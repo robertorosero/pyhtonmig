@@ -44,6 +44,9 @@
 # Don't edit this (usually)
 DESTLIB=$(prefix)/lib/python
 
+# Standard enabled (tests are always available)
+TESTPATH=$(DESTLIB)/test
+
 # Enable this for SGI systems
 #ARCHPATH=:$(DESTLIB)/sgi
 
@@ -53,7 +56,7 @@ DESTLIB=$(prefix)/lib/python
 # Enable this if stdwin installed
 #STDWINPATH=:$(DESTLIB)/stdwin
 
-PYTHONPATH=.:$(DESTLIB)$(ARCHPATH)$(STDWINPATH)
+PYTHONPATH=.:$(DESTLIB)$(TESTPATH)$(ARCHPATH)$(STDWINPATH)
 
 
 # Modules that should always be present (non UNIX dependent)
