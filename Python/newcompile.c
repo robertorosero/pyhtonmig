@@ -1087,7 +1087,6 @@ compiler_body(struct compiler *c, asdl_seq *stmts)
 	stmt_ty st;
 
 	st = asdl_seq_GET(stmts, 0);
-	printf("is_docstring? %d\n", compiler_isdocstring(st));
 	if (compiler_isdocstring(st)) {
 		i = 1;
 		VISIT(c, expr, st->v.Expr.value);
