@@ -58,6 +58,7 @@ sub do_env_envdesc{
     return "\n<dl class='envdesc'>"
          . "\n<dt><tt>&#92;begin{<b class='environment'>$env</b>}</tt>"
          . "\n    $params"
+         . "\n<br /><tt>&#92;end{<b class='environment'>$env</b>}</tt>"
 	 . "\n<dd>"
 	 . $_
 	 . "</dl>";
