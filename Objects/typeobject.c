@@ -246,6 +246,7 @@ type_set_bases(PyTypeObject *type, PyObject *value, void *context)
 	if (mro_internal(type) < 0)
 		goto bail;
 
+	temp = PyList_New(0);
 	if (!temp)
 		goto bail;
 
