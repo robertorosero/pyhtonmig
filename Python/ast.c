@@ -1779,8 +1779,10 @@ ast_for_if_stmt(const node *n)
 	int i, n_elif, has_else = 0;
 	asdl_seq *orelse = NULL;
 	n_elif = NCH(n) - 4;
-	if (TYPE(CHILD(n, n_elif)) == NAME
-	    && STR(CHILD(n, n_elif))[2] == 's') {
+        /* must reference the child n_elif+1 since 'else' token is third,
+           not fourth, child from the end. */
+	if (TYPE(CHILD(n, (n_elif + 1))) == NAME
+	    && STR(CHILD(n, (n_elif + 1)))[2] == 's') {
 	    has_else = 1;
 	    n_elif -= 3;
 	}
