@@ -7,12 +7,13 @@ Utility functions for manipulating directories and directory trees."""
 __revision__ = "$Id$"
 
 import os
-from distutils.errors import DistutilsFileError
+from types import *
+from distutils.errors import DistutilsFileError, DistutilsInternalError
 
 
 # cache for by mkpath() -- in addition to cheapening redundant calls,
 # eliminates redundant "creating /foo/bar/baz" messages in dry-run mode
-PATH_CREATED = {}
+_path_created = {}
 
 # I don't use os.makedirs because a) it's new to Python 1.5.2, and
 # b) it blows up if the directory already exists (I want to silently
@@ -27,7 +28,12 @@ def mkpath (name, mode=0777, verbose=0, dry_run=0):
        summary of each mkdir to stdout.  Return the list of directories
        actually created."""
 
-    global PATH_CREATED
+    global _path_created
+
+    # Detect a common bug -- name is None
+    if type(name) is not StringType:
+        raise DistutilsInternalError, \
+              "mkpath: 'name' must be a string (got %s)" % `name`
 
     # XXX what's the better way to handle verbosity? print as we create
     # each directory in the path (the current behaviour), or only announce
@@ -38,7 +44,7 @@ def mkpath (name, mode=0777, verbose=0, dry_run=0):
     created_dirs = []
     if os.path.isdir (name) or name == '':
         return created_dirs
-    if PATH_CREATED.get (name):
+    if _path_created.get (name):
         return created_dirs
 
     (head, tail) = os.path.split (name)
@@ -58,7 +64,7 @@ def mkpath (name, mode=0777, verbose=0, dry_run=0):
     for d in tails:
         #print "head = %s, d = %s: " % (head, d),
         head = os.path.join (head, d)
-        if PATH_CREATED.get (head):
+        if _path_created.get (head):
             continue
 
         if verbose:
@@ -72,7 +78,7 @@ def mkpath (name, mode=0777, verbose=0, dry_run=0):
                 raise DistutilsFileError, \
                       "could not create '%s': %s" % (head, exc[-1])
 
-        PATH_CREATED[head] = 1
+        _path_created[head] = 1
     return created_dirs
 
 # mkpath ()
@@ -174,23 +180,37 @@ def copy_tree (src, dst,
 
 # copy_tree ()
 
+# Helper for remove_tree()
+def _build_cmdtuple(path, cmdtuples):
+    for f in os.listdir(path):
+        real_f = os.path.join(path,f)
+        if os.path.isdir(real_f) and not os.path.islink(real_f):
+            _build_cmdtuple(real_f, cmdtuples)
+        else:
+            cmdtuples.append((os.remove, real_f))
+    cmdtuples.append((os.rmdir, path))
+
 
 def remove_tree (directory, verbose=0, dry_run=0):
     """Recursively remove an entire directory tree.  Any errors are ignored
-       (apart from being reported to stdout if 'verbose' is true)."""
-
-    from shutil import rmtree
+    (apart from being reported to stdout if 'verbose' is true).
+    """
+    from distutils.util import grok_environment_error
+    global _path_created
 
     if verbose:
         print "removing '%s' (and everything under it)" % directory
     if dry_run:
         return
-    try:
-        rmtree(directory,1)
-    except (IOError, OSError), exc:
-        if verbose:
-            if exc.filename:
-                print "error removing %s: %s (%s)" % \
-                       (directory, exc.strerror, exc.filename)
-            else:
-                print "error removing %s: %s" % (directory, exc.strerror)
+    cmdtuples = []
+    _build_cmdtuple(directory, cmdtuples)
+    for cmd in cmdtuples:
+        try:
+            apply(cmd[0], (cmd[1],))
+            # remove dir from cache if it's already there
+            if _path_created.has_key(cmd[1]):
+                del _path_created[cmd[1]]
+        except (IOError, OSError), exc:
+            if verbose:
+                print grok_environment_error(
+                    exc, "error removing %s: " % directory)
