@@ -814,7 +814,7 @@ compiler_assert(struct compiler *c, stmt_ty s)
 	int end;
 
 	if (Py_OptimizeFlag)
-		return 0;
+		return 1;
 	if (assertion_error == NULL) {
 		assertion_error = PyString_FromString("AssertionError");
 		if (assertion_error == NULL)
@@ -835,6 +835,13 @@ compiler_assert(struct compiler *c, stmt_ty s)
 	}
 	compiler_use_block(c, end);
 	return 1;
+}
+
+static int
+compiler_augassign(struct compiler *c, stmt_ty s)
+{
+	/* XXX unfinished */
+	return 0;
 }
 
 
@@ -877,7 +884,7 @@ compiler_visit_stmt(struct compiler *c, stmt_ty s)
 		}
 		break;
         case AugAssign_kind:
-		break;
+		return compiler_augassign(c, s);
         case Print_kind:
 		return compiler_print(c, s);
 		break;
