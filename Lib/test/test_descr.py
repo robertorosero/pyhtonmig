@@ -412,6 +412,28 @@ def diamond():
     verify(G().boo() == "C")
     verify(G.__mro__ == (G, E, D, C, B, A, object))
 
+def objects():
+    if verbose: print "Testing 'object' class..."
+    # Not much to test here :-)
+    a = object()
+    verify(a.__class__ == object == type(a))
+    b = object()
+    verify(a is not b)
+
+    try:
+        object().foo
+    except AttributeError:
+        pass
+    else:
+        print "Ouch: object() should not have a foo attribute!"
+
+    try:
+        object().foo = 12
+    except AttributeError:
+        pass
+    else:
+        print "Ouch: object() should not allow setting a foo attribute!"
+
 def errors():
     if verbose: print "Testing errors..."
 
@@ -470,6 +492,7 @@ def all():
     pymods()
     multi()
     diamond()
+    objects()
     errors()
 
 all()
