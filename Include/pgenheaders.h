@@ -47,7 +47,7 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #undef label
 #endif
 
-#ifdef macintosh
+#ifdef HAVE_STDLIB_H
 #include <stdlib.h>
 #endif
 
