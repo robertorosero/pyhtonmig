@@ -326,8 +326,9 @@ get_module(m, name, m_ret)
 			void *handle = dlopen(namebuf, RTLD_NOW);
 #else
 			void *handle;
-			printf("dlopen(\"%s\", %d);\n",
-			       namebuf, RTLD_LAZY);
+			if (verbose)
+				printf("dlopen(\"%s\", %d);\n",
+				       namebuf, RTLD_LAZY);
 			handle = dlopen(namebuf, RTLD_LAZY);
 #endif
 			if (handle == NULL) {
