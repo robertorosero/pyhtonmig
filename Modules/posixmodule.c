@@ -48,6 +48,7 @@ extern int mkdir PROTO((const char *, mode_t));
 extern int chdir PROTO((const char *));
 extern int rmdir PROTO((const char *));
 extern int chmod PROTO((const char *, mode_t));
+extern int chown PROTO((const char *, uid_t, gid_t));
 extern char *getcwd PROTO((char *, int));
 extern char *strerror PROTO((int));
 extern int link PROTO((const char *, const char *));
@@ -208,6 +209,25 @@ posix_strint(args, func)
 }
 
 static object *
+posix_strintint(args, func)
+	object *args;
+	int (*func) FPROTO((const char *, int, int));
+{
+	char *path;
+	int i,i2;
+	int res;
+	if (!getargs(args, "(sii)", &path, &i, &i2))
+		return NULL;
+	BGN_SAVE
+	res = (*func)(path, i, i2);
+	END_SAVE
+	if (res < 0)
+		return posix_error();
+	INCREF(None);
+	return None;
+}
+
+static object *
 posix_do_stat(self, args, statfunc)
 	object *self;
 	object *args;
@@ -253,6 +273,14 @@ posix_chmod(self, args)
 	object *args;
 {
 	return posix_strint(args, chmod);
+}
+
+static object *
+posix_chown(self, args)
+	object *self;
+	object *args;
+{
+	return posix_strintint(args, chown);
 }
 
 static object *
@@ -1175,6 +1203,7 @@ posix_pipe(self, args)
 static struct methodlist posix_methods[] = {
 	{"chdir",	posix_chdir},
 	{"chmod",	posix_chmod},
+	{"chown",	posix_chown},
 	{"getcwd",	posix_getcwd},
 	{"link",	posix_link},
 	{"listdir",	posix_listdir},
