@@ -59,40 +59,6 @@ def linecache_checkcache(orig_checkcache=linecache.checkcache):
     cache.update(save)
 linecache.checkcache = linecache_checkcache
 
-
-# Note: <<newline-and-indent>> event is defined in AutoIndent.py
-
-#$ event <<plain-newline-and-indent>>
-#$ win <Control-j>
-#$ unix <Control-j>
-
-#$ event <<beginning-of-line>>
-#$ win <Control-a>
-#$ win <Home>
-#$ unix <Control-a>
-#$ unix <Home>
-
-#$ event <<history-next>>
-#$ win <Alt-n>
-#$ unix <Alt-n>
-
-#$ event <<history-previous>>
-#$ win <Alt-p>
-#$ unix <Alt-p>
-
-#$ event <<interrupt-execution>>
-#$ win <Control-c>
-#$ unix <Control-c>
-
-#$ event <<end-of-file>>
-#$ win <Control-d>
-#$ unix <Control-d>
-
-#$ event <<open-stack-viewer>>
-
-#$ event <<toggle-debugger>>
-
-
 class PyShellEditorWindow(EditorWindow):
 
     # Regular text edit window when a shell is present
