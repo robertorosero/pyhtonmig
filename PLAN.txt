@@ -312,10 +312,6 @@ Merge issues:
           Looks like Guido added this in descr-branch rev 2.80.2.6
           of dictobject.c; but this form of casting cheat doesn't work
           anymore on dicts.
-
-+ If some non-Windows test has an expected-output file in descr-branch
-  that has been removed on the trunk since descr-fork, it will probably
-  fail.  The cure is to remove the expected-output file in descr-branch too.
 ------------------------------------------------------------------
 2001-07-06
 
