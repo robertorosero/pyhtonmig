@@ -841,11 +841,9 @@ sock_getattr(s, name)
 }
 
 
-/* Type object for socket objects.
-   XXX This should be static, but some compilers don't grok the
-   XXX forward reference to it in that case... */
+/* Type object for socket objects. */
 
-typeobject Socktype = {
+static typeobject Socktype = {
 	OB_HEAD_INIT(&Typetype)
 	0,
 	"socket",
