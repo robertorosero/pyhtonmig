@@ -1356,22 +1356,25 @@ PyObject_SelfIter(PyObject *obj)
 	  PyType_HasFeature((descr)->ob_type, Py_TPFLAGS_HAVE_CLASS)) ? \
 		(descr)->ob_type->field : NULL)
 
-/* Find the dict where an attribute resides, and remember whether its value */
-/* is a data descriptor.  The dict is returned un-INCREFed. */
+/* Find the dict where an attribute resides, and return it un-INCREFed.  */
+/* In addition, cache/return whether the value is a descriptor-with-set; and */
+/* cache/return the value itself if the value is a descriptor-with-get. */
 PyObject *_PyObject_FindAttr(PyTypeObject *tp, PyObject *name,
-			     int *is_data_descr)
+			     PyObject **descr, int *isdata)
 {
-	PyObject *pair = NULL;
-	PyObject *flag = NULL;
-	PyObject *where = NULL;
-	PyObject *descr = NULL;
+	PyObject *triple = NULL;
+	PyObject *value;
+	PyObject *cache_where = Py_None;
+	PyObject *cache_descr = Py_None;
+	PyObject *cache_isdata = Py_False;
 
 	if (tp->tp_cache != NULL) {
-		pair = PyDict_GetItem(tp->tp_cache, name);
+		triple = PyDict_GetItem(tp->tp_cache, name);
 		/* pair is not owned by this func */
-		if (pair) {
-			flag = PyTuple_GET_ITEM(pair, 0);
-			where = PyTuple_GET_ITEM(pair, 1);
+		if (triple) {
+			cache_where = PyTuple_GET_ITEM(triple, 0);
+			cache_descr = PyTuple_GET_ITEM(triple, 1);
+			cache_isdata = PyTuple_GET_ITEM(triple, 2);
 			goto done;
 		}
 	}
@@ -1395,42 +1398,40 @@ PyObject *_PyObject_FindAttr(PyTypeObject *tp, PyObject *name,
 				dict = ((PyTypeObject *) base)->tp_dict;
 			}
 			assert(dict && PyDict_Check(dict));
-			descr = PyDict_GetItem(dict, name);
-			if (descr != NULL) {
-				if (GET_DESCR_FIELD(descr, tp_descr_set)) {
-					/* It's a data descriptor. */
-					flag = Py_True;
-				} else {
-					flag = Py_False;
-				}
-				where = dict;
+			value = PyDict_GetItem(dict, name);
+			if (value != NULL) {
+				cache_where = dict;
+				if (GET_DESCR_FIELD(value, tp_descr_get))
+					cache_descr = value;
+				if (GET_DESCR_FIELD(value, tp_descr_set))
+					cache_isdata = Py_True;
 				break;
 			}
 		}
 	}
 
-	if (flag == NULL) {
-		flag = Py_False;
-		where = Py_None;
-	}
-
 	if (tp->tp_cache != NULL) {
-		pair = PyTuple_New(2);
-		Py_INCREF(flag);
-		PyTuple_SetItem(pair, 0, flag);
-		Py_INCREF(where);
-		PyTuple_SetItem(pair, 1, where);
-		PyDict_SetItem(tp->tp_cache, name, pair);
-		Py_DECREF(pair);
+		triple = PyTuple_New(3);
+		Py_INCREF(cache_where);
+		PyTuple_SetItem(triple, 0, cache_where);
+		Py_INCREF(cache_descr);
+		PyTuple_SetItem(triple, 1, cache_descr);
+		Py_INCREF(cache_isdata);
+		PyTuple_SetItem(triple, 2, cache_isdata);
+		PyDict_SetItem(tp->tp_cache, name, triple);
+		Py_DECREF(triple);
 	}
 
   done:
-	*is_data_descr = (flag == Py_True);
-	if (where == Py_None) {
+	if (cache_descr == Py_None)
+		*descr = NULL;
+	else
+		*descr = cache_descr;
+	*isdata = (cache_isdata == Py_True);
+	if (cache_where == Py_None)
 		return NULL;
-	} else {
-		return where;
-	}
+	else
+		return cache_where;
 }
 
 PyObject *
@@ -1438,8 +1439,8 @@ PyObject_GenericGetAttr(PyObject *obj, PyObject *name)
 {
 	PyTypeObject *tp = obj->ob_type;
 	PyObject *where;
-	int is_data_descr = 0;
 	PyObject *descr = NULL;
+	int isdata = 0;
 	PyObject *res = NULL;
 	descrgetfunc descr_get;
 	long dictoffset;
@@ -1472,10 +1473,10 @@ PyObject_GenericGetAttr(PyObject *obj, PyObject *name)
 	}
 
 	/* Locate the attribute among the base classes. */
-	where = _PyObject_FindAttr(tp, name, &is_data_descr);
+	where = _PyObject_FindAttr(tp, name, &descr, &isdata);
 
 	/* Data descriptor takes priority over instance attribute. */
-	if (!is_data_descr) {
+	if (!isdata) {
 
 		/* Inline _PyObject_GetDictPtr */
 		dictoffset = tp->tp_dictoffset;
@@ -1506,18 +1507,17 @@ PyObject_GenericGetAttr(PyObject *obj, PyObject *name)
 		}
 	}
 
-	if (where != NULL) {
-		descr = PyDict_GetItem(where, name);
-		assert(descr != NULL);
+	if (descr != NULL) {
 		descr_get = GET_DESCR_FIELD(descr, tp_descr_get);
+		assert(descr_get != NULL);
+		res = descr_get(descr, obj, (PyObject *)tp);
+		goto done;
+	}
 
-		if (descr_get != NULL) {
-			res = descr_get(descr, obj, (PyObject *) tp);
-			goto done;
-		}
-
-		Py_INCREF(descr);
-		res = descr;
+	if (where != NULL) {
+		res = PyDict_GetItem(where, name);
+		assert(res != NULL);
+		Py_INCREF(res);
 		goto done;
 	}
 
@@ -1535,8 +1535,8 @@ PyObject_GenericSetAttr(PyObject *obj, PyObject *name, PyObject *value)
 {
 	PyTypeObject *tp = obj->ob_type;
 	PyObject *where;
-	int is_data_descr = 0;
-	PyObject *descr = NULL;
+	PyObject *descr;
+	int isdata = 0;
 	descrsetfunc descr_set;
 	PyObject **dictptr;
 	int res = -1;
@@ -1568,15 +1568,12 @@ PyObject_GenericSetAttr(PyObject *obj, PyObject *name, PyObject *value)
 	}
 
 	/* Locate the attribute among the base classes. */
-	where = _PyObject_FindAttr(tp, name, &is_data_descr);
-	if (where != NULL) {
-		descr = PyDict_GetItem(where, name);
-	}
-	if (is_data_descr) {
+	where = _PyObject_FindAttr(tp, name, &descr, &isdata);
+	if (isdata) {
 		/* Data descriptor takes priority over instance attribute. */
-		assert(descr != NULL);
+		assert(descr != NULL); /* XXX Will fail if set but no get! */
 		descr_set = GET_DESCR_FIELD(descr, tp_descr_set);
-		assert(descr_set != NULL && PyDescr_IsData(descr));
+		assert(descr_set != NULL);
 		res = descr_set(descr, obj, value);
 		goto done;
 	}

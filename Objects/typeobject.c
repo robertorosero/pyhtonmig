@@ -2103,7 +2103,7 @@ static int
 type_setattro(PyTypeObject *type, PyObject *name, PyObject *value)
 {
 	PyObject *old;
-	int was_data_descr, is_data_descr;
+	int wasdata, isdata, wasdescr, isdescr, wasnull, isnull;
 
 	if (!(type->tp_flags & Py_TPFLAGS_HEAPTYPE)) {
 		PyErr_Format(
@@ -2115,12 +2115,14 @@ type_setattro(PyTypeObject *type, PyObject *name, PyObject *value)
 
 	/* If this change affects attribute lookup, invalidate cache entries. */
 	old = PyDict_GetItem(type->tp_dict, name);
-	was_data_descr = (old != NULL) && GET_DESCR_FIELD(old, tp_descr_set);
-	is_data_descr = (value != NULL) && GET_DESCR_FIELD(value, tp_descr_set);
-	if (was_data_descr != is_data_descr ||
-	    (old == NULL) != (value == NULL)) {
+	wasnull = (old == NULL);
+	isnull = (value == NULL);
+	wasdescr = (GET_DESCR_FIELD(old, tp_descr_get) != NULL);
+	isdescr = (GET_DESCR_FIELD(value, tp_descr_get) != NULL);
+	wasdata = (GET_DESCR_FIELD(old, tp_descr_set) != NULL);
+	isdata = (GET_DESCR_FIELD(value, tp_descr_set) != NULL);
+	if (wasnull != isnull || wasdescr != isdescr || wasdata != isdata)
 		update_subclasses(type, name, invalidate_cache, name);
-	}
 
 	if (PyObject_GenericSetAttr((PyObject *)type, name, value) < 0)
 		return -1;
