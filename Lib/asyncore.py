@@ -80,6 +80,7 @@ def poll (timeout=0.0, map=None):
         except select.error, err:
             if err[0] != EINTR:
                 raise
+            r = []; w = []; e = []
 
         if DEBUG:
             print r,w,e
@@ -510,7 +511,6 @@ def close_all (map=None):
 #
 # Regardless, this is useful for pipes, and stdin/stdout...
 
-import os
 if os.name == 'posix':
     import fcntl
 

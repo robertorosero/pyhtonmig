@@ -172,7 +172,7 @@ def deepcopy(x, memo = None):
                 raise error, \
                       "un-deep-copyable object of type %s" % type(x)
             else:
-                y = _reconstruct(x, reductor(), 1)
+                y = _reconstruct(x, reductor(), 1, memo)
         else:
             y = copier(memo)
     else:
@@ -197,7 +197,10 @@ try:
     d[types.UnicodeType] = _deepcopy_atomic
 except AttributeError:
     pass
-d[types.CodeType] = _deepcopy_atomic
+try:
+    d[types.CodeType] = _deepcopy_atomic
+except AttributeError:
+    pass
 d[types.TypeType] = _deepcopy_atomic
 d[types.XRangeType] = _deepcopy_atomic
 
@@ -279,10 +282,12 @@ def _deepcopy_inst(x, memo):
     return y
 d[types.InstanceType] = _deepcopy_inst
 
-def _reconstruct(x, info, deep):
+def _reconstruct(x, info, deep, memo=None):
     if isinstance(info, str):
         return x
     assert isinstance(info, tuple)
+    if memo is None:
+        memo = {}
     n = len(info)
     assert n in (2, 3)
     callable, args = info[:2]
@@ -291,11 +296,11 @@ def _reconstruct(x, info, deep):
     else:
         state = {}
     if deep:
-        args = deepcopy(args)
+        args = deepcopy(args, memo)
     y = callable(*args)
     if state:
         if deep:
-            state = deepcopy(state)
+            state = deepcopy(state, memo)
         y.__dict__.update(state)
     return y
 

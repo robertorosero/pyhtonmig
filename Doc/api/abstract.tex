@@ -307,6 +307,14 @@ determination.
   return false.
 \end{cfuncdesc}
 
+\begin{cfuncdesc}{PyObject*}{PyObject_GetIter}{PyObject *o}
+  This is equivalent to the Python expression \samp{iter(\var{o})}.
+  It returns a new iterator for the object argument, or the object 
+  itself if the object is already an iterator.  Raises
+  \exception{TypeError} and returns \NULL{} if the object cannot be
+  iterated.
+\end{cfuncdesc}
+
 
 \section{Number Protocol \label{number}}
 
@@ -855,18 +863,30 @@ To write a loop which iterates over an iterator, the C code should
 look something like this:
 
 \begin{verbatim}
-PyObject *iterator = ...;
+PyObject *iterator = PyObject_GetIter(obj);
 PyObject *item;
 
-while (item = PyIter_Next(iter)) {
-    /* do something with item */
+if (iterator == NULL) {
+    /* propagate error */
 }
+
+while (item = PyIter_Next(iterator)) {
+    /* do something with item */
+    ...
+    /* release reference when done */
+    Py_DECREF(item);
+}
+
+Py_DECREF(iterator);
+
 if (PyErr_Occurred()) {
-    /* propogate error */
+    /* propagate error */
 }
 else {
     /* continue doing useful work */
 }
+\end{verbatim}
+
 
 \section{Buffer Protocol \label{abstract-buffer}}
 
@@ -897,7 +917,7 @@ else {
   Returns \code{1} if \var{o} supports the single-segment readable
   buffer interface.  Otherwise returns \code{0}.
   \versionadded{2.2}
-\enc{cfuncdesc}
+\end{cfuncdesc}
 
 \begin{cfuncdesc}{int}{PyObject_AsWriteBuffer}{PyObject *obj,
                                                const char **buffer,
@@ -909,5 +929,3 @@ else {
   \code{0} and sets a \exception{TypeError} on error.
   \versionadded{1.6}
 \end{cfuncdesc}
-
-\end{verbatim}

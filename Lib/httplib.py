@@ -69,6 +69,7 @@ Req-sent-unread-response       _CS_REQ_SENT       <response_class>
 import errno
 import mimetools
 import socket
+from urlparse import urlsplit
 
 try:
     from cStringIO import StringIO
@@ -403,13 +404,13 @@ class HTTPConnection:
         if self.debuglevel > 0:
             print "send:", repr(str)
         try:
-            self.sock.send(str)
+            self.sock.sendall(str)
         except socket.error, v:
             if v[0] == 32:      # Broken pipe
                 self.close()
             raise
 
-    def putrequest(self, method, url):
+    def putrequest(self, method, url, skip_host=0):
         """Send a request to the server.
 
         `method' specifies an HTTP request method, e.g. 'GET'.
@@ -460,18 +461,31 @@ class HTTPConnection:
         if self._http_vsn == 11:
             # Issue some standard headers for better HTTP/1.1 compliance
 
-            # this header is issued *only* for HTTP/1.1 connections. more
-            # specifically, this means it is only issued when the client uses
-            # the new HTTPConnection() class. backwards-compat clients will
-            # be using HTTP/1.0 and those clients may be issuing this header
-            # themselves. we should NOT issue it twice; some web servers (such
-            # as Apache) barf when they see two Host: headers
+            if not skip_host:
+                # this header is issued *only* for HTTP/1.1
+                # connections. more specifically, this means it is
+                # only issued when the client uses the new
+                # HTTPConnection() class. backwards-compat clients
+                # will be using HTTP/1.0 and those clients may be
+                # issuing this header themselves. we should NOT issue
+                # it twice; some web servers (such as Apache) barf
+                # when they see two Host: headers
 
-            # if we need a non-standard port,include it in the header
-            if self.port == HTTP_PORT:
-                self.putheader('Host', self.host)
-            else:
-                self.putheader('Host', "%s:%s" % (self.host, self.port))
+                # If we need a non-standard port,include it in the
+                # header.  If the request is going through a proxy,
+                # but the host of the actual URL, not the host of the
+                # proxy.
+
+                netloc = ''
+                if url.startswith('http'):
+                    nil, netloc, nil, nil, nil = urlsplit(url)
+
+                if netloc:
+                    self.putheader('Host', netloc)
+                elif self.port == HTTP_PORT:
+                    self.putheader('Host', self.host)
+                else:
+                    self.putheader('Host', "%s:%s" % (self.host, self.port))
 
             # note: we are assuming that clients will not attempt to set these
             #       headers since *this* library must deal with the
@@ -529,7 +543,14 @@ class HTTPConnection:
             self._send_request(method, url, body, headers)
 
     def _send_request(self, method, url, body, headers):
-        self.putrequest(method, url)
+        # If headers already contains a host header, then define the
+        # optional skip_host argument to putrequest().  The check is
+        # harder because field names are case insensitive.
+        if (headers.has_key('Host')
+            or [k for k in headers.iterkeys() if k.lower() == "host"]):
+            self.putrequest(method, url, skip_host=1)
+        else:
+            self.putrequest(method, url)
 
         if body:
             self.putheader('Content-Length', str(len(body)))
@@ -856,6 +877,17 @@ def test():
         for header in headers.headers: print header.strip()
     print
     print h.getfile().read()
+
+    # minimal test that code to extract host from url works
+    class HTTP11(HTTP):
+        _http_vsn = 11
+        _http_vsn_str = 'HTTP/1.1'
+
+    h = HTTP11('www.python.org')
+    h.putrequest('GET', 'http://www.python.org/~jeremy/')
+    h.endheaders()
+    h.getreply()
+    h.close()
 
     if hasattr(socket, 'ssl'):
         host = 'sourceforge.net'
