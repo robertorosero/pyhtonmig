@@ -660,6 +660,7 @@ compiler_function(struct compiler *c, stmt_ty s)
 {
 	PyCodeObject *co;
 	arguments_ty args = s->v.FunctionDef.args;
+	int i, n;
 	assert(s->kind == FunctionDef_kind);
 
 	if (args->defaults)
@@ -667,7 +668,14 @@ compiler_function(struct compiler *c, stmt_ty s)
 	if (!compiler_enter_scope(c, s->v.FunctionDef.name, (void *)s))
 		return 0;
 	c->u->u_argcount = asdl_seq_LEN(s->v.FunctionDef.args->args);
-	VISIT_SEQ(c, stmt, s->v.FunctionDef.body);
+	n = asdl_seq_LEN(s->v.FunctionDef.body);
+	for (i = 0; i < n; i++) {
+		stmt_ty s2 = asdl_seq_GET(s->v.FunctionDef.body, i);
+		if (i == 0 && s2->kind == Expr_kind &&
+		    s2->v.Expr.value->kind == Str_kind)
+			continue;
+		VISIT(c, stmt, s2);
+	}
 	co = assemble(c);
 	if (co == NULL)
 		return 0;
