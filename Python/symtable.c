@@ -603,6 +603,7 @@ symtable_exit_block(struct symtable *st, void *ast)
 	if (end >= 0) {
 		st->st_cur = (PySTEntryObject *)PyList_GET_ITEM(st->st_stack, 
 								end);
+		Py_INCREF(st->st_cur);
 		if (PySequence_DelItem(st->st_stack, end) < 0)
 			return 0;
 	}
@@ -621,6 +622,7 @@ symtable_enter_block(struct symtable *st, identifier name, block_ty block,
 			Py_DECREF(st->st_cur);
 			return 0;
 		}
+		Py_DECREF(st->st_cur);
 	}
 	st->st_cur = PySTEntry_New(st, name, block, ast, lineno);
 	if (name == GET_IDENTIFIER(top))
