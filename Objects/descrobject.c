@@ -203,16 +203,21 @@ descr_call(PyDescrObject *descr, PyObject *args, PyObject *kwds)
 	argc = PyTuple_GET_SIZE(args);
 	if (argc < 1) {
 		PyErr_SetString(PyExc_TypeError,
-				"descriptor call needs 'self' argument");
+				"descriptor call needs a self argument");
 		return NULL;
 	}
 	self = PyTuple_GET_ITEM(args, 0);
 	if (!PyObject_IsInstance(self, (PyObject *)(descr->d_type))) {
+		char *name = descr_name(descr);
+		if (name == NULL)
+			name = "?";
 		PyErr_Format(PyExc_TypeError,
-			     "descriptor call 'self' is type '%.100s', "
-			     "expected type '%.100s'",
-			     self->ob_type->tp_name,
-			     descr->d_type->tp_name);
+			     "descriptor '%.100s' "
+			     "requires a '%.100s', "
+			     "received a '%.100s'",
+			     name,
+			     descr->d_type->tp_name,
+			     self->ob_type->tp_name);
 		return NULL;
 	}
 
