@@ -540,21 +540,6 @@ SOURCE=..\Python\errors.c
 # End Source File
 # Begin Source File
 
-SOURCE=..\Python\exceptions.c
-
-!IF  "$(CFG)" == "python16 - Win32 Release"
-
-!ELSEIF  "$(CFG)" == "python16 - Win32 Debug"
-
-!ELSEIF  "$(CFG)" == "python16 - Win32 Alpha Debug"
-
-!ELSEIF  "$(CFG)" == "python16 - Win32 Alpha Release"
-
-!ENDIF 
-
-# End Source File
-# Begin Source File
-
 SOURCE=..\Objects\fileobject.c
 
 !IF  "$(CFG)" == "python16 - Win32 Release"
@@ -646,20 +631,6 @@ SOURCE=..\Python\frozen.c
 # Begin Source File
 
 SOURCE=..\Objects\funcobject.c
-
-!IF  "$(CFG)" == "python16 - Win32 Release"
-
-!ELSEIF  "$(CFG)" == "python16 - Win32 Debug"
-
-!ELSEIF  "$(CFG)" == "python16 - Win32 Alpha Debug"
-
-!ELSEIF  "$(CFG)" == "python16 - Win32 Alpha Release"
-
-!ENDIF 
-
-# End Source File
-# Begin Source File
-SOURCE=..\Modules\gcmodule.c
 
 !IF  "$(CFG)" == "python16 - Win32 Release"
 
