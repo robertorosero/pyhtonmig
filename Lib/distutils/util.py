@@ -170,6 +170,9 @@ def make_file (src, dst, func, args,
        'args', but only if it needs to: i.e. if 'dst' does not exist or
        'src' is newer than 'dst'."""
 
+    if type (args) is not TupleType:
+        raise TypeError, "'args' must be a tuple of command arguments"
+
     if newer (src, dst):
         if verbose and update_message:
             print update_message

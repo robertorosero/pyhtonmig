@@ -904,6 +904,9 @@ class Command:
            a message to print if the verbosity level is high enough, and an
            optional verbosity threshold."""
 
+        if type (args) is not TupleType:
+            raise TypeError, "'args' must be a tuple of command arguments"
+
         # Generate a message if we weren't passed one
         if msg is None:
             msg = "%s %s" % (func.__name__, `args`)
