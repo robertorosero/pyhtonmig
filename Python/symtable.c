@@ -5,11 +5,11 @@
 #include "symtable.h"
 #include "structmember.h"
 
-PySymtableEntryObject *
-PySymtableEntry_New(struct symtable *st, identifier name, scope_ty scope,
-		    void *key, int lineno)
+PySTEntryObject *
+PySTEntry_New(struct symtable *st, identifier name, block_ty block,
+	      void *key, int lineno)
 {
-	PySymtableEntryObject *ste = NULL;
+	PySTEntryObject *ste = NULL;
 	PyObject *k, *v;
 
 	k = PyLong_FromVoidPtr(key);
@@ -18,14 +18,14 @@ PySymtableEntry_New(struct symtable *st, identifier name, scope_ty scope,
 	/* XXX do we need the lookup code anymore? */
 	v = PyDict_GetItem(st->st_symbols, k);
 	if (v) {
-		assert(PySymtableEntry_Check(v));
+		assert(PySTEntry_Check(v));
 		Py_DECREF(k);
 		Py_INCREF(v);
-		return (PySymtableEntryObject *)v;
+		return (PySTEntryObject *)v;
 	}
 	
-	ste = (PySymtableEntryObject *)PyObject_New(PySymtableEntryObject,
-						    &PySymtableEntry_Type);
+	ste = (PySTEntryObject *)PyObject_New(PySTEntryObject,
+					      &PySTEntry_Type);
 	ste->ste_table = st;
 	ste->ste_id = k;
 
@@ -47,7 +47,7 @@ PySymtableEntry_New(struct symtable *st, identifier name, scope_ty scope,
 	    goto fail;
 	ste->ste_children = v;
 
-	ste->ste_type = scope;
+	ste->ste_type = block;
 	ste->ste_optimized = 0;
 	ste->ste_opt_lineno = 0;
 	ste->ste_lineno = lineno;
@@ -55,7 +55,7 @@ PySymtableEntry_New(struct symtable *st, identifier name, scope_ty scope,
 	if (st->st_cur == NULL)
 		ste->ste_nested = 0;
 	else if (st->st_cur->ste_nested 
-		 || st->st_cur->ste_type == FunctionScope)
+		 || st->st_cur->ste_type == FunctionBlock)
 		ste->ste_nested = 1;
 	else
 		ste->ste_nested = 0;
@@ -72,20 +72,19 @@ PySymtableEntry_New(struct symtable *st, identifier name, scope_ty scope,
 }
 
 static PyObject *
-ste_repr(PySymtableEntryObject *ste)
+ste_repr(PySTEntryObject *ste)
 {
 	char buf[256];
 
 	PyOS_snprintf(buf, sizeof(buf),
 		      "<symtable entry %.100s(%ld), line %d>",
 		      PyString_AS_STRING(ste->ste_name),
-		      PyInt_AS_LONG(ste->ste_id),
-		      ste->ste_lineno);
+		      PyInt_AS_LONG(ste->ste_id), ste->ste_lineno);
 	return PyString_FromString(buf);
 }
 
 static void
-ste_dealloc(PySymtableEntryObject *ste)
+ste_dealloc(PySTEntryObject *ste)
 {
 	ste->ste_table = NULL;
 	Py_XDECREF(ste->ste_id);
@@ -96,7 +95,7 @@ ste_dealloc(PySymtableEntryObject *ste)
 	PyObject_Del(ste);
 }
 
-#define OFF(x) offsetof(PySymtableEntryObject, x)
+#define OFF(x) offsetof(PySTEntryObject, x)
 
 static PyMemberDef ste_memberlist[] = {
 	{"id",       T_OBJECT, OFF(ste_id), READONLY},
@@ -111,11 +110,11 @@ static PyMemberDef ste_memberlist[] = {
 	{NULL}
 };
 
-PyTypeObject PySymtableEntry_Type = {
+PyTypeObject PySTEntry_Type = {
 	PyObject_HEAD_INIT(&PyType_Type)
 	0,
 	"symtable entry",
-	sizeof(PySymtableEntryObject),
+	sizeof(PySTEntryObject),
 	0,
 	(destructor)ste_dealloc,                /* tp_dealloc */
 	0,                                      /* tp_print */
@@ -153,9 +152,9 @@ PyTypeObject PySymtableEntry_Type = {
 	0,					/* tp_new */
 };
 
-static int symtable_enter_scope(struct symtable *st, identifier name, 
-				scope_ty scope, void *ast, int lineno);
-static int symtable_exit_scope(struct symtable *st, void *ast);
+static int symtable_enter_block(struct symtable *st, identifier name, 
+				block_ty block, void *ast, int lineno);
+static int symtable_exit_block(struct symtable *st, void *ast);
 static int symtable_visit_stmt(struct symtable *st, stmt_ty s);
 static int symtable_visit_expr(struct symtable *st, expr_ty s);
 static int symtable_visit_arguments(struct symtable *st, arguments_ty);
@@ -215,7 +214,7 @@ PySymtable_Build(mod_ty mod, const char *filename, PyFutureFeatures *future)
 		return st;
 	st->st_filename = filename;
 	st->st_future = future;
-	symtable_enter_scope(st, GET_IDENTIFIER(top), ModuleScope, 
+	symtable_enter_block(st, GET_IDENTIFIER(top), ModuleBlock, 
 			     (void *)mod, 0);
 	/* Any other top-level initialization? */
 	if (mod->kind == Module_kind) {
@@ -227,26 +226,255 @@ PySymtable_Build(mod_ty mod, const char *filename, PyFutureFeatures *future)
 				return NULL;
 			}
 	}
-	symtable_exit_scope(st, (void *)mod);
+	symtable_exit_block(st, (void *)mod);
 	return st;
 }
 
+int 
+PySTEntry_GetScope(PySTEntryObject *ste, PyObject *name)
+{
+	PyObject *v;
+	int flags;
 
-/* symtable_enter_scope() gets a reference via PySymtableEntry_New().
-   This reference is released when the scope is exited, via the DECREF
-   in symtable_exit_scope().
+	v = PyDict_GetItem(ste->ste_symbols, name);
+	if (!v)
+		return 0;
+	assert(PyInt_Check(v));
+	flags = PyInt_AS_LONG(v);
+	flags = (flags >> SCOPE_OFF) & SCOPE_MASK;
+	return flags;
+}
+
+
+/* Analyze raw symbol information to determine scope of each name.
+
+   The next several functions are helpers for PySymtable_Analyze(),
+   which determines whether a name is local, global, or free.  In addition, 
+   it determines which local variables are cell variables; they provide
+   bindings that are used for free variables in enclosed blocks.  
+
+   There are also two kinds of free variables, implicit and explicit.  An 
+   explicit global is declared with the global statement.  An implicit
+   global is a free variable for which the compiler has found no binding
+   in an enclosing function scope.  The implicit global is either a global
+   or a builtin.  Python's module and class blocks use the xxx_NAME opcodes
+   to handle these names to implement slightly odd semantics.  In such a
+   block, the name is treated as global until it is assigned to; then it
+   is treated as a local.
+
+   The symbol table requires two passes to determine the scope of each name.
+   The first pass collects raw facts from the AST: the name is a parameter 
+   here, the name is used by not defined here, etc.  The second pass analyzes
+   these facts during a pass over the PySTEntryObjects created during pass 1.
+
+   When a function is entered during the second pass, the parent passes
+   the set of all name bindings visible to its children.  These bindings 
+   are used to determine if the variable is free or an implicit global.
+   After doing the local analysis, it analyzes each of its child blocks
+   using an updated set of name bindings.  
+
+   The children update the free variable set.  If a local variable is free 
+   in a child, the variable is marked as a cell.  The current function must 
+   provide runtime storage for the variable that may outlive the function's 
+   frame.  Cell variables are removed from the free set before the analyze
+   function returns to its parent.
+   
+   The sets of bound and free variables are implemented as dictionaries
+   mapping strings to None.
+*/
+
+#define SET_SCOPE(DICT, NAME, I) { \
+	PyObject *o = PyInt_FromLong(I); \
+	if (!o) \
+		return 0; \
+	if (PyDict_SetItem((DICT), (NAME), o) < 0) \
+		return 0; \
+}
+
+/* XXX handle this:
+   def f(x):
+       global y
+       def g():
+           return x + y
+   so that y is a global
+*/
+
+int 
+analyze_name(PyObject *dict, PyObject *name, int flags, PyObject *bound,
+	     PyObject *local, PyObject *free)
+{
+	if (flags & DEF_GLOBAL) {
+		if (flags & DEF_PARAM)
+			return 0; /* can't declare a parameter as global */
+		SET_SCOPE(dict, name, GLOBAL_EXPLICIT);
+		return 1;
+	}
+	if (flags & DEF_BOUND) {
+		SET_SCOPE(dict, name, LOCAL);
+		if (PyDict_SetItem(local, name, Py_None) < 0)
+			return 0;
+		return 1;
+	}
+	if (bound && PyDict_GetItem(bound, name)) {
+		SET_SCOPE(dict, name, FREE);
+		if (PyDict_SetItem(free, name, Py_None) < 0)
+			return 0;
+		return 1;
+	}
+	else {
+		SET_SCOPE(dict, name, GLOBAL_IMPLICIT);
+		return 1;
+	}
+	return 0; /* Can't get here */
+}
+
+#undef SET_SCOPE
+
+/* If a name is defined in free and also in locals, then this block
+   provides the binding for the free variable.  The name should be
+   marked CELL in this block and removed from the free list.
+
+   Note that the current block's free variables are included in free.
+   That's safe because no name can be free and local in the same scope.
+*/
+
+int
+analyze_cells(PyObject *scope, PyObject *free)
+{
+	PyObject *name, *v, *w;
+	int flags, pos = 0, success = 0;
+
+	w = PyInt_FromLong(CELL);
+	if (!w)
+		return 0;
+	while (PyDict_Next(scope, &pos, &name, &v)) {
+		assert(PyInt_Check(v));
+		flags = PyInt_AS_LONG(v);
+		if (flags != LOCAL)
+			continue;
+		if (!PyDict_GetItem(free, name))
+			continue;
+		/* Replace LOCAL with CELL for this name, and remove
+		   from free. It is safe to replace the value of name 
+		   in the dict, because it will not cause a resize.
+		 */
+		if (PyDict_SetItem(scope, name, w) < 0)
+			goto error;
+		if (!PyDict_DelItem(free, name) < 0)
+			goto error;
+	}
+	success = 1;
+ error:
+	Py_DECREF(w);
+	return success;
+}
+
+/* Enter the final scope information into the st_symbols dict. */
+int
+update_symbols(PyObject *symbols, PyObject *scope)
+{
+	PyObject *name, *v, *u, *w;
+	int i, flags, pos = 0;
+
+	while (PyDict_Next(symbols, &pos, &name, &v)) {
+		assert(PyInt_Check(v));
+		flags = PyInt_AS_LONG(v);
+		w = PyDict_GetItem(scope, name);
+		assert(w && PyInt_Check(w));
+		i = PyInt_AS_LONG(w);
+		flags |= (i << SCOPE_OFF);
+		u = PyInt_FromLong(flags);
+		if (!PyDict_SetItem(symbols, name, u)) {
+			Py_DECREF(u);
+			return 0;
+		}
+		Py_DECREF(u);
+	}
+	return 1;
+}   
+
+int
+analyze_block(PySTEntryObject *ste, PyObject *bound, PyObject *free)
+{
+	PyObject *name, *v, *local = NULL, *scope = NULL, *newbound = NULL;
+	int i, flags, pos = 0, success = 0;
+
+	local = PyDict_New();
+	if (!local)
+		goto error;
+	scope = PyDict_New();
+	if (!scope)
+		goto error;
+
+	while (PyDict_Next(ste->ste_symbols, &pos, &name, &v)) {
+		flags = PyInt_AS_LONG(v);
+		if (!analyze_name(scope, name, flags, bound, local, free))
+			goto error;
+	}
+
+	/* create a new bound dictionary to pass to children */
+	newbound = PyDict_New();
+	if (!newbound)
+		goto error;
+	if (ste->ste_type != ClassBlock) {
+		if (PyDict_Update(newbound, local) < 0)
+			goto error;
+	}
+	if (bound) {
+		if (PyDict_Update(newbound, bound) < 0)
+			goto error;
+	}
+
+	/* call analyze_block() on each child */
+	for (i = 0; i < PyList_GET_SIZE(ste->ste_children); ++i) {
+		PyObject *c;
+		c = PyDict_GetItem(ste->ste_table->st_symbols,
+				   PyList_GET_ITEM(ste->ste_children, i));
+		assert(c && PySTEntry_Check(c));
+		if (!analyze_block((PySTEntryObject *)c, local, free))
+			goto error;
+	}
+
+	if (!analyze_cells(scope, free))
+		goto error;
+	if (!update_symbols(ste->ste_symbols, scope))
+		goto error;
+	success = 1;
+ error:
+	Py_XDECREF(local);
+	Py_XDECREF(scope);
+	Py_XDECREF(newbound);
+	return success;
+}
+
+int
+PySymtable_Analyze(struct symtable *st)
+{
+	PyObject *free;
+	int r;
+
+	free = PyDict_New();
+	if (!free)
+		return 0;
+	r = analyze_block((PySTEntryObject *)st->st_global, NULL, free);
+	Py_DECREF(free);
+	return r;
+}
+
+
+/* symtable_enter_block() gets a reference via PySTEntry_New().
+   This reference is released when the block is exited, via the DECREF
+   in symtable_exit_block().
 */
 
 static int
-symtable_exit_scope(struct symtable *st, void *ast)
+symtable_exit_block(struct symtable *st, void *ast)
 {
 	int end;
 
-	if (st->st_pass == 1)
-		symtable_update_free_vars(st);
 	Py_DECREF(st->st_cur);
 	end = PyList_GET_SIZE(st->st_stack) - 1;
-	st->st_cur = (PySymtableEntryObject *)PyList_GET_ITEM(st->st_stack, 
+	st->st_cur = (PySTEntryObject *)PyList_GET_ITEM(st->st_stack, 
 							      end);
 	if (PySequence_DelItem(st->st_stack, end) < 0)
 		return -1;
@@ -254,10 +482,10 @@ symtable_exit_scope(struct symtable *st, void *ast)
 }
 
 static int
-symtable_enter_scope(struct symtable *st, identifier name, scope_ty scope, 
+symtable_enter_block(struct symtable *st, identifier name, block_ty block, 
 		     void *ast, int lineno)
 {
-	PySymtableEntryObject *prev = NULL;
+	PySTEntryObject *prev = NULL;
 
 	if (st->st_cur) {
 		prev = st->st_cur;
@@ -267,7 +495,7 @@ symtable_enter_scope(struct symtable *st, identifier name, scope_ty scope,
 			return 0;
 		}
 	}
-	st->st_cur = PySymtableEntry_New(st, name, scope, ast, lineno);
+	st->st_cur = PySTEntry_New(st, name, block, ast, lineno);
 	if (name == GET_IDENTIFIER(top))
 		st->st_global = st->st_cur->ste_symbols;
 	if (prev && st->st_pass == 1) {
@@ -356,19 +584,19 @@ symtable_visit_stmt(struct symtable *st, stmt_ty s)
 		symtable_add_def(st, s->v.FunctionDef.name, DEF_LOCAL);
 		if (s->v.FunctionDef.args->defaults)
 			VISIT_SEQ(st, expr, s->v.FunctionDef.args->defaults);
-		symtable_enter_scope(st, s->v.FunctionDef.name, FunctionScope,
+		symtable_enter_block(st, s->v.FunctionDef.name, FunctionBlock,
 				     (void *)s, s->lineno);
 		VISIT(st, arguments, s->v.FunctionDef.args);
 		VISIT_SEQ(st, stmt, s->v.FunctionDef.body);
-		symtable_exit_scope(st, s);
+		symtable_exit_block(st, s);
 		break;
         case ClassDef_kind:
 		symtable_add_def(st, s->v.ClassDef.name, DEF_LOCAL);
 		VISIT_SEQ(st, expr, s->v.ClassDef.bases);
-		symtable_enter_scope(st, s->v.ClassDef.name, ClassScope, 
+		symtable_enter_block(st, s->v.ClassDef.name, ClassBlock, 
 				     (void *)s, s->lineno);
 		VISIT_SEQ(st, stmt, s->v.ClassDef.body);
-		symtable_exit_scope(st, s);
+		symtable_exit_block(st, s);
 		break;
         case Return_kind:
 		if (s->v.Return.value)
@@ -489,10 +717,10 @@ symtable_visit_expr(struct symtable *st, expr_ty e)
 		symtable_add_def(st, GET_IDENTIFIER(lambda), DEF_LOCAL);
 		VISIT(st, arguments, e->v.Lambda.args);
 		/* XXX how to get line numbers for expressions */
-		symtable_enter_scope(st, GET_IDENTIFIER(lambda),
-				     FunctionScope, (void *)e, 0);
+		symtable_enter_block(st, GET_IDENTIFIER(lambda),
+				     FunctionBlock, (void *)e, 0);
 		VISIT(st, expr, e->v.Lambda.body);
-		symtable_exit_scope(st, (void *)e);
+		symtable_exit_block(st, (void *)e);
 		break;
         case Dict_kind:
 		VISIT_SEQ(st, expr, e->v.Dict.keys);
@@ -590,7 +818,7 @@ symtable_visit_params(struct symtable *st, asdl_seq *args, int toplevel)
 static int 
 symtable_visit_arguments(struct symtable *st, arguments_ty a)
 {
-	/* skip default arguments inside function scope
+	/* skip default arguments inside function block
 	   XXX should ast be different?
 	*/
 	if (!symtable_visit_params(st, a->args, 1))
