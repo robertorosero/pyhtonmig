@@ -67,6 +67,9 @@ extern long getmtime(); /* Defined in posixmodule.c */
 #ifdef HAVE_DLFCN_H
 #include <dlfcn.h>
 typedef void (*dl_funcptr)();
+#ifndef RTLD_NOW
+#define RTLD_NOW 2
+#endif
 #else /* !HAVE_DLFCN_H */
 #include "dl.h"
 #endif /* !HAVE_DLFCN_H */
@@ -306,6 +309,10 @@ get_module(m, name, m_ret)
 			/* RTLD_NOW: resolve externals now
 			   (i.e. core dump now if some are missing) */
 			void *handle = dlopen(namebuf, RTLD_NOW);
+			if (handle == NULL) {
+				err_setstr(ImportError, dlerror());
+				return NULL;
+			}
 			p = (dl_funcptr) dlsym(handle, funcname);
 		}
 #else /* !HAVE_DLFCN_H */
@@ -315,22 +322,20 @@ get_module(m, name, m_ret)
 			err_setstr(ImportError,
 			   "dynamic module does not define init function");
 			return NULL;
-		} else {
-			(*p)();
-			*m_ret = m = dictlookup(modules, name);
-			if (m == NULL) {
-				err_setstr(SystemError,
-				   "dynamic module not initialized properly");
-				return NULL;
-			} else {
-				if (verbose)
-					fprintf(stderr,
-				"import %s # dynamically loaded from %s\n",
-						name, namebuf);
-				INCREF(None);
-				return None;
-			}
 		}
+		(*p)();
+		*m_ret = m = dictlookup(modules, name);
+		if (m == NULL) {
+			err_setstr(SystemError,
+				   "dynamic module not initialized properly");
+			return NULL;
+		}
+		if (verbose)
+			fprintf(stderr,
+				"import %s # dynamically loaded from %s\n",
+				name, namebuf);
+		INCREF(None);
+		return None;
 		break;
 	      }
 #endif /* USE_DL */
