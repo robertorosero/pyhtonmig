@@ -62,8 +62,6 @@ reg_dealloc(re)
 	XDECREF(re->re_groupindex);
 	XDECREF(re->re_givenpat);
 	XDECREF(re->re_realpat);
-	XDEL(re->re_patbuf.buffer);
-	XDEL(re->re_patbuf.translate);
 	DEL(re);
 }
 
