@@ -1,7 +1,7 @@
 Document Type: WSE
 item: Global
   Version=8.14
-  Title=Python 2.2 alpha 1
+  Title=Python 2.2 alpha 2
   Flags=00010100
   Languages=65 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
   Japanese Font Name=MS Gothic
@@ -64,7 +64,7 @@ item: Global
 end
 item: Set Variable
   Variable=PYVER_STRING
-  Value=2.2a1
+  Value=2.2a2
 end
 item: Remark
 end
