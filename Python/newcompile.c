@@ -45,7 +45,6 @@ struct compiler {
 };
 
 static int compiler_enter_scope(struct compiler *, identifier, void *);
-static int compiler_exit_scope(struct compiler *, identifier, void *);
 static void compiler_free(struct compiler *);
 static PyCodeObject *compiler_get_code(struct compiler *);
 static int compiler_new_block(struct compiler *);
@@ -65,6 +64,9 @@ static int compiler_visit_slice(struct compiler *, slice_ty);
 
 static int compiler_push_fblock(struct compiler *, enum fblocktype, int);
 static void compiler_pop_fblock(struct compiler *, enum fblocktype, int);
+
+static PyCodeObject *assemble(struct compiler *);
+static int arg_is_pyobject(int);
 
 int
 _Py_Mangle(char *p, char *name, char *buffer, size_t maxlen)
@@ -94,11 +96,20 @@ _Py_Mangle(char *p, char *name, char *buffer, size_t maxlen)
 	return 1;
 }
 
+static void 
+init(struct compiler *c)
+{
+	c->c_blocks = NULL;
+	c->c_nblocks = 0;
+	c->c_interactive = 0;
+}
+
 PyCodeObject *
 PyAST_Compile(mod_ty mod, const char *filename, PyCompilerFlags *flags)
 {
 	struct compiler c;
 
+	init(&c);
 	c.c_filename = filename;
 	c.c_future = PyFuture_FromAST(mod, filename);
 	if (c.c_future == NULL)
@@ -108,16 +119,30 @@ PyAST_Compile(mod_ty mod, const char *filename, PyCompilerFlags *flags)
 		c.c_future->ff_features = merged;
 		flags->cf_flags = merged;
 	}
-	
+
+	/* Trivial test of marshal code for now. */
+	{
+		PyObject *buf = PyString_FromStringAndSize(NULL, 1024);
+		int offset = 0;
+		assert(marshal_write_mod(&buf, &offset, mod));
+		if (!_PyString_Resize(&buf, offset) < 0) {
+			fprintf(stderr, "resize failed!\n");
+			goto error;
+		}
+	}
+
 	c.c_st = PySymtable_Build(mod, filename, c.c_future);
 	if (c.c_st == NULL)
 		goto error;
-	return NULL;
 
-	compiler_mod(&c, mod);
+	if (!compiler_mod(&c, mod))
+		goto error;
 
+	return assemble(&c);
  error:
 	compiler_free(&c);
+	if (!PyErr_Occurred())
+		PyErr_SetString(PyExc_SystemError, "PyAST_Compile() failed");
 	return NULL;
 }
 
@@ -129,44 +154,29 @@ compiler_free(struct compiler *c)
 	if (c->c_st)
 		PySymtable_Free(c->c_st);
 	if (c->c_future)
-		PyMem_Free((void *)c->c_future);
+		PyObject_Free((void *)c->c_future);
 	for (i = 0; i < c->c_nblocks; i++) 
-		free((void *)c->c_blocks[i]);
+		PyObject_Free((void *)c->c_blocks[i]);
 	if (c->c_blocks)
-		free((void *)c->c_blocks);
+		PyObject_Free((void *)c->c_blocks);
 }
 
 
 static int
 compiler_enter_scope(struct compiler *c, identifier name, void *key)
 {
-	/* XXX need stack of info */
-	PyObject *k, *v;
-
-	k = PyLong_FromVoidPtr(key);
-	if (k == NULL)
+	c->c_ste = PySymtable_Lookup(c->c_st, key);
+	if (!c->c_ste) {
 		return 0;
-	v = PyDict_GetItem(c->c_st->st_symbols, k);
-	if (!v) {
-		/* XXX */
-		PyErr_SetObject(PyExc_KeyError, name);
-		return 0;
-	}
-	assert(PySTEntry_Check(v));
-	c->c_ste = (PySTEntryObject *)v;
-
+	}		
 	c->c_nblocks = 0;
-	c->c_blocks = (struct basicblock **)malloc(sizeof(struct basicblock *)
-						   * DEFAULT_BLOCKS);
+	c->c_blocks = (struct basicblock **)PyObject_Malloc(
+	    sizeof(struct basicblock *) * DEFAULT_BLOCKS);
 	if (!c->c_blocks)
 		return 0;
-	return 1;
-}
-
-static int
-compiler_exit_scope(struct compiler *c, identifier name, void *key)
-{
-	/* pop current scope off stack & reinit */
+	memset(c->c_blocks, 0, sizeof(struct basicblock *) * DEFAULT_BLOCKS);
+	if (compiler_use_new_block(c) < 0)
+		return 0;
 	return 1;
 }
 
@@ -176,11 +186,12 @@ compiler_get_code(struct compiler *c)
 	/* get the code object for the current block.
 	   XXX may want to return a thunk instead to allow later passes
 	*/
+	PyErr_SetString(PyExc_SystemError, "compiler doesn't work");
 	return NULL;
 }
 
 /* Allocate a new block and return its index in c_blocks. 
-   Returns 0 on error.
+   Returns -1 on error.
 */
 
 static int
@@ -192,13 +203,13 @@ compiler_new_block(struct compiler *c)
 	if (c->c_nblocks && c->c_nblocks % DEFAULT_BLOCKS == 0) {
 		/* XXX should double */
 		int newsize = c->c_nblocks + DEFAULT_BLOCKS;
-		c->c_blocks = (struct basicblock **)realloc(c->c_blocks,
-							    newsize);
+		c->c_blocks = (struct basicblock **)PyObject_Realloc(c->c_blocks,
+								  newsize);
 		if (c->c_blocks == NULL)
 			return 0;
 	}
 	i = c->c_nblocks++;
-	b = (struct basicblock *)malloc(sizeof(struct basicblock));
+	b = (struct basicblock *)PyObject_Malloc(sizeof(struct basicblock));
 	if (b == NULL)
 		return 0;
 	memset((void *)b, 0, sizeof(struct basicblock));
@@ -218,7 +229,7 @@ static int
 compiler_use_new_block(struct compiler *c)
 {
 	int block = compiler_new_block(c);
-	if (!block)
+	if (block < 0)
 		return 0;
 	c->c_curblock = block;
 	return block;
@@ -239,8 +250,10 @@ compiler_next_instr(struct compiler *c, int block)
 		void *ptr;
 		int newsize;
 		b->b_ialloc *= 2;
-		/* XXX newsize is wrong */
-		ptr = realloc((void *)b, newsize);
+		newsize = sizeof(struct basicblock) 
+			+ ((b->b_ialloc - DEFAULT_BLOCK_SIZE) 
+			   * sizeof(struct instr));
+		ptr = PyObject_Realloc((void *)b, newsize);
 		if (ptr == NULL)
 			return -1;
 		if (ptr != (void *)b)
@@ -273,11 +286,12 @@ compiler_addop_o(struct compiler *c, int opcode, PyObject *o)
 {
 	struct instr *i;
 	int off;
+	assert(arg_is_pyobject(opcode));
 	off = compiler_next_instr(c, c->c_curblock);
 	if (off < 0)
 		return 0;
 	i = &c->c_blocks[c->c_curblock]->b_instr[off];
-	i->i_opcode = i->i_opcode;
+	i->i_opcode = opcode;
 	i->i_arg = o;
 	return 1;
 }
@@ -295,13 +309,13 @@ compiler_addop_i(struct compiler *c, int opcode, int oparg)
 	if (off < 0)
 		return 0;
 	i = &c->c_blocks[c->c_curblock]->b_instr[off];
-	i->i_opcode = i->i_opcode;
+	i->i_opcode = opcode;
 	i->i_oparg = oparg;
 	return 1;
 }
 
 #define NEW_BLOCK(C) { \
-        if (!compiler_use_new_block((C))) \
+        if (compiler_use_new_block((C)) < 0) \
 	        return 0; \
 }
 
@@ -333,7 +347,7 @@ compiler_addop_i(struct compiler *c, int opcode, int oparg)
 	int i; \
 	asdl_seq *seq = (SEQ); /* avoid variable capture */ \
 	for (i = 0; i < asdl_seq_LEN(seq); i++) { \
-		TYPE ## _ty elt = asdl_seq_get(seq, i); \
+		TYPE ## _ty elt = asdl_seq_GET(seq, i); \
 		if (!compiler_visit_ ## TYPE((C), elt)) \
 			return 0; \
 	} \
@@ -342,11 +356,14 @@ compiler_addop_i(struct compiler *c, int opcode, int oparg)
 static int
 compiler_mod(struct compiler *c, mod_ty mod)
 {
+	if (!compiler_enter_scope(c, NULL, mod))
+		return 0;
 	switch (mod->kind) {
 	case Module_kind:
 		VISIT_SEQ(c, stmt, mod->v.Module.body);
 		break;
 	case Interactive_kind:
+		c->c_interactive = 1;
 		VISIT(c, stmt, mod->v.Interactive.body);
 		break;
 	case Expression_kind:
@@ -396,13 +413,13 @@ compiler_print(struct compiler *c, stmt_ty s)
 		if (dest) {
 			ADDOP(c, DUP_TOP);
 			VISIT(c, expr, 
-			      (expr_ty)asdl_seq_get(s->v.Print.values, i));
+			      (expr_ty)asdl_seq_GET(s->v.Print.values, i));
 			ADDOP(c, ROT_TWO);
 			ADDOP(c, PRINT_ITEM_TO);
 		}
 		else {
 			VISIT(c, expr, 
-			      (expr_ty)asdl_seq_get(s->v.Print.values, i));
+			      (expr_ty)asdl_seq_GET(s->v.Print.values, i));
 			ADDOP(c, PRINT_ITEM);
 		}
 	}
@@ -424,11 +441,11 @@ compiler_if(struct compiler *c, stmt_ty s)
 	
 	assert(s->kind == If_kind);
 	end = compiler_new_block(c);
-	if (!end)
+	if (end < 0)
 		return 0;
 	while (elif) {
 		next = compiler_new_block(c);
-		if (!next)
+		if (next < 0)
 			return 0;
 		VISIT(c, expr, s->v.If.test);
 		ADDOP_I(c, JUMP_IF_FALSE, next);
@@ -439,7 +456,7 @@ compiler_if(struct compiler *c, stmt_ty s)
 		compiler_use_block(c, next);
 		ADDOP(c, POP_TOP);
 		if (s->v.If.orelse) {
-			stmt_ty t = asdl_seq_get(s->v.If.orelse, 0);
+			stmt_ty t = asdl_seq_GET(s->v.If.orelse, 0);
 			if (t->kind == If_kind) {
 				elif = 1;
 				s = t;
@@ -461,7 +478,7 @@ compiler_for(struct compiler *c, stmt_ty s)
 	start = compiler_new_block(c);
 	cleanup = compiler_new_block(c);
 	end = compiler_new_block(c);
-	if (!(start && end && cleanup))
+	if (start < 0 || end < 0 || cleanup < 0)
 		return 0;
 	ADDOP_I(c, SETUP_LOOP, end);
 	if (!compiler_push_fblock(c, LOOP, start))
@@ -487,11 +504,11 @@ compiler_while(struct compiler *c, stmt_ty s)
 	int loop, orelse, end;
 	loop = compiler_new_block(c);
 	end = compiler_new_block(c);
-	if (!(loop && end))
+	if (loop < 0 || end < 0)
 		return 0;
 	if (s->v.While.orelse) {
 		orelse = compiler_new_block(c);
-		if (!orelse)
+		if (orelse < 0)
 			return 0;
 	}
 	else
@@ -561,6 +578,7 @@ compiler_visit_stmt(struct compiler *c, stmt_ty s)
 {
 	int i, n;
 
+	fprintf(stderr, "compile stmt %d at %d\n", s->kind, s->lineno);
 	c->c_lineno = s->lineno; 	/* XXX this isn't right */
 	switch (s->kind) {
         case FunctionDef_kind:
@@ -589,7 +607,7 @@ compiler_visit_stmt(struct compiler *c, stmt_ty s)
 			if (i < n - 1) 
 				ADDOP(c, DUP_TOP);
 			VISIT(c, expr, 
-			      (expr_ty)asdl_seq_get(s->v.Assign.targets, i));
+			      (expr_ty)asdl_seq_GET(s->v.Assign.targets, i));
 		}
 		break;
         case AugAssign_kind:
@@ -802,17 +820,17 @@ compiler_boolop(struct compiler *c, expr_ty e)
 	else
 		jumpi = JUMP_IF_TRUE;
 	end = compiler_new_block(c);
-	if (!end)
+	if (end < 0)
 		return 0;
 	s = e->v.BoolOp.values;
 	n = asdl_seq_LEN(s) - 1;
 	for (i = 0; i < n; ++i) {
-		VISIT(c, expr, asdl_seq_get(s, i));
+		VISIT(c, expr, asdl_seq_GET(s, i));
 		ADDOP_I(c, jumpi, end);
 		NEW_BLOCK(c);
 		ADDOP(c, POP_TOP)
 	}
-	VISIT(c, expr, asdl_seq_get(s, n));
+	VISIT(c, expr, asdl_seq_GET(s, n));
 	compiler_use_block(c, end);
 	return 1;
 }
@@ -845,9 +863,9 @@ compiler_visit_expr(struct compiler *c, expr_ty e)
 		   It wants the stack to look like (value) (dict) (key) */
 		for (i = 0; i < n; i++) {
 			ADDOP(c, DUP_TOP);
-			VISIT(c, expr, asdl_seq_get(e->v.Dict.values, i));
+			VISIT(c, expr, asdl_seq_GET(e->v.Dict.values, i));
 			ADDOP(c, ROT_TWO);
-			VISIT(c, expr, asdl_seq_get(e->v.Dict.keys, i));
+			VISIT(c, expr, asdl_seq_GET(e->v.Dict.keys, i));
 			ADDOP(c, STORE_SUBSCR);
 		}
 		break;
@@ -861,7 +879,8 @@ compiler_visit_expr(struct compiler *c, expr_ty e)
 		VISIT(c, expr, e->v.Repr.value);
 		ADDOP(c, UNARY_CONVERT);
 		break;
-        case Num_kind:
+        case Num_kind: 
+		ADDOP_O(c, LOAD_CONST, e->v.Num.n);
 		break;
         case Str_kind:
 		break;
@@ -961,4 +980,41 @@ static int
 compiler_visit_arguments(struct compiler *c, arguments_ty a)
 {
 	return 1;
+}
+
+static PyCodeObject *
+assemble(struct compiler *c)
+{
+	int i, j;
+
+	fprintf(stderr, "nblocks=%d curblock=%d\n",
+		c->c_nblocks, c->c_curblock);
+	for (i = 0; i < c->c_nblocks; i++) {
+		struct basicblock *b = c->c_blocks[i];
+		fprintf(stderr, "block %d: used=%d alloc=%d\n",
+			i, b->b_iused, b->b_ialloc);
+		for (j = 0; j < b->b_iused; j++) {
+			fprintf(stderr, "instr %d: %d\n",
+				j, b->b_instr[j].i_opcode);
+		}
+	}
+	
+	PyErr_SetString(PyExc_SystemError, "no assembler exists\n");
+	return NULL;
+}
+
+static int
+arg_is_pyobject(int opcode)
+{
+    switch (opcode) {
+    case LOAD_CONST:
+    case LOAD_NAME: case LOAD_GLOBAL: case LOAD_FAST: case LOAD_DEREF:
+    case STORE_NAME: case STORE_GLOBAL: case STORE_FAST: case STORE_DEREF:
+    case DELETE_NAME: case DELETE_GLOBAL: case DELETE_FAST:
+	    return 1;
+    default:
+	    return 0;
+    }
+    assert(0); /* Can't get here */
+    return 0;
 }
