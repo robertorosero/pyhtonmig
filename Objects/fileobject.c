@@ -743,7 +743,7 @@ writestring(s, f)
 		if (fp != NULL)
 			fputs(s, fp);
 	}
-	else {
+	else if (!err_occurred()) {
 		object *v = newstringobject(s);
 		if (v == NULL) {
 			err_clear();
