@@ -521,7 +521,7 @@ ast_for_arguments(struct compiling *c, const node *n)
        varargslist: (fpdef ['=' test] ',')* ('*' NAME [',' '**' NAME]
             | '**' NAME) | fpdef ['=' test] (',' fpdef ['=' test])* [',']
     */
-    int i, n_args = 0, n_defaults = 0;
+    int i, n_args = 0, n_defaults = 0, found_default = 0;
     asdl_seq *args, *defaults;
     identifier vararg = NULL, kwarg = NULL;
     node *ch;
@@ -536,8 +536,9 @@ ast_for_arguments(struct compiling *c, const node *n)
     /* first count the number of normal args & defaults */
     for (i = 0; i < NCH(n); i++) {
 	ch = CHILD(n, i);
-	if (TYPE(ch) == fpdef)
+	if (TYPE(ch) == fpdef) {
 	    n_args++;
+	}
 	if (TYPE(ch) == EQUAL)
 	    n_defaults++;
     }
@@ -556,6 +557,21 @@ ast_for_arguments(struct compiling *c, const node *n)
 	ch = CHILD(n, i);
 	switch (TYPE(ch)) {
             case fpdef:
+                /* XXX Need to worry about checking if TYPE(CHILD(n, i+1)) is
+                   anything other than EQUAL or a comma? */
+                /* XXX Should NCH(n) check be made a separate check? */
+                if (i + 1 < NCH(n) && TYPE(CHILD(n, i + 1)) == EQUAL) {
+                    asdl_seq_APPEND(defaults, 
+				    ast_for_expr(c, CHILD(n, i + 2)));
+                    i += 2;
+		    found_default = 1;
+                }
+		else if (found_default) {
+		    ast_error(n, 
+			     "non-default argument follows default argument");
+		    goto error;
+		}
+
                 if (NCH(ch) == 3) {
                     asdl_seq_APPEND(args, 
                                     compiler_complex_args(CHILD(ch, 1))); 
@@ -565,13 +581,6 @@ ast_for_arguments(struct compiling *c, const node *n)
                     asdl_seq_APPEND(args, Name(NEW_IDENTIFIER(CHILD(ch, 0)),
                                                Param));
 		}
-                /* XXX Need to worry about checking if TYPE(CHILD(n, i+1)) is
-                   anything other than EQUAL or a comma? */
-                /* XXX Should NCH(n) check be made a separate check? */
-                if (i + 1 < NCH(n) && TYPE(CHILD(n, i + 1)) == EQUAL) {
-                    asdl_seq_APPEND(defaults, ast_for_expr(c, CHILD(n, i + 2)));
-                    i += 2;
-                }
                 i += 2; /* the name and the comma */
                 break;
             case STAR:
