@@ -1236,52 +1236,9 @@ PySequence_Tuple(PyObject *v)
 PyObject *
 PySequence_List(PyObject *v)
 {
-	PySequenceMethods *m;
-
 	if (v == NULL)
 		return null_error();
-
-	if (PyList_Check(v))
-		return PyList_GetSlice(v, 0, PyList_GET_SIZE(v));
-
-	m = v->ob_type->tp_as_sequence;
-	if (m && m->sq_item) {
-		int i;
-		PyObject *l;
-		int n = PySequence_Size(v);
-		if (n < 0)
-			return NULL;
-		l = PyList_New(n);
-		if (l == NULL)
-			return NULL;
-		for (i = 0; ; i++) {
-			PyObject *item = (*m->sq_item)(v, i);
-			if (item == NULL) {
-				if (PyErr_ExceptionMatches(PyExc_IndexError))
-					PyErr_Clear();
-				else {
-					Py_DECREF(l);
-					l = NULL;
-				}
-				break;
-			}
-			if (i < n)
-				PyList_SET_ITEM(l, i, item);
-			else if (PyList_Append(l, item) < 0) {
-				Py_DECREF(l);
-				l = NULL;
-				break;
-			}
-		}
-		if (i < n && l != NULL) {
-			if (PyList_SetSlice(l, i, n, (PyObject *)NULL) != 0) {
-				Py_DECREF(l);
-				l = NULL;
-			}
-		}
-		return l;
-	}
-	return type_error("list() argument must be a sequence");
+	return PyObject_CallFunction((PyObject *) &PyList_Type, "(O)", v);
 }
 
 PyObject *
