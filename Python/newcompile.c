@@ -1137,7 +1137,6 @@ dfs(struct compiler *c, int block, struct assembler *a)
 	struct basicblock *b;
 	struct instr *instr = NULL;
 
-	fprintf(stderr, "dfs(%d)\n", block);
 	if (block >= c->c_nblocks)
 		return;
 	b = c->c_blocks[block];
