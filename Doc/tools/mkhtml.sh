@@ -27,6 +27,8 @@ export TEXINPUTS
 
 if [ -d $part ] ; then
     rm -f $part/*.html
+else
+    mkdir $part
 fi
 
 echo "latex2html -init_file $srcdir/perl/l2hinit.perl -dir $part" \
