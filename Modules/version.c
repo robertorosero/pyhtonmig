@@ -35,7 +35,7 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #ifdef __DATE__
 #define DATE __DATE__
 #else
-#define DATE "26 January 1994"
+#define DATE "4 May 1994"
 #endif
 
 char *
