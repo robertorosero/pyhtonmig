@@ -38,7 +38,8 @@ The following values are considered false:
 
 \item	instances of user-defined classes, if the class defines a
 	\method{__nonzero__()} or \method{__len__()} method, when that
-	method returns zero.
+	method returns zero.\footnote{Additional information on these
+special methods may be found in the \emph{Python Reference Manual}.}
 
 \end{itemize}
 
@@ -130,20 +131,26 @@ Notes:
 Objects of different types, except different numeric types, never
 compare equal; such objects are ordered consistently but arbitrarily
 (so that sorting a heterogeneous array yields a consistent result).
-Furthermore, some types (e.g., windows) support only a degenerate
-notion of comparison where any two objects of that type are unequal.
-Again, such objects are ordered arbitrarily but consistently.
-\indexii{types}{numeric}
+Furthermore, some types (for example, file objects) support only a
+degenerate notion of comparison where any two objects of that type are
+unequal.  Again, such objects are ordered arbitrarily but
+consistently.
+\indexii{object}{numeric}
 \indexii{objects}{comparing}
+
+Instances of a class normally compare as non-equal unless the class
+\withsubitem{(instance method)}{\ttindex{__cmp__()}}
+defines the \method{__cmp__()} method.  Refer to the \emph{Python
+Reference Manual} for information on the use of this method to effect
+object comparisons.
 
 (Implementation note: objects of different types except numbers are
 ordered by their type names; objects of the same types that don't
 support proper comparison are ordered by their address.)
 
-Two more operations with the same syntactic priority, \samp{in} and
-\samp{not in}, are supported only by sequence types (below).
-\opindex{in}
-\opindex{not in}
+Two more operations with the same syntactic priority,
+\samp{in}\opindex{in} and \samp{not in}\opindex{not in}, are supported
+only by sequence types (below).
 
 
 \subsection{Numeric Types \label{typesnumeric}}
@@ -151,9 +158,9 @@ Two more operations with the same syntactic priority, \samp{in} and
 There are four numeric types: \dfn{plain integers}, \dfn{long integers}, 
 \dfn{floating point numbers}, and \dfn{complex numbers}.
 Plain integers (also just called \dfn{integers})
-are implemented using \ctype{long} in \C{}, which gives them at least 32
+are implemented using \ctype{long} in C, which gives them at least 32
 bits of precision.  Long integers have unlimited precision.  Floating
-point numbers are implemented using \ctype{double} in \C{}.  All bets on
+point numbers are implemented using \ctype{double} in C.  All bets on
 their precision are off unless you happen to know the machine you are
 working with.
 \indexii{numeric}{types}
@@ -162,20 +169,20 @@ working with.
 \indexiii{long}{integer}{type}
 \indexii{floating point}{type}
 \indexii{complex number}{type}
-\indexii{C@\C{}}{language}
+\indexii{C}{language}
 
 Complex numbers have a real and imaginary part, which are both
-implemented using \ctype{double} in \C{}.  To extract these parts from
+implemented using \ctype{double} in C.  To extract these parts from
 a complex number \var{z}, use \code{\var{z}.real} and \code{\var{z}.imag}.  
 
 Numbers are created by numeric literals or as the result of built-in
 functions and operators.  Unadorned integer literals (including hex
-and octal numbers) yield plain integers.  Integer literals with an \samp{L}
-or \samp{l} suffix yield long integers
-(\samp{L} is preferred because \samp{1l} looks too much like eleven!).
-Numeric literals containing a decimal point or an exponent sign yield
-floating point numbers.  Appending \samp{j} or \samp{J} to a numeric
-literal yields a complex number.
+and octal numbers) yield plain integers.  Integer literals with an
+\character{L} or \character{l} suffix yield long integers
+(\character{L} is preferred because \samp{1l} looks too much like
+eleven!).  Numeric literals containing a decimal point or an exponent
+sign yield floating point numbers.  Appending \character{j} or
+\character{J} to a numeric literal yields a complex number.
 \indexii{numeric}{literals}
 \indexii{integer}{literals}
 \indexiii{long}{integer}{literals}
