@@ -19,7 +19,7 @@ syntax (e.g. between statements in compound statements).
 
 \subsection{Comments}
 
-A comment starts with a hash character (\verb\#\) that is not part of
+A comment starts with a hash character (\verb@#@) that is not part of
 a string literal, and ends at the end of the physical line.  A comment
 always signifies the end of the logical line.  Comments are ignored by
 the syntax.
@@ -123,7 +123,7 @@ The following example shows various indentation errors:
 
 (Actually, the first three errors are detected by the parser; only the
 last error is found by the lexical analyzer --- the indentation of
-\verb\return r\ does not match a level popped off the stack.)
+\verb@return r@ does not match a level popped off the stack.)
 
 \section{Other tokens}
 
@@ -309,8 +309,8 @@ Some examples of floating point literals:
 \end{verbatim}
 
 Note that numeric literals do not include a sign; a phrase like
-\verb\-1\ is actually an expression composed of the operator
-\verb\-\ and the literal \verb\1\.
+\verb@-1@ is actually an expression composed of the operator
+\verb@-@ and the literal \verb@1@.
 
 \section{Operators}
 
@@ -323,7 +323,7 @@ The following tokens are operators:
 <       ==      >       <=      <>      !=      >=
 \end{verbatim}
 
-The comparison operators \verb\<>\ and \verb\!=\ are alternate
+The comparison operators \verb@<>@ and \verb@!=@ are alternate
 spellings of the same operator.
 
 \section{Delimiters}
