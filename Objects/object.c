@@ -1073,6 +1073,40 @@ PyObject_SetAttr(PyObject *v, PyObject *name, PyObject *value)
 	return -1;
 }
 
+/* Helper to get a pointer to an object's __dict__ slot, if any */
+
+PyObject **
+_PyObject_GetDictPtr(PyObject *obj)
+{
+#define PTRSIZE (sizeof(PyObject *))
+
+	long dictoffset;
+	PyTypeObject *tp = obj->ob_type;
+
+	if (!(tp->tp_flags & Py_TPFLAGS_HAVE_CLASS))
+		return NULL;
+	dictoffset = tp->tp_dictoffset;
+	if (dictoffset == 0)
+		return NULL;
+	if (dictoffset < 0) {
+		dictoffset += tp->tp_basicsize;
+		assert(dictoffset > 0); /* Sanity check */
+		if (tp->tp_itemsize > 0) {
+			int n = ((PyVarObject *)obj)->ob_size;
+			if (n > 0) {
+				dictoffset += tp->tp_itemsize * n;
+				/* Round up, if necessary */
+				if (tp->tp_itemsize % PTRSIZE != 0) {
+					dictoffset += PTRSIZE - 1;
+					dictoffset /= PTRSIZE;
+					dictoffset *= PTRSIZE;
+				}
+			}
+		}
+	}
+	return (PyObject **) ((char *)obj + dictoffset);
+}
+
 /* Generic GetAttr functions - put these in your tp_[gs]etattro slot */
 
 PyObject *
@@ -1081,7 +1115,7 @@ PyObject_GenericGetAttr(PyObject *obj, PyObject *name)
 	PyTypeObject *tp = obj->ob_type;
 	PyObject *descr;
 	descrgetfunc f;
-	int dictoffset;
+	PyObject **dictptr;
 
 	if (tp->tp_dict == NULL) {
 		if (PyType_InitDict(tp) < 0)
@@ -1096,9 +1130,9 @@ PyObject_GenericGetAttr(PyObject *obj, PyObject *name)
 			return f(descr, obj);
 	}
 
-	dictoffset = tp->tp_dictoffset;
-	if (dictoffset != 0) {
-		PyObject *dict = * (PyObject **) ((char *)obj + dictoffset);
+	dictptr = _PyObject_GetDictPtr(obj);
+	if (dictptr != NULL) {
+		PyObject *dict = *dictptr;
 		if (dict != NULL) {
 			PyObject *res = PyDict_GetItem(dict, name);
 			if (res != NULL) {
@@ -1128,7 +1162,7 @@ PyObject_GenericSetAttr(PyObject *obj, PyObject *name, PyObject *value)
 	PyTypeObject *tp = obj->ob_type;
 	PyObject *descr;
 	descrsetfunc f;
-	int dictoffset;
+	PyObject **dictptr;
 
 	if (tp->tp_dict == NULL) {
 		if (PyType_InitDict(tp) < 0)
@@ -1142,9 +1176,8 @@ PyObject_GenericSetAttr(PyObject *obj, PyObject *name, PyObject *value)
 			return f(descr, obj, value);
 	}
 
-	dictoffset = tp->tp_dictoffset;
-	if (dictoffset != 0) {
-		PyObject **dictptr = (PyObject **) ((char *)obj + dictoffset);
+	dictptr = _PyObject_GetDictPtr(obj);
+	if (dictptr != NULL) {
 		PyObject *dict = *dictptr;
 		if (dict == NULL && value != NULL) {
 			dict = PyDict_New();

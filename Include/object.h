@@ -313,6 +313,7 @@ extern DL_IMPORT(int) PyObject_HasAttrString(PyObject *, char *);
 extern DL_IMPORT(PyObject *) PyObject_GetAttr(PyObject *, PyObject *);
 extern DL_IMPORT(int) PyObject_SetAttr(PyObject *, PyObject *, PyObject *);
 extern DL_IMPORT(int) PyObject_HasAttr(PyObject *, PyObject *);
+extern DL_IMPORT(PyObject **) _PyObject_GetDictPtr(PyObject *);
 extern DL_IMPORT(PyObject *) PyObject_GenericGetAttr(PyObject *, PyObject *);
 extern DL_IMPORT(int) PyObject_GenericSetAttr(PyObject *,
 					      PyObject *, PyObject *);
