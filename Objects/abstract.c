@@ -1536,6 +1536,24 @@ PyObject_CallObject(PyObject *o, PyObject *a)
 }
 
 PyObject *
+PyObject_Call(PyObject *func, PyObject *arg, PyObject *kw)
+{
+        ternaryfunc call;
+
+	if ((call = func->ob_type->tp_call) != NULL) {
+		PyObject *result = (*call)(func, arg, kw);
+		if (result == NULL && !PyErr_Occurred())
+			PyErr_SetString(
+				PyExc_SystemError,
+				"NULL result without error in PyObject_Call");
+		return result;
+	}
+	PyErr_Format(PyExc_TypeError, "object is not callable: %s",
+		     PyString_AS_STRING(PyObject_Repr(func)));
+	return NULL;
+}
+
+PyObject *
 PyObject_CallFunction(PyObject *callable, char *format, ...)
 {
 	va_list va;

@@ -1208,12 +1208,6 @@ PyCallable_Check(PyObject *x)
 {
 	if (x == NULL)
 		return 0;
-	if (x->ob_type->tp_call != NULL ||
-	    PyFunction_Check(x) ||
-	    PyMethod_Check(x) ||
-	    PyCFunction_Check(x) ||
-	    PyClass_Check(x))
-		return 1;
 	if (PyInstance_Check(x)) {
 		PyObject *call = PyObject_GetAttrString(x, "__call__");
 		if (call == NULL) {
@@ -1225,7 +1219,9 @@ PyCallable_Check(PyObject *x)
 		Py_DECREF(call);
 		return 1;
 	}
-	return 0;
+	else {
+		return x->ob_type->tp_call != NULL;
+	}
 }
 
 

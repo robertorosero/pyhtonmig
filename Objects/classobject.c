@@ -396,7 +396,7 @@ PyTypeObject PyClass_Type = {
 	0,					/* tp_as_sequence */
 	0,					/* tp_as_mapping */
 	0,					/* tp_hash */
-	0,					/* tp_call */
+	PyInstance_New,				/* tp_call */
 	(reprfunc)class_str,			/* tp_str */
 	(getattrofunc)class_getattr,		/* tp_getattro */
 	(setattrofunc)class_setattr,		/* tp_setattro */
@@ -1791,6 +1791,23 @@ instance_iternext(PyInstanceObject *self)
 	return NULL;
 }
 
+static PyObject *
+instance_call(PyObject *func, PyObject *arg, PyObject *kw)
+{
+	PyObject *res, *call = PyObject_GetAttrString(func, "__call__");
+	if (call == NULL) {
+		PyInstanceObject *inst = (PyInstanceObject*) func;
+		PyErr_Clear();
+		PyErr_Format(PyExc_AttributeError,
+			     "%.200s instance has no __call__ method",
+			     PyString_AsString(inst->in_class->cl_name));
+		return NULL;
+	}
+	res = PyObject_Call(call, arg, kw);
+	Py_DECREF(call);
+	return res;
+}
+
 
 static PyNumberMethods instance_as_number = {
 	(binaryfunc)instance_add,		/* nb_add */
@@ -1845,7 +1862,7 @@ PyTypeObject PyInstance_Type = {
 	&instance_as_sequence,			/* tp_as_sequence */
 	&instance_as_mapping,			/* tp_as_mapping */
 	(hashfunc)instance_hash,		/* tp_hash */
-	0,					/* tp_call */
+	instance_call,				/* tp_call */
 	(reprfunc)instance_str,			/* tp_str */
 	(getattrofunc)instance_getattr,		/* tp_getattro */
 	(setattrofunc)instance_setattr,		/* tp_setattro */
@@ -2082,6 +2099,57 @@ instancemethod_traverse(PyMethodObject *im, visitproc visit, void *arg)
 	return 0;
 }
 
+static PyObject *
+instancemethod_call(PyObject *func, PyObject *arg, PyObject *kw)
+{
+	PyObject *self = PyMethod_GET_SELF(func);
+	PyObject *class = PyMethod_GET_CLASS(func);
+	PyObject *result;
+
+	func = PyMethod_GET_FUNCTION(func);
+	if (self == NULL) {
+		/* Unbound methods must be called with an instance of
+		   the class (or a derived class) as first argument */
+		int ok;
+		if (PyTuple_Size(arg) >= 1)
+			self = PyTuple_GET_ITEM(arg, 0);
+		if (self == NULL)
+			ok = 0;
+		else {
+			ok = PyObject_IsInstance(self, class);
+			if (ok < 0)
+				return NULL;
+		}
+		if (!ok) {
+			PyErr_Format(PyExc_TypeError,
+				     "unbound method %s%s must be "
+				     "called with instance as first argument",
+				     PyEval_GetFuncName(func),
+				     PyEval_GetFuncDesc(func));
+			return NULL;
+		}
+		Py_INCREF(arg);
+	}
+	else {
+		int argcount = PyTuple_Size(arg);
+		PyObject *newarg = PyTuple_New(argcount + 1);
+		int i;
+		if (newarg == NULL)
+			return NULL;
+		Py_INCREF(self);
+		PyTuple_SET_ITEM(newarg, 0, self);
+		for (i = 0; i < argcount; i++) {
+			PyObject *v = PyTuple_GET_ITEM(arg, i);
+			Py_XINCREF(v);
+			PyTuple_SET_ITEM(newarg, i+1, v);
+		}
+		arg = newarg;
+	}
+	result = PyObject_Call((PyObject *)func, arg, kw);
+	Py_DECREF(arg);
+	return result;
+}
+
 PyTypeObject PyMethod_Type = {
 	PyObject_HEAD_INIT(&PyType_Type)
 	0,
@@ -2098,12 +2166,12 @@ PyTypeObject PyMethod_Type = {
 	0,					/* tp_as_sequence */
 	0,					/* tp_as_mapping */
 	(hashfunc)instancemethod_hash,		/* tp_hash */
-	0,					/* tp_call */
+	instancemethod_call,			/* tp_call */
 	0,					/* tp_str */
 	(getattrofunc)instancemethod_getattro,	/* tp_getattro */
 	(setattrofunc)instancemethod_setattro,	/* tp_setattro */
 	0,					/* tp_as_buffer */
-	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_GC | Py_TPFLAGS_HAVE_WEAKREFS,
+	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_GC,
 	0,					/* tp_doc */
 	(traverseproc)instancemethod_traverse,	/* tp_traverse */
 	0,					/* tp_clear */

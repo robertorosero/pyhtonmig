@@ -3,6 +3,7 @@
 
 #include "Python.h"
 #include "compile.h"
+#include "eval.h"
 #include "structmember.h"
 
 PyObject *
@@ -314,6 +315,57 @@ func_traverse(PyFunctionObject *f, visitproc visit, void *arg)
 	return 0;
 }
 
+static PyObject *
+function_call(PyObject *func, PyObject *arg, PyObject *kw)
+{
+	PyObject *result;
+	PyObject *argdefs;
+	PyObject **d, **k;
+	int nk, nd;
+
+	argdefs = PyFunction_GET_DEFAULTS(func);
+	if (argdefs != NULL && PyTuple_Check(argdefs)) {
+		d = &PyTuple_GET_ITEM((PyTupleObject *)argdefs, 0);
+		nd = PyTuple_Size(argdefs);
+	}
+	else {
+		d = NULL;
+		nd = 0;
+	}
+
+	if (kw != NULL && PyDict_Check(kw)) {
+		int pos, i;
+		nk = PyDict_Size(kw);
+		k = PyMem_NEW(PyObject *, 2*nk);
+		if (k == NULL) {
+			PyErr_NoMemory();
+			Py_DECREF(arg);
+			return NULL;
+		}
+		pos = i = 0;
+		while (PyDict_Next(kw, &pos, &k[i], &k[i+1]))
+			i += 2;
+		nk = i/2;
+		/* XXX This is broken if the caller deletes dict items! */
+	}
+	else {
+		k = NULL;
+		nk = 0;
+	}
+
+	result = PyEval_EvalCodeEx(
+		(PyCodeObject *)PyFunction_GET_CODE(func),
+		PyFunction_GET_GLOBALS(func), (PyObject *)NULL,
+		&PyTuple_GET_ITEM(arg, 0), PyTuple_Size(arg),
+		k, nk, d, nd,
+		PyFunction_GET_CLOSURE(func));
+
+	if (k != NULL)
+		PyMem_DEL(k);
+
+	return result;
+}
+
 PyTypeObject PyFunction_Type = {
 	PyObject_HEAD_INIT(&PyType_Type)
 	0,
@@ -330,12 +382,12 @@ PyTypeObject PyFunction_Type = {
 	0,		/*tp_as_sequence*/
 	0,		/*tp_as_mapping*/
 	0,		/*tp_hash*/
-	0,		/*tp_call*/
+	function_call,	/*tp_call*/
 	0,		/*tp_str*/
 	(getattrofunc)func_getattro,	     /*tp_getattro*/
 	(setattrofunc)func_setattro,	     /*tp_setattro*/
 	0,		/* tp_as_buffer */
-	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_GC | Py_TPFLAGS_HAVE_WEAKREFS,
+	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_GC,
 	0,		/* tp_doc */
 	(traverseproc)func_traverse,	/* tp_traverse */
 	0,		/* tp_clear */
