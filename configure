@@ -1,5 +1,5 @@
 #!/bin/sh
-# From configure.in Revision: 1.2.4.12 
+# From configure.in Revision: 1.2.4.13 
 #!/bin/sh
 # Guess values for system-dependent variables and create Makefiles.
 # Generated automatically using autoconf.
@@ -414,6 +414,32 @@ else
 fi
 
 
+echo checking for NeXT
+cat > conftest.c <<EOF
+#include "confdefs.h"
+
+#ifdef _NEXT_SOURCE
+main() { exit(0); }
+#endif
+
+EOF
+eval $compile
+if test -s conftest && (./conftest; exit) 2>/dev/null; then
+  
+{
+test -n "$verbose" && \
+echo "	defining _POSIX_SOURCE"
+echo "#define" _POSIX_SOURCE 1 >> confdefs.h
+DEFS="$DEFS -D_POSIX_SOURCE=1"
+SEDDEFS="${SEDDEFS}\${SEDdA}_POSIX_SOURCE\${SEDdB}_POSIX_SOURCE\${SEDdC}1\${SEDdD}
+\${SEDuA}_POSIX_SOURCE\${SEDuB}_POSIX_SOURCE\${SEDuC}1\${SEDuD}
+\${SEDeA}_POSIX_SOURCE\${SEDeB}_POSIX_SOURCE\${SEDeC}1\${SEDeD}
+"
+}
+
+
+fi
+rm -fr conftest*
 
 # checks for header files
 echo checking for ANSI C header files
@@ -848,39 +874,7 @@ echo checking for --with-svr4
 # check whether --with-svr4 was given
 withval="$with_svr4"
 if test -n "$withval"; then
-  LIBS_save="${LIBS}"
-LIBS="${LIBS} -lnsl"
-have_lib=""
-echo checking for -lnsl
-cat > conftest.c <<EOF
-#include "confdefs.h"
-
-int main() { exit(0); }
-int t() { main(); }
-EOF
-if eval $compile; then
-  rm -rf conftest*
-  have_lib="1"
-
-fi
-rm -f conftest*
-LIBS="${LIBS_save}"
-if test -n "${have_lib}"; then
-   
-{
-test -n "$verbose" && \
-echo "	defining HAVE_LIBNSL"
-echo "#define" HAVE_LIBNSL 1 >> confdefs.h
-DEFS="$DEFS -DHAVE_LIBNSL=1"
-SEDDEFS="${SEDDEFS}\${SEDdA}HAVE_LIBNSL\${SEDdB}HAVE_LIBNSL\${SEDdC}1\${SEDdD}
-\${SEDuA}HAVE_LIBNSL\${SEDuB}HAVE_LIBNSL\${SEDuC}1\${SEDuD}
-\${SEDeA}HAVE_LIBNSL\${SEDeB}HAVE_LIBNSL\${SEDeC}1\${SEDeD}
-"
-}
-
-   LIBS="${LIBS} -lnsl"
-fi
-
+  
 LIBS_save="${LIBS}"
 LIBS="${LIBS} -lsocket"
 have_lib=""
@@ -913,6 +907,73 @@ SEDDEFS="${SEDDEFS}\${SEDdA}HAVE_LIBSOCKET\${SEDdB}HAVE_LIBSOCKET\${SEDdC}1\${SE
 
    LIBS="${LIBS} -lsocket"
 fi
+
+LIBS_save="${LIBS}"
+LIBS="${LIBS} -linet"
+have_lib=""
+echo checking for -linet
+cat > conftest.c <<EOF
+#include "confdefs.h"
+
+int main() { exit(0); }
+int t() { main(); }
+EOF
+if eval $compile; then
+  rm -rf conftest*
+  have_lib="1"
+
+fi
+rm -f conftest*
+LIBS="${LIBS_save}"
+if test -n "${have_lib}"; then
+   
+{
+test -n "$verbose" && \
+echo "	defining HAVE_LIBINET"
+echo "#define" HAVE_LIBINET 1 >> confdefs.h
+DEFS="$DEFS -DHAVE_LIBINET=1"
+SEDDEFS="${SEDDEFS}\${SEDdA}HAVE_LIBINET\${SEDdB}HAVE_LIBINET\${SEDdC}1\${SEDdD}
+\${SEDuA}HAVE_LIBINET\${SEDuB}HAVE_LIBINET\${SEDuC}1\${SEDuD}
+\${SEDeA}HAVE_LIBINET\${SEDeB}HAVE_LIBINET\${SEDeC}1\${SEDeD}
+"
+}
+
+   LIBS="${LIBS} -linet"
+fi
+
+LIBS_save="${LIBS}"
+LIBS="${LIBS} -lnsl"
+have_lib=""
+echo checking for -lnsl
+cat > conftest.c <<EOF
+#include "confdefs.h"
+
+int main() { exit(0); }
+int t() { main(); }
+EOF
+if eval $compile; then
+  rm -rf conftest*
+  have_lib="1"
+
+fi
+rm -f conftest*
+LIBS="${LIBS_save}"
+if test -n "${have_lib}"; then
+   
+{
+test -n "$verbose" && \
+echo "	defining HAVE_LIBNSL"
+echo "#define" HAVE_LIBNSL 1 >> confdefs.h
+DEFS="$DEFS -DHAVE_LIBNSL=1"
+SEDDEFS="${SEDDEFS}\${SEDdA}HAVE_LIBNSL\${SEDdB}HAVE_LIBNSL\${SEDdC}1\${SEDdD}
+\${SEDuA}HAVE_LIBNSL\${SEDuB}HAVE_LIBNSL\${SEDuC}1\${SEDuD}
+\${SEDeA}HAVE_LIBNSL\${SEDeB}HAVE_LIBNSL\${SEDeC}1\${SEDeD}
+"
+}
+
+   LIBS="${LIBS} -lnsl"
+fi
+
 
 fi
 
@@ -1129,7 +1190,7 @@ fi
 
 
 # checks for library functions
-for func in clock ftime gettimeofday getpeername getpgrp getpid getwd lstat nice readlink select setsid setpgid setpgrp siginterrupt symlink tcgetpgrp tcsetpgrp times uname waitpid
+for func in clock dlopen ftime gettimeofday getpeername getpgrp getpid getwd lstat nice readlink select setsid setpgid setpgrp siginterrupt symlink tcgetpgrp tcsetpgrp times uname waitpid
 do
 trfunc=HAVE_`echo $func | tr '[a-z]' '[A-Z]'`
 echo checking for ${func}
@@ -1426,6 +1487,41 @@ rm -f conftest*
 
 
 # checks for compiler characteristics
+
+echo checking for unsigned characters
+cat > conftest.c <<EOF
+#include "confdefs.h"
+/* volatile prevents gcc2 from optimizing the test away on sparcs.  */
+#if !__STDC__
+#define volatile
+#endif
+main() {
+#ifdef __CHAR_UNSIGNED__
+  exit(1); /* No need to redefine it.  */
+#else
+  volatile char c = 255; exit(c < 0);
+#endif
+}
+EOF
+eval $compile
+if test -s conftest && (./conftest; exit) 2>/dev/null; then
+  
+{
+test -n "$verbose" && \
+echo "	defining __CHAR_UNSIGNED__"
+echo "#define" __CHAR_UNSIGNED__ 1 >> confdefs.h
+DEFS="$DEFS -D__CHAR_UNSIGNED__=1"
+SEDDEFS="${SEDDEFS}\${SEDdA}__CHAR_UNSIGNED__\${SEDdB}__CHAR_UNSIGNED__\${SEDdC}1\${SEDdD}
+\${SEDuA}__CHAR_UNSIGNED__\${SEDuB}__CHAR_UNSIGNED__\${SEDuC}1\${SEDuD}
+\${SEDeA}__CHAR_UNSIGNED__\${SEDeB}__CHAR_UNSIGNED__\${SEDeC}1\${SEDeD}
+"
+}
+
+
+fi
+rm -fr conftest*
+
+
 prog='/* Ultrix mips cc rejects this.  */
 typedef int charset[2]; const charset x;
 /* SunOS 4.1.1 cc rejects this.  */
@@ -1490,10 +1586,41 @@ SEDDEFS="${SEDDEFS}\${SEDdA}const\${SEDdB}const\${SEDdC}\${SEDdD}
 fi
 rm -f conftest*
 
+
+echo checking for wheter we have signed char
+cat > conftest.c <<EOF
+#include "confdefs.h"
+
+int main() { exit(0); }
+int t() { signed char c; }
+EOF
+if eval $compile; then
+  :
+else
+  rm -rf conftest*
+  
+{
+test -n "$verbose" && \
+echo "	defining" signed to be empty
+echo "#define" signed  >> confdefs.h
+DEFS="$DEFS -Dsigned="
+SEDDEFS="${SEDDEFS}\${SEDdA}signed\${SEDdB}signed\${SEDdC}\${SEDdD}
+\${SEDuA}signed\${SEDuB}signed\${SEDuC}\${SEDuD}
+\${SEDeA}signed\${SEDeB}signed\${SEDeC}\${SEDeD}
+"
+}
+
+fi
+rm -f conftest*
+
+
 echo checking for prototypes
 cat > conftest.c <<EOF
 #include "confdefs.h"
-int foo(int x){return 0;} int main(){return foo(10);}
+
+int foo(int x) { return 0; }
+int main() { return foo(10); }
+
 EOF
 eval $compile
 if test -s conftest && (./conftest; exit) 2>/dev/null; then
@@ -1512,13 +1639,40 @@ SEDDEFS="${SEDDEFS}\${SEDdA}HAVE_PROTOTYPES\${SEDdB}HAVE_PROTOTYPES\${SEDdC}1\${
 
 fi
 rm -fr conftest*
+
+echo checking for variable length prototypes and stdarg.h
+cat > conftest.c <<EOF
+#include "confdefs.h"
+
+#include <stdarg.h>
+int foo(int x, ...) { return 0; }
+int main() { return foo(10, 11, 12); }
+
+EOF
+eval $compile
+if test -s conftest && (./conftest; exit) 2>/dev/null; then
+  
+{
+test -n "$verbose" && \
+echo "	defining HAVE_STDARG_PROTOTYPES"
+echo "#define" HAVE_STDARG_PROTOTYPES 1 >> confdefs.h
+DEFS="$DEFS -DHAVE_STDARG_PROTOTYPES=1"
+SEDDEFS="${SEDDEFS}\${SEDdA}HAVE_STDARG_PROTOTYPES\${SEDdB}HAVE_STDARG_PROTOTYPES\${SEDdC}1\${SEDdD}
+\${SEDuA}HAVE_STDARG_PROTOTYPES\${SEDuB}HAVE_STDARG_PROTOTYPES\${SEDuC}1\${SEDuD}
+\${SEDeA}HAVE_STDARG_PROTOTYPES\${SEDeB}HAVE_STDARG_PROTOTYPES\${SEDeC}1\${SEDeD}
+"
+}
+ have_prototypes=1
+
+fi
+rm -fr conftest*
 if test "$have_prototypes"; then
 echo checking for "bad exec* prototypes"
 cat > conftest.c <<EOF
 #include "confdefs.h"
 #include <unistd.h>
 int main() { exit(0); }
-int t() { char *const*t;execve("@",t,t); }
+int t() { char **t;execve("@",t,t); }
 EOF
 if eval $compile; then
   :
@@ -1540,6 +1694,7 @@ fi
 rm -f conftest*
 
 fi
+
 echo checking for bad static forward
 cat > conftest.c <<EOF
 #include "confdefs.h"
