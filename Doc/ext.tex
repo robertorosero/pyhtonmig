@@ -1,7 +1,7 @@
-%TODO: dynload #! restriction is too strong
+%TODO: chapter 3; dynload #! restriction is too strong
 \documentstyle[twoside,11pt,myformat]{report}
 
-\title{\bf Extending and Embedding the Python Interpreter}
+\title{Extending and Embedding the Python Interpreter}
 
 \author{
 	Guido van Rossum \\
@@ -658,7 +658,7 @@ calls to
 \end{verbatim}
 
 (It is possible to think of an extension to the definition of format
-strings to accomodate this directly, e.g., placing a \samp{|} in a
+strings to accomodate this directly, e.g. placing a \samp{|} in a
 tuple might specify that the remaining arguments are optional.
 \code{getargs()} should then return one more than the number of
 variables stored into.)
@@ -666,7 +666,7 @@ variables stored into.)
 Advanced users note: If you set the `varargs' flag in the method list
 for a function, the argument will always be a tuple (the `raw argument
 list').  In this case you must enclose single and empty argument lists
-in parentheses, e.g., \samp{(s)} and \samp{()}.
+in parentheses, e.g. \samp{(s)} and \samp{()}.
 
 
 \section{The {\tt mkvalue()} function}
@@ -832,15 +832,15 @@ recompile Python itself with C++.
 
 \chapter{Dynamic Loading}
 
-On most modern systems (e.g., SunOS, SGI Irix, and SVR4 derivatives
-that support shared libraries) it is possible to configure Python to
-support dynamic loading of modules implemented in C.  In the case of
-SunOS- or SVR4-style shared libraries this configuration is even done
-automatically.  Once configured and installed it's trivial to use: if
-a Python program executes \code{import foo}, the search for modules
-tries to find a file \file{foomodule.o} or \file{foomodule.so} (in the
-shared library case) in the module search path, and if one is found,
-it is loaded into the executing binary and executed.  Once loaded, the
+On most modern systems it is possible to configure Python to support
+dynamic loading of extension modules implemented in C.  When shared
+libraries are used dynamic loading is configured automatically;
+otherwise you have to select it as a build option (see below).  Once
+configured, dynamic loading is trivial to use: when a Python program
+executes \code{import foo}, the search for modules tries to find a
+file \file{foomodule.o} (\file{foomodule.so} when using shared
+libraries) in the module search path, and if one is found, it is
+loaded into the executing binary and executed.  Once loaded, the
 module acts just like a built-in extension module.
 
 The advantages of dynamic loading are twofold: the `core' Python
@@ -850,151 +850,167 @@ own copy of the Python interpreter.  There are also disadvantages:
 dynamic loading isn't available on all systems (this just means that
 on some systems you have to use static loading), and dynamically
 loading a module that was compiled for a different version of Python
-(e.g., with a different representation of objects) may dump core.
-
-{\bf NEW:} Under SunOS (all versions) and IRIX 5.x, dynamic loading
-now uses shared libraries and is always configured.  See at the
-end of this chapter for how to create a dynamically loadable module.
+(e.g. with a different representation of objects) may dump core.
 
 
 \section{Configuring and building the interpreter for dynamic loading}
 
-(Ignore this section for SunOS and IRIX 5.x --- on these systems
-dynamic loading is always configured.)
+There are three styles of dynamic loading: one using shared libraries,
+one using SGI IRIX 4 dynamic loading, and one using GNU dynamic
+loading.
 
-Dynamic loading is a little complicated to configure, since its
-implementation is extremely system dependent, and there are no
-really standard libraries or interfaces for it.  I'm using an
-extremely simple interface, which basically needs only one function:
+\subsection{Shared libraries}
 
-\begin{verbatim}
-    funcptr = dl_loadmod(binary, object, function)
-\end{verbatim}
+The following systems supports dynamic loading using shared libraries:
+SunOS 4; Solaris 2; SGI IRIX 5 (but not SGI IRIX 4!); and probably all
+systems derived from SVR4, or at least those SVR4 derivatives that
+support shared libraries (are there any that don't?).
 
-where \code{binary} is the pathname of the currently executing program
-(not just \code{argv[0]}!), \code{object} is the name of the \samp{.o}
-file to be dynamically loaded, and \code{function} is the name of a
-function in the module.  If the dynamic loading succeeds,
-\code{dl_loadmod()} returns a pointer to the named function; if not, it
-returns \code{NULL}.
+You don't need to do anything to configure dynamic loading on these
+systems --- the \file{configure} detects the presence of the
+\file{<dlfcn.h>} header file and automatically configures dynamic
+loading.
 
-I provide two implementations of \code{dl_loadmod()}: one for SGI machines
-running Irix 4.0 (written by my colleague Jack Jansen), and one that
-is a thin interface layer for Wilson Ho's (GNU) dynamic loading
-package \dfn{dld} (version 3.2.3).  Dld implements a much more powerful
-version of dynamic loading than needed (including unlinking), but it
-does not support System V's COFF object file format.  It currently
-supports only VAX (Ultrix), Sun 3 (SunOS 3.4 and 4.0), SPARCstation
-(SunOS 4.0), Sequent Symmetry (Dynix), and Atari ST (from the dld
-3.2.3 README file).
+\subsection{SGI dynamic loading}
 
-The various packages can all be retrieved from anonymous ftp host
-\code{ftp.cwi.nl}, directory \file{pub/dynload}.  The files are
-\file{dl-1.6.tar.Z} (SGI IRIX 4 dynamic loading),
-\code{dld-3.2.3.tar.Z} (GNU dld) and \file{dl-dld-1.1.tar.Z} (SGI dl
-on top of GNU dld).
+Only SGI IRIX 4 supports dynamic loading of modules using SGI dynamic
+loading.  (SGI IRIX 5 might also support it but it is inferior to
+using shared libraries so there is no reason to; a small test didn't
+work right away so I gave up trying to support it.)
 
-XXX
-To build a Python interpreter capable of dynamic loading, you need to
-edit the Makefile.  Basically you must uncomment the lines starting
-with \samp{\#DL_}, but you must also edit some of the lines to choose
-which version of dl_loadmod to use, and fill in the pathname of the dld
-library if you use it.  And, of course, you must first build
-dl_loadmod and dld, if used.  (This is now done through the Configure
-script.  For SunOS and IRIX 5.x, everything is now automatic.)
+Before you build Python, you first need to fetch and build the \code{dl}
+package written by Jack Jansen.  This is available by anonymous ftp
+from host \file{ftp.cwi.nl}, directory \file{pub/dynload}, file
+\file{dl-1.6.tar.Z}.  (The version number may change.)  Follow the
+instructions in the package's \file{README} file to build it.
+
+Once you have built \code{dl}, you can configure Python to use it.  To
+this end, you run the \file{configure} script with the option
+\code{--with-dl=\var{directory}} where \var{directory} is the absolute
+pathname of the \code{dl} directory.
+
+Now build and install Python as you normally would (see the
+\file{README} file in the toplevel Python directory.)
+
+\subsection{GNU dynamic loading}
+
+GNU dynamic loading supports (according to its \file{README} file) the
+following hardware and software combinations: VAX (Ultrix), Sun 3
+(SunOS 3.4 and 4.0), Sparc (SunOS 4.0), Sequent Symmetry (Dynix), and
+Atari ST.  There is no reason to use it on a Sparc; I haven't seen a
+Sun 3 for years so I don't know if these have shared libraries or not.
+
+You need to fetch and build two packages.  One is GNU DLD 3.2.3,
+available by anonymous ftp from host \file{ftp.cwi.nl}, directory
+\file{pub/dynload}, file \file{dld-3.2.3.tar.Z}.  (As far as I know,
+no further development on GNU DLD is being done.)  The other is an
+emulation of Jack Jansen's \code{dl} package that I wrote on top of
+GNU DLD 3.2.3.  This is available from the same host and directory,
+file dl-dld-1.1.tar.Z.  (The version number may change --- but I doubt
+it will.)  Follow the instructions in each package's \file{README}
+file to configure build them.
+
+Now configure Python.  Run the \file{configure} script with the option
+\code{--with-dl-dld=\var{dl-directory},\var{dld-directory}} where
+\var{dl-directory} is the absolute pathname of the directory where you
+have built the \file{dl-dld} package, and \var{dld-directory} is that
+of the GNU DLD package.  The Python interpreter you build hereafter
+will support GNU dynamic loading.
 
 
 \section{Building a dynamically loadable module}
 
-Building an object file usable by dynamic loading is easy, if you
-follow these rules (substitute your module name for \code{foo}
-everywhere):
+Since there are three styles of dynamic loading, there are also three
+groups of instructions for building a dynamically loadable module.
+Instructions common for all three styles are given first.  Assuming
+your module is called \code{foo}, the source filename must be
+\file{foomodule.c}, so the object name is \file{foomodule.o}.  The
+module must be written as a normal Python extension module (as
+described earlier).
 
-\begin{itemize}
+Note that in all cases you will have to create your own Makefile that
+compiles your module file(s).  This Makefile will have to pass two
+\samp{-I} arguments to the C compiler which will make it find the
+Python header files.  If the Make variable \var{PYTHONTOP} points to
+the toplevel Python directory, your \var{CFLAGS} Make variable should
+contain the options \samp{-I\$(PYTHONTOP) -I\$(PYTHONTOP)/Include}.
+(Most header files are in the \file{Include} subdirectory, but the
+\file{config.h} header lives in the toplevel directory.)  You must
+also add \samp{-DHAVE_CONFIG_H} to the definition of \var{CFLAGS} to
+direct the Python headers to include \file{config.h}.
 
-\item
-The source filename must be \file{foomodule.c}, so the object
-name is \file{foomodule.o}.
 
-\item
-The module must be written as a (statically linked) Python extension
-module (described in an earlier chapter) except that no line for it
-must be added to \file{config.c} and it mustn't be linked with the
-main Python interpreter.
+\subsection{Shared libraries}
 
-\item
-The module's initialization function must be called \code{initfoo}; it
-must install the module in \code{sys.modules} (generally by calling
-\code{initmodule()} as explained earlier.
+You must link the \samp{.o} file to produce a shared library.  This is
+done using a special invocation of the \UNIX{} loader/linker, {\em
+ld}(1).  Unfortunately the invocation differs slightly per system.
 
-\item
-The module must be compiled with \samp{-c}.  The resulting .o file must
-not be stripped.
-
-\item
-Since the module must include many standard Python include files, it
-must be compiled with a \samp{-I} option pointing to the Python source
-directory (unless it resides there itself).
-
-\item
-On SGI Irix, the compiler flag \samp{-G0} (or \samp{-G 0}) must be passed.
-IF THIS IS NOT DONE THE RESULTING CODE WILL NOT WORK.
-
-\item
-{\bf NEW:} On SunOS and IRIX 5.x, you must create a shared library
-from your \samp{.o} file using the following command (assuming your
-module is called \code{foo}):
-
+On SunOS 4, use
 \begin{verbatim}
-    ld -o foomodule.so foomodule.o <any other libraries needed>
+    ld foomodule.o -o foomodule.so
 \end{verbatim}
 
-and place the resulting \samp{.so} file in the Python search path (not
-the \samp{.o} file).  Note: on Solaris, you need to pass \samp{-G} to
-the loader; on IRIX 5.x, you need to pass \samp{-shared}.  Sigh...
+On Solaris 2, use
+\begin{verbatim}
+    ld -G foomodule.o -o foomodule.so
+\end{verbatim}
 
-\end{itemize}
+On SGI IRIX 5, use
+\begin{verbatim}
+    ld -shared foomodule.o -o foomodule.so
+\end{verbatim}
 
+On other systems, consult the manual page for {\em ld}(1) to find what
+flags, if any, must be used.
 
-\section{Using libraries}
+If your extension module uses system libraries that haven't already
+been linked with Python (e.g. a windowing system), these must be
+passed to the {\em ld} command as \samp{-l} options after the
+\samp{.o} file.
 
-If your dynamically loadable module needs to be linked with one or
-more libraries that aren't linked with Python (or if it needs a
-routine that isn't used by Python from one of the libraries with which
-Python is linked), you must specify a list of libraries to search
-after loading the module in a file with extension \samp{.libs} (and
-otherwise the same as your \samp{.o} file).  This file should contain
-one or more lines containing whitespace-separated absolute library
-pathnames.  When using the dl interface, \samp{-l...} flags may also
-be used (it is in fact passed as an option list to the system linker
-ld(1)), but the dl-dld interface requires absolute pathnames.  I
-believe it is possible to specify shared libraries here.
-
-(On SunOS, any extra libraries must be specified on the \code{ld}
-command that creates the \samp{.so} file.)
+The resulting file \file{foomodule.so} must be copied into a directory
+along the Python module search path.
 
 
-\section{Caveats}
+\subsection{SGI dynamic loading}
 
-Dynamic loading requires that \code{main}'s \code{argv[0]} contains
-the pathname or at least filename of the Python interpreter.
-Unfortunately, when executing a directly executable Python script (an
-executable file with \samp{\#!...} on the first line), the kernel
-overwrites \code{argv[0]} with the name of the script.  There is no
-easy way around this, so executable Python scripts cannot use
-dynamically loaded modules.  (You can always write a simple shell
-script that calls the Python interpreter with the script as its
-input.)
+{bf IMPORTANT:} You must compile your extension module with the
+additional C flag \samp{-G0} (or \samp{-G 0}).  This instruct the
+assembler to generate position-independent code.
 
-When using dl, the overlay is first converted into an `overlay' for
-the current process by the system linker (\code{ld}).  The overlay is
-saved as a file with extension \samp{.ld}, either in the directory
-where the \samp{.o} file lives or (if that can't be written) in a
-temporary directory.  An existing \samp{.ld} file resulting from a
-previous run (not from a temporary directory) is used, bypassing the
-(costly) linking phase, provided its version matches the \samp{.o}
-file and the current binary.  (See the \code{dl} man page for more
-details.)
+You don't need to link the resulting \file{foomodule.o} file; just
+copy it into a directory along the Python module search path.
+
+The first time your extension is loaded, it takes some extra time and
+a few messages may be printed.  This creates a file
+\file{foomodule.ld} which is an image that can be loaded quickly into
+the Python interpreter process.  When a new Python interpreter is
+installed, the \code{dl} package detects this and rebuilds
+\file{foomodule.ld}.  The file \file{foomodule.ld} is placed in the
+directory where \file{foomodule.o} was found, unless this directory is
+unwritable; in that case it is placed in a temporary
+directory.\footnote{Check the manual page of the \code{dl} package for
+details.}
+
+If your extension modules uses additional system libraries, you must
+create a file \file{foomodule.libs} in the same directory as the
+\file{foomodule.o}.  This file should contain one or more lines with
+whitespace-separated options that will be passed to the linker ---
+normally only \samp{-l} options or absolute pathnames of libraries
+(\samp{.a} files) should be used.
+
+
+\subsection{GNU dynamic loading}
+
+Just copy \file{foomodule.o} into a directory along the Python module
+search path.
+
+If your extension modules uses additional system libraries, you must
+create a file \file{foomodule.libs} in the same directory as the
+\file{foomodule.o}.  This file should contain one or more lines with
+whitespace-separated absolute pathnames of libraries (\samp{.a}
+files).  No \samp{-l} options can be used.
 
 
 \input{ext.ind}
