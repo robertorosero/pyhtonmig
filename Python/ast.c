@@ -548,7 +548,7 @@ ast_for_atom(const node *n)
            | '{' [dictmaker] '}' | '`' testlist '`' | NAME | NUMBER | STRING+ 
     */
     node *ch = CHILD(n, 0);
-    fprintf(stderr, "ast_for_atom((%d, %d))\n", TYPE(ch), NCH(ch));
+    /* fprintf(stderr, "ast_for_atom((%d, %d))\n", TYPE(ch), NCH(ch)); */
     switch (TYPE(ch)) {
     case NAME:
 	/* All names start in Load context, but may later be changed. */
@@ -667,7 +667,7 @@ ast_for_expr(const node *n)
     asdl_seq *seq;
     int i;
 
-    fprintf(stderr, "ast_for_expr(%d, %d)\n", TYPE(n), NCH(n));
+    /* fprintf(stderr, "ast_for_expr(%d, %d)\n", TYPE(n), NCH(n)); */
  loop:
     switch (TYPE(n)) {
     case test:
@@ -858,7 +858,7 @@ ast_for_expr_stmt(const node *n)
        test: ... here starts the operator precendence dance 
      */
 
-    fprintf(stderr, "ast_for_expr_stmt(%d, %d)\n", TYPE(n), NCH(n));
+    /* fprintf(stderr, "ast_for_expr_stmt(%d, %d)\n", TYPE(n), NCH(n)); */
     if (NCH(n) == 1) {
 	expr_ty e = ast_for_testlist(CHILD(n, 0));
 	assert(e);
@@ -920,7 +920,7 @@ ast_for_exprlist(const node *n, int context)
     int i;
     expr_ty e;
 
-    fprintf(stderr, "ast_for_exprlist(%d, %d)\n", TYPE(n), context);
+    /* fprintf(stderr, "ast_for_exprlist(%d, %d)\n", TYPE(n), context); */
     REQ(n, exprlist);
 
     seq = asdl_seq_new((NCH(n) + 1) / 2);
@@ -1140,7 +1140,7 @@ ast_for_suite(const node *n)
     int i, total, num, pos = 0;
     node *ch;
 
-    fprintf(stderr, "ast_for_suite(%d) lineno=%d\n", TYPE(n), n->n_lineno);
+    /* fprintf(stderr, "ast_for_suite(%d) lineno=%d\n", TYPE(n), n->n_lineno); */
     REQ(n, suite);
 
     total = num_stmts(n);
@@ -1372,9 +1372,8 @@ ast_for_classdef(const node *n)
 static stmt_ty
 ast_for_stmt(const node *n)
 {
-/*    _PyObject_DebugMallocStats(); */
-    fprintf(stderr, "ast_for_stmt(%d) lineno=%d\n",
-	    TYPE(n), n->n_lineno);
+    /* fprintf(stderr, "ast_for_stmt(%d) lineno=%d\n",
+       TYPE(n), n->n_lineno); */
     if (TYPE(n) == stmt) {
 	assert(NCH(n) == 1);
 	n = CHILD(n, 0);
