@@ -23,7 +23,7 @@ than one line:
     >>> e = doctest.Example('print 1\n', '1\n', 0)
     Traceback (most recent call last):
     AssertionError
-    
+
     >>> # Source spans multiple lines: require terminating newline.
     >>> e = doctest.Example('print 1;\nprint 2\n', '1\n2\n', 0)
     >>> e = doctest.Example('print 1;\nprint 2', '1\n2\n', 0)
@@ -135,7 +135,7 @@ will return a single test (for that function's docstring):
     ...     44
     ...     '''
     ...     return v+v
-    
+
     >>> finder = doctest.DocTestFinder()
     >>> tests = finder.find(double)
     >>> print tests
@@ -150,12 +150,12 @@ If an object has no docstring, then a test is not created for it:
     ...     pass
     >>> finder.find(no_docstring)
     []
-    
+
 If the function has a docstring with no examples, then a test with no
 examples is returned.  (This lets `DocTestRunner` collect statistics
 about which functions have no tests -- but is that useful?  And should
 an empty test also be created when there's no docstring?)
-    
+
     >>> def no_examples(v):
     ...     ''' no doctest examples '''
     >>> finder.find(no_examples)
@@ -272,7 +272,7 @@ functions, classes, and the `__test__` dictionary, if it exists:
     ...     '__test__': {
     ...         'd': '>>> print 6\n6\n>>> print 7\n7\n',
     ...         'c': triple}})
-    
+
     >>> finder = doctest.DocTestFinder()
     >>> # The '(None)' is to prevent it from filtering out objects
     >>> # that were not defined in module m.
@@ -315,7 +315,7 @@ will only be generated for it once:
     True
 
 
-    
+
 
 """
 
@@ -328,5 +328,3 @@ def test_main():
 
 if __name__ == '__main__':
     test_main()
-    
-    

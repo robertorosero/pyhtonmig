@@ -1,6 +1,8 @@
 # Module doctest.
-# Released to the public domain 16-Jan-2001,
-# by Tim Peters (tim.one@home.com).
+# Released to the public domain 16-Jan-2001, by Tim Peters (tim@python.org).
+# Significant enhancements by:
+#     Jim Fulton
+#     Edward Loper
 
 # Provided as-is; use at your own risk; no warranty; no promises; enjoy!
 
@@ -402,7 +404,7 @@ def _tag_msg(tag, msg, indent_msg=True):
     """
     # What string should we use to indent contents?
     INDENT = '    '
-    
+
     # If the message doesn't end in a newline, then add one.
     if msg[-1:] != '\n':
         msg += '\n'
@@ -434,13 +436,13 @@ class Example:
     """
     A single doctest example, consisting of source code and expected
     output.  Example defines the following attributes:
-    
+
       - source: The source code that should be run.  It ends with a
         newline iff the source spans more than one line.
-      
+
       - want: The expected output from running the source code.  If
         not empty, then this string ends with a newline.
-    
+
       - lineno: The line number within the DocTest string containing
         this Example where the Example begins.  This line number is
         zero-based, with respect to the beginning of the DocTest.
@@ -458,15 +460,15 @@ class DocTest:
     """
     A collection of doctest examples that should be run in a single
     namespace.  Each DocTest defines the following attributes:
-    
+
       - examples: the list of examples.
-        
+
       - name: A name identifying the DocTest (typically, the name of
         the object whose docstring this DocTest was extracted from).
-        
+
       - filename: The name of the file that this DocTest was extracted
         from.
-        
+
       - lineno: The line number within filename where this DocTest
         begins.  This line number is zero-based, with respect to the
         beginning of the file.
@@ -512,7 +514,7 @@ class DocTest:
                 raise ValueError('line %r of the docstring for %s lacks '
                                  'blanks after %s: %r' %
                                  (lineno, self.name, self._PS1, line))
-                                 
+
             j = j + 1
             blanks = m.group(1)
             nblanks = len(blanks)
@@ -555,7 +557,7 @@ class DocTest:
                 want = "\n".join(want) + "\n"
             examples.append(Example(source, want, lineno))
         return examples
-            
+
     def __repr__(self):
         if len(self.examples) == 0:
             examples = 'no examples'
@@ -565,20 +567,20 @@ class DocTest:
             examples = '%d examples' % len(self.examples)
         return ('<DocTest %s from %s:%s (%s)>' %
                 (self.name, self.filename, self.lineno, examples))
-                 
+
 
     # This lets us sort tests by name:
     def __cmp__(self, other):
         if not isinstance(other, DocTest): return -1
         return cmp((self.name, self.filename, self.lineno, id(self)),
                    (other.name, other.filename, other.lineno, id(other)))
-                                            
+
 ######################################################################
 ## 3. DocTest Finder
 ######################################################################
-                                             
+
 class DocTestFinder:
-    """    
+    """
     A class used to extract the DocTests that are relevant to a given
     object, from its docstring and the docstrings of its contained
     objects.  Doctests can currently be extracted from the following
@@ -598,7 +600,7 @@ class DocTestFinder:
     a module or of a class, but not when examining a module's
     `__test__` dictionary.  By default, no objects are ignored.
     """
-    
+
     def __init__(self, verbose=False, namefilter=None, objfilter=None,
                  recurse=True):
         """
@@ -611,7 +613,7 @@ class DocTestFinder:
         self._namefilter = namefilter
         self._objfilter = objfilter
         self._recurse = recurse
-        
+
     def find(self, obj, name=None, module=None):
         """
         Return a list of the DocTests that are defined by the given
@@ -643,7 +645,7 @@ class DocTestFinder:
         # filenames and line numbers, so they will be set to None.
         if module == '(None)':
             module = None
-            
+
         # Read the module's source code.  This is used by
         # DocTestFinder._find_lineno to find the line number for a
         # given object's docstring.
@@ -696,7 +698,7 @@ class DocTestFinder:
         # If we've already processed this object, then ignore it.
         if id(obj) in seen: return
         seen[id(obj)] = 1
-        
+
         # Find a test for this object, and add it to the list of tests.
         test = self._get_test(obj, name, module, source_lines)
         if test is not None: tests.append(test)
@@ -730,7 +732,7 @@ class DocTestFinder:
                                      (type(val),))
                 valname = '%s.%s' % (name, valname)
                 self._find(tests, val, valname, module, source_lines, seen)
-                
+
         # Look for tests in a class's contained objects.
         if inspect.isclass(obj) and self._recurse:
             for valname, val in obj.__dict__.items():
@@ -789,7 +791,7 @@ class DocTestFinder:
         # Find the line number for modules.
         if inspect.ismodule(obj):
             lineno = 0
-        
+
         # Find the line number for classes.
         # Note: this could be fooled if a class is defined multiple
         # times in a single file.
@@ -824,7 +826,7 @@ class DocTestFinder:
 
         # We couldn't find the line number.
         return None
-    
+
 ######################################################################
 ## 4. DocTest Runner
 ######################################################################
@@ -851,7 +853,7 @@ class DocTestRunner:
     The `summarize` method prints a summary of all the test cases that
     have been run by the runner, and returns an aggregated `(f, t)`
     tuple:
-        
+
         >>> runner.summarize(verbose=1)
         4 items passed all tests:
            2 tests in _TestClass
@@ -934,10 +936,10 @@ class DocTestRunner:
         possible.  See the documentation for `TestRunner` for more
         information about option flags.
         """
-        # Handle the common case first, for efficiency: 
+        # Handle the common case first, for efficiency:
         # if they're string-identical, always return true.
         if got == want: return True
-    
+
         # The values True and False replaced 1 and 0 as the return
         # value for boolean comparisons in Python 2.3.
         if not (self._optionflags & DONT_ACCEPT_TRUE_FOR_1):
@@ -950,7 +952,7 @@ class DocTestRunner:
             want = re.sub('(?m)^%s$' % re.escape(BLANKLINE_MARKER),
                           '', want)
             if got == want: return True
-    
+
         # This flag causes doctest to ignore any differences in the
         # contents of whitespace strings.  Note that this can be used
         # in conjunction with the ELLISPIS flag.
@@ -958,7 +960,7 @@ class DocTestRunner:
             got = ' '.join(got.split())
             want = ' '.join(want.split())
             if got == want: return True
-    
+
         # The ELLIPSIS flag says to let the sequence "..." in `want`
         # match any substring in `got`.  We implement this by
         # transforming `want` into a regular expression.
@@ -972,7 +974,7 @@ class DocTestRunner:
             want_re = '(?s)^%s$' % want_re
             # Check if the `want_re` regexp matches got.
             if re.match(want_re, got): return True
-    
+
         # We didn't find any match; return false.
         return False
 
@@ -980,7 +982,7 @@ class DocTestRunner:
         """
         Return a string describing the differences between the
         expected output (`want`) and the actual output (`got`).
-        """        
+        """
         # Check if we should use diff.  Don't use diff if the actual
         # or expected outputs are too short, or if the expected output
         # contains an ellipsis marker.
@@ -1056,7 +1058,7 @@ class DocTestRunner:
             _tag_msg("Exception raised", exception_tb))
 
     def __failure_header(self, test, example):
-        s = (self.DIVIDER + "\n" + 
+        s = (self.DIVIDER + "\n" +
              _tag_msg("Failure in example", example.source))
         if test.filename is None:
             # [XX] I'm not putting +1 here, to give the same output
@@ -1119,7 +1121,7 @@ class DocTestRunner:
 
             # Extract the example's actual output from fakeout, and
             # write it to `got`.  Add a terminating newline if it
-            # doesn't have already one.                
+            # doesn't have already one.
             got = self._fakeout.getvalue()
             self._fakeout.truncate(0)
             if got and got[-1:] != '\n': got += '\n'
@@ -1360,7 +1362,7 @@ def testmod(m=None, name=None, globs=None, verbose=None, isprivate=None,
             multi-line expected and actual outputs will be displayed
             using a context diff.
     """
-            
+
     """ [XX] This is no longer true:
     Advanced tomfoolery:  testmod runs methods of a local instance of
     class doctest.Tester, then merges the results into (or creates)
@@ -1384,7 +1386,7 @@ def testmod(m=None, name=None, globs=None, verbose=None, isprivate=None,
     # If no name was given, then use the module's name.
     if name is None:
         name = m.__name__
-                
+
     # If globals were not specified, then default to the module.
     if globs is None:
         globs = m.__dict__
@@ -1469,7 +1471,7 @@ class Tester:
         m.__dict__.update(d)
         if module is None: module = '(None)'
         return self.rundoc(m, name, module)
-        
+
     def run__test__(self, d, name):
         import new
         m = new.module(name)
@@ -1571,7 +1573,7 @@ def DocTestSuite(module=None, filename=None, globs=None, extraglobs=None,
     """
     if module is not None and filename is not None:
         raise ValueError('Specify module or filename, not both.')
-    
+
     if test_finder is None:
         test_finder = DocTestFinder()
     if test_runner is None:
@@ -1601,7 +1603,7 @@ def DocTestSuite(module=None, filename=None, globs=None, extraglobs=None,
             elif filename.endswith(".pyo"):
                 filename = filename[:-1]
             test.filename = filename
-        suite.addTest(DocTestTestCase(test_runner, test, globs, 
+        suite.addTest(DocTestTestCase(test_runner, test, globs,
                                       extraglobs, setUp, tearDown))
 
     return suite
@@ -1778,7 +1780,7 @@ __test__ = {"_TestClass": _TestClass,
 #                 [0, 1, 2, ..., 999]
 #             """,
 #             "whitespace normalization": r"""
-#             If the whitespace normalization flag is used, then 
+#             If the whitespace normalization flag is used, then
 #             differences in whitespace are ignored.
 #                 >>> print range(30)
 #                 [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14,
@@ -1909,7 +1911,7 @@ ValueError: x
 x
 Traceback (most recent call last):
 [...]
-ValueError: 
+ValueError:
 foo
 
 """
@@ -1923,6 +1925,6 @@ def _test():
     r = unittest.TextTestRunner()
     r.run(DocTestSuite())#optionflags=ELLIPSIS | NORMALIZE_WHITESPACE |
 #                       UNIFIED_DIFF))
-    
+
 if __name__ == "__main__":
     _test()
