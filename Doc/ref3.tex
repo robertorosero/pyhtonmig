@@ -371,10 +371,12 @@ argument.  An example of a built-in method is \verb@list.append@ if
 
 \item[Classes]
 Class objects are described below.  When a class object is called as a
-parameterless function, a new class instance (also described below) is
-created and returned.  The class's initialization function is not
-called --- this is the responsibility of the caller.  It is illegal to
-call a class object with one or more arguments.
+function, a new class instance (also described below) is created and
+returned.  This implies a call to the class's \verb@__init__@ method
+if it has one.  Any arguments are passed on to the \verb@__init__@
+method -- if there is \verb@__init__# method, the class must be calle
+without arguments.
+\ttindex{__init__}
 \obindex{class}
 \obindex{class instance}
 \obindex{instance}
@@ -423,8 +425,8 @@ Class attribute assignments update the class's dictionary, never the
 dictionary of a base class.
 \indexiii{class}{attribute}{assignment}
 
-A class can be called as a parameterless function to yield a class
-instance (see above).
+A class can be called as a function to yield a class instance (see
+above).
 \indexii{class object}{call}
 
 Special read-only attributes: \verb@__dict__@ yields the dictionary
@@ -436,7 +438,7 @@ order of their occurrence in the base class list.
 
 \item[Class instances]
 A class instance is created by calling a class object as a
-parameterless function.  A class instance has a dictionary in which
+function.  A class instance has a dictionary in which
 attribute references are searched.  When an attribute is not found
 there, and the instance's class has an attribute by that name, and
 that class attribute is a user-defined function (and in no other
@@ -586,9 +588,11 @@ class, then \verb@x[i]@ is equivalent to \verb@x.__getitem__(i)@.
 Except for \verb@__repr__@, \verb@__str__@ and \verb@__cmp__@,
 attempts to execute an
 operation raise an exception when no appropriate method is defined.
-For \verb@__repr__@ and \verb@__cmp__@, the traditional
-interpretations are used in this case.
-For \verb@__str__@, the \verb@__repr__@ method is used.
+For \verb@__repr__@, the default is to return a string describing the
+object's class and address.
+For \verb@__cmp__@, the default is to compare instances based on their
+address.
+For \verb@__str__@, the default is to use \verb@__repr__@.
 
 
 \subsection{Special methods for any type}
