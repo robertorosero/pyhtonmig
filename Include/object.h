@@ -284,7 +284,8 @@ extern DL_IMPORT(int) _PyObject_TypeCheck(PyObject *, PyTypeObject *);
 	((ob)->ob_type == (tp) || _PyObject_TypeCheck(ob, tp))
 
 extern DL_IMPORT(PyTypeObject) PyType_Type; /* The type of most type objects */
-extern DL_IMPORT(PyTypeObject) PyTurtle_Type; /* The type of PyType_Type */
+extern DL_IMPORT(PyTypeObject) PyDynamicType_Type; /* For dynamic types */
+extern DL_IMPORT(PyTypeObject) PyTurtle_Type; /* The type of the above two */
 
 #define PyType_Check(op) PyObject_TypeCheck(op, &PyType_Type)
 
