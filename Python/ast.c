@@ -91,7 +91,11 @@ num_stmts(const node *n)
     return 0;
 }
 
-mod_ty PyAST_FromNode(const node *n)
+/* Generate AST from concrete syntax tree
+*/
+
+mod_ty
+PyAST_FromNode(const node *n)
 {
     int i, j, num, total;
     asdl_seq *stmts = NULL;
@@ -351,6 +355,8 @@ ast_for_arguments(const node *n)
 
     /* XXX TO DO
        check for invalid argument lists like normal after default
+            DONE; causes bus error since calls to this function do not check
+            for possible NULL result to signal an error.
        handle nested tuple arguments
     */
 
@@ -362,6 +368,11 @@ ast_for_arguments(const node *n)
     asdl_seq *args, *defaults;
     identifier vararg = NULL, kwarg = NULL;
     node *ch;
+    /* Used to make sure that different kinds of arguments come in the proper
+       order */
+    enum parameter_kinds
+            {fpdef_kind=1, defaults_kind=2, vararg_kind=3, kwarg_kind=4}
+            parameter_kind = fpdef_kind;
 
     if (TYPE(n) == parameters) {
 	if (NCH(n) == 2)
@@ -403,21 +414,47 @@ ast_for_arguments(const node *n)
 			asdl_seq_free(defaults);
 		return NULL;
 	    }
-	    if (TYPE(CHILD(ch, 0)) == NAME)
-		asdl_seq_APPEND(args, Name(NEW_IDENTIFIER(CHILD(ch, 0)),
-					   Param));
+	    if (TYPE(CHILD(ch, 0)) == NAME) {
+                if (parameter_kind > fpdef_kind) {
+                    fprintf(stderr, "Error in order of arg kinds\n");
+                    PyErr_Occurred();
+                    return NULL;
+                }
+                    asdl_seq_APPEND(args, Name(NEW_IDENTIFIER(CHILD(ch, 0)),
+                                    Param));
+                    /* Don't need to set parameter_kind since that is the
+                       default */
+            }
 	    if (i + 1 < NCH(n) && TYPE(CHILD(n, i + 1)) == EQUAL) {
+                if (parameter_kind > defaults_kind) {
+                    fprintf(stderr, "Error in order of arg kinds\n");
+                    PyErr_Occurred();
+                    return NULL;
+                }
 		asdl_seq_APPEND(defaults, ast_for_expr(CHILD(n, i + 2)));
+                parameter_kind = defaults_kind;
 		i += 2;
 	    }
 	    i += 2; /* the name and the comma */
 	    break;
 	case STAR:
+            if (parameter_kind > vararg_kind) {
+                fprintf(stderr, "Error in order of arg kinds\n");
+                PyErr_Occurred();
+                return NULL;
+            }
 	    vararg = NEW_IDENTIFIER(CHILD(n, i+1));
+            parameter_kind = vararg_kind;
 	    i += 3;
 	    break;
 	case DOUBLESTAR:
+            if (parameter_kind > kwarg_kind) {
+                fprintf(stderr, "Error in order of arg kinds\n");
+                PyErr_Occurred();
+                return NULL;
+            }
 	    kwarg = NEW_IDENTIFIER(CHILD(n, i+1));
+            parameter_kind = kwarg_kind;
 	    i += 3;
 	    break;
 	default:
