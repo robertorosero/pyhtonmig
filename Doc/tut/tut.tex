@@ -1106,13 +1106,14 @@ they may be referenced.
 
 The actual parameters (arguments) to a function call are introduced in
 the local symbol table of the called function when it is called; thus,
-arguments are passed using \emph{call by value}.\footnote{
+arguments are passed using \emph{call by value} (where the
+\emph{value} is always an object \emph{reference}, not the value of
+the object).\footnote{
          Actually, \emph{call by object reference} would be a better
          description, since if a mutable object is passed, the caller
          will see any changes the callee makes to it (e.g., items
          inserted into a list).
-}
-When a function calls another function, a new local symbol table is
+} When a function calls another function, a new local symbol table is
 created for that call.
 
 A function definition introduces the function name in the current
