@@ -67,7 +67,7 @@ static PyTypeObject spamlist_type = {
 	PyObject_GenericGetAttr,		/* tp_getattro */
 	0,					/* tp_setattro */
 	0,					/* tp_as_buffer */
-	Py_TPFLAGS_DEFAULT,			/* tp_flags */
+	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE, /* tp_flags */
 	0,					/* tp_doc */
 	0,					/* tp_traverse */
 	0,					/* tp_clear */
@@ -88,13 +88,7 @@ static PyTypeObject spamlist_type = {
 	PyType_GenericNew,			/* tp_new */
 };
 
-static PyObject *
-spamlist_new(void)
-{
-	return PyObject_CallObject((PyObject *) &spamlist_type, NULL);
-}
-
-/* spamdict -- a dictf subtype */
+/* spamdict -- a dict subtype */
 
 typedef struct {
 	PyDictObject dict;
@@ -161,7 +155,7 @@ static PyTypeObject spamdict_type = {
 	PyObject_GenericGetAttr,		/* tp_getattro */
 	0,					/* tp_setattro */
 	0,					/* tp_as_buffer */
-	Py_TPFLAGS_DEFAULT,			/* tp_flags */
+	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE, /* tp_flags */
 	0,					/* tp_doc */
 	0,					/* tp_traverse */
 	0,					/* tp_clear */
@@ -182,33 +176,7 @@ static PyTypeObject spamdict_type = {
 	PyType_GenericNew,			/* tp_new */
 };
 
-static PyObject *
-spamdict_new(void)
-{
-	return PyObject_CallObject((PyObject *) &spamdict_type, NULL);
-}
-
-static PyObject *
-spam_dict(PyObject *self, PyObject *args)
-{
-	if (!PyArg_ParseTuple(args, ":dict"))
-		return NULL;
-	return spamdict_new();
-}
-
-/* Module spam */
-
-static PyObject *
-spam_list(PyObject *self, PyObject *args)
-{
-	if (!PyArg_ParseTuple(args, ":list"))
-		return NULL;
-	return spamlist_new();
-}
-
 static PyMethodDef spam_functions[] = {
-	{"list", spam_list, METH_VARARGS, "create a new spamlist object"},
-	{"dict", spam_dict, METH_VARARGS, "create a new spamdict object"},
 	{0}
 };
 
@@ -228,11 +196,11 @@ initspam(void)
 	if (d == NULL)
 		return;
 	Py_INCREF(&spamlist_type);
-	if (PyDict_SetItemString(d, "SpamListType",
+	if (PyDict_SetItemString(d, "spamlist",
 				 (PyObject *) &spamlist_type) < 0)
 		return;
 	Py_INCREF(&spamdict_type);
-	if (PyDict_SetItemString(d, "SpamDictType",
+	if (PyDict_SetItemString(d, "spamdict",
 				 (PyObject *) &spamdict_type) < 0)
 		return;
 }

@@ -220,11 +220,9 @@ def spamlists():
     import copy, spam
     def spamlist(l, memo=None):
         import spam
-        sl = spam.list()
-        for i in l: sl.append(i)
-        return sl
+        return spam.spamlist(l)
     # This is an ugly hack:
-    copy._deepcopy_dispatch[spam.SpamListType] = spamlist
+    copy._deepcopy_dispatch[spam.spamlist] = spamlist
 
     testbinop(spamlist([1]), spamlist([2]), spamlist([1,2]), "a+b", "__add__")
     testbinop(spamlist([1,2,3]), 2, 1, "b in a", "__contains__")
@@ -248,11 +246,11 @@ def spamdicts():
     import copy, spam
     def spamdict(d, memo=None):
         import spam
-        sd = spam.dict()
+        sd = spam.spamdict()
         for k, v in d.items(): sd[k] = v
         return sd
     # This is an ugly hack:
-    copy._deepcopy_dispatch[spam.SpamDictType] = spamdict
+    copy._deepcopy_dispatch[spam.spamdict] = spamdict
 
     testbinop(spamdict({1:2}), spamdict({2:1}), -1, "cmp(a,b)", "__cmp__")
     testbinop(spamdict({1:2,3:4}), 1, 1, "b in a", "__contains__")
