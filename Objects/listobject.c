@@ -505,7 +505,7 @@ static object *comparefunc;
 static int
 cmp(v, w)
 #ifdef __STDC__
-	void *v, *w;
+	const void *v, *w;
 #else
 	char *v, *w;
 #endif
