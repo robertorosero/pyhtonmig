@@ -96,13 +96,24 @@ in ``Grammar/Grammar``) that the function handles (alias_for_import_name
 is the exception to this).  These in turn call the constructor functions
 as defined by the ASDL grammar to create the nodes of the AST.
 
-Common macros used as defined in ``Include/node.h``:
+Common macros used to manipulate ``node *`` structs as defined in 
+``Include/node.h``:
   - CHILD(node, n) -- Returns the nth child of node using zero-offset
     indexing
   - NCH(node) -- Number of children node has
   - STR(node) -- String representation of node
   - TYPE(node) -- The type of node as listed in ``Include/graminit.h``
   - REQ(node, type) -- Assert that the node is the type that is expected
+
+XXX Function and macros for creating and using ``asdl_seq *`` types
+(found in Python/asdl.c and Include/asdl.h):
+    + asdl_seq_new
+        * when to use?
+        * when to call asdl_seq_free?
+    + asdl_seq_APPEND
+    + asdl_seq_SET
+    + asdl_seq_GET
+    + asdl_seq_LEN
 
 
 Code Generation and Basic Blocks
