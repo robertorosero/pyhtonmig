@@ -1961,8 +1961,13 @@ SLOT2(sq_slice, getslice, int, int, ii);
 static int
 slot_sq_ass_item(PyObject *self, int index, PyObject *value)
 {
-	PyObject *res = PyObject_CallMethod(self, "__setitem__",
-					    "iO", index, value);
+	PyObject *res;
+
+	if (value == NULL)
+		res = PyObject_CallMethod(self, "__delitem__", "i", index);
+	else
+		res = PyObject_CallMethod(self, "__setitem__",
+					  "iO", index, value);
 	if (res == NULL)
 		return -1;
 	Py_DECREF(res);
@@ -1972,8 +1977,13 @@ slot_sq_ass_item(PyObject *self, int index, PyObject *value)
 static int
 slot_sq_ass_slice(PyObject *self, int i, int j, PyObject *value)
 {
-	PyObject *res = PyObject_CallMethod(self, "__setslice__",
-					    "iiO", i, j, value);
+	PyObject *res;
+
+	if (value == NULL)
+		res = PyObject_CallMethod(self, "__delslice__", "ii", i, j);
+	else
+		res = PyObject_CallMethod(self, "__setslice__",
+					  "iiO", i, j, value);
 	if (res == NULL)
 		return -1;
 	Py_DECREF(res);
@@ -2003,8 +2013,13 @@ SLOT1(mp_subscript, getitem, PyObject *, O);
 static int
 slot_mp_ass_subscript(PyObject *self, PyObject *key, PyObject *value)
 {
-	PyObject *res = PyObject_CallMethod(self, "__setitem__",
-					    "OO", key, value);
+	PyObject *res;
+
+	if (value == NULL)
+		res = PyObject_CallMethod(self, "__delitem__", "O", key);
+	else
+		res = PyObject_CallMethod(self, "__setitem__",
+					  "OO", key, value);
 	if (res == NULL)
 		return -1;
 	Py_DECREF(res);
@@ -2260,7 +2275,9 @@ override_slots(PyTypeObject *type, PyObject *dict)
 	SQSLOT("__getitem__", sq_item);
 	SQSLOT("__getslice__", sq_slice);
 	SQSLOT("__setitem__", sq_ass_item);
+	SQSLOT("__delitem__", sq_ass_item);
 	SQSLOT("__setslice__", sq_ass_slice);
+	SQSLOT("__delslice__", sq_ass_slice);
 	SQSLOT("__contains__", sq_contains);
 	SQSLOT("__iadd__", sq_inplace_concat);
 	SQSLOT("__imul__", sq_inplace_repeat);
@@ -2268,6 +2285,7 @@ override_slots(PyTypeObject *type, PyObject *dict)
 	MPSLOT("__len__", mp_length);
 	MPSLOT("__getitem__", mp_subscript);
 	MPSLOT("__setitem__", mp_ass_subscript);
+	MPSLOT("__delitem__", mp_ass_subscript);
 
 	NBSLOT("__add__", nb_add);
 	NBSLOT("__sub__", nb_subtract);
