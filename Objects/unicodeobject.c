@@ -67,6 +67,8 @@ Copyright (c) Corporation for National Research Initiatives.
 #include "unicodeobject.h"
 #include "ucnhash.h"
 
+#include "mymath.h"                     /* need fabs() */
+
 #if defined(HAVE_LIMITS_H)
 #include <limits.h>
 #else
