@@ -1260,7 +1260,8 @@ compiler_visit_expr(struct compiler *c, expr_ty e)
 		break;
 	/* The following exprs can be assignment targets. */
         case Attribute_kind:
-		VISIT(c, expr, e->v.Attribute.value);
+		if (e->v.Attribute.ctx != AugStore)
+			VISIT(c, expr, e->v.Attribute.value);
 		switch (e->v.Attribute.ctx) {
 		case AugLoad:
 			ADDOP(c, DUP_TOP);
