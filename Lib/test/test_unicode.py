@@ -5,7 +5,7 @@ Written by Marc-Andre Lemburg (mal@lemburg.com).
 (c) Copyright CNRI, All Rights Reserved. NO WARRANTY.
 
 """#"
-from test_support import verify, verbose
+from test_support import verify, verbose, TestFailed
 import sys
 
 def test(method, input, output, *args):
@@ -366,6 +366,12 @@ verify('...%(foo)s...' % {u'foo':u"abc",u'def':123} == u'...abc...')
 verify('...%s...%s...%s...%s...' % (1,2,3,u"abc") == u'...1...2...3...abc...')
 verify('...%%...%%s...%s...%s...%s...%s...' % (1,2,3,u"abc") == u'...%...%s...1...2...3...abc...')
 verify('...%s...' % u"abc" == u'...abc...')
+verify('%*s' % (5,u'abc',) == u'  abc')
+verify('%*s' % (-5,u'abc',) == u'abc  ')
+verify('%*.*s' % (5,2,u'abc',) == u'   ab')
+verify('%*.*s' % (5,3,u'abc',) == u'  abc')
+verify('%i %*.*s' % (10, 5,3,u'abc',) == u'10   abc')
+verify('%i%s %*.*s' % (10, 3, 5,3,u'abc',) == u'103   abc')
 print 'done.'
 
 # Test builtin codecs
@@ -380,9 +386,9 @@ verify(u'\ud84d\udc56'.encode('utf-8') == \
        ''.join((chr(0xf0), chr(0xa3), chr(0x91), chr(0x96))) )
 # UTF-8 specific decoding tests
 verify(unicode(''.join((chr(0xf0), chr(0xa3), chr(0x91), chr(0x96))),
-               'utf-8') == u'\ud84d\udc56' )
+               'utf-8') == u'\U00023456' )
 verify(unicode(''.join((chr(0xf0), chr(0x90), chr(0x80), chr(0x82))),
-               'utf-8') == u'\ud800\udc02' )
+               'utf-8') == u'\U00010002' )
 verify(unicode(''.join((chr(0xe2), chr(0x82), chr(0xac))),
                'utf-8') == u'\u20ac' )
 
@@ -487,10 +493,13 @@ for encoding in (
     'cp856', 'cp857', 'cp864', 'cp869', 'cp874',
 
     'mac_greek', 'mac_iceland','mac_roman', 'mac_turkish',
-    'cp1006', 'cp875', 'iso8859_8',
+    'cp1006', 'iso8859_8',
 
     ### These have undefined mappings:
     #'cp424',
+
+    ### These fail the round-trip:
+    #'cp875'
 
     ):
     try:
