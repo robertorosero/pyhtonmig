@@ -558,6 +558,39 @@ sub make_str_index_entry{
     return "$aname$str</a>";
 }
 
+$REFCOUNTS_LOADED = 0;
+
+sub load_refcounts{
+    $REFCOUNTS_LOADED = 1;
+
+    use File::Basename;
+    my $myname, $mydir, $myext;
+    ($myname, $mydir, $myext) = fileparse(__FILE__, '\..*');
+    chop $mydir;			# remove trailing '/'
+    ($myname, $mydir, $myext) = fileparse($mydir, '\..*');
+    chop $mydir;			# remove trailing '/'
+    $mydir = getcwd() . "$dd$mydir"
+      unless $mydir =~ s|^/|/|;
+    local $_;
+    my $filename = "$mydir${dd}api${dd}refcounts.dat";
+    open(REFCOUNT_FILE, "<$filename") || die "\n$!\n";
+    print "[loading API refcount data]";
+    while (<REFCOUNT_FILE>) {
+        if (/([a-zA-Z0-9_]+):PyObject\*:([a-zA-Z0-9_]*):(0|[-+]1):(.*)$/) {
+            my($func, $param, $count, $comment) = ($1, $2, $3, $4);
+            #print "\n$func($param) --> $count";
+            $REFCOUNTS{"$func:$param"} = $count;
+        }
+    }
+}
+
+sub get_refcount{
+    my ($func, $param) = @_;
+    load_refcounts()
+        unless $REFCOUNTS_LOADED;
+    return $REFCOUNTS{"$func:$param"};
+}
+
 sub do_env_cfuncdesc{
     local($_) = @_;
     my $return_type = next_argument();
@@ -567,7 +600,21 @@ sub do_env_cfuncdesc{
         "<tt class='cfunction'>$function_name()</tt>" . get_indexsubitem());
     $idx =~ s/ \(.*\)//;
     $idx =~ s/\(\)//;		# ????
+    my $result_rc = get_refcount($function_name, '');
+    my $rcinfo = '';
+    if ($result_rc eq '+1') {
+        $rcinfo = '<span class="label">Return value:</span>'
+                  . "\n  <span class=\"value\">New reference.</span>";
+    }
+    elsif ($result_rc eq '0') {
+        $rcinfo = '<span class="label">Return value:</span>'
+                  . "\n  <span class=\"value\">Borrowed reference.</span>";
+    }
+    if ($rcinfo ne '') {
+        $rcinfo = "\n<div class=\"refcount-info\">\n  $rcinfo\n</div>";
+    }
     return "<dl><dt>$return_type <b>$idx</b> (<var>$arg_list</var>)\n<dd>"
+           . $rcinfo
            . $_
            . '</dl>';
 }
