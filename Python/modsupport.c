@@ -240,7 +240,20 @@ do_arg(arg, p_format, p_va)
 		}
 	
 	case 'O': /* object */ {
-		object **p = va_arg(*p_va, object **);
+		typeobject *type = NULL;
+		object **p;
+		if (*format == '!') {
+			type = va_arg(*p_va, typeobject *);
+			format++;
+		}
+		p = va_arg(*p_va, object **);
+		if (type && (*p)->ob_type != type) {
+			char buf[200];
+			sprintf(buf, "Object of type %.100s expected",
+				type->tp_name);
+			err_setstr(TypeError, buf);
+			return 0;
+		}
 		*p = arg;
 		break;
 		}
