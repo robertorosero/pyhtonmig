@@ -202,6 +202,8 @@ typedef long (*hashfunc)(PyObject *);
 typedef PyObject *(*richcmpfunc) (PyObject *, PyObject *, int);
 typedef PyObject *(*getiterfunc) (PyObject *);
 typedef PyObject *(*iternextfunc) (PyObject *);
+typedef PyObject *(*descrgetfunc) (PyObject *, PyObject *);
+typedef int (*descrsetfunc) (PyObject *, PyObject *, PyObject *);
 
 typedef struct _typeobject {
 	PyObject_VAR_HEAD
@@ -255,6 +257,17 @@ typedef struct _typeobject {
 	getiterfunc tp_iter;
 	iternextfunc tp_iternext;
 
+	/* Attribute descriptor stuff */
+	struct PyMethodDef *tp_methods;
+	struct memberlist *tp_members;
+	struct getsetlist *tp_getset;
+	struct _typeobject *tp_base;
+	PyObject *tp_dict;
+	descrgetfunc tp_descr_get;
+	descrsetfunc tp_descr_set;
+	unaryfunc tp_construct;
+
+
 #ifdef COUNT_ALLOCS
 	/* these must be last and never explicitly initialized */
 	int tp_alloc;
@@ -264,9 +277,17 @@ typedef struct _typeobject {
 #endif
 } PyTypeObject;
 
+
+/* Generic type check */
+extern DL_IMPORT(int) _PyObject_TypeCheck(PyObject *, PyTypeObject *);
+#define PyObject_TypeCheck(ob, tp) \
+	((ob)->ob_type == (tp) || _PyObject_TypeCheck(ob, tp))
+
 extern DL_IMPORT(PyTypeObject) PyType_Type; /* The type of type objects */
 
-#define PyType_Check(op) ((op)->ob_type == &PyType_Type)
+#define PyType_Check(op) PyObject_TypeCheck(op, &PyType_Type)
+
+extern DL_IMPORT(int) PyType_InitDict(PyTypeObject *);
 
 /* Generic operations on objects */
 extern DL_IMPORT(int) PyObject_Print(PyObject *, FILE *, int);
@@ -283,6 +304,8 @@ extern DL_IMPORT(int) PyObject_HasAttrString(PyObject *, char *);
 extern DL_IMPORT(PyObject *) PyObject_GetAttr(PyObject *, PyObject *);
 extern DL_IMPORT(int) PyObject_SetAttr(PyObject *, PyObject *, PyObject *);
 extern DL_IMPORT(int) PyObject_HasAttr(PyObject *, PyObject *);
+extern DL_IMPORT(PyObject *) PyGeneric_GetAttr(PyObject *, PyObject *);
+extern DL_IMPORT(int) PyGeneric_SetAttr(PyObject *, PyObject *, PyObject *);
 extern DL_IMPORT(long) PyObject_Hash(PyObject *);
 extern DL_IMPORT(int) PyObject_IsTrue(PyObject *);
 extern DL_IMPORT(int) PyObject_Not(PyObject *);
@@ -357,6 +380,9 @@ given type object has a specified feature.
 /* tp_iter is defined */
 #define Py_TPFLAGS_HAVE_ITER (1L<<7)
 
+/* Experimental stuff for healing the type/class split */
+#define Py_TPFLAGS_HAVE_CLASS (1L<<8)
+
 #define Py_TPFLAGS_DEFAULT  ( \
                              Py_TPFLAGS_HAVE_GETCHARBUFFER | \
                              Py_TPFLAGS_HAVE_SEQUENCE_IN | \
@@ -364,6 +390,7 @@ given type object has a specified feature.
                              Py_TPFLAGS_HAVE_RICHCOMPARE | \
                              Py_TPFLAGS_HAVE_WEAKREFS | \
                              Py_TPFLAGS_HAVE_ITER | \
+                             Py_TPFLAGS_HAVE_CLASS | \
                             0)
 
 #define PyType_HasFeature(t,f)  (((t)->tp_flags & (f)) != 0)

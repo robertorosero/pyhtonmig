@@ -3,6 +3,8 @@
 
 #include "Python.h"
 
+typedef PyDictEntry dictentry;
+typedef PyDictObject dictobject;
 
 /*
  * MINSIZE is the minimum size of a dictionary.
@@ -52,58 +54,6 @@ static long polys[] = {
 
 /* Object used as dummy key to fill deleted entries */
 static PyObject *dummy; /* Initialized by first call to newdictobject() */
-
-/*
-There are three kinds of slots in the table:
-
-1. Unused.  me_key == me_value == NULL
-   Does not hold an active (key, value) pair now and never did.  Unused can
-   transition to Active upon key insertion.  This is the only case in which
-   me_key is NULL, and is each slot's initial state.
-
-2. Active.  me_key != NULL and me_key != dummy and me_value != NULL
-   Holds an active (key, value) pair.  Active can transition to Dummy upon
-   key deletion.  This is the only case in which me_value != NULL.
-
-3. Dummy.  me_key == dummy and me_value == NULL
-   Previously held an active (key, value) pair, but that was deleted and an
-   active pair has not yet overwritten the slot.  Dummy can transition to
-   Active upon key insertion.  Dummy slots cannot be made Unused again
-   (cannot have me_key set to NULL), else the probe sequence in case of
-   collision would have no way to know they were once active.
-
-Note: .popitem() abuses the me_hash field of an Unused or Dummy slot to
-hold a search finger.  The me_hash field of Unused or Dummy slots has no
-meaning otherwise.
-*/
-typedef struct {
-	long me_hash;      /* cached hash code of me_key */
-	PyObject *me_key;
-	PyObject *me_value;
-#ifdef USE_CACHE_ALIGNED
-	long	aligner;
-#endif
-} dictentry;
-
-/*
-To ensure the lookup algorithm terminates, there must be at least one Unused
-slot (NULL key) in the table.
-The value ma_fill is the number of non-NULL keys (sum of Active and Dummy);
-ma_used is the number of non-NULL, non-dummy keys (== the number of non-NULL
-values == the number of Active items).
-To avoid slowing down lookups on a near-full table, we resize the table when
-it's two-thirds full.
-*/
-typedef struct dictobject dictobject;
-struct dictobject {
-	PyObject_HEAD
-	int ma_fill;  /* # Active + # Dummy */
-	int ma_used;  /* # Active */
-	int ma_size;  /* total # slots in ma_table */
-	int ma_poly;  /* appopriate entry from polys vector */
-	dictentry *ma_table;
-	dictentry *(*ma_lookup)(dictobject *mp, PyObject *key, long hash);
-};
 
 /* forward declarations */
 static dictentry *
@@ -1262,7 +1212,7 @@ static char clear__doc__[] =
 static char copy__doc__[] =
 "D.copy() -> a shallow copy of D";
 
-static PyMethodDef mapp_methods[] = {
+static PyMethodDef dict_methods[] = {
 	{"has_key",	(PyCFunction)dict_has_key,      METH_VARARGS,
 	 has_key__doc__},
 	{"get",         (PyCFunction)dict_get,          METH_VARARGS,
@@ -1285,12 +1235,6 @@ static PyMethodDef mapp_methods[] = {
 	 copy__doc__},
 	{NULL,		NULL}	/* sentinel */
 };
-
-static PyObject *
-dict_getattr(dictobject *mp, char *name)
-{
-	return Py_FindMethod(mapp_methods, (PyObject *)mp, name);
-}
 
 static int
 dict_contains(dictobject *mp, PyObject *key)
@@ -1326,6 +1270,23 @@ static PySequenceMethods dict_as_sequence = {
 
 staticforward PyObject *dictiter_new(dictobject *);
 
+static PyObject *
+dict_construct(PyDictObject *self)
+{
+	if (self == NULL)
+		return PyDict_New();
+	self->ma_size = 0;
+	self->ma_poly = 0;
+	self->ma_table = NULL;
+	self->ma_fill = 0;
+	self->ma_used = 0;
+	self->ma_lookup = lookdict_string;
+#ifdef SHOW_CONVERSION_COUNTS
+	++created;
+#endif
+	return (PyObject *)self;
+}
+
 PyTypeObject PyDict_Type = {
 	PyObject_HEAD_INIT(&PyType_Type)
 	0,
@@ -1334,7 +1295,7 @@ PyTypeObject PyDict_Type = {
 	0,
 	(destructor)dict_dealloc,		/* tp_dealloc */
 	(printfunc)dict_print,			/* tp_print */
-	(getattrfunc)dict_getattr,		/* tp_getattr */
+	0,					/* tp_getattr */
 	0,					/* tp_setattr */
 	(cmpfunc)dict_compare,			/* tp_compare */
 	(reprfunc)dict_repr,			/* tp_repr */
@@ -1344,7 +1305,7 @@ PyTypeObject PyDict_Type = {
 	0,					/* tp_hash */
 	0,					/* tp_call */
 	0,					/* tp_str */
-	0,					/* tp_getattro */
+	PyGeneric_GetAttr,			/* tp_getattro */
 	0,					/* tp_setattro */
 	0,					/* tp_as_buffer */
 	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_GC,	/* tp_flags */
@@ -1355,6 +1316,14 @@ PyTypeObject PyDict_Type = {
 	0,					/* tp_weaklistoffset */
 	(getiterfunc)dictiter_new,		/* tp_iter */
 	0,					/* tp_iternext */
+	dict_methods,				/* tp_methods */
+	0,					/* tp_members */
+	0,					/* tp_getset */
+	0,					/* tp_base */
+	0,					/* tp_dict */
+	0,					/* tp_descr_get */
+	0,					/* tp_descr_set */
+	(unaryfunc)dict_construct,		/* tp_construct */
 };
 
 /* For backward compatibility with old dictionary interface */
@@ -1461,12 +1430,6 @@ static PyMethodDef dictiter_methods[] = {
 	{NULL,		NULL}		/* sentinel */
 };
 
-static PyObject *
-dictiter_getattr(dictiterobject *di, char *name)
-{
-	return Py_FindMethod(dictiter_methods, (PyObject *)di, name);
-}
-
 static PyObject *dictiter_iternext(dictiterobject *di)
 {
 	PyObject *key;
@@ -1492,7 +1455,7 @@ PyTypeObject PyDictIter_Type = {
 	/* methods */
 	(destructor)dictiter_dealloc, 		/* tp_dealloc */
 	0,					/* tp_print */
-	(getattrfunc)dictiter_getattr,		/* tp_getattr */
+	0,					/* tp_getattr */
 	0,					/* tp_setattr */
 	0,					/* tp_compare */
 	0,					/* tp_repr */
@@ -1502,7 +1465,7 @@ PyTypeObject PyDictIter_Type = {
 	0,					/* tp_hash */
 	0,					/* tp_call */
 	0,					/* tp_str */
-	0,					/* tp_getattro */
+	PyGeneric_GetAttr,			/* tp_getattro */
 	0,					/* tp_setattro */
 	0,					/* tp_as_buffer */
 	Py_TPFLAGS_DEFAULT,			/* tp_flags */
@@ -1513,4 +1476,11 @@ PyTypeObject PyDictIter_Type = {
 	0,					/* tp_weaklistoffset */
 	(getiterfunc)dictiter_getiter,		/* tp_iter */
 	(iternextfunc)dictiter_iternext,	/* tp_iternext */
+	dictiter_methods,			/* tp_methods */
+	0,					/* tp_members */
+	0,					/* tp_getset */
+	0,					/* tp_base */
+	0,					/* tp_dict */
+	0,					/* tp_descr_get */
+	0,					/* tp_descr_set */
 };

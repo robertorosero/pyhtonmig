@@ -233,6 +233,7 @@ OBJECT_OBJS=	\
 		Objects/classobject.o \
 		Objects/cobject.o \
 		Objects/complexobject.o \
+		Objects/descrobject.o \
 		Objects/fileobject.o \
 		Objects/floatobject.o \
 		Objects/frameobject.o \
@@ -435,6 +436,7 @@ PYTHON_HEADERS= \
 		Include/tupleobject.h \
 		Include/listobject.h \
 		Include/iterobject.h \
+		Include/descrobject.h \
 		Include/dictobject.h \
 		Include/methodobject.h \
 		Include/moduleobject.h \

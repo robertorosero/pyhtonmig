@@ -33,20 +33,6 @@ typedef PyObject *(*callproc)(PyObject *, PyObject *, PyObject *);
 
 /* Forward declarations */
 
-static PyObject *eval_code2(PyCodeObject *,
-			    PyObject *, PyObject *,
-			    PyObject **, int,
-			    PyObject **, int,
-			    PyObject **, int,
-			    PyObject *);
-
-static char *get_func_name(PyObject *);
-static char *get_func_desc(PyObject *);
-static PyObject *call_object(PyObject *, PyObject *, PyObject *);
-static PyObject *call_cfunction(PyObject *, PyObject *, PyObject *);
-static PyObject *call_instance(PyObject *, PyObject *, PyObject *);
-static PyObject *call_method(PyObject *, PyObject *, PyObject *);
-static PyObject *call_eval_code2(PyObject *, PyObject *, PyObject *);
 static PyObject *fast_function(PyObject *, PyObject ***, int, int, int);
 static PyObject *fast_cfunction(PyObject *, PyObject ***, int);
 static PyObject *do_call(PyObject *, PyObject ***, int, int);
@@ -338,7 +324,7 @@ static int unpack_sequence(PyObject *, int, PyObject **);
 PyObject *
 PyEval_EvalCode(PyCodeObject *co, PyObject *globals, PyObject *locals)
 {
-	return eval_code2(co,
+	return PyEval_EvalCodeEx(co,
 			  globals, locals,
 			  (PyObject **)NULL, 0,
 			  (PyObject **)NULL, 0,
@@ -349,8 +335,8 @@ PyEval_EvalCode(PyCodeObject *co, PyObject *globals, PyObject *locals)
 
 /* Interpreter main loop */
 
-static PyObject *
-eval_code2(PyCodeObject *co, PyObject *globals, PyObject *locals,
+PyObject *
+PyEval_EvalCodeEx(PyCodeObject *co, PyObject *globals, PyObject *locals,
 	   PyObject **args, int argcount, PyObject **kws, int kwcount,
 	   PyObject **defs, int defcount, PyObject *closure)
 {
@@ -425,7 +411,8 @@ eval_code2(PyCodeObject *co, PyObject *globals, PyObject *locals,
 #endif
 
 	if (globals == NULL) {
-		PyErr_SetString(PyExc_SystemError, "eval_code2: NULL globals");
+		PyErr_SetString(PyExc_SystemError,
+				"PyEval_EvalCodeEx: NULL globals");
 		return NULL;
 	}
 
@@ -2760,13 +2747,13 @@ PyEval_CallObjectWithKeywords(PyObject *func, PyObject *arg, PyObject *kw)
 		return NULL;
 	}
 
-	result = call_object(func, arg, kw);
+	result = PyObject_Call(func, arg, kw);
 	Py_DECREF(arg);
 	return result;
 }
 
 /* How often is each kind of object called?  The answer depends on the
-   program.  An instrumented call_object() was used to run the Python
+   program.  An instrumented PyObject_Call() was used to run the Python
    regression test suite.  The results were:
    4200000 PyCFunctions
     390000 fast_function() calls
@@ -2779,11 +2766,11 @@ PyEval_CallObjectWithKeywords(PyObject *func, PyObject *arg, PyObject *kw)
     most common, but not by such a large margin.
 */
 
-static char *
-get_func_name(PyObject *func)
+char *
+PyEval_GetFuncName(PyObject *func)
 {
 	if (PyMethod_Check(func))
-		return get_func_name(PyMethod_GET_FUNCTION(func));
+		return PyEval_GetFuncName(PyMethod_GET_FUNCTION(func));
 	else if (PyFunction_Check(func))
 		return PyString_AsString(((PyFunctionObject*)func)->func_name);
 	else if (PyCFunction_Check(func))
@@ -2798,8 +2785,8 @@ get_func_name(PyObject *func)
 	}
 }
 
-static char *
-get_func_desc(PyObject *func)
+char *
+PyEval_GetFuncDesc(PyObject *func)
 {
 	if (PyMethod_Check(func))
 		return "()";
@@ -2814,188 +2801,6 @@ get_func_desc(PyObject *func)
 	} else {
 		return " object";
 	}
-}
-
-static PyObject *
-call_object(PyObject *func, PyObject *arg, PyObject *kw)
-{
-        ternaryfunc call;
-        PyObject *result;
-
-	if (PyMethod_Check(func))
-		result = call_method(func, arg, kw);
-	else if (PyFunction_Check(func))
-		result = call_eval_code2(func, arg, kw);
-	else if (PyCFunction_Check(func))
-		result = call_cfunction(func, arg, kw);
-	else if (PyClass_Check(func))
-		result = PyInstance_New(func, arg, kw);
-	else if (PyInstance_Check(func))
-		result = call_instance(func, arg, kw);
-	else if ((call = func->ob_type->tp_call) != NULL)
-		result = (*call)(func, arg, kw);
-	else {
-		PyErr_Format(PyExc_TypeError, "object is not callable: %s",
-			     PyString_AS_STRING(PyObject_Repr(func)));
-		return NULL;
-	}
-        if (result == NULL && !PyErr_Occurred())
-		PyErr_SetString(PyExc_SystemError,
-			   "NULL result without error in call_object");
-
-        return result;
-}
-
-static PyObject *
-call_cfunction(PyObject *func, PyObject *arg, PyObject *kw)
-{
-	PyCFunctionObject* f = (PyCFunctionObject*)func;
-	PyCFunction meth = PyCFunction_GET_FUNCTION(func);
-	PyObject *self = PyCFunction_GET_SELF(func);
-	int flags = PyCFunction_GET_FLAGS(func);
-
-	if (flags & METH_KEYWORDS) {
-		return (*(PyCFunctionWithKeywords)meth)(self, arg, kw);
-	}
-	if (kw != NULL && PyDict_Size(kw) != 0) {
-		PyErr_Format(PyExc_TypeError,
-			     "%.200s() takes no keyword arguments",
-			     f->m_ml->ml_name);
-		return NULL;
-	}
-	if (flags & METH_VARARGS) {
-		return (*meth)(self, arg);
-	}
-	if (!(flags & METH_VARARGS)) {
-		/* the really old style */
-		int size = PyTuple_GET_SIZE(arg);
-		if (size == 1)
-			arg = PyTuple_GET_ITEM(arg, 0);
-		else if (size == 0)
-			arg = NULL;
-		return (*meth)(self, arg);
-	}
-	/* should never get here ??? */
-	PyErr_BadInternalCall();
-	return NULL;
-}
-
-static PyObject *
-call_instance(PyObject *func, PyObject *arg, PyObject *kw)
-{
-	PyObject *res, *call = PyObject_GetAttrString(func, "__call__");
-	if (call == NULL) {
-		PyInstanceObject *inst = (PyInstanceObject*) func;
-		PyErr_Clear();
-		PyErr_Format(PyExc_AttributeError,
-			     "%.200s instance has no __call__ method",
-			     PyString_AsString(inst->in_class->cl_name));
-		return NULL;
-	}
-	res = call_object(call, arg, kw);
-	Py_DECREF(call);
-	return res;
-}
-
-static PyObject *
-call_method(PyObject *func, PyObject *arg, PyObject *kw)
-{
-	PyObject *self = PyMethod_GET_SELF(func);
-	PyObject *class = PyMethod_GET_CLASS(func);
-	PyObject *result;
-
-	func = PyMethod_GET_FUNCTION(func);
-	if (self == NULL) {
-		/* Unbound methods must be called with an instance of
-		   the class (or a derived class) as first argument */
-		int ok;
-		if (PyTuple_Size(arg) >= 1)
-			self = PyTuple_GET_ITEM(arg, 0);
-		if (self == NULL)
-			ok = 0;
-		else {
-			ok = PyObject_IsInstance(self, class);
-			if (ok < 0)
-				return NULL;
-		}
-		if (!ok) {
-			PyErr_Format(PyExc_TypeError,
-				     "unbound method %s%s must be "
-				     "called with instance as first argument",
-				     get_func_name(func), get_func_desc(func));
-			return NULL;
-		}
-		Py_INCREF(arg);
-	}
-	else {
-		int argcount = PyTuple_Size(arg);
-		PyObject *newarg = PyTuple_New(argcount + 1);
-		int i;
-		if (newarg == NULL)
-			return NULL;
-		Py_INCREF(self);
-		PyTuple_SET_ITEM(newarg, 0, self);
-		for (i = 0; i < argcount; i++) {
-			PyObject *v = PyTuple_GET_ITEM(arg, i);
-			Py_XINCREF(v);
-			PyTuple_SET_ITEM(newarg, i+1, v);
-		}
-		arg = newarg;
-	}
-	result = call_object(func, arg, kw);
-	Py_DECREF(arg);
-	return result;
-}
-
-static PyObject *
-call_eval_code2(PyObject *func, PyObject *arg, PyObject *kw)
-{
-	PyObject *result;
-	PyObject *argdefs;
-	PyObject **d, **k;
-	int nk, nd;
-
-	argdefs = PyFunction_GET_DEFAULTS(func);
-	if (argdefs != NULL && PyTuple_Check(argdefs)) {
-		d = &PyTuple_GET_ITEM((PyTupleObject *)argdefs, 0);
-		nd = PyTuple_Size(argdefs);
-	}
-	else {
-		d = NULL;
-		nd = 0;
-	}
-
-	if (kw != NULL) {
-		int pos, i;
-		nk = PyDict_Size(kw);
-		k = PyMem_NEW(PyObject *, 2*nk);
-		if (k == NULL) {
-			PyErr_NoMemory();
-			Py_DECREF(arg);
-			return NULL;
-		}
-		pos = i = 0;
-		while (PyDict_Next(kw, &pos, &k[i], &k[i+1]))
-			i += 2;
-		nk = i/2;
-		/* XXX This is broken if the caller deletes dict items! */
-	}
-	else {
-		k = NULL;
-		nk = 0;
-	}
-
-	result = eval_code2(
-		(PyCodeObject *)PyFunction_GET_CODE(func),
-		PyFunction_GET_GLOBALS(func), (PyObject *)NULL,
-		&PyTuple_GET_ITEM(arg, 0), PyTuple_Size(arg),
-		k, nk, d, nd,
-		PyFunction_GET_CLOSURE(func));
-
-	if (k != NULL)
-		PyMem_DEL(k);
-
-	return result;
 }
 
 #define EXT_POP(STACK_POINTER) (*--(STACK_POINTER))
@@ -3041,7 +2846,7 @@ fast_function(PyObject *func, PyObject ***pp_stack, int n, int na, int nk)
 		d = &PyTuple_GET_ITEM(argdefs, 0);
 		nd = ((PyTupleObject *)argdefs)->ob_size;
 	}
-	return eval_code2((PyCodeObject *)co, globals,
+	return PyEval_EvalCodeEx((PyCodeObject *)co, globals,
 			  (PyObject *)NULL, (*pp_stack)-n, na,
 			  (*pp_stack)-2*nk, nk, d, nd,
 			  closure);
@@ -3068,8 +2873,8 @@ update_keyword_args(PyObject *orig_kwdict, int nk, PyObject ***pp_stack,
                         PyErr_Format(PyExc_TypeError,
                                      "%.200s%s got multiple values "
                                      "for keyword argument '%.200s'",
-				     get_func_name(func),
-				     get_func_desc(func),
+				     PyEval_GetFuncName(func),
+				     PyEval_GetFuncDesc(func),
 				     PyString_AsString(key));
 			Py_DECREF(key);
 			Py_DECREF(value);
@@ -3142,7 +2947,7 @@ do_call(PyObject *func, PyObject ***pp_stack, int na, int nk)
 	callargs = load_args(pp_stack, na);
 	if (callargs == NULL)
 		goto call_fail;
-	result = call_object(func, callargs, kwdict);
+	result = PyObject_Call(func, callargs, kwdict);
  call_fail:
 	Py_XDECREF(callargs);
 	Py_XDECREF(kwdict);
@@ -3164,8 +2969,8 @@ ext_do_call(PyObject *func, PyObject ***pp_stack, int flags, int na, int nk)
 			PyErr_Format(PyExc_TypeError,
 				     "%s%s argument after ** "
 				     "must be a dictionary",
-				     get_func_name(func),
-				     get_func_desc(func));
+				     PyEval_GetFuncName(func),
+				     PyEval_GetFuncDesc(func));
 			goto ext_call_fail;
 		}
 	}
@@ -3179,8 +2984,8 @@ ext_do_call(PyObject *func, PyObject ***pp_stack, int flags, int na, int nk)
 					PyErr_Format(PyExc_TypeError,
 						     "%s%s argument after * "
 						     "must be a sequence",
-						     get_func_name(func),
-						     get_func_desc(func));
+						     PyEval_GetFuncName(func),
+						     PyEval_GetFuncDesc(func));
 				}
 				goto ext_call_fail;
 			}
@@ -3197,7 +3002,7 @@ ext_do_call(PyObject *func, PyObject ***pp_stack, int flags, int na, int nk)
 	callargs = update_star_args(na, nstar, stararg, pp_stack);
 	if (callargs == NULL)
 		goto ext_call_fail;
-	result = call_object(func, callargs, kwdict);
+	result = PyObject_Call(func, callargs, kwdict);
       ext_call_fail:
 	Py_XDECREF(callargs);
 	Py_XDECREF(kwdict);
