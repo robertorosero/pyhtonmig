@@ -319,6 +319,7 @@ get_inprogress_dict()
 		    Py_DECREF(inprogress);
 		    return NULL;
 		}
+		Py_DECREF(inprogress);
 	}
 	return inprogress;
 }
