@@ -28,7 +28,7 @@ class Profile:
 
 	def trace_dispatch(self, frame, event, arg):
 		if event == 'call':
-			funcname = codehack.getcodename(frame.f_code)
+			funcname = frame.f_code.co_name
 			if self.profile_func and not self.profiling:
 				if self.profile_func.has_key(funcname):
 					return
@@ -55,7 +55,7 @@ class Profile:
 						  ':' + \
 						  `codehack.getlineno(pframe.f_code)` \
 						  + '(' + \
-						  codehack.getcodename(pframe.f_code) \
+						  pframe.f_code.co_name \
 						  + ')'
 					pframe.f_locals['__key'] = pkey
 				if self.debug:
@@ -96,7 +96,7 @@ class Profile:
 				if not self.profiling:
 					return
 				if self.profile_func.has_key( \
-					codehack.getcodename(frame.f_code)):
+					frame.f_code.co_name):
 					self.profiling = 0
 			self.call_level = depth(frame)
 			self.cur_frame = frame
@@ -118,7 +118,7 @@ class Profile:
 					s0 = 'exception: '
 				else:
 					s0 = None
-				self.handle_return(self.cur_frame, frame, s0)
+				self.handle_return(frame, self.cur_frame, s0)
 			self.call_level = call_level
 			self.cur_frame = frame
 			return
@@ -132,7 +132,7 @@ class Profile:
 		if frame.f_locals.has_key('__key'):
 			key = frame.f_locals['__key']
 		else:
-			funcname = codehack.getcodename(frame.f_code)
+			funcname = frame.f_code.co_name
 			lineno = codehack.getlineno(frame.f_code)
 			filename = frame.f_code.co_filename
 			key = filename + ':' + `lineno` + '(' + funcname + ')'
@@ -143,7 +143,7 @@ class Profile:
 			if pframe.f_locals.has_key('__key'):
 				pkey = pframe.f_locals['__key']
 			else:
-				funcname = codehack.getcodename(frame.f_code)
+				funcname = frame.f_code.co_name
 				lineno = codehack.getlineno(frame.f_code)
 				filename = frame.f_code.co_filename
 				pkey = filename + ':' + `lineno` + '(' + funcname + ')'

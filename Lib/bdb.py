@@ -17,6 +17,8 @@ class Bdb: # Basic Debugger
 		self.breaks = {}
 	
 	def reset(self):
+		import linecache
+		linecache.checkcache()
 		self.botframe = None
 		self.stopframe = None
 		self.returnframe = None
@@ -217,11 +219,11 @@ class Bdb: # Basic Debugger
 	# 
 	
 	def format_stack_entry(self, frame_lineno):
-		import codehack, linecache, repr, string
+		import linecache, repr, string
 		frame, lineno = frame_lineno
 		filename = frame.f_code.co_filename
 		s = filename + '(' + `lineno` + ')'
-		s = s + codehack.getcodename(frame.f_code)
+		s = s + frame.f_code.co_name
 		if frame.f_locals.has_key('__args__'):
 			args = frame.f_locals['__args__']
 			if args is not None:
@@ -273,13 +275,12 @@ class Bdb: # Basic Debugger
 
 class Tdb(Bdb):
 	def user_call(self, frame, args):
-		import codehack
-		name = codehack.getcodename(frame.f_code)
+		name = frame.f_code.co_name
 		if not name: name = '???'
 		print '+++ call', name, args
 	def user_line(self, frame):
-		import linecache, string, codehack
-		name = codehack.getcodename(frame.f_code)
+		import linecache, string
+		name = frame.f_code.co_name
 		if not name: name = '???'
 		fn = frame.f_code.co_filename
 		line = linecache.getline(fn, frame.f_lineno)
@@ -300,7 +301,5 @@ def bar(a):
 	return a/2
 
 def test():
-	import linecache
-	linecache.checkcache()
 	t = Tdb()
 	t.run('import bdb; bdb.foo(10)')

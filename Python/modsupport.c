@@ -1,5 +1,5 @@
 /***********************************************************
-Copyright 1991, 1992, 1993 by Stichting Mathematisch Centrum,
+Copyright 1991, 1992, 1993, 1994 by Stichting Mathematisch Centrum,
 Amsterdam, The Netherlands.
 
                         All Rights Reserved
@@ -99,7 +99,6 @@ do_arg(arg, p_format, p_va)
 	va_list *p_va;
 {
 	char *format = *p_format;
-	va_list va = *p_va;
 	
 	if (arg == NULL)
 		return 0; /* Incomplete tuple or list */
@@ -112,7 +111,7 @@ do_arg(arg, p_format, p_va)
 			return 0;
 		n = gettuplesize(arg);
 		for (i = 0; i < n; i++) {
-			if (!do_arg(gettupleitem(arg, i), &format, &va))
+			if (!do_arg(gettupleitem(arg, i), &format, p_va))
 				return 0;
 		}
 		if (*format++ != ')')
@@ -124,7 +123,7 @@ do_arg(arg, p_format, p_va)
 		return 0;
 
 	case 'b': /* byte -- very short int */ {
-		char *p = va_arg(va, char *);
+		char *p = va_arg(*p_va, char *);
 		if (is_intobject(arg))
 			*p = getintvalue(arg);
 		else
@@ -133,7 +132,7 @@ do_arg(arg, p_format, p_va)
 		}
 
 	case 'h': /* short int */ {
-		short *p = va_arg(va, short *);
+		short *p = va_arg(*p_va, short *);
 		if (is_intobject(arg))
 			*p = getintvalue(arg);
 		else
@@ -142,7 +141,7 @@ do_arg(arg, p_format, p_va)
 		}
 	
 	case 'i': /* int */ {
-		int *p = va_arg(va, int *);
+		int *p = va_arg(*p_va, int *);
 		if (is_intobject(arg))
 			*p = getintvalue(arg);
 		else
@@ -151,7 +150,7 @@ do_arg(arg, p_format, p_va)
 		}
 	
 	case 'l': /* long int */ {
-		long *p = va_arg(va, long *);
+		long *p = va_arg(*p_va, long *);
 		if (is_intobject(arg))
 			*p = getintvalue(arg);
 		else
@@ -160,7 +159,7 @@ do_arg(arg, p_format, p_va)
 		}
 	
 	case 'f': /* float */ {
-		float *p = va_arg(va, float *);
+		float *p = va_arg(*p_va, float *);
 		if (is_floatobject(arg))
 			*p = getfloatvalue(arg);
 		else if (is_intobject(arg))
@@ -171,7 +170,7 @@ do_arg(arg, p_format, p_va)
 		}
 	
 	case 'd': /* double */ {
-		double *p = va_arg(va, double *);
+		double *p = va_arg(*p_va, double *);
 		if (is_floatobject(arg))
 			*p = getfloatvalue(arg);
 		else if (is_intobject(arg))
@@ -182,7 +181,7 @@ do_arg(arg, p_format, p_va)
 		}
 	
 	case 'c': /* char */ {
-		char *p = va_arg(va, char *);
+		char *p = va_arg(*p_va, char *);
 		if (is_stringobject(arg) && getstringsize(arg) == 1)
 			*p = getstringvalue(arg)[0];
 		else
@@ -191,13 +190,13 @@ do_arg(arg, p_format, p_va)
 		}
 	
 	case 's': /* string */ {
-		char **p = va_arg(va, char **);
+		char **p = va_arg(*p_va, char **);
 		if (is_stringobject(arg))
 			*p = getstringvalue(arg);
 		else
 			return 0;
 		if (*format == '#') {
-			int *q = va_arg(va, int *);
+			int *q = va_arg(*p_va, int *);
 			*q = getstringsize(arg);
 			format++;
 		}
@@ -209,7 +208,7 @@ do_arg(arg, p_format, p_va)
 		}
 	
 	case 'z': /* string, may be NULL (None) */ {
-		char **p = va_arg(va, char **);
+		char **p = va_arg(*p_va, char **);
 		if (arg == None)
 			*p = 0;
 		else if (is_stringobject(arg))
@@ -217,7 +216,7 @@ do_arg(arg, p_format, p_va)
 		else
 			return 0;
 		if (*format == '#') {
-			int *q = va_arg(va, int *);
+			int *q = va_arg(*p_va, int *);
 			if (arg == None)
 				*q = 0;
 			else
@@ -232,7 +231,7 @@ do_arg(arg, p_format, p_va)
 		}
 	
 	case 'S': /* string object */ {
-		object **p = va_arg(va, object **);
+		object **p = va_arg(*p_va, object **);
 		if (is_stringobject(arg))
 			*p = arg;
 		else
@@ -241,7 +240,20 @@ do_arg(arg, p_format, p_va)
 		}
 	
 	case 'O': /* object */ {
-		object **p = va_arg(va, object **);
+		typeobject *type = NULL;
+		object **p;
+		if (*format == '!') {
+			type = va_arg(*p_va, typeobject *);
+			format++;
+		}
+		p = va_arg(*p_va, object **);
+		if (type && (*p)->ob_type != type) {
+			char buf[200];
+			sprintf(buf, "Object of type %.100s expected",
+				type->tp_name);
+			err_setstr(TypeError, buf);
+			return 0;
+		}
 		*p = arg;
 		break;
 		}
@@ -253,13 +265,12 @@ do_arg(arg, p_format, p_va)
 	
 	}
 	
-	*p_va = va;
 	*p_format = format;
 	
 	return 1;
 }
 
-#ifdef USE_STDARG
+#ifdef HAVE_STDARG_PROTOTYPES
 /* VARARGS2 */
 int getargs(object *arg, char *format, ...)
 #else
@@ -270,7 +281,7 @@ int getargs(va_alist) va_dcl
 	char *f;
 	int ok;
 	va_list va;
-#ifdef USE_STDARG
+#ifdef HAVE_STDARG_PROTOTYPES
 
 	va_start(va, format);
 #else
@@ -517,7 +528,7 @@ do_mkvalue(p_format, p_va)
 	}
 }
 
-#ifdef USE_STDARG
+#ifdef HAVE_STDARG_PROTOTYPES
 /* VARARGS 2 */
 object *mkvalue(char *format, ...)
 #else
@@ -527,7 +538,7 @@ object *mkvalue(va_alist) va_dcl
 {
 	va_list va;
 	object* retval;
-#ifdef USE_STDARG
+#ifdef HAVE_STDARG_PROTOTYPES
 	va_start(va, format);
 #else
 	char *format;

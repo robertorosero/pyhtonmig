@@ -1,5 +1,5 @@
 /***********************************************************
-Copyright 1991, 1992, 1993 by Stichting Mathematisch Centrum,
+Copyright 1991, 1992, 1993, 1994 by Stichting Mathematisch Centrum,
 Amsterdam, The Netherlands.
 
                         All Rights Reserved
@@ -63,6 +63,10 @@ builtin_apply(self, args)
 	object *func, *arglist;
 	if (!getargs(args, "(OO)", &func, &arglist))
 		return NULL;
+	if (!is_tupleobject(arglist)) {
+		err_setstr(TypeError, "apply() 2nd argument must be tuple");
+		return NULL;
+	}
 	return call_object(func, arglist);
 }
 
@@ -107,12 +111,19 @@ builtin_filter(self, args)
 			goto Fail_2;
 	}
 
-	for (i = j = 0; i < len; ++i) {
+	for (i = j = 0; ; ++i) {
 		object *item, *good;
 		int ok;
 
-		if ((item = (*sqf->sq_item)(seq, i)) == NULL)
+		if ((item = (*sqf->sq_item)(seq, i)) == NULL) {
+			if (i < len)
+				goto Fail_1;
+			if (err_occurred() == IndexError) {
+				err_clear();
+				break;
+			}
 			goto Fail_1;
+		}
 
 		if (func == None) {
 			good = item;
@@ -131,13 +142,20 @@ builtin_filter(self, args)
 		DECREF(good);
 		if (ok) {
 			INCREF(item);
-			if (setlistitem(result, j++, item) < 0)
-				goto Fail_1;
+			if (j < len) {
+				if (setlistitem(result, j++, item) < 0)
+					goto Fail_1;
+			}
+			else {
+				j++;
+				if (addlistitem(result, item) < 0)
+					goto Fail_1;
+			}
 		}
 	}
 
 
-	if (setlistslice(result, j, len, NULL) < 0)
+	if (j < len && setlistslice(result, j, len, NULL) < 0)
 		goto Fail_1;
 
 	return result;
@@ -453,7 +471,7 @@ builtin_map(self, args)
 		goto Fail_2;
 	}
 
-	for (len = -1, i = 0, sqp = seqs; i < n; ++i, ++sqp) {
+	for (len = 0, i = 0, sqp = seqs; i < n; ++i, ++sqp) {
 		int curlen;
 	
 		if ((sqp->seq = gettupleitem(args, i + 1)) == NULL)
@@ -480,55 +498,81 @@ builtin_map(self, args)
 		goto Fail_2;
 
 	/* XXX Special case map(None, single_list) could be more efficient */
-	for (i = 0; i < len; ++i) {
-		object *arglist, *item;
+	for (i = 0; ; ++i) {
+		object *arglist, *item, *value;
+		int any = 0;
 
-		if ((arglist = newtupleobject(n)) == NULL)
-			goto Fail_1;
+		if (func == None && n == 1)
+			arglist = NULL;
+		else {
+			if ((arglist = newtupleobject(n)) == NULL)
+				goto Fail_1;
+		}
 
 		for (j = 0, sqp = seqs; j < n; ++j, ++sqp) {
-			if (i >= sqp->len) {
+			if (sqp->len < 0) {
 				INCREF(None);
 				item = None;
 			}
 			else {
 				item = (*sqp->sqf->sq_item)(sqp->seq, i);
-				if (item == NULL)
-					goto Fail_0;
+				if (item == NULL) {
+					if (i < sqp->len)
+						goto Fail_0;
+					if (err_occurred() == IndexError) {
+						err_clear();
+						INCREF(None);
+						item = None;
+						sqp->len = -1;
+					}
+					else {
+						goto Fail_0;
+					}
+				}
+				else
+					any = 1;
 
 			}
-			if (settupleitem(arglist, j, item) < 0)
+			if (!arglist)
+				break;
+			if (settupleitem(arglist, j, item) < 0) {
+				DECREF(item);
 				goto Fail_0;
+			}
 			continue;
 
 		Fail_0:
-			DECREF(arglist);
+			XDECREF(arglist);
 			goto Fail_1;
 		}
 
-		if (func == None) {
-			if (n == 1)	{ /* avoid creating singleton */
-				INCREF(item); /* This is arglist[0] !!! */
-				DECREF(arglist);
-				if (setlistitem(result, i, item) < 0)
-					goto Fail_1;
-			}
-			else {
-				if (setlistitem(result, i, arglist) < 0)
-					goto Fail_1;
-			}
+		if (!arglist)
+			arglist = item;
+
+		if (!any) {
+			DECREF(arglist);
+			break;
 		}
+
+		if (func == None)
+			value = arglist;
 		else {
-			object *value = call_object(func, arglist);
+			value = call_object(func, arglist);
 			DECREF(arglist);
 			if (value == NULL)
 				goto Fail_1;
-			if (setlistitem((object *) result, i, value) < 0)
+		}
+		if (i >= len) {
+			if (addlistitem(result, value) < 0)
+				goto Fail_1;
+		}
+		else {
+			if (setlistitem(result, i, value) < 0)
 				goto Fail_1;
 		}
 	}
 
-	if (seqs) DEL(seqs);
+	DEL(seqs);
 	return result;
 
 Fail_1:
@@ -665,7 +709,7 @@ min_max(v, sign)
 	object *v;
 	int sign;
 {
-	int i, n, cmp;
+	int i;
 	object *w, *x;
 	sequence_methods *sq;
 	if (v == NULL) {
@@ -677,24 +721,30 @@ min_max(v, sign)
 		err_setstr(TypeError, "min() or max() of non-sequence");
 		return NULL;
 	}
-	n = (*sq->sq_length)(v);
-	if (n < 0)
-		return NULL;
-	if (n == 0) {
-		err_setstr(ValueError, "min() or max() of empty sequence");
-		return NULL;
-	}
-	w = (*sq->sq_item)(v, 0); /* Implies INCREF */
-	for (i = 1; i < n; i++) {
+	w = NULL;
+	for (i = 0; ; i++) {
 		x = (*sq->sq_item)(v, i); /* Implies INCREF */
-		cmp = cmpobject(x, w);
-		if (cmp * sign > 0) {
-			DECREF(w);
-			w = x;
+		if (x == NULL) {
+			if (err_occurred() == IndexError) {
+				err_clear();
+				break;
+			}
+			XDECREF(w);
+			return NULL;
 		}
-		else
-			DECREF(x);
+		if (w == NULL)
+			w = x;
+		else {
+			if (cmpobject(x, w) * sign > 0) {
+				DECREF(w);
+				w = x;
+			}
+			else
+				DECREF(x);
+		}
 	}
+	if (w == NULL)
+		err_setstr(ValueError, "min() or max() of empty sequence");
 	return w;
 }
 
@@ -735,10 +785,18 @@ builtin_open(self, args)
 	object *self;
 	object *args;
 {
-	char *name, *mode;
-	if (!getargs(args, "(ss)", &name, &mode))
+	char *name;
+	char *mode = "r";
+	int bufsize = -1;
+	object *f;
+	if (!getargs(args, "s", &name) &&
+	    (err_clear(), !getargs(args, "(ss)", &name, &mode)) &&
+	    (err_clear(), !getargs(args, "(ssi)", &name, &mode, &bufsize)))
 		return NULL;
-	return newfileobject(name, mode);
+	f = newfileobject(name, mode);
+	if (f != NULL)
+		setfilebufsize(f, bufsize);
+	return f;
 }
 
 static object *
@@ -920,25 +978,15 @@ builtin_reduce(self, args)
 {
 	object *seq, *func, *result;
 	sequence_methods *sqf;
-	static char reduce_err[] = "reduce() requires 2 or 3 args";
 	register int i;
-	int start = 0;
-	int len;
 
-	if (args == NULL || !is_tupleobject(args)) {
-		err_setstr(TypeError, reduce_err);
-		return NULL;
-	}
-
-	switch (gettuplesize(args)) {
-	case 2:
-		start = 1;		/* fall through */
-	case 3:
-		func = gettupleitem(args, 0);
-		seq  = gettupleitem(args, 1);
-		break;
-	default:
-		err_setstr(TypeError, reduce_err);
+	if (getargs(args, "(OO)", &func, &seq))
+		result = NULL;
+	else {
+		err_clear();
+		if (!getargs(args, "(OOO)", &func, &seq, &result))
+			return NULL;
+		INCREF(result);
 	}
 
 	if ((sqf = seq->ob_type->tp_as_sequence) == NULL) {
@@ -947,55 +995,47 @@ builtin_reduce(self, args)
 		return NULL;
 	}
 
-	if ((len = (*sqf->sq_length)(seq)) < 0)
-		goto Fail_2;
-
-	if (start == 1) {
-		if (len == 0) {
-			err_setstr(TypeError,
-			    "reduce of empty sequence with no initial value");
-			goto Fail_2;
-		}
-
-		if ((result = (*sqf->sq_item)(seq, 0)) == NULL)
-			goto Fail_2;
-	}
-	else {
-		result = gettupleitem(args, 2);
-		INCREF(result);
-	}
-
 	if ((args = newtupleobject(2)) == NULL)
-		goto Fail_1;
+		goto Fail;
 
-	for (i = start; i < len; ++i) {
+	for (i = 0; ; ++i) {
 		object *op2;
 
 		if (args->ob_refcnt > 1) {
 			DECREF(args);
 			if ((args = newtupleobject(2)) == NULL)
-				goto Fail_1;
+				goto Fail;
 		}
 
-		if ((op2 = (*sqf->sq_item)(seq, i)) == NULL)
-			goto Fail_2;
+		if ((op2 = (*sqf->sq_item)(seq, i)) == NULL) {
+			if (err_occurred() == IndexError) {
+				err_clear();
+				break;
+			}
+			goto Fail;
+		}
 
-		settupleitem(args, 0, result);
-		settupleitem(args, 1, op2);
-		if ((result = call_object(func, args)) == NULL)
-			goto Fail_0;
+		if (result == NULL)
+			result = op2;
+		else {
+			settupleitem(args, 0, result);
+			settupleitem(args, 1, op2);
+			if ((result = call_object(func, args)) == NULL)
+				goto Fail;
+		}
 	}
 
 	DECREF(args);
 
+	if (result == NULL)
+		err_setstr(TypeError,
+			   "reduce of empty sequence with no initial value");
+
 	return result;
 
-Fail_0:
-	DECREF(args);
-	goto Fail_2;
-Fail_1:
-	DECREF(result);
-Fail_2:
+Fail:
+	XDECREF(args);
+	XDECREF(result);
 	return NULL;
 }
 
@@ -1073,6 +1113,27 @@ builtin_type(self, v)
 	return v;
 }
 
+static object *
+builtin_vars(self, v)
+	object *self;
+	object *v;
+{
+	object *d;
+	if (v == NULL) {
+		d = getlocals();
+		INCREF(d);
+	}
+	else {
+		d = getattr(v, "__dict__");
+		if (d == NULL) {
+			err_setstr(TypeError,
+				"dir() argument must have __dict__ attribute");
+			return NULL;
+		}
+	}
+	return d;
+}
+
 static struct methodlist builtin_methods[] = {
 	{"abs",		builtin_abs},
 	{"apply",	builtin_apply},
@@ -1111,6 +1172,7 @@ static struct methodlist builtin_methods[] = {
 	{"setattr",	builtin_setattr},
 	{"str",		builtin_str},
 	{"type",	builtin_type},
+	{"vars",	builtin_vars},
 	{"xrange",	builtin_xrange},
 	{NULL,		NULL},
 };
@@ -1291,8 +1353,8 @@ filterstring(func, strobj)
 
 	if (func == None) {
 		/* No character is ever false -- share input string */
-		INCREF(result);
-		return result;
+		INCREF(strobj);
+		return strobj;
 	}
 	if ((result = newsizedstringobject(NULL, len)) == NULL)
 		return NULL;

@@ -53,7 +53,7 @@ static	double	HUGE		= 1.7976931348623157e308;
 extern	double	atof();		/* Only called when result known to be ok */
 
 #include <errno.h>
-extern	int	errno;
+/* extern	int	errno; */
 
 double strtod(str, ptr)
     char *str;

@@ -74,17 +74,28 @@ class Pdb(bdb.Bdb, cmd.Cmd):
 	# Return true to exit from the command loop 
 	
 	do_h = cmd.Cmd.do_help
-	
+
 	def do_break(self, arg):
 		if not arg:
 			print self.get_all_breaks() # XXX
 			return
-		try:
+		# Try line number as argument
+		try:	
 			lineno = int(eval(arg))
+			filename = self.curframe.f_code.co_filename
 		except:
-			print '*** Error in argument:', `arg`
-			return
-		filename = self.curframe.f_code.co_filename
+			# Try function name as the argument
+			import codehack
+			g_frame = self.curframe.f_globals
+			try:
+				code = eval(arg, g_frame).func_code 
+			except:
+				print '*** Could not eval argument:', arg
+				return
+			lineno = codehack.getlineno(code)
+			filename = code.co_filename
+
+		# now set the break point
 		err = self.set_break(filename, lineno)
 		if err: print '***', err
 	do_b = do_break
@@ -229,7 +240,6 @@ class Pdb(bdb.Bdb, cmd.Cmd):
 	do_l = do_list
 
 	def do_whatis(self, arg):
-		import codehack
 		try:
 			value = eval(arg, self.curframe.f_globals, \
 					self.curframe.f_locals)
@@ -241,13 +251,13 @@ class Pdb(bdb.Bdb, cmd.Cmd):
 		try: code = value.func_code
 		except: pass
 		if code:
-			print 'Function', codehack.getcodename(code)
+			print 'Function', code.co_name
 			return
 		# Is it an instance method?
 		try: code = value.im_func.func_code
 		except: pass
 		if code:
-			print 'Method', codehack.getcodename(code)
+			print 'Method', code.co_name
 			return
 		# None of the above...
 		print type(value)
@@ -306,8 +316,6 @@ def pm():
 TESTCMD = 'import x; x.main()'
 
 def test():
-	import linecache
-	linecache.checkcache()
 	run(TESTCMD)
 
 # print help

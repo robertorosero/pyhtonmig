@@ -1,5 +1,5 @@
 /***********************************************************
-Copyright 1991, 1992, 1993 by Stichting Mathematisch Centrum,
+Copyright 1991, 1992, 1993, 1994 by Stichting Mathematisch Centrum,
 Amsterdam, The Netherlands.
 
                         All Rights Reserved
@@ -32,12 +32,17 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
    - a malloc'ed string ending in \n normally
 */
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
 #include <stdio.h>
 #include <string.h>
+#include <errno.h>
 
 #include "mymalloc.h"
 
-#ifdef HAVE_READLINE
+#ifdef WITH_READLINE
 
 extern char *readline();
 
@@ -54,7 +59,49 @@ onintr(sig)
 	longjmp(jbuf, 1);
 }
 
-#endif /* HAVE_READLINE */
+#else /* !WITH_READLINE */
+
+/* This function restarts a fgets() after an EINTR error occurred
+   except if intrcheck() returns true. */
+
+static int
+my_fgets(buf, len, fp)
+	char *buf;
+	int len;
+	FILE *fp;
+{
+	char *p;
+	for (;;) {
+		errno = 0;
+		p = fgets(buf, len, fp);
+		if (p != NULL)
+			return 0; /* No error */
+		if (feof(fp)) {
+/*fprintf(stderr, "my_fgets: EOF\n");*/
+			return -1; /* EOF */
+		}
+#ifdef EINTR
+		if (errno == EINTR) {
+			if (intrcheck()) {
+/*fprintf(stderr, "my_fgets: EINTR with intrcheck()\n");*/
+				return 1; /* Interrupt */
+			}
+/*fprintf(stderr, "my_fgets: EINTR\n");*/
+			continue;
+#endif
+		}
+		if (intrcheck()) {
+/*fprintf(stderr, "my_fgets: intrcheck()\n");*/
+			return 1; /* Interrupt */
+		}
+/*fprintf(stderr, "my_fgets: error\n");*/
+		return -2; /* Error */
+	}
+	/* NOTREACHED */
+}
+
+#endif /* WITH_READLINE */
+
 
 char *
 my_readline(prompt)
@@ -62,7 +109,7 @@ my_readline(prompt)
 {
 	int n;
 	char *p;
-#ifdef HAVE_READLINE
+#ifdef WITH_READLINE
 	RETSIGTYPE (*old_inthandler)();
 	static int been_here;
 	if (!been_here) {
@@ -92,17 +139,23 @@ my_readline(prompt)
 		p[n+1] = '\0';
 	}
 	return p;
-#else /* !HAVE_READLINE */
+#else /* !WITH_READLINE */
 	n = 100;
 	if ((p = malloc(n)) == NULL)
 		return NULL;
 	if (prompt)
 		fprintf(stderr, "%s", prompt);
-	if (fgets(p, n, stdin) == NULL)
-		    *p = '\0';
-	if (intrcheck()) {
+	switch (my_fgets(p, n, stdin)) {
+	case 0: /* Normal case */
+		break;
+	case 1: /* Interrupt */
 		free(p);
 		return NULL;
+	case -1: /* EOF */
+	case -2: /* Error */
+	default: /* Shouldn't happen */
+		*p = '\0';
+		break;
 	}
 	n = strlen(p);
 	while (n > 0 && p[n-1] != '\n') {
@@ -110,10 +163,10 @@ my_readline(prompt)
 		p = realloc(p, n + incr);
 		if (p == NULL)
 			return NULL;
-		if (fgets(p+n, incr, stdin) == NULL)
+		if (my_fgets(p+n, incr, stdin) != 0)
 			break;
 		n += strlen(p+n);
 	}
 	return realloc(p, n+1);
-#endif /* !HAVE_READLINE */
+#endif /* !WITH_READLINE */
 }
