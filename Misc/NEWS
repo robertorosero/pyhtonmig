@@ -84,6 +84,14 @@ Tools/Demos
 
 Build
 
+- Note that release builds of Python should arrange to define the
+  preprocessor symbol NDEBUG on the command line (or equivalent).
+  In the 2.2 pre-release series we tried to define this by magic in
+  Python.h instead, but it proved to caused problems for extension
+  authors.  The Unix, Windows and Mac builds now all define NDEBUG in
+  release builds via cmdline (or equivalent) instead.  Ports to
+  other platforms should do likewise.
+
 - It is no longer necessary to use --with-suffix when building on a
   case-insensitive file system (such as Mac OS X HFS+). In the build
   directory an extension is used, but not in the installed python.
@@ -111,6 +119,7 @@ Mac
 
 - In unix-Python on Mac OS X (and darwin) sys.platform is now "darwin",
   without any trailing digits.
+
 
 What's New in Python 2.2b2?
 Release date: 16-Nov-2001
