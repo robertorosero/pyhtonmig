@@ -105,7 +105,7 @@ range_repr(r)
 	rangeobject *r;
 {
 	char buf[80];
-	sprintf(buf, "(range(%ld, %ld, %ld) * %d)",
+	sprintf(buf, "(xrange(%ld, %ld, %ld) * %d)",
 			r->start,
 			r->start + r->len * r->step,
 			r->step,

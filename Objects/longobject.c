@@ -31,6 +31,7 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #include "longintrepr.h"
 #include <math.h>
 #include <assert.h>
+#include <ctype.h>
 
 #define ABS(x) ((x) < 0 ? -(x) : (x))
 
@@ -352,23 +353,39 @@ long_format(aa, base)
 
 /* Convert a string to a long int object, in a given base.
    Base zero implies a default depending on the number.
-   External linkage: used in compile.c for literals. */
+   External linkage: used in compile.c and stropmodule.c. */
 
 object *
 long_scan(str, base)
 	char *str;
 	int base;
 {
+	return long_escan(str, (char **)NULL, base);
+}
+
+object *
+long_escan(str, pend, base)
+	char *str;
+	char **pend;
+	int base;
+{
 	int sign = 1;
 	longobject *z;
 	
-	assert(base == 0 || base >= 2 && base <= 36);
+	if (base != 0 && base < 2 || base > 36) {
+		err_setstr(ValueError, "invalid base for long literal");
+		return NULL;
+	}
+	while (*str != '\0' && isspace(*str))
+		str++;
 	if (*str == '+')
 		++str;
 	else if (*str == '-') {
 		++str;
 		sign = -1;
 	}
+	while (*str != '\0' && isspace(*str))
+		str++;
 	if (base == 0) {
 		if (str[0] != '0')
 			base = 10;
@@ -398,6 +415,8 @@ long_scan(str, base)
 	}
 	if (sign < 0 && z != NULL && z->ob_size != 0)
 		z->ob_size = -(z->ob_size);
+	if (pend)
+		*pend = str;
 	return (object *) z;
 }
 
