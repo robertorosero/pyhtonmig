@@ -66,7 +66,7 @@ class bdist_rpm (Command):
         ('doc-files=', None,
          "list of documentation files (space or comma-separated)"),
         ('changelog=', None,
-         "path to RPM changelog"),
+         "RPM changelog"),
         ('icon=', None,
          "name of icon file"),
         ('provides=', None,
@@ -95,7 +95,7 @@ class bdist_rpm (Command):
          "RPM 2 compatibility mode"),
        ]
 
-    boolean_options = ['keep-temp', 'rpm2-mode']
+    boolean_options = ['keep-temp', 'use-rpm-opt-flags', 'rpm3-mode']
 
     negative_opt = {'no-keep-temp': 'keep-temp',
                     'no-rpm-opt-flags': 'use-rpm-opt-flags',
@@ -280,6 +280,9 @@ class bdist_rpm (Command):
         # build package
         self.announce('building RPMs')
         rpm_cmd = ['rpm']
+        if os.path.exists('/usr/bin/rpmbuild') or \
+           os.path.exists('/bin/rpmbuild'):
+            rpm_cmd = ['rpmbuild']
         if self.source_only: # what kind of RPMs?
             rpm_cmd.append('-bs')
         elif self.binary_only:

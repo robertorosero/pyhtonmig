@@ -681,7 +681,7 @@ build_node_children(PyObject *tuple, node *root, int *line_num)
                 PyErr_Format(parser_error,
                              "second item in terminal node must be a string,"
                              " found %s",
-                             ((PyTypeObject*)PyObject_Type(temp))->tp_name);
+                             temp->ob_type->tp_name);
                 Py_DECREF(temp);
                 return 0;
             }
@@ -694,7 +694,7 @@ build_node_children(PyObject *tuple, node *root, int *line_num)
                         PyErr_Format(parser_error,
                                      "third item in terminal node must be an"
                                      " integer, found %s",
-                                ((PyTypeObject*)PyObject_Type(temp))->tp_name);
+                                     temp->ob_type->tp_name);
                         Py_DECREF(o);
                         Py_DECREF(temp);
                         return 0;
@@ -1438,6 +1438,7 @@ validate_expr_stmt(node *tree)
                    || strcmp(s, "-=") == 0
                    || strcmp(s, "*=") == 0
                    || strcmp(s, "/=") == 0
+                   || strcmp(s, "//=") == 0
                    || strcmp(s, "%=") == 0
                    || strcmp(s, "&=") == 0
                    || strcmp(s, "|=") == 0
@@ -1691,6 +1692,9 @@ validate_global_stmt(node *tree)
     int res = (validate_ntype(tree, global_stmt)
                && is_even(nch) && (nch >= 2));
 
+    if (!res && !PyErr_Occurred())
+        err_string("illegal global statement");
+
     if (res)
         res = (validate_name(CHILD(tree, 0), "global")
                && validate_ntype(CHILD(tree, 1), NAME));
@@ -1738,8 +1742,7 @@ validate_assert_stmt(node *tree)
     int nch = NCH(tree);
     int res = (validate_ntype(tree, assert_stmt)
                && ((nch == 2) || (nch == 4))
-               && (validate_name(CHILD(tree, 0), "__assert__") ||
-                   validate_name(CHILD(tree, 0), "assert"))
+               && (validate_name(CHILD(tree, 0), "assert"))
                && validate_test(CHILD(tree, 1)));
 
     if (!res && !PyErr_Occurred())
@@ -2093,6 +2096,7 @@ validate_term(node *tree)
     for ( ; res && (pos < nch); pos += 2)
         res = (((TYPE(CHILD(tree, pos)) == STAR)
                || (TYPE(CHILD(tree, pos)) == SLASH)
+               || (TYPE(CHILD(tree, pos)) == DOUBLESLASH)
                || (TYPE(CHILD(tree, pos)) == PERCENT))
                && validate_factor(CHILD(tree, pos + 1)));
 

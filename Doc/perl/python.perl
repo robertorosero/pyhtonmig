@@ -85,7 +85,7 @@ sub do_cmd_let{
 
 # the older version of LaTeX2HTML we use doesn't support this, but we use it:
 
-sub do_cmd_textasciitilde{ '~' . @_[0]; }
+sub do_cmd_textasciitilde{ '&#126;' . @_[0]; }
 sub do_cmd_textasciicircum{ '^' . @_[0]; }
 sub do_cmd_textbar{ '|' . @_[0]; }
 sub do_cmd_infinity{ '&infin;' . @_[0]; }
@@ -322,7 +322,7 @@ sub do_cmd_manpage{
     return "<span class=\"manpage\"><i>$page</i>($section)</span>" . $_;
 }
 
-$PEP_FORMAT = "http://python.sourceforge.net/peps/pep-%04d.html";
+$PEP_FORMAT = "http://www.python.org/peps/pep-%04d.html";
 #$RFC_FORMAT = "http://www.ietf.org/rfc/rfc%04d.txt";
 $RFC_FORMAT = "http://www.faqs.org/rfcs/rfc%d.html";
 
@@ -805,6 +805,19 @@ sub do_cmd_production{
             . $_);
 }
 
+sub do_cmd_productioncont{
+    local($_) = @_;
+    my $defn = next_argument();
+    $defn =~ s/^( +)/'&nbsp;' x length $1/e;
+    return ("<tr valign=\"baseline\">\n"
+            . "    <td>&nbsp;</td>\n"
+            . "    <td>&nbsp;</td>\n"
+            . "    <td><code>"
+            . translate_commands($defn)
+            . "</code></td></tr>"
+            . $_);
+}
+
 sub process_grammar_files{
     my $lang;
     my $filename;
@@ -845,6 +858,7 @@ sub process_grammar_files{
 
 sub strip_grammar_markup{
     local($_) = @_;
+    s/\\productioncont/              /g;
     s/\\production(<<\d+>>)(.+)\1/\n\2 ::= /g;
     s/\\token(<<\d+>>)(.+)\1/\2/g;
     s/\\e([^a-zA-Z])/\\\1/g;
@@ -1866,8 +1880,11 @@ sub do_cmd_term{
 #code # {}
 process_commands_wrap_deferred(<<_RAW_ARG_DEFERRED_CMDS_);
 declaremodule # [] # {} # {}
+funcline # {} # {}
+funclineni # {} # {}
 memberline # [] # {}
 methodline # [] # {} # {}
+methodlineni # [] # {} # {}
 modulesynopsis # {}
 platform # {}
 samp # {}

@@ -406,13 +406,19 @@ Upon unpickling, if the class also defines the method
 \method{__setstate__()}, it is called with the unpickled
 state\footnote{These methods can also be used to implement copying
 class instances.}.  If there is no \method{__setstate__()} method, the
-pickled object must be a dictionary and its items are assigned to the
+pickled state must be a dictionary and its items are assigned to the
 new instance's dictionary.  If a class defines both
 \method{__getstate__()} and \method{__setstate__()}, the state object
 needn't be a dictionary and these methods can do what they
-want\footnote{This protocol is also used by the shallow and deep
+want.\footnote{This protocol is also used by the shallow and deep
 copying operations defined in the
-\refmodule{copy} module.}.
+\refmodule{copy} module.}
+
+\begin{notice}[warning]
+  For new-style classes, if \method{__getstate__()} returns a false
+  value, the \method{__setstate__()} method will not be called.
+\end{notice}
+
 
 \subsubsection{Pickling and unpickling extension types}
 
@@ -438,6 +444,7 @@ or three, with the following semantics:
       by name.
 
 \item A tuple of arguments for the callable object, or \code{None}.
+\deprecated{2.3}{Use the tuple of arguments instead}								
 
 \item Optionally, the object's state, which will be passed to
       the object's \method{__setstate__()} method as described in
@@ -450,10 +457,13 @@ or three, with the following semantics:
 
 Upon unpickling, the callable will be called (provided that it meets
 the above criteria), passing in the tuple of arguments; it should
-return the unpickled object.  If the second item was \code{None}, then
-instead of calling the callable directly, its \method{__basicnew__()}
-method is called without arguments.  It should also return the
-unpickled object.
+return the unpickled object.
+
+If the second item was \code{None}, then instead of calling the
+callable directly, its \method{__basicnew__()} method is called
+without arguments.  It should also return the unpickled object.
+
+\deprecated{2.3}{Use the tuple of arguments instead}
 
 An alternative to implementing a \method{__reduce__()} method on the
 object to be pickled, is to register the callable with the

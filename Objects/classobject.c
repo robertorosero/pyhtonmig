@@ -543,6 +543,10 @@ PyInstance_New(PyObject *klass, PyObject *arg, PyObject *kw)
 		initstr = PyString_InternFromString("__init__");
 	init = instance_getattr2(inst, initstr);
 	if (init == NULL) {
+		if (PyErr_Occurred()) {
+			Py_DECREF(inst);
+			return NULL;
+		}
 		if ((arg != NULL && (!PyTuple_Check(arg) ||
 				     PyTuple_Size(arg) != 0))
 		    || (kw != NULL && (!PyDict_Check(kw) ||
@@ -674,7 +678,7 @@ instance_getattr1(register PyInstanceObject *inst, PyObject *name)
 		}
 	}
 	v = instance_getattr2(inst, name);
-	if (v == NULL) {
+	if (v == NULL && !PyErr_Occurred()) {
 		PyErr_Format(PyExc_AttributeError,
 			     "%.50s instance has no attribute '%.400s'",
 			     PyString_AS_STRING(inst->in_class->cl_name), sname);
@@ -723,6 +727,27 @@ instance_getattr(register PyInstanceObject *inst, PyObject *name)
 		Py_DECREF(args);
 	}
 	return res;
+}
+
+/* See classobject.h comments:  this only does dict lookups, and is always
+ * safe to call.
+ */
+PyObject *
+_PyInstance_Lookup(PyObject *pinst, PyObject *name)
+{
+	PyObject *v;
+	PyClassObject *class;
+	PyInstanceObject *inst;	/* pinst cast to the right type */
+
+	assert(PyInstance_Check(pinst));
+	inst = (PyInstanceObject *)pinst;
+
+	assert(PyString_Check(name));
+
+ 	v = PyDict_GetItem(inst->in_dict, name);
+	if (v == NULL)
+		v = class_lookup(inst->in_class, name, &class);
+	return v;
 }
 
 static int
@@ -1052,7 +1077,7 @@ sliceobj_from_intint(int i, int j)
 	start = PyInt_FromLong((long)i);
 	if (!start)
 		return NULL;
-	
+
 	end = PyInt_FromLong((long)j);
 	if (!end) {
 		Py_DECREF(start);
@@ -1084,9 +1109,9 @@ instance_slice(PyInstanceObject *inst, int i, int j)
 		if (func == NULL)
 			return NULL;
 		arg = Py_BuildValue("(N)", sliceobj_from_intint(i, j));
-	} else 
+	} else
 		arg = Py_BuildValue("(ii)", i, j);
-		
+
 	if (arg == NULL) {
 		Py_DECREF(func);
 		return NULL;
@@ -1215,7 +1240,7 @@ instance_contains(PyInstanceObject *inst, PyObject *member)
 		res = PyEval_CallObject(func, arg);
 		Py_DECREF(func);
 		Py_DECREF(arg);
-		if(res == NULL) 
+		if(res == NULL)
 			return -1;
 		ret = PyObject_IsTrue(res);
 		Py_DECREF(res);
@@ -1288,7 +1313,7 @@ static PyObject *coerce_obj;
 
 /* Try one half of a binary operator involving a class instance. */
 static PyObject *
-half_binop(PyObject *v, PyObject *w, char *opname, binaryfunc thisfunc, 
+half_binop(PyObject *v, PyObject *w, char *opname, binaryfunc thisfunc,
 		int swapped)
 {
 	PyObject *args;
@@ -1296,7 +1321,7 @@ half_binop(PyObject *v, PyObject *w, char *opname, binaryfunc thisfunc,
 	PyObject *coerced = NULL;
 	PyObject *v1;
 	PyObject *result;
-	
+
 	if (!PyInstance_Check(v)) {
 		Py_INCREF(Py_NotImplemented);
 		return Py_NotImplemented;
@@ -1315,6 +1340,7 @@ half_binop(PyObject *v, PyObject *w, char *opname, binaryfunc thisfunc,
 
 	args = Py_BuildValue("(O)", w);
 	if (args == NULL) {
+		Py_DECREF(coercefunc);
 		return NULL;
 	}
 	coerced = PyEval_CallObject(coercefunc, args);
@@ -1507,8 +1533,10 @@ half_cmp(PyObject *v, PyObject *w)
 	}
 
 	args = Py_BuildValue("(O)", w);
-	if (args == NULL)
+	if (args == NULL) {
+		Py_DECREF(cmp_func);
 		return -2;
+	}
 
 	result = PyEval_CallObject(cmp_func, args);
 	Py_DECREF(args);
@@ -1647,7 +1675,7 @@ bin_power(PyObject *v, PyObject *w)
 /* This version is for ternary calls only (z != None) */
 static PyObject *
 instance_pow(PyObject *v, PyObject *w, PyObject *z)
-{	
+{
 	if (z == Py_None) {
 		return do_binop(v, w, "__pow__", "__rpow__", bin_power);
 	}
@@ -1716,7 +1744,7 @@ instance_ipow(PyObject *v, PyObject *w, PyObject *z)
 #define NAME_OPS 6
 static PyObject **name_op = NULL;
 
-static int 
+static int
 init_name_op(void)
 {
 	int i;
@@ -1756,25 +1784,20 @@ half_richcompare(PyObject *v, PyObject *w, int op)
 	/* If the instance doesn't define an __getattr__ method, use
 	   instance_getattr2 directly because it will not set an
 	   exception on failure. */
-	if (((PyInstanceObject *)v)->in_class->cl_getattr == NULL) {
-		method = instance_getattr2((PyInstanceObject *)v, 
+	if (((PyInstanceObject *)v)->in_class->cl_getattr == NULL)
+		method = instance_getattr2((PyInstanceObject *)v,
 					   name_op[op]);
-		if (method == NULL) {
-			assert(!PyErr_Occurred());
-			res = Py_NotImplemented;
-			Py_INCREF(res);
-			return res;
-		}
-	} else {
+	else
 		method = PyObject_GetAttr(v, name_op[op]);
-		if (method == NULL) {
+	if (method == NULL) {
+		if (PyErr_Occurred()) {
 			if (!PyErr_ExceptionMatches(PyExc_AttributeError))
 				return NULL;
 			PyErr_Clear();
-			res = Py_NotImplemented;
-			Py_INCREF(res);
-			return res;
 		}
+		res = Py_NotImplemented;
+		Py_INCREF(res);
+		return res;
 	}
 
 	args = Py_BuildValue("(O)", w);
@@ -1879,6 +1902,7 @@ instance_iternext(PyInstanceObject *self)
 static PyObject *
 instance_call(PyObject *func, PyObject *arg, PyObject *kw)
 {
+	PyThreadState *tstate = PyThreadState_GET();
 	PyObject *res, *call = PyObject_GetAttrString(func, "__call__");
 	if (call == NULL) {
 		PyInstanceObject *inst = (PyInstanceObject*) func;
@@ -1888,7 +1912,22 @@ instance_call(PyObject *func, PyObject *arg, PyObject *kw)
 			     PyString_AsString(inst->in_class->cl_name));
 		return NULL;
 	}
-	res = PyObject_Call(call, arg, kw);
+	/* We must check and increment the recursion depth here. Scenario:
+	       class A:
+	           pass
+	       A.__call__ = A() # that's right
+	       a = A() # ok
+	       a() # infinite recursion
+	   This bounces between instance_call() and PyObject_Call() without
+	   ever hitting eval_frame() (which has the main recursion check). */
+	if (tstate->recursion_depth++ > Py_GetRecursionLimit()) {
+		PyErr_SetString(PyExc_RuntimeError,
+				"maximum __call__ recursion depth exceeded");
+		res = NULL;
+	}
+	else
+		res = PyObject_Call(call, arg, kw);
+	tstate->recursion_depth--;
 	Py_DECREF(call);
 	return res;
 }

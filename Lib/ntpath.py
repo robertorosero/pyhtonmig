@@ -11,7 +11,8 @@ import stat
 __all__ = ["normcase","isabs","join","splitdrive","split","splitext",
            "basename","dirname","commonprefix","getsize","getmtime",
            "getatime","islink","exists","isdir","isfile","ismount",
-           "walk","expanduser","expandvars","normpath","abspath","splitunc"]
+           "walk","expanduser","expandvars","normpath","abspath","splitunc",
+           "realpath"]
 
 # Normalize the case of a pathname and map slashes to backslashes.
 # Other normalizations (such as optimizing '../' away) are not done
@@ -457,8 +458,18 @@ def normpath(path):
 # Return an absolute path.
 def abspath(path):
     """Return the absolute version of a path"""
-    if path: # Empty path must return current working directory.
+    try:
         from nt import _getfullpathname
+    except ImportError: # Not running on Windows - mock up something sensible.
+        global abspath
+        def _abspath(path):
+            if not isabs(path):
+                path = join(os.getcwd(), path)
+            return normpath(path)
+        abspath = _abspath
+        return _abspath(path)
+
+    if path: # Empty path must return current working directory.
         try:
             path = _getfullpathname(path)
         except WindowsError:

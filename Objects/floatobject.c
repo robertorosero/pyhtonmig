@@ -123,7 +123,7 @@ PyFloat_FromString(PyObject *v, char **pend)
 #endif
 	else if (PyObject_AsCharBuffer(v, &s, &len)) {
 		PyErr_SetString(PyExc_TypeError,
-				"float() needs a string argument");
+				"float() argument must be a string or a number");
 		return NULL;
 	}
 
@@ -577,9 +577,9 @@ float_pow(PyObject *v, PyObject *w, PyObject *z)
 	PyFPE_START_PROTECT("pow", return NULL)
 	ix = pow(iv, iw);
 	PyFPE_END_PROTECT(ix)
-	Py_SET_ERANGE_IF_OVERFLOW(ix);
+	Py_ADJUST_ERANGE1(ix);
 	if (errno != 0) {
-		/* XXX could it be another type of error? */
+		assert(errno == ERANGE);
 		PyErr_SetFromErrno(PyExc_OverflowError);
 		return NULL;
 	}
@@ -625,7 +625,10 @@ float_coerce(PyObject **pv, PyObject **pw)
 		return 0;
 	}
 	else if (PyLong_Check(*pw)) {
-		*pw = PyFloat_FromDouble(PyLong_AsDouble(*pw));
+		double x = PyLong_AsDouble(*pw);
+		if (x == -1.0 && PyErr_Occurred())
+			return -1;
+		*pw = PyFloat_FromDouble(x);
 		Py_INCREF(*pv);
 		return 0;
 	}

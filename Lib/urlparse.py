@@ -4,7 +4,8 @@ See RFC 1808: "Relative Uniform Resource Locators", by R. Fielding,
 UC Irvine, June 1995.
 """
 
-__all__ = ["urlparse", "urlunparse", "urljoin"]
+__all__ = ["urlparse", "urlunparse", "urljoin", "urldefrag",
+           "urlsplit", "urlunsplit"]
 
 # A classification of schemes ('' means apply by default)
 uses_relative = ['ftp', 'http', 'gopher', 'nntp', 'wais', 'file',
@@ -87,7 +88,9 @@ def urlsplit(url, scheme='', allow_fragments=1):
             if url[:2] == '//':
                 i = url.find('/', 2)
                 if i < 0:
-                    i = len(url)
+                    i = url.find('#')
+                    if i < 0:
+                        i = len(url)
                 netloc = url[2:i]
                 url = url[i:]
             if allow_fragments and '#' in url:
@@ -126,7 +129,7 @@ def urlunparse((scheme, netloc, url, params, query, fragment)):
     return urlunsplit((scheme, netloc, url, query, fragment))
 
 def urlunsplit((scheme, netloc, url, query, fragment)):
-    if netloc or (scheme in uses_netloc and url[:2] == '//'):
+    if netloc or (scheme and scheme in uses_netloc and url[:2] != '//'):
         if url and url[:1] != '/': url = '/' + url
         url = '//' + (netloc or '') + url
     if scheme:

@@ -61,7 +61,7 @@ int Py_OptimizeFlag = 0;
 "name '%.400s' is used prior to global declaration"
 
 #define LOCAL_GLOBAL \
-"name '%.400s' is a function paramter and declared global"
+"name '%.400s' is a function parameter and declared global"
 
 #define LATE_FUTURE \
 "from __future__ imports must occur at the beginning of the file"
@@ -133,11 +133,11 @@ code_compare(PyCodeObject *co, PyCodeObject *cp)
 	cmp = PyObject_Compare(co->co_name, cp->co_name);
 	if (cmp) return cmp;
 	cmp = co->co_argcount - cp->co_argcount;
-	if (cmp) return cmp;
+	if (cmp) return (cmp<0)?-1:1;
 	cmp = co->co_nlocals - cp->co_nlocals;
-	if (cmp) return cmp;
+	if (cmp) return (cmp<0)?-1:1;
 	cmp = co->co_flags - cp->co_flags;
-	if (cmp) return cmp;
+	if (cmp) return (cmp<0)?-1:1;
 	cmp = PyObject_Compare(co->co_code, cp->co_code);
 	if (cmp) return cmp;
 	cmp = PyObject_Compare(co->co_consts, cp->co_consts);
@@ -465,14 +465,21 @@ com_error(struct compiling *c, PyObject *exc, char *msg)
 		Py_INCREF(Py_None);
 		line = Py_None;
 	}
-	t = Py_BuildValue("(ziOO)", c->c_filename, c->c_lineno,
-			  Py_None, line);
-	if (t == NULL)
-		goto exit;
-	w = Py_BuildValue("(OO)", v, t);
-	if (w == NULL)
-		goto exit;
-	PyErr_SetObject(exc, w);
+	if (exc == PyExc_SyntaxError) {
+		t = Py_BuildValue("(ziOO)", c->c_filename, c->c_lineno,
+				  Py_None, line);
+		if (t == NULL)
+			goto exit;
+		w = Py_BuildValue("(OO)", v, t);
+		if (w == NULL)
+			goto exit;
+		PyErr_SetObject(exc, w);
+	} else {
+		/* Make sure additional exceptions are printed with
+		   file and line, also. */
+		PyErr_SetObject(exc, v);
+		PyErr_SyntaxLocation(c->c_filename, c->c_lineno);
+	}
  exit:
 	Py_XDECREF(t);
 	Py_XDECREF(v);
@@ -554,6 +561,7 @@ static void symtable_global(struct symtable *, node *);
 static void symtable_import(struct symtable *, node *);
 static void symtable_assign(struct symtable *, node *, int);
 static void symtable_list_comprehension(struct symtable *, node *);
+static void symtable_list_for(struct symtable *, node *);
 
 static int symtable_update_free_vars(struct symtable *);
 static int symtable_undo_free(struct symtable *, PyObject *, PyObject *);
@@ -1153,7 +1161,8 @@ parsestr(struct compiling *com, char *s)
 	s++;
 	len = strlen(s);
 	if (len > INT_MAX) {
-		PyErr_SetString(PyExc_OverflowError, "string to parse is too long");
+		com_error(com, PyExc_OverflowError, 
+			  "string to parse is too long");
 		return NULL;
 	}
 	if (s[--len] != quote) {
@@ -1171,11 +1180,15 @@ parsestr(struct compiling *com, char *s)
 #ifdef Py_USING_UNICODE
 	if (unicode || Py_UnicodeFlag) {
 		if (rawmode)
-			return PyUnicode_DecodeRawUnicodeEscape(
-				s, len, NULL);
+			v = PyUnicode_DecodeRawUnicodeEscape(
+				 s, len, NULL);
 		else
-			return PyUnicode_DecodeUnicodeEscape(
+			v = PyUnicode_DecodeUnicodeEscape(
 				s, len, NULL);
+		if (v == NULL)
+			PyErr_SyntaxLocation(com->c_filename, com->c_lineno);
+		return v;
+			
 	}
 #endif
 	if (rawmode || strchr(s, '\\') == NULL)
@@ -1238,9 +1251,9 @@ parsestr(struct compiling *com, char *s)
 				*p++ = x;
 				break;
 			}
-			PyErr_SetString(PyExc_ValueError, 
-					"invalid \\x escape");
 			Py_DECREF(v);
+			com_error(com, PyExc_ValueError, 
+				  "invalid \\x escape");
 			return NULL;
 		default:
 			*p++ = '\\';
@@ -1369,6 +1382,8 @@ com_list_comprehension(struct compiling *c, node *n)
 {
 	/* listmaker: test list_for */
 	char tmpname[30];
+
+	REQ(n, listmaker);
 	PyOS_snprintf(tmpname, sizeof(tmpname), "_[%d]", ++c->c_tmpname);
 	com_addoparg(c, BUILD_LIST, 0);
 	com_addbyte(c, DUP_TOP); /* leave the result on the stack */
@@ -1940,13 +1955,14 @@ com_factor(struct compiling *c, node *n)
  	    && NCH(ppower) == 1
 	    && TYPE((patom = CHILD(ppower, 0))) == atom
 	    && TYPE((pnum = CHILD(patom, 0))) == NUMBER
-	    && !(childtype == MINUS && is_float_zero(STR(pnum)))) {
+	    && !(childtype == MINUS &&
+		 (STR(pnum)[0] == '0' || is_float_zero(STR(pnum))))) {
 		if (childtype == TILDE) {
 			com_invert_constant(c, pnum);
 			return;
 		}
 		if (childtype == MINUS) {
-			char *s = malloc(strlen(STR(pnum)) + 2);
+			char *s = PyMem_Malloc(strlen(STR(pnum)) + 2);
 			if (s == NULL) {
 				com_error(c, PyExc_MemoryError, "");
 				com_addbyte(c, 255);
@@ -1954,7 +1970,7 @@ com_factor(struct compiling *c, node *n)
 			}
 			s[0] = '-';
 			strcpy(s + 1, STR(pnum));
-			free(STR(pnum));
+			PyMem_Free(STR(pnum));
 			STR(pnum) = s;
 		}
 		com_atom(c, patom);
@@ -3926,6 +3942,9 @@ compile_classdef(struct compiling *c, node *n)
 	/* classdef: 'class' NAME ['(' testlist ')'] ':' suite */
 	c->c_name = STR(CHILD(n, 1));
 	c->c_private = c->c_name;
+	/* Initialize local __module__ from global __name__ */
+	com_addop_name(c, LOAD_GLOBAL, "__name__");
+	com_addop_name(c, STORE_NAME, "__module__");
 	ch = CHILD(n, NCH(n)-1); /* The suite */
 	doc = get_docstring(c, ch);
 	if (doc != NULL) {
@@ -4365,16 +4384,23 @@ symtable_cellvar_offsets(PyObject **cellvars, int argcount,
 					return -1;
 				PyList_SET_ITEM(list, 0, v);
 				Py_INCREF(v);
-			} else
-				PyList_Insert(list, 0, v);
+			} else {
+				if (PyList_Insert(list, 0, v) < 0) {
+					Py_DECREF(list);
+					return -1;
+				}
+			}
 		}
 	}
-	if (list == NULL || PyList_GET_SIZE(list) == 0)
+	if (list == NULL)
 		return 0;
+
 	/* There are cellvars that are also arguments.  Create a dict
 	   to replace cellvars and put the args at the front.
 	*/
 	d = PyDict_New();
+	if (d == NULL)
+		return -1;
 	for (i = PyList_GET_SIZE(list); --i >= 0; ) {
 		v = PyInt_FromLong(i);
 		if (v == NULL) 
@@ -4383,14 +4409,18 @@ symtable_cellvar_offsets(PyObject **cellvars, int argcount,
 			goto fail;
 		if (PyDict_DelItem(*cellvars, PyList_GET_ITEM(list, i)) < 0)
 			goto fail;
+		Py_DECREF(v);
 	}
 	pos = 0;
 	i = PyList_GET_SIZE(list);
 	Py_DECREF(list);
 	while (PyDict_Next(*cellvars, &pos, &v, &w)) {
 		w = PyInt_FromLong(i++);  /* don't care about the old key */
+		if (w == NULL)
+			goto fail;
 		if (PyDict_SetItem(d, v, w) < 0) {
 			Py_DECREF(w);
+			v = NULL;
 			goto fail;
 		}
 		Py_DECREF(w);
@@ -4400,6 +4430,7 @@ symtable_cellvar_offsets(PyObject **cellvars, int argcount,
 	return 1;
  fail:
 	Py_DECREF(d);
+	Py_XDECREF(v);
 	return -1;
 }
 
@@ -4449,7 +4480,7 @@ symtable_check_unoptimized(struct compiling *c,
 "unqualified exec is not allowed in function '%.100s' it %s"
 
 #define ILLEGAL_EXEC_AND_IMPORT_STAR \
-"function '%.100s' uses import * and bare exec, which are illegal" \
+"function '%.100s' uses import * and bare exec, which are illegal " \
 "because it %s"
 
 	/* XXX perhaps the linenos for these opt-breaking statements
@@ -4543,6 +4574,8 @@ symtable_load_symbols(struct compiling *c)
 
 	for (i = 0; i < si.si_nlocals; ++i) {
 		v = PyInt_FromLong(i);
+		if (v == NULL)
+			goto fail;
 		if (PyDict_SetItem(c->c_locals, 
 				   PyList_GET_ITEM(varnames, i), v) < 0)
 			goto fail;
@@ -4615,6 +4648,8 @@ symtable_load_symbols(struct compiling *c)
  					goto fail;
  				if (st->st_nscopes != 1) {
  					v = PyInt_FromLong(flags);
+					if (v == NULL)
+						goto fail;
  					if (PyDict_SetItem(st->st_global, 
  							   name, v)) 
  						goto fail;
@@ -4651,6 +4686,7 @@ symtable_init()
 	st->st_pass = 1;
 
 	st->st_filename = NULL;
+	st->st_symbols = NULL;
 	if ((st->st_stack = PyList_New(0)) == NULL)
 		goto fail;
 	if ((st->st_symbols = PyDict_New()) == NULL)
@@ -4658,7 +4694,6 @@ symtable_init()
 	st->st_cur = NULL;
 	st->st_nscopes = 0;
 	st->st_errors = 0;
-	st->st_tmpname = 0;
 	st->st_private = NULL;
 	return st;
  fail:
@@ -4702,9 +4737,9 @@ symtable_update_free_vars(struct symtable *st)
 	for (i = 0; i < PyList_GET_SIZE(ste->ste_children); ++i) {
 		int pos = 0;
 
-		if (list)
-			PyList_SetSlice(list, 0, 
-					((PyVarObject*)list)->ob_size, 0);
+		if (list && PyList_SetSlice(list, 0, 
+					    PyList_GET_SIZE(list), 0) < 0)
+				return -1;
 		child = (PySymtableEntryObject *)
 			PyList_GET_ITEM(ste->ste_children, i);
 		while (PyDict_Next(child->ste_symbols, &pos, &name, &o)) {
@@ -4854,13 +4889,16 @@ symtable_enter_scope(struct symtable *st, char *name, int type,
 	if (st->st_cur) {
 		prev = st->st_cur;
 		if (PyList_Append(st->st_stack, (PyObject *)st->st_cur) < 0) {
-			Py_DECREF(st->st_cur);
 			st->st_errors++;
 			return;
 		}
 	}
 	st->st_cur = (PySymtableEntryObject *)
 		PySymtableEntry_New(st, name, type, lineno);
+	if (st->st_cur == NULL) {
+		st->st_errors++;
+		return;
+	}
 	if (strcmp(name, TOP) == 0)
 		st->st_global = st->st_cur->ste_symbols;
 	if (prev && st->st_pass == 1) {
@@ -4929,6 +4967,8 @@ symtable_add_def_o(struct symtable *st, PyObject *dict,
 	} else
 	    val = flag;
 	o = PyInt_FromLong(val);
+	if (o == NULL)
+		return -1;
 	if (PyDict_SetItem(dict, name, o) < 0) {
 		Py_DECREF(o);
 		return -1;
@@ -4947,6 +4987,8 @@ symtable_add_def_o(struct symtable *st, PyObject *dict,
 		} else
 			val = flag;
 		o = PyInt_FromLong(val);
+		if (o == NULL)
+			return -1;
 		if (PyDict_SetItem(st->st_global, name, o) < 0) {
 			Py_DECREF(o);
 			return -1;
@@ -5108,12 +5150,12 @@ symtable_node(struct symtable *st, node *n)
 		}
 		goto loop;
 	case list_iter:
+		/* only occurs when there are multiple for loops
+		   in a list comprehension */
 		n = CHILD(n, 0);
-		if (TYPE(n) == list_for) {
-			st->st_tmpname++;
-			symtable_list_comprehension(st, n);
-			st->st_tmpname--;
-		} else {
+		if (TYPE(n) == list_for)
+			symtable_list_for(st, n);
+		else {
 			REQ(n, list_if);
 			symtable_node(st, CHILD(n, 1));
 			if (NCH(n) == 3) {
@@ -5141,10 +5183,7 @@ symtable_node(struct symtable *st, node *n)
 		/* fall through */
 	case listmaker:
 		if (NCH(n) > 1 && TYPE(CHILD(n, 1)) == list_for) {
-			st->st_tmpname++;
-			symtable_list_comprehension(st, CHILD(n, 1));
-			symtable_node(st, CHILD(n, 0));
-			st->st_tmpname--;
+			symtable_list_comprehension(st, n);
 			break;
 		}
 		/* fall through */
@@ -5183,7 +5222,7 @@ symtable_funcdef(struct symtable *st, node *n)
 }
 
 /* The next two functions parse the argument tuple.
-   symtable_default_arg() checks for names in the default arguments,
+   symtable_default_args() checks for names in the default arguments,
    which are references in the defining scope.  symtable_params()
    parses the parameter names, which are defined in the function's
    body. 
@@ -5342,10 +5381,23 @@ symtable_global(struct symtable *st, node *n)
 static void
 symtable_list_comprehension(struct symtable *st, node *n)
 {
+	/* listmaker: test list_for */
 	char tmpname[30];
 
-	PyOS_snprintf(tmpname, sizeof(tmpname), "_[%d]", st->st_tmpname);
+	REQ(n, listmaker);
+	PyOS_snprintf(tmpname, sizeof(tmpname), "_[%d]", 
+		      ++st->st_cur->ste_tmpname);
 	symtable_add_def(st, tmpname, DEF_LOCAL);
+	symtable_list_for(st, CHILD(n, 1));
+	symtable_node(st, CHILD(n, 0));
+	--st->st_cur->ste_tmpname;
+}
+
+static void
+symtable_list_for(struct symtable *st, node *n)
+{
+	REQ(n, list_for);
+	/* list_for: for v in expr [list_iter] */
 	symtable_assign(st, CHILD(n, 1), 0);
 	symtable_node(st, CHILD(n, 3));
 	if (NCH(n) == 5)

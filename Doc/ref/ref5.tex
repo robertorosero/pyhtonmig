@@ -54,8 +54,8 @@ categorized syntactically as atoms.  The syntax for atoms is:
   \production{atom}
              {\token{identifier} | \token{literal} | \token{enclosure}}
   \production{enclosure}
-             {\token{parenth_form} | \token{list_display}
-              | \token{dict_display} | \token{string_conversion}}
+             {\token{parenth_form} | \token{list_display}}
+  \productioncont{| \token{dict_display} | \token{string_conversion}}
 \end{productionlist}
 
 
@@ -112,9 +112,8 @@ Python supports string literals and various numeric literals:
 
 \begin{productionlist}
   \production{literal}
-             {\token{stringliteral} | \token{integer}
-              | \token{longinteger} | \token{floatnumber}
-              | \token{imagnumber}}
+             {\token{stringliteral} | \token{integer} | \token{longinteger}}
+  \productioncont{| \token{floatnumber} | \token{imagnumber}}
 \end{productionlist}
 
 Evaluation of a literal yields an object of the given type (string,
@@ -212,7 +211,7 @@ enclosed in curly braces:
 
 \begin{productionlist}
   \production{dict_display}
-             {"{" [\token{key_datum_list}] "}"}
+             {"\{" [\token{key_datum_list}] "\}"}
   \production{key_datum_list}
              {\token{key_datum} ("," \token{key_datum})* [","]}
   \production{key_datum}
@@ -262,9 +261,11 @@ involved).
 (In particular, converting a string adds quotes around it and converts
 ``funny'' characters to escape sequences that are safe to print.)
 
-It is illegal to attempt to convert recursive objects (e.g., lists or
-dictionaries that contain a reference to themselves, directly or
-indirectly.)
+Recursive objects (for example, lists or dictionaries that contain a
+reference to themselves, directly or indirectly) use \samp{...} to
+indicate a recursive reference, and the result cannot be passed to
+\function{eval()} to get an equal value (\exception{SyntaxError} will
+be raised instead).
 \obindex{recursive}
 
 The built-in function \function{repr()} performs exactly the same
@@ -439,13 +440,13 @@ series of arguments:
   \production{call}
              {\token{primary} "(" [\token{argument_list} [","]] ")"}
   \production{argument_list}
-             {\token{positional_arguments} ["," \token{keyword_arguments} 
-		 ["," "*" \token{expression} ["," "**" \token{expression}]]]
-              | \token{keyword_arguments} ["," "*" \token{expression} 
-		["," "**" \token{expression}]]
-	      | "*" \token{expression} ["," "**" \token{expression}]
-	      | "**" \token{expression}
-	     }
+             {\token{positional_arguments} ["," \token{keyword_arguments}]}
+  \productioncont{                     ["," "*" \token{expression}]}
+  \productioncont{                     ["," "**" \token{expression}]}
+  \productioncont{| \token{keyword_arguments} ["," "*" \token{expression}]}
+  \productioncont{                    ["," "**" \token{expression}]}
+  \productioncont{| "*" \token{expression} ["," "**" \token{expression}]}
+  \productioncont{| "**" \token{expression}}
   \production{positional_arguments}
              {\token{expression} ("," \token{expression})*}
   \production{keyword_arguments}
@@ -631,7 +632,7 @@ All unary arithmetic (and bit-wise) operations have the same priority:
 \begin{productionlist}
   \production{u_expr}
              {\token{power} | "-" \token{u_expr}
-              | "+" \token{u_expr} | "~" \token{u_expr}}
+              | "+" \token{u_expr} | "{\~}" \token{u_expr}}
 \end{productionlist}
 
 The unary \code{-} (minus) operator yields the negation of its
@@ -666,11 +667,12 @@ operators:
 \begin{productionlist}
   \production{m_expr}
              {\token{u_expr} | \token{m_expr} "*" \token{u_expr}
-              | \token{m_expr} "/" \token{u_expr}
-              | \token{m_expr} "\%" \token{u_expr}}
+              | \token{m_expr} "//" \token{u_expr}
+              | \token{m_expr} "/" \token{u_expr}}
+  \productioncont{| \token{m_expr} "\%" \token{u_expr}}
   \production{a_expr}
-             {\token{m_expr} | \token{aexpr} "+" \token{m_expr}
-              \token{aexpr} "-" \token{m_expr}}
+             {\token{m_expr} | \token{a_expr} "+" \token{m_expr}
+              | \token{a_expr} "-" \token{m_expr}}
 \end{productionlist}
 
 The \code{*} (multiplication) operator yields the product of its
@@ -681,11 +683,12 @@ then multiplied together.  In the latter case, sequence repetition is
 performed; a negative repetition factor yields an empty sequence.
 \index{multiplication}
 
-The \code{/} (division) operator yields the quotient of its
-arguments.  The numeric arguments are first converted to a common
-type.  Plain or long integer division yields an integer of the same
-type; the result is that of mathematical division with the `floor'
-function applied to the result.  Division by zero raises the
+The \code{/} (division) and \code{//} (floor division) operators yield
+the quotient of their arguments.  The numeric arguments are first
+converted to a common type.  Plain or long integer division yields an
+integer of the same type; the result is that of mathematical division
+with the `floor' function applied to the result.  Division by zero
+raises the
 \exception{ZeroDivisionError} exception.
 \exindex{ZeroDivisionError}
 \index{division}
@@ -705,7 +708,7 @@ The integer division and modulo operators are connected by the
 following identity: \code{x == (x/y)*y + (x\%y)}.  Integer division and
 modulo are also connected with the built-in function \function{divmod()}:
 \code{divmod(x, y) == (x/y, x\%y)}.  These identities don't hold for
-floating point and complex numbers; there similar identities hold
+floating point numbers; there similar identities hold
 approximately where \code{x/y} is replaced by \code{floor(x/y)}) or
 \code{floor(x/y) - 1} (for floats),\footnote{
     If x is very close to an exact integer multiple of y, it's
@@ -713,8 +716,12 @@ approximately where \code{x/y} is replaced by \code{floor(x/y)}) or
     \code{(x-x\%y)/y} due to rounding.  In such cases, Python returns
     the latter result, in order to preserve that \code{divmod(x,y)[0]
     * y + x \%{} y} be very close to \code{x}.
-} or \code{floor((x/y).real)} (for
-complex).
+}.
+
+\deprecated{2.3}{The floor division operator, the modulo operator,
+and the \function{divmod()} function are no longer defined for complex
+numbers.  Instead, convert to a floating point number using the
+\function{abs()} function if appropriate.}
 
 The \code{+} (addition) operator yields the sum of its arguments.
 The arguments must either both be numbers or both sequences of the
@@ -801,8 +808,8 @@ interpretation that is conventional in mathematics:
   \production{comparison}
              {\token{or_expr} ( \token{comp_operator} \token{or_expr} )*}
   \production{comp_operator}
-             {"<" | ">" | "==" | ">=" | "<=" | "<>" | "!="
-              | "is" ["not"] | ["not"] "in"}
+             {"<" | ">" | "==" | ">=" | "<=" | "<>" | "!="}
+  \productioncont{| "is" ["not"] | ["not"] "in"}
 \end{productionlist}
 
 Comparisons yield integer values: \code{1} for true, \code{0} for false.
@@ -831,7 +838,7 @@ obsolescent.
 The operators \code{<}, \code{>}, \code{==}, \code{>=}, \code{<=}, and
 \code{!=} compare
 the values of two objects.  The objects need not have the same type.
-If both are numbers, they are coverted to a common type.  Otherwise,
+If both are numbers, they are converted to a common type.  Otherwise,
 objects of different types \emph{always} compare unequal, and are
 ordered consistently but arbitrarily.
 
@@ -973,11 +980,16 @@ invent a value anyway, it does not bother to return a value of the
 same type as its argument, so e.g., \code{not 'foo'} yields \code{0},
 not \code{''}.)
 
+\section{Lambdas\label{lambdas}}
+\indexii{lambda}{expression}
+\indexii{lambda}{form}
+\indexii{anonmymous}{function}
+
 Lambda forms (lambda expressions) have the same syntactic position as
 expressions.  They are a shorthand to create anonymous functions; the
 expression \code{lambda \var{arguments}: \var{expression}}
-yields a function object that behaves virtually identical to one
-defined with
+yields a function object.  The unnamed object behaves like a function
+object defined with
 
 \begin{verbatim}
 def name(arguments):
@@ -987,34 +999,6 @@ def name(arguments):
 See section \ref{function} for the syntax of parameter lists.  Note
 that functions created with lambda forms cannot contain statements.
 \label{lambda}
-\indexii{lambda}{expression}
-\indexii{lambda}{form}
-\indexii{anonmymous}{function}
-
-\strong{Programmer's note:} Prior to Python 2.1, a lambda form defined
-inside a function has no access to names defined in the function's
-namespace.  This is because Python had only two scopes: local and
-global.  A common work-around was to use default argument values to
-pass selected variables into the lambda's namespace, e.g.:
-
-\begin{verbatim}
-def make_incrementor(increment):
-    return lambda x, n=increment: x+n
-\end{verbatim}
-
-As of Python 2.1, nested scopes were introduced, and this work-around
-has not been necessary.  Python 2.1 supports nested scopes in modules
-which include the statement \samp{from __future__ import
-nested_scopes}, and more recent versions of Python enable nested
-scopes by default.  This version works starting with Python 2.1:
-
-\begin{verbatim}
-from __future__ import nested_scopes
-
-def make_incrementor(increment):
-    return lambda x: x+increment
-\end{verbatim}
-
 
 \section{Expression lists\label{exprlists}}
 \indexii{expression}{list}
@@ -1037,6 +1021,37 @@ tuple, but rather yields the value of that expression.
 \code{()}.)
 \indexii{trailing}{comma}
 
+\section{Evaluation order\label{evalorder}}
+\indexii{evaluation}{order}
+
+Python evaluates expressions from left to right. Notice that while
+evaluating an assignment, the right-hand side is evaluated before
+the left-hand side.
+
+In the following lines, expressions will be evaluated in the
+arithmetic order of their suffixes:
+
+\begin{verbatim}
+expr1, expr2, expr3, expr4
+(expr1, expr2, expr3, expr4)
+expr1 + expr2 * (expr3 - expr4)
+func(expr1, expr2, *expr3, **expr4)
+expr3, expr4 = expr1, expr2
+\end{verbatim}
+
+Dictionaries are currently an exception to the rule and they evaluate
+in the following order:
+    
+\begin{verbatim}
+{expr2: expr1, expr4: expr3}
+\end{verbatim}
+
+In Python 2.3, the order will be changed to be consistent with
+other expressions:
+
+\begin{verbatim}
+{expr1: expr2, expr3: expr4}
+\end{verbatim}  
 
 \section{Summary\label{summary}}
 

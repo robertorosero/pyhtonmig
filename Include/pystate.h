@@ -27,6 +27,9 @@ typedef struct _is {
     int dlopenflags;
 #endif
 
+    PyObject *codec_search_path;
+    PyObject *codec_search_cache;
+
 } PyInterpreterState;
 
 
@@ -69,6 +72,8 @@ typedef struct _ts {
 
     PyObject *dict;
 
+    int tick_counter;
+
     /* XXX signal handlers should also be here */
 
 } PyThreadState;
@@ -106,6 +111,9 @@ DL_IMPORT(PyInterpreterState *) PyInterpreterState_Head(void);
 DL_IMPORT(PyInterpreterState *) PyInterpreterState_Next(PyInterpreterState *);
 DL_IMPORT(PyThreadState *) PyInterpreterState_ThreadHead(PyInterpreterState *);
 DL_IMPORT(PyThreadState *) PyThreadState_Next(PyThreadState *);
+
+/* hook for PyEval_GetFrame(), requested for Psyco */
+extern DL_IMPORT(unaryfunc) _PyThreadState_GetFrame;
 
 #ifdef __cplusplus
 }

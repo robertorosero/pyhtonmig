@@ -10,7 +10,7 @@
 
 """Internal support module for sre"""
 
-import _sre,sys
+import _sre, sys
 
 from sre_constants import *
 
@@ -188,6 +188,9 @@ def _optimize_charset(charset, fixup):
                 # XXX: could append to charmap tail
                 return charset # cannot compress
     except IndexError:
+        if sys.maxunicode != 65535:
+            # XXX: big charsets don't work in UCS-4 builds
+            return charset
         # character set contains unicode characters
         return _optimize_unicode(charset, fixup)
     # compress character map
@@ -278,8 +281,8 @@ def _optimize_unicode(charset, fixup):
         new = comps.setdefault(chunk, block)
         mapping[i] = new
         if new == block:
-            block += 1
-            data += _mk_bitmap(chunk)
+            block = block + 1
+            data = data + _mk_bitmap(chunk)
     header = [block]
     assert MAXCODE == 65535
     for i in range(128):
@@ -396,7 +399,7 @@ def _compile_info(code, pattern, flags):
                 table[i+1] = table[table[i+1]-1]+1
         code.extend(table[1:]) # don't store first entry
     elif charset:
-        _compile_charset(charset, 0, code)
+        _compile_charset(charset, flags, code)
     code[skip] = len(code) - skip
 
 STRING_TYPES = [type("")]

@@ -6,7 +6,7 @@ Written by Marc-Andre Lemburg (mal@lemburg.com).
 
 """#"
 from test_support import verify, verbose, TestFailed
-import sys
+import sys, string
 
 if not sys.platform.startswith('java'):
     # Test basic sanity of repr()
@@ -50,6 +50,25 @@ def test(method, input, output, *args):
         exc = sys.exc_info()[:2]
     else:
         exc = None
+    if value == output and type(value) is type(output):
+        # if the original is returned make sure that
+        # this doesn't happen with subclasses
+        if value is input:
+            class usub(unicode):
+                def __repr__(self):
+                    return 'usub(%r)' % unicode.__repr__(self)
+            input = usub(input)
+            try:
+                f = getattr(input, method)
+                value = apply(f, args)
+            except:
+                value = sys.exc_type
+                exc = sys.exc_info()[:2]
+            if value is input:
+                if verbose:
+                    print 'no'
+                print '*',f, `input`, `output`, `value`
+                return
     if value != output or type(value) is not type(output):
         if verbose:
             print 'no'
@@ -83,6 +102,10 @@ test('find', u'abcdefghiabc', 9, u'abc', 1)
 test('find', u'abcdefghiabc', -1, u'def', 4)
 
 test('rfind', u'abcdefghiabc', 9, u'abc')
+test('rfind', 'abcdefghiabc', 9, u'abc')
+test('rfind', 'abcdefghiabc', 12, u'')
+test('rfind', u'abcdefghiabc', 12, '')
+test('rfind', u'abcdefghiabc', 12, u'')
 
 test('lower', u'HeLLo', u'hello')
 test('lower', u'hello', u'hello')
@@ -146,6 +169,24 @@ test('lstrip', u'   hello   ', u'hello   ')
 test('rstrip', u'   hello   ', u'   hello')
 test('strip', u'hello', u'hello')
 
+# strip/lstrip/rstrip with None arg
+test('strip', u'   hello   ', u'hello', None)
+test('lstrip', u'   hello   ', u'hello   ', None)
+test('rstrip', u'   hello   ', u'   hello', None)
+test('strip', u'hello', u'hello', None)
+
+# strip/lstrip/rstrip with unicode arg
+test('strip', u'xyzzyhelloxyzzy', u'hello', u'xyz')
+test('lstrip', u'xyzzyhelloxyzzy', u'helloxyzzy', u'xyz')
+test('rstrip', u'xyzzyhelloxyzzy', u'xyzzyhello', u'xyz')
+test('strip', u'hello', u'hello', u'xyz')
+
+# strip/lstrip/rstrip with str arg
+test('strip', u'xyzzyhelloxyzzy', u'hello', 'xyz')
+test('lstrip', u'xyzzyhelloxyzzy', u'helloxyzzy', 'xyz')
+test('rstrip', u'xyzzyhelloxyzzy', u'xyzzyhello', 'xyz')
+test('strip', u'hello', u'hello', 'xyz')
+
 test('swapcase', u'HeLLo cOmpUteRs', u'hEllO CoMPuTErS')
 
 if 0:
@@ -164,6 +205,8 @@ test('replace', u'one!two!three!', u'one!two!three!', u'!', u'@', 0)
 test('replace', u'one!two!three!', u'one@two@three@', u'!', u'@')
 test('replace', u'one!two!three!', u'one!two!three!', u'x', u'@')
 test('replace', u'one!two!three!', u'one!two!three!', u'x', u'@', 2)
+test('replace', u'abc', u'abc', u'ab', u'--', 0)
+test('replace', u'abc', u'abc', u'xy', u'--')
 
 test('startswith', u'hello', 1, u'he')
 test('startswith', u'hello', 1, u'hello')
@@ -193,6 +236,8 @@ test('endswith', u'helloworld', 0, u'lowo', 4, 7)
 test('endswith', u'helloworld', 0, u'lowo', 3, 8)
 test('endswith', u'ab', 0, u'ab', 0, 1)
 test('endswith', u'ab', 0, u'ab', 0, 0)
+test('endswith', 'helloworld', 1, u'd')
+test('endswith', 'helloworld', 0, u'l')
 
 test('expandtabs', u'abc\rab\tdef\ng\thi', u'abc\rab      def\ng       hi')
 test('expandtabs', u'abc\rab\tdef\ng\thi', u'abc\rab      def\ng       hi', 8)
@@ -203,6 +248,19 @@ if 0:
     test('capwords', u'abc def ghi', u'Abc Def Ghi')
     test('capwords', u'abc\tdef\nghi', u'Abc Def Ghi')
     test('capwords', u'abc\t   def  \nghi', u'Abc Def Ghi')
+
+test('zfill', u'123', u'123', 2)
+test('zfill', u'123', u'123', 3)
+test('zfill', u'123', u'0123', 4)
+test('zfill', u'+123', u'+123', 3)
+test('zfill', u'+123', u'+123', 4)
+test('zfill', u'+123', u'+0123', 5)
+test('zfill', u'-123', u'-123', 3)
+test('zfill', u'-123', u'-123', 4)
+test('zfill', u'-123', u'-0123', 5)
+test('zfill', u'', u'000', 3)
+test('zfill', u'34', u'34', 1)
+test('zfill', u'34', u'00034', 5)
 
 # Comparisons:
 print 'Testing Unicode comparisons...',
@@ -357,6 +415,12 @@ verify(('a' in (1,None,'a')) == 1)
 verify(('a' in (1,None,u'a')) == 1)
 verify(('a' in ('x',1,u'y')) == 0)
 verify(('a' in ('x',1,None)) == 0)
+try:
+    u'\xe2' in 'g\xe2teau'
+except UnicodeError:
+    pass
+else:
+    print '*** contains operator does not propagate UnicodeErrors'
 print 'done.'
 
 # Formatting:
@@ -383,6 +447,14 @@ except KeyError:
     print '*** formatting failed for "%s"' % "u'abc, def'"
 else:
     verify(value == u'abc, def')
+
+for ordinal in (-100, 0x200000):
+    try:
+        u"%c" % ordinal
+    except ValueError:
+        pass
+    else:
+        print '*** formatting u"%%c" %% %i should give a ValueError' % ordinal
 
 # formatting jobs delegated from the string implementation:
 verify('...%(foo)s...' % {'foo':u"abc"} == u'...abc...')
@@ -495,19 +567,40 @@ else:
 verify(unicode('+3ADYAA-', 'utf-7', 'replace') == u'\ufffd')
 
 # UTF-8 specific encoding tests:
-verify(u'\u20ac'.encode('utf-8') == \
-       ''.join((chr(0xe2), chr(0x82), chr(0xac))) )
-verify(u'\ud800\udc02'.encode('utf-8') == \
-       ''.join((chr(0xf0), chr(0x90), chr(0x80), chr(0x82))) )
-verify(u'\ud84d\udc56'.encode('utf-8') == \
-       ''.join((chr(0xf0), chr(0xa3), chr(0x91), chr(0x96))) )
+verify(u''.encode('utf-8') == '')
+verify(u'\u20ac'.encode('utf-8') == '\xe2\x82\xac')
+verify(u'\ud800\udc02'.encode('utf-8') == '\xf0\x90\x80\x82')
+verify(u'\ud84d\udc56'.encode('utf-8') == '\xf0\xa3\x91\x96')
+verify(u'\ud800'.encode('utf-8') == '\xed\xa0\x80')
+verify(u'\udc00'.encode('utf-8') == '\xed\xb0\x80')
+verify((u'\ud800\udc02'*1000).encode('utf-8') ==
+       '\xf0\x90\x80\x82'*1000)
+verify(u'\u6b63\u78ba\u306b\u8a00\u3046\u3068\u7ffb\u8a33\u306f'
+       u'\u3055\u308c\u3066\u3044\u307e\u305b\u3093\u3002\u4e00'
+       u'\u90e8\u306f\u30c9\u30a4\u30c4\u8a9e\u3067\u3059\u304c'
+       u'\u3001\u3042\u3068\u306f\u3067\u305f\u3089\u3081\u3067'
+       u'\u3059\u3002\u5b9f\u969b\u306b\u306f\u300cWenn ist das'
+       u' Nunstuck git und'.encode('utf-8') ==
+       '\xe6\xad\xa3\xe7\xa2\xba\xe3\x81\xab\xe8\xa8\x80\xe3\x81'
+       '\x86\xe3\x81\xa8\xe7\xbf\xbb\xe8\xa8\xb3\xe3\x81\xaf\xe3'
+       '\x81\x95\xe3\x82\x8c\xe3\x81\xa6\xe3\x81\x84\xe3\x81\xbe'
+       '\xe3\x81\x9b\xe3\x82\x93\xe3\x80\x82\xe4\xb8\x80\xe9\x83'
+       '\xa8\xe3\x81\xaf\xe3\x83\x89\xe3\x82\xa4\xe3\x83\x84\xe8'
+       '\xaa\x9e\xe3\x81\xa7\xe3\x81\x99\xe3\x81\x8c\xe3\x80\x81'
+       '\xe3\x81\x82\xe3\x81\xa8\xe3\x81\xaf\xe3\x81\xa7\xe3\x81'
+       '\x9f\xe3\x82\x89\xe3\x82\x81\xe3\x81\xa7\xe3\x81\x99\xe3'
+       '\x80\x82\xe5\xae\x9f\xe9\x9a\x9b\xe3\x81\xab\xe3\x81\xaf'
+       '\xe3\x80\x8cWenn ist das Nunstuck git und')
+
 # UTF-8 specific decoding tests
-verify(unicode(''.join((chr(0xf0), chr(0xa3), chr(0x91), chr(0x96))),
-               'utf-8') == u'\U00023456' )
-verify(unicode(''.join((chr(0xf0), chr(0x90), chr(0x80), chr(0x82))),
-               'utf-8') == u'\U00010002' )
-verify(unicode(''.join((chr(0xe2), chr(0x82), chr(0xac))),
-               'utf-8') == u'\u20ac' )
+verify(unicode('\xf0\xa3\x91\x96', 'utf-8') == u'\U00023456' )
+verify(unicode('\xf0\x90\x80\x82', 'utf-8') == u'\U00010002' )
+verify(unicode('\xe2\x82\xac', 'utf-8') == u'\u20ac' )
+# test UTF-8 2.2.1 bug work-around
+verify(unicode('\xa0\x80', 'utf-8') == u'\ud800' )
+verify(unicode('\xaf\xbf', 'utf-8') == u'\udbff' )
+verify(unicode('\xed\xb0\x80', 'utf-8') == u'\udc00' )
+verify(unicode('\xed\xbf\xbf', 'utf-8') == u'\udfff' )
 
 # Other possible utf-8 test cases:
 # * strict decoding testing for all of the
@@ -538,6 +631,14 @@ else:
     raise TestFailed, "unicode('Andr\202') failed to raise an exception"
 verify(unicode('Andr\202 x','ascii','ignore') == u"Andr x")
 verify(unicode('Andr\202 x','ascii','replace') == u'Andr\uFFFD x')
+
+verify("\\N{foo}xx".decode("unicode-escape", "ignore") == u"xx")
+try:
+    "\\".decode("unicode-escape")
+except ValueError:
+    pass
+else:
+    raise TestFailed, '"\\".decode("unicode-escape") should fail'
 
 verify(u'hello'.encode('ascii') == 'hello')
 verify(u'hello'.encode('utf-7') == 'hello')
@@ -649,6 +750,14 @@ for encoding in (
         print '*** codec "%s" failed round-trip' % encoding
     except ValueError,why:
         print '*** codec for "%s" failed: %s' % (encoding, why)
+
+# UTF-8 must be roundtrip safe for all UCS-2 code points
+# This excludes surrogates: in the full range, there would be
+# a surrogate pair (\udbff\udc00), which gets converted back
+# to a non-BMP character (\U0010fc00)
+u = u''.join(map(unichr, range(0,0xd800)+range(0xe000,0x10000)))
+for encoding in ('utf-8',):
+    verify(unicode(u.encode(encoding),encoding) == u)
 
 print 'done.'
 

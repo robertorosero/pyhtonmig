@@ -81,6 +81,23 @@ An Integrated DeveLopment Environment for Python
 by Guido van Rossum
 """ % idlever.IDLE_VERSION
 
+def _find_module(fullname, path=None):
+    """Version of imp.find_module() that handles hierarchical module names"""
+
+    file = None
+    for tgt in fullname.split('.'):
+        if file is not None:
+            file.close()            # close intermediate files
+        (file, filename, descr) = imp.find_module(tgt, path)
+        if descr[2] == imp.PY_SOURCE:
+            break                   # find but not load the source file
+        module = imp.load_module(tgt, file, filename, descr)
+        try:
+            path = module.__path__
+        except AttributeError:
+            raise ImportError, 'No source for module ' + module.__name__
+    return file, filename, descr
+
 class EditorWindow:
 
     from Percolator import Percolator
@@ -95,6 +112,7 @@ class EditorWindow:
     about_text = about_text
 
     vars = {}
+    runnable = False    # Shell window cannot Import Module or Run Script
 
     def __init__(self, flist=None, filename=None, key=None, root=None):
         edconf = idleconf.getsection('EditorWindow')
@@ -294,14 +312,23 @@ class EditorWindow:
     help_url = "http://www.python.org/doc/current/"
     if sys.platform[:3] == "win":
         fn = os.path.dirname(__file__)
-        fn = os.path.join(fn, os.pardir, os.pardir, "Doc", "index.html")
+        fn = os.path.join(fn, os.pardir, os.pardir, "pythlp.chm")
         fn = os.path.normpath(fn)
         if os.path.isfile(fn):
             help_url = fn
+        else:
+            fn = os.path.dirname(__file__)
+            fn = os.path.join(fn, os.pardir, os.pardir, "Doc", "index.html")
+            fn = os.path.normpath(fn)
+            if os.path.isfile(fn):
+                help_url = fn
         del fn
 
-    def python_docs(self, event=None):
-        webbrowser.open(self.help_url)
+        def python_docs(self, event=None):
+            os.startfile(self.help_url)
+    else:
+        def python_docs(self, event=None):
+            webbrowser.open(self.help_url)
 
     def select_all(self, event=None):
         self.text.tag_add("sel", "1.0", "end-1c")
@@ -330,10 +357,9 @@ class EditorWindow:
                 name = string.strip(name)
             if not name:
                 return
-        # XXX Ought to support package syntax
         # XXX Ought to insert current file's directory in front of path
         try:
-            (f, file, (suffix, mode, type)) = imp.find_module(name)
+            (f, file, (suffix, mode, type)) = _find_module(name)
         except (NameError, ImportError), msg:
             tkMessageBox.showerror("Import error", str(msg), parent=self.text)
             return
@@ -465,7 +491,7 @@ class EditorWindow:
         top, bot = self.getwindowlines()
         lineno = self.getlineno(mark)
         height = bot - top
-        newtop = max(1, lineno - height/2)
+        newtop = max(1, lineno - height//2)
         text.yview(float(newtop))
 
     def getwindowlines(self):

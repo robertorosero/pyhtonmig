@@ -36,6 +36,7 @@ aliases = {
     # ASCII
     'us_ascii': 'ascii',
     'ansi_x3.4_1968': 'ascii', # used on Linux
+    'ansi_x3_4_1968': 'ascii', # used on BSD?
     '646': 'ascii',            # used on Solaris
 
     # EBCDIC
@@ -75,6 +76,9 @@ aliases = {
     'windows_1252': 'cp1252',
     'windows_1254': 'cp1254',
     'windows_1255': 'cp1255',
+    'windows_1256': 'cp1256',
+    'windows_1257': 'cp1257',
+    'windows_1258': 'cp1258',
 
     # MBCS
     'dbcs': 'mbcs',

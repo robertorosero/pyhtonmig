@@ -44,7 +44,14 @@ roundupsize(int n)
 	return ((n >> nbits) + 1) << nbits;
  }
 
-#define NRESIZE(var, type, nitems) PyMem_RESIZE(var, type, roundupsize(nitems))
+#define NRESIZE(var, type, nitems)				\
+do {								\
+	size_t _new_size = roundupsize(nitems);			\
+	if (_new_size <= ((~(size_t)0) / sizeof(type)))		\
+		PyMem_RESIZE(var, type, _new_size);		\
+	else							\
+		var = NULL;					\
+} while (0)
 
 PyObject *
 PyList_New(int size)
@@ -195,8 +202,8 @@ static void
 list_dealloc(PyListObject *op)
 {
 	int i;
+	PyObject_GC_UnTrack(op);
 	Py_TRASHCAN_SAFE_BEGIN(op)
-	_PyObject_GC_UNTRACK(op);
 	if (op->ob_item != NULL) {
 		/* Do it backwards, for Christian Tismer.
 		   There's a simple test case where somehow this reduces
@@ -392,6 +399,8 @@ list_concat(PyListObject *a, PyObject *bb)
 	}
 #define b ((PyListObject *)bb)
 	size = a->ob_size + b->ob_size;
+	if (size < 0)
+		return PyErr_NoMemory();
 	np = (PyListObject *) PyList_New(size);
 	if (np == NULL) {
 		return NULL;
@@ -420,6 +429,8 @@ list_repeat(PyListObject *a, int n)
 	if (n < 0)
 		n = 0;
 	size = a->ob_size * n;
+	if (n && size/n != a->ob_size)
+		return PyErr_NoMemory();
 	np = (PyListObject *) PyList_New(size);
 	if (np == NULL)
 		return NULL;
@@ -457,6 +468,8 @@ list_ass_slice(PyListObject *a, int ilow, int ihigh, PyObject *v)
 			/* Special case "a[i:j] = a" -- copy b first */
 			int ret;
 			v = list_slice(b, 0, n);
+			if (v == NULL)
+				return -1;
 			ret = list_ass_slice(a, ilow, ihigh, v);
 			Py_DECREF(v);
 			return ret;
@@ -478,8 +491,13 @@ list_ass_slice(PyListObject *a, int ilow, int ihigh, PyObject *v)
 		ihigh = a->ob_size;
 	item = a->ob_item;
 	d = n - (ihigh-ilow);
-	if (ihigh > ilow)
+	if (ihigh > ilow) {
 		p = recycle = PyMem_NEW(PyObject *, (ihigh-ilow));
+		if (recycle == NULL) {
+			PyErr_NoMemory();
+			return -1;
+		}
+	}
 	else
 		p = recycle = NULL;
 	if (d <= 0) { /* Delete -d items; recycle ihigh-ilow items */
@@ -1565,8 +1583,10 @@ list_fill(PyListObject *result, PyObject *v)
 	if (n < 0)
 		n = 8;	/* arbitrary */
 	NRESIZE(result->ob_item, PyObject*, n);
-	if (result->ob_item == NULL)
+	if (result->ob_item == NULL) {
+		PyErr_NoMemory();
 		goto error;
+	}
 	for (i = 0; i < n; i++)
 		result->ob_item[i] = NULL;
 	result->ob_size = n;
@@ -1627,7 +1647,7 @@ list_nohash(PyObject *self)
 static char append_doc[] =
 "L.append(object) -- append object to end";
 static char extend_doc[] =
-"L.extend(list) -- extend list by appending list elements";
+"L.extend(iterable) -- extend list by appending elements from the iterable";
 static char insert_doc[] =
 "L.insert(index, object) -- insert object before index";
 static char pop_doc[] =
@@ -1714,7 +1734,7 @@ PyTypeObject PyList_Type = {
 	(initproc)list_init,			/* tp_init */
 	PyType_GenericAlloc,			/* tp_alloc */
 	PyType_GenericNew,			/* tp_new */
-	_PyObject_GC_Del,			/* tp_free */
+	_PyObject_GC_Del,        		/* tp_free */
 };
 
 

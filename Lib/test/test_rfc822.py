@@ -18,7 +18,7 @@ class MessageTestCase(unittest.TestCase):
             'To: "last, first" <userid@foo.net>\n\ntest\n')
         self.assert_(msg.get("to") == '"last, first" <userid@foo.net>')
         self.assert_(msg.get("TO") == '"last, first" <userid@foo.net>')
-        self.assert_(msg.get("No-Such-Header") == "")
+        self.assert_(msg.get("No-Such-Header") is None)
         self.assert_(msg.get("No-Such-Header", "No-Such-Value")
                      == "No-Such-Value")
 
@@ -193,6 +193,15 @@ class MessageTestCase(unittest.TestCase):
 ##        lst = rfc822.AddrlistClass(addr).getaddrlist()
 ##        self.assertEqual(len(lst), OBSCENELY_LONG_HEADER_MULTIPLIER)
 
+
+    def test_parseaddr(self):
+        eq = self.assertEqual
+        eq(rfc822.parseaddr('<>'), ('', ''))
+        eq(rfc822.parseaddr('aperson@dom.ain'), ('', 'aperson@dom.ain'))
+        eq(rfc822.parseaddr('bperson@dom.ain (Bea A. Person)'),
+           ('Bea A. Person', 'bperson@dom.ain'))
+        eq(rfc822.parseaddr('Cynthia Person <cperson@dom.ain>'),
+           ('Cynthia Person', 'cperson@dom.ain'))
 
 def test_main():
     test_support.run_unittest(MessageTestCase)

@@ -52,7 +52,7 @@ if (sys.platform.lower().startswith("win")
 
     _realsocketcall = _socket.socket
 
-    def socket(family, type, proto=0):
+    def socket(family=AF_INET, type=SOCK_STREAM, proto=0):
         return _socketobject(_realsocketcall(family, type, proto))
 
     try:
@@ -140,9 +140,6 @@ class _socketobject:
         # Avoid referencing globals here
         self._sock = self.__class__._closedsocket()
 
-    def __del__(self):
-        self.close()
-
     def accept(self):
         sock, addr = self._sock.accept()
         return _socketobject(sock), addr
@@ -181,7 +178,7 @@ class _fileobject:
 
     def flush(self):
         if self._wbuf:
-            self._sock.send(self._wbuf)
+            self._sock.sendall(self._wbuf)
             self._wbuf = ""
 
     def fileno(self):
@@ -197,7 +194,7 @@ class _fileobject:
                 self.flush()
 
     def writelines(self, list):
-        filter(self._sock.send, list)
+        filter(self._sock.sendall, list)
         self.flush()
 
     def read(self, n=-1):

@@ -17,7 +17,7 @@ __all__ = ["normcase","isabs","join","splitdrive","split","splitext",
            "basename","dirname","commonprefix","getsize","getmtime",
            "getatime","islink","exists","isdir","isfile","ismount",
            "walk","expanduser","expandvars","normpath","abspath",
-           "samefile","sameopenfile","samestat"]
+           "samefile","sameopenfile","samestat","realpath"]
 
 # Normalize the case of a pathname.  Trivial in Posix, string.lower on Mac.
 # On MS-DOS this may also turn slashes into backslashes; however, other
@@ -306,8 +306,10 @@ def expanduser(path):
         i = i + 1
     if i == 1:
         if not os.environ.has_key('HOME'):
-            return path
-        userhome = os.environ['HOME']
+            import pwd
+            userhome = pwd.getpwuid(os.getuid())[5]
+        else:
+            userhome = os.environ['HOME']
     else:
         import pwd
         try:

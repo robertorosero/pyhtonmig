@@ -177,6 +177,7 @@ def main(tests=None, testdir=None, verbose=0, quiet=0, generate=0,
     for test in tests:
         if not quiet:
             print test
+            sys.stdout.flush()
         ok = runtest(test, generate, verbose, quiet, testdir)
         if ok > 0:
             good.append(test)
@@ -315,17 +316,21 @@ def runtest(test, generate, verbose, quiet, testdir = None):
     except (ImportError, test_support.TestSkipped), msg:
         if not quiet:
             print "test", test, "skipped --", msg
+            sys.stdout.flush()
         return -1
     except KeyboardInterrupt:
         raise
     except test_support.TestFailed, msg:
         print "test", test, "failed --", msg
+        sys.stdout.flush()
         return 0
     except:
         type, value = sys.exc_info()[:2]
         print "test", test, "crashed --", str(type) + ":", value
+        sys.stdout.flush()
         if verbose:
             traceback.print_exc(file=sys.stdout)
+            sys.stdout.flush()
         return 0
     else:
         if not cfp:
@@ -355,7 +360,9 @@ def runtest(test, generate, verbose, quiet, testdir = None):
         if output == expected:
             return 1
         print "test", test, "produced unexpected output:"
+        sys.stdout.flush()
         reportdiff(expected, output)
+        sys.stdout.flush()
         return 0
 
 def reportdiff(expected, output):
@@ -477,6 +484,7 @@ _expectations = {
         test_curses
         test_dbm
         test_dl
+        test_email_codecs
         test_fcntl
         test_fork1
         test_gdbm
@@ -504,6 +512,7 @@ _expectations = {
         test_cl
         test_curses
         test_dl
+        test_email_codecs
         test_gl
         test_imgfile
         test_largefile
@@ -527,6 +536,7 @@ _expectations = {
         test_curses
         test_dbm
         test_dl
+        test_email_codecs
         test_fcntl
         test_fork1
         test_gl
@@ -553,13 +563,14 @@ _expectations = {
         test_winreg
         test_winsound
         """,
-    'unixware5':
+    'unixware7':
         """
         test_al
         test_bsddb
         test_cd
         test_cl
         test_dl
+        test_email_codecs
         test_gl
         test_imgfile
         test_largefile
@@ -577,6 +588,65 @@ _expectations = {
         test_winreg
         test_winsound
         """,
+    'openunix8':
+        """
+        test_al
+        test_bsddb
+        test_cd
+        test_cl
+        test_dl
+        test_email_codecs
+        test_gl
+        test_imgfile
+        test_largefile
+        test_linuxaudiodev
+        test_minidom
+        test_nis
+        test_ntpath
+        test_openpty
+        test_pyexpat
+        test_sax
+        test_socketserver
+        test_sunaudiodev
+        test_sundry
+        test_unicode_file
+        test_winreg
+        test_winsound
+        """,
+    'sco_sv3':
+        """
+        test_al
+        test_asynchat
+        test_bsddb
+        test_cd
+        test_cl
+        test_dl
+        test_email_codecs
+        test_fork1
+        test_gettext
+        test_gl
+        test_imgfile
+        test_largefile
+        test_linuxaudiodev
+        test_locale
+        test_minidom
+        test_nis
+        test_ntpath
+        test_openpty
+        test_pyexpat
+        test_queue
+        test_sax
+        test_socketserver
+        test_sunaudiodev
+        test_sundry
+        test_thread
+        test_threaded_import
+        test_threadedtempfile
+        test_threading
+        test_unicode_file
+        test_winreg
+        test_winsound
+        """,
     'riscos':
         """
         test_al
@@ -588,6 +658,7 @@ _expectations = {
         test_crypt
         test_dbm
         test_dl
+        test_email_codecs
         test_fcntl
         test_fork1
         test_gdbm
@@ -626,10 +697,12 @@ _expectations = {
         test_cl
         test_curses
         test_dl
+        test_email_codecs
         test_gdbm
         test_gl
         test_imgfile
         test_largefile
+        test_locale
         test_linuxaudiodev
         test_minidom
         test_nis

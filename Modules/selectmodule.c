@@ -18,9 +18,6 @@
 #define FD_SETSIZE 512
 #endif 
 
-#ifdef HAVE_UNISTD_H
-#include <unistd.h>
-#endif
 #if defined(HAVE_POLL_H)
 #include <poll.h>
 #elif defined(HAVE_SYS_POLL_H)
@@ -248,7 +245,7 @@ select_select(PyObject *self, PyObject *args)
 		if (rfd2obj) PyMem_DEL(rfd2obj);
 		if (wfd2obj) PyMem_DEL(wfd2obj);
 		if (efd2obj) PyMem_DEL(efd2obj);
-		return NULL;
+		return PyErr_NoMemory();
 	}
 #endif /* SELECT_USES_HEAP */
 	/* Convert lists to fd_sets, and get maximum fd number
@@ -271,9 +268,16 @@ select_select(PyObject *self, PyObject *args)
 	n = select(max, &ifdset, &ofdset, &efdset, tvp);
 	Py_END_ALLOW_THREADS
 
+#ifdef MS_WINDOWS
+	if (n == SOCKET_ERROR) {
+		errno = WSAGetLastError();
+		PyErr_SetFromErrno(SelectError);
+	}
+#else
 	if (n < 0) {
 		PyErr_SetFromErrno(SelectError);
 	}
+#endif
 	else if (n == 0) {
                 /* optimization */
 		ifdlist = PyList_New(0);

@@ -5,21 +5,22 @@
 
 from macsupport import *
 
-FSRef_ptr = OpaqueType("FSRef", "PyMac_BuildFSRef", "PyMac_GetFSRef")
-
 class ResMixIn:
 
 	def checkit(self):
-		OutLbrace()
-		Output("OSErr _err = ResError();")
-		Output("if (_err != noErr) return PyMac_Error(_err);")
-		OutRbrace()
+		if self.returntype.__class__ != OSErrType:
+			OutLbrace()
+			Output("OSErr _err = ResError();")
+			Output("if (_err != noErr) return PyMac_Error(_err);")
+			OutRbrace()
 		FunctionGenerator.checkit(self) # XXX
 
-class ResFunction(ResMixIn, FunctionGenerator): pass
-class ResMethod(ResMixIn, MethodGenerator): pass
+class ResFunction(ResMixIn, OSErrWeakLinkFunctionGenerator): pass
+class ResMethod(ResMixIn, OSErrWeakLinkMethodGenerator): pass
 
 RsrcChainLocation = Type("RsrcChainLocation", "h")
+FSCatalogInfoBitmap = FakeType("0") # Type("FSCatalogInfoBitmap", "l")
+FSCatalogInfo_ptr = FakeType("(FSCatalogInfo *)0")
 
 # includestuff etc. are imported from macsupport
 

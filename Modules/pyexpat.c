@@ -89,7 +89,7 @@ typedef struct {
 
 staticforward PyTypeObject Xmlparsetype;
 
-typedef void (*xmlhandlersetter)(XML_Parser *self, void *meth);
+typedef void (*xmlhandlersetter)(XML_Parser self, void *meth);
 typedef void* xmlhandler;
 
 struct HandlerInfo {
@@ -352,6 +352,33 @@ getcode(enum HandlerTypes slot, char* func_name, int lineno)
     return NULL;
 }
 
+static int
+trace_frame(PyThreadState *tstate, PyFrameObject *f, int code, PyObject *val)
+{
+    int result = 0;
+    if (!tstate->use_tracing || tstate->tracing)
+	return 0;
+    if (tstate->c_profilefunc != NULL) {
+	tstate->tracing++;
+	result = tstate->c_profilefunc(tstate->c_profileobj,
+				       f, code , val);
+	tstate->use_tracing = ((tstate->c_tracefunc != NULL)
+			       || (tstate->c_profilefunc != NULL));
+	tstate->tracing--;
+	if (result)
+	    return result;
+    }
+    if (tstate->c_tracefunc != NULL) {
+	tstate->tracing++;
+	result = tstate->c_tracefunc(tstate->c_traceobj,
+				     f, code , val);
+	tstate->use_tracing = ((tstate->c_tracefunc != NULL)
+			       || (tstate->c_profilefunc != NULL));
+	tstate->tracing--;
+    }	
+    return result;
+}
+
 static PyObject*
 call_with_frame(PyCodeObject *c, PyObject* func, PyObject* args)
 {
@@ -361,18 +388,29 @@ call_with_frame(PyCodeObject *c, PyObject* func, PyObject* args)
 
     if (c == NULL)
         return NULL;
+    
     f = PyFrame_New(
                     tstate,			/*back*/
                     c,				/*code*/
-                    tstate->frame->f_globals,	/*globals*/
+                    PyEval_GetGlobals(),	/*globals*/
                     NULL			/*locals*/
                     );
     if (f == NULL)
         return NULL;
     tstate->frame = f;
+    if (trace_frame(tstate, f, PyTrace_CALL, Py_None)) {
+	Py_DECREF(f);
+	return NULL;
+    }
     res = PyEval_CallObject(func, args);
     if (res == NULL && tstate->curexc_traceback == NULL)
         PyTraceBack_Here(f);
+    else {
+	if (trace_frame(tstate, f, PyTrace_RETURN, res)) {
+	    Py_XDECREF(res);
+	    res = NULL;
+	}
+    }
     tstate->frame = f->f_back;
     Py_DECREF(f);
     return res;
@@ -609,35 +647,63 @@ conv_content_model(XML_Content * const model,
     return result;
 }
 
-static PyObject *
-conv_content_model_utf8(XML_Content * const model)
+static void
+my_ElementDeclHandler(void *userData,
+                      const XML_Char *name,
+                      XML_Content *model)
 {
-    return conv_content_model(model, conv_string_to_utf8);
-}
+    xmlparseobject *self = (xmlparseobject *)userData;
+    PyObject *args = NULL;
+
+    if (self->handlers[ElementDecl] != NULL
+        && self->handlers[ElementDecl] != Py_None) {
+        PyObject *rv = NULL;
+        PyObject *modelobj, *nameobj;
 
 #ifdef Py_USING_UNICODE
-static PyObject *
-conv_content_model_unicode(XML_Content * const model)
-{
-    return conv_content_model(model, conv_string_to_unicode);
-}
-
-VOID_HANDLER(ElementDecl,
-             (void *userData,
-              const XML_Char *name,
-              XML_Content *model),
-             ("O&O&",
-              STRING_CONV_FUNC,name,
-              (self->returns_unicode ? conv_content_model_unicode
-                                     : conv_content_model_utf8),model))
+        modelobj = conv_content_model(model,
+                                      (self->returns_unicode
+                                       ? conv_string_to_unicode
+                                       : conv_string_to_utf8));
 #else
-VOID_HANDLER(ElementDecl,
-             (void *userData,
-              const XML_Char *name,
-              XML_Content *model),
-             ("O&O&",
-              STRING_CONV_FUNC,name, conv_content_model_utf8,model))
+        modelobj = conv_content_model(model, conv_string_to_utf8);
 #endif
+        if (modelobj == NULL) {
+            flag_error(self);
+            goto finally;
+        }
+        nameobj = PyString_FromString(name);
+        if (nameobj == NULL) {
+            Py_DECREF(modelobj);
+            flag_error(self);
+            goto finally;
+        }
+        args = Py_BuildValue("NN", nameobj, modelobj);
+        if (args == NULL) {
+            Py_DECREF(modelobj);
+            flag_error(self);
+            goto finally;
+        }
+        self->in_callback = 1;
+        rv = call_with_frame(getcode(ElementDecl, "ElementDecl", __LINE__),
+                             self->handlers[ElementDecl], args);
+        self->in_callback = 0;
+        if (rv == NULL) {
+            flag_error(self);
+            goto finally;
+        }
+        Py_DECREF(rv);
+    }
+ finally:
+    Py_XDECREF(args);
+    /* XML_FreeContentModel() was introduced in Expat 1.95.6. */
+#if EXPAT_VERSION >= 0x015f06
+    XML_FreeContentModel(self->itself, model);
+#else
+    free(model);
+#endif
+    return;
+}
 
 VOID_HANDLER(AttlistDecl,
              (void *userData,
@@ -1274,20 +1340,30 @@ xmlparse_getattr(xmlparseobject *self, char *name)
         Py_INCREF(self->handlers[handlernum]);
         return self->handlers[handlernum];
     }
+
+#define APPEND(list, str)				\
+	do {						\
+		PyObject *o = PyString_FromString(str);	\
+		if (o != NULL)				\
+			PyList_Append(list, o);		\
+		Py_XDECREF(o);				\
+	} while (0)
+
     if (strcmp(name, "__members__") == 0) {
         int i;
         PyObject *rc = PyList_New(0);
-        for(i = 0; handler_info[i].name != NULL; i++) {
-            PyList_Append(rc, PyString_FromString(handler_info[i].name));
+        for (i = 0; handler_info[i].name != NULL; i++) {
+            APPEND(rc, handler_info[i].name);
         }
-        PyList_Append(rc, PyString_FromString("ErrorCode"));
-        PyList_Append(rc, PyString_FromString("ErrorLineNumber"));
-        PyList_Append(rc, PyString_FromString("ErrorColumnNumber"));
-        PyList_Append(rc, PyString_FromString("ErrorByteIndex"));
-        PyList_Append(rc, PyString_FromString("ordered_attributes"));
-        PyList_Append(rc, PyString_FromString("returns_unicode"));
-        PyList_Append(rc, PyString_FromString("specified_attributes"));
+        APPEND(rc, "ErrorCode");
+        APPEND(rc, "ErrorLineNumber");
+        APPEND(rc, "ErrorColumnNumber");
+        APPEND(rc, "ErrorByteIndex");
+        APPEND(rc, "ordered_attributes");
+        APPEND(rc, "returns_unicode");
+        APPEND(rc, "specified_attributes");
 
+#undef APPEND
         return rc;
     }
     return Py_FindMethod(xmlparse_methods, (PyObject *)self, name);
@@ -1718,7 +1794,7 @@ pyxml_UpdatePairedHandlers(xmlparseobject *self,
 }
 
 static void
-pyxml_SetStartElementHandler(XML_Parser *parser, void *junk)
+pyxml_SetStartElementHandler(XML_Parser parser, void *junk)
 {
     pyxml_UpdatePairedHandlers((xmlparseobject *)XML_GetUserData(parser),
                                StartElement, EndElement,
@@ -1726,7 +1802,7 @@ pyxml_SetStartElementHandler(XML_Parser *parser, void *junk)
 }
 
 static void
-pyxml_SetEndElementHandler(XML_Parser *parser, void *junk)
+pyxml_SetEndElementHandler(XML_Parser parser, void *junk)
 {
     pyxml_UpdatePairedHandlers((xmlparseobject *)XML_GetUserData(parser), 
                                StartElement, EndElement,
@@ -1734,7 +1810,7 @@ pyxml_SetEndElementHandler(XML_Parser *parser, void *junk)
 }
 
 static void
-pyxml_SetStartNamespaceDeclHandler(XML_Parser *parser, void *junk)
+pyxml_SetStartNamespaceDeclHandler(XML_Parser parser, void *junk)
 {
     pyxml_UpdatePairedHandlers((xmlparseobject *)XML_GetUserData(parser), 
                                StartNamespaceDecl, EndNamespaceDecl,
@@ -1742,7 +1818,7 @@ pyxml_SetStartNamespaceDeclHandler(XML_Parser *parser, void *junk)
 }
 
 static void
-pyxml_SetEndNamespaceDeclHandler(XML_Parser *parser, void *junk)
+pyxml_SetEndNamespaceDeclHandler(XML_Parser parser, void *junk)
 {
     pyxml_UpdatePairedHandlers((xmlparseobject *)XML_GetUserData(parser), 
                                StartNamespaceDecl, EndNamespaceDecl,
@@ -1750,7 +1826,7 @@ pyxml_SetEndNamespaceDeclHandler(XML_Parser *parser, void *junk)
 }
 
 static void
-pyxml_SetStartCdataSection(XML_Parser *parser, void *junk)
+pyxml_SetStartCdataSection(XML_Parser parser, void *junk)
 {
     pyxml_UpdatePairedHandlers((xmlparseobject *)XML_GetUserData(parser),
                                StartCdataSection, EndCdataSection,
@@ -1758,7 +1834,7 @@ pyxml_SetStartCdataSection(XML_Parser *parser, void *junk)
 }
 
 static void
-pyxml_SetEndCdataSection(XML_Parser *parser, void *junk)
+pyxml_SetEndCdataSection(XML_Parser parser, void *junk)
 {
     pyxml_UpdatePairedHandlers((xmlparseobject *)XML_GetUserData(parser), 
                                StartCdataSection, EndCdataSection, 
@@ -1768,7 +1844,7 @@ pyxml_SetEndCdataSection(XML_Parser *parser, void *junk)
 #if EXPAT_VERSION >= 0x010200
 
 static void
-pyxml_SetStartDoctypeDeclHandler(XML_Parser *parser, void *junk)
+pyxml_SetStartDoctypeDeclHandler(XML_Parser parser, void *junk)
 {
     pyxml_UpdatePairedHandlers((xmlparseobject *)XML_GetUserData(parser),
                                StartDoctypeDecl, EndDoctypeDecl,
@@ -1776,7 +1852,7 @@ pyxml_SetStartDoctypeDeclHandler(XML_Parser *parser, void *junk)
 }
 
 static void
-pyxml_SetEndDoctypeDeclHandler(XML_Parser *parser, void *junk)
+pyxml_SetEndDoctypeDeclHandler(XML_Parser parser, void *junk)
 {
     pyxml_UpdatePairedHandlers((xmlparseobject *)XML_GetUserData(parser),
                                StartDoctypeDecl, EndDoctypeDecl,

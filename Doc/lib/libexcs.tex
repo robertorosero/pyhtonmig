@@ -188,7 +188,7 @@ Raised when an \keyword{assert} statement fails.
   \kbd{Control-C} or \kbd{Delete}).  During execution, a check for
   interrupts is made regularly.
 % XXXJH xrefs here
-  Interrupts typed when a built-in function \function{input()} or
+  Interrupts typed when a built-in function (\function{input()} or
   \function{raw_input()}) is waiting for input also raise this
   exception.
 \end{excdesc}
@@ -206,8 +206,8 @@ Raised when an \keyword{assert} statement fails.
 
 \begin{excdesc}{NameError}
   Raised when a local or global name is not found.  This applies only
-  to unqualified names.  The associated value is the name that could
-  not be found.
+  to unqualified names.  The associated value is an error message that
+  includes the name that could not be found.
 \end{excdesc}
 
 \begin{excdesc}{NotImplementedError}

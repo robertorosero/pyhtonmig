@@ -121,6 +121,9 @@
 /* struct addrinfo (netdb.h) */
 #undef HAVE_ADDRINFO
 
+/* Define if you have getaddrinfo() */
+#undef HAVE_GETADDRINFO
+
 /* struct sockaddr_storage (sys/socket.h) */
 #undef HAVE_SOCKADDR_STORAGE
 
@@ -157,6 +160,9 @@
 
 /* Define if you have GNU PTH threads */
 #undef HAVE_PTH
+
+/* Define if you have readline 2.2 */
+#undef HAVE_RL_COMPLETION_APPEND_CHARACTER
 
 /* Define if you have readline 4.0 */
 #undef HAVE_RL_PRE_INPUT_HOOK
@@ -401,9 +407,6 @@
 
 /* Define if you have the gai_strerror function.  */
 #undef HAVE_GAI_STRERROR
-
-/* Define if you have the getaddrinfo function.  */
-#undef HAVE_GETADDRINFO
 
 /* Define if you have the getcwd function.  */
 #undef HAVE_GETCWD
@@ -749,6 +752,10 @@
 
 /* Define if you have the ieee library (-lieee).  */
 #undef HAVE_LIBIEEE
+
+/* Defined for Solaris 2.6 bug in pthread header. */
+#undef HAVE_PTHREAD_DESTRUCTOR
+
 
 #ifdef __CYGWIN__
 #ifdef USE_DL_IMPORT

@@ -481,7 +481,7 @@ class Checker:
         if self.name_table.has_key(url):
             return self.name_table[url]
 
-        scheme = urllib.splittype(url)
+        scheme, path = urllib.splittype(url)
         if scheme in ('mailto', 'news', 'javascript', 'telnet'):
             self.note(1, " Not checking %s URL" % scheme)
             return None
@@ -544,6 +544,9 @@ class Checker:
     def checkforhtml(self, info, url):
         if info.has_key('content-type'):
             ctype = string.lower(info['content-type'])
+            if ';' in ctype:
+                # handle content-type: text/html; charset=iso8859-1 :
+                ctype = ctype.split(';', 1)[0].strip()
         else:
             if url[-1:] == "/":
                 return 1

@@ -350,10 +350,9 @@ xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx*/
        /*
 	 Call a callable Python object, callable_object, with a
 	 variable number of C arguments.  The C arguments are provided
-	 as PyObject * values; 'n' specifies the number of arguments
-	 present.  Returns the result of the call on success, or NULL
-	 on failure.  This is the equivalent of the Python expression:
-	 apply(o,args).
+	 as PyObject * values, terminated by a NULL.  Returns the
+	 result of the call on success, or NULL on failure.  This is
+	 the equivalent of the Python expression: apply(o,args).
        */
 
 
@@ -362,10 +361,10 @@ xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx*/
 
        /*
 	 Call the method named m of object o with a variable number of
-	 C arguments.  The C arguments are provided as PyObject * values;
-	 'n' specifies the number of arguments present.  Returns the
-	 result of the call on success, or NULL on failure.  This is the
-	 equivalent of the Python expression: o.method(args).
+	 C arguments.  The C arguments are provided as PyObject *
+	 values, terminated by NULL.  Returns the result of the call
+	 on success, or NULL on failure.  This is the equivalent of
+	 the Python expression: o.method(args).
        */
 
 
@@ -443,6 +442,14 @@ xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx*/
 	 Map the object, key, to the value, v.  Returns
 	 -1 on failure.  This is the equivalent of the Python
 	 statement: o[key]=v.
+       */
+
+     DL_IMPORT(int) PyObject_DelItemString(PyObject *o, char *key);
+
+       /*
+         Remove the mapping for object, key, from the object *o.
+         Returns -1 on failure.  This is equivalent to
+         the Python statement: del o[key].
        */
 
      DL_IMPORT(int) PyObject_DelItem(PyObject *o, PyObject *key);

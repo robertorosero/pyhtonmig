@@ -15,13 +15,12 @@
 #include "macglue.h"
 #endif
 
-#ifdef HAVE_UNISTD_H
-#include <unistd.h>
-#endif
-
 #ifdef HAVE_FCNTL_H
 #include <fcntl.h>
 #endif
+
+/* check if the int_value can't be written in 15 bits (signed) */
+#define CANT_WRITE(int_value)	(int_value > 32767)
 
 extern time_t PyOS_GetLastModificationTime(char *, FILE *);
 						/* In getmtime.c */
@@ -162,7 +161,8 @@ lock_import(void)
 		import_lock_level++;
 		return;
 	}
-	if (import_lock_thread != -1 || !PyThread_acquire_lock(import_lock, 0)) {
+	if (import_lock_thread != -1 || !PyThread_acquire_lock(import_lock, 0))
+	{
 		PyThreadState *tstate = PyEval_SaveThread();
 		PyThread_acquire_lock(import_lock, 1);
 		PyEval_RestoreThread(tstate);
@@ -171,25 +171,26 @@ lock_import(void)
 	import_lock_level = 1;
 }
 
-static void
+static int
 unlock_import(void)
 {
 	long me = PyThread_get_thread_ident();
 	if (me == -1)
-		return; /* Too bad */
+		return 0; /* Too bad */
 	if (import_lock_thread != me)
-		Py_FatalError("unlock_import: not holding the import lock");
+		return -1;
 	import_lock_level--;
 	if (import_lock_level == 0) {
 		import_lock_thread = -1;
 		PyThread_release_lock(import_lock);
 	}
+	return 1;
 }
 
 #else
 
 #define lock_import()
-#define unlock_import()
+#define unlock_import() 0
 
 #endif
 
@@ -203,6 +204,34 @@ imp_lock_held(PyObject *self, PyObject *args)
 #else
 	return PyInt_FromLong(0);
 #endif
+}
+
+static PyObject *
+imp_acquire_lock(PyObject *self, PyObject *args)
+{
+	if (!PyArg_ParseTuple(args, ":acquire_lock"))
+		return NULL;
+#ifdef WITH_THREAD
+	lock_import();
+#endif
+	Py_INCREF(Py_None);
+	return Py_None;
+}
+
+static PyObject *
+imp_release_lock(PyObject *self, PyObject *args)
+{
+	if (!PyArg_ParseTuple(args, ":release_lock"))
+		return NULL;
+#ifdef WITH_THREAD
+	if (unlock_import() < 0) {
+		PyErr_SetString(PyExc_RuntimeError,
+				"not holding the import lock");
+		return NULL;
+	}
+#endif
+	Py_INCREF(Py_None);
+	return Py_None;
 }
 
 /* Helper for sys */
@@ -690,6 +719,18 @@ static void
 write_compiled_module(PyCodeObject *co, char *cpathname, long mtime)
 {
 	FILE *fp;
+
+	if (CANT_WRITE(co->co_argcount) ||
+	    CANT_WRITE(co->co_nlocals) ||
+	    CANT_WRITE(co->co_stacksize) ||
+	    CANT_WRITE(co->co_flags) ||
+	    CANT_WRITE(co->co_firstlineno)) {
+		if (Py_VerboseFlag)
+			PySys_WriteStderr(
+				"# code too large: can't write %s\n",
+				cpathname);
+		return;
+	}
 
 	fp = open_exclusive(cpathname);
 	if (fp == NULL) {
@@ -1575,6 +1616,8 @@ PyImport_ImportModule(char *name)
 	PyObject *result;
 
 	pname = PyString_FromString(name);
+	if (pname == NULL)
+		return NULL;
 	result = PyImport_Import(pname);
 	Py_DECREF(pname);
 	return result;
@@ -1645,7 +1688,12 @@ PyImport_ImportModuleEx(char *name, PyObject *globals, PyObject *locals,
 	PyObject *result;
 	lock_import();
 	result = import_module_ex(name, globals, locals, fromlist);
-	unlock_import();
+	if (unlock_import() < 0) {
+		Py_XDECREF(result);
+		PyErr_SetString(PyExc_RuntimeError,
+				"not holding the import lock");
+		return NULL;
+	}
 	return result;
 }
 
@@ -2415,6 +2463,18 @@ Return 1 if the import lock is currently held.\n\
 On platforms without threads, return 0.\
 ";
 
+static char doc_acquire_lock[] = "\
+acquire_lock() -> None\n\
+Acquires the interpreter's import lock for the current thread.\n\
+This lock should be used by import hooks to ensure thread-safety\n\
+when importing modules.\n\
+On platforms without threads, this function does nothing.";
+
+static char doc_release_lock[] = "\
+release_lock() -> None\n\
+Release the interpreter's import lock.\n\
+On platforms without threads, this function does nothing.";
+
 static PyMethodDef imp_methods[] = {
 	{"find_module",		imp_find_module,	1, doc_find_module},
 	{"get_magic",		imp_get_magic,		1, doc_get_magic},
@@ -2422,6 +2482,8 @@ static PyMethodDef imp_methods[] = {
 	{"load_module",		imp_load_module,	1, doc_load_module},
 	{"new_module",		imp_new_module,		1, doc_new_module},
 	{"lock_held",		imp_lock_held,		1, doc_lock_held},
+	{"acquire_lock",	imp_acquire_lock,	1, doc_acquire_lock},
+	{"release_lock",	imp_release_lock,	1, doc_release_lock},
 	/* The rest are obsolete */
 	{"get_frozen_object",	imp_get_frozen_object,	1},
 	{"init_builtin",	imp_init_builtin,	1},

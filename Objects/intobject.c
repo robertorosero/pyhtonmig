@@ -142,6 +142,13 @@ int_dealloc(PyIntObject *v)
 		v->ob_type->tp_free((PyObject *)v);
 }
 
+static void
+int_free(PyIntObject *v)
+{
+	v->ob_type = (struct _typeobject *)free_list;
+	free_list = v;
+}
+
 long
 PyInt_AsLong(register PyObject *op)
 {
@@ -337,6 +344,14 @@ one that can lose catastrophic amounts of information, it's the native long
 product that must have overflowed.
 */
 
+/* Return true if the sq_repeat method should be used */
+#define USE_SQ_REPEAT(o) (!PyInt_Check(o) && \
+			  o->ob_type->tp_as_sequence && \
+			  o->ob_type->tp_as_sequence->sq_repeat && \
+			  !(o->ob_type->tp_as_number && \
+                            o->ob_type->tp_flags & Py_TPFLAGS_CHECKTYPES && \
+			    o->ob_type->tp_as_number->nb_multiply))
+
 static PyObject *
 int_mul(PyObject *v, PyObject *w)
 {
@@ -345,19 +360,42 @@ int_mul(PyObject *v, PyObject *w)
 	double doubled_longprod;	/* (double)longprod */
 	double doubleprod;		/* (double)a * (double)b */
 
-	if (!PyInt_Check(v) &&
-	    v->ob_type->tp_as_sequence &&
-	    v->ob_type->tp_as_sequence->sq_repeat) {
+	if (USE_SQ_REPEAT(v)) {
+	  repeat:
 		/* sequence * int */
 		a = PyInt_AsLong(w);
+#if LONG_MAX != INT_MAX
+		if (a > INT_MAX) {
+			PyErr_SetString(PyExc_ValueError,
+					"sequence repeat count too large");
+			return NULL;
+		}
+		else if (a < INT_MIN)
+			a = INT_MIN;
+		/* XXX Why don't I either
+
+		   - set a to -1 whenever it's negative (after all,
+		     sequence repeat usually treats negative numbers
+		     as zero(); or
+
+		   - raise an exception when it's less than INT_MIN?
+
+		   I'm thinking about a hypothetical use case where some
+		   sequence type might use a negative value as a flag of
+		   some kind.  In those cases I don't want to break the
+		   code by mapping all negative values to -1.  But I also
+		   don't want to break e.g. []*(-sys.maxint), which is
+		   perfectly safe, returning [].  As a compromise, I do
+		   map out-of-range negative values.
+		*/
+#endif
 		return (*v->ob_type->tp_as_sequence->sq_repeat)(v, a);
 	}
-	if (!PyInt_Check(w) &&
-	    w->ob_type->tp_as_sequence &&
-	    w->ob_type->tp_as_sequence->sq_repeat) {
-		/* int * sequence */
-		a = PyInt_AsLong(v);
-		return (*w->ob_type->tp_as_sequence->sq_repeat)(w, a);
+	if (USE_SQ_REPEAT(w)) {
+		PyObject *tmp = v;
+		v = w;
+		w = tmp;
+		goto repeat;
 	}
 
 	CONVERT_TO_LONG(v, a);
@@ -611,9 +649,16 @@ int_neg(PyIntObject *v)
 	a = v->ob_ival;
 	x = -a;
 	if (a < 0 && x < 0) {
+		PyObject *o;
 		if (err_ovf("integer negation"))
 			return NULL;
-		return PyNumber_Negative(PyLong_FromLong(a));
+		o = PyLong_FromLong(a);
+		if (o != NULL) {
+			PyObject *result = PyNumber_Negative(o);
+			Py_DECREF(o);
+			return result;
+		}
+		return NULL;
 	}
 	return PyInt_FromLong(x);
 }
@@ -893,7 +938,7 @@ PyTypeObject PyInt_Type = {
 	0,					/* tp_as_mapping */
 	(hashfunc)int_hash,			/* tp_hash */
         0,					/* tp_call */
-        0,					/* tp_str */
+        (reprfunc)int_repr,			/* tp_str */
 	PyObject_GenericGetAttr,		/* tp_getattro */
 	0,					/* tp_setattro */
 	0,					/* tp_as_buffer */
@@ -917,6 +962,7 @@ PyTypeObject PyInt_Type = {
 	0,					/* tp_init */
 	0,					/* tp_alloc */
 	int_new,				/* tp_new */
+	(destructor)int_free,         		/* tp_free */
 };
 
 void

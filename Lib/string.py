@@ -73,33 +73,38 @@ def swapcase(s):
     return s.swapcase()
 
 # Strip leading and trailing tabs and spaces
-def strip(s):
-    """strip(s) -> string
+def strip(s, chars=None):
+    """strip(s [,chars]) -> string
 
     Return a copy of the string s with leading and trailing
     whitespace removed.
+    If chars is given and not None, remove characters in chars instead.
+    If chars is unicode, S will be converted to unicode before stripping.
 
     """
-    return s.strip()
+    return s.strip(chars)
 
 # Strip leading tabs and spaces
-def lstrip(s):
-    """lstrip(s) -> string
+def lstrip(s, chars=None):
+    """lstrip(s [,chars]) -> string
 
     Return a copy of the string s with leading whitespace removed.
+    If chars is given and not None, remove characters in chars instead.
+    If chars is unicode, S will be converted to unicode before stripping.
 
     """
-    return s.lstrip()
+    return s.lstrip(chars)
 
 # Strip trailing tabs and spaces
-def rstrip(s):
-    """rstrip(s) -> string
+def rstrip(s, chars=None):
+    """rstrip(s [,chars]) -> string
 
-    Return a copy of the string s with trailing whitespace
-    removed.
+    Return a copy of the string s with trailing whitespace removed.
+    If chars is given and not None, remove characters in chars instead.
+    If chars is unicode, S will be converted to unicode before stripping.
 
     """
-    return s.rstrip()
+    return s.rstrip(chars)
 
 
 # Split a string into a list of space/tab-separated words
@@ -107,9 +112,9 @@ def split(s, sep=None, maxsplit=-1):
     """split(s [,sep [,maxsplit]]) -> list of strings
 
     Return a list of the words in the string s, using sep as the
-    delimiter string.  If maxsplit is given, splits into at most
-    maxsplit words.  If sep is not specified, any whitespace string
-    is a separator.
+    delimiter string.  If maxsplit is given, splits at no more than
+    maxsplit places (resulting in at most maxsplit+1 words).  If sep
+    is not specified, any whitespace string is a separator.
 
     (split and splitfields are synonymous)
 
@@ -190,7 +195,10 @@ def rfind(s, *args):
 _float = float
 _int = int
 _long = long
-_StringType = type('')
+try:
+    _StringTypes = (str, unicode)
+except NameError:
+    _StringTypes = (str,)
 
 # Convert string to float
 def atof(s):
@@ -276,14 +284,9 @@ def zfill(x, width):
     of the specified width.  The string x is never truncated.
 
     """
-    if type(x) == type(''): s = x
-    else: s = `x`
-    n = len(s)
-    if n >= width: return s
-    sign = ''
-    if s[0] in ('-', '+'):
-        sign, s = s[0], s[1:]
-    return sign + '0'*(width-n) + s
+    if not isinstance(x, _StringTypes):
+        x = repr(x)
+    return x.zfill(width)
 
 # Expand tabs in a string.
 # Doesn't take non-printing chars into account, but does understand \n.

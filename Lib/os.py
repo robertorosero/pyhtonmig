@@ -60,6 +60,7 @@ elif 'nt' in _names:
     linesep = '\r\n'
     curdir = '.'; pardir = '..'; sep = '\\'; pathsep = ';'
     defpath = '.;C:\\bin'
+    altsep = '/'
     from nt import *
     for i in ['_exit']:
         try:
@@ -298,7 +299,7 @@ def execvp(file, args):
     _execvpe(file, args)
 
 def execvpe(file, args, env):
-    """execv(file, args, env)
+    """execvpe(file, args, env)
 
     Execute the executable file (which is searched for along $PATH)
     with argument list args and environment env , replacing the
@@ -308,8 +309,9 @@ def execvpe(file, args, env):
 
 __all__.extend(["execl","execle","execlp","execlpe","execvp","execvpe"])
 
-_notfound = None
 def _execvpe(file, args, env=None):
+    from errno import ENOENT, ENOTDIR
+
     if env is not None:
         func = execve
         argrest = (args, env)
@@ -317,7 +319,7 @@ def _execvpe(file, args, env=None):
         func = execv
         argrest = (args,)
         env = environ
-    global _notfound
+
     head, tail = path.split(file)
     if head:
         apply(func, (file,) + argrest)
@@ -327,30 +329,21 @@ def _execvpe(file, args, env=None):
     else:
         envpath = defpath
     PATH = envpath.split(pathsep)
-    if not _notfound:
-        if sys.platform[:4] == 'beos':
-            #  Process handling (fork, wait) under BeOS (up to 5.0)
-            #  doesn't interoperate reliably with the thread interlocking
-            #  that happens during an import.  The actual error we need
-            #  is the same on BeOS for posix.open() et al., ENOENT.
-            try: unlink('/_#.# ## #.#')
-            except error, _notfound: pass
-        else:
-            import tempfile
-            t = tempfile.mktemp()
-            # Exec a file that is guaranteed not to exist
-            try: execv(t, ('blah',))
-            except error, _notfound: pass
-    exc, arg = error, _notfound
+    saved_exc = None
+    saved_tb = None
     for dir in PATH:
         fullname = path.join(dir, file)
         try:
             apply(func, (fullname,) + argrest)
-        except error, (errno, msg):
-            if errno != arg[0]:
-                exc, arg = error, (errno, msg)
-    raise exc, arg
-
+        except error, e:
+            tb = sys.exc_info()[2]
+            if (e.errno != ENOENT and e.errno != ENOTDIR
+                and saved_exc is None):
+                saved_exc = e
+                saved_tb = tb
+    if saved_exc:
+        raise error, saved_exc, saved_tb
+    raise error, e, tb
 
 # Change environ to automatically call putenv() if it exists
 try:
@@ -374,7 +367,7 @@ else:
         from riscosenviron import _Environ
     elif name in ('os2', 'nt', 'dos'):  # Where Env Var Names Must Be UPPERCASE
         # But we store them as upper case
-        class _Environ(UserDict.UserDict):
+        class _Environ(UserDict.IterableUserDict):
             def __init__(self, environ):
                 UserDict.UserDict.__init__(self)
                 data = self.data
@@ -403,7 +396,7 @@ else:
                     self[k] = v
 
     else:  # Where Env Var Names Can Be Mixed Case
-        class _Environ(UserDict.UserDict):
+        class _Environ(UserDict.IterableUserDict):
             def __init__(self, environ):
                 UserDict.UserDict.__init__(self)
                 self.data = environ
@@ -591,3 +584,30 @@ if _exists("fork"):
             stdout, stdin = popen2.popen4(cmd, bufsize)
             return stdin, stdout
         __all__.append("popen4")
+
+import copy_reg as _copy_reg
+
+def _make_stat_result(tup, dict):
+    return stat_result(tup, dict)
+
+def _pickle_stat_result(sr):
+    (type, args) = sr.__reduce__()
+    return (_make_stat_result, args)
+
+try:
+    _copy_reg.pickle(stat_result, _pickle_stat_result, _make_stat_result)
+except NameError: # stat_result may not exist
+    pass
+
+def _make_statvfs_result(tup, dict):
+    return statvfs_result(tup, dict)
+
+def _pickle_statvfs_result(sr):
+    (type, args) = sr.__reduce__()
+    return (_make_statvfs_result, args)
+
+try:
+    _copy_reg.pickle(statvfs_result, _pickle_statvfs_result,
+                     _make_statvfs_result)
+except NameError: # statvfs_result may not exist
+    pass

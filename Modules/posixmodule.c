@@ -46,11 +46,6 @@ corresponding Unix manual entries for more information on calls.";
 #include <grp.h>
 #endif
 
-/* pick up declaration of confstr on some systems? */
-#ifdef HAVE_UNISTD_H
-#include <unistd.h>
-#endif /* HAVE_UNISTD_H */
-
 /* Various compilers have only certain posix functions */
 /* XXX Gosh I wish these were all moved into pyconfig.h */
 #if defined(PYCC_VACPP) && defined(PYOS_OS2)
@@ -77,6 +72,8 @@ corresponding Unix manual entries for more information on calls.";
 #else
 #ifdef _MSC_VER		/* Microsoft compiler */
 #define HAVE_GETCWD     1
+#define HAVE_FSYNC	1
+#define fsync _commit
 #ifdef MS_WIN32
 #define HAVE_SPAWNV	1
 #define HAVE_EXECV      1
@@ -111,10 +108,6 @@ corresponding Unix manual entries for more information on calls.";
 #endif /* ! __IBMC__ */
 
 #ifndef _MSC_VER
-
-#ifdef HAVE_UNISTD_H
-#include <unistd.h>
-#endif
 
 #if defined(sun) && !defined(__SVR4)
 /* SunOS 4.1.4 doesn't have prototypes for these: */
@@ -735,7 +728,11 @@ posix_do_stat(PyObject *self, PyObject *args, char *format,
 
 static char posix_access__doc__[] =
 "access(path, mode) -> 1 if granted, 0 otherwise\n\
-Test for access to a file.";
+Use the real uid/gid to test for access to a path.  Note that most\n\
+operations will use the effective uid/gid, therefore this routine can\n\
+be used in a suid/sgid environment to test if the invoking user has the\n\
+specified access to the path.  The mode argument can be F_OK to test\n\
+existence, or the inclusive-OR of R_OK, W_OK, and X_OK.";
 
 static PyObject *
 posix_access(PyObject *self, PyObject *args)
@@ -1309,7 +1306,8 @@ posix_rmdir(PyObject *self, PyObject *args)
 
 
 static char posix_stat__doc__[] =
-"stat(path) -> (mode,ino,dev,nlink,uid,gid,size,atime,mtime,ctime)\n\
+"stat(path) -> (st_mode, st_ino, st_dev, st_nlink, st_uid, st_gid,\n\
+                st_size, st_atime, st_mtime, st_ctime)\n\
 Perform a stat system call on the given path.";
 
 static PyObject *
@@ -1514,7 +1512,7 @@ posix_execv(PyObject *self, PyObject *args)
 
 	argvlist = PyMem_NEW(char *, argc+1);
 	if (argvlist == NULL)
-		return NULL;
+		return PyErr_NoMemory();
 	for (i = 0; i < argc; i++) {
 		if (!PyArg_Parse((*getitem)(argv, i), "s", &argvlist[i])) {
 			PyMem_DEL(argvlist);
@@ -1710,7 +1708,7 @@ posix_spawnv(PyObject *self, PyObject *args)
 
 	argvlist = PyMem_NEW(char *, argc+1);
 	if (argvlist == NULL)
-		return NULL;
+		return PyErr_NoMemory();
 	for (i = 0; i < argc; i++) {
 		if (!PyArg_Parse((*getitem)(argv, i), "s", &argvlist[i])) {
 			PyMem_DEL(argvlist);
@@ -2794,7 +2792,7 @@ _PyPopen(char *cmdstring, int mode, int n)
 		 char *m1, *m2;
 		 PyObject *p1, *p2;
 		
-		 if (mode && _O_TEXT) {
+		 if (mode & _O_TEXT) {
 			 m1 = "r";
 			 m2 = "w";
 		 } else {
@@ -2826,7 +2824,7 @@ _PyPopen(char *cmdstring, int mode, int n)
 		 char *m1, *m2;
 		 PyObject *p1, *p2, *p3;
 		
-		 if (mode && _O_TEXT) {
+		 if (mode & _O_TEXT) {
 			 m1 = "r";
 			 m2 = "w";
 		 } else {
@@ -3377,7 +3375,8 @@ posix_wait(PyObject *self, PyObject *args)
 
 
 static char posix_lstat__doc__[] =
-"lstat(path) -> (mode,ino,dev,nlink,uid,gid,size,atime,mtime,ctime)\n\
+"lstat(path) -> (st_mode, st_ino, st_dev, st_nlink, st_uid, st_gid,\n\
+                 st_size, st_atime, st_mtime, st_ctime)\n\
 Like stat(path), but do not follow symbolic links.";
 
 static PyObject *
@@ -4434,7 +4433,7 @@ posix_statvfs(PyObject *self, PyObject *args)
 static char posix_tempnam__doc__[] = "\
 tempnam([dir[, prefix]]) -> string\n\
 Return a unique name for a temporary file.\n\
-The directory and a short may be specified as strings; they may be omitted\n\
+The directory and a prefix may be specified as strings; they may be omitted\n\
 or None if not needed.";
 
 static PyObject *
@@ -4481,7 +4480,7 @@ posix_tmpfile(PyObject *self, PyObject *args)
     fp = tmpfile();
     if (fp == NULL)
         return posix_error();
-    return PyFile_FromFile(fp, "<tmpfile>", "w+", fclose);
+    return PyFile_FromFile(fp, "<tmpfile>", "w+b", fclose);
 }
 #endif
 
@@ -6014,5 +6013,5 @@ INITFUNC(void)
 
 	statvfs_result_desc.name = MODNAME ".statvfs_result";
 	PyStructSequence_InitType(&StatVFSResultType, &statvfs_result_desc);
-	PyDict_SetItemString(d, "statvfs_result", (PyObject*) &StatResultType);
+	PyDict_SetItemString(d, "statvfs_result", (PyObject*) &StatVFSResultType);
 }

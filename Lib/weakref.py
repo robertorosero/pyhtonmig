@@ -144,19 +144,15 @@ class WeakKeyDictionary(UserDict.UserDict):
 
     def __init__(self, dict=None):
         self.data = {}
-        if dict is not None: self.update(dict)
         def remove(k, selfref=ref(self)):
             self = selfref()
             if self is not None:
                 del self.data[k]
         self._remove = remove
+        if dict is not None: self.update(dict)
 
     def __delitem__(self, key):
-        for ref in self.data.iterkeys():
-            o = ref()
-            if o == key:
-                del self.data[ref]
-                return
+        del self.data[ref(key)]
 
     def __getitem__(self, key):
         return self.data[ref(key)]

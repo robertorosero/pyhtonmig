@@ -12,10 +12,6 @@
 #include <signal.h>
 #include <errno.h>
 
-#ifdef HAVE_UNISTD_H
-#include <unistd.h> /* For isatty() */
-#endif
-
 /* GNU readline definitions */
 #undef HAVE_CONFIG_H /* Else readline/chardefs.h includes strings.h */
 #include <readline/readline.h>
@@ -279,7 +275,7 @@ set_completer_delims(PyObject *self, PyObject *args)
 	if(!PyArg_ParseTuple(args, "s:set_completer_delims", &break_chars)) {
 		return NULL;
 	}
-	free(rl_completer_word_break_characters);
+	free((void*)rl_completer_word_break_characters);
 	rl_completer_word_break_characters = strdup(break_chars);
 	Py_INCREF(Py_None);
 	return Py_None;
@@ -336,6 +332,23 @@ for state in 0, 1, 2, ..., until it returns a non-string.\n\
 It should return the next possible completion starting with 'text'.\
 ";
 
+static PyObject *
+get_completer(PyObject *self, PyObject *noargs)
+{
+	if (completer == NULL) {
+		Py_INCREF(Py_None);
+		return Py_None;
+	}
+	Py_INCREF(completer);
+	return completer;
+}
+
+static char doc_get_completer[] = "\
+get_completer() -> function\n\
+\n\
+Returns current completer function.\
+";
+
 /* Exported function to read the current line buffer */
 
 static PyObject *
@@ -389,6 +402,7 @@ static struct PyMethodDef readline_methods[] =
  	{"get_history_length", get_history_length, 
 	 METH_VARARGS, get_history_length_doc},
 	{"set_completer", set_completer, METH_VARARGS, doc_set_completer},
+	{"get_completer", get_completer, METH_NOARGS, doc_get_completer},
 	{"get_begidx", get_begidx, METH_OLDARGS, doc_get_begidx},
 	{"get_endidx", get_endidx, METH_OLDARGS, doc_get_endidx},
 
@@ -408,16 +422,14 @@ static struct PyMethodDef readline_methods[] =
 /* C function to call the Python hooks. */
 
 static int
-on_hook(PyObject *func, PyThreadState *tstate)
+on_hook(PyObject *func, PyThreadState **tstate)
 {
 	int result = 0;
 	if (func != NULL) {
 		PyObject *r;
-		PyThreadState *save_tstate;
 		/* Note that readline is called with the interpreter
 		   lock released! */
-		save_tstate = PyThreadState_Swap(NULL);
-		PyEval_RestoreThread(tstate);
+		PyEval_RestoreThread(*tstate);
 		r = PyObject_CallFunction(func, NULL);
 		if (r == NULL)
 			goto error;
@@ -431,8 +443,7 @@ on_hook(PyObject *func, PyThreadState *tstate)
 		PyErr_Clear();
 		Py_XDECREF(r);
 	  done:
-		PyEval_SaveThread();
-		PyThreadState_Swap(save_tstate);
+		*tstate = PyEval_SaveThread();
 	}
 	return result;
 }
@@ -440,14 +451,14 @@ on_hook(PyObject *func, PyThreadState *tstate)
 static int
 on_startup_hook(void)
 {
-	return on_hook(startup_hook, startup_hook_tstate);
+	return on_hook(startup_hook, &startup_hook_tstate);
 }
 
 #ifdef HAVE_RL_PRE_INPUT_HOOK
 static int
 on_pre_input_hook(void)
 {
-	return on_hook(pre_input_hook, pre_input_hook_tstate);
+	return on_hook(pre_input_hook, &pre_input_hook_tstate);
 }
 #endif
 
@@ -459,10 +470,8 @@ on_completion(char *text, int state)
 	char *result = NULL;
 	if (completer != NULL) {
 		PyObject *r;
-		PyThreadState *save_tstate;
 		/* Note that readline is called with the interpreter
 		   lock released! */
-		save_tstate = PyThreadState_Swap(NULL);
 		PyEval_RestoreThread(completer_tstate);
 		r = PyObject_CallFunction(completer, "si", text, state);
 		if (r == NULL)
@@ -482,8 +491,7 @@ on_completion(char *text, int state)
 		PyErr_Clear();
 		Py_XDECREF(r);
 	  done:
-		PyEval_SaveThread();
-		PyThreadState_Swap(save_tstate);
+		completer_tstate = PyEval_SaveThread();
 	}
 	return result;
 }
@@ -524,6 +532,9 @@ setup_readline(void)
 	rl_completer_word_break_characters =
 		strdup(" \t\n`~!@#$%^&*()-=+[{]}\\|;:'\",<>/?");
 		/* All nonalphanums except '.' */
+#ifdef HAVE_RL_COMPLETION_APPEND_CHARACTER
+	rl_completion_append_character ='\0';
+#endif
 
 	begidx = PyInt_FromLong(0L);
 	endidx = PyInt_FromLong(0L);

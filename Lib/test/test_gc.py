@@ -83,6 +83,12 @@ def test_newinstance():
     gc.collect()
     del a
     expect_nonzero(gc.collect(), "newinstance(2)")
+    del B, C
+    expect_nonzero(gc.collect(), "newinstance(3)")
+    A.a = A()
+    del A
+    expect_nonzero(gc.collect(), "newinstance(4)")
+    expect(gc.collect(), 0, "newinstance(5)")
 
 def test_method():
     # Tricky: self.__init__ is a bound method, it references the instance.
@@ -171,6 +177,127 @@ def test_del():
     gc.disable()
     apply(gc.set_threshold, thresholds)
 
+class Ouch:
+    n = 0
+    def __del__(self):
+        Ouch.n = Ouch.n + 1
+        if Ouch.n % 7 == 0:
+            gc.collect()
+
+def test_trashcan():
+    # "trashcan" is a hack to prevent stack overflow when deallocating
+    # very deeply nested tuples etc.  It works in part by abusing the
+    # type pointer and refcount fields, and that can yield horrible
+    # problems when gc tries to traverse the structures.
+    # If this test fails (as it does in 2.0, 2.1 and 2.2), it will
+    # most likely die via segfault.
+
+    gc.enable()
+    N = 200
+    for count in range(3):
+        t = []
+        for i in range(N):
+            t = [t, Ouch()]
+        u = []
+        for i in range(N):
+            u = [u, Ouch()]
+        v = {}
+        for i in range(N):
+            v = {1: v, 2: Ouch()}
+    gc.disable()
+
+class Boom:
+    def __getattr__(self, someattribute):
+        del self.attr
+        raise AttributeError
+
+def test_boom():
+    a = Boom()
+    b = Boom()
+    a.attr = b
+    b.attr = a
+
+    gc.collect()
+    garbagelen = len(gc.garbage)
+    del a, b
+    # a<->b are in a trash cycle now.  Collection will invoke Boom.__getattr__
+    # (to see whether a and b have __del__ methods), and __getattr__ deletes
+    # the internal "attr" attributes as a side effect.  That causes the
+    # trash cycle to get reclaimed via refcounts falling to 0, thus mutating
+    # the trash graph as a side effect of merely asking whether __del__
+    # exists.  This used to (before 2.3b1) crash Python.  Now __getattr__
+    # isn't called.
+    expect(gc.collect(), 4, "boom")
+    expect(len(gc.garbage), garbagelen, "boom")
+
+class Boom2:
+    def __init__(self):
+        self.x = 0
+
+    def __getattr__(self, someattribute):
+        self.x += 1
+        if self.x > 1:
+            del self.attr
+        raise AttributeError
+
+def test_boom2():
+    a = Boom2()
+    b = Boom2()
+    a.attr = b
+    b.attr = a
+
+    gc.collect()
+    garbagelen = len(gc.garbage)
+    del a, b
+    # Much like test_boom(), except that __getattr__ doesn't break the
+    # cycle until the second time gc checks for __del__.  As of 2.3b1,
+    # there isn't a second time, so this simply cleans up the trash cycle.
+    # We expect a, b, a.__dict__ and b.__dict__ (4 objects) to get reclaimed
+    # this way.
+    expect(gc.collect(), 4, "boom2")
+    expect(len(gc.garbage), garbagelen, "boom2")
+
+# boom__new and boom2_new are exactly like boom and boom2, except use
+# new-style classes.
+
+class Boom_New(object):
+    def __getattr__(self, someattribute):
+        del self.attr
+        raise AttributeError
+
+def test_boom_new():
+    a = Boom_New()
+    b = Boom_New()
+    a.attr = b
+    b.attr = a
+
+    gc.collect()
+    garbagelen = len(gc.garbage)
+    del a, b
+    expect(gc.collect(), 4, "boom_new")
+    expect(len(gc.garbage), garbagelen, "boom_new")
+
+class Boom2_New(object):
+    def __init__(self):
+        self.x = 0
+
+    def __getattr__(self, someattribute):
+        self.x += 1
+        if self.x > 1:
+            del self.attr
+        raise AttributeError
+
+def test_boom2_new():
+    a = Boom2_New()
+    b = Boom2_New()
+    a.attr = b
+    b.attr = a
+
+    gc.collect()
+    garbagelen = len(gc.garbage)
+    del a, b
+    expect(gc.collect(), 4, "boom2_new")
+    expect(len(gc.garbage), garbagelen, "boom2_new")
 
 def test_all():
     gc.collect() # Delete 2nd generation garbage
@@ -187,6 +314,11 @@ def test_all():
     run_test("finalizers", test_finalizer)
     run_test("__del__", test_del)
     run_test("saveall", test_saveall)
+    run_test("trashcan", test_trashcan)
+    run_test("boom", test_boom)
+    run_test("boom2", test_boom2)
+    run_test("boom_new", test_boom_new)
+    run_test("boom2_new", test_boom2_new)
 
 def test():
     if verbose:

@@ -303,8 +303,8 @@ platform: $(BUILDPYTHON)
 # Build the shared modules
 sharedmods: $(BUILDPYTHON)
 	case $$MAKEFLAGS in \
-	*-s*) CC='$(CC)' LDSHARED='$(LDSHARED)' OPT='$(OPT)' ./$(BUILDPYTHON) -E $(srcdir)/setup.py -q build;; \
-	*) CC='$(CC)' LDSHARED='$(LDSHARED)' OPT='$(OPT)' ./$(BUILDPYTHON) -E $(srcdir)/setup.py build;; \
+	*-s*) CC='$(CC)' LDSHARED='$(BLDSHARED)' OPT='$(OPT)' ./$(BUILDPYTHON) -E $(srcdir)/setup.py -q build;; \
+	*) CC='$(CC)' LDSHARED='$(BLDSHARED)' OPT='$(OPT)' ./$(BUILDPYTHON) -E $(srcdir)/setup.py build;; \
 	esac
 
 # buildno should really depend on something like LIBRARY_SRC
@@ -547,7 +547,7 @@ bininstall:	altbininstall
 # Install the interpreter with $(VERSION) affixed
 # This goes into $(exec_prefix)
 altbininstall:	$(BUILDPYTHON)
-	@for i in $(BINDIR); \
+	@for i in $(BINDIR) $(LIBDIR); \
 	do \
 		if test ! -d $$i; then \
 			echo "Creating directory $$i"; \
@@ -583,7 +583,7 @@ PLATDIR=	plat-$(MACHDEP)
 MACHDEPS=	$(PLATDIR)
 XMLLIBSUBDIRS=  xml xml/dom xml/parsers xml/sax
 LIBSUBDIRS=	lib-old lib-tk site-packages test test/output test/data \
-		encodings email compiler hotshot \
+		encodings email email/test email/test/data compiler hotshot \
 		distutils distutils/command $(XMLLIBSUBDIRS) curses $(MACHDEPS)
 libinstall:	$(BUILDPYTHON) $(srcdir)/Lib/$(PLATDIR)
 	@for i in $(SCRIPTDIR) $(LIBDEST); \
@@ -827,7 +827,7 @@ tags::
 	ctags -w -t Include/*.h; \
 	for i in $(SRCDIRS); do ctags -w -t -a $$i/*.[ch]; \
 	done; \
-	sort tags -o tags
+	sort -o tags tags
 
 # Create a tags file for GNU Emacs
 TAGS::

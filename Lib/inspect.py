@@ -263,8 +263,17 @@ def getdoc(object):
     All tabs are expanded to spaces.  To clean up docstrings that are
     indented to line up with blocks of code, any whitespace than can be
     uniformly removed from the second line onwards is removed."""
-    if hasattr(object, '__doc__') and object.__doc__:
-        lines = string.split(string.expandtabs(object.__doc__), '\n')
+    try:
+        doc = object.__doc__
+    except AttributeError:
+        return None
+    if not isinstance(doc, (str, unicode)):
+        return None
+    try:
+        lines = string.split(string.expandtabs(doc), '\n')
+    except UnicodeError:
+        return None
+    else:
         margin = None
         for line in lines[1:]:
             content = len(string.lstrip(line))
@@ -401,11 +410,12 @@ def findsource(object):
         if not hasattr(object, 'co_firstlineno'):
             raise IOError, 'could not find function definition'
         lnum = object.co_firstlineno - 1
-        pat = re.compile(r'^\s*def\s')
+        pat = re.compile(r'^(\s*def\s)|(.*\slambda(:|\s))')
         while lnum > 0:
             if pat.match(lines[lnum]): break
             lnum = lnum - 1
         return lines, lnum
+    raise IOError, 'could not find code object'
 
 def getcomments(object):
     """Get lines of comments immediately preceding an object's source code."""
@@ -479,6 +489,8 @@ class BlockFinder:
         elif type == tokenize.DEDENT:
             self.indent = self.indent - 1
             if self.indent == 0: raise EndOfBlock, self.last
+        elif type == tokenize.NAME and scol == 0:
+            raise EndOfBlock, self.last
 
 def getblock(lines):
     """Extract the block of code at the top of the given list of lines."""
@@ -486,6 +498,8 @@ def getblock(lines):
         tokenize.tokenize(ListReader(lines).readline, BlockFinder().tokeneater)
     except EndOfBlock, eob:
         return lines[:eob.args[0]]
+    # Fooling the indent/dedent logic implies a one-line definition
+    return lines[:1]
 
 def getsourcelines(object):
     """Return a list of source lines and starting line number for an object.

@@ -97,6 +97,10 @@ if fcmp(coerce(1, 1.1), (1.0, 1.1)): raise TestFailed, 'coerce(1, 1.1)'
 if coerce(1, 1L) != (1L, 1L): raise TestFailed, 'coerce(1, 1L)'
 if fcmp(coerce(1L, 1.1), (1.0, 1.1)): raise TestFailed, 'coerce(1L, 1.1)'
 
+try: coerce(0.5, long("12345" * 1000))
+except OverflowError: pass
+else: raise TestFailed, 'coerce(0.5, long("12345" * 1000))'
+
 print 'compile'
 compile('print 1\n', '', 'exec')
 
@@ -124,16 +128,29 @@ if complex(0j, 3.14) != 3.14j: raise TestFailed, 'complex(0j, 3.14)'
 if complex(0.0, 3.14) != 3.14j: raise TestFailed, 'complex(0.0, 3.14)'
 if complex("1") != 1+0j: raise TestFailed, 'complex("1")'
 if complex("1j") != 1j: raise TestFailed, 'complex("1j")'
+
 try: complex("1", "1")
 except TypeError: pass
 else: raise TestFailed, 'complex("1", "1")'
+
 try: complex(1, "1")
 except TypeError: pass
 else: raise TestFailed, 'complex(1, "1")'
+
 if complex("  3.14+J  ") != 3.14+1j:  raise TestFailed, 'complex("  3.14+J  )"'
 if have_unicode:
     if complex(unicode("  3.14+J  ")) != 3.14+1j:
         raise TestFailed, 'complex(u"  3.14+J  )"'
+
+# SF bug 543840:  complex(string) accepts strings with \0
+# Fixed in 2.3.
+try:
+    complex('1+1j\0j')
+except ValueError:
+    pass
+else:
+    raise TestFailed("complex('1+1j\0j') should have raised ValueError")
+
 class Z:
     def __complex__(self): return 3.14j
 z = Z()
@@ -475,6 +492,38 @@ if len((1, 2, 3, 4)) != 4: raise TestFailed, 'len((1, 2, 3, 4))'
 if len([1, 2, 3, 4]) != 4: raise TestFailed, 'len([1, 2, 3, 4])'
 if len({}) != 0: raise TestFailed, 'len({})'
 if len({'a':1, 'b': 2}) != 2: raise TestFailed, 'len({\'a\':1, \'b\': 2})'
+
+print 'list'
+if list([]) != []: raise TestFailed, 'list([])'
+l0_3 = [0, 1, 2, 3]
+l0_3_bis = list(l0_3)
+if l0_3 != l0_3_bis or l0_3 is l0_3_bis: raise TestFailed, 'list([0, 1, 2, 3])'
+if list(()) != []: raise TestFailed, 'list(())'
+if list((0, 1, 2, 3)) != [0, 1, 2, 3]: raise TestFailed, 'list((0, 1, 2, 3))'
+if list('') != []: raise TestFailed, 'list('')'
+if list('spam') != ['s', 'p', 'a', 'm']: raise TestFailed, "list('spam')"
+
+if sys.maxint == 0x7fffffff:
+    # This test can currently only work on 32-bit machines.
+    # XXX If/when PySequence_Length() returns a ssize_t, it should be
+    # XXX re-enabled.
+    try:
+        # Verify clearing of bug #556025.
+        # This assumes that the max data size (sys.maxint) == max
+        # address size this also assumes that the address size is at
+        # least 4 bytes with 8 byte addresses, the bug is not well
+        # tested
+        #
+        # Note: This test is expected to SEGV under Cygwin 1.3.12 or
+        # earlier due to a newlib bug.  See the following mailing list
+        # thread for the details:
+
+        #     http://sources.redhat.com/ml/newlib/2002/msg00369.html
+        list(xrange(sys.maxint // 2))
+    except MemoryError:
+        pass
+    else:
+        raise TestFailed, 'list(xrange(sys.maxint / 4))'
 
 print 'long'
 if long(314) != 314L: raise TestFailed, 'long(314)'

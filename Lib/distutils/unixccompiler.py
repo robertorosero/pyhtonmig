@@ -17,7 +17,7 @@ the "typical" Unix-style command-line C compiler:
 
 __revision__ = "$Id$"
 
-import string, re, os
+import string, re, os, sys
 from types import *
 from copy import copy
 from distutils import sysconfig
@@ -61,6 +61,9 @@ class UnixCCompiler (CCompiler):
                    'archiver'     : ["ar", "-cr"],
                    'ranlib'       : None,
                   }
+
+    if sys.platform[:6] == "darwin":
+        executables['ranlib'] = ["ranlib"]
 
     # Needed for the filename generation methods provided by the base
     # class, CCompiler.  NB. whoever instantiates/uses a particular
@@ -263,6 +266,9 @@ class UnixCCompiler (CCompiler):
         # the configuration data stored in the Python installation, so
         # we use this hack.
         compiler = os.path.basename(sysconfig.get_config_var("CC"))
+        if sys.platform[:6] == "darwin":
+            # MacOSX's linker doesn't understand the -R flag at all
+            return "-L" + dir
         if compiler == "gcc" or compiler == "g++":
             return "-Wl,-R" + dir
         else:

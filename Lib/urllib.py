@@ -193,7 +193,7 @@ class URLopener:
 
     # External interface
     def retrieve(self, url, filename=None, reporthook=None, data=None):
-        """retrieve(url) returns (filename, None) for a local object
+        """retrieve(url) returns (filename, headers) for a local object
         or (tempfilename, headers) for a remote object."""
         url = unwrap(toBytes(url))
         if self.tempcache and self.tempcache.has_key(url):
@@ -399,7 +399,7 @@ class URLopener:
 
     def open_file(self, url):
         """Use local file or FTP depending on form of URL."""
-        if url[:2] == '//' and url[2:3] != '/':
+        if url[:2] == '//' and url[2:3] != '/' and url[2:12].lower() != 'localhost/':
             return self.open_ftp(url)
         else:
             return self.open_local_file(url)
@@ -409,7 +409,10 @@ class URLopener:
         import mimetypes, mimetools, rfc822, StringIO
         host, file = splithost(url)
         localname = url2pathname(file)
-        stats = os.stat(localname)
+        try:
+            stats = os.stat(localname)
+        except OSError, e:
+            raise IOError(e.errno, e.strerror, e.filename)
         size = stats[stat.ST_SIZE]
         modified = rfc822.formatdate(stats[stat.ST_MTIME])
         mtype = mimetypes.guess_type(url)[0]
@@ -576,6 +579,10 @@ class FancyURLopener(URLopener):
 
     def http_error_301(self, url, fp, errcode, errmsg, headers, data=None):
         """Error 301 -- also relocated (permanently)."""
+        return self.http_error_302(url, fp, errcode, errmsg, headers, data)
+
+    def http_error_303(self, url, fp, errcode, errmsg, headers, data=None):
+        """Error 303 -- also relocated (essentially identical to 302)."""
         return self.http_error_302(url, fp, errcode, errmsg, headers, data)
 
     def http_error_401(self, url, fp, errcode, errmsg, headers, data=None):
@@ -951,7 +958,7 @@ def splituser(host):
     global _userprog
     if _userprog is None:
         import re
-        _userprog = re.compile('^([^@]*)@(.*)$')
+        _userprog = re.compile('^(.*)@(.*)$')
 
     match = _userprog.match(host)
     if match: return map(unquote, match.group(1, 2))
@@ -1280,7 +1287,11 @@ elif os.name == 'nt':
                     # Per-protocol settings
                     for p in proxyServer.split(';'):
                         protocol, address = p.split('=', 1)
-                        proxies[protocol] = '%s://%s' % (protocol, address)
+                        # See if address has a type:// prefix
+                        import re
+                        if not re.match('^([^/:]+)://', address):
+                            address = '%s://%s' % (protocol, address)
+                        proxies[protocol] = address
                 else:
                     # Use one setting for all protocols
                     if proxyServer[:5] == 'http:':
@@ -1395,7 +1406,7 @@ def test(args=[]):
             '/etc/passwd',
             'file:/etc/passwd',
             'file://localhost/etc/passwd',
-            'ftp://ftp.python.org/etc/passwd',
+            'ftp://ftp.python.org/pub/python/README',
 ##          'gopher://gopher.micro.umn.edu/1/',
             'http://www.python.org/index.html',
             ]
