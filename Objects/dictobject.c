@@ -1313,7 +1313,7 @@ PyTypeObject PyDict_Type = {
 	0,					/* tp_setattro */
 	0,					/* tp_as_buffer */
 	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_GC,	/* tp_flags */
-	0,					/* tp_doc */
+	"dictionary type",			/* tp_doc */
 	(traverseproc)dict_traverse,		/* tp_traverse */
 	(inquiry)dict_tp_clear,			/* tp_clear */
 	0,					/* tp_richcompare */
@@ -1476,7 +1476,7 @@ PyTypeObject PyDictIter_Type = {
 	0,					/* tp_setattro */
 	0,					/* tp_as_buffer */
 	Py_TPFLAGS_DEFAULT,			/* tp_flags */
- 	"dictionary type",			/* tp_doc */
+ 	0,					/* tp_doc */
  	0,					/* tp_traverse */
  	0,					/* tp_clear */
 	0,					/* tp_richcompare */
