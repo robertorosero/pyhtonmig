@@ -18,6 +18,7 @@ $NUMBERED_FOOTNOTES = 1;
 $SHOW_SECTION_NUMBERS = 1;
 
 $ICONSERVER = '../icons';
+$IMAGE_TYPE = 'gif';
 
 # Control where the navigation bars should show up:
 $TOP_NAVIGATION = 1;
