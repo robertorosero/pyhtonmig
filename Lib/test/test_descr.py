@@ -483,7 +483,7 @@ def objects():
     verify(not hasattr(a, "foo"))
     try:
         a.foo = 12
-    except AttributeError:
+    except TypeError:
         pass
     else:
         verify(0, "object() should not allow setting a foo attribute")
