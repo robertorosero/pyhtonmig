@@ -3,6 +3,16 @@
 
 #include "Python.h"
 
+#ifdef HAVE_DLOPEN
+#ifdef HAVE_DLFCN_H
+#include <dlfcn.h>
+#endif
+#ifndef RTLD_LAZY
+#define RTLD_LAZY 1
+#endif
+#endif
+
+
 #define ZAP(x) { \
 	PyObject *tmp = (PyObject *)(x); \
 	(x) = NULL; \
@@ -39,6 +49,13 @@ PyInterpreterState_New(void)
 		interp->builtins = NULL;
 		interp->checkinterval = 10;
 		interp->tstate_head = NULL;
+#ifdef HAVE_DLOPEN
+#ifdef RTLD_NOW
+                interp->dlopenflags = RTLD_NOW;
+#else
+		interp->dlopenflags = RTLD_LAZY;
+#endif
+#endif
 
 		HEAD_LOCK();
 		interp->next = interp_head;
@@ -246,4 +263,29 @@ PyThreadState_GetDict(void)
 	if (_PyThreadState_Current->dict == NULL)
 		_PyThreadState_Current->dict = PyDict_New();
 	return _PyThreadState_Current->dict;
+}
+
+
+/* Routines for advanced debuggers, requested by David Beazley.
+   Don't use unless you know what you are doing! */
+
+PyInterpreterState *
+PyInterpreterState_Head(void)
+{
+	return interp_head;
+}
+
+PyInterpreterState *
+PyInterpreterState_Next(PyInterpreterState *interp) {
+	return interp->next;
+}
+
+PyThreadState *
+PyInterpreterState_ThreadHead(PyInterpreterState *interp) {
+	return interp->tstate_head;
+}
+
+PyThreadState *
+PyThreadState_Next(PyThreadState *tstate) {
+	return tstate->next;
 }

@@ -355,7 +355,7 @@ that three unescaped quotes in a row terminate the string.  (A
 
 Unless an `r' or `R' prefix is present, escape sequences in strings
 are interpreted according to rules similar
-to those used by Standard \C{}.  The recognized escape sequences are:
+to those used by Standard C.  The recognized escape sequences are:
 \index{physical line}
 \index{escape sequence}
 \index{Standard C}
@@ -403,7 +403,7 @@ backslashes are left in the string}.  For example, the string literal
 `n'.  String quotes can be escaped with a backslash, but the backslash
 remains in the string; for example, \code{r"\e""} is a valid string
 literal consisting of two characters: a backslash and a double quote;
-\code{r"\e"} is not a value string literal (even a raw string cannot
+\code{r"\e"} is not a valid string literal (even a raw string cannot
 end in an odd number of backslashes).  Specifically, \emph{a raw
 string cannot end in a single backslash} (since the backslash would
 escape the following quote character).  Note also that a single
@@ -432,11 +432,6 @@ implemented at compile time.  The `+' operator must be used to
 concatenate string expressions at run time.  Also note that literal
 concatenation can use different quoting styles for each component
 (even mixing raw strings and triple quoted strings).
-
-
-\subsection{Unicode literals \label{unicode}}
-
-XXX explain more here...
 
 
 \subsection{Numeric literals\label{numbers}}

@@ -1,3 +1,20 @@
+What's New in Python 2.2a2?
+===========================
+
+Tests
+
+- Several new tests in the standard test suite, with special thanks to
+  Nick Mathewson.
+
+Core
+
+Library
+
+New platforms
+
+C API
+
+
 What's New in Python 2.2a1?
 ===========================
 
@@ -159,6 +176,14 @@ Core
 
 
 Library
+
+- The constants ascii_letters, ascii_lowercase. and ascii_uppercase
+  were added to the string module.  These a locale-indenpendent
+  constants, unlike letters, lowercase, and uppercase.  These are now
+  use in appropriate locations in the standard library.
+
+- The flags used in dlopen calls can now be configured using
+  sys.setdlopenflags and queried using sys.getdlopenflags.
 
 - Fredrik Lundh's xmlrpclib is now a standard library module.  This
   provides full client-side XML-RPC support.  In addition,

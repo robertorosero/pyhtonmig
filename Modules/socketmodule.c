@@ -195,12 +195,7 @@ Socket methods:
 #include <GUSI.h>
 #endif
 
-/* XXX 24-Jun-2000 Tim:  I have no idea what the code inside this block is
-   trying to do, and don't have time to look.  Looks like Unix-specific code
-   in those files, though, which will never compile on Windows. */
-#ifndef MS_WINDOWS
 #include "addrinfo.h"
-#endif /* ifndef MS_WINDOWS hack */
 
 #ifdef USE_SSL
 #include "openssl/rsa.h"
@@ -210,11 +205,6 @@ Socket methods:
 #include "openssl/ssl.h"
 #include "openssl/err.h"
 #endif /* USE_SSL */
-
-/* XXX 24-Jun-2000 Tim:  I have no idea what the code inside this block is
-   trying to do, and don't have time to look.  Looks like Unix-specific code
-   in those files, though, which will never compile on Windows. */
-#ifndef MS_WINDOWS
 
 #ifndef HAVE_INET_PTON
 int inet_pton (int af, char *src, void *dst);
@@ -228,8 +218,6 @@ char *inet_ntop(int af, void *src, char *dst, socklen_t size);
 #ifndef HAVE_GETNAMEINFO
 #include "getnameinfo.c"
 #endif
-
-#endif /* ifndef MS_WINDOWS hack */
 
 #if defined(MS_WINDOWS) || defined(__BEOS__)
 /* BeOS suffers from the same socket dichotomy as Win32... - [cjh] */
@@ -585,7 +573,7 @@ setipaddr(char* name, struct sockaddr_in * addr_ret)
 static PyObject *
 makeipaddr(struct sockaddr_in *addr)
 {
-	long x = ntohl(addr->sin_addr.s_addr);
+	unsigned long x = ntohl(addr->sin_addr.s_addr);
 	char buf[100];
 	sprintf(buf, "%d.%d.%d.%d",
 		(int) (x>>24) & 0xff, (int) (x>>16) & 0xff,
@@ -2098,13 +2086,13 @@ PySocket_inet_aton(PyObject *self, PyObject *args)
 
 	/* Have to use inet_addr() instead */
 	char *ip_addr;
-	long packed_addr;
+	unsigned long packed_addr;
 
 	if (!PyArg_ParseTuple(args, "s:inet_aton", &ip_addr)) {
 		return NULL;
 	}
 #ifdef USE_GUSI1
-	packed_addr = (long)inet_addr(ip_addr).s_addr;
+	packed_addr = inet_addr(ip_addr).s_addr;
 #else
 	packed_addr = inet_addr(ip_addr);
 #endif
