@@ -576,30 +576,30 @@ bug demonstration
         g.flatten(msg)
         eq(sfp.getvalue(), """\
 Subject: =?iso-8859-1?q?Die_Mieter_treten_hier_ein_werden_mit_einem_Foerd?=
- =?iso-8859-1?q?erband_komfortabel_den_Korridor_entlang=2C_an_s=FCdl=FCnd?=
- =?iso-8859-1?q?ischen_Wandgem=E4lden_vorbei=2C_gegen_die_rotierenden_Kli?=
- =?iso-8859-1?q?ngen_bef=F6rdert=2E_?= =?iso-8859-2?q?Finan=E8ni_metropol?=
- =?iso-8859-2?q?e_se_hroutily_pod_tlakem_jejich_d=F9vtipu=2E=2E_?=
- =?utf-8?b?5q2j56K644Gr6KiA44GG44Go57+76Kiz44Gv44GV44KM44Gm44GE44G+44Gb?=
- =?utf-8?b?44KT44CC5LiA6YOo44Gv44OJ44Kk44OE6Kqe44Gn44GZ44GM44CB44GC44Go?=
- =?utf-8?b?44Gv44Gn44Gf44KJ44KB44Gn44GZ44CC5a6f6Zqb44Gr44Gv44CMV2VubiBp?=
- =?utf-8?q?st_das_Nunstuck_git_und_Slotermeyer=3F_Ja!_Beiherhund_das_Oder?=
- =?utf-8?b?IGRpZSBGbGlwcGVyd2FsZHQgZ2Vyc3B1dC7jgI3jgajoqIDjgaPjgabjgYQ=?=
- =?utf-8?b?44G+44GZ44CC?=
+ =?iso-8859-1?q?erband_komfortabel_den_Korridor_entlang=2C_an_s=FCdl=FCndi?=
+ =?iso-8859-1?q?schen_Wandgem=E4lden_vorbei=2C_gegen_die_rotierenden_Kling?=
+ =?iso-8859-1?q?en_bef=F6rdert=2E_?= =?iso-8859-2?q?Finan=E8ni_met?=
+ =?iso-8859-2?q?ropole_se_hroutily_pod_tlakem_jejich_d=F9vtipu=2E=2E_?=
+ =?utf-8?b?5q2j56K644Gr6KiA44GG44Go57+76Kiz44Gv44GV44KM44Gm44GE?=
+ =?utf-8?b?44G+44Gb44KT44CC5LiA6YOo44Gv44OJ44Kk44OE6Kqe44Gn44GZ44GM44CB?=
+ =?utf-8?b?44GC44Go44Gv44Gn44Gf44KJ44KB44Gn44GZ44CC5a6f6Zqb44Gr44Gv44CM?=
+ =?utf-8?q?Wenn_ist_das_Nunstuck_git_und_Slotermeyer=3F_Ja!_Beiherhund_das?=
+ =?utf-8?b?IE9kZXIgZGllIEZsaXBwZXJ3YWxkdCBnZXJzcHV0LuOAjeOBqOiogOOBow==?=
+ =?utf-8?b?44Gm44GE44G+44GZ44CC?=
 
 """)
         eq(h.encode(), """\
 =?iso-8859-1?q?Die_Mieter_treten_hier_ein_werden_mit_einem_Foerd?=
- =?iso-8859-1?q?erband_komfortabel_den_Korridor_entlang=2C_an_s=FCdl=FCnd?=
- =?iso-8859-1?q?ischen_Wandgem=E4lden_vorbei=2C_gegen_die_rotierenden_Kli?=
- =?iso-8859-1?q?ngen_bef=F6rdert=2E_?= =?iso-8859-2?q?Finan=E8ni_metropol?=
- =?iso-8859-2?q?e_se_hroutily_pod_tlakem_jejich_d=F9vtipu=2E=2E_?=
- =?utf-8?b?5q2j56K644Gr6KiA44GG44Go57+76Kiz44Gv44GV44KM44Gm44GE44G+44Gb?=
- =?utf-8?b?44KT44CC5LiA6YOo44Gv44OJ44Kk44OE6Kqe44Gn44GZ44GM44CB44GC44Go?=
- =?utf-8?b?44Gv44Gn44Gf44KJ44KB44Gn44GZ44CC5a6f6Zqb44Gr44Gv44CMV2VubiBp?=
- =?utf-8?q?st_das_Nunstuck_git_und_Slotermeyer=3F_Ja!_Beiherhund_das_Oder?=
- =?utf-8?b?IGRpZSBGbGlwcGVyd2FsZHQgZ2Vyc3B1dC7jgI3jgajoqIDjgaPjgabjgYQ=?=
- =?utf-8?b?44G+44GZ44CC?=""")
+ =?iso-8859-1?q?erband_komfortabel_den_Korridor_entlang=2C_an_s=FCdl=FCndi?=
+ =?iso-8859-1?q?schen_Wandgem=E4lden_vorbei=2C_gegen_die_rotierenden_Kling?=
+ =?iso-8859-1?q?en_bef=F6rdert=2E_?= =?iso-8859-2?q?Finan=E8ni_met?=
+ =?iso-8859-2?q?ropole_se_hroutily_pod_tlakem_jejich_d=F9vtipu=2E=2E_?=
+ =?utf-8?b?5q2j56K644Gr6KiA44GG44Go57+76Kiz44Gv44GV44KM44Gm44GE?=
+ =?utf-8?b?44G+44Gb44KT44CC5LiA6YOo44Gv44OJ44Kk44OE6Kqe44Gn44GZ44GM44CB?=
+ =?utf-8?b?44GC44Go44Gv44Gn44Gf44KJ44KB44Gn44GZ44CC5a6f6Zqb44Gr44Gv44CM?=
+ =?utf-8?q?Wenn_ist_das_Nunstuck_git_und_Slotermeyer=3F_Ja!_Beiherhund_das?=
+ =?utf-8?b?IE9kZXIgZGllIEZsaXBwZXJ3YWxkdCBnZXJzcHV0LuOAjeOBqOiogOOBow==?=
+ =?utf-8?b?44Gm44GE44G+44GZ44CC?=""")
 
     def test_long_header_encode(self):
         eq = self.ndiffAssertEqual
@@ -760,10 +760,10 @@ This is an example of string which has almost the limit of header length.
         h = Header(gs, 'iso-8859-1', header_name=fn)
         # BAW: this seems broken because the first line is too long
         eq(h.encode(), """\
-X-Very-Very-Very-Long-Header-Name: =?iso-8859-1?q?Die_Mieter_treten_hier_ein_werden_mit_eine?=
- =?iso-8859-1?q?m_Foerderband_komfortabel_den_Korridor_ent?=
- =?iso-8859-1?q?lang=2C_an_s=FCdl=FCndischen_Wandgem=E4lden_vorbei?=
- =?iso-8859-1?q?=2C_gegen_die_rotierenden_Klingen_bef=F6rdert=2E_?=""")
+=?iso-8859-1?q?Die_Mieter_treten_hier_?=
+ =?iso-8859-1?q?ein_werden_mit_einem_Foerderband_komfortabel_den_Korridor_?=
+ =?iso-8859-1?q?entlang=2C_an_s=FCdl=FCndischen_Wandgem=E4lden_vorbei=2C_g?=
+ =?iso-8859-1?q?egen_die_rotierenden_Klingen_bef=F6rdert=2E_?=""")
 
 
 
@@ -2249,16 +2249,16 @@ class TestHeader(TestEmailBase):
         enc = h.encode()
         eq(enc, """\
 =?iso-8859-1?q?Die_Mieter_treten_hier_ein_werden_mit_einem_Foerderband_ko?=
- =?iso-8859-1?q?mfortabel_den_Korridor_entlang=2C_an_s=FCdl=FCndischen_Wa?=
- =?iso-8859-1?q?ndgem=E4lden_vorbei=2C_gegen_die_rotierenden_Klingen_bef?=
- =?iso-8859-1?q?=F6rdert=2E_?= =?iso-8859-2?q?Finan=E8ni_metropole_se_hro?=
- =?iso-8859-2?q?utily_pod_tlakem_jejich_d=F9vtipu=2E=2E_?= =?utf-8?b?5q2j?=
- =?utf-8?b?56K644Gr6KiA44GG44Go57+76Kiz44Gv44GV44KM44Gm44GE44G+44Gb44KT?=
- =?utf-8?b?44CC5LiA6YOo44Gv44OJ44Kk44OE6Kqe44Gn44GZ44GM44CB44GC44Go44Gv?=
- =?utf-8?b?44Gn44Gf44KJ44KB44Gn44GZ44CC5a6f6Zqb44Gr44Gv44CMV2VubiBpc3Qg?=
- =?utf-8?q?das_Nunstuck_git_und_Slotermeyer=3F_Ja!_Beiherhund_das_Oder_di?=
- =?utf-8?b?ZSBGbGlwcGVyd2FsZHQgZ2Vyc3B1dC7jgI3jgajoqIDjgaPjgabjgYTjgb4=?=
- =?utf-8?b?44GZ44CC?=""")
+ =?iso-8859-1?q?mfortabel_den_Korridor_entlang=2C_an_s=FCdl=FCndischen_Wan?=
+ =?iso-8859-1?q?dgem=E4lden_vorbei=2C_gegen_die_rotierenden_Klingen_bef=F6?=
+ =?iso-8859-1?q?rdert=2E_?= =?iso-8859-2?q?Finan=E8ni_metropole_se_hroutily?=
+ =?iso-8859-2?q?_pod_tlakem_jejich_d=F9vtipu=2E=2E_?= =?utf-8?b?5q2j56K6?=
+ =?utf-8?b?44Gr6KiA44GG44Go57+76Kiz44Gv44GV44KM44Gm44GE44G+44Gb44KT44CC?=
+ =?utf-8?b?5LiA6YOo44Gv44OJ44Kk44OE6Kqe44Gn44GZ44GM44CB44GC44Go44Gv44Gn?=
+ =?utf-8?b?44Gf44KJ44KB44Gn44GZ44CC5a6f6Zqb44Gr44Gv44CMV2VubiBpc3QgZGFz?=
+ =?utf-8?q?_Nunstuck_git_und_Slotermeyer=3F_Ja!_Beiherhund_das_Oder_die_Fl?=
+ =?utf-8?b?aXBwZXJ3YWxkdCBnZXJzcHV0LuOAjeOBqOiogOOBo+OBpuOBhOOBvuOBmQ==?=
+ =?utf-8?b?44CC?=""")
         eq(decode_header(enc),
            [(g_head, "iso-8859-1"), (cz_head, "iso-8859-2"),
             (utf8_head, "utf-8")])
