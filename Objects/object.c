@@ -1351,13 +1351,97 @@ PyObject_SelfIter(PyObject *obj)
 	return obj;
 }
 
+#define GET_DESCR_FIELD(descr, field) \
+	(((descr) != NULL && \
+	  PyType_HasFeature((descr)->ob_type, Py_TPFLAGS_HAVE_CLASS)) ? \
+		(descr)->ob_type->field : NULL)
+
+/* Find the dict where an attribute resides, and remember whether its value */
+/* is a data descriptor.  The dict is returned un-INCREFed. */
+PyObject *_PyObject_FindAttr(PyTypeObject *tp, PyObject *name,
+			     int *is_data_descr)
+{
+	PyObject *pair = NULL;
+	PyObject *flag = NULL;
+	PyObject *where = NULL;
+	PyObject *descr = NULL;
+
+	if (tp->tp_cache != NULL) {
+		pair = PyDict_GetItem(tp->tp_cache, name);
+		/* pair is not owned by this func */
+		if (pair) {
+			flag = PyTuple_GET_ITEM(pair, 0);
+			where = PyTuple_GET_ITEM(pair, 1);
+			goto done;
+		}
+	}
+	
+	/* Inline _PyType_Lookup */
+	{
+		int i, n;
+		PyObject *mro, *base, *dict;
+
+		/* Look in tp_dict of types in MRO */
+		mro = tp->tp_mro;
+		assert(mro != NULL);
+		assert(PyTuple_Check(mro));
+		n = PyTuple_GET_SIZE(mro);
+		for (i = 0; i < n; i++) {
+			base = PyTuple_GET_ITEM(mro, i);
+			if (PyClass_Check(base)) {
+				dict = ((PyClassObject *) base)->cl_dict;
+			} else {
+				assert(PyType_Check(base));
+				dict = ((PyTypeObject *) base)->tp_dict;
+			}
+			assert(dict && PyDict_Check(dict));
+			descr = PyDict_GetItem(dict, name);
+			if (descr != NULL) {
+				if (GET_DESCR_FIELD(descr, tp_descr_set)) {
+					/* It's a data descriptor. */
+					flag = Py_True;
+				} else {
+					flag = Py_False;
+				}
+				where = dict;
+				break;
+			}
+		}
+	}
+
+	if (flag == NULL) {
+		flag = Py_False;
+		where = Py_None;
+	}
+
+	if (tp->tp_cache != NULL) {
+		pair = PyTuple_New(2);
+		Py_INCREF(flag);
+		PyTuple_SetItem(pair, 0, flag);
+		Py_INCREF(where);
+		PyTuple_SetItem(pair, 1, where);
+		PyDict_SetItem(tp->tp_cache, name, pair);
+		Py_DECREF(pair);
+	}
+
+  done:
+	*is_data_descr = (flag == Py_True);
+	if (where == Py_None) {
+		return NULL;
+	} else {
+		return where;
+	}
+}
+
 PyObject *
 PyObject_GenericGetAttr(PyObject *obj, PyObject *name)
 {
 	PyTypeObject *tp = obj->ob_type;
+	PyObject *where;
+	int is_data_descr = 0;
 	PyObject *descr = NULL;
 	PyObject *res = NULL;
-	descrgetfunc f;
+	descrgetfunc descr_get;
 	long dictoffset;
 	PyObject **dictptr;
 
@@ -1387,75 +1471,51 @@ PyObject_GenericGetAttr(PyObject *obj, PyObject *name)
 			goto done;
 	}
 
-	/* Inline _PyType_Lookup */
-	{
-		int i, n;
-		PyObject *mro, *base, *dict;
+	/* Locate the attribute among the base classes. */
+	where = _PyObject_FindAttr(tp, name, &is_data_descr);
 
-		/* Look in tp_dict of types in MRO */
-		mro = tp->tp_mro;
-		assert(mro != NULL);
-		assert(PyTuple_Check(mro));
-		n = PyTuple_GET_SIZE(mro);
-		for (i = 0; i < n; i++) {
-			base = PyTuple_GET_ITEM(mro, i);
-			if (PyClass_Check(base))
-				dict = ((PyClassObject *)base)->cl_dict;
-			else {
-				assert(PyType_Check(base));
-				dict = ((PyTypeObject *)base)->tp_dict;
+	/* Data descriptor takes priority over instance attribute. */
+	if (!is_data_descr) {
+
+		/* Inline _PyObject_GetDictPtr */
+		dictoffset = tp->tp_dictoffset;
+		if (dictoffset != 0) {
+			PyObject *dict;
+			if (dictoffset < 0) {
+				int tsize;
+				size_t size;
+
+				tsize = ((PyVarObject *)obj)->ob_size;
+				if (tsize < 0)
+					tsize = -tsize;
+				size = _PyObject_VAR_SIZE(tp, tsize);
+
+				dictoffset += (long)size;
+				assert(dictoffset > 0);
+				assert(dictoffset % SIZEOF_VOID_P == 0);
 			}
-			assert(dict && PyDict_Check(dict));
-			descr = PyDict_GetItem(dict, name);
-			if (descr != NULL)
-				break;
+			dictptr = (PyObject **) ((char *)obj + dictoffset);
+			dict = *dictptr;
+			if (dict != NULL) {
+				res = PyDict_GetItem(dict, name);
+				if (res != NULL) {
+					Py_INCREF(res);
+					goto done;
+				}
+			}
 		}
 	}
 
-	f = NULL;
-	if (descr != NULL &&
-	    PyType_HasFeature(descr->ob_type, Py_TPFLAGS_HAVE_CLASS)) {
-		f = descr->ob_type->tp_descr_get;
-		if (f != NULL && PyDescr_IsData(descr)) {
-			res = f(descr, obj, (PyObject *)obj->ob_type);
+	if (where != NULL) {
+		descr = PyDict_GetItem(where, name);
+		assert(descr != NULL);
+		descr_get = GET_DESCR_FIELD(descr, tp_descr_get);
+
+		if (descr_get != NULL) {
+			res = descr_get(descr, obj, (PyObject *) tp);
 			goto done;
 		}
-	}
 
-	/* Inline _PyObject_GetDictPtr */
-	dictoffset = tp->tp_dictoffset;
-	if (dictoffset != 0) {
-		PyObject *dict;
-		if (dictoffset < 0) {
-			int tsize;
-			size_t size;
-
-			tsize = ((PyVarObject *)obj)->ob_size;
-			if (tsize < 0)
-				tsize = -tsize;
-			size = _PyObject_VAR_SIZE(tp, tsize);
-
-			dictoffset += (long)size;
-			assert(dictoffset > 0);
-			assert(dictoffset % SIZEOF_VOID_P == 0);
-		}
-		dictptr = (PyObject **) ((char *)obj + dictoffset);
-		dict = *dictptr;
-		if (dict != NULL) {
-			res = PyDict_GetItem(dict, name);
-			if (res != NULL) {
-				Py_INCREF(res);
-				goto done;
-			}
-		}
-	}
-
-	if (f != NULL) {
-		res = f(descr, obj, (PyObject *)obj->ob_type);
-		goto done;
-	}
-
-	if (descr != NULL) {
 		Py_INCREF(descr);
 		res = descr;
 		goto done;
@@ -1464,6 +1524,7 @@ PyObject_GenericGetAttr(PyObject *obj, PyObject *name)
 	PyErr_Format(PyExc_AttributeError,
 		     "'%.50s' object has no attribute '%.400s'",
 		     tp->tp_name, PyString_AS_STRING(name));
+
   done:
 	Py_DECREF(name);
 	return res;
@@ -1473,8 +1534,10 @@ int
 PyObject_GenericSetAttr(PyObject *obj, PyObject *name, PyObject *value)
 {
 	PyTypeObject *tp = obj->ob_type;
-	PyObject *descr;
-	descrsetfunc f;
+	PyObject *where;
+	int is_data_descr = 0;
+	PyObject *descr = NULL;
+	descrsetfunc descr_set;
 	PyObject **dictptr;
 	int res = -1;
 
@@ -1504,15 +1567,18 @@ PyObject_GenericSetAttr(PyObject *obj, PyObject *name, PyObject *value)
 			goto done;
 	}
 
-	descr = _PyType_Lookup(tp, name);
-	f = NULL;
-	if (descr != NULL &&
-	    PyType_HasFeature(descr->ob_type, Py_TPFLAGS_HAVE_CLASS)) {
-		f = descr->ob_type->tp_descr_set;
-		if (f != NULL && PyDescr_IsData(descr)) {
-			res = f(descr, obj, value);
-			goto done;
-		}
+	/* Locate the attribute among the base classes. */
+	where = _PyObject_FindAttr(tp, name, &is_data_descr);
+	if (where != NULL) {
+		descr = PyDict_GetItem(where, name);
+	}
+	if (is_data_descr) {
+		/* Data descriptor takes priority over instance attribute. */
+		assert(descr != NULL);
+		descr_set = GET_DESCR_FIELD(descr, tp_descr_set);
+		assert(descr_set != NULL && PyDescr_IsData(descr));
+		res = descr_set(descr, obj, value);
+		goto done;
 	}
 
 	dictptr = _PyObject_GetDictPtr(obj);
@@ -1535,11 +1601,6 @@ PyObject_GenericSetAttr(PyObject *obj, PyObject *name, PyObject *value)
 		}
 	}
 
-	if (f != NULL) {
-		res = f(descr, obj, value);
-		goto done;
-	}
-
 	if (descr == NULL) {
 		PyErr_Format(PyExc_AttributeError,
 			     "'%.50s' object has no attribute '%.400s'",
@@ -1550,6 +1611,7 @@ PyObject_GenericSetAttr(PyObject *obj, PyObject *name, PyObject *value)
 	PyErr_Format(PyExc_AttributeError,
 		     "'%.50s' object attribute '%.400s' is read-only",
 		     tp->tp_name, PyString_AS_STRING(name));
+
   done:
 	Py_DECREF(name);
 	return res;

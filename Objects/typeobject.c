@@ -178,8 +178,9 @@ mro_subclasses(PyTypeObject *type, PyObject* temp)
 static int
 type_set_bases(PyTypeObject *type, PyObject *value, void *context)
 {
-	int i, r = 0;
+	int i, r = 0, cacheable;
 	PyObject *ob, *temp;
+	PyObject *ref, *subclass_list, *subclass;
 	PyTypeObject *new_base, *old_base;
 	PyObject *old_bases, *old_mro;
 
@@ -205,6 +206,7 @@ type_set_bases(PyTypeObject *type, PyObject *value, void *context)
 			     type->tp_name);
 		return -1;
 	}
+
 	for (i = 0; i < PyTuple_GET_SIZE(value); i++) {
 		ob = PyTuple_GET_ITEM(value, i);
 		if (!PyClass_Check(ob) && !PyType_Check(ob)) {
@@ -225,9 +227,8 @@ type_set_bases(PyTypeObject *type, PyObject *value, void *context)
 
 	new_base = best_base(value);
 
-	if (!new_base) {
+	if (!new_base)
 		return -1;
-	}
 
 	if (!compatible_for_assignment(type->tp_base, new_base, "__bases__"))
 		return -1;
@@ -242,11 +243,9 @@ type_set_bases(PyTypeObject *type, PyObject *value, void *context)
 	type->tp_bases = value;
 	type->tp_base = new_base;
 
-	if (mro_internal(type) < 0) {
+	if (mro_internal(type) < 0)
 		goto bail;
-	}
 
-	temp = PyList_New(0);
 	if (!temp)
 		goto bail;
 
@@ -267,6 +266,47 @@ type_set_bases(PyTypeObject *type, PyObject *value, void *context)
 	}
 
 	Py_DECREF(temp);
+
+	/* If there's a classic class among the bases, we can't use the cache */
+	cacheable = 1;
+	temp = type->tp_mro;
+	assert(PyTuple_Check(temp));
+	for (i = 0; i < PyTuple_GET_SIZE(temp); i++) {
+		PyObject *t = PyTuple_GET_ITEM(temp, i);
+		if (PyClass_Check(t)) {
+			cacheable = 0;
+			break;
+		}
+	}
+
+	/* Invalidate the cache for this type and all subclasses. */
+	Py_XDECREF(type->tp_cache);
+	if (cacheable)
+		type->tp_cache = PyDict_New();
+	else
+		type->tp_cache = NULL;
+
+	subclass_list = type->tp_subclasses;
+	if (subclass_list != NULL) {
+		assert(PyList_Check(subclass_list));
+		for (i = 0; i < PyList_GET_SIZE(subclass_list); i++) {
+			ref = PyList_GET_ITEM(subclass_list, i);
+			assert(PyWeakref_CheckRef(ref));
+			subclass = PyWeakref_GET_OBJECT(ref);
+			assert(subclass != NULL);
+			if (subclass != Py_None) {
+				PyTypeObject *sc;
+				assert(PyType_Check(subclass));
+				sc = (PyTypeObject *)subclass;
+				if (sc->tp_cache && cacheable) {
+					PyDict_Clear(sc->tp_cache);
+				} else {
+					Py_XDECREF(sc->tp_cache);
+					sc->tp_cache = NULL;
+				}
+			}
+		}
+	}
 
 	/* any base that was in __bases__ but now isn't, we
 	   need to remove |type| from its tp_subclasses.
@@ -322,6 +362,16 @@ type_dict(PyTypeObject *type, void *context)
 }
 
 static PyObject *
+type_cache(PyTypeObject *type, void *context)
+{
+	if (type->tp_cache == NULL) {
+		Py_INCREF(Py_None);
+		return Py_None;
+	}
+	return PyDictProxy_New(type->tp_cache);
+}
+
+static PyObject *
 type_get_doc(PyTypeObject *type, void *context)
 {
 	PyObject *result;
@@ -347,6 +397,7 @@ static PyGetSetDef type_getsets[] = {
 	{"__bases__", (getter)type_get_bases, (setter)type_set_bases, NULL},
 	{"__module__", (getter)type_module, (setter)type_set_module, NULL},
 	{"__dict__",  (getter)type_dict,  NULL, NULL},
+	{"__cache__",  (getter)type_cache,  NULL, NULL},
 	{"__doc__", (getter)type_get_doc, NULL, NULL},
 	{0}
 };
@@ -1303,8 +1354,9 @@ best_base(PyObject *bases)
 		}
 		base_i = (PyTypeObject *)base_proto;
 		if (base_i->tp_dict == NULL) {
-			if (PyType_Ready(base_i) < 0)
+			if (PyType_Ready(base_i) < 0) {
 				return NULL;
+			}
 		}
 		candidate = solid_base(base_i);
 		if (winner == NULL) {
@@ -1325,9 +1377,10 @@ best_base(PyObject *bases)
 			return NULL;
 		}
 	}
-	if (base == NULL)
+	if (base == NULL) {
 		PyErr_SetString(PyExc_TypeError,
 			"a new-style class can't have only classic bases");
+	}
 	return base;
 }
 
@@ -2028,8 +2081,29 @@ type_getattro(PyTypeObject *type, PyObject *name)
 }
 
 static int
+invalidate_cache(PyTypeObject *type, void *data)
+{
+	PyObject *name = (PyObject *)data;
+	if (type->tp_cache != NULL) {
+		assert(PyDict_Check(type->tp_cache));
+		if (PyDict_DelItem(type->tp_cache, name) != 0) {
+			PyErr_Clear();
+		}
+	}
+	return 0;
+}
+
+#define GET_DESCR_FIELD(descr, field) \
+	(((descr) != NULL && \
+	  PyType_HasFeature((descr)->ob_type, Py_TPFLAGS_HAVE_CLASS)) ? \
+		(descr)->ob_type->field : NULL)
+
+static int
 type_setattro(PyTypeObject *type, PyObject *name, PyObject *value)
 {
+	PyObject *old;
+	int was_data_descr, is_data_descr;
+
 	if (!(type->tp_flags & Py_TPFLAGS_HEAPTYPE)) {
 		PyErr_Format(
 			PyExc_TypeError,
@@ -2037,12 +2111,19 @@ type_setattro(PyTypeObject *type, PyObject *name, PyObject *value)
 			type->tp_name);
 		return -1;
 	}
-	/* XXX Example of how I expect this to be used...
-	if (update_subclasses(type, name, invalidate_cache, NULL) < 0)
-		return -1;
-	*/
+
+	/* If this change affects attribute lookup, invalidate cache entries. */
+	old = PyDict_GetItem(type->tp_dict, name);
+	was_data_descr = (old != NULL) && GET_DESCR_FIELD(old, tp_descr_set);
+	is_data_descr = (value != NULL) && GET_DESCR_FIELD(value, tp_descr_set);
+	if (was_data_descr != is_data_descr ||
+	    (old == NULL) != (value == NULL)) {
+		update_subclasses(type, name, invalidate_cache, name);
+	}
+
 	if (PyObject_GenericSetAttr((PyObject *)type, name, value) < 0)
 		return -1;
+
 	return update_slot(type, name);
 }
 
@@ -3052,7 +3133,7 @@ PyType_Ready(PyTypeObject *type)
 {
 	PyObject *dict, *bases;
 	PyTypeObject *base;
-	int i, n;
+	int i, n, cacheable;
 
 	if (type->tp_flags & Py_TPFLAGS_READY) {
 		assert(type->tp_dict != NULL);
@@ -3139,10 +3220,23 @@ PyType_Ready(PyTypeObject *type)
 	assert(bases != NULL);
 	assert(PyTuple_Check(bases));
 	n = PyTuple_GET_SIZE(bases);
+	cacheable = 1;
 	for (i = 1; i < n; i++) {
 		PyObject *b = PyTuple_GET_ITEM(bases, i);
-		if (PyType_Check(b))
+		if (PyType_Check(b)) {
 			inherit_slots(type, (PyTypeObject *)b);
+		} else {
+			/* Cache only works if all bases are new-style. */
+			cacheable = 0;
+		}
+	}
+
+	/* Initialize the attribute location cache. */
+	Py_XDECREF(type->tp_cache);
+	if (cacheable) {
+		type->tp_cache = PyDict_New();
+	} else {
+		type->tp_cache = NULL;
 	}
 
 	/* if the type dictionary doesn't contain a __doc__, set it from
@@ -3235,7 +3329,7 @@ remove_subclass(PyTypeObject *base, PyTypeObject *type)
 		ref = PyList_GET_ITEM(list, i);
 		assert(PyWeakref_CheckRef(ref));
 		if (PyWeakref_GET_OBJECT(ref) == (PyObject*)type) {
-			/* this can't fail, right? */
+			/* XXX What if the following fails? */
 			PySequence_DelItem(list, i);
 			return;
 		}
