@@ -1,5 +1,5 @@
 #!/bin/sh
-# From configure.in Revision: 1.2.4.7 
+# From configure.in Revision: 1.2.4.8 
 #!/bin/sh
 # Guess values for system-dependent variables and create Makefiles.
 # Generated automatically using autoconf.
@@ -129,6 +129,22 @@ esac
 
 # Save the original args to write them into config.status later.
 configure_args="$*"
+
+if test -z "$prefix"
+then
+  echo checking for python to derive installation directory prefix
+  IFS="${IFS= 	}"; saveifs="$IFS"; IFS="$IFS:"
+  for dir in $PATH; do
+    test -z "$dir" && dir=.
+    if test $dir != . && test -f $dir/python; then
+      # Not all systems have dirname.
+      prefix=`echo $dir|sed 's%/[^/][^/]*$%%'`
+      break
+    fi
+  done
+  IFS="$saveifs"
+  echo "	chose installation directory prefix ${prefix}"
+fi
 
 
 # checks for alternative programs
@@ -893,7 +909,10 @@ SEDDEFS="${SEDDEFS}\${SEDdA}WITH_READLINE\${SEDdB}WITH_READLINE\${SEDdC}1\${SEDd
 "
 }
 
-if test "$withval" != 1; then LIBS="$LIBS -L$withval"; fi
+if test -d "$withval"
+then LIBS="$LIBS -L$withval"
+else echo proper usage is --with-readline=DIRECTORY; exit 1
+fi
 LIBS="$LIBS -lreadline -ltermcap"
 fi
 
@@ -976,6 +995,63 @@ else
 fi
 
 
+fi
+
+
+# -I${DLINCLDIR} is added to the compile rule for import.o
+
+DLINCLDIR=/
+
+echo checking for --with-sgi-dl
+# check whether --with-sgi-dl was given
+withval="$with_sgi_dl"
+if test -n "$withval"; then
+  
+{
+test -n "$verbose" && \
+echo "	defining WITH_SGI_DL"
+echo "#define" WITH_SGI_DL 1 >> confdefs.h
+DEFS="$DEFS -DWITH_SGI_DL=1"
+SEDDEFS="${SEDDEFS}\${SEDdA}WITH_SGI_DL\${SEDdB}WITH_SGI_DL\${SEDdC}1\${SEDdD}
+\${SEDuA}WITH_SGI_DL\${SEDuB}WITH_SGI_DL\${SEDuC}1\${SEDuD}
+\${SEDeA}WITH_SGI_DL\${SEDeB}WITH_SGI_DL\${SEDeC}1\${SEDeD}
+"
+}
+
+dldir=$withval
+if test -d "$dldir"
+then LIBS="$LIBS -L$dldir"
+else echo proper usage is --with-sgi-dl=DIRECTORY; exit 1
+fi
+DLINCLDIR=${dldir}
+LIBS="$LIBS -ldl -lmld"
+fi
+
+
+echo checking for --with-dl-dld
+# check whether --with-dl-dld was given
+withval="$with_dl_dld"
+if test -n "$withval"; then
+  
+{
+test -n "$verbose" && \
+echo "	defining WITH_DL_DLD"
+echo "#define" WITH_DL_DLD 1 >> confdefs.h
+DEFS="$DEFS -DWITH_DL_DLD=1"
+SEDDEFS="${SEDDEFS}\${SEDdA}WITH_DL_DLD\${SEDdB}WITH_DL_DLD\${SEDdC}1\${SEDdD}
+\${SEDuA}WITH_DL_DLD\${SEDuB}WITH_DL_DLD\${SEDuC}1\${SEDuD}
+\${SEDeA}WITH_DL_DLD\${SEDeB}WITH_DL_DLD\${SEDeC}1\${SEDeD}
+"
+}
+
+dldir=`echo "$withval" | sed 's/,.*//'`
+dlddir=`echo "$withval" | sed 's/.*,//'`
+if test -d "$dldir" -a -d "$dlddir"
+then LIBS="$LIBS -L$dldir -L$dlddir"
+else echo proper usage is --with-dl-dld=DL_DIRECTORY,DLD_DIRECTORY; exit 1
+fi
+DLINCLDIR=${dldir}
+LIBS="$LIBS -ldl -ldld"
 fi
 
 
@@ -1366,6 +1442,35 @@ fi
 rm -f conftest*
 
 fi
+echo checking for bad static forward
+cat > conftest.c <<EOF
+#include "confdefs.h"
+
+struct s { int a; int b; };
+static struct s foo;
+struct s *fooaddr() { return &foo; }
+static struct s foo = { 1, 2 };
+main() { if (fooaddr() != &foo) exit(1); else exit(0); }
+
+EOF
+eval $compile
+if test -s conftest && (./conftest; exit) 2>/dev/null; then
+  :
+else
+  
+{
+test -n "$verbose" && \
+echo "	defining BAD_STATIC_FORWARD"
+echo "#define" BAD_STATIC_FORWARD 1 >> confdefs.h
+DEFS="$DEFS -DBAD_STATIC_FORWARD=1"
+SEDDEFS="${SEDDEFS}\${SEDdA}BAD_STATIC_FORWARD\${SEDdB}BAD_STATIC_FORWARD\${SEDdC}1\${SEDdD}
+\${SEDuA}BAD_STATIC_FORWARD\${SEDuB}BAD_STATIC_FORWARD\${SEDuC}1\${SEDuD}
+\${SEDeA}BAD_STATIC_FORWARD\${SEDeB}BAD_STATIC_FORWARD\${SEDeC}1\${SEDeD}
+"
+}
+
+fi
+rm -fr conftest*
 
 # checks for system services
 # (none yet)
@@ -1420,6 +1525,31 @@ if test -n "$XENIX"; then
 fi
 
 
+# check for --with-libm=...
+
+LIBM=-lm
+# check whether --with-libm was given
+withval="$with_libm"
+if test -n "$withval"; then
+  if test "$withval" != 1
+then LIBM=$withval
+else echo proper usage is --with-libm=STRING; exit 1
+fi
+fi
+
+
+# check for --with-libc=...
+
+# check whether --with-libc was given
+withval="$with_libc"
+if test -n "$withval"; then
+  if test "$withval" != 1
+then LIBC=$withval
+else echo proper usage is --with-libc=STRING; exit 1
+fi
+fi
+
+
 # generate output files
 # Set default prefixes.
 if test -n "$prefix"; then
@@ -1468,7 +1598,10 @@ INSTALL_PROGRAM='$INSTALL_PROGRAM'
 INSTALL_DATA='$INSTALL_DATA'
 RANLIB='$RANLIB'
 CPP='$CPP'
+DLINCLDIR='$DLINCLDIR'
 LIBOBJS='$LIBOBJS'
+LIBM='$LIBM'
+LIBC='$LIBC'
 LIBS='$LIBS'
 srcdir='$srcdir'
 prefix='$prefix'
@@ -1501,7 +1634,10 @@ s%@INSTALL_PROGRAM@%$INSTALL_PROGRAM%g
 s%@INSTALL_DATA@%$INSTALL_DATA%g
 s%@RANLIB@%$RANLIB%g
 s%@CPP@%$CPP%g
+s%@DLINCLDIR@%$DLINCLDIR%g
 s%@LIBOBJS@%$LIBOBJS%g
+s%@LIBM@%$LIBM%g
+s%@LIBC@%$LIBC%g
 s%@LIBS@%$LIBS%g
 s%@srcdir@%$srcdir%g
 s%@DEFS@%-DHAVE_CONFIG_H%" $top_srcdir/${file}.in >> $file
