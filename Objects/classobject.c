@@ -592,7 +592,7 @@ instance_dealloc(register PyInstanceObject *inst)
 #endif
 	if (--inst->ob_refcnt > 0) {
 #ifdef COUNT_ALLOCS
-		inst->ob_type->tp_free--;
+		inst->ob_type->tp_frees--;
 #endif
 		return; /* __del__ added a reference; don't delete now */
 	}
@@ -600,7 +600,7 @@ instance_dealloc(register PyInstanceObject *inst)
 	_Py_ForgetReference((PyObject *)inst);
 #ifdef COUNT_ALLOCS
 	/* compensate for increment in _Py_ForgetReference */
-	inst->ob_type->tp_free--;
+	inst->ob_type->tp_frees--;
 #endif
 #ifndef WITH_CYCLE_GC
 	inst->ob_type = NULL;
