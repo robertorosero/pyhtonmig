@@ -12,7 +12,7 @@ def tzparse(tzstr):
 	if tzprog == None:
 		import regex
 		tzprog = regex.compile(tzpat)
-	if not tzprog.match(tzstr):
+	if tzprog.match(tzstr) < 0:
 		raise ValueError, 'not the TZ syntax I understand'
 	regs = tzprog.regs
 	subs = []
