@@ -152,7 +152,7 @@ time_sleep(self, args)
 static object *
 time_convert(when, function)
 	time_t when;
-	struct tm * (*function) PROTO((time_t *));
+	struct tm * (*function) PROTO((const time_t *));
 {
 	struct tm *p = function(&when);
 	return mkvalue("(iiiiiiiii)",

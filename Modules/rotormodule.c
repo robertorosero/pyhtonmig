@@ -656,7 +656,7 @@ rotor_encrypt(self, args)
 	}
 	memset(tmp,'\0',len+1);
 	memcpy(tmp,string,len);
-	RTR_e_region(self,tmp,len, TRUE);
+	RTR_e_region(self,(unsigned char *)tmp,len, TRUE);
 	rtn = newsizedstringobject(tmp,len);
 	free(tmp);
 	return(rtn);
@@ -680,7 +680,7 @@ rotor_encryptmore(self, args)
 	}
 	memset(tmp,'\0',len+1);
 	memcpy(tmp,string,len);
-	RTR_e_region(self,tmp,len, FALSE);
+	RTR_e_region(self,(unsigned char *)tmp,len, FALSE);
 	rtn = newsizedstringobject(tmp,len);
 	free(tmp);
 	return(rtn);
@@ -704,7 +704,7 @@ rotor_decrypt(self, args)
 	}
 	memset(tmp,'\0',len+1);
 	memcpy(tmp,string,len);
-	RTR_d_region(self,tmp,len, TRUE);
+	RTR_d_region(self,(unsigned char *)tmp,len, TRUE);
 	rtn = newsizedstringobject(tmp,len);
 	free(tmp);
 	return(rtn);
@@ -728,7 +728,7 @@ rotor_decryptmore(self, args)
 	}
 	memset(tmp,'\0',len+1);
 	memcpy(tmp,string,len);
-	RTR_d_region(self,tmp,len, FALSE);
+	RTR_d_region(self,(unsigned char *)tmp,len, FALSE);
 	rtn = newsizedstringobject(tmp,len);
 	free(tmp);
 	return(rtn);

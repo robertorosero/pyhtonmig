@@ -201,7 +201,7 @@ IMAGE *image;
 
 static int writetab(outf,tab,len)
 FILE *outf;
-unsigned long *tab;
+/*unsigned*/ long *tab;
 int len;
 {
     int r;
@@ -215,7 +215,7 @@ int len;
 
 static readtab(inf,tab,len)
 FILE *inf;
-unsigned long *tab;
+/*unsigned*/ long *tab;
 int len;
 {
     while(len) {
