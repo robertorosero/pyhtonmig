@@ -980,7 +980,9 @@ Availability: Some flavors of \UNIX.
 \begin{funcdesc}{kill}{pid, sig}
 \index{process!killing}
 \index{process!signalling}
-Kill the process \var{pid} with signal \var{sig}.
+Kill the process \var{pid} with signal \var{sig}.  Constants for the
+specific signals available on the host platform are defined in the
+\refmodule{signal} module.
 Availability: \UNIX.
 \end{funcdesc}
 
@@ -1060,8 +1062,9 @@ L = ['cp', 'index.html', '/dev/null']
 os.spawnvpe(os.P_WAIT, 'cp', L, os.environ)
 \end{verbatim}
 
-Availability: \UNIX, Windows.  \function{spawnvp()} and
-\function{spawnvpe()} are not available on Windows.
+Availability: \UNIX, Windows.  \function{spawnlp()},
+\function{spawnlpe()}, \function{spawnvp()} and \function{spawnvpe()}
+are not available on Windows.
 \versionadded{1.6}
 \end{funcdesc}
 
