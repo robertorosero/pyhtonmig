@@ -1,5 +1,5 @@
 #!/bin/sh
-# From configure.in Revision: 1.2.4.21 
+# From configure.in Revision: 1.2.4.22 
 #!/bin/sh
 # Guess values for system-dependent variables and create Makefiles.
 # Generated automatically using autoconf version 1.8 
@@ -744,7 +744,7 @@ rm -f conftest*
 fi
 rm -f conftest*
 
-for ac_hdr in dlfcn.h fcntl.h signal.h stdarg.h stdlib.h thread.h unistd.h utime.h sys/audioio.h sys/param.h sys/select.h sys/time.h sys/times.h sys/un.h sys/utsname.h
+for ac_hdr in dlfcn.h fcntl.h limits.h signal.h stdarg.h stdlib.h thread.h unistd.h utime.h sys/audioio.h sys/param.h sys/select.h sys/time.h sys/times.h sys/un.h sys/utsname.h
 do
 ac_tr_hdr=HAVE_`echo $ac_hdr | tr '[a-z]./' '[A-Z]__'`
 test -n "$silent" || echo "checking for ${ac_hdr}"
