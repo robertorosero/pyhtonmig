@@ -195,7 +195,7 @@ String literals are described by the following lexical definitions:
 stringliteral:  "'" stringitem* "'"
 stringitem:     stringchar | escapeseq
 stringchar:     <any ASCII character except newline or "\" or "'">
-escapeseq:      "'" <any ASCII character except newline>
+escapeseq:      "\" <any ASCII character except newline>
 \end{verbatim}
 \index{ASCII}
 
