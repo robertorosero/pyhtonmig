@@ -6,6 +6,20 @@
 #include "symtable.h"
 #include "opcode.h"
 
+/* fblockinfo tracks the current frame block.
+
+   A frame block is used to handle loops, try/except, and try/finally.
+   It's called a frame block to distinguish it from a basic block in the
+   compiler IR.
+*/
+
+enum fblocktype { LOOP, EXCEPT, FINALLY_TRY, FINALLY_END };
+
+struct fblockinfo {
+        enum fblocktype fb_type;
+	int fb_block;
+};
+
 struct compiler {
 	const char *c_filename;
 	struct symtable *c_st;
@@ -21,7 +35,61 @@ struct compiler {
 	struct basicblock c_entry;
 	struct basicblock c_exit;
 	struct basicblock **c_blocks;
+
+	int c_nfblocks;
+	struct fblockinfo c_fblock[CO_MAXBLOCKS];
+
+	int c_lineno;
 };
+
+static int compiler_enter_scope(struct compiler *, identifier, void *);
+static int compiler_exit_scope(struct compiler *, identifier, void *);
+static void compiler_free(struct compiler *);
+static PyCodeObject *compiler_get_code(struct compiler *);
+static int compiler_new_block(struct compiler *);
+static int compiler_next_instr(struct compiler *, int);
+static int compiler_addop(struct compiler *, int);
+static int compiler_addop_o(struct compiler *, int, PyObject *);
+static int compiler_addop_i(struct compiler *, int, int);
+static void compiler_use_block(struct compiler *, int);
+static int compiler_use_new_block(struct compiler *);
+static int compiler_error(struct compiler *, const char *);
+
+static int compiler_mod(struct compiler *, mod_ty);
+static int compiler_visit_stmt(struct compiler *, stmt_ty);
+static int compiler_visit_expr(struct compiler *, expr_ty);
+static int compiler_visit_arguments(struct compiler *, arguments_ty);
+static int compiler_visit_slice(struct compiler *, slice_ty);
+
+static int compiler_push_fblock(struct compiler *, enum fblocktype, int);
+static void compiler_pop_fblock(struct compiler *, enum fblocktype, int);
+
+PyCodeObject *
+PyAST_Compile(mod_ty mod, const char *filename, PyCompilerFlags *flags)
+{
+	struct compiler c;
+
+	c.c_filename = filename;
+	c.c_future = PyFuture_FromAST(mod, filename);
+	if (c.c_future == NULL)
+		goto error;
+	if (flags) {
+		int merged = c.c_future->ff_features | flags->cf_flags;
+		c.c_future->ff_features = merged;
+		flags->cf_flags = merged;
+	}
+	
+	c.c_st = PySymtable_Build(mod, filename, c.c_future);
+	if (c.c_st == NULL)
+		goto error;
+	return NULL;
+
+	compiler_mod(&c, mod);
+
+ error:
+	compiler_free(&c);
+	return NULL;
+}
 
 static void
 compiler_free(struct compiler *c)
@@ -39,34 +107,6 @@ compiler_free(struct compiler *c)
 }
 
 
-PyCodeObject *
-PyAST_Compile(mod_ty mod, const char *filename, PyCompilerFlags *flags)
-{
-	struct compiler c;
-	PyCodeObject *co;
-
-	c.c_filename = filename;
-	c.c_future = PyFuture_FromAST(mod, filename);
-	if (c.c_future == NULL)
-		goto error;
-	if (flags) {
-		int merged = c.c_future->ff_features | flags->cf_flags;
-		c.c_future->ff_features = merged;
-		flags->cf_flags = merged;
-	}
-	
-	c.c_st = PySymtable_Build(mod, filename, flags);
-	if (c.c_st == NULL)
-		goto error;
-	return NULL;
-
-	compiler_mod(&c, mod);
-
- error:
-	compiler_free(&c);
-	return NULL;
-}
-
 static int
 compiler_enter_scope(struct compiler *c, identifier name, void *key)
 {
@@ -83,7 +123,7 @@ compiler_enter_scope(struct compiler *c, identifier name, void *key)
 		return 0;
 	}
 	assert(PySymtableEntry_Check(v));
-	c->c_symbols = v;
+	c->c_symbols = (PySymtableEntryObject *)v;
 
 	c->c_nblocks = 0;
 	c->c_blocks = (struct basicblock **)malloc(sizeof(struct basicblock *) 
@@ -110,6 +150,10 @@ compiler_get_code(struct compiler *c)
 	return NULL;
 }
 
+/* Allocate a new block and return its index in c_blocks. 
+   Returns 0 on error.
+*/
+
 static int
 compiler_new_block(struct compiler *c)
 {
@@ -134,14 +178,35 @@ compiler_new_block(struct compiler *c)
 	return i;
 }
 
-/* Note: returns -1 on failure */
+static void
+compiler_use_block(struct compiler *c, int block)
+{
+	assert(block < c->c_nblocks);
+	c->c_curblock = block;
+}
+
+static int
+compiler_use_new_block(struct compiler *c)
+{
+	int block = compiler_new_block(c);
+	if (!block)
+		return 0;
+	c->c_curblock = block;
+	return block;
+}
+
+/* Returns the offset of the next instruction in the current block's
+   b_instr array.  Resizes the b_instr as necessary.
+   Returns -1 on failure.
+ */
+
 static int
 compiler_next_instr(struct compiler *c, int block)
 {
 	struct basicblock *b;
 	assert(block < c->c_nblocks);
 	b = c->c_blocks[block];
-	if (b->b_ioffset == b->b_ialloc) {
+	if (b->b_iused == b->b_ialloc) {
 		void *ptr;
 		int newsize;
 		b->b_ialloc *= 2;
@@ -152,8 +217,12 @@ compiler_next_instr(struct compiler *c, int block)
 		if (ptr != (void *)b)
 			c->c_blocks[block] = (struct basicblock *)ptr;
 	}
-	return b->b_ioffset++;
+	return b->b_iused++;
 }
+
+/* Add an opcode with no argument.
+   Returns 0 on failure, 1 on success.
+*/
 
 static int
 compiler_addop(struct compiler *c, int opcode)
@@ -166,6 +235,10 @@ compiler_addop(struct compiler *c, int opcode)
 	return 1;
 }
 
+/* Add an opcode with a PyObject * argument.
+   Returns 0 on failure, 1 on success.
+*/
+
 static int
 compiler_addop_o(struct compiler *c, int opcode, PyObject *o)
 {
@@ -174,11 +247,15 @@ compiler_addop_o(struct compiler *c, int opcode, PyObject *o)
 	off = compiler_next_instr(c, c->c_curblock);
 	if (off < 0)
 		return 0;
-	i = c->c_blocks[c->c_curblock];
+	i = &c->c_blocks[c->c_curblock]->b_instr[off];
 	i->i_opcode = i->i_opcode;
 	i->i_arg = o;
 	return 1;
 }
+
+/* Add an opcode with an integer argument.
+   Returns 0 on failure, 1 on success.
+*/
 
 static int
 compiler_addop_i(struct compiler *c, int opcode, int oparg)
@@ -188,15 +265,16 @@ compiler_addop_i(struct compiler *c, int opcode, int oparg)
 	off = compiler_next_instr(c, c->c_curblock);
 	if (off < 0)
 		return 0;
-	i = c->c_blocks[c->c_curblock];
+	i = &c->c_blocks[c->c_curblock]->b_instr[off];
 	i->i_opcode = i->i_opcode;
 	i->i_oparg = oparg;
 	return 1;
 }
 
-/* VISIT and VISIT_SEQ takes an ASDL type as their second argument.  They use
-   the ASDL name to synthesize the name of the C type and the visit function. 
-*/
+#define NEW_BLOCK(C) { \
+        if (!compiler_use_new_block((C))) \
+	        return 0; \
+}
 
 #define ADDOP(C, OP) { \
 	if (!compiler_addop((C), (OP))) \
@@ -212,6 +290,10 @@ compiler_addop_i(struct compiler *c, int opcode, int oparg)
 	if (!compiler_addop_i((C), (OP), (O))) \
 		return 0; \
 }
+
+/* VISIT and VISIT_SEQ takes an ASDL type as their second argument.  They use
+   the ASDL name to synthesize the name of the C type and the visit function. 
+*/
 
 #define VISIT(C, TYPE, V) {\
 	if (!compiler_visit_ ## TYPE((C), (V))) \
@@ -248,7 +330,7 @@ static int
 compiler_function(struct compiler *c, stmt_ty s)
 {
 	PyCodeObject *co;
-	assert(s->kind == Function_kind);
+	assert(s->kind == FunctionDef_kind);
 
 	if (s->v.FunctionDef.args->defaults)
 		VISIT_SEQ(c, expr, s->v.FunctionDef.args->defaults);
@@ -273,26 +355,28 @@ compiler_print(struct compiler *c, stmt_ty s)
 	n = asdl_seq_LEN(s->v.Print.values);
 	dest = false;
 	if (s->v.Print.dest) {
-		VISIT(C, EXPR, s->v.Print.dest);
+		VISIT(c, expr, s->v.Print.dest);
 		dest = true;
 	}
 	for (i = 0; i < n; i++) {
 		if (dest) {
 			ADDOP(c, DUP_TOP);
-			VISIT(c, expr, asdl_get_seq(s->v.Print.values, i));
+			VISIT(c, expr, 
+			      (expr_ty)asdl_seq_get(s->v.Print.values, i));
 			ADDOP(c, ROT_TWO);
 			ADDOP(c, PRINT_ITEM_TO);
 		}
 		else {
-			VISIT(c, expr, asdl_get_seq(s->v.Print.values, i));
+			VISIT(c, expr, 
+			      (expr_ty)asdl_seq_get(s->v.Print.values, i));
 			ADDOP(c, PRINT_ITEM);
 		}
 	}
 	if (s->v.Print.nl) {
 		if (dest)
-			ADDOP(c, PRINT_NEWLINE_TO);
+			ADDOP(c, PRINT_NEWLINE_TO)
 		else
-			ADDOP(c, PRINT_NEWLINE);
+			ADDOP(c, PRINT_NEWLINE)
 	}
 	else if (dest)
 		ADDOP(c, POP_TOP);
@@ -300,19 +384,150 @@ compiler_print(struct compiler *c, stmt_ty s)
 }
 
 static int
-compiler_function(struct compiler *c, stmt_ty s)
+compiler_if(struct compiler *c, stmt_ty s)
 {
-	int i, n;
+	int end, next, elif = 1;
 	
 	assert(s->kind == If_kind);
-
+	end = compiler_new_block(c);
+	if (!end)
+		return 0;
+	while (elif) {
+		next = compiler_new_block(c);
+		if (!next)
+			return 0;
+		VISIT(c, expr, s->v.If.test);
+		ADDOP_I(c, JUMP_IF_FALSE, next);
+		NEW_BLOCK(c);
+		ADDOP(c, POP_TOP);
+		VISIT_SEQ(c, stmt, s->v.If.body);
+		ADDOP_I(c, JUMP_FORWARD, end);
+		compiler_use_block(c, next);
+		ADDOP(c, POP_TOP);
+		if (s->v.If.orelse) {
+			stmt_ty t = asdl_seq_get(s->v.If.orelse, 0);
+			if (t->kind == If_kind) {
+				elif = 1;
+				s = t;
+				c->c_lineno = t->lineno;
+			}
+		}
+		if (!elif)
+			VISIT_SEQ(c, stmt, s->v.If.orelse);
+	}
+	compiler_use_block(c, end);
+	return 1;
 }
 
 static int
-compiler_stmt(struct compiler *c, stmt_ty s)
+compiler_for(struct compiler *c, stmt_ty s)
+{
+	int start, cleanup, end;
+
+	start = compiler_new_block(c);
+	cleanup = compiler_new_block(c);
+	end = compiler_new_block(c);
+	if (!(start && end && cleanup))
+		return 0;
+	ADDOP_I(c, SETUP_LOOP, end);
+	if (!compiler_push_fblock(c, LOOP, start))
+		return 0;
+	VISIT(c, expr, s->v.For.iter);
+	ADDOP(c, GET_ITER);
+	compiler_use_block(c, start);
+	ADDOP_I(c, FOR_ITER, cleanup);
+	VISIT(c, expr, s->v.For.target);
+	VISIT_SEQ(c, stmt, s->v.For.body);
+	ADDOP_I(c, JUMP_ABSOLUTE, start);
+	compiler_use_block(c, cleanup);
+	ADDOP(c, POP_BLOCK);
+	compiler_pop_fblock(c, LOOP, start);
+	VISIT_SEQ(c, stmt, s->v.For.orelse);
+	compiler_use_block(c, end);
+	return 1;
+}
+
+static int
+compiler_while(struct compiler *c, stmt_ty s)
+{
+	int loop, orelse, end;
+	loop = compiler_new_block(c);
+	end = compiler_new_block(c);
+	if (!(loop && end))
+		return 0;
+	if (s->v.While.orelse) {
+		orelse = compiler_new_block(c);
+		if (!orelse)
+			return 0;
+	}
+	else
+		orelse = -1;
+
+	ADDOP_I(c, SETUP_LOOP, end);
+	compiler_use_block(c, loop);
+	if (!compiler_push_fblock(c, LOOP, loop))
+		return 0;
+	VISIT(c, expr, s->v.While.test);
+	ADDOP_I(c, JUMP_IF_FALSE, orelse == -1 ? end : orelse);
+	NEW_BLOCK(c);
+	ADDOP(c, POP_TOP);
+	VISIT_SEQ(c, stmt, s->v.While.body);
+	ADDOP_I(c, JUMP_ABSOLUTE, loop);
+
+	/* XXX should the two POP instructions be in a separate block
+	   if there is no else clause ? 
+	*/
+	if (orelse == -1)
+		compiler_use_block(c, end);
+	else
+		compiler_use_block(c, orelse);
+	ADDOP(c, POP_TOP);
+	ADDOP(c, POP_BLOCK);
+	compiler_pop_fblock(c, LOOP, loop);
+	if (orelse != -1)
+		VISIT_SEQ(c, stmt, s->v.While.orelse);
+	compiler_use_block(c, end);
+	
+	return 1;
+}
+
+static int
+compiler_continue(struct compiler *c)
+{
+	int i;
+
+	if (!c->c_nfblocks)
+		return compiler_error(c, "'continue' outside loop");
+	i = c->c_nfblocks - 1;
+	switch (c->c_fblock[i].fb_type) {
+	case LOOP:
+		ADDOP_I(c, JUMP_ABSOLUTE, c->c_fblock[i].fb_block);
+		NEW_BLOCK(c);
+		break;
+	case EXCEPT:
+	case FINALLY_TRY:
+		while (--i > 0 && c->c_fblock[i].fb_type != LOOP)
+			;
+		if (i == -1)
+			return compiler_error(c, "'continue' outside loop");
+		ADDOP_I(c, CONTINUE_LOOP, c->c_fblock[i].fb_block);
+		NEW_BLOCK(c);
+		break;
+	case FINALLY_END:
+	        return compiler_error(c,
+			"'continue' not allowed in 'finally' block");
+		break;
+	}
+	
+	return 1;
+}
+
+static int
+compiler_visit_stmt(struct compiler *c, stmt_ty s)
 {
 	int i, n;
-	
+
+	c->c_lineno = s->lineno; 	/* XXX this isn't right */
 	switch (s->kind) {
         case FunctionDef_kind:
 		return compiler_function(c, s);
@@ -337,9 +552,10 @@ compiler_stmt(struct compiler *c, stmt_ty s)
 		n = asdl_seq_LEN(s->v.Assign.targets);
 		VISIT(c, expr, s->v.Assign.value);
 		for (i = 0; i < n; i++) {
-			if (i < n - 1)
+			if (i < n - 1) 
 				ADDOP(c, DUP_TOP);
-			VISIT(c, expr, asdl_get_seq(s->v.Assign.targets, i));
+			VISIT(c, expr, 
+			      (expr_ty)asdl_seq_get(s->v.Assign.targets, i));
 		}
 		break;
         case AugAssign_kind:
@@ -348,21 +564,23 @@ compiler_stmt(struct compiler *c, stmt_ty s)
 		return compiler_print(c, s);
 		break;
         case For_kind:
+		return compiler_for(c, s);
 		break;
         case While_kind:
+		return compiler_if(c, s);
 		break;
         case If_kind:
 		return compiler_if(c, s);
 		break;
         case Raise_kind:
 		if (s->v.Raise.type) {
-			VISIT(st, expr, s->v.Raise.type);
+			VISIT(c, expr, s->v.Raise.type);
 			n++;
 			if (s->v.Raise.inst) {
-				VISIT(st, expr, s->v.Raise.inst);
+				VISIT(c, expr, s->v.Raise.inst);
 				n++;
 				if (s->v.Raise.tback) {
-					VISIT(st, expr, s->v.Raise.tback);
+					VISIT(c, expr, s->v.Raise.tback);
 					n++;
 				}
 			}
@@ -380,13 +598,14 @@ compiler_stmt(struct compiler *c, stmt_ty s)
         case ImportFrom_kind:
 		break;
         case Exec_kind:
-		VISIT(st, expr, s->v.Exec.body);
+		VISIT(c, expr, s->v.Exec.body);
 		if (s->v.Exec.globals) {
-			VISIT(st, expr, s->v.Exec.globals);
-			if (s->v.Exec.locals) 
-				VISIT(st, expr, s->v.Exec.locals);
-			else
+			VISIT(c, expr, s->v.Exec.globals);
+			if (s->v.Exec.locals) {
+				VISIT(c, expr, s->v.Exec.locals);
+			} else {
 				ADDOP(c, DUP_TOP);
+			}
 		} else {
 			ADDOP_O(c, LOAD_CONST, Py_None);
 			ADDOP(c, DUP_TOP);
@@ -397,16 +616,22 @@ compiler_stmt(struct compiler *c, stmt_ty s)
 		break;
         case Expr_kind:
 		VISIT(c, expr, s->v.Expr.value);
-		if (c->c_interactive)
+		if (c->c_interactive) {
 			ADDOP(c, PRINT_EXPR);
-		else
+		}
+		else {
 			ADDOP(c, DUP_TOP);
+		}
 		break;
         case Pass_kind:
 		break;
         case Break_kind:
+		if (!c->c_nfblocks)
+			return compiler_error(c, "'break' outside loop");
+		ADDOP(c, BREAK_LOOP);
 		break;
         case Continue_kind:
+		compiler_continue(c);
 		break;
 	}
 	return 1;
@@ -425,10 +650,11 @@ unaryop(unaryop_ty op)
 	case USub:
 		return UNARY_NEGATIVE;
 	}
+	return 0;
 }
 
 static int 
-binop(operator_ty op)
+binop(struct compiler *c, operator_ty op)
 {
 	switch (op) {
 	case Add:
@@ -438,7 +664,7 @@ binop(operator_ty op)
 	case Mult: 
 		return BINARY_MULTIPLY;
 	case Div:
-		if (c->c_flags & CO_FUTURE_DIVISION)
+		if (c->c_flags->cf_flags & CO_FUTURE_DIVISION)
 			return BINARY_TRUE_DIVIDE;
 		else
 			return BINARY_DIVIDE;
@@ -459,6 +685,7 @@ binop(operator_ty op)
 	case FloorDiv:
 		return BINARY_FLOOR_DIVIDE;
 	}
+	return 0;
 }
 	
 static int 
@@ -472,7 +699,7 @@ compiler_visit_expr(struct compiler *c, expr_ty e)
         case BinOp_kind:
 		VISIT(c, expr, e->v.BinOp.left);
 		VISIT(c, expr, e->v.BinOp.right);
-		ADDOP(c, binop(e->v.BinOp.op));
+		ADDOP(c, binop(c, e->v.BinOp.op));
 		break;
         case UnaryOp_kind:
 		VISIT(c, expr, e->v.UnaryOp.operand);
@@ -531,8 +758,6 @@ compiler_visit_expr(struct compiler *c, expr_ty e)
 		VISIT(c, slice, e->v.Subscript.slice);
 		break;
         case Name_kind:
-		compiler_add_def(c, e->v.Name.id, 
-				 e->v.Name.ctx == Load ? USE : DEF_LOCAL);
 		break;
 	/* child nodes of List and Tuple will have expr_context set */
         case List_kind:
@@ -545,3 +770,52 @@ compiler_visit_expr(struct compiler *c, expr_ty e)
 	return 1;
 }
 
+static int 
+compiler_push_fblock(struct compiler *c, enum fblocktype t, int b)
+{
+	struct fblockinfo *f;
+	if (c->c_nfblocks >= CO_MAXBLOCKS)
+		return 0;
+	f = &c->c_fblock[c->c_nfblocks++];
+	f->fb_type = t;
+	f->fb_block = b;
+	return 1;
+}
+
+static void
+compiler_pop_fblock(struct compiler *c, enum fblocktype t, int b)
+{
+	assert(c->c_nfblocks > 0);
+	c->c_nfblocks--;
+	assert(c->c_fblock[c->c_nfblocks].fb_type == t);
+	assert(c->c_fblock[c->c_nfblocks].fb_block == b);
+}
+
+/* Raises a SyntaxError and returns 0.
+   If something goes wrong, a different exception may be raised.
+*/
+
+static int
+compiler_error(struct compiler *c, const char *errstr)
+{
+	PyObject *loc;
+	PyObject *u, *v;
+
+	loc = PyErr_ProgramText(c->c_filename, c->c_lineno);
+	if (!loc) {
+		Py_INCREF(Py_None);
+		loc = Py_None;
+	}
+	u = Py_BuildValue("(ziOO)", c->c_filename, c->c_lineno, Py_None, loc);
+	if (!u)
+		goto exit;
+	v = Py_BuildValue("(zO)", errstr, u);
+	if (!v)
+		goto exit;
+	PyErr_SetObject(PyExc_SyntaxError, v);
+ exit:
+	Py_DECREF(loc);
+	Py_XDECREF(u);
+	Py_XDECREF(v);
+	return 0;
+}
