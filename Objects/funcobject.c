@@ -142,9 +142,8 @@ static struct memberlist func_memberlist[] = {
 };
 
 static PyObject *
-func_getattro(PyFunctionObject *op, PyObject *name)
+func_getattro(PyObject *op, PyObject *name)
 {
-	PyObject *rtn;
 	char *sname = PyString_AsString(name);
 	
 	if (sname[0] != '_' && PyEval_GetRestricted()) {
@@ -153,25 +152,12 @@ func_getattro(PyFunctionObject *op, PyObject *name)
 		return NULL;
 	}
 
-	/* no API for PyMember_HasAttr() */
-	rtn = PyMember_Get((char *)op, func_memberlist, sname);
-
-	if (rtn == NULL && PyErr_ExceptionMatches(PyExc_AttributeError)) {
-		PyErr_Clear();
-		if (op->func_dict != NULL) {
-			rtn = PyDict_GetItem(op->func_dict, name);
-			Py_XINCREF(rtn);
-		}
-		if (rtn == NULL)
-			PyErr_SetObject(PyExc_AttributeError, name);
-	}
-	return rtn;
+	return PyGeneric_GetAttr(op, name);
 }
 
 static int
-func_setattro(PyFunctionObject *op, PyObject *name, PyObject *value)
+func_setattro(PyObject *op, PyObject *name, PyObject *value)
 {
-	int rtn;
 	char *sname = PyString_AsString(name);
 
 	if (PyEval_GetRestricted()) {
@@ -217,31 +203,7 @@ func_setattro(PyFunctionObject *op, PyObject *name, PyObject *value)
 		}
 	}
 
-	rtn = PyMember_Set((char *)op, func_memberlist, sname, value);
-	if (rtn < 0 && PyErr_ExceptionMatches(PyExc_AttributeError)) {
-		PyErr_Clear();
-		if (op->func_dict == NULL) {
-			/* don't create the dict if we're deleting an
-			 * attribute.  In that case, we know we'll get an
-			 * AttributeError.
-			 */
-			if (value == NULL) {
-				PyErr_SetString(PyExc_AttributeError, sname);
-				return -1;
-			}
-			op->func_dict = PyDict_New();
-			if (op->func_dict == NULL)
-				return -1;
-		}
-                if (value == NULL)
-			rtn = PyDict_DelItem(op->func_dict, name);
-                else
-			rtn = PyDict_SetItem(op->func_dict, name, value);
-		/* transform KeyError into AttributeError */
-		if (rtn < 0 && PyErr_ExceptionMatches(PyExc_KeyError))
-			PyErr_SetString(PyExc_AttributeError, sname);
-	}
-	return rtn;
+	return PyGeneric_SetAttr(op, name, value);
 }
 
 static void
@@ -396,8 +358,8 @@ PyTypeObject PyFunction_Type = {
 	0,					/* tp_hash */
 	function_call,				/* tp_call */
 	0,					/* tp_str */
-	(getattrofunc)func_getattro,		/* tp_getattro */
-	(setattrofunc)func_setattro,		/* tp_setattro */
+	func_getattro,				/* tp_getattro */
+	func_setattro,				/* tp_setattro */
 	0,					/* tp_as_buffer */
 	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_GC,	/* tp_flags */
 	0,					/* tp_doc */
@@ -408,10 +370,12 @@ PyTypeObject PyFunction_Type = {
 	0,					/* tp_iter */
 	0,					/* tp_iternext */
 	0,					/* tp_methods */
-	0,					/* tp_members */
+	func_memberlist,			/* tp_members */
 	0,					/* tp_getset */
 	0,					/* tp_base */
 	0,					/* tp_dict */
 	func_descr_get,				/* tp_descr_get */
 	0,					/* tp_descr_set */
+	0,					/* tp_construct */
+	offsetof(PyFunctionObject, func_dict),	/* tp_dictoffset */
 };
