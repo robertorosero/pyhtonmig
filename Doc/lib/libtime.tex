@@ -1,12 +1,13 @@
 \section{\module{time} ---
          Time access and conversions}
-\declaremodule{builtin}{time}
 
+\declaremodule{builtin}{time}
 \modulesynopsis{Time access and conversions.}
 
 
 This module provides various time-related functions.
-It is always available.
+It is always available, but not all functions are available
+on all platforms.
 
 An explanation of some terminology and conventions is in order.
 
@@ -76,11 +77,21 @@ this, where available).
 The time tuple as returned by \function{gmtime()},
 \function{localtime()}, and \function{strptime()}, and accepted by
 \function{asctime()}, \function{mktime()} and \function{strftime()},
-is a tuple of 9 integers: year (e.g.\ 1993), month (1--12), day
-(1--31), hour (0--23), minute (0--61; see note \strong{(1)} after
-table in \function{strftime()} description), second (0--59), weekday
-(0--6, monday is 0), Julian day (1--366) and daylight savings flag
-(-1, 0 or 1).  Note that unlike the C structure, the month value is a
+is a tuple of 9 integers:
+
+\begin{tableiii}{r|l|l}{textrm}{Index}{Field}{Comment}
+  \lineiii{0}{year}{(e.g.\ 1993)}
+  \lineiii{1}{month}{range [1,12]}
+  \lineiii{2}{day}{range [1,31]}
+  \lineiii{3}{hour}{range [0,23]}
+  \lineiii{4}{minute}{range [0,59]}
+  \lineiii{5}{second}{range [0,61]; see \strong{(1)} after table in \function{strftime()} description)}
+  \lineiii{6}{weekday}{range [0,6], monday is 0}
+  \lineiii{7}{Julian day}{range [1,366]}
+  \lineiii{8}{daylight savings flag}{0, 1 or -1; see below}
+\end{tableiii}
+
+Note that unlike the C structure, the month value is a
 range of 1-12, not 0-11.  A year value will be handled as descibed
 under ``Year 2000 (Y2K) issues'' above.  A \code{-1} argument as
 daylight savings flag, passed to \function{mktime()} will usually
@@ -226,8 +237,9 @@ directives as those used by \function{strftime()}; it defaults to
 returned by \function{ctime()}.  The same platform caveats apply; see
 the local \UNIX{} documentation for restrictions or additional
 supported directives.  If \var{string} cannot be parsed according to
-\var{format}, \exception{ValueError} is raised.  This function may not
-be defined on all platforms.
+\var{format}, \exception{ValueError} is raised.
+
+Availability: Most modern \UNIX{} systems.
 \end{funcdesc}
 
 \begin{funcdesc}{time}{}
@@ -248,3 +260,10 @@ A tuple of two strings: the first is the name of the local non-DST
 timezone, the second is the name of the local DST timezone.  If no DST
 timezone is defined, the second string should not be used.
 \end{datadesc}
+
+
+\begin{seealso}
+  \seemodule{locale}{Internationalization services.  The locale
+                     settings can affect the return values for some of 
+                     the functions in the \module{time} module.}
+\end{seealso}
