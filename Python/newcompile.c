@@ -503,12 +503,14 @@ compiler_unit_free(struct compiler_unit *u)
 		PyObject_Free((void *)u->u_blocks[i]);
 	if (u->u_blocks)
 		PyObject_Free((void *)u->u_blocks);
+	Py_XDECREF(u->u_ste);
 	Py_XDECREF(u->u_name);
 	Py_XDECREF(u->u_consts);
 	Py_XDECREF(u->u_names);
 	Py_XDECREF(u->u_varnames);
 	Py_XDECREF(u->u_freevars);
 	Py_XDECREF(u->u_cellvars);
+	Py_XDECREF(u->u_private);
 	PyObject_Free(u);
 }
 
