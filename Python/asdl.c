@@ -6,8 +6,10 @@ asdl_seq_new(int size)
 {
     asdl_seq *seq = (asdl_seq *)PyObject_Malloc(sizeof(asdl_seq)
 					     + sizeof(void *) * (size - 1));
-    if (!seq)
+    if (!seq) {
+	PyErr_SetString(PyExc_MemoryError, "no memory");
 	return NULL;
+    }
     seq->size = size;
     seq->offset = 0;
     return seq;
