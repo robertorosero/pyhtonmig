@@ -1,5 +1,5 @@
 #!/bin/sh
-# From configure.in Revision: 1.2.4.17 
+# From configure.in Revision: 1.2.4.18 
 #!/bin/sh
 # Guess values for system-dependent variables and create Makefiles.
 # Generated automatically using autoconf version 1.8 
@@ -335,7 +335,7 @@ fi
 # Don't suppress compiler output when --verbose is specified
 test -n "$verbose" &&
 	ac_compile=`echo "$ac_compile" | sed "s|>/dev/null 2>&1||"`
-test -n "$verbose" && echo "	ac_compile='$ac_compile'"
+test -n "$verbose" && echo "	setting ac_compile to '$ac_compile'"
 
 # checks for alternative programs
 if test -z "$CC"; then
@@ -638,7 +638,7 @@ else
 fi
 
 
-echo checking for NeXT
+test -n "$silent" || echo "checking for NeXT"
 cat > conftest.${ac_ext} <<EOF
 #include "confdefs.h"
 
@@ -1108,7 +1108,7 @@ ac_sed_defs="${ac_sed_defs}\${ac_dA}HAVE_LIBDL\${ac_dB}HAVE_LIBDL\${ac_dC}1\${ac
 fi
 
 
-echo checking for --with-svr4
+test -n "$silent" || echo "checking for --with-svr4"
 # check whether --with-svr4 or --without-svr4 was given.
 withval="$with_svr4"
 if test -n "$withval"; then
@@ -1216,7 +1216,7 @@ fi
 fi
 
 
-echo checking for --with-readline
+test -n "$silent" || echo "checking for --with-readline"
 # check whether --with-readline or --without-readline was given.
 withval="$with_readline"
 if test -n "$withval"; then
@@ -1234,7 +1234,7 @@ ac_sed_defs="${ac_sed_defs}\${ac_dA}WITH_READLINE\${ac_dB}WITH_READLINE\${ac_dC}
 
 if test -d "$withval"
 then LIBS="$LIBS -L$withval"
-else echo proper usage is --with-readline=DIRECTORY 1>&2; exit 1
+else echo "configure: proper usage is --with-readline=DIRECTORY" >&2; exit 1
 fi
 termcap=
 ac_save_LIBS="${LIBS}"
@@ -1284,12 +1284,12 @@ fi
 
 if test ! -z "$termcap"
 then LIBS="$LIBS -lreadline -l$termcap"
-else echo no working termcap/termlib, do not use --with-readline 1>&2; exit 1
+else echo "configure: no working termcap/termlib" >&2; exit 1
 fi
 fi
 
 
-echo checking for --with-thread
+test -n "$silent" || echo "checking for --with-thread"
 # check whether --with-thread or --without-thread was given.
 withval="$with_thread"
 if test -n "$withval"; then
@@ -1425,7 +1425,7 @@ fi
 
 DLINCLDIR=/
 
-echo checking for --with-sgi-dl
+test -n "$silent" || echo "checking for --with-sgi-dl"
 # check whether --with-sgi-dl or --without-sgi-dl was given.
 withval="$with_sgi_dl"
 if test -n "$withval"; then
@@ -1444,14 +1444,14 @@ ac_sed_defs="${ac_sed_defs}\${ac_dA}WITH_SGI_DL\${ac_dB}WITH_SGI_DL\${ac_dC}1\${
 dldir=$withval
 if test -d "$dldir"
 then LIBS="$LIBS -L$dldir"
-else echo proper usage is --with-sgi-dl=DIRECTORY 1>&2; exit 1
+else echo "configure: proper usage is --with-sgi-dl=DIRECTORY" >&2; exit 1
 fi
 DLINCLDIR=${dldir}
 LIBS="$LIBS -ldl -lmld"
 fi
 
 
-echo checking for --with-dl-dld
+test -n "$silent" || echo "checking for --with-dl-dld"
 # check whether --with-dl-dld or --without-dl-dld was given.
 withval="$with_dl_dld"
 if test -n "$withval"; then
@@ -1471,7 +1471,7 @@ dldir=`echo "$withval" | sed 's/,.*//'`
 dlddir=`echo "$withval" | sed 's/.*,//'`
 if test -d "$dldir" -a -d "$dlddir"
 then LIBS="$LIBS -L$dldir -L$dlddir"
-else echo proper usage is --with-dl-dld=DL_DIRECTORY,DLD_DIRECTORY 1>&2; exit 1
+else echo "configure: proper usage is --with-dl-dld=DL_DIRECTORY" >&2; exit 1
 fi
 DLINCLDIR=${dldir}
 LIBS="$LIBS -ldl -ldld"
@@ -1479,7 +1479,7 @@ fi
 
 
 # checks for library functions
-for ac_func in clock dlopen ftime gettimeofday getpeername getpgrp getpid getwd lstat nice readlink select setsid setpgid setpgrp setvbuf siginterrupt symlink tcgetpgrp tcsetpgrp times uname waitpid
+for ac_func in chown clock dlopen ftime gettimeofday getpeername getpgrp getpid getwd link lstat nice readlink select setgid setuid setsid setpgid setpgrp setvbuf siginterrupt symlink tcgetpgrp tcsetpgrp times uname waitpid
 do
 ac_tr_func=HAVE_`echo $ac_func | tr '[a-z]' '[A-Z]'`
 test -n "$silent" || echo "checking for ${ac_func}"
@@ -1903,7 +1903,7 @@ fi
 rm -f conftest*
 
 
-echo checking for prototypes
+test -n "$silent" || echo "checking for prototypes"
 cat > conftest.${ac_ext} <<EOF
 #include "confdefs.h"
 
@@ -1929,7 +1929,7 @@ ac_sed_defs="${ac_sed_defs}\${ac_dA}HAVE_PROTOTYPES\${ac_dB}HAVE_PROTOTYPES\${ac
 fi
 rm -fr conftest*
 
-echo checking for variable length prototypes and stdarg.h
+test -n "$silent" || echo "checking for variable length prototypes and stdarg.h"
 cat > conftest.${ac_ext} <<EOF
 #include "confdefs.h"
 
@@ -1984,7 +1984,7 @@ rm -f conftest*
 
 fi
 
-echo checking for bad static forward
+test -n "$silent" || echo "checking for bad static forward"
 cat > conftest.${ac_ext} <<EOF
 #include "confdefs.h"
 
@@ -2075,7 +2075,7 @@ withval="$with_libm"
 if test -n "$withval"; then
   if test "$withval" != yes
 then LIBM=$withval
-else echo proper usage is --with-libm=STRING 1>&2; exit 1
+else echo "configure: proper usage is --with-libm=STRING" >&2; exit 1
 fi
 fi
 
@@ -2087,7 +2087,7 @@ withval="$with_libc"
 if test -n "$withval"; then
   if test "$withval" != yes
 then LIBC=$withval
-else echo proper usage is --with-libc=STRING 1>&2; exit 1
+else echo "configure: proper usage is --with-libc=STRING" >&2; exit 1
 fi
 fi
 
