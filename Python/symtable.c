@@ -557,7 +557,7 @@ symtable_add_def(struct symtable *st, PyObject *name, int flag)
 				 PyString_AsString(name));
 		    PyErr_SyntaxLocation(st->st_filename,
 				       st->st_cur->ste_lineno);
-		    return -1;
+		    return 0;
 	    }
 	    val |= flag;
 	} else
@@ -565,13 +565,13 @@ symtable_add_def(struct symtable *st, PyObject *name, int flag)
 	o = PyInt_FromLong(val);
 	if (PyDict_SetItem(dict, name, o) < 0) {
 		Py_DECREF(o);
-		return -1;
+		return 0;
 	}
 	Py_DECREF(o);
 
 	if (flag & DEF_PARAM) {
 		if (PyList_Append(st->st_cur->ste_varnames, name) < 0) 
-			return -1;
+			return 0;
 	} else	if (flag & DEF_GLOBAL) {
 		/* XXX need to update DEF_GLOBAL for other flags too;
 		   perhaps only DEF_FREE_GLOBAL */
@@ -583,11 +583,11 @@ symtable_add_def(struct symtable *st, PyObject *name, int flag)
 		o = PyInt_FromLong(val);
 		if (PyDict_SetItem(st->st_global, name, o) < 0) {
 			Py_DECREF(o);
-			return -1;
+			return 0;
 		}
 		Py_DECREF(o);
 	}
-	return 0;
+	return 1;
 }
 
 /* VISIT and VISIT_SEQ takes an ASDL type as their second argument.  They use
@@ -611,24 +611,31 @@ symtable_add_def(struct symtable *st, PyObject *name, int flag)
 static int
 symtable_visit_stmt(struct symtable *st, stmt_ty s)
 {
+	fprintf(stderr, "symtable %d %d\n", s->kind, s->lineno);
 	switch (s->kind) {
         case FunctionDef_kind:
-		symtable_add_def(st, s->v.FunctionDef.name, DEF_LOCAL);
+		if (!symtable_add_def(st, s->v.FunctionDef.name, DEF_LOCAL))
+			return 0;
 		if (s->v.FunctionDef.args->defaults)
 			VISIT_SEQ(st, expr, s->v.FunctionDef.args->defaults);
-		symtable_enter_block(st, s->v.FunctionDef.name, FunctionBlock,
-				     (void *)s, s->lineno);
+		if (!symtable_enter_block(st, s->v.FunctionDef.name, 
+					  FunctionBlock, (void *)s, s->lineno))
+			return 0;
 		VISIT(st, arguments, s->v.FunctionDef.args);
 		VISIT_SEQ(st, stmt, s->v.FunctionDef.body);
-		symtable_exit_block(st, s);
+		if (!symtable_exit_block(st, s))
+			return 0;
 		break;
         case ClassDef_kind:
-		symtable_add_def(st, s->v.ClassDef.name, DEF_LOCAL);
+		if (!symtable_add_def(st, s->v.ClassDef.name, DEF_LOCAL))
+			return 0;
 		VISIT_SEQ(st, expr, s->v.ClassDef.bases);
-		symtable_enter_block(st, s->v.ClassDef.name, ClassBlock, 
-				     (void *)s, s->lineno);
+		if (!symtable_enter_block(st, s->v.ClassDef.name, ClassBlock, 
+					  (void *)s, s->lineno))
+			return 0;
 		VISIT_SEQ(st, stmt, s->v.ClassDef.body);
-		symtable_exit_block(st, s);
+		if (!symtable_exit_block(st, s))
+			return 0;
 		break;
         case Return_kind:
 		if (s->v.Return.value)
@@ -715,8 +722,9 @@ symtable_visit_stmt(struct symtable *st, stmt_ty s)
 		int i;
 		asdl_seq *seq = s->v.Global.names;
 		for (i = 0; i < asdl_seq_LEN(seq); i++)
-			symtable_add_def(st, asdl_seq_GET(seq, i), 
-					 DEF_GLOBAL);
+			if (!symtable_add_def(st, asdl_seq_GET(seq, i), 
+					      DEF_GLOBAL))
+				return 0;
 		
 		break;
 	}
@@ -747,7 +755,8 @@ symtable_visit_expr(struct symtable *st, expr_ty e)
 		VISIT(st, expr, e->v.UnaryOp.operand);
 		break;
         case Lambda_kind:
-		symtable_add_def(st, GET_IDENTIFIER(lambda), DEF_LOCAL);
+		if (!symtable_add_def(st, GET_IDENTIFIER(lambda), DEF_LOCAL))
+			return 0;
 		VISIT(st, arguments, e->v.Lambda.args);
 		/* XXX how to get line numbers for expressions */
 		symtable_enter_block(st, GET_IDENTIFIER(lambda),
@@ -792,8 +801,9 @@ symtable_visit_expr(struct symtable *st, expr_ty e)
 		VISIT(st, slice, e->v.Subscript.slice);
 		break;
         case Name_kind:
-		symtable_add_def(st, e->v.Name.id, 
-				 e->v.Name.ctx == Load ? USE : DEF_LOCAL);
+		if (!symtable_add_def(st, e->v.Name.id, 
+				      e->v.Name.ctx == Load ? USE : DEF_LOCAL))
+			return 0;
 		break;
 	/* child nodes of List and Tuple will have expr_context set */
         case List_kind:
@@ -813,7 +823,8 @@ symtable_implicit_arg(struct symtable *st, int pos)
 	if (id == NULL)
 		return 0;
 	/* XXX intern id? */
-	symtable_add_def(st, id, DEF_PARAM);
+	if (!symtable_add_def(st, id, DEF_PARAM))
+		return 0;
 	Py_DECREF(id);
 	return 1;
 }
@@ -854,15 +865,11 @@ symtable_visit_arguments(struct symtable *st, arguments_ty a)
 	/* skip default arguments inside function block
 	   XXX should ast be different?
 	*/
-	if (a->args)
-		if (!symtable_visit_params(st, a->args, 1))
+	if (a->args && !symtable_visit_params(st, a->args, 1))
 			return 0;
-
-	if (a->vararg)
-		if (!symtable_add_def(st, a->vararg, DEF_PARAM))
+	if (a->vararg && !symtable_add_def(st, a->vararg, DEF_PARAM))
 			return 0;
-	if (a->kwarg)
-		if (!symtable_add_def(st, a->kwarg, DEF_PARAM))
+	if (a->kwarg && !symtable_add_def(st, a->kwarg, DEF_PARAM))
 			return 0;
 	
 	return 1;
