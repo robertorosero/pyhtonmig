@@ -7,18 +7,28 @@
 struct memberlist type_members[] = {
 	{"__name__", T_STRING, offsetof(PyTypeObject, tp_name), READONLY},
 	{"__doc__", T_STRING, offsetof(PyTypeObject, tp_doc), READONLY},
-	{"__dict__", T_OBJECT, offsetof(PyTypeObject, tp_dict), READONLY},
 	{0}
 };
 
 static PyObject *
-type_bases(PyObject *type, void *context)
+type_bases(PyTypeObject *type, void *context)
 {
 	return PyTuple_New(0);
 }
 
+static PyObject *
+type_dict(PyTypeObject *type, void *context)
+{
+	if (type->tp_dict == NULL) {
+		Py_INCREF(Py_None);
+		return Py_None;
+	}
+	return PyDictProxy_New(type->tp_dict);
+}
+
 struct getsetlist type_getsets[] = {
-	{"__bases__", type_bases, NULL, NULL},
+	{"__bases__", (getter)type_bases, NULL, NULL},
+	{"__dict__",  (getter)type_dict,  NULL, NULL},
 	{0}
 };
 

@@ -23,3 +23,5 @@ extern DL_IMPORT(PyObject *) PyDescr_NewGetSet(PyTypeObject *,
 					       struct getsetlist *);
 
 extern DL_IMPORT(int) PyType_InitDict(PyTypeObject *);
+
+extern DL_IMPORT(PyObject *) PyDictProxy_New(PyObject *);

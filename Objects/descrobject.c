@@ -525,3 +525,189 @@ PyType_InitDict(PyTypeObject *type)
 		return -1;
 	return 0;
 }
+
+
+/* --- Readonly proxy for dictionaries (actually any mapping) --- */
+
+typedef struct {
+	PyObject_HEAD
+	PyObject *dict;
+} proxyobject;
+
+static int
+proxy_len(proxyobject *pp)
+{
+	return PyObject_Size(pp->dict);
+}
+
+static PyObject *
+proxy_getitem(proxyobject *pp, PyObject *key)
+{
+	return PyObject_GetItem(pp->dict, key);
+}
+
+static PyMappingMethods proxy_as_mapping = {
+	(inquiry)proxy_len,			/* mp_length */
+	(binaryfunc)proxy_getitem,		/* mp_subscript */
+	0,					/* mp_ass_subscript */
+};
+
+static int
+proxy_contains(proxyobject *pp, PyObject *key)
+{
+	return PySequence_Contains(pp->dict, key);
+}
+
+static PySequenceMethods proxy_as_sequence = {
+	0,					/* sq_length */
+	0,					/* sq_concat */
+	0,					/* sq_repeat */
+	0,					/* sq_item */
+	0,					/* sq_slice */
+	0,					/* sq_ass_item */
+	0,					/* sq_ass_slice */
+	(objobjproc)proxy_contains,		/* sq_contains */
+	0,					/* sq_inplace_concat */
+	0,					/* sq_inplace_repeat */
+};
+
+static PyObject *
+proxy_has_key(proxyobject *pp, PyObject *args)
+{
+	PyObject *key;
+
+	if (!PyArg_ParseTuple(args, "O:has_key", &key))
+		return NULL;
+	return PyInt_FromLong(PySequence_Contains(pp->dict, key));
+}
+
+static PyObject *
+proxy_get(proxyobject *pp, PyObject *args)
+{
+	PyObject *key, *def = Py_None;
+
+	if (!PyArg_ParseTuple(args, "O|O:get", &key, &def))
+		return NULL;
+	return PyObject_CallMethod(pp->dict, "get", "(OO)", key, def);
+}
+
+static PyObject *
+proxy_keys(proxyobject *pp, PyObject *args)
+{
+	if (!PyArg_ParseTuple(args, ":keys"))
+		return NULL;
+	return PyMapping_Keys(pp->dict);
+}
+
+static PyObject *
+proxy_values(proxyobject *pp, PyObject *args)
+{
+	if (!PyArg_ParseTuple(args, ":values"))
+		return NULL;
+	return PyMapping_Values(pp->dict);
+}
+
+static PyObject *
+proxy_items(proxyobject *pp, PyObject *args)
+{
+	if (!PyArg_ParseTuple(args, ":items"))
+		return NULL;
+	return PyMapping_Items(pp->dict);
+}
+
+static PyObject *
+proxy_copy(proxyobject *pp, PyObject *args)
+{
+	if (!PyArg_ParseTuple(args, ":copy"))
+		return NULL;
+	return PyObject_CallMethod(pp->dict, "copy", NULL);
+}
+
+static PyMethodDef proxy_methods[] = {
+	{"has_key", (PyCFunction)proxy_has_key, METH_VARARGS, "XXX"},
+	{"get",	    (PyCFunction)proxy_get,     METH_VARARGS, "XXX"},
+	{"keys",    (PyCFunction)proxy_keys,    METH_VARARGS, "XXX"},
+	{"values",  (PyCFunction)proxy_values,  METH_VARARGS, "XXX"},
+	{"items",   (PyCFunction)proxy_items,   METH_VARARGS, "XXX"},
+	{"copy",    (PyCFunction)proxy_copy,    METH_VARARGS, "XXX"},
+	{0}
+};
+
+static void
+proxy_dealloc(proxyobject *pp)
+{
+	Py_DECREF(pp->dict);
+	PyObject_DEL(pp);
+}
+
+static PyObject *
+proxy_getiter(proxyobject *pp)
+{
+	return PyObject_GetIter(pp->dict);
+}
+
+#if 0
+static int
+proxy_print(proxyobject *pp, FILE *fp, int flags)
+{
+	return PyObject_Print(pp->dict, fp, flags);
+}
+#endif
+
+PyObject *
+proxy_str(proxyobject *pp)
+{
+	return PyObject_Str(pp->dict);
+}
+
+PyTypeObject proxytype = {
+	PyObject_HEAD_INIT(&PyType_Type)
+	0,					/* ob_size */
+	"dict-proxy",				/* tp_name */
+	sizeof(proxyobject),			/* tp_basicsize */
+	0,					/* tp_itemsize */
+	/* methods */
+	(destructor)proxy_dealloc, 		/* tp_dealloc */
+	0,					/* tp_print */
+	0,					/* tp_getattr */
+	0,					/* tp_setattr */
+	0,					/* tp_compare */
+	0,					/* tp_repr */
+	0,					/* tp_as_number */
+	&proxy_as_sequence,			/* tp_as_sequence */
+	&proxy_as_mapping,			/* tp_as_mapping */
+	0,					/* tp_hash */
+	0,					/* tp_call */
+	(reprfunc)proxy_str,			/* tp_str */
+	PyGeneric_GetAttr,			/* tp_getattro */
+	0,					/* tp_setattro */
+	0,					/* tp_as_buffer */
+	Py_TPFLAGS_DEFAULT,			/* tp_flags */
+ 	0,					/* tp_doc */
+ 	0,					/* tp_traverse */
+ 	0,					/* tp_clear */
+	0,					/* tp_richcompare */
+	0,					/* tp_weaklistoffset */
+	(getiterfunc)proxy_getiter,		/* tp_iter */
+	0,					/* tp_iternext */
+	proxy_methods,				/* tp_methods */
+	0,					/* tp_members */
+	0,					/* tp_getset */
+	0,					/* tp_base */
+	0,					/* tp_dict */
+	0,					/* tp_descr_get */
+	0,					/* tp_descr_set */
+};
+
+PyObject *
+PyDictProxy_New(PyObject *dict)
+{
+	proxyobject *pp;
+
+	pp = PyObject_NEW(proxyobject, &proxytype);
+	if (pp != NULL) {
+		Py_INCREF(dict);
+		pp->dict = dict;
+	}
+	return (PyObject *)pp;
+}
