@@ -136,11 +136,35 @@ class Bdb: # Basic Debugger
 		self.returnframe = frame
 		self.quitting = 0
 	
+	def set_trace(self):
+		# Start debugging from here
+		try:
+			1 + ''
+		except:
+			frame = sys.exc_traceback.tb_frame.f_back
+		self.reset()
+		while frame:
+			frame.f_trace = self.trace_dispatch
+			self.botframe = frame
+			frame = frame.f_back
+		self.set_step()
+		sys.settrace(self.trace_dispatch)
+
 	def set_continue(self):
 		# Don't stop except at breakpoints or when finished
 		self.stopframe = self.botframe
 		self.returnframe = None
 		self.quitting = 0
+		if not self.breaks:
+			# no breakpoints; run without debugger overhead
+			sys.settrace(None)
+			try:
+				1 + ''	# raise an exception
+			except:
+				frame = sys.exc_traceback.tb_frame.f_back
+			while frame and frame is not self.botframe:
+				del frame.f_trace
+				frame = frame.f_back
 	
 	def set_quit(self):
 		self.stopframe = self.botframe
@@ -270,6 +294,9 @@ class Bdb: # Basic Debugger
 			self.quitting = 1
 			sys.settrace(None)
 
+
+def set_trace():
+	Bdb().set_trace()
 
 # -------------------- testing --------------------
 

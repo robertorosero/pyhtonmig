@@ -12,12 +12,15 @@ import string
 import fpformat
 import marshal
 
+# __start_time is the time at which a function was entered.
+__key = '__key'
+__start_time = '__start_time'
+
 class Profile:
 
 	def __init__(self):
 		self.timings = {}
 		self.debug = None
-		self.call_level = 0
 		self.profile_func = None
 		self.profiling = 0
 
@@ -27,29 +30,31 @@ class Profile:
 		self.profile_func[funcname] = 1
 
 	def trace_dispatch(self, frame, event, arg):
+		t = os.times()
+		t = t[0] + t[1]
+##		stacktrace(frame)
+##		print event,frame.f_code.co_name,frame.f_lineno,`frame`,\
+##			  `frame.f_back`
 		if event == 'call':
 			funcname = frame.f_code.co_name
 			if self.profile_func and not self.profiling:
 				if self.profile_func.has_key(funcname):
 					return
 				self.profiling = 1
-			t = os.times()
-			t = t[0] + t[1]
-			if frame.f_locals.has_key('__key'):
-				key = frame.f_locals['__key']
+			if frame.f_locals.has_key(__key):
+				key = frame.f_locals[__key]
 			else:
 				lineno = codehack.getlineno(frame.f_code)
 				filename = frame.f_code.co_filename
 				key = filename + ':' + `lineno` + '(' + funcname + ')'
-				frame.f_locals['__key'] = key
-			self.call_level = depth(frame)
+				frame.f_locals[__key] = key
 			self.cur_frame = frame
 			pframe = frame.f_back
 			if self.debug:
-				s0 = 'call: ' + key + ' depth: ' + `self.call_level` + ' time: ' + `t`
+				s0 = 'call: ' + key + ' time: ' + `t`
 			if pframe:
-				if pframe.f_locals.has_key('__key'):
-					pkey = pframe.f_locals['__key']
+				if pframe.f_locals.has_key(__key):
+					pkey = pframe.f_locals[__key]
 				else:
 					pkey = pframe.f_code.co_filename + \
 						  ':' + \
@@ -57,11 +62,11 @@ class Profile:
 						  + '(' + \
 						  pframe.f_code.co_name \
 						  + ')'
-					pframe.f_locals['__key'] = pkey
+					pframe.f_locals[__key] = pkey
 				if self.debug:
 					s1 = 'parent: ' + pkey
-				if pframe.f_locals.has_key('__start_time'):
-					st = pframe.f_locals['__start_time']
+				if pframe.f_locals.has_key(__start_time):
+					st = pframe.f_locals[__start_time]
 					nc, tt, ct, callers, callees = \
 						self.timings[pkey]
 					if self.debug:
@@ -86,10 +91,12 @@ class Profile:
 				else:
 					callees[pkey] = 1
 			self.timings[key] = nc + 1, tt, ct, callers, callees
-			frame.f_locals['__start_time'] = t
 			if self.debug:
 				print s0
 				print s1
+			t = os.times()
+			t = t[0] + t[1]
+			frame.f_locals[__start_time] = t
 			return
 		if event == 'return':
 			if self.profile_func:
@@ -98,61 +105,56 @@ class Profile:
 				if self.profile_func.has_key( \
 					frame.f_code.co_name):
 					self.profiling = 0
-			self.call_level = depth(frame)
-			self.cur_frame = frame
 			pframe = frame.f_back
+			self.cur_frame = pframe
 			if self.debug:
 				s0 = 'return: '
 			else:
 				s0 = None
-			self.handle_return(pframe, frame, s0)
+			self.handle_return(pframe, frame, t, s0)
 			return
 		if event == 'exception':
 			if self.profile_func and not self.profiling:
 				return
-			call_level = depth(frame)
-			if call_level < self.call_level:
-				if call_level <> self.call_level - 1:
-					print 'heh!',call_level,self.call_level
-				if self.debug:
-					s0 = 'exception: '
-				else:
-					s0 = None
-				self.handle_return(frame, self.cur_frame, s0)
-			self.call_level = call_level
+			if frame == self.cur_frame:
+				return
+			if self.debug:
+				s0 = 'exception: '
+			else:
+				s0 = None
+			self.handle_return(frame, self.cur_frame, t, s0)
 			self.cur_frame = frame
 			return
 		print 'profile.Profile.dispatch: unknown debugging event:',
 		print `event`
 		return
 
-	def handle_return(self, pframe, frame, s0):
-		t = os.times()
-		t = t[0] + t[1]
-		if frame.f_locals.has_key('__key'):
-			key = frame.f_locals['__key']
+	def handle_return(self, pframe, frame, t, s0):
+##		print 'handle_return',`pframe`,`frame`
+		if frame.f_locals.has_key(__key):
+			key = frame.f_locals[__key]
 		else:
 			funcname = frame.f_code.co_name
 			lineno = codehack.getlineno(frame.f_code)
 			filename = frame.f_code.co_filename
 			key = filename + ':' + `lineno` + '(' + funcname + ')'
-			frame.f_locals['__key'] = key
+			frame.f_locals[__key] = key
 		if self.debug:
-			s0 = s0 + key + ' depth: ' + `self.call_level` + ' time: ' + `t`
+			s0 = s0 + key + ' time: ' + `t`
 		if pframe:
-			if pframe.f_locals.has_key('__key'):
-				pkey = pframe.f_locals['__key']
+			if pframe.f_locals.has_key(__key):
+				pkey = pframe.f_locals[__key]
 			else:
 				funcname = frame.f_code.co_name
 				lineno = codehack.getlineno(frame.f_code)
 				filename = frame.f_code.co_filename
 				pkey = filename + ':' + `lineno` + '(' + funcname + ')'
-				pframe.f_locals['__key'] = pkey
+				pframe.f_locals[__key] = pkey
 			if self.debug:
 				s1 = 'parent: '+pkey
-			if pframe.f_locals.has_key('__start_time') and \
+			if pframe.f_locals.has_key(__start_time) and \
 				  self.timings.has_key(pkey):
-				st = pframe.f_locals['__start_time']
+				st = pframe.f_locals[__start_time]
 				nc, tt, ct, callers, callees = \
 					self.timings[pkey]
 				if self.debug:
@@ -160,13 +162,14 @@ class Profile:
 					s1 = s1+' after: st='+`t`+' nc='+`nc`+' tt='+`tt`+' ct='+`ct+(t-st)`
 				self.timings[pkey] = \
 					nc, tt, ct + (t - st), callers, callees
-				pframe.f_locals['__start_time'] = t
+			else:
+				pframe = None
 		if self.timings.has_key(key):
 			nc, tt, ct, callers, callees = self.timings[key]
 		else:
 			nc, tt, ct, callers, callees = 0, 0, 0, {}, {}
-		if frame.f_locals.has_key('__start_time'):
-			st = frame.f_locals['__start_time']
+		if frame.f_locals.has_key(__start_time):
+			st = frame.f_locals[__start_time]
 		else:
 			st = t
 		if self.debug:
@@ -176,6 +179,10 @@ class Profile:
 			print s1
 		self.timings[key] = \
 			nc, tt + (t - st), ct + (t - st), callers, callees
+		if pframe:
+			t = os.times()
+			t = t[0] + t[1]
+			pframe.f_locals[__start_time] = t
 
 	def print_stats(self):
 		# Print in reverse order by ct
@@ -220,13 +227,6 @@ class Profile:
 		finally:
 			sys.setprofile(None)
 
-
-def depth(frame):
-	d = 0
-	while frame:
-		d = d + 1
-		frame = frame.f_back
-	return d
 
 class Stats:
 	def __init__(self, file):
@@ -351,16 +351,16 @@ def f8(x):
 	return string.rjust(fpformat.fix(x, 3), 8)
 
 # simplified user interface
-def run(statement, file = None):
+def run(statement, *args):
 	prof = Profile()
 	try:
 		prof.run(statement)
 	except SystemExit:
 		pass
-	if file is None:
+	if len(args) == 0:
 		prof.print_stats()
 	else:
-		prof.dump_stats(file)
+		prof.dump_stats(args[0])
 
 # test command with debugging
 def debug():
@@ -387,3 +387,14 @@ def help():
 	else:
 		print 'Sorry, can\'t find the help file "profile.doc"',
 		print 'along the Python search path'
+
+def stacktrace(frame):
+	sys.stdout.write('\n')
+	dummy = do_stacktrace(frame)
+
+def do_stacktrace(frame):
+	if frame:
+		do_stacktrace(frame.f_back)
+		file = frame.f_code.co_name
+		line = frame.f_lineno
+		print frame.f_code.co_name,`frame.f_lineno`,`frame`

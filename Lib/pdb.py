@@ -297,6 +297,8 @@ def runctx(statement, globals, locals):
 def runcall(*args):
 	apply(Pdb().runcall, args)
 
+def set_trace():
+	Pdb().set_trace()
 
 # Post-Mortem interface
 
