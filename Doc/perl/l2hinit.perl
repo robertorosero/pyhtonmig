@@ -511,4 +511,49 @@ sub protect_useritems {
 %declarations = ('preform' => '<dl><dd><pre class="verbatim"></pre></dl>',
 		 %declarations);
 
+
+# This is added to get rid of the long comment that follows the doctype
+# declaration; MSIE5 on NT4 SP4 barfs on it and drops the content of the
+# page.
+sub make_head_and_body {
+    local($title,$body) = @_;
+    local($DTDcomment) = '';
+    local($version,$isolanguage) = ($HTML_VERSION, 'EN');
+    local(%isolanguages) = (  'english',  'EN'   , 'USenglish', 'EN.US'
+			    , 'original', 'EN'   , 'german'   , 'DE'
+			    , 'austrian', 'DE.AT', 'french'   , 'FR'
+			    , 'spanish',  'ES'
+			    , %isolanguages );
+    $isolanguage = $isolanguages{$default_language};
+    $isolanguage = 'EN' unless $isolanguage;
+    $title = &purify($title,1);
+    eval("\$title = ". $default_title ) unless ($title);
+
+    # allow user-modification of the <TITLE> tag; thanks Dan Young
+    if (defined &custom_TITLE_hook) {
+	$title = &custom_TITLE_hook($title, $toc_sec_title);
+    }
+
+    if ($DOCTYPE =~ /\/\/[\w\.]+\s*$/) { # language spec included
+	$DTDcomment = "<!DOCTYPE html PUBLIC \"$DOCTYPE\">\n";
+    } else {
+	$DTDcomment = "<!DOCTYPE html PUBLIC \"$DOCTYPE//"
+	    . ($ISO_LANGUAGE ? $ISO_LANGUAGE : $isolanguage) . "\">\n";
+    }
+
+    $STYLESHEET = $FILE.".css" unless $STYLESHEET;
+    if (!$charset && $CHARSET) { $charset = $CHARSET; $charset =~ s/_/\-/go; }
+
+    join('', ($DOCTYPE ? $DTDcomment : '' )
+	,"<html>\n<head>\n<title>", $title, "</title>\n"
+	, &meta_information($title)
+	, ($CHARSET && $HTML_VERSION ge "2.1" ?
+           "<meta http-equiv=\"Content-Type\" content=\"text/html; charset=$charset\">\n"
+           : "" )
+	, ($BASE ? "<base href=\"$BASE\">\n" : "" )
+	, "<link rel=\"STYLESHEET\" href=\"$STYLESHEET\">"
+	, $more_links_mark
+	, "\n</head>\n<body $body>\n");
+}
+
 1;	# This must be the last line
