@@ -177,6 +177,14 @@ rotor rotormodule.o
 # timing timingmodule.o
 
 
+# Lance Ellinghouse's signal module
+# signal signalmodule.o
+
+
+# John Redford's sybase module
+# sybase sybasemodule.o
+
+
 # Example -- included for reference only
 
 # xx xxmodule.o
