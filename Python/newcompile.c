@@ -35,9 +35,7 @@ int Py_OptimizeFlag = 0;
      #: name mangling in classes (__vars) doesn't work
      #: doing from __future__ import division doesn't work 
         doesn't output BINARY_TRUE_DIVISION
-     #: vars() doesn't return local variables
-     #: co_names & co_varnames don't contain the correct names
-             u_names & u_varnames are not used properly
+     #: co_names doesn't contain locals, only globals, co_varnames may work
      #: doc strings at class scope are POPed, not stored
         In interactive mode, they are printed. :-)
      #: ref leaks in interpreter when press return on empty line
@@ -2650,12 +2648,10 @@ makecode(struct compiler *c, struct assembler *a)
 	int nlocals;
 
 	consts = dict_keys_inorder(c->u->u_consts, 0);
-	if (!consts)
-		goto error;
 	names = dict_keys_inorder(c->u->u_names, 0);
-	if (!names)
+	varnames = dict_keys_inorder(c->u->u_varnames, 0);
+	if (!consts || !names || !varnames)
 		goto error;
-	varnames = PySequence_Tuple(c->u->u_ste->ste_varnames);
         freevars = PySequence_Tuple(c->u->u_freevars);
         cellvars = PySequence_Tuple(c->u->u_cellvars);
         if (!varnames || !freevars || !cellvars)
