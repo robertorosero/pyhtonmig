@@ -1640,6 +1640,10 @@ parsestr(const char *s)
 	return v;
 }
 
+/* Build a Python string object out of a STRING atom.  This takes care of
+ * compile-time literal catenation, calling parsestr() on each piece, and
+ * pasting the intermediate results together.
+ */
 static PyObject *
 parsestrplus(node *n)
 {
@@ -1649,25 +1653,25 @@ parsestrplus(node *n)
 	if ((v = parsestr(STR(CHILD(n, 0)))) != NULL) {
 		/* String literal concatenation */
 		for (i = 1; i < NCH(n); i++) {
-		    PyObject *s;
-		    s = parsestr(STR(CHILD(n, i)));
-		    if (s == NULL)
-			goto onError;
-		    if (PyString_Check(v) && PyString_Check(s)) {
-			PyString_ConcatAndDel(&v, s);
-			if (v == NULL)
-			    goto onError;
-		    }
+			PyObject *s;
+			s = parsestr(STR(CHILD(n, i)));
+			if (s == NULL)
+				goto onError;
+			if (PyString_Check(v) && PyString_Check(s)) {
+				PyString_ConcatAndDel(&v, s);
+				if (v == NULL)
+				    goto onError;
+			}
 #ifdef Py_USING_UNICODE
-		    else {
-			PyObject *temp;
-			temp = PyUnicode_Concat(v, s);
-			Py_DECREF(s);
-			if (temp == NULL)
-			    goto onError;
-			Py_DECREF(v);
-			v = temp;
-		    }
+			else {
+				PyObject *temp;
+				temp = PyUnicode_Concat(v, s);
+				Py_DECREF(s);
+				if (temp == NULL)
+					goto onError;
+				Py_DECREF(v);
+				v = temp;
+			}
 #endif
 		}
 	}
