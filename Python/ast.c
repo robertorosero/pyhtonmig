@@ -2546,6 +2546,7 @@ decode_utf8(const char **sPtr, const char *end, char* encoding)
 #else
 	PyObject *u, *v;
 	char *s, *t;
+	t = s = *sPtr;
 	/* while (s < end && *s != '\\') s++; */ /* inefficient for u".." */
 	while (s < end && (*s & 0x80)) s++;
 	*sPtr = s;
@@ -2566,8 +2567,10 @@ decode_unicode(const char *s, size_t len, int rawmode, const char *encoding)
 	char *p;
 	const char *end;
 	if (encoding == NULL) {
+	     	buf = s;
 		u = NULL;
 	} else if (strcmp(encoding, "iso-8859-1") == 0) {
+	     	buf = s;
 		u = NULL;
 	} else {
 		/* "\XX" may become "\u005c\uHHLL" (12 bytes) */
@@ -2667,15 +2670,7 @@ parsestr(const char *s, const char *encoding)
 	}
 #ifdef Py_USING_UNICODE
 	if (unicode || Py_UnicodeFlag) {
-#if 0
-		/* XXX currently broken */
 		return decode_unicode(s, len, rawmode, encoding);
-#else
-		if (rawmode)
-			return PyUnicode_DecodeRawUnicodeEscape(s, len, NULL);
-		else
-			return PyUnicode_DecodeUnicodeEscape(s, len, NULL);
-#endif
 	}
 #endif
 	need_encoding = (encoding != NULL &&
