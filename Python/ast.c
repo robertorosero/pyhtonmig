@@ -806,8 +806,32 @@ ast_for_call(const node *n, expr_ty func)
       argument: [test '='] test	# Really [keyword '='] test
     */
 
+    int i, nargs;
+    asdl_seq *args = NULL;
+
     REQ(n, arglist);
-    return Call(func, NULL, NULL, NULL, NULL);
+
+    nargs = 0;
+    for (i = 0; i < NCH(n); i++)
+	if (TYPE(CHILD(n, i)) == argument)
+	    nargs++;
+
+    args = asdl_seq_new(nargs);
+    for (i = 0; i < NCH(n); i++) {
+	node *ch = CHILD(n, i);
+	if (TYPE(ch) == argument) {
+	    expr_ty e;
+	    if (NCH(ch) == 1)
+		e = ast_for_expr(CHILD(ch, 0));
+	    else
+		e = NULL;
+	    asdl_seq_SET(args, i / 2, e);
+	}
+    }
+    
+
+    /* XXX syntax error if more than 255 arguments */
+    return Call(func, args, NULL, NULL, NULL);
 }
 
 static expr_ty
