@@ -131,6 +131,7 @@ dbm_ass_sub(dp, v, w)
 	dp->di_size = -1;
 	if (w == NULL) {
 	    if ( dbm_delete(dp->di_dbm, krec) < 0 ) {
+		dbm_clearerr(dp->di_dbm);
 		err_setstr(KeyError, GETSTRINGVALUE((stringobject *)v));
 		return -1;
 	    }
@@ -141,6 +142,7 @@ dbm_ass_sub(dp, v, w)
 		return -1;
 	    }
 	    if ( dbm_store(dp->di_dbm, krec, drec, DBM_REPLACE) < 0 ) {
+		dbm_clearerr(dp->di_dbm);
 		err_setstr(DbmError, "Cannot add item to database");
 		return -1;
 	    }
