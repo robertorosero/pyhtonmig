@@ -71,6 +71,7 @@ recheck:
 
 configure:	configure.in
 		autoconf
+		autoheader
 
 tags:		ctags -t Parser/*.[ch] Objects/*.[ch] Python/*.[ch] Include/*.h
 
