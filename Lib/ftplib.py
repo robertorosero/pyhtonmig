@@ -9,10 +9,7 @@
 # >>> from ftplib import FTP
 # >>> ftp = FTP('ftp.cwi.nl') # connect to host, default port
 # >>> ftp.login() # default, i.e.: user anonymous, passwd user@hostname
-# >>> def handle_one_line(line): # callback for ftp.retrlines
-# ...     print line
-# ... 
-# >>> ftp.retrlines('LIST', handle_one_line) # list directory contents
+# >>> ftp.retrlines('LIST') # list directory contents
 # total 43
 # d--x--x--x   2 root     root         512 Jul  1 16:50 bin
 # d--x--x--x   2 root     root         512 Sep 16  1991 etc
@@ -20,7 +17,7 @@
 # drwxr-srwt  15 root     ftp        10240 Nov  5 20:43 pub
 # >>> ftp.quit()
 #
-# To download a file, use ftp.retrlines('RETR ' + filename, handle_one_line),
+# To download a file, use ftp.retrlines('RETR ' + filename),
 # or ftp.retrbinary() with slightly different arguments.
 # To upload a file, use ftp.storlines() or ftp.storbinary(), which have
 # an open file as argument.
@@ -218,7 +215,7 @@ class FTP:
 			nextport = (nextport + 1) % PORT_CYCLE
 			sock.bind('', port)
 			getsockname = None
-		sock.listen(0) # Assigns the port if not explicitly bound
+		sock.listen(1) # Assigns the port if not explicitly bound
 		if getsockname:
 			host, port = getsockname()
 		resp = self.sendport(port)
