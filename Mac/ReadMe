@@ -84,11 +84,11 @@ the next release.
 test_httplib fails with an unexpected output error. This will be fixed in
 the next release.
 
-test_pep263 crashes with a syntax error. This will be fixed in the next release.
-
 test_socket fails, this problem is being investigated.
 
-test_strptime fails, this problem is being investigated.
+test_strptime and test_time fail, this problem is being investigated.
+
+test_unicode fails, this problem is being investigated.
 
 Three tests will fail on MacOS9 with MemoryErrors:
 test_longexp, test_sha and test_zlib (on MacOSX these should pass).
