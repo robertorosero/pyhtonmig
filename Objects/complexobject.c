@@ -183,6 +183,17 @@ c_powi(Py_complex x, long n)
 
 }
 
+static PyObject *
+complex_subtype_from_c_complex(PyTypeObject *type, Py_complex cval)
+{
+	PyObject *op;
+
+	op = PyType_GenericAlloc(type, 0);
+	if (op != NULL)
+		((PyComplexObject *)op)->cval = cval;
+	return op;
+}
+
 PyObject *
 PyComplex_FromCComplex(Py_complex cval)
 {
@@ -195,6 +206,15 @@ PyComplex_FromCComplex(Py_complex cval)
 	PyObject_INIT(op, &PyComplex_Type);
 	op->cval = cval;
 	return (PyObject *) op;
+}
+
+static PyObject *
+complex_subtype_from_doubles(PyTypeObject *type, double real, double imag)
+{
+	Py_complex c;
+	c.real = real;
+	c.imag = imag;
+	return complex_subtype_from_c_complex(type, c);
 }
 
 PyObject *
@@ -567,7 +587,7 @@ static struct memberlist complex_members[] = {
 };
 
 static PyObject *
-complex_from_string(PyObject *v)
+complex_subtype_from_string(PyTypeObject *type, PyObject *v)
 {
 	extern double strtod(const char *, char **);
 	const char *s, *start;
@@ -715,7 +735,7 @@ complex_from_string(PyObject *v)
 		return NULL;
 	}
 
-	return PyComplex_FromDoubles(x,y);
+	return complex_subtype_from_doubles(type, x, y);
 }
 
 static PyObject *
@@ -727,14 +747,13 @@ complex_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	int own_r = 0;
 	static char *kwlist[] = {"real", "imag", 0};
 
-	assert(type == &PyComplex_Type);
 	r = Py_False;
 	i = NULL;
 	if (!PyArg_ParseTupleAndKeywords(args, kwds, "|OO:complex", kwlist,
 					 &r, &i))
 		return NULL;
 	if (PyString_Check(r) || PyUnicode_Check(r))
-		return complex_from_string(r);
+		return complex_subtype_from_string(type, r);
 	if ((nbr = r->ob_type->tp_as_number) == NULL ||
 	    nbr->nb_float == NULL ||
 	    (i != NULL &&
@@ -807,7 +826,7 @@ complex_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	}
 	cr.real -= ci.imag;
 	cr.imag += ci.real;
-	return PyComplex_FromCComplex(cr);
+	return complex_subtype_from_c_complex(type, cr);
 }
 
 static char complex_doc[] =
@@ -863,7 +882,7 @@ PyTypeObject PyComplex_Type = {
 	PyObject_GenericGetAttr,		/* tp_getattro */
 	0,					/* tp_setattro */
 	0,					/* tp_as_buffer */
-	Py_TPFLAGS_DEFAULT,			/* tp_flags */
+	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE, /* tp_flags */
 	complex_doc,				/* tp_doc */
 	0,					/* tp_traverse */
 	0,					/* tp_clear */
