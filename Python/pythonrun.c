@@ -459,6 +459,7 @@ fatal(msg)
 /* Clean up and exit */
 
 #ifdef WITH_THREAD
+#include "thread.h"
 int threads_started = 0; /* Set by threadmodule.c and maybe others */
 #endif
 
@@ -508,10 +509,17 @@ goaway(sts)
 	   debugging anyway). */
 	
 	(void) save_thread();
+#ifndef NO_EXIT_PROG
 	if (threads_started)
 		_exit_prog(sts);
 	else
 		exit_prog(sts);
+#else /* !NO_EXIT_PROG */
+	if (threads_started)
+		_exit(sts);
+	else
+		exit(sts);
+#endif /* !NO_EXIT_PROG */
 	
 #else /* WITH_THREAD */
 	
