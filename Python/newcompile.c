@@ -699,13 +699,13 @@ opcode_stack_effect(int opcode, int oparg)
 			return -1;
 
 		case SLICE+0:
-			return 0;
+			return 1;
 		case SLICE+1:
-			return -1;
+			return 0;
 		case SLICE+2:
-			return -1;
+			return 0;
 		case SLICE+3:
-			return -2;
+			return -1;
 
 		case STORE_SLICE+0:
 			return -2;
@@ -2572,13 +2572,14 @@ compiler_handle_subscr(struct compiler *c, const char *kind,
                        expr_context_ty ctx) {
     int op;
 
+    /* XXX this code is duplicated */
     switch (ctx) {
     case AugLoad: /* fall through to Load */
     case Load:    op = BINARY_SUBSCR; break;
     case AugStore:/* fall through to Store */
     case Store:   op = STORE_SUBSCR; break;
     case Del:     op = DELETE_SUBSCR; break;
-    default:
+    case Param:
         fprintf(stderr, "invalid %s kind %d in compiler_visit_slice\n", 
                 kind, ctx);
         return 0;
@@ -2594,58 +2595,77 @@ compiler_handle_subscr(struct compiler *c, const char *kind,
 }
 
 static int
-compiler_slice(struct compiler *c, slice_ty s, int op, expr_context_ty ctx)
+compiler_slice(struct compiler *c, slice_ty s, expr_context_ty ctx)
 {
-	int slice_offset = 0, stack_count = 0;
+	int n = 2;
 	assert(s->kind == Slice_kind);
 
-        /* XXX: is this right?  is ExtSlice ever used? */
-	if (s->v.Slice.step) {
-            if (s->v.Slice.lower) {
-                VISIT(c, expr, s->v.Slice.lower);
-            }
-            else {
-                ADDOP_O(c, LOAD_CONST, Py_None, consts);
-            }
-                
-            if (s->v.Slice.upper) {
-                VISIT(c, expr, s->v.Slice.upper);
-            }
-            else {
-                ADDOP_O(c, LOAD_CONST, Py_None, consts);
-            }
-
-            VISIT(c, expr, s->v.Slice.step);
-            ADDOP_I(c, BUILD_SLICE, 3);   /* XXX: always 3? remove arg? */
-            return compiler_handle_subscr(c, "extended slice", ctx);
-        }
-
+	/* only handles the cases where BUILD_SLICE is emitted */
 	if (s->v.Slice.lower) {
+                VISIT(c, expr, s->v.Slice.lower);
+	}
+	else {
+                ADDOP_O(c, LOAD_CONST, Py_None, consts);
+	}
+                
+	if (s->v.Slice.upper) {
+                VISIT(c, expr, s->v.Slice.upper);
+	}
+	else {
+                ADDOP_O(c, LOAD_CONST, Py_None, consts);
+	}
+
+	if (s->v.Slice.step) {
+		n++;
+		VISIT(c, expr, s->v.Slice.step);
+	}
+	ADDOP_I(c, BUILD_SLICE, n);
+	return 1;
+}
+
+static int
+compiler_simple_slice(struct compiler *c, slice_ty s, expr_context_ty ctx)
+{
+	int op, slice_offset = 0, stack_count = 0;
+
+	assert(s->v.Slice.step == NULL);
+	if (s->v.Slice.lower) {
+		slice_offset++;
 		stack_count++;
-		slice_offset |= 1;
-		if (ctx != AugStore)
+		if (ctx != AugStore) 
 			VISIT(c, expr, s->v.Slice.lower);
 	}
 	if (s->v.Slice.upper) {
+		slice_offset += 2;
 		stack_count++;
-		slice_offset |= 2;
-		if (ctx != AugStore)
+		if (ctx != AugStore) 
 			VISIT(c, expr, s->v.Slice.upper);
 	}
 
-	if (ctx == AugLoad) {
-		switch (stack_count) {
-		case 0: ADDOP(c, DUP_TOP); break;
-		case 1: ADDOP_I(c, DUP_TOPX, 2); break;
-		case 2: ADDOP_I(c, DUP_TOPX, 3); break;
-		}
-	}
-	else if (ctx == AugStore) {
-		switch (stack_count) {
-		case 0: ADDOP(c, ROT_TWO); break;
-		case 1: ADDOP(c, ROT_THREE); break;
-		case 2: ADDOP(c, ROT_FOUR); break;
-		}
+ 	if (ctx == AugLoad) {
+ 		switch (stack_count) {
+ 		case 0: ADDOP(c, DUP_TOP); break;
+ 		case 1: ADDOP_I(c, DUP_TOPX, 2); break;
+ 		case 2: ADDOP_I(c, DUP_TOPX, 3); break;
+ 		}
+  	}
+ 	else if (ctx == AugStore) {
+ 		switch (stack_count) {
+ 		case 0: ADDOP(c, ROT_TWO); break;
+ 		case 1: ADDOP(c, ROT_THREE); break;
+ 		case 2: ADDOP(c, ROT_FOUR); break;
+  		}
+  	}
+
+	switch (ctx) {
+	case AugLoad: /* fall through to Load */
+	case Load: op = SLICE; break;
+	case AugStore:/* fall through to Store */
+	case Store: op = STORE_SLICE; break;
+	case Del: op = DELETE_SLICE; break;
+	case Param:  /* XXX impossible? */
+		fprintf(stderr, "param invalid\n");
+		assert(0);
 	}
 
 	ADDOP(c, op + slice_offset);
@@ -2653,29 +2673,58 @@ compiler_slice(struct compiler *c, slice_ty s, int op, expr_context_ty ctx)
 }
 
 static int
-compiler_visit_slice(struct compiler *c, slice_ty s, expr_context_ty ctx)
+compiler_visit_nested_slice(struct compiler *c, slice_ty s, 
+			    expr_context_ty ctx)
 {
-	int op;
 	switch (s->kind) {
 	case Ellipsis_kind:
 		ADDOP_O(c, LOAD_CONST, Py_Ellipsis, consts);
 		break;
 	case Slice_kind:
-		switch (ctx) {
-		case AugLoad: /* fall through to Load */
-		case Load:    op = SLICE; break;
-		case AugStore:/* fall through to Store */
-		case Store:   op = STORE_SLICE; break;
-		case Del:     op = DELETE_SLICE; break;
-		default:
-			fprintf(stderr, "invalid slice kind %d "
-				"in compiler_visit_slice\n", ctx);
-			return 0;
-		}
-                return compiler_slice(c, s, op, ctx);
-	case ExtSlice_kind:
-                /* XXX: do we need to do anything?  should this be removed? */
+		return compiler_slice(c, s, ctx);
 		break;
+	case Index_kind:
+		VISIT(c, expr, s->v.Index.value);
+		break;
+	case ExtSlice_kind:
+		assert(0);
+		break;
+	}
+	return 1;
+}
+
+
+static int
+compiler_visit_slice(struct compiler *c, slice_ty s, expr_context_ty ctx)
+{
+	switch (s->kind) {
+	case Ellipsis_kind:
+		ADDOP_O(c, LOAD_CONST, Py_Ellipsis, consts);
+		break;
+	case Slice_kind:
+		if (!s->v.Slice.step) 
+			return compiler_simple_slice(c, s, ctx);
+                if (!compiler_slice(c, s, ctx))
+			return 0;
+		if (ctx == AugLoad) {
+			ADDOP_I(c, DUP_TOPX, 2);
+		}
+		else if (ctx == AugStore) {
+			ADDOP(c, ROT_THREE);
+		}
+		return compiler_handle_subscr(c, "slice", ctx);
+		break;
+	case ExtSlice_kind: {
+		int i, n = asdl_seq_LEN(s->v.ExtSlice.dims);
+		for (i = 0; i < n; i++) {
+			slice_ty sub = asdl_seq_GET(s->v.ExtSlice.dims, i);
+			if (!compiler_visit_nested_slice(c, sub, ctx))
+				return 0;
+		}
+		ADDOP_I(c, BUILD_TUPLE, n);
+                return compiler_handle_subscr(c, "extended slice", ctx);
+		break;
+	}
 	case Index_kind:
                 if (ctx != AugStore)
 			VISIT(c, expr, s->v.Index.value);
@@ -2728,10 +2777,12 @@ stackdepth_walk(struct compiler *c, int block, int depth, int maxdepth)
 	for (i = 0; i < b->b_iused; i++) {
 		instr = &b->b_instr[i];
 		depth += opcode_stack_effect(instr->i_opcode, instr->i_oparg);
-		assert(depth >= 0); /* invalid code or bug in stackdepth() */
 		if (depth > maxdepth)
 			maxdepth = depth;
-		fprintf(stderr, "  %s %d\n", opnames[instr->i_opcode], depth);
+		fprintf(stderr, "  %14s %3d %3d (%d)\n", 
+			opnames[instr->i_opcode], depth, maxdepth,
+			instr->i_lineno);
+		assert(depth >= 0); /* invalid code or bug in stackdepth() */
 		if (instr->i_jrel || instr->i_jabs) {
 			maxdepth = stackdepth_walk(c, instr->i_target,
 						   depth, maxdepth);
