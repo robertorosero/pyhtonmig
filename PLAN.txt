@@ -276,49 +276,7 @@ was committed on 2001-07-07.
 
 Merge issues:
 
-+ Tried only on Windows; Unix build may not even compile.
-
-+ New std test failures (again on Windows):
-
-      test_descr.py
-          Two shallow test errors were fixed (relying on exact order of
-          dict traversal -- for that matter, it still does, but now the
-          correct exact order <wink>).
-
-          A core dump was "fixed" (unsure about that!) via adding a
-          tp_new slot to dict objects, to ensure that they're initialized
-          before being used.
-
-          Then it died with
-            File "../lib/test\test_descr.py", line 325, in pydicts
-                verify(a1.state == 12)
-            AttributeError: 'dictionary' object has no attribute 'state'
-
-          I don't understand what tp_new is supposed to do for dicts,
-          exactly.  PEP 253 says
-
-          - If the base type defines tp_init as well as tp_new, its tp_new
-            should be inheritable: it should call the tp_alloc and the
-            tp_init of the type passed in as its first argument.
-
-          The tp_new I added doesn't do that, mostly because I couldn't find
-          any code that already does that in order to fill in the fine
-          points.  PEP 253 also says tp_alloc has signature:
-
-            PyObject *tp_alloc(PyTypeObject *type,
-                               PyObject *args,
-                               PyObject *kwds)
-
-          but in reality it appears to be this instead:
-
-              typedef PyObject *(*allocfunc)(struct _typeobject *, int);
-
-          After lots of guesswork, made a tp_new that got beyond that.
-
-          Now it dies with
-
-            Testing errors...
-            test test_descr failed -- __slots__ = {} should be illegal
+(all resolved -- GvR)
 ----------------------------------------------------------------------------
 2001-07-06
 
