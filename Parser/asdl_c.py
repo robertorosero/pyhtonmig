@@ -328,44 +328,96 @@ class PickleVisitor(EmitVisitor):
     def visitField(self, sum):
         pass
 
-class PicklePrototypeVisitor(PickleVisitor):
+class MarshalPrototypeVisitor(PickleVisitor):
 
-    def visitSum(self, sum, name):
+    def prototype(self, sum, name):
         ctype = get_c_type(name)
-        self.emit("int pkl_write_%s(PyObject *write, %s o);" % (name, ctype),
-                  0)
+        self.emit("int marshal_write_%s(PyObject **, int *, %s);"
+                  % (name, ctype), 0)
 
-class PickleFunctionVisitor(PickleVisitor):
-    
-    def visitSum(self, sum, name):
+    visitProduct = visitSum = prototype
+
+def find_sequence(fields):
+    """Return True if any field uses a sequence."""
+    for f in fields:
+        if f.seq:
+            return 1
+    return 0
+
+class MarshalFunctionVisitor(PickleVisitor):
+
+    def func_begin(self, name, has_seq):
         ctype = get_c_type(name)
         self.emit("int", 0)
-        self.emit("pkl_write_%s(PyObject *write, %s o)" % (name, ctype), 0)
+        self.emit("marshal_write_%s(PyObject **buf, int *off, %s o)" %
+                  (name, ctype), 0)
         self.emit("{", 0)
-        self.emit("switch (o->kind) {", 1)
-        simple = self.is_simple(sum)
-        for i in range(len(sum.types)):
-            t = sum.types[i]
-            self.visit(t, i + 1, name, simple)
-        self.emit("}", 1)
-        self.emit("return 0;", 1)
+        if has_seq:
+            self.emit("int i;", 1) # XXX only need it for sequences
+
+    def func_end(self):
+        self.emit("return 1;", 1)
         self.emit("}", 0)
         self.emit("", 0)
+    
+    def visitSum(self, sum, name):
+        has_seq = 0
+        for t in sum.types:
+            if find_sequence(t.fields):
+                has_seq = 1
+                break
+        self.func_begin(name, has_seq)
+        simple = self.is_simple(sum)
+        if simple:
+            self.emit("switch (o) {", 1)
+        else:
+            self.emit("switch (o->kind) {", 1)
+        for i in range(len(sum.types)):
+            t = sum.types[i]
+            self.visitConstructor(t, i + 1, name, simple)
+        self.emit("}", 1)
+        self.func_end()
+
+    def visitProduct(self, prod, name):
+        self.func_begin(name, find_sequence(prod.fields))
+        for field in prod.fields:
+            self.visitField(field, name, 1, 1)
+        self.func_end()
             
     def visitConstructor(self, cons, enum, name, simple):
         if simple:
-            pass
+            self.emit("case %s:" % cons.name, 1)
+            self.emit("marshal_write_int(buf, off, %d);" % enum, 2);
+            self.emit("break;", 2)
         else:
             self.emit("case %s_kind:" % cons.name, 1)
-            self.emit("pkl_write_int(write, %d);" % enum, 2)
+            self.emit("marshal_write_int(buf, off, %d);" % enum, 2)
             for f in cons.fields:
-                self.visit(f, cons.name)
+                self.visitField(f, cons.name, 2, 0)
             self.emit("break;", 2)
 
-    def visitField(self, field, name):
-        # handle seq and opt
-        self.emit("pkl_write_%s(write, o->v.%s.%s);" % (
-            field.type, name, field.name), 2)
+    def visitField(self, field, name, depth, product):
+        def emit(s, d):
+            self.emit(s, depth + d)
+        if product:
+            value = "o->%s" % field.name
+        else:
+            value = "o->v.%s.%s" % (name, field.name)
+        if field.seq:
+            emit("marshal_write_int(buf, off, asdl_seq_LEN(%s));" % value, 0)
+            emit("for (i = 0; i < asdl_seq_LEN(%s); i++) {" % value, 0)
+            emit("void *elt = asdl_seq_GET(%s, i);" % value, 1);
+            emit("marshal_write_%s(buf, off, elt);" % field.type, 1)
+            emit("}", 0)
+        elif field.opt:
+            emit("if (%s) {" % value, 0)
+            emit("marshal_write_int(buf, off, 1);", 1)
+            emit("marshal_write_%s(buf, off, %s);" % (field.type, value), 1)
+            emit("}", 0)
+            emit("else", 0)
+            emit("marshal_write_int(buf, off, 0);", 1)
+        else:
+            emit("marshal_write_%s(buf, off, %s);" % (field.type, value), 0)
 
 class ChainOfVisitors:
     def __init__(self, *visitors):
@@ -390,7 +442,7 @@ def main(srcfile):
     c = ChainOfVisitors(TypeDefVisitor(f),
                         StructVisitor(f),
                         PrototypeVisitor(f),
-##                        PicklePrototypeVisitor(f),
+                        MarshalPrototypeVisitor(f),
                         )
     c.visit(mod)
     f.close()
@@ -405,7 +457,7 @@ def main(srcfile):
     print >> f, '#include "%s-ast.h"' % mod.name
     print >> f
     v = ChainOfVisitors(FunctionVisitor(f),
-##                        PickleFunctionVisitor(f),
+                        MarshalFunctionVisitor(f),
                         )
     v.visit(mod)
     f.close()
