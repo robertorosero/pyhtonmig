@@ -6,6 +6,8 @@
 #include "symtable.h"
 #include "opcode.h"
 
+int Py_OptimizeFlag = 0;
+
 /* fblockinfo tracks the current frame block.
 
    A frame block is used to handle loops, try/except, and try/finally.
@@ -29,7 +31,7 @@ struct compiler {
 	int c_interactive;
 
 	/* info that changes for each code block */
-	PySymtableEntryObject *c_symbols;
+	PySTEntryObject *c_ste;
 	int c_nblocks;
 	int c_curblock;
 	struct basicblock c_entry;
@@ -63,6 +65,34 @@ static int compiler_visit_slice(struct compiler *, slice_ty);
 
 static int compiler_push_fblock(struct compiler *, enum fblocktype, int);
 static void compiler_pop_fblock(struct compiler *, enum fblocktype, int);
+
+int
+_Py_Mangle(char *p, char *name, char *buffer, size_t maxlen)
+{
+	/* Name mangling: __private becomes _classname__private.
+	   This is independent from how the name is used. */
+	size_t nlen, plen;
+	if (p == NULL || name == NULL || name[0] != '_' || name[1] != '_')
+		return 0;
+	nlen = strlen(name);
+	if (nlen+2 >= maxlen)
+		return 0; /* Don't mangle __extremely_long_names */
+	if (name[nlen-1] == '_' && name[nlen-2] == '_')
+		return 0; /* Don't mangle __whatever__ */
+	/* Strip leading underscores from class name */
+	while (*p == '_')
+		p++;
+	if (*p == '\0')
+		return 0; /* Don't mangle if class is just underscores */
+	plen = strlen(p);
+	if (plen + nlen >= maxlen)
+		plen = maxlen-nlen-2; /* Truncate class name if too long */
+	/* buffer = "_" + p[:plen] + name # i.e. 1+plen+nlen bytes */
+	buffer[0] = '_';
+	strncpy(buffer+1, p, plen);
+	strcpy(buffer+1+plen, name);
+	return 1;
+}
 
 PyCodeObject *
 PyAST_Compile(mod_ty mod, const char *filename, PyCompilerFlags *flags)
@@ -122,11 +152,11 @@ compiler_enter_scope(struct compiler *c, identifier name, void *key)
 		PyErr_SetObject(PyExc_KeyError, name);
 		return 0;
 	}
-	assert(PySymtableEntry_Check(v));
-	c->c_symbols = (PySymtableEntryObject *)v;
+	assert(PySTEntry_Check(v));
+	c->c_ste = (PySTEntryObject *)v;
 
 	c->c_nblocks = 0;
-	c->c_blocks = (struct basicblock **)malloc(sizeof(struct basicblock *) 
+	c->c_blocks = (struct basicblock **)malloc(sizeof(struct basicblock *)
 						   * DEFAULT_BLOCKS);
 	if (!c->c_blocks)
 		return 0;
@@ -144,8 +174,7 @@ static PyCodeObject *
 compiler_get_code(struct compiler *c)
 {
 	/* get the code object for the current block.
-	   XXX may want to return a thunk insttead
-	       to allow later passes
+	   XXX may want to return a thunk instead to allow later passes
 	*/
 	return NULL;
 }
@@ -315,12 +344,17 @@ compiler_mod(struct compiler *c, mod_ty mod)
 {
 	switch (mod->kind) {
 	case Module_kind:
+		VISIT_SEQ(c, stmt, mod->v.Module.body);
 		break;
 	case Interactive_kind:
+		VISIT(c, stmt, mod->v.Interactive.body);
 		break;
 	case Expression_kind:
+		VISIT(c, expr, mod->v.Expression.body);
 		break;
 	case Suite_kind:
+		assert(0);
+		VISIT_SEQ(c, stmt, mod->v.Suite.body);
 		break;
 	}
 	return 1;
@@ -567,7 +601,7 @@ compiler_visit_stmt(struct compiler *c, stmt_ty s)
 		return compiler_for(c, s);
 		break;
         case While_kind:
-		return compiler_if(c, s);
+		return compiler_while(c, s);
 		break;
         case If_kind:
 		return compiler_if(c, s);
@@ -687,6 +721,101 @@ binop(struct compiler *c, operator_ty op)
 	}
 	return 0;
 }
+
+static int
+compiler_name(struct compiler *c, expr_ty e)
+{
+	int op, scope;
+	enum { OP_FAST, OP_GLOBAL, OP_DEREF, OP_NAME } optype;
+
+	/* XXX AugStore isn't used anywhere! */
+	op = 0;
+	optype = OP_NAME;
+	scope = PyST_GetScope(c->c_ste, e->v.Name.id);
+	switch (scope) {
+	case FREE:
+	case CELL:
+		optype = OP_DEREF;
+		break;
+	case LOCAL:
+		if (c->c_ste->ste_type == FunctionBlock)
+			optype = OP_FAST;
+		break;
+	case GLOBAL_IMPLICIT:
+		if (c->c_ste->ste_optimized)
+			optype = OP_GLOBAL;
+		break;
+	case GLOBAL_EXPLICIT:
+		optype = OP_GLOBAL;
+		break;
+	}
+
+	switch (optype) {
+	case OP_DEREF:
+		switch (e->v.Name.ctx) {
+		case Load: op = LOAD_DEREF; break;
+		case Store: op = STORE_DEREF; break;
+		case AugStore:
+			break;
+		case Del:
+			assert(0); /* impossible */
+		}
+	case OP_FAST:
+		switch (e->v.Name.ctx) {
+		case Load: op = LOAD_FAST; break;
+		case Store: op = STORE_FAST; break;
+		case Del: op = DELETE_FAST; break;
+		case AugStore:
+			break;
+		}
+	case OP_GLOBAL:
+		switch (e->v.Name.ctx) {
+		case Load: op = LOAD_GLOBAL; break;
+		case Store: op = STORE_GLOBAL; break;
+		case Del: op = DELETE_GLOBAL; break;
+		case AugStore:
+			break;
+		}
+	case OP_NAME:
+		switch (e->v.Name.ctx) {
+		case Load: op = LOAD_NAME; break;
+		case Store: op = STORE_NAME; break;
+		case Del: op = DELETE_NAME; break;
+		case AugStore:
+			break;
+		}
+	}
+	
+	assert(op);
+	ADDOP_O(c, op, e->v.Name.id);
+	return 1;
+}
+
+static int
+compiler_boolop(struct compiler *c, expr_ty e)
+{
+	int end, jumpi, i, n;
+	asdl_seq *s;
+	
+	if (e->v.BoolOp.op == And)
+		jumpi = JUMP_IF_FALSE;
+	else
+		jumpi = JUMP_IF_TRUE;
+	end = compiler_new_block(c);
+	if (!end)
+		return 0;
+	s = e->v.BoolOp.values;
+	n = asdl_seq_LEN(s) - 1;
+	for (i = 0; i < n; ++i) {
+		VISIT(c, expr, asdl_seq_get(s, i));
+		ADDOP_I(c, jumpi, end);
+		NEW_BLOCK(c);
+		ADDOP(c, POP_TOP)
+	}
+	VISIT(c, expr, asdl_seq_get(s, n));
+	compiler_use_block(c, end);
+	return 1;
+}
 	
 static int 
 compiler_visit_expr(struct compiler *c, expr_ty e)
@@ -694,7 +823,8 @@ compiler_visit_expr(struct compiler *c, expr_ty e)
 	int i, n;
 
 	switch (e->kind) {
-        case BoolOp_kind:
+        case BoolOp_kind: 
+		return compiler_boolop(c, e);
 		break;
         case BinOp_kind:
 		VISIT(c, expr, e->v.BinOp.left);
@@ -757,7 +887,8 @@ compiler_visit_expr(struct compiler *c, expr_ty e)
 		VISIT(c, expr, e->v.Subscript.value);
 		VISIT(c, slice, e->v.Subscript.slice);
 		break;
-        case Name_kind:
+        case Name_kind: 
+		return compiler_name(c, e);
 		break;
 	/* child nodes of List and Tuple will have expr_context set */
         case List_kind:
@@ -818,4 +949,16 @@ compiler_error(struct compiler *c, const char *errstr)
 	Py_XDECREF(u);
 	Py_XDECREF(v);
 	return 0;
+}
+
+static int
+compiler_visit_slice(struct compiler *c, slice_ty s)
+{
+	return 1;
+}
+
+static int
+compiler_visit_arguments(struct compiler *c, arguments_ty a)
+{
+	return 1;
 }
