@@ -666,10 +666,12 @@ instance_getattr2(register PyInstanceObject *inst, PyObject *name)
 			v = w;
 		}
 		else if (PyMethod_Check(v)) {
-			PyObject *im_class = PyMethod_Class(v);
+			/* XXX This should be a tp_descr_get slot of
+			   PyMethodObjects */
+			PyObject *im_class = PyMethod_GET_CLASS(v);
 			/* Only if classes are compatible */
 			if (PyClass_IsSubclass((PyObject *)class, im_class)) {
-				PyObject *im_func = PyMethod_Function(v);
+				PyObject *im_func = PyMethod_GET_FUNCTION(v);
 				PyObject *w = PyMethod_New(im_func,
 						(PyObject *)inst, im_class);
 				Py_DECREF(v);
@@ -1944,36 +1946,6 @@ PyMethod_New(PyObject *func, PyObject *self, PyObject *class)
 	im->im_class = class;
 	PyObject_GC_Init(im);
 	return (PyObject *)im;
-}
-
-PyObject *
-PyMethod_Function(register PyObject *im)
-{
-	if (!PyMethod_Check(im)) {
-		PyErr_BadInternalCall();
-		return NULL;
-	}
-	return ((PyMethodObject *)im)->im_func;
-}
-
-PyObject *
-PyMethod_Self(register PyObject *im)
-{
-	if (!PyMethod_Check(im)) {
-		PyErr_BadInternalCall();
-		return NULL;
-	}
-	return ((PyMethodObject *)im)->im_self;
-}
-
-PyObject *
-PyMethod_Class(register PyObject *im)
-{
-	if (!PyMethod_Check(im)) {
-		PyErr_BadInternalCall();
-		return NULL;
-	}
-	return ((PyMethodObject *)im)->im_class;
 }
 
 /* Class method methods */
