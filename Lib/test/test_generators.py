@@ -389,7 +389,7 @@ Was hoping to see this instead:
 ['gi_frame', 'gi_running', 'next']
 
 >>> print i.next.__doc__
-x.next() -> get the next value, or raise StopIteration
+x.next() -> the next value, or raise StopIteration
 >>> iter(i) is i
 1
 >>> import types
