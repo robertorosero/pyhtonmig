@@ -983,7 +983,7 @@ builtin_input(PyObject *self, PyObject *args)
 					 PyEval_GetBuiltins()) != 0)
 			return NULL;
 	}
-	res = PyRun_String(str, Py_eval_input, globals, locals);
+	res = PyRun_StringFlags(str, Py_eval_input, globals, locals, NULL);
 	Py_DECREF(line);
 	return res;
 }
