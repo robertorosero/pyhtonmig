@@ -97,7 +97,7 @@ descr_repr(PyDescrObject *descr)
 }
 
 static PyObject *
-descr_get(PyDescrObject *descr, PyObject *obj)
+descr_get(PyDescrObject *descr, PyObject *obj, PyTypeObject *type)
 {
 	if (obj == NULL) {
 		Py_INCREF(descr);
@@ -251,7 +251,7 @@ descr_call(PyDescrObject *descr, PyObject *args, PyObject *kwds)
 	}
 
 	if (argc == 1)
-		return descr_get(descr, self);
+		return descr_get(descr, self, self->ob_type);
 	if (argc == 2) {
 		PyObject *value = PyTuple_GET_ITEM(args, 1);
 		if (descr_set(descr, self, value) < 0)
@@ -269,10 +269,13 @@ static PyObject *
 descr_get_api(PyDescrObject *descr, PyObject *args)
 {
 	PyObject *obj;
+	PyTypeObject *type = NULL;
 
-	if (!PyArg_ParseTuple(args, "O:get", &obj))
+	if (!PyArg_ParseTuple(args, "O|O!:get", &obj, &PyType_Type, &type))
 		return NULL;
-	return descr_get(descr, obj);
+	if (type == NULL)
+		type = obj->ob_type;
+	return descr_get(descr, obj, type);
 }
 
 static PyObject *

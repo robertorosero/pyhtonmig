@@ -632,7 +632,7 @@ type_getattro(PyTypeObject *type, PyObject *name)
 	if (descr != NULL) {
 		f = descr->ob_type->tp_descr_get;
 		if (f != NULL && PyDescr_IsData(descr))
-			return f(descr, (PyObject *)type);
+			return f(descr, (PyObject *)type, metatype);
 	}
 
 	/* Look in tp_defined of this type and its bases */
@@ -644,7 +644,7 @@ type_getattro(PyTypeObject *type, PyObject *name)
 
 	/* Use the descriptor from the metatype */
 	if (f != NULL) {
-		res = f(descr, NULL);
+		res = f(descr, NULL, metatype);
 		return res;
 	}
 	if (descr != NULL) {
@@ -1635,8 +1635,8 @@ static struct wrapperbase tab_next[] = {
 };
 
 static struct wrapperbase tab_descr_get[] = {
-	{"__get__", (wrapperfunc)wrap_binaryfunc,
-	 "descr.__get__(obj) -> value"},
+	{"__get__", (wrapperfunc)wrap_ternaryfunc,
+	 "descr.__get__(obj, type) -> value"},
 	{0}
 };
 
@@ -2025,7 +2025,7 @@ slot_tp_iternext(PyObject *self)
 	return PyObject_CallMethod(self, "next", "");
 }
 
-SLOT1(tp_descr_get, get, PyObject *, O);
+SLOT2(tp_descr_get, get, PyObject *, PyTypeObject *, OO);
 
 static int
 slot_tp_descr_set(PyObject *self, PyObject *target, PyObject *value)

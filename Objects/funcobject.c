@@ -330,14 +330,9 @@ function_call(PyObject *func, PyObject *arg, PyObject *kw)
 
 /* Bind a function to an object */
 static PyObject *
-func_descr_get(PyObject *func, PyObject *obj)
+func_descr_get(PyObject *func, PyObject *obj, PyTypeObject *type)
 {
-	if (obj == NULL) {
-		Py_INCREF(func);
-		return func;
-	}
-	else
-		return PyMethod_New(func, obj, (PyObject *)obj->ob_type);
+	return PyMethod_New(func, obj, (PyObject *)type);
 }
 
 PyTypeObject PyFunction_Type = {

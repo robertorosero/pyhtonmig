@@ -1127,7 +1127,7 @@ PyObject_GenericGetAttr(PyObject *obj, PyObject *name)
 	if (descr != NULL) {
 		f = descr->ob_type->tp_descr_get;
 		if (f != NULL && PyDescr_IsData(descr))
-			return f(descr, obj);
+			return f(descr, obj, obj->ob_type);
 	}
 
 	dictptr = _PyObject_GetDictPtr(obj);
@@ -1143,7 +1143,7 @@ PyObject_GenericGetAttr(PyObject *obj, PyObject *name)
 	}
 
 	if (f != NULL)
-		return f(descr, obj);
+		return f(descr, obj, obj->ob_type);
 
 	if (descr != NULL) {
 		Py_INCREF(descr);
