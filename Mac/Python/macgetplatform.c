@@ -1,7 +1,0 @@
-
-char *
-getplatform()
-{
-	return "mac";
-}
-
