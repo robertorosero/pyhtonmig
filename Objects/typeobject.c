@@ -188,7 +188,7 @@ type_construct(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	type = PyObject_New(PyTypeObject, &PyType_Type);
 	if (type == NULL)
 		return NULL;
-	memset(((void *)type) + offsetof(PyTypeObject, tp_name), '\0',
+	memset(((char *)type) + offsetof(PyTypeObject, tp_name), '\0',
 	       sizeof(PyTypeObject) - offsetof(PyTypeObject, tp_name));
 	type->tp_name = PyString_AS_STRING(name);
 	type->tp_flags = Py_TPFLAGS_DEFAULT;
