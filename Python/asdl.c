@@ -19,11 +19,16 @@ asdl_seq_free(asdl_seq *seq)
     PyObject_Free(seq);
 }
 
-#define CHECKSIZE(BUF, OFF, MIN) \
-	if ((*OFF + (MIN)) >= PyString_GET_SIZE(*BUF)) { \
-		if (_PyString_Resize(BUF, PyString_GET_SIZE(*BUF) * 2) < 0) \
+#define CHECKSIZE(BUF, OFF, MIN) { \
+	int need = *(OFF) + MIN; \
+	if (need >= PyString_GET_SIZE(*(BUF))) { \
+		int newsize = PyString_GET_SIZE(*(BUF)) * 2; \
+		if (newsize < need) \
+			newsize = need; \
+		if (_PyString_Resize((BUF), newsize) < 0) \
 			return 0; \
 	} \
+} 
 
 int 
 marshal_write_int(PyObject **buf, int *offset, int x)
