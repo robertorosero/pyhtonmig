@@ -1,10 +1,16 @@
-# NOTE: This file is copied by the Makefile to Setup, which you can
-# subsequently edit to suit your taste without losing the original.
-#
-# This file is used by the makesetup script to construct Makefile.in
-# and config.c, from Makefile.in.in (sic!) and config.c.in,
-# respectively.
-#
+# The file Setup is used by the makesetup script to construct the files
+# Makefile and config.c, from Makefile.pre and config.c.in,
+# respectively.  The file Setup itself is initially copied from
+# Setup.in; once it exists it will not be overwritten, so you can edit
+# Setup to your heart's content.  One possibility is to overwrite it
+# with a copy of Setup.sgi or Setup.sunos[45] before you start editing.
+# Note that Makefile.pre is created from Makefile.pre.in by the toplevel
+# configure script.
+
+# (VPATH notes: Setup and Makefile.pre are in the build directory, as
+# are Makefile and config.c; Setup.in and config.c.in are in the source
+# directory.)
+
 # Each line in this file describes one or more optional modules.
 # Comment out lines to suppress modules.
 # Lines have the following structure:
@@ -22,7 +28,7 @@
 # <name> = <value>
 #
 # which defines a Make variable definition inserted into Makefile.in
-#
+
 # NOTE: As a standard policy, as many modules as can be supported by a
 # platform should be present.  The distribution comes with all modules
 # enabled that are supported by most platforms and don't require you
@@ -32,13 +38,20 @@
 
 
 # Some special rules to define PYTHONPATH.
-# Edit the definitions below to indicate which options you are using
+# Edit the definitions below to indicate which options you are using.
+# Don't add any whitespace or comments!
 
-DESTDIR=/usr/local		# Edit this if needed
-DESTLIB=$(DESTDIR)/lib/python	# Don't edit this (usually)
-#ARCHPATH=:$(DESTLIB)/sgi	# Enable this for SGI systems
-#ARCHPATH=:$(DESTLIB)/sun4	# Enable this for Sun systems
-#STDWINPATH=:$(DESTLIB)/stdwin	# Enable this if stdwin installed
+# Don't edit this (usually)
+DESTLIB=$(prefix)/lib/python
+
+# Enable this for SGI systems
+#ARCHPATH=:$(DESTLIB)/sgi
+
+# Enable this for Sun systems
+#ARCHPATH=:$(DESTLIB)/sun4
+
+# Enable this if stdwin installed
+#STDWINPATH=:$(DESTLIB)/stdwin
 
 PYTHONPATH=.:$(DESTLIB)$(ARCHPATH)$(STDWINPATH)
 
@@ -155,7 +168,7 @@ rotor rotormodule.o
 
 
 # GNN's timing module
-timing timingmodule.o
+# timing timingmodule.o
 
 
 # Example -- included for reference only
