@@ -1271,7 +1271,7 @@ static PySequenceMethods dict_as_sequence = {
 staticforward PyObject *dictiter_new(dictobject *);
 
 static PyObject *
-dict_construct(PyDictObject *self)
+dict_construct(PyDictObject *self, PyObject *args, PyObject *kw)
 {
 	if (self == NULL)
 		return PyDict_New();
@@ -1323,7 +1323,7 @@ PyTypeObject PyDict_Type = {
 	0,					/* tp_dict */
 	0,					/* tp_descr_get */
 	0,					/* tp_descr_set */
-	(unaryfunc)dict_construct,		/* tp_construct */
+	(ternaryfunc)dict_construct,		/* tp_construct */
 };
 
 /* For backward compatibility with old dictionary interface */

@@ -1495,7 +1495,7 @@ list_richcompare(PyObject *v, PyObject *w, int op)
 }
 
 static PyObject *
-list_construct(PyListObject *self)
+list_construct(PyListObject *self, PyObject *args, PyObject *kw)
 {
 	if (self == NULL)
 		return PyList_New(0);
@@ -1585,7 +1585,7 @@ PyTypeObject PyList_Type = {
 	0,					/* tp_dict */
 	0,					/* tp_descr_get */
 	0,					/* tp_descr_set */
-	(unaryfunc)list_construct,		/* tp_construct */
+	(ternaryfunc)list_construct,		/* tp_construct */
 };
 
 
@@ -1668,6 +1668,6 @@ static PyTypeObject immutable_list_type = {
 	0,					/* tp_dict */
 	0,					/* tp_descr_get */
 	0,					/* tp_descr_set */
-	(unaryfunc)list_construct,		/* tp_construct */
+	(ternaryfunc)list_construct,		/* tp_construct */
 	/* NOTE: This is *not* the standard list_type struct! */
 };
