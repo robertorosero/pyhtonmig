@@ -223,6 +223,7 @@ class Dist (Command):
         for fn in standards:
             if type (fn) is TupleType:
                 alts = fn
+                got_it = 0
                 for fn in alts:
                     if os.path.exists (fn):
                         got_it = 1
