@@ -114,6 +114,9 @@ Py_Initialize(void)
 		Py_FatalError("Py_Initialize: can't make first thread");
 	(void) PyThreadState_Swap(tstate);
 
+	if (PyType_InitDict(&PyType_Type) < 0)
+		Py_FatalError("Py_Initialize: can't initialize 'type'");
+
 	interp->modules = PyDict_New();
 	if (interp->modules == NULL)
 		Py_FatalError("Py_Initialize: can't make modules dictionary");
