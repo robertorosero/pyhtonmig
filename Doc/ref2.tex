@@ -41,10 +41,15 @@ backslash and the following end-of-line character.  For example:
 \index{backslash character}
 %
 \begin{verbatim}
-if 1900 < year < 2100 and 1 <= month <= 12 and 1 <= day <= 31 and
-   0 <= hour < 24 and 0 <= minute < 60 and 0 <= second < 60:
+if 1900 < year < 2100 and 1 <= month <= 12 \
+   and 1 <= day <= 31 and 0 <= hour < 24 \
+   and 0 <= minute < 60 and 0 <= second < 60:   # Looks like a valid date
         return 1
 \end{verbatim}
+
+A line ending in a backslash cannot carry a comment; a backslash does
+not continue a comment (but it does continue a string literal, see
+below).
 
 \subsection{Implicit line joining}
 
@@ -53,11 +58,15 @@ split over more than one physical line without using backslashes.
 For example:
 
 \begin{verbatim}
-month_names = ['Januari', 'Februari', 'Maart',
-               'April',   'Mei',      'Juni',
-               'Juli',    'Augustus', 'September',
-               'Oktober', 'November', 'December']
+month_names = ['Januari', 'Februari', 'Maart',      # These are the
+               'April',   'Mei',      'Juni',       # Dutch names
+               'Juli',    'Augustus', 'September',  # for the months
+               'Oktober', 'November', 'December']   # of the year
 \end{verbatim}
+
+Implicitly continued lines can carry comments.  The indentation of the
+continuation lines is not important.  Blank continuation lines are
+allowed.
 
 \subsection{Blank lines}
 
