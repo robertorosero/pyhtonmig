@@ -446,13 +446,10 @@ ToDo
 ----
 
 + Grammar support (Parser/Python.asdl, Parser/asdl_c.py)
-    - decorators
     - empty base class list (``class Class(): pass``)
 + parse tree->AST support (Python/ast.c)
-    - decorators
     - generator expressions
 + AST->bytecode support (Python/newcompile.c)
-    - decorators
     - generator expressions
 + Stdlib support
     - AST->Python access?
@@ -460,7 +457,10 @@ ToDo
 + Documentation
     - flesh out this doc
 	* byte stream output
+	* explanation of how symbol table pass works
 + Universal
+    - remove "generator comprehension" mentions and change to "generator
+      expression"
     - make sure entire test suite passes
     - fix memory leaks
     - make sure return types are properly checked for errors
