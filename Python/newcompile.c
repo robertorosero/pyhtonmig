@@ -2615,7 +2615,7 @@ static int
 compute_code_flags(struct compiler *c)
 {
 	PySTEntryObject *ste = c->u->u_ste;
-	int flags = 0;
+	int flags = 0, n;
 	if (ste->ste_type != ModuleBlock)
 		flags |= CO_NEWLOCALS;
 	if (ste->ste_type == FunctionBlock) {
@@ -2630,6 +2630,18 @@ compute_code_flags(struct compiler *c)
 		flags |= CO_VARARGS;
 	if (ste->ste_varkeywords)
 		flags |= CO_VARKEYWORDS;
+	n = PyDict_Size(c->u->u_freevars);
+	if (n < 0)
+	    return -1;
+	if (n == 0) {
+	    n = PyDict_Size(c->u->u_cellvars);
+	    if (n < 0)
+		return -1;
+	    if (n == 0) {
+		flags |= CO_NOFREE;
+	    }
+	}
+
 	return flags;
 }
 
@@ -2644,7 +2656,7 @@ makecode(struct compiler *c, struct assembler *a)
 	PyObject *name = NULL;
 	PyObject *freevars = NULL;
 	PyObject *cellvars = NULL;
-	int nlocals;
+	int nlocals, flags;
 
 	consts = dict_keys_inorder(c->u->u_consts, 0);
 	names = dict_keys_inorder(c->u->u_names, 0);
@@ -2661,8 +2673,11 @@ makecode(struct compiler *c, struct assembler *a)
 		goto error;
 
         nlocals = PyDict_Size(c->u->u_varnames);
+	flags = compute_code_flags(c);
+	if (flags < 0)
+	    goto error;
 	co = PyCode_New(c->u->u_argcount, nlocals, stackdepth(c),
-			compute_code_flags(c),
+			flags,
 			a->a_bytecode, consts, names, varnames,
 			freevars, cellvars,
 			filename, c->u->u_name,
