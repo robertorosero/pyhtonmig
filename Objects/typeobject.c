@@ -13,7 +13,10 @@ struct memberlist type_members[] = {
 static PyObject *
 type_bases(PyTypeObject *type, void *context)
 {
-	return PyTuple_New(0);
+	if (type->tp_base == NULL)
+		return PyTuple_New(0);
+	else
+		return Py_BuildValue("(O)", type->tp_base);
 }
 
 static PyObject *
@@ -45,6 +48,35 @@ type_repr(PyTypeObject *type)
 	char buf[100];
 	sprintf(buf, "<type '%.80s'>", type->tp_name);
 	return PyString_FromString(buf);
+}
+
+static PyObject *
+type_call(PyTypeObject *type, PyObject *args, PyObject *kwds)
+{
+	char *dummy = NULL;
+	PyObject *obj, *res;
+
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "", &dummy))
+		return NULL;
+
+	if (type->tp_construct == NULL) {
+		PyErr_Format(PyExc_TypeError,
+			     "cannot construct '%.100s' instances",
+			     type->tp_name);
+		return NULL;
+	}
+	obj = PyObject_New(PyObject, type);
+	if (obj == NULL)
+		return NULL;
+	res = (type->tp_construct)(obj);
+	if (res != obj) {
+		Py_DECREF(obj);
+		if (res == NULL)
+			return NULL;
+	}
+	if (PyType_IS_GC(type))
+		PyObject_GC_Init(res);
+	return res;
 }
 
 static PyObject *
@@ -107,7 +139,7 @@ PyTypeObject PyType_Type = {
 	0,					/* tp_as_sequence */
 	0,					/* tp_as_mapping */
 	0,					/* tp_hash */
-	0,					/* tp_call */
+	(ternaryfunc)type_call,			/* tp_call */
 	0,					/* tp_str */
 	(getattrofunc)type_getattro,		/* tp_getattro */
 	0,					/* tp_setattro */
@@ -210,14 +242,169 @@ add_getset(PyTypeObject *type, struct getsetlist *gsp)
 
 staticforward int add_operators(PyTypeObject *);
 
+static int
+inherit_slots(PyTypeObject *type, PyTypeObject *base)
+{
+#undef COPYSLOT
+#undef COPYNUM
+#undef COPYSEQ
+#undef COPYMAP
+#define COPYSLOT(SLOT) \
+	if (!type->SLOT) type->SLOT = base->SLOT
+
+#define COPYNUM(SLOT) COPYSLOT(tp_as_number->SLOT)
+#define COPYSEQ(SLOT) COPYSLOT(tp_as_sequence->SLOT)
+#define COPYMAP(SLOT) COPYSLOT(tp_as_mapping->SLOT)
+
+	if (type->tp_as_number == NULL)
+		type->tp_as_number = base->tp_as_number;
+	else if (base->tp_as_number) {
+		COPYNUM(nb_add);
+		COPYNUM(nb_subtract);
+		COPYNUM(nb_multiply);
+		COPYNUM(nb_divide);
+		COPYNUM(nb_remainder);
+		COPYNUM(nb_divmod);
+		COPYNUM(nb_power);
+		COPYNUM(nb_negative);
+		COPYNUM(nb_positive);
+		COPYNUM(nb_absolute);
+		COPYNUM(nb_nonzero);
+		COPYNUM(nb_invert);
+		COPYNUM(nb_lshift);
+		COPYNUM(nb_rshift);
+		COPYNUM(nb_and);
+		COPYNUM(nb_xor);
+		COPYNUM(nb_or);
+		COPYNUM(nb_coerce);
+		COPYNUM(nb_int);
+		COPYNUM(nb_long);
+		COPYNUM(nb_float);
+		COPYNUM(nb_oct);
+		COPYNUM(nb_hex);
+		COPYNUM(nb_inplace_add);
+		COPYNUM(nb_inplace_subtract);
+		COPYNUM(nb_inplace_multiply);
+		COPYNUM(nb_inplace_divide);
+		COPYNUM(nb_inplace_remainder);
+		COPYNUM(nb_inplace_power);
+		COPYNUM(nb_inplace_lshift);
+		COPYNUM(nb_inplace_rshift);
+		COPYNUM(nb_inplace_and);
+		COPYNUM(nb_inplace_xor);
+		COPYNUM(nb_inplace_or);
+	}
+
+	if (type->tp_as_sequence == NULL)
+		type->tp_as_sequence = base->tp_as_sequence;
+	else if (base->tp_as_sequence) {
+		COPYSEQ(sq_length);
+		COPYSEQ(sq_concat);
+		COPYSEQ(sq_repeat);
+		COPYSEQ(sq_item);
+		COPYSEQ(sq_slice);
+		COPYSEQ(sq_ass_item);
+		COPYSEQ(sq_ass_slice);
+		COPYSEQ(sq_contains);
+		COPYSEQ(sq_inplace_concat);
+		COPYSEQ(sq_inplace_repeat);
+	}
+
+	if (type->tp_as_mapping == NULL)
+		type->tp_as_mapping = base->tp_as_mapping;
+	else if (base->tp_as_mapping) {
+		COPYMAP(mp_length);
+		COPYMAP(mp_subscript);
+		COPYMAP(mp_ass_subscript);
+	}
+
+	/* Special flag magic */
+	if (!type->tp_as_buffer && base->tp_as_buffer) {
+		type->tp_flags &= ~Py_TPFLAGS_HAVE_GETCHARBUFFER;
+		type->tp_flags |=
+			base->tp_flags & Py_TPFLAGS_HAVE_GETCHARBUFFER;
+	}
+	if (!type->tp_as_sequence && base->tp_as_sequence) {
+		type->tp_flags &= ~Py_TPFLAGS_HAVE_SEQUENCE_IN;
+		type->tp_flags |= base->tp_flags & Py_TPFLAGS_HAVE_SEQUENCE_IN;
+	}
+	if (!(type->tp_flags & Py_TPFLAGS_GC) &&
+	    (base->tp_flags & Py_TPFLAGS_GC) &&
+	    (type->tp_flags & Py_TPFLAGS_HAVE_RICHCOMPARE/*GC slots exist*/) &&
+	    (!type->tp_traverse && !type->tp_clear)) {
+		type->tp_flags |= Py_TPFLAGS_GC;
+		type->tp_basicsize += PyGC_HEAD_SIZE;
+		COPYSLOT(tp_traverse);
+		COPYSLOT(tp_clear);
+	}
+	if ((type->tp_flags & Py_TPFLAGS_HAVE_INPLACEOPS) !=
+	    (base->tp_flags & Py_TPFLAGS_HAVE_INPLACEOPS)) {
+		if ((!type->tp_as_number && base->tp_as_number) ||
+		    (!type->tp_as_sequence && base->tp_as_sequence)) {
+			type->tp_flags &= ~Py_TPFLAGS_HAVE_INPLACEOPS;
+			if (!type->tp_as_number && !type->tp_as_sequence) {
+				type->tp_flags |= base->tp_flags &
+					Py_TPFLAGS_HAVE_INPLACEOPS;
+			}
+		}
+		/* Wow */
+	}
+	if (!type->tp_as_number && base->tp_as_number) {
+		type->tp_flags &= ~Py_TPFLAGS_CHECKTYPES;
+		type->tp_flags |= base->tp_flags & Py_TPFLAGS_CHECKTYPES;
+	}
+
+	COPYSLOT(tp_name);
+	COPYSLOT(tp_basicsize);
+	COPYSLOT(tp_itemsize);
+	COPYSLOT(tp_dealloc);
+	COPYSLOT(tp_print);
+	COPYSLOT(tp_getattr);
+	COPYSLOT(tp_setattr);
+	COPYSLOT(tp_compare);
+	COPYSLOT(tp_repr);
+	COPYSLOT(tp_hash);
+	COPYSLOT(tp_call);
+	COPYSLOT(tp_str);
+	COPYSLOT(tp_getattro);
+	COPYSLOT(tp_setattro);
+	COPYSLOT(tp_as_buffer);
+	COPYSLOT(tp_flags);
+	COPYSLOT(tp_doc);
+	if (type->tp_flags & base->tp_flags & Py_TPFLAGS_HAVE_RICHCOMPARE) {
+		COPYSLOT(tp_richcompare);
+	}
+	if (type->tp_flags & base->tp_flags & Py_TPFLAGS_HAVE_WEAKREFS) {
+		COPYSLOT(tp_weaklistoffset);
+	}
+	if (type->tp_flags & base->tp_flags & Py_TPFLAGS_HAVE_ITER) {
+		COPYSLOT(tp_iter);
+		COPYSLOT(tp_iternext);
+	}
+	if (type->tp_flags & base->tp_flags & Py_TPFLAGS_HAVE_CLASS) {
+		COPYSLOT(tp_descr_get);
+		COPYSLOT(tp_descr_set);
+		COPYSLOT(tp_construct);
+	}
+
+	return 0;
+}
+
 int
 PyType_InitDict(PyTypeObject *type)
 {
 	PyObject *dict;
+	PyTypeObject *base = type->tp_base;
 
 	if (type->tp_dict != NULL)
 		return 0;
-	dict = PyDict_New();
+	if (base) {
+		if (PyType_InitDict(base) < 0)
+			return -1;
+		dict = PyDict_Copy(base->tp_dict);
+	}
+	else
+		dict = PyDict_New();
 	if (dict == NULL)
 		return -1;
 	type->tp_dict = dict;
@@ -245,6 +432,13 @@ PyType_InitDict(PyTypeObject *type)
 		if (add_getset(type, type->tp_getset) < 0)
 			return -1;
 	}
+
+	/* Inherit base class slots and methods */
+	if (base) {
+		if (inherit_slots(type, base) < 0)
+			return -1;
+	}
+
 	return 0;
 }
 
