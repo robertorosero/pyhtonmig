@@ -1,4 +1,7 @@
 #!/bin/sh
+# From configure.in Revision
+
+#!/bin/sh
 # Guess values for system-dependent variables and create Makefiles.
 # Generated automatically using autoconf.
 # Copyright (C) 1991, 1992, 1993 Free Software Foundation, Inc.
@@ -779,39 +782,6 @@ SEDDEFS="${SEDDEFS}\${SEDdA}HAVE_LIBDL\${SEDdB}HAVE_LIBDL\${SEDdC}1\${SEDdD}
 fi
 
 LIBS_save="${LIBS}"
-LIBS="${LIBS} -lsocket"
-have_lib=""
-echo checking for -lsocket
-cat > conftest.c <<EOF
-#include "confdefs.h"
-
-int main() { exit(0); }
-int t() { main(); }
-EOF
-if eval $compile; then
-  rm -rf conftest*
-  have_lib="1"
-
-fi
-rm -f conftest*
-LIBS="${LIBS_save}"
-if test -n "${have_lib}"; then
-   
-{
-test -n "$verbose" && \
-echo "	defining HAVE_LIBSOCKET"
-echo "#define" HAVE_LIBSOCKET 1 >> confdefs.h
-DEFS="$DEFS -DHAVE_LIBSOCKET=1"
-SEDDEFS="${SEDDEFS}\${SEDdA}HAVE_LIBSOCKET\${SEDdB}HAVE_LIBSOCKET\${SEDdC}1\${SEDdD}
-\${SEDuA}HAVE_LIBSOCKET\${SEDuB}HAVE_LIBSOCKET\${SEDuC}1\${SEDuD}
-\${SEDeA}HAVE_LIBSOCKET\${SEDeB}HAVE_LIBSOCKET\${SEDeC}1\${SEDeD}
-"
-}
-
-   LIBS="${LIBS} -lsocket"
-fi
-
-LIBS_save="${LIBS}"
 LIBS="${LIBS} -lnsl"
 have_lib=""
 echo checking for -lnsl
@@ -842,6 +812,39 @@ SEDDEFS="${SEDDEFS}\${SEDdA}HAVE_LIBNSL\${SEDdB}HAVE_LIBNSL\${SEDdC}1\${SEDdD}
 }
 
    LIBS="${LIBS} -lnsl"
+fi
+
+LIBS_save="${LIBS}"
+LIBS="${LIBS} -lsocket"
+have_lib=""
+echo checking for -lsocket
+cat > conftest.c <<EOF
+#include "confdefs.h"
+
+int main() { exit(0); }
+int t() { main(); }
+EOF
+if eval $compile; then
+  rm -rf conftest*
+  have_lib="1"
+
+fi
+rm -f conftest*
+LIBS="${LIBS_save}"
+if test -n "${have_lib}"; then
+   
+{
+test -n "$verbose" && \
+echo "	defining HAVE_LIBSOCKET"
+echo "#define" HAVE_LIBSOCKET 1 >> confdefs.h
+DEFS="$DEFS -DHAVE_LIBSOCKET=1"
+SEDDEFS="${SEDDEFS}\${SEDdA}HAVE_LIBSOCKET\${SEDdB}HAVE_LIBSOCKET\${SEDdC}1\${SEDdD}
+\${SEDuA}HAVE_LIBSOCKET\${SEDuB}HAVE_LIBSOCKET\${SEDuC}1\${SEDuD}
+\${SEDeA}HAVE_LIBSOCKET\${SEDeB}HAVE_LIBSOCKET\${SEDeC}1\${SEDeD}
+"
+}
+
+   LIBS="${LIBS} -lsocket"
 fi
 
 
@@ -1188,6 +1191,35 @@ fi
 rm -f conftest*
 
 fi
+
+echo checking for whether sys/select.h and sys/time.h may both be included
+cat > conftest.c <<EOF
+#include "confdefs.h"
+
+#include <sys/types.h>
+#include <sys/select.h>
+#include <sys/time.h>
+
+int main() { exit(0); }
+int t() { ; }
+EOF
+if eval $compile; then
+  rm -rf conftest*
+  
+{
+test -n "$verbose" && \
+echo "	defining SYS_SELECT_WITH_SYS_TIME"
+echo "#define" SYS_SELECT_WITH_SYS_TIME 1 >> confdefs.h
+DEFS="$DEFS -DSYS_SELECT_WITH_SYS_TIME=1"
+SEDDEFS="${SEDDEFS}\${SEDdA}SYS_SELECT_WITH_SYS_TIME\${SEDdB}SYS_SELECT_WITH_SYS_TIME\${SEDdC}1\${SEDdD}
+\${SEDuA}SYS_SELECT_WITH_SYS_TIME\${SEDuB}SYS_SELECT_WITH_SYS_TIME\${SEDuC}1\${SEDuD}
+\${SEDeA}SYS_SELECT_WITH_SYS_TIME\${SEDeB}SYS_SELECT_WITH_SYS_TIME\${SEDeC}1\${SEDeD}
+"
+}
+
+
+fi
+rm -f conftest*
 
 
 # checks for compiler characteristics
