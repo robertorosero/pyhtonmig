@@ -367,6 +367,8 @@ type_init(PyObject *self, PyObject *args, PyObject *kwds)
 		PyTypeObject *t;
 		for (i = n; --i >= 0; ) {
 			t = (PyTypeObject *) PyTuple_GET_ITEM(bases, i);
+			if (t->tp_dict == NULL)
+				continue;
 			x = PyObject_CallMethod(type->tp_dict,
 						"update", "O", t->tp_dict);
 			if (x == NULL) {
