@@ -187,7 +187,6 @@ symtable_new(void)
 	if ((st->st_symbols = PyDict_New()) == NULL)
 		goto fail; 
 	st->st_cur = NULL;
-	st->st_errors = 0;
 	st->st_tmpname = 0;
 	st->st_private = NULL;
 	return st;
@@ -217,7 +216,9 @@ PySymtable_Build(mod_ty mod, const char *filename, PyFutureFeatures *future)
 	symtable_enter_block(st, GET_IDENTIFIER(top), ModuleBlock, 
 			     (void *)mod, 0);
 	/* Any other top-level initialization? */
-	if (mod->kind == Module_kind) {
+	switch (mod->kind) {
+	case Module_kind: 
+	{
 		int i;
 		asdl_seq *seq = mod->v.Module.body;
 		for (i = 0; i < asdl_seq_LEN(seq); i++)
@@ -226,12 +227,19 @@ PySymtable_Build(mod_ty mod, const char *filename, PyFutureFeatures *future)
 				return NULL;
 			}
 	}
+	break;
+	case Expression_kind:
+		symtable_visit_expr(st, mod->v.Expression.body);
+		break;
+	default:
+		return NULL;
+	}
 	symtable_exit_block(st, (void *)mod);
 	return st;
 }
 
 int 
-PySTEntry_GetScope(PySTEntryObject *ste, PyObject *name)
+PyST_GetScope(PySTEntryObject *ste, PyObject *name)
 {
 	PyObject *v;
 	int flags;
@@ -474,11 +482,13 @@ symtable_exit_block(struct symtable *st, void *ast)
 
 	Py_DECREF(st->st_cur);
 	end = PyList_GET_SIZE(st->st_stack) - 1;
-	st->st_cur = (PySTEntryObject *)PyList_GET_ITEM(st->st_stack, 
-							      end);
-	if (PySequence_DelItem(st->st_stack, end) < 0)
-		return -1;
-	return 0;
+	if (end >= 0) {
+		st->st_cur = (PySTEntryObject *)PyList_GET_ITEM(st->st_stack, 
+								end);
+		if (PySequence_DelItem(st->st_stack, end) < 0)
+			return 0;
+	}
+	return 1;
 }
 
 static int
@@ -491,17 +501,15 @@ symtable_enter_block(struct symtable *st, identifier name, block_ty block,
 		prev = st->st_cur;
 		if (PyList_Append(st->st_stack, (PyObject *)st->st_cur) < 0) {
 			Py_DECREF(st->st_cur);
-			st->st_errors++;
 			return 0;
 		}
 	}
 	st->st_cur = PySTEntry_New(st, name, block, ast, lineno);
 	if (name == GET_IDENTIFIER(top))
 		st->st_global = st->st_cur->ste_symbols;
-	if (prev && st->st_pass == 1) {
+	if (prev) {
 		if (PyList_Append(prev->ste_children, 
 				  (PyObject *)st->st_cur) < 0) {
-			st->st_errors++;
 			return 0;
 		}
 	}
