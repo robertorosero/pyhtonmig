@@ -691,6 +691,38 @@ compiler_function(struct compiler *c, stmt_ty s)
 }
 
 static int
+compiler_class(struct compiler *c, stmt_ty s)
+{
+	int n;
+	PyCodeObject *co;
+	/* push class name on stack, needed by BUILD_CLASS */
+	ADDOP_O(c, LOAD_CONST, s->v.ClassDef.name, consts);
+	/* push the tuple of base classes on the stack */
+	n = asdl_seq_LEN(s->v.ClassDef.bases);
+	if (n > 0)
+		VISIT_SEQ(c, expr, s->v.ClassDef.bases);
+	ADDOP_I(c, BUILD_TUPLE, n);
+	if (!compiler_enter_scope(c, s->v.ClassDef.name, (void *)s))
+		return 0;
+	VISIT_SEQ(c, stmt, s->v.ClassDef.body);
+	ADDOP(c, LOAD_LOCALS);
+	ADDOP(c, RETURN_VALUE);
+	co = assemble(c);
+	if (co == NULL)
+		return 0;
+	compiler_exit_scope(c);
+
+	/* XXX closure */
+	ADDOP_O(c, LOAD_CONST, (PyObject *)co, consts);
+	ADDOP_I(c, MAKE_FUNCTION, 0);
+	ADDOP_I(c, CALL_FUNCTION, 0);
+	ADDOP(c, BUILD_CLASS);
+	if (!compiler_nameop(c, s->v.ClassDef.name, Store))
+		return 0;
+	return 1;
+}
+
+static int
 compiler_lambda(struct compiler *c, expr_ty e)
 {
 	PyCodeObject *co;
@@ -1004,9 +1036,8 @@ compiler_visit_stmt(struct compiler *c, stmt_ty s)
 	switch (s->kind) {
         case FunctionDef_kind:
 		return compiler_function(c, s);
-		break;
         case ClassDef_kind:
-		break;
+		return compiler_class(c, s);
         case Return_kind:
 		if (s->v.Return.value)
 			VISIT(c, expr, s->v.Return.value)
@@ -1982,6 +2013,24 @@ dict_keys_inorder(PyObject *dict, int offset)
 	return tuple;
 }
 
+static int
+compute_code_flags(struct compiler *c)
+{
+	PySTEntryObject *ste = c->u->u_ste;
+	int flags = 0;
+	if (ste->ste_type != ModuleBlock)
+		flags |= CO_NEWLOCALS;
+	if (ste->ste_type == FunctionBlock) {
+		if (ste->ste_optimized)
+			flags |= CO_OPTIMIZED;
+		if (ste->ste_nested)
+			flags |= CO_NESTED;
+		if (ste->ste_generator)
+			flags |= CO_GENERATOR;
+	}
+	return flags;
+}
+
 static PyCodeObject *
 makecode(struct compiler *c, struct assembler *a)
 {
@@ -2008,7 +2057,8 @@ makecode(struct compiler *c, struct assembler *a)
 		goto error;
 
 	nlocals = PyList_GET_SIZE(c->u->u_varnames);
-	co = PyCode_New(c->u->u_argcount, nlocals, stackdepth(c), 0,
+	co = PyCode_New(c->u->u_argcount, nlocals, stackdepth(c),
+			compute_code_flags(c),
 			a->a_bytecode, consts, names, varnames,
 			nil, nil,
 			filename, c->u->u_name,
