@@ -792,14 +792,21 @@ class DocTestFinder:
     ignored.
     """
 
-    def __init__(self, verbose=False, namefilter=None, objfilter=None,
-                 recurse=True):
+    def __init__(self, verbose=False, doctest_factory=DocTest, 
+                 namefilter=None, objfilter=None, recurse=True):
         """
         Create a new doctest finder.
+
+        The optional argument `doctest_factory` specifies a class or
+        function that should be used to create new DocTest objects (or
+        objects that implement the same interface as DocTest).  This
+        signature for this factory function should match the signature
+        of the DocTest constructor.
 
         If the optional argument `recurse` is false, then `find` will
         only examine the given object, and not any contained objects.
         """
+        self._doctest_factory = doctest_factory
         self._verbose = verbose
         self._namefilter = namefilter
         self._objfilter = objfilter
@@ -1008,7 +1015,7 @@ class DocTestFinder:
             filename = None
         else:
             filename = getattr(module, '__file__', module.__name__)
-        return DocTest(docstring, globs, name, filename, lineno)
+        return self._doctest_factory(docstring, globs, name, filename, lineno)
 
     def _find_lineno(self, obj, source_lines):
         """
