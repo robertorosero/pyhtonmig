@@ -121,6 +121,11 @@ Tools
 
 Build
 
+- If you are an adventurous person using Mac OS X you may want to look at
+  Mac/OSX. There is a Makefile there that will build Python as a real Mac
+  application, which can be used for experimenting with Carbon or Cocoa.
+  Discussion of this on pythonmac-sig, please.
+
 C API
 
 - New function PyObject_Dir(obj), like Python __builtin__.dir(obj).
