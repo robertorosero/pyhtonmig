@@ -203,7 +203,7 @@ class Bdb: # Basic Debugger
 			return 'There are no breakpoints in that file!'
 		del self.breaks[filename]
 	
-	def clear_all_breaks(self, filename, lineno):
+	def clear_all_breaks(self):
 		if not self.breaks:
 			return 'There are no breakpoints!'
 		self.breaks = {}
