@@ -252,7 +252,11 @@ inittime()
 #ifdef HAVE_TZNAME
 	tzset();
 	dictinsert(d, "timezone", newintobject((long)timezone));
+#ifdef HAVE_ALTZONE
 	dictinsert(d, "altzone", newintobject((long)altzone));
+#else
+	dictinsert(d, "altzone", newintobject((long)timezone-3600));
+#endif
 	dictinsert(d, "daylight", newintobject((long)daylight));
 	dictinsert(d, "tzname", mkvalue("(zz)", tzname[0], tzname[1]));
 #else /* !HAVE_TZNAME */
