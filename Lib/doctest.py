@@ -738,7 +738,7 @@ class DocTestFinder:
 
         # Find a test for this object, and add it to the list of tests.
         test = self._get_test(obj, name, module, source_lines)
-        if test is not None: 
+        if test is not None:
             tests.append(test)
 
         # Look for tests in a module's contained objects.
@@ -980,7 +980,7 @@ class DocTestRunner:
         """
         # Handle the common case first, for efficiency:
         # if they're string-identical, always return true.
-        if got == want: 
+        if got == want:
             return True
 
         # The values True and False replaced 1 and 0 as the return
@@ -1009,7 +1009,7 @@ class DocTestRunner:
         if (self._optionflags & NORMALIZE_WHITESPACE):
             got = ' '.join(got.split())
             want = ' '.join(want.split())
-            if got == want: 
+            if got == want:
                 return True
 
         # The ELLIPSIS flag says to let the sequence "..." in `want`
@@ -1039,7 +1039,7 @@ class DocTestRunner:
         # with blank lines in the expected output string.
         if not (self._optionflags & DONT_ACCEPT_BLANKLINE):
             want = re.sub('(?m)^%s$' % re.escape(BLANKLINE_MARKER), '', want)
-                          
+
         # Check if we should use diff.  Don't use diff if the actual
         # or expected outputs are too short, or if the expected output
         # contains an ellipsis marker.
@@ -1763,28 +1763,26 @@ def debug_script(src, pm=False, globs=None):
     "Debug a test script"
     import pdb
 
-    srcfile = tempfile.NamedTemporaryFile(prefix='doctestdebug-',
-                                          suffix='.py', mode="w")
-    srcfile.write(src)
-    srcfile.flush()
+    srcfilename = tempfile.mktemp("doctestdebug.py")
+    f = open(srcfilename, 'w')
+    f.write(src)
+    f.close()
+
     if globs:
         globs = globs.copy()
     else:
         globs = {}
 
-    try:
-        if pm:
-            try:
-                execfile(srcfile.name, globs, globs)
-            except:
-                print sys.exc_info()[1]
-                pdb.post_mortem(sys.exc_info()[2])
-        else:
-            # Note that %r is vital here.  '%s' instead can, e.g., cause
-            # backslashes to get treated as metacharacters on Windows.
-            pdb.run("execfile(%r)" % srcfile.name, globs, globs)
-    finally:
-        srcfile.close() # Automatically deletes the file.
+    if pm:
+        try:
+            execfile(srcfilename, globs, globs)
+        except:
+            print sys.exc_info()[1]
+            pdb.post_mortem(sys.exc_info()[2])
+    else:
+        # Note that %r is vital here.  '%s' instead can, e.g., cause
+        # backslashes to get treated as metacharacters on Windows.
+        pdb.run("execfile(%r)" % srcfilename, globs, globs)
 
 def debug(module, name, pm=False):
     """Debug a single doctest test doc string
