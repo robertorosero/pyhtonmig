@@ -35,6 +35,7 @@ struct compiler_unit {
 
 	int u_argcount;
 	int u_nblocks;
+	int u_nalloc;
 	int u_curblock;
 	struct basicblock u_entry;
 	struct basicblock u_exit;
@@ -208,6 +209,7 @@ compiler_enter_scope(struct compiler *c, identifier name, void *key)
 	u->u_varnames = u->u_ste->ste_varnames;
 	Py_INCREF(u->u_varnames);
 	u->u_nblocks = 0;
+	u->u_nalloc = DEFAULT_BLOCKS;
 	u->u_blocks = (struct basicblock **)PyObject_Malloc(
 		sizeof(struct basicblock *) * DEFAULT_BLOCKS);
 	if (!u->u_blocks)
@@ -237,14 +239,12 @@ compiler_enter_scope(struct compiler *c, identifier name, void *key)
 	return 1;
 }
 
-static int
-compiler_exit_scope(struct compiler *c)
+static void
+compiler_unit_free(struct compiler_unit *u)
 {
-	struct compiler_unit *u = c->u;
-	int i, n;
-	PyObject *wrapper;
+	int i;
 
-	for (i = 0; i < u->u_nblocks; i++) 
+	for (i = 0; i < u->u_nblocks; i++)
 		PyObject_Free((void *)u->u_blocks[i]);
 	if (u->u_blocks)
 		PyObject_Free((void *)u->u_blocks);
@@ -252,9 +252,29 @@ compiler_exit_scope(struct compiler *c)
 	Py_XDECREF(u->u_consts);
 	Py_XDECREF(u->u_names);
 	Py_XDECREF(u->u_varnames);
-
 	PyObject_Free(u);
+}
 
+static void
+compiler_unit_check(struct compiler_unit *u)
+{
+    int i;
+    assert(u->u_curblock < u->u_nblocks);
+    assert(u->u_nblocks <= u->u_nalloc);
+    for (i = 0; i < u->u_nblocks; i++) {
+	assert(u->u_blocks[i]);
+	assert(u->u_blocks[i] != 0xcbcbcbcb);
+	assert(u->u_blocks[i] != 0xfbfbfbfb);
+    }
+}
+
+static int
+compiler_exit_scope(struct compiler *c)
+{
+	int n;
+	PyObject *wrapper;
+
+	compiler_unit_free(c->u);
 	/* Restore c->u to the parent unit. */
 	n = PyList_GET_SIZE(c->c_stack) - 1;
 	if (n >= 0) {
@@ -262,6 +282,7 @@ compiler_exit_scope(struct compiler *c)
 		c->u = (struct compiler_unit *)PyCObject_AsVoidPtr(wrapper);
 		if (PySequence_DelItem(c->c_stack, n) < 0)
 			return 0;
+		compiler_unit_check(c->u);
 	}
 	else
 		c->u = NULL;
@@ -281,20 +302,25 @@ compiler_new_block(struct compiler *c)
 	int block;
 
 	u = c->u;
-	if (u->u_nblocks && u->u_nblocks % DEFAULT_BLOCKS == 0) {
-		/* XXX should double */
-		int newsize = u->u_nblocks + DEFAULT_BLOCKS;
+	if (u->u_nblocks == u->u_nalloc) {
+		int newsize = ((u->u_nalloc + u->u_nalloc) 
+			       * sizeof(struct basicblock *));
 		u->u_blocks = (struct basicblock **)PyObject_Realloc(
 			u->u_blocks, newsize);
 		if (u->u_blocks == NULL)
 			return -1;
+		memset(u->u_blocks + u->u_nalloc, 0,
+		       sizeof(struct basicblock *) * u->u_nalloc);
+		u->u_nalloc += u->u_nalloc;
 	}
+	compiler_unit_check(u);
 	b = (struct basicblock *)PyObject_Malloc(sizeof(struct basicblock));
 	if (b == NULL)
 		return -1;
 	memset((void *)b, 0, sizeof(struct basicblock));
 	b->b_ialloc = DEFAULT_BLOCK_SIZE;
 	block = u->u_nblocks++;
+	assert(u->u_blocks[block] == NULL);
 	u->u_blocks[block] = b;
 	return block;
 }
@@ -360,8 +386,10 @@ compiler_next_instr(struct compiler *c, int block)
 		ptr = PyObject_Realloc((void *)b, newsize);
 		if (ptr == NULL)
 			return -1;
-		if (ptr != (void *)b)
+		if (ptr != (void *)b) {
+			fprintf(stderr, "resize block %d\n", block);
 			c->u->u_blocks[block] = (struct basicblock *)ptr;
+		}
 	}
 	return b->b_iused++;
 }
