@@ -17,6 +17,8 @@ class Bdb: # Basic Debugger
 		self.breaks = {}
 	
 	def reset(self):
+		import linecache
+		linecache.checkcache()
 		self.botframe = None
 		self.stopframe = None
 		self.returnframe = None
@@ -300,7 +302,5 @@ def bar(a):
 	return a/2
 
 def test():
-	import linecache
-	linecache.checkcache()
 	t = Tdb()
 	t.run('import bdb; bdb.foo(10)')
