@@ -2357,6 +2357,25 @@ string_methods[] = {
 	{NULL,     NULL}		     /* sentinel */
 };
 
+static PyObject *
+string_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
+{
+	PyObject *x = NULL;
+	static char *kwlist[] = {"object", 0};
+
+	assert(type == &PyString_Type);
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "|O:str", kwlist, &x))
+		return NULL;
+	if (x == NULL)
+		return PyString_FromString("");
+	return PyObject_Str(x);
+}
+
+static char string_doc[] =
+"str(object) -> string\n\
+\n\
+Return a nice string representation of the object.\n\
+If the argument is a string, the return value is the same object.";
 
 PyTypeObject PyString_Type = {
 	PyObject_HEAD_INIT(&PyType_Type)
@@ -2380,7 +2399,7 @@ PyTypeObject PyString_Type = {
 	0,					/* tp_setattro */
 	&string_as_buffer,			/* tp_as_buffer */
 	Py_TPFLAGS_DEFAULT,			/* tp_flags */
-	0,					/* tp_doc */
+	string_doc,				/* tp_doc */
 	0,					/* tp_traverse */
 	0,					/* tp_clear */
 	0,					/* tp_richcompare */
@@ -2392,6 +2411,12 @@ PyTypeObject PyString_Type = {
 	0,					/* tp_getset */
 	0,					/* tp_base */
 	0,					/* tp_dict */
+	0,					/* tp_descr_get */
+	0,					/* tp_descr_set */
+	0,					/* tp_dictoffset */
+	0,					/* tp_init */
+	0,					/* tp_alloc */
+	string_new,				/* tp_new */
 };
 
 void
