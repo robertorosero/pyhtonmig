@@ -75,7 +75,7 @@ pdf:	$(PDFFILES)
 ps:	$(PSFILES)
 
 
-README:	$(PSFILES)
+README:	$(PSFILES) $(TOOLSDIR)/getpagecounts
 	$(TOOLSDIR)/getpagecounts >$@
 
 
