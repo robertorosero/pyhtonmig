@@ -41,6 +41,64 @@ static PyObject *parsestrplus(struct compiling *, const node *n);
 
 extern grammar _PyParser_Grammar; /* From graminit.c */
 
+#ifndef LINENO
+#define LINENO(n)	((n)->n_lineno)
+#endif
+
+#define NEW_IDENTIFIER(n) PyString_InternFromString(STR(n))
+
+/* This routine provides an invalid object for the syntax error.
+   The outermost routine must unpack this error and create the
+   proper object.  We do this so that we don't have to pass
+   the filename to everything function.
+
+   XXX Maybe we should just pass the filename...
+*/
+
+static int
+ast_error(const node *n, const char *errstr)
+{
+    PyObject *u = Py_BuildValue("zi", errstr, LINENO(n));
+    if (!u)
+	return 0;
+    PyErr_SetObject(PyExc_SyntaxError, u);
+    Py_DECREF(u);
+    return 0;
+}
+
+static void
+ast_error_finish(const char *filename)
+{
+    PyObject *type, *value, *tback, *errstr, *loc, *tmp;
+    int lineno;
+
+    assert(PyErr_Occurred());
+    PyErr_Fetch(&type, &value, &tback);
+    errstr = PyTuple_GetItem(value, 0);
+    if (!errstr)
+	return;
+    Py_INCREF(errstr);
+    lineno = PyInt_AsLong(PyTuple_GetItem(value, 1));
+    if (lineno == -1)
+	return;
+    Py_DECREF(value);
+
+    loc = PyErr_ProgramText(filename, lineno);
+    if (!loc) {
+	Py_INCREF(Py_None);
+	loc = Py_None;
+    }
+    tmp = Py_BuildValue("(ziOO)", filename, lineno, Py_None, loc);
+    Py_DECREF(loc);
+    if (!tmp)
+	return;
+    value = Py_BuildValue("(OO)", errstr, tmp);
+    Py_DECREF(errstr);
+    Py_DECREF(tmp);
+    if (!value)
+	return;
+    PyErr_Restore(type, value, tback);
+}
 
 /* num_stmts() returns number of contained statements.
 
@@ -107,7 +165,7 @@ num_stmts(const node *n)
 */
 
 mod_ty
-PyAST_FromNode(const node *n, PyCompilerFlags *flags)
+PyAST_FromNode(const node *n, PyCompilerFlags *flags, const char *filename)
 {
     int i, j, num;
     asdl_seq *stmts = NULL;
@@ -123,7 +181,6 @@ PyAST_FromNode(const node *n, PyCompilerFlags *flags)
     } else {
         c.c_encoding = NULL;
     }
-
 
     switch (TYPE(n)) {
         case file_input:
@@ -166,7 +223,7 @@ PyAST_FromNode(const node *n, PyCompilerFlags *flags)
             if (TYPE(CHILD(n, 0)) == NEWLINE) {
                 stmts = asdl_seq_new(1);
                 if (!stmts)
-                    return NULL;
+		    goto error;
                 asdl_seq_SET(stmts, 0, Pass(n->n_lineno));
                 return Interactive(stmts);
             }
@@ -175,9 +232,12 @@ PyAST_FromNode(const node *n, PyCompilerFlags *flags)
                 num = num_stmts(n);
                 stmts = asdl_seq_new(num);
                 if (!stmts)
-                    return NULL;
+		    goto error;
                 if (num == 1) {
-                    asdl_seq_SET(stmts, 0, ast_for_stmt(&c, n));
+		    stmt_ty s = ast_for_stmt(&c, n);
+		    if (!s)
+			goto error;
+                    asdl_seq_SET(stmts, 0, s);
                 }
                 else {
                     /* Only a simple_stmt can contain multiple statements. */
@@ -201,16 +261,9 @@ PyAST_FromNode(const node *n, PyCompilerFlags *flags)
  error:
     if (stmts)
 	asdl_seq_free(stmts);
-    fprintf(stderr, "error in PyAST_FromNode() exc? %c\n",
-            PyErr_Occurred() ? 'Y': 'N');
+    ast_error_finish(filename);
     return NULL;
 }
-
-#ifndef LINENO
-#define LINENO(n)	((n)->n_lineno)
-#endif
-
-#define NEW_IDENTIFIER(n) PyString_InternFromString(STR(n))
 
 /* Return the AST repr. of the operator represented as syntax (|, ^, etc.)
 */
@@ -274,52 +327,49 @@ get_operator(const node *n)
 */
 
 static int
-set_context(expr_ty e, expr_context_ty ctx)
+set_context(expr_ty e, expr_context_ty ctx, const node *n)
 {
     asdl_seq *s = NULL;
 
     switch (e->kind) {
         case Attribute_kind:
-            e->v.Attribute.ctx = ctx;
-            break;
+	    e->v.Attribute.ctx = ctx;
+	    break;
         case Subscript_kind:
-            e->v.Subscript.ctx = ctx;
-            break;
+	    e->v.Subscript.ctx = ctx;
+	    break;
         case Name_kind:
-            e->v.Name.ctx = ctx;
-            break;
+	    e->v.Name.ctx = ctx;
+	    break;
         case List_kind:
-            e->v.List.ctx = ctx;
-            s = e->v.List.elts;
-            break;
+	    e->v.List.ctx = ctx;
+	    s = e->v.List.elts;
+	    break;
         case Tuple_kind:
-            e->v.Tuple.ctx = ctx;
-            s = e->v.Tuple.elts;
-            break;
+	    e->v.Tuple.ctx = ctx;
+	    s = e->v.Tuple.elts;
+	    break;
+        case Call_kind:
+	    if (ctx == Store)
+		return ast_error(n, "can't assign to function call");
+	    else if (ctx == Del)
+		return ast_error(n, "can't delete function call");
+	    else
+		return ast_error(n, "unexpected operation on function call");
+	    break;
         default:
-	    /* XXX It's not clear why were't getting into this code,
-	       although list comps seem like one possibility.
-
-               This occurs in at least 2 cases:
-                 [x(i) for i in range(3)] # Call_kind (8)
-                 [i*2 for i in range(3)]  # BinOp_kind (2)
-
-               The byte code generated seems to work fine.
-               Maybe there's a problem with nested list comps?
-	    */
-	    abort();
-	    fprintf(stderr, "can't set context for %d\n", e->kind);
-            return 0;
+	    return ast_error(n, "unexpected node in assignment");
+	    break;
     }
     if (s) {
 	int i;
 
 	for (i = 0; i < asdl_seq_LEN(s); i++) {
-	    if (set_context(asdl_seq_GET(s, i), ctx) < 0)
-		return -1;
+	    if (!set_context(asdl_seq_GET(s, i), ctx, n))
+		return 0;
 	}
     }
-    return 0;
+    return 1;
 }
 
 static operator_ty
@@ -1347,7 +1397,7 @@ ast_for_expr_stmt(struct compiling *c, const node *n)
 	return AugAssign(expr1, operator, expr2, LINENO(n));
     }
     else {
-	int i, tmp;
+	int i;
 	asdl_seq *targets;
         expr_ty expression;
 
@@ -1363,8 +1413,7 @@ ast_for_expr_stmt(struct compiling *c, const node *n)
 		asdl_seq_free(targets);
 		return NULL;
 	    }
-	    tmp = set_context(e, Store);
-            if (tmp == -1) {
+	    if (!set_context(e, Store, CHILD(n, i))) {
                 asdl_seq_free(targets);
                 return NULL;
             }
@@ -1429,8 +1478,7 @@ ast_for_exprlist(struct compiling *c, const node *n, int context)
 	    return NULL;
 	}
 	if (context) {
-            int context_result = set_context(e, context);
-	    if (context_result == -1)
+	    if (!set_context(e, context, CHILD(n, i)))
                 return NULL;
         }
 	asdl_seq_SET(seq, i / 2, e);
@@ -2036,7 +2084,7 @@ ast_for_except_clause(struct compiling *c, const node *exc, node *body)
 	expr_ty e = ast_for_expr(c, CHILD(exc, 3));
 	if (!e)
             return NULL;
-	if (set_context(e, Store) == -1)
+	if (!set_context(e, Store, CHILD(exc, 3)))
             return NULL;
         expression = ast_for_expr(c, CHILD(exc, 1));
         if (!expression)
