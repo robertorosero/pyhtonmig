@@ -41,9 +41,9 @@ qua:
 	latex qua
 	dvips qua >qua.ps
 
-lib.texi: lib1.tex lib2.tex lib3.tex lib4.tex lib5.tex \
+lib.texi: lib*.tex \
 	texipre.dat texipost.dat partparse.py
-	python partparse.py -o @lib.texi lib[1-5].tex
+	python partparse.py -o @lib.texi `whichlibs`
 	mv @lib.texi lib.texi
 
 .PRECIOUS:	lib.texi
