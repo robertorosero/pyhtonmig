@@ -318,8 +318,9 @@ eval_code(co, globals, locals, owner, arg)
 		
 		if (--ticker < 0) {
 			ticker = ticker_count;
-			if (intrcheck()) {
-				err_set(KeyboardInterrupt);
+			if (sigcheck(f)) {
+				if (!err_occurred())
+					err_set(KeyboardInterrupt);
 				why = WHY_EXCEPTION;
 				goto on_error;
 			}
@@ -1709,6 +1710,12 @@ getowner()
 		return NULL;
 	else
 		return current_frame->f_owner;
+}
+
+object *
+getframe()
+{
+	return current_frame;
 }
 
 void

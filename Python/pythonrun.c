@@ -561,15 +561,22 @@ sighandler(sig)
 static void
 initsigs()
 {
-	initintr();
+	RETSIGTYPE (*t)();
+	initintr(); /* May imply initsignal() */
 #ifdef HAVE_SIGNAL_H
 #ifdef SIGHUP
-	if (signal(SIGHUP, SIG_IGN) != SIG_IGN)
+	t = signal(SIGHUP, SIG_IGN);
+	if (t == SIG_DFL)
 		signal(SIGHUP, sighandler);
+	else
+		signal(SIGHUP, t);
 #endif              
 #ifdef SIGTERM
-	if (signal(SIGTERM, SIG_IGN) != SIG_IGN)
+	t = signal(SIGTERM, SIG_IGN);
+	if (t == SIG_DFL)
 		signal(SIGTERM, sighandler);
+	else
+		signal(SIGTERM, t);
 #endif
 #endif /* HAVE_SIGNAL_H */
 }
