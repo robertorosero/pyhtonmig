@@ -1972,7 +1972,7 @@ slot_sq_ass_item(PyObject *self, int index, PyObject *value)
 static int
 slot_sq_ass_slice(PyObject *self, int i, int j, PyObject *value)
 {
-	PyObject *res = PyObject_CallMethod(self, "__setitem__",
+	PyObject *res = PyObject_CallMethod(self, "__setslice__",
 					    "iiO", i, j, value);
 	if (res == NULL)
 		return -1;
