@@ -287,7 +287,6 @@ Merge issues:
 
           Now dies with a memory error right after
               Testing Python subclass of dict...
-          I expect this is a merge glitch that slipped past me.
 
           Small program that reproduces the problem:
               class C(dictionary):
@@ -300,7 +299,19 @@ Merge issues:
           mp->ma_table is NULL when we get into lookdict_string.  But
           mp->ma_table must never be NULL after the trunk dict rewrite (any
           legit way of creating the dict will leave ma_table pointing to
-          ma_smalltable).
+          the ma_smalltable member).
+
+          Note:  We get into lookdict_string because insertdict forces
+          mp->ma_lookup to lookdict_string if mp->ma_lookup is NULL.  It
+          is in this case.  But that again says this object never went thru
+          dict initialization:  insertdict should really be asserting that
+          mp->ma_lookup is not NULL on entry!  The trunk version simply
+          assumes it's not NULL (it's impossible to create a dict object
+          with it NULL).
+
+          Looks like Guido added this in descr-branch rev 2.80.2.6
+          of dictobject.c; but this form of casting cheat doesn't work
+          anymore on dicts.
 
 + If some non-Windows test has an expected-output file in descr-branch
   that has been removed on the trunk since descr-fork, it will probably
