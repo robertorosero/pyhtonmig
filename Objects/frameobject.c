@@ -15,7 +15,6 @@ static struct memberlist frame_memberlist[] = {
 	{"f_code",	T_OBJECT,	OFF(f_code),	RO},
 	{"f_builtins",	T_OBJECT,	OFF(f_builtins),RO},
 	{"f_globals",	T_OBJECT,	OFF(f_globals),	RO},
-	{"f_locals",	T_OBJECT,	OFF(f_locals),	RO},
 	{"f_lasti",	T_INT,		OFF(f_lasti),	RO},
 	{"f_lineno",	T_INT,		OFF(f_lineno),	RO},
 	{"f_restricted",T_INT,		OFF(f_restricted),RO},
