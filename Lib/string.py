@@ -95,30 +95,18 @@ def joinfields(words, sep):
 
 # Find substring, raise exception if not found
 index_error = 'substring not found in string.index'
-def index(s, sub, *args):
-	if args:
-		if len(args) > 1:
-			raise TypeError, 'string.index(): too many args'
-		i = args[0]
-		if i < 0: i = i + len(s)
-	else:
-		i = 0
+def index(s, sub, i = 0):
+	if i < 0: i = i + len(s)
 	n = len(sub)
 	m = len(s) + 1 - n
 	while i < m:
 		if sub == s[i:i+n]: return i
 		i = i+1
-	raise index_error, (s, sub) + args
+	raise index_error, (s, sub, i)
 
 # Find last substring, raise exception if not found
-def rindex(s, sub, *args):
-	if args:
-		if len(args) > 1:
-			raise TypeError, 'string.rindex(): too many args'
-		i = args[0]
-		if i < 0: i = i + len(s)
-	else:
-		i = 0
+def rindex(s, sub, i = 0):
+	if i < 0: i = i + len(s)
 	n = len(sub)
 	m = len(s) + 1 - n
 	r = None
@@ -126,20 +114,20 @@ def rindex(s, sub, *args):
 		if sub == s[i:i+n]: r = i
 		i = i+1
 	if r is None:
-		raise index_error, (s, sub) + args
+		raise index_error, (s, sub, i)
 	return r
 
 # Find substring, return -1 if not found
-def find(*args):
+def find(s, sub, i = 0):
 	try:
-		return apply(index, args)
+		return index(s, sub, i)
 	except index_error:
 		return -1
 
 # Find last substring, return -1 if not found
-def rfind(*args):
+def rfind(s, sub, i = 0):
 	try:
-		return apply(rindex, args)
+		return rindex(s, sub, i)
 	except index_error:
 		return -1
 

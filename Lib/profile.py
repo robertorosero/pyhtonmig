@@ -351,16 +351,16 @@ def f8(x):
 	return string.rjust(fpformat.fix(x, 3), 8)
 
 # simplified user interface
-def run(statement, *args):
+def run(statement, file = None):
 	prof = Profile()
 	try:
 		prof.run(statement)
 	except SystemExit:
 		pass
-	if len(args) == 0:
+	if file is None:
 		prof.print_stats()
 	else:
-		prof.dump_stats(args[0])
+		prof.dump_stats(file)
 
 # test command with debugging
 def debug():

@@ -71,7 +71,7 @@ class FTP:
 	# Initialize host to localhost, port to standard ftp port
 	# Optional arguments are host (for connect()),
 	# and user, passwd, acct (for login())
-	def __init__(self, *args):
+	def __init__(self, host = '', user = '', passwd = '', acct = ''):
 		# Initialize the instance to something mostly harmless
 		self.debugging = 0
 		self.host = ''
@@ -79,18 +79,16 @@ class FTP:
 		self.sock = None
 		self.file = None
 		self.welcome = None
-		if args:
-			self.connect(args[0])
-			if args[1:]:
-				apply(self.login, args[1:])
+		if host:
+			self.connect(host)
+			if user: self.login(user, passwd, acct)
 
 	# Connect to host.  Arguments:
 	# - host: hostname to connect to (default previous host)
 	# - port: port to connect to (default previous port)
-	def connect(self, *args):
-		if args: self.host = args[0]
-		if args[1:]: self.port = args[1]
-		if args[2:]: raise TypeError, 'too many args'
+	def connect(self, host = '', port = 0):
+		if host: self.host = host
+		if port: self.port = port
 		self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 		self.sock.connect(self.host, self.port)
 		self.file = self.sock.makefile('r')
@@ -232,14 +230,7 @@ class FTP:
 		return conn
 
 	# Login, default anonymous
-	def login(self, *args):
-		user = passwd = acct = ''
-		n = len(args)
-		if n > 3: raise TypeError, 'too many arguments'
-		if n > 0: user = args[0]
-		if n > 1: passwd = args[1]
-		if n > 2: acct = args[2]
-		if not user: user = 'anonymous'
+	def login(self, user = 'anonymous', passwd = '', acct = ''):
 		if user == 'anonymous' and passwd in ('', '-'):
 			thishost = socket.gethostname()
 			if os.environ.has_key('LOGNAME'):
@@ -275,11 +266,7 @@ class FTP:
 	# The callback function is called for each line, with trailing
 	# CRLF stripped.  This creates a new port for you.
 	# print_lines is the default callback 
-	def retrlines(self, cmd, *args):
-		callback = None
-		if args:
-			callback = args[0]
-			if args[1:]: raise TypeError, 'too many args'
+	def retrlines(self, cmd, callback = None):
 		if not callback: callback = print_line
 		resp = self.sendcmd('TYPE A')
 		conn = self.transfercmd(cmd)
