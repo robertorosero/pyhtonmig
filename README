@@ -1,15 +1,18 @@
 This is Python version 1.6
 ==========================
 
+Copyright (c) 1995-2000 Corporation for National Research Initiatives.
+All rights reserved.
+
+Copyright (c) 1991-1995 Stichting Mathematisch Centrum.
+All rights reserved.
+
 License information
 -------------------
 
-Copyright (c) 1991-1995, Stichting Mathematisch Centrum.
-All rights reserved.
-
 See the file "LICENSE" for information on terms & conditions for
-accessing and otherwise using Python 1.6b1 and for a DISCLAIMER OF ALL
-WARRANTIES.
+accessing and otherwise using this software, and for a DISCLAIMER OF
+ALL WARRANTIES.
 
 
 What's new in this release?
