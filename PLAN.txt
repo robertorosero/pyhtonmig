@@ -184,6 +184,11 @@ the HEAD branch (e.g. the dict object has been radically rewritten).
 On the other hand, if we do this too early, we'll have to do it again
 later.
 
+To undo or rename before final merge:  Modules/spam.c has worked its
+way into the branch Unix and Windows builds (pythoncore.dsp and
+PC/config.c); also imported by test_descr.py.  How about renaming to
+xxsubtype.c (whatever) now?
+
 
 Project: performance tuning
 ***************************
