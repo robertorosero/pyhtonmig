@@ -17,6 +17,12 @@ AC_ISC_POSIX
 AC_MINIX
 dnl DYNIX test runs compile so must be last
 AC_DYNIX_SEQ
+echo checking for NeXT
+AC_TEST_PROGRAM([
+#ifdef _NEXT_SOURCE
+main() { exit(0); }
+#endif
+], AC_DEFINE(_POSIX_SOURCE))
 
 # checks for header files
 AC_STDC_HEADERS
@@ -35,8 +41,11 @@ AC_UID_T
 AC_HAVE_LIBRARY(dl)
 
 echo checking for --with-svr4
-AC_WITH(svr4, [AC_HAVE_LIBRARY(nsl)
-AC_HAVE_LIBRARY(socket)])
+AC_WITH(svr4, [
+AC_HAVE_LIBRARY(socket)
+AC_HAVE_LIBRARY(inet)
+AC_HAVE_LIBRARY(nsl)
+])
 
 echo checking for --with-readline
 AC_WITH(readline, [AC_DEFINE(WITH_READLINE)
@@ -87,7 +96,7 @@ DLINCLDIR=${dldir}
 LIBS="$LIBS -ldl -ldld"])
 
 # checks for library functions
-AC_HAVE_FUNCS(clock ftime gettimeofday getpeername getpgrp getpid getwd lstat nice readlink select setsid setpgid setpgrp siginterrupt symlink tcgetpgrp tcsetpgrp times uname waitpid)
+AC_HAVE_FUNCS(clock dlopen ftime gettimeofday getpeername getpgrp getpid getwd lstat nice readlink select setsid setpgid setpgrp siginterrupt symlink tcgetpgrp tcsetpgrp times uname waitpid)
 AC_REPLACE_FUNCS(dup2 getcwd strerror strtod memmove)
 AC_FUNC_CHECK(getpgrp, AC_COMPILE_CHECK([argument to getpgrp], [#include <unistd.h>], [getpgrp(0);], AC_DEFINE(GETPGRP_HAVE_ARG)))
 
@@ -103,12 +112,29 @@ AC_COMPILE_CHECK([whether sys/select.h and sys/time.h may both be included], [
 ], [;], [AC_DEFINE(SYS_SELECT_WITH_SYS_TIME)])
 
 # checks for compiler characteristics
+
+AC_CHAR_UNSIGNED
+
 AC_CONST
+
+AC_COMPILE_CHECK([wheter we have signed char], [], [signed char c;], [], AC_DEFINE(signed, []))
+
 echo checking for prototypes
-AC_TEST_PROGRAM([int foo(int x){return 0;} int main(){return foo(10);}], AC_DEFINE(HAVE_PROTOTYPES) have_prototypes=1)
+AC_TEST_PROGRAM([
+int foo(int x) { return 0; }
+int main() { return foo(10); }
+], AC_DEFINE(HAVE_PROTOTYPES) have_prototypes=1)
+
+echo checking for variable length prototypes and stdarg.h
+AC_TEST_PROGRAM([
+#include <stdarg.h>
+int foo(int x, ...) { return 0; }
+int main() { return foo(10, 11, 12); }
+], AC_DEFINE(HAVE_STDARG_PROTOTYPES) have_prototypes=1)
 if test "$have_prototypes"; then
-AC_COMPILE_CHECK(["bad exec* prototypes"], [#include <unistd.h>], [char *const*t;execve("@",t,t);], , AC_DEFINE(BAD_EXEC_PROTOTYPES))
+AC_COMPILE_CHECK(["bad exec* prototypes"], [#include <unistd.h>], [char **t;execve("@",t,t);], , AC_DEFINE(BAD_EXEC_PROTOTYPES))
 fi
+
 echo checking for bad static forward
 AC_TEST_PROGRAM([
 struct s { int a; int b; };
