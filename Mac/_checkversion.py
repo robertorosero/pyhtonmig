@@ -5,7 +5,7 @@ _checkversion.py file"""
 import pyversioncheck
 
 _PACKAGE="MacPython"
-_VERSION="2.3a2"
+_VERSION="2.3b1"
 _URL="http://www.cwi.nl/~jack/macpythonversion.txt"
 
 try:
