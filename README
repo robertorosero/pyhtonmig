@@ -1,10 +1,10 @@
-Python release 1.0.2
+Python release 1.0.3
 ====================
 
-==> This is patch number 2 to Python 1.0, bumping its version string
-   to 1.0.2.  It consists mostly of portability fixes.  See the file
-   Misc/NEWS for a description of what's new in this patch (as well as
-   what's new in 1.0).
+==> This is patch number 3 to Python 1.0, bumping its version string
+    to 1.0.3.  It consists almost entirely of essential bug fixes to
+    the C sources.  See the file Misc/NEWS for a description of what's
+    new in this patch (as well as what's new in 1.0).
 
 ==> Python 1.0 is the first "official" Python release in more than
     half a year.  It's significantly improved over version 0.9.9, both
@@ -340,11 +340,10 @@ Ftp access
 ----------
 
 The latest Python source distribution can be ftp'ed from site
-ftp.cwi.nl (IP address 192.16.184.180), directory /pub/python, file
-python<version>.tar.Z.  Curerntly <version> is 1.0.2.  You can also
-find PostScript of the main Python documentation there, Macintosh and
-PC binaries, and the latest STDWIN source distribution (in directory
-/pub/stdwin).  Mirror sites are gatekeeper.dec.com
+ftp.cwi.nl, directory /pub/python, file python<version>.tar.Z.  You
+can also find PostScript of the main Python documentation there,
+Macintosh and PC binaries, and the latest STDWIN source distribution
+(in directory /pub/stdwin).  Mirror sites are gatekeeper.dec.com
 (/pub/plan/python/cwi), ftp.wustl.edu
 (/graphics/graphics/sgi-stuff/python) and ftp.uu.net
 (/languages/python) -- try these sites first if you are on the US

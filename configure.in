@@ -124,7 +124,7 @@ LIBS="$LIBS -ldl -ldld"])
 
 # checks for library functions
 AC_HAVE_FUNCS(chown clock dlopen ftime gettimeofday getpeername getpgrp getpid getwd link lstat nice readlink select setgid setuid setsid setpgid setpgrp setvbuf siginterrupt symlink tcgetpgrp tcsetpgrp times uname waitpid)
-AC_REPLACE_FUNCS(dup2 getcwd strerror strtod memmove)
+AC_REPLACE_FUNCS(dup2 getcwd strerror memmove)
 AC_FUNC_CHECK(getpgrp, AC_COMPILE_CHECK([argument to getpgrp], [#include <unistd.h>], [getpgrp(0);], AC_DEFINE(GETPGRP_HAVE_ARG)))
 
 # checks for structures
