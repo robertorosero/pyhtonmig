@@ -75,10 +75,6 @@ builtin_apply(PyObject *self, PyObject *args)
 	PyObject *func, *alist = NULL, *kwdict = NULL;
 	PyObject *t = NULL, *retval = NULL;
 
-	if (PyErr_Warn(PyExc_PendingDeprecationWarning,
-		       "use func(*args, **kwargs) instead of "
-		       "apply(func, args, kwargs)") < 0)
-		return NULL;
 	if (!PyArg_UnpackTuple(args, "apply", 1, 3, &func, &alist, &kwdict))
 		return NULL;
 	if (alist != NULL) {
@@ -583,7 +579,7 @@ builtin_execfile(PyObject *self, PyObject *args)
 		struct stat s;
 		if (stat(filename, &s) == 0) {
 			if (S_ISDIR(s.st_mode))
-#				if defined(PY_OS2) && defined(PYCC_VACPP)
+#				if defined(PYOS_OS2) && defined(PYCC_VACPP)
 					errno = EOS2ERR;
 #				else
 					errno = EISDIR;
@@ -2176,6 +2172,8 @@ filtertuple(PyObject *func, PyObject *tuple)
 		if (tuple->ob_type->tp_as_sequence &&
 		    tuple->ob_type->tp_as_sequence->sq_item) {
 			item = tuple->ob_type->tp_as_sequence->sq_item(tuple, i);
+			if (item == NULL)
+				goto Fail_1;
 		} else {
 			PyErr_SetString(PyExc_TypeError, "filter(): unsubscriptable tuple");
 			goto Fail_1;
@@ -2186,20 +2184,25 @@ filtertuple(PyObject *func, PyObject *tuple)
 		}
 		else {
 			PyObject *arg = Py_BuildValue("(O)", item);
-			if (arg == NULL)
+			if (arg == NULL) {
+				Py_DECREF(item);
 				goto Fail_1;
+			}
 			good = PyEval_CallObject(func, arg);
 			Py_DECREF(arg);
-			if (good == NULL)
+			if (good == NULL) {
+				Py_DECREF(item);
 				goto Fail_1;
+			}
 		}
 		ok = PyObject_IsTrue(good);
 		Py_DECREF(good);
 		if (ok) {
-			Py_INCREF(item);
 			if (PyTuple_SetItem(result, j++, item) < 0)
 				goto Fail_1;
 		}
+		else
+			Py_DECREF(item);
 	}
 
 	if (_PyTuple_Resize(&result, j) < 0)

@@ -105,7 +105,7 @@ shutdown(how) -- shut down traffic in one or both directions\n\
 \n\
  [*] not available on all platforms!");
 
-/* XXX This is a terrible mess of of platform-dependent preprocessor hacks.
+/* XXX This is a terrible mess of platform-dependent preprocessor hacks.
    I hope some day someone can clean this up please... */
 
 /* Hacks for gethostbyname_r().  On some non-Linux platforms, the configure
@@ -194,12 +194,15 @@ shutdown(how) -- shut down traffic in one or both directions\n\
    but I don't know what the right thing is. */
 #define _SGIAPI 1
 
-#ifndef ENABLE_IPV6
-#define INET_ADDRSTRLEN 16
-#endif
-
 #define HAVE_INET_PTON
 #include <netdb.h>
+#endif
+
+/* Irix 6.5 fails to define this variable at all. This is needed 
+   for both GCC and SGI's compiler. I'd say that the SGI headers 
+   are just busted. */
+#if defined(__sgi) && !defined(INET_ADDRSTRLEN)
+#define INET_ADDRSTRLEN 16
 #endif
 
 /* Generic includes */
@@ -855,7 +858,7 @@ makesockaddr(int sockfd, struct sockaddr *addr, int addrlen)
 		return ret;
 	}
 
-#if defined(AF_UNIX) && !defined(PYOS_OS2)
+#if defined(AF_UNIX)
 	case AF_UNIX:
 	{
 		struct sockaddr_un *a = (struct sockaddr_un *) addr;
@@ -929,7 +932,7 @@ getsockaddrarg(PySocketSockObject *s, PyObject *args,
 {
 	switch (s->sock_family) {
 
-#if defined(AF_UNIX) && !defined(PYOS_OS2)
+#if defined(AF_UNIX)
 	case AF_UNIX:
 	{
 		struct sockaddr_un* addr;
@@ -947,7 +950,11 @@ getsockaddrarg(PySocketSockObject *s, PyObject *args,
 		memcpy(addr->sun_path, path, len);
 		addr->sun_path[len] = 0;
 		*addr_ret = (struct sockaddr *) addr;
+#if defined(PYOS_OS2)
+		*len_ret = sizeof(*addr);
+#else
 		*len_ret = len + sizeof(*addr) - sizeof(addr->sun_path);
+#endif
 		return 1;
 	}
 #endif /* AF_UNIX */
@@ -956,7 +963,7 @@ getsockaddrarg(PySocketSockObject *s, PyObject *args,
 	{
 		struct sockaddr_in* addr;
 		char *host;
-		int port;
+		int port, result;
  		addr=(struct sockaddr_in*)&(s->sock_addr).in;
 		if (!PyTuple_Check(args)) {
 			PyErr_Format(
@@ -969,7 +976,10 @@ getsockaddrarg(PySocketSockObject *s, PyObject *args,
 		if (!PyArg_ParseTuple(args, "eti:getsockaddrarg", 
 				      "idna", &host, &port))
 			return 0;
-		if (setipaddr(host, (struct sockaddr *)addr, sizeof(*addr),  AF_INET) < 0)
+                result = setipaddr(host, (struct sockaddr *)addr, 
+                                   sizeof(*addr),  AF_INET);
+                PyMem_Free(host);
+                if (result < 0)
 			return 0;
 		addr->sin_family = AF_INET;
 		addr->sin_port = htons((short)port);
@@ -983,7 +993,7 @@ getsockaddrarg(PySocketSockObject *s, PyObject *args,
 	{
 		struct sockaddr_in6* addr;
 		char *host;
-		int port, flowinfo, scope_id;
+		int port, flowinfo, scope_id, result;
  		addr = (struct sockaddr_in6*)&(s->sock_addr).in6;
 		flowinfo = scope_id = 0;
 		if (!PyArg_ParseTuple(args, "eti|ii", 
@@ -991,7 +1001,10 @@ getsockaddrarg(PySocketSockObject *s, PyObject *args,
 				      &scope_id)) {
 			return 0;
 		}
-		if (setipaddr(host, (struct sockaddr *)addr,  sizeof(*addr), AF_INET6) < 0)
+                result = setipaddr(host, (struct sockaddr *)addr,  
+                                   sizeof(*addr), AF_INET6);
+                PyMem_Free(host);
+                if (result < 0)
 			return 0;
 		addr->sin6_family = s->sock_family;
 		addr->sin6_port = htons((short)port);
@@ -1054,7 +1067,7 @@ getsockaddrlen(PySocketSockObject *s, socklen_t *len_ret)
 {
 	switch (s->sock_family) {
 
-#if defined(AF_UNIX) && !defined(PYOS_OS2)
+#if defined(AF_UNIX)
 	case AF_UNIX:
 	{
 		*len_ret = sizeof (struct sockaddr_un);
@@ -2962,6 +2975,14 @@ socket_inet_pton(PyObject *self, PyObject *args)
 		return NULL;
 	}
 
+#ifndef ENABLE_IPV6
+	if(af == AF_INET6) {
+		PyErr_SetString(socket_error,
+				"can't use AF_INET6, IPv6 is disabled");
+		return NULL;
+	}
+#endif 
+
 	retval = inet_pton(af, ip, packed);
 	if (retval < 0) {
 		PyErr_SetFromErrno(socket_error);
@@ -3092,7 +3113,7 @@ socket_getaddrinfo(PyObject *self, PyObject *args)
 		pptr = (char *)NULL;
 	} else {
 		PyErr_SetString(socket_error, "Int or String expected");
-		return NULL;
+                goto err;
 	}
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = family;
@@ -3106,7 +3127,7 @@ socket_getaddrinfo(PyObject *self, PyObject *args)
 	RELEASE_GETADDRINFO_LOCK  /* see comment in setipaddr() */
 	if (error) {
 		set_gaierror(error);
-		return NULL;
+		goto err;
 	}
 
 	if ((all = PyList_New(0)) == NULL)
@@ -3524,7 +3545,7 @@ init_socket(void)
 #ifdef AF_INET6
 	PyModule_AddIntConstant(m, "AF_INET6", AF_INET6);
 #endif /* AF_INET6 */
-#if defined(AF_UNIX) && !defined(PYOS_OS2)
+#if defined(AF_UNIX)
 	PyModule_AddIntConstant(m, "AF_UNIX", AF_UNIX);
 #endif /* AF_UNIX */
 #ifdef AF_AX25
@@ -3734,6 +3755,9 @@ init_socket(void)
 #endif
 #ifdef	IPPROTO_IPV4
 	PyModule_AddIntConstant(m, "IPPROTO_IPV4", IPPROTO_IPV4);
+#endif
+#ifdef	IPPROTO_IPV6
+	PyModule_AddIntConstant(m, "IPPROTO_IPV6", IPPROTO_IPV6);
 #endif
 #ifdef	IPPROTO_IPIP
 	PyModule_AddIntConstant(m, "IPPROTO_IPIP", IPPROTO_IPIP);

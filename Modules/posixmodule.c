@@ -42,8 +42,8 @@ corresponding Unix manual entries for more information on calls.");
 #include <io.h>
 #include <stdio.h>
 #include <process.h>
-#include "osdefs.h"
 #endif
+#include "osdefs.h"
 #endif
 
 #include <sys/types.h>
@@ -1144,7 +1144,25 @@ posix_chmod(PyObject *self, PyObject *args)
 	char *path = NULL;
 	int i;
 	int res;
-	if (!PyArg_ParseTuple(args, "eti", Py_FileSystemDefaultEncoding,
+#ifdef Py_WIN_WIDE_FILENAMES
+	if (unicode_file_names()) {
+		PyUnicodeObject *po;
+		if (PyArg_ParseTuple(args, "Ui|:chmod", &po, &i)) {
+			Py_BEGIN_ALLOW_THREADS
+			res = _wchmod(PyUnicode_AS_UNICODE(po), i);
+			Py_END_ALLOW_THREADS
+			if (res < 0)
+				return posix_error_with_unicode_filename(
+						PyUnicode_AS_UNICODE(po));
+			Py_INCREF(Py_None);
+			return Py_None;
+		}
+		/* Drop the argument parsing error as narrow strings
+		   are also valid. */
+		PyErr_Clear();
+	}
+#endif /* Py_WIN_WIDE_FILENAMES */
+	if (!PyArg_ParseTuple(args, "eti:chmod", Py_FileSystemDefaultEncoding,
 	                      &path, &i))
 		return NULL;
 	Py_BEGIN_ALLOW_THREADS
@@ -1916,11 +1934,32 @@ posix_utime(PyObject *self, PyObject *args)
 #define UTIME_ARG buf
 #endif /* HAVE_UTIMES */
 
-	if (!PyArg_ParseTuple(args, "sO:utime", &path, &arg))
+	int have_unicode_filename = 0;
+#ifdef Py_WIN_WIDE_FILENAMES
+	PyUnicodeObject *obwpath;
+	wchar_t *wpath;
+	if (unicode_file_names()) {
+		if (PyArg_ParseTuple(args, "UO|:utime", &obwpath, &arg)) {
+			wpath = PyUnicode_AS_UNICODE(obwpath);
+			have_unicode_filename = 1;
+		} else
+			/* Drop the argument parsing error as narrow strings
+			   are also valid. */
+			PyErr_Clear();
+	}
+#endif /* Py_WIN_WIDE_FILENAMES */
+
+	if (!have_unicode_filename && \
+		!PyArg_ParseTuple(args, "sO:utime", &path, &arg))
 		return NULL;
 	if (arg == Py_None) {
 		/* optional time values not given */
 		Py_BEGIN_ALLOW_THREADS
+#ifdef Py_WIN_WIDE_FILENAMES
+		if (have_unicode_filename)
+			res = _wutime(wpath, NULL);
+		else
+#endif /* Py_WIN_WIDE_FILENAMES */
 		res = utime(path, NULL);
 		Py_END_ALLOW_THREADS
 	}
@@ -1946,12 +1985,25 @@ posix_utime(PyObject *self, PyObject *args)
 		Py_END_ALLOW_THREADS
 #else
 		Py_BEGIN_ALLOW_THREADS
+#ifdef Py_WIN_WIDE_FILENAMES
+		if (have_unicode_filename)
+			/* utime is OK with utimbuf, but _wutime insists 
+			   on _utimbuf (the msvc headers assert the 
+			   underscore version is ansi) */
+			res = _wutime(wpath, (struct _utimbuf *)UTIME_ARG);
+		else
+#endif /* Py_WIN_WIDE_FILENAMES */
 		res = utime(path, UTIME_ARG);
 		Py_END_ALLOW_THREADS
-#endif
+#endif /* HAVE_UTIMES */
 	}
-	if (res < 0)
+	if (res < 0) {
+#ifdef Py_WIN_WIDE_FILENAMES
+		if (have_unicode_filename)
+			return posix_error_with_unicode_filename(wpath);
+#endif /* Py_WIN_WIDE_FILENAMES */
 		return posix_error_with_filename(path);
+	}
 	Py_INCREF(Py_None);
 	return Py_None;
 #undef UTIME_ARG
@@ -2458,6 +2510,231 @@ posix_spawnve(PyObject *self, PyObject *args)
 	PyMem_Free(path);
 	return res;
 }
+
+/* OS/2 supports spawnvp & spawnvpe natively */
+#if defined(PYOS_OS2)
+PyDoc_STRVAR(posix_spawnvp__doc__,
+"spawnvp(mode, file, args)\n\n\
+Execute the program 'file' in a new process, using the environment\n\
+search path to find the file.\n\
+\n\
+	mode: mode of process creation\n\
+	file: executable file name\n\
+	args: tuple or list of strings");
+
+static PyObject *
+posix_spawnvp(PyObject *self, PyObject *args)
+{
+	char *path;
+	PyObject *argv;
+	char **argvlist;
+	int mode, i, argc;
+	Py_intptr_t spawnval;
+	PyObject *(*getitem)(PyObject *, int);
+
+	/* spawnvp has three arguments: (mode, path, argv), where
+	   argv is a list or tuple of strings. */
+
+	if (!PyArg_ParseTuple(args, "ietO:spawnvp", &mode,
+			      Py_FileSystemDefaultEncoding,
+			      &path, &argv))
+		return NULL;
+	if (PyList_Check(argv)) {
+		argc = PyList_Size(argv);
+		getitem = PyList_GetItem;
+	}
+	else if (PyTuple_Check(argv)) {
+		argc = PyTuple_Size(argv);
+		getitem = PyTuple_GetItem;
+	}
+	else {
+		PyErr_SetString(PyExc_TypeError,
+				"spawnvp() arg 2 must be a tuple or list");
+		PyMem_Free(path);
+		return NULL;
+	}
+
+	argvlist = PyMem_NEW(char *, argc+1);
+	if (argvlist == NULL) {
+		PyMem_Free(path);
+		return PyErr_NoMemory();
+	}
+	for (i = 0; i < argc; i++) {
+		if (!PyArg_Parse((*getitem)(argv, i), "et",
+				 Py_FileSystemDefaultEncoding,
+				 &argvlist[i])) {
+			free_string_array(argvlist, i);
+			PyErr_SetString(
+				PyExc_TypeError,
+				"spawnvp() arg 2 must contain only strings");
+			PyMem_Free(path);
+			return NULL;
+		}
+	}
+	argvlist[argc] = NULL;
+
+	Py_BEGIN_ALLOW_THREADS
+#if defined(PYCC_GCC)
+	spawnval = spawnvp(mode, path, argvlist);
+#else
+	spawnval = _spawnvp(mode, path, argvlist);
+#endif
+	Py_END_ALLOW_THREADS
+
+	free_string_array(argvlist, argc);
+	PyMem_Free(path);
+
+	if (spawnval == -1)
+		return posix_error();
+	else
+		return Py_BuildValue("l", (long) spawnval);
+}
+
+
+PyDoc_STRVAR(posix_spawnvpe__doc__,
+"spawnvpe(mode, file, args, env)\n\n\
+Execute the program 'file' in a new process, using the environment\n\
+search path to find the file.\n\
+\n\
+	mode: mode of process creation\n\
+	file: executable file name\n\
+	args: tuple or list of arguments\n\
+	env: dictionary of strings mapping to strings");
+
+static PyObject *
+posix_spawnvpe(PyObject *self, PyObject *args)
+{
+	char *path;
+	PyObject *argv, *env;
+	char **argvlist;
+	char **envlist;
+	PyObject *key, *val, *keys=NULL, *vals=NULL, *res=NULL;
+	int mode, i, pos, argc, envc;
+	Py_intptr_t spawnval;
+	PyObject *(*getitem)(PyObject *, int);
+	int lastarg = 0;
+
+	/* spawnvpe has four arguments: (mode, path, argv, env), where
+	   argv is a list or tuple of strings and env is a dictionary
+	   like posix.environ. */
+
+	if (!PyArg_ParseTuple(args, "ietOO:spawnvpe", &mode,
+			      Py_FileSystemDefaultEncoding,
+			      &path, &argv, &env))
+		return NULL;
+	if (PyList_Check(argv)) {
+		argc = PyList_Size(argv);
+		getitem = PyList_GetItem;
+	}
+	else if (PyTuple_Check(argv)) {
+		argc = PyTuple_Size(argv);
+		getitem = PyTuple_GetItem;
+	}
+	else {
+		PyErr_SetString(PyExc_TypeError,
+				"spawnvpe() arg 2 must be a tuple or list");
+		goto fail_0;
+	}
+	if (!PyMapping_Check(env)) {
+		PyErr_SetString(PyExc_TypeError,
+				"spawnvpe() arg 3 must be a mapping object");
+		goto fail_0;
+	}
+
+	argvlist = PyMem_NEW(char *, argc+1);
+	if (argvlist == NULL) {
+		PyErr_NoMemory();
+		goto fail_0;
+	}
+	for (i = 0; i < argc; i++) {
+		if (!PyArg_Parse((*getitem)(argv, i),
+			     "et;spawnvpe() arg 2 must contain only strings",
+				 Py_FileSystemDefaultEncoding,
+				 &argvlist[i]))
+		{
+			lastarg = i;
+			goto fail_1;
+		}
+	}
+	lastarg = argc;
+	argvlist[argc] = NULL;
+
+	i = PyMapping_Size(env);
+	if (i < 0)
+		goto fail_1;
+	envlist = PyMem_NEW(char *, i + 1);
+	if (envlist == NULL) {
+		PyErr_NoMemory();
+		goto fail_1;
+	}
+	envc = 0;
+	keys = PyMapping_Keys(env);
+	vals = PyMapping_Values(env);
+	if (!keys || !vals)
+		goto fail_2;
+	if (!PyList_Check(keys) || !PyList_Check(vals)) {
+		PyErr_SetString(PyExc_TypeError,
+			"spawnvpe(): env.keys() or env.values() is not a list");
+		goto fail_2;
+	}
+
+	for (pos = 0; pos < i; pos++) {
+		char *p, *k, *v;
+		size_t len;
+
+		key = PyList_GetItem(keys, pos);
+		val = PyList_GetItem(vals, pos);
+		if (!key || !val)
+			goto fail_2;
+
+		if (!PyArg_Parse(
+			    key,
+			    "s;spawnvpe() arg 3 contains a non-string key",
+			    &k) ||
+		    !PyArg_Parse(
+			    val,
+			    "s;spawnvpe() arg 3 contains a non-string value",
+			    &v))
+		{
+			goto fail_2;
+		}
+		len = PyString_Size(key) + PyString_Size(val) + 2;
+		p = PyMem_NEW(char, len);
+		if (p == NULL) {
+			PyErr_NoMemory();
+			goto fail_2;
+		}
+		PyOS_snprintf(p, len, "%s=%s", k, v);
+		envlist[envc++] = p;
+	}
+	envlist[envc] = 0;
+
+	Py_BEGIN_ALLOW_THREADS
+#if defined(PYCC_GCC)
+	spawnval = spawnve(mode, path, argvlist, envlist);
+#else
+	spawnval = _spawnve(mode, path, argvlist, envlist);
+#endif
+	Py_END_ALLOW_THREADS
+
+	if (spawnval == -1)
+		(void) posix_error();
+	else
+		res = Py_BuildValue("l", (long) spawnval);
+
+  fail_2:
+	while (--envc >= 0)
+		PyMem_DEL(envlist[envc]);
+	PyMem_DEL(envlist);
+  fail_1:
+	free_string_array(argvlist, lastarg);
+	Py_XDECREF(vals);
+	Py_XDECREF(keys);
+  fail_0:
+	PyMem_Free(path);
+	return res;
+}
+#endif /* PYOS_OS2 */
 #endif /* HAVE_SPAWNV */
 
 
@@ -3615,7 +3892,7 @@ static PyObject *_PyPopenProcs = NULL;
 static PyObject *
 posix_popen(PyObject *self, PyObject *args)
 {
-	PyObject *f, *s;
+	PyObject *f;
 	int tm = 0;
 
 	char *cmdstring;
@@ -3623,8 +3900,6 @@ posix_popen(PyObject *self, PyObject *args)
 	int bufsize = -1;
 	if (!PyArg_ParseTuple(args, "s|si:popen", &cmdstring, &mode, &bufsize))
 		return NULL;
-
-	s = PyTuple_New(0);
 
 	if (*mode == 'r')
 		tm = _O_RDONLY;
@@ -3937,7 +4212,7 @@ _PyPopen(char *cmdstring, int mode, int n)
 
 	/* Create new output read handle and the input write handle. Set
 	 * the inheritance properties to FALSE. Otherwise, the child inherits
-	 * the these handles; resulting in non-closeable handles to the pipes
+	 * these handles; resulting in non-closeable handles to the pipes
 	 * being created. */
 	 fSuccess = DuplicateHandle(GetCurrentProcess(), hChildStdinWr,
 				    GetCurrentProcess(), &hChildStdinWrDup, 0,
@@ -4332,6 +4607,11 @@ posix_popen(PyObject *self, PyObject *args)
 	PyObject *f;
 	if (!PyArg_ParseTuple(args, "s|si:popen", &name, &mode, &bufsize))
 		return NULL;
+	/* Strip mode of binary or text modifiers */
+	if (strcmp(mode, "rb") == 0 || strcmp(mode, "rt") == 0)
+		mode = "r";
+	else if (strcmp(mode, "wb") == 0 || strcmp(mode, "wt") == 0)
+		mode = "w";
 	Py_BEGIN_ALLOW_THREADS
 	fp = popen(name, mode);
 	Py_END_ALLOW_THREADS
@@ -4408,7 +4688,7 @@ posix_setegid (PyObject *self, PyObject *args)
 
 #ifdef HAVE_SETREUID
 PyDoc_STRVAR(posix_setreuid__doc__,
-"seteuid(ruid, euid)\n\n\
+"setreuid(ruid, euid)\n\n\
 Set the current process's real and effective user ids.");
 
 static PyObject *
@@ -4428,7 +4708,7 @@ posix_setreuid (PyObject *self, PyObject *args)
 
 #ifdef HAVE_SETREGID
 PyDoc_STRVAR(posix_setregid__doc__,
-"setegid(rgid, egid)\n\n\
+"setregid(rgid, egid)\n\n\
 Set the current process's real and effective group ids.");
 
 static PyObject *
@@ -4607,7 +4887,7 @@ posix_lstat(PyObject *self, PyObject *args)
 	return posix_do_stat(self, args, "et:lstat", lstat, NULL, NULL);
 #else /* !HAVE_LSTAT */
 #ifdef MS_WINDOWS
-	return posix_do_stat(self, args, "et:lstat", STAT, "u:lstat", _wstati64);
+	return posix_do_stat(self, args, "et:lstat", STAT, "U:lstat", _wstati64);
 #else
 	return posix_do_stat(self, args, "et:lstat", STAT, NULL, NULL);
 #endif
@@ -6904,6 +7184,10 @@ static PyMethodDef posix_methods[] = {
 #ifdef HAVE_SPAWNV
 	{"spawnv",	posix_spawnv, METH_VARARGS, posix_spawnv__doc__},
 	{"spawnve",	posix_spawnve, METH_VARARGS, posix_spawnve__doc__},
+#if defined(PYOS_OS2)
+	{"spawnvp",	posix_spawnvp, METH_VARARGS, posix_spawnvp__doc__},
+	{"spawnvpe",	posix_spawnvpe, METH_VARARGS, posix_spawnvpe__doc__},
+#endif /* PYOS_OS2 */
 #endif /* HAVE_SPAWNV */
 #ifdef HAVE_FORK1
 	{"fork1",       posix_fork1, METH_NOARGS, posix_fork1__doc__},

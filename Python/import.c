@@ -553,7 +553,7 @@ _PyImport_FindExtension(char *name, char *filename)
 
 /* Get the module object corresponding to a module name.
    First check the modules dictionary if there's one there,
-   if not, create a new one and insert in in the modules dictionary.
+   if not, create a new one and insert it in the modules dictionary.
    Because the former action is most common, THIS DOES NOT RETURN A
    'NEW' REFERENCE! */
 
@@ -2178,9 +2178,10 @@ ensure_fromlist(PyObject *mod, PyObject *fromlist, char *buf, int buflen,
 			if (all == NULL)
 				PyErr_Clear();
 			else {
-				if (!ensure_fromlist(mod, all, buf, buflen, 1))
-					return 0;
+				int ret = ensure_fromlist(mod, all, buf, buflen, 1);
 				Py_DECREF(all);
+				if (!ret)
+					return 0;
 			}
 			continue;
 		}

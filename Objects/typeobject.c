@@ -303,12 +303,15 @@ type_set_bases(PyTypeObject *type, PyObject *value, void *context)
 	return r;
 
   bail:
+	Py_DECREF(type->tp_bases);
+	Py_DECREF(type->tp_base);
+	if (type->tp_mro != old_mro) {
+		Py_DECREF(type->tp_mro);
+	}
+
 	type->tp_bases = old_bases;
 	type->tp_base = old_base;
 	type->tp_mro = old_mro;
-
-	Py_DECREF(value);
-	Py_DECREF(new_base);
 
 	return -1;
 }
@@ -636,7 +639,11 @@ subtype_dealloc(PyObject *self)
 	++_PyTrash_delete_nesting;
 	Py_TRASHCAN_SAFE_BEGIN(self);
 	--_PyTrash_delete_nesting;
-	_PyObject_GC_TRACK(self); /* We'll untrack for real later */
+	/* DO NOT restore GC tracking at this point.  weakref callbacks
+	 * (if any, and whether directly here or indirectly in something we
+	 * call) may trigger GC, and if self is tracked at that point, it
+	 * will look like trash to GC and GC will try to delete self again.
+	 */
 
 	/* Find the nearest base with a different tp_dealloc */
 	base = type;
@@ -654,9 +661,12 @@ subtype_dealloc(PyObject *self)
 
 	/* Maybe call finalizer; exit early if resurrected */
 	if (type->tp_del) {
+		_PyObject_GC_TRACK(self);
 		type->tp_del(self);
 		if (self->ob_refcnt > 0)
-			goto endlabel;
+			goto endlabel;	/* resurrected */
+		else
+			_PyObject_GC_UNTRACK(self);
 	}
 
 	/*  Clear slots up to the nearest base with a different tp_dealloc */
@@ -680,11 +690,11 @@ subtype_dealloc(PyObject *self)
 		}
 	}
 
-	/* Finalize GC if the base doesn't do GC and we do */
-	if (!PyType_IS_GC(base))
-		_PyObject_GC_UNTRACK(self);
-
-	/* Call the base tp_dealloc() */
+	/* Call the base tp_dealloc(); first retrack self if
+	 * basedealloc knows about gc.
+	 */
+	if (PyType_IS_GC(base))
+		_PyObject_GC_TRACK(self);
 	assert(basedealloc);
 	basedealloc(self);
 
@@ -721,6 +731,16 @@ subtype_dealloc(PyObject *self)
 	         GC untrack
 		 trashcan begin
 		 GC track
+
+           Q. Why did the last question say "immediately GC-track again"?
+              It's nowhere near immediately.
+
+           A. Because the code *used* to re-track immediately.  Bad Idea.
+              self has a refcount of 0, and if gc ever gets its hands on it
+              (which can happen if any weakref callback gets invoked), it
+              looks like trash to gc too, and gc also tries to delete self
+              then.  But we're already deleting self.  Double dealloction is
+              a subtle disaster.
 
 	   Q. Why the bizarre (net-zero) manipulation of
 	      _PyTrash_delete_nesting around the trashcan macros?
@@ -2547,6 +2567,7 @@ reduce_2(PyObject *obj)
 			goto end;
 	}
 	else {
+		PyErr_Clear();
 		state = PyObject_GetAttrString(obj, "__dict__");
 		if (state == NULL) {
 			PyErr_Clear();
@@ -3309,6 +3330,20 @@ wrap_inquiry(PyObject *self, PyObject *args, void *wrapped)
 }
 
 static PyObject *
+wrap_inquirypred(PyObject *self, PyObject *args, void *wrapped)
+{
+	inquiry func = (inquiry)wrapped;
+	int res;
+
+	if (!PyArg_ParseTuple(args, ""))
+		return NULL;
+	res = (*func)(self);
+	if (res == -1 && PyErr_Occurred())
+		return NULL;
+	return PyBool_FromLong((long)res);
+}
+
+static PyObject *
 wrap_binaryfunc(PyObject *self, PyObject *args, void *wrapped)
 {
 	binaryfunc func = (binaryfunc)wrapped;
@@ -3559,7 +3594,8 @@ wrap_objobjproc(PyObject *self, PyObject *args, void *wrapped)
 	res = (*func)(self, value);
 	if (res == -1 && PyErr_Occurred())
 		return NULL;
-	return PyInt_FromLong((long)res);
+	else
+		return PyBool_FromLong(res);
 }
 
 static PyObject *
@@ -4896,7 +4932,7 @@ static slotdef slotdefs[] = {
 	UNSLOT("__pos__", nb_positive, slot_nb_positive, wrap_unaryfunc, "+x"),
 	UNSLOT("__abs__", nb_absolute, slot_nb_absolute, wrap_unaryfunc,
 	       "abs(x)"),
-	UNSLOT("__nonzero__", nb_nonzero, slot_nb_nonzero, wrap_inquiry,
+	UNSLOT("__nonzero__", nb_nonzero, slot_nb_nonzero, wrap_inquirypred,
 	       "x != 0"),
 	UNSLOT("__invert__", nb_invert, slot_nb_invert, wrap_unaryfunc, "~x"),
 	BINSLOT("__lshift__", nb_lshift, slot_nb_lshift, "<<"),
@@ -5380,7 +5416,7 @@ static PyMemberDef super_members[] = {
 	{"__self__",  T_OBJECT, offsetof(superobject, obj), READONLY,
 	 "the instance invoking super(); may be None"},
 	{"__self_class__", T_OBJECT, offsetof(superobject, obj_type), READONLY,
-	 "the type of the the instance invoking super(); may be None"},
+	 "the type of the instance invoking super(); may be None"},
 	{0}
 };
 
@@ -5460,7 +5496,15 @@ super_getattro(PyObject *self, PyObject *name)
 				Py_INCREF(res);
 				f = res->ob_type->tp_descr_get;
 				if (f != NULL) {
-					tmp = f(res, su->obj,
+					tmp = f(res,
+						/* Only pass 'obj' param if
+						   this is instance-mode super 
+						   (See SF ID #743627)
+						*/
+						(su->obj ==
+						 (PyObject *)su->obj_type 
+							? (PyObject *)NULL 
+							: su->obj),
 						(PyObject *)starttype);
 					Py_DECREF(res);
 					res = tmp;

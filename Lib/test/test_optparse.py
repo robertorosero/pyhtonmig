@@ -607,9 +607,25 @@ class TestNArgsAppend(BaseTest):
 class TestVersion(BaseTest):
     def test_version(self):
         oldargv = sys.argv[0]
-        sys.argv[0] = "./foo/bar"
+        sys.argv[0] = os.path.join(os.curdir, "foo", "bar")
         self.parser = OptionParser(usage=SUPPRESS_USAGE, version="%prog 0.1")
         self.assertStdoutEquals(["--version"], "bar 0.1\n")
+        sys.argv[0] = oldargv
+
+    def test_version_with_prog_keyword(self):
+        oldargv = sys.argv[0]
+        sys.argv[0] = "./foo/bar"
+        self.parser = OptionParser(usage=SUPPRESS_USAGE, version="%prog 0.1",
+                                   prog="splat")
+        self.assertStdoutEquals(["--version"], "splat 0.1\n")
+        sys.argv[0] = oldargv
+
+    def test_version_with_prog_attribute(self):
+        oldargv = sys.argv[0]
+        sys.argv[0] = "./foo/bar"
+        self.parser = OptionParser(usage=SUPPRESS_USAGE, version="%prog 0.1")
+        self.parser.prog = "splat"
+        self.assertStdoutEquals(["--version"], "splat 0.1\n")
         sys.argv[0] = oldargv
 
     def test_no_version(self):
@@ -1086,7 +1102,7 @@ class TestHelp(BaseTest):
     def assertHelpEquals(self, expected_output):
         # This trick is used to make optparse believe bar.py is being executed.
         oldargv = sys.argv[0]
-        sys.argv[0] = "./foo/bar.py"
+        sys.argv[0] = os.path.join(os.curdir, "foo", "bar.py")
 
         self.assertStdoutEquals(["-h"], expected_output)
 

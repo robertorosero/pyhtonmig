@@ -36,7 +36,7 @@
 /*
  * Handwritten code to wrap version 3.x of the Berkeley DB library,
  * written to replace a SWIG-generated file.  It has since been updated
- * to compile with BerkeleyDB versions 3.2 through 4.1.
+ * to compile with BerkeleyDB versions 3.2 through 4.2.
  *
  * This module was started by Andrew Kuchling to remove the dependency
  * on SWIG in a package by Gregory P. Smith <greg@electricrain.com> who
@@ -93,7 +93,7 @@
 /* 40 = 4.0, 33 = 3.3; this will break if the second number is > 9 */
 #define DBVER (DB_VERSION_MAJOR * 10 + DB_VERSION_MINOR)
 
-#define PY_BSDDB_VERSION "4.1.6"
+#define PY_BSDDB_VERSION "4.2.0.2"
 static char *rcs_id = "$Id$";
 
 
@@ -2167,6 +2167,17 @@ DB_verify(DBObject* self, PyObject* args, PyObject* kwargs)
     MYDB_END_ALLOW_THREADS;
     if (outFileName)
         fclose(outFile);
+
+    /* DB.verify acts as a DB handle destructor (like close); this was
+     * documented in BerkeleyDB 4.2 but had the undocumented effect
+     * of not being safe in prior versions while still requiring an explicit
+     * DB.close call afterwards.  Lets call close for the user to emulate
+     * the safe 4.2 behaviour. */
+#if (DBVER <= 41)
+    self->db->close(self->db, 0);
+#endif
+    self->db = NULL;
+
     RETURN_IF_ERR();
     RETURN_NONE();
 }
@@ -2361,7 +2372,7 @@ DB_has_key(DBObject* self, PyObject* args)
     data.flags = DB_DBT_USERMEM;
 
     MYDB_BEGIN_ALLOW_THREADS;
-    err = self->db->get(self->db, NULL, &key, &data, 0);
+    err = self->db->get(self->db, txn, &key, &data, 0);
     MYDB_END_ALLOW_THREADS;
     FREE_DBT(key);
     return PyInt_FromLong((err == ENOMEM) || (err == 0));
@@ -2838,7 +2849,15 @@ DBC_set(DBCursorObject* self, PyObject* args, PyObject *kwargs)
                                    data.data, data.size);
             break;
         }
-        FREE_DBT(key);
+        if (_DB_get_type(self->mydb) == DB_BTREE) {
+            /* the only time a malloced key is returned is when we
+             * call this on a BTree database because it performs
+             * partial matching and needs to return the real key.
+             * All others leave key untouched [where calling free()
+             * on it would often segfault].
+             */
+            FREE_DBT(key);
+        }
         FREE_DBT(data);
     }
 
@@ -2900,7 +2919,15 @@ DBC_set_range(DBCursorObject* self, PyObject* args, PyObject* kwargs)
                                    data.data, data.size);
             break;
         }
-        FREE_DBT(key);
+        if (_DB_get_type(self->mydb) == DB_BTREE) {
+            /* the only time a malloced key is returned is when we
+             * call this on a BTree database because it performs
+             * partial matching and needs to return the real key.
+             * All others leave key untouched [where calling free()
+             * on it would often segfault].
+             */
+            FREE_DBT(key);
+        }
         FREE_DBT(data);
     }
 
@@ -3275,6 +3302,21 @@ DBEnv_set_timeout(DBEnvObject* self, PyObject* args, PyObject* kwargs)
     RETURN_NONE();
 }
 #endif /* DBVER >= 40 */
+
+static PyObject*
+DBEnv_set_shm_key(DBEnvObject* self, PyObject* args)
+{
+    int err;
+    long shm_key = 0;
+
+    if (!PyArg_ParseTuple(args, "l:set_shm_key", &shm_key))
+        return NULL;
+    CHECK_ENV_NOT_CLOSED(self);
+
+    err = self->db_env->set_shm_key(self->db_env, shm_key);
+    RETURN_IF_ERR();
+    RETURN_NONE();
+}
 
 static PyObject*
 DBEnv_set_cachesize(DBEnvObject* self, PyObject* args)
@@ -4076,6 +4118,7 @@ static PyMethodDef DBEnv_methods[] = {
 #if (DBVER >= 40)
     {"set_timeout",     (PyCFunction)DBEnv_set_timeout,      METH_VARARGS|METH_KEYWORDS},
 #endif
+    {"set_shm_key",     (PyCFunction)DBEnv_set_shm_key,      METH_VARARGS},
     {"set_cachesize",   (PyCFunction)DBEnv_set_cachesize,    METH_VARARGS},
     {"set_data_dir",    (PyCFunction)DBEnv_set_data_dir,     METH_VARARGS},
 #if (DBVER >= 32)
@@ -4324,8 +4367,6 @@ static PyMethodDef bsddb_methods[] = {
  */
 #define ADD_INT(dict, NAME)         _addIntToDict(dict, #NAME, NAME)
 
-
-
 DL_EXPORT(void) init_bsddb(void)
 {
     PyObject* m;
@@ -4370,7 +4411,13 @@ DL_EXPORT(void) init_bsddb(void)
     ADD_INT(d, DB_MAX_PAGES);
     ADD_INT(d, DB_MAX_RECORDS);
 
+#if (DBVER >= 42)
+    ADD_INT(d, DB_RPCCLIENT);
+#else
     ADD_INT(d, DB_CLIENT);
+    /* allow apps to be written using DB_RPCCLIENT on older BerkeleyDB */
+    _addIntToDict(d, "DB_RPCCLIENT", DB_CLIENT);
+#endif
     ADD_INT(d, DB_XA_CREATE);
 
     ADD_INT(d, DB_CREATE);
@@ -4519,7 +4566,7 @@ DL_EXPORT(void) init_bsddb(void)
     ADD_INT(d, DB_CHECKPOINT);
     ADD_INT(d, DB_CURLSN);
 #endif
-#if (DBVER >= 33)
+#if ((DBVER >= 33) && (DBVER <= 41))
     ADD_INT(d, DB_COMMIT);
 #endif
     ADD_INT(d, DB_CONSUME);
@@ -4592,6 +4639,18 @@ DL_EXPORT(void) init_bsddb(void)
     ADD_INT(d, DB_YIELDCPU);
     ADD_INT(d, DB_PANIC_ENVIRONMENT);
     ADD_INT(d, DB_NOPANIC);
+#endif
+
+#if (DBVER >= 42)
+    ADD_INT(d, DB_TIME_NOTGRANTED);
+    ADD_INT(d, DB_TXN_NOT_DURABLE);
+    ADD_INT(d, DB_TXN_WRITE_NOSYNC);
+    ADD_INT(d, DB_LOG_AUTOREMOVE);
+    ADD_INT(d, DB_DIRECT_LOG);
+    ADD_INT(d, DB_DIRECT_DB);
+    ADD_INT(d, DB_INIT_REP);
+    ADD_INT(d, DB_ENCRYPT);
+    ADD_INT(d, DB_CHKSUM);
 #endif
 
 #if (DBVER >= 41)

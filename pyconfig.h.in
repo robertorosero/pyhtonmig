@@ -44,6 +44,9 @@
 /* Define if nice() returns success/failure instead of the new priority. */
 #undef HAVE_BROKEN_NICE
 
+/* Define if poll() sets errno on invalid file descriptors. */
+#undef HAVE_BROKEN_POLL
+
 /* Define if the Posix semaphores do not work on your system */
 #undef HAVE_BROKEN_POSIX_SEMAPHORES
 
@@ -96,13 +99,13 @@
 /* Define to 1 if you have the `execv' function. */
 #undef HAVE_EXECV
 
-/* Define to 1 if you have the `fchdir' function. */
+/* Define if you have the 'fchdir' function. */
 #undef HAVE_FCHDIR
 
 /* Define to 1 if you have the <fcntl.h> header file. */
 #undef HAVE_FCNTL_H
 
-/* Define to 1 if you have the `fdatasync' function. */
+/* Define if you have the 'fdatasync' function. */
 #undef HAVE_FDATASYNC
 
 /* Define if you have the 'flock' function. */
@@ -126,7 +129,7 @@
 /* Define to 1 if you have the `fstatvfs' function. */
 #undef HAVE_FSTATVFS
 
-/* Define to 1 if you have the `fsync' function. */
+/* Define if you have the 'fsync' function. */
 #undef HAVE_FSYNC
 
 /* Define to 1 if you have the `ftell64' function. */
@@ -599,6 +602,9 @@
 /* Define to 1 if you don't have `tm_zone' but do have the external array
    `tzname'. */
 #undef HAVE_TZNAME
+
+/* Define this if you have tcl and TCL_UTF_MAX==6 */
+#undef HAVE_UCS4_TCL
 
 /* Define this if you have the type uintptr_t. */
 #undef HAVE_UINTPTR_T

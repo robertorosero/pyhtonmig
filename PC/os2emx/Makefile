@@ -91,7 +91,7 @@ ifeq ($(MODE),debug)
   CFLAGS+=	-g -O
   LDFLAGS+=	-g
 else
-  CFLAGS+=	-s -O3 -fomit-frame-pointer
+  CFLAGS+=	-s -O3 -fomit-frame-pointer -mprobe
   LDFLAGS+=	-s
 endif
 CFLAGS+=	$(PY_DEF)
@@ -113,6 +113,7 @@ EXEOMF=		no
 
 # File extensions
 MODULE.EXT=	.pyd
+MODLIB.EXT=	.dll
 ifeq ($(OMF),yes)
   O=		.obj
   A=		.lib
@@ -253,7 +254,7 @@ DESCRIPTION._tkinter$(MODULE.EXT)=	Python Extension DLL for access to Tcl/Tk Env
 DESCRIPTION.mpz$(MODULE.EXT)=		Python Extension DLL for access to GNU multi-precision library
 DESCRIPTION.readline$(MODULE.EXT)=	Python Extension DLL for access to GNU ReadLine library
 DESCRIPTION.bsddb185$(MODULE.EXT)=	Python Extension DLL for access to BSD DB (v1.85) library
-DESCRIPTION._curses$(MODULE.EXT)=	Python Extension DLL for access to ncurses library
+DESCRIPTION._curses$(MODLIB.EXT)=	Python Extension DLL for access to ncurses library
 DESCRIPTION.pyexpat$(MODULE.EXT)=	Python Extension DLL for access to expat library
 DESCRIPTION.bz2$(MODULE.EXT)=		Python Extension DLL for accessing the bz2 compression library
 
@@ -429,6 +430,10 @@ HARDEXTMODULES=	_hotshot \
 		_testcap \
 		unicoded
 
+# Python modules that are used as libraries and therefore must use
+# a .DLL extension
+LIBEXTMODULES=
+
 # Python external ($(MODULE.EXT)) modules - can be EASY or HARD
 ifeq ($(HAVE_ZLIB),yes)
   HARDEXTMODULES+=	zlib
@@ -451,7 +456,8 @@ ifeq ($(HAVE_BSDDB),yes)
   HARDEXTMODULES+=	bsddb185
 endif
 ifeq ($(HAVE_NCURSES),yes)
-  HARDEXTMODULES+=	_curses _curses_
+  LIBEXTMODULES+=	_curses
+  HARDEXTMODULES+=	_curses_
 endif
 ifeq ($(HAVE_GDBM),yes)
   HARDEXTMODULES+=	gdbm dbm
@@ -464,7 +470,7 @@ endif
 HARDEXTMODULES+=	pyexpat
 EXPAT.INC=	-I../../Modules/expat
 EXPAT.DEF=	-DHAVE_EXPAT_H -DXML_NS=1 -DXML_DTD=1 -DXML_BYTE_ORDER=12 \
-		-DXML_CONTENT_BYTES=1024
+		-DXML_CONTENT_BYTES=1024 -DHAVE_MEMMOVE=1 -DHAVE_BCOPY=1
 EXPAT.SRC=	$(addprefix ../../Modules/expat/, \
 		xmlparse.c \
 		xmlrole.c \
@@ -473,6 +479,7 @@ EXPAT.SRC=	$(addprefix ../../Modules/expat/, \
 # all the external modules
 EXTERNDLLS=	$(addsuffix $(MODULE.EXT),$(patsubst %module,%,$(EASYEXTMODULES)))
 EXTERNDLLS+=	$(addsuffix $(MODULE.EXT),$(patsubst %module,%,$(HARDEXTMODULES)))
+EXTERNDLLS+=	$(addsuffix $(MODLIB.EXT),$(patsubst %module,%,$(LIBEXTMODULES)))
 
 # Targets
 all:  $(OUT) $(PYTHON.LIB) $(PYTHON.DEF) $(PYTHON.IMPLIB) $(PYTHON.DLL) \
@@ -583,7 +590,7 @@ crypt$(MODULE.EXT): $(OUT)cryptmodule$O $(OUT)crypt_m.def $(PYTHON.IMPLIB)
 $(OUT)_curses_m.def:
 	@echo Creating .DEF file: $@
 	@echo LIBRARY $(notdir $*) INITINSTANCE TERMINSTANCE >$@
-	@echo DESCRIPTION $(DQUOTE)$(DESCRIPTION.$(notdir $*)$(MODULE.EXT))$(DQUOTE) >>$@
+	@echo DESCRIPTION $(DQUOTE)$(DESCRIPTION.$(notdir $*)$(MODLIB.EXT))$(DQUOTE) >>$@
 	@echo DATA MULTIPLE NONSHARED >>$@
 	@echo EXPORTS >>$@
 	@echo 	init_curses >>$@
@@ -609,7 +616,7 @@ $(OUT)_curses_panel_m.def:
 	@echo EXPORTS >>$@
 	@echo 	init_curses_panel >>$@
 
-_curses$(MODULE.EXT): $(OUT)_cursesmodule$O $(OUT)_curses_m.def $(PYTHON.IMPLIB)
+_curses$(MODLIB.EXT): $(OUT)_cursesmodule$O $(OUT)_curses_m.def $(PYTHON.IMPLIB)
 	$(LD) $(LDFLAGS.DLL) -o $@ $(^^) $(L^) $(LIBS) -lncurses
 
 # curses_panel needs to be renamed to be useful

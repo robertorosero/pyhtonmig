@@ -33,7 +33,7 @@
 #----------------------------------------------------------------------
 
 
-"""Support for BerkeleyDB 3.1 through 4.1.
+"""Support for BerkeleyDB 3.2 through 4.2.
 """
 
 try:
@@ -52,8 +52,38 @@ error = db.DBError  # So bsddb.error will mean something...
 
 #----------------------------------------------------------------------
 
+import sys
 
-class _DBWithCursor:
+# for backwards compatibility with python versions older than 2.3, the
+# iterator interface is dynamically defined and added using a mixin
+# class.  old python can't tokenize it due to the yield keyword.
+if sys.version >= '2.3':
+    exec """
+import UserDict
+class _iter_mixin(UserDict.DictMixin):
+    def __iter__(self):
+        try:
+            yield self.first()[0]
+            next = self.next
+            while 1:
+                yield next()[0]
+        except _bsddb.DBNotFoundError:
+            return
+
+    def iteritems(self):
+        try:
+            yield self.first()
+            next = self.next
+            while 1:
+                yield next()
+        except _bsddb.DBNotFoundError:
+            return
+"""
+else:
+    class _iter_mixin: pass
+
+
+class _DBWithCursor(_iter_mixin):
     """
     A simple wrapper around DB that makes it look like the bsddbobject in
     the old module.  It uses a cursor as needed to provide DB traversal.
@@ -114,7 +144,7 @@ class _DBWithCursor:
     def set_location(self, key):
         self._checkOpen()
         self._checkCursor()
-        return self.dbc.set(key)
+        return self.dbc.set_range(key)
 
     def next(self):
         self._checkOpen()

@@ -468,22 +468,29 @@ class PyBuildExt(build_ext):
         # Sleepycat Berkeley DB interface.  http://www.sleepycat.com
         #
         # This requires the Sleepycat DB code. The earliest supported version
-        # of that library is 3.0, the latest supported version is 4.1.  A list
+        # of that library is 3.1, the latest supported version is 4.2.  A list
         # of available releases can be found at
         #
         # http://www.sleepycat.com/update/index.html
+        #
+        # NOTE: 3.1 is only partially supported; expect the extended bsddb module
+        # test suite to show failures due to some missing methods and behaviours
+        # in BerkeleyDB 3.1.
 
         # when sorted in reverse order, keys for this dict must appear in the
         # order you wish to search - e.g., search for db4 before db3
         db_try_this = {
-            'db4': {'libs': ('db-4.1', 'db41', 'db-4.0', 'db4',),
-                    'libdirs': ('/usr/local/BerkeleyDB.4.1/lib',
+            'db4': {'libs': ('db-4.2', 'db42', 'db-4.1', 'db41', 'db-4.0', 'db4',),
+                    'libdirs': ('/usr/local/BerkeleyDB.4.2/lib',
+                                '/usr/local/BerkeleyDB.4.1/lib',
                                 '/usr/local/BerkeleyDB.4.0/lib',
                                 '/usr/local/lib',
                                 '/opt/sfw',
                                 '/sw/lib',
                                 ),
-                    'incdirs': ('/usr/local/BerkeleyDB.4.1/include',
+                    'incdirs': ('/usr/local/BerkeleyDB.4.2/include',
+                                '/usr/local/include/db42',
+                                '/usr/local/BerkeleyDB.4.1/include',
                                 '/usr/local/include/db41',
                                 '/usr/local/BerkeleyDB.4.0/include',
                                 '/usr/local/include/db4',
@@ -730,21 +737,26 @@ class PyBuildExt(build_ext):
         else:
             xmlbo = "4321"
         expatinc = os.path.join(os.getcwd(), srcdir, 'Modules', 'expat')
-        exts.append(Extension('pyexpat',
-                              sources = [
-            'pyexpat.c',
-            'expat/xmlparse.c',
-            'expat/xmlrole.c',
-            'expat/xmltok.c',
-            ],
-                              define_macros = [
+        define_macros = [
             ('XML_NS', '1'),
             ('XML_DTD', '1'),
             ('BYTEORDER', xmlbo),
             ('XML_CONTEXT_BYTES','1024'),
-            ],
-                              include_dirs = [expatinc]
-                               ))
+            ]
+        config_h = sysconfig.get_config_h_filename()
+        config_h_vars = sysconfig.parse_config_h(open(config_h))
+        for feature_macro in ['HAVE_MEMMOVE', 'HAVE_BCOPY']:
+            if config_h_vars.has_key(feature_macro):
+                define_macros.append((feature_macro, '1'))
+        exts.append(Extension('pyexpat',
+                              define_macros = define_macros,
+                              include_dirs = [expatinc],
+                              sources = ['pyexpat.c',
+                                         'expat/xmlparse.c',
+                                         'expat/xmlrole.c',
+                                         'expat/xmltok.c',
+                                         ],
+                              ))
 
         # Dynamic loading module
         if sys.maxint == 0x7fffffff:

@@ -1,3 +1,37 @@
+What's New in IDLE 1.0.3?
+===================================
+
+*Release date: 13-May-2004*
+
+- Keybindings with the Shift modifier now work correctly.  So do bindings which
+  use the Space key.  Limit unmodified user keybindings to the function keys.
+  Python Bug 775353, IDLEfork Bugs 755647, 761557
+
+What's New in IDLE 1.0.2?
+===================================
+
+*Release date: 05-Dec-2003*
+
+- After an exception, run.py was not setting the exception vector. Noam
+  Raphael suggested correcting this so pdb's postmortem pm() would work. 
+  IDLEfork Patch 844675
+
+- IDLE now does not fail to save the file anymore if the Tk buffer is not a
+  Unicode string, yet eol_convention is.  Python Bugs 774680, 788378
+
+- IDLE will use the Python html docs on the system, if found
+
+What's New in IDLE 1.0.1?
+===================================
+
+*Release date: 23-Sep-2003*
+
+- IDLE didn't start correctly when Python was installed in "Program Files" on
+  W2K and XP.  Python Bugs 780451, 784183
+
+- config-main.def documentation incorrectly referred to idle- instead of 
+  config-  filenames.  SF 782759  Also added note about .idlerc location.
+
 What's New in IDLE 1.0?
 ===================================
 
@@ -40,6 +74,16 @@ What's New in IDLE 1.0b2?
 ===================================
 
 *Release date: 29-Jun-2003*
+
+- Extend AboutDialog.ViewFile() to support file encodings.  Make the CREDITS
+  file Latin-1.
+
+- Updated the About dialog to reflect re-integration into Python.  Provide
+  buttons to display Python's NEWS, License, and Credits, plus additional
+  buttons for IDLE's README and NEWS.
+
+- TextViewer() now has a third parameter which allows inserting text into the
+  viewer instead of reading from a file.
 
 - (Created the .../Lib/idlelib directory in the Python CVS, which is a clone of
   IDLEfork modified to install in the Python environment.  The code in the
