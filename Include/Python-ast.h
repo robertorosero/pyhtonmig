@@ -104,7 +104,7 @@ struct _stmt {
                 
                 struct {
                         expr_ty dest;
-                        asdl_seq *value;
+                        asdl_seq *values;
                         bool nl;
                 } Print;
                 
@@ -334,7 +334,7 @@ stmt_ty Delete(asdl_seq * targets, int lineno);
 stmt_ty Assign(asdl_seq * targets, expr_ty value, int lineno);
 stmt_ty AugAssign(expr_ty target, operator_ty op, expr_ty value, int
                   lineno);
-stmt_ty Print(expr_ty dest, asdl_seq * value, bool nl, int lineno);
+stmt_ty Print(expr_ty dest, asdl_seq * values, bool nl, int lineno);
 stmt_ty For(expr_ty target, expr_ty iter, asdl_seq * body, asdl_seq *
             orelse, int lineno);
 stmt_ty While(expr_ty test, asdl_seq * body, asdl_seq * orelse, int lineno);

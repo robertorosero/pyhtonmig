@@ -222,7 +222,7 @@ AugAssign(expr_ty target, operator_ty op, expr_ty value, int lineno)
 }
 
 stmt_ty
-Print(expr_ty dest, asdl_seq * value, bool nl, int lineno)
+Print(expr_ty dest, asdl_seq * values, bool nl, int lineno)
 {
         stmt_ty p;
         p = (stmt_ty)malloc(sizeof(*p));
@@ -232,7 +232,7 @@ Print(expr_ty dest, asdl_seq * value, bool nl, int lineno)
         }
         p->kind = Print_kind;
         p->v.Print.dest = dest;
-        p->v.Print.value = value;
+        p->v.Print.values = values;
         p->v.Print.nl = nl;
         p->lineno = lineno;
         return p;
