@@ -118,9 +118,11 @@ subtype_dealloc(PyObject *self)
 
 	type = self->ob_type;
 	base = type->tp_base;
-	while (base && (f = base->tp_dealloc) == subtype_dealloc)
+	while ((f = base->tp_dealloc) == subtype_dealloc) {
 		base = base->tp_base;
-	if (dictoffset && (base == NULL || !base->tp_dictoffset)) {
+		assert(base);
+	}
+	if (dictoffset && !base->tp_dictoffset) {
 		PyObject **dictptr = (PyObject **) ((char *)self + dictoffset);
 		PyObject *dict = *dictptr;
 		if (dict != NULL) {
