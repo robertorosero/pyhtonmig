@@ -317,6 +317,15 @@ ELLIPSIS = 1 << 3
 UNIFIED_DIFF = 1 << 4
 CONTEXT_DIFF = 1 << 5
 
+OPTIONFLAGS_BY_NAME = {
+    'DONT_ACCEPT_TRUE_FOR_1': DONT_ACCEPT_TRUE_FOR_1,
+    'DONT_ACCEPT_BLANKLINE': DONT_ACCEPT_BLANKLINE,
+    'NORMALIZE_WHITESPACE': NORMALIZE_WHITESPACE,
+    'ELLIPSIS': ELLIPSIS,
+    'UNIFIED_DIFF': UNIFIED_DIFF,
+    'CONTEXT_DIFF': CONTEXT_DIFF,
+    }
+
 # Special string markers for use in `want` strings:
 BLANKLINE_MARKER = '<BLANKLINE>'
 ELLIPSIS_MARKER = '...'
@@ -596,9 +605,11 @@ class DocTestFinder:
       - The object filter is a function `f(obj)` that returns true
         if the given object should be ignored.
 
-    These filter functions are applied when examining the contents of
-    a module or of a class, but not when examining a module's
-    `__test__` dictionary.  By default, no objects are ignored.
+    Each object is ignored if either filter function returns true for
+    that object.  These filter functions are applied when examining
+    the contents of a module or of a class, but not when examining a
+    module's `__test__` dictionary.  By default, no objects are
+    ignored.
     """
 
     def __init__(self, verbose=False, namefilter=None, objfilter=None,
@@ -693,7 +704,6 @@ class DocTestFinder:
         """
         if self._verbose:
             print 'Finding tests in %s' % name
-        print >>sys.stderr, 'Finding tests in %s' % name
 
         # If we've already processed this object, then ignore it.
         if id(obj) in seen: return
@@ -949,8 +959,12 @@ class DocTestRunner:
         # <BLANKLINE> can be used as a special sequence to signify a
         # blank line, unless the DONT_ACCEPT_BLANKLINE flag is used.
         if not (self._optionflags & DONT_ACCEPT_BLANKLINE):
-            want = re.sub('(?m)^%s$' % re.escape(BLANKLINE_MARKER),
+            # Replace <BLANKLINE> in want with a blank line.
+            want = re.sub('(?m)^%s\s*?$' % re.escape(BLANKLINE_MARKER),
                           '', want)
+            # If a line in got contains only spaces, then remove the
+            # spaces.
+            got = re.sub('(?m)^\s*?$', '', got)
             if got == want: return True
 
         # This flag causes doctest to ignore any differences in the
@@ -1011,7 +1025,8 @@ class DocTestRunner:
         # If we're not using diff, then simply list the expected
         # output followed by the actual output.  But explicitly mark
         # blank lines in the actual output.
-        got = re.sub('(?m)^$(?!\Z)', '<BLANKLINE>', got)
+        if not (self._optionflags & DONT_ACCEPT_BLANKLINE):
+            got = re.sub('(?m)^$(?!\Z)', '<BLANKLINE>', got)
         return (_tag_msg("Expected", want or "Nothing") +
                 _tag_msg("Got", got))
 
@@ -1084,10 +1099,34 @@ class DocTestRunner:
     # that the exception_only message is the first non-indented line
     # starting with word characters after the "Traceback ...".)
     _EXCEPTION_RE = re.compile(('^(?P<out>.*)'
-                                '^Traceback \((?:%s|%s)\):\s*$.*?'
+                                '^(?P<hdr>Traceback \((?:%s|%s)\):)\s*$.*?'
                                 '^(?P<exc>\w+.*)') %
                                ('most recent call last', 'innermost last'),
                                re.MULTILINE | re.DOTALL)
+
+    _OPTION_DIRECTIVE_RE = re.compile('\s*doctest:\s*(?P<flags>[^#]*)')
+
+    def __handle_directive(self, example):
+        """
+        Check if the given example is actually a directive to doctest
+        (to turn an optionflag on or off; and if it is, then handle
+        the directive.
+
+        Return true iff the example is actually a directive (and so
+        should not be executed).
+        """
+        m = self._OPTION_DIRECTIVE_RE.match(example.source)
+        if m is None: return False
+
+        for flag in m.group('flags').upper().split():
+            if (flag[:1] not in '+-' or
+                flag[1:] not in OPTIONFLAGS_BY_NAME):
+                raise ValueError('Bad doctest option directive: '+flag)
+            if flag[0] == '+':
+                self._optionflags |= OPTIONFLAGS_BY_NAME[flag[1:]]
+            else:
+                self._optionflags &= ~OPTIONFLAGS_BY_NAME[flag[1:]]
+        return True
 
     def __run(self, test, globs, compileflags, out):
         """
@@ -1102,8 +1141,18 @@ class DocTestRunner:
         # Keep track of the number of failures and tries.
         failures = tries = 0
 
+        # Save the option flags (since doctest directives can be used
+        # to modify them).
+        original_optionflags = self._optionflags
+
         # Process each example.
         for example in test.examples:
+            # Check if it's an option directive.  If it is, then handle
+            # it, and go on to the next example.
+            if self.__handle_directive(example):
+                continue
+
+            # Record that we started this example.
             tries += 1
             self.report_start(out, test, example)
 
@@ -1149,16 +1198,22 @@ class DocTestRunner:
                                                      exc_info)
                     failures += 1
                 else:
+                    exc_hdr = m.group('hdr')+'\n' # Exception header
                     # The test passes iff the pre-exception output and
                     # the exception description match the values given
                     # in `want`.
                     if (self.check_output(m.group('out'), got) and
                         self.check_output(m.group('exc'), exc_msg)):
                         # Is +exc_msg the right thing here??
-                        self.report_success(out, test, example, got+exc_msg)
+                        self.report_success(out, test, example,
+                                            got+exc_hdr+exc_msg)
                     else:
-                        self.report_failure(out, test, example, got+exc_msg)
+                        self.report_failure(out, test, example,
+                                            got+exc_hdr+exc_msg)
                         failures += 1
+
+        # Restore the option flags (in case they were modified)
+        self._optionflags = original_optionflags
 
         # Record and return the number of failures and tries.
         self.__record_outcome(test, failures, tries)
@@ -1911,7 +1966,7 @@ ValueError: x
 x
 Traceback (most recent call last):
 [...]
-ValueError:
+ValueError: 
 foo
 
 """
@@ -1923,8 +1978,7 @@ def _test():
     #                UNIFIED_DIFF)
     #print '~'*70
     r = unittest.TextTestRunner()
-    r.run(DocTestSuite())#optionflags=ELLIPSIS | NORMALIZE_WHITESPACE |
-#                       UNIFIED_DIFF))
+    r.run(DocTestSuite())
 
 if __name__ == "__main__":
     _test()
