@@ -4,7 +4,7 @@
 # Based on prior profile module by Sjoerd Mullender...
 #   which was hacked somewhat by: Guido van Rossum
 #
-# See jprofile.doc for more information
+# See profile.doc for more information
 
 
 # Copyright 1994, by InfoSeek Corporation, all rights reserved.
@@ -79,13 +79,13 @@ def run(statement, *args):
 # print help
 def help():
 	for dirname in sys.path:
-		fullname = os.path.join(dirname, 'jprofile.doc')
+		fullname = os.path.join(dirname, 'profile.doc')
 		if os.path.exists(fullname):
 			sts = os.system('${PAGER-more} '+fullname)
 			if sts: print '*** Pager exit status:', sts
 			break
 	else:
-		print 'Sorry, can\'t find the help file "jprofile.doc"',
+		print 'Sorry, can\'t find the help file "profile.doc"',
 		print 'along the Python search path'
 
 
@@ -306,7 +306,7 @@ class Profile:
 			self.f_back = prior
 			
 	def simulate_call(self, name):
-		code = self.fake_code('jprofile', 0, name)
+		code = self.fake_code('profile', 0, name)
 		if self.cur:
 			pframe = self.cur[-2]
 		else:
