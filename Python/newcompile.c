@@ -1002,7 +1002,7 @@ compiler_visit_stmt(struct compiler *c, stmt_ty s)
 			ADDOP(c, PRINT_EXPR);
 		}
 		else {
-			ADDOP(c, DUP_TOP);
+			ADDOP(c, POP_TOP);
 		}
 		break;
         case Pass_kind:
