@@ -1,7 +1,11 @@
+#ifndef Py_CODE_H
+#include "code.h"
+#endif
+
 #ifndef Py_COMPILE_H
 #define Py_COMPILE_H
 #ifdef __cplusplus
-//extern "C" {
+extern "C" {
 #endif
 
 /* Public interface */
