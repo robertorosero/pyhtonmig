@@ -311,7 +311,6 @@ get_inprogress_dict()
 	} 
 	inprogress = PyDict_GetItem(tstate_dict, _PyCompareState_Key); 
 	if (inprogress == NULL) {
-		PyErr_Clear();
 		inprogress = PyDict_New();
 		if (inprogress == NULL)
 			return NULL;
