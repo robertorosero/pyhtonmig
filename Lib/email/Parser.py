@@ -58,9 +58,8 @@ class TextUtil:
         """
         r = self.fp.read()
         if self.unread:
-            self.unread.append(r)
             r = "\n".join(self.unread) + r
-        self.unread = []
+            self.unread = []
         return r
 
     def readuntil(self, re, afterblank=0, includematch=0):
@@ -224,7 +223,7 @@ class Parser:
             separator = '--' + boundary
             boundaryRE = re.compile(
                     r'(?P<sep>' + re.escape(separator) + 
-                    r')(?P<end>--)?(?P<ws>[ \t]*)')
+                    r')(?P<end>--)?(?P<ws>[ \t]*)(?P<linesep>\r\n|\r|\n)$')
             preamble, matchobj = fp.readuntil(boundaryRE)
             if not matchobj:
                 # Broken - we hit the end of file. Just set the body 
@@ -269,7 +268,10 @@ class Parser:
                     self._attach_trailer(subobj, trailer)
                 if matchobj.group('end'):
                     # That was the last piece of data. Let our caller attach
-                    # the epilogue to us.
+                    # the epilogue to us. But before we do that, push the
+                    # line ending of the match group back into the readline
+                    # buffer, as it's part of the epilogue.
+                    fp.unreadline(matchobj.group('linesep'))
                     return container
 
         elif container.get_content_maintype() == "multipart":
