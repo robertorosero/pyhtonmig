@@ -76,7 +76,8 @@ time timemodule.o	# time operations and variables
 # supported...)
 
 fcntl fcntlmodule.o	# fcntl(2) and ioctl(2)
-pwd grp pwdmodule.o	# pwd(3) and grp(3)
+pwd pwdmodule.o		# pwd(3) 
+grp grpmodule.o		# grp(3)
 crypt cryptmodule.o	# crypt(3)
 select selectmodule.o	# select(2); not on ancient System V
 socket socketmodule.o	# socket(2); not on ancient System V
@@ -192,6 +193,10 @@ rotor rotormodule.o
 
 # Generic (SunOS / SVR4) dynamic loading module
 # dl dlmodule.o
+
+
+# Jack's imgformat module
+# imgformat imgformatmodule.o
 
 
 # Example -- included for reference only
