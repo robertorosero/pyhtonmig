@@ -381,7 +381,7 @@ PyMac_BuildOptStr255(Str255 s)
 int
 PyMac_GetRect(PyObject *v, Rect *r)
 {
-	return PyArg_Parse(v, "(hhhh)", &r->left, &r->top, &r->right, &r->bottom);
+	return PyArg_Parse(v, "(HHHH)", &r->left, &r->top, &r->right, &r->bottom);
 }
 
 /* Convert a Rect to a Python object */
@@ -399,7 +399,7 @@ PyMac_BuildRect(Rect *r)
 int
 PyMac_GetPoint(PyObject *v, Point *p)
 {
-	return PyArg_Parse(v, "(hh)", &p->h, &p->v);
+	return PyArg_Parse(v, "(HH)", &p->h, &p->v);
 }
 
 /* Convert a Point to a Python object */
@@ -415,7 +415,7 @@ PyMac_BuildPoint(Point p)
 int
 PyMac_GetEventRecord(PyObject *v, EventRecord *e)
 {
-	return PyArg_Parse(v, "(Hkk(hh)H)",
+	return PyArg_Parse(v, "(Hkk(HH)H)",
 	                   &e->what,
 	                   &e->message,
 	                   &e->when,
