@@ -412,6 +412,51 @@ def diamond():
     verify(G().boo() == "C")
     verify(G.__mro__ == (G, E, D, C, B, A, object))
 
+def errors():
+    if verbose: print "Testing errors..."
+
+    try:
+        class C(list, dictionary):
+            pass
+    except TypeError:
+        pass
+    else:
+        print "Ouch: inheritance from both list and dict should be illegal!"
+
+    try:
+        class C(object, None):
+            pass
+    except TypeError:
+        pass
+    else:
+        print "Ouch: inheritance from non-type should be illegal!"
+    class Classic:
+        pass
+
+    try:
+        class C(object, Classic):
+            pass
+    except TypeError:
+        pass
+    else:
+        print "Ouch: inheritance from object and Classic should be illegal!"
+
+    try:
+        class C(int):
+            pass
+    except TypeError:
+        pass
+    else:
+        print "Ouch: inheritance from int should be illegal!"
+
+    try:
+        class C(object):
+            __slots__ = {}
+    except TypeError:
+        pass
+    else:
+        print "Ouch: __slots__ = {} should be illegal!"
+
 def all():
     lists()
     dicts()
@@ -425,6 +470,7 @@ def all():
     pymods()
     multi()
     diamond()
+    errors()
 
 all()
 
