@@ -400,6 +400,9 @@ given type object has a specified feature.
 /* Set if the type object is dynamically allocated */
 #define Py_TPFLAGS_HEAPTYPE (1L<<9)
 
+/* Set if the type allows subclassing */
+#define Py_TPFLAGS_BASETYPE (1L<<10)
+
 #define Py_TPFLAGS_DEFAULT  ( \
                              Py_TPFLAGS_HAVE_GETCHARBUFFER | \
                              Py_TPFLAGS_HAVE_SEQUENCE_IN | \
