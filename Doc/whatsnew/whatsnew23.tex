@@ -3,7 +3,7 @@
 % $Id$
 
 \title{What's New in Python 2.3}
-\release{0.90}
+\release{1.00}
 \author{A.M.\ Kuchling}
 \authoraddress{\email{amk@amk.ca}}
 
@@ -11,8 +11,8 @@
 \maketitle
 \tableofcontents
 
-This article explains the new features in Python 2.3.  The 
-release date of Python 2.3 is currently scheduled for August 2003.
+This article explains the new features in Python 2.3.  Python 2.3 was
+released on July 29, 2003.
 
 The main themes for Python 2.3 are polishing some of the features
 added in 2.2, adding various small but useful enhancements to the core
@@ -1055,7 +1055,7 @@ class FakeSeq:
     def __getitem__(self, item):
         if isinstance(item, slice):
             indices = item.indices(len(self))
-            return FakeSeq([self.calc_item(i) in range(*indices)])
+            return FakeSeq([self.calc_item(i) for i in range(*indices)])
         else:
             return self.calc_item(i)
 \end{verbatim}
@@ -1390,7 +1390,7 @@ support using the \code{+=} assignment operator to add another array's
 contents, and the \code{*=} assignment operator to repeat an array.
 (Contributed by Jason Orendorff.)
 
-\item The \module{bsddb} module has been replaced by version 4.1.1
+\item The \module{bsddb} module has been replaced by version 4.1.6
 of the \ulink{PyBSDDB}{http://pybsddb.sourceforge.net} package,
 providing a more complete interface to the transactional features of
 the BerkeleyDB library.
@@ -2386,7 +2386,8 @@ name.
 The author would like to thank the following people for offering
 suggestions, corrections and assistance with various drafts of this
 article: Jeff Bauer, Simon Brunning, Brett Cannon, Michael Chermside,
-Andrew Dalke, Scott David Daniels, Fred~L. Drake, Jr., Kelly Gerber,
+Andrew Dalke, Scott David Daniels, Fred~L. Drake, Jr., David Fraser,
+Kelly Gerber,
 Raymond Hettinger, Michael Hudson, Chris Lambert, Detlef Lannert,
 Martin von~L\"owis, Andrew MacIntyre, Lalo Martins, Chad Netzer,
 Gustavo Niemeyer, Neal Norwitz, Hans Nowak, Chris Reedy, Francesco

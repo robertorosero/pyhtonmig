@@ -94,6 +94,9 @@ class Random(_random.Random):
         If a is not None or an int or long, hash(a) is used instead.
         """
 
+        if a is None:
+            import time
+            a = long(time.time() * 256) # use fractional seconds
         super(Random, self).seed(a)
         self.gauss_next = None
 
@@ -255,6 +258,10 @@ class Random(_random.Random):
                 result[i] = pool[j]
                 pool[j] = pool[n-i-1]   # move non-selected item into vacancy
         else:
+            try:
+                n > 0 and (population[0], population[n//2], population[n-1])
+            except (TypeError, KeyError):   # handle sets and dictionaries
+                population = tuple(population)
             selected = {}
             for i in xrange(k):
                 j = _int(random() * n)
@@ -326,8 +333,8 @@ class Random(_random.Random):
         # arc:  range of distribution (in radians between 0 and pi)
         import warnings
         warnings.warn("The cunifvariate function is deprecated; Use (mean "
-                      "+ arc * (Random.random() - 0.5)) % Math.pi instead",
-                      DeprecationWarning)
+                      "+ arc * (Random.random() - 0.5)) % Math.pi instead.",
+                      DeprecationWarning, 2)
 
         return (mean + arc * (self.random() - 0.5)) % _pi
 
@@ -480,8 +487,8 @@ class Random(_random.Random):
         # ccc = alpha + ainv
         import warnings
         warnings.warn("The stdgamma function is deprecated; "
-                      "use gammavariate() instead",
-                      DeprecationWarning)
+                      "use gammavariate() instead.",
+                      DeprecationWarning, 2)
         return self.gammavariate(alpha, 1.0)
 
 
