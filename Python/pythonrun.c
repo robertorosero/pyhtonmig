@@ -1314,7 +1314,7 @@ _Py_AskYesNo(char *prompt)
 {
 	char buf[256];
 	
-	printf("%s [ny] ", prompt);
+	fprintf(stderr, "%s [ny] ", prompt);
 	if (fgets(buf, sizeof buf, stdin) == NULL)
 		return 0;
 	return buf[0] == 'y' || buf[0] == 'Y';
