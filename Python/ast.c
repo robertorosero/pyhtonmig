@@ -1623,6 +1623,7 @@ ast_for_import_stmt(const node *n)
             alias_ty import_alias = alias_for_import_name(CHILD(n, i));
             if (!import_alias) {
                 asdl_seq_free(aliases);
+                free(mod);
                 return NULL;
             }
 	    asdl_seq_APPEND(aliases, import_alias);
@@ -1663,45 +1664,32 @@ ast_for_global_stmt(const node *n)
 static stmt_ty
 ast_for_exec_stmt(const node *n)
 {
+    expr_ty expr1, globals = NULL, locals = NULL;
+    int n_children = NCH(n);
+    if (n_children != 2 && n_children != 4 && n_children != 6) {
+        PyErr_Format(PyExc_Exception,
+                     "poorly formed 'exec' statement: %d parts to statement",
+                     n_children);
+        return NULL;
+    }
+
     /* exec_stmt: 'exec' expr ['in' test [',' test]] */
     REQ(n, exec_stmt);
-    if (NCH(n) == 2) {
-        expr_ty expression = ast_for_expr(CHILD(n, 1));
-        if (!expression)
+    expr1 = ast_for_expr(CHILD(n, 1));
+    if (!expr1)
+        return NULL;
+    if (n_children >= 4) {
+        globals = ast_for_expr(CHILD(n, 3));
+        if (!globals)
             return NULL;
-	return Exec(expression, NULL, NULL, LINENO(n));
     }
-    else if (NCH(n) == 4) {
-        expr_ty expr1, expr2;
-
-        expr1 = ast_for_expr(CHILD(n, 1));
-        if (!expr1)
+    if (n_children == 6) {
+        locals = ast_for_expr(CHILD(n, 5));
+        if (!locals)
             return NULL;
-        expr2 = ast_for_expr(CHILD(n, 3));
-        if (!expr2)
-            return NULL;
-
-	return Exec(expr1, expr2, NULL, LINENO(n));
     }
-    else if (NCH(n) == 6) {
-        expr_ty expr1, expr2, expr3;
 
-        expr1 = ast_for_expr(CHILD(n, 1));
-        if (!expr1)
-            return NULL;
-        expr2 = ast_for_expr(CHILD(n, 3));
-        if (!expr2)
-            return NULL;
-        expr3 = ast_for_expr(CHILD(n, 5));
-        if (!expr3)
-            return NULL;
-
-	return Exec(expr1, expr2, expr3, LINENO(n));
-    }
-    PyErr_Format(PyExc_Exception,
-                 "poorly formed 'exec' statement: %d parts to statement",
-                 NCH(n));
-    return NULL;
+    return Exec(expr1, globals, locals, LINENO(n));
 }
 
 static stmt_ty
