@@ -47,7 +47,7 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #define CHECK(x) /* Don't know how to check */
 #endif
 
-#ifndef THINK_C
+#ifndef macintosh
 extern double fmod PROTO((double, double));
 extern double pow PROTO((double, double));
 #endif
@@ -156,7 +156,17 @@ float_hash(v)
 	/* This is designed so that Python numbers with the same
 	   value hash to the same value, otherwise comparisons
 	   of mapping keys will turn out weird */
+
+#ifdef MPW /* MPW C modf expects pointer to extended as second argument */
+{
+	extended e;
+	fractpart = modf(v->ob_fval, &e);
+	intpart = e;
+}
+#else
 	fractpart = modf(v->ob_fval, &intpart);
+#endif
+
 	if (fractpart == 0.0) {
 		if (intpart > 0x7fffffffL || -intpart > 0x7fffffffL) {
 			/* Convert to long int and use its hash... */

@@ -687,6 +687,7 @@ formatstring(format, args)
 			int c = '\0';
 			int fill;
 			object *v;
+			object *temp = NULL;
 			char *buf;
 			int sign;
 			int len;
@@ -819,12 +820,11 @@ formatstring(format, args)
 				len = 1;
 				break;
 			case 's':
-				v = strobject(v);
-				if (v == NULL)
+				temp = strobject(v);
+				if (temp == NULL)
 					goto error;
-				buf = getstringvalue(v);
-				len = getstringsize(v);
-				DECREF(v);
+				buf = getstringvalue(temp);
+				len = getstringsize(temp);
 				if (prec >= 0 && len > prec)
 					len = prec;
 				break;
@@ -917,6 +917,7 @@ formatstring(format, args)
                                            "not all arguments converted");
                                 goto error;
                         }
+			XDECREF(temp);
 		} /* '%' */
 	} /* until end */
 	if (argidx < arglen) {
