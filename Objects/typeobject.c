@@ -903,8 +903,6 @@ inherit_slots(PyTypeObject *type, PyTypeObject *base)
 		type->tp_flags |= base->tp_flags & Py_TPFLAGS_CHECKTYPES;
 	}
 
-	COPYSLOT(tp_name);
-
 	/* Copying basicsize is connected to the GC flags */
 	oldsize = base->tp_basicsize;
 	if (base->tp_flags & Py_TPFLAGS_GC)
