@@ -1,5 +1,5 @@
 /***********************************************************
-Copyright 1991, 1992, 1993 by Stichting Mathematisch Centrum,
+Copyright 1991, 1992, 1993, 1994 by Stichting Mathematisch Centrum,
 Amsterdam, The Netherlands.
 
                         All Rights Reserved
@@ -34,7 +34,7 @@ newlistobject(size)
 {
 	int i;
 	listobject *op;
-	MALLARG nbytes;
+	size_t nbytes;
 	if (size < 0) {
 		err_badcall();
 		return NULL;
