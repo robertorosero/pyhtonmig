@@ -912,7 +912,7 @@ compiler_make_closure(struct compiler *c, PyCodeObject *co, int args)
 		else /* (reftype == FREE) */
 			arg = compiler_lookup_arg(c->u->u_freevars, name);
 		if (arg == -1) {
-			fprintf(stderr, "lookup %s in %s %d %d\n"
+			printf("lookup %s in %s %d %d\n"
 				"freevars of %s: %s\n",
 				PyObject_REPR(name), 
 				PyString_AS_STRING(c->u->u_name), 
