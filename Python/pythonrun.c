@@ -635,6 +635,7 @@ PyRun_InteractiveOneFlags(FILE *fp, const char *filename, PyCompilerFlags *flags
 		return -1;
 	d = PyModule_GetDict(m);
 	v = run_mod(mod, filename, d, d, flags);
+	free_mod(mod);
 	if (v == NULL) {
 		PyErr_Print();
 		return -1;
@@ -1067,11 +1068,16 @@ PyObject *
 PyRun_FileExFlags(FILE *fp, const char *filename, int start, PyObject *globals,
 		  PyObject *locals, int closeit, PyCompilerFlags *flags)
 {
+	PyObject *ret;
 	mod_ty mod = PyParser_ASTFromFile(fp, filename, start, 0, 0,
 					  flags, NULL);
+	if (mod == NULL)
+		return NULL;
 	if (closeit)
 		fclose(fp);
-	return run_err_mod(mod, filename, globals, locals, flags);
+	ret = run_err_mod(mod, filename, globals, locals, flags);
+	free_mod(mod);
+	return ret;
 }
 
 static PyObject *
@@ -1139,6 +1145,7 @@ Py_CompileStringFlags(const char *str, const char *filename, int start,
 	if (mod == NULL)
 		return NULL;
 	co = PyAST_Compile(mod, filename, flags);
+	free_mod(mod);
 	return (PyObject *)co;
 }
 
@@ -1152,6 +1159,7 @@ Py_SymtableString(const char *str, const char *filename, int start)
 	if (mod == NULL)
 		return NULL;
 	st = PySymtable_Build(mod, filename, 0);
+	free_mod(mod);
 	return st;
 }
 
@@ -1161,11 +1169,15 @@ PyParser_ASTFromString(const char *s, const char *filename, int start,
 		       PyCompilerFlags *flags)
 {
 	node *n;
+	mod_ty mod;
 	perrdetail err;
 	n = PyParser_ParseStringFlags(s, &_PyParser_Grammar, start, &err, 
 				      PARSER_FLAGS(flags));
-	if (n)
-		return PyAST_FromNode(n, flags);
+	if (n) {
+		mod = PyAST_FromNode(n, flags);
+		PyNode_Free(n);
+		return mod;
+	}
 	else {
 		err_input(&err);
 		return NULL;
@@ -1177,11 +1189,15 @@ PyParser_ASTFromFile(FILE *fp, const char *filename, int start, char *ps1,
 		     char *ps2, PyCompilerFlags *flags, int *errcode)
 {
 	node *n;
+	mod_ty mod;
 	perrdetail err;
 	n = PyParser_ParseFileFlags(fp, filename, &_PyParser_Grammar, start, 
 				    ps1, ps2, &err, PARSER_FLAGS(flags));
-	if (n)
-		return PyAST_FromNode(n, flags);
+	if (n) {
+		mod = PyAST_FromNode(n, flags);
+		PyNode_Free(n);
+		return mod;
+	}
 	else {
 		err_input(&err);
 		if (errcode)
