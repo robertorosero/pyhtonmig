@@ -35,6 +35,7 @@ object *call_object PROTO((object *, object *));
 object *getglobals PROTO((void));
 object *getlocals PROTO((void));
 object *getowner PROTO((void));
+object *getframe PROTO((void));
 
 void printtraceback PROTO((object *));
 void flushline PROTO((void));

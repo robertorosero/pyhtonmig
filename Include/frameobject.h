@@ -70,11 +70,11 @@ frameobject * newframeobject PROTO(
 /* List access macros */
 
 #ifdef NDEBUG
-#define GETITEM(v, i) GETLISTITEM((listobject *)(v), (i))
+#define GETITEM(v, i) GETTUPLEITEM((tupleobject *)(v), (i))
 #define GETITEMNAME(v, i) GETSTRINGVALUE((stringobject *)GETITEM((v), (i)))
 #else
-#define GETITEM(v, i) getlistitem((v), (i))
-#define GETITEMNAME(v, i) getstringvalue(getlistitem((v), (i)))
+#define GETITEM(v, i) gettupleitem((v), (i))
+#define GETITEMNAME(v, i) getstringvalue(GETITEM(v, i))
 #endif
 
 #define GETUSTRINGVALUE(s) ((unsigned char *)GETSTRINGVALUE(s))

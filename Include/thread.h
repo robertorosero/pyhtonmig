@@ -23,6 +23,7 @@ void init_thread PROTO((void));
 int start_new_thread PROTO((void (*)(void *), void *));
 void exit_thread PROTO((void));
 void _exit_thread PROTO((void));
+long get_thread_ident PROTO((void));
 
 type_lock allocate_lock PROTO((void));
 void free_lock PROTO((type_lock));
