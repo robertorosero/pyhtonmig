@@ -52,6 +52,7 @@ typedef struct _frame {
 	int f_iblock;		/* index in f_blockstack */
 	int f_lasti;		/* Last instruction if called */
 	int f_lineno;		/* Current line number */
+	object *f_trace;	/* Trace function */
 } frameobject;
 
 
@@ -94,6 +95,11 @@ block *pop_block PROTO((frameobject *));
 /* Extend the value stack */
 
 object **extend_stack PROTO((frameobject *, int, int));
+
+/* Conversions between "fast locals" and locals in dictionary */
+
+void locals_2_fast PROTO((frameobject *, int));
+void fast_2_locals PROTO((frameobject *));
 
 #ifdef __cplusplus
 }

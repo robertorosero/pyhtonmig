@@ -69,6 +69,8 @@ extern void err_badcall PROTO((void));
 
 extern object *err_getexc PROTO((void));
 
+extern int sigcheck PROTO((void)); /* In sigcheck.c or signalmodule.c */
+
 #ifdef __cplusplus
 }
 #endif
