@@ -23,10 +23,6 @@ Python/C API
   are independently described.  Perhaps break the chapter into
   sections for each of the *Procs interfaces.
 
-* Make sure the reference count behavior of all the "exceptional"
-  cases in the C API is documented in the API manual, and mentioned in 
-  the extension manual if the function is mentioned.
-
 * PyErr_SetInterrupt():  XXX comment about platform dependence should
   be resolved, or explain the problem.  Ask Guido for explanation.
 
