@@ -92,6 +92,40 @@ Code Generation and Basic Blocks
 XXX Describe the structure of the code generator, the types involved,
 and the helper functions and macros.
 
+- for each ast type (mod, stmt, expr, ...) define function with a
+  switch statement.  inline code generation for simple things,
+  call function compiler_xxx where xxx is kind name for others.
+
+- use VISIT macro to invoke compiler_visit_XXX
+
+- user VISIT_SEQ macro to invoke compiler_visit_XXX for a sequence
+  of type XXX
+
+- all functions return true on success, false on failure
+
+- code generator uses basic blocks
+
+  - each block has single entry point
+  - possibly multiple exit points
+  - when generating jumps, always jump to a block
+  - for code unit, blocks identified by int id
+
+- NEW_BLOCK() -- create block and set it as current
+- NEXT_BLOCK() -- NEW_BLOCK() plus jump from current block
+- compiler_new_block() -- create a block but don't use it
+  (used for generating jumps)
+
+- code generated with ADDOP macros add opcode to current block
+  ADDOP() -- opcode with no arguments
+  ADDOP_O() -- oparg is a PyObject *
+  ADDOP_I() -- oparg is a number
+  ADDOP_JABS() -- oparg is an absolute jump to block id
+  ADDOP_JREL() -- oparg is a relative jump to block id 
+  XXX no need for JABS() and JREL(), always computed at the
+  end from block id
+
+- symbol table pass and compiler_nameop()
+
 Code Objects
 ------------
 
