@@ -4,11 +4,31 @@ Release date: 21-Dec-2001
 
 Type/class unification and new-style classes
 
+- pickle.py, cPickle: allow pickling instances of new-style classes
+  with a custom metaclass.
+
 Core and builtins
+
+- weakref proxy object: when comparing, unwrap both arguments if both
+  are proxies.
 
 Extension modules
 
+- binascii.b2a_base64(): fix a potential buffer overrun when encoding
+  very short strings.
+
 Library
+
+- dumbdbm.py: fixed a dumb old bug (the file didn't get synched at
+  close or delete time).
+
+- rfc822.py: fixed a bug where the address '<>' was converted to None
+  instead of an empty string.
+
+- xmlrpclib.py: version 1.0.0; uses precision for doubles.
+
+- test suite: the pickle and cPickle tests were not executing any code
+  when run from the standard regresssion test.
 
 Tools/Demos
 
@@ -21,6 +41,17 @@ New platforms
 Tests
 
 Windows
+
+- distutils package: fixed broken Windows installers (bdist_wininst).
+
+- tempfile.py: prevent mysterious warnings when TemporaryFileWrapper
+  instances are deleted at process exit time.
+
+- socket.py: prevent mysterious warnings when socket instances are
+  deleted at process exit time.
+
+- posixmodule.c: fix a Windows crash with stat() of a filename ending
+  in backslash.
 
 Mac
 
