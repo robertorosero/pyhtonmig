@@ -84,7 +84,9 @@ typedef void (*dl_funcptr)();
 #define RTLD_LAZY 1
 #endif
 #else /* !USE_SHLIB */
-#include "dl.h"
+#ifdef WITH_MAC_DL
+#include "dynamic_load.h"
+#endif
 #endif /* !USE_SHLIB */
 
 extern char *getprogramname();
