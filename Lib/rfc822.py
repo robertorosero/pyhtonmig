@@ -43,10 +43,6 @@ import string
 import time
 
 
-_monthnames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul',
-	  'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-
-
 class Message:
 
 	# Initialize the class instance and read the headers.
@@ -235,6 +231,7 @@ class Message:
 # XXX Should fix these to be really conformant.
 # XXX The inverses of the parse functions may also be useful.
 
+
 # Remove quotes from a string.
 
 def unquote(str):
@@ -244,6 +241,7 @@ def unquote(str):
 		if str[0] == '<' and str[-1:] == '>':
 			return str[1:-1]
 	return str
+
 
 # Parse an address into (name, address) tuple
 
@@ -278,7 +276,11 @@ def parseaddr(address):
 		name = name[1:-1]
 	return name, address
 
+
 # Parse a date field
+
+_monthnames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul',
+	  'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
 def parsedate(data):
 	# XXX This completely ignores timezone matters at the moment...
