@@ -132,7 +132,12 @@ int unicode_resize(register PyUnicodeObject *unicode,
        instead ! */
     if (unicode == unicode_empty || 
 	(unicode->length == 1 && 
-	 unicode->str[0] < 256 &&
+         /* MvL said unicode->str[] may be signed.  Python generally assumes
+          * an int contains at least 32 bits, and we don't use more than
+          * 32 bits even in a UCS4 build, so casting to unsigned int should
+          * be correct.
+          */
+	 (unsigned int)unicode->str[0] < 256U &&
 	 unicode_latin1[unicode->str[0]] == unicode)) {
         PyErr_SetString(PyExc_SystemError,
                         "can't resize shared unicode objects");
@@ -211,6 +216,14 @@ PyUnicodeObject *_PyUnicode_New(int length)
 	PyErr_NoMemory();
 	goto onError;
     }
+    /* Initialize the first element to guard against cases where
+     * the caller fails before initializing str -- unicode_resize()
+     * reads str[0], and the Keep-Alive optimization can keep memory
+     * allocated for str alive across a call to unicode_dealloc(unicode).
+     * We don't want unicode_resize to read uninitialized memory in
+     * that case.
+     */
+    unicode->str[0] = 0;
     unicode->str[length] = 0;
     unicode->length = length;
     unicode->hash = -1;
@@ -1834,6 +1847,8 @@ PyObject *PyUnicode_DecodeUnicodeEscape(const char *s,
     }
     if (_PyUnicode_Resize(&v, (int)(p - PyUnicode_AS_UNICODE(v))))
         goto onError;
+    Py_XDECREF(errorHandler);
+    Py_XDECREF(exc);
     return (PyObject *)v;
 
 ucnhashError:
@@ -2876,7 +2891,7 @@ static
 int charmap_encoding_error(
     const Py_UNICODE *p, int size, int *inpos, PyObject *mapping,
     PyObject **exceptionObject,
-    int *known_errorHandler, PyObject *errorHandler, const char *errors,
+    int *known_errorHandler, PyObject **errorHandler, const char *errors,
     PyObject **res, int *respos)
 {
     PyObject *repunicode = NULL; /* initialize to prevent gcc warning */
@@ -2959,7 +2974,7 @@ int charmap_encoding_error(
 	    *inpos = collendpos;
 	    break;
 	default:
-	    repunicode = unicode_encode_call_errorhandler(errors, &errorHandler,
+	    repunicode = unicode_encode_call_errorhandler(errors, errorHandler,
 		encoding, reason, p, size, exceptionObject,
 		collstartpos, collendpos, &newpos);
 	    if (repunicode == NULL)
@@ -3024,9 +3039,11 @@ PyObject *PyUnicode_EncodeCharmap(const Py_UNICODE *p,
 	if (x==Py_None) { /* unencodable character */
 	    if (charmap_encoding_error(p, size, &inpos, mapping,
 		&exc,
-		&known_errorHandler, errorHandler, errors,
-		&res, &respos))
+		&known_errorHandler, &errorHandler, errors,
+		&res, &respos)) {
+		Py_DECREF(x);
 		goto onError;
+	    }
 	}
 	else
 	    /* done with this character => adjust input position */
@@ -3198,6 +3215,7 @@ int charmaptranslate_lookup(Py_UNICODE c, PyObject *mapping, PyObject **result)
 	/* wrong return value */
 	PyErr_SetString(PyExc_TypeError,
 	      "character mapping must return integer, None or unicode");
+	Py_DECREF(x);
 	return -1;
     }
 }
@@ -6535,8 +6553,11 @@ PyObject *PyUnicode_Format(PyObject *format,
 	    case 'e':
 	    case 'E':
 	    case 'f':
+	    case 'F':
 	    case 'g':
 	    case 'G':
+		if (c == 'F')
+			c = 'f';
 		pbuf = formatbuf;
 		len = formatfloat(pbuf, sizeof(formatbuf)/sizeof(Py_UNICODE),
 			flags, prec, c, v);

@@ -20,7 +20,7 @@ class TestBasicOps(unittest.TestCase):
     def test_autoseed(self):
         self.gen.seed()
         state1 = self.gen.getstate()
-        time.sleep(1.1)
+        time.sleep(0.1)
         self.gen.seed()      # diffent seeds at different times
         state2 = self.gen.getstate()
         self.assertNotEqual(state1, state2)
@@ -85,6 +85,17 @@ class TestBasicOps(unittest.TestCase):
                     break
             else:
                 self.fail()
+
+    def test_sample_inputs(self):
+        # SF bug #801342 -- population can be any iterable defining __len__()
+        from sets import Set
+        self.gen.sample(Set(range(20)), 2)
+        self.gen.sample(range(20), 2)
+        self.gen.sample(xrange(20), 2)
+        self.gen.sample(dict.fromkeys('abcdefghijklmnopqrst'), 2)
+        self.gen.sample(str('abcdefghijklmnopqrst'), 2)
+        self.gen.sample(unicode('abcdefghijklmnopqrst'), 2)
+        self.gen.sample(tuple('abcdefghijklmnopqrst'), 2)
 
     def test_gauss(self):
         # Ensure that the seed() method initializes all the hidden state.  In
