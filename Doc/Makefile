@@ -41,8 +41,7 @@ qua:
 	latex qua
 	dvips qua >qua.ps
 
-lib.texi: lib*.tex \
-	texipre.dat texipost.dat partparse.py
+lib.texi: lib*.tex texipre.dat texipost.dat partparse.py
 	python partparse.py -o @lib.texi `whichlibs`
 	mv @lib.texi lib.texi
 
@@ -60,22 +59,22 @@ libwww: lib.texi
 	texi2html -d lib.texi /usr/local/ftp.cwi.nl/pub/www/texinfo/python
 
 # This one too...
-LATEX2HTML=	/usr/local/LaTeX2html/latex2html
-L2HARGS=	-address $$USER@`domainname` -dont_include myformat -nolatex
-latex2html: l2htut l2href l2hext
+L2H=	/usr/local/LaTeX2html/latex2html
+L2HARGS=-address $$USER@`domainname` -dont_include myformat -nolatex
+l2h: l2htut l2href l2hext
 
 l2htut: tut
-	$(LATEX2HTML) $(L2HARGS) tut.tex
+	$(L2H) $(L2HARGS) tut.tex
 	@rm -rf python-tut
 	mv tut python-tut
 
 l2href: ref
-	$(LATEX2HTML) $(L2HARGS) ref.tex
+	$(L2H) $(L2HARGS) ref.tex
 	@rm -rf python-ref
 	mv ref python-ref
 
 l2hext: ext
-	$(LATEX2HTML) $(L2HARGS) ext.tex
+	$(L2H) $(L2HARGS) ext.tex
 	@rm -rf python-ext
 	mv ext python-ext
 
