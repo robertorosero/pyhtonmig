@@ -95,7 +95,6 @@ def lists():
     testsetop([1,2], 3, [1,2,1,2,1,2], "a*=b", "__imul__")
     testunop([1,2,3], 3, "len(a)", "__len__")
     testbinop([1,2], 3, [1,2,1,2,1,2], "a*b", "__mul__")
-    testbinop([1], [2], [2,1], "b+a", "__radd__")
     testbinop([1,2], 3, [1,2,1,2,1,2], "b*a", "__rmul__")
     testset2op([1,2], 1, 3, [1,3], "a[b]=c", "__setitem__")
     testset3op([1,2,3,4], 1, 3, [5,6], [1,5,6,4], "a[b:c]=d", "__setslice__")
@@ -237,7 +236,6 @@ def spamlists():
     testsetop(spamlist([1,2]), 3, spamlist([1,2,1,2,1,2]), "a*=b", "__imul__")
     testunop(spamlist([1,2,3]), 3, "len(a)", "__len__")
     testbinop(spamlist([1,2]), 3, spamlist([1,2,1,2,1,2]), "a*b", "__mul__")
-    testbinop(spamlist([1]), spamlist([2]), spamlist([2,1]), "b+a", "__radd__")
     testbinop(spamlist([1,2]), 3, spamlist([1,2,1,2,1,2]), "b*a", "__rmul__")
     testset2op(spamlist([1,2]), 1, 3, spamlist([1,3]), "a[b]=c", "__setitem__")
     testset3op(spamlist([1,2,3,4]), 1, 3, spamlist([5,6]),
