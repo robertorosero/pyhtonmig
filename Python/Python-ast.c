@@ -18,14 +18,9 @@ Module(asdl_seq * body)
 }
 
 mod_ty
-Interactive(stmt_ty body)
+Interactive(asdl_seq * body)
 {
         mod_ty p;
-        if (!body) {
-                PyErr_SetString(PyExc_ValueError,
-                                "field body is required for Interactive");
-                return NULL;
-        }
         p = (mod_ty)malloc(sizeof(*p));
         if (!p) {
                 PyErr_SetString(PyExc_MemoryError, "no memory");
@@ -1060,7 +1055,12 @@ marshal_write_mod(PyObject **buf, int *off, mod_ty o)
                 break;
         case Interactive_kind:
                 marshal_write_int(buf, off, 2);
-                marshal_write_stmt(buf, off, o->v.Interactive.body);
+                marshal_write_int(buf, off,
+                                  asdl_seq_LEN(o->v.Interactive.body));
+                for (i = 0; i < asdl_seq_LEN(o->v.Interactive.body); i++) {
+                        void *elt = asdl_seq_GET(o->v.Interactive.body, i);
+                        marshal_write_stmt(buf, off, elt);
+                }
                 break;
         case Expression_kind:
                 marshal_write_int(buf, off, 3);
