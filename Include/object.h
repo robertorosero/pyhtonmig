@@ -205,7 +205,8 @@ typedef PyObject *(*iternextfunc) (PyObject *);
 typedef PyObject *(*descrgetfunc) (PyObject *, PyObject *);
 typedef int (*descrsetfunc) (PyObject *, PyObject *, PyObject *);
 typedef int (*initproc)(PyObject *, PyObject *, PyObject *);
-typedef PyObject *(*allocfunc)(struct _typeobject *, PyObject *, PyObject *);
+typedef PyObject *(*newfunc)(struct _typeobject *, PyObject *, PyObject *);
+typedef PyObject *(*allocfunc)(struct _typeobject *, int);
 
 typedef struct _typeobject {
 	PyObject_VAR_HEAD
@@ -270,7 +271,7 @@ typedef struct _typeobject {
 	long tp_dictoffset;
 	initproc tp_init;
 	allocfunc tp_alloc;
-	allocfunc tp_new;
+	newfunc tp_new;
 	PyObject *tp_bases;
 	PyObject *tp_mro; /* method resolution order */
 	PyObject *tp_introduced;
@@ -296,8 +297,7 @@ extern DL_IMPORT(PyTypeObject) PyBaseObject_Type; /* Most base object type */
 #define PyType_Check(op) PyObject_TypeCheck(op, &PyType_Type)
 
 extern DL_IMPORT(int) PyType_InitDict(PyTypeObject *);
-extern DL_IMPORT(PyObject *) PyType_GenericAlloc(PyTypeObject *,
-						 PyObject *, PyObject *);
+extern DL_IMPORT(PyObject *) PyType_GenericAlloc(PyTypeObject *, int);
 extern DL_IMPORT(PyObject *) PyType_GenericNew(PyTypeObject *,
 					       PyObject *, PyObject *);
 

@@ -77,14 +77,14 @@ type_call(PyTypeObject *type, PyObject *args, PyObject *kwds)
 }
 
 PyObject *
-PyType_GenericAlloc(PyTypeObject *type, PyObject *args, PyObject *kwds)
+PyType_GenericAlloc(PyTypeObject *type, int nitems)
 {
 	int size;
 	void *mem;
 	PyObject *obj;
 
 	/* Inline PyObject_New() so we can zero the memory */
-	size = _PyObject_SIZE(type);
+	size = _PyObject_VAR_SIZE(type, nitems);
 	mem = PyObject_MALLOC(size);
 	if (mem == NULL)
 		return PyErr_NoMemory();
@@ -95,7 +95,10 @@ PyType_GenericAlloc(PyTypeObject *type, PyObject *args, PyObject *kwds)
 		obj = (PyObject *)mem;
 	if (type->tp_flags & Py_TPFLAGS_HEAPTYPE)
 		Py_INCREF(type);
-	PyObject_INIT(obj, type);
+	if (type->tp_itemsize == 0)
+		PyObject_INIT(obj, type);
+	else
+		(void) PyObject_INIT_VAR((PyVarObject *)obj, type, nitems);
 	if (PyType_IS_GC(type))
 		PyObject_GC_Init(obj);
 	return obj;
@@ -106,7 +109,7 @@ PyType_GenericNew(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
 	PyObject *self;
 
-	self = type->tp_alloc(type, args, kwds);
+	self = type->tp_alloc(type, 0);
 	if (self == NULL)
 		return NULL;
 	if (type->tp_init != NULL && type->tp_init(self, args, kwds) < 0) {
@@ -526,17 +529,11 @@ solid_base(PyTypeObject *type)
 }
 
 static PyObject *
-type_alloc(PyTypeObject *metatype, PyObject *args, PyObject *kwds)
+type_alloc(PyTypeObject *metatype, int nitems)
 {
 	PyTypeObject *type;
-	PyObject *name, *bases, *dict;
-	static char *kwlist[] = {"name", "bases", "dict", 0};
 
-	/* Check arguments (again?!?! yes, alas -- we need the dict!) */
-	if (!PyArg_ParseTupleAndKeywords(args, kwds, "SOO:type", kwlist,
-					 &name, &bases, &dict))
-		return NULL;
-	type = (PyTypeObject *)PyType_GenericAlloc(metatype, args, kwds);
+	type = (PyTypeObject *)PyType_GenericAlloc(metatype, nitems);
 	if (type != NULL)
 		type->tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HEAPTYPE;
 	return (PyObject *)type;
