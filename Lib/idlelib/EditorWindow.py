@@ -597,8 +597,8 @@ class EditorWindow:
                 rfList.remove(newFile)
             rfList.insert(0,newFile)
         rfList=self.__CleanRecentFiles(rfList)
-        print self.top.instanceDict
-        print self
+        #print self.top.instanceDict
+        #print self
         if rfList:
             for instance in self.top.instanceDict.keys():
                 instance.menuRecentFiles.delete(1,END)
@@ -714,7 +714,7 @@ class EditorWindow:
         return reply
 
     def _close(self):
-        print self.io.filename
+        #print self.io.filename
         if self.io.filename:
             self.UpdateRecentFilesList(newFile=self.io.filename)
             
