@@ -10,14 +10,12 @@ typedef enum _block_type { FunctionBlock, ClassBlock, ModuleBlock }
 struct _symtable_entry;
 
 struct symtable {
-	int st_pass;             /* pass == 1 or 2 */
 	const char *st_filename; /* name of file being compiled */
 	struct _symtable_entry *st_cur; /* current symbol table entry */
 	PyObject *st_symbols;    /* dictionary of symbol table entries */
         PyObject *st_stack;      /* stack of namespace info */
 	PyObject *st_global;     /* borrowed ref to MODULE in st_symbols */
 	int st_nblocks;          /* number of blocks */
-	int st_errors;           /* number of errors */
 	char *st_private;        /* name of current class or NULL */
 	int st_tmpname;          /* temporary name counter */
 	PyFutureFeatures *st_future; /* module's future features */
@@ -47,7 +45,7 @@ extern DL_IMPORT(PyTypeObject) PySTEntry_Type;
 
 extern DL_IMPORT(PySTEntryObject *) \
 	PySTEntry_New(struct symtable *, identifier, block_ty, void *, int);
-DL_IMPORT(int) PyST_GetScope(PyObject *, PyObject *);
+DL_IMPORT(int) PyST_GetScope(PySTEntryObject *, PyObject *);
 
 DL_IMPORT(struct symtable *) PyNode_CompileSymtable(struct _node *, char *);
 DL_IMPORT(struct symtable *) PySymtable_Build(mod_ty, const char *, 
@@ -77,8 +75,12 @@ DL_IMPORT(void) PySymtable_Free(struct symtable *);
 */
 #define SCOPE_OFF 11
 #define SCOPE_MASK 7
-const int LOCAL = 1, GLOBAL_EXPLICIT = 2, GLOBAL_IMPLICIT = 3, FREE = 4,
-	CELL = 5;
+
+#define LOCAL 1
+#define GLOBAL_EXPLICIT 2
+#define GLOBAL_IMPLICIT 3
+#define FREE 4
+#define CELL 5
 
 #define OPT_IMPORT_STAR 1
 #define OPT_EXEC 2
