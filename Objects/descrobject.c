@@ -311,6 +311,21 @@ static struct getsetlist member_getset[] = {
 	{0}
 };
 
+static PyObject *
+wrapper_get_doc(PyWrapperDescrObject *descr, void *closure)
+{
+	if (descr->d_base->doc == NULL) {
+		Py_INCREF(Py_None);
+		return Py_None;
+	}
+	return PyString_FromString(descr->d_base->doc);
+}
+
+static struct getsetlist wrapper_getset[] = {
+	{"__doc__", (getter)wrapper_get_doc},
+	{0}
+};
+
 static PyTypeObject PyMethodDescr_Type = {
 	PyObject_HEAD_INIT(&PyType_Type)
 	0,
@@ -456,7 +471,7 @@ static PyTypeObject PyWrapperDescr_Type = {
 	0,					/* tp_iternext */
 	0,					/* tp_methods */
 	descr_members,				/* tp_members */
-	0,					/* tp_getset */
+	wrapper_getset,				/* tp_getset */
 	0,					/* tp_base */
 	0,					/* tp_dict */
 	(descrgetfunc)wrapper_get,		/* tp_descr_get */
