@@ -535,6 +535,7 @@ PyRun_InteractiveOneFlags(FILE *fp, char *filename, PyCompilerFlags *flags)
 	PyObject *m, *d, *v, *w;
 	mod_ty mod;
 	char *ps1 = "", *ps2 = "";
+	int errcode = 0;
 
 	v = PySys_GetObject("ps1");
 	if (v != NULL) {
@@ -554,10 +555,14 @@ PyRun_InteractiveOneFlags(FILE *fp, char *filename, PyCompilerFlags *flags)
 	}
 	mod = PyParser_ASTFromFile(fp, filename, 
 				   Py_single_input, ps1, ps2,
-				   PARSER_FLAGS(flags));
+				   PARSER_FLAGS(flags), &errcode);
 	Py_XDECREF(v);
 	Py_XDECREF(w);
 	if (mod == NULL) {
+		if (errcode == E_EOF) {
+			PyErr_Clear();
+			return E_EOF;
+		}
 		PyErr_Print();
 		return -1;
 	}
@@ -978,7 +983,7 @@ PyRun_FileExFlags(FILE *fp, char *filename, int start, PyObject *globals,
 		  PyObject *locals, int closeit, PyCompilerFlags *flags)
 {
 	mod_ty mod = PyParser_ASTFromFile(fp, filename, start, 0, 0,
-					  PARSER_FLAGS(flags));
+					  PARSER_FLAGS(flags), NULL);
 	if (closeit)
 		fclose(fp);
 	return run_err_mod(mod, filename, globals, locals, flags);
@@ -1086,7 +1091,7 @@ PyParser_ASTFromString(const char *s, const char *filename, int start,
 
 mod_ty
 PyParser_ASTFromFile(FILE *fp, const char *filename, int start, char *ps1, 
-		     char *ps2, int flags)
+		     char *ps2, int flags, int *errcode)
 {
 	node *n;
 	perrdetail err;
@@ -1097,6 +1102,8 @@ PyParser_ASTFromFile(FILE *fp, const char *filename, int start, char *ps1,
 		return PyAST_FromNode(n);
 	else {
 		err_input(&err);
+		if (errcode)
+			*errcode = err.error;
 		return NULL;
 	}
 }

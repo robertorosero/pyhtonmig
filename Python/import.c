@@ -657,7 +657,8 @@ parse_source_module(const char *pathname, FILE *fp)
 	PyCodeObject *co = NULL;
 	mod_ty mod;
 
-	mod = PyParser_ASTFromFile(fp, pathname, Py_file_input, 0, 0, 0);
+	mod = PyParser_ASTFromFile(fp, pathname, Py_file_input, 0, 0, 0, 
+				   NULL);
 	if (mod)
 		co = PyAST_Compile(mod, pathname, NULL);
 	return co;
