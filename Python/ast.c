@@ -813,19 +813,22 @@ ast_for_expr(const node *n)
 	if (NCH(n) == 1)
 	    return e;
 	/* power: atom trailer* ('**' factor)*
-           trailer: '(' [arglist] ')' | '[' subscriptlist ']' | '.' NAME */
+           trailer: '(' [arglist] ')' | '[' subscriptlist ']' | '.' NAME 
+
+	   XXX What about atom trailer trailer ** factor?
+	*/
 	if (TYPE(CHILD(n, NCH(n) - 1)) == factor) {
 	    expr_ty f = ast_for_expr(CHILD(n, NCH(n) - 1));
 	    return BinOp(e, Pow, f);
 	}
 	for (i = 1; i < NCH(n); i++) {
-	    expr_ty new;
+	    expr_ty new = e;
 	    node *ch = CHILD(n, i);
 	    if (TYPE(CHILD(ch, 0)) == LPAR) {
 		if (NCH(ch) == 2)
-		    return Call(e, NULL, NULL, NULL, NULL);
+		    new = Call(new, NULL, NULL, NULL, NULL);
 		else
-		    return ast_for_call(CHILD(ch, 1), e);
+		    new = ast_for_call(CHILD(ch, 1), new);
 	    }
 	    else if (TYPE(CHILD(ch, 0)) == LSQB) {
 		REQ(CHILD(ch, 2), RSQB);
