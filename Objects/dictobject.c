@@ -607,7 +607,7 @@ getmappingitems(mp)
 		err_badcall();
 		return NULL;
 	}
-	return mapping_values((mappingobject *)mp, (object *)NULL);
+	return mapping_items((mappingobject *)mp, (object *)NULL);
 }
 
 static int
