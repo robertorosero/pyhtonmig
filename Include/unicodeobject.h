@@ -7,7 +7,7 @@ Unicode implementation based on original code by Fredrik Lundh,
 modified by Marc-Andre Lemburg (mal@lemburg.com) according to the
 Unicode Integration Proposal (see file Misc/unicode.txt).
 
-(c) Copyright CNRI, All Rights Reserved. NO WARRANTY.
+Copyright (c) Corporation for National Research Initiatives.
 
 
  Original header:
@@ -107,6 +107,17 @@ typedef unsigned short Py_UNICODE;
 
 #endif
 
+/*
+ * Use this typedef when you need to represent a UTF-16 surrogate pair
+ * as single unsigned integer.
+ */
+#if SIZEOF_INT >= 4 
+typedef unsigned int Py_UCS4; 
+#elif SIZEOF_LONG >= 4
+typedef unsigned long Py_UCS4; 
+#endif 
+
+
 /* --- Internal Unicode Operations ---------------------------------------- */
 
 /* If you want Python to use the compiler's wctype.h functions instead
@@ -137,6 +148,8 @@ typedef unsigned short Py_UNICODE;
 #define Py_UNICODE_TODIGIT(ch) _PyUnicode_ToDigit(ch)
 #define Py_UNICODE_TONUMERIC(ch) _PyUnicode_ToNumeric(ch)
 
+#define Py_UNICODE_ISALPHA(ch) iswalpha(ch)
+
 #else
 
 #define Py_UNICODE_ISSPACE(ch) _PyUnicode_IsWhitespace(ch)
@@ -158,7 +171,15 @@ typedef unsigned short Py_UNICODE;
 #define Py_UNICODE_TODIGIT(ch) _PyUnicode_ToDigit(ch)
 #define Py_UNICODE_TONUMERIC(ch) _PyUnicode_ToNumeric(ch)
 
+#define Py_UNICODE_ISALPHA(ch) _PyUnicode_IsAlpha(ch)
+
 #endif
+
+#define Py_UNICODE_ISALNUM(ch) \
+       (Py_UNICODE_ISALPHA(ch) || \
+        Py_UNICODE_ISDECIMAL(ch) || \
+        Py_UNICODE_ISDIGIT(ch) || \
+        Py_UNICODE_ISNUMERIC(ch))
 
 #define Py_UNICODE_COPY(target, source, length)\
     (memcpy((target), (source), (length)*sizeof(Py_UNICODE)))
@@ -168,7 +189,8 @@ typedef unsigned short Py_UNICODE;
     while (0)
 
 #define Py_UNICODE_MATCH(string, offset, substring)\
-    (!memcmp((string)->str + (offset), (substring)->str,\
+    ((*((string)->str + (offset)) == *((substring)->str)) &&\
+     !memcmp((string)->str + (offset), (substring)->str,\
              (substring)->length*sizeof(Py_UNICODE)))
 
 #ifdef __cplusplus
@@ -182,8 +204,9 @@ typedef struct {
     int length;			/* Length of raw Unicode data in buffer */
     Py_UNICODE *str;		/* Raw Unicode buffer */
     long hash;			/* Hash value; -1 if not set */
-    PyObject *utf8str;		/* UTF-8 encoded version as Python string,
-				   or NULL */
+    PyObject *defenc;		/* (Default) Encoded version as Python
+				   string, or NULL; this is used for
+				   implementing the buffer protocol */
 } PyUnicodeObject;
 
 extern DL_IMPORT(PyTypeObject) PyUnicode_Type;
@@ -275,6 +298,24 @@ extern DL_IMPORT(int) PyUnicode_Resize(
 
 */
 
+extern DL_IMPORT(PyObject*) PyUnicode_FromEncodedObject(
+    register PyObject *obj, 	/* Object */
+    const char *encoding,       /* encoding */
+    const char *errors          /* error handling */
+    );
+
+/* Shortcut for PyUnicode_FromEncodedObject(obj, NULL, "strict");
+   which results in using the default encoding as basis for 
+   decoding the object.
+
+   Coerces obj to an Unicode object and return a reference with
+   *incremented* refcount.
+
+   The API returns NULL in case of an error. The caller is responsible
+   for decref'ing the returned objects.
+
+*/
+
 extern DL_IMPORT(PyObject*) PyUnicode_FromObject(
     register PyObject *obj 	/* Object */
     );
@@ -336,7 +377,7 @@ extern DL_IMPORT(int) PyUnicode_AsWideChar(
    
  */
 
-extern DL_IMPORT(const char*) PyUnicode_GetDefaultEncoding();
+extern DL_IMPORT(const char*) PyUnicode_GetDefaultEncoding(void);
 
 /* Sets the currently active default encoding.
 
@@ -453,7 +494,7 @@ extern DL_IMPORT(PyObject*) PyUnicode_AsUTF16String(
 
    Note that Py_UNICODE data is being interpreted as UTF-16 reduced to
    UCS-2. This trick makes it possible to add full UTF-16 capabilities
-   at a later point without comprimising the APIs.
+   at a later point without compromising the APIs.
 
 */
 
@@ -775,7 +816,7 @@ extern DL_IMPORT(int) PyUnicode_Compare(
     PyObject *right		/* Right string */
     );
 
-/* Apply a argument tuple or dictionar to a format string and return
+/* Apply a argument tuple or dictionary to a format string and return
    the resulting Unicode string. */
 
 extern DL_IMPORT(PyObject *) PyUnicode_Format(
@@ -856,6 +897,10 @@ extern DL_IMPORT(int) _PyUnicode_IsDigit(
     );
 
 extern DL_IMPORT(int) _PyUnicode_IsNumeric(
+    register const Py_UNICODE ch 	/* Unicode character */
+    );
+
+extern DL_IMPORT(int) _PyUnicode_IsAlpha(
     register const Py_UNICODE ch 	/* Unicode character */
     );
 

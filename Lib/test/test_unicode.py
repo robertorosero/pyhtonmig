@@ -168,6 +168,60 @@ assert 'abc' < u'abcd'
 assert u'abc' < u'abcd'
 print 'done.'
 
+if 0:
+    # Move these tests to a Unicode collation module test...
+
+    print 'Testing UTF-16 code point order comparisons...',
+    #No surrogates, no fixup required.
+    assert u'\u0061' < u'\u20ac'
+    # Non surrogate below surrogate value, no fixup required
+    assert u'\u0061' < u'\ud800\udc02'
+
+    # Non surrogate above surrogate value, fixup required
+    def test_lecmp(s, s2):
+      assert s <  s2 , "comparison failed on %s < %s" % (s, s2)
+
+    def test_fixup(s):
+      s2 = u'\ud800\udc01'
+      test_lecmp(s, s2)
+      s2 = u'\ud900\udc01'
+      test_lecmp(s, s2)
+      s2 = u'\uda00\udc01'
+      test_lecmp(s, s2)
+      s2 = u'\udb00\udc01'
+      test_lecmp(s, s2)
+      s2 = u'\ud800\udd01'
+      test_lecmp(s, s2)
+      s2 = u'\ud900\udd01'
+      test_lecmp(s, s2)
+      s2 = u'\uda00\udd01'
+      test_lecmp(s, s2)
+      s2 = u'\udb00\udd01'
+      test_lecmp(s, s2)
+      s2 = u'\ud800\ude01'
+      test_lecmp(s, s2)
+      s2 = u'\ud900\ude01'
+      test_lecmp(s, s2)
+      s2 = u'\uda00\ude01'
+      test_lecmp(s, s2)
+      s2 = u'\udb00\ude01'
+      test_lecmp(s, s2)
+      s2 = u'\ud800\udfff'
+      test_lecmp(s, s2)
+      s2 = u'\ud900\udfff'
+      test_lecmp(s, s2)
+      s2 = u'\uda00\udfff'
+      test_lecmp(s, s2)
+      s2 = u'\udb00\udfff'
+      test_lecmp(s, s2)
+
+    test_fixup(u'\ue000')
+    test_fixup(u'\uff61')
+
+    # Surrogates on both sides, no fixup required
+    assert u'\ud800\udc02' < u'\ud84d\udc56'
+    print 'done.'
+
 test('ljust', u'abc',  u'abc       ', 10)
 test('rjust', u'abc',  u'       abc', 10)
 test('center', u'abc', u'   abc    ', 10)
@@ -205,6 +259,22 @@ test('istitle', u'Greek \u1FFcitlecases ...', 1)
 test('istitle', u'Not a capitalized String', 0)
 test('istitle', u'Not\ta Titlecase String', 0)
 test('istitle', u'Not--a Titlecase String', 0)
+
+test('isalpha', u'a', 1)
+test('isalpha', u'A', 1)
+test('isalpha', u'\n', 0)
+test('isalpha', u'\u1FFc', 1)
+test('isalpha', u'abc', 1)
+test('isalpha', u'aBc123', 0)
+test('isalpha', u'abc\n', 0)
+
+test('isalnum', u'a', 1)
+test('isalnum', u'A', 1)
+test('isalnum', u'\n', 0)
+test('isalnum', u'123abc456', 1)
+test('isalnum', u'a1b3c', 1)
+test('isalnum', u'aBc000 ', 0)
+test('isalnum', u'abc\n', 0)
 
 test('splitlines', u"abc\ndef\n\rghi", [u'abc', u'def', u'', u'ghi'])
 test('splitlines', u"abc\ndef\n\r\nghi", [u'abc', u'def', u'', u'ghi'])
@@ -247,13 +317,22 @@ assert u"%s, %s, %i, %f, %5.2f" % (u"abc", "abc", 1, -2, 3) == u'abc, abc, 1, -2
 assert u"%s, %s, %i, %f, %5.2f" % (u"abc", "abc", -1, -2, 3.5) == u'abc, abc, -1, -2.000000,  3.50'
 assert u"%s, %s, %i, %f, %5.2f" % (u"abc", "abc", -1, -2, 3.57) == u'abc, abc, -1, -2.000000,  3.57'
 assert u"%s, %s, %i, %f, %5.2f" % (u"abc", "abc", -1, -2, 1003.57) == u'abc, abc, -1, -2.000000, 1003.57'
-assert u"%c" % (u"abc",) == u'a'
-assert u"%c" % ("abc",) == u'a'
+assert u"%c" % (u"a",) == u'a'
+assert u"%c" % ("a",) == u'a'
 assert u"%c" % (34,) == u'"'
 assert u"%c" % (36,) == u'$'
-assert u"%r, %r" % (u"abc", "abc") == u"u'abc', 'abc'"
+value = u"%r, %r" % (u"abc", "abc") 
+if value != u"u'abc', 'abc'":
+    print '*** formatting failed for "%s"' % 'u"%r, %r" % (u"abc", "abc")'
+
 assert u"%(x)s, %(y)s" % {'x':u"abc", 'y':"def"} == u'abc, def'
-assert u"%(x)s, %(ה)s" % {'x':u"abc", u'ה'.encode('utf-8'):"def"} == u'abc, def'
+try:
+    value = u"%(x)s, %(ה)s" % {'x':u"abc", u'ה'.encode('utf-8'):"def"} 
+except KeyError:
+    print '*** formatting failed for "%s"' % "u'abc, def'"
+else:
+    assert value == u'abc, def'
+
 # formatting jobs delegated from the string implementation:
 assert '...%(foo)s...' % {'foo':u"abc"} == u'...abc...'
 assert '...%(foo)s...' % {'foo':"abc"} == '...abc...'
@@ -263,21 +342,51 @@ assert '...%(foo)s...' % {u'foo':u"abc",'def':123} ==  u'...abc...'
 assert '...%(foo)s...' % {u'foo':u"abc",u'def':123} == u'...abc...'
 assert '...%s...%s...%s...%s...' % (1,2,3,u"abc") == u'...1...2...3...abc...'
 assert '...%s...' % u"abc" == u'...abc...'
-try:
-    '...%s...הצü...' % u"abc"
-except ValueError:
-    pass
-else:
-    raise AssertionError, "'...%s...הצü...' % u'abc' failed to raise an exception"
 print 'done.'
 
 # Test builtin codecs
 print 'Testing builtin codecs...',
 
+# UTF-8 specific encoding tests:
+assert u'\u20ac'.encode('utf-8') == \
+       ''.join((chr(0xe2), chr(0x82), chr(0xac)))
+assert u'\ud800\udc02'.encode('utf-8') == \
+       ''.join((chr(0xf0), chr(0x90), chr(0x80), chr(0x82)))
+assert u'\ud84d\udc56'.encode('utf-8') == \
+       ''.join((chr(0xf0), chr(0xa3), chr(0x91), chr(0x96)))
+# UTF-8 specific decoding tests
+assert unicode(''.join((chr(0xf0), chr(0xa3), chr(0x91), chr(0x96))),
+               'utf-8') == u'\ud84d\udc56'
+assert unicode(''.join((chr(0xf0), chr(0x90), chr(0x80), chr(0x82))),
+               'utf-8') == u'\ud800\udc02'
+assert unicode(''.join((chr(0xe2), chr(0x82), chr(0xac))),
+               'utf-8') == u'\u20ac'
+
+# Other possible utf-8 test cases:
+# * strict decoding testing for all of the
+#   UTF8_ERROR cases in PyUnicode_DecodeUTF8
+
+
+
 assert unicode('hello','ascii') == u'hello'
 assert unicode('hello','utf-8') == u'hello'
 assert unicode('hello','utf8') == u'hello'
 assert unicode('hello','latin-1') == u'hello'
+
+class String:
+    x = ''
+    def __str__(self):
+        return self.x
+
+o = String()
+
+o.x = 'abc'
+assert unicode(o) == u'abc'
+assert str(o) == 'abc'
+
+o.x = u'abc'
+assert unicode(o) == u'abc'
+assert str(o) == 'abc'
 
 try:
     u'Andr\202 x'.encode('ascii')
@@ -405,3 +514,4 @@ assert (u"abc" "def") == u"abcdef"
 assert (u"abc" u"def" "ghi") == u"abcdefghi"
 assert ("abc" "def" u"ghi") == u"abcdefghi"
 print 'done.'
+

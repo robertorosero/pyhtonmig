@@ -3726,9 +3726,14 @@ Python code as \code{sys.platform}.
 
 \begin{cfuncdesc}{const char*}{Py_GetCopyright}{}
 Return the official copyright string for the current Python version, 
-for example
+for example:
 
-\code{"Copyright 1991-1995 Stichting Mathematisch Centrum, Amsterdam"}
+\begin{verbatim}
+"Copyright (c) 1995-2000 Corporation for National Research Initiatives.\n\
+All Rights Reserved.\n\
+Copyright (c) 1991-1995 Stichting Mathematisch Centrum, Amsterdam.\n\
+All Rights Reserved."
+\end{verbatim}
 
 The returned string points into static storage; the caller should not 
 modify its value.  The value is available to Python code as the list 

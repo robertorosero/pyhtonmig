@@ -1,34 +1,3 @@
-/***********************************************************
-Copyright 1991-1995 by Stichting Mathematisch Centrum, Amsterdam,
-The Netherlands.
-
-                        All Rights Reserved
-
-Permission to use, copy, modify, and distribute this software and its
-documentation for any purpose and without fee is hereby granted,
-provided that the above copyright notice appear in all copies and that
-both that copyright notice and this permission notice appear in
-supporting documentation, and that the names of Stichting Mathematisch
-Centrum or CWI or Corporation for National Research Initiatives or
-CNRI not be used in advertising or publicity pertaining to
-distribution of the software without specific, written prior
-permission.
-
-While CWI is the initial source for this software, a modified version
-is made available by the Corporation for National Research Initiatives
-(CNRI) at the Internet address ftp://ftp.python.org.
-
-STICHTING MATHEMATISCH CENTRUM AND CNRI DISCLAIM ALL WARRANTIES WITH
-REGARD TO THIS SOFTWARE, INCLUDING ALL IMPLIED WARRANTIES OF
-MERCHANTABILITY AND FITNESS, IN NO EVENT SHALL STICHTING MATHEMATISCH
-CENTRUM OR CNRI BE LIABLE FOR ANY SPECIAL, INDIRECT OR CONSEQUENTIAL
-DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR
-PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
-TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
-PERFORMANCE OF THIS SOFTWARE.
-
-******************************************************************/
-
 /* New getargs implementation */
 
 /* XXX There are several unchecked sprintf or strcat calls in this file.
@@ -446,7 +415,7 @@ convertsimple(arg, p_format, p_va, msgbuf)
 
 /* Internal API needed by convertsimple1(): */
 extern 
-PyObject *_PyUnicode_AsUTF8String(PyObject *unicode,
+PyObject *_PyUnicode_AsDefaultEncodedString(PyObject *unicode,
 				  const char *errors);
 
 /* Convert a non-tuple argument.  Return NULL if conversion went OK,
@@ -624,7 +593,8 @@ convertsimple1(arg, p_format, p_va)
 				if (PyString_Check(arg))
 				    *p = PyString_AS_STRING(arg);
 				else if (PyUnicode_Check(arg)) {
-				    arg = _PyUnicode_AsUTF8String(arg, NULL);
+				    arg = _PyUnicode_AsDefaultEncodedString(
+							            arg, NULL);
 				    if (arg == NULL)
 					return "unicode conversion error";
 				    *p = PyString_AS_STRING(arg);
@@ -669,7 +639,8 @@ convertsimple1(arg, p_format, p_va)
 				else if (PyString_Check(arg))
 				  *p = PyString_AsString(arg);
 				else if (PyUnicode_Check(arg)) {
-				  arg = _PyUnicode_AsUTF8String(arg, NULL);
+				  arg = _PyUnicode_AsDefaultEncodedString(
+								  arg, NULL);
 				  if (arg == NULL)
 				      return "unicode conversion error";
 				  *p = PyString_AS_STRING(arg);
@@ -701,7 +672,7 @@ convertsimple1(arg, p_format, p_va)
 			/* Get 'e' parameter: the encoding name */
 			encoding = (const char *)va_arg(*p_va, const char *);
 			if (encoding == NULL)
-				return "(encoding is NULL)";
+			    	encoding = PyUnicode_GetDefaultEncoding();
 			
 			/* Get 's' parameter: the output buffer to use */
 			if (*format != 's')

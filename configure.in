@@ -356,7 +356,7 @@ AC_HEADER_STDC
 AC_CHECK_HEADERS(dlfcn.h fcntl.h limits.h locale.h ncurses.h pthread.h \
 signal.h stdarg.h stddef.h stdlib.h thread.h unistd.h utime.h \
 sys/audioio.h sys/file.h sys/lock.h \
-sys/param.h sys/select.h sys/time.h sys/times.h \
+sys/param.h sys/select.h sys/socket.h sys/time.h sys/times.h \
 sys/un.h sys/utsname.h sys/wait.h)
 AC_HEADER_DIRENT
 
@@ -380,7 +380,6 @@ AC_TYPE_PID_T
 AC_TYPE_SIGNAL
 AC_TYPE_SIZE_T
 AC_TYPE_UID_T
-AC_CHECK_TYPE(socklen_t, int)
 
 # Sizes of various common basic types
 AC_CHECK_SIZEOF(int)
@@ -654,10 +653,6 @@ AC_DEFINE(_REENTRANT)
 AC_CHECK_HEADER(mach/cthreads.h, [AC_DEFINE(WITH_THREAD)
 AC_DEFINE(C_THREADS)
 LIBOBJS="$LIBOBJS thread.o"],[
-AC_CHECK_LIB(pth, pth_init, [AC_DEFINE(WITH_THREAD)
-AC_DEFINE(_GNU_PTH)
-LIBS="-lpth $LIBS"
-LIBOBJS="$LIBOBJS thread.o"],[
 AC_CHECK_LIB(pthread, pthread_create, [AC_DEFINE(WITH_THREAD)
 AC_DEFINE(_POSIX_THREADS)
 LIBS="-lpthread $LIBS"
@@ -680,6 +675,10 @@ AC_CHECK_LIB(thread, __d6_pthread_create, [AC_DEFINE(WITH_THREAD)
 AC_DEFINE(_POSIX_THREADS)
 LIBS="$LIBS -lthread"
 LIBOBJS="$LIBOBJS thread.o"], [
+AC_CHECK_LIB(pth, pth_init, [AC_DEFINE(WITH_THREAD)
+AC_DEFINE(_GNU_PTH)
+LIBS="-lpth $LIBS"
+LIBOBJS="$LIBOBJS thread.o"],[
 AC_CHECK_LIB(cma, pthread_create, [AC_DEFINE(WITH_THREAD)
 AC_DEFINE(_POSIX_THREADS)
 LIBS="$LIBS -lcma"
@@ -1073,6 +1072,15 @@ then AC_DEFINE(WANT_WCTYPE_FUNCTIONS) AC_MSG_RESULT(yes)
 else AC_MSG_RESULT(no)
 fi],
 [AC_MSG_RESULT(no)])
+
+# THIS MUST BE LAST, IT CAN BREAK OTHER TESTS!
+# Add sys/socket.h to confdefs.h
+cat >> confdefs.h <<\EOF
+#ifdef HAVE_SYS_SOCKET_H
+#include <sys/socket.h>
+#endif
+EOF
+AC_CHECK_TYPE(socklen_t, int)
 
 # generate output files
 AC_OUTPUT(Makefile \

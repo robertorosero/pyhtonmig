@@ -11,54 +11,16 @@ import sys, os, string, re, shutil
 from distutils.errors import *
 from distutils.spawn import spawn
 
-# for backwards compatibility:
-from distutils.file_util import *
-from distutils.dir_util import *
-from distutils.dep_util import *
-from distutils.archive_util import *
-
-
-# Need to define 'abspath()', because it was new with Python 1.5.2
-if hasattr (os.path, 'abspath'):
-    abspath = os.path.abspath
-else:
-    def abspath(path):
-        if not os.path.isabs(path):
-            path = os.path.join(os.getcwd(), path)
-        return os.path.normpath(path)
-
-
-# More backwards compatability hacks
-def extend (list, new_list):
-    """Appends the list 'new_list' to 'list', just like the 'extend()'
-       list method does in Python 1.5.2 -- but this works on earlier
-       versions of Python too."""
-
-    if hasattr (list, 'extend'):
-        list.extend (new_list)
-    else:
-        list[len(list):] = new_list
-
-# extend ()
-
 
 def get_platform ():
     """Return a string (suitable for tacking onto directory names) that
-       identifies the current platform.  Under Unix, identifies both the OS
-       and hardware architecture, e.g. "linux-i586", "solaris-sparc",
-       "irix-mips".  For Windows and Mac OS, just returns 'sys.platform' --
-       i.e. "???" or "???"."""
-
-    if os.name == 'posix':
-        (OS, _, rel, _, arch) = os.uname()
-        return "%s%c-%s" % (string.lower (OS), rel[0], string.lower (arch))
-    else:
-        return sys.platform
-
-# get_platform()
+    identifies the current platform.  Currently, this is just
+    'sys.platform'.
+    """
+    return sys.platform
 
 
-def native_path (pathname):
+def convert_path (pathname):
     """Return 'pathname' as a name that will work on the native
        filesystem, i.e. split it on '/' and put it back together again
        using the current directory separator.  Needed because filenames in
@@ -73,35 +35,31 @@ def native_path (pathname):
     if pathname[-1] == '/':
         raise ValueError, "path '%s' cannot end with '/'" % pathname
     if os.sep != '/':
-       if os.sep in pathname:
-            raise ValueError, \
-              "path '%s' cannot contain '%c' character" % (pathname, os.sep)
-       else:
-            paths = string.split (pathname, '/')
-            return apply (os.path.join, paths)
+        paths = string.split (pathname, '/')
+        return apply (os.path.join, paths)
     else:
         return pathname
 
-# native_path ()
+# convert_path ()
 
 
 def change_root (new_root, pathname):
-
     """Return 'pathname' with 'new_root' prepended.  If 'pathname' is
     relative, this is equivalent to "os.path.join(new_root,pathname)".
     Otherwise, it requires making 'pathname' relative and then joining the
-    two, which is tricky on DOS/Windows and Mac OS."""
-
-    if not abspath (pathname):
-        return os.path.join (new_root, pathname)
-
-    elif os.name == 'posix':
-        return os.path.join (new_root, pathname[1:])
+    two, which is tricky on DOS/Windows and Mac OS.
+    """
+    if os.name == 'posix':
+        if not os.path.isabs (pathname):
+            return os.path.join (new_root, pathname)
+        else:
+            return os.path.join (new_root, pathname[1:])
 
     elif os.name == 'nt':
-        (root_drive, root_path) = os.path.splitdrive (new_root)
         (drive, path) = os.path.splitdrive (pathname)
-        raise RuntimeError, "I give up -- not sure how to do this on Windows"
+        if path[0] == '\\':
+            path = path[1:]
+        return os.path.join (new_root, path)
 
     elif os.name == 'mac':
         raise RuntimeError, "no clue how to do this on Mac OS"
@@ -111,14 +69,19 @@ def change_root (new_root, pathname):
               "nothing known about platform '%s'" % os.name
 
 
-def _check_environ ():
+_environ_checked = 0
+def check_environ ():
     """Ensure that 'os.environ' has all the environment variables we
        guarantee that users can use in config files, command-line
        options, etc.  Currently this includes:
          HOME - user's home directory (Unix only)
-         PLAT - desription of the current platform, including hardware
+         PLAT - description of the current platform, including hardware
                 and OS (see 'get_platform()')
     """
+
+    global _environ_checked
+    if _environ_checked:
+        return
 
     if os.name == 'posix' and not os.environ.has_key('HOME'):
         import pwd
@@ -127,10 +90,12 @@ def _check_environ ():
     if not os.environ.has_key('PLAT'):
         os.environ['PLAT'] = get_platform ()
 
+    _environ_checked = 1
+
 
 def subst_vars (str, local_vars):
     """Perform shell/Perl-style variable substitution on 'string'.
-       Every occurence of '$' followed by a name, or a name enclosed in
+       Every occurrence of '$' followed by a name, or a name enclosed in
        braces, is considered a variable.  Every variable is substituted by
        the value found in the 'local_vars' dictionary, or in 'os.environ'
        if it's not in 'local_vars'.  'os.environ' is first checked/
@@ -138,7 +103,7 @@ def subst_vars (str, local_vars):
        '_check_environ()'.  Raise ValueError for any variables not found in
        either 'local_vars' or 'os.environ'."""
 
-    _check_environ ()
+    check_environ ()
     def _subst (match, local_vars=local_vars):
         var_name = match.group(1)
         if local_vars.has_key (var_name):
@@ -151,3 +116,116 @@ def subst_vars (str, local_vars):
 # subst_vars ()
 
 
+def grok_environment_error (exc, prefix="error: "):
+    """Generate a useful error message from an EnvironmentError (IOError or
+    OSError) exception object.  Handles Python 1.5.1 and 1.5.2 styles, and
+    does what it can to deal with exception objects that don't have a
+    filename (which happens when the error is due to a two-file operation,
+    such as 'rename()' or 'link()'.  Returns the error message as a string
+    prefixed with 'prefix'.
+    """
+    # check for Python 1.5.2-style {IO,OS}Error exception objects
+    if hasattr (exc, 'filename') and hasattr (exc, 'strerror'):
+        if exc.filename:
+            error = prefix + "%s: %s" % (exc.filename, exc.strerror)
+        else:
+            # two-argument functions in posix module don't
+            # include the filename in the exception object!
+            error = prefix + "%s" % exc.strerror
+    else:
+        error = prefix + str(exc[-1])
+
+    return error
+
+
+# Needed by 'split_quoted()'
+_wordchars_re = re.compile(r'[^\\\'\"%s ]*' % string.whitespace)
+_squote_re = re.compile(r"'(?:[^'\\]|\\.)*'")
+_dquote_re = re.compile(r'"(?:[^"\\]|\\.)*"')
+
+def split_quoted (s):
+    """Split a string up according to Unix shell-like rules for quotes and
+    backslashes.  In short: words are delimited by spaces, as long as those
+    spaces are not escaped by a backslash, or inside a quoted string.
+    Single and double quotes are equivalent, and the quote characters can
+    be backslash-escaped.  The backslash is stripped from any two-character
+    escape sequence, leaving only the escaped character.  The quote
+    characters are stripped from any quoted string.  Returns a list of
+    words.
+    """
+
+    # This is a nice algorithm for splitting up a single string, since it
+    # doesn't require character-by-character examination.  It was a little
+    # bit of a brain-bender to get it working right, though...
+
+    s = string.strip(s)
+    words = []
+    pos = 0
+
+    while s:
+        m = _wordchars_re.match(s, pos)
+        end = m.end()
+        if end == len(s):
+            words.append(s[:end])
+            break
+
+        if s[end] in string.whitespace: # unescaped, unquoted whitespace: now
+            words.append(s[:end])       # we definitely have a word delimiter
+            s = string.lstrip(s[end:])
+            pos = 0
+
+        elif s[end] == '\\':            # preserve whatever is being escaped;
+                                        # will become part of the current word
+            s = s[:end] + s[end+1:]
+            pos = end+1
+
+        else:
+            if s[end] == "'":           # slurp singly-quoted string
+                m = _squote_re.match(s, end)
+            elif s[end] == '"':         # slurp doubly-quoted string
+                m = _dquote_re.match(s, end)
+            else:
+                raise RuntimeError, \
+                      "this can't happen (bad char '%c')" % s[end]
+
+            if m is None:
+                raise ValueError, \
+                      "bad string (mismatched %s quotes?)" % s[end]
+
+            (beg, end) = m.span()
+            s = s[:beg] + s[beg+1:end-1] + s[end:]
+            pos = m.end() - 2
+
+        if pos >= len(s):
+            words.append(s)
+            break
+
+    return words
+
+# split_quoted ()
+
+
+def execute (func, args, msg=None, verbose=0, dry_run=0):
+    """Perform some action that affects the outside world (eg.  by writing
+    to the filesystem).  Such actions are special because they are disabled
+    by the 'dry_run' flag, and announce themselves if 'verbose' is true.
+    This method takes care of all that bureaucracy for you; all you have to
+    do is supply the function to call and an argument tuple for it (to
+    embody the "external action" being performed), and an optional message
+    to print.
+    """
+    # Generate a message if we weren't passed one
+    if msg is None:
+        msg = "%s%s" % (func.__name__, `args`)
+        if msg[-2:] == ',)':        # correct for singleton tuple 
+            msg = msg[0:-2] + ')'
+
+    # Print it if verbosity level is high enough
+    if verbose:
+        print msg
+
+    # And do it, as long as we're not in dry-run mode
+    if not dry_run:
+        apply(func, args)
+
+# execute()

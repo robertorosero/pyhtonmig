@@ -1,34 +1,3 @@
-/***********************************************************
-Copyright 1991-1995 by Stichting Mathematisch Centrum, Amsterdam,
-The Netherlands.
-
-                        All Rights Reserved
-
-Permission to use, copy, modify, and distribute this software and its
-documentation for any purpose and without fee is hereby granted,
-provided that the above copyright notice appear in all copies and that
-both that copyright notice and this permission notice appear in
-supporting documentation, and that the names of Stichting Mathematisch
-Centrum or CWI or Corporation for National Research Initiatives or
-CNRI not be used in advertising or publicity pertaining to
-distribution of the software without specific, written prior
-permission.
-
-While CWI is the initial source for this software, a modified version
-is made available by the Corporation for National Research Initiatives
-(CNRI) at the Internet address ftp://ftp.python.org.
-
-STICHTING MATHEMATISCH CENTRUM AND CNRI DISCLAIM ALL WARRANTIES WITH
-REGARD TO THIS SOFTWARE, INCLUDING ALL IMPLIED WARRANTIES OF
-MERCHANTABILITY AND FITNESS, IN NO EVENT SHALL STICHTING MATHEMATISCH
-CENTRUM OR CNRI BE LIABLE FOR ANY SPECIAL, INDIRECT OR CONSEQUENTIAL
-DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR
-PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
-TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
-PERFORMANCE OF THIS SOFTWARE.
-
-******************************************************************/
-
 /* Math module -- standard C math library functions, pi and e */
 
 #include "Python.h"
@@ -156,8 +125,6 @@ FUNC2(math_pow, power, math_pow_doc,
 FUNC2(math_pow, pow, math_pow_doc,
       "pow(x,y)\n\nReturn x**y.")
 #endif
-FUNC1(math_rint, rint, math_rint_doc,
-      "rint(x)\n\nReturn the integer nearest to x as a real.")
 FUNC1(math_sin, sin, math_sin_doc,
       "sin(x)\n\nReturn the sine of x.")
 FUNC1(math_sinh, sinh, math_sinh_doc,
@@ -269,7 +236,6 @@ static PyMethodDef math_methods[] = {
 	{"log10",	math_log10,	0,	math_log10_doc},
 	{"modf",	math_modf,	0,	math_modf_doc},
 	{"pow",		math_pow,	0,	math_pow_doc},
-	{"rint",	math_rint,	0,	math_rint_doc},
 	{"sin",		math_sin,	0,	math_sin_doc},
 	{"sinh",	math_sinh,	0,	math_sinh_doc},
 	{"sqrt",	math_sqrt,	0,	math_sqrt_doc},

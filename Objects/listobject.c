@@ -1,34 +1,3 @@
-/***********************************************************
-Copyright 1991-1995 by Stichting Mathematisch Centrum, Amsterdam,
-The Netherlands.
-
-                        All Rights Reserved
-
-Permission to use, copy, modify, and distribute this software and its
-documentation for any purpose and without fee is hereby granted,
-provided that the above copyright notice appear in all copies and that
-both that copyright notice and this permission notice appear in
-supporting documentation, and that the names of Stichting Mathematisch
-Centrum or CWI or Corporation for National Research Initiatives or
-CNRI not be used in advertising or publicity pertaining to
-distribution of the software without specific, written prior
-permission.
-
-While CWI is the initial source for this software, a modified version
-is made available by the Corporation for National Research Initiatives
-(CNRI) at the Internet address ftp://ftp.python.org.
-
-STICHTING MATHEMATISCH CENTRUM AND CNRI DISCLAIM ALL WARRANTIES WITH
-REGARD TO THIS SOFTWARE, INCLUDING ALL IMPLIED WARRANTIES OF
-MERCHANTABILITY AND FITNESS, IN NO EVENT SHALL STICHTING MATHEMATISCH
-CENTRUM OR CNRI BE LIABLE FOR ANY SPECIAL, INDIRECT OR CONSEQUENTIAL
-DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR
-PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
-TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
-PERFORMANCE OF THIS SOFTWARE.
-
-******************************************************************/
-
 /* List object implementation */
 
 #include "Python.h"
@@ -623,16 +592,14 @@ listextend(self, args)
 	if (!PyArg_ParseTuple(args, "O:extend", &b))
 		return NULL;
 
-	if (!PyList_Check(b)) {
-		PyErr_SetString(PyExc_TypeError,
-				"list.extend() argument must be a list");
+	b = PySequence_Fast(b, "list.extend() argument must be a sequence");
+	if (!b)
 		return NULL;
-	}
-	if (PyList_GET_SIZE(b) == 0) {
+
+	if (PyObject_Length(b) == 0)
 		/* short circuit when b is empty */
-		Py_INCREF(Py_None);
-		return Py_None;
-	}
+		goto ok;
+
 	if (self == (PyListObject*)b) {
 		/* as in list_ass_slice() we must special case the
 		 * situation: a.extend(a)
@@ -640,6 +607,7 @@ listextend(self, args)
 		 * XXX: I think this way ought to be faster than using
 		 * list_slice() the way list_ass_slice() does.
 		 */
+		Py_DECREF(b);
 		b = PyList_New(selflen);
 		if (!b)
 			return NULL;
@@ -649,33 +617,29 @@ listextend(self, args)
 			PyList_SET_ITEM(b, i, o);
 		}
 	}
-	else
-		/* we want b to have the same refcount semantics for the
-		 * Py_XDECREF() in the finally clause regardless of which
-		 * branch in the above conditional we took.
-		 */
-		Py_INCREF(b);
 
-	blen = PyList_GET_SIZE(b);
+	blen = PyObject_Length(b);
+
 	/* resize a using idiom */
 	items = self->ob_item;
 	NRESIZE(items, PyObject*, selflen + blen);
-	if (items == NULL ) {
+	if (items == NULL) {
 		PyErr_NoMemory();
-		goto finally;
+		goto failed;
 	}
 	self->ob_item = items;
 
-	/* populate the end self with b's items */
+	/* populate the end of self with b's items */
 	for (i = 0; i < blen; i++) {
-		PyObject *o = PyList_GET_ITEM(b, i);
+		PyObject *o = PySequence_Fast_GET_ITEM(b, i);
 		Py_INCREF(o);
 		PyList_SET_ITEM(self, self->ob_size++, o);
 	}
+  ok:
 	res = Py_None;
 	Py_INCREF(res);
-  finally:
-	Py_XDECREF(b);
+  failed:
+	Py_DECREF(b);
 	return res;
 }
 
@@ -1289,26 +1253,33 @@ PyList_Sort(v)
 	return 0;
 }
 
-static PyObject *
-listreverse(self, args)
+static void
+_listreverse(self)
 	PyListObject *self;
-	PyObject *args;
 {
 	register PyObject **p, **q;
 	register PyObject *tmp;
 	
-	if (!PyArg_ParseTuple(args, ":reverse"))
-		return NULL;
-
 	if (self->ob_size > 1) {
 		for (p = self->ob_item, q = self->ob_item + self->ob_size - 1;
-						p < q; p++, q--) {
+		     p < q;
+		     p++, q--)
+		{
 			tmp = *p;
 			*p = *q;
 			*q = tmp;
 		}
 	}
-	
+}
+
+static PyObject *
+listreverse(self, args)
+	PyListObject *self;
+	PyObject *args;
+{
+	if (!PyArg_ParseTuple(args, ":reverse"))
+		return NULL;
+	_listreverse(self);
 	Py_INCREF(Py_None);
 	return Py_None;
 }
@@ -1321,10 +1292,7 @@ PyList_Reverse(v)
 		PyErr_BadInternalCall();
 		return -1;
 	}
-	v = listreverse((PyListObject *)v, (PyObject *)NULL);
-	if (v == NULL)
-		return -1;
-	Py_DECREF(v);
+	_listreverse((PyListObject *)v);
 	return 0;
 }
 

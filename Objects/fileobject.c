@@ -1,34 +1,3 @@
-/***********************************************************
-Copyright 1991-1995 by Stichting Mathematisch Centrum, Amsterdam,
-The Netherlands.
-
-                        All Rights Reserved
-
-Permission to use, copy, modify, and distribute this software and its
-documentation for any purpose and without fee is hereby granted,
-provided that the above copyright notice appear in all copies and that
-both that copyright notice and this permission notice appear in
-supporting documentation, and that the names of Stichting Mathematisch
-Centrum or CWI or Corporation for National Research Initiatives or
-CNRI not be used in advertising or publicity pertaining to
-distribution of the software without specific, written prior
-permission.
-
-While CWI is the initial source for this software, a modified version
-is made available by the Corporation for National Research Initiatives
-(CNRI) at the Internet address ftp://ftp.python.org.
-
-STICHTING MATHEMATISCH CENTRUM AND CNRI DISCLAIM ALL WARRANTIES WITH
-REGARD TO THIS SOFTWARE, INCLUDING ALL IMPLIED WARRANTIES OF
-MERCHANTABILITY AND FITNESS, IN NO EVENT SHALL STICHTING MATHEMATISCH
-CENTRUM OR CNRI BE LIABLE FOR ANY SPECIAL, INDIRECT OR CONSEQUENTIAL
-DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR
-PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
-TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
-PERFORMANCE OF THIS SOFTWARE.
-
-******************************************************************/
-
 /* File object implementation */
 
 #include "Python.h"
@@ -602,7 +571,7 @@ file_readinto(f, args)
 */
 
 static PyObject *
-getline(f, n)
+get_line(f, n)
 	PyFileObject *f;
 	int n;
 {
@@ -724,7 +693,7 @@ PyFile_GetLine(f, n)
 	}
 	if (((PyFileObject*)f)->f_fp == NULL)
 		return err_closed();
-	return getline((PyFileObject *)f, n);
+	return get_line((PyFileObject *)f, n);
 }
 
 /* Python method */
@@ -744,7 +713,7 @@ file_readline(f, args)
 		return PyString_FromString("");
 	if (n < 0)
 		n = 0;
-	return getline(f, n);
+	return get_line(f, n);
 }
 
 static PyObject *
@@ -838,7 +807,7 @@ file_readlines(f, args)
 			goto error;
 		if (sizehint > 0) {
 			/* Need to complete the last line */
-			PyObject *rest = getline(f, 0);
+			PyObject *rest = get_line(f, 0);
 			if (rest == NULL) {
 				Py_DECREF(line);
 				goto error;
@@ -930,19 +899,12 @@ file_writelines(f, args)
 				line = PySequence_GetItem(args, index+j);
 				if (line == NULL) {
 					if (PyErr_ExceptionMatches(
-						PyExc_IndexError))
-					{
+						PyExc_IndexError)) {
 						PyErr_Clear();
 						break;
 					}
 					/* Some other error occurred.
 					   XXX We may lose some output. */
-					goto error;
-				}
-				if (!PyString_Check(line)) {
-					Py_DECREF(line);
-					PyErr_SetString(PyExc_TypeError,
-				 "writelines() requires sequences of strings");
 					goto error;
 				}
 				PyList_SetItem(list, j, line);
@@ -951,11 +913,43 @@ file_writelines(f, args)
 		if (j == 0)
 			break;
 
+		/* Check that all entries are indeed strings. If not,
+		   apply the same rules as for file.write() and
+		   convert the results to strings. This is slow, but
+		   seems to be the only way since all conversion APIs
+		   could potentially execute Python code. */
+		for (i = 0; i < j; i++) {
+			PyObject *v = PyList_GET_ITEM(list, i);
+			if (!PyString_Check(v)) {
+			    	const char *buffer;
+			    	int len;
+				if (((f->f_binary && 
+				      PyObject_AsReadBuffer(v,
+					      (const void**)&buffer,
+							    &len)) ||
+				     PyObject_AsCharBuffer(v,
+							   &buffer,
+							   &len))) {
+					PyErr_SetString(PyExc_TypeError,
+				"writelines() requires sequences of strings");
+					goto error;
+				}
+				line = PyString_FromStringAndSize(buffer,
+								  len);
+				if (line == NULL)
+					goto error;
+				Py_DECREF(v);
+				PyList_SET_ITEM(list, i, line);
+			}
+		}
+
+		/* Since we are releasing the global lock, the
+		   following code may *not* execute Python code. */
 		Py_BEGIN_ALLOW_THREADS
 		f->f_softspace = 0;
 		errno = 0;
 		for (i = 0; i < j; i++) {
-			line = PyList_GET_ITEM(list, i);
+		    	line = PyList_GET_ITEM(list, i);
 			len = PyString_GET_SIZE(line);
 			nwritten = fwrite(PyString_AS_STRING(line),
 					  1, len, f->f_fp);
