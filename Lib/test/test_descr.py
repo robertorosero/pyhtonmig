@@ -676,6 +676,24 @@ def compattr():
     verify(a.x == 10)
     verify(a.x == 11)
 
+def newslot():
+    if verbose: print "Testing __new__ slot override..."
+    class C(list):
+        def __new__(cls):
+            self = list.__new__(cls)
+            self.foo = 1
+            return self
+        def __init__(self):
+            self.foo = self.foo + 2
+    a = C()
+    verify(a.foo == 3)
+    verify(a.__class__ is C)
+    class D(C):
+        pass
+    b = D()
+    verify(b.foo == 3)
+    verify(b.__class__ is D)
+
 def all():
     lists()
     dicts()
@@ -698,6 +716,7 @@ def all():
     classmethods()
     classic()
     compattr()
+    newslot()
 
 all()
 
