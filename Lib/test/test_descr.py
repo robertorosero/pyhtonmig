@@ -715,6 +715,29 @@ def newslot():
     verify(b.foo == 3)
     verify(b.__class__ is D)
 
+class PerverseMetaType(type):
+    def mro(cls):
+        L = type.mro(cls)
+        L.reverse()
+        return L
+
+def altmro():
+    if verbose: print "Testing mro() and overriding it..."
+    class A(object):
+        def f(self): return "A"
+    class B(A):
+        pass
+    class C(A):
+        def f(self): return "C"
+    class D(B, C):
+        pass
+    verify(D.mro() == [D, B, C, A, object] == list(D.__mro__))
+    verify(D().f() == "C")
+    class X(A,B,C,D):
+        __metaclass__ = PerverseMetaType
+    verify(X.__mro__ == (object, A, C, B, D, X))
+    verify(X().f() == "A")
+
 def all():
     lists()
     dicts()
@@ -739,6 +762,7 @@ def all():
     classic()
     compattr()
     newslot()
+    altmro()
 
 all()
 
