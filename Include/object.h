@@ -255,6 +255,13 @@ typedef struct _typeobject {
 	getiterfunc tp_iter;
 	iternextfunc tp_iternext;
 
+	/* Attribute descriptor stuff */
+	struct PyMethodDef *tp_methods;
+	struct memberlist *tp_members;
+	struct getsetlist *tp_getset;
+	struct _typeobject *tp_base;
+	PyObject *tp_dict;
+
 #ifdef COUNT_ALLOCS
 	/* these must be last and never explicitly initialized */
 	int tp_alloc;
@@ -357,6 +364,9 @@ given type object has a specified feature.
 /* tp_iter is defined */
 #define Py_TPFLAGS_HAVE_ITER (1L<<7)
 
+/* Experimental stuff for healing the type/class split */
+#define Py_TPFLAGS_HAVE_CLASS (1L<<8)
+
 #define Py_TPFLAGS_DEFAULT  ( \
                              Py_TPFLAGS_HAVE_GETCHARBUFFER | \
                              Py_TPFLAGS_HAVE_SEQUENCE_IN | \
@@ -364,6 +374,7 @@ given type object has a specified feature.
                              Py_TPFLAGS_HAVE_RICHCOMPARE | \
                              Py_TPFLAGS_HAVE_WEAKREFS | \
                              Py_TPFLAGS_HAVE_ITER | \
+                             Py_TPFLAGS_HAVE_CLASS | \
                             0)
 
 #define PyType_HasFeature(t,f)  (((t)->tp_flags & (f)) != 0)
