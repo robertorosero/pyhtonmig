@@ -1,3 +1,22 @@
+----------------------------------------------------------------------
+(from BUGS1.0.1)
+----------------------------------------------------------------------
+document addpack, urllib, ...
+
+import.c from JaapV
+
+document os.exec*
+
+name sunaudiodevmodule.c is too long
+
+play with / include SUIT interface
+
+make regsub.[g]sub() optionally case insensitive
+
+handle printing of errors in lines containing multiline strings
+
+======================================================================
+
 (*) errors in __repr__() are handled wrong when called from format
 
 - long(0x80000000) has wrong value!
