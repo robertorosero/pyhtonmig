@@ -265,10 +265,16 @@ class Header:
     def _split(self, s, charset, firstline, splitchars):
         # Split up a header safely for use with encode_chunks.
         splittable = charset.to_splittable(s)
-        encoded = charset.from_splittable(splittable)
+        encoded = charset.from_splittable(splittable, True)
         elen = charset.encoded_header_len(encoded)
-
-        if elen <= self._maxlinelen:
+        # The maxlinelen depends on whether we're on the first line or not, to
+        # take account of any header field name.
+        if firstline:
+            maxlinelen = self._firstlinelen
+        else:
+            maxlinelen = self._maxlinelen
+        # If the line's encoded length first, just return it
+        if elen <= maxlinelen:
             return [(encoded, charset)]
         # If we have undetermined raw 8bit characters sitting in a byte
         # string, we really don't know what the right thing to do is.  We
@@ -276,7 +282,7 @@ class Header:
         # could break if we split it between pairs.  The least harm seems to
         # be to not split the header at all, but that means they could go out
         # longer than maxlinelen.
-        elif charset == '8bit':
+        if charset == '8bit':
             return [(s, charset)]
         # BAW: I'm not sure what the right test here is.  What we're trying to
         # do is be faithful to RFC 2822's recommendation that ($2.2.3):
@@ -295,14 +301,16 @@ class Header:
         elif elen == len(s):
             # We can split on _maxlinelen boundaries because we know that the
             # encoding won't change the size of the string
-            splitpnt = self._maxlinelen
+            splitpnt = maxlinelen
             first = charset.from_splittable(splittable[:splitpnt], False)
             last = charset.from_splittable(splittable[splitpnt:], False)
         else:
+            # Binary search for split point
+            first, last = _binsplit(splittable, charset, maxlinelen)
             # Divide and conquer.
-            halfway = _floordiv(len(splittable), 2)
-            first = charset.from_splittable(splittable[:halfway], False)
-            last = charset.from_splittable(splittable[halfway:], False)
+##            halfway = _floordiv(len(splittable), 2)
+##            first = charset.from_splittable(splittable[:halfway], False)
+##            last = charset.from_splittable(splittable[halfway:], False)
         # Do the split
         return self._split(first, charset, firstline, splitchars) + \
                self._split(last, charset, False, splitchars)
@@ -432,3 +440,25 @@ def _split_ascii(s, firstlen, restlen, continuation_ws, splitchars):
             lines.append(joiner.join(this))
     linejoiner = '\n' + continuation_ws
     return linejoiner.join(lines)
+
+
+
+def _binsplit(splittable, charset, maxlinelen):
+    i = lastm = 0
+    j = len(splittable) - 1
+    while True:
+        if j < i:
+            break
+        m = (i + j) / 2
+        chunk = charset.from_splittable(splittable[:m], True)
+        chunklen = charset.encoded_header_len(chunk)
+        if chunklen < maxlinelen:
+            lastm = m
+            i = m + 1
+        elif chunklen > maxlinelen:
+            j = m - 1
+        else:
+            break
+    first = charset.from_splittable(splittable[:lastm], False)
+    last = charset.from_splittable(splittable[lastm:], False)
+    return first, last
