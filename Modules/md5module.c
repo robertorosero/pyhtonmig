@@ -37,11 +37,9 @@ typedef struct {
         MD5_CTX	md5;		/* the context holder */
 } md5object;
 
-extern typeobject MD5type;	/* Really static, forward */
+static typeobject MD5type;	/* Forward */
 
 #define is_md5object(v)		((v)->ob_type == &MD5type)
-
-static const char initialiser_name[] = "md5";
 
 /* #define MD5_DEBUG */
 
@@ -171,9 +169,9 @@ md5_copy(self, args)
 
 		
 static struct methodlist md5_methods[] = {
-	{"update",		md5_update},
-	{"digest",		md5_digest},
-	{"copy",		md5_copy},
+	{"update",		(method)md5_update},
+	{"digest",		(method)md5_digest},
+	{"copy",		(method)md5_copy},
 	{NULL,			NULL}		/* sentinel */
 };
 
@@ -195,19 +193,19 @@ typeobject MD5type = {
 	sizeof(md5object),	/*tp_size*/
 	0,			/*tp_itemsize*/
 	/* methods */
-	md5_dealloc,	/*tp_dealloc*/
-	0,		/*tp_print*/
-	md5_getattr,	/*tp_getattr*/
-	0,		/*tp_setattr*/
-	0,		/*tp_compare*/
-	0,		/*tp_repr*/
-        0,		 /*tp_as_number*/
+	(destructor)md5_dealloc, /*tp_dealloc*/
+	0,			/*tp_print*/
+	(getattrfunc)md5_getattr, /*tp_getattr*/
+	0,			/*tp_setattr*/
+	0,			/*tp_compare*/
+	0,			/*tp_repr*/
+        0,			/*tp_as_number*/
 };
 
 /* List of functions exported by this module */
 
 static struct methodlist md5_functions[] = {
-	{initialiser_name,	MD5_md5},
+	{"md5",			(method)MD5_md5},
 	{NULL,			NULL}		 /* Sentinel */
 };
 

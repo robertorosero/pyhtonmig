@@ -222,9 +222,9 @@ typeobject Configtype = {
 	sizeof(configobject),	/*tp_size*/
 	0,			/*tp_itemsize*/
 	/* methods */
-	config_dealloc,		/*tp_dealloc*/
+	(destructor)config_dealloc, /*tp_dealloc*/
 	0,			/*tp_print*/
-	config_getattr,		/*tp_getattr*/
+	(getattrfunc)config_getattr, /*tp_getattr*/
 	0,			/*tp_setattr*/
 	0,			/*tp_compare*/
 	0,			/*tp_repr*/
@@ -530,9 +530,9 @@ typeobject Porttype = {
 	sizeof(portobject),	/*tp_size*/
 	0,			/*tp_itemsize*/
 	/* methods */
-	port_dealloc,		/*tp_dealloc*/
+	(destructor)port_dealloc, /*tp_dealloc*/
 	0,			/*tp_print*/
-	port_getattr,		/*tp_getattr*/
+	(getattrfunc)port_getattr, /*tp_getattr*/
 	0,			/*tp_setattr*/
 	0,			/*tp_compare*/
 	0,			/*tp_repr*/

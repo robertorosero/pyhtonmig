@@ -89,7 +89,7 @@ typedef struct {
 	unsigned char *advances; /* [num_rotors] */
 } rotorobject;
 
-extern typeobject Rotortype;	/* Really static, forward */
+static typeobject Rotortype;	/* Forward */
 
 #define is_rotorobject(v)		((v)->ob_type == &Rotortype)
 
@@ -749,11 +749,11 @@ rotor_setkey(self, args)
 }
 
 static struct methodlist rotor_methods[] = {
-	{"encrypt",	rotor_encrypt},
-	{"encryptmore",	rotor_encryptmore},
-	{"decrypt",	rotor_decrypt},
-	{"decryptmore",	rotor_decryptmore},
-	{"setkey",	rotor_setkey},
+	{"encrypt",	(method)rotor_encrypt},
+	{"encryptmore",	(method)rotor_encryptmore},
+	{"decrypt",	(method)rotor_decrypt},
+	{"decryptmore",	(method)rotor_decryptmore},
+	{"setkey",	(method)rotor_setkey},
 	{NULL,		NULL}		/* sentinel */
 };
 
@@ -769,17 +769,17 @@ rotor_getattr(s, name)
 
 static typeobject Rotortype = {
 	OB_HEAD_INIT(&Typetype)
-	0,			/*ob_size*/
+	0,				/*ob_size*/
 	"rotor",			/*tp_name*/
-	sizeof(rotorobject),	/*tp_size*/
-	0,			/*tp_itemsize*/
+	sizeof(rotorobject),		/*tp_size*/
+	0,				/*tp_itemsize*/
 	/* methods */
-	rotor_dealloc,	/*tp_dealloc*/
-	0,		/*tp_print*/
-	rotor_getattr,		/*tp_getattr*/
-	0,		/*tp_setattr*/
-	0,		/*tp_compare*/
-	0,		/*tp_repr*/
+	(destructor)rotor_dealloc,	/*tp_dealloc*/
+	0,				/*tp_print*/
+	(getattrfunc)rotor_getattr,	/*tp_getattr*/
+	0,				/*tp_setattr*/
+	0,				/*tp_compare*/
+	0,				/*tp_repr*/
 };
 
 

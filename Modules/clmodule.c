@@ -675,9 +675,9 @@ static typeobject Cltype = {
 	sizeof(clobject),	/*tp_size*/
 	0,			/*tp_itemsize*/
 	/* methods */
-	cl_dealloc,		/*tp_dealloc*/
+	(destructor)cl_dealloc,	/*tp_dealloc*/
 	0,			/*tp_print*/
-	cl_getattr,		/*tp_getattr*/
+	(getattrfunc)cl_getattr, /*tp_getattr*/
 	0,			/*tp_setattr*/
 	0,			/*tp_compare*/
 	0,			/*tp_repr*/

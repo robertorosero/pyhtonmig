@@ -946,22 +946,22 @@ array_tostring(self, args)
 }
 
 static struct methodlist array_methods[] = {
-	{"append",	array_append},
-	{"byteswap",	array_byteswap},
-/*	{"count",	array_count},*/
-	{"fromfile",	array_fromfile},
-	{"fromlist",	array_fromlist},
-	{"fromstring",	array_fromstring},
-/*	{"index",	array_index},*/
-	{"insert",	array_insert},
-	{"read",	array_fromfile},
-/*	{"remove",	array_remove},*/
-	{"reverse",	array_reverse},
-/*	{"sort",	array_sort},*/
-	{"tofile",	array_tofile},
-	{"tolist",	array_tolist},
-	{"tostring",	array_tostring},
-	{"write",	array_tofile},
+	{"append",	(method)array_append},
+	{"byteswap",	(method)array_byteswap},
+/*	{"count",	(method)array_count},*/
+	{"fromfile",	(method)array_fromfile},
+	{"fromlist",	(method)array_fromlist},
+	{"fromstring",	(method)array_fromstring},
+/*	{"index",	(method)array_index},*/
+	{"insert",	(method)array_insert},
+	{"read",	(method)array_fromfile},
+/*	{"remove",	(method)array_remove},*/
+	{"reverse",	(method)array_reverse},
+/*	{"sort",	(method)array_sort},*/
+	{"tofile",	(method)array_tofile},
+	{"tolist",	(method)array_tolist},
+	{"tostring",	(method)array_tostring},
+	{"write",	(method)array_tofile},
 	{NULL,		NULL}		/* sentinel */
 };
 
@@ -1079,13 +1079,13 @@ array_repr(a)
 }
 
 static sequence_methods array_as_sequence = {
-	array_length,	/*sq_length*/
-	array_concat,	/*sq_concat*/
-	array_repeat,	/*sq_repeat*/
-	array_item,	/*sq_item*/
-	array_slice,	/*sq_slice*/
-	array_ass_item,	/*sq_ass_item*/
-	array_ass_slice, /*sq_ass_slice*/
+	(inquiry)array_length,			/*sq_length*/
+	(binaryfunc)array_concat,		/*sq_concat*/
+	(intargfunc)array_repeat,		/*sq_repeat*/
+	(intargfunc)array_item,			/*sq_item*/
+	(intintargfunc)array_slice,		/*sq_slice*/
+	(intobjargproc)array_ass_item,		/*sq_ass_item*/
+	(intintobjargproc)array_ass_slice,	/*sq_ass_slice*/
 };
 
 typeobject Arraytype = {
@@ -1094,15 +1094,15 @@ typeobject Arraytype = {
 	"array",
 	sizeof(arrayobject),
 	0,
-	array_dealloc,	/*tp_dealloc*/
-	array_print,	/*tp_print*/
-	array_getattr,	/*tp_getattr*/
-	0,		/*tp_setattr*/
-	array_compare,	/*tp_compare*/
-	array_repr,	/*tp_repr*/
-	0,		/*tp_as_number*/
-	&array_as_sequence,	/*tp_as_sequence*/
-	0,		/*tp_as_mapping*/
+	(destructor)array_dealloc,	/*tp_dealloc*/
+	(printfunc)array_print,		/*tp_print*/
+	(getattrfunc)array_getattr,	/*tp_getattr*/
+	0,				/*tp_setattr*/
+	(cmpfunc)array_compare,		/*tp_compare*/
+	(reprfunc)array_repr,		/*tp_repr*/
+	0,				/*tp_as_number*/
+	&array_as_sequence,		/*tp_as_sequence*/
+	0,				/*tp_as_mapping*/
 };
 
 

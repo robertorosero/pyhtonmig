@@ -795,26 +795,26 @@ sock_shutdown(s, args)
 /* List of methods for socket objects */
 
 static struct methodlist sock_methods[] = {
-	{"accept",	sock_accept},
-	{"allowbroadcast",	sock_allowbroadcast},
-	{"setsockopt",	sock_setsockopt},
-	{"getsockopt",	sock_getsockopt},
-	{"bind",	sock_bind},
-	{"close",	sock_close},
-	{"connect",	sock_connect},
-	{"fileno",	sock_fileno},
-	{"getsockname",	sock_getsockname},
+	{"accept",		(method)sock_accept},
+	{"allowbroadcast",	(method)sock_allowbroadcast},
+	{"setsockopt",		(method)sock_setsockopt},
+	{"getsockopt",		(method)sock_getsockopt},
+	{"bind",		(method)sock_bind},
+	{"close",		(method)sock_close},
+	{"connect",		(method)sock_connect},
+	{"fileno",		(method)sock_fileno},
+	{"getsockname",		(method)sock_getsockname},
 #ifdef HAVE_GETPEERNAME
-	{"getpeername",	sock_getpeername},
+	{"getpeername",		(method)sock_getpeername},
 #endif
-	{"listen",	sock_listen},
-	{"makefile",	sock_makefile},
-	{"recv",	sock_recv},
-	{"recvfrom",	sock_recvfrom},
-	{"send",	sock_send},
-	{"sendto",	sock_sendto},
-	{"shutdown",	sock_shutdown},
-	{NULL,		NULL}		/* sentinel */
+	{"listen",		(method)sock_listen},
+	{"makefile",		(method)sock_makefile},
+	{"recv",		(method)sock_recv},
+	{"recvfrom",		(method)sock_recvfrom},
+	{"send",		(method)sock_send},
+	{"sendto",		(method)sock_sendto},
+	{"shutdown",		(method)sock_shutdown},
+	{NULL,			NULL}		/* sentinel */
 };
 
 
@@ -851,9 +851,9 @@ typeobject Socktype = {
 	"socket",
 	sizeof(sockobject),
 	0,
-	sock_dealloc,	/*tp_dealloc*/
+	(destructor)sock_dealloc, /*tp_dealloc*/
 	0,		/*tp_print*/
-	sock_getattr,	/*tp_getattr*/
+	(getattrfunc)sock_getattr, /*tp_getattr*/
 	0,		/*tp_setattr*/
 	0,		/*tp_compare*/
 	0,		/*tp_repr*/

@@ -232,9 +232,9 @@ reg_group(re, args)
 }
 
 static struct methodlist reg_methods[] = {
-	{"match",	reg_match},
-	{"search",	reg_search},
-	{"group",	reg_group},
+	{"match",	(method)reg_match},
+	{"search",	(method)reg_search},
+	{"group",	(method)reg_group},
 	{NULL,		NULL}		/* sentinel */
 };
 
@@ -316,9 +316,9 @@ static typeobject Regextype = {
 	sizeof(regexobject),	/*tp_size*/
 	0,			/*tp_itemsize*/
 	/* methods */
-	reg_dealloc,		/*tp_dealloc*/
+	(destructor)reg_dealloc, /*tp_dealloc*/
 	0,			/*tp_print*/
-	reg_getattr,		/*tp_getattr*/
+	(getattrfunc)reg_getattr, /*tp_getattr*/
 	0,			/*tp_setattr*/
 	0,			/*tp_compare*/
 	0,			/*tp_repr*/

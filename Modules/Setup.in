@@ -28,7 +28,7 @@
 # to use Setup.sgi instead of Setup).
 
 
-# Some special rules to define PYTHONPATH
+# Some special rules to define PYTHONPATH.
 # Edit the definitions below to indicate which options you are using
 
 DESTDIR=/usr/local		# Edit this if needed
@@ -53,20 +53,23 @@ time timemodule.o	# time operations and variables
 
 
 # Modules with some UNIX dependencies -- on by default.
-# Note that some UNIX versions still don't support all of these
-# so you may have to comment them out before the build completes.
-# (in particular dbm is often a troublemaker -- it is now off by
-# default.)
+# (If you have a really backward UNIX, select and socket may not be
+# supported...)
 
-#dbm dbmmodule.o 	# dbm(3) may require -lndbm or similar
 fcntl fcntlmodule.o	# fcntl(2) and ioctl(2)
-nis nismodule.o		# Sun yellow pages -- not everywhere
 pwd grp pwdmodule.o	# pwd(3) and grp(3)
 select selectmodule.o	# select(2); not on ancient System V
 socket socketmodule.o	# socket(2); not on ancient System V
 
 
-# Multimedia modules -- off by default
+# Some more UNIX dependent modules -- off by default, since these
+# are not supported by all UNIX systems.
+
+#dbm dbmmodule.o 	# dbm(3) may require -lndbm or similar
+#nis nismodule.o 	# Sun yellow pages -- not everywhere
+
+
+# Multimedia modules -- on by default.
 # These represent audio samples or images as strings
 
 audioop audioopmodule.o # Operations on audio samples

@@ -29,6 +29,11 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #include "modsupport.h"
 #include "ceval.h"
 
+#ifndef WITH_THREAD
+Error!  The rest of Python is not compiled with thread support.
+Rerun configure, adding a --with-thread option.
+#endif
+
 #include "thread.h"
 
 extern int threads_started;
@@ -147,12 +152,12 @@ lock_locked_lock(self, args)
 }
 
 static struct methodlist lock_methods[] = {
-	{"acquire_lock",	lock_acquire_lock},
-	{"acquire",		lock_acquire_lock},
-	{"release_lock",	lock_release_lock},
-	{"release",		lock_release_lock},
-	{"locked_lock",		lock_locked_lock},
-	{"locked",		lock_locked_lock},
+	{"acquire_lock",	(method)lock_acquire_lock},
+	{"acquire",		(method)lock_acquire_lock},
+	{"release_lock",	(method)lock_release_lock},
+	{"release",		(method)lock_release_lock},
+	{"locked_lock",		(method)lock_locked_lock},
+	{"locked",		(method)lock_locked_lock},
 	{NULL,			NULL}		/* sentinel */
 };
 
@@ -166,17 +171,17 @@ lock_getattr(self, name)
 
 static typeobject Locktype = {
 	OB_HEAD_INIT(&Typetype)
-	0,			/*ob_size*/
-	"lock",			/*tp_name*/
-	sizeof(lockobject),	/*tp_size*/
-	0,			/*tp_itemsize*/
+	0,				/*ob_size*/
+	"lock",				/*tp_name*/
+	sizeof(lockobject),		/*tp_size*/
+	0,				/*tp_itemsize*/
 	/* methods */
-	lock_dealloc,	/*tp_dealloc*/
-	0,		/*tp_print*/
-	lock_getattr,	/*tp_getattr*/
-	0,		/*tp_setattr*/
-	0,		/*tp_compare*/
-	0,		/*tp_repr*/
+	(destructor)lock_dealloc,	/*tp_dealloc*/
+	0,				/*tp_print*/
+	(getattrfunc)lock_getattr,	/*tp_getattr*/
+	0,				/*tp_setattr*/
+	0,				/*tp_compare*/
+	0,				/*tp_repr*/
 };
 
 
@@ -261,13 +266,13 @@ thread_allocate_lock(self, args)
 }
 
 static struct methodlist thread_methods[] = {
-	{"start_new_thread",	thread_start_new_thread},
-	{"start_new",		thread_start_new_thread},
-	{"allocate_lock",	thread_allocate_lock},
-	{"allocate",		thread_allocate_lock},
-	{"exit_thread",		thread_exit_thread},
-	{"exit",		thread_exit_thread},
-	{"exit_prog",		thread_exit_prog},
+	{"start_new_thread",	(method)thread_start_new_thread},
+	{"start_new",		(method)thread_start_new_thread},
+	{"allocate_lock",	(method)thread_allocate_lock},
+	{"allocate",		(method)thread_allocate_lock},
+	{"exit_thread",		(method)thread_exit_thread},
+	{"exit",		(method)thread_exit_thread},
+	{"exit_prog",		(method)thread_exit_prog},
 	{NULL,			NULL}		/* sentinel */
 };
 

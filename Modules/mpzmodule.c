@@ -90,7 +90,7 @@ typedef struct {
         MP_INT	mpz;		/* the actual number */
 } mpzobject;
 
-extern typeobject MPZtype;	/* Really static, forward */
+static typeobject MPZtype;	/* Forward */
 
 #define is_mpzobject(v)		((v)->ob_type == &MPZtype)
 
@@ -995,6 +995,10 @@ mpz_mpzcoerce(z)
 	return NULL;
 } /* mpz_mpzcoerce() */
 	
+/* Forward */
+static void mpz_divm PROTO((MP_INT *res, const MP_INT *num,
+			    const MP_INT *den, const MP_INT *mod));
+
 static object *
 MPZ_powm(self, args)
 	object *self;
@@ -1182,7 +1186,7 @@ MPZ_sqrtrem(self, args)
 } /* MPZ_sqrtrem() */
 
 
-void
+static void
 #if __STDC__
 mpz_divm(MP_INT *res, const MP_INT *num, const MP_INT *den, const MP_INT *mod)
 #else
@@ -1545,7 +1549,7 @@ static struct methodlist mpz_methods[] = {
 	{"hex",			mpz_hex},
 	{"oct",			mpz_oct},
 #endif /* def MPZ_CONVERSIONS_AS_METHODS */
-	{"binary",		mpz_binary},
+	{"binary",		(object *(*)(object *, object *))mpz_binary},
 	{NULL,			NULL}		/* sentinel */
 };
 
@@ -1600,9 +1604,10 @@ mpz_repr(v)
 
 
 
-#define UF (object* (*) FPROTO((object *))) /* Unary function */
-#define BF (object* (*) FPROTO((object *, object *))) /* Binary function */
-#define IF (int (*) FPROTO((object *))) /* Int function */
+#define UF (unaryfunc)
+#define BF (binaryfunc)
+#define IF (inquiry)
+#define CF (coercion)
 
 static number_methods mpz_as_number = {
 	BF mpz_addition,	/*nb_add*/
@@ -1622,8 +1627,7 @@ static number_methods mpz_as_number = {
 	BF mpz_andfunc,		/*nb_and*/
 	BF mpz_xorfunc,		/*nb_xor*/
 	BF mpz_orfunc,		/*nb_or*/
-	(int (*) FPROTO((object **, object **)))
-	mpz_coerce,		/*nb_coerce*/
+	CF mpz_coerce,		/*nb_coerce*/
 #ifndef MPZ_CONVERSIONS_AS_METHODS
 	UF mpz_int,		/*nb_int*/
 	UF mpz_long,		/*nb_long*/
@@ -1640,13 +1644,13 @@ static typeobject MPZtype = {
 	sizeof(mpzobject),	/*tp_size*/
 	0,			/*tp_itemsize*/
 	/* methods */
-	mpz_dealloc,	/*tp_dealloc*/
-	0,		/*tp_print*/
-	mpz_getattr,	/*tp_getattr*/
-	0,		/*tp_setattr*/
-	mpz_compare,	/*tp_compare*/
-	mpz_repr,	/*tp_repr*/
-        &mpz_as_number, /*tp_as_number*/
+	(destructor)mpz_dealloc, /*tp_dealloc*/
+	0,			/*tp_print*/
+	(getattrfunc)mpz_getattr, /*tp_getattr*/
+	0,			/*tp_setattr*/
+	(cmpfunc)mpz_compare,	/*tp_compare*/
+	(reprfunc)mpz_repr,	/*tp_repr*/
+        &mpz_as_number, 	/*tp_as_number*/
 };
 
 /* List of functions exported by this module */

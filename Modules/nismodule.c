@@ -57,6 +57,8 @@ nis_mapname (map)
 	return map;
 }
 
+typedef int (*foreachfunc) PROTO((int, char *, int, char *, int, char *));
+
 static int
 nis_foreach (instatus, inkey, inkeylen, inval, invallen, indata)
 	int instatus;
@@ -134,7 +136,7 @@ nis_cat (self, args)
 	cat = newdictobject ();
 	if (cat == NULL)
 		return NULL;
-	cb.foreach = nis_foreach;
+	cb.foreach = (foreachfunc)nis_foreach;
 	cb.data = (char *)cat;
 	BGN_SAVE
 	map = nis_mapname (map);
