@@ -8,7 +8,9 @@
 # Options:
 # -s directory: alternative source directory (default derived from $0)
 # -c file:      alternative config.c template (default $srcdir/config.c.in)
+# -c -:         don't write config.c
 # -m file:      alternative Makefile template (default ./Makefile.pre)
+# -m -:         don't write Makefile
 #
 # Remaining arguments are one or more Setup files (default ./Setup).
 # Setup files after a -n option are used for their variables, modules
@@ -137,14 +139,20 @@ sed -e 's/[ 	]*#.*//' -e '/^[ 	]*$/d' |
 		INITBITS="${INITBITS}	{\"$mod\", init$mod},$NL"
 	done
 
-	sed -e "
+	case $config in
+	-)  ;;
+	*)  sed -e "
 		1i$NL/* Generated automatically from $config by makesetup. */
 		/MARKER 1/i$NL$EXTDECLS
 		/MARKER 2/i$NL$INITBITS
 
 		" $config >config.c
+	    ;;
+	esac
 
-	sed -e "
+	case $makepre in
+	-)  ;;
+	*)  sed -e "
 		1i$NL# Generated automatically from $makepre by makesetup.
 		s%@MODOBJS@%$OBJS%
 		s%@MODLIBS@%$LIBS%
@@ -152,5 +160,7 @@ sed -e 's/[ 	]*#.*//' -e '/^[ 	]*$/d' |
 		/Definitions added by makesetup/a$NL$NL$DEFS
 
 		" $makepre >Makefile
+	    ;;
+	esac
 
 )
