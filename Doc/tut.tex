@@ -2647,6 +2647,25 @@ to a more modest approach.  In this chapter I will briefly list the
 most important improvements to the language and how you can use them
 to your benefit.
 
+\section{The Last Printed Expression}
+
+In interactive mode, the last printed expression is assigned to the
+variable \code\_\.  This means that when you are using Python as a
+desk calculator, it is somewhat easier to continue calculations, for
+example:
+
+\begin{verbatim}
+        >>> tax = 17.5 / 100
+        >>> price = 3.50
+        >>> price * tax
+        0.6125
+        >>> price + _
+        4.1125
+        >>> round(_, 2)
+        4.11
+        >>> 
+\end{verbatim}
+
 \section{String Literals}
 
 \subsection{Double Quotes}
