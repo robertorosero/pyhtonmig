@@ -219,7 +219,7 @@ continuation lines, then `DocTest` will raise a ValueError:
     Traceback (most recent call last):
     ValueError: line 2 of the docstring for some_test has inconsistent leading whitespace: '    ...          2)'
 
-If there's no blnak space after a PS1 prompt ('>>>'), then `DocTest`
+If there's no blank space after a PS1 prompt ('>>>'), then `DocTest`
 will raise a ValueError:
 
     >>> docstring = '>>>print 1\n1'
@@ -372,7 +372,7 @@ will only be generated for it once:
     ...     g = f # define an alias for f.
 
     >>> finder = doctest.DocTestFinder()
-    >>> tests = finder.find(TwoNames)
+    >>> tests = finder.find(TwoNames, ignore_imports=False)
     >>> tests.sort()
     >>> print len(tests)
     2
@@ -909,6 +909,11 @@ Multiple flags can be toggled by a single option directive:
 """
 
 def test_testsource(): r"""
+Unit tests for `testsource()`.
+
+The testsource() function takes a module and a name, finds the (first)
+test with that name in that module, and converts it to an
+
     >>> import test.test_doctest
     >>> name = 'test.test_doctest.sample_func'
     >>> print doctest.testsource(test.test_doctest, name)
