@@ -497,7 +497,7 @@ PyRun_InteractiveLoopFlags(FILE *fp, char *filename, PyCompilerFlags *flags)
 
 	if (flags == NULL) {
 		flags = &local_flags;
-		local_flags.cf_nested_scopes = 0;
+		local_flags.cf_flags = 0;
 	}
 	v = PySys_GetObject("ps1");
 	if (v == NULL) {
@@ -536,6 +536,7 @@ PyRun_InteractiveOneFlags(FILE *fp, char *filename, PyCompilerFlags *flags)
 	node *n;
 	perrdetail err;
 	char *ps1 = "", *ps2 = "";
+
 	v = PySys_GetObject("ps1");
 	if (v != NULL) {
 		v = PyObject_Str(v);
@@ -552,8 +553,11 @@ PyRun_InteractiveOneFlags(FILE *fp, char *filename, PyCompilerFlags *flags)
 		else if (PyString_Check(w))
 			ps2 = PyString_AsString(w);
 	}
-	n = PyParser_ParseFile(fp, filename, &_PyParser_Grammar,
-			       Py_single_input, ps1, ps2, &err);
+	n = PyParser_ParseFileFlags(fp, filename, &_PyParser_Grammar,
+			    	    Py_single_input, ps1, ps2, &err,
+			    	    (flags &&
+			    	     flags->cf_flags & PyCF_GENERATORS) ?
+			    	    	PyPARSE_YIELD_IS_KEYWORD : 0);
 	Py_XDECREF(v);
 	Py_XDECREF(w);
 	if (n == NULL) {
@@ -1004,7 +1008,10 @@ PyObject *
 PyRun_StringFlags(char *str, int start, PyObject *globals, PyObject *locals,
 		  PyCompilerFlags *flags)
 {
-	return run_err_node(PyParser_SimpleParseString(str, start),
+	return run_err_node(PyParser_SimpleParseStringFlags(
+				str, start,
+				(flags && flags->cf_flags & PyCF_GENERATORS) ?
+				PyPARSE_YIELD_IS_KEYWORD : 0),
 			    "<string>", globals, locals, flags);
 }
 
@@ -1020,7 +1027,9 @@ PyObject *
 PyRun_FileExFlags(FILE *fp, char *filename, int start, PyObject *globals,
 		  PyObject *locals, int closeit, PyCompilerFlags *flags)
 {
-	node *n = PyParser_SimpleParseFile(fp, filename, start);
+	node *n = PyParser_SimpleParseFileFlags(fp, filename, start,
+			(flags && flags->cf_flags & PyCF_GENERATORS) ?
+				PyPARSE_YIELD_IS_KEYWORD : 0);
 	if (closeit)
 		fclose(fp);
 	return run_err_node(n, filename, globals, locals, flags);
@@ -1078,10 +1087,14 @@ run_pyc_file(FILE *fp, char *filename, PyObject *globals, PyObject *locals,
 	v = PyEval_EvalCode(co, globals, locals);
 	if (v && flags) {
 		if (co->co_flags & CO_NESTED)
-			flags->cf_nested_scopes = 1;
+			flags->cf_flags |= PyCF_NESTED_SCOPES;
+		if (co->co_flags & CO_GENERATOR_ALLOWED)
+			flags->cf_flags |= PyCF_GENERATORS;
 #if 0
 		fprintf(stderr, "run_pyc_file: nested_scopes: %d\n",
-			flags->cf_nested_scopes);
+			flags->cf_flags & PyCF_NESTED_SCOPES);
+		fprintf(stderr, "run_pyc_file: generators: %d\n",
+			flags->cf_flags & PyCF_GENERATORS);
 #endif
 	}
 	Py_DECREF(co);
@@ -1100,7 +1113,9 @@ Py_CompileStringFlags(char *str, char *filename, int start,
 {
 	node *n;
 	PyCodeObject *co;
-	n = PyParser_SimpleParseString(str, start);
+	n = PyParser_SimpleParseStringFlags(str, start,
+		(flags && flags->cf_flags & PyCF_GENERATORS) ?
+			PyPARSE_YIELD_IS_KEYWORD : 0);
 	if (n == NULL)
 		return NULL;
 	co = PyNode_CompileFlags(n, filename, flags);
@@ -1124,28 +1139,41 @@ Py_SymtableString(char *str, char *filename, int start)
 /* Simplified interface to parsefile -- return node or set exception */
 
 node *
-PyParser_SimpleParseFile(FILE *fp, char *filename, int start)
+PyParser_SimpleParseFileFlags(FILE *fp, char *filename, int start, int flags)
 {
 	node *n;
 	perrdetail err;
-	n = PyParser_ParseFile(fp, filename, &_PyParser_Grammar, start,
-				(char *)0, (char *)0, &err);
+	n = PyParser_ParseFileFlags(fp, filename, &_PyParser_Grammar, start,
+					(char *)0, (char *)0, &err, flags);
 	if (n == NULL)
 		err_input(&err);
 	return n;
 }
 
+node *
+PyParser_SimpleParseFile(FILE *fp, char *filename, int start)
+{
+	return PyParser_SimpleParseFileFlags(fp, filename, start, 0);
+}
+
 /* Simplified interface to parsestring -- return node or set exception */
+
+node *
+PyParser_SimpleParseStringFlags(char *str, int start, int flags)
+{
+	node *n;
+	perrdetail err;
+	n = PyParser_ParseStringFlags(str, &_PyParser_Grammar, start, &err,
+				      flags);
+	if (n == NULL)
+		err_input(&err);
+	return n;
+}
 
 node *
 PyParser_SimpleParseString(char *str, int start)
 {
-	node *n;
-	perrdetail err;
-	n = PyParser_ParseString(str, &_PyParser_Grammar, start, &err);
-	if (n == NULL)
-		err_input(&err);
-	return n;
+	return PyParser_SimpleParseStringFlags(str, start, 0);
 }
 
 /* Set the error appropriate to the given input error code (see errcode.h) */
