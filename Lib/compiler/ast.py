@@ -285,17 +285,17 @@ class Module(Node):
 class Expression(Node):
     # Expression is an artifical node class to support "eval"
     nodes["expression"] = "Expression"
-    def __init__(self, expr):
-        self.expr = expr
+    def __init__(self, node):
+        self.node = node
 
     def getChildren(self):
-        return self.expr,
+        return self.node,
 
     def getChildNodes(self):
-        return self.expr,
+        return self.node,
 
     def __repr__(self):
-        return "Expression(%s)" % (repr(self.expr))
+        return "Expression(%s)" % (repr(self.node))
 
 class UnaryAdd(Node):
     nodes["unaryadd"] = "UnaryAdd"

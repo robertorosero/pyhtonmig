@@ -356,7 +356,7 @@ class CodeGenerator:
         self.set_lineno(node)
         self.scopes = self.parseSymbols(node)
         self.scope = self.scopes[node]
-        self.visit(node.expr)
+        self.visit(node.node)
         self.emit('RETURN_VALUE')
 
     def visitFunction(self, node):
@@ -1166,7 +1166,7 @@ class ExpressionCodeGenerator(NestedScopeMixin, CodeGenerator):
     def __init__(self, tree):
         self.graph = pyassem.PyFlowGraph("<expression>", tree.filename)
         self.__super_init()
-        walk(ast.Expression(tree), self)
+        walk(tree, self)
 
     def get_module(self):
         return self
