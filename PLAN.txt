@@ -57,7 +57,10 @@ It should be an option (maybe a different metaclass, maybe a flag) to
 *not* merge __dict__ with all the bases, but instead search the
 __dict__ (or __introduced__?) of all bases in __mro__ order.  (This is
 needed anyway to unify classes completely.)  *** Partly done.
-Inheritance of slots from bases is still icky.  ***
+Inheritance of slots from bases is still icky: (1) MRO is not always
+respected when inheriting slots; (2) dynamic classes can't add slot
+implementations in Python after creation (e.g., setting C.__hash__
+doesn't set the tp_hash slot).  ***
 
 Universal base class (object).  How can we make the object class
 subclassable and define simple default methods for everything without
