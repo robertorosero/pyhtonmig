@@ -313,6 +313,7 @@ MT = type(sys)
 
 def pymods():
     if verbose: print "Testing Python subclass of module..."
+    global log
     log = []
     class MM(MT):
         def __getattr__(self, name):
