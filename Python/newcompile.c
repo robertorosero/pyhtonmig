@@ -1252,12 +1252,18 @@ compiler_function(struct compiler *c, stmt_ty s)
             return 0;
 
         /* unpack nested arguments */
-        for (i = 0; i < asdl_seq_LEN(args->args); i++) {
+	n = asdl_seq_LEN(args->args);
+        for (i = 0; i < n; i++) {
             expr_ty arg = asdl_seq_GET(args->args, i);
             if (arg->kind == Tuple_kind) {
                 PyObject *id = PyString_FromFormat(".%d", i);
-                if (id == NULL || !compiler_nameop(c, id, Load))
-                    return 0;
+                if (id == NULL)
+			return 0;
+		if (!compiler_nameop(c, id, Load)) {
+			Py_DECREF(id);
+			return 0;
+		}
+		Py_DECREF(id);
                 VISIT(c, expr, arg);
             }
         }
