@@ -7,9 +7,61 @@ extern "C" {
 
 /* Dictionary object type -- mapping from hashable object to object */
 
+/*
+There are three kinds of slots in the table:
+
+1. Unused.  me_key == me_value == NULL
+   Does not hold an active (key, value) pair now and never did.  Unused can
+   transition to Active upon key insertion.  This is the only case in which
+   me_key is NULL, and is each slot's initial state.
+
+2. Active.  me_key != NULL and me_key != dummy and me_value != NULL
+   Holds an active (key, value) pair.  Active can transition to Dummy upon
+   key deletion.  This is the only case in which me_value != NULL.
+
+3. Dummy.  me_key == dummy and me_value == NULL
+   Previously held an active (key, value) pair, but that was deleted and an
+   active pair has not yet overwritten the slot.  Dummy can transition to
+   Active upon key insertion.  Dummy slots cannot be made Unused again
+   (cannot have me_key set to NULL), else the probe sequence in case of
+   collision would have no way to know they were once active.
+
+Note: .popitem() abuses the me_hash field of an Unused or Dummy slot to
+hold a search finger.  The me_hash field of Unused or Dummy slots has no
+meaning otherwise.
+*/
+typedef struct {
+	long me_hash;      /* cached hash code of me_key */
+	PyObject *me_key;
+	PyObject *me_value;
+#ifdef USE_CACHE_ALIGNED
+	long	aligner;
+#endif
+} PyDictEntry;
+
+/*
+To ensure the lookup algorithm terminates, there must be at least one Unused
+slot (NULL key) in the table.
+The value ma_fill is the number of non-NULL keys (sum of Active and Dummy);
+ma_used is the number of non-NULL, non-dummy keys (== the number of non-NULL
+values == the number of Active items).
+To avoid slowing down lookups on a near-full table, we resize the table when
+it's two-thirds full.
+*/
+typedef struct _dictobject PyDictObject;
+struct _dictobject {
+	PyObject_HEAD
+	int ma_fill;  /* # Active + # Dummy */
+	int ma_used;  /* # Active */
+	int ma_size;  /* total # slots in ma_table */
+	int ma_poly;  /* appopriate entry from polys vector */
+	PyDictEntry *ma_table;
+	PyDictEntry *(*ma_lookup)(PyDictObject *mp, PyObject *key, long hash);
+};
+
 extern DL_IMPORT(PyTypeObject) PyDict_Type;
 
-#define PyDict_Check(op) ((op)->ob_type == &PyDict_Type)
+#define PyDict_Check(op) PyObject_TypeCheck(op, &PyDict_Type)
 
 extern DL_IMPORT(PyObject *) PyDict_New(void);
 extern DL_IMPORT(PyObject *) PyDict_GetItem(PyObject *mp, PyObject *key);
