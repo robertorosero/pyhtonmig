@@ -27,7 +27,7 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #include "allobjects.h"
 #include "modsupport.h"
 
-#ifdef __STDC__
+#ifdef HAVE_LIMITS_H
 #include <limits.h>
 #endif
 
@@ -264,19 +264,136 @@ int_sub(v, w)
 	return newintobject(x);
 }
 
+/*
+Integer overflow checking used to be done using a double, but on 64
+bit machines (where both long and double are 64 bit) this fails.  John
+Tromp suggests the following algorithm:
+
+   To detect multiplication overflow on a * b, where a and b are 64-bit
+   positive longs, we consider the positions of the highest 1-bits in a
+   and b. Let these be da and db.  In other words 2^da <= a < 2^{da+1}
+   and similar for b.  Then if da+db >= 63 you definately have overflow.
+   If da+db < 62 you definately have no overflow.  If da+db = 62 then you
+   have overflow if and only if a * b < 0.
+
+   In the general case, you will need to first extract the signs of a and
+   b and take their absolute value, then you can do the above.  The
+   simplest and slowest method of finding da and db is to loop through
+   all bit positions starting from the most significant bit.  Much faster
+   is doing a binary search. You can further optimize this by alternating
+   steps of the binary searches on a and b, and stopping as soon as you
+   have sufficient information on da+db.  For instance, if a has a 1 in
+   its upper half, and so does b, then da >= 32 and db >= 32 so
+   definately da + db >= 63.
+
+I only do bisection for the first two steps, then I resort to a linear
+search for da and db (I can't write it out all the way because the
+number of steps depends on LONG_BIT).
+*/
+
 static object *
 int_mul(v, w)
 	intobject *v;
 	intobject *w;
 {
-	register long a, b;
-	double x;
+	long a, b, ta, tb;
+	int da, db;
+
 	a = v->ob_ival;
 	b = w->ob_ival;
-	x = (double)a * (double)b;
-	if (x > LONG_MAX || x < (double) (long) (LONG_MIN))
-		return err_ovf("integer multiplication");
-	return newintobject(a * b);
+
+	/* Quick test for common case: two small positive ints */
+	if ((a >> (LONG_BIT/2)) == 0 && (b >> (LONG_BIT/2)) == 0)
+		goto ok;
+
+	/* Arrange that a >= b >= 0 */
+	if (a < 0) {
+		a = -a;
+		if (a < 0) {
+			/* Largest negative */
+			if (b == 0 || b == 1)
+				goto ok;
+			else
+				goto bad;
+		}
+	}
+	if (b < 0) {
+		b = -b;
+		if (b < 0) {
+			/* Largest negative */
+			if (a == 0 || a == 1)
+				goto ok;
+			else
+				goto bad;
+		}
+	}
+	if (a < b) {
+		long tmp = a;
+		a = b;
+		b = tmp;
+	}
+
+	/* Some more quick checks */
+	if ((a >> (LONG_BIT/2)) == 0)
+		goto ok;
+	if ((b >> (LONG_BIT/2)) != 0)
+		goto bad;
+
+	/* Now da >= 32, db < 32 (for 64-bit arith) */
+	if ((a >> (LONG_BIT*3/4)) == 0) {
+		/* Now 32 <= da < 48 */
+		if ((b >> (LONG_BIT/4)) == 0)
+			goto ok; /* db < 16 */
+		/* Now 16 <= db < 32 */
+		da = LONG_BIT/2;
+		db = LONG_BIT/4;
+	}
+	else {
+		/* Now 48 <= da < 63 */
+		if (b >> (LONG_BIT/4) != 0)
+			goto bad; /* db >= 16 */
+		/* Now 0 <= db < 16 */
+		da = LONG_BIT*3/4;
+		db = 0;
+	}
+
+	/* Slow code looking for da and db */
+	ta = a >> da;
+	tb = b >> db;
+	while (ta > 1 && tb > 1) {
+		da++;
+		db++;
+		ta >>= 1;
+		tb >>= 1;
+		if (da+db >= LONG_BIT-1)
+			goto bad;
+	}
+	while (ta > 1) {
+		da++;
+		ta >>= 1;
+		if (da+db >= LONG_BIT-1)
+			goto bad;
+	}
+	while (tb > 1) {
+		db++;
+		tb >>= 1;
+		if (da+db >= LONG_BIT-1)
+			goto bad;
+	}
+	if (da+db < LONG_BIT-2)
+		goto ok;
+	if (da+db != LONG_BIT-2) {
+		fprintf(stderr,
+			"int_mul ovf check assertion failed\n");
+		abort();
+	}
+	if (a*b >= 0)
+		goto ok;
+ bad:
+	return err_ovf("integer multiplication");
+
+ ok:
+	return newintobject(v->ob_ival * w->ob_ival);
 }
 
 static int
