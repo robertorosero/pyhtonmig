@@ -3,6 +3,8 @@ For 1.0.1:
 	- info tar file
 	- Extensions
 
+- document os.exec*
+
 - document new modules (builtin as well as Lib)
 
 - restart CVS tree
