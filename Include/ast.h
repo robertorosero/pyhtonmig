@@ -4,7 +4,7 @@
 extern "C" {
 #endif
 
-extern DL_IMPORT(mod_ty) PyAST_FromNode(node *);
+extern DL_IMPORT(mod_ty) PyAST_FromNode(const node *);
 
 #ifdef __cplusplus
 }
