@@ -128,6 +128,7 @@ struct compiler_unit {
 	int u_nfblocks;
 	struct fblockinfo u_fblock[CO_MAXBLOCKS];
 
+	int u_firstlineno; /* the first lineno of the block */
 	int u_lineno;      /* the lineno for the current stmt */
 	bool u_lineno_set; /* boolean to indicate whether instr
 			      has been generated with current lineno */
@@ -156,10 +157,9 @@ struct assembler {
 	int a_lnotab_off;      /* offset into lnotab */
 	int a_lineno;          /* last lineno of emitted instruction */
 	int a_lineno_off;      /* bytecode offset of last lineno */
-	int a_firstlineno;     /* first line number in code */
 };
 
-static int compiler_enter_scope(struct compiler *, identifier, void *);
+static int compiler_enter_scope(struct compiler *, identifier, void *, int);
 static void compiler_free(struct compiler *);
 static int compiler_new_block(struct compiler *);
 static int compiler_next_instr(struct compiler *, int);
@@ -418,7 +418,8 @@ compiler_display_symbols(PyObject *name, PyObject *symbols)
 }
 
 static int
-compiler_enter_scope(struct compiler *c, identifier name, void *key)
+compiler_enter_scope(struct compiler *c, identifier name, void *key,
+		     int lineno)
 {
 	struct compiler_unit *u;
 
@@ -443,6 +444,7 @@ compiler_enter_scope(struct compiler *c, identifier name, void *key)
 		return 0;
 	u->u_tmpname = 0;
 	u->u_nfblocks = 0;
+	u->u_firstlineno = lineno;
 	u->u_lineno = 0;
 	u->u_lineno_set = false;
 	memset(u->u_blocks, 0, sizeof(struct basicblock *) * DEFAULT_BLOCKS);
@@ -1116,7 +1118,7 @@ compiler_mod(struct compiler *c, mod_ty mod)
 		if (!module)
 			return NULL;
 	}
-	if (!compiler_enter_scope(c, module, mod))
+	if (!compiler_enter_scope(c, module, mod, 1))
 		return NULL;
 	switch (mod->kind) {
 	case Module_kind: 
@@ -1241,7 +1243,8 @@ compiler_function(struct compiler *c, stmt_ty s)
 
 	if (args->defaults)
 		VISIT_SEQ(c, expr, args->defaults);
-	if (!compiler_enter_scope(c, s->v.FunctionDef.name, (void *)s))
+	if (!compiler_enter_scope(c, s->v.FunctionDef.name, (void *)s,
+				  s->lineno))
 		return 0;
 
         st = asdl_seq_GET(s->v.FunctionDef.body, 0);
@@ -1300,7 +1303,8 @@ compiler_class(struct compiler *c, stmt_ty s)
 	if (n > 0)
 		VISIT_SEQ(c, expr, s->v.ClassDef.bases);
 	ADDOP_I(c, BUILD_TUPLE, n);
-	if (!compiler_enter_scope(c, s->v.ClassDef.name, (void *)s))
+	if (!compiler_enter_scope(c, s->v.ClassDef.name, (void *)s,
+				  s->lineno))
 		return 0;
         c->u->u_private = s->v.ClassDef.name;
         Py_INCREF(c->u->u_private);
@@ -1350,7 +1354,7 @@ compiler_lambda(struct compiler *c, expr_ty e)
 
 	if (args->defaults)
 		VISIT_SEQ(c, expr, args->defaults);
-	if (!compiler_enter_scope(c, name, (void *)e))
+	if (!compiler_enter_scope(c, name, (void *)e, c->u->u_lineno))
 		return 0;
 	c->u->u_argcount = asdl_seq_LEN(args->args);
 	VISIT(c, expr, e->v.Lambda.body);
@@ -3245,7 +3249,7 @@ makecode(struct compiler *c, struct assembler *a)
 			a->a_bytecode, consts, names, varnames,
 			freevars, cellvars,
 			filename, c->u->u_name,
-			a->a_firstlineno,
+			c->u->u_firstlineno,
 			a->a_lnotab);
  error:
 	Py_XDECREF(consts);
@@ -3282,7 +3286,6 @@ assemble(struct compiler *c, int addNone)
 	if (!assemble_jump_offsets(&a, c))
 		goto error;
 
-	a.a_firstlineno = -1;
 	/* Emit code in reverse postorder from dfs. */
 	for (i = a.a_nblocks - 1; i >= 0; i--) {
 		struct basicblock *b = c->u->u_blocks[a.a_postorder[i]];
@@ -3290,14 +3293,9 @@ assemble(struct compiler *c, int addNone)
                         "\nblock %d: order=%d used=%d alloc=%d next=%d\n",
 			i, a.a_postorder[i], b->b_iused, b->b_ialloc,
 			b->b_next);
-		for (j = 0; j < b->b_iused; j++) {
-			if (a.a_firstlineno < 0) {
-				a.a_firstlineno = b->b_instr[0].i_lineno;
-				a.a_lineno = a.a_firstlineno;
-			}
+		for (j = 0; j < b->b_iused; j++)
 			if (!assemble_emit(&a, &b->b_instr[j]))
 				goto error;
-		}
 	}
 	fprintf(stderr, "\n");
 
