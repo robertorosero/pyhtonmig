@@ -463,7 +463,7 @@ fatal(msg)
 int threads_started = 0; /* Set by threadmodule.c and maybe others */
 #endif
 
-static void
+void
 cleanup()
 {
 	object *exitfunc = sysget("exitfunc");
@@ -559,9 +559,11 @@ initsigs()
 #ifdef SIGHUP
 	if (signal(SIGHUP, SIG_IGN) != SIG_IGN)
 		signal(SIGHUP, sighandler);
-#endif
+#endif              
+#ifdef SIGTERM
 	if (signal(SIGTERM, SIG_IGN) != SIG_IGN)
 		signal(SIGTERM, sighandler);
+#endif
 #endif /* HAVE_SIGNAL_H */
 }
 

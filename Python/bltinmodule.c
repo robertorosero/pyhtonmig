@@ -1291,8 +1291,8 @@ filterstring(func, strobj)
 
 	if (func == None) {
 		/* No character is ever false -- share input string */
-		INCREF(result);
-		return result;
+		INCREF(strobj);
+		return strobj;
 	}
 	if ((result = newsizedstringobject(NULL, len)) == NULL)
 		return NULL;

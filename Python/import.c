@@ -50,29 +50,28 @@ extern long getmtime(); /* Defined in posixmodule.c */
 
 #ifdef WITH_SGI_DL
 #define USE_DL
-#undef HAVE_DLFCN_H
 #endif
 
 #ifdef WITH_DL_DLD
 #define USE_DL
-#undef HAVE_DLFCN_H
 #endif
 
-#ifdef HAVE_DLFCN_H
+#if !defined(USE_DL) && defined(HAVE_DLFCN_H) && defined(HAVE_DLOPEN)
+#define USE_SHLIB
 #define USE_DL
 #endif
 
 #ifdef USE_DL
 
-#ifdef HAVE_DLFCN_H
+#ifdef USE_SHLIB
 #include <dlfcn.h>
 typedef void (*dl_funcptr)();
-#ifndef RTLD_NOW
-#define RTLD_NOW 2
+#ifndef RTLD_LAZY
+#define RTLD_LAZY 1
 #endif
-#else /* !HAVE_DLFCN_H */
+#else /* !USE_SHLIB */
 #include "dl.h"
-#endif /* !HAVE_DLFCN_H */
+#endif /* !USE_SHLIB */
 
 extern char *getprogramname();
 
@@ -128,11 +127,11 @@ static struct filedescr {
 	enum filetype type;
 } filetab[] = {
 #ifdef USE_DL
-#ifdef HAVE_DLFCN_H
+#ifdef USE_SHLIB
 	{"module.so", "rb", C_EXTENSION},
-#else /* !HAVE_DLFCN_H */
+#else /* !USE_SHLIB */
 	{"module.o", "rb", C_EXTENSION},
-#endif /* !HAVE_DLFCN_H */
+#endif /* !USE_SHLIB */
 #endif /* USE_DL */
 	{".py", "r", PY_SOURCE},
 	{".pyc", "rb", PY_COMPILED},
@@ -304,20 +303,27 @@ get_module(m, name, m_ret)
 		dl_funcptr p;
 		fclose(fp);
 		sprintf(funcname, "init%s", name);
-#ifdef HAVE_DLFCN_H
+#ifdef USE_SHLIB
 		{
+#ifdef RTLD_NOW
 			/* RTLD_NOW: resolve externals now
 			   (i.e. core dump now if some are missing) */
 			void *handle = dlopen(namebuf, RTLD_NOW);
+#else
+			void *handle;
+			printf("dlopen(\"%s\", %d);\n",
+			       namebuf, RTLD_LAZY);
+			handle = dlopen(namebuf, RTLD_LAZY);
+#endif
 			if (handle == NULL) {
 				err_setstr(ImportError, dlerror());
 				return NULL;
 			}
 			p = (dl_funcptr) dlsym(handle, funcname);
 		}
-#else /* !HAVE_DLFCN_H */
+#else /* !USE_SHLIB */
 		p =  dl_loadmod(getprogramname(), namebuf, funcname);
-#endif /* !HAVE_DLFCN_H */
+#endif /* !USE_SHLIB */
 		if (p == NULL) {
 			err_setstr(ImportError,
 			   "dynamic module does not define init function");
