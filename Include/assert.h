@@ -28,7 +28,13 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 ******************************************************************/
 
+#ifdef MPW /* This is for MPW's File command */
+
+#define assert(e) { if (!(e)) { printf("### Python: Assertion failed:\n\
+    File %s; Line %d\n", __FILE__, __LINE__); abort(); } }
+#else
 #define assert(e) { if (!(e)) { printf("Assertion failed\n"); abort(); } }
+#endif
 
 #ifdef __cplusplus
 }
