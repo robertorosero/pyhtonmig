@@ -17,6 +17,8 @@ handle printing of errors in lines containing multiline strings
 
 ======================================================================
 
+- ought to use features from autoconf 1.8
+
 (*) errors in __repr__() are handled wrong when called from format
 
 - long(0x80000000) has wrong value!

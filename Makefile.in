@@ -196,7 +196,7 @@ clean:		localclean
 		done
 
 localclobber:	localclean
-		-rm -f tags TAGS config.status
+		-rm -f tags TAGS python
 
 clobber:	localclobber
 		-for i in $(SUBDIRS); do \
@@ -210,7 +210,7 @@ clobber:	localclobber
 # Make things extra clean, before making a distribution
 distclean:	clobber
 		-$(MAKE) SUBDIRS="$(SUBDIRSTOO)" clobber
-		-rm -f config.h Makefile
+		-rm -f config.status config.h Makefile
 		-for i in $(SUBDIRS) $(SUBDIRSTOO); do \
 			 for f in $$i/*.in; do \
 				f=`basename "$$f" .in`; \

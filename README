@@ -1,8 +1,8 @@
-Python release 1.0.1
+Python release 1.0.2
 ====================
 
-==> This is patch number 1 to Python 1.0, bumping its version string
-   to 1.0.0.  It consists mostly of portability fixes.  See the file
+==> This is patch number 2 to Python 1.0, bumping its version string
+   to 1.0.2.  It consists mostly of portability fixes.  See the file
    Misc/NEWS for a description of what's new in this patch (as well as
    what's new in 1.0).
 
@@ -281,7 +281,7 @@ again.  You don't need to do "make clean"; you do need to run "make
 Makefile" in the Modules subdirectory (or just run "make" at the
 toplevel).
 
-3.13. Q. Other trouble building Python 1.0.1 on platform X.
+3.13. Q. Other trouble building Python 1.0.2 on platform X.
 
 A. Please email the details to <guido@cwi.nl> and I'll look into it.
 
@@ -341,7 +341,7 @@ Ftp access
 
 The latest Python source distribution can be ftp'ed from site
 ftp.cwi.nl (IP address 192.16.184.180), directory /pub/python, file
-python<version>.tar.Z.  Curerntly <version> is 1.0.0.  You can also
+python<version>.tar.Z.  Curerntly <version> is 1.0.2.  You can also
 find PostScript of the main Python documentation there, Macintosh and
 PC binaries, and the latest STDWIN source distribution (in directory
 /pub/stdwin).  Mirror sites are gatekeeper.dec.com
