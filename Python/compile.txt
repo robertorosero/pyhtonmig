@@ -1,0 +1,106 @@
+Developer Notes for Python Compiler
+===================================
+
+Parsing
+-------
+
+Abstract Syntax Tree (AST)
+--------------------------
+
+The abstract syntax tree (AST) is a high-level description of the
+program structure with the syntactic details of the source text
+removed.  It is specified using the Zephyr Abstract Syntax Definition
+Language (ASDL) [Wang97]_.
+
+The Python definition is found in the file ``Parser/Python.asdl``.
+
+The definition describes the structure of statements, expressions, and
+several specialized types, like list comprehensions and exception
+handlers.  Most definitions in the AST correspond to a particular
+source construct, like an if statement or an attribute lookup.  The
+definition is independent of its realization in any particular
+programming language.
+
+The AST has concrete representations in Python and C.  There is also
+representation as a byte stream, so that AST objects can be passed
+between Python and C.  (ASDL calls this format the pickle format, but
+I avoid that term to avoid confusion with Python pickles.)  Each
+programming language has a generic representation for ASDL and a tool
+to generate a code for a specific abstract syntax.
+
+The following fragment of the Python abstract syntax demonstrates the
+approach.
+
+::
+
+  module Python
+  {
+	stmt = FunctionDef(identifier name, arguments args, stmt* body)
+	      | Return(expr? value) | Yield(expr value)
+	      attributes (int lineno)
+  }
+
+The preceding example describes three different kinds of statements --
+a function definition and return and yield statement.  The function
+definition has three arguments -- its name, its argument list, and
+zero or more statements that make up its body.  The return statement
+has an optional expression that is the return value.  The yield
+statement requires an expression.
+
+The statement definitions above generate the following C structure
+type.
+
+::
+
+  typedef struct _stmt *stmt_ty;
+
+  struct _stmt {
+        enum { FunctionDef_kind=1, Return_kind=2, Yield_kind=3 } kind;
+        union {
+                struct {
+                        identifier name;
+                        arguments_ty args;
+                        asdl_seq *body;
+                } FunctionDef;
+                
+                struct {
+                        expr_ty value;
+                } Return;
+                
+                struct {
+                        expr_ty value;
+                } Yield;
+        } v;
+        int lineno;
+   }
+
+It also generates a series of constructor functions that generate a
+``stmt_ty`` with the appropriate initialization.  The ``kind`` field
+specifies which component of the union is initialized.  The
+``FunctionDef`` C function sets ``kind`` to ``FunctionDef_kind`` and
+initializes the ``name``, ``args``, and ``body`` fields.
+
+The parser generates a concrete syntax tree represented by a ``node
+*`` defined in ``Include/node.h``.  The abstract syntax is generated
+from the concrete syntax in ``Python/ast.c`` using the function::
+
+    mod_ty PyAST_FromNode(const node *n);
+
+Code Generation and Basic Blocks
+--------------------------------
+
+XXX Describe the structure of the code generator, the types involved,
+and the helper functions and macros.
+
+Code Objects
+------------
+
+XXX Describe Python code objects.
+
+.. [Wang97]  Daniel C. Wang, Andrew W. Appel, Jeff L. Korn, and Chris
+   S. Serra.  `The Zephyr Abstract Syntax Description Language.`_
+   In Proceedings of the Conference on Domain-Specific Languages, pp.
+   213--227, 1997.
+
+.. _The Zephyr Abstract Syntax Description Language.:
+   http://www.cs.princeton.edu/~danwang/Papers/dsl97/dsl97-abstract.html.
