@@ -1,5 +1,5 @@
 #!/bin/sh
-# From configure.in Revision: 1.2.4.13 
+# From configure.in Revision: 1.2.4.14 
 #!/bin/sh
 # Guess values for system-dependent variables and create Makefiles.
 # Generated automatically using autoconf.
@@ -146,6 +146,9 @@ then
   echo "	chose installation directory prefix ${prefix}"
 fi
 
+# Don't suppress compiler output when --verbose is specified
+test -n "$verbose" && compile=`echo "$compile" | sed "s|>/dev/null 2>&1||"`
+test -n "$verbose" && echo "	compile='$compile'"
 
 # checks for alternative programs
 if test -z "$CC"; then

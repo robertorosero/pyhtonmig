@@ -3,6 +3,9 @@ AC_REVISION($Revision$)dnl
 AC_INIT(Include/object.h)
 AC_PREFIX(python)
 AC_CONFIG_HEADER(config.h)dnl
+# Don't suppress compiler output when --verbose is specified
+test -n "$verbose" && compile=`echo "$compile" | sed "s|>/dev/null 2>&1||"`
+test -n "$verbose" && echo "	compile='$compile'"
 
 # checks for alternative programs
 AC_PROG_CC
