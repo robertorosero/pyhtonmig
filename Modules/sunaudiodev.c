@@ -28,6 +28,10 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #include "modsupport.h"
 #include "structmember.h"
 
+#ifdef HAVE_SYS_AUDIOIO_H
+#define SOLARIS
+#endif
+
 #include <stropts.h>
 #include <sys/ioctl.h>
 #ifdef SOLARIS
