@@ -103,7 +103,7 @@ class_getattr(op, name)
 	register char *name;
 {
 	register object *v;
-	object *class;
+	classobject *class;
 	if (strcmp(name, "__dict__") == 0) {
 		INCREF(op->cl_dict);
 		return op->cl_dict;
@@ -235,7 +235,7 @@ addaccess(class, inst)
 	
 	n = gettuplesize(class->cl_bases);
 	for (i = 0; i < n; i++) {
-		if (addaccess(gettupleitem(class->cl_bases, i), inst) < 0)
+		if (addaccess((classobject *)gettupleitem(class->cl_bases, i), inst) < 0)
 			return -1;
 	}
 	
