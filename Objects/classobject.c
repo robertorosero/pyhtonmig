@@ -2022,43 +2022,51 @@ instancemethod_compare(PyMethodObject *a, PyMethodObject *b)
 static PyObject *
 instancemethod_repr(PyMethodObject *a)
 {
-	char buf[240];
-	PyInstanceObject *self = (PyInstanceObject *)(a->im_self);
+	char buffer[240];
+	PyObject *self = a->im_self;
 	PyObject *func = a->im_func;
-	PyClassObject *class = (PyClassObject *)(a->im_class);
-	PyObject *fclassname, *iclassname, *funcname;
-	char *fcname, *icname, *fname;
-	fclassname = class->cl_name;
-	if (PyFunction_Check(func)) {
-		funcname = ((PyFunctionObject *)func)->func_name;
-		Py_INCREF(funcname);
+	PyObject *klass = a->im_class;
+	PyObject *funcname = NULL, *klassname = NULL, *result = NULL;
+	char *sfuncname = "?", *sklassname = "?";
+
+	funcname = PyObject_GetAttrString(func, "__name__");
+	if (funcname == NULL)
+		PyErr_Clear();
+	else if (!PyString_Check(funcname)) {
+		Py_DECREF(funcname);
+		funcname = NULL;
 	}
-	else {
-		funcname = PyObject_GetAttrString(func,"__name__");
-		if (funcname == NULL)
-			PyErr_Clear();
+	else
+		sfuncname = PyString_AS_STRING(funcname);
+	klassname = PyObject_GetAttrString(klass, "__name__");
+	if (klassname == NULL)
+		PyErr_Clear();
+	else if (!PyString_Check(klassname)) {
+		Py_DECREF(klassname);
+		klassname = NULL;
 	}
-	if (funcname != NULL && PyString_Check(funcname))
-		fname = PyString_AS_STRING(funcname);
 	else
-		fname = "?";
-	if (fclassname != NULL && PyString_Check(fclassname))
-		fcname = PyString_AsString(fclassname);
-	else
-		fcname = "?";
+		sklassname = PyString_AS_STRING(klassname);
 	if (self == NULL)
-		sprintf(buf, "<unbound method %.100s.%.100s>", fcname, fname);
+		sprintf(buffer, "<unbound method %.100s.%.100s>",
+			sklassname, sfuncname);
 	else {
-		iclassname = self->in_class->cl_name;
-		if (iclassname != NULL && PyString_Check(iclassname))
-			icname = PyString_AsString(iclassname);
-		else
-			icname = "?";
-		sprintf(buf, "<method %.60s.%.60s of %.60s instance at %p>",
-			fcname, fname, icname, self);
+		PyObject *selfrepr = PyObject_Repr(self);
+		if (selfrepr == NULL)
+			goto fail;
+		if (!PyString_Check(selfrepr)) {
+			Py_DECREF(selfrepr);
+			goto fail;
+		}
+		sprintf(buffer, "<bound method %.60s.%.60s of %.60s>",
+			sklassname, sfuncname, PyString_AS_STRING(selfrepr));
+		Py_DECREF(selfrepr);
 	}
+	result = PyString_FromString(buffer);
+  fail:
 	Py_XDECREF(funcname);
-	return PyString_FromString(buf);
+	Py_XDECREF(klassname);
+	return result;
 }
 
 static long

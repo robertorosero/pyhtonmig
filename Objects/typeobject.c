@@ -53,13 +53,7 @@ type_repr(PyTypeObject *type)
 static PyObject *
 type_call(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
-	char *dummy = NULL;
 	PyObject *obj, *res;
-	char buffer[100];
-
-	sprintf(buffer, ":<type '%.80s'>", type->tp_name);
-	if (!PyArg_ParseTupleAndKeywords(args, kwds, buffer, &dummy))
-		return NULL;
 
 	if (type->tp_construct == NULL) {
 		PyErr_Format(PyExc_TypeError,
@@ -70,7 +64,7 @@ type_call(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	obj = PyObject_New(PyObject, type);
 	if (obj == NULL)
 		return NULL;
-	res = (type->tp_construct)(obj);
+	res = (type->tp_construct)(obj, args, kwds);
 	if (res != obj) {
 		Py_DECREF(obj);
 		if (res == NULL)
@@ -114,9 +108,14 @@ type_getattro(PyTypeObject *type, PyObject *name)
 
 	if (type->tp_flags & Py_TPFLAGS_HAVE_CLASS) {
 		descr = PyDict_GetItem(type->tp_dict, name);
-		if (descr != NULL &&
-		    (f = descr->ob_type->tp_descr_get) != NULL)
-			return (*f)(descr, NULL);
+		if (descr != NULL) {
+			f = descr->ob_type->tp_descr_get;
+			if (f != NULL)
+				return (*f)(descr, NULL);
+			/* Not a descriptor -- a plain value */
+			Py_INCREF(descr);
+			return descr;
+		}
 	}
 
 	PyErr_Format(PyExc_AttributeError,
@@ -125,13 +124,110 @@ type_getattro(PyTypeObject *type, PyObject *name)
 	return NULL;
 }
 
+/* Helpers for subtyping */
+static PyObject *
+subtype_construct(PyObject *self, PyObject *args, PyObject *kwds)
+{
+	PyObject *res;
+
+	if (self == NULL) {
+		PyErr_SetString(PyExc_TypeError,
+				"can't allocate subtype instances");
+		return NULL;
+	}
+	res = self->ob_type->tp_base->tp_construct(self, args, kwds);
+	if (res == self)
+		Py_INCREF(self->ob_type);
+	return res;
+}
+
+static void
+subtype_dealloc(PyObject *self)
+{
+	self->ob_type->tp_base->tp_dealloc(self);
+	Py_DECREF(self->ob_type);
+}
+
+/* TypeType's constructor is called when a type is subclassed */
+static PyObject *
+type_construct(PyTypeObject *type, PyObject *args, PyObject *kwds)
+{
+	PyObject *name, *bases, *dict, *x;
+	PyTypeObject *base;
+	char *dummy = NULL;
+
+	if (type != NULL) {
+		PyErr_SetString(PyExc_TypeError,
+				"can't construct a preallocated type");
+		return NULL;
+	}
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "SOO", &dummy,
+					 &name, &bases, &dict))
+		return NULL;
+	if (!PyTuple_Check(bases) || !PyDict_Check(dict)) {
+		PyErr_SetString(PyExc_TypeError,
+				"usage: TypeType(name, bases, dict) ");
+		return NULL;
+	}
+	if (PyTuple_GET_SIZE(bases) > 1) {
+		PyErr_SetString(PyExc_TypeError,
+				"can't multiple-inherit from types");
+		return NULL;
+	}
+	if (PyTuple_GET_SIZE(bases) < 1) {
+		PyErr_SetString(PyExc_TypeError,
+				"can't create a new type without a base type");
+		return NULL;
+	}
+	base = (PyTypeObject *)PyTuple_GET_ITEM(bases, 0);
+	if (!PyType_Check((PyObject *)base)) {
+		PyErr_SetString(PyExc_TypeError,
+				"base type must be a type");
+		return NULL;
+	}
+	type = PyObject_New(PyTypeObject, &PyType_Type);
+	if (type == NULL)
+		return NULL;
+	memset(((void *)type) + offsetof(PyTypeObject, tp_name), '\0',
+	       sizeof(PyTypeObject) - offsetof(PyTypeObject, tp_name));
+	type->tp_name = PyString_AS_STRING(name);
+	type->tp_flags = Py_TPFLAGS_DEFAULT;
+	Py_INCREF(base);
+	type->tp_base = base;
+	if (base->tp_construct)
+		type->tp_construct = subtype_construct;
+	if (base->tp_dealloc)
+		type->tp_dealloc = subtype_dealloc;
+	if (PyType_InitDict(type) < 0) {
+		Py_DECREF(type);
+		return NULL;
+	}
+	x = PyObject_CallMethod(type->tp_dict, "update", "O", dict);
+	if (x == NULL) {
+		Py_DECREF(type);
+		return NULL;
+	}
+	Py_DECREF(x); /* throw away None */
+	PyDict_SetItemString(type->tp_dict, "__name__", name);
+	return (PyObject *)type;
+}
+
+/* Only for dynamic types, created by type_construct() above */
+static void
+type_dealloc(PyTypeObject *type)
+{
+	Py_XDECREF(type->tp_base);
+	Py_XDECREF(type->tp_dict);
+	PyObject_DEL(type);
+}
+
 PyTypeObject PyType_Type = {
-	PyObject_HEAD_INIT(&PyType_Type)
+	PyObject_HEAD_INIT(&PyTurtle_Type)
 	0,			/* Number of items for varobject */
 	"type",			/* Name of this type */
 	sizeof(PyTypeObject),	/* Basic object size */
 	0,			/* Item size for varobject */
-	0,					/* tp_dealloc */
+	(destructor)type_dealloc,		/* tp_dealloc */
 	0,					/* tp_print */
 	0,			 		/* tp_getattr */
 	0,					/* tp_setattr */
@@ -158,6 +254,75 @@ PyTypeObject PyType_Type = {
 	type_members,				/* tp_members */
 	type_getsets,				/* tp_getset */
 	0,					/* tp_base */
+	0,					/* tp_dict */
+	0,					/* tp_descr_get */
+	0,					/* tp_descr_set */
+	(ternaryfunc)type_construct,		/* tp_construct */
+};
+
+
+/* The "turtle" type is named after the expression "turtles all the way down",
+   a reference to the fact that it is its own type.  We get the progression:
+   x                => {} # for example
+   type(x)          => DictType
+   type(DictType)   => TypeType
+   type(TypeType)   => TurtleType
+   type(TurtleType) => TurtleType
+   type(TurtleType) => TurtleType
+   type(TurtleType) => TurtleType
+   .
+   .
+   .
+   It's from an old story often told about Bertrand Russel, popularized most
+   recently by Stephen Hawking; do a Google search for the phrase to find out
+   more.  The oldest turtle reference in the Python archives seems to be:
+   http://mail.python.org/pipermail/types-sig/1998-November/000084.html */
+
+static PyObject *
+turtle_call(PyTypeObject *metatype, PyObject *args, PyObject *kwds)
+{
+	if (metatype->tp_construct == NULL) {
+		PyErr_Format(PyExc_TypeError,
+			     "can't subclass '.%100s' objects yet",
+			     metatype->tp_name);
+		return NULL;
+	}
+	return (*metatype->tp_construct)(NULL, args, kwds);
+}
+
+PyTypeObject PyTurtle_Type = {
+	PyObject_HEAD_INIT(&PyTurtle_Type)
+	0,			/* Number of items for varobject */
+	"turtle",		/* Name of this type */
+	sizeof(PyTypeObject),	/* Basic object size */
+	0,			/* Item size for varobject */
+	0,					/* tp_dealloc */
+	0,					/* tp_print */
+	0,			 		/* tp_getattr */
+	0,					/* tp_setattr */
+	0,					/* tp_compare */
+	(reprfunc)type_repr,			/* tp_repr */
+	0,					/* tp_as_number */
+	0,					/* tp_as_sequence */
+	0,					/* tp_as_mapping */
+	0,					/* tp_hash */
+	(ternaryfunc)turtle_call,		/* tp_call */
+	0,					/* tp_str */
+	(getattrofunc)type_getattro,		/* tp_getattro */
+	0,					/* tp_setattro */
+	0,					/* tp_as_buffer */
+	Py_TPFLAGS_DEFAULT,			/* tp_flags */
+	"Define the behavior of a particular type of object.", /* tp_doc */
+	0,					/* tp_traverse */
+	0,					/* tp_clear */
+	0,					/* tp_richcompare */
+	0,					/* tp_weaklistoffset */
+	0,					/* tp_iter */
+	0,					/* tp_iternext */
+	0,					/* tp_methods */
+	type_members,				/* tp_members */
+	type_getsets,				/* tp_getset */
+	&PyType_Type,				/* tp_base */
 	0,					/* tp_dict */
 };
 
@@ -330,15 +495,6 @@ inherit_slots(PyTypeObject *type, PyTypeObject *base)
 		type->tp_flags &= ~Py_TPFLAGS_HAVE_SEQUENCE_IN;
 		type->tp_flags |= base->tp_flags & Py_TPFLAGS_HAVE_SEQUENCE_IN;
 	}
-	if (!(type->tp_flags & Py_TPFLAGS_GC) &&
-	    (base->tp_flags & Py_TPFLAGS_GC) &&
-	    (type->tp_flags & Py_TPFLAGS_HAVE_RICHCOMPARE/*GC slots exist*/) &&
-	    (!type->tp_traverse && !type->tp_clear)) {
-		type->tp_flags |= Py_TPFLAGS_GC;
-		type->tp_basicsize += PyGC_HEAD_SIZE;
-		COPYSLOT(tp_traverse);
-		COPYSLOT(tp_clear);
-	}
 	if ((type->tp_flags & Py_TPFLAGS_HAVE_INPLACEOPS) !=
 	    (base->tp_flags & Py_TPFLAGS_HAVE_INPLACEOPS)) {
 		if ((!type->tp_as_number && base->tp_as_number) ||
@@ -358,6 +514,15 @@ inherit_slots(PyTypeObject *type, PyTypeObject *base)
 
 	COPYSLOT(tp_name);
 	COPYSLOT(tp_basicsize);
+	if (!(type->tp_flags & Py_TPFLAGS_GC) &&
+	    (base->tp_flags & Py_TPFLAGS_GC) &&
+	    (type->tp_flags & Py_TPFLAGS_HAVE_RICHCOMPARE/*GC slots exist*/) &&
+	    (!type->tp_traverse && !type->tp_clear)) {
+		type->tp_flags |= Py_TPFLAGS_GC;
+		type->tp_basicsize += PyGC_HEAD_SIZE;
+		COPYSLOT(tp_traverse);
+		COPYSLOT(tp_clear);
+	}
 	COPYSLOT(tp_itemsize);
 	COPYSLOT(tp_dealloc);
 	COPYSLOT(tp_print);

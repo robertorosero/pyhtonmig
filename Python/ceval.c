@@ -3243,34 +3243,20 @@ build_class(PyObject *methods, PyObject *bases, PyObject *name)
 	for (i = 0; i < n; i++) {
 		PyObject *base = PyTuple_GET_ITEM(bases, i);
 		if (!PyClass_Check(base)) {
-			/* Call the base's *type*, if it is callable.
-			   This code is a hook for Donald Beaudry's
-			   and Jim Fulton's type extensions.  In
-			   unextended Python it will never be triggered
-			   since its types are not callable.
-			   Ditto: call the bases's *class*, if it has
-			   one.  This makes the same thing possible
-			   without writing C code.  A true meta-object
-			   protocol! */
-			PyObject *basetype = (PyObject *)base->ob_type;
-			PyObject *callable = NULL;
-			if (PyCallable_Check(basetype))
-				callable = basetype;
-			else
-				callable = PyObject_GetAttrString(
-					base, "__class__");
-			if (callable) {
+			/* If the base is a type, call its base to clone it.
+			   This is a weaker form of the Don Beaudry hook
+			   that used to be here.  It should be sufficient
+			   because types can now be subtyped. */
+			if (PyType_Check(base)) {
+				PyObject *basetype = (PyObject *)base->ob_type;
 				PyObject *args;
 				PyObject *newclass = NULL;
 				args = Py_BuildValue(
 					"(OOO)", name, bases, methods);
 				if (args != NULL) {
 					newclass = PyEval_CallObject(
-						callable, args);
+						basetype, args);
 					Py_DECREF(args);
-				}
-				if (callable != basetype) {
-					Py_DECREF(callable);
 				}
 				return newclass;
 			}

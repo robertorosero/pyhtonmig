@@ -38,7 +38,7 @@ static PyMethodDef spamlist_methods[] = {
 staticforward PyTypeObject spamlist_type;
 
 static PyObject *
-spamlist_construct(spamlistobject *arg)
+spamlist_construct(spamlistobject *arg, PyObject *args, PyObject *kwds)
 {
 	spamlistobject *self;
 
@@ -49,7 +49,7 @@ spamlist_construct(spamlistobject *arg)
 		if (self == NULL)
 			return NULL;
 	}
-	if (PyList_Type.tp_construct((PyObject *)self) == NULL) {
+	if (PyList_Type.tp_construct((PyObject *)self, args, kwds) == NULL) {
 		if (self != arg)
 			PyObject_Del(self);
 		return NULL;
@@ -94,7 +94,7 @@ static PyTypeObject spamlist_type = {
 	0,					/* tp_dict */
 	0,					/* tp_descr_get */
 	0,					/* tp_descr_set */
-	(unaryfunc)spamlist_construct,		/* tp_construct */
+	spamlist_construct,			/* tp_construct */
 };
 
 static PyObject *
@@ -141,7 +141,7 @@ static PyMethodDef spamdict_methods[] = {
 staticforward PyTypeObject spamdict_type;
 
 static PyObject *
-spamdict_construct(spamdictobject *arg)
+spamdict_construct(spamdictobject *arg, PyObject *args, PyObject *kwds)
 {
 	spamdictobject *self;
 
@@ -152,7 +152,7 @@ spamdict_construct(spamdictobject *arg)
 		if (self == NULL)
 			return NULL;
 	}
-	if (PyDict_Type.tp_construct((PyObject *)self) == NULL) {
+	if (PyDict_Type.tp_construct((PyObject *)self, args, kwds) == NULL) {
 		if (self != arg)
 			PyObject_Del(self);
 		return NULL;
@@ -197,7 +197,7 @@ static PyTypeObject spamdict_type = {
 	0,					/* tp_dict */
 	0,					/* tp_descr_get */
 	0,					/* tp_descr_set */
-	(unaryfunc)spamdict_construct,		/* tp_construct */
+	spamdict_construct,			/* tp_construct */
 };
 
 static PyObject *

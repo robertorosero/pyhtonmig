@@ -1087,8 +1087,13 @@ PyGeneric_GetAttr(PyObject *obj, PyObject *name)
 			return NULL;
 	}
 	descr = PyDict_GetItem(tp->tp_dict, name);
-	if (descr != NULL && (f = descr->ob_type->tp_descr_get) != NULL)
-		return (*f)(descr, obj);
+	if (descr != NULL) {
+		f = descr->ob_type->tp_descr_get;
+		if (f != NULL)
+			return (*f)(descr, obj);
+		Py_INCREF(descr);
+		return descr;
+	}
 	PyErr_Format(PyExc_AttributeError,
 		     "'%.50s' object has no attribute '%.400s'",
 		     tp->tp_name, PyString_AS_STRING(name));

@@ -265,7 +265,7 @@ typedef struct _typeobject {
 	PyObject *tp_dict;
 	descrgetfunc tp_descr_get;
 	descrsetfunc tp_descr_set;
-	unaryfunc tp_construct;
+	ternaryfunc tp_construct;
 
 
 #ifdef COUNT_ALLOCS
@@ -283,7 +283,8 @@ extern DL_IMPORT(int) _PyObject_TypeCheck(PyObject *, PyTypeObject *);
 #define PyObject_TypeCheck(ob, tp) \
 	((ob)->ob_type == (tp) || _PyObject_TypeCheck(ob, tp))
 
-extern DL_IMPORT(PyTypeObject) PyType_Type; /* The type of type objects */
+extern DL_IMPORT(PyTypeObject) PyType_Type; /* The type of most type objects */
+extern DL_IMPORT(PyTypeObject) PyTurtle_Type; /* The type of PyType_Type */
 
 #define PyType_Check(op) PyObject_TypeCheck(op, &PyType_Type)
 

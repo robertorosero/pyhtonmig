@@ -69,5 +69,6 @@ DictIterType = type(iter({}))
 SequenceIterType = type(iter([]))
 FunctionIterType = type(iter(lambda: 0, 0))
 DictProxyType = type(TypeType.__dict__)
+TurtleType = type(TypeType)
 
 del sys, _f, _C, _x                     # Not for export

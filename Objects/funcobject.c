@@ -366,31 +366,52 @@ function_call(PyObject *func, PyObject *arg, PyObject *kw)
 	return result;
 }
 
+/* Bind a function to an object */
+static PyObject *
+func_descr_get(PyObject *func, PyObject *obj)
+{
+	if (obj == NULL) {
+		Py_INCREF(func);
+		return func;
+	}
+	else
+		return PyMethod_New(func, obj, (PyObject *)obj->ob_type);
+}
+
 PyTypeObject PyFunction_Type = {
 	PyObject_HEAD_INIT(&PyType_Type)
 	0,
 	"function",
 	sizeof(PyFunctionObject) + PyGC_HEAD_SIZE,
 	0,
-	(destructor)func_dealloc, /*tp_dealloc*/
-	0,		/*tp_print*/
-	0, /*tp_getattr*/
-	0, /*tp_setattr*/
-	0, /*tp_compare*/
-	(reprfunc)func_repr, /*tp_repr*/
-	0,		/*tp_as_number*/
-	0,		/*tp_as_sequence*/
-	0,		/*tp_as_mapping*/
-	0,		/*tp_hash*/
-	function_call,	/*tp_call*/
-	0,		/*tp_str*/
-	(getattrofunc)func_getattro,	     /*tp_getattro*/
-	(setattrofunc)func_setattro,	     /*tp_setattro*/
-	0,		/* tp_as_buffer */
-	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_GC,
-	0,		/* tp_doc */
-	(traverseproc)func_traverse,	/* tp_traverse */
-	0,		/* tp_clear */
-	0,		/* tp_richcompare */
+	(destructor)func_dealloc,		/* tp_dealloc */
+	0,					/* tp_print */
+	0,					/* tp_getattr */
+	0,					/* tp_setattr */
+	0,					/* tp_compare */
+	(reprfunc)func_repr,			/* tp_repr */
+	0,					/* tp_as_number */
+	0,					/* tp_as_sequence */
+	0,					/* tp_as_mapping */
+	0,					/* tp_hash */
+	function_call,				/* tp_call */
+	0,					/* tp_str */
+	(getattrofunc)func_getattro,		/* tp_getattro */
+	(setattrofunc)func_setattro,		/* tp_setattro */
+	0,					/* tp_as_buffer */
+	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_GC,	/* tp_flags */
+	0,					/* tp_doc */
+	(traverseproc)func_traverse,		/* tp_traverse */
+	0,					/* tp_clear */
+	0,					/* tp_richcompare */
 	offsetof(PyFunctionObject, func_weakreflist), /* tp_weaklistoffset */
+	0,					/* tp_iter */
+	0,					/* tp_iternext */
+	0,					/* tp_methods */
+	0,					/* tp_members */
+	0,					/* tp_getset */
+	0,					/* tp_base */
+	0,					/* tp_dict */
+	func_descr_get,				/* tp_descr_get */
+	0,					/* tp_descr_set */
 };
