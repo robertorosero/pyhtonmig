@@ -9,7 +9,7 @@ import os, sys, traceback
 import asdl
 
 TABSIZE = 8
-MAX_COL = 76
+MAX_COL = 80
 
 def get_c_type(name):
     """Return a string for the C name of the type.
@@ -416,19 +416,22 @@ class FreeVisitor(PickleVisitor):
         # don't call free_TYPE() for them.
 
         elif field.opt:
-            emit("if (%s)" % value, 0)
+            emit("if (%s) {" % value, 0)
             self.free(field, value, depth + 1)
+            emit("}", 0)
         else:
             self.free(field, value, depth)
 
     def free(self, field, value, depth):
-        if str(field.type) in ("identifier", "string"):
-            self.emit("Py_DECREF(%s);" % value, depth)
+        if str(field.type) in ("identifier", "string", "object"):
+            ctype = get_c_type(field.type)
+            self.emit("Py_DECREF((%s)%s);" % (ctype, value), depth)
         elif str(field.type) == "bool":
             return
         else:
             print >> sys.stderr, field.type
-            self.emit("free_%s(%s);" % (field.type, value), depth)
+            ctype = get_c_type(field.type)
+            self.emit("free_%s((%s)%s);" % (field.type, ctype, value), depth)
         
 
 class MarshalFunctionVisitor(PickleVisitor):
@@ -490,15 +493,18 @@ class MarshalFunctionVisitor(PickleVisitor):
             emit("marshal_write_int(buf, off, asdl_seq_LEN(%s));" % value, 0)
             emit("for (i = 0; i < asdl_seq_LEN(%s); i++) {" % value, 0)
             emit("void *elt = asdl_seq_GET(%s, i);" % value, 1);
-            emit("marshal_write_%s(buf, off, elt);" % field.type, 1)
+            ctype = get_c_type(field.type);
+            emit("marshal_write_%s(buf, off, (%s)elt);" % (field.type,
+                    ctype), 1)
             emit("}", 0)
         elif field.opt:
             emit("if (%s) {" % value, 0)
             emit("marshal_write_int(buf, off, 1);", 1)
             emit("marshal_write_%s(buf, off, %s);" % (field.type, value), 1)
             emit("}", 0)
-            emit("else", 0)
+            emit("else {", 0)
             emit("marshal_write_int(buf, off, 0);", 1)
+            emit("}", 0)
         else:
             emit("marshal_write_%s(buf, off, %s);" % (field.type, value), 0)
 
