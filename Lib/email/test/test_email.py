@@ -2360,6 +2360,15 @@ A very long line that must get split to something other than at the
         h = make_header(decode_header(s))
         eq(h.encode(), s)
 
+    def test_whitespace_eater(self):
+        eq = self.assertEqual
+        s = 'Subject: =?koi8-r?b?8NLP18XSy8EgzsEgxsnOwczYztk=?= =?koi8-r?q?=CA?= zz.'
+        parts = decode_header(s)
+        eq(parts, [('Subject:', None), ('\xf0\xd2\xcf\xd7\xc5\xd2\xcb\xc1 \xce\xc1 \xc6\xc9\xce\xc1\xcc\xd8\xce\xd9\xca', 'koi8-r'), ('zz.', None)])
+        hdr = make_header(parts)
+        eq(hdr.encode(),
+           'Subject: =?koi8-r?b?8NLP18XSy8EgzsEgxsnOwczYztnK?= zz.')
+
 
 
 # Test RFC 2231 header parameters (en/de)coding
