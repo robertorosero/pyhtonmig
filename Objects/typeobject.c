@@ -53,6 +53,8 @@ type_repr(PyTypeObject *type)
 static PyObject *
 type_call(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
+	int size;
+	void *mem;
 	PyObject *obj, *res;
 
 	if (type->tp_construct == NULL) {
@@ -61,9 +63,19 @@ type_call(PyTypeObject *type, PyObject *args, PyObject *kwds)
 			     type->tp_name);
 		return NULL;
 	}
-	obj = PyObject_New(PyObject, type);
-	if (obj == NULL)
-		return NULL;
+
+	/* Inline PyObject_New() so we can zero the memory */
+	size = _PyObject_SIZE(type);
+	mem = PyObject_MALLOC(size);
+	if (mem == NULL)
+		return PyErr_NoMemory();
+	memset(mem, '\0', size);
+	if (PyType_IS_GC(type))
+		obj = PyObject_FROM_GC(mem);
+	else
+		obj = (PyObject *)mem;
+	PyObject_INIT(obj, type);
+
 	res = (type->tp_construct)(obj, args, kwds);
 	if (res != obj) {
 		Py_DECREF(obj);
@@ -148,7 +160,58 @@ subtype_dealloc(PyObject *self)
 	Py_DECREF(self->ob_type);
 }
 
+static PyObject *
+subtype_getattro(PyObject *self, PyObject *name)
+{
+	int dictoffset = self->ob_type->tp_members[0].offset;
+	PyObject *dict = * (PyObject **) ((char *)self + dictoffset);
+
+	if (dict != NULL) {
+		PyObject *res = PyObject_GetItem(dict, name);
+		if (res != NULL)
+			return res;
+		PyErr_Clear();
+	}
+	return PyGeneric_GetAttr(self, name);
+}
+
+static int
+subtype_setattro(PyObject *self, PyObject *name, PyObject *value)
+{
+	PyTypeObject *tp = self->ob_type;
+	PyObject *descr;
+
+	assert(tp->tp_dict != NULL && PyDict_Check(tp->tp_dict));
+	descr = PyDict_GetItem(tp->tp_dict, name);
+	if (descr == NULL) {
+		int dictoffset = self->ob_type->tp_members[0].offset;
+		PyObject **dictptr = (PyObject **) ((char *)self + dictoffset);
+		PyObject *dict = *dictptr;
+
+		if (dict == NULL) {
+			dict = PyDict_New();
+			if (dict == NULL)
+				return -1;
+			*dictptr = dict;
+		}
+		if (value == NULL) {
+			int res = PyObject_DelItem(dict, name);
+			if (res < 0 &&
+			    PyErr_ExceptionMatches(PyExc_KeyError))
+			{
+				PyErr_SetObject(PyExc_AttributeError, name);
+				return -1;
+			}
+		}
+		else
+			return PyObject_SetItem(dict, name, value);
+	}
+	return PyGeneric_SetAttr(self, name, value);
+}
+
 staticforward void override_slots(PyTypeObject *type, PyObject *dict);
+
+#define NMEMBERS 1
 
 typedef struct {
 	PyTypeObject type;
@@ -156,6 +219,7 @@ typedef struct {
 	PySequenceMethods as_sequence;
 	PyMappingMethods as_mapping;
 	PyBufferProcs as_buffer;
+	struct memberlist members[NMEMBERS+1];
 	char name[1];
 } etype;
 
@@ -167,6 +231,8 @@ type_construct(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	PyObject *bases, *dict, *x;
 	PyTypeObject *base;
 	char *dummy = NULL;
+	etype *et;
+	struct memberlist *mp;
 
 	if (type != NULL) {
 		PyErr_SetString(PyExc_TypeError,
@@ -197,16 +263,17 @@ type_construct(PyTypeObject *type, PyObject *args, PyObject *kwds)
 				"base type must be a type");
 		return NULL;
 	}
-	type = PyObject_MALLOC(sizeof(etype) + strlen(name));
-	if (type == NULL)
+	et = PyObject_MALLOC(sizeof(etype) + strlen(name));
+	if (et == NULL)
 		return NULL;
-	memset(type, '\0', sizeof(etype));
+	memset(et, '\0', sizeof(etype));
+	type = &et->type;
 	PyObject_INIT(type, &PyType_Type);
-	type->tp_as_number = & (((etype *)type)->as_number);
-	type->tp_as_sequence = & (((etype *)type)->as_sequence);
-	type->tp_as_mapping = & (((etype *)type)->as_mapping);
-	type->tp_as_buffer = & (((etype *)type)->as_buffer);
-	type->tp_name = strcpy(((etype *)type)->name, name);
+	type->tp_as_number = &et->as_number;
+	type->tp_as_sequence = &et->as_sequence;
+	type->tp_as_mapping = &et->as_mapping;
+	type->tp_as_buffer = &et->as_buffer;
+	type->tp_name = strcpy(et->name, name);
 	type->tp_flags = Py_TPFLAGS_DEFAULT;
 	Py_INCREF(base);
 	type->tp_base = base;
@@ -214,10 +281,30 @@ type_construct(PyTypeObject *type, PyObject *args, PyObject *kwds)
 		type->tp_construct = subtype_construct;
 	if (base->tp_dealloc)
 		type->tp_dealloc = subtype_dealloc;
+	if (base->tp_getattro == NULL ||
+	    base->tp_getattro == PyGeneric_GetAttr) {
+		type->tp_getattro = subtype_getattro;
+		type->tp_getattr = NULL;
+	}
+	if (base->tp_setattro == NULL ||
+	    base->tp_setattro == PyGeneric_SetAttr) {
+		type->tp_setattro = subtype_setattro;
+		type->tp_setattr = NULL;
+	}
+
+	type->tp_members = mp = et->members;
+	mp->name = "__dict__";
+	mp->type = T_OBJECT;
+	mp->offset = base->tp_basicsize - ((base->tp_flags & Py_TPFLAGS_GC)
+					   ? PyGC_HEAD_SIZE : 0);
+	mp->readonly = 1;
+	assert(mp+1 <= &et->members[NMEMBERS]);
+
 	if (PyType_InitDict(type) < 0) {
 		Py_DECREF(type);
 		return NULL;
 	}
+	type->tp_basicsize += sizeof(PyObject *); /* for __dict__ */
 	x = PyObject_CallMethod(type->tp_dict, "update", "O", dict);
 	if (x == NULL) {
 		Py_DECREF(type);
@@ -428,6 +515,8 @@ staticforward int add_operators(PyTypeObject *);
 static int
 inherit_slots(PyTypeObject *type, PyTypeObject *base)
 {
+	int oldsize, newsize;
+
 #undef COPYSLOT
 #undef COPYNUM
 #undef COPYSEQ
@@ -529,16 +618,28 @@ inherit_slots(PyTypeObject *type, PyTypeObject *base)
 	}
 
 	COPYSLOT(tp_name);
-	COPYSLOT(tp_basicsize);
+
+	/* Copying basicsize is connected to the GC flags */
+	oldsize = base->tp_basicsize;
+	if (base->tp_flags & Py_TPFLAGS_GC)
+		oldsize -= PyGC_HEAD_SIZE;
+	newsize = type->tp_basicsize;
+	if (newsize && (type->tp_flags & Py_TPFLAGS_GC))
+		newsize -= PyGC_HEAD_SIZE;
+	if (!newsize)
+		newsize = oldsize;
 	if (!(type->tp_flags & Py_TPFLAGS_GC) &&
 	    (base->tp_flags & Py_TPFLAGS_GC) &&
 	    (type->tp_flags & Py_TPFLAGS_HAVE_RICHCOMPARE/*GC slots exist*/) &&
 	    (!type->tp_traverse && !type->tp_clear)) {
 		type->tp_flags |= Py_TPFLAGS_GC;
-		type->tp_basicsize += PyGC_HEAD_SIZE;
 		COPYSLOT(tp_traverse);
 		COPYSLOT(tp_clear);
 	}
+	if (type->tp_flags & Py_TPFLAGS_GC)
+		newsize += PyGC_HEAD_SIZE;
+	type->tp_basicsize = newsize;
+
 	COPYSLOT(tp_itemsize);
 	COPYSLOT(tp_dealloc);
 	COPYSLOT(tp_print);
@@ -1226,6 +1327,8 @@ slot_mp_ass_subscript(PyObject *self, PyObject *key, PyObject *value)
 	return 0;
 }
 
+/* XXX the numerical slots should call the reverse operators too;
+   but how do they know their type? */
 SLOT1(nb_add, add, PyObject *, O);
 SLOT1(nb_subtract, sub, PyObject *, O);
 SLOT1(nb_multiply, mul, PyObject *, O);
