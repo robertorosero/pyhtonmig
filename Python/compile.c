@@ -214,6 +214,8 @@ struct compiling {
 	object *c_consts;	/* list of objects */
 	object *c_names;	/* list of strings (names) */
 	object *c_globals;	/* dictionary */
+	object *c_locals;	/* dictionary (of names that must be local) */
+	object* c_fastlocalmap; /* tuples of names of locals */
 	int c_nexti;		/* index into c_code */
 	int c_errors;		/* counts errors occurred */
 	int c_infunction;	/* set when compiling a function */
@@ -222,6 +224,9 @@ struct compiling {
 	int c_begin;		/* begin of current loop, for 'continue' */
 	int c_block[MAXBLOCKS];	/* stack of block types */
 	int c_nblocks;		/* current block stack level */
+	int c_local_dict_access;/* exec stmt accessed local dict */
+	int c_fpcount;          /* formal parameters name count  */
+	int c_nargs;            /* formal argument count */
 	char *c_filename;	/* filename of current node */
 	char *c_name;		/* name of object (e.g. function) */
 };
@@ -272,14 +277,18 @@ static int com_add PROTO((struct compiling *, object *, object *));
 static int com_addconst PROTO((struct compiling *, object *));
 static int com_addname PROTO((struct compiling *, object *));
 static void com_addopname PROTO((struct compiling *, int, node *));
-static void com_list PROTO((struct compiling *, node *, int));
+static void com_list PROTO((struct compiling *, node *));
+static int com_exprs PROTO((struct compiling*, node *));
 static int com_argdefs PROTO((struct compiling *, node *, int *));
+static void com_addlocal_fpdef PROTO((struct compiling *, node *));
+static void com_addlocal_fpNAME PROTO((struct compiling *, node *));
 
 static int
 com_init(c, filename)
 	struct compiling *c;
 	char *filename;
 {
+	c->c_fastlocalmap = NULL;
 	if ((c->c_code = newsizedstringobject((char *)NULL, 1000)) == NULL)
 		goto fail_3;
 	if ((c->c_consts = newlistobject(0)) == NULL)
@@ -288,6 +297,8 @@ com_init(c, filename)
 		goto fail_1;
 	if ((c->c_globals = newdictobject()) == NULL)
 		goto fail_0;
+	if ((c->c_locals = newdictobject()) == NULL)
+		goto fail_00;
 	c->c_nexti = 0;
 	c->c_errors = 0;
 	c->c_infunction = 0;
@@ -295,10 +306,15 @@ com_init(c, filename)
 	c->c_loops = 0;
 	c->c_begin = 0;
 	c->c_nblocks = 0;
+	c->c_local_dict_access = 0;
+	c->c_fpcount = 0;
+	c->c_nargs = -1;
 	c->c_filename = filename;
 	c->c_name = "?";
 	return 1;
 	
+  fail_00:
+  	DECREF(c->c_globals);
   fail_0:
   	DECREF(c->c_names);
   fail_1:
@@ -317,6 +333,8 @@ com_free(c)
 	XDECREF(c->c_consts);
 	XDECREF(c->c_names);
 	XDECREF(c->c_globals);
+	XDECREF(c->c_locals);
+	XDECREF(c->c_fastlocalmap);
 }
 
 static void
@@ -445,10 +463,9 @@ com_addname(c, v)
 	return com_add(c, c->c_names, v);
 }
 
-static void
-com_addopnamestr(c, op, name)
+static int
+com_addnamestr(c, name)
 	struct compiling *c;
-	int op;
 	char *name;
 {
 	object *v;
@@ -461,19 +478,17 @@ com_addopnamestr(c, op, name)
 		i = com_addname(c, v);
 		DECREF(v);
 	}
-	/* Hack to replace *_NAME opcodes by *_GLOBAL if necessary */
-	switch (op) {
-	case LOAD_NAME:
-	case STORE_NAME:
-	case DELETE_NAME:
-		if (dictlookup(c->c_globals, name) != NULL) {
-			switch (op) {
-			case LOAD_NAME:   op = LOAD_GLOBAL;   break;
-			case STORE_NAME:  op = STORE_GLOBAL;  break;
-			case DELETE_NAME: op = DELETE_GLOBAL; break;
-			}
-		}
-	}
+	return i;
+}
+
+static void
+com_addopnamestr(c, op, name)
+	struct compiling *c;
+	int op;
+	char *name;
+{
+	int i;
+	i = com_addnamestr(c, name);
 	com_addoparg(c, op, i);
 }
 
@@ -646,13 +661,10 @@ com_list_constructor(c, n)
 	node *n;
 {
 	int len;
-	int i;
 	if (TYPE(n) != testlist)
 		REQ(n, exprlist);
 	/* exprlist: expr (',' expr)* [',']; likewise for testlist */
-	len = (NCH(n) + 1) / 2;
-	for (i = 0; i < NCH(n); i += 2)
-		com_node(c, CHILD(n, i));
+	len = com_exprs(c, n);
 	com_addoparg(c, BUILD_LIST, len);
 }
 
@@ -788,13 +800,13 @@ com_call_function(c, n)
 	node *n; /* EITHER testlist OR ')' */
 {
 	if (TYPE(n) == RPAR) {
-		com_addoparg(c, BUILD_TUPLE, 0);
-		com_addbyte(c, BINARY_CALL);
+		com_addoparg(c, CALL, 0);
 	}
 	else {
+		int nargs;
 		REQ(n, testlist);
-		com_list(c, n, 1);
-		com_addbyte(c, BINARY_CALL);
+		nargs = com_exprs(c, n);
+		com_addoparg(c, CALL, nargs);
 	}
 }
 
@@ -1200,23 +1212,31 @@ com_test(c, n)
 }
 
 static void
-com_list(c, n, toplevel)
+com_list(c, n)
 	struct compiling *c;
 	node *n;
-	int toplevel; /* If nonzero, *always* build a tuple */
 {
 	/* exprlist: expr (',' expr)* [',']; likewise for testlist */
-	if (NCH(n) == 1 && !toplevel) {
+	if (NCH(n) == 1) {
 		com_node(c, CHILD(n, 0));
 	}
 	else {
-		int i;
 		int len;
-		len = (NCH(n) + 1) / 2;
-		for (i = 0; i < NCH(n); i += 2)
-			com_node(c, CHILD(n, i));
+		len = com_exprs(c, n);
 		com_addoparg(c, BUILD_TUPLE, len);
 	}
+}
+
+static int
+com_exprs(c, n)
+	struct compiling *c;
+	node *n;
+{
+	/* exprlist: expr (',' expr)* [',']; likewise for testlist */
+	int i;
+	for (i = 0; i < NCH(n); i += 2)
+		com_node(c, CHILD(n, i));
+	return (NCH(n) + 1) / 2;
 }
 
 
@@ -1601,8 +1621,10 @@ com_exec_stmt(c, n)
 	com_node(c, CHILD(n, 1));
 	if (NCH(n) >= 4)
 		com_node(c, CHILD(n, 3));
-	else
+	else {
 		com_addoparg(c, LOAD_CONST, com_addconst(c, None));
+		c->c_local_dict_access++;
+	}
 	if (NCH(n) >= 6)
 		com_node(c, CHILD(n, 5));
 	else
@@ -2197,7 +2219,7 @@ com_node(c, n)
 	/* Expression nodes */
 	
 	case testlist:
-		com_list(c, n, 0);
+		com_list(c, n);
 		break;
 	case test:
 		com_test(c, n);
@@ -2212,7 +2234,7 @@ com_node(c, n)
 		com_comparison(c, n);
 		break;
 	case exprlist:
-		com_list(c, n, 0);
+		com_list(c, n);
 		break;
 	case expr:
 		com_expr(c, n);
@@ -2256,8 +2278,11 @@ com_fpdef(c, n)
 	REQ(n, fpdef); /* fpdef: NAME | '(' fplist ')' */
 	if (TYPE(CHILD(n, 0)) == LPAR)
 		com_fplist(c, CHILD(n, 1));
-	else
+	else {
 		com_addopname(c, STORE_NAME, CHILD(n, 0));
+		c->c_fpcount++;
+		com_addlocal_fpNAME(c, CHILD(n, 0));
+	}
 }
 
 static void
@@ -2297,6 +2322,7 @@ com_arglist(c, n)
 	nargs = 0;
 	for (i = 0; i < nch; i++) {
 		nargs++;
+		com_addlocal_fpdef(c, CHILD(n, i));
 		i++;
 		if (i >= nch)
 			break;
@@ -2310,6 +2336,8 @@ com_arglist(c, n)
 		if (t != COMMA)
 			break;
 	}
+	c->c_nargs = nargs;
+	/* XXX assert c->c_nargs = getmappingsize(c->c_locals); */
 	com_addoparg(c, op, nargs);
 	for (i = 0; i < nch; i++) {
 		com_fpdef(c, CHILD(n, i));
@@ -2325,6 +2353,10 @@ com_arglist(c, n)
 		}
 		if (t != COMMA)
 			break;
+	}
+	if (c->c_fpcount != getmappingsize(c->c_locals)) {
+		err_setstr(SyntaxError, "duplicate formal parameter");
+		c->c_errors++;
 	}
 	if (op == UNPACK_VARARG)
 		com_addopname(c, STORE_NAME, CHILD(n, nch+1));
@@ -2515,61 +2547,47 @@ optimize(c)
 	int opcode;
 	int oparg;
 	object *name;
-	int fast_reserved;
 	object *error_type, *error_value, *error_traceback;
+	int pos;
+	object *key, *value;
+	object *localmap;
 	
 #define NEXTOP()	(*next_instr++)
 #define NEXTARG()	(next_instr += 2, (next_instr[-1]<<8) + next_instr[-2])
 #define GETITEM(v, i)	(getlistitem((v), (i)))
 #define GETNAMEOBJ(i)	(GETITEM(c->c_names, (i)))
 	
-	locals = newdictobject();
-	if (locals == NULL) {
-		c->c_errors++;
-		return;
-	}
-	nlocals = 0;
+	locals = c->c_locals;
+	nlocals = getmappingsize(locals);
 
 	err_fetch(&error_type, &error_value, &error_traceback);
 	
-	next_instr = (unsigned char *) getstringvalue(c->c_code);
-	for (;;) {
-		opcode = NEXTOP();
-		if (opcode == STOP_CODE)
-			break;
-		if (opcode == EXEC_STMT)
-			goto end; /* Don't optimize if exec present */
-		if (HAS_ARG(opcode))
-			oparg = NEXTARG();
-		if (opcode == STORE_NAME || opcode == DELETE_NAME ||
-		    opcode == IMPORT_FROM) {
-			object *v;
-			name = GETNAMEOBJ(oparg);
-			if (dict2lookup(locals, name) != NULL)
-				continue;
-			err_clear();
-			v = newintobject(nlocals);
-			if (v == NULL) {
-				c->c_errors++;
-				goto err;
-			}
-			nlocals++;
-			if (dict2insert(locals, name, v) != 0) {
-				DECREF(v);
-				c->c_errors++;
-				goto err;
-			}
-			DECREF(v);
-		}
-	}
-	
-	if (dictlookup(locals, "*") != NULL) {
+	if (!nlocals || c->c_local_dict_access || 
+	    dictlookup(locals, "*") != NULL) {
 		/* Don't optimize anything */
 		goto end;
 	}
+	err_clear();
 	
+	localmap = newtupleobject(nlocals);
+	if (localmap == NULL)
+	        goto err;
+	pos = 0;
+	while (mappinggetnext(locals, &pos, &key, &value)) {
+		int j;
+		if (!is_intobject(value)) {
+			c->c_errors++;
+			err_setstr(SystemError, "XXX:compile.c bad fastlocal");
+			goto err;
+		}
+		j = getintvalue(value);
+		if (0 <= j && j < nlocals) {
+			INCREF(key);
+			settupleitem(localmap, j, key);
+		}
+	}
+
 	next_instr = (unsigned char *) getstringvalue(c->c_code);
-	fast_reserved = 0;
 	for (;;) {
 		cur_instr = next_instr;
 		opcode = NEXTOP();
@@ -2577,35 +2595,12 @@ optimize(c)
 			break;
 		if (HAS_ARG(opcode))
 			oparg = NEXTARG();
-		if (opcode == RESERVE_FAST) {
+		if (opcode == RESERVE_FAST) { /* XXX backwards compat.. soon to go*/
 			int i;
-			object *localmap = newtupleobject(nlocals);
-			int pos;
-			object *key, *value;
-			if (localmap == NULL) { /* XXX mask error */
-				err_clear();
-				continue;
-			}
-			pos = 0;
-			while (mappinggetnext(locals, &pos, &key, &value)) {
-				int j;
-				if (!is_intobject(value))
-					continue;
-				j = getintvalue(value);
-				if (0 <= j && j < nlocals) {
-					INCREF(key);
-					settupleitem(localmap, j, key);
-				}
-			}
 			i = com_addconst(c, localmap);
 			cur_instr[1] = i & 0xff;
 			cur_instr[2] = (i>>8) & 0xff;
-			fast_reserved = 1;
-			DECREF(localmap);
-			continue;
 		}
-		if (!fast_reserved)
-			continue;
 		if (opcode == LOAD_NAME ||
 		    opcode == STORE_NAME ||
 		    opcode == DELETE_NAME) {
@@ -2615,8 +2610,8 @@ optimize(c)
 			v = dict2lookup(locals, name);
 			if (v == NULL) {
 				err_clear();
-				if (opcode == LOAD_NAME)
-					cur_instr[0] = LOAD_GLOBAL;
+				/* XXX assert: must be (opcode == LOAD_NAME) */
+				cur_instr[0] = LOAD_GLOBAL;
 				continue;
 			}
 			i = getintvalue(v);
@@ -2629,11 +2624,151 @@ optimize(c)
 			cur_instr[2] = (i>>8) & 0xff;
 		}
 	}
+	c->c_fastlocalmap = localmap;
 
  end:
 	err_restore(error_type, error_value, error_traceback);
  err:
-	DECREF(locals);
+	return;
+}
+
+static void
+globalize(c)
+	struct compiling *c;
+{
+	unsigned char *next_instr, *cur_instr;
+	object *locals;
+	int opcode;
+	int oparg;
+	object *name, *dictsmall, *dictbig;
+	object *key, *value;
+	int pos;
+	object *error_type, *error_value, *error_traceback;
+	
+	locals = c->c_locals;
+
+	err_fetch(&error_type, &error_value, &error_traceback);
+
+	/* Diagnose intersection of globals and parameters */
+	if (getmappingsize(locals) < getmappingsize(c->c_globals)) {
+		dictsmall = c->c_locals;
+		dictbig = c->c_globals;
+	}
+	else {
+		dictbig = c->c_locals;
+		dictsmall = c->c_globals;
+	}
+	pos = 0;
+	while (mappinggetnext(dictsmall, &pos, &key, &value)) {
+		if (dict2lookup(dictbig, key)) {
+		  /* XXX: Is this really an error?? */
+		  /* We *could* just turn off fast-arg passing when the value
+		     is less than nargs?  We could also just skip fast-tuple
+		     storage on the common locals.*/
+
+			err_setstr(SyntaxError, "parameters can't be made global");
+			c->c_errors++;
+			goto err;
+		}
+		err_clear();
+	}
+
+	next_instr = (unsigned char *) getstringvalue(c->c_code);
+	for (;;) {
+		cur_instr = next_instr;
+		opcode = NEXTOP();
+		if (opcode == STOP_CODE)
+			break;
+		if (HAS_ARG(opcode))
+			oparg = NEXTARG();
+		if (opcode == STORE_NAME || opcode == DELETE_NAME ||
+		    opcode == LOAD_NAME) {
+			name = GETNAMEOBJ(oparg);
+			if (dict2lookup(c->c_globals, name) != NULL) {
+				switch (opcode) {
+				case LOAD_NAME:   
+					cur_instr[0] = LOAD_GLOBAL; break; 
+				case STORE_NAME:  
+					cur_instr[0] = STORE_GLOBAL; break;
+				case DELETE_NAME: 
+					cur_instr[0] = DELETE_GLOBAL; break;
+				}
+				continue;
+			}
+			err_clear();
+		}
+		/* XXX What does it mean if we import *and* declare global? */
+		/* Should we test for this?? */
+		if (opcode == STORE_NAME || opcode == DELETE_NAME ||
+		    opcode == IMPORT_FROM) {
+			object *v;
+			name = GETNAMEOBJ(oparg);
+			if (dict2lookup(locals, name) != NULL)
+				continue;
+			err_clear();
+			v = newintobject(getmappingsize(locals));
+			if (v == NULL) {
+				c->c_errors++;
+				goto err;
+			}
+			if (dict2insert(locals, name, v) != 0) {
+				DECREF(v);
+				c->c_errors++;
+				goto err;
+			}
+			DECREF(v);
+		}
+	}
+	
+ end:
+	err_restore(error_type, error_value, error_traceback);
+ err:
+	return;
+}
+
+
+/* The next function pulls a representative formal parameter name to
+   the head of the name list, for each formal parameter (or parameter
+   tuple) in the formal parameter list. We make it to the head of the
+   list by calling this function repeatedly before any other names
+   have been processed.  This positioning is helpful for fast-arg
+   optimization, as it allows us to have id-numbers for the fast-arg
+   references that match those provided in our fast-locals.  This
+   means we can decide at run time where we'll keep the arguments, and
+   our indicies (re: oparg) will remain fixed. */
+
+static void
+com_addlocal_fpdef(c, n)
+	struct compiling *c;
+	node *n;
+{
+	REQ(n, fpdef); /* fpdef: NAME | '(' fplist ')' */
+	while(TYPE(CHILD(n, 0)) != NAME) {
+		node * m = CHILD(n,1);
+		REQ(m, fplist); /* fplist: fpdef (',' fpdef)* [','] */
+		n = CHILD(m, 0);
+		REQ(n, fpdef);
+	}
+	com_addlocal_fpNAME(c, CHILD(n, 0));
+}
+
+static void
+com_addlocal_fpNAME(c, n)
+	struct compiling *c;
+	node *n;
+{
+	int i;
+	object *v, *nameobj;
+
+	REQ(n, NAME);
+	i = com_addnamestr(c, STR(n));
+	if (c->c_nargs >= 0 && i < c->c_nargs)
+		return;
+	nameobj = GETNAMEOBJ(i);
+	v = newintobject(getmappingsize(c->c_locals));
+	if (v == NULL || dict2insert(c->c_locals, nameobj, v) != 0)
+		c->c_errors++;
+	XDECREF(v);
 }
 
 codeobject *
@@ -2647,6 +2782,7 @@ compile(n, filename)
 		return NULL;
 	compile_node(&sc, n);
 	com_done(&sc);
+	globalize(&sc);
 	if ((TYPE(n) == funcdef || TYPE(n) == lambdef) && sc.c_errors == 0)
 		optimize(&sc);
 	co = NULL;

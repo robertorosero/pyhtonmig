@@ -94,6 +94,27 @@ static object *build_class PROTO((object *, object *, object *));
 static int access_statement PROTO((object *, object *, frameobject *));
 static int exec_statement PROTO((object *, object *, object *));
 
+typedef struct {
+	PyObject_VAR_HEAD
+	PyObject **ob_item;
+} PyFastCallObject;
+
+typeobject FastCalltype = {
+	OB_HEAD_INIT(&Typetype)
+	0,
+	"fast_call",
+	sizeof(PyFastCallObject),
+	0,
+	0 /* (destructor)list_dealloc*/ , /*tp_dealloc*/
+	0 /*(printfunc)list_print*/     , /*tp_print*/
+	0 /*(getattrfunc)list_getattr*/ , /*tp_getattr*/
+	0,		                  /*tp_setattr*/
+	0 /*(cmpfunc)list_compare*/,      /*tp_compare*/
+	0 /*(reprfunc)list_repr*/,        /*tp_repr*/
+	0,		                  /*tp_as_number*/
+	0 /*&list_as_sequence*/,	  /*tp_as_sequence*/
+	0,		                  /*tp_as_mapping*/
+};
 
 /* Pointer to current frame, used to link new frames to */
 
@@ -282,8 +303,8 @@ eval_code(co, globals, locals, owner, arg)
 	register frameobject *f; /* Current frame */
 	register listobject *fastlocals = NULL;
 	object *retval;		/* Return value iff why == WHY_RETURN */
-	int needmerge = 0;	/* Set if need to merge locals back at end */
 	int defmode = 0;	/* Default access mode for new variables */
+	PyFastCallObject fastcalltuple;
 #ifdef LLTRACE
 	int lltrace;
 #endif
@@ -327,6 +348,10 @@ eval_code(co, globals, locals, owner, arg)
 		err_setstr(SystemError, "eval_code: NULL globals or locals");
 		return NULL;
 	}
+	
+	fastcalltuple.ob_type = &FastCalltype;
+	fastcalltuple.ob_refcnt = 1;
+
 
 #ifdef LLTRACE
 	lltrace = dictlookup(globals, "__lltrace__") != NULL;
@@ -591,7 +616,7 @@ eval_code(co, globals, locals, owner, arg)
 			PUSH(x);
 			break;
 		
-		case BINARY_CALL:
+		case BINARY_CALL:  /* XXX: No longer used */
 			w = POP();
 			v = POP();
 			f->f_lasti = INSTR_OFFSET() - 1; /* For tracing */
@@ -1002,54 +1027,6 @@ eval_code(co, globals, locals, owner, arg)
 					break;
 				}
 				n = gettuplesize(v);
-#ifdef COMPAT_HACKS
-/* Implement various compatibility hacks (for 0.9.4 or earlier):
-   (a) f(a,b,...) accepts f((1,2,...))
-   (b) f((a,b,...)) accepts f(1,2,...)
-   (c) f(self,(a,b,...)) accepts f(x,1,2,...)
-*/
-				if (n == 1 && oparg != 1) {
-					/* Rule (a) */
-					w = gettupleitem(v, 0);
-					if (is_tupleobject(w)) {
-						INCREF(w);
-						DECREF(v);
-						v = w;
-						n = gettuplesize(v);
-					}
-				}
-				else if (n != 1 && oparg == 1) {
-					/* Rule (b) */
-					PUSH(v);
-					break;
-					/* Don't fall through */
-				}
-				else if (n > 2 && oparg == 2) {
-					/* Rule (c) */
-					int i;
-					w = newtupleobject(n-1);
-					u = newtupleobject(2);
-					if (u == NULL || w == NULL) {
-						XDECREF(w);
-						XDECREF(u);
-						DECREF(v);
-						why = WHY_EXCEPTION;
-						break;
-					}
-					t = gettupleitem(v, 0);
-					INCREF(t);
-					settupleitem(u, 0, t);
-					for (i = 1; i < n; i++) {
-						t = gettupleitem(v, i);
-						INCREF(t);
-						settupleitem(w, i-1, t);
-					}
-					settupleitem(u, 1, w);
-					DECREF(v);
-					v = u;
-					n = 2;
-				}
-#endif /* Disabled compatibility hacks */
 				if (n != oparg) {
 					err_setstr(TypeError,
 						"arg count mismatch");
@@ -1294,6 +1271,44 @@ eval_code(co, globals, locals, owner, arg)
 				PUSH(x);
 			}
 			break;
+
+		case CALL:
+			if (fastcalltuple.ob_refcnt != 1) {
+				err_setstr(SystemError, "XXX: fast error ");
+				why = WHY_EXCEPTION;
+				break;
+			}
+			fastcalltuple.ob_size = oparg;
+			fastcalltuple.ob_item = &TOP() - oparg +1;
+#define USE_SLOW_TUPLE 1
+#if USE_SLOW_TUPLE
+			w = newtupleobject(oparg);
+			if (w == NULL) 
+				break;
+			for (; --oparg >= 0;) {
+				v = POP();
+				err = settupleitem(w, oparg, v);
+				if (err != 0)
+					break;
+			}
+			v = POP();
+#else
+			w = (object*)&fastcalltuple;
+			v = fastcalltuple.ob_item[-1];
+#endif
+			f->f_lasti = INSTR_OFFSET() - 1; /* For tracing */
+			x = call_object(v, w);
+			DECREF(v);
+#if USE_SLOW_TUPLE
+			DECREF(w);
+#else
+			for (; oparg-- >= 0;) {
+				v = POP();
+				DECREF(v);
+			}
+#endif
+			PUSH(x);
+			break;
 		
 		case BUILD_LIST:
 			x =  newlistobject(oparg);
@@ -1352,6 +1367,7 @@ eval_code(co, globals, locals, owner, arg)
 		case IMPORT_FROM:
 			w = GETNAMEV(oparg);
 			v = TOP();
+			fast_2_locals(f);  /* XXX very slow :-( */
 			err = import_from(f->f_locals, v, w);
 			locals_2_fast(f, 0);
 			break;
@@ -1591,9 +1607,7 @@ eval_code(co, globals, locals, owner, arg)
 	current_frame = f->f_back;
 	DECREF(f);
 
-	if (needmerge)
-		locals_2_fast(current_frame, 1);
-	
+
 	return retval;
 }
 

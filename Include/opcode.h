@@ -49,7 +49,7 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #define BINARY_ADD	23
 #define BINARY_SUBTRACT	24
 #define BINARY_SUBSCR	25
-#define BINARY_CALL	26
+#define BINARY_CALL	26  /* XXX: no longer used */
 
 #define SLICE		30
 /* Also uses 31-33 */
@@ -120,6 +120,7 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #define LOAD_GLOBAL	116	/* Index in name list */
 
 #define SET_FUNC_ARGS	117	/* Argcount */
+#define CALL		118	/* Argcount */
 
 #define SETUP_LOOP	120	/* Target address (absolute) */
 #define SETUP_EXCEPT	121	/* "" */
