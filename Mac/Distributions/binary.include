@@ -205,3 +205,4 @@
 (':pystone.py', None)
 (':setup.py', None)
 (':site-packages', None)
+(':Tools:unicode:mkstringprep.py', None)
