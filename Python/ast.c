@@ -505,13 +505,15 @@ ast_for_arguments(struct compiling *c, const node *n)
 	ch = CHILD(n, i);
 	switch (TYPE(ch)) {
             case fpdef:
-                if (NCH(ch) == 3)
+                if (NCH(ch) == 3) {
                     asdl_seq_APPEND(args, 
                                     compiler_complex_args(CHILD(ch, 1))); 
-                else if (TYPE(CHILD(ch, 0)) == NAME)
+		}
+                else if (TYPE(CHILD(ch, 0)) == NAME) {
                     /* XXX check return value of Name call */
                     asdl_seq_APPEND(args, Name(NEW_IDENTIFIER(CHILD(ch, 0)),
                                                Param));
+		}
                 /* XXX Need to worry about checking if TYPE(CHILD(n, i+1)) is
                    anything other than EQUAL or a comma? */
                 /* XXX Should NCH(n) check be made a separate check? */
@@ -670,8 +672,6 @@ ast_for_listcomp(struct compiling *c, const node *n)
     int i, n_fors;
     node *ch;
 
-    fprintf(stderr, "listcomp at %d\n", n->n_lineno);
-
     REQ(n, listmaker);
     assert(NCH(n) > 1);
 
@@ -774,7 +774,6 @@ ast_for_atom(struct compiling *c, const node *n)
     */
     node *ch = CHILD(n, 0);
 
-    /* fprintf(stderr, "ast_for_atom((%d, %d))\n", TYPE(ch), NCH(ch)); */
     switch (TYPE(ch)) {
         case NAME:
             /* All names start in Load context, but may later be changed. */
@@ -1001,7 +1000,6 @@ ast_for_expr(struct compiling *c, const node *n)
     asdl_seq *seq;
     int i;
 
-    /* fprintf(stderr, "ast_for_expr(%d, %d)\n", TYPE(n), NCH(n)); */
  loop:
     switch (TYPE(n)) {
         case test:
@@ -1163,7 +1161,7 @@ ast_for_expr(struct compiling *c, const node *n)
                     else {
                         int j;
                         slice_ty slc;
-                        asdl_seq *slices = asdl_seq_new(NCH(ch) / 2);
+                        asdl_seq *slices = asdl_seq_new((NCH(ch) + 1) / 2);
                         if (!slices) {
 		            /* XXX free(e); */
                             return NULL;
@@ -1239,7 +1237,7 @@ ast_for_call(struct compiling *c, const node *n, expr_ty func)
 	    else
 		nkeywords++;
 	}
-
+    
     args = asdl_seq_new(nargs);
     if (!args)
         goto error;
@@ -1327,7 +1325,6 @@ ast_for_expr_stmt(struct compiling *c, const node *n)
        test: ... here starts the operator precendence dance
      */
 
-    /* fprintf(stderr, "ast_for_expr_stmt(%d, %d)\n", TYPE(n), NCH(n)); */
     if (NCH(n) == 1) {
 	expr_ty e = ast_for_testlist(c, CHILD(n, 0));
         if (!e)
@@ -1424,7 +1421,6 @@ ast_for_exprlist(struct compiling *c, const node *n, int context)
     int i;
     expr_ty e;
 
-    /* fprintf(stderr, "ast_for_exprlist(%d, %d)\n", TYPE(n), context); */
     REQ(n, exprlist);
 
     seq = asdl_seq_new((NCH(n) + 1) / 2);
@@ -1755,10 +1751,9 @@ ast_for_suite(struct compiling *c, const node *n)
     /* suite: simple_stmt | NEWLINE INDENT stmt+ DEDENT */
     asdl_seq *seq = NULL;
     stmt_ty s;
-    int i, total, num, pos = 0;
+    int i, total, num, end, pos = 0;
     node *ch;
 
-    /* fprintf(stderr, "ast_for_suite(%d) lineno=%d\n", TYPE(n), n->n_lineno); */
     REQ(n, suite);
 
     total = num_stmts(n);
@@ -1767,8 +1762,14 @@ ast_for_suite(struct compiling *c, const node *n)
     	return NULL;
     if (TYPE(CHILD(n, 0)) == simple_stmt) {
 	n = CHILD(n, 0);
+	/* simple_stmt always ends with a NEWLINE,
+	   and may have a trailing SEMI 
+	*/
+	end = NCH(n) - 1;
+	if (TYPE(CHILD(n, end - 1)) == SEMI)
+	    end--;
         /* loop by 2 to skip semi-colons */
-	for (i = 0; i < NCH(n); i += 2) {
+	for (i = 0; i < end; i += 2) {
 	    ch = CHILD(n, i);
 	    s = ast_for_stmt(c, ch);
 	    if (!s)
@@ -2156,8 +2157,6 @@ ast_for_classdef(struct compiling *c, const node *n)
 static stmt_ty
 ast_for_stmt(struct compiling *c, const node *n)
 {
-    /* fprintf(stderr, "ast_for_stmt(%d) lineno=%d\n",
-       TYPE(n), n->n_lineno); */
     if (TYPE(n) == stmt) {
 	assert(NCH(n) == 1);
 	n = CHILD(n, 0);
@@ -2226,7 +2225,6 @@ ast_for_stmt(struct compiling *c, const node *n)
 	}
     }
 }
-
 
 static PyObject *
 parsenumber(const char *s)
