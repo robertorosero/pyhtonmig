@@ -289,7 +289,7 @@ Merge issues:
           tp_new slot to dict objects, to ensure that they're initialized
           before being used.
 
-          Now dies with
+          Then it died with
             File "../lib/test\test_descr.py", line 325, in pydicts
                 verify(a1.state == 12)
             AttributeError: 'dictionary' object has no attribute 'state'
@@ -312,6 +312,13 @@ Merge issues:
           but in reality it appears to be this instead:
 
               typedef PyObject *(*allocfunc)(struct _typeobject *, int);
+
+          After lots of guesswork, made a tp_new that got beyond that.
+
+          Now it dies with
+
+            Testing errors...
+            test test_descr failed -- __slots__ = {} should be illegal
 ----------------------------------------------------------------------------
 2001-07-06
 

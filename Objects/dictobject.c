@@ -159,12 +159,6 @@ PyDict_New(void)
 	return (PyObject *)mp;
 }
 
-static PyObject *
-dict_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
-{
-	return PyDict_New();
-}
-
 /*
 The basic lookup function used by all operations.
 This is based on Algorithm D from Knuth Vol. 3, Sec. 6.4.
@@ -356,12 +350,9 @@ insertdict(register dictobject *mp, PyObject *key, long hash, PyObject *value)
 	PyObject *old_value;
 	register dictentry *ep;
 	typedef PyDictEntry *(*lookupfunc)(PyDictObject *, PyObject *, long);
-	register lookupfunc lookup;
 
-	lookup = mp->ma_lookup;
-	if (lookup == NULL)
-		mp->ma_lookup = lookup = lookdict_string;
-	ep = lookup(mp, key, hash);
+	assert(mp->ma_lookup != NULL);
+	ep = mp->ma_lookup(mp, key, hash);
 	if (ep->me_value != NULL) {
 		old_value = ep->me_value;
 		ep->me_value = value;
@@ -1689,6 +1680,56 @@ dict_init(PyDictObject *self, PyObject *args, PyObject *kw)
 	++created;
 #endif
 	return 0;
+}
+
+/* XXX This is wrong, but if I knew *how* it was wrong I would fix
+ * XXX it instead of typing this comment <0.5 wink>.
+ */
+static PyObject *
+dict_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
+{
+	PyObject *self;
+
+	/* XXX Is it legit to insist these all be non-NULL? */
+	if (!(type && type->tp_alloc && type->tp_init)) {
+		PyErr_BadInternalCall();
+		return NULL;
+	}
+
+	/* XXX I'm not sure what the 2nd tp_alloc arg is for, and wholly
+	 * unsure what to pass if 0 isn't appropriate in this specific case.
+	 * XXX Will tp_alloc set up GC correctly for dict objects?
+	 * If not, how to tell?  If so, how to verify?  Dare not add the
+	 * object *twice* to the GC list.
+	 */
+	self = type->tp_alloc(type, 0);
+	if (self == NULL)
+		return NULL;
+	/* XXX Safe to assume Py_DECREF(self) is OK hereafter? */
+
+	/* XXX This appears to be necessary (core dumps without it).  But I
+	 * would have guessed that, if type is a subclass, it's part of
+	 * type->tp_init()'s job to call all base class tp_init slots, "bottom
+	 * up".  Apparently not(?).
+	 */
+	if (dict_init((PyDictObject *)self, args, kwds) < 0) {
+		Py_DECREF(self);
+		return NULL;
+	}
+
+	/* XXX If type is PyDictObject, we end up calling dict_init twice.
+	 * Should that be special-cased?  It's a little inefficient, and
+	 * "created* will get incremented twice.  But if type is a subclass,
+	 * and calls dict_init directly (see last blob of confusions), that's
+	 * going to happen anyway.
+	 */
+	if (type->tp_init(self, args, kwds) < 0) {
+		Py_DECREF(self);
+		return NULL;
+	}
+
+	/* This line I feel confident about <wink>. */
+	return self;
 }
 
 static PyObject *
