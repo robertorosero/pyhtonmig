@@ -85,7 +85,12 @@ CST to AST
 ----------
 
 The parser generates a concrete syntax tree represented by a ``node
-*`` defined in ``Include/node.h``.  The abstract syntax is generated
+*`` defined in ``Include/node.h``.  Node indexing starts at 0.  Every
+token that can have whitespace surrounding it is its own token.  This
+means that something like "else:" is actually two tokens: 'else' and
+':'.
+
+The abstract syntax is generated
 from the concrete syntax in ``Python/ast.c`` using the function::
 
     mod_ty PyAST_FromNode(const node *n);
