@@ -146,59 +146,61 @@ do_arg(arg, p_format, p_va)
 
 	case 'b': /* byte -- very short int */ {
 		char *p = va_arg(*p_va, char *);
-		if (is_intobject(arg))
-			*p = getintvalue(arg);
-		else
+		long ival = getintvalue(arg);
+		if (ival == -1 && err_occurred())
 			return 0;
+		else
+			*p = ival;
 		break;
 		}
 
 	case 'h': /* short int */ {
 		short *p = va_arg(*p_va, short *);
-		if (is_intobject(arg))
-			*p = getintvalue(arg);
-		else
+		long ival = getintvalue(arg);
+		if (ival == -1 && err_occurred())
 			return 0;
+		else
+			*p = ival;
 		break;
 		}
 	
 	case 'i': /* int */ {
 		int *p = va_arg(*p_va, int *);
-		if (is_intobject(arg))
-			*p = getintvalue(arg);
-		else
+		long ival = getintvalue(arg);
+		if (ival == -1 && err_occurred())
 			return 0;
+		else
+			*p = ival;
 		break;
 		}
 	
 	case 'l': /* long int */ {
 		long *p = va_arg(*p_va, long *);
-		if (is_intobject(arg))
-			*p = getintvalue(arg);
-		else
+		long ival = getintvalue(arg);
+		if (ival == -1 && err_occurred())
 			return 0;
+		else
+			*p = ival;
 		break;
 		}
 	
 	case 'f': /* float */ {
 		float *p = va_arg(*p_va, float *);
-		if (is_floatobject(arg))
-			*p = getfloatvalue(arg);
-		else if (is_intobject(arg))
-			*p = (float)getintvalue(arg);
-		else
+		double dval = getfloatvalue(arg);
+		if (err_occurred())
 			return 0;
+		else
+			*p = dval;
 		break;
 		}
 	
 	case 'd': /* double */ {
 		double *p = va_arg(*p_va, double *);
-		if (is_floatobject(arg))
-			*p = getfloatvalue(arg);
-		else if (is_intobject(arg))
-			*p = (double)getintvalue(arg);
-		else
+		double dval = getfloatvalue(arg);
+		if (err_occurred())
 			return 0;
+		else
+			*p = dval;
 		break;
 		}
 	
@@ -262,21 +264,37 @@ do_arg(arg, p_format, p_va)
 		}
 	
 	case 'O': /* object */ {
-		typeobject *type = NULL;
+		typeobject *type;
 		object **p;
 		if (*format == '!') {
-			type = va_arg(*p_va, typeobject *);
 			format++;
+			type = va_arg(*p_va, typeobject*);
+			if (arg->ob_type != type)
+				return 0;
+			else {
+				p = va_arg(*p_va, object **);
+				*p = arg;
+			}
 		}
-		p = va_arg(*p_va, object **);
-		if (type && (*p)->ob_type != type) {
-			char buf[200];
-			sprintf(buf, "Object of type %.100s expected",
-				type->tp_name);
-			err_setstr(TypeError, buf);
-			return 0;
+		else if (*format == '?') {
+			inquiry pred = va_arg(*p_va, inquiry);
+			format++;
+			if ((*pred)(arg)) {
+				p = va_arg(*p_va, object **);
+				*p = arg;
+			}
 		}
-		*p = arg;
+		else if (*format == '&') {
+			binaryfunc convert = va_arg(*p_va, binaryfunc);
+			void *addr = va_arg(*p_va, void *);
+			format++;
+			if (! (*convert)(arg, addr))
+				return 0;
+		}
+		else {
+			p = va_arg(*p_va, object **);
+			*p = arg;
+		}
 		break;
 		}
 
