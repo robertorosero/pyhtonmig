@@ -730,8 +730,8 @@ compiler_for(struct compiler *c, stmt_ty s)
 		return 0;
 	VISIT(c, expr, s->v.For.iter);
 	ADDOP(c, GET_ITER);
-	compiler_use_block(c, start);
-	ADDOP_I(c, FOR_ITER, cleanup);
+	compiler_use_next_block(c, start);
+	ADDOP_JREL(c, FOR_ITER, cleanup);
 	VISIT(c, expr, s->v.For.target);
 	VISIT_SEQ(c, stmt, s->v.For.body);
 	ADDOP_JABS(c, JUMP_ABSOLUTE, start);
@@ -739,7 +739,7 @@ compiler_for(struct compiler *c, stmt_ty s)
 	ADDOP(c, POP_BLOCK);
 	compiler_pop_fblock(c, LOOP, start);
 	VISIT_SEQ(c, stmt, s->v.For.orelse);
-	compiler_use_block(c, end);
+	compiler_use_next_block(c, end);
 	return 1;
 }
 
@@ -781,7 +781,7 @@ compiler_while(struct compiler *c, stmt_ty s)
 	compiler_pop_fblock(c, LOOP, loop);
 	if (orelse != -1)
 		VISIT_SEQ(c, stmt, s->v.While.orelse);
-	compiler_use_block(c, end);
+	compiler_use_next_block(c, end);
 
 	return 1;
 }
@@ -1250,7 +1250,7 @@ compiler_boolop(struct compiler *c, expr_ty e)
 		ADDOP(c, POP_TOP)
 	}
 	VISIT(c, expr, asdl_seq_GET(s, n));
-	compiler_use_block(c, end);
+	compiler_use_next_block(c, end);
 	return 1;
 }
 
@@ -1284,7 +1284,7 @@ compiler_compare(struct compiler *c, expr_ty e)
 		compiler_use_block(c, cleanup);
 		ADDOP(c, ROT_TWO);
 		ADDOP(c, POP_TOP);
-		compiler_use_block(c, end);
+		compiler_use_next_block(c, end);
 	}
 	return 1;
 }
