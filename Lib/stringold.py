@@ -409,6 +409,16 @@ def replace(s, old, new, maxsplit=0):
     return s.replace(old, new, maxsplit)
 
 
+# XXX: transitional
+#
+# If string objects do not have methods, then we need to use the old string.py
+# library, which uses strop for many more things than just the few outlined
+# below.
+try:
+    ''.upper
+except AttributeError:
+    from stringold import *
+
 # Try importing optional built-in module "strop" -- if it exists,
 # it redefines some string operations that are 100-1000 times faster.
 # It also defines values for whitespace, lowercase and uppercase
