@@ -912,7 +912,8 @@ Perhaps the most well-known statement type is the
 \keyword{if} statement.  For example:
 
 \begin{verbatim}
->>> #  [Code which sets 'x' to a value...]
+>>> import random
+>>> x = random.choice([-1, 0, 1, 2])
 >>> if x < 0:
 ...      x = 0
 ...      print 'Negative changed to zero'
