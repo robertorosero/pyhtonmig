@@ -277,13 +277,25 @@
   \typeout{*** MACRO exmodindex IS OBSOLETE -- USE declaremodule INSTEAD!}}
 
 % Additional string for an index entry
-\newcommand{\index@subitem}{}
-\newcommand{\setindexsubitem}[1]{\renewcommand{\index@subitem}{#1}}
-\newcommand{\ttindex}[1]{\index{#1@{\py@idxcode{#1}} \index@subitem}}
-
+\newif\ifpy@usingsubitem\py@usingsubitemfalse
+\newcommand{\py@indexsubitem}{}
+\newcommand{\setindexsubitem}[1]{\renewcommand{\py@indexsubitem}{ #1}%
+                                 \py@usingsubitemtrue}
+\newcommand{\ttindex}[1]{%
+  \ifpy@usingsubitem
+    \index{#1@{\py@idxcode{#1}}\py@indexsubitem}%
+  \else%
+    \index{#1@{\py@idxcode{#1}}}%
+  \fi%
+}
 \newcommand{\withsubitem}[2]{%
   \begingroup%
-  \def\index@subitem{#1}#2%
+    \ifpy@usingsubitem%
+      \def\index@subitem{#1}#2%
+    \else%
+      \def\index@subitem{#1}#2%
+      \py@usingsubitemfalse%
+    \fi
   \endgroup%
 }
 
@@ -421,6 +433,7 @@
 
 
 \newcommand{\py@reset}{
+  \py@usingsubitemfalse
   \py@ProcessModSynopsis
   \renewcommand{\py@thisclass}{}
   \renewcommand{\py@thismodule}{}
