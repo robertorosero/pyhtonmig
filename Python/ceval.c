@@ -516,7 +516,7 @@ eval_frame(PyFrameObject *f)
 #ifdef LLTRACE
 	int lltrace;
 #endif
-#if defined(Py_DEBUG) || defined(LLTRACE)
+#if defined(Py_DEBUG)
 	/* Make it easier to find out where we are with a debugger */
 	char *filename;
 #endif
@@ -629,9 +629,9 @@ eval_frame(PyFrameObject *f)
 	}
 
 #ifdef LLTRACE
-	lltrace = PyDict_GetItemString(f->f_globals,"__lltrace__") != NULL;
+	lltrace = PyDict_GetItemString(f->f_globals, "__lltrace__") != NULL;
 #endif
-#if defined(Py_DEBUG) || defined(LLTRACE)
+#if defined(Py_DEBUG)
 	filename = PyString_AsString(co->co_filename);
 #endif
 
@@ -690,7 +690,7 @@ eval_frame(PyFrameObject *f)
 	fast_next_opcode:
 		/* Extract opcode and argument */
 
-#if defined(Py_DEBUG) || defined(LLTRACE)
+#if defined(Py_DEBUG)
 		f->f_lasti = INSTR_OFFSET();
 #endif
 
