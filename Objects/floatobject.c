@@ -633,7 +633,7 @@ float_float(PyObject *v)
 static PyObject *
 float_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
-	PyObject *x;
+	PyObject *x = Py_False; /* Integer zero */
 	static char *kwlist[] = {"x", 0};
 
 	assert(type == &PyFloat_Type);
