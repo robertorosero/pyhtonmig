@@ -30,9 +30,17 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 /* Parser-tokenizer link interface */
 
-extern int parsestring PROTO((char *, grammar *, int, node **_ret));
-extern int parsefile PROTO((FILE *, char *, grammar *, int,
-					char *, char *, node **));
+typedef struct {
+	int error;
+	char *filename;
+	int lineno;
+	int offset;
+	char *text;
+} perrdetail;
+
+extern node *parsestring PROTO((char *, grammar *, int, perrdetail *));
+extern node *parsefile PROTO((FILE *, char *, grammar *, int,
+			    char *, char *, perrdetail *));
 
 #ifdef __cplusplus
 }

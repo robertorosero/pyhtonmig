@@ -64,7 +64,6 @@ extern object *ZeroDivisionError;
 extern int err_badarg PROTO((void));
 extern object *err_nomem PROTO((void));
 extern object *err_errno PROTO((object *));
-extern void err_input PROTO((int));
 
 extern void err_badcall PROTO((void));
 
