@@ -1218,6 +1218,40 @@ dict_getattr(dictobject *mp, char *name)
 	return Py_FindMethod(mapp_methods, (PyObject *)mp, name);
 }
 
+static int
+dict_contains(dictobject *mp, PyObject *key)
+{
+	long hash;
+
+#ifdef CACHE_HASH
+	if (!PyString_Check(key) ||
+	    (hash = ((PyStringObject *) key)->ob_shash) == -1)
+#endif
+	{
+		hash = PyObject_Hash(key);
+		if (hash == -1)
+			return -1;
+	}
+	return (mp->ma_size != 0
+		&& (mp->ma_lookup)(mp, key, hash)->me_value != NULL);
+}
+
+staticforward PyObject *dictiter_new(dictobject *);
+
+/* Hack to implement "key in dict" */
+static PySequenceMethods dict_as_sequence = {
+	0,					/* sq_length */
+	0,					/* sq_concat */
+	0,					/* sq_repeat */
+	0,					/* sq_item */
+	0,					/* sq_slice */
+	0,					/* sq_ass_item */
+	0,					/* sq_ass_slice */
+	(objobjproc)dict_contains,		/* sq_contains */
+	0,					/* sq_inplace_concat */
+	0,					/* sq_inplace_repeat */
+};
+
 PyTypeObject PyDict_Type = {
 	PyObject_HEAD_INIT(&PyType_Type)
 	0,
@@ -1231,7 +1265,7 @@ PyTypeObject PyDict_Type = {
 	(cmpfunc)dict_compare,			/* tp_compare */
 	(reprfunc)dict_repr,			/* tp_repr */
 	0,					/* tp_as_number */
-	0,					/* tp_as_sequence */
+	&dict_as_sequence,			/* tp_as_sequence */
 	&dict_as_mapping,			/* tp_as_mapping */
 	0,					/* tp_hash */
 	0,					/* tp_call */
@@ -1244,6 +1278,8 @@ PyTypeObject PyDict_Type = {
 	(traverseproc)dict_traverse,		/* tp_traverse */
 	(inquiry)dict_tp_clear,			/* tp_clear */
 	0,					/* tp_richcompare */
+	0,					/* tp_weaklistoffset */
+	(getiterfunc)dictiter_new,		/* tp_iter */
 };
 
 /* For backward compatibility with old dictionary interface */
@@ -1286,3 +1322,102 @@ PyDict_DelItemString(PyObject *v, char *key)
 	Py_DECREF(kv);
 	return err;
 }
+
+/* Dictionary iterator type */
+
+extern PyTypeObject PyDictIter_Type; /* Forward */
+
+typedef struct {
+	PyObject_HEAD
+	dictobject *di_dict;
+	int di_size;
+	int di_pos;
+} dictiterobject;
+
+static PyObject *
+dictiter_new(dictobject *dict)
+{
+	dictiterobject *di;
+	di = PyObject_NEW(dictiterobject, &PyDictIter_Type);
+	if (di == NULL)
+		return NULL;
+	Py_INCREF(dict);
+	di->di_dict = dict;
+	di->di_size = dict->ma_size;
+	di->di_pos = 0;
+	return (PyObject *)di;
+}
+
+static void
+dictiter_dealloc(dictiterobject *di)
+{
+	Py_DECREF(di->di_dict);
+	PyObject_DEL(di);
+}
+
+static PyObject *
+dictiter_next(dictiterobject *di, PyObject *args)
+{
+	PyObject *key;
+	if (di->di_size != di->di_dict->ma_size) {
+		PyErr_SetString(PyExc_RuntimeError,
+				"dictionary changed size during iteration");
+		return NULL;
+	}
+	if (PyDict_Next((PyObject *)(di->di_dict), &di->di_pos, &key, NULL)) {
+		Py_INCREF(key);
+		return key;
+	}
+	PyErr_SetObject(PyExc_IndexError, Py_None);
+	return NULL;
+}
+
+static PyObject *
+dictiter_getiter(PyObject *it)
+{
+	Py_INCREF(it);
+	return it;
+}
+
+static PyMethodDef dictiter_methods[] = {
+	{"next",	(PyCFunction)dictiter_next,	METH_VARARGS,
+	 "it.next() -- get the next value, or raise IndexError"},
+	{NULL,		NULL}		/* sentinel */
+};
+
+static PyObject *
+dictiter_getattr(dictiterobject *it, char *name)
+{
+	return Py_FindMethod(dictiter_methods, (PyObject *)it, name);
+}
+
+PyTypeObject PyDictIter_Type = {
+	PyObject_HEAD_INIT(&PyType_Type)
+	0,					/* ob_size */
+	"dictionary-iterator",			/* tp_name */
+	sizeof(dictiterobject),			/* tp_basicsize */
+	0,					/* tp_itemsize */
+	/* methods */
+	(destructor)dictiter_dealloc, 		/* tp_dealloc */
+	0,					/* tp_print */
+	(getattrfunc)dictiter_getattr,		/* tp_getattr */
+	0,					/* tp_setattr */
+	0,					/* tp_compare */
+	0,					/* tp_repr */
+	0,					/* tp_as_number */
+	0,					/* tp_as_sequence */
+	0,					/* tp_as_mapping */
+	0,					/* tp_hash */
+	0,					/* tp_call */
+	0,					/* tp_str */
+	0,					/* tp_getattro */
+	0,					/* tp_setattro */
+	0,					/* tp_as_buffer */
+	Py_TPFLAGS_DEFAULT,			/* tp_flags */
+ 	0,					/* tp_doc */
+ 	0,					/* tp_traverse */
+ 	0,					/* tp_clear */
+	0,					/* tp_richcompare */
+	0,					/* tp_weaklistoffset */
+	(getiterfunc)dictiter_getiter,		/* tp_iter */
+};
