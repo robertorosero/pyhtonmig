@@ -322,9 +322,12 @@ static PyObject *
 wrap_ternaryfunc(PyObject *self, PyObject *args, void *wrapped)
 {
 	ternaryfunc func = (ternaryfunc)wrapped;
-	PyObject *other, *third;
+	PyObject *other;
+	PyObject *third = Py_None;
 
-	if (!PyArg_ParseTuple(args, "OO", &other, &third))
+	/* Note: This wrapper only works for __pow__() */
+
+	if (!PyArg_ParseTuple(args, "O|O", &other, &third))
 		return NULL;
 	return (*func)(self, other, third);
 }
