@@ -368,7 +368,7 @@ analyze_name(PyObject *dict, PyObject *name, int flags, PyObject *bound,
 static int
 analyze_cells(PyObject *scope, PyObject *free)
 {
-	PyObject *name, *v, *w;
+        PyObject *name, *v, *w;
 	int flags, pos = 0, success = 0;
 
 	w = PyInt_FromLong(CELL);
@@ -398,9 +398,10 @@ analyze_cells(PyObject *scope, PyObject *free)
 
 /* Enter the final scope information into the st_symbols dict. */
 static int
-update_symbols(PyObject *symbols, PyObject *scope)
+update_symbols(PyObject *symbols, PyObject *scope, 
+               PyObject *bound, PyObject *free)
 {
-	PyObject *name, *v, *u, *w;
+	PyObject *name, *v, *u, *w, *free_value = NULL;
 	int i, flags, pos = 0;
 
 	while (PyDict_Next(symbols, &pos, &name, &v)) {
@@ -417,6 +418,25 @@ update_symbols(PyObject *symbols, PyObject *scope)
 		}
 		Py_DECREF(u);
 	}
+
+        free_value = PyInt_FromLong(FREE << SCOPE_OFF);
+        if (!free_value)
+            return 0;
+
+        /* add a free variable when it's only use is for creating a closure */
+        pos = 0;
+	while (PyDict_Next(free, &pos, &name, &v)) {
+            if (PyDict_GetItem(symbols, name))
+                continue;       /* it's not free, probably a cell */
+            if (!PyDict_GetItem(bound, name))
+                continue;       /* it's a global */
+
+            if (PyDict_SetItem(symbols, name, free_value) < 0) {
+                Py_DECREF(free_value);
+                return 0;
+            }
+        }
+        Py_DECREF(free_value);
 	return 1;
 }   
 
@@ -446,7 +466,7 @@ analyze_block(PySTEntryObject *ste, PyObject *bound, PyObject *free)
 	newbound = PyDict_New();
 	if (!newbound)
 		goto error;
-	if (ste->ste_type != ClassBlock) {
+	if (ste->ste_type == FunctionBlock) {
 		if (PyDict_Update(newbound, local) < 0)
 			goto error;
 	}
@@ -458,13 +478,13 @@ analyze_block(PySTEntryObject *ste, PyObject *bound, PyObject *free)
 	for (i = 0; i < PyList_GET_SIZE(ste->ste_children); ++i) {
 		PyObject *c = PyList_GET_ITEM(ste->ste_children, i);
 		assert(c && PySTEntry_Check(c));
-		if (!analyze_block((PySTEntryObject *)c, local, free))
+		if (!analyze_block((PySTEntryObject *)c, newbound, free))
 			goto error;
 	}
 
 	if (!analyze_cells(scope, free))
 		goto error;
-	if (!update_symbols(ste->ste_symbols, scope))
+	if (!update_symbols(ste->ste_symbols, scope, bound, free))
 		goto error;
 	success = 1;
  error:
