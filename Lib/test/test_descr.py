@@ -240,6 +240,17 @@ def spamlists():
     testset2op(spamlist([1,2]), 1, 3, spamlist([1,3]), "a[b]=c", "__setitem__")
     testset3op(spamlist([1,2,3,4]), 1, 3, spamlist([5,6]),
                spamlist([1,5,6,4]), "a[b:c]=d", "__setslice__")
+    # Test subclassing
+    class C(spam.spamlist):
+        def foo(self): return 1
+    a = C()
+    verify(a == [])
+    verify(a.foo() == 1)
+    a.append(100)
+    verify(a == [100])
+    verify(a.getstate() == 0)
+    a.setstate(42)
+    verify(a.getstate() == 42)
 
 def spamdicts():
     if verbose: print "Testing spamdict operations..."
@@ -272,6 +283,17 @@ def spamdicts():
     testunop(spamdict({1:2,3:4}), "{3: 4, 1: 2}", "repr(a)", "__repr__")
     testset2op(spamdict({1:2,3:4}), 2, 3, spamdict({1:2,2:3,3:4}),
                "a[b]=c", "__setitem__")
+    # Test subclassing
+    class C(spam.spamdict):
+        def foo(self): return 1
+    a = C()
+    verify(a.items() == [])
+    verify(a.foo() == 1)
+    a['foo'] = 'bar'
+    verify(a.items() == [('foo', 'bar')])
+    verify(a.getstate() == 0)
+    a.setstate(100)
+    verify(a.getstate() == 100)
 
 def pydicts():
     if verbose: print "Testing Python subclass of dict..."
