@@ -1,12 +1,13 @@
-dnl Process this file with autoconf to produce a configure script.
+dnl Process this file with autoconf 1.8 or later to produce a configure script.
 AC_REVISION($Revision$)dnl
+AC_PREREQ(1.8)dnl
 AC_INIT(Include/object.h)
 AC_PREFIX(python)
 AC_CONFIG_HEADER(config.h)dnl
 # Don't suppress compiler output when --verbose is specified
 test -n "$verbose" &&
 	ac_compile=`echo "$ac_compile" | sed "s|>/dev/null 2>&1||"`
-test -n "$verbose" && echo "	ac_compile='$ac_compile'"
+AC_VERBOSE(setting ac_compile to '$ac_compile')
 
 # checks for alternative programs
 AC_PROG_CC
@@ -21,7 +22,7 @@ AC_ISC_POSIX
 AC_MINIX
 dnl DYNIX test runs compile so must be last
 AC_DYNIX_SEQ
-echo checking for NeXT
+AC_CHECKING(for NeXT)
 AC_TEST_PROGRAM([
 #ifdef _NEXT_SOURCE
 main() { exit(0); }
@@ -44,27 +45,27 @@ AC_UID_T
 # checks for libraries
 AC_HAVE_LIBRARY(dl)
 
-echo checking for --with-svr4
+AC_CHECKING(for --with-svr4)
 AC_WITH(svr4, [
 AC_HAVE_LIBRARY(socket)
 AC_HAVE_LIBRARY(inet)
 AC_HAVE_LIBRARY(nsl)
 ])
 
-echo checking for --with-readline
+AC_CHECKING(for --with-readline)
 AC_WITH(readline, [AC_DEFINE(WITH_READLINE)
 if test -d "$withval"
 then LIBS="$LIBS -L$withval"
-else echo proper usage is --with-readline=DIRECTORY 1>&2; exit 1
+else AC_ERROR(proper usage is --with-readline=DIRECTORY)
 fi
 termcap=
 AC_HAVE_LIBRARY(termcap, [termcap=termcap], [AC_HAVE_LIBRARY(termlib, [termcap=termlib])])
 if test ! -z "$termcap"
 then LIBS="$LIBS -lreadline -l$termcap"
-else echo no working termcap/termlib, do not use --with-readline 1>&2; exit 1
+else AC_ERROR(no working termcap/termlib, do not use --with-readline)
 fi])
 
-echo checking for --with-thread
+AC_CHECKING(for --with-thread)
 AC_WITH(thread, [
 if test -d "$withval"
 then LIBS="$LIBS -L$withval"
@@ -85,29 +86,29 @@ LIBOBJS="$LIBOBJS thread.o"])
 AC_SUBST(DLINCLDIR)
 DLINCLDIR=/
 
-echo checking for --with-sgi-dl
+AC_CHECKING(for --with-sgi-dl)
 AC_WITH(sgi-dl, [AC_DEFINE(WITH_SGI_DL)
 dldir=$withval
 if test -d "$dldir"
 then LIBS="$LIBS -L$dldir"
-else echo proper usage is --with-sgi-dl=DIRECTORY 1>&2; exit 1
+else AC_ERROR(proper usage is --with-sgi-dl=DIRECTORY)
 fi
 DLINCLDIR=${dldir}
 LIBS="$LIBS -ldl -lmld"])
 
-echo checking for --with-dl-dld
+AC_CHECKING(for --with-dl-dld)
 AC_WITH(dl-dld, [AC_DEFINE(WITH_DL_DLD)
 dldir=`echo "$withval" | sed 's/,.*//'`
 dlddir=`echo "$withval" | sed 's/.*,//'`
 if test -d "$dldir" -a -d "$dlddir"
 then LIBS="$LIBS -L$dldir -L$dlddir"
-else echo proper usage is --with-dl-dld=DL_DIRECTORY,DLD_DIRECTORY 1>&2; exit 1
+else AC_ERROR(proper usage is --with-dl-dld=DL_DIRECTORY,DLD_DIRECTORY)
 fi
 DLINCLDIR=${dldir}
 LIBS="$LIBS -ldl -ldld"])
 
 # checks for library functions
-AC_HAVE_FUNCS(clock dlopen ftime gettimeofday getpeername getpgrp getpid getwd lstat nice readlink select setsid setpgid setpgrp setvbuf siginterrupt symlink tcgetpgrp tcsetpgrp times uname waitpid)
+AC_HAVE_FUNCS(chown clock dlopen ftime gettimeofday getpeername getpgrp getpid getwd link lstat nice readlink select setgid setuid setsid setpgid setpgrp setvbuf siginterrupt symlink tcgetpgrp tcsetpgrp times uname waitpid)
 AC_REPLACE_FUNCS(dup2 getcwd strerror strtod memmove)
 AC_FUNC_CHECK(getpgrp, AC_COMPILE_CHECK([argument to getpgrp], [#include <unistd.h>], [getpgrp(0);], AC_DEFINE(GETPGRP_HAVE_ARG)))
 
@@ -130,13 +131,13 @@ AC_CONST
 
 AC_COMPILE_CHECK([wheter we have signed char], [], [signed char c;], [], AC_DEFINE(signed, []))
 
-echo checking for prototypes
+AC_CHECKING(for prototypes)
 AC_TEST_PROGRAM([
 int foo(int x) { return 0; }
 int main() { return foo(10); }
 ], AC_DEFINE(HAVE_PROTOTYPES) have_prototypes=1)
 
-echo checking for variable length prototypes and stdarg.h
+AC_CHECKING(for variable length prototypes and stdarg.h)
 AC_TEST_PROGRAM([
 #include <stdarg.h>
 int foo(int x, ...) { return 0; }
@@ -146,7 +147,7 @@ if test "$have_prototypes"; then
 AC_COMPILE_CHECK(["bad exec* prototypes"], [#include <unistd.h>], [char **t;execve("@",t,t);], , AC_DEFINE(BAD_EXEC_PROTOTYPES))
 fi
 
-echo checking for bad static forward
+AC_CHECKING(for bad static forward)
 AC_TEST_PROGRAM([
 struct s { int a; int b; };
 static struct s foo;
@@ -167,14 +168,14 @@ AC_SUBST(LIBM)
 LIBM=-lm
 AC_WITH(libm, [if test "$withval" != yes
 then LIBM=$withval
-else echo proper usage is --with-libm=STRING 1>&2; exit 1
+else AC_ERROR(proper usage is --with-libm=STRING)
 fi])
 
 # check for --with-libc=...
 AC_SUBST(LIBC)
 AC_WITH(libc, [if test "$withval" != yes
 then LIBC=$withval
-else echo proper usage is --with-libc=STRING 1>&2; exit 1
+else AC_ERROR(proper usage is --with-libc=STRING)
 fi])
 
 # generate output files
