@@ -91,9 +91,35 @@ x = '"'; y = "\""; assert(len(x) == 1 and x == y and ord(x) == 34)
 x = "doesn't \"shrink\" does it"
 y = 'doesn\'t "shrink" does it'
 assert(len(x) == 24 and x == y)
-x = "doesn \"shrink\" doesn't it"
-y = 'doesn "shrink" doesn\'t it'
-assert(len(x) == 25 and x == y)
+x = "does \"shrink\" doesn't it"
+y = 'does "shrink" doesn\'t it'
+assert(len(x) == 24 and x == y)
+x = """
+The "quick"
+brown fox
+jumps over
+the 'lazy' dog.
+"""
+y = '\nThe "quick"\nbrown fox\njumps over\nthe \'lazy\' dog.\n'
+assert(x == y)
+y = '''
+The "quick"
+brown fox
+jumps over
+the 'lazy' dog.
+'''; assert(x == y)
+y = "\n\
+The \"quick\"\n\
+brown fox\n\
+jumps over\n\
+the 'lazy' dog.\n\
+"; assert(x == y)
+y = '\n\
+The \"quick\"\n\
+brown fox\n\
+jumps over\n\
+the \'lazy\' dog.\n\
+'; assert(x == y)
 
 
 print '1.2 Grammar'
