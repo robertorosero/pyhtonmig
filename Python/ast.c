@@ -9,6 +9,10 @@
 
 #include <assert.h>
 
+#if 1
+#define fprintf if (0) fprintf
+#endif
+
 /* XXX TO DO
    - re-indent this file (should be done)
    - internal error checking (freeing memory, etc.)
@@ -1095,17 +1099,11 @@ ast_for_expr(const node *n)
 
                XXX What about atom trailer trailer ** factor?
             */
-            if (TYPE(CHILD(n, NCH(n) - 1)) == factor) {
-                expr_ty f = ast_for_expr(CHILD(n, NCH(n) - 1));
-                if (!f) {
-		    /* XXX free(e); */
-                    return NULL;
-		}
-                return BinOp(e, Pow, f);
-            }
             for (i = 1; i < NCH(n); i++) {
                 expr_ty new = e;
                 node *ch = CHILD(n, i);
+                if (ch->n_str && strcmp(ch->n_str, "**") == 0)
+                    break;
                 if (TYPE(CHILD(ch, 0)) == LPAR) {
                     if (NCH(ch) == 2)
                         new = Call(new, NULL, NULL, NULL, NULL);
@@ -1169,6 +1167,14 @@ ast_for_expr(const node *n)
 		    }
                 }
                 e = new;
+            }
+            if (TYPE(CHILD(n, NCH(n) - 1)) == factor) {
+                expr_ty f = ast_for_expr(CHILD(n, NCH(n) - 1));
+                if (!f) {
+		    /* XXX free(e); */
+                    return NULL;
+		}
+                return BinOp(e, Pow, f);
             }
             return e;
         }
@@ -1744,7 +1750,8 @@ ast_for_suite(const node *n)
     	return NULL;
     if (TYPE(CHILD(n, 0)) == simple_stmt) {
 	n = CHILD(n, 0);
-	for (i = 0; i < total; i++) {
+        /* loop by 2 to skip semi-colons */
+	for (i = 0; i < NCH(n); i += 2) {
 	    ch = CHILD(n, i);
 	    s = ast_for_stmt(ch);
 	    if (!s)
