@@ -7,8 +7,18 @@ contributions from others at CWI and elsewhere.  The last version of
 Python issued by CWI was Python 1.2.  In 1995, Mr. van Rossum
 continued his work on Python at the Corporation for National Research
 Initiatives (CNRI) in Reston, Virginia where several versions of the
-software were generated.  Python 1.6 is the last of the versions
-developed at CNRI.
+software were generated.  Python 1.6 was the last of the versions
+developed at CNRI and the only version issued by CNRI with an open
+source license.
+
+Following the release of Python 1.6, and after Guido van Rossum left
+CNRI to work with commercial software developers, it became clear that
+the ability to use Python with software available under the GNU Public
+License (GPL) was very desirable. CNRI and the Free Software
+Foundation (FSF)interacted to develop enabling wording changes to the
+Python license. Python 1.6.1 is essentially the same as Python 1.6,
+with a few minor bug fixes, and with a GPL compatible open source
+license.
 
 
 
