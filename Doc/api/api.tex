@@ -2422,18 +2422,19 @@ attributes are filled in; the caller is responsible for providing a
 \begin{cfuncdesc}{PyObject *}{PyModule_GetDict}{PyObject *module}
 Return the dictionary object that implements \var{module}'s namespace; 
 this object is the same as the \member{__dict__} attribute of the
-module object.  This function never fails.
+module object.  This function never fails.  \strong{Note:} this
+function returns a borrowed reference.
 \end{cfuncdesc}
 
 \begin{cfuncdesc}{char *}{PyModule_GetName}{PyObject *module}
 Return \var{module}'s \member{__name__} value.  If the module does not 
-provide one, \exception{SystemError} is raised.
+provide one, \exception{SystemError} is raised and \NULL{} is returned.
 \end{cfuncdesc}
 
 \begin{cfuncdesc}{char *}{PyModule_GetFilename}{PyObject *module}
 Return the name of the file from which \var{module} was loaded using
 \var{module}'s \member{__file__} attribute.  If this is not defined,
-raise \exception{SystemError}.
+raise \exception{SystemError} and return \NULL.
 \end{cfuncdesc}
 
 
