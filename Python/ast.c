@@ -10,9 +10,10 @@
 #include <assert.h>
 
 /* XXX TO DO
-   re-indent this file
-   internal error checking (such as function return values, etc.)
-   syntax errors
+   - re-indent this file
+    - internal error checking (such as function return values, freeing memory,
+      etc.)
+   - syntax errors
 */
 
 static asdl_seq *seq_for_testlist(const node *);
@@ -52,46 +53,51 @@ num_stmts(const node *n)
     node *ch;
 
     switch (TYPE(n)) {
-    case single_input:
-	if (TYPE(CHILD(n, 0)) == NEWLINE)
-	    return 0;
-	else
-	    return num_stmts(CHILD(n, 0));
-    case file_input:
-	l = 0;
-	for (i = 0; i < NCH(n); i++) {
-	    ch = CHILD(n, i);
-	    if (TYPE(ch) == stmt)
-		l += num_stmts(ch);
-	}
-	return l;
-    case stmt:
-	return num_stmts(CHILD(n, 0));
-    case compound_stmt:
-	return 1;
-    case simple_stmt:
-	return NCH(n) / 2;
-    case suite:
-	if (NCH(n) == 1)
-	    return num_stmts(CHILD(n, 0));
-	else {
-	    l = 0;
-	    for (i = 2; i < (NCH(n) - 1); i++)
-		l += num_stmts(CHILD(n, i));
-	    return l;
-	}
-    default: {
-        char buf[128];
-	sprintf(buf, "Non-statement found: %d %d\n",
-		TYPE(n), NCH(n));
-	Py_FatalError(buf);
-	}
+        case single_input:
+            if (TYPE(CHILD(n, 0)) == NEWLINE)
+                return 0;
+            else
+                return num_stmts(CHILD(n, 0));
+        case file_input:
+            l = 0;
+            for (i = 0; i < NCH(n); i++) {
+                ch = CHILD(n, i);
+                if (TYPE(ch) == stmt)
+                    l += num_stmts(ch);
+            }
+            return l;
+        case stmt:
+            return num_stmts(CHILD(n, 0));
+        case compound_stmt:
+            return 1;
+        case simple_stmt:
+            return NCH(n) / 2; /* Divide by 2 to remove count of semi-colons */
+        case suite:
+            if (NCH(n) == 1)
+                return num_stmts(CHILD(n, 0));
+            else {
+                l = 0;
+                for (i = 2; i < (NCH(n) - 1); i++)
+                    l += num_stmts(CHILD(n, i));
+                return l;
+            }
+        default: {
+            char buf[128];
+
+            sprintf(buf, "Non-statement found: %d %d\n",
+                    TYPE(n), NCH(n));
+            Py_FatalError(buf);
+        }
     }
     assert(0);
     return 0;
 }
 
-mod_ty PyAST_FromNode(const node *n)
+/* Transform the CST rooted at node * to the appropriate AST
+*/
+
+mod_ty
+PyAST_FromNode(const node *n)
 {
     int i, j, num, total;
     asdl_seq *stmts = NULL;
@@ -99,78 +105,85 @@ mod_ty PyAST_FromNode(const node *n)
     node *ch;
 
     switch (TYPE(n)) {
-    case file_input:
-	total = num_stmts(n);
-	fprintf(stderr, "file_input containing %d statements\n", total);
-	stmts = asdl_seq_new(total);
-	if (!stmts)
-		return NULL;
-	for (i = 0; i < NCH(n) - 1; i++) {
-	    ch = CHILD(n, i);
-	    if (TYPE(ch) == NEWLINE)
-		continue;
-	    REQ(ch, stmt);
-	    num = num_stmts(ch);
-	    if (num == 1) {
-		s = ast_for_stmt(ch);
-		if (!s)
-		    goto error;
-		asdl_seq_APPEND(stmts, s);
-	    } else {
-		ch = CHILD(ch, 0);
-		REQ(ch, simple_stmt);
-		for (j = 0; j < num; j++) {
-		    s = ast_for_stmt(CHILD(ch, j * 2));
-		    if (!s)
-			goto error;
-		    asdl_seq_APPEND(stmts, s);
-		}
-	    }
-	}
-	return Module(stmts);
-    case eval_input:
-	return Expression(ast_for_testlist(CHILD(n, 0)));
-    case single_input:
-	if (TYPE(CHILD(n, 0)) == NEWLINE) {
-	    stmts = asdl_seq_new(1);
-	    if (!stmts)
-		return NULL;
-	    asdl_seq_SET(stmts, 0, Pass(n->n_lineno));
-	    return Interactive(stmts);
-	}
-	else {
-	    n = CHILD(n, 0);
-	    num = num_stmts(n);
-	    stmts = asdl_seq_new(num);
-	    if (!stmts)
-		return NULL;
-	    if (num == 1) {
-		asdl_seq_SET(stmts, 0, ast_for_stmt(n));
-	    }
-	    else {
-		/* Only a simple_stmt can contain multiple statements. */
-		REQ(n, simple_stmt);
-		for (i = 0; i < NCH(n); i += 2) {
-		    stmt_ty s;
-		    if (TYPE(CHILD(n, i)) == NEWLINE)
-			break;
-		    s = ast_for_stmt(CHILD(n, i));
-		    if (!s)
-			goto error;
-		    asdl_seq_SET(stmts, i / 2, s);
-		}
-	    }
+        case file_input:
+            total = num_stmts(n);
+            fprintf(stderr, "file_input containing %d statements\n", total);
+            stmts = asdl_seq_new(total);
+            if (!stmts)
+                    return NULL;
+            for (i = 0; i < NCH(n) - 1; i++) {
+                ch = CHILD(n, i);
+                if (TYPE(ch) == NEWLINE)
+                    continue;
+                REQ(ch, stmt);
+                num = num_stmts(ch);
+                if (num == 1) {
+                    s = ast_for_stmt(ch);
+                    if (!s)
+                        goto error;
+                    asdl_seq_APPEND(stmts, s);
+                }
+                else {
+                    ch = CHILD(ch, 0);
+                    REQ(ch, simple_stmt);
+                    for (j = 0; j < num; j++) {
+                        s = ast_for_stmt(CHILD(ch, j * 2));
+                        if (!s)
+                            goto error;
+                        asdl_seq_APPEND(stmts, s);
+                    }
+                }
+            }
+            return Module(stmts);
+        case eval_input: {
+            expr_ty testlist_ast;
+            
+            testlist_ast = ast_for_testlist(CHILD(n, 0));
+            if (!testlist_ast)
+                goto error;
+            return Expression(testlist_ast);
+        }
+        case single_input:
+            if (TYPE(CHILD(n, 0)) == NEWLINE) {
+                stmts = asdl_seq_new(1);
+                if (!stmts)
+                    return NULL;
+                asdl_seq_SET(stmts, 0, Pass(n->n_lineno));
+                return Interactive(stmts);
+            }
+            else {
+                n = CHILD(n, 0);
+                num = num_stmts(n);
+                stmts = asdl_seq_new(num);
+                if (!stmts)
+                    return NULL;
+                if (num == 1) {
+                    asdl_seq_SET(stmts, 0, ast_for_stmt(n));
+                }
+                else {
+                    /* Only a simple_stmt can contain multiple statements. */
+                    REQ(n, simple_stmt);
+                    for (i = 0; i < NCH(n); i += 2) {
+                        stmt_ty s;
+                        if (TYPE(CHILD(n, i)) == NEWLINE)
+                            break;
+                        s = ast_for_stmt(CHILD(n, i));
+                        if (!s)
+                            goto error;
+                        asdl_seq_SET(stmts, i / 2, s);
+                    }
+                }
 
-	    return Interactive(stmts);
-	}
-    default:
-	goto error;
+                return Interactive(stmts);
+            }
+        default:
+            goto error;
     }
  error:
     if (stmts)
 	asdl_seq_free(stmts);
-    fprintf(stderr, "error in PyAST_FromNode() exc?\n");
-    PyErr_Occurred();
+    fprintf(stderr, "error in PyAST_FromNode() exc? %c\n",
+            PyErr_Occurred() ? 'Y': 'N');
     return NULL;
 }
 
@@ -180,66 +193,98 @@ mod_ty PyAST_FromNode(const node *n)
 
 #define NEW_IDENTIFIER(n) PyString_InternFromString(STR(n))
 
+/* Return the AST repr. of the operator represented as syntax (|, ^, etc.)
+*/
+
 static operator_ty
 get_operator(const node *n)
 {
     switch (TYPE(n)) {
-    case VBAR:
-	return BitOr;
-    case CIRCUMFLEX:
-	return BitXor;
-    case AMPER:
-	return BitAnd;
-    case LEFTSHIFT:
-	return LShift;
-    case RIGHTSHIFT:
-	return RShift;
-    case PLUS:
-	return Add;
-    case MINUS:
-	return Sub;
-    case STAR:
-	return Mult;
-    case SLASH:
-	return Div;
-    case DOUBLESLASH:
-	return FloorDiv;
-    case PERCENT:
-	return Mod;
-    default:
-	return 0;
+        case VBAR:
+            return BitOr;
+        case CIRCUMFLEX:
+            return BitXor;
+        case AMPER:
+            return BitAnd;
+        case LEFTSHIFT:
+            return LShift;
+        case RIGHTSHIFT:
+            return RShift;
+        case PLUS:
+            return Add;
+        case MINUS:
+            return Sub;
+        case STAR:
+            return Mult;
+        case SLASH:
+            return Div;
+        case DOUBLESLASH:
+            return FloorDiv;
+        case PERCENT:
+            return Mod;
+        default:
+            return 0;
     }
 }
+
+/* Set the context ctx for expr_ty e returning 0 on success, -1 on error.
+
+   Only sets context for expr kinds that "can appear in assignment context"
+   (according to ../Parser/Python.asdl)
+
+   If e is a sequential type, items in sequence will also have their context
+   set.
+
+   XXX: Exception got thrown when called with context 8 (Call_kind) while
+   running ``make``:
+
+       Traceback (most recent call last):
+         File "./setup.py", line 4, in <module>
+             __version__ = "$Revision$"
+             Exception: can't set context for 8
+
+    Another exception from running regrtest.py:
+
+        code Lib/test/regrtest.py
+        XXX undetected error
+        Traceback (most recent call last):
+          File "Lib/test/regrtest.py", line 71, in <module>
+              import sys
+              SyntaxError: can't set context for 8
+   
+*/
 
 static int
 set_context(expr_ty e, expr_context_ty ctx)
 {
     asdl_seq *s = NULL;
+
     switch (e->kind) {
-    case Attribute_kind:
-	e->v.Attribute.ctx = ctx;
-	break;
-    case Subscript_kind:
-	e->v.Subscript.ctx = ctx;
-	break;
-    case Name_kind:
-	e->v.Name.ctx = ctx;
-	break;
-    case List_kind:
-	e->v.List.ctx = ctx;
-	s = e->v.List.elts;
-	break;
-    case Tuple_kind:
-	e->v.Tuple.ctx = ctx;
-	s = e->v.Tuple.elts;
-	break;
-    default:
-	    /* This should trigger syntax error */
-	fprintf(stderr, "can't set context for %d\n", e->kind);
-	return -1;
+        case Attribute_kind:
+            e->v.Attribute.ctx = ctx;
+            break;
+        case Subscript_kind:
+            e->v.Subscript.ctx = ctx;
+            break;
+        case Name_kind:
+            e->v.Name.ctx = ctx;
+            break;
+        case List_kind:
+            e->v.List.ctx = ctx;
+            s = e->v.List.elts;
+            break;
+        case Tuple_kind:
+            e->v.Tuple.ctx = ctx;
+            s = e->v.Tuple.elts;
+            break;
+        default:
+            PyErr_Format(PyExc_SyntaxError, "can't set context for %d",
+                         e->kind);
+            return -1;
     }
     if (s) {
 	int i;
+
 	for (i = 0; i < asdl_seq_LEN(s); i++) {
 	    if (set_context(asdl_seq_GET(s, i), ctx) < 0)
 		return -1;
@@ -254,35 +299,35 @@ ast_for_augassign(const node *n)
     REQ(n, augassign);
     n = CHILD(n, 0);
     switch (STR(n)[0]) {
-    case '+':
-	return Add;
-    case '-':
-	return Sub;
-    case '/':
-	if (STR(n)[1] == '/')
-	    return FloorDiv;
-	else
-	    return Div;
-    case '%':
-	return Mod;
-    case '<':
-	return LShift;
-    case '>':
-	return RShift;
-    case '&':
-	return BitAnd;
-    case '^':
-	return BitXor;
-    case '|':
-	return BitOr;
-    case '*':
-	if (STR(n)[1] == '*')
-	    return Pow;
-	else
-	    return Mult;
-    default:
-	fprintf(stderr, "invalid augassign: %s", STR(n));
-	return 0;
+        case '+':
+            return Add;
+        case '-':
+            return Sub;
+        case '/':
+            if (STR(n)[1] == '/')
+                return FloorDiv;
+            else
+                return Div;
+        case '%':
+            return Mod;
+        case '<':
+            return LShift;
+        case '>':
+            return RShift;
+        case '&':
+            return BitAnd;
+        case '^':
+            return BitXor;
+        case '|':
+            return BitOr;
+        case '*':
+            if (STR(n)[1] == '*')
+                return Pow;
+            else
+                return Mult;
+        default:
+            PyErr_Format(PyExc_Exception, "invalid augassign: %s", STR(n));
+            return NULL;
     }
 }
 
@@ -296,37 +341,47 @@ ast_for_comp_op(const node *n)
     if (NCH(n) == 1) {
 	n = CHILD(n, 0);
 	switch (TYPE(n)) {
-	case LESS:
-	    return Lt;
-	case GREATER:
-	    return Gt;
-	case EQEQUAL:			/* == */
-	case EQUAL:
-	    return Eq;
-	case LESSEQUAL:
-	    return LtE;
-	case GREATEREQUAL:
-	    return GtE;
-	case NOTEQUAL:
-	    return NotEq;
-	case NAME:
-	    if (strcmp(STR(n), "in") == 0)
-		return In;
-	    if (strcmp(STR(n), "is") == 0)
-		return Is;
+            case LESS:
+                return Lt;
+            case GREATER:
+                return Gt;
+            case EQEQUAL:			/* == */
+            case EQUAL:
+                return Eq;
+            case LESSEQUAL:
+                return LtE;
+            case GREATEREQUAL:
+                return GtE;
+            case NOTEQUAL:
+                return NotEq;
+            case NAME:
+                if (strcmp(STR(n), "in") == 0)
+                    return In;
+                if (strcmp(STR(n), "is") == 0)
+                    return Is;
+            default:
+                PyErr_Format(PyExc_Exception, "invalid comp_op: %s",
+                             STR(n));
+                return NULL;
 	}
     }
     else if (NCH(n) == 2) {
 	/* handle "not in" and "is not" */
 	switch (TYPE(CHILD(n, 0))) {
-	case NAME:
-	    if (strcmp(STR(CHILD(n, 1)), "in") == 0)
-		return NotIn;
-	    if (strcmp(STR(CHILD(n, 0)), "is") == 0)
-		return IsNot;
+            case NAME:
+                if (strcmp(STR(CHILD(n, 1)), "in") == 0)
+                    return NotIn;
+                if (strcmp(STR(CHILD(n, 0)), "is") == 0)
+                    return IsNot;
+            default:
+                PyErr_Format(PyExc_Exception, "invalid comp_op: %s %s",
+                             STR(CHILD(n, 0)), STR(CHILD(n, 1)));
+                return NULL;
 	}
     }
-    return 0;
+    PyErr_Format(PyExc_Exception, "invalid comp_op: has %d children",
+                 NCH(n));
+    return NULL;
 }
 
 static asdl_seq *
@@ -334,27 +389,36 @@ seq_for_testlist(const node *n)
 {
     /* testlist: test (',' test)* [','] */
     asdl_seq *seq;
+    expr_ty expression;
     int i;
 
     seq = asdl_seq_new((NCH(n) + 1) / 2);
-    if (seq) {
-        for (i = 0; i < NCH(n); i += 2) {
-	    asdl_seq_SET(seq, i / 2, ast_for_expr(CHILD(n, i)));
+    if (!seq)
+        return NULL;
+
+    for (i = 0; i < NCH(n); i += 2) {
+        expression = ast_for_expr(CHILD(n, i));
+        if (!expression) {
+            asdl_seq_free(seq);
+            return NULL;
         }
+        
+        asdl_seq_SET(seq, i / 2, expression);
     }
     return seq;
 }
 
+/* Create AST for argument list.
+
+   XXX TO DO:
+       - check for invalid argument lists like normal after default
+       - handle nested tuple arguments
+       - handle default arguments properly (might be problem somewhere else)
+*/
+
 static arguments_ty
 ast_for_arguments(const node *n)
 {
-
-    /* XXX TO DO
-       check for invalid argument lists like normal after default
-       handle nested tuple arguments
-       handle default arguments properly (might be problem somwhere else)
-    */
-
     /* parameters: '(' [varargslist] ')'
        varargslist: (fpdef ['=' test] ',')* ('*' NAME [',' '**' NAME]
             | '**' NAME) | fpdef ['=' test] (',' fpdef ['=' test])* [',']
@@ -365,7 +429,7 @@ ast_for_arguments(const node *n)
     node *ch;
 
     if (TYPE(n) == parameters) {
-	if (NCH(n) == 2)
+	if (NCH(n) == 2) /* () as argument list */
 	    return arguments(NULL, NULL, NULL, NULL);
 	n = CHILD(n, 1);
     }
@@ -381,12 +445,10 @@ ast_for_arguments(const node *n)
     }
     args = (n_args ? asdl_seq_new(n_args) : NULL);
     if (!args && n_args)
-    	return NULL;
+    	return NULL; /* Don't need to go to NULL; nothing allocated */
     defaults = (n_defaults ? asdl_seq_new(n_defaults) : NULL);
-    if (!defaults && n_defaults) {
-	if (args) asdl_seq_free(args);
-    	return NULL;
-    }
+    if (!defaults && n_defaults)
+        goto error;
 
     /* fpdef: NAME | '(' fplist ')'
        fplist: fpdef (',' fpdef)* [',']
@@ -395,39 +457,47 @@ ast_for_arguments(const node *n)
     while (i < NCH(n)) {
 	ch = CHILD(n, i);
 	switch (TYPE(ch)) {
-	case fpdef:
-	    if (NCH(ch) == 3) {
-		/* XXX don't handle fplist yet */
-		if (args)
-			asdl_seq_free(args);
-		if (defaults)
-			asdl_seq_free(defaults);
-		return NULL;
-	    }
-	    if (TYPE(CHILD(ch, 0)) == NAME)
-		asdl_seq_APPEND(args, Name(NEW_IDENTIFIER(CHILD(ch, 0)),
-					   Param));
-	    if (i + 1 < NCH(n) && TYPE(CHILD(n, i + 1)) == EQUAL) {
-		asdl_seq_APPEND(defaults, ast_for_expr(CHILD(n, i + 2)));
-		i += 2;
-	    }
-	    i += 2; /* the name and the comma */
-	    break;
-	case STAR:
-	    vararg = NEW_IDENTIFIER(CHILD(n, i+1));
-	    i += 3;
-	    break;
-	case DOUBLESTAR:
-	    kwarg = NEW_IDENTIFIER(CHILD(n, i+1));
-	    i += 3;
-	    break;
-	default:
-	    fprintf(stderr, "unexpected node in varargslist: %d @ %d\n",
-		    TYPE(ch), i);
+            case fpdef:
+                if (NCH(ch) == 3)
+                    /* XXX don't handle fplist yet */
+                    goto error;
+                if (TYPE(CHILD(ch, 0)) == NAME)
+                    /* XXX check return value of Name call */
+                    asdl_seq_APPEND(args, Name(NEW_IDENTIFIER(CHILD(ch, 0)),
+                                               Param));
+                /* XXX Need to worry about checking if TYPE(CHILD(n, i+1)) is
+                   anything other than EQUAL or a comma? */
+                /* XXX Should NCH(n) check be made a separate check? */
+                if (i + 1 < NCH(n) && TYPE(CHILD(n, i + 1)) == EQUAL) {
+                    asdl_seq_APPEND(defaults, ast_for_expr(CHILD(n, i + 2)));
+                    i += 2;
+                }
+                i += 2; /* the name and the comma */
+                break;
+            case STAR:
+                vararg = NEW_IDENTIFIER(CHILD(n, i+1));
+                i += 3;
+                break;
+            case DOUBLESTAR:
+                kwarg = NEW_IDENTIFIER(CHILD(n, i+1));
+                i += 3;
+                break;
+            default:
+                PyErr_Format(PyExc_Exception,
+                             "unexpected node in varargslist: %d @ %d\n",
+                             TYPE(ch), i);
+                goto error;
 	}
     }
 
     return arguments(args, vararg, kwarg, defaults);
+
+ error:
+    if (args)
+        asdl_seq_free(args);
+    if (defaults)
+        asdl_seq_free(defaults);
+    return NULL;
 }
 
 static stmt_ty
@@ -435,28 +505,60 @@ ast_for_funcdef(const node *n)
 {
     /* funcdef: 'def' NAME parameters ':' suite */
     identifier name = NEW_IDENTIFIER(CHILD(n, 1));
+    arguments_ty args;
+    asdl_seq *body;
+    
     REQ(n, funcdef);
-    return FunctionDef(name, ast_for_arguments(CHILD(n, 2)),
-		       ast_for_suite(CHILD(n, 4)), LINENO(n));
+    args = ast_for_arguments(CHILD(n, 2));
+    if (!args)
+        return NULL;
+    body = ast_for_suite(CHILD(n, 4));
+    if (!body)
+        return NULL;
+
+    return FunctionDef(name, args, body, LINENO(n));
 }
 
 static expr_ty
 ast_for_lambdef(const node *n)
 {
     /* lambdef: 'lambda' [varargslist] ':' test */
-    if (NCH(n) == 3)
-	return Lambda(arguments(NULL, NULL, NULL, NULL),
-		      ast_for_expr(CHILD(n, 2)));
-    else
-	return Lambda(ast_for_arguments(CHILD(n, 1)),
-		      ast_for_expr(CHILD(n, 3)));
+    arguments_ty args;
+    expr_ty expression;
+
+    if (NCH(n) == 3) {
+        args = arguments(NULL, NULL, NULL, NULL);
+        if (!args)
+            return NULL;
+        expression = ast_for_expr(CHILD(n, 2));
+        if (!expression)
+            return NULL;
+
+	return Lambda(args, expression);
+    }
+    else {
+        args = ast_for_arguments(CHILD(n, 1));
+        if (!args)
+            return NULL;
+        expression = ast_for_expr(CHILD(n, 3));
+        if (!expression)
+            return NULL;
+            
+	return Lambda(args, expression);
+    }
 }
+
+/* Count the number of 'for' loop in a list comprehension.
+
+   Helper for ast_for_listcomp().
+*/
 
 static int
 count_list_fors(const node *n)
 {
     int n_fors = 0;
     node *ch = CHILD(n, 1);
+
  count_list_for:
     n_fors++;
     REQ(ch, list_for);
@@ -470,20 +572,30 @@ count_list_fors(const node *n)
     if (TYPE(ch) == list_for)
 	goto count_list_for;
     else if (TYPE(ch) == list_if) {
-	if (NCH(ch) == 3) {
-	    ch = CHILD(ch, 2);
-	    goto count_list_iter;
-	} else
-	    return n_fors;
+        if (NCH(ch) == 3) {
+            ch = CHILD(ch, 2);
+            goto count_list_iter;
+        }
+        else
+            return n_fors;
     }
-    assert(0); /* can't get here */
-    return -1;
+    else {
+        /* Should never be reached */
+        PyErr_SetString(PyExc_Exception, "logic error in count_list_fors");
+        return -1;
+    }
 }
+
+/* Count the number of 'if' statements in a list comprehension.
+
+   Helper for ast_for_listcomp().
+*/
 
 static int
 count_list_ifs(const node *n)
 {
     int n_ifs = 0;
+
  count_list_iter:
     REQ(n, list_iter);
     if (TYPE(CHILD(n, 0)) == list_for)
@@ -517,29 +629,42 @@ ast_for_listcomp(const node *n)
     elt = ast_for_expr(CHILD(n, 0));
     if (!elt)
 	    return NULL;
-    set_context(elt, Load);
 
+    set_context(elt, Load);
     n_fors = count_list_fors(n);
     listcomps = asdl_seq_new(n_fors);
     if (!listcomps) {
 	/* XXX free elt? */
     	return NULL;
     }
+    
     ch = CHILD(n, 1);
     for (i = 0; i < n_fors; i++) {
 	listcomp_ty c;
 	asdl_seq *t;
+        expr_ty expression;
+
 	REQ(ch, list_for);
+
 	t = ast_for_exprlist(CHILD(ch, 1), Store);
+        if (!t) {
+            asdl_seq_free(listcomps);
+            return NULL;
+        }
+        expression = ast_for_testlist(CHILD(ch, 3));
+        if (!expression) {
+            asdl_seq_free(listcomps);
+            return NULL;
+        }
+
 	if (asdl_seq_LEN(t) == 1)
-	    c = listcomp(asdl_seq_GET(t, 0),
-			 ast_for_testlist(CHILD(ch, 3)), NULL);
+	    c = listcomp(asdl_seq_GET(t, 0), expression, NULL);
 	else
-	    c = listcomp(Tuple(t, Store),
-			 ast_for_testlist(CHILD(ch, 3)), NULL);
+	    c = listcomp(Tuple(t, Store), expression, NULL);
 	if (NCH(ch) == 5) {
 	    int j, n_ifs;
 	    asdl_seq *ifs;
+
 	    ch = CHILD(ch, 4);
 	    n_ifs = count_list_ifs(ch);
 	    ifs = asdl_seq_new(n_ifs);
@@ -548,10 +673,13 @@ ast_for_listcomp(const node *n)
 		asdl_seq_free(listcomps);
 		return NULL;
 	    }
+
 	    for (j = 0; j < n_ifs; j++) {
 		REQ(ch, list_iter);
+
 		ch = CHILD(ch, 0);
 		REQ(ch, list_if);
+
 		asdl_seq_APPEND(ifs, CHILD(ch, 1));
 		if (NCH(ch) == 3)
 		    ch = CHILD(ch, 2);
@@ -697,6 +825,9 @@ ast_for_binop(const node *n)
 	}
 	return result;
 }
+
+/* Do not name a variable 'expr'!  Will cause a compile error.
+*/
 
 static expr_ty
 ast_for_expr(const node *n)
