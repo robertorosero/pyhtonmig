@@ -266,6 +266,7 @@ typedef struct _typeobject {
 	descrgetfunc tp_descr_get;
 	descrsetfunc tp_descr_set;
 	ternaryfunc tp_construct;
+	long tp_dictoffset;
 
 
 #ifdef COUNT_ALLOCS
