@@ -660,6 +660,10 @@ format unit; and the entry in [square] brackets is the type of the C
 variable(s) whose address should be passed.  (Use the \samp{\&}
 operator to pass a variable's address.)
 
+Note that any Python object references which are provided to the
+caller are \emph{borrowed} references; do not decrement their
+reference count!
+
 \begin{description}
 
 \item[\samp{s} (string) {[char *]}]
@@ -718,8 +722,8 @@ Store a Python object in a C object pointer.  This is similar to
 \samp{O}, but takes two C arguments: the first is the address of a
 Python type object, the second is the address of the C variable (of
 type \ctype{PyObject *}) into which the object pointer is stored.
-If the Python object does not have the required type, a
-\exception{TypeError} exception is raised.
+If the Python object does not have the required type,
+\exception{TypeError} is raised.
 
 \item[\samp{O\&} (object) {[\var{converter}, \var{anything}]}]
 Convert a Python object to a C variable through a \var{converter}
@@ -739,8 +743,8 @@ should raise an exception.
 
 \item[\samp{S} (string) {[PyStringObject *]}]
 Like \samp{O} but requires that the Python object is a string object.
-Raises a \exception{TypeError} exception if the object is not a string
-object.  The C variable may also be declared as \ctype{PyObject *}.
+Raises \exception{TypeError} if the object is not a string object.
+The C variable may also be declared as \ctype{PyObject *}.
 
 \item[\samp{(\var{items})} (tuple) {[\var{matching-items}]}]
 The object must be a Python sequence whose length is the number of
@@ -750,7 +754,7 @@ may be nested.
 
 \strong{Note:} Prior to Python version 1.5.2, this format specifier
 only accepted a tuple containing the individual parameters, not an
-arbitrary sequence.  Code which previously caused a
+arbitrary sequence.  Code which previously caused
 \exception{TypeError} to be raised here may now proceed without an
 exception.  This is not expected to be a problem for existing code.
 
