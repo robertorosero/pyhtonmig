@@ -176,6 +176,11 @@ type_construct(PyTypeObject *type, PyObject *args, PyObject *kwds)
 				"base type must be a type");
 		return NULL;
 	}
+	if (base->tp_construct == NULL) {
+		PyErr_SetString(PyExc_TypeError,
+				"base type must have a constructor slot");
+		return NULL;
+	}
 
 	/* Check for a __slots__ sequence variable in dict, and count it */
 	slots = PyDict_GetItemString(dict, "__slots__");
