@@ -4,8 +4,9 @@ AC_INIT(Include/object.h)
 AC_PREFIX(python)
 AC_CONFIG_HEADER(config.h)dnl
 # Don't suppress compiler output when --verbose is specified
-test -n "$verbose" && compile=`echo "$compile" | sed "s|>/dev/null 2>&1||"`
-test -n "$verbose" && echo "	compile='$compile'"
+test -n "$verbose" &&
+	ac_compile=`echo "$ac_compile" | sed "s|>/dev/null 2>&1||"`
+test -n "$verbose" && echo "	ac_compile='$ac_compile'"
 
 # checks for alternative programs
 AC_PROG_CC
@@ -157,14 +158,14 @@ AC_XENIX_DIR
 # check for --with-libm=...
 AC_SUBST(LIBM)
 LIBM=-lm
-AC_WITH(libm, [if test "$withval" != 1
+AC_WITH(libm, [if test "$withval" != yes
 then LIBM=$withval
 else echo proper usage is --with-libm=STRING 1>&2; exit 1
 fi])
 
 # check for --with-libc=...
 AC_SUBST(LIBC)
-AC_WITH(libc, [if test "$withval" != 1
+AC_WITH(libc, [if test "$withval" != yes
 then LIBC=$withval
 else echo proper usage is --with-libc=STRING 1>&2; exit 1
 fi])
