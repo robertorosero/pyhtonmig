@@ -296,7 +296,7 @@ __all__ = [
     'testmod',
     'run_docstring_examples',
     'Tester',
-    'DocTestTestCase',
+    'DocTestCase',
     'DocTestSuite',
     'testsource',
     'debug',
@@ -1600,12 +1600,13 @@ class DebugRunner(DocTestRunner):
 
        If the output doesn't match, then a DocTestFailure is raised:
 
-         >>> try:
-         ...    test = DocTest('''
+         >>> test = DocTest('''
          ...      >>> x = 1
          ...      >>> x
          ...      2
          ...      ''', {}, 'foo', 'foo.py', 0)
+
+         >>> try:
          ...    runner.run(test)
          ... except DocTestFailure, failure:
          ...    pass
@@ -1864,38 +1865,32 @@ class Tester:
 ## 7. Unittest Support
 ######################################################################
 
-class DocTestTestCase(unittest.TestCase):
-    """A test case that wraps a test function.
+class DocTestCase(unittest.TestCase):
 
-    This is useful for slipping pre-existing test functions into the
-    PyUnit framework.  Optionally, set-up and tidy-up functions can be
-    supplied.  As with TestCase, the tidy-up ('tearDown') function will
-    always be called if the set-up ('setUp') function ran successfully.
-    """
-
-    def __init__(self, test_runner, test,
-                 setUp=None, tearDown=None):
+    def __init__(self, test, optionflags=0, setUp=None, tearDown=None):
         unittest.TestCase.__init__(self)
-        self.__test_runner = test_runner
+        self._dt_optionflags = optionflags
         self._dt_test = test
-        self.__setUp = setUp
-        self.__tearDown = tearDown
+        self._dt_setUp = setUp
+        self._dt_tearDown = tearDown
 
     def setUp(self):
-        if self.__setUp is not None:
-            self.__setUp()
+        if self._dt_setUp is not None:
+            self._dt_setUp()
 
     def tearDown(self):
-        if self.__tearDown is not None:
-            self.__tearDown()
+        if self._dt_tearDown is not None:
+            self._dt_tearDown()
 
     def runTest(self):
         test = self._dt_test
         old = sys.stdout
         new = StringIO()
+        runner = DocTestRunner(optionflags=self._dt_optionflags, verbose=False)
+
         try:
-            self.__test_runner.DIVIDER = "-"*70
-            failures, tries = self.__test_runner.run(test, out=new.write)
+            runner.DIVIDER = "-"*70
+            failures, tries = runner.run(test, out=new.write)
         finally:
             sys.stdout = old
 
@@ -1915,9 +1910,53 @@ class DocTestTestCase(unittest.TestCase):
                 )
 
     def debug(self):
-        runner = DebugRunner(verbose=False,
-                             optionflags=self.__test_runner.optionflags)
-        runner.run(self._dt_test, nooutput)
+        r"""Run the test case without results and without catching exceptions
+
+           The unit test framework includes a debug method on test cases
+           and test suites to support post-mortem debugging.  The test code
+           is run in such a way that errors are not caught.  This way a
+           caller can catch the errors and initiate post-mortem debugging:
+
+             >>> test = DocTest('>>> raise KeyError', {}, 'foo', 'foo.py', 0)
+             >>> case = DocTestCase(test)
+             >>> case.debug()
+             Traceback (most recent call last):
+             ...
+             KeyError
+
+           If the output doesn't match, then a DocTestFailure is raised:
+
+             >>> test = DocTest('''
+             ...      >>> x = 1
+             ...      >>> x
+             ...      2
+             ...      ''', {}, 'foo', 'foo.py', 0)
+             >>> case = DocTestCase(test)
+
+             >>> try:
+             ...    case.debug()
+             ... except DocTestFailure, failure:
+             ...    pass
+
+           DocTestFailure objects provide access to the test:
+
+             >>> failure.test is test
+             True
+
+           As well as to the example:
+
+             >>> failure.example.want
+             '2\n'
+
+           and the actual output:
+
+             >>> failure.got
+             '1\n'
+
+           """
+
+        runner = DebugRunner(verbose = False, optionflags=self._dt_optionflags)
+        runner.run(self._dt_test, out=nooutput)
 
     def id(self):
         return self._dt_test.name
@@ -1954,7 +1993,6 @@ def DocTestSuite(module=None, globs=None, extraglobs=None,
 
     if test_finder is None:
         test_finder = DocTestFinder()
-    test_runner = DocTestRunner(optionflags=optionflags, verbose=False)
 
     module = _normalize_module(module)
     tests = test_finder.find(module, globs=globs, extraglobs=extraglobs)
@@ -1975,12 +2013,11 @@ def DocTestSuite(module=None, globs=None, extraglobs=None,
             elif filename.endswith(".pyo"):
                 filename = filename[:-1]
             test.filename = filename
-        suite.addTest(DocTestTestCase(test_runner, test,
-                                      setUp, tearDown))
+        suite.addTest(DocTestCase(test, optionflags, setUp, tearDown))
 
     return suite
 
-class DocTestFileTestCase(DocTestTestCase):
+class DocFileCase(DocTestCase):
 
     def id(self):
         return '_'.join(self._dt_test.name.split('.'))
@@ -2006,10 +2043,9 @@ def DocFileTest(path, package=None, globs=None,
     if globs is None:
         globs = {}
 
-    test_runner = DocTestRunner(optionflags=optionflags, verbose=False)
     test = DocTest(doc, globs, name, path, 0)
-
-    return DocTestFileTestCase(test_runner, test, setUp, tearDown)
+    
+    return DocFileCase(test, optionflags, setUp, tearDown)
 
 def DocFileSuite(*paths, **kw):
     """Creates a suite of doctest files.
