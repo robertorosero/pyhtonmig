@@ -125,28 +125,26 @@ subtype_dealloc(PyObject *self)
 
 staticforward void override_slots(PyTypeObject *type, PyObject *dict);
 
-#define NMEMBERS 1
-
 typedef struct {
 	PyTypeObject type;
 	PyNumberMethods as_number;
 	PySequenceMethods as_sequence;
 	PyMappingMethods as_mapping;
 	PyBufferProcs as_buffer;
-	struct memberlist members[NMEMBERS+1];
-	char name[1];
+	PyObject *name, *slots;
+	struct memberlist members[1];
 } etype;
 
 /* TypeType's constructor is called when a type is subclassed */
 static PyObject *
 type_construct(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
-	char *name;
-	PyObject *bases, *dict, *x;
+	PyObject *name, *bases, *dict, *x, *slots;
 	PyTypeObject *base;
 	char *dummy = NULL;
 	etype *et;
 	struct memberlist *mp;
+	int i, nslots, slotoffset, allocsize;
 
 	/* Check arguments */
 	if (type != NULL) {
@@ -154,7 +152,7 @@ type_construct(PyTypeObject *type, PyObject *args, PyObject *kwds)
 				"can't construct a preallocated type");
 		return NULL;
 	}
-	if (!PyArg_ParseTupleAndKeywords(args, kwds, "sOO", &dummy,
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "SOO", &dummy,
 					 &name, &bases, &dict))
 		return NULL;
 	if (!PyTuple_Check(bases) || !PyDict_Check(dict)) {
@@ -179,18 +177,48 @@ type_construct(PyTypeObject *type, PyObject *args, PyObject *kwds)
 		return NULL;
 	}
 
+	/* Check for a __slots__ sequence variable in dict, and count it */
+	slots = PyDict_GetItemString(dict, "__slots__");
+	nslots = 0;
+	if (slots != NULL) {
+		/* Make it into a tuple */
+		if (PyString_Check(slots))
+			slots = Py_BuildValue("(O)", slots);
+		else
+			slots = PySequence_Tuple(slots);
+		if (slots == NULL)
+			return NULL;
+		nslots = PyTuple_GET_SIZE(slots);
+		for (i = 0; i < nslots; i++) {
+			if (!PyString_Check(PyTuple_GET_ITEM(slots, i))) {
+				PyErr_SetString(PyExc_TypeError,
+				"__slots__ must be a sequence of strings");
+				Py_DECREF(slots);
+				return NULL;
+			}
+		}
+	}
+	if (slots == NULL && base->tp_dictoffset == 0 &&
+	    (base->tp_setattro == PyGeneric_SetAttr ||
+	     base->tp_setattro == NULL))
+		nslots = 1;
+
 	/* Allocate memory and construct a type object in it */
-	et = PyObject_MALLOC(sizeof(etype) + strlen(name));
+	allocsize = sizeof(etype) + nslots*sizeof(struct memberlist);
+	et = PyObject_MALLOC(allocsize);
 	if (et == NULL)
 		return NULL;
-	memset(et, '\0', sizeof(etype));
+	memset(et, '\0', allocsize);
 	type = &et->type;
 	PyObject_INIT(type, &PyDynamicType_Type);
+	Py_INCREF(name);
+	et->name = name;
+	et->slots = slots;
 	type->tp_as_number = &et->as_number;
 	type->tp_as_sequence = &et->as_sequence;
 	type->tp_as_mapping = &et->as_mapping;
 	type->tp_as_buffer = &et->as_buffer;
-	type->tp_name = strcpy(et->name, name);
+	type->tp_name = PyString_AS_STRING(name);
 	type->tp_flags = Py_TPFLAGS_DEFAULT;
 
 	/* Copy slots and dict from the base type */
@@ -215,22 +243,29 @@ type_construct(PyTypeObject *type, PyObject *args, PyObject *kwds)
 		type->tp_setattr = NULL;
 	}
 
-	/* Add a __dict__ slot if we don't already have one,
-	   but only if the getattro is generic */
-	if (type->tp_dictoffset == 0 &&
-	    type->tp_setattro == PyGeneric_SetAttr) {
-		int dictoffset = type->tp_basicsize;
-		if (type->tp_flags & Py_TPFLAGS_GC)
-			dictoffset -= PyGC_HEAD_SIZE;
-		type->tp_dictoffset = dictoffset;
+	/* Add custom slots */
+	mp = et->members;
+	slotoffset = type->tp_basicsize;
+	if (type->tp_flags & Py_TPFLAGS_GC)
+		slotoffset -= PyGC_HEAD_SIZE;
+	if (slots != NULL) {
+		for (i = 0; i < nslots; i++, mp++) {
+			mp->name = PyString_AS_STRING(
+				PyTuple_GET_ITEM(slots, i));
+			mp->type = T_OBJECT;
+			mp->offset = slotoffset + i*sizeof(PyObject *);
+		}
+		type->tp_basicsize += nslots*sizeof(PyObject *);
+	}
+	else if (nslots) {
+		type->tp_dictoffset = slotoffset;
 		type->tp_basicsize += sizeof(PyObject *);
-		mp = et->members;
 		mp->name = "__dict__";
 		mp->type = T_OBJECT;
-		mp->offset = dictoffset;
+		mp->offset = slotoffset;
 		mp->readonly = 1;
-		add_members(type, mp);
 	}
+	add_members(type, et->members);
 
 	x = PyObject_CallMethod(type->tp_dict, "update", "O", dict);
 	if (x == NULL) {
@@ -310,8 +345,12 @@ dtype_call(PyTypeObject *type, PyObject *args, PyObject *kwds)
 static void
 dtype_dealloc(PyTypeObject *type)
 {
+	etype *et = (etype *)type;
+
 	Py_XDECREF(type->tp_base);
 	Py_XDECREF(type->tp_dict);
+	Py_XDECREF(et->name);
+	Py_XDECREF(et->slots);
 	PyObject_DEL(type);
 }
 
@@ -347,7 +386,7 @@ PyTypeObject PyDynamicType_Type = {
 	0,					/* tp_methods */
 	type_members,				/* tp_members */
 	type_getsets,				/* tp_getset */
-	0,					/* tp_base */
+	&PyType_Type,				/* tp_base */
 	0,					/* tp_dict */
 	0,					/* tp_descr_get */
 	0,					/* tp_descr_set */
