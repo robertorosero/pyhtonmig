@@ -295,6 +295,52 @@ type_init(PyObject *self, PyObject *args, PyObject *kwds)
 	return 0;
 }
 
+static int
+issubtype(PyTypeObject *a, PyTypeObject *b)
+{
+	while (a != b) {
+		a = a->tp_base;
+		if (a == NULL)
+			return 0;
+	}
+	return 1;
+}
+
+#define ISSUBTYPE(a, b) issubtype(a, b)
+
+static PyObject *
+type_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
+{
+	PyObject *name, *bases, *dict;
+	static char *kwlist[] = {"name", "bases", "dict", 0};
+
+	/* Check arguments (again?!?! yes, alas -- we need the bases!) */
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "SOO", kwlist,
+					 &name, &bases, &dict))
+		return NULL;
+	if (PyTuple_Check(bases)) {
+		PyTypeObject *metatype = type;
+		int i, n;
+		n = PyTuple_GET_SIZE(bases);
+		for (i = 0; i < n; i++) {
+			PyObject *base_i = PyTuple_GET_ITEM(bases, i);
+			PyTypeObject *type_i = base_i->ob_type;
+			if (ISSUBTYPE(metatype, type_i))
+				continue;
+			if (ISSUBTYPE(type_i, metatype)) {
+				metatype = type_i;
+				continue;
+			}
+			PyErr_SetString(PyExc_TypeError,
+					"metaclass conflict among bases");
+			return NULL;
+		}
+		if (metatype->tp_new != type_new)
+			return metatype->tp_new(type, args, kwds);
+	}
+	return PyType_GenericNew(type, args, kwds);
+}
+
 static void
 type_dealloc(PyTypeObject *type)
 {
@@ -350,7 +396,7 @@ PyTypeObject PyType_Type = {
 	offsetof(PyTypeObject, tp_dict),	/* tp_dictoffset */
 	type_init,				/* tp_init */
 	PyType_GenericAlloc,			/* tp_alloc */
-	PyType_GenericNew,			/* tp_new */
+	type_new,				/* tp_new */
 };
 
 
