@@ -3,7 +3,7 @@ LIBDESTDIR=$DESTDIR/lib
 LIBDEST=$LIBDESTDIR/python
 DOCDESTDIR=$LIBDEST/doc
 
-all:	tut lib ref ext qua
+all:	tut lib ref ext
 
 tut:
 	latex tut
