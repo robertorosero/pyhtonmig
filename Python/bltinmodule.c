@@ -1300,6 +1300,32 @@ Convert a string or number to a floating point number, if possible.";
 
 
 static PyObject *
+builtin_iter(PyObject *self, PyObject *args)
+{
+	PyObject *v, *w = NULL;
+
+	if (!PyArg_ParseTuple(args, "O|O:iter", &v, &w))
+		return NULL;
+	if (w == NULL)
+		return PyObject_GetIter(v);
+	if (!PyCallable_Check(v)) {
+		PyErr_SetString(PyExc_TypeError,
+				"iter(v, w): v must be callable");
+		return NULL;
+	}
+	return PyCallIter_New(v, w);
+}
+
+static char iter_doc[] =
+"iter(object[, sentinel]) -> iterator\n\
+\n\
+Get an iterator from an object.  If the sentinel argument is omitted,\n\
+the object must supply its own iterator, or be a sequence.\n\
+If a sentinel is given, the object must be callable and the iterator\n\
+calls it until it returns or raises the sentinel.";
+
+
+static PyObject *
 builtin_len(PyObject *self, PyObject *args)
 {
 	PyObject *v;
@@ -2226,6 +2252,7 @@ static PyMethodDef builtin_methods[] = {
 	{"int",		builtin_int, 1, int_doc},
 	{"isinstance",  builtin_isinstance, 1, isinstance_doc},
 	{"issubclass",  builtin_issubclass, 1, issubclass_doc},
+	{"iter",	builtin_iter, 1, iter_doc},
 	{"len",		builtin_len, 1, len_doc},
 	{"list",	builtin_list, 1, list_doc},
 	{"locals",	builtin_locals, 1, locals_doc},

@@ -1626,3 +1626,27 @@ PyObject_CallMethod(PyObject *o, char *name, char *format, ...)
 
 	return retval;
 }
+
+PyObject *
+PyObject_GetIter(PyObject *o)
+{
+	PyTypeObject *t = o->ob_type;
+	getiterfunc f = NULL;
+	if (PyType_HasFeature(t, Py_TPFLAGS_HAVE_ITER))
+		f = t->tp_iter;
+	if (f == NULL) {
+#if 0
+		if (PyCallable_Check(o)) {
+			Py_INCREF(o);
+			return o;
+		}
+#endif
+		if (PySequence_Check(o))
+			return PyIter_New(o);
+		PyErr_SetString(PyExc_TypeError,
+				"getiter() of non-sequence");
+		return NULL;
+	}
+	else
+		return (*f)(o);
+}

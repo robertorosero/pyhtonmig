@@ -240,6 +240,7 @@ OBJECT_OBJS=	\
 		Objects/funcobject.o \
 		Objects/intobject.o \
 		Objects/listobject.o \
+		Objects/iterobject.o \
 		Objects/longobject.o \
 		Objects/dictobject.o \
 		Objects/methodobject.o \
@@ -431,6 +432,7 @@ PYTHON_HEADERS= \
 		Include/bufferobject.h \
 		Include/tupleobject.h \
 		Include/listobject.h \
+		Include/iterobject.h \
 		Include/dictobject.h \
 		Include/methodobject.h \
 		Include/moduleobject.h \

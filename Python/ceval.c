@@ -1822,6 +1822,37 @@ eval_code2(PyCodeObject *co, PyObject *globals, PyObject *locals,
 			JUMPTO(oparg);
 			continue;
 
+		case GET_ITER:
+			/* before: [obj]; after [getiter(obj)] */
+			v = POP();
+			x = PyObject_GetIter(v);
+			Py_DECREF(v);
+			if (x != NULL) {
+				PUSH(x);
+				continue;
+			}
+			break;
+
+		case FOR_ITER:
+			/* before: [iter]; after: [iter, iter()] *or* [] */
+			v = TOP();
+			if (PyIter_Check(v)) /* Speed-up common case */
+				x = v->ob_type->tp_call(v, NULL, NULL);
+			else
+				x = PyObject_CallObject(v, NULL);
+			if (x == NULL) {
+				if (PyErr_ExceptionMatches(PyExc_IndexError)) {
+					PyErr_Clear();
+					x = v = POP();
+					Py_DECREF(v);
+					JUMPBY(oparg);
+					continue;
+				}
+				break;
+			}
+			PUSH(x);
+			continue;
+
 		case FOR_LOOP:
 			/* for v in s: ...
 			   On entry: stack contains s, i.
