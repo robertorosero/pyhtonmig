@@ -495,8 +495,17 @@ class Parser:
         """
         Return the doctest examples from the string.
 
-        This is a list of doctest.Example instances, one Example
-        per doctest test in the string.
+        This is a list of (source, want, lineno) triples, one per example
+        in the string.  "source" is a single Python statement; it ends
+        with a newline iff the statement contains more than one
+        physical line.  "want" is the expected output from running the
+        example (either from stdout, or a traceback in case of exception).
+        "want" always ends with a newline, unless no output is expected,
+        in which case "want" is an empty string.  "lineno" is the 0-based
+        line number of the first line of "source" within the string.  It's
+        0-based because it's most common in doctests that nothing
+        interesting appears on the same line as opening triple-quote,
+        and so the first interesting line is called "line 1" then.
 
         >>> text = '''
         ...        >>> x, y = 2, 3  # no output expected
@@ -511,18 +520,10 @@ class Parser:
         ...        5
         ...        '''
         >>> for x in Parser('<string>', text).get_examples():
-        ...     x.source
-        ...     x.want
-        ...     x.lineno
-        'x, y = 2, 3  # no output expected'
-        ''
-        1
-        'if 1:\\n    print x\\n    print y\\n'
-        '2\\n3\\n'
-        2
-        'x+y'
-        '5\\n'
-        9
+        ...     print x
+        ('x, y = 2, 3  # no output expected', '', 1)
+        ('if 1:\\n    print x\\n    print y\\n', '2\\n3\\n', 2)
+        ('x+y', '5\\n', 9)
         """
         return self._parse(kind='examples')
 
@@ -637,7 +638,7 @@ class Parser:
             # suck up response
             if isPS1(line) or isEmpty(line):
                 if not do_program:
-                    push(Example(source, "", lineno))
+                    push((source, "", lineno))
                 continue
 
             # There is a response.
@@ -659,7 +660,7 @@ class Parser:
                 output.extend(['#     ' + x for x in want])
             else:
                 want = "\n".join(want) + "\n"
-                push(Example(source, want, lineno))
+                push((source, want, lineno))
 
         if do_program:
             # Trim junk on both ends.
@@ -742,7 +743,8 @@ class DocTest:
         self.lineno = lineno
         # Parse the docstring.
         self.docstring = docstring
-        self.examples = Parser(name, docstring).get_examples()
+        examples = Parser(name, docstring).get_examples()
+        self.examples = [Example(*example) for example in examples]
 
     def __repr__(self):
         if len(self.examples) == 0:
