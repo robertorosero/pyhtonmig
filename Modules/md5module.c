@@ -21,44 +21,43 @@ ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
 OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 ******************************************************************/
+
 /* MD5 module */
 
-/* This module provides an interface to a message digest algorithm,
-   MD5 in this case */
+/* This module provides an interface to the RSA Data Security,
+   Inc. MD5 Message-Digest Algorithm, described in RFC 1321.
+   It requires the files md5c.c and md5.h (which are slightly changed
+   from the versions in the RFC to avoid the "global.h" file.) */
+
 
 /* MD5 objects */
 
 #include "allobjects.h"
-#include "modsupport.h"		/* For getargs() etc. */
+#include "modsupport.h"
 
 #include "md5.h"
+
 typedef struct {
 	OB_HEAD
         MD5_CTX	md5;		/* the context holder */
 } md5object;
 
-static typeobject MD5type;	/* Forward */
+staticforward typeobject MD5type;
 
 #define is_md5object(v)		((v)->ob_type == &MD5type)
-
-/* #define MD5_DEBUG */
 
 static md5object *
 newmd5object()
 {
 	md5object *md5p;
 
-
-#ifdef MD5_DEBUG
-	fputs( "md5_object() called...\n", stderr );
-#endif /* def MD5_DEBUG */
 	md5p = NEWOBJ(md5object, &MD5type);
 	if (md5p == NULL)
 		return NULL;
 
 	MD5Init(&md5p->md5);	/* actual initialisation */
 	return md5p;
-} /* newmd5object() */
+}
 
 
 /* MD5 methods */
@@ -67,47 +66,12 @@ static void
 md5_dealloc(md5p)
 	md5object *md5p;
 {
-#ifdef MD5_DEBUG
-	fputs( "md5_dealloc() called...\n", stderr );
-#endif /* def MD5_DEBUG */
-
 	DEL(md5p);
-} /* md5_dealloc() */
-
-
-/* MD5 initialisation */
-
-static object *
-MD5_md5(self, args)
-	object *self;
-	object *args;
-{
-	md5object *md5p;
-	char *cp = (char *)NULL;
-	int len;
-	
-
-#ifdef MD5_DEBUG
-	fputs("MD5_md5() called...\n", stderr);
-#endif /* def MD5_DEBUG */
-
-	if (!getargs(args, "")) {
-		err_clear();
-		if (!getargs(args, "s#", &cp, &len))
-			return NULL;
-	}
-
-	if ((md5p = newmd5object()) == NULL)
-		return NULL;
-
-	if (cp)
-		MD5Update(&md5p->md5, cp, len);
-
-	return (object *)md5p;
-} /* MD5_md5() */
+}
 
 
 /* MD5 methods-as-attributes */
+
 static object *
 md5_update(self, args)
 	md5object *self;
@@ -116,7 +80,6 @@ md5_update(self, args)
 	char *cp;
 	int len;
 
-	
 	if (!getargs(args, "s#", &cp, &len))
 		return NULL;
 
@@ -124,9 +87,8 @@ md5_update(self, args)
 
 	INCREF(None);
 	return None;
-} /* md5_update() */
+}
 
-#define DIGESTLEN	16	/* this is used twice--walrus@umich.edu */
 static object *
 md5_digest(self, args)
 	md5object *self;
@@ -134,8 +96,7 @@ md5_digest(self, args)
 {
 
 	MD5_CTX mdContext;
-	char aDigest[DIGESTLEN];
-	
+	char aDigest[16];
 
 	if (!getnoarg(args))
 		return NULL;
@@ -144,9 +105,8 @@ md5_digest(self, args)
 	mdContext = self->md5;
 	MD5Final(aDigest, &mdContext);
 
-	return newsizedstringobject((char *)aDigest, DIGESTLEN);
-} /* md5_digest() */
-#undef DIGESTLEN
+	return newsizedstringobject((char *)aDigest, 16);
+}
 
 static object *
 md5_copy(self, args)
@@ -155,7 +115,6 @@ md5_copy(self, args)
 {
 	md5object *md5p;
 
-	
 	if (!getnoarg(args))
 		return NULL;
 
@@ -165,9 +124,8 @@ md5_copy(self, args)
 	md5p->md5 = self->md5;
 
 	return (object *)md5p;
-} /* md5_copy() */
+}
 
-		
 static struct methodlist md5_methods[] = {
 	{"update",		(method)md5_update},
 	{"digest",		(method)md5_digest},
@@ -181,12 +139,9 @@ md5_getattr(self, name)
 	char *name;
 {
 	return findmethod(md5_methods, (object *)self, name);
-} /* md5_getattr() */
+}
 
-#ifndef _AIX
-static
-#endif
-typeobject MD5type = {
+static typeobject MD5type = {
 	OB_HEAD_INIT(&Typetype)
 	0,			/*ob_size*/
 	"md5",			/*tp_name*/
@@ -202,6 +157,34 @@ typeobject MD5type = {
         0,			/*tp_as_number*/
 };
 
+
+/* MD5 functions */
+
+static object *
+MD5_md5(self, args)
+	object *self;
+	object *args;
+{
+	md5object *md5p;
+	char *cp = (char *)NULL;
+	int len;
+
+	if (!getargs(args, "")) {
+		err_clear();
+		if (!getargs(args, "s#", &cp, &len))
+			return NULL;
+	}
+
+	if ((md5p = newmd5object()) == NULL)
+		return NULL;
+
+	if (cp)
+		MD5Update(&md5p->md5, cp, len);
+
+	return (object *)md5p;
+}
+
+
 /* List of functions exported by this module */
 
 static struct methodlist md5_functions[] = {
@@ -215,12 +198,5 @@ static struct methodlist md5_functions[] = {
 void
 initmd5()
 {
-#ifdef MD5_DEBUG
-	fputs( "initmd5() called...\n", stderr );
-#endif /* def MD5_DEBUG */
 	(void)initmodule("md5", md5_functions);
-} /* initmd5() */
-
-#ifdef MAKEDUMMYINT
-int _md5_dummy_int;	/* XXX otherwise, we're .bss-less (DYNLOAD->Jack?) */
-#endif /* def MAKEDUMMYINT */
+}
