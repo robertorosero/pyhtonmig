@@ -55,8 +55,10 @@ time timemodule.o	# time operations and variables
 # Modules with some UNIX dependencies -- on by default.
 # Note that some UNIX versions still don't support all of these
 # so you may have to comment them out before the build completes.
+# (in particular dbm is often a troublemaker -- it is now off by
+# default.)
 
-dbm dbmmodule.o		# dbm(3) may require -ldbm or similar
+#dbm dbmmodule.o 	# dbm(3) may require -lndbm or similar
 fcntl fcntlmodule.o	# fcntl(2) and ioctl(2)
 nis nismodule.o		# Sun yellow pages -- not everywhere
 pwd grp pwdmodule.o	# pwd(3) and grp(3)
