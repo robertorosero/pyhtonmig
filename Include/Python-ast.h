@@ -24,7 +24,7 @@ typedef enum _unaryop { Invert=1, Not=2, UAdd=3, USub=4 } unaryop_ty;
 typedef enum _cmpop { Eq=1, NotEq=2, Lt=3, LtE=4, Gt=5, GtE=6, Is=7,
                       IsNot=8, In=9, NotIn=10 } cmpop_ty;
 
-typedef struct _listcomp *listcomp_ty;
+typedef struct _comprehension *comprehension_ty;
 
 typedef struct _excepthandler *excepthandler_ty;
 
@@ -178,10 +178,10 @@ struct _stmt {
 
 struct _expr {
         enum { BoolOp_kind=1, BinOp_kind=2, UnaryOp_kind=3, Lambda_kind=4,
-               Dict_kind=5, ListComp_kind=6, Compare_kind=7, Call_kind=8,
-               Repr_kind=9, Num_kind=10, Str_kind=11, Attribute_kind=12,
-               Subscript_kind=13, Name_kind=14, List_kind=15, Tuple_kind=16
-               } kind;
+               Dict_kind=5, ListComp_kind=6, GeneratorComp_kind=7,
+               Compare_kind=8, Call_kind=9, Repr_kind=10, Num_kind=11,
+               Str_kind=12, Attribute_kind=13, Subscript_kind=14,
+               Name_kind=15, List_kind=16, Tuple_kind=17 } kind;
         union {
                 struct {
                         boolop_ty op;
@@ -213,6 +213,11 @@ struct _expr {
                         expr_ty elt;
                         asdl_seq *generators;
                 } ListComp;
+                
+                struct {
+                        expr_ty elt;
+                        asdl_seq *generators;
+                } GeneratorComp;
                 
                 struct {
                         expr_ty left;
@@ -291,7 +296,7 @@ struct _slice {
         } v;
 };
 
-struct _listcomp {
+struct _comprehension {
         expr_ty target;
         expr_ty iter;
         asdl_seq *ifs;
@@ -358,6 +363,7 @@ expr_ty UnaryOp(unaryop_ty op, expr_ty operand);
 expr_ty Lambda(arguments_ty args, expr_ty body);
 expr_ty Dict(asdl_seq * keys, asdl_seq * values);
 expr_ty ListComp(expr_ty elt, asdl_seq * generators);
+expr_ty GeneratorComp(expr_ty elt, asdl_seq * generators);
 expr_ty Compare(expr_ty left, asdl_seq * ops, asdl_seq * comparators);
 expr_ty Call(expr_ty func, asdl_seq * args, asdl_seq * keywords, expr_ty
              starargs, expr_ty kwargs);
@@ -373,7 +379,8 @@ slice_ty Ellipsis(void);
 slice_ty Slice(expr_ty lower, expr_ty upper, expr_ty step);
 slice_ty ExtSlice(asdl_seq * dims);
 slice_ty Index(expr_ty value);
-listcomp_ty listcomp(expr_ty target, expr_ty iter, asdl_seq * ifs);
+comprehension_ty comprehension(expr_ty target, expr_ty iter, asdl_seq *
+                               ifs);
 excepthandler_ty excepthandler(expr_ty type, expr_ty name, asdl_seq * body);
 arguments_ty arguments(asdl_seq * args, identifier vararg, identifier
                        kwarg, asdl_seq * defaults);
@@ -388,7 +395,7 @@ void free_boolop(boolop_ty);
 void free_operator(operator_ty);
 void free_unaryop(unaryop_ty);
 void free_cmpop(cmpop_ty);
-void free_listcomp(listcomp_ty);
+void free_comprehension(comprehension_ty);
 void free_excepthandler(excepthandler_ty);
 void free_arguments(arguments_ty);
 void free_keyword(keyword_ty);
@@ -402,7 +409,7 @@ int marshal_write_boolop(PyObject **, int *, boolop_ty);
 int marshal_write_operator(PyObject **, int *, operator_ty);
 int marshal_write_unaryop(PyObject **, int *, unaryop_ty);
 int marshal_write_cmpop(PyObject **, int *, cmpop_ty);
-int marshal_write_listcomp(PyObject **, int *, listcomp_ty);
+int marshal_write_comprehension(PyObject **, int *, comprehension_ty);
 int marshal_write_excepthandler(PyObject **, int *, excepthandler_ty);
 int marshal_write_arguments(PyObject **, int *, arguments_ty);
 int marshal_write_keyword(PyObject **, int *, keyword_ty);

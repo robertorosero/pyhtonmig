@@ -650,6 +650,26 @@ ListComp(expr_ty elt, asdl_seq * generators)
 }
 
 expr_ty
+GeneratorComp(expr_ty elt, asdl_seq * generators)
+{
+        expr_ty p;
+        if (!elt) {
+                PyErr_SetString(PyExc_ValueError,
+                                "field elt is required for GeneratorComp");
+                return NULL;
+        }
+        p = (expr_ty)malloc(sizeof(*p));
+        if (!p) {
+                PyErr_SetString(PyExc_MemoryError, "no memory");
+                return NULL;
+        }
+        p->kind = GeneratorComp_kind;
+        p->v.GeneratorComp.elt = elt;
+        p->v.GeneratorComp.generators = generators;
+        return p;
+}
+
+expr_ty
 Compare(expr_ty left, asdl_seq * ops, asdl_seq * comparators)
 {
         expr_ty p;
@@ -940,21 +960,21 @@ Index(expr_ty value)
         return p;
 }
 
-listcomp_ty
-listcomp(expr_ty target, expr_ty iter, asdl_seq * ifs)
+comprehension_ty
+comprehension(expr_ty target, expr_ty iter, asdl_seq * ifs)
 {
-        listcomp_ty p;
+        comprehension_ty p;
         if (!target) {
                 PyErr_SetString(PyExc_ValueError,
-                                "field target is required for listcomp");
+                                "field target is required for comprehension");
                 return NULL;
         }
         if (!iter) {
                 PyErr_SetString(PyExc_ValueError,
-                                "field iter is required for listcomp");
+                                "field iter is required for comprehension");
                 return NULL;
         }
-        p = (listcomp_ty)malloc(sizeof(*p));
+        p = (comprehension_ty)malloc(sizeof(*p));
         if (!p) {
                 PyErr_SetString(PyExc_MemoryError, "no memory");
                 return NULL;
@@ -1278,7 +1298,14 @@ free_expr(expr_ty o)
                 seq = o->v.ListComp.generators;
                 n = asdl_seq_LEN(seq);
                 for (i = 0; i < n; i++)
-                        free_listcomp(asdl_seq_GET(seq, i));
+                        free_comprehension(asdl_seq_GET(seq, i));
+                break;
+        case GeneratorComp_kind:
+                free_expr(o->v.GeneratorComp.elt);
+                seq = o->v.GeneratorComp.generators;
+                n = asdl_seq_LEN(seq);
+                for (i = 0; i < n; i++)
+                        free_comprehension(asdl_seq_GET(seq, i));
                 break;
         case Compare_kind:
                 free_expr(o->v.Compare.left);
@@ -1400,7 +1427,7 @@ free_cmpop(cmpop_ty o)
 }
 
 void
-free_listcomp(listcomp_ty o)
+free_comprehension(comprehension_ty o)
 {
         int i, n;
         asdl_seq *seq;
@@ -1817,11 +1844,24 @@ marshal_write_expr(PyObject **buf, int *off, expr_ty o)
                      i++) {
                         void *elt = asdl_seq_GET(o->v.ListComp.generators,
                                                  i);
-                        marshal_write_listcomp(buf, off, elt);
+                        marshal_write_comprehension(buf, off, elt);
+                }
+                break;
+        case GeneratorComp_kind:
+                marshal_write_int(buf, off, 7);
+                marshal_write_expr(buf, off, o->v.GeneratorComp.elt);
+                marshal_write_int(buf, off,
+                                  asdl_seq_LEN(o->v.GeneratorComp.generators));
+                                  
+                for (i = 0; i <
+                     asdl_seq_LEN(o->v.GeneratorComp.generators); i++) {
+                        void *elt =
+                        asdl_seq_GET(o->v.GeneratorComp.generators, i);
+                        marshal_write_comprehension(buf, off, elt);
                 }
                 break;
         case Compare_kind:
-                marshal_write_int(buf, off, 7);
+                marshal_write_int(buf, off, 8);
                 marshal_write_expr(buf, off, o->v.Compare.left);
                 marshal_write_int(buf, off, asdl_seq_LEN(o->v.Compare.ops));
                 for (i = 0; i < asdl_seq_LEN(o->v.Compare.ops); i++) {
@@ -1838,7 +1878,7 @@ marshal_write_expr(PyObject **buf, int *off, expr_ty o)
                 }
                 break;
         case Call_kind:
-                marshal_write_int(buf, off, 8);
+                marshal_write_int(buf, off, 9);
                 marshal_write_expr(buf, off, o->v.Call.func);
                 marshal_write_int(buf, off, asdl_seq_LEN(o->v.Call.args));
                 for (i = 0; i < asdl_seq_LEN(o->v.Call.args); i++) {
@@ -1865,36 +1905,36 @@ marshal_write_expr(PyObject **buf, int *off, expr_ty o)
                         marshal_write_int(buf, off, 0);
                 break;
         case Repr_kind:
-                marshal_write_int(buf, off, 9);
+                marshal_write_int(buf, off, 10);
                 marshal_write_expr(buf, off, o->v.Repr.value);
                 break;
         case Num_kind:
-                marshal_write_int(buf, off, 10);
+                marshal_write_int(buf, off, 11);
                 marshal_write_object(buf, off, o->v.Num.n);
                 break;
         case Str_kind:
-                marshal_write_int(buf, off, 11);
+                marshal_write_int(buf, off, 12);
                 marshal_write_string(buf, off, o->v.Str.s);
                 break;
         case Attribute_kind:
-                marshal_write_int(buf, off, 12);
+                marshal_write_int(buf, off, 13);
                 marshal_write_expr(buf, off, o->v.Attribute.value);
                 marshal_write_identifier(buf, off, o->v.Attribute.attr);
                 marshal_write_expr_context(buf, off, o->v.Attribute.ctx);
                 break;
         case Subscript_kind:
-                marshal_write_int(buf, off, 13);
+                marshal_write_int(buf, off, 14);
                 marshal_write_expr(buf, off, o->v.Subscript.value);
                 marshal_write_slice(buf, off, o->v.Subscript.slice);
                 marshal_write_expr_context(buf, off, o->v.Subscript.ctx);
                 break;
         case Name_kind:
-                marshal_write_int(buf, off, 14);
+                marshal_write_int(buf, off, 15);
                 marshal_write_identifier(buf, off, o->v.Name.id);
                 marshal_write_expr_context(buf, off, o->v.Name.ctx);
                 break;
         case List_kind:
-                marshal_write_int(buf, off, 15);
+                marshal_write_int(buf, off, 16);
                 marshal_write_int(buf, off, asdl_seq_LEN(o->v.List.elts));
                 for (i = 0; i < asdl_seq_LEN(o->v.List.elts); i++) {
                         void *elt = asdl_seq_GET(o->v.List.elts, i);
@@ -1903,7 +1943,7 @@ marshal_write_expr(PyObject **buf, int *off, expr_ty o)
                 marshal_write_expr_context(buf, off, o->v.List.ctx);
                 break;
         case Tuple_kind:
-                marshal_write_int(buf, off, 16);
+                marshal_write_int(buf, off, 17);
                 marshal_write_int(buf, off, asdl_seq_LEN(o->v.Tuple.elts));
                 for (i = 0; i < asdl_seq_LEN(o->v.Tuple.elts); i++) {
                         void *elt = asdl_seq_GET(o->v.Tuple.elts, i);
@@ -2104,7 +2144,7 @@ marshal_write_cmpop(PyObject **buf, int *off, cmpop_ty o)
 }
 
 int
-marshal_write_listcomp(PyObject **buf, int *off, listcomp_ty o)
+marshal_write_comprehension(PyObject **buf, int *off, comprehension_ty o)
 {
         int i;
         marshal_write_expr(buf, off, o->target);

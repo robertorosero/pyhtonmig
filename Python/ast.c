@@ -757,7 +757,7 @@ ast_for_listcomp(struct compiling *c, const node *n)
     
     ch = CHILD(n, 1);
     for (i = 0; i < n_fors; i++) {
-	listcomp_ty lc;
+	comprehension_ty lc;
 	asdl_seq *t;
         expr_ty expression;
 
@@ -777,9 +777,9 @@ ast_for_listcomp(struct compiling *c, const node *n)
         }
 
 	if (asdl_seq_LEN(t) == 1)
-	    lc = listcomp(asdl_seq_GET(t, 0), expression, NULL);
+	    lc = comprehension(asdl_seq_GET(t, 0), expression, NULL);
 	else
-	    lc = listcomp(Tuple(t, Store), expression, NULL);
+	    lc = comprehension(Tuple(t, Store), expression, NULL);
 
         if (!lc) {
             asdl_seq_free(listcomps);
@@ -1279,10 +1279,10 @@ ast_for_call(struct compiling *c, const node *n, expr_ty func)
     /*
       arglist: (argument ',')* (argument [',']| '*' test [',' '**' test]
                | '**' test)
-      argument: [test '='] test	# Really [keyword '='] test
+      argument: [test '='] test [gen_for]	 # Really [keyword '='] test
     */
 
-    int i, nargs, nkeywords;
+    int i, nargs, nkeywords, ngens;
     asdl_seq *args = NULL;
     asdl_seq *keywords = NULL;
     expr_ty vararg = NULL, kwarg = NULL;
@@ -1291,11 +1291,14 @@ ast_for_call(struct compiling *c, const node *n, expr_ty func)
 
     nargs = 0;
     nkeywords = 0;
+    ngens = 0;
     for (i = 0; i < NCH(n); i++) 
 	if (TYPE(CHILD(n, i)) == argument) {
 	    if (NCH(CHILD(n, i)) == 1)
 		nargs++;
-	    else
+	    else if (TYPE(CHILD(CHILD(n, i), 1)) == gen_for)
+		ngens++;
+            else
 		nkeywords++;
 	}
     
@@ -1317,6 +1320,9 @@ ast_for_call(struct compiling *c, const node *n, expr_ty func)
                     goto error;
 		asdl_seq_SET(args, nargs++, e);
 	    }  
+	    else if (TYPE(CHILD(CHILD(n, 0), 1)) == gen_for) {
+                /* XXX handle generator comp */
+            }
 	    else {
 		keyword_ty kw;
 		identifier key;

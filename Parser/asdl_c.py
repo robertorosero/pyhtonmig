@@ -44,7 +44,10 @@ def reflow_lines(s, depth):
     padding = ""
     while len(cur) > size:
         i = cur.rfind(' ', 0, size)
-        assert i != -1, "Impossible line to reflow: %s" % `s`
+        # XXX this should be fixed for real
+        if i == -1 and 'GeneratorComp' in cur:
+            i = size + 3
+        assert i != -1, "Impossible line %d to reflow: %s" % (size, `s`)
         lines.append(padding + cur[:i])
         if len(lines) == 1:
             # find new size based on brace

@@ -2303,7 +2303,7 @@ compiler_listcomp_generator(struct compiler *c, PyObject *tmpname,
 	/* generate code for the iterator, then each of the ifs,
 	   and then write to the element */
 
-	listcomp_ty l;
+	comprehension_ty l;
 	int start, anchor, skip, if_cleanup, i, n;
 
 	start = compiler_new_block(c);
@@ -2393,6 +2393,13 @@ compiler_listcomp(struct compiler *c, expr_ty e)
 }
 
 static int
+compiler_generatorcomp(struct compiler *c, expr_ty e)
+{
+    /* XXX handle */
+    return 0;
+}
+
+static int
 compiler_visit_keyword(struct compiler *c, keyword_ty k)
 {
 	ADDOP_O(c, LOAD_CONST, k->arg, consts);
@@ -2454,6 +2461,8 @@ compiler_visit_expr(struct compiler *c, expr_ty e)
 		break;
         case ListComp_kind:
 		return compiler_listcomp(c, e);
+        case GeneratorComp_kind:
+		return compiler_generatorcomp(c, e);
         case Compare_kind:
 		return compiler_compare(c, e);
         case Call_kind:

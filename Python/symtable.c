@@ -160,7 +160,7 @@ static int symtable_visit_expr(struct symtable *st, expr_ty s);
 static int symtable_visit_arguments(struct symtable *st, arguments_ty);
 static int symtable_visit_excepthandler(struct symtable *st, excepthandler_ty);
 static int symtable_visit_alias(struct symtable *st, alias_ty);
-static int symtable_visit_listcomp(struct symtable *st, listcomp_ty);
+static int symtable_visit_comprehension(struct symtable *st, comprehension_ty);
 static int symtable_visit_keyword(struct symtable *st, keyword_ty);
 static int symtable_visit_slice(struct symtable *st, slice_ty);
 static int symtable_visit_params(struct symtable *st, asdl_seq *args, int top);
@@ -919,8 +919,9 @@ symtable_visit_expr(struct symtable *st, expr_ty e)
 		if (e->v.Lambda.args->defaults)
 			VISIT_SEQ(st, expr, e->v.Lambda.args->defaults);
 		/* XXX how to get line numbers for expressions */
-		symtable_enter_block(st, GET_IDENTIFIER(lambda),
-				     FunctionBlock, (void *)e, 0);
+		if (!symtable_enter_block(st, GET_IDENTIFIER(lambda),
+                                          FunctionBlock, (void *)e, 0))
+			return 0;
 		VISIT(st, arguments, e->v.Lambda.args);
 		VISIT(st, expr, e->v.Lambda.body);
 		symtable_exit_block(st, (void *)e);
@@ -940,7 +941,21 @@ symtable_visit_expr(struct symtable *st, expr_ty e)
 		if (!symtable_add_def(st, tmp, DEF_LOCAL))
 			return 0;
 		VISIT(st, expr, e->v.ListComp.elt);
-		VISIT_SEQ(st, listcomp, e->v.ListComp.generators);
+		VISIT_SEQ(st, comprehension, e->v.ListComp.generators);
+		break;
+	}
+        case GeneratorComp_kind: {
+		char tmpname[256];
+		identifier tmp;
+
+                /* XXX this is correct/complete */
+		tmp = PyString_FromString("<genexpr>");
+		if (!symtable_enter_block(st, tmp, FunctionBlock, 
+                                          (void *)e, 0))
+			return 0;
+		VISIT(st, expr, e->v.GeneratorComp.elt);
+		VISIT_SEQ(st, comprehension, e->v.GeneratorComp.generators);
+		symtable_exit_block(st, (void *)e);
 		break;
 	}
         case Compare_kind:
@@ -1102,7 +1117,7 @@ symtable_visit_alias(struct symtable *st, alias_ty a)
 
 
 static int 
-symtable_visit_listcomp(struct symtable *st, listcomp_ty lc)
+symtable_visit_comprehension(struct symtable *st, comprehension_ty lc)
 {
 	VISIT(st, expr, lc->target);
 	VISIT(st, expr, lc->iter);

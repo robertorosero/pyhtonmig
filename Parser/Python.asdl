@@ -52,7 +52,8 @@ module Python
 	     | UnaryOp(unaryop op, expr operand)
 	     | Lambda(arguments args, expr body)
 	     | Dict(expr* keys, expr *values)
-	     | ListComp(expr elt, listcomp* generators)
+	     | ListComp(expr elt, comprehension* generators)
+	     | GeneratorComp(expr elt, comprehension* generators)
 	     -- need sequences for compare to distinguish between
 	     -- x < 4 < 3 and (x < 4) < 3
 	     | Compare(expr left, cmpop* ops, expr* comparators)
@@ -85,7 +86,7 @@ module Python
 
 	cmpop = Eq | NotEq | Lt | LtE | Gt | GtE | Is | IsNot | In | NotIn
 
-	listcomp = (expr target, expr iter, expr* ifs)
+	comprehension = (expr target, expr iter, expr* ifs)
 
 	-- not sure what to call the first argument for raise and except
 
