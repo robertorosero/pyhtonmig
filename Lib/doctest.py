@@ -449,6 +449,208 @@ class _SpoofOut(StringIO):
         if hasattr(self, "softspace"):
             del self.softspace
 
+class Parser:
+    """
+    Extract doctests from a string.
+    """
+
+    _PS1 = ">>>"
+    _PS2 = "..."
+    _isPS1 = re.compile(r"(\s*)" + re.escape(_PS1)).match
+    _isPS2 = re.compile(r"(\s*)" + re.escape(_PS2)).match
+    _isEmpty = re.compile(r"\s*$").match
+    _isComment = re.compile(r"\s*#").match
+
+    def __init__(self, name, string):
+        """
+        Prepare to extract doctests from string `string`.
+
+        `name` is an arbitrary (string) name associated with the string,
+        and is used only in error messages.
+        """
+        self.name = name
+        self.source = string
+
+    def get_examples(self):
+        """
+        Return the doctest examples from the string.
+
+        This is a list of doctest.Example instances, one Example
+        per doctest test in the string.
+
+        >>> text = '''
+        ...        >>> x, y = 2, 3  # no output expected
+        ...        >>> if 1:
+        ...        ...     print x
+        ...        ...     print y
+        ...        2
+        ...        3
+        ...
+        ...        Some text.
+        ...        >>> x+y
+        ...        5
+        ...        '''
+        >>> for x in Parser('<string>', text).get_examples():
+        ...     x.source
+        ...     x.want
+        ...     x.lineno
+        'x, y = 2, 3  # no output expected'
+        ''
+        1
+        'if 1:\\n    print x\\n    print y\\n'
+        '2\\n3\\n'
+        2
+        'x+y'
+        '5\\n'
+        9
+        """
+        return self._parse(kind='examples')
+
+    def get_program(self):
+        """
+        Return an executable program from the string, as a string.
+
+        The format of this isn't rigidly defined.  In general, doctest
+        examples become the executable statements in the result, and
+        and their expected outputs become comments, preceded by an
+        "#Expected:" comment.  Everything else (text, comments,
+        everything not part of a doctest test) is also placed in comments.
+
+        >>> text = '''
+        ...        >>> x, y = 2, 3  # no output expected
+        ...        >>> if 1:
+        ...        ...     print x
+        ...        ...     print y
+        ...        2
+        ...        3
+        ...
+        ...        Some text.
+        ...        >>> x+y
+        ...        5
+        ...        '''
+        >>> print Parser('<string>', text).get_program()
+        x, y = 2, 3  # no output expected
+        if 1:
+            print x
+            print y
+        # Expected:
+        #     2
+        #     3
+        #
+        #         Some text.
+        x+y
+        # Expected:
+        #     5
+        """
+        return self._parse(kind='program')
+
+    def _parse(self,   kind):
+        assert kind in ('examples', 'program')
+        do_program = kind == 'program'
+        output = []
+        push = output.append
+
+        string = self.source
+        if not string.endswith('\n'):
+            string += '\n'
+
+        isPS1, isPS2 = self._isPS1, self._isPS2
+        isEmpty, isComment = self._isEmpty, self._isComment
+        lines = string.split("\n")
+        i, n = 0, len(lines)
+        while i < n:
+            # Search for an example (a PS1 line).
+            line = lines[i]
+            i += 1
+            m = isPS1(line)
+            if m is None:
+                if do_program:
+                    line = line.rstrip()
+                    if line:
+                        line = '  ' + line
+                    push('#' + line)
+                continue
+            # line is a PS1 line.
+            j = m.end(0)  # beyond the prompt
+            if isEmpty(line, j) or isComment(line, j):
+                # a bare prompt or comment -- not interesting
+                if do_program:
+                    push("#  " + line[j:])
+                continue
+            # line is a non-trivial PS1 line.
+            lineno = i - 1
+            if line[j] != " ":
+                raise ValueError('line %r of the docstring for %s lacks '
+                                 'blank after %s: %r' %
+                                 (lineno, self.name, self._PS1, line))
+
+            j += 1
+            blanks = m.group(1)
+            nblanks = len(blanks)
+            # suck up this and following PS2 lines
+            source = []
+            while 1:
+                source.append(line[j:])
+                line = lines[i]
+                m = isPS2(line)
+                if m:
+                    if m.group(1) != blanks:
+                        raise ValueError('line %r of the docstring for %s '
+                            'has inconsistent leading whitespace: %r' %
+                            (i, self.name, line))
+                    i += 1
+                else:
+                    break
+
+            if do_program:
+                output.extend(source)
+            else:
+                # get rid of useless null line from trailing empty "..."
+                if source[-1] == "":
+                    assert len(source) > 1
+                    del source[-1]
+                if len(source) == 1:
+                    source = source[0]
+                else:
+                    source = "\n".join(source) + "\n"
+
+            # suck up response
+            if isPS1(line) or isEmpty(line):
+                if not do_program:
+                    push(Example(source, "", lineno))
+                continue
+
+            # There is a response.
+            want = []
+            if do_program:
+                push("# Expected:")
+            while 1:
+                if line[:nblanks] != blanks:
+                    raise ValueError('line %r of the docstring for %s '
+                        'has inconsistent leading whitespace: %r' %
+                        (i, self.name, line))
+                want.append(line[nblanks:])
+                i += 1
+                line = lines[i]
+                if isPS1(line) or isEmpty(line):
+                    break
+
+            if do_program:
+                output.extend(['#     ' + x for x in want])
+            else:
+                want = "\n".join(want) + "\n"
+                push(Example(source, want, lineno))
+
+        if do_program:
+            # Trim junk on both ends.
+            while output and output[-1] == '#':
+                output.pop()
+            while output and output[0] == '#':
+                output.pop(0)
+            output = '\n'.join(output)
+
+        return output
+
 ######################################################################
 ## 2. Example & DocTest
 ######################################################################
@@ -520,85 +722,7 @@ class DocTest:
         self.lineno = lineno
         # Parse the docstring.
         self.docstring = docstring
-        self.examples = self._parse(docstring)
-
-    _PS1 = ">>>"
-    _PS2 = "..."
-    _isPS1 = re.compile(r"(\s*)" + re.escape(_PS1)).match
-    _isPS2 = re.compile(r"(\s*)" + re.escape(_PS2)).match
-    _isEmpty = re.compile(r"\s*$").match
-    _isComment = re.compile(r"\s*#").match
-
-    def _parse(self, string):
-        if not string.endswith('\n'):
-            string += '\n'
-        examples = []
-        isPS1, isPS2 = self._isPS1, self._isPS2
-        isEmpty, isComment = self._isEmpty, self._isComment
-        lines = string.split("\n")
-        i, n = 0, len(lines)
-        while i < n:
-            # Search for an example (a PS1 line).
-            line = lines[i]
-            i += 1
-            m = isPS1(line)
-            if m is None:
-                continue
-            # line is a PS1 line.
-            j = m.end(0)  # beyond the prompt
-            if isEmpty(line, j) or isComment(line, j):
-                # a bare prompt or comment -- not interesting
-                continue
-            # line is a non-trivial PS1 line.
-            lineno = i - 1
-            if line[j] != " ":
-                raise ValueError('line %r of the docstring for %s lacks '
-                                 'blank after %s: %r' %
-                                 (lineno, self.name, self._PS1, line))
-
-            j += 1
-            blanks = m.group(1)
-            nblanks = len(blanks)
-            # suck up this and following PS2 lines
-            source = []
-            while 1:
-                source.append(line[j:])
-                line = lines[i]
-                m = isPS2(line)
-                if m:
-                    if m.group(1) != blanks:
-                        raise ValueError('line %r of the docstring for %s '
-                            'has inconsistent leading whitespace: %r' %
-                            (i, self.name, line))
-                    i += 1
-                else:
-                    break
-            # get rid of useless null line from trailing empty "..."
-            if source[-1] == "":
-                assert len(source) > 1
-                del source[-1]
-            if len(source) == 1:
-                source = source[0]
-            else:
-                source = "\n".join(source) + "\n"
-            # suck up response
-            if isPS1(line) or isEmpty(line):
-                want = ""
-            else:
-                want = []
-                while 1:
-                    if line[:nblanks] != blanks:
-                        raise ValueError('line %r of the docstring for %s '
-                            'has inconsistent leading whitespace: %r' %
-                            (i, self.name, line))
-                    want.append(line[nblanks:])
-                    i += 1
-                    line = lines[i]
-                    if isPS1(line) or isEmpty(line):
-                        break
-                want = "\n".join(want) + "\n"
-            examples.append(Example(source, want, lineno))
-        return examples
+        self.examples = Parser(name, docstring).get_examples()
 
     def __repr__(self):
         if len(self.examples) == 0:
@@ -1936,7 +2060,6 @@ def script_from_examples(s):
        ...           '''
 
        >>> print script_from_examples(text)
-       #
        #        Here are examples of simple math.
        #
        #            Python has super accurate integer addition
@@ -1961,63 +2084,9 @@ def script_from_examples(s):
        <BLANKLINE>
        #
        #            Ho hum
-       #
        """
-    isPS1, isPS2 = DocTest._isPS1, DocTest._isPS2
-    isEmpty, isComment = DocTest._isEmpty, DocTest._isComment
-    output = []
-    lines = s.split("\n")
-    i, n = 0, len(lines)
-    while i < n:
-        line = lines[i]
-        i = i + 1
-        m = isPS1(line)
-        if m is None:
-            line = line.rstrip()
-            if line:
-                line = '  ' + line
-            output.append('#'+line)
-            continue
-        j = m.end(0)  # beyond the prompt
-        if isEmpty(line, j) or isComment(line, j):
-            # a bare prompt or comment -- not interesting
-            output.append('#  '+line[j:])
 
-        lineno = i - 1
-        if line[j] != " ":
-            raise ValueError("line %r of docstring lacks blank after %s: %s" %
-                             (lineno, PS1, line))
-        j = j + 1
-        blanks = m.group(1)
-        nblanks = len(blanks)
-        # suck up this and following PS2 lines
-        while 1:
-            output.append(line[j:])
-            line = lines[i]
-            m = isPS2(line)
-            if m:
-                if m.group(1) != blanks:
-                    raise ValueError("inconsistent leading whitespace "
-                        "in line %r of docstring: %s" % (i, line))
-                i = i + 1
-            else:
-                break
-
-        # suck up response
-        if not (isPS1(line) or isEmpty(line)):
-            output.append('# Expected:')
-            while 1:
-                if line[:nblanks] != blanks:
-                    raise ValueError("inconsistent leading whitespace "
-                        "in line %r of docstring: %s" % (i, line))
-                output.append('#     '+line[nblanks:])
-                i = i + 1
-                line = lines[i]
-                if isPS1(line) or isEmpty(line):
-                    break
-
-    return '\n'.join(output)
-
+    return Parser('<string>', s).get_program()
 
 def _want_comment(example):
     """
