@@ -57,7 +57,7 @@ type_call(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
 	if (type->tp_new == NULL) {
 		PyErr_Format(PyExc_TypeError,
-			     "cannot construct '%.100s' instances",
+			     "cannot create '%.100s' instances",
 			     type->tp_name);
 		return NULL;
 	}
@@ -98,7 +98,7 @@ PyType_GenericNew(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	self = type->tp_alloc(type, args, kwds);
 	if (self == NULL)
 		return NULL;
-	if (type->tp_init(self, args, kwds) < 0) {
+	if (type->tp_init != NULL && type->tp_init(self, args, kwds) < 0) {
 		Py_DECREF(self);
 		return NULL;
 	}
@@ -111,15 +111,16 @@ static void
 subtype_dealloc(PyObject *self)
 {
 	int dictoffset = self->ob_type->tp_dictoffset;
-	PyTypeObject *base;
+	PyTypeObject *type, *base;
 	destructor f;
 
 	/* This exists so we can DECREF self->ob_type */
 
-	base = self->ob_type->tp_base;
-	while ((f = base->tp_dealloc) == subtype_dealloc)
+	type = self->ob_type;
+	base = type->tp_base;
+	while (base && (f = base->tp_dealloc) == subtype_dealloc)
 		base = base->tp_base;
-	if (dictoffset && !base->tp_dictoffset) {
+	if (dictoffset && (base == NULL || !base->tp_dictoffset)) {
 		PyObject **dictptr = (PyObject **) ((char *)self + dictoffset);
 		PyObject *dict = *dictptr;
 		if (dict != NULL) {
@@ -128,8 +129,9 @@ subtype_dealloc(PyObject *self)
 		}
 	}
 	f(self);
-	if (self->ob_type->tp_flags & Py_TPFLAGS_HEAPTYPE) {
-		Py_DECREF(self->ob_type);
+	/* Can't reference self beyond this point */
+	if (type->tp_flags & Py_TPFLAGS_HEAPTYPE) {
+		Py_DECREF(type);
 	}
 }
 
@@ -145,13 +147,13 @@ typedef struct {
 	struct memberlist members[1];
 } etype;
 
-/* TypeType's constructor is called when a type is subclassed */
+/* TypeType's initializer; called when a type is subclassed */
 static int
 type_init(PyObject *self, PyObject *args, PyObject *kwds)
 {
 	PyObject *name, *bases, *dict, *x, *slots;
 	PyTypeObject *type, *base;
-	char *dummy = NULL;
+	static char *kwlist[] = {"name", "bases", "dict", 0};
 	etype *et;
 	struct memberlist *mp;
 	int i, nslots, slotoffset, allocsize;
@@ -160,7 +162,7 @@ type_init(PyObject *self, PyObject *args, PyObject *kwds)
 	type = (PyTypeObject *)self;
 
 	/* Check arguments */
-	if (!PyArg_ParseTupleAndKeywords(args, kwds, "SOO", &dummy,
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "SOO", kwlist,
 					 &name, &bases, &dict))
 		return -1;
 	if (!PyTuple_Check(bases) || !PyDict_Check(dict)) {
@@ -170,24 +172,23 @@ type_init(PyObject *self, PyObject *args, PyObject *kwds)
 	}
 	if (PyTuple_GET_SIZE(bases) > 1) {
 		PyErr_SetString(PyExc_TypeError,
-				"can't multiple-inherit from types");
+				"can't multiple-inherit from types (yet)");
 		return -1;
 	}
-	if (PyTuple_GET_SIZE(bases) < 1) {
-		PyErr_SetString(PyExc_TypeError,
-				"can't create a new type without a base type");
-		return -1;
-	}
-	base = (PyTypeObject *)PyTuple_GET_ITEM(bases, 0);
-	if (!PyType_Check((PyObject *)base)) {
-		PyErr_SetString(PyExc_TypeError,
-				"base type must be a type");
-		return -1;
-	}
-	if (base->tp_init == NULL) {
-		PyErr_SetString(PyExc_TypeError,
-				"base type must have a constructor slot");
-		return -1;
+	if (PyTuple_GET_SIZE(bases) < 1)
+		base = &PyBaseObject_Type;
+	else {
+		base = (PyTypeObject *)PyTuple_GET_ITEM(bases, 0);
+		if (!PyType_Check((PyObject *)base)) {
+			PyErr_SetString(PyExc_TypeError,
+					"base type must be a type");
+			return -1;
+		}
+		if (base->tp_new == NULL) {
+			PyErr_SetString(PyExc_TypeError,
+					"base type must have a tp_new slot");
+			return -1;
+		}
 	}
 
 	/* Check for a __slots__ sequence variable in dict, and count it */
@@ -346,6 +347,57 @@ PyTypeObject PyType_Type = {
 	0,					/* tp_descr_set */
 	offsetof(PyTypeObject, tp_dict),	/* tp_dictoffset */
 	type_init,				/* tp_init */
+	PyType_GenericAlloc,			/* tp_alloc */
+	PyType_GenericNew,			/* tp_new */
+};
+
+
+/* The base type of all types (eventually)... except itself. */
+
+static void
+object_dealloc(PyObject *self)
+{
+	PyObject_Del(self);
+}
+
+PyTypeObject PyBaseObject_Type = {
+	PyObject_HEAD_INIT(&PyType_Type)
+	0,					/* ob_size */
+	"object",				/* tp_name */
+	sizeof(PyObject),			/* tp_basicsize */
+	0,					/* tp_itemsize */
+	(destructor)object_dealloc,		/* tp_dealloc */
+	0,					/* tp_print */
+	0,			 		/* tp_getattr */
+	0,					/* tp_setattr */
+	0,					/* tp_compare */
+	0,					/* tp_repr */
+	0,					/* tp_as_number */
+	0,					/* tp_as_sequence */
+	0,					/* tp_as_mapping */
+	0,					/* tp_hash */
+	0,					/* tp_call */
+	0,					/* tp_str */
+	PyGeneric_GetAttr,			/* tp_getattro */
+	0,					/* tp_setattro */
+	0,					/* tp_as_buffer */
+	Py_TPFLAGS_DEFAULT,			/* tp_flags */
+	"The most base type",			/* tp_doc */
+	0,					/* tp_traverse */
+	0,					/* tp_clear */
+	0,					/* tp_richcompare */
+	0,					/* tp_weaklistoffset */
+	0,					/* tp_iter */
+	0,					/* tp_iternext */
+	0,					/* tp_methods */
+	0,					/* tp_members */
+	0,					/* tp_getset */
+	0,					/* tp_base */
+	0,					/* tp_dict */
+	0,					/* tp_descr_get */
+	0,					/* tp_descr_set */
+	0,					/* tp_dictoffset */
+	0,					/* tp_init */
 	PyType_GenericAlloc,			/* tp_alloc */
 	PyType_GenericNew,			/* tp_new */
 };
