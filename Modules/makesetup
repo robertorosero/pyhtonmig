@@ -7,7 +7,7 @@
 NL="\\
 "
 
-sed -e 's/#.*//' -e '/^[ 	]*$/d' ${1-Setup} |
+sed -e 's/#.*//' -e '/^[ 	]*$/d' ${*-Setup} |
 (
 	DEFS=
 	MODS=
