@@ -872,7 +872,6 @@ sub get_table_col1_fonts{
         $efont = "</$font>";
         $efont =~ s/ .*>/>/;
     }
-    print "\nfonts: ('$font', '$sfont', '$efont')";
     return ($font, $sfont, $efont);
 }
 
