@@ -252,7 +252,7 @@ class Field(AST):
         if self.name is None:
             return "Field(%s%s)" % (self.type, extra)
         else:
-            return "Field(%s, %s,%s)" % (self.type, self.name, extra)
+            return "Field(%s, %s%s)" % (self.type, self.name, extra)
 
 class Sum(AST):
     def __init__(self, types, attributes=None):
