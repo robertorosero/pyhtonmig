@@ -16,6 +16,7 @@ package main;
 $HTML_VERSION = 4.0;
 
 $MAX_LINK_DEPTH = 2;
+$MAX_SPLIT_DEPTH = 5;      # split at subsections but not sub-subsections
 $ADDRESS = '';
 
 $NO_FOOTNODE = 1;
