@@ -131,25 +131,6 @@ esac
 configure_args="$*"
 
 
-echo checking for --with-solaris
-# check whether --with-solaris was given
-withval="$with_solaris"
-if test -n "$withval"; then
-  
-{
-test -n "$verbose" && \
-echo "	defining SOLARIS"
-echo "#define" SOLARIS 1 >> confdefs.h
-DEFS="$DEFS -DSOLARIS=1"
-SEDDEFS="${SEDDEFS}\${SEDdA}SOLARIS\${SEDdB}SOLARIS\${SEDdC}1\${SEDdD}
-\${SEDuA}SOLARIS\${SEDuB}SOLARIS\${SEDuC}1\${SEDuD}
-\${SEDeA}SOLARIS\${SEDeB}SOLARIS\${SEDeC}1\${SEDeD}
-"
-}
-
-fi
-
-
 # checks for alternative programs
 if test -z "$CC"; then
   # Extract the first word of `gcc', so it can be a program name with args.
@@ -449,7 +430,7 @@ rm -f conftest*
 fi
 rm -f conftest*
 
-for hdr in dlfcn.h signal.h stdarg.h stdlib.h unistd.h utime.h sys/param.h sys/select.h sys/times.h sys/un.h sys/utsname.h
+for hdr in dlfcn.h signal.h stdarg.h stdlib.h thread.h unistd.h utime.h sys/audioio.h sys/param.h sys/select.h sys/times.h sys/un.h sys/utsname.h
 do
 trhdr=HAVE_`echo $hdr | tr '[a-z]./' '[A-Z]__'`
 echo checking for ${hdr}

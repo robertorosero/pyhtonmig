@@ -1,4 +1,4 @@
-Python release 1.0.0 BETA 3
+Python release 1.0.0 BETA 4
 ===========================
 
 ==> This is still a BETA release.  I've been furiously hacking over
@@ -48,9 +48,8 @@ chdir into each subdirectory in turn and run make there manually
 (do the Modules subdirectory last!).
 
 EXCEPTIONS: on SVR4 derived systems, you need to pass the configure
-script the option --with-svr4.  On SOLARIS 2 you *also* need to pass
-it --with-solaris.  See below for more options you can pass to the
-configure script.
+script the option --with-svr4.  See below for more options you can
+pass to the configure script.
 
 You can configure the interpreter to contain fewer or more built-in
 modules by editing the file Modules/Setup.  Read the comments in the
@@ -119,17 +118,11 @@ w_erase' to the stdwin.h file (in the stdwin distribution,
 subdirectory H).  The GL conflict may be solvable by reordering the -l
 options on the final link command, but it appears unsafe...
 
-- Certain modules need to know whether you are running Sun SOLARIS 2.
-I currently don't know a failsafe way to determine this, so you have
-to pass the option --with-solaris to the configure script.  (This is
-currently only needed when you use threads or the sunaudiodev module.)
-
-- On SGI IRIX, and on Sun SOLARIS 2, you can use multiple threads.
-To enable this, pass --with-thread.  On SOLARIS 2, also pass
---with-solaris.  In the Modules/Setup file, enable the thread module.
-(Threads aren't enabled automatically because there are run-time
-penalties when support for them is compiled in even if you don't use
-them.)
+- On SGI IRIX, and on Sun SOLARIS 2, you can use multiple threads.  To
+enable this, pass --with-thread.  In the Modules/Setup file, enable
+the thread module.  (Threads aren't enabled automatically because
+there are run-time penalties when support for them is compiled in even
+if you don't use them.)
 
 - On SGI IRIX, there are modules that interface to many SGI specific
 system libraries, e.g. the GL library and the audio hardware.  To
@@ -199,8 +192,9 @@ comments.
 ChangeLog	A raw list of changes since the first 1.0.0 BETA release
 Contrib/	Contributed code
 Demo/		Demonstration scripts, modules and programs
+Demo2/		Some more demonstrations (not distributed)
 Doc/		Documentation (in LaTeX)
-Extensions/	Extension modules (not very well supported yet)
+Extensions/	Extension modules (not distributed)
 Grammar/	Input for the parser generator
 Include/	Public header files
 Lib/		Python library modules
@@ -212,10 +206,14 @@ Parser/		The parser and tokenizer and their input handling
 Python/		The "compiler" and interpreter
 README		The file you're reading now
 TODO		A list of things that aren't finished yet
-config.status	status from last run of configure script (not distributed)
+acconfig.h	Additional input for the autoheader program
+config.h	Configuration header (generated)
+config.h.in	Source from which config.status creates config.h
+config.status	status from last run of configure script (generated)
 configure	Configuration shell script (GNU autoconf output)
 configure.in	Configuration specification (GNU autoconf input)
-python		The executable interpreter (not distributed)
+tags, TAGS	Tags files for vi and Emacs (generated)
+python		The executable interpreter (generated)
 readline/	Source code for the GNU readline library
 
 

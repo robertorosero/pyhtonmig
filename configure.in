@@ -3,9 +3,6 @@ AC_REVISION($Revision$)dnl
 AC_INIT(Include/object.h)
 AC_CONFIG_HEADER(config.h)dnl
 
-echo checking for --with-solaris
-AC_WITH(solaris, [AC_DEFINE(SOLARIS)])
-
 # checks for alternative programs
 AC_PROG_CC
 AC_PROG_INSTALL
@@ -20,7 +17,7 @@ AC_DYNIX_SEQ
 
 # checks for header files
 AC_STDC_HEADERS
-AC_HAVE_HEADERS(dlfcn.h signal.h stdarg.h stdlib.h unistd.h utime.h sys/param.h sys/select.h sys/times.h sys/un.h sys/utsname.h)
+AC_HAVE_HEADERS(dlfcn.h signal.h stdarg.h stdlib.h thread.h unistd.h utime.h sys/audioio.h sys/param.h sys/select.h sys/times.h sys/un.h sys/utsname.h)
 AC_DIR_HEADER
 
 # checks for typedefs
