@@ -306,8 +306,6 @@ def pm():
 TESTCMD = 'import x; x.main()'
 
 def test():
-	import linecache
-	linecache.checkcache()
 	run(TESTCMD)
 
 # print help
