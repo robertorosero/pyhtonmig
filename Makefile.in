@@ -129,6 +129,7 @@ libainstall:	all
 		$(INSTALL) Modules/Setup $(LIBPL)/Setup
 		$(INSTALL) $(srcdir)/Modules/makesetup $(LIBPL)/makesetup
 		$(INSTALL) config.h $(LIBPL)/config.h
+		$(INSTALL) $(srcdir)/Python/frozenmain.c $(LIBPL)/frozenmain.c
 
 # Build the sub-Makefiles
 Makefiles:	config.status

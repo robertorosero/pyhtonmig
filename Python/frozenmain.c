@@ -35,6 +35,8 @@ extern int debugging;
 extern int verbose;
 extern int killprint;
 
+static char *argv0;
+
 main(argc, argv)
 	int argc;
 	char **argv;
@@ -42,6 +44,8 @@ main(argc, argv)
 	char *p;
 	int n, sts;
 	int inspect = 0;
+
+	argv0 = argv[0];
 
 	if ((p = getenv("PYTHONDEBUG")) && *p != '\0')
 		debugging = 1;
@@ -73,4 +77,10 @@ main(argc, argv)
 
 	goaway(sts);
 	/*NOTREACHED*/
+}
+
+char *
+getprogramname()
+{
+	return argv0;
 }
