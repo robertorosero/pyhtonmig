@@ -64,9 +64,9 @@ init_symtable(void)
 	PyModule_AddIntConstant(m, "DEF_IMPORT", DEF_IMPORT);
 	PyModule_AddIntConstant(m, "DEF_BOUND", DEF_BOUND);
 
-	PyModule_AddIntConstant(m, "TYPE_FUNCTION", FunctionScope);
-	PyModule_AddIntConstant(m, "TYPE_CLASS", ClassScope);
-	PyModule_AddIntConstant(m, "TYPE_MODULE", ModuleScope);
+	PyModule_AddIntConstant(m, "TYPE_FUNCTION", FunctionBlock);
+	PyModule_AddIntConstant(m, "TYPE_CLASS", ClassBlock);
+	PyModule_AddIntConstant(m, "TYPE_MODULE", ModuleBlock);
 
 	PyModule_AddIntConstant(m, "OPT_IMPORT_STAR", OPT_IMPORT_STAR);
 	PyModule_AddIntConstant(m, "OPT_EXEC", OPT_EXEC);
