@@ -66,6 +66,8 @@ type_repr(PyTypeObject *type)
 static PyObject *
 type_call(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
+	PyObject *obj;
+
 	if (type->tp_new == NULL) {
 		PyErr_Format(PyExc_TypeError,
 			     "cannot create '%.100s' instances",
@@ -73,7 +75,14 @@ type_call(PyTypeObject *type, PyObject *args, PyObject *kwds)
 		return NULL;
 	}
 
-	return type->tp_new(type, args, kwds);
+	obj = type->tp_new(type, args, NULL);
+	if (obj != NULL && type->tp_init != NULL) {
+		if (type->tp_init(obj, args, kwds) < 0) {
+			Py_DECREF(obj);
+			obj = NULL;
+		}
+	}
+	return obj;
 }
 
 PyObject *
@@ -107,16 +116,7 @@ PyType_GenericAlloc(PyTypeObject *type, int nitems)
 PyObject *
 PyType_GenericNew(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
-	PyObject *self;
-
-	self = type->tp_alloc(type, 0);
-	if (self == NULL)
-		return NULL;
-	if (type->tp_init != NULL && type->tp_init(self, args, kwds) < 0) {
-		Py_DECREF(self);
-		return NULL;
-	}
-	return self;
+	return type->tp_alloc(type, 0);
 }
 
 /* Helper for subtyping */
