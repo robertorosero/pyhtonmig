@@ -42,8 +42,12 @@ extern DL_IMPORT(int) PyFunction_SetClosure(PyObject *, PyObject *);
 #define PyFunction_GET_CLOSURE(func) \
 	(((PyFunctionObject *)func) -> func_closure)
 
-/* The classmethod type lives here, too */
+/* The classmethod and staticmethod types lives here, too */
 extern DL_IMPORT(PyTypeObject) PyClassMethod_Type;
+extern DL_IMPORT(PyTypeObject) PyStaticMethod_Type;
+
+extern DL_IMPORT(PyObject *) PyClassMethod_New(PyObject *);
+extern DL_IMPORT(PyObject *) PyStaticMethod_New(PyObject *);
 
 #ifdef __cplusplus
 }

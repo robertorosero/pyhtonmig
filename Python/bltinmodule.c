@@ -1815,6 +1815,9 @@ _PyBuiltin_Init(void)
 	if (PyDict_SetItemString(dict, "object",
 				 (PyObject *) &PyBaseObject_Type) < 0)
 		return NULL;
+	if (PyDict_SetItemString(dict, "staticmethod",
+				 (PyObject *) &PyStaticMethod_Type) < 0)
+		return NULL;
 	if (PyDict_SetItemString(dict, "str", (PyObject *) &PyString_Type) < 0)
 		return NULL;
 	if (PyDict_SetItemString(dict, "tuple",

@@ -377,6 +377,23 @@ PyTypeObject PyFunction_Type = {
 
 /* Class method object */
 
+/* A class method receives the class as implicit first argument,
+   just like an instance method receives the instance.
+   To declare a class method, use this idiom:
+
+     class C:
+         def f(cls, arg1, arg2, ...): ...
+	 f = classmethod(f)
+   
+   It can be called either on the class (e.g. C.f()) or on an instance
+   (e.g. C().f()); the instance is ignored except for its class.
+   If a class method is called for a derived class, the derived class
+   object is passed as the implied first argument.
+
+   Class methods are different than C++ or Java static methods.
+   If you want those, see static methods below.
+*/
+
 typedef struct {
 	PyObject_HEAD
 	PyObject *cm_callable;
@@ -457,3 +474,125 @@ PyTypeObject PyClassMethod_Type = {
 	PyType_GenericAlloc,			/* tp_alloc */
 	PyType_GenericNew,			/* tp_new */
 };
+
+PyObject *
+PyClassMethod_New(PyObject *callable)
+{
+	classmethod *cm = (classmethod *)
+		PyType_GenericAlloc(&PyClassMethod_Type, 0);
+	if (cm != NULL) {
+		Py_INCREF(callable);
+		cm->cm_callable = callable;
+	}
+	return (PyObject *)cm;
+}
+
+
+/* Static method object */
+
+/* A static method does not receive an implicit first argument.
+   To declare a static method, use this idiom:
+
+     class C:
+         def f(arg1, arg2, ...): ...
+	 f = staticmethod(f)
+
+   It can be called either on the class (e.g. C.f()) or on an instance
+   (e.g. C().f()); the instance is ignored except for its class.
+
+   Static methods in Python are similar to those found in Java or C++.
+   For a more advanced concept, see class methods above.
+*/
+
+typedef struct {
+	PyObject_HEAD
+	PyObject *sm_callable;
+} staticmethod;
+
+static void
+sm_dealloc(staticmethod *sm)
+{
+	Py_XDECREF(sm->sm_callable);
+	PyObject_DEL(sm);
+}
+
+static PyObject *
+sm_descr_get(PyObject *self, PyObject *obj, PyObject *type)
+{
+	staticmethod *sm = (staticmethod *)self;
+
+	if (sm->sm_callable == NULL) {
+		PyErr_SetString(PyExc_RuntimeError,
+				"uninitialized staticmethod object");
+		return NULL;
+	}
+	Py_INCREF(sm->sm_callable);
+	return sm->sm_callable;
+}
+
+static int
+sm_init(PyObject *self, PyObject *args, PyObject *kwds)
+{
+	staticmethod *sm = (staticmethod *)self;
+	PyObject *callable;
+
+	if (!PyArg_ParseTuple(args, "O:callable", &callable))
+		return -1;
+	Py_INCREF(callable);
+	sm->sm_callable = callable;
+	return 0;
+}
+
+PyTypeObject PyStaticMethod_Type = {
+	PyObject_HEAD_INIT(&PyType_Type)
+	0,
+	"staticmethod",
+	sizeof(staticmethod),
+	0,
+	(destructor)sm_dealloc,			/* tp_dealloc */
+	0,					/* tp_print */
+	0,					/* tp_getattr */
+	0,					/* tp_setattr */
+	0,					/* tp_compare */
+	0,					/* tp_repr */
+	0,					/* tp_as_number */
+	0,					/* tp_as_sequence */
+	0,					/* tp_as_mapping */
+	0,					/* tp_hash */
+	0,					/* tp_call */
+	0,					/* tp_str */
+	PyObject_GenericGetAttr,		/* tp_getattro */
+	0,					/* tp_setattro */
+	0,					/* tp_as_buffer */
+	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE, /* tp_flags */
+	0,					/* tp_doc */
+	0,					/* tp_traverse */
+	0,					/* tp_clear */
+	0,					/* tp_richcompare */
+	0,					/* tp_weaklistoffset */
+	0,					/* tp_iter */
+	0,					/* tp_iternext */
+	0,					/* tp_methods */
+	0,					/* tp_members */
+	0,					/* tp_getset */
+	0,					/* tp_base */
+	0,					/* tp_dict */
+	sm_descr_get,				/* tp_descr_get */
+	0,					/* tp_descr_set */
+	0,					/* tp_dictoffset */
+	sm_init,				/* tp_init */
+	PyType_GenericAlloc,			/* tp_alloc */
+	PyType_GenericNew,			/* tp_new */
+};
+
+PyObject *
+PyStaticMethod_New(PyObject *callable)
+{
+	staticmethod *sm = (staticmethod *)
+		PyType_GenericAlloc(&PyStaticMethod_Type, 0);
+	if (sm != NULL) {
+		Py_INCREF(callable);
+		sm->sm_callable = callable;
+	}
+	return (PyObject *)sm;
+}

@@ -95,8 +95,10 @@ type_call(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	}
 
 	obj = type->tp_new(type, args, NULL);
-	if (obj != NULL && type->tp_init != NULL) {
-		if (type->tp_init(obj, args, kwds) < 0) {
+	if (obj != NULL) {
+		type = obj->ob_type;
+		if (type->tp_init != NULL &&
+		    type->tp_init(obj, args, kwds) < 0) {
 			Py_DECREF(obj);
 			obj = NULL;
 		}
@@ -534,6 +536,19 @@ type_new(PyTypeObject *metatype, PyObject *args, PyObject *kwds)
 		return NULL;
 	}
 
+	/* Special-case __new__: if it's a plain function,
+	   make it a static function */
+	tmp = PyDict_GetItemString(dict, "__new__");
+	if (tmp != NULL && PyFunction_Check(tmp)) {
+		tmp = PyStaticMethod_New(tmp);
+		if (tmp == NULL) {
+			Py_DECREF(type);
+			return NULL;
+		}
+		PyDict_SetItemString(dict, "__new__", tmp);
+		Py_DECREF(tmp);
+	}
+
 	/* Add descriptors for custom slots from __slots__, or for __dict__ */
 	mp = et->members;
 	slotoffset = PyType_BASICSIZE(base);
@@ -843,6 +858,31 @@ add_wrappers(PyTypeObject *type, struct wrapperbase *base, void *wrapped)
 		if (PyDict_SetItemString(dict, base->name, descr) < 0)
 			return -1;
 		Py_DECREF(descr);
+	}
+	return 0;
+}
+
+static int
+add_staticmethodwrappers(PyTypeObject *type, struct wrapperbase *base,
+			void *wrapped)
+{
+	PyObject *dict = type->tp_defined;
+	PyObject *sm;
+
+	for (; base->name != NULL; base++) {
+		PyObject *descr;
+		if (PyDict_GetItemString(dict, base->name))
+			continue;
+		descr = PyDescr_NewWrapper(type->ob_type, base, wrapped);
+		if (descr == NULL)
+			return -1;
+		sm = PyStaticMethod_New(descr);
+		Py_DECREF(descr);
+		if (sm == NULL)
+			return -1;
+		if (PyDict_SetItemString(dict, base->name, sm) < 0)
+			return -1;
+		Py_DECREF(sm);
 	}
 	return 0;
 }
@@ -1698,6 +1738,19 @@ static struct wrapperbase tab_init[] = {
 	{0}
 };
 
+static PyObject *
+wrap_new(PyObject *type, PyObject *args, void *wrapped)
+{
+	newfunc new = (newfunc)wrapped;
+	return new((PyTypeObject *)type, args, NULL);
+}
+
+static struct wrapperbase tab_new[] = {
+	{"__new__", (wrapperfunc)wrap_new,
+	 "T.__new__() -> an object with type T"},
+	{0}
+};
+
 static int
 add_operators(PyTypeObject *type)
 {
@@ -1786,6 +1839,9 @@ add_operators(PyTypeObject *type)
 	ADD(type->tp_descr_get, tab_descr_get);
 	ADD(type->tp_descr_set, tab_descr_set);
 	ADD(type->tp_init, tab_init);
+
+	if (type->tp_new != NULL)
+		add_staticmethodwrappers(type, tab_new, type->tp_new);
 
 	return 0;
 }
@@ -2072,6 +2128,32 @@ slot_tp_init(PyObject *self, PyObject *args, PyObject *kwds)
 	return 0;
 }
 
+static PyObject *
+slot_tp_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
+{
+	PyObject *func = PyObject_GetAttrString((PyObject *)type, "__new__");
+	PyObject *newargs, *x;
+	int i, n;
+
+	if (func == NULL)
+		return NULL;
+	assert(PyTuple_Check(args));
+	n = PyTuple_GET_SIZE(args);
+	newargs = PyTuple_New(n+1);
+	if (newargs == NULL)
+		return NULL;
+	Py_INCREF(type);
+	PyTuple_SET_ITEM(newargs, 0, (PyObject *)type);
+	for (i = 0; i < n; i++) {
+		x = PyTuple_GET_ITEM(args, i);
+		Py_INCREF(x);
+		PyTuple_SET_ITEM(newargs, i+1, x);
+	}
+	x = PyObject_Call(func, newargs, kwds);
+	Py_DECREF(func);
+	return x;
+}
+
 static void
 override_slots(PyTypeObject *type, PyObject *dict)
 {
@@ -2171,4 +2253,5 @@ override_slots(PyTypeObject *type, PyObject *dict)
 	TPSLOT("__get__", tp_descr_get);
 	TPSLOT("__set__", tp_descr_set);
 	TPSLOT("__init__", tp_init);
+	TPSLOT("__new__", tp_new);
 }
