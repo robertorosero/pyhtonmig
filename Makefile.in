@@ -94,12 +94,13 @@ libinstall:
 		-if test ! -d $(prefix)/lib/python; \
 		then mkdir $(prefix)/lib/python; \
 		fi
-		cp -r Lib/* $(prefix)/lib/python
+		cp -r $(srcdir)/Lib/* $(prefix)/lib/python
 		@echo Ideally, run something to compile all modules now...
 
 # install the manual page
 maninstall:
-		$(INSTALL) Misc/python.man $(prefix)/man/man1/python.1
+		$(INSTALL) $(srcdir)/Misc/python.man \
+			$(prefix)/man/man1/python.1
 
 # install the include files
 inclinstall:
@@ -108,7 +109,7 @@ inclinstall:
 		fi
 		cp $(srcdir)/Include/*.h $(prefix)/include/Py
 
-# install the lib*.a files
+# install the lib*.a files and miscellaneous stuff needed by extensions
 LIBP=		$(exec_prefix)/lib/python
 LIBPL=		$(LIBP)/lib
 libainstall:	all
@@ -122,14 +123,17 @@ libainstall:	all
 			echo $$i; $(INSTALL) $$i/lib$$i.a $(LIBPL)/lib$$i.a; \
 		done
 		$(INSTALL) Modules/config.c $(LIBPL)/config.c
+		$(INSTALL) $(srcdir)/Modules/config.c.in $(LIBPL)/config.c.in
 		$(INSTALL) Modules/Makefile $(LIBPL)/Makefile
+		$(INSTALL) Modules/Setup $(LIBPL)/Setup
+		$(INSTALL) $(srcdir)/Modules/makesetup $(LIBPL)/makesetup
 		$(INSTALL) config.h $(LIBPL)/config.h
 
 # Build the sub-Makefiles
 Makefiles:	config.status
 		(cd Modules; $(MAKE) -f Makefile.pre Makefile)
 		for i in . $(SUBDIRS); do \
-			(echo $$i; cd $$i; $(MAKE) Makefile) \
+			(echo $$i; cd $$i; $(MAKE) Makefile); \
 		done
 
 # Build the toplevel Makefile
