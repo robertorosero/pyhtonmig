@@ -94,6 +94,8 @@ if 0*'abcde' <> '': raise TestFailed, 'string repetition 0*'
 if min('abc') <> 'a' or max('abc') <> 'c': raise TestFailed, 'min/max string'
 if 'a' in 'abc' and 'b' in 'abc' and 'c' in 'abc' and 'd' not in 'abc': pass
 else: raise TestFailed, 'in/not in string'
+x = 'x'*103
+if '%s!'%x != x+'!': raise TestFailed, 'nasty string formatting bug'
 
 print '6.5.2 Tuples'
 if len(()) <> 0: raise TestFailed, 'len(())'
