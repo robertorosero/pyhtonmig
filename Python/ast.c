@@ -563,9 +563,8 @@ ast_for_atom(const node *n)
     case NUMBER:
 	return Num(parsenumber(STR(ch)));
 	break;
-	/* XXX other cases... */
-    case LPAR: /* tuple */
-	return Tuple(seq_for_testlist(CHILD(n, 1)), Load);
+    case LPAR: /* some parenthesized expressions */
+	return ast_for_testlist(CHILD(n, 1));
 	break;
     case LSQB: /* list (or list comprehension) */
 	ch = CHILD(n, 1);
