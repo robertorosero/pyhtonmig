@@ -1540,6 +1540,8 @@ list_fill(PyListObject *result, PyObject *v)
 	NRESIZE(result->ob_item, PyObject*, n);
 	if (result->ob_item == NULL)
 		goto error;
+	for (i = 0; i < n; i++)
+		result->ob_item[i] = NULL;
 	result->ob_size = n;
 
 	/* Run iterator to exhaustion. */
