@@ -32,8 +32,6 @@ int Py_OptimizeFlag = 0;
 
    Invalid behaviour:
      #: Ellipsis isn't handled properly
-     #: doing from __future__ import division doesn't work 
-        doesn't output BINARY_TRUE_DIVISION
      #: co_names doesn't contain locals, only globals, co_varnames may work
      #: ref leaks in interpreter when press return on empty line
      #: yield or return outside a function don't raise a SyntaxError
@@ -211,6 +209,8 @@ PyAST_Compile(mod_ty mod, const char *filename, PyCompilerFlags *flags)
 {
 	struct compiler c;
 	PyCodeObject *co = NULL;
+        PyCompilerFlags local_flags;
+        int merged;
 
         if (!__doc__) {
             __doc__ = PyString_InternFromString("__doc__");
@@ -224,11 +224,14 @@ PyAST_Compile(mod_ty mod, const char *filename, PyCompilerFlags *flags)
 	c.c_future = PyFuture_FromAST(mod, filename);
 	if (c.c_future == NULL)
 		goto error;
-	if (flags) {
-		int merged = c.c_future->ff_features | flags->cf_flags;
-		c.c_future->ff_features = merged;
-		flags->cf_flags = merged;
-	}
+	if (!flags) {
+            local_flags.cf_flags = 0;
+            flags = &local_flags;
+        }
+        merged = c.c_future->ff_features | flags->cf_flags;
+        c.c_future->ff_features = merged;
+        flags->cf_flags = merged;
+        c.c_flags = flags;
 
 	/* Trivial test of marshal code for now. */
 	{
@@ -2732,6 +2735,8 @@ compute_code_flags(struct compiler *c)
 		flags |= CO_VARKEYWORDS;
 	if (ste->ste_generator)
 		flags |= CO_GENERATOR;
+        if (c->c_flags->cf_flags & CO_FUTURE_DIVISION)
+                flags |= CO_FUTURE_DIVISION;
 	n = PyDict_Size(c->u->u_freevars);
 	if (n < 0)
 	    return -1;

@@ -1145,13 +1145,10 @@ Py_CompileStringFlags(const char *str, const char *filename, int start,
 struct symtable *
 Py_SymtableString(const char *str, const char *filename, int start)
 {
-	PyCompilerFlags local_flags;
 	mod_ty mod;
 	struct symtable *st;
 
-	local_flags.cf_flags = 0; /* XXX flags? */
-
-	mod = PyParser_ASTFromString(str, filename, start, &local_flags);
+	mod = PyParser_ASTFromString(str, filename, start, NULL);
 	if (mod == NULL)
 		return NULL;
 	st = PySymtable_Build(mod, filename, 0);
@@ -1181,7 +1178,6 @@ PyParser_ASTFromFile(FILE *fp, const char *filename, int start, char *ps1,
 {
 	node *n;
 	perrdetail err;
-	fprintf(stderr, "filename=%s\n", filename);
 	n = PyParser_ParseFileFlags(fp, filename, &_PyParser_Grammar, start, 
 				    ps1, ps2, &err, PARSER_FLAGS(flags));
 	if (n)

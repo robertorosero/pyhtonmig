@@ -58,7 +58,7 @@ future_parse(PyFutureFeatures *ff, mod_ty mod, const char *filename)
 			return 0;
 	}
 
-	if (mod->kind != Module_kind) /* XXX */
+	if (!(mod->kind == Module_kind || mod->kind == Interactive_kind))
 		return 1;
 	for (i = 0; i < asdl_seq_LEN(mod->v.Module.body); i++) {
 		stmt_ty s = asdl_seq_GET(mod->v.Module.body, i);
