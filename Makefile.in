@@ -62,7 +62,7 @@ SUBDIRSTOO=	Include Lib Doc Misc Demo readline Grammar
 
 # Files and directories to be distributed
 CONFIGFILES=	configure configure.in acconfig.h config.h.in Makefile.in
-DISTFILES=	README TODO ChangeLog $(CONFIGFILES)
+DISTFILES=	README ChangeLog $(CONFIGFILES)
 DISTDIRS=	$(SUBDIRS) $(SUBDIRSTOO) Ext-dummy
 DIST=		$(DISTFILES) $(DISTDIRS)
 

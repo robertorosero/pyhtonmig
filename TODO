@@ -1,7 +1,4 @@
-ext.tex
-write NEWS file
 make freeze script working again (use Extensions/mkext.py as a base?)
-update versions: Doc/*.tex, README, Python/version.c; where else?
 
 Put PostScript on archive site
 
@@ -15,6 +12,4 @@ Later:
 - make module marshal work with user-defined file-like objects
 - built-in help
 - hierarchical module names
-- have a look at latex2info
 - PC binary
-- fix FAQ

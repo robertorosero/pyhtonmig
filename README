@@ -1,9 +1,14 @@
-Python release 1.0.0 BETA 6
-===========================
+Python release 1.0.0
+====================
 
-==> This is still a BETA release.  I've been furiously hacking over
-    the past few weeks.  If you think I've goofed up, please mail me
-    an error report!
+==> This is the first "official" Python release in more than half a
+    year.  It's significantly improved, both at the functionality
+    level and (especially) in portability of the source -- you should
+    now be able to configure build this without manual intervention on
+    almost any type of Unix system.  It is known to work at least on
+    IRIX 4 and 5, SunOS 4, Solaris 2, HP-UX, Ultrix, OSF/1, AIX, SCO
+    ODT 3.0, minix, and through the use of automatic feature detection
+    should work on most other Unix flavors (e.g. NeXT) as well.
 
 ==> If you don't know yet what Python is: it's an interpreted,
     extensible, embeddable, interactive, object-oriented programming
@@ -15,10 +20,8 @@ Python release 1.0.0 BETA 6
     the section Build Instructions below for more details.
 
 ==> If you want to know what's new since release 0.9.9: read
-    Misc/NEWS.  Older history is in Misc/HISTORY.  [XXX Not in this
-    BETA release yet.]  News since the release of 1.0.0 BETA (the
-    first BETA release) is in ./ChangeLog.  Things left to do are in
-    ./TODO.
+    Misc/NEWS.  Older history is in Misc/HISTORY.  News since the
+    release of 1.0.0 BETA (the first BETA release) is in ./ChangeLog.
 
 ==> All documentation is in the subdirectory Doc in the form of LaTeX
     files.  In order of importance for new users: Tutorial (tut),
@@ -262,7 +265,6 @@ Objects/	Implementation of most built-in object types
 Parser/		The parser and tokenizer and their input handling
 Python/		The "compiler" and interpreter
 README		The file you're reading now
-TODO		A list of things that aren't finished yet
 acconfig.h	Additional input for the autoheader program
 config.h	Configuration header (generated)
 config.h.in	Source from which config.status creates config.h
@@ -279,10 +281,11 @@ Ftp access
 
 The latest Python source distribution can be ftp'ed from site
 ftp.cwi.nl (IP address 192.16.184.180), directory /pub/python, file
-python<version>.tar.Z.  You can also find PostScript of the main
-Python documentation there, Macintosh and PC binaries, and the latest
-STDWIN source distribution (in directory /pub/stdwin).  Mirror sites
-are gatekeeper.dec.com (/pub/plan/python/cwi), ftp.wustl.edu
+python<version>.tar.Z.  Curerntly <version> is 1.0.0.  You can also
+find PostScript of the main Python documentation there, Macintosh and
+PC binaries, and the latest STDWIN source distribution (in directory
+/pub/stdwin).  Mirror sites are gatekeeper.dec.com
+(/pub/plan/python/cwi), ftp.wustl.edu
 (/graphics/graphics/sgi-stuff/python) and ftp.uu.net
 (/languages/python) -- try these sites first if you are on the US
 continent, or at least closer to it than to Europe.  These mirror
