@@ -59,45 +59,12 @@ def linecache_checkcache(orig_checkcache=linecache.checkcache):
     cache.update(save)
 linecache.checkcache = linecache_checkcache
 
-
-# Note: <<newline-and-indent>> event is defined in AutoIndent.py
-
-#$ event <<plain-newline-and-indent>>
-#$ win <Control-j>
-#$ unix <Control-j>
-
-#$ event <<beginning-of-line>>
-#$ win <Control-a>
-#$ win <Home>
-#$ unix <Control-a>
-#$ unix <Home>
-
-#$ event <<history-next>>
-#$ win <Alt-n>
-#$ unix <Alt-n>
-
-#$ event <<history-previous>>
-#$ win <Alt-p>
-#$ unix <Alt-p>
-
-#$ event <<interrupt-execution>>
-#$ win <Control-c>
-#$ unix <Control-c>
-
-#$ event <<end-of-file>>
-#$ win <Control-d>
-#$ unix <Control-d>
-
-#$ event <<open-stack-viewer>>
-
-#$ event <<toggle-debugger>>
-
-
 class PyShellEditorWindow(EditorWindow):
 
     # Regular text edit window when a shell is present
     # XXX ought to merge with regular editor window
-
+    runnable = True  # Shell not present, enable Import Module and Run Script
+    
     def __init__(self, *args):
         apply(EditorWindow.__init__, (self,) + args)
         self.text.bind("<<set-breakpoint-here>>", self.set_breakpoint_here)
@@ -348,8 +315,7 @@ class PyShell(OutputWindow):
         import __builtin__
         __builtin__.quit = __builtin__.exit = "To exit, type Ctrl-D."
 
-        self.auto = self.extensions["AutoIndent"] # Required extension
-        self.auto.config(usetabs=1, indentwidth=8, context_use_ps1=1)
+        self.config(usetabs=1, indentwidth=8, context_use_ps1=1)
 
         text = self.text
         text.configure(wrap="char")
@@ -456,7 +422,6 @@ class PyShell(OutputWindow):
         # Break cycles
         self.interp = None
         self.console = None
-        self.auto = None
         self.flist.pyshell = None
         self.history = None
         OutputWindow._close(self) # Really EditorWindow._close
@@ -561,7 +526,7 @@ class PyShell(OutputWindow):
             self.text.insert("insert", "\n")
             self.text.see("insert")
         else:
-            self.auto.auto_indent(event)
+            self.auto_indent(event)
         return "break"
 
     def enter_callback(self, event):
@@ -601,7 +566,7 @@ class PyShell(OutputWindow):
         # If we're in the current input before its last line,
         # insert a newline right at the insert point
         if self.text.compare("insert", "<", "end-1c linestart"):
-            self.auto.auto_indent(event)
+            self.auto_indent(event)
             return "break"
         # We're in the last line; append a newline and submit it
         self.text.mark_set("insert", "end-1c")
@@ -609,7 +574,7 @@ class PyShell(OutputWindow):
             self.text.insert("insert", "\n")
             self.text.see("insert")
         else:
-            self.auto.auto_indent(event)
+            self.auto_indent(event)
         self.text.tag_add("stdin", "iomark", "end-1c")
         self.text.update_idletasks()
         if self.reading:
