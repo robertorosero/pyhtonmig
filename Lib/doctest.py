@@ -511,7 +511,7 @@ class DocTest:
         while i < n:
             # Search for an example (a PS1 line).
             line = lines[i]
-            i = i + 1
+            i += 1
             m = isPS1(line)
             if m is None:
                 continue
@@ -527,7 +527,7 @@ class DocTest:
                                  'blank after %s: %r' %
                                  (lineno, self.name, self._PS1, line))
 
-            j = j + 1
+            j += 1
             blanks = m.group(1)
             nblanks = len(blanks)
             # suck up this and following PS2 lines
@@ -541,7 +541,7 @@ class DocTest:
                         raise ValueError('line %r of the docstring for %s '
                             'has inconsistent leading whitespace: %r' %
                             (i, self.name, line))
-                    i = i + 1
+                    i += 1
                 else:
                     break
             # get rid of useless null line from trailing empty "..."
@@ -563,7 +563,7 @@ class DocTest:
                             'has inconsistent leading whitespace: %r' %
                             (i, self.name, line))
                     want.append(line[nblanks:])
-                    i = i + 1
+                    i += 1
                     line = lines[i]
                     if isPS1(line) or isEmpty(line):
                         break
@@ -1304,8 +1304,8 @@ class DocTestRunner:
         for x in self._name2ft.items():
             name, (f, t) = x
             assert f <= t
-            totalt = totalt + t
-            totalf = totalf + f
+            totalt += t
+            totalf += f
             if t == 0:
                 notests.append(name)
             elif f == 0:
