@@ -1,7 +1,7 @@
 Document Type: WSE
 item: Global
   Version=5.0
-  Title=Python 1.6 (final)
+  Title=Python 1.6 .1 (final)
   Flags=00010100
   Languages=65 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
   Japanese Font Name=MS Gothic
@@ -26,11 +26,11 @@ item: Global
   Variable Flags2=00001001
   Variable Name3=_SRC_
   Variable Description3=Python source directory
-  Variable Default3=C:\code\python\dist\src16
+  Variable Default3=C:\code\python\dist\src161
   Variable Flags3=00001001
   Variable Name4=_DOC_
   Variable Description4=HTML documentation tree directory
-  Variable Default4=C:\code\python\dist\src16\html
+  Variable Default4=C:\code\python\dist\src161\html
   Variable Flags4=00001001
   Variable Name5=_TCLMINOR_
   Variable Description5=Tcl/Tk Minor Version (e.g. the "3" in "8.3.1")
@@ -59,11 +59,11 @@ item: Check Configuration
 end
 item: Set Variable
   Variable=APPTITLE
-  Value=Python 1.6 (final)
+  Value=Python 1.6.1 (final)
 end
 item: Set Variable
   Variable=GROUP
-  Value=Python 1.6
+  Value=Python 1.6.1
 end
 item: Set Variable
   Variable=PY_VERSION
@@ -71,7 +71,7 @@ item: Set Variable
 end
 item: Set Variable
   Variable=MAINDIR
-  Value=Python16
+  Value=Python161
 end
 item: Get Registry Key Value
   Variable=PROGRAM_FILES
