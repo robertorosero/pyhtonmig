@@ -70,12 +70,12 @@ marshal_write_identifier(PyObject **buf, int *offset, identifier id)
 int 
 marshal_write_string(PyObject **buf, int *offset, string s)
 {
-	int l = PyString_GET_SIZE(s);
-	marshal_write_int(buf, offset, l);
-	CHECKSIZE(buf, offset, l);
+	int len = PyString_GET_SIZE(s);
+	marshal_write_int(buf, offset, len);
+	CHECKSIZE(buf, offset, len);
 	memcpy(PyString_AS_STRING(*buf) + *offset,
-	       PyString_AS_STRING(s), l);
-	*offset += l;
+	       PyString_AS_STRING(s), len);
+	*offset += len;
 	return 1;
 }
 
