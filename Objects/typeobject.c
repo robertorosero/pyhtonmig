@@ -146,45 +146,48 @@ typedef struct {
 } etype;
 
 /* TypeType's constructor is called when a type is subclassed */
-static PyObject *
-type_init(PyTypeObject *type, PyObject *args, PyObject *kwds)
+static int
+type_init(PyObject *self, PyObject *args, PyObject *kwds)
 {
 	PyObject *name, *bases, *dict, *x, *slots;
-	PyTypeObject *base;
+	PyTypeObject *type, *base;
 	char *dummy = NULL;
 	etype *et;
 	struct memberlist *mp;
 	int i, nslots, slotoffset, allocsize;
 
+	assert(PyType_Check(self));
+	type = (PyTypeObject *)self;
+
 	/* Check arguments */
 	if (!PyArg_ParseTupleAndKeywords(args, kwds, "SOO", &dummy,
 					 &name, &bases, &dict))
-		return NULL;
+		return -1;
 	if (!PyTuple_Check(bases) || !PyDict_Check(dict)) {
 		PyErr_SetString(PyExc_TypeError,
 				"usage: TypeType(name, bases, dict) ");
-		return NULL;
+		return -1;
 	}
 	if (PyTuple_GET_SIZE(bases) > 1) {
 		PyErr_SetString(PyExc_TypeError,
 				"can't multiple-inherit from types");
-		return NULL;
+		return -1;
 	}
 	if (PyTuple_GET_SIZE(bases) < 1) {
 		PyErr_SetString(PyExc_TypeError,
 				"can't create a new type without a base type");
-		return NULL;
+		return -1;
 	}
 	base = (PyTypeObject *)PyTuple_GET_ITEM(bases, 0);
 	if (!PyType_Check((PyObject *)base)) {
 		PyErr_SetString(PyExc_TypeError,
 				"base type must be a type");
-		return NULL;
+		return -1;
 	}
 	if (base->tp_init == NULL) {
 		PyErr_SetString(PyExc_TypeError,
 				"base type must have a constructor slot");
-		return NULL;
+		return -1;
 	}
 
 	/* Check for a __slots__ sequence variable in dict, and count it */
@@ -197,14 +200,14 @@ type_init(PyTypeObject *type, PyObject *args, PyObject *kwds)
 		else
 			slots = PySequence_Tuple(slots);
 		if (slots == NULL)
-			return NULL;
+			return -1;
 		nslots = PyTuple_GET_SIZE(slots);
 		for (i = 0; i < nslots; i++) {
 			if (!PyString_Check(PyTuple_GET_ITEM(slots, i))) {
 				PyErr_SetString(PyExc_TypeError,
 				"__slots__ must be a sequence of strings");
 				Py_DECREF(slots);
-				return NULL;
+				return -1;
 			}
 		}
 	}
@@ -213,28 +216,18 @@ type_init(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	     base->tp_setattro == NULL))
 		nslots = 1;
 
-	/* Allocate memory and construct a type object in it */
+	/* Check allocation size and initialize the type object */
 	allocsize = sizeof(etype) + nslots*sizeof(struct memberlist);
-	if (type == NULL) {
-		et = PyObject_MALLOC(allocsize);
-		if (et == NULL)
-			return NULL;
-		memset(et, '\0', allocsize);
-		type = &et->type;
-		PyObject_INIT(type, &PyType_Type);
+	if (type->ob_type->tp_basicsize < allocsize) {
+		PyErr_Format(
+			PyExc_SystemError,
+			"insufficient allocated memory for subtype: "
+			"allocated %d, needed %d",
+			type->ob_type->tp_basicsize,
+			allocsize);
+		return -1;
 	}
-	else {
-		if (type->ob_type->tp_basicsize < allocsize) {
-			PyErr_Format(
-				PyExc_SystemError,
-				"insufficient allocated memory for subtype: "
-				"allocated %d, needed %d",
-				type->ob_type->tp_basicsize,
-				allocsize);
-			return NULL;
-		}
-		et = (etype *)type;
-	}
+	et = (etype *)type;
 	Py_INCREF(name);
 	et->name = name;
 	et->slots = slots;
@@ -250,7 +243,7 @@ type_init(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	type->tp_base = base;
 	if (PyType_InitDict(type) < 0) {
 		Py_DECREF(type);
-		return NULL;
+		return -1;
 	}
 
 	/* Override some slots with specific requirements */
@@ -292,11 +285,11 @@ type_init(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	x = PyObject_CallMethod(type->tp_dict, "update", "O", dict);
 	if (x == NULL) {
 		Py_DECREF(type);
-		return NULL;
+		return -1;
 	}
 	Py_DECREF(x); /* throw away None */
 	override_slots(type, dict);
-	return (PyObject *)type;
+	return 0;
 }
 
 static void
@@ -352,7 +345,7 @@ PyTypeObject PyType_Type = {
 	0,					/* tp_descr_get */
 	0,					/* tp_descr_set */
 	offsetof(PyTypeObject, tp_dict),	/* tp_dictoffset */
-	(initproc)type_init,			/* tp_init */
+	type_init,				/* tp_init */
 	PyType_GenericAlloc,			/* tp_alloc */
 	PyType_GenericNew,			/* tp_new */
 };
