@@ -878,10 +878,11 @@ cleared if it was previously set.
 \end{cfuncdesc}
 
 \begin{cfuncdesc}{void}{PyErr_SetInterrupt}{}
-This function is obsolete (XXX or platform dependent?).  It simulates
+This function is obsolete.  It simulates
 the effect of a \constant{SIGINT} signal arriving --- the next time
 \cfunction{PyErr_CheckSignals()} is called,
 \exception{KeyboadInterrupt} will be raised.
+It may be called without holding the interpreter lock.
 \end{cfuncdesc}
 
 \begin{cfuncdesc}{PyObject*}{PyErr_NewException}{char *name,
