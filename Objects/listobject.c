@@ -1496,11 +1496,95 @@ list_richcompare(PyObject *v, PyObject *w, int op)
 	return PyObject_RichCompare(vl->ob_item[i], wl->ob_item[i], op);
 }
 
+/* Adapted from newer code by Tim */
+static int
+list_fill(PyListObject *result, PyObject *v)
+{
+	PyObject *it;      /* iter(v) */
+	int n;		   /* guess for result list size */
+	int i;
+
+	n = result->ob_size;
+
+	/* Special-case list(a_list), for speed. */
+	if (PyList_Check(v)) {
+		if (v == (PyObject *)result)
+			return 0; /* source is destination, we're done */
+		return list_ass_slice(result, 0, n, v);
+	}
+
+	/* Empty previous contents */
+	if (n != 0) {
+		if (list_ass_slice(result, 0, n, (PyObject *)NULL) != 0)
+			return -1;
+	}
+
+	/* Get iterator.  There may be some low-level efficiency to be gained
+	 * by caching the tp_iternext slot instead of using PyIter_Next()
+	 * later, but premature optimization is the root etc.
+	 */
+	it = PyObject_GetIter(v);
+	if (it == NULL)
+		return -1;
+
+	/* Guess a result list size. */
+	n = -1;	 /* unknown */
+	if (PySequence_Check(v) &&
+	    v->ob_type->tp_as_sequence->sq_length) {
+		n = PySequence_Size(v);
+		if (n < 0)
+			PyErr_Clear();
+	}
+	if (n < 0)
+		n = 8;	/* arbitrary */
+	NRESIZE(result->ob_item, PyObject*, n);
+	if (result->ob_item == NULL)
+		goto error;
+	result->ob_size = n;
+
+	/* Run iterator to exhaustion. */
+	for (i = 0; ; i++) {
+		PyObject *item = PyIter_Next(it);
+		if (item == NULL) {
+			if (PyErr_Occurred())
+				goto error;
+			break;
+		}
+		if (i < n)
+			PyList_SET_ITEM(result, i, item); /* steals ref */
+		else {
+			int status = ins1(result, result->ob_size, item);
+			Py_DECREF(item);  /* append creates a new ref */
+			if (status < 0)
+				goto error;
+		}
+	}
+
+	/* Cut back result list if initial guess was too large. */
+	if (i < n && result != NULL) {
+		if (list_ass_slice(result, i, n, (PyObject *)NULL) != 0)
+			goto error;
+	}
+	Py_DECREF(it);
+	return 0;
+
+  error:
+	Py_DECREF(it);
+	return -1;
+}
+
 static int
 list_init(PyListObject *self, PyObject *args, PyObject *kw)
 {
-	self->ob_size = 0;
-	self->ob_item = NULL;
+	PyObject *arg = NULL;
+	static char *kwlist[] = {"sequence", 0};
+
+	if (!PyArg_ParseTupleAndKeywords(args, kw, "|O:list", kwlist, &arg))
+		return -1;
+	if (arg != NULL)
+		return list_fill(self, arg);
+	if (self->ob_size > 0)
+		return list_ass_slice(self, 0, self->ob_size, (PyObject*)NULL);
 	return 0;
 }
 
@@ -1549,6 +1633,10 @@ static PySequenceMethods list_as_sequence = {
 	(intargfunc)list_inplace_repeat,	/* sq_inplace_repeat */
 };
 
+static char list_doc[] =
+"list() -> new list\n"
+"list(sequence) -> new list initialized from sequence's items";
+
 PyTypeObject PyList_Type = {
 	PyObject_HEAD_INIT(&PyType_Type)
 	0,
@@ -1571,7 +1659,7 @@ PyTypeObject PyList_Type = {
 	0,					/* tp_setattro */
 	0,					/* tp_as_buffer */
 	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_GC,	/* tp_flags */
- 	0,					/* tp_doc */
+ 	list_doc,				/* tp_doc */
  	(traverseproc)list_traverse,		/* tp_traverse */
  	(inquiry)list_clear,			/* tp_clear */
 	list_richcompare,			/* tp_richcompare */
@@ -1657,7 +1745,7 @@ static PyTypeObject immutable_list_type = {
 	0,					/* tp_setattro */
 	0,					/* tp_as_buffer */
 	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_GC,	/* tp_flags */
- 	0,					/* tp_doc */
+ 	list_doc,				/* tp_doc */
  	(traverseproc)list_traverse,		/* tp_traverse */
 	0,					/* tp_clear */
 	list_richcompare,			/* tp_richcompare */
