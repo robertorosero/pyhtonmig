@@ -1227,39 +1227,6 @@ same value.";
 
 
 static PyObject *
-builtin_int(PyObject *self, PyObject *args)
-{
-	PyObject *v;
-	int base = -909;		     /* unlikely! */
-
-	if (!PyArg_ParseTuple(args, "O|i:int", &v, &base))
-		return NULL;
-	if (base == -909)
-		return PyNumber_Int(v);
-	else if (PyString_Check(v))
-		return PyInt_FromString(PyString_AS_STRING(v), NULL, base);
-	else if (PyUnicode_Check(v))
-		return PyInt_FromUnicode(PyUnicode_AS_UNICODE(v),
-					 PyUnicode_GET_SIZE(v),
-					 base);
-	else {
-		PyErr_SetString(PyExc_TypeError,
-				"int() can't convert non-string with explicit base");
-		return NULL;
-	}
-}
-
-static char int_doc[] =
-"int(x[, base]) -> integer\n\
-\n\
-Convert a string or number to an integer, if possible.  A floating point\n\
-argument will be truncated towards zero (this does not include a string\n\
-representation of a floating point number!)  When converting a string, use\n\
-the optional base.  It is an error to supply a base when converting a\n\
-non-string.";
-
-
-static PyObject *
 builtin_long(PyObject *self, PyObject *args)
 {
 	PyObject *v;
@@ -2137,7 +2104,6 @@ static PyMethodDef builtin_methods[] = {
 	{"id",		builtin_id, 1, id_doc},
 	{"input",	builtin_input, 1, input_doc},
 	{"intern",	builtin_intern, 1, intern_doc},
-	{"int",		builtin_int, 1, int_doc},
 	{"isinstance",  builtin_isinstance, 1, isinstance_doc},
 	{"issubclass",  builtin_issubclass, 1, issubclass_doc},
 	{"iter",	builtin_iter, 1, iter_doc},
@@ -2195,6 +2161,8 @@ _PyBuiltin_Init(void)
 				 (PyObject *) &PyDict_Type) < 0)
 		return NULL;
 	if (PyDict_SetItemString(dict, "list", (PyObject *) &PyList_Type) < 0)
+		return NULL;
+	if (PyDict_SetItemString(dict, "int", (PyObject *) &PyInt_Type) < 0)
 		return NULL;
 	if (PyDict_SetItemString(dict, "object",
 				 (PyObject *) &PyBaseObject_Type) < 0)
