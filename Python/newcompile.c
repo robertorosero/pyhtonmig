@@ -156,6 +156,7 @@ static int inplace_binop(struct compiler *, operator_ty);
 static PyCodeObject *assemble(struct compiler *, int addNone);
 
 static char *opnames[];
+static PyObject *__doc__;
 
 int
 _Py_Mangle(char *p, char *name, char *buffer, size_t maxlen)
@@ -202,6 +203,12 @@ PyAST_Compile(mod_ty mod, const char *filename, PyCompilerFlags *flags)
 {
 	struct compiler c;
 	PyCodeObject *co = NULL;
+
+        if (!__doc__) {
+            __doc__ = PyString_InternFromString("__doc__");
+            if (!__doc__)
+                goto error;
+        }
 
 	if (!compiler_init(&c))
 		goto error;
@@ -910,9 +917,17 @@ compiler_function(struct compiler *c, stmt_ty s)
 }
 
 static int
+compiler_isdocstring(stmt_ty s)
+{
+    if (s->kind != Expr_kind)
+        return 0;
+    return s->v.Expr.value->kind == Str_kind;
+}
+
+static int
 compiler_class(struct compiler *c, stmt_ty s)
 {
-	int n;
+	int n, i;
 	PyCodeObject *co;
         PyObject *str;
 	/* push class name on stack, needed by BUILD_CLASS */
@@ -938,8 +953,18 @@ compiler_class(struct compiler *c, stmt_ty s)
         }
         Py_DECREF(str);
 
-        /* XXX: doc strings go POP_TOP, instead of STORE_NAME (__doc__) */
-	VISIT_SEQ(c, stmt, s->v.ClassDef.body);
+        stmt_ty st = asdl_seq_GET(s->v.ClassDef.body, 0);
+        i = 0;
+        if (compiler_isdocstring(st)) {
+            i++;
+            VISIT(c, expr, st->v.Expr.value);
+            if (!compiler_nameop(c, __doc__, Store))
+                return 0;
+        }
+
+        for (; i < asdl_seq_LEN(s->v.ClassDef.body); i++)
+            VISIT(c, stmt, asdl_seq_GET(s->v.ClassDef.body, i));
+
 	ADDOP(c, LOAD_LOCALS);
 	ADDOP(c, RETURN_VALUE);
 	co = assemble(c, 1);
