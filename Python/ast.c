@@ -15,47 +15,128 @@
    syntax errors
 */
 
-static asdl_seq *seq_for_testlist(node *);
-static expr_ty ast_for_expr(node *);
-static stmt_ty ast_for_stmt(node *);
-static asdl_seq *ast_for_suite(node *);
-static asdl_seq *ast_for_exprlist(node *, int);
-static expr_ty ast_for_testlist(node *);
+static asdl_seq *seq_for_testlist(const node *);
+static expr_ty ast_for_expr(const node *);
+static stmt_ty ast_for_stmt(const node *);
+static asdl_seq *ast_for_suite(const node *);
+static asdl_seq *ast_for_exprlist(const node *, int);
+static expr_ty ast_for_testlist(const node *);
+
+static PyObject *parsenumber(char *);
 
 extern grammar _PyParser_Grammar; /* From graminit.c */
 
-mod_ty PyAST_FromNode(node *n)
+/* num_stmts() returns number of contained statements.
+
+   Use this routine to determine how big a sequence is needed for
+   the statements in a parse tree.  Its raison d'etre is this bit of
+   grammar: 
+
+   stmt: simple_stmt | compound_stmt
+   simple_stmt: small_stmt (';' small_stmt)* [';'] NEWLINE
+   
+   A simple_stmt can contain multiple small_stmt elements joined
+   by semicolons.  If the arg is a simple_stmt, the number of
+   small_stmt elements is returned.
+*/
+
+static int
+num_stmts(const node *n)
 {
-    int i;
-    asdl_seq *stmts;
+    int i, l;
+    node *ch;
+
+    switch (TYPE(n)) {
+    case single_input:
+	if (TYPE(CHILD(n, 0)) == NEWLINE)
+	    return 0;
+	else
+	    return num_stmts(CHILD(n, 0));
+    case file_input:
+	l = 0;
+	for (i = 0; i < NCH(n); i++) {
+	    ch = CHILD(n, i);
+	    if (TYPE(ch) == stmt)
+		l += num_stmts(ch);
+	}
+	return l;
+    case stmt:
+	return num_stmts(CHILD(n, 0));
+    case compound_stmt:
+	return 1;
+    case simple_stmt:
+	return NCH(n) / 2;
+    case suite:
+	if (NCH(n) == 1)
+	    return num_stmts(CHILD(n, 0));
+	else {
+	    l = 0;
+	    for (i = 2; i < (NCH(n) - 1); i++)
+		l += num_stmts(CHILD(n, i));
+	    return l;
+	}
+    default: {
+        char buf[128];
+	sprintf(buf, "Non-statement found: %d %d\n",
+		TYPE(n), NCH(n));
+	Py_FatalError(buf);
+	}
+    }
+    assert(0);
+    return 0;
+}
+
+mod_ty PyAST_FromNode(const node *n)
+{
+    int i, j, num, total;
+    asdl_seq *stmts = NULL;
     stmt_ty s;
+    node *ch;
 
     switch (TYPE(n)) {
     case file_input:
-	    stmts = asdl_seq_new(NCH(n) / 2);
-	    for (i = 0; i < NCH(n); i++) {
-		    if (TYPE(CHILD(n, i)) == stmt) {
-			    s = ast_for_stmt(CHILD(n, i));
-			    if (!s) {
-				    asdl_seq_free(stmts);
-				    return NULL;
-			    }
-			    if (asdl_seq_append(stmts, s) < 0) {
-				    return NULL;
-			    }
-		    }
-		    else
-			    fprintf(stderr, "skipping %d\n", 
-				    TYPE(CHILD(n, i)));
+	total = num_stmts(n);
+	fprintf(stderr, "file_input containing %d statements\n", total);
+	stmts = asdl_seq_new(total);
+	for (i = 0; i < NCH(n) - 1; i++) {
+	    ch = CHILD(n, i);
+	    if (TYPE(ch) == NEWLINE)
+		continue;
+	    REQ(ch, stmt);
+	    num = num_stmts(ch);
+	    if (num == 1) {
+		s = ast_for_stmt(ch);
+		if (!s) 
+		    goto error;
+		asdl_seq_APPEND(stmts, s);
+	    } else {
+		ch = CHILD(ch, 0);
+		REQ(ch, simple_stmt);
+		for (j = 0; j < num; j++) {
+		    s = ast_for_stmt(CHILD(ch, j * 2));
+		    if (!s)
+			goto error;
+		    asdl_seq_APPEND(stmts, s);
+		}
 	    }
-	    return Module(stmts);
+	}
+	return Module(stmts);
     case eval_input:
-	    return Expression(ast_for_testlist(CHILD(n, 0)));
-	    break;
+	return Expression(ast_for_testlist(CHILD(n, 0)));
+	break;
+    case single_input:
+	if (TYPE(CHILD(n, 0)) == NEWLINE)
+	    return Interactive(Pass(n->n_lineno));
+	else
+	    return Interactive(ast_for_stmt(CHILD(n, 0)));
     default:
-	    return NULL;
+	goto error;
     }
-    /* Can't get here */
+ error:
+    if (stmts)
+	asdl_seq_free(stmts);
+    fprintf(stderr, "error in PyAST_FromNode() exc? %d\n",
+	    PyErr_Occurred());
     return NULL;
 }
 
@@ -66,7 +147,7 @@ mod_ty PyAST_FromNode(node *n)
 #define NEW_IDENTIFIER(n) PyString_InternFromString(STR(n))
 
 static operator_ty
-get_operator(node *n)
+get_operator(const node *n)
 {
     switch (TYPE(n)) {
     case VBAR:
@@ -126,7 +207,7 @@ set_context(expr_ty e, expr_context_ty ctx)
     if (s) {
 	int i;
 	for (i = 0; i < asdl_seq_LEN(s); i++) {
-	    if (set_context(asdl_seq_get(s, i), ctx) < 0)
+	    if (set_context(asdl_seq_GET(s, i), ctx) < 0)
 		return -1;
 	}
     }
@@ -134,7 +215,7 @@ set_context(expr_ty e, expr_context_ty ctx)
 }
 
 static operator_ty
-ast_for_augassign(node *n)
+ast_for_augassign(const node *n)
 {
     REQ(n, augassign);
     n = CHILD(n, 0);
@@ -172,7 +253,7 @@ ast_for_augassign(node *n)
 }
 
 static cmpop_ty
-ast_for_comp_op(node *n)
+ast_for_comp_op(const node *n)
 {
     /* comp_op: '<'|'>'|'=='|'>='|'<='|'<>'|'!='|'in'|'not' 'in'|'is'
                |'is' 'not'
@@ -215,20 +296,20 @@ ast_for_comp_op(node *n)
 }
 
 static asdl_seq *
-seq_for_testlist(node *n)
+seq_for_testlist(const node *n)
 {
     asdl_seq *seq;
     int i;
 
     seq = asdl_seq_new(NCH(n) / 2);
     for (i = 0; i < NCH(n); i += 2) {
-	asdl_seq_append(seq, ast_for_expr(CHILD(n, i)));
+	asdl_seq_SET(seq, i / 2, ast_for_expr(CHILD(n, i)));
     }
     return seq;
 }
 
 static arguments_ty
-ast_for_arguments(node *n)
+ast_for_arguments(const node *n)
 {
 
     /* XXX TO DO
@@ -276,9 +357,9 @@ ast_for_arguments(node *n)
 		return NULL;
 	    }
 	    if (TYPE(CHILD(ch, 0)) == NAME)
-		asdl_seq_append(args, NEW_IDENTIFIER(CHILD(ch, 0)));
+		asdl_seq_APPEND(args, NEW_IDENTIFIER(CHILD(ch, 0)));
 	    if (i + 1 < NCH(n) && TYPE(CHILD(n, i + 1)) == EQUAL) {
-		asdl_seq_append(defaults, ast_for_expr(CHILD(n, i + 2)));
+		asdl_seq_APPEND(defaults, ast_for_expr(CHILD(n, i + 2)));
 		i += 2;
 	    }
 	    i += 2; /* the name and the comma */
@@ -301,7 +382,7 @@ ast_for_arguments(node *n)
 }
 
 static stmt_ty
-ast_for_funcdef(node *n)
+ast_for_funcdef(const node *n)
 {
     /* funcdef: 'def' NAME parameters ':' suite */
     identifier name = NEW_IDENTIFIER(CHILD(n, 1));
@@ -311,7 +392,7 @@ ast_for_funcdef(node *n)
 }
 
 static expr_ty
-ast_for_lambdef(node *n)
+ast_for_lambdef(const node *n)
 {
     /* lambdef: 'lambda' [varargslist] ':' test */
     if (NCH(n) == 3)
@@ -323,7 +404,7 @@ ast_for_lambdef(node *n)
 }
 
 static int
-count_list_fors(node *n)
+count_list_fors(const node *n)
 {
     int n_fors = 0;
     node *ch = CHILD(n, 1);
@@ -351,7 +432,7 @@ count_list_fors(node *n)
 }
 
 static int
-count_list_ifs(node *n)
+count_list_ifs(const node *n)
 {
     int n_ifs = 0;
  count_list_iter:
@@ -368,7 +449,7 @@ count_list_ifs(node *n)
 }
 
 static expr_ty
-ast_for_listcomp(node *n)
+ast_for_listcomp(const node *n)
 {
     /* listmaker: test ( list_for | (',' test)* [','] ) 
        list_for: 'for' exprlist 'in' testlist_safe [list_iter]
@@ -385,6 +466,8 @@ ast_for_listcomp(node *n)
     assert(NCH(n) > 1);
     
     target = ast_for_expr(CHILD(n, 0));
+    if (!target)
+	    return NULL;
     set_context(target, Store);
 
     n_fors = count_list_fors(n);
@@ -396,7 +479,7 @@ ast_for_listcomp(node *n)
 	REQ(ch, list_for);
 	t = ast_for_exprlist(CHILD(ch, 1), Store);
 	if (asdl_seq_LEN(t) == 1)
-	    c = listcomp(asdl_seq_get(t, 0), 
+	    c = listcomp(asdl_seq_GET(t, 0), 
 			 ast_for_testlist(CHILD(ch, 3)), NULL);
 	else
 	    c = listcomp(Tuple(t, Store),
@@ -411,7 +494,7 @@ ast_for_listcomp(node *n)
 		REQ(ch, list_iter);
 		ch = CHILD(ch, 0);
 		REQ(ch, list_if);
-		asdl_seq_append(ifs, CHILD(ch, 1));
+		asdl_seq_APPEND(ifs, CHILD(ch, 1));
 		if (NCH(ch) == 3)
 		    ch = CHILD(ch, 2);
 	    }
@@ -419,14 +502,14 @@ ast_for_listcomp(node *n)
 	    if (TYPE(ch) == list_iter)
 		ch = CHILD(ch, 0);
 	}
-	asdl_seq_append(listcomps, c);
+	asdl_seq_APPEND(listcomps, c);
     }
 
     return ListComp(target, listcomps);
 }
 
 static expr_ty
-ast_for_atom(node *n)
+ast_for_atom(const node *n)
 {
     /* atom: '(' [testlist] ')' | '[' [listmaker] ']' 
            | '{' [dictmaker] '}' | '`' testlist '`' | NAME | NUMBER | STRING+ 
@@ -435,16 +518,14 @@ ast_for_atom(node *n)
     fprintf(stderr, "ast_for_atom((%d, %d))\n", TYPE(ch), NCH(ch));
     switch (TYPE(ch)) {
     case NAME:
-	/* by default, mark all names as Load context.
-	   change later if needed.
-	*/
+	/* All names start in Load context, but may later be changed. */
 	return Name(NEW_IDENTIFIER(ch), Load);
 	break;
     case STRING:
 	return Str(PyString_FromString(STR(ch)));
 	break;
     case NUMBER:
-	return Num(PyString_FromString(STR(ch)));
+	return Num(parsenumber(STR(ch)));
 	break;
 	/* XXX other cases... */
     case LPAR: /* tuple */
@@ -455,8 +536,13 @@ ast_for_atom(node *n)
 	if (TYPE(ch) == RSQB)
 		return List(NULL, Load);
 	REQ(ch, listmaker);
-	if (NCH(ch) == 1 || TYPE(CHILD(ch, 1)) == COMMA)
-	    return List(ast_for_testlist(ch), Load);
+	if (NCH(ch) == 1 || TYPE(CHILD(ch, 1)) == COMMA) {
+	    asdl_seq *elts = asdl_seq_new(1);
+	    if (!elts)
+		return NULL;
+	    asdl_seq_SET(elts, 0, ast_for_testlist(ch));
+	    return List(elts, Load);
+	}
 	else
 	    return ast_for_listcomp(ch);
 	break;
@@ -469,8 +555,8 @@ ast_for_atom(node *n)
 	keys = asdl_seq_new(size);
 	values = asdl_seq_new(size);
 	for (i = 0; i < NCH(ch); i += 4) {
-	    asdl_seq_append(keys, ast_for_expr(CHILD(ch, i)));
-	    asdl_seq_append(values, ast_for_expr(CHILD(ch, i + 2)));
+	    asdl_seq_SET(keys, i / 4, ast_for_expr(CHILD(ch, i)));
+	    asdl_seq_SET(values, i / 4, ast_for_expr(CHILD(ch, i + 2)));
 	}
 	return Dict(keys, values);
 	break;
@@ -485,7 +571,7 @@ ast_for_atom(node *n)
 }
 
 static slice_ty
-ast_for_slice(node *n)
+ast_for_slice(const node *n)
 {
     node *ch;
     expr_ty lower = NULL, upper = NULL, step = NULL;
@@ -531,7 +617,7 @@ ast_for_slice(node *n)
 }
 
 static expr_ty
-ast_for_subscript(node *n)
+ast_for_subscript(const node *n)
 {
     node *t, *s;
     int nch;
@@ -558,7 +644,7 @@ ast_for_subscript(node *n)
 	int i;
 	asdl_seq *slices = asdl_seq_new(nch / 2);
 	for (i = 0; i < nch ; i += 2)
-	    asdl_seq_append(slices, ast_for_slice(CHILD(s, i)));
+	    asdl_seq_SET(slices, i / 2, ast_for_slice(CHILD(s, i)));
 	return Subscript(ast_for_atom(CHILD(n, 0)),
 			 ExtSlice(slices), Load);
     }
@@ -567,7 +653,7 @@ ast_for_subscript(node *n)
 }
 
 static expr_ty
-ast_for_expr(node *n)
+ast_for_expr(const node *n)
 {
     /* handle the full range of simple expressions
        test: and_test ('or' and_test)* | lambdef
@@ -593,24 +679,20 @@ ast_for_expr(node *n)
     case test:
 	if (TYPE(CHILD(n, 0)) == lambdef)
 	    return ast_for_lambdef(CHILD(n, 0));
-	if (NCH(n) == 1) {
-	    n = CHILD(n, 0);
-	    goto loop;
-	}
-	seq = asdl_seq_new(NCH(n) / 2 + 1);
-	for (i = 0; i < NCH(n); i += 2)
-	    asdl_seq_append(seq, ast_for_expr(CHILD(n, i)));
-	return BoolOp(Or, seq);
-	break;
+	/* Fall through to and_test */
     case and_test:
 	if (NCH(n) == 1) {
 	    n = CHILD(n, 0);
 	    goto loop;
 	}
-	seq = asdl_seq_new(NCH(n) / 2 + 1);
-	for (i = 0; i < NCH(n); i += 2)
-	    asdl_seq_append(seq, ast_for_expr(CHILD(n, i)));
-	return BoolOp(And, seq);
+	seq = asdl_seq_new((NCH(n) + 1) / 2);
+	for (i = 0; i < NCH(n); i += 2) {
+	    expr_ty e = ast_for_expr(CHILD(n, i));
+	    if (!e)
+		return NULL;
+	    asdl_seq_SET(seq, i / 2, e);
+	}
+	return BoolOp(Or, seq);
 	break;
     case not_test:
 	if (NCH(n) == 1) {
@@ -625,11 +707,13 @@ ast_for_expr(node *n)
 	    goto loop;
 	} else {
 	    asdl_seq *ops, *cmps;
-	    ops = asdl_seq_new(NCH(n) / 2 + 1);
-	    cmps = asdl_seq_new(NCH(n) / 2 + 1);
+	    ops = asdl_seq_new(NCH(n) / 2);
+	    cmps = asdl_seq_new(NCH(n) / 2);
 	    for (i = 1; i < NCH(n); i += 2) {
-		asdl_seq_append(ops, (void *)ast_for_comp_op(CHILD(n, i)));
-		asdl_seq_append(cmps, (void *)ast_for_expr(CHILD(n, i + 1)));
+		/* XXX cmpop_ty is just an enum */
+		asdl_seq_SET(ops, i / 2, 
+			     (void *)ast_for_comp_op(CHILD(n, i)));
+		asdl_seq_SET(cmps, i / 2, ast_for_expr(CHILD(n, i + 1)));
 	    }
 	    return Compare(ast_for_expr(CHILD(n, 0)), ops, cmps);
 	}
@@ -669,31 +753,52 @@ ast_for_expr(node *n)
 	    break;
 	}
 	break;
-    case power:
+    case power: 
+    {
+	expr_ty e = ast_for_atom(CHILD(n, 0));
 	if (NCH(n) == 1)
-	    return ast_for_atom(CHILD(n, 0));
+	    return e;
 	/* power: atom trailer* ('**' factor)* 
            trailer: '(' [arglist] ')' | '[' subscriptlist ']' | '.' NAME */
-	if (NCH(n) == 2 && TYPE(CHILD(n, 1)) == trailer) {
-	    node *ch = CHILD(n, 1);
-	    if (TYPE(CHILD(ch, 0)) == LPAR) {
-		/* XXX a call */
-	    } else if (TYPE(CHILD(ch, 0)) == LSQB) {
-		return ast_for_subscript(n);
-	    } else if (TYPE(CHILD(ch, 0)) == DOT) {
-		return Attribute(ast_for_atom(CHILD(n, 0)),
-				 NEW_IDENTIFIER(CHILD(ch, 1)), Load);
-	    }
+	if (TYPE(CHILD(n, NCH(n) - 1)) == factor) {
+	    /* XXX Handle ** */
+	    return NULL;
 	}
-	return NULL;
+	for (i = 1; i < NCH(n); i++) {
+	    expr_ty new;
+	    node *ch = CHILD(n, i);
+	    if (TYPE(CHILD(ch, 0)) == LPAR) {
+	    }
+	    else if (TYPE(CHILD(ch, 0)) == LSQB) {
+		REQ(CHILD(ch, 2), RSQB);
+		ch = CHILD(ch, 1);
+		if (NCH(ch) <= 2)
+		    new = Subscript(e, ast_for_slice(CHILD(ch, 0)), Load);
+		else {
+		    int j;
+		    asdl_seq *slices = asdl_seq_new(NCH(ch) / 2);
+		    for (j = 0; j < NCH(ch); j += 2)
+			asdl_seq_SET(slices, j / 2, 
+				     ast_for_slice(CHILD(ch, j)));
+		    new = Subscript(e, ExtSlice(slices), Load);
+		}
+	    }
+	    else {
+		assert(TYPE(CHILD(ch, 0)) == DOT);
+		new = Attribute(e, NEW_IDENTIFIER(CHILD(ch, 1)), Load);
+	    }
+	    e = new;
+	}
+	return e;
 	break;
+    }
     }
     /* should never get here */
     return NULL;
 }
 
 static expr_ty
-ast_for_testlist(node *n)
+ast_for_testlist(const node *n)
 {
     /* could be a testlist or a listmaker with no list_for */
     if (NCH(n) == 1)
@@ -703,7 +808,7 @@ ast_for_testlist(node *n)
 }
 
 static stmt_ty
-ast_for_expr_stmt(node *n)
+ast_for_expr_stmt(const node *n)
 {
     REQ(n, expr_stmt);
     /* expr_stmt: testlist (augassign testlist | ('=' testlist)*) 
@@ -715,7 +820,9 @@ ast_for_expr_stmt(node *n)
 
     fprintf(stderr, "ast_for_expr_stmt(%d, %d)\n", TYPE(n), NCH(n));
     if (NCH(n) == 1) {
-	return Expr(ast_for_testlist(CHILD(n, 0)), LINENO(n));
+	expr_ty e = ast_for_testlist(CHILD(n, 0));
+	assert(e);
+	return Expr(e, LINENO(n));
     } else if (TYPE(CHILD(n, 1)) == augassign) {
 	return AugAssign(ast_for_testlist(CHILD(n, 0)),
 			 ast_for_augassign(CHILD(n, 1)),
@@ -727,12 +834,14 @@ ast_for_expr_stmt(node *n)
 
 	/* a normal assignment */
 	REQ(CHILD(n, 1), EQUAL);
-	targets = asdl_seq_new(NCH(n) / 2 + 1);
+	targets = asdl_seq_new(NCH(n) / 2);
 	for (i = 0; i < NCH(n) - 2; i += 2) {
 	    expr_ty e = ast_for_testlist(CHILD(n, i));
 	    /* set context to assign */
+	    if (!e)
+		    return NULL;
 	    set_context(e, Store);
-	    asdl_seq_append(targets, e);
+	    asdl_seq_SET(targets, i / 2, e);
 	}
 	return Assign(targets, ast_for_testlist(CHILD(n, NCH(n) - 1)),
 		      LINENO(n));
@@ -741,7 +850,7 @@ ast_for_expr_stmt(node *n)
 }
 
 static stmt_ty
-ast_for_print_stmt(node *n)
+ast_for_print_stmt(const node *n)
 {
     /* print_stmt: 'print' ( [ test (',' test)* [','] ] 
                              | '>>' test [ (',' test)+ [','] ] ) 
@@ -758,14 +867,14 @@ ast_for_print_stmt(node *n)
     }
     seq = asdl_seq_new((NCH(n) + 1 - start) / 2);
     for (i = start; i < NCH(n); i += 2) {
-	asdl_seq_append(seq, ast_for_expr(CHILD(n, i)));
+	asdl_seq_APPEND(seq, ast_for_expr(CHILD(n, i)));
     }
     nl = (TYPE(CHILD(n, NCH(n) - 1)) == COMMA) ? false : true;
     return Print(dest, seq, nl, LINENO(n));
 }
 
 static asdl_seq *
-ast_for_exprlist(node *n, int context)
+ast_for_exprlist(const node *n, int context)
 {
     asdl_seq *seq;
     int i;
@@ -777,15 +886,17 @@ ast_for_exprlist(node *n, int context)
     seq = asdl_seq_new((NCH(n) + 1) / 2);
     for (i = 0; i < NCH(n); i += 2) {
 	e = ast_for_expr(CHILD(n, i));
+	if (!e)
+		return NULL;
 	if (context)
 	    set_context(e, context);
-	asdl_seq_append(seq, e);
+	asdl_seq_SET(seq, i / 2, e);
     }
     return seq;
 }
 
 static stmt_ty
-ast_for_del_stmt(node *n)
+ast_for_del_stmt(const node *n)
 {
     /* del_stmt: 'del' exprlist */
     REQ(n, del_stmt);
@@ -793,7 +904,7 @@ ast_for_del_stmt(node *n)
 }
 
 static stmt_ty
-ast_for_flow_stmt(node *n)
+ast_for_flow_stmt(const node *n)
 {
     /*
       flow_stmt: break_stmt | continue_stmt | return_stmt | raise_stmt 
@@ -840,7 +951,7 @@ ast_for_flow_stmt(node *n)
 }
 
 static alias_ty
-alias_for_import_name(node *n)
+alias_for_import_name(const node *n)
 {
     /*
       import_as_name: NAME [NAME NAME]
@@ -905,7 +1016,7 @@ alias_for_import_name(node *n)
 }
 
 static stmt_ty
-ast_for_import_stmt(node *n)
+ast_for_import_stmt(const node *n)
 {
     /*
       import_stmt: 'import' dotted_as_name (',' dotted_as_name)* 
@@ -919,20 +1030,20 @@ ast_for_import_stmt(node *n)
     if (STR(CHILD(n, 0))[0] == 'i') { /* import */
 	aliases = asdl_seq_new(NCH(n) / 2);
 	for (i = 1; i < NCH(n); i += 2)
-	    asdl_seq_append(aliases, alias_for_import_name(CHILD(n, i)));
+	    asdl_seq_SET(aliases, i / 2, alias_for_import_name(CHILD(n, i)));
 	return Import(aliases, LINENO(n));
     } else if (STR(CHILD(n, 0))[0] == 'f') { /* from */
 	alias_ty mod = alias_for_import_name(CHILD(n, 1));
 	aliases = asdl_seq_new((NCH(n) - 2) / 2);
 	for (i = 3; i <= NCH(n); i += 2)
-	    asdl_seq_append(aliases, alias_for_import_name(CHILD(n, i)));
+	    asdl_seq_APPEND(aliases, alias_for_import_name(CHILD(n, i)));
 	return ImportFrom(mod->name, aliases, LINENO(n));
     }
     return NULL;
 }
 
 static stmt_ty
-ast_for_global_stmt(node *n)
+ast_for_global_stmt(const node *n)
 {
     /* global_stmt: 'global' NAME (',' NAME)* */
     identifier name;
@@ -945,14 +1056,13 @@ ast_for_global_stmt(node *n)
 	name = NEW_IDENTIFIER(CHILD(n, i));
 	if (!name)
 	    return NULL;
-	if (asdl_seq_append(s, name) < 0)
-	    return NULL;
+	asdl_seq_SET(s, i / 2, name);
     }
     return Global(s, LINENO(n));
 }
 
 static stmt_ty
-ast_for_exec_stmt(node *n)
+ast_for_exec_stmt(const node *n)
 {
     /* exec_stmt: 'exec' expr ['in' test [',' test]] */
     REQ(n, exec_stmt);
@@ -969,7 +1079,7 @@ ast_for_exec_stmt(node *n)
 }
 
 static stmt_ty
-ast_for_assert_stmt(node *n)
+ast_for_assert_stmt(const node *n)
 {
     /* assert_stmt: 'assert' test [',' test] */
     REQ(n, assert_stmt);
@@ -982,37 +1092,61 @@ ast_for_assert_stmt(node *n)
 }
 
 static asdl_seq *
-ast_for_suite(node *n)
+ast_for_suite(const node *n)
 {
     /* suite: simple_stmt | NEWLINE INDENT stmt+ DEDENT */
-    asdl_seq *seq;
-    int i;
+    asdl_seq *seq = NULL;
+    stmt_ty s;
+    int i, total, num;
+    node *ch, *ch2;
+
     fprintf(stderr, "ast_for_suite(%d)\n", TYPE(n));
     REQ(n, suite);
 
-    fprintf(stderr, "ast_for_suite(CHILD(n, 0)==%d)\n", TYPE(CHILD(n, 0)));
-
-    if (NCH(n) == 1) {
-	/* XXX punt on stmt; stmt */
-	REQ(CHILD(n, 0), simple_stmt);
-	seq = asdl_seq_new(1);
-	asdl_seq_append(seq, ast_for_stmt(CHILD(n, 0)));
-	return seq;
+    total = num_stmts(n);
+    seq = asdl_seq_new(total);
+    if (TYPE(CHILD(n, 0)) == simple_stmt) {
+	n = CHILD(n, 0);
+	for (i = 0; i < total; i++) {
+	    ch = CHILD(n, i);
+	    s = ast_for_stmt(ch);
+	    if (!s)
+		goto error;
+	    asdl_seq_APPEND(seq, s);
+	}
     }
-    fprintf(stderr, "\t%d\n", NCH(n));
-    /* one child node for each stmt, plus 3 children for NL, {, & } */
-    seq = asdl_seq_new(NCH(n) - 3);
-    for (i = 2; i < NCH(n) - 1; i++) {
-	fprintf(stderr, "\t%d: %d %d\n", i, TYPE(CHILD(n, i)),
-		NCH(CHILD(n, i)));
-	REQ(CHILD(n, i), stmt);
-	asdl_seq_append(seq, ast_for_stmt(CHILD(n, i)));
+    else {
+	for (i = 2; i < (NCH(n) - 1); i++) {
+	    ch = CHILD(n, i);
+	    num = num_stmts(ch);
+	    if (num == 1) {
+		s = ast_for_stmt(ch);
+		if (!s)
+		    goto error;
+		asdl_seq_APPEND(seq, s);
+	    }
+	    else {
+		int j;
+		for (j = 0; j < num; j++) {
+		    ch2 = CHILD(ch, j);
+		    REQ(ch2, small_stmt);
+		    s = ast_for_stmt(ch2);
+		    if (!s)
+			goto error;
+		    asdl_seq_APPEND(seq, s);
+		}
+	    }
+	}
     }
     return seq;
+ error:
+    if (seq)
+	asdl_seq_free(seq);
+    return NULL;
 }
 
 static stmt_ty
-ast_for_if_stmt(node *n)
+ast_for_if_stmt(const node *n)
 {
     /* if_stmt: 'if' test ':' suite ('elif' test ':' suite)* 
        ['else' ':' suite]
@@ -1046,7 +1180,7 @@ ast_for_if_stmt(node *n)
 
 	if (has_else) {
 	    orelse = asdl_seq_new(1);
-	    asdl_seq_append(orelse,
+	    asdl_seq_SET(orelse, 0,
 			    If(ast_for_expr(CHILD(n, NCH(n) - 6)),
 			       ast_for_suite(CHILD(n, NCH(n) - 4)),
 			       ast_for_suite(CHILD(n, NCH(n) - 1)), 
@@ -1058,11 +1192,12 @@ ast_for_if_stmt(node *n)
 			
 	for (i = 0; i < n_elif; i++) {
 	    int off = 5 + (n_elif - i - 1) * 4;
-	    orelse = asdl_seq_new(1);
-	    asdl_seq_append(orelse,
+	    asdl_seq *new = asdl_seq_new(1);
+	    asdl_seq_SET(new, 0,
 			    If(ast_for_expr(CHILD(n, off)),
 			       ast_for_suite(CHILD(n, off + 2)),
 			       orelse, LINENO(n)));
+	    orelse = new;
 	}
 	return If(ast_for_expr(CHILD(n, 1)),
 		  ast_for_suite(CHILD(n, 3)),
@@ -1073,7 +1208,7 @@ ast_for_if_stmt(node *n)
 }
 
 static stmt_ty
-ast_for_while_stmt(node *n)
+ast_for_while_stmt(const node *n)
 {
     /* while_stmt: 'while' test ':' suite ['else' ':' suite] */
     REQ(n, while_stmt);
@@ -1090,7 +1225,7 @@ ast_for_while_stmt(node *n)
 }
 
 static stmt_ty
-ast_for_for_stmt(node *n)
+ast_for_for_stmt(const node *n)
 {
     asdl_seq *_target = NULL, *seq = NULL;
     expr_ty target;
@@ -1102,7 +1237,7 @@ ast_for_for_stmt(node *n)
 
     _target = ast_for_exprlist(CHILD(n, 1), 0);
     if (asdl_seq_LEN(_target) == 1) {
-	target = asdl_seq_get(_target, 0);
+	target = asdl_seq_GET(_target, 0);
 	asdl_seq_free(_target);
     }
     else
@@ -1116,7 +1251,7 @@ ast_for_for_stmt(node *n)
 }
 
 static excepthandler_ty
-ast_for_except_clause(node *exc, node *body)
+ast_for_except_clause(const node *exc, node *body)
 {
     /* except_clause: 'except' [test [',' test]] */
     REQ(exc, except_clause);
@@ -1129,6 +1264,8 @@ ast_for_except_clause(node *exc, node *body)
 			     ast_for_suite(body));
     else {
 	expr_ty e = ast_for_expr(CHILD(exc, 3));
+	if (!e)
+		return NULL;
 	set_context(e, Store);
 	return excepthandler(ast_for_expr(CHILD(exc, 1)), e,
 		      ast_for_suite(body));
@@ -1136,7 +1273,7 @@ ast_for_except_clause(node *exc, node *body)
 }
 
 static stmt_ty
-ast_for_try_stmt(node *n)
+ast_for_try_stmt(const node *n)
 {
     REQ(n, try_stmt);
     if (TYPE(CHILD(n, 3)) == NAME) {/* must be 'finally' */
@@ -1156,7 +1293,7 @@ ast_for_try_stmt(node *n)
 	n_except /= 3;
 	handlers = asdl_seq_new(n_except);
 	for (i = 0; i < n_except; i++)
-	    asdl_seq_append(handlers,
+	    asdl_seq_SET(handlers, i,
 			    ast_for_except_clause(CHILD(n, 3 + i * 3),
 						  CHILD(n, 5 + i * 3)));
 	return TryExcept(ast_for_suite(CHILD(n, 2)), handlers,
@@ -1167,7 +1304,7 @@ ast_for_try_stmt(node *n)
 }
 
 static stmt_ty
-ast_for_classdef(node *n)
+ast_for_classdef(const node *n)
 {
     /* classdef: 'class' NAME ['(' testlist ')'] ':' suite */
     expr_ty _bases;
@@ -1182,7 +1319,7 @@ ast_for_classdef(node *n)
 	bases = _bases->v.Tuple.elts;
     else {
 	bases = asdl_seq_new(1);
-	asdl_seq_append(bases, _bases);
+	asdl_seq_SET(bases, 0, _bases);
     }
     return ClassDef(NEW_IDENTIFIER(CHILD(n, 1)), bases,
 		    ast_for_suite(CHILD(n, 6)), LINENO(n));
@@ -1190,7 +1327,7 @@ ast_for_classdef(node *n)
 }
 
 static stmt_ty
-ast_for_stmt(node *n)
+ast_for_stmt(const node *n)
 {
     if (TYPE(n) == stmt) {
 	assert(NCH(n) == 1);
@@ -1198,14 +1335,10 @@ ast_for_stmt(node *n)
     }
     fprintf(stderr, "stmt lineno %d\n", n->n_lineno);
     if (TYPE(n) == simple_stmt) {
-	/* I'm explicitly punting on multiple statements joined by a
-	   semicolon.  When I do handle it, ast_for_stmt() will have
-	   to return a sequence of statements.  It may actually be
-	   easier to put the check for a several small statements
-	   joined by a semicolon in the caller.  
-	*/
-	assert(NCH(n) == 2);
+	assert(num_stmts(n) == 1);
 	n = CHILD(n, 0);
+    }
+    if (TYPE(n) == small_stmt) {
 	REQ(n, small_stmt);
 	n = CHILD(n, 0);
 	/* small_stmt: expr_stmt | print_stmt  | del_stmt | pass_stmt 
@@ -1260,3 +1393,49 @@ ast_for_stmt(node *n)
     return NULL;
 }
 
+
+static PyObject *
+parsenumber(char *s)
+{
+	char *end;
+	long x;
+	double dx;
+#ifndef WITHOUT_COMPLEX
+	Py_complex c;
+	int imflag;
+#endif
+
+	errno = 0;
+	end = s + strlen(s) - 1;
+#ifndef WITHOUT_COMPLEX
+	imflag = *end == 'j' || *end == 'J';
+#endif
+	if (*end == 'l' || *end == 'L')
+		return PyLong_FromString(s, (char **)0, 0);
+	if (s[0] == '0')
+		x = (long) PyOS_strtoul((char *)s, &end, 0);
+	else
+		x = PyOS_strtol(s, &end, 0);
+	if (*end == '\0') {
+		if (errno != 0)
+			return PyLong_FromString(s, (char **)0, 0);
+		return PyInt_FromLong(x);
+	}
+	/* XXX Huge floats may silently fail */
+#ifndef WITHOUT_COMPLEX
+	if (imflag) {
+		c.real = 0.;
+		PyFPE_START_PROTECT("atof", return 0)
+		c.imag = atof(s);
+		PyFPE_END_PROTECT(c)
+		return PyComplex_FromCComplex(c);
+	}
+	else
+#endif
+	{
+		PyFPE_START_PROTECT("atof", return 0)
+		dx = atof(s);
+		PyFPE_END_PROTECT(dx)
+		return PyFloat_FromDouble(dx);
+	}
+}
