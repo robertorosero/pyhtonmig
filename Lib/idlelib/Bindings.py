@@ -49,6 +49,16 @@ menudefs = [
    ('R_eplace...', '<<replace>>'),
    ('Go to _line', '<<goto-line>>'),
   ]),
+('format', [
+    ('_Indent region', '<<indent-region>>'),
+    ('_Dedent region', '<<dedent-region>>'),
+    ('Comment _out region', '<<comment-region>>'),
+    ('U_ncomment region', '<<uncomment-region>>'),
+    ('Tabify region', '<<tabify-region>>'),
+    ('Untabify region', '<<untabify-region>>'),
+    ('Toggle tabs', '<<toggle-tabs>>'),
+    ('New indent width', '<<change-indentwidth>>'),
+]),
  ('run',[
    ('Python shell', '<<open-python-shell>>'),
  ]),
