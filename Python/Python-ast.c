@@ -1045,3 +1045,719 @@ alias(identifier name, identifier asname)
         return p;
 }
 
+int
+marshal_write_mod(PyObject **buf, int *off, mod_ty o)
+{
+        int i;
+        switch (o->kind) {
+        case Module_kind:
+                marshal_write_int(buf, off, 1);
+                marshal_write_int(buf, off, asdl_seq_LEN(o->v.Module.body));
+                for (i = 0; i < asdl_seq_LEN(o->v.Module.body); i++) {
+                        void *elt = asdl_seq_GET(o->v.Module.body, i);
+                        marshal_write_stmt(buf, off, elt);
+                }
+                break;
+        case Interactive_kind:
+                marshal_write_int(buf, off, 2);
+                marshal_write_stmt(buf, off, o->v.Interactive.body);
+                break;
+        case Expression_kind:
+                marshal_write_int(buf, off, 3);
+                marshal_write_expr(buf, off, o->v.Expression.body);
+                break;
+        case Suite_kind:
+                marshal_write_int(buf, off, 4);
+                marshal_write_int(buf, off, asdl_seq_LEN(o->v.Suite.body));
+                for (i = 0; i < asdl_seq_LEN(o->v.Suite.body); i++) {
+                        void *elt = asdl_seq_GET(o->v.Suite.body, i);
+                        marshal_write_stmt(buf, off, elt);
+                }
+                break;
+        }
+        return 1;
+}
+
+int
+marshal_write_stmt(PyObject **buf, int *off, stmt_ty o)
+{
+        int i;
+        switch (o->kind) {
+        case FunctionDef_kind:
+                marshal_write_int(buf, off, 1);
+                marshal_write_identifier(buf, off, o->v.FunctionDef.name);
+                marshal_write_arguments(buf, off, o->v.FunctionDef.args);
+                marshal_write_int(buf, off,
+                                  asdl_seq_LEN(o->v.FunctionDef.body));
+                for (i = 0; i < asdl_seq_LEN(o->v.FunctionDef.body); i++) {
+                        void *elt = asdl_seq_GET(o->v.FunctionDef.body, i);
+                        marshal_write_stmt(buf, off, elt);
+                }
+                break;
+        case ClassDef_kind:
+                marshal_write_int(buf, off, 2);
+                marshal_write_identifier(buf, off, o->v.ClassDef.name);
+                marshal_write_int(buf, off,
+                                  asdl_seq_LEN(o->v.ClassDef.bases));
+                for (i = 0; i < asdl_seq_LEN(o->v.ClassDef.bases); i++) {
+                        void *elt = asdl_seq_GET(o->v.ClassDef.bases, i);
+                        marshal_write_expr(buf, off, elt);
+                }
+                marshal_write_int(buf, off,
+                                  asdl_seq_LEN(o->v.ClassDef.body));
+                for (i = 0; i < asdl_seq_LEN(o->v.ClassDef.body); i++) {
+                        void *elt = asdl_seq_GET(o->v.ClassDef.body, i);
+                        marshal_write_stmt(buf, off, elt);
+                }
+                break;
+        case Return_kind:
+                marshal_write_int(buf, off, 3);
+                if (o->v.Return.value) {
+                        marshal_write_int(buf, off, 1);
+                        marshal_write_expr(buf, off, o->v.Return.value);
+                }
+                else
+                        marshal_write_int(buf, off, 0);
+                break;
+        case Yield_kind:
+                marshal_write_int(buf, off, 4);
+                marshal_write_expr(buf, off, o->v.Yield.value);
+                break;
+        case Delete_kind:
+                marshal_write_int(buf, off, 5);
+                marshal_write_int(buf, off,
+                                  asdl_seq_LEN(o->v.Delete.targets));
+                for (i = 0; i < asdl_seq_LEN(o->v.Delete.targets); i++) {
+                        void *elt = asdl_seq_GET(o->v.Delete.targets, i);
+                        marshal_write_expr(buf, off, elt);
+                }
+                break;
+        case Assign_kind:
+                marshal_write_int(buf, off, 6);
+                marshal_write_int(buf, off,
+                                  asdl_seq_LEN(o->v.Assign.targets));
+                for (i = 0; i < asdl_seq_LEN(o->v.Assign.targets); i++) {
+                        void *elt = asdl_seq_GET(o->v.Assign.targets, i);
+                        marshal_write_expr(buf, off, elt);
+                }
+                marshal_write_expr(buf, off, o->v.Assign.value);
+                break;
+        case AugAssign_kind:
+                marshal_write_int(buf, off, 7);
+                marshal_write_expr(buf, off, o->v.AugAssign.target);
+                marshal_write_operator(buf, off, o->v.AugAssign.op);
+                marshal_write_expr(buf, off, o->v.AugAssign.value);
+                break;
+        case Print_kind:
+                marshal_write_int(buf, off, 8);
+                if (o->v.Print.dest) {
+                        marshal_write_int(buf, off, 1);
+                        marshal_write_expr(buf, off, o->v.Print.dest);
+                }
+                else
+                        marshal_write_int(buf, off, 0);
+                marshal_write_int(buf, off,
+                                  asdl_seq_LEN(o->v.Print.values));
+                for (i = 0; i < asdl_seq_LEN(o->v.Print.values); i++) {
+                        void *elt = asdl_seq_GET(o->v.Print.values, i);
+                        marshal_write_expr(buf, off, elt);
+                }
+                marshal_write_bool(buf, off, o->v.Print.nl);
+                break;
+        case For_kind:
+                marshal_write_int(buf, off, 9);
+                marshal_write_expr(buf, off, o->v.For.target);
+                marshal_write_expr(buf, off, o->v.For.iter);
+                marshal_write_int(buf, off, asdl_seq_LEN(o->v.For.body));
+                for (i = 0; i < asdl_seq_LEN(o->v.For.body); i++) {
+                        void *elt = asdl_seq_GET(o->v.For.body, i);
+                        marshal_write_stmt(buf, off, elt);
+                }
+                marshal_write_int(buf, off, asdl_seq_LEN(o->v.For.orelse));
+                for (i = 0; i < asdl_seq_LEN(o->v.For.orelse); i++) {
+                        void *elt = asdl_seq_GET(o->v.For.orelse, i);
+                        marshal_write_stmt(buf, off, elt);
+                }
+                break;
+        case While_kind:
+                marshal_write_int(buf, off, 10);
+                marshal_write_expr(buf, off, o->v.While.test);
+                marshal_write_int(buf, off, asdl_seq_LEN(o->v.While.body));
+                for (i = 0; i < asdl_seq_LEN(o->v.While.body); i++) {
+                        void *elt = asdl_seq_GET(o->v.While.body, i);
+                        marshal_write_stmt(buf, off, elt);
+                }
+                marshal_write_int(buf, off,
+                                  asdl_seq_LEN(o->v.While.orelse));
+                for (i = 0; i < asdl_seq_LEN(o->v.While.orelse); i++) {
+                        void *elt = asdl_seq_GET(o->v.While.orelse, i);
+                        marshal_write_stmt(buf, off, elt);
+                }
+                break;
+        case If_kind:
+                marshal_write_int(buf, off, 11);
+                marshal_write_expr(buf, off, o->v.If.test);
+                marshal_write_int(buf, off, asdl_seq_LEN(o->v.If.body));
+                for (i = 0; i < asdl_seq_LEN(o->v.If.body); i++) {
+                        void *elt = asdl_seq_GET(o->v.If.body, i);
+                        marshal_write_stmt(buf, off, elt);
+                }
+                marshal_write_int(buf, off, asdl_seq_LEN(o->v.If.orelse));
+                for (i = 0; i < asdl_seq_LEN(o->v.If.orelse); i++) {
+                        void *elt = asdl_seq_GET(o->v.If.orelse, i);
+                        marshal_write_stmt(buf, off, elt);
+                }
+                break;
+        case Raise_kind:
+                marshal_write_int(buf, off, 12);
+                if (o->v.Raise.type) {
+                        marshal_write_int(buf, off, 1);
+                        marshal_write_expr(buf, off, o->v.Raise.type);
+                }
+                else
+                        marshal_write_int(buf, off, 0);
+                if (o->v.Raise.inst) {
+                        marshal_write_int(buf, off, 1);
+                        marshal_write_expr(buf, off, o->v.Raise.inst);
+                }
+                else
+                        marshal_write_int(buf, off, 0);
+                if (o->v.Raise.tback) {
+                        marshal_write_int(buf, off, 1);
+                        marshal_write_expr(buf, off, o->v.Raise.tback);
+                }
+                else
+                        marshal_write_int(buf, off, 0);
+                break;
+        case TryExcept_kind:
+                marshal_write_int(buf, off, 13);
+                marshal_write_int(buf, off,
+                                  asdl_seq_LEN(o->v.TryExcept.body));
+                for (i = 0; i < asdl_seq_LEN(o->v.TryExcept.body); i++) {
+                        void *elt = asdl_seq_GET(o->v.TryExcept.body, i);
+                        marshal_write_stmt(buf, off, elt);
+                }
+                marshal_write_int(buf, off,
+                                  asdl_seq_LEN(o->v.TryExcept.handlers));
+                for (i = 0; i < asdl_seq_LEN(o->v.TryExcept.handlers); i++)
+                     {
+                        void *elt = asdl_seq_GET(o->v.TryExcept.handlers,
+                                                 i);
+                        marshal_write_excepthandler(buf, off, elt);
+                }
+                marshal_write_int(buf, off,
+                                  asdl_seq_LEN(o->v.TryExcept.orelse));
+                for (i = 0; i < asdl_seq_LEN(o->v.TryExcept.orelse); i++) {
+                        void *elt = asdl_seq_GET(o->v.TryExcept.orelse, i);
+                        marshal_write_stmt(buf, off, elt);
+                }
+                break;
+        case TryFinally_kind:
+                marshal_write_int(buf, off, 14);
+                marshal_write_int(buf, off,
+                                  asdl_seq_LEN(o->v.TryFinally.body));
+                for (i = 0; i < asdl_seq_LEN(o->v.TryFinally.body); i++) {
+                        void *elt = asdl_seq_GET(o->v.TryFinally.body, i);
+                        marshal_write_stmt(buf, off, elt);
+                }
+                marshal_write_int(buf, off,
+                                  asdl_seq_LEN(o->v.TryFinally.finalbody));
+                for (i = 0; i < asdl_seq_LEN(o->v.TryFinally.finalbody);
+                     i++) {
+                        void *elt = asdl_seq_GET(o->v.TryFinally.finalbody,
+                                                 i);
+                        marshal_write_stmt(buf, off, elt);
+                }
+                break;
+        case Assert_kind:
+                marshal_write_int(buf, off, 15);
+                marshal_write_expr(buf, off, o->v.Assert.test);
+                if (o->v.Assert.msg) {
+                        marshal_write_int(buf, off, 1);
+                        marshal_write_expr(buf, off, o->v.Assert.msg);
+                }
+                else
+                        marshal_write_int(buf, off, 0);
+                break;
+        case Import_kind:
+                marshal_write_int(buf, off, 16);
+                marshal_write_int(buf, off,
+                                  asdl_seq_LEN(o->v.Import.names));
+                for (i = 0; i < asdl_seq_LEN(o->v.Import.names); i++) {
+                        void *elt = asdl_seq_GET(o->v.Import.names, i);
+                        marshal_write_alias(buf, off, elt);
+                }
+                break;
+        case ImportFrom_kind:
+                marshal_write_int(buf, off, 17);
+                marshal_write_identifier(buf, off, o->v.ImportFrom.module);
+                marshal_write_int(buf, off,
+                                  asdl_seq_LEN(o->v.ImportFrom.names));
+                for (i = 0; i < asdl_seq_LEN(o->v.ImportFrom.names); i++) {
+                        void *elt = asdl_seq_GET(o->v.ImportFrom.names, i);
+                        marshal_write_alias(buf, off, elt);
+                }
+                break;
+        case Exec_kind:
+                marshal_write_int(buf, off, 18);
+                marshal_write_expr(buf, off, o->v.Exec.body);
+                if (o->v.Exec.globals) {
+                        marshal_write_int(buf, off, 1);
+                        marshal_write_expr(buf, off, o->v.Exec.globals);
+                }
+                else
+                        marshal_write_int(buf, off, 0);
+                if (o->v.Exec.locals) {
+                        marshal_write_int(buf, off, 1);
+                        marshal_write_expr(buf, off, o->v.Exec.locals);
+                }
+                else
+                        marshal_write_int(buf, off, 0);
+                break;
+        case Global_kind:
+                marshal_write_int(buf, off, 19);
+                marshal_write_int(buf, off,
+                                  asdl_seq_LEN(o->v.Global.names));
+                for (i = 0; i < asdl_seq_LEN(o->v.Global.names); i++) {
+                        void *elt = asdl_seq_GET(o->v.Global.names, i);
+                        marshal_write_identifier(buf, off, elt);
+                }
+                break;
+        case Expr_kind:
+                marshal_write_int(buf, off, 20);
+                marshal_write_expr(buf, off, o->v.Expr.value);
+                break;
+        case Pass_kind:
+                marshal_write_int(buf, off, 21);
+                break;
+        case Break_kind:
+                marshal_write_int(buf, off, 22);
+                break;
+        case Continue_kind:
+                marshal_write_int(buf, off, 23);
+                break;
+        }
+        return 1;
+}
+
+int
+marshal_write_expr(PyObject **buf, int *off, expr_ty o)
+{
+        int i;
+        switch (o->kind) {
+        case BoolOp_kind:
+                marshal_write_int(buf, off, 1);
+                marshal_write_boolop(buf, off, o->v.BoolOp.op);
+                marshal_write_int(buf, off,
+                                  asdl_seq_LEN(o->v.BoolOp.values));
+                for (i = 0; i < asdl_seq_LEN(o->v.BoolOp.values); i++) {
+                        void *elt = asdl_seq_GET(o->v.BoolOp.values, i);
+                        marshal_write_expr(buf, off, elt);
+                }
+                break;
+        case BinOp_kind:
+                marshal_write_int(buf, off, 2);
+                marshal_write_expr(buf, off, o->v.BinOp.left);
+                marshal_write_operator(buf, off, o->v.BinOp.op);
+                marshal_write_expr(buf, off, o->v.BinOp.right);
+                break;
+        case UnaryOp_kind:
+                marshal_write_int(buf, off, 3);
+                marshal_write_unaryop(buf, off, o->v.UnaryOp.op);
+                marshal_write_expr(buf, off, o->v.UnaryOp.operand);
+                break;
+        case Lambda_kind:
+                marshal_write_int(buf, off, 4);
+                marshal_write_arguments(buf, off, o->v.Lambda.args);
+                marshal_write_expr(buf, off, o->v.Lambda.body);
+                break;
+        case Dict_kind:
+                marshal_write_int(buf, off, 5);
+                marshal_write_int(buf, off, asdl_seq_LEN(o->v.Dict.keys));
+                for (i = 0; i < asdl_seq_LEN(o->v.Dict.keys); i++) {
+                        void *elt = asdl_seq_GET(o->v.Dict.keys, i);
+                        marshal_write_expr(buf, off, elt);
+                }
+                marshal_write_int(buf, off, asdl_seq_LEN(o->v.Dict.values));
+                for (i = 0; i < asdl_seq_LEN(o->v.Dict.values); i++) {
+                        void *elt = asdl_seq_GET(o->v.Dict.values, i);
+                        marshal_write_expr(buf, off, elt);
+                }
+                break;
+        case ListComp_kind:
+                marshal_write_int(buf, off, 6);
+                marshal_write_expr(buf, off, o->v.ListComp.target);
+                marshal_write_int(buf, off,
+                                  asdl_seq_LEN(o->v.ListComp.generators));
+                for (i = 0; i < asdl_seq_LEN(o->v.ListComp.generators);
+                     i++) {
+                        void *elt = asdl_seq_GET(o->v.ListComp.generators,
+                                                 i);
+                        marshal_write_listcomp(buf, off, elt);
+                }
+                break;
+        case Compare_kind:
+                marshal_write_int(buf, off, 7);
+                marshal_write_expr(buf, off, o->v.Compare.left);
+                marshal_write_int(buf, off, asdl_seq_LEN(o->v.Compare.ops));
+                for (i = 0; i < asdl_seq_LEN(o->v.Compare.ops); i++) {
+                        void *elt = asdl_seq_GET(o->v.Compare.ops, i);
+                        marshal_write_cmpop(buf, off, (cmpop_ty)elt);
+                }
+                marshal_write_int(buf, off,
+                                  asdl_seq_LEN(o->v.Compare.comparators));
+                for (i = 0; i < asdl_seq_LEN(o->v.Compare.comparators);
+                     i++) {
+                        void *elt = asdl_seq_GET(o->v.Compare.comparators,
+                                                 i);
+                        marshal_write_expr(buf, off, elt);
+                }
+                break;
+        case Call_kind:
+                marshal_write_int(buf, off, 8);
+                marshal_write_expr(buf, off, o->v.Call.func);
+                marshal_write_int(buf, off, asdl_seq_LEN(o->v.Call.args));
+                for (i = 0; i < asdl_seq_LEN(o->v.Call.args); i++) {
+                        void *elt = asdl_seq_GET(o->v.Call.args, i);
+                        marshal_write_expr(buf, off, elt);
+                }
+                marshal_write_int(buf, off,
+                                  asdl_seq_LEN(o->v.Call.keywords));
+                for (i = 0; i < asdl_seq_LEN(o->v.Call.keywords); i++) {
+                        void *elt = asdl_seq_GET(o->v.Call.keywords, i);
+                        marshal_write_keyword(buf, off, elt);
+                }
+                if (o->v.Call.starargs) {
+                        marshal_write_int(buf, off, 1);
+                        marshal_write_expr(buf, off, o->v.Call.starargs);
+                }
+                else
+                        marshal_write_int(buf, off, 0);
+                if (o->v.Call.kwargs) {
+                        marshal_write_int(buf, off, 1);
+                        marshal_write_expr(buf, off, o->v.Call.kwargs);
+                }
+                else
+                        marshal_write_int(buf, off, 0);
+                break;
+        case Repr_kind:
+                marshal_write_int(buf, off, 9);
+                marshal_write_expr(buf, off, o->v.Repr.value);
+                break;
+        case Num_kind:
+                marshal_write_int(buf, off, 10);
+                marshal_write_object(buf, off, o->v.Num.n);
+                break;
+        case Str_kind:
+                marshal_write_int(buf, off, 11);
+                marshal_write_string(buf, off, o->v.Str.s);
+                break;
+        case Attribute_kind:
+                marshal_write_int(buf, off, 12);
+                marshal_write_expr(buf, off, o->v.Attribute.value);
+                marshal_write_identifier(buf, off, o->v.Attribute.attr);
+                marshal_write_expr_context(buf, off, o->v.Attribute.ctx);
+                break;
+        case Subscript_kind:
+                marshal_write_int(buf, off, 13);
+                marshal_write_expr(buf, off, o->v.Subscript.value);
+                marshal_write_slice(buf, off, o->v.Subscript.slice);
+                marshal_write_expr_context(buf, off, o->v.Subscript.ctx);
+                break;
+        case Name_kind:
+                marshal_write_int(buf, off, 14);
+                marshal_write_identifier(buf, off, o->v.Name.id);
+                marshal_write_expr_context(buf, off, o->v.Name.ctx);
+                break;
+        case List_kind:
+                marshal_write_int(buf, off, 15);
+                marshal_write_int(buf, off, asdl_seq_LEN(o->v.List.elts));
+                for (i = 0; i < asdl_seq_LEN(o->v.List.elts); i++) {
+                        void *elt = asdl_seq_GET(o->v.List.elts, i);
+                        marshal_write_expr(buf, off, elt);
+                }
+                marshal_write_expr_context(buf, off, o->v.List.ctx);
+                break;
+        case Tuple_kind:
+                marshal_write_int(buf, off, 16);
+                marshal_write_int(buf, off, asdl_seq_LEN(o->v.Tuple.elts));
+                for (i = 0; i < asdl_seq_LEN(o->v.Tuple.elts); i++) {
+                        void *elt = asdl_seq_GET(o->v.Tuple.elts, i);
+                        marshal_write_expr(buf, off, elt);
+                }
+                marshal_write_expr_context(buf, off, o->v.Tuple.ctx);
+                break;
+        }
+        return 1;
+}
+
+int
+marshal_write_expr_context(PyObject **buf, int *off, expr_context_ty o)
+{
+        switch (o) {
+        case Load:
+                marshal_write_int(buf, off, 1);
+                break;
+        case Store:
+                marshal_write_int(buf, off, 2);
+                break;
+        case Del:
+                marshal_write_int(buf, off, 3);
+                break;
+        case AugStore:
+                marshal_write_int(buf, off, 4);
+                break;
+        }
+        return 1;
+}
+
+int
+marshal_write_slice(PyObject **buf, int *off, slice_ty o)
+{
+        int i;
+        switch (o->kind) {
+        case Ellipsis_kind:
+                marshal_write_int(buf, off, 1);
+                break;
+        case Slice_kind:
+                marshal_write_int(buf, off, 2);
+                if (o->v.Slice.lower) {
+                        marshal_write_int(buf, off, 1);
+                        marshal_write_expr(buf, off, o->v.Slice.lower);
+                }
+                else
+                        marshal_write_int(buf, off, 0);
+                if (o->v.Slice.upper) {
+                        marshal_write_int(buf, off, 1);
+                        marshal_write_expr(buf, off, o->v.Slice.upper);
+                }
+                else
+                        marshal_write_int(buf, off, 0);
+                if (o->v.Slice.step) {
+                        marshal_write_int(buf, off, 1);
+                        marshal_write_expr(buf, off, o->v.Slice.step);
+                }
+                else
+                        marshal_write_int(buf, off, 0);
+                break;
+        case ExtSlice_kind:
+                marshal_write_int(buf, off, 3);
+                marshal_write_int(buf, off,
+                                  asdl_seq_LEN(o->v.ExtSlice.dims));
+                for (i = 0; i < asdl_seq_LEN(o->v.ExtSlice.dims); i++) {
+                        void *elt = asdl_seq_GET(o->v.ExtSlice.dims, i);
+                        marshal_write_slice(buf, off, elt);
+                }
+                break;
+        case Index_kind:
+                marshal_write_int(buf, off, 4);
+                marshal_write_expr(buf, off, o->v.Index.value);
+                break;
+        }
+        return 1;
+}
+
+int
+marshal_write_boolop(PyObject **buf, int *off, boolop_ty o)
+{
+        switch (o) {
+        case And:
+                marshal_write_int(buf, off, 1);
+                break;
+        case Or:
+                marshal_write_int(buf, off, 2);
+                break;
+        }
+        return 1;
+}
+
+int
+marshal_write_operator(PyObject **buf, int *off, operator_ty o)
+{
+        switch (o) {
+        case Add:
+                marshal_write_int(buf, off, 1);
+                break;
+        case Sub:
+                marshal_write_int(buf, off, 2);
+                break;
+        case Mult:
+                marshal_write_int(buf, off, 3);
+                break;
+        case Div:
+                marshal_write_int(buf, off, 4);
+                break;
+        case Mod:
+                marshal_write_int(buf, off, 5);
+                break;
+        case Pow:
+                marshal_write_int(buf, off, 6);
+                break;
+        case LShift:
+                marshal_write_int(buf, off, 7);
+                break;
+        case RShift:
+                marshal_write_int(buf, off, 8);
+                break;
+        case BitOr:
+                marshal_write_int(buf, off, 9);
+                break;
+        case BitXor:
+                marshal_write_int(buf, off, 10);
+                break;
+        case BitAnd:
+                marshal_write_int(buf, off, 11);
+                break;
+        case FloorDiv:
+                marshal_write_int(buf, off, 12);
+                break;
+        }
+        return 1;
+}
+
+int
+marshal_write_unaryop(PyObject **buf, int *off, unaryop_ty o)
+{
+        switch (o) {
+        case Invert:
+                marshal_write_int(buf, off, 1);
+                break;
+        case Not:
+                marshal_write_int(buf, off, 2);
+                break;
+        case UAdd:
+                marshal_write_int(buf, off, 3);
+                break;
+        case USub:
+                marshal_write_int(buf, off, 4);
+                break;
+        }
+        return 1;
+}
+
+int
+marshal_write_cmpop(PyObject **buf, int *off, cmpop_ty o)
+{
+        switch (o) {
+        case Eq:
+                marshal_write_int(buf, off, 1);
+                break;
+        case NotEq:
+                marshal_write_int(buf, off, 2);
+                break;
+        case Lt:
+                marshal_write_int(buf, off, 3);
+                break;
+        case LtE:
+                marshal_write_int(buf, off, 4);
+                break;
+        case Gt:
+                marshal_write_int(buf, off, 5);
+                break;
+        case GtE:
+                marshal_write_int(buf, off, 6);
+                break;
+        case Is:
+                marshal_write_int(buf, off, 7);
+                break;
+        case IsNot:
+                marshal_write_int(buf, off, 8);
+                break;
+        case In:
+                marshal_write_int(buf, off, 9);
+                break;
+        case NotIn:
+                marshal_write_int(buf, off, 10);
+                break;
+        }
+        return 1;
+}
+
+int
+marshal_write_listcomp(PyObject **buf, int *off, listcomp_ty o)
+{
+        int i;
+        marshal_write_expr(buf, off, o->target);
+        marshal_write_expr(buf, off, o->iter);
+        marshal_write_int(buf, off, asdl_seq_LEN(o->ifs));
+        for (i = 0; i < asdl_seq_LEN(o->ifs); i++) {
+                void *elt = asdl_seq_GET(o->ifs, i);
+                marshal_write_expr(buf, off, elt);
+        }
+        return 1;
+}
+
+int
+marshal_write_excepthandler(PyObject **buf, int *off, excepthandler_ty o)
+{
+        int i;
+        if (o->type) {
+                marshal_write_int(buf, off, 1);
+                marshal_write_expr(buf, off, o->type);
+        }
+        else
+                marshal_write_int(buf, off, 0);
+        if (o->name) {
+                marshal_write_int(buf, off, 1);
+                marshal_write_expr(buf, off, o->name);
+        }
+        else
+                marshal_write_int(buf, off, 0);
+        marshal_write_int(buf, off, asdl_seq_LEN(o->body));
+        for (i = 0; i < asdl_seq_LEN(o->body); i++) {
+                void *elt = asdl_seq_GET(o->body, i);
+                marshal_write_stmt(buf, off, elt);
+        }
+        return 1;
+}
+
+int
+marshal_write_arguments(PyObject **buf, int *off, arguments_ty o)
+{
+        int i;
+        marshal_write_int(buf, off, asdl_seq_LEN(o->args));
+        for (i = 0; i < asdl_seq_LEN(o->args); i++) {
+                void *elt = asdl_seq_GET(o->args, i);
+                marshal_write_expr(buf, off, elt);
+        }
+        if (o->vararg) {
+                marshal_write_int(buf, off, 1);
+                marshal_write_identifier(buf, off, o->vararg);
+        }
+        else
+                marshal_write_int(buf, off, 0);
+        if (o->kwarg) {
+                marshal_write_int(buf, off, 1);
+                marshal_write_identifier(buf, off, o->kwarg);
+        }
+        else
+                marshal_write_int(buf, off, 0);
+        marshal_write_int(buf, off, asdl_seq_LEN(o->defaults));
+        for (i = 0; i < asdl_seq_LEN(o->defaults); i++) {
+                void *elt = asdl_seq_GET(o->defaults, i);
+                marshal_write_expr(buf, off, elt);
+        }
+        return 1;
+}
+
+int
+marshal_write_keyword(PyObject **buf, int *off, keyword_ty o)
+{
+        marshal_write_identifier(buf, off, o->arg);
+        marshal_write_expr(buf, off, o->value);
+        return 1;
+}
+
+int
+marshal_write_alias(PyObject **buf, int *off, alias_ty o)
+{
+        marshal_write_identifier(buf, off, o->name);
+        if (o->asname) {
+                marshal_write_int(buf, off, 1);
+                marshal_write_identifier(buf, off, o->asname);
+        }
+        else
+                marshal_write_int(buf, off, 0);
+        return 1;
+}
+

@@ -13,19 +13,29 @@ typedef PyObject * object;
    interned Python strings.
 */
 
-/* A sequence should be typed so that its use can be typechecked. */
+/* XXX A sequence should be typed so that its use can be typechecked. */
+
+/* XXX We shouldn't pay for offset when we don't need APPEND. */
 
 typedef struct {
     int size;
-    int used;
-    void **elements;
+    int offset;
+    void *elements[1];
 } asdl_seq;
 
 asdl_seq *asdl_seq_new(int size);
-void *asdl_seq_get(asdl_seq *seq, int offset);
-int asdl_seq_append(asdl_seq *seq, void *elt);
 void asdl_seq_free(asdl_seq *);
 
-#define asdl_seq_LEN(S) ((S)->used)
+#define asdl_seq_GET(S, I) (S)->elements[(I)]
+#define asdl_seq_SET(S, I, V) (S)->elements[I] = (V)
+#define asdl_seq_APPEND(S, V) (S)->elements[(S)->offset++] = (V)
+#define asdl_seq_LEN(S) ((S) == NULL ? 0 : (S)->size)
+
+/* Routines to marshal the basic types. */
+int marshal_write_int(PyObject **, int *, int);
+int marshal_write_bool(PyObject **, int *, bool);
+int marshal_write_identifier(PyObject **, int *, identifier);
+int marshal_write_string(PyObject **, int *, string);
+int marshal_write_object(PyObject **, int *, object);
 
 #endif /* !Py_ASDL_H */

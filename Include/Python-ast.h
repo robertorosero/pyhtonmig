@@ -379,3 +379,17 @@ arguments_ty arguments(asdl_seq * args, identifier vararg, identifier
                        kwarg, asdl_seq * defaults);
 keyword_ty keyword(identifier arg, expr_ty value);
 alias_ty alias(identifier name, identifier asname);
+int marshal_write_mod(PyObject **, int *, mod_ty);
+int marshal_write_stmt(PyObject **, int *, stmt_ty);
+int marshal_write_expr(PyObject **, int *, expr_ty);
+int marshal_write_expr_context(PyObject **, int *, expr_context_ty);
+int marshal_write_slice(PyObject **, int *, slice_ty);
+int marshal_write_boolop(PyObject **, int *, boolop_ty);
+int marshal_write_operator(PyObject **, int *, operator_ty);
+int marshal_write_unaryop(PyObject **, int *, unaryop_ty);
+int marshal_write_cmpop(PyObject **, int *, cmpop_ty);
+int marshal_write_listcomp(PyObject **, int *, listcomp_ty);
+int marshal_write_excepthandler(PyObject **, int *, excepthandler_ty);
+int marshal_write_arguments(PyObject **, int *, arguments_ty);
+int marshal_write_keyword(PyObject **, int *, keyword_ty);
+int marshal_write_alias(PyObject **, int *, alias_ty);
