@@ -649,6 +649,33 @@ def classic():
     verify(d.foo(1) == (d, 1))
     verify(D.foo(d, 1) == (d, 1))
 
+def compattr():
+    if verbose: print "Testing computed attributes..."
+    class C(object):
+        class computed_attribute(object):
+            def __init__(self, get, set=None):
+                self.__get = get
+                self.__set = set
+            def __get__(self, obj, type=None):
+                return self.__get(obj)
+            def __set__(self, obj, value):
+                return self.__set(obj, value)
+        def __init__(self):
+            self.__x = 0
+        def __get_x(self):
+            x = self.__x
+            self.__x = x+1
+            return x
+        def __set_x(self, x):
+            self.__x = x
+        x = computed_attribute(__get_x, __set_x)
+    a = C()
+    verify(a.x == 0)
+    verify(a.x == 1)
+    a.x = 10
+    verify(a.x == 10)
+    verify(a.x == 11)
+
 def all():
     lists()
     dicts()
@@ -670,6 +697,7 @@ def all():
     errors()
     classmethods()
     classic()
+    compattr()
 
 all()
 

@@ -426,9 +426,11 @@ PyDescr_IsData(PyObject *d)
 		case DF_MEMBER:
 		case DF_GETSET:
 			return 1;
+		default:
+			return 0;
 		}
 	}
-	return 0;
+	return d->ob_type->tp_descr_set != NULL;
 }
 
 static PyDescrObject *
