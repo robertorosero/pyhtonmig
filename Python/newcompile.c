@@ -91,7 +91,6 @@ static int compiler_visit_expr(struct compiler *, expr_ty);
 static int compiler_augassign(struct compiler *, stmt_ty);
 static int compiler_visit_slice(struct compiler *, slice_ty,
 				expr_context_ty);
-static int compiler_visit_listcomp(struct compiler *, listcomp_ty);
 
 static int compiler_push_fblock(struct compiler *, enum fblocktype, int);
 static void compiler_pop_fblock(struct compiler *, enum fblocktype, int);
@@ -819,7 +818,6 @@ compiler_continue(struct compiler *c)
 	case FINALLY_END:
 	        return compiler_error(c,
 			"'continue' not allowed in 'finally' block");
-		break;
 	}
 
 	return 1;
@@ -948,19 +946,14 @@ compiler_visit_stmt(struct compiler *c, stmt_ty s)
 		break;
         case AugAssign_kind:
 		return compiler_augassign(c, s);
-		break;
         case Print_kind:
 		return compiler_print(c, s);
-		break;
         case For_kind:
 		return compiler_for(c, s);
-		break;
         case While_kind:
 		return compiler_while(c, s);
-		break;
         case If_kind:
 		return compiler_if(c, s);
-		break;
         case Raise_kind:
 		n = 0;
 		if (s->v.Raise.type) {
@@ -1198,7 +1191,6 @@ compiler_nameop(struct compiler *c, identifier name, expr_context_ty ctx)
 		}
 		ADDOP_O(c, op, name, varnames);
 		return 1;
-		break;
 	case OP_GLOBAL:
 		switch (ctx) {
 		case Load: op = LOAD_GLOBAL; break;
@@ -1263,6 +1255,34 @@ compiler_boolop(struct compiler *c, expr_ty e)
 }
 
 static int
+compiler_list(struct compiler *c, expr_ty e)
+{
+	int n = asdl_seq_LEN(e->v.List.elts);
+	if (e->v.List.ctx == Store) {
+		ADDOP_I(c, UNPACK_SEQUENCE, n);
+	}
+	VISIT_SEQ(c, expr, e->v.List.elts);
+	if (e->v.List.ctx == Load) {
+		ADDOP_I(c, BUILD_LIST, n);
+	}
+	return 1;
+}
+
+static int
+compiler_tuple(struct compiler *c, expr_ty e)
+{
+	int n = asdl_seq_LEN(e->v.Tuple.elts);
+	if (e->v.Tuple.ctx == Store) {
+		ADDOP_I(c, UNPACK_SEQUENCE, n);
+	}
+	VISIT_SEQ(c, expr, e->v.Tuple.elts);
+	if (e->v.Tuple.ctx == Load) {
+		ADDOP_I(c, BUILD_TUPLE, n);
+	}
+	return 1;
+}
+
+static int
 compiler_compare(struct compiler *c, expr_ty e)
 {
 	int i, n, cleanup;
@@ -1297,13 +1317,58 @@ compiler_compare(struct compiler *c, expr_ty e)
 	return 1;
 }
 
+static int
+compiler_listcomp_generator(struct compiler *c, listcomp_ty l, expr_ty elt)
+{
+	/* generate code for the iterator, then each of the ifs,
+	   and then write to the element */
+	
+	int start, anchor, skip, i, n;
+
+	start = compiler_new_block(c);
+	skip = compiler_new_block(c);
+	anchor = compiler_new_block(c);
+	
+	VISIT(c, expr, l->iter);
+	ADDOP(c, GET_ITER);
+	compiler_use_next_block(c, start);
+	ADDOP_JREL(c, FOR_ITER, anchor);
+	NEXT_BLOCK(c);
+	VISIT(c, expr, l->target);
+	
+	n = asdl_seq_LEN(l->ifs);
+	for (i = 0; i < n; i++) {
+		expr_ty e = asdl_seq_GET(l->ifs, i);
+		VISIT(c, expr, e);
+		/* XXX not anchor? */
+		ADDOP_JREL(c, JUMP_IF_FALSE, skip);
+		NEXT_BLOCK(c);
+		ADDOP(c, DUP_TOP);
+	} 
+
+	if (!compiler_nameop(c, c->u->u_tmp, Load))
+		return 0;
+	VISIT(c, expr, elt);
+	ADDOP_I(c, CALL_FUNCTION, 1);
+	ADDOP(c, POP_TOP);
+
+	compiler_use_next_block(c, skip);
+	ADDOP_JABS(c, JUMP_ABSOLUTE, start);
+	compiler_use_next_block(c, anchor);
+	if (!compiler_nameop(c, c->u->u_tmp, Del))
+		return 0;
+	
+	return 1;
+}
 
 static int
 compiler_listcomp(struct compiler *c, expr_ty e)
 {
+	int i;
 	char tmpname[256];
 	identifier tmp;
 	static identifier append;
+	asdl_seq *generators = e->v.ListComp.generators;
 
 	assert(e->kind == ListComp_kind);
 	if (!append) {
@@ -1322,7 +1387,12 @@ compiler_listcomp(struct compiler *c, expr_ty e)
 	if (!compiler_nameop(c, tmp, Store))
 		return 0;
 	c->u->u_tmp = tmp;
-	VISIT_SEQ(c, listcomp, e->v.ListComp.generators);
+	for (i = 0; i < asdl_seq_LEN(generators); i++) {
+		if (!compiler_listcomp_generator(c,
+						 asdl_seq_GET(generators, i),
+						 e->v.ListComp.elt))
+			return 0;
+	}
 	c->u->u_tmp = NULL;
 	return 1;
 }
@@ -1335,7 +1405,6 @@ compiler_visit_expr(struct compiler *c, expr_ty e)
 	switch (e->kind) {
         case BoolOp_kind:
 		return compiler_boolop(c, e);
-		break;
         case BinOp_kind:
 		VISIT(c, expr, e->v.BinOp.left);
 		VISIT(c, expr, e->v.BinOp.right);
@@ -1363,10 +1432,8 @@ compiler_visit_expr(struct compiler *c, expr_ty e)
 		break;
         case ListComp_kind:
 		return compiler_listcomp(c, e);
-		break;
         case Compare_kind:
 		return compiler_compare(c, e);
-		break;
         case Call_kind:
 		VISIT(c, expr, e->v.Call.func);
 		n = asdl_seq_LEN(e->v.Call.args);
@@ -1437,16 +1504,11 @@ compiler_visit_expr(struct compiler *c, expr_ty e)
 		break;
         case Name_kind:
 		return compiler_name(c, e);
-		break;
 	/* child nodes of List and Tuple will have expr_context set */
         case List_kind:
-		VISIT_SEQ(c, expr, e->v.List.elts);
-		ADDOP_I(c, BUILD_LIST, asdl_seq_LEN(e->v.List.elts));
-		break;
+		return compiler_list(c, e);
         case Tuple_kind:
-		VISIT_SEQ(c, expr, e->v.Tuple.elts);
-		ADDOP_I(c, BUILD_TUPLE, asdl_seq_LEN(e->v.Tuple.elts));
-		break;
+		return compiler_tuple(c, e);
 	}
 	return 1;
 }
@@ -1485,90 +1547,10 @@ compiler_augassign(struct compiler *c, stmt_ty s)
 		VISIT(c, expr, s->v.AugAssign.value);
 		ADDOP(c, inplace_binop(c, s->v.AugAssign.op));
 		return compiler_nameop(c, e->v.Name.id, Store);
-		break;
 	default:
 	    fprintf(stderr, "invalid node type for augmented assignment\n");
 	    return 0;
 	}
-	return 1;
-}
-
-static int
-compiler_visit_listcomp(struct compiler *c, listcomp_ty l)
-{
-	/* generate code for the iterator, then each of the ifs,
-	   and then write to the target */
-	
-	int start, anchor, skip, i, n;
-	expr_ty load_target;
-
-	/* The target must be valid in an assignment context,
-	   which limits the kinds of expressions that are valid.
-	   We need to load and store the target, which means it
-	   must be visited in two contexts.  The ast provides
-	   a store context, so create a copy for use in the load
-	   context.
-	*/
-	switch (l->target->kind) {
-	case Attribute_kind: 
-		load_target = Attribute(l->target->v.Attribute.value,
-					l->target->v.Attribute.attr,
-					Load);
-		break;
-	case Subscript_kind:
-		load_target = Subscript(l->target->v.Subscript.value,
-					l->target->v.Subscript.slice,
-					Load);
-		break;
-	case Name_kind:
-		load_target = Name(l->target->v.Name.id, Load);
-		break;
-	case List_kind:
-		load_target = List(l->target->v.List.elts, Load);
-		break;
-	case Tuple_kind:
-		load_target = Tuple(l->target->v.Tuple.elts, Load);
-		break;
-	default:
-		PyErr_Format(PyExc_SyntaxError, 
-			     "invalid list comp target: kind %d\n",
-			     l->target->kind);
-		return 0;
-	}
-
-	start = compiler_new_block(c);
-	skip = compiler_new_block(c);
-	anchor = compiler_new_block(c);
-	
-	VISIT(c, expr, l->iter);
-	ADDOP(c, GET_ITER);
-	compiler_use_next_block(c, start);
-	ADDOP_JREL(c, FOR_ITER, anchor);
-	NEXT_BLOCK(c);
-	VISIT(c, expr, l->target);
-	
-	n = asdl_seq_LEN(l->ifs);
-	for (i = 0; i < n; i++) {
-		expr_ty e = asdl_seq_GET(l->ifs, i);
-		VISIT(c, expr, e);
-		/* XXX not anchor? */
-		ADDOP_JREL(c, JUMP_IF_FALSE, skip);
-		NEXT_BLOCK(c);
-		ADDOP(c, DUP_TOP);
-	} 
-
-	if (!compiler_nameop(c, c->u->u_tmp, Load))
-		return 0;
-	VISIT(c, expr, load_target);
-	ADDOP_I(c, CALL_FUNCTION, 1);
-	ADDOP(c, POP_TOP);
-
-	compiler_use_next_block(c, skip);
-	ADDOP_JABS(c, JUMP_ABSOLUTE, start);
-	compiler_use_next_block(c, anchor);
-	if (!compiler_nameop(c, c->u->u_tmp, Del))
-		return 0;
-	
 	return 1;
 }
 
