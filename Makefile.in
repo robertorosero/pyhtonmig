@@ -137,6 +137,8 @@ config.status:	$(srcdir)/configure
 		else $(SHELL) $(srcdir)/configure $(WITH); \
 		fi
 
+.PRECIOUS:	config.status
+
 # Rerun configure with the same options as it was run last time,
 # provided the config.status script exists
 recheck:

@@ -1,8 +1,4 @@
-Lance's md5 bug!
-SCO specific notes file?
 AIX changes, notes file
-Say in Extensions README where it should be installed (so ../Python works)
-md5.update fails for Lance
 Add NEWS and HISTORY to Misc directory
 make freeze script working again (use Extensions/mkext.py as a base?)
 update documentation (especially ext.tex!)
