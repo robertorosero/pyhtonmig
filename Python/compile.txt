@@ -119,11 +119,10 @@ particular programming language.
 The following fragment of the Python ASDL construct demonstrates the
 approach and syntax::
 
-  XXX update example once decorators in
-
   module Python
   {
-	stmt = FunctionDef(identifier name, arguments args, stmt* body)
+	stmt = FunctionDef(identifier name, arguments args, stmt* body,
+			    expr* decorators)
 	      | Return(expr? value) | Yield(expr value)
 	      attributes (int lineno)
   }
@@ -136,8 +135,9 @@ various kinds.  They all take arguments of various kinds and amounts.
 Modifiers on the argument type specify the number of values needed; '?'
 means it is optional, '*' means 0 or more, no modifier means only one
 value for the argument and it is required.  FunctionDef, for instance,
-takes an identifier for the name, 'arguments' for args, and zero or more
-stmt arguments for 'body'.
+takes an identifier for the name, 'arguments' for args, zero or more
+stmt arguments for 'body', and zero or more expr arguments for
+'decorators'.
 
 Do notice that something like 'arguments', which is a node type, is
 represented as a single AST node and not as a sequence of nodes as with
