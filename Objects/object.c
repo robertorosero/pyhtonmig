@@ -1089,7 +1089,7 @@ _PyObject_GetDictPtr(PyObject *obj)
 	if (dictoffset == 0)
 		return NULL;
 	if (dictoffset < 0) {
-		dictoffset += tp->tp_basicsize;
+		dictoffset += PyType_BASICSIZE(tp);
 		assert(dictoffset > 0); /* Sanity check */
 		if (tp->tp_itemsize > 0) {
 			int n = ((PyVarObject *)obj)->ob_size;
