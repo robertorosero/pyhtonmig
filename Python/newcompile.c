@@ -65,6 +65,9 @@ struct instr {
 };
 
 typedef struct basicblock_ {
+	/* next block in the list of blocks for a unit (don't confuse with
+	 * b_next) */
+	struct basicblock_ *b_list;
 	/* number of instructions used */
 	int b_iused;
 	/* length of instruction array (b_instr) */
@@ -118,12 +121,9 @@ struct compiler_unit {
 	PyObject *u_private;	/* for private name mangling */
 
 	int u_argcount;    /* number of arguments for block */ 
-	int u_nblocks;     /* number of used blocks in u_blocks
-			      u_nblocks < u_nalloc */
-	int u_nalloc;      /* current alloc count for u_blocks */
-	basicblock *u_curblock; /* pointer to current block (from u_blocks) */
+	basicblock *u_blocks; /* pointer to list of blocks */
+	basicblock *u_curblock; /* pointer to current block */
 	int u_tmpname;     /* temporary variables for list comps */
-	basicblock **u_blocks;
 
 	int u_nfblocks;
 	struct fblockinfo u_fblock[CO_MAXBLOCKS];
@@ -438,18 +438,12 @@ compiler_enter_scope(struct compiler *c, identifier name, void *key,
 	u->u_freevars = dictbytype(u->u_ste->ste_symbols, FREE, DEF_FREE_CLASS,
                                    PyDict_Size(u->u_cellvars));
 
-	u->u_nblocks = 0;
-	u->u_nalloc = DEFAULT_BLOCKS;
-	u->u_blocks = (basicblock **)PyObject_Malloc(
-		sizeof(basicblock *) * DEFAULT_BLOCKS);
-	if (!u->u_blocks)
-		return 0;
+	u->u_blocks = NULL;
 	u->u_tmpname = 0;
 	u->u_nfblocks = 0;
 	u->u_firstlineno = lineno;
 	u->u_lineno = 0;
 	u->u_lineno_set = false;
-	memset(u->u_blocks, 0, sizeof(basicblock *) * DEFAULT_BLOCKS);
 	u->u_consts = PyDict_New();
 	if (!u->u_consts)
 		return 0;
@@ -484,11 +478,8 @@ compiler_enter_scope(struct compiler *c, identifier name, void *key,
 static void
 compiler_unit_check(struct compiler_unit *u)
 {
-	int i;
-	assert(u->u_nblocks <= u->u_nalloc);
-	for (i = 0; i < u->u_nblocks; i++) {
-		basicblock *block = u->u_blocks[i];
-		assert(block);
+	basicblock *block;
+	for (block = u->u_blocks; block != NULL; block = block->b_list) {
 		assert(block != (void *)0xcbcbcbcb);
 		assert(block != (void *)0xfbfbfbfb);
 		assert(block != (void *)0xdbdbdbdb);
@@ -507,17 +498,17 @@ compiler_unit_check(struct compiler_unit *u)
 static void
 compiler_unit_free(struct compiler_unit *u)
 {
-	int i;
+	basicblock *b, *next;
 
 	compiler_unit_check(u);
-	for (i = 0; i < u->u_nblocks; i++) {
-		basicblock *b = u->u_blocks[i];
+	b = u->u_blocks;
+	while (b != NULL) {
 		if (b->b_instr)
 			PyObject_Free((void *)b->b_instr);
+		next = b->b_list;
 		PyObject_Free((void *)b);
+		b = next;
 	}
-	if (u->u_blocks)
-		PyObject_Free((void *)u->u_blocks);
 	Py_XDECREF(u->u_ste);
 	Py_XDECREF(u->u_name);
 	Py_XDECREF(u->u_consts);
@@ -561,28 +552,15 @@ compiler_new_block(struct compiler *c)
 {
 	basicblock *b;
 	struct compiler_unit *u;
-	int i;
 
 	u = c->u;
-	if (u->u_nblocks == u->u_nalloc) {
-		int newsize = ((u->u_nalloc + u->u_nalloc)
-			       * sizeof(basicblock *));
-		u->u_blocks = (basicblock **)PyObject_Realloc(
-			u->u_blocks, newsize);
-		if (u->u_blocks == NULL)
-			return NULL;
-		memset(u->u_blocks + u->u_nalloc, 0,
-		       sizeof(basicblock *) * u->u_nalloc);
-		u->u_nalloc += u->u_nalloc;
-	}
 	b = (basicblock *)PyObject_Malloc(sizeof(basicblock));
 	if (b == NULL)
 		return NULL;
 	memset((void *)b, 0, sizeof(basicblock));
 	assert (b->b_next == NULL);
-	i = u->u_nblocks++;
-	assert(u->u_blocks[i] == NULL);
-	u->u_blocks[i] = b;
+	b->b_list = u->u_blocks;
+	u->u_blocks = b;
 	return b;
 }
 
@@ -2886,12 +2864,14 @@ out:
 static int
 stackdepth(struct compiler *c)
 {
-	int i;
-	for (i = 0; i < c->u->u_nblocks; i++) {
-		c->u->u_blocks[i]->b_seen = 0;
-		c->u->u_blocks[i]->b_startdepth = INT_MIN;
+	basicblock *b, *entryblock;
+	entryblock = NULL;
+	for (b = c->u->u_blocks; b != NULL; b = b->b_list) {
+		b->b_seen = 0;
+		b->b_startdepth = INT_MIN;
+		entryblock = b;
 	}
-	return stackdepth_walk(c, c->u->u_blocks[0], 0, 0);
+	return stackdepth_walk(c, entryblock, 0, 0);
 }
 
 static int
@@ -3134,23 +3114,22 @@ assemble_emit(struct assembler *a, struct instr *i)
 static int
 assemble_jump_offsets(struct assembler *a, struct compiler *c)
 {
+	basicblock *b;
 	int bsize, totsize = 0;
-	int i, j;
+	int i;
 
 	/* Compute the size of each block and fixup jump args.
 	   Replace block pointer with position in bytecode. */
-	assert(a->a_nblocks <= c->u->u_nblocks);
 	for (i = a->a_nblocks - 1; i >= 0; i--) {
 		basicblock *b = a->a_postorder[i];
 		bsize = blocksize(b);
 		b->b_offset = totsize;
 		totsize += bsize;
 	}
-	for (i = 0; i < c->u->u_nblocks; i++) {
-		basicblock *b = c->u->u_blocks[i];
+	for (b = c->u->u_blocks; b != NULL; b = b->b_list) {
 		bsize = b->b_offset;
-		for (j = 0; j < b->b_iused; j++) {
-			struct instr *instr = &b->b_instr[j];
+		for (i = 0; i < b->b_iused; i++) {
+			struct instr *instr = &b->b_instr[i];
 			/* Relative jumps are computed relative to
 			   the instruction pointer after fetching
 			   the jump instruction.
@@ -3278,8 +3257,9 @@ makecode(struct compiler *c, struct assembler *a)
 static PyCodeObject *
 assemble(struct compiler *c, int addNone)
 {
+	basicblock *b, *entryblock;
 	struct assembler a;
-	int i, j;
+	int i, j, nblocks;
 	PyCodeObject *co = NULL;
 
 	/* Make sure every block that falls off the end returns None.
@@ -3291,9 +3271,16 @@ assemble(struct compiler *c, int addNone)
             ADDOP_O(c, LOAD_CONST, Py_None, consts);
 	ADDOP(c, RETURN_VALUE);
 
-	if (!assemble_init(&a, c->u->u_nblocks))
+	nblocks = 0;
+	entryblock = NULL;
+	for (b = c->u->u_blocks; b != NULL; b = b->b_list) {
+		nblocks++;
+		entryblock = b; 
+	}
+
+	if (!assemble_init(&a, nblocks))
 		goto error;
-	dfs(c, c->u->u_blocks[0], &a);
+	dfs(c, entryblock, &a);
 
 	/* Can't modify the bytecode after computing jump offsets. */
 	if (!assemble_jump_offsets(&a, c))
