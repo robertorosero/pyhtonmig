@@ -7,6 +7,7 @@ import sys
 
 NoneType = type(None)
 TypeType = type(NoneType)
+ObjectType = NoneType.__bases__[0]
 
 IntType = type(0)
 LongType = type(0L)
