@@ -389,7 +389,8 @@ ast_for_arguments(const node *n)
 		return NULL;
 	    }
 	    if (TYPE(CHILD(ch, 0)) == NAME)
-		asdl_seq_APPEND(args, NEW_IDENTIFIER(CHILD(ch, 0)));
+		asdl_seq_APPEND(args, Name(NEW_IDENTIFIER(CHILD(ch, 0)),
+					   Param));
 	    if (i + 1 < NCH(n) && TYPE(CHILD(n, i + 1)) == EQUAL) {
 		asdl_seq_APPEND(defaults, ast_for_expr(CHILD(n, i + 2)));
 		i += 2;

@@ -611,7 +611,6 @@ symtable_add_def(struct symtable *st, PyObject *name, int flag)
 static int
 symtable_visit_stmt(struct symtable *st, stmt_ty s)
 {
-	fprintf(stderr, "symtable %d %d\n", s->kind, s->lineno);
 	switch (s->kind) {
         case FunctionDef_kind:
 		if (!symtable_add_def(st, s->v.FunctionDef.name, DEF_LOCAL))
@@ -837,7 +836,7 @@ symtable_visit_params(struct symtable *st, asdl_seq *args, int toplevel)
 	for (i = 0; i < asdl_seq_LEN(args); i++) {
 		expr_ty arg = asdl_seq_GET(args, i);
 		if (arg->kind == Name_kind) {
-			assert(arg->v.Name.ctx == Load);
+			assert(arg->v.Name.ctx == Param);
 			if (!symtable_add_def(st, arg->v.Name.id, DEF_PARAM))
 				return 0;
 		}
@@ -852,9 +851,10 @@ symtable_visit_params(struct symtable *st, asdl_seq *args, int toplevel)
 		}
 		else {
 			/* syntax error */
+			fprintf(stderr, "unexpected expr in parameter list\n");
 			return 0;
 		}
-	}	
+	}
 	
 	return 1;
 }
@@ -871,7 +871,6 @@ symtable_visit_arguments(struct symtable *st, arguments_ty a)
 			return 0;
 	if (a->kwarg && !symtable_add_def(st, a->kwarg, DEF_PARAM))
 			return 0;
-	
 	return 1;
 }
 

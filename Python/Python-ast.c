@@ -1507,6 +1507,9 @@ marshal_write_expr_context(PyObject **buf, int *off, expr_context_ty o)
         case AugStore:
                 marshal_write_int(buf, off, 4);
                 break;
+        case Param:
+                marshal_write_int(buf, off, 5);
+                break;
         }
         return 1;
 }

@@ -70,7 +70,7 @@ module Python
 	     | List(expr* elts, expr_context ctx) 
 	     | Tuple(expr *elts, expr_context ctx)
 
-	expr_context = Load | Store | Del | AugStore
+	expr_context = Load | Store | Del | AugStore | Param
 
 	slice = Ellipsis | Slice(expr? lower, expr? upper, expr? step) 
 	      | ExtSlice(slice* dims) 
