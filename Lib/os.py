@@ -78,3 +78,21 @@ def execvp(file, args):
 			if errno != arg[0]:
 				exc, arg = error, (errno, msg)
 	raise exc, arg
+
+# Provide listdir for Windows NT that doesn't have it built in
+if name == 'nt':
+	try:
+		_tmp = listdir
+		del _tmp
+	except NameError:
+		def listdir(name):
+			if path.ismount(name):
+				list = ['.']
+			else:
+				list = ['.', '..']
+			f = popen('dir/l/b ' + name, 'r')
+			line = f.readline()
+			while line:
+				list.append(line[:-1])
+				line = f.readline()
+			return list
