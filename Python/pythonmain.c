@@ -106,6 +106,10 @@ Options and arguments (and corresponding environment variables):\n\
 -u     : unbuffered stdout and stderr (also PYTHONUNBUFFERED=x)\n\
 -v     : verbose (trace import statements) (also PYTHONVERBOSE=x)\n\
 -c cmd : program passed in as string (terminates option list)\n\
+");
+			/* ANSI does not allow strings > 512 chars
+			   and MPW doesn't like it either -- so split it! */
+			fprintf(stderr, "\
 file   : program read from script file\n\
 -      : program read from stdin (default; interactive mode if a tty)\n\
 arg ...: arguments passed to program in sys.argv[1:]\n\

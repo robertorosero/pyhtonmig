@@ -28,6 +28,13 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #include "modsupport.h"
 #include "import.h"
 
+#ifdef MPW		/* MPW pushes 'extended' for float and double types with varargs */
+typedef extended va_double;
+#else 
+typedef double va_double;
+#endif
+
+
 object *
 initmodule(name, methods)
 	char *name;
@@ -469,7 +476,7 @@ do_mkvalue(p_format, p_va)
 		
 	case 'f':
 	case 'd':
-		return newfloatobject((double)va_arg(*p_va, double));
+		return newfloatobject((double)va_arg(*p_va, va_double));
 		
 	case 'c':
 		{
