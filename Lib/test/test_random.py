@@ -3,8 +3,9 @@
 import unittest
 import random
 import time
+import pickle
+import warnings
 from math import log, exp, sqrt, pi
-from sets import Set
 from test import test_support
 
 class TestBasicOps(unittest.TestCase):
@@ -19,7 +20,7 @@ class TestBasicOps(unittest.TestCase):
     def test_autoseed(self):
         self.gen.seed()
         state1 = self.gen.getstate()
-        time.sleep(1.1)
+        time.sleep(0.1)
         self.gen.seed()      # diffent seeds at different times
         state2 = self.gen.getstate()
         self.assertNotEqual(state1, state2)
@@ -38,6 +39,8 @@ class TestBasicOps(unittest.TestCase):
             self.gen.seed(arg)
         for arg in [range(3), dict(one=1)]:
             self.assertRaises(TypeError, self.gen.seed, arg)
+        self.assertRaises(TypeError, self.gen.seed, 1, 2)
+        self.assertRaises(TypeError, type(self.gen), [])
 
     def test_jumpahead(self):
         self.gen.seed()
@@ -62,9 +65,9 @@ class TestBasicOps(unittest.TestCase):
         for k in xrange(N+1):
             s = self.gen.sample(population, k)
             self.assertEqual(len(s), k)
-            uniq = Set(s)
+            uniq = set(s)
             self.assertEqual(len(uniq), k)
-            self.failUnless(uniq <= Set(population))
+            self.failUnless(uniq <= set(population))
         self.assertEqual(self.gen.sample([], 0), [])  # test edge case N==k==0
 
     def test_sample_distribution(self):
@@ -76,7 +79,7 @@ class TestBasicOps(unittest.TestCase):
         def factorial(n):
             return reduce(int.__mul__, xrange(1, n), 1)
         for k in xrange(n):
-            expected = factorial(n) / factorial(n-k)
+            expected = factorial(n) // factorial(n-k)
             perms = {}
             for i in xrange(trials):
                 perms[tuple(self.gen.sample(pop, k))] = None
@@ -84,6 +87,15 @@ class TestBasicOps(unittest.TestCase):
                     break
             else:
                 self.fail()
+
+    def test_sample_inputs(self):
+        # SF bug #801342 -- population can be any iterable defining __len__()
+        self.gen.sample(set(range(20)), 2)
+        self.gen.sample(range(20), 2)
+        self.gen.sample(xrange(20), 2)
+        self.gen.sample(dict.fromkeys('abcdefghijklmnopqrst'), 2)
+        self.gen.sample(str('abcdefghijklmnopqrst'), 2)
+        self.gen.sample(tuple('abcdefghijklmnopqrst'), 2)
 
     def test_gauss(self):
         # Ensure that the seed() method initializes all the hidden state.  In
@@ -102,9 +114,18 @@ class TestBasicOps(unittest.TestCase):
             self.assertEqual(x1, x2)
             self.assertEqual(y1, y2)
 
+    def test_pickling(self):
+        state = pickle.dumps(self.gen)
+        origseq = [self.gen.random() for i in xrange(10)]
+        newgen = pickle.loads(state)
+        restoredseq = [newgen.random() for i in xrange(10)]
+        self.assertEqual(origseq, restoredseq)
 
 class WichmannHill_TestBasicOps(TestBasicOps):
     gen = random.WichmannHill()
+
+    def test_setstate_first_arg(self):
+        self.assertRaises(ValueError, self.gen.setstate, (2, None, None))
 
     def test_strong_jumpahead(self):
         # tests that jumpahead(n) semantics correspond to n calls to random()
@@ -136,8 +157,129 @@ class WichmannHill_TestBasicOps(TestBasicOps):
             self.assertEqual(x1, x2)
             self.assertEqual(y1, y2)
 
+    def test_bigrand(self):
+        # Verify warnings are raised when randrange is too large for random()
+        oldfilters = warnings.filters[:]
+        warnings.filterwarnings("error", "Underlying random")
+        self.assertRaises(UserWarning, self.gen.randrange, 2**60)
+        warnings.filters[:] = oldfilters
+
+class SystemRandom_TestBasicOps(TestBasicOps):
+    gen = random.SystemRandom()
+
+    def test_autoseed(self):
+        # Doesn't need to do anything except not fail
+        self.gen.seed()
+
+    def test_saverestore(self):
+        self.assertRaises(NotImplementedError, self.gen.getstate)
+        self.assertRaises(NotImplementedError, self.gen.setstate, None)
+
+    def test_seedargs(self):
+        # Doesn't need to do anything except not fail
+        self.gen.seed(100)
+
+    def test_jumpahead(self):
+        # Doesn't need to do anything except not fail
+        self.gen.jumpahead(100)
+
+    def test_gauss(self):
+        self.gen.gauss_next = None
+        self.gen.seed(100)
+        self.assertEqual(self.gen.gauss_next, None)
+
+    def test_pickling(self):
+        self.assertRaises(NotImplementedError, pickle.dumps, self.gen)
+
+    def test_53_bits_per_float(self):
+        # This should pass whenever a C double has 53 bit precision.
+        span = 2 ** 53
+        cum = 0
+        for i in xrange(100):
+            cum |= int(self.gen.random() * span)
+        self.assertEqual(cum, span-1)
+
+    def test_bigrand(self):
+        # The randrange routine should build-up the required number of bits
+        # in stages so that all bit positions are active.
+        span = 2 ** 500
+        cum = 0
+        for i in xrange(100):
+            r = self.gen.randrange(span)
+            self.assert_(0 <= r < span)
+            cum |= r
+        self.assertEqual(cum, span-1)
+
+    def test_bigrand_ranges(self):
+        for i in [40,80, 160, 200, 211, 250, 375, 512, 550]:
+            start = self.gen.randrange(2 ** i)
+            stop = self.gen.randrange(2 ** (i-2))
+            if stop <= start:
+                return
+            self.assert_(start <= self.gen.randrange(start, stop) < stop)
+
+    def test_rangelimits(self):
+        for start, stop in [(-2,0), (-(2**60)-2,-(2**60)), (2**60,2**60+2)]:
+            self.assertEqual(set(range(start,stop)),
+                set([self.gen.randrange(start,stop) for i in xrange(100)]))
+
+    def test_genrandbits(self):
+        # Verify ranges
+        for k in xrange(1, 1000):
+            self.assert_(0 <= self.gen.getrandbits(k) < 2**k)
+
+        # Verify all bits active
+        getbits = self.gen.getrandbits
+        for span in [1, 2, 3, 4, 31, 32, 32, 52, 53, 54, 119, 127, 128, 129]:
+            cum = 0
+            for i in xrange(100):
+                cum |= getbits(span)
+            self.assertEqual(cum, 2**span-1)
+
+        # Verify argument checking
+        self.assertRaises(TypeError, self.gen.getrandbits)
+        self.assertRaises(TypeError, self.gen.getrandbits, 1, 2)
+        self.assertRaises(ValueError, self.gen.getrandbits, 0)
+        self.assertRaises(ValueError, self.gen.getrandbits, -1)
+        self.assertRaises(TypeError, self.gen.getrandbits, 10.1)
+
+    def test_randbelow_logic(self, _log=log, int=int):
+        # check bitcount transition points:  2**i and 2**(i+1)-1
+        # show that: k = int(1.001 + _log(n, 2))
+        # is equal to or one greater than the number of bits in n
+        for i in xrange(1, 1000):
+            n = 1L << i # check an exact power of two
+            numbits = i+1
+            k = int(1.00001 + _log(n, 2))
+            self.assertEqual(k, numbits)
+            self.assert_(n == 2**(k-1))
+
+            n += n - 1      # check 1 below the next power of two
+            k = int(1.00001 + _log(n, 2))
+            self.assert_(k in [numbits, numbits+1])
+            self.assert_(2**k > n > 2**(k-2))
+
+            n -= n >> 15     # check a little farther below the next power of two
+            k = int(1.00001 + _log(n, 2))
+            self.assertEqual(k, numbits)        # note the stronger assertion
+            self.assert_(2**k > n > 2**(k-1))   # note the stronger assertion
+
+
 class MersenneTwister_TestBasicOps(TestBasicOps):
     gen = random.Random()
+
+    def test_setstate_first_arg(self):
+        self.assertRaises(ValueError, self.gen.setstate, (1, None, None))
+
+    def test_setstate_middle_arg(self):
+        # Wrong type, s/b tuple
+        self.assertRaises(TypeError, self.gen.setstate, (2, None, None))
+        # Wrong length, s/b 625
+        self.assertRaises(ValueError, self.gen.setstate, (2, (1,2,3), None))
+        # Wrong type, s/b tuple of 625 ints
+        self.assertRaises(TypeError, self.gen.setstate, (2, ('a',)*625, None))
+        # Last element s/b an int also
+        self.assertRaises(TypeError, self.gen.setstate, (2, (0,)*624+('a',), None))
 
     def test_referenceImplementation(self):
         # Compare the python implementation with results from the original
@@ -187,7 +329,6 @@ class MersenneTwister_TestBasicOps(TestBasicOps):
                     0x11388382c15694L,
                     0x02dad977c9e1feL,
                     0x191d96d4d334c6L]
-
         self.gen.seed(61731L + (24903L<<32) + (614L<<64) + (42143L<<96))
         actual = self.randomlist(2000)[-10:]
         for a, e in zip(actual, expected):
@@ -201,6 +342,83 @@ class MersenneTwister_TestBasicOps(TestBasicOps):
         # so don't make this horribly big.
         seed = (1L << (10000 * 8)) - 1  # about 10K bytes
         self.gen.seed(seed)
+
+    def test_53_bits_per_float(self):
+        # This should pass whenever a C double has 53 bit precision.
+        span = 2 ** 53
+        cum = 0
+        for i in xrange(100):
+            cum |= int(self.gen.random() * span)
+        self.assertEqual(cum, span-1)
+
+    def test_bigrand(self):
+        # The randrange routine should build-up the required number of bits
+        # in stages so that all bit positions are active.
+        span = 2 ** 500
+        cum = 0
+        for i in xrange(100):
+            r = self.gen.randrange(span)
+            self.assert_(0 <= r < span)
+            cum |= r
+        self.assertEqual(cum, span-1)
+
+    def test_bigrand_ranges(self):
+        for i in [40,80, 160, 200, 211, 250, 375, 512, 550]:
+            start = self.gen.randrange(2 ** i)
+            stop = self.gen.randrange(2 ** (i-2))
+            if stop <= start:
+                return
+            self.assert_(start <= self.gen.randrange(start, stop) < stop)
+
+    def test_rangelimits(self):
+        for start, stop in [(-2,0), (-(2**60)-2,-(2**60)), (2**60,2**60+2)]:
+            self.assertEqual(set(range(start,stop)),
+                set([self.gen.randrange(start,stop) for i in xrange(100)]))
+
+    def test_genrandbits(self):
+        # Verify cross-platform repeatability
+        self.gen.seed(1234567)
+        self.assertEqual(self.gen.getrandbits(100),
+                         97904845777343510404718956115L)
+        # Verify ranges
+        for k in xrange(1, 1000):
+            self.assert_(0 <= self.gen.getrandbits(k) < 2**k)
+
+        # Verify all bits active
+        getbits = self.gen.getrandbits
+        for span in [1, 2, 3, 4, 31, 32, 32, 52, 53, 54, 119, 127, 128, 129]:
+            cum = 0
+            for i in xrange(100):
+                cum |= getbits(span)
+            self.assertEqual(cum, 2**span-1)
+
+        # Verify argument checking
+        self.assertRaises(TypeError, self.gen.getrandbits)
+        self.assertRaises(TypeError, self.gen.getrandbits, 'a')
+        self.assertRaises(TypeError, self.gen.getrandbits, 1, 2)
+        self.assertRaises(ValueError, self.gen.getrandbits, 0)
+        self.assertRaises(ValueError, self.gen.getrandbits, -1)
+
+    def test_randbelow_logic(self, _log=log, int=int):
+        # check bitcount transition points:  2**i and 2**(i+1)-1
+        # show that: k = int(1.001 + _log(n, 2))
+        # is equal to or one greater than the number of bits in n
+        for i in xrange(1, 1000):
+            n = 1L << i # check an exact power of two
+            numbits = i+1
+            k = int(1.00001 + _log(n, 2))
+            self.assertEqual(k, numbits)
+            self.assert_(n == 2**(k-1))
+
+            n += n - 1      # check 1 below the next power of two
+            k = int(1.00001 + _log(n, 2))
+            self.assert_(k in [numbits, numbits+1])
+            self.assert_(2**k > n > 2**(k-2))
+
+            n -= n >> 15     # check a little farther below the next power of two
+            k = int(1.00001 + _log(n, 2))
+            self.assertEqual(k, numbits)        # note the stronger assertion
+            self.assert_(2**k > n > 2**(k-1))   # note the stronger assertion
 
 _gammacoeff = (0.9999999999995183, 676.5203681218835, -1259.139216722289,
               771.3234287757674,  -176.6150291498386, 12.50734324009056,
@@ -269,24 +487,30 @@ class TestModule(unittest.TestCase):
 
     def test__all__(self):
         # tests validity but not completeness of the __all__ list
-        self.failUnless(Set(random.__all__) <= Set(dir(random)))
+        self.failUnless(set(random.__all__) <= set(dir(random)))
 
 def test_main(verbose=None):
-    suite = unittest.TestSuite()
-    for testclass in (WichmannHill_TestBasicOps,
+    testclasses =    [WichmannHill_TestBasicOps,
                       MersenneTwister_TestBasicOps,
                       TestDistributions,
-                      TestModule):
-        suite.addTest(unittest.makeSuite(testclass))
-    test_support.run_suite(suite)
+                      TestModule]
+
+    try:
+        random.SystemRandom().random()
+    except NotImplementedError:
+        pass
+    else:
+        testclasses.append(SystemRandom_TestBasicOps)
+
+    test_support.run_unittest(*testclasses)
 
     # verify reference counting
     import sys
     if verbose and hasattr(sys, "gettotalrefcount"):
-        counts = []
-        for i in xrange(5):
-            test_support.run_suite(suite)
-            counts.append(sys.gettotalrefcount()-i)
+        counts = [None] * 5
+        for i in xrange(len(counts)):
+            test_support.run_unittest(*testclasses)
+            counts[i] = sys.gettotalrefcount()
         print counts
 
 if __name__ == "__main__":

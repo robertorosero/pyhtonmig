@@ -110,7 +110,10 @@ Time of last modification.
 \end{datadesc}
 
 \begin{datadesc}{ST_CTIME}
-Time of last status change (see manual pages for details).
+The ``ctime'' as reported by the operating system.  On some systems
+(like \UNIX) is the time of the last metadata change, and, on others
+(like Windows), is the creation time (see platform documentation for
+details).
 \end{datadesc}
 
 The interpretation of ``file size'' changes according to the file
@@ -129,12 +132,12 @@ Example:
 import os, sys
 from stat import *
 
-def walktree(dir, callback):
-    '''recursively descend the directory rooted at dir,
+def walktree(top, callback):
+    '''recursively descend the directory tree rooted at top,
        calling the callback function for each regular file'''
 
-    for f in os.listdir(dir):
-        pathname = '%s/%s' % (dir, f)
+    for f in os.listdir(top):
+        pathname = os.path.join(top, f)
         mode = os.stat(pathname)[ST_MODE]
         if S_ISDIR(mode):
             # It's a directory, recurse into it

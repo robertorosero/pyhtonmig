@@ -1,4 +1,4 @@
-"""Supporting definitions for the Python regression test."""
+"""Supporting definitions for the Python regression tests."""
 
 if __name__ != 'test.test_support':
     raise ImportError, 'test_support must be imported from the test package'
@@ -50,18 +50,37 @@ def unload(name):
         pass
 
 def forget(modname):
+    '''"Forget" a module was ever imported by removing it from sys.modules and
+    deleting any .pyc and .pyo files.'''
     unload(modname)
     import os
     for dirname in sys.path:
         try:
-            os.unlink(os.path.join(dirname, modname + '.pyc'))
+            os.unlink(os.path.join(dirname, modname + os.extsep + 'pyc'))
+        except os.error:
+            pass
+        # Deleting the .pyo file cannot be within the 'try' for the .pyc since
+        # the chance exists that there is no .pyc (and thus the 'try' statement
+        # is exited) but there is a .pyo file.
+        try:
+            os.unlink(os.path.join(dirname, modname + os.extsep + 'pyo'))
         except os.error:
             pass
 
 def is_resource_enabled(resource):
+    """Test whether a resource is enabled.  Known resources are set by
+    regrtest.py."""
     return use_resources is not None and resource in use_resources
 
 def requires(resource, msg=None):
+    """Raise ResourceDenied if the specified resource is not available.
+
+    If the caller's module is __main__ then automatically return True.  The
+    possibility of False being returned occurs when regrtest.py is executing."""
+    # see if the caller's module is __main__ - if so, treat as if
+    # the resource was set
+    if sys._getframe().f_back.f_globals.get("__name__") == "__main__":
+        return
     if not is_resource_enabled(resource):
         if msg is None:
             msg = "Use of the `%s' resource not enabled" % resource
@@ -99,19 +118,47 @@ import os
 if os.name == 'java':
     # Jython disallows @ in module names
     TESTFN = '$test'
-elif os.name != 'riscos':
+elif os.name == 'riscos':
+    TESTFN = 'testfile'
+else:
     TESTFN = '@test'
     # Unicode name only used if TEST_FN_ENCODING exists for the platform.
     if have_unicode:
+        # Assuming sys.getfilesystemencoding()!=sys.getdefaultencoding()
+        # TESTFN_UNICODE is a filename that can be encoded using the
+        # file system encoding, but *not* with the default (ascii) encoding
         if isinstance('', unicode):
             # python -U
             # XXX perhaps unicode() should accept Unicode strings?
-            TESTFN_UNICODE="@test-\xe0\xf2"
+            TESTFN_UNICODE = "@test-\xe0\xf2"
         else:
-            TESTFN_UNICODE=unicode("@test-\xe0\xf2", "latin-1") # 2 latin characters.
-        TESTFN_ENCODING=sys.getfilesystemencoding()
-else:
-    TESTFN = 'test'
+            # 2 latin characters.
+            TESTFN_UNICODE = unicode("@test-\xe0\xf2", "latin-1")
+        TESTFN_ENCODING = sys.getfilesystemencoding()
+        # TESTFN_UNICODE_UNENCODEABLE is a filename that should *not* be
+        # able to be encoded by *either* the default or filesystem encoding.
+        # This test really only makes sense on Windows NT platforms
+        # which have special Unicode support in posixmodule.
+        if (not hasattr(sys, "getwindowsversion") or
+                sys.getwindowsversion()[3] < 2): #  0=win32s or 1=9x/ME
+            TESTFN_UNICODE_UNENCODEABLE = None
+        else:
+            # Japanese characters (I think - from bug 846133)
+            TESTFN_UNICODE_UNENCODEABLE = u"@test-\u5171\u6709\u3055\u308c\u308b"
+            try:
+                # XXX - Note - should be using TESTFN_ENCODING here - but for
+                # Windows, "mbcs" currently always operates as if in
+                # errors=ignore' mode - hence we get '?' characters rather than
+                # the exception.  'Latin1' operates as we expect - ie, fails.
+                # See [ 850997 ] mbcs encoding ignores errors
+                TESTFN_UNICODE_UNENCODEABLE.encode("Latin1")
+            except UnicodeEncodeError:
+                pass
+            else:
+                print \
+                'WARNING: The filename %r CAN be encoded by the filesystem.  ' \
+                'Unicode filename tests may not be effective' \
+                % TESTFN_UNICODE_UNENCODEABLE
 
 # Make sure we can write to TESTFN, try in /tmp if we can't
 fp = None
@@ -137,6 +184,9 @@ del os, fp
 from os import unlink
 
 def findfile(file, here=__file__):
+    """Try to find a file on sys.path and the working directory.  If it is not
+    found the argument passed to the function is returned (this does not
+    necessarily signal failure; could still be the legitimate path)."""
     import os
     if os.path.isabs(file):
         return file
@@ -225,9 +275,19 @@ def run_suite(suite, testclass=None):
         raise TestFailed(err)
 
 
-def run_unittest(testclass):
-    """Run tests from a unittest.TestCase-derived class."""
-    run_suite(unittest.makeSuite(testclass), testclass)
+def run_unittest(*classes):
+    """Run tests from unittest.TestCase-derived classes."""
+    suite = unittest.TestSuite()
+    for cls in classes:
+        if isinstance(cls, (unittest.TestSuite, unittest.TestCase)):
+            suite.addTest(cls)
+        else:
+            suite.addTest(unittest.makeSuite(cls))
+    if len(classes)==1:
+        testclass = classes[0]
+    else:
+        testclass = None
+    run_suite(suite, testclass)
 
 
 #=======================================================================
@@ -256,6 +316,8 @@ def run_doctest(module, verbosity=None):
         f, t = doctest.testmod(module, verbose=verbosity)
         if f:
             raise TestFailed("%d of %d doctests failed" % (f, t))
-        return f, t
     finally:
         sys.stdout = save_stdout
+    if verbose:
+        print 'doctest (%s) ... %d tests with zero failures' % (module.__name__, t)
+    return f, t

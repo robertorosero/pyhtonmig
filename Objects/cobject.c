@@ -46,9 +46,9 @@ PyCObject_FromVoidPtrAndDesc(void *cobj, void *desc,
     self = PyObject_NEW(PyCObject, &PyCObject_Type);
     if (self == NULL)
         return NULL;
-    self->cobject=cobj;
-    self->destructor=(destructor1)destr;
-    self->desc=desc;
+    self->cobject = cobj;
+    self->destructor = (destructor1)destr;
+    self->desc = desc;
 
     return (PyObject *)self;
 }
@@ -97,6 +97,20 @@ PyCObject_Import(char *module_name, char *name)
         Py_DECREF(m);
     }
     return r;
+}
+
+int
+PyCObject_SetVoidPtr(PyObject *_self, void *cobj)
+{
+    PyCObject* self = (PyCObject*)_self;
+    if (self == NULL || !PyCObject_Check(self) ||
+	self->destructor != NULL) {
+	PyErr_SetString(PyExc_TypeError, 
+			"Invalid call to PyCObject_SetVoidPtr");
+	return 0;
+    }
+    self->cobject = cobj;
+    return 1;
 }
 
 static void

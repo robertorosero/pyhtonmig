@@ -5,9 +5,12 @@
 \modulesynopsis{Time access and conversions.}
 
 
-This module provides various time-related functions.
-It is always available, but not all functions are available
-on all platforms.
+This module provides various time-related functions.  It is always
+available, but not all functions are available on all platforms.  Most
+of the functions defined in this module call platform C library
+functions with the same name.  It may sometimes be helpful to consult
+the platform documentation, because the semantics of these functions
+varies among platforms.
 
 An explanation of some terminology and conventions is in order.
 
@@ -154,11 +157,14 @@ The resolution is typically better than one microsecond.
 
 \begin{funcdesc}{ctime}{\optional{secs}}
 Convert a time expressed in seconds since the epoch to a string
-representing local time. If \var{secs} is not provided, the current time
-as returned by \function{time()} is used.  \code{ctime(\var{secs})}
-is equivalent to \code{asctime(localtime(\var{secs}))}.
+representing local time. If \var{secs} is not provided or
+\constant{None}, the current time as returned by \function{time()} is
+used.  \code{ctime(\var{secs})} is equivalent to
+\code{asctime(localtime(\var{secs}))}.
 Locale information is not used by \function{ctime()}.
 \versionchanged[Allowed \var{secs} to be omitted]{2.1}
+\versionchanged[If \var{secs} is \constant{None}, the current time is
+                used]{2.4}
 \end{funcdesc}
 
 \begin{datadesc}{daylight}
@@ -168,16 +174,23 @@ Nonzero if a DST timezone is defined.
 \begin{funcdesc}{gmtime}{\optional{secs}}
 Convert a time expressed in seconds since the epoch to a \class{struct_time}
 in UTC in which the dst flag is always zero.  If \var{secs} is not
-provided, the current time as returned by \function{time()} is used.
-Fractions of a second are ignored.  See above for a description of the
-\class{struct_time} object.
+provided or \constant{None}, the current time as returned by
+\function{time()} is used.  Fractions of a second are ignored.  See
+above for a description of the \class{struct_time} object. See
+\function{calendar.timegm()} for the inverse of this function.
 \versionchanged[Allowed \var{secs} to be omitted]{2.1}
+\versionchanged[If \var{secs} is \constant{None}, the current time is
+                used]{2.4}
 \end{funcdesc}
 
 \begin{funcdesc}{localtime}{\optional{secs}}
-Like \function{gmtime()} but converts to local time.  The dst flag is
-set to \code{1} when DST applies to the given time.
+Like \function{gmtime()} but converts to local time.  If \var{secs} is
+not provided or \constant{None}, the current time as returned by
+\function{time()} is used.  The dst flag is set to \code{1} when DST
+applies to the given time.
 \versionchanged[Allowed \var{secs} to be omitted]{2.1}
+\versionchanged[If \var{secs} is \constant{None}, the current time is
+                used]{2.4}
 \end{funcdesc}
 
 \begin{funcdesc}{mktime}{t}
@@ -208,8 +221,11 @@ Convert a tuple or \class{struct_time} representing a time as returned
 by \function{gmtime()} or \function{localtime()} to a string as
 specified by the \var{format} argument.  If \var{t} is not
 provided, the current time as returned by \function{localtime()} is
-used.  \var{format} must be a string.
+used.  \var{format} must be a string.  \exception{ValueError} is raised
+if any field in \var{t} is outside of the allowed range.
 \versionchanged[Allowed \var{t} to be omitted]{2.1}
+\versionchanged[\exception{ValueError} raised if a field in \var{t} is
+out of range.]{2.4}
 
 The following directives can be embedded in the \var{format} string.
 They are shown without the optional field width and precision
@@ -228,15 +244,15 @@ specification, and are replaced by the indicated characters in the
   \lineiii{\%j}{Day of the year as a decimal number [001,366].}{}
   \lineiii{\%m}{Month as a decimal number [01,12].}{}
   \lineiii{\%M}{Minute as a decimal number [00,59].}{}
-  \lineiii{\%p}{Locale's equivalent of either AM or PM.}{}
-  \lineiii{\%S}{Second as a decimal number [00,61].}{(1)}
+  \lineiii{\%p}{Locale's equivalent of either AM or PM.}{(1)}
+  \lineiii{\%S}{Second as a decimal number [00,61].}{(2)}
   \lineiii{\%U}{Week number of the year (Sunday as the first day of the
                 week) as a decimal number [00,53].  All days in a new year
-                preceding the first Sunday are considered to be in week 0.}{}
+                preceding the first Sunday are considered to be in week 0.}{(3)}
   \lineiii{\%w}{Weekday as a decimal number [0(Sunday),6].}{}
   \lineiii{\%W}{Week number of the year (Monday as the first day of the
                 week) as a decimal number [00,53].  All days in a new year
-                preceding the first Monday are considered to be in week 0.}{}
+                preceding the first Monday are considered to be in week 0.}{(3)}
   \lineiii{\%x}{Locale's appropriate date representation.}{}
   \lineiii{\%X}{Locale's appropriate time representation.}{}
   \lineiii{\%y}{Year without century as a decimal number [00,99].}{}
@@ -250,8 +266,16 @@ Notes:
 
 \begin{description}
   \item[(1)]
+    When used with the \function{strptime()} function, the \code{\%p}
+    directive only affects the output hour field if the \code{\%I} directive
+    is used to parse the hour.
+  \item[(2)]
     The range really is \code{0} to \code{61}; this accounts for leap
     seconds and the (very rare) double leap seconds.
+  \item[(3)]
+    When used with the \function{strptime()} function, \code{\%U} and \code{\%W}
+    are only used in calculations when the day of the week and the year are
+    specified.
 \end{description}
 
 Here is an example, a format for dates compatible with that specified 
@@ -285,13 +309,17 @@ value is a \class{struct_time} as returned by \function{gmtime()} or
 \function{localtime()}.  The \var{format} parameter uses the same
 directives as those used by \function{strftime()}; it defaults to
 \code{"\%a \%b \%d \%H:\%M:\%S \%Y"} which matches the formatting
-returned by \function{ctime()}.  The same platform caveats apply; see
-the local \UNIX{} documentation for restrictions or additional
-supported directives.  If \var{string} cannot be parsed according to
-\var{format}, \exception{ValueError} is raised.  Values which are not
-provided as part of the input string are filled in with default
-values; the specific values are platform-dependent as the XPG standard
-does not provide sufficient information to constrain the result.
+returned by \function{ctime()}.  If \var{string} cannot be parsed
+according to \var{format}, \exception{ValueError} is raised.  If the
+string to be parsed has excess data after parsing,
+\exception{ValueError} is raised.  The default values used to fill in
+any missing data are \code{(1900, 1, 1, 0, 0, 0, 0, 1, -1)} .
+
+Support for the \code{\%Z} directive is based on the values contained in
+\code{tzname} and whether \code{daylight} is true.  Because of this,
+it is platform-specific except for recognizing UTC and GMT which are
+always known (and are considered to be non-daylight savings
+timezones).
 \end{funcdesc}
 
 \begin{datadesc}{struct_time}
@@ -321,8 +349,105 @@ timezone, the second is the name of the local DST timezone.  If no DST
 timezone is defined, the second string should not be used.
 \end{datadesc}
 
+\begin{funcdesc}{tzset}{}
+Resets the time conversion rules used by the library routines.
+The environment variable \envvar{TZ} specifies how this is done.
+\versionadded{2.3}
+
+Availability: \UNIX.
+
+\begin{notice}
+Although in many cases, changing the \envvar{TZ} environment variable
+may affect the output of functions like \function{localtime} without calling 
+\function{tzset}, this behavior should not be relied on.
+
+The \envvar{TZ} environment variable should contain no whitespace.
+\end{notice}
+
+The standard format of the \envvar{TZ} environment variable is:
+(whitespace added for clarity)
+\begin{itemize}
+    \item[std offset [dst [offset] [,start[/time], end[/time]]]]
+\end{itemize}
+
+Where:
+
+\begin{itemize}
+  \item[std and dst]
+    Three or more alphanumerics giving the timezone abbreviations.
+    These will be propagated into time.tzname
+
+  \item[offset]
+    The offset has the form: \plusminus{} hh[:mm[:ss]].
+    This indicates the value added the local time to arrive at UTC. 
+    If preceded by a '-', the timezone is east of the Prime 
+    Meridian; otherwise, it is west. If no offset follows
+    dst, summer time is assumed to be one hour ahead of standard time.
+
+  \item[start[/time],end[/time]]
+    Indicates when to change to and back from DST. The format of the
+    start and end dates are one of the following:
+
+    \begin{itemize}
+      \item[J\var{n}]
+        The Julian day \var{n} (1 <= \var{n} <= 365). Leap days are not 
+        counted, so in all years February 28 is day 59 and
+        March 1 is day 60.
+
+    \item[\var{n}]
+        The zero-based Julian day (0 <= \var{n} <= 365). Leap days are
+        counted, and it is possible to refer to February 29.
+
+      \item[M\var{m}.\var{n}.\var{d}]
+        The \var{d}'th day (0 <= \var{d} <= 6) or week \var{n} 
+        of month \var{m} of the year (1 <= \var{n} <= 5, 
+        1 <= \var{m} <= 12, where week 5 means "the last \var{d} day
+        in month \var{m}" which may occur in either the fourth or 
+        the fifth week). Week 1 is the first week in which the 
+        \var{d}'th day occurs. Day zero is Sunday.
+    \end{itemize}
+
+    time has the same format as offset except that no leading sign ('-' or
+    '+') is allowed. The default, if time is not given, is 02:00:00.
+\end{itemize}
+
+
+\begin{verbatim}
+>>> os.environ['TZ'] = 'EST+05EDT,M4.1.0,M10.5.0'
+>>> time.tzset()
+>>> time.strftime('%X %x %Z')
+'02:07:36 05/08/03 EDT'
+>>> os.environ['TZ'] = 'AEST-10AEDT-11,M10.5.0,M3.5.0'
+>>> time.tzset()
+>>> time.strftime('%X %x %Z')
+'16:08:12 05/08/03 AEST'
+\end{verbatim}
+
+On many Unix systems (including *BSD, Linux, Solaris, and Darwin), it
+is more convenient to use the system's zoneinfo (\manpage{tzfile}{5}) 
+database to specify the timezone rules. To do this, set the 
+\envvar{TZ} environment variable to the path of the required timezone 
+datafile, relative to the root of the systems 'zoneinfo' timezone database,
+usually located at \file{/usr/share/zoneinfo}. For example, 
+\code{'US/Eastern'}, \code{'Australia/Melbourne'}, \code{'Egypt'} or 
+\code{'Europe/Amsterdam'}.
+
+\begin{verbatim}
+>>> os.environ['TZ'] = 'US/Eastern'
+>>> time.tzset()
+>>> time.tzname
+('EST', 'EDT')
+>>> os.environ['TZ'] = 'Egypt'
+>>> time.tzset()
+>>> time.tzname
+('EET', 'EEST')
+\end{verbatim}
+
+\end{funcdesc}
+
 
 \begin{seealso}
+  \seemodule{datetime}{More object-oriented interface to dates and times.}
   \seemodule{locale}{Internationalization services.  The locale
                      settings can affect the return values for some of 
                      the functions in the \module{time} module.}

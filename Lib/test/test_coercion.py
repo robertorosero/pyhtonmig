@@ -67,10 +67,25 @@ class MethodNumber:
 
 
 candidates = [ 2, 4.0, 2L, 2+0j, [1], (2,), None,
-               MethodNumber(1), CoerceNumber(2)]
+               MethodNumber(2), CoerceNumber(2)]
 
 infix_binops = [ '+', '-', '*', '/', '**', '%' ]
 prefix_binops = [ 'divmod' ]
+
+def format_float(value):
+    if abs(value) < 0.01:
+        return '0.0'
+    else:
+        return '%.1f' % value
+
+# avoid testing platform fp quirks
+def format_result(value):
+    if isinstance(value, complex):
+        return '(%s + %sj)' % (format_float(value.real),
+                               format_float(value.imag))
+    elif isinstance(value, float):
+        return format_float(value)
+    return str(value)
 
 def do_infix_binops():
     for a in candidates:
@@ -83,7 +98,7 @@ def do_infix_binops():
                     error = sys.exc_info()[:2]
                     print '... %s' % error[0]
                 else:
-                    print '=', x
+                    print '=', format_result(x)
                 try:
                     z = copy.copy(a)
                 except copy.Error:
@@ -95,7 +110,7 @@ def do_infix_binops():
                     error = sys.exc_info()[:2]
                     print '... %s' % error[0]
                 else:
-                    print '=>', z
+                    print '=>', format_result(z)
 
 def do_prefix_binops():
     for a in candidates:
@@ -108,7 +123,42 @@ def do_prefix_binops():
                     error = sys.exc_info()[:2]
                     print '... %s' % error[0]
                 else:
-                    print '=', x
+                    print '=', format_result(x)
+
+# New-style class version of CoerceNumber
+class CoerceTo(object):
+    def __init__(self, arg):
+        self.arg = arg
+    def __coerce__(self, other):
+        if isinstance(other, CoerceTo):
+            return self.arg, other.arg
+        else:
+            return self.arg, other
+
+def assert_(expr, msg=None):
+    if not expr:
+        raise AssertionError, msg
+
+def do_cmptypes():
+    # Built-in tp_compare slots expect their arguments to have the
+    # same type, but a user-defined __coerce__ doesn't have to obey.
+    # SF #980352
+    evil_coercer = CoerceTo(42)
+    # Make sure these don't crash any more
+    assert_(cmp(u'fish', evil_coercer) != 0)
+    assert_(cmp(slice(1), evil_coercer) != 0)
+    # ...but that this still works
+    class WackyComparer(object):
+        def __cmp__(self, other):
+            assert_(other == 42, 'expected evil_coercer, got %r' % other)
+            return 0
+    assert_(cmp(WackyComparer(), evil_coercer) == 0)
+    # ...and classic classes too, since that code path is a little different
+    class ClassicWackyComparer:
+        def __cmp__(self, other):
+            assert_(other == 42, 'expected evil_coercer, got %r' % other)
+            return 0
+    assert_(cmp(ClassicWackyComparer(), evil_coercer) == 0)
 
 warnings.filterwarnings("ignore",
                         r'complex divmod\(\), // and % are deprecated',
@@ -116,3 +166,4 @@ warnings.filterwarnings("ignore",
                         r'test.test_coercion$')
 do_infix_binops()
 do_prefix_binops()
+do_cmptypes()

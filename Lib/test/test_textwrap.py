@@ -1,5 +1,5 @@
 #
-# Test script for the textwrap module.
+# Test suite for the textwrap module.
 #
 # Original tests written by Greg Ward <gward@python.net>.
 # Converted to PyUnit by Peter Hansen <peter@engcorp.com>.
@@ -11,7 +11,7 @@
 import unittest
 from test import test_support
 
-from textwrap import TextWrapper, wrap, fill
+from textwrap import TextWrapper, wrap, fill, dedent
 
 
 class BaseTestCase(unittest.TestCase):
@@ -23,7 +23,7 @@ class BaseTestCase(unittest.TestCase):
             for i in range(len(textin)):
                 result.append("  %d: %r" % (i, textin[i]))
             result = '\n'.join(result)
-        elif isinstance(textin, (str, unicode)):
+        elif isinstance(textin, basestring):
             result = "  %s\n" % repr(textin)
         return result
 
@@ -47,7 +47,7 @@ class BaseTestCase(unittest.TestCase):
 class WrapTestCase(BaseTestCase):
 
     def setUp(self):
-        self.wrapper = TextWrapper(width=45, fix_sentence_endings=True)
+        self.wrapper = TextWrapper(width=45)
 
     def test_simple(self):
         # Simple case: just words, spaces, and a bit of punctuation
@@ -84,12 +84,50 @@ What a mess!
                   "wrapped.  Some lines are  tabbed too.  What a",
                   "mess!"]
 
-        result = self.wrapper.wrap(text)
+        wrapper = TextWrapper(45, fix_sentence_endings=True)
+        result = wrapper.wrap(text)
         self.check(result, expect)
 
-        result = self.wrapper.fill(text)
+        result = wrapper.fill(text)
         self.check(result, '\n'.join(expect))
 
+    def test_fix_sentence_endings(self):
+        wrapper = TextWrapper(60, fix_sentence_endings=True)
+
+        # SF #847346: ensure that fix_sentence_endings=True does the
+        # right thing even on input short enough that it doesn't need to
+        # be wrapped.
+        text = "A short line. Note the single space."
+        expect = ["A short line.  Note the single space."]
+        self.check(wrapper.wrap(text), expect)
+
+        # Test some of the hairy end cases that _fix_sentence_endings()
+        # is supposed to handle (the easy stuff is tested in
+        # test_whitespace() above).
+        text = "Well, Doctor? What do you think?"
+        expect = ["Well, Doctor?  What do you think?"]
+        self.check(wrapper.wrap(text), expect)
+
+        text = "Well, Doctor?\nWhat do you think?"
+        self.check(wrapper.wrap(text), expect)
+
+        text = 'I say, chaps! Anyone for "tennis?"\nHmmph!'
+        expect = ['I say, chaps!  Anyone for "tennis?"  Hmmph!']
+        self.check(wrapper.wrap(text), expect)
+
+        wrapper.width = 20
+        expect = ['I say, chaps!', 'Anyone for "tennis?"', 'Hmmph!']
+        self.check(wrapper.wrap(text), expect)
+
+        text = 'And she said, "Go to hell!"\nCan you believe that?'
+        expect = ['And she said, "Go to',
+                  'hell!"  Can you',
+                  'believe that?']
+        self.check(wrapper.wrap(text), expect)
+
+        wrapper.width = 60
+        expect = ['And she said, "Go to hell!"  Can you believe that?']
+        self.check(wrapper.wrap(text), expect)
 
     def test_wrap_short(self):
         # Wrapping to make short lines longer
@@ -224,11 +262,44 @@ What a mess!
         self.check_split("what the--.", ["what", " ", "the--."])
         self.check_split("--text--.", ["--text--."])
 
-        # My initial mis-interpretation of part of the bug report --
-        # These were always handled correctly, but it can't hurt to make
-        # sure that they *stay* correct!
+        # When I first read bug #596434, this is what I thought David
+        # was talking about.  I was wrong; these have always worked
+        # fine.  The real problem is tested in test_funky_parens()
+        # below...
         self.check_split("--option", ["--option"])
         self.check_split("--option-opt", ["--option-", "opt"])
+        self.check_split("foo --option-opt bar",
+                         ["foo", " ", "--option-", "opt", " ", "bar"])
+
+    def test_punct_hyphens(self):
+        # Oh bother, SF #965425 found another problem with hyphens --
+        # hyphenated words in single quotes weren't handled correctly.
+        # In fact, the bug is that *any* punctuation around a hyphenated
+        # word was handled incorrectly, except for a leading "--", which
+        # was special-cased for Optik and Docutils.  So test a variety
+        # of styles of punctuation around a hyphenated word.
+        # (Actually this is based on an Optik bug report, #813077).
+        self.check_split("the 'wibble-wobble' widget",
+                         ['the', ' ', "'wibble-", "wobble'", ' ', 'widget'])
+        self.check_split('the "wibble-wobble" widget',
+                         ['the', ' ', '"wibble-', 'wobble"', ' ', 'widget'])
+        self.check_split("the (wibble-wobble) widget",
+                         ['the', ' ', "(wibble-", "wobble)", ' ', 'widget'])
+        self.check_split("the ['wibble-wobble'] widget",
+                         ['the', ' ', "['wibble-", "wobble']", ' ', 'widget'])
+
+    def test_funky_parens (self):
+        # Second part of SF bug #596434: long option strings inside
+        # parentheses.
+        self.check_split("foo (--option) bar",
+                         ["foo", " ", "(--option)", " ", "bar"])
+
+        # Related stuff -- make sure parens work in simpler contexts.
+        self.check_split("foo (bar) baz",
+                         ["foo", " ", "(bar)", " ", "baz"])
+        self.check_split("blah (ding dong), wubba",
+                         ["blah", " ", "(ding", " ", "dong),",
+                          " ", "wubba"])
 
     def test_initial_whitespace(self):
         # SF bug #622849 reported inconsistent handling of leading
@@ -262,6 +333,12 @@ What a mess!
              ["Hello", " ", "there", " ", "--", " ", "you", " ", "goof-",
               "ball,", " ", "use", " ", "the", " ", "-b", " ",  "option!"])
 
+    def test_bad_width(self):
+        # Ensure that width <= 0 is caught.
+        text = "Whatever, it doesn't matter."
+        self.assertRaises(ValueError, wrap, text, 0)
+        self.assertRaises(ValueError, wrap, text, -1)
+
 
 class LongWordTestCase (BaseTestCase):
     def setUp(self):
@@ -283,6 +360,16 @@ How *do* you spell that odd word, anyways?
                         ['Did you say "supercalifragilisticexpialidocious?"',
                          'How *do* you spell that odd word, anyways?'])
 
+        # SF bug 797650.  Prevent an infinite loop by making sure that at
+        # least one character gets split off on every pass.
+        self.check_wrap('-'*10+'hello', 10,
+                        ['----------',
+                         '               h',
+                         '               e',
+                         '               l',
+                         '               l',
+                         '               o'],
+                        subsequent_indent = ' '*15)
 
     def test_nobreak_long(self):
         # Test with break_long_words disabled
@@ -299,7 +386,6 @@ How *do* you spell that odd word, anyways?
         # Same thing with kwargs passed to standalone wrap() function.
         result = wrap(self.text, width=30, break_long_words=0)
         self.check(result, expect)
-
 
 
 class IndentTestCases(BaseTestCase):
@@ -351,12 +437,74 @@ some (including a hanging indent).'''
         self.check(result, expect)
 
 
+# Despite the similar names, DedentTestCase is *not* the inverse
+# of IndentTestCase!
+class DedentTestCase(unittest.TestCase):
+
+    def test_dedent_nomargin(self):
+        # No lines indented.
+        text = "Hello there.\nHow are you?\nOh good, I'm glad."
+        self.assertEquals(dedent(text), text)
+
+        # Similar, with a blank line.
+        text = "Hello there.\n\nBoo!"
+        self.assertEquals(dedent(text), text)
+
+        # Some lines indented, but overall margin is still zero.
+        text = "Hello there.\n  This is indented."
+        self.assertEquals(dedent(text), text)
+
+        # Again, add a blank line.
+        text = "Hello there.\n\n  Boo!\n"
+        self.assertEquals(dedent(text), text)
+
+    def test_dedent_even(self):
+        # All lines indented by two spaces.
+        text = "  Hello there.\n  How are ya?\n  Oh good."
+        expect = "Hello there.\nHow are ya?\nOh good."
+        self.assertEquals(dedent(text), expect)
+
+        # Same, with blank lines.
+        text = "  Hello there.\n\n  How are ya?\n  Oh good.\n"
+        expect = "Hello there.\n\nHow are ya?\nOh good.\n"
+        self.assertEquals(dedent(text), expect)
+
+        # Now indent one of the blank lines.
+        text = "  Hello there.\n  \n  How are ya?\n  Oh good.\n"
+        expect = "Hello there.\n\nHow are ya?\nOh good.\n"
+        self.assertEquals(dedent(text), expect)
+
+    def test_dedent_uneven(self):
+        # Lines indented unevenly.
+        text = '''\
+        def foo():
+            while 1:
+                return foo
+        '''
+        expect = '''\
+def foo():
+    while 1:
+        return foo
+'''
+        self.assertEquals(dedent(text), expect)
+
+        # Uneven indentation with a blank line.
+        text = "  Foo\n    Bar\n\n   Baz\n"
+        expect = "Foo\n  Bar\n\n Baz\n"
+        self.assertEquals(dedent(text), expect)
+
+        # Uneven indentation with a whitespace-only line.
+        text = "  Foo\n    Bar\n \n   Baz\n"
+        expect = "Foo\n  Bar\n\n Baz\n"
+        self.assertEquals(dedent(text), expect)
+
+
+
 def test_main():
-    suite = unittest.TestSuite()
-    suite.addTest(unittest.makeSuite(WrapTestCase))
-    suite.addTest(unittest.makeSuite(LongWordTestCase))
-    suite.addTest(unittest.makeSuite(IndentTestCases))
-    test_support.run_suite(suite)
+    test_support.run_unittest(WrapTestCase,
+                              LongWordTestCase,
+                              IndentTestCases,
+                              DedentTestCase)
 
 if __name__ == '__main__':
     test_main()

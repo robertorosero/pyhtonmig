@@ -200,6 +200,15 @@ DOCTYPE html PUBLIC '-//W3C//DTD HTML 4.01//EN'
         self.check_events("""<a b='' c="">""", [
             ("starttag", "a", [("b", ""), ("c", "")]),
             ])
+        # URL construction stuff from RFC 1808:
+        safe = "$-_.+"
+        extra = "!*'(),"
+        reserved = ";/?:@&="
+        url = "http://example.com:8080/path/to/file?%s%s%s" % (
+            safe, extra, reserved)
+        self.check_events("""<e a=%s>""" % url, [
+            ("starttag", "e", [("a", url)]),
+            ])
         # Regression test for SF patch #669683.
         self.check_events("<e a=rgb(1,2,3)>", [
             ("starttag", "e", [("a", "rgb(1,2,3)")]),
@@ -297,6 +306,19 @@ DOCTYPE html PUBLIC '-//W3C//DTD HTML 4.01//EN'
         self.check_events(["<a b=", "'>'>"], output)
         self.check_events(["<a b='>", "'>"], output)
         self.check_events(["<a b='>'", ">"], output)
+
+        output = [("comment", "abc")]
+        self._run_check(["", "<!--abc-->"], output)
+        self._run_check(["<", "!--abc-->"], output)
+        self._run_check(["<!", "--abc-->"], output)
+        self._run_check(["<!-", "-abc-->"], output)
+        self._run_check(["<!--", "abc-->"], output)
+        self._run_check(["<!--a", "bc-->"], output)
+        self._run_check(["<!--ab", "c-->"], output)
+        self._run_check(["<!--abc", "-->"], output)
+        self._run_check(["<!--abc-", "->"], output)
+        self._run_check(["<!--abc--", ">"], output)
+        self._run_check(["<!--abc-->", ""], output)
 
     def _test_starttag_junk_chars(self):
         self.check_parse_error("<")

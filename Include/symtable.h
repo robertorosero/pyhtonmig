@@ -18,7 +18,6 @@ struct symtable {
 	PyObject *st_global;     /* borrowed ref to MODULE in st_symbols */
 	int st_nblocks;          /* number of blocks */
 	char *st_private;        /* name of current class or NULL */
-	int st_tmpname;          /* temporary name counter */
 	PyFutureFeatures *st_future; /* module's future features */
 };
 
@@ -89,6 +88,9 @@ PyAPI_FUNC(void) PySymtable_Free(struct symtable *);
 #define OPT_IMPORT_STAR 1
 #define OPT_EXEC 2
 #define OPT_BARE_EXEC 4
+
+#define GENERATOR 1
+#define GENERATOR_EXPRESSION 2
 
 #ifdef __cplusplus
 }

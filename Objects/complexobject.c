@@ -272,13 +272,23 @@ complex_dealloc(PyObject *op)
 static void
 complex_to_buf(char *buf, int bufsz, PyComplexObject *v, int precision)
 {
-	if (v->cval.real == 0.)
-		PyOS_snprintf(buf, bufsz, "%.*gj",
-			      precision, v->cval.imag);
-	else
-		PyOS_snprintf(buf, bufsz, "(%.*g%+.*gj)",
-			      precision, v->cval.real,
-			      precision, v->cval.imag);
+	char format[32];
+	if (v->cval.real == 0.) {
+		PyOS_snprintf(format, 32, "%%.%ig", precision);
+		PyOS_ascii_formatd(buf, bufsz, format, v->cval.imag);
+		strncat(buf, "j", bufsz);
+	} else {
+		char re[64], im[64];
+		char *fmt;
+		PyOS_snprintf(format, 32, "%%.%ig", precision);
+		PyOS_ascii_formatd(re, 64, format, v->cval.real);
+		PyOS_ascii_formatd(im, 64, format, v->cval.imag);
+		if (v->cval.imag < 0.)
+			fmt = "(%s%sj)";
+		else
+			fmt = "(%s+%sj)";
+		PyOS_snprintf(buf, bufsz, fmt, re, im);
+	}
 }
 
 static int
@@ -439,7 +449,7 @@ complex_divmod(PyComplexObject *v, PyComplexObject *w)
 	mod = c_diff(v->cval, c_prod(w->cval, div));
 	d = PyComplex_FromCComplex(div);
 	m = PyComplex_FromCComplex(mod);
-	z = Py_BuildValue("(OO)", d, m);
+	z = PyTuple_Pack(2, d, m);
 	Py_XDECREF(d);
 	Py_XDECREF(m);
 	return z;
@@ -593,7 +603,7 @@ complex_richcompare(PyObject *v, PyObject *w, int op)
 
 	if (op != Py_EQ && op != Py_NE) {
 		PyErr_SetString(PyExc_TypeError,
-			"cannot compare complex numbers using <, <=, >, >=");
+			"no ordering relation is defined for complex numbers");
 		return NULL;
 	}
 
@@ -610,7 +620,7 @@ static PyObject *
 complex_int(PyObject *v)
 {
 	PyErr_SetString(PyExc_TypeError,
-		   "can't convert complex to int; use e.g. int(abs(z))");
+		   "can't convert complex to int; use int(abs(z))");
 	return NULL;
 }
 
@@ -618,7 +628,7 @@ static PyObject *
 complex_long(PyObject *v)
 {
 	PyErr_SetString(PyExc_TypeError,
-		   "can't convert complex to long; use e.g. long(abs(z))");
+		   "can't convert complex to long; use long(abs(z))");
 	return NULL;
 }
 
@@ -626,7 +636,7 @@ static PyObject *
 complex_float(PyObject *v)
 {
 	PyErr_SetString(PyExc_TypeError,
-		   "can't convert complex to float; use e.g. abs(z)");
+		   "can't convert complex to float; use abs(z)");
 	return NULL;
 }
 
@@ -662,7 +672,6 @@ static PyMemberDef complex_members[] = {
 static PyObject *
 complex_subtype_from_string(PyTypeObject *type, PyObject *v)
 {
-	extern double strtod(const char *, char **);
 	const char *s, *start;
 	char *end;
 	double x=0.0, y=0.0, z;
@@ -774,7 +783,7 @@ complex_subtype_from_string(PyTypeObject *type, PyObject *v)
 			}
 			errno = 0;
 			PyFPE_START_PROTECT("strtod", return 0)
-				z = strtod(s, &end) ;
+				z = PyOS_ascii_strtod(s, &end) ;
 			PyFPE_END_PROTECT(z)
 				if (errno != 0) {
 					PyOS_snprintf(buffer, sizeof(buffer),
@@ -831,7 +840,7 @@ complex_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 					 &r, &i))
 		return NULL;
 
-	/* Special-case for single argumet that is already complex */
+	/* Special-case for single argument that is already complex */
 	if (PyComplex_CheckExact(r) && i == NULL &&
 	    type == &PyComplex_Type) {
 		/* Note that we can't know whether it's safe to return
@@ -865,7 +874,7 @@ complex_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	if (f == NULL)
 		PyErr_Clear();
 	else {
-		PyObject *args = Py_BuildValue("()");
+		PyObject *args = PyTuple_New(0);
 		if (args == NULL)
 			return NULL;
 		r = PyEval_CallObject(f, args);
@@ -882,6 +891,9 @@ complex_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	    ((i != NULL) && (nbi == NULL || nbi->nb_float == NULL))) {
 		PyErr_SetString(PyExc_TypeError,
 			   "complex() argument must be a string or a number");
+		if (own_r) {
+			Py_DECREF(r);
+		}
 		return NULL;
 	}
 	if (PyComplex_Check(r)) {

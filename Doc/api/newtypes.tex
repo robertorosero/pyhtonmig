@@ -22,7 +22,7 @@ defining new object types.
   Initialize a newly-allocated object \var{op} with its type and
   initial reference.  Returns the initialized object.  If \var{type}
   indicates that the object participates in the cyclic garbage
-  detector, it it added to the detector's set of observed objects.
+  detector, it is added to the detector's set of observed objects.
   Other fields of the object are not affected.
 \end{cfuncdesc}
 
@@ -148,7 +148,7 @@ Python objects.
   object as an object.  In a normal ``release'' build, it contains
   only the objects reference count and a pointer to the corresponding
   type object.  It corresponds to the fields defined by the
-  expansion of the \code{PyObject_VAR_HEAD} macro.
+  expansion of the \code{PyObject_HEAD} macro.
 \end{ctypedesc}
 
 \begin{ctypedesc}{PyVarObject}
@@ -166,7 +166,7 @@ These macros are used in the definition of \ctype{PyObject} and
   This is a macro which expands to the declarations of the fields of
   the \ctype{PyObject} type; it is used when declaring new types which
   represent objects without a varying length.  The specific fields it
-  expands to depends on the definition of
+  expands to depend on the definition of
   \csimplemacro{Py_TRACE_REFS}.  By default, that macro is not
   defined, and \csimplemacro{PyObject_HEAD} expands to:
   \begin{verbatim}
@@ -306,6 +306,21 @@ may be set for any given method.
   \versionadded{2.3}
 \end{datadesc}
 
+One other constant controls whether a method is loaded in place of
+another definition with the same method name.
+
+\begin{datadesc}{METH_COEXIST}
+  The method will be loaded in place of existing definitions.  Without
+  \var{METH_COEXIST}, the default is to skip repeated definitions.  Since
+  slot wrappers are loaded before the method table, the existence of a
+  \var{sq_contains} slot, for example, would generate a wrapped method
+  named \method{__contains__()} and preclude the loading of a
+  corresponding PyCFunction with the same name.  With the flag defined,
+  the PyCFunction will be loaded in place of the wrapper object and will
+  co-exist with the slot.  This is helpful because calls to PyCFunctions
+  are optimized more than wrapper object calls.
+  \versionadded{2.4}
+\end{datadesc}
 
 \begin{cfuncdesc}{PyObject*}{Py_FindMethod}{PyMethodDef table[],
                                             PyObject *ob, char *name}
@@ -397,7 +412,7 @@ Foo_Type.ob_type = &PyType_Type;
   This should be done before any instances of the type are created.
   \cfunction{PyType_Ready()} checks if \member{ob_type} is \NULL, and
   if so, initializes it: in Python 2.2, it is set to
-  \code{\&PyType_Type}; in Python 2.2.1 and later it will be
+  \code{\&PyType_Type}; in Python 2.2.1 and later it is
   initialized to the \member{ob_type} field of the base class.
   \cfunction{PyType_Ready()} will not change this field if it is
   non-zero.
@@ -498,7 +513,7 @@ Foo_Type.ob_type = &PyType_Type;
 
   The destructor function is called by the \cfunction{Py_DECREF()} and
   \cfunction{Py_XDECREF()} macros when the new reference count is
-  zero.  At this point, the instance is still in existance, but there
+  zero.  At this point, the instance is still in existence, but there
   are no references to it.  The destructor function should free all
   references which the instance owns, free all memory buffers owned by
   the instance (using the freeing function corresponding to the
@@ -704,7 +719,7 @@ PyMappingMethods *tp_as_mapping;
 \end{cmemberdesc}
 
 \begin{cmemberdesc}{PyTypeObject}{PyBufferProcs*}{tp_as_buffer}
-  Pointer to an additional structure contains fields relevant only to
+  Pointer to an additional structure that contains fields relevant only to
   objects which implement the buffer interface.  These fields are
   documented in ``Buffer Object Structures'' (section
   \ref{buffer-structs}).
@@ -854,7 +869,7 @@ PyMappingMethods *tp_as_mapping;
     GC-related fields \member{tp_traverse} and \member{tp_clear} are
     present in the type object; but those fields also exist when
     \constant{Py_TPFLAGS_HAVE_GC} is clear but
-    \constant{Py_TPFLAGS_HAVE_RICHCOMPARE} is set).
+    \constant{Py_TPFLAGS_HAVE_RICHCOMPARE} is set.
   \end{datadesc}
 
   \begin{datadesc}{Py_TPFLAGS_DEFAULT}
@@ -1115,7 +1130,7 @@ typedef struct PyGetSetDef {
 
   If the value of this field is greater than zero, it specifies the
   offset from the start of the instance structure.  If the value is
-  less than zero, it specifies the offset from the *end* of the
+  less than zero, it specifies the offset from the \emph{end} of the
   instance structure.  A negative offset is more expensive to use, and
   should only be used when the instance structure contains a
   variable-length part.  This is used for example to add an instance
@@ -1374,6 +1389,16 @@ inherited by subtypes.
   field.
 \end{cmemberdesc}
 
+Also, note that, in a garbage collected Python, tp_dealloc may be
+called from any Python thread, not just the thread which created the
+object (if the object becomes part of a refcount cycle, that cycle
+might be collected by a garbage collection on any thread).  This is
+not a problem for Python API calls, since the thread on which
+tp_dealloc is called will own the Global Interpreter Lock (GIL).
+However, if the object being destroyed in turn destroys objects from
+some other C or \Cpp{} library, care should be taken to ensure that
+destroying those objects on the thread which called tp_dealloc will
+not violate any assumptions of the library.
 
 \section{Mapping Object Structures \label{mapping-structs}}
 
@@ -1515,7 +1540,7 @@ to be able to test for its presence before using it.}
          \label{supporting-iteration}}
 
 
-\section{Supporting Cyclic Garbarge Collection
+\section{Supporting Cyclic Garbage Collection
          \label{supporting-cycle-detection}}
 
 Python's support for detecting and collecting garbage which involves
@@ -1620,7 +1645,9 @@ type:
   Type of the visitor function passed to the \member{tp_traverse}
   handler.  The function should be called with an object to traverse
   as \var{object} and the third parameter to the \member{tp_traverse}
-  handler as \var{arg}.
+  handler as \var{arg}.  The Python core uses several visitor functions
+  to implement cyclic garbage detection; it's not expected that users will
+  need to write their own visitor functions.
 \end{ctypedesc}
 
 The \member{tp_traverse} handler must have the following type:
@@ -1630,10 +1657,35 @@ The \member{tp_traverse} handler must have the following type:
   Traversal function for a container object.  Implementations must
   call the \var{visit} function for each object directly contained by
   \var{self}, with the parameters to \var{visit} being the contained
-  object and the \var{arg} value passed to the handler.  If
-  \var{visit} returns a non-zero value then an error has occurred and
+  object and the \var{arg} value passed to the handler.  The \var{visit}
+  function must not be called with a \NULL{} object argument.  If
+  \var{visit} returns a non-zero value
   that value should be returned immediately.
 \end{ctypedesc}
+
+To simplify writing \member{tp_traverse} handlers, a
+\cfunction{Py_VISIT()} macro is provided.  In order to use this macro,
+the \member{tp_traverse} implementation must name its arguments
+exactly \var{visit} and \var{arg}:
+
+\begin{cfuncdesc}{void}{Py_VISIT}{PyObject *o}
+  Call the \var{visit} callback, with arguments \var{o} and \var{arg}.
+  If \var{visit} returns a non-zero value, then return it.  Using this
+  macro, \member{tp_traverse} handlers look like:
+
+\begin{verbatim}
+static int
+my_traverse(Noddy *self, visitproc visit, void *arg)
+{
+    Py_VISIT(self->foo);
+    Py_VISIT(self->bar);
+    return 0;
+}
+\end{verbatim}
+
+\versionadded{2.4}
+\end{cfuncdesc}
+
 
 The \member{tp_clear} handler must be of the \ctype{inquiry} type, or
 \NULL{} if the object is immutable.

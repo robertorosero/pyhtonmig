@@ -57,15 +57,15 @@ Options:
               are read and the -i option replaced with the parsed
               params (note - quoting args in this file is NOT supported)
 
--s subsystem: Specify the subsystem (For Windows only.); 
+-s subsystem: Specify the subsystem (For Windows only.);
               'console' (default), 'windows', 'service' or 'com_dll'
-              
+
 -w:           Toggle Windows (NT or 95) behavior.
               (For debugging only -- on a win32 platform, win32 behavior
               is automatic.)
 
 -r prefix=f:  Replace path prefix.
-              Replace prefix with f in the source path references 
+              Replace prefix with f in the source path references
               contained in the resulting binary.
 
 Arguments:
@@ -89,6 +89,7 @@ if it does, the resulting binary is not self-contained.
 
 # Import standard modules
 
+import modulefinder
 import getopt
 import os
 import sys
@@ -97,7 +98,6 @@ import sys
 # Import the freeze-private modules
 
 import checkextensions
-import modulefinder
 import makeconfig
 import makefreeze
 import makemakefile
@@ -228,7 +228,7 @@ def main():
         config_h_dir = exec_prefix
         config_c_in = os.path.join(prefix, 'Modules', 'config.c.in')
         frozenmain_c = os.path.join(prefix, 'Python', 'frozenmain.c')
-        makefile_in = os.path.join(exec_prefix, 'Modules', 'Makefile')
+        makefile_in = os.path.join(exec_prefix, 'Makefile')
         if win:
             frozendllmain_c = os.path.join(exec_prefix, 'Pc\\frozen_dllmain.c')
     else:
@@ -335,7 +335,7 @@ def main():
                 winmakemakefile.get_custom_entry_point(subsystem)
         except ValueError, why:
             usage(why)
-            
+
 
     # Actual work starts here...
 
@@ -343,7 +343,7 @@ def main():
     dir = os.path.dirname(scriptfile)
     path[0] = dir
     mf = modulefinder.ModuleFinder(path, debug, exclude, replace_paths)
-    
+
     if win and subsystem=='service':
         # If a Windows service, then add the "built-in" module.
         mod = mf.add_module("servicemanager")
@@ -411,7 +411,7 @@ def main():
         else:
             # Do the windows thang...
             import checkextensions_win32
-            # Get a list of CExtension instances, each describing a module 
+            # Get a list of CExtension instances, each describing a module
             # (including its source files)
             frozen_extensions = checkextensions_win32.checkextensions(
                 unknown, extensions, prefix)
@@ -461,8 +461,8 @@ def main():
     somevars = {}
     if os.path.exists(makefile_in):
         makevars = parsesetup.getmakevars(makefile_in)
-    for key in makevars.keys():
-        somevars[key] = makevars[key]
+        for key in makevars.keys():
+            somevars[key] = makevars[key]
 
     somevars['CFLAGS'] = ' '.join(cflags) # override
     somevars['CPPFLAGS'] = ' '.join(cppflags) # override

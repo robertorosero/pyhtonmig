@@ -45,12 +45,12 @@ if __name__ == "__main__":
         print "ok: got OptionConflictError for -H"
     else:
         print "not ok: no conflict between -h and -H"
-    
+
     parser.add_option("-f", "--file", dest="file")
-    #print `parser.get_option("-f")`
-    #print `parser.get_option("-F")`
-    #print `parser.get_option("--file")`
-    #print `parser.get_option("--fIlE")`
+    #print repr(parser.get_option("-f"))
+    #print repr(parser.get_option("-F"))
+    #print repr(parser.get_option("--file"))
+    #print repr(parser.get_option("--fIlE"))
     (options, args) = parser.parse_args(["--FiLe", "foo"])
     assert options.file == "foo", options.file
     print "ok: case insensitive long options work"
@@ -58,5 +58,3 @@ if __name__ == "__main__":
     (options, args) = parser.parse_args(["-F", "bar"])
     assert options.file == "bar", options.file
     print "ok: case insensitive short options work"
-    
-    

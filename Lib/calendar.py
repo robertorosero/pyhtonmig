@@ -28,29 +28,39 @@ mdays = [0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
 # fresh on each call, in case the user changes locale between calls.
 
 class _localized_month:
+
+    _months = [datetime.date(2001, i+1, 1).strftime for i in range(12)]
+    _months.insert(0, lambda x: "")
+
     def __init__(self, format):
         self.format = format
 
     def __getitem__(self, i):
-        data = [datetime.date(2001, j, 1).strftime(self.format)
-                     for j in range(1, 13)]
-        data.insert(0, "")
-        return data[i]
+        funcs = self._months[i]
+        if isinstance(i, slice):
+            return [f(self.format) for f in funcs]
+        else:
+            return funcs(self.format)
 
     def __len__(self):
         return 13
 
 class _localized_day:
+
+    # January 1, 2001, was a Monday.
+    _days = [datetime.date(2001, 1, i+1).strftime for i in range(7)]
+
     def __init__(self, format):
         self.format = format
 
     def __getitem__(self, i):
-        # January 1, 2001, was a Monday.
-        data = [datetime.date(2001, 1, j+1).strftime(self.format)
-                     for j in range(7)]
-        return data[i]
+        funcs = self._days[i]
+        if isinstance(i, slice):
+            return [f(self.format) for f in funcs]
+        else:
+            return funcs(self.format)
 
-    def __len__(self_):
+    def __len__(self):
         return 7
 
 # Full and abbreviated names of weekdays
@@ -151,9 +161,9 @@ def month(theyear, themonth, w=0, l=0):
     """Return a month's calendar string (multi-line)."""
     w = max(2, w)
     l = max(1, l)
-    s = ((month_name[themonth] + ' ' + `theyear`).center(
-                 7 * (w + 1) - 1).rstrip() +
-         '\n' * l + weekheader(w).rstrip() + '\n' * l)
+    s = ("%s %r" % (month_name[themonth], theyear)).center(
+                 7 * (w + 1) - 1).rstrip() + \
+         '\n' * l + weekheader(w).rstrip() + '\n' * l
     for aweek in monthcalendar(theyear, themonth):
         s = s + week(aweek, w).rstrip() + '\n' * l
     return s[:-l] + '\n'
@@ -181,7 +191,7 @@ def calendar(year, w=0, l=0, c=_spacing):
     l = max(1, l)
     c = max(2, c)
     colwidth = (w + 1) * 7 - 1
-    s = `year`.center(colwidth * 3 + c * 2).rstrip() + '\n' * l
+    s = repr(year).center(colwidth * 3 + c * 2).rstrip() + '\n' * l
     header = weekheader(w)
     header = format3cstring(header, header, header, colwidth, c).rstrip()
     for q in range(January, January+12, 3):

@@ -75,7 +75,6 @@ import time
 import socket # For gethostbyaddr()
 import mimetools
 import SocketServer
-import cStringIO
 
 # Default error message
 DEFAULT_ERROR_MESSAGE = """\
@@ -98,7 +97,7 @@ class HTTPServer(SocketServer.TCPServer):
     def server_bind(self):
         """Override server_bind to store the server name."""
         SocketServer.TCPServer.server_bind(self)
-        host, port = self.socket.getsockname()
+        host, port = self.socket.getsockname()[:2]
         self.server_name = socket.getfqdn(host)
         self.server_port = port
 
@@ -218,7 +217,7 @@ class BaseHTTPRequestHandler(SocketServer.StreamRequestHandler):
     def parse_request(self):
         """Parse a request (internal).
 
-        The request should be stored in self.raw_request; the results
+        The request should be stored in self.raw_requestline; the results
         are in self.command, self.path, self.request_version and
         self.headers.
 
@@ -239,7 +238,7 @@ class BaseHTTPRequestHandler(SocketServer.StreamRequestHandler):
         if len(words) == 3:
             [command, path, version] = words
             if version[:5] != 'HTTP/':
-                self.send_error(400, "Bad request version (%s)" % `version`)
+                self.send_error(400, "Bad request version (%r)" % version)
                 return False
             try:
                 base_version_number = version.split('/', 1)[1]
@@ -254,7 +253,7 @@ class BaseHTTPRequestHandler(SocketServer.StreamRequestHandler):
                     raise ValueError
                 version_number = int(version_number[0]), int(version_number[1])
             except (ValueError, IndexError):
-                self.send_error(400, "Bad request version (%s)" % `version`)
+                self.send_error(400, "Bad request version (%r)" % version)
                 return False
             if version_number >= (1, 1) and self.protocol_version >= "HTTP/1.1":
                 self.close_connection = 0
@@ -267,26 +266,17 @@ class BaseHTTPRequestHandler(SocketServer.StreamRequestHandler):
             self.close_connection = 1
             if command != 'GET':
                 self.send_error(400,
-                                "Bad HTTP/0.9 request type (%s)" % `command`)
+                                "Bad HTTP/0.9 request type (%r)" % command)
                 return False
         elif not words:
             return False
         else:
-            self.send_error(400, "Bad request syntax (%s)" % `requestline`)
+            self.send_error(400, "Bad request syntax (%r)" % requestline)
             return False
         self.command, self.path, self.request_version = command, path, version
 
-        # Deal with pipelining
-        bytes = ""
-        while 1:
-            line = self.rfile.readline()
-            bytes = bytes + line
-            if line == '\r\n' or line == '\n' or line == '':
-                break
-
         # Examine the headers and look for a Connection directive
-        hfile = cStringIO.StringIO(bytes)
-        self.headers = self.MessageClass(hfile)
+        self.headers = self.MessageClass(self.rfile, 0)
 
         conntype = self.headers.get('Connection', "")
         if conntype.lower() == 'close':
@@ -312,7 +302,7 @@ class BaseHTTPRequestHandler(SocketServer.StreamRequestHandler):
             return
         mname = 'do_' + self.command
         if not hasattr(self, mname):
-            self.send_error(501, "Unsupported method (%s)" % `self.command`)
+            self.send_error(501, "Unsupported method (%r)" % self.command)
             return
         method = getattr(self, mname)
         method()
@@ -475,7 +465,7 @@ class BaseHTTPRequestHandler(SocketServer.StreamRequestHandler):
 
         """
 
-        host, port = self.client_address
+        host, port = self.client_address[:2]
         return socket.getfqdn(host)
 
     # Essentially static class variables

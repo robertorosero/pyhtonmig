@@ -43,6 +43,7 @@ import sys
 import imp
 import tokenize # Python tokenizer
 from token import NAME, DEDENT, NEWLINE
+from operator import itemgetter
 
 __all__ = ["readmodule", "readmodule_ex", "Class", "Function"]
 
@@ -221,7 +222,7 @@ def _readmodule(module, path, inpackage=None):
                         else:
                             super.append(token)
                     inherit = names
-                cur_class = Class(module, class_name, inherit, file, lineno)
+                cur_class = Class(fullmodule, class_name, inherit, file, lineno)
                 if not stack:
                     dict[class_name] = cur_class
                 stack.append((cur_class, thisindent))
@@ -326,8 +327,7 @@ def _main():
     for obj in objs:
         if isinstance(obj, Class):
             print "class", obj.name, obj.super, obj.lineno
-            methods = obj.methods.items()
-            methods.sort(lambda a, b: cmp(a[1], b[1]))
+            methods = sorted(obj.methods.iteritems(), key=itemgetter(1))
             for name, lineno in methods:
                 if name != "__path__":
                     print "  def", name, lineno

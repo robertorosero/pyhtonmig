@@ -90,8 +90,8 @@ def unctrl(c):
     bits = _ctoi(c)
     if bits == 0x7f:
         rep = "^?"
-    elif bits & 0x20:
-        rep = chr((bits & 0x7f) | 0x20)
+    elif isprint(bits & 0x7f):
+        rep = chr(bits & 0x7f)
     else:
         rep = "^" + chr(((bits & 0x7f) | 0x20) + 0x20)
     if bits & 0x80:

@@ -46,7 +46,7 @@ certain stdio libraries in which \cfunction{tell()} discards buffered
 data before discovering that the \cfunction{lseek()} system call
 doesn't work.  For maximum portability, you should set the seekable
 argument to zero to prevent that initial \method{tell()} when passing
-in an unseekable object such as a a file object created from a socket
+in an unseekable object such as a file object created from a socket
 object.
 
 Input lines as read from the file may either be terminated by CR-LF or
@@ -129,7 +129,7 @@ switch dates.  Not enough to worry about for common use.
 
 
 \begin{seealso}
-  \seemodule{email}{Comprehensive email handling package; supercedes
+  \seemodule{email}{Comprehensive email handling package; supersedes
                     the \module{rfc822} module.}
   \seemodule{mailbox}{Classes to read various mailbox formats produced 
                       by end-user mail programs.}
@@ -255,10 +255,10 @@ there is no header matching \var{name}, or it is unparsable, return
 In particular: \code{\var{m}[name]} is like
 \code{\var{m}.getheader(name)} but raises \exception{KeyError} if
 there is no matching header; and \code{len(\var{m})},
-\code{\var{m}.get(\var{name}\optional{\var{, default}})},
+\code{\var{m}.get(\var{name}\optional{, \var{default}})},
 \code{\var{m}.has_key(\var{name})}, \code{\var{m}.keys()},
 \code{\var{m}.values()} \code{\var{m}.items()}, and
-\code{\var{m}.setdefault(\var{name}\optional{\var{, default}})} act as
+\code{\var{m}.setdefault(\var{name}\optional{, \var{default}})} act as
 expected, with the one difference that \method{setdefault()} uses
 an empty string as the default value.  \class{Message} instances
 also support the mapping writable interface \code{\var{m}[name] =

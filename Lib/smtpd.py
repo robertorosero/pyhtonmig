@@ -17,7 +17,7 @@ Options:
 
     --class classname
     -c classname
-        Use `classname' as the concrete SMTP proxy class.  Uses `SMTPProxy' by
+        Use `classname' as the concrete SMTP proxy class.  Uses `PureProxy' by
         default.
 
     --debug
@@ -61,7 +61,7 @@ and if remoteport is not given, then 25 is used.
 #
 # Please note that this script requires Python 2.0
 #
-# Author: Barry Warsaw <barry@digicool.com>
+# Author: Barry Warsaw <barry@python.org>
 #
 # TODO:
 #
@@ -533,8 +533,14 @@ if __name__ == '__main__':
             print >> sys.stderr, \
                   'Cannot setuid "nobody"; try running with -n option.'
             sys.exit(1)
-    import __main__
-    class_ = getattr(__main__, options.classname)
+    classname = options.classname
+    if "." in classname:
+        lastdot = classname.rfind(".")
+        mod = __import__(classname[:lastdot], globals(), locals(), [""])
+        classname = classname[lastdot+1:]
+    else:
+        import __main__ as mod
+    class_ = getattr(mod, classname)
     proxy = class_((options.localhost, options.localport),
                    (options.remotehost, options.remoteport))
     try:

@@ -49,6 +49,25 @@ reset to false with the \method{clear()} method.  The \method{wait()}
 method blocks until the flag is true.
 \end{funcdesc}
 
+\begin{classdesc*}{local}{}
+A class that represents thread-local data.  Thread-local data are data
+whose values are thread specific.  To manage thread-local data, just
+create an instance of \class{local} (or a subclass) and store
+attributes on it:
+
+\begin{verbatim}
+mydata = threading.local()
+mydata.x = 1
+\end{verbatim}
+
+The instance's values will be different for separate threads.
+
+For more details and extensive examples, see the documentation string
+of the \module{_threading_local} module.
+
+\versionadded{2.4}
+\end{classdesc*}
+
 \begin{funcdesc}{Lock}{}
 A factory function that returns a new primitive lock object.  Once
 a thread has acquired it, subsequent attempts to acquire it block,
@@ -89,6 +108,22 @@ subclassed in a limited fashion.
 \begin{classdesc*}{Timer}{}
 A thread that executes a function after a specified interval has passed.
 \end{classdesc*}
+
+\begin{funcdesc}{settrace}{func}
+Set a trace function\index{trace function} for all threads started
+from the \module{threading} module.  The \var{func} will be passed to 
+\function{sys.settrace()} for each thread, before its \method{run()}
+method is called.
+\versionadded{2.3}
+\end{funcdesc}
+
+\begin{funcdesc}{setprofile}{func}
+Set a profile function\index{profile function} for all threads started
+from the \module{threading} module.  The \var{func} will be passed to 
+\function{sys.setprofile()} for each thread, before its \method{run()}
+method is called.
+\versionadded{2.3}
+\end{funcdesc}
 
 Detailed interfaces for the objects are documented below.  
 

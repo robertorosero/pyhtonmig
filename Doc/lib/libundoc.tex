@@ -2,7 +2,7 @@
 
 Here's a quick listing of modules that are currently undocumented, but
 that should be documented.  Feel free to contribute documentation for
-them!  (Send via email to \email{python-docs@python.org}.)
+them!  (Send via email to \email{docs@python.org}.)
 
 The idea and original contents for this chapter were taken
 from a posting by Fredrik Lundh; the specific contents of this chapter
@@ -15,10 +15,7 @@ Frameworks tend to be harder to document, but are well worth the
 effort spent.
 
 \begin{description}
-\item[\module{test}]
---- Regression testing framework.  This is used for the Python
-regression test, but is useful for other Python libraries as well.
-This is a package rather than a single module.
+\item None at this time.
 \end{description}
 
 
@@ -32,19 +29,8 @@ Some of these are very old and/or not very robust; marked with ``hmm.''
 
 \item[\module{ihooks}]
 --- Import hook support (for \refmodule{rexec}; may become obsolete).
-
-\item[\module{platform}]
---- This module tries to retrieve as much platform identifying data as
-possible.  It makes this information available via function APIs.
-If called from the command line, it prints the platform information
-concatenated as single string to \code{sys.stdout}.  The output format
-is useable as part of a filename.
-\versionadded{2.3}
-
-\item[\module{smtpd}]
---- An SMTP daemon implementation which meets the minimum requirements
-for \rfc{821} conformance.
 \end{description}
+
 
 
 \section{Platform specific modules}
@@ -55,11 +41,16 @@ document these.
 
 \begin{description}
 \item[\module{ntpath}]
---- Implementation on \module{os.path} on Win32, Win64, WinCE, and
+--- Implementation of \module{os.path} on Win32, Win64, WinCE, and
 OS/2 platforms.
 
 \item[\module{posixpath}]
---- Implementation on \module{os.path} on \POSIX.
+--- Implementation of \module{os.path} on \POSIX.
+
+\item[\module{bsddb185}]
+--- Backwards compatibility module for systems which still use the Berkeley
+DB 1.85 module.  It is normally only available on certain BSD Unix-based
+systems.  It should never be used directly.
 \end{description}
 
 
@@ -79,10 +70,6 @@ by the \module{ossaudiodev} module.
 \item[\module{toaiff}]
 --- Convert "arbitrary" sound files to AIFF files; should probably
 become a tool or demo.  Requires the external program \program{sox}.
-
-\item[\module{ossaudiodev}]
---- Play audio data via the Open Sound System API.  This is usable on
-Linux, some flavors of BSD, and some commercial \UNIX{} platforms.
 \end{description}
 
 

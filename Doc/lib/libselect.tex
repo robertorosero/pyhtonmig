@@ -23,21 +23,21 @@ corresponding string, as would be printed by the \C{} function
 \end{excdesc}
 
 \begin{funcdesc}{poll}{}
-(Not supported by all operating systems.)  Returns a polling object, 
+(Not supported by all operating systems.)  Returns a polling object,
 which supports registering and unregistering file descriptors, and
-then polling them for I/O events; 
-see section~\ref{poll-objects} below for the methods supported by 
+then polling them for I/O events;
+see section~\ref{poll-objects} below for the methods supported by
 polling objects.
 \end{funcdesc}
 
 \begin{funcdesc}{select}{iwtd, owtd, ewtd\optional{, timeout}}
 This is a straightforward interface to the \UNIX{} \cfunction{select()}
-system call.  The first three arguments are lists of `waitable
+system call.  The first three arguments are sequences of `waitable
 objects': either integers representing file descriptors or
 objects with a parameterless method named \method{fileno()} returning
-such an integer.  The three lists of waitable objects are for input,
-output and `exceptional conditions', respectively.  Empty lists are
-allowed, but acceptance of three empty lists is platform-dependent.
+such an integer.  The three sequences of waitable objects are for input,
+output and `exceptional conditions', respectively.  Empty sequences are
+allowed, but acceptance of three empty sequences is platform-dependent.
 (It is known to work on \UNIX{} but not on Windows.)  The optional
 \var{timeout} argument specifies a time-out as a floating point number
 in seconds.  When the \var{timeout} argument is omitted the function
@@ -49,19 +49,19 @@ subsets of the first three arguments.  When the time-out is reached
 without a file descriptor becoming ready, three empty lists are
 returned.
 
-Amongst the acceptable object types in the lists are Python file
+Among the acceptable object types in the sequences are Python file
 objects (e.g. \code{sys.stdin}, or objects returned by
 \function{open()} or \function{os.popen()}), socket objects
-returned by \function{socket.socket()},%
+returned by \function{socket.socket()}.%
 \withsubitem{(in module socket)}{\ttindex{socket()}}
-\withsubitem{(in module os)}{\ttindex{popen()}}.
+\withsubitem{(in module os)}{\ttindex{popen()}}
 You may also define a \dfn{wrapper} class yourself, as long as it has
 an appropriate \method{fileno()} method (that really returns a file
 descriptor, not just a random integer).
 \note{File objects on Windows are not acceptable, but sockets
 are.\index{WinSock}  On Windows, the underlying \cfunction{select()}
 function is provided by the WinSock library, and does not handle file
-desciptors that don't originate from WinSock.}
+descriptors that don't originate from WinSock.}
 \end{funcdesc}
 
 \subsection{Polling Objects
@@ -102,8 +102,7 @@ used will check for all 3 types of events.
 
 Registering a file descriptor that's already registered is not an
 error, and has the same effect as registering the descriptor exactly
-once. 
- 
+once.
 \end{methoddesc}
 
 \begin{methoddesc}{unregister}{fd}
@@ -119,17 +118,15 @@ causes a \exception{KeyError} exception to be raised.
 Polls the set of registered file descriptors, and returns a
 possibly-empty list containing \code{(\var{fd}, \var{event})} 2-tuples
 for the descriptors that have events or errors to report.
-\var{fd} is the file descriptor, and \var{event} is a bitmask 
+\var{fd} is the file descriptor, and \var{event} is a bitmask
 with bits set for the reported events for that descriptor
---- \constant{POLLIN} for waiting input, 
+--- \constant{POLLIN} for waiting input,
 \constant{POLLOUT} to indicate that the descriptor can be written to, and
 so forth.
 An empty list indicates that the call timed out and no file
 descriptors had any events to report.
 If \var{timeout} is given, it specifies the length of time in
 milliseconds which the system will wait for events before returning.
-If \var{timeout} is omitted, negative, or \code{None}, the call will
+If \var{timeout} is omitted, negative, or \constant{None}, the call will
 block until there is an event for this poll object.
 \end{methoddesc}
-
-

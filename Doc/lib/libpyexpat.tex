@@ -156,6 +156,27 @@ The child parser is created with the \member{ordered_attributes},
 values of this parser.
 \end{methoddesc}
 
+\begin{methoddesc}[xmlparser]{UseForeignDTD}{\optional{flag}}
+Calling this with a true value for \var{flag} (the default) will cause
+Expat to call the \member{ExternalEntityRefHandler} with
+\constant{None} for all arguments to allow an alternate DTD to be
+loaded.  If the document does not contain a document type declaration,
+the \member{ExternalEntityRefHandler} will still be called, but the
+\member{StartDoctypeDeclHandler} and \member{EndDoctypeDeclHandler}
+will not be called.
+
+Passing a false value for \var{flag} will cancel a previous call that
+passed a true value, but otherwise has no effect.
+
+This method can only be called before the \method{Parse()} or
+\method{ParseFile()} methods are called; calling it after either of
+those have been called causes \exception{ExpatError} to be raised with
+the \member{code} attribute set to
+\constant{errors.XML_ERROR_CANT_CHANGE_FEATURE_ONCE_PARSING}.
+
+\versionadded{2.3}
+\end{methoddesc}
+
 
 \class{xmlparser} objects have the following attributes:
 
@@ -236,6 +257,26 @@ Column number at which an error occurred.
 Line number at which an error occurred.
 \end{memberdesc}
 
+The following attributes contain values relating to the current parse
+location in an \class{xmlparser} object.  During a callback reporting
+a parse event they indicate the location of the first of the sequence
+of characters that generated the event.  When called outside of a
+callback, the position indicated will be just past the last parse
+event (regardless of whether there was an associated callback).
+\versionadded{2.4}
+
+\begin{memberdesc}[xmlparser]{CurrentByteIndex} 
+Current byte index in the parser input.
+\end{memberdesc} 
+
+\begin{memberdesc}[xmlparser]{CurrentColumnNumber} 
+Current column number in the parser input.
+\end{memberdesc}
+
+\begin{memberdesc}[xmlparser]{CurrentLineNumber}
+Current line number in the parser input.
+\end{memberdesc}
+
 Here is the list of handlers that can be set.  To set a handler on an
 \class{xmlparser} object \var{o}, use
 \code{\var{o}.\var{handlername} = \var{func}}.  \var{handlername} must
@@ -269,7 +310,7 @@ This requires Expat version 1.2 or newer.
 \end{methoddesc}
 
 \begin{methoddesc}[xmlparser]{EndDoctypeDeclHandler}{}
-Called when Expat is done parsing the document type delaration.
+Called when Expat is done parsing the document type declaration.
 This requires Expat version 1.2 or newer.
 \end{methoddesc}
 
@@ -338,7 +379,7 @@ entities, \var{value} will be a string giving the declared contents
 of the entity; this will be \code{None} for external entities.  The
 \var{notationName} parameter will be \code{None} for parsed entities,
 and the name of the notation for unparsed entities.
-\var{is_parameter_entity} will be true if the entity is a paremeter
+\var{is_parameter_entity} will be true if the entity is a parameter
 entity or false for general entities (most applications only need to
 be concerned with general entities).
 This is only available starting with version 1.95.0 of the Expat
@@ -580,7 +621,7 @@ entity instead of an internal entity.
 
 \begin{datadescni}{XML_ERROR_BAD_CHAR_REF}
 A character reference referred to a character which is illegal in XML
-(for example, character \code{0}, or `\code{\&\#0;}'.
+(for example, character \code{0}, or `\code{\&\#0;}').
 \end{datadescni}
 
 \begin{datadescni}{XML_ERROR_BINARY_ENTITY_REF}
@@ -624,7 +665,7 @@ A parameter entity reference was found where it was not allowed.
 \end{datadescni}
 
 \begin{datadescni}{XML_ERROR_PARTIAL_CHAR}
-
+An incomplete character was found in the input.
 \end{datadescni}
 
 \begin{datadescni}{XML_ERROR_RECURSIVE_ENTITY_REF}
@@ -651,4 +692,85 @@ A reference was made to a entity which was not defined.
 
 \begin{datadescni}{XML_ERROR_UNKNOWN_ENCODING}
 The document encoding is not supported by Expat.
+\end{datadescni}
+
+\begin{datadescni}{XML_ERROR_UNCLOSED_CDATA_SECTION}
+A CDATA marked section was not closed.
+\end{datadescni}
+
+\begin{datadescni}{XML_ERROR_EXTERNAL_ENTITY_HANDLING}
+\end{datadescni}
+
+\begin{datadescni}{XML_ERROR_NOT_STANDALONE}
+The parser determined that the document was not ``standalone'' though
+it declared itself to be in the XML declaration, and the
+\member{NotStandaloneHandler} was set and returned \code{0}.
+\end{datadescni}
+
+\begin{datadescni}{XML_ERROR_UNEXPECTED_STATE}
+\end{datadescni}
+
+\begin{datadescni}{XML_ERROR_ENTITY_DECLARED_IN_PE}
+\end{datadescni}
+
+\begin{datadescni}{XML_ERROR_FEATURE_REQUIRES_XML_DTD}
+An operation was requested that requires DTD support to be compiled
+in, but Expat was configured without DTD support.  This should never
+be reported by a standard build of the \module{xml.parsers.expat}
+module.
+\end{datadescni}
+
+\begin{datadescni}{XML_ERROR_CANT_CHANGE_FEATURE_ONCE_PARSING}
+A behavioral change was requested after parsing started that can only
+be changed before parsing has started.  This is (currently) only
+raised by \method{UseForeignDTD()}.
+\end{datadescni}
+
+\begin{datadescni}{XML_ERROR_UNBOUND_PREFIX}
+An undeclared prefix was found when namespace processing was enabled.
+\end{datadescni}
+
+\begin{datadescni}{XML_ERROR_UNDECLARING_PREFIX}
+The document attempted to remove the namespace declaration associated
+with a prefix.
+\end{datadescni}
+
+\begin{datadescni}{XML_ERROR_INCOMPLETE_PE}
+A parameter entity contained incomplete markup.
+\end{datadescni}
+
+\begin{datadescni}{XML_ERROR_XML_DECL}
+The document contained no document element at all.
+\end{datadescni}
+
+\begin{datadescni}{XML_ERROR_TEXT_DECL}
+There was an error parsing a text declaration in an external entity.
+\end{datadescni}
+
+\begin{datadescni}{XML_ERROR_PUBLICID}
+Characters were found in the public id that are not allowed.
+\end{datadescni}
+
+\begin{datadescni}{XML_ERROR_SUSPENDED}
+The requested operation was made on a suspended parser, but isn't
+allowed.  This includes attempts to provide additional input or to
+stop the parser.
+\end{datadescni}
+
+\begin{datadescni}{XML_ERROR_NOT_SUSPENDED}
+An attempt to resume the parser was made when the parser had not been
+suspended.
+\end{datadescni}
+
+\begin{datadescni}{XML_ERROR_ABORTED}
+This should not be reported to Python applications.
+\end{datadescni}
+
+\begin{datadescni}{XML_ERROR_FINISHED}
+The requested operation was made on a parser which was finished
+parsing input, but isn't allowed.  This includes attempts to provide
+additional input or to stop the parser.
+\end{datadescni}
+
+\begin{datadescni}{XML_ERROR_SUSPEND_PE}
 \end{datadescni}

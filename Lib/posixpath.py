@@ -19,7 +19,7 @@ __all__ = ["normcase","isabs","join","splitdrive","split","splitext",
            "walk","expanduser","expandvars","normpath","abspath",
            "samefile","sameopenfile","samestat",
            "curdir","pardir","sep","pathsep","defpath","altsep","extsep",
-           "realpath","supports_unicode_filenames"]
+           "devnull","realpath","supports_unicode_filenames"]
 
 # strings representing various path-related bits and pieces
 curdir = '.'
@@ -29,6 +29,7 @@ sep = '/'
 pathsep = ':'
 defpath = ':/bin:/usr/bin'
 altsep = None
+devnull = '/dev/null'
 
 # Normalize the case of a pathname.  Trivial in Posix, string.lower on Mac.
 # On MS-DOS this may also turn slashes into backslashes; however, other
@@ -45,7 +46,7 @@ def normcase(s):
 
 def isabs(s):
     """Test whether a path is absolute"""
-    return s[:1] == '/'
+    return s.startswith('/')
 
 
 # Join pathnames.
@@ -56,12 +57,12 @@ def join(a, *p):
     """Join two or more pathname components, inserting '/' as needed"""
     path = a
     for b in p:
-        if b[:1] == '/':
+        if b.startswith('/'):
             path = b
-        elif path == '' or path[-1:] == '/':
-            path = path + b
+        elif path == '' or path.endswith('/'):
+            path +=  b
         else:
-            path = path + '/' + b
+            path += '/' + b
     return path
 
 
@@ -76,8 +77,7 @@ def split(p):
     i = p.rfind('/') + 1
     head, tail = p[:i], p[i:]
     if head and head != '/'*len(head):
-        while head[-1] == '/':
-            head = head[:-1]
+        head = head.rstrip('/')
     return head, tail
 
 
@@ -124,15 +124,13 @@ def dirname(p):
 def commonprefix(m):
     "Given a list of pathnames, returns the longest common leading component"
     if not m: return ''
-    prefix = m[0]
-    for item in m:
-        for i in range(len(prefix)):
-            if prefix[:i+1] != item[:i+1]:
-                prefix = prefix[:i]
-                if i == 0: return ''
-                break
-    return prefix
-
+    s1 = min(m)
+    s2 = max(m)
+    n = min(len(s1), len(s2))
+    for i in xrange(n):
+        if s1[i] != s2[i]:
+            return s1[:i]
+    return s1[:n]
 
 # Get size, mtime, atime of files.
 
@@ -149,7 +147,7 @@ def getatime(filename):
     return os.stat(filename).st_atime
 
 def getctime(filename):
-    """Return the creation time of a file, reported by os.stat()."""
+    """Return the metadata change time of a file, reported by os.stat()."""
     return os.stat(filename).st_ctime
 
 # Is a path a symbolic link?
@@ -171,6 +169,17 @@ def exists(path):
     """Test whether a path exists.  Returns False for broken symbolic links"""
     try:
         st = os.stat(path)
+    except os.error:
+        return False
+    return True
+
+
+# Being true for dangling symbolic links is also useful.
+
+def lexists(path):
+    """Test whether a path exists.  Returns True for broken symbolic links"""
+    try:
+        st = os.lstat(path)
     except os.error:
         return False
     return True
@@ -301,15 +310,15 @@ def walk(top, func, arg):
 def expanduser(path):
     """Expand ~ and ~user constructions.  If user or $HOME is unknown,
     do nothing."""
-    if path[:1] != '~':
+    if not path.startswith('~'):
         return path
-    i, n = 1, len(path)
-    while i < n and path[i] != '/':
-        i = i + 1
+    i = path.find('/', 1)
+    if i < 0:
+        i = len(path)
     if i == 1:
-        if not 'HOME' in os.environ:
+        if 'HOME' not in os.environ:
             import pwd
-            userhome = pwd.getpwuid(os.getuid())[5]
+            userhome = pwd.getpwuid(os.getuid()).pw_dir
         else:
             userhome = os.environ['HOME']
     else:
@@ -318,8 +327,9 @@ def expanduser(path):
             pwent = pwd.getpwnam(path[1:i])
         except KeyError:
             return path
-        userhome = pwent[5]
-    if userhome[-1:] == '/': i = i + 1
+        userhome = pwent.pw_dir
+    if userhome.endswith('/'):
+        i += 1
     return userhome + path[i:]
 
 
@@ -345,13 +355,13 @@ def expandvars(path):
             break
         i, j = m.span(0)
         name = m.group(1)
-        if name[:1] == '{' and name[-1:] == '}':
+        if name.startswith('{') and name.endswith('}'):
             name = name[1:-1]
         if name in os.environ:
             tail = path[j:]
             path = path[:i] + os.environ[name]
             i = len(path)
-            path = path + tail
+            path += tail
         else:
             i = j
     return path
@@ -401,18 +411,44 @@ def abspath(path):
 def realpath(filename):
     """Return the canonical path of the specified filename, eliminating any
 symbolic links encountered in the path."""
-    filename = abspath(filename)
+    if isabs(filename):
+        bits = ['/'] + filename.split('/')[1:]
+    else:
+        bits = filename.split('/')
 
-    bits = ['/'] + filename.split('/')[1:]
     for i in range(2, len(bits)+1):
         component = join(*bits[0:i])
+        # Resolve symbolic links.
         if islink(component):
-            resolved = os.readlink(component)
-            (dir, file) = split(component)
-            resolved = normpath(join(dir, resolved))
-            newpath = join(*([resolved] + bits[i:]))
-            return realpath(newpath)
+            resolved = _resolve_link(component)
+            if resolved is None:
+                # Infinite loop -- return original component + rest of the path
+                return abspath(join(*([component] + bits[i:])))
+            else:
+                newpath = join(*([resolved] + bits[i:]))
+                return realpath(newpath)
 
-    return filename
+    return abspath(filename)
+
+
+def _resolve_link(path):
+    """Internal helper function.  Takes a path and follows symlinks
+    until we either arrive at something that isn't a symlink, or
+    encounter a path we've seen before (meaning that there's a loop).
+    """
+    paths_seen = []
+    while islink(path):
+        if path in paths_seen:
+            # Already seen this path, so we must have a symlink loop
+            return None
+        paths_seen.append(path)
+        # Resolve where the link points to
+        resolved = os.readlink(path)
+        if not isabs(resolved):
+            dir = dirname(path)
+            path = normpath(join(dir, resolved))
+        else:
+            path = normpath(resolved)
+    return path
 
 supports_unicode_filenames = False

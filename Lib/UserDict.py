@@ -4,8 +4,6 @@ class UserDict:
     def __init__(self, dict=None, **kwargs):
         self.data = {}
         if dict is not None:
-            if not hasattr(dict,'keys'):
-                dict = type({})(dict)   # make mapping from a sequence
             self.update(dict)
         if len(kwargs):
             self.update(kwargs)
@@ -22,7 +20,7 @@ class UserDict:
     def clear(self): self.data.clear()
     def copy(self):
         if self.__class__ is UserDict:
-            return UserDict(self.data)
+            return UserDict(self.data.copy())
         import copy
         data = self.data
         try:
@@ -39,14 +37,18 @@ class UserDict:
     def itervalues(self): return self.data.itervalues()
     def values(self): return self.data.values()
     def has_key(self, key): return self.data.has_key(key)
-    def update(self, dict):
-        if isinstance(dict, UserDict):
+    def update(self, dict=None, **kwargs):
+        if dict is None:
+            pass
+        elif isinstance(dict, UserDict):
             self.data.update(dict.data)
-        elif isinstance(dict, type(self.data)):
+        elif isinstance(dict, type({})) or not hasattr(dict, 'items'):
             self.data.update(dict)
         else:
             for k, v in dict.items():
                 self[k] = v
+        if len(kwargs):
+            self.data.update(kwargs)
     def get(self, key, failobj=None):
         if not self.has_key(key):
             return failobj
@@ -111,7 +113,7 @@ class DictMixin:
     def clear(self):
         for key in self.keys():
             del self[key]
-    def setdefault(self, key, default):
+    def setdefault(self, key, default=None):
         try:
             return self[key]
         except KeyError:
@@ -136,17 +138,21 @@ class DictMixin:
             raise KeyError, 'container is empty'
         del self[k]
         return (k, v)
-    def update(self, other):
+    def update(self, other=None, **kwargs):
         # Make progressively weaker assumptions about "other"
-        if hasattr(other, 'iteritems'):  # iteritems saves memory and lookups
+        if other is None:
+            pass
+        elif hasattr(other, 'iteritems'):  # iteritems saves memory and lookups
             for k, v in other.iteritems():
                 self[k] = v
-        elif hasattr(other, '__iter__'): # iter saves memory
-            for k in other:
-                self[k] = other[k]
-        else:
+        elif hasattr(other, 'keys'):
             for k in other.keys():
                 self[k] = other[k]
+        else:
+            for k, v in other:
+                self[k] = v
+        if kwargs:
+            self.update(kwargs)
     def get(self, key, default=None):
         try:
             return self[key]
@@ -155,6 +161,8 @@ class DictMixin:
     def __repr__(self):
         return repr(dict(self.iteritems()))
     def __cmp__(self, other):
+        if other is None:
+            return 1
         if isinstance(other, DictMixin):
             other = dict(other.iteritems())
         return cmp(dict(self.iteritems()), other)

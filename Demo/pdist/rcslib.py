@@ -83,7 +83,7 @@ class RCS:
             if line[0] == '\t':
                 # XXX could be a lock or symbolic name
                 # Anything else?
-                continue 
+                continue
             i = string.find(line, ':')
             if i > 0:
                 key, value = line[:i], string.strip(line[i+1:])
@@ -232,7 +232,7 @@ class RCS:
         """
         name, rev = self._unmangle(name_rev)
         if not self.isvalid(name):
-            raise os.error, 'not an rcs file %s' % `name`
+            raise os.error, 'not an rcs file %r' % (name,)
         return name, rev
 
     # --- Internal methods ---
@@ -252,7 +252,7 @@ class RCS:
         namev = self.rcsname(name)
         if rev:
             cmd = cmd + ' ' + rflag + rev
-        return os.popen("%s %s" % (cmd, `namev`))
+        return os.popen("%s %r" % (cmd, namev))
 
     def _unmangle(self, name_rev):
         """INTERNAL: Normalize NAME_REV argument to (NAME, REV) tuple.
@@ -287,7 +287,7 @@ class RCS:
         if reason&0x80:
             code = code + '(coredump)'
         return code, signal
- 
+
     def _system(self, cmd):
         """INTERNAL: run COMMAND in a subshell.
 
@@ -311,7 +311,7 @@ class RCS:
 
         If a second PATTERN argument is given, only files matching it
         are kept.  No check for valid filenames is made.
-        
+
         """
         if pat:
             def keep(name, pat = pat):

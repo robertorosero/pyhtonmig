@@ -21,17 +21,6 @@
 #include <windows.h>
 #endif /* _MSC_VER */
 
-#ifdef macintosh
-#ifdef USE_GUSI
-#define HAVE_FTRUNCATE
-#endif
-#endif
-
-#ifdef __MWERKS__
-/* Mwerks fopen() doesn't always set errno */
-#define NO_FOPEN_ERRNO
-#endif
-
 #if defined(PYOS_OS2) && defined(PYCC_GCC)
 #include <io.h>
 #endif
@@ -52,13 +41,11 @@
 #define FUNLOCKFILE(f)
 #endif
 
-#ifdef WITH_UNIVERSAL_NEWLINES
 /* Bits in f_newlinetypes */
 #define NEWLINE_UNKNOWN	0	/* No newline seen, yet */
 #define NEWLINE_CR 1		/* \r newline seen */
 #define NEWLINE_LF 2		/* \n newline seen */
 #define NEWLINE_CRLF 4		/* \r\n newline seen */
-#endif
 
 FILE *
 PyFile_AsFile(PyObject *f)
@@ -96,9 +83,10 @@ dircheck(PyFileObject* f)
 #else
 		char *msg = "Is a directory";
 #endif
-		PyObject *exc = PyObject_CallFunction(PyExc_IOError, "(is)", 
+		PyObject *exc = PyObject_CallFunction(PyExc_IOError, "(is)",
 						      EISDIR, msg);
 		PyErr_SetObject(PyExc_IOError, exc);
+		Py_XDECREF(exc);
 		return NULL;
 	}
 #endif
@@ -107,8 +95,8 @@ dircheck(PyFileObject* f)
 
 
 static PyObject *
-fill_file_fields(PyFileObject *f, FILE *fp, char *name, char *mode,
-		 int (*close)(FILE *), PyObject *wname)
+fill_file_fields(PyFileObject *f, FILE *fp, PyObject *name, char *mode,
+		 int (*close)(FILE *))
 {
 	assert(f != NULL);
 	assert(PyFile_Check(f));
@@ -116,23 +104,22 @@ fill_file_fields(PyFileObject *f, FILE *fp, char *name, char *mode,
 
 	Py_DECREF(f->f_name);
 	Py_DECREF(f->f_mode);
-#ifdef Py_USING_UNICODE
-	if (wname)
-		f->f_name = PyUnicode_FromObject(wname);
-	else
-#endif
-		f->f_name = PyString_FromString(name);
+	Py_DECREF(f->f_encoding);
+
+        Py_INCREF (name);
+        f->f_name = name;
+
 	f->f_mode = PyString_FromString(mode);
 
 	f->f_close = close;
 	f->f_softspace = 0;
 	f->f_binary = strchr(mode,'b') != NULL;
 	f->f_buf = NULL;
-#ifdef WITH_UNIVERSAL_NEWLINES
 	f->f_univ_newline = (strchr(mode, 'U') != NULL);
 	f->f_newlinetypes = NEWLINE_UNKNOWN;
 	f->f_skipnextlf = 0;
-#endif
+	Py_INCREF(Py_None);
+	f->f_encoding = Py_None;
 
 	if (f->f_name == NULL || f->f_mode == NULL)
 		return NULL;
@@ -164,59 +151,31 @@ open_the_file(PyFileObject *f, char *name, char *mode)
 		return NULL;
 	}
 	errno = 0;
-#ifdef HAVE_FOPENRF
-	if (*mode == '*') {
-		FILE *fopenRF();
-		f->f_fp = fopenRF(name, mode+1);
-	}
-	else
-#endif
-	{
-#ifdef WITH_UNIVERSAL_NEWLINES
-		if (strcmp(mode, "U") == 0 || strcmp(mode, "rU") == 0)
-			mode = "rb";
-#else
-		/* Compatibility: specifying U in a Python without universal
-		** newlines is allowed, and the file is opened as a normal text
-		** file.
-		*/
-		if (strcmp(mode, "U") == 0 || strcmp(mode, "rU") == 0)
-			mode = "r";
-#endif
+
+	if (strcmp(mode, "U") == 0 || strcmp(mode, "rU") == 0)
+		mode = "rb";
 #ifdef MS_WINDOWS
-		if (PyUnicode_Check(f->f_name)) {
-			PyObject *wmode; 
-			wmode = PyUnicode_DecodeASCII(mode, strlen(mode), NULL); 
-			if (f->f_name && wmode) {
-				Py_BEGIN_ALLOW_THREADS
-				/* PyUnicode_AS_UNICODE OK without thread
-				   lock as it is a simple dereference. */
-				f->f_fp = _wfopen(PyUnicode_AS_UNICODE(f->f_name),
-						  PyUnicode_AS_UNICODE(wmode));
-				Py_END_ALLOW_THREADS
-			}
-			Py_XDECREF(wmode);
-		}
-#endif
-		if (NULL == f->f_fp && NULL != name) {
+	if (PyUnicode_Check(f->f_name)) {
+		PyObject *wmode;
+		wmode = PyUnicode_DecodeASCII(mode, strlen(mode), NULL);
+		if (f->f_name && wmode) {
 			Py_BEGIN_ALLOW_THREADS
-			f->f_fp = fopen(name, mode);
+			/* PyUnicode_AS_UNICODE OK without thread
+			   lock as it is a simple dereference. */
+			f->f_fp = _wfopen(PyUnicode_AS_UNICODE(f->f_name),
+					  PyUnicode_AS_UNICODE(wmode));
 			Py_END_ALLOW_THREADS
 		}
+		Py_XDECREF(wmode);
 	}
-	if (f->f_fp == NULL) {
-#ifdef NO_FOPEN_ERRNO
-		/* Metroworks only, wich does not always sets errno */
-		if (errno == 0) {
-			PyObject *v;
-			v = Py_BuildValue("(is)", 0, "Cannot open file");
-			if (v != NULL) {
-				PyErr_SetObject(PyExc_IOError, v);
-				Py_DECREF(v);
-			}
-			return NULL;
-		}
 #endif
+	if (NULL == f->f_fp && NULL != name) {
+		Py_BEGIN_ALLOW_THREADS
+		f->f_fp = fopen(name, mode);
+		Py_END_ALLOW_THREADS
+	}
+
+	if (f->f_fp == NULL) {
 #ifdef _MSC_VER
 		/* MSVC 6 (Microsoft) leaves errno at 0 for bad mode strings,
 		 * across all Windows flavors.  When it sets EINVAL varies
@@ -234,11 +193,7 @@ open_the_file(PyFileObject *f, char *name, char *mode)
 			PyErr_Format(PyExc_IOError, "invalid mode: %s",
 				     mode);
 		else
-#ifdef MS_WINDOWS
 			PyErr_SetFromErrnoWithFilenameObject(PyExc_IOError, f->f_name);
-#else
-			PyErr_SetFromErrnoWithFilename(PyExc_IOError, name);
-#endif /* MS_WINDOWS */
 		f = NULL;
 	}
 	if (f != NULL)
@@ -252,10 +207,12 @@ PyFile_FromFile(FILE *fp, char *name, char *mode, int (*close)(FILE *))
 	PyFileObject *f = (PyFileObject *)PyFile_Type.tp_new(&PyFile_Type,
 							     NULL, NULL);
 	if (f != NULL) {
-		if (fill_file_fields(f, fp, name, mode, close, NULL) == NULL) {
+                PyObject *o_name = PyString_FromString(name);
+		if (fill_file_fields(f, fp, o_name, mode, close) == NULL) {
 			Py_DECREF(f);
 			f = NULL;
 		}
+                Py_DECREF(o_name);
 	}
 	return (PyObject *) f;
 }
@@ -279,27 +236,54 @@ PyFile_FromString(char *name, char *mode)
 void
 PyFile_SetBufSize(PyObject *f, int bufsize)
 {
+	PyFileObject *file = (PyFileObject *)f;
 	if (bufsize >= 0) {
-#ifdef HAVE_SETVBUF
 		int type;
 		switch (bufsize) {
 		case 0:
 			type = _IONBF;
 			break;
+#ifdef HAVE_SETVBUF
 		case 1:
 			type = _IOLBF;
 			bufsize = BUFSIZ;
 			break;
+#endif
 		default:
 			type = _IOFBF;
+#ifndef HAVE_SETVBUF
+			bufsize = BUFSIZ;
+#endif
+			break;
 		}
-		setvbuf(((PyFileObject *)f)->f_fp, (char *)NULL,
-			type, bufsize);
+		fflush(file->f_fp);
+		if (type == _IONBF) {
+			PyMem_Free(file->f_setbuf);
+			file->f_setbuf = NULL;
+		} else {
+			file->f_setbuf = PyMem_Realloc(file->f_setbuf, bufsize);
+		}
+#ifdef HAVE_SETVBUF
+		setvbuf(file->f_fp, file->f_setbuf, type, bufsize);
 #else /* !HAVE_SETVBUF */
-		if (bufsize <= 1)
-			setbuf(((PyFileObject *)f)->f_fp, (char *)NULL);
+		setbuf(file->f_fp, file->f_setbuf);
 #endif /* !HAVE_SETVBUF */
 	}
+}
+
+/* Set the encoding used to output Unicode strings.
+   Returh 1 on success, 0 on failure. */
+
+int
+PyFile_SetEncoding(PyObject *f, const char *enc)
+{
+	PyFileObject *file = (PyFileObject*)f;
+	PyObject *str = PyString_FromString(enc);
+	if (!str)
+		return 0;
+	Py_DECREF(file->f_encoding);
+	file->f_encoding = str;
+	return 1;
 }
 
 static PyObject *
@@ -316,13 +300,24 @@ static void drop_readahead(PyFileObject *);
 static void
 file_dealloc(PyFileObject *f)
 {
+	int sts = 0;
+	if (f->weakreflist != NULL)
+		PyObject_ClearWeakRefs((PyObject *) f);
 	if (f->f_fp != NULL && f->f_close != NULL) {
 		Py_BEGIN_ALLOW_THREADS
-		(*f->f_close)(f->f_fp);
+		sts = (*f->f_close)(f->f_fp);
 		Py_END_ALLOW_THREADS
+		if (sts == EOF) 
+#ifdef HAVE_STRERROR
+			PySys_WriteStderr("close failed: [Errno %d] %s\n", errno, strerror(errno)); 
+#else
+			PySys_WriteStderr("close failed: [Errno %d]\n", errno); 
+#endif
 	}
+	PyMem_Free(f->f_setbuf);
 	Py_XDECREF(f->f_name);
 	Py_XDECREF(f->f_mode);
+	Py_XDECREF(f->f_encoding);
 	drop_readahead(f);
 	f->ob_type->tp_free((PyObject *)f);
 }
@@ -365,6 +360,8 @@ file_close(PyFileObject *f)
 		}
 		f->f_fp = NULL;
 	}
+	PyMem_Free(f->f_setbuf);
+	f->f_setbuf = NULL;
 	if (sts == EOF)
 		return PyErr_SetFromErrno(PyExc_IOError);
 	if (sts != 0)
@@ -484,9 +481,7 @@ file_seek(PyFileObject *f, PyObject *args)
 		clearerr(f->f_fp);
 		return NULL;
 	}
-#ifdef WITH_UNIVERSAL_NEWLINES
 	f->f_skipnextlf = 0;
-#endif
 	Py_INCREF(Py_None);
 	return Py_None;
 }
@@ -496,18 +491,33 @@ file_seek(PyFileObject *f, PyObject *args)
 static PyObject *
 file_truncate(PyFileObject *f, PyObject *args)
 {
-	int ret;
 	Py_off_t newsize;
-	PyObject *newsizeobj;
+	PyObject *newsizeobj = NULL;
+	Py_off_t initialpos;
+	int ret;
 
 	if (f->f_fp == NULL)
 		return err_closed();
-	newsizeobj = NULL;
 	if (!PyArg_UnpackTuple(args, "truncate", 0, 1, &newsizeobj))
 		return NULL;
 
+	/* Get current file position.  If the file happens to be open for
+	 * update and the last operation was an input operation, C doesn't
+	 * define what the later fflush() will do, but we promise truncate()
+	 * won't change the current position (and fflush() *does* change it
+	 * then at least on Windows).  The easiest thing is to capture
+	 * current pos now and seek back to it at the end.
+	 */
+	Py_BEGIN_ALLOW_THREADS
+	errno = 0;
+	initialpos = _portable_ftell(f->f_fp);
+	Py_END_ALLOW_THREADS
+	if (initialpos == -1)
+		goto onioerror;
+
 	/* Set newsize to current postion if newsizeobj NULL, else to the
-	   specified value. */
+	 * specified value.
+	 */
 	if (newsizeobj != NULL) {
 #if !defined(HAVE_LARGEFILE_SUPPORT)
 		newsize = PyInt_AsLong(newsizeobj);
@@ -519,17 +529,13 @@ file_truncate(PyFileObject *f, PyObject *args)
 		if (PyErr_Occurred())
 			return NULL;
 	}
-	else {
-		/* Default to current position. */
-		Py_BEGIN_ALLOW_THREADS
-		errno = 0;
-		newsize = _portable_ftell(f->f_fp);
-		Py_END_ALLOW_THREADS
-		if (newsize == -1)
-			goto onioerror;
-	}
+	else /* default to current position */
+		newsize = initialpos;
 
-	/* Flush the file. */
+	/* Flush the stream.  We're mixing stream-level I/O with lower-level
+	 * I/O, and a flush may be necessary to synch both platform views
+	 * of the current file state.
+	 */
 	Py_BEGIN_ALLOW_THREADS
 	errno = 0;
 	ret = fflush(f->f_fp);
@@ -541,65 +547,46 @@ file_truncate(PyFileObject *f, PyObject *args)
 	/* MS _chsize doesn't work if newsize doesn't fit in 32 bits,
 	   so don't even try using it. */
 	{
-		Py_off_t current;	/* current file position */
 		HANDLE hFile;
-		int error;
 
-		/* current <- current file postion. */
-		if (newsizeobj == NULL)
-			current = newsize;
-		else {
-			Py_BEGIN_ALLOW_THREADS
-			errno = 0;
-			current = _portable_ftell(f->f_fp);
-			Py_END_ALLOW_THREADS
-			if (current == -1)
-				goto onioerror;
-		}
-
-		/* Move to newsize. */
-		if (current != newsize) {
-			Py_BEGIN_ALLOW_THREADS
-			errno = 0;
-			error = _portable_fseek(f->f_fp, newsize, SEEK_SET)
-				!= 0;
-			Py_END_ALLOW_THREADS
-			if (error)
-				goto onioerror;
-		}
+		/* Have to move current pos to desired endpoint on Windows. */
+		Py_BEGIN_ALLOW_THREADS
+		errno = 0;
+		ret = _portable_fseek(f->f_fp, newsize, SEEK_SET) != 0;
+		Py_END_ALLOW_THREADS
+		if (ret)
+			goto onioerror;
 
 		/* Truncate.  Note that this may grow the file! */
 		Py_BEGIN_ALLOW_THREADS
 		errno = 0;
 		hFile = (HANDLE)_get_osfhandle(fileno(f->f_fp));
-		error = hFile == (HANDLE)-1;
-		if (!error) {
-			error = SetEndOfFile(hFile) == 0;
-			if (error)
+		ret = hFile == (HANDLE)-1;
+		if (ret == 0) {
+			ret = SetEndOfFile(hFile) == 0;
+			if (ret)
 				errno = EACCES;
 		}
 		Py_END_ALLOW_THREADS
-		if (error)
+		if (ret)
 			goto onioerror;
-
-		/* Restore original file position. */
-		if (current != newsize) {
-			Py_BEGIN_ALLOW_THREADS
-			errno = 0;
-			error = _portable_fseek(f->f_fp, current, SEEK_SET)
-				!= 0;
-			Py_END_ALLOW_THREADS
-			if (error)
-				goto onioerror;
-		}
 	}
 #else
 	Py_BEGIN_ALLOW_THREADS
 	errno = 0;
 	ret = ftruncate(fileno(f->f_fp), newsize);
 	Py_END_ALLOW_THREADS
-	if (ret != 0) goto onioerror;
+	if (ret != 0)
+		goto onioerror;
 #endif /* !MS_WINDOWS */
+
+	/* Restore original file position. */
+	Py_BEGIN_ALLOW_THREADS
+	errno = 0;
+	ret = _portable_fseek(f->f_fp, initialpos, SEEK_SET) != 0;
+	Py_END_ALLOW_THREADS
+	if (ret)
+		goto onioerror;
 
 	Py_INCREF(Py_None);
 	return Py_None;
@@ -627,7 +614,6 @@ file_tell(PyFileObject *f)
 		clearerr(f->f_fp);
 		return NULL;
 	}
-#ifdef WITH_UNIVERSAL_NEWLINES
 	if (f->f_skipnextlf) {
 		int c;
 		c = GETC(f->f_fp);
@@ -636,7 +622,6 @@ file_tell(PyFileObject *f)
 			f->f_skipnextlf = 0;
 		} else if (c != EOF) ungetc(c, f->f_fp);
 	}
-#endif
 #if !defined(HAVE_LARGEFILE_SUPPORT)
 	return PyInt_FromLong(pos);
 #else
@@ -714,12 +699,7 @@ new_buffersize(PyFileObject *f, size_t currentsize)
 		   works.  We can't use the lseek() value either, because we
 		   need to take the amount of buffered data into account.
 		   (Yet another reason why stdio stinks. :-) */
-#ifdef USE_GUSI2
-		pos = lseek(fileno(f->f_fp), 1L, SEEK_CUR);
-		pos = lseek(fileno(f->f_fp), -1L, SEEK_CUR);
-#else
 		pos = lseek(fileno(f->f_fp), 0L, SEEK_CUR);
-#endif
 		if (pos >= 0) {
 			pos = ftell(f->f_fp);
 		}
@@ -833,7 +813,7 @@ file_readinto(PyFileObject *f, PyObject *args)
 	while (ntodo > 0) {
 		Py_BEGIN_ALLOW_THREADS
 		errno = 0;
-		nnow = Py_UniversalNewlineFread(ptr+ndone, ntodo, f->f_fp, 
+		nnow = Py_UniversalNewlineFread(ptr+ndone, ntodo, f->f_fp,
 						(PyObject *)f);
 		Py_END_ALLOW_THREADS
 		if (nnow == 0) {
@@ -1073,18 +1053,12 @@ get_line(PyFileObject *f, int n)
 	size_t used_v_size;	/* # used slots in buffer */
 	size_t increment;       /* amount to increment the buffer */
 	PyObject *v;
-#ifdef WITH_UNIVERSAL_NEWLINES
 	int newlinetypes = f->f_newlinetypes;
 	int skipnextlf = f->f_skipnextlf;
 	int univ_newline = f->f_univ_newline;
-#endif
 
 #if defined(USE_FGETS_IN_GETLINE)
-#ifdef WITH_UNIVERSAL_NEWLINES
 	if (n <= 0 && !univ_newline )
-#else
-	if (n <= 0)
-#endif
 		return getline_via_fgets(fp);
 #endif
 	total_v_size = n > 0 ? n : 100;
@@ -1097,15 +1071,14 @@ get_line(PyFileObject *f, int n)
 	for (;;) {
 		Py_BEGIN_ALLOW_THREADS
 		FLOCKFILE(fp);
-#ifdef WITH_UNIVERSAL_NEWLINES
 		if (univ_newline) {
 			c = 'x'; /* Shut up gcc warning */
 			while ( buf != end && (c = GETC(fp)) != EOF ) {
 				if (skipnextlf ) {
 					skipnextlf = 0;
 					if (c == '\n') {
-						/* Seeing a \n here with 
-						 * skipnextlf true means we 
+						/* Seeing a \n here with
+						 * skipnextlf true means we
 						 * saw a \r before.
 						 */
 						newlinetypes |= NEWLINE_CRLF;
@@ -1126,17 +1099,14 @@ get_line(PyFileObject *f, int n)
 			if ( c == EOF && skipnextlf )
 				newlinetypes |= NEWLINE_CR;
 		} else /* If not universal newlines use the normal loop */
-#endif
 		while ((c = GETC(fp)) != EOF &&
 		       (*buf++ = c) != '\n' &&
 			buf != end)
 			;
 		FUNLOCKFILE(fp);
 		Py_END_ALLOW_THREADS
-#ifdef WITH_UNIVERSAL_NEWLINES
 		f->f_newlinetypes = newlinetypes;
 		f->f_skipnextlf = skipnextlf;
-#endif
 		if (c == '\n')
 			break;
 		if (c == EOF) {
@@ -1202,7 +1172,7 @@ PyFile_GetLine(PyObject *f, int n)
 		if (reader == NULL)
 			return NULL;
 		if (n <= 0)
-			args = Py_BuildValue("()");
+			args = PyTuple_New(0);
 		else
 			args = Py_BuildValue("(i)", n);
 		if (args == NULL) {
@@ -1588,7 +1558,9 @@ PyDoc_STRVAR(seek_doc,
 "0 (offset from start of file, offset should be >= 0); other values are 1\n"
 "(move relative to current position, positive or negative), and 2 (move\n"
 "relative to end of file, usually negative, although many platforms allow\n"
-"seeking beyond the end of a file).\n"
+"seeking beyond the end of a file).  If the file is opened in text mode,\n"
+"only offsets returned by tell() are legal.  Use of other offsets causes\n"
+"undefined behavior."
 "\n"
 "Note that not all file objects are seekable.");
 
@@ -1667,6 +1639,8 @@ static PyMemberDef file_memberlist[] = {
 	 "file mode ('r', 'U', 'w', 'a', possibly with 'b' or '+' added)"},
 	{"name",	T_OBJECT,	OFF(f_name),	RO,
 	 "file name"},
+	{"encoding",	T_OBJECT,	OFF(f_encoding),	RO,
+	 "file encoding"},
 	/* getattr(f, "closed") is implemented without this table */
 	{NULL}	/* Sentinel */
 };
@@ -1676,7 +1650,6 @@ get_closed(PyFileObject *f, void *closure)
 {
 	return PyBool_FromLong((long)(f->f_fp == 0));
 }
-#ifdef WITH_UNIVERSAL_NEWLINES
 static PyObject *
 get_newlines(PyFileObject *f, void *closure)
 {
@@ -1699,20 +1672,17 @@ get_newlines(PyFileObject *f, void *closure)
 	case NEWLINE_CR|NEWLINE_LF|NEWLINE_CRLF:
 		return Py_BuildValue("(sss)", "\r", "\n", "\r\n");
 	default:
-		PyErr_Format(PyExc_SystemError, 
-			     "Unknown newlines value 0x%x\n", 
+		PyErr_Format(PyExc_SystemError,
+			     "Unknown newlines value 0x%x\n",
 			     f->f_newlinetypes);
 		return NULL;
 	}
 }
-#endif
 
 static PyGetSetDef file_getsetlist[] = {
 	{"closed", (getter)get_closed, NULL, "True if the file is closed"},
-#ifdef WITH_UNIVERSAL_NEWLINES
-	{"newlines", (getter)get_newlines, NULL, 
+	{"newlines", (getter)get_newlines, NULL,
 	 "end-of-line convention used in this file"},
-#endif
 	{0},
 };
 
@@ -1725,8 +1695,8 @@ drop_readahead(PyFileObject *f)
 	}
 }
 
-/* Make sure that file has a readahead buffer with at least one byte 
-   (unless at EOF) and no more than bufsize.  Returns negative value on 
+/* Make sure that file has a readahead buffer with at least one byte
+   (unless at EOF) and no more than bufsize.  Returns negative value on
    error */
 static int
 readahead(PyFileObject *f, int bufsize)
@@ -1734,7 +1704,7 @@ readahead(PyFileObject *f, int bufsize)
 	int chunksize;
 
 	if (f->f_buf != NULL) {
-		if( (f->f_bufend - f->f_bufptr) >= 1) 
+		if( (f->f_bufend - f->f_bufptr) >= 1)
 			return 0;
 		else
 			drop_readahead(f);
@@ -1761,8 +1731,8 @@ readahead(PyFileObject *f, int bufsize)
 }
 
 /* Used by file_iternext.  The returned string will start with 'skip'
-   uninitialized bytes followed by the remainder of the line. Don't be 
-   horrified by the recursive call: maximum recursion depth is limited by 
+   uninitialized bytes followed by the remainder of the line. Don't be
+   horrified by the recursive call: maximum recursion depth is limited by
    logarithmic buffer growth to about 50 even when reading a 1gb line. */
 
 static PyStringObject *
@@ -1774,11 +1744,11 @@ readahead_get_line_skip(PyFileObject *f, int skip, int bufsize)
 	int len;
 
 	if (f->f_buf == NULL)
-		if (readahead(f, bufsize) < 0) 
+		if (readahead(f, bufsize) < 0)
 			return NULL;
 
 	len = f->f_bufend - f->f_bufptr;
-	if (len == 0) 
+	if (len == 0)
 		return (PyStringObject *)
 			PyString_FromStringAndSize(NULL, skip);
 	bufptr = memchr(f->f_bufptr, '\n', len);
@@ -1787,7 +1757,7 @@ readahead_get_line_skip(PyFileObject *f, int skip, int bufsize)
 		len = bufptr - f->f_bufptr;
 		s = (PyStringObject *)
 			PyString_FromStringAndSize(NULL, skip+len);
-		if (s == NULL) 
+		if (s == NULL)
 			return NULL;
 		memcpy(PyString_AS_STRING(s)+skip, f->f_bufptr, len);
 		f->f_bufptr = bufptr;
@@ -1851,6 +1821,9 @@ file_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 		((PyFileObject *)self)->f_name = not_yet_string;
 		Py_INCREF(not_yet_string);
 		((PyFileObject *)self)->f_mode = not_yet_string;
+		Py_INCREF(Py_None);
+		((PyFileObject *)self)->f_encoding = Py_None;
+		((PyFileObject *)self)->weakreflist = NULL;
 	}
 	return self;
 }
@@ -1881,8 +1854,8 @@ file_init(PyObject *self, PyObject *args, PyObject *kwds)
 		if (PyArg_ParseTupleAndKeywords(args, kwds, "U|si:file",
 						kwlist, &po, &mode, &bufsize)) {
 			wideargument = 1;
-			if (fill_file_fields(foself, NULL, name, mode,
-					     fclose, po) == NULL)
+			if (fill_file_fields(foself, NULL, po, mode,
+					     fclose) == NULL)
 				goto Error;
 		} else {
 			/* Drop the argument parsing error as narrow
@@ -1893,17 +1866,26 @@ file_init(PyObject *self, PyObject *args, PyObject *kwds)
 #endif
 
 	if (!wideargument) {
+                PyObject *o_name;
+
 		if (!PyArg_ParseTupleAndKeywords(args, kwds, "et|si:file", kwlist,
 						 Py_FileSystemDefaultEncoding,
 						 &name,
 						 &mode, &bufsize))
 			return -1;
-		if (fill_file_fields(foself, NULL, name, mode,
-				     fclose, NULL) == NULL)
+
+                /* We parse again to get the name as a PyObject */
+                if (!PyArg_ParseTupleAndKeywords(args, kwds, "O|si:file", kwlist,
+                    &o_name, &mode, &bufsize))
+                        return -1;
+
+		if (fill_file_fields(foself, NULL, o_name, mode,
+				     fclose) == NULL)
 			goto Error;
 	}
 	if (open_the_file(foself, name, mode) == NULL)
 		goto Error;
+	foself->f_setbuf = NULL;
 	PyFile_SetBufSize(self, bufsize);
 	goto Done;
 
@@ -1927,7 +1909,6 @@ PyDoc_STR(
 "If the buffering argument is given, 0 means unbuffered, 1 means line\n"
 "buffered, and larger numbers specify the buffer size.\n"
 )
-#ifdef WITH_UNIVERSAL_NEWLINES
 PyDoc_STR(
 "Add a 'U' to mode to open the file for input with universal newline\n"
 "support.  Any line ending in the input file will be seen as a '\\n'\n"
@@ -1937,7 +1918,6 @@ PyDoc_STR(
 "\n"
 "'U' cannot be combined with 'w' or '+' mode.\n"
 )
-#endif /* WITH_UNIVERSAL_NEWLINES */
 PyDoc_STR(
 "\n"
 "Note:  open() is an alias for file()."
@@ -1962,14 +1942,15 @@ PyTypeObject PyFile_Type = {
 	0,					/* tp_call */
 	0,					/* tp_str */
 	PyObject_GenericGetAttr,		/* tp_getattro */
-	0,					/* tp_setattro */
+	/* softspace is writable:  we must supply tp_setattro */
+	PyObject_GenericSetAttr,		/* tp_setattro */
 	0,					/* tp_as_buffer */
-	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE, /* tp_flags */
+	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_WEAKREFS, /* tp_flags */
 	file_doc,				/* tp_doc */
 	0,					/* tp_traverse */
 	0,					/* tp_clear */
 	0,					/* tp_richcompare */
-	0,					/* tp_weaklistoffset */
+	offsetof(PyFileObject, weakreflist),	/* tp_weaklistoffset */
 	(getiterfunc)file_getiter,		/* tp_iter */
 	(iternextfunc)file_iternext,		/* tp_iternext */
 	file_methods,				/* tp_methods */
@@ -2033,11 +2014,31 @@ PyFile_WriteObject(PyObject *v, PyObject *f, int flags)
 	}
 	else if (PyFile_Check(f)) {
 		FILE *fp = PyFile_AsFile(f);
+#ifdef Py_USING_UNICODE
+		PyObject *enc = ((PyFileObject*)f)->f_encoding;
+		int result;
+#endif
 		if (fp == NULL) {
 			err_closed();
 			return -1;
 		}
+#ifdef Py_USING_UNICODE
+                if ((flags & Py_PRINT_RAW) &&
+		    PyUnicode_Check(v) && enc != Py_None) {
+			char *cenc = PyString_AS_STRING(enc);
+			value = PyUnicode_AsEncodedString(v, cenc, "strict");
+			if (value == NULL)
+				return -1;
+		} else {
+			value = v;
+			Py_INCREF(value);
+		}
+		result = PyObject_Print(value, fp, flags);
+		Py_DECREF(value);
+		return result;
+#else
 		return PyObject_Print(v, fp, flags);
+#endif
 	}
 	writer = PyObject_GetAttrString(f, "write");
 	if (writer == NULL)
@@ -2055,7 +2056,7 @@ PyFile_WriteObject(PyObject *v, PyObject *f, int flags)
 		Py_DECREF(writer);
 		return -1;
 	}
-	args = Py_BuildValue("(O)", value);
+	args = PyTuple_Pack(1, value);
 	if (args == NULL) {
 		Py_DECREF(value);
 		Py_DECREF(writer);
@@ -2158,7 +2159,6 @@ int PyObject_AsFileDescriptor(PyObject *o)
 	return fd;
 }
 
-#ifdef WITH_UNIVERSAL_NEWLINES
 /* From here on we need access to the real fgets and fread */
 #undef fgets
 #undef fread
@@ -2336,4 +2336,3 @@ Py_UniversalNewlineFread(char *buf, size_t n,
 	f->f_skipnextlf = skipnextlf;
 	return dst - buf;
 }
-#endif

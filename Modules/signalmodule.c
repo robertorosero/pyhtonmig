@@ -99,7 +99,7 @@ signal_default_int_handler(PyObject *self, PyObject *args)
 PyDoc_STRVAR(default_int_handler_doc,
 "default_int_handler(...)\n\
 \n\
-The default handler for SIGINT instated by Python.\n\
+The default handler for SIGINT installed by Python.\n\
 It raises KeyboardInterrupt.");
 
 
@@ -136,9 +136,6 @@ signal_handler(int sig_num)
 		   to the Python handler... */
 		return;
 	}
-#endif
-#ifdef HAVE_SIGINTERRUPT
-	siginterrupt(sig_num, 1);
 #endif
 	PyOS_setsig(sig_num, signal_handler);
 }
@@ -217,9 +214,6 @@ signal_signal(PyObject *self, PyObject *args)
 	}
 	else
 		func = signal_handler;
-#ifdef HAVE_SIGINTERRUPT
-	siginterrupt(sig_num, 1);
-#endif
 	if (PyOS_setsig(sig_num, func) == SIG_ERR) {
 		PyErr_SetFromErrno(PyExc_RuntimeError);
 		return NULL;
@@ -539,6 +533,16 @@ initsignal(void)
 #ifdef SIGXFSZ
 	x = PyInt_FromLong(SIGXFSZ);
 	PyDict_SetItemString(d, "SIGXFSZ", x);
+        Py_XDECREF(x);
+#endif
+#ifdef SIGRTMIN
+        x = PyInt_FromLong(SIGRTMIN);
+        PyDict_SetItemString(d, "SIGRTMIN", x);
+        Py_XDECREF(x);
+#endif
+#ifdef SIGRTMAX
+        x = PyInt_FromLong(SIGRTMAX);
+        PyDict_SetItemString(d, "SIGRTMAX", x);
         Py_XDECREF(x);
 #endif
 #ifdef SIGINFO

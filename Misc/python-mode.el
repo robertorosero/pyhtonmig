@@ -358,10 +358,45 @@ support for features needed by `python-mode'.")
 	(kw2 (mapconcat 'identity
 			'("else:" "except:" "finally:" "try:")
 			"\\|"))
+	(kw3 (mapconcat 'identity
+			'("ArithmeticError" "AssertionError"
+			  "AttributeError" "DeprecationWarning" "EOFError"
+			  "Ellipsis" "EnvironmentError" "Exception" "False"
+			  "FloatingPointError" "FutureWarning" "IOError"
+			  "ImportError" "IndentationError" "IndexError"
+			  "KeyError" "KeyboardInterrupt" "LookupError"
+			  "MemoryError" "NameError" "None" "NotImplemented"
+			  "NotImplementedError" "OSError" "OverflowError"
+			  "OverflowWarning" "PendingDeprecationWarning"
+			  "ReferenceError" "RuntimeError" "RuntimeWarning"
+			  "StandardError" "StopIteration" "SyntaxError"
+			  "SyntaxWarning" "SystemError" "SystemExit"
+			  "TabError" "True" "TypeError" "UnboundLocalError"
+			  "UnicodeDecodeError" "UnicodeEncodeError"
+			  "UnicodeError" "UnicodeTranslateError"
+			  "UserWarning" "ValueError" "Warning"
+			  "ZeroDivisionError" "__debug__"
+			  "__import__" "__name__" "abs" "apply" "basestring"
+			  "bool" "buffer" "callable" "chr" "classmethod"
+			  "cmp" "coerce" "compile" "complex" "copyright"
+			  "delattr" "dict" "dir" "divmod"
+			  "enumerate" "eval" "execfile" "exit" "file"
+			  "filter" "float" "getattr" "globals" "hasattr"
+			  "hash" "hex" "id" "input" "int" "intern"
+			  "isinstance" "issubclass" "iter" "len" "license"
+			  "list" "locals" "long" "map" "max" "min" "object"
+			  "oct" "open" "ord" "pow" "property" "range"
+			  "raw_input" "reduce" "reload" "repr" "round"
+			  "setattr" "slice" "staticmethod" "str" "sum"
+			  "super" "tuple" "type" "unichr" "unicode" "vars"
+			  "xrange" "zip")
+			"\\|"))
 	)
     (list
      ;; keywords
      (cons (concat "\\b\\(" kw1 "\\)\\b[ \n\t(]") 1)
+     ;; builtins when they don't appear as object attributes
+     (cons (concat "\\(\\b\\|[.]\\)\\(" kw3 "\\)\\b[ \n\t(]") 2)
      ;; block introducing keywords with immediately following colons.
      ;; Yes "except" is in both lists.
      (cons (concat "\\b\\(" kw2 "\\)[ \n\t(]") 1)
@@ -483,7 +518,7 @@ prospect as debugging continues.")
   "^> \\(.*\\)(\\([0-9]+\\))\\([?a-zA-Z0-9_]+\\)()"
   "Regular expression pdbtrack uses to find a stack trace entry.")
 
-(defconst py-pdbtrack-input-prompt "\n[(<]?pdb[>)]? "
+(defconst py-pdbtrack-input-prompt "\n[(<]*pdb[>)]+ "
   "Regular expression pdbtrack uses to recognize a pdb prompt.")
 
 (defconst py-pdbtrack-track-range 10000
@@ -565,7 +600,6 @@ prospect as debugging continues.")
   (define-key py-mode-map "\C-c\C-u"  'py-goto-block-up)
   (define-key py-mode-map "\C-c#"     'py-comment-region)
   (define-key py-mode-map "\C-c?"     'py-describe-mode)
-  (define-key py-mode-map [f1]        'py-help-at-point)
   (define-key py-mode-map "\C-c\C-h"  'py-help-at-point)
   (define-key py-mode-map "\e\C-a"    'py-beginning-of-def-or-class)
   (define-key py-mode-map "\e\C-e"    'py-end-of-def-or-class)
@@ -1187,14 +1221,14 @@ It is added to `interpreter-mode-alist' and `py-choose-shell'.
 		  (backward-to-indentation 1))
 		(not (looking-at py-no-outdent-re)))
 	 )))
-      
+
 (defun py-electric-colon (arg)
   "Insert a colon.
 In certain cases the line is dedented appropriately.  If a numeric
 argument ARG is provided, that many colons are inserted
 non-electrically.  Electric behavior is inhibited inside a string or
 comment."
-  (interactive "P")
+  (interactive "*P")
   (self-insert-command (prefix-numeric-value arg))
   ;; are we in a string or comment?
   (if (save-excursion
@@ -1290,8 +1324,8 @@ If the traceback target file path is invalid, we look for the most
 recently visited python-mode buffer which either has the name of the
 current function \(or class) or which defines the function \(or
 class).  This is to provide for remote scripts, eg, Zope's 'Script
-(Python)' - put a _copy_ of the script in a python-mode buffer named
-for the script and pdbtrack will find it.)"
+(Python)' - put a _copy_ of the script in a buffer named for the
+script, and set to python-mode, and pdbtrack will find it.)"
   ;; Instead of trying to piece things together from partial text
   ;; (which can be almost useless depending on Emacs version), we
   ;; monitor to the point where we have the next pdb prompt, and then
@@ -1370,15 +1404,14 @@ problem as best as we can determine."
                              (max (point-min)
                                   (string-match "^\\([^#]\\|#[^#]\\|#$\\)"
                                                 (buffer-substring (point-min)
-                                                                  (point-max)
-                                                                  funcbuffer))
+                                                                  (point-max)))
                                   ))))))
              (list lineno funcbuffer))
 
             ((= (elt filename 0) ?\<)
              (format "(Non-file source: '%s')" filename))
 
-            (t (format "Function/file not found: %s(), %s" funcname filename)))
+            (t (format "Not found: %s(), %s" funcname filename)))
       )
     )
   )
@@ -1392,10 +1425,6 @@ named for funcname or define a function funcname."
   (let ((buffers (buffer-list))
         curbuf
         got)
-    (if (and py-pdbtrack-last-grubbed-buffer
-             (member py-pdbtrack-last-grubbed-buffer buffers))
-        ; Prefer last grubbed buffer by putting it at the front of the list:
-        (setq buffers (cons py-pdbtrack-last-grubbed-buffer buffers)))
     (while (and buffers (not got))
       (setq buf (car buffers)
             buffers (cdr buffers))
@@ -1404,9 +1433,10 @@ named for funcname or define a function funcname."
                (or (string-match funcname (buffer-name buf))
                    (string-match (concat "^\\s-*\\(def\\|class\\)\\s-+"
                                          funcname "\\s-*(")
-                                 (buffer-substring (point-min buf)
-                                                   (point-max buf)
-                                                   buf))))
+                                 (save-excursion
+                                   (set-buffer buf)
+                                   (buffer-substring (point-min)
+                                                     (point-max))))))
           (setq got buf)))
     (setq py-pdbtrack-last-grubbed-buffer got)))
 
@@ -1951,6 +1981,8 @@ number of characters to delete (default is 1)."
     (py-electric-backspace arg)))
 
 ;; required for pending-del and delsel modes
+(put 'py-electric-colon 'delete-selection t) ;delsel
+(put 'py-electric-colon 'pending-delete   t) ;pending-del
 (put 'py-electric-backspace 'delete-selection 'supersede) ;delsel
 (put 'py-electric-backspace 'pending-delete   'supersede) ;pending-del
 (put 'py-electric-delete    'delete-selection 'supersede) ;delsel
@@ -2870,11 +2902,18 @@ A `nomenclature' is a fancy way of saying AWordWithMixedCaseNotUnderscores."
 		   (mapconcat 'identity newcmd " ")))))
 
      (list
-      (read-shell-command "Run pychecker like this: "
-                          (if last
-			      last
-			    default)
-                          'py-pychecker-history))))
+      (if (fboundp 'read-shell-command)
+	  (read-shell-command "Run pychecker like this: "
+			      (if last
+				  last
+				default)
+			      'py-pychecker-history)
+	(read-string "Run pychecker like this: "
+		     (if last
+			 last
+		       default)
+		     'py-pychecker-history))
+	)))
   (save-some-buffers (not py-ask-about-save) nil)
   (compile-internal command "No more errors"))
 
@@ -3718,7 +3757,7 @@ If point is inside a string, narrow to that string and fill.
       (py-fill-comment justify))
      ;; are we inside a string?
      ((nth 3 pps)
-      (py-fill-string (nth 2 pps)))
+      (py-fill-string (nth 8 pps)))
      ;; otherwise use the default
      (t
       (fill-paragraph justify)))))

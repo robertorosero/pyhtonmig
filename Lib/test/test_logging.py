@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Copyright 2001-2002 by Vinay Sajip. All Rights Reserved.
+# Copyright 2001-2004 by Vinay Sajip. All Rights Reserved.
 #
 # Permission to use, copy, modify, and distribute this software and its
 # documentation for any purpose and without fee is hereby granted,
@@ -26,17 +26,12 @@ Copyright (C) 2001-2002 Vinay Sajip. All Rights Reserved.
 
 import select
 import os, sys, string, struct, types, cPickle, cStringIO
-import socket, threading, time, locale
+import socket, threading, time
 import logging, logging.handlers, logging.config
 
-try:
-    locale.setlocale(locale.LC_ALL, '')
-except (ValueError, locale.Error):
-    # this happens on a Solaris box which only supports "C" locale
-    # or a Mac OS X box which supports very little locale stuff at all
-    pass
-
 BANNER = "-- %-10s %-6s ---------------------------------------------------\n"
+
+FINISH_UP = "Finish up, it's closing time. Messages should bear numbers 0 through 24."
 
 #----------------------------------------------------------------------------
 # Log receiver
@@ -68,8 +63,7 @@ class LogRecordStreamHandler(StreamRequestHandler):
                 while len(chunk) < slen:
                     chunk = chunk + self.connection.recv(slen - len(chunk))
                 obj = self.unPickle(chunk)
-                record = logging.LogRecord(None, None, "", 0, "", (), None)
-                record.__dict__.update(obj)
+                record = logging.makeLogRecord(obj)
                 self.handleLogRecord(record)
             except:
                 raise
@@ -79,9 +73,15 @@ class LogRecordStreamHandler(StreamRequestHandler):
 
     def handleLogRecord(self, record):
         logname = "logrecv.tcp." + record.name
+        #If the end-of-messages sentinel is seen, tell the server to terminate
+        if record.msg == FINISH_UP:
+            self.server.abort = 1
         record.msg = record.msg + " (via " + logname + ")"
         logger = logging.getLogger(logname)
         logger.handle(record)
+
+# The server sets socketDataProcessed when it's done.
+socketDataProcessed = threading.Event()
 
 class LogRecordSocketReceiver(ThreadingTCPServer):
     """
@@ -107,6 +107,8 @@ class LogRecordSocketReceiver(ThreadingTCPServer):
             if rd:
                 self.handle_request()
             abort = self.abort
+        #notify the main thread that we're about to exit
+        socketDataProcessed.set()
 
     def process_request(self, request, client_address):
         #import threading
@@ -195,7 +197,7 @@ def test0():
     INF_ERR_UNDEF.info(nextmessage())
     INF_ERR_UNDEF.debug(nextmessage())
 
-    INF.info("Messages should bear numbers 0 through 24.")
+    INF.info(FINISH_UP)
 
 #----------------------------------------------------------------------------
 # Test 1
@@ -398,7 +400,7 @@ def banner(nm, typ):
     sys.stdout.write(sep)
     sys.stdout.flush()
 
-def test_main():
+def test_main_inner():
     rootLogger = logging.getLogger("")
     rootLogger.setLevel(logging.DEBUG)
     hdlr = logging.StreamHandler(sys.stdout)
@@ -409,7 +411,7 @@ def test_main():
     #Set up a handler such that all events are sent via a socket to the log
     #receiver (logrecv).
     #The handler will only be added to the rootLogger for some of the tests
-    hdlr = logging.handlers.SocketHandler('localhost',
+    shdlr = logging.handlers.SocketHandler('localhost',
                                    logging.handlers.DEFAULT_TCP_LOGGING_PORT)
 
     #Configure the logger for logrecv so events do not propagate beyond it.
@@ -435,10 +437,10 @@ def test_main():
     try:
         banner("log_test0", "begin")
 
-        rootLogger.addHandler(hdlr)
+        rootLogger.addHandler(shdlr)
         test0()
-        hdlr.close()
-        rootLogger.removeHandler(hdlr)
+        shdlr.close()
+        rootLogger.removeHandler(shdlr)
 
         banner("log_test0", "end")
 
@@ -455,15 +457,41 @@ def test_main():
         banner("log_test3", "end")
 
     finally:
-        #shut down server
-        tcpserver.abort = 1
+        #wait for TCP receiver to terminate
+        socketDataProcessed.wait()
         for thread in threads:
             thread.join()
         banner("logrecv output", "begin")
         sys.stdout.write(sockOut.getvalue())
         sockOut.close()
+        sockLogger.removeHandler(sockhdlr)
+        sockhdlr.close()
         banner("logrecv output", "end")
         sys.stdout.flush()
+        try:
+            hdlr.close()
+        except:
+            pass
+        rootLogger.removeHandler(hdlr)
+
+def test_main():
+    import locale
+    # Set the locale to the platform-dependent default.  I have no idea
+    # why the test does this, but in any case we save the current locale
+    # first so we can restore it at the end.
+    try:
+        original_locale = locale.setlocale(locale.LC_ALL)
+        locale.setlocale(locale.LC_ALL, '')
+    except (ValueError, locale.Error):
+        # this happens on a Solaris box which only supports "C" locale
+        # or a Mac OS X box which supports very little locale stuff at all
+        original_locale = None
+
+    try:
+        test_main_inner()
+    finally:
+        if original_locale is not None:
+            locale.setlocale(locale.LC_ALL, original_locale)
 
 if __name__ == "__main__":
     sys.stdout.write("test_logging\n")

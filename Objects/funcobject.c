@@ -11,6 +11,7 @@ PyFunction_New(PyObject *code, PyObject *globals)
 {
 	PyFunctionObject *op = PyObject_GC_New(PyFunctionObject,
 					    &PyFunction_Type);
+	static PyObject *__name__ = 0;
 	if (op != NULL) {
 		PyObject *doc;
 		PyObject *consts;
@@ -40,7 +41,14 @@ PyFunction_New(PyObject *code, PyObject *globals)
 		/* __module__: If module name is in globals, use it.
 		   Otherwise, use None.
 		*/
-		module = PyDict_GetItemString(globals, "__name__");
+		if (!__name__) {
+			__name__ = PyString_InternFromString("__name__");
+			if (!__name__) {
+				Py_DECREF(op);
+				return NULL;
+			}
+		}
+		module = PyDict_GetItem(globals, __name__);
 		if (module) {
 		    Py_INCREF(module);
 		    op->func_module = module;
@@ -148,8 +156,6 @@ PyFunction_SetClosure(PyObject *op, PyObject *closure)
 
 #define OFF(x) offsetof(PyFunctionObject, x)
 
-#define RR ()
-
 static PyMemberDef func_memberlist[] = {
         {"func_closure",  T_OBJECT,     OFF(func_closure),
 	 RESTRICTED|READONLY},
@@ -157,8 +163,6 @@ static PyMemberDef func_memberlist[] = {
         {"__doc__",       T_OBJECT,     OFF(func_doc), WRITE_RESTRICTED},
         {"func_globals",  T_OBJECT,     OFF(func_globals),
 	 RESTRICTED|READONLY},
-        {"func_name",     T_OBJECT,     OFF(func_name),         READONLY},
-        {"__name__",      T_OBJECT,     OFF(func_name),         READONLY},
         {"__module__",    T_OBJECT,     OFF(func_module), WRITE_RESTRICTED},
         {NULL}  /* Sentinel */
 };
@@ -226,6 +230,7 @@ static int
 func_set_code(PyFunctionObject *op, PyObject *value)
 {
 	PyObject *tmp;
+	int nfree, nclosure;
 
 	if (restricted())
 		return -1;
@@ -236,9 +241,50 @@ func_set_code(PyFunctionObject *op, PyObject *value)
 				"func_code must be set to a code object");
 		return -1;
 	}
+	nfree = PyCode_GetNumFree((PyCodeObject *)value);
+	nclosure = (op->func_closure == NULL ? 0 :
+		    PyTuple_GET_SIZE(op->func_closure));
+	if (nclosure != nfree) {
+		PyErr_Format(PyExc_ValueError,
+			     "%s() requires a code object with %d free vars,"
+			     " not %d",
+			     PyString_AsString(op->func_name),
+			     nclosure, nfree);
+		return -1;
+	}
 	tmp = op->func_code;
 	Py_INCREF(value);
 	op->func_code = value;
+	Py_DECREF(tmp);
+	return 0;
+}
+
+static PyObject *
+func_get_name(PyFunctionObject *op)
+{
+	if (restricted())
+		return NULL;
+	Py_INCREF(op->func_name);
+	return op->func_name;
+}
+
+static int
+func_set_name(PyFunctionObject *op, PyObject *value)
+{
+	PyObject *tmp;
+
+	if (restricted())
+		return -1;
+	/* Not legal to del f.func_name or to set it to anything
+	 * other than a string object. */
+	if (value == NULL || !PyString_Check(value)) {
+		PyErr_SetString(PyExc_TypeError,
+				"func_name must be set to a string object");
+		return -1;
+	}
+	tmp = op->func_name;
+	Py_INCREF(value);
+	op->func_name = value;
 	Py_DECREF(tmp);
 	return 0;
 }
@@ -285,6 +331,8 @@ static PyGetSetDef func_getsetlist[] = {
 	 (setter)func_set_defaults},
 	{"func_dict", (getter)func_get_dict, (setter)func_set_dict},
 	{"__dict__", (getter)func_get_dict, (setter)func_set_dict},
+	{"func_name", (getter)func_get_name, (setter)func_set_name},
+	{"__name__", (getter)func_get_name, (setter)func_set_name},
 	{NULL} /* Sentinel */
 };
 
@@ -316,8 +364,11 @@ func_new(PyTypeObject* type, PyObject* args, PyObject* kw)
 	PyObject *closure = Py_None;
 	PyFunctionObject *newfunc;
 	int nfree, nclosure;
+	static char *kwlist[] = {"code", "globals", "name",
+				 "argdefs", "closure", 0};
 
-	if (!PyArg_ParseTuple(args, "O!O!|OOO:function",
+	if (!PyArg_ParseTupleAndKeywords(args, kw, "O!O!|OOO:function",
+			      kwlist,
 			      &PyCode_Type, &code,
 			      &PyDict_Type, &globals,
 			      &name, &defaults, &closure))
@@ -407,8 +458,6 @@ func_dealloc(PyFunctionObject *op)
 static PyObject*
 func_repr(PyFunctionObject *op)
 {
-	if (op->func_name == Py_None)
-		return PyString_FromFormat("<anonymous function at %p>", op);
 	return PyString_FromFormat("<function %s at %p>",
 				   PyString_AsString(op->func_name),
 				   op);
@@ -637,6 +686,12 @@ cm_init(PyObject *self, PyObject *args, PyObject *kwds)
 
 	if (!PyArg_UnpackTuple(args, "classmethod", 1, 1, &callable))
 		return -1;
+	if (!PyCallable_Check(callable)) {
+		PyErr_Format(PyExc_TypeError, "'%s' object is not callable",
+		     callable->ob_type->tp_name);
+		return -1;
+	}
+	
 	Py_INCREF(callable);
 	cm->cm_callable = callable;
 	return 0;

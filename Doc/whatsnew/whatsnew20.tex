@@ -5,7 +5,10 @@
 \title{What's New in Python 2.0}
 \release{1.02}
 \author{A.M. Kuchling and Moshe Zadka}
-\authoraddress{\email{amk@amk.ca}, \email{moshez@twistedmatrix.com} }
+\authoraddress{
+	\strong{Python Software Foundation}\\
+	Email: \email{amk@amk.ca}, \email{moshez@twistedmatrix.com}
+}
 \begin{document}
 \maketitle\tableofcontents
 
@@ -394,9 +397,10 @@ been added to Python 2.0.  Augmented assignment operators include
 statement \code{a += 2} increments the value of the variable 
 \code{a} by 2, equivalent to the slightly lengthier \code{a = a + 2}.
 
+% The empty groups below prevent conversion to guillemets.
 The full list of supported assignment operators is \code{+=},
 \code{-=}, \code{*=}, \code{/=}, \code{\%=}, \code{**=}, \code{\&=},
-\code{|=}, \verb|^=|, \code{>>=}, and \code{<<=}.  Python classes can
+\code{|=}, \verb|^=|, \code{>{}>=}, and \code{<{}<=}.  Python classes can
 override the augmented assignment operators by defining methods named
 \method{__iadd__}, \method{__isub__}, etc.  For example, the following
 \class{Number} class stores a number and supports using += to create a
@@ -421,7 +425,7 @@ variable on the left-hand side.
 
 Augmented assignment operators were first introduced in the C
 programming language, and most C-derived languages, such as
-\program{awk}, C++, Java, Perl, and PHP also support them.  The augmented
+\program{awk}, \Cpp, Java, Perl, and PHP also support them.  The augmented
 assignment patch was implemented by Thomas Wouters.
 
 % ======================================================================
@@ -525,8 +529,8 @@ tricky and depends crucially on how often the program creates and
 destroys objects.  The detection of cycles can be disabled when Python
 is compiled, if you can't afford even a tiny speed penalty or suspect
 that the cycle collection is buggy, by specifying the
-\samp{--without-cycle-gc} switch when running the \file{configure}
-script.
+\longprogramopt{without-cycle-gc} switch when running the
+\program{configure} script.
 
 Several people tackled this problem and contributed to a solution.  An
 early implementation of the cycle detection approach was written by
@@ -633,12 +637,12 @@ exception would simply be silently swallowed.
 Work has been done on porting Python to 64-bit Windows on the Itanium
 processor, mostly by Trent Mick of ActiveState.  (Confusingly,
 \code{sys.platform} is still \code{'win32'} on Win64 because it seems
-that for ease of porting, MS Visual C++ treats code as 32 bit on Itanium.)
+that for ease of porting, MS Visual \Cpp{} treats code as 32 bit on Itanium.)
 PythonWin also supports Windows CE; see the Python CE page at
 \url{http://starship.python.net/crew/mhammond/ce/} for more
 information.
 
-Another new platform is Darwin/MacOS X; inital support for it is in
+Another new platform is Darwin/MacOS X; initial support for it is in
 Python 2.0.  Dynamic loading works, if you specify ``configure
 --with-dyld --with-suffix=.x''.  Consult the README in the Python
 source distribution for more instructions.
@@ -904,8 +908,8 @@ had to go through an arduous ritual of editing Makefiles and
 configuration files, which only really work on Unix and leave Windows
 and MacOS unsupported.  Python users faced wildly differing
 installation instructions which varied between different extension
-packages, which made adminstering a Python installation something of a
-chore.
+packages, which made administering a Python installation something of 
+a chore.
 
 The SIG for distribution utilities, shepherded by Greg Ward, has
 created the Distutils, a system to make package installation much
@@ -1000,7 +1004,7 @@ every starting and end tag encountered by the parser, the
 \method{characters()} method is called for every chunk of character
 data, and so forth.
 
-The advantage of the event-driven approach is that that the whole
+The advantage of the event-driven approach is that the whole
 document doesn't have to be resident in memory at any one time, which
 matters if you are processing really huge documents.  However, writing
 the SAX handler class can get very complicated if you're trying to

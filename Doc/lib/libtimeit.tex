@@ -52,7 +52,7 @@ The optional \var{file} argument directs where the traceback is sent;
 it defaults to \code{sys.stderr}.
 \end{methoddesc}
 
-\begin{methoddesc}{repeat}{\optional{repeat\code{=3}\optional{,
+\begin{methoddesc}{repeat}{\optional{repeat\code{=3} \optional{,
                            number\code{=1000000}}}}
 Call \method{timeit()} a few times.
 
@@ -82,6 +82,18 @@ times, measured in seconds as a float.  The argument is the number of
 times through the loop, defaulting to one million.  The main
 statement, the setup statement and the timer function to be used are
 passed to the constructor.
+
+\begin{notice}
+By default, \method{timeit()} temporarily turns off garbage collection
+during the timing.  The advantage of this approach is that it makes
+independent timings more comparable.  This disadvantage is that GC
+may be an important component of the performance of the function being
+measured.  If so, GC can be re-enabled as the first statement in the
+\var{setup} string.  For example:
+\begin{verbatim}
+    timeit.Timer('for i in xrange(10): oct(i)', 'gc.enable()').timeit()
+\end{verbatim}
+\end{notice}
 \end{methoddesc}
 
 
@@ -96,16 +108,16 @@ python timeit.py [-n N] [-r N] [-s S] [-t] [-c] [-h] [statement ...]
 where the following options are understood:
 
 \begin{description}
-\item[-n N/--number=N] how many times to execute 'statement'
-\item[-r N/--repeat=N] how many times to repeat the timer (default 3)
-\item[-s S/--setup=S] statement to be executed once initially (default
+\item[-n N/\longprogramopt{number=N}] how many times to execute 'statement'
+\item[-r N/\longprogramopt{repeat=N}] how many times to repeat the timer (default 3)
+\item[-s S/\longprogramopt{setup=S}] statement to be executed once initially (default
 \code{'pass'})
-\item[-t/--time] use \function{time.time()}
+\item[-t/\longprogramopt{time}] use \function{time.time()}
 (default on all platforms but Windows)
-\item[-c/--clock] use \function{time.clock()} (default on Windows)
-\item[-v/--verbose] print raw timing results; repeat for more digits
+\item[-c/\longprogramopt{clock}] use \function{time.clock()} (default on Windows)
+\item[-v/\longprogramopt{verbose}] print raw timing results; repeat for more digits
 precision
-\item[-h/--help] print a short usage message and exit
+\item[-h/\longprogramopt{help}] print a short usage message and exit
 \end{description}
 
 A multi-line statement may be given by specifying each line as a
@@ -122,7 +134,7 @@ The default timer function is platform dependent.  On Windows,
 \function{time.time()}'s granularity is 1/60th of a second; on \UNIX,
 \function{time.clock()} has 1/100th of a second granularity and
 \function{time.time()} is much more precise.  On either platform, the
-default timer functions measures wall clock time, not the CPU time.
+default timer functions measure wall clock time, not the CPU time.
 This means that other processes running on the same computer may
 interfere with the timing.  The best thing to do when accurate timing
 is necessary is to repeat the timing a few times and use the best
@@ -192,4 +204,21 @@ missing and present object attributes.
 >>> t = timeit.Timer(stmt=s)
 >>> print "%.2f usec/pass" % (1000000 * t.timeit(number=100000)/100000)
 3.15 usec/pass
+\end{verbatim}
+
+To give the \module{timeit} module access to functions you
+define, you can pass a \code{setup} parameter which contains an import
+statement:
+
+\begin{verbatim}
+def test():
+    "Stupid test function"
+    L = []
+    for i in range(100):
+        L.append(i)
+
+if __name__=='__main__':
+    from timeit import Timer
+    t = Timer("test()", "from __main__ import test")
+    print t.timeit()
 \end{verbatim}

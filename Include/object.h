@@ -488,6 +488,13 @@ given type object has a specified feature.
 /* Objects support garbage collection (see objimp.h) */
 #define Py_TPFLAGS_HAVE_GC (1L<<14)
 
+/* These two bits are preserved for Stackless Python, next after this is 16 */
+#ifdef STACKLESS
+#define Py_TPFLAGS_HAVE_STACKLESS_EXTENSION (3L<<15)
+#else
+#define Py_TPFLAGS_HAVE_STACKLESS_EXTENSION 0
+#endif
+
 #define Py_TPFLAGS_DEFAULT  ( \
                              Py_TPFLAGS_HAVE_GETCHARBUFFER | \
                              Py_TPFLAGS_HAVE_SEQUENCE_IN | \
@@ -496,6 +503,7 @@ given type object has a specified feature.
                              Py_TPFLAGS_HAVE_WEAKREFS | \
                              Py_TPFLAGS_HAVE_ITER | \
                              Py_TPFLAGS_HAVE_CLASS | \
+                             Py_TPFLAGS_HAVE_STACKLESS_EXTENSION | \
                             0)
 
 #define PyType_HasFeature(t,f)  (((t)->tp_flags & (f)) != 0)
@@ -612,9 +620,25 @@ PyAPI_FUNC(void) _Py_AddToAllObjects(PyObject *, int force);
 	else						\
 		_Py_Dealloc((PyObject *)(op))
 
+#define Py_CLEAR(op)				\
+        do {                            	\
+                if (op) {			\
+                        PyObject *tmp = (PyObject *)(op);	\
+                        (op) = NULL;		\
+                        Py_DECREF(tmp);		\
+                }				\
+        } while (0)
+
 /* Macros to use in case the object pointer may be NULL: */
 #define Py_XINCREF(op) if ((op) == NULL) ; else Py_INCREF(op)
 #define Py_XDECREF(op) if ((op) == NULL) ; else Py_DECREF(op)
+
+/*
+These are provided as conveniences to Python runtime embedders, so that
+they can have object code that is not dependent on Python compilation flags.
+*/
+PyAPI_FUNC(void) Py_IncRef(PyObject *);
+PyAPI_FUNC(void) Py_DecRef(PyObject *);
 
 /*
 _Py_NoneStruct is an object of undefined type which can be used in contexts
@@ -624,6 +648,9 @@ Don't forget to apply Py_INCREF() when returning this value!!!
 */
 PyAPI_DATA(PyObject) _Py_NoneStruct; /* Don't use this directly */
 #define Py_None (&_Py_NoneStruct)
+
+/* Macro for returning Py_None from a function */
+#define Py_RETURN_NONE return Py_INCREF(Py_None), Py_None
 
 /*
 Py_NotImplemented is a singleton used to signal that an operation is
@@ -639,6 +666,11 @@ PyAPI_DATA(PyObject) _Py_NotImplementedStruct; /* Don't use this directly */
 #define Py_NE 3
 #define Py_GT 4
 #define Py_GE 5
+
+/* Maps Py_LT to Py_GT, ..., Py_GE to Py_LE.
+ * Defined in object.c.
+ */
+PyAPI_DATA(int) _Py_SwappedOp[];
 
 /*
 Define staticforward and statichere for source compatibility with old
@@ -687,22 +719,22 @@ It takes a while to get used to the proper usage of reference counts.
 
 Functions that create an object set the reference count to 1; such new
 objects must be stored somewhere or destroyed again with Py_DECREF().
-Functions that 'store' objects such as PyTuple_SetItem() and
-PyDict_SetItemString()
+Some functions that 'store' objects, such as PyTuple_SetItem() and
+PyList_SetItem(),
 don't increment the reference count of the object, since the most
 frequent use is to store a fresh object.  Functions that 'retrieve'
-objects such as PyTuple_GetItem() and PyDict_GetItemString() also
+objects, such as PyTuple_GetItem() and PyDict_GetItemString(), also
 don't increment
 the reference count, since most frequently the object is only looked at
 quickly.  Thus, to retrieve an object and store it again, the caller
 must call Py_INCREF() explicitly.
 
-NOTE: functions that 'consume' a reference count like
-PyList_SetItemString() even consume the reference if the object wasn't
-stored, to simplify error handling.
+NOTE: functions that 'consume' a reference count, like
+PyList_SetItem(), consume the reference even if the object wasn't
+successfully stored, to simplify error handling.
 
 It seems attractive to make other functions that take an object as
-argument consume a reference count; however this may quickly get
+argument consume a reference count; however, this may quickly get
 confusing (even the current practice is already confusing).  Consider
 it carefully, it may save lots of calls to Py_INCREF() and Py_DECREF() at
 times.

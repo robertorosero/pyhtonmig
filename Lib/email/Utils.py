@@ -1,17 +1,17 @@
-# Copyright (C) 2001,2002 Python Software Foundation
-# Author: barry@zope.com (Barry Warsaw)
+# Copyright (C) 2001-2004 Python Software Foundation
+# Author: Barry Warsaw
+# Contact: email-sig@python.org
 
-"""Miscellaneous utilities.
-"""
+"""Miscellaneous utilities."""
 
-import time
-import socket
-import re
-import random
 import os
+import re
+import time
+import base64
+import random
+import socket
 import warnings
 from cStringIO import StringIO
-from types import ListType
 
 from email._parseaddr import quote
 from email._parseaddr import AddressList as _AddressList
@@ -21,30 +21,7 @@ from email._parseaddr import mktime_tz
 from email._parseaddr import parsedate as _parsedate
 from email._parseaddr import parsedate_tz as _parsedate_tz
 
-try:
-    True, False
-except NameError:
-    True = 1
-    False = 0
-
-try:
-    from quopri import decodestring as _qdecode
-except ImportError:
-    # Python 2.1 doesn't have quopri.decodestring()
-    def _qdecode(s):
-        import quopri as _quopri
-
-        if not s:
-            return s
-        infp = StringIO(s)
-        outfp = StringIO()
-        _quopri.decode(infp, outfp)
-        value = outfp.getvalue()
-        if not s.endswith('\n') and value.endswith('\n'):
-            return value[:-1]
-        return value
-
-import base64
+from quopri import decodestring as _qdecode
 
 # Intrapackage imports
 from email.Encoders import _bencode, _qencode
@@ -104,12 +81,6 @@ def formataddr(pair):
         return '%s%s%s <%s>' % (quotes, name, quotes, address)
     return address
 
-# For backwards compatibility
-def dump_address_pair(pair):
-    warnings.warn('Use email.Utils.formataddr() instead',
-                  DeprecationWarning, 2)
-    return formataddr(pair)
-
 
 
 def getaddresses(fieldvalues):
@@ -131,48 +102,8 @@ ecre = re.compile(r'''
   ''', re.VERBOSE | re.IGNORECASE)
 
 
-def decode(s):
-    """Return a decoded string according to RFC 2047, as a unicode string.
-
-    NOTE: This function is deprecated.  Use Header.decode_header() instead.
-    """
-    warnings.warn('Use Header.decode_header() instead.', DeprecationWarning, 2)
-    # Intra-package import here to avoid circular import problems.
-    from email.Header import decode_header
-    L = decode_header(s)
-    if not isinstance(L, ListType):
-        # s wasn't decoded
-        return s
-
-    rtn = []
-    for atom, charset in L:
-        if charset is None:
-            rtn.append(atom)
-        else:
-            # Convert the string to Unicode using the given encoding.  Leave
-            # Unicode conversion errors to strict.
-            rtn.append(unicode(atom, charset))
-    # Now that we've decoded everything, we just need to join all the parts
-    # together into the final string.
-    return UEMPTYSTRING.join(rtn)
-
-
 
-def encode(s, charset='iso-8859-1', encoding='q'):
-    """Encode a string according to RFC 2047."""
-    warnings.warn('Use Header.Header.encode() instead.', DeprecationWarning, 2)
-    encoding = encoding.lower()
-    if encoding == 'q':
-        estr = _qencode(s)
-    elif encoding == 'b':
-        estr = _bencode(s)
-    else:
-        raise ValueError, 'Illegal encoding code: ' + encoding
-    return '=?%s?%s?%s?=' % (charset.lower(), encoding, estr)
-
-
-
-def formatdate(timeval=None, localtime=False):
+def formatdate(timeval=None, localtime=False, usegmt=False):
     """Returns a date string as specified by RFC 2822, e.g.:
 
     Fri, 09 Nov 2001 01:08:47 -0000
@@ -183,6 +114,10 @@ def formatdate(timeval=None, localtime=False):
     Optional localtime is a flag that when True, interprets timeval, and
     returns a date relative to the local timezone instead of UTC, properly
     taking daylight savings time into account.
+
+    Optional argument usegmt means that the timezone is written out as
+    an ascii string, not numeric one (so "GMT" instead of "+0000"). This
+    is needed for HTTP, and is only used when localtime==False.
     """
     # Note: we cannot use strftime() because that honors the locale and RFC
     # 2822 requires that day and month names be the English abbreviations.
@@ -203,11 +138,14 @@ def formatdate(timeval=None, localtime=False):
             sign = '-'
         else:
             sign = '+'
-        zone = '%s%02d%02d' % (sign, hours, minutes / 60)
+        zone = '%s%02d%02d' % (sign, hours, minutes // 60)
     else:
         now = time.gmtime(timeval)
         # Timezone offset is always -0000
-        zone = '-0000'
+        if usegmt:
+            zone = 'GMT'
+        else:
+            zone = '-0000'
     return '%s, %02d %s %04d %02d:%02d:%02d %s' % (
         ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][now[6]],
         now[2],
@@ -280,7 +218,7 @@ def decode_rfc2231(s):
     import urllib
     parts = s.split("'", 2)
     if len(parts) == 1:
-        return None, None, s
+        return None, None, urllib.unquote(s)
     charset, language, s = parts
     return charset, language, urllib.unquote(s)
 
@@ -338,3 +276,16 @@ def decode_params(params):
             new_params.append(
                 (name, (charset, language, '"%s"' % quote(value))))
     return new_params
+
+def collapse_rfc2231_value(value, errors='replace',
+                           fallback_charset='us-ascii'):
+    if isinstance(value, tuple):
+        rawval = unquote(value[2])
+        charset = value[0] or 'us-ascii'
+        try:
+            return unicode(rawval, charset, errors)
+        except LookupError:
+            # XXX charset is unknown to Python.
+            return unicode(rawval, fallback_charset, errors)
+    else:
+        return unquote(value)

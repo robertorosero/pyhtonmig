@@ -3,10 +3,6 @@
 
 #include "Python.h"
 
-#ifdef macintosh
-#include "macglue.h"
-#endif
-
 #ifdef Py_REF_DEBUG
 long _Py_RefTotal;
 #endif
@@ -149,6 +145,18 @@ _Py_NegativeRefcount(const char *fname, int lineno, PyObject *op)
 }
 
 #endif /* Py_REF_DEBUG */
+
+void
+Py_IncRef(PyObject *o)
+{
+    Py_XINCREF(o);
+}
+
+void
+Py_DecRef(PyObject *o)
+{
+    Py_XDECREF(o);
+}
 
 PyObject *
 PyObject_Init(PyObject *op, PyTypeObject *tp)
@@ -468,7 +476,7 @@ adjust_tp_compare(int c)
                          ? (t)->tp_richcompare : NULL)
 
 /* Map rich comparison operators to their swapped version, e.g. LT --> GT */
-static int swapped_op[] = {Py_GT, Py_GE, Py_EQ, Py_NE, Py_LT, Py_LE};
+int _Py_SwappedOp[] = {Py_GT, Py_GE, Py_EQ, Py_NE, Py_LT, Py_LE};
 
 /* Try a genuine rich comparison, returning an object.  Return:
    NULL for exception;
@@ -486,7 +494,7 @@ try_rich_compare(PyObject *v, PyObject *w, int op)
 	if (v->ob_type != w->ob_type &&
 	    PyType_IsSubtype(w->ob_type, v->ob_type) &&
 	    (f = RICHCOMPARE(w->ob_type)) != NULL) {
-		res = (*f)(w, v, swapped_op[op]);
+		res = (*f)(w, v, _Py_SwappedOp[op]);
 		if (res != Py_NotImplemented)
 			return res;
 		Py_DECREF(res);
@@ -498,7 +506,7 @@ try_rich_compare(PyObject *v, PyObject *w, int op)
 		Py_DECREF(res);
 	}
 	if ((f = RICHCOMPARE(w->ob_type)) != NULL) {
-		return (*f)(w, v, swapped_op[op]);
+		return (*f)(w, v, _Py_SwappedOp[op]);
 	}
 	res = Py_NotImplemented;
 	Py_INCREF(res);
@@ -598,31 +606,26 @@ try_3way_compare(PyObject *v, PyObject *w)
 	    w->ob_type->tp_compare == _PyObject_SlotCompare)
 		return _PyObject_SlotCompare(v, w);
 
-	/* Try coercion; if it fails, give up */
+	/* If we're here, v and w,
+	    a) are not instances;
+	    b) have different types or a type without tp_compare; and
+	    c) don't have a user-defined tp_compare.
+	   tp_compare implementations in C assume that both arguments
+	   have their type, so we give up if the coercion fails or if
+	   it yields types which are still incompatible (which can
+	   happen with a user-defined nb_coerce).
+	*/
 	c = PyNumber_CoerceEx(&v, &w);
 	if (c < 0)
 		return -2;
 	if (c > 0)
 		return 2;
-
-	/* Try v's comparison, if defined */
-	if ((f = v->ob_type->tp_compare) != NULL) {
+	f = v->ob_type->tp_compare;
+	if (f != NULL && f == w->ob_type->tp_compare) {
 		c = (*f)(v, w);
 		Py_DECREF(v);
 		Py_DECREF(w);
 		return adjust_tp_compare(c);
-	}
-
-	/* Try w's comparison, if defined */
-	if ((f = w->ob_type->tp_compare) != NULL) {
-		c = (*f)(w, v); /* swapped! */
-		Py_DECREF(v);
-		Py_DECREF(w);
-		c = adjust_tp_compare(c);
-		if (c >= -1)
-			return -c; /* Swapped! */
-		else
-			return c;
 	}
 
 	/* No comparison defined */
@@ -696,8 +699,6 @@ default_3way_compare(PyObject *v, PyObject *w)
 		Py_uintptr_t)(w->ob_type)) ? -1 : 1;
 }
 
-#define CHECK_TYPES(o) PyType_HasFeature((o)->ob_type, Py_TPFLAGS_CHECKTYPES)
-
 /* Do a 3-way comparison, by hook or by crook.  Return:
    -2 for an exception (but see below);
    -1 if v <  w;
@@ -740,120 +741,6 @@ do_cmp(PyObject *v, PyObject *w)
 	return default_3way_compare(v, w);
 }
 
-/* compare_nesting is incremented before calling compare (for
-   some types) and decremented on exit.  If the count exceeds the
-   nesting limit, enable code to detect circular data structures.
-
-   This is a tunable parameter that should only affect the performance
-   of comparisons, nothing else.  Setting it high makes comparing deeply
-   nested non-cyclical data structures faster, but makes comparing cyclical
-   data structures slower.
-*/
-#define NESTING_LIMIT 20
-
-static int compare_nesting = 0;
-
-static PyObject*
-get_inprogress_dict(void)
-{
-	static PyObject *key;
-	PyObject *tstate_dict, *inprogress;
-
-	if (key == NULL) {
-		key = PyString_InternFromString("cmp_state");
-		if (key == NULL)
-			return NULL;
-	}
-
-	tstate_dict = PyThreadState_GetDict();
-	if (tstate_dict == NULL) {
-		PyErr_BadInternalCall();
-		return NULL;
-	}
-
-	inprogress = PyDict_GetItem(tstate_dict, key);
-	if (inprogress == NULL) {
-		inprogress = PyDict_New();
-		if (inprogress == NULL)
-			return NULL;
-		if (PyDict_SetItem(tstate_dict, key, inprogress) == -1) {
-		    Py_DECREF(inprogress);
-		    return NULL;
-		}
-		Py_DECREF(inprogress);
-	}
-
-	return inprogress;
-}
-
-/* If the comparison "v op w" is already in progress in this thread, returns
- * a borrowed reference to Py_None (the caller must not decref).
- * If it's not already in progress, returns "a token" which must eventually
- * be passed to delete_token().  The caller must not decref this either
- * (delete_token decrefs it).  The token must not survive beyond any point
- * where v or w may die.
- * If an error occurs (out-of-memory), returns NULL.
- */
-static PyObject *
-check_recursion(PyObject *v, PyObject *w, int op)
-{
-	PyObject *inprogress;
-	PyObject *token;
-	Py_uintptr_t iv = (Py_uintptr_t)v;
-	Py_uintptr_t iw = (Py_uintptr_t)w;
-	PyObject *x, *y, *z;
-
-	inprogress = get_inprogress_dict();
-	if (inprogress == NULL)
-		return NULL;
-
-	token = PyTuple_New(3);
-	if (token == NULL)
-		return NULL;
-
-	if (iv <= iw) {
-		PyTuple_SET_ITEM(token, 0, x = PyLong_FromVoidPtr((void *)v));
-		PyTuple_SET_ITEM(token, 1, y = PyLong_FromVoidPtr((void *)w));
-		if (op >= 0)
-			op = swapped_op[op];
-	} else {
-		PyTuple_SET_ITEM(token, 0, x = PyLong_FromVoidPtr((void *)w));
-		PyTuple_SET_ITEM(token, 1, y = PyLong_FromVoidPtr((void *)v));
-	}
-	PyTuple_SET_ITEM(token, 2, z = PyInt_FromLong((long)op));
-	if (x == NULL || y == NULL || z == NULL) {
-		Py_DECREF(token);
-		return NULL;
-	}
-
-	if (PyDict_GetItem(inprogress, token) != NULL) {
-		Py_DECREF(token);
-		return Py_None; /* Without INCREF! */
-	}
-
-	if (PyDict_SetItem(inprogress, token, token) < 0) {
-		Py_DECREF(token);
-		return NULL;
-	}
-
-	return token;
-}
-
-static void
-delete_token(PyObject *token)
-{
-	PyObject *inprogress;
-
-	if (token == NULL || token == Py_None)
-		return;
-	inprogress = get_inprogress_dict();
-	if (inprogress == NULL)
-		PyErr_Clear();
-	else
-		PyDict_DelItem(inprogress, token);
-	Py_DECREF(token);
-}
-
 /* Compare v to w.  Return
    -1 if v <  w or exception (PyErr_Occurred() true in latter case).
     0 if v == w.
@@ -864,47 +751,18 @@ delete_token(PyObject *token)
 int
 PyObject_Compare(PyObject *v, PyObject *w)
 {
-	PyTypeObject *vtp;
 	int result;
 
-#if defined(USE_STACKCHECK)
-	if (PyOS_CheckStack()) {
-		PyErr_SetString(PyExc_MemoryError, "Stack overflow");
-		return -1;
-	}
-#endif
 	if (v == NULL || w == NULL) {
 		PyErr_BadInternalCall();
 		return -1;
 	}
 	if (v == w)
 		return 0;
-	vtp = v->ob_type;
-	compare_nesting++;
-	if (compare_nesting > NESTING_LIMIT &&
-	    (vtp->tp_as_mapping || vtp->tp_as_sequence) &&
-	    !PyString_CheckExact(v) &&
-	    !PyTuple_CheckExact(v)) {
-		/* try to detect circular data structures */
-		PyObject *token = check_recursion(v, w, -1);
-
-		if (token == NULL) {
-			result = -1;
-		}
-		else if (token == Py_None) {
-			/* already comparing these objects.  assume
-			   they're equal until shown otherwise */
-                        result = 0;
-		}
-		else {
-			result = do_cmp(v, w);
-			delete_token(token);
-		}
-	}
-	else {
-		result = do_cmp(v, w);
-	}
-	compare_nesting--;
+	if (Py_EnterRecursiveCall(" in cmp"))
+		return -1;
+	result = do_cmp(v, w);
+	Py_LeaveRecursiveCall();
 	return result < 0 ? -1 : result;
 }
 
@@ -975,41 +833,10 @@ PyObject_RichCompare(PyObject *v, PyObject *w, int op)
 	PyObject *res;
 
 	assert(Py_LT <= op && op <= Py_GE);
+	if (Py_EnterRecursiveCall(" in cmp"))
+		return NULL;
 
-	compare_nesting++;
-	if (compare_nesting > NESTING_LIMIT &&
-	    (v->ob_type->tp_as_mapping || v->ob_type->tp_as_sequence) &&
-	    !PyString_CheckExact(v) &&
-	    !PyTuple_CheckExact(v)) {
-		/* try to detect circular data structures */
-		PyObject *token = check_recursion(v, w, op);
-		if (token == NULL) {
-			res = NULL;
-			goto Done;
-		}
-		else if (token == Py_None) {
-			/* already comparing these objects with this operator.
-			   assume they're equal until shown otherwise */
-			if (op == Py_EQ)
-				res = Py_True;
-			else if (op == Py_NE)
-				res = Py_False;
-			else {
-				PyErr_SetString(PyExc_ValueError,
-					"can't order recursive values");
-				res = NULL;
-			}
-			Py_XINCREF(res);
-		}
-		else {
-			res = do_richcmp(v, w, op);
-			delete_token(token);
-		}
-		goto Done;
-	}
-
-	/* No nesting extremism.
-	   If the types are equal, and not old-style instances, try to
+	/* If the types are equal, and not old-style instances, try to
 	   get out cheap (don't bother with coercions etc.). */
 	if (v->ob_type == w->ob_type && !PyInstance_Check(v)) {
 		cmpfunc fcmp;
@@ -1041,7 +868,7 @@ PyObject_RichCompare(PyObject *v, PyObject *w, int op)
 	/* Fast path not taken, or couldn't deliver a useful result. */
 	res = do_richcmp(v, w, op);
 Done:
-	compare_nesting--;
+	Py_LeaveRecursiveCall();
 	return res;
 }
 
@@ -1049,9 +876,19 @@ Done:
 int
 PyObject_RichCompareBool(PyObject *v, PyObject *w, int op)
 {
-	PyObject *res = PyObject_RichCompare(v, w, op);
+	PyObject *res;
 	int ok;
 
+	/* Quick result when objects are the same.
+	   Guarantees that identity implies equality. */
+	if (v == w) {
+		if (op == Py_EQ)
+			return 1;
+		else if (op == Py_NE)
+			return 0;
+	}
+
+	res = PyObject_RichCompare(v, w, op);
 	if (res == NULL)
 		return -1;
 	if (PyBool_Check(res))
@@ -1063,7 +900,7 @@ PyObject_RichCompareBool(PyObject *v, PyObject *w, int op)
 }
 
 /* Set of hash utility functions to help maintaining the invariant that
-	iff a==b then hash(a)==hash(b)
+	if a==b then hash(a)==hash(b)
 
    All the utility functions (_Py_Hash*()) return "-1" to signify an error.
 */
@@ -1080,15 +917,7 @@ _Py_HashDouble(double v)
 	 * of mapping keys will turn out weird.
 	 */
 
-#ifdef MPW /* MPW C modf expects pointer to extended as second argument */
-{
-	extended e;
-	fractpart = modf(v, &e);
-	intpart = e;
-}
-#else
 	fractpart = modf(v, &intpart);
-#endif
 	if (fractpart == 0.0) {
 		/* This must return the same hash as an equal int or long. */
 		if (intpart > LONG_MAX || -intpart > LONG_MAX) {
@@ -1342,14 +1171,14 @@ _PyObject_GetDictPtr(PyObject *obj)
 	return (PyObject **) ((char *)obj + dictoffset);
 }
 
-/* Generic GetAttr functions - put these in your tp_[gs]etattro slot */
-
 PyObject *
 PyObject_SelfIter(PyObject *obj)
 {
 	Py_INCREF(obj);
 	return obj;
 }
+
+/* Generic GetAttr functions - put these in your tp_[gs]etattro slot */
 
 PyObject *
 PyObject_GenericGetAttr(PyObject *obj, PyObject *name)
@@ -1412,12 +1241,15 @@ PyObject_GenericGetAttr(PyObject *obj, PyObject *name)
 		}
 	}
 
+	Py_XINCREF(descr);
+
 	f = NULL;
 	if (descr != NULL &&
 	    PyType_HasFeature(descr->ob_type, Py_TPFLAGS_HAVE_CLASS)) {
 		f = descr->ob_type->tp_descr_get;
 		if (f != NULL && PyDescr_IsData(descr)) {
 			res = f(descr, obj, (PyObject *)obj->ob_type);
+			Py_DECREF(descr);
 			goto done;
 		}
 	}
@@ -1445,6 +1277,7 @@ PyObject_GenericGetAttr(PyObject *obj, PyObject *name)
 			res = PyDict_GetItem(dict, name);
 			if (res != NULL) {
 				Py_INCREF(res);
+				Py_XDECREF(descr);
 				goto done;
 			}
 		}
@@ -1452,12 +1285,13 @@ PyObject_GenericGetAttr(PyObject *obj, PyObject *name)
 
 	if (f != NULL) {
 		res = f(descr, obj, (PyObject *)obj->ob_type);
+		Py_DECREF(descr);
 		goto done;
 	}
 
 	if (descr != NULL) {
-		Py_INCREF(descr);
 		res = descr;
+		/* descr was already increfed above */
 		goto done;
 	}
 
@@ -1780,7 +1614,7 @@ PyObject_Dir(PyObject *arg)
 		PyObject *locals = PyEval_GetLocals();
 		if (locals == NULL)
 			goto error;
-		result = PyDict_Keys(locals);
+		result = PyMapping_Keys(locals);
 		if (result == NULL)
 			goto error;
 	}
@@ -1863,6 +1697,11 @@ PyObject_Dir(PyObject *arg)
 	}
 
 	assert(result);
+	if (!PyList_Check(result)) {
+		PyErr_SetString(PyExc_TypeError,
+			"Expected keys() to be a list.");
+		goto error;
+	}
 	if (PyList_Sort(result) != 0)
 		goto error;
 	else
@@ -1960,6 +1799,9 @@ _Py_ReadyTypes(void)
 {
 	if (PyType_Ready(&PyType_Type) < 0)
 		Py_FatalError("Can't initialize 'type'");
+
+	if (PyType_Ready(&_PyWeakref_RefType) < 0)
+		Py_FatalError("Can't initialize 'weakref'");
 
 	if (PyType_Ready(&PyBool_Type) < 0)
 		Py_FatalError("Can't initialize 'bool'");

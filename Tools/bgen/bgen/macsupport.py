@@ -129,10 +129,10 @@ class VarUnicodeInputBufferType(VarInputBufferType):
 
     def getargsFormat(self):
         return "u#"
-        
+
 class VarUnicodeReverseInputBufferType(ReverseInputBufferMixin, VarUnicodeInputBufferType):
     pass
-    
+
 UnicodeInBuffer = VarUnicodeInputBufferType('UniChar', 'UniCharCount', 'l')
 UnicodeReverseInBuffer = VarUnicodeReverseInputBufferType('UniChar', 'UniCharCount', 'l')
 UniChar_ptr = InputOnlyType("UniCharPtr", "u")
@@ -142,12 +142,7 @@ UniChar_ptr = InputOnlyType("UniCharPtr", "u")
 
 # Stuff added immediately after the system include files
 includestuff = """
-#ifdef _WIN32
-#include "pywintoolbox.h"
-#else
-#include "macglue.h"
 #include "pymactoolbox.h"
-#endif
 
 /* Macro to test whether a weak-loaded CFM function exists */
 #define PyMac_PRECHECK(rtn) do { if ( &rtn == NULL )  {\\
@@ -185,7 +180,7 @@ class OSErrMethodGenerator(OSErrMixIn, MethodGenerator): pass
 
 class WeakLinkMixIn:
     "Mix-in to test the function actually exists (!= NULL) before calling"
-    
+
     def precheck(self):
         Output('#ifndef %s', self.name)
         Output('PyMac_PRECHECK(%s);', self.name)
@@ -200,11 +195,3 @@ class MacModule(Module):
     "Subclass which gets the exception initializer from macglue.c"
     def exceptionInitializer(self):
         return "PyMac_GetOSErrException()"
-
-_SetOutputFileName = SetOutputFileName # Save original
-def SetOutputFileName(file = None):
-    "Set the output file name and set its creator&type to CWIE&TEXT"
-    _SetOutputFileName(file)
-    if file:
-        import MacOS
-        MacOS.SetCreatorAndType(file, 'CWIE', 'TEXT')

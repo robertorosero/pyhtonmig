@@ -39,26 +39,26 @@ except ImportError:
 if maxint == 2147483647:
     # The following test will start to fail in Python 2.4;
     # change the 020000000000 to -020000000000
-    if -2147483647-1 != 020000000000: raise TestFailed, 'max negative int'
+    if -2147483647-1 != -020000000000: raise TestFailed, 'max negative int'
     # XXX -2147483648
-    if 037777777777 != -1: raise TestFailed, 'oct -1'
-    if 0xffffffff != -1: raise TestFailed, 'hex -1'
+    if 037777777777 < 0: raise TestFailed, 'large oct'
+    if 0xffffffff < 0: raise TestFailed, 'large hex'
     for s in '2147483648', '040000000000', '0x100000000':
         try:
             x = eval(s)
         except OverflowError:
-            print "OverflowError on huge integer literal " + `s`
+            print "OverflowError on huge integer literal " + repr(s)
 elif eval('maxint == 9223372036854775807'):
-    if eval('-9223372036854775807-1 != 01000000000000000000000'):
+    if eval('-9223372036854775807-1 != -01000000000000000000000'):
         raise TestFailed, 'max negative int'
-    if eval('01777777777777777777777') != -1: raise TestFailed, 'oct -1'
-    if eval('0xffffffffffffffff') != -1: raise TestFailed, 'hex -1'
+    if eval('01777777777777777777777') < 0: raise TestFailed, 'large oct'
+    if eval('0xffffffffffffffff') < 0: raise TestFailed, 'large hex'
     for s in '9223372036854775808', '02000000000000000000000', \
              '0x10000000000000000':
         try:
             x = eval(s)
         except OverflowError:
-            print "OverflowError on huge integer literal " + `s`
+            print "OverflowError on huge integer literal " + repr(s)
 else:
     print 'Weird maxint value', maxint
 
@@ -420,12 +420,16 @@ except RuntimeError: pass
 try: raise KeyboardInterrupt
 except KeyboardInterrupt: pass
 
-print 'import_stmt' # 'import' NAME (',' NAME)* | 'from' NAME 'import' ('*' | NAME (',' NAME)*)
+print 'import_name' # 'import' dotted_as_names
 import sys
 import time, sys
+print 'import_from' # 'from' dotted_name 'import' ('*' | '(' import_as_names ')' | import_as_names)
 from time import time
+from time import (time)
 from sys import *
 from sys import path, argv
+from sys import (path, argv)
+from sys import (path, argv,)
 
 print 'global_stmt' # 'global' NAME (',' NAME)*
 def f():
@@ -704,6 +708,7 @@ print [3 * x for x in nums]
 print [x for x in nums if x > 2]
 print [(i, s) for i in nums for s in strs]
 print [(i, s) for i in nums for s in [f for f in strs if "n" in f]]
+print [(lambda a:[a**i for i in range(a+1)])(j) for j in range(5)]
 
 def test_in_func(l):
     return [None < x < 3 for x in l if x > 2]
@@ -741,3 +746,46 @@ print [
         for (sp_sno, sp_pno) in suppart
           if sno == sp_sno and pno == sp_pno
 ]
+
+# generator expression tests
+g = ([x for x in range(10)] for x in range(1))
+verify(g.next() == [x for x in range(10)])
+try:
+    g.next()
+    raise TestFailed, 'should produce StopIteration exception'
+except StopIteration:
+    pass
+
+a = 1
+try:
+    g = (a for d in a)
+    g.next()
+    raise TestFailed, 'should produce TypeError'
+except TypeError:
+    pass
+
+verify(list((x, y) for x in 'abcd' for y in 'abcd') == [(x, y) for x in 'abcd' for y in 'abcd'])
+verify(list((x, y) for x in 'ab' for y in 'xy') == [(x, y) for x in 'ab' for y in 'xy'])
+
+a = [x for x in range(10)]
+b = (x for x in (y for y in a))
+verify(sum(b) == sum([x for x in range(10)]))
+
+verify(sum(x**2 for x in range(10)) == sum([x**2 for x in range(10)]))
+verify(sum(x*x for x in range(10) if x%2) == sum([x*x for x in range(10) if x%2]))
+verify(sum(x for x in (y for y in range(10))) == sum([x for x in range(10)]))
+verify(sum(x for x in (y for y in (z for z in range(10)))) == sum([x for x in range(10)]))
+verify(sum(x for x in [y for y in (z for z in range(10))]) == sum([x for x in range(10)]))
+verify(sum(x for x in (y for y in (z for z in range(10) if True)) if True) == sum([x for x in range(10)]))
+verify(sum(x for x in (y for y in (z for z in range(10) if True) if False) if True) == 0)
+check_syntax("foo(x for x in range(10), 100)")
+check_syntax("foo(100, x for x in range(10))")
+
+# test for outmost iterable precomputation
+x = 10; g = (i for i in range(x)); x = 5
+verify(len(list(g)) == 10)
+
+# This should hold, since we're only precomputing outmost iterable.
+x = 10; t = False; g = ((i,j) for i in range(x) if t for j in range(x))
+x = 5; t = True;
+verify([(i,j) for i in range(10) for j in range(5)] == list(g))

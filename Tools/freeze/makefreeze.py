@@ -19,7 +19,7 @@ default_entry_point = """
 int
 main(int argc, char **argv)
 {
-	extern int Py_FrozenMain(int, char **);
+        extern int Py_FrozenMain(int, char **);
 """ + ((not __debug__ and """
         Py_OptimizeFlag++;
 """) or "")  + """
@@ -87,4 +87,4 @@ def writecode(outfp, mod, str):
 
 ## def writecode(outfp, mod, str):
 ##     outfp.write('unsigned char M_%s[%d] = "%s";\n' % (mod, len(str),
-##     '\\"'.join(map(lambda s: `s`[1:-1], str.split('"')))))
+##     '\\"'.join(map(lambda s: repr(s)[1:-1], str.split('"')))))

@@ -41,10 +41,14 @@ The module defines the following type:
 \begin{funcdesc}{array}{typecode\optional{, initializer}}
 Return a new array whose items are restricted by \var{typecode},
 and initialized from the optional \var{initializer} value, which
-must be a list or a string.  The list or string is passed to the
+must be a list, string, or iterable over elements of the
+appropriate type.
+\versionchanged[Formerly, only lists or strings were accepted]{2.4}
+If given a list or string, the initializer is passed to the
 new array's \method{fromlist()}, \method{fromstring()}, or
 \method{fromunicode()} method (see below) to add initial items to
-the array.
+the array.  Otherwise, the iterable initializer is passed to the
+\method{extend()} method.
 \end{funcdesc}
 
 \begin{datadesc}{ArrayType}
@@ -101,13 +105,16 @@ data from a file written on a machine with a different byte order.
 \end{methoddesc}
 
 \begin{methoddesc}[array]{count}{x}
-Return the number of occurences of \var{x} in the array.
+Return the number of occurrences of \var{x} in the array.
 \end{methoddesc}
 
-\begin{methoddesc}[array]{extend}{a}
-Append array items from \var{a} to the end of the array.  The two
-arrays must have \emph{exactly} the same type code; if not,
-\exception{TypeError} will be raised.
+\begin{methoddesc}[array]{extend}{iterable}
+Append items from \var{iterable} to the end of the array.  If
+\var{iterable} is another array, it must have \emph{exactly} the same
+type code; if not, \exception{TypeError} will be raised.  If
+\var{iterable} is not an array, it must be iterable and its
+elements must be the right type to be appended to the array.
+\versionchanged[Formerly, the argument could only be another array]{2.4}
 \end{methoddesc}
 
 \begin{methoddesc}[array]{fromfile}{f, n}
@@ -140,12 +147,13 @@ append Unicode data to an array of some other type.
 
 \begin{methoddesc}[array]{index}{x}
 Return the smallest \var{i} such that \var{i} is the index of
-the first occurence of \var{x} in the array.
+the first occurrence of \var{x} in the array.
 \end{methoddesc}
 
 \begin{methoddesc}[array]{insert}{i, x}
 Insert a new item with value \var{x} in the array before position
-\var{i}.
+\var{i}. Negative values are treated as being relative to the end
+of the array.
 \end{methoddesc}
 
 \begin{methoddesc}[array]{pop}{\optional{i}}
@@ -166,7 +174,7 @@ do.
 \end{methoddesc}
 
 \begin{methoddesc}[array]{remove}{x}
-Remove the first occurence of \var{x} from the array.
+Remove the first occurrence of \var{x} from the array.
 \end{methoddesc}
 
 \begin{methoddesc}[array]{reverse}{}
@@ -229,5 +237,5 @@ array('d', [1.0, 2.0, 3.14])
            \url{http://numpy.sourceforge.net/} for further information
            about Numerical Python.  (A PDF version of the NumPy manual
            is available at
-           \url{http://numpy.sourceforge.net/numdoc/numdoc.pdf}.}
+           \url{http://numpy.sourceforge.net/numdoc/numdoc.pdf}).}
 \end{seealso}

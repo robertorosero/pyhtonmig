@@ -34,13 +34,17 @@ __version__ = "2.6"
 # Imports
 # =======
 
+from operator import attrgetter
 import sys
 import os
 import urllib
 import mimetools
 import rfc822
 import UserDict
-from StringIO import StringIO
+try:
+    from cStringIO import StringIO
+except ImportError:
+    from StringIO import StringIO
 
 __all__ = ["MiniFieldStorage", "FieldStorage", "FormContentDict",
            "SvFormContentDict", "InterpFormContentDict", "FormContent",
@@ -209,11 +213,17 @@ def parse_qsl(qs, keep_blank_values=0, strict_parsing=0):
     pairs = [s2 for s1 in qs.split('&') for s2 in s1.split(';')]
     r = []
     for name_value in pairs:
+        if not name_value and not strict_parsing:
+            continue
         nv = name_value.split('=', 1)
         if len(nv) != 2:
             if strict_parsing:
-                raise ValueError, "bad query field: %s" % `name_value`
-            continue
+                raise ValueError, "bad query field: %r" % (name_value,)
+            # Handle case of a control-name with no equal sign
+            if keep_blank_values:
+                nv.append('')
+            else:
+                continue
         if len(nv[1]) or keep_blank_values:
             name = urllib.unquote(nv[0].replace('+', ' '))
             value = urllib.unquote(nv[1].replace('+', ' '))
@@ -247,8 +257,8 @@ def parse_multipart(fp, pdict):
     if 'boundary' in pdict:
         boundary = pdict['boundary']
     if not valid_boundary(boundary):
-        raise ValueError,  ('Invalid boundary in multipart form: %s'
-                            % `boundary`)
+        raise ValueError,  ('Invalid boundary in multipart form: %r'
+                            % (boundary,))
 
     nextpart = "--" + boundary
     lastpart = "--" + boundary + "--"
@@ -322,7 +332,7 @@ def parse_header(line):
     Return the main content-type and a dictionary of options.
 
     """
-    plist = map(lambda x: x.strip(), line.split(';'))
+    plist = [x.strip() for x in line.split(';')]
     key = plist.pop(0).lower()
     pdict = {}
     for p in plist:
@@ -332,6 +342,7 @@ def parse_header(line):
             value = p[i+1:].strip()
             if len(value) >= 2 and value[0] == value[-1] == '"':
                 value = value[1:-1]
+                value = value.replace('\\\\', '\\').replace('\\"', '"')
             pdict[name] = value
     return key, pdict
 
@@ -361,7 +372,7 @@ class MiniFieldStorage:
 
     def __repr__(self):
         """Return printable representation."""
-        return "MiniFieldStorage(%s, %s)" % (`self.name`, `self.value`)
+        return "MiniFieldStorage(%r, %r)" % (self.name, self.value)
 
 
 class FieldStorage:
@@ -522,8 +533,8 @@ class FieldStorage:
 
     def __repr__(self):
         """Return a printable representation."""
-        return "FieldStorage(%s, %s, %s)" % (
-                `self.name`, `self.filename`, `self.value`)
+        return "FieldStorage(%r, %r, %r)" % (
+                self.name, self.filename, self.value)
 
     def __iter__(self):
         return iter(self.keys())
@@ -560,7 +571,7 @@ class FieldStorage:
         if key in self:
             value = self[key]
             if type(value) is type([]):
-                return map(lambda v: v.value, value)
+                return map(attrgetter('value'), value)
             else:
                 return value.value
         else:
@@ -582,7 +593,7 @@ class FieldStorage:
         if key in self:
             value = self[key]
             if type(value) is type([]):
-                return map(lambda v: v.value, value)
+                return map(attrgetter('value'), value)
             else:
                 return [value.value]
         else:
@@ -632,8 +643,7 @@ class FieldStorage:
         """Internal: read a part that is itself multipart."""
         ib = self.innerboundary
         if not valid_boundary(ib):
-            raise ValueError, ('Invalid boundary in multipart form: %s'
-                               % `ib`)
+            raise ValueError, 'Invalid boundary in multipart form: %r' % (ib,)
         self.list = []
         klass = self.FieldStorageClass or self.__class__
         part = klass(self.fp, {}, ib,
@@ -957,8 +967,8 @@ def print_form(form):
     for key in keys:
         print "<DT>" + escape(key) + ":",
         value = form[key]
-        print "<i>" + escape(`type(value)`) + "</i>"
-        print "<DD>" + escape(`value`)
+        print "<i>" + escape(repr(type(value))) + "</i>"
+        print "<DD>" + escape(repr(value))
     print "</DL>"
     print
 

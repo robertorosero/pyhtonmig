@@ -383,7 +383,7 @@ class FaqWizard:
         try:
             meth = getattr(self, mname)
         except AttributeError:
-            self.error("Bad request type %s." % `req`)
+            self.error("Bad request type %r." % (req,))
         else:
             try:
                 meth()
@@ -583,7 +583,7 @@ class FaqWizard:
     def do_roulette(self):
         import random
         files = self.dir.list()
-        if not files: 
+        if not files:
             self.error("No entries.")
             return
         file = random.choice(files)
@@ -664,7 +664,7 @@ class FaqWizard:
         rev = self.ui.rev
         mami = revparse(rev)
         if not mami:
-            self.error("Invalid revision number: %s." % `rev`)
+            self.error("Invalid revision number: %r." % (rev,))
         self.prologue(T_REVISION, entry)
         self.shell(interpolate(SH_REVISION, entry, rev=rev))
 
@@ -674,10 +674,10 @@ class FaqWizard:
         rev = self.ui.rev
         mami = revparse(rev)
         if not mami:
-            self.error("Invalid revision number: %s." % `rev`)
+            self.error("Invalid revision number: %r." % (rev,))
         if prev:
             if not revparse(prev):
-                self.error("Invalid previous revision number: %s." % `prev`)
+                self.error("Invalid previous revision number: %r." % (prev,))
         else:
             prev = '%d.%d' % (mami[0], mami[1])
         self.prologue(T_DIFF, entry)
@@ -732,7 +732,7 @@ class FaqWizard:
             emit(VERSIONCONFLICT, entry, self.ui)
             return
         commit_ok = ((not PASSWORD
-                      or self.ui.password == PASSWORD) 
+                      or self.ui.password == PASSWORD)
                      and self.ui.author
                      and '@' in self.ui.email
                      and self.ui.log)
@@ -808,7 +808,7 @@ class FaqWizard:
 
         import tempfile
         tf = tempfile.NamedTemporaryFile()
-        emit(LOGHEADER, self.ui, os.environ, date=date, _file=tfn)
+        emit(LOGHEADER, self.ui, os.environ, date=date, _file=tf)
         tf.flush()
         tf.seek(0)
 
@@ -820,7 +820,7 @@ class FaqWizard:
         log("output: " + output)
         log("done: " + str(sts))
         log("TempFile:\n" + tf.read() + "end")
-        
+
         if not sts:
             self.prologue(T_COMMITTED)
             emit(COMMITTED)
@@ -830,7 +830,7 @@ class FaqWizard:
         print '<PRE>%s</PRE>' % escape(output)
 
         try:
-            os.unlink(tfn)
+            os.unlink(tf.name)
         except os.error:
             pass
 

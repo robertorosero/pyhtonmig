@@ -424,9 +424,8 @@ class AbstractPickleTests(unittest.TestCase):
         for proto in protocols:
             s = self.dumps(l, proto)
             x = self.loads(s)
-            self.assertEqual(x, l)
-            self.assertEqual(x, x[0])
-            self.assertEqual(id(x), id(x[0]))
+            self.assertEqual(len(x), 1)
+            self.assert_(x is x[0])
 
     def test_recursive_dict(self):
         d = {}
@@ -434,9 +433,8 @@ class AbstractPickleTests(unittest.TestCase):
         for proto in protocols:
             s = self.dumps(d, proto)
             x = self.loads(s)
-            self.assertEqual(x, d)
-            self.assertEqual(x[1], x)
-            self.assertEqual(id(x[1]), id(x))
+            self.assertEqual(x.keys(), [1])
+            self.assert_(x[1] is x)
 
     def test_recursive_inst(self):
         i = C()
@@ -444,9 +442,8 @@ class AbstractPickleTests(unittest.TestCase):
         for proto in protocols:
             s = self.dumps(i, 2)
             x = self.loads(s)
-            self.assertEqual(x, i)
-            self.assertEqual(x.attr, x)
-            self.assertEqual(id(x.attr), id(x))
+            self.assertEqual(dir(x), dir(i))
+            self.assert_(x.attr is x)
 
     def test_recursive_multi(self):
         l = []
@@ -457,12 +454,10 @@ class AbstractPickleTests(unittest.TestCase):
         for proto in protocols:
             s = self.dumps(l, proto)
             x = self.loads(s)
-            self.assertEqual(x, l)
-            self.assertEqual(x[0], i)
-            self.assertEqual(x[0].attr, d)
-            self.assertEqual(x[0].attr[1], x)
-            self.assertEqual(x[0].attr[1][0], i)
-            self.assertEqual(x[0].attr[1][0].attr, d)
+            self.assertEqual(len(x), 1)
+            self.assertEqual(dir(x[0]), dir(i))
+            self.assertEqual(x[0].attr.keys(), [1])
+            self.assert_(x[0].attr[1] is x)
 
     def test_garyp(self):
         self.assertRaises(self.error, self.loads, 'garyp')
@@ -921,6 +916,16 @@ class AbstractPickleModuleTests(unittest.TestCase):
         # Of course this needs to be changed when HIGHEST_PROTOCOL changes.
         self.assertEqual(self.module.HIGHEST_PROTOCOL, 2)
 
+    def test_callapi(self):
+        from cStringIO import StringIO
+        f = StringIO()
+        # With and without keyword arguments
+        self.module.dump(123, f, -1)
+        self.module.dump(123, file=f, protocol=-1)
+        self.module.dumps(123, -1)
+        self.module.dumps(123, protocol=-1)
+        self.module.Pickler(f, -1)
+        self.module.Pickler(f, protocol=-1)
 
 class AbstractPersistentPicklerTests(unittest.TestCase):
 

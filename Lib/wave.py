@@ -155,7 +155,7 @@ class Wave_read:
 
     def __init__(self, f):
         self._i_opened_the_file = None
-        if type(f) == type(''):
+        if isinstance(f, basestring):
             f = __builtin__.open(f, 'rb')
             self._i_opened_the_file = f
         # else, assume it is an open file object already
@@ -261,7 +261,7 @@ class Wave_read:
             sampwidth = struct.unpack('<h', chunk.read(2))[0]
             self._sampwidth = (sampwidth + 7) // 8
         else:
-            raise Error, 'unknown format: ' + `wFormatTag`
+            raise Error, 'unknown format: %r' % (wFormatTag,)
         self._framesize = self._nchannels * self._sampwidth
         self._comptype = 'NONE'
         self._compname = 'not compressed'
@@ -294,7 +294,7 @@ class Wave_write:
 
     def __init__(self, f):
         self._i_opened_the_file = None
-        if type(f) == type(''):
+        if isinstance(f, basestring):
             f = __builtin__.open(f, 'wb')
             self._i_opened_the_file = f
         self.initfp(f)

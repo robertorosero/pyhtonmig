@@ -6,7 +6,7 @@
 #include <sys/types.h>
 #include <string.h>
 
-#ifdef WITH_NEXT_FRAMEWORK
+#ifdef __APPLE__
 #include <mach-o/dyld.h>
 #endif
 
@@ -190,10 +190,14 @@ isdir(char *filename)                   /* Is directory */
 }
 
 
-/* joinpath requires that any buffer argument passed to it has at
-   least MAXPATHLEN + 1 bytes allocated.  If this requirement is met,
-   it guarantees that it will never overflow the buffer.  If stuff
-   is too long, buffer will contain a truncated copy of stuff.
+/* Add a path component, by appending stuff to buffer.
+   buffer must have at least MAXPATHLEN + 1 bytes allocated, and contain a
+   NUL-terminated string with no more than MAXPATHLEN characters (not counting
+   the trailing NUL).  It's a fatal error if it contains a string longer than
+   that (callers must be careful!).  If these requirements are met, it's
+   guaranteed that buffer will still be a NUL-terminated string with no more
+   than MAXPATHLEN characters at exit.  If stuff is too long, only as much of
+   stuff as fits will be appended.
 */
 static void
 joinpath(char *buffer, char *stuff)
@@ -206,6 +210,8 @@ joinpath(char *buffer, char *stuff)
         if (n > 0 && buffer[n-1] != SEP && n < MAXPATHLEN)
             buffer[n++] = SEP;
     }
+    if (n > MAXPATHLEN)
+    	Py_FatalError("buffer overflow in getpath.c's joinpath()");
     k = strlen(stuff);
     if (n + k > MAXPATHLEN)
         k = MAXPATHLEN - n;
@@ -374,6 +380,9 @@ calculate_path(void)
 #ifdef WITH_NEXT_FRAMEWORK
     NSModule pythonModule;
 #endif
+#ifdef __APPLE__
+    unsigned long nsexeclength = MAXPATHLEN;
+#endif
 
 	/* If there is no slash in the argv0 path, then we have to
 	 * assume python is on the user's $PATH, since there's no
@@ -382,6 +391,20 @@ calculate_path(void)
 	 */
 	if (strchr(prog, SEP))
 		strncpy(progpath, prog, MAXPATHLEN);
+#ifdef __APPLE__
+     /* On Mac OS X, if a script uses an interpreter of the form
+      * "#!/opt/python2.3/bin/python", the kernel only passes "python"
+      * as argv[0], which falls through to the $PATH search below.
+      * If /opt/python2.3/bin isn't in your path, or is near the end,
+      * this algorithm may incorrectly find /usr/bin/python. To work
+      * around this, we can use _NSGetExecutablePath to get a better
+      * hint of what the intended interpreter was, although this
+      * will fail if a relative path was used. but in that case,
+      * absolutize() should help us out below
+      */
+     else if(0 == _NSGetExecutablePath(progpath, &nsexeclength) && progpath[0] == SEP)
+       ;
+#endif /* __APPLE__ */
 	else if (path) {
 		while (1) {
 			char *delim = strchr(path, DELIM);

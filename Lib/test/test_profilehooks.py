@@ -11,7 +11,10 @@ class HookWatcher:
         self.events = []
 
     def callback(self, frame, event, arg):
-        self.add_event(event, frame)
+        if (event == "call"
+            or event == "return"
+            or event == "exception"):
+            self.add_event(event, frame)
 
     def add_event(self, event, frame=None):
         """Add an event to the log."""
@@ -56,10 +59,16 @@ class ProfileSimulator(HookWatcher):
         self.testcase.fail(
             "the profiler should never receive exception events")
 
+    def trace_pass(self, frame):
+        pass
+
     dispatch = {
         'call': trace_call,
         'exception': trace_exception,
         'return': trace_return,
+        'c_call': trace_pass,
+        'c_return': trace_pass,
+        'c_exception': trace_pass,
         }
 
 
@@ -349,11 +358,10 @@ def show_events(callable):
 
 
 def test_main():
-    loader = unittest.TestLoader()
-    suite = unittest.TestSuite()
-    suite.addTest(loader.loadTestsFromTestCase(ProfileHookTestCase))
-    suite.addTest(loader.loadTestsFromTestCase(ProfileSimulatorTestCase))
-    test_support.run_suite(suite)
+    test_support.run_unittest(
+        ProfileHookTestCase,
+        ProfileSimulatorTestCase
+    )
 
 
 if __name__ == "__main__":

@@ -30,13 +30,8 @@ PERFORMANCE OF THIS SOFTWARE.
 ******************************************************************/
 
 #include "Python.h"
-#include "macglue.h"
 #include "pymactoolbox.h"
-#ifdef WITHOUT_FRAMEWORKS
-#include <Navigation.h>
-#else
 #include <Carbon/Carbon.h>
-#endif
 
 static PyObject *ErrorObject;
 
@@ -60,13 +55,6 @@ my_eventProc(NavEventCallbackMessage callBackSelector,
 		return;
 	}
 	if ( pyfunc == Py_None ) {
-#if !TARGET_API_MAC_OSX
-		/* Special case: give update events to the Python event handling code */
-		if ( callBackSelector == kNavCBEvent && 
-				callBackParms->eventData.eventDataParms.event->what == updateEvt)
-			PyMac_HandleEvent(callBackParms->eventData.eventDataParms.event);
-		/* Ignore others */
-#endif
 		return;
 	}
 	rv = PyObject_CallFunction(pyfunc, "ls#", (long)callBackSelector,

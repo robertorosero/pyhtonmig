@@ -15,6 +15,18 @@
 #include "windows.h"
 #endif /* MS_WINDOWS */
 
+#ifdef __VMS
+extern char* vms__StdioReadline(FILE *sys_stdin, FILE *sys_stdout, char *prompt);
+#endif
+
+
+PyThreadState* _PyOS_ReadlineTState;
+
+#ifdef WITH_THREAD
+#include "pythread.h"
+static PyThread_type_lock _PyOS_ReadlineLock = NULL;
+#endif
+
 int (*PyOS_InputHook)(void) = NULL;
 
 #ifdef RISCOS
@@ -69,10 +81,13 @@ my_fgets(char *buf, int len, FILE *fp)
 		}
 #ifdef EINTR
 		if (errno == EINTR) {
-			if (PyOS_InterruptOccurred()) {
-				return 1; /* Interrupt */
+			int s;
+			PyEval_RestoreThread(_PyOS_ReadlineTState);
+			s = PyErr_CheckSignals();
+			PyEval_SaveThread();
+			if (s < 0) {
+				return 1;
 			}
-			continue;
 		}
 #endif
 		if (PyOS_InterruptOccurred()) {
@@ -119,13 +134,6 @@ PyOS_StdioReadline(FILE *sys_stdin, FILE *sys_stdout, char *prompt)
 		*p = '\0';
 		break;
 	}
-#ifdef MPW
-	/* Hack for MPW C where the prompt comes right back in the input */
-	/* XXX (Actually this would be rather nice on most systems...) */
-	n = strlen(prompt);
-	if (strncmp(p, prompt, n) == 0)
-		memmove(p, p + n, strlen(p) - n + 1);
-#endif
 	n = strlen(p);
 	while (n > 0 && p[n-1] != '\n') {
 		size_t incr = n+2;
@@ -158,11 +166,32 @@ PyOS_Readline(FILE *sys_stdin, FILE *sys_stdout, char *prompt)
 {
 	char *rv;
 
-	if (PyOS_ReadlineFunctionPointer == NULL) {
-                PyOS_ReadlineFunctionPointer = PyOS_StdioReadline;
+	if (_PyOS_ReadlineTState == PyThreadState_GET()) {
+		PyErr_SetString(PyExc_RuntimeError,
+				"can't re-enter readline");
+		return NULL;
 	}
+	
 
+	if (PyOS_ReadlineFunctionPointer == NULL) {
+#ifdef __VMS
+                PyOS_ReadlineFunctionPointer = vms__StdioReadline;
+#else
+                PyOS_ReadlineFunctionPointer = PyOS_StdioReadline;
+#endif
+	}
+	
+#ifdef WITH_THREAD
+	if (_PyOS_ReadlineLock == NULL) {
+		_PyOS_ReadlineLock = PyThread_allocate_lock();		
+	}
+#endif
+
+	_PyOS_ReadlineTState = PyThreadState_GET();
 	Py_BEGIN_ALLOW_THREADS
+#ifdef WITH_THREAD
+	PyThread_acquire_lock(_PyOS_ReadlineLock, 1);
+#endif
 
         /* This is needed to handle the unlikely case that the
          * interpreter is in interactive mode *and* stdin/out are not
@@ -175,5 +204,12 @@ PyOS_Readline(FILE *sys_stdin, FILE *sys_stdout, char *prompt)
                 rv = (*PyOS_ReadlineFunctionPointer)(sys_stdin, sys_stdout,
                                                      prompt);
 	Py_END_ALLOW_THREADS
+
+#ifdef WITH_THREAD
+	PyThread_release_lock(_PyOS_ReadlineLock);
+#endif
+
+	_PyOS_ReadlineTState = NULL;
+
 	return rv;
 }

@@ -670,13 +670,14 @@ instance_dealloc(register PyInstanceObject *inst)
 		_Py_NewReference((PyObject *)inst);
 		inst->ob_refcnt = refcnt;
 		_PyObject_GC_TRACK(inst);
-		/* If Py_REF_DEBUG, the original decref dropped _Py_RefTotal,
-		 * but _Py_NewReference bumped it again, so that's a wash.
-		 * If Py_TRACE_REFS, _Py_NewReference re-added self to the
-		 * object chain, so no more to do there either.
+		/* If Py_REF_DEBUG, _Py_NewReference bumped _Py_RefTotal, so
+		 * we need to undo that. */
+		_Py_DEC_REFTOTAL;
+		/* If Py_TRACE_REFS, _Py_NewReference re-added self to the
+		 * object chain, so no more to do there.
 		 * If COUNT_ALLOCS, the original decref bumped tp_frees, and
-		 * _Py_NewReference bumped tp_allocs:  both of those need to
-		 * be undone.
+		 * _Py_NewReference bumped tp_allocs: both of those need to be
+		 * undone.
 		 */
 #ifdef COUNT_ALLOCS
 		--inst->ob_type->tp_frees;
@@ -750,7 +751,7 @@ instance_getattr(register PyInstanceObject *inst, PyObject *name)
 		if (!PyErr_ExceptionMatches(PyExc_AttributeError))
 			return NULL;
 		PyErr_Clear();
-		args = Py_BuildValue("(OO)", inst, name);
+		args = PyTuple_Pack(2, inst, name);
 		if (args == NULL)
 			return NULL;
 		res = PyEval_CallObject(func, args);
@@ -847,9 +848,9 @@ instance_setattr(PyInstanceObject *inst, PyObject *name, PyObject *v)
 	if (func == NULL)
 		return instance_setattr1(inst, name, v);
 	if (v == NULL)
-		args = Py_BuildValue("(OO)", inst, name);
+		args = PyTuple_Pack(2, inst, name);
 	else
-		args = Py_BuildValue("(OOO)", inst, name, v);
+		args = PyTuple_Pack(3, inst, name, v);
 	if (args == NULL)
 		return -1;
 	res = PyEval_CallObject(func, args);
@@ -953,6 +954,7 @@ instance_hash(PyInstanceObject *inst)
 				return _Py_HashPointer(inst);
 			}
 		}
+		Py_XDECREF(func);
 		PyErr_SetString(PyExc_TypeError, "unhashable instance");
 		return -1;
 	}
@@ -1037,7 +1039,7 @@ instance_subscript(PyInstanceObject *inst, PyObject *key)
 	func = instance_getattr(inst, getitemstr);
 	if (func == NULL)
 		return NULL;
-	arg = Py_BuildValue("(O)", key);
+	arg = PyTuple_Pack(1, key);
 	if (arg == NULL) {
 		Py_DECREF(func);
 		return NULL;
@@ -1068,9 +1070,9 @@ instance_ass_subscript(PyInstanceObject *inst, PyObject *key, PyObject *value)
 	if (func == NULL)
 		return -1;
 	if (value == NULL)
-		arg = Py_BuildValue("(O)", key);
+		arg = PyTuple_Pack(1, key);
 	else
-		arg = Py_BuildValue("(OO)", key, value);
+		arg = PyTuple_Pack(2, key, value);
 	if (arg == NULL) {
 		Py_DECREF(func);
 		return -1;
@@ -1280,7 +1282,7 @@ instance_contains(PyInstanceObject *inst, PyObject *member)
 	if (func) {
 		PyObject *res;
 		int ret;
-		PyObject *arg = Py_BuildValue("(O)", member);
+		PyObject *arg = PyTuple_Pack(1, member);
 		if(arg == NULL) {
 			Py_DECREF(func);
 			return -1;
@@ -1345,7 +1347,7 @@ generic_binary_op(PyObject *v, PyObject *w, char *opname)
 		Py_INCREF(Py_NotImplemented);
 		return Py_NotImplemented;
 	}
-	args = Py_BuildValue("(O)", w);
+	args = PyTuple_Pack(1, w);
 	if (args == NULL) {
 		Py_DECREF(func);
 		return NULL;
@@ -1388,7 +1390,7 @@ half_binop(PyObject *v, PyObject *w, char *opname, binaryfunc thisfunc,
 		return generic_binary_op(v, w, opname);
 	}
 
-	args = Py_BuildValue("(O)", w);
+	args = PyTuple_Pack(1, w);
 	if (args == NULL) {
 		Py_DECREF(coercefunc);
 		return NULL;
@@ -1473,7 +1475,7 @@ instance_coerce(PyObject **pv, PyObject **pw)
 		return 1;
 	}
 	/* Has __coerce__ method: call it */
-	args = Py_BuildValue("(O)", w);
+	args = PyTuple_Pack(1, w);
 	if (args == NULL) {
 		return -1;
 	}
@@ -1586,7 +1588,7 @@ half_cmp(PyObject *v, PyObject *w)
 		return 2;
 	}
 
-	args = Py_BuildValue("(O)", w);
+	args = PyTuple_Pack(1, w);
 	if (args == NULL) {
 		Py_DECREF(cmp_func);
 		return -2;
@@ -1746,7 +1748,7 @@ instance_pow(PyObject *v, PyObject *w, PyObject *z)
 		func = PyObject_GetAttrString(v, "__pow__");
 		if (func == NULL)
 			return NULL;
-		args = Py_BuildValue("(OO)", w, z);
+		args = PyTuple_Pack(2, w, z);
 		if (args == NULL) {
 			Py_DECREF(func);
 			return NULL;
@@ -1785,7 +1787,7 @@ instance_ipow(PyObject *v, PyObject *w, PyObject *z)
 			PyErr_Clear();
 			return instance_pow(v, w, z);
 		}
-		args = Py_BuildValue("(OO)", w, z);
+		args = PyTuple_Pack(2, w, z);
 		if (args == NULL) {
 			Py_DECREF(func);
 			return NULL;
@@ -1858,7 +1860,7 @@ half_richcompare(PyObject *v, PyObject *w, int op)
 		return res;
 	}
 
-	args = Py_BuildValue("(O)", w);
+	args = PyTuple_Pack(1, w);
 	if (args == NULL) {
 		Py_DECREF(method);
 		return NULL;
@@ -1870,9 +1872,6 @@ half_richcompare(PyObject *v, PyObject *w, int op)
 
 	return res;
 }
-
-/* Map rich comparison operators to their swapped version, e.g. LT --> GT */
-static int swapped_op[] = {Py_GT, Py_GE, Py_EQ, Py_NE, Py_LT, Py_LE};
 
 static PyObject *
 instance_richcompare(PyObject *v, PyObject *w, int op)
@@ -1887,7 +1886,7 @@ instance_richcompare(PyObject *v, PyObject *w, int op)
 	}
 
 	if (PyInstance_Check(w)) {
-		res = half_richcompare(w, v, swapped_op[op]);
+		res = half_richcompare(w, v, _Py_SwappedOp[op]);
 		if (res != Py_NotImplemented)
 			return res;
 		Py_DECREF(res);
@@ -1969,7 +1968,6 @@ instance_iternext(PyInstanceObject *self)
 static PyObject *
 instance_call(PyObject *func, PyObject *arg, PyObject *kw)
 {
-	PyThreadState *tstate = PyThreadState_GET();
 	PyObject *res, *call = PyObject_GetAttrString(func, "__call__");
 	if (call == NULL) {
 		PyInstanceObject *inst = (PyInstanceObject*) func;
@@ -1989,14 +1987,13 @@ instance_call(PyObject *func, PyObject *arg, PyObject *kw)
 	       a() # infinite recursion
 	   This bounces between instance_call() and PyObject_Call() without
 	   ever hitting eval_frame() (which has the main recursion check). */
-	if (tstate->recursion_depth++ > Py_GetRecursionLimit()) {
-		PyErr_SetString(PyExc_RuntimeError,
-				"maximum __call__ recursion depth exceeded");
+	if (Py_EnterRecursiveCall(" in __call__")) {
 		res = NULL;
 	}
-	else
+	else {
 		res = PyObject_Call(call, arg, kw);
-	tstate->recursion_depth--;
+		Py_LeaveRecursiveCall();
+	}
 	Py_DECREF(call);
 	return res;
 }
@@ -2139,19 +2136,34 @@ static PyMemberDef instancemethod_memberlist[] = {
 	{NULL}	/* Sentinel */
 };
 
-/* The getattr() implementation for PyMethod objects is similar to
-   PyObject_GenericGetAttr(), but instead of looking in __dict__ it
-   asks im_self for the attribute.  Then the error handling is a bit
-   different because we want to preserve the exception raised by the
-   delegate, unless we have an alternative from our class. */
+/* Christian Tismer argued convincingly that method attributes should
+   (nearly) always override function attributes.
+   The one exception is __doc__; there's a default __doc__ which
+   should only be used for the class, not for instances */
+
+static PyObject *
+instancemethod_get_doc(PyMethodObject *im, void *context)
+{
+	static PyObject *docstr;
+	if (docstr == NULL) {
+		docstr= PyString_InternFromString("__doc__");
+		if (docstr == NULL)
+			return NULL;
+	}
+	return PyObject_GetAttr(im->im_func, docstr);
+}
+
+static PyGetSetDef instancemethod_getset[] = {
+	{"__doc__", (getter)instancemethod_get_doc, NULL, NULL},
+	{0}
+};
 
 static PyObject *
 instancemethod_getattro(PyObject *obj, PyObject *name)
 {
 	PyMethodObject *im = (PyMethodObject *)obj;
 	PyTypeObject *tp = obj->ob_type;
-	PyObject *descr = NULL, *res;
-	descrgetfunc f = NULL;
+	PyObject *descr = NULL;
 
 	if (PyType_HasFeature(tp, Py_TPFLAGS_HAVE_CLASS)) {
 		if (tp->tp_dict == NULL) {
@@ -2161,30 +2173,17 @@ instancemethod_getattro(PyObject *obj, PyObject *name)
 		descr = _PyType_Lookup(tp, name);
 	}
 
-	f = NULL;
 	if (descr != NULL) {
-		f = TP_DESCR_GET(descr->ob_type);
-		if (f != NULL && PyDescr_IsData(descr))
+		descrgetfunc f = TP_DESCR_GET(descr->ob_type);
+		if (f != NULL)
 			return f(descr, obj, (PyObject *)obj->ob_type);
+		else {
+			Py_INCREF(descr);
+			return descr;
+		}
 	}
 
-	res = PyObject_GetAttr(im->im_func, name);
-	if (res != NULL || !PyErr_ExceptionMatches(PyExc_AttributeError))
-		return res;
-
-	if (f != NULL) {
-		PyErr_Clear();
-		return f(descr, obj, (PyObject *)obj->ob_type);
-	}
-
-	if (descr != NULL) {
-		PyErr_Clear();
-		Py_INCREF(descr);
-		return descr;
-	}
-
-	assert(PyErr_Occurred());
-	return NULL;
+	return PyObject_GetAttr(im->im_func, name);
 }
 
 PyDoc_STRVAR(instancemethod_doc,
@@ -2491,7 +2490,7 @@ PyTypeObject PyMethod_Type = {
 	0,					/* tp_iternext */
 	0,					/* tp_methods */
 	instancemethod_memberlist,		/* tp_members */
-	0,					/* tp_getset */
+	instancemethod_getset,			/* tp_getset */
 	0,					/* tp_base */
 	0,					/* tp_dict */
 	instancemethod_descr_get,		/* tp_descr_get */

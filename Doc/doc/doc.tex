@@ -12,8 +12,8 @@
 
 \author{Fred L. Drake, Jr.}
 \authoraddress{
-	PythonLabs \\
-	Email: \email{fdrake@acm.org}
+        PythonLabs \\
+        Email: \email{fdrake@acm.org}
 }
 
 
@@ -35,6 +35,10 @@ This document describes the document classes and special markup used
 in the Python documentation.  Authors may use this guide, in
 conjunction with the template files provided with the
 distribution, to create or maintain whole documents or sections.
+
+If you're interested in contributing to Python's documentation,
+there's no need to learn \LaTeX{} if you're not so inclined; plain
+text contributions are more than welcome as well.
 \end{abstract}
 
 \tableofcontents
@@ -73,6 +77,16 @@ distribution, to create or maintain whole documents or sections.
   discussing future directions for the Python documentation and where
   to turn for more information.
 
+  If your interest is in contributing to the Python documentation, but
+  you don't have the time or inclination to learn \LaTeX{} and the
+  markup structures documented here, there's a welcoming place for you
+  among the Python contributors as well.  Any time you feel that you
+  can clarify existing documentation or provide documentation that's
+  missing, the existing documentation team will gladly work with you
+  to integrate your text, dealing with the markup for you.  Please
+  don't let the material in this document stand between the
+  documentation and your desire to help out!
+
 \section{Directory Structure \label{directories}}
 
   The source distribution for the standard Python documentation
@@ -94,65 +108,70 @@ distribution, to create or maintain whole documents or sections.
 
   \begin{definitions}
     \term{Document Sources}
-	The \LaTeX{} sources for each document are placed in a
-	separate directory.  These directories are given short
-	names which vaguely indicate the document in each:
+        The \LaTeX{} sources for each document are placed in a
+        separate directory.  These directories are given short
+        names which vaguely indicate the document in each:
 
-	\begin{tableii}{p{.75in}|p{3in}}{filenq}{Directory}{Document Title}
-	  \lineii{api/}
+        \begin{tableii}{p{.75in}|p{3in}}{filenq}{Directory}{Document Title}
+          \lineii{api/}
             {\citetitle[../api/api.html]{The Python/C API}}
-	  \lineii{dist/}
+          \lineii{dist/}
             {\citetitle[../dist/dist.html]{Distributing Python Modules}}
-	  \lineii{doc/}
+          \lineii{doc/}
             {\citetitle[../doc/doc.html]{Documenting Python}}
-	  \lineii{ext/}
-            {\citetitle[../ext/ext.html]{Extending and Embedding the Python Interpreter}}
-	  \lineii{inst/}
+          \lineii{ext/}
+            {\citetitle[../ext/ext.html]
+                       {Extending and Embedding the Python Interpreter}}
+          \lineii{inst/}
             {\citetitle[../inst/inst.html]{Installing Python Modules}}
-	  \lineii{lib/}
+          \lineii{lib/}
             {\citetitle[../lib/lib.html]{Python Library Reference}}
-	  \lineii{mac/}
+          \lineii{mac/}
             {\citetitle[../mac/mac.html]{Macintosh Module Reference}}
-	  \lineii{ref/}
+          \lineii{ref/}
             {\citetitle[../ref/ref.html]{Python Reference Manual}}
-	  \lineii{tut/}
+          \lineii{tut/}
             {\citetitle[../tut/tut.html]{Python Tutorial}}
-	\end{tableii}
+          \lineii{whatsnew/}
+            {\citetitle[../whatsnew/whatsnew24.html]
+                       {What's New in Python \shortversion}}
+        \end{tableii}
 
     \term{Format-Specific Output}
-	Most output formats have a directory which contains a
-	\file{Makefile} which controls the generation of that format
-	and provides storage for the formatted documents.  The only
-	variations within this category are the Portable Document
+        Most output formats have a directory which contains a
+        \file{Makefile} which controls the generation of that format
+        and provides storage for the formatted documents.  The only
+        variations within this category are the Portable Document
         Format (PDF) and PostScript versions are placed in the
-	directories \file{paper-a4/} and \file{paper-letter/} (this
-	causes all the temporary files created by \LaTeX{} to be kept
-	in the same place for each paper size, where they can be more
-	easily ignored).
+        directories \file{paper-a4/} and \file{paper-letter/} (this
+        causes all the temporary files created by \LaTeX{} to be kept
+        in the same place for each paper size, where they can be more
+        easily ignored).
 
-	\begin{tableii}{p{.75in}|p{3in}}{filenq}{Directory}{Output Formats}
-	  \lineii{html/}{HTML output}
-	  \lineii{info/}{GNU info output}
-	  \lineii{isilo/}{\ulink{iSilo}{http://www.isilo.com/}
-                	  documents (for Palm OS devices)}
-	  \lineii{paper-a4/}{PDF and PostScript, A4 paper}
-	  \lineii{paper-letter/}{PDF and PostScript, US-Letter paper}
-	\end{tableii}
+        \begin{tableii}{p{.75in}|p{3in}}{filenq}{Directory}{Output Formats}
+          \lineii{html/}{HTML output}
+          \lineii{info/}{GNU info output}
+          \lineii{isilo/}{\ulink{iSilo}{http://www.isilo.com/}
+                          documents (for Palm OS devices)}
+          \lineii{paper-a4/}{PDF and PostScript, A4 paper}
+          \lineii{paper-letter/}{PDF and PostScript, US-Letter paper}
+        \end{tableii}
 
     \term{Supplemental Files}
-	Some additional directories are used to store supplemental
-	files used for the various processes.  Directories are
-	included for the shared \LaTeX{} document classes, the
-	\LaTeX2HTML support, template files for various document
-	components, and the scripts used to perform various steps in
-	the formatting processes.
+        Some additional directories are used to store supplemental
+        files used for the various processes.  Directories are
+        included for the shared \LaTeX{} document classes, the
+        \LaTeX2HTML support, template files for various document
+        components, and the scripts used to perform various steps in
+        the formatting processes.
 
-	\begin{tableii}{p{.75in}|p{3in}}{filenq}{Directory}{Contents}
-	  \lineii{perl/}{Support for \LaTeX2HTML processing}
-	  \lineii{templates/}{Example files for source documents}
-	  \lineii{texinputs/}{Style implementation for \LaTeX}
-	  \lineii{tools/}{Custom processing scripts}
-	\end{tableii}
+        \begin{tableii}{p{.75in}|p{3in}}{filenq}{Directory}{Contents}
+          \lineii{commontex/}{Document content shared among documents}
+          \lineii{perl/}     {Support for \LaTeX2HTML processing}
+          \lineii{templates/}{Example files for source documents}
+          \lineii{texinputs/}{Style implementation for \LaTeX}
+          \lineii{tools/}    {Custom processing scripts}
+        \end{tableii}
 
   \end{definitions}
 
@@ -160,12 +179,10 @@ distribution, to create or maintain whole documents or sections.
 \section{Style Guide \label{style-guide}}
 
   The Python documentation should follow the \citetitle
-  [http://developer.apple.com/techpubs/macos8/pdf/apple_styleguide00.pdf]
+  [http://developer.apple.com/documentation/UserExperience/Conceptual/APStyleGuide/AppleStyleGuide2003.pdf]
   {Apple Publications Style Guide} wherever possible.  This particular
   style guide was selected mostly because it seems reasonable and is
-  easy to get online.  (Printed copies are available; see the Apple's
-  \citetitle[http://developer.apple.com/techpubs/faq.html]{Developer
-  Documentation FAQ} for more information.)
+  easy to get online.
 
   Topics which are not covered in the Apple's style guide will be
   discussed in this document if necessary.
@@ -187,26 +204,27 @@ distribution, to create or maintain whole documents or sections.
     For ``central processing unit.''  Many style guides say this
     should be spelled out on the first use (and if you must use it,
     do so!).  For the Python documentation, this abbreviation should
-    be avoided since there's no reasonable way to predict which occurance
+    be avoided since there's no reasonable way to predict which occurrence
     will be the first seen by the reader.  It is better to use the
     word ``processor'' instead.
 
     \item[\POSIX]
-	The name assigned to a particular group of standards.  This is
-	always uppercase.  Use the macro \macro{POSIX} to represent this
-    name.
+        The name assigned to a particular group of standards.  This is
+        always uppercase.  Use the macro \macro{POSIX} to represent this
+        name.
 
     \item[Python]
-	The name of our favorite programming language is always
-	capitalized.
+        The name of our favorite programming language is always
+        capitalized.
 
     \item[Unicode]
-	The name of a character set and matching encoding.  This is
-    always written capitalized.
+        The name of a character set and matching encoding.  This is
+        always written capitalized.
 
     \item[\UNIX]
-    The name of the operating system developed at AT\&T Bell Labs
-    in the early 1970s.  Use the macro \macro{UNIX} to use this name.
+        The name of the operating system developed at AT\&T Bell Labs
+        in the early 1970s.  Use the macro \macro{UNIX} to use this
+        name.
   \end{description}
 
 
@@ -214,11 +232,15 @@ distribution, to create or maintain whole documents or sections.
 
   This section is a brief introduction to \LaTeX{} concepts and
   syntax, to provide authors enough information to author documents
-  productively without having to become ``\TeX{}nicians.''
+  productively without having to become ``\TeX{}nicians.''  This does
+  not teach everything needed to know about writing \LaTeX{} for
+  Python documentation; many of the standard ``environments'' are not
+  described here (though you will learn how to mark something as an
+  environment).
 
   Perhaps the most important concept to keep in mind while marking up
   Python documentation is that while \TeX{} is unstructured, \LaTeX{} was
-  designed as a layer on top of \TeX{} which specifically supports 
+  designed as a layer on top of \TeX{} which specifically supports
   structured markup.  The Python-specific markup is intended to extend
   the structure provided by standard \LaTeX{} document classes to
   support additional information specific to Python.
@@ -314,7 +336,7 @@ Still more text.
     and optional parameters should be marked using the alternate
     syntax for a group.
 
-    For example, a macro named ``foo'' which takes a single parameter
+    For example, a macro which takes a single parameter
     would appear like this:
 
 \begin{verbatim}
@@ -322,7 +344,7 @@ Still more text.
 \end{verbatim}
 
     A macro which takes an optional parameter would be typed like this
-    when the optional paramter is given:
+    when the optional parameter is given:
 
 \begin{verbatim}
 \name[optional]
@@ -445,6 +467,34 @@ This \UNIX\ is also followed by a space.
     \end{description}
 
 
+  \subsection{Common Environments \label{latex-environments}}
+
+    \LaTeX{} provides a variety of environments even without the
+    additional markup provided by the Python-specific document classes
+    introduced in the next section.  The following environments are
+    provided as part of standard \LaTeX{} and are being used in the
+    standard Python documentation; descriptions will be added here as
+    time allows.
+
+\begin{verbatim}
+abstract
+alltt
+description
+displaymath
+document
+enumerate
+figure
+flushleft
+itemize
+list
+math
+quotation
+quote
+sloppypar
+verbatim
+\end{verbatim}
+
+
 \section{Document Classes \label{classes}}
 
   Two \LaTeX{} document classes are defined specifically for use with
@@ -480,7 +530,8 @@ This \UNIX\ is also followed by a space.
 
   The Python document classes define a lot of new environments and
   macros.  This section contains the reference material for these
-  facilities.
+  facilities.  Documentation for ``standard'' \LaTeX{} constructs is
+  not included here, though they are used in the Python documentation.
 
   \subsection{Markup for the Preamble \label{preamble-info}}
 
@@ -503,7 +554,7 @@ This \UNIX\ is also followed by a space.
       author's email address.  The domain name portion of
       the address should be lower case.
 
-      No presentation is generated from this markup, but it is used to 
+      No presentation is generated from this markup, but it is used to
       help keep track of contributions.
     \end{macrodesc}
 
@@ -600,7 +651,7 @@ This \UNIX\ is also followed by a space.
     \end{envdesc}
 
     \begin{envdesc}{excclassdesc}{\p{name}\p{constructor parameters}}
-      Descibe an exception defined by a class.  \var{constructor
+      Describe an exception defined by a class.  \var{constructor
       parameters} should not include the \var{self} parameter or
       the parentheses used in the call syntax.  To describe an
       exception class without describing the parameters to its
@@ -608,8 +659,7 @@ This \UNIX\ is also followed by a space.
     \end{envdesc}
 
     \begin{envdesc}{excdesc}{\p{name}}
-      Describe an exception.  This may be either a string exception or
-      a class exception.  In the case of class exceptions, the
+      Describe an exception.  In the case of class exceptions, the
       constructor parameters are not described; use \env{excclassdesc}
       to describe an exception class and its constructor.
     \end{envdesc}
@@ -681,7 +731,7 @@ This \UNIX\ is also followed by a space.
 \begin{verbatim}
 >>> 1 + 1
 2
->>> 
+>>>
 \end{verbatim}
 
     Within the \env{verbatim} environment, characters special to
@@ -776,24 +826,26 @@ This \UNIX\ is also followed by a space.
     \end{macrodesc}
 
     \begin{macrodesc}{deprecated}{\p{version}\p{what to do}}
-      Declare whatever is being described as being deprecated starting 
+      Declare whatever is being described as being deprecated starting
       with release \var{version}.  The text given as \var{what to do}
       should recommend something to use instead.  It should be
       complete sentences.  The entire deprecation notice will be
-      presented as a separate paragraph; it should either preceed or
+      presented as a separate paragraph; it should either precede or
       succeed the description of the deprecated feature.
     \end{macrodesc}
 
     \begin{macrodesc}{dfn}{\p{term}}
-      Mark the defining instance of \var{term} in the text.  (No index 
+      Mark the defining instance of \var{term} in the text.  (No index
       entries are generated.)
     \end{macrodesc}
 
     \begin{macrodesc}{e}{}
-      Produces a backslash.  This is convenient in \macro{code} and
-      similar macros, and is only defined there.  To create a
-      backslash in ordinary text (such as the contents of the
-      \macro{file} macro), use the standard \macro{textbackslash} macro.
+      Produces a backslash.  This is convenient in \macro{code},
+      \macro{file}, and similar macros, and the \env{alltt}
+      environment, and is only defined there.  To
+      create a backslash in ordinary text (such as the contents of the
+      \macro{citetitle} macro), use the standard \macro{textbackslash}
+      macro.
     \end{macrodesc}
 
     \begin{macrodesc}{email}{\p{address}}
@@ -824,7 +876,7 @@ This \UNIX\ is also followed by a space.
 
     \begin{macrodesc}{filenq}{\p{file or dir}}
       Like \macro{file}, but single quotes are never used.  This can
-      be used in conjunction with tables if a column will only contain 
+      be used in conjunction with tables if a column will only contain
       file or directory names.
       \warning{The \macro{filenq} macro cannot be used in the
       content of a section title due to processing limitations.}
@@ -926,8 +978,8 @@ This \UNIX\ is also followed by a space.
 
     \begin{macrodesc}{program}{\p{name}}
       The name of an executable program.  This may differ from the
-      file name for the executable for some platforms.  In particular, 
-      the \file{.exe} (or other) extension should be omitted for 
+      file name for the executable for some platforms.  In particular,
+      the \file{.exe} (or other) extension should be omitted for
       Windows programs.
     \end{macrodesc}
 
@@ -944,7 +996,7 @@ This \UNIX\ is also followed by a space.
     \end{macrodesc}
 
     \begin{macrodesc}{refmodule}{\op{key}\p{name}}
-      Like \macro{module}, but create a hyperlink to the documentation 
+      Like \macro{module}, but create a hyperlink to the documentation
       for the named module.  Note that the corresponding
       \macro{declaremodule} must be in the same document.  If the
       \macro{declaremodule} defines a module key different from the
@@ -957,7 +1009,7 @@ This \UNIX\ is also followed by a space.
     \end{macrodesc}
 
     \begin{macrodesc}{rfc}{\p{number}}
-      A reference to an Internet Request for Comments.  This generates 
+      A reference to an Internet Request for Comments.  This generates
       appropriate index entries.  The text \samp{RFC \var{number}} is
       generated; in the HTML output, this text is a hyperlink to an
       online copy of the specified RFC.
@@ -965,7 +1017,7 @@ This \UNIX\ is also followed by a space.
 
     \begin{macrodesc}{samp}{\p{text}}
       A short code sample, but possibly longer than would be given
-      using \macro{code}.  Since quotation marks are added, spaces are 
+      using \macro{code}.  Since quotation marks are added, spaces are
       acceptable.
     \end{macrodesc}
 
@@ -998,7 +1050,7 @@ This \UNIX\ is also followed by a space.
     \end{macrodesc}
 
     \begin{macrodesc}{url}{\p{url}}
-      A URL (or URN).  The URL will be presented as text.  In the HTML 
+      A URL (or URN).  The URL will be presented as text.  In the HTML
       and PDF formatted versions, the URL will also be a hyperlink.
       This can be used when referring to external resources without
       specific titles; references to resources which have titles
@@ -1017,29 +1069,6 @@ This \UNIX\ is also followed by a space.
       \macro{shortversion} macro.
     \end{macrodesc}
 
-    \begin{macrodesc}{versionadded}{\op{explanation}\p{version}}
-      The version of Python which added the described feature to the
-      library or C API.  \var{explanation} should be a \emph{brief}
-      explanation of the change consisting of a capitalized sentence
-      fragment; a period will be appended by the formatting process.
-      This is typically added to the end of the first paragraph of the
-      description before any availability notes.  The location should
-      be selected so the explanation makes sense and may vary as
-      needed.
-    \end{macrodesc}
-
-    \begin{macrodesc}{versionchanged}{\op{explanation}\p{version}}
-      The version of Python in which the named feature was changed in
-      some way (new parameters, changed side effects, etc.).
-      \var{explanation} should be a \emph{brief} explanation of the
-      change consisting of a capitalized sentence fragment; a
-      period will be appended by the formatting process.
-      This is typically added to the end of the first paragraph of the
-      description before any availability notes and after
-      \macro{versionadded}.  The location should be selected so the
-      explanation makes sense and may vary as needed.
-    \end{macrodesc}
-
     \begin{macrodesc}{warning}{\p{text}}
       An important bit of information about an API that a user should
       be very aware of when using whatever bit of API the warning
@@ -1049,6 +1078,37 @@ This \UNIX\ is also followed by a space.
       and include all appropriate punctuation.  This differs from
       \macro{note} in that it is recommended over \macro{note} for
       information regarding security.
+    \end{macrodesc}
+
+    The following two macros are used to describe information that's
+    associated with changes from one release to another.  For features
+    which are described by a single paragraph, these are typically
+    added as separate source lines at the end of the paragraph.  When
+    adding these to features described by multiple paragraphs, they
+    are usually collected in a single separate paragraph after the
+    description.  When both \macro{versionadded} and
+    \macro{versionchanged} are used, \macro{versionadded} should come
+    first; the versions should be listed in chronological order.  Both
+    of these should come before availability statements.  The location
+    should be selected so the explanation makes sense and may vary as
+    needed.
+
+    \begin{macrodesc}{versionadded}{\op{explanation}\p{version}}
+      The version of Python which added the described feature to the
+      library or C API.  \var{explanation} should be a \emph{brief}
+      explanation of the change consisting of a capitalized sentence
+      fragment; a period will be appended by the formatting process.
+      When this applies to an entire module, it should be placed at
+      the top of the module section before any prose.
+    \end{macrodesc}
+
+    \begin{macrodesc}{versionchanged}{\op{explanation}\p{version}}
+      The version of Python in which the named feature was changed in
+      some way (new parameters, changed side effects, etc.).
+      \var{explanation} should be a \emph{brief} explanation of the
+      change consisting of a capitalized sentence fragment; a
+      period will be appended by the formatting process.  This should
+      not generally be applied to modules.
     \end{macrodesc}
 
 
@@ -1062,7 +1122,7 @@ This \UNIX\ is also followed by a space.
 
   \begin{envdesc}{notice}{\op{type}}
     Label some paragraphs as being worthy of additional attention from
-    the reader.  What sort of attention is warrented can be indicated
+    the reader.  What sort of attention is warranted can be indicated
     by specifying the \var{type} of the notice.  The only values
     defined for \var{type} are \code{note} and \code{warning}; these
     are equivalent in intent to the inline markup of the same name.
@@ -1307,8 +1367,8 @@ This \UNIX\ is also followed by a space.
   \lineii{RuntimeWarning}
          {Base category for warnings about dubious runtime features.}
   \lineii{FutureWarning}
-	 {Base category for warnings about constructs that will change
-	 semantically in the future.}
+         {Base category for warnings about constructs that will change
+         semantically in the future.}
 \end{tableii}
 \end{verbatim}
 
@@ -1396,10 +1456,19 @@ This \UNIX\ is also followed by a space.
     For each of the following macros, \var{why} should be one or more
     complete sentences, starting with a capital letter (unless it
     starts with an identifier, which should not be modified), and
-    ending with the apropriate punctuation.
+    ending with the appropriate punctuation.
 
     These macros are only defined within the content of the
     \env{seealso} and \env{seealso*} environments.
+
+    \begin{macrodesc}{seelink}{\p{url}\p{linktext}\p{why}}
+      References to specific on-line resources should be given using
+      the \macro{seelink} macro if they don't have a meaningful title
+      but there is some short description of what's at the end of the
+      link.  Online documents which have identifiable titles should be
+      referenced using the \macro{seetitle} macro, using the optional
+      parameter to that macro to provide the URL.
+    \end{macrodesc}
 
     \begin{macrodesc}{seemodule}{\op{key}\p{name}\p{why}}
       Refer to another module.  \var{why} should be a brief
@@ -1498,7 +1567,7 @@ This \UNIX\ is also followed by a space.
 
     \begin{macrodesc}{exindex}{\p{exception}}
       Add a reference to an exception named \var{exception}.  The
-      exception may be either string- or class-based.
+      exception should be class-based.
     \end{macrodesc}
 
     \begin{macrodesc}{kwindex}{\p{keyword}}
@@ -1558,7 +1627,7 @@ This \UNIX\ is also followed by a space.
 
     \begin{macrodesc}{indexii}{\p{word1}\p{word2}}
       Build two index entries.  This is exactly equivalent to using
-      \code{\e index\{\var{word1}!\var{word2}\}} and 
+      \code{\e index\{\var{word1}!\var{word2}\}} and
       \code{\e index\{\var{word2}!\var{word1}\}}.
     \end{macrodesc}
 
@@ -1591,7 +1660,7 @@ This \UNIX\ is also followed by a space.
     \begin{envdesc}{productionlist}{\op{language}}
       This environment is used to enclose a group of productions.  The
       two macros are only defined within this environment.  If a
-      document descibes more than one language, the optional parameter
+      document describes more than one language, the optional parameter
       \var{language} should be used to distinguish productions between
       languages.  The value of the parameter should be a short name
       that can be used as part of a filename; colons or other
@@ -1646,13 +1715,23 @@ This \UNIX\ is also followed by a space.
   The components of graphical interfaces will be assigned markup, but
   most of the specifics have not been determined.
 
+  \begin{macrodesc}{guilabel}{\p{label}}
+    Labels presented as part of an interactive user interface should
+    be marked using \macro{guilabel}.  This includes labels from
+    text-based interfaces such as those created using \code{curses} or
+    other text-based libraries.  Any label used in the interface
+    should be marked with this macro, including button labels, window
+    titles, field names, menu and menu selection names, and even
+    values in selection lists.
+  \end{macrodesc}
+
   \begin{macrodesc}{menuselection}{\p{menupath}}
     Menu selections should be marked using a combination of
     \macro{menuselection} and \macro{sub}.  This macro is used to mark
     a complete sequence of menu selections, including selecting
     submenus and choosing a specific operation, or any subsequence of
     such a sequence.  The names of individual selections should be
-    separated by occurances of \macro{sub}.
+    separated by occurrences of \macro{sub}.
 
     For example, to mark the selection ``\menuselection{Start \sub
     Programs}'', use this markup:
@@ -1665,6 +1744,10 @@ This \UNIX\ is also followed by a space.
     such as the ellipsis some operating systems use to indicate that
     the command opens a dialog, the indicator should be omitted from
     the selection name.
+
+    Individual selection names within the \macro{menuselection} should
+    not be marked using \macro{guilabel} since that's implied by using
+    \macro{menuselection}.
   \end{macrodesc}
 
   \begin{macrodesc}{sub}{}
@@ -1769,21 +1852,26 @@ This \UNIX\ is also followed by a space.
     \begin{description}
       \item[\program{mkhowto}]
         This is the primary script used to format third-party
-	documents.  It contains all the logic needed to ``get it
-	right.''  The proper way to use this script is to make a
-	symbolic link to it or run it in place; the actual script file 
-	must be stored as part of the documentation source tree,
-	though it may be used to format documents outside the
-	tree.  Use \program{mkhowto} \longprogramopt{help}
-        for a list of
+        documents.  It contains all the logic needed to ``get it
+        right.''  The proper way to use this script is to make a
+        symbolic link to it or run it in place; the actual script file
+        must be stored as part of the documentation source tree,
+        though it may be used to format documents outside the tree.
+        Use \program{mkhowto} \longprogramopt{help} for a list of
         command line options.
 
         \program{mkhowto} can be used for both \code{howto} and
         \code{manual} class documents.  It is usually a good idea to
         always use the latest version of this tool rather than a
-        version from an older source release of Python.
+        version from an older source release of Python.  It can be
+        used to generate DVI, HTML, PDF, PostScript, and plain text
+        documents.  The GNU info and iSilo formats will be supported
+        by this script in some future version.
 
-	XXX  Need more here.
+        Use the \longprogramopt{help} option on this script's command
+        line to get a summary of options for this script.
+
+        XXX  Need more here.
     \end{description}
 
 
@@ -1795,12 +1883,12 @@ This \UNIX\ is also followed by a space.
 
     Using the Cygwin installer, make sure your Cygwin installation
     includes Perl, Python, and the \TeX{} packages.  Perl and Python
-    are located under \menuselection{Interpreters} in the installer
+    are located under \menuselection{Interpreters} in the installer.
     The \TeX{} packages are located in the \menuselection{Text}
-    section; installing the tetex-beta, texmf, texmf-base, and
-    texmf-extra ensures that all the required packages are available.
-    (There may be a more minimal set, but I've not spent time trying
-    to minimize the installation.)
+    section; installing the \code{tetex-beta}, \code{texmf},
+    \code{texmf-base}, and \code{texmf-extra} ensures that all the
+    required packages are available.  (There may be a more minimal
+    set, but I've not spent time trying to minimize the installation.)
 
     The netpbm package is used by \LaTeX2HTML, and \emph{must} be
     installed before \LaTeX2HTML can be successfully installed, even
@@ -1817,11 +1905,104 @@ This \UNIX\ is also followed by a space.
     using this command to build and install the software:
 
 \begin{verbatim}
-% configure && make install
+% ./configure && make install
 \end{verbatim}
 
-    You should now be able to build at least the HTML, PDF, and
+    You should now be able to build at least the DVI, HTML, PDF, and
     PostScript versions of the formatted documentation.
+
+
+\section{Including Graphics \label{graphics}}
+
+  The standard documentation included with Python makes no use of
+  diagrams or images; this is intentional.  The outside tools used to
+  format the documentation have not always been suited to working with
+  graphics.  As the tools have evolved and been improved by their
+  maintainers, support for graphics has improved.
+
+  The internal tools, starting with the \program{mkhowto} script, do
+  not provide any direct support for graphics.  However,
+  \program{mkhowto} will not interfere with graphics support in the
+  external tools.
+
+  Experience using graphics together with these tools and the
+  \code{howto} and \code{manual} document classes is not extensive,
+  but has been known to work.  The basic approach is this:
+
+  \begin{enumerate}
+    \item Create the image or graphic using your favorite
+          application.
+
+    \item Convert the image to a format supported by the conversion to
+          your desired output format.  If you want to generate HTML or
+          PostScript, you can convert the image or graphic to
+          encapsulated PostScript (a \file{.eps} file); \LaTeX2HTML
+          can convert that to a \file{.gif} file; it may be possible
+          to provide a \file{.gif} file directly.  If you want to
+          generate PDF, you need to provide an ``encapsulated'' PDF
+          file.  This can be generated from encapsulated PostScript
+          using the \program{epstopdf} tool provided with the te\TeX{}
+          distribution on Linux and \UNIX.
+
+    \item In your document, add this line to ``import'' the general
+          graphics support package \code{graphicx}:
+
+\begin{verbatim}
+\usepackage{graphicx}
+\end{verbatim}
+
+    \item Where you want to include your graphic or image, include
+          markup similar to this:
+
+\begin{verbatim}
+\begin{figure}
+  \centering
+  \includegraphics[width=5in]{myimage}
+  \caption{Description of my image}
+\end{figure}
+\end{verbatim}
+
+          In particular, note for the \macro{includegraphics} macro
+          that no file extension is provided.  If you're only
+          interested in one target format, you can include the
+          extension of the appropriate input file, but to allow
+          support for multiple formats, omitting the extension makes
+          life easier.
+
+    \item Run \program{mkhowto} normally.
+  \end{enumerate}
+
+  If you're working on systems which support some sort of
+  \program{make} facility, you can use that to ensure the intermediate
+  graphic formats are kept up to date.  This example shows a
+  \file{Makefile} used to format a document containing a diagram
+  created using the \program{dia} application:
+
+\begin{verbatim}
+default: pdf
+all:     html pdf ps
+
+html:   mydoc/mydoc.html
+pdf:    mydoc.pdf
+ps:     mydoc.ps
+
+mydoc/mydoc.html:  mydoc.tex mygraphic.eps
+        mkhowto --html $<
+
+mydoc.pdf:  mydoc.tex mygraphic.pdf
+        mkhowto --pdf $<
+
+mydoc.ps:   mydoc.tex mygraphic.eps
+        mkhowto --postscript $<
+
+.SUFFIXES: .dia .eps .pdf
+
+.dia.eps:
+        dia --nosplash --export $@ $<
+
+.eps.pdf:
+        epstopdf $<
+\end{verbatim} % $ <-- bow to font-lock
 
 
 \section{Future Directions \label{futures}}
@@ -1896,10 +2077,10 @@ This \UNIX\ is also followed by a space.
     extent that the desired information is already present in the
     documentation.  Some XSLT stylesheets have been started for
     presenting a preliminary XML version as HTML, but the results are
-    fairly rough..
+    fairly rough.
 
     The timeframe for the conversion is not clear since there doesn't
-    seem to be much time available to work on this, but the appearant
+    seem to be much time available to work on this, but the apparent
     benefits are growing more substantial at a moderately rapid pace.
 
 
@@ -1913,7 +2094,7 @@ This \UNIX\ is also followed by a space.
     interested parties.
 
     Comments and bug reports on the standard documents should be sent
-    to \email{python-docs@python.org}.  This may include comments
+    to \email{docs@python.org}.  This may include comments
     about formatting, content, grammatical and spelling errors, or
     this document.  You can also send comments on this document
     directly to the author at \email{fdrake@acm.org}.

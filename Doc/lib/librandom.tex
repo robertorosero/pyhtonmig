@@ -41,6 +41,10 @@ Class \class{Random} can also be subclassed if you want to use a
 different basic generator of your own devising: in that case, override
 the \method{random()}, \method{seed()}, \method{getstate()},
 \method{setstate()} and \method{jumpahead()} methods.
+Optionally, a new generator can supply a \method{getrandombits()}
+method --- this allows \method{randrange()} to produce selections
+over an arbitrarily large range.
+\versionadded[the \method{getrandombits()} method]{2.4}
 
 As an example of subclassing, the \module{random} module provides
 the \class{WichmannHill} class which implements an alternative generator
@@ -57,7 +61,11 @@ Bookkeeping functions:
   Optional argument \var{x} can be any hashable object.
   If \var{x} is omitted or \code{None}, current system time is used;
   current system time is also used to initialize the generator when the
-  module is first imported.
+  module is first imported.  If randomness sources are provided by the
+  operating system, they are used instead of the system time (see the
+  \function{os.urandom()}
+  function for details on availability).  \versionchanged[formerly,
+  operating system resources were not used]{2.4}
   If \var{x} is not \code{None} or an int or long,
   \code{hash(\var{x})} is used instead.
   If \var{x} is an int or long, \var{x} is used directly.
@@ -92,6 +100,14 @@ Bookkeeping functions:
   separated by many steps.]{2.3}
  \end{funcdesc}
 
+\begin{funcdesc}{getrandbits}{k}
+  Returns a python \class{long} int with \var{k} random bits.
+  This method is supplied with the MersenneTwister generator and some
+  other generators may also provide it as an optional part of the API.
+  When available, \method{getrandbits()} enables \method{randrange()}
+  to handle arbitrarily large ranges.
+  \versionadded{2.4}   
+\end{funcdesc} 
 
 Functions for integers:
 
@@ -113,6 +129,7 @@ Functions for sequences:
 
 \begin{funcdesc}{choice}{seq}
   Return a random element from the non-empty sequence \var{seq}.
+  If \var{seq} is empty, raises \exception{IndexError}.
 \end{funcdesc}
 
 \begin{funcdesc}{shuffle}{x\optional{, random}}
@@ -168,18 +185,6 @@ these equations can be found in any statistics text.
   Returned values range between 0 and 1.
 \end{funcdesc}
 
-\begin{funcdesc}{cunifvariate}{mean, arc}
-  Circular uniform distribution.  \var{mean} is the mean angle, and
-  \var{arc} is the range of the distribution, centered around the mean
-  angle.  Both values must be expressed in radians, and can range
-  between 0 and \emph{pi}.  Returned values range between
-  \code{\var{mean} - \var{arc}/2} and \code{\var{mean} +
-  \var{arc}/2} and are normalized to between 0 and \emph{pi}.
-
-  \deprecated{2.3}{Instead, use \code{(\var{mean} + \var{arc} *
-                   (random.random() - 0.5)) \% math.pi}.}
-\end{funcdesc}
-
 \begin{funcdesc}{expovariate}{lambd}
   Exponential distribution.  \var{lambd} is 1.0 divided by the desired
   mean.  (The parameter would be called ``lambda'', but that is a
@@ -227,7 +232,7 @@ these equations can be found in any statistics text.
   \var{beta} is the shape parameter.
 \end{funcdesc}
 
-Alternative Generator
+Alternative Generators
 
 \begin{classdesc}{WichmannHill}{\optional{seed}}
 Class that implements the Wichmann-Hill algorithm as the core generator.
@@ -245,6 +250,18 @@ require care that two independent random sequences do not overlap.
   that distinct integer arguments yield distinct internal states, and can
   yield no more than about 2**24 distinct internal states in all.
 \end{funcdesc}
+
+\begin{classdesc}{SystemRandom}{\optional{seed}}
+Class that uses the \function{os.urandom()} function for generating
+random numbers from sources provided by the operating system.
+Not available on all systems.
+Does not rely on software state and sequences are not reproducible.
+Accordingly, the \method{seed()} and \method{jumpahead()} methods
+have no effect and are ignored.  The \method{getstate()} and
+\method{setstate()} methods raise \exception{NotImplementedError} if
+called.
+\versionadded{2.4}
+\end{classdesc}
 
 \begin{seealso}
   \seetext{M. Matsumoto and T. Nishimura, ``Mersenne Twister: A

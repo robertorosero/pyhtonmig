@@ -2,7 +2,7 @@
 
 Implements the Distutils 'sdist' command (create a source distribution)."""
 
-# This module should be kept compatible with Python 1.5.2.
+# This module should be kept compatible with Python 2.1.
 
 __revision__ = "$Id$"
 
@@ -304,6 +304,10 @@ class sdist (Command):
             build_clib = self.get_finalized_command('build_clib')
             self.filelist.extend(build_clib.get_source_files())
 
+        if self.distribution.has_scripts():
+            build_scripts = self.get_finalized_command('build_scripts')
+            self.filelist.extend(build_scripts.get_source_files())
+
     # add_defaults ()
 
 
@@ -343,14 +347,14 @@ class sdist (Command):
           * the build tree (typically "build")
           * the release tree itself (only an issue if we ran "sdist"
             previously with --keep-temp, or it aborted)
-          * any RCS or CVS directories
+          * any RCS, CVS and .svn directories
         """
         build = self.get_finalized_command('build')
         base_dir = self.distribution.get_fullname()
 
         self.filelist.exclude_pattern(None, prefix=build.build_base)
         self.filelist.exclude_pattern(None, prefix=base_dir)
-        self.filelist.exclude_pattern(r'/(RCS|CVS)/.*', is_regex=1)
+        self.filelist.exclude_pattern(r'/(RCS|CVS|\.svn)/.*', is_regex=1)
 
 
     def write_manifest (self):

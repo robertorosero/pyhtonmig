@@ -125,6 +125,67 @@ settrace_and_raise.events = [(2, 'exception'),
                              (4, 'line'),
                              (4, 'return')]
 
+# implicit return example
+def ireturn_example():
+    a = 5
+    b = 5
+    if a == b:
+        b = a+1
+    else:
+        pass
+
+ireturn_example.events = [(0, 'call'),
+                          (1, 'line'),
+                          (2, 'line'),
+                          (3, 'line'),
+                          (4, 'line'),
+                          (4, 'return')]
+
+# Tight loop with while(1) example (SF #765624)
+def tightloop_example():
+    items = range(0, 3)
+    try:
+        i = 0
+        while 1:
+            b = items[i]; i+=1
+    except IndexError:
+        pass
+
+tightloop_example.events = [(0, 'call'),
+                            (1, 'line'),
+                            (2, 'line'),
+                            (3, 'line'),
+                            (4, 'line'),
+                            (5, 'line'),
+                            (5, 'line'),
+                            (5, 'line'),
+                            (5, 'line'),
+                            (5, 'exception'),
+                            (6, 'line'),
+                            (7, 'line'),
+                            (7, 'return')]
+
+def tighterloop_example():
+    items = range(1, 4)
+    try:
+        i = 0
+        while 1: i = items[i]
+    except IndexError:
+        pass
+
+tighterloop_example.events = [(0, 'call'),
+                            (1, 'line'),
+                            (2, 'line'),
+                            (3, 'line'),
+                            (4, 'line'),
+                            (4, 'line'),
+                            (4, 'line'),
+                            (4, 'line'),
+                            (4, 'exception'),
+                            (5, 'line'),
+                            (6, 'line'),
+                            (6, 'return')]
+
 class Tracer:
     def __init__(self):
         self.events = []
@@ -157,25 +218,31 @@ class TraceTestCase(unittest.TestCase):
         self.compare_events(func.func_code.co_firstlineno,
                             tracer.events, func.events)
 
-    def test_1_basic(self):
+    def test_01_basic(self):
         self.run_test(basic)
-    def test_2_arigo(self):
+    def test_02_arigo(self):
         self.run_test(arigo_example)
-    def test_3_one_instr(self):
+    def test_03_one_instr(self):
         self.run_test(one_instr_line)
-    def test_4_no_pop_blocks(self):
+    def test_04_no_pop_blocks(self):
         self.run_test(no_pop_blocks)
-    def test_5_no_pop_tops(self):
+    def test_05_no_pop_tops(self):
         self.run_test(no_pop_tops)
-    def test_6_call(self):
+    def test_06_call(self):
         self.run_test(call)
-    def test_7_raise(self):
+    def test_07_raise(self):
         self.run_test(test_raise)
 
-    def test_8_settrace_and_return(self):
+    def test_08_settrace_and_return(self):
         self.run_test2(settrace_and_return)
-    def test_9_settrace_and_raise(self):
+    def test_09_settrace_and_raise(self):
         self.run_test2(settrace_and_raise)
+    def test_10_ireturn(self):
+        self.run_test(ireturn_example)
+    def test_11_tightloop(self):
+        self.run_test(tightloop_example)
+    def test_12_tighterloop(self):
+        self.run_test(tighterloop_example)
 
 class RaisingTraceFuncTestCase(unittest.TestCase):
     def trace(self, frame, event, arg):
@@ -220,6 +287,27 @@ class RaisingTraceFuncTestCase(unittest.TestCase):
         self.run_test_for_event('return')
     def test_exception(self):
         self.run_test_for_event('exception')
+
+    def test_trash_stack(self):
+        def f():
+            for i in range(5):
+                print i  # line tracing will raise an exception at this line
+
+        def g(frame, why, extra):
+            if (why == 'line' and
+                frame.f_lineno == f.func_code.co_firstlineno + 2):
+                raise RuntimeError, "i am crashing"
+            return g
+
+        sys.settrace(g)
+        try:
+            f()
+        except RuntimeError:
+            # the test is really that this doesn't segfault:
+            import gc
+            gc.collect()
+        else:
+            self.fail("exception not propagated")
 
 
 # 'Jump' tests: assigning to frame.f_lineno within a trace function
@@ -510,9 +598,11 @@ class JumpTestCase(unittest.TestCase):
         no_jump_without_trace_function()
 
 def test_main():
-    test_support.run_unittest(TraceTestCase)
-    test_support.run_unittest(RaisingTraceFuncTestCase)
-    test_support.run_unittest(JumpTestCase)
+    test_support.run_unittest(
+        TraceTestCase,
+        RaisingTraceFuncTestCase,
+        JumpTestCase
+    )
 
 if __name__ == "__main__":
     test_main()

@@ -2,7 +2,7 @@
 \sectionauthor{Bob Savage}{bobsavage@mac.com}
 
 Using Python on a Macintosh, especially on Mac OS 9 (MacPython-OSX
-includes a complete unix Python) can seem like something completely
+includes a complete \UNIX{} Python) can seem like something completely
 different than using it on a \UNIX-like or Windows system. Most of the
 Python documentation, both the ``official'' documentation and published
 books, describe only how Python is used on these systems, causing
@@ -28,11 +28,12 @@ What you get after installing is a number of things:
 \begin{itemize}
     \item A \file{MacPython-2.3} folder in your \file{Applications}
     folder. In here you find the PythonIDE Integrated Development Environment;
-    PythonLauncher, which handles double-clicking Python scripts from the Finder; and
-    the Package Manager.
+    PythonLauncher, which handles double-clicking Python scripts from
+    the Finder; and the Package Manager.
     
-    \item A fairly standard unix commandline Python interpreter in
-    \file{/usr/local/bin/python}, but without the usual \file{/usr/local/lib/python}.
+    \item A fairly standard \UNIX{} commandline Python interpreter in
+    \file{/usr/local/bin/python}, but without the usual
+    \file{/usr/local/lib/python}.
     
     \item A framework \file{/Library/Frameworks/Python.framework}, where
     all the action really is, but which you usually do not have to be aware of.
@@ -44,8 +45,8 @@ PythonIDE contains an Apple Help Viewer book called "MacPython Help"
 which you can access through its help menu. If you are completely new to
 Python you should start reading the IDE introduction in that document.
 
-If you are familiar with Python on other unix platforms you should read the
-section on running Python scripts from the unix shell.
+If you are familiar with Python on other \UNIX{} platforms you should
+read the section on running Python scripts from the \UNIX{} shell.
 
 \subsection{How to run a Python script}
 
@@ -55,14 +56,14 @@ menu when the IDE is running.
 
 If you want to run Python scripts from the Terminal window command line
 or from the Finder you first need an editor to create your script.
-Mac OS X comes with a number of standard unix command line editors,
+Mac OS X comes with a number of standard \UNIX{} command line editors,
 \program{vi} and \program{emacs} among them. If you want a more Mac-like
 editor \program{BBEdit} or \program{TextWrangler} from Bare Bones Software
-(see \url{http://www.barebones.com}) are good choices. Their freeware
-\program{BBEdit Lite} is officially discontinued but still available.
-\program{AppleWorks} or any other word processor that can save files
-in ASCII is also a possibility, but \program{TextEdit} is not: it saves in .rtf
-format only.
+(see \url{http://www.barebones.com/products/bbedit/index.shtml}) are
+good choices.  Their freeware \program{BBEdit Lite} is officially
+discontinued but still available.  \program{AppleWorks} or any other
+word processor that can save files in ASCII is also a possibility, including
+\program{TextEdit} which is included with OS X.
 
 To run your script from the Terminal window you must make sure that
 \file{/usr/local/bin} is in your shell search path before \file{/usr/bin},
@@ -85,13 +86,14 @@ Preferences menu to change things globally.
 
 There is one Mac OS X quirk that you need to be aware of: programs
 that talk to the Aqua window manager (in other words, anything that has a GUI)
-need to be run in a special way. Use \program{pythonw} in stead of \program{python}
+need to be run in a special way. Use \program{pythonw} instead of \program{python}
 to start such scripts.
 
 \subsection{configuration}
 
-MacPython honours all standard unix environment variables such as \envvar{PYTHONPATH},
-but setting these variables for programs started from the Finder is non-standard
+MacPython honours all standard \UNIX{} environment variables such as
+\envvar{PYTHONPATH}, but setting these variables for programs started
+from the Finder is non-standard
 as the Finder does not read your \file{.profile} or \file{.cshrc} at startup.
 You need to create a file \file{\textasciitilde /.MacOSX/environment.plist}.
 See Apple's Technical Document QA1067 for details.
@@ -103,7 +105,7 @@ Package Manager, see the MacPython Help Book for details.
 
 The most recent release version as well as possible newer experimental
 versions are best found at the MacPython page maintained by Jack
-Jansen: \url{http://www.cwi.nl/\textasciitilde jack/macpython.html}.
+Jansen: \url{http://homepages.cwi.nl/\textasciitilde jack/macpython.html}.
 
 Please refer to the \file{README} included with your distribution for
 the most up-to-date instructions.
@@ -155,9 +157,9 @@ section \ref{defaults}.
 
 \item
 When you waved the script icon over the \program{PythonInterpreter},
-the \program{PythonInterpreter} icon did not hilight.  Most likely the
-Creator code and document type is unset (or set incorrectly) -- this
-often happens when a file originates on a non-Mac computer.  See
+the \program{PythonInterpreter} icon did not highlight.  Most likely
+the Creator code and document type is unset (or set incorrectly) --
+this often happens when a file originates on a non-Mac computer.  See
 section \ref{creator-code} for more details.
 \end{itemize}
 
@@ -238,7 +240,9 @@ with extra features.
 
 You can create a text file with any word processing program such as
 \program{MSWord} or \program{AppleWorks} but you need to make sure
-that the file is saved as ``\ASCII'' or ``plain text''.
+that the file is saved as ``\ASCII'' or ``plain text''. This also
+works for \program{TextEdit}, but you need to use the command ``Make Plain Text``
+in the ``Format`` menu before trying to save.
 
 
 \subsubsection{Editors with Python modes}
@@ -380,7 +384,7 @@ execute it or smaller selections of it.
 You can create a new script, open a previously saved script, and save
 your currently open script by selecting the appropriate item in the
 ``File'' menu. Dropping a Python script onto the
-\program{Python IDE} will open it for editting.
+\program{Python IDE} will open it for editing.
 
 If you try to open a script with the \program{Python IDE} but either
 can't locate it from the ``Open'' dialog box, or you get an error

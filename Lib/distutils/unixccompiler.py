@@ -203,6 +203,10 @@ class UnixCCompiler(CCompiler):
         if sys.platform[:6] == "darwin":
             # MacOSX's linker doesn't understand the -R flag at all
             return "-L" + dir
+        elif sys.platform[:5] == "hp-ux":
+            return "+s -L" + dir
+        elif sys.platform[:7] == "irix646" or sys.platform[:6] == "osf1V5":
+            return ["-rpath", dir]
         elif compiler[:3] == "gcc" or compiler[:3] == "g++":
             return "-Wl,-R" + dir
         else:
@@ -215,7 +219,7 @@ class UnixCCompiler(CCompiler):
         shared_f = self.library_filename(lib, lib_type='shared')
         dylib_f = self.library_filename(lib, lib_type='dylib')
         static_f = self.library_filename(lib, lib_type='static')
-        
+
         for dir in dirs:
             shared = os.path.join(dir, shared_f)
             dylib = os.path.join(dir, dylib_f)
@@ -230,6 +234,6 @@ class UnixCCompiler(CCompiler):
                 return shared
             elif os.path.exists(static):
                 return static
-            
+
         # Oops, didn't find it in *any* of 'dirs'
         return None

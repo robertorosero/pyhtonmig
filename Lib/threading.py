@@ -8,13 +8,14 @@ except ImportError:
     del _sys.modules[__name__]
     raise
 
-from StringIO import StringIO as _StringIO
 from time import time as _time, sleep as _sleep
-from traceback import print_exc as _print_exc
+from traceback import format_exc as _format_exc
+from collections import deque
 
 # Rename some stuff so "from threading import *" is safe
 __all__ = ['activeCount', 'Condition', 'currentThread', 'enumerate', 'Event',
-           'Lock', 'RLock', 'Semaphore', 'BoundedSemaphore', 'Thread', 'Timer']
+           'Lock', 'RLock', 'Semaphore', 'BoundedSemaphore', 'Thread',
+           'Timer', 'setprofile', 'settrace', 'local']
 
 _start_new_thread = thread.start_new_thread
 _allocate_lock = thread.allocate_lock
@@ -23,13 +24,17 @@ ThreadError = thread.error
 del thread
 
 
-# Debug support (adapted from ihooks.py)
+# Debug support (adapted from ihooks.py).
+# All the major classes here derive from _Verbose.  We force that to
+# be a new-style class so that all the major classes here are new-style.
+# This helps debugging (type(instance) is more revealing for instances
+# of new-style classes).
 
-_VERBOSE = 0 # XXX Bool or int?
+_VERBOSE = False
 
 if __debug__:
 
-    class _Verbose:
+    class _Verbose(object):
 
         def __init__(self, verbose=None):
             if verbose is None:
@@ -45,12 +50,24 @@ if __debug__:
 
 else:
     # Disable this when using "python -O"
-    class _Verbose:
+    class _Verbose(object):
         def __init__(self, verbose=None):
             pass
         def _note(self, *args):
             pass
 
+# Support for profile and trace hooks
+
+_profile_hook = None
+_trace_hook = None
+
+def setprofile(func):
+    global _profile_hook
+    _profile_hook = func
+
+def settrace(func):
+    global _trace_hook
+    _trace_hook = func
 
 # Synchronization classes
 
@@ -176,7 +193,6 @@ class _Condition(_Verbose):
             return True
 
     def wait(self, timeout=None):
-        currentThread() # for side-effect
         assert self._is_owned(), "wait() of un-acquire()d lock"
         waiter = _allocate_lock()
         waiter.acquire()
@@ -218,7 +234,6 @@ class _Condition(_Verbose):
             self._acquire_restore(saved_state)
 
     def notify(self, n=1):
-        currentThread() # for side-effect
         assert self._is_owned(), "notify() of un-acquire()d lock"
         __waiters = self.__waiters
         waiters = __waiters[:n]
@@ -352,6 +367,11 @@ _limbo = {}
 class Thread(_Verbose):
 
     __initialized = False
+    # Need to store a reference to sys.exc_info for printing
+    # out exceptions when a thread tries to use a global var. during interp.
+    # shutdown and thus raises an exception about trying to perform some
+    # operation on/with a NoneType
+    __exc_info = _sys.exc_info
 
     def __init__(self, group=None, target=None, name=None,
                  args=(), kwargs={}, verbose=None):
@@ -366,6 +386,9 @@ class Thread(_Verbose):
         self.__stopped = False
         self.__block = Condition(Lock())
         self.__initialized = True
+        # sys.stderr is not stored in the class like
+        # sys.exc_info since it can be changed between instances
+        self.__stderr = _sys.stderr
 
     def _set_daemon(self):
         # Overridden in _MainThread and _DummyThread
@@ -407,6 +430,14 @@ class Thread(_Verbose):
             _active_limbo_lock.release()
             if __debug__:
                 self._note("%s.__bootstrap(): thread started", self)
+
+            if _trace_hook:
+                self._note("%s.__bootstrap(): registering trace hook", self)
+                _sys.settrace(_trace_hook)
+            if _profile_hook:
+                self._note("%s.__bootstrap(): registering profile hook", self)
+                _sys.setprofile(_profile_hook)
+
             try:
                 self.run()
             except SystemExit:
@@ -415,10 +446,36 @@ class Thread(_Verbose):
             except:
                 if __debug__:
                     self._note("%s.__bootstrap(): unhandled exception", self)
-                s = _StringIO()
-                _print_exc(file=s)
-                _sys.stderr.write("Exception in thread %s:\n%s\n" %
-                                 (self.getName(), s.getvalue()))
+                # If sys.stderr is no more (most likely from interpreter
+                # shutdown) use self.__stderr.  Otherwise still use sys (as in
+                # _sys) in case sys.stderr was redefined since the creation of
+                # self.
+                if _sys:
+                    _sys.stderr.write("Exception in thread %s:\n%s\n" %
+                                      (self.getName(), _format_exc()))
+                else:
+                    # Do the best job possible w/o a huge amt. of code to
+                    # approximate a traceback (code ideas from
+                    # Lib/traceback.py)
+                    exc_type, exc_value, exc_tb = self.__exc_info()
+                    try:
+                        print>>self.__stderr, (
+                            "Exception in thread " + self.getName() +
+                            " (most likely raised during interpreter shutdown):")
+                        print>>self.__stderr, (
+                            "Traceback (most recent call last):")
+                        while exc_tb:
+                            print>>self.__stderr, (
+                                '  File "%s", line %s, in %s' %
+                                (exc_tb.tb_frame.f_code.co_filename,
+                                    exc_tb.tb_lineno,
+                                    exc_tb.tb_frame.f_code.co_name))
+                            exc_tb = exc_tb.tb_next
+                        print>>self.__stderr, ("%s: %s" % (exc_type, exc_value))
+                    # Make sure that exc_tb gets deleted since it is a memory
+                    # hog; deleting everything else is just for thoroughness
+                    finally:
+                        del exc_type, exc_value, exc_tb
             else:
                 if __debug__:
                     self._note("%s.__bootstrap(): normal return", self)
@@ -436,9 +493,38 @@ class Thread(_Verbose):
         self.__block.release()
 
     def __delete(self):
+        "Remove current thread from the dict of currently running threads."
+
+        # Notes about running with dummy_thread:
+        #
+        # Must take care to not raise an exception if dummy_thread is being
+        # used (and thus this module is being used as an instance of
+        # dummy_threading).  dummy_thread.get_ident() always returns -1 since
+        # there is only one thread if dummy_thread is being used.  Thus
+        # len(_active) is always <= 1 here, and any Thread instance created
+        # overwrites the (if any) thread currently registered in _active.
+        #
+        # An instance of _MainThread is always created by 'threading'.  This
+        # gets overwritten the instant an instance of Thread is created; both
+        # threads return -1 from dummy_thread.get_ident() and thus have the
+        # same key in the dict.  So when the _MainThread instance created by
+        # 'threading' tries to clean itself up when atexit calls this method
+        # it gets a KeyError if another Thread instance was created.
+        #
+        # This all means that KeyError from trying to delete something from
+        # _active if dummy_threading is being used is a red herring.  But
+        # since it isn't if dummy_threading is *not* being used then don't
+        # hide the exception.
+
         _active_limbo_lock.acquire()
-        del _active[_get_ident()]
-        _active_limbo_lock.release()
+        try:
+            try:
+                del _active[_get_ident()]
+            except KeyError:
+                if 'dummy_threading' not in _sys.modules:
+                    raise
+        finally:
+            _active_limbo_lock.release()
 
     def join(self, timeout=None):
         assert self.__initialized, "Thread.__init__() not called"
@@ -600,10 +686,17 @@ def enumerate():
     _active_limbo_lock.release()
     return active
 
-
 # Create the main thread object
 
 _MainThread()
+
+# get thread-local implementation, either from the thread
+# module, or from the python fallback
+
+try:
+    from thread import _local as local
+except ImportError:
+    from _threading_local import local
 
 
 # Self-test code
@@ -618,7 +711,7 @@ def _test():
             self.rc = Condition(self.mon)
             self.wc = Condition(self.mon)
             self.limit = limit
-            self.queue = []
+            self.queue = deque()
 
         def put(self, item):
             self.mon.acquire()
@@ -636,7 +729,7 @@ def _test():
             while not self.queue:
                 self._note("get(): queue empty")
                 self.rc.wait()
-            item = self.queue.pop(0)
+            item = self.queue.popleft()
             self._note("get(): got %s, %d left", item, len(self.queue))
             self.wc.notify()
             self.mon.release()

@@ -3,7 +3,7 @@
 Implements the Distutils 'bdist_wininst' command: create a windows installer
 exe-program."""
 
-# This module should be kept compatible with Python 1.5.2.
+# This module should be kept compatible with Python 2.1.
 
 __revision__ = "$Id$"
 
@@ -24,7 +24,7 @@ class bdist_wininst (Command):
                     ('keep-temp', 'k',
                      "keep the pseudo-installation tree around after " +
                      "creating the distribution archive"),
-                    ('target-version=', 'v',
+                    ('target-version=', None,
                      "require a specific python version" +
                      " on the target system"),
                     ('no-target-compile', 'c',
@@ -43,6 +43,10 @@ class bdist_wininst (Command):
                     ('install-script=', None,
                      "basename of installation script to be run after"
                      "installation or before deinstallation"),
+                    ('pre-install-script=', None,
+                     "Fully qualified filename of a script to be run before "
+                     "any files are installed.  This script need not be in the "
+                     "distribution"),
                    ]
 
     boolean_options = ['keep-temp', 'no-target-compile', 'no-target-optimize',
@@ -59,6 +63,7 @@ class bdist_wininst (Command):
         self.title = None
         self.skip_build = 0
         self.install_script = None
+        self.pre_install_script = None
 
     # initialize_options()
 
@@ -69,11 +74,12 @@ class bdist_wininst (Command):
             self.bdist_dir = os.path.join(bdist_base, 'wininst')
         if not self.target_version:
             self.target_version = ""
-        if self.distribution.has_ext_modules():
+        if not self.skip_build and self.distribution.has_ext_modules():
             short_version = get_python_version()
             if self.target_version and self.target_version != short_version:
                 raise DistutilsOptionError, \
-                      "target version can only be" + short_version
+                      "target version can only be %s, or the '--skip_build'" \
+                      " option must be specified" % (short_version,)
             self.target_version = short_version
 
         self.set_undefined_options('bdist', ('dist_dir', 'dist_dir'))
@@ -100,7 +106,7 @@ class bdist_wininst (Command):
         if not self.skip_build:
             self.run_command('build')
 
-        install = self.reinitialize_command('install')
+        install = self.reinitialize_command('install', reinit_subcommands=1)
         install.root = self.bdist_dir
         install.skip_build = self.skip_build
         install.warn_dir = 0
@@ -109,6 +115,22 @@ class bdist_wininst (Command):
         # we do not want to include pyc or pyo files
         install_lib.compile = 0
         install_lib.optimize = 0
+
+        if self.distribution.has_ext_modules():
+            # If we are building an installer for a Python version other
+            # than the one we are currently running, then we need to ensure
+            # our build_lib reflects the other Python version rather than ours.
+            # Note that for target_version!=sys.version, we must have skipped the
+            # build step, so there is no issue with enforcing the build of this
+            # version.
+            target_version = self.target_version
+            if not target_version:
+                assert self.skip_build, "Should have already checked this"
+                target_version = sys.version[0:3]
+            plat_specifier = ".%s-%s" % (get_platform(), target_version)
+            build = self.get_finalized_command('build')
+            build.build_lib = os.path.join(build.build_base,
+                                           'lib' + plat_specifier)
 
         # Use a custom scheme for the zip-file, because we have to decide
         # at installation time which scheme to use.
@@ -155,39 +177,41 @@ class bdist_wininst (Command):
         lines = []
         metadata = self.distribution.metadata
 
-        # Write the [metadata] section.  Values are written with
-        # repr()[1:-1], so they do not contain unprintable characters, and
-        # are not surrounded by quote chars.
+        # Write the [metadata] section.
         lines.append("[metadata]")
 
         # 'info' will be displayed in the installer's dialog box,
         # describing the items to be installed.
         info = (metadata.long_description or '') + '\n'
 
+        # Escape newline characters
+        def escape(s):
+            return string.replace(s, "\n", "\\n")
+
         for name in ["author", "author_email", "description", "maintainer",
                      "maintainer_email", "name", "url", "version"]:
             data = getattr(metadata, name, "")
             if data:
                 info = info + ("\n    %s: %s" % \
-                               (string.capitalize(name), data))
-                lines.append("%s=%s" % (name, repr(data)[1:-1]))
+                               (string.capitalize(name), escape(data)))
+                lines.append("%s=%s" % (name, escape(data)))
 
         # The [setup] section contains entries controlling
         # the installer runtime.
         lines.append("\n[Setup]")
         if self.install_script:
             lines.append("install_script=%s" % self.install_script)
-        lines.append("info=%s" % repr(info)[1:-1])
+        lines.append("info=%s" % escape(info))
         lines.append("target_compile=%d" % (not self.no_target_compile))
         lines.append("target_optimize=%d" % (not self.no_target_optimize))
         if self.target_version:
             lines.append("target_version=%s" % self.target_version)
 
         title = self.title or self.distribution.get_fullname()
-        lines.append("title=%s" % repr(title)[1:-1])
+        lines.append("title=%s" % escape(title))
         import time
         import distutils
-        build_info = "Build %s with distutils-%s" % \
+        build_info = "Built %s with distutils-%s" % \
                      (time.ctime(time.time()), distutils.__version__)
         lines.append("build_info=%s" % build_info)
         return string.join(lines, "\n")
@@ -201,15 +225,7 @@ class bdist_wininst (Command):
 
         cfgdata = self.get_inidata()
 
-        if self.target_version:
-            # if we create an installer for a specific python version,
-            # it's better to include this in the name
-            installer_name = os.path.join(self.dist_dir,
-                                          "%s.win32-py%s.exe" %
-                                           (fullname, self.target_version))
-        else:
-            installer_name = os.path.join(self.dist_dir,
-                                          "%s.win32.exe" % fullname)
+        installer_name = self.get_installer_filename(fullname)
         self.announce("creating %s" % installer_name)
 
         if bitmap:
@@ -223,9 +239,32 @@ class bdist_wininst (Command):
         if bitmap:
             file.write(bitmapdata)
 
+        # Convert cfgdata from unicode to ascii, mbcs encoded
+        try:
+            unicode
+        except NameError:
+            pass
+        else:
+            if isinstance(cfgdata, unicode):
+                cfgdata = cfgdata.encode("mbcs")
+
+        # Append the pre-install script
+        cfgdata = cfgdata + "\0"
+        if self.pre_install_script:
+            script_data = open(self.pre_install_script, "r").read()
+            cfgdata = cfgdata + script_data + "\n\0"
+        else:
+            # empty pre-install script
+            cfgdata = cfgdata + "\0"
         file.write(cfgdata)
+
+        # The 'magic number' 0x1234567B is used to make sure that the
+        # binary layout of 'cfgdata' is what the wininst.exe binary
+        # expects.  If the layout changes, increment that number, make
+        # the corresponding changes to the wininst.exe sources, and
+        # recompile them.
         header = struct.pack("<iii",
-                             0x1234567A,       # tag
+                             0x1234567B,       # tag
                              len(cfgdata),     # length
                              bitmaplen,        # number of bytes in bitmap
                              )
@@ -234,9 +273,50 @@ class bdist_wininst (Command):
 
     # create_exe()
 
+    def get_installer_filename(self, fullname):
+        # Factored out to allow overriding in subclasses
+        if self.target_version:
+            # if we create an installer for a specific python version,
+            # it's better to include this in the name
+            installer_name = os.path.join(self.dist_dir,
+                                          "%s.win32-py%s.exe" %
+                                           (fullname, self.target_version))
+        else:
+            installer_name = os.path.join(self.dist_dir,
+                                          "%s.win32.exe" % fullname)
+        return installer_name
+    # get_installer_filename()
+
     def get_exe_bytes (self):
-        # wininst.exe is in the same directory as this file
+        from distutils.msvccompiler import get_build_version
+        # If a target-version other than the current version has been
+        # specified, then using the MSVC version from *this* build is no good.
+        # Without actually finding and executing the target version and parsing
+        # its sys.version, we just hard-code our knowledge of old versions.
+        # NOTE: Possible alternative is to allow "--target-version" to
+        # specify a Python executable rather than a simple version string.
+        # We can then execute this program to obtain any info we need, such
+        # as the real sys.version string for the build.
+        cur_version = get_python_version()
+        if self.target_version and self.target_version != cur_version:
+            # If the target version is *later* than us, then we assume they
+            # use what we use
+            # string compares seem wrong, but are what sysconfig.py itself uses
+            if self.target_version > cur_version:
+                bv = get_build_version()
+            else:
+                if self.target_version < "2.4":
+                    bv = "6"
+                else:
+                    bv = "7.1"
+        else:
+            # for current version - use authoritative check.
+            bv = get_build_version()
+
+        # wininst-x.y.exe is in the same directory as this file
         directory = os.path.dirname(__file__)
-        filename = os.path.join(directory, "wininst.exe")
+        # we must use a wininst-x.y.exe built with the same C compiler
+        # used for python.  XXX What about mingw, borland, and so on?
+        filename = os.path.join(directory, "wininst-%s.exe" % bv)
         return open(filename, "rb").read()
 # class bdist_wininst

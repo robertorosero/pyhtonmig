@@ -27,7 +27,7 @@ typedef __int64 hs_time;
 #ifndef HAVE_GETTIMEOFDAY
 #error "This module requires gettimeofday() on non-Windows platforms!"
 #endif
-#if defined(macintosh) || (defined(PYOS_OS2) && defined(PYCC_GCC))
+#if (defined(PYOS_OS2) && defined(PYCC_GCC))
 #include <sys/time.h>
 #else
 #include <sys/resource.h>
@@ -47,10 +47,6 @@ typedef struct timeval hs_time;
 #endif
 
 #define BUFFERSIZE 10240
-
-#ifdef macintosh
-#define PATH_MAX 254
-#endif
 
 #if defined(PYOS_OS2) && defined(PYCC_GCC)
 #define PATH_MAX 260
@@ -352,9 +348,11 @@ unpack_add_info(LogReaderObject *self)
                     goto finally;
                 }
                 if (PyDict_SetItem(self->info, key, list)) {
+                    Py_DECREF(list);
                     err = ERR_EXCEPTION;
                     goto finally;
                 }
+                Py_DECREF(list);
             }
             if (PyList_Append(list, value))
                 err = ERR_EXCEPTION;
@@ -524,6 +522,7 @@ logreader_dealloc(LogReaderObject *self)
         fclose(self->logfp);
         self->logfp = NULL;
     }
+    Py_XDECREF(self->info);
     PyObject_Del(self);
 }
 
@@ -800,11 +799,16 @@ get_fileno(ProfilerObject *self, PyCodeObject *fcode)
         PyObject *name = PyDict_GetItem(dict, obj);
         if (name == NULL) {
             if (pack_define_func(self, fileno, fcode->co_firstlineno,
-                                 PyString_AS_STRING(fcode->co_name)) < 0)
+                                 PyString_AS_STRING(fcode->co_name)) < 0) {
+                Py_DECREF(obj);
                 return -1;
-            if (PyDict_SetItem(dict, obj, fcode->co_name))
+            }
+            if (PyDict_SetItem(dict, obj, fcode->co_name)) {
+                Py_DECREF(obj);
                 return -1;
+            }
         }
+        Py_DECREF(obj);
     }
     return fileno;
 }
@@ -825,12 +829,14 @@ get_tdelta(ProfilerObject *self)
 
     GETTIMEOFDAY(&tv);
 
-    if (tv.tv_sec == self->prev_timeofday.tv_sec)
-        tdelta = tv.tv_usec - self->prev_timeofday.tv_usec;
-    else
-        tdelta = ((tv.tv_sec - self->prev_timeofday.tv_sec) * 1000000
-                  + tv.tv_usec);
+    tdelta = tv.tv_usec - self->prev_timeofday.tv_usec;
+    if (tv.tv_sec != self->prev_timeofday.tv_sec)
+        tdelta += (tv.tv_sec - self->prev_timeofday.tv_sec) * 1000000;
 #endif
+    /* time can go backwards on some multiprocessor systems or by NTP */
+    if (tdelta < 0)
+        return 0;
+
     self->prev_timeofday = tv;
     return tdelta;
 }
@@ -941,7 +947,7 @@ calibrate(void)
         }
 #endif
     }
-#if defined(MS_WINDOWS) || defined(macintosh) || defined(PYOS_OS2) || \
+#if defined(MS_WINDOWS) || defined(PYOS_OS2) || \
     defined(__VMS)
     rusage_diff = -1;
 #else

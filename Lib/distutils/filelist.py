@@ -4,7 +4,7 @@ Provides the FileList class, used for poking about the filesystem
 and building lists of files.
 """
 
-# This module should be kept compatible with Python 1.5.2.
+# This module should be kept compatible with Python 2.1.
 
 __revision__ = "$Id$"
 
@@ -166,8 +166,8 @@ class FileList:
                              (dir, string.join(patterns)))
             for pattern in patterns:
                 if not self.include_pattern(pattern, prefix=dir):
-                    log.warn(("warngin: no files found matching '%s' " +
-                                "under directory '%s'"), 
+                    log.warn(("warning: no files found matching '%s' " +
+                                "under directory '%s'"),
                              pattern, dir)
 
         elif action == 'recursive-exclude':

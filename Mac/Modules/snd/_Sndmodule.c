@@ -5,27 +5,17 @@
 
 
 
-#ifdef _WIN32
-#include "pywintoolbox.h"
-#else
-#include "macglue.h"
 #include "pymactoolbox.h"
-#endif
 
 /* Macro to test whether a weak-loaded CFM function exists */
 #define PyMac_PRECHECK(rtn) do { if ( &rtn == NULL )  {\
-    	PyErr_SetString(PyExc_NotImplementedError, \
-    	"Not available in this shared library/OS version"); \
-    	return NULL; \
+        PyErr_SetString(PyExc_NotImplementedError, \
+        "Not available in this shared library/OS version"); \
+        return NULL; \
     }} while(0)
 
 
-#ifdef WITHOUT_FRAMEWORKS
-#include <Sound.h>
-#include <OSUtils.h> /* for Set(Current)A5 */
-#else
 #include <Carbon/Carbon.h>
-#endif
 
 /* Convert a SndCommand argument */
 static int

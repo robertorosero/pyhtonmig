@@ -204,8 +204,6 @@ class CodeGenerator:
         self.checkClass()
         self.locals = misc.Stack()
         self.setups = misc.Stack()
-        self.curStack = 0
-        self.maxStack = 0
         self.last_lineno = None
         self._setupGraphDelegation()
         self._div_op = "BINARY_DIVIDE"
@@ -368,6 +366,13 @@ class CodeGenerator:
         self._visitFuncOrLambda(node, isLambda=1)
 
     def _visitFuncOrLambda(self, node, isLambda=0):
+        if not isLambda and node.decorators:
+            for decorator in node.decorators.nodes:
+                self.visit(decorator)
+            ndecorators = len(node.decorators.nodes)
+        else:
+            ndecorators = 0
+
         gen = self.FunctionGen(node, self.scopes, isLambda,
                                self.class_name, self.get_module())
         walk(node.code, gen)
@@ -384,6 +389,9 @@ class CodeGenerator:
         else:
             self.emit('LOAD_CONST', gen)
             self.emit('MAKE_FUNCTION', len(node.defaults))
+
+        for i in range(ndecorators):
+            self.emit('CALL_FUNCTION', 1)
 
     def visitClass(self, node):
         gen = self.ClassGen(node, self.scopes,
@@ -621,32 +629,103 @@ class CodeGenerator:
         self.newBlock()
         self.emit('POP_TOP')
 
+    def visitGenExpr(self, node):
+        gen = GenExprCodeGenerator(node, self.scopes, self.class_name,
+                                   self.get_module())
+        walk(node.code, gen)
+        gen.finish()
+        self.set_lineno(node)
+        frees = gen.scope.get_free_vars()
+        if frees:
+            for name in frees:
+                self.emit('LOAD_CLOSURE', name)
+            self.emit('LOAD_CONST', gen)
+            self.emit('MAKE_CLOSURE', 0)
+        else:
+            self.emit('LOAD_CONST', gen)
+            self.emit('MAKE_FUNCTION', 0)
+
+        # precomputation of outmost iterable
+        self.visit(node.code.quals[0].iter)
+        self.emit('GET_ITER')
+        self.emit('CALL_FUNCTION', 1)
+
+    def visitGenExprInner(self, node):
+        self.set_lineno(node)
+        # setup list
+
+        stack = []
+        for i, for_ in zip(range(len(node.quals)), node.quals):
+            start, anchor = self.visit(for_)
+            cont = None
+            for if_ in for_.ifs:
+                if cont is None:
+                    cont = self.newBlock()
+                self.visit(if_, cont)
+            stack.insert(0, (start, cont, anchor))
+
+        self.visit(node.expr)
+        self.emit('YIELD_VALUE')
+
+        for start, cont, anchor in stack:
+            if cont:
+                skip_one = self.newBlock()
+                self.emit('JUMP_FORWARD', skip_one)
+                self.startBlock(cont)
+                self.emit('POP_TOP')
+                self.nextBlock(skip_one)
+            self.emit('JUMP_ABSOLUTE', start)
+            self.startBlock(anchor)
+        self.emit('LOAD_CONST', None)
+
+    def visitGenExprFor(self, node):
+        start = self.newBlock()
+        anchor = self.newBlock()
+
+        if node.is_outmost:
+            self.loadName('[outmost-iterable]')
+        else:
+            self.visit(node.iter)
+            self.emit('GET_ITER')
+
+        self.nextBlock(start)
+        self.set_lineno(node, force=True)
+        self.emit('FOR_ITER', anchor)
+        self.nextBlock()
+        self.visit(node.assign)
+        return start, anchor
+
+    def visitGenExprIf(self, node, branch):
+        self.set_lineno(node, force=True)
+        self.visit(node.test)
+        self.emit('JUMP_IF_FALSE', branch)
+        self.newBlock()
+        self.emit('POP_TOP')
+
     # exception related
 
     def visitAssert(self, node):
         # XXX would be interesting to implement this via a
         # transformation of the AST before this stage
-        end = self.newBlock()
-        self.set_lineno(node)
-        # XXX __debug__ and AssertionError appear to be special cases
-        # -- they are always loaded as globals even if there are local
-        # names.  I guess this is a sort of renaming op.
-        self.emit('LOAD_GLOBAL', '__debug__')
-        self.emit('JUMP_IF_FALSE', end)
-        self.nextBlock()
-        self.emit('POP_TOP')
-        self.visit(node.test)
-        self.emit('JUMP_IF_TRUE', end)
-        self.nextBlock()
-        self.emit('POP_TOP')
-        self.emit('LOAD_GLOBAL', 'AssertionError')
-        if node.fail:
-            self.visit(node.fail)
-            self.emit('RAISE_VARARGS', 2)
-        else:
-            self.emit('RAISE_VARARGS', 1)
-        self.nextBlock(end)
-        self.emit('POP_TOP')
+        if __debug__:
+            end = self.newBlock()
+            self.set_lineno(node)
+            # XXX AssertionError appears to be special case -- it is always
+            # loaded as a global even if there is a local name.  I guess this
+            # is a sort of renaming op.
+            self.nextBlock()
+            self.visit(node.test)
+            self.emit('JUMP_IF_TRUE', end)
+            self.nextBlock()
+            self.emit('POP_TOP')
+            self.emit('LOAD_GLOBAL', 'AssertionError')
+            if node.fail:
+                self.visit(node.fail)
+                self.emit('RAISE_VARARGS', 2)
+            else:
+                self.emit('RAISE_VARARGS', 1)
+            self.nextBlock(end)
+            self.emit('POP_TOP')
 
     def visitRaise(self, node):
         self.set_lineno(node)
@@ -761,7 +840,11 @@ class CodeGenerator:
                 self.emit('LOAD_CONST', None)
             self.emit('IMPORT_NAME', name)
             mod = name.split(".")[0]
-            self.storeName(alias or mod)
+            if alias:
+                self._resolveDots(name)
+                self.storeName(alias)
+            else:
+                self.storeName(mod)
 
     def visitFrom(self, node):
         self.set_lineno(node)
@@ -1197,6 +1280,7 @@ class AbstractFunctionCode:
             klass.lambdaCount = klass.lambdaCount + 1
         else:
             name = func.name
+
         args, hasTupleArg = generateArgList(func.argnames)
         self.graph = pyassem.PyFlowGraph(name, func.filename, args,
                                          optimized=1)
@@ -1260,6 +1344,21 @@ class FunctionCodeGenerator(NestedScopeMixin, AbstractFunctionCode,
         self.graph.setCellVars(self.scope.get_cell_vars())
         if self.scope.generator is not None:
             self.graph.setFlag(CO_GENERATOR)
+
+class GenExprCodeGenerator(NestedScopeMixin, AbstractFunctionCode,
+                           CodeGenerator):
+    super_init = CodeGenerator.__init__ # call be other init
+    scopes = None
+
+    __super_init = AbstractFunctionCode.__init__
+
+    def __init__(self, gexp, scopes, class_name, mod):
+        self.scopes = scopes
+        self.scope = scopes[gexp]
+        self.__super_init(gexp, scopes, 1, class_name, mod)
+        self.graph.setFreeVars(self.scope.get_free_vars())
+        self.graph.setCellVars(self.scope.get_cell_vars())
+        self.graph.setFlag(CO_GENERATOR)
 
 class AbstractClassCode:
 

@@ -18,7 +18,7 @@ HTML options:
     --split, -s		Specify a section level for page splitting, default: %(max_split_depth)s.
     --iconserver, -i	Specify location of icons (default: ./).
     --image-type	Specify the image type to use in HTML output;
-                        values: gif (default), png.
+                        values: gif, png (default).
     --numeric           Don't rename the HTML files; just keep node#.html for
                         the filenames.
     --style             Specify the CSS file to use for the output (filename,
@@ -43,19 +43,7 @@ import glob
 import os
 import re
 import shutil
-import string
 import sys
-
-
-if not hasattr(os.path, "abspath"):
-    # Python 1.5.1 or earlier
-    def abspath(path):
-        """Return an absolute path."""
-        if not os.path.isabs(path):
-            path = os.path.join(os.getcwd(), path)
-        return os.path.normpath(path)
-
-    os.path.abspath = abspath
 
 
 MYDIR = os.path.abspath(sys.path[0])
@@ -76,14 +64,13 @@ PERL_BINARY = "perl"
 PYTHON_BINARY = "python"
 
 
-def usage(options):
-    print __doc__ % options
+def usage(options, file):
+    print >>file, __doc__ % options
 
 def error(options, message, err=2):
-    sys.stdout = sys.stderr
-    print message
-    print
-    usage(options)
+    print >>sys.stderr, message
+    print >>sys.stderr
+    usage(options, sys.stderr)
     sys.exit(2)
 
 
@@ -96,7 +83,7 @@ class Options:
     discard_temps = 1
     have_temps = 0
     icon_server = "."
-    image_type = "gif"
+    image_type = "png"
     logging = 0
     max_link_depth = 3
     max_split_depth = 6
@@ -163,7 +150,7 @@ class Options:
                 self.formats = list(self.ALL_FORMATS)
                 self.dvips_safe = "ps" in self.formats
             elif opt in ("-H", "--help"):
-                usage(self)
+                usage(self, sys.stdout)
                 sys.exit()
             elif opt == "--iconserver":
                 self.icon_server = arg
@@ -209,7 +196,7 @@ class Options:
                 self.global_module_index = arg
             elif opt == "--dir":
                 if os.sep == "\\":
-                    arg = re.sub("/", "\\", arg)
+                    arg = re.sub("/", "\\\\", arg)
                 self.builddir = os.path.expanduser(arg)
             elif opt == "--paper":
                 self.paper = arg
@@ -243,13 +230,18 @@ class Options:
         if not self.formats:
             self.formats = self.DEFAULT_FORMATS
         # determine the base set of texinputs directories:
-        texinputs = string.split(os.environ.get("TEXINPUTS", ""), os.pathsep)
+        texinputs = os.environ.get("TEXINPUTS", "").split(os.pathsep)
         if not texinputs:
             texinputs = ['']
-        self.base_texinputs = [
-            os.path.join(TOPDIR, "paper-" + self.paper),
-            os.path.join(TOPDIR, "texinputs"),
-            ] + texinputs
+        mydirs = [os.path.join(TOPDIR, "paper-" + self.paper),
+                  os.path.join(TOPDIR, "texinputs"),
+                  ]
+        if '' in texinputs:
+            i = texinputs.index('')
+            texinputs[i:i] = mydirs
+        else:
+            texinputs += mydirs
+        self.base_texinputs = texinputs
         if self.builddir:
             self.builddir = os.path.abspath(self.builddir)
 
@@ -320,8 +312,8 @@ class Job:
             self.cleanup()
 
     def setup_texinputs(self):
-        texinputs = [self.filedir] + list(self.options.base_texinputs)
-        os.environ["TEXINPUTS"] = string.join(texinputs, os.pathsep)
+        texinputs = [self.filedir] + self.options.base_texinputs
+        os.environ["TEXINPUTS"] = os.pathsep.join(texinputs)
         self.message("TEXINPUTS=" + os.environ["TEXINPUTS"])
 
     def build_aux(self, binary=None):
@@ -391,7 +383,7 @@ class Job:
         if max_split_depth is None:
             max_split_depth = self.options.max_split_depth
         texfile = None
-        for p in string.split(os.environ["TEXINPUTS"], os.pathsep):
+        for p in os.environ["TEXINPUTS"].split(os.pathsep):
             fn = os.path.join(p, self.doc + ".tex")
             if os.path.isfile(fn):
                 texfile = fn
@@ -413,7 +405,7 @@ class Job:
                 "-dir", builddir,
                 texfile
                 ]
-        self.run(string.join(args))     # XXX need quoting!
+        self.run(" ".join(args))     # XXX need quoting!
         # ... postprocess
         shutil.copyfile(self.options.style_file,
                         os.path.join(builddir, self.doc + ".css"))
@@ -525,9 +517,11 @@ class Job:
             self.warning(
                 "Session transcript and error messages are in %s."
                 % self.log_filename)
+            result = 1
             if hasattr(os, "WIFEXITED"):
                 if os.WIFEXITED(rc):
-                    self.warning("Exited with status %s." % os.WEXITSTATUS(rc))
+                    result = os.WEXITSTATUS(rc)
+                    self.warning("Exited with status %s." % result)
                 else:
                     self.warning("Killed by signal %s." % os.WSTOPSIG(rc))
             else:
@@ -535,7 +529,7 @@ class Job:
             sys.stderr.write("The relevant lines from the transcript are:\n")
             sys.stderr.write("-" * 72 + "\n")
             sys.stderr.writelines(get_run_transcript(self.log_filename))
-            sys.exit(rc)
+            sys.exit(result)
 
     def message(self, msg):
         msg = "+++ " + msg
@@ -634,12 +628,12 @@ _to_perl["$"] = "\\$"
 _to_perl['"'] = '\\"'
 
 def string_to_perl(s):
-    return string.join(map(_to_perl.get, s), '')
+    return ''.join(map(_to_perl.get, s))
 
 
 def check_for_bibtex(filename):
     fp = open(filename)
-    pos = string.find(fp.read(), r"\bibdata{")
+    pos = fp.read().find(r"\bibdata{")
     fp.close()
     return pos >= 0
 

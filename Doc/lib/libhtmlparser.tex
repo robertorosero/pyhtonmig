@@ -4,6 +4,8 @@
 \declaremodule{standard}{HTMLParser}
 \modulesynopsis{A simple parser that can handle HTML and XHTML.}
 
+\versionadded{2.2}
+
 This module defines a class \class{HTMLParser} which serves as the
 basis for parsing text files formatted in HTML\index{HTML} (HyperText
 Mark-up Language) and XHTML.\index{XHTML}  Unlike the parser in
@@ -22,6 +24,17 @@ Unlike the parser in \refmodule{htmllib}, this parser does not check
 that end tags match start tags or call the end-tag handler for
 elements which are closed implicitly by closing an outer element.
 \end{classdesc}
+
+An exception is defined as well:
+
+\begin{excdesc}{HTMLParseError}
+Exception raised by the \class{HTMLParser} class when it encounters an
+error while parsing.  This exception provides three attributes:
+\member{msg} is a brief message explaining the error, \member{lineno}
+is the number of the line on which the broken construct was detected,
+and \member{offset} is the number of characters into the line at which
+the construct starts.
+\end{excdesc}
 
 
 \class{HTMLParser} instances have the following methods:
@@ -109,9 +122,9 @@ base class implementation does nothing.
 \begin{methoddesc}{handle_comment}{data}
 This method is called when a comment is encountered.  The
 \var{comment} argument is a string containing the text between the
-\samp{<!--} and \samp{-->} delimiters, but not the delimiters
-themselves.  For example, the comment \samp{<!--text-->} will cause
-this method to be called with the argument \code{'text'}.  It is
+\samp{--} and \samp{--} delimiters, but not the delimiters
+themselves.  For example, the comment \samp{<!--text-->} will
+cause this method to be called with the argument \code{'text'}.  It is
 intended to be overridden by a derived class; the base class
 implementation does nothing.
 \end{methoddesc}
@@ -132,7 +145,7 @@ is intended to be overridden by a derived class; the base class
 implementation does nothing.
 
 \note{The \class{HTMLParser} class uses the SGML syntactic rules for
-processing instruction.  An XHTML processing instruction using the
+processing instructions.  An XHTML processing instruction using the
 trailing \character{?} will cause the \character{?} to be included in
 \var{data}.}
 \end{methoddesc}

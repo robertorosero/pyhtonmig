@@ -92,6 +92,7 @@ char *_PyParser_TokenNames[] = {
 	"DOUBLESTAREQUAL",
 	"DOUBLESLASH",
 	"DOUBLESLASHEQUAL",
+	"AT",
 	/* This table must match the #defines in token.h! */
 	"OP",
 	"<ERRORTOKEN>",
@@ -650,6 +651,63 @@ PyTokenizer_Free(struct tok_state *tok)
 	PyMem_DEL(tok);
 }
 
+#if !defined(PGEN) && defined(Py_USING_UNICODE)
+static int
+tok_stdin_decode(struct tok_state *tok, char **inp)
+{
+	PyObject *enc, *sysstdin, *decoded, *utf8;
+	const char *encoding;
+	char *converted;
+
+	if (PySys_GetFile((char *)"stdin", NULL) != stdin)
+		return 0;
+	sysstdin = PySys_GetObject("stdin");
+	if (sysstdin == NULL || !PyFile_Check(sysstdin))
+		return 0;
+
+	enc = ((PyFileObject *)sysstdin)->f_encoding;
+	if (enc == NULL || !PyString_Check(enc))
+		return 0;
+	Py_INCREF(enc);
+
+	encoding = PyString_AsString(enc);
+	decoded = PyUnicode_Decode(*inp, strlen(*inp), encoding, NULL);
+	if (decoded == NULL)
+		goto error_clear;
+
+	utf8 = PyUnicode_AsEncodedString(decoded, "utf-8", NULL);
+	Py_DECREF(decoded);
+	if (utf8 == NULL)
+		goto error_clear;
+
+	converted = new_string(PyString_AsString(utf8), PyString_Size(utf8));
+	Py_DECREF(utf8);
+	if (converted == NULL)
+		goto error_nomem;
+
+	PyMem_FREE(*inp);
+	*inp = converted;
+	if (tok->encoding != NULL)
+		PyMem_DEL(tok->encoding);
+	tok->encoding = new_string(encoding, strlen(encoding));
+	if (tok->encoding == NULL)
+		goto error_nomem;
+
+	Py_DECREF(enc);
+	return 0;
+
+error_nomem:
+	Py_DECREF(enc);
+	tok->done = E_NOMEM;
+	return -1;
+
+error_clear:
+	/* Fallback to iso-8859-1: for backward compatibility */
+	Py_DECREF(enc);
+	PyErr_Clear();
+	return 0;
+}
+#endif
 
 /* Get next char, updating state; error code goes into tok->done */
 
@@ -689,6 +747,10 @@ tok_nextc(register struct tok_state *tok)
 				PyMem_FREE(new);
 				tok->done = E_EOF;
 			}
+#if !defined(PGEN) && defined(Py_USING_UNICODE)
+			else if (tok_stdin_decode(tok, &new) != 0)
+				PyMem_FREE(new);
+#endif
 			else if (tok->start != NULL) {
 				size_t start = tok->start - tok->buf;
 				size_t oldlen = tok->cur - tok->buf;
@@ -784,7 +846,6 @@ tok_nextc(register struct tok_state *tok)
 				done = tok->inp[-1] == '\n';
 			}
 			tok->cur = tok->buf + cur;
-#ifndef macintosh
 			/* replace "\r\n" with "\n" */
 			/* For Mac we leave the \r, giving a syntax error */
 			pt = tok->inp - 2;
@@ -793,7 +854,6 @@ tok_nextc(register struct tok_state *tok)
 				*pt = '\0';
 				tok->inp = pt;
 			}
-#endif
 		}
 		if (tok->done != E_OK) {
 			if (tok->prompt != NULL)
@@ -849,6 +909,7 @@ PyToken_OneChar(int c)
 	case '}':	return RBRACE;
 	case '^':	return CIRCUMFLEX;
 	case '~':	return TILDE;
+	case '@':       return AT;
 	default:	return OP;
 	}
 }
@@ -1185,15 +1246,6 @@ tok_get(register struct tok_state *tok, char **p_start, char **p_end)
 		return NEWLINE;
 	}
 	
-#ifdef macintosh
-	if (c == '\r') {
-		PySys_WriteStderr(
-		  "File contains \\r characters (incorrect line endings?)\n");
-		tok->done = E_TOKEN;
-		tok->cur = tok->inp;
-		return ERRORTOKEN;
-	}
-#endif	
 	/* Period or number starting with period? */
 	if (c == '.') {
 		c = tok_nextc(tok);

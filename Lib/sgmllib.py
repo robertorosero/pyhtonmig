@@ -12,7 +12,7 @@
 import markupbase
 import re
 
-__all__ = ["SGMLParser"]
+__all__ = ["SGMLParser", "SGMLParseError"]
 
 # Regular expressions used for parsing
 
@@ -33,7 +33,7 @@ endbracket = re.compile('[<>]')
 tagfind = re.compile('[a-zA-Z][-_.a-zA-Z0-9]*')
 attrfind = re.compile(
     r'\s*([a-zA-Z_][-:.a-zA-Z_0-9]*)(\s*=\s*'
-    r'(\'[^\']*\'|"[^"]*"|[-a-zA-Z0-9./,:;+*%?!&$\(\)_#=~\'"]*))?')
+    r'(\'[^\']*\'|"[^"]*"|[-a-zA-Z0-9./,:;+*%?!&$\(\)_#=~\'"@]*))?')
 
 
 class SGMLParseError(RuntimeError):
@@ -61,6 +61,7 @@ class SGMLParser(markupbase.ParserBase):
 
     def reset(self):
         """Reset this instance. Loses all unprocessed data."""
+        self.__starttag_text = None
         self.rawdata = ''
         self.stack = []
         self.lasttag = '???'
@@ -221,7 +222,6 @@ class SGMLParser(markupbase.ParserBase):
         j = match.end(0)
         return j-i
 
-    __starttag_text = None
     def get_starttag_text(self):
         return self.__starttag_text
 
@@ -423,18 +423,18 @@ class TestSGMLParser(SGMLParser):
 
     def handle_data(self, data):
         self.testdata = self.testdata + data
-        if len(`self.testdata`) >= 70:
+        if len(repr(self.testdata)) >= 70:
             self.flush()
 
     def flush(self):
         data = self.testdata
         if data:
             self.testdata = ""
-            print 'data:', `data`
+            print 'data:', repr(data)
 
     def handle_comment(self, data):
         self.flush()
-        r = `data`
+        r = repr(data)
         if len(r) > 68:
             r = r[:32] + '...' + r[-32:]
         print 'comment:', r

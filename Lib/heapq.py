@@ -30,7 +30,7 @@ without surprises: heap[0] is the smallest item, and heap.sort()
 maintains the heap invariant!
 """
 
-# Original code by Kevin O'Connor, augmented by Tim Peters
+# Original code by Kevin O'Connor, augmented by Tim Peters and Raymond Hettinger
 
 __about__ = """Heap queues
 
@@ -126,7 +126,12 @@ Believe me, real good tape sorts were quite spectacular to watch!
 From all times, sorting has always been a Great Art! :-)
 """
 
-__all__ = ['heappush', 'heappop', 'heapify', 'heapreplace']
+__all__ = ['heappush', 'heappop', 'heapify', 'heapreplace', 'nlargest',
+           'nsmallest']
+
+from itertools import islice, repeat, count, imap, izip, tee
+from operator import itemgetter
+import bisect
 
 def heappush(heap, item):
     """Push item onto heap, maintaining the heap invariant."""
@@ -150,7 +155,10 @@ def heapreplace(heap, item):
     This is more efficient than heappop() followed by heappush(), and can be
     more appropriate when using a fixed-size heap.  Note that the value
     returned may be larger than item!  That constrains reasonable uses of
-    this routine.
+    this routine unless written as part of a conditional replacement:
+
+        if item > heap[0]:
+            item = heapreplace(heap, item)
     """
     returnitem = heap[0]    # raises appropriate IndexError if heap is empty
     heap[0] = item
@@ -165,8 +173,59 @@ def heapify(x):
     # or i < (n-1)/2.  If n is even = 2*j, this is (2*j-1)/2 = j-1/2 so
     # j-1 is the largest, which is n//2 - 1.  If n is odd = 2*j+1, this is
     # (2*j+1-1)/2 = j so j-1 is the largest, and that's again n//2-1.
-    for i in xrange(n//2 - 1, -1, -1):
+    for i in reversed(xrange(n//2)):
         _siftup(x, i)
+
+def nlargest(n, iterable):
+    """Find the n largest elements in a dataset.
+
+    Equivalent to:  sorted(iterable, reverse=True)[:n]
+    """
+    it = iter(iterable)
+    result = list(islice(it, n))
+    if not result:
+        return result
+    heapify(result)
+    _heapreplace = heapreplace
+    sol = result[0]         # sol --> smallest of the nlargest
+    for elem in it:
+        if elem <= sol:
+            continue
+        _heapreplace(result, elem)
+        sol = result[0]
+    result.sort(reverse=True)
+    return result
+
+def nsmallest(n, iterable):
+    """Find the n smallest elements in a dataset.
+
+    Equivalent to:  sorted(iterable)[:n]
+    """
+    if hasattr(iterable, '__len__') and n * 10 <= len(iterable):
+        # For smaller values of n, the bisect method is faster than a minheap.
+        # It is also memory efficient, consuming only n elements of space.
+        it = iter(iterable)
+        result = sorted(islice(it, 0, n))
+        if not result:
+            return result
+        insort = bisect.insort
+        pop = result.pop
+        los = result[-1]    # los --> Largest of the nsmallest
+        for elem in it:
+            if los <= elem:
+                continue
+            insort(result, elem)
+            pop()
+            los = result[-1]
+        return result
+    # An alternative approach manifests the whole iterable in memory but
+    # saves comparisons by heapifying all at once.  Also, saves time
+    # over bisect.insort() which has O(n) data movement time for every
+    # insertion.  Finding the n smallest of an m length iterable requires
+    #    O(m) + O(n log m) comparisons.
+    h = list(iterable)
+    heapify(h)
+    return map(heappop, repeat(h, min(n, len(h))))
 
 # 'heap' is a heap at all indices >= startpos, except possibly for pos.  pos
 # is the index of a leaf with a possibly out-of-order value.  Restore the
@@ -238,10 +297,43 @@ def _siftup(heap, pos):
         heap[pos] = heap[childpos]
         pos = childpos
         childpos = 2*pos + 1
-    # The leaf at pos is empty now.  Put newitem there, and and bubble it up
+    # The leaf at pos is empty now.  Put newitem there, and bubble it up
     # to its final resting place (by sifting its parents down).
     heap[pos] = newitem
     _siftdown(heap, startpos, pos)
+
+# If available, use C implementation
+try:
+    from _heapq import heappush, heappop, heapify, heapreplace, nlargest, nsmallest
+except ImportError:
+    pass
+
+# Extend the implementations of nsmallest and nlargest to use a key= argument
+_nsmallest = nsmallest
+def nsmallest(n, iterable, key=None):
+    """Find the n smallest elements in a dataset.
+
+    Equivalent to:  sorted(iterable, key=key)[:n]
+    """
+    if key is None:
+        return _nsmallest(n, iterable)
+    in1, in2 = tee(iterable)
+    it = izip(imap(key, in1), count(), in2)                 # decorate
+    result = _nsmallest(n, it)
+    return map(itemgetter(2), result)                       # undecorate
+
+_nlargest = nlargest
+def nlargest(n, iterable, key=None):
+    """Find the n largest elements in a dataset.
+
+    Equivalent to:  sorted(iterable, key=key, reverse=True)[:n]
+    """
+    if key is None:
+        return _nlargest(n, iterable)
+    in1, in2 = tee(iterable)
+    it = izip(imap(key, in1), count(), in2)                 # decorate
+    result = _nlargest(n, it)
+    return map(itemgetter(2), result)                       # undecorate
 
 if __name__ == "__main__":
     # Simple sanity test

@@ -92,7 +92,7 @@ CRLF = '\r\n'
 # The class itself
 class NNTP:
     def __init__(self, host, port=NNTP_PORT, user=None, password=None,
-                 readermode=None):
+                 readermode=None, usenetrc=True):
         """Initialize an instance.  Arguments:
         - host: hostname to connect to
         - port: port to connect to (default the standard NNTP port)
@@ -136,7 +136,7 @@ class NNTP:
         # If no login/password was specified, try to get them from ~/.netrc
         # Presume that if .netc has an entry, NNRP authentication is required.
         try:
-            if not user:
+            if usenetrc and not user:
                 import netrc
                 credentials = netrc.netrc()
                 auth = credentials.authenticators(host)
@@ -175,7 +175,7 @@ class NNTP:
         If the response code is 200, posting is allowed;
         if it 201, posting is not allowed."""
 
-        if self.debugging: print '*welcome*', `self.welcome`
+        if self.debugging: print '*welcome*', repr(self.welcome)
         return self.welcome
 
     def set_debuglevel(self, level):
@@ -190,12 +190,12 @@ class NNTP:
     def putline(self, line):
         """Internal: send one line to the server, appending CRLF."""
         line = line + CRLF
-        if self.debugging > 1: print '*put*', `line`
+        if self.debugging > 1: print '*put*', repr(line)
         self.sock.sendall(line)
 
     def putcmd(self, line):
         """Internal: send one command to the server (through putline())."""
-        if self.debugging: print '*cmd*', `line`
+        if self.debugging: print '*cmd*', repr(line)
         self.putline(line)
 
     def getline(self):
@@ -203,7 +203,7 @@ class NNTP:
         Raise EOFError if the connection is closed."""
         line = self.file.readline()
         if self.debugging > 1:
-            print '*get*', `line`
+            print '*get*', repr(line)
         if not line: raise EOFError
         if line[-2:] == CRLF: line = line[:-2]
         elif line[-1:] in CRLF: line = line[:-1]
@@ -213,7 +213,7 @@ class NNTP:
         """Internal: get a response from the server.
         Raise various errors if the response indicates an error."""
         resp = self.getline()
-        if self.debugging: print '*resp*', `resp`
+        if self.debugging: print '*resp*', repr(resp)
         c = resp[:1]
         if c == '4':
             raise NNTPTemporaryError(resp)
@@ -296,6 +296,42 @@ class NNTP:
             # Parse lines into "group last first flag"
             list[i] = tuple(list[i].split())
         return resp, list
+
+    def description(self, group):
+
+        """Get a description for a single group.  If more than one
+        group matches ('group' is a pattern), return the first.  If no
+        group matches, return an empty string.
+
+        This elides the response code from the server, since it can
+        only be '215' or '285' (for xgtitle) anyway.  If the response
+        code is needed, use the 'descriptions' method.
+
+        NOTE: This neither checks for a wildcard in 'group' nor does
+        it check whether the group actually exists."""
+
+        resp, lines = self.descriptions(group)
+        if len(lines) == 0:
+            return ""
+        else:
+            return lines[0][1]
+
+    def descriptions(self, group_pattern):
+        """Get descriptions for a range of groups."""
+        line_pat = re.compile("^(?P<group>[^ \t]+)[ \t]+(.*)$")
+        # Try the more std (acc. to RFC2980) LIST NEWSGROUPS first
+        resp, raw_lines = self.longcmd('LIST NEWSGROUPS ' + group_pattern)
+        if resp[:3] != "215":
+            # Now the deprecated XGTITLE.  This either raises an error
+            # or succeeds with the same output structure as LIST
+            # NEWSGROUPS.
+            resp, raw_lines = self.longcmd('XGTITLE ' + group_pattern)
+        lines = []
+        for raw_line in raw_lines:
+            match = line_pat.search(raw_line.strip())
+            if match:
+                lines.append(match.group(1, 2))
+        return resp, lines
 
     def group(self, name):
         """Process a GROUP command.  Argument:

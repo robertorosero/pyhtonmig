@@ -17,7 +17,10 @@ import urllib
 import cgi
 import shutil
 import mimetypes
-from StringIO import StringIO
+try:
+    from cStringIO import StringIO
+except ImportError:
+    from StringIO import StringIO
 
 
 class SimpleHTTPRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
@@ -25,9 +28,8 @@ class SimpleHTTPRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     """Simple HTTP request handler with GET and HEAD commands.
 
     This serves files from the current directory and any of its
-    subdirectories.  It assumes that all files are plain text files
-    unless they have the extension ".html" in which case it assumes
-    they are HTML files.
+    subdirectories.  The MIME type for files is determined by
+    calling the .guess_type() method.
 
     The GET and HEAD requests are identical except that the HEAD
     request omits the actual contents of the file.
@@ -99,14 +101,14 @@ class SimpleHTTPRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         except os.error:
             self.send_error(404, "No permission to list directory")
             return None
-        list.sort(lambda a, b: cmp(a.lower(), b.lower()))
+        list.sort(key=lambda a: a.lower())
         f = StringIO()
         f.write("<title>Directory listing for %s</title>\n" % self.path)
         f.write("<h2>Directory listing for %s</h2>\n" % self.path)
         f.write("<hr>\n<ul>\n")
         for name in list:
             fullname = os.path.join(path, name)
-            displayname = linkname = name = cgi.escape(name)
+            displayname = linkname = name
             # Append / for directories or @ for symbolic links
             if os.path.isdir(fullname):
                 displayname = name + "/"
@@ -114,7 +116,8 @@ class SimpleHTTPRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             if os.path.islink(fullname):
                 displayname = name + "@"
                 # Note: a link to a directory displays with @ and links with /
-            f.write('<li><a href="%s">%s</a>\n' % (linkname, displayname))
+            f.write('<li><a href="%s">%s</a>\n'
+                    % (urllib.quote(linkname), cgi.escape(displayname)))
         f.write("</ul>\n<hr>\n")
         length = f.tell()
         f.seek(0)
@@ -168,7 +171,7 @@ class SimpleHTTPRequestHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         usable for a MIME Content-type header.
 
         The default implementation looks the file's extension
-        up in the table self.extensions_map, using text/plain
+        up in the table self.extensions_map, using application/octet-stream
         as a default; however it would be permissible (if
         slow) to look inside the data to make a better guess.
 

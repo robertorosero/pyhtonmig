@@ -51,6 +51,7 @@ PySTEntry_New(struct symtable *st, identifier name, block_ty block,
 	ste->ste_varargs = 0;
 	ste->ste_varkeywords = 0;
 	ste->ste_opt_lineno = 0;
+	ste->ste_tmpname = 0;
 	ste->ste_lineno = lineno;
 
 	ste->ste_nested = 0;

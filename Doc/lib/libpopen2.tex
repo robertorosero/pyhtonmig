@@ -24,12 +24,20 @@ this is needed to determine whether the file objects should be opened
 in binary or text mode.  The default value for \var{mode} is
 \code{'t'}.
 
+On \UNIX, \var{cmd} may be a sequence, in which case arguments will be passed
+directly to the program without shell intervention (as with
+\function{os.spawnv()}). If \var{cmd} is a string it will be passed to the
+shell (as with \function{os.system()}).
+
 The only way to retrieve the return codes for the child processes is
 by using the \method{poll()} or \method{wait()} methods on the
 \class{Popen3} and \class{Popen4} classes; these are only available on
 \UNIX.  This information is not available when using the
 \function{popen2()}, \function{popen3()}, and \function{popen4()}
 functions, or the equivalent functions in the \refmodule{os} module.
+(Note that the tuples returned by the \refmodule{os} module's functions
+are in a different order from the ones returned by the \module{popen2}
+module.)
 
 \begin{funcdesc}{popen2}{cmd\optional{, bufsize\optional{, mode}}}
 Executes \var{cmd} as a sub-process.  Returns the file objects
@@ -72,7 +80,6 @@ using \function{popen4()}.
 \versionadded{2.0}
 \end{classdesc}
 
-
 \subsection{Popen3 and Popen4 Objects \label{popen3-objects}}
 
 Instances of the \class{Popen3} and \class{Popen4} classes have the
@@ -106,9 +113,10 @@ A file object that provides input to the child process.
 \end{memberdesc}
 
 \begin{memberdesc}{childerr}
-Where the standard error from the child process goes is
-\var{capturestderr} was true for the constructor, or \code{None}.
-This will always be \code{None} for \class{Popen4} instances.
+A file object that provides error output from the child process, if
+\var{capturestderr} was true for the constructor, otherwise
+\code{None}.  This will always be \code{None} for \class{Popen4}
+instances.
 \end{memberdesc}
 
 \begin{memberdesc}{pid}

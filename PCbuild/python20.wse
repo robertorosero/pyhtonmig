@@ -1,7 +1,7 @@
 Document Type: WSE
 item: Global
-  Version=8.14
-  Title=Python 2.3 beta 1
+  Version=9.0
+  Title=Python 2.4a1
   Flags=00010100
   Languages=65 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
   Japanese Font Name=MS Gothic
@@ -18,17 +18,19 @@ item: Global
   Patch Flags=0000000000001001
   Patch Threshold=85
   Patch Memory=4000
-  EXE Filename=Python-2.3b1.exe
+  MIF PDF Version=1.0
+  MIF SMS Version=2.0
+  EXE Filename=Python-2.4a1.exe
   Dialogs Version=8
-  Version File=2.3b1
+  Version File=2.4a1
   Version Description=Python Programming Language
-  Version Copyright=©2001-2003 Python Software Foundation
+  Version Copyright=©2001-2004 Python Software Foundation
   Version Company=PythonLabs at Zope Corporation
   Crystal Format=10111100101100000010001001001001
   Step View=&All
   Variable Name1=_WISE_
   Variable Description1=WISE root directory
-  Variable Default1=C:\PROGRAM FILES\WISE INSTALLMASTER 8.1
+  Variable Default1=C:\Programme\Wise Installation System
   Variable Flags1=00001000
   Variable Name2=_TCLDIR_
   Variable Description2=The directory in which the Tcl/Tk installation
@@ -45,6 +47,8 @@ item: Global
   Variable Default4=C:\Windows\System
   Variable Values4=C:\Windows\System
   Variable Values4=C:\WINNT\System32
+  Variable Values4=C:\Code\MSDLLs
+  Variable Values4=C:\Windows\System32
   Variable Flags4=00000010
   Variable Name5=_PYMAJOR_
   Variable Description5=Python major version number; the 2 in 2.3.
@@ -63,10 +67,16 @@ item: Global
   Variable Values7=1
   Variable Values7=0
   Variable Flags7=00001010
+  Variable Name8=_ALIASNAME_
+  Variable Flags8=00001000
+  Variable Name9=_ALIASPATH_
+  Variable Flags9=00001000
+  Variable Name10=_ALIASTYPE_
+  Variable Flags10=00001000
 end
 item: Set Variable
   Variable=PYVER_STRING
-  Value=2.3b1
+  Value=2.3
 end
 item: Remark
 end
@@ -203,11 +213,20 @@ end
 item: End Block
 end
 item: Remark
-  Text=Note from Tim:  doesn't seem to be a way to get the true boot drive, the Wizard hardcodes "C".
+  Text=Note from Tim:  The Wizard hardcod "C:" at the start of the replacement text for MAINDIR.
+end
+item: Remark
+  Text=That's not appropriate if the system drive doesn't happen to be C:.
+end
+item: Remark
+  Text=I removed the "C:", and that did the right thing for two people who tested it on non-C: machines,
+end
+item: Remark
+  Text=but it's unclear whether it will always do the right thing.
 end
 item: Set Variable
   Variable=MAINDIR
-  Value=C:\%MAINDIR%
+  Value=\%MAINDIR%
   Flags=00001100
 end
 item: Remark
@@ -1937,20 +1956,6 @@ end
 item: Remark
 end
 item: Install File
-  Source=..\lib\csv\*.py
-  Destination=%MAINDIR%\Lib\csv
-  Description=CSV package
-  Flags=0000000000000010
-end
-item: Install File
-  Source=..\lib\csv\util\*.py
-  Destination=%MAINDIR%\Lib\csv\util
-  Description=CSV package
-  Flags=0000000000000010
-end
-item: Remark
-end
-item: Install File
   Source=..\lib\distutils\*.py
   Destination=%MAINDIR%\Lib\distutils
   Description=Distribution utility modules
@@ -2146,26 +2151,32 @@ item: Remark
   Text=IDLE
 end
 item: Install File
-  Source=..\tools\idle\*.py
-  Destination=%MAINDIR%\Tools\idle
+  Source=..\Lib\idlelib\*.py
+  Destination=%MAINDIR%\Lib\idlelib
   Description=Integrated DeveLopment Environment for Python
   Flags=0000000000000010
 end
 item: Install File
-  Source=..\tools\idle\*.txt
-  Destination=%MAINDIR%\Tools\idle
+  Source=..\Lib\idlelib\*.txt
+  Destination=%MAINDIR%\Lib\idlelib
   Description=Integrated DeveLopment Environment for Python
   Flags=0000000000000010
 end
 item: Install File
-  Source=..\tools\idle\icons\*
-  Destination=%MAINDIR%\Tools\idle\Icons
+  Source=..\Lib\idlelib\*.def
+  Destination=%MAINDIR%\Lib\idlelib
   Description=Integrated DeveLopment Environment for Python
   Flags=0000000000000010
 end
 item: Install File
-  Source=..\tools\idle\idle.pyw
-  Destination=%MAINDIR%\Tools\idle\idle.pyw
+  Source=..\Lib\idlelib\Icons\*
+  Destination=%MAINDIR%\Lib\idlelib\Icons
+  Description=Integrated DeveLopment Environment for Python
+  Flags=0000000000000010
+end
+item: Install File
+  Source=..\Tools\scripts\idle
+  Destination=%MAINDIR%\Lib\idlelib\idle.pyw
   Description=IDLE bootstrap script
   Flags=0000000000000010
 end
@@ -2358,6 +2369,12 @@ item: Install File
 end
 item: Install File
   Source=..\lib\test\*.gz
+  Destination=%MAINDIR%\Lib\test
+  Description=Python Test files
+  Flags=0000000000000010
+end
+item: Install File
+  Source=..\lib\test\*.txt
   Destination=%MAINDIR%\Lib\test
   Description=Python Test files
   Flags=0000000000000010
@@ -2649,25 +2666,25 @@ end
 item: Edit Registry
   Total Keys=1
   Key=Python.NoConFile\shell\Edit with IDLE\command
-  New Value=%MAINDIR%\pythonw.exe %MAINDIR%\Tools\idle\idle.pyw -e "%%1"
+  New Value=%MAINDIR%\pythonw.exe %MAINDIR%\Lib\idlelib\idle.pyw -n -e "%%1"
 end
 item: Edit Registry
   Total Keys=1
   Key=Python.File\shell\Edit with IDLE\command
-  New Value=%MAINDIR%\pythonw.exe %MAINDIR%\Tools\idle\idle.pyw -e "%%1"
+  New Value=%MAINDIR%\pythonw.exe %MAINDIR%\Lib\idlelib\idle.pyw -n -e "%%1"
 end
 item: Else Statement
 end
 item: Edit Registry
   Total Keys=1
   Key=Software\CLASSES\Python.NoConFile\shell\Edit with IDLE\command
-  New Value=%MAINDIR%\pythonw.exe %MAINDIR%\Tools\idle\idle.pyw -e "%%1"
+  New Value=%MAINDIR%\pythonw.exe %MAINDIR%\Lib\idlelib\idle.pyw -n -e "%%1"
   Root=1
 end
 item: Edit Registry
   Total Keys=1
   Key=Software\CLASSES\Python.File\shell\Edit with IDLE\command
-  New Value=%MAINDIR%\pythonw.exe %MAINDIR%\Tools\idle\idle.pyw -e "%%1"
+  New Value=%MAINDIR%\pythonw.exe %MAINDIR%\Lib\idlelib\idle.pyw -n -e "%%1"
   Root=1
 end
 item: End Block
@@ -2943,7 +2960,7 @@ end
 item: Create Shortcut
   Source=%MAINDIR%\pythonw.exe
   Destination=%GROUP%\IDLE (Python GUI).lnk
-  Command Options="%MAINDIR%\Tools\idle\idle.pyw"
+  Command Options="%MAINDIR%\Lib\idlelib\idle.pyw"
   Working Directory=%MAINDIR%
   Key Type=1536
   Flags=00000001

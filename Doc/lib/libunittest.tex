@@ -6,6 +6,7 @@
 \moduleauthor{Steve Purcell}{stephen\textunderscore{}purcell@yahoo.com}
 \sectionauthor{Steve Purcell}{stephen\textunderscore{}purcell@yahoo.com}
 \sectionauthor{Fred L. Drake, Jr.}{fdrake@acm.org}
+\sectionauthor{Raymond Hettinger}{python@rcn.com}
 
 \versionadded{2.1}
 
@@ -34,7 +35,8 @@ starting a server process.
 A \dfn{test case} is the smallest unit of testing.  It checks for a
 specific response to a particular set of inputs.  PyUnit provides a
 base class, \class{TestCase}, which may be used to create new test
-cases.
+cases. You may provide your own implementation that does not subclass
+from \class{TestCase}, of course.
 
 \term{test suite}
 A \dfn{test suite} is a collection of test cases, test suites, or
@@ -81,6 +83,8 @@ class.
 
 
 \begin{seealso}
+  \seemodule{doctest}{Another test-support module with a very
+                      different flavor.}
   \seetitle[http://pyunit.sourceforge.net/]{PyUnit Web Site}{The
             source for further information on PyUnit.}
   \seetitle[http://www.XProgramming.com/testfram.htm]{Simple Smalltalk
@@ -88,6 +92,101 @@ class.
             testing frameworks using the pattern shared by
             \module{unittest}.}
 \end{seealso}
+
+
+\subsection{Basic example \label{minimal-example}}
+
+The \module{unittest} module provides a rich set of tools for
+constructing and running tests.  This section demonstrates that a
+small subset of the tools suffice to meet the needs of most users.
+
+Here is a short script to test three functions from the
+\refmodule{random} module:
+
+\begin{verbatim}
+import random
+import unittest
+
+class TestSequenceFunctions(unittest.TestCase):
+    
+    def setUp(self):
+        self.seq = range(10)
+
+    def testshuffle(self):
+        # make sure the shuffled sequence does not lose any elements
+        random.shuffle(self.seq)
+        self.seq.sort()
+        self.assertEqual(self.seq, range(10))
+
+    def testchoice(self):
+        element = random.choice(self.seq)
+        self.assert_(element in self.seq)
+
+    def testsample(self):
+        self.assertRaises(ValueError, random.sample, self.seq, 20)
+        for element in random.sample(self.seq, 5):
+            self.assert_(element in self.seq)
+
+if __name__ == '__main__':
+    unittest.main()
+\end{verbatim}
+
+A testcase is created by subclassing \class{unittest.TestCase}.
+The three individual tests are defined with methods whose names start with
+the letters \samp{test}.  This naming convention informs the test runner
+about which methods represent tests.
+
+The crux of each test is a call to \method{assertEqual()} to
+check for an expected result; \method{assert_()} to verify a condition;
+or \method{assertRaises()} to verify that an expected exception gets
+raised.  These methods are used instead of the \keyword{assert} statement
+so the test runner can accumulate all test results and produce a report.
+
+When a \method{setUp()} method is defined, the test runner will run that
+method prior to each test.  Likewise, if a \method{tearDown()} method is
+defined, the test runner will invoke that method after each test.  In the
+example, \method{setUp()} was used to create a fresh sequence for each test.
+
+The final block shows a simple way to run the tests.
+\function{unittest.main()} provides a command line interface to the
+test script.  When run from the command line, the above script
+produces an output that looks like this:
+
+\begin{verbatim}
+...
+----------------------------------------------------------------------
+Ran 3 tests in 0.000s
+
+OK
+\end{verbatim}
+
+Instead of \function{unittest.main()}, there are other ways to run the tests
+with a finer level of control, less terse output, and no requirement to be
+run from the command line.  For example, the last two lines may be replaced
+with:
+
+\begin{verbatim}
+suite = unittest.makeSuite(TestSequenceFunctions)
+unittest.TextTestRunner(verbosity=2).run(suite)
+\end{verbatim}
+
+Running the revised script from the interpreter or another script
+produces the following output:
+
+\begin{verbatim}
+testchoice (__main__.TestSequenceFunctions) ... ok
+testsample (__main__.TestSequenceFunctions) ... ok
+testshuffle (__main__.TestSequenceFunctions) ... ok
+
+----------------------------------------------------------------------
+Ran 3 tests in 0.110s
+
+OK
+\end{verbatim}
+
+The above examples show the most commonly used \module{unittest} features
+which are sufficient to meet many everyday testing needs.  The remainder
+of the documentation explores the full feature set from first principles.
 
 
 \subsection{Organizing test code
@@ -266,12 +365,11 @@ class WidgetTestSuite(unittest.TestSuite):
 
 Since it is a common pattern to create a \class{TestCase} subclass
 with many similarly named test functions, there is a convenience
-function called \function{makeSuite()} provided in the
-\refmodule{unittest} module that constructs a test suite that
-comprises all of the test cases in a test case class:
+function called \function{makeSuite()} that constructs a test suite
+that comprises all of the test cases in a test case class:
 
 \begin{verbatim}
-suite = unittest.makeSuite(WidgetTestCase,'test')
+suite = unittest.makeSuite(WidgetTestCase)
 \end{verbatim}
 
 Note that when using the \function{makeSuite()} function, the order in
@@ -291,7 +389,7 @@ alltests = unittest.TestSuite((suite1, suite2))
 \end{verbatim}
 
 You can place the definitions of test cases and test suites in the
-same modules as the code they are to test (e.g.\ \file{widget.py}),
+same modules as the code they are to test (such as \file{widget.py}),
 but there are several advantages to placing the test code in a
 separate module, such as \file{widgettests.py}:
 
@@ -420,6 +518,12 @@ if __name__ == '__main__':
 \end{verbatim}
 \end{funcdesc}
 
+In some cases, the existing tests may have be written using the
+\refmodule{doctest} module.  If so, that module provides a 
+\class{DocTestSuite} class that can automatically build
+\class{unittest.TestSuite} instances from the existing test code.
+\versionadded{2.3}
+
 
 \subsection{TestCase Objects
             \label{testcase-objects}}
@@ -456,7 +560,7 @@ Methods in the first group are:
 
 \begin{methoddesc}[TestCase]{run}{\optional{result}}
   Run the test, collecting the result into the test result object
-  passed as \var{result}.  If \var{result} is omitted or \code{None},
+  passed as \var{result}.  If \var{result} is omitted or \constant{None},
   a temporary result object is created and used, but is not made
   available to the caller.  This is equivalent to simply calling the
   \class{TestCase} instance.
@@ -464,7 +568,7 @@ Methods in the first group are:
 
 \begin{methoddesc}[TestCase]{debug}{}
   Run the test without collecting the result.  This allows exceptions
-  raised by the test to be propogated to the caller, and can be used
+  raised by the test to be propagated to the caller, and can be used
   to support running tests under a debugger.
 \end{methoddesc}
 
@@ -476,14 +580,14 @@ report failures.
 \methodline{failUnless}{expr\optional{, msg}}
   Signal a test failure if \var{expr} is false; the explanation for
   the error will be \var{msg} if given, otherwise it will be
-  \code{None}.
+  \constant{None}.
 \end{methoddesc}
 
 \begin{methoddesc}[TestCase]{assertEqual}{first, second\optional{, msg}}
 \methodline{failUnlessEqual}{first, second\optional{, msg}}
   Test that \var{first} and \var{second} are equal.  If the values do
   not compare equal, the test will fail with the explanation given by
-  \var{msg}, or \code{None}.  Note that using \method{failUnlessEqual()}
+  \var{msg}, or \constant{None}.  Note that using \method{failUnlessEqual()}
   improves upon doing the comparison as the first parameter to
   \method{failUnless()}:  the default value for \var{msg} can be
   computed to include representations of both \var{first} and
@@ -494,7 +598,7 @@ report failures.
 \methodline{failIfEqual}{first, second\optional{, msg}}
   Test that \var{first} and \var{second} are not equal.  If the values
   do compare equal, the test will fail with the explanation given by
-  \var{msg}, or \code{None}.  Note that using \method{failIfEqual()}
+  \var{msg}, or \constant{None}.  Note that using \method{failIfEqual()}
   improves upon doing the comparison as the first parameter to
   \method{failUnless()} is that the default value for \var{msg} can be
   computed to include representations of both \var{first} and
@@ -510,7 +614,7 @@ report failures.
   and comparing to zero.  Note that comparing a given number of decimal places
   is not the same as comparing a given number of significant digits.
   If the values do not compare equal, the test will fail with the explanation
-  given by \var{msg}, or \code{None}.  
+  given by \var{msg}, or \constant{None}.  
 \end{methoddesc}
 
 \begin{methoddesc}[TestCase]{assertNotAlmostEqual}{first, second\optional{,
@@ -522,7 +626,7 @@ report failures.
   and comparing to zero.  Note that comparing a given number of decimal places
   is not the same as comparing a given number of significant digits.
   If the values do not compare equal, the test will fail with the explanation
-  given by \var{msg}, or \code{None}.  
+  given by \var{msg}, or \constant{None}.  
 \end{methoddesc}
 
 \begin{methoddesc}[TestCase]{assertRaises}{exception, callable, \moreargs}
@@ -538,12 +642,12 @@ report failures.
 \begin{methoddesc}[TestCase]{failIf}{expr\optional{, msg}}
   The inverse of the \method{failUnless()} method is the
   \method{failIf()} method.  This signals a test failure if \var{expr}
-  is true, with \var{msg} or \code{None} for the error message.
+  is true, with \var{msg} or \constant{None} for the error message.
 \end{methoddesc}
 
 \begin{methoddesc}[TestCase]{fail}{\optional{msg}}
   Signals a test failure unconditionally, with \var{msg} or
-  \code{None} for the error message.
+  \constant{None} for the error message.
 \end{methoddesc}
 
 \begin{memberdesc}[TestCase]{failureException}
@@ -578,10 +682,10 @@ information on the test:
 \end{methoddesc}
 
 \begin{methoddesc}[TestCase]{shortDescription}{}
-  Returns a one-line description of the test, or \code{None} if no
+  Returns a one-line description of the test, or \constant{None} if no
   description has been provided.  The default implementation of this
   method returns the first line of the test method's docstring, if
-  available, or \code{None}.
+  available, or \constant{None}.
 \end{methoddesc}
 
 
@@ -667,7 +771,7 @@ be of interest when inspecting the results of running a set of tests:
 
 
 The following methods of the \class{TestResult} class are used to
-maintain the internal data structures, and mmay be extended in
+maintain the internal data structures, and may be extended in
 subclasses to support additional reporting requirements.  This is
 particularly useful in building tools which support interactive
 reporting while tests are being run.
@@ -789,7 +893,7 @@ either by subclassing or assignment on an instance:
 \begin{memberdesc}[TestLoader]{sortTestMethodsUsing}
   Function to be used to compare method names when sorting them in
   \method{getTestCaseNames()}.  The default value is the built-in
-  \function{cmp()} function; it can be set to \code{None} to disable
+  \function{cmp()} function; it can be set to \constant{None} to disable
   the sort.
 \end{memberdesc}
 
@@ -798,45 +902,3 @@ either by subclassing or assignment on an instance:
   No methods on the resulting object are needed.  The default value is
   the \class{TestSuite} class.
 \end{memberdesc}
-
-
-\subsection{Getting Extended Error Information
-            \label{unittest-error-info}}
-
-Some applications can make use of more error information (for example,
-an integrated development environment, or IDE).  Such an application
-can retrieve supplemental information about errors and failures by
-using an alternate \class{TestResult} implementation, and extending
-the \method{defaultTestResult()} method of the \class{TestCase} class
-to provide it.
-
-Here is a brief example of a \class{TestResult} subclass which stores
-the actual exception and traceback objects.  (Be aware that storing
-traceback objects can cause a great deal of memory not to be reclaimed
-when it otherwise would be, which can have effects that affect the
-behavior of the tests.)
-
-\begin{verbatim}
-import unittest
-
-class MyTestCase(unittest.TestCase):
-    def defaultTestResult(self):
-        return MyTestResult()
-
-class MyTestResult(unittest.TestResult):
-    def __init__(self):
-        self.errors_tb = []
-        self.failures_tb = []
-
-    def addError(self, test, err):
-        self.errors_tb.append((test, err))
-        unittest.TestResult.addError(self, test, err)
-
-    def addFailure(self, test, err):
-        self.failures_tb.append((test, err))
-        unittest.TestResult.addFailure(self, test, err)
-\end{verbatim}
-
-Tests written using \class{MyTestCase} as the base class, instead of
-\class{TestCase}, will allow tools to extract additional information
-from the results object.

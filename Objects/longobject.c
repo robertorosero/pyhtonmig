@@ -12,7 +12,15 @@
  * both operands contain more than KARATSUBA_CUTOFF digits (this
  * being an internal Python long digit, in base BASE).
  */
-#define KARATSUBA_CUTOFF 35
+#define KARATSUBA_CUTOFF 70
+#define KARATSUBA_SQUARE_CUTOFF (2 * KARATSUBA_CUTOFF)
+
+/* For exponentiation, use the binary left-to-right algorithm
+ * unless the exponent contains more than FIVEARY_CUTOFF digits.
+ * In that case, do 5 bits at a time.  The potential drawback is that
+ * a table of 2**5 intermediate results is computed.
+ */
+#define FIVEARY_CUTOFF 8
 
 #define ABS(x) ((x) < 0 ? -(x) : (x))
 
@@ -237,6 +245,15 @@ PyLong_AsUnsignedLong(PyObject *vv)
 	int i;
 
 	if (vv == NULL || !PyLong_Check(vv)) {
+		if (vv != NULL && PyInt_Check(vv)) {
+			long val = PyInt_AsLong(vv);
+			if (val < 0) {
+				PyErr_SetString(PyExc_OverflowError,
+				"can't convert negative value to unsigned long");
+				return (unsigned long) -1;
+			}
+			return val;
+		}
 		PyErr_BadInternalCall();
 		return (unsigned long) -1;
 	}
@@ -271,6 +288,8 @@ PyLong_AsUnsignedLongMask(PyObject *vv)
 	int i, sign;
 
 	if (vv == NULL || !PyLong_Check(vv)) {
+		if (vv != NULL && PyInt_Check(vv))
+			return PyInt_AsUnsignedLongMask(vv);
 		PyErr_BadInternalCall();
 		return (unsigned long) -1;
 	}
@@ -1201,8 +1220,8 @@ long_from_binary_base(char **str, int base)
 	bits_in_accum = 0;
 	pdigit = z->ob_digit;
 	while (--p >= start) {
-		unsigned char ch = (unsigned char)*p;
-		digit k;
+		int k;
+		char ch = *p;
 
 		if (ch <= '9')
 			k = ch - '0';
@@ -1212,8 +1231,8 @@ long_from_binary_base(char **str, int base)
 			assert(ch >= 'A');
 			k = ch - 'A' + 10;
 		}
-		assert(k < base);
-		accum |= k << bits_in_accum;
+		assert(k >= 0 && k < base);
+		accum |= (twodigits)(k << bits_in_accum);
 		bits_in_accum += bits_per_char;
 		if (bits_in_accum >= SHIFT) {
 			*pdigit++ = (digit)(accum & MASK);
@@ -1440,7 +1459,7 @@ x_divrem(PyLongObject *v1, PyLongObject *w1, PyLongObject **prem)
 			digit zz = (digit) (z >> SHIFT);
 			carry += v->ob_digit[i+k] - z
 				+ ((twodigits)zz << SHIFT);
-			v->ob_digit[i+k] = carry & MASK;
+			v->ob_digit[i+k] = (digit)(carry & MASK);
 			carry = Py_ARITHMETIC_RIGHT_SHIFT(BASE_TWODIGITS_TYPE,
 							  carry, SHIFT);
 			carry -= zz;
@@ -1459,7 +1478,7 @@ x_divrem(PyLongObject *v1, PyLongObject *w1, PyLongObject **prem)
 			carry = 0;
 			for (i = 0; i < size_w && i+k < size_v; ++i) {
 				carry += v->ob_digit[i+k] + w->ob_digit[i];
-				v->ob_digit[i+k] = carry & MASK;
+				v->ob_digit[i+k] = (digit)(carry & MASK);
 				carry = Py_ARITHMETIC_RIGHT_SHIFT(
 						BASE_TWODIGITS_TYPE,
 						carry, SHIFT);
@@ -1717,26 +1736,72 @@ x_mul(PyLongObject *a, PyLongObject *b)
 		return NULL;
 
 	memset(z->ob_digit, 0, z->ob_size * sizeof(digit));
-	for (i = 0; i < size_a; ++i) {
-		twodigits carry = 0;
-		twodigits f = a->ob_digit[i];
-		int j;
-		digit *pz = z->ob_digit + i;
+	if (a == b) {
+		/* Efficient squaring per HAC, Algorithm 14.16:
+		 * http://www.cacr.math.uwaterloo.ca/hac/about/chap14.pdf
+		 * Gives slightly less than a 2x speedup when a == b,
+		 * via exploiting that each entry in the multiplication
+		 * pyramid appears twice (except for the size_a squares).
+		 */
+		for (i = 0; i < size_a; ++i) {
+			twodigits carry;
+			twodigits f = a->ob_digit[i];
+			digit *pz = z->ob_digit + (i << 1);
+			digit *pa = a->ob_digit + i + 1;
+			digit *paend = a->ob_digit + size_a;
 
-		SIGCHECK({
-			Py_DECREF(z);
-			return NULL;
-		})
-		for (j = 0; j < size_b; ++j) {
-			carry += *pz + b->ob_digit[j] * f;
-			*pz++ = (digit) (carry & MASK);
+			SIGCHECK({
+				Py_DECREF(z);
+				return NULL;
+			})
+
+			carry = *pz + f * f;
+			*pz++ = (digit)(carry & MASK);
 			carry >>= SHIFT;
+			assert(carry <= MASK);
+
+			/* Now f is added in twice in each column of the
+			 * pyramid it appears.  Same as adding f<<1 once.
+			 */
+			f <<= 1;
+			while (pa < paend) {
+				carry += *pz + *pa++ * f;
+				*pz++ = (digit)(carry & MASK);
+				carry >>= SHIFT;
+				assert(carry <= (MASK << 1));
+			}
+			if (carry) {
+				carry += *pz;
+				*pz++ = (digit)(carry & MASK);
+				carry >>= SHIFT;
+			}
+			if (carry)
+				*pz += (digit)(carry & MASK);
+			assert((carry >> SHIFT) == 0);
 		}
-		for (; carry != 0; ++j) {
-			assert(i+j < z->ob_size);
-			carry += *pz;
-			*pz++ = (digit) (carry & MASK);
-			carry >>= SHIFT;
+	}
+	else {	/* a is not the same as b -- gradeschool long mult */
+		for (i = 0; i < size_a; ++i) {
+			twodigits carry = 0;
+			twodigits f = a->ob_digit[i];
+			digit *pz = z->ob_digit + i;
+			digit *pb = b->ob_digit;
+			digit *pbend = b->ob_digit + size_b;
+
+			SIGCHECK({
+				Py_DECREF(z);
+				return NULL;
+			})
+
+			while (pb < pbend) {
+				carry += *pz + *pb++ * f;
+				*pz++ = (digit)(carry & MASK);
+				carry >>= SHIFT;
+				assert(carry <= MASK);
+			}
+			if (carry)
+				*pz += (digit)(carry & MASK);
+			assert((carry >> SHIFT) == 0);
 		}
 	}
 	return long_normalize(z);
@@ -1816,7 +1881,8 @@ k_mul(PyLongObject *a, PyLongObject *b)
 	}
 
 	/* Use gradeschool math when either number is too small. */
-	if (asize <= KARATSUBA_CUTOFF) {
+	i = a == b ? KARATSUBA_SQUARE_CUTOFF : KARATSUBA_CUTOFF;
+	if (asize <= i) {
 		if (asize == 0)
 			return _PyLong_New(0);
 		else
@@ -1837,7 +1903,13 @@ k_mul(PyLongObject *a, PyLongObject *b)
 	if (kmul_split(a, shift, &ah, &al) < 0) goto fail;
 	assert(ah->ob_size > 0);	/* the split isn't degenerate */
 
-	if (kmul_split(b, shift, &bh, &bl) < 0) goto fail;
+	if (a == b) {
+		bh = ah;
+		bl = al;
+		Py_INCREF(bh);
+		Py_INCREF(bl);
+	}
+	else if (kmul_split(b, shift, &bh, &bl) < 0) goto fail;
 
 	/* The plan:
 	 * 1. Allocate result space (asize + bsize digits:  that's always
@@ -1906,7 +1978,11 @@ k_mul(PyLongObject *a, PyLongObject *b)
 	Py_DECREF(al);
 	ah = al = NULL;
 
-	if ((t2 = x_add(bh, bl)) == NULL) {
+	if (a == b) {
+		t2 = t1;
+		Py_INCREF(t2);
+	}
+	else if ((t2 = x_add(bh, bl)) == NULL) {
 		Py_DECREF(t1);
 		goto fail;
 	}
@@ -2078,6 +2154,12 @@ long_mul(PyLongObject *v, PyLongObject *w)
    have different signs.  We then subtract one from the 'div'
    part of the outcome to keep the invariant intact. */
 
+/* Compute
+ *     *pdiv, *pmod = divmod(v, w)
+ * NULL can be passed for pdiv or pmod, in which case that part of
+ * the result is simply thrown away.  The caller owns a reference to
+ * each of these it requests (does not pass NULL for).
+ */
 static int
 l_divmod(PyLongObject *v, PyLongObject *w,
 	 PyLongObject **pdiv, PyLongObject **pmod)
@@ -2109,44 +2191,43 @@ l_divmod(PyLongObject *v, PyLongObject *w,
 		Py_DECREF(div);
 		div = temp;
 	}
-	*pdiv = div;
-	*pmod = mod;
+	if (pdiv != NULL)
+		*pdiv = div;
+	else
+		Py_DECREF(div);
+
+	if (pmod != NULL)
+		*pmod = mod;
+	else
+		Py_DECREF(mod);
+
 	return 0;
 }
 
 static PyObject *
 long_div(PyObject *v, PyObject *w)
 {
-	PyLongObject *a, *b, *div, *mod;
+	PyLongObject *a, *b, *div;
 
 	CONVERT_BINOP(v, w, &a, &b);
-
-	if (l_divmod(a, b, &div, &mod) < 0) {
-		Py_DECREF(a);
-		Py_DECREF(b);
-		return NULL;
-	}
+	if (l_divmod(a, b, &div, NULL) < 0)
+		div = NULL;
 	Py_DECREF(a);
 	Py_DECREF(b);
-	Py_DECREF(mod);
 	return (PyObject *)div;
 }
 
 static PyObject *
 long_classic_div(PyObject *v, PyObject *w)
 {
-	PyLongObject *a, *b, *div, *mod;
+	PyLongObject *a, *b, *div;
 
 	CONVERT_BINOP(v, w, &a, &b);
-
 	if (Py_DivisionWarningFlag &&
 	    PyErr_Warn(PyExc_DeprecationWarning, "classic long division") < 0)
 		div = NULL;
-	else if (l_divmod(a, b, &div, &mod) < 0)
+	else if (l_divmod(a, b, &div, NULL) < 0)
 		div = NULL;
-	else
-		Py_DECREF(mod);
-
 	Py_DECREF(a);
 	Py_DECREF(b);
 	return (PyObject *)div;
@@ -2197,18 +2278,14 @@ overflow:
 static PyObject *
 long_mod(PyObject *v, PyObject *w)
 {
-	PyLongObject *a, *b, *div, *mod;
+	PyLongObject *a, *b, *mod;
 
 	CONVERT_BINOP(v, w, &a, &b);
 
-	if (l_divmod(a, b, &div, &mod) < 0) {
-		Py_DECREF(a);
-		Py_DECREF(b);
-		return NULL;
-	}
+	if (l_divmod(a, b, NULL, &mod) < 0)
+		mod = NULL;
 	Py_DECREF(a);
 	Py_DECREF(b);
-	Py_DECREF(div);
 	return (PyObject *)mod;
 }
 
@@ -2239,22 +2316,33 @@ long_divmod(PyObject *v, PyObject *w)
 	return z;
 }
 
+/* pow(v, w, x) */
 static PyObject *
 long_pow(PyObject *v, PyObject *w, PyObject *x)
 {
-	PyLongObject *a, *b;
-	PyObject *c;
-	PyLongObject *z, *div, *mod;
-	int size_b, i;
+	PyLongObject *a, *b, *c; /* a,b,c = v,w,x */
+	int negativeOutput = 0;  /* if x<0 return negative output */
 
+	PyLongObject *z = NULL;  /* accumulated result */
+	int i, j, k;             /* counters */
+	PyLongObject *temp = NULL;
+
+	/* 5-ary values.  If the exponent is large enough, table is
+	 * precomputed so that table[i] == a**i % c for i in range(32).
+	 */
+	PyLongObject *table[32] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+				   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+
+	/* a, b, c = v, w, x */
 	CONVERT_BINOP(v, w, &a, &b);
-	if (PyLong_Check(x) || Py_None == x) {
-		c = x;
+	if (PyLong_Check(x)) {
+		c = (PyLongObject *)x;
 		Py_INCREF(x);
 	}
-	else if (PyInt_Check(x)) {
-		c = PyLong_FromLong(PyInt_AS_LONG(x));
-	}
+	else if (PyInt_Check(x))
+		c = (PyLongObject *)PyLong_FromLong(PyInt_AS_LONG(x));
+	else if (x == Py_None)
+		c = NULL;
 	else {
 		Py_DECREF(a);
 		Py_DECREF(b);
@@ -2262,95 +2350,154 @@ long_pow(PyObject *v, PyObject *w, PyObject *x)
 		return Py_NotImplemented;
 	}
 
-	if (c != Py_None && ((PyLongObject *)c)->ob_size == 0) {
-		PyErr_SetString(PyExc_ValueError,
-				"pow() 3rd argument cannot be 0");
-		z = NULL;
-		goto error;
-	}
-
-	size_b = b->ob_size;
-	if (size_b < 0) {
-		Py_DECREF(a);
-		Py_DECREF(b);
-		Py_DECREF(c);
-		if (x != Py_None) {
+	if (b->ob_size < 0) {  /* if exponent is negative */
+		if (c) {
 			PyErr_SetString(PyExc_TypeError, "pow() 2nd argument "
-			     "cannot be negative when 3rd argument specified");
-			return NULL;
-		}
-		/* Return a float.  This works because we know that
-		   this calls float_pow() which converts its
-		   arguments to double. */
-		return PyFloat_Type.tp_as_number->nb_power(v, w, x);
-	}
-	z = (PyLongObject *)PyLong_FromLong(1L);
-	for (i = 0; i < size_b; ++i) {
-		digit bi = b->ob_digit[i];
-		int j;
-
-		for (j = 0; j < SHIFT; ++j) {
-			PyLongObject *temp;
-
-			if (bi & 1) {
-				temp = (PyLongObject *)long_mul(z, a);
-				Py_DECREF(z);
-			 	if (c!=Py_None && temp!=NULL) {
-			 		if (l_divmod(temp,(PyLongObject *)c,
-							&div,&mod) < 0) {
-						Py_DECREF(temp);
-						z = NULL;
-						goto error;
-					}
-				 	Py_XDECREF(div);
-				 	Py_DECREF(temp);
-				 	temp = mod;
-				}
-			 	z = temp;
-				if (z == NULL)
-					break;
-			}
-			bi >>= 1;
-			if (bi == 0 && i+1 == size_b)
-				break;
-			temp = (PyLongObject *)long_mul(a, a);
-			Py_DECREF(a);
-		 	if (c!=Py_None && temp!=NULL) {
-			 	if (l_divmod(temp, (PyLongObject *)c, &div,
-							&mod) < 0) {
-					Py_DECREF(temp);
-					z = NULL;
-					goto error;
-				}
-			 	Py_XDECREF(div);
-			 	Py_DECREF(temp);
-			 	temp = mod;
-			}
-			a = temp;
-			if (a == NULL) {
-				Py_DECREF(z);
-				z = NULL;
-				break;
-			}
-		}
-		if (a == NULL || z == NULL)
-			break;
-	}
-	if (c!=Py_None && z!=NULL) {
-		if (l_divmod(z, (PyLongObject *)c, &div, &mod) < 0) {
-			Py_DECREF(z);
-			z = NULL;
+			    "cannot be negative when 3rd argument specified");
+			goto Error;
 		}
 		else {
-			Py_XDECREF(div);
-			Py_DECREF(z);
-			z = mod;
+			/* else return a float.  This works because we know
+			   that this calls float_pow() which converts its
+			   arguments to double. */
+			Py_DECREF(a);
+			Py_DECREF(b);
+			return PyFloat_Type.tp_as_number->nb_power(v, w, x);
 		}
 	}
-  error:
+
+	if (c) {
+		/* if modulus == 0:
+		       raise ValueError() */
+		if (c->ob_size == 0) {
+			PyErr_SetString(PyExc_ValueError,
+					"pow() 3rd argument cannot be 0");
+			goto Error;
+		}
+
+		/* if modulus < 0:
+		       negativeOutput = True
+		       modulus = -modulus */
+		if (c->ob_size < 0) {
+			negativeOutput = 1;
+			temp = (PyLongObject *)_PyLong_Copy(c);
+			if (temp == NULL)
+				goto Error;
+			Py_DECREF(c);
+			c = temp;
+			temp = NULL;
+			c->ob_size = - c->ob_size;
+		}
+
+		/* if modulus == 1:
+		       return 0 */
+		if ((c->ob_size == 1) && (c->ob_digit[0] == 1)) {
+			z = (PyLongObject *)PyLong_FromLong(0L);
+			goto Done;
+		}
+
+		/* if base < 0:
+		       base = base % modulus
+		   Having the base positive just makes things easier. */
+		if (a->ob_size < 0) {
+			if (l_divmod(a, c, NULL, &temp) < 0)
+				goto Error;
+			Py_DECREF(a);
+			a = temp;
+			temp = NULL;
+		}
+	}
+
+	/* At this point a, b, and c are guaranteed non-negative UNLESS
+	   c is NULL, in which case a may be negative. */
+
+	z = (PyLongObject *)PyLong_FromLong(1L);
+	if (z == NULL)
+		goto Error;
+
+	/* Perform a modular reduction, X = X % c, but leave X alone if c
+	 * is NULL.
+	 */
+#define REDUCE(X)					\
+	if (c != NULL) {				\
+		if (l_divmod(X, c, NULL, &temp) < 0)	\
+			goto Error;			\
+		Py_XDECREF(X);				\
+		X = temp;				\
+		temp = NULL;				\
+	}
+
+	/* Multiply two values, then reduce the result:
+	   result = X*Y % c.  If c is NULL, skip the mod. */
+#define MULT(X, Y, result)				\
+{							\
+	temp = (PyLongObject *)long_mul(X, Y);		\
+	if (temp == NULL)				\
+		goto Error;				\
+	Py_XDECREF(result);				\
+	result = temp;					\
+	temp = NULL;					\
+	REDUCE(result)					\
+}
+
+	if (b->ob_size <= FIVEARY_CUTOFF) {
+		/* Left-to-right binary exponentiation (HAC Algorithm 14.79) */
+		/* http://www.cacr.math.uwaterloo.ca/hac/about/chap14.pdf    */
+		for (i = b->ob_size - 1; i >= 0; --i) {
+			digit bi = b->ob_digit[i];
+
+			for (j = 1 << (SHIFT-1); j != 0; j >>= 1) {
+				MULT(z, z, z)
+				if (bi & j)
+					MULT(z, a, z)
+			}
+		}
+	}
+	else {
+		/* Left-to-right 5-ary exponentiation (HAC Algorithm 14.82) */
+		Py_INCREF(z);	/* still holds 1L */
+		table[0] = z;
+		for (i = 1; i < 32; ++i)
+			MULT(table[i-1], a, table[i])
+
+		for (i = b->ob_size - 1; i >= 0; --i) {
+			const digit bi = b->ob_digit[i];
+
+			for (j = SHIFT - 5; j >= 0; j -= 5) {
+				const int index = (bi >> j) & 0x1f;
+				for (k = 0; k < 5; ++k)
+					MULT(z, z, z)
+				if (index)
+					MULT(z, table[index], z)
+			}
+		}
+	}
+
+	if (negativeOutput && (z->ob_size != 0)) {
+		temp = (PyLongObject *)long_sub(z, c);
+		if (temp == NULL)
+			goto Error;
+		Py_DECREF(z);
+		z = temp;
+		temp = NULL;
+	}
+	goto Done;
+
+ Error:
+ 	if (z != NULL) {
+ 		Py_DECREF(z);
+ 		z = NULL;
+ 	}
+	/* fall through */
+ Done:
 	Py_XDECREF(a);
-	Py_DECREF(b);
-	Py_DECREF(c);
+	Py_XDECREF(b);
+	Py_XDECREF(c);
+	Py_XDECREF(temp);
+	if (b->ob_size > FIVEARY_CUTOFF) {
+		for (i = 0; i < 32; ++i)
+			Py_XDECREF(table[i]);
+	}
 	return (PyObject *)z;
 }
 
@@ -2794,8 +2941,10 @@ long_subtype_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	if (n < 0)
 		n = -n;
 	new = (PyLongObject *)type->tp_alloc(type, n);
-	if (new == NULL)
+	if (new == NULL) {
+		Py_DECREF(tmp);
 		return NULL;
+	}
 	assert(PyLong_Check(new));
 	new->ob_size = tmp->ob_size;
 	for (i = 0; i < n; i++)

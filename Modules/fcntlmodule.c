@@ -99,7 +99,7 @@ fcntl_ioctl(PyObject *self, PyObject *args)
 	int ret;
 	char *str;
 	int len;
-	int mutate_arg = 0;
+	int mutate_arg = 1;
 	char buf[1024];
 
 	if (PyArg_ParseTuple(args, "O&iw#|i:ioctl",
@@ -107,10 +107,6 @@ fcntl_ioctl(PyObject *self, PyObject *args)
 			     &str, &len, &mutate_arg)) {
 		char *arg;
 
-		if (PyTuple_Size(args) == 3) {
-			/* warning goes here in 2.4 */
-			mutate_arg = 0;
-		}
 	       	if (mutate_arg) {
 			if (len <= sizeof buf) {
 				memcpy(buf, str, len);
@@ -182,7 +178,11 @@ fcntl_ioctl(PyObject *self, PyObject *args)
 	  return NULL;
 	}
 	Py_BEGIN_ALLOW_THREADS
+#ifdef __VMS
+	ret = ioctl(fd, code, (void *)arg);
+#else
 	ret = ioctl(fd, code, arg);
+#endif
 	Py_END_ALLOW_THREADS
 	if (ret < 0) {
 		PyErr_SetFromErrno(PyExc_IOError);
@@ -195,7 +195,7 @@ PyDoc_STRVAR(ioctl_doc,
 "ioctl(fd, opt[, arg[, mutate_flag]])\n\
 \n\
 Perform the requested operation on file descriptor fd.  The operation is\n\
-defined by op and is operating system dependent.  Typically these codes are\n\
+defined by opt and is operating system dependent.  Typically these codes are\n\
 retrieved from the fcntl or termios library modules.\n\
 \n\
 The argument arg is optional, and defaults to 0; it may be an int or a\n\
@@ -552,7 +552,10 @@ all_ins(PyObject* d)
 	INS(I_FDINSERT);
 	INS(I_STR);
 	INS(I_SWROPT);
+#ifdef I_GWROPT
+	/* despite the comment above, old-ish glibcs miss a couple... */
 	INS(I_GWROPT);
+#endif
 	INS(I_SENDFD);
 	INS(I_RECVFD);
 	INS(I_LIST);
@@ -561,7 +564,9 @@ all_ins(PyObject* d)
 	INS(I_GETBAND);
 	INS(I_CANPUT);
 	INS(I_SETCLTIME);
+#ifdef I_GETCLTIME
 	INS(I_GETCLTIME);
+#endif
 	INS(I_LINK);
 	INS(I_UNLINK);
 	INS(I_PLINK);

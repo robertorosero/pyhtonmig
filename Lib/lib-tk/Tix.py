@@ -374,9 +374,9 @@ class TixWidget(Tkinter.Widget):
         if option == '':
             return
         elif not isinstance(option, StringType):
-            option = `option`
+            option = repr(option)
         if not isinstance(value, StringType):
-            value = `value`
+            value = repr(value)
         names = self._subwidget_names()
         for name in names:
             self.tk.call(name, 'configure', '-' + option, value)
@@ -1005,6 +1005,17 @@ class HList(TixWidget):
     def item_delete(self, entry, col):
         self.tk.call(self._w, 'item', 'delete', entry, col)
 
+    def entrycget(self, entry, opt):
+        return self.tk.call(self._w, 'entrycget', entry, opt)
+
+    def entryconfigure(self, entry, cnf={}, **kw):
+        if cnf is None:
+            return _lst2dict(
+                self.tk.split(
+                self.tk.call(self._w, 'entryconfigure', entry)))
+        self.tk.call(self._w, 'entryconfigure', entry,
+              *self._options(cnf, kw))
+
     def nearest(self, y):
         return self.tk.call(self._w, 'nearest', y)
 
@@ -1093,15 +1104,15 @@ class ListNoteBook(TixWidget):
         return self.subwidget_list[name]
 
     def page(self, name):
-       return self.subwidget(name)
+        return self.subwidget(name)
 
     def pages(self):
-       # Can't call subwidgets_all directly because we don't want .nbframe
-       names = self.tk.split(self.tk.call(self._w, 'pages'))
-       ret = []
-       for x in names:
-           ret.append(self.subwidget(x))
-       return ret
+        # Can't call subwidgets_all directly because we don't want .nbframe
+        names = self.tk.split(self.tk.call(self._w, 'pages'))
+        ret = []
+        for x in names:
+            ret.append(self.subwidget(x))
+        return ret
 
     def raise_page(self, name):              # raise is a python keyword
         self.tk.call(self._w, 'raise', name)
@@ -1726,7 +1737,7 @@ class _dummyNoteBookFrame(NoteBookFrame, TixSubWidget):
 
 class _dummyPanedWindow(PanedWindow, TixSubWidget):
     def __init__(self, master, name, destroy_physically=1):
-       TixSubWidget.__init__(self, master, name, destroy_physically)
+        TixSubWidget.__init__(self, master, name, destroy_physically)
 
 ########################
 ### Utility Routines ###

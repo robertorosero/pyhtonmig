@@ -13,13 +13,19 @@ classes, instances and exceptions.
 \indexii{built-in}{types}
 
 Some operations are supported by several object types; in particular,
-all objects can be compared, tested for truth value, and converted to
-a string (with the \code{`\textrm{\ldots}`} notation).  The latter
-conversion is implicitly used when an object is written by the
+practically all objects can be compared, tested for truth value,
+and converted to a string (with the \code{`\textrm{\ldots}`} notation,
+the equivalent \function{repr()} function, or the slightly different
+\function{str()} function).  The latter
+function is implicitly used when an object is written by the
 \keyword{print}\stindex{print} statement.
+(Information on \ulink{\keyword{print} statement}{../ref/print.html}
+and other language statements can be found in the
+\citetitle[../ref/ref.html]{Python Reference Manual} and the
+\citetitle[../tut/tut.html]{Python Tutorial}.)
 
 
-\subsection{Truth Value Testing} \label{truth}
+\subsection{Truth Value Testing\label{truth}}
 
 Any object can be tested for truth value, for use in an \keyword{if} or
 \keyword{while} condition or as operand of the Boolean operations below.
@@ -140,7 +146,7 @@ Notes:
 
 \end{description}
 
-Objects of different types, except different numeric types, never
+Objects of different types, except different numeric types and different string types, never
 compare equal; such objects are ordered consistently but arbitrarily
 (so that sorting a heterogeneous array yields a consistent result).
 Furthermore, some types (for example, file objects) support only a
@@ -312,8 +318,9 @@ priority (operations in the same box have the same priority):
   \lineiii{\var{x} | \var{y}}{bitwise \dfn{or} of \var{x} and \var{y}}{}
   \lineiii{\var{x} \^{} \var{y}}{bitwise \dfn{exclusive or} of \var{x} and \var{y}}{}
   \lineiii{\var{x} \&{} \var{y}}{bitwise \dfn{and} of \var{x} and \var{y}}{}
-  \lineiii{\var{x} << \var{n}}{\var{x} shifted left by \var{n} bits}{(1), (2)}
-  \lineiii{\var{x} >> \var{n}}{\var{x} shifted right by \var{n} bits}{(1), (3)}
+  % The empty groups below prevent conversion to guillemets.
+  \lineiii{\var{x} <{}< \var{n}}{\var{x} shifted left by \var{n} bits}{(1), (2)}
+  \lineiii{\var{x} >{}> \var{n}}{\var{x} shifted right by \var{n} bits}{(1), (3)}
   \hline
   \lineiii{\~\var{x}}{the bits of \var{x} inverted}{}
 \end{tableiii}
@@ -391,6 +398,12 @@ do not obey this property are deemed broken.  (This constraint
 was added in Python 2.3; in Python 2.2, various iterators are
 broken according to this rule.)
 
+Python's generators provide a convenient way to implement the
+iterator protocol.  If a container object's \method{__iter__()}
+method is implemented as a generator, it will automatically
+return an iterator object (technically, a generator object)
+supplying the \method{__iter__()} and \method{next()} methods.
+
 
 \subsection{Sequence Types \label{typesseq}}
 
@@ -401,13 +414,13 @@ String literals are written in single or double quotes:
 \code{'xyzzy'}, \code{"frobozz"}.  See chapter 2 of the
 \citetitle[../ref/strings.html]{Python Reference Manual} for more about
 string literals.  Unicode strings are much like strings, but are
-specified in the syntax using a preceeding \character{u} character:
+specified in the syntax using a preceding \character{u} character:
 \code{u'abc'}, \code{u"def"}.  Lists are constructed with square brackets,
 separating items with commas: \code{[a, b, c]}.  Tuples are
 constructed by the comma operator (not within square brackets), with
 or without enclosing parentheses, but an empty tuple must have the
-enclosing parentheses, e.g., \code{a, b, c} or \code{()}.  A single
-item tuple must have a trailing comma, e.g., \code{(d,)}.
+enclosing parentheses, such as \code{a, b, c} or \code{()}.  A single
+item tuple must have a trailing comma, such as \code{(d,)}.
 \obindex{sequence}
 \obindex{string}
 \obindex{Unicode}
@@ -439,11 +452,11 @@ This table lists the sequence operations sorted in ascending priority
 and \var{j} are integers:
 
 \begin{tableiii}{c|l|c}{code}{Operation}{Result}{Notes}
-  \lineiii{\var{x} in \var{s}}{\code{1} if an item of \var{s} is equal to \var{x}, else \code{0}}{(1)}
-  \lineiii{\var{x} not in \var{s}}{\code{0} if an item of \var{s} is
-equal to \var{x}, else \code{1}}{(1)}
+  \lineiii{\var{x} in \var{s}}{\code{True} if an item of \var{s} is equal to \var{x}, else \code{False}}{(1)}
+  \lineiii{\var{x} not in \var{s}}{\code{False} if an item of \var{s} is
+equal to \var{x}, else \code{True}}{(1)}
   \hline
-  \lineiii{\var{s} + \var{t}}{the concatenation of \var{s} and \var{t}}{}
+  \lineiii{\var{s} + \var{t}}{the concatenation of \var{s} and \var{t}}{(6)}
   \lineiii{\var{s} * \var{n}\textrm{,} \var{n} * \var{s}}{\var{n} shallow copies of \var{s} concatenated}{(2)}
   \hline
   \lineiii{\var{s}[\var{i}]}{\var{i}'th item of \var{s}, origin 0}{(3)}
@@ -489,10 +502,11 @@ In Python 2.3 and beyond, \var{x} may be a string of any length.
 [[3], [3], [3]]
 \end{verbatim}
 
-  What has happened is that \code{lists} is a list containing three
-  copies of the list \code{[[]]} (a one-element list containing an
-  empty list), but the contained list is shared by each copy.  You can
-  create a list of different lists this way:
+  What has happened is that \code{[[]]} is a one-element list containing
+  an empty list, so all three elements of \code{[[]] * 3} are (pointers to)
+  this single empty list.  Modifying any of the elements of \code{lists}
+  modifies this single list.  You can create a list of different lists this
+  way:
 
 \begin{verbatim}
 >>> lists = [[] for i in range(3)]
@@ -517,11 +531,24 @@ In Python 2.3 and beyond, \var{x} may be a string of any length.
 
 \item[(5)] The slice of \var{s} from \var{i} to \var{j} with step
   \var{k} is defined as the sequence of items with index 
-  \code{\var{x} = \var{i} + \var{n}*\var{k}} such that \code{0}
-  \code{<=} \var{n} \code{<} \code{abs(i-j)}.  If \var{i} or \var{j}
+  \code{\var{x} = \var{i} + \var{n}*\var{k}} such that
+  $0 \leq n < \frac{j-i}{k}$.  In other words, the indices
+  are \code{i}, \code{i+k}, \code{i+2*k}, \code{i+3*k} and so on, stopping when
+  \var{j} is reached (but never including \var{j}).  If \var{i} or \var{j}
   is greater than \code{len(\var{s})}, use \code{len(\var{s})}.  If
-  \var{i} or \var{j} are ommitted then they become ``end'' values
-  (which end depends on the sign of \var{k}).
+  \var{i} or \var{j} are omitted then they become ``end'' values
+  (which end depends on the sign of \var{k}).  Note, \var{k} cannot
+  be zero.
+
+\item[(6)] If \var{s} and \var{t} are both strings, some Python
+implementations such as CPython can usually perform an in-place optimization
+for assignments of the form \code{\var{s}=\var{s}+\var{t}} or
+\code{\var{s}+=\var{t}}.  When applicable, this optimization makes
+quadratic run-time much less likely.  This optimization is both version
+and implementation dependent.  For performance sensitive code, it is
+preferable to use the \method{str.join()} method which assures consistent
+linear concatenation performance across versions and implementations.
+\versionchanged[Formerly, string concatenation never occurred in-place]{2.4}
 
 \end{description}
 
@@ -533,11 +560,14 @@ objects support:
 
 \begin{methoddesc}[string]{capitalize}{}
 Return a copy of the string with only its first character capitalized.
+
+For 8-bit strings, this method is locale-dependent.
 \end{methoddesc}
 
-\begin{methoddesc}[string]{center}{width}
+\begin{methoddesc}[string]{center}{width\optional{, fillchar}}
 Return centered in a string of length \var{width}. Padding is done
-using spaces.
+using the specified \var{fillchar} (default is a space).
+\versionchanged[Support for the \var{fillchar} argument]{2.4}
 \end{methoddesc}
 
 \begin{methoddesc}[string]{count}{sub\optional{, start\optional{, end}}}
@@ -551,9 +581,11 @@ Decodes the string using the codec registered for \var{encoding}.
 \var{encoding} defaults to the default string encoding.  \var{errors}
 may be given to set a different error handling scheme.  The default is
 \code{'strict'}, meaning that encoding errors raise
-\exception{ValueError}.  Other possible values are \code{'ignore'} and
-\code{replace'}.
+\exception{UnicodeError}.  Other possible values are \code{'ignore'},
+\code{'replace'} and any other name registered via
+\function{codecs.register_error}.
 \versionadded{2.2}
+\versionchanged[Support for other error handling schemes added]{2.3}
 \end{methoddesc}
 
 \begin{methoddesc}[string]{encode}{\optional{encoding\optional{,errors}}}
@@ -561,9 +593,13 @@ Return an encoded version of the string.  Default encoding is the current
 default string encoding.  \var{errors} may be given to set a different
 error handling scheme.  The default for \var{errors} is
 \code{'strict'}, meaning that encoding errors raise a
-\exception{ValueError}.  Other possible values are \code{'ignore'} and
-\code{'replace'}.
+\exception{UnicodeError}.  Other possible values are \code{'ignore'},
+\code{'replace'}, \code{'xmlcharrefreplace'}, \code{'backslashreplace'}
+and any other name registered via \function{codecs.register_error}.
+For a list of possible encodings, see section~\ref{standard-encodings}.
 \versionadded{2.0}
+\versionchanged[Support for \code{'xmlcharrefreplace'} and
+\code{'backslashreplace'} and other error handling schemes added]{2.3}
 \end{methoddesc}
 
 \begin{methoddesc}[string]{endswith}{suffix\optional{, start\optional{, end}}}
@@ -594,36 +630,52 @@ substring is not found.
 \begin{methoddesc}[string]{isalnum}{}
 Return true if all characters in the string are alphanumeric and there
 is at least one character, false otherwise.
+
+For 8-bit strings, this method is locale-dependent.
 \end{methoddesc}
 
 \begin{methoddesc}[string]{isalpha}{}
 Return true if all characters in the string are alphabetic and there
 is at least one character, false otherwise.
+
+For 8-bit strings, this method is locale-dependent.
 \end{methoddesc}
 
 \begin{methoddesc}[string]{isdigit}{}
-Return true if there are only digit characters, false otherwise.
+Return true if all characters in the string are digits and there
+is at least one character, false otherwise.
+
+For 8-bit strings, this method is locale-dependent.
 \end{methoddesc}
 
 \begin{methoddesc}[string]{islower}{}
 Return true if all cased characters in the string are lowercase and
 there is at least one cased character, false otherwise.
+
+For 8-bit strings, this method is locale-dependent.
 \end{methoddesc}
 
 \begin{methoddesc}[string]{isspace}{}
 Return true if there are only whitespace characters in the string and
-the string is not empty, false otherwise.
+there is at least one character, false otherwise.
+
+For 8-bit strings, this method is locale-dependent.
 \end{methoddesc}
 
 \begin{methoddesc}[string]{istitle}{}
-Return true if the string is a titlecased string: uppercase
-characters may only follow uncased characters and lowercase characters
-only cased ones.  Return false otherwise.
+Return true if the string is a titlecased string and there is at least one
+character, for example uppercase characters may only follow uncased
+characters and lowercase characters only cased ones.  Return false
+otherwise.
+
+For 8-bit strings, this method is locale-dependent.
 \end{methoddesc}
 
 \begin{methoddesc}[string]{isupper}{}
 Return true if all cased characters in the string are uppercase and
 there is at least one cased character, false otherwise.
+
+For 8-bit strings, this method is locale-dependent.
 \end{methoddesc}
 
 \begin{methoddesc}[string]{join}{seq}
@@ -632,14 +684,18 @@ sequence \var{seq}.  The separator between elements is the string
 providing this method.
 \end{methoddesc}
 
-\begin{methoddesc}[string]{ljust}{width}
+\begin{methoddesc}[string]{ljust}{width\optional{, fillchar}}
 Return the string left justified in a string of length \var{width}.
-Padding is done using spaces.  The original string is returned if
+Padding is done using the specified \var{fillchar} (default is a
+space).  The original string is returned if
 \var{width} is less than \code{len(\var{s})}.
+\versionchanged[Support for the \var{fillchar} argument]{2.4}
 \end{methoddesc}
 
 \begin{methoddesc}[string]{lower}{}
 Return a copy of the string converted to lowercase.
+
+For 8-bit strings, this method is locale-dependent.
 \end{methoddesc}
 
 \begin{methoddesc}[string]{lstrip}{\optional{chars}}
@@ -651,10 +707,10 @@ the string this method is called on.
 \versionchanged[Support for the \var{chars} argument]{2.2.2}
 \end{methoddesc}
 
-\begin{methoddesc}[string]{replace}{old, new\optional{, maxsplit}}
+\begin{methoddesc}[string]{replace}{old, new\optional{, count}}
 Return a copy of the string with all occurrences of substring
 \var{old} replaced by \var{new}.  If the optional argument
-\var{maxsplit} is given, only the first \var{maxsplit} occurrences are
+\var{count} is given, only the first \var{count} occurrences are
 replaced.
 \end{methoddesc}
 
@@ -670,10 +726,20 @@ Like \method{rfind()} but raises \exception{ValueError} when the
 substring \var{sub} is not found.
 \end{methoddesc}
 
-\begin{methoddesc}[string]{rjust}{width}
+\begin{methoddesc}[string]{rjust}{width\optional{, fillchar}}
 Return the string right justified in a string of length \var{width}.
-Padding is done using spaces.  The original string is returned if
+Padding is done using the specified \var{fillchar} (default is a space).
+The original string is returned if
 \var{width} is less than \code{len(\var{s})}.
+\versionchanged[Support for the \var{fillchar} argument]{2.4}
+\end{methoddesc}
+
+\begin{methoddesc}[string]{rsplit}{\optional{sep \optional{,maxsplit}}}
+Return a list of the words in the string, using \var{sep} as the
+delimiter string.  If \var{maxsplit} is given, at most \var{maxsplit}
+splits are done, the \emph{rightmost} ones.  If \var{sep} is not specified
+or \code{None}, any whitespace string is a separator.
+\versionadded{2.4}
 \end{methoddesc}
 
 \begin{methoddesc}[string]{rstrip}{\optional{chars}}
@@ -688,8 +754,22 @@ string this method is called on.
 \begin{methoddesc}[string]{split}{\optional{sep \optional{,maxsplit}}}
 Return a list of the words in the string, using \var{sep} as the
 delimiter string.  If \var{maxsplit} is given, at most \var{maxsplit}
-splits are done.  If \var{sep} is not specified or \code{None}, any
-whitespace string is a separator.
+splits are done. (thus, the list will have at most \code{\var{maxsplit}+1}
+elements).  If \var{maxsplit} is not specified or is zero, then there
+is no limit on the number of splits (all possible splits are made).
+Consecutive delimiters are not grouped together and are
+deemed to delimit empty strings (for example, \samp{'1,,2'.split(',')}
+returns \samp{['1', '', '2']}).  The \var{sep} argument may consist of
+multiple characters (for example, \samp{'1, 2, 3'.split(', ')} returns
+\samp{['1', '2', '3']}).  Splitting an empty string with a specified
+separator returns an empty list.
+
+If \var{sep} is not specified or is \code{None}, a different splitting
+algorithm is applied.  Words are separated by arbitrary length strings of
+whitespace characters (spaces, tabs, newlines, returns, and formfeeds).
+Consecutive whitespace delimiters are treated as a single delimiter
+(\samp{'1   2  3'.split()} returns \samp{['1', '2', '3']}).  Splitting an
+empty string returns \samp{['']}.
 \end{methoddesc}
 
 \begin{methoddesc}[string]{splitlines}{\optional{keepends}}
@@ -718,11 +798,15 @@ the both ends of the string this method is called on.
 \begin{methoddesc}[string]{swapcase}{}
 Return a copy of the string with uppercase characters converted to
 lowercase and vice versa.
+
+For 8-bit strings, this method is locale-dependent.
 \end{methoddesc}
 
 \begin{methoddesc}[string]{title}{}
 Return a titlecased version of the string: words start with uppercase
 characters, all remaining cased characters are lowercase.
+
+For 8-bit strings, this method is locale-dependent.
 \end{methoddesc}
 
 \begin{methoddesc}[string]{translate}{table\optional{, deletechars}}
@@ -730,10 +814,22 @@ Return a copy of the string where all characters occurring in the
 optional argument \var{deletechars} are removed, and the remaining
 characters have been mapped through the given translation table, which
 must be a string of length 256.
+
+For Unicode objects, the \method{translate()} method does not
+accept the optional \var{deletechars} argument.  Instead, it
+returns a copy of the \var{s} where all characters have been mapped
+through the given translation table which must be a mapping of
+Unicode ordinals to Unicode ordinals, Unicode strings or \code{None}.
+Unmapped characters are left untouched. Characters mapped to \code{None}
+are deleted.  Note, a more flexible approach is to create a custom
+character mapping codec using the \refmodule{codecs} module (see
+\module{encodings.cp1251} for an example).      
 \end{methoddesc}
 
 \begin{methoddesc}[string]{upper}{}
 Return a copy of the string converted to uppercase.
+
+For 8-bit strings, this method is locale-dependent.
 \end{methoddesc}
 
 \begin{methoddesc}[string]{zfill}{width}
@@ -767,7 +863,7 @@ converted using the \code{\%s} conversion are Unicode objects, the
 result will also be a Unicode object.
 
 If \var{format} requires a single argument, \var{values} may be a
-single non-tuple object. \footnote{To format only a tuple you
+single non-tuple object.\footnote{To format only a tuple you
 should therefore provide a singleton tuple whose only element
 is the tuple to be formatted.}  Otherwise, \var{values} must be a tuple with
 exactly the number of items specified by the format string, or a
@@ -836,8 +932,8 @@ The conversion types are:
   \lineiii{i}{Signed integer decimal.}{}
   \lineiii{o}{Unsigned octal.}{(1)}
   \lineiii{u}{Unsigned decimal.}{}
-  \lineiii{x}{Unsigned hexidecimal (lowercase).}{(2)}
-  \lineiii{X}{Unsigned hexidecimal (uppercase).}{(2)}
+  \lineiii{x}{Unsigned hexadecimal (lowercase).}{(2)}
+  \lineiii{X}{Unsigned hexadecimal (uppercase).}{(2)}
   \lineiii{e}{Floating point exponential format (lowercase).}{}
   \lineiii{E}{Floating point exponential format (uppercase).}{}
   \lineiii{f}{Floating point decimal format.}{}
@@ -892,17 +988,17 @@ are replaced by \code{\%g} conversions.\footnote{
 }  All other errors raise exceptions.
 
 Additional string operations are defined in standard modules
-\refmodule{string}\refstmodindex{string} and
+\refmodule{string}\refstmodindex{string}\ and
 \refmodule{re}.\refstmodindex{re}
 
 
 \subsubsection{XRange Type \label{typesseq-xrange}}
 
-The xrange\obindex{xrange} type is an immutable sequence which is
-commonly used for looping.  The advantage of the xrange type is that an
-xrange object will always take the same amount of memory, no matter the
-size of the range it represents.  There are no consistent performance
-advantages.
+The \class{xrange}\obindex{xrange} type is an immutable sequence which
+is commonly used for looping.  The advantage of the \class{xrange}
+type is that an \class{xrange} object will always take the same amount
+of memory, no matter the size of the range it represents.  There are
+no consistent performance advantages.
 
 XRange objects have very little behavior: they only support indexing,
 iteration, and the \function{len()} function.
@@ -938,8 +1034,9 @@ The following operations are defined on mutable sequence types (where
         {same as \code{\var{s}[len(\var{s}):len(\var{s})] = \var{x}}}{(3)}
   \lineiii{\var{s}.count(\var{x})}
     {return number of \var{i}'s for which \code{\var{s}[\var{i}] == \var{x}}}{}
-  \lineiii{\var{s}.index(\var{x})}
-    {return smallest \var{i} such that \code{\var{s}[\var{i}] == \var{x}}}{(4)}
+  \lineiii{\var{s}.index(\var{x}\optional{, \var{i}\optional{, \var{j}}})}
+    {return smallest \var{k} such that \code{\var{s}[\var{k}] == \var{x}} and
+    \code{\var{i} <= \var{k} < \var{j}}}{(4)}
   \lineiii{\var{s}.insert(\var{i}, \var{x})}
 	{same as \code{\var{s}[\var{i}:\var{i}] = [\var{x}]}}{(5)}
   \lineiii{\var{s}.pop(\optional{\var{i}})}
@@ -948,7 +1045,8 @@ The following operations are defined on mutable sequence types (where
 	{same as \code{del \var{s}[\var{s}.index(\var{x})]}}{(4)}
   \lineiii{\var{s}.reverse()}
 	{reverses the items of \var{s} in place}{(7)}
-  \lineiii{\var{s}.sort(\optional{\var{cmpfunc=None}})}
+  \lineiii{\var{s}.sort(\optional{\var{cmp}\optional{,
+                        \var{key}\optional{, \var{reverse}}}})}
 	{sort the items of \var{s} in place}{(7), (8), (9), (10)}
 \end{tableiii}
 \indexiv{operations on}{mutable}{sequence}{types}
@@ -973,12 +1071,14 @@ Notes:
   no longer works in Python 2.0.  Use of this misfeature has been
   deprecated since Python 1.4.
 
-\item[(3)] Raises an exception when \var{x} is not a list object.  The
-  \method{extend()} method is experimental and not supported by
-  mutable sequence types other than lists.
+\item[(3)] Raises an exception when \var{x} is not a list object.
 
 \item[(4)] Raises \exception{ValueError} when \var{x} is not found in
-  \var{s}.
+  \var{s}. When a negative index is passed as the second or third parameter
+  to the \method{index()} method, the list length is added, as for slice
+  indices.  If it is still negative, it is truncated to zero, as for
+  slice indices.  \versionchanged[Previously, \method{index()} didn't
+  have arguments for specifying start and stop positions]{2.3}
 
 \item[(5)] When a negative index is passed as the first parameter to
   the \method{insert()} method, the list length is added, as for slice
@@ -995,54 +1095,167 @@ Notes:
   list.  To remind you that they operate by side effect, they don't return
   the sorted or reversed list.
 
-\item[(8)] The \method{sort()} method takes an optional argument
-  specifying a comparison function of two arguments (list items) which
-  should return a negative, zero or positive number depending on whether
-  the first argument is considered smaller than, equal to, or larger
-  than the second argument.  Note that this slows the sorting process
-  down considerably; for example to sort a list in reverse order it is much
-  faster to call \method{sort()} followed by \method{reverse()}
-  than to use \method{sort()} with a comparison function that
-  reverses the ordering of the elements.  Passing \constant{None} as the
-  comparison function is semantically equivalent to calling
-  \method{sort()} with no comparison function.
+\item[(8)] The \method{sort()} method takes optional arguments for
+  controlling the comparisons.
+
+  \var{cmp} specifies a custom comparison function of two arguments
+     (list items) which should return a negative, zero or positive number
+     depending on whether the first argument is considered smaller than,
+     equal to, or larger than the second argument:
+     \samp{\var{cmp}=\keyword{lambda} \var{x},\var{y}:
+     \function{cmp}(x.lower(), y.lower())}
+     
+  \var{key} specifies a function of one argument that is used to
+     extract a comparison key from each list element:
+     \samp{\var{key}=\function{str.lower}}
+
+  \var{reverse} is a boolean value.  If set to \code{True}, then the
+     list elements are sorted as if each comparison were reversed.
+
+  In general, the \var{key} and \var{reverse} conversion processes are
+  much faster than specifying an equivalent \var{cmp} function.  This is
+  because \var{cmp} is called multiple times for each list element while
+  \var{key} and \var{reverse} touch each element only once.
+
   \versionchanged[Support for \code{None} as an equivalent to omitting
-  \var{cmpfunc} was added]{2.3}
+  \var{cmp} was added]{2.3}
 
-  As an example of using the \var{cmpfunc} argument to the
-  \method{sort()} method, consider sorting a list of sequences by the
-  second element of that list:
+  \versionchanged[Support for \var{key} and \var{reverse} was added]{2.4}
 
-\begin{verbatim}
-def mycmp(a, b):
-    return cmp(a[1], b[1])
-
-mylist.sort(mycmp)
-\end{verbatim}
-
-  A more time-efficient approach for reasonably-sized data structures can
-  often be used:
-
-\begin{verbatim}
-tmplist = [(x[1], x) for x in mylist]
-tmplist.sort()
-mylist = [x for (key, x) in tmplist]
-\end{verbatim}
-
-\item[(9)] Whether the \method{sort()} method is stable is not defined by
-  the language (a sort is stable if it guarantees not to change the
-  relative order of elements that compare equal).  In the C
-  implementation of Python, sorts were stable only by accident through
-  Python 2.2.  The C implementation of Python 2.3 introduced a stable
-  \method{sort()} method, but code that intends to be portable across
-  implementations and versions must not rely on stability.
+\item[(9)] Starting with Python 2.3, the \method{sort()} method is
+  guaranteed to be stable.  A sort is stable if it guarantees not to
+  change the relative order of elements that compare equal --- this is
+  helpful for sorting in multiple passes (for example, sort by
+  department, then by salary grade).
 
 \item[(10)] While a list is being sorted, the effect of attempting to
-  mutate, or even inspect, the list is undefined.  The C implementation
-  of Python 2.3 makes the list appear empty for the duration, and raises
-  \exception{ValueError} if it can detect that the list has been
-  mutated during a sort.
+  mutate, or even inspect, the list is undefined.  The C
+  implementation of Python 2.3 and newer makes the list appear empty
+  for the duration, and raises \exception{ValueError} if it can detect
+  that the list has been mutated during a sort.
 \end{description}
+
+\subsection{Set Types \label{types-set}}
+\obindex{set}
+
+A \dfn{set} object is an unordered collection of immutable values.
+Common uses include membership testing, removing duplicates from a sequence,
+and computing mathematical operations such as intersection, union, difference,
+and symmetric difference.
+\versionadded{2.4}     
+
+Like other collections, sets support \code{\var{x} in \var{set}},
+\code{len(\var{set})}, and \code{for \var{x} in \var{set}}.  Being an
+unordered collection, sets do not record element position or order of
+insertion.  Accordingly, sets do not support indexing, slicing, or
+other sequence-like behavior.     
+
+There are currently two builtin set types, \class{set} and \class{frozenset}.
+The \class{set} type is mutable --- the contents can be changed using methods
+like \method{add()} and \method{remove()}.  Since it is mutable, it has no
+hash value and cannot be used as either a dictionary key or as an element of
+another set.  The \class{frozenset} type is immutable and hashable --- its
+contents cannot be altered after is created; however, it can be used as
+a dictionary key or as an element of another set.
+
+Instances of \class{set} and \class{frozenset} provide the following operations:
+
+\begin{tableiii}{c|c|l}{code}{Operation}{Equivalent}{Result}
+  \lineiii{len(\var{s})}{}{cardinality of set \var{s}}
+
+  \hline
+  \lineiii{\var{x} in \var{s}}{}
+         {test \var{x} for membership in \var{s}}
+  \lineiii{\var{x} not in \var{s}}{}
+         {test \var{x} for non-membership in \var{s}}
+  \lineiii{\var{s}.issubset(\var{t})}{\code{\var{s} <= \var{t}}}
+         {test whether every element in \var{s} is in \var{t}}
+  \lineiii{\var{s}.issuperset(\var{t})}{\code{\var{s} >= \var{t}}}
+         {test whether every element in \var{t} is in \var{s}}
+
+  \hline
+  \lineiii{\var{s}.union(\var{t})}{\var{s} | \var{t}}
+         {new set with elements from both \var{s} and \var{t}}
+  \lineiii{\var{s}.intersection(\var{t})}{\var{s} \&\ \var{t}}
+         {new set with elements common to \var{s} and \var{t}}
+  \lineiii{\var{s}.difference(\var{t})}{\var{s} - \var{t}}
+         {new set with elements in \var{s} but not in \var{t}}
+  \lineiii{\var{s}.symmetric_difference(\var{t})}{\var{s} \^\ \var{t}}
+         {new set with elements in either \var{s} or \var{t} but not both}
+  \lineiii{\var{s}.copy()}{}
+         {new set with a shallow copy of \var{s}}
+\end{tableiii}
+
+Note, the non-operator versions of \method{union()}, \method{intersection()},
+\method{difference()}, and \method{symmetric_difference()},
+\method{issubset()}, and \method{issuperset()} methods will accept any
+iterable as an argument.  In contrast, their operator based counterparts
+require their arguments to be sets.  This precludes error-prone constructions
+like \code{set('abc') \&\ 'cbs'} in favor of the more readable
+\code{set('abc').intersection('cbs')}.
+
+Both \class{set} and \class{frozenset} support set to set comparisons.
+Two sets are equal if and only if every element of each set is contained in
+the other (each is a subset of the other).
+A set is less than another set if and only if the first set is a proper
+subset of the second set (is a subset, but is not equal).
+A set is greater than another set if and only if the first set is a proper
+superset of the second set (is a superset, but is not equal).
+
+Instances of \class{set} are compared to instances of \class{frozenset} based
+on their members.  For example, \samp{set('abc') == frozenset('abc')} returns
+\code{True}.     
+
+The subset and equality comparisons do not generalize to a complete
+ordering function.  For example, any two disjoint sets are not equal and
+are not subsets of each other, so \emph{all} of the following return
+\code{False}:  \code{\var{a}<\var{b}}, \code{\var{a}==\var{b}}, or
+\code{\var{a}>\var{b}}.
+Accordingly, sets do not implement the \method{__cmp__} method.
+
+Since sets only define partial ordering (subset relationships), the output
+of the \method{list.sort()} method is undefined for lists of sets.
+
+Binary operations that mix \class{set} instances with \class{frozenset}
+return the type of the first operand.  For example:
+\samp{frozenset('ab') | set('bc')} returns an instance of \class{frozenset}.
+
+The following table lists operations available for \class{set}
+that do not apply to immutable instances of \class{frozenset}:
+
+\begin{tableiii}{c|c|l}{code}{Operation}{Equivalent}{Result}
+  \lineiii{\var{s}.update(\var{t})}
+         {\var{s} |= \var{t}}
+         {return set \var{s} with elements added from \var{t}}
+  \lineiii{\var{s}.intersection_update(\var{t})}
+         {\var{s} \&= \var{t}}
+         {return set \var{s} keeping only elements also found in \var{t}}
+  \lineiii{\var{s}.difference_update(\var{t})}
+         {\var{s} -= \var{t}}
+         {return set \var{s} after removing elements found in \var{t}}
+  \lineiii{\var{s}.symmetric_difference_update(\var{t})}
+         {\var{s} \textasciicircum= \var{t}}
+         {return set \var{s} with elements from \var{s} or \var{t}
+          but not both}
+
+  \hline
+  \lineiii{\var{s}.add(\var{x})}{}
+         {add element \var{x} to set \var{s}}
+  \lineiii{\var{s}.remove(\var{x})}{}
+         {remove \var{x} from set \var{s}; raises KeyError if not present}
+  \lineiii{\var{s}.discard(\var{x})}{}
+         {removes \var{x} from set \var{s} if present}
+  \lineiii{\var{s}.pop()}{}
+         {remove and return an arbitrary element from \var{s}; raises
+	  \exception{KeyError} if empty}
+  \lineiii{\var{s}.clear()}{}
+         {remove all elements from set \var{s}}
+\end{tableiii}
+
+Note, the non-operator versions of the \method{update()},
+\method{intersection_update()}, \method{difference_update()}, and
+\method{symmetric_difference_update()} methods will accept any iterable
+as an argument.
 
 
 \subsection{Mapping Types \label{typesmapping}}
@@ -1056,7 +1269,7 @@ almost arbitrary values.  Only values containing lists, dictionaries
 or other mutable types (that are compared by value rather than by
 object identity) may not be used as keys.
 Numeric types used for keys obey the normal rules for numeric
-comparison: if two numbers compare equal (e.g. \code{1} and
+comparison: if two numbers compare equal (such as \code{1} and
 \code{1.0}) then they can be used interchangeably to index the same
 dictionary entry.
 
@@ -1076,6 +1289,7 @@ arbitrary objects):
   \ttindex{clear()}
   \ttindex{copy()}
   \ttindex{has_key()}
+  \ttindex{fromkeys()}    
   \ttindex{items()}
   \ttindex{keys()}
   \ttindex{update()}
@@ -1085,7 +1299,7 @@ arbitrary objects):
   \ttindex{pop()}
   \ttindex{popitem()}
   \ttindex{iteritems()}
-  \ttindex{iterkeys)}
+  \ttindex{iterkeys()}
   \ttindex{itervalues()}}
 
 \begin{tableiii}{c|l|c}{code}{Operation}{Result}{Notes}
@@ -1100,7 +1314,7 @@ arbitrary objects):
   \lineiii{\var{a}.clear()}{remove all items from \code{a}}{}
   \lineiii{\var{a}.copy()}{a (shallow) copy of \code{a}}{}
   \lineiii{\var{a}.has_key(\var{k})}
-          {\code{1} if \var{a} has a key \var{k}, else \code{0}}
+          {\code{True} if \var{a} has a key \var{k}, else \code{False}}
           {}
   \lineiii{\var{k} \code{in} \var{a}}
           {Equivalent to \var{a}.has_key(\var{k})}
@@ -1112,9 +1326,9 @@ arbitrary objects):
           {a copy of \var{a}'s list of (\var{key}, \var{value}) pairs}
           {(3)}
   \lineiii{\var{a}.keys()}{a copy of \var{a}'s list of keys}{(3)}
-  \lineiii{\var{a}.update(\var{b})}
-          {\code{for \var{k} in \var{b}.keys(): \var{a}[\var{k}] = \var{b}[\var{k}]}}
-          {}
+  \lineiii{\var{a}.update(\optional{\var{b}})}
+          {updates (and overwrites) key/value pairs from \var{b}}
+          {(9)}
   \lineiii{\var{a}.fromkeys(\var{seq}\optional{, \var{value}})}
           {Creates a new dictionary with keys from \var{seq} and values set to \var{value}}
           {(7)}			   
@@ -1153,8 +1367,10 @@ in the map.
 
 \item[(2)] \versionadded{2.2}
 
-\item[(3)] Keys and values are listed in random order.  If
-\method{items()}, \method{keys()}, \method{values()},
+\item[(3)] Keys and values are listed in an arbitrary order which is
+non-random, varies across Python implementations, and depends on the
+dictionary's history of insertions and deletions.
+If \method{items()}, \method{keys()}, \method{values()},
 \method{iteritems()}, \method{iterkeys()}, and \method{itervalues()}
 are called with no intervening modifications to the dictionary, the
 lists will directly correspond.  This allows the creation of
@@ -1172,7 +1388,7 @@ provided and \var{k} is not in the map, \code{None} is returned.
 
 \item[(5)] \function{setdefault()} is like \function{get()}, except
 that if \var{k} is missing, \var{x} is both returned and inserted into
-the dictionary as the value of \var{k}.
+the dictionary as the value of \var{k}. \var{x} defaults to \var{None}.
 
 \item[(6)] \function{popitem()} is useful to destructively iterate
 over a dictionary, as often used in set algorithms.
@@ -1182,8 +1398,16 @@ new dictionary. \var{value} defaults to \code{None}.  \versionadded{2.3}
 
 \item[(8)] \function{pop()} raises a \exception{KeyError} when no default
 value is given and the key is not found.  \versionadded{2.3}
-\end{description}
 
+\item[(9)] \function{update()} accepts either another mapping object
+or an iterable of key/value pairs (as a tuple or other iterable of
+length two).  If keyword arguments are specified, the mapping is
+then is updated with those key/value pairs:
+\samp{d.update(red=1, blue=2)}.
+\versionchanged[Allowed the argument to be an iterable of key/value
+                pairs and allowed keyword arguments]{2.4}
+
+\end{description}
 
 \subsection{File Objects
             \label{bltin-file-objects}}
@@ -1193,8 +1417,7 @@ package and can be created with the built-in constructor
 \function{file()}\bifuncindex{file} described in section
 \ref{built-in-funcs}, ``Built-in Functions.''\footnote{\function{file()}
 is new in Python 2.2.  The older built-in \function{open()} is an
-alias for \function{file()}.}
-File objects are also returned
+alias for \function{file()}.}  File objects are also returned
 by some other built-in functions and methods, such as
 \function{os.popen()} and \function{os.fdopen()} and the
 \method{makefile()} method of socket objects.
@@ -1242,7 +1465,7 @@ Files have the following methods:
 \end{methoddesc}
 
 \begin{methoddesc}[file]{next}{}
-A file object is its own iterator, i.e. \code{iter(\var{f})} returns
+A file object is its own iterator, for example \code{iter(\var{f})} returns
 \var{f} (unless \var{f} is closed).  When a file is used as an
 iterator, typically in a \keyword{for} loop (for example,
 \code{for line in f: print line}), the \method{next()} method is
@@ -1274,7 +1497,8 @@ flush the read-ahead buffer.
 
 \begin{methoddesc}[file]{readline}{\optional{size}}
   Read one entire line from the file.  A trailing newline character is
-  kept in the string\footnote{
+  kept in the string (but may be absent when a file ends with an
+  incomplete line).\footnote{
 	The advantage of leaving the newline on is that
 	returning an empty string is then an unambiguous \EOF{}
 	indication.  It is also possible (in cases where it might
@@ -1282,8 +1506,7 @@ flush the read-ahead buffer.
 	want to make an exact copy of a file while scanning its lines)
 	to tell whether the last line of a file ended in a newline
 	or not (yes this happens!).
-  } (but may be absent when a file ends with an
-  incomplete line).  If the \var{size} argument is present and
+  }  If the \var{size} argument is present and
   non-negative, it is a maximum byte count (including the trailing
   newline) and an incomplete line may be returned.
   An empty string is returned \emph{only} when \EOF{} is encountered
@@ -1305,7 +1528,7 @@ flush the read-ahead buffer.
 \begin{methoddesc}[file]{xreadlines}{}
   This method returns the same thing as \code{iter(f)}.
   \versionadded{2.1}
-  \deprecated{2.3}{Use \code{for line in file} instead.}
+  \deprecated{2.3}{Use \samp{for \var{line} in \var{file}} instead.}
 \end{methoddesc}
 
 \begin{methoddesc}[file]{seek}{offset\optional{, whence}}
@@ -1318,7 +1541,12 @@ flush the read-ahead buffer.
   \method{seek()} operations will be undone at the next write.  If the
   file is only opened for writing in append mode (mode \code{'a'}),
   this method is essentially a no-op, but it remains useful for files
-  opened in append mode with reading enabled (mode \code{'a+'}).
+  opened in append mode with reading enabled (mode \code{'a+'}).  If the
+  file is opened in text mode (mode \code{'t'}), only offsets returned
+  by \method{tell()} are legal.  Use of other offsets causes undefined
+  behavior.
+
+  Note that not all file objects are seekable.
 \end{methoddesc}
 
 \begin{methoddesc}[file]{tell}{}
@@ -1335,7 +1563,7 @@ flush the read-ahead buffer.
   include that file may remain unchanged, increase to the specified
   size as if zero-filled, or increase to the specified size with
   undefined new content.
-  Availability:  Windows, many \UNIX variants.
+  Availability:  Windows, many \UNIX{} variants.
 \end{methoddesc}
 
 \begin{methoddesc}[file]{write}{str}
@@ -1368,6 +1596,20 @@ read-only attribute; the \method{close()} method changes the value.
 It may not be available on all file-like objects.
 \end{memberdesc}
 
+\begin{memberdesc}[file]{encoding}
+The encoding that this file uses. When Unicode strings are written
+to a file, they will be converted to byte strings using this encoding.
+In addition, when the file is connected to a terminal, the attribute
+gives the encoding that the terminal is likely to use (that 
+information might be incorrect if the user has misconfigured the 
+terminal). The attribute is read-only and may not be present on
+all file-like objects. It may also be \code{None}, in which case
+the file uses the system default encoding for converting Unicode
+strings.
+
+\versionadded{2.3}
+\end{memberdesc}
+
 \begin{memberdesc}[file]{mode}
 The I/O mode for the file.  If the file was created using the
 \function{open()} built-in function, this will be the value of the
@@ -1383,8 +1625,9 @@ attribute and may not be present on all file-like objects.
 \end{memberdesc}
 
 \begin{memberdesc}[file]{newlines}
-If Python was built with the \code{--with-universal-newlines} option
-(the default) this read-only attribute exists, and for files opened in
+If Python was built with the \longprogramopt{with-universal-newlines}
+option to \program{configure} (the default) this read-only attribute
+exists, and for files opened in
 universal newline read mode it keeps track of the types of newlines
 encountered while reading the file. The values it can take are
 \code{'\e r'}, \code{'\e n'}, \code{'\e r\e n'}, \code{None} (unknown,
@@ -1432,7 +1675,8 @@ Modifying this dictionary will actually change the module's symbol
 table, but direct assignment to the \member{__dict__} attribute is not
 possible (you can write \code{\var{m}.__dict__['a'] = 1}, which
 defines \code{\var{m}.a} to be \code{1}, but you can't write
-\code{\var{m}.__dict__ = \{\}}.
+\code{\var{m}.__dict__ = \{\}}).  Modifying \member{__dict__} directly
+is not recommended.
 
 Modules built into the interpreter are written like this:
 \code{<module 'sys' (built-in)>}.  If loaded from a file, they are
@@ -1458,25 +1702,8 @@ and user-defined functions.  Both support the same operation (to call
 the function), but the implementation is different, hence the
 different object types.
 
-The implementation adds two special read-only attributes:
-\code{\var{f}.func_code} is a function's \dfn{code
-object}\obindex{code} (see below) and \code{\var{f}.func_globals} is
-the dictionary used as the function's global namespace (this is the
-same as \code{\var{m}.__dict__} where \var{m} is the module in which
-the function \var{f} was defined).
-
-Function objects also support getting and setting arbitrary
-attributes, which can be used to, e.g. attach metadata to functions.
-Regular attribute dot-notation is used to get and set such
-attributes. \emph{Note that the current implementation only supports
-function attributes on user-defined functions.  Function attributes on
-built-in functions may be supported in the future.}
-
-Functions have another special attribute \code{\var{f}.__dict__}
-(a.k.a. \code{\var{f}.func_dict}) which contains the namespace used to
-support function attributes.  \code{__dict__} and \code{func_dict} can
-be accessed directly or set to a dictionary object.  A function's
-dictionary cannot be deleted.
+See the \citetitle[../ref/ref.html]{Python Reference Manual} for more
+information.
 
 \subsubsection{Methods \label{typesmethods}}
 \obindex{method}
@@ -1550,7 +1777,7 @@ information.
 
 Type objects represent the various object types.  An object's type is
 accessed by the built-in function \function{type()}.  There are no special
-operations on types.  The standard module \module{types} defines names
+operations on types.  The standard module \refmodule{types} defines names
 for all standard built-in types.
 \bifuncindex{type}
 \refstmodindex{types}
@@ -1603,7 +1830,8 @@ slice objects.
 \subsection{Special Attributes \label{specialattrs}}
 
 The implementation adds a few special read-only attributes to several
-object types, where they are relevant:
+object types, where they are relevant.  Some of these are not reported
+by the \function{dir()} built-in function.
 
 \begin{memberdesc}[object]{__dict__}
 A dictionary or other mapping object used to store an
@@ -1627,4 +1855,8 @@ The class to which a class instance belongs.
 \begin{memberdesc}[class]{__bases__}
 The tuple of base classes of a class object.  If there are no base
 classes, this will be an empty tuple.
+\end{memberdesc}
+
+\begin{memberdesc}[class]{__name__}
+The name of the class or type.
 \end{memberdesc}

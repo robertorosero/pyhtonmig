@@ -1,7 +1,7 @@
-This is Python version 2.3 alpha 2
+This is Python version 2.4 alpha 3
 ==================================
 
-Copyright (c) 2001, 2002, 2003 Python Software Foundation.
+Copyright (c) 2001, 2002, 2003, 2004 Python Software Foundation.
 All rights reserved.
 
 Copyright (c) 2000 BeOpen.com.
@@ -68,7 +68,7 @@ http://www.python.org/doc/ for online and downloadable versions, as
 well as a list of other introductions, and reference documentation.
 
 There's a quickly growing set of books on Python.  See
-http://www.python.org/psa/bookstore/ for a list.
+http://www.python.org/cgi-bin/moinmoin/PythonBooks for a list.
 
 
 Documentation
@@ -217,7 +217,7 @@ are probably experiencing compiler bugs, usually related to
 optimization.  This is a common problem with some versions of gcc, and
 some vendor-supplied compilers, which can sometimes be worked around
 by turning off optimization.  Consider switching to stable versions
-(gcc 2.95.2, or contact your vendor.)
+(gcc 2.95.2, gcc 3.x, or contact your vendor.)
 
 From Python 2.0 onward, all Python C code is ANSI C.  Compiling using
 old K&R-C-only compilers is no longer possible.  ANSI C compilers are
@@ -254,6 +254,21 @@ Platform specific notes
 on these platforms without the special directions mentioned here,
 submit a documentation bug report to SourceForge (see Bug Reports
 above) so we can remove them!)
+
+Unix platforms: If your vendor still ships (and you still use) Berkeley DB
+	1.85 you will need to edit Modules/Setup to build the bsddb185
+	module and add a line to sitecustomize.py which makes it the
+	default.  In Modules/Setup a line like
+
+	    bsddb185 bsddbmodule.c
+
+	should work.  (You may need to add -I, -L or -l flags to direct the
+	compiler and linker to your include files and libraries.)  You can
+	then force it to be the version people import by adding
+
+	    import bsddb185 as bsddb
+
+	in sitecustomize.py.
 
 64-bit platforms: The modules audioop, imageop and rgbimg don't work.
 	The setup.py script disables them on 64-bit installations.
@@ -303,8 +318,12 @@ Linux:  A problem with threads and fork() was tracked down to a bug in
 	module now needs the -lcrypt option.  The setup.py script
 	takes care of this automatically.
 
-Red Hat Linux: There's an executable /usr/bin/python which is Python
-	1.5.2 on most Red Hat installations; several key Red Hat tools
+Red Hat Linux: Red Hat 9 built Python2.2 in UCS-4 mode and hacked
+	Tcl to support it. To compile Python2.3 with Tkinter, you will
+	need to pass --enable-unicode=ucs4 flag to ./configure. 
+
+	There's an executable /usr/bin/python which is Python
+	1.5.2 on most older Red Hat installations; several key Red Hat tools
 	require this version.  Python 2.1.x may be installed as
 	/usr/bin/python2.  The Makefile installs Python as
 	/usr/local/bin/python, which may or may not take precedence
@@ -344,10 +363,18 @@ AIX:	A complete overhaul of the shared library support is now in
 	like "cc_r".  For full C++ module support, set CC="xlC_r" (or
 	CC="xlC" without thread support).
 
-HP-UX:	When using threading, you may have to add -D_REENTRANT to the
+HP-UX:  When using threading, you may have to add -D_REENTRANT to the
 	OPT variable in the top-level Makefile; reported by Pat Knight,
 	this seems to make a difference (at least for HP-UX 10.20)
-	even though pyconfig.h defines it.
+	even though pyconfig.h defines it. This seems unnecessary when
+	using HP/UX 11 and later - threading seems to work "out of the 
+	box".
+
+HP-UX ia64: When building on the ia64 (Itanium) platform using HP's 
+	compiler, some experience has shown that the compiler's 
+	optimiser produces a completely broken version of python 
+	(see http://www.python.org/sf/814976). To work around this, 
+	edit the Makefile and remove -O from the OPT line.
 
 HP PA-RISC 2.0: A recent bug report (http://www.python.org/sf/546117)
 	suggests that the C compiler in this 64-bit system has bugs
@@ -744,11 +771,10 @@ into a shared library, which can then be used by the interpreter
 executable, and by applications embedding Python. To enable this feature,
 configure with --enable-shared. 
 
-If you do so, a static library will be created in addition to the
-shared library, which uses the same object files as the shared library
-In particular, the library likely object files using
-position-independent code (PIC) if PIC flags are needed for the shared
-library.
+If you enable this feature, the same object files will be used to create
+a static library.  In particular, the static library will contain object
+files using position-independent code (PIC) on platforms where PIC flags
+are needed for the shared library.
 
 
 Configuring additional built-in modules
@@ -862,6 +888,10 @@ the directory given with the --prefix option to configure or to the
 platform-specific files will be installed in subdirectories if the
 directory given by --exec-prefix or the `exec_prefix' Make variable
 (defaults to the --prefix directory) is given.
+
+If DESTDIR is set, it will be taken as the root directory of the
+installation, and files will be installed into $(DESTDIR)$(prefix),
+$(DESTDIR)$(exec_prefix), etc.
 
 All subdirectories created will have Python's version number in their
 name, e.g. the library modules are installed in
@@ -996,6 +1026,7 @@ Modules/getpath.o.
 	in files. Python code can open a file with open(file, 'U') to
 	read it in universal newline mode. THIS OPTION IS UNSUPPORTED.
 
+--with-tsc: Profile using the Pentium timestamping counter (TSC).
 
 Building for multiple architectures (using the VPATH feature)
 -------------------------------------------------------------
@@ -1038,11 +1069,11 @@ however this assumes that you only need to add modules.)
 Building on non-UNIX systems
 ----------------------------
 
-For Windows (2000/NT/ME/98/95), assuming you have MS VC++ 6.0, the
+For Windows (2000/NT/ME/98/95), assuming you have MS VC++ 7.1, the
 project files are in PCbuild, the workspace is pcbuild.dsw.  See
 PCbuild\readme.txt for detailed instructions.
 
-For other non-Unix Windows compilers, in particular Windows 3.1 and
+For other non-Unix Windows compilers, in particular MS VC++ 6.0 and
 for OS/2, enter the directory "PC" and read the file "readme.txt".
 
 For the Mac, a separate source distribution will be made available,

@@ -18,6 +18,7 @@
 # 2002-10-22 mvl  generate NFC tables
 # 2002-11-24 mvl  expand all ranges, sort names version-independently
 # 2002-11-25 mvl  add UNIDATA_VERSION
+# 2004-05-29 perky add east asian width information
 #
 # written by Fredrik Lundh (fredrik@pythonware.com)
 #
@@ -25,12 +26,13 @@
 import sys
 
 SCRIPT = sys.argv[0]
-VERSION = "2.2"
+VERSION = "2.3"
 
 # The Unicode Database
 UNIDATA_VERSION = "3.2.0"
 UNICODE_DATA = "UnicodeData.txt"
 COMPOSITION_EXCLUSIONS = "CompositionExclusions.txt"
+EASTASIAN_WIDTH = "EastAsianWidth.txt"
 
 CATEGORY_NAMES = [ "Cn", "Lu", "Ll", "Lt", "Mn", "Mc", "Me", "Nd",
     "Nl", "No", "Zs", "Zl", "Zp", "Cc", "Cf", "Cs", "Co", "Cn", "Lm",
@@ -40,6 +42,8 @@ CATEGORY_NAMES = [ "Cn", "Lu", "Ll", "Lt", "Mn", "Mc", "Me", "Nd",
 BIDIRECTIONAL_NAMES = [ "", "L", "LRE", "LRO", "R", "AL", "RLE", "RLO",
     "PDF", "EN", "ES", "ET", "AN", "CS", "NSM", "BN", "B", "S", "WS",
     "ON" ]
+
+EASTASIANWIDTH_NAMES = [ "F", "H", "W", "Na", "A", "N" ]
 
 # note: should match definitions in Objects/unicodectype.c
 ALPHA_MASK = 0x01
@@ -55,7 +59,8 @@ def maketables(trace=0):
 
     print "--- Reading", UNICODE_DATA, "..."
 
-    unicode = UnicodeData(UNICODE_DATA, COMPOSITION_EXCLUSIONS)
+    unicode = UnicodeData(UNICODE_DATA, COMPOSITION_EXCLUSIONS,
+                          EASTASIAN_WIDTH)
 
     print len(filter(None, unicode.table)), "characters"
 
@@ -68,7 +73,7 @@ def maketables(trace=0):
 
 def makeunicodedata(unicode, trace):
 
-    dummy = (0, 0, 0, 0)
+    dummy = (0, 0, 0, 0, 0)
     table = [dummy]
     cache = {0: dummy}
     index = [0] * len(unicode.chars)
@@ -87,8 +92,9 @@ def makeunicodedata(unicode, trace):
             combining = int(record[3])
             bidirectional = BIDIRECTIONAL_NAMES.index(record[4])
             mirrored = record[9] == "Y"
+            eastasianwidth = EASTASIANWIDTH_NAMES.index(record[15])
             item = (
-                category, combining, bidirectional, mirrored
+                category, combining, bidirectional, mirrored, eastasianwidth
                 )
             # add entry to index and item tables
             i = cache.get(item)
@@ -200,7 +206,7 @@ def makeunicodedata(unicode, trace):
     print >>fp, \
           "const _PyUnicode_DatabaseRecord _PyUnicode_Database_Records[] = {"
     for item in table:
-        print >>fp, "    {%d, %d, %d, %d}," % item
+        print >>fp, "    {%d, %d, %d, %d, %d}," % item
     print >>fp, "};"
     print >>fp
 
@@ -231,6 +237,12 @@ def makeunicodedata(unicode, trace):
 
     print >>fp, "const char *_PyUnicode_BidirectionalNames[] = {"
     for name in BIDIRECTIONAL_NAMES:
+        print >>fp, "    \"%s\"," % name
+    print >>fp, "    NULL"
+    print >>fp, "};"
+
+    print >>fp, "const char *_PyUnicode_EastAsianWidthNames[] = {"
+    for name in EASTASIANWIDTH_NAMES:
         print >>fp, "    \"%s\"," % name
     print >>fp, "    NULL"
     print >>fp, "};"
@@ -331,7 +343,7 @@ def makeunicodetype(unicode, trace):
                 flags |= DIGIT_MASK
                 digit = int(record[7])
             item = (
-                flags, upper, lower, title, decimal, digit
+                upper, lower, title, decimal, digit, flags
                 )
             # add entry to index and item tables
             i = cache.get(item)
@@ -538,7 +550,7 @@ import sys
 
 class UnicodeData:
 
-    def __init__(self, filename, exclusions, expand=1):
+    def __init__(self, filename, exclusions, eastasianwidth, expand=1):
         file = open(filename)
         table = [None] * 0x110000
         while 1:
@@ -580,6 +592,25 @@ class UnicodeData:
                 continue
             char = int(s.split()[0],16)
             self.exclusions[char] = 1
+
+        widths = [None] * 0x110000
+        for s in open(eastasianwidth):
+            s = s.strip()
+            if not s:
+                continue
+            if s[0] == '#':
+                continue
+            s = s.split()[0].split(';')
+            if '..' in s[0]:
+                first, last = [int(c, 16) for c in s[0].split('..')]
+                chars = range(first, last+1)
+            else:
+                chars = [int(s[0], 16)]
+            for char in chars:
+                widths[char] = s[1]
+        for i in range(0, 0x110000):
+            if table[i] is not None:
+                table[i].append(widths[i])
 
     def uselatin1(self):
         # restrict character range to ISO Latin 1

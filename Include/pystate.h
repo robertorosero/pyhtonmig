@@ -29,6 +29,9 @@ typedef struct _is {
 #ifdef HAVE_DLOPEN
     int dlopenflags;
 #endif
+#ifdef WITH_TSC
+    int tscdump;
+#endif
 
 } PyInterpreterState;
 
@@ -45,6 +48,9 @@ typedef int (*Py_tracefunc)(PyObject *, struct _frame *, int, PyObject *);
 #define PyTrace_EXCEPTION 1
 #define PyTrace_LINE 2
 #define PyTrace_RETURN 3
+#define PyTrace_C_CALL 4
+#define PyTrace_C_EXCEPTION 5
+#define PyTrace_C_RETURN 6
 
 typedef struct _ts {
 
@@ -71,8 +77,18 @@ typedef struct _ts {
 
     PyObject *dict;
 
+    /* tick_counter is incremented whenever the check_interval ticker
+     * reaches zero. The purpose is to give a useful measure of the number
+     * of interpreted bytecode instructions in a given thread.  This
+     * extremely lightweight statistic collector may be of interest to
+     * profilers (like psyco.jit()), although nothing in the core uses it.
+     */
     int tick_counter;
+
     int gilstate_counter;
+
+    PyObject *async_exc; /* Asynchronous exception to raise */
+    long thread_id; /* Thread id where this tstate was created */
 
     /* XXX signal handlers should also be here */
 
@@ -93,6 +109,7 @@ PyAPI_FUNC(void) PyThreadState_DeleteCurrent(void);
 PyAPI_FUNC(PyThreadState *) PyThreadState_Get(void);
 PyAPI_FUNC(PyThreadState *) PyThreadState_Swap(PyThreadState *);
 PyAPI_FUNC(PyObject *) PyThreadState_GetDict(void);
+PyAPI_FUNC(int) PyThreadState_SetAsyncExc(long, PyObject *);
 
 
 /* Variable and macro for in-line access to current thread state */
@@ -105,25 +122,25 @@ PyAPI_DATA(PyThreadState *) _PyThreadState_Current;
 #define PyThreadState_GET() (_PyThreadState_Current)
 #endif
 
-typedef 
+typedef
     enum {PyGILState_LOCKED, PyGILState_UNLOCKED}
         PyGILState_STATE;
 
 /* Ensure that the current thread is ready to call the Python
    C API, regardless of the current state of Python, or of its
    thread lock.  This may be called as many times as desired
-   by a thread so long as each call is matched with a call to 
-   PyGILState_Release().  In general, other thread-state APIs may 
-   be used between _Ensure() and _Release() calls, so long as the 
+   by a thread so long as each call is matched with a call to
+   PyGILState_Release().  In general, other thread-state APIs may
+   be used between _Ensure() and _Release() calls, so long as the
    thread-state is restored to its previous state before the Release().
    For example, normal use of the Py_BEGIN_ALLOW_THREADS/
    Py_END_ALLOW_THREADS macros are acceptable.
 
    The return value is an opaque "handle" to the thread state when
-   PyGILState_Acquire() was called, and must be passed to
+   PyGILState_Ensure() was called, and must be passed to
    PyGILState_Release() to ensure Python is left in the same state. Even
-   though recursive calls are allowed, these handles can *not* be shared - 
-   each unique call to PyGILState_Ensure must save the handle for its 
+   though recursive calls are allowed, these handles can *not* be shared -
+   each unique call to PyGILState_Ensure must save the handle for its
    call to PyGILState_Release.
 
    When the function returns, the current thread will hold the GIL.
@@ -134,18 +151,18 @@ PyAPI_FUNC(PyGILState_STATE) PyGILState_Ensure(void);
 
 /* Release any resources previously acquired.  After this call, Python's
    state will be the same as it was prior to the corresponding
-   PyGILState_Acquire call (but generally this state will be unknown to 
+   PyGILState_Ensure() call (but generally this state will be unknown to
    the caller, hence the use of the GILState API.)
 
-   Every call to PyGILState_Ensure must be matched by a call to 
+   Every call to PyGILState_Ensure must be matched by a call to
    PyGILState_Release on the same thread.
 */
 PyAPI_FUNC(void) PyGILState_Release(PyGILState_STATE);
 
 /* Helper/diagnostic function - get the current thread state for
-   this thread.  May return NULL if no GILState API has been used 
-   on the current thread.  Note the main thread always has such a 
-   thread-state, even if no auto-thread-state call has been made 
+   this thread.  May return NULL if no GILState API has been used
+   on the current thread.  Note the main thread always has such a
+   thread-state, even if no auto-thread-state call has been made
    on the main thread.
 */
 PyAPI_FUNC(PyThreadState *) PyGILState_GetThisThreadState(void);

@@ -1,6 +1,7 @@
 import unittest
 from test import test_support
 from bisect import bisect_right, bisect_left, insort_left, insort_right, insort, bisect
+from UserList import UserList
 
 class TestBisect(unittest.TestCase):
 
@@ -89,6 +90,7 @@ class TestBisect(unittest.TestCase):
     def test_precomputed(self):
         for func, data, elem, expected in self.precomputedCases:
             self.assertEqual(func(data, elem), expected)
+            self.assertEqual(func(UserList(data), elem), expected)
 
     def test_random(self, n=25):
         from random import randrange
@@ -132,25 +134,61 @@ class TestBisect(unittest.TestCase):
 
 class TestInsort(unittest.TestCase):
 
-    def test_vsListSort(self, n=500):
+    def test_vsBuiltinSort(self, n=500):
         from random import choice
-        digits = "0123456789"
-        raw = []
-        insorted = []
-        for i in range(n):
-            digit = choice(digits)
-            raw.append(digit)
-            if digit in "02468":
-                f = insort_left
-            else:
-                f = insort_right
-            f(insorted, digit)
-        sorted = raw[:]
-        sorted.sort()
-        self.assertEqual(sorted, insorted)
+        for insorted in (list(), UserList()):
+            for i in xrange(n):
+                digit = choice("0123456789")
+                if digit in "02468":
+                    f = insort_left
+                else:
+                    f = insort_right
+                f(insorted, digit)
+        self.assertEqual(sorted(insorted), insorted)
 
     def test_backcompatibility(self):
         self.assertEqual(insort, insort_right)
+
+#==============================================================================
+
+
+class LenOnly:
+    "Dummy sequence class defining __len__ but not __getitem__."
+    def __len__(self):
+        return 10
+
+class GetOnly:
+    "Dummy sequence class defining __getitem__ but not __len__."
+    def __getitem__(self, ndx):
+        return 10
+
+class CmpErr:
+    "Dummy element that always raises an error during comparison"
+    def __cmp__(self, other):
+        raise ZeroDivisionError
+
+class TestErrorHandling(unittest.TestCase):
+
+    def test_non_sequence(self):
+        for f in (bisect_left, bisect_right, insort_left, insort_right):
+            self.assertRaises(TypeError, f, 10, 10)
+
+    def test_len_only(self):
+        for f in (bisect_left, bisect_right, insort_left, insort_right):
+            self.assertRaises(AttributeError, f, LenOnly(), 10)
+
+    def test_get_only(self):
+        for f in (bisect_left, bisect_right, insort_left, insort_right):
+            self.assertRaises(AttributeError, f, GetOnly(), 10)
+
+    def test_cmp_err(self):
+        seq = [CmpErr(), CmpErr(), CmpErr()]
+        for f in (bisect_left, bisect_right, insort_left, insort_right):
+            self.assertRaises(ZeroDivisionError, f, seq, 10)
+
+    def test_arg_parsing(self):
+        for f in (bisect_left, bisect_right, insort_left, insort_right):
+            self.assertRaises(TypeError, f, 10)
 
 #==============================================================================
 
@@ -173,34 +211,7 @@ This example uses bisect() to look up a letter grade for an exam total
     >>> map(grade, [33, 99, 77, 44, 12, 88])
     ['E', 'A', 'B', 'D', 'F', 'A']
 
-The bisect module can be used with the Queue module to implement
-a priority queue (example courtesy of Fredrik Lundh):
-
->>> import Queue, bisect
->>> class PriorityQueue(Queue.Queue):
-...     def _put(self, item):
-...         bisect.insort(self.queue, item)
-...
->>> queue = PriorityQueue(0)
->>> queue.put((2, "second"))
->>> queue.put((1, "first"))
->>> queue.put((3, "third"))
->>> queue.get()
-(1, 'first')
->>> queue.get()
-(2, 'second')
-
 """
-
-#==============================================================================
-
-def makeAllTests():
-    suite = unittest.TestSuite()
-    for klass in (TestBisect,
-                  TestInsort
-                  ):
-        suite.addTest(unittest.makeSuite(klass))
-    return suite
 
 #------------------------------------------------------------------------------
 
@@ -208,9 +219,25 @@ __test__ = {'libreftest' : libreftest}
 
 def test_main(verbose=None):
     from test import test_bisect
-    suite = makeAllTests()
-    test_support.run_suite(suite)
+    from types import BuiltinFunctionType
+    import sys
+
+    test_classes = [TestBisect, TestInsort]
+    if isinstance(bisect_left, BuiltinFunctionType):
+        test_classes.append(TestErrorHandling)
+
+    test_support.run_unittest(*test_classes)
     test_support.run_doctest(test_bisect, verbose)
+
+    # verify reference counting
+    if verbose and hasattr(sys, "gettotalrefcount"):
+        import gc
+        counts = [None] * 5
+        for i in xrange(len(counts)):
+            test_support.run_unittest(*test_classes)
+            gc.collect()
+            counts[i] = sys.gettotalrefcount()
+        print counts
 
 if __name__ == "__main__":
     test_main(verbose=True)

@@ -4,7 +4,7 @@ Provides the Command class, the base class for the command classes
 in the distutils.command package.
 """
 
-# This module should be kept compatible with Python 1.5.2.
+# This module should be kept compatible with Python 2.1.
 
 __revision__ = "$Id$"
 
@@ -68,7 +68,7 @@ class Command:
 
         # Per-command versions of the global flags, so that the user can
         # customize Distutils' behaviour command-by-command and let some
-        # commands fallback on the Distribution's behaviour.  None means
+        # commands fall back on the Distribution's behaviour.  None means
         # "not defined, check self.distribution's copy", while 0 or 1 mean
         # false and true (duh).  Note that this means figuring out the real
         # value of each flag is a touch complicated -- hence "self._dry_run"
@@ -79,7 +79,7 @@ class Command:
         # verbose is largely ignored, but needs to be set for
         # backwards compatibility (I think)?
         self.verbose = dist.verbose
-        
+
         # Some commands define a 'self.force' option to ignore file
         # timestamps, but methods defined *here* assume that
         # 'self.force' exists for all commands.  So define it here
@@ -100,7 +100,7 @@ class Command:
 
 
     # XXX A more explicit way to customize dry_run would be better.
-    
+
     def __getattr__ (self, attr):
         if attr == 'dry_run':
             myval = getattr(self, "_" + attr)
@@ -148,7 +148,7 @@ class Command:
         """Set final values for all the options that this command supports.
         This is always called as late as possible, ie.  after any option
         assignments from the command-line or from other commands have been
-        done.  Thus, this is the place to to code option dependencies: if
+        done.  Thus, this is the place to code option dependencies: if
         'foo' depends on 'bar', then it is safe to set 'foo' from 'bar' as
         long as 'foo' still has the same value it was assigned in
         'initialize_options()'.
@@ -253,8 +253,8 @@ class Command:
 
             if not ok:
                 raise DistutilsOptionError, \
-                      "'%s' must be a list of strings (got %s)" % \
-                      (option, `val`)
+                      "'%s' must be a list of strings (got %r)" % \
+                      (option, val)
 
     def _ensure_tested_string (self, option, tester,
                                what, error_fmt, default=None):

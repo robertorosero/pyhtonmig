@@ -15,8 +15,8 @@ class RoundtripLegalSyntaxTestCase(unittest.TestCase):
         t = st1.totuple()
         try:
             st2 = parser.sequence2st(t)
-        except parser.ParserError:
-            self.fail("could not roundtrip %r" % s)
+        except parser.ParserError, why:
+            self.fail("could not roundtrip %r: %s" % (s, why))
 
         self.assertEquals(t, st2.totuple(),
                           "could not re-generate syntax tree")
@@ -67,6 +67,8 @@ class RoundtripLegalSyntaxTestCase(unittest.TestCase):
         self.check_expr("lambda foo=bar, blaz=blat+2, **z: 0")
         self.check_expr("lambda foo=bar, blaz=blat+2, *y, **z: 0")
         self.check_expr("lambda x, *y, **z: 0")
+        self.check_expr("(x for x in range(10))")
+        self.check_expr("foo(x for x in range(10))")
 
     def test_print(self):
         self.check_suite("print")
@@ -117,15 +119,37 @@ class RoundtripLegalSyntaxTestCase(unittest.TestCase):
         self.check_suite("def f(a, b, foo=bar, *args, **kw): pass")
         self.check_suite("def f(a, b, foo=bar, **kw): pass")
 
+        self.check_suite("@staticmethod\n"
+                         "def f(): pass")
+        self.check_suite("@staticmethod\n"
+                         "@funcattrs(x, y)\n"
+                         "def f(): pass")
+        self.check_suite("@funcattrs()\n"
+                         "def f(): pass")
+
     def test_import_from_statement(self):
         self.check_suite("from sys.path import *")
         self.check_suite("from sys.path import dirname")
+        self.check_suite("from sys.path import (dirname)")
+        self.check_suite("from sys.path import (dirname,)")
         self.check_suite("from sys.path import dirname as my_dirname")
+        self.check_suite("from sys.path import (dirname as my_dirname)")
+        self.check_suite("from sys.path import (dirname as my_dirname,)")
         self.check_suite("from sys.path import dirname, basename")
+        self.check_suite("from sys.path import (dirname, basename)")
+        self.check_suite("from sys.path import (dirname, basename,)")
         self.check_suite(
             "from sys.path import dirname as my_dirname, basename")
         self.check_suite(
+            "from sys.path import (dirname as my_dirname, basename)")
+        self.check_suite(
+            "from sys.path import (dirname as my_dirname, basename,)")
+        self.check_suite(
             "from sys.path import dirname, basename as my_basename")
+        self.check_suite(
+            "from sys.path import (dirname, basename as my_basename)")
+        self.check_suite(
+            "from sys.path import (dirname, basename as my_basename,)")
 
     def test_basic_import_statement(self):
         self.check_suite("import sys")
@@ -374,11 +398,10 @@ class IllegalSyntaxTestCase(unittest.TestCase):
         self.check_bad_tree(tree, "malformed global ast")
 
 def test_main():
-    loader = unittest.TestLoader()
-    suite = unittest.TestSuite()
-    suite.addTest(loader.loadTestsFromTestCase(RoundtripLegalSyntaxTestCase))
-    suite.addTest(loader.loadTestsFromTestCase(IllegalSyntaxTestCase))
-    test_support.run_suite(suite)
+    test_support.run_unittest(
+        RoundtripLegalSyntaxTestCase,
+        IllegalSyntaxTestCase
+    )
 
 
 if __name__ == "__main__":

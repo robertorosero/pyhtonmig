@@ -104,15 +104,15 @@ This section is provided for users that ``don't want to read the
 manual.'' It provides a very brief overview, and allows a user to
 rapidly perform profiling on an existing application.
 
-To profile an application with a main entry point of \samp{foo()}, you
-would add the following to your module:
+To profile an application with a main entry point of \function{foo()},
+you would add the following to your module:
 
 \begin{verbatim}
 import profile
 profile.run('foo()')
 \end{verbatim}
 
-The above action would cause \samp{foo()} to be run, and a series of
+The above action would cause \function{foo()} to be run, and a series of
 informative lines (the profile) to be printed.  The above approach is
 most useful when working with the interpreter.  If you would like to
 save the results of a profile into a file for later examination, you
@@ -128,8 +128,18 @@ The file \file{profile.py} can also be invoked as
 a script to profile another script.  For example:
 
 \begin{verbatim}
-python /usr/local/lib/python1.5/profile.py myscript.py
+python -m profile myscript.py
 \end{verbatim}
+
+\file{profile.py} accepts two optional arguments on the command line:
+
+\begin{verbatim}
+profile.py [-o output_file] [-s sort_order]
+\end{verbatim}
+
+\programopt{-s} only applies to standard output (\programopt{-o} is
+not supplied).  Look in the \class{Stats} documentation for valid sort
+values.
 
 When you wish to review the profile, you should use the methods in the
 \module{pstats} module.  Typically you would load the statistics data as
@@ -142,7 +152,7 @@ p = pstats.Stats('fooprof')
 
 The class \class{Stats} (the above code just created an instance of
 this class) has a variety of methods for manipulating and printing the
-data that was just read into \samp{p}.  When you ran
+data that was just read into \code{p}.  When you ran
 \function{profile.run()} above, what was printed was the result of three
 method calls:
 
@@ -190,8 +200,8 @@ p.sort_stats('file').print_stats('__init__')
 \end{verbatim}
 
 This will sort all the statistics by file name, and then print out
-statistics for only the class init methods ('cause they are spelled
-with \samp{__init__} in them).  As one final example, you could try:
+statistics for only the class init methods (since they are spelled
+with \code{__init__} in them).  As one final example, you could try:
 
 \begin{verbatim}
 p.sort_stats('time', 'cum').print_stats(.5, 'init')
@@ -204,7 +214,7 @@ of its original size, then only lines containing \code{init} are
 maintained, and that sub-sub-list is printed.
 
 If you wondered what functions called the above functions, you could
-now (\samp{p} is still sorted according to the last criteria) do:
+now (\code{p} is still sorted according to the last criteria) do:
 
 \begin{verbatim}
 p.print_callers(.5, 'init')
@@ -275,7 +285,7 @@ Profiler Extensions, which includes discussion of how to derive
 ``better'' profilers from the classes presented, or reading the source
 code for these modules.
 
-\begin{funcdesc}{run}{string\optional{, filename\optional{, ...}}}
+\begin{funcdesc}{run}{command\optional{, filename}}
 
 This function takes a single argument that has can be passed to the
 \keyword{exec} statement, and an optional file name.  In all cases this
@@ -339,6 +349,12 @@ figure is printed.
 
 \end{funcdesc}
 
+\begin{funcdesc}{runctx}{command, globals, locals\optional{, filename}}
+This function is similar to \function{profile.run()}, with added
+arguments to supply the globals and locals dictionaries for the
+\var{command} string.
+\end{funcdesc}
+
 Analysis of the profiler data is done using this class from the
 \module{pstats} module:
 
@@ -346,7 +362,7 @@ Analysis of the profiler data is done using this class from the
 % (This \stmodindex use may be hard to change ;-( )
 \stmodindex{pstats}
 
-\begin{classdesc}{Stats}{filename\optional{, ...}}
+\begin{classdesc}{Stats}{filename\optional{, \moreargs}}
 This class constructor creates an instance of a ``statistics object''
 from a \var{filename} (or set of filenames).  \class{Stats} objects are
 manipulated by methods, in order to print useful reports.
@@ -383,7 +399,7 @@ statistics for these two entries are accumulated into a single entry.
 \end{methoddesc}
 
 
-\begin{methoddesc}[Stats]{add}{filename\optional{, ...}}
+\begin{methoddesc}[Stats]{add}{filename\optional{, \moreargs}}
 This method of the \class{Stats} class accumulates additional
 profiling information into the current profiling object.  Its
 arguments should refer to filenames created by the corresponding
@@ -392,15 +408,23 @@ version of \function{profile.run()}.  Statistics for identically named
 single function statistics.
 \end{methoddesc}
 
-\begin{methoddesc}[Stats]{sort_stats}{key\optional{, ...}}
+\begin{methoddesc}[Stats]{dump_stats}{filename}
+Save the data loaded into the \class{Stats} object to a file named
+\var{filename}.  The file is created if it does not exist, and is
+overwritten if it already exists.  This is equivalent to the method of
+the same name on the \class{profile.Profile} class.
+\versionadded{2.3}
+\end{methoddesc}
+
+\begin{methoddesc}[Stats]{sort_stats}{key\optional{, \moreargs}}
 This method modifies the \class{Stats} object by sorting it according
 to the supplied criteria.  The argument is typically a string
 identifying the basis of a sort (example: \code{'time'} or
 \code{'name'}).
 
 When more than one key is provided, then additional keys are used as
-secondary criteria when the there is equality in all keys selected
-before them.  For example, \samp{sort_stats('name', 'file')} will sort
+secondary criteria when there is equality in all keys selected
+before them.  For example, \code{sort_stats('name', 'file')} will sort
 all the entries according to their function name, and resolve all ties
 (identical function names) by sorting by file name.
 
@@ -455,7 +479,7 @@ in the \function{profile.run()} definition.
 
 The order of the printing is based on the last \method{sort_stats()}
 operation done on the object (subject to caveats in \method{add()} and
-\method{strip_dirs()}.
+\method{strip_dirs()}).
 
 The arguments provided (if any) can be used to limit the list down to
 the significant entries.  Initially, the list is taken to be the
@@ -472,14 +496,14 @@ print_stats(.1, 'foo:')
 \end{verbatim}
 
 would first limit the printing to first 10\% of list, and then only
-print functions that were part of filename \samp{.*foo:}.  In
+print functions that were part of filename \file{.*foo:}.  In
 contrast, the command:
 
 \begin{verbatim}
 print_stats('foo:', .1)
 \end{verbatim}
 
-would limit the list to all functions having file names \samp{.*foo:},
+would limit the list to all functions having file names \file{.*foo:},
 and then proceed to only print the first 10\% of them.
 \end{methoddesc}
 
@@ -501,34 +525,17 @@ of direction of calls (re: called vs was called by), the arguments and
 ordering are identical to the \method{print_callers()} method.
 \end{methoddesc}
 
-\begin{methoddesc}[Stats]{ignore}{}
-\deprecated{1.5.1}{This is not needed in modern versions of
-Python.\footnote{
-  This was once necessary, when Python would print any unused expression
-  result that was not \code{None}.  The method is still defined for
-  backward compatibility.}}
-\end{methoddesc}
-
 
 \section{Limitations \label{profile-limits}}
 
-There are two fundamental limitations on this profiler.  The first is
-that it relies on the Python interpreter to dispatch \dfn{call},
-\dfn{return}, and \dfn{exception} events.  Compiled \C{} code does not
-get interpreted, and hence is ``invisible'' to the profiler.  All time
-spent in \C{} code (including built-in functions) will be charged to the
-Python function that invoked the \C{} code.  If the \C{} code calls out
-to some native Python code, then those calls will be profiled
-properly.
-
-The second limitation has to do with accuracy of timing information.
+One limitation has to do with accuracy of timing information.
 There is a fundamental problem with deterministic profilers involving
 accuracy.  The most obvious restriction is that the underlying ``clock''
 is only ticking at a rate (typically) of about .001 seconds.  Hence no
-measurements will be more accurate that that underlying clock.  If
+measurements will be more accurate than the underlying clock.  If
 enough measurements are taken, then the ``error'' will tend to average
 out. Unfortunately, removing this first error induces a second source
-of error...
+of error.
 
 The second problem is that it ``takes a while'' from when an event is
 dispatched until the profiler's call to get the time actually

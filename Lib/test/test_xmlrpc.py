@@ -10,6 +10,8 @@ alist = [{'astring': 'foo@bar.baz.spam',
           'anotherlist': ['.zyx.41'],
           'abase64': xmlrpclib.Binary("my dog has fleas"),
           'boolean': xmlrpclib.False,
+          'unicode': u'\u4000\u6000\u8000',
+          u'ukey\u4000': 'regular value',
           }]
 
 class XMLRPCTestCase(unittest.TestCase):
@@ -28,6 +30,14 @@ class XMLRPCTestCase(unittest.TestCase):
         if sys.maxint > 2L**31-1:
             self.assertRaises(OverflowError, xmlrpclib.dumps,
                               (int(2L**34),))
+
+    def test_dump_none(self):
+        value = alist + [None]
+        arg1 = (alist + [None],)
+        strg = xmlrpclib.dumps(arg1, allow_none=True)
+        self.assertEquals(value,
+                          xmlrpclib.loads(strg)[0][0])
+        self.assertRaises(TypeError, xmlrpclib.dumps, (arg1,))
 
 def test_main():
     test_support.run_unittest(XMLRPCTestCase)

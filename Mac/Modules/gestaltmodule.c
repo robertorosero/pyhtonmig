@@ -25,14 +25,9 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 /* Macintosh Gestalt interface */
 
 #include "Python.h"
-#include "macglue.h"
+#include "pymactoolbox.h"
 
-#ifdef WITHOUT_FRAMEWORKS
-#include <Types.h>
-#include <Gestalt.h>
-#else
 #include <Carbon/Carbon.h>
-#endif
 
 static PyObject *
 gestalt_gestalt(PyObject *self, PyObject *args)

@@ -1,4 +1,5 @@
-# Copyright (C) 2002 Python Software Foundation
+# Copyright (C) 2002-2004 Python Software Foundation
+# Contact: email-sig@python.org
 
 """Email address parsing code.
 
@@ -6,13 +7,6 @@ Lifted directly from rfc822.py.  This should eventually be rewritten.
 """
 
 import time
-from types import TupleType
-
-try:
-    True, False
-except NameError:
-    True = 1
-    False = 0
 
 SPACE = ' '
 EMPTYSTRING = ''
@@ -54,9 +48,8 @@ def parsedate_tz(data):
         del data[0]
     else:
         i = data[0].rfind(',')
-        if i < 0:
-            return None
-        data[0] = data[0][i+1:]
+        if i >= 0:
+            data[0] = data[0][i+1:]
     if len(data) == 3: # RFC 850 date, deprecated
         stuff = data[0].split('-')
         if len(stuff) == 3:
@@ -123,15 +116,15 @@ def parsedate_tz(data):
             tzoffset = -tzoffset
         else:
             tzsign = 1
-        tzoffset = tzsign * ( (tzoffset/100)*3600 + (tzoffset % 100)*60)
-    tuple = (yy, mm, dd, thh, tmm, tss, 0, 0, 0, tzoffset)
+        tzoffset = tzsign * ( (tzoffset//100)*3600 + (tzoffset % 100)*60)
+    tuple = (yy, mm, dd, thh, tmm, tss, 0, 1, 0, tzoffset)
     return tuple
 
 
 def parsedate(data):
     """Convert a time string to a time tuple."""
     t = parsedate_tz(data)
-    if isinstance(t, TupleType):
+    if isinstance(t, tuple):
         return t[:9]
     else:
         return t
@@ -441,9 +434,6 @@ class AddressList(AddrlistClass):
 
     def __len__(self):
         return len(self.addresslist)
-
-    def __str__(self):
-        return COMMASPACE.join(map(dump_address_pair, self.addresslist))
 
     def __add__(self, other):
         # Set union

@@ -20,75 +20,6 @@
 #include <errno.h>
 #endif
 
-
-/* try to determine what version of the Pthread Standard is installed.
- * this is important, since all sorts of parameter types changed from
- * draft to draft and there are several (incompatible) drafts in
- * common use.  these macros are a start, at least. 
- * 12 May 1997 -- david arnold <davida@pobox.com>
- */
-
-#if defined(__ultrix) && defined(__mips) && defined(_DECTHREADS_)
-/* _DECTHREADS_ is defined in cma.h which is included by pthread.h */
-#  define PY_PTHREAD_D4
-#  error Systems with PY_PTHREAD_D4 are unsupported. See README.
-
-#elif defined(__osf__) && defined (__alpha)
-/* _DECTHREADS_ is defined in cma.h which is included by pthread.h */
-#  if !defined(_PTHREAD_ENV_ALPHA) || defined(_PTHREAD_USE_D4) || defined(PTHREAD_USE_D4)
-#    define PY_PTHREAD_D4
-#    error Systems with PY_PTHREAD_D4 are unsupported. See README.
-#  else
-#    define PY_PTHREAD_STD
-#  endif
-
-#elif defined(_AIX)
-/* SCHED_BG_NP is defined if using AIX DCE pthreads
- * but it is unsupported by AIX 4 pthreads. Default
- * attributes for AIX 4 pthreads equal to NULL. For
- * AIX DCE pthreads they should be left unchanged.
- */
-#  if !defined(SCHED_BG_NP)
-#    define PY_PTHREAD_STD
-#  else
-#    define PY_PTHREAD_D7
-#    error Systems with PY_PTHREAD_D7 are unsupported. See README.
-#  endif
-
-#elif defined(__DGUX)
-#  define PY_PTHREAD_D6
-#  error Systems with PY_PTHREAD_D6 are unsupported. See README.
-
-#elif defined(__hpux) && defined(_DECTHREADS_)
-#  define PY_PTHREAD_D4
-#  error Systems with PY_PTHREAD_D4 are unsupported. See README.
-
-#else /* Default case */
-#  define PY_PTHREAD_STD
-
-#endif
-
-#ifdef USE_GUSI
-/* The Macintosh GUSI I/O library sets the stackspace to
-** 20KB, much too low. We up it to 64K.
-*/
-#define THREAD_STACK_SIZE 0x10000
-#endif
-
-
-/* set default attribute object for different versions */
-
-#if defined(PY_PTHREAD_D4) || defined(PY_PTHREAD_D7)
-#if !defined(pthread_attr_default)
-#  define pthread_attr_default pthread_attr_default
-#endif
-#if !defined(pthread_mutexattr_default)
-#  define pthread_mutexattr_default pthread_mutexattr_default
-#endif
-#if !defined(pthread_condattr_default)
-#  define pthread_condattr_default pthread_condattr_default
-#endif
-#elif defined(PY_PTHREAD_STD) || defined(PY_PTHREAD_D6)
 #if !defined(pthread_attr_default)
 #  define pthread_attr_default ((pthread_attr_t *)NULL)
 #endif
@@ -97,7 +28,6 @@
 #endif
 #if !defined(pthread_condattr_default)
 #  define pthread_condattr_default ((pthread_condattr_t *)NULL)
-#endif
 #endif
 
 
@@ -116,7 +46,7 @@
  * other UNIX International compliant systems that don't have the full
  * pthread implementation.
  */
-#ifdef HAVE_PTHREAD_SIGMASK
+#if defined(HAVE_PTHREAD_SIGMASK) && !defined(HAVE_BROKEN_PTHREAD_SIGMASK)
 #  define SET_THREAD_SIGMASK pthread_sigmask
 #else
 #  define SET_THREAD_SIGMASK sigprocmask
@@ -189,7 +119,6 @@ PyThread_start_new_thread(void (*func)(void *), void *arg)
 {
 	pthread_t th;
 	int status;
- 	sigset_t oldmask, newmask;
 #if defined(THREAD_STACK_SIZE) || defined(PTHREAD_SYSTEM_SCHED_SUPPORTED)
 	pthread_attr_t attrs;
 #endif
@@ -203,31 +132,11 @@ PyThread_start_new_thread(void (*func)(void *), void *arg)
 #ifdef THREAD_STACK_SIZE
 	pthread_attr_setstacksize(&attrs, THREAD_STACK_SIZE);
 #endif
-#ifdef PTHREAD_SYSTEM_SCHED_SUPPORTED
+#if defined(PTHREAD_SYSTEM_SCHED_SUPPORTED) && !defined(__FreeBSD__)
         pthread_attr_setscope(&attrs, PTHREAD_SCOPE_SYSTEM);
 #endif
 
-	/* Mask all signals in the current thread before creating the new
-	 * thread.  This causes the new thread to start with all signals
-	 * blocked.
-	 */
-	sigfillset(&newmask);
-	SET_THREAD_SIGMASK(SIG_BLOCK, &newmask, &oldmask);
-
 	status = pthread_create(&th, 
-#if defined(PY_PTHREAD_D4)
-				 pthread_attr_default,
-				 (pthread_startroutine_t)func, 
-				 (pthread_addr_t)arg
-#elif defined(PY_PTHREAD_D6)
-				 pthread_attr_default,
-				 (void* (*)(void *))func,
-				 arg
-#elif defined(PY_PTHREAD_D7)
-				 pthread_attr_default,
-				 func,
-				 arg
-#elif defined(PY_PTHREAD_STD)
 #if defined(THREAD_STACK_SIZE) || defined(PTHREAD_SYSTEM_SCHED_SUPPORTED)
 				 &attrs,
 #else
@@ -235,11 +144,7 @@ PyThread_start_new_thread(void (*func)(void *), void *arg)
 #endif
 				 (void* (*)(void *))func,
 				 (void *)arg
-#endif
 				 );
-
-	/* Restore signal mask for original thread */
-	SET_THREAD_SIGMASK(SIG_SETMASK, &oldmask, NULL);
 
 #if defined(THREAD_STACK_SIZE) || defined(PTHREAD_SYSTEM_SCHED_SUPPORTED)
 	pthread_attr_destroy(&attrs);
@@ -247,11 +152,7 @@ PyThread_start_new_thread(void (*func)(void *), void *arg)
 	if (status != 0)
             return -1;
 
-#if defined(PY_PTHREAD_D4) || defined(PY_PTHREAD_D6) || defined(PY_PTHREAD_D7)
-        pthread_detach(&th);
-#elif defined(PY_PTHREAD_STD)
         pthread_detach(th);
-#endif
 
 #if SIZEOF_PTHREAD_T <= SIZEOF_LONG
 	return (long) th;
@@ -262,7 +163,7 @@ PyThread_start_new_thread(void (*func)(void *), void *arg)
 
 /* XXX This implementation is considered (to quote Tim Peters) "inherently
    hosed" because:
-     - It does not guanrantee the promise that a non-zero integer is returned.
+     - It does not guarantee the promise that a non-zero integer is returned.
      - The cast to long is inherently unsafe.
      - It is not clear that the 'volatile' (for AIX?) and ugly casting in the
        latter return statement (for Alpha OSF/1) are any longer necessary.

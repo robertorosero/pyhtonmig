@@ -85,6 +85,7 @@ Otherwise a generated Info file name is used.")
      (progn (setq obindex t)
 	    "\n@table @code\n@item \\1\n@obindex \\1\n")
      "@end table\n")
+    ("comment" 0 "\n@ignore\n" "\n@end ignore\n")
     ("csimplemacrodesc" 1
      (progn (setq cindex t)
 	    "\n@table @code\n@item \\1\n@cindex \\1\n")
@@ -119,6 +120,9 @@ Otherwise a generated Info file name is used.")
 	     "@contents\n"
 	     "@bye\n"))
     ("enumerate" 0 "@enumerate" "@end enumerate")
+    ("envdesc" 2 (concat "\n@table @code"
+                         "\n@item @backslash{}begin@{\\1@}\\2")
+     "@end table\n")
     ("excdesc" 1
      (progn (setq obindex t)
 	    "\n@table @code\n@item \\1\n@obindex \\1\n")
@@ -144,6 +148,9 @@ Otherwise a generated Info file name is used.")
 			      "@item \\3 @tab \\4 @tab \\5\n"
 			      "@item ------- @tab ------ @tab ------\n")
      "@end multitable\n")
+    ("macrodesc" 2 (concat "\n@table @code"
+                           "\n@item \\1@{\\2@}")
+     "@end table\n")
     ("memberdesc" 1
      (progn (setq findex t)
 	    "\n@table @code\n@item \\1\n@findex \\1\n")
@@ -182,7 +189,9 @@ Otherwise a generated Info file name is used.")
 		 "@multitable @columnfractions .20 .20 .20 .20 .20\n"
 		 "@item \\3 @tab \\4 @tab \\5 @tab \\6 @tab \\7\n"
 		 "@item ------- @tab ------- @tab ------- @tab ------- @tab -------\n")
-     "@end multitable\n"))
+     "@end multitable\n")
+    ("alltt" 0 "@example" "@end example")
+    )
   "Associative list defining substitutions for environments.
 Each list item is of the form (ENVIRONMENT ARGNUM BEGIN END) where:
 - ENVIRONMENT is LaTeX environment name
@@ -193,13 +202,16 @@ Both BEGIN and END are evaled.  Moreover, you can reference arguments through
 \N regular expression notation in strings of BEGIN.")
 
 (defconst py2texi-commands
-  '(("ABC" 0 "ABC")
+  '(("AA" 0 "@AA{}")
+    ("aa" 0 "@aa{}")
+    ("ABC" 0 "ABC")
     ("appendix" 0 (progn (setq appendix t) ""))
     ("ASCII" 0 "ASCII")
     ("author" 1 (progn (setq author (match-string 1 string)) ""))
     ("authoraddress" 1
      (progn (setq author-address (match-string 1 string)) ""))
     ("b" 1 "@w{\\1}")
+    ("backslash" 0 "@backslash{}")
     ("bf" 0 "@destroy")
     ("bifuncindex" 1 (progn (setq findex t) "@findex{\\1}"))
     ("C" 0 "C")
@@ -231,14 +243,16 @@ Both BEGIN and END are evaled.  Moreover, you can reference arguments through
     ("documentclass" 1 py2texi-magic)
     ("e" 0 "@backslash{}")
     ("else" 0 (concat "@end ifinfo\n@" (setq last-if "iftex")))
+    ("env" 1 "@code{\\1}")
     ("EOF" 0 "@code{EOF}")
     ("email" 1 "@email{\\1}")
     ("emph" 1 "@emph{\\1}")
-    ("envvar" 1 "@samp{\\1}")
+    ("envvar" 1 "@env{\\1}")
     ("exception" 1 "@code{\\1}")
     ("exindex" 1 (progn (setq obindex t) "@obindex{\\1}"))
     ("fi" 0 (concat "@end " last-if))
     ("file" 1 "@file{\\1}")
+    ("filenq" 1 "@file{\\1}")
     ("filevar" 1 "@file{@var{\\1}}")
     ("footnote" 1 "@footnote{\\1}")
     ("frac" 0 "")
@@ -270,6 +284,7 @@ Both BEGIN and END are evaled.  Moreover, you can reference arguments through
     ("linev" 5 "@item \\1 @tab \\2 @tab \\3 @tab \\4 @tab \\5")
     ("localmoduletable" 0 "")
     ("longprogramopt" 1 "@option{--\\1}")
+    ("macro" 1 "@code{@backslash{}\\1}")
     ("mailheader" 1 "@code{\\1}")
     ("makeindex" 0 "")
     ("makemodindex" 0 "")
@@ -359,6 +374,7 @@ Both BEGIN and END are evaled.  Moreover, you can reference arguments through
     ("sum" 0 "")
     ("tableofcontents" 0 "")
     ("term" 1 "@item \\1")
+    ("TeX" 0 "@TeX{}")
     ("textasciitilde" 0 "~")
     ("textasciicircum" 0 "^")
     ("textbackslash" 0 "@backslash{}")
@@ -554,9 +570,13 @@ Do not include .ind files."
 			  (string-match "\\.ind\\.tex$" filename)))
       (setq dirs py2texi-dirs)
       (while (and (not includefile) dirs)
-	(setq includefile (concat path (car dirs) filename))
+	(setq includefile
+              (concat (file-name-as-directory (car dirs)) filename))
+        (if (not (file-name-absolute-p includefile))
+            (setq includefile
+                  (concat (file-name-as-directory path) includefile)))
 	(unless (file-exists-p includefile)
-	  (setq includefile nil)
+          (setq includefile nil)
 	  (setq dirs (cdr dirs))))
       (if includefile
 	  (save-restriction

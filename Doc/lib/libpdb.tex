@@ -39,8 +39,15 @@ NameError: 'spam'
 a script to debug other scripts.  For example:
 
 \begin{verbatim}
-python /usr/local/lib/python1.5/pdb.py myscript.py
+python -m pdb myscript.py
 \end{verbatim}
+
+When invoked as a script, pdb will automatically enter post-mortem debugging
+if the program being debugged exits abnormally. After post-mortem debugging
+(or after normal exit of the program), pdb will restart the program.
+Automatic restarting preserves pdb's state (such as breakpoints) and in most
+cases is more useful than quitting the debugger upon program's exit.
+\versionadded[Restarting post-mortem behavior added]{2.4}
 
 Typical usage to inspect a crashed program is:
 
@@ -77,7 +84,7 @@ used.  (See the explanation of the \keyword{exec} statement or the
 \end{funcdesc}
 
 \begin{funcdesc}{runeval}{expression\optional{, globals\optional{, locals}}}
-Evaluate the \var{expression} (given as a a string) under debugger
+Evaluate the \var{expression} (given as a string) under debugger
 control.  When \function{runeval()} returns, it returns the value of the
 expression.  Otherwise this function is similar to
 \function{run()}.
@@ -265,7 +272,7 @@ It should be noted that not all jumps are allowed --- for instance it
 is not possible to jump into the middle of a \keyword{for} loop or out
 of a \keyword{finally} clause.
 
-\item[l(ist) \optional{\var{first\optional{, last}}}]
+\item[l(ist) \optional{\var{first}\optional{, \var{last}}}]
 
 List source code for the current file.  Without arguments, list 11
 lines around the current line or continue the previous listing.  With
@@ -285,7 +292,7 @@ command --- this executes the Python \keyword{print} statement.}
 
 \item[pp \var{expression}]
 
-Like the \samp{p} command, except the value of the exception is
+Like the \samp{p} command, except the value of the expression is
 pretty-printed using the \module{pprint} module.
 
 \item[alias \optional{\var{name} \optional{command}}]
@@ -350,8 +357,9 @@ Some changes were made to the interpreter:
 
 Trace functions have three arguments: \var{frame}, \var{event}, and
 \var{arg}. \var{frame} is the current stack frame.  \var{event} is a
-string: \code{'call'}, \code{'line'}, \code{'return'} or
-\code{'exception'}.  \var{arg} depends on the event type.
+string: \code{'call'}, \code{'line'}, \code{'return'}, \code{'exception'},
+ \code{'c_call'}, \code{'c_return'}, or \code{'c_exception'}. \var{arg}
+ depends on the event type.
 
 The global trace function is invoked (with \var{event} set to
 \code{'call'}) whenever a new local scope is entered; it should return
@@ -389,6 +397,16 @@ An exception has occurred.  The local trace function is called;
 \var{arg} is a triple \code{(\var{exception}, \var{value},
 \var{traceback})}; the return value specifies the new local trace
 function.
+
+\item[\code{'c_call'}]
+A C function is about to be called.  This may be an extension function
+or a builtin.  \var{arg} is the C function object.
+
+\item[\code{'c_return'}]
+A C function has returned. \var{arg} is \code{None}.
+
+\item[\code{'c_exception'}]
+A C function has thrown an exception.  \var{arg} is \code{None}.
 
 \end{description}
 

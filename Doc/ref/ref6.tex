@@ -48,7 +48,7 @@ function and the resulting string is written to standard output (see
 section~\ref{print}) on a line by itself.  (Expression statements
 yielding \code{None} are not written, so that procedure calls do not
 cause any output.)
-\ttindex{None}
+\obindex{None}
 \indexii{string}{conversion}
 \index{output}
 \indexii{standard}{output}
@@ -84,11 +84,12 @@ if __debug__:
 These equivalences assume that \code{__debug__}\ttindex{__debug__} and
 \exception{AssertionError}\exindex{AssertionError} refer to the built-in
 variables with those names.  In the current implementation, the
-built-in variable \code{__debug__} is 1 under normal circumstances, 0
-when optimization is requested (command line option -O).  The current
-code generator emits no code for an assert statement when optimization
-is requested at compile time.  Note that it is unnecessary to include
-the source code for the expression that failed in the error message;
+built-in variable \code{__debug__} is \code{True} under normal
+circumstances, \code{False} when optimization is requested (command line
+option -O).  The current code generator emits no code for an assert
+statement when optimization is requested at compile time.  Note that it
+is unnecessary to include the source code for the expression that failed
+in the error message;
 it will be displayed as part of the stack trace.
 
 Assignments to \code{__debug__} are illegal.  The value for the
@@ -149,7 +150,7 @@ target.
 
 \item
 If the target list is a comma-separated list of targets: The object
-must be a sequence with the same number of items as the there are
+must be a sequence with the same number of items as there are
 targets in the target list, and the items are assigned, from left to
 right, to the corresponding targets.  (This rule is relaxed as of
 Python 1.5; in earlier versions, the object had to be a tuple.  Since
@@ -275,7 +276,8 @@ operation and an assignment statement:
              {\token{target} \token{augop} \token{expression_list}}
   \production{augop}
              {"+=" | "-=" | "*=" | "/=" | "\%=" | "**="}
-  \productioncont{| ">>=" | "<<=" | "\&=" | "\textasciicircum=" | "|="}
+  % The empty groups below prevent conversion to guillemets.
+  \productioncont{| ">{}>=" | "<{}<=" | "\&=" | "\textasciicircum=" | "|="}
 \end{productionlist}
 
 (See section~\ref{primaries} for the syntax definitions for the last
@@ -495,7 +497,7 @@ get executed.
 \begin{notice}
 In Python 2.2, the \keyword{yield} statement is only allowed
 when the \code{generators} feature has been enabled.  It will always
-be enabled in Python 2.3.  This \code{__future__} import statment can
+be enabled in Python 2.3.  This \code{__future__} import statement can
 be used to enable the feature:
 
 \begin{verbatim}
@@ -521,9 +523,8 @@ from __future__ import generators
 \end{productionlist}
 
 If no expressions are present, \keyword{raise} re-raises the last
-expression that was active in the current scope.  If no exception has
-been active in the current scope, an exception is raised that
-indicates indicates that this is the error.
+expression that was active in the current scope.  If no exception is
+active in the current scope, an exception is raised indicating this error.
 \index{exception}
 \indexii{raising}{exception}
 
@@ -544,9 +545,6 @@ the class constructor; if it is \code{None}, an empty argument list is
 used, and any other object is treated as a single argument to the
 constructor.  The instance so created by calling the constructor is
 used as the exception value.
-
-If the first object is a string, the string object is the exception
-type, and the second object becomes the exception value.
 
 If a third object is present and not \code{None}, it must be a
 traceback\obindex{traceback} object (see section~\ref{traceback}), and
@@ -616,6 +614,9 @@ It continues with the next cycle of the nearest enclosing loop.
 
 \section{The \keyword{import} statement \label{import}}
 \stindex{import}
+\index{module!importing}
+\indexii{name}{binding}
+\kwindex{from}
 
 \begin{productionlist}
   \production{import_stmt}
@@ -624,6 +625,9 @@ It continues with the next cycle of the nearest enclosing loop.
   \productioncont{| "from" \token{module} "import" \token{identifier}
                     ["as" \token{name}]}
   \productioncont{  ( "," \token{identifier} ["as" \token{name}] )*}
+  \productioncont{| "from" \token{module} "import" "(" \token{identifier}
+                    ["as" \token{name}]}
+  \productioncont{  ( "," \token{identifier} ["as" \token{name}] )* [","] ")"}
   \productioncont{| "from" \token{module} "import" "*"}
   \production{module}
              {(\token{identifier} ".")* \token{identifier}}
@@ -635,9 +639,6 @@ namespace (of the scope where the \keyword{import} statement occurs).
 The first form (without \keyword{from}) repeats these steps for each
 identifier in the list.  The form with \keyword{from} performs step
 (1) once, and then performs step (2) repeatedly.
-\indexii{importing}{module}
-\indexii{name}{binding}
-\kwindex{from}
 
 In this context, to ``initialize'' a built-in or extension module means to
 call an initialization function that the module must provide for the purpose
@@ -664,18 +665,16 @@ given as \code{sys.path}.
 \indexii{filename}{extension}
 \indexiii{module}{search}{path}
 
-If a built-in module is found, its built-in initialization code is
-executed and step (1) is finished.  If no matching file is found,
-\exception{ImportError} is raised.  If a file is found, it is parsed,
+If a built-in module is found,\indexii{module}{initialization} its
+built-in initialization code is executed and step (1) is finished.  If
+no matching file is found,
+\exception{ImportError}\exindex{ImportError} is raised.
+\index{code block}If a file is found, it is parsed,
 yielding an executable code block.  If a syntax error occurs,
-\exception{SyntaxError} is raised.  Otherwise, an empty module of the given
-name is created and inserted in the module table, and then the code
-block is executed in the context of this module.  Exceptions during
-this execution terminate step (1).
-\indexii{module}{initialization}
-\exindex{SyntaxError}
-\exindex{ImportError}
-\index{code block}
+\exception{SyntaxError}\exindex{SyntaxError} is raised.  Otherwise, an
+empty module of the given name is created and inserted in the module
+table, and then the code block is executed in the context of this
+module.  Exceptions during this execution terminate step (1).
 
 When step (1) finishes without raising an exception, step (2) can
 begin.
@@ -738,6 +737,84 @@ Functions}{../lib/built-in-funcs.html} in the
 information.
 \bifuncindex{__import__}
 
+\subsection{Future statements \label{future}}
+
+A \dfn{future statement}\indexii{future}{statement} is a directive to
+the compiler that a particular module should be compiled using syntax
+or semantics that will be available in a specified future release of
+Python.  The future statement is intended to ease migration to future
+versions of Python that introduce incompatible changes to the
+language.  It allows use of the new features on a per-module basis
+before the release in which the feature becomes standard.
+
+\begin{productionlist}[*]
+  \production{future_statement}
+             {"from" "__future__" "import" feature ["as" name] ("," feature ["as" name])*}
+  \productioncont{| "from" "__future__" "import" "(" feature ["as" name] ("," feature ["as" name])* [","] ")"}
+  \production{feature}{identifier}
+  \production{name}{identifier}
+\end{productionlist}
+
+A future statement must appear near the top of the module.  The only
+lines that can appear before a future statement are:
+
+\begin{itemize}
+
+\item the module docstring (if any),
+\item comments,
+\item blank lines, and
+\item other future statements.
+
+\end{itemize}
+
+The features recognized by Python 2.3 are \samp{generators},
+\samp{division} and \samp{nested_scopes}.  \samp{generators} and
+\samp{nested_scopes} are redundant in 2.3 because they are always
+enabled. 
+
+A future statement is recognized and treated specially at compile
+time: Changes to the semantics of core constructs are often
+implemented by generating different code.  It may even be the case
+that a new feature introduces new incompatible syntax (such as a new
+reserved word), in which case the compiler may need to parse the
+module differently.  Such decisions cannot be pushed off until
+runtime.
+
+For any given release, the compiler knows which feature names have been
+defined, and raises a compile-time error if a future statement contains
+a feature not known to it.
+
+The direct runtime semantics are the same as for any import statement:
+there is a standard module \module{__future__}, described later, and
+it will be imported in the usual way at the time the future statement
+is executed.
+
+The interesting runtime semantics depend on the specific feature
+enabled by the future statement.
+
+Note that there is nothing special about the statement:
+
+\begin{verbatim}
+import __future__ [as name]
+\end{verbatim}
+
+That is not a future statement; it's an ordinary import statement with
+no special semantics or syntax restrictions.
+
+Code compiled by an exec statement or calls to the builtin functions
+\function{compile()} and \function{execfile()} that occur in a module
+\module{M} containing a future statement will, by default, use the new 
+syntax or semantics associated with the future statement.  This can,
+starting with Python 2.2 be controlled by optional arguments to
+\function{compile()} --- see the documentation of that function in the 
+library reference for details.
+
+A future statement typed at an interactive interpreter prompt will
+take effect for the rest of the interpreter session.  If an
+interpreter is started with the \programopt{-i} option, is passed a
+script name to execute, and the script includes a future statement, it
+will be in effect in the interactive session started after the script
+is executed.
 
 \section{The \keyword{global} statement \label{global}}
 \stindex{global}
@@ -801,8 +878,9 @@ In all cases, if the optional parts are omitted, the code is executed
 in the current scope.  If only the first expression after \keyword{in}
 is specified, it should be a dictionary, which will be used for both
 the global and the local variables.  If two expressions are given,
-both must be dictionaries and they are used for the global and local
-variables, respectively.
+they are used for the global and local variables, respectively.
+If provided, \var{locals} can be any mapping object.
+\versionchanged[formerly \var{locals} was required to be a dictionary]{2.4}
 
 As a side effect, an implementation may insert additional keys into
 the dictionaries given besides those corresponding to variable names
@@ -822,11 +900,5 @@ for use by \keyword{exec}.
 \bifuncindex{globals}
 \bifuncindex{locals}
 
-Also, in the current implementation, multi-line compound statements must
-end with a newline:
-\code{exec "for v in seq:\e{}n\e{}tprint v\e{}n"} works, but
-\code{exec "for v in seq:\e{}n\e{}tprint v"} fails with
-\exception{SyntaxError}.
-\exindex{SyntaxError}
   
 

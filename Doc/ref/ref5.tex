@@ -55,7 +55,8 @@ categorized syntactically as atoms.  The syntax for atoms is:
              {\token{identifier} | \token{literal} | \token{enclosure}}
   \production{enclosure}
              {\token{parenth_form} | \token{list_display}}
-  \productioncont{| \token{dict_display} | \token{string_conversion}}
+  \productioncont{| \token{generator_expression} | \token{dict_display}}
+  \productioncont{| \token{string_conversion}}
 \end{productionlist}
 
 
@@ -63,18 +64,18 @@ categorized syntactically as atoms.  The syntax for atoms is:
 \index{name}
 \index{identifier}
 
-An identifier occurring as an atom is a name.  See Section 4.1 for
-documentation of naming and binding.
+An identifier occurring as an atom is a name.  See
+section~\ref{naming} for documentation of naming and binding.
 
 When the name is bound to an object, evaluation of the atom yields
 that object.  When a name is not bound, an attempt to evaluate it
 raises a \exception{NameError} exception.
 \exindex{NameError}
 
-\strong{Private name mangling:}%
+\strong{Private name mangling:}
 \indexii{name}{mangling}%
 \indexii{private}{names}%
-when an identifier that textually occurs in a class definition begins
+When an identifier that textually occurs in a class definition begins
 with two or more underscore characters and does not end in two or more
 underscores, it is considered a \dfn{private name} of that class.
 Private names are transformed to a longer form before code is
@@ -153,6 +154,11 @@ A list display is a possibly empty series of expressions enclosed in
 square brackets:
 
 \begin{productionlist}
+  \production{test}
+             {\token{and_test} ( "or" \token{and_test} )*
+              | \token{lambda_form}}
+  \production{testlist}
+             {\token{test} ( "," \token{test} )* [ "," ]}
   \production{list_display}
              {"[" [\token{listmaker}] "]"}
   \production{listmaker}
@@ -179,9 +185,55 @@ case, the elements of the new list are those that would be produced
 by considering each of the \keyword{for} or \keyword{if} clauses a block,
 nesting from
 left to right, and evaluating the expression to produce a list element
-each time the innermost block is reached.
+each time the innermost block is reached\footnote{In Python 2.3, a
+list comprehension "leaks" the control variables of each
+\samp{for} it contains into the containing scope.  However, this
+behavior is deprecated, and relying on it will not work once this
+bug is fixed in a future release}.
 \obindex{list}
 \indexii{empty}{list}
+
+
+\subsection{Generator expressions\label{genexpr}}
+\indexii{generator}{expression}
+
+A generator expression is a compact generator notation in parentheses:
+
+\begin{productionlist}
+  \production{generator_expression}
+             {"(" \token{test} \token{genexpr_for} ")"}
+  \production{genexpr_for}
+             {"for" \token{expression_list} "in" \token{test}
+              [\token{genexpr_iter}]}
+  \production{genexpr_iter}
+             {\token{genexpr_for} | \token{genexpr_if}}
+  \production{genexpr_if}
+             {"if" \token{test} [\token{genexpr_iter}]}
+\end{productionlist}
+
+A generator expression yields a new generator object.
+\obindex{generator}
+\obindex{generator expression}
+It consists of a single expression followed by at least one
+\keyword{for} clause and zero or more \keyword{for} or \keyword{if}
+clauses.  The iterating values of the new generator are those that
+would be produced by considering each of the \keyword{for} or
+\keyword{if} clauses a block, nesting from left to right, and
+evaluating the expression to yield a value that is reached the
+innermost block for each iteration.
+
+Variables used in the generator expression are evaluated lazily
+when the \method{next()} method is called for generator object
+(in the same fashion as normal generators). However, the leftmost
+\keyword{for} clause is immediately evaluated so that error produced
+by it can be seen before any other possible error in the code that
+handles the generator expression.
+Subsequent \keyword{for} clauses cannot be evaluated immediately since
+they may depend on the previous \keyword{for} loop.
+For example: \samp{(x*y for x in range(10) for y in bar(x))}.
+
+The parentheses can be omitted on calls with only one argument.
+See section \ref{calls} for the detail.
 
 
 \subsection{Dictionary displays\label{dict}}
@@ -210,7 +262,7 @@ entries of the dictionary: each key object is used as a key into the
 dictionary to store the corresponding datum.
 
 Restrictions on the types of the key values are listed earlier in
-section \ref{types}.  (To summarize,the key type should be hashable,
+section \ref{types}.  (To summarize, the key type should be hashable,
 which excludes all mutable objects.)  Clashes between duplicate keys
 are not detected; the last datum (textually rightmost in the display)
 stored for a given key value prevails.
@@ -423,6 +475,8 @@ series of arguments:
 \begin{productionlist}
   \production{call}
              {\token{primary} "(" [\token{argument_list} [","]] ")"}
+             {\token{primary} "(" [\token{argument_list} [","] |
+	      \token{test} \token{genexpr_for} ] ")"}                                                   
   \production{argument_list}
              {\token{positional_arguments} ["," \token{keyword_arguments}]}
   \productioncont{                     ["," "*" \token{expression}]}
@@ -439,8 +493,8 @@ series of arguments:
              {\token{identifier} "=" \token{expression}}
 \end{productionlist}
 
-A trailing comma may be present after an argument list but does not
-affect the semantics.
+A trailing comma may be present after the positional and keyword
+arguments but does not affect the semantics.
 
 The primary must evaluate to a callable object (user-defined
 functions, built-in functions, methods of built-in objects, class
@@ -714,7 +768,7 @@ following identity: \code{x == (x/y)*y + (x\%y)}.  Integer division and
 modulo are also connected with the built-in function \function{divmod()}:
 \code{divmod(x, y) == (x/y, x\%y)}.  These identities don't hold for
 floating point numbers; there similar identities hold
-approximately where \code{x/y} is replaced by \code{floor(x/y)}) or
+approximately where \code{x/y} is replaced by \code{floor(x/y)} or
 \code{floor(x/y) - 1}\footnote{
     If x is very close to an exact integer multiple of y, it's
     possible for \code{floor(x/y)} to be one larger than
@@ -748,9 +802,10 @@ The shifting operations have lower priority than the arithmetic
 operations:
 
 \begin{productionlist}
+  % The empty groups below prevent conversion to guillemets.
   \production{shift_expr}
              {\token{a_expr}
-              | \token{shift_expr} ( "<<" | ">>" ) \token{a_expr}}
+              | \token{shift_expr} ( "<{}<" | ">{}>" ) \token{a_expr}}
 \end{productionlist}
 
 These operators accept plain or long integers as arguments.  The
@@ -817,7 +872,7 @@ interpretation that is conventional in mathematics:
   \productioncont{| "is" ["not"] | ["not"] "in"}
 \end{productionlist}
 
-Comparisons yield integer values: \code{1} for true, \code{0} for false.
+Comparisons yield boolean values: \code{True} or \code{False}.
 
 Comparisons can be chained arbitrarily, e.g., \code{x < y <= z} is
 equivalent to \code{x < y and y <= z}, except that \code{y} is
@@ -867,7 +922,15 @@ behavior.
 
 \item
 Tuples and lists are compared lexicographically using comparison of
-corresponding items.
+corresponding elements.  This means that to compare equal, each
+element must compare equal and the two sequences must be of the same
+type and have the same length.
+
+If not equal, the sequences are ordered the same as their first
+differing elements.  For example, \code{cmp([1,2,x], [1,2,y])} returns
+the same as \code{cmp(x,y)}.  If the corresponding element does not
+exist, the shorter sequence is ordered first (for example,
+\code{[1,2] < [1,2,3]}).
 
 \item
 Mappings (dictionaries) compare equal if and only if their sorted
@@ -905,10 +968,13 @@ only if there exists an index \var{i} such that
 \code{\var{x} == \var{y}[\var{i}]} is true.
 
 For the Unicode and string types, \code{\var{x} in \var{y}} is true if
-and only if there exists an index \var{i} such that \code{\var{x} ==
-\var{y}[\var{i}]} is true. If \code{\var{x}} is not a string or
-Unicode object of length \code{1}, a \exception{TypeError} exception
-is raised.
+and only if \var{x} is a substring of \var{y}.  An equivalent test is
+\code{y.find(x) != -1}.  Note, \var{x} and \var{y} need not be the
+same type; consequently, \code{u'ab' in 'abc'} will return \code{True}.
+Empty strings are always considered to be a substring of any other string,
+so \code{"" in "abc"} will return \code{True}.
+\versionchanged[Previously, \var{x} was required to be a string of
+length \code{1}]{2.3}
 
 For user-defined classes which define the \method{__contains__()} method,
 \code{\var{x} in \var{y}} is true if and only if
@@ -951,8 +1017,6 @@ Boolean operations have the lowest priority of all Python operations:
              {\token{not_test} | \token{and_test} "and" \token{not_test}}
   \production{not_test}
              {\token{comparison} | "not" \token{not_test}}
-  \production{lambda_form}
-             {"lambda" [\token{parameter_list}]: \token{expression}}
 \end{productionlist}
 
 In the context of Boolean operations, and also when expressions are
@@ -961,8 +1025,8 @@ as false: \code{None}, numeric zero of all types, empty sequences
 (strings, tuples and lists), and empty mappings (dictionaries).  All
 other values are interpreted as true.
 
-The operator \keyword{not} yields \code{1} if its argument is false,
-\code{0} otherwise.
+The operator \keyword{not} yields \code{True} if its argument is false,
+\code{False} otherwise.
 \opindex{not}
 
 The expression \code{\var{x} and \var{y}} first evaluates \var{x}; if
@@ -976,19 +1040,24 @@ evaluated and the resulting value is returned.
 \opindex{or}
 
 (Note that neither \keyword{and} nor \keyword{or} restrict the value
-and type they return to \code{0} and \code{1}, but rather return the
+and type they return to \code{False} and \code{True}, but rather return the
 last evaluated argument.
 This is sometimes useful, e.g., if \code{s} is a string that should be
 replaced by a default value if it is empty, the expression
 \code{s or 'foo'} yields the desired value.  Because \keyword{not} has to
 invent a value anyway, it does not bother to return a value of the
-same type as its argument, so e.g., \code{not 'foo'} yields \code{0},
+same type as its argument, so e.g., \code{not 'foo'} yields \code{False},
 not \code{''}.)
 
 \section{Lambdas\label{lambdas}}
 \indexii{lambda}{expression}
 \indexii{lambda}{form}
-\indexii{anonmymous}{function}
+\indexii{anonymous}{function}
+
+\begin{productionlist}
+  \production{lambda_form}
+             {"lambda" [\token{parameter_list}]: \token{expression}}
+\end{productionlist}
 
 Lambda forms (lambda expressions) have the same syntactic position as
 expressions.  They are a shorthand to create anonymous functions; the
@@ -1052,9 +1121,9 @@ precedences\indexii{operator}{precedence} in Python, from lowest
 precedence (least binding) to highest precedence (most binding).
 Operators in the same box have the same precedence.  Unless the syntax
 is explicitly given, operators are binary.  Operators in the same box
-group left to right (except for comparisons, which chain from left to
-right --- see above, and exponentiation, which groups from right to
-left).
+group left to right (except for comparisons, including tests, which all
+have the same precedence and chain from left to right --- see section
+\ref{comparisons} -- and exponentiation, which groups from right to left).
 
 \begin{tableii}{c|l}{textrm}{Operator}{Description}
     \lineii{\keyword{lambda}}			{Lambda expression}

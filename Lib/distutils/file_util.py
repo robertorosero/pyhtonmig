@@ -3,7 +3,7 @@
 Utility functions for operating on single files.
 """
 
-# This module should be kept compatible with Python 1.5.2.
+# This module should be kept compatible with Python 2.1.
 
 __revision__ = "$Id$"
 
@@ -42,7 +42,7 @@ def _copy_file_contents (src, dst, buffer_size=16*1024):
             except os.error, (errno, errstr):
                 raise DistutilsFileError, \
                       "could not delete '%s': %s" % (dst, errstr)
-        
+
         try:
             fdst = open(dst, 'wb')
         except os.error, (errno, errstr):

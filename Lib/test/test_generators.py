@@ -236,7 +236,7 @@ Guido's binary tree example.
     ...         self.right = right
     ...
     ...     def __repr__(self, level=0, indent="    "):
-    ...         s = level*indent + `self.label`
+    ...         s = level*indent + repr(self.label)
     ...         if self.left:
     ...             s = s + "\\n" + self.left.__repr__(level+1, indent)
     ...         if self.right:
@@ -267,9 +267,9 @@ Guido's binary tree example.
     ...             yield x
 
     >>> # Show it off: create a tree.
-    ... t = tree("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
-    ... # Print the nodes of the tree in in-order.
-    ... for x in t:
+    >>> t = tree("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+    >>> # Print the nodes of the tree in in-order.
+    >>> for x in t:
     ...     print x,
     A B C D E F G H I J K L M N O P Q R S T U V W X Y Z
 
@@ -653,15 +653,15 @@ syntax_tests = """
 ...     return 22
 ...     yield 1
 Traceback (most recent call last):
-  ...
-SyntaxError: 'return' with argument inside generator (<string>, line 2)
+  ..
+SyntaxError: 'return' with argument inside generator (<doctest test.test_generators.__test__.syntax[0]>, line 2)
 
 >>> def f():
 ...     yield 1
 ...     return 22
 Traceback (most recent call last):
-  ...
-SyntaxError: 'return' with argument inside generator (<string>, line 3)
+  ..
+SyntaxError: 'return' with argument inside generator (<doctest test.test_generators.__test__.syntax[1]>, line 3)
 
 "return None" is not the same as "return" in a generator:
 
@@ -669,8 +669,8 @@ SyntaxError: 'return' with argument inside generator (<string>, line 3)
 ...     yield 1
 ...     return None
 Traceback (most recent call last):
-  ...
-SyntaxError: 'return' with argument inside generator (<string>, line 3)
+  ..
+SyntaxError: 'return' with argument inside generator (<doctest test.test_generators.__test__.syntax[2]>, line 3)
 
 This one is fine:
 
@@ -684,8 +684,8 @@ This one is fine:
 ...     finally:
 ...         pass
 Traceback (most recent call last):
-  ...
-SyntaxError: 'yield' not allowed in a 'try' block with a 'finally' clause (<string>, line 3)
+  ..
+SyntaxError: 'yield' not allowed in a 'try' block with a 'finally' clause (<doctest test.test_generators.__test__.syntax[4]>, line 3)
 
 >>> def f():
 ...     try:
@@ -699,7 +699,7 @@ SyntaxError: 'yield' not allowed in a 'try' block with a 'finally' clause (<stri
 ...         pass
 Traceback (most recent call last):
   ...
-SyntaxError: 'yield' not allowed in a 'try' block with a 'finally' clause (<string>, line 6)
+SyntaxError: 'yield' not allowed in a 'try' block with a 'finally' clause (<doctest test.test_generators.__test__.syntax[5]>, line 6)
 
 But this is fine:
 
@@ -805,7 +805,7 @@ SyntaxError: invalid syntax
 ...     if 0:
 ...         yield 2             # because it's a generator
 Traceback (most recent call last):
-SyntaxError: 'return' with argument inside generator (<string>, line 8)
+SyntaxError: 'return' with argument inside generator (<doctest test.test_generators.__test__.syntax[22]>, line 8)
 
 This one caused a crash (see SF bug 567538):
 
@@ -1397,15 +1397,8 @@ __test__ = {"tut":      tutorial_tests,
 # Note that doctest and regrtest both look in sys.argv for a "-v" argument,
 # so this works as expected in both ways of running regrtest.
 def test_main(verbose=None):
-    import doctest
     from test import test_support, test_generators
-    if 0:   # change to 1 to run forever (to check for leaks)
-        while 1:
-            doctest.master = None
-            test_support.run_doctest(test_generators, verbose)
-            print ".",
-    else:
-        test_support.run_doctest(test_generators, verbose)
+    test_support.run_doctest(test_generators, verbose)
 
 # This part isn't needed for regrtest, but for running the test directly.
 if __name__ == "__main__":

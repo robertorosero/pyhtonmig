@@ -70,9 +70,9 @@ def get_python_inc(plat_specific=0, prefix=None):
         return os.path.join(prefix, "include")
     elif os.name == "mac":
         if plat_specific:
-                return os.path.join(prefix, "Mac", "Include")
+            return os.path.join(prefix, "Mac", "Include")
         else:
-                return os.path.join(prefix, "Include")
+            return os.path.join(prefix, "Include")
     elif os.name == "os2":
         return os.path.join(prefix, "Include")
     else:
@@ -153,6 +153,8 @@ def customize_compiler(compiler):
             cc = os.environ['CC']
         if os.environ.has_key('CXX'):
             cxx = os.environ['CXX']
+        if os.environ.has_key('LDSHARED'):
+            ldshared = os.environ['LDSHARED']
         if os.environ.has_key('CPP'):
             cpp = os.environ['CPP']
         else:
@@ -160,7 +162,7 @@ def customize_compiler(compiler):
         if os.environ.has_key('LDFLAGS'):
             ldshared = ldshared + ' ' + os.environ['LDFLAGS']
         if basecflags:
-        	opt = basecflags + ' ' + opt
+            opt = basecflags + ' ' + opt
         if os.environ.has_key('CFLAGS'):
             opt = opt + ' ' + os.environ['CFLAGS']
             ldshared = ldshared + ' ' + os.environ['CFLAGS']
@@ -354,6 +356,21 @@ def _init_posix():
             my_msg = my_msg + " (%s)" % msg.strerror
 
         raise DistutilsPlatformError(my_msg)
+
+    # On MacOSX we need to check the setting of the environment variable
+    # MACOSX_DEPLOYMENT_TARGET: configure bases some choices on it so
+    # it needs to be compatible.
+    # If it isn't set we set it to the configure-time value
+    if sys.platform == 'darwin' and g.has_key('CONFIGURE_MACOSX_DEPLOYMENT_TARGET'):
+        cfg_target = g['CONFIGURE_MACOSX_DEPLOYMENT_TARGET']
+        cur_target = os.getenv('MACOSX_DEPLOYMENT_TARGET', '')
+        if cur_target == '':
+            cur_target = cfg_target
+            os.putenv('MACOSX_DEPLOYMENT_TARGET', cfg_target)
+        if cfg_target != cur_target:
+            my_msg = ('$MACOSX_DEPLOYMENT_TARGET mismatch: now "%s" but "%s" during configure'
+                % (cur_target, cfg_target))
+            raise DistutilsPlatformError(my_msg)
 
     # On AIX, there are wrong paths to the linker scripts in the Makefile
     # -- these paths are relative to the Python source, but when installed

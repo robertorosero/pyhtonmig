@@ -300,7 +300,7 @@ dialect_init(DialectObj * self, PyObject * args, PyObject * kwargs)
 	self->doublequote = 1;
 	self->strict = 0;
 
-        if (!PyArg_ParseTuple(args, "|O", &dialect))
+	if (!PyArg_UnpackTuple(args, "", 0, 1, &dialect))
                 return -1;
         Py_XINCREF(dialect);
         if (kwargs != NULL) {
@@ -465,6 +465,8 @@ parse_grow_buff(ReaderObj *self)
 {
 	if (self->field_size == 0) {
 		self->field_size = 4096;
+		if (self->field != NULL)
+			PyMem_Free(self->field);
 		self->field = PyMem_Malloc(self->field_size);
 	}
 	else {
@@ -739,6 +741,8 @@ Reader_dealloc(ReaderObj *self)
         Py_XDECREF(self->dialect);
         Py_XDECREF(self->input_iter);
         Py_XDECREF(self->fields);
+        if (self->field != NULL)
+        	PyMem_Free(self->field);
 	PyObject_GC_Del(self);
 }
 
@@ -838,7 +842,7 @@ csv_reader(PyObject *module, PyObject *args, PyObject *keyword_args)
 	self->field_len = 0;
 	self->state = START_RECORD;
 
-        if (!PyArg_ParseTuple(args, "O|O", &iterator, &dialect)) {
+	if (!PyArg_UnpackTuple(args, "", 1, 2, &iterator, &dialect)) {
                 Py_DECREF(self);
                 return NULL;
         }
@@ -1002,6 +1006,8 @@ join_check_rec_size(WriterObj *self, int rec_len)
 	if (rec_len > self->rec_size) {
 		if (self->rec_size == 0) {
 			self->rec_size = (rec_len / MEM_INCR + 1) * MEM_INCR;
+			if (self->rec != NULL)
+				PyMem_Free(self->rec);
 			self->rec = PyMem_Malloc(self->rec_size);
 		}
 		else {
@@ -1191,6 +1197,8 @@ Writer_dealloc(WriterObj *self)
 {
         Py_XDECREF(self->dialect);
         Py_XDECREF(self->writeline);
+	if (self->rec != NULL)
+		PyMem_Free(self->rec);
 	PyObject_GC_Del(self);
 }
 
@@ -1279,7 +1287,7 @@ csv_writer(PyObject *module, PyObject *args, PyObject *keyword_args)
 	self->rec_len = 0;
 	self->num_fields = 0;
 
-        if (!PyArg_ParseTuple(args, "O|O", &output_file, &dialect)) {
+	if (!PyArg_UnpackTuple(args, "", 1, 2, &output_file, &dialect)) {
                 Py_DECREF(self);
                 return NULL;
         }
@@ -1319,7 +1327,7 @@ csv_register_dialect(PyObject *module, PyObject *args)
 {
         PyObject *name_obj, *dialect_obj;
 
-        if (!PyArg_ParseTuple(args, "OO", &name_obj, &dialect_obj))
+	if (!PyArg_UnpackTuple(args, "", 2, 2, &name_obj, &dialect_obj))
                 return NULL;
         if (!PyString_Check(name_obj)
 #ifdef Py_USING_UNICODE
@@ -1404,7 +1412,7 @@ PyDoc_STRVAR(csv_module_doc,
 "        escapechar = None\n"
 "        doublequote = True\n"
 "        skipinitialspace = False\n"
-"        lineterminator = '\r\n'\n"
+"        lineterminator = '\\r\\n'\n"
 "        quoting = QUOTE_MINIMAL\n"
 "\n"
 "SETTINGS:\n"
@@ -1426,7 +1434,8 @@ PyDoc_STRVAR(csv_module_doc,
 "            field contains either the quotechar or the delimiter\n"
 "        csv.QUOTE_ALL means that quotes are always placed around fields.\n"
 "        csv.QUOTE_NONNUMERIC means that quotes are always placed around\n"
-"            fields which contain characters other than [+-0-9.].\n"
+"            fields which do not parse as integers or floating point\n"
+"            numbers.\n"
 "        csv.QUOTE_NONE means that quotes are never placed around fields.\n"
 "    * escapechar - specifies a one-character string used to escape \n"
 "        the delimiter when quoting is set to QUOTE_NONE.\n"
@@ -1448,7 +1457,7 @@ PyDoc_STRVAR(csv_reader_doc,
 "provided by the dialect.\n"
 "\n"
 "The returned object is an iterator.  Each iteration returns a row\n"
-	     "of the CSV file (which can span multiple input lines):\n");
+"of the CSV file (which can span multiple input lines):\n");
 
 PyDoc_STRVAR(csv_writer_doc,
 "    csv_writer = csv.writer(fileobj [, dialect='excel']\n"

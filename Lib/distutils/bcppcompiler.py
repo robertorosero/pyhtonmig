@@ -11,7 +11,7 @@ for the Borland C++ compiler.
 # someone should sit down and factor out the common code as
 # WindowsCCompiler!  --GPW
 
-# This module should be kept compatible with Python 1.5.2.
+# This module should be kept compatible with Python 2.1.
 
 __revision__ = "$Id$"
 
@@ -85,7 +85,7 @@ class BCPPCompiler(CCompiler) :
     def compile(self, sources,
                 output_dir=None, macros=None, include_dirs=None, debug=0,
                 extra_preargs=None, extra_postargs=None, depends=None):
-        
+
         macros, objects, extra_postargs, pp_opts, build = \
                 self._setup_compile(output_dir, macros, include_dirs, sources,
                                     depends, extra_postargs)
@@ -96,7 +96,11 @@ class BCPPCompiler(CCompiler) :
         else:
             compile_opts.extend (self.compile_options)
 
-        for obj, (src, ext) in build.items():
+        for obj in objects:
+            try:
+                src, ext = build[obj]
+            except KeyError:
+                continue
             # XXX why do the normpath here?
             src = os.path.normpath(src)
             obj = os.path.normpath(obj)

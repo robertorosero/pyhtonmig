@@ -3,7 +3,9 @@
 import curses, ascii
 
 def rectangle(win, uly, ulx, lry, lrx):
-    "Draw a rectangle."
+    """Draw a rectangle with corners at the provided upper-left
+    and lower-right coordinates.
+    """
     win.vline(uly+1, ulx, curses.ACS_VLINE, lry - uly - 1)
     win.hline(uly, ulx+1, curses.ACS_HLINE, lrx - ulx - 1)
     win.hline(lry, ulx+1, curses.ACS_HLINE, lrx - ulx - 1)
@@ -109,6 +111,8 @@ class Textbox:
             if x == 0 and self._end_of_line(y) == 0:
                 self.win.deleteln()
             else:
+                # first undo the effect of self._end_of_line
+                self.win.move(y, x)
                 self.win.clrtoeol()
         elif ch == ascii.FF:                            # ^l
             self.win.refresh()
@@ -157,10 +161,13 @@ class Textbox:
 
 if __name__ == '__main__':
     def test_editbox(stdscr):
-        win = curses.newwin(4, 9, 15, 20)
-        rectangle(stdscr, 14, 19, 19, 29)
+        ncols, nlines = 9, 4
+        uly, ulx = 15, 20
+        stdscr.addstr(uly-2, ulx, "Use Ctrl-G to end editing.")
+        win = curses.newwin(nlines, ncols, uly, ulx)
+        rectangle(stdscr, uly-1, ulx-1, uly + nlines, ulx + ncols)
         stdscr.refresh()
         return Textbox(win).edit()
 
     str = curses.wrapper(test_editbox)
-    print str
+    print 'Contents of text box:', repr(str)

@@ -21,9 +21,8 @@ PERFORMANCE OF THIS SOFTWARE.
 
 ******************************************************************/
 
-#include <ColorPicker.h>
+#include <Carbon/Carbon.h>
 #include "Python.h"
-#include "macglue.h"
 #include "pymactoolbox.h"
 
 /* ----------------------------------------------------- */
@@ -33,9 +32,7 @@ static char cp_GetColor__doc__[] =
 ;
 
 static PyObject *
-cp_GetColor(self, args)
-	PyObject *self;	/* Not used */
-	PyObject *args;
+cp_GetColor(PyObject *self, PyObject *args)
 {
 	RGBColor inColor, outColor;
 	Boolean ok;
@@ -64,9 +61,7 @@ static char cp_module_documentation[] =
 ""
 ;
 
-void initColorPicker();
-
-void initColorPicker()
+void initColorPicker(void)
 {
 	PyObject *m;
 

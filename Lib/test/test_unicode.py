@@ -11,7 +11,8 @@ from test import test_support, string_tests
 
 class UnicodeTest(
     string_tests.CommonTest,
-    string_tests.MixinStrUnicodeUserStringTest
+    string_tests.MixinStrUnicodeUserStringTest,
+    string_tests.MixinStrUnicodeTest,
     ):
     type2test = unicode
 
@@ -32,6 +33,13 @@ class UnicodeTest(
             realresult = method(*args)
             self.assertEqual(realresult, result)
             self.assert_(object is not realresult)
+
+    def test_literals(self):
+        self.assertEqual(u'\xff', u'\u00ff')
+        self.assertEqual(u'\uffff', u'\U0000ffff')
+        self.assertRaises(UnicodeError, eval, 'u\'\\Ufffffffe\'')
+        self.assertRaises(UnicodeError, eval, 'u\'\\Uffffffff\'')
+        self.assertRaises(UnicodeError, eval, 'u\'\\U%08x\'' % 0x110000)
 
     def test_repr(self):
         if not sys.platform.startswith('java'):
@@ -129,6 +137,7 @@ class UnicodeTest(
         self.checkequalnofix(u'iiix', u'abababc', 'translate', {ord('a'):None, ord('b'):ord('i'), ord('c'):u'x'})
         self.checkequalnofix(u'<i><i><i>c', u'abababc', 'translate', {ord('a'):None, ord('b'):u'<i>'})
         self.checkequalnofix(u'c', u'abababc', 'translate', {ord('a'):None, ord('b'):u''})
+        self.checkequalnofix(u'xyyx', u'xzx', 'translate', {ord('z'):u'yy'})
 
         self.assertRaises(TypeError, u'hello'.translate)
         self.assertRaises(TypeError, u'abababc'.translate, {ord('a'):''})
@@ -429,6 +438,14 @@ class UnicodeTest(
         self.assertEqual(unicode(o), u'unicode(obj) is compatible to str()')
         self.assertEqual(str(o), 'unicode(obj) is compatible to str()')
 
+        # %-formatting and .__unicode__()
+        self.assertEqual(u'%s' %
+                         UnicodeCompat(u"u'%s' % obj uses obj.__unicode__()"),
+                         u"u'%s' % obj uses obj.__unicode__()")
+        self.assertEqual(u'%s' %
+                         UnicodeCompat(u"u'%s' % obj falls back to obj.__str__()"),
+                         u"u'%s' % obj falls back to obj.__str__()")
+
         for obj in (123, 123.45, 123L):
             self.assertEqual(unicode(obj), unicode(str(obj)))
 
@@ -523,6 +540,10 @@ class UnicodeTest(
         # Other possible utf-8 test cases:
         # * strict decoding testing for all of the
         #   UTF8_ERROR cases in PyUnicode_DecodeUTF8
+
+    def test_codecs_idna(self):
+        # Test whether trailing dot is preserved
+        self.assertEqual(u"www.python.org.".encode("idna"), "www.python.org.")
 
     def test_codecs_errors(self):
         # Error handling (encoding)
@@ -697,10 +718,15 @@ class UnicodeTest(
         print >>out, u'def\n'
         print >>out, u'def\n'
 
+    def test_ucs4(self):
+        if sys.maxunicode == 0xFFFF:
+            return
+        x = u'\U00100000'
+        y = x.encode("raw-unicode-escape").decode("raw-unicode-escape")
+        self.assertEqual(x, y)
+
 def test_main():
-    suite = unittest.TestSuite()
-    suite.addTest(unittest.makeSuite(UnicodeTest))
-    test_support.run_suite(suite)
+    test_support.run_unittest(UnicodeTest)
 
 if __name__ == "__main__":
     test_main()

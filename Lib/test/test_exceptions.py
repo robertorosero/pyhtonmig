@@ -3,7 +3,7 @@
 from test.test_support import TestFailed, TESTFN, unlink
 from types import ClassType
 import warnings
-import sys, traceback
+import sys, traceback, os
 
 print '5. Built-in exceptions'
 # XXX This is not really enough, each *operation* should be tested!
@@ -85,15 +85,16 @@ except NameError: pass
 
 r(OverflowError)
 # XXX
-# Obscure:  this test relies on int+int raising OverflowError if the
-# ints are big enough.  But ints no longer do that by default.  This
-# test will have to go away someday.  For now, we can convert the
-# transitional OverflowWarning into an error.
+# Obscure:  in 2.2 and 2.3, this test relied on changing OverflowWarning
+# into an error, in order to trigger OverflowError.  In 2.4, OverflowWarning
+# should no longer be generated, so the focus of the test shifts to showing
+# that OverflowError *isn't* generated.  OverflowWarning should be gone
+# in Python 2.5, and then the filterwarnings() call, and this comment,
+# should go away.
 warnings.filterwarnings("error", "", OverflowWarning, __name__)
 x = 1
-try:
-    while 1: x = x+x
-except OverflowError: pass
+for dummy in range(128):
+    x += x  # this simply shouldn't blow up
 
 r(RuntimeError)
 print '(not used any more?)'
@@ -185,7 +186,7 @@ def test_capi1():
         exc, err, tb = sys.exc_info()
         co = tb.tb_frame.f_code
         assert co.co_name == "test_capi1"
-        assert co.co_filename.endswith('test_exceptions.py')
+        assert co.co_filename.endswith('test_exceptions'+os.extsep+'py')
     else:
         print "Expected exception"
 
@@ -197,7 +198,7 @@ def test_capi2():
         exc, err, tb = sys.exc_info()
         co = tb.tb_frame.f_code
         assert co.co_name == "__init__"
-        assert co.co_filename.endswith('test_exceptions.py')
+        assert co.co_filename.endswith('test_exceptions'+os.extsep+'py')
         co2 = tb.tb_frame.f_back.f_code
         assert co2.co_name == "test_capi2"
     else:

@@ -107,6 +107,16 @@ The accompanying value is a pair \code{(\var{error}, \var{string})}
 representing an error returned by a library call.
 \var{string} represents the description of \var{error}, as returned
 by the \cfunction{gai_strerror()} C function.
+The \var{error} value will match one of the \constant{EAI_*} constants
+defined in this module.
+\end{excdesc}
+
+\begin{excdesc}{timeout}
+This exception is raised when a timeout occurs on a socket which has
+had timeouts enabled via a prior call to \method{settimeout()}.  The
+accompanying value is a string whose value is currently always ``timed
+out''.
+\versionadded{2.3}
 \end{excdesc}
 
 \begin{datadesc}{AF_UNIX}
@@ -150,13 +160,20 @@ those symbols that are defined in the \UNIX{} header files are defined;
 for a few symbols, default values are provided.
 \end{datadesc}
 
-\begin{funcdesc}{getaddrinfo}{host, port\optional{, family, socktype, proto, flags}}
+\begin{datadesc}{has_ipv6}
+This constant contains a boolean value which indicates if IPv6 is
+supported on this platform.
+\versionadded{2.3}
+\end{datadesc}
 
+\begin{funcdesc}{getaddrinfo}{host, port\optional{, family\optional{,
+                              socktype\optional{, proto\optional{,
+                              flags}}}}}
 Resolves the \var{host}/\var{port} argument, into a sequence of
 5-tuples that contain all the necessary argument for the sockets
 manipulation. \var{host} is a domain name, a string representation of
 IPv4/v6 address or \code{None}.
-\var{port} is a string service name (like \code{``http''}), a numeric
+\var{port} is a string service name (like \code{'http'}), a numeric
 port number or \code{None}.
 
 The rest of the arguments are optional and must be numeric if
@@ -165,15 +182,16 @@ string or \code{None}, you can pass \code{NULL} to the C API.  The
 \function{getaddrinfo()} function returns a list of 5-tuples with
 the following structure:
 
-\code{(\var{family}, \var{socktype}, \var{proto}, \var{canonname}, \var{sockaddr})}.
+\code{(\var{family}, \var{socktype}, \var{proto}, \var{canonname},
+      \var{sockaddr})}
 
 \var{family}, \var{socktype}, \var{proto} are all integer and are meant to
 be passed to the \function{socket()} function.
 \var{canonname} is a string representing the canonical name of the \var{host}.
-It can be a numeric IPv4/v6 address when \code{AI_CANONNAME} is specified
+It can be a numeric IPv4/v6 address when \constant{AI_CANONNAME} is specified
 for a numeric \var{host}.
 \var{sockaddr} is a tuple describing a socket address, as described above.
-See \code{Lib/httplib.py} and other library files
+See the source for the \refmodule{httplib} and other library modules
 for a typical usage of the function.
 \versionadded{2.2}
 \end{funcdesc}
@@ -200,10 +218,11 @@ is an IPv4 address itself it is returned unchanged.  See
 
 \begin{funcdesc}{gethostbyname_ex}{hostname}
 Translate a host name to IPv4 address format, extended interface.
-Return a triple \code{(hostname, aliaslist, ipaddrlist)} where
-\code{hostname} is the primary host name responding to the given
-\var{ip_address}, \code{aliaslist} is a (possibly empty) list of
-alternative host names for the same address, and \code{ipaddrlist} is
+Return a triple \code{(\var{hostname}, \var{aliaslist},
+\var{ipaddrlist})} where
+\var{hostname} is the primary host name responding to the given
+\var{ip_address}, \var{aliaslist} is a (possibly empty) list of
+alternative host names for the same address, and \var{ipaddrlist} is
 a list of IPv4 addresses for the same interface on the same
 host (often but not always a single address).
 \function{gethostbyname_ex()} does not support IPv6 name resolution, and
@@ -253,18 +272,26 @@ modes, the correct protocol is chosen automatically if the protocol is
 omitted or zero.
 \end{funcdesc}
 
-\begin{funcdesc}{getservbyname}{servicename, protocolname}
+\begin{funcdesc}{getservbyname}{servicename\optional{, protocolname}}
 Translate an Internet service name and protocol name to a port number
-for that service.  The protocol name should be \code{'tcp'} or
-\code{'udp'}.
+for that service.  The optional protocol name, if given, should be
+\code{'tcp'} or \code{'udp'}, otherwise any protocol will match.
 \end{funcdesc}
 
-\begin{funcdesc}{socket}{family, type\optional{, proto}}
+\begin{funcdesc}{getservbyport}{port\optional{, protocolname}}
+Translate an Internet port number and protocol name to a service name
+for that service.  The optional protocol name, if given, should be
+\code{'tcp'} or \code{'udp'}, otherwise any protocol will match.
+\end{funcdesc}
+
+\begin{funcdesc}{socket}{\optional{family\optional{,
+                         type\optional{, proto}}}}
 Create a new socket using the given address family, socket type and
-protocol number.  The address family should be \constant{AF_INET}, \constant{AF_INET6} or
-\constant{AF_UNIX}.  The socket type should be \constant{SOCK_STREAM},
-\constant{SOCK_DGRAM} or perhaps one of the other \samp{SOCK_} constants.
-The protocol number is usually zero and may be omitted in that case.
+protocol number.  The address family should be \constant{AF_INET} (the
+default), \constant{AF_INET6} or \constant{AF_UNIX}.  The socket type
+should be \constant{SOCK_STREAM} (the default), \constant{SOCK_DGRAM}
+or perhaps one of the other \samp{SOCK_} constants.  The protocol
+number is usually zero and may be omitted in that case.
 \end{funcdesc}
 
 \begin{funcdesc}{ssl}{sock\optional{, keyfile, certfile}}
@@ -274,6 +301,15 @@ key. \var{certfile} is a PEM formatted certificate chain file. On
 success, a new \class{SSLObject} is returned.
 
 \warning{This does not do any certificate verification!}
+\end{funcdesc}
+
+\begin{funcdesc}{socketpair}{\optional{family\optional{, type\optional{, proto}}}}
+Build a pair of connected socket objects using the given address
+family, socket type, and protocol number.  Address family, socket type,
+and protocol number are as for the \function{socket()} function above.
+The default family is \constant{AF_UNIX} if defined on the platform;
+otherwise, the default is \constant{AF_INET}.
+Availability: \UNIX.  \versionadded{2.4}
 \end{funcdesc}
 
 \begin{funcdesc}{fromfd}{fd, family, type\optional{, proto}}
@@ -316,11 +352,10 @@ no-op; otherwise, it performs a 2-byte swap operation.
 \begin{funcdesc}{inet_aton}{ip_string}
 Convert an IPv4 address from dotted-quad string format (for example,
 '123.45.67.89') to 32-bit packed binary format, as a string four
-characters in length.
-
-Useful when conversing with a program that uses the standard C library
-and needs objects of type \ctype{struct in_addr}, which is the C type
-for the 32-bit packed binary this function returns.
+characters in length.  This is useful when conversing with a program
+that uses the standard C library and needs objects of type
+\ctype{struct in_addr}, which is the C type for the 32-bit packed
+binary this function returns.
 
 If the IPv4 address string passed to this function is invalid,
 \exception{socket.error} will be raised. Note that exactly what is
@@ -334,19 +369,54 @@ support.
 
 \begin{funcdesc}{inet_ntoa}{packed_ip}
 Convert a 32-bit packed IPv4 address (a string four characters in
-length) to its standard dotted-quad string representation
-(for example, '123.45.67.89').
-
-Useful when conversing with a program that uses the standard C library
-and needs objects of type \ctype{struct in_addr}, which is the C type
-for the 32-bit packed binary this function takes as an argument.
+length) to its standard dotted-quad string representation (for
+example, '123.45.67.89').  This is useful when conversing with a
+program that uses the standard C library and needs objects of type
+\ctype{struct in_addr}, which is the C type for the 32-bit packed
+binary data this function takes as an argument.
 
 If the string passed to this function is not exactly 4 bytes in
 length, \exception{socket.error} will be raised.
-
 \function{inet_ntoa()} does not support IPv6, and
 \function{getnameinfo()} should be used instead for IPv4/v6 dual stack
 support.
+\end{funcdesc}
+
+\begin{funcdesc}{inet_pton}{address_family, ip_string}
+Convert an IP address from its family-specific string format to a packed,
+binary format.
+\function{inet_pton()} is useful when a library or network protocol calls for
+an object of type \ctype{struct in_addr} (similar to \function{inet_aton()})
+or \ctype{struct in6_addr}.
+
+Supported values for \var{address_family} are currently
+\constant{AF_INET} and \constant{AF_INET6}.
+If the IP address string \var{ip_string} is invalid,
+\exception{socket.error} will be raised. Note that exactly what is valid
+depends on both the value of \var{address_family} and the underlying
+implementation of \cfunction{inet_pton()}.
+
+Availability: \UNIX{} (maybe not all platforms).
+\versionadded{2.3}
+\end{funcdesc}
+
+\begin{funcdesc}{inet_ntop}{address_family, packed_ip}
+Convert a packed IP address (a string of some number of characters) to
+its standard, family-specific string representation (for example,
+\code{'7.10.0.5'} or \code{'5aef:2b::8'})
+\function{inet_ntop()} is useful when a library or network protocol returns
+an object of type \ctype{struct in_addr} (similar to \function{inet_ntoa()})
+or \ctype{struct in6_addr}.
+
+Supported values for \var{address_family} are currently
+\constant{AF_INET} and \constant{AF_INET6}.
+If the string \var{packed_ip} is not the correct length for the
+specified address family, \exception{ValueError} will be raised.  A
+\exception{socket.error} is raised for errors from the call to
+\function{inet_ntop()}.
+
+Availability: \UNIX{} (maybe not all platforms).
+\versionadded{2.3}
 \end{funcdesc}
 
 \begin{funcdesc}{getdefaulttimeout}{}
@@ -394,8 +464,8 @@ Bind the socket to \var{address}.  The socket must not already be bound.
 (The format of \var{address} depends on the address family --- see
 above.)  \note{This method has historically accepted a pair
 of parameters for \constant{AF_INET} addresses instead of only a
-tuple.  This was never intentional and is no longer be available in
-Python 2.0.}
+tuple.  This was never intentional and is no longer available in
+Python 2.0 and later.}
 \end{methoddesc}
 
 \begin{methoddesc}[socket]{close}{}
@@ -422,13 +492,17 @@ operation succeeded, otherwise the value of the \cdata{errno}
 variable.  This is useful to support, for example, asynchronous connects.
 \note{This method has historically accepted a pair of
 parameters for \constant{AF_INET} addresses instead of only a tuple.
-This was never intentional and is no longer be available in Python
+This was never intentional and is no longer available in Python
 2.0 and later.}
 \end{methoddesc}
 
 \begin{methoddesc}[socket]{fileno}{}
 Return the socket's file descriptor (a small integer).  This is useful
 with \function{select.select()}.
+
+Under Windows the small integer returned by this method cannot be used where
+a file descriptor can be used (such as \function{os.fdopen()}).  \UNIX{} does
+not have this limitation.
 \end{methoddesc}
 
 \begin{methoddesc}[socket]{getpeername}{}
@@ -536,11 +610,11 @@ block until they can proceed.
 Set a timeout on blocking socket operations.  The \var{value} argument
 can be a nonnegative float expressing seconds, or \code{None}.
 If a float is
-given, subsequent socket operations will raise an \exception{error}
+given, subsequent socket operations will raise an \exception{timeout}
 exception if the timeout period \var{value} has elapsed before the
 operation has completed.  Setting a timeout of \code{None} disables
 timeouts on socket operations.
-\code{s.settimeout(0.0)} is equivalent to \code{s.blocking(0)};
+\code{s.settimeout(0.0)} is equivalent to \code{s.setblocking(0)};
 \code{s.settimeout(None)} is equivalent to \code{s.setblocking(1)}.
 \versionadded{2.3}
 \end{methoddesc}
@@ -553,7 +627,7 @@ the last call to \method{setblocking()} or \method{settimeout()}.
 \end{methoddesc}
 
 Some notes on socket blocking and timeouts: A socket object can be in
-one of three modes: blocking, non-blocking, or timout.  Sockets are
+one of three modes: blocking, non-blocking, or timeout.  Sockets are
 always created in blocking mode.  In blocking mode, operations block
 until complete.  In non-blocking mode, operations fail (with an error
 that is unfortunately system-dependent) if they cannot be completed
@@ -570,10 +644,14 @@ method should only be used when the socket is in blocking mode; in
 timeout or non-blocking mode file operations that cannot be completed
 immediately will fail.
 
+Note that the \method{connect()} operation is subject to the timeout
+setting, and in general it is recommended to call
+\method{settimeout()} before calling \method{connect()}.
+
 \begin{methoddesc}[socket]{setsockopt}{level, optname, value}
 Set the value of the given socket option (see the \UNIX{} manual page
 \manpage{setsockopt}{2}).  The needed symbolic constants are defined in
-the \module{socket} module (\code{SO_*} etc.).  The value can be an
+the \module{socket} module (\constant{SO_*} etc.).  The value can be an
 integer or a string representing a buffer.  In the latter case it is
 up to the caller to ensure that the string contains the proper bits
 (see the optional built-in module
@@ -583,8 +661,8 @@ structures as strings).
 
 \begin{methoddesc}[socket]{shutdown}{how}
 Shut down one or both halves of the connection.  If \var{how} is
-\code{0}, further receives are disallowed.  If \var{how} is \code{1},
-further sends are disallowed.  If \var{how} is \code{2}, further sends
+\constant{SHUT_RD}, further receives are disallowed.  If \var{how} is \constant{SHUT_WR},
+further sends are disallowed.  If \var{how} is \constant{SHUT_RDWR}, further sends
 and receives are disallowed.
 \end{methoddesc}
 
@@ -651,7 +729,7 @@ s.connect((HOST, PORT))
 s.send('Hello, world')
 data = s.recv(1024)
 s.close()
-print 'Received', `data`
+print 'Received', repr(data)
 \end{verbatim}
 
 The next two examples are identical to the above two, but support both
@@ -727,5 +805,5 @@ if s is None:
 s.send('Hello, world')
 data = s.recv(1024)
 s.close()
-print 'Received', `data`
+print 'Received', repr(data)
 \end{verbatim}

@@ -248,7 +248,7 @@ is not     negated object identity   (2)
 Notes :
     Comparison behavior can be overridden for a given class by defining special
 method __cmp__.
-    The above comparisions return True or False which are of type bool
+    The above comparisons return True or False which are of type bool
 (a subclass of int) and behave exactly as 1 or 0 except for their type and
 that they print as True or False instead of 1 or 0.
     (1) X < Y < Z < W has expected meaning, unlike C
@@ -1041,6 +1041,8 @@ str(object)         printablerepresentation of an object. Class overridable
                     (__str__).See also repr().
 super(type)         Create an unbound super object.  Used to call cooperative
                     superclass methods.
+sum(sequence,       Add the values in the sequence and return the sum.
+    [start]) 
 tuple(sequence)     Creates a tuple with same elements as sequence. If already
                     a tuple, return itself (not a copy).
                     Returns a type object [see module types] representing
@@ -1361,7 +1363,7 @@ getrefcount(object Returns the reference count of the object. Generally one
 )                  higher than you might expect, because of object arg temp
                    reference.
 setcheckinterval(  Sets the interpreter's thread switching interval (in number
-interval)          of virtual code instructions, default:10).
+interval)          of virtual code instructions, default:100).
 settrace(func)     Sets a trace function: called before each line ofcode is
                    exited.
 setprofile(func)   Sets a profile function for performance profiling.
@@ -1862,6 +1864,7 @@ compileall       Force "compilation" of all .py files in a directory.
 ConfigParser     Configuration file parser (much like windows .ini files)
 copy             Generic shallow and deep copying operations.
 copy_reg         Helper to provide extensibility for pickle/cPickle.
+csv              Read and write files with comma separated values.
 dbhash           (g)dbm-compatible interface to bsdhash.hashopen.
 dircache         Sorted list of files in a dir, using a cache.
 [DEL:dircmp:DEL] [DEL:Defines a class to build directory diff tools on.:DEL]
@@ -1959,7 +1962,7 @@ repr             Redo repr() but with limits on most sizes.
 rexec            Restricted execution facilities ("safe" exec, eval, etc).
 rfc822           RFC-822 message manipulation class.
 rlcompleter      Word completion for GNU readline 2.0.
-robotparser      Parse robot.txt files, useful for web spiders.
+robotparser      Parse robots.txt files, useful for web spiders.
 sched            A generally useful event scheduler class.
 sets             Module for a set datatype.
 sgmllib          A parser for SGML.
@@ -2070,8 +2073,7 @@ zipfile          Read & write PK zipped files.
 * Cryptographic Extensions *
 
             md5         Interface to RSA's MD5 message digest algorithm
-            mpz         Interface to int part of GNU multiple precision library
-            rotor       Implementation of a rotor-based encryption algorithm
+            sha         Interface to the SHA message digest algorithm
             HMAC        Keyed-Hashing for Message Authentication -- RFC 2104.
 
 * Stdwin * Standard Window System

@@ -1,5 +1,5 @@
 %
-% python.sty for the Python docummentation  [works only with with Latex2e]
+% python.sty for the Python docummentation  [works only with Latex2e]
 %
 
 \NeedsTeXFormat{LaTeX2e}[1995/12/01]
@@ -19,6 +19,11 @@
 %
 %\RequirePackage{showkeys}
 %\RequirePackage{showidx}
+
+% If we ever want to indent paragraphs, this needs to be changed.
+% This is used inside the macros defined here instead of coding
+% \noindent directly.
+\let\py@parindent=\noindent
 
 % for PDF output, use maximal compression & a lot of other stuff
 % (test for PDF recommended by Tanmoy Bhattacharya <tanmoy@qcd.lanl.gov>)
@@ -56,12 +61,19 @@
     \let\pdfstartlink=\pdfannotlink
   }{}
   %
+  % The \py@parindent here is a hack -- we're forcing pdfTeX into
+  % horizontal mode since \pdfstartlink requires that.
+  \def\py@pdfstartlink{%
+    \ifvmode\py@parindent\fi%
+    \pdfstartlink%
+  }
+  %
   % Macro that takes two args: the name to link to and the content of
   % the link.  This takes care of the PDF magic, getting the colors
   % the same for each link, and avoids having lots of garbage all over 
   % this style file.
   \newcommand{\py@linkToName}[2]{%
-    \pdfstartlink attr{/Border [0 0 0]} goto name{#1}%
+    \py@pdfstartlink attr{/Border [0 0 0]} goto name{#1}%
       \py@LinkColor#2\py@NormalColor%
     \pdfendlink%
   }
@@ -72,6 +84,7 @@
     \py@OldContentsline{#1}{\py@linkToName{page\my@pageno}{#2}}{#3}%
   }
   \AtEndDocument{
+    \def\_{\string_}
     \InputIfFileExists{\jobname.bkm}{\pdfcatalog{/PageMode /UseOutlines}}{}
   }
   \newcommand{\py@target}[1]{%
@@ -236,6 +249,7 @@
   % Calculate the text width for the minipage:
   \setlength{\py@codewidth}{\linewidth}%
   \addtolength{\py@codewidth}{-\parindent}%
+  \let\e=\textbackslash%
   %
   \par\indent%
   \begin{minipage}[t]{\py@codewidth}%
@@ -821,8 +835,11 @@
 \newcommand{\NULL}{\constant{NULL}}
 \newcommand{\infinity}{\ensuremath{\infty}}
 \newcommand{\plusminus}{\ensuremath{\pm}}
+
+% \guilabel{Start}
+\newcommand{\guilabel}[1]{\textsf{#1}}
 % \menuselection{Start \sub Programs \sub Python}
-\newcommand{\menuselection}[1]{{\def\sub{ \ensuremath{>} }#1}}
+\newcommand{\menuselection}[1]{\guilabel{{\def\sub{ \ensuremath{>} }#1}}}
 
 % Also for consistency: spell Python "Python", not "python"!
 
@@ -846,14 +863,13 @@
 \newcommand{\strong}[1]{{\bf #1}}
 % let's experiment with a new font:
 \newcommand{\file}[1]{`\filenq{#1}'}
-\newcommand{\filenq}[1]{{\py@smallsize\textsf{#1}}}
+\newcommand{\filenq}[1]{{\py@smallsize\textsf{\let\e=\textbackslash#1}}}
 
 % Use this def/redef approach for \url{} since hyperref defined this already,
 % but only if we actually used hyperref:
 \ifpdf
   \newcommand{\url}[1]{{%
-    \noindent%
-    \pdfstartlink attr{/Border [0 0 0]} user{/S /URI /URI (#1)}%
+    \py@pdfstartlink attr{/Border [0 0 0]} user{/S /URI /URI (#1)}%
     \py@LinkColor%                              color of the link text
     \py@smallsize\sf #1%
     \py@NormalColor%                    Turn it back off; these are declarative
@@ -928,10 +944,9 @@
 
 % \ulink{link text}{URL}
 \ifpdf
-  % The \noindent here is a hack -- we're forcing pdfTeX into
-  % horizontal mode since \pdfstartlink requires that.
-  \newcommand{\ulink}[2]{\noindent{%
-    \pdfstartlink attr{/Border [0 0 0]} user{/S /URI /URI (#2)}%
+  \newcommand{\ulink}[2]{{%
+    % For PDF, we *should* only generate a link when the URL is absolute.
+    \py@pdfstartlink attr{/Border [0 0 0]} user{/S /URI /URI (#2)}%
     \py@LinkColor%                              color of the link text
     #1%
     \py@NormalColor%                    Turn it back off; these are declarative
@@ -974,11 +989,39 @@
   \end{tabular}
 }
 
+\newlength{\py@noticelength}
+
+\newcommand{\py@heavybox}{
+  \setlength{\fboxrule}{2pt}
+  \setlength{\fboxsep}{7pt}
+  \setlength{\py@noticelength}{\linewidth}
+  \addtolength{\py@noticelength}{-2\fboxsep}
+  \addtolength{\py@noticelength}{-2\fboxrule}
+  \setlength{\shadowsize}{3pt}
+  \Sbox
+  \minipage{\py@noticelength}
+}
+\newcommand{\py@endheavybox}{
+  \endminipage
+  \endSbox
+  \fbox{\TheSbox}
+}
+
+% a 'note' is as plain as it gets:
 \newcommand{\py@noticelabel@note}{Note:}
+\newcommand{\py@noticestart@note}{}
+\newcommand{\py@noticeend@note}{}
+
+% a 'warning' gets more visible distinction:
 \newcommand{\py@noticelabel@warning}{Warning:}
+\newcommand{\py@noticestart@warning}{\py@heavybox}
+\newcommand{\py@noticeend@warning}{\py@endheavybox}
+
 \newenvironment{notice}[1][note]{
+  \def\py@noticetype{#1}
+  \csname py@noticestart@#1\endcsname
   \par\strong{\csname py@noticelabel@#1\endcsname}
-}{}
+}{\csname py@noticeend@\py@noticetype\endcsname}
 \newcommand{\note}[1]{\strong{\py@noticelabel@note} #1}
 \newcommand{\warning}[1]{\strong{\py@noticelabel@warning} #1}
 
@@ -1159,6 +1202,14 @@
   }
 \fi
 
+% \seelink{url}{link text}
+\newcommand{\py@seelink}[3]{%
+  \par
+  \begin{fulllineitems}
+    \item[\ulink{#2}{#1}]
+    #3
+  \end{fulllineitems}
+}
 % \seetitle[url]{title}{why it's interesting}
 \newcommand{\py@seetitle}[3][\py@modulebadkey]{%
   \par
@@ -1203,6 +1254,7 @@
   \let\seerfc=\py@seerfc
   \let\seetitle=\py@seetitle
   \let\seeurl=\py@seeurl
+  \let\seelink=\py@seelink
 }{\par}
 \newenvironment{seealso}{
   \par
@@ -1214,6 +1266,7 @@
   \let\seerfc=\py@seerfc
   \let\seetitle=\py@seetitle
   \let\seeurl=\py@seeurl
+  \let\seelink=\py@seelink
 }{\par}
 
 % Allow the Python release number to be specified independently of the

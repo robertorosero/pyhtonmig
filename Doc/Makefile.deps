@@ -5,9 +5,10 @@ COMMONSTYLES= texinputs/python.sty \
 
 INDEXSTYLES=texinputs/python.ist
 
-COMMONTEX= texinputs/copyright.tex \
-	texinputs/license.tex \
-	texinputs/boilerplate.tex
+COMMONTEX=commontex/copyright.tex \
+	commontex/license.tex \
+	commontex/patchlevel.tex \
+	commontex/boilerplate.tex
 
 MANSTYLES= texinputs/fncychap.sty \
 	texinputs/manual.cls \
@@ -29,8 +30,8 @@ APIFILES= $(MANSTYLES) $(INDEXSTYLES) $(COMMONTEX) \
 	api/refcounting.tex \
 	api/utilities.tex \
 	api/veryhigh.tex \
-	texinputs/typestruct.h \
-	texinputs/reportingbugs.tex
+	commontex/typestruct.h \
+	commontex/reportingbugs.tex
 
 # These files are generated from those listed above, and are used to
 # generate the typeset versions of the manuals.  The list is defined
@@ -47,10 +48,10 @@ ANNOAPIFILES= $(MANSTYLES) $(INDEXSTYLES) $(COMMONTEX) api/refcounts.dat \
 	paper-$(PAPER)/refcounting.tex \
 	paper-$(PAPER)/utilities.tex \
 	paper-$(PAPER)/veryhigh.tex \
-	texinputs/reportingbugs.tex
+	commontex/reportingbugs.tex
 
 DOCFILES= $(HOWTOSTYLES) \
-	texinputs/boilerplate.tex \
+	commontex/boilerplate.tex \
 	texinputs/ltxmarkup.sty \
 	doc/doc.tex
 
@@ -60,13 +61,15 @@ EXTFILES= ext/ext.tex $(MANSTYLES) $(INDEXSTYLES) $(COMMONTEX) \
 	ext/building.tex \
 	ext/windows.tex \
 	ext/embedding.tex \
-	ext/cycle-gc.c \
 	ext/noddy.c \
+	ext/noddy2.c \
+	ext/noddy3.c \
+	ext/noddy4.c \
 	ext/run-func.c \
-	texinputs/typestruct.h \
-	texinputs/reportingbugs.tex
+	commontex/typestruct.h \
+	commontex/reportingbugs.tex
 
-TUTFILES= tut/tut.tex $(MANSTYLES) $(COMMONTEX)
+TUTFILES= tut/tut.tex tut/glossary.tex $(MANSTYLES) $(COMMONTEX)
 
 # LaTeX source files for the Python Reference Manual
 REFFILES= $(MANSTYLES) $(INDEXSTYLES) $(COMMONTEX) \
@@ -78,12 +81,11 @@ REFFILES= $(MANSTYLES) $(INDEXSTYLES) $(COMMONTEX) \
 	ref/ref5.tex \
 	ref/ref6.tex \
 	ref/ref7.tex \
-	ref/ref8.tex \
-	ref/refa1.tex
+	ref/ref8.tex 
 
 # LaTeX source files for the Python Library Reference
 LIBFILES= $(MANSTYLES) $(INDEXSTYLES) $(COMMONTEX) \
-	texinputs/reportingbugs.tex \
+	commontex/reportingbugs.tex \
 	lib/lib.tex \
 	lib/asttable.tex \
 	lib/compiler.tex \
@@ -104,6 +106,7 @@ LIBFILES= $(MANSTYLES) $(INDEXSTYLES) $(COMMONTEX) \
 	lib/libfuncs.tex \
 	lib/libpython.tex \
 	lib/libsys.tex \
+	lib/libplatform.tex \
 	lib/libfpectl.tex \
 	lib/libgc.tex \
 	lib/libsets.tex \
@@ -113,6 +116,7 @@ LIBFILES= $(MANSTYLES) $(INDEXSTYLES) $(COMMONTEX) \
 	lib/libdifflib.tex \
 	lib/libdoctest.tex \
 	lib/libunittest.tex \
+	lib/libtest.tex \
 	lib/libtypes.tex \
 	lib/libtraceback.tex \
 	lib/libpickle.tex \
@@ -125,6 +129,7 @@ LIBFILES= $(MANSTYLES) $(INDEXSTYLES) $(COMMONTEX) \
 	lib/libparser.tex \
 	lib/libbltin.tex \
 	lib/libmain.tex \
+	lib/libfuture.tex \
 	lib/libstrings.tex \
 	lib/libstring.tex \
 	lib/libtextwrap.tex \
@@ -134,8 +139,7 @@ LIBFILES= $(MANSTYLES) $(INDEXSTYLES) $(COMMONTEX) \
 	lib/libstruct.tex \
 	lib/libmisc.tex \
 	lib/libmath.tex \
-	lib/librand.tex \
-	lib/libwhrandom.tex \
+	lib/libdecimal.tex \
 	lib/libarray.tex \
 	lib/liballos.tex \
 	lib/libos.tex \
@@ -198,9 +202,7 @@ LIBFILES= $(MANSTYLES) $(INDEXSTYLES) $(COMMONTEX) \
 	lib/libcrypto.tex \
 	lib/libmd5.tex \
 	lib/libsha.tex \
-	lib/libmpz.tex \
 	lib/libhmac.tex \
-	lib/librotor.tex \
 	lib/libstdwin.tex \
 	lib/libsgi.tex \
 	lib/libal.tex \
@@ -228,6 +230,7 @@ LIBFILES= $(MANSTYLES) $(INDEXSTYLES) $(COMMONTEX) \
 	lib/libuser.tex \
 	lib/libanydbm.tex \
 	lib/libbsddb.tex \
+	lib/libdumbdbm.tex \
 	lib/libdbhash.tex \
 	lib/librandom.tex \
 	lib/libsite.tex \
@@ -249,7 +252,6 @@ LIBFILES= $(MANSTYLES) $(INDEXSTYLES) $(COMMONTEX) \
 	lib/libre.tex \
 	lib/libuserdict.tex \
 	lib/libdis.tex \
-	lib/libxmllib.tex \
 	lib/libxmlrpclib.tex \
 	lib/libsimplexmlrpc.tex \
 	lib/libdocxmlrpc.tex \
@@ -272,15 +274,16 @@ LIBFILES= $(MANSTYLES) $(INDEXSTYLES) $(COMMONTEX) \
 	lib/libuu.tex \
 	lib/libsunaudio.tex \
 	lib/libfileinput.tex \
-	lib/libxreadlines.tex \
 	lib/libimaplib.tex \
 	lib/libpoplib.tex \
 	lib/libcalendar.tex \
 	lib/libpopen2.tex \
 	lib/libbisect.tex \
+	lib/libcollections.tex \
 	lib/libheapq.tex \
 	lib/libmimetypes.tex \
 	lib/libsmtplib.tex \
+	lib/libsmtpd.tex \
 	lib/libcmd.tex \
 	lib/libmultifile.tex \
 	lib/libthreading.tex \
@@ -315,7 +318,6 @@ LIBFILES= $(MANSTYLES) $(INDEXSTYLES) $(COMMONTEX) \
 	lib/libnew.tex \
 	lib/libdircache.tex \
 	lib/libfilecmp.tex \
-	lib/libstatcache.tex \
 	lib/libsunau.tex \
 	lib/libwave.tex \
 	lib/libchunk.tex \
@@ -362,6 +364,7 @@ MACFILES= $(HOWTOSTYLES) $(INDEXSTYLES) $(COMMONTEX) \
 	mac/libmacui.tex \
 	mac/libmacic.tex \
 	mac/libframework.tex \
+	mac/libautogil.tex \
 	mac/libminiae.tex \
 	mac/libscrap.tex
 

@@ -48,6 +48,9 @@ class GlobTests(unittest.TestCase):
         self.mktemp('ZZZ')
         self.mktemp('a', 'bcd', 'EF')
         self.mktemp('a', 'bcd', 'efg', 'ha')
+        if hasattr(os, 'symlink'):
+            os.symlink(self.norm('broken'), self.norm('sym1'))
+            os.symlink(self.norm('broken'), self.norm('sym2'))
 
     def tearDown(self):
         deltree(self.tempdir)
@@ -61,15 +64,10 @@ class GlobTests(unittest.TestCase):
         return glob.glob(p)
 
     def assertSequencesEqual_noorder(self, l1, l2):
-        l1 = list(l1)
-        l2 = list(l2)
-        l1.sort()
-        l2.sort()
-        self.assertEqual(l1, l2)
+        self.assertEqual(set(l1), set(l2))
 
     def test_glob_literal(self):
         eq = self.assertSequencesEqual_noorder
-        np = lambda *f: norm(self.tempdir, *f)
         eq(self.glob('a'), [self.norm('a')])
         eq(self.glob('a', 'D'), [self.norm('a', 'D')])
         eq(self.glob('aab'), [self.norm('aab')])
@@ -77,7 +75,6 @@ class GlobTests(unittest.TestCase):
 
     def test_glob_one_directory(self):
         eq = self.assertSequencesEqual_noorder
-        np = lambda *f: norm(self.tempdir, *f)
         eq(self.glob('a*'), map(self.norm, ['a', 'aab', 'aaa']))
         eq(self.glob('*a'), map(self.norm, ['a', 'aaa']))
         eq(self.glob('aa?'), map(self.norm, ['aaa', 'aab']))
@@ -86,7 +83,6 @@ class GlobTests(unittest.TestCase):
 
     def test_glob_nested_directory(self):
         eq = self.assertSequencesEqual_noorder
-        np = lambda *f: norm(self.tempdir, *f)
         if os.path.normcase("abCD") == "abCD":
             # case-sensitive filesystem
             eq(self.glob('a', 'bcd', 'E*'), [self.norm('a', 'bcd', 'EF')])
@@ -98,13 +94,19 @@ class GlobTests(unittest.TestCase):
 
     def test_glob_directory_names(self):
         eq = self.assertSequencesEqual_noorder
-        np = lambda *f: norm(self.tempdir, *f)
         eq(self.glob('*', 'D'), [self.norm('a', 'D')])
         eq(self.glob('*', '*a'), [])
         eq(self.glob('a', '*', '*', '*a'),
            [self.norm('a', 'bcd', 'efg', 'ha')])
         eq(self.glob('?a?', '*F'), map(self.norm, [os.path.join('aaa', 'zzzF'),
                                                    os.path.join('aab', 'F')]))
+
+    def test_glob_broken_symlinks(self):
+        if hasattr(os, 'symlink'):
+            eq = self.assertSequencesEqual_noorder
+            eq(self.glob('sym*'), [self.norm('sym1'), self.norm('sym2')])
+            eq(self.glob('sym1'), [self.norm('sym1')])
+            eq(self.glob('sym2'), [self.norm('sym2')])
 
 
 def test_main():

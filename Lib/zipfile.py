@@ -1,6 +1,4 @@
 "Read and write ZIP files."
-# Written by James C. Ahlstrom jim@interet.com
-# All rights transferred to CNRI pursuant to the Python contribution agreement
 
 import struct, os, time
 import binascii
@@ -25,9 +23,9 @@ ZIP_DEFLATED = 8
 # Here are some struct module formats for reading headers
 structEndArchive = "<4s4H2lH"     # 9 items, end of archive, 22 bytes
 stringEndArchive = "PK\005\006"   # magic number for end of archive record
-structCentralDir = "<4s4B4H3l5HLl"# 19 items, central directory, 46 bytes
+structCentralDir = "<4s4B4HlLL5HLl"# 19 items, central directory, 46 bytes
 stringCentralDir = "PK\001\002"   # magic number for central directory
-structFileHeader = "<4s2B4H3l2H"  # 12 items, file header record, 30 bytes
+structFileHeader = "<4s2B4HlLL2H"  # 12 items, file header record, 30 bytes
 stringFileHeader = "PK\003\004"   # magic number for file header
 
 # indexes of entries in the central directory structure
@@ -116,7 +114,18 @@ class ZipInfo:
     """Class with attributes describing each file in the ZIP archive."""
 
     def __init__(self, filename="NoName", date_time=(1980,1,1,0,0,0)):
-        self.filename = _normpath(filename) # Name of the file in the archive
+        self.orig_filename = filename   # Original file name in archive
+# Terminate the file name at the first null byte.  Null bytes in file
+# names are used as tricks by viruses in archives.
+        null_byte = filename.find(chr(0))
+        if null_byte >= 0:
+            filename = filename[0:null_byte]
+# This is used to ensure paths in generated ZIP files always use
+# forward slashes as the directory separator, as required by the
+# ZIP format specification.
+        if os.sep != "/":
+            filename = filename.replace(os.sep, "/")
+        self.filename = filename        # Normalized file name
         self.date_time = date_time      # year, month, day, hour, min, sec
         # Standard values:
         self.compress_type = ZIP_STORED # Type of compression for the file
@@ -157,17 +166,6 @@ class ZipInfo:
         return header + self.filename + self.extra
 
 
-# This is used to ensure paths in generated ZIP files always use
-# forward slashes as the directory separator, as required by the
-# ZIP format specification.
-if os.sep != "/":
-    def _normpath(path):
-        return path.replace(os.sep, "/")
-else:
-    def _normpath(path):
-        return path
-
-
 class ZipFile:
     """ Class with methods to open, read, write, close, list zip files.
 
@@ -195,7 +193,7 @@ class ZipFile:
         self.NameToInfo = {}    # Find file info given name
         self.filelist = []      # List of ZipInfo instances for archive
         self.compression = compression  # Method of compression
-        self.mode = key = mode[0]
+        self.mode = key = mode[0].replace('b', '')
 
         # Check if we were passed a file-like object
         if isinstance(file, basestring):
@@ -300,10 +298,10 @@ class ZipFile:
                                 + fheader[_FH_FILENAME_LENGTH]
                                 + fheader[_FH_EXTRA_FIELD_LENGTH])
             fname = fp.read(fheader[_FH_FILENAME_LENGTH])
-            if fname != data.filename:
+            if fname != data.orig_filename:
                 raise RuntimeError, \
                       'File name in directory "%s" and header "%s" differ.' % (
-                          data.filename, fname)
+                          data.orig_filename, fname)
 
     def namelist(self):
         """Return a list of file names in the archive."""
@@ -329,7 +327,7 @@ class ZipFile:
         for zinfo in self.filelist:
             try:
                 self.read(zinfo.filename)       # Check CRC-32
-            except:
+            except BadZipfile:
                 return zinfo.filename
 
     def getinfo(self, name):
@@ -398,7 +396,7 @@ class ZipFile:
             zinfo = ZipInfo(filename, date_time)
         else:
             zinfo = ZipInfo(arcname, date_time)
-        zinfo.external_attr = st[0] << 16L      # Unix attributes
+        zinfo.external_attr = (st[0] & 0xFFFF) << 16L      # Unix attributes
         if compress_type is None:
             zinfo.compress_type = self.compression
         else:
@@ -441,7 +439,7 @@ class ZipFile:
         # Seek backwards and write CRC and file sizes
         position = self.fp.tell()       # Preserve current position in file
         self.fp.seek(zinfo.header_offset + 14, 0)
-        self.fp.write(struct.pack("<lll", zinfo.CRC, zinfo.compress_size,
+        self.fp.write(struct.pack("<lLL", zinfo.CRC, zinfo.compress_size,
               zinfo.file_size))
         self.fp.seek(position, 0)
         self.filelist.append(zinfo)
@@ -473,7 +471,7 @@ class ZipFile:
         self.fp.write(bytes)
         if zinfo.flag_bits & 0x08:
             # Write CRC and file sizes after the file data
-            self.fp.write(struct.pack("<lll", zinfo.CRC, zinfo.compress_size,
+            self.fp.write(struct.pack("<lLL", zinfo.CRC, zinfo.compress_size,
                   zinfo.file_size))
         self.filelist.append(zinfo)
         self.NameToInfo[zinfo.filename] = zinfo

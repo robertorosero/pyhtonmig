@@ -58,7 +58,7 @@ locale.setlocale(locale.LC_ALL, '')
 \end{funcdesc}
 
 \begin{funcdesc}{localeconv}{}
-  Returns the database of of the local conventions as a dictionary.
+  Returns the database of the local conventions as a dictionary.
   This dictionary has the following strings as keys:
 
   \begin{tableiii}{l|l|p{3in}}{constant}{Key}{Category}{Meaning}
@@ -86,7 +86,7 @@ locale.setlocale(locale.LC_ALL, '')
     \lineiii{}{\code{'positive_sign'}}
             {Symbol used to annotate a positive monetary value.}
     \lineiii{}{\code{'negative_sign'}}
-            {Symbol used to annotate a nnegative monetary value.}
+            {Symbol used to annotate a negative monetary value.}
     \lineiii{}{\code{'frac_digits'}}
             {Number of fractional digits used in local formatting
              of monetary values.}
@@ -397,8 +397,8 @@ Example:
 
 \begin{verbatim}
 >>> import locale
->>> loc = locale.setlocale(locale.LC_ALL) # get current locale
->>> locale.setlocale(locale.LC_ALL, 'de') # use German locale
+>>> loc = locale.getlocale(locale.LC_ALL) # get current locale
+>>> locale.setlocale(locale.LC_ALL, 'de_DE') # use German locale; name might vary with platform
 >>> locale.strcoll('f\xe4n', 'foo') # compare a string containing an umlaut 
 >>> locale.setlocale(locale.LC_ALL, '') # use user's preferred locale
 >>> locale.setlocale(locale.LC_ALL, 'C') # use default (C) locale
@@ -426,8 +426,8 @@ threads that happen to run before the settings have been restored.
 
 If, when coding a module for general use, you need a locale
 independent version of an operation that is affected by the locale
-(e.g. \function{string.lower()}, or certain formats used with
-\function{time.strftime()})), you will have to find a way to do it
+(such as \function{string.lower()}, or certain formats used with
+\function{time.strftime()}), you will have to find a way to do it
 without using the standard library routine.  Even better is convincing
 yourself that using locale settings is okay.  Only as a last resort
 should you document that your module is not compatible with
@@ -456,25 +456,6 @@ find out what the current locale is.  But since the return value can
 only be used portably to restore it, that is not very useful (except
 perhaps to find out whether or not the locale is \samp{C}).
 
-When Python is embedded in an application, if the application sets the
-locale to something specific before initializing Python, that is
-generally okay, and Python will use whatever locale is set,
-\emph{except} that the \constant{LC_NUMERIC} locale should always be
-\samp{C}.
-
-The \function{setlocale()} function in the \module{locale} module
-gives the Python programmer the impression that you can manipulate the
-\constant{LC_NUMERIC} locale setting, but this not the case at the C
-level: C code will always find that the \constant{LC_NUMERIC} locale
-setting is \samp{C}.  This is because too much would break when the
-decimal point character is set to something else than a period
-(e.g. the Python parser would break).  Caveat: threads that run
-without holding Python's global interpreter lock may occasionally find
-that the numeric locale setting differs; this is because the only
-portable way to implement this feature is to set the numeric locale
-settings to what the user requests, extract the relevant
-characteristics, and then restore the \samp{C} numeric locale.
-
 When Python code uses the \module{locale} module to change the locale,
 this also affects the embedding application.  If the embedding
 application doesn't want this to happen, it should remove the
@@ -488,15 +469,16 @@ that the \module{_locale} module is not accessible as a shared library.
 The locale module exposes the C library's gettext interface on systems
 that provide this interface.  It consists of the functions
 \function{gettext()}, \function{dgettext()}, \function{dcgettext()},
-\function{textdomain()}, and \function{bindtextdomain()}.  These are
-similar to the same functions in the \refmodule{gettext} module, but use
-the C library's binary format for message catalogs, and the C
-library's search algorithms for locating message catalogs. 
+\function{textdomain()}, \function{bindtextdomain()}, and
+\function{bind_textdomain_codeset()}.  These are similar to the same
+functions in the \refmodule{gettext} module, but use the C library's
+binary format for message catalogs, and the C library's search
+algorithms for locating message catalogs. 
 
 Python applications should normally find no need to invoke these
 functions, and should use \refmodule{gettext} instead.  A known
 exception to this rule are applications that link use additional C
 libraries which internally invoke \cfunction{gettext()} or
-\function{cdgettext()}.  For these applications, it may be necessary to
+\function{dcgettext()}.  For these applications, it may be necessary to
 bind the text domain, so that the libraries can properly locate their
 message catalogs.

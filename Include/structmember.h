@@ -7,9 +7,7 @@ extern "C" {
 
 /* Interface to map C struct members to Python object attributes */
 
-#ifdef HAVE_STDDEF_H
 #include <stddef.h> /* For offsetof */
-#endif
 
 /* The offsetof() macro calculates the offset of a structure member
    in its structure.  Unfortunately this cannot be written down
@@ -63,10 +61,6 @@ typedef struct PyMemberDef {
 
 /* Added by Jack: strings contained in the structure */
 #define T_STRING_INPLACE	13
-#ifdef macintosh
-#define T_PSTRING	14	/* macintosh pascal-style counted string */
-#define T_PSTRING_INPLACE	15
-#endif /* macintosh */
 
 #define T_OBJECT_EX	16	/* Like T_OBJECT, but raises AttributeError
 				   when the value is NULL, instead of

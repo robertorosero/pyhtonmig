@@ -26,6 +26,18 @@
 /*#define Py_DEBUG 1*/
 #endif
 
+/* if building an extension or wrapper executable,
+ * mark Python API symbols "extern" so that symbols
+ * imported from the Python core DLL aren't duplicated.
+ */
+#ifdef Py_BUILD_CORE
+#  define PyAPI_FUNC(RTYPE)	RTYPE
+#else
+#  define PyAPI_FUNC(RTYPE)	extern RTYPE
+#endif
+#define PyAPI_DATA(RTYPE)	extern RTYPE
+#define PyMODINIT_FUNC	void
+
 /* Use OS/2 flavour of threads */
 #define WITH_THREAD	1
 #define OS2_THREADS	1
@@ -40,9 +52,6 @@
 
 /* enable the GC module */
 #define WITH_CYCLE_GC	1
-
-/* Define if you want to read files with foreign newlines. */
-#define WITH_UNIVERSAL_NEWLINES 1
 
 /* Define if you want documentation strings in extension modules */
 #define WITH_DOC_STRINGS 1
@@ -218,23 +227,20 @@ typedef long intptr_t;
 /* Define if you have the sigaction function. */
 #define HAVE_SIGACTION 1
 
-/* Define if you have the strdup function. */
-#define HAVE_STRDUP 1
-
 /* Define if you have the strerror function. */
 #define HAVE_STRERROR 1
 
 /* Define if you have the strftime function. */
 #define HAVE_STRFTIME 1
 
-/* Define if you have the strptime function. */
-#define HAVE_STRPTIME 1
-
 /* Define if you have the tcgetpgrp function. */
 #define HAVE_TCGETPGRP 1
 
 /* Define if you have the tcsetpgrp function. */
 #define HAVE_TCSETPGRP 1
+
+/* Define if you have the tmpfile function.  */
+#define HAVE_TMPFILE 1
 
 /* Define if you have the times function. */
 #define HAVE_TIMES 1
@@ -254,26 +260,8 @@ typedef long intptr_t;
 /* Define if you have the <fcntl.h> header file. */
 #define HAVE_FCNTL_H 1
 
-/* Define if you have the <limits.h> header file. */
-#define HAVE_LIMITS_H 1
-
-/* Define if you have the <locale.h> header file. */
-#define HAVE_LOCALE_H 1
-
 /* Define if you have the <ncurses.h> header file. */
 #define HAVE_NCURSES_H 1
-
-/* Define if you have the <signal.h> header file. */
-#define HAVE_SIGNAL_H 1
-
-/* Define if you have the <stdarg.h> header file. */
-#define HAVE_STDARG_H 1
-
-/* Define if you have the <stddef.h> header file. */
-#define HAVE_STDDEF_H 1
-
-/* Define if you have the <stdlib.h> header file. */
-#define HAVE_STDLIB_H 1
 
 /* Define if you have the <sys/file.h> header file. */
 #define HAVE_SYS_FILE_H 1

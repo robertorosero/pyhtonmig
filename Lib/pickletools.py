@@ -6,9 +6,13 @@ can be found here.  Some functions meant for external use:
 genops(pickle)
    Generate all the opcodes in a pickle, as (opcode, arg, position) triples.
 
-dis(pickle, out=None, indentlevel=4)
+dis(pickle, out=None, memo=None, indentlevel=4)
    Print a symbolic disassembly of a pickle.
 '''
+
+__all__ = ['dis',
+           'genops',
+          ]
 
 # Other ideas:
 #
@@ -1521,11 +1525,6 @@ opcodes = [
       argument to be passed to the object's __setstate__, and then the REDUCE
       opcode is followed by code to create setstate's argument, and then a
       BUILD opcode to apply  __setstate__ to that argument.
-
-      There are lots of special cases here.  The argtuple can be None, in
-      which case callable.__basicnew__() is called instead to produce the
-      object to be pushed on the stack.  This appears to be a trick unique
-      to ExtensionClasses, and is deprecated regardless.
 
       If type(callable) is not ClassType, REDUCE complains unless the
       callable has been registered with the copy_reg module's

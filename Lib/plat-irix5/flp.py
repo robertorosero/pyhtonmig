@@ -80,18 +80,18 @@ def checkcache(filename):
         fp.close()
 
 def _unpack_cache(altforms):
-        forms = {}
-        for name in altforms.keys():
-            altobj, altlist = altforms[name]
-            obj = _newobj()
-            obj.make(altobj)
-            list = []
-            for altobj in altlist:
-                nobj = _newobj()
-                nobj.make(altobj)
-                list.append(nobj)
-            forms[name] = obj, list
-        return forms
+    forms = {}
+    for name in altforms.keys():
+        altobj, altlist = altforms[name]
+        obj = _newobj()
+        obj.make(altobj)
+        list = []
+        for altobj in altlist:
+            nobj = _newobj()
+            nobj.make(altobj)
+            list.append(nobj)
+        forms[name] = obj, list
+    return forms
 
 def rdlong(fp):
     s = fp.read(4)
@@ -146,7 +146,7 @@ def freeze(filename):
     forms = parse_forms(filename)
     altforms = _pack_cache(forms)
     print 'import flp'
-    print 'flp._internal_cache[', `filename`, '] =', altforms
+    print 'flp._internal_cache[', repr(filename), '] =', altforms
 
 #
 # Internal: create the data structure to be placed in the cache
@@ -277,8 +277,8 @@ def _parse_line(line):
         return line
     name, value = match.group(1, 2)
     if name[0] == 'N':
-            name = string.join(string.split(name),'')
-            name = string.lower(name)
+        name = string.join(string.split(name),'')
+        name = string.lower(name)
     name = string.capitalize(name)
     try:
         pf = _parse_func[name]
@@ -292,7 +292,7 @@ def _readline(file):
     if not line:
         raise EOFError
     return line[:-1]
-        
+
 def _parse_1_line(file):
     line = _readline(file)
     while line == '':
@@ -417,7 +417,7 @@ def _select_crfunc(fm, cl):
     elif cl == FL.TEXT: return fm.add_text
     elif cl == FL.TIMER: return fm.add_timer
     else:
-        raise error, 'Unknown object type: ' + `cl`
+        raise error, 'Unknown object type: %r' % (cl,)
 
 
 def test():

@@ -1,5 +1,5 @@
-LIBRARY        PYTHON22 INITINSTANCE TERMINSTANCE
-DESCRIPTION    'Python 2.2 Core DLL'
+LIBRARY        PYTHON24 INITINSTANCE TERMINSTANCE
+DESCRIPTION    'Python 2.4 Core DLL'
 PROTMODE
 DATA           MULTIPLE NONSHARED
 
@@ -69,7 +69,6 @@ EXPORTS
                _PyImport_Inittab
                _PyParser_Grammar
                _PyParser_TokenNames
-               _PyThread_Started
                _Py_EllipsisObject
                _Py_NoneStruct
                _Py_PackageContext

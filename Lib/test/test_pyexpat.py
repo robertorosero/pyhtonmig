@@ -216,7 +216,7 @@ for entry in L:
     if tag is not entry:
         print "expected L to contain many references to the same string",
         print "(it didn't)"
-        print "L =", `L`
+        print "L =", repr(L)
         break
 
 # Tests of the buffer_text attribute.
@@ -228,8 +228,8 @@ class TextCollector:
 
     def check(self, expected, label):
         require(self.stuff == expected,
-                "%s\nstuff    = %s\nexpected = %s"
-                % (label, `self.stuff`, `map(unicode, expected)`))
+                "%s\nstuff    = %r\nexpected = %r"
+                % (label, self.stuff, map(unicode, expected)))
 
     def CharacterDataHandler(self, text):
         self.stuff.append(text)
@@ -311,3 +311,57 @@ parser.Parse("<a>1<b/>2<c></c>3<!--abc-->4<!--def-->5</a> ", 1)
 handler.check(["<a>", "1", "<b>", "</b>", "2", "<c>", "</c>", "3",
                "<!--abc-->", "4", "<!--def-->", "5", "</a>"],
               "buffered text not properly split")
+
+# Test handling of exception from callback:
+def StartElementHandler(name, attrs):
+    raise RuntimeError(name)
+
+parser = expat.ParserCreate()
+parser.StartElementHandler = StartElementHandler
+
+try:
+    parser.Parse("<a><b><c/></b></a>", 1)
+except RuntimeError, e:
+    if e.args[0] != "a":
+        print "Expected RuntimeError for element 'a'; found %r" % e.args[0]
+else:
+    print "Expected RuntimeError for 'a'"
+
+# Test Current* members:
+class PositionTest:
+
+    def __init__(self, expected_list, parser):
+        self.parser = parser
+        self.parser.StartElementHandler = self.StartElementHandler
+        self.parser.EndElementHandler = self.EndElementHandler
+        self.expected_list = expected_list
+        self.upto = 0
+
+    def StartElementHandler(self, name, attrs):
+        self.check_pos('s')
+
+    def EndElementHandler(self, name):
+        self.check_pos('e')
+
+    def check_pos(self, event):
+        pos = (event,
+               self.parser.CurrentByteIndex,
+               self.parser.CurrentLineNumber,
+               self.parser.CurrentColumnNumber)
+        require(self.upto < len(self.expected_list),
+                'too many parser events')
+        expected = self.expected_list[self.upto]
+        require(pos == expected,
+                'expected position %s, got %s' % (expected, pos))
+        self.upto += 1
+
+
+parser = expat.ParserCreate()
+handler = PositionTest([('s', 0, 1, 0), ('s', 5, 2, 1), ('s', 11, 3, 2),
+                        ('e', 15, 3, 6), ('e', 17, 4, 1), ('e', 22, 5, 0)],
+                       parser)
+parser.Parse('''<a>
+ <b>
+  <c/>
+ </b>
+</a>''', 1)

@@ -3,7 +3,7 @@
 Contains CCompiler, an abstract base class that defines the interface
 for the Distutils compiler abstraction model."""
 
-# This module should be kept compatible with Python 1.5.2.
+# This module should be kept compatible with Python 2.1.
 
 __revision__ = "$Id$"
 
@@ -685,13 +685,17 @@ class CCompiler:
 
         # A concrete compiler class can either override this method
         # entirely or implement _compile().
-        
+
         macros, objects, extra_postargs, pp_opts, build = \
                 self._setup_compile(output_dir, macros, include_dirs, sources,
                                     depends, extra_postargs)
         cc_args = self._get_cc_args(pp_opts, debug, extra_preargs)
 
-        for obj, (src, ext) in build.items():
+        for obj in objects:
+            try:
+                src, ext = build[obj]
+            except KeyError:
+                continue
             self._compile(obj, src, ext, cc_args, extra_postargs, pp_opts)
 
         # Return *all* object filenames, not just the ones we just built.
@@ -699,7 +703,7 @@ class CCompiler:
 
     def _compile(self, obj, src, ext, cc_args, extra_postargs, pp_opts):
         """Compile 'src' to product 'obj'."""
-        
+
         # A concrete compiler class that does not override compile()
         # should implement _compile().
         pass
@@ -882,6 +886,51 @@ class CCompiler:
         linked into the shared library or executable.
         """
         raise NotImplementedError
+
+    def has_function(self, funcname,
+                     includes=None,
+                     include_dirs=None,
+                     libraries=None,
+                     library_dirs=None):
+        """Return a boolean indicating whether funcname is supported on
+        the current platform.  The optional arguments can be used to
+        augment the compilation environment.
+        """
+
+        # this can't be included at module scope because it tries to
+        # import math which might not be available at that point - maybe
+        # the necessary logic should just be inlined?
+        import tempfile
+        if includes is None:
+            includes = []
+        if include_dirs is None:
+            include_dirs = []
+        if libraries is None:
+            libraries = []
+        if library_dirs is None:
+            library_dirs = []
+        fd, fname = tempfile.mkstemp(".c", funcname, text=True)
+        f = os.fdopen(fd, "w")
+        for incl in includes:
+            f.write("""#include "%s"\n""" % incl)
+        f.write("""\
+main (int argc, char **argv) {
+    %s();
+}
+""" % funcname)
+        f.close()
+        try:
+            objects = self.compile([fname], include_dirs=include_dirs)
+        except CompileError:
+            return False
+
+        try:
+            self.link_executable(objects, "a.out",
+                                 libraries=libraries,
+                                 library_dirs=library_dirs)
+        except (LinkError, TypeError):
+            return False
+        return True
 
     def find_library_file (self, dirs, lib, debug=0):
         """Search the specified list of directories for a static or shared
@@ -1192,7 +1241,11 @@ def gen_lib_options (compiler, library_dirs, runtime_library_dirs, libraries):
         lib_opts.append (compiler.library_dir_option (dir))
 
     for dir in runtime_library_dirs:
-        lib_opts.append (compiler.runtime_library_dir_option (dir))
+        opt = compiler.runtime_library_dir_option (dir)
+        if type(opt) is ListType:
+            lib_opts = lib_opts + opt
+        else:
+            lib_opts.append (opt)
 
     # XXX it's important that we *not* remove redundant library mentions!
     # sometimes you really do have to say "-lfoo -lbar -lfoo" in order to

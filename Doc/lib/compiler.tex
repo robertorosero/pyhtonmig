@@ -89,7 +89,7 @@ package.  The interpreter detects syntax errors in two distinct
 phases.  One set of errors is detected by the interpreter's parser,
 the other set by the compiler.  The compiler package relies on the
 interpreter's parser, so it get the first phases of error checking for
-free.  It implements the second phase itself, and that implement is
+free.  It implements the second phase itself, and that implementation is
 incomplete.  For example, the compiler package does not raise an error
 if a name appears more than once in an argument list: 
 \code{def f(x, x): ...}
@@ -269,21 +269,24 @@ the class names from the \module{compiler.ast} module.
 >>> mod = compiler.parseFile("/tmp/doublelib.py")
 >>> mod
 Module('This is an example module.\n\nThis is the docstring.\n', 
-       Stmt([Function('double', ['x'], [], 0, 'Return twice the argument', 
-       Stmt([Return(Mul((Name('x'), Const(2))))]))]))
+       Stmt([Function(None, 'double', ['x'], [], 0,
+                      'Return twice the argument', 
+                      Stmt([Return(Mul((Name('x'), Const(2))))]))]))
 >>> from compiler.ast import *
 >>> Module('This is an example module.\n\nThis is the docstring.\n', 
-...    Stmt([Function('double', ['x'], [], 0, 'Return twice the argument', 
-...    Stmt([Return(Mul((Name('x'), Const(2))))]))]))
+...    Stmt([Function(None, 'double', ['x'], [], 0,
+...                   'Return twice the argument', 
+...                   Stmt([Return(Mul((Name('x'), Const(2))))]))]))
 Module('This is an example module.\n\nThis is the docstring.\n', 
-       Stmt([Function('double', ['x'], [], 0, 'Return twice the argument', 
-       Stmt([Return(Mul((Name('x'), Const(2))))]))]))
+       Stmt([Function(None, 'double', ['x'], [], 0,
+                      'Return twice the argument', 
+                      Stmt([Return(Mul((Name('x'), Const(2))))]))]))
 >>> mod.doc
 'This is an example module.\n\nThis is the docstring.\n'
 >>> for node in mod.node.nodes:
 ...     print node
 ... 
-Function('double', ['x'], [], 0, 'Return twice the argument',
+Function(None, 'double', ['x'], [], 0, 'Return twice the argument',
          Stmt([Return(Mul((Name('x'), Const(2))))]))
 >>> func = mod.node.nodes[0]
 >>> func.code
@@ -296,7 +299,7 @@ Stmt([Return(Mul((Name('x'), Const(2))))])
 
 The visitor pattern is ...  The \refmodule{compiler} package uses a
 variant on the visitor pattern that takes advantage of Python's
-introspection features to elminiate the need for much of the visitor's
+introspection features to eliminate the need for much of the visitor's
 infrastructure.
 
 The classes being visited do not need to be programmed to accept

@@ -13,7 +13,7 @@ uses_relative = ['ftp', 'http', 'gopher', 'nntp', 'imap',
                                'prospero', 'rtsp', 'rtspu', '']
 uses_netloc = ['ftp', 'http', 'gopher', 'nntp', 'telnet',
                              'imap', 'wais', 'file', 'mms', 'https', 'shttp',
-                             'snews', 'prospero', 'rtsp', 'rtspu', '']
+                             'snews', 'prospero', 'rtsp', 'rtspu', 'rsync', '']
 non_hierarchical = ['gopher', 'hdl', 'mailto', 'news',
                                   'telnet', 'wais', 'imap', 'snews', 'sip']
 uses_params = ['ftp', 'hdl', 'prospero', 'http', 'imap',
@@ -157,13 +157,9 @@ def urljoin(base, url, allow_fragments = 1):
     if path[:1] == '/':
         return urlunparse((scheme, netloc, path,
                            params, query, fragment))
-    if not path:
-        if not params:
-            params = bparams
-            if not query:
-                query = bquery
+    if not (path or params or query):
         return urlunparse((scheme, netloc, bpath,
-                           params, query, fragment))
+                           bparams, bquery, fragment))
     segments = bpath.split('/')[:-1] + path.split('/')
     # XXX The stuff below is bogus in various ways...
     if segments[-1] == '.':
@@ -247,8 +243,11 @@ def test():
         else:
             fp = open(fn)
     else:
-        import StringIO
-        fp = StringIO.StringIO(test_input)
+        try:
+            from cStringIO import StringIO
+        except ImportError:
+            from StringIO import StringIO
+        fp = StringIO(test_input)
     while 1:
         line = fp.readline()
         if not line: break

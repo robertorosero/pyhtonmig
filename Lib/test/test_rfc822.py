@@ -53,7 +53,7 @@ class MessageTestCase(unittest.TestCase):
         out = m.getdate('date')
         if out:
             self.assertEqual(out,
-                             (1999, 1, 13, 23, 57, 35, 0, 0, 0),
+                             (1999, 1, 13, 23, 57, 35, 0, 1, 0),
                              "date conversion failed")
 
 
@@ -175,6 +175,17 @@ class MessageTestCase(unittest.TestCase):
             '\n'
             'foo',
             [('', 'guido@[132.151.1.21]')])
+
+    def test_iter(self):
+        m = rfc822.Message(StringIO(
+            'Date:    Wed, 13 Jan 1999 23:57:35 -0500\n'
+            'From:    Guido van Rossum <guido@CNRI.Reston.VA.US>\n'
+            'To:      "Guido van\n'
+            '\t : Rossum" <guido@python.org>\n'
+            'Subject: test2\n'
+            '\n'
+            'test2\n' ))
+        self.assertEqual(sorted(m), ['date', 'from', 'subject', 'to'])
 
     def test_rfc2822_phrases(self):
         # RFC 2822 (the update to RFC 822) specifies that dots in phrases are

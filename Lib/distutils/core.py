@@ -6,7 +6,7 @@ indirectly provides the Distribution and Command classes, although they are
 really defined in distutils.dist and distutils.cmd.
 """
 
-# This module should be kept compatible with Python 1.5.2.
+# This module should be kept compatible with Python 2.1.
 
 __revision__ = "$Id$"
 
@@ -47,14 +47,14 @@ setup_keywords = ('distclass', 'script_name', 'script_args', 'options',
                   'name', 'version', 'author', 'author_email',
                   'maintainer', 'maintainer_email', 'url', 'license',
                   'description', 'long_description', 'keywords',
-                  'platforms', 'classifiers', 'download_url')
+                  'platforms', 'classifiers', 'download_url',)
 
 # Legal keyword arguments for the Extension constructor
 extension_keywords = ('name', 'sources', 'include_dirs',
                       'define_macros', 'undef_macros',
                       'library_dirs', 'libraries', 'runtime_library_dirs',
                       'extra_objects', 'extra_compile_args', 'extra_link_args',
-                      'export_symbols', 'depends', 'language')
+                      'swig_opts', 'export_symbols', 'depends', 'language')
 
 def setup (**attrs):
     """The gateway to the Distutils: do everything your setup script needs
@@ -202,7 +202,7 @@ def run_setup (script_name, script_args=None, stop_after="run"):
     used to drive the Distutils.
     """
     if stop_after not in ('init', 'config', 'commandline', 'run'):
-        raise ValueError, "invalid value for 'stop_after': %s" % `stop_after`
+        raise ValueError, "invalid value for 'stop_after': %r" % (stop_after,)
 
     global _setup_stop_after, _setup_distribution
     _setup_stop_after = stop_after
@@ -238,4 +238,3 @@ def run_setup (script_name, script_args=None, stop_after="run"):
     return _setup_distribution
 
 # run_setup ()
-

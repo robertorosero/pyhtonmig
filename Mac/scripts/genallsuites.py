@@ -7,6 +7,8 @@ import sys
 import os
 import gensuitemodule
 
+verbose=sys.stdout
+
 DSTDIR="/Users/jack/src/python/Lib/plat-mac/lib-scriptpackages"
 OS9DISK="/Volumes/Moes"
 
@@ -20,31 +22,31 @@ NETSCAPE=OS9DISK + "/Applications (Mac OS 9)/Netscape Communicator\xe2\x84\xa2 F
 TERMINAL="/Applications/Utilities/Terminal.app"
 
 gensuitemodule.processfile_fromresource(APPLESCRIPT,
-	output=os.path.join(DSTDIR, 'StdSuites'),
-	basepkgname='_builtinSuites',
-	edit_modnames=[])
+        output=os.path.join(DSTDIR, 'StdSuites'),
+        basepkgname='_builtinSuites',
+        edit_modnames=[], verbose=verbose)
 gensuitemodule.processfile(SYSTEMEVENTS,
-	output=os.path.join(DSTDIR, 'SystemEvents'),
-	basepkgname='StdSuites',
-	edit_modnames=[])
+        output=os.path.join(DSTDIR, 'SystemEvents'),
+        basepkgname='StdSuites',
+        edit_modnames=[('Disk_2d_Folder_2d_File_Suite', 'Disk_Folder_File_Suite')],
+        verbose=verbose)
 gensuitemodule.processfile(CODEWARRIOR,
-	output=os.path.join(DSTDIR, 'CodeWarrior'),
-	basepkgname='StdSuites',
-	edit_modnames=[])
+        output=os.path.join(DSTDIR, 'CodeWarrior'),
+        basepkgname='StdSuites',
+        edit_modnames=[], verbose=verbose)
 gensuitemodule.processfile(EXPLORER,
-	output=os.path.join(DSTDIR, 'Explorer'),
-	basepkgname='StdSuites',
-	edit_modnames=[])
+        output=os.path.join(DSTDIR, 'Explorer'),
+        basepkgname='StdSuites',
+        edit_modnames=[], verbose=verbose)
 gensuitemodule.processfile(FINDER,
-	output=os.path.join(DSTDIR, 'Finder'),
-	basepkgname='StdSuites',
-	edit_modnames=[])
+        output=os.path.join(DSTDIR, 'Finder'),
+        basepkgname='StdSuites',
+        edit_modnames=[], verbose=verbose)
 gensuitemodule.processfile(NETSCAPE,
-	output=os.path.join(DSTDIR, 'Netscape'),
-	basepkgname='StdSuites',
-	edit_modnames=[('WorldWideWeb_suite_2c__as_d', 'WorldWideWeb_suite')])
+        output=os.path.join(DSTDIR, 'Netscape'),
+        basepkgname='StdSuites',
+        edit_modnames=[('WorldWideWeb_suite_2c__as_d', 'WorldWideWeb_suite')], verbose=verbose)
 gensuitemodule.processfile(TERMINAL,
-	output=os.path.join(DSTDIR, 'Terminal'),
-	basepkgname='StdSuites',
-	edit_modnames=[])
-	
+        output=os.path.join(DSTDIR, 'Terminal'),
+        basepkgname='StdSuites',
+        edit_modnames=[], verbose=verbose)

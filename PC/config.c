@@ -24,7 +24,6 @@ extern void initregex(void);
 #ifndef MS_WIN64
 extern void initrgbimg(void);
 #endif
-extern void initrotor(void);
 extern void initsignal(void);
 extern void initsha(void);
 extern void initstrop(void);
@@ -33,19 +32,36 @@ extern void inittime(void);
 extern void initthread(void);
 extern void initcStringIO(void);
 extern void initcPickle(void);
-extern void initpcre(void);
 #ifdef WIN32
 extern void initmsvcrt(void);
 extern void init_locale(void);
 #endif
 extern void init_codecs(void);
-extern void initxreadlines(void);
 extern void init_weakref(void);
 extern void init_hotshot(void);
 extern void initxxsubtype(void);
 extern void initzipimport(void);
 extern void init_random(void);
 extern void inititertools(void);
+extern void initcollections(void);
+extern void init_heapq(void);
+extern void init_bisect(void);
+extern void init_symtable(void);
+extern void initmmap(void);
+extern void init_csv(void);
+extern void init_sre(void);
+extern void initparser(void);
+extern void init_winreg(void);
+extern void initdatetime(void);
+
+extern void init_multibytecodec(void);
+extern void init_codecs_cn(void);
+extern void init_codecs_hk(void);
+extern void init_codecs_iso2022(void);
+extern void init_codecs_jp(void);
+extern void init_codecs_kr(void);
+extern void init_codecs_tw(void);
+extern void init_subprocess(void);
 
 /* tools/freeze/makeconfig.py marker for additional "extern" */
 /* -- ADDMODULE MARKER 1 -- */
@@ -76,7 +92,6 @@ struct _inittab _PyImport_Inittab[] = {
 #ifndef MS_WIN64
         {"rgbimg", initrgbimg},
 #endif
-        {"rotor", initrotor},
         {"signal", initsignal},
         {"sha", initsha},
         {"strop", initstrop},
@@ -87,21 +102,40 @@ struct _inittab _PyImport_Inittab[] = {
 #endif
         {"cStringIO", initcStringIO},
         {"cPickle", initcPickle},
-        {"pcre", initpcre},
 #ifdef WIN32
         {"msvcrt", initmsvcrt},
         {"_locale", init_locale},
 #endif
+	/* XXX Should _subprocess go in a WIN32 block?  not WIN64? */
+	{"_subprocess", init_subprocess},
 
         {"_codecs", init_codecs},
-	{"xreadlines", initxreadlines},
 	{"_weakref", init_weakref},
 	{"_hotshot", init_hotshot},
 	{"_random", init_random},
+        {"_bisect", init_bisect},
+        {"_heapq", init_heapq},
 	{"itertools", inititertools},
+        {"collections", initcollections},
+	{"_symtable", init_symtable},
+	{"mmap", initmmap},
+	{"_csv", init_csv},
+	{"_sre", init_sre},
+	{"parser", initparser},
+	{"_winreg", init_winreg},
+	{"datetime", initdatetime},
 
 	{"xxsubtype", initxxsubtype},
 	{"zipimport", initzipimport},
+
+	/* CJK codecs */
+	{"_multibytecodec", init_multibytecodec},
+	{"_codecs_cn", init_codecs_cn},
+	{"_codecs_hk", init_codecs_hk},
+	{"_codecs_iso2022", init_codecs_iso2022},
+	{"_codecs_jp", init_codecs_jp},
+	{"_codecs_kr", init_codecs_kr},
+	{"_codecs_tw", init_codecs_tw},
 
 /* tools/freeze/makeconfig.py marker for additional "_inittab" entries */
 /* -- ADDMODULE MARKER 2 -- */

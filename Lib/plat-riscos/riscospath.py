@@ -15,7 +15,7 @@ as os.path.
 # strings representing various path-related bits and pieces
 curdir = '@'
 pardir = '^'
-extsep = '.'
+extsep = '/'
 sep = '.'
 pathsep = ','
 defpath = '<Run$Dir>'
@@ -217,6 +217,8 @@ def exists(p):
         return swi.swi('OS_File', '5s;i', p)!=0
     except swi.error:
         return 0
+
+lexists = exists
 
 
 def isdir(p):

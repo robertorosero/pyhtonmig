@@ -19,7 +19,7 @@ ConfigParser constructor as a dictionary.
 
 class:
 
-ConfigParser -- responsible for for parsing a list of
+ConfigParser -- responsible for parsing a list of
                 configuration files, and managing the parsed database.
 
     methods:
@@ -45,7 +45,7 @@ ConfigParser -- responsible for for parsing a list of
     read(filenames)
         read and parse the list of named configuration files, given by
         name.  A single filename is also allowed.  Non-existing files
-        are ignored.
+        are ignored.  Return list of successfully read files.
 
     readfp(fp, filename=None)
         read and parse one configuration file, given as a file object.
@@ -92,7 +92,8 @@ import re
 __all__ = ["NoSectionError", "DuplicateSectionError", "NoOptionError",
            "InterpolationError", "InterpolationDepthError",
            "InterpolationSyntaxError", "ParsingError",
-           "MissingSectionHeaderError", "ConfigParser",
+           "MissingSectionHeaderError",
+           "ConfigParser", "SafeConfigParser", "RawConfigParser",
            "DEFAULTSECT", "MAX_INTERPOLATION_DEPTH"]
 
 DEFAULTSECT = "DEFAULT"
@@ -118,7 +119,7 @@ class NoSectionError(Error):
     """Raised when no section matches a requested option."""
 
     def __init__(self, section):
-        Error.__init__(self, 'No section: ' + `section`)
+        Error.__init__(self, 'No section: %r' % (section,))
         self.section = section
 
 class DuplicateSectionError(Error):
@@ -191,7 +192,7 @@ class MissingSectionHeaderError(ParsingError):
     def __init__(self, filename, lineno, line):
         Error.__init__(
             self,
-            'File contains no section headers.\nfile: %s, line: %d\n%s' %
+            'File contains no section headers.\nfile: %s, line: %d\n%r' %
             (filename, lineno, line))
         self.filename = filename
         self.lineno = lineno
@@ -202,10 +203,10 @@ class MissingSectionHeaderError(ParsingError):
 class RawConfigParser:
     def __init__(self, defaults=None):
         self._sections = {}
-        if defaults is None:
-            self._defaults = {}
-        else:
-            self._defaults = defaults
+        self._defaults = {}
+        if defaults:
+            for key, value in defaults.items():
+                self._defaults[self.optionxform(key)] = value
 
     def defaults(self):
         return self._defaults
@@ -252,9 +253,12 @@ class RawConfigParser:
         home directory, systemwide directory), and all existing
         configuration files in the list will be read.  A single
         filename may also be given.
+
+        Return list of successfully read files.
         """
         if isinstance(filenames, basestring):
             filenames = [filenames]
+        read_ok = []
         for filename in filenames:
             try:
                 fp = open(filename)
@@ -262,6 +266,8 @@ class RawConfigParser:
                 continue
             self._read(fp, filename)
             fp.close()
+            read_ok.append(filename)
+        return read_ok
 
     def readfp(self, fp, filename=None):
         """Like read() but the argument must be a file-like object.
@@ -453,7 +459,7 @@ class RawConfigParser:
                     optname = None
                 # no section header in the file?
                 elif cursect is None:
-                    raise MissingSectionHeaderError(fpname, lineno, `line`)
+                    raise MissingSectionHeaderError(fpname, lineno, line)
                 # an option line?
                 else:
                     mo = self.OPTCRE.match(line)
@@ -478,7 +484,7 @@ class RawConfigParser:
                         # list of all bogus lines
                         if not e:
                             e = ParsingError(fpname)
-                        e.append(lineno, `line`)
+                        e.append(lineno, repr(line))
         # if any parsing errors occurred, raise an exception
         if e:
             raise e
@@ -504,8 +510,9 @@ class ConfigParser(RawConfigParser):
             if section != DEFAULTSECT:
                 raise NoSectionError(section)
         # Update with the entry specific variables
-        if vars is not None:
-            d.update(vars)
+        if vars:
+            for key, value in vars.items():
+                d[self.optionxform(key)] = value
         option = self.optionxform(option)
         try:
             value = d[option]
@@ -537,17 +544,17 @@ class ConfigParser(RawConfigParser):
                 raise NoSectionError(section)
         # Update with the entry specific variables
         if vars:
-            d.update(vars)
+            for key, value in vars.items():
+                d[self.optionxform(key)] = value
         options = d.keys()
         if "__name__" in options:
             options.remove("__name__")
         if raw:
-            for option in options:
-                yield (option, d[option])
+            return [(option, d[option])
+                    for option in options]
         else:
-            for option in options:
-                yield (option,
-                       self._interpolate(section, option, d[option], d))
+            return [(option, self._interpolate(section, option, d[option], d))
+                    for option in options]
 
     def _interpolate(self, section, option, rawval, vars):
         # do the string interpolation
@@ -555,7 +562,8 @@ class ConfigParser(RawConfigParser):
         depth = MAX_INTERPOLATION_DEPTH
         while depth:                    # Loop through this until it's done
             depth -= 1
-            if value.find("%(") != -1:
+            if "%(" in value:
+                value = self._KEYCRE.sub(self._interpolation_replace, value)
                 try:
                     value = value % vars
                 except KeyError, e:
@@ -563,9 +571,18 @@ class ConfigParser(RawConfigParser):
                         option, section, rawval, e[0])
             else:
                 break
-        if value.find("%(") != -1:
+        if "%(" in value:
             raise InterpolationDepthError(option, section, rawval)
         return value
+
+    _KEYCRE = re.compile(r"%\(([^)]*)\)s|.")
+
+    def _interpolation_replace(self, match):
+        s = match.group(1)
+        if s is None:
+            return match.group()
+        else:
+            return "%%(%s)s" % self.optionxform(s)
 
 
 class SafeConfigParser(ConfigParser):
@@ -597,9 +614,9 @@ class SafeConfigParser(ConfigParser):
             elif c == "(":
                 m = self._interpvar_match(rest)
                 if m is None:
-                    raise InterpolationSyntaxError(
-                        "bad interpolation variable reference", rest)
-                var = m.group(1)
+                    raise InterpolationSyntaxError(option, section,
+                        "bad interpolation variable reference %r" % rest)
+                var = self.optionxform(m.group(1))
                 rest = rest[m.end():]
                 try:
                     v = map[var]
@@ -613,5 +630,11 @@ class SafeConfigParser(ConfigParser):
                     accum.append(v)
             else:
                 raise InterpolationSyntaxError(
-                    option, section, rest,
-                    "'%' must be followed by '%' or '(', found: " + `rest`)
+                    option, section,
+                    "'%%' must be followed by '%%' or '(', found: %r" % (rest,))
+
+    def set(self, section, option, value):
+        """Set an option.  Extend ConfigParser.set: check for string values."""
+        if not isinstance(value, basestring):
+            raise TypeError("option values must be strings")
+        ConfigParser.set(self, section, option, value)

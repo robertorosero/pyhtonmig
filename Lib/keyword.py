@@ -46,11 +46,7 @@ kwlist = [
 #--end keywords--
         ]
 
-kwdict = {}
-for keyword in kwlist:
-    kwdict[keyword] = 1
-
-iskeyword = kwdict.has_key
+iskeyword = frozenset(kwlist).__contains__
 
 def main():
     import sys, re
@@ -67,7 +63,7 @@ def main():
     while 1:
         line = fp.readline()
         if not line: break
-        if line.find('{1, "') > -1:
+        if '{1, "' in line:
             match = strprog.search(line)
             if match:
                 lines.append("        '" + match.group(1) + "',\n")

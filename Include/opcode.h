@@ -13,6 +13,7 @@ extern "C" {
 #define ROT_THREE	3
 #define DUP_TOP		4
 #define ROT_FOUR	5
+#define NOP		9
 
 #define UNARY_POSITIVE	10
 #define UNARY_NEGATIVE	11
@@ -21,6 +22,7 @@ extern "C" {
 
 #define UNARY_INVERT	15
 
+#define LIST_APPEND	18
 #define BINARY_POWER	19
 
 #define BINARY_MULTIPLY	20

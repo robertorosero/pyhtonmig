@@ -11,7 +11,7 @@ import sys
 import bz2
 from bz2 import BZ2File, BZ2Compressor, BZ2Decompressor
 
-has_cmdline_bunzip2 = sys.platform not in ("win32", "os2emx")
+has_cmdline_bunzip2 = sys.platform not in ("win32", "os2emx", "riscos")
 
 class BaseTest(unittest.TestCase):
     "Base for other testcases."
@@ -59,6 +59,7 @@ class BZ2FileTest(BaseTest):
         # "Test BZ2File.read()"
         self.createTempFile()
         bz2f = BZ2File(self.filename)
+        self.assertRaises(TypeError, bz2f.read, None)
         self.assertEqual(bz2f.read(), self.TEXT)
         bz2f.close()
 
@@ -86,6 +87,7 @@ class BZ2FileTest(BaseTest):
         # "Test BZ2File.readline()"
         self.createTempFile()
         bz2f = BZ2File(self.filename)
+        self.assertRaises(TypeError, bz2f.readline, None)
         sio = StringIO(self.TEXT)
         for line in sio.readlines():
             self.assertEqual(bz2f.readline(), line)
@@ -95,6 +97,7 @@ class BZ2FileTest(BaseTest):
         # "Test BZ2File.readlines()"
         self.createTempFile()
         bz2f = BZ2File(self.filename)
+        self.assertRaises(TypeError, bz2f.readlines, None)
         sio = StringIO(self.TEXT)
         self.assertEqual(bz2f.readlines(), sio.readlines())
         bz2f.close()
@@ -134,6 +137,7 @@ class BZ2FileTest(BaseTest):
     def testWrite(self):
         # "Test BZ2File.write()"
         bz2f = BZ2File(self.filename, "w")
+        self.assertRaises(TypeError, bz2f.write)
         bz2f.write(self.TEXT)
         bz2f.close()
         f = open(self.filename, 'rb')
@@ -158,6 +162,7 @@ class BZ2FileTest(BaseTest):
     def testWriteLines(self):
         # "Test BZ2File.writelines()"
         bz2f = BZ2File(self.filename, "w")
+        self.assertRaises(TypeError, bz2f.writelines)
         sio = StringIO(self.TEXT)
         bz2f.writelines(sio.readlines())
         bz2f.close()
@@ -169,6 +174,7 @@ class BZ2FileTest(BaseTest):
         # "Test BZ2File.seek(150, 0)"
         self.createTempFile()
         bz2f = BZ2File(self.filename)
+        self.assertRaises(TypeError, bz2f.seek)
         bz2f.seek(150)
         self.assertEqual(bz2f.read(), self.TEXT[150:])
         bz2f.close()
@@ -219,15 +225,21 @@ class BZ2FileTest(BaseTest):
         bz2f.close()
 
     def testOpenDel(self):
+        # "Test opening and deleting a file many times"
         self.createTempFile()
         for i in xrange(10000):
             o = BZ2File(self.filename)
             del o
 
+    def testOpenNonexistent(self):
+        # "Test opening a nonexistent file"
+        self.assertRaises(IOError, BZ2File, "/non/existent")
+
 class BZ2CompressorTest(BaseTest):
     def testCompress(self):
         # "Test BZ2Compressor.compress()/flush()"
         bz2c = BZ2Compressor()
+        self.assertRaises(TypeError, bz2c.compress)
         data = bz2c.compress(self.TEXT)
         data += bz2c.flush()
         self.assertEqual(self.decompress(data), self.TEXT)
@@ -247,9 +259,13 @@ class BZ2CompressorTest(BaseTest):
         self.assertEqual(self.decompress(data), self.TEXT)
 
 class BZ2DecompressorTest(BaseTest):
+    def test_Constructor(self):
+        self.assertRaises(TypeError, BZ2Decompressor, 42)
+
     def testDecompress(self):
         # "Test BZ2Decompressor.decompress()"
         bz2d = BZ2Decompressor()
+        self.assertRaises(TypeError, bz2d.decompress)
         text = bz2d.decompress(self.DATA)
         self.assertEqual(text, self.TEXT)
 
@@ -304,13 +320,12 @@ class FuncTest(BaseTest):
         self.assertRaises(ValueError, bz2.decompress, self.DATA[:-10])
 
 def test_main():
-    suite = unittest.TestSuite()
-    for test in (BZ2FileTest,
-                 BZ2CompressorTest,
-                 BZ2DecompressorTest,
-                 FuncTest):
-        suite.addTest(unittest.makeSuite(test))
-    test_support.run_suite(suite)
+    test_support.run_unittest(
+        BZ2FileTest,
+        BZ2CompressorTest,
+        BZ2DecompressorTest,
+        FuncTest
+    )
 
 if __name__ == '__main__':
     test_main()

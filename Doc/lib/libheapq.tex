@@ -59,7 +59,12 @@ If the heap is empty, \exception{IndexError} is raised.
 This is more efficient than \function{heappop()} followed
 by  \function{heappush()}, and can be more appropriate when using
 a fixed-size heap.  Note that the value returned may be larger
-than \var{item}!  That constrains reasonable uses of this routine.
+than \var{item}!  That constrains reasonable uses of this routine
+unless written as part of a conditional replacement:
+\begin{verbatim}
+        if item > heap[0]:
+            item = heapreplace(heap, item)
+\end{verbatim}
 \end{funcdesc}
 
 Example of use:
@@ -82,6 +87,33 @@ Example of use:
 True
 >>>
 \end{verbatim}
+
+The module also offers two general purpose functions based on heaps.
+
+\begin{funcdesc}{nlargest}{n, iterable\optional{, key}}
+Return a list with the \var{n} largest elements from the dataset defined
+by \var{iterable}.  \var{key}, if provided, specifies a function of one
+argument that is used to extract a comparison key from each element
+in the iterable:  \samp{\var{key}=\function{str.lower}}
+Equivalent to:  \samp{sorted(iterable, key=key, reverse=True)[:n]}
+\versionadded{2.4}
+\versionchanged[Added the optional \var{key} argument]{2.5}
+\end{funcdesc}
+
+\begin{funcdesc}{nsmallest}{n, iterable\optional{, key}}
+Return a list with the \var{n} smallest elements from the dataset defined
+by \var{iterable}.  \var{key}, if provided, specifies a function of one
+argument that is used to extract a comparison key from each element
+in the iterable:  \samp{\var{key}=\function{str.lower}}
+Equivalent to:  \samp{sorted(iterable, key=key)[:n]}
+\versionadded{2.4}
+\versionchanged[Added the optional \var{key} argument]{2.5}
+\end{funcdesc}
+
+Both functions perform best for smaller values of \var{n}.  For larger
+values, it is more efficient to use the \function{sorted()} function.  Also,
+when \code{n==1}, it is more efficient to use the builtin \function{min()}
+and \function{max()} functions.
 
 
 \subsection{Theory}

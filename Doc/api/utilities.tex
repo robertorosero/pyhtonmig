@@ -84,7 +84,7 @@ values from C values.
   \cfunction{Py_AtExit()} returns \code{0}; on failure, it returns
   \code{-1}.  The cleanup function registered last is called first.
   Each cleanup function will be called at most once.  Since Python's
-  internal finallization will have completed before the cleanup
+  internal finalization will have completed before the cleanup
   function, no Python APIs should be called by \var{func}.
 \end{cfuncdesc}
 
@@ -105,8 +105,11 @@ values from C values.
   are \index{package variable!\code{__all__}}
   \withsubitem{(package variable)}{\ttindex{__all__}}loaded.)  Return
   a new reference to the imported module, or \NULL{} with an exception
-  set on failure (the module may still be created in this case ---
-  examine \code{sys.modules} to find out).
+  set on failure.  Before Python 2.4, the module may still be created in
+  the failure case --- examine \code{sys.modules} to find out.  Starting
+  with Python 2.4, a failing import of a module no longer leaves the
+  module in \code{sys.modules}.
+  \versionchanged[failing imports remove incomplete module objects]{2.4}
   \withsubitem{(in module sys)}{\ttindex{modules}}
 \end{cfuncdesc}
 
@@ -118,11 +121,13 @@ values from C values.
   \function{__import__()} function calls this function directly.
 
   The return value is a new reference to the imported module or
-  top-level package, or \NULL{} with an exception set on failure (the
+  top-level package, or \NULL{} with an exception set on failure (before
+  Python 2.4, the
   module may still be created in this case).  Like for
   \function{__import__()}, the return value when a submodule of a
   package was requested is normally the top-level package, unless a
   non-empty \var{fromlist} was given.
+  \versionchanged[failing imports remove incomplete module objects]{2.4}
 \end{cfuncdesc}
 
 \begin{cfuncdesc}{PyObject*}{PyImport_Import}{PyObject *name}
@@ -145,9 +150,9 @@ values from C values.
 
 \begin{cfuncdesc}{PyObject*}{PyImport_AddModule}{char *name}
   Return the module object corresponding to a module name.  The
-  \var{name} argument may be of the form \code{package.module}).
+  \var{name} argument may be of the form \code{package.module}.
   First check the modules dictionary if there's one there, and if not,
-  create a new one and insert in in the modules dictionary.
+  create a new one and insert it in the modules dictionary.
   Return \NULL{} with an exception set on failure.
   \note{This function does not load or import the module; if the
   module wasn't already loaded, you will get an empty module object.
@@ -161,11 +166,25 @@ values from C values.
   a code object read from a Python bytecode file or obtained from the
   built-in function \function{compile()}\bifuncindex{compile}, load
   the module.  Return a new reference to the module object, or \NULL{}
-  with an exception set if an error occurred (the module may still be
-  created in this case).  This function would reload the module if it
-  was already imported.  If \var{name} points to a dotted name of the
+  with an exception set if an error occurred.  Before Python 2.4, the module
+  could still be created in error cases.  Starting with Python 2.4,
+  \var{name} is removed from \code{sys.modules} in error cases, and even
+  if \var{name} was already in \code{sys.modules} on entry to
+  \cfunction{PyImport_ExecCodeModule()}.  Leaving incompletely initialized
+  modules in \code{sys.modules} is dangerous, as imports of such modules
+  have no way to know that the module object is an unknown (and probably
+  damaged with respect to the module author's intents) state.
+
+  This function will reload the module if it was already imported.  See
+  \cfunction{PyImport_ReloadModule()} for the intended way to reload a
+  module.
+
+  If \var{name} points to a dotted name of the
   form \code{package.module}, any package structures not already
   created will still not be created.
+
+  \versionchanged[\var{name} is removed from \code{sys.modules} in error cases]{2.4}
+
 \end{cfuncdesc}
 
 \begin{cfuncdesc}{long}{PyImport_GetMagicNumber}{}
@@ -283,20 +302,31 @@ data must be opened in binary mode.
 
 Numeric values are stored with the least significant byte first.
 
-\begin{cfuncdesc}{void}{PyMarshal_WriteLongToFile}{long value, FILE *file}
+The module supports two versions of the data format: version 0 is the
+historical version, version 1 (new in Python 2.4) shares interned
+strings in the file, and upon unmarshalling. \var{Py_MARSHAL_VERSION}
+indicates the current file format (currently 1).
+
+\begin{cfuncdesc}{void}{PyMarshal_WriteLongToFile}{long value, FILE *file, int version}
   Marshal a \ctype{long} integer, \var{value}, to \var{file}.  This
   will only write the least-significant 32 bits of \var{value};
   regardless of the size of the native \ctype{long} type.
+
+  \versionchanged[\var{version} indicates the file format]{2.4}
 \end{cfuncdesc}
 
 \begin{cfuncdesc}{void}{PyMarshal_WriteObjectToFile}{PyObject *value,
-                                                     FILE *file}
+                                                     FILE *file, int version}
   Marshal a Python object, \var{value}, to \var{file}.
+
+  \versionchanged[\var{version} indicates the file format]{2.4}
 \end{cfuncdesc}
 
-\begin{cfuncdesc}{PyObject*}{PyMarshal_WriteObjectToString}{PyObject *value}
+\begin{cfuncdesc}{PyObject*}{PyMarshal_WriteObjectToString}{PyObject *value, int version}
   Return a string object containing the marshalled representation of
   \var{value}.
+
+  \versionchanged[\var{version} indicates the file format]{2.4}
 \end{cfuncdesc}
 
 The following functions allow marshalled values to be read back in.
@@ -373,7 +403,7 @@ and the entry in [square] brackets is the type of the C variable(s)
 whose address should be passed.
 
 \begin{description}
-  \item[\samp{s} (string or Unicode object) {[char *]}]
+  \item[\samp{s} (string or Unicode object) {[const char *]}]
   Convert a Python string or Unicode object to a C pointer to a
   character string.  You must not provide storage for the string
   itself; a pointer to an existing string is stored into the character
@@ -385,7 +415,7 @@ whose address should be passed.
   raised.
 
   \item[\samp{s\#} (string, Unicode or any read buffer compatible object)
-  {[char *, int]}]
+  {[const char *, int]}]
   This variant on \samp{s} stores into two C variables, the first one
   a pointer to a character string, the second one its length.  In this
   case the Python string may contain embedded null bytes.  Unicode
@@ -394,12 +424,12 @@ whose address should be passed.
   compatible objects pass back a reference to the raw internal data
   representation.
 
-  \item[\samp{z} (string or \code{None}) {[char *]}]
+  \item[\samp{z} (string or \code{None}) {[const char *]}]
   Like \samp{s}, but the Python object may also be \code{None}, in
   which case the C pointer is set to \NULL.
 
   \item[\samp{z\#} (string or \code{None} or any read buffer
-  compatible object) {[char *, int]}]
+  compatible object) {[const char *, int]}]
   This is to \samp{s\#} as \samp{z} is to \samp{s}.
 
   \item[\samp{u} (Unicode object) {[Py_UNICODE *]}]
@@ -422,7 +452,7 @@ whose address should be passed.
   encoded data without embedded NUL bytes.
 
   This format requires two arguments.  The first is only used as
-  input, and must be a \ctype{char*} which points to the name of an
+  input, and must be a \ctype{const char*} which points to the name of an
   encoding as a NUL-terminated string, or \NULL, in which case the
   default encoding is used.  An exception is raised if the named
   encoding is not known to Python.  The second argument must be a
@@ -450,7 +480,7 @@ whose address should be passed.
   characters.
 
   It requires three arguments.  The first is only used as input, and
-  must be a \ctype{char*} which points to the name of an encoding as a
+  must be a \ctype{const char*} which points to the name of an encoding as a
   NUL-terminated string, or \NULL, in which case the default encoding
   is used.  An exception is raised if the named encoding is not known
   to Python.  The second argument must be a \ctype{char**}; the value
@@ -664,12 +694,25 @@ return false and raise an appropriate exception.
   failure, it returns false and raises the appropriate exception.
 \end{cfuncdesc}
 
+\begin{cfuncdesc}{int}{PyArg_VaParse}{PyObject *args, char *format,
+                                         va_list vargs}
+  Identical to \cfunction{PyArg_ParseTuple()}, except that it accepts a
+  va_list rather than a variable number of arguments.
+\end{cfuncdesc}
+
 \begin{cfuncdesc}{int}{PyArg_ParseTupleAndKeywords}{PyObject *args,
                        PyObject *kw, char *format, char *keywords[],
                        \moreargs}
   Parse the parameters of a function that takes both positional and
   keyword parameters into local variables.  Returns true on success;
   on failure, it returns false and raises the appropriate exception.
+\end{cfuncdesc}
+
+\begin{cfuncdesc}{int}{PyArg_VaParseTupleAndKeywords}{PyObject *args,
+                       PyObject *kw, char *format, char *keywords[],
+                       va_list vargs}
+  Identical to \cfunction{PyArg_ParseTupleAndKeywords()}, except that it
+  accepts a va_list rather than a variable number of arguments.
 \end{cfuncdesc}
 
 \begin{cfuncdesc}{int}{PyArg_Parse}{PyObject *args, char *format,
@@ -780,14 +823,14 @@ PyArg_ParseTuple(args, "O|O:ref", &object, &callback)
     Same as \samp{s\#}.
 
     \item[\samp{u} (Unicode string) {[Py_UNICODE *]}]
-    Convert a null-terminated buffer of Unicode (UCS-2) data to a
-    Python Unicode object.  If the Unicode buffer pointer is \NULL,
-    \code{None} is returned.
+    Convert a null-terminated buffer of Unicode (UCS-2 or UCS-4)
+    data to a Python Unicode object.  If the Unicode buffer pointer
+    is \NULL, \code{None} is returned.
 
     \item[\samp{u\#} (Unicode string) {[Py_UNICODE *, int]}]
-    Convert a Unicode (UCS-2) data buffer and its length to a Python
-    Unicode object.   If the Unicode buffer pointer is \NULL, the
-    length is ignored and \code{None} is returned.
+    Convert a Unicode (UCS-2 or UCS-4) data buffer and its length
+    to a Python Unicode object.   If the Unicode buffer pointer
+    is \NULL, the length is ignored and \code{None} is returned.
 
     \item[\samp{i} (integer) {[int]}]
     Convert a plain C \ctype{int} to a Python integer object.
@@ -825,9 +868,6 @@ PyArg_ParseTuple(args, "O|O:ref", &object, &callback)
     \exception{SystemError} is set.
 
     \item[\samp{S} (object) {[PyObject *]}]
-    Same as \samp{O}.
-
-    \item[\samp{U} (object) {[PyObject *]}]
     Same as \samp{O}.
 
     \item[\samp{N} (object) {[PyObject *]}]

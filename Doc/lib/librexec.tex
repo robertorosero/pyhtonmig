@@ -3,7 +3,12 @@
 
 \declaremodule{standard}{rexec}
 \modulesynopsis{Basic restricted execution framework.}
+\versionchanged[Disabled module]{2.3}
 
+\begin{notice}[warning]
+  The documentation has been left in place to help in reading old code
+  that uses the module.
+\end{notice}
 
 This module contains the \class{RExec} class, which supports
 \method{r_eval()}, \method{r_execfile()}, \method{r_exec()}, and
@@ -195,7 +200,7 @@ this module.)
 Contains the names of built-in modules which can be safely imported.
 The value for \class{RExec} is \code{('audioop', 'array', 'binascii',
 'cmath', 'errno', 'imageop', 'marshal', 'math', 'md5', 'operator',
-'parser', 'regex', 'rotor', 'select', 'sha', '_sre', 'strop',
+'parser', 'regex', 'select', 'sha', '_sre', 'strop',
 'struct', 'time')}.  A similar remark about overriding this variable
 applies --- use the value from the base class as a starting point.
 \end{memberdesc}

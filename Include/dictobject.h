@@ -7,6 +7,12 @@ extern "C" {
 
 /* Dictionary object type -- mapping from hashable object to object */
 
+/* The distribution includes a separate file, Objects/dictnotes.txt,
+   describing explorations into dictionary design and optimization.  
+   It covers typical dictionary use patterns, the parameters for
+   tuning dictionaries, and several ideas for possible optimizations.
+*/
+
 /*
 There are three kinds of slots in the table:
 
@@ -81,6 +87,7 @@ struct _dictobject {
 PyAPI_DATA(PyTypeObject) PyDict_Type;
 
 #define PyDict_Check(op) PyObject_TypeCheck(op, &PyDict_Type)
+#define PyDict_CheckExact(op) ((op)->ob_type == &PyDict_Type)
 
 PyAPI_FUNC(PyObject *) PyDict_New(void);
 PyAPI_FUNC(PyObject *) PyDict_GetItem(PyObject *mp, PyObject *key);
@@ -94,6 +101,7 @@ PyAPI_FUNC(PyObject *) PyDict_Values(PyObject *mp);
 PyAPI_FUNC(PyObject *) PyDict_Items(PyObject *mp);
 PyAPI_FUNC(int) PyDict_Size(PyObject *mp);
 PyAPI_FUNC(PyObject *) PyDict_Copy(PyObject *mp);
+PyAPI_FUNC(int) PyDict_Contains(PyObject *mp, PyObject *key);
 
 /* PyDict_Update(mp, other) is equivalent to PyDict_Merge(mp, other, 1). */
 PyAPI_FUNC(int) PyDict_Update(PyObject *mp, PyObject *other);

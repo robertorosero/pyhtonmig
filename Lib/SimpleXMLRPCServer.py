@@ -104,7 +104,6 @@ from xmlrpclib import Fault
 import SocketServer
 import BaseHTTPServer
 import sys
-import types
 import os
 
 def resolve_dotted_attribute(obj, attr):
@@ -267,7 +266,7 @@ class SimpleXMLRPCDispatcher:
     def system_methodSignature(self, method_name):
         """system.methodSignature('add') => [double, int, int]
 
-        Returns a list describing the signiture of the method. In the
+        Returns a list describing the signature of the method. In the
         above example, the add method takes two integers as arguments
         and returns a double result.
 
@@ -305,6 +304,7 @@ class SimpleXMLRPCDispatcher:
         if method is None:
             return ""
         else:
+            import pydoc
             return pydoc.getdoc(method)
 
     def system_multicall(self, call_list):
@@ -462,7 +462,7 @@ class CGIXMLRPCRequestHandler(SimpleXMLRPCDispatcher):
         print 'Content-Type: text/xml'
         print 'Content-Length: %d' % len(response)
         print
-        print response
+        sys.stdout.write(response)
 
     def handle_get(self):
         """Handle a single HTTP GET request.
@@ -485,7 +485,7 @@ class CGIXMLRPCRequestHandler(SimpleXMLRPCDispatcher):
         print 'Content-Type: text/html'
         print 'Content-Length: %d' % len(response)
         print
-        print response
+        sys.stdout.write(response)
 
     def handle_request(self, request_text = None):
         """Handle a single XML-RPC request passed through a CGI post method.

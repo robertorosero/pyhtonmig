@@ -1,6 +1,6 @@
 """A simple log mechanism styled after PEP 282."""
 
-# This module should be kept compatible with Python 1.5.2.
+# This module should be kept compatible with Python 2.1.
 
 # The class here is styled after PEP 282 so that it could later be
 # replaced with a standard Python logging implementation.
@@ -28,16 +28,16 @@ class Log:
 
     def debug(self, msg, *args):
         self._log(DEBUG, msg, args)
-    
+
     def info(self, msg, *args):
         self._log(INFO, msg, args)
-    
+
     def warn(self, msg, *args):
         self._log(WARN, msg, args)
-    
+
     def error(self, msg, *args):
         self._log(ERROR, msg, args)
-    
+
     def fatal(self, msg, *args):
         self._log(FATAL, msg, args)
 
@@ -50,7 +50,10 @@ error = _global_log.error
 fatal = _global_log.fatal
 
 def set_threshold(level):
+    # return the old threshold for use from tests
+    old = _global_log.threshold
     _global_log.threshold = level
+    return old
 
 def set_verbosity(v):
     if v <= 0:

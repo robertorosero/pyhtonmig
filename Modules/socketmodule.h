@@ -2,7 +2,11 @@
 
 /* Includes needed for the sockaddr_* symbols below */
 #ifndef MS_WINDOWS
-# include <sys/socket.h>
+#ifdef __VMS
+#   include <socket.h>
+# else
+#   include <sys/socket.h>
+# endif
 # include <netinet/in.h>
 # if !(defined(__BEOS__) || defined(__CYGWIN__) || (defined(PYOS_OS2) && defined(PYCC_VACPP)))
 #  include <netinet/tcp.h>
@@ -26,6 +30,17 @@
 # include <sys/un.h>
 #else
 # undef AF_UNIX
+#endif
+
+#ifdef HAVE_BLUETOOTH_BLUETOOTH_H
+#include <bluetooth/bluetooth.h>
+#include <bluetooth/rfcomm.h>
+#include <bluetooth/l2cap.h>
+#include <bluetooth/sco.h>
+#endif
+
+#ifdef HAVE_BLUETOOTH_H
+#include <bluetooth.h>
 #endif
 
 #ifdef HAVE_NETPACKET_PACKET_H
@@ -75,6 +90,11 @@ typedef struct {
 #ifdef ENABLE_IPV6
 		struct sockaddr_in6 in6;
 		struct sockaddr_storage storage;
+#endif
+#ifdef HAVE_BLUETOOTH_BLUETOOTH_H
+		struct sockaddr_l2 bt_l2;
+		struct sockaddr_rc bt_rc;
+		struct sockaddr_sco bt_sco;
 #endif
 #ifdef HAVE_NETPACKET_PACKET_H
 		struct sockaddr_ll ll;
@@ -140,6 +160,7 @@ typedef struct {
 /* C API for usage by other Python modules */
 typedef struct {
 	PyTypeObject *Sock_Type;
+        PyObject *error;
 } PySocketModule_APIObject;
 
 /* XXX The net effect of the following appears to be to define a function

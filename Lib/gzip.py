@@ -205,7 +205,7 @@ class GzipFile:
     def read(self, size=-1):
         if self.mode != READ:
             import errno
-            raise IOError(errno.EBADF, "write() on read-only GzipFile object")
+            raise IOError(errno.EBADF, "read() on write-only GzipFile object")
 
         if self.extrasize <= 0 and self.fileobj is None:
             return ''
@@ -334,6 +334,14 @@ class GzipFile:
     def flush(self):
         self.fileobj.flush()
 
+    def fileno(self):
+        """Invoke the underlying file object's fileno() method.
+
+        This will raise AttributeError if the underlying file object
+        doesn't support fileno().
+        """
+        return self.fileobj.fileno()
+
     def isatty(self):
         return False
 
@@ -442,7 +450,7 @@ def _test():
                 g = sys.stdout
             else:
                 if arg[-3:] != ".gz":
-                    print "filename doesn't end in .gz:", `arg`
+                    print "filename doesn't end in .gz:", repr(arg)
                     continue
                 f = open(arg, "rb")
                 g = __builtin__.open(arg[:-3], "wb")

@@ -52,6 +52,7 @@ class StringTest(
         self.checkraises(TypeError, string_tests.BadSeq1(), 'join', ' ')
         self.checkequal('a b c', string_tests.BadSeq2(), 'join', ' ')
 
+
 class ModuleTest(unittest.TestCase):
 
     def test_attrs(self):
@@ -95,10 +96,7 @@ class ModuleTest(unittest.TestCase):
         self.assertEqual(string.capwords('ABC-def DEF-ghi GHI'), 'Abc-def Def-ghi Ghi')
 
 def test_main():
-    suite = unittest.TestSuite()
-    suite.addTest(unittest.makeSuite(StringTest))
-    suite.addTest(unittest.makeSuite(ModuleTest))
-    test_support.run_suite(suite)
+    test_support.run_unittest(StringTest, ModuleTest)
 
 if __name__ == "__main__":
     test_main()

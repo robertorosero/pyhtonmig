@@ -93,7 +93,7 @@ class PyBuildExt(build_ext):
                 self.extensions.remove(ext)
 
         # Parse Modules/Setup to figure out which modules are turned
-        # on in the file. 
+        # on in the file.
         input = text_file.TextFile('Modules/Setup', join_lines=1)
         remove_modules = []
         while 1:
@@ -102,11 +102,11 @@ class PyBuildExt(build_ext):
             line = line.split()
             remove_modules.append( line[0] )
         input.close()
-        
+
         for ext in self.extensions[:]:
             if ext.name in remove_modules:
                 self.extensions.remove(ext)
-        
+
         # When you run "make CC=altcc" or something similar, you really want
         # those environment variables passed into the setup.py phase.  Here's
         # a small set of useful ones.
@@ -142,18 +142,18 @@ class PyBuildExt(build_ext):
         return platform
 
     def detect_modules(self):
-	try:
-		belibs = os.environ['BELIBRARIES'].split(';')
-	except KeyError:
-		belibs = ['/boot/beos/system/lib']
-	belibs.append('/boot/home/config/lib')
-	self.compiler.library_dirs.append('/boot/home/config/lib')
-	try:
-		beincl = os.environ['BEINCLUDES'].split(';')
-	except KeyError:
-		beincl = []
-	beincl.append('/boot/home/config/include')
-	self.compiler.include_dirs.append('/boot/home/config/include')
+        try:
+            belibs = os.environ['BELIBRARIES'].split(';')
+        except KeyError:
+            belibs = ['/boot/beos/system/lib']
+        belibs.append('/boot/home/config/lib')
+        self.compiler.library_dirs.append('/boot/home/config/lib')
+        try:
+            beincl = os.environ['BEINCLUDES'].split(';')
+        except KeyError:
+            beincl = []
+        beincl.append('/boot/home/config/include')
+        self.compiler.include_dirs.append('/boot/home/config/include')
         # lib_dirs and inc_dirs are used to search for files;
         # if a file is found in one of those directories, it can
         # be assumed that no additional -I,-L directives are needed.
@@ -162,7 +162,7 @@ class PyBuildExt(build_ext):
         exts = []
 
         platform = self.get_platform()
-        
+
         # Check for MacOS X, which doesn't need libm.a at all
         math_libs = ['m']
         if platform in ['Darwin1.2', 'beos']:
@@ -177,11 +177,9 @@ class PyBuildExt(build_ext):
 
         # Some modules that are normally always on:
         exts.append( Extension('regex', ['regexmodule.c', 'regexpr.c']) )
-        exts.append( Extension('pcre', ['pcremodule.c', 'pypcre.c']) )
 
         exts.append( Extension('_weakref', ['_weakref.c']) )
         exts.append( Extension('_symtable', ['symtablemodule.c']) )
-        exts.append( Extension('xreadlines', ['xreadlinesmodule.c']) )
 
         # array objects
         exts.append( Extension('array', ['arraymodule.c']) )
@@ -245,10 +243,7 @@ class PyBuildExt(build_ext):
         # Memory-mapped files (also works on Win32).
         exts.append( Extension('mmap', ['mmapmodule.c']) )
 
-        # Lance Ellinghaus's modules:
-        # enigma-inspired encryption
-        exts.append( Extension('rotor', ['rotormodule.c']) )
-        # syslog daemon interface
+        # Lance Ellinghaus's syslog daemon interface
         exts.append( Extension('syslog', ['syslogmodule.c']) )
 
         # George Neville-Neil's timing module:
@@ -348,7 +343,7 @@ class PyBuildExt(build_ext):
         dblib = []
         if self.compiler.find_library_file(lib_dirs, 'db'):
             dblib = ['db']
-        
+
         db185_incs = find_file('db_185.h', inc_dirs,
                                ['/usr/include/db3', '/usr/include/db2'])
         db_inc = find_file('db.h', inc_dirs, ['/usr/include/db1'])
@@ -362,23 +357,6 @@ class PyBuildExt(build_ext):
                                    include_dirs = db_inc,
                                    libraries = dblib) )
 
-        # The mpz module interfaces to the GNU Multiple Precision library.
-        # You need to ftp the GNU MP library.
-        # This was originally written and tested against GMP 1.2 and 1.3.2.
-        # It has been modified by Rob Hooft to work with 2.0.2 as well, but I
-        # haven't tested it recently.   For a more complete module,
-        # refer to pympz.sourceforge.net.
-
-        # A compatible MP library unencombered by the GPL also exists.  It was
-        # posted to comp.sources.misc in volume 40 and is widely available from
-        # FTP archive sites. One URL for it is:
-        # ftp://gatekeeper.dec.com/.b/usenet/comp.sources.misc/volume40/fgmp/part01.Z
-
-        if (self.compiler.find_library_file(lib_dirs, 'gmp')):
-            exts.append( Extension('mpz', ['mpzmodule.c'],
-                                   libraries = ['gmp'] ) )
-
-
         # Unix-only modules
         if platform not in ['mac', 'win32']:
             # Steen Lumholt's termios module
@@ -389,7 +367,7 @@ class PyBuildExt(build_ext):
 
             # Generic dynamic loading module
             #exts.append( Extension('dl', ['dlmodule.c']) )
-            
+
             # Sun yellow pages. Some systems have the functions in libc.
             if platform not in ['cygwin']:
                 if (self.compiler.find_library_file(lib_dirs, 'nsl')):
@@ -401,10 +379,6 @@ class PyBuildExt(build_ext):
 
         # Curses support, requring the System V version of curses, often
         # provided by the ncurses library.
-        if platform == 'sunos4':
-            inc_dirs += ['/usr/5include']
-            lib_dirs += ['/usr/5lib']
-
         if (self.compiler.find_library_file(lib_dirs, 'ncurses')):
             curses_libs = ['ncurses']
             exts.append( Extension('_curses', ['_cursesmodule.c'],
@@ -448,7 +422,7 @@ class PyBuildExt(build_ext):
 
         # Andrew Kuchling's zlib module.
         # This require zlib 1.1.3 (or later).
-        # See http://www.cdrom.com/pub/infozip/zlib/
+        # See http://www.gzip.org/zlib/
         if (self.compiler.find_library_file(lib_dirs, 'z')):
             exts.append( Extension('zlib', ['zlibmodule.c'],
                                    libraries = ['z']) )
@@ -504,15 +478,15 @@ class PyBuildExt(build_ext):
 
     def detect_tkinter(self, inc_dirs, lib_dirs):
         # The _tkinter module.
-        
+
         # Assume we haven't found any of the libraries or include files
         tcllib = tklib = tcl_includes = tk_includes = None
         for version in ['8.4', '8.3', '8.2', '8.1', '8.0']:
-             tklib = self.compiler.find_library_file(lib_dirs,
-                                                     'tk' + version )
-             tcllib = self.compiler.find_library_file(lib_dirs,
-                                                      'tcl' + version )
-             if tklib and tcllib:
+            tklib = self.compiler.find_library_file(lib_dirs,
+                                                    'tk' + version )
+            tcllib = self.compiler.find_library_file(lib_dirs,
+                                                     'tcl' + version )
+            if tklib and tcllib:
                 # Exit the loop when we've found the Tcl/Tk libraries
                 break
 

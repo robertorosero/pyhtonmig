@@ -7,14 +7,15 @@ CLIB = $(LIBSROOT).clib
 TCPIPLIB = $(LIBSROOT).TCPIPLibs
 DLKLIB = $(LIBSROOT).dlk
 ZLIB = $(LIBSROOT).zlib
+BZLIB = $(LIBSROOT).bzlib
 EXPAT = $(LIBSROOT).expat.lib
 
-OBJSCAN = objscan
-MAKEDLK = makedlk
+OBJSCAN = $(DLKLIB).objscan
+MAKEDLK = $(DLKLIB).makedlk
 
 # change from time to time (don't forget to change !Boot also)
-TARGET=Python22
-BUILD=25
+TARGET=Python23
+BUILD=40
 
 
 #
@@ -61,20 +62,20 @@ MODULES_DYNAMIC =\
 	@.^.Lib.array/pyd\
 	@.^.Lib.audioop/pyd\
 	@.^.Lib.binascii/pyd\
+	@.^.Lib.bz2/pyd\
 	@.^.Lib.cmath/pyd\
 	@.^.Lib.cPickle/pyd\
 	@.^.Lib.cStringIO/pyd\
+	@.^.Lib.datetime/pyd\
 	@.^.Lib.errno/pyd\
 	@.^.Lib.imageop/pyd\
+	@.^.Lib.itertools/pyd\
 	@.^.Lib.math/pyd\
 	@.^.Lib.md5/pyd\
-	@.^.Lib.new/pyd\
 	@.^.Lib.operator/pyd\
 	@.^.Lib.parser/pyd\
-	@.^.Lib.pcre/pyd\
 	@.^.Lib.regex/pyd\
 	@.^.Lib.rgbimg/pyd\
-	@.^.Lib.rotor/pyd\
 	@.^.Lib.sha/pyd\
 	@.^.Lib.signal/pyd\
 	@.^.Lib.struct/pyd\
@@ -87,13 +88,15 @@ MODULES_DYNAMIC =\
 	@.^.Lib._weakref/pyd\
 	@.^.Lib._testcapi/pyd\
 	@.^.Lib.unicodedata/pyd\
-	@.^.Lib.xreadlines/pyd\
 	@.^.Lib.pyexpat/pyd\
 	@.^.Lib.plat-riscos.drawf/pyd\
 	@.^.Lib.plat-riscos.swi/pyd\
 	@.^.Lib._sre/pyd\
 	@.^.Lib.xxsubtype/pyd\
-	@.^.Lib._symtable/pyd
+	@.^.Lib._symtable/pyd\
+	@.^.Lib._random/pyd\
+	@.^.Lib.zipimport/pyd\
+	@.^.Lib._csv/pyd
 
 
 OBJECTS_PYTHON =\
@@ -125,7 +128,6 @@ OBJECTS_PYTHON =\
 	@.^.Python.o.ceval\
 	@.^.Python.o.bltinmodule\
 	@.^.Python.o.exceptions\
-	@.^.Python.o.hypot\
 	@.^.Python.o.codecs\
 	@.^.Python.o.symtable\
 	@.^.Python.o.future
@@ -145,16 +147,19 @@ OBJECTS_OBJECTS =\
 	@.^.Objects.o.sliceobject\
 	@.^.Objects.o.rangeobject\
 	@.^.Objects.o.object\
+	@.^.Objects.o.obmalloc\
 	@.^.Objects.o.moduleobject\
 	@.^.Objects.o.methodobject\
 	@.^.Objects.o.longobject\
 	@.^.Objects.o.listobject\
 	@.^.Objects.o.intobject\
+	@.^.Objects.o.boolobject\
 	@.^.Objects.o.iterobject\
 	@.^.Objects.o.funcobject\
 	@.^.Objects.o.frameobject\
 	@.^.Objects.o.floatobject\
 	@.^.Objects.o.fileobject\
+	@.^.Objects.o.enumobject\
 	@.^.Objects.o.dictobject\
 	@.^.Objects.o.complexobject\
 	@.^.Objects.o.cobject\
@@ -244,15 +249,24 @@ $(LIB_PYTHON):	$(OBJECTS)
 @.^.Lib.cStringIO/pyd: @.^.Modules.o.cStringIO s.linktab
 	$(MAKEDLK) -d @.^.Lib.cStringIO/pyd -s s.linktab -o @.^.Modules.o.cStringIO -e initcStringIO
 
+@.^.Lib._csv/pyd: @.^.Modules.o._csv s.linktab
+	$(MAKEDLK) -d @.^.Lib._csv/pyd -s s.linktab -o @.^.Modules.o._csv -e init_csv
+
 @.^.Lib.plat-riscos.drawf/pyd: Modules.o.drawfmodule #s.linktab
 	$(LINK) -aof -o Modules.o.drawflink Modules.o.drawfmodule $(OSLIB).o.OSLIB32
 	$(MAKEDLK) -d @.^.Lib.plat-riscos.drawf/pyd -s s.linktab -o Modules.o.drawflink -e initdrawf
+
+@.^.Lib.datetime/pyd: @.^.Modules.o.datetimemodule s.linktab
+	$(MAKEDLK) -d @.^.Lib.datetime/pyd -s s.linktab -o @.^.Modules.o.datetimemodule -e initdatetime
 
 @.^.Lib.errno/pyd: @.^.Modules.o.errnomodule #s.linktab
 	$(MAKEDLK) -d @.^.Lib.errno/pyd -s s.linktab -o @.^.Modules.o.errnomodule -e initerrno
 
 @.^.Lib.imageop/pyd: @.^.Modules.o.imageop s.linktab
 	$(MAKEDLK) -d @.^.Lib.imageop/pyd -s s.linktab -o @.^.Modules.o.imageop -e initimageop
+
+@.^.Lib.itertools/pyd: @.^.Modules.o.itertoolsmodule s.linktab
+	$(MAKEDLK) -d @.^.Lib.itertools/pyd -s s.linktab -o @.^.Modules.o.itertoolsmodule -e inititertools
 
 @.^.Lib.math/pyd: @.^.Modules.o.mathmodule s.linktab
 	$(MAKEDLK) -d @.^.Lib.math/pyd -s s.linktab -o @.^.Modules.o.mathmodule -e initmath
@@ -270,19 +284,12 @@ $(LIB_PYTHON):	$(OBJECTS)
 @.^.Lib.parser/pyd: @.^.Modules.o.parsermodule s.linktab
 	$(MAKEDLK) -d @.^.Lib.parser/pyd -s s.linktab -o @.^.Modules.o.parsermodule -e initparser
 
-@.^.Lib.pcre/pyd: @.^.Modules.o.pcremodule @.^.Modules.o.pypcre s.linktab
-	$(LINK) -aof -o @.^.Modules.o.pcrelink @.^.Modules.o.pcremodule @.^.Modules.o.pypcre
-	$(MAKEDLK) -d @.^.Lib.pcre/pyd -s s.linktab -o @.^.Modules.o.pcrelink -e initpcre
-
 @.^.Lib.regex/pyd: @.^.Modules.o.regexmodule @.^.Modules.o.regexpr s.linktab
 	$(LINK) -aof -o @.^.Modules.o.regexlink @.^.Modules.o.regexmodule @.^.Modules.o.regexpr
 	$(MAKEDLK) -d @.^.Lib.regex/pyd -s s.linktab -o @.^.Modules.o.regexlink -e initregex
 
 @.^.Lib.rgbimg/pyd: @.^.Modules.o.rgbimgmodule s.linktab
 	$(MAKEDLK) -d @.^.Lib.rgbimg/pyd -s s.linktab -o @.^.Modules.o.rgbimgmodule -e initrgbimg
-
-@.^.Lib.rotor/pyd: @.^.Modules.o.rotormodule s.linktab
-	$(MAKEDLK) -d @.^.Lib.rotor/pyd -s s.linktab -o @.^.Modules.o.rotormodule -e initrotor
 
 @.^.Lib.sha/pyd: @.^.Modules.o.shamodule s.linktab
 	$(MAKEDLK) -d @.^.Lib.sha/pyd -s s.linktab -o @.^.Modules.o.shamodule -e initsha
@@ -318,11 +325,11 @@ $(LIB_PYTHON):	$(OBJECTS)
 @.^.Lib.unicodedata/pyd: @.^.Modules.o.unicodedata s.linktab
 	$(MAKEDLK) -d @.^.Lib.unicodedata/pyd -s s.linktab -o @.^.Modules.o.unicodedata -e initunicodedata
 
-@.^.Lib.xreadlines/pyd: @.^.Modules.o.xreadlinesmodule s.linktab
-	$(MAKEDLK) -d @.^.Lib.xreadlines/pyd -s s.linktab -o @.^.Modules.o.xreadlinesmodule -e initxreadlines
-
 @.^.Lib.xxsubtype/pyd: @.^.Modules.o.xxsubtype s.linktab
 	$(MAKEDLK) -d @.^.Lib.xxsubtype/pyd -s s.linktab -o @.^.Modules.o.xxsubtype -e initxxsubtype
+
+@.^.Lib._random/pyd: @.^.Modules.o._randommodule s.linktab
+	$(MAKEDLK) -d @.^.Lib._random/pyd -s s.linktab -o @.^.Modules.o._randommodule -e init_random
 
 @.^.Lib._symtable/pyd: @.^.Modules.o.symtablemodule s.linktab
 	$(MAKEDLK) -d @.^.Lib._symtable/pyd -s s.linktab -o @.^.Modules.o.symtablemodule -e init_symtable
@@ -332,14 +339,14 @@ $(LIB_PYTHON):	$(OBJECTS)
 # Dynamic Modules with other dependencies
 #
 @.^.Lib.select/pyd:  @.^.Modules.o.selectmodule s.linktab
-	$(LINK) -aof -o @.^.Modules.o.selectlink @.^.Modules.o.selectmodule $(TCPIPLIB).o.socklib
+	$(LINK) -aof -o @.^.Modules.o.selectlink @.^.Modules.o.selectmodule $(TCPIPLIB).o.socklib5
 	$(MAKEDLK) -d @.^.Lib.select/pyd -s s.linktab -o @.^.Modules.o.selectlink -e initselect
 
 @.^.Modules.o.selectmodule: @.^.Modules.c.selectmodule
 	$(CC) -I$(TCPIPLIB).include -o $@ @.^.Modules.c.selectmodule
 
 @.^.Lib._socket/pyd: @.^.Modules.o.socketmodule s.linktab 
-	$(LINK) -aof -o @.^.Modules.o._socketlink @.^.Modules.o.socketmodule $(TCPIPLIB).o.inetlib $(TCPIPLIB).o.unixlib $(TCPIPLIB).o.socklib
+	$(LINK) -aof -o @.^.Modules.o._socketlink @.^.Modules.o.socketmodule $(TCPIPLIB).o.inetlib $(TCPIPLIB).o.unixlib $(TCPIPLIB).o.socklib5
 	$(MAKEDLK) -d @.^.Lib._socket/pyd -s s.linktab -o @.^.Modules.o._socketlink -e init_socket
 
 @.^.Modules.o.socketmodule: @.^.Modules.c.socketmodule
@@ -353,6 +360,12 @@ $(LIB_PYTHON):	$(OBJECTS)
 @.^.Modules.o.zlibmodule: @.^.Modules.c.zlibmodule
 	$(CC) -I$(ZLIB) -o $@ @.^.Modules.c.zlibmodule
 
+@.^.Lib.bz2/pyd: @.^.Modules.o.bz2module s.linktab
+	$(LINK) -aof -o @.^.Modules.o.bz2link @.^.Modules.o.bz2module $(BZLIB).bzlib
+	$(MAKEDLK) -d @.^.Lib.bz2/pyd -s s.linktab -o @.^.Modules.o.bz2link -e initbz2
+
+@.^.Modules.o.bz2module: @.^.Modules.c.bz2module
+	$(CC) -I$(BZLIB) -o $@ @.^.Modules.c.bz2module
 
 @.^.Lib.time/pyd: @.^.Modules.o.timemodule s.linktab @.o.sleep
 	$(LINK) -aof -o @.^.Modules.o.timelink @.^.Modules.o.timemodule @.o.sleep $(OSLIB).o.OSLib32
@@ -369,6 +382,10 @@ $(LIB_PYTHON):	$(OBJECTS)
 
 @.^.Modules.o.pyexpat: @.^.Modules.c.pyexpat
 	$(CCEXPAT) -o $@ @.^.Modules.c.pyexpat
+
+@.^.Lib.zipimport/pyd: @.^.Modules.o.zipimport s.linktab
+	$(LINK) -aof -o @.^.Modules.o.zipimportlink @.^.Modules.o.zipimport o.unixstuff $(OSLIB).o.OSLib32
+	$(MAKEDLK) -d @.^.Lib.zipimport/pyd -s s.linktab -o @.^.Modules.o.zipimportlink -e initzipimport
 
 
 ##########################################################################

@@ -27,12 +27,18 @@ Written by Marc-Andre Lemburg (mal@lemburg.com).
 
 """#"
 
-import codecs, exceptions, re
+import codecs, exceptions, types, aliases
 
 _cache = {}
 _unknown = '--unknown--'
 _import_tail = ['*']
-_norm_encoding_RE = re.compile('[^a-zA-Z0-9.]')
+_norm_encoding_map = ('                                              . '
+                      '0123456789       ABCDEFGHIJKLMNOPQRSTUVWXYZ     '
+                      ' abcdefghijklmnopqrstuvwxyz                     '
+                      '                                                '
+                      '                                                '
+                      '                ')
+_aliases = aliases.aliases
 
 class CodecRegistryError(exceptions.LookupError,
                          exceptions.SystemError):
@@ -45,10 +51,20 @@ def normalize_encoding(encoding):
         Normalization works as follows: all non-alphanumeric
         characters except the dot used for Python package names are
         collapsed and replaced with a single underscore, e.g. '  -;#'
-        becomes '_'.
+        becomes '_'. Leading and trailing underscores are removed.
+
+        Note that encoding names should be ASCII only; if they do use
+        non-ASCII characters, these must be Latin-1 compatible.
 
     """
-    return '_'.join(_norm_encoding_RE.split(encoding))
+    # Make sure we have an 8-bit string, because .translate() works
+    # differently for Unicode strings.
+    if type(encoding) is types.UnicodeType:
+        # Note that .encode('latin-1') does *not* use the codec
+        # registry, so this call doesn't recurse. (See unicodeobject.c
+        # PyUnicode_AsEncodedString() for details)
+        encoding = encoding.encode('latin-1')
+    return '_'.join(encoding.translate(_norm_encoding_map).split())
 
 def search_function(encoding):
 
@@ -59,23 +75,31 @@ def search_function(encoding):
 
     # Import the module:
     #
-    # First look in the encodings package, then try to lookup the
-    # encoding in the aliases mapping and retry the import using the
-    # default import module lookup scheme with the alias name.
+    # First try to find an alias for the normalized encoding
+    # name and lookup the module using the aliased name, then try to
+    # lookup the module using the standard import scheme, i.e. first
+    # try in the encodings package, then at top-level.
     #
-    modname = normalize_encoding(encoding)
-    try:
-        mod = __import__('encodings.' + modname,
-                         globals(), locals(), _import_tail)
-    except ImportError:
-        import aliases
-        modname = (aliases.aliases.get(modname) or
-                   aliases.aliases.get(modname.replace('.', '_')) or
-                   modname)
+    norm_encoding = normalize_encoding(encoding)
+    aliased_encoding = _aliases.get(norm_encoding) or \
+                       _aliases.get(norm_encoding.replace('.', '_'))
+    if aliased_encoding is not None:
+        modnames = [aliased_encoding,
+                    norm_encoding]
+    else:
+        modnames = [norm_encoding]
+    for modname in modnames:
+        if not modname:
+            continue
         try:
-            mod = __import__(modname, globals(), locals(), _import_tail)
+            mod = __import__(modname,
+                             globals(), locals(), _import_tail)
         except ImportError:
-            mod = None
+            pass
+        else:
+            break
+    else:
+        mod = None
 
     try:
         getregentry = mod.getregentry
@@ -110,10 +134,9 @@ def search_function(encoding):
     except AttributeError:
         pass
     else:
-        import aliases
         for alias in codecaliases:
-            if not aliases.aliases.has_key(alias):
-                aliases.aliases[alias] = modname
+            if not _aliases.has_key(alias):
+                _aliases[alias] = modname
 
     # Return the registry entry
     return entry

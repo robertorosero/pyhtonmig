@@ -37,12 +37,6 @@ class CodecCallbackTest(unittest.TestCase):
     def test_xmlcharnamereplace(self):
         # This time use a named character entity for unencodable
         # characters, if one is available.
-        names = {}
-        for (key, value) in htmlentitydefs.entitydefs.items():
-            if len(value)==1:
-                names[unicode(value, "latin-1")] = unicode(key, "latin-1")
-            else:
-                names[unichr(int(value[2:-1]))] = unicode(key, "latin-1")
 
         def xmlcharnamereplace(exc):
             if not isinstance(exc, UnicodeEncodeError):
@@ -50,7 +44,7 @@ class CodecCallbackTest(unittest.TestCase):
             l = []
             for c in exc.object[exc.start:exc.end]:
                 try:
-                    l.append(u"&%s;" % names[c])
+                    l.append(u"&%s;" % htmlentitydefs.codepoint2name[ord(c)])
                 except KeyError:
                     l.append(u"&#%d;" % ord(c))
             return (u"".join(l), exc.end)
@@ -264,7 +258,7 @@ class CodecCallbackTest(unittest.TestCase):
         self.check_exceptionobjectargs(
             UnicodeEncodeError,
             ["ascii", u"g\xfcrk", 1, 2, "ouch"],
-            "'ascii' codec can't encode character '\ufc' in position 1: ouch"
+            "'ascii' codec can't encode character u'\\xfc' in position 1: ouch"
         )
         self.check_exceptionobjectargs(
             UnicodeEncodeError,
@@ -274,8 +268,24 @@ class CodecCallbackTest(unittest.TestCase):
         self.check_exceptionobjectargs(
             UnicodeEncodeError,
             ["ascii", u"\xfcx", 0, 1, "ouch"],
-            "'ascii' codec can't encode character '\ufc' in position 0: ouch"
+            "'ascii' codec can't encode character u'\\xfc' in position 0: ouch"
         )
+        self.check_exceptionobjectargs(
+            UnicodeEncodeError,
+            ["ascii", u"\u0100x", 0, 1, "ouch"],
+            "'ascii' codec can't encode character u'\\u0100' in position 0: ouch"
+        )
+        self.check_exceptionobjectargs(
+            UnicodeEncodeError,
+            ["ascii", u"\uffffx", 0, 1, "ouch"],
+            "'ascii' codec can't encode character u'\\uffff' in position 0: ouch"
+        )
+        if sys.maxunicode > 0xffff:
+            self.check_exceptionobjectargs(
+                UnicodeEncodeError,
+                ["ascii", u"\U00010000x", 0, 1, "ouch"],
+                "'ascii' codec can't encode character u'\\U00010000' in position 0: ouch"
+            )
 
     def test_unicodedecodeerror(self):
         self.check_exceptionobjectargs(
@@ -293,8 +303,24 @@ class CodecCallbackTest(unittest.TestCase):
         self.check_exceptionobjectargs(
             UnicodeTranslateError,
             [u"g\xfcrk", 1, 2, "ouch"],
-            "can't translate character '\\ufc' in position 1: ouch"
+            "can't translate character u'\\xfc' in position 1: ouch"
         )
+        self.check_exceptionobjectargs(
+            UnicodeTranslateError,
+            [u"g\u0100rk", 1, 2, "ouch"],
+            "can't translate character u'\\u0100' in position 1: ouch"
+        )
+        self.check_exceptionobjectargs(
+            UnicodeTranslateError,
+            [u"g\uffffrk", 1, 2, "ouch"],
+            "can't translate character u'\\uffff' in position 1: ouch"
+        )
+        if sys.maxunicode > 0xffff:
+            self.check_exceptionobjectargs(
+                UnicodeTranslateError,
+                [u"g\U00010000rk", 1, 2, "ouch"],
+                "can't translate character u'\\U00010000' in position 1: ouch"
+            )
         self.check_exceptionobjectargs(
             UnicodeTranslateError,
             [u"g\xfcrk", 1, 3, "ouch"],
@@ -362,7 +388,7 @@ class CodecCallbackTest(unittest.TestCase):
            codecs.replace_errors,
            UnicodeError("ouch")
         )
-        # With the correct exception, "ignore" returns an empty replacement
+        # With the correct exception, "replace" returns an "?" or u"\ufffd" replacement
         self.assertEquals(
             codecs.replace_errors(UnicodeEncodeError("ascii", u"\u3042", 0, 1, "ouch")),
             (u"?", 1)
@@ -579,7 +605,7 @@ class CodecCallbackTest(unittest.TestCase):
         handler.pos = 1
         self.assertEquals("\xff0".decode("ascii", "test.posreturn"), u"<?>0")
 
-        # Largest valid positive position (one beyond end of input
+        # Largest valid positive position (one beyond end of input)
         handler.pos = 2
         self.assertEquals("\xff0".decode("ascii", "test.posreturn"), u"<?>")
 
@@ -664,10 +690,20 @@ class CodecCallbackTest(unittest.TestCase):
         self.assertRaises(TypeError, u"\xff".translate, {0xff: sys.maxunicode+1})
         self.assertRaises(TypeError, u"\xff".translate, {0xff: ()})
 
+    def test_bug828737(self):
+        charmap = {
+            ord("&"): u"&amp;",
+            ord("<"): u"&lt;",
+            ord(">"): u"&gt;",
+            ord('"'): u"&quot;",
+        }
+
+        for n in (1, 10, 100, 1000):
+            text = u'abc<def>ghi'*n
+            text.translate(charmap)
+
 def test_main():
-    suite = unittest.TestSuite()
-    suite.addTest(unittest.makeSuite(CodecCallbackTest))
-    test.test_support.run_suite(suite)
+    test.test_support.run_unittest(CodecCallbackTest)
 
 if __name__ == "__main__":
     test_main()

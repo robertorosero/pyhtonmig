@@ -14,7 +14,7 @@ __all__ = ["normcase","isabs","join","splitdrive","split","splitext",
            "getatime","getctime", "islink","exists","isdir","isfile","ismount",
            "walk","expanduser","expandvars","normpath","abspath","splitunc",
            "curdir","pardir","sep","pathsep","defpath","altsep","extsep",
-           "realpath","supports_unicode_filenames"]
+           "devnull","realpath","supports_unicode_filenames"]
 
 # strings representing various path-related bits and pieces
 curdir = '.'
@@ -29,6 +29,7 @@ if 'ce' in sys.builtin_module_names:
 elif 'os2' in sys.builtin_module_names:
     # OS/2 w/ VACPP
     altsep = '/'
+devnull = 'nul'
 
 # Normalize the case of a pathname and map slashes to backslashes.
 # Other normalizations (such as optimizing '../' away) are not done
@@ -248,7 +249,6 @@ def islink(path):
 
 
 # Does a path exist?
-# This is false for dangling symbolic links.
 
 def exists(path):
     """Test whether a path exists"""
@@ -257,6 +257,8 @@ def exists(path):
     except os.error:
         return False
     return True
+
+lexists = exists
 
 
 # Is a path a dos directory?
@@ -301,7 +303,7 @@ def ismount(path):
 # For each directory under top (including top itself, but excluding
 # '.' and '..'), func(arg, dirname, filenames) is called, where
 # dirname is the name of the directory and filenames is the list
-# files files (and subdirectories etc.) in the directory.
+# of files (and subdirectories etc.) in the directory.
 # The func may modify the filenames list, to implement a filter,
 # or to impose a different order of visiting.
 
@@ -439,9 +441,25 @@ def normpath(path):
     """Normalize path, eliminating double slashes, etc."""
     path = path.replace("/", "\\")
     prefix, path = splitdrive(path)
-    while path[:1] == "\\":
-        prefix = prefix + "\\"
-        path = path[1:]
+    # We need to be careful here. If the prefix is empty, and the path starts
+    # with a backslash, it could either be an absolute path on the current
+    # drive (\dir1\dir2\file) or a UNC filename (\\server\mount\dir1\file). It
+    # is therefore imperative NOT to collapse multiple backslashes blindly in
+    # that case.
+    # The code below preserves multiple backslashes when there is no drive
+    # letter. This means that the invalid filename \\\a\b is preserved
+    # unchanged, where a\\\b is normalised to a\b. It's not clear that there
+    # is any better behaviour for such edge cases.
+    if prefix == '':
+        # No drive letter - preserve initial backslashes
+        while path[:1] == "\\":
+            prefix = prefix + "\\"
+            path = path[1:]
+    else:
+        # We have a drive letter - collapse initial backslashes
+        if path.startswith("\\"):
+            prefix = prefix + "\\"
+            path = path.lstrip("\\")
     comps = path.split("\\")
     i = 0
     while i < len(comps):

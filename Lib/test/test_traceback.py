@@ -40,6 +40,50 @@ class TracebackCases(unittest.TestCase):
         self.assert_(len(err) == 3)
         self.assert_(err[1].strip() == "[x for x in x] = x")
 
+    def test_bug737473(self):
+        import sys, os, tempfile, time
+
+        savedpath = sys.path[:]
+        testdir = tempfile.mkdtemp()
+        try:
+            sys.path.insert(0, testdir)
+            testfile = os.path.join(testdir, 'test_bug737473.py')
+            print >> open(testfile, 'w'), """
+def test():
+    raise ValueError"""
+
+            if 'test_bug737473' in sys.modules:
+                del sys.modules['test_bug737473']
+            import test_bug737473
+
+            try:
+                test_bug737473.test()
+            except ValueError:
+                # this loads source code to linecache
+                traceback.extract_tb(sys.exc_traceback)
+
+            # If this test runs too quickly, test_bug737473.py's mtime
+            # attribute will remain unchanged even if the file is rewritten.
+            # Consequently, the file would not reload.  So, added a sleep()
+            # delay to assure that a new, distinct timestamp is written.
+            # Since WinME with FAT32 has multisecond resolution, more than
+            # three seconds are needed for this test to pass reliably :-(
+            time.sleep(4)
+
+            print >> open(testfile, 'w'), """
+def test():
+    raise NotImplementedError"""
+            reload(test_bug737473)
+            try:
+                test_bug737473.test()
+            except NotImplementedError:
+                src = traceback.extract_tb(sys.exc_traceback)[-1][-1]
+                self.failUnlessEqual(src, 'raise NotImplementedError')
+        finally:
+            sys.path[:] = savedpath
+            for f in os.listdir(testdir):
+                os.unlink(os.path.join(testdir, f))
+            os.rmdir(testdir)
 
 def test_main():
     run_unittest(TracebackCases)

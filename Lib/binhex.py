@@ -197,7 +197,6 @@ class BinHex:
         self.state = _DID_HEADER
 
     def _writeinfo(self, name, finfo):
-        name = name
         nl = len(name)
         if nl > 63:
             raise Error, 'Filename too long'
@@ -229,7 +228,7 @@ class BinHex:
 
     def close_data(self):
         if self.dlen != 0:
-            raise Error, 'Incorrect data size, diff='+`self.rlen`
+            raise Error, 'Incorrect data size, diff=%r' % (self.rlen,)
         self._writecrc()
         self.state = _DID_DATA
 
@@ -248,7 +247,7 @@ class BinHex:
             raise Error, 'Close at the wrong time'
         if self.rlen != 0:
             raise Error, \
-                  "Incorrect resource-datasize, diff="+`self.rlen`
+                  "Incorrect resource-datasize, diff=%r" % (self.rlen,)
         self._writecrc()
         self.ofp.close()
         self.state = None

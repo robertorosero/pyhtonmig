@@ -3,7 +3,7 @@
 Implements the Distutils 'bdist_rpm' command (create RPM source and binary
 distributions)."""
 
-# This module should be kept compatible with Python 1.5.2.
+# This module should be kept compatible with Python 2.1.
 
 __revision__ = "$Id$"
 
@@ -81,6 +81,8 @@ class bdist_rpm (Command):
          "capabilities required to build this package"),
         ('obsoletes=', None,
          "capabilities made obsolete by this package"),
+        ('no-autoreq', None,
+         "do not automatically calculate dependencies"),
 
         # Actions to take when building RPM
         ('keep-temp', 'k',
@@ -95,9 +97,38 @@ class bdist_rpm (Command):
          "RPM 3 compatibility mode (default)"),
         ('rpm2-mode', None,
          "RPM 2 compatibility mode"),
+
+        # Add the hooks necessary for specifying custom scripts
+        ('prep-script=', None,
+         "Specify a script for the PREP phase of RPM building"),
+        ('build-script=', None,
+         "Specify a script for the BUILD phase of RPM building"),
+
+        ('pre-install=', None,
+         "Specify a script for the pre-INSTALL phase of RPM building"),
+        ('install-script=', None,
+         "Specify a script for the INSTALL phase of RPM building"),
+        ('post-install=', None,
+         "Specify a script for the post-INSTALL phase of RPM building"),
+
+        ('pre-uninstall=', None,
+         "Specify a script for the pre-UNINSTALL phase of RPM building"),
+        ('post-uninstall=', None,
+         "Specify a script for the post-UNINSTALL phase of RPM building"),
+
+        ('clean-script=', None,
+         "Specify a script for the CLEAN phase of RPM building"),
+
+        ('verify-script=', None,
+         "Specify a script for the VERIFY phase of the RPM build"),
+
+        # Allow a packager to explicitly force an architecture
+        ('force-arch=', None,
+         "Force an architecture onto the RPM build process"),
        ]
 
-    boolean_options = ['keep-temp', 'use-rpm-opt-flags', 'rpm3-mode']
+    boolean_options = ['keep-temp', 'use-rpm-opt-flags', 'rpm3-mode',
+                       'no-autoreq']
 
     negative_opt = {'no-keep-temp': 'keep-temp',
                     'no-rpm-opt-flags': 'use-rpm-opt-flags',
@@ -144,6 +175,9 @@ class bdist_rpm (Command):
         self.keep_temp = 0
         self.use_rpm_opt_flags = 1
         self.rpm3_mode = 1
+        self.no_autoreq = 0
+
+        self.force_arch = None
 
     # initialize_options()
 
@@ -225,6 +259,7 @@ class bdist_rpm (Command):
         self.ensure_string_list('build_requires')
         self.ensure_string_list('obsoletes')
 
+        self.ensure_string('force_arch')
     # finalize_package_data ()
 
 
@@ -295,7 +330,7 @@ class bdist_rpm (Command):
             rpm_cmd.append('-ba')
         if self.rpm3_mode:
             rpm_cmd.extend(['--define',
-                             '_topdir %s/%s' % (os.getcwd(), self.rpm_base),])
+                             '_topdir %s' % os.path.abspath(self.rpm_base)])
         if not self.keep_temp:
             rpm_cmd.append('--clean')
         rpm_cmd.append(spec_path)
@@ -313,10 +348,15 @@ class bdist_rpm (Command):
 
             if not self.source_only:
                 rpms = glob.glob(os.path.join(rpm_dir['RPMS'], "*/*.rpm"))
+                debuginfo = glob.glob(os.path.join(rpm_dir['RPMS'], \
+                                                   "*/*debuginfo*.rpm"))
+                if debuginfo:
+                    rpms.remove(debuginfo[0])
                 assert len(rpms) == 1, \
                        "unexpected number of RPM files found: %s" % rpms
                 self.move_file(rpms[0], self.dist_dir)
-
+                if debuginfo:
+                    self.move_file(debuginfo[0], self.dist_dir)
     # run()
 
 
@@ -327,8 +367,8 @@ class bdist_rpm (Command):
         # definitions and headers
         spec_file = [
             '%define name ' + self.distribution.get_name(),
-            '%define version ' + self.distribution.get_version(),
-            '%define release ' + self.release,
+            '%define version ' + self.distribution.get_version().replace('-','_'),
+            '%define release ' + self.release.replace('-','_'),
             '',
             'Summary: ' + self.distribution.get_description(),
             ]
@@ -356,12 +396,15 @@ class bdist_rpm (Command):
         spec_file.extend([
             'License: ' + self.distribution.get_license(),
             'Group: ' + self.group,
-            'BuildRoot: %{_tmppath}/%{name}-buildroot',
+            'BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-buildroot',
             'Prefix: %{_prefix}', ])
 
-        # noarch if no extension modules
-        if not self.distribution.has_ext_modules():
-            spec_file.append('BuildArchitectures: noarch')
+        if not self.force_arch:
+            # noarch if no extension modules
+            if not self.distribution.has_ext_modules():
+                spec_file.append('BuildArch: noarch')
+        else:
+            spec_file.append( 'BuildArch: %s' % self.force_arch )
 
         for field in ('Vendor',
                       'Packager',
@@ -389,6 +432,9 @@ class bdist_rpm (Command):
 
         if self.icon:
             spec_file.append('Icon: ' + os.path.basename(self.icon))
+
+        if self.no_autoreq:
+            spec_file.append('AutoReq: 0')
 
         spec_file.extend([
             '',

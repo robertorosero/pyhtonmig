@@ -51,10 +51,11 @@ matches a particular string, which comes down to the same thing).
 
 Regular expressions can be concatenated to form new regular
 expressions; if \emph{A} and \emph{B} are both regular expressions,
-then \emph{AB} is also a regular expression.  If a string \emph{p}
-matches A and another string \emph{q} matches B, the string \emph{pq}
-will match AB if \emph{A} and \emph{B} do no specify boundary
-conditions that are no longer satisfied by \emph{pq}.  Thus, complex
+then \emph{AB} is also a regular expression.  In general, if a string
+\emph{p} matches \emph{A} and another string \emph{q} matches \emph{B},
+the string \emph{pq} will match AB.  This holds unless \emph{A} or
+\emph{B} contain low precedence operations; boundary conditions between
+\emph{A} and \emph{B}; or have numbered group references.  Thus, complex
 expressions can easily be constructed from simpler primitive
 expressions like the ones described here.  For details of the theory
 and implementation of regular expressions, consult the Friedl book
@@ -77,8 +78,8 @@ Special characters either stand for classes of ordinary characters, or
 affect how the regular expressions around them are interpreted.
 
 The special characters are:
-
-\begin{list}{}{\leftmargin 0.7in \labelwidth 0.65in}
+%
+\begin{description}
 
 \item[\character{.}] (Dot.)  In the default mode, this matches any
 character except a newline.  If the \constant{DOTALL} flag has been
@@ -186,14 +187,13 @@ except \character{\textasciicircum}.
 \item[\character{|}]\code{A|B}, where A and B can be arbitrary REs,
 creates a regular expression that will match either A or B.  An
 arbitrary number of REs can be separated by the \character{|} in this
-way.  This can be used inside groups (see below) as well.  REs
-separated by \character{|} are tried from left to right, and the first
-one that allows the complete pattern to match is considered the
-accepted branch.  This means that if \code{A} matches, \code{B} will
-never be tested, even if it would produce a longer overall match.  In
-other words, the \character{|} operator is never greedy.  To match a
-literal \character{|}, use \regexp{\e|}, or enclose it inside a
-character class, as in \regexp{[|]}.
+way.  This can be used inside groups (see below) as well.  As the target
+string is scanned, REs separated by \character{|} are tried from left to
+right. When one pattern completely matches, that branch is accepted.
+This means that once \code{A} matches, \code{B} will not be tested further,
+even if it would produce a longer overall match.  In other words, the
+\character{|} operator is never greedy.  To match a literal \character{|},
+use \regexp{\e|}, or enclose it inside a character class, as in \regexp{[|]}.
 
 \item[\code{(...)}] Matches whatever regular expression is inside the
 parentheses, and indicates the start and end of a group; the contents
@@ -297,14 +297,23 @@ assertions, the contained pattern must only match strings of some
 fixed length.  Patterns which start with negative lookbehind
 assertions may match at the beginning of the string being searched.
 
-\end{list}
+\item[\code{(?(\var{id/name})yes-pattern|no-pattern)}] Will try to match
+with \regexp{yes-pattern} if the group with given \var{id} or \var{name}
+exists, and with \regexp{no-pattern} if it doesn't. \regexp{|no-pattern}
+is optional and can be omitted. For example, 
+\regexp{(<)?(\e w+@\e w+(?:\e .\e w+)+)(?(1)>)} is a poor email matching
+pattern, which will match with \code{'<user@host.com>'} as well as
+\code{'user@host.com'}, but not with \code{'<user@host.com'}.
+\versionadded{2.4}
+
+\end{description}
 
 The special sequences consist of \character{\e} and a character from the
 list below.  If the ordinary character is not on the list, then the
 resulting RE will match the second character.  For example,
 \regexp{\e\$} matches the character \character{\$}.
-
-\begin{list}{}{\leftmargin 0.7in \labelwidth 0.65in}
+%
+\begin{description}
 
 \item[\code{\e \var{number}}] Matches the contents of the group of the
 same number.  Groups are numbered starting from 1.  For example,
@@ -365,7 +374,7 @@ character properties database.
 
 \item[\code{\e Z}]Matches only at the end of the string.
 
-\end{list}
+\end{description}
 
 Most of the standard escapes supported by Python string literals are
 also accepted by the regular expression parser:
@@ -378,7 +387,8 @@ also accepted by the regular expression parser:
 
 Octal escapes are included in a limited form: If the first digit is a
 0, or if there are three octal digits, it is considered an octal
-escape. Otherwise, it is a group reference.
+escape. Otherwise, it is a group reference.  As for string literals,
+octal escapes are always at most three digits in length.
 
 
 % Note the lack of a period in the section title; it causes problems
@@ -414,8 +424,10 @@ re.compile("^a", re.M).search("ba", 1)   # fails; no preceding \n
 \subsection{Module Contents}
 \nodename{Contents of Module re}
 
-The module defines the following functions and constants, and an exception:
-
+The module defines several functions, constants, and an exception. Some of the
+functions are simplified versions of the full featured methods for compiled
+regular expressions.  Most non-trivial applications always use the compiled
+form.
 
 \begin{funcdesc}{compile}{pattern\optional{, flags}}
   Compile a regular expression pattern into a regular expression
@@ -542,20 +554,23 @@ ignored.
   the old \function{regsub.split()} and \function{regsub.splitx()}.
 \end{funcdesc}
 
-\begin{funcdesc}{findall}{pattern, string}
+\begin{funcdesc}{findall}{pattern, string\optional{, flags}}
   Return a list of all non-overlapping matches of \var{pattern} in
   \var{string}.  If one or more groups are present in the pattern,
   return a list of groups; this will be a list of tuples if the
   pattern has more than one group.  Empty matches are included in the
-  result.
+  result unless they touch the beginning of another match.
   \versionadded{1.5.2}
+  \versionchanged[Added the optional flags argument]{2.4}
 \end{funcdesc}
 
-\begin{funcdesc}{finditer}{pattern, string}
+\begin{funcdesc}{finditer}{pattern, string\optional{, flags}}
   Return an iterator over all non-overlapping matches for the RE
   \var{pattern} in \var{string}.  For each match, the iterator returns
-  a match object.  Empty matches are included in the result.
+  a match object.  Empty matches are included in the result unless they
+  touch the beginning of another match.
   \versionadded{2.2}
+  \versionchanged[Added the optional flags argument]{2.4}
 \end{funcdesc}
 
 \begin{funcdesc}{sub}{pattern, repl, string\optional{, count}}
@@ -583,8 +598,8 @@ ignored.
 
 \begin{verbatim}
 >>> def dashrepl(matchobj):
-....    if matchobj.group(0) == '-': return ' '
-....    else: return '-'
+...     if matchobj.group(0) == '-': return ' '
+...     else: return '-'
 >>> re.sub('-{1,2}', dashrepl, 'pro----gram-files')
 'pro--gram files'
 \end{verbatim}
@@ -638,18 +653,6 @@ ignored.
 Compiled regular expression objects support the following methods and
 attributes:
 
-\begin{methoddesc}[RegexObject]{search}{string\optional{, pos\optional{,
-                                        endpos}}}
-  Scan through \var{string} looking for a location where this regular
-  expression produces a match, and return a
-  corresponding \class{MatchObject} instance.  Return \code{None} if no
-  position in the string matches the pattern; note that this is
-  different from finding a zero-length match at some point in the string.
-
-  The optional \var{pos} and \var{endpos} parameters have the same
-  meaning as for the \method{match()} method.
-\end{methoddesc}
-
 \begin{methoddesc}[RegexObject]{match}{string\optional{, pos\optional{,
                                        endpos}}}
   If zero or more characters at the beginning of \var{string} match
@@ -679,16 +682,30 @@ attributes:
   \code{\var{rx}.match(\var{string}[:50], 0)}.
 \end{methoddesc}
 
+\begin{methoddesc}[RegexObject]{search}{string\optional{, pos\optional{,
+                                        endpos}}}
+  Scan through \var{string} looking for a location where this regular
+  expression produces a match, and return a
+  corresponding \class{MatchObject} instance.  Return \code{None} if no
+  position in the string matches the pattern; note that this is
+  different from finding a zero-length match at some point in the string.
+
+  The optional \var{pos} and \var{endpos} parameters have the same
+  meaning as for the \method{match()} method.
+\end{methoddesc}
+
 \begin{methoddesc}[RegexObject]{split}{string\optional{,
                                        maxsplit\code{ = 0}}}
 Identical to the \function{split()} function, using the compiled pattern.
 \end{methoddesc}
 
-\begin{methoddesc}[RegexObject]{findall}{string}
+\begin{methoddesc}[RegexObject]{findall}{string\optional{, pos\optional{,
+                                        endpos}}}
 Identical to the \function{findall()} function, using the compiled pattern.
 \end{methoddesc}
 
-\begin{methoddesc}[RegexObject]{finditer}{string}
+\begin{methoddesc}[RegexObject]{finditer}{string\optional{, pos\optional{,
+                                        endpos}}}
 Identical to the \function{finditer()} function, using the compiled pattern.
 \end{methoddesc}
 
@@ -740,7 +757,7 @@ Without arguments, \var{group1} defaults to zero (the whole match
 is returned).
 If a \var{groupN} argument is zero, the corresponding return value is the
 entire matching string; if it is in the inclusive range [1..99], it is
-the string matching the the corresponding parenthesized group.  If a
+the string matching the corresponding parenthesized group.  If a
 group number is negative or larger than the number of groups defined
 in the pattern, an \exception{IndexError} exception is raised.
 If a group is contained in a part of the pattern that did not match,
@@ -812,24 +829,25 @@ Note that if \var{group} did not contribute to the match, this is
 \end{methoddesc}
 
 \begin{memberdesc}[MatchObject]{pos}
-The value of \var{pos} which was passed to the
-\function{search()} or \function{match()} function.  This is the index
-into the string at which the RE engine started looking for a match.
+The value of \var{pos} which was passed to the \function{search()} or
+\function{match()} method of the \class{RegexObject}.  This is the
+index into the string at which the RE engine started looking for a
+match.
 \end{memberdesc}
 
 \begin{memberdesc}[MatchObject]{endpos}
-The value of \var{endpos} which was passed to the
-\function{search()} or \function{match()} function.  This is the index
-into the string beyond which the RE engine will not go.
+The value of \var{endpos} which was passed to the \function{search()}
+or \function{match()} method of the \class{RegexObject}.  This is the
+index into the string beyond which the RE engine will not go.
 \end{memberdesc}
 
 \begin{memberdesc}[MatchObject]{lastindex}
 The integer index of the last matched capturing group, or \code{None}
 if no group was matched at all. For example, the expressions
 \regexp{(a)b}, \regexp{((a)(b))}, and \regexp{((ab))} will have
-\code{lastindex == 1} if applyied to the string \code{'ab'},
+\code{lastindex == 1} if applied to the string \code{'ab'},
 while the expression \regexp{(a)(b)} will have \code{lastindex == 2},
-if applyied to the same string.
+if applied to the same string.
 \end{memberdesc}
 
 \begin{memberdesc}[MatchObject]{lastgroup}
@@ -865,7 +883,7 @@ offers some more-or-less equivalent mappings between
   \lineii{\code{\%d}}
          {\regexp{[-+]?\e d+}}
   \lineii{\code{\%e}, \code{\%E}, \code{\%f}, \code{\%g}}
-         {\regexp{[-+]?(\e d+(\e.\e d*)?|\e d*\e.\e d+)([eE]\e d+)?}}
+         {\regexp{[-+]?(\e d+(\e.\e d*)?|\e d*\e.\e d+)([eE][-+]?\e d+)?}}
   \lineii{\code{\%i}}
          {\regexp{[-+]?(0[xX][\e dA-Fa-f]+|0[0-7]*|\e d+)}}
   \lineii{\code{\%o}}
@@ -896,15 +914,16 @@ The equivalent regular expression would be
     (\S+) - (\d+) errors, (\d+) warnings
 \end{verbatim}
 
-\leftline{\strong{Avoiding backtracking}}
+\leftline{\strong{Avoiding recursion}}
 
-If you create regular expressions that require the engine to perform a lot
-of backtracking, you may encounter a RuntimeError exception with the message
-\code{maximum recursion limit exceeded}.  For example,
+If you create regular expressions that require the engine to perform a
+lot of recursion, you may encounter a RuntimeError exception with
+the message \code{maximum recursion limit} exceeded. For example,
 
 \begin{verbatim}
->>> s = "<" + "that's a very big string!"*1000 + ">"
->>> re.match('<.*?>', s)
+>>> import re
+>>> s = 'Begin ' + 1000*'a very long string ' + 'end'
+>>> re.match('Begin (\w| )*? end', s).end()
 Traceback (most recent call last):
   File "<stdin>", line 1, in ?
   File "/usr/local/lib/python2.3/sre.py", line 132, in match
@@ -912,8 +931,10 @@ Traceback (most recent call last):
 RuntimeError: maximum recursion limit exceeded
 \end{verbatim}
 
-You can often restructure your regular expression to avoid backtracking.
-The above regular expression can be recast as
-\regexp{\textless[\textasciicircum \textgreater]*\textgreater}.  As a
-further benefit, such regular expressions will run faster than their
-backtracking equivalents.
+You can often restructure your regular expression to avoid recursion.
+
+Starting with Python 2.3, simple uses of the \regexp{*?} pattern are
+special-cased to avoid recursion.  Thus, the above regular expression
+can avoid recursion by being recast as
+\regexp{Begin [a-zA-Z0-9_ ]*?end}.  As a further benefit, such regular
+expressions will run faster than their recursive equivalents.

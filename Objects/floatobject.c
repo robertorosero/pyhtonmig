@@ -8,19 +8,9 @@
 
 #include <ctype.h>
 
-#if !defined(__STDC__) && !defined(macintosh)
+#if !defined(__STDC__)
 extern double fmod(double, double);
 extern double pow(double, double);
-#endif
-
-#if defined(sun) && !defined(__SVR4)
-/* On SunOS4.1 only libm.a exists. Make sure that references to all
-   needed math functions exist in the executable, so that dynamic
-   loading of mathmodule does not fail. */
-double (*_Py_math_funcs_hack[])() = {
-	acos, asin, atan, atan2, ceil, cos, cosh, exp, fabs, floor,
-	fmod, log, log10, pow, sin, sinh, sqrt, tan, tanh
-};
 #endif
 
 /* Special free list -- see comments for same code in intobject.c. */
@@ -142,7 +132,7 @@ PyFloat_FromString(PyObject *v, char **pend)
 	 * key off errno.
          */
 	PyFPE_START_PROTECT("strtod", return NULL)
-	x = strtod(s, (char **)&end);
+	x = PyOS_ascii_strtod(s, (char **)&end);
 	PyFPE_END_PROTECT(x)
 	errno = 0;
 	/* Believe it or not, Solaris 2.6 can move end *beyond* the null
@@ -174,7 +164,7 @@ PyFloat_FromString(PyObject *v, char **pend)
 		/* See above -- may have been strtod being anal
 		   about denorms. */
 		PyFPE_START_PROTECT("atof", return NULL)
-		x = atof(s);
+		x = PyOS_ascii_atof(s);
 		PyFPE_END_PROTECT(x)
 		errno = 0;    /* whether atof ever set errno is undefined */
 	}
@@ -233,6 +223,7 @@ static void
 format_float(char *buf, size_t buflen, PyFloatObject *v, int precision)
 {
 	register char *cp;
+	char format[32];
 	/* Subroutine for float_repr and float_print.
 	   We want float numbers to be recognizable as such,
 	   i.e., they should contain a decimal point or an exponent.
@@ -240,7 +231,8 @@ format_float(char *buf, size_t buflen, PyFloatObject *v, int precision)
 	   in such cases, we append ".0" to the string. */
 
 	assert(PyFloat_Check(v));
-	PyOS_snprintf(buf, buflen, "%.*g", precision, v->ob_fval);
+	PyOS_snprintf(format, 32, "%%.%ig", precision);
+	PyOS_ascii_formatd(buf, buflen, format, v->ob_fval);
 	cp = buf;
 	if (*cp == '-')
 		cp++;
@@ -362,12 +354,234 @@ float_str(PyFloatObject *v)
 	return PyString_FromString(buf);
 }
 
-static int
-float_compare(PyFloatObject *v, PyFloatObject *w)
+/* Comparison is pretty much a nightmare.  When comparing float to float,
+ * we do it as straightforwardly (and long-windedly) as conceivable, so
+ * that, e.g., Python x == y delivers the same result as the platform
+ * C x == y when x and/or y is a NaN.
+ * When mixing float with an integer type, there's no good *uniform* approach.
+ * Converting the double to an integer obviously doesn't work, since we
+ * may lose info from fractional bits.  Converting the integer to a double
+ * also has two failure modes:  (1) a long int may trigger overflow (too
+ * large to fit in the dynamic range of a C double); (2) even a C long may have
+ * more bits than fit in a C double (e.g., on a a 64-bit box long may have
+ * 63 bits of precision, but a C double probably has only 53), and then
+ * we can falsely claim equality when low-order integer bits are lost by
+ * coercion to double.  So this part is painful too.
+ */
+
+static PyObject*
+float_richcompare(PyObject *v, PyObject *w, int op)
 {
-	double i = v->ob_fval;
-	double j = w->ob_fval;
-	return (i < j) ? -1 : (i > j) ? 1 : 0;
+	double i, j;
+	int r = 0;
+
+	assert(PyFloat_Check(v));
+	i = PyFloat_AS_DOUBLE(v);
+
+	/* Switch on the type of w.  Set i and j to doubles to be compared,
+	 * and op to the richcomp to use.
+	 */
+	if (PyFloat_Check(w))
+		j = PyFloat_AS_DOUBLE(w);
+
+	else if (Py_IS_INFINITY(i) || Py_IS_NAN(i)) {
+		if (PyInt_Check(w) || PyLong_Check(w))
+			/* If i is an infinity, its magnitude exceeds any
+			 * finite integer, so it doesn't matter which int we
+			 * compare i with.  If i is a NaN, similarly.
+			 */
+			j = 0.0;
+		else
+			goto Unimplemented;
+	}
+
+	else if (PyInt_Check(w)) {
+		long jj = PyInt_AS_LONG(w);
+		/* In the worst realistic case I can imagine, C double is a
+		 * Cray single with 48 bits of precision, and long has 64
+		 * bits.
+		 */
+#if SIZEOF_LONG > 6
+		unsigned long abs = (unsigned long)(jj < 0 ? -jj : jj);
+		if (abs >> 48) {
+			/* Needs more than 48 bits.  Make it take the
+			 * PyLong path.
+			 */
+			PyObject *result;
+			PyObject *ww = PyLong_FromLong(jj);
+
+			if (ww == NULL)
+				return NULL;
+			result = float_richcompare(v, ww, op);
+			Py_DECREF(ww);
+			return result;
+		}
+#endif
+		j = (double)jj;
+		assert((long)j == jj);
+	}
+
+	else if (PyLong_Check(w)) {
+		int vsign = i == 0.0 ? 0 : i < 0.0 ? -1 : 1;
+		int wsign = _PyLong_Sign(w);
+		size_t nbits;
+		double mant;
+		int exponent;
+
+		if (vsign != wsign) {
+			/* Magnitudes are irrelevant -- the signs alone
+			 * determine the outcome.
+			 */
+			i = (double)vsign;
+			j = (double)wsign;
+			goto Compare;
+		}
+		/* The signs are the same. */
+		/* Convert w to a double if it fits.  In particular, 0 fits. */
+		nbits = _PyLong_NumBits(w);
+		if (nbits == (size_t)-1 && PyErr_Occurred()) {
+			/* This long is so large that size_t isn't big enough
+			 * to hold the # of bits.  Replace with little doubles
+			 * that give the same outcome -- w is so large that
+			 * its magnitude must exceed the magnitude of any
+			 * finite float.
+			 */
+			PyErr_Clear();
+			i = (double)vsign;
+			assert(wsign != 0);
+			j = wsign * 2.0;
+			goto Compare;
+		}
+		if (nbits <= 48) {
+			j = PyLong_AsDouble(w);
+			/* It's impossible that <= 48 bits overflowed. */
+			assert(j != -1.0 || ! PyErr_Occurred());
+			goto Compare;
+		}
+		assert(wsign != 0); /* else nbits was 0 */
+		assert(vsign != 0); /* if vsign were 0, then since wsign is
+		                     * not 0, we would have taken the
+		                     * vsign != wsign branch at the start */
+		/* We want to work with non-negative numbers. */
+		if (vsign < 0) {
+			/* "Multiply both sides" by -1; this also swaps the
+			 * comparator.
+			 */
+			i = -i;
+			op = _Py_SwappedOp[op];
+		}
+		assert(i > 0.0);
+		mant = frexp(i, &exponent);
+		/* exponent is the # of bits in v before the radix point;
+		 * we know that nbits (the # of bits in w) > 48 at this point
+		 */
+		if (exponent < 0 || (size_t)exponent < nbits) {
+			i = 1.0;
+			j = 2.0;
+			goto Compare;
+		}
+		if ((size_t)exponent > nbits) {
+			i = 2.0;
+			j = 1.0;
+			goto Compare;
+		}
+		/* v and w have the same number of bits before the radix
+		 * point.  Construct two longs that have the same comparison
+		 * outcome.
+		 */
+		{
+			double fracpart;
+			double intpart;
+			PyObject *result = NULL;
+			PyObject *one = NULL;
+			PyObject *vv = NULL;
+			PyObject *ww = w;
+
+			if (wsign < 0) {
+				ww = PyNumber_Negative(w);
+				if (ww == NULL)
+					goto Error;
+			}
+			else
+				Py_INCREF(ww);
+
+			fracpart = modf(i, &intpart);
+			vv = PyLong_FromDouble(intpart);
+			if (vv == NULL)
+				goto Error;
+
+			if (fracpart != 0.0) {
+				/* Shift left, and or a 1 bit into vv
+				 * to represent the lost fraction.
+				 */
+				PyObject *temp;
+
+				one = PyInt_FromLong(1);
+				if (one == NULL)
+					goto Error;
+
+				temp = PyNumber_Lshift(ww, one);
+				if (temp == NULL)
+					goto Error;
+				Py_DECREF(ww);
+				ww = temp;
+
+				temp = PyNumber_Lshift(vv, one);
+				if (temp == NULL)
+					goto Error;
+				Py_DECREF(vv);
+				vv = temp;
+
+				temp = PyNumber_Or(vv, one);
+				if (temp == NULL)
+					goto Error;
+				Py_DECREF(vv);
+				vv = temp;
+			}
+
+			r = PyObject_RichCompareBool(vv, ww, op);
+			if (r < 0)
+				goto Error;
+			result = PyBool_FromLong(r);
+ 		 Error:
+ 		 	Py_XDECREF(vv);
+ 		 	Py_XDECREF(ww);
+ 		 	Py_XDECREF(one);
+ 		 	return result;
+		}
+	} /* else if (PyLong_Check(w)) */
+
+	else	/* w isn't float, int, or long */
+		goto Unimplemented;
+
+ Compare:
+	PyFPE_START_PROTECT("richcompare", return NULL)
+	switch (op) {
+	case Py_EQ:
+		r = i == j;
+		break;
+	case Py_NE:
+		r = i != j;
+		break;
+	case Py_LE:
+		r = i <= j;
+		break;
+	case Py_GE:
+		r = i >= j;
+		break;
+	case Py_LT:
+		r = i < j;
+		break;
+	case Py_GT:
+		r = i > j;
+		break;
+	}
+	PyFPE_END_PROTECT(r)
+	return PyBool_FromLong(r);
+
+ Unimplemented:
+	Py_INCREF(Py_NotImplemented);
+	return Py_NotImplemented;
 }
 
 static long
@@ -572,10 +786,39 @@ float_pow(PyObject *v, PyObject *w, PyObject *z)
 		}
 		return PyFloat_FromDouble(0.0);
 	}
-	if (iv < 0.0 && iw != floor(iw)) {
-		PyErr_SetString(PyExc_ValueError,
-				"negative number cannot be raised to a fractional power");
-		return NULL;
+	if (iv < 0.0) {
+		/* Whether this is an error is a mess, and bumps into libm
+		 * bugs so we have to figure it out ourselves.
+		 */
+		if (iw != floor(iw)) {
+			PyErr_SetString(PyExc_ValueError, "negative number "
+				"cannot be raised to a fractional power");
+			return NULL;
+		}
+		/* iw is an exact integer, albeit perhaps a very large one.
+		 * -1 raised to an exact integer should never be exceptional.
+		 * Alas, some libms (chiefly glibc as of early 2003) return
+		 * NaN and set EDOM on pow(-1, large_int) if the int doesn't
+		 * happen to be representable in a *C* integer.  That's a
+		 * bug; we let that slide in math.pow() (which currently
+		 * reflects all platform accidents), but not for Python's **.
+		 */
+		 if (iv == -1.0 && !Py_IS_INFINITY(iw) && iw == iw) {
+		 	/* XXX the "iw == iw" was to weed out NaNs.  This
+		 	 * XXX doesn't actually work on all platforms.
+		 	 */
+		 	/* Return 1 if iw is even, -1 if iw is odd; there's
+		 	 * no guarantee that any C integral type is big
+		 	 * enough to hold iw, so we have to check this
+		 	 * indirectly.
+		 	 */
+		 	ix = floor(iw * 0.5) * 2.0;
+			return PyFloat_FromDouble(ix == iw ? 1.0 : -1.0);
+		}
+		/* Else iv != -1.0, and overflow or underflow are possible.
+		 * Unless we're to write pow() ourselves, we have to trust
+		 * the platform to do this correctly.
+		 */
 	}
 	errno = 0;
 	PyFPE_START_PROTECT("pow", return NULL)
@@ -583,8 +826,11 @@ float_pow(PyObject *v, PyObject *w, PyObject *z)
 	PyFPE_END_PROTECT(ix)
 	Py_ADJUST_ERANGE1(ix);
 	if (errno != 0) {
-		assert(errno == ERANGE);
-		PyErr_SetFromErrno(PyExc_OverflowError);
+		/* We don't expect any errno value other than ERANGE, but
+		 * the range of libm bugs appears unbounded.
+		 */
+		PyErr_SetFromErrno(errno == ERANGE ? PyExc_OverflowError :
+						     PyExc_ValueError);
 		return NULL;
 	}
 	return PyFloat_FromDouble(ix);
@@ -719,8 +965,10 @@ float_subtype_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 		return NULL;
 	assert(PyFloat_CheckExact(tmp));
 	new = type->tp_alloc(type, 0);
-	if (new == NULL)
+	if (new == NULL) {
+		Py_DECREF(tmp);
 		return NULL;
+	}
 	((PyFloatObject *)new)->ob_fval = ((PyFloatObject *)tmp)->ob_fval;
 	Py_DECREF(tmp);
 	return new;
@@ -794,7 +1042,7 @@ PyTypeObject PyFloat_Type = {
 	(printfunc)float_print, 		/* tp_print */
 	0,					/* tp_getattr */
 	0,					/* tp_setattr */
-	(cmpfunc)float_compare, 		/* tp_compare */
+	0,			 		/* tp_compare */
 	(reprfunc)float_repr,			/* tp_repr */
 	&float_as_number,			/* tp_as_number */
 	0,					/* tp_as_sequence */
@@ -810,7 +1058,7 @@ PyTypeObject PyFloat_Type = {
 	float_doc,				/* tp_doc */
  	0,					/* tp_traverse */
 	0,					/* tp_clear */
-	0,					/* tp_richcompare */
+	(richcmpfunc)float_richcompare,		/* tp_richcompare */
 	0,					/* tp_weaklistoffset */
 	0,					/* tp_iter */
 	0,					/* tp_iternext */
@@ -832,7 +1080,7 @@ PyFloat_Fini(void)
 {
 	PyFloatObject *p;
 	PyFloatBlock *list, *next;
-	int i;
+	unsigned i;
 	int bc, bf;	/* block count, number of freed blocks */
 	int frem, fsum;	/* remaining unfreed floats per block, total */
 

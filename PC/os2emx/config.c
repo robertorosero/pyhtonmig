@@ -52,17 +52,18 @@ extern void initarray();
 extern void initbinascii();
 extern void initcPickle();
 extern void initcStringIO();
+extern void initcollections();
 extern void initcmath();
 extern void initdatetime();
 extern void initdl();
 extern void initerrno();
 extern void initfcntl();
+extern void init_heapq();
 extern void initimageop();
 extern void inititertools();
 extern void initmath();
 extern void initmd5();
 extern void initoperator();
-extern void initpcre();
 extern void initregex();
 extern void initrgbimg();
 extern void initsha();
@@ -71,7 +72,6 @@ extern void initstruct();
 extern void inittermios();
 extern void inittime();
 extern void inittiming();
-extern void initxreadlines();
 extern void initxxsubtype();
 extern void initzipimport();
 #if !HAVE_DYNAMIC_LOADING
@@ -85,7 +85,6 @@ extern void initfpectl();
 extern void initfpetest();
 extern void initparser();
 extern void initpwd();
-extern void initrotor();
 extern void initunicodedata();
 extern void initzlib();
 #ifdef USE_SOCKET
@@ -107,7 +106,7 @@ struct _inittab _PyImport_Inittab[] = {
 	{"thread", initthread},
 #endif
 	{"_codecs", init_codecs},
-	{"_csv", init_codecs},
+	{"_csv", init_csv},
 	{"_locale", init_locale},
 	{"_random", init_random},
 	{"_sre", init_sre},
@@ -117,17 +116,18 @@ struct _inittab _PyImport_Inittab[] = {
 	{"binascii", initbinascii},
 	{"cPickle", initcPickle},
 	{"cStringIO", initcStringIO},
+	{"collections", initcollections},
 	{"cmath", initcmath},
 	{"datetime", initdatetime},
 	{"dl", initdl},
 	{"errno", initerrno},
 	{"fcntl", initfcntl},
+	{"_heapq", init_heapq},
 	{"imageop", initimageop},
 	{"itertools", inititertools},
 	{"math", initmath},
 	{"md5", initmd5},
 	{"operator", initoperator},
-	{"pcre", initpcre},
 	{"regex", initregex},
 	{"rgbimg", initrgbimg},
 	{"sha", initsha},
@@ -136,7 +136,6 @@ struct _inittab _PyImport_Inittab[] = {
 	{"termios", inittermios},
 	{"time", inittime},
 	{"timing", inittiming},
-	{"xreadlines", initxreadlines},
 	{"xxsubtype", initxxsubtype},
 	{"zipimport", initzipimport},
 #if !HAVE_DYNAMIC_LOADING
@@ -150,7 +149,6 @@ struct _inittab _PyImport_Inittab[] = {
 	{"fpetest", initfpetest},
 	{"parser", initparser},
 	{"pwd", initpwd},
-	{"rotor", initrotor},
 	{"unicodedata", initunicodedata},
 	{"zlib", initzlib},
 #ifdef USE_SOCKET

@@ -47,7 +47,7 @@ one argument, the encoding name in all lower case letters, and return\n\
 a tuple of functions (encoder, decoder, stream_reader, stream_writer).");
 
 static
-PyObject *codecregister(PyObject *self, PyObject *args)
+PyObject *codec_register(PyObject *self, PyObject *args)
 {
     PyObject *search_function;
 
@@ -71,7 +71,7 @@ Looks up a codec tuple in the Python codec registry and returns\n\
 a tuple of functions.");
 
 static
-PyObject *codeclookup(PyObject *self, PyObject *args)
+PyObject *codec_lookup(PyObject *self, PyObject *args)
 {
     char *encoding;
 
@@ -79,6 +79,72 @@ PyObject *codeclookup(PyObject *self, PyObject *args)
         goto onError;
 
     return _PyCodec_Lookup(encoding);
+
+ onError:
+    return NULL;
+}
+
+PyDoc_STRVAR(encode__doc__,
+"encode(obj, [encoding[,errors]]) -> object\n\
+\n\
+Encodes obj using the codec registered for encoding. encoding defaults\n\
+to the default encoding. errors may be given to set a different error\n\
+handling scheme. Default is 'strict' meaning that encoding errors raise\n\
+a ValueError. Other possible values are 'ignore', 'replace' and\n\
+'xmlcharrefreplace' as well as any other name registered with\n\
+codecs.register_error that can handle ValueErrors.");
+
+static PyObject *
+codec_encode(PyObject *self, PyObject *args)
+{
+    const char *encoding = NULL;
+    const char *errors = NULL;
+    PyObject *v;
+    
+    if (!PyArg_ParseTuple(args, "O|ss:encode", &v, &encoding, &errors))
+        return NULL;
+
+    if (encoding == NULL)
+	encoding = PyUnicode_GetDefaultEncoding();
+
+    /* Encode via the codec registry */
+    v = PyCodec_Encode(v, encoding, errors);
+    if (v == NULL)
+        goto onError;
+    return v;
+
+ onError:
+    return NULL;
+}
+
+PyDoc_STRVAR(decode__doc__,
+"decode(obj, [encoding[,errors]]) -> object\n\
+\n\
+Decodes obj using the codec registered for encoding. encoding defaults\n\
+to the default encoding. errors may be given to set a different error\n\
+handling scheme. Default is 'strict' meaning that encoding errors raise\n\
+a ValueError. Other possible values are 'ignore' and 'replace'\n\
+as well as any other name registerd with codecs.register_error that is\n\
+able to handle ValueErrors.");
+
+static PyObject *
+codec_decode(PyObject *self, PyObject *args)
+{
+    const char *encoding = NULL;
+    const char *errors = NULL;
+    PyObject *v;
+    
+    if (!PyArg_ParseTuple(args, "O|ss:decode", &v, &encoding, &errors))
+        return NULL;
+
+    if (encoding == NULL)
+	encoding = PyUnicode_GetDefaultEncoding();
+
+    /* Decode via the codec registry */
+    v = PyCodec_Decode(v, encoding, errors);
+    if (v == NULL)
+        goto onError;
+    return v;
 
  onError:
     return NULL;
@@ -203,13 +269,20 @@ utf_8_decode(PyObject *self,
     const char *data;
     int size;
     const char *errors = NULL;
-    
-    if (!PyArg_ParseTuple(args, "t#|z:utf_8_decode",
-			  &data, &size, &errors))
-	return NULL;
+    int final = 0;
+    int consumed;
+    PyObject *decoded = NULL;
 
-    return codec_tuple(PyUnicode_DecodeUTF8(data, size, errors),
-		       size);
+    if (!PyArg_ParseTuple(args, "t#|zi:utf_8_decode",
+			  &data, &size, &errors, &final))
+	return NULL;
+    consumed = size;
+	
+    decoded = PyUnicode_DecodeUTF8Stateful(data, size, errors,
+					   final ? NULL : &consumed);
+    if (decoded == NULL)
+	return NULL;
+    return codec_tuple(decoded, consumed);
 }
 
 static PyObject *
@@ -220,12 +293,19 @@ utf_16_decode(PyObject *self,
     int size;
     const char *errors = NULL;
     int byteorder = 0;
-    
-    if (!PyArg_ParseTuple(args, "t#|z:utf_16_decode",
-			  &data, &size, &errors))
+    int final = 0;
+    int consumed;
+    PyObject *decoded;
+
+    if (!PyArg_ParseTuple(args, "t#|zi:utf_16_decode",
+			  &data, &size, &errors, &final))
 	return NULL;
-    return codec_tuple(PyUnicode_DecodeUTF16(data, size, errors, &byteorder),
-		       size);
+    consumed = size;
+    decoded = PyUnicode_DecodeUTF16Stateful(data, size, errors, &byteorder,
+					    final ? NULL : &consumed);
+    if (decoded == NULL)
+	return NULL;
+    return codec_tuple(decoded, consumed);
 }
 
 static PyObject *
@@ -236,12 +316,20 @@ utf_16_le_decode(PyObject *self,
     int size;
     const char *errors = NULL;
     int byteorder = -1;
+    int final = 0;
+    int consumed;
+    PyObject *decoded = NULL;
     
-    if (!PyArg_ParseTuple(args, "t#|z:utf_16_le_decode",
-			  &data, &size, &errors))
+    if (!PyArg_ParseTuple(args, "t#|zi:utf_16_le_decode",
+			  &data, &size, &errors, &final))
 	return NULL;
-    return codec_tuple(PyUnicode_DecodeUTF16(data, size, errors, &byteorder),
-		       size);
+    consumed = size;
+    decoded = PyUnicode_DecodeUTF16Stateful(data, size, errors,
+	&byteorder, final ? NULL : &consumed);
+    if (decoded == NULL)
+	return NULL;
+    return codec_tuple(decoded, consumed);
+
 }
 
 static PyObject *
@@ -252,12 +340,19 @@ utf_16_be_decode(PyObject *self,
     int size;
     const char *errors = NULL;
     int byteorder = 1;
+    int final = 0;
+    int consumed;
+    PyObject *decoded = NULL;
     
-    if (!PyArg_ParseTuple(args, "t#|z:utf_16_be_decode",
-			  &data, &size, &errors))
+    if (!PyArg_ParseTuple(args, "t#|zi:utf_16_be_decode",
+			  &data, &size, &errors, &final))
 	return NULL;
-    return codec_tuple(PyUnicode_DecodeUTF16(data, size, errors, &byteorder),
-		       size);
+    consumed = size;
+    decoded = PyUnicode_DecodeUTF16Stateful(data, size, errors,
+	&byteorder, final ? NULL : &consumed);
+    if (decoded == NULL)
+	return NULL;
+    return codec_tuple(decoded, consumed);
 }
 
 /* This non-standard version also provides access to the byteorder
@@ -277,15 +372,19 @@ utf_16_ex_decode(PyObject *self,
     const char *errors = NULL;
     int byteorder = 0;
     PyObject *unicode, *tuple;
-    
-    if (!PyArg_ParseTuple(args, "t#|zi:utf_16_ex_decode",
-			  &data, &size, &errors, &byteorder))
+    int final = 0;
+    int consumed;
+
+    if (!PyArg_ParseTuple(args, "t#|zii:utf_16_ex_decode",
+			  &data, &size, &errors, &byteorder, &final))
 	return NULL;
 
-    unicode = PyUnicode_DecodeUTF16(data, size, errors, &byteorder);
+    consumed = size;
+    unicode = PyUnicode_DecodeUTF16Stateful(data, size, errors, &byteorder,
+					    final ? NULL : &consumed);
     if (unicode == NULL)
 	return NULL;
-    tuple = Py_BuildValue("Oii", unicode, size, byteorder);
+    tuple = Py_BuildValue("Oii", unicode, consumed, byteorder);
     Py_DECREF(unicode);
     return tuple;
 }
@@ -765,10 +864,14 @@ static PyObject *lookup_error(PyObject *self, PyObject *args)
 /* --- Module API --------------------------------------------------------- */
 
 static PyMethodDef _codecs_functions[] = {
-    {"register",		codecregister,			METH_VARARGS,
+    {"register",		codec_register,			METH_VARARGS,
         register__doc__},
-    {"lookup",			codeclookup, 			METH_VARARGS,
+    {"lookup",			codec_lookup, 			METH_VARARGS,
         lookup__doc__},
+    {"encode",			codec_encode,			METH_VARARGS,
+	encode__doc__},
+    {"decode",			codec_decode,			METH_VARARGS,
+	decode__doc__},
     {"escape_encode",		escape_encode,			METH_VARARGS},
     {"escape_decode",		escape_decode,			METH_VARARGS},
 #ifdef Py_USING_UNICODE

@@ -11,8 +11,8 @@ def main():
         while line[i] in '0123456789': i = i+1
         size = eval(line[:i])
         while line[i] in ' \t': i = i+1
-        file = line[i:-1]
-        comps = file.split('/')
+        filename = line[i:-1]
+        comps = filename.split('/')
         if comps[0] == '': comps[0] = '/'
         if comps[len(comps)-1] == '': del comps[len(comps)-1]
         total, d = store(size, comps, total, d)
@@ -46,7 +46,7 @@ def show(total, d, prefix):
 ##      list.append((total - sum, os.curdir))
     list.sort()
     list.reverse()
-    width = len(`list[0][0]`)
+    width = len(repr(list[0][0]))
     for tsub, key in list:
         if tsub is None:
             psub = prefix
@@ -56,4 +56,5 @@ def show(total, d, prefix):
         if d.has_key(key):
             show(tsub, d[key][1], psub)
 
-main()
+if __name__ == '__main__':
+    main()

@@ -1191,7 +1191,7 @@ UnicodeError__init__(PyObject *self, PyObject *args, PyTypeObject *objecttype)
 	&PyInt_Type, &start,
 	&PyInt_Type, &end,
 	&PyString_Type, &reason))
-	return NULL;
+	goto finally;
 
     if (PyObject_SetAttrString(self, "args", args))
 	goto finally;
@@ -1251,10 +1251,18 @@ UnicodeEncodeError__str__(PyObject *self, PyObject *arg)
 	goto error;
 
     if (end==start+1) {
+	int badchar = (int)PyUnicode_AS_UNICODE(objectObj)[start];
+	char *format;
+	if (badchar <= 0xff)
+	   format = "'%.400s' codec can't encode character u'\\x%02x' in position %d: %.400s";
+	else if (badchar <= 0xffff)
+	   format = "'%.400s' codec can't encode character u'\\u%04x' in position %d: %.400s";
+	else
+	   format = "'%.400s' codec can't encode character u'\\U%08x' in position %d: %.400s";
 	PyOS_snprintf(buffer, sizeof(buffer),
-	    "'%.400s' codec can't encode character '\\u%x' in position %d: %.400s",
+	    format,
 	    PyString_AS_STRING(encodingObj),
-	    (int)PyUnicode_AS_UNICODE(objectObj)[start],
+	    badchar,
 	    start,
 	    PyString_AS_STRING(reasonObj)
 	);
@@ -1329,7 +1337,7 @@ UnicodeDecodeError__str__(PyObject *self, PyObject *arg)
 
     if (end==start+1) {
 	PyOS_snprintf(buffer, sizeof(buffer),
-	    "'%.400s' codec can't decode byte 0x%x in position %d: %.400s",
+	    "'%.400s' codec can't decode byte 0x%02x in position %d: %.400s",
 	    PyString_AS_STRING(encodingObj),
 	    ((int)PyString_AS_STRING(objectObj)[start])&0xff,
 	    start,
@@ -1438,9 +1446,17 @@ UnicodeTranslateError__str__(PyObject *self, PyObject *arg)
 	goto error;
 
     if (end==start+1) {
+	int badchar = (int)PyUnicode_AS_UNICODE(objectObj)[start];
+	char *format;
+	if (badchar <= 0xff)
+	   format = "can't translate character u'\\x%02x' in position %d: %.400s";
+	else if (badchar <= 0xffff)
+	   format = "can't translate character u'\\u%04x' in position %d: %.400s";
+	else
+	   format = "can't translate character u'\\U%08x' in position %d: %.400s";
 	PyOS_snprintf(buffer, sizeof(buffer),
-	    "can't translate character '\\u%x' in position %d: %.400s",
-	    (int)PyUnicode_AS_UNICODE(objectObj)[start],
+	    format,
+	    badchar,
 	    start,
 	    PyString_AS_STRING(reasonObj)
 	);
@@ -1544,7 +1560,7 @@ PyDoc_STRVAR(SyntaxWarning__doc__,
 "Base class for warnings about dubious syntax.");
 
 PyDoc_STRVAR(OverflowWarning__doc__,
-"Base class for warnings about numeric overflow.");
+"Base class for warnings about numeric overflow.  Won't exist in Python 2.5.");
 
 PyDoc_STRVAR(RuntimeWarning__doc__,
 "Base class for warnings about dubious runtime behavior.");
@@ -1619,6 +1635,7 @@ PyObject *PyExc_UserWarning;
 PyObject *PyExc_DeprecationWarning;
 PyObject *PyExc_PendingDeprecationWarning;
 PyObject *PyExc_SyntaxWarning;
+/* PyExc_OverflowWarning should be removed for Python 2.5 */
 PyObject *PyExc_OverflowWarning;
 PyObject *PyExc_RuntimeWarning;
 PyObject *PyExc_FutureWarning;
@@ -1710,6 +1727,7 @@ static struct {
  {"PendingDeprecationWarning", &PyExc_PendingDeprecationWarning, &PyExc_Warning,
   PendingDeprecationWarning__doc__},
  {"SyntaxWarning", &PyExc_SyntaxWarning, &PyExc_Warning, SyntaxWarning__doc__},
+ /* OverflowWarning should be removed for Python 2.5 */
  {"OverflowWarning", &PyExc_OverflowWarning, &PyExc_Warning,
   OverflowWarning__doc__},
  {"RuntimeWarning", &PyExc_RuntimeWarning, &PyExc_Warning,
@@ -1805,7 +1823,7 @@ _PyExc_Init(void)
     }
 
     /* Now we need to pre-allocate a MemoryError instance */
-    args = Py_BuildValue("()");
+    args = PyTuple_New(0);
     if (!args ||
 	!(PyExc_MemoryErrorInst = PyEval_CallObject(PyExc_MemoryError, args)))
     {

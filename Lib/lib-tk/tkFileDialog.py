@@ -76,6 +76,21 @@ class Open(_Dialog):
 
     command = "tk_getOpenFile"
 
+    def _fixresult(self, widget, result):
+        if isinstance(result, tuple):
+            # multiple results:
+            result = tuple([getattr(r, "string", r) for r in result])
+            if result:
+                import os
+                path, file = os.path.split(result[0])
+                self.options["initialdir"] = path
+                # don't set initialfile or filename, as we have multiple of these
+            return result
+        if not widget.tk.wantobjects() and "multiple" in self.options:
+            # Need to split result explicitly
+            return self._fixresult(widget, widget.tk.splitlist(result))
+        return _Dialog._fixresult(self, widget, result)
+
 class SaveAs(_Dialog):
     "Ask for a filename to save as"
 
@@ -90,6 +105,12 @@ class Directory(Dialog):
 
     def _fixresult(self, widget, result):
         if result:
+            # convert Tcl path objects to strings
+            try:
+                result = result.string
+            except AttributeError:
+                # it already is a string
+                pass
             # keep directory until next time
             self.options["initialdir"] = result
         self.directory = result # compatibility
@@ -110,14 +131,12 @@ def asksaveasfilename(**options):
 
 def askopenfilenames(**options):
     """Ask for multiple filenames to open
-    
-    Returns a list of filenames or empty list if 
+
+    Returns a list of filenames or empty list if
     cancel button selected
     """
     options["multiple"]=1
-    files=Open(**options).show()
-    return files.split()
-
+    return Open(**options).show()
 
 # FIXME: are the following  perhaps a bit too convenient?
 
@@ -132,8 +151,8 @@ def askopenfile(mode = "r", **options):
 def askopenfiles(mode = "r", **options):
     """Ask for multiple filenames and return the open file
     objects
-    
-    returns a list of open file objects or an empty list if 
+
+    returns a list of open file objects or an empty list if
     cancel selected
     """
 
@@ -185,7 +204,7 @@ if __name__ == "__main__":
         fp=open(openfilename,"r")
         fp.close()
     except:
-        print "Could not open File: " 
+        print "Could not open File: "
         print sys.exc_info()[1]
 
     print "open", openfilename.encode(enc)
@@ -194,4 +213,3 @@ if __name__ == "__main__":
 
     saveasfilename=asksaveasfilename()
     print "saveas", saveasfilename.encode(enc)
-

@@ -19,7 +19,7 @@ There are two parts to this job:
 \begin{enumerate}
   \item Being able to tell if a line of input completes a Python 
         statement: in short, telling whether to print
-        `\code{>\code{>}>~} or `\code{...~}' next.
+        `\code{>\code{>}>~}' or `\code{...~}' next.
   \item Remembering which future statements the user has entered, so 
         subsequent input can be compiled with these in effect.
 \end{enumerate}
@@ -58,7 +58,7 @@ for the parser is better.
 \end{funcdesc}
 
 \begin{classdesc}{Compile}{}
-Instances of this class have \method{__call__()} methods indentical in
+Instances of this class have \method{__call__()} methods identical in
 signature to the built-in function \function{compile()}, but with the
 difference that if the instance compiles program text containing a
 \module{__future__} statement, the instance 'remembers' and compiles

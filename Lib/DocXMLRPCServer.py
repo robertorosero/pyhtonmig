@@ -14,11 +14,12 @@ import pydoc
 import inspect
 import types
 import re
+import sys
 
-from SimpleXMLRPCServer import SimpleXMLRPCServer,\
-            SimpleXMLRPCRequestHandler,\
-            CGIXMLRPCRequestHandler,\
-            resolve_dotted_attribute
+from SimpleXMLRPCServer import (SimpleXMLRPCServer,
+            SimpleXMLRPCRequestHandler,
+            CGIXMLRPCRequestHandler,
+            resolve_dotted_attribute)
 
 class ServerHTMLDoc(pydoc.HTMLDoc):
     """Class used to generate pydoc HTML document for a server"""
@@ -269,7 +270,7 @@ class DocCGIXMLRPCRequestHandler(   CGIXMLRPCRequestHandler,
         print 'Content-Type: text/html'
         print 'Content-Length: %d' % len(response)
         print
-        print response
+        sys.stdout.write(response)
 
     def __init__(self):
         CGIXMLRPCRequestHandler.__init__(self)

@@ -3,7 +3,7 @@
 
 \declaremodule{standard}{ConfigParser}
 \modulesynopsis{Configuration file parser.}
-\moduleauthor{Ken Manheimer}{klm@digicool.com}
+\moduleauthor{Ken Manheimer}{klm@zope.com}
 \moduleauthor{Barry Warsaw}{bwarsaw@python.org}
 \moduleauthor{Eric S. Raymond}{esr@thyrsus.com}
 \sectionauthor{Christopher G. Petrilli}{petrilli@amber.org}
@@ -57,11 +57,18 @@ does not support the magical interpolation behavior.
 
 \begin{classdesc}{ConfigParser}{\optional{defaults}}
 Derived class of \class{RawConfigParser} that implements the magical
-interpolation feature and adds optional arguments the \method{get()}
+interpolation feature and adds optional arguments to the \method{get()}
 and \method{items()} methods.  The values in \var{defaults} must be
 appropriate for the \samp{\%()s} string interpolation.  Note that
 \var{__name__} is an intrinsic default; its value is the section name,
 and will override any value provided in \var{defaults}.
+
+All option names used in interpolation will be passed through the
+\method{optionxform()} method just like any other option name
+reference.  For example, using the default implementation of
+\method{optionxform()} (which converts option names to lower case),
+the values \samp{foo \%(bar)s} and \samp{foo \%(BAR)s} are
+equivalent.
 \end{classdesc}
 
 \begin{classdesc}{SafeConfigParser}{\optional{defaults}}
@@ -79,9 +86,8 @@ Exception raised when a specified section is not found.
 \end{excdesc}
 
 \begin{excdesc}{DuplicateSectionError}
-Exception raised when multiple sections with the same name are found,
-or if \method{add_section()} is called with the name of a section that 
-is already present.
+Exception raised if \method{add_section()} is called with the name of
+a section that is already present.
 \end{excdesc}
 
 \begin{excdesc}{NoOptionError}
@@ -165,13 +171,14 @@ Returns a list of options available in the specified \var{section}.
 \end{methoddesc}
 
 \begin{methoddesc}{has_option}{section, option}
-If the given section exists, and contains the given option. return 1;
-otherwise return 0.
+If the given section exists, and contains the given option,
+return \constant{True}; otherwise return \constant{False}.
 \versionadded{1.6}
 \end{methoddesc}
 
 \begin{methoddesc}{read}{filenames}
-Read and parse a list of filenames.  If \var{filenames} is a string or
+Attempt to read and parse a list of filenames, returning a list of filenames
+which were successfully parsed.  If \var{filenames} is a string or
 Unicode string, it is treated as a single filename.
 If a file named in \var{filenames} cannot be opened, that file will be
 ignored.  This is designed so that you can specify a list of potential
@@ -191,6 +198,7 @@ config = ConfigParser.ConfigParser()
 config.readfp(open('defaults.cfg'))
 config.read(['site.cfg', os.path.expanduser('~/.myapp.cfg')])
 \end{verbatim}
+\versionchanged[Returns list of successfully parsed filenames]{2.4}
 \end{methoddesc}
 
 \begin{methoddesc}{readfp}{fp\optional{, filename}}
@@ -217,10 +225,10 @@ A convenience method which coerces the \var{option} in the specified
 \begin{methoddesc}{getboolean}{section, option}
 A convenience method which coerces the \var{option} in the specified
 \var{section} to a Boolean value.  Note that the accepted values
-for the option are \code{1}, \code{yes}, \code{true}, and \code{on},
-which cause this method to return true, and \code{0}, \code{no},
-\code{false}, and \code{off}, which cause it to return false.  These
-values are checked in a case-insensitive manner.  Any other value will
+for the option are \code{"1"}, \code{"yes"}, \code{"true"}, and \code{"on"},
+which cause this method to return \code{True}, and \code{"0"}, \code{"no"},
+\code{"false"}, and \code{"off"}, which cause it to return \code{False}.  These
+string values are checked in a case-insensitive manner.  Any other value will
 cause it to raise \exception{ValueError}.
 \end{methoddesc}
 
@@ -230,8 +238,12 @@ option in the given \var{section}.
 \end{methoddesc}
 
 \begin{methoddesc}{set}{section, option, value}
-If the given section exists, set the given option to the specified value;
-otherwise raise \exception{NoSectionError}.
+If the given section exists, set the given option to the specified
+value; otherwise raise \exception{NoSectionError}.  While it is
+possible to use \class{RawConfigParser} (or \class{ConfigParser} with
+\var{raw} parameters set to true) for \emph{internal} storage of
+non-string values, full functionality (including interpolation and
+output to files) can only be achieved using string values.
 \versionadded{1.6}
 \end{methoddesc}
 
@@ -245,7 +257,8 @@ call.
 \begin{methoddesc}{remove_option}{section, option}
 Remove the specified \var{option} from the specified \var{section}.
 If the section does not exist, raise \exception{NoSectionError}. 
-If the option existed to be removed, return 1; otherwise return 0.
+If the option existed to be removed, return \constant{True};
+otherwise return \constant{False}.
 \versionadded{1.6}
 \end{methoddesc}
 
@@ -279,8 +292,22 @@ on the defaults passed into the constructor, as well as the options
 \end{methoddesc}
 
 \begin{methoddesc}{items}{section\optional{, raw\optional{, vars}}}
-Create a generator which will return a tuple \code{(name, value)} for
-each option in the given \var{section}. Optional arguments have the
-same meaning as for the \code{get()} method.
+Return a list of \code{(\var{name}, \var{value})} pairs for each
+option in the given \var{section}. Optional arguments have the
+same meaning as for the \method{get()} method.
 \versionadded{2.3}
+\end{methoddesc}
+
+
+\subsection{SafeConfigParser Objects \label{SafeConfigParser-objects}}
+
+The \class{SafeConfigParser} class implements the same extended
+interface as \class{ConfigParser}, with the following addition:
+
+\begin{methoddesc}{set}{section, option, value}
+If the given section exists, set the given option to the specified
+value; otherwise raise \exception{NoSectionError}.  \var{value} must
+be a string (\class{str} or \class{unicode}); if not,
+\exception{TypeError} is raised.
+\versionadded{2.4}
 \end{methoddesc}

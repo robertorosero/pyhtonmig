@@ -51,13 +51,13 @@ class TestGenericUnivNewlines(unittest.TestCase):
         fp = open(test_support.TESTFN, self.READMODE)
         data = fp.read()
         self.assertEqual(data, DATA_LF)
-        self.assertEqual(`fp.newlines`, `self.NEWLINE`)
+        self.assertEqual(repr(fp.newlines), repr(self.NEWLINE))
 
     def test_readlines(self):
         fp = open(test_support.TESTFN, self.READMODE)
         data = fp.readlines()
         self.assertEqual(data, DATA_SPLIT)
-        self.assertEqual(`fp.newlines`, `self.NEWLINE`)
+        self.assertEqual(repr(fp.newlines), repr(self.NEWLINE))
 
     def test_readline(self):
         fp = open(test_support.TESTFN, self.READMODE)
@@ -67,7 +67,7 @@ class TestGenericUnivNewlines(unittest.TestCase):
             data.append(d)
             d = fp.readline()
         self.assertEqual(data, DATA_SPLIT)
-        self.assertEqual(`fp.newlines`, `self.NEWLINE`)
+        self.assertEqual(repr(fp.newlines), repr(self.NEWLINE))
 
     def test_seek(self):
         fp = open(test_support.TESTFN, self.READMODE)
@@ -111,11 +111,13 @@ class TestMixedNewlines(TestGenericUnivNewlines):
 
 
 def test_main():
-    test_support.run_unittest(TestNativeNewlines)
-    test_support.run_unittest(TestCRNewlines)
-    test_support.run_unittest(TestLFNewlines)
-    test_support.run_unittest(TestCRLFNewlines)
-    test_support.run_unittest(TestMixedNewlines)
+    test_support.run_unittest(
+        TestNativeNewlines,
+        TestCRNewlines,
+        TestLFNewlines,
+        TestCRLFNewlines,
+        TestMixedNewlines
+     )
 
 if __name__ == '__main__':
     test_main()

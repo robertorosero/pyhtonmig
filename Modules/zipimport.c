@@ -91,6 +91,7 @@ zipimporter_init(ZipImporter *self, PyObject *args, PyObject *kwds)
 	path = NULL;
 	prefix = NULL;
 	for (;;) {
+#ifndef RISCOS
 		struct stat statbuf;
 		int rv;
 
@@ -102,6 +103,15 @@ zipimporter_init(ZipImporter *self, PyObject *args, PyObject *kwds)
 				path = buf;
 			break;
 		}
+#else
+		if (object_exists(buf)) {
+			/* it exists */
+			if (isfile(buf))
+				/* it's a file */
+				path = buf;
+			break;
+		}
+#endif
 		/* back up one path element */
 		p = strrchr(buf, SEP);
 		if (prefix != NULL)
@@ -240,7 +250,7 @@ make_filename(char *prefix, char *name, char *path)
 	return len;
 }
 
-enum module_info {
+enum zi_module_info {
 	MI_ERROR,
 	MI_NOT_FOUND,
 	MI_MODULE,
@@ -248,7 +258,7 @@ enum module_info {
 };
 
 /* Return some information about a module. */
-static enum module_info
+static enum zi_module_info
 get_module_info(ZipImporter *self, char *fullname)
 {
 	char *subname, path[MAXPATHLEN + 1];
@@ -281,7 +291,7 @@ zipimporter_find_module(PyObject *obj, PyObject *args)
 	ZipImporter *self = (ZipImporter *)obj;
 	PyObject *path = NULL;
 	char *fullname;
-	enum module_info mi;
+	enum zi_module_info mi;
 
 	if (!PyArg_ParseTuple(args, "s|O:zipimporter.find_module",
 			      &fullname, &path))
@@ -369,7 +379,7 @@ zipimporter_is_package(PyObject *obj, PyObject *args)
 {
 	ZipImporter *self = (ZipImporter *)obj;
 	char *fullname;
-	enum module_info mi;
+	enum zi_module_info mi;
 
 	if (!PyArg_ParseTuple(args, "s:zipimporter.is_package",
 			      &fullname))
@@ -447,7 +457,7 @@ zipimporter_get_source(PyObject *obj, PyObject *args)
 	PyObject *toc_entry;
 	char *fullname, *subname, path[MAXPATHLEN+1];
 	int len;
-	enum module_info mi;
+	enum zi_module_info mi;
 
 	if (!PyArg_ParseTuple(args, "s:zipimporter.get_source", &fullname))
 		return NULL;
@@ -645,11 +655,12 @@ read_directory(char *archive)
 	PyObject *files = NULL;
 	FILE *fp;
 	long compress, crc, data_size, file_size, file_offset, date, time;
-	long header_offset, name_size, header_size, header_end;
+	long header_offset, name_size, header_size, header_position;
 	long i, l, length, count;
 	char path[MAXPATHLEN + 5];
 	char name[MAXPATHLEN + 5];
 	char *p, endof_central_dir[22];
+	long arc_offset; /* offset from beginning of file to start of zip-archive */
 
 	if (strlen(archive) > MAXPATHLEN) {
 		PyErr_SetString(PyExc_OverflowError,
@@ -665,7 +676,7 @@ read_directory(char *archive)
 		return NULL;
 	}
 	fseek(fp, -22, SEEK_END);
-	header_end = ftell(fp);
+	header_position = ftell(fp);
 	if (fread(endof_central_dir, 1, 22, fp) != 22) {
 		fclose(fp);
 		PyErr_Format(ZipImportError, "can't read Zip file: "
@@ -680,7 +691,10 @@ read_directory(char *archive)
 		return NULL;
 	}
 
+	header_size = get_long((unsigned char *)endof_central_dir + 12);
 	header_offset = get_long((unsigned char *)endof_central_dir + 16);
+	arc_offset = header_position - header_offset - header_size;
+	header_offset += arc_offset;
 
 	files = PyDict_New();
 	if (files == NULL)
@@ -711,7 +725,7 @@ read_directory(char *archive)
 		   PyMarshal_ReadShortFromFile(fp) +
 		   PyMarshal_ReadShortFromFile(fp);
 		fseek(fp, header_offset + 42, 0);
-		file_offset = PyMarshal_ReadLongFromFile(fp);
+		file_offset = PyMarshal_ReadLongFromFile(fp) + arc_offset;
 		if (name_size > MAXPATHLEN)
 			name_size = MAXPATHLEN;
 
@@ -861,7 +875,7 @@ get_data(char *archive, PyObject *toc_entry)
 				"zlib not available");
 		goto error;
 	}
-	data = PyObject_CallFunction(decompress, "Ol", raw_data, -15);
+	data = PyObject_CallFunction(decompress, "Oi", raw_data, -15);
 error:
 	Py_DECREF(raw_data);
 	return data;

@@ -32,6 +32,7 @@
 Sample use, command line:
   trace.py -c -f counts --ignore-dir '$prefix' spam.py eggs
   trace.py -t --ignore-dir '$prefix' spam.py eggs
+  trace.py --trackcalls spam.py eggs
 
 Sample use, programmatically
    # create a Trace object, telling it what to ignore, and whether to
@@ -39,20 +40,21 @@ Sample use, programmatically
    trace = trace.Trace(ignoredirs=[sys.prefix, sys.exec_prefix,], trace=0,
                        count=1)
    # run the new command using the given trace
-   trace.run(coverage.globaltrace, 'main()')
+   trace.run('main()')
    # make a report, telling it where you want output
    r = trace.results()
    r.write_results(show_missing=True)
 """
 
 import linecache
-import marshal
 import os
 import re
 import sys
+import threading
 import token
 import tokenize
 import types
+import gc
 
 try:
     import cPickle
@@ -73,6 +75,11 @@ Otherwise, exactly one of the following three options must be given:
                       and write the counts to <module>.cover for each
                       module executed, in the module's directory.
                       See also `--coverdir', `--file', `--no-report' below.
+-l, --listfuncs       Keep track of which functions are executed at least
+                      once and write the results to sys.stdout after the
+                      program exits.
+-T, --trackcalls      Keep track of caller/called pairs and write the
+                      results to sys.stdout after the program exits.
 -r, --report          Generate a report from a counts file; do not execute
                       any code.  `--file' must specify the results file to
                       read, which must have been created in a previous run
@@ -176,13 +183,19 @@ def fullmodname(path):
             if len(dir) > len(longest):
                 longest = dir
 
-    base = path[len(longest) + 1:].replace("/", ".")
+    if longest:
+        base = path[len(longest) + 1:]
+    else:
+        base = path
+    base = base.replace(os.sep, ".")
+    if os.altsep:
+        base = base.replace(os.altsep, ".")
     filename, ext = os.path.splitext(base)
     return filename
 
 class CoverageResults:
     def __init__(self, counts=None, calledfuncs=None, infile=None,
-                 outfile=None):
+                 callers=None, outfile=None):
         self.counts = counts
         if self.counts is None:
             self.counts = {}
@@ -191,30 +204,30 @@ class CoverageResults:
         if self.calledfuncs is None:
             self.calledfuncs = {}
         self.calledfuncs = self.calledfuncs.copy()
+        self.callers = callers
+        if self.callers is None:
+            self.callers = {}
+        self.callers = self.callers.copy()
         self.infile = infile
         self.outfile = outfile
         if self.infile:
-            # Try and merge existing counts file.
-            # This code understand a couple of old trace.py formats.
+            # Try to merge existing counts file.
             try:
-                thingie = pickle.load(open(self.infile, 'r'))
-                if isinstance(thingie, dict):
-                    self.update(self.__class__(thingie))
-                elif isinstance(thingie, tuple) and len(thingie) == 2:
-                    counts, calledfuncs = thingie
-                    self.update(self.__class__(counts, calledfuncs))
-            except (IOError, EOFError), err:
+                counts, calledfuncs, callers = \
+                        pickle.load(open(self.infile, 'rb'))
+                self.update(self.__class__(counts, calledfuncs, callers))
+            except (IOError, EOFError, ValueError), err:
                 print >> sys.stderr, ("Skipping counts file %r: %s"
                                       % (self.infile, err))
-            except pickle.UnpicklingError:
-                self.update(self.__class__(marshal.load(open(self.infile))))
 
     def update(self, other):
         """Merge in the data from another CoverageResults"""
         counts = self.counts
         calledfuncs = self.calledfuncs
+        callers = self.callers
         other_counts = other.counts
         other_calledfuncs = other.calledfuncs
+        other_callers = other.callers
 
         for key in other_counts.keys():
             counts[key] = counts.get(key, 0) + other_counts[key]
@@ -222,13 +235,38 @@ class CoverageResults:
         for key in other_calledfuncs.keys():
             calledfuncs[key] = 1
 
+        for key in other_callers.keys():
+            callers[key] = 1
+
     def write_results(self, show_missing=True, summary=False, coverdir=None):
         """
         @param coverdir
         """
-        for filename, modulename, funcname in self.calledfuncs.keys():
-            print ("filename: %s, modulename: %s, funcname: %s"
-                   % (filename, modulename, funcname))
+        if self.calledfuncs:
+            print
+            print "functions called:"
+            calls = self.calledfuncs.keys()
+            calls.sort()
+            for filename, modulename, funcname in calls:
+                print ("filename: %s, modulename: %s, funcname: %s"
+                       % (filename, modulename, funcname))
+
+        if self.callers:
+            print
+            print "calling relationships:"
+            calls = self.callers.keys()
+            calls.sort()
+            lastfile = lastcfile = ""
+            for ((pfile, pmod, pfunc), (cfile, cmod, cfunc)) in calls:
+                if pfile != lastfile:
+                    print
+                    print "***", pfile, "***"
+                    lastfile = pfile
+                    lastcfile = ""
+                if cfile != pfile and lastcfile != cfile:
+                    print "  -->", cfile
+                    lastcfile = cfile
+                print "    %s.%s -> %s.%s" % (pmod, pfunc, cmod, cfunc)
 
         # turn the counts data ("(filename, lineno) = count") into something
         # accessible on a per-file basis
@@ -284,8 +322,8 @@ class CoverageResults:
         if self.outfile:
             # try and store counts and module info into self.outfile
             try:
-                pickle.dump((self.counts, self.calledfuncs),
-                            open(self.outfile, 'w'), 1)
+                pickle.dump((self.counts, self.calledfuncs, self.callers),
+                            open(self.outfile, 'wb'), 1)
             except IOError, err:
                 print >> sys.stderr, "Can't save counts files because %s" % err
 
@@ -297,7 +335,7 @@ class CoverageResults:
         except IOError, err:
             print >> sys.stderr, ("trace: Could not open %r for writing: %s"
                                   "- skipping" % (path, err))
-            return
+            return 0, 0
 
         n_lines = 0
         n_hits = 0
@@ -310,16 +348,16 @@ class CoverageResults:
                 n_hits += 1
                 n_lines += 1
             elif rx_blank.match(line):
-                outfile.write("      ")
+                outfile.write("       ")
             else:
                 # lines preceded by no marks weren't hit
                 # Highlight them if so indicated, unless the line contains
                 # #pragma: NO COVER
                 if lineno in lnotab and not PRAGMA_NOCOVER in lines[i]:
                     outfile.write(">>>>>> ")
+                    n_lines += 1
                 else:
                     outfile.write("       ")
-                n_lines += 1
             outfile.write(lines[i].expandtabs(8))
         outfile.close()
 
@@ -378,9 +416,8 @@ def find_strings(filename):
 
 def find_executable_linenos(filename):
     """Return dict where keys are line numbers in the line number table."""
-    assert filename.endswith('.py')
     try:
-        prog = open(filename).read()
+        prog = open(filename, "rU").read()
     except IOError, err:
         print >> sys.stderr, ("Not printing coverage data for %r: %s"
                               % (filename, err))
@@ -390,8 +427,8 @@ def find_executable_linenos(filename):
     return find_lines(code, strs)
 
 class Trace:
-    def __init__(self, count=1, trace=1, countfuncs=0, ignoremods=(),
-                 ignoredirs=(), infile=None, outfile=None):
+    def __init__(self, count=1, trace=1, countfuncs=0, countcallers=0,
+                 ignoremods=(), ignoredirs=(), infile=None, outfile=None):
         """
         @param count true iff it should count number of times each
                      line is executed
@@ -417,7 +454,11 @@ class Trace:
         self.donothing = 0
         self.trace = trace
         self._calledfuncs = {}
-        if countfuncs:
+        self._callers = {}
+        self._caller_cache = {}
+        if countcallers:
+            self.globaltrace = self.globaltrace_trackcallers
+        elif countfuncs:
             self.globaltrace = self.globaltrace_countfuncs
         elif trace and count:
             self.globaltrace = self.globaltrace_lt
@@ -437,22 +478,26 @@ class Trace:
         dict = __main__.__dict__
         if not self.donothing:
             sys.settrace(self.globaltrace)
+            threading.settrace(self.globaltrace)
         try:
             exec cmd in dict, dict
         finally:
             if not self.donothing:
                 sys.settrace(None)
+                threading.settrace(None)
 
     def runctx(self, cmd, globals=None, locals=None):
         if globals is None: globals = {}
         if locals is None: locals = {}
         if not self.donothing:
             sys.settrace(self.globaltrace)
+            threading.settrace(self.globaltrace)
         try:
             exec cmd in globals, locals
         finally:
             if not self.donothing:
                 sys.settrace(None)
+                threading.settrace(None)
 
     def runfunc(self, func, *args, **kw):
         result = None
@@ -465,20 +510,70 @@ class Trace:
                 sys.settrace(None)
         return result
 
+    def file_module_function_of(self, frame):
+        code = frame.f_code
+        filename = code.co_filename
+        if filename:
+            modulename = modname(filename)
+        else:
+            modulename = None
+
+        funcname = code.co_name
+        clsname = None
+        if code in self._caller_cache:
+            if self._caller_cache[code] is not None:
+                clsname = self._caller_cache[code]
+        else:
+            self._caller_cache[code] = None
+            ## use of gc.get_referrers() was suggested by Michael Hudson
+            # all functions which refer to this code object
+            funcs = [f for f in gc.get_referrers(code)
+                         if hasattr(f, "func_doc")]
+            # require len(func) == 1 to avoid ambiguity caused by calls to
+            # new.function(): "In the face of ambiguity, refuse the
+            # temptation to guess."
+            if len(funcs) == 1:
+                dicts = [d for d in gc.get_referrers(funcs[0])
+                             if isinstance(d, dict)]
+                if len(dicts) == 1:
+                    classes = [c for c in gc.get_referrers(dicts[0])
+                                   if hasattr(c, "__bases__")]
+                    if len(classes) == 1:
+                        # ditto for new.classobj()
+                        clsname = str(classes[0])
+                        # cache the result - assumption is that new.* is
+                        # not called later to disturb this relationship
+                        # _caller_cache could be flushed if functions in
+                        # the new module get called.
+                        self._caller_cache[code] = clsname
+        if clsname is not None:
+            # final hack - module name shows up in str(cls), but we've already
+            # computed module name, so remove it
+            clsname = clsname.split(".")[1:]
+            clsname = ".".join(clsname)
+            funcname = "%s.%s" % (clsname, funcname)
+
+        return filename, modulename, funcname
+
+    def globaltrace_trackcallers(self, frame, why, arg):
+        """Handler for call events.
+
+        Adds information about who called who to the self._callers dict.
+        """
+        if why == 'call':
+            # XXX Should do a better job of identifying methods
+            this_func = self.file_module_function_of(frame)
+            parent_func = self.file_module_function_of(frame.f_back)
+            self._callers[(parent_func, this_func)] = 1
+
     def globaltrace_countfuncs(self, frame, why, arg):
         """Handler for call events.
 
         Adds (filename, modulename, funcname) to the self._calledfuncs dict.
         """
         if why == 'call':
-            code = frame.f_code
-            filename = code.co_filename
-            funcname = code.co_name
-            if filename:
-                modulename = modname(filename)
-            else:
-                modulename = None
-            self._calledfuncs[(filename, modulename, funcname)] = 1
+            this_func = self.file_module_function_of(frame)
+            self._calledfuncs[this_func] = 1
 
     def globaltrace_lt(self, frame, why, arg):
         """Handler for call events.
@@ -538,7 +633,8 @@ class Trace:
     def results(self):
         return CoverageResults(self.counts, infile=self.infile,
                                outfile=self.outfile,
-                               calledfuncs=self._calledfuncs)
+                               calledfuncs=self._calledfuncs,
+                               callers=self._callers)
 
 def _err_exit(msg):
     sys.stderr.write("%s: %s\n" % (sys.argv[0], msg))
@@ -550,12 +646,13 @@ def main(argv=None):
     if argv is None:
         argv = sys.argv
     try:
-        opts, prog_argv = getopt.getopt(argv[1:], "tcrRf:d:msC:l",
+        opts, prog_argv = getopt.getopt(argv[1:], "tcrRf:d:msC:lT",
                                         ["help", "version", "trace", "count",
                                          "report", "no-report", "summary",
                                          "file=", "missing",
                                          "ignore-module=", "ignore-dir=",
-                                         "coverdir=", "listfuncs",])
+                                         "coverdir=", "listfuncs",
+                                         "trackcalls"])
 
     except getopt.error, msg:
         sys.stderr.write("%s: %s\n" % (sys.argv[0], msg))
@@ -574,6 +671,7 @@ def main(argv=None):
     coverdir = None
     summary = 0
     listfuncs = False
+    countcallers = False
 
     for opt, val in opts:
         if opt == "--help":
@@ -583,6 +681,10 @@ def main(argv=None):
         if opt == "--version":
             sys.stdout.write("trace 2.0\n")
             sys.exit(0)
+
+        if opt == "-T" or opt == "--trackcalls":
+            countcallers = True
+            continue
 
         if opt == "-l" or opt == "--listfuncs":
             listfuncs = True
@@ -644,9 +746,9 @@ def main(argv=None):
     if listfuncs and (count or trace):
         _err_exit("cannot specify both --listfuncs and (--trace or --count)")
 
-    if not count and not trace and not report and not listfuncs:
-        _err_exit("must specify one of --trace, --count, --report or "
-                  "--listfuncs")
+    if not (count or trace or report or listfuncs or countcallers):
+        _err_exit("must specify one of --trace, --count, --report, "
+                  "--listfuncs, or --trackcalls")
 
     if report and no_report:
         _err_exit("cannot specify both --report and --no-report")
@@ -667,10 +769,11 @@ def main(argv=None):
         sys.path[0] = os.path.split(progname)[0]
 
         t = Trace(count, trace, countfuncs=listfuncs,
-                  ignoremods=ignore_modules, ignoredirs=ignore_dirs,
-                  infile=counts_file, outfile=counts_file)
+                  countcallers=countcallers, ignoremods=ignore_modules,
+                  ignoredirs=ignore_dirs, infile=counts_file,
+                  outfile=counts_file)
         try:
-            t.run('execfile(' + `progname` + ')')
+            t.run('execfile(%r)' % (progname,))
         except IOError, err:
             _err_exit("Cannot run file %r because: %s" % (sys.argv[0], err))
         except SystemExit:

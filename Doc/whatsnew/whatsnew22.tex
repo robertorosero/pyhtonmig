@@ -5,7 +5,10 @@
 \title{What's New in Python 2.2}
 \release{1.02}
 \author{A.M. Kuchling}
-\authoraddress{\email{amk@amk.ca}}
+\authoraddress{
+	\strong{Python Software Foundation}\\
+	Email: \email{amk@amk.ca}
+}
 \begin{document}
 \maketitle\tableofcontents
 
@@ -344,7 +347,7 @@ will be used in methods to call a method in the superclass; for
 example, \class{D}'s \method{save()} method would look like this:
 
 \begin{verbatim}
-class D:
+class D (B,C):
     def save (self):
 	# Call superclass .save()
         super(D, self).save()
@@ -424,14 +427,9 @@ Finally, it's possible to constrain the list of attributes that can be
 referenced on an object using the new \member{__slots__} class attribute.
 Python objects are usually very dynamic; at any time it's possible to
 define a new attribute on an instance by just doing
-\code{obj.new_attr=1}.  This is flexible and convenient, but this
-flexibility can also lead to bugs, as when you meant to write
-\code{obj.template = 'a'} but made a typo and wrote
-\code{obj.templtae} by accident.  
-
-A new-style class can define a class attribute named \member{__slots__}
-to constrain the list of legal attribute names.  An example will make
-this clear:
+\code{obj.new_attr=1}.   A new-style class can define a class attribute named
+\member{__slots__} to limit the legal attributes 
+to a particular set of names.  An example will make this clear:
 
 \begin{verbatim}
 >>> class C(object):
@@ -443,14 +441,15 @@ None
 >>> obj.template = 'Test'
 >>> print obj.template
 Test
->>> obj.templtae = None
+>>> obj.newattr = None
 Traceback (most recent call last):
   File "<stdin>", line 1, in ?
-AttributeError: 'C' object has no attribute 'templtae'
+AttributeError: 'C' object has no attribute 'newattr'
 \end{verbatim}
 
 Note how you get an \exception{AttributeError} on the attempt to
 assign to an attribute not listed in \member{__slots__}.
+
 
 
 \subsection{Related Links}
@@ -1229,6 +1228,33 @@ affect you very much.
   \cfunction{PyInterpreterState_ThreadHead()} and
   \cfunction{PyThreadState_Next()} allow looping over all the thread
   states for a given interpreter.  (Contributed by David Beazley.)
+
+\item The C-level interface to the garbage collector has been changed
+to make it easier to write extension types that support garbage
+collection and to debug misuses of the functions.
+Various functions have slightly different semantics, so a bunch of
+functions had to be renamed.  Extensions that use the old API will
+still compile but will \emph{not} participate in garbage collection,
+so updating them for 2.2 should be considered fairly high priority.
+
+To upgrade an extension module to the new API, perform the following
+steps:
+
+\begin{itemize}
+
+\item Rename \cfunction{Py_TPFLAGS_GC} to \cfunction{PyTPFLAGS_HAVE_GC}.
+
+\item Use \cfunction{PyObject_GC_New} or \cfunction{PyObject_GC_NewVar} to
+allocate objects, and \cfunction{PyObject_GC_Del} to deallocate them.
+
+\item Rename \cfunction{PyObject_GC_Init} to \cfunction{PyObject_GC_Track} and
+\cfunction{PyObject_GC_Fini} to \cfunction{PyObject_GC_UnTrack}.
+
+\item Remove \cfunction{PyGC_HEAD_SIZE} from object size calculations.
+
+\item Remove calls to \cfunction{PyObject_AS_GC} and \cfunction{PyObject_FROM_GC}.
+
+\end{itemize}
 
   \item A new \samp{et} format sequence was added to
   \cfunction{PyArg_ParseTuple}; \samp{et} takes both a parameter and

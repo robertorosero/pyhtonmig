@@ -2,20 +2,10 @@
 ** Convert objects from Python to CoreFoundation and vice-versa.
 */
 
-#ifdef WITHOUT_FRAMEWORKS
-#include <CFBase.h>
-#include <CFNumber.h>
-#include <CFArray.h>
-#include <CFData.h>
-#include <CFDictionary.h>
-#include <CFString.h>
-#include <CFURL.h>
-#else
 #include <CoreServices/CoreServices.h>
-#endif
 
 #include "Python.h"
-#include "macglue.h"
+#include "pymactoolbox.h"
 #include "pycfbridge.h"
 
 

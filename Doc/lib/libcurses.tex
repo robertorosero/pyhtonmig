@@ -337,7 +337,7 @@ occur.  The \method{refresh()} and \method{noutrefresh()} methods of a
 pad require 6 arguments to specify the part of the pad to be
 displayed and the location on the screen to be used for the display.
 The arguments are pminrow, pmincol, sminrow, smincol, smaxrow,
-smaxcol; the p arguments refer to the upper left corner of the the pad
+smaxcol; the p arguments refer to the upper left corner of the pad
 region to be displayed and the s arguments define a clipping box on
 the screen within which the pad region is to be displayed.
 \end{funcdesc}
@@ -362,7 +362,7 @@ Leave cbreak mode.  Return to normal ``cooked'' mode with line buffering.
 \end{funcdesc}
 
 \begin{funcdesc}{noecho}{}
-Leave echo mode.  Echoing of input characters is turned off,
+Leave echo mode.  Echoing of input characters is turned off.
 \end{funcdesc}
 
 \begin{funcdesc}{nonl}{}
@@ -537,6 +537,15 @@ a window (in which case default behavior would be to use the window
 size if \envvar{LINES} and \envvar{COLUMNS} are not set).
 \end{funcdesc}
 
+\begin{funcdesc}{use_default_colors}{}
+Allow use of default values for colors on terminals supporting this
+feature. Use this to support transparency in your
+application.  The default color is assigned to the color number -1.
+After calling this function, 
+\code{init_pair(x, curses.COLOR_RED, -1)} initializes, for instance,
+color pair \var{x} to a red foreground color on the default background.
+\end{funcdesc}
+
 \subsection{Window Objects \label{curses-window-objects}}
 
 Window objects, as returned by \function{initscr()} and
@@ -661,7 +670,7 @@ Updates the current cursor position of all the ancestors of the window
 to reflect the current cursor position of the window.
 \end{methoddesc}
 
-\begin{methoddesc}[window]{delch}{\optional{x, y}}
+\begin{methoddesc}[window]{delch}{\optional{y, x}}
 Delete any character at \code{(\var{y}, \var{x})}.
 \end{methoddesc}
 
@@ -699,14 +708,14 @@ Return a tuple \code{(\var{y}, \var{x})} of co-ordinates of upper-left
 corner.
 \end{methoddesc}
 
-\begin{methoddesc}[window]{getch}{\optional{x, y}}
+\begin{methoddesc}[window]{getch}{\optional{y, x}}
 Get a character. Note that the integer returned does \emph{not} have to
 be in \ASCII{} range: function keys, keypad keys and so on return numbers
 higher than 256. In no-delay mode, -1 is returned if there is 
 no input.
 \end{methoddesc}
 
-\begin{methoddesc}[window]{getkey}{\optional{x, y}}
+\begin{methoddesc}[window]{getkey}{\optional{y, x}}
 Get a character, returning a string instead of an integer, as
 \method{getch()} does. Function keys, keypad keys and so on return a
 multibyte string containing the key name.  In no-delay mode, an
@@ -724,7 +733,7 @@ parent window into two integer variables y and x.  Returns
 \code{-1,-1} if this window has no parent.
 \end{methoddesc}
 
-\begin{methoddesc}[window]{getstr}{\optional{x, y}}
+\begin{methoddesc}[window]{getstr}{\optional{y, x}}
 Read a string from the user, with primitive line editing capacity.
 \end{methoddesc}
 
@@ -760,7 +769,7 @@ degrade performance considerably, due to repeated calls to
 wrefresh.  This option is disabled by default.
 \end{methoddesc}
 
-\begin{methoddesc}[window]{inch}{\optional{x, y}}
+\begin{methoddesc}[window]{inch}{\optional{y, x}}
 Return the character at the given position in the window. The bottom
 8 bits are the character proper, and upper bits are the attributes.
 \end{methoddesc}
@@ -790,7 +799,7 @@ before the character under the cursor, up to \var{n} characters.
 If \var{n} is zero or negative,
 the entire string is inserted.
 All characters to the right of
-the cursor are shifted right, with the the rightmost characters on the
+the cursor are shifted right, with the rightmost characters on the
 line being lost.  The cursor position does not change (after moving to
 \var{y}, \var{x}, if specified). 
 \end{methoddesc}
@@ -798,7 +807,7 @@ line being lost.  The cursor position does not change (after moving to
 \begin{methoddesc}[window]{insstr}{\optional{y, x, } str \optional{, attr}}
 Insert a character string (as many characters as will fit on the line)
 before the character under the cursor.  All characters to the right of
-the cursor are shifted right, with the the rightmost characters on the
+the cursor are shifted right, with the rightmost characters on the
 line being lost.  The cursor position does not change (after moving to
 \var{y}, \var{x}, if specified). 
 \end{methoddesc}
@@ -997,7 +1006,7 @@ the window.
 
 \begin{methoddesc}[window]{timeout}{delay}
 Sets blocking or non-blocking read behavior for the window.  If
-\var{delay} is negative, blocking read is used, which will wait
+\var{delay} is negative, blocking read is used (which will wait
 indefinitely for input).  If \var{delay} is zero, then non-blocking
 read is used, and -1 will be returned by \method{getch()} if no input
 is waiting.  If \var{delay} is positive, then \method{getch()} will
@@ -1164,7 +1173,7 @@ there are normally at least four function keys (\constant{KEY_F1},
 \constant{KEY_F2}, \constant{KEY_F3}, \constant{KEY_F4}) available,
 and the arrow keys mapped to \constant{KEY_UP}, \constant{KEY_DOWN},
 \constant{KEY_LEFT} and \constant{KEY_RIGHT} in the obvious way.  If
-your machine has a PC keybboard, it is safe to expect arrow keys and
+your machine has a PC keyboard, it is safe to expect arrow keys and
 twelve function keys (older PC keyboards may have only ten function
 keys); also, the following keypad mappings are standard:
 
@@ -1266,7 +1275,7 @@ The module \module{curses.textpad} defines the following function:
 Draw a rectangle.  The first argument must be a window object; the
 remaining arguments are coordinates relative to that window.  The
 second and third arguments are the y and x coordinates of the upper
-left hand corner of the rectangle To be drawn; the fourth and fifth
+left hand corner of the rectangle to be drawn; the fourth and fifth
 arguments are the y and x coordinates of the lower right hand corner.
 The rectangle will be drawn using VT100/IBM PC forms characters on
 terminals that make this possible (including xterm and most other
@@ -1283,7 +1292,7 @@ You can instantiate a \class{Textbox} object as follows:
 Return a textbox widget object.  The \var{win} argument should be a
 curses \class{WindowObject} in which the textbox is to be contained.
 The edit cursor of the textbox is initially located at the upper left
-hand corner of the containin window, with coordinates \code{(0, 0)}.
+hand corner of the containing window, with coordinates \code{(0, 0)}.
 The instance's \member{stripspaces} flag is initially on.
 \end{classdesc}
 
@@ -1349,7 +1358,7 @@ This data member is a flag which controls the interpretation of blanks in
 the window.  When it is on, trailing blanks on each line are ignored;
 any cursor motion that would land the cursor on a trailing blank goes
 to the end of that line instead, and trailing blanks are stripped when
-the window contents is gathered.
+the window contents are gathered.
 \end{memberdesc}
 
 
@@ -1366,7 +1375,7 @@ This module supplies one function, \function{wrapper()}, which runs
 another function which should be the rest of your curses-using
 application.  If the application raises an exception,
 \function{wrapper()} will restore the terminal to a sane state before
-passing it further up the stack and generating a traceback.
+re-raising the exception and generating a traceback.
 
 \begin{funcdesc}{wrapper}{func, \moreargs}
 Wrapper function that initializes curses and calls another function,

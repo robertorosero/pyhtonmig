@@ -6,13 +6,11 @@
 
 
 \strong{This module is automatically imported during initialization.}
+The automatic import can be suppressed using the interpreter's
+\programopt{-S} option.
 
-In earlier versions of Python (up to and including 1.5a3), scripts or
-modules that needed to use site-specific modules would place
-\samp{import site} somewhere near the top of their code.  This is no
-longer necessary.
-
-This will append site-specific paths to the module search path.
+Importing this module will append site-specific paths to the module
+search path.
 \indexiii{module}{search}{path}
 
 It starts by constructing up to four directories from a head and a
@@ -28,7 +26,8 @@ path for configuration files.
 \indexii{site-packages}{directory}
 
 A path configuration file is a file whose name has the form
-\file{\var{package}.pth}; its contents are additional items (one
+\file{\var{package}.pth} and exists in one of the four directories
+mentioned above; its contents are additional items (one
 per line) to be added to \code{sys.path}.  Non-existing items are
 never added to \code{sys.path}, but no check is made that the item
 refers to a directory (rather than a file).  No item is added to

@@ -891,7 +891,7 @@ HISTORY file!  Many important changes listed there.
 
 Alternatively, a good overview of the changes between 1.5.2 and 2.0 is
 the document "What's New in Python 2.0" by Kuchling and Moshe Zadka:
-http://starship.python.net/crew/amk/python/writing/new-python/.
+http://www.amk.ca/python/2.0/.
 
 --Guido van Rossum (home page: http://www.pythonlabs.com/~guido/)
 
@@ -1882,7 +1882,7 @@ Overview of Changes since 1.5.2
 
 For this overview, I have borrowed from the document "What's New in
 Python 2.0" by Andrew Kuchling and Moshe Zadka:
-http://starship.python.net/crew/amk/python/writing/new-python/.
+http://www.amk.ca/python/2.0/ .
 
 There are lots of new modules and lots of bugs have been fixed.  A
 list of all new modules is included below.
@@ -7053,7 +7053,7 @@ separate file pyimenu.el is no longer needed, imenu support is folded
 into python-mode.el.
 
 - The configure script can finally correctly find the readline library in a 
-non-standard location.  The LDFLAGS variable is passed on the the Makefiles 
+non-standard location.  The LDFLAGS variable is passed on the Makefiles 
 from the configure script.
 
 - Shared libraries are now installed as programs (i.e. with executable 
@@ -7255,7 +7255,7 @@ Ellipses object, and corresponding syntax:
 	x[lo:hi:stride]		==	x[slice(lo, hi, stride)]
 	x[a, ..., z]		==	x[(a, Ellipses, z)]
 
-- New documentation for errno and cgi mdoules.
+- New documentation for errno and cgi modules.
 
 - The directory containing the script passed to the interpreter is
 inserted in from of sys.path; "." is no longer a default path
@@ -9278,7 +9278,7 @@ passed are system-dependent.  You can generate a version for your own
 system by running the script demo/scripts/h2py.py with
 /usr/include/sys/socket.h as input.
 
-cddb: interface to the database used the the CD player
+cddb: interface to the database used by the CD player
 
 torgb: convert various image file types to rgb format (requires pbmplus)
 

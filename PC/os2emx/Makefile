@@ -1,16 +1,16 @@
 #####################==================----------------
 #
-# Top-Level Makefile for Building Python 2.3 for OS/2 using GCC/EMX
+# Top-Level Makefile for Building Python 2.4 for OS/2 using GCC/EMX
 # Originally written by Andrew Zabolotny, <bit@eltech.ru> for Python 1.5.2
-# Modified by Andrew MacIntyre, <andymac@pcug.org.au> for Python 2.3
+# Modified by Andrew MacIntyre, <andymac@pcug.org.au> for Python 2.4
 #
 # This makefile was developed for use with [P]GCC/EMX compiler any
 # version and GNU Make.
 #
-# The output of the build is a largish Python23.DLL containing the
+# The output of the build is a largish Python24.DLL containing the
 # essential modules of Python and a small Python.exe program to start
 # the interpreter. When embedding Python within another program, only
-# Python23.DLL is needed. We also build python_s.a static library (which
+# Python24.DLL is needed. We also build python_s.a static library (which
 # can be converted into OMF (.lib) format using emxomf tool) and both
 # python.a and python.lib import libraries.  Then the optional 
 # extension modules, which are OS/2 DLLs renamed with a PYD file extension.
@@ -40,8 +40,6 @@ HAVE_ZLIB=	no
 HAVE_UFC=	no
 # Do you have the Tcl/Tk library installed?
 HAVE_TCLTK=	no
-# Do you have the GNU multiprecision library installed?
-HAVE_GMPZ=	no
 # Do you have the GNU readline library installed?
 # NOTE: I'm using a modified version of Kai Uwe Rommel's port that 
 #       - is compiled with multithreading enabled
@@ -64,7 +62,7 @@ HAVE_BZ2=	no
 
 # === install locations ===
 # default value of PYTHONHOME
-LIB_DIR=C:/Python23
+LIB_DIR=C:/Python24
 # default is to have everything in or under PYTHONHOME
 EXE_DIR=$(LIB_DIR)
 DLL_DIR=$(EXE_DIR)
@@ -83,6 +81,7 @@ ARFLAGS=	crs
 IMPLIB=		emximp
 EXPLIB=		emxexp
 EXEOPT=		emxbind
+PY_DEF=		-DPy_BUILD_CORE
 
 
 # adjust C compiler settings based on build options
@@ -90,9 +89,10 @@ ifeq ($(MODE),debug)
   CFLAGS+=	-g -O
   LDFLAGS+=	-g
 else
-  CFLAGS+=	-s -O2
+  CFLAGS+=	-s -O3 -fomit-frame-pointer -mprobe
   LDFLAGS+=	-s
 endif
+CFLAGS+=	$(PY_DEF)
 ifeq ($(ASSERTIONS),no)
   CFLAGS+=	-DNDEBUG
 endif
@@ -111,6 +111,7 @@ EXEOMF=		no
 
 # File extensions
 MODULE.EXT=	.pyd
+MODLIB.EXT=	.dll
 ifeq ($(OMF),yes)
   O=		.obj
   A=		.lib
@@ -214,11 +215,11 @@ $(OUT)%$O: %.c
 	@echo Creating .DEF file: $@
 	@echo NAME $(notdir $*) $(EXETYPE.$(notdir $*).exe) >$@
 	@echo DESCRIPTION $(DQUOTE)$(DESCRIPTION.$(notdir $*).exe)$(DQUOTE) >>$@
-	@echo STACKSIZE 1048576 >>$@
+	@echo STACKSIZE 1572864 >>$@
 
 # Output file names
-PYTHON_VER=	2.3
-PYTHON_LIB=	python23
+PYTHON_VER=	2.4
+PYTHON_LIB=	python24
 PYTHON.LIB=	$(PYTHON_LIB)_s$A
 PYTHON.IMPLIB=	$(PYTHON_LIB)$A
 ifeq ($(EXEOMF),yes)
@@ -248,10 +249,9 @@ DESCRIPTION.$(PGEN.EXE)=	Python object-oriented programming language parser gene
 DESCRIPTION.zlib$(MODULE.EXT)=		Python Extension DLL for accessing the InfoZip compression library
 DESCRIPTION.crypt$(MODULE.EXT)=		Python Extension DLL implementing the crypt$(BRO)$(BRC) function
 DESCRIPTION._tkinter$(MODULE.EXT)=	Python Extension DLL for access to Tcl/Tk Environment
-DESCRIPTION.mpz$(MODULE.EXT)=		Python Extension DLL for access to GNU multi-precision library
 DESCRIPTION.readline$(MODULE.EXT)=	Python Extension DLL for access to GNU ReadLine library
 DESCRIPTION.bsddb185$(MODULE.EXT)=	Python Extension DLL for access to BSD DB (v1.85) library
-DESCRIPTION._curses$(MODULE.EXT)=	Python Extension DLL for access to ncurses library
+DESCRIPTION._curses$(MODLIB.EXT)=	Python Extension DLL for access to ncurses library
 DESCRIPTION.pyexpat$(MODULE.EXT)=	Python Extension DLL for access to expat library
 DESCRIPTION.bz2$(MODULE.EXT)=		Python Extension DLL for accessing the bz2 compression library
 
@@ -269,6 +269,7 @@ SRC.MODULES=	$(addprefix $(TOP), \
 		Modules/binascii.c \
 		Modules/cmathmodule.c \
 		Modules/_codecsmodule.c \
+		Modules/collectionsmodule.c \
 		Modules/cPickle.c \
 		Modules/cStringIO.c \
 		Modules/_csv.c \
@@ -276,6 +277,7 @@ SRC.MODULES=	$(addprefix $(TOP), \
 		Modules/dlmodule.c \
 		Modules/errnomodule.c \
 		Modules/fcntlmodule.c \
+		Modules/_heapqmodule.c \
 		Modules/imageop.c \
 		Modules/itertoolsmodule.c \
 		Modules/_localemodule.c \
@@ -283,8 +285,6 @@ SRC.MODULES=	$(addprefix $(TOP), \
 		Modules/md5c.c \
 		Modules/md5module.c \
 		Modules/operator.c \
-		Modules/pcremodule.c \
-		Modules/pypcre.c \
 		Modules/_randommodule.c \
 		Modules/regexmodule.c \
 		Modules/regexpr.c \
@@ -298,7 +298,6 @@ SRC.MODULES=	$(addprefix $(TOP), \
 		Modules/timemodule.c \
 		Modules/timingmodule.c \
 		Modules/_weakref.c \
-		Modules/xreadlinesmodule.c \
 		Modules/xxsubtype.c \
 		Modules/zipimport.c)
 SRC.PARSE1=	$(addprefix $(TOP), \
@@ -340,6 +339,7 @@ SRC.PYTHON=	$(addprefix $(TOP), \
 		Python/mystrtoul.c \
 		Python/pyfpe.c \
 		Python/pystate.c \
+		Python/pystrtod.c \
 		Python/pythonrun.c \
 		Python/structmember.c \
 		Python/symtable.c \
@@ -363,6 +363,7 @@ SRC.OBJECT=	$(addprefix $(TOP), \
 		Objects/floatobject.c \
 		Objects/frameobject.c \
 		Objects/funcobject.c \
+		Objects/genobject.c \
 		Objects/intobject.c \
 		Objects/iterobject.c \
 		Objects/listobject.c \
@@ -372,6 +373,7 @@ SRC.OBJECT=	$(addprefix $(TOP), \
 		Objects/object.c \
 		Objects/obmalloc.c \
 		Objects/rangeobject.c \
+		Objects/setobject.c \
 		Objects/sliceobject.c \
 		Objects/stringobject.c \
 		Objects/structseq.c \
@@ -416,7 +418,6 @@ EASYEXTMODULES=	fpectl \
 		fpetest \
 		parser \
 		pwd \
-		rotor \
 		select 
 
 # Python modules to be dynamically loaded that need explicit build rules
@@ -426,6 +427,10 @@ HARDEXTMODULES=	_hotshot \
 		_socket \
 		_testcap \
 		unicoded
+
+# Python modules that are used as libraries and therefore must use
+# a .DLL extension
+LIBEXTMODULES=
 
 # Python external ($(MODULE.EXT)) modules - can be EASY or HARD
 ifeq ($(HAVE_ZLIB),yes)
@@ -439,9 +444,6 @@ ifeq ($(HAVE_TCLTK),yes)
   CFLAGS+=		-DHAS_DIRENT -I/TclTk80/include
   TK_LIBS+=		-L/TclTk80/lib -ltcl80 -ltk80
 endif
-ifeq ($(HAVE_GMPZ),yes)
-  HARDEXTMODULES+=	mpz
-endif
 ifeq ($(HAVE_GREADLINE),yes)
   HARDEXTMODULES+=	readline
 endif
@@ -449,7 +451,8 @@ ifeq ($(HAVE_BSDDB),yes)
   HARDEXTMODULES+=	bsddb185
 endif
 ifeq ($(HAVE_NCURSES),yes)
-  HARDEXTMODULES+=	_curses _curses_
+  LIBEXTMODULES+=	_curses
+  HARDEXTMODULES+=	_curses_
 endif
 ifeq ($(HAVE_GDBM),yes)
   HARDEXTMODULES+=	gdbm dbm
@@ -462,7 +465,7 @@ endif
 HARDEXTMODULES+=	pyexpat
 EXPAT.INC=	-I../../Modules/expat
 EXPAT.DEF=	-DHAVE_EXPAT_H -DXML_NS=1 -DXML_DTD=1 -DXML_BYTE_ORDER=12 \
-		-DXML_CONTENT_BYTES=1024
+		-DXML_CONTENT_BYTES=1024 -DHAVE_MEMMOVE=1 -DHAVE_BCOPY=1
 EXPAT.SRC=	$(addprefix ../../Modules/expat/, \
 		xmlparse.c \
 		xmlrole.c \
@@ -471,15 +474,20 @@ EXPAT.SRC=	$(addprefix ../../Modules/expat/, \
 # all the external modules
 EXTERNDLLS=	$(addsuffix $(MODULE.EXT),$(patsubst %module,%,$(EASYEXTMODULES)))
 EXTERNDLLS+=	$(addsuffix $(MODULE.EXT),$(patsubst %module,%,$(HARDEXTMODULES)))
+EXTERNDLLS+=	$(addsuffix $(MODLIB.EXT),$(patsubst %module,%,$(LIBEXTMODULES)))
 
 # Targets
 all:  $(OUT) $(PYTHON.LIB) $(PYTHON.DEF) $(PYTHON.IMPLIB) $(PYTHON.DLL) \
-  $(PYTHON.EXE) $(PYTHONPM.EXE) $(PGEN.EXE) $(EXTERNDLLS)
+	python_noncore
+
+python_noncore:
+	make PY_DEF= $(PYTHON.EXE) $(PYTHONPM.EXE) $(PGEN.EXE) $(EXTERNDLLS)
 
 clean:
 	rm -f $(OUT)*
 	rm -f $(PYTHON.LIB) $(PYTHON.IMPLIB) $(PYTHON.EXEIMP) $(PYTHON.DLL) \
-	  $(PYTHON.EXE) $(PYTHONPM.EXE) $(PGEN.EXE) *$(MODULE.EXT)
+	  $(PYTHON.EXE) $(PYTHONPM.EXE) $(PGEN.EXE) *$(MODULE.EXT) *.dll
+	find ../../Lib -name "*.py[co]" -exec rm {} ";"
 
 lx:
 	@echo Packing everything with lxLite...
@@ -498,6 +506,9 @@ $(PYTHON.LIB): $(OBJ.LIB)
 	rm.exe -f $@
 	$(AR) $(ARFLAGS) $@ $^
 
+# the Python core DLL .def file needs to have a number of non-static
+# symbols that aren't part of the Python C API removed (commented out)
+# from the DLL export list.
 $(PYTHON.DEF): $(PYTHON.LIB)
 	@echo Creating .DEF file: $@
 	@echo LIBRARY $(PYTHON_LIB) INITINSTANCE TERMINSTANCE >$@
@@ -505,7 +516,17 @@ $(PYTHON.DEF): $(PYTHON.LIB)
 	@echo PROTMODE >>$@
 	@echo DATA MULTIPLE NONSHARED >>$@
 	@echo EXPORTS >>$@
-	$(EXPLIB) -u $(PYTHON.LIB) >>$@
+	$(EXPLIB) -u $(PYTHON.LIB) |\
+	 sed -e "/^  .init.*/s/^ /; /" \
+		-e "/^  .pcre_.*/s/^ /; /" \
+		-e "/^  .array_methods/s/^ /; /" \
+		-e "/^  .fast_save_leave/s/^ /; /" \
+		-e "/^  .dlopen/s/^ /; /" \
+		-e "/^  .dlsym/s/^ /; /" \
+		-e "/^  .dlclose/s/^ /; /" \
+		-e "/^  .dlerror/s/^ /; /" \
+		-e "/^  ._Py_re_.*/s/^ /; /" \
+		-e "/^  ._Py_MD5.*/s/^ /; /" >>$@
 
 $(PYTHON.IMPLIB): $(PYTHON.DEF)
 	$(IMPLIB) -o $@ $^
@@ -564,7 +585,7 @@ crypt$(MODULE.EXT): $(OUT)cryptmodule$O $(OUT)crypt_m.def $(PYTHON.IMPLIB)
 $(OUT)_curses_m.def:
 	@echo Creating .DEF file: $@
 	@echo LIBRARY $(notdir $*) INITINSTANCE TERMINSTANCE >$@
-	@echo DESCRIPTION $(DQUOTE)$(DESCRIPTION.$(notdir $*)$(MODULE.EXT))$(DQUOTE) >>$@
+	@echo DESCRIPTION $(DQUOTE)$(DESCRIPTION.$(notdir $*)$(MODLIB.EXT))$(DQUOTE) >>$@
 	@echo DATA MULTIPLE NONSHARED >>$@
 	@echo EXPORTS >>$@
 	@echo 	init_curses >>$@
@@ -590,7 +611,7 @@ $(OUT)_curses_panel_m.def:
 	@echo EXPORTS >>$@
 	@echo 	init_curses_panel >>$@
 
-_curses$(MODULE.EXT): $(OUT)_cursesmodule$O $(OUT)_curses_m.def $(PYTHON.IMPLIB)
+_curses$(MODLIB.EXT): $(OUT)_cursesmodule$O $(OUT)_curses_m.def $(PYTHON.IMPLIB)
 	$(LD) $(LDFLAGS.DLL) -o $@ $(^^) $(L^) $(LIBS) -lncurses
 
 # curses_panel needs to be renamed to be useful
@@ -606,8 +627,6 @@ dbm$(MODULE.EXT): $(OUT)dbmmodule$O $(OUT)dbm_m.def $(PYTHON.IMPLIB)
 gdbm$(MODULE.EXT): $(OUT)gdbmmodule$O $(OUT)gdbm_m.def $(PYTHON.IMPLIB)
 	$(LD) $(LDFLAGS.DLL) -o $@ $(^^) $(L^) $(LIBS) -lgdbm
 
-mpz$(MODULE.EXT): $(OUT)mpzmodule$O $(OUT)mpz_m.def $(PYTHON.IMPLIB)
-	$(LD) $(LDFLAGS.DLL) -o $@ $(^^) $(L^) $(LIBS) -lgmp
 
 # Expat is now distributed with Python, so use the included version
 $(OUT)pyexpat$O:	../../Modules/pyexpat.c
@@ -627,7 +646,7 @@ readline$(MODULE.EXT): $(OUT)readline$O $(OUT)readline_m.def $(PYTHON.IMPLIB)
 
 #_tkinter$(MODULE.EXT): $(OUT)_tkinter$O $(OUT)tclNotify$O $(OUT)tkappinit$O
 _tkinter$(MODULE.EXT): $(OUT)_tkinter$O $(OUT)tclNotify$O \
-    $(OUT)_tkinter_m.def $(PYTHON.IMPLIB)
+		$(OUT)_tkinter_m.def $(PYTHON.IMPLIB)
 	$(LD) $(LDFLAGS.DLL) -o $@ $(^^) $(L^) $(LIBS) $(TK_LIBS)
 
 zlib$(MODULE.EXT): $(OUT)zlibmodule$O $(OUT)zlib_m.def $(PYTHON.IMPLIB)

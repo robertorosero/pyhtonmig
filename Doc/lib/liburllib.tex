@@ -21,14 +21,18 @@ It defines the following public functions:
 \begin{funcdesc}{urlopen}{url\optional{, data\optional{, proxies}}}
 Open a network object denoted by a URL for reading.  If the URL does
 not have a scheme identifier, or if it has \file{file:} as its scheme
-identifier, this opens a local file; otherwise it opens a socket to a
-server somewhere on the network.  If the connection cannot be made, or
-if the server returns an error code, the \exception{IOError} exception
-is raised.  If all went well, a file-like object is returned.  This
-supports the following methods: \method{read()}, \method{readline()},
-\method{readlines()}, \method{fileno()}, \method{close()},
-\method{info()} and \method{geturl()}.  It also has proper support for
-the iterator protocol.
+identifier, this opens a local file (without universal newlines);
+otherwise it opens a socket to a server somewhere on the network.  If
+the connection cannot be made, or if the server returns an error code,
+the \exception{IOError} exception is raised.  If all went well, a
+file-like object is returned.  This supports the following methods:
+\method{read()}, \method{readline()}, \method{readlines()}, \method{fileno()},
+\method{close()}, \method{info()} and \method{geturl()}.  It also has
+proper support for the iterator protocol.
+One caveat: the \method{read()} method, if the size argument is
+omitted or negative, may not read until the end of the data stream;
+there is no good way to determine that the entire stream from a socket
+has been read in the general case.
 
 Except for the \method{info()} and \method{geturl()} methods,
 these methods have the same interface as for
@@ -146,7 +150,7 @@ The public functions \function{urlopen()} and
 \class{FancyURLopener} class and use it to perform their requested
 actions.  To override this functionality, programmers can create a
 subclass of \class{URLopener} or \class{FancyURLopener}, then assign
-that an instance of that class to the
+an instance of that class to the
 \code{urllib._urlopener} variable before calling the desired function.
 For example, applications may want to specify a different
 \mailheader{User-Agent} header than \class{URLopener} defines.  This
@@ -257,12 +261,12 @@ actually retrieve a resource at an \file{https:} URL.
 
 \begin{classdesc}{FancyURLopener}{...}
 \class{FancyURLopener} subclasses \class{URLopener} providing default
-handling for the following HTTP response codes: 301, 302, 303 and 401.
-For 301, 302 and 303 response codes, the \mailheader{Location} header
-is used to fetch the actual URL.  For 401 response codes
-(authentication required), basic HTTP authentication is performed.
-For 301, 302 and 303 response codes, recursion is bounded by the value
-of the \var{maxtries} attribute, which defaults 10.
+handling for the following HTTP response codes: 301, 302, 303, 307 and
+401.  For the 30x response codes listed above, the
+\mailheader{Location} header is used to fetch the actual URL.  For 401
+response codes (authentication required), basic HTTP authentication is
+performed.  For the 30x response codes, recursion is bounded by the
+value of the \var{maxtries} attribute, which defaults to 10.
 
 \note{According to the letter of \rfc{2616}, 301 and 302 responses to
   POST requests must not be automatically redirected without
@@ -323,6 +327,23 @@ Gopher\indexii{Gopher}{protocol} protocol, type information is encoded
 in the URL; there is currently no easy way to extract it.  If the
 returned data is HTML, you can use the module
 \refmodule{htmllib}\refstmodindex{htmllib} to parse it.
+
+\item
+The code handling the FTP\index{FTP} protocol cannot differentiate
+between a file and a directory.  This can lead to unexpected behavior
+when attempting to read a URL that points to a file that is not
+accessible.  If the URL ends in a \code{/}, it is assumed to refer to
+a directory and will be handled accordingly.  But if an attempt to
+read a file leads to a 550 error (meaning the URL cannot be found or
+is not accessible, often for permission reasons), then the path is
+treated as a directory in order to handle the case when a directory is
+specified by a URL but the trailing \code{/} has been left off.  This can
+cause misleading results when you try to fetch a file whose read
+permissions make it inaccessible; the FTP code will try to read it,
+fail with a 550 error, and then perform a directory listing for the
+unreadable file. If fine-grained control is needed, consider using the
+\module{ftplib} module, subclassing \class{FancyURLOpener}, or changing
+\var{_urlopener} to meet your needs.
 
 \item
 This module does not support the use of proxies which require

@@ -1,4 +1,4 @@
-\chapter{Extending Python with C or \Cpp \label{intro}}
+\chapter{Extending Python with \C{} or \Cpp{} \label{intro}}
 
 
 It is quite easy to add new built-in modules to Python, if you know
@@ -23,7 +23,7 @@ Let's create an extension module called \samp{spam} (the favorite food
 of Monty Python fans...) and let's say we want to create a Python
 interface to the C library function \cfunction{system()}.\footnote{An
 interface for this function already exists in the standard module
-\module{os} --- it was chosen as a simple and straightfoward example.}
+\module{os} --- it was chosen as a simple and straightforward example.}
 This function takes a null-terminated character string as argument and
 returns an integer.  We want this function to be callable from Python
 as follows:
@@ -46,9 +46,12 @@ The first line of our file can be:
 
 which pulls in the Python API (you can add a comment describing the
 purpose of the module and a copyright notice if you like).
-Since Python may define some pre-processor definitions which affect
-the standard headers on some systems, you must include \file{Python.h}
-before any standard headers are included.
+
+\begin{notice}[warning]
+  Since Python may define some pre-processor definitions which affect
+  the standard headers on some systems, you \emph{must} include
+  \file{Python.h} before any standard headers are included.
+\end{notice}
 
 All user-visible symbols defined by \file{Python.h} have a prefix of
 \samp{Py} or \samp{PY}, except those defined in standard header files.
@@ -67,7 +70,7 @@ is evaluated (we'll see shortly how it ends up being called):
 static PyObject *
 spam_system(PyObject *self, PyObject *args)
 {
-    char *command;
+    const char *command;
     int sts;
 
     if (!PyArg_ParseTuple(args, "s", &command))
@@ -240,7 +243,8 @@ discarded, causing \cdata{SpamError} to become a dangling pointer.
 Should it become a dangling pointer, C code which raises the exception
 could cause a core dump or other unintended side effects.
 
-We discuss the use of PyMODINIT_FUNC later in this sample.
+We discuss the use of PyMODINIT_FUNC as a function return type later in this
+sample.
 
 \section{Back to the Example
          \label{backToExample}}
@@ -286,7 +290,8 @@ are objects on the heap in Python!)
 
 If you have a C function that returns no useful argument (a function
 returning \ctype{void}), the corresponding Python function must return
-\code{None}.   You need this idiom to do so:
+\code{None}.   You need this idiom to do so (which is implemented by the
+\csimplemacro{Py_RETURN_NONE} macro):
 
 \begin{verbatim}
     Py_INCREF(Py_None);
@@ -349,7 +354,7 @@ initspam(void)
 
 Note that PyMODINIT_FUNC declares the function as \code{void} return type, 
 declares any special linkage declarations required by the platform, and for 
-\Cpp declares the function as \code{extern "C"}.
+\Cpp{} declares the function as \code{extern "C"}.
 
 When the Python program imports module \module{spam} for the first
 time, \cfunction{initspam()} is called. (See below for comments about
@@ -629,7 +634,7 @@ Some example calls:
     int ok;
     int i, j;
     long k, l;
-    char *s;
+    const char *s;
     int size;
 
     ok = PyArg_ParseTuple(args, ""); /* No arguments */
@@ -654,8 +659,8 @@ Some example calls:
 
 \begin{verbatim}
     {
-        char *file;
-        char *mode = "r";
+        const char *file;
+        const char *mode = "r";
         int bufsize = 0;
         ok = PyArg_ParseTuple(args, "s|si", &file, &mode, &bufsize);
         /* A string, and optionally another string and an integer */
@@ -819,7 +824,7 @@ dynamic allocation and deallocation of memory on the heap.  In C,
 this is done using the functions \cfunction{malloc()} and
 \cfunction{free()}.  In \Cpp, the operators \keyword{new} and
 \keyword{delete} are used with essentially the same meaning and
-we'll restrict the following discussion to the latter.
+we'll restrict the following discussion to the C case.
 
 Every block of memory allocated with \cfunction{malloc()} should
 eventually be returned to the pool of available memory by exactly one
@@ -997,8 +1002,8 @@ on, it must be turned into an owned reference by calling
 \cfunction{Py_INCREF()}.
 
 The object reference returned from a C function that is called from
-Python must be an owned reference --- ownership is tranferred from the
-function to its caller.
+Python must be an owned reference --- ownership is transferred from
+the function to its caller.
 
 
 \subsection{Thin Ice
@@ -1142,7 +1147,7 @@ apply.  If the main program (the Python interpreter) is compiled and
 linked by the C compiler, global or static objects with constructors
 cannot be used.  This is not a problem if the main program is linked
 by the \Cpp{} compiler.  Functions that will be called by the
-Python interpreter (in particular, module initalization functions)
+Python interpreter (in particular, module initialization functions)
 have to be declared using \code{extern "C"}.
 It is unnecessary to enclose the Python header files in
 \code{extern "C" \{...\}} --- they use this form already if the symbol
@@ -1223,7 +1228,7 @@ declared \keyword{static} like everything else:
 
 \begin{verbatim}
 static int
-PySpam_System(char *command)
+PySpam_System(const char *command)
 {
     return system(command);
 }
@@ -1235,7 +1240,7 @@ The function \cfunction{spam_system()} is modified in a trivial way:
 static PyObject *
 spam_system(PyObject *self, PyObject *args)
 {
-    char *command;
+    const char *command;
     int sts;
 
     if (!PyArg_ParseTuple(args, "s", &command))
@@ -1344,7 +1349,7 @@ import_spam(void)
 }
 #endif
 
-#endif /* !defined(Py_SPAMMODULE_H */
+#endif /* !defined(Py_SPAMMODULE_H) */
 \end{verbatim}
 
 All that a client module must do in order to have access to the

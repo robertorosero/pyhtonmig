@@ -33,7 +33,7 @@ The difference in default timer function is because on Windows,
 clock() has microsecond granularity but time()'s granularity is 1/60th
 of a second; on Unix, clock() has 1/100th of a second granularity and
 time() is much more precise.  On either platform, the default timer
-functions measures wall clock time, not the CPU time.  This means that
+functions measure wall clock time, not the CPU time.  This means that
 other processes running on the same computer may interfere with the
 timing.  The best thing to do when accurate timing is necessary is to
 repeat the timing a few times and use the best time.  The -r option is
@@ -51,8 +51,8 @@ use python -O for the older versions to avoid timing SET_LINENO
 instructions.
 """
 
+import gc
 import sys
-import math
 import time
 try:
     import itertools
@@ -156,7 +156,12 @@ class Timer:
             it = itertools.repeat(None, number)
         else:
             it = [None] * number
-        return self.inner(it, self.timer)
+        gcold = gc.isenabled()
+        gc.disable()
+        timing = self.inner(it, self.timer)
+        if gcold:
+            gc.enable()
+        return timing
 
     def repeat(self, repeat=default_repeat, number=default_number):
         """Call timeit() a few times.
@@ -236,6 +241,11 @@ def main(args=None):
             print __doc__,
             return 0
     setup = "\n".join(setup) or "pass"
+    # Include the current directory, so that local imports work (sys.path
+    # contains the directory of this script, rather than the current
+    # directory)
+    import os
+    sys.path.insert(0, os.curdir)
     t = Timer(stmt, setup, timer)
     if number == 0:
         # determine number so that 0.2 <= total time < 2.0
@@ -260,7 +270,15 @@ def main(args=None):
         print "raw times:", " ".join(["%.*g" % (precision, x) for x in r])
     print "%d loops," % number,
     usec = best * 1e6 / number
-    print "best of %d: %.*g usec per loop" % (repeat, precision, usec)
+    if usec < 1000:
+        print "best of %d: %.*g usec per loop" % (repeat, precision, usec)
+    else:
+        msec = usec / 1000
+        if msec < 1000:
+            print "best of %d: %.*g msec per loop" % (repeat, precision, msec)
+        else:
+            sec = msec / 1000
+            print "best of %d: %.*g sec per loop" % (repeat, precision, sec)
     return None
 
 if __name__ == "__main__":

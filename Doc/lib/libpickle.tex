@@ -20,8 +20,8 @@ inverse operation, whereby a byte stream is converted back into an
 object hierarchy.  Pickling (and unpickling) is alternatively known as
 ``serialization'', ``marshalling,''\footnote{Don't confuse this with
 the \refmodule{marshal} module} or ``flattening'',
-however the preferred term used here is ``pickling'' and
-``unpickling'' to avoid confusing.
+however, to avoid confusion, the terms used here are ``pickling'' and
+``unpickling''.
 
 This documentation describes both the \module{pickle} module and the 
 \refmodule{cPickle} module.
@@ -85,17 +85,13 @@ significant ways:
       \module{pickle} serialization format is guaranteed to be
       backwards compatible across Python releases.
 
-\item The \module{pickle} module doesn't handle code objects, which
-      the \module{marshal} module does.  This avoids the possibility
-      of smuggling Trojan horses into a program through the
-      \module{pickle} module\footnote{This doesn't necessarily imply
-      that \module{pickle} is inherently secure.  See
-      section~\ref{pickle-sec} for a more detailed discussion on
-      \module{pickle} module security.  Besides, it's possible that
-      \module{pickle} will eventually support serializing code
-      objects.}.
-
 \end{itemize}
+
+\begin{notice}[warning]
+The \module{pickle} module is not intended to be secure against
+erroneous or maliciously constructed data.  Never unpickle data
+received from an untrusted or unauthenticated source.
+\end{notice}
 
 Note that serialization is a more primitive notion than persistence;
 although
@@ -148,14 +144,10 @@ If \var{protocol} is specified as a negative value
 or \constant{HIGHEST_PROTOCOL},
 the highest protocol version available will be used.
 
-\versionchanged[The \var{bin} parameter is deprecated and only provided
-for backwards compatibility.  You should use the \var{protocol}
-parameter instead]{2.3}
+\versionchanged[Introduced the \var{protocol} parameter]{2.3}
 
 A binary format, which is slightly more efficient, can be chosen by
-specifying a true value for the \var{bin} argument to the
-\class{Pickler} constructor or the \function{dump()} and \function{dumps()}
-functions.  A \var{protocol} version >= 1 implies use of a binary format.
+specifying a \var{protocol} version >= 1.
 
 \subsection{Usage}
 
@@ -168,29 +160,23 @@ following constant:
 \begin{datadesc}{HIGHEST_PROTOCOL}
 The highest protocol version available.  This value can be passed
 as a \var{protocol} value.
+\versionadded{2.3}
 \end{datadesc}
 
 The \module{pickle} module provides the
 following functions to make this process more convenient:
 
-\begin{funcdesc}{dump}{object, file\optional{, protocol\optional{, bin}}}
-Write a pickled representation of \var{object} to the open file object
+\begin{funcdesc}{dump}{obj, file\optional{, protocol}}
+Write a pickled representation of \var{obj} to the open file object
 \var{file}.  This is equivalent to
-\code{Pickler(\var{file}, \var{protocol}, \var{bin}).dump(\var{object})}.
+\code{Pickler(\var{file}, \var{protocol}).dump(\var{obj})}.
 
-If the \var{protocol} parameter is ommitted, protocol 0 is used.
+If the \var{protocol} parameter is omitted, protocol 0 is used.
 If \var{protocol} is specified as a negative value
 or \constant{HIGHEST_PROTOCOL},
 the highest protocol version will be used.
 
-\versionchanged[The \var{protocol} parameter was added.
-The \var{bin} parameter is deprecated and only provided
-for backwards compatibility.  You should use the \var{protocol}
-parameter instead]{2.3}
-
-If the optional \var{bin} argument is true, the binary pickle format
-is used; otherwise the (less efficient) text pickle format is used
-(for backwards compatibility, this is the default).
+\versionchanged[Introduced the \var{protocol} parameter]{2.3}
 
 \var{file} must have a \method{write()} method that accepts a single
 string argument.  It can thus be a file object opened for writing, a
@@ -214,23 +200,17 @@ This function automatically determines whether the data stream was
 written in binary mode or not.
 \end{funcdesc}
 
-\begin{funcdesc}{dumps}{object\optional{, protocol\optional{, bin}}}
+\begin{funcdesc}{dumps}{obj\optional{, protocol}}
 Return the pickled representation of the object as a string, instead
 of writing it to a file.
 
-If the \var{protocol} parameter is ommitted, protocol 0 is used.
+If the \var{protocol} parameter is omitted, protocol 0 is used.
 If \var{protocol} is specified as a negative value
 or \constant{HIGHEST_PROTOCOL},
 the highest protocol version will be used.
 
-\versionchanged[The \var{protocol} parameter was added.
-The \var{bin} parameter is deprecated and only provided
-for backwards compatibility.  You should use the \var{protocol}
-parameter instead]{2.3}
+\versionchanged[The \var{protocol} parameter was added]{2.3}
 
-If the optional \var{bin} argument is
-true, the binary pickle format is used; otherwise the (less efficient)
-text pickle format is used (this is the default).
 \end{funcdesc}
 
 \begin{funcdesc}{loads}{string}
@@ -251,37 +231,29 @@ the \method{dump()} method.
 \end{excdesc}
 
 \begin{excdesc}{UnpicklingError}
-This exception is raised when there is a problem unpickling an object,
-such as a security violation.  Note that other exceptions may also be
-raised during unpickling, including (but not necessarily limited to)
-\exception{AttributeError}, \exception{EOFError},
-\exception{ImportError}, and \exception{IndexError}.
+This exception is raised when there is a problem unpickling an object.
+Note that other exceptions may also be raised during unpickling,
+including (but not necessarily limited to) \exception{AttributeError},
+\exception{EOFError}, \exception{ImportError}, and \exception{IndexError}.
 \end{excdesc}
 
 The \module{pickle} module also exports two callables\footnote{In the
 \module{pickle} module these callables are classes, which you could
-subclass to customize the behavior.  However, in the \module{cPickle}
-modules these callables are factory functions and so cannot be
-subclassed.  One of the common reasons to subclass is to control what
-objects can actually be unpickled.  See section~\ref{pickle-sec} for
-more details on security concerns.}, \class{Pickler} and
-\class{Unpickler}:
+subclass to customize the behavior.  However, in the \refmodule{cPickle}
+module these callables are factory functions and so cannot be
+subclassed.  One common reason to subclass is to control what
+objects can actually be unpickled.  See section~\ref{pickle-sub} for
+more details.}, \class{Pickler} and \class{Unpickler}:
 
-\begin{classdesc}{Pickler}{file\optional{, protocol\optional{, bin}}}
+\begin{classdesc}{Pickler}{file\optional{, protocol}}
 This takes a file-like object to which it will write a pickle data
 stream.  
 
-If the \var{protocol} parameter is ommitted, protocol 0 is used.
+If the \var{protocol} parameter is omitted, protocol 0 is used.
 If \var{protocol} is specified as a negative value,
 the highest protocol version will be used.
 
-\versionchanged[The \var{bin} parameter is deprecated and only provided
-for backwards compatibility.  You should use the \var{protocol}
-parameter instead]{2.3}
-
-Optional \var{bin} if true, tells the pickler to use the more
-efficient binary pickle format, otherwise the \ASCII{} format is used
-(this is the default).
+\versionchanged[Introduced the \var{protocol} parameter]{2.3}
 
 \var{file} must have a \method{write()} method that accepts a single
 string argument.  It can thus be an open file object, a
@@ -291,10 +263,10 @@ object that meets this interface.
 
 \class{Pickler} objects define one (or two) public methods:
 
-\begin{methoddesc}[Pickler]{dump}{object}
-Write a pickled representation of \var{object} to the open file object
+\begin{methoddesc}[Pickler]{dump}{obj}
+Write a pickled representation of \var{obj} to the open file object
 given in the constructor.  Either the binary or \ASCII{} format will
-be used, depending on the value of the \var{bin} flag passed to the
+be used, depending on the value of the \var{protocol} argument passed to the
 constructor.
 \end{methoddesc}
 
@@ -325,7 +297,7 @@ the same \class{Pickler} instance.  These must then be matched to the
 same number of calls to the \method{load()} method of the
 corresponding \class{Unpickler} instance.  If the same object is
 pickled by multiple \method{dump()} calls, the \method{load()} will
-all yield references to the same object\footnote{\emph{Warning}: this
+all yield references to the same object.\footnote{\emph{Warning}: this
 is intended for pickling multiple objects without intervening
 modifications to the objects or their parts.  If you modify an object
 and then pickle it again using the same \class{Pickler} instance, the
@@ -333,7 +305,7 @@ object is not pickled again --- a reference to it is pickled and the
 \class{Unpickler} will return the old value, not the modified one.
 There are two problems here: (1) detecting changes, and (2)
 marshalling a minimal set of changes.  Garbage Collection may also
-become a problem here.}.
+become a problem here.}
 
 \class{Unpickler} objects are defined as:
 
@@ -383,7 +355,7 @@ The following types can be pickled:
 
 \item normal and Unicode strings
 
-\item tuples, lists, and dictionaries containing only picklable objects
+\item tuples, lists, sets, and dictionaries containing only picklable objects
 
 \item functions defined at the top level of a module
 
@@ -407,9 +379,9 @@ function name is pickled, along with the name of module the function
 is defined in.  Neither the function's code, nor any of its function
 attributes are pickled.  Thus the defining module must be importable
 in the unpickling environment, and the module must contain the named
-object, otherwise an exception will be raised\footnote{The exception
+object, otherwise an exception will be raised.\footnote{The exception
 raised will likely be an \exception{ImportError} or an
-\exception{AttributeError} but it could be something else.}.
+\exception{AttributeError} but it could be something else.}
 
 Similarly, classes are pickled by named reference, so the same
 restrictions in the unpickling environment apply.  Note that none of
@@ -445,7 +417,7 @@ serialized.  This protocol provides a standard way for you to define,
 customize, and control how your objects are serialized and
 de-serialized.  The description in this section doesn't cover specific
 customizations that you can employ to make the unpickling environment
-safer from untrusted pickle data streams; see section~\ref{pickle-sec}
+slightly safer from untrusted pickle data streams; see section~\ref{pickle-sub}
 for more details.
 
 \subsubsection{Pickling and unpickling normal class
@@ -453,15 +425,32 @@ for more details.
 
 When a pickled class instance is unpickled, its \method{__init__()}
 method is normally \emph{not} invoked.  If it is desirable that the
-\method{__init__()} method be called on unpickling, a class can define
-a method \method{__getinitargs__()}, which should return a
+\method{__init__()} method be called on unpickling, an old-style class
+can define a method \method{__getinitargs__()}, which should return a
 \emph{tuple} containing the arguments to be passed to the class
-constructor (i.e. \method{__init__()}).  The
+constructor (\method{__init__()} for example).  The
 \method{__getinitargs__()} method is called at
 pickle time; the tuple it returns is incorporated in the pickle for
 the instance.
 \withsubitem{(copy protocol)}{\ttindex{__getinitargs__()}}
 \withsubitem{(instance constructor)}{\ttindex{__init__()}}
+
+\withsubitem{(copy protocol)}{\ttindex{__getnewargs__()}}
+
+New-style types can provide a \method{__getnewargs__()} method that is
+used for protocol 2.  Implementing this method is needed if the type
+establishes some internal invariants when the instance is created, or
+if the memory allocation is affected by the values passed to the
+\method{__new__()} method for the type (as it is for tuples and
+strings).  Instances of a new-style type \class{C} are created using
+
+\begin{alltt}
+obj = C.__new__(C, *\var{args})
+\end{alltt}
+
+where \var{args} is the result of calling \method{__getnewargs__()} on
+the original object; if there is no \method{__getnewargs__()}, an
+empty tuple is assumed.
 
 \withsubitem{(copy protocol)}{
   \ttindex{__getstate__()}\ttindex{__setstate__()}}
@@ -477,8 +466,8 @@ pickled.
 
 Upon unpickling, if the class also defines the method
 \method{__setstate__()}, it is called with the unpickled
-state\footnote{These methods can also be used to implement copying
-class instances.}.  If there is no \method{__setstate__()} method, the
+state.\footnote{These methods can also be used to implement copying
+class instances.}  If there is no \method{__setstate__()} method, the
 pickled state must be a dictionary and its items are assigned to the
 new instance's dictionary.  If a class defines both
 \method{__getstate__()} and \method{__setstate__()}, the state object
@@ -503,21 +492,31 @@ time \method{__reduce__()} will be called with no arguments, and it
 must return either a string or a tuple.
 
 If a string is returned, it names a global variable whose contents are
-pickled as normal.  When a tuple is returned, it must be of length two
-or three, with the following semantics:
+pickled as normal.  The string returned by \method{__reduce__} should
+be the object's local name relative to its module; the pickle module
+searches the module namespace to determine the object's module.
+
+When a tuple is returned, it must be between two and five elements
+long. Optional elements can either be omitted, or \code{None} can be provided 
+as their value.  The semantics of each element are:
 
 \begin{itemize}
 
-\item A callable object, which in the unpickling environment must be
-      either a class, a callable registered as a ``safe constructor''
-      (see below), or it must have an attribute
-      \member{__safe_for_unpickling__} with a true value.  Otherwise,
-      an \exception{UnpicklingError} will be raised in the unpickling
-      environment.  Note that as usual, the callable itself is pickled
-      by name.
+\item A callable object that will be called to create the initial
+version of the object.  The next element of the tuple will provide
+arguments for this callable, and later elements provide additional
+state information that will subsequently be used to fully reconstruct
+the pickled date.
 
-\item A tuple of arguments for the callable object, or \code{None}.
-\deprecated{2.3}{Use the tuple of arguments instead}								
+In the unpickling environment this object must be either a class, a
+callable registered as a ``safe constructor'' (see below), or it must
+have an attribute \member{__safe_for_unpickling__} with a true value.
+Otherwise, an \exception{UnpicklingError} will be raised in the
+unpickling environment.  Note that as usual, the callable itself is
+pickled by name.
+
+\item A tuple of arguments for the callable object.
+\versionchanged[Formerly, this argument could also be \code{None}]{2.5}
 
 \item Optionally, the object's state, which will be passed to
       the object's \method{__setstate__()} method as described in
@@ -526,17 +525,38 @@ or three, with the following semantics:
       be a dictionary and it will be added to the object's
       \member{__dict__}.
 
+\item Optionally, an iterator (and not a sequence) yielding successive
+list items.  These list items will be pickled, and appended to the
+object using either \code{obj.append(\var{item})} or
+\code{obj.extend(\var{list_of_items})}.  This is primarily used for
+list subclasses, but may be used by other classes as long as they have
+\method{append()} and \method{extend()} methods with the appropriate
+signature.  (Whether \method{append()} or \method{extend()} is used
+depends on which pickle protocol version is used as well as the number
+of items to append, so both must be supported.)
+
+\item Optionally, an iterator (not a sequence)
+yielding successive dictionary items, which should be tuples of the
+form \code{(\var{key}, \var{value})}.  These items will be pickled
+and stored to the object using \code{obj[\var{key}] = \var{value}}.
+This is primarily used for dictionary subclasses, but may be used by
+other classes as long as they implement \method{__setitem__}.
+
 \end{itemize}
 
-Upon unpickling, the callable will be called (provided that it meets
-the above criteria), passing in the tuple of arguments; it should
-return the unpickled object.
+It is sometimes useful to know the protocol version when implementing
+\method{__reduce__}.  This can be done by implementing a method named
+\method{__reduce_ex__} instead of \method{__reduce__}.
+\method{__reduce_ex__}, when it exists, is called in preference over
+\method{__reduce__} (you may still provide \method{__reduce__} for
+backwards compatibility).  The \method{__reduce_ex__} method will be
+called with a single integer argument, the protocol version.
 
-If the second item was \code{None}, then instead of calling the
-callable directly, its \method{__basicnew__()} method is called
-without arguments.  It should also return the unpickled object.
-
-\deprecated{2.3}{Use the tuple of arguments instead}
+The \class{object} class implements both \method{__reduce__} and
+\method{__reduce_ex__}; however, if a subclass overrides
+\method{__reduce__} but not \method{__reduce_ex__}, the
+\method{__reduce_ex__} implementation detects this and calls
+\method{__reduce__}.
 
 An alternative to implementing a \method{__reduce__()} method on the
 object to be pickled, is to register the callable with the
@@ -549,6 +569,7 @@ that they are called with a single argument, the object to be pickled.
 The registered constructor is deemed a ``safe constructor'' for purposes
 of unpickling as described above.
 
+
 \subsubsection{Pickling and unpickling external objects}
 
 For the benefit of object persistence, the \module{pickle} module
@@ -557,13 +578,13 @@ data stream.  Such objects are referenced by a ``persistent id'',
 which is just an arbitrary string of printable \ASCII{} characters.
 The resolution of such names is not defined by the \module{pickle}
 module; it will delegate this resolution to user defined functions on
-the pickler and unpickler\footnote{The actual mechanism for
+the pickler and unpickler.\footnote{The actual mechanism for
 associating these user defined functions is slightly different for
 \module{pickle} and \module{cPickle}.  The description given here
 works the same for both implementations.  Users of the \module{pickle}
 module could also use subclassing to effect the same results,
 overriding the \method{persistent_id()} and \method{persistent_load()}
-methods in the derived classes.}.
+methods in the derived classes.}
 
 To define external persistent id resolution, you need to set the
 \member{persistent_id} attribute of the pickler object and the
@@ -637,8 +658,8 @@ list, in which case, when the unpickler reaches a persistent id, the
 persistent id string will simply be appended to this list.  This
 functionality exists so that a pickle data stream can be ``sniffed''
 for object references without actually instantiating all the objects
-in a pickle\footnote{We'll leave you with the image of Guido and Jim
-sitting around sniffing pickles in their living rooms.}.  Setting
+in a pickle.\footnote{We'll leave you with the image of Guido and Jim
+sitting around sniffing pickles in their living rooms.}  Setting
 \member{persistent_load} to a list is usually used in conjunction with
 the \method{noload()} method on the Unpickler.
 
@@ -647,75 +668,34 @@ the \method{noload()} method on the Unpickler.
 % shot at producing a persistent id.  Since Jim Fulton can't remember
 % why it was added or what it's for, I'm leaving it undocumented.
 
-\subsection{Security \label{pickle-sec}}
+\subsection{Subclassing Unpicklers \label{pickle-sub}}
 
-Most of the security issues surrounding the \module{pickle} and
-\module{cPickle} module involve unpickling.  There are no known
-security vulnerabilities
-related to pickling because you (the programmer) control the objects
-that \module{pickle} will interact with, and all it produces is a
-string.
-
-However, for unpickling, it is \strong{never} a good idea to unpickle
-an untrusted string whose origins are dubious, for example, strings
-read from a socket.  This is because unpickling can create unexpected
-objects and even potentially run methods of those objects, such as
-their class constructor or destructor\footnote{A special note of
-caution is worth raising about the \refmodule{Cookie}
-module.  By default, the \class{Cookie.Cookie} class is an alias for
-the \class{Cookie.SmartCookie} class, which ``helpfully'' attempts to
-unpickle any cookie data string it is passed.  This is a huge security
-hole because cookie data typically comes from an untrusted source.
-You should either explicitly use the \class{Cookie.SimpleCookie} class
---- which doesn't attempt to unpickle its string --- or you should
-implement the defensive programming steps described later on in this
-section.}.
-
-You can defend against this by customizing your unpickler so that you
-can control exactly what gets unpickled and what gets called.
-Unfortunately, exactly how you do this is different depending on
-whether you're using \module{pickle} or \module{cPickle}.
-
-One common feature that both modules implement is the
-\member{__safe_for_unpickling__} attribute.  Before calling a callable
-which is not a class, the unpickler will check to make sure that the
-callable has either been registered as a safe callable via the
-\refmodule[copyreg]{copy_reg} module, or that it has an
-attribute \member{__safe_for_unpickling__} with a true value.  This
-prevents the unpickling environment from being tricked into doing
-evil things like call \code{os.unlink()} with an arbitrary file name.
-See section~\ref{pickle-protocol} for more details.
-
-For safely unpickling class instances, you need to control exactly
-which classes will get created.  Be aware that a class's constructor
-could be called (if the pickler found a \method{__getinitargs__()}
-method) and the the class's destructor (i.e. its \method{__del__()} method)
-might get called when the object is garbage collected.  Depending on
-the class, it isn't very heard to trick either method into doing bad
-things, such as removing a file.  The way to
-control the classes that are safe to instantiate differs in
-\module{pickle} and \module{cPickle}\footnote{A word of caution: the
+By default, unpickling will import any class that it finds in the
+pickle data.  You can control exactly what gets unpickled and what
+gets called by customizing your unpickler.  Unfortunately, exactly how
+you do this is different depending on whether you're using
+\module{pickle} or \module{cPickle}.\footnote{A word of caution: the
 mechanisms described here use internal attributes and methods, which
 are subject to change in future versions of Python.  We intend to
 someday provide a common interface for controlling this behavior,
-which will work in either \module{pickle} or \module{cPickle}.}.
+which will work in either \module{pickle} or \module{cPickle}.}
 
 In the \module{pickle} module, you need to derive a subclass from
 \class{Unpickler}, overriding the \method{load_global()}
 method.  \method{load_global()} should read two lines from the pickle
-data stream where the first line will the the name of the module
+data stream where the first line will the name of the module
 containing the class and the second line will be the name of the
-instance's class.  It then look up the class, possibly importing the
+instance's class.  It then looks up the class, possibly importing the
 module and digging out the attribute, then it appends what it finds to
 the unpickler's stack.  Later on, this class will be assigned to the
 \member{__class__} attribute of an empty class, as a way of magically
 creating an instance without calling its class's \method{__init__()}.
-You job (should you choose to accept it), would be to have
+Your job (should you choose to accept it), would be to have
 \method{load_global()} push onto the unpickler's stack, a known safe
 version of any class you deem safe to unpickle.  It is up to you to
 produce such a class.  Or you could raise an error if you want to
 disallow all unpickling of instances.  If this sounds like a hack,
-you're right.  UTSL.
+you're right.  Refer to the source code to make this work.
 
 Things are a little cleaner with \module{cPickle}, but not by much.
 To control what gets unpickled, you can set the unpickler's
@@ -724,7 +704,7 @@ To control what gets unpickled, you can set the unpickler's
 \exception{UnpicklingError}.  If it is a function,
 then it should accept a module name and a class name, and return the
 corresponding class object.  It is responsible for looking up the
-class, again performing any necessary imports, and it may raise an
+class and performing any necessary imports, and it may raise an
 error to prevent instances of the class from being unpickled.
 
 The moral of the story is that you should be really careful about the
@@ -815,7 +795,7 @@ follows can happen from either the same process or a new process.
 
 \declaremodule{builtin}{cPickle}
 \modulesynopsis{Faster version of \refmodule{pickle}, but not subclassable.}
-\moduleauthor{Jim Fulton}{jfulton@digicool.com}
+\moduleauthor{Jim Fulton}{jim@zope.com}
 \sectionauthor{Fred L. Drake, Jr.}{fdrake@acm.org}
 
 The \module{cPickle} module supports serialization and
@@ -836,16 +816,16 @@ should benefit from the greatly improved performance of the
 The pickle data stream produced by \module{pickle} and
 \module{cPickle} are identical, so it is possible to use
 \module{pickle} and \module{cPickle} interchangeably with existing
-pickles\footnote{Since the pickle data format is actually a tiny
+pickles.\footnote{Since the pickle data format is actually a tiny
 stack-oriented programming language, and some freedom is taken in the
 encodings of certain objects, it is possible that the two modules
 produce different data streams for the same input objects.  However it
 is guaranteed that they will always be able to read each other's
-data streams.}.
+data streams.}
 
 There are additional minor differences in API between \module{cPickle}
 and \module{pickle}, however for most applications, they are
-interchangable.  More documentation is provided in the
+interchangeable.  More documentation is provided in the
 \module{pickle} module documentation, which
 includes a list of the documented differences.
 

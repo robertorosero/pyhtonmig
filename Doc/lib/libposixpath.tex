@@ -43,6 +43,15 @@ half of the pair returned by \code{split(\var{path})}.
 
 \begin{funcdesc}{exists}{path}
 Return \code{True} if \var{path} refers to an existing path.
+Returns \code{False} for broken symbolic links.
+\end{funcdesc}
+
+\begin{funcdesc}{lexists}{path}
+Return \code{True} if \var{path} refers to an existing path.
+Returns \code{True} for broken symbolic links.  
+Equivalent to \function{exists()} on platforms lacking
+\function{os.lstat()}.
+\versionadded{2.4}
 \end{funcdesc}
 
 \begin{funcdesc}{expanduser}{path}
@@ -52,8 +61,7 @@ initial \samp{\~{}} is replaced by the environment variable
 \envvar{HOME}; an initial \samp{\~\var{user}} is looked up in the
 password directory through the built-in module
 \refmodule{pwd}\refbimodindex{pwd}.  If the expansion fails, or if the
-path does not begin with a tilde, the path is returned unchanged.  On
-the Macintosh, this always returns \var{path} unchanged.
+path does not begin with a tilde, the path is returned unchanged.
 \end{funcdesc}
 
 \begin{funcdesc}{expandvars}{path}
@@ -61,7 +69,6 @@ Return the argument with environment variables expanded.  Substrings
 of the form \samp{\$\var{name}} or \samp{\$\{\var{name}\}} are
 replaced by the value of environment variable \var{name}.  Malformed
 variable names and references to non-existing variables are left
-unchanged.  On the Macintosh, this always returns \var{path}
 unchanged.
 \end{funcdesc}
 
@@ -84,7 +91,9 @@ not exist or is inaccessible.
 \end{funcdesc}
 
 \begin{funcdesc}{getctime}{path}
-Return the time of creation of \var{path}.  The return
+Return the system's ctime which, on some systems (like \UNIX) is the
+time of the last change, and, on others (like Windows), is the
+creation time for \var{path}.  The return
 value is a number giving the number of seconds since the epoch (see the 
 \refmodule{time} module).  Raise \exception{os.error} if the file does
 not exist or is inaccessible.
@@ -152,7 +161,8 @@ Normalize a pathname.  This collapses redundant separators and
 up-level references, e.g. \code{A//B}, \code{A/./B} and
 \code{A/foo/../B} all become \code{A/B}.  It does not normalize the
 case (use \function{normcase()} for that).  On Windows, it converts
-forward slashes to backward slashes.
+forward slashes to backward slashes. It should be understood that this may
+change the meaning of the path if it contains symbolic links! 
 \end{funcdesc}
 
 \begin{funcdesc}{realpath}{path}
@@ -237,6 +247,9 @@ directories you must identify them with
 \code{os.path.isdir(\var{file})}, and invoke \function{walk()} as
 necessary.
 \end{notice}
+
+\note{The newer \function{\refmodule{os}.walk()} generator supplies
+      similar functionality and can be easier to use.}
 \end{funcdesc}
 
 \begin{datadesc}{supports_unicode_filenames}

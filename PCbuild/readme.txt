@@ -1,12 +1,13 @@
-Building Python using VC++ 6.0 or 5.0
+Building Python using VC++ 7.1
 -------------------------------------
 This directory is used to build Python for Win32 platforms, e.g. Windows
-95, 98 and NT.  It requires Microsoft Visual C++ 6.x or 5.x.
+95, 98 and NT.  It requires Microsoft Visual C++ 7.1
+(a.k.a. Visual Studio .NET 2003).
 (For other Windows platforms and compilers, see ../PC/readme.txt.)
 
-All you need to do is open the workspace "pcbuild.dsw" in MSVC++, select
-the Debug or Release setting (using Build -> Set Active Configuration...),
-and build the projects.
+All you need to do is open the workspace "pcbuild.sln" in MSVC++, select
+the Debug or Release setting (using "Solution Configuration" from
+the "Standard" toolbar"), and build the projects.
 
 The proper order to build subprojects:
 
@@ -24,7 +25,7 @@ The proper order to build subprojects:
    to the subsystems they implement; see SUBPROJECTS below)
 
 When using the Debug setting, the output files have a _d added to
-their name:  python21_d.dll, python_d.exe, parser_d.pyd, and so on.
+their name:  python24_d.dll, python_d.exe, parser_d.pyd, and so on.
 
 SUBPROJECTS
 -----------
@@ -39,23 +40,11 @@ python
     .exe
 pythonw
     pythonw.exe, a variant of python.exe that doesn't pop up a DOS box
-_csv
-    C support for the comma-separated values module
 _socket
     socketmodule.c
-_sre
-    Unicode-aware regular expression engine
-_symtable
-    the _symtable module, symtablemodule.c
 _testcapi
     tests of the Python C API, run via Lib/test/test_capi.py, and
     implemented by module Modules/_testcapimodule.c
-datetime
-    datetimemodule.c
-mmap
-    mmapmodule.c
-parser
-    the parser module
 pyexpat
     Python wrapper for accelerated XML parsing, which incorporates stable
     code from the Expat project:  http://sourceforge.net/projects/expat/
@@ -63,8 +52,6 @@ select
     selectmodule.c
 unicodedata
     large tables of Unicode data
-winreg
-    Windows registry API
 winsound
     play sounds (typically .wav files) under Windows
 
@@ -76,63 +63,78 @@ unpack into new subdirectories of dist\.
 
 _tkinter
     Python wrapper for the Tk windowing system.  Requires building
-    Tcl/Tk first.  Following are instructions for Tcl/Tk 8.4.1:
+    Tcl/Tk first.  Following are instructions for Tcl/Tk 8.4.7; these
+    should work for version 8.4.6 too, with suitable substitutions:
 
     Get source
     ----------
     Go to
         http://prdownloads.sourceforge.net/tcl/
     and download
-        tcl841-src.zip
-        tk841-src.zip
+        tcl847-src.zip
+        tk847-src.zip
     Unzip into
-        dist\tcl8.4.1\
-        dist\tk8.4.1\
+        dist\tcl8.4.7\
+        dist\tk8.4.7\
     respectively.
 
-    Build Tcl first (done here w/ MSVC 6 on Win2K; also Win98SE)
+    Build Tcl first (done here w/ MSVC 7.1 on Windows XP)
     ---------------
-    cd dist\tcl8.4.1\win
-    run vcvars32.bat [necessary even on Win2K]
+    Use "Start -> All Programs -> Microsoft Visual Studio .NET 2003
+         -> Visual Studio .NET Tools -> Visual Studio .NET 2003 Command Prompt"
+    to get a shell window with the correct environment settings
+    cd dist\tcl8.4.7\win
     nmake -f makefile.vc
-    nmake -f makefile.vc INSTALLDIR=..\..\tcl84 install
+    nmake -f makefile.vc INSTALLDIR=..\..\tcltk install
 
     XXX Should we compile with OPTS=threads?
 
-    XXX Some tests failed in "nmake -f makefile.vc test".
+    Optional:  run tests, via
+        nmake -f makefile.vc test
+
+        On WinXP Pro, wholly up to date as of 30-Aug-2004:
+        all.tcl:        Total   10678   Passed  9969    Skipped 709     Failed  0
+        Sourced 129 Test Files.
 
     Build Tk
     --------
-    cd dist\tk8.4.1\win
-    nmake -f makefile.vc TCLDIR=..\..\tcl8.4.1
-    nmake -f makefile.vc TCLDIR=..\..\tcl8.4.1 INSTALLDIR=..\..\tcl84 install
+    cd dist\tk8.4.7\win
+    nmake -f makefile.vc TCLDIR=..\..\tcl8.4.7
+    nmake -f makefile.vc TCLDIR=..\..\tcl8.4.7 INSTALLDIR=..\..\tcltk install
 
     XXX Should we compile with OPTS=threads?
-
-    XXX Some tests failed in "nmake -f makefile.vc test".
 
     XXX Our installer copies a lot of stuff out of the Tcl/Tk install
     XXX directory.  Is all of that really needed for Python use of Tcl/Tk?
 
-    Make sure the installer matches
-    -------------------------------
-    Ensure that the Wise compiler vrbl _TCLDIR_ is set to the name of
-    the common Tcl/Tk installation directory (tcl84 for the instructions
-    above).  This is needed so the installer can copy various Tcl/Tk
-    files into the Python distribution.
+    Optional:  run tests, via
+        nmake -f makefile.vc TCLDIR=..\..\tcl8.4.7 test
 
+        On WinXP Pro, wholly up to date as of 30-Aug-2004:
+        all.tcl:        Total   8420    Passed  6826    Skipped 1581    Failed  13
+        Sourced 91 Test Files.
+        Files with failing tests: canvImg.test scrollbar.test textWind.test winWm.test
+        
+   Built Tix
+   ---------
+   Download from http://prdownloads.sourceforge.net/tix/tix-8.1.4.tar.gz
+   cd dist\tix-8.1.4
+   [cygwin]patch -p1 < ..\..\python\PC\tix.diff
+   cd win
+   nmake -f makefile.vc
+   nmake -f makefile.vc install
 
 zlib
     Python wrapper for the zlib compression library.  Get the source code
-    for version 1.1.4 from a convenient mirror at:
+    for version 1.2.1 from a convenient mirror at:
         http://www.gzip.org/zlib/
-    Unpack into dist\zlib-1.1.4.
+    Unpack into dist\zlib-1.2.1.
     A custom pre-link step in the zlib project settings should manage to
-    build zlib-1.1.4\zlib.lib by magic before zlib.pyd (or zlib_d.pyd) is
+    build zlib-1.2.1\zlib.lib by magic before zlib.pyd (or zlib_d.pyd) is
     linked in PCbuild\.
     However, the zlib project is not smart enough to remove anything under
-    zlib-1.1.4\ when you do a clean, so if you want to rebuild zlib.lib
-    you need to clean up zlib-1.1.4\ by hand.
+    zlib-1.2.1\ when you do a clean, so if you want to rebuild zlib.lib
+    you need to clean up zlib-1.2.1\ by hand.
 
 bz2
     Python wrapper for the libbz2 compression library.  Homepage
@@ -142,19 +144,14 @@ bz2
     must disable its "TAR file smart CR/LF conversion" feature (under
     Options -> Configuration -> Miscellaneous -> Other) for the duration.
 
-    Don't bother trying to use libbz2.dsp with MSVC.  After 10 minutes
-    of fiddling, I couldn't get it to work.  Perhaps it works with
-    MSVC 5 (I used MSVC 6).  It's better to run the by-hand makefile
-    anyway, because it runs a helpful test step at the end.
+    A custom pre-link step in the bz2 project settings should manage to
+    build bzip2-1.0.2\libbz2.lib by magic before bz2.pyd (or bz2_d.pyd) is
+    linked in PCbuild\.
+    However, the bz2 project is not smart enough to remove anything under
+    bzip2-1.0.2\ when you do a clean, so if you want to rebuild bzip2.lib
+    you need to clean up bzip2-1.0.2\ by hand.
 
-    cd into dist\bzip2-1.0.2, and run
-        nmake -f makefile.msc
-    [Note that if you're running Win9X, you'll need to run vcvars32.bat
-     before running nmake (this batch file is in your MSVC installation).
-     TODO:  make this work like zlib (in particular, MSVC runs the prelink
-     step in an enviroment that already has the correct envars set up).
-    ]
-    The make step shouldn't yield any warnings or errors, and should end
+    The build step shouldn't yield any warnings or errors, and should end
     by displaying 6 blocks each terminated with
         FC: no differences encountered
     If FC finds differences, see the warning abou WinZip above (when I
@@ -168,35 +165,47 @@ _bsddb
     Go to Sleepycat's download page:
         http://www.sleepycat.com/download/
 
-    and download version 4.1.25.  The file name is db-4.1.25.NC.zip.
-    XXX with or without strong cryptography?  I picked "without".
+    and download version 4.2.52.
 
-    Unpack into
-        dist\db-4.1.25
+    With or without strong cryptography? You can choose either with or
+    without strong cryptography, as per the instructions below.  By
+    default, Python is built and distributed WITHOUT strong crypto.
 
-    [If using WinZip to unpack the db-4.1.25.NC distro, that requires
-     renaming the directory (to remove ".NC") after unpacking.
-    ]
+    Unpack into the dist\. directory, ensuring you expand with folder names.
+
+    If you downloaded with strong crypto, this will create a dist\db-4.2.52
+    directory, and is ready to use.
+
+    If you downloaded WITHOUT strong crypto, this will create a
+    dist\db-4.2.52.NC directory - this directory should be renamed to
+    dist\db-4.2.52 before use.
+
+    As of 11-Apr-2004, you also need to download and manually apply two
+    patches before proceeding (and the sleepycat download page tells you
+    about this).  Cygwin patch worked for me.  cd to dist\db-4.2.52 and
+    use "patch -p0 < patchfile" once for each downloaded patchfile.
 
     Open
-        dist\db-4.1.25\docs\index.html
+        dist\db-4.2.52\docs\index.html
 
-    and follow the Windows instructions for building the Sleepycat
+    and follow the "Windows->Building Berkeley DB with Visual C++ .NET"
+    instructions for building the Sleepycat
     software.  Note that Berkeley_DB.dsw is in the build_win32 subdirectory.
-    Build the Release version ("build_all -- Win32 Release").
+    Build the "Release Static" version.
 
-    XXX We're actually linking against Release_static\libdb41s.lib.
+    XXX We're linking against Release_static\libdb42s.lib.
     XXX This yields the following warnings:
 """
 Compiling...
 _bsddb.c
 Linking...
    Creating library ./_bsddb.lib and object ./_bsddb.exp
-LINK : warning LNK4049: locally defined symbol "_malloc" imported
-LINK : warning LNK4049: locally defined symbol "_free" imported
-LINK : warning LNK4049: locally defined symbol "_fclose" imported
-LINK : warning LNK4049: locally defined symbol "_fopen" imported
-_bsddb.pyd - 0 error(s), 4 warning(s)
+_bsddb.obj : warning LNK4217: locally defined symbol _malloc imported in function __db_associateCallback
+_bsddb.obj : warning LNK4217: locally defined symbol _free imported in function __DB_consume
+_bsddb.obj : warning LNK4217: locally defined symbol _fclose imported in function _DB_verify
+_bsddb.obj : warning LNK4217: locally defined symbol _fopen imported in function _DB_verify
+_bsddb.obj : warning LNK4217: locally defined symbol _strncpy imported in function _init_pybsddb
+__bsddb - 0 error(s), 5 warning(s)
 """
     XXX This isn't encouraging, but I don't know what to do about it.
 
@@ -204,8 +213,8 @@ _bsddb.pyd - 0 error(s), 4 warning(s)
     is then enabled.  Running in verbose mode may be helpful.
 
     XXX The test_bsddb3 tests don't always pass, on Windows (according to
-    XXX me) or on Linux (according to Barry).  I had much better luck
-    XXX on Win2K than on Win98SE.  The common failure mode across platforms
+    XXX me) or on Linux (according to Barry).  (I had much better luck
+    XXX on Win2K than on Win98SE.)  The common failure mode across platforms
     XXX is
     XXX     DBAgainError: (11, 'Resource temporarily unavailable -- unable
     XXX                         to join the environment')
@@ -229,6 +238,16 @@ _bsddb.pyd - 0 error(s), 4 warning(s)
     XXX doesn't cause a test to fail when it happens (exceptions in
     XXX threads are invisible to unittest).
 
+    XXX 11-Apr-2004 tim
+    XXX On WinXP Pro, I got one failure from test_bsddb3:
+    XXX
+    XXX ERROR: test04_n_flag (bsddb.test.test_compat.CompatibilityTestCase)
+    XXX Traceback (most recent call last):
+    XXX  File "C:\Code\python\lib\bsddb\test\test_compat.py", line 86, in test04_n_flag
+    XXX    f = hashopen(self.filename, 'n')
+    XXX File "C:\Code\python\lib\bsddb\__init__.py", line 293, in hashopen
+    XXX    d.open(file, db.DB_HASH, flags, mode)
+    XXX DBInvalidArgError: (22, 'Invalid argument -- DB_TRUNCATE illegal with locking specified')
 
 _ssl
     Python wrapper for the secure sockets library.
@@ -237,13 +256,13 @@ _ssl
         http://www.openssl.org
 
     You (probably) don't want the "engine" code.  For example, get
-        openssl-0.9.6g.tar.gz
+        openssl-0.9.7d.tar.gz
     not
-        openssl-engine-0.9.6g.tar.gz
+        openssl-engine-0.9.7d.tar.gz
 
     Unpack into the "dist" directory, retaining the folder name from
     the archive - for example, the latest stable OpenSSL will install as
-        dist/openssl-0.9.6g
+        dist/openssl-0.9.7d
 
     You can (theoretically) use any version of OpenSSL you like - the
     build process will automatically select the latest version.
@@ -256,8 +275,6 @@ _ssl
     the build.  This Python script locates and builds your OpenSSL
     installation, then invokes a simple makefile to build the final .pyd.
 
-    Win9x users:  see "Win9x note" below.
-
     build_ssl.py attempts to catch the most common errors (such as not
     being able to find OpenSSL sources, or not being able to find a Perl
     that works with OpenSSL) and give a reasonable error message.
@@ -269,30 +286,21 @@ _ssl
     build_ssl.py/MSVC isn't clever enough to clean OpenSSL - you must do
     this by hand.
 
-    Win9x note:  If, near the start of the build process, you see
-    something like
+Building for Itanium
+--------------------
 
-        C:\Code\openssl-0.9.6g>set OPTS=no-asm
-        Out of environment space
+The project files support a ReleaseItanium configuration which creates
+Win64/Itanium binaries. For this to work, you need to install the Platform
+SDK, in particular the 64-bit support. This includes an Itanium compiler
+(future releases of the SDK likely include an AMD64 compiler as well).
+In addition, you need the Visual Studio plugin for external C compilers,
+from http://sf.net/projects/vsextcomp. The plugin will wrap cl.exe, to
+locate the proper target compiler, and convert compiler options
+accordingly.
 
-    then you're in trouble, and will probably also see these errors near
-    the end of the process:
-
-        NMAKE : fatal error U1073: don't know how to make
-            'crypto\md5\asm\m5_win32.asm'
-        Stop.
-        NMAKE : fatal error U1073: don't know how to make
-            'C:\Code\openssl-0.9.6g/out32/libeay32.lib'
-        Stop.
-
-    You need more environment space.  Win9x only has room for 256 bytes
-    by default, and especially after installing ActivePerl (which fiddles
-    the PATH envar), you're likely to run out.  KB Q230205
-
-        http://support.microsoft.com/default.aspx?scid=KB;en-us;q230205
-
-    explains how to edit CONFIG.SYS to cure this.
-
+The Itanium build has seen little testing. The SDK compiler reports a lot
+of warnings about conversion from size_t to int, which will be fixed in
+future Python releases.
 
 YOUR OWN EXTENSION DLLs
 -----------------------

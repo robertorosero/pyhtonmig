@@ -27,7 +27,7 @@ def confirm(outcome, name):
     tests = tests + 1
     if outcome:
         if verbose:
-            print "Failed", name
+            print "Passed", name
     else:
         failures.append(name)
 
@@ -489,6 +489,41 @@ def test_expat_incomplete():
     else:
         return 0
 
+def test_sax_parse_exception_str():
+    # pass various values from a locator to the SAXParseException to
+    # make sure that the __str__() doesn't fall apart when None is
+    # passed instead of an integer line and column number
+    #
+    # use "normal" values for the locator:
+    str(SAXParseException("message", None,
+                          DummyLocator(1, 1)))
+    # use None for the line number:
+    str(SAXParseException("message", None,
+                          DummyLocator(None, 1)))
+    # use None for the column number:
+    str(SAXParseException("message", None,
+                          DummyLocator(1, None)))
+    # use None for both:
+    str(SAXParseException("message", None,
+                          DummyLocator(None, None)))
+    return 1
+
+class DummyLocator:
+    def __init__(self, lineno, colno):
+        self._lineno = lineno
+        self._colno = colno
+
+    def getPublicId(self):
+        return "pubid"
+
+    def getSystemId(self):
+        return "sysid"
+
+    def getLineNumber(self):
+        return self._lineno
+
+    def getColumnNumber(self):
+        return self._colno
 
 # ===========================================================================
 #
@@ -652,6 +687,10 @@ items.sort()
 for (name, value) in items:
     if name[ : 5] == "test_":
         confirm(value(), name)
+# We delete the items variable so that the assignment to items above
+# doesn't pick up the old value of items (which messes with attempts
+# to find reference leaks).
+del items
 
 if verbose:
     print "%d tests, %d failures" % (tests, len(failures))

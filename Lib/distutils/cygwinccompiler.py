@@ -45,7 +45,7 @@ cygwin in no-cygwin mode).
 # * mingw gcc 3.2/ld 2.13 works
 #   (ld supports -shared)
 
-# This module should be kept compatible with Python 1.5.2.
+# This module should be kept compatible with Python 2.1.
 
 __revision__ = "$Id$"
 
@@ -75,7 +75,7 @@ class CygwinCCompiler (UnixCCompiler):
                          (status, details))
         if status is not CONFIG_H_OK:
             self.warn(
-                "Python's pyconfig.h doesn't seem to support your compiler. " 
+                "Python's pyconfig.h doesn't seem to support your compiler. "
                 "Reason: %s. "
                 "Compiling may fail because of undefined preprocessor macros."
                 % details)
@@ -108,6 +108,7 @@ class CygwinCCompiler (UnixCCompiler):
         # XXX optimization, warnings etc. should be customizable.
         self.set_executables(compiler='gcc -mcygwin -O -Wall',
                              compiler_so='gcc -mcygwin -mdll -O -Wall',
+                             compiler_cxx='g++ -mcygwin -O -Wall',
                              linker_exe='gcc -mcygwin',
                              linker_so=('%s -mcygwin %s' %
                                         (self.linker_dll, shared_option)))
@@ -121,6 +122,17 @@ class CygwinCCompiler (UnixCCompiler):
                 "Consider upgrading to a newer version of gcc")
         else:
             self.dll_libraries=[]
+            # Include the appropriate MSVC runtime library if Python was built
+            # with MSVC 7.0 or 7.1.
+            msc_pos = sys.version.find('MSC v.')
+            if msc_pos != -1:
+                msc_ver = sys.version[msc_pos+6:msc_pos+10]
+                if msc_ver == '1300':
+                    # MSVC 7.0
+                    self.dll_libraries = ['msvcr70']
+                elif msc_ver == '1310':
+                    # MSVC 7.1
+                    self.dll_libraries = ['msvcr71']
 
     # __init__ ()
 
@@ -295,6 +307,7 @@ class Mingw32CCompiler (CygwinCCompiler):
 
         self.set_executables(compiler='gcc -mno-cygwin -O -Wall',
                              compiler_so='gcc -mno-cygwin -mdll -O -Wall',
+                             compiler_cxx='g++ -mno-cygwin -O -Wall',
                              linker_exe='gcc -mno-cygwin',
                              linker_so='%s -mno-cygwin %s %s'
                                         % (self.linker_dll, shared_option,
@@ -305,6 +318,18 @@ class Mingw32CCompiler (CygwinCCompiler):
 
         # no additional libraries needed
         self.dll_libraries=[]
+
+        # Include the appropriate MSVC runtime library if Python was built
+        # with MSVC 7.0 or 7.1.
+        msc_pos = sys.version.find('MSC v.')
+        if msc_pos != -1:
+            msc_ver = sys.version[msc_pos+6:msc_pos+10]
+            if msc_ver == '1300':
+                # MSVC 7.0
+                self.dll_libraries = ['msvcr70']
+            elif msc_ver == '1310':
+                # MSVC 7.1
+                self.dll_libraries = ['msvcr71']
 
     # __init__ ()
 

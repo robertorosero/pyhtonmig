@@ -9,43 +9,6 @@ typedef struct {
 	long	len;
 } rangeobject;
 
-PyObject *
-PyRange_New(long start, long len, long step, int reps)
-{
-	rangeobject *obj;
-
-	if (reps != 1) {
-		PyErr_SetString(PyExc_ValueError,
-			"PyRange_New's 'repetitions' argument must be 1");
-		return NULL;
-	}
-
-	obj = PyObject_New(rangeobject, &PyRange_Type);
-	if (obj == NULL)
-		return NULL;
-
-	if (len == 0) {
-		start = 0;
-		len = 0;
-		step = 1;
-	}
-	else {
-		long last = start + (len - 1) * step;
-		if ((step > 0) ?
-		    (last > (PyInt_GetMax() - step)) : 
-		    (last < (-1 - PyInt_GetMax() - step))) {
-			PyErr_SetString(PyExc_OverflowError,
-					"integer addition");
-			return NULL;
-		}			
-	}
-	obj->start = start;
-	obj->len   = len;
-	obj->step  = step;
-
-	return (PyObject *) obj;
-}
-
 /* Return number of items in range/xrange (lo, hi, step).  step > 0
  * required.  Return a value < 0 if & only if the true value is too
  * large to fit in a signed long.
@@ -78,6 +41,7 @@ get_len_of_range(long lo, long hi, long step)
 static PyObject *
 range_new(PyTypeObject *type, PyObject *args, PyObject *kw)
 {
+	rangeobject *obj;
 	long ilow = 0, ihigh = 0, istep = 1;
 	long n;
 
@@ -106,7 +70,14 @@ range_new(PyTypeObject *type, PyObject *args, PyObject *kw)
 				"xrange() result has too many items");
 		return NULL;
 	}
-	return PyRange_New(ilow, n, istep, 1);
+
+	obj = PyObject_New(rangeobject, &PyRange_Type);
+	if (obj == NULL)
+		return NULL;
+	obj->start = ilow;
+	obj->len   = n;
+	obj->step  = istep;
+	return (PyObject *) obj;
 }
 
 PyDoc_STRVAR(range_doc,
@@ -144,7 +115,7 @@ static PyObject *
 range_repr(rangeobject *r)
 {
 	PyObject *rtn;
-	
+
 	if (r->start == 0 && r->step == 1)
 		rtn = PyString_FromFormat("xrange(%ld)",
 					  r->start + r->len * r->step);
@@ -171,6 +142,15 @@ static PySequenceMethods range_as_sequence = {
 };
 
 static PyObject * range_iter(PyObject *seq);
+static PyObject * range_reverse(PyObject *seq);
+
+PyDoc_STRVAR(reverse_doc,
+"Returns a reverse iterator.");
+
+static PyMethodDef range_methods[] = {
+	{"__reversed__",	(PyCFunction)range_reverse, METH_NOARGS, reverse_doc},
+ 	{NULL,		NULL}		/* sentinel */
+};
 
 PyTypeObject PyRange_Type = {
 	PyObject_HEAD_INIT(&PyType_Type)
@@ -201,7 +181,7 @@ PyTypeObject PyRange_Type = {
 	0,				/* tp_weaklistoffset */
 	(getiterfunc)range_iter,	/* tp_iter */
 	0,				/* tp_iternext */
-	0,				/* tp_methods */	
+	range_methods,			/* tp_methods */
 	0,				/* tp_members */
 	0,				/* tp_getset */
 	0,				/* tp_base */
@@ -246,12 +226,50 @@ range_iter(PyObject *seq)
 }
 
 static PyObject *
+range_reverse(PyObject *seq)
+{
+	rangeiterobject *it;
+	long start, step, len;
+
+	if (!PyRange_Check(seq)) {
+		PyErr_BadInternalCall();
+		return NULL;
+	}
+	it = PyObject_New(rangeiterobject, &Pyrangeiter_Type);
+	if (it == NULL)
+		return NULL;
+
+	start = ((rangeobject *)seq)->start;
+	step = ((rangeobject *)seq)->step;
+	len = ((rangeobject *)seq)->len;
+
+	it->index = 0;
+	it->start = start + (len-1) * step;
+	it->step = -step;
+	it->len = len;
+
+	return (PyObject *)it;
+}
+
+static PyObject *
 rangeiter_next(rangeiterobject *r)
 {
-	if (r->index < r->len) 
+	if (r->index < r->len)
 		return PyInt_FromLong(r->start + (r->index++) * r->step);
 	return NULL;
 }
+
+static int
+rangeiter_len(rangeiterobject *r)
+{
+	return r->len - r->index;
+}
+
+static PySequenceMethods rangeiter_as_sequence = {
+	(inquiry)rangeiter_len,		/* sq_length */
+	0,				/* sq_concat */
+};
+
 
 static PyTypeObject Pyrangeiter_Type = {
 	PyObject_HEAD_INIT(&PyType_Type)
@@ -267,7 +285,7 @@ static PyTypeObject Pyrangeiter_Type = {
 	0,                                      /* tp_compare */
 	0,                                      /* tp_repr */
 	0,                                      /* tp_as_number */
-	0,                                      /* tp_as_sequence */
+	&rangeiter_as_sequence,			/* tp_as_sequence */
 	0,                                      /* tp_as_mapping */
 	0,                                      /* tp_hash */
 	0,                                      /* tp_call */

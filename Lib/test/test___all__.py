@@ -9,8 +9,6 @@ warnings.filterwarnings("ignore", ".* 'pre' .*", DeprecationWarning,
                         r'pre$')
 warnings.filterwarnings("ignore", ".* regsub .*", DeprecationWarning,
                         r'^regsub$')
-warnings.filterwarnings("ignore", ".* statcache .*", DeprecationWarning,
-                        r'statcache$')
 
 class AllTest(unittest.TestCase):
 
@@ -21,20 +19,6 @@ class AllTest(unittest.TestCase):
         except ImportError:
             # Silent fail here seems the best route since some modules
             # may not be available in all environments.
-            # Since an ImportError may leave a partial module object in
-            # sys.modules, get rid of that first.  Here's what happens if
-            # you don't:  importing pty fails on Windows because pty tries to
-            # import FCNTL, which doesn't exist.  That raises an ImportError,
-            # caught here.  It also leaves a partial pty module in sys.modules.
-            # So when test_pty is called later, the import of pty succeeds,
-            # but shouldn't.  As a result, test_pty crashes with an
-            # AttributeError instead of an ImportError, and regrtest interprets
-            # the latter as a test failure (ImportError is treated as "test
-            # skipped" -- which is what test_pty should say on Windows).
-            try:
-                del sys.modules[modname]
-            except KeyError:
-                pass
             return
         verify(hasattr(sys.modules[modname], "__all__"),
                "%s has no __all__ attribute" % modname)
@@ -42,10 +26,8 @@ class AllTest(unittest.TestCase):
         exec "from %s import *" % modname in names
         if names.has_key("__builtins__"):
             del names["__builtins__"]
-        keys = names.keys()
-        keys.sort()
-        all = list(sys.modules[modname].__all__) # in case it's a tuple
-        all.sort()
+        keys = set(names)
+        all = set(sys.modules[modname].__all__)
         verify(keys==all, "%s != %s" % (keys, all))
 
     def test_all(self):
@@ -55,10 +37,12 @@ class AllTest(unittest.TestCase):
             import _socket
 
         self.check_all("BaseHTTPServer")
+        self.check_all("Bastion")
         self.check_all("CGIHTTPServer")
         self.check_all("ConfigParser")
         self.check_all("Cookie")
         self.check_all("MimeWriter")
+        self.check_all("Queue")
         self.check_all("SimpleHTTPServer")
         self.check_all("SocketServer")
         self.check_all("StringIO")
@@ -80,7 +64,9 @@ class AllTest(unittest.TestCase):
         self.check_all("compileall")
         self.check_all("copy")
         self.check_all("copy_reg")
+        self.check_all("csv")
         self.check_all("dbhash")
+        self.check_all("decimal")
         self.check_all("difflib")
         self.check_all("dircache")
         self.check_all("dis")
@@ -121,10 +107,12 @@ class AllTest(unittest.TestCase):
         self.check_all("nntplib")
         self.check_all("ntpath")
         self.check_all("opcode")
+        self.check_all("optparse")
         self.check_all("os")
         self.check_all("os2emxpath")
         self.check_all("pdb")
         self.check_all("pickle")
+        self.check_all("pickletools")
         self.check_all("pipes")
         self.check_all("popen2")
         self.check_all("poplib")
@@ -144,6 +132,7 @@ class AllTest(unittest.TestCase):
         self.check_all("repr")
         self.check_all("rexec")
         self.check_all("rfc822")
+        self.check_all("rlcompleter")
         self.check_all("robotparser")
         self.check_all("sched")
         self.check_all("sets")
@@ -156,7 +145,7 @@ class AllTest(unittest.TestCase):
         self.check_all("sndhdr")
         self.check_all("socket")
         self.check_all("sre")
-        self.check_all("statcache")
+        self.check_all("_strptime")
         self.check_all("symtable")
         self.check_all("tabnanny")
         self.check_all("tarfile")
@@ -164,10 +153,12 @@ class AllTest(unittest.TestCase):
         self.check_all("tempfile")
         self.check_all("textwrap")
         self.check_all("threading")
+        self.check_all("timeit")
         self.check_all("toaiff")
         self.check_all("tokenize")
         self.check_all("traceback")
         self.check_all("tty")
+        self.check_all("unittest")
         self.check_all("urllib")
         self.check_all("urlparse")
         self.check_all("uu")
@@ -192,9 +183,7 @@ class AllTest(unittest.TestCase):
 
 
 def test_main():
-    suite = unittest.TestSuite()
-    suite.addTest(unittest.makeSuite(AllTest))
-    test_support.run_suite(suite)
+    test_support.run_unittest(AllTest)
 
 if __name__ == "__main__":
     test_main()

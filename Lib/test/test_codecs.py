@@ -3,13 +3,119 @@ import unittest
 import codecs
 import StringIO
 
-class UTF16Test(unittest.TestCase):
+class Queue(object):
+    """
+    queue: write bytes at one end, read bytes from the other end
+    """
+    def __init__(self):
+        self._buffer = ""
+
+    def write(self, chars):
+        self._buffer += chars
+
+    def read(self, size=-1):
+        if size<0:
+            s = self._buffer
+            self._buffer = ""
+            return s
+        else:
+            s = self._buffer[:size]
+            self._buffer = self._buffer[size:]
+            return s
+
+class ReadTest(unittest.TestCase):
+    def check_partial(self, input, partialresults):
+        # get a StreamReader for the encoding and feed the bytestring version
+        # of input to the reader byte by byte. Read every available from
+        # the StreamReader and check that the results equal the appropriate
+        # entries from partialresults.
+        q = Queue()
+        r = codecs.getreader(self.encoding)(q)
+        result = u""
+        for (c, partialresult) in zip(input.encode(self.encoding), partialresults):
+            q.write(c)
+            result += r.read()
+            self.assertEqual(result, partialresult)
+        # check that there's nothing left in the buffers
+        self.assertEqual(r.read(), u"")
+        self.assertEqual(r.bytebuffer, "")
+        self.assertEqual(r.charbuffer, u"")
+
+    def test_readline(self):
+        def getreader(input):
+            stream = StringIO.StringIO(input.encode(self.encoding))
+            return codecs.getreader(self.encoding)(stream)
+
+        def readalllines(input, keepends=True):
+            reader = getreader(input)
+            lines = []
+            while True:
+                line = reader.readline(keepends=keepends)
+                if not line:
+                    break
+                lines.append(line)
+            return "".join(lines)
+
+        s = u"foo\nbar\r\nbaz\rspam\u2028eggs"
+        self.assertEqual(readalllines(s, True), s)
+        self.assertEqual(readalllines(s, False), u"foobarbazspameggs")
+
+        # Test long lines (multiple calls to read() in readline())
+        vw = []
+        vwo = []
+        for (i, lineend) in enumerate(u"\n \r\n \r \u2028".split()):
+            vw.append((i*200)*u"\3042" + lineend)
+            vwo.append((i*200)*u"\3042")
+        self.assertEqual(readalllines("".join(vw), True), "".join(vw))
+        self.assertEqual(readalllines("".join(vw), False),"".join(vwo))
+
+        # Test lines where the first read might end with \r, so the
+        # reader has to look ahead whether this is a lone \r or a \r\n
+        for size in xrange(80):
+            for lineend in u"\n \r\n \r \u2028".split():
+                s = size*u"a" + lineend + u"xxx\n"
+                self.assertEqual(
+                    getreader(s).readline(keepends=True),
+                    size*u"a" + lineend,
+                )
+                self.assertEqual(
+                    getreader(s).readline(keepends=False),
+                    size*u"a",
+                )
+
+    def test_readlinequeue(self):
+        q = Queue()
+        writer = codecs.getwriter(self.encoding)(q)
+        reader = codecs.getreader(self.encoding)(q)
+
+        # No lineends
+        writer.write(u"foo\r")
+        self.assertEqual(reader.readline(keepends=False), u"foo")
+        writer.write(u"\nbar\r")
+        self.assertEqual(reader.readline(keepends=False), u"bar")
+        writer.write(u"baz")
+        self.assertEqual(reader.readline(keepends=False), u"baz")
+        self.assertEqual(reader.readline(keepends=False), u"")
+
+        # Lineends
+        writer.write(u"foo\r")
+        self.assertEqual(reader.readline(keepends=True), u"foo\r")
+        writer.write(u"\nbar\r")
+        self.assertEqual(reader.readline(keepends=True), u"bar\r")
+        writer.write(u"baz")
+        self.assertEqual(reader.readline(keepends=True), u"baz")
+        self.assertEqual(reader.readline(keepends=True), u"")
+        writer.write(u"foo\r\n")
+        self.assertEqual(reader.readline(keepends=True), u"foo\r\n")
+
+class UTF16Test(ReadTest):
+    encoding = "utf-16"
 
     spamle = '\xff\xfes\x00p\x00a\x00m\x00s\x00p\x00a\x00m\x00'
     spambe = '\xfe\xff\x00s\x00p\x00a\x00m\x00s\x00p\x00a\x00m'
 
     def test_only_one_bom(self):
-        _,_,reader,writer = codecs.lookup("utf-16")
+        _,_,reader,writer = codecs.lookup(self.encoding)
         # encode some stream
         s = StringIO.StringIO()
         f = writer(s)
@@ -22,6 +128,80 @@ class UTF16Test(unittest.TestCase):
         s = StringIO.StringIO(d)
         f = reader(s)
         self.assertEquals(f.read(), u"spamspam")
+
+    def test_partial(self):
+        self.check_partial(
+            u"\x00\xff\u0100\uffff",
+            [
+                u"", # first byte of BOM read
+                u"", # second byte of BOM read => byteorder known
+                u"",
+                u"\x00",
+                u"\x00",
+                u"\x00\xff",
+                u"\x00\xff",
+                u"\x00\xff\u0100",
+                u"\x00\xff\u0100",
+                u"\x00\xff\u0100\uffff",
+            ]
+        )
+
+class UTF16LETest(ReadTest):
+    encoding = "utf-16-le"
+
+    def test_partial(self):
+        self.check_partial(
+            u"\x00\xff\u0100\uffff",
+            [
+                u"",
+                u"\x00",
+                u"\x00",
+                u"\x00\xff",
+                u"\x00\xff",
+                u"\x00\xff\u0100",
+                u"\x00\xff\u0100",
+                u"\x00\xff\u0100\uffff",
+            ]
+        )
+
+class UTF16BETest(ReadTest):
+    encoding = "utf-16-be"
+
+    def test_partial(self):
+        self.check_partial(
+            u"\x00\xff\u0100\uffff",
+            [
+                u"",
+                u"\x00",
+                u"\x00",
+                u"\x00\xff",
+                u"\x00\xff",
+                u"\x00\xff\u0100",
+                u"\x00\xff\u0100",
+                u"\x00\xff\u0100\uffff",
+            ]
+        )
+
+class UTF8Test(ReadTest):
+    encoding = "utf-8"
+
+    def test_partial(self):
+        self.check_partial(
+            u"\x00\xff\u07ff\u0800\uffff",
+            [
+                u"\x00",
+                u"\x00",
+                u"\x00\xff",
+                u"\x00\xff",
+                u"\x00\xff\u07ff",
+                u"\x00\xff\u07ff",
+                u"\x00\xff\u07ff",
+                u"\x00\xff\u07ff\u0800",
+                u"\x00\xff\u07ff\u0800",
+                u"\x00\xff\u07ff\u0800",
+                u"\x00\xff\u07ff\u0800\uffff",
+            ]
+        )
 
 class EscapeDecodeTest(unittest.TestCase):
     def test_empty_escape_decode(self):
@@ -332,14 +512,235 @@ class NameprepTest(unittest.TestCase):
                 except Exception,e:
                     raise test_support.TestFailed("Test 3.%d: %s" % (pos+1, str(e)))
 
+class CodecTest(unittest.TestCase):
+    def test_builtin(self):
+        self.assertEquals(unicode("python.org", "idna"), u"python.org")
+
+class CodecsModuleTest(unittest.TestCase):
+
+    def test_decode(self):
+        self.assertEquals(codecs.decode('\xe4\xf6\xfc', 'latin-1'),
+                          u'\xe4\xf6\xfc')
+        self.assertRaises(TypeError, codecs.decode)
+        self.assertEquals(codecs.decode('abc'), u'abc')
+        self.assertRaises(UnicodeDecodeError, codecs.decode, '\xff', 'ascii')
+
+    def test_encode(self):
+        self.assertEquals(codecs.encode(u'\xe4\xf6\xfc', 'latin-1'),
+                          '\xe4\xf6\xfc')
+        self.assertRaises(TypeError, codecs.encode)
+        self.assertEquals(codecs.encode(u'abc'), 'abc')
+        self.assertRaises(UnicodeEncodeError, codecs.encode, u'\xffff', 'ascii')
+
+    def test_register(self):
+        self.assertRaises(TypeError, codecs.register)
+
+    def test_lookup(self):
+        self.assertRaises(TypeError, codecs.lookup)
+        self.assertRaises(LookupError, codecs.lookup, "__spam__")
+
+class StreamReaderTest(unittest.TestCase):
+
+    def setUp(self):
+        self.reader = codecs.getreader('utf-8')
+        self.stream = StringIO.StringIO('\xed\x95\x9c\n\xea\xb8\x80')
+
+    def test_readlines(self):
+        f = self.reader(self.stream)
+        self.assertEquals(f.readlines(), [u'\ud55c\n', u'\uae00'])
+
+all_unicode_encodings = [
+    "ascii",
+    "base64_codec",
+    "big5",
+    "big5hkscs",
+    "charmap",
+    "cp037",
+    "cp1006",
+    "cp1026",
+    "cp1140",
+    "cp1250",
+    "cp1251",
+    "cp1252",
+    "cp1253",
+    "cp1254",
+    "cp1255",
+    "cp1256",
+    "cp1257",
+    "cp1258",
+    "cp424",
+    "cp437",
+    "cp500",
+    "cp737",
+    "cp775",
+    "cp850",
+    "cp852",
+    "cp855",
+    "cp856",
+    "cp857",
+    "cp860",
+    "cp861",
+    "cp862",
+    "cp863",
+    "cp864",
+    "cp865",
+    "cp866",
+    "cp869",
+    "cp874",
+    "cp875",
+    "cp932",
+    "cp949",
+    "cp950",
+    "euc_jis_2004",
+    "euc_jisx0213",
+    "euc_jp",
+    "euc_kr",
+    "gb18030",
+    "gb2312",
+    "gbk",
+    "hex_codec",
+    "hp_roman8",
+    "hz",
+    "idna",
+    "iso2022_jp",
+    "iso2022_jp_1",
+    "iso2022_jp_2",
+    "iso2022_jp_2004",
+    "iso2022_jp_3",
+    "iso2022_jp_ext",
+    "iso2022_kr",
+    "iso8859_1",
+    "iso8859_10",
+    "iso8859_11",
+    "iso8859_13",
+    "iso8859_14",
+    "iso8859_15",
+    "iso8859_16",
+    "iso8859_2",
+    "iso8859_3",
+    "iso8859_4",
+    "iso8859_5",
+    "iso8859_6",
+    "iso8859_7",
+    "iso8859_8",
+    "iso8859_9",
+    "johab",
+    "koi8_r",
+    "koi8_u",
+    "latin_1",
+    "mac_cyrillic",
+    "mac_greek",
+    "mac_iceland",
+    "mac_latin2",
+    "mac_roman",
+    "mac_turkish",
+    "palmos",
+    "ptcp154",
+    "punycode",
+    "raw_unicode_escape",
+    "rot_13",
+    "shift_jis",
+    "shift_jis_2004",
+    "shift_jisx0213",
+    "tis_620",
+    "unicode_escape",
+    "unicode_internal",
+    "utf_16",
+    "utf_16_be",
+    "utf_16_le",
+    "utf_7",
+    "utf_8",
+]
+
+if hasattr(codecs, "mbcs_encode"):
+    all_unicode_encodings.append("mbcs")
+
+# The following encodings work only with str, not unicode
+all_string_encodings = [
+    "quopri_codec",
+    "string_escape",
+    "uu_codec",
+]
+
+# The following encoding is not tested, because it's not supposed
+# to work:
+#    "undefined"
+
+# The following encodings don't work in stateful mode
+broken_unicode_with_streams = [
+    "base64_codec",
+    "hex_codec",
+    "punycode",
+    "unicode_internal"
+]
+
+try:
+    import bz2
+except ImportError:
+    pass
+else:
+    all_unicode_encodings.append("bz2_codec")
+    broken_unicode_with_streams.append("bz2_codec")
+
+try:
+    import zlib
+except ImportError:
+    pass
+else:
+    all_unicode_encodings.append("zlib_codec")
+    broken_unicode_with_streams.append("zlib_codec")
+
+class BasicUnicodeTest(unittest.TestCase):
+    def test_basics(self):
+        s = u"abc123" # all codecs should be able to encode these
+        for encoding in all_unicode_encodings:
+            (bytes, size) = codecs.getencoder(encoding)(s)
+            if encoding != "unicode_internal":
+                self.assertEqual(size, len(s), "%r != %r (encoding=%r)" % (size, len(s), encoding))
+            (chars, size) = codecs.getdecoder(encoding)(bytes)
+            self.assertEqual(chars, s, "%r != %r (encoding=%r)" % (chars, s, encoding))
+
+            if encoding not in broken_unicode_with_streams:
+                # check stream reader/writer
+                q = Queue()
+                writer = codecs.getwriter(encoding)(q)
+                encodedresult = ""
+                for c in s:
+                    writer.write(c)
+                    encodedresult += q.read()
+                q = Queue()
+                reader = codecs.getreader(encoding)(q)
+                decodedresult = u""
+                for c in encodedresult:
+                    q.write(c)
+                    decodedresult += reader.read()
+                self.assertEqual(decodedresult, s, "%r != %r (encoding=%r)" % (decodedresult, s, encoding))
+
+class BasicStrTest(unittest.TestCase):
+    def test_basics(self):
+        s = "abc123"
+        for encoding in all_string_encodings:
+            (bytes, size) = codecs.getencoder(encoding)(s)
+            self.assertEqual(size, len(s))
+            (chars, size) = codecs.getdecoder(encoding)(bytes)
+            self.assertEqual(chars, s, "%r != %r (encoding=%r)" % (chars, s, encoding))
+
 def test_main():
-    suite = unittest.TestSuite()
-    suite.addTest(unittest.makeSuite(UTF16Test))
-    suite.addTest(unittest.makeSuite(EscapeDecodeTest))
-    suite.addTest(unittest.makeSuite(RecodingTest))
-    suite.addTest(unittest.makeSuite(PunycodeTest))
-    suite.addTest(unittest.makeSuite(NameprepTest))
-    test_support.run_suite(suite)
+    test_support.run_unittest(
+        UTF16Test,
+        UTF16LETest,
+        UTF16BETest,
+        UTF8Test,
+        EscapeDecodeTest,
+        RecodingTest,
+        PunycodeTest,
+        NameprepTest,
+        CodecTest,
+        CodecsModuleTest,
+        StreamReaderTest,
+        BasicUnicodeTest,
+        BasicStrTest
+    )
 
 
 if __name__ == "__main__":

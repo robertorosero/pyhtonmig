@@ -1,5 +1,8 @@
 /* RISCOS/pyconfig.h: Python configuration for RISC OS  */
 
+#ifndef Py_PYCONFIG_H
+#define Py_PYCONFIG_H
+
 /* Define if on AIX 3.
    System headers sometimes define this.
    We just want to avoid a redefinition error message.  */
@@ -24,9 +27,6 @@
 /* Define if you don't have tm_zone but do have the external array
    tzname.  */
 #undef HAVE_TZNAME
-
-/* Define if on MINIX.  */
-#undef _MINIX
 
 /* Define to `int' if <sys/types.h> doesn't define.  */
 #undef mode_t
@@ -69,10 +69,6 @@
 /* Define for AIX if your compiler is a genuine IBM xlC/xlC_r
    and you want support for AIX C++ shared extension modules. */
 #undef AIX_GENUINE_CPLUSPLUS
-
-/* Define if your <unistd.h> contains bad prototypes for exec*()
-   (as it does on SGI IRIX 4.x) */
-#undef BAD_EXEC_PROTOTYPES
 
 /* Define if your compiler botches static forward declarations
    (as it does on SCI ODT 3.0) */
@@ -143,7 +139,7 @@
 #undef HAVE_LARGEFILE_SUPPORT
 
 /* Define this if you have the type long long */
-#undef HAVE_LONG_LONG
+#define HAVE_LONG_LONG
 
 /* Define if your compiler supports function prototypes */
 #define HAVE_PROTOTYPES 1
@@ -233,17 +229,6 @@
    one supplied by Python itself. (see Include/unicodectype.h). */
 #undef WANT_WCTYPE_FUNCTIONS
 
-/* Define if you want to emulate SGI (IRIX 4) dynamic linking.
-   This is rumoured to work on VAX (Ultrix), Sun3 (SunOS 3.4),
-   Sequent Symmetry (Dynix), and Atari ST.
-   This requires the "dl-dld" library,
-   ftp://ftp.cwi.nl/pub/dynload/dl-dld-1.1.tar.Z,
-   as well as the "GNU dld" library,
-   ftp://ftp.cwi.nl/pub/dynload/dld-3.2.3.tar.Z.
-   Don't bother on SunOS 4 or 5, they already have dynamic linking using
-   shared libraries */ 
-#undef WITH_DL_DLD
-
 /* Define if you want documentation strings in extension modules */
 #define WITH_DOC_STRINGS 1
 
@@ -253,7 +238,7 @@
 #undef WITH_DYLD
 
 /* Define if you want to compile in Python-specific mallocs */
-#undef WITH_PYMALLOC
+#define WITH_PYMALLOC 1
 
 /* Define if you want to produce an OpenStep/Rhapsody framework
    (shared library plus accessory files). */
@@ -261,13 +246,6 @@
 
 /* Define if you want to use MacPython modules on MacOSX in unix-Python */
 #undef USE_TOOLBOX_OBJECT_GLUE
-
-/* Define if you want to use SGI (IRIX 4) dynamic linking.
-   This requires the "dl" library by Jack Jansen,
-   ftp://ftp.cwi.nl/pub/dynload/dl-1.6.tar.Z.
-   Don't bother on IRIX 5, it already has dynamic linking using SunOS
-   style shared libraries */ 
-#undef WITH_SGI_DL
 
 /* Define if you want to compile in rudimentary thread support */
 #undef WITH_THREAD
@@ -291,7 +269,7 @@
 #define SIZEOF_LONG 4
 
 /* The number of bytes in a long long.  */
-#undef SIZEOF_LONG_LONG
+#define SIZEOF_LONG_LONG 8
 
 /* The number of bytes in a short.  */
 #define SIZEOF_SHORT 2
@@ -396,7 +374,7 @@
 #undef HAVE_GETNAMEINFO
 
 /* Define if you have the getpeername function.  */
-#undef HAVE_GETPEERNAME
+#define HAVE_GETPEERNAME
 
 /* Define if you have the getpgid function.  */
 #undef HAVE_GETPGID
@@ -423,7 +401,7 @@
 #undef HAVE_HSTRERROR
 
 /* Define if you have the hypot function.  */
-#undef HAVE_HYPOT
+#define HAVE_HYPOT
 
 /* Define if you have the inet_pton function.  */
 #define HAVE_INET_PTON 1
@@ -536,9 +514,6 @@
 /* Define if you have the strftime function.  */
 #define HAVE_STRFTIME 1
 
-/* Define if you have the strptime function.  */
-#undef HAVE_STRPTIME
-
 /* Define if you have the symlink function.  */
 #undef HAVE_SYMLINK
 
@@ -605,12 +580,6 @@
 /* Define if you have the <libutil.h> header file.  */
 #undef HAVE_LIBUTIL_H
 
-/* Define if you have the <limits.h> header file.  */
-#define HAVE_LIMITS_H 1
-
-/* Define if you have the <locale.h> header file.  */
-#define HAVE_LOCALE_H 1
-
 /* Define if you have the <ncurses.h> header file.  */
 #undef HAVE_NCURSES_H
 
@@ -631,18 +600,6 @@
 
 /* Define if you have the <pty.h> header file.  */
 #undef HAVE_PTY_H
-
-/* Define if you have the <signal.h> header file.  */
-#define HAVE_SIGNAL_H 1
-
-/* Define if you have the <stdarg.h> header file.  */
-#define HAVE_STDARG_H 1
-
-/* Define if you have the <stddef.h> header file.  */
-#define HAVE_STDDEF_H 1
-
-/* Define if you have the <stdlib.h> header file.  */
-#define HAVE_STDLIB_H 1
 
 /* Define if you have the <sys/audioio.h> header file.  */
 #undef HAVE_SYS_AUDIOIO_H
@@ -734,3 +691,5 @@
 #undef DONT_HAVE_SYS_STAT_H
 
 #define PLATFORM "riscos"
+
+#endif /* Py_PYCONFIG_H */

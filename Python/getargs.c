@@ -12,15 +12,19 @@ int PyArg_VaParse(PyObject *, char *, va_list);
 
 int PyArg_ParseTupleAndKeywords(PyObject *, PyObject *,
 				char *, char **, ...);
+int PyArg_VaParseTupleAndKeywords(PyObject *, PyObject *,
+				char *, char **, va_list);
+
 
 /* Forward */
 static int vgetargs1(PyObject *, char *, va_list *, int);
 static void seterror(int, char *, int *, char *, char *);
 static char *convertitem(PyObject *, char **, va_list *, int *, char *, 
-			 size_t);
+			 size_t, PyObject **);
 static char *converttuple(PyObject *, char **, va_list *,
-			  int *, char *, size_t, int);
-static char *convertsimple(PyObject *, char **, va_list *, char *, size_t);
+			  int *, char *, size_t, int, PyObject **);
+static char *convertsimple(PyObject *, char **, va_list *, char *,
+			   size_t, PyObject **);
 static int convertbuffer(PyObject *, void **p, char **);
 
 static int vgetargskeywords(PyObject *, PyObject *,
@@ -72,6 +76,49 @@ PyArg_VaParse(PyObject *args, char *format, va_list va)
 }
 
 
+/* Handle cleanup of allocated memory in case of exception */
+
+static int
+addcleanup(void *ptr, PyObject **freelist)
+{
+	PyObject *cobj;
+	if (!*freelist) {
+		*freelist = PyList_New(0);
+		if (!*freelist) {
+			PyMem_FREE(ptr);
+			return -1;
+		}
+	}
+	cobj = PyCObject_FromVoidPtr(ptr, NULL);
+	if (!cobj) {
+		PyMem_FREE(ptr);
+		return -1;
+	}
+	if(PyList_Append(*freelist, cobj)) {
+                PyMem_FREE(ptr);
+		Py_DECREF(cobj);
+		return -1;
+	}
+        Py_DECREF(cobj);
+	return 0;
+}
+
+static int
+cleanreturn(int retval, PyObject *freelist)
+{
+	if(freelist) {
+		if((retval) == 0) {
+			int len = PyList_GET_SIZE(freelist), i;
+			for (i = 0; i < len; i++)
+                                PyMem_FREE(PyCObject_AsVoidPtr(
+                                		PyList_GET_ITEM(freelist, i)));
+		}
+		Py_DECREF(freelist);
+	}
+	return retval;
+}
+
+
 static int
 vgetargs1(PyObject *args, char *format, va_list *p_va, int compat)
 {
@@ -86,6 +133,7 @@ vgetargs1(PyObject *args, char *format, va_list *p_va, int compat)
 	char *formatsave = format;
 	int i, len;
 	char *msg;
+	PyObject *freelist = NULL;
 	
 	assert(compat || (args != (PyObject*)NULL));
 
@@ -157,11 +205,11 @@ vgetargs1(PyObject *args, char *format, va_list *p_va, int compat)
 				return 0;
 			}
 			msg = convertitem(args, &format, p_va, levels, msgbuf,
-					  sizeof(msgbuf));
+					  sizeof(msgbuf), &freelist);
 			if (msg == NULL)
-				return 1;
+				return cleanreturn(1, freelist);
 			seterror(levels[0], msg, levels+1, fname, message);
-			return 0;
+			return cleanreturn(0, freelist);
 		}
 		else {
 			PyErr_SetString(PyExc_SystemError,
@@ -200,10 +248,10 @@ vgetargs1(PyObject *args, char *format, va_list *p_va, int compat)
 		if (*format == '|')
 			format++;
 		msg = convertitem(PyTuple_GET_ITEM(args, i), &format, p_va,
-				  levels, msgbuf, sizeof(msgbuf));
+				  levels, msgbuf, sizeof(msgbuf), &freelist);
 		if (msg) {
 			seterror(i+1, msg, levels, fname, message);
-			return 0;
+			return cleanreturn(0, freelist);
 		}
 	}
 
@@ -212,10 +260,10 @@ vgetargs1(PyObject *args, char *format, va_list *p_va, int compat)
 	    *format != '|' && *format != ':' && *format != ';') {
 		PyErr_Format(PyExc_SystemError,
 			     "bad format string: %.200s", formatsave);
-		return 0;
+		return cleanreturn(0, freelist);
 	}
 	
-	return 1;
+	return cleanreturn(1, freelist);
 }
 
 
@@ -277,7 +325,7 @@ seterror(int iarg, char *msg, int *levels, char *fname, char *message)
 
 static char *
 converttuple(PyObject *arg, char **p_format, va_list *p_va, int *levels,
-	     char *msgbuf, size_t bufsize, int toplevel)
+	     char *msgbuf, size_t bufsize, int toplevel, PyObject **freelist)
 {
 	int level = 0;
 	int n = 0;
@@ -327,7 +375,7 @@ converttuple(PyObject *arg, char **p_format, va_list *p_va, int *levels,
 		PyObject *item;
 		item = PySequence_GetItem(arg, i);
 		msg = convertitem(item, &format, p_va, levels+1, msgbuf,
-				  bufsize);
+				  bufsize, freelist);
 		/* PySequence_GetItem calls tp->sq_item, which INCREFs */
 		Py_XDECREF(item);
 		if (msg != NULL) {
@@ -345,7 +393,7 @@ converttuple(PyObject *arg, char **p_format, va_list *p_va, int *levels,
 
 static char *
 convertitem(PyObject *arg, char **p_format, va_list *p_va, int *levels,
-	    char *msgbuf, size_t bufsize)
+	    char *msgbuf, size_t bufsize, PyObject **freelist)
 {
 	char *msg;
 	char *format = *p_format;
@@ -353,12 +401,13 @@ convertitem(PyObject *arg, char **p_format, va_list *p_va, int *levels,
 	if (*format == '(' /* ')' */) {
 		format++;
 		msg = converttuple(arg, &format, p_va, levels, msgbuf, 
-				   bufsize, 0);
+				   bufsize, 0, freelist);
 		if (msg == NULL)
 			format++;
 	}
 	else {
-		msg = convertsimple(arg, &format, p_va, msgbuf, bufsize);
+		msg = convertsimple(arg, &format, p_va, msgbuf, bufsize,
+				    freelist);
 		if (msg != NULL)
 			levels[0] = 0;
 	}
@@ -409,7 +458,7 @@ float_argument_error(PyObject *arg)
 
 static char *
 convertsimple(PyObject *arg, char **p_format, va_list *p_va, char *msgbuf,
-	      size_t bufsize)
+	      size_t bufsize, PyObject **freelist)
 {
 	char *format = *p_format;
 	char c = *format++;
@@ -423,7 +472,7 @@ convertsimple(PyObject *arg, char **p_format, va_list *p_va, char *msgbuf,
 		char *p = va_arg(*p_va, char *);
 		long ival;
 		if (float_argument_error(arg))
-			return NULL;
+			return converterr("integer<b>", arg, msgbuf, bufsize);
 		ival = PyInt_AsLong(arg);
 		if (ival == -1 && PyErr_Occurred())
 			return converterr("integer<b>", arg, msgbuf, bufsize);
@@ -447,7 +496,7 @@ convertsimple(PyObject *arg, char **p_format, va_list *p_va, char *msgbuf,
 		char *p = va_arg(*p_va, char *);
 		long ival;
 		if (float_argument_error(arg))
-			return NULL;
+			return converterr("integer<B>", arg, msgbuf, bufsize);
 		ival = PyInt_AsUnsignedLongMask(arg);
 		if (ival == -1 && PyErr_Occurred())
 			return converterr("integer<B>", arg, msgbuf, bufsize);
@@ -460,7 +509,7 @@ convertsimple(PyObject *arg, char **p_format, va_list *p_va, char *msgbuf,
 		short *p = va_arg(*p_va, short *);
 		long ival;
 		if (float_argument_error(arg))
-			return NULL;
+			return converterr("integer<h>", arg, msgbuf, bufsize);
 		ival = PyInt_AsLong(arg);
 		if (ival == -1 && PyErr_Occurred())
 			return converterr("integer<h>", arg, msgbuf, bufsize);
@@ -484,7 +533,7 @@ convertsimple(PyObject *arg, char **p_format, va_list *p_va, char *msgbuf,
 		unsigned short *p = va_arg(*p_va, unsigned short *);
 		long ival;
 		if (float_argument_error(arg))
-			return NULL;
+			return converterr("integer<H>", arg, msgbuf, bufsize);
 		ival = PyInt_AsUnsignedLongMask(arg);
 		if (ival == -1 && PyErr_Occurred())
 			return converterr("integer<H>", arg, msgbuf, bufsize);
@@ -497,7 +546,7 @@ convertsimple(PyObject *arg, char **p_format, va_list *p_va, char *msgbuf,
 		int *p = va_arg(*p_va, int *);
 		long ival;
 		if (float_argument_error(arg))
-			return NULL;
+			return converterr("integer<i>", arg, msgbuf, bufsize);
 		ival = PyInt_AsLong(arg);
 		if (ival == -1 && PyErr_Occurred())
 			return converterr("integer<i>", arg, msgbuf, bufsize);
@@ -521,7 +570,7 @@ convertsimple(PyObject *arg, char **p_format, va_list *p_va, char *msgbuf,
 		unsigned int *p = va_arg(*p_va, unsigned int *);
 		unsigned int ival;
 		if (float_argument_error(arg))
-			return NULL;
+			return converterr("integer<I>", arg, msgbuf, bufsize);
 		ival = PyInt_AsUnsignedLongMask(arg);
 		if (ival == -1 && PyErr_Occurred())
 			return converterr("integer<I>", arg, msgbuf, bufsize);
@@ -534,7 +583,7 @@ convertsimple(PyObject *arg, char **p_format, va_list *p_va, char *msgbuf,
 		long *p = va_arg(*p_va, long *);
 		long ival;
 		if (float_argument_error(arg))
-			return NULL;
+			return converterr("integer<l>", arg, msgbuf, bufsize);
 		ival = PyInt_AsLong(arg);
 		if (ival == -1 && PyErr_Occurred())
 			return converterr("integer<l>", arg, msgbuf, bufsize);
@@ -571,8 +620,6 @@ convertsimple(PyObject *arg, char **p_format, va_list *p_va, char *msgbuf,
 	case 'K': { /* long long sized bitfield */
 		unsigned PY_LONG_LONG *p = va_arg(*p_va, unsigned PY_LONG_LONG *);
 		unsigned PY_LONG_LONG ival;
-		if (float_argument_error(arg))
-			return NULL;
 		if (PyInt_Check(arg))
 			ival = PyInt_AsUnsignedLongMask(arg);
 		else if (PyLong_Check(arg))
@@ -836,16 +883,24 @@ convertsimple(PyObject *arg, char **p_format, va_list *p_va, char *msgbuf,
 			int *buffer_len = va_arg(*p_va, int *);
 
 			format++;
-			if (buffer_len == NULL)
+			if (buffer_len == NULL) {
+				Py_DECREF(s);
 				return converterr(
 					"(buffer_len is NULL)",
 					arg, msgbuf, bufsize);
+			}
 			if (*buffer == NULL) {
 				*buffer = PyMem_NEW(char, size + 1);
 				if (*buffer == NULL) {
 					Py_DECREF(s);
 					return converterr(
 						"(memory error)",
+						arg, msgbuf, bufsize);
+				}
+				if(addcleanup(*buffer, freelist)) {
+					Py_DECREF(s);
+					return converterr(
+						"(cleanup problem)",
 						arg, msgbuf, bufsize);
 				}
 			} else {
@@ -874,15 +929,22 @@ convertsimple(PyObject *arg, char **p_format, va_list *p_va, char *msgbuf,
 			   PyMem_Free()ing it after usage
 
 			*/
-			if ((int)strlen(PyString_AS_STRING(s)) != size)
+			if ((int)strlen(PyString_AS_STRING(s)) != size) {
+				Py_DECREF(s);
 				return converterr(
 					"(encoded string without NULL bytes)",
 					arg, msgbuf, bufsize);
+			}
 			*buffer = PyMem_NEW(char, size + 1);
 			if (*buffer == NULL) {
 				Py_DECREF(s);
 				return converterr("(memory error)",
 						  arg, msgbuf, bufsize);
+			}
+			if(addcleanup(*buffer, freelist)) {
+				Py_DECREF(s);
+				return converterr("(cleanup problem)",
+						arg, msgbuf, bufsize);
 			}
 			memcpy(*buffer,
 			       PyString_AS_STRING(s),
@@ -1092,6 +1154,39 @@ PyArg_ParseTupleAndKeywords(PyObject *args,
 }
 
 
+int
+PyArg_VaParseTupleAndKeywords(PyObject *args,
+			    PyObject *keywords,
+			    char *format, 
+			    char **kwlist, va_list va)
+{
+	int retval;
+	va_list lva;
+
+	if ((args == NULL || !PyTuple_Check(args)) ||
+	    (keywords != NULL && !PyDict_Check(keywords)) ||
+	    format == NULL ||
+	    kwlist == NULL)
+	{
+		PyErr_BadInternalCall();
+		return 0;
+	}
+
+#ifdef VA_LIST_IS_ARRAY
+	memcpy(lva, va, sizeof(va_list));
+#else
+#ifdef __va_copy
+	__va_copy(lva, va);
+#else
+	lva = va;
+#endif
+#endif
+
+	retval = vgetargskeywords(args, keywords, format, kwlist, &lva);	
+	return retval;
+}
+
+
 static int
 vgetargskeywords(PyObject *args, PyObject *keywords, char *format,
 	         char **kwlist, va_list *p_va)
@@ -1103,6 +1198,7 @@ vgetargskeywords(PyObject *args, PyObject *keywords, char *format,
 	char *formatsave;
 	int i, len, nargs, nkeywords;
 	char *msg, **p;
+	PyObject *freelist = NULL;
 
 	assert(args != NULL && PyTuple_Check(args));
 	assert(keywords == NULL || PyDict_Check(keywords));
@@ -1227,16 +1323,16 @@ vgetargskeywords(PyObject *args, PyObject *keywords, char *format,
 		if (*format == '|')
 			format++;
 		msg = convertitem(PyTuple_GET_ITEM(args, i), &format, p_va,
-				 levels, msgbuf, sizeof(msgbuf));
+				  levels, msgbuf, sizeof(msgbuf), &freelist);
 		if (msg) {
 			seterror(i+1, msg, levels, fname, message);
-			return 0;
+			return cleanreturn(0, freelist);
 		}
 	}
 
 	/* handle no keyword parameters in call */	
 	if (nkeywords == 0)
-		return 1; 
+		return cleanreturn(1, freelist);
 
 	/* convert the keyword arguments; this uses the format 
 	   string where it was left after processing args */
@@ -1248,23 +1344,23 @@ vgetargskeywords(PyObject *args, PyObject *keywords, char *format,
 		if (item != NULL) {
 			Py_INCREF(item);
 			msg = convertitem(item, &format, p_va, levels, msgbuf,
-					  sizeof(msgbuf));
+					  sizeof(msgbuf), &freelist);
 			Py_DECREF(item);
 			if (msg) {
 				seterror(i+1, msg, levels, fname, message);
-				return 0;
+				return cleanreturn(0, freelist);
 			}
 			--nkeywords;
 			if (nkeywords == 0)
 				break;
 		}
 		else if (PyErr_Occurred())
-			return 0;
+			return cleanreturn(0, freelist);
 		else {
 			msg = skipitem(&format, p_va);
 			if (msg) {
 				seterror(i+1, msg, levels, fname, message);
-				return 0;
+				return cleanreturn(0, freelist);
 			}
 		}
 	}
@@ -1279,7 +1375,7 @@ vgetargskeywords(PyObject *args, PyObject *keywords, char *format,
 			if (!PyString_Check(key)) {
 				PyErr_SetString(PyExc_TypeError, 
 					        "keywords must be strings");
-				return 0;
+				return cleanreturn(0, freelist);
 			}
 			ks = PyString_AsString(key);
 			for (i = 0; i < max; i++) {
@@ -1293,12 +1389,12 @@ vgetargskeywords(PyObject *args, PyObject *keywords, char *format,
 					     "'%s' is an invalid keyword "
 					     "argument for this function",
 					     ks);
-				return 0;
+				return cleanreturn(0, freelist);
 			}
 		}
 	}
 
-	return 1;
+	return cleanreturn(1, freelist);
 }
 
 

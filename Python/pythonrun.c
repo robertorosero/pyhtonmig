@@ -16,9 +16,7 @@
 #include "eval.h"
 #include "marshal.h"
 
-#ifdef HAVE_SIGNAL_H
 #include <signal.h>
-#endif
 
 #ifdef HAVE_LANGINFO_H
 #include <locale.h>
@@ -30,9 +28,6 @@
 #include "windows.h"
 #endif
 
-#ifdef macintosh
-#include "macglue.h"
-#endif
 extern char *Py_GetPath(void);
 
 extern grammar _PyParser_Grammar; /* From graminit.c */
@@ -72,9 +67,38 @@ int Py_IgnoreEnvironmentFlag; /* e.g. PYTHONPATH, PYTHONHOME */
 int _Py_QnewFlag = 0;
 
 /* Reference to 'warnings' module, to avoid importing it
-   on the fly when the import lock may be held.  See 683658
+   on the fly when the import lock may be held.  See 683658/771097
 */
-PyObject *PyModule_WarningsModule = NULL;
+static PyObject *warnings_module = NULL;
+
+/* Returns a borrowed reference to the 'warnings' module, or NULL.
+   If the module is returned, it is guaranteed to have been obtained
+   without acquiring the import lock
+*/
+PyObject *PyModule_GetWarningsModule(void)
+{
+	PyObject *typ, *val, *tb;
+	PyObject *all_modules;
+	/* If we managed to get the module at init time, just use it */
+	if (warnings_module)
+		return warnings_module;
+	/* If it wasn't available at init time, it may be available
+	   now in sys.modules (common scenario is frozen apps: import
+	   at init time fails, but the frozen init code sets up sys.path
+	   correctly, then does an implicit import of warnings for us
+	*/
+	/* Save and restore any exceptions */
+	PyErr_Fetch(&typ, &val, &tb);
+
+	all_modules = PySys_GetObject("modules");
+	if (all_modules) {
+		warnings_module = PyDict_GetItemString(all_modules, "warnings");
+		/* We keep a ref in the global */
+		Py_XINCREF(warnings_module);
+	}
+	PyErr_Restore(typ, val, tb);
+	return warnings_module;
+}
 
 static int initialized = 0;
 
@@ -110,12 +134,17 @@ add_flag(int flag, const char *envs)
 }
 
 void
-Py_Initialize(void)
+Py_InitializeEx(int install_sigs)
 {
 	PyInterpreterState *interp;
 	PyThreadState *tstate;
 	PyObject *bimod, *sysmod;
 	char *p;
+#if defined(Py_USING_UNICODE) && defined(HAVE_LANGINFO_H) && defined(CODESET)
+	char *codeset;
+	char *saved_locale;
+	PyObject *sys_stream, *sys_isatty;
+#endif
 	extern void _Py_ReadyTypes(void);
 
 	if (initialized)
@@ -182,7 +211,8 @@ Py_Initialize(void)
 
 	_PyImportHooks_Init();
 
-	initsigs(); /* Signal handling stuff, including initintr() */
+	if (install_sigs)
+		initsigs(); /* Signal handling stuff, including initintr() */
 
 	initmain(); /* Module __main__ */
 	if (!Py_NoSiteFlag)
@@ -193,30 +223,69 @@ Py_Initialize(void)
 	_PyGILState_Init(interp, tstate);
 #endif /* WITH_THREAD */
 
-	PyModule_WarningsModule = PyImport_ImportModule("warnings");
+	warnings_module = PyImport_ImportModule("warnings");
+	if (!warnings_module)
+		PyErr_Clear();
 
 #if defined(Py_USING_UNICODE) && defined(HAVE_LANGINFO_H) && defined(CODESET)
 	/* On Unix, set the file system encoding according to the
 	   user's preference, if the CODESET names a well-known
 	   Python codec, and Py_FileSystemDefaultEncoding isn't
-	   initialized by other means.  */
-	if (!Py_FileSystemDefaultEncoding) {
-		char *saved_locale = setlocale(LC_CTYPE, NULL);
-		char *codeset;
-		setlocale(LC_CTYPE, "");
-		codeset = nl_langinfo(CODESET);
-		if (*codeset) {
-			PyObject *enc = PyCodec_Encoder(codeset);
-			if (enc) {
-				Py_FileSystemDefaultEncoding = strdup(codeset);
-				Py_DECREF(enc);
-			} else
-				PyErr_Clear();
+	   initialized by other means. Also set the encoding of
+	   stdin and stdout if these are terminals.  */
+
+	saved_locale = strdup(setlocale(LC_CTYPE, NULL));
+	setlocale(LC_CTYPE, "");
+	codeset = nl_langinfo(CODESET);
+	if (codeset && *codeset) {
+		PyObject *enc = PyCodec_Encoder(codeset);
+		if (enc) {
+			codeset = strdup(codeset);
+			Py_DECREF(enc);
+		} else {
+			codeset = NULL;
+			PyErr_Clear();
 		}
-		setlocale(LC_CTYPE, saved_locale);
+	} else
+		codeset = NULL;
+	setlocale(LC_CTYPE, saved_locale);
+	free(saved_locale);
+
+	if (codeset) {
+		sys_stream = PySys_GetObject("stdin");
+		sys_isatty = PyObject_CallMethod(sys_stream, "isatty", "");
+		if (!sys_isatty)
+			PyErr_Clear();
+		if(sys_isatty && PyObject_IsTrue(sys_isatty)) {
+			if (!PyFile_SetEncoding(sys_stream, codeset))
+				Py_FatalError("Cannot set codeset of stdin");
+		}
+		Py_XDECREF(sys_isatty);
+
+		sys_stream = PySys_GetObject("stdout");
+		sys_isatty = PyObject_CallMethod(sys_stream, "isatty", "");
+		if (!sys_isatty)
+			PyErr_Clear();
+		if(sys_isatty && PyObject_IsTrue(sys_isatty)) {
+			if (!PyFile_SetEncoding(sys_stream, codeset))
+				Py_FatalError("Cannot set codeset of stdout");
+		}
+		Py_XDECREF(sys_isatty);
+
+		if (!Py_FileSystemDefaultEncoding)
+			Py_FileSystemDefaultEncoding = codeset;
+		else
+			free(codeset);
 	}
 #endif
 }
+
+void
+Py_Initialize(void)
+{
+	Py_InitializeEx(1);
+}
+
 
 #ifdef COUNT_ALLOCS
 extern void dump_counts(void);
@@ -258,26 +327,51 @@ Py_Finalize(void)
 	initialized = 0;
 
 	/* Get current thread state and interpreter pointer */
-	tstate = PyThreadState_Get();
+	tstate = PyThreadState_GET();
 	interp = tstate->interp;
 
 	/* Disable signal handling */
 	PyOS_FiniInterrupts();
 
 	/* drop module references we saved */
-	Py_XDECREF(PyModule_WarningsModule);
-	PyModule_WarningsModule = NULL;
+	Py_XDECREF(warnings_module);
+	warnings_module = NULL;
 
 	/* Collect garbage.  This may call finalizers; it's nice to call these
-	   before all modules are destroyed. */
+	 * before all modules are destroyed.
+	 * XXX If a __del__ or weakref callback is triggered here, and tries to
+	 * XXX import a module, bad things can happen, because Python no
+	 * XXX longer believes it's initialized.
+	 * XXX     Fatal Python error: Interpreter not initialized (version mismatch?)
+	 * XXX is easy to provoke that way.  I've also seen, e.g.,
+	 * XXX     Exception exceptions.ImportError: 'No module named sha'
+	 * XXX         in <function callback at 0x008F5718> ignored
+	 * XXX but I'm unclear on exactly how that one happens.  In any case,
+	 * XXX I haven't seen a real-life report of either of these.
+         */
 	PyGC_Collect();
 
 	/* Destroy all modules */
 	PyImport_Cleanup();
 
 	/* Collect final garbage.  This disposes of cycles created by
-	   new-style class definitions, for example. */
+	 * new-style class definitions, for example.
+	 * XXX This is disabled because it caused too many problems.  If
+	 * XXX a __del__ or weakref callback triggers here, Python code has
+	 * XXX a hard time running, because even the sys module has been
+	 * XXX cleared out (sys.stdout is gone, sys.excepthook is gone, etc).
+	 * XXX One symptom is a sequence of information-free messages
+	 * XXX coming from threads (if a __del__ or callback is invoked,
+	 * XXX other threads can execute too, and any exception they encounter
+	 * XXX triggers a comedy of errors as subsystem after subsystem
+	 * XXX fails to find what it *expects* to find in sys to help report
+	 * XXX the exception and consequent unexpected failures).  I've also
+	 * XXX seen segfaults then, after adding print statements to the
+	 * XXX Python code getting called.
+	 */
+#if 0
 	PyGC_Collect();
+#endif
 
 	/* Destroy the database used by _PyImport_{Fixup,Find}Extension */
 	_PyImport_Fini();
@@ -325,6 +419,7 @@ Py_Finalize(void)
 	PyFrame_Fini();
 	PyCFunction_Fini();
 	PyTuple_Fini();
+	PyList_Fini();
 	PyString_Fini();
 	PyInt_Fini();
 	PyFloat_Fini();
@@ -446,7 +541,7 @@ Py_EndInterpreter(PyThreadState *tstate)
 {
 	PyInterpreterState *interp = tstate->interp;
 
-	if (tstate != PyThreadState_Get())
+	if (tstate != PyThreadState_GET())
 		Py_FatalError("Py_EndInterpreter: thread is not current");
 	if (tstate->frame != NULL)
 		Py_FatalError("Py_EndInterpreter: thread still has a frame");
@@ -654,13 +749,6 @@ maybe_pyc_file(FILE *fp, const char* filename, const char* ext, int closeit)
 {
 	if (strcmp(ext, ".pyc") == 0 || strcmp(ext, ".pyo") == 0)
 		return 1;
-
-#ifdef macintosh
-	/* On a mac, we also assume a pyc file for types 'PYC ' and 'APPL' */
-	if (PyMac_getfiletype((char *)filename) == 'PYC '
-	    || PyMac_getfiletype((char *)filename) == 'APPL')
-		return 1;
-#endif /* macintosh */
 
 	/* Only look into the file if we are allowed to close it, since
 	   it then should also be seekable. */
@@ -928,7 +1016,7 @@ PyErr_PrintEx(int set_sys_last_vars)
 	}
 	hook = PySys_GetObject("excepthook");
 	if (hook) {
-		PyObject *args = Py_BuildValue("(OOO)",
+		PyObject *args = PyTuple_Pack(3,
                     exception, v ? v : Py_None, tb ? tb : Py_None);
 		PyObject *result = PyEval_CallObject(hook, args);
 		if (result == NULL) {
@@ -963,8 +1051,8 @@ PyErr_PrintEx(int set_sys_last_vars)
 void PyErr_Display(PyObject *exception, PyObject *value, PyObject *tb)
 {
 	int err = 0;
-	PyObject *v = value;
 	PyObject *f = PySys_GetObject("stderr");
+	Py_INCREF(value);
 	if (f == NULL)
 		fprintf(stderr, "lost sys.stderr\n");
 	else {
@@ -974,12 +1062,12 @@ void PyErr_Display(PyObject *exception, PyObject *value, PyObject *tb)
 		if (tb && tb != Py_None)
 			err = PyTraceBack_Print(tb, f);
 		if (err == 0 &&
-		    PyObject_HasAttrString(v, "print_file_and_line"))
+		    PyObject_HasAttrString(value, "print_file_and_line"))
 		{
 			PyObject *message;
 			const char *filename, *text;
 			int lineno, offset;
-			if (!parse_syntax_error(v, &message, &filename,
+			if (!parse_syntax_error(value, &message, &filename,
 						&lineno, &offset, &text))
 				PyErr_Clear();
 			else {
@@ -995,7 +1083,8 @@ void PyErr_Display(PyObject *exception, PyObject *value, PyObject *tb)
 				PyFile_WriteString("\n", f);
 				if (text != NULL)
 					print_error_text(f, offset, text);
-				v = message;
+				Py_DECREF(value);
+				value = message;
 				/* Can't be bothered to check all those
 				   PyFile_WriteString() calls */
 				if (PyErr_Occurred())
@@ -1032,8 +1121,8 @@ void PyErr_Display(PyObject *exception, PyObject *value, PyObject *tb)
 		else
 			err = PyFile_WriteObject(exception, f, Py_PRINT_RAW);
 		if (err == 0) {
-			if (v != NULL && v != Py_None) {
-				PyObject *s = PyObject_Str(v);
+			if (value != Py_None) {
+				PyObject *s = PyObject_Str(value);
 				/* only print colon if the str() of the
 				   object is not the empty string
 				*/
@@ -1050,6 +1139,7 @@ void PyErr_Display(PyObject *exception, PyObject *value, PyObject *tb)
 		if (err == 0)
 			err = PyFile_WriteString("\n", f);
 	}
+	Py_DECREF(value);
 	/* If an error happened here, don't show it.
 	   XXX This is wrong, but too many callers rely on this behavior. */
 	if (err != 0)
@@ -1312,7 +1402,8 @@ err_input(perrdetail *err)
 		msg = "EOL while scanning single-quoted string";
 		break;
 	case E_INTR:
-		PyErr_SetNone(PyExc_KeyboardInterrupt);
+		if (!PyErr_Occurred())
+			PyErr_SetNone(PyExc_KeyboardInterrupt);
 		return;
 	case E_NOMEM:
 		PyErr_NoMemory();
@@ -1336,7 +1427,7 @@ err_input(perrdetail *err)
 		msg = "too many levels of indentation";
 		break;
 	case E_DECODE: {	/* XXX */
-		PyThreadState* tstate = PyThreadState_Get();
+		PyThreadState* tstate = PyThreadState_GET();
 		PyObject* value = tstate->curexc_value;
 		if (value != NULL) {
 			u = PyObject_Repr(value);
@@ -1345,6 +1436,10 @@ err_input(perrdetail *err)
 				break;
 			}
 		}
+		if (msg == NULL)
+			msg = "unknown decode error";
+		break;
+	}
 	default:
 		fprintf(stderr, "error=%d\n", err->error);
 		msg = "unknown parsing error";
@@ -1387,7 +1482,6 @@ Py_FatalError(const char *msg)
 
 #ifdef WITH_THREAD
 #include "pythread.h"
-int _PyThread_Started = 0; /* Set by threadmodule.c and maybe others */
 #endif
 
 #define NEXITFUNCS 32
@@ -1440,42 +1534,24 @@ Py_Exit(int sts)
 {
 	Py_Finalize();
 
-#ifdef macintosh
-	PyMac_Exit(sts);
-#else
 	exit(sts);
-#endif
 }
 
 static void
 initsigs(void)
 {
-#ifdef HAVE_SIGNAL_H
 #ifdef SIGPIPE
-	signal(SIGPIPE, SIG_IGN);
+	PyOS_setsig(SIGPIPE, SIG_IGN);
 #endif
 #ifdef SIGXFZ
-	signal(SIGXFZ, SIG_IGN);
+	PyOS_setsig(SIGXFZ, SIG_IGN);
 #endif
 #ifdef SIGXFSZ
-	signal(SIGXFSZ, SIG_IGN);
+	PyOS_setsig(SIGXFSZ, SIG_IGN);
 #endif
-#endif /* HAVE_SIGNAL_H */
 	PyOS_InitInterrupts(); /* May imply initsignal() */
 }
 
-#ifdef MPW
-
-/* Check for file descriptor connected to interactive device.
-   Pretend that stdin is always interactive, other files never. */
-
-int
-isatty(int fd)
-{
-	return fd == fileno(stdin);
-}
-
-#endif
 
 /*
  * The file descriptor fd is considered ``interactive'' if either
@@ -1535,18 +1611,14 @@ PyOS_getsig(int sig)
 {
 #ifdef HAVE_SIGACTION
 	struct sigaction context;
-	/* Initialize context.sa_handler to SIG_ERR which makes about as
-	 * much sense as anything else.  It should get overwritten if
-	 * sigaction actually succeeds and otherwise we avoid an
-	 * uninitialized memory read.
-	 */
-	context.sa_handler = SIG_ERR;
-	sigaction(sig, NULL, &context);
+	if (sigaction(sig, NULL, &context) == -1)
+		return SIG_ERR;
 	return context.sa_handler;
 #else
 	PyOS_sighandler_t handler;
 	handler = signal(sig, SIG_IGN);
-	signal(sig, handler);
+	if (handler != SIG_ERR)
+		signal(sig, handler);
 	return handler;
 #endif
 }
@@ -1555,20 +1627,19 @@ PyOS_sighandler_t
 PyOS_setsig(int sig, PyOS_sighandler_t handler)
 {
 #ifdef HAVE_SIGACTION
-	struct sigaction context;
-	PyOS_sighandler_t oldhandler;
-	/* Initialize context.sa_handler to SIG_ERR which makes about as
-	 * much sense as anything else.  It should get overwritten if
-	 * sigaction actually succeeds and otherwise we avoid an
-	 * uninitialized memory read.
-	 */
-	context.sa_handler = SIG_ERR;
-	sigaction(sig, NULL, &context);
-	oldhandler = context.sa_handler;
+	struct sigaction context, ocontext;
 	context.sa_handler = handler;
-	sigaction(sig, &context, NULL);
-	return oldhandler;
+	sigemptyset(&context.sa_mask);
+	context.sa_flags = 0;
+	if (sigaction(sig, &context, &ocontext) == -1)
+		return SIG_ERR;
+	return ocontext.sa_handler;
 #else
-	return signal(sig, handler);
+	PyOS_sighandler_t oldhandler;
+	oldhandler = signal(sig, handler);
+#ifdef HAVE_SIGINTERRUPT
+	siginterrupt(sig, 1);
+#endif
+	return oldhandler;
 #endif
 }

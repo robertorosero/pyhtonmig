@@ -833,8 +833,12 @@ whichmodule(PyObject *global, PyObject *global_name)
 		*global_name_attr = 0, *name = 0;
 
 	module = PyObject_GetAttrString(global, "__module__");
-	if (module) return module;
-	PyErr_Clear();
+	if (module) 
+		return module;
+	if (PyErr_ExceptionMatches(PyExc_AttributeError))
+		PyErr_Clear();
+	else
+		return NULL;
 
 	if (!( modules_dict = PySys_GetObject("modules")))
 		return NULL;
@@ -846,7 +850,10 @@ whichmodule(PyObject *global, PyObject *global_name)
 
 		global_name_attr = PyObject_GetAttr(module, global_name);
 		if (!global_name_attr)  {
-			PyErr_Clear();
+			if (PyErr_ExceptionMatches(PyExc_AttributeError))
+				PyErr_Clear();
+			else
+				return NULL;
 			continue;
 		}
 
@@ -1814,7 +1821,10 @@ save_inst(Picklerobject *self, PyObject *args)
 		}
 	}
 	else {
-		PyErr_Clear();
+		if (PyErr_ExceptionMatches(PyExc_AttributeError))
+			PyErr_Clear();
+		else
+			goto finally;
 	}
 
 	if (!self->bin) {
@@ -1859,10 +1869,16 @@ save_inst(Picklerobject *self, PyObject *args)
 			goto finally;
 	}
 	else {
-		PyErr_Clear();
+		if (PyErr_ExceptionMatches(PyExc_AttributeError))
+			PyErr_Clear();
+		else
+			goto finally;
 
 		if (!( state = PyObject_GetAttr(args, __dict___str)))  {
-			PyErr_Clear();
+			if (PyErr_ExceptionMatches(PyExc_AttributeError))
+				PyErr_Clear();
+			else
+				goto finally;
 			res = 0;
 			goto finally;
 		}
@@ -2127,6 +2143,12 @@ save_reduce(Picklerobject *self, PyObject *args, PyObject *ob)
 				&dictitems))
 		return -1;
 
+	if (!PyTuple_Check(argtup)) {
+		PyErr_SetString(PicklingError,
+				"args from reduce() should be a tuple");
+		return -1;
+	}
+
 	if (state == Py_None)
 		state = NULL;
 	if (listitems == Py_None)
@@ -2141,7 +2163,10 @@ save_reduce(Picklerobject *self, PyObject *args, PyObject *ob)
         	PyObject *temp = PyObject_GetAttr(callable, __name___str);
 
 		if (temp == NULL) {
-			PyErr_Clear();
+			if (PyErr_ExceptionMatches(PyExc_AttributeError))
+				PyErr_Clear();
+			else
+				return -1;
 			use_newobj = 0;
 		}
 		else {
@@ -2176,8 +2201,13 @@ save_reduce(Picklerobject *self, PyObject *args, PyObject *ob)
 			PyObject *ob_dot_class;
 
 			ob_dot_class = PyObject_GetAttr(ob, __class___str);
-			if (ob_dot_class == NULL)
-				PyErr_Clear();
+			if (ob_dot_class == NULL) {
+				if (PyErr_ExceptionMatches(
+					    PyExc_AttributeError))
+					PyErr_Clear();
+				else
+					return -1;
+			}
 			i = ob_dot_class != cls; /* true iff a problem */
 			Py_XDECREF(ob_dot_class);
 			if (i) {
@@ -2394,6 +2424,11 @@ save(Picklerobject *self, PyObject *args, int pers_save)
         case 'f':
 		if (type == &PyFunction_Type) {
 			res = save_global(self, args, NULL);
+			if (res && PyErr_ExceptionMatches(PickleError)) {
+				/* fall back to reduce */
+				PyErr_Clear();
+				break;
+			}
 			goto finally;
 		}
 		break;
@@ -2447,7 +2482,10 @@ save(Picklerobject *self, PyObject *args, int pers_save)
 			}
 		}
 		else {
-			PyErr_Clear();
+			if (PyErr_ExceptionMatches(PyExc_AttributeError))
+				PyErr_Clear();
+			else
+				goto finally;
 			/* Check for a __reduce__ method. */
 			__reduce__ = PyObject_GetAttr(args, __reduce___str);
 			if (__reduce__ != NULL) {
@@ -2818,13 +2856,14 @@ newPicklerobject(PyObject *file, int proto)
 
 
 static PyObject *
-get_Pickler(PyObject *self, PyObject *args)
+get_Pickler(PyObject *self, PyObject *args, PyObject *kwds)
 {
+	static char *kwlist[] = {"file", "protocol", NULL};
 	PyObject *file = NULL;
 	int proto = 0;
 
 	/* XXX
-	 * The documented signature is Pickler(file, proto=0), but this
+	 * The documented signature is Pickler(file, protocol=0), but this
 	 * accepts Pickler() and Pickler(integer) too.  The meaning then
 	 * is clear as mud, undocumented, and not supported by pickle.py.
 	 * I'm told Zope uses this, but I haven't traced into this code
@@ -2833,7 +2872,8 @@ get_Pickler(PyObject *self, PyObject *args)
 	if (!PyArg_ParseTuple(args, "|i:Pickler", &proto)) {
 		PyErr_Clear();
 		proto = 0;
-		if (!PyArg_ParseTuple(args, "O|i:Pickler", &file, &proto))
+		if (!PyArg_ParseTupleAndKeywords(args, kwds, "O|i:Pickler",
+			    kwlist, &file, &proto))
 			return NULL;
 	}
 	return (PyObject *)newPicklerobject(file, proto);
@@ -2853,7 +2893,7 @@ Pickler_dealloc(Picklerobject *self)
 	Py_XDECREF(self->inst_pers_func);
 	Py_XDECREF(self->dispatch_table);
 	PyMem_Free(self->write_buf);
-	PyObject_GC_Del(self);
+	self->ob_type->tp_free((PyObject *)self);
 }
 
 static int
@@ -3287,7 +3327,7 @@ load_float(Unpicklerobject *self)
 	if (!( s=pystrndup(s,len)))  return -1;
 
 	errno = 0;
-	d = strtod(s, &endptr);
+	d = PyOS_ascii_strtod(s, &endptr);
 
 	if (errno || (endptr[0] != '\n') || (endptr[1] != '\0')) {
 		PyErr_SetString(PyExc_ValueError,
@@ -3564,7 +3604,7 @@ Instance_New(PyObject *cls, PyObject *args)
 			PyObject *__getinitargs__;
 
 			__getinitargs__ = PyObject_GetAttr(cls,
-							   __getinitargs___str);
+						   __getinitargs___str);
 			if (!__getinitargs__)  {
 				/* We have a class with no __getinitargs__,
 				   so bypass usual construction  */
@@ -3582,17 +3622,6 @@ Instance_New(PyObject *cls, PyObject *args)
 		else goto err;
 	}
 
-	if (args==Py_None) {
-		/* Special case, call cls.__basicnew__() */
-		PyObject *basicnew;
-
-		basicnew = PyObject_GetAttr(cls, __basicnew___str);
-		if (!basicnew)  return NULL;
-		r=PyObject_CallObject(basicnew, NULL);
-		Py_DECREF(basicnew);
-		if (r) return r;
-	}
-
 	if ((r=PyObject_CallObject(cls, args))) return r;
 
   err:
@@ -3600,7 +3629,7 @@ Instance_New(PyObject *cls, PyObject *args)
 		PyObject *tp, *v, *tb;
 
 		PyErr_Fetch(&tp, &v, &tb);
-		if ((r=Py_BuildValue("OOO",v,cls,args))) {
+		if ((r=PyTuple_Pack(3,v,cls,args))) {
 			Py_XDECREF(v);
 			v=r;
 		}
@@ -4253,6 +4282,8 @@ load_build(Unpicklerobject *self)
 		Py_DECREF(junk);
 		return 0;
 	}
+	if (!PyErr_ExceptionMatches(PyExc_AttributeError))
+		return -1;
 	PyErr_Clear();
 
 	/* A default __setstate__.  First see whether state embeds a
@@ -5203,6 +5234,7 @@ Unpickler_dealloc(Unpicklerobject *self)
 	Py_XDECREF(self->pers_func);
 	Py_XDECREF(self->arg);
 	Py_XDECREF(self->last_string);
+	Py_XDECREF(self->find_class);
 
 	if (self->marks) {
 		free(self->marks);
@@ -5212,7 +5244,7 @@ Unpickler_dealloc(Unpicklerobject *self)
 		free(self->buf);
 	}
 
-	PyObject_GC_Del(self);
+	self->ob_type->tp_free((PyObject *)self);
 }
 
 static int
@@ -5234,6 +5266,7 @@ Unpickler_traverse(Unpicklerobject *self, visitproc visit, void *arg)
 	VISIT(self->pers_func);
 	VISIT(self->arg);
 	VISIT(self->last_string);
+	VISIT(self->find_class);
 #undef VISIT
 	return 0;
 }
@@ -5250,6 +5283,7 @@ Unpickler_clear(Unpicklerobject *self)
 	CLEAR(self->pers_func);
 	CLEAR(self->arg);
 	CLEAR(self->last_string);
+	CLEAR(self->find_class);
 #undef CLEAR
 	return 0;
 }
@@ -5340,15 +5374,17 @@ Unpickler_setattr(Unpicklerobject *self, char *name, PyObject *value)
  * Module-level functions.
  */
 
-/* dump(obj, file, proto=0). */
+/* dump(obj, file, protocol=0). */
 static PyObject *
-cpm_dump(PyObject *self, PyObject *args)
+cpm_dump(PyObject *self, PyObject *args, PyObject *kwds)
 {
+	static char *kwlist[] = {"obj", "file", "protocol", NULL};
 	PyObject *ob, *file, *res = NULL;
 	Picklerobject *pickler = 0;
 	int proto = 0;
 
-	if (!( PyArg_ParseTuple(args, "OO|i", &ob, &file, &proto)))
+	if (!( PyArg_ParseTupleAndKeywords(args, kwds, "OO|i", kwlist,
+		   &ob, &file, &proto)))
 		goto finally;
 
 	if (!( pickler = newPicklerobject(file, proto)))
@@ -5367,15 +5403,17 @@ cpm_dump(PyObject *self, PyObject *args)
 }
 
 
-/* dumps(obj, proto=0). */
+/* dumps(obj, protocol=0). */
 static PyObject *
-cpm_dumps(PyObject *self, PyObject *args)
+cpm_dumps(PyObject *self, PyObject *args, PyObject *kwds)
 {
+	static char *kwlist[] = {"obj", "protocol", NULL};
 	PyObject *ob, *file = 0, *res = NULL;
 	Picklerobject *pickler = 0;
 	int proto = 0;
 
-	if (!( PyArg_ParseTuple(args, "O|i:dumps", &ob, &proto)))
+	if (!( PyArg_ParseTupleAndKeywords(args, kwds, "O|i:dumps", kwlist,
+		   &ob, &proto)))
 		goto finally;
 
 	if (!( file = PycStringIO->NewOutput(128)))
@@ -5476,15 +5514,15 @@ static PyTypeObject Unpicklertype = {
 };
 
 static struct PyMethodDef cPickle_methods[] = {
-  {"dump",         (PyCFunction)cpm_dump,         METH_VARARGS,
-   PyDoc_STR("dump(object, file, proto=0) -- "
+  {"dump",         (PyCFunction)cpm_dump,         METH_VARARGS | METH_KEYWORDS,
+   PyDoc_STR("dump(obj, file, protocol=0) -- "
    "Write an object in pickle format to the given file.\n"
    "\n"
    "See the Pickler docstring for the meaning of optional argument proto.")
   },
 
-  {"dumps",        (PyCFunction)cpm_dumps,        METH_VARARGS,
-   PyDoc_STR("dumps(object, proto=0) -- "
+  {"dumps",        (PyCFunction)cpm_dumps,        METH_VARARGS | METH_KEYWORDS,
+   PyDoc_STR("dumps(obj, protocol=0) -- "
    "Return a string containing an object in pickle format.\n"
    "\n"
    "See the Pickler docstring for the meaning of optional argument proto.")
@@ -5496,8 +5534,8 @@ static struct PyMethodDef cPickle_methods[] = {
   {"loads",        (PyCFunction)cpm_loads,        METH_VARARGS,
    PyDoc_STR("loads(string) -- Load a pickle from the given string")},
 
-  {"Pickler",      (PyCFunction)get_Pickler,      METH_VARARGS,
-   PyDoc_STR("Pickler(file, proto=0) -- Create a pickler.\n"
+  {"Pickler",      (PyCFunction)get_Pickler,      METH_VARARGS | METH_KEYWORDS,
+   PyDoc_STR("Pickler(file, protocol=0) -- Create a pickler.\n"
    "\n"
    "This takes a file-like object for writing a pickle data stream.\n"
    "The optional proto argument tells the pickler to use the given\n"
@@ -5533,6 +5571,11 @@ init_stuff(PyObject *module_dict)
 	PyObject *copy_reg, *t, *r;
 
 #define INIT_STR(S) if (!( S ## _str=PyString_InternFromString(#S)))  return -1;
+
+	if (PyType_Ready(&Unpicklertype) < 0)
+		return -1;
+	if (PyType_Ready(&Picklertype) < 0)
+		return -1;
 
 	INIT_STR(__class__);
 	INIT_STR(__getinitargs__);

@@ -37,6 +37,15 @@ typedef struct {
     long ob_shash;
     int ob_sstate;
     char ob_sval[1];
+
+    /* Invariants:
+     *     ob_sval contains space for 'ob_size+1' elements.
+     *     ob_sval[ob_size] == 0.
+     *     ob_shash is the hash of the string or -1 if not computed yet.
+     *     ob_sstate != 0 iff the string object is in stringobject.c's
+     *       'interned' dictionary; in this case the two references
+     *       from 'interned' to this object are *not counted* in ob_refcnt.
+     */
 } PyStringObject;
 
 #define SSTATE_NOT_INTERNED 0
@@ -65,7 +74,7 @@ PyAPI_FUNC(int) _PyString_Eq(PyObject *, PyObject*);
 PyAPI_FUNC(PyObject *) PyString_Format(PyObject *, PyObject *);
 PyAPI_FUNC(PyObject *) _PyString_FormatLong(PyObject*, int, int,
 						  int, char**, int*);
-extern DL_IMPORT(PyObject *) PyString_DecodeEscape(const char *, int, 
+PyAPI_FUNC(PyObject *) PyString_DecodeEscape(const char *, int, 
 						   const char *, int,
 						   const char *);
 

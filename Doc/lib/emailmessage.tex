@@ -37,16 +37,17 @@ Return the entire message flatten as a string.  When optional
 \var{unixfrom} is \code{True}, the envelope header is included in the
 returned string.  \var{unixfrom} defaults to \code{False}.
 
-Note that this method is provided as a convenience and may not always
-format the message the way you want.  For more flexibility,
-instantiate a \class{Generator} instance and use its
+Note that this method is provided as a convenience and may not always format
+the message the way you want.  For example, by default it mangles lines that
+begin with \code{From }.  For more flexibility, instantiate a
+\class{Generator} instance and use its
 \method{flatten()} method directly.  For example:
 
 \begin{verbatim}
 from cStringIO import StringIO
 from email.Generator import Generator
 fp = StringIO()
-g = Generator(mangle_from_=False, maxheaderlen=60)
+g = Generator(fp, mangle_from_=False, maxheaderlen=60)
 g.flatten(msg)
 text = fp.getvalue()
 \end{verbatim}
@@ -354,15 +355,21 @@ instead of \mailheader{Content-Type}.
 Parameter keys are always compared case insensitively.  The return
 value can either be a string, or a 3-tuple if the parameter was
 \rfc{2231} encoded.  When it's a 3-tuple, the elements of the value are of
-the form \code{(CHARSET, LANGUAGE, VALUE)}, where \code{LANGUAGE} may
-be the empty string.  Your application should be prepared to deal with
-3-tuple return values, which it can convert to a Unicode string like
-so:
+the form \code{(CHARSET, LANGUAGE, VALUE)}.  Note that both \code{CHARSET} and
+\code{LANGUAGE} can be \code{None}, in which case you should consider
+\code{VALUE} to be encoded in the \code{us-ascii} charset.  You can
+usually ignore \code{LANGUAGE}.
+
+If your application doesn't care whether the parameter was encoded as in
+\rfc{2231}, you can collapse the parameter value by calling
+\function{email.Utils.collapse_rfc2231_value()}, passing in the return value
+from \method{get_param()}.  This will return a suitably decoded Unicode string
+whn the value is a tuple, or the original string unquoted if it isn't.  For
+example:
 
 \begin{verbatim}
-param = msg.get_param('foo')
-if isinstance(param, tuple):
-    param = unicode(param[2], param[0])
+rawparam = msg.get_param('foo')
+param = email.Utils.collapse_rfc2231_value(rawparam)
 \end{verbatim}
 
 In any case, the parameter value (either the returned string, or the
@@ -495,7 +502,7 @@ multipart message structure:
 
 \begin{verbatim}
 >>> for part in msg.walk():
->>>     print part.get_content_type()
+...     print part.get_content_type()
 multipart/report
 text/plain
 message/delivery-status
@@ -546,32 +553,21 @@ newline get printed after your closing \mimetype{multipart} boundary,
 set the \var{epilogue} to the empty string.
 \end{datadesc}
 
+\begin{datadesc}{defects}
+The \var{defects} attribute contains a list of all the problems found when
+parsing this message.  See \refmodule{email.Errors} for a detailed description
+of the possible parsing defects.
+
+\versionadded{2.4}
+\end{datadesc}
+
 \subsubsection{Deprecated methods}
 
-The following methods are deprecated in \module{email} version 2.
-They are documented here for completeness.
+\versionchanged[The \method{add_payload()} method was removed; use the
+\method{attach()} method instead]{2.4}
 
-\begin{methoddesc}[Message]{add_payload}{payload}
-Add \var{payload} to the message object's existing payload.  If, prior
-to calling this method, the object's payload was \code{None}
-(i.e. never before set), then after this method is called, the payload
-will be the argument \var{payload}.
-
-If the object's payload was already a list
-(i.e. \method{is_multipart()} returns 1), then \var{payload} is
-appended to the end of the existing payload list.
-
-For any other type of existing payload, \method{add_payload()} will
-transform the new payload into a list consisting of the old payload
-and \var{payload}, but only if the document is already a MIME
-multipart document.  This condition is satisfied if the message's
-\mailheader{Content-Type} header's main type is either
-\mimetype{multipart}, or there is no \mailheader{Content-Type}
-header.  In any other situation,
-\exception{MultipartConversionError} is raised.
-
-\deprecated{2.2.2}{Use the \method{attach()} method instead.}
-\end{methoddesc}
+The following methods are deprecated.  They are documented here for
+completeness.
 
 \begin{methoddesc}[Message]{get_type}{\optional{failobj}}
 Return the message's content type, as a string of the form

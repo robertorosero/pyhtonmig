@@ -105,9 +105,6 @@ __all__ = [ "match", "search", "sub", "subn", "split", "findall",
 
 __version__ = "2.2.1"
 
-# this module works under 1.5.2 and later.  don't use string methods
-import string
-
 # flags
 I = IGNORECASE = sre_compile.SRE_FLAG_IGNORECASE # ignore case
 L = LOCALE = sre_compile.SRE_FLAG_LOCALE # assume current 8-bit locale
@@ -139,7 +136,9 @@ def search(pattern, string, flags=0):
 def sub(pattern, repl, string, count=0):
     """Return the string obtained by replacing the leftmost
     non-overlapping occurrences of the pattern in string by the
-    replacement repl"""
+    replacement repl.  repl can be either a string or a callable;
+    if a callable, it's passed the match object and must return
+    a replacement string to be used."""
     return _compile(pattern, 0).sub(repl, string, count)
 
 def subn(pattern, repl, string, count=0):
@@ -147,7 +146,9 @@ def subn(pattern, repl, string, count=0):
     new_string is the string obtained by replacing the leftmost
     non-overlapping occurrences of the pattern in the source
     string by the replacement repl.  number is the number of
-    substitutions that were made."""
+    substitutions that were made. repl can be either a string or a
+    callable; if a callable, it's passed the match object and must
+    return a replacement string to be used."""
     return _compile(pattern, 0).subn(repl, string, count)
 
 def split(pattern, string, maxsplit=0):
@@ -155,7 +156,7 @@ def split(pattern, string, maxsplit=0):
     returning a list containing the resulting substrings."""
     return _compile(pattern, 0).split(string, maxsplit)
 
-def findall(pattern, string):
+def findall(pattern, string, flags=0):
     """Return a list of all non-overlapping matches in the string.
 
     If one or more groups are present in the pattern, return a
@@ -163,16 +164,16 @@ def findall(pattern, string):
     has more than one group.
 
     Empty matches are included in the result."""
-    return _compile(pattern, 0).findall(string)
+    return _compile(pattern, flags).findall(string)
 
 if sys.hexversion >= 0x02020000:
     __all__.append("finditer")
-    def finditer(pattern, string):
+    def finditer(pattern, string, flags=0):
         """Return an iterator over all non-overlapping matches in the
         string.  For each match, the iterator returns a match object.
 
         Empty matches are included in the result."""
-        return _compile(pattern, 0).finditer(string)
+        return _compile(pattern, flags).finditer(string)
 
 def compile(pattern, flags=0):
     "Compile a regular expression pattern, returning a pattern object."
@@ -197,7 +198,7 @@ def escape(pattern):
                 s[i] = "\\000"
             else:
                 s[i] = "\\" + c
-    return _join(s, pattern)
+    return pattern[:0].join(s)
 
 # --------------------------------------------------------------------
 # internals
@@ -209,19 +210,16 @@ _pattern_type = type(sre_compile.compile("", 0))
 
 _MAXCACHE = 100
 
-def _join(seq, sep):
-    # internal: join into string having the same type as sep
-    return string.join(seq, sep[:0])
-
 def _compile(*key):
     # internal: compile pattern
-    p = _cache.get(key)
+    cachekey = (type(key[0]),) + key
+    p = _cache.get(cachekey)
     if p is not None:
         return p
     pattern, flags = key
-    if type(pattern) is _pattern_type:
+    if isinstance(pattern, _pattern_type):
         return pattern
-    if type(pattern) not in sre_compile.STRING_TYPES:
+    if not sre_compile.isstring(pattern):
         raise TypeError, "first argument must be string or compiled pattern"
     try:
         p = sre_compile.compile(pattern, flags)
@@ -229,7 +227,7 @@ def _compile(*key):
         raise error, v # invalid expression
     if len(_cache) >= _MAXCACHE:
         _cache.clear()
-    _cache[key] = p
+    _cache[cachekey] = p
     return p
 
 def _compile_repl(*key):

@@ -1,7 +1,9 @@
+# !/usr/bin/env python
 """Guess which db package to use to open a db file."""
 
 import os
 import struct
+import sys
 
 try:
     import dbm
@@ -29,8 +31,10 @@ def whichdb(filename):
     try:
         f = open(filename + os.extsep + "pag", "rb")
         f.close()
-        f = open(filename + os.extsep + "dir", "rb")
-        f.close()
+        # dbm linked with gdbm on OS/2 doesn't have .dir file
+        if not (dbm.library == "GNU gdbm" and sys.platform == "os2emx"):
+            f = open(filename + os.extsep + "dir", "rb")
+            f.close()
         return "dbm"
     except IOError:
         # some dbm emulations based on Berkeley DB generate a .db file
@@ -48,17 +52,21 @@ def whichdb(filename):
         except (IOError, _dbmerror):
             pass
 
-    # Check for dumbdbm next -- this has a .dir and and a .dat file
+    # Check for dumbdbm next -- this has a .dir and a .dat file
     try:
-        f = open(filename + os.extsep + "dat", "rb")
-        f.close()
+        # First check for presence of files
+        os.stat(filename + os.extsep + "dat")
+        size = os.stat(filename + os.extsep + "dir").st_size
+        # dumbdbm files with no keys are empty
+        if size == 0:
+            return "dumbdbm"
         f = open(filename + os.extsep + "dir", "rb")
         try:
             if f.read(1) in ["'", '"']:
                 return "dumbdbm"
         finally:
             f.close()
-    except IOError:
+    except (OSError, IOError):
         pass
 
     # See if the file exists, return None if not
@@ -86,11 +94,12 @@ def whichdb(filename):
     if magic == 0x13579ace:
         return "gdbm"
 
-    # Check for BSD hash
+    # Check for old Berkeley db hash file format v2
     if magic in (0x00061561, 0x61150600):
-        return "dbhash"
+        return "bsddb185"
 
-    # BSD hash v2 has a 12-byte NULL pad in front of the file type
+    # Later versions of Berkeley db hash file have a 12-byte pad in
+    # front of the file type
     try:
         (magic,) = struct.unpack("=l", s16[-4:])
     except struct.error:
@@ -102,3 +111,7 @@ def whichdb(filename):
 
     # Unknown
     return ""
+
+if __name__ == "__main__":
+    for filename in sys.argv[1:]:
+        print whichdb(filename) or "UNKNOWN", filename

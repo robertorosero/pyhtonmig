@@ -22,7 +22,7 @@ def get(using=None):
     else:
         alternatives = _tryorder
     for browser in alternatives:
-        if browser.find('%s') > -1:
+        if '%s' in browser:
             # User gave us a command line, don't mess with it.
             return GenericBrowser(browser)
         else:
@@ -277,14 +277,15 @@ if os.environ.get("TERM") or os.environ.get("DISPLAY"):
 
     # X browsers have more in the way of options
     if os.environ.get("DISPLAY"):
-        _tryorder = ["galeon", "skipstone", "mozilla", "netscape",
+        _tryorder = ["galeon", "skipstone",
+                     "mozilla-firefox", "mozilla-firebird", "mozilla", "netscape",
                      "kfm", "grail"] + _tryorder
 
         # First, the Netscape series
-        if _iscommand("mozilla"):
-            register("mozilla", None, Netscape("mozilla"))
-        if _iscommand("netscape"):
-            register("netscape", None, Netscape("netscape"))
+        for browser in ("mozilla-firefox", "mozilla-firebird",
+                        "mozilla", "netscape"):
+            if _iscommand(browser):
+                register(browser, None, Netscape(browser))
 
         # Next, Mosaic -- old but still in use.
         if _iscommand("mosaic"):

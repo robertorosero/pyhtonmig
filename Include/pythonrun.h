@@ -23,6 +23,7 @@ PyAPI_FUNC(void) Py_SetPythonHome(char *);
 PyAPI_FUNC(char *) Py_GetPythonHome(void);
 
 PyAPI_FUNC(void) Py_Initialize(void);
+PyAPI_FUNC(void) Py_InitializeEx(int);
 PyAPI_FUNC(void) Py_Finalize(void);
 PyAPI_FUNC(int) Py_IsInitialized(void);
 PyAPI_FUNC(PyThreadState *) Py_NewInterpreter(void);
@@ -122,6 +123,7 @@ PyAPI_FUNC(void) PyMethod_Fini(void);
 PyAPI_FUNC(void) PyFrame_Fini(void);
 PyAPI_FUNC(void) PyCFunction_Fini(void);
 PyAPI_FUNC(void) PyTuple_Fini(void);
+PyAPI_FUNC(void) PyList_Fini(void);
 PyAPI_FUNC(void) PyString_Fini(void);
 PyAPI_FUNC(void) PyInt_Fini(void);
 PyAPI_FUNC(void) PyFloat_Fini(void);
@@ -131,6 +133,7 @@ PyAPI_FUNC(void) PyOS_FiniInterrupts(void);
 PyAPI_FUNC(char *) PyOS_Readline(FILE *, FILE *, char *);
 PyAPI_DATA(int) (*PyOS_InputHook)(void);
 PyAPI_DATA(char) *(*PyOS_ReadlineFunctionPointer)(FILE *, FILE *, char *);
+PyAPI_DATA(PyThreadState*) _PyOS_ReadlineTState;
 
 /* Stack size, in "pointers" (so we get extra safety margins
    on 64-bit platforms).  On a 32-bit platform, this translates

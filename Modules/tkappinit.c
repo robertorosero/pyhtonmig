@@ -12,6 +12,7 @@
    it explicitly, e.g. tkapp.eval("load {} Blt").
  */
 
+#include <string.h>
 #include <tcl.h>
 #include <tk.h>
 
@@ -19,6 +20,7 @@ int
 Tcl_AppInit(Tcl_Interp *interp)
 {
 	Tk_Window main_window;
+	const char * _tkinter_skip_tk_init;
 
 #ifdef TK_AQUA
 #ifndef MAX_PATH_LEN
@@ -68,7 +70,15 @@ Tcl_AppInit(Tcl_Interp *interp)
 	TclSetLibraryPath(pathPtr);
 #endif
 
-	if (Tk_Init (interp) == TCL_ERROR)
+#ifdef WITH_XXX
+		// Initialize modules that don't require Tk
+#endif
+
+	_tkinter_skip_tk_init =	Tcl_GetVar(interp, "_tkinter_skip_tk_init", TCL_GLOBAL_ONLY);
+	if (_tkinter_skip_tk_init != NULL && strcmp(_tkinter_skip_tk_init, "1")	== 0) {
+		return TCL_OK;
+	}
+	if (Tk_Init(interp) == TCL_ERROR)
 		return TCL_ERROR;
 
 	main_window = Tk_MainWindow(interp);

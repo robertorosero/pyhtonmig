@@ -24,6 +24,14 @@ and also pops up a little window for controlling it.
 
 Run "pydoc -w <name>" to write out the HTML documentation for a module
 to a file named "<name>.html".
+
+Module docs for core modules are assumed to be in
+
+    http://www.python.org/doc/current/lib/
+
+This can be overridden by setting the PYTHONDOCS environment variable
+to a different URL or to a local directory containing the Library
+Reference Manual pages.
 """
 
 __author__ = "Ka-Ping Yee <ping@lfw.org>"
@@ -33,8 +41,7 @@ __credits__ = """Guido van Rossum, for an excellent programming language.
 Tommy Burnette, the original creator of manpy.
 Paul Prescod, for all his work on onlinehelp.
 Richard Chamberlain, for the first implementation of textdoc.
-
-Mynd you, møøse bites Kan be pretty nasti..."""
+"""
 
 # Known bugs that can't be fixed here:
 #   - imp.load_module() cannot be prevented from clobbering existing
@@ -47,6 +54,7 @@ Mynd you, møøse bites Kan be pretty nasti..."""
 import sys, imp, os, re, types, inspect, __builtin__
 from repr import Repr
 from string import expandtabs, find, join, lower, split, strip, rfind, rstrip
+from collections import deque
 
 # --------------------------------------------------------- common routines
 
@@ -104,16 +112,16 @@ def cram(text, maxlen):
         return text[:pre] + '...' + text[len(text)-post:]
     return text
 
+_re_stripid = re.compile(r' at 0x[0-9a-f]{6,16}(>+)$', re.IGNORECASE)
 def stripid(text):
     """Remove the hexadecimal id from a Python object representation."""
-    # The behaviour of %p is implementation-dependent; we check two cases.
-    for pattern in [' at 0x[0-9a-f]{6,}(>+)$', ' at [0-9A-F]{8,}(>+)$']:
-        if re.search(pattern, repr(Exception)):
-            return re.sub(pattern, '\\1', text)
+    # The behaviour of %p is implementation-dependent in terms of case.
+    if _re_stripid.search(repr(Exception)):
+        return _re_stripid.sub(r'\1', text)
     return text
 
-def _is_some_method(object):
-    return inspect.ismethod(object) or inspect.ismethoddescriptor(object)
+def _is_some_method(obj):
+    return inspect.ismethod(obj) or inspect.ismethoddescriptor(obj)
 
 def allmethods(cl):
     methods = {}
@@ -142,14 +150,18 @@ def _split_list(s, predicate):
             no.append(x)
     return yes, no
 
-def visiblename(name):
+def visiblename(name, all=None):
     """Decide whether to show documentation on a variable."""
     # Certain special names are redundant.
     if name in ['__builtins__', '__doc__', '__file__', '__path__',
                 '__module__', '__name__']: return 0
     # Private names are hidden, but special names are displayed.
     if name.startswith('__') and name.endswith('__'): return 1
-    return not name.startswith('_')
+    if all is not None:
+        # only document that which the programmer exported in __all__
+        return name in all
+    else:
+        return not name.startswith('_')
 
 # ----------------------------------------------------- module manipulation
 
@@ -275,9 +287,17 @@ class Doc:
     def document(self, object, name=None, *args):
         """Generate documentation for an object."""
         args = (object, name) + args
-        if inspect.ismodule(object): return self.docmodule(*args)
-        if inspect.isclass(object): return self.docclass(*args)
-        if inspect.isroutine(object): return self.docroutine(*args)
+        # 'try' clause is to attempt to handle the possibility that inspect
+        # identifies something in a way that pydoc itself has issues handling;
+        # think 'super' and how it is a descriptor (which raises the exception
+        # by lacking a __name__ attribute) and an instance.
+        try:
+            if inspect.ismodule(object): return self.docmodule(*args)
+            if inspect.isclass(object): return self.docclass(*args)
+            if inspect.isroutine(object): return self.docroutine(*args)
+        except AttributeError:
+            pass
+        if isinstance(object, property): return self.docproperty(*args)
         return self.docother(*args)
 
     def fail(self, object, name=None, *args):
@@ -287,6 +307,33 @@ class Doc:
         raise TypeError, message
 
     docmodule = docclass = docroutine = docother = fail
+
+    def getdocloc(self, object):
+        """Return the location of module docs or None"""
+
+        try:
+            file = inspect.getabsfile(object)
+        except TypeError:
+            file = '(built-in)'
+
+        docloc = os.environ.get("PYTHONDOCS",
+                                "http://www.python.org/doc/current/lib")
+        basedir = os.path.join(sys.exec_prefix, "lib",
+                               "python"+sys.version[0:3])
+        if (isinstance(object, type(os)) and
+            (object.__name__ in ('errno', 'exceptions', 'gc', 'imp',
+                                 'marshal', 'posix', 'signal', 'sys',
+                                 'thread', 'zipimport') or
+             (file.startswith(basedir) and
+              not file.startswith(os.path.join(basedir, 'site-packages'))))):
+            htmlfile = "module-%s.html" % object.__name__
+            if docloc.startswith("http://"):
+                docloc = "%s/%s" % (docloc.rstrip("/"), htmlfile)
+            else:
+                docloc = os.path.join(docloc, htmlfile)
+        else:
+            docloc = None
+        return docloc
 
 # -------------------------------------------- HTML documentation generator
 
@@ -305,11 +352,11 @@ class HTMLRepr(Repr):
         return Repr.repr(self, object)
 
     def repr1(self, x, level):
-        methodname = 'repr_' + join(split(type(x).__name__), '_')
-        if hasattr(self, methodname):
-            return getattr(self, methodname)(x, level)
-        else:
-            return self.escape(cram(stripid(repr(x)), self.maxother))
+        if hasattr(type(x), '__name__'):
+            methodname = 'repr_' + join(split(type(x).__name__), '_')
+            if hasattr(self, methodname):
+                return getattr(self, methodname)(x, level)
+        return self.escape(cram(stripid(repr(x)), self.maxother))
 
     def repr_string(self, x, level):
         test = cram(x, self.maxstring)
@@ -501,6 +548,10 @@ class HTMLDoc(Doc):
     def docmodule(self, object, name=None, mod=None, *ignored):
         """Produce HTML documentation for a module object."""
         name = object.__name__ # ignore the passed-in name
+        try:
+            all = object.__all__
+        except AttributeError:
+            all = None
         parts = split(name, '.')
         links = []
         for i in range(len(parts)-1):
@@ -528,15 +579,23 @@ class HTMLDoc(Doc):
             info.append(self.escape(str(object.__date__)))
         if info:
             head = head + ' (%s)' % join(info, ', ')
+        docloc = self.getdocloc(object)
+        if docloc is not None:
+            docloc = '<br><a href="%(docloc)s">Module Docs</a>' % locals()
+        else:
+            docloc = ''
         result = self.heading(
-            head, '#ffffff', '#7799ee', '<a href=".">index</a><br>' + filelink)
+            head, '#ffffff', '#7799ee',
+            '<a href=".">index</a><br>' + filelink + docloc)
 
         modules = inspect.getmembers(object, inspect.ismodule)
 
         classes, cdict = [], {}
         for key, value in inspect.getmembers(object, inspect.isclass):
-            if (inspect.getmodule(value) or object) is object:
-                if visiblename(key):
+            # if __all__ exists, believe it.  Otherwise use old heuristic.
+            if (all is not None or
+                (inspect.getmodule(value) or object) is object):
+                if visiblename(key, all):
                     classes.append((key, value))
                     cdict[key] = cdict[value] = '#' + key
         for key, value in classes:
@@ -549,14 +608,16 @@ class HTMLDoc(Doc):
                             cdict[key] = cdict[base] = modname + '.html#' + key
         funcs, fdict = [], {}
         for key, value in inspect.getmembers(object, inspect.isroutine):
-            if inspect.isbuiltin(value) or inspect.getmodule(value) is object:
-                if visiblename(key):
+            # if __all__ exists, believe it.  Otherwise use old heuristic.
+            if (all is not None or
+                inspect.isbuiltin(value) or inspect.getmodule(value) is object):
+                if visiblename(key, all):
                     funcs.append((key, value))
                     fdict[key] = '#-' + key
                     if inspect.isfunction(value): fdict[value] = fdict[key]
         data = []
         for key, value in inspect.getmembers(object, isdata):
-            if visiblename(key):
+            if visiblename(key, all):
                 data.append((key, value))
 
         doc = self.markup(getdoc(object), self.preformat, fdict, cdict)
@@ -637,7 +698,7 @@ class HTMLDoc(Doc):
         hr = HorizontalRule()
 
         # List the mro, if non-trivial.
-        mro = list(inspect.getmro(object))
+        mro = deque(inspect.getmro(object))
         if len(mro) > 2:
             hr.maybe()
             push('<dl><dt>Method resolution order:</dt>\n')
@@ -663,20 +724,7 @@ class HTMLDoc(Doc):
                 hr.maybe()
                 push(msg)
                 for name, kind, homecls, value in ok:
-                    push('<dl><dt><strong>%s</strong></dt>\n' % name)
-                    if value.__doc__ is not None:
-                        doc = self.markup(value.__doc__, self.preformat,
-                                          funcs, classes, mdict)
-                        push('<dd><tt>%s</tt></dd>\n' % doc)
-                    for attr, tag in [('fget', '<em>get</em>'),
-                                      ('fset', '<em>set</em>'),
-                                      ('fdel', '<em>delete</em>')]:
-                        func = getattr(value, attr)
-                        if func is not None:
-                            base = self.document(func, tag, mod,
-                                                 funcs, classes, mdict, object)
-                            push('<dd>%s</dd>\n' % base)
-                    push('</dl>\n')
+                    push(self._docproperty(name, value, mod))
             return attrs
 
         def spilldata(msg, attrs, predicate):
@@ -686,7 +734,7 @@ class HTMLDoc(Doc):
                 push(msg)
                 for name, kind, homecls, value in ok:
                     base = self.docother(getattr(object, name), name, mod)
-                    if callable(value):
+                    if callable(value) or inspect.isdatadescriptor(value):
                         doc = getattr(value, "__doc__", None)
                     else:
                         doc = None
@@ -715,7 +763,7 @@ class HTMLDoc(Doc):
 
         while attrs:
             if mro:
-                thisclass = mro.pop(0)
+                thisclass = mro.popleft()
             else:
                 thisclass = attrs[0][2]
             attrs, inherited = _split_list(attrs, lambda t: t[2] is thisclass)
@@ -731,7 +779,7 @@ class HTMLDoc(Doc):
             tag += ':<br>\n'
 
             # Sort attrs by name.
-            attrs.sort(lambda t1, t2: cmp(t1[0], t2[0]))
+            attrs.sort(key=lambda t: t[0])
 
             # Pump out the attrs, segregated by kind.
             attrs = spill('Methods %s' % tag, attrs,
@@ -823,6 +871,30 @@ class HTMLDoc(Doc):
             doc = doc and '<dd><tt>%s</tt></dd>' % doc
             return '<dl><dt>%s</dt>%s</dl>\n' % (decl, doc)
 
+    def _docproperty(self, name, value, mod):
+        results = []
+        push = results.append
+
+        if name:
+            push('<dl><dt><strong>%s</strong></dt>\n' % name)
+        if value.__doc__ is not None:
+            doc = self.markup(value.__doc__, self.preformat)
+            push('<dd><tt>%s</tt></dd>\n' % doc)
+        for attr, tag in [('fget', '<em>get</em>'),
+                          ('fset', '<em>set</em>'),
+                          ('fdel', '<em>delete</em>')]:
+            func = getattr(value, attr)
+            if func is not None:
+                base = self.document(func, tag, mod)
+                push('<dd>%s</dd>\n' % base)
+        push('</dl>\n')
+
+        return ''.join(results)
+
+    def docproperty(self, object, name=None, mod=None, cl=None):
+        """Produce html documentation for a property."""
+        return self._docproperty(name, object, mod)
+
     def docother(self, object, name=None, mod=None, *ignored):
         """Produce HTML documentation for a data object."""
         lhs = name and '<strong>%s</strong> = ' % name or ''
@@ -867,11 +939,11 @@ class TextRepr(Repr):
         self.maxstring = self.maxother = 100
 
     def repr1(self, x, level):
-        methodname = 'repr_' + join(split(type(x).__name__), '_')
-        if hasattr(self, methodname):
-            return getattr(self, methodname)(x, level)
-        else:
-            return cram(stripid(repr(x)), self.maxother)
+        if hasattr(type(x), '__name__'):
+            methodname = 'repr_' + join(split(type(x).__name__), '_')
+            if hasattr(self, methodname):
+                return getattr(self, methodname)(x, level)
+        return cram(stripid(repr(x)), self.maxother)
 
     def repr_string(self, x, level):
         test = cram(x, self.maxstring)
@@ -939,26 +1011,40 @@ class TextDoc(Doc):
         result = self.section('NAME', name + (synop and ' - ' + synop))
 
         try:
+            all = object.__all__
+        except AttributeError:
+            all = None
+
+        try:
             file = inspect.getabsfile(object)
         except TypeError:
             file = '(built-in)'
         result = result + self.section('FILE', file)
+
+        docloc = self.getdocloc(object)
+        if docloc is not None:
+            result = result + self.section('MODULE DOCS', docloc)
+
         if desc:
             result = result + self.section('DESCRIPTION', desc)
 
         classes = []
         for key, value in inspect.getmembers(object, inspect.isclass):
-            if (inspect.getmodule(value) or object) is object:
-                if visiblename(key):
+            # if __all__ exists, believe it.  Otherwise use old heuristic.
+            if (all is not None
+                or (inspect.getmodule(value) or object) is object):
+                if visiblename(key, all):
                     classes.append((key, value))
         funcs = []
         for key, value in inspect.getmembers(object, inspect.isroutine):
-            if inspect.isbuiltin(value) or inspect.getmodule(value) is object:
-                if visiblename(key):
+            # if __all__ exists, believe it.  Otherwise use old heuristic.
+            if (all is not None or
+                inspect.isbuiltin(value) or inspect.getmodule(value) is object):
+                if visiblename(key, all):
                     funcs.append((key, value))
         data = []
         for key, value in inspect.getmembers(object, isdata):
-            if visiblename(key):
+            if visiblename(key, all):
                 data.append((key, value))
 
         if hasattr(object, '__path__'):
@@ -1030,7 +1116,7 @@ class TextDoc(Doc):
         push = contents.append
 
         # List the mro, if non-trivial.
-        mro = list(inspect.getmro(object))
+        mro = deque(inspect.getmro(object))
         if len(mro) > 2:
             push("Method resolution order:")
             for base in mro:
@@ -1063,22 +1149,7 @@ class TextDoc(Doc):
                 hr.maybe()
                 push(msg)
                 for name, kind, homecls, value in ok:
-                    push(name)
-                    need_blank_after_doc = 0
-                    doc = getdoc(value) or ''
-                    if doc:
-                        push(self.indent(doc))
-                        need_blank_after_doc = 1
-                    for attr, tag in [('fget', '<get>'),
-                                      ('fset', '<set>'),
-                                      ('fdel', '<delete>')]:
-                        func = getattr(value, attr)
-                        if func is not None:
-                            if need_blank_after_doc:
-                                push('')
-                                need_blank_after_doc = 0
-                            base = self.document(func, tag, mod)
-                            push(self.indent(base))
+                    push(self._docproperty(name, value, mod))
             return attrs
 
         def spilldata(msg, attrs, predicate):
@@ -1087,7 +1158,7 @@ class TextDoc(Doc):
                 hr.maybe()
                 push(msg)
                 for name, kind, homecls, value in ok:
-                    if callable(value):
+                    if callable(value) or inspect.isdatadescriptor(value):
                         doc = getattr(value, "__doc__", None)
                     else:
                         doc = None
@@ -1099,7 +1170,7 @@ class TextDoc(Doc):
                        inspect.classify_class_attrs(object))
         while attrs:
             if mro:
-                thisclass = mro.pop(0)
+                thisclass = mro.popleft()
             else:
                 thisclass = attrs[0][2]
             attrs, inherited = _split_list(attrs, lambda t: t[2] is thisclass)
@@ -1182,6 +1253,34 @@ class TextDoc(Doc):
         else:
             doc = getdoc(object) or ''
             return decl + '\n' + (doc and rstrip(self.indent(doc)) + '\n')
+
+    def _docproperty(self, name, value, mod):
+        results = []
+        push = results.append
+
+        if name:
+            push(name)
+        need_blank_after_doc = 0
+        doc = getdoc(value) or ''
+        if doc:
+            push(self.indent(doc))
+            need_blank_after_doc = 1
+        for attr, tag in [('fget', '<get>'),
+                          ('fset', '<set>'),
+                          ('fdel', '<delete>')]:
+            func = getattr(value, attr)
+            if func is not None:
+                if need_blank_after_doc:
+                    push('')
+                    need_blank_after_doc = 0
+                base = self.document(func, tag, mod)
+                push(self.indent(base))
+
+        return '\n'.join(results)
+
+    def docproperty(self, object, name=None, mod=None, cl=None):
+        """Produce text documentation for a property."""
+        return self._docproperty(name, object, mod)
 
     def docother(self, object, name=None, mod=None, maxlen=None, doc=None):
         """Produce text documentation for a data object."""
@@ -1437,7 +1536,7 @@ class Helper:
         'STRINGS': ('ref/strings', 'str UNICODE SEQUENCES STRINGMETHODS FORMATTING TYPES'),
         'STRINGMETHODS': ('lib/string-methods', 'STRINGS FORMATTING'),
         'FORMATTING': ('lib/typesseq-strings', 'OPERATORS'),
-        'UNICODE': ('ref/strings', 'encodings unicode TYPES STRING'),
+        'UNICODE': ('ref/strings', 'encodings unicode SEQUENCES STRINGMETHODS FORMATTING TYPES'),
         'NUMBERS': ('ref/numbers', 'INTEGER FLOAT COMPLEX TYPES'),
         'INTEGER': ('ref/integers', 'int range'),
         'FLOAT': ('ref/floating', 'float math'),
@@ -1469,13 +1568,14 @@ class Helper:
         'SEQUENCEMETHODS2': ('ref/sequence-methods', 'SEQUENCES SEQUENCEMETHODS1 SPECIALMETHODS'),
         'MAPPINGMETHODS': ('ref/sequence-types', 'MAPPINGS SPECIALMETHODS'),
         'NUMBERMETHODS': ('ref/numeric-types', 'NUMBERS AUGMENTEDASSIGNMENT SPECIALMETHODS'),
-        'EXECUTION': ('ref/naming', ''),
-        'NAMESPACES': ('ref/naming', 'global ASSIGNMENT DELETION'),
+        'EXECUTION': ('ref/execmodel', 'NAMESPACES DYNAMICFEATURES EXCEPTIONS'),
+        'NAMESPACES': ('ref/naming', 'global ASSIGNMENT DELETION DYNAMICFEATURES'),
+        'DYNAMICFEATURES': ('ref/dynamic-features', ''),
         'SCOPING': 'NAMESPACES',
         'FRAMES': 'NAMESPACES',
         'EXCEPTIONS': ('ref/exceptions', 'try except finally raise'),
-        'COERCIONS': 'CONVERSIONS',
-        'CONVERSIONS': ('ref/conversions', ''),
+        'COERCIONS': ('ref/coercion-rules','CONVERSIONS'),
+        'CONVERSIONS': ('ref/conversions', 'COERCIONS'),
         'IDENTIFIERS': ('ref/identifiers', 'keywords SPECIALIDENTIFIERS'),
         'SPECIALIDENTIFIERS': ('ref/id-classes', ''),
         'PRIVATENAMES': ('ref/atom-identifiers', ''),
@@ -1550,15 +1650,23 @@ has the same effect as typing a particular string at the help> prompt.
     def interact(self):
         self.output.write('\n')
         while True:
-            self.output.write('help> ')
-            self.output.flush()
             try:
-                request = self.input.readline()
+                request = self.getline('help> ')
                 if not request: break
-            except KeyboardInterrupt: break
+            except (KeyboardInterrupt, EOFError):
+                break
             request = strip(replace(request, '"', '', "'", ''))
             if lower(request) in ['q', 'quit']: break
             self.help(request)
+
+    def getline(self, prompt):
+        """Read one line, using raw_input when available."""
+        if self.input is sys.stdin:
+            return raw_input(prompt)
+        else:
+            self.output.write(prompt)
+            self.output.flush()
+            return self.input.readline()
 
     def help(self, request):
         if type(request) is type(''):
@@ -2048,8 +2156,16 @@ def gui():
 
     import Tkinter
     try:
-        gui = GUI(Tkinter.Tk())
-        Tkinter.mainloop()
+        root = Tkinter.Tk()
+        # Tk will crash if pythonw.exe has an XP .manifest
+        # file and the root has is not destroyed explicitly.
+        # If the problem is ever fixed in Tk, the explicit
+        # destroy can go.
+        try:
+            gui = GUI(root)
+            root.mainloop()
+        finally:
+            root.destroy()
     except KeyboardInterrupt:
         pass
 
@@ -2108,19 +2224,21 @@ def cli():
                     else:
                         writedoc(arg)
                 else:
-                    doc(arg)
+                    help.help(arg)
             except ErrorDuringImport, value:
                 print value
 
     except (getopt.error, BadUsage):
-        cmd = sys.argv[0]
+        cmd = os.path.basename(sys.argv[0])
         print """pydoc - the Python documentation tool
 
 %s <name> ...
     Show text documentation on something.  <name> may be the name of a
-    function, module, or package, or a dotted reference to a class or
-    function within a module or module in a package.  If <name> contains
-    a '%s', it is used as the path to a Python source file to document.
+    Python keyword, topic, function, module, or package, or a dotted
+    reference to a class or function within a module or module in a
+    package.  If <name> contains a '%s', it is used as the path to a
+    Python source file to document. If name is 'keywords', 'topics',
+    or 'modules', a listing of these things is displayed.
 
 %s -k <keyword>
     Search for a keyword in the synopsis lines of all available modules.

@@ -136,9 +136,9 @@ class RExec(ihooks._Verbose):
     ok_builtin_modules = ('audioop', 'array', 'binascii',
                           'cmath', 'errno', 'imageop',
                           'marshal', 'math', 'md5', 'operator',
-                          'parser', 'regex', 'pcre', 'rotor', 'select',
+                          'parser', 'regex', 'select',
                           'sha', '_sre', 'strop', 'struct', 'time',
-                          'xreadlines', '_weakref')
+                          '_weakref')
 
     ok_posix_names = ('error', 'fstat', 'listdir', 'lstat', 'readlink',
                       'stat', 'times', 'uname', 'getpid', 'getppid',
@@ -552,7 +552,7 @@ def test():
         try:
             fp = open(args[0])
         except IOError, msg:
-            print "%s: can't open file %s" % (sys.argv[0], `args[0]`)
+            print "%s: can't open file %r" % (sys.argv[0], args[0])
             return 1
     if fp.isatty():
         try:

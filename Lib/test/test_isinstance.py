@@ -4,6 +4,7 @@
 
 import unittest
 from test import test_support
+import sys
 
 
 
@@ -244,15 +245,31 @@ class TestIsInstanceIsSubclass(unittest.TestCase):
         self.assertEqual(True, issubclass(int, (long, (float, int))))
         self.assertEqual(True, issubclass(str, (unicode, (Child, NewChild, basestring))))
 
+    def test_subclass_recursion_limit(self):
+        # make sure that issubclass raises RuntimeError before the C stack is
+        # blown
+        self.assertRaises(RuntimeError, blowstack, issubclass, str, str)
 
+    def test_isinstance_recursion_limit(self):
+        # make sure that issubclass raises RuntimeError before the C stack is
+        # blown
+        self.assertRaises(RuntimeError, blowstack, isinstance, '', str)
+
+def blowstack(fxn, arg, compare_to):
+    # Make sure that calling isinstance with a deeply nested tuple for its
+    # argument will raise RuntimeError eventually.
+    tuple_arg = (compare_to,)
+    for cnt in xrange(sys.getrecursionlimit()+5):
+        tuple_arg = (tuple_arg,)
+        fxn(arg, tuple_arg)
 
 
 def test_main():
-    suite = unittest.TestSuite()
-    suite.addTest(unittest.makeSuite(TestIsInstanceExceptions))
-    suite.addTest(unittest.makeSuite(TestIsSubclassExceptions))
-    suite.addTest(unittest.makeSuite(TestIsInstanceIsSubclass))
-    test_support.run_suite(suite)
+    test_support.run_unittest(
+        TestIsInstanceExceptions,
+        TestIsSubclassExceptions,
+        TestIsInstanceIsSubclass
+    )
 
 
 if __name__ == '__main__':

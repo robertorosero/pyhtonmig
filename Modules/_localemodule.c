@@ -1,5 +1,5 @@
 /***********************************************************
-Copyright (C) 1997, 2002 Martin von Loewis
+Copyright (C) 1997, 2002, 2003 Martin von Loewis
 
 Permission to use, copy, modify, and distribute this software and its
 documentation for any purpose and without fee is hereby granted,
@@ -29,13 +29,13 @@ This software comes with no warranty. Use at your own risk.
 #include <wchar.h>
 #endif
 
+#if defined(__APPLE__)
+#include <CoreFoundation/CoreFoundation.h>
+#endif
+
 #if defined(MS_WINDOWS)
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
-#endif
-
-#if defined(__APPLE__) || defined(__MWERKS__)
-#include "macglue.h"
 #endif
 
 #ifdef RISCOS
@@ -50,13 +50,6 @@ static PyObject *Error;
 
 PyDoc_STRVAR(setlocale__doc__,
 "(integer,string=None) -> string. Activates/queries locale processing.");
-
-/* to record the LC_NUMERIC settings */
-static PyObject* grouping = NULL;
-static PyObject* thousands_sep = NULL;
-static PyObject* decimal_point = NULL;
-/* if non-null, indicates that LC_NUMERIC is different from "C" */
-static char* saved_numeric = NULL;
 
 /* the grouping is terminated by either 0 or CHAR_MAX */
 static PyObject*
@@ -167,7 +160,6 @@ PyLocale_setlocale(PyObject* self, PyObject* args)
     int category;
     char *locale = NULL, *result;
     PyObject *result_object;
-    struct lconv *lc;
 
     if (!PyArg_ParseTuple(args, "i|z:setlocale", &category, &locale))
         return NULL;
@@ -177,33 +169,12 @@ PyLocale_setlocale(PyObject* self, PyObject* args)
         result = setlocale(category, locale);
         if (!result) {
             /* operation failed, no setting was changed */
-            PyErr_SetString(Error, "locale setting not supported");
+            PyErr_SetString(Error, "unsupported locale setting");
             return NULL;
         }
         result_object = PyString_FromString(result);
-        if (!result)
+        if (!result_object)
             return NULL;
-        /* record changes to LC_NUMERIC */
-        if (category == LC_NUMERIC || category == LC_ALL) {
-            if (strcmp(locale, "C") == 0 || strcmp(locale, "POSIX") == 0) {
-                /* user just asked for default numeric locale */
-                if (saved_numeric)
-                    free(saved_numeric);
-                saved_numeric = NULL;
-            } else {
-                /* remember values */
-                lc = localeconv();
-                Py_XDECREF(grouping);
-                grouping = copy_grouping(lc->grouping);
-                Py_XDECREF(thousands_sep);
-                thousands_sep = PyString_FromString(lc->thousands_sep);
-                Py_XDECREF(decimal_point);
-                decimal_point = PyString_FromString(lc->decimal_point);
-                saved_numeric = strdup(locale);
-                /* restore to "C" */
-                setlocale(LC_NUMERIC, "C");
-            }
-        }
         /* record changes to LC_CTYPE */
         if (category == LC_CTYPE || category == LC_ALL)
             fixup_ulcase();
@@ -211,18 +182,12 @@ PyLocale_setlocale(PyObject* self, PyObject* args)
         PyErr_Clear();
     } else {
         /* get locale */
-        /* restore LC_NUMERIC first, if appropriate */
-        if (saved_numeric)
-            setlocale(LC_NUMERIC, saved_numeric);
         result = setlocale(category, NULL);
         if (!result) {
             PyErr_SetString(Error, "locale query failed");
             return NULL;
         }
         result_object = PyString_FromString(result);
-        /* restore back to "C" */
-        if (saved_numeric)
-            setlocale(LC_NUMERIC, "C");
     }
     return result_object;
 }
@@ -260,20 +225,13 @@ PyLocale_localeconv(PyObject* self)
     Py_XDECREF(x)
 
     /* Numeric information */
-    if (saved_numeric){
-        /* cannot use localeconv results */
-        PyDict_SetItemString(result, "decimal_point", decimal_point);
-        PyDict_SetItemString(result, "grouping", grouping);
-        PyDict_SetItemString(result, "thousands_sep", thousands_sep);
-    } else {
-        RESULT_STRING(decimal_point);
-        RESULT_STRING(thousands_sep);
-        x = copy_grouping(l->grouping);
-        if (!x)
-            goto failed;
-        PyDict_SetItemString(result, "grouping", x);
-        Py_XDECREF(x);
-    }
+    RESULT_STRING(decimal_point);
+    RESULT_STRING(thousands_sep);
+    x = copy_grouping(l->grouping);
+    if (!x)
+        goto failed;
+    PyDict_SetItemString(result, "grouping", x);
+    Py_XDECREF(x);
 
     /* Monetary information */
     RESULT_STRING(int_curr_symbol);
@@ -347,7 +305,6 @@ PyLocale_strcoll(PyObject* self, PyObject* args)
     }
     /* Convert the unicode strings to wchar[]. */
     len1 = PyUnicode_GET_SIZE(os1) + 1;
-    len2 = PyUnicode_GET_SIZE(os2) + 1;
     ws1 = PyMem_MALLOC(len1 * sizeof(wchar_t));
     if (!ws1) {
         PyErr_NoMemory();
@@ -355,6 +312,8 @@ PyLocale_strcoll(PyObject* self, PyObject* args)
     }
     if (PyUnicode_AsWideChar((PyUnicodeObject*)os1, ws1, len1) == -1)
         goto done;
+    ws1[len1 - 1] = 0;
+    len2 = PyUnicode_GET_SIZE(os2) + 1;
     ws2 = PyMem_MALLOC(len2 * sizeof(wchar_t));
     if (!ws2) {
         PyErr_NoMemory();
@@ -362,6 +321,7 @@ PyLocale_strcoll(PyObject* self, PyObject* args)
     }
     if (PyUnicode_AsWideChar((PyUnicodeObject*)os2, ws2, len2) == -1)
         goto done;
+    ws2[len2 - 1] = 0;
     /* Collate the strings. */
     result = PyInt_FromLong(wcscoll(ws1, ws2));
   done:
@@ -448,10 +408,34 @@ PyLocale_getdefaultlocale(PyObject* self)
 #endif
 
 #if defined(__APPLE__)
+/*
+** Find out what the current script is.
+** Donated by Fredrik Lundh.
+*/
+static char *mac_getscript(void)
+{
+    CFStringEncoding enc = CFStringGetSystemEncoding();
+    static CFStringRef name = NULL;
+    /* Return the code name for the encodings for which we have codecs. */
+    switch(enc) {
+    case kCFStringEncodingMacRoman: return "mac-roman";
+    case kCFStringEncodingMacGreek: return "mac-greek";
+    case kCFStringEncodingMacCyrillic: return "mac-cyrillic";
+    case kCFStringEncodingMacTurkish: return "mac-turkish";
+    case kCFStringEncodingMacIcelandic: return "mac-icelandic";
+    /* XXX which one is mac-latin2? */
+    }
+    if (!name) {
+        /* This leaks a an object. */
+        name = CFStringConvertEncodingToIANACharSetName(enc);
+    }
+    return (char *)CFStringGetCStringPtr(name, 0); 
+}
+
 static PyObject*
 PyLocale_getdefaultlocale(PyObject* self)
 {
-    return Py_BuildValue("Os", Py_None, PyMac_getscript());
+    return Py_BuildValue("Os", Py_None, mac_getscript());
 }
 #endif
 
@@ -578,8 +562,12 @@ PyLocale_nl_langinfo(PyObject* self, PyObject* args)
        returns numeric values in the char* return value, which would
        crash PyString_FromString.  */
     for (i = 0; langinfo_constants[i].name; i++)
-	    if (langinfo_constants[i].value == item)
-		    return PyString_FromString(nl_langinfo(item));
+        if (langinfo_constants[i].value == item) {
+            /* Check NULL as a workaround for GNU libc's returning NULL
+               instead of an empty string for nl_langinfo(ERA).  */
+            const char *result = nl_langinfo(item);
+            return PyString_FromString(result != NULL ? result : "");
+        }
     PyErr_SetString(PyExc_ValueError, "unsupported langinfo constant");
     return NULL;
 }
@@ -663,6 +651,24 @@ PyIntl_bindtextdomain(PyObject* self,PyObject*args)
 	return PyString_FromString(dirname);
 }
 
+#ifdef HAVE_BIND_TEXTDOMAIN_CODESET
+PyDoc_STRVAR(bind_textdomain_codeset__doc__,
+"bind_textdomain_codeset(domain, codeset) -> string\n"
+"Bind the C library's domain to codeset.");
+
+static PyObject*
+PyIntl_bind_textdomain_codeset(PyObject* self,PyObject*args)
+{
+	char *domain,*codeset;
+	if (!PyArg_ParseTuple(args, "sz", &domain, &codeset))
+		return NULL;
+	codeset = bind_textdomain_codeset(domain, codeset);
+	if (codeset)
+		return PyString_FromString(codeset);
+	Py_RETURN_NONE;
+}
+#endif
+
 #endif
 
 static struct PyMethodDef PyLocale_Methods[] = {
@@ -692,6 +698,10 @@ static struct PyMethodDef PyLocale_Methods[] = {
    textdomain__doc__},
   {"bindtextdomain",(PyCFunction)PyIntl_bindtextdomain,METH_VARARGS,
    bindtextdomain__doc__},
+#ifdef HAVE_BIND_TEXTDOMAIN_CODESET
+  {"bind_textdomain_codeset",(PyCFunction)PyIntl_bind_textdomain_codeset,
+   METH_VARARGS, bind_textdomain_codeset__doc__},
+#endif
 #endif  
   {NULL, NULL}
 };

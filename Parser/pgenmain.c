@@ -26,10 +26,6 @@ int Py_IgnoreEnvironmentFlag;
 
 /* Forward */
 grammar *getgrammar(char *filename);
-#ifdef THINK_C
-int main(int, char **);
-char *askfile(void);
-#endif
 
 void
 Py_Exit(int sts)
@@ -44,11 +40,6 @@ main(int argc, char **argv)
 	FILE *fp;
 	char *filename, *graminit_h, *graminit_c;
 	
-#ifdef THINK_C
-	filename = askfile();
-	graminit_h = askfile();
-	graminit_c = askfile();
-#else
 	if (argc != 4) {
 		fprintf(stderr,
 			"usage: %s grammar graminit.h graminit.c\n", argv[0]);
@@ -57,7 +48,6 @@ main(int argc, char **argv)
 	filename = argv[1];
 	graminit_h = argv[2];
 	graminit_c = argv[3];
-#endif
 	g = getgrammar(filename);
 	fp = fopen(graminit_c, "w");
 	if (fp == NULL) {
@@ -126,41 +116,12 @@ getgrammar(char *filename)
 	return g;
 }
 
-#ifdef THINK_C
-char *
-askfile(void)
-{
-	char buf[256];
-	static char name[256];
-	printf("Input file name: ");
-	if (fgets(buf, sizeof buf, stdin) == NULL) {
-		printf("EOF\n");
-		Py_Exit(1);
-	}
-	/* XXX The (unsigned char *) case is needed by THINK C 3.0 */
-	if (sscanf(/*(unsigned char *)*/buf, " %s ", name) != 1) {
-		printf("No file\n");
-		Py_Exit(1);
-	}
-	return name;
-}
-#endif
-
 void
 Py_FatalError(const char *msg)
 {
 	fprintf(stderr, "pgen: FATAL ERROR: %s\n", msg);
 	Py_Exit(1);
 }
-
-#ifdef macintosh
-/* ARGSUSED */
-int
-guesstabsize(char *path)
-{
-	return 4;
-}
-#endif
 
 /* No-nonsense my_readline() for tokenizer.c */
 
@@ -184,14 +145,12 @@ PyOS_Readline(FILE *sys_stdin, FILE *sys_stdout, char *prompt)
 	return PyMem_REALLOC(p, n+1);
 }
 
-#ifdef WITH_UNIVERSAL_NEWLINES
 /* No-nonsense fgets */
 char *
 Py_UniversalNewlineFgets(char *buf, int n, FILE *stream, PyObject *fobj)
 {
 	return fgets(buf, n, stream);
 }
-#endif
 
 
 #include <stdarg.h>
