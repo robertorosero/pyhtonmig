@@ -757,6 +757,7 @@ int_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	int base = -909;
 	static char *kwlist[] = {"x", "base", 0};
 
+	assert(type == &PyInt_Type);
 	if (!PyArg_ParseTupleAndKeywords(args, kwds, "|Oi:int", kwlist,
 					 &x, &base))
 		return NULL;
