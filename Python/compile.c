@@ -1908,7 +1908,7 @@ com_argdefs(c, n, argcount_return)
 			break;
 	}
 	if (star)
-		nargs ^= 0xffff;
+		nargs ^= 0x4000;
 	*argcount_return = nargs;
 	if (ndefs > 0)
 		com_addoparg(c, BUILD_TUPLE, ndefs);

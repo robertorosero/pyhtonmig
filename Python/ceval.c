@@ -646,7 +646,7 @@ eval_code(co, globals, locals, owner, arg)
 			/* Print value except if procedure result */
 			/* Before printing, also assign to '_' */
 			if (v != None &&
-			    (err = dictinsert(f->f_locals, "_", v)) == 0) {
+			    (err = setbuiltin("_", v)) == 0) {
 				flushline();
 				x = sysget("stdout");
 				softspace(x, 1);
@@ -2112,8 +2112,8 @@ call_function(func, arg)
 	if (argdefs != NULL && arg != NULL && is_tupleobject(arg)) {
 		int actualcount, j;
 		/* Process default arguments */
-		if (argcount & 0x8000)
-			argcount ^= 0xffff;
+		if (argcount & 0x4000)
+			argcount ^= 0x4000;
 		actualcount = gettuplesize(arg);
 		j = gettuplesize(argdefs) - (argcount - actualcount);
 		if (actualcount < argcount && j >= 0) {

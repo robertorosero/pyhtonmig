@@ -1183,7 +1183,15 @@ object *
 getbuiltin(name)
 	object *name;
 {
-	return dict2lookup(builtin_dict, name);
+	return mappinglookup(builtin_dict, name);
+}
+
+int
+setbuiltin(cname, value)
+	char *cname;
+	object *value;
+{
+	return dictinsert(builtin_dict, cname, value);
 }
 
 /* Predefined exceptions */
