@@ -1286,7 +1286,7 @@ ast_for_for_stmt(const node *n)
     if (NCH(n) == 9)
 	seq = ast_for_suite(CHILD(n, 8));
 
-    _target = ast_for_exprlist(CHILD(n, 1), 0);
+    _target = ast_for_exprlist(CHILD(n, 1), Store);
     if (asdl_seq_LEN(_target) == 1) {
 	target = asdl_seq_GET(_target, 0);
 	asdl_seq_free(_target);
