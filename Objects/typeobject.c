@@ -294,6 +294,10 @@ best_base(PyObject *bases)
 				"bases must be types");
 			return NULL;
 		}
+		if (base_i->tp_dict == NULL) {
+			if (PyType_InitDict(base_i) < 0)
+				return NULL;
+		}
 		candidate = solid_base(base_i);
 		if (issubtype(winner, candidate))
 			;
@@ -315,6 +319,9 @@ best_base(PyObject *bases)
 
 /* TypeType's initializer; called when a type is subclassed */
 
+staticforward void object_dealloc(PyObject *);
+staticforward int object_init(PyObject *, PyObject *, PyObject *);
+
 static int
 type_init(PyObject *self, PyObject *args, PyObject *kwds)
 {
@@ -328,13 +335,20 @@ type_init(PyObject *self, PyObject *args, PyObject *kwds)
 	assert(PyType_Check(self));
 	type = (PyTypeObject *)self;
 
+	/* Check this is a virginal type object */
+	if (type->tp_dict != NULL) {
+		PyErr_SetString(PyExc_TypeError,
+				"can't re-initialize type objects");
+		return -1;
+	}
+
 	/* Check arguments */
 	if (!PyArg_ParseTupleAndKeywords(args, kwds, "SOO:type", kwlist,
 					 &name, &bases, &dict))
 		return -1;
 	if (!PyTuple_Check(bases) || !PyDict_Check(dict)) {
 		PyErr_SetString(PyExc_TypeError,
-				"usage: TypeType(name, bases, dict) ");
+				"usage: type(name, bases, dict) ");
 		return -1;
 	}
 
@@ -353,7 +367,7 @@ type_init(PyObject *self, PyObject *args, PyObject *kwds)
 	base = best_base(bases);
 	if (base == NULL)
 		return -1;
-	if (base->tp_init == NULL) {
+	if (base->tp_init == NULL && base != &PyBaseObject_Type) {
 		PyErr_SetString(PyExc_TypeError,
 				"base type must have a constructor slot");
 		return -1;
@@ -365,6 +379,7 @@ type_init(PyObject *self, PyObject *args, PyObject *kwds)
 	type->tp_base = base;
 
 	/* Check for a __slots__ sequence variable in dict, and count it */
+	/* XXX This should move to type_alloc() */
 	slots = PyDict_GetItemString(dict, "__slots__");
 	nslots = 0;
 	if (slots != NULL) {
@@ -410,19 +425,6 @@ type_init(PyObject *self, PyObject *args, PyObject *kwds)
 	type->tp_as_mapping = &et->as_mapping;
 	type->tp_as_buffer = &et->as_buffer;
 	type->tp_name = PyString_AS_STRING(name);
-	type->tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HEAPTYPE;
-
-	/* Override some slots with specific requirements */
-	if (type->tp_dealloc)
-		type->tp_dealloc = subtype_dealloc;
-	if (type->tp_getattro == NULL) {
-		type->tp_getattro = PyObject_GenericGetAttr;
-		type->tp_getattr = NULL;
-	}
-	if (type->tp_setattro == NULL) {
-		type->tp_setattro = PyObject_GenericSetAttr;
-		type->tp_setattr = NULL;
-	}
 
 	/* Initialize tp_introduced from passed-in dict */
 	type->tp_introduced = dict = PyDict_Copy(dict);
@@ -454,7 +456,25 @@ type_init(PyObject *self, PyObject *args, PyObject *kwds)
 	type->tp_basicsize = slotoffset;
 	add_members(type, et->members);
 
-	/* Initialize tp_bases, tp_dict, tp_introduced; inherit slots */
+	/* Special case some slots */
+	if (type->tp_dictoffset != 0) {
+		if (base->tp_getattr == NULL && base->tp_getattro == NULL)
+			type->tp_getattro = PyObject_GenericGetAttr;
+		if (base->tp_setattr == NULL && base->tp_setattro == NULL)
+			type->tp_setattro = PyObject_GenericSetAttr;
+	}
+	if (base->tp_dealloc == NULL)
+		type->tp_dealloc = object_dealloc;
+	else
+		type->tp_dealloc = subtype_dealloc;
+	if (base->tp_new == NULL)
+		type->tp_new = PyType_GenericNew;
+	if (base->tp_alloc == NULL)
+		type->tp_alloc = PyType_GenericAlloc;
+	if (base->tp_init == NULL)
+		type->tp_init = object_init;
+
+	/* Initialize the rest */
 	if (PyType_InitDict(type) < 0)
 		return -1;
 
@@ -506,7 +526,24 @@ solid_base(PyTypeObject *type)
 }
 
 static PyObject *
-type_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
+type_alloc(PyTypeObject *metatype, PyObject *args, PyObject *kwds)
+{
+	PyTypeObject *type;
+	PyObject *name, *bases, *dict;
+	static char *kwlist[] = {"name", "bases", "dict", 0};
+
+	/* Check arguments (again?!?! yes, alas -- we need the dict!) */
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "SOO:type", kwlist,
+					 &name, &bases, &dict))
+		return NULL;
+	type = (PyTypeObject *)PyType_GenericAlloc(metatype, args, kwds);
+	if (type != NULL)
+		type->tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HEAPTYPE;
+	return (PyObject *)type;
+}
+
+static PyObject *
+type_new(PyTypeObject *metatype, PyObject *args, PyObject *kwds)
 {
 	PyObject *name, *bases, *dict;
 	static char *kwlist[] = {"name", "bases", "dict", 0};
@@ -524,7 +561,6 @@ type_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 					 &name, &bases, &dict))
 		return NULL;
 	if (PyTuple_Check(bases)) {
-		PyTypeObject *metatype = type;
 		int i, n;
 		n = PyTuple_GET_SIZE(bases);
 		for (i = 0; i < n; i++) {
@@ -541,9 +577,19 @@ type_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 			return NULL;
 		}
 		if (metatype->tp_new != type_new)
-			return metatype->tp_new(type, args, kwds);
+			return metatype->tp_new(metatype, args, kwds);
 	}
-	return PyType_GenericNew(type, args, kwds);
+	return PyType_GenericNew(metatype, args, kwds);
+}
+
+static PyObject *
+type_getattro(PyTypeObject *type, PyObject *name)
+{
+	if (type->tp_dict == NULL) {
+		if (PyType_InitDict(type) < 0)
+			return NULL;
+	}
+	return PyObject_GenericGetAttr((PyObject *)type, name);
 }
 
 static void
@@ -551,9 +597,8 @@ type_dealloc(PyTypeObject *type)
 {
 	etype *et;
 
-	/* Assert this is a heap-allocated type object, or uninitialized */
-	if (type->tp_flags != 0)
-		assert(type->tp_flags & Py_TPFLAGS_HEAPTYPE);
+	/* Assert this is a heap-allocated type object */
+	assert(type->tp_flags & Py_TPFLAGS_HEAPTYPE);
 	et = (etype *)type;
 	Py_XDECREF(type->tp_base);
 	Py_XDECREF(type->tp_dict);
@@ -585,7 +630,7 @@ PyTypeObject PyType_Type = {
 	0,					/* tp_hash */
 	(ternaryfunc)type_call,			/* tp_call */
 	0,					/* tp_str */
-	PyObject_GenericGetAttr,		/* tp_getattro */
+	(getattrofunc)type_getattro,		/* tp_getattro */
 	0,					/* tp_setattro */
 	0,					/* tp_as_buffer */
 	Py_TPFLAGS_DEFAULT,			/* tp_flags */
@@ -605,12 +650,18 @@ PyTypeObject PyType_Type = {
 	0,					/* tp_descr_set */
 	offsetof(PyTypeObject, tp_dict),	/* tp_dictoffset */
 	type_init,				/* tp_init */
-	PyType_GenericAlloc,			/* tp_alloc */
+	type_alloc,				/* tp_alloc */
 	type_new,				/* tp_new */
 };
 
 
 /* The base type of all types (eventually)... except itself. */
+
+static int
+object_init(PyObject *self, PyObject *args, PyObject *kwds)
+{
+	return 0;
+}
 
 static void
 object_dealloc(PyObject *self)
@@ -623,19 +674,13 @@ static struct memberlist object_members[] = {
 	{0}
 };
 
-static int
-object_init(PyObject *self, PyObject *args, PyObject *kwds)
-{
-	return 0;
-}
-
 PyTypeObject PyBaseObject_Type = {
 	PyObject_HEAD_INIT(&PyType_Type)
 	0,					/* ob_size */
 	"object",				/* tp_name */
 	sizeof(PyObject),			/* tp_basicsize */
 	0,					/* tp_itemsize */
-	(destructor)object_dealloc,		/* tp_dealloc */
+	0/*(destructor)object_dealloc*/,	/* tp_dealloc */
 	0,					/* tp_print */
 	0,			 		/* tp_getattr */
 	0,					/* tp_setattr */
@@ -647,7 +692,7 @@ PyTypeObject PyBaseObject_Type = {
 	0,					/* tp_hash */
 	0,					/* tp_call */
 	0,					/* tp_str */
-	PyObject_GenericGetAttr,		/* tp_getattro */
+	0,					/* tp_getattro */
 	0,					/* tp_setattro */
 	0,					/* tp_as_buffer */
 	Py_TPFLAGS_DEFAULT,			/* tp_flags */
@@ -666,9 +711,9 @@ PyTypeObject PyBaseObject_Type = {
 	0,					/* tp_descr_get */
 	0,					/* tp_descr_set */
 	0,					/* tp_dictoffset */
-	object_init,				/* tp_init */
-	PyType_GenericAlloc,			/* tp_alloc */
-	PyType_GenericNew,			/* tp_new */
+	0,					/* tp_init */
+	0,					/* tp_alloc */
+	0,					/* tp_new */
 };
 
 
@@ -884,20 +929,30 @@ inherit_slots(PyTypeObject *type, PyTypeObject *base)
 	COPYSLOT(tp_itemsize);
 	COPYSLOT(tp_dealloc);
 	COPYSLOT(tp_print);
-	COPYSLOT(tp_getattr);
-	COPYSLOT(tp_setattr);
-	COPYSLOT(tp_compare);
+	if (type->tp_getattr == NULL && type->tp_getattro == NULL) {
+		type->tp_getattr = base->tp_getattr;
+		type->tp_getattro = base->tp_getattro;
+	}
+	if (type->tp_setattr == NULL && type->tp_setattro == NULL) {
+		type->tp_setattr = base->tp_setattr;
+		type->tp_setattro = base->tp_setattro;
+	}
+	/* tp_compare see tp_richcompare */
 	COPYSLOT(tp_repr);
 	COPYSLOT(tp_hash);
 	COPYSLOT(tp_call);
 	COPYSLOT(tp_str);
-	COPYSLOT(tp_getattro);
-	COPYSLOT(tp_setattro);
 	COPYSLOT(tp_as_buffer);
 	COPYSLOT(tp_flags);
 	COPYSLOT(tp_doc);
 	if (type->tp_flags & base->tp_flags & Py_TPFLAGS_HAVE_RICHCOMPARE) {
-		COPYSLOT(tp_richcompare);
+		if (type->tp_compare == NULL && type->tp_richcompare == NULL) {
+			type->tp_compare = base->tp_compare;
+			type->tp_richcompare = base->tp_richcompare;
+		}
+	}
+	else {
+		COPYSLOT(tp_compare);
 	}
 	if (type->tp_flags & base->tp_flags & Py_TPFLAGS_HAVE_WEAKREFS) {
 		COPYSLOT(tp_weaklistoffset);
