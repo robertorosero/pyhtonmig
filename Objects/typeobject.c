@@ -141,6 +141,7 @@ type_getattro(PyTypeObject *type, PyObject *name)
 }
 
 /* Helpers for subtyping */
+
 static PyObject *
 subtype_construct(PyObject *self, PyObject *args, PyObject *kwds)
 {
@@ -358,6 +359,29 @@ PyTypeObject PyType_Type = {
 
 /* Support for dynamic types, created by type_construct() above */
 
+static PyObject *
+dtype_call(PyTypeObject *type, PyObject *args, PyObject *kwds)
+{
+	PyObject *newobj, *init, *res;
+
+	newobj = type_call(type, args, kwds);
+	if (newobj == NULL)
+		return NULL;
+	init = PyObject_GetAttrString(newobj, "__init__");
+	if (init == NULL) {
+		PyErr_Clear();
+		return newobj;
+	}
+	res = PyObject_Call(init, args, kwds);
+	Py_DECREF(init);
+	if (res == NULL) {
+		Py_DECREF(newobj);
+		return NULL;
+	}
+	Py_DECREF(res);
+	return newobj;
+}
+
 static int
 dtype_setattro(PyTypeObject *type, PyObject *name, PyObject *value)
 {
@@ -428,7 +452,7 @@ PyTypeObject PyDynamicType_Type = {
 	0,					/* tp_as_sequence */
 	0,					/* tp_as_mapping */
 	0,					/* tp_hash */
-	(ternaryfunc)type_call,			/* tp_call */
+	(ternaryfunc)dtype_call,		/* tp_call */
 	0,					/* tp_str */
 	(getattrofunc)type_getattro,		/* tp_getattro */
 	(setattrofunc)dtype_setattro,		/* tp_setattro */
