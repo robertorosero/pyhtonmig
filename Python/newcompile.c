@@ -29,6 +29,9 @@ int Py_OptimizeFlag = 0;
      #: Get this err msg: XXX rd_object called with exception set
         From Python/marshal.c::PyMarshal_ReadLastObjectFromFile()
         This looks like it may be related to encoding not being implemented.
+     #: These don't work right (from test_grammar):
+           def f4(two, (compound, (argument, list))): pass
+           def v3(a, (b, c), *rest): return a, b, c, rest
 
    Invalid behaviour:
      #: name mangling in classes (__vars) doesn't work
@@ -1127,15 +1130,13 @@ compiler_continue(struct compiler *c)
 			;
 		if (i == -1)
 			return compiler_error(c, LOOP_ERROR_MSG);
-		ADDOP_I(c, CONTINUE_LOOP, c->u->u_fblock[i].fb_block);
+		ADDOP_JABS(c, CONTINUE_LOOP, c->u->u_fblock[i].fb_block);
 		break;
 	case FINALLY_END:
 	        return compiler_error(c,
 			"'continue' not supported inside 'finally' clause");
 	}
 
-	/* If the continue wasn't an error, it will always end a block. */
-	NEW_BLOCK(c);
 	return 1;
 }
 
