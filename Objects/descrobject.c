@@ -93,7 +93,7 @@ static int
 descr_check(PyDescrObject *descr, PyObject *obj, PyTypeObject *type,
 	  PyObject **pres)
 {
-	if (obj == NULL) {
+	if (obj == NULL || obj == Py_None) {
 		Py_INCREF(descr);
 		*pres = (PyObject *)descr;
 		return 1;
