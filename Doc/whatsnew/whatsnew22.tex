@@ -3,16 +3,17 @@
 % $Id$
 
 \title{What's New in Python 2.2}
-\release{0.10}
+\release{1.02}
 \author{A.M. Kuchling}
-\authoraddress{\email{akuchlin@mems-exchange.org}}
+\authoraddress{\email{amk@amk.ca}}
 \begin{document}
 \maketitle\tableofcontents
 
 \section{Introduction}
 
-This article explains the new features in Python 2.2.
-The final release of Python 2.2 is planned for December 2001.
+This article explains the new features in Python 2.2.2, released on
+October 14, 2002.  Python 2.2.2 is a bugfix release of Python 2.2,
+originally released on December 21, 2001.
 
 Python 2.2 can be thought of as the "cleanup release".  There are some
 features such as generators and iterators that are completely new, but
@@ -124,7 +125,7 @@ So how do you define a new-style class?  You do it by subclassing an
 existing new-style class.  Most of Python's built-in types, such as
 integers, lists, dictionaries, and even files, are new-style classes
 now.  A new-style class named \class{object}, the base class for all
-built-in types, has been also been added so if no built-in type is
+built-in types, has also been added so if no built-in type is
 suitable, you can just subclass \class{object}:
 
 \begin{verbatim}
@@ -245,7 +246,7 @@ The \function{staticmethod()} function takes the function
 stored in the class object.  You might expect there to be special
 syntax for creating such methods (\code{def static f()},
 \code{defstatic f()}, or something like that) but no such syntax has
-been defined yet; that's been left for future versions.
+been defined yet; that's been left for future versions of Python.
 
 More new features, such as slots and properties, are also implemented
 as new kinds of descriptors, and it's not difficult to write a
@@ -260,10 +261,13 @@ from eiffel import eiffelmethod
 class C(object):
     def f(self, arg1, arg2):
         # The actual function
+        ...
     def pre_f(self):
         # Check preconditions
+        ...
     def post_f(self):
         # Check postconditions
+        ...
 
     f = eiffelmethod(f, pre_f, post_f)
 \end{verbatim}
@@ -275,6 +279,7 @@ There will be a few wizards who need to know about it in order to
 write \function{eiffelmethod()} or the ZODB or whatever, but most
 users will just write code on top of the resulting libraries and
 ignore the implementation details.
+
 
 \subsection{Multiple Inheritance: The Diamond Rule}
 
@@ -309,6 +314,9 @@ that state never getting saved.
 
 New-style classes follow a different algorithm that's a bit more
 complicated to explain, but does the right thing in this situation.
+(Note that Python 2.3 changes this algorithm to one that produces the
+same results in most cases, but produces more useful results for
+really complicated inheritance graphs.)
 
 \begin{enumerate}
 
@@ -326,9 +334,28 @@ the above example, the list becomes [\class{D}, \class{B}, \class{C},
 
 Following this rule, referring to \method{D.save()} will return
 \method{C.save()}, which is the behaviour we're after.  This lookup
-rule is the same as the one followed by Common Lisp.  
+rule is the same as the one followed by Common Lisp.  A new built-in
+function, \function{super()}, provides a way to get at a class's
+superclasses without having to reimplement Python's algorithm.
+The most commonly used form will be 
+\function{super(\var{class}, \var{obj})}, which returns 
+a bound superclass object (not the actual class object).  This form
+will be used in methods to call a method in the superclass; for
+example, \class{D}'s \method{save()} method would look like this:
 
-% XXX mention super()
+\begin{verbatim}
+class D:
+    def save (self):
+	# Call superclass .save()
+        super(D, self).save()
+        # Save D's private information here
+        ...
+\end{verbatim}
+
+\function{super()} can also return unbound superclass objects
+when called as \function{super(\var{class})} or
+\function{super(\var{class1}, \var{class2})}, but this probably won't
+often be useful.
 
 
 \subsection{Attribute Access}
@@ -397,14 +424,9 @@ Finally, it's possible to constrain the list of attributes that can be
 referenced on an object using the new \member{__slots__} class attribute.
 Python objects are usually very dynamic; at any time it's possible to
 define a new attribute on an instance by just doing
-\code{obj.new_attr=1}.  This is flexible and convenient, but this
-flexibility can also lead to bugs, as when you meant to write
-\code{obj.template = 'a'} but made a typo and wrote
-\code{obj.templtae} by accident.  
-
-A new-style class can define a class attribute named \member{__slots__}
-to constrain the list of legal attribute names.  An example will make
-this clear:
+\code{obj.new_attr=1}.   A new-style class can define a class attribute named
+\member{__slots__} to limit the legal attributes 
+to a particular set of names.  An example will make this clear:
 
 \begin{verbatim}
 >>> class C(object):
@@ -416,14 +438,15 @@ None
 >>> obj.template = 'Test'
 >>> print obj.template
 Test
->>> obj.templtae = None
+>>> obj.newattr = None
 Traceback (most recent call last):
   File "<stdin>", line 1, in ?
-AttributeError: 'C' object has no attribute 'templtae'
+AttributeError: 'C' object has no attribute 'newattr'
 \end{verbatim}
 
 Note how you get an \exception{AttributeError} on the attempt to
 assign to an attribute not listed in \member{__slots__}.
+
 
 
 \subsection{Related Links}
@@ -497,9 +520,9 @@ Python classes can define an \method{__iter__()} method, which should
 create and return a new iterator for the object; if the object is its
 own iterator, this method can just return \code{self}.  In particular,
 iterators will usually be their own iterators.  Extension types
-implemented in C can implement a \code{tp_iter} function in order to
+implemented in C can implement a \member{tp_iter} function in order to
 return an iterator, and extension types that want to behave as
-iterators can define a \code{tp_iternext} function.
+iterators can define a \member{tp_iternext} function.
 
 So, after all this, what do iterators actually do?  They have one
 required method, \method{next()}, which takes no arguments and returns
@@ -528,7 +551,7 @@ In 2.2, Python's \keyword{for} statement no longer expects a sequence;
 it expects something for which \function{iter()} will return an iterator.
 For backward compatibility and convenience, an iterator is
 automatically constructed for sequences that don't implement
-\method{__iter__()} or a \code{tp_iter} slot, so \code{for i in
+\method{__iter__()} or a \member{tp_iter} slot, so \code{for i in
 [1,2,3]} will still work.  Wherever the Python interpreter loops over
 a sequence, it's been changed to use the iterator protocol.  This
 means you can do things like this:
@@ -635,11 +658,11 @@ outputs the value of \code{i}, similar to a \keyword{return}
 statement.  The big difference between \keyword{yield} and a
 \keyword{return} statement is that on reaching a \keyword{yield} the
 generator's state of execution is suspended and local variables are
-preserved.  On the next call to the generator's \code{.next()} method,
+preserved.  On the next call to the generator's \code{next()} method,
 the function will resume executing immediately after the
 \keyword{yield} statement.  (For complicated reasons, the
 \keyword{yield} statement isn't allowed inside the \keyword{try} block
-of a \code{try...finally} statement; read \pep{255} for a full
+of a \keyword{try}...\keyword{finally} statement; read \pep{255} for a full
 explanation of the interaction between \keyword{yield} and
 exceptions.)
 
@@ -839,7 +862,7 @@ of \code{/} will not change until Python 3.0.
 
 \item Classes can define methods called \method{__truediv__} and
 \method{__floordiv__} to overload the two division operators.  At the
-C level, there are also slots in the \code{PyNumberMethods} structure
+C level, there are also slots in the \ctype{PyNumberMethods} structure
 so extension types can define the two operators.
 
 \item Python 2.2 supports some command-line arguments for testing
@@ -1040,7 +1063,7 @@ Jeremy Hylton.}
 \begin{itemize}
 
   \item The \module{xmlrpclib} module was contributed to the standard
-  library by Fredrik Lundh, provding support for writing XML-RPC
+  library by Fredrik Lundh, providing support for writing XML-RPC
   clients.  XML-RPC is a simple remote procedure call protocol built on
   top of HTTP and XML. For example, the following snippet retrieves a
   list of RSS channels from the O'Reilly Network, and then 
@@ -1090,7 +1113,7 @@ more information about XML-RPC.
    The original patch for this feature was contributed by Nick Mathewson.
 
   \item The Python profiler has been extensively reworked and various
-  errors in its output have been corrected.  (Contributed by Fred
+  errors in its output have been corrected.  (Contributed by
   Fred~L. Drake, Jr. and Tim Peters.)
  
   \item The \module{socket} module can be compiled to support IPv6;
@@ -1107,7 +1130,7 @@ more information about XML-RPC.
   function \function{help()} that uses the \module{pydoc} module
   introduced in Python 2.1 to provide interactive help.
   \code{help(\var{object})} displays any available help text about
-  \var{object}.  \code{help()} with no argument puts you in an online
+  \var{object}.  \function{help()} with no argument puts you in an online
   help utility, where you can enter the names of functions, classes,
   or modules to read their help text.
   (Contributed by Guido van Rossum, using Ka-Ping Yee's \module{pydoc} module.)
@@ -1134,7 +1157,6 @@ more information about XML-RPC.
   in \rfc{2342}, SORT, GETACL and SETACL.  (Contributed by Anthony
   Baxter and Michel Pelletier.)
 
-  % XXX should the 'email' module get a section of its own?
   \item The \module{rfc822} module's parsing of email addresses is now
   compliant with \rfc{2822}, an update to \rfc{822}.  (The module's
   name is \emph{not} going to be changed to \samp{rfc2822}.)  A new
@@ -1219,7 +1241,7 @@ affect you very much.
   \cfunction{PyArg_UnpackTuple()}, has been added that's simpler and
   presumably faster.  Instead of specifying a format string, the
   caller simply gives the minimum and maximum number of arguments
-  expected, and a set of pointers to \code{PyObject*} variables that
+  expected, and a set of pointers to \ctype{PyObject*} variables that
   will be filled in with argument values.  
 
   \item Two new flags \constant{METH_NOARGS} and \constant{METH_O} are
@@ -1253,9 +1275,12 @@ affect you very much.
 
 As usual there were a bunch of other improvements and bugfixes
 scattered throughout the source tree.  A search through the CVS change
-logs finds there were 527 patches applied, and 683 bugs fixed; both
-figures are likely to be underestimates.  Some of the more notable
-changes are:
+logs finds there were 527 patches applied and 683 bugs fixed between
+Python 2.1 and 2.2; 2.2.1 applied 139 patches and fixed 143 bugs;
+2.2.2 applied 106 patches and fixed 82 bugs.  These figures are likely
+to be underestimates.
+
+Some of the more notable changes are:
 
 \begin{itemize}
 
@@ -1332,10 +1357,10 @@ to experiment with these modules can uncomment them manually.
   now convert it to an MBCS encoded string, as used by the Microsoft
   file APIs.  As MBCS is explicitly used by the file APIs, Python's
   choice of ASCII as the default encoding turns out to be an
-  annoyance.  On Unix, the locale's character set is used if
+  annoyance.  On \UNIX, the locale's character set is used if
   \function{locale.nl_langinfo(CODESET)} is available.  (Windows
   support was contributed by Mark Hammond with assistance from
-  Marc-Andr\'e Lemburg. Unix support was added by Martin von L\"owis.)
+  Marc-Andr\'e Lemburg. \UNIX{} support was added by Martin von L\"owis.)
 
   \item Large file support is now enabled on Windows.  (Contributed by
   Tim Peters.)
@@ -1405,7 +1430,7 @@ article: Fred Bremmer, Keith Briggs, Andrew Dalke, Fred~L. Drake, Jr.,
 Carel Fellinger, David Goodger, Mark Hammond, Stephen Hansen, Michael
 Hudson, Jack Jansen, Marc-Andr\'e Lemburg, Martin von L\"owis, Fredrik
 Lundh, Michael McLay, Nick Mathewson, Paul Moore, Gustavo Niemeyer,
-Don O'Donnell, Tim Peters, Jens Quade, Tom Reinhardt, Neil
-Schemenauer, Guido van Rossum, Greg Ward.
+Don O'Donnell, Joonas Paalasma, Tim Peters, Jens Quade, Tom Reinhardt, Neil
+Schemenauer, Guido van Rossum, Greg Ward, Edward Welbourne.
 
 \end{document}

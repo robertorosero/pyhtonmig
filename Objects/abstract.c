@@ -174,6 +174,24 @@ PyObject_DelItem(PyObject *o, PyObject *key)
 	return -1;
 }
 
+int
+PyObject_DelItemString(PyObject *o, char *key)
+{
+	PyObject *okey;
+	int ret;
+
+	if (o == NULL || key == NULL) {
+		null_error();
+		return -1;
+	}
+	okey = PyString_FromString(key);
+	if (okey == NULL)
+		return -1;
+	ret = PyObject_DelItem(o, okey);
+	Py_DECREF(okey);
+	return ret;
+}
+
 int PyObject_AsCharBuffer(PyObject *obj,
 			  const char **buffer,
 			  int *buffer_len)
@@ -450,7 +468,7 @@ ternary_op(PyObject *v,
 	if (mv != NULL && NEW_STYLE_NUMBER(v))
 		slotv = *NB_TERNOP(mv, op_slot);
 	if (w->ob_type != v->ob_type &&
-	    mv != NULL && NEW_STYLE_NUMBER(w)) {
+            mw != NULL && NEW_STYLE_NUMBER(w)) {
 		slotw = *NB_TERNOP(mw, op_slot);
 		if (slotw == slotv)
 			slotw = NULL;
@@ -587,17 +605,18 @@ PyNumber_Add(PyObject *v, PyObject *w)
 	PyObject *result = binary_op1(v, w, NB_SLOT(nb_add));
 	if (result == Py_NotImplemented) {
 		PySequenceMethods *m = v->ob_type->tp_as_sequence;
-		Py_DECREF(Py_NotImplemented);
 		if (m && m->sq_concat) {
+			Py_DECREF(result);
 			result = (*m->sq_concat)(v, w);
 		}
-                else {
-                    PyErr_Format(
+		if (result == Py_NotImplemented) {
+			Py_DECREF(result);
+			PyErr_Format(
 			    PyExc_TypeError,
 			    "unsupported operand types for +: '%s' and '%s'",
 			    v->ob_type->tp_name,
 			    w->ob_type->tp_name);
-                    result = NULL;
+			result = NULL;
                 }
 	}
 	return result;
@@ -721,8 +740,12 @@ PyObject *
 PyNumber_InPlaceMultiply(PyObject *v, PyObject *w)
 {
 	PyObject * (*g)(PyObject *, int) = NULL;
-	if (HASINPLACE(v) && v->ob_type->tp_as_sequence &&
-		(g = v->ob_type->tp_as_sequence->sq_inplace_repeat)) {
+	if (HASINPLACE(v) &&
+	    v->ob_type->tp_as_sequence &&
+	    (g = v->ob_type->tp_as_sequence->sq_inplace_repeat) &&
+	    !(v->ob_type->tp_as_number &&
+	      v->ob_type->tp_as_number->nb_inplace_multiply))
+	{
 		long n;
 		if (PyInt_Check(w)) {
 			n  = PyInt_AsLong(w);
@@ -880,7 +903,7 @@ PyNumber_Int(PyObject *o)
 	if (!PyObject_AsCharBuffer(o, &buffer, &buffer_len))
 		return int_from_string((char*)buffer, buffer_len);
 
-	return type_error("object can't be converted to int");
+	return type_error("int() argument must be a string or a number");
 }
 
 /* Add a check for embedded NULL-bytes in the argument. */
@@ -937,7 +960,7 @@ PyNumber_Long(PyObject *o)
 	if (!PyObject_AsCharBuffer(o, &buffer, &buffer_len))
 		return long_from_string(buffer, buffer_len);
 
-	return type_error("object can't be converted to long");
+	return type_error("long() argument must be a string or a number");
 }
 
 PyObject *
@@ -1770,7 +1793,11 @@ objargs_mktuple(va_list va)
 #ifdef VA_LIST_IS_ARRAY
 	memcpy(countva, va, sizeof(va_list));
 #else
+#ifdef __va_copy
+	__va_copy(countva, va);
+#else
 	countva = va;
+#endif
 #endif
 
 	while (((PyObject *)va_arg(countva, PyObject *)) != NULL)
@@ -1838,6 +1865,32 @@ PyObject_CallFunctionObjArgs(PyObject *callable, ...)
 
 /* isinstance(), issubclass() */
 
+/* abstract_get_bases() has logically 4 return states, with a sort of 0th
+ * state that will almost never happen.
+ *
+ * 0. creating the __bases__ static string could get a MemoryError
+ * 1. getattr(cls, '__bases__') could raise an AttributeError
+ * 2. getattr(cls, '__bases__') could raise some other exception
+ * 3. getattr(cls, '__bases__') could return a tuple
+ * 4. getattr(cls, '__bases__') could return something other than a tuple
+ *
+ * Only state #3 is a non-error state and only it returns a non-NULL object
+ * (it returns the retrieved tuple).
+ *
+ * Any raised AttributeErrors are masked by clearing the exception and
+ * returning NULL.  If an object other than a tuple comes out of __bases__,
+ * then again, the return value is NULL.  So yes, these two situations
+ * produce exactly the same results: NULL is returned and no error is set.
+ *
+ * If some exception other than AttributeError is raised, then NULL is also
+ * returned, but the exception is not cleared.  That's because we want the
+ * exception to be propagated along.
+ *
+ * Callers are expected to test for PyErr_Occurred() when the return value
+ * is NULL to decide whether a valid exception should be propagated or not.
+ * When there's no exception to propagate, it's customary for the caller to
+ * set a TypeError.
+ */
 static PyObject *
 abstract_get_bases(PyObject *cls)
 {
@@ -1849,13 +1902,16 @@ abstract_get_bases(PyObject *cls)
 		if (__bases__ == NULL)
 			return NULL;
 	}
-
 	bases = PyObject_GetAttr(cls, __bases__);
-	if (bases == NULL || !PyTuple_Check(bases)) {
-	        Py_XDECREF(bases);
+	if (bases == NULL) {
+		if (PyErr_ExceptionMatches(PyExc_AttributeError))
+			PyErr_Clear();
 		return NULL;
 	}
-
+	if (!PyTuple_Check(bases)) {
+	        Py_DECREF(bases);
+		return NULL;
+	}
 	return bases;
 }
 
@@ -1872,9 +1928,11 @@ abstract_issubclass(PyObject *derived, PyObject *cls)
 		return 1;
 
 	bases = abstract_get_bases(derived);
-	if (bases == NULL)
+	if (bases == NULL) {
+		if (PyErr_Occurred())
+			return -1;
 		return 0;
-
+	}
 	n = PyTuple_GET_SIZE(bases);
 	for (i = 0; i < n; i++) {
 		r = abstract_issubclass(PyTuple_GET_ITEM(bases, i), cls);
@@ -1919,10 +1977,13 @@ PyObject_IsInstance(PyObject *inst, PyObject *cls)
 	else {
 		PyObject *cls_bases = abstract_get_bases(cls);
 		if (cls_bases == NULL) {
-			PyErr_SetString(PyExc_TypeError, 
-				"isinstance() arg 2 must be a class or type");
+			/* Do not mask errors. */
+			if (!PyErr_Occurred())
+				PyErr_SetString(PyExc_TypeError,
+				"isinstance() arg 2 must be a class, type,"
+				" or tuple of classes and types");
 			return -1;
-		} 
+		}
 		Py_DECREF(cls_bases);
 		if (__class__ == NULL) {
 			__class__ = PyString_FromString("__class__");
@@ -1954,7 +2015,9 @@ PyObject_IsSubclass(PyObject *derived, PyObject *cls)
 	       
 		derived_bases = abstract_get_bases(derived);
 		if (derived_bases == NULL) {
-			PyErr_SetString(PyExc_TypeError, 
+			/* Do not mask errors */
+			if (!PyErr_Occurred())
+				PyErr_SetString(PyExc_TypeError,
 					"issubclass() arg 1 must be a class");
 			return -1;
 		}
@@ -1962,7 +2025,9 @@ PyObject_IsSubclass(PyObject *derived, PyObject *cls)
 
 		cls_bases = abstract_get_bases(cls);
 		if (cls_bases == NULL) {
-			PyErr_SetString(PyExc_TypeError, 
+			/* Do not mask errors */
+			if (!PyErr_Occurred())
+				PyErr_SetString(PyExc_TypeError,
 					"issubclass() arg 2 must be a class");
 			return -1;
 		}
@@ -2031,4 +2096,3 @@ PyIter_Next(PyObject *iter)
 		PyErr_Clear();
 	return result;
 }
-

@@ -50,6 +50,7 @@ import exceptions
 import select
 import socket
 import sys
+import time
 
 import os
 from errno import EALREADY, EINPROGRESS, EWOULDBLOCK, ECONNRESET, \
@@ -75,11 +76,16 @@ def poll (timeout=0.0, map=None):
                 r.append (fd)
             if obj.writable():
                 w.append (fd)
-        try:
-            r,w,e = select.select (r,w,e, timeout)
-        except select.error, err:
-            if err[0] != EINTR:
-                raise
+        if [] == r == w == e:
+            time.sleep(timeout)
+        else:
+            try:
+                r,w,e = select.select (r,w,e, timeout)
+            except select.error, err:
+                if err[0] != EINTR:
+                    raise
+                else:
+                    return
 
         if DEBUG:
             print r,w,e
@@ -365,7 +371,7 @@ class dispatcher:
     def __getattr__ (self, attr):
         return getattr (self.socket, attr)
 
-    # log and log_info maybe overriden to provide more sophisitcated
+    # log and log_info maybe overriden to provide more sophisticated
     # logging and warning methods. In general, log is for 'hit' logging
     # and 'log_info' is for informational, warning and error logging.
 
@@ -510,7 +516,6 @@ def close_all (map=None):
 #
 # Regardless, this is useful for pipes, and stdin/stdout...
 
-import os
 if os.name == 'posix':
     import fcntl
 

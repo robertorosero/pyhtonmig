@@ -55,7 +55,8 @@ AC_MSG_CHECKING(MACHDEP)
 if test -z "$MACHDEP"
 then
 	ac_sys_system=`uname -s`
-	if test "$ac_sys_system" = "AIX" -o "$ac_sys_system" = "Monterey64"; then
+	if test "$ac_sys_system" = "AIX" -o "$ac_sys_system" = "Monterey64" \
+	-o "$ac_sys_system" = "UnixWare" -o "$ac_sys_system" = "OpenUNIX"; then
 		ac_sys_release=`uname -v`
 	else
 		ac_sys_release=`uname -r`
@@ -208,7 +209,7 @@ AC_MSG_RESULT($EXEEXT)
 # case we give a warning if no ext is given
 AC_SUBST(BUILDEXEEXT)
 AC_MSG_CHECKING(for case-insensitive build directory)
-if test -d "python"
+if test -d "${srcdir}/python"
 then
     AC_MSG_RESULT(yes)
     BUILDEXEEXT=.exe
@@ -279,7 +280,7 @@ then
         if test -z "$CXX"; then
               LINKCC="\$(PURIFY) \$(CC)"
         else
-              echo 'int main(){return 0;}' > conftest.$ac_ext
+              echo 'void foo();int main(){foo();}void foo(){}' > conftest.$ac_ext
               $CXX -c conftest.$ac_ext 2>&5
               if $CC -o conftest$ac_exeext conftest.$ac_objext 2>&5 \
                  && test -s conftest$ac_exeext && ./conftest$ac_exeext
@@ -292,7 +293,7 @@ then
         fi
 	case $ac_sys_system in
 	AIX*)
-	   LINKCC="\$(srcdir)/Modules/makexp_aix Modules/python.exp \"\" \$(LIBRARY); $(LINKCC)";;
+	   LINKCC="\$(srcdir)/Modules/makexp_aix Modules/python.exp \"\" \$(LIBRARY); $LINKCC";;
 	dgux*)
 	   LINKCC="LD_RUN_PATH=$libdir $(LINKCC)";;
 	Monterey64*)
@@ -387,11 +388,17 @@ then
 	*)
 	    OPT="-O3 -Wall -Wstrict-prototypes";;
 	esac
+	case $ac_sys_system in
+	    SCO_SV*) OPT="$OPT -m486 -DSCO5";;
+	esac
 	;;
     *)
 	case $ac_sys_system in
 	OpenUNIX*|UnixWare*)
 	    OPT="-O -K pentium,host,inline,loop_unroll,alloca ";;
+	SCO_SV*)
+	    CFLAGS="$CFLAGS -belf"
+	    OPT="-belf -O -Ki486 -DSCO5";;
 	*)
 	    OPT="-O";;
 	esac
@@ -465,6 +472,7 @@ int main(){
   pthread_t p;
   if(pthread_create(&p,NULL,routine,NULL)!=0)
     return 1;
+  (void)pthread_detach(p);
   return 0;
 }
 ],
@@ -497,6 +505,7 @@ int main(){
   pthread_t p;
   if(pthread_create(&p,NULL,routine,NULL)!=0)
     return 1;
+  (void)pthread_detach(p);
   return 0;
 }
 ],
@@ -518,6 +527,18 @@ dnl AC_MSG_RESULT($cpp_type)
 
 # checks for header files
 AC_HEADER_STDC
+
+# If the compiler generates any stderr on these tests, the header file
+# is considered absent. On some systems, gcc will produce warnings for
+# some of the headers (Redhat 6 if kernel headers don't match glibc
+# headers). Thus, disable warnings. This can go away if autoconf 2.50
+# is used, since it considers the gcc status to determine errors.
+if test "$GCC" = yes
+then
+   CPPFLAGS_save=$CPPFLAGS
+   CPPFLAGS="$CPPFLAGS -w"
+fi
+
 AC_CHECK_HEADERS(dlfcn.h fcntl.h grp.h limits.h langinfo.h locale.h \
 ncurses.h poll.h pthread.h \
 signal.h stdarg.h stddef.h stdlib.h thread.h unistd.h utime.h termios.h \
@@ -525,6 +546,12 @@ sys/audioio.h sys/file.h sys/lock.h sys/modem.h db_185.h db.h \
 sys/param.h sys/poll.h sys/select.h sys/socket.h sys/time.h sys/times.h \
 sys/un.h sys/utsname.h sys/wait.h pty.h term.h libutil.h \
 ndbm.h db1/ndbm.h gdbm/ndbm.h sys/resource.h netpacket/packet.h)
+
+if test "$GCC" = yes
+then
+   CPPFLAGS=$CPPFLAGS_save
+fi
+
 AC_HEADER_DIRENT
 
 # checks for typedefs
@@ -642,7 +669,7 @@ if test "$have_pthread_t" = yes ; then
   AC_MSG_CHECKING(size of pthread_t)
   AC_CACHE_VAL(ac_cv_sizeof_pthread_t,
   [AC_TRY_RUN([#include <stdio.h>
-  #include <pthread.h>
+#include <pthread.h>
   main()
   {
     FILE *f=fopen("conftestval", "w");
@@ -773,7 +800,7 @@ then
 	SunOS/5*) 
 		if test "$GCC" = "yes"
 		then LDSHARED='$(CC) -shared'
-		else LDSHARED="$(CC) -G";
+		else LDSHARED='$(CC) -G';
 		fi ;;
 	hp*|HP*) LDSHARED="ld -b";;
 	OSF*) LDSHARED="ld -shared -expect_unresolved \"*\"";;
@@ -793,25 +820,27 @@ then
 			# Link against the framework. All externals should be defined.
 			LDSHARED="$LDSHARED "'-framework $(PYTHONFRAMEWORK)'
 		else
-			# No framework. Ignore undefined symbols, assuming they come from Python
-			LDSHARED="$LDSHARED -flat_namespace -undefined suppress"
+			# No framework, use the Python app as bundle-loader
+			BLDSHARED="$LDSHARED "'-bundle_loader $(BUILDPYTHON)'
+			LDSHARED="$LDSHARED "'-bundle_loader $(BINDIR)/$(PYTHON)'
 		fi ;;
-	Linux*) LDSHARED="gcc -shared";;
+	Linux*) LDSHARED='$(CC) -shared';;
 	dgux*) LDSHARED="ld -G";;
 	BSD/OS*/4*) LDSHARED="gcc -shared";;
-	OpenBSD*|NetBSD*|FreeBSD*)
+	OpenBSD*|FreeBSD*)
 		if [[ "`$CC -dM -E - </dev/null | grep __ELF__`" != "" ]]
 		then
 			LDSHARED="cc -shared ${LDFLAGS}"
 		else
 			LDSHARED="ld -Bshareable ${LDFLAGS}"
 		fi;;
+	NetBSD*) LDSHARED="cc -shared ${LDFLAGS}";;
 	OpenUNIX*|UnixWare*)
 		if test "$GCC" = "yes"
 		then LDSHARED="$(CC) -shared"
 		else LDSHARED="$(CC) -G"
 		fi;;
-	SCO_SV*) LDSHARED="cc -G -KPIC -Ki486 -belf -Wl,-Bexport";;
+	SCO_SV*) LDSHARED="$(CC) -Wl,-G,-Bexport";;
 	Monterey*) LDSHARED="cc -G -dy -Bdynamic -Bexport -L/usr/lib/ia64l64";;
 	CYGWIN*) LDSHARED="gcc -shared -Wl,--enable-auto-image-base";;
 	*)	LDSHARED="ld";;
@@ -840,7 +869,11 @@ then
 		then CCSHARED="-fPIC"
 		else CCSHARED="-KPIC"
 		fi;;
-	SCO_SV*) CCSHARED="-KPIC -dy -Bdynamic";;
+	SCO_SV*)
+		if test "$GCC" = "yes"
+		then CCSHARED="-fPIC"
+		else CCSHARED="-Kpic -belf"
+		fi;;
 	Monterey*) CCSHARED="-G";;
 	IRIX*/6*)  case $CC in
 		   *gcc*) CCSHARED="-shared";;
@@ -877,7 +910,7 @@ then
 		fi
 		LINKFORSHARED="$LINKFORSHARED $extra_frameworks";;
 	OpenUNIX*|UnixWare*) LINKFORSHARED="-Wl,-Bexport";;
-	SCO_SV*) LINKFORSHARED="-Bdynamic -dy -Wl,-Bexport";;
+	SCO_SV*) LINKFORSHARED="-Wl,-Bexport";;
 	ReliantUNIX*) LINKFORSHARED="-W1 -Blargedynsym";;
 	FreeBSD*|NetBSD*|OpenBSD*) 
 		if [[ "`$CC -dM -E - </dev/null | grep __ELF__`" != "" ]]
@@ -886,7 +919,7 @@ then
 		fi;;
 	SunOS/5*) case $CC in
 		  *gcc*)
-		    if $CC -Xlinker -V 2>&1 | grep BFD >/dev/null
+		    if $CC -Xlinker --help 2>&1 | grep export-dynamic >/dev/null
 		    then
 			LINKFORSHARED="-Xlinker --export-dynamic"
 		    fi;;
@@ -1026,9 +1059,9 @@ else
     AC_MSG_CHECKING(for _POSIX_THREADS in unistd.h)
     AC_EGREP_CPP(yes,
     [#include <unistd.h>
-     #ifdef _POSIX_THREADS
-     yes
-     #endif
+#ifdef _POSIX_THREADS
+yes
+#endif
     ], unistd_defines_pthreads=yes, unistd_defines_pthreads=no)
     AC_MSG_RESULT($unistd_defines_pthreads)
 
@@ -1103,9 +1136,10 @@ pthread_create (NULL, NULL, start_routine, NULL)], [
       }
       main() {
         pthread_attr_t attr;
+        pthread_t id;
         if (pthread_attr_init(&attr)) exit(-1);
         if (pthread_attr_setscope(&attr, PTHREAD_SCOPE_SYSTEM)) exit(-1);
-        if (pthread_create(NULL, &attr, foo, NULL)) exit(-1);
+        if (pthread_create(&id, &attr, foo, NULL)) exit(-1);
         exit(0);
       }],
       ac_cv_pthread_system_supported=yes,
@@ -1136,6 +1170,14 @@ pthread_create (NULL, NULL, start_routine, NULL)], [
         OSF1) LDLAST=-threads;;
         esac
     fi
+
+    if test "$posix_threads" = yes -a \
+		"$ac_sys_system" = "SunOS" -a \
+		"$ac_sys_release" = "5.6"; then
+		AC_DEFINE(HAVE_PTHREAD_DESTRUCTOR, 1,
+		[Defined for Solaris 2.6 bug in pthread header.])
+	fi
+
 fi
 
 # Check for enable-ipv6
@@ -1864,7 +1906,27 @@ wchar_h="no"
 # determine wchar_t size
 if test "$wchar_h" = yes
 then
-  AC_CHECK_SIZEOF(wchar_t, 4, [#include <wchar.h>])
+  dnl autoconf 2.13 fails to automatically include additional headers
+  dnl Therefore, we expand
+  dnl AC_CHECK_SIZEOF(wchar_t, 4, [#include <wchar.h>])
+  dnl inline
+  AC_MSG_CHECKING(size of wchar_t)
+  AC_CACHE_VAL(ac_cv_sizeof_wchar_t,
+  [AC_TRY_RUN([
+   #include <stdio.h>
+   #include <wchar.h>
+   main()
+   {
+     FILE *f=fopen("conftestval", "w");
+     if (!f) exit(1);
+     fprintf(f, "%d\n", sizeof(wchar_t));
+     exit(0);
+   }], ac_cv_sizeof_wchar_t=`cat conftestval`,
+       ac_cv_sizeof_wchar_t=0,
+       ac_cv_sizeof_wchar_t=4)
+  ])
+  AC_MSG_RESULT($ac_cv_sizeof_wchar_t)
+  AC_DEFINE_UNQUOTED(SIZEOF_WCHAR_T,$ac_cv_sizeof_wchar_t)
 fi
 
 AC_MSG_CHECKING(what type to use for unicode)
@@ -1948,6 +2010,17 @@ AC_MSG_RESULT($ac_cv_have_getc_unlocked)
 if test "$ac_cv_have_getc_unlocked" = yes
 then
   AC_DEFINE(HAVE_GETC_UNLOCKED)
+fi
+
+# check for readline 2.2
+AC_TRY_CPP([#include <readline/readline.h>],
+have_readline=yes, have_readline=no)
+if test $have_readline = yes
+then
+  AC_EGREP_HEADER([extern int rl_completion_append_character;],
+  [readline/readline.h],
+  AC_DEFINE(HAVE_RL_COMPLETION_APPEND_CHARACTER, 1,
+  [Define if you have readline 2.2]), )
 fi
 
 # check for readline 4.0

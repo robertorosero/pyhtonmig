@@ -36,12 +36,27 @@ This section describes Python type objects and the singleton object
 \end{cvardesc}
 
 \begin{cfuncdesc}{int}{PyType_Check}{PyObject *o}
-  Returns true is the object \var{o} is a type object.
+  Returns true if the object \var{o} is a type object, including
+  instances of types derived from the standard type object.  Returns
+  false in all other cases.
+\end{cfuncdesc}
+
+\begin{cfuncdesc}{int}{PyType_CheckExact}{PyObject *o}
+  Returns true if the object \var{o} is a type object, but not a
+  subtype of the standard type object.  Returns false in all other
+  cases.
+  \versionadded{2.2}
 \end{cfuncdesc}
 
 \begin{cfuncdesc}{int}{PyType_HasFeature}{PyObject *o, int feature}
   Returns true if the type object \var{o} sets the feature
   \var{feature}.  Type features are denoted by single bit flags.
+\end{cfuncdesc}
+
+\begin{cfuncdesc}{int}{PyType_IS_GC}{PyObject *o}
+  Return true if the type object includes support for the cycle
+  detector; this tests the type flag \constant{Py_TPFLAGS_HAVE_GC}.
+  \versionadded{2.0}
 \end{cfuncdesc}
 
 \begin{cfuncdesc}{int}{PyType_IsSubtype}{PyTypeObject *a, PyTypeObject *b}
@@ -74,7 +89,8 @@ There is no \cfunction{PyNone_Check()} function for the same reason.
 
 \begin{cvardesc}{PyObject*}{Py_None}
   The Python \code{None} object, denoting lack of value.  This object
-  has no methods.
+  has no methods.  It needs to be treated just like any other object
+  with respect to reference counts.
 \end{cvardesc}
 
 
@@ -513,36 +529,45 @@ parameter and are called with a non-string parameter.
 \end{cfuncdesc}
 
 \begin{cfuncdesc}{char*}{PyString_AsString}{PyObject *string}
-  Returns a null-terminated representation of the contents of
+  Returns a NUL-terminated representation of the contents of
   \var{string}.  The pointer refers to the internal buffer of
   \var{string}, not a copy.  The data must not be modified in any way,
   unless the string was just created using
   \code{PyString_FromStringAndSize(NULL, \var{size})}.
-  It must not be deallocated.
+  It must not be deallocated.  If \var{string} is a Unicode object,
+  this function computes the default encoding of \var{string} and
+  operates on that.  If \var{string} is not a string object at all,
+  \cfunction{PyString_AsString()} returns \NULL{} and raises
+  \exception{TypeError}.
 \end{cfuncdesc}
 
 \begin{cfuncdesc}{char*}{PyString_AS_STRING}{PyObject *string}
   Macro form of \cfunction{PyString_AsString()} but without error
-  checking.
+  checking.  Only string objects are supported; no Unicode objects
+  should be passed.
 \end{cfuncdesc}
 
 \begin{cfuncdesc}{int}{PyString_AsStringAndSize}{PyObject *obj,
                                                  char **buffer,
                                                  int *length}
-  Returns a null-terminated representation of the contents of the
+  Returns a NUL-terminated representation of the contents of the
   object \var{obj} through the output variables \var{buffer} and
   \var{length}.
 
   The function accepts both string and Unicode objects as input. For
   Unicode objects it returns the default encoded version of the
-  object.  If \var{length} is set to \NULL, the resulting buffer may
-  not contain null characters; if it does, the function returns -1 and
-  a \exception{TypeError} is raised.
+  object.  If \var{length} is \NULL, the resulting buffer may not
+  contain NUL characters; if it does, the function returns \code{-1}
+  and a \exception{TypeError} is raised.
 
   The buffer refers to an internal string buffer of \var{obj}, not a
   copy. The data must not be modified in any way, unless the string
   was just created using \code{PyString_FromStringAndSize(NULL,
-  \var{size})}.  It must not be deallocated.
+  \var{size})}.  It must not be deallocated.  If \var{string} is a
+  Unicode object, this function computes the default encoding of
+  \var{string} and operates on that.  If \var{string} is not a string
+  object at all, \cfunction{PyString_AsString()} returns \NULL{} and
+  raises \exception{TypeError}.
 \end{cfuncdesc}
 
 \begin{cfuncdesc}{void}{PyString_Concat}{PyObject **string,
@@ -566,7 +591,16 @@ parameter and are called with a non-string parameter.
 \begin{cfuncdesc}{int}{_PyString_Resize}{PyObject **string, int newsize}
   A way to resize a string object even though it is ``immutable''.
   Only use this to build up a brand new string object; don't use this
-  if the string may already be known in other parts of the code.
+  if the string may already be known in other parts of the code.  It
+  is an error to call this function if the refcount on the input string
+  object is not one.
+  Pass the address of an existing string object as an lvalue (it may
+  be written into), and the new size desired.  On success, \var{*string}
+  holds the resized string object and 0 is returned; the address in
+  \var{*string} may differ from its input value.  If the
+  reallocation fails, the original string object at \var{*string} is
+  deallocated, \var{*string} is set to \NULL{}, a memory exception is set,
+  and -1 is returned.
 \end{cfuncdesc}
 
 \begin{cfuncdesc}{PyObject*}{PyString_Format}{PyObject *format,
@@ -855,16 +889,16 @@ following functions. Support is optimized if Python's own
 
 \begin{cfuncdesc}{PyObject*}{PyUnicode_FromWideChar}{const wchar_t *w,
                                                      int size}
-  Create a Unicode object from the \ctype{whcar_t} buffer \var{w} of
+  Create a Unicode object from the \ctype{wchar_t} buffer \var{w} of
   the given size.  Returns \NULL{} on failure.
 \end{cfuncdesc}
 
 \begin{cfuncdesc}{int}{PyUnicode_AsWideChar}{PyUnicodeObject *unicode,
                                              wchar_t *w,
                                              int size}
-  Copies the Unicode object contents into the \ctype{whcar_t} buffer
-  \var{w}.  At most \var{size} \ctype{whcar_t} characters are copied.
-  Returns the number of \ctype{whcar_t} characters copied or -1 in
+  Copies the Unicode object contents into the \ctype{wchar_t} buffer
+  \var{w}.  At most \var{size} \ctype{wchar_t} characters are copied.
+  Returns the number of \ctype{wchar_t} characters copied or -1 in
   case of an error.
 \end{cfuncdesc}
 
@@ -1296,23 +1330,27 @@ They all return \NULL{} or \code{-1} if an exception occurs.
   match, \var{direction} == 1 a suffix match), 0 otherwise.
 \end{cfuncdesc}
 
-\begin{cfuncdesc}{PyObject*}{PyUnicode_Find}{PyObject *str,
-                                                  PyObject *substr,
-                                                  int start,
-                                                  int end,
-                                                  int direction}
+\begin{cfuncdesc}{int}{PyUnicode_Find}{PyObject *str,
+                                       PyObject *substr,
+                                       int start,
+                                       int end,
+                                       int direction}
   Return the first position of \var{substr} in
   \var{str}[\var{start}:\var{end}] using the given \var{direction}
   (\var{direction} == 1 means to do a forward search,
-  \var{direction} == -1 a backward search), 0 otherwise.
+  \var{direction} == -1 a backward search).  The return value is the
+  index of the first match; a value of \code{-1} indicates that no
+  match was found, and \code{-2} indicates that an error occurred and
+  an exception has been set.
 \end{cfuncdesc}
 
-\begin{cfuncdesc}{PyObject*}{PyUnicode_Count}{PyObject *str,
-                                                  PyObject *substr,
-                                                  int start,
-                                                  int end}
-  Count the number of occurrences of \var{substr} in
-  \var{str}[\var{start}:\var{end}]
+\begin{cfuncdesc}{int}{PyUnicode_Count}{PyObject *str,
+                                        PyObject *substr,
+                                        int start,
+                                        int end}
+  Return the number of non-overlapping occurrences of \var{substr} in
+  \code{\var{str}[\var{start}:\var{end}]}.  Returns \code{-1} if an
+  error occurred.
 \end{cfuncdesc}
 
 \begin{cfuncdesc}{PyObject*}{PyUnicode_Replace}{PyObject *str,

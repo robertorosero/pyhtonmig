@@ -316,20 +316,26 @@ class _Event(_Verbose):
 
     def set(self):
         self.__cond.acquire()
-        self.__flag = 1
-        self.__cond.notifyAll()
-        self.__cond.release()
+        try:
+            self.__flag = 1
+            self.__cond.notifyAll()
+        finally:
+            self.__cond.release()
 
     def clear(self):
         self.__cond.acquire()
-        self.__flag = 0
-        self.__cond.release()
+        try:
+            self.__flag = 0
+        finally:
+            self.__cond.release()
 
     def wait(self, timeout=None):
         self.__cond.acquire()
-        if not self.__flag:
-            self.__cond.wait(timeout)
-        self.__cond.release()
+        try:
+            if not self.__flag:
+                self.__cond.wait(timeout)
+        finally:
+            self.__cond.release()
 
 # Helper to generate new thread names
 _counter = 0
@@ -421,7 +427,10 @@ class Thread(_Verbose):
                     self._note("%s.__bootstrap(): normal return", self)
         finally:
             self.__stop()
-            self.__delete()
+            try:
+                self.__delete()
+            except:
+                pass
 
     def __stop(self):
         self.__block.acquire()
@@ -569,7 +578,7 @@ class _DummyThread(Thread):
     def _set_daemon(self):
         return 1
 
-    def join(self):
+    def join(self, timeout=None):
         assert 0, "cannot join a dummy thread"
 
 

@@ -6,7 +6,7 @@ Example:
 
 >>> from ftplib import FTP
 >>> ftp = FTP('ftp.python.org') # connect to host, default port
->>> ftp.login() # default, i.e.: user anonymous, passwd user@hostname
+>>> ftp.login() # default, i.e.: user anonymous, passwd anonymous@
 '230 Guest login ok, access restrictions apply.'
 >>> ftp.retrlines('LIST') # list directory contents
 total 9
@@ -114,7 +114,6 @@ class FTP:
         - port: port to connect to (integer, default previous port)'''
         if host: self.host = host
         if port: self.port = port
-        self.passiveserver = 0
         msg = "getaddrinfo returns an empty list"
         for res in socket.getaddrinfo(self.host, self.port, 0, socket.SOCK_STREAM):
             af, socktype, proto, canonname, sa = res
@@ -169,7 +168,7 @@ class FTP:
     def putline(self, line):
         line = line + CRLF
         if self.debugging > 1: print '*put*', self.sanitize(line)
-        self.sock.send(line)
+        self.sock.sendall(line)
 
     # Internal: send one command to the server (through putline())
     def putcmd(self, line):
@@ -232,7 +231,7 @@ class FTP:
         tried.  Instead, just send the ABOR command as OOB data.'''
         line = 'ABOR' + CRLF
         if self.debugging > 1: print '*put urgent*', self.sanitize(line)
-        self.sock.send(line, MSG_OOB)
+        self.sock.sendall(line, MSG_OOB)
         resp = self.getmultiline()
         if resp[:3] not in ('426', '226'):
             raise error_proto, resp
@@ -352,19 +351,14 @@ class FTP:
         if not passwd: passwd = ''
         if not acct: acct = ''
         if user == 'anonymous' and passwd in ('', '-'):
-            # get fully qualified domain name of local host
-            thishost = socket.getfqdn()
-            try:
-                if os.environ.has_key('LOGNAME'):
-                    realuser = os.environ['LOGNAME']
-                elif os.environ.has_key('USER'):
-                    realuser = os.environ['USER']
-                else:
-                    realuser = 'anonymous'
-            except AttributeError:
-                # Not all systems have os.environ....
-                realuser = 'anonymous'
-            passwd = passwd + realuser + '@' + thishost
+	    # If there is no anonymous ftp password specified
+	    # then we'll just use anonymous@
+	    # We don't send any other thing because:
+	    # - We want to remain anonymous
+	    # - We want to stop SPAM
+	    # - We don't want to let ftp sites to discriminate by the user,
+	    #   host or country.
+            passwd = passwd + 'anonymous@'
         resp = self.sendcmd('USER ' + user)
         if resp[0] == '3': resp = self.sendcmd('PASS ' + passwd)
         if resp[0] == '3': resp = self.sendcmd('ACCT ' + acct)
@@ -423,7 +417,7 @@ class FTP:
         while 1:
             buf = fp.read(blocksize)
             if not buf: break
-            conn.send(buf)
+            conn.sendall(buf)
         conn.close()
         return self.voidresp()
 
@@ -437,7 +431,7 @@ class FTP:
             if buf[-2:] != CRLF:
                 if buf[-1] in CRLF: buf = buf[:-1]
                 buf = buf + CRLF
-            conn.send(buf)
+            conn.sendall(buf)
         conn.close()
         return self.voidresp()
 
@@ -493,8 +487,8 @@ class FTP:
             try:
                 return self.voidcmd('CDUP')
             except error_perm, msg:
-                if msg[:3] != '500':
-                    raise error_perm, msg
+                if msg.args[0][:3] != '500':
+                    raise
         elif dirname == '':
             dirname = '.'  # does nothing, but could return error
         cmd = 'CWD ' + dirname

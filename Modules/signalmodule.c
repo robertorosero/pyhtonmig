@@ -10,10 +10,6 @@
 #include <process.h>
 #endif
 
-#ifdef HAVE_UNISTD_H
-#include <unistd.h>
-#endif
-
 #include <signal.h>
 
 #ifndef SIG_ERR
@@ -370,7 +366,7 @@ initsignal(void)
 		Py_INCREF(IntHandler);
 		Py_DECREF(Handlers[SIGINT].func);
 		Handlers[SIGINT].func = IntHandler;
-		old_siginthandler = PyOS_setsig(SIGINT, &signal_handler);
+		old_siginthandler = PyOS_setsig(SIGINT, signal_handler);
 	}
 
 #ifdef SIGHUP

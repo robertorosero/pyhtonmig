@@ -18,8 +18,6 @@ except AttributeError:
 
 Error = 'macostools.Error'
 
-FSSpecType = type(macfs.FSSpec(':'))
-
 BUFSIZ=0x80000		# Copy in 0.5Mb chunks
 
 #
@@ -36,9 +34,13 @@ def mkalias(src, dst, relative=None):
 		alias = srcfss.NewAlias(relativefss)
 	else:
 		alias = srcfss.NewAlias()
-	srcfinfo = srcfss.GetFInfo()
-
-	Res.FSpCreateResFile(dstfss, srcfinfo.Creator, srcfinfo.Type, -1)
+	
+	if os.path.isdir(src):
+		cr, tp = 'MACS', 'fdrp'
+	else:
+		cr, tp = srcfss.GetCreatorType()
+	
+	Res.FSpCreateResFile(dstfss, cr, tp, -1)
 	h = Res.FSpOpenResFile(dstfss, 3)
 	resource = Res.Resource(alias.data)
 	resource.AddResource('alis', 0, '')
@@ -67,7 +69,10 @@ def touched(dst):
 	now = time.time()
 	if now == moddate:
 		now = now + 1
-	dir_fss.SetDates(crdate, now, bkdate)
+	try:
+		dir_fss.SetDates(crdate, now, bkdate)
+	except macfs.error:
+		pass
 	
 def touched_ae(dst):
 	"""Tell the finder a file has changed"""

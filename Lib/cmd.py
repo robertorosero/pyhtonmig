@@ -53,11 +53,21 @@ PROMPT = '(Cmd) '
 IDENTCHARS = string.ascii_letters + string.digits + '_'
 
 class Cmd:
+    """A simple framework for writing line-oriented command interpreters.
+
+    These are often useful for test harnesses, administrative tools, and
+    prototypes that will later be wrapped in a more sophisticated interface.
+
+    A Cmd instance or subclass instance is a line-oriented interpreter
+    framework.  There is no good reason to instantiate Cmd itself; rather,
+    it's useful as a superclass of an interpreter class you define yourself
+    in order to inherit Cmd's methods and encapsulate action methods.
+
+    """
     prompt = PROMPT
     identchars = IDENTCHARS
     ruler = '='
     lastcmd = ''
-    cmdqueue = []
     intro = None
     doc_leader = ""
     doc_header = "Documented commands (type help <topic>):"
@@ -67,15 +77,24 @@ class Cmd:
     use_rawinput = 1
 
     def __init__(self, completekey='tab'):
-        if completekey:
-            try:
-                import readline
-                readline.set_completer(self.complete)
-                readline.parse_and_bind(completekey+": complete")
-            except ImportError:
-                pass
+        """Instantiate a line-oriented interpreter framework.
+
+        The optional argument is the readline name of a completion key;
+        it defaults to the Tab key. If completekey is not None and the
+        readline module is available, command completion is done
+        automatically.
+
+        """
+        self.cmdqueue = []
+        self.completekey = completekey
 
     def cmdloop(self, intro=None):
+        """Repeatedly issue a prompt, accept input, parse an initial prefix
+        off the received input, and dispatch to action methods, passing them
+        the remainder of the line as argument.
+
+        """
+
         self.preloop()
         if intro is not None:
             self.intro = intro
@@ -94,6 +113,7 @@ class Cmd:
                         line = 'EOF'
                 else:
                     sys.stdout.write(self.prompt)
+                    sys.stdout.flush()
                     line = sys.stdin.readline()
                     if not len(line):
                         line = 'EOF'
@@ -105,16 +125,38 @@ class Cmd:
         self.postloop()
 
     def precmd(self, line):
+        """Hook method executed just before the command line is
+        interpreted, but after the input prompt is generated and issued.
+
+        """
         return line
 
     def postcmd(self, stop, line):
+        """Hook method executed just after a command dispatch is finished."""
         return stop
 
     def preloop(self):
-        pass
+        """Hook method executed once when the cmdloop() method is called."""
+        if self.completekey:
+            try:
+                import readline
+                self.old_completer = readline.get_completer()
+                readline.set_completer(self.complete)
+                readline.parse_and_bind(self.completekey+": complete")
+            except ImportError:
+                pass
 
     def postloop(self):
-        pass
+        """Hook method executed once when the cmdloop() method is about to
+        return.
+
+        """
+        if self.completekey:
+            try:
+                import readline
+                readline.set_completer(self.old_completer)
+            except ImportError:
+                pass
 
     def parseline(self, line):
         line = line.strip()
@@ -133,6 +175,15 @@ class Cmd:
         return cmd, arg, line
 
     def onecmd(self, line):
+        """Interpret the argument as though it had been typed in response
+        to the prompt.
+
+        This may be overridden, but should not normally need to be;
+        see the precmd() and postcmd() methods for useful execution hooks.
+        The return value is a flag indicating whether interpretation of
+        commands by the interpreter should stop.
+
+        """
         cmd, arg, line = self.parseline(line)
         if not line:
             return self.emptyline()
@@ -149,13 +200,31 @@ class Cmd:
             return func(arg)
 
     def emptyline(self):
+        """Called when an empty line is entered in response to the prompt.
+
+        If this method is not overridden, it repeats the last nonempty
+        command entered.
+
+        """
         if self.lastcmd:
             return self.onecmd(self.lastcmd)
 
     def default(self, line):
+        """Called on an input line when the command prefix is not recognized.
+
+        If this method is not overridden, it prints an error message and
+        returns.
+
+        """
         print '*** Unknown syntax:', line
 
     def completedefault(self, *ignored):
+        """Method called to complete an input line when no command-specific
+        complete_*() method is available.
+
+        By default, it returns an empty list.
+
+        """
         return []
 
     def completenames(self, text, *ignored):

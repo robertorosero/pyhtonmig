@@ -605,9 +605,17 @@ class Misc:
             self.tk.call('winfo', 'cells', self._w))
     def winfo_children(self):
         """Return a list of all widgets which are children of this widget."""
-        return map(self._nametowidget,
-               self.tk.splitlist(self.tk.call(
-                   'winfo', 'children', self._w)))
+        result = []
+        for child in self.tk.splitlist(
+            self.tk.call('winfo', 'children', self._w)):
+            try:
+                # Tcl sometimes returns extra windows, e.g. for
+                # menus; those need to be skipped
+                result.append(self._nametowidget(child))
+            except KeyError:
+                pass
+        return result
+
     def winfo_class(self):
         """Return window class name of this widget."""
         return self.tk.call('winfo', 'class', self._w)
@@ -1016,38 +1024,54 @@ class Misc:
         """Internal function."""
         if len(args) != len(self._subst_format): return args
         getboolean = self.tk.getboolean
+
         getint = int
+        def getint_event(s):
+            """Tk changed behavior in 8.4.2, returning "??" rather more often."""
+            try:
+                return int(s)
+            except ValueError:
+                return s
+
         nsign, b, f, h, k, s, t, w, x, y, A, E, K, N, W, T, X, Y, D = args
         # Missing: (a, c, d, m, o, v, B, R)
         e = Event()
+        # serial field: valid vor all events
+        # number of button: ButtonPress and ButtonRelease events only
+        # height field: Configure, ConfigureRequest, Create,
+        # ResizeRequest, and Expose events only
+        # keycode field: KeyPress and KeyRelease events only
+        # time field: "valid for events that contain a time field"
+        # width field: Configure, ConfigureRequest, Create, ResizeRequest,
+        # and Expose events only
+        # x field: "valid for events that contain a x field"
+        # y field: "valid for events that contain a y field"
+        # keysym as decimal: KeyPress and KeyRelease events only
+        # x_root, y_root fields: ButtonPress, ButtonRelease, KeyPress,
+        # KeyRelease,and Motion events
         e.serial = getint(nsign)
-        e.num = getint(b)
+        e.num = getint_event(b)
         try: e.focus = getboolean(f)
         except TclError: pass
-        e.height = getint(h)
-        e.keycode = getint(k)
-        # For Visibility events, event state is a string and
-        # not an integer:
-        try:
-            e.state = getint(s)
-        except ValueError:
-            e.state = s
-        e.time = getint(t)
-        e.width = getint(w)
-        e.x = getint(x)
-        e.y = getint(y)
+        e.height = getint_event(h)
+        e.keycode = getint_event(k)
+        e.state = getint_event(s)
+        e.time = getint_event(t)
+        e.width = getint_event(w)
+        e.x = getint_event(x)
+        e.y = getint_event(y)
         e.char = A
         try: e.send_event = getboolean(E)
         except TclError: pass
         e.keysym = K
-        e.keysym_num = getint(N)
+        e.keysym_num = getint_event(N)
         e.type = T
         try:
             e.widget = self._nametowidget(W)
         except KeyError:
             e.widget = W
-        e.x_root = getint(X)
-        e.y_root = getint(Y)
+        e.x_root = getint_event(X)
+        e.y_root = getint_event(Y)
         try:
             e.delta = getint(D)
         except ValueError:
@@ -2095,7 +2119,7 @@ class Canvas(Widget):
         self.tk.call(self._w, 'select', 'from', tagOrId, index)
     def select_item(self):
         """Return the item which has the selection."""
-        self.tk.call(self._w, 'select', 'item')
+        return self.tk.call(self._w, 'select', 'item') or None
     def select_to(self, tagOrId, index):
         """Set the variable end of a selection in item TAGORID to INDEX."""
         self.tk.call(self._w, 'select', 'to', tagOrId, index)

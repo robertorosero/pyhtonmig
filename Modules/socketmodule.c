@@ -115,10 +115,6 @@ Socket methods:
 #include "pythread.h"
 #endif
 
-#ifdef HAVE_UNISTD_H
-#include <unistd.h>
-#endif
-
 #if defined(PYCC_VACPP)
 #include <types.h>
 #include <io.h>
@@ -144,6 +140,11 @@ Socket methods:
 #include <netinet/in.h>
 #if !(defined(__BEOS__) || defined(__CYGWIN__) || (defined(PYOS_OS2) && defined(PYCC_VACPP)))
 #include <netinet/tcp.h>
+#endif
+
+/* This declaration is required for HPUX 10 */
+#if defined(__hpux) && !defined(h_errno)
+extern int h_errno;
 #endif
 
 /* Headers needed for inet_ntoa() and inet_addr() */
@@ -226,9 +227,14 @@ const char *inet_ntop(int af, const void *src, char *dst, socklen_t size);
    determine the bug just by checking for __APPLE__. If this bug
    gets ever fixed, perhaps checking for sys/version.h would be
    appropriate, which is 10/0 on the system with the bug. */
+#ifndef HAVE_GETNAMEINFO
+/* This bug seems to be fixed in Jaguar. Ths easiest way I could
+   Find to check for Jaguar is that it has getnameinfo(), which
+   older releases don't have */
 #undef HAVE_GETADDRINFO
 /* avoid clashes with the C library definition of the symbol. */
 #define getaddrinfo fake_getaddrinfo
+#endif
 #endif
 
 /* I know this is a bad practice, but it is the easiest... */
@@ -286,6 +292,20 @@ static PyObject *PyGAI_Error;
 
 #ifdef USE_SSL
 static PyObject *PySSLErrorObject;
+enum py_ssl_error {
+	/* these mirror ssl.h */
+	PY_SSL_ERROR_NONE,                 
+	PY_SSL_ERROR_SSL,                   
+	PY_SSL_ERROR_WANT_READ,             
+	PY_SSL_ERROR_WANT_WRITE,            
+	PY_SSL_ERROR_WANT_X509_LOOKUP,      
+	PY_SSL_ERROR_SYSCALL,     /* look at error stack/return value/errno */
+	PY_SSL_ERROR_ZERO_RETURN,           
+	PY_SSL_ERROR_WANT_CONNECT,
+	/* start of non ssl.h errorcodes */ 
+	PY_SSL_ERROR_EOF,         /* special case of SSL_ERROR_SYSCALL */
+	PY_SSL_ERROR_INVALID_ERROR_CODE
+};
 #endif /* USE_SSL */
 
 
@@ -573,7 +593,7 @@ PyThread_type_lock gethostbyname_lock;
    an error occurred; then an exception is raised. */
 
 static int
-setipaddr(char* name, struct sockaddr * addr_ret, int af)
+setipaddr(char* name, struct sockaddr * addr_ret, size_t addr_ret_size, int af)
 {
 	struct addrinfo hints, *res;
 	int error;
@@ -611,7 +631,9 @@ setipaddr(char* name, struct sockaddr * addr_ret, int af)
 				"wildcard resolved to multiple address");
 			return -1;
 		}
-		memcpy(addr_ret, res->ai_addr, res->ai_addrlen);
+		if (res->ai_addrlen < addr_ret_size)
+			addr_ret_size = res->ai_addrlen;
+		memcpy(addr_ret, res->ai_addr, addr_ret_size);
 		freeaddrinfo(res);
 		return siz;
 	}
@@ -646,7 +668,9 @@ setipaddr(char* name, struct sockaddr * addr_ret, int af)
 		PyGAI_Err(error);
 		return -1;
 	}
-	memcpy((char *) addr_ret, res->ai_addr, res->ai_addrlen);
+	if (res->ai_addrlen < addr_ret_size)
+		addr_ret_size = res->ai_addrlen;
+	memcpy((char *) addr_ret, res->ai_addr, addr_ret_size);
 	freeaddrinfo(res);
 	switch (addr_ret->sa_family) {
 	case AF_INET:
@@ -821,7 +845,7 @@ getsockaddrarg(PySocketSockObject *s, PyObject *args,
 		}
 		if (!PyArg_ParseTuple(args, "si:getsockaddrarg", &host, &port))
 			return 0;
-		if (setipaddr(host, (struct sockaddr *)addr, AF_INET) < 0)
+		if (setipaddr(host, (struct sockaddr *)addr, sizeof(*addr),  AF_INET) < 0)
 			return 0;
 		addr->sin_family = AF_INET;
 		addr->sin_port = htons((short)port);
@@ -842,7 +866,7 @@ getsockaddrarg(PySocketSockObject *s, PyObject *args,
 				&scope_id)) {
 			return 0;
 		}
-		if (setipaddr(host, (struct sockaddr *)addr, AF_INET6) < 0)
+		if (setipaddr(host, (struct sockaddr *)addr,  sizeof(*addr), AF_INET6) < 0)
 			return 0;
 		addr->sin6_family = s->sock_family;
 		addr->sin6_port = htons((short)port);
@@ -1457,6 +1481,11 @@ PySocketSock_makefile(PySocketSockObject *s, PyObject *args)
 			SOCKETCLOSE(fd);
 		return PySocket_Err();
 	}
+#ifdef USE_GUSI2
+	/* Workaround for bug in Metrowerks MSL vs. GUSI I/O library */
+	if (strchr(mode, 'b') != NULL )
+		bufsize = 0;
+#endif
 	f = PyFile_FromFile(fp, "<socket>", mode, fclose);
 	if (f != NULL)
 		PyFile_SetBufSize(f, bufsize);
@@ -1946,7 +1975,7 @@ PySocket_gethostbyname(PyObject *self, PyObject *args)
 
 	if (!PyArg_ParseTuple(args, "s:gethostbyname", &name))
 		return NULL;
-	if (setipaddr(name, (struct sockaddr *)&addrbuf, AF_INET) < 0)
+	if (setipaddr(name, (struct sockaddr *)&addrbuf,  sizeof(addrbuf), AF_INET) < 0)
 		return NULL;
 	return makeipaddr((struct sockaddr *)&addrbuf,
 		sizeof(struct sockaddr_in));
@@ -2095,7 +2124,7 @@ PySocket_gethostbyname_ex(PyObject *self, PyObject *args)
 
 	if (!PyArg_ParseTuple(args, "s:gethostbyname_ex", &name))
 		return NULL;
-	if (setipaddr(name, (struct sockaddr *)&addr, PF_INET) < 0)
+	if (setipaddr(name, (struct sockaddr *)&addr, sizeof(addr), PF_INET) < 0)
 		return NULL;
 	Py_BEGIN_ALLOW_THREADS
 #ifdef HAVE_GETHOSTBYNAME_R
@@ -2167,7 +2196,7 @@ PySocket_gethostbyaddr(PyObject *self, PyObject *args)
 	if (!PyArg_ParseTuple(args, "s:gethostbyaddr", &ip_num))
 		return NULL;
 	af = PF_UNSPEC;
-	if (setipaddr(ip_num, sa, af) < 0)
+	if (setipaddr(ip_num, sa, sizeof(addr), af) < 0)
 		return NULL;
 	af = sa->sa_family;
 	ap = NULL;
@@ -2527,6 +2556,8 @@ PySocket_getaddrinfo(PyObject *self, PyObject *args)
 			goto err;
 		Py_XDECREF(single);
 	}
+	if (res0)
+		freeaddrinfo(res0);
 	return all;
  err:
 	Py_XDECREF(single);
@@ -2630,11 +2661,71 @@ PySSL_SetError(SSL *ssl, int ret)
 	PyObject *v, *n, *s;
 	char *errstr;
 	int err;
+	enum py_ssl_error p;
 
 	assert(ret <= 0);
     
 	err = SSL_get_error(ssl, ret);
-	n = PyInt_FromLong(err);
+
+	switch (err) {
+	case SSL_ERROR_ZERO_RETURN:
+		errstr = "TLS/SSL connection has been closed";
+		p=PY_SSL_ERROR_ZERO_RETURN;
+		break;
+	case SSL_ERROR_WANT_READ:
+		errstr = "The operation did not complete (read)";
+		p=PY_SSL_ERROR_WANT_READ;
+		break;
+	case SSL_ERROR_WANT_WRITE:
+		p=PY_SSL_ERROR_WANT_WRITE;
+		errstr = "The operation did not complete (write)";
+		break;
+	case SSL_ERROR_WANT_X509_LOOKUP:
+		p=PY_SSL_ERROR_WANT_X509_LOOKUP;
+		errstr = "The operation did not complete (X509 lookup)";
+		break;
+	case SSL_ERROR_WANT_CONNECT:
+		p=PY_SSL_ERROR_WANT_CONNECT;
+		errstr = "The operation did not complete (connect)";
+		break;
+	case SSL_ERROR_SYSCALL:
+	{
+		unsigned long e = ERR_get_error();
+		if(e==0){
+			if(ret==0){
+				p=PY_SSL_ERROR_EOF;
+				errstr = "EOF occurred in violation of protocol";
+			}else if(ret==-1){
+				/* the underlying BIO reported an I/O error */
+				return PySocket_Err();
+			}else{  /* possible? */
+				p=PY_SSL_ERROR_SYSCALL;
+				errstr = "Some I/O error occurred";
+			}
+		} else {
+			p=PY_SSL_ERROR_SYSCALL;
+			/* XXX Protected by global interpreter lock */
+			errstr = ERR_error_string(e, NULL);
+		}
+		break;
+	}   
+	case SSL_ERROR_SSL:
+	{
+		unsigned long e = ERR_get_error();
+		p=PY_SSL_ERROR_SSL;
+		if (e !=0) {
+			/* XXX Protected by global interpreter lock */
+			errstr = ERR_error_string(e, NULL);
+		} else { /* possible? */
+			errstr="A failure in the SSL library occurred";
+		}
+		break;
+	}
+	default:
+		p=PY_SSL_ERROR_INVALID_ERROR_CODE;
+		errstr = "Invalid error code";
+	}
+	n = PyInt_FromLong((long) p);
 	if (n == NULL)
 		return NULL;
 	v = PyTuple_New(2);
@@ -2643,40 +2734,6 @@ PySSL_SetError(SSL *ssl, int ret)
 		return NULL;
 	}
 
-	switch (SSL_get_error(ssl, ret)) {
-	case SSL_ERROR_ZERO_RETURN:
-		errstr = "TLS/SSL connection has been closed";
-		break;
-	case SSL_ERROR_WANT_READ:
-		errstr = "The operation did not complete (read)";
-		break;
-	case SSL_ERROR_WANT_WRITE:
-		errstr = "The operation did not complete (write)";
-		break;
-	case SSL_ERROR_WANT_X509_LOOKUP:
-		errstr = "The operation did not complete (X509 lookup)";
-		break;
-	case SSL_ERROR_SYSCALL:
-	case SSL_ERROR_SSL:
-	{
-		unsigned long e = ERR_get_error();
-		if (e == 0) {
-			/* an EOF was observed that violates the protocol */
-			errstr = "EOF occurred in violation of protocol";
-		} else if (e == -1) {
-			/* the underlying BIO reported an I/O error */
-			Py_DECREF(v);
-			Py_DECREF(n);
-			return PySocket_Err();
-		} else {
-			/* XXX Protected by global interpreter lock */
-			errstr = ERR_error_string(e, NULL);
-		}
-		break;
-	}
-	default:
-		errstr = "Invalid error code";
-	}
 	s = PyString_FromString(errstr);
 	if (s == NULL) {
 		Py_DECREF(v);
@@ -3174,17 +3231,25 @@ init_socket(void)
 				 (PyObject *)&PySSL_Type) != 0)
 		return;
 	PyModule_AddIntConstant(m, "SSL_ERROR_ZERO_RETURN",
-				SSL_ERROR_ZERO_RETURN);
+				PY_SSL_ERROR_ZERO_RETURN);
 	PyModule_AddIntConstant(m, "SSL_ERROR_WANT_READ",
-				SSL_ERROR_WANT_READ);
+				PY_SSL_ERROR_WANT_READ);
 	PyModule_AddIntConstant(m, "SSL_ERROR_WANT_WRITE",
-				SSL_ERROR_WANT_WRITE);
+				PY_SSL_ERROR_WANT_WRITE);
 	PyModule_AddIntConstant(m, "SSL_ERROR_WANT_X509_LOOKUP",
-				SSL_ERROR_WANT_X509_LOOKUP);
+				PY_SSL_ERROR_WANT_X509_LOOKUP);
 	PyModule_AddIntConstant(m, "SSL_ERROR_SYSCALL",
-				SSL_ERROR_SYSCALL);
+				PY_SSL_ERROR_SYSCALL);
 	PyModule_AddIntConstant(m, "SSL_ERROR_SSL",
-				SSL_ERROR_SSL);
+				PY_SSL_ERROR_SSL);
+	PyModule_AddIntConstant(m, "SSL_ERROR_WANT_CONNECT",
+				PY_SSL_ERROR_WANT_CONNECT);
+	/* non ssl.h errorcodes */
+	PyModule_AddIntConstant(m, "SSL_ERROR_EOF",
+				PY_SSL_ERROR_EOF);
+	PyModule_AddIntConstant(m, "SSL_ERROR_INVALID_ERROR_CODE",
+				PY_SSL_ERROR_INVALID_ERROR_CODE);
+
 #endif /* USE_SSL */
 	if (PyDict_SetItemString(d, "SocketType",
 				 (PyObject *)&PySocketSock_Type) != 0)
@@ -3621,6 +3686,37 @@ init_socket(void)
 #ifdef	TCP_MAXSEG
 	insint(d, "TCP_MAXSEG", TCP_MAXSEG);
 #endif
+#ifdef	TCP_CORK
+	insint(d, "TCP_CORK", TCP_CORK);
+#endif
+#ifdef	TCP_KEEPIDLE
+	insint(d, "TCP_KEEPIDLE", TCP_KEEPIDLE);
+#endif
+#ifdef	TCP_KEEPINTVL
+	insint(d, "TCP_KEEPINTVL", TCP_KEEPINTVL);
+#endif
+#ifdef	TCP_KEEPCNT
+	insint(d, "TCP_KEEPCNT", TCP_KEEPCNT);
+#endif
+#ifdef	TCP_SYNCNT
+	insint(d, "TCP_SYNCNT", TCP_SYNCNT);
+#endif
+#ifdef	TCP_LINGER2
+	insint(d, "TCP_LINGER2", TCP_LINGER2);
+#endif
+#ifdef	TCP_DEFER_ACCEPT
+	insint(d, "TCP_DEFER_ACCEPT", TCP_DEFER_ACCEPT);
+#endif
+#ifdef	TCP_WINDOW_CLAMP
+	insint(d, "TCP_WINDOW_CLAMP", TCP_WINDOW_CLAMP);
+#endif
+#ifdef	TCP_INFO
+	insint(d, "TCP_INFO", TCP_INFO);
+#endif
+#ifdef	TCP_QUICKACK
+	insint(d, "TCP_QUICKACK", TCP_QUICKACK);
+#endif
+
 
 	/* IPX options */
 #ifdef	IPX_TYPE

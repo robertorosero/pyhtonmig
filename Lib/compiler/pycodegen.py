@@ -34,6 +34,7 @@ EXCEPT = 2
 TRY_FINALLY = 3
 END_FINALLY = 4
 
+# XXX this doesn't seem to be used
 class BlockStack(misc.Stack):
     __super_init = misc.Stack.__init__
 
@@ -135,7 +136,7 @@ class Module(AbstractCompileMode):
         # to indicate the type of the value.  simplest way to get the
         # same effect is to call marshal and then skip the code.
         mtime = os.stat(self.filename)[stat.ST_MTIME]
-        mtime = struct.pack('i', mtime)
+        mtime = struct.pack('<i', mtime)
         return self.MAGIC + mtime
 
 class LocalNameFinder:
@@ -351,6 +352,13 @@ class CodeGenerator:
         self.emit('LOAD_CONST', None)
         self.emit('RETURN_VALUE')
 
+    def visitExpression(self, node):
+        self.set_lineno(node)
+        self.scopes = self.parseSymbols(node)
+        self.scope = self.scopes[node]
+        self.visit(node.node)
+        self.emit('RETURN_VALUE')
+
     def visitFunction(self, node):
         self._visitFuncOrLambda(node, isLambda=0)
         if node.doc:
@@ -381,9 +389,6 @@ class CodeGenerator:
     def visitClass(self, node):
         gen = self.ClassGen(node, self.scopes,
                             self.get_module())
-        if node.doc:
-            self.emit('LOAD_CONST', node.doc)
-            self.storeName('__doc__')
         walk(node.code, gen)
         gen.finish()
         self.set_lineno(node)
@@ -1158,9 +1163,7 @@ class ExpressionCodeGenerator(NestedScopeMixin, CodeGenerator):
     def __init__(self, tree):
         self.graph = pyassem.PyFlowGraph("<expression>", tree.filename)
         self.__super_init()
-        self.set_lineno(tree)
         walk(tree, self)
-        self.emit('RETURN_VALUE')
 
     def get_module(self):
         return self
@@ -1181,6 +1184,7 @@ class InteractiveCodeGenerator(NestedScopeMixin, CodeGenerator):
 
     def get_module(self):
         return self
+    
     def visitDiscard(self, node):
         # XXX Discard means it's an expression.  Perhaps this is a bad
         # name.
@@ -1299,7 +1303,10 @@ class ClassCodeGenerator(NestedScopeMixin, AbstractClassCode, CodeGenerator):
         self.__super_init(klass, scopes, module)
         self.graph.setFreeVars(self.scope.get_free_vars())
         self.graph.setCellVars(self.scope.get_cell_vars())
-##        self.graph.setFlag(CO_NESTED)
+        self.set_lineno(klass)
+        if klass.doc:
+            self.emit("LOAD_CONST", klass.doc)
+            self.storeName("__doc__")
 
 def generateArgList(arglist):
     """Generate an arg list marking TupleArgs"""

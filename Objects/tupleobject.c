@@ -139,8 +139,8 @@ tupledealloc(register PyTupleObject *op)
 {
 	register int i;
 	register int len =  op->ob_size;
+	PyObject_GC_UnTrack(op);
 	Py_TRASHCAN_SAFE_BEGIN(op)
-	_PyObject_GC_UNTRACK(op);
 	if (len > 0) {
 		i = len;
 		while (--i >= 0)
@@ -337,6 +337,8 @@ tupleconcat(register PyTupleObject *a, register PyObject *bb)
 	}
 #define b ((PyTupleObject *)bb)
 	size = a->ob_size + b->ob_size;
+	if (size < 0)
+		return PyErr_NoMemory();
 	np = (PyTupleObject *) PyTuple_New(size);
 	if (np == NULL) {
 		return NULL;

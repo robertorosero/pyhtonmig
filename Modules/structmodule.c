@@ -1,4 +1,3 @@
-
 /* struct module -- pack values into and (out of) strings */
 
 /* New version supporting byte order, alignment and size options,
@@ -226,12 +225,8 @@ pack_float(double x, /* The number to pack */
 		return -1;
 	}
 
-	if (e >= 128) {
-		/* XXX 128 itself is reserved for Inf/NaN */
-		PyErr_SetString(PyExc_OverflowError,
-				"float too large to pack with f format");
-		return -1;
-	}
+	if (e >= 128)
+		goto Overflow;
 	else if (e < -126) {
 		/* Gradual underflow */
 		f = ldexp(f, 126 + e);
@@ -244,6 +239,14 @@ pack_float(double x, /* The number to pack */
 
 	f *= 8388608.0; /* 2**23 */
 	fbits = (long) floor(f + 0.5); /* Round */
+	assert(fbits <= 8388608);
+	if (fbits >> 23) {
+		/* The carry propagated out of a string of 23 1 bits. */
+		fbits = 0;
+		++e;
+		if (e >= 255)
+			goto Overflow;
+	}
 
 	/* First byte */
 	*p = (s<<7) | (e>>1);
@@ -262,6 +265,11 @@ pack_float(double x, /* The number to pack */
 
 	/* Done */
 	return 0;
+
+ Overflow:
+	PyErr_SetString(PyExc_OverflowError,
+			"float too large to pack with f format");
+	return -1;
 }
 
 static int
@@ -297,12 +305,8 @@ pack_double(double x, /* The number to pack */
 		return -1;
 	}
 
-	if (e >= 1024) {
-		/* XXX 1024 itself is reserved for Inf/NaN */
-		PyErr_SetString(PyExc_OverflowError,
-				"float too large to pack with d format");
-		return -1;
-	}
+	if (e >= 1024)
+		goto Overflow;
 	else if (e < -1022) {
 		/* Gradual underflow */
 		f = ldexp(f, 1022 + e);
@@ -316,9 +320,24 @@ pack_double(double x, /* The number to pack */
 	/* fhi receives the high 28 bits; flo the low 24 bits (== 52 bits) */
 	f *= 268435456.0; /* 2**28 */
 	fhi = (long) floor(f); /* Truncate */
+	assert(fhi < 268435456);
+
 	f -= (double)fhi;
 	f *= 16777216.0; /* 2**24 */
 	flo = (long) floor(f + 0.5); /* Round */
+	assert(flo <= 16777216);
+	if (flo >> 24) {
+		/* The carry propagated out of a string of 24 1 bits. */
+		flo = 0;
+		++fhi;
+		if (fhi >> 28) {
+			/* And it also progagated out of the next 28 bits. */
+			fhi = 0;
+			++e;
+			if (e >= 2047)
+				goto Overflow;
+		}
+	}
 
 	/* First byte */
 	*p = (s<<7) | (e>>4);
@@ -354,6 +373,11 @@ pack_double(double x, /* The number to pack */
 
 	/* Done */
 	return 0;
+
+ Overflow:
+	PyErr_SetString(PyExc_OverflowError,
+			"float too large to pack with d format");
+	return -1;
 }
 
 static PyObject *
@@ -483,6 +507,14 @@ typedef struct _formatdef {
 */
 
 /* Native mode routines. ****************************************************/
+/* NOTE:
+   In all n[up]_<type> routines handling types larger than 1 byte, there is
+   *no* guarantee that the p pointer is properly aligned for each type,
+   therefore memcpy is called.  An intermediate variable is used to
+   compensate for big-endian architectures.
+   Normally both the intermediate variable and the memcpy call will be
+   skipped by C optimisation in little-endian architectures (gcc >= 2.91
+   does this). */
 
 static PyObject *
 nu_char(const char *p, const formatdef *f)
@@ -505,38 +537,49 @@ nu_ubyte(const char *p, const formatdef *f)
 static PyObject *
 nu_short(const char *p, const formatdef *f)
 {
-	return PyInt_FromLong((long) *(short *)p);
+	short x;
+	memcpy((char *)&x, p, sizeof x);
+	return PyInt_FromLong((long)x);
 }
 
 static PyObject *
 nu_ushort(const char *p, const formatdef *f)
 {
-	return PyInt_FromLong((long) *(unsigned short *)p);
+	unsigned short x;
+	memcpy((char *)&x, p, sizeof x);
+	return PyInt_FromLong((long)x);
 }
 
 static PyObject *
 nu_int(const char *p, const formatdef *f)
 {
-	return PyInt_FromLong((long) *(int *)p);
+	int x;
+	memcpy((char *)&x, p, sizeof x);
+	return PyInt_FromLong((long)x);
 }
 
 static PyObject *
 nu_uint(const char *p, const formatdef *f)
 {
-	unsigned int x = *(unsigned int *)p;
+	unsigned int x;
+	memcpy((char *)&x, p, sizeof x);
 	return PyLong_FromUnsignedLong((unsigned long)x);
 }
 
 static PyObject *
 nu_long(const char *p, const formatdef *f)
 {
-	return PyInt_FromLong(*(long *)p);
+	long x;
+	memcpy((char *)&x, p, sizeof x);
+	return PyInt_FromLong(x);
 }
 
 static PyObject *
 nu_ulong(const char *p, const formatdef *f)
 {
-	return PyLong_FromUnsignedLong(*(unsigned long *)p);
+	unsigned long x;
+	memcpy((char *)&x, p, sizeof x);
+	return PyLong_FromUnsignedLong(x);
 }
 
 /* Native mode doesn't support q or Q unless the platform C supports
@@ -547,27 +590,26 @@ nu_ulong(const char *p, const formatdef *f)
 static PyObject *
 nu_longlong(const char *p, const formatdef *f)
 {
-	/* p may not be properly aligned */
 	LONG_LONG x;
-	memcpy(&x, p, sizeof(LONG_LONG));
+	memcpy((char *)&x, p, sizeof x);
 	return PyLong_FromLongLong(x);
 }
 
 static PyObject *
 nu_ulonglong(const char *p, const formatdef *f)
 {
-	/* p may not be properly aligned */
 	unsigned LONG_LONG x;
-	memcpy(&x, p, sizeof(unsigned LONG_LONG));
+	memcpy((char *)&x, p, sizeof x);
 	return PyLong_FromUnsignedLongLong(x);
 }
+
 #endif
 
 static PyObject *
 nu_float(const char *p, const formatdef *f)
 {
 	float x;
-	memcpy((char *)&x, p, sizeof(float));
+	memcpy((char *)&x, p, sizeof x);
 	return PyFloat_FromDouble((double)x);
 }
 
@@ -575,14 +617,16 @@ static PyObject *
 nu_double(const char *p, const formatdef *f)
 {
 	double x;
-	memcpy((char *)&x, p, sizeof(double));
+	memcpy((char *)&x, p, sizeof x);
 	return PyFloat_FromDouble(x);
 }
 
 static PyObject *
 nu_void_p(const char *p, const formatdef *f)
 {
-	return PyLong_FromVoidPtr(*(void **)p);
+	void *x;
+	memcpy((char *)&x, p, sizeof x);
+	return PyLong_FromVoidPtr(x);
 }
 
 static int
@@ -631,15 +675,17 @@ static int
 np_short(char *p, PyObject *v, const formatdef *f)
 {
 	long x;
+	short y;
 	if (get_long(v, &x) < 0)
 		return -1;
 	if (x < SHRT_MIN || x > SHRT_MAX){
 		PyErr_SetString(StructError,
 				"short format requires " STRINGIFY(SHRT_MIN)
-                                "<=number<=" STRINGIFY(SHRT_MAX));
+				"<=number<=" STRINGIFY(SHRT_MAX));
 		return -1;
 	}
-	* (short *)p = (short)x;
+	y = (short)x;
+	memcpy(p, (char *)&y, sizeof y);
 	return 0;
 }
 
@@ -647,6 +693,7 @@ static int
 np_ushort(char *p, PyObject *v, const formatdef *f)
 {
 	long x;
+	unsigned short y;
 	if (get_long(v, &x) < 0)
 		return -1;
 	if (x < 0 || x > USHRT_MAX){
@@ -654,7 +701,8 @@ np_ushort(char *p, PyObject *v, const formatdef *f)
 				"short format requires 0<=number<=" STRINGIFY(USHRT_MAX));
 		return -1;
 	}
-	* (unsigned short *)p = (unsigned short)x;
+	y = (unsigned short)x;
+	memcpy(p, (char *)&y, sizeof y);
 	return 0;
 }
 
@@ -662,9 +710,11 @@ static int
 np_int(char *p, PyObject *v, const formatdef *f)
 {
 	long x;
+	int y;
 	if (get_long(v, &x) < 0)
 		return -1;
-	* (int *)p = x;
+	y = (int)x;
+	memcpy(p, (char *)&y, sizeof y);
 	return 0;
 }
 
@@ -672,9 +722,11 @@ static int
 np_uint(char *p, PyObject *v, const formatdef *f)
 {
 	unsigned long x;
+	unsigned int y;
 	if (get_ulong(v, &x) < 0)
 		return -1;
-	* (unsigned int *)p = x;
+	y = (unsigned int)x;
+	memcpy(p, (char *)&y, sizeof y);
 	return 0;
 }
 
@@ -684,7 +736,7 @@ np_long(char *p, PyObject *v, const formatdef *f)
 	long x;
 	if (get_long(v, &x) < 0)
 		return -1;
-	* (long *)p = x;
+	memcpy(p, (char *)&x, sizeof x);
 	return 0;
 }
 
@@ -694,7 +746,7 @@ np_ulong(char *p, PyObject *v, const formatdef *f)
 	unsigned long x;
 	if (get_ulong(v, &x) < 0)
 		return -1;
-	* (unsigned long *)p = x;
+	memcpy(p, (char *)&x, sizeof x);
 	return 0;
 }
 
@@ -706,7 +758,7 @@ np_longlong(char *p, PyObject *v, const formatdef *f)
 	LONG_LONG x;
 	if (get_longlong(v, &x) < 0)
 		return -1;
-	memcpy(p, &x, sizeof(LONG_LONG));
+	memcpy(p, (char *)&x, sizeof x);
 	return 0;
 }
 
@@ -716,7 +768,7 @@ np_ulonglong(char *p, PyObject *v, const formatdef *f)
 	unsigned LONG_LONG x;
 	if (get_ulonglong(v, &x) < 0)
 		return -1;
-	memcpy(p, &x, sizeof(unsigned LONG_LONG));
+	memcpy(p, (char *)&x, sizeof x);
 	return 0;
 }
 #endif
@@ -730,7 +782,7 @@ np_float(char *p, PyObject *v, const formatdef *f)
 				"required argument is not a float");
 		return -1;
 	}
-	memcpy(p, (char *)&x, sizeof(float));
+	memcpy(p, (char *)&x, sizeof x);
 	return 0;
 }
 
@@ -758,7 +810,7 @@ np_void_p(char *p, PyObject *v, const formatdef *f)
 					"required argument is not an integer");
 		return -1;
 	}
-	*(void **)p = x;
+	memcpy(p, (char *)&x, sizeof x);
 	return 0;
 }
 
@@ -1218,7 +1270,7 @@ calcsize(const char *fmt, const formatdef *f)
 		size += x;
 		if (x/itemsize != num || size < 0) {
 			PyErr_SetString(StructError,
-                                        "total struct size too long");
+					"total struct size too long");
 			return -1;
 		}
 	}
@@ -1267,7 +1319,7 @@ struct_pack(PyObject *self, PyObject *args)
 
 	if (args == NULL || !PyTuple_Check(args) ||
 	    (n = PyTuple_Size(args)) < 1)
-        {
+	{
 		PyErr_SetString(PyExc_TypeError,
 			"struct.pack requires at least one argument");
 		return NULL;

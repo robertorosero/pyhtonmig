@@ -517,6 +517,18 @@ extern DL_IMPORT(int) PyUnicode_AsWideChar(
 
 #endif
 
+/* --- Unicode ordinals --------------------------------------------------- */
+
+/* Create a Unicode Object from the given Unicode code point ordinal. 
+ 
+   The ordinal must be in range(0x10000) on narrow Python builds
+   (UCS2), and range(0x110000) on wide builds (UCS4). A ValueError is
+   raised in case it is not.
+
+*/
+
+extern DL_IMPORT(PyObject*) PyUnicode_FromOrdinal(int ordinal);
+
 /* === Builtin Codecs ===================================================== 
 
    Many of these APIs take two arguments encoding and errors. These
@@ -1038,6 +1050,13 @@ extern DL_IMPORT(PyObject *) PyUnicode_Format(
 extern DL_IMPORT(int) PyUnicode_Contains(
     PyObject *container,	/* Container string */ 
     PyObject *element		/* Element string */
+    );
+
+/* Externally visible for str.strip(unicode) */
+extern DL_IMPORT(PyObject *) _PyUnicode_XStrip(
+    PyUnicodeObject *self,
+    int striptype,
+    PyObject *sepobj
     );
 
 /* === Characters Type APIs =============================================== */

@@ -93,7 +93,9 @@ platforms), and is equivalent to \code{getenv("HOME")} in C.
 If the platform supports the \function{putenv()} function, this
 mapping may be used to modify the environment as well as query the
 environment.  \function{putenv()} will be called automatically when
-the mapping is modified.
+the mapping is modified.  \note{On some platforms, including
+FreeBSD and Mac OS X, setting \code{environ} may cause memory leaks.
+Refer to the system documentation for putenv.}
 
 If \function{putenv()} is not provided, this mapping may be passed to
 the appropriate process-creation functions to cause child processes to 
@@ -113,7 +115,9 @@ Availability: \UNIX.
 \end{funcdesc}
 
 \begin{funcdesc}{getegid}{}
-Return the current process' effective group id.
+Return the effective group id of the current process.  This
+corresponds to the `set id' bit on the file being executed in the
+current process.
 Availability: \UNIX.
 \end{funcdesc}
 
@@ -125,7 +129,7 @@ Availability: \UNIX.
 
 \begin{funcdesc}{getgid}{}
 \index{process!group}
-Return the current process' group id.
+Return the real group id of the current process.
 Availability: \UNIX.
 \end{funcdesc}
 
@@ -143,7 +147,7 @@ Availability: \UNIX.
 
 \begin{funcdesc}{getpgrp}{}
 \index{process!group}
-Return the current process group id.
+Return the id of the current process group.
 Availability: \UNIX.
 \end{funcdesc}
 
@@ -179,6 +183,10 @@ Set the environment variable named \var{varname} to the string
 started with \function{os.system()}, \function{popen()} or
 \function{fork()} and \function{execv()}.
 Availability: most flavors of \UNIX, Windows.
+
+\note{On some platforms, including FreeBSD and Mac OS X,
+setting \code{environ} may cause memory leaks.
+Refer to the system documentation for putenv.}
 
 When \function{putenv()} is
 supported, assignments to items in \code{os.environ} are automatically
@@ -218,9 +226,10 @@ Calls the system call \cfunction{setpgrp()} or \cfunction{setpgrp(0,
 Availability: \UNIX.
 \end{funcdesc}
 
-\begin{funcdesc}{setpgid}{pid, pgrp}
-Calls the system call \cfunction{setpgid()}.  See the \UNIX{} manual
-for the semantics.
+\begin{funcdesc}{setpgid}{pid, pgrp} Calls the system call
+\cfunction{setpgid()} to set the process group id of the process with
+id \var{pid} to the process group with id \var{pgrp}.  See the \UNIX{}
+manual for the semantics.
 Availability: \UNIX.
 \end{funcdesc}
 
@@ -308,7 +317,7 @@ Availability: \UNIX, Windows.
 \end{funcdesc}
 
 \begin{funcdesc}{tmpfile}{}
-Return a new file object opened in update mode (\samp{w+}).  The file
+Return a new file object opened in update mode (\samp{w+b}).  The file
 has no directory entries associated with it and will be automatically
 deleted once there are no file descriptors for the file.
 Availability: \UNIX, Windows.
@@ -327,6 +336,11 @@ the child processes.  The only way to control the input and output
 streams and also retrieve the return codes is to use the
 \class{Popen3} and \class{Popen4} classes from the \refmodule{popen2}
 module; these are only available on \UNIX.
+
+For a discussion of possible deadlock conditions related to the use
+of these functions, see ``\ulink{Flow Control
+Issues}{popen2-flow-control.html}''
+(section~\ref{popen2-flow-control}).
 
 \begin{funcdesc}{popen2}{cmd\optional{, mode\optional{, bufsize}}}
 Executes \var{cmd} as a sub-process.  Returns the file objects
@@ -382,6 +396,12 @@ first if necessary.
 Availability: \UNIX, Windows.
 \end{funcdesc}
 
+\begin{funcdesc}{fdatasync}{fd}
+Force write of file with filedescriptor \var{fd} to disk.
+Does not force update of metadata.
+Availability: \UNIX.
+\end{funcdesc}
+
 \begin{funcdesc}{fpathconf}{fd, name}
 Return system configuration information relevant to an open file.
 \var{name} specifies the configuration value to retrieve; it may be a
@@ -410,6 +430,18 @@ Availability: \UNIX, Windows.
 Return information about the filesystem containing the file associated
 with file descriptor \var{fd}, like \function{statvfs()}.
 Availability: \UNIX.
+\end{funcdesc}
+
+\begin{funcdesc}{fsync}{fd}
+Force write of file with filedescriptor \var{fd} to disk.  On \UNIX,
+this calls the native \cfunction{fsync()} function; on Windows, the
+MS \cfunction{_commit()} function.
+
+If you're starting with a Python file object \var{f}, first do
+\code{\var{f}.flush()}, and then do \code{os.fsync(\var{f}.fileno())},
+to ensure that all internal buffers associated with \var{f} are written
+to disk.
+Availability: \UNIX, and Windows starting in 2.2.3.
 \end{funcdesc}
 
 \begin{funcdesc}{ftruncate}{fd, length}
@@ -467,7 +499,9 @@ Availability: \UNIX, Windows.
 
 \begin{funcdesc}{read}{fd, n}
 Read at most \var{n} bytes from file descriptor \var{fd}.
-Return a string containing the bytes read.
+Return a string containing the bytes read.  If the end of the file
+referred to by \var{fd} has been reached, an empty string is
+returned.
 Availability: Macintosh, \UNIX, Windows.
 
 Note: this function is intended for low-level I/O and must be applied
@@ -544,11 +578,13 @@ Availability: Macintosh, Windows.
 \subsection{Files and Directories \label{os-file-dir}}
 
 \begin{funcdesc}{access}{path, mode}
-Check read/write/execute permissions for this process or existence of
-file \var{path}.  \var{mode} should be \constant{F_OK} to test the
-existence of \var{path}, or it can be the inclusive OR of one or more
-of \constant{R_OK}, \constant{W_OK}, and \constant{X_OK} to test
-permissions.  Return \code{1} if access is allowed, \code{0} if not.
+Use the real uid/gid to test for access to \var{path}.  Note that most
+operations will use the effective uid/gid, therefore this routine can
+be used in a suid/sgid environment to test if the invoking user has the
+specified access to \var{path}.  \var{mode} should be \constant{F_OK}
+to test the existence of \var{path}, or it can be the inclusive OR of
+one or more of \constant{R_OK}, \constant{W_OK}, and \constant{X_OK} to
+test permissions.  Return \code{1} if access is allowed, \code{0} if not.
 See the \UNIX{} man page \manpage{access}{2} for more information.
 Availability: \UNIX, Windows.
 \end{funcdesc}
@@ -643,12 +679,15 @@ Availability: Macintosh, \UNIX, Windows.
 
 \begin{funcdesc}{makedirs}{path\optional{, mode}}
 \index{directory!creating}
-Recursive directory creation function.  Like \function{mkdir()},
+Recursive directory creation function.\index{directory!creating}
+\index{UNC paths!and \function{os.makedirs()}}
+Like \function{mkdir()},
 but makes all intermediate-level directories needed to contain the
 leaf directory.  Throws an \exception{error} exception if the leaf
 directory already exists or cannot be created.  The default \var{mode}
 is \code{0777} (octal).  This function does not properly handle UNC
-paths (only relevant on Windows systems).
+paths (only relevant on Windows systems; Universal Naming Convention
+paths are those that use the `\code{\e\e host\e path}' syntax).
 \versionadded{1.5.2}
 \end{funcdesc}
 
@@ -748,7 +787,7 @@ the \ctype{stat} structure, namely:
 \member{st_mode} (protection bits),
 \member{st_ino} (inode number),
 \member{st_dev} (device),
-\member{st_nlink} (number of hard links,
+\member{st_nlink} (number of hard links),
 \member{st_uid} (user ID of owner),
 \member{st_gid} (group ID of owner),
 \member{st_size} (size of file, in bytes),
@@ -842,6 +881,10 @@ files if \var{dir} is omitted or \code{None}.  If given and not
 filename.  Applications are responsible for properly creating and
 managing files created using paths returned by \function{tempnam()};
 no automatic cleanup is provided.
+On \UNIX, the environment variable \envvar{TMPDIR} overrides
+\var{dir}, while on Windows the \envvar{TMP} is used.  The specific
+behavior of this function depends on the C library implementation;
+some aspects are underspecified in system documentation.
 \warning{Use of \function{tempnam()} is vulnerable to symlink attacks;
 consider using \function{tmpfile()} instead.}
 Availability: \UNIX, Windows.
@@ -980,7 +1023,9 @@ Availability: Some flavors of \UNIX.
 \begin{funcdesc}{kill}{pid, sig}
 \index{process!killing}
 \index{process!signalling}
-Kill the process \var{pid} with signal \var{sig}.
+Kill the process \var{pid} with signal \var{sig}.  Constants for the
+specific signals available on the host platform are defined in the
+\refmodule{signal} module.
 Availability: \UNIX.
 \end{funcdesc}
 
@@ -1016,7 +1061,8 @@ Execute the program \var{path} in a new process.  If \var{mode} is
 \constant{P_NOWAIT}, this function returns the process ID of the new
 process; if \var{mode} is \constant{P_WAIT}, returns the process's
 exit code if it exits normally, or \code{-\var{signal}}, where
-\var{signal} is the signal that killed the process.
+\var{signal} is the signal that killed the process.  On Windows, the
+process ID will actually be the process handle.
 
 The \character{l} and \character{v} variants of the
 \function{spawn*()} functions differ in how command-line arguments are
@@ -1060,8 +1106,9 @@ L = ['cp', 'index.html', '/dev/null']
 os.spawnvpe(os.P_WAIT, 'cp', L, os.environ)
 \end{verbatim}
 
-Availability: \UNIX, Windows.  \function{spawnvp()} and
-\function{spawnvpe()} are not available on Windows.
+Availability: \UNIX, Windows.  \function{spawnlp()},
+\function{spawnlpe()}, \function{spawnvp()} and \function{spawnvpe()}
+are not available on Windows.
 \versionadded{1.6}
 \end{funcdesc}
 
@@ -1295,6 +1342,12 @@ An alternative character used by the operating system to separate pathname
 components, or \code{None} if only one separator character exists.  This is
 set to \character{/} on DOS and Windows systems where \code{sep} is a
 backslash.
+\end{datadesc}
+
+\begin{datadesc}{extsep}
+The character which separates the base filename from the extension;
+for example, the \character{.} in \code{os.py}.
+\versionadded{2.2}
 \end{datadesc}
 
 \begin{datadesc}{pathsep}

@@ -316,8 +316,14 @@ init_common(int *argcp, char ***argvp, int embedded)
 		*argcp = 1;
 		*argvp = emb_argv;
 	} else {
-		/* Create argc/argv. Do it before we go into the options event loop. */
-		*argcp = PyMac_GetArgv(argvp, PyMac_options.noargs);
+		/* Create argc/argv. Do it before we go into the options event loop.
+		** In MachoPython we skip this step if we already have plausible
+		** command line arguments.
+		*/
+#if TARGET_API_MAC_OSX
+		if (*argcp == 2 && strncmp((*argvp)[1], "-psn_", 5) == 0)
+#endif
+			*argcp = PyMac_GetArgv(argvp, PyMac_options.noargs);
 #if !TARGET_API_MAC_OSX
 #ifndef NO_ARGV0_CHDIR
 		if (*argcp >= 1 && (*argvp)[0] && (*argvp)[0][0]) {
@@ -330,6 +336,8 @@ init_common(int *argcp, char ***argvp, int embedded)
 			p = strrchr(app_wd, ':');
 			if ( p ) *p = 0;
 			chdir(app_wd);
+		} else {
+			fprintf(stderr, "Warning: No argv[0], cannot chdir to pythonhome\n");
 		}
 #endif
 #endif
@@ -550,13 +558,9 @@ main(int argc, char **argv)
 		if (locateResourcePy("__main__.py", scriptpath, 1024))
 			script = scriptpath;
 			
-		printf("original argc=%d\n", argc);
-		for(i=0; i<argc; i++) printf("original argv[%d] = \"%s\"\n", i, argv[i]);
 
 		init_common(&argc, &argv, 0);
 
-		printf("modified argc=%d\n", argc);
-		for(i=0; i<argc; i++) printf("modified argv[%d] = \"%s\"\n", i, argv[i]);
 	}
 
 	Py_Main(argc, argv, script);

@@ -13,10 +13,6 @@
 #include "eval.h"
 #include "marshal.h"
 
-#ifdef HAVE_UNISTD_H
-#include <unistd.h>
-#endif
-
 #ifdef HAVE_SIGNAL_H
 #include <signal.h>
 #endif
@@ -53,8 +49,6 @@ int _Py_AskYesNo(char *prompt);
 
 extern void _PyUnicode_Init(void);
 extern void _PyUnicode_Fini(void);
-extern void _PyCodecRegistry_Init(void);
-extern void _PyCodecRegistry_Fini(void);
 
 int Py_DebugFlag; /* Needed by parser.c */
 int Py_VerboseFlag; /* Needed by import.c */
@@ -136,9 +130,6 @@ Py_Initialize(void)
 	interp->modules = PyDict_New();
 	if (interp->modules == NULL)
 		Py_FatalError("Py_Initialize: can't make modules dictionary");
-
-	/* Init codec registry */
-	_PyCodecRegistry_Init();
 
 #ifdef Py_USING_UNICODE
 	/* Init Unicode implementation; relies on the codec registry */
@@ -223,14 +214,6 @@ Py_Finalize(void)
 	/* Disable signal handling */
 	PyOS_FiniInterrupts();
 
-#ifdef Py_USING_UNICODE
-	/* Cleanup Unicode implementation */
-	_PyUnicode_Fini();
-#endif
-
-	/* Cleanup Codec registry */
-	_PyCodecRegistry_Fini();
-
 	/* Destroy all modules */
 	PyImport_Cleanup();
 
@@ -272,6 +255,11 @@ Py_Finalize(void)
 	PyInt_Fini();
 	PyFloat_Fini();
 
+#ifdef Py_USING_UNICODE
+	/* Cleanup Unicode implementation */
+	_PyUnicode_Fini();
+#endif
+
 	/* XXX Still allocated:
 	   - various static ad-hoc pointers to interned strings
 	   - int and float free list blocks
@@ -281,10 +269,6 @@ Py_Finalize(void)
 	PyGrammar_RemoveAccelerators(&_PyParser_Grammar);
 
 	call_ll_exitfuncs();
-
-#ifdef Py_TRACE_REFS
-	_Py_ResetReferences();
-#endif /* Py_TRACE_REFS */
 }
 
 /* Create and initialize a new interpreter and thread, and return the
@@ -924,7 +908,7 @@ void PyErr_Display(PyObject *exception, PyObject *value, PyObject *tb)
 		if (tb && tb != Py_None)
 			err = PyTraceBack_Print(tb, f);
 		if (err == 0 &&
-		    PyErr_GivenExceptionMatches(exception, PyExc_SyntaxError))
+		    PyObject_HasAttrString(v, "print_file_and_line"))
 		{
 			PyObject *message;
 			char *filename, *text;

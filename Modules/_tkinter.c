@@ -1191,7 +1191,7 @@ Tkapp_SplitList(PyObject *self, PyObject *args)
 	PyObject *v;
 	int i;
 
-	if (!PyArg_ParseTuple(args, "s:splitlist", &list))
+	if (!PyArg_ParseTuple(args, "et:splitlist", "utf-8", &list))
 		return NULL;
 
 	if (Tcl_SplitList(Tkapp_Interp(self), list, &argc, &argv) == TCL_ERROR)
@@ -1219,7 +1219,7 @@ Tkapp_Split(PyObject *self, PyObject *args)
 {
 	char *list;
 
-	if (!PyArg_ParseTuple(args, "s:split", &list))
+	if (!PyArg_ParseTuple(args, "et:split", "utf-8", &list))
 		return NULL;
 	return Split(list);
 }
@@ -1346,7 +1346,7 @@ Tkapp_CreateCommand(PyObject *self, PyObject *args)
 
 	data = PyMem_NEW(PythonCmd_ClientData, 1);
 	if (!data)
-		return NULL;
+		return PyErr_NoMemory();
 	Py_XINCREF(self);
 	Py_XINCREF(func);
 	data->self = self;

@@ -172,7 +172,7 @@ class Transformer:
     def eval_input(self, nodelist):
         # from the built-in function input()
         ### is this sufficient?
-        return self.com_node(nodelist[0])
+        return Expression(self.com_node(nodelist[0]))
 
     def funcdef(self, nodelist):
         # funcdef: 'def' NAME parameters ':' suite
@@ -746,9 +746,8 @@ class Transformer:
 
     def com_arglist(self, nodelist):
         # varargslist:
-        #   (fpdef ['=' test] ',')* ('*' NAME [',' ('**'|'*' '*') NAME]
-        #  | fpdef ['=' test] (',' fpdef ['=' test])* [',']
-        #  | ('**'|'*' '*') NAME)
+        #     (fpdef ['=' test] ',')* ('*' NAME [',' '**' NAME] | '**' NAME)
+        #   | fpdef ['=' test] (',' fpdef ['=' test])* [',']
         # fpdef: NAME | '(' fplist ')'
         # fplist: fpdef (',' fpdef)* [',']
         names = []
@@ -767,12 +766,10 @@ class Transformer:
                         i = i + 3
 
                 if i < len(nodelist):
-                    # should be DOUBLESTAR or STAR STAR
+                    # should be DOUBLESTAR
                     t = nodelist[i][0]
                     if t == token.DOUBLESTAR:
                         node = nodelist[i+1]
-                    elif t == token.STARSTAR:
-                        node = nodelist[i+2]
                     else:
                         raise ValueError, "unexpected token: %s" % t
                     names.append(node[1])

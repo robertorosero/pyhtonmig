@@ -3,7 +3,13 @@
 
 #include <stdlib.h>
 #include <string.h>
+#if defined(__APPLE__) || defined(HAVE_PTHREAD_DESTRUCTOR)
+#define destructor xxdestructor
+#endif
 #include <pthread.h>
+#if defined(__APPLE__) || defined(HAVE_PTHREAD_DESTRUCTOR)
+#undef destructor
+#endif
 #include <signal.h>
 
 
@@ -147,7 +153,7 @@ long
 PyThread_start_new_thread(void (*func)(void *), void *arg)
 {
 	pthread_t th;
-	int success;
+	int status;
  	sigset_t oldmask, newmask;
 #if defined(THREAD_STACK_SIZE) || defined(PTHREAD_SYSTEM_SCHED_SUPPORTED)
 	pthread_attr_t attrs;
@@ -173,7 +179,7 @@ PyThread_start_new_thread(void (*func)(void *), void *arg)
 	sigfillset(&newmask);
 	SET_THREAD_SIGMASK(SIG_BLOCK, &newmask, &oldmask);
 
-	success = pthread_create(&th, 
+	status = pthread_create(&th, 
 #if defined(PY_PTHREAD_D4)
 				 pthread_attr_default,
 				 (pthread_startroutine_t)func, 
@@ -203,13 +209,15 @@ PyThread_start_new_thread(void (*func)(void *), void *arg)
 #if defined(THREAD_STACK_SIZE) || defined(PTHREAD_SYSTEM_SCHED_SUPPORTED)
 	pthread_attr_destroy(&attrs);
 #endif
-	if (success == 0) {
+	if (status != 0)
+            return -1;
+
 #if defined(PY_PTHREAD_D4) || defined(PY_PTHREAD_D6) || defined(PY_PTHREAD_D7)
-		pthread_detach(&th);
+        pthread_detach(&th);
 #elif defined(PY_PTHREAD_STD)
-		pthread_detach(th);
+        pthread_detach(th);
 #endif
-	}
+
 #if SIZEOF_PTHREAD_T <= SIZEOF_LONG
 	return (long) th;
 #else
@@ -353,27 +361,23 @@ PyThread_acquire_lock(PyThread_type_lock lock, int waitflag)
 	status = pthread_mutex_lock( &thelock->mut );
 	CHECK_STATUS("pthread_mutex_lock[1]");
 	success = thelock->locked == 0;
-	if (success) thelock->locked = 1;
-	status = pthread_mutex_unlock( &thelock->mut );
-	CHECK_STATUS("pthread_mutex_unlock[1]");
 
 	if ( !success && waitflag ) {
 		/* continue trying until we get the lock */
 
 		/* mut must be locked by me -- part of the condition
 		 * protocol */
-		status = pthread_mutex_lock( &thelock->mut );
-		CHECK_STATUS("pthread_mutex_lock[2]");
 		while ( thelock->locked ) {
 			status = pthread_cond_wait(&thelock->lock_released,
 						   &thelock->mut);
 			CHECK_STATUS("pthread_cond_wait");
 		}
-		thelock->locked = 1;
-		status = pthread_mutex_unlock( &thelock->mut );
-		CHECK_STATUS("pthread_mutex_unlock[2]");
 		success = 1;
 	}
+	if (success) thelock->locked = 1;
+	status = pthread_mutex_unlock( &thelock->mut );
+	CHECK_STATUS("pthread_mutex_unlock[1]");
+
 	if (error) success = 0;
 	dprintf(("PyThread_acquire_lock(%p, %d) -> %d\n", lock, waitflag, success));
 	return success;

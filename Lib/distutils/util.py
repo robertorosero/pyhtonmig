@@ -42,10 +42,11 @@ def get_platform ():
 
     (osname, host, release, version, machine) = os.uname()
 
-    # Convert the OS name to lowercase and remove '/' characters
-    # (to accommodate BSD/OS)
+    # Convert the OS name to lowercase, remove '/' characters
+    # (to accommodate BSD/OS), and translate spaces (for "Power Macintosh")
     osname = string.lower(osname)
     osname = string.replace(osname, '/', '')
+    machine = string.replace(machine, ' ', '_')
 
     if osname[:5] == "linux":
         # At least on Linux/Intel, 'machine' is the processor --
@@ -83,6 +84,8 @@ def convert_path (pathname):
     ends with a slash.
     """
     if os.sep == '/':
+        return pathname
+    if not pathname:
         return pathname
     if pathname[0] == '/':
         raise ValueError, "path '%s' cannot be absolute" % pathname

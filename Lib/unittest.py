@@ -46,7 +46,7 @@ SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
 
 __author__ = "Steve Purcell"
 __email__ = "stephen_purcell at yahoo dot com"
-__version__ = "$Revision$"[11:-2]
+__version__ = "#Revision: 1.43 $"[11:-2]
 
 import time
 import sys
@@ -616,7 +616,7 @@ class TextTestRunner:
         self.stream.writeln(result.separator2)
         run = result.testsRun
         self.stream.writeln("Ran %d test%s in %.3fs" %
-                            (run, run == 1 and "" or "s", timeTaken))
+                            (run, run != 1 and "s" or "", timeTaken))
         self.stream.writeln()
         if not result.wasSuccessful():
             self.stream.write("FAILED (")

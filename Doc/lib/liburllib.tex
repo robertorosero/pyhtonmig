@@ -60,7 +60,7 @@ redirected URL.
 If the \var{url} uses the \file{http:} scheme identifier, the optional
 \var{data} argument may be given to specify a \code{POST} request
 (normally the request type is \code{GET}).  The \var{data} argument
-must in standard \mimetype{application/x-www-form-urlencoded} format;
+must be in standard \mimetype{application/x-www-form-urlencoded} format;
 see the \function{urlencode()} function below.
 
 The \function{urlopen()} function works transparently with proxies
@@ -91,10 +91,9 @@ If the URL points to a local file, or a valid cached copy of the
 object exists, the object is not copied.  Return a tuple
 \code{(\var{filename}, \var{headers})} where \var{filename} is the
 local file name under which the object can be found, and \var{headers}
-is either \code{None} (for a local object) or whatever the
-\method{info()} method of the object returned by \function{urlopen()}
-returned (for a remote object, possibly cached).  Exceptions are the
-same as for \function{urlopen()}.
+is whatever the \method{info()} method of the object returned by
+\function{urlopen()} returned (for a remote object, possibly cached).
+Exceptions are the same as for \function{urlopen()}.
 
 The second argument, if present, specifies the file location to copy
 to (if absent, the location will be a tempfile with a generated name).
@@ -103,7 +102,7 @@ once on establishment of the network connection and once after each
 block read thereafter.  The hook will be passed three arguments; a
 count of blocks transferred so far, a block size in bytes, and the
 total size of the file.  The third argument may be \code{-1} on older
-FTP servers which do not return a file size in response to a retrieval 
+FTP servers which do not return a file size in response to a retrieval
 request.
 
 If the \var{url} uses the \file{http:} scheme identifier, the optional
@@ -113,6 +112,30 @@ must in standard \mimetype{application/x-www-form-urlencoded} format;
 see the \function{urlencode()} function below.
 \end{funcdesc}
 
+\begin{datadesc}{_urlopener}
+The public functions \function{urlopen()} and
+\function{urlretrieve()} create an instance of the
+\class{FancyURLopener} class and use it to perform their requested
+actions.  To override this functionality, programmers can create a
+subclass of \class{URLopener} or \class{FancyURLopener}, then assign
+that an instance of that class to the
+\code{urllib._urlopener} variable before calling the desired function.
+For example, applications may want to specify a different
+\mailheader{User-Agent} header than \class{URLopener} defines.  This
+can be accomplished with the following code:
+
+\begin{verbatim}
+import urllib
+
+class AppURLopener(urllib.FancyURLopener):
+    def __init__(self, *args):
+        self.version = "App/1.7"
+        urllib.FancyURLopener.__init__(self, *args)
+
+urllib._urlopener = AppURLopener()
+\end{verbatim}
+\end{datadesc}
+
 \begin{funcdesc}{urlcleanup}{}
 Clear the cache that may have been built up by previous calls to
 \function{urlretrieve()}.
@@ -120,7 +143,7 @@ Clear the cache that may have been built up by previous calls to
 
 \begin{funcdesc}{quote}{string\optional{, safe}}
 Replace special characters in \var{string} using the \samp{\%xx} escape.
-Letters, digits, and the characters \character{_,.-} are never quoted.
+Letters, digits, and the characters \character{_.-} are never quoted.
 The optional \var{safe} parameter specifies additional characters
 that should not be quoted --- its default value is \code{'/'}.
 
@@ -130,7 +153,8 @@ Example: \code{quote('/\~{}connolly/')} yields \code{'/\%7econnolly/'}.
 \begin{funcdesc}{quote_plus}{string\optional{, safe}}
 Like \function{quote()}, but also replaces spaces by plus signs, as
 required for quoting HTML form values.  Plus signs in the original
-string are escaped unless they are included in \var{safe}.
+string are escaped unless they are included in \var{safe}.  It also
+does not have \var{safe} default to \code{'/'}.
 \end{funcdesc}
 
 \begin{funcdesc}{unquote}{string}
@@ -146,7 +170,7 @@ required for unquoting HTML form values.
 
 \begin{funcdesc}{urlencode}{query\optional{, doseq}}
 Convert a mapping object or a sequence of two-element tuples  to a
-``url-encoded'' string, suitable to pass to 
+``url-encoded'' string, suitable to pass to
 \function{urlopen()} above as the optional \var{data} argument.  This
 is useful to pass a dictionary of form fields to a \code{POST}
 request.  The resulting string is a series of
@@ -159,27 +183,23 @@ When a sequence of two-element tuples is used as the \var{query} argument,
 the first element of each tuple is a key and the second is a value.  The
 order of parameters in the encoded string will match the order of parameter
 tuples in the sequence.
+The \refmodule{cgi} module provides the functions
+\function{parse_qs()} and \function{parse_qsl()} which are used to
+parse query strings into Python data structures.
 \end{funcdesc}
 
-The public functions \function{urlopen()} and
-\function{urlretrieve()} create an instance of the
-\class{FancyURLopener} class and use it to perform their requested
-actions.  To override this functionality, programmers can create a
-subclass of \class{URLopener} or \class{FancyURLopener}, then assign
-that an instance of that class to the
-\code{urllib._urlopener} variable before calling the desired function.
-For example, applications may want to specify a different
-\mailheader{User-Agent} header than \class{URLopener} defines.  This
-can be accomplished with the following code:
+\begin{funcdesc}{pathname2url}{path}
+Convert the pathname \var{path} from the local syntax for a path to
+the form used in the path component of a URL.  This does not produce a
+complete URL.  The return value will already be quoted using the
+\function{quote()} function.
+\end{funcdesc}
 
-\begin{verbatim}
-class AppURLopener(urllib.FancyURLopener):
-    def __init__(self, *args):
-        self.version = "App/1.7"
-        urllib.FancyURLopener.__init__(self, *args)
-
-urllib._urlopener = AppURLopener()
-\end{verbatim}
+\begin{funcdesc}{url2pathname}{path}
+Convert the path component \var{path} from an encoded URL to the local
+syntax for a path.  This does not accept a complete URL.  This
+function uses \function{unquote()} to decode \var{path}.
+\end{funcdesc}
 
 \begin{classdesc}{URLopener}{\optional{proxies\optional{, **x509}}}
 Base class for opening and reading URLs.  Unless you need to support
@@ -203,12 +223,18 @@ actually retrieve a resource at an \file{https:} URL.
 
 \begin{classdesc}{FancyURLopener}{...}
 \class{FancyURLopener} subclasses \class{URLopener} providing default
-handling for the following HTTP response codes: 301, 302 or 401.  For
-301 and 302 response codes, the \mailheader{Location} header is used to
-fetch the actual URL.  For 401 response codes (authentication
-required), basic HTTP authentication is performed.  For 301 and 302 response
-codes, recursion is bounded by the value of the \var{maxtries} attribute,
-which defaults 10.
+handling for the following HTTP response codes: 301, 302, 303 and 401.
+For 301, 302 and 303 response codes, the \mailheader{Location} header
+is used to fetch the actual URL.  For 401 response codes
+(authentication required), basic HTTP authentication is performed.
+For 301, 302 and 303 response codes, recursion is bounded by the value
+of the \var{maxtries} attribute, which defaults 10.
+
+\note{According to the letter of \rfc{2616}, 301 and 302 responses to
+  POST requests must not be automatically redirected without
+  confirmation by the user.  In reality, browsers do allow automatic
+  redirection of these responses, changing the POST to a GET, and
+  \module{urllib} reproduces this behaviour.}
 
 The parameters to the constructor are the same as those for
 \class{URLopener}.
@@ -283,10 +309,10 @@ manipulation is in module \refmodule{urlparse}\refstmodindex{urlparse}.
 following attributes.
 
 \begin{methoddesc}[URLopener]{open}{fullurl\optional{, data}}
-Open \var{fullurl} using the appropriate protocol.  This method sets 
+Open \var{fullurl} using the appropriate protocol.  This method sets
 up cache and proxy information, then calls the appropriate open method with
 its input arguments.  If the scheme is not recognized,
-\method{open_unknown()} is called.  The \var{data} argument 
+\method{open_unknown()} is called.  The \var{data} argument
 has the same meaning as the \var{data} argument of \function{urlopen()}.
 \end{methoddesc}
 

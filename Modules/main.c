@@ -4,10 +4,6 @@
 #include "osdefs.h"
 #include "compile.h" /* For CO_FUTURE_DIVISION */
 
-#ifdef HAVE_UNISTD_H
-#include <unistd.h>
-#endif
-
 #ifdef MS_WINDOWS
 #include <fcntl.h>
 #endif
@@ -64,7 +60,6 @@ static char *usage_2 = "\
 -u     : unbuffered binary stdout and stderr (also PYTHONUNBUFFERED=x)\n\
 ";
 static char *usage_3 = "\
--U     : Unicode literals: treats '...' literals like u'...'\n\
 -v     : verbose (trace import statements) (also PYTHONVERBOSE=x)\n\
 -V     : print the Python version number and exit\n\
 -W arg : warning control (arg is action:message:category:module:lineno)\n\
@@ -327,9 +322,12 @@ Py_Main(int argc, char **argv)
 	Py_Initialize();
 
 	if (Py_VerboseFlag ||
-	    (command == NULL && filename == NULL && stdin_is_interactive))
-		fprintf(stderr, "Python %s on %s\n%s\n",
-			Py_GetVersion(), Py_GetPlatform(), COPYRIGHT);
+	    (command == NULL && filename == NULL && stdin_is_interactive)) {
+		fprintf(stderr, "Python %s on %s\n",
+			Py_GetVersion(), Py_GetPlatform());
+ 		if (!Py_NoSiteFlag)
+ 			fprintf(stderr, "%s\n", COPYRIGHT);
+	}
 
 	if (command != NULL) {
 		/* Backup _PyOS_optind and force sys.argv[0] = '-c' */

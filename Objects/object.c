@@ -79,6 +79,15 @@ inc_count(PyTypeObject *tp)
 		if (tp->tp_next != NULL) /* sanity check */
 			Py_FatalError("XXX inc_count sanity check");
 		tp->tp_next = type_list;
+		/* Note that as of Python 2.2, heap-allocated type objects
+		 * can go away, but this code requires that they stay alive
+		 * until program exit.  That's why we're careful with
+		 * refcounts here.  type_list gets a new reference to tp,
+		 * while ownership of the reference type_list used to hold
+		 * (if any) was transferred to tp->tp_next in the line above.
+		 * tp is thus effectively immortal after this.
+		 */
+		Py_INCREF(tp);
 		type_list = tp;
 	}
 	tp->tp_allocs++;
@@ -90,11 +99,8 @@ inc_count(PyTypeObject *tp)
 PyObject *
 PyObject_Init(PyObject *op, PyTypeObject *tp)
 {
-	if (op == NULL) {
-		PyErr_SetString(PyExc_SystemError,
-				"NULL object passed to PyObject_Init");
-		return op;
-  	}
+	if (op == NULL)
+		return PyErr_NoMemory();
 	/* Any changes should be reflected in PyObject_INIT (objimpl.h) */
 	op->ob_type = tp;
 	_Py_NewReference(op);
@@ -104,11 +110,8 @@ PyObject_Init(PyObject *op, PyTypeObject *tp)
 PyVarObject *
 PyObject_InitVar(PyVarObject *op, PyTypeObject *tp, int size)
 {
-	if (op == NULL) {
-		PyErr_SetString(PyExc_SystemError,
-				"NULL object passed to PyObject_InitVar");
-		return op;
-	}
+	if (op == NULL)
+		return (PyVarObject *) PyErr_NoMemory();
 	/* Any changes should be reflected in PyObject_INIT_VAR */
 	op->ob_size = size;
 	op->ob_type = tp;
@@ -143,10 +146,15 @@ _PyObject_Del(PyObject *op)
 	PyObject_FREE(op);
 }
 
-int
-PyObject_Print(PyObject *op, FILE *fp, int flags)
+/* Implementation of PyObject_Print with recursion checking */
+static int
+internal_print(PyObject *op, FILE *fp, int flags, int nesting)
 {
 	int ret = 0;
+	if (nesting > 10) {
+		PyErr_SetString(PyExc_RuntimeError, "print recursion");
+		return -1;
+	}
 	if (PyErr_CheckSignals())
 		return -1;
 #ifdef USE_STACKCHECK
@@ -172,7 +180,8 @@ PyObject_Print(PyObject *op, FILE *fp, int flags)
 			if (s == NULL)
 				ret = -1;
 			else {
-				ret = PyObject_Print(s, fp, Py_PRINT_RAW);
+				ret = internal_print(s, fp, Py_PRINT_RAW,
+						     nesting+1);
 			}
 			Py_XDECREF(s);
 		}
@@ -188,6 +197,13 @@ PyObject_Print(PyObject *op, FILE *fp, int flags)
 	}
 	return ret;
 }
+
+int
+PyObject_Print(PyObject *op, FILE *fp, int flags)
+{
+	return internal_print(op, fp, flags, 0);
+}
+
 
 /* For debugging convenience.  See Misc/gdbinit for some useful gdb hooks */
 void _PyObject_Dump(PyObject* op) 
@@ -479,7 +495,7 @@ try_3way_compare(PyObject *v, PyObject *w)
 	if (f != NULL && f == w->ob_type->tp_compare) {
 		c = (*f)(v, w);
 		if (c < 0 && PyErr_Occurred())
-			return -1;
+			return -2;
 		return c < 0 ? -1 : c > 0 ? 1 : 0;
 	}
 
@@ -1191,8 +1207,14 @@ _PyObject_GetDictPtr(PyObject *obj)
 	if (dictoffset == 0)
 		return NULL;
 	if (dictoffset < 0) {
-		const size_t size = _PyObject_VAR_SIZE(tp,
-					((PyVarObject *)obj)->ob_size);
+		int tsize;
+		size_t size;
+
+		tsize = ((PyVarObject *)obj)->ob_size;
+		if (tsize < 0)
+			tsize = -tsize;
+		size = _PyObject_VAR_SIZE(tp, tsize);
+
 		dictoffset += (long)size;
 		assert(dictoffset > 0);
 		assert(dictoffset % SIZEOF_VOID_P == 0);
@@ -1237,7 +1259,8 @@ PyObject_GenericGetAttr(PyObject *obj, PyObject *name)
 
 	descr = _PyType_Lookup(tp, name);
 	f = NULL;
-	if (descr != NULL) {
+	if (descr != NULL &&
+	    PyType_HasFeature(descr->ob_type, Py_TPFLAGS_HAVE_CLASS)) {
 		f = descr->ob_type->tp_descr_get;
 		if (f != NULL && PyDescr_IsData(descr)) {
 			res = f(descr, obj, (PyObject *)obj->ob_type);
@@ -1311,7 +1334,8 @@ PyObject_GenericSetAttr(PyObject *obj, PyObject *name, PyObject *value)
 
 	descr = _PyType_Lookup(tp, name);
 	f = NULL;
-	if (descr != NULL) {
+	if (descr != NULL &&
+	    PyType_HasFeature(descr->ob_type, Py_TPFLAGS_HAVE_CLASS)) {
 		f = descr->ob_type->tp_descr_set;
 		if (f != NULL && PyDescr_IsData(descr)) {
 			res = f(descr, obj, value);
@@ -1501,14 +1525,22 @@ merge_class_dict(PyObject* dict, PyObject* aclass)
 	if (bases == NULL)
 		PyErr_Clear();
 	else {
+		/* We have no guarantee that bases is a real tuple */
 		int i, n;
-		assert(PyTuple_Check(bases));
-		n = PyTuple_GET_SIZE(bases);
-		for (i = 0; i < n; i++) {
-			PyObject *base = PyTuple_GET_ITEM(bases, i);
-			if (merge_class_dict(dict, base) < 0) {
-				Py_DECREF(bases);
-				return -1;
+		n = PySequence_Size(bases); /* This better be right */
+		if (n < 0)
+			PyErr_Clear();
+		else {
+			for (i = 0; i < n; i++) {
+				PyObject *base = PySequence_GetItem(bases, i);
+				if (base == NULL) {
+					Py_DECREF(bases);
+					return -1;
+				}
+				if (merge_class_dict(dict, base) < 0) {
+					Py_DECREF(bases);
+					return -1;
+				}
 			}
 		}
 		Py_DECREF(bases);
@@ -1767,8 +1799,6 @@ static PyObject refchain = {&refchain, &refchain};
 void
 _Py_ResetReferences(void)
 {
-	refchain._ob_prev = refchain._ob_next = &refchain;
-	_Py_RefTotal = 0;
 }
 
 void
@@ -1870,7 +1900,7 @@ PyTypeObject *_Py_cobject_hack = &PyCObject_Type;
 
 
 /* Hack to force loading of abstract.o */
-int (*_Py_abstract_hack)(PyObject *) = &PyObject_Size;
+int (*_Py_abstract_hack)(PyObject *) = PyObject_Size;
 
 
 /* Python's malloc wrappers (see pymem.h) */
@@ -1888,11 +1918,8 @@ PyMem_Malloc(size_t nbytes)
 void *
 PyMem_Realloc(void *p, size_t nbytes)
 {
-#if _PyMem_EXTRA > 0
-	if (nbytes == 0)
-		nbytes = _PyMem_EXTRA;
-#endif
-	return PyMem_REALLOC(p, nbytes);
+	/* See comment near MALLOC_ZERO_RETURNS_NULL in pyport.h. */
+	return PyMem_REALLOC(p, nbytes ? nbytes : 1);
 }
 
 void

@@ -76,7 +76,7 @@ That creates 10 distinct generators, which can be passed out to 10
 distinct threads.  The generators don't share state so can be called
 safely in parallel.  So long as no thread calls its \code{g.random()}
 more than a million times (the second argument to
-\function{create_generators()}, the sequences seen by each thread will
+\function{create_generators()}), the sequences seen by each thread will
 not overlap.  The period of the underlying Wichmann-Hill generator
 limits how far this technique can be pushed.
 
@@ -156,7 +156,6 @@ Functions for integers:
 \end{funcdesc}
 
 \begin{funcdesc}{randint}{a, b}
-  \deprecated{2.0}{Use \function{randrange()} instead.}
   Return a random integer \var{N} such that
   \code{\var{a} <= \var{N} <= \var{b}}.
 \end{funcdesc}
@@ -207,7 +206,10 @@ these equations can be found in any statistics text.
   angle.  Both values must be expressed in radians, and can range
   between 0 and \emph{pi}.  Returned values range between
   \code{\var{mean} - \var{arc}/2} and \code{\var{mean} +
-  \var{arc}/2}.
+  \var{arc}/2} and are normalized to between 0 and \emph{pi}.
+
+  \deprecated{2.3}{Instead, use \code{(\var{mean} + \var{arc} *
+                   (random.random() - 0.5)) \% math.pi}.}
 \end{funcdesc}
 
 \begin{funcdesc}{expovariate}{lambd}
@@ -217,9 +219,9 @@ these equations can be found in any statistics text.
   positive infinity.
 \end{funcdesc}
 
-\begin{funcdesc}{gamma}{alpha, beta}
+\begin{funcdesc}{gammavariate}{alpha, beta}
   Gamma distribution.  (\emph{Not} the gamma function!)  Conditions on
-  the parameters are \code{\var{alpha} > -1} and \code{\var{beta} > 0}.
+  the parameters are \code{\var{alpha} > 0} and \code{\var{beta} > 0}.
 \end{funcdesc}
 
 \begin{funcdesc}{gauss}{mu, sigma}

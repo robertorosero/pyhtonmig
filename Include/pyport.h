@@ -285,6 +285,41 @@ extern "C" {
 			errno = ERANGE; \
 	} while(0)
 
+/* Py_ADJUST_ERANGE1(x)
+ * Py_ADJUST_ERANGE2(x, y)
+ * Set errno to 0 before calling a libm function, and invoke one of these
+ * macros after, passing the function result(s) (Py_ADJUST_ERANGE2 is useful
+ * for functions returning complex results).  This makes two kinds of
+ * adjustments to errno:  (A) If it looks like the platform libm set
+ * errno=ERANGE due to underflow, clear errno. (B) If it looks like the
+ * platform libm overflowed but didn't set errno, force errno to ERANGE.  In
+ * effect, we're trying to force a useful implementation of C89 errno
+ * behavior.
+ * Caution:
+ *    This isn't reliable.  See Py_OVERFLOWED comments.
+ *    X and Y may be evaluated more than once.
+ */
+#define Py_ADJUST_ERANGE1(X)						\
+	do {								\
+		if (errno == 0) {					\
+			if ((X) == Py_HUGE_VAL || (X) == -Py_HUGE_VAL)	\
+				errno = ERANGE;				\
+		}							\
+		else if (errno == ERANGE && (X) == 0.0)			\
+			errno = 0;					\
+	} while(0)
+
+#define Py_ADJUST_ERANGE2(X, Y)						\
+	do {								\
+		if ((X) == Py_HUGE_VAL || (X) == -Py_HUGE_VAL ||	\
+		    (Y) == Py_HUGE_VAL || (Y) == -Py_HUGE_VAL) {	\
+				if (errno == 0)				\
+					errno = ERANGE;			\
+		}							\
+		else if (errno == ERANGE)				\
+			errno = 0;					\
+	} while(0)
+
 /**************************************************************************
 Prototypes that are missing from the standard include files on some systems
 (and possibly only some versions of such systems.)
@@ -364,8 +399,16 @@ extern double hypot(double, double);
 #endif
 
 #ifdef MALLOC_ZERO_RETURNS_NULL
-/* XXX Always allocate one extra byte, since some malloc's return NULL
-   XXX for malloc(0) or realloc(p, 0). */
+/* Allocate an extra byte if the platform malloc(0) returns NULL.
+   Caution:  this bears no relation to whether realloc(p, 0) returns NULL
+   when p != NULL.  Even on platforms where malloc(0) does not return NULL,
+   realloc(p, 0) may act like free(p) and return NULL.  Examples include
+   Windows, and Python's own obmalloc.c (as of 2-Mar-2002).  For whatever
+   reason, our docs promise that PyMem_Realloc(p, 0) won't act like
+   free(p) or return NULL, so realloc() calls may have to be hacked
+   too, but MALLOC_ZERO_RETURNS_NULL's state is irrelevant to realloc (it
+   needs a different hack).
+*/
 #define _PyMem_EXTRA 1
 #else
 #define _PyMem_EXTRA 0

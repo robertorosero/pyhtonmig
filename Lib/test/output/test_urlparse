@@ -1,4 +1,10 @@
 test_urlparse
+http://www.python.org = ('http', 'www.python.org', '', '', '', '')
+http://www.python.org#abc = ('http', 'www.python.org', '', '', '', 'abc')
+http://www.python.org/#abc = ('http', 'www.python.org', '/', '', '', 'abc')
+http://a/b/c/d;p?q#f = ('http', 'a', '/b/c/d', 'p', 'q', 'f')
+file:///tmp/junk.txt = ('file', '', '/tmp/junk.txt', '', '', '')
+
 urlparse.urljoin() tests
 
 g:h           = 'g:h'

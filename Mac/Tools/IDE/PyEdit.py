@@ -17,6 +17,12 @@ import string
 import marshal
 import re
 
+if hasattr(Win, "FrontNonFloatingWindow"):
+	MyFrontWindow = Win.FrontNonFloatingWindow
+else:
+	MyFrontWindow = Win.FrontWindow
+
+
 try:
 	import Wthreading
 except ImportError:
@@ -954,11 +960,7 @@ class SearchEngine:
 			from Carbon import Res
 			editor.textchanged()
 			editor.selectionchanged()
-			editor.ted.WEUseText(Res.Resource(Text))
-			editor.ted.WECalText()
-			editor.SetPort()
-			editor.GetWindow().InvalWindowRect(editor._bounds)
-			#editor.ted.WEUpdate(self.w.wid.GetWindowPort().visRgn)
+			editor.set(Text)
 			EasyDialogs.Message("Replaced %d occurrences" % counter)
 	
 	def dont(self):
@@ -1128,7 +1130,8 @@ def execstring(pytext, globals, locals, filename="<string>", debugging=0,
 			else:
 				PyDebugger.startfromhere()
 		elif not haveThreading:
-			MacOS.EnableAppswitch(0)
+			if hasattr(MacOS, 'EnableAppswitch'):
+				MacOS.EnableAppswitch(0)
 		try:
 			if profiling:
 				import profile, ProfileBrowser
@@ -1145,7 +1148,8 @@ def execstring(pytext, globals, locals, filename="<string>", debugging=0,
 				exec code in globals, locals
 		finally:
 			if not haveThreading:
-				MacOS.EnableAppswitch(-1)
+				if hasattr(MacOS, 'EnableAppswitch'):
+					MacOS.EnableAppswitch(-1)
 	except W.AlertError, detail:
 		raise W.AlertError, detail
 	except (KeyboardInterrupt, BdbQuit):
@@ -1187,7 +1191,7 @@ def _filename_as_modname(fname):
 			return string.join(string.split(modname, '.'), '_')
 
 def findeditor(topwindow, fromtop = 0):
-	wid = Win.FrontWindow()
+	wid = MyFrontWindow()
 	if not fromtop:
 		if topwindow.w and wid == topwindow.w.wid:
 			wid = topwindow.w.wid.GetNextWindow()
