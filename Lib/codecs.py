@@ -230,6 +230,7 @@ class StreamReader(Codec):
         self.errors = errors
         self.bytebuffer = ""
         self.charbuffer = u""
+        self.atcr = False
 
     def decode(self, input, errors='strict'):
         raise NotImplementedError
@@ -256,41 +257,39 @@ class StreamReader(Codec):
             definition of the encoding and the given size, e.g.  if
             optional encoding endings or state markers are available
             on the stream, these should be read too.
-
         """
         # read until we get the required number of characters (if available)
-        done = False
         while True:
             # can the request can be satisfied from the character buffer?
             if chars < 0:
                 if self.charbuffer:
-                    done = True
+                    break
             else:
                 if len(self.charbuffer) >= chars:
-                    done = True
-            if done:
-                if chars < 0:
-                    result = self.charbuffer
-                    self.charbuffer = u""
-                    break
-                else:
-                    result = self.charbuffer[:chars]
-                    self.charbuffer = self.charbuffer[chars:]
                     break
             # we need more data
             if size < 0:
                 newdata = self.stream.read()
             else:
                 newdata = self.stream.read(size)
+            # decode bytes (those remaining from the last call included)
             data = self.bytebuffer + newdata
-            object, decodedbytes = self.decode(data, self.errors)
+            newchars, decodedbytes = self.decode(data, self.errors)
             # keep undecoded bytes until the next call
             self.bytebuffer = data[decodedbytes:]
             # put new characters in the character buffer
-            self.charbuffer += object
+            self.charbuffer += newchars
             # there was no data available
             if not newdata:
-                done = True
+                break
+        if chars < 0:
+            # Return everything we've got
+            result = self.charbuffer
+            self.charbuffer = u""
+        else:
+            # Return the first chars characters
+            result = self.charbuffer[:chars]
+            self.charbuffer = self.charbuffer[chars:]
         return result
 
     def readline(self, size=None, keepends=True):
@@ -302,24 +301,36 @@ class StreamReader(Codec):
             read() method.
 
         """
-        if size is None:
-            size = 10
+        readsize = size or 72
         line = u""
+        # If size is given, we call read() only once
         while True:
-            data = self.read(size)
+            data = self.read(readsize)
+            if self.atcr and data.startswith(u"\n"):
+                data = data[1:]
+            if data:
+                self.atcr = data.endswith(u"\r")
             line += data
-            pos = line.find("\n")
-            if pos>=0:
-                self.charbuffer = line[pos+1:] + self.charbuffer
-                if keepends:
-                    line = line[:pos+1]
-                else:
-                    line = line[:pos]
-                return line
-            elif not data:
-                return line
-            if size<8000:
-                size *= 2
+            lines = line.splitlines(True)
+            if lines:
+                line0withend = lines[0]
+                line0withoutend = lines[0].splitlines(False)[0]
+                if line0withend != line0withoutend: # We really have a line end
+                    # Put the rest back together and keep it until the next call
+                    self.charbuffer = u"".join(lines[1:]) + self.charbuffer
+                    if keepends:
+                        line = line0withend
+                    else:
+                        line = line0withoutend
+                    break
+            # we didn't get anything or this was our only try
+            if not data or size is not None:
+                if line and not keepends:
+                    line = line.splitlines(False)[0]
+                break
+            if readsize<8000:
+                readsize *= 2
+        return line
 
     def readlines(self, sizehint=None, keepends=True):
 
@@ -345,7 +356,17 @@ class StreamReader(Codec):
             from decoding errors.
 
         """
-        pass
+        self.bytebuffer = ""
+        self.charbuffer = u""
+        self.atcr = False
+
+    def seek(self, offset, whence=0):
+        """ Set the input stream's current position.
+
+            Resets the codec buffers used for keeping state.
+        """
+        self.reset()
+        self.stream.seek(offset, whence)
 
     def next(self):
 
@@ -709,11 +730,19 @@ def make_encoding_map(decoding_map):
 
 ### error handlers
 
-strict_errors = lookup_error("strict")
-ignore_errors = lookup_error("ignore")
-replace_errors = lookup_error("replace")
-xmlcharrefreplace_errors = lookup_error("xmlcharrefreplace")
-backslashreplace_errors = lookup_error("backslashreplace")
+try:
+    strict_errors = lookup_error("strict")
+    ignore_errors = lookup_error("ignore")
+    replace_errors = lookup_error("replace")
+    xmlcharrefreplace_errors = lookup_error("xmlcharrefreplace")
+    backslashreplace_errors = lookup_error("backslashreplace")
+except LookupError:
+    # In --disable-unicode builds, these error handler are missing
+    strict_errors = None
+    ignore_errors = None
+    replace_errors = None
+    xmlcharrefreplace_errors = None
+    backslashreplace_errors = None
 
 # Tell modulefinder that using codecs probably needs the encodings
 # package

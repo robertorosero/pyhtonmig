@@ -1,7 +1,33 @@
-What's New in IDLE 1.1rc2?
-=============================
+What's New in IDLE 1.1.1?
+=========================
 
-*Release date: XX-NOV-2004*
+*Release date: 30-MAR-2005*
+
+
+What's New in IDLE 1.1.1c2?
+===========================
+
+*Release date: 17-MAR-2005*
+
+
+What's New in IDLE 1.1.1c1?
+===========================
+
+*Release date: 10-MAR-2005*
+
+- If an extension can't be loaded, print warning and skip it instead of
+  erroring out.
+
+- Improve error handling when .idlerc can't be created (warn and exit)
+
+- The GUI was hanging if the shell window was closed while a raw_input() 
+  was pending.  Restored the quit() of the readline() mainloop().
+  http://mail.python.org/pipermail/idle-dev/2004-December/002307.html
+
+What's New in IDLE 1.1?
+=======================
+
+*Release date: 30-NOV-2004*
 
 - On OpenBSD, terminating IDLE with ctrl-c from the command line caused a
   stuck subprocess MainThread because only the SocketThread was exiting.

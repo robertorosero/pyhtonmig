@@ -134,7 +134,6 @@ __all__ = [
     'setcontext', 'getcontext'
 ]
 
-import threading
 import copy
 
 #Rounding
@@ -385,7 +384,19 @@ _condition_map = {ConversionSyntax:InvalidOperation,
 # The getcontext() and setcontext() function manage access to a thread-local
 # current context.  Py2.4 offers direct support for thread locals.  If that
 # is not available, use threading.currentThread() which is slower but will
-# work for older Pythons.
+# work for older Pythons.  If threads are not part of the build, create a
+# mock threading object with threading.local() returning the module namespace.
+
+try:
+    import threading
+except ImportError:
+    # Python was compiled without threads; create a mock object instead
+    import sys
+    class MockThreading:
+        def local(self, sys=sys):
+            return sys.modules[__name__]
+    threading = MockThreading()
+    del sys, MockThreading
 
 try:
     threading.local
@@ -634,6 +645,8 @@ class Decimal(object):
 
     def __cmp__(self, other, context=None):
         other = _convert_other(other)
+        if other is NotImplemented:
+            return other
 
         if self._is_special or other._is_special:
             ans = self._check_nans(other, context)
@@ -685,12 +698,12 @@ class Decimal(object):
 
     def __eq__(self, other):
         if not isinstance(other, (Decimal, int, long)):
-            return False
+            return NotImplemented
         return self.__cmp__(other) == 0
 
     def __ne__(self, other):
         if not isinstance(other, (Decimal, int, long)):
-            return True
+            return NotImplemented
         return self.__cmp__(other) != 0
 
     def compare(self, other, context=None):
@@ -703,6 +716,8 @@ class Decimal(object):
         Like __cmp__, but returns Decimal instances.
         """
         other = _convert_other(other)
+        if other is NotImplemented:
+            return other
 
         #compare(NaN, NaN) = NaN
         if (self._is_special or other and other._is_special):
@@ -717,6 +732,10 @@ class Decimal(object):
         # Decimal integers must hash the same as the ints
         # Non-integer decimals are normalized and hashed as strings
         # Normalization assures that hast(100E-1) == hash(10)
+        if self._is_special:
+            if self._isnan():
+                raise TypeError('Cannot hash a NaN value.')
+            return hash(str(self))
         i = int(self)
         if self == Decimal(i):
             return hash(i)
@@ -904,6 +923,8 @@ class Decimal(object):
         -INF + INF (or the reverse) cause InvalidOperation errors.
         """
         other = _convert_other(other)
+        if other is NotImplemented:
+            return other
 
         if context is None:
             context = getcontext()
@@ -991,6 +1012,8 @@ class Decimal(object):
     def __sub__(self, other, context=None):
         """Return self + (-other)"""
         other = _convert_other(other)
+        if other is NotImplemented:
+            return other
 
         if self._is_special or other._is_special:
             ans = self._check_nans(other, context=context)
@@ -1008,6 +1031,8 @@ class Decimal(object):
     def __rsub__(self, other, context=None):
         """Return other + (-self)"""
         other = _convert_other(other)
+        if other is NotImplemented:
+            return other
 
         tmp = Decimal(self)
         tmp._sign = 1 - tmp._sign
@@ -1053,6 +1078,8 @@ class Decimal(object):
         (+-) INF * 0 (or its reverse) raise InvalidOperation.
         """
         other = _convert_other(other)
+        if other is NotImplemented:
+            return other
 
         if context is None:
             context = getcontext()
@@ -1125,6 +1152,10 @@ class Decimal(object):
         computing the other value are not raised.
         """
         other = _convert_other(other)
+        if other is NotImplemented:
+            if divmod in (0, 1):
+                return NotImplemented
+            return (NotImplemented, NotImplemented)
 
         if context is None:
             context = getcontext()
@@ -1277,6 +1308,8 @@ class Decimal(object):
     def __rdiv__(self, other, context=None):
         """Swaps self/other and returns __div__."""
         other = _convert_other(other)
+        if other is NotImplemented:
+            return other
         return other.__div__(self, context=context)
     __rtruediv__ = __rdiv__
 
@@ -1289,6 +1322,8 @@ class Decimal(object):
     def __rdivmod__(self, other, context=None):
         """Swaps self/other and returns __divmod__."""
         other = _convert_other(other)
+        if other is NotImplemented:
+            return other
         return other.__divmod__(self, context=context)
 
     def __mod__(self, other, context=None):
@@ -1296,6 +1331,8 @@ class Decimal(object):
         self % other
         """
         other = _convert_other(other)
+        if other is NotImplemented:
+            return other
 
         if self._is_special or other._is_special:
             ans = self._check_nans(other, context)
@@ -1310,6 +1347,8 @@ class Decimal(object):
     def __rmod__(self, other, context=None):
         """Swaps self/other and returns __mod__."""
         other = _convert_other(other)
+        if other is NotImplemented:
+            return other
         return other.__mod__(self, context=context)
 
     def remainder_near(self, other, context=None):
@@ -1317,6 +1356,8 @@ class Decimal(object):
         Remainder nearest to 0-  abs(remainder-near) <= other/2
         """
         other = _convert_other(other)
+        if other is NotImplemented:
+            return other
 
         if self._is_special or other._is_special:
             ans = self._check_nans(other, context)
@@ -1396,6 +1437,8 @@ class Decimal(object):
     def __rfloordiv__(self, other, context=None):
         """Swaps self/other and returns __floordiv__."""
         other = _convert_other(other)
+        if other is NotImplemented:
+            return other
         return other.__floordiv__(self, context=context)
 
     def __float__(self):
@@ -1646,6 +1689,8 @@ class Decimal(object):
         If modulo is None (default), don't take it mod modulo.
         """
         n = _convert_other(n)
+        if n is NotImplemented:
+            return n
 
         if context is None:
             context = getcontext()
@@ -1732,6 +1777,8 @@ class Decimal(object):
     def __rpow__(self, other, context=None):
         """Swaps self/other and returns __pow__."""
         other = _convert_other(other)
+        if other is NotImplemented:
+            return other
         return other.__pow__(self, context=context)
 
     def normalize(self, context=None):
@@ -1986,6 +2033,8 @@ class Decimal(object):
         NaN (and signals if one is sNaN).  Also rounds.
         """
         other = _convert_other(other)
+        if other is NotImplemented:
+            return other
 
         if self._is_special or other._is_special:
             # if one operand is a quiet NaN and the other is number, then the
@@ -2033,6 +2082,8 @@ class Decimal(object):
         NaN (and signals if one is sNaN).  Also rounds.
         """
         other = _convert_other(other)
+        if other is NotImplemented:
+            return other
 
         if self._is_special or other._is_special:
             # if one operand is a quiet NaN and the other is number, then the
@@ -2859,8 +2910,7 @@ def _convert_other(other):
         return other
     if isinstance(other, (int, long)):
         return Decimal(other)
-
-    raise TypeError, "You can interact Decimal only with int, long or Decimal data types."
+    return NotImplemented
 
 _infinity_map = {
     'inf' : 1,
