@@ -134,7 +134,8 @@ class Parser:
         if not headersonly:
             obj = self._parsemessage(root, fp)
             trailer = fp.read()
-            self._attach_trailer(obj, trailer)
+            if obj and trailer:
+                self._attach_trailer(obj, trailer)
         return root
 
     def parsestr(self, text, headersonly=False):
@@ -220,14 +221,14 @@ class Parser:
         boundary = container.get_boundary()
         isdigest = (container.get_content_type() == 'multipart/digest')
         if boundary: 
-            preamble = epilogue = None
             separator = '--' + boundary
             boundaryRE = re.compile(
                     r'(?P<sep>' + re.escape(separator) + 
                     r')(?P<end>--)?(?P<ws>[ \t]*)')
             preamble, matchobj = fp.readuntil(boundaryRE)
             if not matchobj:
-                # Broken. Just set the body to the text
+                # Broken - we hit the end of file. Just set the body 
+                # to the text.
                 container.set_payload(preamble)
                 return container
             container.preamble = preamble
@@ -296,7 +297,7 @@ class Parser:
                     nextline = fp.peekline()
                     if nextline[:2] == "--":
                         break
-                    return container
+                return container
             else:
                 raise ValueError, "%s not implemented yet"%(ct)
         else:
@@ -324,3 +325,4 @@ class HeaderParser(Parser):
         # Consume but do not parse, the body
         text = fp.read()
         container.set_payload(text)
+        return None
