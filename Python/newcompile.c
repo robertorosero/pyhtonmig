@@ -82,7 +82,7 @@ static PyCodeObject *compiler_mod(struct compiler *, mod_ty);
 static int compiler_visit_stmt(struct compiler *, stmt_ty);
 static int compiler_visit_expr(struct compiler *, expr_ty);
 static int compiler_augassign(struct compiler *, stmt_ty);
-static int compiler_visit_slice(struct compiler *c, slice_ty s, 
+static int compiler_visit_slice(struct compiler *c, slice_ty s,
 				expr_context_ty ctx);
 
 static int compiler_push_fblock(struct compiler *, enum fblocktype, int);
@@ -711,7 +711,7 @@ compiler_if(struct compiler *c, stmt_ty s)
 		else
 			break;
 	}
-	compiler_use_block(c, end);
+	compiler_use_next_block(c, end);
 	return 1;
 }
 
@@ -1843,8 +1843,8 @@ assemble(struct compiler *c)
 	/* Emit code in reverse postorder from dfs. */
 	for (i = a.a_nblocks - 1; i >= 0; i--) {
 		struct basicblock *b = c->u->u_blocks[a.a_postorder[i]];
-		fprintf(stderr, "block %d(%d): used=%d alloc=%d\n",
-			i, a.a_postorder[i], b->b_iused, b->b_ialloc);
+		fprintf(stderr, "block %d(%d): used=%d alloc=%d next=%d\n",
+			i, a.a_postorder[i], b->b_iused, b->b_ialloc, b->b_next);
 		for (j = 0; j < b->b_iused; j++) {
 			if (!assemble_emit(&a, &b->b_instr[j]))
 				goto error;
