@@ -59,7 +59,7 @@ TOOLSDIR=	tools
 
 # This is the *documentation* release, and is used to construct the file
 # names of the downloadable tarballs.
-RELEASE=1.5.2p1
+RELEASE=1.5.2p2
 
 
 # These must be declared phony since there
