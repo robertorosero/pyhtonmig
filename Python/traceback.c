@@ -1,5 +1,5 @@
 /***********************************************************
-Copyright 1991, 1992, 1993 by Stichting Mathematisch Centrum,
+Copyright 1991, 1992, 1993, 1994 by Stichting Mathematisch Centrum,
 Amsterdam, The Netherlands.
 
                         All Rights Reserved
@@ -74,9 +74,9 @@ static typeobject Tracebacktype = {
 	"traceback",
 	sizeof(tracebackobject),
 	0,
-	tb_dealloc,	/*tp_dealloc*/
+	(destructor)tb_dealloc, /*tp_dealloc*/
 	0,		/*tp_print*/
-	tb_getattr,	/*tp_getattr*/
+	(getattrfunc)tb_getattr, /*tp_getattr*/
 	0,		/*tp_setattr*/
 	0,		/*tp_compare*/
 	0,		/*tp_repr*/

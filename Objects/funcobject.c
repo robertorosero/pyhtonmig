@@ -1,5 +1,5 @@
 /***********************************************************
-Copyright 1991, 1992, 1993 by Stichting Mathematisch Centrum,
+Copyright 1991, 1992, 1993, 1994 by Stichting Mathematisch Centrum,
 Amsterdam, The Netherlands.
 
                         All Rights Reserved
@@ -136,14 +136,14 @@ typeobject Functype = {
 	"function",
 	sizeof(funcobject),
 	0,
-	func_dealloc,	/*tp_dealloc*/
+	(destructor)func_dealloc, /*tp_dealloc*/
 	0,		/*tp_print*/
-	func_getattr,	/*tp_getattr*/
+	(getattrfunc)func_getattr, /*tp_getattr*/
 	0,		/*tp_setattr*/
-	func_compare,	/*tp_compare*/
-	func_repr,	/*tp_repr*/
+	(cmpfunc)func_compare, /*tp_compare*/
+	(reprfunc)func_repr, /*tp_repr*/
 	0,		/*tp_as_number*/
 	0,		/*tp_as_sequence*/
 	0,		/*tp_as_mapping*/
-	func_hash,	/*tp_hash*/
+	(hashfunc)func_hash, /*tp_hash*/
 };

@@ -1,5 +1,5 @@
 /***********************************************************
-Copyright 1991, 1992, 1993 by Stichting Mathematisch Centrum,
+Copyright 1991, 1992, 1993, 1994 by Stichting Mathematisch Centrum,
 Amsterdam, The Netherlands.
 
                         All Rights Reserved
@@ -28,6 +28,9 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 extern char *getenv();
 
+extern char *getversion();
+extern char *getcopyright();
+
 extern int debugging;
 extern int verbose;
 extern int killprint;
@@ -49,7 +52,9 @@ main(argc, argv)
 	if ((p = getenv("PYTHONKILLPRINT")) && *p != '\0')
 		killprint = 1;
 
-	initargs(&argc, &argv);
+	if (verbose)
+		fprintf(stderr, "Python %s\n%s\n",
+			getversion(), getcopyright());
 	initall();
 	setpythonargv(argc, argv);
 

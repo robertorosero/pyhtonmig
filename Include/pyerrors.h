@@ -5,7 +5,7 @@ extern "C" {
 #endif
 
 /***********************************************************
-Copyright 1991, 1992, 1993 by Stichting Mathematisch Centrum,
+Copyright 1991, 1992, 1993, 1994 by Stichting Mathematisch Centrum,
 Amsterdam, The Netherlands.
 
                         All Rights Reserved
@@ -64,7 +64,6 @@ extern object *ZeroDivisionError;
 extern int err_badarg PROTO((void));
 extern object *err_nomem PROTO((void));
 extern object *err_errno PROTO((object *));
-extern void err_input PROTO((int));
 
 extern void err_badcall PROTO((void));
 

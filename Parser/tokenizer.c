@@ -1,5 +1,5 @@
 /***********************************************************
-Copyright 1991, 1992, 1993 by Stichting Mathematisch Centrum,
+Copyright 1991, 1992, 1993, 1994 by Stichting Mathematisch Centrum,
 Amsterdam, The Netherlands.
 
                         All Rights Reserved
@@ -33,9 +33,13 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #include <ctype.h>
 #include "string.h"
 
-#include "fgetsintr.h"
 #include "tokenizer.h"
 #include "errcode.h"
+
+extern char *my_readline PROTO((char *));
+/* Return malloc'ed string including trailing \n;
+   empty malloc'ed string for EOF;
+   NULL if interrupted */
 
 /* Don't ever change this -- it would break the portability of Python code */
 #define TABSIZE 8
@@ -180,45 +184,26 @@ tok_nextc(tok)
 			tok->done = E_EOF;
 			return EOF;
 		}
-#ifdef USE_READLINE
 		if (tok->prompt != NULL) {
-			extern char *readline PROTO((char *prompt));
-			static int been_here;
-			if (!been_here) {
-				/* Force rebind of TAB to insert-tab */
-				extern int rl_insert();
-				rl_bind_key('\t', rl_insert);
-				been_here++;
-			}
 			if (tok->buf != NULL)
 				free(tok->buf);
-			tok->buf = readline(tok->prompt);
-			(void) intrcheck(); /* Clear pending interrupt */
+			tok->buf = my_readline(tok->prompt);
 			if (tok->nextprompt != NULL)
 				tok->prompt = tok->nextprompt;
-			if (tok->buf == NULL) {
+			if (tok->buf == NULL)
+				tok->done = E_INTR;
+			else if (tok->buf[0] == '\0') {
+				free(tok->buf);
+				tok->buf = NULL;
 				tok->done = E_EOF;
 			}
 			else {
 				tok->end = strchr(tok->buf, '\0');
-				if (tok->end > tok->buf)
-					add_history(tok->buf);
-				/* Replace trailing '\n' by '\0'
-				   (we don't need a '\0', but the
-				   tokenizer wants a '\n'...) */
-				*tok->end++ = '\n';
 				tok->inp = tok->end;
 				tok->cur = tok->buf;
 			}
 		}
-		else
-#endif
-		{
-			if (tok->prompt != NULL) {
-				fprintf(stderr, "%s", tok->prompt);
-				if (tok->nextprompt != NULL)
-					tok->prompt = tok->nextprompt;
-			}
+		else {
 			if (tok->buf == NULL) {
 				tok->buf = NEW(char, BUFSIZ);
 				if (tok->buf == NULL) {
@@ -227,8 +212,11 @@ tok_nextc(tok)
 				}
 				tok->end = tok->buf + BUFSIZ;
 			}
-			tok->done = fgets_intr(tok->buf,
-				(int)(tok->end - tok->buf), tok->fp);
+			if (fgets(tok->buf, (int)(tok->end - tok->buf),
+				  tok->fp) == NULL)
+				tok->done = E_EOF;
+			else
+				tok->done = E_OK;
 			tok->inp = strchr(tok->buf, '\0');
 			/* Read until '\n' or EOF */
 			while (tok->inp+1==tok->end && tok->inp[-1]!='\n') {
@@ -245,9 +233,9 @@ tok_nextc(tok)
 				tok->buf = newbuf;
 				tok->inp = tok->buf + curvalid;
 				tok->end = tok->buf + newsize;
-				if (fgets_intr(tok->inp,
+				if (fgets(tok->inp,
 					       (int)(tok->end - tok->inp),
-					       tok->fp) != E_OK)
+					       tok->fp) == NULL)
 					break;
 				tok->inp = strchr(tok->inp, '\0');
 			}

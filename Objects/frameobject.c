@@ -1,5 +1,5 @@
 /***********************************************************
-Copyright 1991, 1992, 1993 by Stichting Mathematisch Centrum,
+Copyright 1991, 1992, 1993, 1994 by Stichting Mathematisch Centrum,
 Amsterdam, The Netherlands.
 
                         All Rights Reserved
@@ -98,9 +98,9 @@ typeobject Frametype = {
 	"frame",
 	sizeof(frameobject),
 	0,
-	frame_dealloc,	/*tp_dealloc*/
+	(destructor)frame_dealloc, /*tp_dealloc*/
 	0,		/*tp_print*/
-	frame_getattr,	/*tp_getattr*/
+	(getattrfunc)frame_getattr, /*tp_getattr*/
 	0,		/*tp_setattr*/
 	0,		/*tp_compare*/
 	0,		/*tp_repr*/

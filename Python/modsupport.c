@@ -1,5 +1,5 @@
 /***********************************************************
-Copyright 1991, 1992, 1993 by Stichting Mathematisch Centrum,
+Copyright 1991, 1992, 1993, 1994 by Stichting Mathematisch Centrum,
 Amsterdam, The Netherlands.
 
                         All Rights Reserved
@@ -259,7 +259,7 @@ do_arg(arg, p_format, p_va)
 	return 1;
 }
 
-#ifdef USE_STDARG
+#ifdef HAVE_STDARG_H
 /* VARARGS2 */
 int getargs(object *arg, char *format, ...)
 #else
@@ -270,7 +270,7 @@ int getargs(va_alist) va_dcl
 	char *f;
 	int ok;
 	va_list va;
-#ifdef USE_STDARG
+#ifdef HAVE_STDARG_H
 
 	va_start(va, format);
 #else
@@ -517,7 +517,7 @@ do_mkvalue(p_format, p_va)
 	}
 }
 
-#ifdef USE_STDARG
+#ifdef HAVE_STDARG_H
 /* VARARGS 2 */
 object *mkvalue(char *format, ...)
 #else
@@ -527,7 +527,7 @@ object *mkvalue(va_alist) va_dcl
 {
 	va_list va;
 	object* retval;
-#ifdef USE_STDARG
+#ifdef HAVE_STDARG_H
 	va_start(va, format);
 #else
 	char *format;

@@ -7,12 +7,14 @@ and a published article about Python.
 The following are the LaTeX source files:
 
 	tut.tex				The tutorial
-	lib.tex, lib[1-5].tex		The library reference
+	lib.tex, lib*.tex		The library reference
 	ref.tex, ref[1-8].tex		The reference manual
+	ext.tex				How to extend Python
 	qua.tex, quabib.bib		Article published in CWI Quarterly
 
-All except qua.tex use the style option file "myformat.sty".  This
-contains some macro definitions and sets some style parameters.
+All except qua.tex (which isn't built by the default target) use the
+style option file "myformat.sty".  This contains some macro
+definitions and sets some style parameters.
 
 The style parameters are set up for European paper size (21 x 29.7 cm,
 a.k.a. A4, or roughly 8.27 x 11.7 inch) by default.  To use US paper,

@@ -1,13 +1,23 @@
 #! /bin/sh
 
-# This script converts Makefile.in.in and config.c.in into Makefile.in
+# This script converts Makefile.pre and config.c.in into Makefile
 # and config.c, based on the module definitions found in the file
-# Setup.
+# Setup.  Note: config.c.in and Setup are found in $srcdir;
+# Makefile.pre is found in the current directory.
+
+case $1 in
+-s)	shift; srcdir=$1; shift;;
+*)	case $0 in
+	*/*)	srcdir=`echo $0 | sed 's,/[^/]*$,,'`;;
+	*)	srcdir=.;;
+	esac
+	;;
+esac
 
 NL="\\
 "
 
-sed -e 's/#.*//' -e '/^[ 	]*$/d' ${1-Setup} |
+sed -e 's/[ 	]*#.*//' -e '/^[ 	]*$/d' ${*-$srcdir/Setup} |
 (
 	DEFS=
 	MODS=
@@ -40,6 +50,10 @@ sed -e 's/#.*//' -e '/^[ 	]*$/d' ${1-Setup} |
 		for obj in $objs
 		do
 		  src=`basename $obj .o`.c
+		  case $src in
+		  glmodule.c) ;;
+		  *) src='$(srcdir)/'$src;;
+		  esac
 		  RULES="$RULES$obj: $src; \$(CC) \$(CFLAGS) $cpps -c $src$NL"
 		done
 		OBJS="$OBJS $objs"
@@ -57,15 +71,15 @@ sed -e 's/#.*//' -e '/^[ 	]*$/d' ${1-Setup} |
 
 		/MARKER 2/i$NL$INITBITS
 
-		" config.c.in >config.c
+		" $srcdir/config.c.in >config.c
 
 	sed -e "
 		s%@MODOBJS@%$OBJS%
 		s%@MODLIBS@%$LIBS%
-		/Rules added by ..makesetup/a$NL$NL$RULES
+		/Rules added by makesetup/a$NL$NL$RULES
 		
-		/Definitions added by ..makesetup/a$NL$NL$DEFS
+		/Definitions added by makesetup/a$NL$NL$DEFS
 		
-		" Makefile.in.in >Makefile.in
+		" Makefile.pre >Makefile
 
 )

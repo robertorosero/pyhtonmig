@@ -1,5 +1,5 @@
 /**********************************************************
-Copyright 1991, 1992, 1993 by Stichting Mathematisch Centrum,
+Copyright 1991, 1992, 1993, 1994 by Stichting Mathematisch Centrum,
 Amsterdam, The Netherlands.
 
                         All Rights Reserved
@@ -24,7 +24,7 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 /* AL module -- interface to Mark Callow's Audio Library (AL). */
 
-#include "audio.h"
+#include <audio.h>
 
 /* Check which version audio library we have: */
 #ifdef AL_ERROR_NUMBER
@@ -50,7 +50,7 @@ typedef struct {
 	ALconfig ob_config;
 } configobject;
 
-extern typeobject Configtype; /* Forward */
+staticforward typeobject Configtype;
 
 #define is_configobject(v) ((v)->ob_type == &Configtype)
 
@@ -215,16 +215,16 @@ config_getattr(self, name)
 	return findmethod(config_methods, (object *)self, name);
 }
 
-typeobject Configtype = {
+static typeobject Configtype = {
 	OB_HEAD_INIT(&Typetype)
 	0,			/*ob_size*/
 	"config",		/*tp_name*/
 	sizeof(configobject),	/*tp_size*/
 	0,			/*tp_itemsize*/
 	/* methods */
-	config_dealloc,		/*tp_dealloc*/
+	(destructor)config_dealloc, /*tp_dealloc*/
 	0,			/*tp_print*/
-	config_getattr,		/*tp_getattr*/
+	(getattrfunc)config_getattr, /*tp_getattr*/
 	0,			/*tp_setattr*/
 	0,			/*tp_compare*/
 	0,			/*tp_repr*/
@@ -250,7 +250,7 @@ typedef struct {
 	ALport ob_port;
 } portobject;
 
-extern typeobject Porttype; /* Forward */
+staticforward typeobject Porttype;
 
 #define is_portobject(v) ((v)->ob_type == &Porttype)
 
@@ -490,7 +490,6 @@ al_getstatus (self, args)
 
 static struct methodlist port_methods[] = {
 	{"closeport",		al_closeport},
-	{"close",		al_closeport},
 	{"getfd",		al_getfd},
         {"fileno",		al_getfd},
 	{"getfilled",		al_getfilled},
@@ -524,16 +523,16 @@ port_getattr(p, name)
 	return findmethod(port_methods, (object *)p, name);
 }
 
-typeobject Porttype = {
+static typeobject Porttype = {
 	OB_HEAD_INIT(&Typetype)
 	0,			/*ob_size*/
 	"port",			/*tp_name*/
 	sizeof(portobject),	/*tp_size*/
 	0,			/*tp_itemsize*/
 	/* methods */
-	port_dealloc,		/*tp_dealloc*/
+	(destructor)port_dealloc, /*tp_dealloc*/
 	0,			/*tp_print*/
-	port_getattr,		/*tp_getattr*/
+	(getattrfunc)port_getattr, /*tp_getattr*/
 	0,			/*tp_setattr*/
 	0,			/*tp_compare*/
 	0,			/*tp_repr*/
