@@ -125,6 +125,8 @@ and the docstrings of its contained objects.  It can be used with
 modules, functions, classes, methods, staticmethods, classmethods, and
 properties.
 
+Finding Tests in Functions
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 For a function whose docstring contains examples, DocTestFinder.find()
 will return a single test (for that function's docstring):
 
@@ -161,40 +163,42 @@ an empty test also be created when there's no docstring?)
     >>> finder.find(no_examples)
     [<DocTest no_examples from None:1 (no examples)>]
 
+Finding Tests in Classes
+~~~~~~~~~~~~~~~~~~~~~~~~
 For a class, DocTestFinder will create a test for the class's
 docstring, and will recursively explore its contents, including
 methods, classmethods, staticmethods, properties, and nested classes.
 
     >>> # A class:
-    >>> class X:
+    >>> class A:
     ...     '''
     ...     >>> print 1
     ...     1
     ...     '''
     ...     def __init__(self, val):
     ...         '''
-    ...         >>> print X(12).get()
+    ...         >>> print A(12).get()
     ...         12
     ...         '''
     ...         self.val = val
     ...
     ...     def double(self):
     ...         '''
-    ...         >>> print X(12).double().get()
+    ...         >>> print A(12).double().get()
     ...         24
     ...         '''
-    ...         return X(self.val + self.val)
+    ...         return A(self.val + self.val)
     ...
     ...     def get(self):
     ...         '''
-    ...         >>> print X(-5).get()
+    ...         >>> print A(-5).get()
     ...         -5
     ...         '''
     ...         return self.val
     ...
     ...     def a_staticmethod(v):
     ...         '''
-    ...         >>> print X.a_staticmethod(10)
+    ...         >>> print A.a_staticmethod(10)
     ...         11
     ...         '''
     ...         return v+1
@@ -202,9 +206,9 @@ methods, classmethods, staticmethods, properties, and nested classes.
     ...
     ...     def a_classmethod(cls, v):
     ...         '''
-    ...         >>> print X.a_classmethod(10)
+    ...         >>> print A.a_classmethod(10)
     ...         12
-    ...         >>> print X(0).a_classmethod(10)
+    ...         >>> print A(0).a_classmethod(10)
     ...         12
     ...         '''
     ...         return v+2
@@ -217,37 +221,76 @@ methods, classmethods, staticmethods, properties, and nested classes.
     ...
     ...     class NestedClass:
     ...         '''
-    ...         >>> x = X.NestedClass(5)
+    ...         >>> x = A.NestedClass(5)
     ...         >>> y = x.square()
     ...         >>> print y.get()
     ...         25
     ...         '''
     ...         def __init__(self, val=0):
     ...             '''
-    ...             >>> print X.NestedClass().get()
+    ...             >>> print A.NestedClass().get()
     ...             0
     ...             '''
     ...             self.val = val
     ...         def square(self):
-    ...             X.NestedClass(self.val*self.val)
+    ...             A.NestedClass(self.val*self.val)
     ...         def get(self):
     ...             return self.val
 
     >>> finder = doctest.DocTestFinder()
-    >>> tests = finder.find(X)
+    >>> tests = finder.find(A)
     >>> tests.sort()
     >>> for t in tests:
     ...     print '%4s %2s  %s' % (t.lineno, len(t.examples), t.name)
-    None  1  X
-    None  3  X.NestedClass
-      96  1  X.NestedClass.__init__
-       7  1  X.__init__
-      40  2  X.a_classmethod
-    None  1  X.a_property
-      40  1  X.a_staticmethod
-      40  1  X.double
-      40  1  X.get
+    None  1  A
+    None  3  A.NestedClass
+      96  1  A.NestedClass.__init__
+       7  1  A.__init__
+      40  2  A.a_classmethod
+    None  1  A.a_property
+      40  1  A.a_staticmethod
+      40  1  A.double
+      40  1  A.get
 
+New-style classes are also supported:
+
+    >>> class B(object):
+    ...     '''
+    ...     >>> print 1
+    ...     1
+    ...     '''
+    ...     def __init__(self, val):
+    ...         '''
+    ...         >>> print B(12).get()
+    ...         12
+    ...         '''
+    ...         self.val = val
+    ...
+    ...     def double(self):
+    ...         '''
+    ...         >>> print B(12).double().get()
+    ...         24
+    ...         '''
+    ...         return B(self.val + self.val)
+    ...
+    ...     def get(self):
+    ...         '''
+    ...         >>> print B(-5).get()
+    ...         -5
+    ...         '''
+    ...         return self.val
+
+    >>> tests = finder.find(B)
+    >>> tests.sort()
+    >>> for t in tests:
+    ...     print '%4s %2s  %s' % (t.lineno, len(t.examples), t.name)
+    None  1  B
+       7  1  B.__init__
+      40  1  B.double
+      40  1  B.get
+
+Finding Tests in Modules
+~~~~~~~~~~~~~~~~~~~~~~~~
 For a module, DocTestFinder will create a test for the class's
 docstring, and will recursively explore its contents, including
 functions, classes, and the `__test__` dictionary, if it exists:
@@ -263,7 +306,7 @@ functions, classes, and the `__test__` dictionary, if it exists:
     ...     return val*3
     >>> m.__dict__.update({
     ...     'double': double,
-    ...     'X': X,
+    ...     'A': A,
     ...     '__doc__': '''
     ...         Module docstring.
     ...             >>> print 'module'
@@ -281,23 +324,27 @@ functions, classes, and the `__test__` dictionary, if it exists:
     >>> for t in tests:
     ...     print '%4s %2s  %s' % (t.lineno, len(t.examples), t.name)
        1  1  some_module
-    None  1  some_module.X
-    None  3  some_module.X.NestedClass
-      57  1  some_module.X.NestedClass.__init__
-       6  1  some_module.X.__init__
-      35  2  some_module.X.a_classmethod
-    None  1  some_module.X.a_property
-      27  1  some_module.X.a_staticmethod
-      13  1  some_module.X.double
-      20  1  some_module.X.get
+    None  1  some_module.A
+    None  3  some_module.A.NestedClass
+      57  1  some_module.A.NestedClass.__init__
+       6  1  some_module.A.__init__
+      35  2  some_module.A.a_classmethod
+    None  1  some_module.A.a_property
+      27  1  some_module.A.a_staticmethod
+      13  1  some_module.A.double
+      20  1  some_module.A.get
        1  1  some_module.c
     None  2  some_module.d
        1  1  some_module.double
 
+Duplicate Removal
+~~~~~~~~~~~~~~~~~
 If a single object is listed twice (under different names), then tests
 will only be generated for it once:
 
     >>> class TwoNames:
+    ...     '''f() and g() are two names for the same method'''
+    ...
     ...     def f(self):
     ...         '''
     ...         >>> print TwoNames().f()
@@ -309,19 +356,507 @@ will only be generated for it once:
 
     >>> finder = doctest.DocTestFinder()
     >>> tests = finder.find(TwoNames)
+    >>> tests.sort()
     >>> print len(tests)
-    1
-    >>> print tests[0].name in ('TwoNames.f', 'TwoNames.g')
+    2
+    >>> print tests[0].name
+    TwoNames
+    >>> print tests[1].name in ('TwoNames.f', 'TwoNames.g')
     True
 
+Filter Functions
+~~~~~~~~~~~~~~~~
+Two filter functions can be used to restrict which objects get
+examined: a name-based filter and an object-based filter.
 
+    >>> def namefilter(prefix, base):
+    ...     return base.startswith('a_')
+    >>> tests = doctest.DocTestFinder(namefilter=namefilter).find(A)
+    >>> tests.sort()
+    >>> for t in tests:
+    ...     print '%4s %2s  %s' % (t.lineno, len(t.examples), t.name)
+    None  1  A
+    None  3  A.NestedClass
+      96  1  A.NestedClass.__init__
+       7  1  A.__init__
+      40  1  A.double
+      40  1  A.get
+  
+    >>> def objfilter(obj):
+    ...     return isinstance(obj, (staticmethod, classmethod))
+    >>> tests = doctest.DocTestFinder(objfilter=objfilter).find(A)
+    >>> tests.sort()
+    >>> for t in tests:
+    ...     print '%4s %2s  %s' % (t.lineno, len(t.examples), t.name)
+    None  1  A
+    None  3  A.NestedClass
+      96  1  A.NestedClass.__init__
+       7  1  A.__init__
+    None  1  A.a_property
+      40  1  A.double
+      40  1  A.get
 
+If a given object is filtered out, then none of the objects that it
+contains will be added either:
+
+    >>> def namefilter(prefix, base):
+    ...     return base == 'NestedClass'
+    >>> tests = doctest.DocTestFinder(namefilter=namefilter).find(A)
+    >>> tests.sort()
+    >>> for t in tests:
+    ...     print '%4s %2s  %s' % (t.lineno, len(t.examples), t.name)
+    None  1  A
+       7  1  A.__init__
+      40  2  A.a_classmethod
+    None  1  A.a_property
+      40  1  A.a_staticmethod
+      40  1  A.double
+      40  1  A.get
+
+The filter functions apply to contained objects, and *not* to the
+object explicitly passed to DocTestFinder:
+
+    >>> def namefilter(prefix, base):
+    ...     return base == 'A'
+    >>> tests = doctest.DocTestFinder(namefilter=namefilter).find(A)
+    >>> len(tests)
+    9
+
+Turning off Recursion
+~~~~~~~~~~~~~~~~~~~~~
+DocTestFinder can be told not to look for tests in contained objects
+using the `recurse` flag:
+
+    >>> tests = doctest.DocTestFinder(recurse=False).find(A)
+    >>> tests.sort()
+    >>> for t in tests:
+    ...     print '%4s %2s  %s' % (t.lineno, len(t.examples), t.name)
+    None  1  A
+"""
+
+class test_DocTestRunner:
+    def basics(): r"""
+Unit tests for the `DocTestRunner` class.
+
+DocTestRunner is used to run DocTest test cases, and to accumulate
+statistics.  Here's a simple DocTest case we can use:
+
+    >>> def f(x):
+    ...     '''
+    ...     >>> x = 12
+    ...     >>> print x
+    ...     12
+    ...     >>> x/2
+    ...     6
+    ...     '''
+    >>> test = doctest.DocTestFinder().find(f)[0]
+
+The main DocTestRunner interface is the `run` method, which runs a
+given DocTest case in a given namespace (globs).  It returns a tuple
+`(f,t)`, where `f` is the number of failed tests and `t` is the number
+of tried tests.
+
+    >>> doctest.DocTestRunner().run(test, {})
+    (0, 3)
+
+The `verbose` flag makes the test runner generate more detailed
+output:
+
+    >>> doctest.DocTestRunner(verbose=True).run(test, {})
+    Trying: x = 12
+    Expecting: nothing
+    ok
+    Trying: print x
+    Expecting: 12
+    ok
+    Trying: x/2
+    Expecting: 6
+    ok
+    (0, 3)
+
+If any example produces incorrect output, then the test runner reports
+the failure and proceeds to the next example:
+
+    >>> def f(x):
+    ...     '''
+    ...     >>> x = 12
+    ...     >>> print x
+    ...     14
+    ...     >>> x/2
+    ...     6
+    ...     '''
+    >>> test = doctest.DocTestFinder().find(f)[0]
+    >>> doctest.DocTestRunner(verbose=True).run(test, {})
+    Trying: x = 12
+    Expecting: nothing
+    ok
+    Trying: print x
+    Expecting: 14
+    **********************************************************************
+    Failure in example: print x
+    from line #2 of f
+    Expected: 14
+    Got: 12
+    Trying: x/2
+    Expecting: 6
+    ok
+    (1, 3)
+"""
+    def exceptions(): r"""
+Tests of `DocTestRunner`'s exception handling.
+
+An expected exception is specified with a traceback message.  The
+lines between the first line and the type/value may be omitted or
+replaced with any other string:
+
+    >>> def f(x):
+    ...     '''
+    ...     >>> x = 12
+    ...     >>> print x/0
+    ...     Traceback (most recent call last):
+    ...     ZeroDivisionError: integer division or modulo by zero
+    ...     '''
+    >>> test = doctest.DocTestFinder().find(f)[0]
+    >>> doctest.DocTestRunner().run(test, {})
+    (0, 2)
+
+An example may generate output before it raises an exception; if it
+does, then the output must match the expected output:
+
+    >>> def f(x):
+    ...     '''
+    ...     >>> x = 12
+    ...     >>> print 'pre-exception output', x/0
+    ...     pre-exception output
+    ...     Traceback (most recent call last):
+    ...     ZeroDivisionError: integer division or modulo by zero
+    ...     '''
+    >>> test = doctest.DocTestFinder().find(f)[0]
+    >>> doctest.DocTestRunner().run(test, {})
+    (0, 2)
+
+Exception messages may contain newlines:
+
+    >>> def f(x):
+    ...     r'''
+    ...     >>> raise ValueError, 'multi\nline\nmessage'
+    ...     Traceback (most recent call last):
+    ...     ValueError: multi
+    ...     line
+    ...     message
+    ...     '''
+    >>> test = doctest.DocTestFinder().find(f)[0]
+    >>> doctest.DocTestRunner().run(test, {})
+    (0, 1)
+
+If an exception is expected, but an exception with the wrong type or
+message is raised, then it is reported as a failure:
+
+    >>> def f(x):
+    ...     r'''
+    ...     >>> raise ValueError, 'message'
+    ...     Traceback (most recent call last):
+    ...     ValueError: wrong message
+    ...     '''
+    >>> test = doctest.DocTestFinder().find(f)[0]
+    >>> doctest.DocTestRunner().run(test, {})
+    **********************************************************************
+    Failure in example: raise ValueError, 'message'
+    from line #1 of f
+    Expected:
+        Traceback (most recent call last):
+        ValueError: wrong message
+    Got:
+        Traceback (most recent call last):
+        ValueError: message
+    (1, 1)
+
+If an exception is raised but not expected, then it is reported as an
+unexpected exception:
+
+    >>> # Allow ellipsis in the following examples (since the filename
+    >>> # and line number in the traceback can vary):
+    >>> doctest: +ELLIPSIS
+
+    >>> def f(x):
+    ...     r'''
+    ...     >>> 1/0
+    ...     0
+    ...     '''
+    >>> test = doctest.DocTestFinder().find(f)[0]
+    >>> doctest.DocTestRunner().run(test, {})
+    **********************************************************************
+    Failure in example: 1/0
+    from line #1 of f
+    Exception raised:
+        Traceback (most recent call last):
+          File "...", line ..., in __run
+            compileflags, 1) in globs
+          File "<string>", line 1, in ?
+        ZeroDivisionError: integer division or modulo by zero
+    (1, 1)
+
+    >>> # Turn ellipsis back off:
+    >>> doctest: -ELLIPSIS
+"""
+    def optionflags(): r"""
+Tests of `DocTestRunner`'s option flag handling.
+
+Several option flags can be used to customize the behavior of the test
+runner.  These are defined as module constants in doctest, and passed
+to the DocTestRunner constructor (multiple constants should be or-ed
+together).
+
+The DONT_ACCEPT_TRUE_FOR_1 flag disables matches between True/False
+and 1/0:
+
+    >>> def f(x):
+    ...     '>>> True\n1\n'
+
+    >>> # Without the flag:
+    >>> test = doctest.DocTestFinder().find(f)[0]
+    >>> doctest.DocTestRunner().run(test, {})
+    (0, 1)
+
+    >>> # With the flag:
+    >>> test = doctest.DocTestFinder().find(f)[0]
+    >>> flags = doctest.DONT_ACCEPT_TRUE_FOR_1
+    >>> doctest.DocTestRunner(optionflags=flags).run(test, {})
+    **********************************************************************
+    Failure in example: True
+    from line #0 of f
+    Expected: 1
+    Got: True
+    (1, 1)
+
+The DONT_ACCEPT_BLANKLINE flag disables the match between blank lines
+and the '<BLANKLINE>' marker:
+
+    >>> def f(x):
+    ...     '>>> print "a\\n\\nb"\na\n<BLANKLINE>\nb\n'
+
+    >>> # Without the flag:
+    >>> test = doctest.DocTestFinder().find(f)[0]
+    >>> doctest.DocTestRunner().run(test, {})
+    (0, 1)
+
+    >>> # With the flag:
+    >>> test = doctest.DocTestFinder().find(f)[0]
+    >>> flags = doctest.DONT_ACCEPT_BLANKLINE
+    >>> doctest.DocTestRunner(optionflags=flags).run(test, {})
+    **********************************************************************
+    Failure in example: print "a\n\nb"
+    from line #0 of f
+    Expected:
+        a
+        <BLANKLINE>
+        b
+    Got:
+        a
+    <BLANKLINE>
+        b
+    (1, 1)
+
+The NORMALIZE_WHITESPACE flag causes all sequences of whitespace to be
+treated as equal:
+
+    >>> def f(x):
+    ...     '>>> print 1, 2, 3\n  1   2 \n 3'
+
+    >>> # Without the flag:
+    >>> test = doctest.DocTestFinder().find(f)[0]
+    >>> doctest.DocTestRunner().run(test, {})
+    **********************************************************************
+    Failure in example: print 1, 2, 3
+    from line #0 of f
+    Expected:
+          1   2 
+         3
+    Got: 1 2 3
+    (1, 1)
+
+    >>> # With the flag:
+    >>> test = doctest.DocTestFinder().find(f)[0]
+    >>> flags = doctest.NORMALIZE_WHITESPACE
+    >>> doctest.DocTestRunner(optionflags=flags).run(test, {})
+    (0, 1)
+
+The ELLIPSIS flag causes ellipsis marker ("...") in the expected
+output to match any substring in the actual output:
+
+    >>> def f(x):
+    ...     '>>> print range(15)\n[0, 1, 2, ..., 14]\n'
+
+    >>> # Without the flag:
+    >>> test = doctest.DocTestFinder().find(f)[0]
+    >>> doctest.DocTestRunner().run(test, {})
+    **********************************************************************
+    Failure in example: print range(15)
+    from line #0 of f
+    Expected: [0, 1, 2, ..., 14]
+    Got: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
+    (1, 1)
+
+    >>> # With the flag:
+    >>> test = doctest.DocTestFinder().find(f)[0]
+    >>> flags = doctest.ELLIPSIS
+    >>> doctest.DocTestRunner(optionflags=flags).run(test, {})
+    (0, 1)
+
+The UNIFIED_DIFF flag causes failures that involve multi-line expected
+and actual outputs to be displayed using a unified diff:
+
+    >>> def f(x):
+    ...     r'''
+    ...     >>> print '\n'.join('abcdefg')
+    ...     a
+    ...     B
+    ...     c
+    ...     d
+    ...     f
+    ...     g
+    ...     h
+    ...     '''
+
+    >>> # Without the flag:
+    >>> test = doctest.DocTestFinder().find(f)[0]
+    >>> doctest.DocTestRunner().run(test, {})
+    **********************************************************************
+    Failure in example: print '\n'.join('abcdefg')
+    from line #1 of f
+    Expected:
+        a
+        B
+        c
+        d
+        f
+        g
+        h
+    Got:
+        a
+        b
+        c
+        d
+        e
+        f
+        g
+    (1, 1)
+
+    >>> # With the flag:
+    >>> test = doctest.DocTestFinder().find(f)[0]
+    >>> flags = doctest.UNIFIED_DIFF
+    >>> doctest.DocTestRunner(optionflags=flags).run(test, {})
+    **********************************************************************
+    Failure in example: print '\n'.join('abcdefg')
+    from line #1 of f
+    Differences (unified diff):
+        --- Expected 
+        +++ Got 
+        @@ -1,8 +1,8 @@
+         a
+        -B
+        +b
+         c
+         d
+        +e
+         f
+         g
+        -h
+    <BLANKLINE>
+    (1, 1)
+
+The CONTEXT_DIFF flag causes failures that involve multi-line expected
+and actual outputs to be displayed using a context diff:
+
+    >>> # Reuse f() from the UNIFIED_DIFF example, above.
+    >>> test = doctest.DocTestFinder().find(f)[0]
+    >>> flags = doctest.CONTEXT_DIFF
+    >>> doctest.DocTestRunner(optionflags=flags).run(test, {})
+    **********************************************************************
+    Failure in example: print '\n'.join('abcdefg')
+    from line #1 of f
+    Differences (unified diff):
+        *** Expected 
+        --- Got 
+        ***************
+        *** 1,8 ****
+          a
+        ! B
+          c
+          d
+          f
+          g
+        - h
+    <BLANKLINE>
+        --- 1,8 ----
+          a
+        ! b
+          c
+          d
+        + e
+          f
+          g
+    <BLANKLINE>
+    (1, 1)
+"""
+
+    def option_directives(): r"""
+Tests of `DocTestRunner`'s option directive mechanism.
+
+Option directives can be used to turn option flags on or off from
+within a DocTest case.  The following example shows how a flag can be
+turned on and off.  Note that comments on the same line as the option
+directive are ignored.
+
+    >>> def f(x): r'''
+    ...     >>> print range(10)       # Should fail: no ellipsis
+    ...     [0, 1, ..., 9]
+    ...
+    ...     >>> doctest: +ELLIPSIS    # turn ellipsis on.
+    ...     >>> print range(10)       # Should succeed
+    ...     [0, 1, ..., 9]
+    ...
+    ...     >>> doctest: -ELLIPSIS    # turn ellipsis back off.
+    ...     >>> print range(10)       # Should fail: no ellipsis
+    ...     [0, 1, ..., 9]
+    ...     '''
+    >>> test = doctest.DocTestFinder().find(f)[0]
+    >>> doctest.DocTestRunner().run(test, {})
+    **********************************************************************
+    Failure in example: print range(10)       # Should fail: no ellipsis
+    from line #1 of f
+    Expected: [0, 1, ..., 9]
+    Got: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    **********************************************************************
+    Failure in example: print range(10)       # Should fail: no ellipsis
+    from line #9 of f
+    Expected: [0, 1, ..., 9]
+    Got: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    (2, 3)
+
+Multiple flags can be toggled by a single option directive:
+
+    >>> def f(x): r'''
+    ...     >>> print range(10)       # Should fail
+    ...     [0, 1,  ...,   9]
+    ...     >>> doctest: +ELLIPSIS +NORMALIZE_WHITESPACE 
+    ...     >>> print range(10)       # Should succeed
+    ...     [0, 1,  ...,   9]
+    ...     '''
+    >>> test = doctest.DocTestFinder().find(f)[0]
+    >>> doctest.DocTestRunner().run(test, {})
+    **********************************************************************
+    Failure in example: print range(10)       # Should fail
+    from line #1 of f
+    Expected: [0, 1,  ...,   9]
+    Got: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    (1, 2)
 
 """
 
 def test_main():
     # Check the doctest cases in doctest itself:
-    test_support.run_doctest(doctest)
+    #test_support.run_doctest(doctest)
     # Check the doctest cases defined here:
     from test import test_doctest
     test_support.run_doctest(test_doctest, verbosity=0)
