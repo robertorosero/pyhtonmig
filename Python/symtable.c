@@ -96,8 +96,6 @@ static PyMemberDef ste_memberlist[] = {
 	{"children", T_OBJECT, OFF(ste_children), READONLY},
 	{"type",     T_INT,    OFF(ste_type), READONLY},
 	{"lineno",   T_INT,    OFF(ste_lineno), READONLY},
-	{"optimized",T_INT,    OFF(ste_optimized), READONLY},
-	{"nested",   T_INT,    OFF(ste_nested), READONLY},
 	{NULL}
 };
 
@@ -143,6 +141,7 @@ PyTypeObject PySTEntry_Type = {
 	0,					/* tp_new */
 };
 
+static int symtable_analyze(struct symtable *st);
 static int symtable_enter_block(struct symtable *st, identifier name, 
 				block_ty block, void *ast, int lineno);
 static int symtable_exit_block(struct symtable *st, void *ast);
@@ -197,6 +196,7 @@ PySymtable_Build(mod_ty mod, const char *filename, PyFutureFeatures *future)
 	st->st_future = future;
 	symtable_enter_block(st, GET_IDENTIFIER(top), ModuleBlock, 
 			     (void *)mod, 0);
+	st->st_top = st->st_cur;
 	/* Any other top-level initialization? */
 	switch (mod->kind) {
 	case Module_kind: {
@@ -225,6 +225,8 @@ PySymtable_Build(mod_ty mod, const char *filename, PyFutureFeatures *future)
 		return NULL;
 	}
 	symtable_exit_block(st, (void *)mod);
+	if (!symtable_analyze(st))
+	    goto error;
 	return st;
  error:
 	PySymtable_Free(st);
@@ -236,7 +238,6 @@ PySymtable_Free(struct symtable *st)
 {
 	Py_XDECREF(st->st_symbols);
 	Py_XDECREF(st->st_stack);
-	Py_XDECREF(st->st_cur);
 	PyMem_Free((void *)st);
 }
 
@@ -416,7 +417,7 @@ update_symbols(PyObject *symbols, PyObject *scope)
 		i = PyInt_AS_LONG(w);
 		flags |= (i << SCOPE_OFF);
 		u = PyInt_FromLong(flags);
-		if (!PyDict_SetItem(symbols, name, u)) {
+		if (PyDict_SetItem(symbols, name, u) < 0) {
 			Py_DECREF(u);
 			return 0;
 		}
@@ -438,6 +439,8 @@ analyze_block(PySTEntryObject *ste, PyObject *bound, PyObject *free)
 	if (!scope)
 		goto error;
 
+	assert(PySTEntry_Check(ste));
+	assert(PyDict_Check(ste->ste_symbols));
 	while (PyDict_Next(ste->ste_symbols, &pos, &name, &v)) {
 		flags = PyInt_AS_LONG(v);
 		if (!analyze_name(scope, name, flags, bound, local, free))
@@ -457,11 +460,8 @@ analyze_block(PySTEntryObject *ste, PyObject *bound, PyObject *free)
 			goto error;
 	}
 
-	/* call analyze_block() on each child */
 	for (i = 0; i < PyList_GET_SIZE(ste->ste_children); ++i) {
-		PyObject *c;
-		c = PyDict_GetItem(ste->ste_table->st_symbols,
-				   PyList_GET_ITEM(ste->ste_children, i));
+		PyObject *c = PyList_GET_ITEM(ste->ste_children, i);
 		assert(c && PySTEntry_Check(c));
 		if (!analyze_block((PySTEntryObject *)c, local, free))
 			goto error;
@@ -476,11 +476,13 @@ analyze_block(PySTEntryObject *ste, PyObject *bound, PyObject *free)
 	Py_XDECREF(local);
 	Py_XDECREF(scope);
 	Py_XDECREF(newbound);
+	if (!success)
+		assert(PyErr_Occurred());
 	return success;
 }
 
 int
-PySymtable_Analyze(struct symtable *st)
+symtable_analyze(struct symtable *st)
 {
 	PyObject *free;
 	int r;
@@ -488,7 +490,7 @@ PySymtable_Analyze(struct symtable *st)
 	free = PyDict_New();
 	if (!free)
 		return 0;
-	r = analyze_block((PySTEntryObject *)st->st_global, NULL, free);
+	r = analyze_block(st->st_top, NULL, free);
 	Py_DECREF(free);
 	return r;
 }
@@ -520,6 +522,9 @@ symtable_enter_block(struct symtable *st, identifier name, block_ty block,
 		     void *ast, int lineno)
 {
 	PySTEntryObject *prev = NULL;
+
+	fprintf(stderr, "enter block %s %d\n",
+		PyString_AS_STRING(name), lineno);
 
 	if (st->st_cur) {
 		prev = st->st_cur;
