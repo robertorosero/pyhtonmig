@@ -17,13 +17,18 @@ int Py_OptimizeFlag = 0;
        needs to be implemented (see also Python/ast.c encoding_decl)
 
      2:
-       LOAD_NAME is output instead of LOAD_GLOBAL
-
-     3:
        Get this err msg: XXX rd_object called with exception set
        From Python/marshal.c::PyMarshal_ReadLastObjectFromFile()
        This looks like it may be related to #1.
 
+     3:
+       LOAD_NAME is output instead of LOAD_GLOBAL
+
+     4:
+       typing Ctrl-C seg faults
+
+     5:
+       line numbers are off
 */
 
 /* fblockinfo tracks the current frame block.
@@ -855,31 +860,18 @@ compiler_if(struct compiler *c, stmt_ty s)
 	end = compiler_new_block(c);
 	if (end < 0)
 		return 0;
-	for (;;) {
-		next = compiler_new_block(c);
-		if (next < 0)
-			return 0;
-		VISIT(c, expr, s->v.If.test);
-		ADDOP_JREL(c, JUMP_IF_FALSE, next);
-		ADDOP(c, POP_TOP);
-		VISIT_SEQ(c, stmt, s->v.If.body);
-		ADDOP_JREL(c, JUMP_FORWARD, end);
-		compiler_use_next_block(c, next);
-		ADDOP(c, POP_TOP);
-		if (s->v.If.orelse) {
-			stmt_ty t = asdl_seq_GET(s->v.If.orelse, 0);
-			if (t->kind == If_kind) {
-				s = t;
-				c->u->u_lineno = t->lineno;
-			}
-			else {
-				VISIT_SEQ(c, stmt, s->v.If.orelse);
-				break;
-			}
-		}
-		else
-			break;
-	}
+        next = compiler_new_block(c);
+        if (next < 0)
+            return 0;
+        VISIT(c, expr, s->v.If.test);
+        ADDOP_JREL(c, JUMP_IF_FALSE, next);
+        ADDOP(c, POP_TOP);
+        VISIT_SEQ(c, stmt, s->v.If.body);
+        ADDOP_JREL(c, JUMP_FORWARD, end);
+        compiler_use_next_block(c, next);
+        ADDOP(c, POP_TOP);
+        if (s->v.If.orelse)
+            VISIT_SEQ(c, stmt, s->v.If.orelse);
 	compiler_use_next_block(c, end);
 	return 1;
 }
@@ -904,7 +896,7 @@ compiler_for(struct compiler *c, stmt_ty s)
 	VISIT(c, expr, s->v.For.target);
 	VISIT_SEQ(c, stmt, s->v.For.body);
 	ADDOP_JABS(c, JUMP_ABSOLUTE, start);
-	compiler_use_next_block(c, cleanup);
+	compiler_use_block(c, cleanup);
 	ADDOP(c, POP_BLOCK);
 	compiler_pop_fblock(c, LOOP, start);
 	VISIT_SEQ(c, stmt, s->v.For.orelse);
