@@ -1214,6 +1214,7 @@ compiler_visit_expr(struct compiler *c, expr_ty e)
 		ADDOP_O(c, LOAD_CONST, e->v.Num.n, consts);
 		break;
         case Str_kind:
+		ADDOP_O(c, LOAD_CONST, e->v.Str.s, consts);
 		break;
 	/* The following exprs can be assignment targets. */
         case Attribute_kind:
