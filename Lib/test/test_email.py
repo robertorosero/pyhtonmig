@@ -921,23 +921,35 @@ class TestMiscellaneous(unittest.TestCase):
 
     def test_formatdate(self):
         now = 1005327232.109884
+        epoch = time.gmtime(0)[0]
+        # When does the epoch start?
+        if epoch == 1970:
+            # traditional Unix epoch
+            matchdate = 'Fri, 09 Nov 2001 17:33:52 -0000'
+        elif epoch == 1904:
+            # Mac epoch
+            matchdate = 'Sat, 09 Nov 1935 16:33:52 -0000'
+        else:
+            matchdate = "I don't understand your epoch"
         gdate = Utils.formatdate(now)
-        ldate = Utils.formatdate(now, localtime=1)
-        self.assertEqual(gdate, 'Fri, 09 Nov 2001 17:33:52 -0000')
-        # It's a little tougher to test for localtime, but we'll try.  Skip if
-        # we don't have strptime().
-        if hasattr(time, 'strptime'):
-            gtime = time.strptime(gdate.split()[4], '%H:%M:%S')
-            ltime = time.strptime(ldate.split()[4], '%H:%M:%S')
-            zone = ldate.split()[5]
-            offset = int(zone[:3]) * -3600 + int(zone[-2:])
-            if time.daylight and time.localtime(now)[-1]:
-                toff = time.altzone
-            else:
-                toff = time.timezone
-            self.assertEqual(offset, toff)
+        self.assertEqual(gdate, matchdate)
 
-    def test_parsedate(self):
+    def test_formatdate_localtime(self):
+        now = 1005327232.109884
+        ldate = Utils.formatdate(now, localtime=1)
+        zone = ldate.split()[5]
+        offset = int(zone[1:3]) * 3600 + int(zone[-2:]) * 60
+        # Remember offset is in seconds west of UTC, but the timezone is in
+        # minutes east of UTC, so the signs differ.
+        if zone[0] == '+':
+            offset = -offset
+        if time.daylight and time.localtime(now)[-1]:
+            toff = time.altzone
+        else:
+            toff = time.timezone
+        self.assertEqual(offset, toff)
+
+    def test_parsedate_none(self):
         self.assertEqual(Utils.parsedate(''), None)
 
 
