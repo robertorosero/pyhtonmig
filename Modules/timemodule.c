@@ -28,9 +28,6 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #include "modsupport.h"
 #include "ceval.h"
 
-#include <signal.h>
-#include <setjmp.h>
-
 #ifdef macintosh
 #include <time.h>
 #else
@@ -61,7 +58,7 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #endif
 
 /* Forward declarations */
-static void floatsleep PROTO((double));
+static int floatsleep PROTO((double));
 static double floattime PROTO(());
 
 static object *
@@ -97,56 +94,20 @@ time_clock(self, args)
 }
 #endif /* HAVE_CLOCK */
 
-#ifdef SIGINT
-static jmp_buf sleep_intr;
-
-/* ARGSUSED */
-static void
-sleep_catcher(sig)
-	int sig; /* Not used but required by interface */
-{
-	longjmp(sleep_intr, 1);
-}
-#endif /* SIGINT */
-
 static object *
 time_sleep(self, args)
 	object *self;
 	object *args;
 {
 	double secs;
-#ifdef SIGINT
-	/* We must set the signal handler *after* calling setjmp, to
-	   avoid a race condition.  Unfortunately some compilers put
-	   the sigsave variable in a register.  Sometimes auto is
-	   enough, sometimes static is needed to avoid this (Microsoft
-	   C 7.0). */
-#ifdef WITH_THREAD
-	auto
-#else
-	static
-#endif
-	       RETSIGTYPE (*sigsave)() = 0; /* Initialized to shut lint up */
-#endif /* SIGINT */
 	if (!getargs(args, "d", &secs))
 		return NULL;
-#ifdef SIGINT
 	BGN_SAVE
-	if (setjmp(sleep_intr)) {
+	if (floatsleep(secs) != 0) {
 		RET_SAVE
-		signal(SIGINT, sigsave);
-		err_set(KeyboardInterrupt);
 		return NULL;
 	}
-	sigsave = signal(SIGINT, SIG_IGN);
-	if (sigsave != (RETSIGTYPE (*)()) SIG_IGN)
-		signal(SIGINT, sleep_catcher);
-#endif
-	floatsleep(secs);
-#ifdef SIGINT
 	END_SAVE
-	signal(SIGINT, sigsave);
-#endif
 	INCREF(None);
 	return None;
 }
@@ -354,10 +315,11 @@ floattime()
 }
 
 
-/* Implement floatsleep() for various platforms */
+/* Implement floatsleep() for various platforms.
+   When interrupted (or when another error occurs), return -1 and
+   set an exception; else return 0. */
 
-
-static void
+static int
 floatsleep(secs)
 	double secs;
 {
@@ -370,15 +332,18 @@ floatsleep(secs)
 	secs = floor(secs);
 	t.tv_sec = (long)secs;
 	t.tv_usec = (long)(frac*1000000.0);
-	(void) select(0, (fd_set *)0, (fd_set *)0, (fd_set *)0, &t);
+	if (select(0, (fd_set *)0, (fd_set *)0, (fd_set *)0, &t) != 0) {
+		err_errno(IOError);
+		return -1;
+	}
 #else /* !HAVE_SELECT */
 #ifdef macintosh
 #define MacTicks	(* (long *)0x16A)
 	long deadline;
 	deadline = MacTicks + (long)(secs * 60.0);
 	while (MacTicks < deadline) {
-		if (intrcheck())
-			sleep_catcher(SIGINT);
+		if (sigcheck())
+			return -1;
 	}
 #else /* !macintosh */
 #ifdef MSDOS
@@ -401,6 +366,8 @@ floatsleep(secs)
 #ifdef QUICKWIN
 		_wyield();
 #endif
+		if (sigcheck())
+			return -1;
 		ftime(&t1);
 		if (t1.time > t2.time ||
 		    t1.time == t2.time && t1.millitm >= t2.millitm)
@@ -408,11 +375,14 @@ floatsleep(secs)
 	}
 #else /* !MSDOS */
 #ifdef _M_IX86
+	/* XXX Can't interrupt this sleep */
 	Sleep((int)(secs*1000));
 #else /* _M_IX86 */
+	/* XXX Can't interrupt this sleep */
 	sleep((int)secs);
 #endif /* _M_IX86 */
 #endif /* !MSDOS */
 #endif /* !macintosh */
 #endif /* !HAVE_SELECT */
+	return 0;
 }

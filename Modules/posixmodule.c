@@ -35,7 +35,6 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #include "ceval.h"
 
 #include <string.h>
-#include <setjmp.h>
 #include <errno.h>
 
 #ifndef macintosh
