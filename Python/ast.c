@@ -176,10 +176,12 @@ PyAST_FromNode(const node *n)
                 return Interactive(stmts);
             }
         case encoding_decl:
-	    /* XXX need to handle */
-            fprintf(stderr, "error in PyAST_FromNode()"
-                            " need to handle encoding\n");
-            break;
+	    /* XXX need to handle properlyi, ignore for now */
+            stmts = asdl_seq_new(1);
+            if (!stmts)
+                return NULL;
+            asdl_seq_SET(stmts, 0, Pass(n->n_lineno));
+            return Interactive(stmts);
         default:
             goto error;
     }
@@ -1329,7 +1331,7 @@ ast_for_print_stmt(const node *n)
     int i, start = 1;
 
     REQ(n, print_stmt);
-    if (TYPE(CHILD(n, 1)) == RIGHTSHIFT) {
+    if (NCH(n) >= 2 && TYPE(CHILD(n, 1)) == RIGHTSHIFT) {
 	dest = ast_for_expr(CHILD(n, 2));
         if (!dest)
             return NULL;
