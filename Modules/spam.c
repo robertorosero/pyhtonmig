@@ -197,7 +197,8 @@ spam_bench(PyObject *self, PyObject *args)
 }
 
 static PyMethodDef spam_functions[] = {
-	{"bench", spam_bench, 1}
+	{"bench", spam_bench, 1},
+	{NULL,			NULL}		/* sentinel */
 };
 
 DL_EXPORT(void)
