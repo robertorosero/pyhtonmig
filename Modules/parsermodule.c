@@ -85,12 +85,10 @@ parser_parsefile(self, args)
 		err_errno(IOError);
 		return NULL;
 	}
-	err = parse_file(fp, filename, file_input, &n);
+	n = parse_file(fp, filename, file_input);
 	fclose(fp);
-	if (err != E_DONE) {
-		err_input(err);
+	if (n != NULL)
 		return NULL;
-	}
 	res = node2tuple(n);
 	freetree(n);
 	return res;
