@@ -114,6 +114,34 @@ newfileobject(name, mode)
 	return (object *)f;
 }
 
+void
+setfilebufsize(ff, bufsize)
+	object *ff;
+	int bufsize;
+{
+	fileobject *f;
+	if (ff == NULL || !is_fileobject(ff))
+		return err_badcall();
+	f = (fileobject *)ff;
+	if (bufsize >= 0) {
+#ifdef HAVE_SETVBUF
+		int type;
+		switch (bufsize) {
+		case 0:
+			type = _IONBF;
+			break;
+		case 1:
+			type = _IOLBF;
+			bufsize = BUFSIZ;
+			break;
+		default:
+			type = _IOFBF;
+		}
+		setvbuf(f->f_fp, (char *)NULL, type, bufsize);
+#endif /* HAVE_SETVBUF */
+	}
+}
+
 static object *
 err_closed()
 {
