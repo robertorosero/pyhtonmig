@@ -130,7 +130,7 @@ def isdir(path):
 
 
 # Is a path a regular file?
-# This follows symbolic links, so both islink() and isdir() can be true
+# This follows symbolic links, so both islink() and isfile() can be true
 # for the same path.
 
 def isfile(path):
