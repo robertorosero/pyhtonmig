@@ -40,9 +40,14 @@ echo checking for --with-readline
 AC_WITH(readline, [AC_DEFINE(WITH_READLINE)
 if test -d "$withval"
 then LIBS="$LIBS -L$withval"
-else echo proper usage is --with-readline=DIRECTORY; exit 1
+else echo proper usage is --with-readline=DIRECTORY 1>&2; exit 1
 fi
-LIBS="$LIBS -lreadline -ltermcap"])
+termcap=
+AC_HAVE_LIBRARY(termcap, [termcap=termcap], [AC_HAVE_LIBRARY(termlib, [termcap=termlib])])
+if test ! -z "$termcap"
+then LIBS="$LIBS -lreadline -l$termcap"
+else echo no working termcap/termlib, do not use --with-readline 1>&2; exit 1
+fi])
 
 echo checking for --with-thread
 AC_WITH(thread, [
@@ -63,7 +68,7 @@ AC_WITH(sgi-dl, [AC_DEFINE(WITH_SGI_DL)
 dldir=$withval
 if test -d "$dldir"
 then LIBS="$LIBS -L$dldir"
-else echo proper usage is --with-sgi-dl=DIRECTORY; exit 1
+else echo proper usage is --with-sgi-dl=DIRECTORY 1>&2; exit 1
 fi
 DLINCLDIR=${dldir}
 LIBS="$LIBS -ldl -lmld"])
@@ -74,13 +79,13 @@ dldir=`echo "$withval" | sed 's/,.*//'`
 dlddir=`echo "$withval" | sed 's/.*,//'`
 if test -d "$dldir" -a -d "$dlddir"
 then LIBS="$LIBS -L$dldir -L$dlddir"
-else echo proper usage is --with-dl-dld=DL_DIRECTORY,DLD_DIRECTORY; exit 1
+else echo proper usage is --with-dl-dld=DL_DIRECTORY,DLD_DIRECTORY 1>&2; exit 1
 fi
 DLINCLDIR=${dldir}
 LIBS="$LIBS -ldl -ldld"])
 
 # checks for library functions
-AC_HAVE_FUNCS(clock ftime gettimeofday getpeername getpgrp getpid getwd lstat readlink readline select setsid setpgid setpgrp siginterrupt symlink tcgetpgrp tcsetpgrp times uname waitpid)
+AC_HAVE_FUNCS(clock ftime gettimeofday getpeername getpgrp getpid getwd lstat readlink select setsid setpgid setpgrp siginterrupt symlink tcgetpgrp tcsetpgrp times uname waitpid)
 AC_REPLACE_FUNCS(dup2 getcwd strerror strtod memmove)
 AC_FUNC_CHECK(getpgrp, AC_COMPILE_CHECK([argument to getpgrp], [#include <unistd.h>], [getpgrp(0);], AC_DEFINE(GETPGRP_HAVE_ARG)))
 
@@ -88,6 +93,7 @@ AC_FUNC_CHECK(getpgrp, AC_COMPILE_CHECK([argument to getpgrp], [#include <unistd
 AC_TIME_WITH_SYS_TIME
 AC_STRUCT_TM
 AC_TIMEZONE
+AC_COMPILE_CHECK([whether we have altzone], [#include <time.h>], [return altzone;], AC_DEFINE(HAVE_ALTZONE))
 AC_COMPILE_CHECK([whether sys/select.h and sys/time.h may both be included], [
 #include <sys/types.h>
 #include <sys/select.h>
@@ -122,14 +128,14 @@ AC_SUBST(LIBM)
 LIBM=-lm
 AC_WITH(libm, [if test "$withval" != 1
 then LIBM=$withval
-else echo proper usage is --with-libm=STRING; exit 1
+else echo proper usage is --with-libm=STRING 1>&2; exit 1
 fi])
 
 # check for --with-libc=...
 AC_SUBST(LIBC)
 AC_WITH(libc, [if test "$withval" != 1
 then LIBC=$withval
-else echo proper usage is --with-libc=STRING; exit 1
+else echo proper usage is --with-libc=STRING 1>&2; exit 1
 fi])
 
 # generate output files

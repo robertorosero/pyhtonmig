@@ -26,6 +26,7 @@
 
 # Substitutions by configure
 srcdir=		@srcdir@
+VPATH=		@srcdir@
 INSTALL=	@INSTALL@
 
 # Install prefixes are treated specially by the configure script:
@@ -72,10 +73,11 @@ python:		Makefiles
 		done
 
 # Test the interpreter (twice, once without .pyc files, once with)
+TESTPATH=	$(srcdir)/Lib$:(srcdir)/Lib/test
 test:		python
 		-rm -f $(srcdir)/Lib/*test*.pyc
-		PYTHONPATH=$(srcdir)/Lib ./python -c 'import autotest'
-		PYTHONPATH=$(srcdir)/Lib ./python -c 'import autotest'
+		PYTHONPATH=$(TESTPATH) ./python -c 'import autotest'
+		PYTHONPATH=$(TESTPATH) ./python -c 'import autotest'
 
 # Install the interpreter
 install:	python
@@ -123,9 +125,13 @@ libainstall:	all
 # Build the sub-Makefiles
 Makefiles:	config.status
 		(cd Modules; $(MAKE) -f Makefile.pre Makefile)
-		for i in $(SUBDIRS); do \
+		for i in . $(SUBDIRS); do \
 			(echo $$i; cd $$i; $(MAKE) Makefile) \
 		done
+
+# Build the toplevel Makefile
+Makefile:	Makefile.in
+		CONFIG_FILES=Makefile CONFIG_HEADERS= $(SHELL) config.status
 
 # Run the configure script.  If config.status already exists,
 # call it with the --recheck argument, which reruns configure with the
@@ -145,7 +151,7 @@ recheck:
 		$(SHELL) config.status --recheck
 
 # Rebuild the configure script from configure.in; also rebuild config.h.in
-configure $(srcdir)/configure:	$(srcdir)/configure.in
+autoconf:
 		(cd $(srcdir); autoconf; autoheader)
 
 # Create a tags file for vi
