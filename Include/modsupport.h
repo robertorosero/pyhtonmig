@@ -51,6 +51,7 @@ extern int vgetargs PROTO((object *, char *, va_list));
 extern object *vmkvalue PROTO((char *, va_list));
 
 extern object *initmodule PROTO((char *, struct methodlist *));
+extern object *initmodule2 PROTO((char *, struct methodlist *, object *));
 
 /* The following are obsolete -- use getargs directly! */
 #define getnoarg(v) getargs(v, "")
