@@ -275,4 +275,376 @@ class TestCase(unittest.TestCase):
             except OSError:
                 pass
 
+    # Test tuples()'s use of iterators.
+    def test_builtin_tuple(self):
+        self.assertEqual(tuple(SequenceClass(5)), (0, 1, 2, 3, 4))
+        self.assertEqual(tuple(SequenceClass(0)), ())
+        self.assertEqual(tuple([]), ())
+        self.assertEqual(tuple(()), ())
+        self.assertEqual(tuple("abc"), ("a", "b", "c"))
+
+        d = {"one": 1, "two": 2, "three": 3}
+        self.assertEqual(tuple(d), tuple(d.keys()))
+
+        self.assertRaises(TypeError, tuple, list)
+        self.assertRaises(TypeError, tuple, 42)
+
+        f = open(TESTFN, "w")
+        try:
+            for i in range(5):
+                f.write("%d\n" % i)
+        finally:
+            f.close()
+        f = open(TESTFN, "r")
+        try:
+            self.assertEqual(tuple(f), ("0\n", "1\n", "2\n", "3\n", "4\n"))
+            f.seek(0, 0)
+            self.assertEqual(tuple(f.xreadlines()),
+                             ("0\n", "1\n", "2\n", "3\n", "4\n"))
+        finally:
+            f.close()
+            try:
+                unlink(TESTFN)
+            except OSError:
+                pass
+
+    # Test filter()'s use of iterators.
+    def test_builtin_filter(self):
+        self.assertEqual(filter(None, SequenceClass(5)), range(1, 5))
+        self.assertEqual(filter(None, SequenceClass(0)), [])
+        self.assertEqual(filter(None, ()), ())
+        self.assertEqual(filter(None, "abc"), "abc")
+
+        d = {"one": 1, "two": 2, "three": 3}
+        self.assertEqual(filter(None, d), d.keys())
+
+        self.assertRaises(TypeError, filter, None, list)
+        self.assertRaises(TypeError, filter, None, 42)
+
+        class Boolean:
+            def __init__(self, truth):
+                self.truth = truth
+            def __nonzero__(self):
+                return self.truth
+        True = Boolean(1)
+        False = Boolean(0)
+
+        class Seq:
+            def __init__(self, *args):
+                self.vals = args
+            def __iter__(self):
+                class SeqIter:
+                    def __init__(self, vals):
+                        self.vals = vals
+                        self.i = 0
+                    def __iter__(self):
+                        return self
+                    def next(self):
+                        i = self.i
+                        self.i = i + 1
+                        if i < len(self.vals):
+                            return self.vals[i]
+                        else:
+                            raise StopIteration
+                return SeqIter(self.vals)
+
+        seq = Seq(*([True, False] * 25))
+        self.assertEqual(filter(lambda x: not x, seq), [False]*25)
+        self.assertEqual(filter(lambda x: not x, iter(seq)), [False]*25)
+
+    # Test max() and min()'s use of iterators.
+    def test_builtin_max_min(self):
+        self.assertEqual(max(SequenceClass(5)), 4)
+        self.assertEqual(min(SequenceClass(5)), 0)
+        self.assertEqual(max(8, -1), 8)
+        self.assertEqual(min(8, -1), -1)
+
+        d = {"one": 1, "two": 2, "three": 3}
+        self.assertEqual(max(d), "two")
+        self.assertEqual(min(d), "one")
+        self.assertEqual(max(d.itervalues()), 3)
+        self.assertEqual(min(iter(d.itervalues())), 1)
+
+        f = open(TESTFN, "w")
+        try:
+            f.write("medium line\n")
+            f.write("xtra large line\n")
+            f.write("itty-bitty line\n")
+        finally:
+            f.close()
+        f = open(TESTFN, "r")
+        try:
+            self.assertEqual(min(f), "itty-bitty line\n")
+            f.seek(0, 0)
+            self.assertEqual(max(f), "xtra large line\n")
+        finally:
+            f.close()
+            try:
+                unlink(TESTFN)
+            except OSError:
+                pass
+
+    # Test map()'s use of iterators.
+    def test_builtin_map(self):
+        self.assertEqual(map(None, SequenceClass(5)), range(5))
+        self.assertEqual(map(lambda x: x+1, SequenceClass(5)), range(1, 6))
+
+        d = {"one": 1, "two": 2, "three": 3}
+        self.assertEqual(map(None, d), d.keys())
+        self.assertEqual(map(lambda k, d=d: (k, d[k]), d), d.items())
+        dkeys = d.keys()
+        expected = [(i < len(d) and dkeys[i] or None,
+                     i,
+                     i < len(d) and dkeys[i] or None)
+                    for i in range(5)]
+        self.assertEqual(map(None, d,
+                                   SequenceClass(5),
+                                   iter(d.iterkeys())),
+                         expected)
+
+        f = open(TESTFN, "w")
+        try:
+            for i in range(10):
+                f.write("xy" * i + "\n") # line i has len 2*i+1
+        finally:
+            f.close()
+        f = open(TESTFN, "r")
+        try:
+            self.assertEqual(map(len, f), range(1, 21, 2))
+        finally:
+            f.close()
+            try:
+                unlink(TESTFN)
+            except OSError:
+                pass
+
+    # Test zip()'s use of iterators.
+    def test_builtin_zip(self):
+        self.assertRaises(TypeError, zip)
+        self.assertRaises(TypeError, zip, None)
+        self.assertRaises(TypeError, zip, range(10), 42)
+        self.assertRaises(TypeError, zip, range(10), zip)
+
+        self.assertEqual(zip(IteratingSequenceClass(3)),
+                         [(0,), (1,), (2,)])
+        self.assertEqual(zip(SequenceClass(3)),
+                         [(0,), (1,), (2,)])
+
+        d = {"one": 1, "two": 2, "three": 3}
+        self.assertEqual(d.items(), zip(d, d.itervalues()))
+
+        # Generate all ints starting at constructor arg.
+        class IntsFrom:
+            def __init__(self, start):
+                self.i = start
+
+            def __iter__(self):
+                return self
+
+            def next(self):
+                i = self.i
+                self.i = i+1
+                return i
+
+        f = open(TESTFN, "w")
+        try:
+            f.write("a\n" "bbb\n" "cc\n")
+        finally:
+            f.close()
+        f = open(TESTFN, "r")
+        try:
+            self.assertEqual(zip(IntsFrom(0), f, IntsFrom(-100)),
+                             [(0, "a\n", -100),
+                              (1, "bbb\n", -99),
+                              (2, "cc\n", -98)])
+        finally:
+            f.close()
+            try:
+                unlink(TESTFN)
+            except OSError:
+                pass
+
+    # Test reduces()'s use of iterators.
+    def test_builtin_reduce(self):
+        from operator import add
+        self.assertEqual(reduce(add, SequenceClass(5)), 10)
+        self.assertEqual(reduce(add, SequenceClass(5), 42), 52)
+        self.assertRaises(TypeError, reduce, add, SequenceClass(0))
+        self.assertEqual(reduce(add, SequenceClass(0), 42), 42)
+        self.assertEqual(reduce(add, SequenceClass(1)), 0)
+        self.assertEqual(reduce(add, SequenceClass(1), 42), 42)
+
+        d = {"one": 1, "two": 2, "three": 3}
+        self.assertEqual(reduce(add, d), "".join(d.keys()))
+
+    def test_unicode_join_endcase(self):
+
+        # This class inserts a Unicode object into its argument's natural
+        # iteration, in the 3rd position.
+        class OhPhooey:
+            def __init__(self, seq):
+                self.it = iter(seq)
+                self.i = 0
+
+            def __iter__(self):
+                return self
+
+            def next(self):
+                i = self.i
+                self.i = i+1
+                if i == 2:
+                    return u"fooled you!"
+                return self.it.next()
+
+        f = open(TESTFN, "w")
+        try:
+            f.write("a\n" + "b\n" + "c\n")
+        finally:
+            f.close()
+
+        f = open(TESTFN, "r")
+        # Nasty:  string.join(s) can't know whether unicode.join() is needed
+        # until it's seen all of s's elements.  But in this case, f's
+        # iterator cannot be restarted.  So what we're testing here is
+        # whether string.join() can manage to remember everything it's seen
+        # and pass that on to unicode.join().
+        try:
+            got = " - ".join(OhPhooey(f))
+            self.assertEqual(got, u"a\n - b\n - fooled you! - c\n")
+        finally:
+            f.close()
+            try:
+                unlink(TESTFN)
+            except OSError:
+                pass
+
+    # Test iterators with 'x in y' and 'x not in y'.
+    def test_in_and_not_in(self):
+        for sc5 in IteratingSequenceClass(5), SequenceClass(5):
+            for i in range(5):
+                self.assert_(i in sc5)
+            for i in "abc", -1, 5, 42.42, (3, 4), [], {1: 1}, 3-12j, sc5:
+                self.assert_(i not in sc5)
+
+        self.assertRaises(TypeError, lambda: 3 in 12)
+        self.assertRaises(TypeError, lambda: 3 not in map)
+
+        d = {"one": 1, "two": 2, "three": 3, 1j: 2j}
+        for k in d:
+            self.assert_(k in d)
+            self.assert_(k not in d.itervalues())
+        for v in d.values():
+            self.assert_(v in d.itervalues())
+            self.assert_(v not in d)
+        for k, v in d.iteritems():
+            self.assert_((k, v) in d.iteritems())
+            self.assert_((v, k) not in d.iteritems())
+
+        f = open(TESTFN, "w")
+        try:
+            f.write("a\n" "b\n" "c\n")
+        finally:
+            f.close()
+        f = open(TESTFN, "r")
+        try:
+            for chunk in "abc":
+                f.seek(0, 0)
+                self.assert_(chunk not in f)
+                f.seek(0, 0)
+                self.assert_((chunk + "\n") in f)
+        finally:
+            f.close()
+            try:
+                unlink(TESTFN)
+            except OSError:
+                pass
+
+    # Test iterators with operator.countOf (PySequence_Count).
+    def test_countOf(self):
+        from operator import countOf
+        self.assertEqual(countOf([1,2,2,3,2,5], 2), 3)
+        self.assertEqual(countOf((1,2,2,3,2,5), 2), 3)
+        self.assertEqual(countOf("122325", "2"), 3)
+        self.assertEqual(countOf("122325", "6"), 0)
+
+        self.assertRaises(TypeError, countOf, 42, 1)
+        self.assertRaises(TypeError, countOf, countOf, countOf)
+
+        d = {"one": 3, "two": 3, "three": 3, 1j: 2j}
+        for k in d:
+            self.assertEqual(countOf(d, k), 1)
+        self.assertEqual(countOf(d.itervalues(), 3), 3)
+        self.assertEqual(countOf(d.itervalues(), 2j), 1)
+        self.assertEqual(countOf(d.itervalues(), 1j), 0)
+
+        f = open(TESTFN, "w")
+        try:
+            f.write("a\n" "b\n" "c\n" "b\n")
+        finally:
+            f.close()
+        f = open(TESTFN, "r")
+        try:
+            for letter, count in ("a", 1), ("b", 2), ("c", 1), ("d", 0):
+                f.seek(0, 0)
+                self.assertEqual(countOf(f, letter + "\n"), count)
+        finally:
+            f.close()
+            try:
+                unlink(TESTFN)
+            except OSError:
+                pass
+
+    # Test iterators on RHS of unpacking assignments.
+    def test_unpack_iter(self):
+        a, b = 1, 2
+        self.assertEqual((a, b), (1, 2))
+
+        a, b, c = IteratingSequenceClass(3)
+        self.assertEqual((a, b, c), (0, 1, 2))
+
+        try:    # too many values
+            a, b = IteratingSequenceClass(3)
+        except ValueError:
+            pass
+        else:
+            self.fail("should have raised ValueError")
+
+        try:    # not enough values
+            a, b, c = IteratingSequenceClass(2)
+        except ValueError:
+            pass
+        else:
+            self.fail("should have raised ValueError")
+
+        try:    # not iterable
+            a, b, c = len
+        except TypeError:
+            pass
+        else:
+            self.fail("should have raised TypeError")
+
+        a, b, c = {1: 42, 2: 42, 3: 42}.itervalues()
+        self.assertEqual((a, b, c), (42, 42, 42))
+
+        f = open(TESTFN, "w")
+        lines = ("a\n", "bb\n", "ccc\n")
+        try:
+            for line in lines:
+                f.write(line)
+        finally:
+            f.close()
+        f = open(TESTFN, "r")
+        try:
+            a, b, c = f
+            self.assertEqual((a, b, c), lines)
+        finally:
+            f.close()
+            try:
+                unlink(TESTFN)
+            except OSError:
+                pass
+
+        (a, b), (c,) = IteratingSequenceClass(2), {42: 24}
+        self.assertEqual((a, b, c), (0, 1, 42))
+
 run_unittest(TestCase)

@@ -31,6 +31,15 @@ typedef struct _is {
 
 struct _frame; /* Avoid including frameobject.h */
 
+/* Py_tracefunc return -1 when raising an exception, or 0 for success. */
+typedef int (*Py_tracefunc)(PyObject *, struct _frame *, int, PyObject *);
+
+/* The following values are used for 'what' for tracefunc functions: */
+#define PyTrace_CALL 0
+#define PyTrace_EXCEPTION 1
+#define PyTrace_LINE 2
+#define PyTrace_RETURN 3
+
 typedef struct _ts {
 
     struct _ts *next;
@@ -40,9 +49,12 @@ typedef struct _ts {
     int recursion_depth;
     int ticker;
     int tracing;
+    int use_tracing;
 
-    PyObject *sys_profilefunc;
-    PyObject *sys_tracefunc;
+    Py_tracefunc c_profilefunc;
+    Py_tracefunc c_tracefunc;
+    PyObject *c_profileobj;
+    PyObject *c_traceobj;
 
     PyObject *curexc_type;
     PyObject *curexc_value;

@@ -74,7 +74,7 @@ class Message:
             # (and then assume seek() works, too)
             try:
                 fp.tell()
-            except:
+            except (AttributeError, IOError):
                 seekable = 0
             else:
                 seekable = 1
@@ -420,6 +420,25 @@ class Message:
         list.reverse()
         for i in list:
             del self.headers[i]
+
+    def get(self, name, default=""):
+        name = name.lower()
+        if self.dict.has_key(name):
+            return self.dict[name]
+        else:
+            return default
+
+    def setdefault(self, name, default=""):
+        lowername = name.lower()
+        if self.dict.has_key(lowername):
+            return self.dict[lowername]
+        else:
+            text = name + ": " + default
+            lines = text.split("\n")
+            for line in lines:
+                self.headers.append(line + "\n")
+            self.dict[lowername] = default
+            return default
 
     def has_key(self, name):
         """Determine whether a message contains the named header."""

@@ -500,8 +500,8 @@ def _run_examples_inner(out, fakeout, examples, globs, verbose, name):
                 # Only compare exception type and value - the rest of
                 # the traceback isn't necessary.
                 want = want.split('\n')[-2] + '\n'
-                exc_type, exc_val, exc_tb = sys.exc_info()
-                got = traceback.format_exception_only(exc_type, exc_val)[0]
+                exc_type, exc_val = sys.exc_info()[:2]
+                got = traceback.format_exception_only(exc_type, exc_val)[-1]
                 state = OK
             else:
                 # unexpected exception
@@ -529,23 +529,34 @@ def _run_examples_inner(out, fakeout, examples, globs, verbose, name):
 
     return failures, len(examples)
 
-# Run list of examples, in context globs.  Return (#failures, #tries).
+# Run list of examples, in a shallow copy of context (dict) globs.
+# Return (#failures, #tries).
 
 def _run_examples(examples, globs, verbose, name):
     import sys
     saveout = sys.stdout
+    globs = globs.copy()
     try:
         sys.stdout = fakeout = _SpoofOut()
         x = _run_examples_inner(saveout.write, fakeout, examples,
                                 globs, verbose, name)
     finally:
         sys.stdout = saveout
+        # While Python gc can clean up most cycles on its own, it doesn't
+        # chase frame objects.  This is especially irksome when running
+        # generator tests that raise exceptions, because a named generator-
+        # iterator gets an entry in globs, and the generator-iterator
+        # object's frame's traceback info points back to globs.  This is
+        # easy to break just by clearing the namespace.  This can also
+        # help to break other kinds of cycles, and even for cycles that
+        # gc can break itself it's better to break them ASAP.
+        globs.clear()
     return x
 
 def run_docstring_examples(f, globs, verbose=0, name="NoName"):
     """f, globs, verbose=0, name="NoName" -> run examples from f.__doc__.
 
-    Use dict globs as the globals for execution.
+    Use (a shallow copy of) dict globs as the globals for execution.
     Return (#failures, #tries).
 
     If optional arg verbose is true, print stuff even if there are no
@@ -735,7 +746,7 @@ see its docs for details.
         f = t = 0
         e = _extract_examples(s)
         if e:
-            f, t = _run_examples(e, self.globs.copy(), self.verbose, name)
+            f, t = _run_examples(e, self.globs, self.verbose, name)
         if self.verbose:
             print f, "of", t, "examples failed in string", name
         self.__record_outcome(name, f, t)
@@ -773,8 +784,7 @@ see its docs for details.
                     "when object.__name__ doesn't exist; " + `object`)
         if self.verbose:
             print "Running", name + ".__doc__"
-        f, t = run_docstring_examples(object, self.globs.copy(),
-                                      self.verbose, name)
+        f, t = run_docstring_examples(object, self.globs, self.verbose, name)
         if self.verbose:
             print f, "of", t, "examples failed in", name + ".__doc__"
         self.__record_outcome(name, f, t)

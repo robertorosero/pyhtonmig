@@ -437,7 +437,7 @@ try_rich_to_3way_compare(PyObject *v, PyObject *w)
 	for (i = 0; i < 3; i++) {
 		switch (try_rich_compare_bool(v, w, tries[i].op)) {
 		case -1:
-			return -1;
+			return -2;
 		case 1:
 			return tries[i].outcome;
 		}
@@ -467,16 +467,6 @@ try_3way_compare(PyObject *v, PyObject *w)
 	if (PyInstance_Check(w))
 		return (*w->ob_type->tp_compare)(v, w);
 
-	/* If the types are equal, don't bother with coercions etc. */
-	if (v->ob_type == w->ob_type) {
-		if ((f = v->ob_type->tp_compare) == NULL)
-			return 2;
-		c = (*f)(v, w);
-		if (PyErr_Occurred())
-			return -2;
-		return c < 0 ? -1 : c > 0 ? 1 : 0;
-	}
-
 	/* Try coercion; if it fails, give up */
 	c = PyNumber_CoerceEx(&v, &w);
 	if (c < 0)
@@ -489,7 +479,7 @@ try_3way_compare(PyObject *v, PyObject *w)
 		c = (*f)(v, w);
 		Py_DECREF(v);
 		Py_DECREF(w);
-		if (PyErr_Occurred())
+		if (c < 0 && PyErr_Occurred())
 			return -2;
 		return c < 0 ? -1 : c > 0 ? 1 : 0;
 	}
@@ -499,7 +489,7 @@ try_3way_compare(PyObject *v, PyObject *w)
 		c = (*f)(w, v); /* swapped! */
 		Py_DECREF(v);
 		Py_DECREF(w);
-		if (PyErr_Occurred())
+		if (c < 0 && PyErr_Occurred())
 			return -2;
 		return c < 0 ? 1 : c > 0 ? -1 : 0; /* negated! */
 	}
@@ -575,11 +565,23 @@ default_3way_compare(PyObject *v, PyObject *w)
 
 #define CHECK_TYPES(o) PyType_HasFeature((o)->ob_type, Py_TPFLAGS_CHECKTYPES)
 
+/* Do a 3-way comparison, by hook or by crook.  Return:
+   -2 for an exception;
+   -1 if v < w;
+    0 if v == w;
+    1 if v > w;
+   If the object implements a tp_compare function, it returns
+   whatever this function returns (whether with an exception or not).
+*/
 static int
 do_cmp(PyObject *v, PyObject *w)
 {
 	int c;
+	cmpfunc f;
 
+	if (v->ob_type == w->ob_type
+	    && (f = v->ob_type->tp_compare) != NULL)
+		return (*f)(v, w);
 	c = try_rich_to_3way_compare(v, w);
 	if (c < 2)
 		return c;
@@ -744,16 +746,9 @@ PyObject_Compare(PyObject *v, PyObject *w)
 }
 
 static PyObject *
-try_3way_to_rich_compare(PyObject *v, PyObject *w, int op)
+convert_3way_to_object(int op, int c)
 {
-	int c;
 	PyObject *result;
-
-	c = try_3way_compare(v, w);
-	if (c >= 2)
-		c = default_3way_compare(v, w);
-	if (c <= -2)
-		return NULL;
 	switch (op) {
 	case Py_LT: c = c <  0; break;
 	case Py_LE: c = c <= 0; break;
@@ -766,11 +761,51 @@ try_3way_to_rich_compare(PyObject *v, PyObject *w, int op)
 	Py_INCREF(result);
 	return result;
 }
+	
+
+static PyObject *
+try_3way_to_rich_compare(PyObject *v, PyObject *w, int op)
+{
+	int c;
+
+	c = try_3way_compare(v, w);
+	if (c >= 2)
+		c = default_3way_compare(v, w);
+	if (c <= -2)
+		return NULL;
+	return convert_3way_to_object(op, c);
+}
 
 static PyObject *
 do_richcmp(PyObject *v, PyObject *w, int op)
 {
 	PyObject *res;
+	cmpfunc f;
+
+	/* If the types are equal, don't bother with coercions etc. 
+	   Instances are special-cased in try_3way_compare, since
+	   a result of 2 does *not* mean one value being greater
+	   than the other. */
+	if (v->ob_type == w->ob_type
+	    && (f = v->ob_type->tp_compare) != NULL
+	    && !PyInstance_Check(v)) {
+		int c;
+		richcmpfunc f1;
+		if ((f1 = RICHCOMPARE(v->ob_type)) != NULL) {
+			/* If the type has richcmp, try it first.
+			   try_rich_compare would try it two-sided,
+			   which is not needed since we've a single
+			   type only. */
+			res = (*f1)(v, w, op);
+			if (res != Py_NotImplemented)
+				return res;
+			Py_DECREF(res);
+		}
+		c = (*f)(v, w);
+		if (c < 0 && PyErr_Occurred())
+			return NULL;
+		return convert_3way_to_object(op, c);
+	}
 
 	res = try_rich_compare(v, w, op);
 	if (res != Py_NotImplemented)
@@ -825,6 +860,7 @@ PyObject_RichCompare(PyObject *v, PyObject *w, int op)
 	return res;
 }
 
+/* Return -1 if error; 1 if v op w; 0 if not (v op w). */
 int
 PyObject_RichCompareBool(PyObject *v, PyObject *w, int op)
 {

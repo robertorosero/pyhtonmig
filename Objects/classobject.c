@@ -1164,11 +1164,15 @@ instance_ass_slice(PyInstanceObject *inst, int i, int j, PyObject *value)
 	return 0;
 }
 
-static int instance_contains(PyInstanceObject *inst, PyObject *member)
+static int
+instance_contains(PyInstanceObject *inst, PyObject *member)
 {
 	static PyObject *__contains__;
-	PyObject *func, *arg, *res;
-	int ret;
+	PyObject *func;
+
+	/* Try __contains__ first.
+	 * If that can't be done, try iterator-based searching.
+	 */
 
 	if(__contains__ == NULL) {
 		__contains__ = PyString_InternFromString("__contains__");
@@ -1176,45 +1180,34 @@ static int instance_contains(PyInstanceObject *inst, PyObject *member)
 			return -1;
 	}
 	func = instance_getattr(inst, __contains__);
-	if(func == NULL) {
-		/* fall back to previous behavior */
-		int i, cmp_res;
-
-		if(!PyErr_ExceptionMatches(PyExc_AttributeError))
+	if (func) {
+		PyObject *res;
+		int ret;
+		PyObject *arg = Py_BuildValue("(O)", member);
+		if(arg == NULL) {
+			Py_DECREF(func);
 			return -1;
-		PyErr_Clear();
-		for(i=0;;i++) {
-			PyObject *obj = instance_item(inst, i);
-			int ret = 0;
-
-			if(obj == NULL) {
-				if(!PyErr_ExceptionMatches(PyExc_IndexError))
-					return -1;
-				PyErr_Clear();
-				return 0;
-			}
-			if(PyObject_Cmp(obj, member, &cmp_res) == -1)
-				ret = -1;
-			if(cmp_res == 0) 
-				ret = 1;
-			Py_DECREF(obj);
-			if(ret)
-				return ret;
 		}
-	}
-	arg = Py_BuildValue("(O)", member);
-	if(arg == NULL) {
+		res = PyEval_CallObject(func, arg);
 		Py_DECREF(func);
-		return -1;
+		Py_DECREF(arg);
+		if(res == NULL) 
+			return -1;
+		ret = PyObject_IsTrue(res);
+		Py_DECREF(res);
+		return ret;
 	}
-	res = PyEval_CallObject(func, arg);
-	Py_DECREF(func);
-	Py_DECREF(arg);
-	if(res == NULL) 
+
+	/* Couldn't find __contains__. */
+	if (PyErr_ExceptionMatches(PyExc_AttributeError)) {
+		/* Assume the failure was simply due to that there is no
+		 * __contains__ attribute, and try iterating instead.
+		 */
+		PyErr_Clear();
+		return _PySequence_IterContains((PyObject *)inst, member);
+	}
+	else
 		return -1;
-	ret = PyObject_IsTrue(res);
-	Py_DECREF(res);
-	return ret;
 }
 
 static PySequenceMethods
@@ -1691,38 +1684,68 @@ instance_ipow(PyObject *v, PyObject *w, PyObject *z)
 
 
 /* Map rich comparison operators to their __xx__ namesakes */
-static char *name_op[] = {
-	"__lt__",
-	"__le__",
-	"__eq__",
-	"__ne__",
-	"__gt__",
-	"__ge__",
-};
+#define NAME_OPS 6
+static PyObject **name_op = NULL;
+
+static int 
+init_name_op(void)
+{
+	int i;
+	char *_name_op[] = {
+		"__lt__",
+		"__le__",
+		"__eq__",
+		"__ne__",
+		"__gt__",
+		"__ge__",
+	};
+
+	name_op = (PyObject **)malloc(sizeof(PyObject *) * NAME_OPS);
+	if (name_op == NULL)
+		return -1;
+	for (i = 0; i < NAME_OPS; ++i) {
+		name_op[i] = PyString_InternFromString(_name_op[i]);
+		if (name_op[i] == NULL)
+			return -1;
+	}
+	return 0;
+}
 
 static PyObject *
 half_richcompare(PyObject *v, PyObject *w, int op)
 {
-	PyObject *name;
 	PyObject *method;
 	PyObject *args;
 	PyObject *res;
 
 	assert(PyInstance_Check(v));
 
-	name = PyString_InternFromString(name_op[op]);
-	if (name == NULL)
-		return NULL;
-
-	method = PyObject_GetAttr(v, name);
-	Py_DECREF(name);
-	if (method == NULL) {
-		if (!PyErr_ExceptionMatches(PyExc_AttributeError))
+	if (name_op == NULL) {
+		if (init_name_op() < 0)
 			return NULL;
-		PyErr_Clear();
-		res = Py_NotImplemented;
-		Py_INCREF(res);
-		return res;
+	}
+	/* If the instance doesn't define an __getattr__ method, use
+	   instance_getattr2 directly because it will not set an
+	   exception on failure. */
+	if (((PyInstanceObject *)v)->in_class->cl_getattr == NULL) {
+		method = instance_getattr2((PyInstanceObject *)v, 
+					   name_op[op]);
+		if (method == NULL) {
+			assert(!PyErr_Occurred());
+			res = Py_NotImplemented;
+			Py_INCREF(res);
+			return res;
+		}
+	} else {
+		method = PyObject_GetAttr(v, name_op[op]);
+		if (method == NULL) {
+			if (!PyErr_ExceptionMatches(PyExc_AttributeError))
+				return NULL;
+			PyErr_Clear();
+			res = Py_NotImplemented;
+			Py_INCREF(res);
+			return res;
+		}
 	}
 
 	args = Py_BuildValue("(O)", w);
@@ -2183,7 +2206,7 @@ PyTypeObject PyMethod_Type = {
 	(getattrofunc)instancemethod_getattro,	/* tp_getattro */
 	(setattrofunc)instancemethod_setattro,	/* tp_setattro */
 	0,					/* tp_as_buffer */
-	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_GC,
+	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_GC,     /* tp_flags */
 	0,					/* tp_doc */
 	(traverseproc)instancemethod_traverse,	/* tp_traverse */
 	0,					/* tp_clear */

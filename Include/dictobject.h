@@ -30,6 +30,17 @@ Note: .popitem() abuses the me_hash field of an Unused or Dummy slot to
 hold a search finger.  The me_hash field of Unused or Dummy slots has no
 meaning otherwise.
 */
+
+/* PyDict_MINSIZE is the minimum size of a dictionary.  This many slots are
+ * allocated directly in the dict object (in the ma_smalltable member).
+ * It must be a power of 2, and at least 4.  8 allows dicts with no more
+ * than 5 active entries to live in ma_smalltable (and so avoid an
+ * additional malloc); instrumentation suggested this suffices for the
+ * majority of dicts (consisting mostly of usually-small instance dicts and
+ * usually-small dicts created to pass keyword arguments).
+ */
+#define PyDict_MINSIZE 8
+
 typedef struct {
 	long me_hash;      /* cached hash code of me_key */
 	PyObject *me_key;
@@ -53,10 +64,21 @@ struct _dictobject {
 	PyObject_HEAD
 	int ma_fill;  /* # Active + # Dummy */
 	int ma_used;  /* # Active */
-	int ma_size;  /* total # slots in ma_table */
-	int ma_poly;  /* appopriate entry from polys vector */
+
+	/* The table contains ma_mask + 1 slots, and that's a power of 2.
+	 * We store the mask instead of the size because the mask is more
+	 * frequently needed.
+	 */
+	int ma_mask;
+
+	/* ma_table points to ma_smalltable for small tables, else to
+	 * additional malloc'ed memory.  ma_table is never NULL!  This rule
+	 * saves repeated runtime null-tests in the workhorse getitem and
+	 * setitem calls.
+	 */
 	PyDictEntry *ma_table;
 	PyDictEntry *(*ma_lookup)(PyDictObject *mp, PyObject *key, long hash);
+	PyDictEntry ma_smalltable[PyDict_MINSIZE];
 };
 
 extern DL_IMPORT(PyTypeObject) PyDict_Type;

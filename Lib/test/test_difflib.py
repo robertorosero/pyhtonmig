@@ -1,2 +1,3 @@
+from test_support import verbose
 import doctest, difflib
-doctest.testmod(difflib, verbose=1)
+doctest.testmod(difflib, verbose=verbose)

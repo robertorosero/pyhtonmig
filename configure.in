@@ -368,6 +368,151 @@ else
   fi
 fi
 
+# Check for enable-ipv6
+OPT="$OPT -Dss_family=__ss_family -Dss_len=__ss_len"
+AC_MSG_CHECKING([whether to enable ipv6])
+AC_ARG_ENABLE(ipv6,
+[  --enable-ipv6                   Enable ipv6 (with ipv4) support
+  --disable-ipv6                  Disable ipv6 support],
+[ case "$enableval" in
+  no)
+       AC_MSG_RESULT(no)
+       ipv6=no
+       ;;
+  *)   AC_MSG_RESULT(yes)
+       AC_DEFINE(ENABLE_IPV6)
+       ipv6=yes
+       ;;
+  esac ],
+
+  AC_TRY_RUN([ /* AF_INET6 avalable check */
+#include <sys/types.h>
+#include <sys/socket.h>
+main()
+{
+ if (socket(AF_INET6, SOCK_STREAM, 0) < 0)
+   exit(1);
+ else
+   exit(0);
+}
+],
+  AC_MSG_RESULT(yes)
+  AC_DEFINE(ENABLE_IPV6)
+  ipv6=yes,
+  AC_MSG_RESULT(no)
+  ipv6=no,
+  AC_MSG_RESULT(no)
+  ipv6=no
+))
+
+ipv6type=unknown
+ipv6lib=none
+ipv6trylibc=no
+
+if test "$ipv6" = "yes"; then
+	AC_MSG_CHECKING([ipv6 stack type])
+	for i in inria kame linux-glibc linux-inet6 toshiba v6d zeta; do
+		case $i in
+		inria)
+			dnl http://www.kame.net/
+			AC_EGREP_CPP(yes, [dnl
+#include <netinet/in.h>
+#ifdef IPV6_INRIA_VERSION
+yes
+#endif],
+				[ipv6type=$i;
+				OPT="-DINET6 $OPT"])
+			;;
+		kame)
+			dnl http://www.kame.net/
+			AC_EGREP_CPP(yes, [dnl
+#include <netinet/in.h>
+#ifdef __KAME__
+yes
+#endif],
+				[ipv6type=$i;
+				ipv6lib=inet6
+				ipv6libdir=/usr/local/v6/lib
+				ipv6trylibc=yes
+				OPT="-DINET6 $OPT"])
+			;;
+		linux-glibc)
+			dnl http://www.v6.linux.or.jp/
+			AC_EGREP_CPP(yes, [dnl
+#include <features.h>
+#if defined(__GLIBC__) && ((__GLIBC__ == 2 && __GLIBC_MINOR__ >= 1) || (__GLIBC__ > 2))
+yes
+#endif],
+				[ipv6type=$i;
+				ipv6trylibc=yes
+				OPT="-DINET6 $OPT"])
+			;;
+		linux-inet6)
+			dnl http://www.v6.linux.or.jp/
+			if test -d /usr/inet6; then
+				ipv6type=$i
+				ipv6lib=inet6
+				ipv6libdir=/usr/inet6/lib
+				OPT="-DINET6 -I/usr/inet6/include $OPT"
+			fi
+			;;
+		toshiba)
+			AC_EGREP_CPP(yes, [dnl
+#include <sys/param.h>
+#ifdef _TOSHIBA_INET6
+yes
+#endif],
+				[ipv6type=$i;
+				ipv6lib=inet6;
+				ipv6libdir=/usr/local/v6/lib;
+				OPT="-DINET6 $OPT"])
+			;;
+		v6d)
+			AC_EGREP_CPP(yes, [dnl
+#include </usr/local/v6/include/sys/v6config.h>
+#ifdef __V6D__
+yes
+#endif],
+				[ipv6type=$i;
+				ipv6lib=v6;
+				ipv6libdir=/usr/local/v6/lib;
+				OPT="-I/usr/local/v6/include $OPT"])
+			;;
+		zeta)
+			AC_EGREP_CPP(yes, [dnl
+#include <sys/param.h>
+#ifdef _ZETA_MINAMI_INET6
+yes
+#endif],
+				[ipv6type=$i;
+				ipv6lib=inet6;
+				ipv6libdir=/usr/local/v6/lib;
+				OPT="-DINET6 $OPT"])
+			;;
+		esac
+		if test "$ipv6type" != "unknown"; then
+			break
+		fi
+	done
+	AC_MSG_RESULT($ipv6type)
+fi
+
+if test "$ipv6" = "yes" -a "$ipv6lib" != "none"; then
+	if test -d $ipv6libdir -a -f $ipv6libdir/lib$ipv6lib.a; then
+		LIBS="-L$ipv6libdir -l$ipv6lib $LIBS"
+		echo "using lib$ipv6lib"
+	else
+		if test $ipv6trylibc = "yes"; then
+			echo "using libc"
+		else
+			echo 'Fatal: no $ipv6lib library found.  cannot continue.'
+			echo "You need to fetch lib$ipv6lib.a from appropriate"
+			echo 'ipv6 kit and compile beforehand.'
+			exit 1
+		fi
+	fi
+fi
+
 dnl # check for ANSI or K&R ("traditional") preprocessor
 dnl AC_MSG_CHECKING(for C preprocessor type)
 dnl AC_TRY_COMPILE([
@@ -381,7 +526,7 @@ dnl AC_MSG_RESULT($cpp_type)
 AC_HEADER_STDC
 AC_CHECK_HEADERS(dlfcn.h fcntl.h limits.h locale.h ncurses.h poll.h pthread.h \
 signal.h stdarg.h stddef.h stdlib.h thread.h unistd.h utime.h termios.h \
-sys/audioio.h sys/file.h sys/lock.h db_185.h db.h \
+sys/audioio.h sys/file.h sys/lock.h sys/modem.h db_185.h db.h \
 sys/param.h sys/select.h sys/socket.h sys/time.h sys/times.h \
 sys/un.h sys/utsname.h sys/wait.h pty.h libutil.h \
 ndbm.h db1/ndbm.h gdbm/ndbm.h)
@@ -677,7 +822,7 @@ then
 	# crt1.o) gets erroneously defined as common, which breaks dynamic
 	# loading of any modules which reference it in System.framework
 	next/4*|next/5*) LINKFORSHARED="-u __dummy -framework System" ;;
-	Darwin/*) LINKFORSHARED="-u __dummy -framework System -framework Foundation" ;;
+	Darwin/*) LINKFORSHARED="-u __dummy -u _PyMac_Error -framework System -framework Foundation -framework Carbon" ;;
 	UnixWare*) LINKFORSHARED="-dy -Bdynamic -Wl,-Bexport";;
 	SCO_SV*) LINKFORSHARED="-Bdynamic -dy -Wl,-Bexport";;
 	ReliantUNIX*) LINKFORSHARED="-W1 -Blargedynsym";;
@@ -997,11 +1142,27 @@ then
 	AC_DEFINE(HAVE_DYNAMIC_LOADING)
 fi
 
+# MACHDEP_OBJS can be set to platform-specific object files needed by Python
+
+AC_SUBST(MACHDEP_OBJS)
+AC_MSG_CHECKING(MACHDEP_OBJS)
+if test -z "$MACHDEP_OBJS"
+then
+	case $ac_sys_system/$ac_sys_release in
+	Darwin/*)
+		MACHDEP_OBJS="Mac/Python/macglue.o"
+		AC_DEFINE(USE_TOOLBOX_OBJECT_GLUE)
+		;;
+	*) MACHDEP_OBJS="";;
+	esac
+fi
+AC_MSG_RESULT($DYNLOADFILE)
+
 # checks for library functions
 AC_CHECK_FUNCS(alarm chown clock confstr ctermid ctermid_r execv \
  flock fork fsync fdatasync fpathconf ftime ftruncate \
  getgroups getlogin getpeername getpid getpwent getwd \
- kill link lstat mkfifo mktime mremap \
+ inet_pton kill link lstat mkfifo mktime mremap \
  nice pathconf pause plock poll pthread_init \
  putenv readlink \
  select setegid seteuid setgid \
@@ -1022,6 +1183,110 @@ AC_REPLACE_FUNCS(dup2 getcwd strdup strerror memmove)
 AC_CHECK_FUNCS(getpgrp, AC_TRY_COMPILE([#include <unistd.h>], [getpgrp(0);], AC_DEFINE(GETPGRP_HAVE_ARG)))
 AC_CHECK_FUNCS(setpgrp, AC_TRY_COMPILE([#include <unistd.h>], [setpgrp(0,0);], AC_DEFINE(SETPGRP_HAVE_ARG)))
 AC_CHECK_FUNCS(gettimeofday, AC_TRY_COMPILE([#include <sys/time.h>], [gettimeofday((struct timeval*)0,(struct timezone*)0);], ,AC_DEFINE(GETTIMEOFDAY_NO_TZ)))
+
+AC_CHECK_FUNCS(getaddrinfo, [dnl
+AC_MSG_CHECKING(getaddrinfo bug)
+AC_TRY_RUN([
+#include <sys/types.h>
+#include <netdb.h>
+#include <string.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+
+main()
+{
+  int passive, gaierr, inet4 = 0, inet6 = 0;
+  struct addrinfo hints, *ai, *aitop;
+  char straddr[INET6_ADDRSTRLEN], strport[16];
+
+  for (passive = 0; passive <= 1; passive++) {
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_flags = passive ? AI_PASSIVE : 0;
+    hints.ai_socktype = SOCK_STREAM;
+    if ((gaierr = getaddrinfo(NULL, "54321", &hints, &aitop)) != 0) {
+      (void)gai_strerror(gaierr);
+      goto bad;
+    }
+    for (ai = aitop; ai; ai = ai->ai_next) {
+      if (ai->ai_addr == NULL ||
+          ai->ai_addrlen == 0 ||
+          getnameinfo(ai->ai_addr, ai->ai_addrlen,
+                      straddr, sizeof(straddr), strport, sizeof(strport),
+                      NI_NUMERICHOST|NI_NUMERICSERV) != 0) {
+        goto bad;
+      }
+      switch (ai->ai_family) {
+      case AF_INET:
+        if (strcmp(strport, "54321") != 0) {
+          goto bad;
+        }
+        if (passive) {
+          if (strcmp(straddr, "0.0.0.0") != 0) {
+            goto bad;
+          }
+        } else {
+          if (strcmp(straddr, "127.0.0.1") != 0) {
+            goto bad;
+          }
+        }
+        inet4++;
+        break;
+      case AF_INET6:
+        if (strcmp(strport, "54321") != 0) {
+          goto bad;
+        }
+        if (passive) {
+          if (strcmp(straddr, "::") != 0) {
+            goto bad;
+          }
+        } else {
+          if (strcmp(straddr, "::1") != 0) {
+            goto bad;
+          }
+        }
+        inet6++;
+        break;
+      case AF_UNSPEC:
+        goto bad;
+        break;
+      default:
+        /* another family support? */
+        break;
+      }
+    }
+  }
+
+  if (!(inet4 == 0 || inet4 == 2))
+    goto bad;
+  if (!(inet6 == 0 || inet6 == 2))
+    goto bad;
+
+  if (aitop)
+    freeaddrinfo(aitop);
+  exit(0);
+
+ bad:
+  if (aitop)
+    freeaddrinfo(aitop);
+  exit(1);
+}
+],
+AC_MSG_RESULT(good)
+buggygetaddrinfo=no,
+AC_MSG_RESULT(buggy)
+buggygetaddrinfo=yes,
+AC_MSG_RESULT(buggy)
+buggygetaddrinfo=yes)], [buggygetaddrinfo=yes])
+
+if test "$buggygetaddrinfo" = "yes"; then
+	if test "$ipv6" = "yes"; then
+		echo 'Fatal: You must get working getaddrinfo() function.'
+		echo '       or you can specify "--disable-ipv6"'.
+		exit 1
+	fi
+fi
+AC_CHECK_FUNCS(getaddrinfo getnameinfo)
 
 # checks for structures
 AC_HEADER_TIME
@@ -1046,6 +1311,31 @@ AC_TRY_COMPILE([
 #include <sys/time.h>
 ], [;], [AC_DEFINE(SYS_SELECT_WITH_SYS_TIME) was_it_defined=yes])
 AC_MSG_RESULT($was_it_defined)
+
+AC_MSG_CHECKING(for addrinfo)
+AC_CACHE_VAL(ac_cv_struct_addrinfo,
+AC_TRY_COMPILE([
+#		include <netdb.h>],
+	[struct addrinfo a],
+	ac_cv_struct_addrinfo=yes,
+	ac_cv_struct_addrinfo=no))
+AC_MSG_RESULT($ac_cv_struct_addrinfo)
+if test $ac_cv_struct_addrinfo = yes; then
+	AC_DEFINE(HAVE_ADDRINFO)
+fi
+
+AC_MSG_CHECKING(for sockaddr_storage)
+AC_CACHE_VAL(ac_cv_struct_sockaddr_storage,
+AC_TRY_COMPILE([
+#		include <sys/types.h>
+#		include <sys/socket.h>],
+	[struct sockaddr_storage s],
+	ac_cv_struct_sockaddr_storage=yes,
+	ac_cv_struct_sockaddr_storage=no))
+AC_MSG_RESULT($ac_cv_struct_sockaddr_storage)
+if test $ac_cv_struct_sockaddr_storage = yes; then
+	AC_DEFINE(HAVE_SOCKADDR_STORAGE)
+fi
 
 # checks for compiler characteristics
 
@@ -1091,6 +1381,16 @@ AC_TRY_COMPILE([#include <unistd.h>], [char **t;execve("@",t,t);], ,
 	AC_DEFINE(BAD_EXEC_PROTOTYPES) bad_prototypes=yes)
 AC_MSG_RESULT($bad_prototypes)
 fi
+
+# check if sockaddr has sa_len member
+AC_MSG_CHECKING(if sockaddr has sa_len member)
+AC_TRY_COMPILE([#include <sys/types.h>
+#include <sys/socket.h>],
+[struct sockaddr x;
+x.sa_len = 0;],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_SOCKADDR_SA_LEN),
+	AC_MSG_RESULT(no))
 
 bad_forward=no
 AC_MSG_CHECKING(for bad static forward)
@@ -1278,23 +1578,54 @@ AC_DEFINE(HAVE_WCHAR_H) wchar_h="yes",
 wchar_h="no"
 )
 
-# check for usable wchar_t
-usable_wchar_t="unkown"
-AC_MSG_CHECKING(for usable wchar_t)
-AC_TRY_RUN([
-#include "wchar.h"
-#include "wctype.h"
-main() {
- wchar_t s;
- if (sizeof(s) == 2)
-  exit(0);
- else
-  exit(1);
-}
-], 
-AC_DEFINE(HAVE_USABLE_WCHAR_T) usable_wchar_t="yes",
-usable_wchar_t="no")
-AC_MSG_RESULT($usable_wchar_t)
+# determine wchar_t size
+if test "$wchar_h" = yes
+then
+  AC_CHECK_SIZEOF(wchar_t)
+fi
+
+AC_MSG_CHECKING(what type to use for unicode)
+AC_ARG_ENABLE(unicode, 
+[  --enable-unicode[=ucs2,ucs4]    Enable Unicode strings (default is yes)],,enable_unicode=yes)
+
+if test $enable_unicode = yes
+then
+  # Without any arguments, Py_UNICODE defaults to two-byte mode
+  enable_unicode="ucs2"
+fi
+
+case "$enable_unicode" in
+ucs2) unicode_size="2"
+      AC_DEFINE(Py_UNICODE_SIZE,2)
+      ;;
+ucs4) unicode_size="4"
+      AC_DEFINE(Py_UNICODE_SIZE,4)
+      ;;
+esac
+
+if test "$enable_unicode" = "no"
+then
+  AC_MSG_RESULT(not used)
+else
+  AC_DEFINE(Py_USING_UNICODE)
+  if test "$unicode_size" = "$ac_cv_sizeof_wchar_t"
+  then
+    PY_UNICODE_TYPE="wchar_t"
+    AC_DEFINE(HAVE_USABLE_WCHAR_T)
+    AC_DEFINE(PY_UNICODE_TYPE,wchar_t)
+  elif test "$ac_cv_sizeof_short" = "$unicode_size"
+  then
+       PY_UNICODE_TYPE="unsigned short"
+       AC_DEFINE(PY_UNICODE_TYPE,unsigned short)
+  elif test "$ac_cv_sizeof_long" = "$unicode_size"
+  then
+       PY_UNICODE_TYPE="unsigned long"
+       AC_DEFINE(PY_UNICODE_TYPE,unsigned long)
+  else
+       PY_UNICODE_TYPE="no type found"
+  fi
+  AC_MSG_RESULT($PY_UNICODE_TYPE)
+fi
 
 # check for endianness
 AC_C_BIGENDIAN

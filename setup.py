@@ -1,8 +1,5 @@
 # Autodetecting setup.py script for building the Python extensions
 #
-# To be fixed:
-#   Implement --disable-modules setting
-#
 
 __version__ = "$Revision$"
 
@@ -12,6 +9,7 @@ from distutils import text_file
 from distutils.errors import *
 from distutils.core import Extension, setup
 from distutils.command.build_ext import build_ext
+from distutils.command.install import install
 
 # This global variable is used to hold the list of modules to be disabled.
 disabled_module_list = []
@@ -132,6 +130,17 @@ class PyBuildExt(build_ext):
         except (CCompilerError, DistutilsError), why:
             self.announce('WARNING: building of extension "%s" failed: %s' %
                           (ext.name, sys.exc_info()[1]))
+            return
+        try:
+            __import__(ext.name)
+        except ImportError:
+            self.announce('WARNING: removing "%s" since importing it failed' %
+                          ext.name)
+            assert not self.inplace
+            fullname = self.get_ext_fullname(ext.name)
+            ext_filename = os.path.join(self.build_lib,
+                                        self.get_ext_filename(fullname))
+            os.remove(ext_filename)
 
     def get_platform (self):
         # Get value of sys.platform
@@ -387,9 +396,6 @@ class PyBuildExt(build_ext):
             if platform not in ['cygwin']:
                 exts.append( Extension('resource', ['resource.c']) )
 
-            # Generic dynamic loading module
-            #exts.append( Extension('dl', ['dlmodule.c']) )
-            
             # Sun yellow pages. Some systems have the functions in libc.
             if platform not in ['cygwin']:
                 if (self.compiler.find_library_file(lib_dirs, 'nsl')):
@@ -598,10 +604,21 @@ class PyBuildExt(build_ext):
         # *** Uncomment these for TOGL extension only:
         #       -lGL -lGLU -lXext -lXmu \
 
+class PyBuildInstall(install):
+    # Suppress the warning about installation into the lib_dynload
+    # directory, which is not in sys.path when running Python during
+    # installation:
+    def initialize_options (self):
+        install.initialize_options(self)
+        self.warn_dir=0
+    
 def main():
+    # turn off warnings when deprecated modules are imported
+    import warnings
+    warnings.filterwarnings("ignore",category=DeprecationWarning)
     setup(name = 'Python standard library',
           version = '%d.%d' % sys.version_info[:2],
-          cmdclass = {'build_ext':PyBuildExt},
+          cmdclass = {'build_ext':PyBuildExt, 'install':PyBuildInstall},
           # The struct module is defined here, because build_ext won't be
           # called unless there's at least one extension module defined.
           ext_modules=[Extension('struct', ['structmodule.c'])],

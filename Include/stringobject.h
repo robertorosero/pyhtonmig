@@ -58,6 +58,7 @@ extern DL_IMPORT(char *) PyString_AsString(PyObject *);
 extern DL_IMPORT(void) PyString_Concat(PyObject **, PyObject *);
 extern DL_IMPORT(void) PyString_ConcatAndDel(PyObject **, PyObject *);
 extern DL_IMPORT(int) _PyString_Resize(PyObject **, int);
+extern DL_IMPORT(int) _PyString_Eq(PyObject *, PyObject*);
 extern DL_IMPORT(PyObject *) PyString_Format(PyObject *, PyObject *);
 extern DL_IMPORT(PyObject *) _PyString_FormatLong(PyObject*, int, int,
 						  int, char**, int*);
@@ -76,9 +77,13 @@ extern DL_IMPORT(void) _Py_ReleaseInternedStrings(void);
 #define PyString_AS_STRING(op) (((PyStringObject *)(op))->ob_sval)
 #define PyString_GET_SIZE(op)  (((PyStringObject *)(op))->ob_size)
 
+/* _PyString_Join(sep, x) is like sep.join(x).  sep must be PyStringObject*,
+   x must be an iterable object. */
+extern DL_IMPORT(PyObject *) _PyString_Join(PyObject *sep, PyObject *x);
+
 /* --- Generic Codecs ----------------------------------------------------- */
 
-/* Create a string object by decoding the encoded string s of the
+/* Create an object by decoding the encoded string s of the
    given size. */
 
 extern DL_IMPORT(PyObject*) PyString_Decode(
@@ -89,7 +94,7 @@ extern DL_IMPORT(PyObject*) PyString_Decode(
     );
 
 /* Encodes a char buffer of the given size and returns a 
-   Python string object. */
+   Python object. */
 
 extern DL_IMPORT(PyObject*) PyString_Encode(
     const char *s,              /* string char buffer */
@@ -98,10 +103,47 @@ extern DL_IMPORT(PyObject*) PyString_Encode(
     const char *errors          /* error handling */
     );
 
-/* Encodes a string object and returns the result as Python string
+/* Encodes a string object and returns the result as Python 
    object. */
 
+extern DL_IMPORT(PyObject*) PyString_AsEncodedObject(
+    PyObject *str,	 	/* string object */
+    const char *encoding,	/* encoding */
+    const char *errors		/* error handling */
+    );
+
+/* Encodes a string object and returns the result as Python string
+   object.   
+   
+   If the codec returns an Unicode object, the object is converted
+   back to a string using the default encoding.
+
+   DEPRECATED - use PyString_AsEncodedObject() instead. */
+
 extern DL_IMPORT(PyObject*) PyString_AsEncodedString(
+    PyObject *str,	 	/* string object */
+    const char *encoding,	/* encoding */
+    const char *errors		/* error handling */
+    );
+
+/* Decodes a string object and returns the result as Python 
+   object. */
+
+extern DL_IMPORT(PyObject*) PyString_AsDecodedObject(
+    PyObject *str,	 	/* string object */
+    const char *encoding,	/* encoding */
+    const char *errors		/* error handling */
+    );
+
+/* Decodes a string object and returns the result as Python string
+   object.  
+   
+   If the codec returns an Unicode object, the object is converted
+   back to a string using the default encoding.
+
+   DEPRECATED - use PyString_AsDecodedObject() instead. */
+
+extern DL_IMPORT(PyObject*) PyString_AsDecodedString(
     PyObject *str,	 	/* string object */
     const char *encoding,	/* encoding */
     const char *errors		/* error handling */

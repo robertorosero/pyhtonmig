@@ -55,7 +55,8 @@ MAKESETUP=      $(srcdir)/Modules/makesetup
 # Compiler options
 OPT=		@OPT@
 DEFS=		@DEFS@
-CFLAGS=		$(OPT) -I. -I$(srcdir)/Include $(DEFS)
+CFLAGS=		$(OPT)
+CPPFLAGS=	-I. -I$(srcdir)/Include $(DEFS)
 LDFLAGS=	@LDFLAGS@
 LDLAST=		@LDLAST@
 SGI_ABI=	@SGI_ABI@
@@ -64,7 +65,7 @@ LINKFORSHARED=	@LINKFORSHARED@
 # Extra C flags added for building the interpreter object files.
 CFLAGSFORSHARED=@CFLAGSFORSHARED@
 # C flags used for building the interpreter object files
-PY_CFLAGS=	$(CFLAGS) $(CFLAGSFORSHARED)
+PY_CFLAGS=	$(CFLAGS) $(CPPFLAGS) $(CFLAGSFORSHARED)
 
 
 # Machine-dependent subdirectories
@@ -137,6 +138,7 @@ MAINOBJ=	@MAINOBJ@
 LIBOBJS=	@LIBOBJS@
 DLINCLDIR=	@DLINCLDIR@
 DYNLOADFILE=	@DYNLOADFILE@
+MACHDEP_OBJS=	@MACHDEP_OBJS@
 
 PYTHON=		python$(EXE)
 
@@ -221,6 +223,7 @@ PYTHON_OBJS=	\
 		Python/traceback.o \
 		Python/getopt.o \
 		Python/$(DYNLOADFILE) \
+		$(MACHDEP_OBJS) \
 		$(LIBOBJS)
 
 
@@ -284,7 +287,8 @@ platform: $(PYTHON)
 
 # Build the shared modules
 sharedmods: $(PYTHON)
-	PYTHONPATH= ./$(PYTHON) $(srcdir)/setup.py build
+	unset PYTHONPATH PYTHONHOME PYTHONSTARTUP; \
+		./$(PYTHON) $(srcdir)/setup.py build
 
 # buildno should really depend on something like LIBRARY_SRC
 buildno: $(PARSER_OBJS) \
@@ -400,16 +404,18 @@ Parser/metagrammar.o:	$(srcdir)/Parser/metagrammar.c
 Python/compile.o Python/symtable.o: $(GRAMMAR_H)
 
 Python/getplatform.o: $(srcdir)/Python/getplatform.c
-		$(CC) -c $(CFLAGS) -DPLATFORM='"$(MACHDEP)"' -o $@ $(srcdir)/Python/getplatform.c
+		$(CC) -c $(CFLAGS) $(CPPFLAGS) -DPLATFORM='"$(MACHDEP)"' -o $@ $(srcdir)/Python/getplatform.c
 
 Python/importdl.o: $(srcdir)/Python/importdl.c
-		$(CC) -c $(CFLAGS) -I$(DLINCLDIR) -o $@ $(srcdir)/Python/importdl.c
+		$(CC) -c $(CFLAGS) $(CPPFLAGS) -I$(DLINCLDIR) -o $@ $(srcdir)/Python/importdl.c
 
 Objects/object.o: $(srcdir)/Objects/object.c $(srcdir)/Objects/obmalloc.c
 
 Objects/unicodectype.o:	$(srcdir)/Objects/unicodectype.c \
 				$(srcdir)/Objects/unicodetype_db.h
 
+Mac/Python/macglue.o: $(srcdir)/Mac/Python/macglue.c
+		$(CC) -c $(CFLAGS) $(CPPFLAGS) -I$(srcdir)/Mac/Include -I$(srcdir)/Python -o $@ $(srcdir)/Mac/Python/macglue.c
 
 ############################################################################
 # Header files
@@ -763,7 +769,7 @@ clobber: clean
 	-rm -f $(PYTHON) $(PGEN) $(LIBRARY) $(LDLIBRARY) $(DLLLIBRARY) \
 		tags TAGS \
 		config.cache config.log config.h Modules/config.c 
-	-rm -rf build
+	-rm -rf build platform
 
 # Make things extra clean, before making a distribution:
 # remove all generated files, even Makefile[.pre]

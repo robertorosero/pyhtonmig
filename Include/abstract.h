@@ -495,9 +495,8 @@ xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx*/
      DL_IMPORT(PyObject *) PyIter_Next(PyObject *);
      /* Takes an iterator object and calls its tp_iternext slot,
 	returning the next value.  If the iterator is exhausted,
-	this can return NULL without setting an exception, *or*
-	NULL with a StopIteration exception.
-	NULL with any other exception  means an error occurred. */
+	this returns NULL without setting an exception.
+	NULL with an exception means an error occurred. */
 
 /*  Number Protocol:*/
 
@@ -923,7 +922,7 @@ xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx*/
          tuple or list.  Use PySequence_Fast_GET_ITEM to access the
          members of this list.
 
-         Returns NULL on failure.  If the object is not a sequence,
+         Returns NULL on failure.  If the object does not support iteration,
          raises a TypeError exception with m as the message text.
        */
 
@@ -944,7 +943,17 @@ xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx*/
 	 expression: o.count(value).
        */
 
-     DL_IMPORT(int) PySequence_Contains(PyObject *o, PyObject *value);
+     DL_IMPORT(int) PySequence_Contains(PyObject *seq, PyObject *ob);
+       /*
+         Return -1 if error; 1 if ob in seq; 0 if ob not in seq.
+         Use __contains__ if possible, else _PySequence_IterContains().
+       */
+
+     DL_IMPORT(int) _PySequence_IterContains(PyObject *seq, PyObject *ob);
+       /*
+         Return -1 if error; 1 if ob in seq; 0 if ob not in seq.
+         Always uses the iteration protocol, and only Py_EQ comparisons.
+       */
 
 /* For DLL-level backwards compatibility */
 #undef PySequence_In

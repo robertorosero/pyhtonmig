@@ -1,13 +1,5 @@
-from test_support import verify, verbose, TestFailed
+from test_support import verify, verbose, TestFailed, sortdict
 from UserList import UserList
-
-def sortdict(d):
-    keys = d.keys()
-    keys.sort()
-    lst = []
-    for k in keys:
-        lst.append("%r: %r" % (k, d[k]))
-    return "{%s}" % ", ".join(lst)
 
 def f(*a, **k):
     print a, sortdict(k)
@@ -58,20 +50,20 @@ g(1, 2, 3, *(4, 5))
 class Nothing: pass
 try:
     g(*Nothing())
-except AttributeError, attr:
+except TypeError, attr:
     pass
 else:
-    print "should raise AttributeError: __len__"
+    print "should raise TypeError"
 
 class Nothing:
     def __len__(self):
         return 5
 try:
     g(*Nothing())
-except AttributeError, attr:
+except TypeError, attr:
     pass
 else:
-    print "should raise AttributeError: __getitem__"
+    print "should raise TypeError"
 
 class Nothing:
     def __len__(self):
@@ -228,8 +220,9 @@ for args in ['', 'a', 'ab']:
                     lambda x: '%s="%s"' % (x, x), defargs)
                 if vararg: arglist.append('*' + vararg)
                 if kwarg: arglist.append('**' + kwarg)
-                decl = 'def %s(%s): print "ok %s", a, b, d, e, v, k' % (
-                    name, ', '.join(arglist), name)
+                decl = (('def %s(%s): print "ok %s", a, b, d, e, v, ' +
+                         'type(k) is type ("") and k or sortdict(k)')
+                         % (name, ', '.join(arglist), name))
                 exec(decl)
                 func = eval(name)
                 funcs.append(func)

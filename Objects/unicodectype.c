@@ -32,23 +32,24 @@ typedef struct {
 #include "unicodetype_db.h"
 
 static const _PyUnicode_TypeRecord *
-gettyperecord(int code)
+gettyperecord(Py_UNICODE code)
 {
     int index;
 
-    if (code < 0 || code >= 65536)
+    if (code >= 65536)
         index = 0;
     else {
         index = index1[(code>>SHIFT)];
         index = index2[(index<<SHIFT)+(code&((1<<SHIFT)-1))];
     }
+
     return &_PyUnicode_TypeRecords[index];
 }
 
 /* Returns 1 for Unicode characters having the category 'Zl' or type
    'B', 0 otherwise. */
 
-int _PyUnicode_IsLinebreak(register const Py_UNICODE ch)
+int _PyUnicode_IsLinebreak(Py_UNICODE ch)
 {
     const _PyUnicode_TypeRecord *ctype = gettyperecord(ch);
 
@@ -58,20 +59,27 @@ int _PyUnicode_IsLinebreak(register const Py_UNICODE ch)
 /* Returns the titlecase Unicode characters corresponding to ch or just
    ch if no titlecase mapping is known. */
 
-Py_UNICODE _PyUnicode_ToTitlecase(register const Py_UNICODE ch)
+Py_UNICODE _PyUnicode_ToTitlecase(register Py_UNICODE ch)
 {
     const _PyUnicode_TypeRecord *ctype = gettyperecord(ch);
 
     if (ctype->title)
-        return ch + ctype->title;
+        ch += ctype->title;
+    else
+	ch += ctype->upper;
 
-    return ch + ctype->upper;
+#ifdef Py_UNICODE_WIDE
+    /* The database assumes that the values wrap around at 0x10000. */
+    if (ch > 0x10000)
+	ch -= 0x10000;
+#endif
+    return ch;
 }
 
 /* Returns 1 for Unicode characters having the category 'Lt', 0
    otherwise. */
 
-int _PyUnicode_IsTitlecase(register const Py_UNICODE ch)
+int _PyUnicode_IsTitlecase(Py_UNICODE ch)
 {
     const _PyUnicode_TypeRecord *ctype = gettyperecord(ch);
 
@@ -81,14 +89,14 @@ int _PyUnicode_IsTitlecase(register const Py_UNICODE ch)
 /* Returns the integer decimal (0-9) for Unicode characters having
    this property, -1 otherwise. */
 
-int _PyUnicode_ToDecimalDigit(register const Py_UNICODE ch)
+int _PyUnicode_ToDecimalDigit(Py_UNICODE ch)
 {
     const _PyUnicode_TypeRecord *ctype = gettyperecord(ch);
 
     return (ctype->flags & DECIMAL_MASK) ? ctype->decimal : -1;
 }
 
-int _PyUnicode_IsDecimalDigit(register const Py_UNICODE ch)
+int _PyUnicode_IsDecimalDigit(Py_UNICODE ch)
 {
     if (_PyUnicode_ToDecimalDigit(ch) < 0)
 	return 0;
@@ -98,14 +106,14 @@ int _PyUnicode_IsDecimalDigit(register const Py_UNICODE ch)
 /* Returns the integer digit (0-9) for Unicode characters having
    this property, -1 otherwise. */
 
-int _PyUnicode_ToDigit(register const Py_UNICODE ch)
+int _PyUnicode_ToDigit(Py_UNICODE ch)
 {
     const _PyUnicode_TypeRecord *ctype = gettyperecord(ch);
 
     return (ctype->flags & DIGIT_MASK) ? ctype->digit : -1;
 }
 
-int _PyUnicode_IsDigit(register const Py_UNICODE ch)
+int _PyUnicode_IsDigit(Py_UNICODE ch)
 {
     if (_PyUnicode_ToDigit(ch) < 0)
 	return 0;
@@ -117,7 +125,7 @@ int _PyUnicode_IsDigit(register const Py_UNICODE ch)
 
 /* TODO: replace with unicodetype_db.h table */
 
-double _PyUnicode_ToNumeric(register const Py_UNICODE ch)
+double _PyUnicode_ToNumeric(Py_UNICODE ch)
 {
     switch (ch) {
     case 0x3007:
@@ -305,7 +313,7 @@ double _PyUnicode_ToNumeric(register const Py_UNICODE ch)
     }
 }
 
-int _PyUnicode_IsNumeric(register const Py_UNICODE ch)
+int _PyUnicode_IsNumeric(Py_UNICODE ch)
 {
     if (_PyUnicode_ToNumeric(ch) < 0.0)
 	return 0;
@@ -317,7 +325,7 @@ int _PyUnicode_IsNumeric(register const Py_UNICODE ch)
 /* Returns 1 for Unicode characters having the bidirectional type
    'WS', 'B' or 'S' or the category 'Zs', 0 otherwise. */
 
-int _PyUnicode_IsWhitespace(register const Py_UNICODE ch)
+int _PyUnicode_IsWhitespace(Py_UNICODE ch)
 {
     const _PyUnicode_TypeRecord *ctype = gettyperecord(ch);
 
@@ -327,7 +335,7 @@ int _PyUnicode_IsWhitespace(register const Py_UNICODE ch)
 /* Returns 1 for Unicode characters having the category 'Ll', 0
    otherwise. */
 
-int _PyUnicode_IsLowercase(register const Py_UNICODE ch)
+int _PyUnicode_IsLowercase(Py_UNICODE ch)
 {
     const _PyUnicode_TypeRecord *ctype = gettyperecord(ch);
 
@@ -337,7 +345,7 @@ int _PyUnicode_IsLowercase(register const Py_UNICODE ch)
 /* Returns 1 for Unicode characters having the category 'Lu', 0
    otherwise. */
 
-int _PyUnicode_IsUppercase(register const Py_UNICODE ch)
+int _PyUnicode_IsUppercase(Py_UNICODE ch)
 {
     const _PyUnicode_TypeRecord *ctype = gettyperecord(ch);
 
@@ -347,27 +355,39 @@ int _PyUnicode_IsUppercase(register const Py_UNICODE ch)
 /* Returns the uppercase Unicode characters corresponding to ch or just
    ch if no uppercase mapping is known. */
 
-Py_UNICODE _PyUnicode_ToUppercase(register const Py_UNICODE ch)
+Py_UNICODE _PyUnicode_ToUppercase(Py_UNICODE ch)
 {
     const _PyUnicode_TypeRecord *ctype = gettyperecord(ch);
 
-    return ch + ctype->upper;
+    ch += ctype->upper;
+#ifdef Py_UNICODE_WIDE
+    /* The database assumes that the values wrap around at 0x10000. */
+    if (ch > 0x10000)
+	ch -= 0x10000;
+#endif
+    return ch;
 }
 
 /* Returns the lowercase Unicode characters corresponding to ch or just
    ch if no lowercase mapping is known. */
 
-Py_UNICODE _PyUnicode_ToLowercase(register const Py_UNICODE ch)
+Py_UNICODE _PyUnicode_ToLowercase(Py_UNICODE ch)
 {
     const _PyUnicode_TypeRecord *ctype = gettyperecord(ch);
 
-    return ch + ctype->lower;
+    ch += ctype->lower;
+#ifdef Py_UNICODE_WIDE
+    /* The database assumes that the values wrap around at 0x10000. */
+    if (ch > 0x10000)
+	ch -= 0x10000;
+#endif
+    return ch;
 }
 
 /* Returns 1 for Unicode characters having the category 'Ll', 'Lu', 'Lt',
    'Lo' or 'Lm',  0 otherwise. */
 
-int _PyUnicode_IsAlpha(register const Py_UNICODE ch)
+int _PyUnicode_IsAlpha(Py_UNICODE ch)
 {
     const _PyUnicode_TypeRecord *ctype = gettyperecord(ch);
 
@@ -379,32 +399,32 @@ int _PyUnicode_IsAlpha(register const Py_UNICODE ch)
 /* Export the interfaces using the wchar_t type for portability
    reasons:  */
 
-int _PyUnicode_IsWhitespace(register const Py_UNICODE ch)
+int _PyUnicode_IsWhitespace(Py_UNICODE ch)
 {
     return iswspace(ch);
 }
 
-int _PyUnicode_IsLowercase(register const Py_UNICODE ch)
+int _PyUnicode_IsLowercase(Py_UNICODE ch)
 {
     return iswlower(ch);
 }
 
-int _PyUnicode_IsUppercase(register const Py_UNICODE ch)
+int _PyUnicode_IsUppercase(Py_UNICODE ch)
 {
     return iswupper(ch);
 }
 
-Py_UNICODE _PyUnicode_ToLowercase(register const Py_UNICODE ch)
+Py_UNICODE _PyUnicode_ToLowercase(Py_UNICODE ch)
 {
     return towlower(ch);
 }
 
-Py_UNICODE _PyUnicode_ToUppercase(register const Py_UNICODE ch)
+Py_UNICODE _PyUnicode_ToUppercase(Py_UNICODE ch)
 {
     return towupper(ch);
 }
 
-int _PyUnicode_IsAlpha(register const Py_UNICODE ch)
+int _PyUnicode_IsAlpha(Py_UNICODE ch)
 {
     return iswalpha(ch);
 }

@@ -196,16 +196,120 @@ static char setdefaultencoding_doc[] =
 \n\
 Set the current default string encoding used by the Unicode implementation.";
 
+/*
+ * Cached interned string objects used for calling the profile and
+ * trace functions.  Initialized by trace_init().
+ */
+static PyObject *whatstrings[4] = {NULL, NULL, NULL, NULL};
+
+static int
+trace_init(void)
+{
+	static char *whatnames[4] = {"call", "exception", "line", "return"};
+	PyObject *name;
+	int i;
+	for (i = 0; i < 4; ++i) {
+		if (whatstrings[i] == NULL) {
+			name = PyString_InternFromString(whatnames[i]);
+			if (name == NULL)
+				return -1;
+			whatstrings[i] = name;
+                }
+	}
+	return 0;
+}
+
+
+static PyObject *
+call_trampoline(PyThreadState *tstate, PyObject* callback,
+		PyFrameObject *frame, int what, PyObject *arg)
+{
+	PyObject *args = PyTuple_New(3);
+	PyObject *whatstr;
+	PyObject *result;
+
+	if (args == NULL)
+		return NULL;
+	Py_INCREF(frame);
+	whatstr = whatstrings[what];
+	Py_INCREF(whatstr);
+	if (arg == NULL)
+		arg = Py_None;
+	Py_INCREF(arg);
+	PyTuple_SET_ITEM(args, 0, (PyObject *)frame);
+	PyTuple_SET_ITEM(args, 1, whatstr);
+	PyTuple_SET_ITEM(args, 2, arg);
+
+	/* call the Python-level function */
+	PyFrame_FastToLocals(frame);
+	result = PyEval_CallObject(callback, args);
+	PyFrame_LocalsToFast(frame, 1);
+	if (result == NULL)
+		PyTraceBack_Here(frame);
+
+	/* cleanup */
+	Py_DECREF(args);
+	return result;
+}
+
+static int
+profile_trampoline(PyObject *self, PyFrameObject *frame,
+		   int what, PyObject *arg)
+{
+	PyThreadState *tstate = frame->f_tstate;
+	PyObject *result;
+
+	result = call_trampoline(tstate, self, frame, what, arg);
+	if (result == NULL) {
+		PyEval_SetProfile(NULL, NULL);
+		return -1;
+	}
+	Py_DECREF(result);
+	return 0;
+}
+
+static int
+trace_trampoline(PyObject *self, PyFrameObject *frame,
+		 int what, PyObject *arg)
+{
+	PyThreadState *tstate = frame->f_tstate;
+	PyObject *callback;
+	PyObject *result;
+
+	if (what == PyTrace_CALL)
+		callback = self;
+	else
+		callback = frame->f_trace;
+	if (callback == NULL)
+		return 0;
+	result = call_trampoline(tstate, callback, frame, what, arg);
+	if (result == NULL) {
+		PyEval_SetTrace(NULL, NULL);
+		Py_XDECREF(frame->f_trace);
+		frame->f_trace = NULL;
+		return -1;
+	}
+	if (result != Py_None) {
+		PyObject *temp = frame->f_trace;
+		frame->f_trace = NULL;
+		Py_XDECREF(temp);
+		frame->f_trace = result;
+	}
+	else {
+		Py_DECREF(result);
+	}
+	return 0;
+}
+
 static PyObject *
 sys_settrace(PyObject *self, PyObject *args)
 {
-	PyThreadState *tstate = PyThreadState_Get();
+	if (trace_init() == -1)
+		return NULL;
 	if (args == Py_None)
-		args = NULL;
+		PyEval_SetTrace(NULL, NULL);
 	else
-		Py_XINCREF(args);
-	Py_XDECREF(tstate->sys_tracefunc);
-	tstate->sys_tracefunc = args;
+		PyEval_SetTrace(trace_trampoline, args);
 	Py_INCREF(Py_None);
 	return Py_None;
 }
@@ -219,13 +323,12 @@ function call.  See the debugger chapter in the library manual.";
 static PyObject *
 sys_setprofile(PyObject *self, PyObject *args)
 {
-	PyThreadState *tstate = PyThreadState_Get();
+	if (trace_init() == -1)
+		return NULL;
 	if (args == Py_None)
-		args = NULL;
+		PyEval_SetProfile(NULL, NULL);
 	else
-		Py_XINCREF(args);
-	Py_XDECREF(tstate->sys_profilefunc);
-	tstate->sys_profilefunc = args;
+		PyEval_SetProfile(profile_trampoline, args);
 	Py_INCREF(Py_None);
 	return Py_None;
 }
@@ -527,6 +630,7 @@ exc_traceback -- traceback of exception currently being handled\n\
 Static objects:\n\
 \n\
 maxint -- the largest supported integer (the smallest is -maxint-1)\n\
+maxunicode -- the largest supported character\n\
 builtin_module_names -- tuple of module names built into this intepreter\n\
 version -- the version of this interpreter as a string\n\
 version_info -- version information as a tuple\n\
@@ -636,6 +740,9 @@ _PySys_Init(void)
 	Py_XDECREF(v);
 	PyDict_SetItemString(sysdict, "maxint",
 			     v = PyInt_FromLong(PyInt_GetMax()));
+	Py_XDECREF(v);
+	PyDict_SetItemString(sysdict, "maxunicode",
+			     v = PyInt_FromLong(PyUnicode_GetMax()));
 	Py_XDECREF(v);
 	PyDict_SetItemString(sysdict, "builtin_module_names",
 		   v = list_builtin_module_names());

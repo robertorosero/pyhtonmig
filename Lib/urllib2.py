@@ -217,7 +217,8 @@ class Request:
     def get_type(self):
         if self.type is None:
             self.type, self.__r_type = splittype(self.__original)
-            assert self.type is not None, self.__original
+            if self.type is None:
+                raise ValueError, "unknown url type: %s" % self.__original
         return self.type
 
     def get_host(self):
@@ -808,7 +809,7 @@ class AbstractHTTPHandler(BaseHandler):
             h.putheader(k, v)
         h.endheaders()
         if req.has_data():
-            h.send(data + '\r\n')
+            h.send(data)
 
         code, msg, hdrs = h.getreply()
         fp = h.getfile()

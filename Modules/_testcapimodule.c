@@ -9,6 +9,22 @@
 
 static PyObject *TestError;	/* set to exception object in init */
 
+/* Raise TestError with test_name + ": " + msg, and return NULL. */
+
+static PyObject *
+raiseTestError(const char* test_name, const char* msg)
+{
+	char buf[2048];
+
+	if (strlen(test_name) + strlen(msg) > sizeof(buf) - 50)
+		PyErr_SetString(TestError, "internal error msg too large");
+	else {
+		sprintf(buf, "%s: %s", test_name, msg);
+		PyErr_SetString(TestError, buf);
+	}
+	return NULL;
+}
+
 /* Test #defines from config.h (particularly the SIZEOF_* defines).
 
    The ones derived from autoconf on the UNIX-like OSes can be relied
@@ -36,6 +52,7 @@ test_config(PyObject *self, PyObject *args)
 	    if (FATNAME != sizeof(TYPE)) \
     	    	return sizeof_error(#FATNAME, #TYPE, FATNAME, sizeof(TYPE))
 
+	CHECK_SIZEOF(SIZEOF_SHORT, short);
 	CHECK_SIZEOF(SIZEOF_INT, int);
 	CHECK_SIZEOF(SIZEOF_LONG, long);
 	CHECK_SIZEOF(SIZEOF_VOID_P, void*);
@@ -145,7 +162,7 @@ test_dict_iteration(PyObject* self, PyObject* args)
 
         if (!PyArg_ParseTuple(args, ":test_dict_iteration"))
                 return NULL;
-	
+
 	for (i = 0; i < 200; i++) {
 		if (test_dict_inner(i) < 0) {
 			return NULL;
@@ -156,10 +173,99 @@ test_dict_iteration(PyObject* self, PyObject* args)
 	return Py_None;
 }
 
+
+/* Tests of PyLong_{As, From}{Unsigned,}Long(), and (#ifdef HAVE_LONG_LONG)
+   PyLong_{As, From}{Unsigned,}LongLong().
+
+   Note that the meat of the test is contained in testcapi_long.h.
+   This is revolting, but delicate code duplication is worse:  "almost
+   exactly the same" code is needed to test LONG_LONG, but the ubiquitous
+   dependence on type names makes it impossible to use a parameterized
+   function.  A giant macro would be even worse than this.  A C++ template
+   would be perfect.
+
+   The "report an error" functions are deliberately not part of the #include
+   file:  if the test fails, you can set a breakpoint in the appropriate
+   error function directly, and crawl back from there in the debugger.
+*/
+
+#define UNBIND(X)  Py_DECREF(X); (X) = NULL
+
+static PyObject *
+raise_test_long_error(const char* msg)
+{
+	return raiseTestError("test_long_api", msg);
+}
+
+#define TESTNAME	test_long_api_inner
+#define TYPENAME	long
+#define F_S_TO_PY	PyLong_FromLong
+#define F_PY_TO_S	PyLong_AsLong
+#define F_U_TO_PY	PyLong_FromUnsignedLong
+#define F_PY_TO_U	PyLong_AsUnsignedLong
+
+#include "testcapi_long.h"
+
+static PyObject *
+test_long_api(PyObject* self, PyObject* args)
+{
+        if (!PyArg_ParseTuple(args, ":test_long_api"))
+                return NULL;
+
+	return TESTNAME(raise_test_long_error);
+}
+
+#undef TESTNAME
+#undef TYPENAME
+#undef F_S_TO_PY
+#undef F_PY_TO_S
+#undef F_U_TO_PY
+#undef F_PY_TO_U
+
+#ifdef HAVE_LONG_LONG
+
+static PyObject *
+raise_test_longlong_error(const char* msg)
+{
+	return raiseTestError("test_longlong_api", msg);
+}
+
+#define TESTNAME	test_longlong_api_inner
+#define TYPENAME	LONG_LONG
+#define F_S_TO_PY	PyLong_FromLongLong
+#define F_PY_TO_S	PyLong_AsLongLong
+#define F_U_TO_PY	PyLong_FromUnsignedLongLong
+#define F_PY_TO_U	PyLong_AsUnsignedLongLong
+
+#include "testcapi_long.h"
+
+static PyObject *
+test_longlong_api(PyObject* self, PyObject* args)
+{
+        if (!PyArg_ParseTuple(args, ":test_longlong_api"))
+                return NULL;
+
+	return TESTNAME(raise_test_longlong_error);
+}
+
+#undef TESTNAME
+#undef TYPENAME
+#undef F_S_TO_PY
+#undef F_PY_TO_S
+#undef F_U_TO_PY
+#undef F_PY_TO_U
+
+#endif	/* ifdef HAVE_LONG_LONG */
+
+
 static PyMethodDef TestMethods[] = {
-	{"test_config", test_config, METH_VARARGS},
-	{"test_list_api", test_list_api, METH_VARARGS},
-	{"test_dict_iteration", test_dict_iteration, METH_VARARGS},
+	{"test_config",		test_config,		METH_VARARGS},
+	{"test_list_api",	test_list_api,		METH_VARARGS},
+	{"test_dict_iteration",	test_dict_iteration,	METH_VARARGS},
+	{"test_long_api",	test_long_api,		METH_VARARGS},
+#ifdef HAVE_LONG_LONG
+	{"test_longlong_api",	test_longlong_api,	METH_VARARGS},
+#endif
 	{NULL, NULL} /* sentinel */
 };
 

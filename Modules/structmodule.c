@@ -9,12 +9,12 @@ Functions to convert between Python values and C structs.\n\
 Python strings are used to hold the data representing the C struct\n\
 and also as format strings to describe the layout of data in the C struct.\n\
 \n\
-The optional first format char indicates byte ordering and alignment:\n\
- @: native w/native alignment(default)\n\
- =: native w/standard alignment\n\
- <: little-endian, std. alignment\n\
- >: big-endian, std. alignment\n\
- !: network, std (same as >)\n\
+The optional first format char indicates byte order, size and alignment:\n\
+ @: native order, size & alignment (default)\n\
+ =: native order, std. size & alignment\n\
+ <: little-endian, std. size & alignment\n\
+ >: big-endian, std. size & alignment\n\
+ !: same as >\n\
 \n\
 The remaining chars indicate types of args and must match exactly;\n\
 these can be preceded by a decimal repeat count:\n\
@@ -22,9 +22,11 @@ these can be preceded by a decimal repeat count:\n\
  h:short; H:unsigned short; i:int; I:unsigned int;\n\
  l:long; L:unsigned long; f:float; d:double.\n\
 Special cases (preceding decimal count indicates length):\n\
- s:string (array of char); p: pascal string (w. count byte).\n\
+ s:string (array of char); p: pascal string (with count byte).\n\
 Special case (only available in native format):\n\
  P:an integer type that is wide enough to hold a pointer.\n\
+Special case (not in native mode unless 'long long' in platform C):\n\
+ q:long long; Q:unsigned long long\n\
 Whitespace between formats is ignored.\n\
 \n\
 The variable struct.error is an exception raised on errors.";
@@ -44,7 +46,7 @@ static PyObject *StructError;
 #ifdef __MWERKS__
 /*
 ** XXXX We have a problem here. There are no unique alignment rules
-** on the PowerPC mac. 
+** on the PowerPC mac.
 */
 #ifdef __powerc
 #pragma options align=mac68k
@@ -65,11 +67,46 @@ typedef struct { char c; void *x; } s_void_p;
 #define DOUBLE_ALIGN (sizeof(s_double) - sizeof(double))
 #define VOID_P_ALIGN (sizeof(s_void_p) - sizeof(void *))
 
+/* We can't support q and Q in native mode unless the compiler does;
+   in std mode, they're 8 bytes on all platforms. */
+#ifdef HAVE_LONG_LONG
+typedef struct { char c; LONG_LONG x; } s_long_long;
+#define LONG_LONG_ALIGN (sizeof(s_long_long) - sizeof(LONG_LONG))
+#endif
+
 #define STRINGIFY(x)    #x
 
 #ifdef __powerc
 #pragma options align=reset
 #endif
+
+/* Helper to get a PyLongObject by hook or by crook.  Caller should decref. */
+
+static PyObject *
+get_pylong(PyObject *v)
+{
+	PyNumberMethods *m;
+
+	assert(v != NULL);
+	if (PyInt_Check(v))
+		return PyLong_FromLong(PyInt_AS_LONG(v));
+	if (PyLong_Check(v)) {
+		Py_INCREF(v);
+		return v;
+	}
+	m = v->ob_type->tp_as_number;
+	if (m != NULL && m->nb_long != NULL) {
+		v = m->nb_long(v);
+		if (v == NULL)
+			return NULL;
+		if (PyLong_Check(v))
+			return v;
+		Py_DECREF(v);
+	}
+	PyErr_SetString(StructError,
+			"cannot convert argument to long");
+	return NULL;
+}
 
 /* Helper routine to get a Python integer and raise the appropriate error
    if it isn't one */
@@ -106,6 +143,47 @@ get_ulong(PyObject *v, unsigned long *p)
 	}
 }
 
+#ifdef HAVE_LONG_LONG
+
+/* Same, but handling native long long. */
+
+static int
+get_longlong(PyObject *v, LONG_LONG *p)
+{
+	LONG_LONG x;
+
+	v = get_pylong(v);
+	if (v == NULL)
+		return -1;
+	assert(PyLong_Check(v));
+	x = PyLong_AsLongLong(v);
+	Py_DECREF(v);
+	if (x == (LONG_LONG)-1 && PyErr_Occurred())
+		return -1;
+	*p = x;
+	return 0;
+}
+
+/* Same, but handling native unsigned long long. */
+
+static int
+get_ulonglong(PyObject *v, unsigned LONG_LONG *p)
+{
+	unsigned LONG_LONG x;
+
+	v = get_pylong(v);
+	if (v == NULL)
+		return -1;
+	assert(PyLong_Check(v));
+	x = PyLong_AsUnsignedLongLong(v);
+	Py_DECREF(v);
+	if (x == (unsigned LONG_LONG)-1 && PyErr_Occurred())
+		return -1;
+	*p = x;
+	return 0;
+}
+
+#endif
 
 /* Floating point helpers */
 
@@ -395,6 +473,17 @@ typedef struct _formatdef {
 		    const struct _formatdef *);
 } formatdef;
 
+/* A large number of small routines follow, with names of the form
+
+	[bln][up]_TYPE
+
+   [bln] distiguishes among big-endian, little-endian and native.
+   [pu] distiguishes between pack (to struct) and unpack (from struct).
+   TYPE is one of char, byte, ubyte, etc.
+*/
+
+/* Native mode routines. ****************************************************/
+
 static PyObject *
 nu_char(const char *p, const formatdef *f)
 {
@@ -449,6 +538,24 @@ nu_ulong(const char *p, const formatdef *f)
 {
 	return PyLong_FromUnsignedLong(*(unsigned long *)p);
 }
+
+/* Native mode doesn't support q or Q unless the platform C supports
+   long long (or, on Windows, __int64). */
+
+#ifdef HAVE_LONG_LONG
+
+static PyObject *
+nu_longlong(const char *p, const formatdef *f)
+{
+	return PyLong_FromLongLong(*(LONG_LONG *)p);
+}
+
+static PyObject *
+nu_ulonglong(const char *p, const formatdef *f)
+{
+	return PyLong_FromUnsignedLongLong(*(unsigned LONG_LONG *)p);
+}
+#endif
 
 static PyObject *
 nu_float(const char *p, const formatdef *f)
@@ -585,6 +692,29 @@ np_ulong(char *p, PyObject *v, const formatdef *f)
 	return 0;
 }
 
+#ifdef HAVE_LONG_LONG
+
+static int
+np_longlong(char *p, PyObject *v, const formatdef *f)
+{
+	LONG_LONG x;
+	if (get_longlong(v, &x) < 0)
+		return -1;
+	* (LONG_LONG *)p = x;
+	return 0;
+}
+
+static int
+np_ulonglong(char *p, PyObject *v, const formatdef *f)
+{
+	unsigned LONG_LONG x;
+	if (get_ulonglong(v, &x) < 0)
+		return -1;
+	* (unsigned LONG_LONG *)p = x;
+	return 0;
+}
+#endif
+
 static int
 np_float(char *p, PyObject *v, const formatdef *f)
 {
@@ -642,8 +772,14 @@ static formatdef native_table[] = {
 	{'f',	sizeof(float),	FLOAT_ALIGN,	nu_float,	np_float},
 	{'d',	sizeof(double),	DOUBLE_ALIGN,	nu_double,	np_double},
 	{'P',	sizeof(void *),	VOID_P_ALIGN,	nu_void_p,	np_void_p},
+#ifdef HAVE_LONG_LONG
+	{'q',	sizeof(LONG_LONG), LONG_LONG_ALIGN, nu_longlong, np_longlong},
+	{'Q',	sizeof(LONG_LONG), LONG_LONG_ALIGN, nu_ulonglong,np_ulonglong},
+#endif
 	{0}
 };
+
+/* Big-endian routines. *****************************************************/
 
 static PyObject *
 bu_int(const char *p, const formatdef *f)
@@ -671,6 +807,24 @@ bu_uint(const char *p, const formatdef *f)
 		return PyLong_FromUnsignedLong(x);
 	else
 		return PyInt_FromLong((long)x);
+}
+
+static PyObject *
+bu_longlong(const char *p, const formatdef *f)
+{
+	return _PyLong_FromByteArray((const unsigned char *)p,
+				      8,
+				      0, /* little-endian */
+				      1  /* signed */);
+}
+
+static PyObject *
+bu_ulonglong(const char *p, const formatdef *f)
+{
+	return _PyLong_FromByteArray((const unsigned char *)p,
+				      8,
+				      0, /* little-endian */
+				      0  /* signed */);
 }
 
 static PyObject *
@@ -716,6 +870,38 @@ bp_uint(char *p, PyObject *v, const formatdef *f)
 }
 
 static int
+bp_longlong(char *p, PyObject *v, const formatdef *f)
+{
+	int res;
+	v = get_pylong(v);
+	if (v == NULL)
+		return -1;
+	res = _PyLong_AsByteArray((PyLongObject *)v,
+			   	  (unsigned char *)p,
+				  8,
+				  0, /* little_endian */
+				  1  /* signed */);
+	Py_DECREF(v);
+	return res;
+}
+
+static int
+bp_ulonglong(char *p, PyObject *v, const formatdef *f)
+{
+	int res;
+	v = get_pylong(v);
+	if (v == NULL)
+		return -1;
+	res = _PyLong_AsByteArray((PyLongObject *)v,
+			   	  (unsigned char *)p,
+				  8,
+				  0, /* little_endian */
+				  0  /* signed */);
+	Py_DECREF(v);
+	return res;
+}
+
+static int
 bp_float(char *p, PyObject *v, const formatdef *f)
 {
 	double x = PyFloat_AsDouble(v);
@@ -752,10 +938,14 @@ static formatdef bigendian_table[] = {
 	{'I',	4,		0,		bu_uint,	bp_uint},
 	{'l',	4,		0,		bu_int,		bp_int},
 	{'L',	4,		0,		bu_uint,	bp_uint},
+	{'q',	8,		0,		bu_longlong,	bp_longlong},
+	{'Q',	8,		0,		bu_ulonglong,	bp_ulonglong},
 	{'f',	4,		0,		bu_float,	bp_float},
 	{'d',	8,		0,		bu_double,	bp_double},
 	{0}
 };
+
+/* Little-endian routines. *****************************************************/
 
 static PyObject *
 lu_int(const char *p, const formatdef *f)
@@ -783,6 +973,24 @@ lu_uint(const char *p, const formatdef *f)
 		return PyLong_FromUnsignedLong(x);
 	else
 		return PyInt_FromLong((long)x);
+}
+
+static PyObject *
+lu_longlong(const char *p, const formatdef *f)
+{
+	return _PyLong_FromByteArray((const unsigned char *)p,
+				      8,
+				      1, /* little-endian */
+				      1  /* signed */);
+}
+
+static PyObject *
+lu_ulonglong(const char *p, const formatdef *f)
+{
+	return _PyLong_FromByteArray((const unsigned char *)p,
+				      8,
+				      1, /* little-endian */
+				      0  /* signed */);
 }
 
 static PyObject *
@@ -828,6 +1036,38 @@ lp_uint(char *p, PyObject *v, const formatdef *f)
 }
 
 static int
+lp_longlong(char *p, PyObject *v, const formatdef *f)
+{
+	int res;
+	v = get_pylong(v);
+	if (v == NULL)
+		return -1;
+	res = _PyLong_AsByteArray((PyLongObject*)v,
+			   	  (unsigned char *)p,
+				  8,
+				  1, /* little_endian */
+				  1  /* signed */);
+	Py_DECREF(v);
+	return res;
+}
+
+static int
+lp_ulonglong(char *p, PyObject *v, const formatdef *f)
+{
+	int res;
+	v = get_pylong(v);
+	if (v == NULL)
+		return -1;
+	res = _PyLong_AsByteArray((PyLongObject*)v,
+			   	  (unsigned char *)p,
+				  8,
+				  1, /* little_endian */
+				  0  /* signed */);
+	Py_DECREF(v);
+	return res;
+}
+
+static int
 lp_float(char *p, PyObject *v, const formatdef *f)
 {
 	double x = PyFloat_AsDouble(v);
@@ -864,6 +1104,8 @@ static formatdef lilendian_table[] = {
 	{'I',	4,		0,		lu_uint,	lp_uint},
 	{'l',	4,		0,		lu_int,		lp_int},
 	{'L',	4,		0,		lu_uint,	lp_uint},
+	{'q',	8,		0,		lu_longlong,	lp_longlong},
+	{'Q',	8,		0,		lu_ulonglong,	lp_ulonglong},
 	{'f',	4,		0,		lu_float,	lp_float},
 	{'d',	8,		0,		lu_double,	lp_double},
 	{0}
@@ -960,7 +1202,7 @@ calcsize(const char *fmt, const formatdef *f)
 		}
 		else
 			num = 1;
-		
+
 		e = getentry(c, f);
 		if (e == NULL)
 			return -1;
@@ -1020,7 +1262,7 @@ struct_pack(PyObject *self, PyObject *args)
 	if (args == NULL || !PyTuple_Check(args) ||
 	    (n = PyTuple_Size(args)) < 1)
         {
-		PyErr_SetString(PyExc_TypeError, 
+		PyErr_SetString(PyExc_TypeError,
 			"struct.pack requires at least one argument");
 		return NULL;
 	}

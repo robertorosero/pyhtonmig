@@ -36,6 +36,7 @@ compiler specific".  Therefore, these should be very rare.
 
 #include <io.h>
 #define HAVE_LIMITS_H
+#define HAVE_SYS_UTIME_H
 #define HAVE_HYPOT
 #define DONT_HAVE_SIG_ALARM
 #define DONT_HAVE_SIG_PAUSE
@@ -177,6 +178,10 @@ typedef int pid_t;
 #define LONG_LONG __int64
 
 #undef HAVE_HYPOT
+#undef HAVE_SYS_UTIME_H
+#define HAVE_UTIME_H
+#define HAVE_DIRENT_H
+#define HAVE_CLOCK
 
 #else /* !_WIN32 */
 #error "Only Win32 and later are supported"
@@ -339,6 +344,7 @@ typedef unsigned long uintptr_t;
 #define Py_DEBUG
 #endif
 
+#define SIZEOF_SHORT 2
 #define SIZEOF_INT 4
 #define SIZEOF_LONG 4
 #define SIZEOF_LONG_LONG 8
@@ -478,6 +484,22 @@ typedef unsigned long uintptr_t;
 /* Define if you want to use the GNU readline library */
 /* #define WITH_READLINE 1 */
 
+/* Define if you want to have a Unicode type. */
+#define Py_USING_UNICODE
+
+/* Define as the integral type used for Unicode representation. */
+#define PY_UNICODE_TYPE unsigned short
+
+/* Define as the size of the unicode type. */
+#define Py_UNICODE_SIZE SIZEOF_SHORT
+
+/* Define if you have a useable wchar_t type defined in wchar.h; useable
+   means wchar_t must be 16-bit unsigned type. (see
+   Include/unicodeobject.h). */
+#if Py_UNICODE_SIZE == 2
+#define HAVE_USABLE_WCHAR_T
+#endif
+
 /* Define if you want cycle garbage collection */
 #define WITH_CYCLE_GC 1
 
@@ -593,7 +615,7 @@ typedef unsigned long uintptr_t;
 /* #define HAVE_SYS_UN_H 1 */
 
 /* Define if you have the <sys/utime.h> header file.  */
-#define HAVE_SYS_UTIME_H 1
+/* #define HAVE_SYS_UTIME_H 1 */
 
 /* Define if you have the <sys/utsname.h> header file.  */
 /* #define HAVE_SYS_UTSNAME_H 1 */

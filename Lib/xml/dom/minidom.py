@@ -279,7 +279,7 @@ def _getElementsByTagNameHelper(parent, name, rc):
 def _getElementsByTagNameNSHelper(parent, nsURI, localName, rc):
     for node in parent.childNodes:
         if node.nodeType == Node.ELEMENT_NODE:
-            if ((localName == "*" or node.tagName == localName) and
+            if ((localName == "*" or node.localName == localName) and
                 (nsURI == "*" or node.namespaceURI == nsURI)):
                 rc.append(node)
             _getElementsByTagNameNSHelper(node, nsURI, localName, rc)
@@ -551,7 +551,7 @@ class Element(Node):
         return _getElementsByTagNameHelper(self, name, [])
 
     def getElementsByTagNameNS(self, namespaceURI, localName):
-        _getElementsByTagNameNSHelper(self, namespaceURI, localName, [])
+        return _getElementsByTagNameNSHelper(self, namespaceURI, localName, [])
 
     def __repr__(self):
         return "<DOM Element: %s at %s>" % (self.tagName, id(self))
@@ -879,13 +879,11 @@ class Document(Node):
         a.value = ""
         return a
 
-    def getElementsByTagNameNS(self, namespaceURI, localName):
-        _getElementsByTagNameNSHelper(self, namespaceURI, localName)
-
     def getElementsByTagName(self, name):
-        rc = []
-        _getElementsByTagNameHelper(self, name, rc)
-        return rc
+        return _getElementsByTagNameHelper(self, name, [])
+
+    def getElementsByTagNameNS(self, namespaceURI, localName):
+        return _getElementsByTagNameNSHelper(self, namespaceURI, localName, [])
 
     def writexml(self, writer, indent="", addindent="", newl=""):
         writer.write('<?xml version="1.0" ?>\n')

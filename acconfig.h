@@ -35,6 +35,18 @@
 /* Define this if your time.h defines altzone */
 #undef HAVE_ALTZONE
 
+/* Define if --enable-ipv6 is specified */
+#undef ENABLE_IPV6
+
+/* Define if sockaddr has sa_len member */
+#undef HAVE_SOCKADDR_SA_LEN
+
+/* struct addrinfo (netdb.h) */
+#undef HAVE_ADDRINFO
+
+/* struct sockaddr_storage (sys/socket.h) */
+#undef HAVE_SOCKADDR_STORAGE
+
 /* Defined when any dynamic module loading is enabled */
 #undef HAVE_DYNAMIC_LOADING
 
@@ -91,6 +103,15 @@
 
 /* Define if the compiler provides a wchar.h header file. */
 #undef HAVE_WCHAR_H
+
+/* Define if you want to have a Unicode type. */
+#undef Py_USING_UNICODE
+
+/* Define as the integral type used for Unicode representation. */
+#undef PY_UNICODE_TYPE
+
+/* Define as the size of the unicode type. */
+#undef Py_UNICODE_SIZE
 
 /* Define if malloc(0) returns a NULL pointer */
 #undef MALLOC_ZERO_RETURNS_NULL
@@ -181,6 +202,9 @@
 /* Define if you want to produce an OpenStep/Rhapsody framework
    (shared library plus accessory files). */
 #undef WITH_NEXT_FRAMEWORK
+
+/* Define if you want to use MacPython modules on MacOSX in unix-Python */
+#undef USE_TOOLBOX_OBJECT_GLUE
 
 /* Define if you want to use SGI (IRIX 4) dynamic linking.
    This requires the "dl" library by Jack Jansen,

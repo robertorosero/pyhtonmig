@@ -9,17 +9,40 @@
 #include <sys/types.h>		/* For size_t */
 #endif
 
-#define ROUNDUP(n, PyTryBlock) \
-	((((n)+(PyTryBlock)-1)/(PyTryBlock))*(PyTryBlock))
-
 static int
 roundupsize(int n)
 {
-	if (n < 500)
-		return ROUNDUP(n, 10);
-	else
-		return ROUNDUP(n, 100);
-}
+	unsigned int nbits = 0;
+	unsigned int n2 = (unsigned int)n >> 5;
+
+	/* Round up: 
+	 * If n <       256, to a multiple of        8.
+	 * If n <      2048, to a multiple of       64.
+	 * If n <     16384, to a multiple of      512.
+	 * If n <    131072, to a multiple of     4096.
+	 * If n <   1048576, to a multiple of    32768.
+	 * If n <   8388608, to a multiple of   262144.
+	 * If n <  67108864, to a multiple of  2097152.
+	 * If n < 536870912, to a multiple of 16777216.
+	 * ...
+	 * If n < 2**(5+3*i), to a multiple of 2**(3*i).
+	 *
+	 * This over-allocates proportional to the list size, making room
+	 * for additional growth.  The over-allocation is mild, but is
+	 * enough to give linear-time amortized behavior over a long
+	 * sequence of appends() in the presence of a poorly-performing
+	 * system realloc() (which is a reality, e.g., across all flavors
+	 * of Windows, with Win9x behavior being particularly bad -- and
+	 * we've still got address space fragmentation problems on Win9x
+	 * even with this scheme, although it requires much longer lists to
+	 * provoke them than it used to).
+	 */
+	do {
+		n2 >>= 3;
+		nbits += 3;
+	} while (n2);
+	return ((n >> nbits) + 1) << nbits;
+ }
 
 #define NRESIZE(var, type, nitems) PyMem_RESIZE(var, type, roundupsize(nitems))
 
@@ -223,26 +246,68 @@ list_print(PyListObject *op, FILE *fp, int flags)
 static PyObject *
 list_repr(PyListObject *v)
 {
-	PyObject *s, *comma;
 	int i;
+	PyObject *s, *temp;
+	PyObject *pieces = NULL, *result = NULL;
 
 	i = Py_ReprEnter((PyObject*)v);
 	if (i != 0) {
-		if (i > 0)
-			return PyString_FromString("[...]");
-		return NULL;
+		return i > 0 ? PyString_FromString("[...]") : NULL;
 	}
+
+	if (v->ob_size == 0) {
+		result = PyString_FromString("[]");
+		goto Done;
+	}
+
+	pieces = PyList_New(0);
+	if (pieces == NULL)
+		goto Done;
+
+	/* Do repr() on each element.  Note that this may mutate the list,
+	   so must refetch the list size on each iteration. */
+	for (i = 0; i < v->ob_size; ++i) {
+		int status;
+		s = PyObject_Repr(v->ob_item[i]);
+		if (s == NULL)
+			goto Done;
+		status = PyList_Append(pieces, s);
+		Py_DECREF(s);  /* append created a new ref */
+		if (status < 0)
+			goto Done;
+	}
+
+	/* Add "[]" decorations to the first and last items. */
+	assert(PyList_GET_SIZE(pieces) > 0);
 	s = PyString_FromString("[");
-	comma = PyString_FromString(", ");
-	for (i = 0; i < v->ob_size && s != NULL; i++) {
-		if (i > 0)
-			PyString_Concat(&s, comma);
-		PyString_ConcatAndDel(&s, PyObject_Repr(v->ob_item[i]));
-	}
-	Py_XDECREF(comma);
-	PyString_ConcatAndDel(&s, PyString_FromString("]"));
+	if (s == NULL)
+		goto Done;
+	temp = PyList_GET_ITEM(pieces, 0);
+	PyString_ConcatAndDel(&s, temp);
+	PyList_SET_ITEM(pieces, 0, s);
+	if (s == NULL)
+		goto Done;
+
+	s = PyString_FromString("]");
+	if (s == NULL)
+		goto Done;
+	temp = PyList_GET_ITEM(pieces, PyList_GET_SIZE(pieces) - 1);
+	PyString_ConcatAndDel(&temp, s);
+	PyList_SET_ITEM(pieces, PyList_GET_SIZE(pieces) - 1, temp);
+	if (temp == NULL)
+		goto Done;
+
+	/* Paste them all together with ", " between. */
+	s = PyString_FromString(", ");
+	if (s == NULL)
+		goto Done;
+	result = _PyString_Join(s, pieces);
+	Py_DECREF(s);	
+
+Done:
+	Py_XDECREF(pieces);
 	Py_ReprLeave((PyObject *)v);
-	return s;
+	return result;
 }
 
 static int
@@ -557,25 +622,11 @@ listinsert(PyListObject *self, PyObject *args)
 	return ins(self, i, v);
 }
 
-/* Define NO_STRICT_LIST_APPEND to enable multi-argument append() */
-
-#ifndef NO_STRICT_LIST_APPEND
-#define PyArg_ParseTuple_Compat1 PyArg_ParseTuple
-#else
-#define PyArg_ParseTuple_Compat1(args, format, ret) \
-( \
-	PyTuple_GET_SIZE(args) > 1 ? (*ret = args, 1) : \
-	PyTuple_GET_SIZE(args) == 1 ? (*ret = PyTuple_GET_ITEM(args, 0), 1) : \
-	PyArg_ParseTuple(args, format, ret) \
-)
-#endif
-
-
 static PyObject *
 listappend(PyListObject *self, PyObject *args)
 {
 	PyObject *v;
-	if (!PyArg_ParseTuple_Compat1(args, "O:append", &v))
+	if (!PyArg_ParseTuple(args, "O:append", &v))
 		return NULL;
 	return ins(self, (int) self->ob_size, v);
 }
@@ -639,7 +690,7 @@ listextend_internal(PyListObject *self, PyObject *b)
 static PyObject *
 list_inplace_concat(PyListObject *self, PyObject *other)
 {
-	other = PySequence_Fast(other, "argument to += must be a sequence");
+	other = PySequence_Fast(other, "argument to += must be iterable");
 	if (!other)
 		return NULL;
 
@@ -659,7 +710,7 @@ listextend(PyListObject *self, PyObject *args)
 	if (!PyArg_ParseTuple(args, "O:extend", &b))
 		return NULL;
 
-	b = PySequence_Fast(b, "list.extend() argument must be a sequence");
+	b = PySequence_Fast(b, "list.extend() argument must be iterable");
 	if (!b)
 		return NULL;
 
@@ -1344,7 +1395,7 @@ listindex(PyListObject *self, PyObject *args)
 	int i;
 	PyObject *v;
 
-	if (!PyArg_ParseTuple_Compat1(args, "O:index", &v))
+	if (!PyArg_ParseTuple(args, "O:index", &v))
 		return NULL;
 	for (i = 0; i < self->ob_size; i++) {
 		int cmp = PyObject_RichCompareBool(self->ob_item[i], v, Py_EQ);
@@ -1364,7 +1415,7 @@ listcount(PyListObject *self, PyObject *args)
 	int i;
 	PyObject *v;
 
-	if (!PyArg_ParseTuple_Compat1(args, "O:count", &v))
+	if (!PyArg_ParseTuple(args, "O:count", &v))
 		return NULL;
 	for (i = 0; i < self->ob_size; i++) {
 		int cmp = PyObject_RichCompareBool(self->ob_item[i], v, Py_EQ);
@@ -1382,7 +1433,7 @@ listremove(PyListObject *self, PyObject *args)
 	int i;
 	PyObject *v;
 
-	if (!PyArg_ParseTuple_Compat1(args, "O:remove", &v))
+	if (!PyArg_ParseTuple(args, "O:remove", &v))
 		return NULL;
 	for (i = 0; i < self->ob_size; i++) {
 		int cmp = PyObject_RichCompareBool(self->ob_item[i], v, Py_EQ);

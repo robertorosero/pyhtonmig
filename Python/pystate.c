@@ -109,6 +109,7 @@ PyThreadState_New(PyInterpreterState *interp)
 		tstate->recursion_depth = 0;
 		tstate->ticker = 0;
 		tstate->tracing = 0;
+		tstate->use_tracing = 0;
 
 		tstate->dict = NULL;
 
@@ -120,8 +121,10 @@ PyThreadState_New(PyInterpreterState *interp)
 		tstate->exc_value = NULL;
 		tstate->exc_traceback = NULL;
 
-		tstate->sys_profilefunc = NULL;
-		tstate->sys_tracefunc = NULL;
+		tstate->c_profilefunc = NULL;
+		tstate->c_tracefunc = NULL;
+		tstate->c_profileobj = NULL;
+		tstate->c_traceobj = NULL;
 
 		HEAD_LOCK();
 		tstate->next = interp->tstate_head;
@@ -152,8 +155,10 @@ PyThreadState_Clear(PyThreadState *tstate)
 	ZAP(tstate->exc_value);
 	ZAP(tstate->exc_traceback);
 
-	ZAP(tstate->sys_profilefunc);
-	ZAP(tstate->sys_tracefunc);
+	tstate->c_profilefunc = NULL;
+	tstate->c_tracefunc = NULL;
+	ZAP(tstate->c_profileobj);
+	ZAP(tstate->c_traceobj);
 }
 
 

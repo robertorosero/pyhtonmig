@@ -1,6 +1,23 @@
-from test_support import TestFailed, verbose
+from test_support import TestFailed, verbose, verify
 import struct
 ## import pdb
+
+import sys
+ISBIGENDIAN = sys.byteorder == "big"
+del sys
+verify((struct.pack('=i', 1)[0] == chr(0)) == ISBIGENDIAN,
+       "bigendian determination appears wrong")
+
+def string_reverse(s):
+    chars = list(s)
+    chars.reverse()
+    return "".join(chars)
+
+def bigendian_to_native(value):
+    if ISBIGENDIAN:
+        return value
+    else:
+        return string_reverse(value)
 
 def simple_err(func, *args):
     try:
@@ -12,7 +29,18 @@ def simple_err(func, *args):
             func.__name__, args)
 ##      pdb.set_trace()
 
-simple_err(struct.calcsize, 'Q')
+def any_err(func, *args):
+    try:
+        apply(func, args)
+    except (struct.error, OverflowError, TypeError):
+        pass
+    else:
+        raise TestFailed, "%s%s did not raise error" % (
+            func.__name__, args)
+##      pdb.set_trace()
+
+
+simple_err(struct.calcsize, 'Z')
 
 sz = struct.calcsize('i')
 if sz * 3 != struct.calcsize('iii'):
@@ -93,20 +121,11 @@ tests = [
                '\000\000\000\000\000\000\000\300', 0),
 ]
 
-def badpack(fmt, arg, got, exp):
-    return
-
-def badunpack(fmt, arg, got, exp):
-    return "unpack(%s, %s) -> (%s,) # expected (%s,)" % (
-        `fmt`, `arg`, `got`, `exp`)
-
-isbigendian = struct.pack('=h', 1) == '\0\1'
-
 for fmt, arg, big, lil, asy in tests:
     if verbose:
         print `fmt`, `arg`, `big`, `lil`
     for (xfmt, exp) in [('>'+fmt, big), ('!'+fmt, big), ('<'+fmt, lil),
-                        ('='+fmt, isbigendian and big or lil)]:
+                        ('='+fmt, ISBIGENDIAN and big or lil)]:
         res = struct.pack(xfmt, arg)
         if res != exp:
             raise TestFailed, "pack(%s, %s) -> %s # expected %s" % (
@@ -119,3 +138,233 @@ for fmt, arg, big, lil, asy in tests:
         if rev != arg and not asy:
             raise TestFailed, "unpack(%s, %s) -> (%s,) # expected (%s,)" % (
                 `fmt`, `res`, `rev`, `arg`)
+
+###########################################################################
+# Simple native q/Q tests.
+
+has_native_qQ = 1
+try:
+    struct.pack("q", 5)
+except struct.error:
+    has_native_qQ = 0
+
+if verbose:
+    print "Platform has native q/Q?", has_native_qQ and "Yes." or "No."
+
+any_err(struct.pack, "Q", -1)   # can't pack -1 as unsigned regardless
+simple_err(struct.pack, "q", "a")  # can't pack string as 'q' regardless
+simple_err(struct.pack, "Q", "a")  # ditto, but 'Q'
+
+def test_native_qQ():
+    bytes = struct.calcsize('q')
+    # The expected values here are in big-endian format, primarily because
+    # I'm on a little-endian machine and so this is the clearest way (for
+    # me) to force the code to get exercised.
+    for format, input, expected in (
+            ('q', -1, '\xff' * bytes),
+            ('q', 0, '\x00' * bytes),
+            ('Q', 0, '\x00' * bytes),
+            ('q', 1L, '\x00' * (bytes-1) + '\x01'),
+            ('Q', (1L << (8*bytes))-1, '\xff' * bytes),
+            ('q', (1L << (8*bytes-1))-1, '\x7f' + '\xff' * (bytes - 1))):
+        got = struct.pack(format, input)
+        native_expected = bigendian_to_native(expected)
+        verify(got == native_expected,
+               "%r-pack of %r gave %r, not %r" %
+                    (format, input, got, native_expected))
+        retrieved = struct.unpack(format, got)[0]
+        verify(retrieved == input,
+               "%r-unpack of %r gave %r, not %r" %
+                    (format, got, retrieved, input))
+
+if has_native_qQ:
+    test_native_qQ()
+
+###########################################################################
+# Standard integer tests (bBhHiIlLqQ).
+
+import binascii
+
+class IntTester:
+
+    # XXX Most std integer modes fail to test for out-of-range.
+    # The "i" and "l" codes appear to range-check OK on 32-bit boxes, but
+    # fail to check correctly on some 64-bit ones (Tru64 Unix + Compaq C
+    # reported by Mark Favas).
+    BUGGY_RANGE_CHECK = "bBhHiIlL"
+
+    def __init__(self, formatpair, bytesize):
+        assert len(formatpair) == 2
+        self.formatpair = formatpair
+        for direction in "<>!=":
+            for code in formatpair:
+                format = direction + code
+                verify(struct.calcsize(format) == bytesize)
+        self.bytesize = bytesize
+        self.bitsize = bytesize * 8
+        self.signed_code, self.unsigned_code = formatpair
+        self.unsigned_min = 0
+        self.unsigned_max = 2L**self.bitsize - 1
+        self.signed_min = -(2L**(self.bitsize-1))
+        self.signed_max = 2L**(self.bitsize-1) - 1
+
+    def test_one(self, x, pack=struct.pack,
+                          unpack=struct.unpack,
+                          unhexlify=binascii.unhexlify):
+        if verbose:
+            print "trying std", self.formatpair, "on", x, "==", hex(x)
+
+        # Try signed.
+        code = self.signed_code
+        if self.signed_min <= x <= self.signed_max:
+            # Try big-endian.
+            expected = long(x)
+            if x < 0:
+                expected += 1L << self.bitsize
+                assert expected > 0
+            expected = hex(expected)[2:-1] # chop "0x" and trailing 'L'
+            if len(expected) & 1:
+                expected = "0" + expected
+            expected = unhexlify(expected)
+            expected = "\x00" * (self.bytesize - len(expected)) + expected
+
+            # Pack work?
+            format = ">" + code
+            got = pack(format, x)
+            verify(got == expected,
+                   "'%s'-pack of %r gave %r, not %r" %
+                    (format, x, got, expected))
+
+            # Unpack work?
+            retrieved = unpack(format, got)[0]
+            verify(x == retrieved,
+                   "'%s'-unpack of %r gave %r, not %r" %
+                    (format, got, retrieved, x))
+
+            # Adding any byte should cause a "too big" error.
+            any_err(unpack, format, '\x01' + got)
+
+            # Try little-endian.
+            format = "<" + code
+            expected = string_reverse(expected)
+
+            # Pack work?
+            got = pack(format, x)
+            verify(got == expected,
+                   "'%s'-pack of %r gave %r, not %r" %
+                    (format, x, got, expected))
+
+            # Unpack work?
+            retrieved = unpack(format, got)[0]
+            verify(x == retrieved,
+                   "'%s'-unpack of %r gave %r, not %r" %
+                    (format, got, retrieved, x))
+
+            # Adding any byte should cause a "too big" error.
+            any_err(unpack, format, '\x01' + got)
+
+        else:
+            # x is out of range -- verify pack realizes that.
+            if code in self.BUGGY_RANGE_CHECK:
+                if verbose:
+                    print "Skipping buggy range check for code", code
+            else:
+                any_err(pack, ">" + code, x)
+                any_err(pack, "<" + code, x)
+
+        # Much the same for unsigned.
+        code = self.unsigned_code
+        if self.unsigned_min <= x <= self.unsigned_max:
+            # Try big-endian.
+            format = ">" + code
+            expected = long(x)
+            expected = hex(expected)[2:-1] # chop "0x" and trailing 'L'
+            if len(expected) & 1:
+                expected = "0" + expected
+            expected = unhexlify(expected)
+            expected = "\x00" * (self.bytesize - len(expected)) + expected
+
+            # Pack work?
+            got = pack(format, x)
+            verify(got == expected,
+                   "'%s'-pack of %r gave %r, not %r" %
+                    (format, x, got, expected))
+
+            # Unpack work?
+            retrieved = unpack(format, got)[0]
+            verify(x == retrieved,
+                   "'%s'-unpack of %r gave %r, not %r" %
+                    (format, got, retrieved, x))
+
+            # Adding any byte should cause a "too big" error.
+            any_err(unpack, format, '\x01' + got)
+
+            # Try little-endian.
+            format = "<" + code
+            expected = string_reverse(expected)
+
+            # Pack work?
+            got = pack(format, x)
+            verify(got == expected,
+                   "'%s'-pack of %r gave %r, not %r" %
+                    (format, x, got, expected))
+
+            # Unpack work?
+            retrieved = unpack(format, got)[0]
+            verify(x == retrieved,
+                   "'%s'-unpack of %r gave %r, not %r" %
+                    (format, got, retrieved, x))
+
+            # Adding any byte should cause a "too big" error.
+            any_err(unpack, format, '\x01' + got)
+
+        else:
+            # x is out of range -- verify pack realizes that.
+            if code in self.BUGGY_RANGE_CHECK:
+                if verbose:
+                    print "Skipping buggy range check for code", code
+            else:
+                any_err(pack, ">" + code, x)
+                any_err(pack, "<" + code, x)
+
+    def run(self):
+        from random import randrange
+
+        # Create all interesting powers of 2.
+        values = []
+        for exp in range(self.bitsize + 3):
+            values.append(1L << exp)
+
+        # Add some random values.
+        for i in range(self.bitsize):
+            val = 0L
+            for j in range(self.bytesize):
+                val = (val << 8) | randrange(256)
+            values.append(val)
+
+        # Try all those, and their negations, and +-1 from them.  Note
+        # that this tests all power-of-2 boundaries in range, and a few out
+        # of range, plus +-(2**n +- 1).
+        for base in values:
+            for val in -base, base:
+                for incr in -1, 0, 1:
+                    x = val + incr
+                    try:
+                        x = int(x)
+                    except OverflowError:
+                        pass
+                    self.test_one(x)
+
+        # Some error cases.
+        for direction in "<>":
+            for code in self.formatpair:
+                for badobject in "a string", 3+42j, randrange:
+                    any_err(struct.pack, direction + code, badobject)
+
+for args in [("bB", 1),
+             ("hH", 2),
+             ("iI", 4),
+             ("lL", 4),
+             ("qQ", 8)]:
+    t = IntTester(*args)
+    t.run()

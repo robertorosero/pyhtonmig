@@ -178,6 +178,14 @@ Socket methods:
 #include <netpacket/packet.h>
 #endif
 
+#ifdef HAVE_STDDEF_H
+#include <stddef.h>
+#endif
+
+#ifndef offsetof
+#define offsetof(type, member)	((size_t)(&((type *)0)->member))
+#endif
+
 #ifndef O_NDELAY
 #define O_NDELAY O_NONBLOCK	/* For QNX only? */
 #endif
@@ -187,6 +195,13 @@ Socket methods:
 #include <GUSI.h>
 #endif
 
+/* XXX 24-Jun-2000 Tim:  I have no idea what the code inside this block is
+   trying to do, and don't have time to look.  Looks like Unix-specific code
+   in those files, though, which will never compile on Windows. */
+#ifndef MS_WINDOWS
+#include "addrinfo.h"
+#endif /* ifndef MS_WINDOWS hack */
+
 #ifdef USE_SSL
 #include "openssl/rsa.h"
 #include "openssl/crypto.h"
@@ -195,6 +210,26 @@ Socket methods:
 #include "openssl/ssl.h"
 #include "openssl/err.h"
 #endif /* USE_SSL */
+
+/* XXX 24-Jun-2000 Tim:  I have no idea what the code inside this block is
+   trying to do, and don't have time to look.  Looks like Unix-specific code
+   in those files, though, which will never compile on Windows. */
+#ifndef MS_WINDOWS
+
+#ifndef HAVE_INET_PTON
+int inet_pton (int af, char *src, void *dst);
+char *inet_ntop(int af, void *src, char *dst, socklen_t size);
+#endif
+
+/* I know this is a bad practice, but it is the easiest... */
+#ifndef HAVE_GETADDRINFO
+#include "getaddrinfo.c"
+#endif
+#ifndef HAVE_GETNAMEINFO
+#include "getnameinfo.c"
+#endif
+
+#endif /* ifndef MS_WINDOWS hack */
 
 #if defined(MS_WINDOWS) || defined(__BEOS__)
 /* BeOS suffers from the same socket dichotomy as Win32... - [cjh] */
@@ -790,6 +825,7 @@ PySocketSock_accept(PySocketSockObject *s, PyObject *args)
 		return NULL;
 	if (!getsockaddrlen(s, &addrlen))
 		return NULL;
+	memset(addrbuf, 0, addrlen);
 	Py_BEGIN_ALLOW_THREADS
 	newfd = accept(s->sock_fd, (struct sockaddr *) addrbuf, &addrlen);
 	Py_END_ALLOW_THREADS
@@ -961,8 +997,8 @@ PySocketSock_getsockopt(PySocketSockObject *s, PyObject *args)
 	socklen_t buflen = 0;
 
 #ifdef __BEOS__
-/* We have incomplete socket support. */
-	PyErr_SetString( PySocket_Error, "getsockopt not supported" );
+	/* We have incomplete socket support. */
+	PyErr_SetString(PySocket_Error, "getsockopt not supported");
 	return NULL;
 #else
 
@@ -988,7 +1024,7 @@ PySocketSock_getsockopt(PySocketSockObject *s, PyObject *args)
 	if (buf == NULL)
 		return NULL;
 	res = getsockopt(s->sock_fd, level, optname,
-			 (void *)PyString_AsString(buf), &buflen);
+			 (void *)PyString_AS_STRING(buf), &buflen);
 	if (res < 0) {
 		Py_DECREF(buf);
 		return PySocket_Err();
@@ -1212,6 +1248,7 @@ PySocketSock_getpeername(PySocketSockObject *s, PyObject *args)
 		return NULL;
 	if (!getsockaddrlen(s, &addrlen))
 		return NULL;
+	memset(addrbuf, 0, addrlen);
 	Py_BEGIN_ALLOW_THREADS
 	res = getpeername(s->sock_fd, (struct sockaddr *) addrbuf, &addrlen);
 	Py_END_ALLOW_THREADS
@@ -1360,7 +1397,8 @@ PySocketSock_recvfrom(PySocketSockObject *s, PyObject *args)
 	if (buf == NULL)
 		return NULL;
 	Py_BEGIN_ALLOW_THREADS
-	n = recvfrom(s->sock_fd, PyString_AsString(buf), len, flags,
+	memset(addrbuf, 0, addrlen);
+	n = recvfrom(s->sock_fd, PyString_AS_STRING(buf), len, flags,
 #ifndef MS_WINDOWS
 #if defined(PYOS_OS2)
 		     (struct sockaddr *)addrbuf, &addrlen
@@ -2918,3 +2956,40 @@ init_socket(void)
 	gethostbyname_lock = PyThread_allocate_lock();
 #endif
 }
+
+/* Simplistic emulation code for inet_pton that only works for IPv4 */
+#ifndef HAVE_INET_PTON
+int 
+inet_pton (int af, char *src, void *dst)
+{
+	if(af == AF_INET){
+		long packed_addr;
+#ifdef USE_GUSI1
+		packed_addr = (long)inet_addr(src).s_addr;
+#else
+		packed_addr = inet_addr(src);
+#endif
+		if (packed_addr == INADDR_NONE)
+			return 0;
+		memcpy(dst, &packed_addr, 4);
+		return 1;
+	}
+	/* Should set errno to EAFNOSUPPORT */
+	return -1;
+}
+
+char *
+inet_ntop(int af, void *src, char *dst, socklen_t size)
+{
+	if (af == AF_INET) {
+		struct in_addr packed_addr;
+		if (size < 16)
+			/* Should set errno to ENOSPC. */
+			return NULL;
+		memcpy(&packed_addr, src, sizeof(packed_addr));
+		return strncpy(dst, inet_ntoa(packed_addr), size);
+	}
+	/* Should set errno to EAFNOSUPPORT */
+	return NULL;
+}
+#endif
