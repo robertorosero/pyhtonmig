@@ -26,7 +26,7 @@ $Header$
 
 */
 
-#include "PROTO.h" /* For PROTO macro --Guido */
+#include "myproto.h" /* For PROTO macro --Guido */
 
 #include <stdio.h>
 #include <assert.h>
