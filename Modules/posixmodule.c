@@ -324,6 +324,7 @@ posix_mkdir(self, args)
 	return posix_strint(args, mkdir);
 }
 
+#ifdef HAVE_NICE
 static object *
 posix_nice(self, args)
 	object *self;
@@ -338,6 +339,7 @@ posix_nice(self, args)
 		return posix_error();
 	return newintobject((long) value);
 }
+#endif /* HAVE_NICE */
 
 static object *
 posix_rename(self, args)
@@ -1172,7 +1174,9 @@ static struct methodlist posix_methods[] = {
 	{"listdir",	posix_listdir},
 	{"lstat",	posix_lstat},
 	{"mkdir",	posix_mkdir},
+#ifdef HAVE_NICE
 	{"nice",	posix_nice},
+#endif
 #ifdef HAVE_READLINK
 	{"readlink",	posix_readlink},
 #endif
