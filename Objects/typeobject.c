@@ -183,7 +183,7 @@ subtype_setattro(PyObject *self, PyObject *name, PyObject *value)
 
 	assert(tp->tp_dict != NULL && PyDict_Check(tp->tp_dict));
 	descr = PyDict_GetItem(tp->tp_dict, name);
-	if (descr == NULL) {
+	if (descr == NULL || descr->ob_type->tp_descr_set == NULL) {
 		int dictoffset = self->ob_type->tp_members[0].offset;
 		PyObject **dictptr = (PyObject **) ((char *)self + dictoffset);
 		PyObject *dict = *dictptr;
@@ -198,10 +198,8 @@ subtype_setattro(PyObject *self, PyObject *name, PyObject *value)
 			int res = PyObject_DelItem(dict, name);
 			if (res < 0 &&
 			    PyErr_ExceptionMatches(PyExc_KeyError))
-			{
 				PyErr_SetObject(PyExc_AttributeError, name);
-				return -1;
-			}
+			return res;
 		}
 		else
 			return PyObject_SetItem(dict, name, value);
