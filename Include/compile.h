@@ -27,17 +27,26 @@ DL_IMPORT(PyFutureFeatures *) PyFuture_FromAST(struct _mod *, const char *);
 
 #define DEFAULT_BLOCK_SIZE 32
 #define DEFAULT_BLOCKS 8
+#define DEFAULT_CODE_SIZE 128
 
 struct instr {
-	int i_opcode;
+	int i_jabs : 1;
+	int i_jrel : 1;
+	int i_hasarg : 1;
+	unsigned char i_opcode;
 	int i_oparg;
-	PyObject *i_arg;
 };
 
 struct basicblock {
 	size_t b_iused;
 	size_t b_ialloc;
-	int next;
+	/* If b_next is non-zero, it is the block id of the next
+	   block reached by normal control flow.
+	   Since a valid b_next must always be > 0,
+	   0 can be reserved to mean no next block. */
+	int b_next;
+	/* b_seen is used to perform a DFS of basicblocks. */
+	int b_seen;
 	struct instr b_instr[DEFAULT_BLOCK_SIZE];
 };
 
