@@ -15,7 +15,7 @@ DEFS=		@DEFS@
 # === Other things that are customizable but not by configure ===
 
 TOP=		..
-INCLDIR=	$(TOP)/Py
+INCLDIR=	$(TOP)/Include
 OPT=		-g
 CFLAGS=		$(OPT) -I$(INCLDIR) $(DEFS)
 
@@ -34,13 +34,7 @@ PARSEROBJS=	acceler.o grammar1.o \
 
 PGENOBJS=	pgenmain.o
 
-PARSERSRCS=	acceler.c fgetsintr.c grammar1.c \
-		intrcheck.c listnode.c myreadline.c node.c parser.c \
-		parsetok.c tokenizer.c bitset.c \
-		firstsets.c grammar.c metagrammar.c pgen.c \
-		printgrammar.c
-
-PGENSRCS=	pgenmain.c
+OBJS=		$(PGENOBJS) $(PARSEROBJS)
 
 PGEN=		pgen
 
@@ -67,8 +61,11 @@ clobber:	clean
 Makefile:	Makefile.in $(TOP)/config.status
 		CONFIG_FILES=Makefile $(SHELL) $(TOP)/config.status
 
-depend:		$(PARSERSRCS) $(PGENSRCS)
-		$(MKDEP) $(CFLAGS) $(PARSERSRCS) $(PGENSRCS)
+depend:
+		$(MKDEP) $(CFLAGS) \
+			`echo $(OBJS) | tr ' ' '\012' | sed 's/\.o/.c/'`
+
+.PRECIOUS:	Makefile
 
 # DO NOT DELETE THIS LINE -- mkdep uses it.
 # DO NOT PUT ANYTHING AFTER THIS LINE, IT WILL GO AWAY.
