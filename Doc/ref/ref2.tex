@@ -28,7 +28,7 @@ the syntax.
 \index{physical line}
 \index{hash character}
 
-\subsection{Line joining}
+\subsection{Explicit line joining}
 
 Two or more physical lines may be joined into logical lines using
 backslash characters (\verb/\/), as follows: when a physical line ends
@@ -37,12 +37,25 @@ joined with the following forming a single logical line, deleting the
 backslash and the following end-of-line character.  For example:
 \index{physical line}
 \index{line joining}
+\index{line continuation}
 \index{backslash character}
 %
 \begin{verbatim}
-month_names = ['Januari', 'Februari', 'Maart',     \
-               'April',   'Mei',      'Juni',      \
-               'Juli',    'Augustus', 'September', \
+if 1900 < year < 2100 and 1 <= month <= 12 and 1 <= day <= 31 and
+   0 <= hour < 24 and 0 <= minute < 60 and 0 <= second < 60:
+        return 1
+\end{verbatim}
+
+\subsection{Implicit line joining}
+
+Expressions in parentheses, square brackets or curly braces can be
+split over more than one physical line without using backslashes.
+For example:
+
+\begin{verbatim}
+month_names = ['Januari', 'Februari', 'Maart',
+               'April',   'Mei',      'Juni',
+               'Juli',    'Augustus', 'September',
                'Oktober', 'November', 'December']
 \end{verbatim}
 
