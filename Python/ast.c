@@ -125,10 +125,34 @@ mod_ty PyAST_FromNode(const node *n)
 	return Expression(ast_for_testlist(CHILD(n, 0)));
 	break;
     case single_input:
-	if (TYPE(CHILD(n, 0)) == NEWLINE)
-	    return Interactive(Pass(n->n_lineno));
-	else
-	    return Interactive(ast_for_stmt(CHILD(n, 0)));
+	if (TYPE(CHILD(n, 0)) == NEWLINE) {
+	    stmts = asdl_seq_new(1);
+	    if (!stmts)
+		return NULL;
+	    asdl_seq_SET(stmts, 0, Pass(n->n_lineno));
+	    return Interactive(stmts);
+	}
+	else {
+	    n = CHILD(n, 0);
+	    num = num_stmts(n);
+	    stmts = asdl_seq_new(num);
+	    if (!stmts)
+		return NULL;
+	    if (num == 1)
+		asdl_seq_SET(stmts, 0, ast_for_stmt(n));
+	    else {
+		/* Only a simple_stmt can contain multiple statements. */
+		REQ(n, simple_stmt);
+		for (i = 0; i < NCH(n); i += 2) {
+		    stmt_ty s = ast_for_stmt(CHILD(n, i));
+		    if (!s)
+			goto error;
+		    asdl_seq_SET(stmts, i / 2, s);
+		}
+	    }
+	    
+	    return Interactive(stmts);
+	}
     default:
 	goto error;
     }
