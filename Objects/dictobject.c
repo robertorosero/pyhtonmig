@@ -126,13 +126,24 @@ show_counts(void)
 }
 #endif
 
-/* Set PyDictObject* mp to empty but w/ PyDict_MINSIZE slots, using
-   ma_smalltable. */
-#define EMPTY_TO_MINSIZE(mp) do { 					\
-	memset((mp)->ma_smalltable, 0, sizeof((mp)->ma_smalltable));	\
+/* Initialization macros.
+   There are two ways to create a dict:  PyDict_New() is the main C API
+   function, and the tp_new slot maps to dict_new().  In the latter case we
+   can save a little time over what PyDict_New does because it's guaranteed
+   that the PyDictObject struct is already zeroed out.
+   Everyone except dict_new() should use EMPTY_TO_MINSIZE (unless they have
+   an excellent reason not to).
+*/
+
+#define INIT_NONZERO_DICT_SLOTS(mp) do {				\
 	(mp)->ma_table = (mp)->ma_smalltable;				\
 	(mp)->ma_mask = PyDict_MINSIZE - 1;				\
+    } while(0)
+
+#define EMPTY_TO_MINSIZE(mp) do {					\
+	memset((mp)->ma_smalltable, 0, sizeof((mp)->ma_smalltable));	\
 	(mp)->ma_used = (mp)->ma_fill = 0;				\
+	INIT_NONZERO_DICT_SLOTS(mp);					\
     } while(0)
 
 PyObject *
@@ -1680,7 +1691,9 @@ dict_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	self = type->tp_alloc(type, 0);
 	if (self != NULL) {
 		PyDictObject *d = (PyDictObject *)self;
-		EMPTY_TO_MINSIZE(d);
+		/* It's guaranteed that tp->alloc zeroed out the struct. */
+		assert(d->ma_table == NULL && d->ma_fill == 0 && d->ma_used == 0);
+		INIT_NONZERO_DICT_SLOTS(d);
 		d->ma_lookup = lookdict_string;
 #ifdef SHOW_CONVERSION_COUNTS
 		++created;
