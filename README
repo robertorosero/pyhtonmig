@@ -12,9 +12,11 @@ Python release 1.0.1
     source -- you should now be able to configure build this without
     manual intervention on almost any type of Unix system.  It is
     known to work at least on IRIX 4 and 5, SunOS 4, Solaris 2, HP-UX,
-    Ultrix, OSF/1, AIX, SCO ODT 3.0, minix, SEQUENT, and through the
-    use of automatic feature detection should work on most other Unix
-    flavors as well.
+    Ultrix, OSF/1, AIX, SCO ODT 3.0, Minix, Linux, SEQUENT, and
+    through the use of automatic feature detection should work on most
+    other Unix flavors as well.  Binaries are available for Macintosh
+    and PC platforms (for DOS, DOS w/ 32-bit extender, Windows, and
+    Windows NT).
 
 ==> If you don't know yet what Python is: it's an interpreted,
     extensible, embeddable, interactive, object-oriented programming
