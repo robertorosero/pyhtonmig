@@ -62,7 +62,8 @@ however, some mailers don't follow that format as specified, so
 \code{'Mon, 20 Nov 1995 19:12:08 -0500'}.  If it succeeds in parsing
 the date, \function{parsedate()} returns a 9-tuple that can be passed
 directly to \function{time.mktime()}; otherwise \code{None} will be
-returned.  
+returned.  Note that fields 6, 7, and 8 of the result tuple are not
+usable.
 \end{funcdesc}
 
 \begin{funcdesc}{parsedate_tz}{date}
@@ -75,7 +76,8 @@ offset is the opposite of the sign of the \code{time.timezone}
 variable for the same timezone; the latter variable follows the
 \POSIX{} standard while this module follows \rfc{822}.)  If the input
 string has no timezone, the last element of the tuple returned is
-\code{None}.
+\code{None}.  Note that fields 6, 7, and 8 of the result tuple are not
+usable.
 \end{funcdesc}
 
 \begin{funcdesc}{mktime_tz}{tuple}
@@ -187,7 +189,8 @@ continuation lines the named headers contain are also parsed.
 
 \begin{methoddesc}{getdate}{name}
 Retrieve a header using \method{getheader()} and parse it into a 9-tuple
-compatible with \function{time.mktime()}.  If there is no header matching
+compatible with \function{time.mktime()}; note that fields 6, 7, and 8 
+are not usable.  If there is no header matching
 \var{name}, or it is unparsable, return \code{None}.
 
 Date parsing appears to be a black art, and not all mailers adhere to
@@ -200,7 +203,8 @@ function may occasionally yield an incorrect result.
 Retrieve a header using \method{getheader()} and parse it into a
 10-tuple; the first 9 elements will make a tuple compatible with
 \function{time.mktime()}, and the 10th is a number giving the offset
-of the date's timezone from UTC.  Similarly to \method{getdate()}, if
+of the date's timezone from UTC.  Note that fields 6, 7, and 8 
+are not usable.  Similarly to \method{getdate()}, if
 there is no header matching \var{name}, or it is unparsable, return
 \code{None}. 
 \end{methoddesc}
