@@ -235,11 +235,13 @@ makesockaddr(addr, addrlen)
 		return ret;
 	}
 
+#ifdef AF_UNIX
 	case AF_UNIX:
 	{
 		struct sockaddr_un *a = (struct sockaddr_un *) addr;
 		return newstringobject(a->sun_path);
 	}
+#endif /* AF_UNIX */
 
 	/* More cases here... */
 
@@ -265,6 +267,7 @@ getsockaddrarg(s, args, addr_ret, len_ret)
 {
 	switch (s->sock_family) {
 
+#ifdef AF_UNIX
 	case AF_UNIX:
 	{
 		static struct sockaddr_un addr;
@@ -282,6 +285,7 @@ getsockaddrarg(s, args, addr_ret, len_ret)
 		*len_ret = len + sizeof addr.sun_family;
 		return 1;
 	}
+#endif /* AF_UNIX */
 
 	case AF_INET:
 	{
@@ -320,11 +324,13 @@ getsockaddrlen(s, len_ret)
 {
 	switch (s->sock_family) {
 
+#ifdef AF_UNIX
 	case AF_UNIX:
 	{
 		*len_ret = sizeof (struct sockaddr_un);
 		return 1;
 	}
+#endif /* AF_UNIX */
 
 	case AF_INET:
 	{
@@ -1063,7 +1069,9 @@ initsocket()
 	if (SocketError == NULL || dictinsert(d, "error", SocketError) != 0)
 		fatal("can't define socket.error");
 	insint(d, "AF_INET", AF_INET);
+#ifdef AF_UNIX
 	insint(d, "AF_UNIX", AF_UNIX);
+#endif /* AF_UNIX */
 	insint(d, "SOCK_STREAM", SOCK_STREAM);
 	insint(d, "SOCK_DGRAM", SOCK_DGRAM);
 	insint(d, "SOCK_RAW", SOCK_RAW);
