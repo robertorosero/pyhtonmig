@@ -284,9 +284,7 @@ extern DL_IMPORT(int) _PyObject_TypeCheck(PyObject *, PyTypeObject *);
 #define PyObject_TypeCheck(ob, tp) \
 	((ob)->ob_type == (tp) || _PyObject_TypeCheck(ob, tp))
 
-extern DL_IMPORT(PyTypeObject) PyType_Type; /* The type of most type objects */
-extern DL_IMPORT(PyTypeObject) PyDynamicType_Type; /* For dynamic types */
-extern DL_IMPORT(PyTypeObject) PyTurtle_Type; /* The type of the above two */
+extern DL_IMPORT(PyTypeObject) PyType_Type; /* Metatype */
 
 #define PyType_Check(op) PyObject_TypeCheck(op, &PyType_Type)
 
@@ -385,6 +383,9 @@ given type object has a specified feature.
 
 /* Experimental stuff for healing the type/class split */
 #define Py_TPFLAGS_HAVE_CLASS (1L<<8)
+
+/* Set if the type object is dynamically allocated */
+#define Py_TPFLAGS_HEAPTYPE (1L<<9)
 
 #define Py_TPFLAGS_DEFAULT  ( \
                              Py_TPFLAGS_HAVE_GETCHARBUFFER | \
