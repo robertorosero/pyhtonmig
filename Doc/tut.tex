@@ -9,7 +9,7 @@
         E-mail: {\tt guido@cwi.nl}
 }
 
-\date{28 April 1994 \\ Release 1.0.2} % XXX update before release!
+\date{4 May 1994 \\ Release 1.0.2} % XXX update before release!
 
 \begin{document}
 
@@ -2960,28 +2960,80 @@ adequate for most output formatting jobs, C's scanf-style input
 formats are not very powerful.  Instead of scanf-style input, Python
 offers Emacs-style regular expressions as a powerful input and
 scanning mechanism.  Read the corresponding section in the Library
-Reference for a full description; here are some examples:
-
-XXX
+Reference for a full description.
 
 \section{Generalized Dictionaries}
 
-XXX keys can be numbers, tuples, some class instances
+The keys of dictionaries are no longer restricted to strings -- they
+can be numbers, tuples, or (certain) class instances.  (Lists and
+dictionaries are not acceptable as dictionary keys, in order to avoid
+problems when the object used as a key is modified.)
 
-XXX methods values(), items()
+Dictionaries have two new methods: \verb\d.values()\ returns a list of
+the dictionary's values, and \verb\d.items()\ returns a list of the
+dictionary's (key, value) pairs.  Like \verb\d.keys()\, these
+operations are slow for large dictionaries.  Examples:
+
+\begin{verbatim}
+        >>> d = {100: 'honderd', 1000: 'duizend', 10: 'tien'}
+        >>> d.keys()
+        [100, 10, 1000]
+        >>> d.values()
+        ['honderd', 'tien', 'duizend']
+        >>> d.items()
+        [(100, 'honderd'), (10, 'tien'), (1000, 'duizend')]
+        >>> 
+\end{verbatim}
 
 \section{Miscellaneous New Built-in Functions}
 
-XXX vars()
+The function \verb\vars()\ returns a dictionary containing the current
+local variables.  With a module as argument, it returns that module's
+global variables.  The old function \verb\dir(x)\ returns
+\verb\vars(x).keys()\.
 
-XXX compile()
+The function \verb\round(x)\ returns a floating point number rounded
+to the nearest integer (but still expressed as a floating point
+number).  E.g. \verb\round(3.4) == 3.0\ and \verb\round(3.5) == 4.0\.
+With a second argument it rounds to the specified number of digits,
+e.g. \verb\round(math.pi, 4) == 3.1416\ or even
+\verb\round(123.4, -2) == 100.0\. 
 
-XXX exec()
+The function \verb\hash(x)\ returns a hash value for an object.
+All object types acceptable as dictionary keys have a hash value (and
+it is this hash value that the dictionary implementation uses).
 
-XXX hasattr()/getattr()/setattr()
+The function \verb\id(x)\ return a unique identifier for an object.
+For two objects x and y, \verb\id(x) == id(y)\ if and only if
+\verb\x is y\.  (In fact the object's address is used.)
 
-XXX hash(), id()
+The function \verb\hasattr(x, name)\ returns whether an object has an
+attribute with the given name (a string value).  The function
+\verb\getattr(x, name)\ returns the object's attribute with the given
+name.  The function \verb\setattr(x, name, value)\ assigns a value to
+an object's attribute with the given name.  These three functions are
+useful if the attribute names are not known beforehand.  Note that
+\verb\getattr(x, 'foo')\ is equivalent to \verb\x.foo\, and
+\verb\setattr(x, 'foo', y)\ is equivalent to \verb\x.foo = y\.  By
+definition, \verb\hasattr(x, name)\ returns true if and only if
+\verb\getattr(x, name)\ returns without raising an exception.
 
-XXX round()
+\section{Else Clause For Try Statement}
+
+The \verb\try...except\ statement now has an optional \verb\else\
+clause, which must follow all \verb\except\ clauses.  It is useful to
+place code that must be executed if the \verb\try\ clause does not
+raise an exception.  For example:
+
+\begin{verbatim}
+        for arg in sys.argv:
+                try:
+                        f = open(arg, 'r')
+                except IOError:
+                        print 'cannot open', arg
+                else:
+                        print arg, 'has', len(f.readlines()), 'lines'
+                        f.close()
+\end{verbatim}
 
 \end{document}
