@@ -619,7 +619,7 @@ PyRun_InteractiveOneFlags(FILE *fp, const char *filename, PyCompilerFlags *flags
 	}
 	mod = PyParser_ASTFromFile(fp, filename, 
 				   Py_single_input, ps1, ps2,
-				   PARSER_FLAGS(flags), &errcode);
+				   flags, &errcode);
 	Py_XDECREF(v);
 	Py_XDECREF(w);
 	if (mod == NULL) {
@@ -1059,8 +1059,7 @@ PyObject *
 PyRun_StringFlags(const char *str, int start, PyObject *globals, 
 		  PyObject *locals, PyCompilerFlags *flags)
 {
-	mod_ty mod = PyParser_ASTFromString(str, "<string>", start, 
-					    PARSER_FLAGS(flags));
+	mod_ty mod = PyParser_ASTFromString(str, "<string>", start, flags);
 	return run_err_mod(mod, "<string>", globals, locals, flags);
 }
 
@@ -1069,7 +1068,7 @@ PyRun_FileExFlags(FILE *fp, const char *filename, int start, PyObject *globals,
 		  PyObject *locals, int closeit, PyCompilerFlags *flags)
 {
 	mod_ty mod = PyParser_ASTFromFile(fp, filename, start, 0, 0,
-					  PARSER_FLAGS(flags), NULL);
+					  flags, NULL);
 	if (closeit)
 		fclose(fp);
 	return run_err_mod(mod, filename, globals, locals, flags);
@@ -1136,8 +1135,7 @@ Py_CompileStringFlags(const char *str, const char *filename, int start,
 {
 	mod_ty mod;
 	PyCodeObject *co;
-	mod = PyParser_ASTFromString(str, filename, start, 
-				     PARSER_FLAGS(flags));
+	mod = PyParser_ASTFromString(str, filename, start, flags);
 	if (mod == NULL)
 		return NULL;
 	co = PyAST_Compile(mod, filename, flags);
@@ -1147,11 +1145,13 @@ Py_CompileStringFlags(const char *str, const char *filename, int start,
 struct symtable *
 Py_SymtableString(const char *str, const char *filename, int start)
 {
-	/* XXX flags? */
-
+	PyCompilerFlags local_flags;
 	mod_ty mod;
 	struct symtable *st;
-	mod = PyParser_ASTFromString(str, filename, start, 0);
+
+	local_flags.cf_flags = 0; /* XXX flags? */
+
+	mod = PyParser_ASTFromString(str, filename, start, &local_flags);
 	if (mod == NULL)
 		return NULL;
 	st = PySymtable_Build(mod, filename, 0);
@@ -1161,14 +1161,14 @@ Py_SymtableString(const char *str, const char *filename, int start)
 /* Preferred access to parser is through AST. */
 mod_ty
 PyParser_ASTFromString(const char *s, const char *filename, int start, 
-		       int flags)
+		       PyCompilerFlags *flags)
 {
 	node *n;
 	perrdetail err;
 	n = PyParser_ParseStringFlags(s, &_PyParser_Grammar, start, &err, 
-				      flags);
+				      PARSER_FLAGS(flags));
 	if (n)
-		return PyAST_FromNode(n);
+		return PyAST_FromNode(n, flags);
 	else {
 		err_input(&err);
 		return NULL;
@@ -1177,15 +1177,15 @@ PyParser_ASTFromString(const char *s, const char *filename, int start,
 
 mod_ty
 PyParser_ASTFromFile(FILE *fp, const char *filename, int start, char *ps1, 
-		     char *ps2, int flags, int *errcode)
+		     char *ps2, PyCompilerFlags *flags, int *errcode)
 {
 	node *n;
 	perrdetail err;
 	fprintf(stderr, "filename=%s\n", filename);
 	n = PyParser_ParseFileFlags(fp, filename, &_PyParser_Grammar, start, 
-				    ps1, ps2, &err, flags);
+				    ps1, ps2, &err, PARSER_FLAGS(flags));
 	if (n)
-		return PyAST_FromNode(n);
+		return PyAST_FromNode(n, flags);
 	else {
 		err_input(&err);
 		if (errcode)
