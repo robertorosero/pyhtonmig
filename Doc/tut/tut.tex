@@ -912,8 +912,7 @@ Perhaps the most well-known statement type is the
 \keyword{if} statement.  For example:
 
 \begin{verbatim}
->>> import random
->>> x = random.choice([-1, 0, 1, 2])
+>>> x = int(raw_input("Please enter a number: "))
 >>> if x < 0:
 ...      x = 0
 ...      print 'Negative changed to zero'
@@ -2746,22 +2745,20 @@ their meanings.
 \section{Handling Exceptions \label{handling}}
 
 It is possible to write programs that handle selected exceptions.
-Look at the following example, which prints a table of inverses of
-some floating point numbers:
+Look at the following example, which asks the user for input until a
+valid integer has been entered, but allows the user to interrupt the
+program (using \kbd{Control-C} or whatever the operating system
+supports); note that a user-generated interruption is signalled by
+raising the \exception{KeyboardInterrupt} exception.
 
 \begin{verbatim}
->>> numbers = [0.3333, 2.5, 0, 10]
->>> for x in numbers:
-...     print x,
+>>> while 1:
 ...     try:
-...         print 1.0 / x
-...     except ZeroDivisionError:
-...         print '*** has no inverse ***'
+...         x = int(raw_input("Please enter a number: "))
+...         break
+...     except ValueError:
+...         print "Oops! That was no valid number.  Try again..."
 ...     
-0.3333 3.00030003
-2.5 0.4
-0 *** has no inverse ***
-10 0.1
 \end{verbatim}
 
 The \keyword{try} statement works as follows.
