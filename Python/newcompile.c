@@ -23,8 +23,7 @@ int Py_OptimizeFlag = 0;
      #: test_errno fails because stackdepth() isn't implemented (assert'ed)
 
    Inappropriate Exceptions:
-     #: problem with cell objects (see test_builtins::test_map)
-        (closures need to be fully implemented)
+     #: problem with cell objects (closures still have bugs)
      #: x = [1] ; x[0] += 1 
         raises TypeError: object does not support item assignment
      #: Get this err msg: XXX rd_object called with exception set
@@ -84,8 +83,6 @@ struct compiler_unit {
 	int u_nalloc;      /* current alloc count for u_blocks */
 	int u_curblock;    /* index of current block in u_blocks */
 	int u_tmpname;     /* temporary variables for list comps */
-	identifier u_tmp;  /* name for u_tmpname */
-	struct basicblock u_exit;
 	struct basicblock **u_blocks;
 
 	int u_nfblocks;
@@ -1126,7 +1123,7 @@ compiler_continue(struct compiler *c)
 		break;
 	case EXCEPT:
 	case FINALLY_TRY:
-		while (--i > 0 && c->u->u_fblock[i].fb_type != LOOP)
+		while (--i >= 0 && c->u->u_fblock[i].fb_type != LOOP)
 			;
 		if (i == -1)
 			return compiler_error(c, LOOP_ERROR_MSG);
@@ -1855,14 +1852,10 @@ compiler_call(struct compiler *c, expr_ty e)
 }
 
 static int
-compiler_listcomp_generator(struct compiler *c, 
+compiler_listcomp_generator(struct compiler *c, PyObject *tmpname,
                             asdl_seq *generators, int gen_index, 
                             expr_ty elt)
 {
-        /* need to capture u_tmp here for nested list comps,
-           u_tmp is set to NULL in compiler_listcomp */
-        PyObject *u_tmp = c->u->u_tmp;
-
 	/* generate code for the iterator, then each of the ifs,
 	   and then write to the element */
 
@@ -1896,12 +1889,13 @@ compiler_listcomp_generator(struct compiler *c,
 	} 
 
         if (++gen_index < asdl_seq_LEN(generators))
-            if (!compiler_listcomp_generator(c, generators, gen_index, elt))
+            if (!compiler_listcomp_generator(c, tmpname, 
+                                             generators, gen_index, elt))
                 return 0;
 
         /* only append after the last for generator */
         if (gen_index >= asdl_seq_LEN(generators)) {
-            if (!compiler_nameop(c, u_tmp, Load))
+            if (!compiler_nameop(c, tmpname, Load))
 		return 0;
             VISIT(c, expr, elt);
             ADDOP_I(c, CALL_FUNCTION, 1);
@@ -1919,7 +1913,7 @@ compiler_listcomp_generator(struct compiler *c,
 	compiler_use_next_block(c, anchor);
         /* delete the append method added to locals */
 	if (gen_index == 1)
-            if (!compiler_nameop(c, u_tmp, Del))
+            if (!compiler_nameop(c, tmpname, Del))
 		return 0;
 	
 	return 1;
@@ -1930,6 +1924,7 @@ compiler_listcomp(struct compiler *c, expr_ty e)
 {
 	char tmpname[256];
 	identifier tmp;
+        int rc = 0;
 	static identifier append;
 	asdl_seq *generators = e->v.ListComp.generators;
 
@@ -1946,13 +1941,11 @@ compiler_listcomp(struct compiler *c, expr_ty e)
 	ADDOP_I(c, BUILD_LIST, 0);
 	ADDOP(c, DUP_TOP);
 	ADDOP_O(c, LOAD_ATTR, append, names);
-	if (!compiler_nameop(c, tmp, Store))
-		return 0;
-	c->u->u_tmp = tmp;
-	if (!compiler_listcomp_generator(c, generators, 0, e->v.ListComp.elt))
-		return 0;
-	c->u->u_tmp = NULL;
-	return 1;
+	if (compiler_nameop(c, tmp, Store))
+            rc = compiler_listcomp_generator(c, tmp, generators, 0, 
+                                             e->v.ListComp.elt);
+        Py_DECREF(tmp);
+	return rc;
 }
 
 static int
