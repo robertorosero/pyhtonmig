@@ -15,6 +15,16 @@ import os
 from distutils.errors import *
 
 
+# Need to define 'abspath()', because it was new with Python 1.5.2
+if hasattr (os.path, 'abspath'):
+    abspath = os.path.abspath
+else:
+    def abspath(path):
+        if not os.path.isabs(path):
+            path = os.path.join(os.getcwd(), path)
+        return os.path.normpath(path)
+
+
 # cache for by mkpath() -- in addition to cheapening redundant calls,
 # eliminates redundant "creating /foo/bar/baz" messages in dry-run mode
 PATH_CREATED = {}
