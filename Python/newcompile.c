@@ -21,6 +21,7 @@ int Py_OptimizeFlag = 0;
         needs to be implemented (see also Python/ast.c encoding_decl)
      #: exec generally still has problems
      #: test_errno fails because stackdepth() isn't implemented (assert'ed)
+     #: do something about memory management!
 
    Inappropriate Exceptions:
      #: Get this err msg: XXX rd_object called with exception set
@@ -584,7 +585,7 @@ compiler_next_instr(struct compiler *c, int block)
 		newsize = oldsize + b->b_ialloc * sizeof(struct instr);
 		if (newsize <= 0) {
 			PyErr_NoMemory();
-			return 0;
+			return -1;
 		}
 		b->b_ialloc <<= 1;
 		ptr = PyObject_Realloc((void *)b, newsize);
