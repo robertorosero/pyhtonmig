@@ -116,12 +116,11 @@ getpythonpath()
 /* Table of built-in modules.
    These are initialized when first imported.
    Note: selection of optional extensions is now generally done by the
-   mkext.py script in ../Extensions, but for non-UNIX systems most
-   well-known extensions are still listed here. */
-
-/* Standard modules */
+   makesetup script. */
 
 /* -- ADDMODULE MARKER 1 -- */
+
+extern void initmarshal();
 
 struct {
 	char *name;
@@ -130,11 +129,16 @@ struct {
 
 /* -- ADDMODULE MARKER 2 -- */
 
-	/* These two entries are here for sys.builtin_module_names */
+	/* This module "lives in" with marshal.c */
+	{"marshal", initmarshal},
+
+	/* These entries are here for sys.builtin_module_names */
+	{"__main__", NULL},
 	{"__builtin__", NULL},
 	{"sys", NULL},
 
-	{0,		0}		/* Sentinel */
+	/* Sentinel */
+	{0, 0}
 };
 
 #ifdef USE_FROZEN

@@ -46,7 +46,7 @@ MYLIBS=		$(LIB) \
 		../Objects/libObjects.a \
 		../Parser/libParser.a
 
-SYSLIBS=	$(MODLIBS) -lm
+SYSLIBS=	-lm
 
 
 # === Rules ===
@@ -58,7 +58,7 @@ $(LIB):		$(OBJS)
 		$(RANLIB) $(LIB)
 
 $(TOP)/python:	config.o $(MYLIBS)
-		$(CC) config.o $(MYLIBS) $(LIBS) $(SYSLIBS) -o python
+		$(CC) config.o $(MYLIBS) $(MODLIBS) $(LIBS) $(SYSLIBS) -o python
 		mv python $(TOP)/python
 
 config.o:	config.c Makefile
@@ -81,7 +81,7 @@ depend:
 		$(MKDEP) $(CFLAGS) \
 			`echo $(OBJS) | tr ' ' '\012' | sed 's/\.o/.c/'`
 
-.PRECIOUS:	Makefile.in Makefile config.c
+.PRECIOUS:	Makefile.in Makefile config.c $(TOP)/python
 
 glmodule.c:	cgen.py cstubs
 		python cgen.py <cstubs >glmodule.c

@@ -78,14 +78,13 @@ Socket methods:
 #include "myselect.h"
 
 #include <signal.h>
+#include <netdb.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#ifdef HAVE_SYS_UN_H
 #include <sys/un.h>
-#include <netdb.h>
-
-#ifdef i860
-/* Cray APP doesn't have getpeername() */
-#define NO_GETPEERNAME
+#else
+#undef AF_UNIX
 #endif
 
 
@@ -607,7 +606,7 @@ sock_getsockname(s, args)
 }
 
 
-#ifndef NO_GETPEERNAME
+#ifdef HAVE_GETPEERNAME		/* Cray APP doesn't have this :-( */
 /* s.getpeername() method */
 
 static object *
@@ -628,7 +627,7 @@ sock_getpeername(s, args)
 		return socket_error();
 	return makesockaddr((struct sockaddr *) addrbuf, addrlen);
 }
-#endif
+#endif /* HAVE_GETPEERNAME */
 
 
 /* s.listen(n) method */
@@ -831,7 +830,7 @@ static struct methodlist sock_methods[] = {
 	{"connect",	sock_connect},
 	{"fileno",	sock_fileno},
 	{"getsockname",	sock_getsockname},
-#ifndef NO_GETPEERNAME
+#ifdef HAVE_GETPEERNAME
 	{"getpeername",	sock_getpeername},
 #endif
 	{"listen",	sock_listen},
