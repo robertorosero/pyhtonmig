@@ -76,6 +76,7 @@ struct assembler {
 	int a_lnotab_off;      /* offset into lnotab */
 	int a_lineno;          /* last lineno of emitted instruction */
 	int a_lineno_off;      /* bytecode offset of last lineno */
+	int a_firstlineno;     /* first line number in code */
 };
 
 static int compiler_enter_scope(struct compiler *, identifier, void *);
@@ -494,8 +495,6 @@ static void
 compiler_set_lineno(struct compiler *c, int off)
 {
 	struct basicblock *b;
-	fprintf(stderr, "set_lineno() set=%d lineno=%d\n",
-		c->u->u_lineno_set, c->u->u_lineno);
 	if (c->u->u_lineno_set)
 		return;
 	c->u->u_lineno_set = true;
@@ -2159,19 +2158,40 @@ assemble_lnotab(struct assembler *a, struct instr *i)
 	if (d_lineno == 0)
 		return 1;
 
-	/* XXX for now */
-	assert(d_bytecode < 256);
+	/* XXX Need logic for line number gaps greater than 255. */
 	assert(d_lineno < 256);
-
-	len = PyString_GET_SIZE(a->a_lnotab);
-	if (a->a_lnotab_off + 2 >= len) {
-		if (_PyString_Resize(&a->a_lnotab, len * 2) < 0)
-			return 0;
+	if (d_bytecode > 255) {
+		int i, nbytes, ncodes = d_bytecode / 255;
+		nbytes = a->a_lnotab_off + 2 * ncodes;
+		len = PyString_GET_SIZE(a->a_lnotab);
+		if (nbytes >= len) {
+			if (len * 2 < nbytes)
+				len = nbytes;
+			else
+				len *= 2;
+			if (_PyString_Resize(&a->a_lnotab, len) < 0)
+				return 0;
+		}
+		lnotab = PyString_AS_STRING(a->a_lnotab) + a->a_lnotab_off;
+		for (i = 0; i < ncodes; i++) {
+			*lnotab++ = 255;
+			*lnotab++ = 0;
+		}
+		d_bytecode -= ncodes * 255;
+		a->a_lnotab_off += ncodes * 2;
 	}
-	lnotab = PyString_AS_STRING(a->a_lnotab) + a->a_lnotab_off;
+	else {
+		len = PyString_GET_SIZE(a->a_lnotab);
+		if (a->a_lnotab_off + 2 >= len) {
+			if (_PyString_Resize(&a->a_lnotab, len * 2) < 0)
+				return 0;
+	    }
+		lnotab = PyString_AS_STRING(a->a_lnotab) + a->a_lnotab_off;
+		a->a_lnotab_off += 2;
+	}
 	*lnotab++ = d_bytecode;
 	*lnotab++ = d_lineno;
-	a->a_lnotab_off += 2;
+	a->a_lineno = i->i_lineno;
 	return 1;
 }
 
@@ -2330,7 +2350,7 @@ makecode(struct compiler *c, struct assembler *a)
 			a->a_bytecode, consts, names, varnames,
 			nil, nil,
 			filename, c->u->u_name,
-			0,
+			a->a_firstlineno,
 			a->a_lnotab);
  error:
 	Py_XDECREF(consts);
@@ -2365,6 +2385,7 @@ assemble(struct compiler *c)
 	if (!assemble_jump_offsets(&a, c))
 		goto error;
 
+	a.a_firstlineno = -1;
 	/* Emit code in reverse postorder from dfs. */
 	for (i = a.a_nblocks - 1; i >= 0; i--) {
 		struct basicblock *b = c->u->u_blocks[a.a_postorder[i]];
@@ -2373,6 +2394,10 @@ assemble(struct compiler *c)
 			i, a.a_postorder[i], b->b_iused, b->b_ialloc,
 			b->b_next);
 		for (j = 0; j < b->b_iused; j++) {
+			if (a.a_firstlineno < 0) {
+				a.a_firstlineno = b->b_instr[0].i_lineno;
+				a.a_lineno = a.a_firstlineno;
+			}
 			if (!assemble_emit(&a, &b->b_instr[j]))
 				goto error;
 		}
