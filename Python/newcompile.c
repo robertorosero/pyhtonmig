@@ -1070,6 +1070,35 @@ compiler_addop_j(struct compiler *c, int opcode, int block, int absolute)
 	} \
 }
 
+static int
+compiler_isdocstring(stmt_ty s)
+{
+    if (s->kind != Expr_kind)
+        return 0;
+    return s->v.Expr.value->kind == Str_kind;
+}
+
+/* Compile a sequence of statements, checking for a docstring. */
+
+static int
+compiler_body(struct compiler *c, asdl_seq *stmts)
+{
+	int i = 0;
+	stmt_ty st;
+
+	st = asdl_seq_GET(stmts, 0);
+	printf("is_docstring? %d\n", compiler_isdocstring(st));
+	if (compiler_isdocstring(st)) {
+		i = 1;
+		VISIT(c, expr, st->v.Expr.value);
+		if (!compiler_nameop(c, __doc__, Store))
+			return 0;
+	}
+        for (; i < asdl_seq_LEN(stmts); i++)
+            VISIT(c, stmt, asdl_seq_GET(stmts, i));
+	return 1;
+}
+
 static PyCodeObject *
 compiler_mod(struct compiler *c, mod_ty mod)
 {
@@ -1084,8 +1113,9 @@ compiler_mod(struct compiler *c, mod_ty mod)
 	if (!compiler_enter_scope(c, module, mod))
 		return NULL;
 	switch (mod->kind) {
-	case Module_kind:
-		VISIT_SEQ(c, stmt, mod->v.Module.body);
+	case Module_kind: 
+		if (!compiler_body(c, mod->v.Module.body))
+			return 0;
 		break;
 	case Interactive_kind:
 		c->c_interactive = 1;
@@ -1194,14 +1224,6 @@ compiler_make_closure(struct compiler *c, PyCodeObject *co, int args)
 }
 
 static int
-compiler_isdocstring(stmt_ty s)
-{
-    if (s->kind != Expr_kind)
-        return 0;
-    return s->v.Expr.value->kind == Str_kind;
-}
-
-static int
 compiler_function(struct compiler *c, stmt_ty s)
 {
 	PyCodeObject *co;
@@ -1256,7 +1278,7 @@ compiler_function(struct compiler *c, stmt_ty s)
 static int
 compiler_class(struct compiler *c, stmt_ty s)
 {
-	int n, i;
+	int n;
 	PyCodeObject *co;
         PyObject *str;
 	/* push class name on stack, needed by BUILD_CLASS */
@@ -1284,17 +1306,8 @@ compiler_class(struct compiler *c, stmt_ty s)
         }
         Py_DECREF(str);
 
-        stmt_ty st = asdl_seq_GET(s->v.ClassDef.body, 0);
-        i = 0;
-        if (compiler_isdocstring(st)) {
-            i = 1;
-            VISIT(c, expr, st->v.Expr.value);
-            if (!compiler_nameop(c, __doc__, Store))
-                return 0;
-        }
-
-        for (; i < asdl_seq_LEN(s->v.ClassDef.body); i++)
-            VISIT(c, stmt, asdl_seq_GET(s->v.ClassDef.body, i));
+	if (!compiler_body(c, s->v.ClassDef.body))
+		return 0;
 
 	ADDOP(c, LOAD_LOCALS);
 	ADDOP(c, RETURN_VALUE);
