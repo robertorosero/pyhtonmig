@@ -13,6 +13,97 @@ credit, let me know and I'll add you to the list!
 
 ======================================================================
 
-<To be done>
+Overview of changes
+-------------------
+
+For the list of change below, I have borrowed from the document
+"What's New in Python 2.0" by Andrew Kuchling and Moshe Zadka:
+http://starship.python.net/crew/amk/python/writing/new-python/.
+
+There are lots of new modules and lots of bugs have been fixed.  To
+find out about new modules, check out the library manual, which has
+been enhanced significantly.
+
+Probably the most pervasive change is the addition of Unicode support.
+We've added a new fundamental datatype, the Unicode string, a new
+build-in function unicode(), an numerous C APIs to deal with Unicode
+and encodings.  See the file Misc/unicode.txt for details, or
+http://starship.python.net/crew/lemburg/unicode-proposal.txt.
+
+Two other big changes, related to the Unicode support, are the
+addition of string methods and (yet another) new regular expression
+engine.
+
+  - String methods mean that you can now say s.lower() etc. instead of
+  importing the string module and saying string.lower(s) etc.  One
+  peculiarity is that the equivalent of string.join(sequence,
+  delimiter) is delimiter.join(sequence).  Use " ".join(sequence) for
+  the effect of string.join(sequence); to make this more readable, try
+  space=" " first.
+
+  - The new regular expression engine, SRE by Fredrik Lundh, is fully
+  backwards compatible with the old engine, and is in fact invoked
+  using the same interface (the "re" module).  You can explicitly
+  invoke the old engine by import pre, or the SRE engine by importing
+  sre.  SRE is faster than pre, and supports Unicode (which was the
+  main reason to put effort in yet another new regular expression
+  engine -- this is at least the fourth!).
+
+Several small incompatible library changes may trip you up:
+
+  - The append() method for lists can no longer be invoked with more
+  than one argument.  This used to append a single tuple made out of
+  all arguments, but was undocumented.  To append a tuple, use
+  e.g. l.append((a, b, c)).
+
+  - The connect(), connect_ex() and bind() methods for sockets require
+  exactly one argument.  Previously, you could call s.connect(host,
+  port), but this was undocumented. You must now write
+  s.connect((host, port)).
+
+  - The str() and repr() functions are now different more often.  For
+  long integers, str() no longer appends a 'L'.  Thus, str(1L) == '1',
+  which used to be '1L'; repr(1L) is unchanged and still returns '1L'.
+  For floats, repr() now gives 17 digits of precision, to ensure no
+  precision is lost (on all current hardware).
+
+  - The -X option is gone.  Built-in exceptions are now always
+  classes.  Many more library modules also have been converted to
+  class-based exceptions.
+
+Other changes that won't break code but are nice to know about:
+
+- Greg Ward's "distutils" package is included: this will make
+installing, building and distributing third party packages much
+simpler.
+
+- There's now special syntax that you can use instead of the apply()
+function.  f(*args, **kwds) is equivalent to apply(f, args, kwds).
+You can also use variations f(a1, a2, *args, **kwds) and you can leave
+one or the other out: f(*args), f(**kwds).
+
+- The built-ins int() and long() take an optional second argument to
+indicate the conversion base -- of course only if the first argument
+is a string.  This makes string.atoi() and string.atol() obsolete.
+(string.atof() was already obsolete).
+
+- When a local variable is known to the compiler but undefined when
+used, a new exception UnboundLocalError is raised.  This is a class
+derived from NameError so code catching NameError should still work.
+The purpose is to provide better diagnostics in the following example:
+
+  x = 1
+  def f():
+      print x
+      x = x+1
+
+This used to raise a NameError on the print statement, which confused
+even experienced Python programmers (especially if there are several
+hundreds of lines of code between the reference and the assignment to
+x :-).
+
+- You can now override the 'in' operator by defining a __contains__
+method.  Note that it has its arguments backwards: x in a causes
+a.__contains__(x) to be called.  That's why the name isn't __in__.
 
 ======================================================================
