@@ -331,15 +331,9 @@ best_base(PyObject *bases)
 static int
 extra_ivars(PyTypeObject *type, PyTypeObject *base)
 {
-	int t_size = type->tp_basicsize;
-	int b_size = base->tp_basicsize;
+	int t_size = PyType_BASICSIZE(type);
+	int b_size = PyType_BASICSIZE(base);
 
-	assert((type->tp_flags & Py_TPFLAGS_GC) >=
-	       (base->tp_flags & Py_TPFLAGS_GC)); /* base has GC, type not! */
-	if (type->tp_flags & Py_TPFLAGS_GC)
-		t_size -= PyGC_HEAD_SIZE;
-	if (base->tp_flags & Py_TPFLAGS_GC)
-		b_size -= PyGC_HEAD_SIZE;
 	assert(t_size >= b_size); /* type smaller than base! */
 	if (type->tp_itemsize || base->tp_itemsize) {
 		/* If itemsize is involved, stricter rules */
@@ -536,9 +530,7 @@ type_new(PyTypeObject *metatype, PyObject *args, PyObject *kwds)
 
 	/* Add descriptors for custom slots from __slots__, or for __dict__ */
 	mp = et->members;
-	slotoffset = base->tp_basicsize;
-	if (base->tp_flags & Py_TPFLAGS_GC)
-		slotoffset -= PyGC_HEAD_SIZE;
+	slotoffset = PyType_BASICSIZE(base);
 	if (slots != NULL) {
 		for (i = 0; i < nslots; i++, mp++) {
 			mp->name = PyString_AS_STRING(
@@ -961,14 +953,8 @@ inherit_slots(PyTypeObject *type, PyTypeObject *base)
 	}
 
 	/* Copying basicsize is connected to the GC flags */
-	oldsize = base->tp_basicsize;
-	if (base->tp_flags & Py_TPFLAGS_GC)
-		oldsize -= PyGC_HEAD_SIZE;
-	newsize = type->tp_basicsize;
-	if (newsize && (type->tp_flags & Py_TPFLAGS_GC))
-		newsize -= PyGC_HEAD_SIZE;
-	if (!newsize)
-		newsize = oldsize;
+	oldsize = PyType_BASICSIZE(base);
+	newsize = type->tp_basicsize ? PyType_BASICSIZE(type) : oldsize;
 	if (!(type->tp_flags & Py_TPFLAGS_GC) &&
 	    (base->tp_flags & Py_TPFLAGS_GC) &&
 	    (type->tp_flags & Py_TPFLAGS_HAVE_RICHCOMPARE/*GC slots exist*/) &&
@@ -977,9 +963,7 @@ inherit_slots(PyTypeObject *type, PyTypeObject *base)
 		COPYSLOT(tp_traverse);
 		COPYSLOT(tp_clear);
 	}
-	if (type->tp_flags & Py_TPFLAGS_GC)
-		newsize += PyGC_HEAD_SIZE;
-	type->tp_basicsize = newsize;
+	PyType_SET_BASICSIZE(type, newsize);
 
 	COPYSLOT(tp_itemsize);
 	COPYSLOT(tp_dealloc);
