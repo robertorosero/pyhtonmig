@@ -301,9 +301,12 @@ class Header:
         else:
             # Binary search for split point
             first, last = _binsplit(splittable, charset, maxlinelen)
-        # Do the split
-        return self._split(first, charset, maxlinelen, splitchars) + \
-               self._split(last, charset, self._maxlinelen, splitchars)
+        # first is of the proper length so just wrap it in the appropriate
+        # chrome.  last must be recursively split.
+        fsplittable = charset.to_splittable(first)
+        fencoded = charset.from_splittable(fsplittable, True)
+        chunk = [(fencoded, charset)]
+        return chunk + self._split(last, charset, self._maxlinelen, splitchars)
 
     def _split_ascii(self, s, charset, firstlen, splitchars):
         line = _split_ascii(s, firstlen, self._maxlinelen,
