@@ -114,6 +114,7 @@ enum regexp_syntax_op	/* syntax codes for plain and quoted characters */
 
 static int re_compile_initialized = 0;
 static int regexp_syntax = 0;
+int re_syntax = 0; /* Exported copy of regexp_syntax */
 static unsigned char regexp_plain_ops[256];
 static unsigned char regexp_quoted_ops[256];
 static unsigned char regexp_precedences[Rnum_ops];
@@ -254,6 +255,7 @@ int syntax;
 
   ret = regexp_syntax;
   regexp_syntax = syntax;
+  re_syntax = syntax; /* Exported copy */
   re_compile_initialize();
   return ret;
 }

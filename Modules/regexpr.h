@@ -64,6 +64,10 @@ typedef struct re_registers
 
 #ifdef HAVE_PROTOTYPES
 
+extern int re_syntax;
+/* This is the actual syntax mask.  It was added so that Python
+   could do syntax-dependent munging of patterns before compilation. */
+
 int re_set_syntax(int syntax);
 /* This sets the syntax to use and returns the previous syntax.  The
    syntax is specified by a bit mask of the above defined bits. */
@@ -124,6 +128,7 @@ int re_exec(char *s);
 
 #else /* HAVE_PROTOTYPES */
 
+extern int re_syntax;
 int re_set_syntax();
 char *re_compile_pattern();
 int re_match();
