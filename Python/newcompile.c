@@ -19,12 +19,12 @@ int Py_OptimizeFlag = 0;
      #: using coding statement, such as in getopt:
        		# -*- coding: iso-8859-1 -*-
         needs to be implemented (see also Python/ast.c encoding_decl)
-     #: exec 'from __future__ import division' seg faults
-        exec generally still has problems
+     #: exec generally still has problems
      #: test_errno fails because stackdepth() isn't implemented (assert'ed)
 
    Inappropriate Exceptions:
      #: problem with cell objects (see test_builtins::test_map)
+        (closures need to be fully implemented)
      #: x = [1] ; x[0] += 1 
         raises TypeError: object does not support item assignment
      #: Get this err msg: XXX rd_object called with exception set
@@ -32,8 +32,12 @@ int Py_OptimizeFlag = 0;
         This looks like it may be related to encoding not being implemented.
 
    Invalid behaviour:
+     #: name mangling in classes (__vars) doesn't work
+     #: doing from __future__ import division doesn't work 
+        doesn't output BINARY_TRUE_DIVISION
      #: vars() doesn't return local variables
-     #: co_names doesn't contain any names
+     #: co_names & co_varnames don't contain the correct names
+             u_names & u_varnames are not used properly
      #: doc strings at class scope are POPed, not stored
         In interactive mode, they are printed. :-)
      #: ref leaks in interpreter when press return on empty line
