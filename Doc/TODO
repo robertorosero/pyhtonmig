@@ -17,7 +17,7 @@ Python/C API
   PyArg_ParseTupleAndKeywords(), Py_BuildValue().  Information
   requested by Greg Kochanski <gpk@bell-labs.com>.
 
-* PyEval_EvalCode() must also be documented.
+* PyEval_EvalCode(), Py_AddPendingCall() must also be documented.
 
 * Break up the PyBufferProcs description so that the function types
   are independently described.  Perhaps break the chapter into
