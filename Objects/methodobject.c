@@ -180,6 +180,7 @@ PyTypeObject PyCFunction_Type = {
 	0,					/* tp_richcompare */
 	0,					/* tp_weaklistoffset */
 	0,					/* tp_iter */
+	0,					/* tp_iternext */
 	0,					/* tp_methods */
 	0,					/* tp_members */
 	meth_getsets,				/* tp_getset */
