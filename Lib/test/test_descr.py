@@ -458,7 +458,7 @@ def objects():
     except AttributeError:
         pass
     else:
-        print "Ouch: object() should not allow setting a foo attribute!"
+        verify(0, "object() should not allow setting a foo attribute")
     verify(not hasattr(object(), "__dict__"))
 
     class Cdict(object):
@@ -503,6 +503,8 @@ def slots():
 
 def dynamics():
     if verbose: print "Testing __dynamic__..."
+    verify(object.__dynamic__ == 0)
+    verify(list.__dynamic__ == 0)
     class S1:
         __metaclass__ = type
     verify(S1.__dynamic__ == 0)
@@ -523,7 +525,7 @@ def dynamics():
     except (AttributeError, TypeError):
         pass
     else:
-        print "Ouch: assignment to a static class attribute shouldn't work!"
+        verify(0, "assignment to a static class attribute should be illegal")
     D.foo = 1
     verify(D.foo == 1)
     # Test that dynamic attributes are inherited
@@ -538,7 +540,7 @@ def dynamics():
     except (AttributeError, TypeError):
         pass
     else:
-        print "Ouch: assignment to SS.foo shouldn't work!"
+        verify(0, "assignment to SS.foo should be illegal")
 
 def errors():
     if verbose: print "Testing errors..."
@@ -549,7 +551,7 @@ def errors():
     except TypeError:
         pass
     else:
-        print "Ouch: inheritance from both list and dict should be illegal!"
+        verify(0, "inheritance from both list and dict should be illegal")
 
     try:
         class C(object, None):
@@ -557,7 +559,7 @@ def errors():
     except TypeError:
         pass
     else:
-        print "Ouch: inheritance from non-type should be illegal!"
+        verify(0, "inheritance from non-type should be illegal")
     class Classic:
         pass
 
@@ -567,7 +569,7 @@ def errors():
     except TypeError:
         pass
     else:
-        print "Ouch: inheritance from object and Classic should be illegal!"
+        verify(0, "inheritance from object and Classic should be illegal")
 
     try:
         class C(int):
@@ -575,7 +577,7 @@ def errors():
     except TypeError:
         pass
     else:
-        print "Ouch: inheritance from int should be illegal!"
+        verify(0, "inheritance from int should be illegal")
 
     try:
         class C(object):
@@ -583,7 +585,7 @@ def errors():
     except TypeError:
         pass
     else:
-        print "Ouch: __slots__ = {} should be illegal!"
+        verify(0, "__slots__ = {} should be illegal")
 
     try:
         class C(object):
@@ -591,7 +593,7 @@ def errors():
     except TypeError:
         pass
     else:
-        print "Ouch: __slots__ = [1] should be illegal!"
+        verify(0, "__slots__ = [1] should be illegal")
 
 def all():
     lists()
