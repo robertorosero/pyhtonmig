@@ -346,7 +346,8 @@ class Dist (Command):
             words = string.split (pattern)
             assert words                # must have something!
             if os.name != 'posix':
-                words[0] = apply (os.path.join, string.split (words[0], '/'))
+                words[0] = apply (os.path.join,
+                                  tuple (string.split (words[0], '/')))
 
             # First word is a directory, possibly with include/exclude
             # patterns making up the rest of the line: it's a recursive

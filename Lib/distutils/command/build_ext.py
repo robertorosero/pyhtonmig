@@ -254,6 +254,6 @@ class BuildExt (Command):
         if package:
             ext_name = package + '.' + ext_name
         ext_path = string.split (ext_name, '.')
-        return apply (os.path.join, ext_path) + sysconfig.SO
+        return apply (os.path.join, tuple (ext_path)) + sysconfig.SO
 
 # class BuildExt

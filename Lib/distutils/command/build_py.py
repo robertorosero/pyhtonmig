@@ -102,17 +102,18 @@ class BuildPy (Command):
 
         if type (package) is StringType:
             path = string.split (package, '.')
-        elif type (package) in (TupleType, ListType):
-            path = list (package)
-        else:
+        elif type (package) not in (TupleType, ListType):
             raise TypeError, "'package' must be a string, list, or tuple"
 
         if not self.package_dir:
             if path:
-                return apply (os.path.join, path)
+                return apply (os.path.join, tuple (path))
             else:
                 return ''
         else:
+            if type (path) is not ListType: # must be mutable!
+                path = list (path) 
+
             tail = []
             while path:
                 try:
@@ -122,12 +123,12 @@ class BuildPy (Command):
                     del path[-1]
                 else:
                     tail.insert (0, pdir)
-                    return apply (os.path.join, tail)
+                    return apply (os.path.join, tuple (tail))
             else:
                 # arg! everything failed, we might as well have not even
                 # looked in package_dir -- oh well
                 if tail:
-                    return apply (os.path.join, tail)
+                    return apply (os.path.join, tuple (tail))
                 else:
                     return ''
 
@@ -263,7 +264,7 @@ class BuildPy (Command):
         outfile_path = list (package)
         outfile_path.append (module + ".py")
         outfile_path.insert (0, self.build_dir)
-        outfile = apply (os.path.join, outfile_path)
+        outfile = apply (os.path.join, tuple (outfile_path))
 
         dir = os.path.dirname (outfile)
         self.mkpath (dir)
