@@ -1,15 +1,15 @@
 \documentstyle[twoside,11pt,myformat]{report}
 
 \title{Python Tutorial}
-	
+        
 \author{
-	Guido van Rossum \\
-	Dept. CST, CWI, P.O. Box 94079 \\
-	1090 GB Amsterdam, The Netherlands \\
-	E-mail: {\tt guido@cwi.nl}
+        Guido van Rossum \\
+        Dept. CST, CWI, P.O. Box 94079 \\
+        1090 GB Amsterdam, The Netherlands \\
+        E-mail: {\tt guido@cwi.nl}
 }
 
-\date{30 January 1994 \\ Release 1.0.0} % XXX update before release!
+\date{28 April 1994 \\ Release 1.0.2} % XXX update before release!
 
 \begin{document}
 
@@ -243,7 +243,7 @@ Typing the interrupt character (usually Control-C or DEL) to the
 primary or secondary prompt cancels the input and returns to the
 primary prompt.%
 \footnote{
-	A problem with the GNU Readline package may prevent this.
+        A problem with the GNU Readline package may prevent this.
 }
 Typing an interrupt while a command is executing raises the {\tt
 KeyboardInterrupt} exception, which may be handled by a {\tt try}
@@ -422,9 +422,9 @@ the example, you must type everything after the prompt, when the
 prompt appears; lines that do not begin with a prompt are output from
 the interpreter.%
 \footnote{
-	I'd prefer to use different fonts to distinguish input
-	from output, but the amount of LaTeX hacking that would require
-	is currently beyond my ability.
+        I'd prefer to use different fonts to distinguish input
+        from output, but the amount of LaTeX hacking that would require
+        is currently beyond my ability.
 }
 Note that a secondary prompt on a line by itself in an example means
 you must type a blank line; this is used to end a multi-line command.
@@ -1037,10 +1037,10 @@ The actual parameters (arguments) to a function call are introduced in
 the local symbol table of the called function when it is called; thus,
 arguments are passed using {\em call\ by\ value}.%
 \footnote{
-	 Actually, {\em call  by  object reference} would be a better
-	 description, since if a mutable object is passed, the caller
-	 will see any changes the callee makes to it (e.g., items
-	 inserted into a list).
+         Actually, {\em call  by  object reference} would be a better
+         description, since if a mutable object is passed, the caller
+         will see any changes the callee makes to it (e.g., items
+         inserted into a list).
 }
 When a function calls another function, a new local symbol table is
 created for that call.
@@ -1422,9 +1422,9 @@ Thus, a list is always smaller than a string, a string is always
 smaller than a tuple, etc.  Mixed numeric types are compared according
 to their numeric value, so 0 equals 0.0, etc.%
 \footnote{
-	The rules for comparing objects of different types should
-	not be relied upon; they may change in a future version of
-	the language.
+        The rules for comparing objects of different types should
+        not be relied upon; they may change in a future version of
+        the language.
 }
 
 
@@ -1516,9 +1516,9 @@ They are executed only the
 {\em first}
 time the module is imported somewhere.%
 \footnote{
-	In fact function definitions are also `statements' that are
-	`executed'; the execution enters the function name in the
-	module's global symbol table.
+        In fact function definitions are also `statements' that are
+        `executed'; the execution enters the function name in the
+        module's global symbol table.
 }
 
 Each module has its own private symbol table, which is used as the
@@ -2073,7 +2073,7 @@ can be bound to the same object.  This is known as aliasing in other
 languages.  This is usually not appreciated on a first glance at
 Python, and can be safely ignored when dealing with immutable basic
 types (numbers, strings, tuples).  However, aliasing has an
-(intended!)  effect on the semantics of Python code involving mutable
+(intended!) effect on the semantics of Python code involving mutable
 objects such as lists, dictionaries, and most types representing
 entities outside the program (files, windows, etc.).  This is usually
 used to the benefit of the program, since aliases behave like pointers
@@ -2116,13 +2116,13 @@ names in modules are attribute references: in the expression
 be a straightforward mapping between the module's attributes and the
 global names defined in the module: they share the same name space!%
 \footnote{
-	Except for one thing.  Module objects have a secret read-only
-	attribute called {\tt __dict__} which returns the dictionary
-	used to implement the module's name space; the name
-	{\tt __dict__} is an attribute but not a global name.
-	Obviously, using this violates the abstraction of name space
-	implementation, and should be restricted to things like
-	post-mortem debuggers...
+        Except for one thing.  Module objects have a secret read-only
+        attribute called {\tt __dict__} which returns the dictionary
+        used to implement the module's name space; the name
+        {\tt __dict__} is an attribute but not a global name.
+        Obviously, using this violates the abstraction of name space
+        implementation, and should be restricted to things like
+        post-mortem debuggers...
 }
 
 Attributes may be read-only or writable.  In the latter case,
@@ -2637,7 +2637,351 @@ object of which the method is an instance, and \verb\m.im_func\ is the
 function object corresponding to the method.
 
 
-XXX Mention bw compat hacks.
+\chapter{Recent Additions}
 
+Python is an evolving language.  Since this tutorial was last
+thoroughly revised, several new features have been added to the
+language.  While ideally I should revise the tutorial to incorporate
+them in the mainline of the text, lack of time currently requires me
+to a more modest approach.  In this chapter I will briefly list the
+most important improvements to the language and how you can use them
+to your benefit.
+
+\section{String Literals}
+
+\subsection{Double Quotes}
+
+Python can now also use double quotes to surround string literals,
+e.g. \verb\"this doesn't hurt a bit"\.
+
+\subsection{Continuation Of String Literals}
+
+String literals can span multiple lines by escaping newlines with
+backslashes, e.g.
+
+\begin{verbatim}
+        hello = "This is a rather long string containing\n\
+        several lines of text just as you would do in C.\n\
+            Note that whitespace at the beginning of the line is\
+         significant.\n"
+        print hello
+\end{verbatim}
+
+which would print the following:
+\begin{verbatim}
+        This is a rather long string containing
+        several lines of text just as you would do in C.
+            Note that whitespace at the beginning of the line is significant.
+\end{verbatim}
+
+\subsection{Triple-quoted strings}
+
+In some cases, when you need to include really long strings (e.g.
+containing several paragraphs of informational text), it is annoying
+that you have to terminate each line with \verb@\n\@, especially if
+you would like to reformat the text occasionally with a powerful text
+editor like Emacs.  For such situations, ``triple-quoted'' strings can
+be used, e.g.
+
+\begin{verbatim}
+        hello = """
+
+            This string is bounded by triple double quotes (3 times ").
+        Newlines in the string are retained, though \
+        it is still possible\nto use all normal escape sequences.
+
+            Whitespace at the beginning of a line is
+        significant.  If you need to include three opening quotes
+        you have to escape at least one of them, e.g. \""".
+
+            This string ends in a newline.
+        """
+\end{verbatim}
+
+Note that there is no semantic difference between strings quoted with
+single quotes (\verb/'/) or double quotes (\verb\"\).
+
+\subsection{String Literal Juxtaposition}
+
+One final twist: you can juxtapose multiple string literals.  Two or
+more adjacent string literals (but not arbitrary expressions!)
+separated only by whitespace will be concatenated (without intervening
+whitespace) into a single string object at compile time.  This makes
+it possible to continue a long string on the next line without
+sacrificing indentation or performance, unlike the use of the string
+concatenation operator \verb\+\ or the continuation of the literal
+itself on the next line (since leading whitespace is significant
+inside all types of string literals).  Note that this feature, like
+all string features except triple-quoted strings, is borrowed from
+Standard C.
+
+\section{The Formatting Operator}
+
+\subsection{Basic Usage}
+
+The chapter on output formatting is really out of date: there is now
+an almost complete interface to C-style printf formats.  This is done
+by overloading the modulo operator (\verb\%\) for a left operand
+which is a string, e.g.
+
+\begin{verbatim}
+        >>> import math
+        >>> print 'The value of PI is approximately %5.3f.' % math.pi
+        The value of PI is approximately 3.142.
+        >>> 
+\end{verbatim}
+
+If there is more than one format in the string you pass a tuple as
+right operand, e.g.
+
+\begin{verbatim}
+        >>> table = {'Sjoerd': 4127, 'Jack': 4098, 'Dcab': 8637678}
+        >>> for name, phone in table.items():
+        ...     print '%-10s ==> %10d' % (name, phone)
+        ... 
+        Jack       ==>       4098
+        Dcab       ==>    8637678
+        Sjoerd     ==>       4127
+        >>> 
+\end{verbatim}
+
+Most formats work exactly as in C and require that you pass the proper
+type (however, if you don't you get an exception, not a core dump).
+The \verb\%s\ format is more relaxed: if the corresponding argument is
+not a string object, it is converted to string using the \verb\str()\
+built-in function.  Using \verb\*\ to pass the width or precision in
+as a separate (integer) argument is supported.  The C formats
+\verb\%n\ and \verb\%p\ are not supported.
+
+\subsection{Referencing Variables By Name}
+
+If you have a really long format string that you don't want to split
+up, it would be nice if you could reference the variables to be
+formatted by name instead of by position.  This can be done by using
+an extension of C formats using the form \verb\%(name)format\, e.g.
+
+\begin{verbatim}
+        >>> table = {'Sjoerd': 4127, 'Jack': 4098, 'Dcab': 8637678}
+        >>> print 'Jack: %(Jack)d; Sjoerd: %(Sjoerd)d; Dcab: %(Dcab)d' % table
+        Jack: 4098; Sjoerd: 4127; Dcab: 8637678
+        >>> 
+\end{verbatim}
+
+This is particularly useful in combination with the new built-in
+\verb\vars()\ function, which returns a dictionary containing all
+local variables.
+
+\section{Optional Function Arguments}
+
+It is now possible to define functions with a variable number of
+arguments.  There are two forms, which can be combined.
+
+\subsection{Default Argument Values}
+
+The most useful form is to specify a default value for one or more
+arguments.  This creates a function that can be called with fewer
+arguments than it is defined, e.g.
+
+\begin{verbatim}
+        def ask_ok(prompt, retries = 4, complaint = 'Yes or no, please!'):
+                while 1:
+                        ok = raw_input(prompt)
+                        if ok in ('y', 'ye', 'yes'): return 1
+                        if ok in ('n', 'no', 'nop', 'nope'): return 0
+                        retries = retries - 1
+                        if retries < 0: raise IOError, 'refusenik user'
+                        print complaint
+\end{verbatim}
+
+This function can be called either like this:
+\verb\ask_ok('Do you really want to quit?')\ or like this:
+\verb\ask_ok('OK to overwrite the file?', 2)\.
+
+The default values are evaluated at the point of function definition
+in the {\em defining} scope, so that e.g.
+
+\begin{verbatim}
+        i = 5
+        def f(arg = i): print arg
+        i = 6
+        f()
+\end{verbatim}
+
+will print \verb\5\.
+
+\subsection{Arbitrary Argument Lists}
+
+It is also possible to specify that a function can be called with an
+arbitrary number of arguments.  These arguments will be wrapped up in
+a tuple.  Before the variable number of arguments, zero or more normal
+arguments may occur, e.g.
+
+\begin{verbatim}
+        def fprintf(file, format, *args):
+                file.write(format % args)
+\end{verbatim}
+
+This feature may be combined with the previous, e.g.
+
+\begin{verbatim}
+        def but_is_it_useful(required, optional = None, *remains):
+                print "I don't know"
+\end{verbatim}
+
+\section{Lambda And Functional Programming Tools}
+
+\subsection{Lambda Forms}
+
+On popular demand, a few features commonly found in functional
+programming languages and Lisp have been added to Python.  With the
+\verb\lambda\ keyword, small anonymous functions can be created.
+Here's a function that returns the sum of its two arguments:
+\verb\lambda a, b: a+b\.  Lambda forms can be used wherever function
+objects are required.  They are syntactically restricted to a single
+expression.  Semantically, they are just syntactic sugar for a normal
+function definition.  Like nested function definitions, lambda forms
+cannot reference variables from the containing scope, but this can be
+overcome through the judicious use of default argument values, e.g.
+
+\begin{verbatim}
+        def make_incrementor(n):
+                return lambda(x, incr=n): x+incr
+\end{verbatim}
+
+\subsection{Map, Reduce and Filter}
+
+Three new built-in functions on sequences are good candidate to pass
+lambda forms.
+
+\subsubsection{Map.}
+
+\verb\map(function, sequence)\ calls \verb\function(item)\ for each of
+the sequence's items and returns a list of the return values.  For
+example, to compute some cubes:
+
+\begin{verbatim}
+        >>> map(lambda x: x*x*x, range(1, 11))
+        [1, 8, 27, 64, 125, 216, 343, 512, 729, 1000]
+        >>>
+\end{verbatim}
+
+More than one sequence may be passed; the function must then have as
+many arguments as there are sequences and is called with the
+corresponding item from each sequence (or \verb\None\ if some sequence
+is shorter than another).  If \verb\None\ is passed for the function,
+a function returning its argument(s) is substituted.
+
+Combining these two special cases, we see that
+\verb\map(None, list1, list2)\  is a convenient way of turning a pair
+of lists into a list of pairs.  For example:
+
+\begin{verbatim}
+        >>> seq = range(8)
+        >>> map(None, seq, map(lambda x: x*x, seq))
+        [(0, 0), (1, 1), (2, 4), (3, 9), (4, 16), (5, 25), (6, 36), (7, 49)]
+        >>> 
+\end{verbatim}
+
+\subsubsection{Filter.}
+
+\verb\filter(function, sequence)\ returns a sequence (of the same
+type, if possible) consisting of those items from the sequence for
+which \verb\function(item)\ is true.  For example, to compute some
+primes:
+
+\begin{verbatim}
+        >>> filter(lambda x: x%2 != 0 and x%3 != 0, range(2, 25))
+        [5, 7, 11, 13, 17, 19, 23]
+        >>>
+\end{verbatim}
+
+\subsubsection{Reduce.}
+
+\verb\reduce(function, sequence)\ returns a single value constructed
+by calling the (binary) function on the first two items of the
+sequence, then on the result and the next item, and so on.  For
+example, to compute the sum of the numbers 1 through 10:
+
+\begin{verbatim}
+        >>> reduce(lambda x, y: x+y, range(1, 11))
+        55
+        >>> 
+\end{verbatim}
+
+If there's only one item in the sequence, its value is returned; if
+the sequence is empty, an exception is raised.
+
+A third argument can be passed to indicate the starting value.  In this
+case the starting value is returned for an empty sequence, and the
+function is first applied to the starting value and the first sequence
+item, then to the result and the next item, and so on.  For example,
+
+\begin{verbatim}
+        >>> def sum(seq):
+        ...     return reduce(lambda x, y: x+y, seq, 0)
+        ... 
+        >>> sum(range(1, 11))
+        55
+        >>> sum([])
+        0
+        >>> 
+\end{verbatim}
+
+\section{Continuation Lines Without Backslashes}
+
+While the general mechanism for continuation of a source line on the
+next physical line remains to place a backslash on the end of the
+line, expressions inside matched parentheses (or square brackets, or
+curly braces) can now also be continued without using a backslash.
+This is particularly useful for calls to functions with many
+arguments, and for initializations of large tables.
+
+For example:
+
+\begin{verbatim}
+        month_names = ['Januari', 'Februari', 'Maart', 
+                       'April',   'Mei',      'Juni', 
+                       'Juli',    'Augustus', 'September',
+                       'Oktober', 'November', 'December']
+\end{verbatim}
+
+and
+
+\begin{verbatim}
+        CopyInternalHyperLinks(self.context.hyperlinks,
+                               copy.context.hyperlinks,
+                               uidremap)
+\end{verbatim}
+
+\section{Regular Expressions}
+
+While C's printf-style output formats, transformed into Python, are
+adequate for most output formatting jobs, C's scanf-style input
+formats are not very powerful.  Instead of scanf-style input, Python
+offers Emacs-style regular expressions as a powerful input and
+scanning mechanism.  Read the corresponding section in the Library
+Reference for a full description; here are some examples:
+
+XXX
+
+\section{Generalized Dictionaries}
+
+XXX keys can be numbers, tuples, some class instances
+
+XXX methods values(), items()
+
+\section{Miscellaneous New Built-in Functions}
+
+XXX vars()
+
+XXX compile()
+
+XXX exec()
+
+XXX hasattr()/getattr()/setattr()
+
+XXX hash(), id()
+
+XXX round()
 
 \end{document}
