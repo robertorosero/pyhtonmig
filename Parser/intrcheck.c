@@ -33,7 +33,11 @@ PERFORMANCE OF THIS SOFTWARE.
 
 #include "config.h"
 #include "myproto.h"
+#include "mymalloc.h" /* For ANY */
 #include "intrcheck.h"
+
+/* Copied here from ceval.h -- can't include that file. */
+int Py_AddPendingCall Py_PROTO((int (*func) Py_PROTO((ANY *)), ANY *arg));
 
 
 #ifdef QUICKWIN
@@ -137,6 +141,8 @@ PyErr_SetInterrupt()
 	interrupted = 1;
 }
 
+extern int sigcheck();
+
 /* ARGSUSED */
 static RETSIGTYPE
 #ifdef _M_IX86
@@ -161,6 +167,7 @@ intcatcher(sig)
 		break;
 	}
 	signal(SIGINT, intcatcher);
+	Py_AddPendingCall(sigcheck, NULL);
 }
 
 void

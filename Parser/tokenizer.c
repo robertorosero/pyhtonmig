@@ -303,13 +303,16 @@ tok_nextc(tok)
 				done = tok->inp[-1] == '\n';
 			}
 			tok->cur = tok->buf + cur;
+#ifndef macintosh
 			/* replace "\r\n" with "\n" */
+			/* For Mac we leave the \r, giving a syntax error */
 			pt = tok->inp - 2;
 			if (pt >= tok->buf && *pt == '\r') {
 				*pt++ = '\n';
 				*pt = '\0';
 				tok->inp = pt;
 			}
+#endif
 		}
 		if (tok->done != E_OK) {
 			if (tok->prompt != NULL)
@@ -538,9 +541,16 @@ tok_get(tok, p_start, p_end)
 	
 	/* Identifier (most frequent token!) */
 	if (isalpha(c) || c == '_') {
-		do {
+		switch (c) {
+		case 'r':
+		case 'R':
 			c = tok_nextc(tok);
-		} while (isalnum(c) || c == '_');
+			if (c == '"' || c == '\'')
+				goto letter_quote;
+		}
+		while (isalnum(c) || c == '_') {
+			c = tok_nextc(tok);
+		}
 		tok_backup(tok, c);
 		*p_start = tok->start;
 		*p_end = tok->cur;
@@ -557,6 +567,14 @@ tok_get(tok, p_start, p_end)
 		return NEWLINE;
 	}
 	
+#ifdef macintosh
+	if (c == '\r') {
+		fprintf(stderr, "File contains \\r characters (incorrect line endings?)\n");
+		tok->done = E_TOKEN;
+		tok->cur = tok->inp;
+		return ERRORTOKEN;
+	}
+#endif	
 	/* Period or number starting with period? */
 	if (c == '.') {
 		c = tok_nextc(tok);
@@ -640,9 +658,11 @@ tok_get(tok, p_start, p_end)
 		*p_end = tok->cur;
 		return NUMBER;
 	}
-	
+
+  letter_quote:
 	/* String */
 	if (c == '\'' || c == '"') {
+		char *quote2 = tok->cur+1;
 		int quote = c;
 		int triple = 0;
 		int tripcount = 0;
@@ -663,7 +683,7 @@ tok_get(tok, p_start, p_end)
 			}
 			else if (c == quote) {
 				tripcount++;
-				if (tok->cur == tok->start+2) {
+				if (tok->cur == quote2) {
 					c = tok_nextc(tok);
 					if (c == quote) {
 						triple = 1;
@@ -736,7 +756,7 @@ tok_get(tok, p_start, p_end)
 }
 
 
-#ifdef DEBUG
+#ifdef Py_DEBUG
 
 void
 tok_dump(type, start, end)
