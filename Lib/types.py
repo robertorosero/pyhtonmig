@@ -6,8 +6,8 @@ Types that are part of optional modules (e.g. array) are not listed.
 import sys
 
 NoneType = type(None)
-TypeType = type(NoneType)
-ObjectType = NoneType.__bases__[0]
+TypeType = type
+ObjectType = object
 
 IntType = type(0)
 LongType = type(0L)
@@ -22,8 +22,8 @@ UnicodeType = type(u'')
 BufferType = type(buffer(''))
 
 TupleType = type(())
-ListType = type([])
-DictType = DictionaryType = type({})
+ListType = list
+DictType = DictionaryType = dictionary
 
 def _f(): pass
 FunctionType = type(_f)
