@@ -13,6 +13,7 @@ from types import ListType, StringType
 from cStringIO import StringIO
 
 from email.Header import Header
+from email.Parser import NLCRE
 
 try:
     from email._compat22 import _isstring
@@ -259,6 +260,14 @@ class Generator:
         # Write out any preamble
         if msg.preamble is not None:
             self._fp.write(msg.preamble)
+            # If preamble is the empty string, the length of the split will be
+            # 1, but the last element will be the empty string.  If it's
+            # anything else but does not end in a line separator, the length
+            # will be > 1 and not end in an empty string.  We need to
+            # guarantee a newline after the preamble, but don't add too many.
+            plines = NLCRE.split(msg.preamble)
+            if plines <> [''] and plines[-1] <> '':
+                self._fp.write('\n')
         # First boundary is a bit different; it doesn't have a leading extra
         # newline.
         print >> self._fp, '--' + boundary
