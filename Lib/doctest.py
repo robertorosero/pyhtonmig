@@ -1,6 +1,6 @@
 # Module doctest.
 # Released to the public domain 16-Jan-2001, by Tim Peters (tim@python.org).
-# Significant enhancements by:
+# Major enhancements and refactoring by:
 #     Jim Fulton
 #     Edward Loper
 
@@ -329,6 +329,26 @@ OPTIONFLAGS_BY_NAME = {
 # Special string markers for use in `want` strings:
 BLANKLINE_MARKER = '<BLANKLINE>'
 ELLIPSIS_MARKER = '...'
+
+
+# There are 4 basic classes:
+#  - Example: a <source, want> pair, plus an intra-docstring line number.
+#  - DocTest: a collection of examples, parsed from a docstring, plus
+#    info about where the docstring came from (name, filename, lineno).
+#  - DocTestFinder: extracts DocTests from a given object's docstring and
+#    its contained objects' docstrings.
+#  - DocTestRunner: runs DocTest cases, and accumulates statistics.
+#
+# So the basic picture is:
+#
+#                             list of:
+# +------+                   +---------+                   +-------+
+# |object| --DocTestFinder-> | DocTest | --DocTestRunner-> |results|
+# +------+                   +---------+                   +-------+
+#                            | Example |
+#                            |   ...   |
+#                            | Example |
+#                            +---------+
 
 ######################################################################
 ## Table of Contents
