@@ -644,7 +644,7 @@ regexp_t bufp;
 		  }
 		if (range)
 		  {
-		    for (a = prev; a <= ch; a++)
+		    for (a = prev; a <= (int)ch; a++)
 		      SETBIT(pattern, offset, a);
 		    prev = -1;
 		    range = 0;
