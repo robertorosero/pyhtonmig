@@ -375,6 +375,8 @@ Tests
 
 - Added test_posix.py, a test suite for the posix module.
 
+- Added test_hexoct.py, a test suite for hex/oct constant folding.
+
 Windows
 -------
 
