@@ -119,7 +119,7 @@ def dicts():
     for i in dictionary.__iter__(d): l.append(i)
     verify(l == l1)
     testunop({1:2,3:4}, 2, "len(a)", "__len__")
-    testunop({1:2,3:4}, "{3: 4, 1: 2}", "repr(a)", "__repr__")
+    testunop({1:2,3:4}, "{1: 2, 3: 4}", "repr(a)", "__repr__")
     testset2op({1:2,3:4}, 2, 3, {1:2,2:3,3:4}, "a[b]=c", "__setitem__")
 
 binops = {
@@ -280,7 +280,7 @@ def spamdicts():
     for i in type(spamdict({})).__iter__(d): l.append(i)
     verify(l == l1)
     testunop(spamdict({1:2,3:4}), 2, "len(a)", "__len__")
-    testunop(spamdict({1:2,3:4}), "{3: 4, 1: 2}", "repr(a)", "__repr__")
+    testunop(spamdict({1:2,3:4}), "{1: 2, 3: 4}", "repr(a)", "__repr__")
     testset2op(spamdict({1:2,3:4}), 2, 3, spamdict({1:2,2:3,3:4}),
                "a[b]=c", "__setitem__")
     # Test subclassing

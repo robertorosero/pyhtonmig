@@ -262,8 +262,23 @@ Merge issues:
 + Tried only on Windows; Unix build may not even compile.
 
 + New std test failures (again on Windows):
+
       test_descr.py
+          Two shallow test errors were fixed (relying on exact order of
+          dict traversal -- for that matter, it still does, but now the
+          correct exact order <wink>).
+          Now dies with a memory error right after
+              Testing Python subclass of dict...
+          I expect this is a merge glitch that slipped past me.
+
       test_generators.py
+          All of the computational tests pass.
+          It's failing because attempting to assign to the .gi_running attr
+          of a generator-iterator object was expected to raise
+              TypeError: object has read-only attributes
+          but is now raising
+              AttributeError: 'generator' object has no attribute 'gi_running'
+          How generator-iterators define attributes should be reworked.
 
 + If some non-Windows test has an expected-output file in descr-branch
   that has been removed on the trunk since descr-fork, it will probably
