@@ -16,6 +16,8 @@ for machine-independent changes. Changes that are new in 2.2b2 are flagged as su
   This is an experimental feature; again: feedback is requested.
 - Command-dot handling has been improved a lot: scripts are now much easier to interrupt,
   and they only scan for cmd-. while in the foreground. [2.2b2]
+- "Copy" from the MacPython console window was always disabled. Fixed. [2.2b2]
+- This release should run on MacOS 8.1 again. [2.2b2 build 116]
 - A new, rather different GUSI I/O library is used. Please report any strange behaviour
   with I/O to the pythonmac-sig mailing list! [2.2b2]
 - There is a new module macresource which makes it easier to open a resource file
