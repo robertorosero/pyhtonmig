@@ -831,6 +831,8 @@ PyErr_PrintEx(int set_sys_last_vars)
 		handle_system_exit();
 	}
 	PyErr_Fetch(&exception, &v, &tb);
+	if (exception == NULL)
+		return;
 	PyErr_NormalizeException(&exception, &v, &tb);
 	if (exception == NULL)
 		return;
@@ -1095,6 +1097,7 @@ PyParser_ASTFromFile(FILE *fp, const char *filename, int start, char *ps1,
 {
 	node *n;
 	perrdetail err;
+	fprintf(stderr, "filename=%s\n", filename);
 	n = PyParser_ParseFileFlags(fp, filename, &_PyParser_Grammar, start, 
 				    ps1, ps2, &err, flags);
 	if (n)
@@ -1154,12 +1157,6 @@ err_input(perrdetail *err)
 	PyObject *v, *w, *errtype;
 	char *msg = NULL;
 	errtype = PyExc_SyntaxError;
-	v = Py_BuildValue("(ziiz)", err->filename,
-			    err->lineno, err->offset, err->text);
-	if (err->text != NULL) {
-		PyMem_DEL(err->text);
-		err->text = NULL;
-	}
 	switch (err->error) {
 	case E_SYNTAX:
 		errtype = PyExc_IndentationError;
@@ -1203,10 +1200,21 @@ err_input(perrdetail *err)
 		errtype = PyExc_IndentationError;
 		msg = "too many levels of indentation";
 		break;
-	default:
-		fprintf(stderr, "error=%d\n", err->error);
-		msg = "unknown parsing error";
+	default: {
+		char buf[256];
+		sprintf(buf, "unknown parsing error=%d\n", err->error);
+		Py_FatalError(buf);
+		/* If the error code is bogus, who knows what the state
+		   of the rest of err is.
+		*/
 		break;
+		}
+	}
+	v = Py_BuildValue("(ziiz)", err->filename,
+			  err->lineno, err->offset, err->text);
+ 	if (err->text != NULL) {
+		PyMem_DEL(err->text);
+		err->text = NULL;
 	}
 	w = Py_BuildValue("(sO)", msg, v);
 	Py_XDECREF(v);
