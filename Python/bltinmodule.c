@@ -9,10 +9,6 @@
 
 #include <ctype.h>
 
-#ifdef HAVE_UNISTD_H
-#include <unistd.h>
-#endif
-
 #ifdef RISCOS
 #include "unixstuff.h"
 #endif
@@ -108,6 +104,26 @@ static char apply_doc[] =
 Call a callable object with positional arguments taken from the tuple args,\n\
 and keyword arguments taken from the optional dictionary kwargs.\n\
 Note that classes are callable, as are instances with a __call__() method.";
+
+
+static PyObject *
+builtin_bool(PyObject *self, PyObject *x)
+{
+	long b = PyObject_IsTrue(x);
+	if (b < 0)
+		return NULL;
+	if (b)
+		x = Py_True;
+	else
+		x = Py_False;
+	Py_INCREF(x);
+	return x;
+}
+
+static char bool_doc[] =
+"bool(x) -> integer\n\
+\n\
+Normalize Boolean: return True (1) when x is true, False (0) otherwise.";
 
 
 static PyObject *
@@ -251,11 +267,11 @@ Fail_it:
 }
 
 static char filter_doc[] =
-"filter(function, sequence) -> list\n\
-\n\
-Return a list containing those items of sequence for which function(item)\n\
-is true.  If function is None, return a list of items that are true.";
-
+"filter(function or None, sequence) -> list, tuple, or string\n"
+"\n"
+"Return those items of sequence for which function(item) is true.  If\n"
+"function is None, return the items that are true.  If sequence is a tuple\n"
+"or string, return the same type, else return a list.";
 
 static PyObject *
 builtin_chr(PyObject *self, PyObject *args)
@@ -285,44 +301,11 @@ static PyObject *
 builtin_unichr(PyObject *self, PyObject *args)
 {
 	long x;
-	Py_UNICODE s[2];
 
 	if (!PyArg_ParseTuple(args, "l:unichr", &x))
 		return NULL;
 
-#ifdef Py_UNICODE_WIDE
-	if (x < 0 || x > 0x10ffff) {
-		PyErr_SetString(PyExc_ValueError,
-				"unichr() arg not in range(0x110000) "
-				"(wide Python build)");
-		return NULL;
-	}
-#else
-	if (x < 0 || x > 0xffff) {
-		PyErr_SetString(PyExc_ValueError,
-				"unichr() arg not in range(0x10000) "
-				"(narrow Python build)");
-		return NULL;
-	}
-#endif
-
-	if (x <= 0xffff) {
-		/* UCS-2 character */
-		s[0] = (Py_UNICODE) x;
-		return PyUnicode_FromUnicode(s, 1);
-	}
-	else {
-#ifndef Py_UNICODE_WIDE
-		/* UCS-4 character.  store as two surrogate characters */
-		x -= 0x10000L;
-		s[0] = 0xD800 + (Py_UNICODE) (x >> 10);
-		s[1] = 0xDC00 + (Py_UNICODE) (x & 0x03FF);
-		return PyUnicode_FromUnicode(s, 2);
-#else
-		s[0] = (Py_UNICODE)x;
-		return PyUnicode_FromUnicode(s, 1);
-#endif
-	}
+	return PyUnicode_FromOrdinal(x);
 }
 
 static char unichr_doc[] =
@@ -595,7 +578,7 @@ builtin_execfile(PyObject *self, PyObject *args)
         }
 
 	if (!exists) {
-		PyErr_SetFromErrno(PyExc_IOError);
+		PyErr_SetFromErrnoWithFilename(PyExc_IOError, filename);
 		return NULL;
 	}
 	cf.cf_flags = 0;
@@ -1777,6 +1760,7 @@ static PyMethodDef builtin_methods[] = {
  	{"__import__",	builtin___import__, METH_VARARGS, import_doc},
  	{"abs",		builtin_abs,        METH_O, abs_doc},
  	{"apply",	builtin_apply,      METH_VARARGS, apply_doc},
+	{"bool",	builtin_bool, 	    METH_O, bool_doc},
  	{"buffer",	builtin_buffer,     METH_VARARGS, buffer_doc},
  	{"callable",	builtin_callable,   METH_O, callable_doc},
  	{"chr",		builtin_chr,        METH_VARARGS, chr_doc},
@@ -1848,6 +1832,8 @@ _PyBuiltin_Init(void)
 	SETBUILTIN("None",		Py_None);
 	SETBUILTIN("Ellipsis",		Py_Ellipsis);
 	SETBUILTIN("NotImplemented",	Py_NotImplemented);
+	SETBUILTIN("True",		Py_True);
+	SETBUILTIN("False",		Py_False);
 	SETBUILTIN("classmethod",	&PyClassMethod_Type);
 #ifndef WITHOUT_COMPLEX
 	SETBUILTIN("complex",		&PyComplex_Type);
@@ -1981,8 +1967,8 @@ filterstring(PyObject *func, PyObject *strobj)
 		Py_DECREF(item);
 	}
 
-	if (j < len && _PyString_Resize(&result, j) < 0)
-		return NULL;
+	if (j < len)
+		_PyString_Resize(&result, j);
 
 	return result;
 

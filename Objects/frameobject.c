@@ -56,9 +56,15 @@ static PyGetSetDef frame_getsetlist[] = {
    After all, while a typical program may make millions of calls, a
    call depth of more than 20 or 30 is probably already exceptional
    unless the program contains run-away recursion.  I hope.
+
+   Later, MAXFREELIST was added to bound the # of frames saved on
+   free_list.  Else programs creating lots of cyclic trash involving
+   frames could provoke free_list into growing without bound.
 */
 
 static PyFrameObject *free_list = NULL;
+static int numfree = 0;		/* number of frames currently in free_list */
+#define MAXFREELIST 200		/* max value for numfree */
 
 static void
 frame_dealloc(PyFrameObject *f)
@@ -67,8 +73,8 @@ frame_dealloc(PyFrameObject *f)
 	PyObject **fastlocals;
 	PyObject **p;
 
+ 	PyObject_GC_UnTrack(f);
 	Py_TRASHCAN_SAFE_BEGIN(f)
-	_PyObject_GC_UNTRACK(f);
 	/* Kill all local variables */
 	slots = f->f_nlocals + f->f_ncells + f->f_nfreevars;
 	fastlocals = f->f_localsplus;
@@ -91,8 +97,13 @@ frame_dealloc(PyFrameObject *f)
 	Py_XDECREF(f->f_exc_type);
 	Py_XDECREF(f->f_exc_value);
 	Py_XDECREF(f->f_exc_traceback);
-	f->f_back = free_list;
-	free_list = f;
+	if (numfree < MAXFREELIST) {
+		++numfree;
+		f->f_back = free_list;
+		free_list = f;
+	}
+	else
+		PyObject_GC_Del(f);
 	Py_TRASHCAN_SAFE_END(f)
 }
 
@@ -245,6 +256,8 @@ PyFrame_New(PyThreadState *tstate, PyCodeObject *code, PyObject *globals,
 			return NULL;
 	}
 	else {
+		assert(numfree > 0);
+		--numfree;
 		f = free_list;
 		free_list = free_list->f_back;
 		if (f->ob_size < extras) {
@@ -252,8 +265,6 @@ PyFrame_New(PyThreadState *tstate, PyCodeObject *code, PyObject *globals,
 			if (f == NULL)
 				return NULL;
 		}
-		else
-			extras = f->ob_size;
 		_Py_NewReference((PyObject *)f);
 	}
 	if (builtins == NULL) {
@@ -304,10 +315,10 @@ PyFrame_New(PyThreadState *tstate, PyCodeObject *code, PyObject *globals,
 	f->f_ncells = ncells;
 	f->f_nfreevars = nfrees;
 
-	while (--extras >= 0)
-		f->f_localsplus[extras] = NULL;
+	extras = f->f_nlocals + ncells + nfrees;
+	memset(f->f_localsplus, 0, extras * sizeof(f->f_localsplus[0]));
 
-	f->f_valuestack = f->f_localsplus + (f->f_nlocals + ncells + nfrees);
+	f->f_valuestack = f->f_localsplus + extras;
 	f->f_stacktop = f->f_valuestack;
 	_PyObject_GC_TRACK(f);
 	return f;
@@ -403,8 +414,6 @@ PyFrame_FastToLocals(PyFrameObject *f)
 			return;
 		}
 	}
-	if (f->f_nlocals == 0)
-		return;
 	map = f->f_code->co_varnames;
 	if (!PyDict_Check(locals) || !PyTuple_Check(map))
 		return;
@@ -413,7 +422,8 @@ PyFrame_FastToLocals(PyFrameObject *f)
 	j = PyTuple_Size(map);
 	if (j > f->f_nlocals)
 		j = f->f_nlocals;
-	map_to_dict(map, j, locals, fast, 0);
+	if (f->f_nlocals)
+	    map_to_dict(map, j, locals, fast, 0);
 	if (f->f_ncells || f->f_nfreevars) {
 		if (!(PyTuple_Check(f->f_code->co_cellvars)
 		      && PyTuple_Check(f->f_code->co_freevars))) {
@@ -442,7 +452,7 @@ PyFrame_LocalsToFast(PyFrameObject *f, int clear)
 		return;
 	locals = f->f_locals;
 	map = f->f_code->co_varnames;
-	if (locals == NULL || f->f_code->co_nlocals == 0)
+	if (locals == NULL)
 		return;
 	if (!PyDict_Check(locals) || !PyTuple_Check(map))
 		return;
@@ -451,7 +461,8 @@ PyFrame_LocalsToFast(PyFrameObject *f, int clear)
 	j = PyTuple_Size(map);
 	if (j > f->f_nlocals)
 		j = f->f_nlocals;
-	dict_to_map(f->f_code->co_varnames, j, locals, fast, 0, clear);
+	if (f->f_nlocals)
+	    dict_to_map(f->f_code->co_varnames, j, locals, fast, 0, clear);
 	if (f->f_ncells || f->f_nfreevars) {
 		if (!(PyTuple_Check(f->f_code->co_cellvars)
 		      && PyTuple_Check(f->f_code->co_freevars)))
@@ -475,5 +486,7 @@ PyFrame_Fini(void)
 		PyFrameObject *f = free_list;
 		free_list = free_list->f_back;
 		PyObject_GC_Del(f);
+		--numfree;
 	}
+	assert(numfree == 0);
 }

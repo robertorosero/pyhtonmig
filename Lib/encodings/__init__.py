@@ -53,10 +53,17 @@ def search_function(encoding):
         # cache misses
         _cache[encoding] = None
         return None
+
+    try:
+        getregentry = mod.getregentry
+    except AttributeError:
+        # Not a codec module
+        _cache[encoding] = None
+        return None
     
     # Now ask the module for the registry entry
     try:
-        entry = tuple(mod.getregentry())
+        entry = tuple(getregentry())
     except AttributeError:
         entry = ()
     if len(entry) != 4:

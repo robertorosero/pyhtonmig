@@ -14,7 +14,9 @@ def basic(src):
     verify(L == [r'Commented Bar',
                  r'Foo Bar',
                  r'Internationalized Stuff',
+                 r'Long Line',
                  r'Section\with$weird%characters[' '\t',
+                 r'Spaces',
                  r'Spacey Bar',
                  ],
            "unexpected list of section names")
@@ -25,6 +27,8 @@ def basic(src):
     verify(cf.get('Foo Bar', 'foo', raw=1) == 'bar')
     verify(cf.get('Spacey Bar', 'foo', raw=1) == 'bar')
     verify(cf.get('Commented Bar', 'foo', raw=1) == 'bar')
+    verify(cf.get('Spaces', 'key with spaces', raw=1) == 'value')
+    verify(cf.get('Spaces', 'another with spaces', raw=1) == 'splat!')
 
     verify('__name__' not in cf.options("Foo Bar"),
            '__name__ "option" should not be exposed by the API!')
@@ -47,6 +51,25 @@ def basic(src):
             "remove_option() failed to report non-existance of option"
             " that never existed")
 
+    verify(cf.get('Long Line', 'foo', raw=1) ==
+           'this line is much, much longer than my editor\nlikes it.')
+
+
+def write(src):
+    print "Testing writing of files..."
+    cf = ConfigParser.ConfigParser()
+    sio = StringIO.StringIO(src)
+    cf.readfp(sio)
+    output = StringIO.StringIO()
+    cf.write(output)
+    verify(output, """[DEFAULT]
+foo = another very
+        long line
+
+[Long Line]
+foo = this line is much, much longer than my editor
+        likes it.
+""")
 
 def case_sensitivity():
     print "Testing case sensitivity..."
@@ -76,6 +99,11 @@ def case_sensitivity():
     cf.readfp(sio)
     verify(cf.options("MySection") == ["option"])
     verify(cf.get("MySection", "Option") == "first line\nsecond line")
+
+    # SF bug #561822:
+    cf = ConfigParser.ConfigParser(defaults={"key":"value"})
+    cf.readfp(StringIO.StringIO("[section]\nnekey=nevalue\n"))
+    verify(cf.has_option("section", "Key"))
 
 
 def boolean(src):
@@ -191,13 +219,25 @@ foo=bar
 foo = bar
 [Commented Bar]
 foo: bar ; comment
+[Long Line]
+foo: this line is much, much longer than my editor
+   likes it.
 [Section\with$weird%characters[""" '\t' r"""]
 [Internationalized Stuff]
 foo[bg]: Bulgarian
 foo=Default
 foo[en]=English
 foo[de]=Deutsch
+[Spaces]
+key with spaces : value
+another with spaces = splat!
 """)
+write("""[Long Line]
+foo: this line is much, much longer than my editor
+   likes it.
+[DEFAULT]
+foo: another very
+ long line""")
 case_sensitivity()
 boolean(r"""
 [BOOLTEST]

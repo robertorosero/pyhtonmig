@@ -2,6 +2,11 @@
 
 from test_support import verify, vereq, verbose, TestFailed, TESTFN
 from copy import deepcopy
+import warnings
+
+warnings.filterwarnings("ignore",
+         r'complex divmod\(\), // and % are deprecated$',
+         DeprecationWarning, r'(<string>|test_descr)$')
 
 def veris(a, b):
     if a is not b:
@@ -360,6 +365,26 @@ def test_dir():
     # object.
     vereq(dir(None), dir(Ellipsis))
 
+    # Nasty test case for proxied objects
+    class Wrapper(object):
+        def __init__(self, obj):
+            self.__obj = obj
+        def __repr__(self):
+            return "Wrapper(%s)" % repr(self.__obj)
+        def __getitem__(self, key):
+            return Wrapper(self.__obj[key])
+        def __len__(self):
+            return len(self.__obj)
+        def __getattr__(self, name):
+            return Wrapper(getattr(self.__obj, name))
+
+    class C(object):
+        def __getclass(self):
+            return Wrapper(type(self))
+        __class__ = property(__getclass)
+
+    dir(C()) # This used to segfault
+
 binops = {
     'add': '+',
     'sub': '-',
@@ -426,6 +451,19 @@ def numops(a, b, skip=[]):
 def ints():
     if verbose: print "Testing int operations..."
     numops(100, 3)
+    # The following crashes in Python 2.2
+    vereq((1).__nonzero__(), 1)
+    vereq((0).__nonzero__(), 0)
+    # This returns 'NotImplemented' in Python 2.2
+    class C(int):
+        def __add__(self, other):
+            return NotImplemented
+    try:
+        C() + ""
+    except TypeError:
+        pass
+    else:
+        raise TestFailed, "NotImplemented should have caused TypeError"
 
 def longs():
     if verbose: print "Testing long operations..."
@@ -1055,6 +1093,30 @@ def slots():
     del x
     vereq(Counted.counter, 0)
 
+    # Test cyclical leaks [SF bug 519621]
+    class F(object):
+        __slots__ = ['a', 'b']
+    log = []
+    s = F()
+    s.a = [Counted(), s]
+    vereq(Counted.counter, 1)
+    s = None
+    import gc
+    gc.collect()
+    vereq(Counted.counter, 0)
+
+    # Test lookup leaks [SF bug 572567]
+    import sys,gc
+    class G(object):
+        def __cmp__(self, other):
+            return 0
+    g = G()
+    orig_objects = len(gc.get_objects())
+    for i in xrange(10):
+        g==g
+    new_objects = len(gc.get_objects())
+    vereq(orig_objects, new_objects)
+
 def dynamics():
     if verbose: print "Testing class attribute propagation..."
     class D(object):
@@ -1195,6 +1257,19 @@ def classmethods():
     vereq(d.goo(1), (D, 1))
     vereq(d.foo(1), (d, 1))
     vereq(D.foo(d, 1), (d, 1))
+    # Test for a specific crash (SF bug 528132)
+    def f(cls, arg): return (cls, arg)
+    ff = classmethod(f)
+    vereq(ff.__get__(0, int)(42), (int, 42))
+    vereq(ff.__get__(0)(42), (int, 42))
+
+    # Test super() with classmethods (SF bug 535444)
+    veris(C.goo.im_self, C)
+    veris(D.goo.im_self, D)
+    veris(super(D,D).goo.im_self, D)
+    veris(super(D,d).goo.im_self, D)
+    vereq(super(D,D).goo(), (D,))
+    vereq(super(D,d).goo(), (D,))
 
 def staticmethods():
     if verbose: print "Testing static methods..."
@@ -1238,13 +1313,16 @@ def compattr():
     if verbose: print "Testing computed attributes..."
     class C(object):
         class computed_attribute(object):
-            def __init__(self, get, set=None):
+            def __init__(self, get, set=None, delete=None):
                 self.__get = get
                 self.__set = set
+                self.__delete = delete
             def __get__(self, obj, type=None):
                 return self.__get(obj)
             def __set__(self, obj, value):
                 return self.__set(obj, value)
+            def __delete__(self, obj):
+                return self.__delete(obj)
         def __init__(self):
             self.__x = 0
         def __get_x(self):
@@ -1253,13 +1331,17 @@ def compattr():
             return x
         def __set_x(self, x):
             self.__x = x
-        x = computed_attribute(__get_x, __set_x)
+        def __delete_x(self):
+            del self.__x
+        x = computed_attribute(__get_x, __set_x, __delete_x)
     a = C()
     vereq(a.x, 0)
     vereq(a.x, 1)
     a.x = 10
     vereq(a.x, 10)
     vereq(a.x, 11)
+    del a.x
+    vereq(hasattr(a, 'x'), 0)
 
 def newslot():
     if verbose: print "Testing __new__ slot override..."
@@ -1572,8 +1654,8 @@ def properties():
     verify(not hasattr(a, "_C__x"))
     C.x.__set__(a, 100)
     vereq(C.x.__get__(a), 100)
-##    C.x.__set__(a)
-##    verify(not hasattr(a, "x"))
+    C.x.__delete__(a)
+    verify(not hasattr(a, "x"))
 
     raw = C.__dict__['x']
     verify(isinstance(raw, property))
@@ -1747,6 +1829,11 @@ def inherits():
     a = longclone(1)
     verify((a + 0).__class__ is long)
     verify((0 + a).__class__ is long)
+
+    # Check that negative clones don't segfault
+    a = longclone(-1)
+    vereq(a.__dict__, {})
+    vereq(long(a), -1)  # verify PyNumber_Long() copies the sign bit
 
     class precfloat(float):
         __slots__ = ['prec']
@@ -2293,6 +2380,12 @@ def setclass():
             pass
         else:
             raise TestFailed, "shouldn't allow %r.__class__ = %r" % (x, C)
+        try:
+            delattr(x, "__class__")
+        except TypeError:
+            pass
+        else:
+            raise TestFailed, "shouldn't allow del %r.__class__" % x
     cant(C(), list)
     cant(list(), C)
     cant(C(), 1)
@@ -2432,6 +2525,94 @@ def pickles():
         print "a = x =", a
         print "b = y =", b
 
+def pickleslots():
+    if verbose: print "Testing pickling of classes with __slots__ ..."
+    import pickle, cPickle
+    # Pickling of classes with __slots__ but without __getstate__ should fail
+    global B, C, D, E
+    class B(object):
+        pass
+    for base in [object, B]:
+        class C(base):
+            __slots__ = ['a']
+        class D(C):
+            pass
+        try:
+            pickle.dumps(C())
+        except TypeError:
+            pass
+        else:
+            raise TestFailed, "should fail: pickle C instance - %s" % base
+        try:
+            cPickle.dumps(C())
+        except TypeError:
+            pass
+        else:
+            raise TestFailed, "should fail: cPickle C instance - %s" % base
+        try:
+            pickle.dumps(C())
+        except TypeError:
+            pass
+        else:
+            raise TestFailed, "should fail: pickle D instance - %s" % base
+        try:
+            cPickle.dumps(D())
+        except TypeError:
+            pass
+        else:
+            raise TestFailed, "should fail: cPickle D instance - %s" % base
+        # Give C a __getstate__ and __setstate__
+        class C(base):
+            __slots__ = ['a']
+            def __getstate__(self):
+                try:
+                    d = self.__dict__.copy()
+                except AttributeError:
+                    d = {}
+                try:
+                    d['a'] = self.a
+                except AttributeError:
+                    pass
+                return d
+            def __setstate__(self, d):
+                for k, v in d.items():
+                    setattr(self, k, v)
+        class D(C):
+            pass
+        # Now it should work
+        x = C()
+        y = pickle.loads(pickle.dumps(x))
+        vereq(hasattr(y, 'a'), 0)
+        y = cPickle.loads(cPickle.dumps(x))
+        vereq(hasattr(y, 'a'), 0)
+        x.a = 42
+        y = pickle.loads(pickle.dumps(x))
+        vereq(y.a, 42)
+        y = cPickle.loads(cPickle.dumps(x))
+        vereq(y.a, 42)
+        x = D()
+        x.a = 42
+        x.b = 100
+        y = pickle.loads(pickle.dumps(x))
+        vereq(y.a + y.b, 142)
+        y = cPickle.loads(cPickle.dumps(x))
+        vereq(y.a + y.b, 142)
+        # But a subclass that adds a slot should not work
+        class E(C):
+            __slots__ = ['b']
+        try:
+            pickle.dumps(E())
+        except TypeError:
+            pass
+        else:
+            raise TestFailed, "should fail: pickle E instance - %s" % base
+        try:
+            cPickle.dumps(E())
+        except TypeError:
+            pass
+        else:
+            raise TestFailed, "should fail: cPickle E instance - %s" % base
+
 def copies():
     if verbose: print "Testing copy.copy() and copy.deepcopy()..."
     import copy
@@ -2542,6 +2723,16 @@ def subclasspropagation():
         pass
     else:
         raise TestFailed, "d.foo should be undefined now"
+
+    # Test a nasty bug in recurse_down_subclasses()
+    import gc
+    class A(object):
+        pass
+    class B(A):
+        pass
+    del B
+    gc.collect()
+    A.__setitem__ = lambda *a: None # crash
 
 def buffer_inherit():
     import binascii
@@ -2702,8 +2893,150 @@ def strops():
     vereq('%c' % 5, '\x05')
     vereq('%c' % '5', '5')
 
+def deepcopyrecursive():
+    if verbose: print "Testing deepcopy of recursive objects..."
+    class Node:
+        pass
+    a = Node()
+    b = Node()
+    a.b = b
+    b.a = a
+    z = deepcopy(a) # This blew up before
 
+def modules():
+    if verbose: print "Testing uninitialized module objects..."
+    from types import ModuleType as M
+    m = M.__new__(M)
+    str(m)
+    vereq(hasattr(m, "__name__"), 0)
+    vereq(hasattr(m, "__file__"), 0)
+    vereq(hasattr(m, "foo"), 0)
+    vereq(m.__dict__, None)
+    m.foo = 1
+    vereq(m.__dict__, {"foo": 1})
 
+def docdescriptor():
+    # SF bug 542984
+    if verbose: print "Testing __doc__ descriptor..."
+    class DocDescr(object):
+        def __get__(self, object, otype):
+            if object:
+                object = object.__class__.__name__ + ' instance'
+            if otype:
+                otype = otype.__name__
+            return 'object=%s; type=%s' % (object, otype)
+    class OldClass:
+        __doc__ = DocDescr()
+    class NewClass(object):
+        __doc__ = DocDescr()
+    vereq(OldClass.__doc__, 'object=None; type=OldClass')
+    vereq(OldClass().__doc__, 'object=OldClass instance; type=OldClass')
+    vereq(NewClass.__doc__, 'object=None; type=NewClass')
+    vereq(NewClass().__doc__, 'object=NewClass instance; type=NewClass')
+
+def imulbug():
+    # SF bug 544647
+    if verbose: print "Testing for __imul__ problems..."
+    class C(object):
+        def __imul__(self, other):
+            return (self, other)
+    x = C()
+    y = x
+    y *= 1.0
+    vereq(y, (x, 1.0))
+    y = x
+    y *= 2
+    vereq(y, (x, 2))
+    y = x
+    y *= 3L
+    vereq(y, (x, 3L))
+    y = x
+    y *= 1L<<100
+    vereq(y, (x, 1L<<100))
+    y = x
+    y *= None
+    vereq(y, (x, None))
+    y = x
+    y *= "foo"
+    vereq(y, (x, "foo"))
+
+def copy_setstate():
+    if verbose:
+        print "Testing that copy.*copy() correctly uses __setstate__..."
+    import copy
+    class C(object):
+        def __init__(self, foo=None):
+            self.foo = foo
+            self.__foo = foo
+        def setfoo(self, foo=None):
+            self.foo = foo
+        def getfoo(self):
+            return self.__foo
+        def __getstate__(self):
+            return [self.foo]
+        def __setstate__(self, lst):
+            assert len(lst) == 1
+            self.__foo = self.foo = lst[0]
+    a = C(42)
+    a.setfoo(24)
+    vereq(a.foo, 24)
+    vereq(a.getfoo(), 42)
+    b = copy.copy(a)
+    vereq(b.foo, 24)
+    vereq(b.getfoo(), 24)
+    b = copy.deepcopy(a)
+    vereq(b.foo, 24)
+    vereq(b.getfoo(), 24)
+
+def subtype_resurrection():
+    if verbose:
+        print "Testing resurrection of new-style instance..."
+
+    class C(object):
+        container = []
+
+        def __del__(self):
+            # resurrect the instance
+            C.container.append(self)
+
+    c = C()
+    c.attr = 42
+    # The most interesting thing here is whether this blows up, due to flawed
+    #  GC tracking logic in typeobject.c's call_finalizer() (a 2.2.1 bug).
+    del c
+
+    # If that didn't blow up, it's also interesting to see whether clearing
+    # the last container slot works:  that will attempt to delete c again,
+    # which will cause c to get appended back to the container again "during"
+    # the del.
+    del C.container[-1]
+    vereq(len(C.container), 1)
+    vereq(C.container[-1].attr, 42)
+
+    # Make c mortal again, so that the test framework with -l doesn't report
+    # it as a leak.
+    del C.__del__
+
+def funnynew():
+    if verbose: print "Testing __new__ returning something unexpected..."
+    class C(object):
+        def __new__(cls, arg):
+            if isinstance(arg, str): return [1, 2, 3]
+            elif isinstance(arg, int): return object.__new__(D)
+            else: return object.__new__(cls)
+    class D(C):
+        def __init__(self, arg):
+            self.foo = arg
+    vereq(C("1"), [1, 2, 3])
+    vereq(D("1"), [1, 2, 3])
+    d = D(None)
+    veris(d.foo, None)
+    d = C(1)
+    vereq(isinstance(d, D), True)
+    vereq(d.foo, 1)
+    d = D(1)
+    vereq(isinstance(d, D), True)
+    vereq(d.foo, 1)
 
 def test_main():
     class_docstrings()
@@ -2759,6 +3092,14 @@ def test_main():
     delhook()
     hashinherit()
     strops()
+    deepcopyrecursive()
+    modules()
+    pickleslots()
+    docdescriptor()
+    imulbug()
+    copy_setstate()
+    subtype_resurrection()
+    funnynew()
     if verbose: print "All OK"
 
 if __name__ == "__main__":

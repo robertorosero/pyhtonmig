@@ -75,6 +75,7 @@ class bdist_dumb (Command):
 
         install = self.reinitialize_command('install', reinit_subcommands=1)
         install.root = self.bdist_dir
+        install.warn_dir = 0
 
         self.announce("installing to %s" % self.bdist_dir)
         self.run_command('install')

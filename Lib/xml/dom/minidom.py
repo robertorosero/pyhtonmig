@@ -584,10 +584,11 @@ class Element(Node):
         return self._attrsNS.has_key((namespaceURI, localName))
 
     def getElementsByTagName(self, name):
-        return _getElementsByTagNameHelper(self, name, [])
+        return _getElementsByTagNameHelper(self, name, NodeList())
 
     def getElementsByTagNameNS(self, namespaceURI, localName):
-        return _getElementsByTagNameNSHelper(self, namespaceURI, localName, [])
+        return _getElementsByTagNameNSHelper(self, namespaceURI, localName,
+                                             NodeList())
 
     def __repr__(self):
         return "<DOM Element: %s at %s>" % (self.tagName, id(self))
@@ -932,10 +933,11 @@ class Document(Node):
         return a
 
     def getElementsByTagName(self, name):
-        return _getElementsByTagNameHelper(self, name, [])
+        return _getElementsByTagNameHelper(self, name, NodeList())
 
     def getElementsByTagNameNS(self, namespaceURI, localName):
-        return _getElementsByTagNameNSHelper(self, namespaceURI, localName, [])
+        return _getElementsByTagNameNSHelper(self, namespaceURI, localName,
+                                             NodeList())
 
     def writexml(self, writer, indent="", addindent="", newl=""):
         writer.write('<?xml version="1.0" ?>\n')

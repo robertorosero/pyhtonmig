@@ -3,7 +3,7 @@
 % $Id$
 
 \title{What's New in Python 2.2}
-\release{0.10}
+\release{1.00}
 \author{A.M. Kuchling}
 \authoraddress{\email{akuchlin@mems-exchange.org}}
 \begin{document}
@@ -11,8 +11,8 @@
 
 \section{Introduction}
 
-This article explains the new features in Python 2.2.
-The final release of Python 2.2 is planned for December 2001.
+This article explains the new features in Python 2.2, released on
+December 21, 2001.
 
 Python 2.2 can be thought of as the "cleanup release".  There are some
 features such as generators and iterators that are completely new, but
@@ -245,7 +245,7 @@ The \function{staticmethod()} function takes the function
 stored in the class object.  You might expect there to be special
 syntax for creating such methods (\code{def static f()},
 \code{defstatic f()}, or something like that) but no such syntax has
-been defined yet; that's been left for future versions.
+been defined yet; that's been left for future versions of Python.
 
 More new features, such as slots and properties, are also implemented
 as new kinds of descriptors, and it's not difficult to write a
@@ -260,10 +260,13 @@ from eiffel import eiffelmethod
 class C(object):
     def f(self, arg1, arg2):
         # The actual function
+        ...
     def pre_f(self):
         # Check preconditions
+        ...
     def post_f(self):
         # Check postconditions
+        ...
 
     f = eiffelmethod(f, pre_f, post_f)
 \end{verbatim}
@@ -275,6 +278,7 @@ There will be a few wizards who need to know about it in order to
 write \function{eiffelmethod()} or the ZODB or whatever, but most
 users will just write code on top of the resulting libraries and
 ignore the implementation details.
+
 
 \subsection{Multiple Inheritance: The Diamond Rule}
 
@@ -326,9 +330,28 @@ the above example, the list becomes [\class{D}, \class{B}, \class{C},
 
 Following this rule, referring to \method{D.save()} will return
 \method{C.save()}, which is the behaviour we're after.  This lookup
-rule is the same as the one followed by Common Lisp.  
+rule is the same as the one followed by Common Lisp.  A new built-in
+function, \function{super()}, provides a way to get at a class's
+superclasses without having to reimplement Python's algorithm.
+The most commonly used form will be 
+\function{super(\var{class}, \var{obj})}, which returns 
+a bound superclass object (not the actual class object).  This form
+will be used in methods to call a method in the superclass; for
+example, \class{D}'s \method{save()} method would look like this:
 
-% XXX mention super()
+\begin{verbatim}
+class D:
+    def save (self):
+	# Call superclass .save()
+        super(D, self).save()
+        # Save D's private information here
+        ...
+\end{verbatim}
+
+\function{super()} can also return unbound superclass objects
+when called as \function{super(\var{class})} or
+\function{super(\var{class1}, \var{class2})}, but this probably won't
+often be useful.
 
 
 \subsection{Attribute Access}
@@ -497,9 +520,9 @@ Python classes can define an \method{__iter__()} method, which should
 create and return a new iterator for the object; if the object is its
 own iterator, this method can just return \code{self}.  In particular,
 iterators will usually be their own iterators.  Extension types
-implemented in C can implement a \code{tp_iter} function in order to
+implemented in C can implement a \member{tp_iter} function in order to
 return an iterator, and extension types that want to behave as
-iterators can define a \code{tp_iternext} function.
+iterators can define a \member{tp_iternext} function.
 
 So, after all this, what do iterators actually do?  They have one
 required method, \method{next()}, which takes no arguments and returns
@@ -528,7 +551,7 @@ In 2.2, Python's \keyword{for} statement no longer expects a sequence;
 it expects something for which \function{iter()} will return an iterator.
 For backward compatibility and convenience, an iterator is
 automatically constructed for sequences that don't implement
-\method{__iter__()} or a \code{tp_iter} slot, so \code{for i in
+\method{__iter__()} or a \member{tp_iter} slot, so \code{for i in
 [1,2,3]} will still work.  Wherever the Python interpreter loops over
 a sequence, it's been changed to use the iterator protocol.  This
 means you can do things like this:
@@ -635,11 +658,11 @@ outputs the value of \code{i}, similar to a \keyword{return}
 statement.  The big difference between \keyword{yield} and a
 \keyword{return} statement is that on reaching a \keyword{yield} the
 generator's state of execution is suspended and local variables are
-preserved.  On the next call to the generator's \code{.next()} method,
+preserved.  On the next call to the generator's \code{next()} method,
 the function will resume executing immediately after the
 \keyword{yield} statement.  (For complicated reasons, the
 \keyword{yield} statement isn't allowed inside the \keyword{try} block
-of a \code{try...finally} statement; read \pep{255} for a full
+of a \keyword{try}...\keyword{finally} statement; read \pep{255} for a full
 explanation of the interaction between \keyword{yield} and
 exceptions.)
 
@@ -839,7 +862,7 @@ of \code{/} will not change until Python 3.0.
 
 \item Classes can define methods called \method{__truediv__} and
 \method{__floordiv__} to overload the two division operators.  At the
-C level, there are also slots in the \code{PyNumberMethods} structure
+C level, there are also slots in the \ctype{PyNumberMethods} structure
 so extension types can define the two operators.
 
 \item Python 2.2 supports some command-line arguments for testing
@@ -1107,7 +1130,7 @@ more information about XML-RPC.
   function \function{help()} that uses the \module{pydoc} module
   introduced in Python 2.1 to provide interactive help.
   \code{help(\var{object})} displays any available help text about
-  \var{object}.  \code{help()} with no argument puts you in an online
+  \var{object}.  \function{help()} with no argument puts you in an online
   help utility, where you can enter the names of functions, classes,
   or modules to read their help text.
   (Contributed by Guido van Rossum, using Ka-Ping Yee's \module{pydoc} module.)
@@ -1219,7 +1242,7 @@ affect you very much.
   \cfunction{PyArg_UnpackTuple()}, has been added that's simpler and
   presumably faster.  Instead of specifying a format string, the
   caller simply gives the minimum and maximum number of arguments
-  expected, and a set of pointers to \code{PyObject*} variables that
+  expected, and a set of pointers to \ctype{PyObject*} variables that
   will be filled in with argument values.  
 
   \item Two new flags \constant{METH_NOARGS} and \constant{METH_O} are
@@ -1332,10 +1355,10 @@ to experiment with these modules can uncomment them manually.
   now convert it to an MBCS encoded string, as used by the Microsoft
   file APIs.  As MBCS is explicitly used by the file APIs, Python's
   choice of ASCII as the default encoding turns out to be an
-  annoyance.  On Unix, the locale's character set is used if
+  annoyance.  On \UNIX, the locale's character set is used if
   \function{locale.nl_langinfo(CODESET)} is available.  (Windows
   support was contributed by Mark Hammond with assistance from
-  Marc-Andr\'e Lemburg. Unix support was added by Martin von L\"owis.)
+  Marc-Andr\'e Lemburg. \UNIX{} support was added by Martin von L\"owis.)
 
   \item Large file support is now enabled on Windows.  (Contributed by
   Tim Peters.)

@@ -425,13 +425,6 @@ class Message:
         for i in list:
             del self.headers[i]
 
-    def get(self, name, default=""):
-        name = name.lower()
-        if self.dict.has_key(name):
-            return self.dict[name]
-        else:
-            return default
-
     def setdefault(self, name, default=""):
         lowername = name.lower()
         if self.dict.has_key(lowername):
@@ -494,8 +487,8 @@ def quote(str):
 
 def parseaddr(address):
     """Parse an address into a (realname, mailaddr) tuple."""
-    a = AddrlistClass(address)
-    list = a.getaddrlist()
+    a = AddressList(address)
+    list = a.addresslist
     if not list:
         return (None, None)
     else:
