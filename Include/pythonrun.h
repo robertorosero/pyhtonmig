@@ -75,10 +75,6 @@ PyAPI_FUNC(int) Py_Main(int argc, char **argv);
 
 /* Use macros for a bunch of old variants */
 #define PyRun_String(str, s, g, l) PyRun_StringFlags(str, s, g, l, NULL)
-#define PyRun_FileEx(f, p, s, g, l, c) \
-        PyRun_FileExFlags(f, p, s, g, l, c, NULL)
-#define PyRun_FileFlags(f, p, s, g, l, flags) \
-        PyRun_FileExFlags(f, p, s, g, l, 0, flags)
 #define PyRun_AnyFile(fp, name) PyRun_AnyFileExFlags(fp, name, 0, NULL)
 #define PyRun_AnyFileEx(fp, name, closeit) \
 	PyRun_AnyFileExFlags(fp, name, closeit, NULL)
