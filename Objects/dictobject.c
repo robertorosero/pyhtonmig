@@ -1286,12 +1286,6 @@ static PyMethodDef mapp_methods[] = {
 	{NULL,		NULL}	/* sentinel */
 };
 
-static PyObject *
-dict_getattr(dictobject *mp, char *name)
-{
-	return Py_FindMethod(mapp_methods, (PyObject *)mp, name);
-}
-
 static int
 dict_contains(dictobject *mp, PyObject *key)
 {
@@ -1334,7 +1328,7 @@ PyTypeObject PyDict_Type = {
 	0,
 	(destructor)dict_dealloc,		/* tp_dealloc */
 	(printfunc)dict_print,			/* tp_print */
-	(getattrfunc)dict_getattr,		/* tp_getattr */
+	0,					/* tp_getattr */
 	0,					/* tp_setattr */
 	(cmpfunc)dict_compare,			/* tp_compare */
 	(reprfunc)dict_repr,			/* tp_repr */
@@ -1355,6 +1349,11 @@ PyTypeObject PyDict_Type = {
 	0,					/* tp_weaklistoffset */
 	(getiterfunc)dictiter_new,		/* tp_iter */
 	0,					/* tp_iternext */
+	mapp_methods,				/* tp_methods */
+	0,					/* tp_members */
+	0,					/* tp_getset */
+	0,					/* tp_base */
+	0,					/* tp_dict */
 };
 
 /* For backward compatibility with old dictionary interface */

@@ -248,33 +248,27 @@ range_tolist(rangeobject *self, PyObject *args)
 }
 
 static PyObject *
-range_getattr(rangeobject *r, char *name)
+range_getstop(rangeobject *r, void *closure)
 {
-	PyObject *result;
-
-	static PyMethodDef range_methods[] = {
-		{"tolist",	(PyCFunction)range_tolist, METH_VARARGS,
-                 "tolist() -> list\n"
-                 "Return a list object with the same values."},
-		{NULL,		NULL}
-	};
-	static struct memberlist range_members[] = {
-		{"step",  T_LONG, offsetof(rangeobject, step), RO},
-		{"start", T_LONG, offsetof(rangeobject, start), RO},
-		{"stop",  T_LONG, 0, RO},
-		{NULL, 0, 0, 0}
-	};
-
-	result = Py_FindMethod(range_methods, (PyObject *) r, name);
-	if (result == NULL) {
-		PyErr_Clear();
-		if (strcmp("stop", name) == 0)
-			result = PyInt_FromLong(r->start + (r->len * r->step));
-		else
-			result = PyMember_Get((char *)r, range_members, name);
-	}
-	return result;
+	return PyInt_FromLong(r->start + (r->len * r->step));
 }
+
+static PyMethodDef range_methods[] = {
+	{"tolist",	(PyCFunction)range_tolist, METH_VARARGS,
+	 "tolist() -> list\n"
+	 "Return a list object with the same values."},
+	{NULL,		NULL}
+};
+static struct memberlist range_members[] = {
+	{"step",  T_LONG, offsetof(rangeobject, step), RO},
+	{"start", T_LONG, offsetof(rangeobject, start), RO},
+	{NULL, 0, 0, 0}
+};
+
+static struct getsetlist range_getsets[] = {
+	{"stop", (getter)range_getstop, NULL, NULL},
+	{0}
+};
 
 static int
 range_contains(rangeobject *r, PyObject *obj)
@@ -318,7 +312,7 @@ PyTypeObject PyRange_Type = {
 	0,			/* Item size for varobject */
 	(destructor)range_dealloc, /*tp_dealloc*/
 	0,			/*tp_print*/
-	(getattrfunc)range_getattr, /*tp_getattr*/
+	0, 			/*tp_getattr*/
 	0,			/*tp_setattr*/
 	(cmpfunc)range_compare, /*tp_compare*/
 	(reprfunc)range_repr,	/*tp_repr*/
@@ -332,4 +326,16 @@ PyTypeObject PyRange_Type = {
 	0,			/*tp_setattro*/
 	0,			/*tp_as_buffer*/
 	Py_TPFLAGS_DEFAULT,	/*tp_flags*/
+	0,					/* tp_doc */
+	0,					/* tp_traverse */
+	0,					/* tp_clear */
+	0,					/* tp_richcompare */
+	0,					/* tp_weaklistoffset */
+	0,					/* tp_iter */
+	0,					/* tp_iternext */
+	range_methods,				/* tp_methods */
+	range_members,				/* tp_members */
+	range_getsets,				/* tp_getset */
+	0,					/* tp_base */
+	0,					/* tp_dict */
 };

@@ -2350,12 +2350,6 @@ string_methods[] = {
 	{NULL,     NULL}		     /* sentinel */
 };
 
-static PyObject *
-string_getattr(PyStringObject *s, char *name)
-{
-	return Py_FindMethod(string_methods, (PyObject*)s, name);
-}
-
 
 PyTypeObject PyString_Type = {
 	PyObject_HEAD_INIT(&PyType_Type)
@@ -2365,7 +2359,7 @@ PyTypeObject PyString_Type = {
 	sizeof(char),
 	(destructor)string_dealloc, /*tp_dealloc*/
 	(printfunc)string_print, /*tp_print*/
-	(getattrfunc)string_getattr,		/*tp_getattr*/
+	0,		/*tp_getattr*/
 	0,		/*tp_setattr*/
 	(cmpfunc)string_compare, /*tp_compare*/
 	(reprfunc)string_repr, /*tp_repr*/
@@ -2380,6 +2374,17 @@ PyTypeObject PyString_Type = {
 	&string_as_buffer,	/*tp_as_buffer*/
 	Py_TPFLAGS_DEFAULT,	/*tp_flags*/
 	0,		/*tp_doc*/
+	0,					/* tp_traverse */
+	0,					/* tp_clear */
+	0,					/* tp_richcompare */
+	0,					/* tp_weaklistoffset */
+	0,					/* tp_iter */
+	0,					/* tp_iternext */
+	string_methods,				/* tp_methods */
+	0,					/* tp_members */
+	0,					/* tp_getset */
+	0,					/* tp_base */
+	0,					/* tp_dict */
 };
 
 void

@@ -1522,12 +1522,6 @@ static PyMethodDef list_methods[] = {
 	{NULL,		NULL}		/* sentinel */
 };
 
-static PyObject *
-list_getattr(PyListObject *f, char *name)
-{
-	return Py_FindMethod(list_methods, (PyObject *)f, name);
-}
-
 static PySequenceMethods list_as_sequence = {
 	(inquiry)list_length,			/* sq_length */
 	(binaryfunc)list_concat,		/* sq_concat */
@@ -1549,7 +1543,7 @@ PyTypeObject PyList_Type = {
 	0,
 	(destructor)list_dealloc,		/* tp_dealloc */
 	(printfunc)list_print,			/* tp_print */
-	(getattrfunc)list_getattr,		/* tp_getattr */
+	0,					/* tp_getattr */
 	0,					/* tp_setattr */
 	0,					/* tp_compare */
 	(reprfunc)list_repr,			/* tp_repr */
@@ -1567,6 +1561,14 @@ PyTypeObject PyList_Type = {
  	(traverseproc)list_traverse,		/* tp_traverse */
  	(inquiry)list_clear,			/* tp_clear */
 	list_richcompare,			/* tp_richcompare */
+	0,					/* tp_weaklistoffset */
+	0,					/* tp_iter */
+	0,					/* tp_iternext */
+	list_methods,				/* tp_methods */
+	0,					/* tp_members */
+	0,					/* tp_getset */
+	0,					/* tp_base */
+	0,					/* tp_dict */
 };
 
 
@@ -1595,12 +1597,6 @@ static PyMethodDef immutable_list_methods[] = {
 	{NULL,		NULL}		/* sentinel */
 };
 
-static PyObject *
-immutable_list_getattr(PyListObject *f, char *name)
-{
-	return Py_FindMethod(immutable_list_methods, (PyObject *)f, name);
-}
-
 static int
 immutable_list_ass(void)
 {
@@ -1627,7 +1623,7 @@ static PyTypeObject immutable_list_type = {
 	0,
 	0, /* Cannot happen */			/* tp_dealloc */
 	(printfunc)list_print,			/* tp_print */
-	(getattrfunc)immutable_list_getattr,	/* tp_getattr */
+	0,					/* tp_getattr */
 	0,					/* tp_setattr */
 	0, /* Won't be called */		/* tp_compare */
 	(reprfunc)list_repr,			/* tp_repr */
@@ -1645,5 +1641,13 @@ static PyTypeObject immutable_list_type = {
  	(traverseproc)list_traverse,		/* tp_traverse */
 	0,					/* tp_clear */
 	list_richcompare,			/* tp_richcompare */
+	0,					/* tp_weaklistoffset */
+	0,					/* tp_iter */
+	0,					/* tp_iternext */
+	immutable_list_methods,			/* tp_methods */
+	0,					/* tp_members */
+	0,					/* tp_getset */
+	0,					/* tp_base */
+	0,					/* tp_dict */
 	/* NOTE: This is *not* the standard list_type struct! */
 };

@@ -8,6 +8,7 @@
 #ifndef WITHOUT_COMPLEX
 
 #include "Python.h"
+#include "structmember.h"
 
 /* Precisions used by repr() and str(), respectively.
 
@@ -559,18 +560,11 @@ static PyMethodDef complex_methods[] = {
 	{NULL,		NULL}		/* sentinel */
 };
 
-
-static PyObject *
-complex_getattr(PyComplexObject *self, char *name)
-{
-	if (strcmp(name, "real") == 0)
-		return (PyObject *)PyFloat_FromDouble(self->cval.real);
-	else if (strcmp(name, "imag") == 0)
-		return (PyObject *)PyFloat_FromDouble(self->cval.imag);
-	else if (strcmp(name, "__members__") == 0)
-		return Py_BuildValue("[ss]", "imag", "real");
-	return Py_FindMethod(complex_methods, (PyObject *)self, name);
-}
+static struct memberlist complex_members[] = {
+	{"real", T_DOUBLE, offsetof(PyComplexObject, cval.real), 0},
+	{"imag", T_DOUBLE, offsetof(PyComplexObject, cval.imag), 0},
+	{0},
+};
 
 static PyNumberMethods complex_as_number = {
 	(binaryfunc)complex_add, 		/* nb_add */
@@ -606,7 +600,7 @@ PyTypeObject PyComplex_Type = {
 	0,
 	(destructor)complex_dealloc,		/* tp_dealloc */
 	(printfunc)complex_print,		/* tp_print */
-	(getattrfunc)complex_getattr,		/* tp_getattr */
+	0,					/* tp_getattr */
 	0,					/* tp_setattr */
 	0,					/* tp_compare */
 	(reprfunc)complex_repr,			/* tp_repr */
@@ -624,6 +618,14 @@ PyTypeObject PyComplex_Type = {
 	0,					/* tp_traverse */
 	0,					/* tp_clear */
 	complex_richcompare,			/* tp_richcompare */
+	0,					/* tp_weaklistoffset */
+	0,					/* tp_iter */
+	0,					/* tp_iternext */
+	complex_methods,			/* tp_methods */
+	complex_members,			/* tp_members */
+	0,					/* tp_getset */
+	0,					/* tp_base */
+	0,					/* tp_dict */
 };
 
 #endif

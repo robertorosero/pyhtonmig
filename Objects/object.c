@@ -981,26 +981,16 @@ PyObject_Hash(PyObject *v)
 PyObject *
 PyObject_GetAttrString(PyObject *v, char *name)
 {
-	if (v->ob_type->tp_getattro != NULL) {
-		PyObject *w, *res;
-		w = PyString_InternFromString(name);
-		if (w == NULL)
-			return NULL;
-		res = (*v->ob_type->tp_getattro)(v, w);
-		Py_XDECREF(w);
-		return res;
-	}
+	PyObject *w, *res;
 
-	if (v->ob_type->tp_getattr == NULL) {
-		PyErr_Format(PyExc_AttributeError,
-			     "'%.50s' object has no attribute '%.400s'",
-			     v->ob_type->tp_name,
-			     name);
-		return NULL;
-	}
-	else {
+	if (v->ob_type->tp_getattr != NULL)
 		return (*v->ob_type->tp_getattr)(v, name);
-	}
+	w = PyString_InternFromString(name);
+	if (w == NULL)
+		return NULL;
+	res = PyObject_GetAttr(v, w);
+	Py_XDECREF(w);
+	return res;
 }
 
 int
@@ -1018,17 +1008,20 @@ PyObject_HasAttrString(PyObject *v, char *name)
 int
 PyObject_SetAttrString(PyObject *v, char *name, PyObject *w)
 {
-	if (v->ob_type->tp_setattro != NULL) {
-		PyObject *s;
-		int res;
-		s = PyString_InternFromString(name);
-		if (s == NULL)
-			return -1;
-		res = (*v->ob_type->tp_setattro)(v, s, w);
-		Py_XDECREF(s);
-		return res;
-	}
+	PyObject *s;
+	int res;
 
+	if (v->ob_type->tp_setattr != NULL)
+		return (*v->ob_type->tp_setattr)(v, name, w);
+	s = PyString_InternFromString(name);
+	if (s == NULL)
+		return -1;
+	res = PyObject_SetAttr(v, s, w);
+	Py_XDECREF(s);
+	return res;
+}
+
+/*
 	if (v->ob_type->tp_setattr == NULL) {
 		if (v->ob_type->tp_getattr == NULL)
 			PyErr_SetString(PyExc_TypeError,
@@ -1041,7 +1034,7 @@ PyObject_SetAttrString(PyObject *v, char *name, PyObject *w)
 	else {
 		return (*v->ob_type->tp_setattr)(v, name, w);
 	}
-}
+*/
 
 /* Internal API needed by PyObject_GetAttr(): */
 extern 
@@ -1051,6 +1044,8 @@ PyObject *_PyUnicode_AsDefaultEncodedString(PyObject *unicode,
 PyObject *
 PyObject_GetAttr(PyObject *v, PyObject *name)
 {
+	PyTypeObject *tp = v->ob_type;
+
 	/* The Unicode to string conversion is done here because the
 	   existing tp_getattro slots expect a string object as name
 	   and we wouldn't want to break those. */
@@ -1059,16 +1054,29 @@ PyObject_GetAttr(PyObject *v, PyObject *name)
 		if (name == NULL)
 			return NULL;
 	}
-
 	if (!PyString_Check(name)) {
 		PyErr_SetString(PyExc_TypeError,
 				"attribute name must be string");
 		return NULL;
 	}
-	if (v->ob_type->tp_getattro != NULL)
-		return (*v->ob_type->tp_getattro)(v, name);
-	else
-	return PyObject_GetAttrString(v, PyString_AS_STRING(name));
+	if (tp->tp_getattro != NULL)
+		return (*tp->tp_getattro)(v, name);
+	if (tp->tp_getattr != NULL)
+		return (*tp->tp_getattr)(v, PyString_AS_STRING(name));
+	if (tp->tp_flags & Py_TPFLAGS_HAVE_CLASS) {
+		PyObject *descr;
+		if (tp->tp_dict == NULL) {
+			if (PyType_InitDict(tp) < 0)
+				return NULL;
+		}
+		descr = PyDict_GetItem(tp->tp_dict, name);
+		if (descr != NULL)
+			return PyDescr_Get(descr, v);
+	}
+	PyErr_Format(PyExc_AttributeError,
+		     "'%.50s' object has no attribute '%.400s'",
+		     tp->tp_name, PyString_AS_STRING(name));
+	return NULL;
 }
 
 int
@@ -1086,6 +1094,7 @@ PyObject_HasAttr(PyObject *v, PyObject *name)
 int
 PyObject_SetAttr(PyObject *v, PyObject *name, PyObject *value)
 {
+	PyTypeObject *tp = v->ob_type;
 	int err;
 
 	/* The Unicode to string conversion is done here because the
@@ -1096,25 +1105,43 @@ PyObject_SetAttr(PyObject *v, PyObject *name, PyObject *value)
 		if (name == NULL)
 			return -1;
 	}
-	else
-		Py_INCREF(name);
-	
-	if (!PyString_Check(name)){
+	else if (!PyString_Check(name)){
 		PyErr_SetString(PyExc_TypeError,
 				"attribute name must be string");
-		err = -1;
+		return -1;
 	}
-	else {
-		PyString_InternInPlace(&name);
-		if (v->ob_type->tp_setattro != NULL)
-			err = (*v->ob_type->tp_setattro)(v, name, value);
-		else
-			err = PyObject_SetAttrString(v, 
-				        PyString_AS_STRING(name), value);
+	else
+		Py_INCREF(name);
+
+	PyString_InternInPlace(&name);
+	if (tp->tp_setattro != NULL) {
+		err = (*tp->tp_setattro)(v, name, value);
+		Py_DECREF(name);
+		return err;
 	}
-	
+	if (tp->tp_setattr != NULL) {
+		err = (*tp->tp_setattr)(v, PyString_AS_STRING(name), value);
+		Py_DECREF(name);
+		return err;
+	}
+	if (tp->tp_flags & Py_TPFLAGS_HAVE_CLASS) {
+		PyObject *descr;
+		if (tp->tp_dict == NULL) {
+			if (PyType_InitDict(tp) < 0)
+				return -1;
+		}
+		descr = PyDict_GetItem(tp->tp_dict, name);
+		if (descr != NULL) {
+			err = PyDescr_Set(descr, v, value);
+			Py_DECREF(name);
+			return err;
+		}
+	}
 	Py_DECREF(name);
-	return err;
+	PyErr_Format(PyExc_AttributeError,
+		     "'%.50s' object has no attribute '%.400s'",
+		     tp->tp_name, PyString_AS_STRING(name));
+	return -1;
 }
 
 /* Test a value used as condition, e.g., in a for or if statement.

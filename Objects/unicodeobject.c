@@ -4557,12 +4557,6 @@ static PyMethodDef unicode_methods[] = {
     {NULL, NULL}
 };
 
-static PyObject * 
-unicode_getattr(PyUnicodeObject *self, char *name)
-{
-    return Py_FindMethod(unicode_methods, (PyObject*) self, name);
-}
-
 static PySequenceMethods unicode_as_sequence = {
     (inquiry) unicode_length, 		/* sq_length */
     (binaryfunc) PyUnicode_Concat, 	/* sq_concat */
@@ -5234,7 +5228,7 @@ PyTypeObject PyUnicode_Type = {
     /* Slots */
     (destructor)_PyUnicode_Free, 	/* tp_dealloc */
     0, 					/* tp_print */
-    (getattrfunc)unicode_getattr, 	/* tp_getattr */
+    0,				 	/* tp_getattr */
     0, 					/* tp_setattr */
     (cmpfunc) unicode_compare, 		/* tp_compare */
     (reprfunc) unicode_repr, 		/* tp_repr */
@@ -5244,10 +5238,22 @@ PyTypeObject PyUnicode_Type = {
     (hashfunc) unicode_hash, 		/* tp_hash*/
     0, 					/* tp_call*/
     (reprfunc) unicode_str,	 	/* tp_str */
-    (getattrofunc) NULL, 		/* tp_getattro */
-    (setattrofunc) NULL, 		/* tp_setattro */
+    0,			 		/* tp_getattro */
+    0,			 		/* tp_setattro */
     &unicode_as_buffer,			/* tp_as_buffer */
     Py_TPFLAGS_DEFAULT,			/* tp_flags */
+    0,					/* tp_doc */
+    0,					/* tp_traverse */
+    0,					/* tp_clear */
+    0,					/* tp_richcompare */
+    0,					/* tp_weaklistoffset */
+    0,					/* tp_iter */
+    0,					/* tp_iternext */
+    unicode_methods,			/* tp_methods */
+    0,					/* tp_members */
+    0,					/* tp_getset */
+    0,					/* tp_base */
+    0,					/* tp_dict */
 };
 
 /* Initialize the Unicode implementation */
