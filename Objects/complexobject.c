@@ -566,6 +566,256 @@ static struct memberlist complex_members[] = {
 	{0},
 };
 
+static PyObject *
+complex_from_string(PyObject *v)
+{
+	extern double strtod(const char *, char **);
+	const char *s, *start;
+	char *end;
+	double x=0.0, y=0.0, z;
+	int got_re=0, got_im=0, done=0;
+	int digit_or_dot;
+	int sw_error=0;
+	int sign;
+	char buffer[256]; /* For errors */
+	char s_buffer[256];
+	int len;
+
+	if (PyString_Check(v)) {
+		s = PyString_AS_STRING(v);
+		len = PyString_GET_SIZE(v);
+	}
+	else if (PyUnicode_Check(v)) {
+		if (PyUnicode_GET_SIZE(v) >= sizeof(s_buffer)) {
+			PyErr_SetString(PyExc_ValueError,
+				 "complex() literal too large to convert");
+			return NULL;
+		}
+		if (PyUnicode_EncodeDecimal(PyUnicode_AS_UNICODE(v),
+					    PyUnicode_GET_SIZE(v),
+					    s_buffer,
+					    NULL))
+			return NULL;
+		s = s_buffer;
+		len = (int)strlen(s);
+	}
+	else if (PyObject_AsCharBuffer(v, &s, &len)) {
+		PyErr_SetString(PyExc_TypeError,
+				"complex() arg is not a string");
+		return NULL;
+	}
+
+	/* position on first nonblank */
+	start = s;
+	while (*s && isspace(Py_CHARMASK(*s)))
+		s++;
+	if (s[0] == '\0') {
+		PyErr_SetString(PyExc_ValueError,
+				"complex() arg is an empty string");
+		return NULL;
+	}
+
+	z = -1.0;
+	sign = 1;
+	do {
+
+		switch (*s) {
+
+		case '\0':
+			if (s-start != len) {
+				PyErr_SetString(
+					PyExc_ValueError,
+					"complex() arg contains a null byte");
+				return NULL;
+			}
+			if(!done) sw_error=1;
+			break;
+
+		case '-':
+			sign = -1;
+				/* Fallthrough */
+		case '+':
+			if (done)  sw_error=1;
+			s++;
+			if  (  *s=='\0'||*s=='+'||*s=='-'  ||
+			       isspace(Py_CHARMASK(*s))  )  sw_error=1;
+			break;
+
+		case 'J':
+		case 'j':
+			if (got_im || done) {
+				sw_error = 1;
+				break;
+			}
+			if  (z<0.0) {
+				y=sign;
+			}
+			else{
+				y=sign*z;
+			}
+			got_im=1;
+			s++;
+			if  (*s!='+' && *s!='-' )
+				done=1;
+			break;
+
+		default:
+			if (isspace(Py_CHARMASK(*s))) {
+				while (*s && isspace(Py_CHARMASK(*s)))
+					s++;
+				if (s[0] != '\0')
+					sw_error=1;
+				else
+					done = 1;
+				break;
+			}
+			digit_or_dot =
+				(*s=='.' || isdigit(Py_CHARMASK(*s)));
+			if  (done||!digit_or_dot) {
+				sw_error=1;
+				break;
+			}
+			errno = 0;
+			PyFPE_START_PROTECT("strtod", return 0)
+				z = strtod(s, &end) ;
+			PyFPE_END_PROTECT(z)
+				if (errno != 0) {
+					sprintf(buffer,
+					  "float() out of range: %.150s", s);
+					PyErr_SetString(
+						PyExc_ValueError,
+						buffer);
+					return NULL;
+				}
+			s=end;
+			if  (*s=='J' || *s=='j') {
+
+				break;
+			}
+			if  (got_re) {
+				sw_error=1;
+				break;
+			}
+
+				/* accept a real part */
+			x=sign*z;
+			got_re=1;
+			if  (got_im)  done=1;
+			z = -1.0;
+			sign = 1;
+			break;
+
+		}  /* end of switch  */
+
+	} while (*s!='\0' && !sw_error);
+
+	if (sw_error) {
+		PyErr_SetString(PyExc_ValueError,
+				"complex() arg is a malformed string");
+		return NULL;
+	}
+
+	return PyComplex_FromDoubles(x,y);
+}
+
+static PyObject *
+complex_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
+{
+	PyObject *r, *i, *tmp;
+	PyNumberMethods *nbr, *nbi = NULL;
+	Py_complex cr, ci;
+	int own_r = 0;
+	static char *kwlist[] = {"real", "imag", 0};
+
+	assert(type == &PyComplex_Type);
+	r = Py_False;
+	i = NULL;
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "|OO:complex", kwlist,
+					 &r, &i))
+		return NULL;
+	if (PyString_Check(r) || PyUnicode_Check(r))
+		return complex_from_string(r);
+	if ((nbr = r->ob_type->tp_as_number) == NULL ||
+	    nbr->nb_float == NULL ||
+	    (i != NULL &&
+	     ((nbi = i->ob_type->tp_as_number) == NULL ||
+	      nbi->nb_float == NULL))) {
+		PyErr_SetString(PyExc_TypeError,
+			   "complex() arg can't be converted to complex");
+		return NULL;
+	}
+	/* XXX Hack to support classes with __complex__ method */
+	if (PyInstance_Check(r)) {
+		static PyObject *complexstr;
+		PyObject *f;
+		if (complexstr == NULL) {
+			complexstr = PyString_InternFromString("__complex__");
+			if (complexstr == NULL)
+				return NULL;
+		}
+		f = PyObject_GetAttr(r, complexstr);
+		if (f == NULL)
+			PyErr_Clear();
+		else {
+			PyObject *args = Py_BuildValue("()");
+			if (args == NULL)
+				return NULL;
+			r = PyEval_CallObject(f, args);
+			Py_DECREF(args);
+			Py_DECREF(f);
+			if (r == NULL)
+				return NULL;
+			own_r = 1;
+		}
+	}
+	if (PyComplex_Check(r)) {
+		cr = ((PyComplexObject*)r)->cval;
+		if (own_r) {
+			Py_DECREF(r);
+		}
+	}
+	else {
+		tmp = PyNumber_Float(r);
+		if (own_r) {
+			Py_DECREF(r);
+		}
+		if (tmp == NULL)
+			return NULL;
+		if (!PyFloat_Check(tmp)) {
+			PyErr_SetString(PyExc_TypeError,
+					"float(r) didn't return a float");
+			Py_DECREF(tmp);
+			return NULL;
+		}
+		cr.real = PyFloat_AsDouble(tmp);
+		Py_DECREF(tmp);
+		cr.imag = 0.0;
+	}
+	if (i == NULL) {
+		ci.real = 0.0;
+		ci.imag = 0.0;
+	}
+	else if (PyComplex_Check(i))
+		ci = ((PyComplexObject*)i)->cval;
+	else {
+		tmp = (*nbi->nb_float)(i);
+		if (tmp == NULL)
+			return NULL;
+		ci.real = PyFloat_AsDouble(tmp);
+		Py_DECREF(tmp);
+		ci.imag = 0.;
+	}
+	cr.real -= ci.imag;
+	cr.imag += ci.real;
+	return PyComplex_FromCComplex(cr);
+}
+
+static char complex_doc[] =
+"complex(real[, imag]) -> complex number\n\
+\n\
+Create a complex number from a real part and an optional imaginary part.\n\
+This is equivalent to (real + imag*1j) where imag defaults to 0.";
+
 static PyNumberMethods complex_as_number = {
 	(binaryfunc)complex_add, 		/* nb_add */
 	(binaryfunc)complex_sub, 		/* nb_subtract */
@@ -614,7 +864,7 @@ PyTypeObject PyComplex_Type = {
 	0,					/* tp_setattro */
 	0,					/* tp_as_buffer */
 	Py_TPFLAGS_DEFAULT,			/* tp_flags */
-	0,					/* tp_doc */
+	complex_doc,				/* tp_doc */
 	0,					/* tp_traverse */
 	0,					/* tp_clear */
 	complex_richcompare,			/* tp_richcompare */
@@ -626,6 +876,12 @@ PyTypeObject PyComplex_Type = {
 	0,					/* tp_getset */
 	0,					/* tp_base */
 	0,					/* tp_dict */
+	0,					/* tp_descr_get */
+	0,					/* tp_descr_set */
+	0,					/* tp_dictoffset */
+	0,					/* tp_init */
+	0,					/* tp_alloc */
+	complex_new,				/* tp_new */
 };
 
 #endif

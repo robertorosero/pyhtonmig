@@ -183,10 +183,10 @@ PyUnicodeObject *_PyUnicode_New(int length)
 		goto onError;
 	    }
 	}
-      else {
+	else {
 	    unicode->str = PyMem_NEW(Py_UNICODE, length + 1);
-      }
-      PyObject_INIT(unicode, &PyUnicode_Type);
+	}
+	PyObject_INIT(unicode, &PyUnicode_Type);
     }
     else {
         unicode = PyObject_NEW(PyUnicodeObject, &PyUnicode_Type);
@@ -5219,6 +5219,30 @@ static PyBufferProcs unicode_as_buffer = {
     (getcharbufferproc) unicode_buffer_getcharbuf,
 };
 
+static PyObject *
+unicode_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
+{
+        PyObject *x = NULL;
+	static char *kwlist[] = {"string", "encoding", "errors", 0};
+	char *encoding = NULL;
+	char *errors = NULL;
+
+	assert(type == &PyUnicode_Type);
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "|Oss:unicode",
+					  kwlist, &x, &encoding, &errors))
+	    return NULL;
+	if (x == NULL)
+		return (PyObject *)_PyUnicode_New(0);
+	return PyUnicode_FromEncodedObject(x, encoding, errors);
+}
+
+static char unicode_doc[] =
+"unicode(string [, encoding[, errors]]) -> object\n\
+\n\
+Create a new Unicode object from the given encoded string.\n\
+encoding defaults to the current default string encoding and \n\
+errors, defining the error handling, to 'strict'.";
+
 PyTypeObject PyUnicode_Type = {
     PyObject_HEAD_INIT(&PyType_Type)
     0, 					/* ob_size */
@@ -5242,7 +5266,7 @@ PyTypeObject PyUnicode_Type = {
     0,			 		/* tp_setattro */
     &unicode_as_buffer,			/* tp_as_buffer */
     Py_TPFLAGS_DEFAULT,			/* tp_flags */
-    0,					/* tp_doc */
+    unicode_doc,			/* tp_doc */
     0,					/* tp_traverse */
     0,					/* tp_clear */
     0,					/* tp_richcompare */
@@ -5254,6 +5278,12 @@ PyTypeObject PyUnicode_Type = {
     0,					/* tp_getset */
     0,					/* tp_base */
     0,					/* tp_dict */
+    0,					/* tp_descr_get */
+    0,					/* tp_descr_set */
+    0,					/* tp_dictoffset */
+    0,					/* tp_init */
+    0,					/* tp_alloc */
+    unicode_new,			/* tp_new */
 };
 
 /* Initialize the Unicode implementation */
