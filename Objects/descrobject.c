@@ -429,105 +429,10 @@ PyDescr_NewGetSet(PyTypeObject *type, struct getsetlist *getset)
 }
 
 
-/* Initialize the __dict__ in a type object */
-
-static struct PyMethodDef intrinsic_methods[] = {
-	{0}
-};
-
-static struct memberlist intrinsic_members[] = {
-	{"__class__", T_OBJECT, offsetof(PyObject, ob_type), READONLY},
-	{0}
-};
-
-static struct getsetlist intrinsic_getsets[] = {
-	{0}
-};
-
-static int
-add_methods(PyTypeObject *type, PyMethodDef *meth)
-{
-	PyObject *dict = type->tp_dict;
-
-	for (; meth->ml_name != NULL; meth++) {
-		PyObject *descr = PyDescr_NewMethod(type, meth);
-		if (descr == NULL)
-			return -1;
-		if (PyDict_SetItemString(dict,meth->ml_name,descr) < 0)
-			return -1;
-		Py_DECREF(descr);
-	}
-	return 0;
-}
-
-static int
-add_members(PyTypeObject *type, struct memberlist *memb)
-{
-	PyObject *dict = type->tp_dict;
-
-	for (; memb->name != NULL; memb++) {
-		PyObject *descr = PyDescr_NewMember(type, memb);
-		if (descr == NULL)
-			return -1;
-		if (PyDict_SetItemString(dict, memb->name, descr) < 0)
-			return -1;
-		Py_DECREF(descr);
-	}
-	return 0;
-}
-
-static int
-add_getset(PyTypeObject *type, struct getsetlist *gsp)
-{
-	PyObject *dict = type->tp_dict;
-
-	for (; gsp->name != NULL; gsp++) {
-		PyObject *descr = PyDescr_NewGetSet(type, gsp);
-
-		if (descr == NULL)
-			return -1;
-		if (PyDict_SetItemString(dict, gsp->name, descr) < 0)
-			return -1;
-		Py_DECREF(descr);
-	}
-	return 0;
-}
-
-int
-PyType_InitDict(PyTypeObject *type)
-{
-	PyObject *dict;
-
-	if (type->tp_dict != NULL)
-		return 0;
-	dict = PyDict_New();
-	if (dict == NULL)
-		return -1;
-	type->tp_dict = dict;
-	if (type->tp_methods != NULL) {
-		if (add_methods(type, type->tp_methods) < 0)
-			return -1;
-	}
-	if (type->tp_members != NULL) {
-		if (add_members(type, type->tp_members) < 0)
-			return -1;
-	}
-	if (type->tp_getset != NULL) {
-		if (add_getset(type, type->tp_getset) < 0)
-			return -1;
-	}
-	/* Add intrinsics */
-	if (add_methods(type, intrinsic_methods) < 0)
-		return -1;
-	if (add_members(type, intrinsic_members) < 0)
-		return -1;
-	if (add_getset(type, intrinsic_getsets) < 0)
-		return -1;
-	return 0;
-}
-
-
 /* --- Readonly proxy for dictionaries (actually any mapping) --- */
+
+/* This has no reason to be in this file except that adding new files is a
+   bit of a pain */
 
 typedef struct {
 	PyObject_HEAD
@@ -645,14 +550,6 @@ proxy_getiter(proxyobject *pp)
 {
 	return PyObject_GetIter(pp->dict);
 }
-
-#if 0
-static int
-proxy_print(proxyobject *pp, FILE *fp, int flags)
-{
-	return PyObject_Print(pp->dict, fp, flags);
-}
-#endif
 
 PyObject *
 proxy_str(proxyobject *pp)

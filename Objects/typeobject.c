@@ -115,3 +115,330 @@ PyTypeObject PyType_Type = {
 	0,					/* tp_base */
 	0,					/* tp_dict */
 };
+
+
+/* Initialize the __dict__ in a type object */
+
+static struct PyMethodDef intrinsic_methods[] = {
+	{0}
+};
+
+static struct memberlist intrinsic_members[] = {
+	{"__class__", T_OBJECT, offsetof(PyObject, ob_type), READONLY},
+	{0}
+};
+
+static struct getsetlist intrinsic_getsets[] = {
+	{0}
+};
+
+static int
+add_methods(PyTypeObject *type, PyMethodDef *meth)
+{
+	PyObject *dict = type->tp_dict;
+
+	for (; meth->ml_name != NULL; meth++) {
+		PyObject *descr = PyDescr_NewMethod(type, meth);
+		if (descr == NULL)
+			return -1;
+		if (PyDict_SetItemString(dict,meth->ml_name,descr) < 0)
+			return -1;
+		Py_DECREF(descr);
+	}
+	return 0;
+}
+
+static int
+add_members(PyTypeObject *type, struct memberlist *memb)
+{
+	PyObject *dict = type->tp_dict;
+
+	for (; memb->name != NULL; memb++) {
+		PyObject *descr = PyDescr_NewMember(type, memb);
+		if (descr == NULL)
+			return -1;
+		if (PyDict_SetItemString(dict, memb->name, descr) < 0)
+			return -1;
+		Py_DECREF(descr);
+	}
+	return 0;
+}
+
+static int
+add_getset(PyTypeObject *type, struct getsetlist *gsp)
+{
+	PyObject *dict = type->tp_dict;
+
+	for (; gsp->name != NULL; gsp++) {
+		PyObject *descr = PyDescr_NewGetSet(type, gsp);
+
+		if (descr == NULL)
+			return -1;
+		if (PyDict_SetItemString(dict, gsp->name, descr) < 0)
+			return -1;
+		Py_DECREF(descr);
+	}
+	return 0;
+}
+
+staticforward int add_operators(PyTypeObject *);
+
+int
+PyType_InitDict(PyTypeObject *type)
+{
+	PyObject *dict;
+
+	if (type->tp_dict != NULL)
+		return 0;
+	dict = PyDict_New();
+	if (dict == NULL)
+		return -1;
+	type->tp_dict = dict;
+
+	/* Add intrinsics */
+	if (add_methods(type, intrinsic_methods) < 0)
+		return -1;
+	if (add_members(type, intrinsic_members) < 0)
+		return -1;
+	if (add_getset(type, intrinsic_getsets) < 0)
+		return -1;
+	if (add_operators(type) < 0)
+		return -1;
+
+	/* Add type-specific descriptors */
+	if (type->tp_methods != NULL) {
+		if (add_methods(type, type->tp_methods) < 0)
+			return -1;
+	}
+	if (type->tp_members != NULL) {
+		if (add_members(type, type->tp_members) < 0)
+			return -1;
+	}
+	if (type->tp_getset != NULL) {
+		if (add_getset(type, type->tp_getset) < 0)
+			return -1;
+	}
+	return 0;
+}
+
+
+/* Generic wrappers for overloadable 'operators' such as __getitem__ */
+
+static PyObject *
+wrap_len(PyObject *self, PyObject *args)
+{
+	long res;
+
+	if (!PyArg_ParseTuple(args, ":__len__"))
+		return NULL;
+	res = PyObject_Size(self);
+	if (res < 0 && PyErr_Occurred())
+		return NULL;
+	return PyInt_FromLong(res);
+}
+
+static PyMethodDef tab_len[] = {
+	{"__len__", wrap_len, METH_VARARGS, "XXX"},
+	{0}
+};
+
+static PyObject *
+wrap_add(PyObject *self, PyObject *args)
+{
+	PyObject *other;
+
+	if (!PyArg_ParseTuple(args, "O:__add__", &other))
+		return NULL;
+	return PyNumber_Add(self, other);
+}
+
+static PyObject *
+wrap_radd(PyObject *self, PyObject *args)
+{
+	PyObject *other;
+
+	if (!PyArg_ParseTuple(args, "O:__radd__", &other))
+		return NULL;
+	return PyNumber_Add(other, self);
+}
+
+static PyMethodDef tab_sq_concat[] = {
+	{"__add__", wrap_add, METH_VARARGS, "XXX"},
+	{"__radd__", wrap_radd, METH_VARARGS, "XXX"},
+	{0}
+};
+
+static PyObject *
+wrap_mul(PyObject *self, PyObject *args)
+{
+	PyObject *other;
+
+	if (!PyArg_ParseTuple(args, "O:__mul__", &other))
+		return NULL;
+	return PyNumber_Multiply(self, other);
+}
+
+static PyObject *
+wrap_rmul(PyObject *self, PyObject *args)
+{
+	PyObject *other;
+
+	if (!PyArg_ParseTuple(args, "O:__rmul__", &other))
+		return NULL;
+	return PyNumber_Multiply(other, self);
+}
+
+static PyMethodDef tab_sq_repeat[] = {
+	{"__mul__", wrap_mul, METH_VARARGS, "XXX"},
+	{"__rmul__", wrap_rmul, METH_VARARGS, "XXX"},
+	{0}
+};
+
+static PyObject *
+wrap_getitem(PyObject *self, PyObject *args)
+{
+	PyObject *key;
+
+	if (!PyArg_ParseTuple(args, "O:__getitem__", &key))
+		return NULL;
+	return PyObject_GetItem(self, key);
+}
+
+static PyMethodDef tab_getitem[] = {
+	{"__getitem__", wrap_getitem, METH_VARARGS, "XXX"},
+	{0}
+};
+
+static PyObject *
+wrap_getslice(PyObject *self, PyObject *args)
+{
+	int i, j;
+
+	if (!PyArg_ParseTuple(args, "ii:__getslice__", &i, &j))
+		return NULL;
+	return PySequence_GetSlice(self, i, j);
+}
+
+static PyMethodDef tab_sq_slice[] = {
+	{"__getslice__", wrap_getslice, METH_VARARGS, "XXX"},
+	{0}
+};
+
+static PyObject *
+wrap_setitem(PyObject *self, PyObject *args)
+{
+	PyObject *key, *value;
+
+	if (!PyArg_ParseTuple(args, "OO:__setitem__", &key, &value))
+		return NULL;
+	if (PyObject_SetItem(self, key, value) < 0)
+		return NULL;
+	Py_INCREF(Py_None);
+	return Py_None;
+}
+
+static PyMethodDef tab_setitem[] = {
+	{"__setitem__", wrap_setitem, METH_VARARGS, "XXX"},
+	{0}
+};
+
+static PyObject *
+wrap_setslice(PyObject *self, PyObject *args)
+{
+	int i, j;
+	PyObject *value;
+
+	if (!PyArg_ParseTuple(args, "iiO:__setslice__", &i, &j, &value))
+		return NULL;
+	if (PySequence_SetSlice(self, i, j, value) < 0)
+		return NULL;
+	Py_INCREF(Py_None);
+	return Py_None;
+}
+
+static PyMethodDef tab_setslice[] = {
+	{"__setslice__", wrap_setslice, METH_VARARGS, "XXX"},
+	{0}
+};
+
+static PyObject *
+wrap_contains(PyObject *self, PyObject *args)
+{
+	PyObject *value;
+	long res;
+
+	if (!PyArg_ParseTuple(args, "O:__contains__", &value))
+		return NULL;
+	res = PySequence_Contains(self, value);
+	if (res < 0 && PyErr_Occurred())
+		return NULL;
+	return PyInt_FromLong(res);
+}
+
+static PyMethodDef tab_contains[] = {
+	{"__contains__", wrap_contains, METH_VARARGS, "XXX"},
+	{0}
+};
+
+static PyObject *
+wrap_iadd(PyObject *self, PyObject *args)
+{
+	PyObject *other;
+
+	if (!PyArg_ParseTuple(args, "O:__iadd__", &other))
+		return NULL;
+	return PyNumber_InPlaceAdd(self, other);
+}
+
+static PyMethodDef tab_iadd[] = {
+	{"__iadd__", wrap_iadd, METH_VARARGS, "XXX"},
+	{0}
+};
+
+static PyObject *
+wrap_imul(PyObject *self, PyObject *args)
+{
+	PyObject *other;
+
+	if (!PyArg_ParseTuple(args, "O:__imul__", &other))
+		return NULL;
+	return PyNumber_InPlaceMultiply(self, other);
+}
+
+static PyMethodDef tab_imul[] = {
+	{"__imul__", wrap_imul, METH_VARARGS, "XXX"},
+	{0}
+};
+
+static int
+add_operators(PyTypeObject *type)
+{
+	PySequenceMethods *sq;
+	PyMappingMethods *mp;
+
+#undef ADD
+#define ADD(SLOT, TABLE) \
+		if (SLOT) { \
+			if (add_methods(type, TABLE) < 0) \
+				return -1; \
+		}
+
+	if ((sq = type->tp_as_sequence) != NULL) {
+		ADD(sq->sq_length, tab_len);
+		ADD(sq->sq_concat, tab_sq_concat);
+		ADD(sq->sq_repeat, tab_sq_repeat);
+		ADD(sq->sq_item, tab_getitem);
+		ADD(sq->sq_slice, tab_sq_slice);
+		ADD(sq->sq_ass_item, tab_setitem);
+		ADD(sq->sq_ass_slice, tab_setslice);
+		ADD(sq->sq_contains, tab_contains);
+		ADD(sq->sq_inplace_concat, tab_iadd);
+		ADD(sq->sq_inplace_repeat, tab_imul);
+	}
+	if ((mp = type->tp_as_mapping) != NULL) {
+		ADD(mp->mp_length, tab_len);
+		ADD(mp->mp_subscript, tab_getitem);
+		ADD(mp->mp_ass_subscript, tab_setitem);
+	}
+	return 0;
+}

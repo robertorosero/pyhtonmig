@@ -279,6 +279,8 @@ extern DL_IMPORT(PyTypeObject) PyType_Type; /* The type of type objects */
 
 #define PyType_Check(op) ((op)->ob_type == &PyType_Type)
 
+extern DL_IMPORT(int) PyType_InitDict(PyTypeObject *);
+
 /* Generic operations on objects */
 extern DL_IMPORT(int) PyObject_Print(PyObject *, FILE *, int);
 extern DL_IMPORT(void) _PyObject_Dump(PyObject *);
