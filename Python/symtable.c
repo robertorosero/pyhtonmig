@@ -40,7 +40,7 @@ PySTEntry_New(struct symtable *st, identifier name, block_ty block,
 	ste->ste_children = v;
 
 	ste->ste_type = block;
-	ste->ste_optimized = 0;
+	ste->ste_optimized = block == FunctionBlock;
 	ste->ste_varargs = 0;
 	ste->ste_varkeywords = 0;
 	ste->ste_opt_lineno = 0;
@@ -518,8 +518,6 @@ symtable_enter_block(struct symtable *st, identifier name, block_ty block,
 {
 	PySTEntryObject *prev = NULL;
 
-	// fprintf(stderr, "enter block %s %d\n", PyString_AS_STRING(name), lineno);
-
 	if (st->st_cur) {
 		prev = st->st_cur;
 		if (PyList_Append(st->st_stack, (PyObject *)st->st_cur) < 0) {
@@ -713,6 +711,7 @@ symtable_visit_stmt(struct symtable *st, stmt_ty s)
 		break;
         case Exec_kind:
 		VISIT(st, expr, s->v.Exec.body);
+		st->st_cur->ste_optimized = 0;
 		if (s->v.Exec.globals) {
 			VISIT(st, expr, s->v.Exec.globals);
 			if (s->v.Exec.locals) 
@@ -922,7 +921,12 @@ static int
 symtable_visit_alias(struct symtable *st, alias_ty a)
 {
 	PyObject *name = (a->asname == NULL) ? a->name : a->asname;
-	return symtable_add_def(st, name, DEF_IMPORT);
+	if (strcmp(PyString_AS_STRING(name), "*"))
+	    return symtable_add_def(st, name, DEF_IMPORT);
+	else {
+	    st->st_cur->ste_optimized = 0;
+	    return 1;
+	}
 }
 
 
