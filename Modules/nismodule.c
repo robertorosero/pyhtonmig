@@ -270,8 +270,9 @@ nisproc_maplist_2(argp, clnt)
     static nisresp_maplist res;
 
     memset(&res, 0, sizeof(res));
-    if (clnt_call(clnt, YPPROC_MAPLIST, nis_xdr_domainname, argp, nis_xdr_ypresp_maplist
-, &res, TIMEOUT) != RPC_SUCCESS) {
+    if (clnt_call(clnt, YPPROC_MAPLIST, nis_xdr_domainname, (caddr_t)argp,
+		  nis_xdr_ypresp_maplist, (caddr_t)&res, TIMEOUT)
+	!= RPC_SUCCESS) {
         return (NULL);
     }
     return (&res);
