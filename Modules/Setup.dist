@@ -464,3 +464,5 @@ GLHACK=-Dclear=__GLclear
 # Example -- included for reference only:
 # xx xxmodule.c
 
+# Another example -- the 'spam' module shows C-level subtyping in action
+spam spam.c
