@@ -37,7 +37,8 @@ extern int getopt(); /* PROTO((int, char **, char *)); -- not standardized */
 
 extern char *getenv();
 
-main(argc, argv)
+int
+realmain(argc, argv)
 	int argc;
 	char **argv;
 {
@@ -57,8 +58,6 @@ main(argc, argv)
 		inspect = 1;
 	if ((p = getenv("PYTHONKILLPRINT")) && *p != '\0')
 		killprint = 1;
-	
-	initargs(&argc, &argv);
 
 	while ((c = getopt(argc, argv, "c:dikv")) != EOF) {
 		if (c == 'c') {
@@ -121,6 +120,10 @@ PYTHONPATH   : colon-separated list of directories prefixed to the\n\
 	
 	if (command == NULL && optind < argc && strcmp(argv[optind], "-") != 0)
 		filename = argv[optind];
+
+	if (verbose ||
+	    command == NULL && filename == NULL && isatty((int)fileno(fp)))
+		fprintf(stderr, "%s\n%s\n", getversion(), getcopyright());
 	
 	if (filename != NULL) {
 		if ((fp = fopen(filename, "r")) == NULL) {

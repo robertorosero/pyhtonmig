@@ -38,13 +38,8 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #include "pythonrun.h"
 #include "import.h"
 
-#ifdef unix
-#define HANDLE_SIGNALS
-#endif
-
-#ifdef HANDLE_SIGNALS
+#ifdef HAVE_SIGNAL_H
 #include <signal.h>
-#include "sigtype.h"
 #endif
 
 extern char *getpythonpath();
@@ -76,15 +71,13 @@ initall()
 	
 	initimport();
 	
-	/* Modules 'builtin' and 'sys' are initialized here,
+	/* Modules '__builtin__' and 'sys' are initialized here,
 	   they are needed by random bits of the interpreter.
 	   All other modules are optional and are initialized
 	   when they are first imported. */
 	
 	initbuiltin(); /* Also initializes builtin exceptions */
 	initsys();
-	
-	initcalls(); /* Configuration-dependent initializations */
 
 	setpythonpath(getpythonpath());
 
@@ -396,7 +389,7 @@ fatal(msg)
 /* Clean up and exit */
 
 #ifdef USE_THREAD
-extern int threads_started;
+int threads_started = 0; /* Set by threadmodule.c and maybe others */
 #endif
 
 static void
@@ -445,7 +438,6 @@ goaway(sts)
 	   debugging anyway). */
 	
 	(void) save_thread();
-	donecalls();
 	if (threads_started)
 		_exit_prog(sts);
 	else
@@ -453,10 +445,7 @@ goaway(sts)
 	
 #else /* USE_THREAD */
 	
-	/* XXX Call doneimport() before donecalls(), since donecalls()
-	   calls wdone(), and doneimport() may close windows */
 	doneimport();
-	donecalls();
 	
 	err_clear();
 
@@ -475,8 +464,8 @@ goaway(sts)
 	/*NOTREACHED*/
 }
 
-#ifdef HANDLE_SIGNALS
-static SIGTYPE
+#ifdef HAVE_SIGNAL_H
+static RETSIGTYPE
 sighandler(sig)
 	int sig;
 {
@@ -491,7 +480,7 @@ static void
 initsigs()
 {
 	initintr();
-#ifdef HANDLE_SIGNALS
+#ifdef HAVE_SIGNAL_H
 	if (signal(SIGHUP, SIG_IGN) != SIG_IGN)
 		signal(SIGHUP, sighandler);
 	if (signal(SIGTERM, SIG_IGN) != SIG_IGN)

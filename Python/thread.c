@@ -1,3 +1,8 @@
+#ifdef sun
+#ifdef __STDC__
+#define SOLARIS
+#endif
+#endif
 /***********************************************************
 Copyright 1991, 1992, 1993 by Stichting Mathematisch Centrum,
 Amsterdam, The Netherlands.

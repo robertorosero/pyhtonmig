@@ -49,7 +49,8 @@ main(argc, argv)
 	if ((p = getenv("PYTHONKILLPRINT")) && *p != '\0')
 		killprint = 1;
 
-	initargs(&argc, &argv);
+	if (verbose)
+		fprintf(stderr, "%s\n%s\n", getversion(), getcopyright());
 	initall();
 	setpythonargv(argc, argv);
 
