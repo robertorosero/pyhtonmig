@@ -22,8 +22,6 @@ Free Software Foundation.
 Emacs-specific code and syntax table code is almost directly borrowed
 from GNU regexp.
 
-$Header$
-
 */
 
 #include "myproto.h" /* For PROTO macro --Guido */
