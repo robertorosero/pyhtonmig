@@ -1676,6 +1676,7 @@ dict_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
 	PyObject *self;
 
+	assert(type != NULL && type->tp_alloc != NULL);
 	self = type->tp_alloc(type, 0);
 	if (self != NULL) {
 		PyDictObject *d = (PyDictObject *)self;
