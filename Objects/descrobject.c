@@ -47,7 +47,7 @@ descr_name(PyDescrObject *descr)
 	case DF_WRAPPER:
 		return descr->d_union.d_wrapper.base->name;
 	default:
-		return NULL;
+		return "?";
 	}
 }
 
@@ -202,20 +202,18 @@ descr_call(PyDescrObject *descr, PyObject *args, PyObject *kwds)
 	assert(PyTuple_Check(args));
 	argc = PyTuple_GET_SIZE(args);
 	if (argc < 1) {
-		PyErr_SetString(PyExc_TypeError,
-				"descriptor call needs a self argument");
+		PyErr_Format(PyExc_TypeError,
+			     "descriptor '%.100s' needs an argument",
+			     descr_name(descr));
 		return NULL;
 	}
 	self = PyTuple_GET_ITEM(args, 0);
 	if (!PyObject_IsInstance(self, (PyObject *)(descr->d_type))) {
-		char *name = descr_name(descr);
-		if (name == NULL)
-			name = "?";
 		PyErr_Format(PyExc_TypeError,
 			     "descriptor '%.100s' "
-			     "requires a '%.100s', "
-			     "received a '%.100s'",
-			     name,
+			     "requires '%.100s', "
+			     "received '%.100s'",
+			     descr_name(descr),
 			     descr->d_type->tp_name,
 			     self->ob_type->tp_name);
 		return NULL;
@@ -244,9 +242,10 @@ descr_call(PyDescrObject *descr, PyObject *args, PyObject *kwds)
 	if (kwds != NULL) {
 		assert(PyDict_Check(kwds));
 		if (PyDict_Size(kwds) > 0) {
-			PyErr_SetString(PyExc_TypeError,
-					"this descriptor object can't called "
-					"called with keyword arguments");
+			PyErr_Format(PyExc_TypeError,
+				     "descriptor '%.100s' can't called "
+					"called with keyword arguments",
+				     descr_name(descr));
 			return NULL;
 		}
 	}
@@ -260,8 +259,9 @@ descr_call(PyDescrObject *descr, PyObject *args, PyObject *kwds)
 		Py_INCREF(Py_None);
 		return Py_None;
 	}
-	PyErr_SetString(PyExc_TypeError,
-			"too many arguments to descriptor call");
+	PyErr_Format(PyExc_TypeError,
+		     "too many arguments to call descriptor '%.100s'",
+		     descr_name(descr));
 	return NULL;
 }
 
@@ -302,7 +302,7 @@ descr_get_name(PyDescrObject *descr)
 {
 	char *s = descr_name(descr);
 
-	if (s != NULL)
+	if (*s != '?')
 		return PyString_FromString(s);
 	PyErr_SetString(PyExc_AttributeError, "unnamed descriptor");
 	return NULL;
