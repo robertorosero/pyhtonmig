@@ -663,7 +663,7 @@ static char join__doc__[] =
 "S.join(sequence) -> string\n\
 \n\
 Return a string which is the concatenation of the string representation\n\
-of very element in the sequence.  The separator between elements is S.";
+of every element in the sequence.  The separator between elements is S.";
 
 static PyObject *
 string_join(self, args)
@@ -1517,12 +1517,11 @@ string_endswith(self, args)
 	if (start < 0 || start > len || plen > len)
 		return PyInt_FromLong(0);
 
-	upper = (end > 0 && end <= len) ? end : len;
+	upper = (end >= 0 && end <= len) ? end : len;
 	lower = (upper - plen) > start ? (upper - plen) : start;
 
-	if (!memcmp(str+lower, suffix, plen))
+	if (upper-lower >= plen && !memcmp(str+lower, suffix, plen))
 		return PyInt_FromLong(1);
-	
 	else return PyInt_FromLong(0);
 }
 
