@@ -502,11 +502,11 @@ type_new(PyTypeObject *metatype, PyObject *args, PyObject *kwds)
 	}
 	else if (nslots) {
 		type->tp_dictoffset = slotoffset;
-		slotoffset += sizeof(PyObject *);
 		mp->name = "__dict__";
 		mp->type = T_OBJECT;
 		mp->offset = slotoffset;
 		mp->readonly = 1;
+		slotoffset += sizeof(PyObject *);
 	}
 	type->tp_basicsize = slotoffset;
 	add_members(type, et->members);
