@@ -450,21 +450,6 @@ SOURCE=..\Python\codecs.c
 # End Source File
 # Begin Source File
 
-SOURCE=..\Python\compile.c
-
-!IF  "$(CFG)" == "pythoncore - Win32 Release"
-
-!ELSEIF  "$(CFG)" == "pythoncore - Win32 Debug"
-
-!ELSEIF  "$(CFG)" == "pythoncore - Win32 Alpha Debug"
-
-!ELSEIF  "$(CFG)" == "pythoncore - Win32 Alpha Release"
-
-!ENDIF 
-
-# End Source File
-# Begin Source File
-
 SOURCE=..\Objects\complexobject.c
 
 !IF  "$(CFG)" == "pythoncore - Win32 Release"
@@ -1239,6 +1224,21 @@ SOURCE=..\Python\mysnprintf.c
 # Begin Source File
 
 SOURCE=..\Python\mystrtoul.c
+
+!IF  "$(CFG)" == "pythoncore - Win32 Release"
+
+!ELSEIF  "$(CFG)" == "pythoncore - Win32 Debug"
+
+!ELSEIF  "$(CFG)" == "pythoncore - Win32 Alpha Debug"
+
+!ELSEIF  "$(CFG)" == "pythoncore - Win32 Alpha Release"
+
+!ENDIF 
+
+# End Source File
+# Begin Source File
+
+SOURCE=..\Python\newcompile.c
 
 !IF  "$(CFG)" == "pythoncore - Win32 Release"
 

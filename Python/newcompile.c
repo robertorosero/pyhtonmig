@@ -88,7 +88,7 @@ static void compiler_pop_fblock(struct compiler *, enum fblocktype, int);
 
 static PyCodeObject *assemble(struct compiler *);
 
-static char *opnames[];
+static char *opnames[144];
 
 #define IS_JUMP(I) ((I)->i_jrel || (I)->i_jabs)
 
@@ -414,7 +414,7 @@ compiler_next_instr(struct compiler *c, int block)
 		ptr = PyObject_Realloc((void *)b, newsize);
 		if (ptr == NULL)
 			return -1;
-		memset(ptr + oldsize, 0, newsize - oldsize);
+		memset((char *)ptr + oldsize, 0, newsize - oldsize);
 		if (ptr != (void *)b) {
 			fprintf(stderr, "resize block %d\n", block);
 			c->u->u_blocks[block] = (struct basicblock *)ptr;
@@ -1135,8 +1135,9 @@ compiler_compare(struct compiler *c, expr_ty e)
 	for (i = 1; i < n; i++) {
 		ADDOP(c, DUP_TOP);
 		ADDOP(c, ROT_THREE);
+		/* XXX We're casting a void* to an int in the next stmt -- bad */
 		ADDOP_I(c, COMPARE_OP, 
-			asdl_seq_GET(e->v.Compare.ops, i - 1));
+			(cmpop_ty)asdl_seq_GET(e->v.Compare.ops, i - 1));
 		ADDOP_JREL(c, JUMP_IF_FALSE, cleanup);
 		NEXT_BLOCK(c);
 		ADDOP(c, POP_TOP);
