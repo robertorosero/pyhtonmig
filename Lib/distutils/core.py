@@ -97,9 +97,21 @@ def setup (**attrs):
             dist.run_commands ()
         except KeyboardInterrupt:
             raise SystemExit, "interrupted"
-        except IOError, exc:
-            # is this 1.5.2-specific? 1.5-specific?
-            raise SystemExit, "error: %s: %s" % (exc.filename, exc.strerror)
+        except (IOError, os.error), exc:
+            # check for Python 1.5.2-style {IO,OS}Error exception objects
+            if hasattr (exc, 'filename') and hasattr (exc, 'strerror'):
+                if exc.filename:
+                    raise SystemExit, \
+                          "error: %s: %s" % (exc.filename, exc.strerror)
+                else:
+                    # two-argument functions in posix module don't
+                    # include the filename in the exception object!
+                    raise SystemExit, \
+                          "error: %s" % exc.strerror
+            else:
+                raise SystemExit, "error: " + exc[-1]
+        except (DistutilsExecError, DistutilsFileError), msg:
+            raise SystemExit, "error: " + str (msg)
 
 # setup ()
 
@@ -903,6 +915,9 @@ class Command:
            tuple for it (to embody the "external action" being performed),
            a message to print if the verbosity level is high enough, and an
            optional verbosity threshold."""
+
+        if type (args) is not TupleType:
+            raise TypeError, "'args' must be a tuple of command arguments"
 
         # Generate a message if we weren't passed one
         if msg is None:

@@ -23,7 +23,7 @@ from copy import copy
 from sysconfig import \
      CC, CCSHARED, CFLAGS, OPT, LDSHARED, LDFLAGS, RANLIB, AR, SO
 from ccompiler import CCompiler, gen_preprocess_options, gen_lib_options
-from util import move_file, newer_pairwise, newer_group
+from util import extend, move_file, newer_pairwise, newer_group
 
 # XXX Things not currently handled:
 #   * optimization/debug/warning flags; we just use whatever's in Python's
@@ -149,7 +149,7 @@ class UnixCCompiler (CCompiler):
             if extra_preargs:
                 cc_args[:0] = extra_preargs
             if extra_postargs:
-                cc_args.extend (extra_postargs)
+                extend (cc_args, extra_postargs)
             self.spawn ([self.cc] + cc_args)
         
 
@@ -289,7 +289,7 @@ class UnixCCompiler (CCompiler):
             if extra_preargs:
                 ld_args[:0] = extra_preargs
             if extra_postargs:
-                ld_args.extend (extra_postargs)
+                extend (ld_args, extra_postargs)
             self.spawn ([self.ld_shared] + ld_args)
         else:
             self.announce ("skipping %s (up-to-date)" % output_filename)
@@ -328,7 +328,7 @@ class UnixCCompiler (CCompiler):
             if extra_preargs:
                 ld_args[:0] = extra_preargs
             if extra_postargs:
-                ld_args.extend (extra_postargs)
+                extend (ld_args, extra_postargs)
             self.spawn ([self.ld_exec] + ld_args)
         else:
             self.announce ("skipping %s (up-to-date)" % output_filename)
