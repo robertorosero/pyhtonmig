@@ -10,13 +10,14 @@ here, I'm grateful to many more people who remain unnamed.  You may
 find your name in the ACKS file.  If you believe you deserve more
 credit, let me know and I'll add you to the list!
 
+--Guido van Rossum (home page: http://www.pythonlabs.com/~guido/)
 
 ======================================================================
 
-Overview of changes
--------------------
+Changes from 1.5.2 to 1.6
+-------------------------
 
-For the list of change below, I have borrowed from the document
+For this overview of changes, I have borrowed from the document
 "What's New in Python 2.0" by Andrew Kuchling and Moshe Zadka:
 http://starship.python.net/crew/amk/python/writing/new-python/.
 
@@ -105,5 +106,61 @@ x :-).
 - You can now override the 'in' operator by defining a __contains__
 method.  Note that it has its arguments backwards: x in a causes
 a.__contains__(x) to be called.  That's why the name isn't __in__.
+
+
+Changes from 1.6b1 to 1.6
+-------------------------
+
+- Slight changes to the CNRI license.  A copyright notice has been
+added; the requirement to indicate the nature of modifications now
+applies when making a derivative work available "to others" instead of
+just "to the public"; the version and date are updated.  The new
+license has a new handle.
+
+- Added the Tools/compiler package.  This is a project led by Jeremy
+Hylton to write the Python bytecode generator in Python.
+
+- The function math.rint() is removed.
+
+- In Python.h, "#define _GNU_SOURCE 1" was added.
+
+- Version 0.9.1 of Greg Ward's distutils is included (instead of
+version 0.9).
+
+- A new version of SRE is included.  It is more stable, and more
+compatible with the old RE module.  Non-matching ranges are indicated
+by -1, not None.  (The documentation said None, but the PRE
+implementation used -1; changing to None would break existing code.)
+
+- The winreg module has been renamed to _winreg.  (There are plans for
+a higher-level API called winreg, but this has not yet materialized in
+a form that is acceptable to the experts.)
+
+- The _locale module is enabled by default.
+
+- Fixed the configuration line for the _curses module.
+
+- A few crashes have been fixed, notably <file>.writelines() with a
+list containing non-string objects would crash, and there were
+situations where a lost SyntaxError could dump core.
+
+- The <list>.extend() method now accepts an arbitrary sequence
+argument.
+
+- If __str__() or __repr__() returns a Unicode object, this is
+converted to an 8-bit string.
+
+- Unicode string comparisons is no longer aware of UTF-16
+encoding peculiarities; it's a straight 16-bit compare.
+
+- The Windows installer now installs the LICENSE file and no longer
+registers the Python DLL version in the registry (this is no longer
+needed).  It now uses Tcl/Tk 8.3.2.
+
+- A few portability problems have been fixed, in particular a
+compilation error involving socklen_t.
+
+- The PC configuration is slightly friendlier to non-Microsoft
+compilers.
 
 ======================================================================
