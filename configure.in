@@ -61,7 +61,13 @@ fi
 termcap=
 AC_HAVE_LIBRARY(termcap, [termcap=termcap], [AC_HAVE_LIBRARY(termlib, [termcap=termlib])])
 if test ! -z "$termcap"
-then LIBS="$LIBS -lreadline -l$termcap"
+then LIBS="$LIBS -lreadline"
+     # Avoid possible conflict between shared libraries termcap and gl
+     # on IRIX 5: both contain a routine called clear.
+     if test -f /usr/lib/lib$termcap.a
+     then LIBS="$LIBS /usr/lib/lib$termcap.a"
+     else LIBS="$LIBS -l$termcap"
+     fi
 else AC_ERROR(no working termcap/termlib, do not use --with-readline)
 fi])
 
