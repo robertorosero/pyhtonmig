@@ -39,19 +39,19 @@ type_dict(PyTypeObject *type, void *context)
 }
 
 static PyObject *
-type_introduced(PyTypeObject *type, void *context)
+type_defined(PyTypeObject *type, void *context)
 {
-	if (type->tp_introduced == NULL) {
+	if (type->tp_defined == NULL) {
 		Py_INCREF(Py_None);
 		return Py_None;
 	}
-	return PyDictProxy_New(type->tp_introduced);
+	return PyDictProxy_New(type->tp_defined);
 }
 
 struct getsetlist type_getsets[] = {
 	{"__module__", (getter)type_module, NULL, NULL},
 	{"__dict__",  (getter)type_dict,  NULL, NULL},
-	{"__introduced__",  (getter)type_introduced,  NULL, NULL},
+	{"__defined__",  (getter)type_defined,  NULL, NULL},
 	{0}
 };
 
@@ -481,8 +481,8 @@ type_new(PyTypeObject *metatype, PyObject *args, PyObject *kwds)
 	Py_INCREF(base);
 	type->tp_base = base;
 
-	/* Initialize tp_introduced from passed-in dict */
-	type->tp_introduced = dict = PyDict_Copy(dict);
+	/* Initialize tp_defined from passed-in dict */
+	type->tp_defined = dict = PyDict_Copy(dict);
 	if (dict == NULL) {
 		Py_DECREF(type);
 		return NULL;
@@ -558,7 +558,7 @@ type_dealloc(PyTypeObject *type)
 	Py_XDECREF(type->tp_dict);
 	Py_XDECREF(type->tp_bases);
 	Py_XDECREF(type->tp_mro);
-	Py_XDECREF(type->tp_introduced);
+	Py_XDECREF(type->tp_defined);
 	/* XXX more? */
 	Py_XDECREF(et->name);
 	Py_XDECREF(et->slots);
@@ -686,7 +686,7 @@ PyTypeObject PyBaseObject_Type = {
 static int
 add_methods(PyTypeObject *type, PyMethodDef *meth)
 {
-	PyObject *dict = type->tp_introduced;
+	PyObject *dict = type->tp_defined;
 
 	for (; meth->ml_name != NULL; meth++) {
 		PyObject *descr;
@@ -705,7 +705,7 @@ add_methods(PyTypeObject *type, PyMethodDef *meth)
 static int
 add_wrappers(PyTypeObject *type, struct wrapperbase *base, void *wrapped)
 {
-	PyObject *dict = type->tp_introduced;
+	PyObject *dict = type->tp_defined;
 
 	for (; base->name != NULL; base++) {
 		PyObject *descr;
@@ -724,7 +724,7 @@ add_wrappers(PyTypeObject *type, struct wrapperbase *base, void *wrapped)
 static int
 add_members(PyTypeObject *type, struct memberlist *memb)
 {
-	PyObject *dict = type->tp_introduced;
+	PyObject *dict = type->tp_defined;
 
 	for (; memb->name != NULL; memb++) {
 		PyObject *descr;
@@ -743,7 +743,7 @@ add_members(PyTypeObject *type, struct memberlist *memb)
 static int
 add_getset(PyTypeObject *type, struct getsetlist *gsp)
 {
-	PyObject *dict = type->tp_introduced;
+	PyObject *dict = type->tp_defined;
 
 	for (; gsp->name != NULL; gsp++) {
 		PyObject *descr;
@@ -968,16 +968,16 @@ PyType_InitDict(PyTypeObject *type)
 			return -1;
 	}
 
-	/* Initialize tp_introduced */
-	dict = type->tp_introduced;
+	/* Initialize tp_defined */
+	dict = type->tp_defined;
 	if (dict == NULL) {
 		dict = PyDict_New();
 		if (dict == NULL)
 			return -1;
-		type->tp_introduced = dict;
+		type->tp_defined = dict;
 	}
 
-	/* Add type-specific descriptors to tp_introduced */
+	/* Add type-specific descriptors to tp_defined */
 	if (add_operators(type) < 0)
 		return -1;
 	if (type->tp_methods != NULL) {
@@ -993,7 +993,7 @@ PyType_InitDict(PyTypeObject *type)
 			return -1;
 	}
 
-	/* Initialize tp_dict from tp_introduced */
+	/* Initialize tp_dict from tp_defined */
 	type->tp_dict = PyDict_Copy(dict);
 	if (type->tp_dict == NULL)
 		return -1;
@@ -1022,7 +1022,7 @@ PyType_InitDict(PyTypeObject *type)
  	for (i = n; --i >= 0; ) {
 		base = (PyTypeObject *)PyTuple_GET_ITEM(bases, i);
 		assert(PyType_Check(base));
-		x = base->tp_introduced;
+		x = base->tp_defined;
 		if (x != NULL) {
 			x = PyObject_CallMethod(type->tp_dict, "update","O",x);
 			if (x == NULL)

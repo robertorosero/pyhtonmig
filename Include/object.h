@@ -275,7 +275,7 @@ typedef struct _typeobject {
 	destructor tp_free; /* Low-level free-memory routine */
 	PyObject *tp_bases;
 	PyObject *tp_mro; /* method resolution order */
-	PyObject *tp_introduced;
+	PyObject *tp_defined;
 
 #ifdef COUNT_ALLOCS
 	/* these must be last and never explicitly initialized */
