@@ -1,6 +1,8 @@
 IDLE 0.6
 --------
 
+Copyright (c) 1998-2000 Corporation for National Research Initiatives.
+
 This is IDLE, my own attempt at a Tkinter-based IDE for Python.
 
 For news about this release, see the file NEWS.txt.  (For a more
