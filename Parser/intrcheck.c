@@ -37,7 +37,27 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #include "intrcheck.h"
 
 
-#ifdef MSDOS
+#ifdef QUICKWIN
+
+#include <io.h>
+
+void
+initintr()
+{
+}
+
+int
+intrcheck()
+{
+	_wyield();
+}
+
+#define OK
+
+#endif /* QUICKWIN */
+
+
+#if defined(MSDOS) && !defined(QUICKWIN)
 
 /* This might work for MS-DOS (untested though): */
 
@@ -59,7 +79,7 @@ intrcheck()
 
 #define OK
 
-#endif /* MSDOS */
+#endif /* MSDOS && !QUICKWIN */
 
 
 #ifdef macintosh
