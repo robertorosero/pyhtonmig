@@ -726,9 +726,8 @@ class HTTPConnection:
     def _send_request(self, method, url, body, headers):
         # If headers already contains a host header, then define the
         # optional skip_host argument to putrequest().  The check is
-        # harder because field names are case insensitive.
-        if 'Host' in (headers
-            or [k for k in headers.iterkeys() if k.lower() == "host"]):
+        # more delicate because field names are case insensitive.
+        if 'host' in [k.lower() for k in headers]:
             self.putrequest(method, url, skip_host=1)
         else:
             self.putrequest(method, url)
@@ -909,6 +908,31 @@ class SSLFile(SharedSocketClient):
             line = all[:i]
             self._buf = all[i:]
             return line
+
+    def readlines(self, sizehint=0):
+        total = 0
+        list = []
+        while True:
+            line = self.readline()
+            if not line:
+                break
+            list.append(line)
+            total += len(line)
+            if sizehint and total >= sizehint:
+                break
+        return list
+
+    def fileno(self):
+        return self._sock.fileno()
+
+    def __iter__(self):
+        return self
+
+    def next(self):
+        line = self.readline()
+        if not line:
+            raise StopIteration
+        return line
 
 class FakeSocket(SharedSocketClient):
 

@@ -58,7 +58,7 @@ locale.setlocale(locale.LC_ALL, '')
 \end{funcdesc}
 
 \begin{funcdesc}{localeconv}{}
-  Returns the database of of the local conventions as a dictionary.
+  Returns the database of the local conventions as a dictionary.
   This dictionary has the following strings as keys:
 
   \begin{tableiii}{l|l|p{3in}}{constant}{Key}{Category}{Meaning}
@@ -398,7 +398,7 @@ Example:
 \begin{verbatim}
 >>> import locale
 >>> loc = locale.setlocale(locale.LC_ALL) # get current locale
->>> locale.setlocale(locale.LC_ALL, 'de') # use German locale
+>>> locale.setlocale(locale.LC_ALL, 'de_DE') # use German locale; name might vary with platform
 >>> locale.strcoll('f\xe4n', 'foo') # compare a string containing an umlaut 
 >>> locale.setlocale(locale.LC_ALL, '') # use user's preferred locale
 >>> locale.setlocale(locale.LC_ALL, 'C') # use default (C) locale

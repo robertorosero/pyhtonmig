@@ -10,7 +10,7 @@ somewhere near the top of their code.  Because of the automatic
 import, this is no longer necessary (but code that does it still
 works).
 
-This will append site-specific paths to to the module search path.  On
+This will append site-specific paths to the module search path.  On
 Unix, it starts with sys.prefix and sys.exec_prefix (if different) and
 appends lib/python<version>/site-packages as well as lib/site-python.
 On other platforms (mainly Mac and Windows), it uses just sys.prefix
@@ -192,6 +192,21 @@ for prefix in prefixes:
 del prefix, sitedir
 
 _dirs_in_sys_path = None
+
+
+# the OS/2 EMX port has optional extension modules that do double duty
+# as DLLs (and must use the .DLL file extension) for other extensions.
+# The library search path needs to be amended so these will be found
+# during module import.  Use BEGINLIBPATH so that these are at the start
+# of the library search path.
+if sys.platform == 'os2emx':
+    dllpath = os.path.join(sys.prefix, "Lib", "lib-dynload")
+    libpath = os.environ['BEGINLIBPATH'].split(';')
+    if libpath[-1]:
+        libpath.append(dllpath)
+    else:
+        libpath[-1] = dllpath
+    os.environ['BEGINLIBPATH'] = ';'.join(libpath)
 
 
 # Define new built-ins 'quit' and 'exit'.

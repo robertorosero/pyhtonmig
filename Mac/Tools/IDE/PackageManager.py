@@ -366,6 +366,7 @@ class PackageBrowser(PimpInterface):
 		self.w.description.enable(0)
 		
 	def updatestatus(self):
+		topcell = self.w.packagebrowser.gettopcell()
 		sel = self.w.packagebrowser.getselection()
 		data = self.getbrowserdata(self.w.hidden_button.get())
 		self.w.packagebrowser.setitems(data)
@@ -382,6 +383,8 @@ class PackageBrowser(PimpInterface):
 			self.w.user_button.enable(0)
 		else:
 			sel = sel[0]
+			if sel >= len(self.packages):
+				sel = 0
 			self.w.packagebrowser.setselection([sel])
 			installed, message = self.getstatus(sel)
 			self.w.installed.set(installed)
@@ -396,6 +399,7 @@ class PackageBrowser(PimpInterface):
 			self.w.recursive_button.enable(1)
 			self.w.force_button.enable(1)
 			self.w.user_button.enable(1)
+		self.w.packagebrowser.settopcell(topcell)
 		
 	def listhit(self, *args, **kwargs):
 		self.updatestatus()
@@ -419,6 +423,11 @@ class PackageBrowser(PimpInterface):
 		
 	def showmessages(self, messages):
 		if messages:
+			# To be on the safe side we always show the hidden packages,
+			# they may be referred to in the error messages.
+			if not self.w.hidden_button.get():
+				self.w.hidden_button.set(1)
+				self.updatestatus()
 			if type(messages) == list:
 				messages = '\n'.join(messages)
 			if self.w.verbose_button.get():

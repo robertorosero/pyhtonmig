@@ -99,6 +99,7 @@ dircheck(PyFileObject* f)
 		PyObject *exc = PyObject_CallFunction(PyExc_IOError, "(is)", 
 						      EISDIR, msg);
 		PyErr_SetObject(PyExc_IOError, exc);
+		Py_XDECREF(exc);
 		return NULL;
 	}
 #endif
@@ -282,25 +283,37 @@ PyFile_FromString(char *name, char *mode)
 void
 PyFile_SetBufSize(PyObject *f, int bufsize)
 {
+	PyFileObject *file = (PyFileObject *)f;
 	if (bufsize >= 0) {
-#ifdef HAVE_SETVBUF
 		int type;
 		switch (bufsize) {
 		case 0:
 			type = _IONBF;
 			break;
+#ifdef HAVE_SETVBUF
 		case 1:
 			type = _IOLBF;
 			bufsize = BUFSIZ;
 			break;
+#endif
 		default:
 			type = _IOFBF;
+#ifndef HAVE_SETVBUF
+			bufsize = BUFSIZ;
+#endif
+			break;
 		}
-		setvbuf(((PyFileObject *)f)->f_fp, (char *)NULL,
-			type, bufsize);
+		fflush(file->f_fp);
+		if (type == _IONBF) {
+			PyMem_Free(file->f_setbuf);
+			file->f_setbuf = NULL;
+		} else {
+			file->f_setbuf = PyMem_Realloc(file->f_setbuf, bufsize);
+		}
+#ifdef HAVE_SETVBUF
+		setvbuf(file->f_fp, file->f_setbuf, type, bufsize);
 #else /* !HAVE_SETVBUF */
-		if (bufsize <= 1)
-			setbuf(((PyFileObject *)f)->f_fp, (char *)NULL);
+		setbuf(file->f_fp, file->f_setbuf);
 #endif /* !HAVE_SETVBUF */
 	}
 }
@@ -384,6 +397,7 @@ file_close(PyFileObject *f)
 		}
 		f->f_fp = NULL;
 	}
+	PyMem_Free(f->f_setbuf);
 	if (sts == EOF)
 		return PyErr_SetFromErrno(PyExc_IOError);
 	if (sts != 0)
@@ -1607,7 +1621,9 @@ PyDoc_STRVAR(seek_doc,
 "0 (offset from start of file, offset should be >= 0); other values are 1\n"
 "(move relative to current position, positive or negative), and 2 (move\n"
 "relative to end of file, usually negative, although many platforms allow\n"
-"seeking beyond the end of a file).\n"
+"seeking beyond the end of a file).  If the file is opened in text mode,\n"
+"only offsets returned by tell() are legal.  Use of other offsets causes\n"
+"undefined behavior."
 "\n"
 "Note that not all file objects are seekable.");
 
@@ -1927,6 +1943,7 @@ file_init(PyObject *self, PyObject *args, PyObject *kwds)
 	}
 	if (open_the_file(foself, name, mode) == NULL)
 		goto Error;
+	foself->f_setbuf = NULL;
 	PyFile_SetBufSize(self, bufsize);
 	goto Done;
 
