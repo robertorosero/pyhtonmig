@@ -434,12 +434,13 @@ vereq((u'ab' in 'abc'), True)
 vereq((u'ab' in (1,None,u'ab')), True)
 vereq((u'' in u'abc'), True)
 vereq(('' in u'abc'), True)
-try:
-    u'\xe2' in 'g\xe2teau'
-except UnicodeError:
-    pass
-else:
-    print '*** contains operator does not propagate UnicodeErrors'
+if sys.getdefaultencoding() == 'ascii':
+    try:
+        u'\xe2' in 'g\xe2teau'
+    except UnicodeError:
+        pass
+    else:
+        print '*** contains operator does not propagate UnicodeErrors'
 print 'done.'
 
 # Formatting:
