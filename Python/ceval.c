@@ -647,7 +647,9 @@ eval_code(co, globals, locals, owner, arg)
 		case PRINT_EXPR:
 			v = POP();
 			/* Print value except if procedure result */
-			if (v != None) {
+			/* Before printing, also assign to '_' */
+			if (v != None &&
+			    (err = dictinsert(f->f_locals, "_", v)) == 0) {
 				flushline();
 				x = sysget("stdout");
 				softspace(x, 1);
