@@ -2036,6 +2036,13 @@ compiler_nameop(struct compiler *c, identifier name, expr_context_ty ctx)
 
         PyObject *dict = c->u->u_names;
 	/* XXX AugStore isn't used anywhere! */
+
+	/* First check for assignment to __debug__. Param? */
+	if ((ctx == Store || ctx == AugStore || ctx == Del)
+	    && !strcmp(PyString_AS_STRING(name), "__debug__")) {
+		return compiler_error(c, "can not assign to __debug__");
+	}
+
 	op = 0;
 	optype = OP_NAME;
 	scope = PyST_GetScope(c->u->u_ste, name);
