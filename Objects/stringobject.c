@@ -401,6 +401,13 @@ string_repr(register PyStringObject *op)
 	}
 }
 
+static PyObject *
+string_str(PyObject *s)
+{
+	Py_INCREF(s);
+	return s;
+}
+
 static int
 string_length(PyStringObject *a)
 {
@@ -2368,7 +2375,7 @@ PyTypeObject PyString_Type = {
 	0,					/* tp_as_mapping */
 	(hashfunc)string_hash, 			/* tp_hash */
 	0,					/* tp_call */
-	0,					/* tp_str */
+	(reprfunc)string_str,			/* tp_str */
 	PyGeneric_GetAttr,			/* tp_getattro */
 	0,					/* tp_setattro */
 	&string_as_buffer,			/* tp_as_buffer */
