@@ -168,12 +168,31 @@ long
 getintvalue(op)
 	register object *op;
 {
-	if (!is_intobject(op)) {
-		err_badcall();
+	number_methods *nb;
+	intobject *io;
+	long val;
+	
+	if (op && is_intobject(op))
+		return GETINTVALUE((intobject*) op);
+	
+	if (op == NULL || (nb = op->ob_type->tp_as_number) == NULL ||
+	    nb->nb_int == NULL) {
+		err_badarg();
 		return -1;
 	}
-	else
-		return ((intobject *)op) -> ob_ival;
+	
+	io = (intobject*) (*nb->nb_int) (op);
+	if (io == NULL)
+		return -1;
+	if (!is_intobject(io)) {
+		err_setstr(TypeError, "nb_int should return int object");
+		return -1;
+	}
+	
+	val = GETINTVALUE(io);
+	DECREF(io);
+	
+	return val;
 }
 
 /* Methods */

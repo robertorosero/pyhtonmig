@@ -77,12 +77,31 @@ double
 getfloatvalue(op)
 	object *op;
 {
-	if (!is_floatobject(op)) {
+	number_methods *nb;
+	floatobject *fo;
+	double val;
+	
+	if (op && is_floatobject(op))
+		return GETFLOATVALUE((floatobject*) op);
+	
+	if (op == NULL || (nb = op->ob_type->tp_as_number) == NULL ||
+	    nb->nb_float == NULL) {
 		err_badarg();
 		return -1;
 	}
-	else
-		return ((floatobject *)op) -> ob_fval;
+	
+	fo = (floatobject*) (*nb->nb_float) (op);
+	if (fo == NULL)
+		return -1;
+	if (!is_floatobject(fo)) {
+		err_setstr(TypeError, "nb_float should return float object");
+		return -1;
+	}
+	
+	val = GETFLOATVALUE(fo);
+	DECREF(fo);
+	
+	return val;
 }
 
 /* Methods */
