@@ -112,8 +112,8 @@ programs, or to test functions during bottom-up program development.
 It is also a handy desk calculator.
 
 Python allows writing very compact and readable programs.  Programs
-written in Python are typically much shorter than equivalent C
-programs, for several reasons:
+written in Python are typically much shorter than equivalent C or
+\Cpp{} programs, for several reasons:
 \begin{itemize}
 \item
 the high-level data types allow you to express complex operations in a
@@ -853,8 +853,9 @@ integer value is true; zero is false.  The condition may also be a
 string or list value, in fact any sequence; anything with a non-zero
 length is true, empty sequences are false.  The test used in the
 example is a simple comparison.  The standard comparison operators are
-written the same as in C: \code{<}, \code{>}, \code{==}, \code{<=},
-\code{>=} and \code{!=}.
+written the same as in C: \code{<} (less than), \code{>} (greater than),
+\code{==} (equal to), \code{<=} (less than or equal to),
+\code{>=} (greater than or equal to) and \code{!=} (not equal to).
 
 \item
 The \emph{body} of the loop is \emph{indented}: indentation is Python's
@@ -1779,6 +1780,9 @@ expression to a variable.  For example,
 \end{verbatim}
 
 Note that in Python, unlike C, assignment cannot occur inside expressions.
+C programmers may grumble about this, but it avoids a common class of
+problems encountered in C programs: typing \code{=} in an expression when
+\code{==} was intended.
 
 \section{Comparing Sequences and Other Types \label{comparing}}
 
@@ -3460,7 +3464,7 @@ methods have no special privileges when calling other methods of the
 same object, a method of a base class that calls another method
 defined in the same base class, may in fact end up calling a method of
 a derived class that overrides it.  (For \Cpp{} programmers: all methods
-in Python are ``virtual functions''.)
+in Python are effectively \keyword{virtual}.)
 
 An overriding method in a derived class may in fact want to extend
 rather than simply replace the base class method of the same name.
