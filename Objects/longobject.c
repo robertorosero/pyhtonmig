@@ -1851,24 +1851,24 @@ static PyNumberMethods long_as_number = {
 
 PyTypeObject PyLong_Type = {
 	PyObject_HEAD_INIT(&PyType_Type)
-	0,
-	"long int",
-	sizeof(PyLongObject) - sizeof(digit),
-	sizeof(digit),
-	(destructor)long_dealloc,	/*tp_dealloc*/
-	0,				/*tp_print*/
-	0,				/*tp_getattr*/
-	0,				/*tp_setattr*/
-	(cmpfunc)long_compare,		/*tp_compare*/
-	(reprfunc)long_repr,		/*tp_repr*/
-	&long_as_number,		/*tp_as_number*/
-	0,				/*tp_as_sequence*/
-	0,				/*tp_as_mapping*/
-	(hashfunc)long_hash,		/*tp_hash*/
-        0,              		/*tp_call*/
-        (reprfunc)long_str,		/*tp_str*/
-	PyGeneric_GetAttr,	/* tp_getattro */
-	0,			/*tp_setattro*/
-	0,			/*tp_as_buffer*/
-	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_CHECKTYPES	/*tp_flags*/
+	0,					/* ob_size */
+	"long int",				/* tp_name */
+	sizeof(PyLongObject) - sizeof(digit),	/* tp_basicsize */
+	sizeof(digit),				/* tp_itemsize */
+	(destructor)long_dealloc,		/* tp_dealloc */
+	0,					/* tp_print */
+	0,					/* tp_getattr */
+	0,					/* tp_setattr */
+	(cmpfunc)long_compare,			/* tp_compare */
+	(reprfunc)long_repr,			/* tp_repr */
+	&long_as_number,			/* tp_as_number */
+	0,					/* tp_as_sequence */
+	0,					/* tp_as_mapping */
+	(hashfunc)long_hash,			/* tp_hash */
+        0,              			/* tp_call */
+        (reprfunc)long_str,			/* tp_str */
+	PyObject_GenericGetAttr,		/* tp_getattro */
+	0,					/* tp_setattro */
+	0,					/* tp_as_buffer */
+	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_CHECKTYPES, /* tp_flags */
 };

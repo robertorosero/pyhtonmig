@@ -107,8 +107,8 @@ PyTypeObject PyFrame_Type = {
 	0,					/* tp_hash */
 	0,					/* tp_call */
 	0,					/* tp_str */
-	PyGeneric_GetAttr,			/* tp_getattro */
-	PyGeneric_SetAttr,			/* tp_setattro */
+	PyObject_GenericGetAttr,		/* tp_getattro */
+	PyObject_GenericSetAttr,		/* tp_setattro */
 	0,					/* tp_as_buffer */
 	Py_TPFLAGS_DEFAULT,			/* tp_flags */
 	0,					/* tp_doc */

@@ -549,7 +549,7 @@ PyTypeObject PyBuffer_Type = {
 	(hashfunc)buffer_hash,			/* tp_hash */
 	0,					/* tp_call */
 	(reprfunc)buffer_str,			/* tp_str */
-	PyGeneric_GetAttr,			/* tp_getattro */
+	PyObject_GenericGetAttr,		/* tp_getattro */
 	0,					/* tp_setattro */
 	&buffer_as_buffer,			/* tp_as_buffer */
 	Py_TPFLAGS_DEFAULT,			/* tp_flags */

@@ -377,7 +377,7 @@ PyTypeObject PyDescr_Type = {
 	0,					/* tp_hash */
 	(ternaryfunc)descr_call,		/* tp_call */
 	0,					/* tp_str */
-	PyGeneric_GetAttr,			/* tp_getattro */
+	PyObject_GenericGetAttr,		/* tp_getattro */
 	0,					/* tp_setattro */
 	0,					/* tp_as_buffer */
 	Py_TPFLAGS_DEFAULT,			/* tp_flags */
@@ -633,7 +633,7 @@ PyTypeObject proxytype = {
 	0,					/* tp_hash */
 	0,					/* tp_call */
 	(reprfunc)proxy_str,			/* tp_str */
-	PyGeneric_GetAttr,			/* tp_getattro */
+	PyObject_GenericGetAttr,		/* tp_getattro */
 	0,					/* tp_setattro */
 	0,					/* tp_as_buffer */
 	Py_TPFLAGS_DEFAULT,			/* tp_flags */
@@ -746,7 +746,7 @@ PyTypeObject wrappertype = {
 	0,					/* tp_hash */
 	(ternaryfunc)wrapper_call,		/* tp_call */
 	0,					/* tp_str */
-	PyGeneric_GetAttr,			/* tp_getattro */
+	PyObject_GenericGetAttr,		/* tp_getattro */
 	0,					/* tp_setattro */
 	0,					/* tp_as_buffer */
 	Py_TPFLAGS_DEFAULT,			/* tp_flags */

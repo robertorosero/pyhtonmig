@@ -152,7 +152,7 @@ func_getattro(PyObject *op, PyObject *name)
 		return NULL;
 	}
 
-	return PyGeneric_GetAttr(op, name);
+	return PyObject_GenericGetAttr(op, name);
 }
 
 static int
@@ -203,7 +203,7 @@ func_setattro(PyObject *op, PyObject *name, PyObject *value)
 		}
 	}
 
-	return PyGeneric_SetAttr(op, name, value);
+	return PyObject_GenericSetAttr(op, name, value);
 }
 
 static void

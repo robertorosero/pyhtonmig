@@ -245,7 +245,7 @@ type_init(PyObject *self, PyObject *args, PyObject *kwds)
 		}
 	}
 	if (slots == NULL && base->tp_dictoffset == 0 &&
-	    (base->tp_setattro == PyGeneric_SetAttr ||
+	    (base->tp_setattro == PyObject_GenericSetAttr ||
 	     base->tp_setattro == NULL))
 		nslots = 1;
 
@@ -283,11 +283,11 @@ type_init(PyObject *self, PyObject *args, PyObject *kwds)
 	if (type->tp_dealloc)
 		type->tp_dealloc = subtype_dealloc;
 	if (type->tp_getattro == NULL) {
-		type->tp_getattro = PyGeneric_GetAttr;
+		type->tp_getattro = PyObject_GenericGetAttr;
 		type->tp_getattr = NULL;
 	}
 	if (type->tp_setattro == NULL) {
-		type->tp_setattro = PyGeneric_SetAttr;
+		type->tp_setattro = PyObject_GenericSetAttr;
 		type->tp_setattr = NULL;
 	}
 
@@ -444,7 +444,7 @@ PyTypeObject PyType_Type = {
 	0,					/* tp_hash */
 	(ternaryfunc)type_call,			/* tp_call */
 	0,					/* tp_str */
-	PyGeneric_GetAttr,			/* tp_getattro */
+	PyObject_GenericGetAttr,			/* tp_getattro */
 	0,					/* tp_setattro */
 	0,					/* tp_as_buffer */
 	Py_TPFLAGS_DEFAULT,			/* tp_flags */
@@ -495,7 +495,7 @@ PyTypeObject PyBaseObject_Type = {
 	0,					/* tp_hash */
 	0,					/* tp_call */
 	0,					/* tp_str */
-	PyGeneric_GetAttr,			/* tp_getattro */
+	PyObject_GenericGetAttr,			/* tp_getattro */
 	0,					/* tp_setattro */
 	0,					/* tp_as_buffer */
 	Py_TPFLAGS_DEFAULT,			/* tp_flags */

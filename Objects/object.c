@@ -1076,7 +1076,7 @@ PyObject_SetAttr(PyObject *v, PyObject *name, PyObject *value)
 /* Generic GetAttr functions - put these in your tp_[gs]etattro slot */
 
 PyObject *
-PyGeneric_GetAttr(PyObject *obj, PyObject *name)
+PyObject_GenericGetAttr(PyObject *obj, PyObject *name)
 {
 	PyTypeObject *tp = obj->ob_type;
 	PyObject *descr;
@@ -1123,7 +1123,7 @@ PyGeneric_GetAttr(PyObject *obj, PyObject *name)
 }
 
 int
-PyGeneric_SetAttr(PyObject *obj, PyObject *name, PyObject *value)
+PyObject_GenericSetAttr(PyObject *obj, PyObject *name, PyObject *value)
 {
 	PyTypeObject *tp = obj->ob_type;
 	PyObject *descr;
