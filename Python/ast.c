@@ -1923,7 +1923,7 @@ ast_for_if_stmt(struct compiling *c, const node *n)
 	if (has_else) {
             expr_ty expression;
             asdl_seq *seq1, *seq2;
-        
+
 	    orelse = asdl_seq_new(1);
 	    if (!orelse)
 		return NULL;
@@ -1943,7 +1943,8 @@ ast_for_if_stmt(struct compiling *c, const node *n)
                 return NULL;
             }
 
-	    asdl_seq_SET(orelse, 0, If(expression, seq1, seq2, LINENO(n)));
+	    asdl_seq_SET(orelse, 0, If(expression, seq1, seq2, 
+				       LINENO(CHILD(n, NCH(n) - 6))));
 	    /* the just-created orelse handled the last elif */
 	    n_elif--;
 	}
@@ -1969,7 +1970,8 @@ ast_for_if_stmt(struct compiling *c, const node *n)
             }
 
 	    asdl_seq_SET(new, 0,
-			 If(expression, suite_seq, orelse, LINENO(n)));
+			 If(expression, suite_seq, orelse, 
+			    LINENO(CHILD(n, off))));
 	    orelse = new;
 	}
 	return If(ast_for_expr(c, CHILD(n, 1)),
