@@ -1,5 +1,5 @@
 #!/bin/sh
-# From configure.in Revision: 1.2.4.8 
+# From configure.in Revision: 1.2.4.9 
 #!/bin/sh
 # Guess values for system-dependent variables and create Makefiles.
 # Generated automatically using autoconf.
@@ -1448,9 +1448,9 @@ cat > conftest.c <<EOF
 
 struct s { int a; int b; };
 static struct s foo;
-struct s *fooaddr() { return &foo; }
+int foobar() { return !foo.a; }
 static struct s foo = { 1, 2 };
-main() { if (fooaddr() != &foo) exit(1); else exit(0); }
+main() { exit(foobar()); }
 
 EOF
 eval $compile
