@@ -29,53 +29,47 @@ SHELL=		/bin/sh
 # === Fixed definitions ===
 
 OBJS=		\
-		arraymodule.o \
 		bltinmodule.o \
 		ceval.o cgensupport.o compile.o \
 		errors.o \
 		frozenmain.o \
 		getmtime.o graminit.o \
 		import.o \
-		marshal.o mathmodule.o modsupport.o \
-		parsermodule.o posixmodule.o pythonmain.o pythonrun.o \
-		regexmodule.o regexpr.o \
-		stropmodule.o structmember.o structmodule.o sysmodule.o \
-		timemodule.o traceback.o \
+		marshal.o modsupport.o \
+		pythonmain.o pythonrun.o \
+		structmember.o sysmodule.o \
+		traceback.o \
 		version.o \
 		$(LIBOBJS)
 
 LIB=		libPython.a
-
-MYLIBS=		$(LIB) ../Objects/libObjects.a ../Parser/libParser.a
 
 SYSLIBS=	-lm
 
 
 # === Rules ===
 
-all:		$(LIB) python
+all:		$(LIB)
 
 $(LIB):		$(OBJS)
 		$(AR) cr $(LIB) $(OBJS)
 		$(RANLIB) $(LIB)
 
-python:		config.o $(MYLIBS)
-		$(CC) config.o $(MYLIBS) $(LIBS) $(SYSLIBS) -o python
-
-config.o:	Makefile
-
 clean:
 		-rm -f *.o core *~ [@,#]* *.old *.orig *.rej
 
 clobber:	clean
-		-rm -f *.a python tags TAGS
+		-rm -f *.a tags TAGS
 
 Makefile:	Makefile.in $(TOP)/config.status
-		CONFIG_FILES=Makefile $(SHELL) $(TOP)/config.status
+		CONFIG_FILES=Makefile CONFIG_HEADERS= \
+		$(SHELL) $(TOP)/config.status
 
 depend:
 		$(MKDEP) $(CFLAGS) \
 			`echo $(OBJS) | tr ' ' '\012' | sed 's/\.o/.c/'`
+
+.PRECIOUS:	Makefile
 
 # DO NOT DELETE THIS LINE -- mkdep uses it.
 # DO NOT PUT ANYTHING AFTER THIS LINE, IT WILL GO AWAY.

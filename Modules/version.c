@@ -1,5 +1,5 @@
 /***********************************************************
-Copyright 1991, 1992, 1993 by Stichting Mathematisch Centrum,
+Copyright 1991, 1992, 1993, 1994 by Stichting Mathematisch Centrum,
 Amsterdam, The Netherlands.
 
                         All Rights Reserved
@@ -30,12 +30,12 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
    version number, the patch level, and the current date (if known to
    the compiler, else a manually inserted date). */
 
-#define VERSION "1.0.%d ALPHA (%s)"
+#define VERSION "1.0.%d BETA (%s)"
 
 #ifdef __DATE__
 #define DATE __DATE__
 #else
-#define DATE ">= 24 Dec 1993"
+#define DATE "January 1994"
 #endif
 
 char *
@@ -52,6 +52,5 @@ getversion()
 char *
 getcopyright()
 {
-	return
-"Copyright 1990, 1991, 1992, 1993 Stichting Mathematisch Centrum, Amsterdam";
+	return "Copyright 1991-1994 Stichting Mathematisch Centrum, Amsterdam";
 }
