@@ -26,6 +26,10 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #include "config.h"
 #endif
 
+#ifdef HAVE_THREAD_H
+#define SOLARIS
+#endif
+
 #include "thread.h"
 
 #ifdef DEBUG
