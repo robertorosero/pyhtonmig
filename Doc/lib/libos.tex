@@ -790,9 +790,10 @@ process status is available immediately.
 Availability: \UNIX{}.
 \end{datadesc}
 
-The following functions take a process stats code as returned by
-\function{waitpid()} as a parameter.  They may be used to determine
-the disposition of a process.
+The following functions take a process status code as returned by
+\function{system()}, \function{wait()}, or \function{waitpid()} as a
+parameter.  They may be used to determine the disposition of a
+process.
 
 \begin{funcdesc}{WIFSTOPPED}{status}
 Return true if the process has been stopped.
