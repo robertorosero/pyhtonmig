@@ -36,12 +36,12 @@ PyClass_New(PyObject *bases, PyObject *dict, PyObject *name)
 			return NULL;
 	}
 	if (name == NULL || !PyString_Check(name)) {
-		PyErr_SetString(PyExc_SystemError,
+		PyErr_SetString(PyExc_TypeError,
 				"PyClass_New: name must be a string");
 		return NULL;
 	}
 	if (dict == NULL || !PyDict_Check(dict)) {
-		PyErr_SetString(PyExc_SystemError,
+		PyErr_SetString(PyExc_TypeError,
 				"PyClass_New: dict must be a dictionary");
 		return NULL;
 	}
@@ -67,14 +67,14 @@ PyClass_New(PyObject *bases, PyObject *dict, PyObject *name)
 	else {
 		int i;
 		if (!PyTuple_Check(bases)) {
-			PyErr_SetString(PyExc_SystemError,
+			PyErr_SetString(PyExc_TypeError,
 					"PyClass_New: bases must be a tuple");
 			return NULL;
 		}
 		i = PyTuple_Size(bases);
 		while (--i >= 0) {
 			if (!PyClass_Check(PyTuple_GetItem(bases, i))) {
-				PyErr_SetString(PyExc_SystemError,
+				PyErr_SetString(PyExc_TypeError,
 					"PyClass_New: base must be a class");
 				return NULL;
 			}
@@ -104,6 +104,18 @@ PyClass_New(PyObject *bases, PyObject *dict, PyObject *name)
 	Py_XINCREF(op->cl_delattr);
 	PyObject_GC_Init(op);
 	return (PyObject *) op;
+}
+
+static PyObject *
+class_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
+{
+	PyObject *name, *bases, *dict;
+	static char *kwlist[] = {"name", "bases", "dict", 0};
+
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "SOO", kwlist,
+					 &name, &bases, &dict))
+		return NULL;
+	return PyClass_New(bases, dict, name);
 }
 
 /* Class methods */
@@ -404,6 +416,22 @@ PyTypeObject PyClass_Type = {
 	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_GC,	/* tp_flags */
 	0,					/* tp_doc */
 	(traverseproc)class_traverse,		/* tp_traverse */
+ 	0,					/* tp_clear */
+	0,					/* tp_richcompare */
+	0,					/* tp_weaklistoffset */
+	0,					/* tp_iter */
+	0,					/* tp_iternext */
+	0,					/* tp_methods */
+	0,					/* tp_members */
+	0,					/* tp_getset */
+	0,					/* tp_base */
+	0,					/* tp_dict */
+	0,					/* tp_descr_get */
+	0,					/* tp_descr_set */
+	0,					/* tp_dictoffset */
+	0,					/* tp_init */
+	0,					/* tp_alloc */
+	class_new,				/* tp_new */
 };
 
 int
