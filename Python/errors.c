@@ -146,11 +146,10 @@ err_errno(exc)
 	object *exc;
 {
 	object *v;
-	if (errno == EINTR && intrcheck()) {
-		err_set(KeyboardInterrupt);
+	int i = errno;
+	if (i == EINTR && sigcheck())
 		return NULL;
-	}
-	v = mkvalue("(is)", errno, strerror(errno));
+	v = mkvalue("(is)", i, strerror(i));
 	if (v != NULL) {
 		err_setval(exc, v);
 		DECREF(v);

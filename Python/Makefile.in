@@ -38,7 +38,7 @@ OBJS=		\
 		import.o \
 		marshal.o modsupport.o mystrtoul.o \
 		pythonmain.o pythonrun.o \
-		structmember.o sysmodule.o \
+		sigcheck.o structmember.o sysmodule.o \
 		traceback.o \
 		version.o \
 		$(LIBOBJS)
@@ -93,6 +93,7 @@ modsupport.o: modsupport.c
 mystrtoul.o: mystrtoul.c
 pythonmain.o: pythonmain.c
 pythonrun.o: pythonrun.c
+sigcheck.o: sigcheck.c
 strerror.o: strerror.c
 strtod.o: strtod.c
 structmember.o: structmember.c

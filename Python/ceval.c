@@ -91,11 +91,8 @@ static int cmp_member PROTO((object *, object *));
 static object *cmp_outcome PROTO((int, object *, object *));
 static int import_from PROTO((object *, object *, object *));
 static object *build_class PROTO((object *, object *, object *));
-static void locals_2_fast PROTO((frameobject *, int));
-static void fast_2_locals PROTO((frameobject *));
 static int access_statement PROTO((object *, object *, frameobject *));
 static int exec_statement PROTO((object *, object *, object *));
-static void mergelocals PROTO(());
 
 
 /* Pointer to current frame, used to link new frames to */
@@ -189,7 +186,6 @@ eval_code(co, globals, locals, owner, arg)
 	register object *t;
 	register frameobject *f; /* Current frame */
 	register listobject *fastlocals = NULL;
-	object *trace = NULL;	/* Trace function or NULL */
 	object *retval;		/* Return value iff why == WHY_RETURN */
 	char *name;		/* Name used by some instructions */
 	int needmerge = 0;	/* Set if need to merge locals back at end */
@@ -276,7 +272,7 @@ eval_code(co, globals, locals, owner, arg)
 		   depends on the situation.  The global trace function
 		   (sys.trace) is also called whenever an exception
 		   is detected. */
-		if (call_trace(&sys_trace, &trace, f, "call", arg)) {
+		if (call_trace(&sys_trace, &f->f_trace, f, "call", arg)) {
 			/* Trace function raised an error */
 			current_frame = f->f_back;
 			DECREF(f);
@@ -320,9 +316,7 @@ eval_code(co, globals, locals, owner, arg)
 		
 		if (--ticker < 0) {
 			ticker = ticker_count;
-			if (sigcheck(f)) {
-				if (!err_occurred())
-					err_set(KeyboardInterrupt);
+			if (sigcheck()) {
 				why = WHY_EXCEPTION;
 				goto on_error;
 			}
@@ -1136,8 +1130,8 @@ eval_code(co, globals, locals, owner, arg)
 		case LOAD_FAST:
 			x = GETLISTITEM(fastlocals, oparg);
 			if (x == NULL) {
-				err_setstr(NameError,
-					   "undefined local variable");
+				err_setval(NameError,
+					   gettupleitem(f->f_localmap, oparg));
 				break;
 			}
 			if (is_accessobject(x)) {
@@ -1165,8 +1159,8 @@ eval_code(co, globals, locals, owner, arg)
 		case DELETE_FAST:
 			x = GETLISTITEM(fastlocals, oparg);
 			if (x == NULL) {
-				err_setstr(NameError,
-					   "undefined local variable");
+				err_setval(NameError,
+					   gettupleitem(f->f_localmap, oparg));
 				break;
 			}
 			if (x != NULL && is_accessobject(x)) {
@@ -1315,10 +1309,10 @@ eval_code(co, globals, locals, owner, arg)
 				printf("--- Line %d ---\n", oparg);
 #endif
 			f->f_lineno = oparg;
-			if (trace != NULL) {
+			if (f->f_trace != NULL) {
 				/* Trace each line of code reached */
 				f->f_lasti = INSTR_OFFSET();
-				err = call_trace(&trace, &trace,
+				err = call_trace(&f->f_trace, &f->f_trace,
 						 f, "line", None);
 			}
 			break;
@@ -1377,8 +1371,8 @@ eval_code(co, globals, locals, owner, arg)
 				f->f_lasti -= 2;
 			tb_here(f);
 
-			if (trace)
-				call_exc_trace(&trace, &trace, f);
+			if (f->f_trace)
+				call_exc_trace(&f->f_trace, &f->f_trace, f);
 			if (sys_profile)
 				call_exc_trace(&sys_profile, (object**)0, f);
 		}
@@ -1455,15 +1449,16 @@ eval_code(co, globals, locals, owner, arg)
 	if (why != WHY_RETURN)
 		retval = NULL;
 	
-	if (trace) {
+	if (f->f_trace) {
 		if (why == WHY_RETURN) {
-			if (call_trace(&trace, &trace, f, "return", retval)) {
+			if (call_trace(&f->f_trace, &f->f_trace, f,
+				       "return", retval)) {
 				XDECREF(retval);
 				retval = NULL;
 				why = WHY_EXCEPTION;
 			}
 		}
-		XDECREF(trace);
+		XDECREF(f->f_trace);
 	}
 	
 	if (sys_profile && why == WHY_RETURN) {
@@ -1474,9 +1469,6 @@ eval_code(co, globals, locals, owner, arg)
 			why = WHY_EXCEPTION;
 		}
 	}
-
-	if (fastlocals && (f->ob_refcnt > 1 || f->f_locals->ob_refcnt > 2))
-		fast_2_locals(f);
 	
 	/* Restore previous frame and release the current one */
 	
@@ -1569,8 +1561,7 @@ call_trace(p_trace, p_newtrace, f, msg, arg)
 	INCREF(arg);
 	settupleitem(arglist, 2, arg);
 	tracing++;
-	fast_2_locals(f);
-	res = call_object(*p_trace, arglist);
+	res = call_object(*p_trace, arglist); /* May clear *p_trace! */
 	locals_2_fast(f, 1);
 	tracing--;
  cleanup:
@@ -1578,7 +1569,7 @@ call_trace(p_trace, p_newtrace, f, msg, arg)
 	if (res == NULL) {
 		/* The trace proc raised an exception */
 		tb_here(f);
-		DECREF(*p_trace);
+		XDECREF(*p_trace);
 		*p_trace = NULL;
 		if (p_newtrace) {
 			XDECREF(*p_newtrace);
@@ -1599,81 +1590,6 @@ call_trace(p_trace, p_newtrace, f, msg, arg)
 		DECREF(res);
 		return 0;
 	}
-}
-
-static void
-fast_2_locals(f)
-	frameobject *f;
-{
-	/* Merge f->f_fastlocals into f->f_locals */
-	object *locals, *fast, *map;
-	object *error_type, *error_value;
-	int j;
-	if (f == NULL)
-		return;
-	locals = f->f_locals;
-	fast = f->f_fastlocals;
-	map = f->f_localmap;
-	if (locals == NULL || fast == NULL || map == NULL)
-		return;
-	if (!is_dictobject(locals) || !is_listobject(fast) ||
-	    !is_tupleobject(map))
-		return;
-	err_get(&error_type, &error_value);
-	for (j = gettuplesize(map); --j >= 0; ) {
-		object *key = gettupleitem(map, j);
-		object *value = getlistitem(fast, j);
-		if (value == NULL) {
-			err_clear();
-			if (dict2remove(locals, key) != 0)
-				err_clear();
-		}
-		else {
-			if (dict2insert(locals, key, value) != 0)
-				err_clear();
-		}
-	}
-	err_setval(error_type, error_value);
-}
-
-static void
-locals_2_fast(f, clear)
-	frameobject *f;
-	int clear;
-{
-	/* Merge f->f_locals into f->f_fastlocals */
-	object *locals, *fast, *map;
-	object *error_type, *error_value;
-	int j;
-	if (f == NULL)
-		return;
-	locals = f->f_locals;
-	fast = f->f_fastlocals;
-	map = f->f_localmap;
-	if (locals == NULL || fast == NULL || map == NULL)
-		return;
-	if (!is_dictobject(locals) || !is_listobject(fast) ||
-	    !is_tupleobject(map))
-		return;
-	err_get(&error_type, &error_value);
-	for (j = gettuplesize(map); --j >= 0; ) {
-		object *key = gettupleitem(map, j);
-		object *value = dict2lookup(locals, key);
-		if (value == NULL)
-			err_clear();
-		else
-			INCREF(value);
-		if (value != NULL || clear)
-			if (setlistitem(fast, j, value) != 0)
-				err_clear();
-	}
-	err_setval(error_type, error_value);
-}
-
-static void
-mergelocals()
-{
-	locals_2_fast(current_frame, 1);
 }
 
 object *
@@ -2029,6 +1945,17 @@ call_builtin(func, arg)
 	}
 	if (is_classobject(func)) {
 		return newinstanceobject(func, arg);
+	}
+	if (is_instanceobject(func)) {
+	        object *res, *call = getattr(func,"__call__");
+		if (call == NULL) {
+			err_clear();
+			err_setstr(AttributeError, "no __call__ method defined");
+			return NULL;
+		}
+		res = call_object(call, arg);
+		DECREF(call);
+		return res;
 	}
 	err_setstr(TypeError, "call of non-function");
 	return NULL;

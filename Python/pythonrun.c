@@ -563,8 +563,10 @@ static void
 initsigs()
 {
 	RETSIGTYPE (*t)();
-	initintr(); /* May imply initsignal() */
 #ifdef HAVE_SIGNAL_H
+#ifdef SIGPIPE
+	signal(SIGPIPE, SIG_IGN);
+#endif
 #ifdef SIGHUP
 	t = signal(SIGHUP, SIG_IGN);
 	if (t == SIG_DFL)
@@ -580,6 +582,7 @@ initsigs()
 		signal(SIGTERM, t);
 #endif
 #endif /* HAVE_SIGNAL_H */
+	initintr(); /* May imply initsignal() */
 }
 
 #ifdef TRACE_REFS
