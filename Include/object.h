@@ -301,6 +301,7 @@ extern DL_IMPORT(int) PyType_InitDict(PyTypeObject *);
 extern DL_IMPORT(PyObject *) PyType_GenericAlloc(PyTypeObject *, int);
 extern DL_IMPORT(PyObject *) PyType_GenericNew(PyTypeObject *,
 					       PyObject *, PyObject *);
+extern DL_IMPORT(PyObject *) _PyType_Lookup(PyTypeObject *, PyObject *);
 
 /* Generic operations on objects */
 extern DL_IMPORT(int) PyObject_Print(PyObject *, FILE *, int);
