@@ -31,19 +31,7 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #include "modsupport.h"
 #include "ceval.h"
 
-#ifdef i860
-/* Cray APP doesn't have memmove */
-#define NEED_MEMMOVE
-extern char *memcpy();
-#endif
-
-#if defined(sun) && !defined(__STDC__)
-/* SunOS doesn't have memmove */
-#define NEED_MEMMOVE
-extern char *memcpy();
-#endif
-
-#ifdef NEED_MEMMOVE
+#ifndef STDC_HEADERS
 extern char *memmove();
 #endif
 
@@ -1187,33 +1175,3 @@ initarray()
 {
 	initmodule("array", a_methods);
 }
-
-
-#ifdef NEED_MEMMOVE
-
-/* A perhaps slow but I hope correct implementation of memmove */
-
-char *memmove(dst, src, n)
-	char *dst;
-	char *src;
-	int n;
-{
-	char *realdst = dst;
-	if (n <= 0)
-		return dst;
-	if (src >= dst+n || dst >= src+n)
-		return memcpy(dst, src, n);
-	if (src > dst) {
-		while (--n >= 0)
-			*dst++ = *src++;
-	}
-	else if (src < dst) {
-		src += n;
-		dst += n;
-		while (--n >= 0)
-			*--dst = *--src;
-	}
-	return realdst;
-}
-
-#endif
