@@ -290,9 +290,7 @@ class SMTP:
         if self.debuglevel > 0: print 'send:', `str`
         if self.sock:
             try:
-                sendptr = 0
-                while sendptr < len(str):
-                    sendptr = sendptr + self.sock.send(str[sendptr:])
+                self.sock.sendall(str)
             except socket.error:
                 self.close()
                 raise SMTPServerDisconnected('Server not connected')
@@ -638,7 +636,7 @@ class SMTP:
             self.rset()
             raise SMTPSenderRefused(code, resp, from_addr)
         senderrs={}
-        if type(to_addrs) == types.StringType:
+        if isinstance(to_addrs, types.StringTypes):
             to_addrs = [to_addrs]
         for each in to_addrs:
             (code,resp)=self.rcpt(each, rcpt_options)

@@ -1,56 +1,60 @@
-Changes in 2.2b2 since 2.1.1
+Changes in 2.2.1 since 2.2
 ----------------------------
 
 These release notes refer to Mac-specific changes only. See NEWS (in the Misc folder)
-for machine-independent changes. Changes that are new in 2.2b2 are flagged as such.
+for machine-independent changes. These notes are meant primarily for MacPython
+but some of the information may be relevant to using Mac-specific features under
+Mac OS X unix Python (a.k.a. MachoPython) too.
 
-
-- The main change is that all toolbox modules have moved to a package called Carbon.
-  So things like "import Res" should be changed to "from Carbon import Res", and
-  "from Res import *" to "from Carbon.Res import *". Please see the readme file for
-  some open questions and join the discussions on pythonmac-sig if you have anything
-  to contribute. Aside from reducing clutter this change will also benefit the
-  port to Mach-O/OSX Python later.
-- On input MacPython now accepts either \n (unix style) or \r (mac style) newlines
-  for text files. This behaviour can be turned off with a preference.
-  This is an experimental feature; again: feedback is requested.
-- Command-dot handling has been improved a lot: scripts are now much easier to interrupt,
-  and they only scan for cmd-. while in the foreground. [2.2b2]
-- "Copy" from the MacPython console window was always disabled. Fixed. [2.2b2]
-- This release should run on MacOS 8.1 again. [2.2b2 build 116]
-- A new, rather different GUSI I/O library is used. Please report any strange behaviour
-  with I/O to the pythonmac-sig mailing list! [2.2b2]
-- There is a new module macresource which makes it easier to open a resource file
-  accompanying your script when the script is not (yet) converted to an applet.
-  This module will later also do the right thing in Mach-O/OSX Python.
-- A new, experimental module hfsplus is included, which gives access to some of the
-  functionality of the HFS+ API. [2.2b2]
-- Threads had a stack that was too small for many serious Python applications (20K).
-  They now get 64K. There is still no overflow check, though.
-- Garbage collection and the gc module have (finally) been enabled.
-- EasyDialogs.ProgressBar now has indeterminate progressbars if you specify maxval=0.
-  This is also the new default. Patch supplied by Dean Draayer.
-- There are new preferences for enabling old-style division warnings and for
-  accepting unix-style newlines in text input files. These can also be set during
-  startup, and in addition you can select very verbose import tracing.
-- The NavServices override for StandardFile has moved from early startup to the
-  time you import macfs. This speeds up MacPython startup.
-- Various outdated scripts have been moved to :Mac:Unsupported.
-- Various outdated items from :Mac:Lib:test have been removed.
-- C Developers: you know have control over the Python console if you are embedding
-  MacPython in another application, thanks to Alexandre Parenteau. :Mac:Demo:embed.html
-  has very minimal documentation.
-- BuildCGIApplet works again.
-- The CodeWarrior OSA suite missed quit(). It is back.
-- Contrib:morefindertools is gone, the functionality has been integrated into
-  the standard module findertools.py.
-
-What is not in this distribution
---------------------------------
-
-- Stackless Python/microthreads hasn't been ported to 2.2 yet. If/when it becomes available
-  Just will undoubtedly announce it on pythonmac-sig and the MacPython homepage.
-- The toolbox modules have not been updated to Universal Header 3.4 or CarbonLib 1.4 yet.
+- This release should work on multiprocessor OSX machines.
+- The problem with incomplete read()s on sockets has been fixed.
+- NavServices is now weaklinked, so this release should work on a virgin Mac OS 8.1.
+- test_longexp took days to finish on OSX. It now fails with a message so the
+  other tests continue.
+- The IDE looks better under OSX after redesign of some windows.
+- The IDE class browser and object browser now work under OSX.
+- The IDE browser now has some understanding of the 2.2 object model.
+- IDE readline() output is echoed to the output window.
+- IDE output is flushed to the screen more often under OSX.
+- IDE doesn't have a second quit menu under OSX anymore.
+- IDE scrollbars now have live feedback.
+- IDE now does copy/paste under OSX.
+- IDE: minimal support for floating windows.
+- The IDE now sort-of works under MachoPython.
+- macostools.mkalias() can now handle folders.
+- macresource module fixed to work under MachoPython.
+- macfs.FSRef objects now have an as_pathname method.
+- The ic module returned bogus values for creator/type. Fixed.
+- Most toolbox modules now weaklink against InterfaceLib (or CarbonLib) so
+  they can be imported even if not all functionality is available. Calling a
+  method missing on your system will raise an exception.
+- Carbon.App: support for various missing methods added.
+- Carbon.CarbonEvt: various method signatures fixed.
+- Carbon.CF: Unicode support added.
+- Carbon.CG: did not import. Fixed.
+- Carbon.CG:  various missing methods added.
+- Carbon.Ctl: ControlActionProcs weren't supported. Fixed.
+- Carbon.Drag: exceptions in callback routines are now printed.
+- Carbon.Fm: QDTextBounds was missing. Added.
+- Carbon.Menu: support for optional MenuObjs was added.
+- Carbon.Mlte: unicode support added.
+- Carbon.Scrap: fixed to work under Carbon by finally implementing the
+  Carbon Scrap Manager interface.
+- Carbon.Snd: SndRecord and SndRecordToFile were missing. Added.
+- Applescript suites had a problem with the required events being in either Standard
+  or Required. Fixed by introducing a new common base suite for them.
+- Applescript example rewritten.
+- Applescript can now handle Unicode parameters.
+- An Applescript suite with a start() event no longer causes problems.
+- Exceptions in AE callback routines are now printed.
+- waste: updated to current version, thereby getting it to work under MachoPython.
+- gensuitemodule: better handling of verbs that are Python keywords.
+- gensuitemodule: enum values are now identify()d.
+- MachoPython: Python.app build process fixed.
+- MachoPython: Python.app can now be called from the command line.
+- MachoPython: MacOS error exceptions now include the textual error in
+  stead of only the numeric error code.
+- Embedding: don't call PyMac_OutputSeen if we have a custom console.
 
 Known problems
 --------------
@@ -58,9 +62,6 @@ Known problems
 This list is probably incomplete, more problems may be listed on the MacPython homepage,
 http://www.cwi.nl/~jack/macpython.html.
 
-- MacPython 2.2b2 (and MacPython 2.1) will not run correctly on a multiprocessor MacOS X
-  machine, it will quickly deadlock during I/O operations. The GUSI I/O library is suspected,
-  hints/clues/workarounds are solicited.
 - Tkinter does not work under Carbon.
 - The IDE and Tkinter do not work together. Run tkinter programs under PythonInterpreter.
 - Tkinter file events do not work, unless you have opened the file through Tcl (but then

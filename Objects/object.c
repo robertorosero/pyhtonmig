@@ -1191,8 +1191,14 @@ _PyObject_GetDictPtr(PyObject *obj)
 	if (dictoffset == 0)
 		return NULL;
 	if (dictoffset < 0) {
-		const size_t size = _PyObject_VAR_SIZE(tp,
-					((PyVarObject *)obj)->ob_size);
+		int tsize;
+		size_t size;
+
+		tsize = ((PyVarObject *)obj)->ob_size;
+		if (tsize < 0)
+			tsize = -tsize;
+		size = _PyObject_VAR_SIZE(tp, tsize);
+
 		dictoffset += (long)size;
 		assert(dictoffset > 0);
 		assert(dictoffset % SIZEOF_VOID_P == 0);
@@ -1888,11 +1894,8 @@ PyMem_Malloc(size_t nbytes)
 void *
 PyMem_Realloc(void *p, size_t nbytes)
 {
-#if _PyMem_EXTRA > 0
-	if (nbytes == 0)
-		nbytes = _PyMem_EXTRA;
-#endif
-	return PyMem_REALLOC(p, nbytes);
+	/* See comment near MALLOC_ZERO_RETURNS_NULL in pyport.h. */
+	return PyMem_REALLOC(p, nbytes ? nbytes : 1);
 }
 
 void

@@ -8,7 +8,6 @@ static PyMemberDef type_members[] = {
 	{"__basicsize__", T_INT, offsetof(PyTypeObject,tp_basicsize),READONLY},
 	{"__itemsize__", T_INT, offsetof(PyTypeObject, tp_itemsize), READONLY},
 	{"__flags__", T_LONG, offsetof(PyTypeObject, tp_flags), READONLY},
-	{"__doc__", T_STRING, offsetof(PyTypeObject, tp_doc), READONLY},
 	{"__weakrefoffset__", T_LONG,
 	 offsetof(PyTypeObject, tp_weaklistoffset), READONLY},
 	{"__base__", T_OBJECT, offsetof(PyTypeObject, tp_base), READONLY},
@@ -80,10 +79,27 @@ type_dict(PyTypeObject *type, void *context)
 	return PyDictProxy_New(type->tp_dict);
 }
 
+static PyObject *
+type_get_doc(PyTypeObject *type, void *context)
+{
+	PyObject *result;
+	if (!(type->tp_flags & Py_TPFLAGS_HEAPTYPE)) {
+		if (type->tp_doc == NULL) {
+			Py_INCREF(Py_None);
+			return Py_None;
+		}
+		return PyString_FromString(type->tp_doc);
+	}
+	result = PyDict_GetItemString(type->tp_dict, "__doc__");
+	Py_INCREF(result);
+	return result;
+}
+
 static PyGetSetDef type_getsets[] = {
 	{"__name__", (getter)type_name, NULL, NULL},
 	{"__module__", (getter)type_module, (setter)type_set_module, NULL},
 	{"__dict__",  (getter)type_dict,  NULL, NULL},
+	{"__doc__", (getter)type_get_doc, NULL, NULL},
 	{0}
 };
 
@@ -851,6 +867,21 @@ static PyGetSetDef subtype_getsets[] = {
 	{0},
 };
 
+/* bozo: __getstate__ that raises TypeError */
+
+static PyObject *
+bozo_func(PyObject *self, PyObject *args)
+{
+	PyErr_SetString(PyExc_TypeError,
+			"a class that defines __slots__ without "
+			"defining __getstate__ cannot be pickled");
+	return NULL;
+}
+
+static PyMethodDef bozo_ml = {"__getstate__", bozo_func};
+
+static PyObject *bozo_obj = NULL;
+
 static PyObject *
 type_new(PyTypeObject *metatype, PyObject *args, PyObject *kwds)
 {
@@ -974,6 +1005,27 @@ type_new(PyTypeObject *metatype, PyObject *args, PyObject *kwds)
 			/* XXX Check against null bytes in name */
 		}
 	}
+	if (slots != NULL) {
+		/* See if *this* class defines __getstate__ */
+		PyObject *getstate = PyDict_GetItemString(dict,
+							  "__getstate__");
+		if (getstate == NULL) {
+			/* If not, provide a bozo that raises TypeError */
+			if (bozo_obj == NULL) {
+				bozo_obj = PyCFunction_New(&bozo_ml, NULL);
+				if (bozo_obj == NULL) {
+					/* XXX decref various things */
+					return NULL;
+				}
+			}
+			if (PyDict_SetItemString(dict,
+						 "__getstate__",
+						 bozo_obj) < 0) {
+				/* XXX decref various things */
+				return NULL;
+			}
+		}
+	}
 	if (slots == NULL && base->tp_dictoffset == 0 &&
 	    (base->tp_setattro == PyObject_GenericSetAttr ||
 	     base->tp_setattro == NULL)) {
@@ -1044,9 +1096,8 @@ type_new(PyTypeObject *metatype, PyObject *args, PyObject *kwds)
 	}
 
 	/* Set tp_doc to a copy of dict['__doc__'], if the latter is there
-	   and is a string (tp_doc is a char* -- can't copy a general object
-	   into it).
-	   XXX What if it's a Unicode string?  Don't know -- this ignores it.
+	   and is a string.  The __doc__ accessor will first look for tp_doc;
+	   if that fails, it will still look into __dict__.
 	*/
 	{
 		PyObject *doc = PyDict_GetItemString(dict, "__doc__");
@@ -1655,7 +1706,7 @@ add_methods(PyTypeObject *type, PyMethodDef *meth)
 		descr = PyDescr_NewMethod(type, meth);
 		if (descr == NULL)
 			return -1;
-		if (PyDict_SetItemString(dict,meth->ml_name,descr) < 0)
+		if (PyDict_SetItemString(dict,meth->ml_name, descr) < 0)
 			return -1;
 		Py_DECREF(descr);
 	}
@@ -2022,6 +2073,19 @@ PyType_Ready(PyTypeObject *type)
 		PyObject *b = PyTuple_GET_ITEM(bases, i);
 		if (PyType_Check(b))
 			inherit_slots(type, (PyTypeObject *)b);
+	}
+
+	/* if the type dictionary doesn't contain a __doc__, set it from
+	   the tp_doc slot.
+	 */
+	if (PyDict_GetItemString(type->tp_dict, "__doc__") == NULL) {
+		if (type->tp_doc != NULL) {
+			PyObject *doc = PyString_FromString(type->tp_doc);
+			PyDict_SetItemString(type->tp_dict, "__doc__", doc);
+			Py_DECREF(doc);
+		} else {
+			PyDict_SetItemString(type->tp_dict, "__doc__", Py_None);
+		}
 	}
 
 	/* Some more special stuff */
@@ -3496,7 +3560,7 @@ static slotdef slotdefs[] = {
 	UNSLOT("__pos__", nb_positive, slot_nb_positive, wrap_unaryfunc, "+x"),
 	UNSLOT("__abs__", nb_absolute, slot_nb_absolute, wrap_unaryfunc,
 	       "abs(x)"),
-	UNSLOT("__nonzero__", nb_nonzero, slot_nb_nonzero, wrap_unaryfunc,
+	UNSLOT("__nonzero__", nb_nonzero, slot_nb_nonzero, wrap_inquiry,
 	       "x != 0"),
 	UNSLOT("__invert__", nb_invert, slot_nb_invert, wrap_unaryfunc, "~x"),
 	BINSLOT("__lshift__", nb_lshift, slot_nb_lshift, "<<"),

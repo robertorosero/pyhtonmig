@@ -1228,7 +1228,7 @@ arbitrary boundary:
 
 \begin{verbatim}
 >>> def fib(n):    # write Fibonacci series up to n
-...     "Print a Fibonacci series up to n"
+...     """Print a Fibonacci series up to n."""
 ...     a, b = 0, 1
 ...     while b < n:
 ...         print b,
@@ -1306,7 +1306,7 @@ the Fibonacci series, instead of printing it:
 
 \begin{verbatim}
 >>> def fib2(n): # return Fibonacci series up to n
-...     "Return a list containing the Fibonacci series up to n"
+...     """Return a list containing the Fibonacci series up to n."""
 ...     result = []
 ...     a, b = 0, 1
 ...     while b < n:
@@ -1485,7 +1485,9 @@ def cheeseshop(kind, *arguments, **keywords):
     print "-- I'm sorry, we're all out of", kind
     for arg in arguments: print arg
     print '-'*40
-    for kw in keywords.keys(): print kw, ':', keywords[kw]
+    keys = keywords.keys()
+    keys.sort()
+    for kw in keys: print kw, ':', keywords[kw]
 \end{verbatim}
 
 It could be called like this:
@@ -1510,6 +1512,11 @@ client : John Cleese
 shopkeeper : Michael Palin
 sketch : Cheese Shop Sketch
 \end{verbatim}
+
+Note that the \method{sort()} method of the list of keyword argument
+names is called before printing the contents of the \code{keywords}
+dictionary; if this is not done, the order in which the arguments are
+printed is undefined.
 
 
 \subsection{Arbitrary Argument Lists \label{arbitraryArgs}}
@@ -2032,12 +2039,13 @@ the highest priority, and \code{or} the lowest, so that
 course, parentheses can be used to express the desired composition.
 
 The Boolean operators \code{and} and \code{or} are so-called
-\emph{shortcut} operators: their arguments are evaluated from left to
-right, and evaluation stops as soon as the outcome is determined.
-E.g., if \code{A} and \code{C} are true but \code{B} is false, \code{A
-and B and C} does not evaluate the expression C.  In general, the
-return value of a shortcut operator, when used as a general value and
-not as a Boolean, is the last evaluated argument.
+\emph{short-circuit} operators: their arguments are evaluated from
+left to right, and evaluation stops as soon as the outcome is
+determined.  For example, if \code{A} and \code{C} are true but
+\code{B} is false, \code{A and B and C} does not evaluate the
+expression \code{C}.  In general, the return value of a short-circuit
+operator, when used as a general value and not as a Boolean, is the
+last evaluated argument.
 
 It is possible to assign the result of a comparison or other Boolean
 expression to a variable.  For example,
