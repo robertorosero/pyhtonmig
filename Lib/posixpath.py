@@ -205,7 +205,7 @@ def walk(top, func, arg):
 	for name in names:
 		if name not in exceptions:
 			name = join(top, name)
-			if isdir(name):
+			if isdir(name) and not islink(name):
 				walk(name, func, arg)
 
 
