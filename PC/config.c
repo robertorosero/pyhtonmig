@@ -121,7 +121,6 @@ struct _inittab _PyImport_Inittab[] = {
 	{"mmap", initmmap},
 	{"_csv", init_csv},
 	{"_sre", init_sre},
-	{"parser", initparser},
 	{"_winreg", init_winreg},
 	{"datetime", initdatetime},
 
