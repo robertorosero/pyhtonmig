@@ -15,7 +15,6 @@ import SearchDialog
 import GrepDialog
 import ReplaceDialog
 import PyParse
-#from IdleConf import idleconf
 from configHandler import idleConf
 import aboutDialog, textView, configDialog
 
