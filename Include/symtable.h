@@ -30,7 +30,7 @@ typedef struct _symtable_entry {
 	PyObject *ste_varnames;  /* list of variable names */
 	PyObject *ste_children;  /* list of child ids */
 	block_ty ste_type;       /* module, class, or function */
-	int ste_optimized : 1;   /* true if namespace can't be optimized */
+	int ste_optimized : 1;   /* true if namespace can be optimized */
 	int ste_nested : 1;      /* true if block is nested */
 	int ste_child_free : 1;  /* true if a child block has free variables,
 				    including free refs to globals */
