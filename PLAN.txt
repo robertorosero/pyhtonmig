@@ -233,11 +233,1153 @@ over this complicated proposal.  Provide the community with a
 prototype implementation to test.  Try to do this *before* casting
 everything in stone!
 
-***************************************************************************
-***************************************************************************
+MERGE BEGIN ****************************************************************
 Merge details (this section is Tim's scratchpad, but should help a lot if
 he dies of frustration while wrestling with CVS <0.9 wink>).
 
+------------------------------------------------------------------
+2001-07-06
+
+Screen dump from initial merge attempt (which had the happy side-effect of
+forcing me to learn that my *editor* is smart enough to capture DOS-box
+output on Win98 -- command.com sure isn't).  Lots of merges, but "only" 15
+conflicts:
+
+C:\Code>cvs -q -z3 up -j date2001-07-06 mergedescr
+RCS file: /cvsroot/python/python/dist/src/LICENSE,v
+retrieving revision 1.15
+retrieving revision 1.17
+Merging differences between 1.15 and 1.17 into LICENSE
+RCS file: /cvsroot/python/python/dist/src/Makefile.pre.in,v
+retrieving revision 1.37
+retrieving revision 1.40
+Merging differences between 1.37 and 1.40 into Makefile.pre.in
+RCS file: /cvsroot/python/python/dist/src/README,v
+retrieving revision 1.123
+retrieving revision 1.124
+Merging differences between 1.123 and 1.124 into README
+RCS file: /cvsroot/python/python/dist/src/acconfig.h,v
+retrieving revision 1.46
+retrieving revision 1.49
+Merging differences between 1.46 and 1.49 into acconfig.h
+RCS file: /cvsroot/python/python/dist/src/config.h.in,v
+retrieving revision 2.92
+retrieving revision 2.97
+Merging differences between 2.92 and 2.97 into config.h.in
+RCS file: /cvsroot/python/python/dist/src/configure,v
+retrieving revision 1.209
+retrieving revision 1.215
+Merging differences between 1.209 and 1.215 into configure
+RCS file: /cvsroot/python/python/dist/src/configure.in,v
+retrieving revision 1.217
+retrieving revision 1.223
+Merging differences between 1.217 and 1.223 into configure.in
+RCS file: /cvsroot/python/python/dist/src/setup.py,v
+retrieving revision 1.38
+retrieving revision 1.41
+Merging differences between 1.38 and 1.41 into setup.py
+RCS file: /cvsroot/python/python/dist/src/Grammar/Grammar,v
+retrieving revision 1.42
+retrieving revision 1.43
+Merging differences between 1.42 and 1.43 into Grammar
+RCS file: /cvsroot/python/python/dist/src/Include/abstract.h,v
+retrieving revision 2.31
+retrieving revision 2.34
+Merging differences between 2.31 and 2.34 into abstract.h
+RCS file: /cvsroot/python/python/dist/src/Include/cStringIO.h,v
+retrieving revision 2.14
+retrieving revision 2.15
+Merging differences between 2.14 and 2.15 into cStringIO.h
+RCS file: /cvsroot/python/python/dist/src/Include/ceval.h,v
+retrieving revision 2.41
+retrieving revision 2.42
+Merging differences between 2.41 and 2.42 into ceval.h
+RCS file: /cvsroot/python/python/dist/src/Include/compile.h,v
+retrieving revision 2.29
+retrieving revision 2.30
+Merging differences between 2.29 and 2.30 into compile.h
+RCS file: /cvsroot/python/python/dist/src/Include/fileobject.h,v
+retrieving revision 2.22
+retrieving revision 2.23
+Merging differences between 2.22 and 2.23 into fileobject.h
+RCS file: /cvsroot/python/python/dist/src/Include/floatobject.h,v
+retrieving revision 2.17
+retrieving revision 2.18
+Merging differences between 2.17 and 2.18 into floatobject.h
+RCS file: /cvsroot/python/python/dist/src/Include/frameobject.h,v
+retrieving revision 2.31
+retrieving revision 2.33
+Merging differences between 2.31 and 2.33 into frameobject.h
+RCS file: /cvsroot/python/python/dist/src/Include/graminit.h,v
+retrieving revision 2.16
+retrieving revision 2.17
+Merging differences between 2.16 and 2.17 into graminit.h
+RCS file: /cvsroot/python/python/dist/src/Include/longobject.h,v
+retrieving revision 2.19
+retrieving revision 2.20
+Merging differences between 2.19 and 2.20 into longobject.h
+RCS file: /cvsroot/python/python/dist/src/Include/opcode.h,v
+retrieving revision 2.35
+retrieving revision 2.36
+Merging differences between 2.35 and 2.36 into opcode.h
+RCS file: /cvsroot/python/python/dist/src/Include/pyport.h,v
+retrieving revision 2.26
+retrieving revision 2.27
+Merging differences between 2.26 and 2.27 into pyport.h
+RCS file: /cvsroot/python/python/dist/src/Include/pystate.h,v
+retrieving revision 2.14
+retrieving revision 2.16
+Merging differences between 2.14 and 2.16 into pystate.h
+RCS file: /cvsroot/python/python/dist/src/Include/rangeobject.h,v
+retrieving revision 2.15
+retrieving revision 2.17
+Merging differences between 2.15 and 2.17 into rangeobject.h
+RCS file: /cvsroot/python/python/dist/src/Include/stringobject.h,v
+retrieving revision 2.25
+retrieving revision 2.28
+Merging differences between 2.25 and 2.28 into stringobject.h
+RCS file: /cvsroot/python/python/dist/src/Include/symtable.h,v
+retrieving revision 2.7
+retrieving revision 2.8
+Merging differences between 2.7 and 2.8 into symtable.h
+RCS file: /cvsroot/python/python/dist/src/Include/tupleobject.h,v
+retrieving revision 2.24
+retrieving revision 2.25
+Merging differences between 2.24 and 2.25 into tupleobject.h
+RCS file: /cvsroot/python/python/dist/src/Include/unicodeobject.h,v
+retrieving revision 2.20
+retrieving revision 2.27
+Merging differences between 2.20 and 2.27 into unicodeobject.h
+RCS file: /cvsroot/python/python/dist/src/Lib/Cookie.py,v
+retrieving revision 1.8
+retrieving revision 1.9
+Merging differences between 1.8 and 1.9 into Cookie.py
+U mergedescr/dist/src/Lib/FCNTL.py
+U mergedescr/dist/src/Lib/HTMLParser.py
+RCS file: /cvsroot/python/python/dist/src/Lib/UserDict.py,v
+retrieving revision 1.12
+retrieving revision 1.14
+Merging differences between 1.12 and 1.14 into UserDict.py
+RCS file: /cvsroot/python/python/dist/src/Lib/UserList.py,v
+retrieving revision 1.16
+retrieving revision 1.17
+Merging differences between 1.16 and 1.17 into UserList.py
+RCS file: /cvsroot/python/python/dist/src/Lib/UserString.py,v
+retrieving revision 1.9
+retrieving revision 1.10
+Merging differences between 1.9 and 1.10 into UserString.py
+RCS file: /cvsroot/python/python/dist/src/Lib/anydbm.py,v
+retrieving revision 1.10
+retrieving revision 1.11
+Merging differences between 1.10 and 1.11 into anydbm.py
+RCS file: /cvsroot/python/python/dist/src/Lib/asyncore.py,v
+retrieving revision 1.11
+retrieving revision 1.14
+Merging differences between 1.11 and 1.14 into asyncore.py
+RCS file: /cvsroot/python/python/dist/src/Lib/base64.py,v
+retrieving revision 1.11
+retrieving revision 1.12
+Merging differences between 1.11 and 1.12 into base64.py
+RCS file: /cvsroot/python/python/dist/src/Lib/bdb.py,v
+retrieving revision 1.31
+retrieving revision 1.32
+Merging differences between 1.31 and 1.32 into bdb.py
+RCS file: /cvsroot/python/python/dist/src/Lib/calendar.py,v
+retrieving revision 1.21
+retrieving revision 1.22
+Merging differences between 1.21 and 1.22 into calendar.py
+RCS file: /cvsroot/python/python/dist/src/Lib/cgi.py,v
+retrieving revision 1.63
+retrieving revision 1.64
+Merging differences between 1.63 and 1.64 into cgi.py
+RCS file: /cvsroot/python/python/dist/src/Lib/chunk.py,v
+retrieving revision 1.10
+retrieving revision 1.11
+Merging differences between 1.10 and 1.11 into chunk.py
+RCS file: /cvsroot/python/python/dist/src/Lib/code.py,v
+retrieving revision 1.15
+retrieving revision 1.16
+Merging differences between 1.15 and 1.16 into code.py
+RCS file: /cvsroot/python/python/dist/src/Lib/codecs.py,v
+retrieving revision 1.16
+retrieving revision 1.19
+Merging differences between 1.16 and 1.19 into codecs.py
+RCS file: /cvsroot/python/python/dist/src/Lib/dbhash.py,v
+retrieving revision 1.5
+retrieving revision 1.6
+Merging differences between 1.5 and 1.6 into dbhash.py
+RCS file: /cvsroot/python/python/dist/src/Lib/dis.py,v
+retrieving revision 1.34
+retrieving revision 1.35
+Merging differences between 1.34 and 1.35 into dis.py
+RCS file: /cvsroot/python/python/dist/src/Lib/doctest.py,v
+retrieving revision 1.10
+retrieving revision 1.14
+Merging differences between 1.10 and 1.14 into doctest.py
+RCS file: /cvsroot/python/python/dist/src/Lib/dumbdbm.py,v
+retrieving revision 1.10
+retrieving revision 1.11
+Merging differences between 1.10 and 1.11 into dumbdbm.py
+RCS file: /cvsroot/python/python/dist/src/Lib/fnmatch.py,v
+retrieving revision 1.11
+retrieving revision 1.12
+Merging differences between 1.11 and 1.12 into fnmatch.py
+RCS file: /cvsroot/python/python/dist/src/Lib/formatter.py,v
+retrieving revision 1.17
+retrieving revision 1.18
+Merging differences between 1.17 and 1.18 into formatter.py
+RCS file: /cvsroot/python/python/dist/src/Lib/glob.py,v
+retrieving revision 1.9
+retrieving revision 1.10
+Merging differences between 1.9 and 1.10 into glob.py
+RCS file: /cvsroot/python/python/dist/src/Lib/htmllib.py,v
+retrieving revision 1.17
+retrieving revision 1.18
+Merging differences between 1.17 and 1.18 into htmllib.py
+RCS file: /cvsroot/python/python/dist/src/Lib/httplib.py,v
+retrieving revision 1.34
+retrieving revision 1.35
+Merging differences between 1.34 and 1.35 into httplib.py
+RCS file: /cvsroot/python/python/dist/src/Lib/imaplib.py,v
+retrieving revision 1.27
+retrieving revision 1.29
+Merging differences between 1.27 and 1.29 into imaplib.py
+RCS file: /cvsroot/python/python/dist/src/Lib/inspect.py,v
+retrieving revision 1.16
+retrieving revision 1.18
+Merging differences between 1.16 and 1.18 into inspect.py
+RCS file: /cvsroot/python/python/dist/src/Lib/keyword.py,v
+retrieving revision 1.10
+retrieving revision 1.11
+Merging differences between 1.10 and 1.11 into keyword.py
+RCS file: /cvsroot/python/python/dist/src/Lib/linecache.py,v
+retrieving revision 1.7
+retrieving revision 1.8
+Merging differences between 1.7 and 1.8 into linecache.py
+RCS file: /cvsroot/python/python/dist/src/Lib/mailbox.py,v
+retrieving revision 1.30
+retrieving revision 1.31
+Merging differences between 1.30 and 1.31 into mailbox.py
+RCS file: /cvsroot/python/python/dist/src/Lib/mailcap.py,v
+retrieving revision 1.9
+retrieving revision 1.10
+Merging differences between 1.9 and 1.10 into mailcap.py
+RCS file: /cvsroot/python/python/dist/src/Lib/mhlib.py,v
+retrieving revision 1.26
+retrieving revision 1.27
+Merging differences between 1.26 and 1.27 into mhlib.py
+RCS file: /cvsroot/python/python/dist/src/Lib/mimetypes.py,v
+retrieving revision 1.13
+retrieving revision 1.14
+Merging differences between 1.13 and 1.14 into mimetypes.py
+RCS file: /cvsroot/python/python/dist/src/Lib/mimify.py,v
+retrieving revision 1.20
+retrieving revision 1.21
+Merging differences between 1.20 and 1.21 into mimify.py
+RCS file: /cvsroot/python/python/dist/src/Lib/ntpath.py,v
+retrieving revision 1.34
+retrieving revision 1.36
+Merging differences between 1.34 and 1.36 into ntpath.py
+RCS file: /cvsroot/python/python/dist/src/Lib/pipes.py,v
+retrieving revision 1.8
+retrieving revision 1.9
+Merging differences between 1.8 and 1.9 into pipes.py
+RCS file: /cvsroot/python/python/dist/src/Lib/posixfile.py,v
+retrieving revision 1.20
+retrieving revision 1.21
+Merging differences between 1.20 and 1.21 into posixfile.py
+RCS file: /cvsroot/python/python/dist/src/Lib/pprint.py,v
+retrieving revision 1.12
+retrieving revision 1.14
+Merging differences between 1.12 and 1.14 into pprint.py
+RCS file: /cvsroot/python/python/dist/src/Lib/pre.py,v
+retrieving revision 1.9
+retrieving revision 1.10
+Merging differences between 1.9 and 1.10 into pre.py
+RCS file: /cvsroot/python/python/dist/src/Lib/profile.py,v
+retrieving revision 1.27
+retrieving revision 1.29
+Merging differences between 1.27 and 1.29 into profile.py
+RCS file: /cvsroot/python/python/dist/src/Lib/pstats.py,v
+retrieving revision 1.15
+retrieving revision 1.18
+Merging differences between 1.15 and 1.18 into pstats.py
+RCS file: /cvsroot/python/python/dist/src/Lib/pty.py,v
+retrieving revision 1.7
+retrieving revision 1.11
+Merging differences between 1.7 and 1.11 into pty.py
+RCS file: /cvsroot/python/python/dist/src/Lib/pydoc.py,v
+retrieving revision 1.38
+retrieving revision 1.39
+Merging differences between 1.38 and 1.39 into pydoc.py
+RCS file: /cvsroot/python/python/dist/src/Lib/quopri.py,v
+retrieving revision 1.11
+retrieving revision 1.14
+Merging differences between 1.11 and 1.14 into quopri.py
+RCS file: /cvsroot/python/python/dist/src/Lib/rexec.py,v
+retrieving revision 1.28
+retrieving revision 1.30
+Merging differences between 1.28 and 1.30 into rexec.py
+RCS file: /cvsroot/python/python/dist/src/Lib/rfc822.py,v
+retrieving revision 1.54
+retrieving revision 1.57
+Merging differences between 1.54 and 1.57 into rfc822.py
+RCS file: /cvsroot/python/python/dist/src/Lib/sgmllib.py,v
+retrieving revision 1.30
+retrieving revision 1.32
+Merging differences between 1.30 and 1.32 into sgmllib.py
+RCS file: /cvsroot/python/python/dist/src/Lib/site.py,v
+retrieving revision 1.26
+retrieving revision 1.28
+Merging differences between 1.26 and 1.28 into site.py
+RCS file: /cvsroot/python/python/dist/src/Lib/sre_compile.py,v
+retrieving revision 1.37
+retrieving revision 1.38
+Merging differences between 1.37 and 1.38 into sre_compile.py
+RCS file: /cvsroot/python/python/dist/src/Lib/sre_constants.py,v
+retrieving revision 1.28
+retrieving revision 1.29
+Merging differences between 1.28 and 1.29 into sre_constants.py
+RCS file: /cvsroot/python/python/dist/src/Lib/tabnanny.py,v
+retrieving revision 1.13
+retrieving revision 1.15
+Merging differences between 1.13 and 1.15 into tabnanny.py
+RCS file: /cvsroot/python/python/dist/src/Lib/tokenize.py,v
+retrieving revision 1.22
+retrieving revision 1.24
+Merging differences between 1.22 and 1.24 into tokenize.py
+RCS file: /cvsroot/python/python/dist/src/Lib/traceback.py,v
+retrieving revision 1.25
+retrieving revision 1.26
+Merging differences between 1.25 and 1.26 into traceback.py
+RCS file: /cvsroot/python/python/dist/src/Lib/types.py,v
+retrieving revision 1.14
+retrieving revision 1.15
+Merging differences between 1.14 and 1.15 into types.py
+RCS file: /cvsroot/python/python/dist/src/Lib/unittest.py,v
+retrieving revision 1.7
+retrieving revision 1.8
+Merging differences between 1.7 and 1.8 into unittest.py
+RCS file: /cvsroot/python/python/dist/src/Lib/urllib.py,v
+retrieving revision 1.126
+retrieving revision 1.127
+Merging differences between 1.126 and 1.127 into urllib.py
+RCS file: /cvsroot/python/python/dist/src/Lib/urllib2.py,v
+retrieving revision 1.13
+retrieving revision 1.15
+Merging differences between 1.13 and 1.15 into urllib2.py
+RCS file: /cvsroot/python/python/dist/src/Lib/weakref.py,v
+retrieving revision 1.9
+retrieving revision 1.10
+Merging differences between 1.9 and 1.10 into weakref.py
+RCS file: /cvsroot/python/python/dist/src/Lib/zipfile.py,v
+retrieving revision 1.13
+retrieving revision 1.14
+Merging differences between 1.13 and 1.14 into zipfile.py
+RCS file: /cvsroot/python/python/dist/src/Lib/distutils/mwerkscompiler.py,v
+retrieving revision 1.1
+retrieving revision 1.4
+Merging differences between 1.1 and 1.4 into mwerkscompiler.py
+RCS file: /cvsroot/python/python/dist/src/Lib/distutils/sysconfig.py,v
+retrieving revision 1.34
+retrieving revision 1.36
+Merging differences between 1.34 and 1.36 into sysconfig.py
+RCS file: /cvsroot/python/python/dist/src/Lib/distutils/command/bdist_rpm.py,v
+retrieving revision 1.23
+retrieving revision 1.24
+Merging differences between 1.23 and 1.24 into bdist_rpm.py
+RCS file: /cvsroot/python/python/dist/src/Lib/distutils/command/bdist_wininst.py,v
+retrieving revision 1.21
+retrieving revision 1.22
+Merging differences between 1.21 and 1.22 into bdist_wininst.py
+RCS file: /cvsroot/python/python/dist/src/Lib/encodings/aliases.py,v
+retrieving revision 1.4
+retrieving revision 1.8
+Merging differences between 1.4 and 1.8 into aliases.py
+U mergedescr/dist/src/Lib/encodings/base64_codec.py
+RCS file: /cvsroot/python/python/dist/src/Lib/encodings/cp037.py,v
+retrieving revision 1.2
+retrieving revision 1.3
+Merging differences between 1.2 and 1.3 into cp037.py
+RCS file: /cvsroot/python/python/dist/src/Lib/encodings/cp1006.py,v
+retrieving revision 1.2
+retrieving revision 1.3
+Merging differences between 1.2 and 1.3 into cp1006.py
+RCS file: /cvsroot/python/python/dist/src/Lib/encodings/cp1026.py,v
+retrieving revision 1.2
+retrieving revision 1.3
+Merging differences between 1.2 and 1.3 into cp1026.py
+U mergedescr/dist/src/Lib/encodings/cp1140.py
+RCS file: /cvsroot/python/python/dist/src/Lib/encodings/cp1250.py,v
+retrieving revision 1.2
+retrieving revision 1.3
+Merging differences between 1.2 and 1.3 into cp1250.py
+RCS file: /cvsroot/python/python/dist/src/Lib/encodings/cp1251.py,v
+retrieving revision 1.2
+retrieving revision 1.3
+Merging differences between 1.2 and 1.3 into cp1251.py
+RCS file: /cvsroot/python/python/dist/src/Lib/encodings/cp1252.py,v
+retrieving revision 1.2
+retrieving revision 1.3
+Merging differences between 1.2 and 1.3 into cp1252.py
+RCS file: /cvsroot/python/python/dist/src/Lib/encodings/cp1253.py,v
+retrieving revision 1.2
+retrieving revision 1.3
+Merging differences between 1.2 and 1.3 into cp1253.py
+RCS file: /cvsroot/python/python/dist/src/Lib/encodings/cp1254.py,v
+retrieving revision 1.2
+retrieving revision 1.3
+Merging differences between 1.2 and 1.3 into cp1254.py
+RCS file: /cvsroot/python/python/dist/src/Lib/encodings/cp1255.py,v
+retrieving revision 1.2
+retrieving revision 1.3
+Merging differences between 1.2 and 1.3 into cp1255.py
+RCS file: /cvsroot/python/python/dist/src/Lib/encodings/cp1256.py,v
+retrieving revision 1.2
+retrieving revision 1.3
+Merging differences between 1.2 and 1.3 into cp1256.py
+RCS file: /cvsroot/python/python/dist/src/Lib/encodings/cp1257.py,v
+retrieving revision 1.2
+retrieving revision 1.3
+Merging differences between 1.2 and 1.3 into cp1257.py
+RCS file: /cvsroot/python/python/dist/src/Lib/encodings/cp1258.py,v
+retrieving revision 1.2
+retrieving revision 1.3
+Merging differences between 1.2 and 1.3 into cp1258.py
+RCS file: /cvsroot/python/python/dist/src/Lib/encodings/cp424.py,v
+retrieving revision 1.2
+retrieving revision 1.3
+Merging differences between 1.2 and 1.3 into cp424.py
+RCS file: /cvsroot/python/python/dist/src/Lib/encodings/cp437.py,v
+retrieving revision 1.2
+retrieving revision 1.3
+Merging differences between 1.2 and 1.3 into cp437.py
+RCS file: /cvsroot/python/python/dist/src/Lib/encodings/cp500.py,v
+retrieving revision 1.2
+retrieving revision 1.3
+Merging differences between 1.2 and 1.3 into cp500.py
+RCS file: /cvsroot/python/python/dist/src/Lib/encodings/cp737.py,v
+retrieving revision 1.2
+retrieving revision 1.3
+Merging differences between 1.2 and 1.3 into cp737.py
+RCS file: /cvsroot/python/python/dist/src/Lib/encodings/cp775.py,v
+retrieving revision 1.2
+retrieving revision 1.3
+Merging differences between 1.2 and 1.3 into cp775.py
+RCS file: /cvsroot/python/python/dist/src/Lib/encodings/cp850.py,v
+retrieving revision 1.2
+retrieving revision 1.3
+Merging differences between 1.2 and 1.3 into cp850.py
+RCS file: /cvsroot/python/python/dist/src/Lib/encodings/cp852.py,v
+retrieving revision 1.2
+retrieving revision 1.3
+Merging differences between 1.2 and 1.3 into cp852.py
+RCS file: /cvsroot/python/python/dist/src/Lib/encodings/cp855.py,v
+retrieving revision 1.2
+retrieving revision 1.3
+Merging differences between 1.2 and 1.3 into cp855.py
+RCS file: /cvsroot/python/python/dist/src/Lib/encodings/cp856.py,v
+retrieving revision 1.3
+retrieving revision 1.4
+Merging differences between 1.3 and 1.4 into cp856.py
+RCS file: /cvsroot/python/python/dist/src/Lib/encodings/cp857.py,v
+retrieving revision 1.2
+retrieving revision 1.3
+Merging differences between 1.2 and 1.3 into cp857.py
+RCS file: /cvsroot/python/python/dist/src/Lib/encodings/cp860.py,v
+retrieving revision 1.2
+retrieving revision 1.3
+Merging differences between 1.2 and 1.3 into cp860.py
+RCS file: /cvsroot/python/python/dist/src/Lib/encodings/cp861.py,v
+retrieving revision 1.2
+retrieving revision 1.3
+Merging differences between 1.2 and 1.3 into cp861.py
+RCS file: /cvsroot/python/python/dist/src/Lib/encodings/cp862.py,v
+retrieving revision 1.2
+retrieving revision 1.3
+Merging differences between 1.2 and 1.3 into cp862.py
+RCS file: /cvsroot/python/python/dist/src/Lib/encodings/cp863.py,v
+retrieving revision 1.2
+retrieving revision 1.3
+Merging differences between 1.2 and 1.3 into cp863.py
+RCS file: /cvsroot/python/python/dist/src/Lib/encodings/cp864.py,v
+retrieving revision 1.2
+retrieving revision 1.3
+Merging differences between 1.2 and 1.3 into cp864.py
+RCS file: /cvsroot/python/python/dist/src/Lib/encodings/cp865.py,v
+retrieving revision 1.2
+retrieving revision 1.3
+Merging differences between 1.2 and 1.3 into cp865.py
+RCS file: /cvsroot/python/python/dist/src/Lib/encodings/cp866.py,v
+retrieving revision 1.2
+retrieving revision 1.3
+Merging differences between 1.2 and 1.3 into cp866.py
+RCS file: /cvsroot/python/python/dist/src/Lib/encodings/cp869.py,v
+retrieving revision 1.2
+retrieving revision 1.3
+Merging differences between 1.2 and 1.3 into cp869.py
+RCS file: /cvsroot/python/python/dist/src/Lib/encodings/cp874.py,v
+retrieving revision 1.2
+retrieving revision 1.3
+Merging differences between 1.2 and 1.3 into cp874.py
+RCS file: /cvsroot/python/python/dist/src/Lib/encodings/cp875.py,v
+retrieving revision 1.2
+retrieving revision 1.3
+Merging differences between 1.2 and 1.3 into cp875.py
+U mergedescr/dist/src/Lib/encodings/hex_codec.py
+RCS file: /cvsroot/python/python/dist/src/Lib/encodings/iso8859_1.py,v
+retrieving revision 1.2
+retrieving revision 1.3
+Merging differences between 1.2 and 1.3 into iso8859_1.py
+RCS file: /cvsroot/python/python/dist/src/Lib/encodings/iso8859_10.py,v
+retrieving revision 1.2
+retrieving revision 1.3
+Merging differences between 1.2 and 1.3 into iso8859_10.py
+RCS file: /cvsroot/python/python/dist/src/Lib/encodings/iso8859_13.py,v
+retrieving revision 1.2
+retrieving revision 1.3
+Merging differences between 1.2 and 1.3 into iso8859_13.py
+RCS file: /cvsroot/python/python/dist/src/Lib/encodings/iso8859_14.py,v
+retrieving revision 1.2
+retrieving revision 1.3
+Merging differences between 1.2 and 1.3 into iso8859_14.py
+RCS file: /cvsroot/python/python/dist/src/Lib/encodings/iso8859_15.py,v
+retrieving revision 1.2
+retrieving revision 1.3
+Merging differences between 1.2 and 1.3 into iso8859_15.py
+RCS file: /cvsroot/python/python/dist/src/Lib/encodings/iso8859_2.py,v
+retrieving revision 1.2
+retrieving revision 1.3
+Merging differences between 1.2 and 1.3 into iso8859_2.py
+RCS file: /cvsroot/python/python/dist/src/Lib/encodings/iso8859_3.py,v
+retrieving revision 1.2
+retrieving revision 1.3
+Merging differences between 1.2 and 1.3 into iso8859_3.py
+RCS file: /cvsroot/python/python/dist/src/Lib/encodings/iso8859_4.py,v
+retrieving revision 1.2
+retrieving revision 1.3
+Merging differences between 1.2 and 1.3 into iso8859_4.py
+RCS file: /cvsroot/python/python/dist/src/Lib/encodings/iso8859_5.py,v
+retrieving revision 1.2
+retrieving revision 1.3
+Merging differences between 1.2 and 1.3 into iso8859_5.py
+RCS file: /cvsroot/python/python/dist/src/Lib/encodings/iso8859_6.py,v
+retrieving revision 1.2
+retrieving revision 1.3
+Merging differences between 1.2 and 1.3 into iso8859_6.py
+RCS file: /cvsroot/python/python/dist/src/Lib/encodings/iso8859_7.py,v
+retrieving revision 1.2
+retrieving revision 1.3
+Merging differences between 1.2 and 1.3 into iso8859_7.py
+RCS file: /cvsroot/python/python/dist/src/Lib/encodings/iso8859_8.py,v
+retrieving revision 1.2
+retrieving revision 1.3
+Merging differences between 1.2 and 1.3 into iso8859_8.py
+RCS file: /cvsroot/python/python/dist/src/Lib/encodings/iso8859_9.py,v
+retrieving revision 1.2
+retrieving revision 1.3
+Merging differences between 1.2 and 1.3 into iso8859_9.py
+RCS file: /cvsroot/python/python/dist/src/Lib/encodings/koi8_r.py,v
+retrieving revision 1.2
+retrieving revision 1.3
+Merging differences between 1.2 and 1.3 into koi8_r.py
+RCS file: /cvsroot/python/python/dist/src/Lib/encodings/mac_cyrillic.py,v
+retrieving revision 1.2
+retrieving revision 1.3
+Merging differences between 1.2 and 1.3 into mac_cyrillic.py
+RCS file: /cvsroot/python/python/dist/src/Lib/encodings/mac_greek.py,v
+retrieving revision 1.2
+retrieving revision 1.3
+Merging differences between 1.2 and 1.3 into mac_greek.py
+RCS file: /cvsroot/python/python/dist/src/Lib/encodings/mac_iceland.py,v
+retrieving revision 1.2
+retrieving revision 1.3
+Merging differences between 1.2 and 1.3 into mac_iceland.py
+RCS file: /cvsroot/python/python/dist/src/Lib/encodings/mac_latin2.py,v
+retrieving revision 1.2
+retrieving revision 1.3
+Merging differences between 1.2 and 1.3 into mac_latin2.py
+RCS file: /cvsroot/python/python/dist/src/Lib/encodings/mac_roman.py,v
+retrieving revision 1.2
+retrieving revision 1.3
+Merging differences between 1.2 and 1.3 into mac_roman.py
+RCS file: /cvsroot/python/python/dist/src/Lib/encodings/mac_turkish.py,v
+retrieving revision 1.2
+retrieving revision 1.3
+Merging differences between 1.2 and 1.3 into mac_turkish.py
+U mergedescr/dist/src/Lib/encodings/quopri_codec.py
+U mergedescr/dist/src/Lib/encodings/rot_13.py
+RCS file: /cvsroot/python/python/dist/src/Lib/encodings/utf_16.py,v
+retrieving revision 1.1
+retrieving revision 1.2
+Merging differences between 1.1 and 1.2 into utf_16.py
+U mergedescr/dist/src/Lib/encodings/uu_codec.py
+U mergedescr/dist/src/Lib/encodings/zlib_codec.py
+RCS file: /cvsroot/python/python/dist/src/Lib/lib-old/lockfile.py,v
+retrieving revision 1.1
+retrieving revision 1.2
+Merging differences between 1.1 and 1.2 into lockfile.py
+RCS file: /cvsroot/python/python/dist/src/Lib/plat-next3/regen,v
+retrieving revision 1.1
+retrieving revision 1.2
+Merging differences between 1.1 and 1.2 into regen
+RCS file: /cvsroot/python/python/dist/src/Lib/plat-riscos/riscosenviron.py,v
+retrieving revision 1.3
+retrieving revision 1.4
+Merging differences between 1.3 and 1.4 into riscosenviron.py
+RCS file: /cvsroot/python/python/dist/src/Lib/plat-riscos/riscospath.py,v
+retrieving revision 1.2
+retrieving revision 1.3
+Merging differences between 1.2 and 1.3 into riscospath.py
+RCS file: /cvsroot/python/python/dist/src/Lib/plat-riscos/rourl2path.py,v
+retrieving revision 1.1
+retrieving revision 1.2
+Merging differences between 1.1 and 1.2 into rourl2path.py
+RCS file: /cvsroot/python/python/dist/src/Lib/plat-sunos4/regen,v
+retrieving revision 1.2
+retrieving revision 1.3
+Merging differences between 1.2 and 1.3 into regen
+RCS file: /cvsroot/python/python/dist/src/Lib/plat-sunos5/regen,v
+retrieving revision 1.3
+retrieving revision 1.4
+Merging differences between 1.3 and 1.4 into regen
+RCS file: /cvsroot/python/python/dist/src/Lib/test/README,v
+retrieving revision 1.6
+retrieving revision 1.9
+Merging differences between 1.6 and 1.9 into README
+U mergedescr/dist/src/Lib/test/double_const.py
+RCS file: /cvsroot/python/python/dist/src/Lib/test/re_tests.py,v
+retrieving revision 1.28
+retrieving revision 1.29
+Merging differences between 1.28 and 1.29 into re_tests.py
+RCS file: /cvsroot/python/python/dist/src/Lib/test/regrtest.py,v
+retrieving revision 1.33
+retrieving revision 1.36
+Merging differences between 1.33 and 1.36 into regrtest.py
+RCS file: /cvsroot/python/python/dist/src/Lib/test/string_tests.py,v
+retrieving revision 1.7
+retrieving revision 1.9
+Merging differences between 1.7 and 1.9 into string_tests.py
+RCS file: /cvsroot/python/python/dist/src/Lib/test/test_b1.py,v
+retrieving revision 1.34
+retrieving revision 1.35
+Merging differences between 1.34 and 1.35 into test_b1.py
+RCS file: /cvsroot/python/python/dist/src/Lib/test/test_b2.py,v
+retrieving revision 1.24
+retrieving revision 1.26
+Merging differences between 1.24 and 1.26 into test_b2.py
+RCS file: /cvsroot/python/python/dist/src/Lib/test/test_binhex.py,v
+retrieving revision 1.10
+retrieving revision 1.11
+Merging differences between 1.10 and 1.11 into test_binhex.py
+U mergedescr/dist/src/Lib/test/test_call.py
+U mergedescr/dist/src/Lib/test/test_codecs.py
+RCS file: /cvsroot/python/python/dist/src/Lib/test/test_complex.py,v
+retrieving revision 1.1
+retrieving revision 1.2
+Merging differences between 1.1 and 1.2 into test_complex.py
+RCS file: /cvsroot/python/python/dist/src/Lib/test/test_contains.py,v
+retrieving revision 1.6
+retrieving revision 1.7
+Merging differences between 1.6 and 1.7 into test_contains.py
+RCS file: /cvsroot/python/python/dist/src/Lib/test/test_cookie.py,v
+retrieving revision 1.9
+retrieving revision 1.10
+Merging differences between 1.9 and 1.10 into test_cookie.py
+RCS file: /cvsroot/python/python/dist/src/Lib/test/test_copy_reg.py,v
+retrieving revision 1.1
+retrieving revision 1.2
+Merging differences between 1.1 and 1.2 into test_copy_reg.py
+RCS file: /cvsroot/python/python/dist/src/Lib/test/test_difflib.py,v
+retrieving revision 1.1
+retrieving revision 1.3
+Merging differences between 1.1 and 1.3 into test_difflib.py
+RCS file: /cvsroot/python/python/dist/src/Lib/test/test_doctest.py,v
+retrieving revision 1.1
+retrieving revision 1.2
+Merging differences between 1.1 and 1.2 into test_doctest.py
+RCS file: /cvsroot/python/python/dist/src/Lib/test/test_dospath.py,v
+retrieving revision 1.3
+retrieving revision 1.4
+Merging differences between 1.3 and 1.4 into test_dospath.py
+RCS file: /cvsroot/python/python/dist/src/Lib/test/test_extcall.py,v
+retrieving revision 1.14
+retrieving revision 1.16
+Merging differences between 1.14 and 1.16 into test_extcall.py
+RCS file: /cvsroot/python/python/dist/src/Lib/test/test_fcntl.py,v
+retrieving revision 1.17
+retrieving revision 1.18
+Merging differences between 1.17 and 1.18 into test_fcntl.py
+RCS file: /cvsroot/python/python/dist/src/Lib/test/test_fnmatch.py,v
+retrieving revision 1.1
+retrieving revision 1.2
+Merging differences between 1.1 and 1.2 into test_fnmatch.py
+U mergedescr/dist/src/Lib/test/test_generators.py
+RCS file: /cvsroot/python/python/dist/src/Lib/test/test_grp.py,v
+retrieving revision 1.7
+retrieving revision 1.8
+Merging differences between 1.7 and 1.8 into test_grp.py
+RCS file: /cvsroot/python/python/dist/src/Lib/test/test_hash.py,v
+retrieving revision 1.2
+retrieving revision 1.4
+Merging differences between 1.2 and 1.4 into test_hash.py
+U mergedescr/dist/src/Lib/test/test_htmlparser.py
+RCS file: /cvsroot/python/python/dist/src/Lib/test/test_import.py,v
+retrieving revision 1.3
+retrieving revision 1.4
+Merging differences between 1.3 and 1.4 into test_import.py
+RCS file: /cvsroot/python/python/dist/src/Lib/test/test_iter.py,v
+retrieving revision 1.2
+retrieving revision 1.17
+Merging differences between 1.2 and 1.17 into test_iter.py
+rcsmerge: warning: conflicts during merge
+RCS file: /cvsroot/python/python/dist/src/Lib/test/test_locale.py,v
+retrieving revision 1.2
+retrieving revision 1.3
+Merging differences between 1.2 and 1.3 into test_locale.py
+RCS file: /cvsroot/python/python/dist/src/Lib/test/test_mailbox.py,v
+retrieving revision 1.3
+retrieving revision 1.6
+Merging differences between 1.3 and 1.6 into test_mailbox.py
+RCS file: /cvsroot/python/python/dist/src/Lib/test/test_minidom.py,v
+retrieving revision 1.26
+retrieving revision 1.27
+Merging differences between 1.26 and 1.27 into test_minidom.py
+RCS file: /cvsroot/python/python/dist/src/Lib/test/test_mmap.py,v
+retrieving revision 1.15
+retrieving revision 1.17
+Merging differences between 1.15 and 1.17 into test_mmap.py
+U mergedescr/dist/src/Lib/test/test_mutants.py
+RCS file: /cvsroot/python/python/dist/src/Lib/test/test_operations.py,v
+retrieving revision 1.3
+retrieving revision 1.5
+Merging differences between 1.3 and 1.5 into test_operations.py
+RCS file: /cvsroot/python/python/dist/src/Lib/test/test_parser.py,v
+retrieving revision 1.6
+retrieving revision 1.7
+Merging differences between 1.6 and 1.7 into test_parser.py
+U mergedescr/dist/src/Lib/test/test_pprint.py
+RCS file: /cvsroot/python/python/dist/src/Lib/test/test_pyexpat.py,v
+retrieving revision 1.7
+retrieving revision 1.9
+Merging differences between 1.7 and 1.9 into test_pyexpat.py
+U mergedescr/dist/src/Lib/test/test_quopri.py
+RCS file: /cvsroot/python/python/dist/src/Lib/test/test_regex.py,v
+retrieving revision 1.9
+retrieving revision 1.10
+Merging differences between 1.9 and 1.10 into test_regex.py
+RCS file: /cvsroot/python/python/dist/src/Lib/test/test_rfc822.py,v
+retrieving revision 1.9
+retrieving revision 1.11
+Merging differences between 1.9 and 1.11 into test_rfc822.py
+RCS file: /cvsroot/python/python/dist/src/Lib/test/test_richcmp.py,v
+retrieving revision 1.5
+retrieving revision 1.6
+Merging differences between 1.5 and 1.6 into test_richcmp.py
+RCS file: /cvsroot/python/python/dist/src/Lib/test/test_scope.py,v
+retrieving revision 1.14
+retrieving revision 1.16
+Merging differences between 1.14 and 1.16 into test_scope.py
+RCS file: /cvsroot/python/python/dist/src/Lib/test/test_sha.py,v
+retrieving revision 1.1
+retrieving revision 1.2
+Merging differences between 1.1 and 1.2 into test_sha.py
+RCS file: /cvsroot/python/python/dist/src/Lib/test/test_sre.py,v
+retrieving revision 1.24
+retrieving revision 1.25
+Merging differences between 1.24 and 1.25 into test_sre.py
+RCS file: /cvsroot/python/python/dist/src/Lib/test/test_strop.py,v
+retrieving revision 1.10
+retrieving revision 1.14
+Merging differences between 1.10 and 1.14 into test_strop.py
+RCS file: /cvsroot/python/python/dist/src/Lib/test/test_struct.py,v
+retrieving revision 1.7
+retrieving revision 1.13
+Merging differences between 1.7 and 1.13 into test_struct.py
+RCS file: /cvsroot/python/python/dist/src/Lib/test/test_support.py,v
+retrieving revision 1.21
+retrieving revision 1.23
+Merging differences between 1.21 and 1.23 into test_support.py
+U mergedescr/dist/src/Lib/test/test_threaded_import.py
+RCS file: /cvsroot/python/python/dist/src/Lib/test/test_time.py,v
+retrieving revision 1.6
+retrieving revision 1.7
+Merging differences between 1.6 and 1.7 into test_time.py
+RCS file: /cvsroot/python/python/dist/src/Lib/test/test_types.py,v
+retrieving revision 1.20
+retrieving revision 1.21
+Merging differences between 1.20 and 1.21 into test_types.py
+RCS file: /cvsroot/python/python/dist/src/Lib/test/test_unicode.py,v
+retrieving revision 1.31
+retrieving revision 1.34
+Merging differences between 1.31 and 1.34 into test_unicode.py
+U mergedescr/dist/src/Lib/test/test_unicode_file.py
+U mergedescr/dist/src/Lib/test/test_urllib2.py
+RCS file: /cvsroot/python/python/dist/src/Lib/test/test_weakref.py,v
+retrieving revision 1.7
+retrieving revision 1.9
+Merging differences between 1.7 and 1.9 into test_weakref.py
+RCS file: /cvsroot/python/python/dist/src/Lib/test/test_xmllib.py,v
+retrieving revision 1.4
+retrieving revision 1.5
+Merging differences between 1.4 and 1.5 into test_xmllib.py
+RCS file: /cvsroot/python/python/dist/src/Lib/test/output/test_coercion,v
+retrieving revision 1.3
+retrieving revision 1.4
+Merging differences between 1.3 and 1.4 into test_coercion
+RCS file: /cvsroot/python/python/dist/src/Lib/test/output/test_cookie,v
+retrieving revision 1.6
+retrieving revision 1.7
+Merging differences between 1.6 and 1.7 into test_cookie
+RCS file: /cvsroot/python/python/dist/src/Lib/test/output/test_extcall,v
+retrieving revision 1.8
+retrieving revision 1.9
+Merging differences between 1.8 and 1.9 into test_extcall
+RCS file: /cvsroot/python/python/dist/src/Lib/test/output/test_minidom,v
+retrieving revision 1.12
+retrieving revision 1.13
+Merging differences between 1.12 and 1.13 into test_minidom
+RCS file: /cvsroot/python/python/dist/src/Lib/test/output/test_pyexpat,v
+retrieving revision 1.6
+retrieving revision 1.7
+Merging differences between 1.6 and 1.7 into test_pyexpat
+RCS file: /cvsroot/python/python/dist/src/Lib/test/output/test_scope,v
+retrieving revision 1.6
+retrieving revision 1.8
+Merging differences between 1.6 and 1.8 into test_scope
+U mergedescr/dist/src/Lib/test/output/test_unicode_file
+RCS file: /cvsroot/python/python/dist/src/Lib/xml/dom/minidom.py,v
+retrieving revision 1.32
+retrieving revision 1.34
+Merging differences between 1.32 and 1.34 into minidom.py
+RCS file: /cvsroot/python/python/dist/src/Lib/xml/sax/expatreader.py,v
+retrieving revision 1.22
+retrieving revision 1.23
+Merging differences between 1.22 and 1.23 into expatreader.py
+RCS file: /cvsroot/python/python/dist/src/Lib/xml/sax/xmlreader.py,v
+retrieving revision 1.14
+retrieving revision 1.16
+Merging differences between 1.14 and 1.16 into xmlreader.py
+RCS file: /cvsroot/python/python/dist/src/Modules/_codecsmodule.c,v
+retrieving revision 2.6
+retrieving revision 2.8
+Merging differences between 2.6 and 2.8 into _codecsmodule.c
+RCS file: /cvsroot/python/python/dist/src/Modules/_cursesmodule.c,v
+retrieving revision 2.51
+retrieving revision 2.52
+Merging differences between 2.51 and 2.52 into _cursesmodule.c
+RCS file: /cvsroot/python/python/dist/src/Modules/_sre.c,v
+retrieving revision 2.55
+retrieving revision 2.60
+Merging differences between 2.55 and 2.60 into _sre.c
+RCS file: /cvsroot/python/python/dist/src/Modules/_testcapimodule.c,v
+retrieving revision 1.3
+retrieving revision 1.9
+Merging differences between 1.3 and 1.9 into _testcapimodule.c
+RCS file: /cvsroot/python/python/dist/src/Modules/_tkinter.c,v
+retrieving revision 1.115
+retrieving revision 1.116
+Merging differences between 1.115 and 1.116 into _tkinter.c
+RCS file: /cvsroot/python/python/dist/src/Modules/_weakref.c,v
+retrieving revision 1.10
+retrieving revision 1.11
+Merging differences between 1.10 and 1.11 into _weakref.c
+U mergedescr/dist/src/Modules/addrinfo.h
+RCS file: /cvsroot/python/python/dist/src/Modules/arraymodule.c,v
+retrieving revision 2.62
+retrieving revision 2.63
+Merging differences between 2.62 and 2.63 into arraymodule.c
+RCS file: /cvsroot/python/python/dist/src/Modules/binascii.c,v
+retrieving revision 2.28
+retrieving revision 2.29
+Merging differences between 2.28 and 2.29 into binascii.c
+RCS file: /cvsroot/python/python/dist/src/Modules/fcntlmodule.c,v
+retrieving revision 2.28
+retrieving revision 2.31
+Merging differences between 2.28 and 2.31 into fcntlmodule.c
+U mergedescr/dist/src/Modules/getaddrinfo.c
+U mergedescr/dist/src/Modules/getnameinfo.c
+RCS file: /cvsroot/python/python/dist/src/Modules/main.c,v
+retrieving revision 1.52
+retrieving revision 1.53
+Merging differences between 1.52 and 1.53 into main.c
+RCS file: /cvsroot/python/python/dist/src/Modules/makesetup,v
+retrieving revision 1.35
+retrieving revision 1.36
+Merging differences between 1.35 and 1.36 into makesetup
+RCS file: /cvsroot/python/python/dist/src/Modules/mathmodule.c,v
+retrieving revision 2.58
+retrieving revision 2.59
+Merging differences between 2.58 and 2.59 into mathmodule.c
+RCS file: /cvsroot/python/python/dist/src/Modules/mmapmodule.c,v
+retrieving revision 2.28
+retrieving revision 2.31
+Merging differences between 2.28 and 2.31 into mmapmodule.c
+RCS file: /cvsroot/python/python/dist/src/Modules/parsermodule.c,v
+retrieving revision 2.60
+retrieving revision 2.61
+Merging differences between 2.60 and 2.61 into parsermodule.c
+RCS file: /cvsroot/python/python/dist/src/Modules/pcremodule.c,v
+retrieving revision 2.25
+retrieving revision 2.26
+Merging differences between 2.25 and 2.26 into pcremodule.c
+RCS file: /cvsroot/python/python/dist/src/Modules/posixmodule.c,v
+retrieving revision 2.187
+retrieving revision 2.190
+Merging differences between 2.187 and 2.190 into posixmodule.c
+RCS file: /cvsroot/python/python/dist/src/Modules/pyexpat.c,v
+retrieving revision 2.45
+retrieving revision 2.46
+Merging differences between 2.45 and 2.46 into pyexpat.c
+RCS file: /cvsroot/python/python/dist/src/Modules/regexpr.c,v
+retrieving revision 1.33
+retrieving revision 1.34
+Merging differences between 1.33 and 1.34 into regexpr.c
+RCS file: /cvsroot/python/python/dist/src/Modules/selectmodule.c,v
+retrieving revision 2.50
+retrieving revision 2.51
+Merging differences between 2.50 and 2.51 into selectmodule.c
+RCS file: /cvsroot/python/python/dist/src/Modules/socketmodule.c,v
+retrieving revision 1.141
+retrieving revision 1.149
+Merging differences between 1.141 and 1.149 into socketmodule.c
+RCS file: /cvsroot/python/python/dist/src/Modules/sre.h,v
+retrieving revision 2.18
+retrieving revision 2.21
+Merging differences between 2.18 and 2.21 into sre.h
+RCS file: /cvsroot/python/python/dist/src/Modules/sre_constants.h,v
+retrieving revision 2.12
+retrieving revision 2.13
+Merging differences between 2.12 and 2.13 into sre_constants.h
+RCS file: /cvsroot/python/python/dist/src/Modules/stropmodule.c,v
+retrieving revision 2.75
+retrieving revision 2.82
+Merging differences between 2.75 and 2.82 into stropmodule.c
+RCS file: /cvsroot/python/python/dist/src/Modules/structmodule.c,v
+retrieving revision 2.42
+retrieving revision 2.48
+Merging differences between 2.42 and 2.48 into structmodule.c
+RCS file: /cvsroot/python/python/dist/src/Modules/termios.c,v
+retrieving revision 2.24
+retrieving revision 2.31
+Merging differences between 2.24 and 2.31 into termios.c
+U mergedescr/dist/src/Modules/testcapi_long.h
+RCS file: /cvsroot/python/python/dist/src/Modules/timemodule.c,v
+retrieving revision 2.110
+retrieving revision 2.111
+Merging differences between 2.110 and 2.111 into timemodule.c
+RCS file: /cvsroot/python/python/dist/src/Modules/xreadlinesmodule.c,v
+retrieving revision 1.5
+retrieving revision 1.6
+Merging differences between 1.5 and 1.6 into xreadlinesmodule.c
+RCS file: /cvsroot/python/python/dist/src/Objects/abstract.c,v
+retrieving revision 2.60
+retrieving revision 2.69
+Merging differences between 2.60 and 2.69 into abstract.c
+rcsmerge: warning: conflicts during merge
+RCS file: /cvsroot/python/python/dist/src/Objects/classobject.c,v
+retrieving revision 2.127
+retrieving revision 2.132
+Merging differences between 2.127 and 2.132 into classobject.c
+rcsmerge: warning: conflicts during merge
+RCS file: /cvsroot/python/python/dist/src/Objects/dictobject.c,v
+retrieving revision 2.80
+retrieving revision 2.106
+Merging differences between 2.80 and 2.106 into dictobject.c
+rcsmerge: warning: conflicts during merge
+RCS file: /cvsroot/python/python/dist/src/Objects/fileobject.c,v
+retrieving revision 2.112
+retrieving revision 2.113
+Merging differences between 2.112 and 2.113 into fileobject.c
+RCS file: /cvsroot/python/python/dist/src/Objects/floatobject.c,v
+retrieving revision 2.81
+retrieving revision 2.82
+Merging differences between 2.81 and 2.82 into floatobject.c
+RCS file: /cvsroot/python/python/dist/src/Objects/frameobject.c,v
+retrieving revision 2.49
+retrieving revision 2.52
+Merging differences between 2.49 and 2.52 into frameobject.c
+RCS file: /cvsroot/python/python/dist/src/Objects/funcobject.c,v
+retrieving revision 2.37
+retrieving revision 2.38
+Merging differences between 2.37 and 2.38 into funcobject.c
+rcsmerge: warning: conflicts during merge
+RCS file: /cvsroot/python/python/dist/src/Objects/intobject.c,v
+retrieving revision 2.56
+retrieving revision 2.57
+Merging differences between 2.56 and 2.57 into intobject.c
+RCS file: /cvsroot/python/python/dist/src/Objects/iterobject.c,v
+retrieving revision 1.3
+retrieving revision 1.4
+Merging differences between 1.3 and 1.4 into iterobject.c
+RCS file: /cvsroot/python/python/dist/src/Objects/listobject.c,v
+retrieving revision 2.92
+retrieving revision 2.96
+Merging differences between 2.92 and 2.96 into listobject.c
+RCS file: /cvsroot/python/python/dist/src/Objects/longobject.c,v
+retrieving revision 1.71
+retrieving revision 1.83
+Merging differences between 1.71 and 1.83 into longobject.c
+rcsmerge: warning: conflicts during merge
+RCS file: /cvsroot/python/python/dist/src/Objects/moduleobject.c,v
+retrieving revision 2.31
+retrieving revision 2.33
+Merging differences between 2.31 and 2.33 into moduleobject.c
+rcsmerge: warning: conflicts during merge
+RCS file: /cvsroot/python/python/dist/src/Objects/object.c,v
+retrieving revision 2.124
+retrieving revision 2.132
+Merging differences between 2.124 and 2.132 into object.c
+rcsmerge: warning: conflicts during merge
+RCS file: /cvsroot/python/python/dist/src/Objects/rangeobject.c,v
+retrieving revision 2.24
+retrieving revision 2.25
+Merging differences between 2.24 and 2.25 into rangeobject.c
+rcsmerge: warning: conflicts during merge
+RCS file: /cvsroot/python/python/dist/src/Objects/stringobject.c,v
+retrieving revision 2.103
+retrieving revision 2.120
+Merging differences between 2.103 and 2.120 into stringobject.c
+rcsmerge: warning: conflicts during merge
+RCS file: /cvsroot/python/python/dist/src/Objects/tupleobject.c,v
+retrieving revision 2.48
+retrieving revision 2.53
+Merging differences between 2.48 and 2.53 into tupleobject.c
+RCS file: /cvsroot/python/python/dist/src/Objects/typeobject.c,v
+retrieving revision 2.16
+retrieving revision 2.18
+Merging differences between 2.16 and 2.18 into typeobject.c
+rcsmerge: warning: conflicts during merge
+RCS file: /cvsroot/python/python/dist/src/Objects/unicodectype.c,v
+retrieving revision 2.7
+retrieving revision 2.11
+Merging differences between 2.7 and 2.11 into unicodectype.c
+RCS file: /cvsroot/python/python/dist/src/Objects/unicodeobject.c,v
+retrieving revision 2.87
+retrieving revision 2.101
+Merging differences between 2.87 and 2.101 into unicodeobject.c
+rcsmerge: warning: conflicts during merge
+RCS file: /cvsroot/python/python/dist/src/PC/WinMain.c,v
+retrieving revision 1.6
+retrieving revision 1.7
+Merging differences between 1.6 and 1.7 into WinMain.c
+RCS file: /cvsroot/python/python/dist/src/PC/config.h,v
+retrieving revision 1.51
+retrieving revision 1.55
+Merging differences between 1.51 and 1.55 into config.h
+RCS file: /cvsroot/python/python/dist/src/PCbuild/BUILDno.txt,v
+retrieving revision 1.12
+retrieving revision 1.15
+Merging differences between 1.12 and 1.15 into BUILDno.txt
+cvs server: nonmergeable file needs merge
+cvs server: revision 1.16 from repository is now in mergedescr/dist/src/PCbuild/pythoncore.dsp
+cvs server: file from working directory is now in .#pythoncore.dsp.1.15.2.3
+C mergedescr/dist/src/PCbuild/pythoncore.dsp
+RCS file: /cvsroot/python/python/dist/src/Python/bltinmodule.c,v
+retrieving revision 2.198
+retrieving revision 2.215
+Merging differences between 2.198 and 2.215 into bltinmodule.c
+rcsmerge: warning: conflicts during merge
+RCS file: /cvsroot/python/python/dist/src/Python/ceval.c,v
+retrieving revision 2.241
+retrieving revision 2.260
+Merging differences between 2.241 and 2.260 into ceval.c
+rcsmerge: warning: conflicts during merge
+RCS file: /cvsroot/python/python/dist/src/Python/compile.c,v
+retrieving revision 2.197
+retrieving revision 2.206
+Merging differences between 2.197 and 2.206 into compile.c
+RCS file: /cvsroot/python/python/dist/src/Python/dynload_win.c,v
+retrieving revision 2.7
+retrieving revision 2.8
+Merging differences between 2.7 and 2.8 into dynload_win.c
+RCS file: /cvsroot/python/python/dist/src/Python/errors.c,v
+retrieving revision 2.62
+retrieving revision 2.63
+Merging differences between 2.62 and 2.63 into errors.c
+RCS file: /cvsroot/python/python/dist/src/Python/getargs.c,v
+retrieving revision 2.54
+retrieving revision 2.60
+Merging differences between 2.54 and 2.60 into getargs.c
+rcsmerge: warning: conflicts during merge
+RCS file: /cvsroot/python/python/dist/src/Python/graminit.c,v
+retrieving revision 2.28
+retrieving revision 2.29
+Merging differences between 2.28 and 2.29 into graminit.c
+RCS file: /cvsroot/python/python/dist/src/Python/import.c,v
+retrieving revision 2.176
+retrieving revision 2.178
+Merging differences between 2.176 and 2.178 into import.c
+RCS file: /cvsroot/python/python/dist/src/Python/marshal.c,v
+retrieving revision 1.62
+retrieving revision 1.64
+Merging differences between 1.62 and 1.64 into marshal.c
+RCS file: /cvsroot/python/python/dist/src/Python/pystate.c,v
+retrieving revision 2.16
+retrieving revision 2.18
+Merging differences between 2.16 and 2.18 into pystate.c
+RCS file: /cvsroot/python/python/dist/src/Python/pythonrun.c,v
+retrieving revision 2.133
+retrieving revision 2.134
+Merging differences between 2.133 and 2.134 into pythonrun.c
+RCS file: /cvsroot/python/python/dist/src/Python/symtable.c,v
+retrieving revision 2.4
+retrieving revision 2.5
+Merging differences between 2.4 and 2.5 into symtable.c
+RCS file: /cvsroot/python/python/dist/src/Python/sysmodule.c,v
+retrieving revision 2.85
+retrieving revision 2.88
+Merging differences between 2.85 and 2.88 into sysmodule.c
+U mergedescr/dist/src/Tools/README
+U mergedescr/dist/src/Tools/scripts/README
+U mergedescr/dist/src/Tools/scripts/byteyears.py
+U mergedescr/dist/src/Tools/scripts/checkappend.py
+U mergedescr/dist/src/Tools/scripts/checkpyc.py
+U mergedescr/dist/src/Tools/scripts/classfix.py
+U mergedescr/dist/src/Tools/scripts/copytime.py
+U mergedescr/dist/src/Tools/scripts/crlf.py
+U mergedescr/dist/src/Tools/scripts/cvsfiles.py
+U mergedescr/dist/src/Tools/scripts/dutree.doc
+U mergedescr/dist/src/Tools/scripts/dutree.py
+U mergedescr/dist/src/Tools/scripts/eptags.py
+U mergedescr/dist/src/Tools/scripts/findlinksto.py
+U mergedescr/dist/src/Tools/scripts/fixcid.py
+U mergedescr/dist/src/Tools/scripts/fixheader.py
+U mergedescr/dist/src/Tools/scripts/fixnotice.py
+U mergedescr/dist/src/Tools/scripts/fixps.py
+U mergedescr/dist/src/Tools/scripts/ftpmirror.py
+U mergedescr/dist/src/Tools/scripts/gencodec.py
+U mergedescr/dist/src/Tools/scripts/h2py.py
+U mergedescr/dist/src/Tools/scripts/ifdef.py
+U mergedescr/dist/src/Tools/scripts/lfcr.py
+U mergedescr/dist/src/Tools/scripts/linktree.py
+U mergedescr/dist/src/Tools/scripts/lll.py
+U mergedescr/dist/src/Tools/scripts/logmerge.py
+U mergedescr/dist/src/Tools/scripts/mailerdaemon.py
+U mergedescr/dist/src/Tools/scripts/md5sum.py
+U mergedescr/dist/src/Tools/scripts/methfix.py
+U mergedescr/dist/src/Tools/scripts/mkreal.py
+U mergedescr/dist/src/Tools/scripts/ndiff.py
+U mergedescr/dist/src/Tools/scripts/nm2def.py
+U mergedescr/dist/src/Tools/scripts/objgraph.py
+U mergedescr/dist/src/Tools/scripts/parseentities.py
+U mergedescr/dist/src/Tools/scripts/pathfix.py
+U mergedescr/dist/src/Tools/scripts/pdeps.py
+U mergedescr/dist/src/Tools/scripts/pindent.py
+U mergedescr/dist/src/Tools/scripts/ptags.py
+U mergedescr/dist/src/Tools/scripts/pydoc.pyw
+U mergedescr/dist/src/Tools/scripts/redemo.py
+U mergedescr/dist/src/Tools/scripts/reindent.py
+U mergedescr/dist/src/Tools/scripts/rgrep.py
+U mergedescr/dist/src/Tools/scripts/suff.py
+U mergedescr/dist/src/Tools/scripts/sum5.py
+U mergedescr/dist/src/Tools/scripts/texi2html.py
+U mergedescr/dist/src/Tools/scripts/trace.py
+U mergedescr/dist/src/Tools/scripts/treesync.py
+U mergedescr/dist/src/Tools/scripts/untabify.py
+U mergedescr/dist/src/Tools/scripts/which.py
+U mergedescr/dist/src/Tools/scripts/xxci.py
+------------------------------------------------------------------
 2001-07-06
 
 Tagged trunk a bit after midnight, like so:
@@ -256,3 +1398,4 @@ This is the first trunk snapshot to be merged into the descr-branch.
 Gave it a date instead of a goofy name because there's going to be more
 than one of these, and at least it's obvious which of two ISO dates comes
 earlier.  These tags should go away after all merging is complete.
+MERGE END ******************************************************************
