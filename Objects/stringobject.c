@@ -26,6 +26,8 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 #include "allobjects.h"
 
+#include <ctype.h>
+
 #ifdef COUNT_ALLOCS
 int null_strings, one_strings;
 #endif
