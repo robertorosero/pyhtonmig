@@ -12,7 +12,7 @@ import doctest
 def sample_func(v):
     """
     Blah blah
-    
+
     >>> print sample_func(22)
     44
 
@@ -1101,7 +1101,7 @@ def test_DocFileSuite():
 
        Note that '/' should be used as a path separator.  It will be
        converted to a native separator at run time:
-       
+
 
          >>> suite = doctest.DocFileSuite('../test/test_doctest.txt')
          >>> suite.run(unittest.TestResult())
@@ -1152,9 +1152,9 @@ def test_DocFileSuite():
          Traceback (most recent call last):
          ...
          AttributeError: 'module' object has no attribute 'sillySetup'
-       
+
     """
-    
+
 
 ######################################################################
 ## Main

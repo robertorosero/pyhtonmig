@@ -1471,9 +1471,9 @@ class DebugRunner(DocTestRunner):
 
          >>> failure.got
          '1\n'
-       
+
        """
-    
+
     def report_unexpected_exception(self, out, test, example, exc_info):
         raise exc_info[0], exc_info[1], exc_info[2]
 
@@ -1571,7 +1571,7 @@ def testmod(m=None, name=None, globs=None, verbose=None, isprivate=None,
     Optional keyword arg "raise_on_error" raises an exception on the
     first unexpected exception or failure. This allows failures to be
     post-mortem debugged.
-    
+
     """
 
     """ [XX] This is no longer true:
@@ -1833,7 +1833,7 @@ class DocTestFileTestCase(DocTestTestCase):
         return '_'.join(self._dt_test.name.split('.'))
 
     def __repr__(self):
-        return self._dt_test.filename 
+        return self._dt_test.filename
     __str__ = __repr__
 
     def format_failure(self, err):
@@ -1855,7 +1855,7 @@ def DocFileTest(path, package=None, globs=None,
 
     test_runner = DocTestRunner(optionflags=optionflags, verbose=False)
     test = DocTest(doc, globs, name, path, 0)
-    
+
     return DocTestFileTestCase(test_runner, test, setUp, tearDown)
 
 def DocFileSuite(*paths, **kw):
@@ -1891,7 +1891,7 @@ def DocFileSuite(*paths, **kw):
     # level.  If it were called in DocFileTest, then this function
     # would be the caller and we might guess the package incorrectly.
     kw['package'] = _normalize_module(kw.get('package'))
-    
+
     for path in paths:
         suite.addTest(DocFileTest(path, **kw))
 
@@ -1930,7 +1930,7 @@ def script_from_examples(s):
        ...           ...    blah
        ...           ...    blah
        ...           ...
-       ...           
+       ...
        ...           Ho hum
        ...           '''
 
@@ -1957,7 +1957,7 @@ def script_from_examples(s):
        if 0:
           blah
           blah
-       <BLANKLINE>    
+       <BLANKLINE>
        #
        #            Ho hum
        #
