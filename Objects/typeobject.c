@@ -1834,7 +1834,7 @@ add_operators(PyTypeObject *type)
 #undef ADD
 #define ADD(SLOT, TABLE) \
 		if (SLOT) { \
-			if (add_wrappers(type, TABLE, SLOT) < 0) \
+			if (add_wrappers(type, TABLE, (void *)(SLOT)) < 0) \
 				return -1; \
 		}
 
@@ -1914,7 +1914,8 @@ add_operators(PyTypeObject *type)
 	ADD(type->tp_init, tab_init);
 
 	if (type->tp_new != NULL)
-		add_staticmethodwrappers(type, tab_new, type->tp_new);
+		add_staticmethodwrappers(type, tab_new,
+					 (void *)(type->tp_new));
 
 	return 0;
 }
