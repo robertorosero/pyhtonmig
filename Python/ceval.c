@@ -3604,8 +3604,14 @@ build_class(PyObject *methods, PyObject *bases, PyObject *name)
 		if (PyTuple_Check(bases) && PyTuple_GET_SIZE(bases) > 0)
 			metaclass = (PyObject *)
 				PyTuple_GET_ITEM(bases, 0)->ob_type;
-		else
-			metaclass = (PyObject *) &PyClass_Type;
+		else {
+			PyObject *g = PyEval_GetGlobals();
+			if (g != NULL && PyDict_Check(g))
+				metaclass = PyDict_GetItemString(
+					g, "__metaclass__");
+			if (metaclass == NULL)
+				metaclass = (PyObject *) &PyClass_Type;
+		}
 	}
 	return PyObject_CallFunction(metaclass, "OOO", name, bases, methods);
 }
