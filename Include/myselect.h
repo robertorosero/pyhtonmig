@@ -33,8 +33,20 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 /* NB caller must include <sys/types.h> */
 
 #ifdef HAVE_SYS_SELECT_H
+
 #include <sys/select.h>
-#endif
+
+#ifdef SYS_TIME_WITH_SYS_SELECT
+#include "mytime.h"
+#else /* !SYS_TIME_WITH_SYS_SELECT */
+#include <time.h>
+#endif /* !SYS_TIME_WITH_SYS_SELECT */
+
+#else /* !HAVE_SYS_SELECT_H */
+
+#include "mytime.h"
+
+#endif /* !HAVE_SYS_SELECT_H */
 
 /* If the fd manipulation macros aren't defined,
    here is a set that should do the job */
