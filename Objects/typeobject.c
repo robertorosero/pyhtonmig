@@ -161,12 +161,15 @@ subtype_dealloc(PyObject *self)
 
 	/* This exists so we can DECREF self->ob_type */
 
+	/* Find the nearest base with a different tp_dealloc */
 	type = self->ob_type;
 	base = type->tp_base;
 	while ((f = base->tp_dealloc) == subtype_dealloc) {
 		base = base->tp_base;
 		assert(base);
 	}
+
+	/* If we added a dict, DECREF it */
 	if (dictoffset && !base->tp_dictoffset) {
 		PyObject **dictptr = (PyObject **) ((char *)self + dictoffset);
 		PyObject *dict = *dictptr;
@@ -175,7 +178,15 @@ subtype_dealloc(PyObject *self)
 			*dictptr = NULL;
 		}
 	}
+
+	/* Finalize GC if the base doesn't do GC and we do */
+	if (PyType_IS_GC(type) && !PyType_IS_GC(base))
+		PyObject_GC_Fini(self);
+
+	/* Call the base tp_dealloc() */
+	assert(f);
 	f(self);
+
 	/* Can't reference self beyond this point */
 	if (type->tp_flags & Py_TPFLAGS_HEAPTYPE) {
 		Py_DECREF(type);
@@ -637,10 +648,11 @@ type_new(PyTypeObject *metatype, PyObject *args, PyObject *kwds)
 		if (base->tp_setattr == NULL && base->tp_setattro == NULL)
 			type->tp_setattro = PyObject_GenericSetAttr;
 	}
-	if (base->tp_new == NULL)
-		type->tp_new = PyType_GenericNew;
-	if (base->tp_alloc == NULL)
-		type->tp_alloc = PyType_GenericAlloc;
+	type->tp_dealloc = subtype_dealloc;
+
+	/* Always override allocation strategy to use regular heap */
+	type->tp_alloc = PyType_GenericAlloc;
+	type->tp_free = _PyObject_Del;
 
 	/* Initialize the rest */
 	if (PyType_InitDict(type) < 0) {
