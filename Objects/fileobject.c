@@ -26,6 +26,7 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 #include "allobjects.h"
 #include "modsupport.h"
+#include "structmember.h"
 #include "ceval.h"
 
 #define BUF(v) GETSTRINGVALUE((stringobject *)v)
@@ -597,12 +598,44 @@ static struct methodlist file_methods[] = {
 	{NULL,		NULL}		/* sentinel */
 };
 
+#define OFF(x) offsetof(fileobject, x)
+
+static struct memberlist file_memberlist[] = {
+	{"softspace",	T_INT,		OFF(f_softspace)},
+	{"mode",	T_OBJECT,	OFF(f_mode),	RO},
+	{"name",	T_OBJECT,	OFF(f_name),	RO},
+	/* getattr(f, "closed") is implemented without this table */
+	{"closed",	T_INT,		0,		RO},
+	{NULL}	/* Sentinel */
+};
+
 static object *
 file_getattr(f, name)
 	fileobject *f;
 	char *name;
 {
-	return findmethod(file_methods, (object *)f, name);
+	object *res;
+
+	res = findmethod(file_methods, (object *)f, name);
+	if (res != NULL)
+		return res;
+	err_clear();
+	if (strcmp(name, "closed") == 0)
+		return newintobject((long)(f->f_fp == 0));
+	return getmember((char *)f, file_memberlist, name);
+}
+
+static int
+file_setattr(f, name, v)
+	fileobject *f;
+	char *name;
+	object *v;
+{
+	if (v == NULL) {
+		err_setstr(AttributeError, "can't delete file attributes");
+		return -1;
+	}
+	return setmember((char *)f, file_memberlist, name, v);
 }
 
 typeobject Filetype = {
@@ -614,7 +647,7 @@ typeobject Filetype = {
 	(destructor)file_dealloc, /*tp_dealloc*/
 	0,		/*tp_print*/
 	(getattrfunc)file_getattr, /*tp_getattr*/
-	0,		/*tp_setattr*/
+	(setattrfunc)file_setattr, /*tp_setattr*/
 	0,		/*tp_compare*/
 	(reprfunc)file_repr, /*tp_repr*/
 };
