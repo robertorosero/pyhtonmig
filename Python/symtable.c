@@ -334,7 +334,7 @@ PyST_GetScope(PySTEntryObject *ste, PyObject *name)
 
 int 
 analyze_name(PyObject *dict, PyObject *name, int flags, PyObject *bound,
-	     PyObject *local, PyObject *free)
+	     PyObject *local, PyObject *free, int nested)
 {
 	if (flags & DEF_GLOBAL) {
 		if (flags & DEF_PARAM)
@@ -348,7 +348,8 @@ analyze_name(PyObject *dict, PyObject *name, int flags, PyObject *bound,
 			return 0;
 		return 1;
 	}
-	if (bound && PyDict_GetItem(bound, name)) {
+	/* If the function is nested, then it can have free vars. */
+	if (nested && bound && PyDict_GetItem(bound, name)) {
 		SET_SCOPE(dict, name, FREE);
 		if (PyDict_SetItem(free, name, Py_None) < 0)
 			return 0;
@@ -443,7 +444,8 @@ analyze_block(PySTEntryObject *ste, PyObject *bound, PyObject *free)
 	assert(PyDict_Check(ste->ste_symbols));
 	while (PyDict_Next(ste->ste_symbols, &pos, &name, &v)) {
 		flags = PyInt_AS_LONG(v);
-		if (!analyze_name(scope, name, flags, bound, local, free))
+		if (!analyze_name(scope, name, flags, bound, local, free,
+				  ste->ste_nested))
 			goto error;
 	}
 
