@@ -528,10 +528,25 @@
 }{\end{fulllineitems}}
 
 % C data types -----------------------------------------------------------
-% \begin{ctypedesc}{typedef name}
-\newenvironment{ctypedesc}[1]{
+% \begin{ctypedesc}[index name]{typedef name}
+\let\py@classbadkey=\@undefined
+
+\newenvironment{ctypedesc}[2][\py@badkey]{
   \begin{fulllineitems}
-    \item[\bfcode{#1}\ttindex{#1}]
+    \item[\bfcode{#2}%
+    \ifx#1\@undefined%
+      \withsubitem{(C type)}{\ttindex{#2}}%
+    \else%
+      \withsubitem{(C type)}{\ttindex{#1}}%
+    \fi]
+}{\end{fulllineitems}}
+
+% Funky macros -----------------------------------------------------------
+% \begin{csimplemacro}{name}
+% -- "simple" because it has no args; NOT for constant definitions!
+\newenvironment{csimplemacrodesc}[1]{
+  \begin{fulllineitems}
+    \item[\bfcode{#1}\withsubitem{(macro)}{\ttindex{#1}}]
 }{\end{fulllineitems}}
 
 % simple functions (not methods) -----------------------------------------
