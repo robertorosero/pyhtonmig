@@ -25,7 +25,11 @@ Clean up isinstance(), issubclass() and their C equivalents.  There
 are a bunch of different APIs here and not all of them do the right
 thing yet.  There should be fewer APIs and their implementation should
 be simpler.  The old "abstract subclass" test should probably
-disappear (if we want to root out ExtensionClass).
+disappear (if we want to root out ExtensionClass).  *** I think I've
+done 90% of this by creating PyType_IsSubtype() and using it
+appropriately.  For now, the old "abstract subclass" test is still
+there, and there may be some places where PyObject_IsSubclass() is
+called where PyType_IsSubtype() would be more appropriate. ***
 
 Check for conflicts between base classes.  I fear that the rules used
 to decide whether multiple bases have conflicting instance variables
@@ -74,7 +78,16 @@ defaults?  *** Done, really. ***
 Add error checking to the MRO calculation.
 
 Make __new__ overridable through a Python class method (!).  Make more
-of the sub-algorithms of type construction available as methods.
+of the sub-algorithms of type construction available as methods.  ***
+After I implemented class methods, I found that in order to be able
+to make an upcall to Base.__new__() and have it create an instance of
+your class (rather than a Base instance), you can't use class methods
+-- you must use static methods.  So I've implemented those too.  I've
+hooked up __new__ in the right places, so the first part of this is
+now done (still to do the other construction methods -- unclear that
+we really need any though).  I expect that some warts will only be
+really debugged when we try to use this for some, eh, interesting
+types such as tuples. ***
 
 More -- I'm sure new issues will crop up as we go.
 
