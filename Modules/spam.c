@@ -176,8 +176,28 @@ static PyTypeObject spamdict_type = {
 	PyType_GenericNew,			/* tp_new */
 };
 
+PyObject *
+spam_bench(PyObject *self, PyObject *args)
+{
+	PyObject *obj, *name, *res;
+	int n = 1000;
+	time_t t0, t1;
+
+	if (!PyArg_ParseTuple(args, "OS|i", &obj, &name, &n))
+		return NULL;
+	t0 = clock();
+	while (--n >= 0) {
+		res = PyObject_GetAttr(obj, name);
+		if (res == NULL)
+			return NULL;
+		Py_DECREF(res);
+	}
+	t1 = clock();
+	return PyFloat_FromDouble((double)(t1-t0) / CLOCKS_PER_SEC);
+}
+
 static PyMethodDef spam_functions[] = {
-	{0}
+	{"bench", spam_bench, 1}
 };
 
 DL_EXPORT(void)
