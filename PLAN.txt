@@ -272,6 +272,12 @@ he dies of frustration while wrestling with CVS <0.9 wink>).
 
 Tagged trunk about 15:20 EDT, like so:
     cvs tag date2001-07-16 python
+
+Guido then added all the other dist/ directories to descr-branch from that
+trunk tag.
+
+Tim then merged trunk delta into the branch via:
+    cvs -q -z3 up -j date2001-07-15 -j date2001-07-16 descr
 ----------------------------------------------------------------------------
 2001-07-15
 
