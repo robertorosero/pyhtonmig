@@ -2158,8 +2158,6 @@ assemble_lnotab(struct assembler *a, struct instr *i)
 	if (d_lineno == 0)
 		return 1;
 
-	/* XXX Need logic for line number gaps greater than 255. */
-	assert(d_lineno < 256);
 	if (d_bytecode > 255) {
 		int i, nbytes, ncodes = d_bytecode / 255;
 		nbytes = a->a_lnotab_off + 2 * ncodes;
@@ -2180,17 +2178,42 @@ assemble_lnotab(struct assembler *a, struct instr *i)
 		d_bytecode -= ncodes * 255;
 		a->a_lnotab_off += ncodes * 2;
 	}
-	else {
+	assert(d_bytecode < 255);
+	if (d_lineno > 255) {
+		int i, nbytes, ncodes = d_lineno / 255;
+		nbytes = a->a_lnotab_off + 2 * ncodes;
+		len = PyString_GET_SIZE(a->a_lnotab);
+		if (nbytes >= len) {
+			if (len * 2 < nbytes)
+				len = nbytes;
+			else
+				len *= 2;
+			if (_PyString_Resize(&a->a_lnotab, len) < 0)
+				return 0;
+		}
+		lnotab = PyString_AS_STRING(a->a_lnotab) + a->a_lnotab_off;
+		*lnotab++ = 255;
+		*lnotab++ = d_bytecode;
+		d_bytecode = 0;
+		for (i = 1; i < ncodes; i++) {
+			*lnotab++ = 255;
+			*lnotab++ = 0;
+		}
+		d_lineno -= ncodes * 255;
+		a->a_lnotab_off += ncodes * 2;
+	}
+
+	if (d_bytecode)	{
 		len = PyString_GET_SIZE(a->a_lnotab);
 		if (a->a_lnotab_off + 2 >= len) {
 			if (_PyString_Resize(&a->a_lnotab, len * 2) < 0)
 				return 0;
-	    }
+		}
 		lnotab = PyString_AS_STRING(a->a_lnotab) + a->a_lnotab_off;
 		a->a_lnotab_off += 2;
+		*lnotab++ = d_bytecode;
+		*lnotab++ = d_lineno;
 	}
-	*lnotab++ = d_bytecode;
-	*lnotab++ = d_lineno;
 	a->a_lineno = i->i_lineno;
 	return 1;
 }
