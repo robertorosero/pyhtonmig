@@ -22,6 +22,10 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 ******************************************************************/
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
 /* strtol and strtoul, renamed to avoid conflicts */
 
 /*
@@ -110,8 +114,10 @@ int		base;
 	}
 	temp = result;
 	result = result * base + c;
+#ifndef MPW
 	if ((result - c) / base != temp)	/* overflow */
 	    ovf = 1;
+#endif
 	str++;
     }
 
