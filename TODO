@@ -6,6 +6,8 @@
 
 - need way to set buffering at file open time
 
+- need way to force stdout unbuffered
+
 - document new modules (builtin as well as Lib)
 
 - restart CVS tree
