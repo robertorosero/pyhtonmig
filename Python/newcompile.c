@@ -1011,6 +1011,34 @@ binop(struct compiler *c, operator_ty op)
 }
 
 static int
+cmpop(cmpop_ty op)
+{
+	switch (op) {
+	case Eq:
+		return PyCmp_EQ;
+	case NotEq:
+		return PyCmp_NE;
+	case Lt:
+		return PyCmp_LT;
+	case LtE:
+		return PyCmp_LE;
+	case Gt:
+		return PyCmp_GT;
+	case GtE:
+		return PyCmp_GE;
+	case Is:
+		return PyCmp_IS;
+	case IsNot:
+		return PyCmp_IS_NOT;
+	case In:
+		return PyCmp_IN;
+	case NotIn:
+		return PyCmp_NOT_IN;
+	}
+	return PyCmp_BAD;
+}
+
+static int
 inplace_binop(struct compiler *c, operator_ty op)
 {
 	switch (op) {
@@ -1179,16 +1207,17 @@ compiler_compare(struct compiler *c, expr_ty e)
 	for (i = 1; i < n; i++) {
 		ADDOP(c, DUP_TOP);
 		ADDOP(c, ROT_THREE);
-		/* XXX We're casting a void* to an int in the next stmt -- bad */
+		/* XXX We're casting a void* to cmpop_ty in the next stmt. */
 		ADDOP_I(c, COMPARE_OP,
-			(cmpop_ty)asdl_seq_GET(e->v.Compare.ops, i - 1));
+			cmpop((cmpop_ty)asdl_seq_GET(e->v.Compare.ops, i - 1)));
 		ADDOP_JREL(c, JUMP_IF_FALSE, cleanup);
 		NEXT_BLOCK(c);
 		ADDOP(c, POP_TOP);
 	}
 	VISIT(c, expr, asdl_seq_GET(e->v.Compare.comparators, n - 1));
 	ADDOP_I(c, COMPARE_OP,
-	       (cmpop_ty)asdl_seq_GET(e->v.Compare.ops, n - 1));
+		/* XXX We're casting a void* to cmpop_ty in the next stmt. */
+	       cmpop((cmpop_ty)asdl_seq_GET(e->v.Compare.ops, n - 1)));
 	if (n > 1) {
 		int end = compiler_new_block(c);
 		ADDOP_JREL(c, JUMP_FORWARD, end);
