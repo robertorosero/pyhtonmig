@@ -1,5 +1,5 @@
 #!/bin/sh
-# From configure.in Revision: 1.2.4.18 
+# From configure.in Revision: 1.2.4.19 
 #!/bin/sh
 # Guess values for system-dependent variables and create Makefiles.
 # Generated automatically using autoconf version 1.8 
@@ -1283,7 +1283,13 @@ fi
 fi
 
 if test ! -z "$termcap"
-then LIBS="$LIBS -lreadline -l$termcap"
+then LIBS="$LIBS -lreadline"
+     # Avoid possible conflict between shared libraries termcap and gl
+     # on IRIX 5: both contain a routine called clear.
+     if test -f /usr/lib/lib$termcap.a
+     then LIBS="$LIBS /usr/lib/lib$termcap.a"
+     else LIBS="$LIBS -l$termcap"
+     fi
 else echo "configure: no working termcap/termlib" >&2; exit 1
 fi
 fi
