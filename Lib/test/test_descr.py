@@ -170,13 +170,14 @@ for name, expr in unops.items():
         expr = '%s a' % expr
     unops[name] = expr
 
-def numops(a, b):
+def numops(a, b, skip=[]):
     dict = {'a': a, 'b': b}
     for name, expr in binops.items():
-        name = "__%s__" % name
-        if hasattr(a, name):
-            res = eval(expr, dict)
-            testbinop(a, b, res, expr, name)
+        if name not in skip:
+            name = "__%s__" % name
+            if hasattr(a, name):
+                res = eval(expr, dict)
+                testbinop(a, b, res, expr, name)
     for name, expr in unops.items():
         name = "__%s__" % name
         if hasattr(a, name):
@@ -194,6 +195,23 @@ def longs():
 def floats():
     if verbose: print "Testing float operations..."
     numops(100.0, 3.0)
+
+def complexes():
+    if verbose: print "Testing complex operations..."
+    numops(100.0j, 3.0j, skip=['lt', 'le', 'gt', 'ge'])
+    class Number(complex):
+        __slots__ = ['prec']
+        def __repr__(self):
+            prec = self.prec or 12
+            if self.imag == 0.0:
+                return "%.*g" % (prec, self.real)
+            if self.real == 0.0:
+                return "%.*gj" % (prec, self.imag)
+            return "(%.*g+%.*gj)" % (prec, self.real, prec, self.imag)
+        __str__ = __repr__
+    a = Number(3.14)
+    a.prec = 12
+    verify(`a` == "3.14")
 
 def spamlists():
     if verbose: print "Testing spamlist operations..."
@@ -526,6 +544,7 @@ def all():
     ints()
     longs()
     floats()
+    complexes()
     spamlists()
     spamdicts()
     pydicts()
