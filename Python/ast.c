@@ -147,7 +147,10 @@ mod_ty PyAST_FromNode(const node *n)
 		/* Only a simple_stmt can contain multiple statements. */
 		REQ(n, simple_stmt);
 		for (i = 0; i < NCH(n); i += 2) {
-		    stmt_ty s = ast_for_stmt(CHILD(n, i));
+		    stmt_ty s;
+		    if (TYPE(CHILD(n, i)) == NEWLINE)
+			break;
+		    s = ast_for_stmt(CHILD(n, i));
 		    if (!s)
 			goto error;
 		    asdl_seq_SET(stmts, i / 2, s);
