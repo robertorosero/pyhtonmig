@@ -401,6 +401,13 @@ string_repr(register PyStringObject *op)
 	}
 }
 
+static PyObject *
+string_str(PyObject *s)
+{
+	Py_INCREF(s);
+	return s;
+}
+
 static int
 string_length(PyStringObject *a)
 {
@@ -1524,7 +1531,7 @@ mymemreplace(const char *str, int len,		/* input string */
              const char *pat, int pat_len,	/* pattern string to find */
              const char *sub, int sub_len,	/* substitution string */
              int count,				/* number of replacements */
-             int *out_len)
+	     int *out_len)
 {
 	char *out_s;
 	char *new_s;
@@ -1541,41 +1548,48 @@ mymemreplace(const char *str, int len,		/* input string */
 		nfound = count;
 	if (nfound == 0)
 		goto return_same;
+
 	new_len = len + nfound*(sub_len - pat_len);
-
-	new_s = (char *)PyMem_MALLOC(new_len);
-	if (new_s == NULL) return NULL;
-
-	*out_len = new_len;
-	out_s = new_s;
-
-	while (len > 0) {
-		/* find index of next instance of pattern */
-		offset = mymemfind(str, len, pat, pat_len);
-		/* if not found,  break out of loop */
-		if (offset == -1) break;
-
-		/* copy non matching part of input string */
-		memcpy(new_s, str, offset); /* copy part of str before pat */
-		str += offset + pat_len; /* move str past pattern */
-		len -= offset + pat_len; /* reduce length of str remaining */
-
-		/* copy substitute into the output string */
-		new_s += offset; /* move new_s to dest for sub string */
-		memcpy(new_s, sub, sub_len); /* copy substring into new_s */
-		new_s += sub_len; /* offset new_s past sub string */
-
-		/* break when we've done count replacements */
-		if (--count == 0) break;
+	if (new_len == 0) {
+		/* Have to allocate something for the caller to free(). */
+		out_s = (char *)PyMem_MALLOC(1);
+		if (out_s == NULL)
+			return NULL;
+		out_s[0] = '\0';
 	}
-	/* copy any remaining values into output string */
-	if (len > 0)
-		memcpy(new_s, str, len);
+	else {
+		assert(new_len > 0);
+		new_s = (char *)PyMem_MALLOC(new_len);
+		if (new_s == NULL)
+			return NULL;
+		out_s = new_s;
+
+		for (; count > 0 && len > 0; --count) {
+			/* find index of next instance of pattern */
+			offset = mymemfind(str, len, pat, pat_len);
+			if (offset == -1)
+				break;
+
+			/* copy non matching part of input string */
+			memcpy(new_s, str, offset);
+			str += offset + pat_len;
+			len -= offset + pat_len;
+
+			/* copy substitute into the output string */
+			new_s += offset;
+			memcpy(new_s, sub, sub_len);
+			new_s += sub_len;
+		}
+		/* copy any remaining values into output string */
+		if (len > 0)
+			memcpy(new_s, str, len);
+	}
+	*out_len = new_len;
 	return out_s;
 
   return_same:
 	*out_len = -1;
-	return (char*)str;	/* have to cast away constness here */
+	return (char *)str; /* cast away const */
 }
 
 
@@ -2374,7 +2388,7 @@ PyTypeObject PyString_Type = {
 	0,		/*tp_as_mapping*/
 	(hashfunc)string_hash, /*tp_hash*/
 	0,		/*tp_call*/
-	0,		/*tp_str*/
+	(reprfunc)string_str,	/*tp_str*/
 	0,		/*tp_getattro*/
 	0,		/*tp_setattro*/
 	&string_as_buffer,	/*tp_as_buffer*/
@@ -2673,9 +2687,13 @@ formatint(char *buf, size_t buflen, int flags,
 	/* When converting 0 under %#x or %#X, C leaves off the base marker,
 	 * but we want it (for consistency with other %#x conversions, and
 	 * for consistency with Python's hex() function).
+	 * BUG 28-Apr-2001 tim:  At least two platform Cs (Metrowerks &
+	 * Compaq Tru64) violate the std by converting 0 w/ leading 0x anyway.
+	 * So add it only if the platform didn't already.
 	 */
-	if (x == 0 && (flags & F_ALT) && (type == 'x' || type == 'X')) {
-		assert(buf[1] != type);  /* else this C *is* adding 0x/0X */
+	if (x == 0 && (flags & F_ALT) && (type == 'x' || type == 'X') &&
+	    buf[1] != (char)type) /* this last always true under std C */
+		{
 		memmove(buf+2, buf, strlen(buf) + 1);
 		buf[0] = '0';
 		buf[1] = (char)type;
@@ -2768,6 +2786,7 @@ PyString_Format(PyObject *format, PyObject *args)
 			int len;
 			char formatbuf[FORMATBUFLEN]; /* For format{float,int,char}() */
 			char *fmt_start = fmt;
+			int argidx_start = argidx;
 			
 			fmt++;
 			if (*fmt == '(') {
@@ -2921,6 +2940,7 @@ PyString_Format(PyObject *format, PyObject *args)
   			case 'r':
 				if (PyUnicode_Check(v)) {
 					fmt = fmt_start;
+					argidx = argidx_start;
 					goto unicode;
 				}
 				if (c == 's')
@@ -3085,8 +3105,7 @@ PyString_Format(PyObject *format, PyObject *args)
 		Py_DECREF(args);
 		args_owned = 0;
 	}
-	/* Fiddle args right (remove the first argidx-1 arguments) */
-	--argidx;
+	/* Fiddle args right (remove the first argidx arguments) */
 	if (PyTuple_Check(orig_args) && argidx > 0) {
 		PyObject *v;
 		int n = PyTuple_GET_SIZE(orig_args) - argidx;

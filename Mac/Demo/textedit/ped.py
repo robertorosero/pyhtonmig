@@ -19,7 +19,7 @@ class TEWindow(ScrolledWindow):
 		self.path = path
 		self.name = name
 		r = windowbounds(400, 400)
-		w = Win.NewWindow(r, name, 1, 0, -1, 1, 0x55555555)
+		w = Win.NewWindow(r, name, 1, 0, -1, 1, 0)
 		self.wid = w
 		x0, y0, x1, y1 = self.wid.GetWindowPort().portRect
 		x0 = x0 + 4
@@ -155,7 +155,6 @@ class TEWindow(ScrolledWindow):
 		self.parent.updatemenubar()
 		
 	def menu_paste(self):
-		print 'SCRAP', Scrap.InfoScrap(), `Scrap.InfoScrap()[1].data`
 		TE.TEFromScrap()
 		self.ted.TESelView()
 		self.ted.TEPaste()
@@ -224,7 +223,11 @@ class Ped(Application):
 					m.enable(on)
 				self.focusgroup_on = on
 				changed = 1
-			on = (Scrap.InfoScrap()[0] <> 0)
+			if hasattr(Scrap, 'InfoScrap'):
+				on = (Scrap.InfoScrap()[0] <> 0)
+			else:
+				# Not there yet on Carbon, simply always enable
+				on = 1
 			if on <> self.pastegroup_on:
 				self.pasteitem.enable(on)
 				self.pastegroup_on = on
@@ -335,6 +338,8 @@ class Ped(Application):
 	def idle(self, *args):
 		if self.active:
 			self.active.do_idle()
+		else:
+			Qd.SetCursor(Qd.qd.arrow)
 
 def main():
 	App = Ped()

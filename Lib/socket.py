@@ -147,7 +147,7 @@ class _socketobject:
     for _m in ('bind', 'connect', 'connect_ex', 'fileno', 'listen',
                'getpeername', 'getsockname',
                'getsockopt', 'setsockopt',
-               'recv', 'recvfrom', 'send', 'sendto',
+               'recv', 'recvfrom', 'send', 'sendall', 'sendto',
                'setblocking',
                'shutdown'):
         exec _s % (_m, _m)
@@ -176,7 +176,7 @@ class _fileobject:
 
     def flush(self):
         if self._wbuf:
-            self._sock.send(self._wbuf)
+            self._sock.sendall(self._wbuf)
             self._wbuf = ""
 
     def fileno(self):
@@ -192,7 +192,7 @@ class _fileobject:
                 self.flush()
 
     def writelines(self, list):
-        filter(self._sock.send, list)
+        filter(self._sock.sendall, list)
         self.flush()
 
     def read(self, n=-1):

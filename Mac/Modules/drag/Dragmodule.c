@@ -8,7 +8,11 @@
 #include "macglue.h"
 #include "pymactoolbox.h"
 
+#ifdef WITHOUT_FRAMEWORKS
 #include <Drag.h>
+#else
+#include <Carbon/Carbon.h>
+#endif
 
 /* Callback glue routines */
 DragTrackingHandlerUPP dragglue_TrackingHandlerUPP;
@@ -17,6 +21,14 @@ DragSendDataUPP dragglue_SendDataUPP;
 #if 0
 DragInputUPP dragglue_InputUPP;
 DragDrawingUPP dragglue_DrawingUPP;
+#endif
+
+#ifdef USE_TOOLBOX_OBJECT_GLUE
+extern PyObject *_DragObj_New(DragRef);
+extern int _DragObj_Convert(PyObject *, DragRef *);
+
+#define DragObj_New _DragObj_New
+#define DragObj_Convert _DragObj_Convert
 #endif
 
 static PyObject *Drag_Error;
@@ -33,8 +45,7 @@ typedef struct DragObjObject {
 	PyObject *sendproc;
 } DragObjObject;
 
-PyObject *DragObj_New(itself)
-	DragRef itself;
+PyObject *DragObj_New(DragRef itself)
 {
 	DragObjObject *it;
 	if (itself == NULL) {
@@ -47,9 +58,7 @@ PyObject *DragObj_New(itself)
 	it->sendproc = NULL;
 	return (PyObject *)it;
 }
-DragObj_Convert(v, p_itself)
-	PyObject *v;
-	DragRef *p_itself;
+DragObj_Convert(PyObject *v, DragRef *p_itself)
 {
 	if (!DragObj_Check(v))
 	{
@@ -60,16 +69,13 @@ DragObj_Convert(v, p_itself)
 	return 1;
 }
 
-static void DragObj_dealloc(self)
-	DragObjObject *self;
+static void DragObj_dealloc(DragObjObject *self)
 {
 	Py_XDECREF(self->sendproc);
 	PyMem_DEL(self);
 }
 
-static PyObject *DragObj_DisposeDrag(_self, _args)
-	DragObjObject *_self;
-	PyObject *_args;
+static PyObject *DragObj_DisposeDrag(DragObjObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
 	OSErr _err;
@@ -82,9 +88,7 @@ static PyObject *DragObj_DisposeDrag(_self, _args)
 	return _res;
 }
 
-static PyObject *DragObj_AddDragItemFlavor(_self, _args)
-	DragObjObject *_self;
-	PyObject *_args;
+static PyObject *DragObj_AddDragItemFlavor(DragObjObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
 	OSErr _err;
@@ -113,9 +117,7 @@ static PyObject *DragObj_AddDragItemFlavor(_self, _args)
 	return _res;
 }
 
-static PyObject *DragObj_SetDragItemFlavorData(_self, _args)
-	DragObjObject *_self;
-	PyObject *_args;
+static PyObject *DragObj_SetDragItemFlavorData(DragObjObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
 	OSErr _err;
@@ -144,9 +146,7 @@ static PyObject *DragObj_SetDragItemFlavorData(_self, _args)
 	return _res;
 }
 
-static PyObject *DragObj_SetDragImage(_self, _args)
-	DragObjObject *_self;
-	PyObject *_args;
+static PyObject *DragObj_SetDragImage(DragObjObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
 	OSErr _err;
@@ -171,9 +171,7 @@ static PyObject *DragObj_SetDragImage(_self, _args)
 	return _res;
 }
 
-static PyObject *DragObj_ChangeDragBehaviors(_self, _args)
-	DragObjObject *_self;
-	PyObject *_args;
+static PyObject *DragObj_ChangeDragBehaviors(DragObjObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
 	OSErr _err;
@@ -192,9 +190,7 @@ static PyObject *DragObj_ChangeDragBehaviors(_self, _args)
 	return _res;
 }
 
-static PyObject *DragObj_TrackDrag(_self, _args)
-	DragObjObject *_self;
-	PyObject *_args;
+static PyObject *DragObj_TrackDrag(DragObjObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
 	OSErr _err;
@@ -213,9 +209,7 @@ static PyObject *DragObj_TrackDrag(_self, _args)
 	return _res;
 }
 
-static PyObject *DragObj_CountDragItems(_self, _args)
-	DragObjObject *_self;
-	PyObject *_args;
+static PyObject *DragObj_CountDragItems(DragObjObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
 	OSErr _err;
@@ -230,9 +224,7 @@ static PyObject *DragObj_CountDragItems(_self, _args)
 	return _res;
 }
 
-static PyObject *DragObj_GetDragItemReferenceNumber(_self, _args)
-	DragObjObject *_self;
-	PyObject *_args;
+static PyObject *DragObj_GetDragItemReferenceNumber(DragObjObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
 	OSErr _err;
@@ -250,9 +242,7 @@ static PyObject *DragObj_GetDragItemReferenceNumber(_self, _args)
 	return _res;
 }
 
-static PyObject *DragObj_CountDragItemFlavors(_self, _args)
-	DragObjObject *_self;
-	PyObject *_args;
+static PyObject *DragObj_CountDragItemFlavors(DragObjObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
 	OSErr _err;
@@ -270,9 +260,7 @@ static PyObject *DragObj_CountDragItemFlavors(_self, _args)
 	return _res;
 }
 
-static PyObject *DragObj_GetFlavorType(_self, _args)
-	DragObjObject *_self;
-	PyObject *_args;
+static PyObject *DragObj_GetFlavorType(DragObjObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
 	OSErr _err;
@@ -293,9 +281,7 @@ static PyObject *DragObj_GetFlavorType(_self, _args)
 	return _res;
 }
 
-static PyObject *DragObj_GetFlavorFlags(_self, _args)
-	DragObjObject *_self;
-	PyObject *_args;
+static PyObject *DragObj_GetFlavorFlags(DragObjObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
 	OSErr _err;
@@ -316,9 +302,7 @@ static PyObject *DragObj_GetFlavorFlags(_self, _args)
 	return _res;
 }
 
-static PyObject *DragObj_GetFlavorDataSize(_self, _args)
-	DragObjObject *_self;
-	PyObject *_args;
+static PyObject *DragObj_GetFlavorDataSize(DragObjObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
 	OSErr _err;
@@ -339,9 +323,7 @@ static PyObject *DragObj_GetFlavorDataSize(_self, _args)
 	return _res;
 }
 
-static PyObject *DragObj_GetFlavorData(_self, _args)
-	DragObjObject *_self;
-	PyObject *_args;
+static PyObject *DragObj_GetFlavorData(DragObjObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
 	OSErr _err;
@@ -376,9 +358,7 @@ static PyObject *DragObj_GetFlavorData(_self, _args)
 	return _res;
 }
 
-static PyObject *DragObj_GetDragItemBounds(_self, _args)
-	DragObjObject *_self;
-	PyObject *_args;
+static PyObject *DragObj_GetDragItemBounds(DragObjObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
 	OSErr _err;
@@ -396,9 +376,7 @@ static PyObject *DragObj_GetDragItemBounds(_self, _args)
 	return _res;
 }
 
-static PyObject *DragObj_SetDragItemBounds(_self, _args)
-	DragObjObject *_self;
-	PyObject *_args;
+static PyObject *DragObj_SetDragItemBounds(DragObjObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
 	OSErr _err;
@@ -417,9 +395,7 @@ static PyObject *DragObj_SetDragItemBounds(_self, _args)
 	return _res;
 }
 
-static PyObject *DragObj_GetDropLocation(_self, _args)
-	DragObjObject *_self;
-	PyObject *_args;
+static PyObject *DragObj_GetDropLocation(DragObjObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
 	OSErr _err;
@@ -434,9 +410,7 @@ static PyObject *DragObj_GetDropLocation(_self, _args)
 	return _res;
 }
 
-static PyObject *DragObj_SetDropLocation(_self, _args)
-	DragObjObject *_self;
-	PyObject *_args;
+static PyObject *DragObj_SetDropLocation(DragObjObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
 	OSErr _err;
@@ -452,9 +426,7 @@ static PyObject *DragObj_SetDropLocation(_self, _args)
 	return _res;
 }
 
-static PyObject *DragObj_GetDragAttributes(_self, _args)
-	DragObjObject *_self;
-	PyObject *_args;
+static PyObject *DragObj_GetDragAttributes(DragObjObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
 	OSErr _err;
@@ -469,9 +441,7 @@ static PyObject *DragObj_GetDragAttributes(_self, _args)
 	return _res;
 }
 
-static PyObject *DragObj_GetDragMouse(_self, _args)
-	DragObjObject *_self;
-	PyObject *_args;
+static PyObject *DragObj_GetDragMouse(DragObjObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
 	OSErr _err;
@@ -489,9 +459,7 @@ static PyObject *DragObj_GetDragMouse(_self, _args)
 	return _res;
 }
 
-static PyObject *DragObj_SetDragMouse(_self, _args)
-	DragObjObject *_self;
-	PyObject *_args;
+static PyObject *DragObj_SetDragMouse(DragObjObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
 	OSErr _err;
@@ -507,9 +475,7 @@ static PyObject *DragObj_SetDragMouse(_self, _args)
 	return _res;
 }
 
-static PyObject *DragObj_GetDragOrigin(_self, _args)
-	DragObjObject *_self;
-	PyObject *_args;
+static PyObject *DragObj_GetDragOrigin(DragObjObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
 	OSErr _err;
@@ -524,9 +490,7 @@ static PyObject *DragObj_GetDragOrigin(_self, _args)
 	return _res;
 }
 
-static PyObject *DragObj_GetDragModifiers(_self, _args)
-	DragObjObject *_self;
-	PyObject *_args;
+static PyObject *DragObj_GetDragModifiers(DragObjObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
 	OSErr _err;
@@ -547,9 +511,7 @@ static PyObject *DragObj_GetDragModifiers(_self, _args)
 	return _res;
 }
 
-static PyObject *DragObj_ShowDragHilite(_self, _args)
-	DragObjObject *_self;
-	PyObject *_args;
+static PyObject *DragObj_ShowDragHilite(DragObjObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
 	OSErr _err;
@@ -568,9 +530,7 @@ static PyObject *DragObj_ShowDragHilite(_self, _args)
 	return _res;
 }
 
-static PyObject *DragObj_HideDragHilite(_self, _args)
-	DragObjObject *_self;
-	PyObject *_args;
+static PyObject *DragObj_HideDragHilite(DragObjObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
 	OSErr _err;
@@ -583,9 +543,7 @@ static PyObject *DragObj_HideDragHilite(_self, _args)
 	return _res;
 }
 
-static PyObject *DragObj_DragPreScroll(_self, _args)
-	DragObjObject *_self;
-	PyObject *_args;
+static PyObject *DragObj_DragPreScroll(DragObjObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
 	OSErr _err;
@@ -604,9 +562,7 @@ static PyObject *DragObj_DragPreScroll(_self, _args)
 	return _res;
 }
 
-static PyObject *DragObj_DragPostScroll(_self, _args)
-	DragObjObject *_self;
-	PyObject *_args;
+static PyObject *DragObj_DragPostScroll(DragObjObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
 	OSErr _err;
@@ -619,9 +575,7 @@ static PyObject *DragObj_DragPostScroll(_self, _args)
 	return _res;
 }
 
-static PyObject *DragObj_UpdateDragHilite(_self, _args)
-	DragObjObject *_self;
-	PyObject *_args;
+static PyObject *DragObj_UpdateDragHilite(DragObjObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
 	OSErr _err;
@@ -697,9 +651,7 @@ static PyMethodDef DragObj_methods[] = {
 
 PyMethodChain DragObj_chain = { DragObj_methods, NULL };
 
-static PyObject *DragObj_getattr(self, name)
-	DragObjObject *self;
-	char *name;
+static PyObject *DragObj_getattr(DragObjObject *self, char *name)
 {
 	return Py_FindMethodInChain(&DragObj_chain, (PyObject *)self, name);
 }
@@ -734,9 +686,7 @@ PyTypeObject DragObj_Type = {
 /* -------------------- End object type DragObj --------------------- */
 
 
-static PyObject *Drag_NewDrag(_self, _args)
-	PyObject *_self;
-	PyObject *_args;
+static PyObject *Drag_NewDrag(PyObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
 	OSErr _err;
@@ -750,9 +700,7 @@ static PyObject *Drag_NewDrag(_self, _args)
 	return _res;
 }
 
-static PyObject *Drag_GetDragHiliteColor(_self, _args)
-	PyObject *_self;
-	PyObject *_args;
+static PyObject *Drag_GetDragHiliteColor(PyObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
 	OSErr _err;
@@ -769,9 +717,7 @@ static PyObject *Drag_GetDragHiliteColor(_self, _args)
 	return _res;
 }
 
-static PyObject *Drag_WaitMouseMoved(_self, _args)
-	PyObject *_self;
-	PyObject *_args;
+static PyObject *Drag_WaitMouseMoved(PyObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
 	Boolean _rv;
@@ -785,9 +731,7 @@ static PyObject *Drag_WaitMouseMoved(_self, _args)
 	return _res;
 }
 
-static PyObject *Drag_ZoomRects(_self, _args)
-	PyObject *_self;
-	PyObject *_args;
+static PyObject *Drag_ZoomRects(PyObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
 	OSErr _err;
@@ -811,9 +755,7 @@ static PyObject *Drag_ZoomRects(_self, _args)
 	return _res;
 }
 
-static PyObject *Drag_ZoomRegion(_self, _args)
-	PyObject *_self;
-	PyObject *_args;
+static PyObject *Drag_ZoomRegion(PyObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
 	OSErr _err;
@@ -837,9 +779,7 @@ static PyObject *Drag_ZoomRegion(_self, _args)
 	return _res;
 }
 
-static PyObject *Drag_InstallTrackingHandler(_self, _args)
-	PyObject *_self;
-	PyObject *_args;
+static PyObject *Drag_InstallTrackingHandler(PyObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
 
@@ -857,9 +797,7 @@ static PyObject *Drag_InstallTrackingHandler(_self, _args)
 
 }
 
-static PyObject *Drag_InstallReceiveHandler(_self, _args)
-	PyObject *_self;
-	PyObject *_args;
+static PyObject *Drag_InstallReceiveHandler(PyObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
 
@@ -877,9 +815,7 @@ static PyObject *Drag_InstallReceiveHandler(_self, _args)
 
 }
 
-static PyObject *Drag_RemoveTrackingHandler(_self, _args)
-	PyObject *_self;
-	PyObject *_args;
+static PyObject *Drag_RemoveTrackingHandler(PyObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
 
@@ -895,9 +831,7 @@ static PyObject *Drag_RemoveTrackingHandler(_self, _args)
 
 }
 
-static PyObject *Drag_RemoveReceiveHandler(_self, _args)
-	PyObject *_self;
-	PyObject *_args;
+static PyObject *Drag_RemoveReceiveHandler(PyObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
 
@@ -1033,12 +967,15 @@ dragglue_Drawing(xxxx
 
 
 
-void initDrag()
+void initDrag(void)
 {
 	PyObject *m;
 	PyObject *d;
 
 
+
+		PyMac_INIT_TOOLBOX_OBJECT_NEW(DragRef, DragObj_New);
+		PyMac_INIT_TOOLBOX_OBJECT_CONVERT(DragRef, DragObj_Convert);
 
 
 	m = Py_InitModule("Drag", Drag_methods);
@@ -1052,12 +989,12 @@ void initDrag()
 	if (PyDict_SetItemString(d, "DragObjType", (PyObject *)&DragObj_Type) != 0)
 		Py_FatalError("can't initialize DragObjType");
 
-	dragglue_TrackingHandlerUPP = NewDragTrackingHandlerProc(dragglue_TrackingHandler);
-	dragglue_ReceiveHandlerUPP = NewDragReceiveHandlerProc(dragglue_ReceiveHandler);
-	dragglue_SendDataUPP = NewDragSendDataProc(dragglue_SendData);
+	dragglue_TrackingHandlerUPP = NewDragTrackingHandlerUPP(dragglue_TrackingHandler);
+	dragglue_ReceiveHandlerUPP = NewDragReceiveHandlerUPP(dragglue_ReceiveHandler);
+	dragglue_SendDataUPP = NewDragSendDataUPP(dragglue_SendData);
 #if 0
-	dragglue_InputUPP = NewDragInputProc(dragglue_Input);
-	dragglue_DrawingUPP = NewDragDrawingProc(dragglue_Drawing);
+	dragglue_InputUPP = NewDragInputUPP(dragglue_Input);
+	dragglue_DrawingUPP = NewDragDrawingUPP(dragglue_Drawing);
 #endif
 
 

@@ -1,7 +1,7 @@
-This is Python version 2.1
-==========================
+This is Python version 2.1.2
+============================
 
-Copyright (c) 2001 Python Software Foundation.
+Copyright (c) 2001-2002 Python Software Foundation.
 All rights reserved.
 
 Copyright (c) 2000 BeOpen.com.
@@ -224,11 +224,12 @@ above) so we can remove them!)
 	contain code that is quite wordsize sensitive.  (If you have a
 	fix, let us know!)
 
-Solaris: When using Sun's C compiler with threads, at least on Solaris
-	2.5.1, you need to add the "-mt" compiler option (the simplest
-	way is probably to specify the compiler with this option as
-	the "CC" environment variable when running the configure
-	script).
+Solaris: When using Sun's C compiler, it's necessary to compile in
+        strict ANSI mode with multithreading enabled. This can be done
+        by setting the 'CC' environment variable to 'cc -Xc -mt'
+        before running the configure script. ANSI-compatibility mode
+        ('-Xa') has been seen to compile the code without problems,
+        but generate faulty code.
 
 Linux:  A problem with threads and fork() was tracked down to a bug in
 	the pthreads code in glibc version 2.0.5; glibc version 2.0.7
@@ -386,16 +387,44 @@ Reliant UNIX: The thread support does not compile on Reliant UNIX, and
         platform as well.  This should be resolved in time for a
         future release.
 
-Mac OS X: You need to add the "-traditional-cpp" option to the
-        compiler command line for the Mac OS X Public Beta.  This is
-        appearantly a bug in the default pre-processor, and is
-        expected not to be a problem with future versions.  Run
-        configure with "OPT='-g -traditional-cpp' ./configure
-        --with-suffix=.exe --with-dyld" to add this
-        option.  One of the regular expression tests fails due to the
-        small stack size used by default (how to change this?), and
-        the test_largefile test is only expected to work on a Unix UFS
-        filesystem (how to check for this on Mac OS X?).
+Mac OS X 10.0: Run configure with "OPT='-no-cpp-precomp' ./configure
+        --with-suffix=.exe --with-dyld".  This generates executable
+        file: 'python.exe' (it cannot be named 'python' on an HFS or
+        HFS+ disk as the file name clashes with directory 'Python').
+        The '-no-cpp-precomp' option prevents a large number of
+        compilation warnings.  One of the regular expression tests
+        fails with a SEGV due to the small stack size used by default
+        (how to change this?), and the test_largefile test is only
+        expected to work on a Unix UFS filesystem (how to check for
+        this on Mac OS X?).
+
+Mac OS X 10.1: Run configure with 
+        "./configure --with-suffix=.x --with-dyld". 
+        This generates executable file: 'python.x' 
+        (it cannot be named 'python' on an HFS or HFS+ 
+        disk as the file name clashes with directory 'Python').
+
+        The makefile is set up to correctly handle two-
+        level namespaces for Mac OS X v10.1 and 10.0.x
+        systems. However, running the prebinding tool on
+        Mac OS X 10.0.x again will cause the tool to break
+        as it cannot handle two level namespaces.
+
+        The default Mac OS X has a default stacksize
+        of 512K which causes the regular expression
+        tests (RE and SRE) to SEGV. To temporarily
+        increase the stacksize, type 'limit stacksize 2M' in
+        the terminal window before running 'make test'.
+
+        The test_largefile test will work on HFS+ and
+        UFS filesystem, providing you have enough space
+        and time.
+
+        After sudo 'make installation', do the following
+        commands:
+        cd /usr/local/bin/
+        sudo mv python.x python
+        sudo mv python2.1.x python2.1
 
 Cygwin: Cygwin Python builds OOTB when configured as follows:
 

@@ -55,9 +55,9 @@ class TraceBack:
 			filename = "<unknown>"
 		if filename and os.path.exists(filename):
 			filename = os.path.split(filename)[1]
-		if lineno:
+		if lineno and charno is not None:
 			charno = charno - 1
-			text = str(value) + '\rFile: "' + str(filename) + '", line ' + str(lineno) + '\r\r' + line[:charno] + "Ä" + line[charno:-1]
+			text = str(value) + '\rFile: "' + str(filename) + '", line ' + str(lineno) + '\r\r' + line[:charno] + "\xa5" + line[charno:-1]
 		else:
 			text = str(value) + '\rFile: "' + str(filename) + '"'
 		self.syntaxdialog = W.ModalDialog((360, 120), "Syntax Error")
@@ -84,6 +84,8 @@ class TraceBack:
 			filename = "<unknown>"
 		self.syntaxclose()
 		if lineno:
+			if charno is None:
+				charno = 1
 			W.getapplication().openscript(filename, lineno, charno - 1)
 		else:
 			W.getapplication().openscript(filename)
@@ -123,10 +125,10 @@ class TraceBack:
 		self.w.editbutton = W.Button((10, -30, 60, 16), "Edit", self.edit)
 		self.w.editbutton.enable(0)
 		
-		self.w.browselocalsbutton = W.Button((80, -30, 100, 16), "Browse localsä", self.browselocals)
+		self.w.browselocalsbutton = W.Button((80, -30, 100, 16), "Browse locals\xc9", self.browselocals)
 		self.w.browselocalsbutton.enable(0)
 		
-		self.w.postmortembutton = W.Button((190, -30, 100, 16), "Post mortemä", self.postmortem)
+		self.w.postmortembutton = W.Button((190, -30, 100, 16), "Post mortem\xc9", self.postmortem)
 		
 		self.w.setdefaultbutton(self.w.editbutton)
 		self.w.bind("cmdb", self.w.browselocalsbutton.push)

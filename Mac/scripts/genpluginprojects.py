@@ -107,38 +107,48 @@ def	genallprojects(force=0):
 	# bgen-generated Toolbox modules
 	genpluginproject("ppc", "App", libraries=["AppearanceLib"])
 	genpluginproject("carbon", "App")
-	genpluginproject("ppc", "Cm",
-		libraries=["QuickTimeLib"],
-		extraexportsymbols=[
-			"CmpObj_New",
-			"CmpObj_Convert",
-			"CmpInstObj_New",
-			"CmpInstObj_Convert",
-		])
-	genpluginproject("carbon", "Cm",
-		extraexportsymbols=[
-			"CmpObj_New",
-			"CmpObj_Convert",
-			"CmpInstObj_New",
-			"CmpInstObj_Convert",
-		])
+##	genpluginproject("ppc", "Cm",
+##		libraries=["QuickTimeLib"],
+##		extraexportsymbols=[
+##			"CmpObj_New",
+##			"CmpObj_Convert",
+##			"CmpInstObj_New",
+##			"CmpInstObj_Convert",
+##		])
+##	genpluginproject("carbon", "Cm",
+##		extraexportsymbols=[
+##			"CmpObj_New",
+##			"CmpObj_Convert",
+##			"CmpInstObj_New",
+##			"CmpInstObj_Convert",
+##		])
+	genpluginproject("ppc", "Cm", libraries=["QuickTimeLib"])
+	genpluginproject("carbon", "Cm")
 	genpluginproject("all", "Fm")
 	genpluginproject("ppc", "Help")
 	genpluginproject("ppc", "Icn", libraries=["IconServicesLib"])
 	genpluginproject("carbon", "Icn")
 	genpluginproject("all", "List")
-	genpluginproject("ppc", "Qt", libraries=["QuickTimeLib", "Cm.ppc.slb", "Qdoffs.ppc.slb"], 
-			extradirs=["::Plugins"])
-	genpluginproject("carbon", "Qt", libraries=["Cm.carbon.slb", "Qdoffs.carbon.slb"],
-			extradirs=["::Plugins"])
-	genpluginproject("all", "Qdoffs",
-		extraexportsymbols=["GWorldObj_New", "GWorldObj_Convert"])
+##	genpluginproject("ppc", "Qt", libraries=["QuickTimeLib", "Cm.ppc.slb", "Qdoffs.ppc.slb"], 
+##			extradirs=["::Plugins"])
+	genpluginproject("ppc", "Qt", libraries=["QuickTimeLib"])
+##	genpluginproject("carbon", "Qt", libraries=["Cm.carbon.slb", "Qdoffs.carbon.slb"],
+##			extradirs=["::Plugins"])
+	genpluginproject("carbon", "Qt")
+##	genpluginproject("all", "Qdoffs",
+##		extraexportsymbols=["GWorldObj_New", "GWorldObj_Convert"])
+	genpluginproject("all", "Qdoffs")
 	genpluginproject("all", "Scrap")
 	genpluginproject("ppc", "Snd", libraries=["SoundLib"])
 	genpluginproject("carbon", "Snd")
 	genpluginproject("all", "Sndihooks", sources=[":snd:Sndihooks.c"])
 	genpluginproject("ppc", "TE", libraries=["DragLib"])
 	genpluginproject("carbon", "TE")
+	genpluginproject("ppc", "Mlte", libraries=["Textension"])
+	genpluginproject("carbon", "Mlte")
+	
+	# Carbon Only?
+	genpluginproject("carbon", "CF")
 	
 	# Other Mac modules
 	genpluginproject("all", "calldll", sources=["calldll.c"])

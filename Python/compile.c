@@ -336,6 +336,50 @@ PyCode_New(int argcount, int nlocals, int stacksize, int flags,
    c_argcount, c_globals, and c_flags.
 */
 
+/* All about c_lnotab.
+
+c_lnotab is an array of unsigned bytes disguised as a Python string.  In -O
+mode, SET_LINENO opcodes aren't generated, and bytecode offsets are mapped
+to source code line #s (when needed for tracebacks) via c_lnotab instead.
+The array is conceptually a list of
+    (bytecode offset increment, line number increment)
+pairs.  The details are important and delicate, best illustrated by example:
+
+    byte code offset    source code line number
+        0		    1
+        6		    2
+       50		    7
+      350                 307
+      361                 308
+
+The first trick is that these numbers aren't stored, only the increments
+from one row to the next (this doesn't really work, but it's a start):
+
+    0, 1,  6, 1,  44, 5,  300, 300,  11, 1
+
+The second trick is that an unsigned byte can't hold negative values, or
+values larger than 255, so (a) there's a deep assumption that byte code
+offsets and their corresponding line #s both increase monotonically, and (b)
+if at least one column jumps by more than 255 from one row to the next, more
+than one pair is written to the table. In case #b, there's no way to know
+from looking at the table later how many were written.  That's the delicate
+part.  A user of c_lnotab desiring to find the source line number
+corresponding to a bytecode address A should do something like this
+
+    lineno = addr = 0
+    for addr_incr, line_incr in c_lnotab:
+        addr += addr_incr
+        if addr > A:
+            return lineno
+        lineno += line_incr
+
+In order for this to work, when the addr field increments by more than 255,
+the line # increment in each pair generated must be 0 until the remaining addr
+increment is < 256.  So, in the example above, com_set_lineno should not (as
+was actually done until 2.2) expand 300, 300 to 255, 255,  45, 45, but to
+255, 0,  45, 255,  0, 45.
+*/
+
 struct compiling {
 	PyObject *c_code;	/* string */
 	PyObject *c_consts;	/* list of objects */
@@ -692,17 +736,17 @@ com_set_lineno(struct compiling *c, int lineno)
 	else {
 		int incr_addr = c->c_nexti - c->c_last_addr;
 		int incr_line = lineno - c->c_last_line;
-		while (incr_addr > 0 || incr_line > 0) {
-			int trunc_addr = incr_addr;
-			int trunc_line = incr_line;
-			if (trunc_addr > 255)
-				trunc_addr = 255;
-			if (trunc_line > 255)
-				trunc_line = 255;
-			com_add_lnotab(c, trunc_addr, trunc_line);
-			incr_addr -= trunc_addr;
-			incr_line -= trunc_line;
+		while (incr_addr > 255) {
+			com_add_lnotab(c, 255, 0);
+			incr_addr -= 255;
 		}
+		while (incr_line > 255) {
+			com_add_lnotab(c, incr_addr, 255);
+			incr_line -=255;
+			incr_addr = 0;
+		}
+		if (incr_addr > 0 || incr_line > 0)
+			com_add_lnotab(c, incr_addr, incr_line);
 		c->c_last_addr = c->c_nexti;
 		c->c_last_line = lineno;
 	}
@@ -4069,7 +4113,7 @@ symtable_init_info(struct symbol_info *si)
 }
 
 static int
-symtable_resolve_free(struct compiling *c, PyObject *name, 
+symtable_resolve_free(struct compiling *c, PyObject *name, int flags,
 		      struct symbol_info *si)
 {
 	PyObject *dict, *v;
@@ -4079,11 +4123,19 @@ symtable_resolve_free(struct compiling *c, PyObject *name,
 	   cell var).  If it occurs in a class, then the class has a
 	   method and a free variable with the same name.
 	*/
-
 	if (c->c_symtable->st_cur->ste_type == TYPE_FUNCTION) {
+		/* If it isn't declared locally, it can't be a cell. */
+		if (!(flags & (DEF_LOCAL | DEF_PARAM)))
+			return 0;
 		v = PyInt_FromLong(si->si_ncells++);
 		dict = c->c_cellvars;
 	} else {
+		/* If it is free anyway, then there is no need to do
+		   anything here.
+		*/
+		if (is_free(flags ^ DEF_FREE_CLASS) 
+		    || flags == DEF_FREE_CLASS)
+			return 0;
 		v = PyInt_FromLong(si->si_nfrees++);
 		dict = c->c_freevars;
 	}
@@ -4369,10 +4421,7 @@ symtable_load_symbols(struct compiling *c)
 		   variables or declared global.
 		*/
 		if (flags & (DEF_FREE | DEF_FREE_CLASS)) {
-		    if ((ste->ste_type == TYPE_CLASS 
-			 && flags != DEF_FREE_CLASS)
-			|| (flags & (DEF_LOCAL | DEF_PARAM)))
-			symtable_resolve_free(c, name, &si);
+			symtable_resolve_free(c, name, flags, &si);
 		}
 
 		if (flags & DEF_STAR) {
@@ -4431,6 +4480,15 @@ symtable_load_symbols(struct compiling *c)
 			}
 		}
 	}
+
+	/*
+	fprintf(stderr, 
+		"cells %d: %s\n"
+		"frees %d: %s\n",
+		si.si_ncells, PyObject_REPR(c->c_cellvars),
+		si.si_nfrees, PyObject_REPR(c->c_freevars));
+	*/
+	assert(PyDict_Size(c->c_freevars) == si.si_nfrees);
 
 	if (si.si_ncells > 1) { /* one cell is always in order */
 		if (symtable_cellvar_offsets(&c->c_cellvars, c->c_argcount,
@@ -4765,7 +4823,7 @@ symtable_add_def_o(struct symtable *st, PyObject *dict,
 static void
 symtable_node(struct symtable *st, node *n)
 {
-	int i, start = 0;
+	int i;
 
  loop:
 	switch (TYPE(n)) {
@@ -4871,36 +4929,62 @@ symtable_node(struct symtable *st, node *n)
 			}
 		}
 		goto loop;
-		/* watchout for fall-through logic below */
+	case list_iter:
+		n = CHILD(n, 0);
+		if (TYPE(n) == list_for) {
+			st->st_tmpname++;
+			symtable_list_comprehension(st, n);
+			st->st_tmpname--;
+		} else {
+			REQ(n, list_if);
+			symtable_node(st, CHILD(n, 1));
+			if (NCH(n) == 3) {
+				n = CHILD(n, 2); 
+				goto loop;
+			}
+		}
+		break;
+	case for_stmt:
+		symtable_assign(st, CHILD(n, 1), 0);
+		for (i = 3; i < NCH(n); ++i)
+			if (TYPE(CHILD(n, i)) >= single_input)
+				symtable_node(st, CHILD(n, i));
+		break;
+	/* The remaining cases fall through to default except in
+	   special circumstances.  This requires the individual cases
+	   to be coded with great care, even though they look like
+	   rather innocuous.  Each case must double-check TYPE(n).
+	*/
 	case argument:
-		if (NCH(n) == 3) {
+		if (TYPE(n) == argument && NCH(n) == 3) {
 			n = CHILD(n, 2);
 			goto loop;
 		}
+		/* fall through */
 	case listmaker:
 		if (NCH(n) > 1 && TYPE(CHILD(n, 1)) == list_for) {
 			st->st_tmpname++;
 			symtable_list_comprehension(st, CHILD(n, 1));
 			symtable_node(st, CHILD(n, 0));
 			st->st_tmpname--;
-			return;
+			break;
 		}
+		/* fall through */
 	case atom:
 		if (TYPE(n) == atom && TYPE(CHILD(n, 0)) == NAME) {
 			symtable_add_use(st, STR(CHILD(n, 0)));
 			break;
 		}
-	case for_stmt:
-		if (TYPE(n) == for_stmt) {
-			symtable_assign(st, CHILD(n, 1), 0);
-			start = 3;
-		}
+		/* fall through */
 	default:
+		/* Walk over every non-token child with a special case
+		   for one child.
+		*/
 		if (NCH(n) == 1) {
 			n = CHILD(n, 0);
 			goto loop;
 		}
-		for (i = start; i < NCH(n); ++i)
+		for (i = 0; i < NCH(n); ++i)
 			if (TYPE(CHILD(n, i)) >= single_input)
 				symtable_node(st, CHILD(n, i));
 	}
@@ -5131,8 +5215,14 @@ symtable_import(struct symtable *st, node *n)
 	}
 }
 
+/* The third argument to symatble_assign() is a flag to be passed to
+   symtable_add_def() if it is eventually called.  The flag is useful
+   to specify the particular type of assignment that should be
+   recorded, e.g. an assignment caused by import.
+ */
+
 static void 
-symtable_assign(struct symtable *st, node *n, int flag)
+symtable_assign(struct symtable *st, node *n, int def_flag)
 {
 	node *tmp;
 	int i;
@@ -5164,7 +5254,7 @@ symtable_assign(struct symtable *st, node *n, int flag)
 			return;
 		} else {
 			for (i = 0; i < NCH(n); i += 2)
-				symtable_assign(st, CHILD(n, i), flag);
+				symtable_assign(st, CHILD(n, i), def_flag);
 		}
 		return;
 	case exprlist:
@@ -5176,7 +5266,7 @@ symtable_assign(struct symtable *st, node *n, int flag)
 		else {
 			int i;
 			for (i = 0; i < NCH(n); i += 2)
-				symtable_assign(st, CHILD(n, i), flag);
+				symtable_assign(st, CHILD(n, i), def_flag);
 			return;
 		}
 		goto loop;
@@ -5188,24 +5278,24 @@ symtable_assign(struct symtable *st, node *n, int flag)
 		} else if (TYPE(tmp) == NAME) {
 			if (strcmp(STR(tmp), "__debug__") == 0)
 				symtable_warn(st, ASSIGN_DEBUG);
-			symtable_add_def(st, STR(tmp), DEF_LOCAL | flag);
+			symtable_add_def(st, STR(tmp), DEF_LOCAL | def_flag);
 		}
 		return;
 	case dotted_as_name:
 		if (NCH(n) == 3)
 			symtable_add_def(st, STR(CHILD(n, 2)),
-					 DEF_LOCAL | flag);
+					 DEF_LOCAL | def_flag);
 		else
 			symtable_add_def(st,
 					 STR(CHILD(CHILD(n,
 							 0), 0)),
-					 DEF_LOCAL | flag);
+					 DEF_LOCAL | def_flag);
 		return;
 	case dotted_name:
-		symtable_add_def(st, STR(CHILD(n, 0)), DEF_LOCAL | flag);
+		symtable_add_def(st, STR(CHILD(n, 0)), DEF_LOCAL | def_flag);
 		return;
 	case NAME:
-		symtable_add_def(st, STR(n), DEF_LOCAL | flag);
+		symtable_add_def(st, STR(n), DEF_LOCAL | def_flag);
 		return;
 	default:
 		if (NCH(n) == 0)
@@ -5218,6 +5308,6 @@ symtable_assign(struct symtable *st, node *n, int flag)
 		   which will be caught in the next pass. */
 		for (i = 0; i < NCH(n); ++i)
 			if (TYPE(CHILD(n, i)) >= single_input)
-				symtable_assign(st, CHILD(n, i), flag);
+				symtable_assign(st, CHILD(n, i), def_flag);
 	}
 }
