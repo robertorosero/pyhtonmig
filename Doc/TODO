@@ -55,13 +55,6 @@ Extending & Embedding
   behavior; only a subset is described.  __reduce__, etc.  Partial
   update submitted by Jim Kerr <jbkerr@sr.hp.com>.
 
-* In the indexes, some subitem entries are separated from the item
-  entries by column- or page-breaks.  Reported by Lorenzo M. Catucci
-  <lorenzo@argon.roma2.infn.it>.  This one will be hard; probably not
-  really worth the pain.  (Only an issue at all when a header-letter
-  and the first index entry get separated -- can change as soon as we
-  change the index entries in the text.)
-
 
 Library Reference
 -----------------
