@@ -1086,6 +1086,8 @@ compiler_body(struct compiler *c, asdl_seq *stmts)
 	int i = 0;
 	stmt_ty st;
 
+	if (!asdl_seq_LEN(stmts))
+		return 1;
 	st = asdl_seq_GET(stmts, 0);
 	if (compiler_isdocstring(st)) {
 		i = 1;
