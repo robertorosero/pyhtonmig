@@ -338,7 +338,7 @@ extended slicing.\indexii{extended}{slicing}
 The semantics for a simple slicing are as follows.  The primary must
 evaluate to a sequence object.  The lower and upper bound expressions,
 if present, must evaluate to plain integers; defaults are zero and the
-sequence's length, respectively.  If either bound is negative, the
+\code{sys.maxint}, respectively.  If either bound is negative, the
 sequence's length is added to it.  The slicing now selects all items
 with index \var{k} such that
 \code{\var{i} <= \var{k} < \var{j}} where \var{i}
