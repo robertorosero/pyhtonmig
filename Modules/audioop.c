@@ -22,14 +22,16 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 ******************************************************************/
 
-/* audioopmodele - Module to detect peak values in arrays */
-
-#ifdef sun
-#define signed
-#endif
+/* audioopmodule - Module to detect peak values in arrays */
 
 #include "allobjects.h"
 #include "modsupport.h"
+
+#if defined(__CHAR_UNSIGNED__) && defined(signed)
+!ERROR!; READ THE SOURCE FILE!;
+/* This module currently does not work on systems where only unsigned
+   characters are available.  Take it out of Setup.  Sorry. */
+#endif
 
 #include <math.h>
 

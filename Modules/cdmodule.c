@@ -797,7 +797,7 @@ typeobject CdParsertype = {
 	/* methods */
 	(destructor)cdparser_dealloc, /*tp_dealloc*/
 	0,			/*tp_print*/
-	(destructor)cdparser_getattr, /*tp_getattr*/
+	(getattrfunc)cdparser_getattr, /*tp_getattr*/
 	0,			/*tp_setattr*/
 	0,			/*tp_compare*/
 	0,			/*tp_repr*/

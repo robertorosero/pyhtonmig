@@ -35,6 +35,10 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #include <sys/types.h>
 #endif
 
+#ifdef QUICKWIN
+#include <io.h>
+#endif
+
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
 #endif
@@ -45,7 +49,7 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #include "mytime.h"
 #endif
 
-#if !HAVE_GETTIMEOFDAY && HAVE_FTIME
+#if HAVE_FTIME
 #include <sys/timeb.h>
 #endif
 
@@ -86,6 +90,7 @@ time_clock(self, args)
 }
 #endif /* HAVE_CLOCK */
 
+#ifdef SIGINT
 static jmp_buf sleep_intr;
 
 /* ARGSUSED */
@@ -95,6 +100,7 @@ sleep_catcher(sig)
 {
 	longjmp(sleep_intr, 1);
 }
+#endif /* SIGINT */
 
 static object *
 time_sleep(self, args)
@@ -102,9 +108,22 @@ time_sleep(self, args)
 	object *args;
 {
 	double secs;
-	RETSIGTYPE (*sigsave)() = 0; /* Initialized to shut lint up */
+#ifdef SIGINT
+	/* We must set the signal handler *after* calling setjmp, to
+	   avoid a race condition.  Unfortunately some compilers put
+	   the sigsave variable in a register.  Sometimes auto is
+	   enough, sometimes static is needed to avoid this (Microsoft
+	   C 7.0). */
+#ifdef WITH_THREAD
+	auto
+#else
+	static
+#endif
+	       RETSIGTYPE (*sigsave)() = 0; /* Initialized to shut lint up */
+#endif /* SIGINT */
 	if (!getargs(args, "d", &secs))
 		return NULL;
+#ifdef SIGINT
 	BGN_SAVE
 	if (setjmp(sleep_intr)) {
 		RET_SAVE
@@ -115,9 +134,12 @@ time_sleep(self, args)
 	sigsave = signal(SIGINT, SIG_IGN);
 	if (sigsave != (RETSIGTYPE (*)()) SIG_IGN)
 		signal(SIGINT, sleep_catcher);
+#endif
 	floatsleep(secs);
+#ifdef SIGINT
 	END_SAVE
 	signal(SIGINT, sigsave);
+#endif
 	INCREF(None);
 	return None;
 }
@@ -301,13 +323,17 @@ floattime()
 	   (2) ftime() -- resolution in milliseconds
 	   (3) time() -- resolution in seconds
 	   In all cases the return value is a float in seconds.
+	   Since on some systems (e.g. SCO ODT 3.0) gettimeofday() may
+	   fail, so we fall back on ftime() or time().
 	   Note: clock resolution does not imply clock accuracy! */
 #ifdef HAVE_GETTIMEOFDAY
+    {
 	struct timeval t;
-	if (gettimeofday(&t, (struct timezone *)NULL) != 0)
-		return 0.0;
-	return (double)t.tv_sec + t.tv_usec*0.000001;
-#else /* !HAVE_GETTIMEOFDAY */
+	if (gettimeofday(&t, (struct timezone *)NULL) == 0)
+		return (double)t.tv_sec + t.tv_usec*0.000001;
+    }
+#endif /* !HAVE_GETTIMEOFDAY */
+    {
 #ifdef HAVE_FTIME
 	struct timeb t;
 	ftime(&t);
@@ -317,7 +343,7 @@ floattime()
 	time(&secs);
 	return (double)secs;
 #endif /* !HAVE_FTIME */
-#endif /* !HAVE_GETTIMEOFDAY */
+    }
 }
 
 
@@ -349,7 +375,30 @@ floatsleep(secs)
 	}
 #else /* !macintosh */
 #ifdef MSDOS
-	delay(long(secs/1000.0));
+	struct timeb t1, t2;
+	double frac;
+	extern double fmod PROTO((double, double));
+	extern double floor PROTO((double));
+	if (secs <= 0.0)
+		return;
+	frac = fmod(secs, 1.0);
+	secs = floor(secs);
+	ftime(&t1);
+	t2.time = t1.time + (int)secs;
+	t2.millitm = t1.millitm + (int)(frac*1000.0);
+	while (t2.millitm >= 1000) {
+		t2.time++;
+		t2.millitm -= 1000;
+	}
+	for (;;) {
+#ifdef QUICKWIN
+		_wyield();
+#endif
+		ftime(&t1);
+		if (t1.time > t2.time ||
+		    t1.time == t2.time && t1.millitm >= t2.millitm)
+			break;
+	}
 #else /* !MSDOS */
 	sleep((int)secs);
 #endif /* !MSDOS */

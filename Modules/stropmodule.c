@@ -31,6 +31,8 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 /* XXX This file assumes that the <ctype.h> is*() functions
    XXX are defined for all 8-bit characters! */
 
+#include <errno.h>
+
 
 static object *
 strop_split(self, args)
@@ -408,9 +410,108 @@ strop_swapcase(self, args)
 }
 
 
+static object *
+strop_atoi(self, args)
+	object *self; /* Not used */
+	object *args;
+{
+	extern long mystrtol PROTO((const char *, char **, int));
+	extern unsigned long mystrtoul PROTO((const char *, char **, int));
+	char *s, *end;
+	int base = 10;
+	long x;
+
+	if (args != NULL && is_tupleobject(args)) {
+		if (!getargs(args, "(si)", &s, &base))
+			return NULL;
+		if (base != 0 && base < 2 || base > 36) {
+			err_setstr(ValueError, "invalid base for atoi()");
+			return NULL;
+		}
+	}
+	else if (!getargs(args, "s", &s))
+		return NULL;
+	errno = 0;
+	if (base == 0 && s[0] == '0')
+		x = (long) mystrtoul(s, &end, base);
+	else
+		x = mystrtol(s, &end, base);
+	if (*end != '\0') {
+		err_setstr(ValueError, "invalid literal for atoi()");
+		return NULL;
+	}
+	else if (errno != 0) {
+		err_setstr(OverflowError, "atoi() literal too large");
+		return NULL;
+	}
+	return newintobject(x);
+}
+
+
+static object *
+strop_atol(self, args)
+	object *self; /* Not used */
+	object *args;
+{
+	char *s, *end;
+	int base = 10;
+	object *x;
+
+	if (args != NULL && is_tupleobject(args)) {
+		if (!getargs(args, "(si)", &s, &base))
+			return NULL;
+		if (base != 0 && base < 2 || base > 36) {
+			err_setstr(ValueError, "invalid base for atol()");
+			return NULL;
+		}
+	}
+	else if (!getargs(args, "s", &s))
+		return NULL;
+	x = long_escan(s, &end, base);
+	if (x == NULL)
+		return NULL;
+	if (base == 0 && (*end == 'l' || *end == 'L'))
+		end++;
+	if (*end != '\0') {
+		err_setstr(ValueError, "invalid literal for atol()");
+		DECREF(x);
+		return NULL;
+	}
+	return x;
+}
+
+
+static object *
+strop_atof(self, args)
+	object *self; /* Not used */
+	object *args;
+{
+	extern double strtod PROTO((const char *, char **));
+	char *s, *end;
+	double x;
+
+	if (!getargs(args, "s", &s))
+		return NULL;
+	errno = 0;
+	x = strtod(s, &end);
+	if (*end != '\0') {
+		err_setstr(ValueError, "invalid literal for atof()");
+		return NULL;
+	}
+	else if (errno != 0) {
+		err_setstr(OverflowError, "atof() literal too large");
+		return NULL;
+	}
+	return newfloatobject(x);
+}
+
+
 /* List of functions defined in the module */
 
 static struct methodlist strop_methods[] = {
+	{"atof",	strop_atof},
+	{"atoi",	strop_atoi},
+	{"atol",	strop_atol},
 	{"index",	strop_index},
 	{"joinfields",	strop_joinfields},
 	{"lower",	strop_lower},

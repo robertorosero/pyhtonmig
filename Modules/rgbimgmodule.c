@@ -746,7 +746,7 @@ initrgbimg()
     object *m, *d;
     m = initmodule("rgbimg", rgbimg_methods);
     d = getmoduledict(m);
-    ImgfileError = newstringobject("rgbimg,error");
+    ImgfileError = newstringobject("rgbimg.error");
     if (ImgfileError == NULL || dictinsert(d, "error", ImgfileError))
 	fatal("can't define rgbimg.error");
 }

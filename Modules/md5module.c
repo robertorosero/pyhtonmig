@@ -77,7 +77,7 @@ md5_update(self, args)
 	md5object *self;
 	object *args;
 {
-	char *cp;
+	unsigned char *cp;
 	int len;
 
 	if (!getargs(args, "s#", &cp, &len))
@@ -96,7 +96,7 @@ md5_digest(self, args)
 {
 
 	MD5_CTX mdContext;
-	char aDigest[16];
+	unsigned char aDigest[16];
 
 	if (!getnoarg(args))
 		return NULL;
@@ -166,7 +166,7 @@ MD5_md5(self, args)
 	object *args;
 {
 	md5object *md5p;
-	char *cp = (char *)NULL;
+	unsigned char *cp = NULL;
 	int len;
 
 	if (!getargs(args, "")) {

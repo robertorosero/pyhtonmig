@@ -35,6 +35,8 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #include <sys/types.h>
 #include <sys/stat.h>
 
+#include "mytime.h"		/* For clock_t on some systems */
+
 #ifdef HAVE_FCNTL_H
 #include <fcntl.h>
 #endif
