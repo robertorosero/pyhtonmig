@@ -288,6 +288,7 @@ extern DL_IMPORT(int) _PyObject_TypeCheck(PyObject *, PyTypeObject *);
 	((ob)->ob_type == (tp) || _PyObject_TypeCheck(ob, tp))
 
 extern DL_IMPORT(PyTypeObject) PyType_Type; /* Metatype */
+extern DL_IMPORT(PyTypeObject) PyBaseObject_Type; /* Most base object type */
 
 #define PyType_Check(op) PyObject_TypeCheck(op, &PyType_Type)
 
@@ -312,8 +313,9 @@ extern DL_IMPORT(int) PyObject_HasAttrString(PyObject *, char *);
 extern DL_IMPORT(PyObject *) PyObject_GetAttr(PyObject *, PyObject *);
 extern DL_IMPORT(int) PyObject_SetAttr(PyObject *, PyObject *, PyObject *);
 extern DL_IMPORT(int) PyObject_HasAttr(PyObject *, PyObject *);
-extern DL_IMPORT(PyObject *) PyGeneric_GetAttr(PyObject *, PyObject *);
-extern DL_IMPORT(int) PyGeneric_SetAttr(PyObject *, PyObject *, PyObject *);
+extern DL_IMPORT(PyObject *) PyObject_GenericGetAttr(PyObject *, PyObject *);
+extern DL_IMPORT(int) PyObject_GenericSetAttr(PyObject *,
+					      PyObject *, PyObject *);
 extern DL_IMPORT(long) PyObject_Hash(PyObject *);
 extern DL_IMPORT(int) PyObject_IsTrue(PyObject *);
 extern DL_IMPORT(int) PyObject_Not(PyObject *);
