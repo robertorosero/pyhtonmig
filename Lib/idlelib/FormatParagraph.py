@@ -20,7 +20,7 @@ import re
 class FormatParagraph:
 
     menudefs = [
-        ('format', [   # /s/edit/format   dscherer@cmu.edu
+        ('edit', [
             ('Format Paragraph', '<<format-paragraph>>'),
          ])
     ]

@@ -1,14 +1,6 @@
-# changes by dscherer@cmu.edu
-#   - IOBinding.open() replaces the current window with the opened file,
-#     if the current window is both unmodified and unnamed
-#   - IOBinding.loadfile() interprets Windows, UNIX, and Macintosh
-#     end-of-line conventions, instead of relying on the standard library,
-#     which will only understand the local convention.
-
 import os
 import tkFileDialog
 import tkMessageBox
-import re
 
 #$ event <<open-window-from-file>>
 #$ win <Control-o>
@@ -76,16 +68,9 @@ class IOBinding:
         if self.editwin.flist:
             filename = self.askopenfile()
             if filename:
-                # if the current window has no filename and hasn't been
-                #   modified, we replace it's contents (no loss).  Otherwise
-                #   we open a new window.
-                if not self.filename and self.get_saved():
-                    self.editwin.flist.open(filename, self.loadfile)
-                else:
-                    self.editwin.flist.open(filename)
+                self.editwin.flist.open(filename)
             else:
                 self.text.focus_set()
-
             return "break"
         # Code for use outside IDLE:
         if self.get_saved():
@@ -102,19 +87,12 @@ class IOBinding:
 
     def loadfile(self, filename):
         try:
-            # open the file in binary mode so that we can handle
-            #   end-of-line convention ourselves.
-            f = open(filename,'rb')
+            f = open(filename)
             chars = f.read()
             f.close()
         except IOError, msg:
             tkMessageBox.showerror("I/O Error", str(msg), master=self.text)
             return 0
-
-        # We now convert all end-of-lines to '\n's
-        eol = r"(\r\n)|\n|\r"  # \r\n (Windows), \n (UNIX), or \r (Mac)
-        chars = re.compile( eol ).sub( r"\n", chars )
-
         self.text.delete("1.0", "end")
         self.set_filename(None)
         self.text.insert("1.0", chars)

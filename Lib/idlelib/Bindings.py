@@ -5,13 +5,6 @@
 # skipped by the code here.  This makes it possible to define the
 # Debug menu here, which is only present in the PythonShell window.
 
-# changes by dscherer@cmu.edu:
-#   - Python shell moved to 'Run' menu
-#   - "Help" renamed to "IDLE Help" to distinguish from Python help.
-#     The distinction between the environment and the language is dim
-#     or nonexistent in a novice's mind.
-#   - Silly advice added
-
 import sys
 import string
 from keydefs import *
@@ -24,6 +17,7 @@ menudefs = [
    ('Open _module...', '<<open-module>>'),
    ('Class _browser', '<<open-class-browser>>'),
    ('_Path browser', '<<open-path-browser>>'),
+   ('Python shell', '<<open-python-shell>>'),
    None,
    ('_Save', '<<save-window>>'),
    ('Save _As...', '<<save-window-as-file>>'),
@@ -41,9 +35,6 @@ menudefs = [
    ('_Paste', '<<Paste>>'),
    ('Select _All', '<<select-all>>'),
   ]),
- ('run',[
-   ('Python shell', '<<open-python-shell>>'),
- ]),
  ('debug', [
    ('_Go to file/line', '<<goto-file-line>>'),
    ('_Stack viewer', '<<open-stack-viewer>>'),
@@ -51,9 +42,8 @@ menudefs = [
    ('!_Auto-open stack viewer', '<<toggle-jit-stack-viewer>>' ),
   ]),
  ('help', [
-   ('_IDLE Help...', '<<help>>'),
+   ('_Help...', '<<help>>'),
    ('Python _Documentation...', '<<python-docs>>'),
-   ('_Advice...', '<<good-advice>>'),
    None,
    ('_About IDLE...', '<<about-idle>>'),
   ]),

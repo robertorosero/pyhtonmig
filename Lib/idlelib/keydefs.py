@@ -8,7 +8,7 @@ windows_keydefs = \
  '<<close-window>>': ['<Alt-F4>'],
  '<<dump-undo-state>>': ['<Control-backslash>'],
  '<<end-of-file>>': ['<Control-d>'],
- '<<python-docs>>': ['<F1>'],
+ '<<help>>': ['<F1>'],
  '<<history-next>>': ['<Alt-n>'],
  '<<history-previous>>': ['<Alt-p>'],
  '<<interrupt-execution>>': ['<Control-c>'],

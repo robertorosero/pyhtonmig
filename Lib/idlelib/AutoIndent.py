@@ -40,7 +40,7 @@ import PyParse
 class AutoIndent:
 
     menudefs = [
-        ('format', [       # /s/edit/format   dscherer@cmu.edu
+        ('edit', [
             None,
             ('_Indent region', '<<indent-region>>'),
             ('_Dedent region', '<<dedent-region>>'),
@@ -61,8 +61,7 @@ class AutoIndent:
 
     windows_keydefs = {
         '<<indent-region>>': ['<Control-bracketright>'],
-        '<<dedent-region>>': ['<Shift-Tab>',     # dscherer@cmu.edu
-                              '<Control-bracketleft>'],
+        '<<dedent-region>>': ['<Control-bracketleft>'],
         '<<comment-region>>': ['<Alt-Key-3>'],
         '<<uncomment-region>>': ['<Alt-Key-4>'],
         '<<tabify-region>>': ['<Alt-Key-5>'],

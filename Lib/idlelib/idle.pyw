@@ -1,12 +1,8 @@
-#! /usr/bin/env python
-
-import os
-import sys
-import IdleConf
-
-idle_dir = os.path.split(sys.argv[0])[0]
-IdleConf.load(idle_dir)
-
-# defer importing Pyshell until IdleConf is loaded
-import PyShell
-PyShell.main()
+try:
+    import idle
+except SystemExit:
+    raise
+except:
+    import traceback
+    traceback.print_exc()
+    raw_input("Hit return to exit...")
