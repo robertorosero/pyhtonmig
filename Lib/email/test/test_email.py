@@ -50,9 +50,9 @@ except NameError:
 
 
 
-def openfile(filename):
+def openfile(filename, mode='r'):
     path = os.path.join(os.path.dirname(landmark), 'data', filename)
-    return open(path, 'r')
+    return open(path, mode)
 
 
 
@@ -1883,7 +1883,7 @@ Here's the message body
 
     def test_crlf_separation(self):
         eq = self.assertEqual
-        fp = openfile('msg_26.txt')
+        fp = openfile('msg_26.txt', 'rb')
         try:
             msg = Parser().parse(fp)
         finally:
