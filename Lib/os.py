@@ -36,7 +36,6 @@ def _get_exports_list(module):
         return [n for n in dir(module) if n[0] != '_']
 
 if 'posix' in _names:
-    print "hello"
     name = 'posix'
     linesep = '\n'
     from posix import *
