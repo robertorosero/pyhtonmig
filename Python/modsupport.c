@@ -38,6 +38,8 @@ Py_InitModule4(name, methods, doc, passthrough, module_api_version)
 {
 	PyObject *m, *d, *v;
 	PyMethodDef *ml;
+	if (!Py_IsInitialized())
+	    Py_FatalError("Interpreter not initialized (version mismatch?)");
 	if (module_api_version != PYTHON_API_VERSION)
 		fprintf(stderr, api_version_warning,
 			name, PYTHON_API_VERSION, name, module_api_version);
