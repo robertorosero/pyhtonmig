@@ -29,7 +29,7 @@ Number Generator interface in a future release.
 
 \begin{funcdesc}{betavariate}{alpha, beta}
 Beta distribution.  Conditions on the parameters are
-$\var{alpha} > -1$ and $\var{beta} > -1$.
+\code{\var{alpha} > -1} and \code{\var{beta} > -1}.
 Returned values range between 0 and 1.
 \end{funcdesc}
 
@@ -38,7 +38,7 @@ Circular uniform distribution.  \var{mean} is the mean angle, and
 \var{arc} is the range of the distribution, centered around the mean
 angle.  Both values must be expressed in radians, and can range
 between 0 and \emph{pi}.  Returned values will range between
-$\var{mean} - \var{arc}/2$ and $\var{mean} + \var{arc}/2$.
+\code{\var{mean} - \var{arc}/2} and \code{\var{mean} + \var{arc}/2}.
 \end{funcdesc}
 
 \begin{funcdesc}{expovariate}{lambd}
@@ -50,7 +50,7 @@ positive infinity.
 
 \begin{funcdesc}{gamma}{alpha, beta}
 Gamma distribution.  (\emph{Not} the gamma function!)  Conditions on
-the parameters are $\var{alpha} > -1$ and $\var{beta} > 0$.
+the parameters are \code{\var{alpha} > -1} and \code{\var{beta} > 0}.
 \end{funcdesc}
 
 \begin{funcdesc}{gauss}{mu, sigma}
