@@ -1103,9 +1103,20 @@ PyObject_SetAttr(PyObject *v, PyObject *name, PyObject *value)
 		return err;
 	}
 	Py_DECREF(name);
-	PyErr_Format(PyExc_AttributeError,
-		     "'%.50s' object has no attribute '%.400s'",
-		     tp->tp_name, PyString_AS_STRING(name));
+	if (tp->tp_getattr == NULL && tp->tp_getattro == NULL)
+		PyErr_Format(PyExc_TypeError,
+			     "'%.100s' object has no attributes "
+			     "(%s .%.100s)",
+			     tp->tp_name,
+			     value==NULL ? "del" : "assign to",
+			     PyString_AS_STRING(name));
+	else
+		PyErr_Format(PyExc_TypeError,
+			     "'%.100s' object has only read-only attributes "
+			     "(%s .%.100s)",
+			     tp->tp_name,
+			     value==NULL ? "del" : "assign to",
+			     PyString_AS_STRING(name));
 	return -1;
 }
 
