@@ -35,7 +35,6 @@ MKDEP=		mkdep
 SHELL=		/bin/sh
 
 MAKESETUP=	$(srcdir)/makesetup
-SETUP=		$(srcdir)/Setup
 
 # === Fixed definitions ===
 
@@ -72,8 +71,12 @@ clean:
 clobber:	clean
 		-rm -f *.a tags TAGS
 
-config.c Makefile: Makefile.pre $(srcdir)/config.c.in $(MAKESETUP) $(SETUP)
-		$(SHELL) $(MAKESETUP) $(SETUP)
+config.c Makefile: Makefile.pre $(srcdir)/config.c.in $(MAKESETUP) Setup
+		$(SHELL) $(MAKESETUP) Setup
+
+# This rule needs no dependency on $(srcdir)/Setup!
+Setup:
+		cp $(srcdir)/Setup Setup
 
 Makefile.pre:	$(srcdir)/Makefile.pre.in ../config.status
 		(cd ..; CONFIG_FILES=Modules/Makefile.pre CONFIG_HEADERS= \
