@@ -533,9 +533,9 @@ class Parser:
 
         The format of this isn't rigidly defined.  In general, doctest
         examples become the executable statements in the result, and
-        and their expected outputs become comments, preceded by an
-        "#Expected:" comment.  Everything else (text, comments,
-        everything not part of a doctest test) is also placed in comments.
+        their expected outputs become comments, preceded by an "#Expected:"
+        comment.  Everything else (text, comments, everything not part of
+        a doctest test) is also placed in comments.
 
         >>> text = '''
         ...        >>> x, y = 2, 3  # no output expected
