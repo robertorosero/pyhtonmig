@@ -79,6 +79,10 @@ del m
 L = []
 dirs_in_sys_path = {}
 for dir in sys.path:
+    # Filter out paths that don't exist, but leave in the empty string
+    # since it's a special case.
+    if dir and not os.path.isdir(dir):
+        continue
     dir, dircase = makepath(dir)
     if not dirs_in_sys_path.has_key(dircase):
         L.append(dir)
@@ -141,10 +145,8 @@ for prefix in prefixes:
                                      "python" + sys.version[:3],
                                      "site-packages"),
                         os.path.join(prefix, "lib", "site-python")]
-        elif os.sep == ':':
-            sitedirs = [os.path.join(prefix, "lib", "site-packages")]
         else:
-            sitedirs = [prefix]
+            sitedirs = [prefix, os.path.join(prefix, "lib", "site-packages")]
         for sitedir in sitedirs:
             if os.path.isdir(sitedir):
                 addsitedir(sitedir)

@@ -30,7 +30,6 @@ import doctest
 import dumbdbm
 import encodings
 import filecmp
-import fileinput
 import fnmatch
 import formatter
 import fpformat
@@ -96,7 +95,6 @@ import urllib2
 # Can't test the "user" module -- if the user has a ~/.pythonrc.py, it
 # can screw up all sorts of things (esp. if it prints!).
 #import user
-import uu
 import webbrowser
 import whichdb
 import xdrlib

@@ -303,6 +303,16 @@ if test -z "$LN" ; then
 	esac
 fi
 
+# Check for --with-pydebug
+AC_MSG_CHECKING(for --with-pydebug)
+AC_ARG_WITH(pydebug, 
+[  --with-pydebug                  build with Py_DEBUG defined], [
+if test "$withval" != no
+then AC_DEFINE(Py_DEBUG) AC_MSG_RESULT(yes); Py_DEBUG='true'
+else AC_MSG_RESULT(no); Py_DEBUG='false'
+fi],
+[AC_MSG_RESULT(no)])
+
 # Optimizer/debugger flags
 AC_SUBST(OPT)
 if test -z "$OPT"
@@ -311,11 +321,17 @@ then
 	yes)
 		case $ac_cv_prog_cc_g in
 	yes)
-	    OPT="-g -O2 -Wall -Wstrict-prototypes";;
+	    if test "$Py_DEBUG" = 'true' ; then
+		# Optimization messes up debuggers, so turn it off for
+		# debug builds.
+		OPT="-g -Wall -Wstrict-prototypes"
+	    else
+		OPT="-g -O3 -Wall -Wstrict-prototypes"
+	    fi;;
 	*)
-	    OPT="-O2 -Wall -Wstrict-prototypes";;
-		esac
-		;;
+	    OPT="-O3 -Wall -Wstrict-prototypes";;
+	esac
+	;;
     *)
 	case $ac_sys_system in
 	UnixWare*)
@@ -385,7 +401,7 @@ AC_ARG_ENABLE(ipv6,
        ;;
   esac ],
 
-  AC_TRY_RUN([ /* AF_INET6 avalable check */
+  AC_TRY_RUN([ /* AF_INET6 available check */
 #include <sys/types.h>
 #include <sys/socket.h>
 main()
@@ -529,7 +545,7 @@ signal.h stdarg.h stddef.h stdlib.h thread.h unistd.h utime.h termios.h \
 sys/audioio.h sys/file.h sys/lock.h sys/modem.h db_185.h db.h \
 sys/param.h sys/select.h sys/socket.h sys/time.h sys/times.h \
 sys/un.h sys/utsname.h sys/wait.h pty.h libutil.h \
-ndbm.h db1/ndbm.h gdbm/ndbm.h)
+ndbm.h db1/ndbm.h gdbm/ndbm.h sys/resource.h)
 AC_HEADER_DIRENT
 
 # checks for typedefs
@@ -861,16 +877,6 @@ AC_MSG_RESULT($CFLAGSFORSHARED)
 AC_CHECK_LIB(dl, dlopen)	# Dynamic linking for SunOS/Solaris and SYSV
 AC_CHECK_LIB(dld, shl_load)	# Dynamic linking for HP-UX
 
-# Check for --with-pydebug
-AC_MSG_CHECKING(for --with-pydebug)
-AC_ARG_WITH(pydebug, 
-[  --with-pydebug                  build with Py_DEBUG defined], [
-if test "$withval" != no
-then AC_DEFINE(Py_DEBUG) AC_MSG_RESULT(yes)
-else AC_MSG_RESULT(no)
-fi],
-[AC_MSG_RESULT(no)])
-
 # checks for system dependent C++ extensions support
 case "$ac_sys_system" in
 	AIX*)	AC_MSG_CHECKING(for genuine AIX C++ extensions support)
@@ -1169,7 +1175,7 @@ AC_CHECK_FUNCS(alarm chown clock confstr ctermid ctermid_r execv \
  setlocale setregid setreuid setsid setpgid setuid setvbuf \
  sigaction siginterrupt sigrelse strftime strptime symlink sysconf \
  tcgetpgrp tcsetpgrp tempnam timegm times tmpfile tmpnam tmpnam_r \
- truncate uname waitpid _getpty)
+ truncate uname waitpid _getpty getpriority)
 
 # check for openpty and forkpty
 
@@ -1659,6 +1665,27 @@ AC_MSG_RESULT($ac_cv_have_getc_unlocked)
 if test "$ac_cv_have_getc_unlocked" = yes
 then
   AC_DEFINE(HAVE_GETC_UNLOCKED)
+fi
+
+# check for readline 4.2
+AC_CHECK_LIB(readline, rl_completion_matches,
+	AC_DEFINE(HAVE_RL_COMPLETION_MATCHES), , -ltermcap)
+
+AC_MSG_CHECKING(for broken nice())
+AC_CACHE_VAL(ac_cv_broken_nice, [
+AC_TRY_RUN([
+int main()
+{
+	int val1 = nice(1);
+	if (val1 != -1 && val1 == nice(2))
+		exit(0);
+	exit(1);
+}
+],ac_cv_broken_nice=yes, ac_cv_broken_nice=no)])
+AC_MSG_RESULT($ac_cv_broken_nice)
+if test "$ac_cv_broken_nice" = yes
+then
+  AC_DEFINE(HAVE_BROKEN_NICE)
 fi
 
 # THIS MUST BE LAST, IT CAN BREAK OTHER TESTS!

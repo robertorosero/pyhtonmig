@@ -811,28 +811,45 @@ long_format(PyObject *aa, int base, int addL)
 		}
 	}
 	else {
+		/* Not 0, and base not a power of 2.  Divide repeatedly by
+		   base, but for speed use the highest power of base that
+		   fits in a digit. */
+		digit powbase = base;  /* powbase == base ** power */
+		int power = 1;
+		for (;;) {
+			unsigned long newpow = powbase * (unsigned long)base;
+			if (newpow >> SHIFT)  /* doesn't fit in a digit */
+				break;
+			powbase = (digit)newpow;
+			++power;
+		}
+		
 		Py_INCREF(a);
 		do {
+			int ntostore = power;
 			digit rem;
-			PyLongObject *temp = divrem1(a, (digit)base, &rem);
+			PyLongObject *temp = divrem1(a, powbase, &rem);
+			Py_DECREF(a);
 			if (temp == NULL) {
-				Py_DECREF(a);
 				Py_DECREF(str);
 				return NULL;
 			}
-			if (rem < 10)
-				rem += '0';
-			else
-				rem += 'A'-10;
-			assert(p > PyString_AS_STRING(str));
-			*--p = (char) rem;
-			Py_DECREF(a);
 			a = temp;
 			SIGCHECK({
 				Py_DECREF(a);
 				Py_DECREF(str);
 				return NULL;
 			})
+			while (--ntostore >= 0) {
+				digit nextrem = (digit)(rem / base);
+				char c = (char)(rem - nextrem * base);
+				assert(p > PyString_AS_STRING(str));
+				c += (c < 10) ? '0' : 'A'-10;
+				*--p = c;
+				rem = nextrem;
+				if (a->ob_size == 0 && rem == 0)
+					break;  /* skip leading zeroes */
+			}
 		} while (ABS(a->ob_size) != 0);
 		Py_DECREF(a);
 	}
@@ -1543,14 +1560,13 @@ long_pow(PyObject *v, PyObject *w, PyObject *x)
 	
 	size_b = b->ob_size;
 	if (size_b < 0) {
-		if (a->ob_size)
-			PyErr_SetString(PyExc_ValueError,
-					"long integer to a negative power");
-		else
-			PyErr_SetString(PyExc_ZeroDivisionError,
-					"zero to a negative power");
-		z = NULL;
-		goto error;
+		/* Return a float.  This works because we know that
+		   this calls float_pow() which converts its
+		   arguments to double. */
+		Py_DECREF(a);
+		Py_DECREF(b);
+		Py_DECREF(c);
+		return PyFloat_Type.tp_as_number->nb_power(v, w, x);
 	}
 	z = (PyLongObject *)PyLong_FromLong(1L);
 	for (i = 0; i < size_b; ++i) {

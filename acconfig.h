@@ -86,6 +86,9 @@
 /* Define if you have GNU PTH threads */
 #undef HAVE_PTH
 
+/* Define if you have readline 4.2 */
+#undef HAVE_RL_COMPLETION_MATCHES
+
 /* Define if your compiler supports variable length function prototypes
    (e.g. void fprintf(FILE *, char *, ...);) *and* <stdarg.h> */
 #undef HAVE_STDARG_PROTOTYPES
@@ -112,6 +115,9 @@
 
 /* Define as the size of the unicode type. */
 #undef Py_UNICODE_SIZE
+
+/* Define if nice() returns success/failure instead of the new priority. */
+#undef HAVE_BROKEN_NICE
 
 /* Define if malloc(0) returns a NULL pointer */
 #undef MALLOC_ZERO_RETURNS_NULL

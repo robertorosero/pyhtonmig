@@ -112,14 +112,22 @@ gen_new(PyFrameObject *f)
 	}
 	gen->gi_frame = f;
 	gen->gi_running = 0;
+	PyObject_GC_Init(gen);
 	return (PyObject *)gen;
+}
+
+static int
+gen_traverse(genobject *gen, visitproc visit, void *arg)
+{
+	return visit((PyObject *)gen->gi_frame, arg);
 }
 
 static void
 gen_dealloc(genobject *gen)
 {
+	PyObject_GC_Fini(gen);
 	Py_DECREF(gen->gi_frame);
-	PyObject_DEL(gen);
+	PyObject_Del(gen);
 }
 
 static PyObject *
@@ -202,11 +210,12 @@ static struct memberlist gen_memberlist[] = {
 
 statichere PyTypeObject gentype = {
 	PyObject_HEAD_INIT(&PyType_Type)
-	0,			/* Number of items for varobject */
-	"generator",		/* Name of this type */
-	sizeof(genobject),	/* Basic object size */
-	0,			/* Item size for varobject */
-	(destructor)gen_dealloc,		/* tp_dealloc */
+	0,					/* ob_size */
+	"generator",				/* tp_name */
+	sizeof(genobject) + PyGC_HEAD_SIZE,	/* tp_basicsize */
+	0,					/* tp_itemsize */
+	/* methods */
+	(destructor)gen_dealloc, 		/* tp_dealloc */
 	0,					/* tp_print */
 	0, 					/* tp_getattr */
 	0,					/* tp_setattr */
@@ -221,10 +230,10 @@ statichere PyTypeObject gentype = {
 	PyObject_GenericGetAttr,		/* tp_getattro */
 	0,					/* tp_setattro */
 	0,					/* tp_as_buffer */
-	Py_TPFLAGS_DEFAULT,			/* tp_flags */
-	0,					/* tp_doc */
-	0,					/* tp_traverse */
-	0,					/* tp_clear */
+	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_GC,	/* tp_flags */
+ 	0,					/* tp_doc */
+ 	(traverseproc)gen_traverse,		/* tp_traverse */
+ 	0,					/* tp_clear */
 	0,					/* tp_richcompare */
 	0,					/* tp_weaklistoffset */
 	(getiterfunc)gen_getiter,		/* tp_iter */
