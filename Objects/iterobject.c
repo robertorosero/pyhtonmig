@@ -70,7 +70,7 @@ PyTypeObject PyIter_Type = {
 	0,					/* tp_as_sequence */
 	0,					/* tp_as_mapping */
 	0,					/* tp_hash */
-	iter_call,				/* tp_call */
+	(ternaryfunc)iter_call,			/* tp_call */
 	0,					/* tp_str */
 	0,					/* tp_getattro */
 	0,					/* tp_setattro */
@@ -124,13 +124,10 @@ calliter_call(calliterobject *it, PyObject *args)
 		}
 	}
 	else {
-		if (PyErr_ExceptionMatches(it->it_sentinel))
-			PyErr_SetObject(PyExc_IndexError, Py_None);
-		else if (PyErr_ExceptionMatches(PyExc_IndexError) &&
-		      !PyErr_GivenExceptionMatches(
-				PyExc_IndexError, it->it_sentinel))
+		if (PyErr_ExceptionMatches(PyExc_IndexError))
 			PyErr_SetString(PyExc_TypeError,
-				"callable in iterator raised unexpected IndexError");
+					"callable in iterator raised "
+					"unexpected IndexError");
 	}
 	return result;
 }
@@ -152,7 +149,7 @@ PyTypeObject PyCallIter_Type = {
 	0,					/* tp_as_sequence */
 	0,					/* tp_as_mapping */
 	0,					/* tp_hash */
-	calliter_call,				/* tp_call */
+	(ternaryfunc)calliter_call,		/* tp_call */
 	0,					/* tp_str */
 	0,					/* tp_getattro */
 	0,					/* tp_setattro */
