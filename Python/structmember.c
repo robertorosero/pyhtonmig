@@ -144,6 +144,11 @@ setmember(addr, mlist, name, v)
 				err_setstr(TypeError, "readonly attribute");
 				return -1;
 			}
+			if (v == NULL && l->type != T_OBJECT) {
+				err_setstr(TypeError,
+				  "can't delete numeric/char attribute");
+				return -1;
+			}
 			addr += l->offset;
 			switch (l->type) {
 			case T_BYTE:
