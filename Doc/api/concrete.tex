@@ -85,7 +85,7 @@ This section describes Python type objects and the singleton object
 
 \subsection{The None Object \label{noneObject}}
 
-\obindex{None@\texttt{None}}
+\obindex{None}
 Note that the \ctype{PyTypeObject} for \code{None} is not directly
 exposed in the Python/C API.  Since \code{None} is a singleton,
 testing for object identity (using \samp{==} in C) is sufficient.
@@ -175,7 +175,7 @@ There is no \cfunction{PyNone_Check()} function for the same reason.
   \versionadded{2.3}
 \end{cfuncdesc}
 
-\begin{cfuncdesc}{unsigned long}{PyInt_AsUnsignedLongLongMask}{PyObject *io}
+\begin{cfuncdesc}{unsigned long long}{PyInt_AsUnsignedLongLongMask}{PyObject *io}
   Will first attempt to cast the object to a \ctype{PyIntObject} or
   \ctype{PyLongObject}, if it is not already one, and then return its
   value as unsigned long long, without checking for overflow.
@@ -188,6 +188,39 @@ There is no \cfunction{PyNone_Check()} function for the same reason.
   header files).
 \end{cfuncdesc}
 
+
+\subsubsection{Boolean Objects \label{boolObjects}}
+
+Booleans in Python are implemented as a subclass of integers.  There
+are only two booleans, \constant{Py_False} and \constant{Py_True}.  As
+such, the normal creation and deletion functions don't apply to
+booleans.  The following macros are available, however.
+
+\begin{cfuncdesc}{int}{PyBool_Check}{PyObject* o}
+  Returns true if \var{o} is of type \cdata{PyBool_Type}.
+  \versionadded{2.3}
+\end{cfuncdesc}
+
+\begin{cvardesc}{PyObject*}{Py_False}
+  The Python \code{False} object.  This object has no methods.  It needs to
+  be treated just like any other object with respect to reference counts.
+\end{cvardesc}
+
+\begin{cvardesc}{PyObject*}{Py_True}
+  The Python \code{True} object.  This object has no methods.  It needs to
+  be treated just like any other object with respect to reference counts.
+\end{cvardesc}
+
+\begin{cfuncdesc}{int}{PyBool_Check}{PyObject* o}
+  Returns true if \var{o} is of type \cdata{PyBool_Type}.
+  \versionadded{2.3}
+\end{cfuncdesc}
+
+\begin{cfuncdesc}{int}{PyBool_FromLong}{long v}
+Returns \constant{Py_True} or \constant{Py_False} depending on the
+truth value of \var{v}.
+\versionadded{2.3}
+\end{cfuncdesc}
 
 \subsection{Long Integer Objects \label{longObjects}}
 
@@ -1112,7 +1145,7 @@ These are the UTF-16 codec APIs:
 
 % --- Unicode-Escape Codecs ----------------------------------------------
 
-These are the ``Unicode Esacpe'' codec APIs:
+These are the ``Unicode Escape'' codec APIs:
 
 \begin{cfuncdesc}{PyObject*}{PyUnicode_DecodeUnicodeEscape}{const char *s,
                                                int size,
@@ -1138,13 +1171,13 @@ These are the ``Unicode Esacpe'' codec APIs:
 
 % --- Raw-Unicode-Escape Codecs ------------------------------------------
 
-These are the ``Raw Unicode Esacpe'' codec APIs:
+These are the ``Raw Unicode Escape'' codec APIs:
 
 \begin{cfuncdesc}{PyObject*}{PyUnicode_DecodeRawUnicodeEscape}{const char *s,
                                                int size,
                                                const char *errors}
   Creates a Unicode object by decoding \var{size} bytes of the
-  Raw-Unicode-Esacpe encoded string \var{s}.  Returns \NULL{} if an
+  Raw-Unicode-Escape encoded string \var{s}.  Returns \NULL{} if an
   exception was raised by the codec.
 \end{cfuncdesc}
 
@@ -1325,7 +1358,7 @@ machine running the codec.
 
 The following APIs are capable of handling Unicode objects and strings
 on input (we refer to them as strings in the descriptions) and return
-Unicode objects or integers as apporpriate.
+Unicode objects or integers as appropriate.
 
 They all return \NULL{} or \code{-1} if an exception occurs.
 
@@ -1658,7 +1691,15 @@ format.
 \end{cvardesc}
 
 \begin{cfuncdesc}{int}{PyList_Check}{PyObject *p}
-  Returns true if its argument is a \ctype{PyListObject}.
+  Returns true if \var{p} is a list object or an instance of a
+  subtype of the list type.
+  \versionchanged[Allowed subtypes to be accepted]{2.2}
+\end{cfuncdesc}
+
+\begin{cfuncdesc}{int}{PyList_CheckExact}{PyObject *p}
+  Return true if \var{p} is a list object, but not an instance of a
+  subtype of the list type.
+  \versionadded{2.2}
 \end{cfuncdesc}
 
 \begin{cfuncdesc}{PyObject*}{PyList_New}{int len}
@@ -1733,8 +1774,10 @@ format.
                                         PyObject *itemlist}
   Sets the slice of \var{list} between \var{low} and \var{high} to the
   contents of \var{itemlist}.  Analogous to
-  \code{\var{list}[\var{low}:\var{high}] = \var{itemlist}}.  Returns
-  \code{0} on success, \code{-1} on failure.
+  \code{\var{list}[\var{low}:\var{high}] = \var{itemlist}}.
+  The \var{itemlist} may be \NULL{}, indicating the assignment
+  of an empty list (slice deletion).
+  Returns \code{0} on success, \code{-1} on failure.
 \end{cfuncdesc}
 
 \begin{cfuncdesc}{int}{PyList_Sort}{PyObject *list}
@@ -1776,7 +1819,9 @@ format.
 \end{cvardesc}
 
 \begin{cfuncdesc}{int}{PyDict_Check}{PyObject *p}
-  Returns true if its argument is a \ctype{PyDictObject}.
+  Returns true if \var{p} is a dict object or an instance of a
+  subtype of the dict type.
+  \versionchanged[Allowed subtypes to be accepted]{2.2}
 \end{cfuncdesc}
 
 \begin{cfuncdesc}{PyObject*}{PyDict_New}{}
@@ -2223,7 +2268,7 @@ There are only a few functions special to module objects.
 \end{cfuncdesc}
 
 \begin{cfuncdesc}{int}{PyModule_AddIntConstant}{PyObject *module,
-                                                char *name, int value}
+                                                char *name, long value}
   Add an integer constant to \var{module} as \var{name}.  This
   convenience function can be used from the module's initialization
   function. Returns \code{-1} on error, \code{0} on success.
@@ -2322,6 +2367,11 @@ They are found in the dictionary of type objects.
   \versionadded{2.2}
 \end{cfuncdesc}
 
+\begin{cfuncdesc}{PyObject*}{PyDescr_NewClassMethod}{PyTypeObject *type,
+						     PyMethodDef *method}
+  \versionadded{2.3}
+\end{cfuncdesc}
+
 \begin{cfuncdesc}{int}{PyDescr_IsData}{PyObject *descr}
   Returns true if the descriptor objects \var{descr} describes a data
   attribute, or false if it describes a method.  \var{descr} must be a
@@ -2417,7 +2467,7 @@ acts as a proxy for the original object as much as it can.
   object; an existing reference object may be returned.  The second
   parameter, \var{callback}, can be a callable object that receives
   notification when \var{ob} is garbage collected; it should accept a
-  single paramter, which will be the weak reference object itself.
+  single parameter, which will be the weak reference object itself.
   \var{callback} may also be \code{None} or \NULL.  If \var{ob}
   is not a weakly-referencable object, or if \var{callback} is not
   callable, \code{None}, or \NULL, this will return \NULL{} and
@@ -2432,7 +2482,7 @@ acts as a proxy for the original object as much as it can.
   a new object; an existing proxy object may be returned.  The second
   parameter, \var{callback}, can be a callable object that receives
   notification when \var{ob} is garbage collected; it should accept a
-  single paramter, which will be the weak reference object itself.
+  single parameter, which will be the weak reference object itself.
   \var{callback} may also be \code{None} or \NULL.  If \var{ob} is not
   a weakly-referencable object, or if \var{callback} is not callable,
   \code{None}, or \NULL, this will return \NULL{} and raise
@@ -2536,7 +2586,7 @@ when accessed.  Cell objects are not likely to be useful elsewhere.
 
 \begin{cfuncdesc}{PyObject*}{PyCell_GET}{PyObject *cell}
   Return the contents of the cell \var{cell}, but without checking
-  that \var{cell} is non-\NULL{} and a call object.
+  that \var{cell} is non-\NULL{} and a cell object.
 \end{cfuncdesc}
 
 \begin{cfuncdesc}{int}{PyCell_Set}{PyObject *cell, PyObject *value}

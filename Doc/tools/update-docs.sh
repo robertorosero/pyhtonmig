@@ -7,7 +7,7 @@
 # and removes it when done.
 
 if [ -z "$HOME" ] ; then
-    HOME=`grep fdrake /etc/passwd | sed 's|^.*:\([^:]*\):[^:]*$|\1|'`
+    HOME=`grep "$LOGNAME" /etc/passwd | sed 's|^.*:\([^:]*\):[^:]*$|\1|'`
     export HOME
 fi
 
@@ -28,4 +28,4 @@ fi
 mv $TMPDIR/Python-Docs-* $DOCTYPE
 rmdir $TMPDIR
 rm -rf $DOCTYPE-temp || exit $?
-rm "$UPDATES" || exit $?
+mv "$UPDATES" python-docs-$DOCTYPE.tar.bz2 || exit $?

@@ -107,6 +107,9 @@ PYTHONFRAMEWORK=	@PYTHONFRAMEWORK@
 PYTHONFRAMEWORKDIR=	@PYTHONFRAMEWORKDIR@
 PYTHONFRAMEWORKPREFIX=	@PYTHONFRAMEWORKPREFIX@
 PYTHONFRAMEWORKINSTALLDIR= @PYTHONFRAMEWORKINSTALLDIR@
+# Deployment target selected during configure, to be checked
+# by distutils
+CONFIGURE_MACOSX_DEPLOYMENT_TARGET=@CONFIGURE_MACOSX_DEPLOYMENT_TARGET@
 # Options to enable prebinding (for fast startup)
 OTHER_LIBTOOL_OPT = -prebind -seg1addr 0x10000000
 
@@ -345,7 +348,7 @@ $(LIBRARY): $(LIBRARY_OBJS)
 
 libpython$(VERSION).so: $(LIBRARY_OBJS)
 	if test $(INSTSONAME) != $(LDLIBRARY); then \
-		$(LDSHARED) -Wl,-soname=$(INSTSONAME) -o $(INSTSONAME) $(LIBRARY_OBJS) $(SHLIBS) $(LIBC) $(LIBM); \
+		$(LDSHARED) -Wl,-h$(INSTSONAME) -o $(INSTSONAME) $(LIBRARY_OBJS) $(SHLIBS) $(LIBC) $(LIBM); \
 		$(LN) -f $(INSTSONAME) $@; \
 	else\
 		$(LDSHARED) -o $@ $(LIBRARY_OBJS) $(SHLIBS) $(LIBC) $(LIBM); \
@@ -609,6 +612,9 @@ altbininstall:	$(BUILDPYTHON)
 			$(INSTALL_SHARED) libpython$(VERSION)$(SO) $(DESTDIR)$(BINDIR); \
 		else \
 			$(INSTALL_SHARED) libpython$(VERSION)$(SO) $(DESTDIR)$(LIBDIR)/$(INSTSONAME); \
+			if test libpython$(VERSION)$(SO) != $(INSTSONAME); then \
+				(cd $(DESTDIR)$(LIBDIR); $(LN) -sf $(INSTSONAME) libpython$(VERSION)$(SO)); \
+			fi \
 		fi; \
 	else	true; \
 	fi
@@ -866,13 +872,13 @@ frameworkinstallmaclib:
 frameworkinstallapps:
 	$(MAKE) -f $(srcdir)/Mac/OSX/Makefile installapps \
 		$(RUNSHARED) BUILDPYTHON=./$(BUILDPYTHON) DIRMODE=$(DIRMODE) FILEMODE=$(FILEMODE) \
-		srcdir=$(srcdir) builddir=. DESTDIR=$(DESTDIR)
+		srcdir=$(srcdir) builddir=. DESTDIR=$(DESTDIR) prefix=$(prefix)
 
 # This install the unix python and pythonw tools in /usr/local/bin
 frameworkinstallunixtools:
 	$(MAKE) -f $(srcdir)/Mac/OSX/Makefile installunixtools \
 		DIRMODE=$(DIRMODE) FILEMODE=$(FILEMODE) \
-		srcdir=$(srcdir) builddir=. DESTDIR=$(DESTDIR)
+		srcdir=$(srcdir) builddir=. DESTDIR=$(DESTDIR) prefix=$(prefix)
 
 # This installs the Demos and Tools into the applications directory.
 # It is not part of a normal frameworkinstall

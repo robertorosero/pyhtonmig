@@ -29,7 +29,7 @@ except ImportError:
 try:
     import locale
     locale.setlocale(locale.LC_CTYPE, "")
-except ImportError:
+except (ImportError, locale.Error):
     pass
 
 encoding = "ascii"
@@ -48,7 +48,7 @@ else:
         # resulting codeset may be unknown to Python. We ignore all
         # these problems, falling back to ASCII
         encoding = locale.nl_langinfo(locale.CODESET)
-        if encoding is None:
+        if encoding is None or encoding is '':
             # situation occurs on Mac OS X
             encoding = 'ascii'
         codecs.lookup(encoding)
@@ -58,7 +58,7 @@ else:
         # bugs that can cause ValueError.
         try:
             encoding = locale.getdefaultlocale()[1]
-            if encoding is None:
+            if encoding is None or encoding is '':
                 # situation occurs on Mac OS X
                 encoding = 'ascii'
             codecs.lookup(encoding)
@@ -252,6 +252,9 @@ class IOBinding:
         firsteol = self.eol_re.search(chars)
         if firsteol:
             self.eol_convention = firsteol.group(0)
+            if isinstance(self.eol_convention, unicode):
+                # Make sure it is an ASCII string
+                self.eol_convention = self.eol_convention.encode("ascii")
             chars = self.eol_re.sub(r"\n", chars)
 
         self.text.delete("1.0", "end")

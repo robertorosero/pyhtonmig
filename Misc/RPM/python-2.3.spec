@@ -25,14 +25,17 @@
 %define config_ipv6 yes
 %define config_ipv6 no
 
+#  Location of the HTML directory.
+%define config_htmldir /var/www/html/python
+
 #################################
 #  End of user-modifiable configs
 #################################
 
 %define name python
-%define version 2.3b1
+%define version 2.3.5
 %define libvers 2.3
-%define release 1pydotorg
+%define release 4pydotorg
 %define __prefix /usr
 
 #  kludge to get around rpm <percent>define weirdness
@@ -40,6 +43,10 @@
 %define pymalloc %(if [ "%{config_pymalloc}" = yes ]; then echo --with-pymalloc; else echo --without-pymalloc; fi)
 %define binsuffix %(if [ "%{config_binsuffix}" = none ]; then echo ; else echo "%{config_binsuffix}"; fi)
 %define include_tkinter %(if [ \\( "%{config_tkinter}" = auto -a -f /usr/bin/wish \\) -o "%{config_tkinter}" = yes ]; then echo 1; else echo 0; fi)
+%define libdirname %(( uname -m | egrep -q '_64$' && [ -d /usr/lib64 ] && echo lib64 ) || echo lib)
+
+#  detect if documentation is available
+%define include_docs %(if [ -f "%{_sourcedir}/html-%{version}.tar.bz2" ]; then echo 1; else echo 0; fi)
 
 Summary: An interpreted, interactive, object-oriented programming language.
 Name: %{name}%{binsuffix}
@@ -48,10 +55,10 @@ Release: %{release}
 Copyright: Modified CNRI Open Source License
 Group: Development/Languages
 Source: Python-%{version}.tgz
+%if %{include_docs}
 Source1: html-%{version}.tar.bz2
-Patch0: Python-2.1-pythonpath.patch
-#Patch1: Python-2.1-expat.patch
-BuildRoot: /var/tmp/%{name}-%{version}-root
+%endif
+BuildRoot: %{_tmppath}/%{name}-%{version}-root
 BuildPrereq: expat-devel
 BuildPrereq: db4-devel
 BuildPrereq: gdbm-devel
@@ -113,6 +120,7 @@ Install python-tools if you want to use these tools to develop
 Python programs.  You will also need to install the python and
 tkinter packages.
 
+%if %{include_docs}
 %package docs
 Summary: Python-related documentation.
 Group: Development/Documentation
@@ -120,8 +128,37 @@ Group: Development/Documentation
 %description docs
 Documentation relating to the Python programming language in HTML and info
 formats.
+%endif
 
 %changelog
+* Tue Jan 04 2005 Sean Reifschneider <jafo-rpms@tummy.com> [2.3.4-4pydotorg]
+- Changing the idle wrapper so that it passes arguments to idle.
+
+* Thu Jul 22 2004 Sean Reifschneider <jafo-rpms@tummy.com> [2.3.4-3pydotorg]
+- Paul Tiemann fixes for %{prefix}.
+- Adding permission changes for directory as suggested by reimeika.ca
+- Adding code to detect when it should be using lib64.
+- Adding a define for the location of /var/www/html for docs.
+
+* Thu May 27 2004 Sean Reifschneider <jafo-rpms@tummy.com> [2.3.4-2pydotorg]
+- Including changes from Ian Holsman to build under Red Hat 7.3.
+- Fixing some problems with the /usr/local path change.
+
+* Sat Mar 27 2004 Sean Reifschneider <jafo-rpms@tummy.com> [2.3.2-3pydotorg]
+- Being more agressive about finding the paths to fix for
+  #!/usr/local/bin/python.
+
+* Sat Feb 07 2004 Sean Reifschneider <jafo-rpms@tummy.com> [2.3.3-2pydotorg]
+- Adding code to remove "#!/usr/local/bin/python" from particular files and
+  causing the RPM build to terminate if there are any unexpected files
+  which have that line in them.
+
+* Mon Oct 13 2003 Sean Reifschneider <jafo-rpms@tummy.com> [2.3.2-1pydotorg]
+- Adding code to detect wether documentation is available to build.
+
+* Fri Sep 19 2003 Sean Reifschneider <jafo-rpms@tummy.com> [2.3.1-1pydotorg]
+- Updating to the 2.3.1 release.
+
 * Mon Feb 24 2003 Sean Reifschneider <jafo-rpms@tummy.com> [2.3b1-1pydotorg]
 - Updating to 2.3b1 release.
 
@@ -175,14 +212,12 @@ formats.
 #######
 %prep
 %setup -n Python-%{version}
-%patch0 -p1
-#%patch1
 
 ########
 #  BUILD
 ########
 %build
-./configure %{ipv6} %{pymalloc} --prefix=%{__prefix}
+./configure --enable-unicode=ucs4 %{ipv6} %{pymalloc} --prefix=%{__prefix}
 make
 
 ##########
@@ -191,10 +226,10 @@ make
 %install
 #  set the install path
 echo '[install_scripts]' >setup.cfg
-echo 'install_dir='"${RPM_BUILD_ROOT}/usr/bin" >>setup.cfg
+echo 'install_dir='"${RPM_BUILD_ROOT}%{__prefix}/bin" >>setup.cfg
 
 [ -d "$RPM_BUILD_ROOT" -a "$RPM_BUILD_ROOT" != "/" ] && rm -rf $RPM_BUILD_ROOT
-mkdir -p $RPM_BUILD_ROOT%{__prefix}/lib/python%{libvers}/lib-dynload
+mkdir -p $RPM_BUILD_ROOT%{__prefix}/%{libdirname}/python%{libvers}/lib-dynload
 make prefix=$RPM_BUILD_ROOT%{__prefix} install
 
 #  REPLACE PATH IN PYDOC
@@ -203,7 +238,7 @@ then
    (
       cd $RPM_BUILD_ROOT%{__prefix}/bin
       mv pydoc pydoc.old
-      sed 's|#!.*|#!/usr/bin/env python'%{binsuffix}'|' \
+      sed 's|#!.*|#!%{__prefix}/bin/env python'%{binsuffix}'|' \
             pydoc.old >pydoc
       chmod 755 pydoc
       rm -f pydoc.old
@@ -222,14 +257,17 @@ fi
 
 ########
 #  Tools
-echo '#!/bin/bash' >${RPM_BUILD_ROOT}%{_bindir}/idle%{binsuffix}
-echo 'exec %{_prefix}/bin/python%{binsuffix} /usr/lib/python%{libvers}/Tools/idle/idle.py' >>$RPM_BUILD_ROOT%{_bindir}/idle%{binsuffix}
-chmod 755 $RPM_BUILD_ROOT%{_bindir}/idle%{binsuffix}
-cp -a Tools $RPM_BUILD_ROOT%{_prefix}/lib/python%{libvers}
+echo '#!%{__prefix}/bin/env python%{binsuffix}' >${RPM_BUILD_ROOT}%{__prefix}/bin/idle%{binsuffix}
+echo 'import os, sys' >>${RPM_BUILD_ROOT}%{__prefix}/bin/idle%{binsuffix}
+echo 'os.execvp("%{__prefix}/bin/python%{binsuffix}", ["%{__prefix}/bin/python%{binsuffix}", "%{__prefix}/lib/python%{libvers}/idlelib/idle.py"] + sys.argv[1:])' >>${RPM_BUILD_ROOT}%{__prefix}/bin/idle%{binsuffix}
+echo 'print "Failed to exec Idle"' >>${RPM_BUILD_ROOT}%{__prefix}/bin/idle%{binsuffix}
+echo 'sys.exit(1)' >>${RPM_BUILD_ROOT}%{__prefix}/bin/idle%{binsuffix}
+chmod 755 $RPM_BUILD_ROOT%{__prefix}/bin/idle%{binsuffix}
+cp -a Tools $RPM_BUILD_ROOT%{__prefix}/%{libdirname}/python%{libvers}
 
 #  MAKE FILE LISTS
 rm -f mainpkg.files
-find "$RPM_BUILD_ROOT""%{__prefix}"/lib/python%{libvers}/lib-dynload -type f |
+find "$RPM_BUILD_ROOT""%{__prefix}"/%{libdirname}/python%{libvers}/lib-dynload -type f |
 	sed "s|^${RPM_BUILD_ROOT}|/|" |
 	grep -v -e '_tkinter.so$' >mainpkg.files
 find "$RPM_BUILD_ROOT""%{__prefix}"/bin -type f |
@@ -237,23 +275,57 @@ find "$RPM_BUILD_ROOT""%{__prefix}"/bin -type f |
 	grep -v -e '/bin/idle%{binsuffix}$' >>mainpkg.files
 
 rm -f tools.files
-find "$RPM_BUILD_ROOT""%{__prefix}"/lib/python%{libvers}/Tools -type f |
-	sed "s|^${RPM_BUILD_ROOT}|/|" >tools.files
+find "$RPM_BUILD_ROOT""%{__prefix}"/%{libdirname}/python%{libvers}/idlelib \
+      "$RPM_BUILD_ROOT""%{__prefix}"/%{libdirname}/python%{libvers}/Tools -type f |
+      sed "s|^${RPM_BUILD_ROOT}|/|" >tools.files
 echo "%{__prefix}"/bin/idle%{binsuffix} >>tools.files
 
 ######
 # Docs
-mkdir -p "$RPM_BUILD_ROOT"/var/www/html/python
+%if %{include_docs}
+mkdir -p "$RPM_BUILD_ROOT"%{config_htmldir}
 (
-   cd "$RPM_BUILD_ROOT"/var/www/html/python
+   cd "$RPM_BUILD_ROOT"%{config_htmldir}
    bunzip2 < %{SOURCE1} | tar x
 )
+%endif
+
+#  fix the #! line in installed files
+find "$RPM_BUILD_ROOT" -type f -print0 |
+      xargs -0 grep -l /usr/local/bin/python | while read file
+do
+   FIXFILE="$file"
+   sed 's|^#!.*python|#!%{__prefix}/bin/env python'"%{binsuffix}"'|' \
+         "$FIXFILE" >/tmp/fix-python-path.$$
+   cat /tmp/fix-python-path.$$ >"$FIXFILE"
+   rm -f /tmp/fix-python-path.$$
+done
+
+#  check to see if there are any straggling #! lines
+find "$RPM_BUILD_ROOT" -type f | xargs egrep -n '^#! */usr/local/bin/python' \
+      | grep ':1:#!' >/tmp/python-rpm-files.$$ || true
+if [ -s /tmp/python-rpm-files.$$ ]
+then
+   echo '*****************************************************'
+   cat /tmp/python-rpm-files.$$
+   cat <<@EOF
+   *****************************************************
+     There are still files referencing /usr/local/bin/python in the
+     install directory.  They are listed above.  Please fix the .spec
+     file and try again.  If you are an end-user, you probably want
+     to report this to jafo-rpms@tummy.com as well.
+   *****************************************************
+@EOF
+   rm -f /tmp/python-rpm-files.$$
+   exit 1
+fi
+rm -f /tmp/python-rpm-files.$$
 
 ########
 #  CLEAN
 ########
 %clean
-rm -fr $RPM_BUILD_ROOT
+[ -n "$RPM_BUILD_ROOT" -a "$RPM_BUILD_ROOT" != / ] && rm -rf $RPM_BUILD_ROOT
 rm -f mainpkg.files tools.files
 
 ########
@@ -263,33 +335,32 @@ rm -f mainpkg.files tools.files
 %defattr(-,root,root)
 %doc Misc/README Misc/cheatsheet Misc/Porting
 %doc LICENSE Misc/ACKS Misc/HISTORY Misc/NEWS
-%{__prefix}/man/man1/python%{binsuffix}.1.gz
+%{__prefix}/man/man1/python%{binsuffix}.1*
 
-%dir %{__prefix}/include/python%{libvers}
-%dir %{__prefix}/lib/python%{libvers}/
-%{__prefix}/lib/python%{libvers}/*.txt
-%{__prefix}/lib/python%{libvers}/*.py*
-%{__prefix}/lib/python%{libvers}/pdb.doc
-%{__prefix}/lib/python%{libvers}/profile.doc
-%{__prefix}/lib/python%{libvers}/curses
-%{__prefix}/lib/python%{libvers}/distutils
-%{__prefix}/lib/python%{libvers}/encodings
-%dir %{__prefix}/lib/python%{libvers}/lib-old
-%{__prefix}/lib/python%{libvers}/plat-linux2
-%{__prefix}/lib/python%{libvers}/site-packages
-%{__prefix}/lib/python%{libvers}/test
-%{__prefix}/lib/python%{libvers}/xml
-%{__prefix}/lib/python%{libvers}/email
-%{__prefix}/lib/python%{libvers}/compiler
-%{__prefix}/lib/python%{libvers}/bsddb
-%{__prefix}/lib/python%{libvers}/hotshot
-%{__prefix}/lib/python%{libvers}/logging
-%{__prefix}/lib/python%{libvers}/lib-old
+%attr(755,root,root) %dir %{__prefix}/include/python%{libvers}
+%attr(755,root,root) %dir %{__prefix}/%{libdirname}/python%{libvers}/
+%{__prefix}/%{libdirname}/python%{libvers}/*.txt
+%{__prefix}/%{libdirname}/python%{libvers}/*.py*
+%{__prefix}/%{libdirname}/python%{libvers}/pdb.doc
+%{__prefix}/%{libdirname}/python%{libvers}/profile.doc
+%{__prefix}/%{libdirname}/python%{libvers}/curses
+%{__prefix}/%{libdirname}/python%{libvers}/distutils
+%{__prefix}/%{libdirname}/python%{libvers}/encodings
+%{__prefix}/%{libdirname}/python%{libvers}/plat-linux2
+%{__prefix}/%{libdirname}/python%{libvers}/site-packages
+%{__prefix}/%{libdirname}/python%{libvers}/test
+%{__prefix}/%{libdirname}/python%{libvers}/xml
+%{__prefix}/%{libdirname}/python%{libvers}/email
+%{__prefix}/%{libdirname}/python%{libvers}/compiler
+%{__prefix}/%{libdirname}/python%{libvers}/bsddb
+%{__prefix}/%{libdirname}/python%{libvers}/hotshot
+%{__prefix}/%{libdirname}/python%{libvers}/logging
+%{__prefix}/%{libdirname}/python%{libvers}/lib-old
 
 %files devel
 %defattr(-,root,root)
 %{__prefix}/include/python%{libvers}/*.h
-%{__prefix}/lib/python%{libvers}/config
+%{__prefix}/%{libdirname}/python%{libvers}/config
 
 %files -f tools.files tools
 %defattr(-,root,root)
@@ -297,10 +368,12 @@ rm -f mainpkg.files tools.files
 %if %{include_tkinter}
 %files tkinter
 %defattr(-,root,root)
-%{__prefix}/lib/python%{libvers}/lib-tk
-%{__prefix}/lib/python%{libvers}/lib-dynload/_tkinter.so*
+%{__prefix}/%{libdirname}/python%{libvers}/lib-tk
+%{__prefix}/%{libdirname}/python%{libvers}/lib-dynload/_tkinter.so*
 %endif
 
+%if %{include_docs}
 %files docs
 %defattr(-,root,root)
-/var/www/html/python/*
+%{config_htmldir}/*
+%endif

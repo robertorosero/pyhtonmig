@@ -17,7 +17,7 @@ Options:
 
     --class classname
     -c classname
-        Use `classname' as the concrete SMTP proxy class.  Uses `SMTPProxy' by
+        Use `classname' as the concrete SMTP proxy class.  Uses `PureProxy' by
         default.
 
     --debug
@@ -61,7 +61,7 @@ and if remoteport is not given, then 25 is used.
 #
 # Please note that this script requires Python 2.0
 #
-# Author: Barry Warsaw <barry@digicool.com>
+# Author: Barry Warsaw <barry@python.org>
 #
 # TODO:
 #
@@ -346,6 +346,7 @@ class PureProxy(SMTPServer):
         refused = self._deliver(mailfrom, rcpttos, data)
         # TBD: what to do with refused addresses?
         print >> DEBUGSTREAM, 'we got some refusals:', refused
+        return refused
 
     def _deliver(self, mailfrom, rcpttos, data):
         import smtplib

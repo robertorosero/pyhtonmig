@@ -14,7 +14,7 @@
 This module defines two classes for implementing HTTP servers
 (Web servers). Usually, this module isn't used directly, but is used
 as a basis for building functioning Web servers. See the
-\module{SimpleHTTPServer}\refstmodindex{SimpleHTTPServer} and
+\refmodule{SimpleHTTPServer}\refstmodindex{SimpleHTTPServer} and
 \refmodule{CGIHTTPServer}\refstmodindex{CGIHTTPServer} modules.
 
 The first class, \class{HTTPServer}, is a
@@ -180,13 +180,13 @@ respectively.
 \end{methoddesc}
 
 \begin{methoddesc}{send_header}{keyword, value}
-Writes a specific MIME header to the output stream. \var{keyword}
+Writes a specific HTTP header to the output stream. \var{keyword}
 should specify the header keyword, with \var{value} specifying
 its value.
 \end{methoddesc}
 
 \begin{methoddesc}{end_headers}{}
-Sends a blank line, indicating the end of the MIME headers in
+Sends a blank line, indicating the end of the HTTP headers in
 the response.
 \end{methoddesc}
 

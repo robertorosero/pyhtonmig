@@ -227,7 +227,10 @@ class dispatcher:
                 status.append('%s:%d' % self.addr)
             except TypeError:
                 status.append(repr(self.addr))
-        return '<%s at %#x>' % (' '.join(status), id(self))
+        # On some systems (RH10) id() can be a negative number. 
+        # work around this.
+        MAX = 2L*sys.maxint+1
+        return '<%s at %#x>' % (' '.join(status), id(self)&MAX)
 
     def add_channel(self, map=None):
         #self.log_info('adding channel %s' % self)
@@ -497,7 +500,7 @@ def close_all(map=None):
 #
 # After a little research (reading man pages on various unixen, and
 # digging through the linux kernel), I've determined that select()
-# isn't meant for doing doing asynchronous file i/o.
+# isn't meant for doing asynchronous file i/o.
 # Heartening, though - reading linux/mm/filemap.c shows that linux
 # supports asynchronous read-ahead.  So _MOST_ of the time, the data
 # will be sitting in memory for us already when we go to read it.

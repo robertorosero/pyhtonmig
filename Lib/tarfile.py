@@ -174,39 +174,46 @@ def copyfileobj(src, dst, length=None):
     return
 
 filemode_table = (
-    (S_IFLNK, "l",
-     S_IFREG, "-",
-     S_IFBLK, "b",
-     S_IFDIR, "d",
-     S_IFCHR, "c",
-     S_IFIFO, "p"),
-    (TUREAD,  "r"),
-    (TUWRITE, "w"),
-    (TUEXEC,  "x", TSUID, "S", TUEXEC|TSUID, "s"),
-    (TGREAD,  "r"),
-    (TGWRITE, "w"),
-    (TGEXEC,  "x", TSGID, "S", TGEXEC|TSGID, "s"),
-    (TOREAD,  "r"),
-    (TOWRITE, "w"),
-    (TOEXEC,  "x", TSVTX, "T", TOEXEC|TSVTX, "t"))
+    ((S_IFLNK,      "l"),
+     (S_IFREG,      "-"),
+     (S_IFBLK,      "b"),
+     (S_IFDIR,      "d"),
+     (S_IFCHR,      "c"),
+     (S_IFIFO,      "p")),
+
+    ((TUREAD,       "r"),),
+    ((TUWRITE,      "w"),),
+    ((TUEXEC|TSUID, "s"),
+     (TSUID,        "S"),
+     (TUEXEC,       "x")),
+
+    ((TGREAD,       "r"),),
+    ((TGWRITE,      "w"),),
+    ((TGEXEC|TSGID, "s"),
+     (TSGID,        "S"),
+     (TGEXEC,       "x")),
+
+    ((TOREAD,       "r"),),
+    ((TOWRITE,      "w"),),
+    ((TOEXEC|TSVTX, "t"),
+     (TSVTX,        "T"),
+     (TOEXEC,       "x"))
+)
 
 def filemode(mode):
     """Convert a file's mode to a string of the form
        -rwxrwxrwx.
        Used by TarFile.list()
     """
-    s = ""
-    for t in filemode_table:
-        while True:
-            if mode & t[0] == t[0]:
-                s += t[1]
-            elif len(t) > 2:
-                t = t[2:]
-                continue
-            else:
-                s += "-"
-            break
-    return s
+    perm = []
+    for table in filemode_table:
+        for bit, char in table:
+            if mode & bit == bit:
+                perm.append(char)
+                break
+        else:
+            perm.append("-")
+    return "".join(perm)
 
 if os.sep != "/":
     normpath = lambda path: os.path.normpath(path).replace(os.sep, "/")
@@ -350,14 +357,14 @@ class _Stream:
         if self.closed:
             return
 
+        if self.mode == "w" and self.type != "tar":
+            self.buf += self.cmp.flush()
         if self.mode == "w" and self.buf:
-            if self.type != "tar":
-                self.buf += self.cmp.flush()
             self.fileobj.write(self.buf)
             self.buf = ""
             if self.type == "gz":
                 self.fileobj.write(struct.pack("<l", self.crc))
-                self.fileobj.write(struct.pack("<L", self.pos))
+                self.fileobj.write(struct.pack("<L", self.pos & 0xffffFFFFL))
 
         if not self._extfileobj:
             self.fileobj.close()
@@ -509,14 +516,12 @@ class ExFileObject(object):
             nl = min(nl, size)
         else:
             size -= len(self.linebuffer)
-            while nl < 0:
+            while (nl < 0 and size > 0):
                 buf = self.read(min(size, 100))
                 if not buf:
                     break
                 self.linebuffer += buf
                 size -= len(buf)
-                if size <= 0:
-                    break
                 nl = self.linebuffer.find("\n")
             if nl == -1:
                 s = self.linebuffer
@@ -649,7 +654,11 @@ class TarInfo(object):
         self.offset_data = 0       # the file's data starts here
 
     def __repr__(self):
-        return "<%s %r at %#x>" % (self.__class__.__name__,self.name,id(self))
+        # On some systems (RH10) id() can be a negative number. 
+        # work around this.
+        MAX = 2L*sys.maxint+1
+        return "<%s %r at %#x>" % (self.__class__.__name__,self.name,
+                                   id(self)&MAX)
 
     def frombuf(cls, buf):
         """Construct a TarInfo object from a 512 byte string buffer.

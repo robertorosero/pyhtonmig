@@ -555,8 +555,8 @@ For example:
 
 \begin{verbatim}
 Extension(...,
-          define_macros=[('NDEBUG', '1')],
-                         ('HAVE_STRFTIME', None),
+          define_macros=[('NDEBUG', '1'),
+                         ('HAVE_STRFTIME', None)],
           undef_macros=['HAVE_FOO', 'HAVE_BAR'])
 \end{verbatim}
 
@@ -805,7 +805,7 @@ On the other hand, this doesn't help the developer to find the cause
 of the failure. For this purpose, the DISTUTILS_DEBUG environment
 variable can be set to anything except an empty string, and distutils
 will now print detailed information what it is doing, and prints the
-full traceback in case an exception occurrs.
+full traceback in case an exception occurs.
 
 \section{Writing the Setup Configuration File}
 \label{setup-config}
@@ -1003,6 +1003,7 @@ into the source distribution:
 \item all C source files mentioned in the \option{ext\_modules} or
   \option{libraries} options (\XXX{getting C library sources currently
     broken -- no get\_source\_files() method in build\_clib.py!})
+\item scripts identified by the \option{scripts} option
 \item anything that looks like a test script: \file{test/test*.py}
   (currently, the Distutils don't do anything with test scripts except
   include them in source distributions, but in the future there will be
@@ -1461,7 +1462,7 @@ Some functions especially useful in this context are available in the
 installation script.
 
 \begin{verbatim}
-dir_created(pathname)
+directory_created(pathname)
 file_created(pathname)
 \end{verbatim}
 
@@ -1477,7 +1478,7 @@ get_special_folder_path(csidl_string)
 
 This function can be used to retrieve special folder locations on
 Windows like the Start Menu or the Desktop.  It returns the full path
-to the folder.  'csidl_string' must be on of the following strings:
+to the folder.  'csidl_string' must be one of the following strings:
 
 \begin{verbatim}
 "CSIDL_APPDATA"

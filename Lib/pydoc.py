@@ -104,12 +104,12 @@ def cram(text, maxlen):
         return text[:pre] + '...' + text[len(text)-post:]
     return text
 
+_re_stripid = re.compile(r' at 0x[0-9a-f]{6,}(>+)$', re.IGNORECASE)
 def stripid(text):
     """Remove the hexadecimal id from a Python object representation."""
-    # The behaviour of %p is implementation-dependent; we check two cases.
-    for pattern in [' at 0x[0-9a-f]{6,}(>+)$', ' at [0-9A-F]{8,}(>+)$']:
-        if re.search(pattern, repr(Exception)):
-            return re.sub(pattern, '\\1', text)
+    # The behaviour of %p is implementation-dependent in terms of case.
+    if _re_stripid.search(repr(Exception)):
+        return _re_stripid.sub(r'\1', text)
     return text
 
 def _is_some_method(object):
@@ -2056,8 +2056,16 @@ def gui():
 
     import Tkinter
     try:
-        gui = GUI(Tkinter.Tk())
-        Tkinter.mainloop()
+        root = Tkinter.Tk()
+        # Tk will crash if pythonw.exe has an XP .manifest
+        # file and the root has is not destroyed explicitly.
+        # If the problem is ever fixed in Tk, the explicit
+        # destroy can go.
+        try:
+            gui = GUI(root)
+            root.mainloop()
+        finally:
+            root.destroy()
     except KeyboardInterrupt:
         pass
 
@@ -2121,7 +2129,7 @@ def cli():
                 print value
 
     except (getopt.error, BadUsage):
-        cmd = sys.argv[0]
+        cmd = os.path.basename(sys.argv[0])
         print """pydoc - the Python documentation tool
 
 %s <name> ...

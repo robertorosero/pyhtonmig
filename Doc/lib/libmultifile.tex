@@ -17,7 +17,7 @@ it can be easily adapted for more general use.
 \begin{classdesc}{MultiFile}{fp\optional{, seekable}}
 Create a multi-file.  You must instantiate this class with an input
 object argument for the \class{MultiFile} instance to get lines from,
-such as as a file object returned by \function{open()}.
+such as a file object returned by \function{open()}.
 
 \class{MultiFile} only ever looks at the input object's
 \method{readline()}, \method{seek()} and \method{tell()} methods, and
@@ -121,7 +121,7 @@ ignores trailing whitespace.
 Turn a boundary string into an end-marker line.  By default, this
 method prepends \code{'-}\code{-'} and appends \code{'-}\code{-'} (like a
 MIME-multipart end-of-message marker) but it is declared so it can be
-be overridden in derived classes.  This method need not append LF or
+overridden in derived classes.  This method need not append LF or
 CR-LF, as comparison with the result ignores trailing whitespace.
 \end{methoddesc}
 

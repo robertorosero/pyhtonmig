@@ -42,8 +42,8 @@ corresponding Unix manual entries for more information on calls.");
 #include <io.h>
 #include <stdio.h>
 #include <process.h>
-#include "osdefs.h"
 #endif
+#include "osdefs.h"
 #endif
 
 #include <sys/types.h>
@@ -902,6 +902,66 @@ _pystat_fromstructstat(STRUCT_STAT st)
 	return v;
 }
 
+#ifdef MS_WINDOWS
+
+/* IsUNCRoot -- test whether the supplied path is of the form \\SERVER\SHARE\,
+   where / can be used in place of \ and the trailing slash is optional.
+   Both SERVER and SHARE must have at least one character.
+*/
+
+#define ISSLASHA(c) ((c) == '\\' || (c) == '/')
+#define ISSLASHW(c) ((c) == L'\\' || (c) == L'/')
+#define ARRAYSIZE(a) (sizeof(a) / sizeof(a[0]))
+
+static BOOL 
+IsUNCRootA(char *path, int pathlen)
+{
+	#define ISSLASH ISSLASHA
+
+	int i, share;
+
+	if (pathlen < 5 || !ISSLASH(path[0]) || !ISSLASH(path[1]))
+		/* minimum UNCRoot is \\x\y */
+		return FALSE;
+	for (i = 2; i < pathlen ; i++)
+		if (ISSLASH(path[i])) break;
+	if (i == 2 || i == pathlen)
+		/* do not allow \\\SHARE or \\SERVER */
+		return FALSE;
+	share = i+1;
+	for (i = share; i < pathlen; i++)
+		if (ISSLASH(path[i])) break;
+	return (i != share && (i == pathlen || i == pathlen-1));
+
+	#undef ISSLASH
+}
+
+#ifdef Py_WIN_WIDE_FILENAMES
+static BOOL 
+IsUNCRootW(Py_UNICODE *path, int pathlen)
+{
+	#define ISSLASH ISSLASHW
+
+	int i, share;
+
+	if (pathlen < 5 || !ISSLASH(path[0]) || !ISSLASH(path[1]))
+		/* minimum UNCRoot is \\x\y */
+		return FALSE;
+	for (i = 2; i < pathlen ; i++)
+		if (ISSLASH(path[i])) break;
+	if (i == 2 || i == pathlen)
+		/* do not allow \\\SHARE or \\SERVER */
+		return FALSE;
+	share = i+1;
+	for (i = share; i < pathlen; i++)
+		if (ISSLASH(path[i])) break;
+	return (i != share && (i == pathlen || i == pathlen-1));
+
+	#undef ISSLASH
+}
+#endif /* Py_WIN_WIDE_FILENAMES */
+#endif /* MS_WINDOWS */
+
 static PyObject *
 posix_do_stat(PyObject *self, PyObject *args,
 	      char *format,
@@ -941,15 +1001,22 @@ posix_do_stat(PyObject *self, PyObject *args,
 			/* Remove trailing slash or backslash, unless it's the current
 			   drive root (/ or \) or a specific drive's root (like c:\ or c:/).
 			*/
-			if (pathlen > 0 &&
-				(wpath[pathlen-1]== L'\\' || wpath[pathlen-1] == L'/')) {
-	    			/* It does end with a slash -- exempt the root drive cases. */
-	    			/* XXX UNC root drives should also be exempted? */
-				if (pathlen == 1 || (pathlen == 3 && wpath[1] == L':'))
-	    			/* leave it alone */;
-	    		else {
-					/* nuke the trailing backslash */
-					wpath[pathlen-1] = L'\0';
+			if (pathlen > 0) {
+				if (ISSLASHW(wpath[pathlen-1])) {
+	    				/* It does end with a slash -- exempt the root drive cases. */
+					if (pathlen == 1 || (pathlen == 3 && wpath[1] == L':') || 
+						IsUNCRootW(wpath, pathlen))
+	    					/* leave it alone */;
+					else {
+						/* nuke the trailing backslash */
+						wpath[pathlen-1] = L'\0';
+					}
+				}
+				else if (ISSLASHW(wpath[1]) && pathlen < ARRAYSIZE(wpath)-1 && 
+					IsUNCRootW(wpath, pathlen)) {
+					/* UNC root w/o trailing slash: add one when there's room */
+					wpath[pathlen++] = L'\\';
+					wpath[pathlen] = L'\0';
 				}
 			}
 			Py_BEGIN_ALLOW_THREADS
@@ -984,16 +1051,25 @@ posix_do_stat(PyObject *self, PyObject *args,
 	/* Remove trailing slash or backslash, unless it's the current
 	   drive root (/ or \) or a specific drive's root (like c:\ or c:/).
 	*/
-	if (pathlen > 0 &&
-	    (path[pathlen-1]== '\\' || path[pathlen-1] == '/')) {
-	    	/* It does end with a slash -- exempt the root drive cases. */
-	    	/* XXX UNC root drives should also be exempted? */
-	    	if (pathlen == 1 || (pathlen == 3 && path[1] == ':'))
-	    		/* leave it alone */;
-	    	else {
-			/* nuke the trailing backslash */
+	if (pathlen > 0) {
+		if (ISSLASHA(path[pathlen-1])) {
+			/* It does end with a slash -- exempt the root drive cases. */
+			if (pathlen == 1 || (pathlen == 3 && path[1] == ':') || 
+				IsUNCRootA(path, pathlen))
+	    			/* leave it alone */;
+			else {
+				/* nuke the trailing backslash */
+				strncpy(pathcopy, path, pathlen);
+				pathcopy[pathlen-1] = '\0';
+				path = pathcopy;
+			}
+		}
+		else if (ISSLASHA(path[1]) && pathlen < ARRAYSIZE(pathcopy)-1 && 
+			IsUNCRootA(path, pathlen)) {
+			/* UNC root w/o trailing slash: add one when there's room */
 			strncpy(pathcopy, path, pathlen);
-			pathcopy[pathlen-1] = '\0';
+			pathcopy[pathlen++] = '\\';
+			pathcopy[pathlen] = '\0';
 			path = pathcopy;
 		}
 	}
@@ -1144,7 +1220,25 @@ posix_chmod(PyObject *self, PyObject *args)
 	char *path = NULL;
 	int i;
 	int res;
-	if (!PyArg_ParseTuple(args, "eti", Py_FileSystemDefaultEncoding,
+#ifdef Py_WIN_WIDE_FILENAMES
+	if (unicode_file_names()) {
+		PyUnicodeObject *po;
+		if (PyArg_ParseTuple(args, "Ui|:chmod", &po, &i)) {
+			Py_BEGIN_ALLOW_THREADS
+			res = _wchmod(PyUnicode_AS_UNICODE(po), i);
+			Py_END_ALLOW_THREADS
+			if (res < 0)
+				return posix_error_with_unicode_filename(
+						PyUnicode_AS_UNICODE(po));
+			Py_INCREF(Py_None);
+			return Py_None;
+		}
+		/* Drop the argument parsing error as narrow strings
+		   are also valid. */
+		PyErr_Clear();
+	}
+#endif /* Py_WIN_WIDE_FILENAMES */
+	if (!PyArg_ParseTuple(args, "eti:chmod", Py_FileSystemDefaultEncoding,
 	                      &path, &i))
 		return NULL;
 	Py_BEGIN_ALLOW_THREADS
@@ -1916,11 +2010,32 @@ posix_utime(PyObject *self, PyObject *args)
 #define UTIME_ARG buf
 #endif /* HAVE_UTIMES */
 
-	if (!PyArg_ParseTuple(args, "sO:utime", &path, &arg))
+	int have_unicode_filename = 0;
+#ifdef Py_WIN_WIDE_FILENAMES
+	PyUnicodeObject *obwpath;
+	wchar_t *wpath;
+	if (unicode_file_names()) {
+		if (PyArg_ParseTuple(args, "UO|:utime", &obwpath, &arg)) {
+			wpath = PyUnicode_AS_UNICODE(obwpath);
+			have_unicode_filename = 1;
+		} else
+			/* Drop the argument parsing error as narrow strings
+			   are also valid. */
+			PyErr_Clear();
+	}
+#endif /* Py_WIN_WIDE_FILENAMES */
+
+	if (!have_unicode_filename && \
+		!PyArg_ParseTuple(args, "sO:utime", &path, &arg))
 		return NULL;
 	if (arg == Py_None) {
 		/* optional time values not given */
 		Py_BEGIN_ALLOW_THREADS
+#ifdef Py_WIN_WIDE_FILENAMES
+		if (have_unicode_filename)
+			res = _wutime(wpath, NULL);
+		else
+#endif /* Py_WIN_WIDE_FILENAMES */
 		res = utime(path, NULL);
 		Py_END_ALLOW_THREADS
 	}
@@ -1946,12 +2061,25 @@ posix_utime(PyObject *self, PyObject *args)
 		Py_END_ALLOW_THREADS
 #else
 		Py_BEGIN_ALLOW_THREADS
+#ifdef Py_WIN_WIDE_FILENAMES
+		if (have_unicode_filename)
+			/* utime is OK with utimbuf, but _wutime insists 
+			   on _utimbuf (the msvc headers assert the 
+			   underscore version is ansi) */
+			res = _wutime(wpath, (struct _utimbuf *)UTIME_ARG);
+		else
+#endif /* Py_WIN_WIDE_FILENAMES */
 		res = utime(path, UTIME_ARG);
 		Py_END_ALLOW_THREADS
-#endif
+#endif /* HAVE_UTIMES */
 	}
-	if (res < 0)
+	if (res < 0) {
+#ifdef Py_WIN_WIDE_FILENAMES
+		if (have_unicode_filename)
+			return posix_error_with_unicode_filename(wpath);
+#endif /* Py_WIN_WIDE_FILENAMES */
 		return posix_error_with_filename(path);
+	}
 	Py_INCREF(Py_None);
 	return Py_None;
 #undef UTIME_ARG
@@ -2458,6 +2586,231 @@ posix_spawnve(PyObject *self, PyObject *args)
 	PyMem_Free(path);
 	return res;
 }
+
+/* OS/2 supports spawnvp & spawnvpe natively */
+#if defined(PYOS_OS2)
+PyDoc_STRVAR(posix_spawnvp__doc__,
+"spawnvp(mode, file, args)\n\n\
+Execute the program 'file' in a new process, using the environment\n\
+search path to find the file.\n\
+\n\
+	mode: mode of process creation\n\
+	file: executable file name\n\
+	args: tuple or list of strings");
+
+static PyObject *
+posix_spawnvp(PyObject *self, PyObject *args)
+{
+	char *path;
+	PyObject *argv;
+	char **argvlist;
+	int mode, i, argc;
+	Py_intptr_t spawnval;
+	PyObject *(*getitem)(PyObject *, int);
+
+	/* spawnvp has three arguments: (mode, path, argv), where
+	   argv is a list or tuple of strings. */
+
+	if (!PyArg_ParseTuple(args, "ietO:spawnvp", &mode,
+			      Py_FileSystemDefaultEncoding,
+			      &path, &argv))
+		return NULL;
+	if (PyList_Check(argv)) {
+		argc = PyList_Size(argv);
+		getitem = PyList_GetItem;
+	}
+	else if (PyTuple_Check(argv)) {
+		argc = PyTuple_Size(argv);
+		getitem = PyTuple_GetItem;
+	}
+	else {
+		PyErr_SetString(PyExc_TypeError,
+				"spawnvp() arg 2 must be a tuple or list");
+		PyMem_Free(path);
+		return NULL;
+	}
+
+	argvlist = PyMem_NEW(char *, argc+1);
+	if (argvlist == NULL) {
+		PyMem_Free(path);
+		return PyErr_NoMemory();
+	}
+	for (i = 0; i < argc; i++) {
+		if (!PyArg_Parse((*getitem)(argv, i), "et",
+				 Py_FileSystemDefaultEncoding,
+				 &argvlist[i])) {
+			free_string_array(argvlist, i);
+			PyErr_SetString(
+				PyExc_TypeError,
+				"spawnvp() arg 2 must contain only strings");
+			PyMem_Free(path);
+			return NULL;
+		}
+	}
+	argvlist[argc] = NULL;
+
+	Py_BEGIN_ALLOW_THREADS
+#if defined(PYCC_GCC)
+	spawnval = spawnvp(mode, path, argvlist);
+#else
+	spawnval = _spawnvp(mode, path, argvlist);
+#endif
+	Py_END_ALLOW_THREADS
+
+	free_string_array(argvlist, argc);
+	PyMem_Free(path);
+
+	if (spawnval == -1)
+		return posix_error();
+	else
+		return Py_BuildValue("l", (long) spawnval);
+}
+
+
+PyDoc_STRVAR(posix_spawnvpe__doc__,
+"spawnvpe(mode, file, args, env)\n\n\
+Execute the program 'file' in a new process, using the environment\n\
+search path to find the file.\n\
+\n\
+	mode: mode of process creation\n\
+	file: executable file name\n\
+	args: tuple or list of arguments\n\
+	env: dictionary of strings mapping to strings");
+
+static PyObject *
+posix_spawnvpe(PyObject *self, PyObject *args)
+{
+	char *path;
+	PyObject *argv, *env;
+	char **argvlist;
+	char **envlist;
+	PyObject *key, *val, *keys=NULL, *vals=NULL, *res=NULL;
+	int mode, i, pos, argc, envc;
+	Py_intptr_t spawnval;
+	PyObject *(*getitem)(PyObject *, int);
+	int lastarg = 0;
+
+	/* spawnvpe has four arguments: (mode, path, argv, env), where
+	   argv is a list or tuple of strings and env is a dictionary
+	   like posix.environ. */
+
+	if (!PyArg_ParseTuple(args, "ietOO:spawnvpe", &mode,
+			      Py_FileSystemDefaultEncoding,
+			      &path, &argv, &env))
+		return NULL;
+	if (PyList_Check(argv)) {
+		argc = PyList_Size(argv);
+		getitem = PyList_GetItem;
+	}
+	else if (PyTuple_Check(argv)) {
+		argc = PyTuple_Size(argv);
+		getitem = PyTuple_GetItem;
+	}
+	else {
+		PyErr_SetString(PyExc_TypeError,
+				"spawnvpe() arg 2 must be a tuple or list");
+		goto fail_0;
+	}
+	if (!PyMapping_Check(env)) {
+		PyErr_SetString(PyExc_TypeError,
+				"spawnvpe() arg 3 must be a mapping object");
+		goto fail_0;
+	}
+
+	argvlist = PyMem_NEW(char *, argc+1);
+	if (argvlist == NULL) {
+		PyErr_NoMemory();
+		goto fail_0;
+	}
+	for (i = 0; i < argc; i++) {
+		if (!PyArg_Parse((*getitem)(argv, i),
+			     "et;spawnvpe() arg 2 must contain only strings",
+				 Py_FileSystemDefaultEncoding,
+				 &argvlist[i]))
+		{
+			lastarg = i;
+			goto fail_1;
+		}
+	}
+	lastarg = argc;
+	argvlist[argc] = NULL;
+
+	i = PyMapping_Size(env);
+	if (i < 0)
+		goto fail_1;
+	envlist = PyMem_NEW(char *, i + 1);
+	if (envlist == NULL) {
+		PyErr_NoMemory();
+		goto fail_1;
+	}
+	envc = 0;
+	keys = PyMapping_Keys(env);
+	vals = PyMapping_Values(env);
+	if (!keys || !vals)
+		goto fail_2;
+	if (!PyList_Check(keys) || !PyList_Check(vals)) {
+		PyErr_SetString(PyExc_TypeError,
+			"spawnvpe(): env.keys() or env.values() is not a list");
+		goto fail_2;
+	}
+
+	for (pos = 0; pos < i; pos++) {
+		char *p, *k, *v;
+		size_t len;
+
+		key = PyList_GetItem(keys, pos);
+		val = PyList_GetItem(vals, pos);
+		if (!key || !val)
+			goto fail_2;
+
+		if (!PyArg_Parse(
+			    key,
+			    "s;spawnvpe() arg 3 contains a non-string key",
+			    &k) ||
+		    !PyArg_Parse(
+			    val,
+			    "s;spawnvpe() arg 3 contains a non-string value",
+			    &v))
+		{
+			goto fail_2;
+		}
+		len = PyString_Size(key) + PyString_Size(val) + 2;
+		p = PyMem_NEW(char, len);
+		if (p == NULL) {
+			PyErr_NoMemory();
+			goto fail_2;
+		}
+		PyOS_snprintf(p, len, "%s=%s", k, v);
+		envlist[envc++] = p;
+	}
+	envlist[envc] = 0;
+
+	Py_BEGIN_ALLOW_THREADS
+#if defined(PYCC_GCC)
+	spawnval = spawnve(mode, path, argvlist, envlist);
+#else
+	spawnval = _spawnve(mode, path, argvlist, envlist);
+#endif
+	Py_END_ALLOW_THREADS
+
+	if (spawnval == -1)
+		(void) posix_error();
+	else
+		res = Py_BuildValue("l", (long) spawnval);
+
+  fail_2:
+	while (--envc >= 0)
+		PyMem_DEL(envlist[envc]);
+	PyMem_DEL(envlist);
+  fail_1:
+	free_string_array(argvlist, lastarg);
+	Py_XDECREF(vals);
+	Py_XDECREF(keys);
+  fail_0:
+	PyMem_Free(path);
+	return res;
+}
+#endif /* PYOS_OS2 */
 #endif /* HAVE_SPAWNV */
 
 
@@ -2895,86 +3248,85 @@ Open a pipe to/from a command returning a file object.");
 static int
 async_system(const char *command)
 {
-    char        *p, errormsg[256], args[1024];
-    RESULTCODES  rcodes;
-    APIRET       rc;
-    char        *shell = getenv("COMSPEC");
-    if (!shell)
-        shell = "cmd";
+	char errormsg[256], args[1024];
+	RESULTCODES rcodes;
+	APIRET rc;
 
-    strcpy(args, shell);
-    p = &args[ strlen(args)+1 ];
-    strcpy(p, "/c ");
-    strcat(p, command);
-    p += strlen(p) + 1;
-    *p = '\0';
+	char *shell = getenv("COMSPEC");
+	if (!shell)
+		shell = "cmd";
 
-    rc = DosExecPgm(errormsg, sizeof(errormsg),
-                    EXEC_ASYNC, /* Execute Async w/o Wait for Results */
-                    args,
-                    NULL,       /* Inherit Parent's Environment */
-                    &rcodes, shell);
-    return rc;
+	/* avoid overflowing the argument buffer */
+	if (strlen(shell) + 3 + strlen(command) >= 1024)
+		return ERROR_NOT_ENOUGH_MEMORY
+
+	args[0] = '\0';
+	strcat(args, shell);
+	strcat(args, "/c ");
+	strcat(args, command);
+
+	/* execute asynchronously, inheriting the environment */
+	rc = DosExecPgm(errormsg,
+			sizeof(errormsg),
+			EXEC_ASYNC,
+			args,
+			NULL,
+			&rcodes,
+			shell);
+	return rc;
 }
 
 static FILE *
 popen(const char *command, const char *mode, int pipesize, int *err)
 {
-    HFILE    rhan, whan;
-    FILE    *retfd = NULL;
-    APIRET   rc = DosCreatePipe(&rhan, &whan, pipesize);
+	int oldfd, tgtfd;
+	HFILE pipeh[2];
+	APIRET rc;
 
-    if (rc != NO_ERROR) {
-	*err = rc;
-        return NULL; /* ERROR - Unable to Create Anon Pipe */
-    }
+	/* mode determines which of stdin or stdout is reconnected to
+	 * the pipe to the child
+	 */
+	if (strchr(mode, 'r') != NULL) {
+		tgt_fd = 1;	/* stdout */
+	} else if (strchr(mode, 'w')) {
+		tgt_fd = 0;	/* stdin */
+	} else {
+		*err = ERROR_INVALID_ACCESS;
+		return NULL;
+	}
 
-    if (strchr(mode, 'r') != NULL) { /* Treat Command as a Data Source */
-        int oldfd = dup(1);      /* Save STDOUT Handle in Another Handle */
+	/* setup the pipe */
+	if ((rc = DosCreatePipe(&pipeh[0], &pipeh[1], pipesize)) != NO_ERROR) {
+		*err = rc;
+		return NULL;
+	}
 
-        DosEnterCritSec();      /* Stop Other Threads While Changing Handles */
-        close(1);                /* Make STDOUT Available for Reallocation */
+	/* prevent other threads accessing stdio */
+	DosEnterCritSec();
 
-        if (dup2(whan, 1) == 0) {      /* Connect STDOUT to Pipe Write Side */
-            DosClose(whan);            /* Close Now-Unused Pipe Write Handle */
+	/* reconnect stdio and execute child */
+	oldfd = dup(tgtfd);
+	close(tgtfd);
+	if (dup2(pipeh[tgtfd], tgtfd) == 0) {
+		DosClose(pipeh[tgtfd]);
+		rc = async_system(command);
+	}
 
-            rc = async_system(command);
-        }
+	/* restore stdio */
+	dup2(oldfd, tgtfd);
+	close(oldfd);
 
-        dup2(oldfd, 1);          /* Reconnect STDOUT to Original Handle */
-        DosExitCritSec();        /* Now Allow Other Threads to Run */
+	/* allow other threads access to stdio */
+	DosExitCritSec();
 
-        if (rc == NO_ERROR)
-            retfd = fdopen(rhan, mode); /* And Return Pipe Read Handle */
-
-        close(oldfd);            /* And Close Saved STDOUT Handle */
-        return retfd;            /* Return fd of Pipe or NULL if Error */
-
-    } else if (strchr(mode, 'w')) { /* Treat Command as a Data Sink */
-        int oldfd = dup(0);      /* Save STDIN Handle in Another Handle */
-
-        DosEnterCritSec();      /* Stop Other Threads While Changing Handles */
-        close(0);                /* Make STDIN Available for Reallocation */
-
-        if (dup2(rhan, 0) == 0)     { /* Connect STDIN to Pipe Read Side */
-            DosClose(rhan);           /* Close Now-Unused Pipe Read Handle */
-
-            rc = async_system(command);
-        }
-
-        dup2(oldfd, 0);          /* Reconnect STDIN to Original Handle */
-        DosExitCritSec();        /* Now Allow Other Threads to Run */
-
-        if (rc == NO_ERROR)
-            retfd = fdopen(whan, mode); /* And Return Pipe Write Handle */
-
-        close(oldfd);            /* And Close Saved STDIN Handle */
-        return retfd;            /* Return fd of Pipe or NULL if Error */
-
-    } else {
-	*err = ERROR_INVALID_ACCESS;
-        return NULL; /* ERROR - Invalid Mode (Neither Read nor Write) */
-    }
+	/* if execution of child was successful return file stream */
+	if (rc == NO_ERROR)
+		return fdopen(pipeh[1 - tgtfd], mode);
+	else {
+		DosClose(pipeh[1 - tgtfd]);
+		*err = rc;
+		return NULL;
+	}
 }
 
 static PyObject *
@@ -3615,7 +3967,7 @@ static PyObject *_PyPopenProcs = NULL;
 static PyObject *
 posix_popen(PyObject *self, PyObject *args)
 {
-	PyObject *f, *s;
+	PyObject *f;
 	int tm = 0;
 
 	char *cmdstring;
@@ -3623,8 +3975,6 @@ posix_popen(PyObject *self, PyObject *args)
 	int bufsize = -1;
 	if (!PyArg_ParseTuple(args, "s|si:popen", &cmdstring, &mode, &bufsize))
 		return NULL;
-
-	s = PyTuple_New(0);
 
 	if (*mode == 'r')
 		tm = _O_RDONLY;
@@ -3937,7 +4287,7 @@ _PyPopen(char *cmdstring, int mode, int n)
 
 	/* Create new output read handle and the input write handle. Set
 	 * the inheritance properties to FALSE. Otherwise, the child inherits
-	 * the these handles; resulting in non-closeable handles to the pipes
+	 * these handles; resulting in non-closeable handles to the pipes
 	 * being created. */
 	 fSuccess = DuplicateHandle(GetCurrentProcess(), hChildStdinWr,
 				    GetCurrentProcess(), &hChildStdinWrDup, 0,
@@ -4332,6 +4682,11 @@ posix_popen(PyObject *self, PyObject *args)
 	PyObject *f;
 	if (!PyArg_ParseTuple(args, "s|si:popen", &name, &mode, &bufsize))
 		return NULL;
+	/* Strip mode of binary or text modifiers */
+	if (strcmp(mode, "rb") == 0 || strcmp(mode, "rt") == 0)
+		mode = "r";
+	else if (strcmp(mode, "wb") == 0 || strcmp(mode, "wt") == 0)
+		mode = "w";
 	Py_BEGIN_ALLOW_THREADS
 	fp = popen(name, mode);
 	Py_END_ALLOW_THREADS
@@ -4408,7 +4763,7 @@ posix_setegid (PyObject *self, PyObject *args)
 
 #ifdef HAVE_SETREUID
 PyDoc_STRVAR(posix_setreuid__doc__,
-"seteuid(ruid, euid)\n\n\
+"setreuid(ruid, euid)\n\n\
 Set the current process's real and effective user ids.");
 
 static PyObject *
@@ -4428,7 +4783,7 @@ posix_setreuid (PyObject *self, PyObject *args)
 
 #ifdef HAVE_SETREGID
 PyDoc_STRVAR(posix_setregid__doc__,
-"setegid(rgid, egid)\n\n\
+"setregid(rgid, egid)\n\n\
 Set the current process's real and effective group ids.");
 
 static PyObject *
@@ -4607,7 +4962,7 @@ posix_lstat(PyObject *self, PyObject *args)
 	return posix_do_stat(self, args, "et:lstat", lstat, NULL, NULL);
 #else /* !HAVE_LSTAT */
 #ifdef MS_WINDOWS
-	return posix_do_stat(self, args, "et:lstat", STAT, "u:lstat", _wstati64);
+	return posix_do_stat(self, args, "et:lstat", STAT, "U:lstat", _wstati64);
 #else
 	return posix_do_stat(self, args, "et:lstat", STAT, NULL, NULL);
 #endif
@@ -6904,6 +7259,10 @@ static PyMethodDef posix_methods[] = {
 #ifdef HAVE_SPAWNV
 	{"spawnv",	posix_spawnv, METH_VARARGS, posix_spawnv__doc__},
 	{"spawnve",	posix_spawnve, METH_VARARGS, posix_spawnve__doc__},
+#if defined(PYOS_OS2)
+	{"spawnvp",	posix_spawnvp, METH_VARARGS, posix_spawnvp__doc__},
+	{"spawnvpe",	posix_spawnvpe, METH_VARARGS, posix_spawnvpe__doc__},
+#endif /* PYOS_OS2 */
 #endif /* HAVE_SPAWNV */
 #ifdef HAVE_FORK1
 	{"fork1",       posix_fork1, METH_NOARGS, posix_fork1__doc__},

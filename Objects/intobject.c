@@ -946,7 +946,7 @@ int_subtype_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	if (!PyInt_Check(tmp)) {
 		if (!PyLong_Check(tmp)) {
 			PyErr_SetString(PyExc_ValueError,
-					"value must convertable to an int");
+					"value can't be converted to int");
 			return NULL;
 		}
 		ival = PyLong_AsLong(tmp);
@@ -1080,7 +1080,7 @@ _PyInt_Init(void)
 	int ival;
 #if NSMALLNEGINTS + NSMALLPOSINTS > 0
 	for (ival = -NSMALLNEGINTS; ival < NSMALLPOSINTS; ival++) {
-		if ((free_list = fill_free_list()) == NULL)
+              if (!free_list && (free_list = fill_free_list()) == NULL)
 			return 0;
 		/* PyObject_New is inlined */
 		v = free_list;

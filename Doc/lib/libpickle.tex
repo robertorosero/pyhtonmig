@@ -164,6 +164,7 @@ following constant:
 \begin{datadesc}{HIGHEST_PROTOCOL}
 The highest protocol version available.  This value can be passed
 as a \var{protocol} value.
+\versionadded{2.3}
 \end{datadesc}
 
 The \module{pickle} module provides the
@@ -253,14 +254,13 @@ including (but not necessarily limited to) \exception{AttributeError},
 \exception{EOFError}, \exception{ImportError}, and \exception{IndexError}.
 \end{excdesc}
 
-The \module{pickle} module also exports two callables\footnote{In the
+The \module{pickle} module also exports two callables,\footnote{In the
 \module{pickle} module these callables are classes, which you could
-subclass to customize the behavior.  However, in the \module{cPickle}
-modules these callables are factory functions and so cannot be
-subclassed.  One of the common reasons to subclass is to control what
-objects can actually be unpickled.  See section~\ref{pickle-sub} for
-more details.}, \class{Pickler} and
-\class{Unpickler}:
+subclass to customize the behavior.  However, in the
+\refmodule{cPickle} module these callables are factory functions and
+so cannot be subclassed.  One common reason to subclass is to control
+what objects can actually be unpickled.  See section~\ref{pickle-sub}
+for more details.} \class{Pickler} and \class{Unpickler}:
 
 \begin{classdesc}{Pickler}{file\optional{, protocol\optional{, bin}}}
 This takes a file-like object to which it will write a pickle data
@@ -448,8 +448,8 @@ for more details.
 
 When a pickled class instance is unpickled, its \method{__init__()}
 method is normally \emph{not} invoked.  If it is desirable that the
-\method{__init__()} method be called on unpickling, a class can define
-a method \method{__getinitargs__()}, which should return a
+\method{__init__()} method be called on unpickling, an old-style class
+can define a method \method{__getinitargs__()}, which should return a
 \emph{tuple} containing the arguments to be passed to the class
 constructor (i.e. \method{__init__()}).  The
 \method{__getinitargs__()} method is called at
@@ -457,6 +457,23 @@ pickle time; the tuple it returns is incorporated in the pickle for
 the instance.
 \withsubitem{(copy protocol)}{\ttindex{__getinitargs__()}}
 \withsubitem{(instance constructor)}{\ttindex{__init__()}}
+
+\withsubitem{(copy protocol)}{\ttindex{__getnewargs__()}}
+
+New-style types can provide a \method{__getnewargs__()} method that is
+used for protocol 2.  Implementing this method is needed if the type
+establishes some internal invariants when the instance is created, or
+if the memory allocation is affected by the values passed to the
+\method{__new__()} method for the type (as it is for tuples and
+strings).  Instances of a new-style type \class{C} are created using
+
+\begin{alltt}
+obj = C.__new__(C, *\var{args})
+\end{alltt}
+
+where \var{args} is the result of calling \method{__getnewargs__()} on
+the original object; if there is no \method{__getnewargs__()}, an
+empty tuple is assumed.
 
 \withsubitem{(copy protocol)}{
   \ttindex{__getstate__()}\ttindex{__setstate__()}}
@@ -657,7 +674,7 @@ which will work in either \module{pickle} or \module{cPickle}.}.
 In the \module{pickle} module, you need to derive a subclass from
 \class{Unpickler}, overriding the \method{load_global()}
 method.  \method{load_global()} should read two lines from the pickle
-data stream where the first line will the the name of the module
+data stream where the first line will the name of the module
 containing the class and the second line will be the name of the
 instance's class.  It then looks up the class, possibly importing the
 module and digging out the attribute, then it appends what it finds to

@@ -553,7 +553,7 @@ _PyImport_FindExtension(char *name, char *filename)
 
 /* Get the module object corresponding to a module name.
    First check the modules dictionary if there's one there,
-   if not, create a new one and insert in in the modules dictionary.
+   if not, create a new one and insert it in the modules dictionary.
    Because the former action is most common, THIS DOES NOT RETURN A
    'NEW' REFERENCE! */
 
@@ -943,6 +943,7 @@ load_package(char *name, char *pathname)
 	if (fdp == NULL) {
 		if (PyErr_ExceptionMatches(PyExc_ImportError)) {
 			PyErr_Clear();
+			Py_INCREF(m);
 		}
 		else
 			m = NULL;
@@ -2178,9 +2179,10 @@ ensure_fromlist(PyObject *mod, PyObject *fromlist, char *buf, int buflen,
 			if (all == NULL)
 				PyErr_Clear();
 			else {
-				if (!ensure_fromlist(mod, all, buf, buflen, 1))
-					return 0;
+				int ret = ensure_fromlist(mod, all, buf, buflen, 1);
 				Py_DECREF(all);
+				if (!ret)
+					return 0;
 			}
 			continue;
 		}
@@ -2308,7 +2310,7 @@ PyObject *
 PyImport_ReloadModule(PyObject *m)
 {
 	PyObject *modules = PyImport_GetModuleDict();
-	PyObject *path = NULL;
+	PyObject *path = NULL, *loader = NULL;
 	char *name, *subname;
 	char buf[MAXPATHLEN+1];
 	struct filedescr *fdp;
@@ -2350,11 +2352,14 @@ PyImport_ReloadModule(PyObject *m)
 			PyErr_Clear();
 	}
 	buf[0] = '\0';
-	fdp = find_module(name, subname, path, buf, MAXPATHLEN+1, &fp, NULL);
+	fdp = find_module(name, subname, path, buf, MAXPATHLEN+1, &fp, &loader);
 	Py_XDECREF(path);
-	if (fdp == NULL)
+	if (fdp == NULL) {
+		Py_XDECREF(loader);
 		return NULL;
-	m = load_module(name, fp, buf, fdp->type, NULL);
+	}
+	m = load_module(name, fp, buf, fdp->type, loader);
+	Py_XDECREF(loader);
 	if (fp)
 		fclose(fp);
 	return m;

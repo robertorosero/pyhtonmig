@@ -60,7 +60,7 @@ def lookup(name, frame, locals):
 def scanvars(reader, frame, locals):
     """Scan one logical line of Python and look up values of variables used."""
     import tokenize, keyword
-    vars, lasttoken, parent, prefix = [], None, None, ''
+    vars, lasttoken, parent, prefix, value = [], None, None, '', __UNDEF__
     for ttype, token, start, end, line in tokenize.generate_tokens(reader):
         if ttype == tokenize.NEWLINE: break
         if ttype == tokenize.NAME and token not in keyword.kwlist:
@@ -273,7 +273,7 @@ class Hook:
 
         if self.logdir is not None:
             import os, tempfile
-            suffix = ['.html', '.txt'][self.format=="html"]
+            suffix = ['.txt', '.html'][self.format=="html"]
             (fd, path) = tempfile.mkstemp(suffix=suffix, dir=self.logdir)
             try:
                 file = os.fdopen(fd, 'w')

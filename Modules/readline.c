@@ -590,7 +590,9 @@ static void
 setup_readline(void)
 {
 #ifdef SAVE_LOCALE
-	char *saved_locale = setlocale(LC_CTYPE, NULL);
+	char *saved_locale = strdup(setlocale(LC_CTYPE, NULL));
+	if (!saved_locale)
+		Py_FatalError("not enough memory to save locale");
 #endif
 
 	using_history();
@@ -631,6 +633,7 @@ setup_readline(void)
 
 #ifdef SAVE_LOCALE
 	setlocale(LC_CTYPE, saved_locale); /* Restore locale */
+	free(saved_locale);
 #endif
 }
 
@@ -655,6 +658,12 @@ call_readline(FILE *sys_stdin, FILE *sys_stdout, char *prompt)
 	size_t n;
 	char *p, *q;
 	PyOS_sighandler_t old_inthandler;
+#ifdef SAVE_LOCALE
+	char *saved_locale = strdup(setlocale(LC_CTYPE, NULL));
+	if (!saved_locale)
+		Py_FatalError("not enough memory to save locale");
+	setlocale(LC_CTYPE, "");
+#endif
 
 	old_inthandler = PyOS_setsig(SIGINT, onintr);
 	if (setjmp(jbuf)) {
@@ -713,6 +722,10 @@ call_readline(FILE *sys_stdin, FILE *sys_stdout, char *prompt)
 		p[n+1] = '\0';
 	}
 	free(q);
+#ifdef SAVE_LOCALE
+	setlocale(LC_CTYPE, saved_locale); /* Restore locale */
+	free(saved_locale);
+#endif
 	return p;
 }
 

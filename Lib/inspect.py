@@ -621,14 +621,22 @@ def getargs(co):
                         count.append(value)
                     elif opname == 'STORE_FAST':
                         stack.append(names[value])
-                        remain[-1] = remain[-1] - 1
-                        while remain[-1] == 0:
-                            remain.pop()
-                            size = count.pop()
-                            stack[-size:] = [stack[-size:]]
-                            if not remain: break
+
+                        # Special case for sublists of length 1: def foo((bar))
+                        # doesn't generate the UNPACK_TUPLE bytecode, so if
+                        # `remain` is empty here, we have such a sublist.
+                        if not remain:
+                            stack[0] = [stack[0]]
+                            break
+                        else:
                             remain[-1] = remain[-1] - 1
-                        if not remain: break
+                            while remain[-1] == 0:
+                                remain.pop()
+                                size = count.pop()
+                                stack[-size:] = [stack[-size:]]
+                                if not remain: break
+                                remain[-1] = remain[-1] - 1
+                            if not remain: break
             args[i] = stack[0]
 
     varargs = None
@@ -739,12 +747,14 @@ def getframeinfo(frame, context=1):
     The optional second argument specifies the number of lines of context
     to return, which are centered around the current line."""
     if istraceback(frame):
+        lineno = frame.tb_lineno
         frame = frame.tb_frame
+    else:
+        lineno = frame.f_lineno
     if not isframe(frame):
         raise TypeError('arg is not a frame or traceback object')
 
     filename = getsourcefile(frame) or getfile(frame)
-    lineno = frame.f_lineno
     if context > 0:
         start = lineno - 1 - context//2
         try:

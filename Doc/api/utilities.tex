@@ -84,7 +84,7 @@ values from C values.
   \cfunction{Py_AtExit()} returns \code{0}; on failure, it returns
   \code{-1}.  The cleanup function registered last is called first.
   Each cleanup function will be called at most once.  Since Python's
-  internal finallization will have completed before the cleanup
+  internal finalization will have completed before the cleanup
   function, no Python APIs should be called by \var{func}.
 \end{cfuncdesc}
 
@@ -147,7 +147,7 @@ values from C values.
   Return the module object corresponding to a module name.  The
   \var{name} argument may be of the form \code{package.module}).
   First check the modules dictionary if there's one there, and if not,
-  create a new one and insert in in the modules dictionary.
+  create a new one and insert it in the modules dictionary.
   Return \NULL{} with an exception set on failure.
   \note{This function does not load or import the module; if the
   module wasn't already loaded, you will get an empty module object.

@@ -209,10 +209,11 @@ class IdleConf:
         if not os.path.exists(userDir):
             try: #make the config dir if it doesn't exist yet
                 os.mkdir(userDir)
-            except IOError:
+            except (OSError, IOError):
                 warn=('\n Warning: unable to create user config directory\n '+
                         userDir+'\n')
                 sys.stderr.write(warn)
+                raise SystemExit
         return userDir
 
     def GetOption(self, configType, section, option, default=None, type=None):
@@ -531,7 +532,7 @@ class IdleConf:
             '<<print-window>>': ['<Control-p>'],
             '<<redo>>': ['<Control-y>'],
             '<<remove-selection>>': ['<Escape>'],
-            '<<save-copy-of-window-as-file>>': ['<Alt-Shift-s>'],
+            '<<save-copy-of-window-as-file>>': ['<Alt-Shift-S>'],
             '<<save-window-as-file>>': ['<Alt-s>'],
             '<<save-window>>': ['<Control-s>'],
             '<<select-all>>': ['<Alt-a>'],

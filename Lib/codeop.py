@@ -1,7 +1,7 @@
 r"""Utilities to compile possibly incomplete Python source code.
 
 This module provides two interfaces, broadly similar to the builtin
-function compile(), that take progam text, a filename and a 'mode'
+function compile(), which takes program text, a filename and a 'mode'
 and:
 
 - Return a code object if the command is complete and valid

@@ -210,7 +210,12 @@ class ModuleFinder:
         if not m.__path__:
             return
         modules = {}
-        suffixes = [".py", ".pyc", ".pyo"]
+        # 'suffixes' used to be a list hardcoded to [".py", ".pyc", ".pyo"].
+        # But we must also collect Python extension modules - although
+        # we cannot separate normal dlls from Python extensions.
+        suffixes = []
+        for triple in imp.get_suffixes():
+            suffixes.append(triple[0])
         for dir in m.__path__:
             try:
                 names = os.listdir(dir)
@@ -238,6 +243,9 @@ class ModuleFinder:
             self.msgout(3, "import_module ->", m)
             return m
         if self.badmodules.has_key(fqname):
+            self.msgout(3, "import_module -> None")
+            return None
+        if parent and parent.__path__ is None:
             self.msgout(3, "import_module -> None")
             return None
         try:
@@ -387,6 +395,7 @@ class ModuleFinder:
 
     def find_module(self, name, path, parent=None):
         if parent is not None:
+            # assert path is not None
             fullname = parent.__name__+'.'+name
         else:
             fullname = name

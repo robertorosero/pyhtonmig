@@ -91,7 +91,7 @@ ifeq ($(MODE),debug)
   CFLAGS+=	-g -O
   LDFLAGS+=	-g
 else
-  CFLAGS+=	-s -O3 -fomit-frame-pointer
+  CFLAGS+=	-s -O3 -fomit-frame-pointer -mprobe
   LDFLAGS+=	-s
 endif
 CFLAGS+=	$(PY_DEF)
@@ -113,6 +113,7 @@ EXEOMF=		no
 
 # File extensions
 MODULE.EXT=	.pyd
+MODLIB.EXT=	.dll
 ifeq ($(OMF),yes)
   O=		.obj
   A=		.lib
@@ -130,9 +131,25 @@ else
   AR=		ar
 endif
 
+
+# === Build time resource settings ===
+
 # EMX's default number of file handles is 40, which is sometimes insufficient
 # (the tempfile regression test tries to create 100 temporary files)
 NFILES=250
+
+# The default stack size for child threads is 64k bytes, which is
+# insufficient for some applications which do a lot of work in threads
+# (such as Zope, especially in conjunction with Plone).
+# Note that this setting is distinct from the stack size for the main
+# thread, which is set via the %.def rule below.
+# EMX documents that the thread stack size should be at least 32768 bytes;
+# for Zope/Plone at least 128k bytes is recommended.
+# Uncomment & adjust the next line to override the default stack size:
+#CFLAGS+=	-DTHREAD_STACK_SIZE=0x20000
+
+
+# === The environment ===
 
 # Source file paths
 SRCPATH=.;../../Python;../../Parser;../../Objects;../../Include;../../Modules
@@ -216,7 +233,7 @@ $(OUT)%$O: %.c
 	@echo Creating .DEF file: $@
 	@echo NAME $(notdir $*) $(EXETYPE.$(notdir $*).exe) >$@
 	@echo DESCRIPTION $(DQUOTE)$(DESCRIPTION.$(notdir $*).exe)$(DQUOTE) >>$@
-	@echo STACKSIZE 1572864 >>$@
+	@echo STACKSIZE 2097152 >>$@
 
 # Output file names
 PYTHON_VER=	2.3
@@ -253,7 +270,7 @@ DESCRIPTION._tkinter$(MODULE.EXT)=	Python Extension DLL for access to Tcl/Tk Env
 DESCRIPTION.mpz$(MODULE.EXT)=		Python Extension DLL for access to GNU multi-precision library
 DESCRIPTION.readline$(MODULE.EXT)=	Python Extension DLL for access to GNU ReadLine library
 DESCRIPTION.bsddb185$(MODULE.EXT)=	Python Extension DLL for access to BSD DB (v1.85) library
-DESCRIPTION._curses$(MODULE.EXT)=	Python Extension DLL for access to ncurses library
+DESCRIPTION._curses$(MODLIB.EXT)=	Python Extension DLL for access to ncurses library
 DESCRIPTION.pyexpat$(MODULE.EXT)=	Python Extension DLL for access to expat library
 DESCRIPTION.bz2$(MODULE.EXT)=		Python Extension DLL for accessing the bz2 compression library
 
@@ -429,6 +446,10 @@ HARDEXTMODULES=	_hotshot \
 		_testcap \
 		unicoded
 
+# Python modules that are used as libraries and therefore must use
+# a .DLL extension
+LIBEXTMODULES=
+
 # Python external ($(MODULE.EXT)) modules - can be EASY or HARD
 ifeq ($(HAVE_ZLIB),yes)
   HARDEXTMODULES+=	zlib
@@ -451,7 +472,8 @@ ifeq ($(HAVE_BSDDB),yes)
   HARDEXTMODULES+=	bsddb185
 endif
 ifeq ($(HAVE_NCURSES),yes)
-  HARDEXTMODULES+=	_curses _curses_
+  LIBEXTMODULES+=	_curses
+  HARDEXTMODULES+=	_curses_
 endif
 ifeq ($(HAVE_GDBM),yes)
   HARDEXTMODULES+=	gdbm dbm
@@ -464,7 +486,7 @@ endif
 HARDEXTMODULES+=	pyexpat
 EXPAT.INC=	-I../../Modules/expat
 EXPAT.DEF=	-DHAVE_EXPAT_H -DXML_NS=1 -DXML_DTD=1 -DXML_BYTE_ORDER=12 \
-		-DXML_CONTENT_BYTES=1024
+		-DXML_CONTENT_BYTES=1024 -DHAVE_MEMMOVE=1 -DHAVE_BCOPY=1
 EXPAT.SRC=	$(addprefix ../../Modules/expat/, \
 		xmlparse.c \
 		xmlrole.c \
@@ -473,6 +495,7 @@ EXPAT.SRC=	$(addprefix ../../Modules/expat/, \
 # all the external modules
 EXTERNDLLS=	$(addsuffix $(MODULE.EXT),$(patsubst %module,%,$(EASYEXTMODULES)))
 EXTERNDLLS+=	$(addsuffix $(MODULE.EXT),$(patsubst %module,%,$(HARDEXTMODULES)))
+EXTERNDLLS+=	$(addsuffix $(MODLIB.EXT),$(patsubst %module,%,$(LIBEXTMODULES)))
 
 # Targets
 all:  $(OUT) $(PYTHON.LIB) $(PYTHON.DEF) $(PYTHON.IMPLIB) $(PYTHON.DLL) \
@@ -583,7 +606,7 @@ crypt$(MODULE.EXT): $(OUT)cryptmodule$O $(OUT)crypt_m.def $(PYTHON.IMPLIB)
 $(OUT)_curses_m.def:
 	@echo Creating .DEF file: $@
 	@echo LIBRARY $(notdir $*) INITINSTANCE TERMINSTANCE >$@
-	@echo DESCRIPTION $(DQUOTE)$(DESCRIPTION.$(notdir $*)$(MODULE.EXT))$(DQUOTE) >>$@
+	@echo DESCRIPTION $(DQUOTE)$(DESCRIPTION.$(notdir $*)$(MODLIB.EXT))$(DQUOTE) >>$@
 	@echo DATA MULTIPLE NONSHARED >>$@
 	@echo EXPORTS >>$@
 	@echo 	init_curses >>$@
@@ -609,7 +632,7 @@ $(OUT)_curses_panel_m.def:
 	@echo EXPORTS >>$@
 	@echo 	init_curses_panel >>$@
 
-_curses$(MODULE.EXT): $(OUT)_cursesmodule$O $(OUT)_curses_m.def $(PYTHON.IMPLIB)
+_curses$(MODLIB.EXT): $(OUT)_cursesmodule$O $(OUT)_curses_m.def $(PYTHON.IMPLIB)
 	$(LD) $(LDFLAGS.DLL) -o $@ $(^^) $(L^) $(LIBS) -lncurses
 
 # curses_panel needs to be renamed to be useful
