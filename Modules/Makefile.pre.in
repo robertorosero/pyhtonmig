@@ -22,6 +22,11 @@ CC=		@CC@
 RANLIB=		@RANLIB@
 DEFS=		@DEFS@
 LIBS=		@LIBS@
+LIBM=		@LIBM@
+LIBC=		@LIBC@
+
+# Install prefix, may be changed by configure
+prefix=		/usr/local
 
 
 # === Variables that are customizable by hand ===
@@ -47,7 +52,7 @@ MYLIBS=		$(LIB) \
 		../Objects/libObjects.a \
 		../Parser/libParser.a
 
-SYSLIBS=	-lm
+SYSLIBS=	$(LIBM) $(LIBC)
 
 
 # === Rules ===
@@ -74,7 +79,7 @@ clobber:	clean
 config.c Makefile: Makefile.pre config.c.in $(MAKESETUP) Setup
 		$(SHELL) $(MAKESETUP) Setup
 
-Setup:		Setup.in
+Setup:
 		cp $(srcdir)/Setup.in Setup
 
 Makefile.pre:	Makefile.pre.in ../config.status
