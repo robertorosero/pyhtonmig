@@ -1,7 +1,5 @@
-describe beta 3 configure process in README
 fix depend targets to work with VPATH
 get rid of --with-solaris
-
 Mac binary
 Add NEWS and HISTORY to Misc directory
 non-Sun dynamic linking (SGI 4 dl, and dl-dld elsewhere)
