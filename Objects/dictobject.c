@@ -825,21 +825,39 @@ dict_items(register dictobject *mp, PyObject *args)
 }
 
 static PyObject *
-dict_update(register dictobject *mp, PyObject *args)
+dict_update(PyObject *mp, PyObject *args)
 {
-	register int i;
-	dictobject *other;
-	dictentry *entry;
+	PyObject *other;
+
 	if (!PyArg_Parse(args, "O!", &PyDict_Type, &other))
 		return NULL;
+	if (PyDict_Update(mp, other) < 0)
+		return NULL;
+	Py_INCREF(Py_None);
+	return Py_None;
+}
+
+int
+PyDict_Update(PyObject *a, PyObject *b)
+{
+	register PyDictObject *mp, *other;
+	register int i;
+	dictentry *entry;
+
+	if (a == NULL || !PyDict_Check(a) || b == NULL || !PyDict_Check(b)) {
+		PyErr_BadInternalCall();
+		return -1;
+	}
+	mp = (PyDictObject *)a;
+	other = (PyDictObject *)b;
 	if (other == mp || other->ma_used == 0)
-		goto done; /* a.update(a) or a.update({}); nothing to do */
+		return 0; /* a.update(a) or a.update({}); nothing to do */
 	/* Do one big resize at the start, rather than incrementally
 	   resizing as we insert new items.  Expect that there will be
 	   no (or few) overlapping keys. */
 	if ((mp->ma_fill + other->ma_used)*3 >= mp->ma_size*2) {
 		if (dictresize(mp, (mp->ma_used + other->ma_used)*3/2) != 0)
-			return NULL;
+			return -1	;
 	}
 	for (i = 0; i < other->ma_size; i++) {
 		entry = &other->ma_table[i];
@@ -850,9 +868,7 @@ dict_update(register dictobject *mp, PyObject *args)
 				   entry->me_value);
 		}
 	}
-  done:
-	Py_INCREF(Py_None);
-	return Py_None;
+	return 0;
 }
 
 static PyObject *
@@ -1233,7 +1249,7 @@ static PyMethodDef dict_methods[] = {
 	 items__doc__},
 	{"values",	(PyCFunction)dict_values,	METH_OLDARGS,
 	 values__doc__},
-	{"update",	(PyCFunction)dict_update,	METH_OLDARGS,
+	{"update",	dict_update,			METH_OLDARGS,
 	 update__doc__},
 	{"clear",	(PyCFunction)dict_clear,	METH_OLDARGS,
 	 clear__doc__},
