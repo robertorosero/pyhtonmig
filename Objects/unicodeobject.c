@@ -64,6 +64,7 @@ Copyright (c) Corporation for National Research Initiatives.
 
 #include "Python.h"
 
+#include "mymath.h"
 #include "unicodeobject.h"
 #include "ucnhash.h"
 
