@@ -189,7 +189,7 @@ class ImportHooksTestCase(ImportHooksBaseTestCase):
         i = ImpWrapper()
         sys.meta_path.append(i)
         sys.path_hooks.append(ImpWrapper)
-        mnames = ("colorsys", "urlparse", "distutils.core", "compiler.misc")
+        mnames = ("colorsys", "urlparse", "distutils.core", "email.Utils")
         for mname in mnames:
             parent = mname.split(".")[0]
             for n in sys.modules.keys():
