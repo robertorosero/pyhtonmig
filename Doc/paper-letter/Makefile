@@ -75,16 +75,19 @@ pdf:	$(PDFFILES)
 ps:	$(PSFILES)
 
 
-README:	$(PSFILES)
+README:	$(PSFILES) $(TOOLSDIR)/getpagecounts
 	$(TOOLSDIR)/getpagecounts >$@
 
 
 # Python/C API Reference Manual
-api.dvi: $(APIFILES)
+api.dvi: api.tex $(APIFILES)
 	$(MKDVI) api
 
-api.pdf: $(APIFILES)
+api.pdf: api.tex $(APIFILES)
 	$(MKPDF) api
+
+api.tex: ../api/api.tex ../api/refcounts.dat ../tools/anno-api.py
+	$(PYTHON) ../tools/anno-api.py -o $@ ../api/api.tex
 
 # Documenting Python
 doc.dvi: $(DOCFILES) ../texinputs/ltxmarkup.sty
@@ -130,7 +133,7 @@ tut.pdf: $(TUTFILES)
 
 
 clean:
-	rm -f *~ *.aux *.idx *.ilg *.ind *.log *.toc *.bkm *.syn *.pla
+	rm -f *~ *.aux *.idx *.ilg *.ind *.log *.toc *.bkm *.syn *.pla api.tex
 
 clobber: clean
 	rm -f $(DVIFILES) $(PSFILES) $(PDFFILES)

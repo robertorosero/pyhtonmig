@@ -11,7 +11,7 @@ This module implements some useful functions on pathnames.
 \begin{funcdesc}{abspath}{path}
 Return a normalized absolutized version of the pathname \var{path}.
 On most platforms, this is equivalent to
-\code{normpath(join(os.getcwd()), \var{path})}.
+\code{normpath(join(os.getcwd(), \var{path}))}.
 \versionadded{1.5.2}
 \end{funcdesc}
 
@@ -127,8 +127,8 @@ slashes.
 Normalize a pathname.  This collapses redundant separators and
 up-level references, e.g. \code{A//B}, \code{A/./B} and
 \code{A/foo/../B} all become \code{A/B}.  It does not normalize the
-case (use \function{normcase()} for that).  On Windows, it does
-converts forward slashes to backward slashes.
+case (use \function{normcase()} for that).  On Windows, it converts
+forward slashes to backward slashes.
 \end{funcdesc}
 
 \begin{funcdesc}{samefile}{path1, path2}
