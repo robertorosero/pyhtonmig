@@ -1078,7 +1078,6 @@ PyStructSequence_New
 GUSISetupConsoleStdio
 GUSIStdioFlush
 GUSIStdioClose
-_fdopen__FiPCc		# _fdopen(int,const char*)
 __close_console
 __close_file
 __position_file
