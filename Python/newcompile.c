@@ -24,8 +24,6 @@ int Py_OptimizeFlag = 0;
 
    Inappropriate Exceptions:
      #: problem with cell objects (closures still have bugs)
-     #: x = [1] ; x[0] += 1 
-        raises TypeError: object does not support item assignment
      #: Get this err msg: XXX rd_object called with exception set
         From Python/marshal.c::PyMarshal_ReadLastObjectFromFile()
         This looks like it may be related to encoding not being implemented.
@@ -2080,6 +2078,8 @@ compiler_augassign(struct compiler *c, stmt_ty s)
 	case Attribute_kind:
 		auge = Attribute(e->v.Attribute.value, e->v.Attribute.attr,
 				 AugLoad);
+                if (auge == NULL)
+                    return 0;
 		VISIT(c, expr, auge);
 		VISIT(c, expr, s->v.AugAssign.value);
 		ADDOP(c, inplace_binop(c, s->v.AugAssign.op));
@@ -2090,10 +2090,12 @@ compiler_augassign(struct compiler *c, stmt_ty s)
 	case Subscript_kind:
 		auge = Subscript(e->v.Subscript.value, e->v.Subscript.slice,
 				 AugLoad);
+                if (auge == NULL)
+                    return 0;
 		VISIT(c, expr, auge);
 		VISIT(c, expr, s->v.AugAssign.value);
 		ADDOP(c, inplace_binop(c, s->v.AugAssign.op));
-		auge->v.Subscript.ctx = AugStore;
+                auge->v.Subscript.ctx = AugStore;
 		VISIT(c, expr, auge);
 		free(auge);
 	    break;
@@ -2231,12 +2233,14 @@ compiler_slice(struct compiler *c, slice_ty s, int op, expr_context_ty ctx)
 		switch (stack_count) {
 		case 0: ADDOP(c, DUP_TOP); break;
 		case 1: ADDOP_I(c, DUP_TOPX, 2); break;
+		case 2: ADDOP_I(c, DUP_TOPX, 3); break;
 		}
 	}
 	else if (ctx == AugStore) {
 		switch (stack_count) {
 		case 0: ADDOP(c, ROT_TWO); break;
 		case 1: ADDOP(c, ROT_THREE); break;
+		case 2: ADDOP(c, ROT_FOUR); break;
 		}
 	}
 
@@ -2269,7 +2273,8 @@ compiler_visit_slice(struct compiler *c, slice_ty s, expr_context_ty ctx)
                 /* XXX: do we need to do anything?  should this be removed? */
 		break;
 	case Index_kind:
-		VISIT(c, expr, s->v.Index.value);
+                if (ctx != AugStore)
+			VISIT(c, expr, s->v.Index.value);
                 return compiler_handle_subscr(c, "index", ctx);
 	}
 	return 1;
