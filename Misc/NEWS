@@ -114,6 +114,9 @@ Library
 
 Tools
 
+- Tools/scripts/fixdiv.py has been added which can be used to fix
+  division operators as per PEP 238.
+
 Build
 
 C API
