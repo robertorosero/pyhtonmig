@@ -139,7 +139,7 @@ Makefiles:	config.status
 		done
 
 # Build the toplevel Makefile
-Makefile:	Makefile.in
+Makefile:	Makefile.in config.status
 		CONFIG_FILES=Makefile CONFIG_HEADERS= $(SHELL) config.status
 
 # Run the configure script.  If config.status already exists,

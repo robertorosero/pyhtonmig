@@ -10,6 +10,13 @@ test -n "$verbose" &&
 AC_VERBOSE(setting ac_compile to '$ac_compile')
 
 # checks for alternative programs
+AC_CHECKING(for --with(out)-gcc)
+AC_WITH(gcc, [
+	case $withval in
+	no)	withval=cc;;
+	yes)	withval=gcc;;
+	esac
+	CC=$withval])
 AC_PROG_CC
 AC_PROG_INSTALL
 AC_PROG_RANLIB
@@ -35,6 +42,8 @@ AC_HAVE_HEADERS(dlfcn.h fcntl.h signal.h stdarg.h stdlib.h thread.h unistd.h uti
 AC_DIR_HEADER
 
 # checks for typedefs
+AC_CHECKING(for clock_t in time.h)
+AC_HEADER_EGREP(clock_t, time.h, , AC_DEFINE(clock_t, long))
 AC_MODE_T
 AC_OFF_T
 AC_PID_T
