@@ -423,9 +423,7 @@ PyDict_SetItem(register PyObject *op, PyObject *key, PyObject *value)
 	register long hash;
 	register int n_used;
 
-	if (op->ob_type != &PyDict_Type) {
-		if (PyDict_Check(op))
-			return PyObject_SetItem(op, key, value);
+	if (!PyDict_Check(op)) {
 		PyErr_BadInternalCall();
 		return -1;
 	}
@@ -487,9 +485,7 @@ PyDict_DelItem(PyObject *op, PyObject *key)
 	register dictentry *ep;
 	PyObject *old_value, *old_key;
 
-	if (op->ob_type != &PyDict_Type) {
-		if (PyDict_Check(op))
-			return PyObject_DelItem(op, key);
+	if (!PyDict_Check(op)) {
 		PyErr_BadInternalCall();
 		return -1;
 	}
