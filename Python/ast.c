@@ -533,6 +533,7 @@ ast_for_listcomp(const node *n)
 		if (NCH(ch) == 3)
 		    ch = CHILD(ch, 2);
 	    }
+	    /* XXX ifs is leaked, we surely have to do something with it */
 	    /* on exit, must guarantee that ch is a list_for */
 	    if (TYPE(ch) == list_iter)
 		ch = CHILD(ch, 0);
@@ -769,13 +770,10 @@ ast_for_expr(const node *n)
 	switch (TYPE(CHILD(n, 0))) {
 	case PLUS:
 	    return UnaryOp(UAdd, ast_for_expr(CHILD(n, 1)));
-	    break;
 	case MINUS:
 	    return UnaryOp(USub, ast_for_expr(CHILD(n, 1)));
-	    break;
 	case TILDE:
 	    return UnaryOp(Invert, ast_for_expr(CHILD(n, 1)));
-	    break;
 	}
 	break;
     case power: {
@@ -819,7 +817,6 @@ ast_for_expr(const node *n)
 	    e = new;
 	}
 	return e;
-	break;
     }
     default:
 	fprintf(stderr, "unhandled expr: %d\n", TYPE(n));
@@ -1105,10 +1102,15 @@ ast_for_import_stmt(const node *n)
 	return Import(aliases, LINENO(n));
     } else if (STR(CHILD(n, 0))[0] == 'f') { /* from */
 	alias_ty mod = alias_for_import_name(CHILD(n, 1));
+	stmt_ty import;
 	aliases = asdl_seq_new((NCH(n) - 2) / 2);
 	for (i = 3; i <= NCH(n); i += 2)
 	    asdl_seq_APPEND(aliases, alias_for_import_name(CHILD(n, i)));
-	return ImportFrom(mod->name, aliases, LINENO(n));
+	import = ImportFrom(mod->name, aliases, LINENO(n));
+	/* XXX we should probably not be using PyObject_Free directly
+	       should we use asdl_seq_free?  we need to cast if so */
+	PyObject_Free(mod);
+	return import;
     }
     return NULL;
 }
