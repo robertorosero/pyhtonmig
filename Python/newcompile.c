@@ -337,8 +337,16 @@ list2dict(PyObject *list)
 	return dict;
 }
 
+/* Return new dict containing names from src that match scope(s).
+
+   src is a symbol table dictionary.  If the scope of a name matches
+   either scope_type or flag is set, insert it into the new dict.  The
+   values are integers, starting at offset and increasing by one for
+   each key.
+*/
+
 static PyObject *
-dictbytype(PyObject *src, int scope_type, int offset)
+dictbytype(PyObject *src, int scope_type, int flag, int offset)
 {
 	int pos = 0, i = offset, scope;
 	PyObject *k, *v, *dest = PyDict_New();
@@ -352,7 +360,7 @@ dictbytype(PyObject *src, int scope_type, int offset)
             assert(PyInt_Check(v));
             scope = (PyInt_AS_LONG(v) >> SCOPE_OFF) & SCOPE_MASK;
 
-            if (scope == scope_type) {
+            if (scope == scope_type || PyInt_AS_LONG(v) & flag) {
                 PyObject *tuple, *item = PyInt_FromLong(i);
                 if (item == NULL) {
 			Py_DECREF(dest);
@@ -422,8 +430,8 @@ compiler_enter_scope(struct compiler *c, identifier name, void *key)
 	Py_INCREF(name);
 	u->u_name = name;
 	u->u_varnames = list2dict(u->u_ste->ste_varnames);
-	u->u_cellvars = dictbytype(u->u_ste->ste_symbols, CELL, 0);
-	u->u_freevars = dictbytype(u->u_ste->ste_symbols, FREE, 
+	u->u_cellvars = dictbytype(u->u_ste->ste_symbols, CELL, 0, 0);
+	u->u_freevars = dictbytype(u->u_ste->ste_symbols, FREE, DEF_FREE_CLASS,
                                    PyDict_Size(u->u_cellvars));
 
 	u->u_nblocks = 0;
@@ -1113,9 +1121,9 @@ get_ref_type(struct compiler *c, PyObject *name)
                           "symbols: %s\nlocals: %s\nglobals: %s\n",
                           PyString_AS_STRING(name), 
                           PyString_AS_STRING(c->u->u_name), 
-                          PyObject_REPR(c->c_st->st_cur->ste_id),
+                          PyObject_REPR(c->u->u_ste->ste_id),
                           c->c_filename,
-                          PyObject_REPR(c->c_st->st_cur->ste_symbols),
+                          PyObject_REPR(c->u->u_ste->ste_symbols),
                           PyObject_REPR(c->u->u_varnames),
                           PyObject_REPR(c->u->u_names)
 		);
@@ -2028,6 +2036,12 @@ compiler_nameop(struct compiler *c, identifier name, expr_context_ty ctx)
 		case AugStore:
 			break;
 		case Del:
+			PyErr_Format(PyExc_SyntaxError,
+				     "can not delete variable '%s' referenced "
+				     "in nested scope",
+				     PyString_AS_STRING(name));
+			return 0;
+			break;
 		case Param:
 			assert(0); /* impossible */
 		}
@@ -2041,7 +2055,7 @@ compiler_nameop(struct compiler *c, identifier name, expr_context_ty ctx)
 		case AugStore:
 			break;
 		case Param:
-                    assert(0); /* impossible */
+			assert(0); /* impossible */
 		}
 		ADDOP_O(c, op, name, varnames);
 		return 1;
@@ -2676,14 +2690,14 @@ stackdepth_walk(struct compiler *c, int block, int depth, int maxdepth)
 		return maxdepth;
 	b->b_seen = 1;
 	b->b_startdepth = depth;
-	fprintf("block %d\n", block);
+	fprintf(stderr, "block %d\n", block);
 	for (i = 0; i < b->b_iused; i++) {
 		instr = &b->b_instr[i];
 		depth += opcode_stack_effect(instr->i_opcode, instr->i_oparg);
 		assert(depth >= 0); /* invalid code or bug in stackdepth() */
 		if (depth > maxdepth)
 			maxdepth = depth;
-		fprintf("  %s %d\n", opnames[instr->i_opcode], depth);
+		fprintf(stderr, "  %s %d\n", opnames[instr->i_opcode], depth);
 		if (instr->i_jrel || instr->i_jabs) {
 			maxdepth = stackdepth_walk(c, instr->i_target,
 						   depth, maxdepth);

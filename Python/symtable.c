@@ -317,35 +317,53 @@ PyST_GetScope(PySTEntryObject *ste, PyObject *name)
 		return 0; \
 }
 
-/* XXX handle this:
-   def f(x):
-       global y
-       def g():
-           return x + y
-   so that y is a global
+/* Decide on scope of name, given flags.
+
+   The dicts passed in as arguments are modified as necessary.
 */
 
 static int 
 analyze_name(PyObject *dict, PyObject *name, int flags, PyObject *bound,
-	     PyObject *local, PyObject *free, int nested)
+	     PyObject *local, PyObject *free, PyObject *global, int nested)
 {
 	if (flags & DEF_GLOBAL) {
 		if (flags & DEF_PARAM)
 			return 0; /* can't declare a parameter as global */
 		SET_SCOPE(dict, name, GLOBAL_EXPLICIT);
+		if (PyDict_SetItem(global, name, Py_None) < 0)
+			return 0;
+		if (bound && PyDict_GetItem(bound, name)) {
+			if (PyDict_DelItem(bound, name) < 0)
+				return 0;
+		}
 		return 1;
 	}
 	if (flags & DEF_BOUND) {
 		SET_SCOPE(dict, name, LOCAL);
 		if (PyDict_SetItem(local, name, Py_None) < 0)
 			return 0;
+		if (PyDict_GetItem(global, name)) {
+			if (PyDict_DelItem(global, name) < 0)
+				return 0;
+		}
 		return 1;
 	}
-	/* If the function is nested, then it can have free vars. */
-	if (nested && bound && PyDict_GetItem(bound, name)) {
+	/* If an enclosing block has a binding for this name, it
+	   is a free variable rather than a global variable.
+	   Note that having a non-NULL bound implies that the block
+	   is nested.
+	*/
+	if (bound && PyDict_GetItem(bound, name)) {
 		SET_SCOPE(dict, name, FREE);
 		if (PyDict_SetItem(free, name, Py_None) < 0)
 			return 0;
+		return 1;
+	}
+	/* If a parent has a global statement, then call it global
+	   explicit?  It could also be global implicit.
+	 */
+	else if (global && PyDict_GetItem(global, name)) {
+		SET_SCOPE(dict, name, GLOBAL_EXPLICIT);
 		return 1;
 	}
 	else {
@@ -399,7 +417,7 @@ analyze_cells(PyObject *scope, PyObject *free)
 /* Enter the final scope information into the st_symbols dict. */
 static int
 update_symbols(PyObject *symbols, PyObject *scope, 
-               PyObject *bound, PyObject *free)
+               PyObject *bound, PyObject *free, int class)
 {
 	PyObject *name, *v, *u, *w, *free_value = NULL;
 	int i, flags, pos = 0;
@@ -421,29 +439,61 @@ update_symbols(PyObject *symbols, PyObject *scope,
 
         free_value = PyInt_FromLong(FREE << SCOPE_OFF);
         if (!free_value)
-            return 0;
+		return 0;
 
         /* add a free variable when it's only use is for creating a closure */
         pos = 0;
 	while (PyDict_Next(free, &pos, &name, &v)) {
-            if (PyDict_GetItem(symbols, name))
-                continue;       /* it's not free, probably a cell */
-            if (!PyDict_GetItem(bound, name))
-                continue;       /* it's a global */
+		PyObject *o = PyDict_GetItem(symbols, name);
 
-            if (PyDict_SetItem(symbols, name, free_value) < 0) {
-                Py_DECREF(free_value);
-                return 0;
-            }
+		if (o) {
+			/* It could be a free variable in a method of
+			   the class that has the same name as a local
+			   or global in the class scope.
+			*/
+			if  (class && 
+			     PyInt_AS_LONG(o) & (DEF_BOUND | DEF_GLOBAL)) {
+				int i = PyInt_AS_LONG(o) | DEF_FREE_CLASS;
+				o = PyInt_FromLong(i);
+				if (!o) {
+					Py_DECREF(free_value);
+					return 0;
+				}
+				if (PyDict_SetItem(symbols, name, o) < 0) {
+					Py_DECREF(o);
+					Py_DECREF(free_value);
+					return 0;
+				}
+			}
+			/* else it's not free, probably a cell */
+			continue;
+		}
+		if (!PyDict_GetItem(bound, name))
+			continue;       /* it's a global */
+
+		if (PyDict_SetItem(symbols, name, free_value) < 0) {
+			Py_DECREF(free_value);
+			return 0;
+		}
         }
         Py_DECREF(free_value);
 	return 1;
 }   
 
+/* Make final symbol table decisions for block of ste.
+   Arguments:
+   bound -- set of variables bound in enclosing scopes (input)
+   free -- set of free variables in enclosed scopes (output)
+   globals -- set of declared global variables in enclosing scopes (input)
+*/
+   
+
 static int
-analyze_block(PySTEntryObject *ste, PyObject *bound, PyObject *free)
+analyze_block(PySTEntryObject *ste, PyObject *bound, PyObject *free, 
+	      PyObject *global)
 {
 	PyObject *name, *v, *local = NULL, *scope = NULL, *newbound = NULL;
+	PyObject *newglobal = NULL;
 	int i, flags, pos = 0, success = 0;
 
 	local = PyDict_New();
@@ -452,45 +502,66 @@ analyze_block(PySTEntryObject *ste, PyObject *bound, PyObject *free)
 	scope = PyDict_New();
 	if (!scope)
 		goto error;
+	newglobal = PyDict_New();
+	if (!newglobal)
+		goto error;
+	newbound = PyDict_New();
+	if (!newbound)
+		goto error;
+
+	if (ste->ste_type == ClassBlock) {
+		/* make a copy of globals before calling analyze_name(),
+		   because global statements in the class have no effect
+		   on nested functions.
+		*/
+		if (PyDict_Update(newglobal, global) < 0)
+			goto error;
+		if (bound)
+			if (PyDict_Update(newbound, bound) < 0)
+				goto error;
+	}
 
 	assert(PySTEntry_Check(ste));
 	assert(PyDict_Check(ste->ste_symbols));
 	while (PyDict_Next(ste->ste_symbols, &pos, &name, &v)) {
 		flags = PyInt_AS_LONG(v);
 		if (!analyze_name(scope, name, flags, bound, local, free,
-				  ste->ste_nested))
+				  global, ste->ste_nested))
 			goto error;
 	}
 
-	/* create a new bound dictionary to pass to children */
-	newbound = PyDict_New();
-	if (!newbound)
-		goto error;
-	if (ste->ste_type == FunctionBlock) {
-		if (PyDict_Update(newbound, local) < 0)
-			goto error;
-	}
-	if (bound) {
-		if (PyDict_Update(newbound, bound) < 0)
+	if (ste->ste_type != ClassBlock) {
+		if (ste->ste_type == FunctionBlock) {
+			if (PyDict_Update(newbound, local) < 0)
+				goto error;
+		}
+		if (bound) {
+			if (PyDict_Update(newbound, bound) < 0)
+				goto error;
+		}
+		if (PyDict_Update(newglobal, global) < 0)
 			goto error;
 	}
 
 	for (i = 0; i < PyList_GET_SIZE(ste->ste_children); ++i) {
 		PyObject *c = PyList_GET_ITEM(ste->ste_children, i);
 		assert(c && PySTEntry_Check(c));
-		if (!analyze_block((PySTEntryObject *)c, newbound, free))
+		if (!analyze_block((PySTEntryObject *)c, newbound, free,
+				   newglobal))
 			goto error;
 	}
 
-	if (!analyze_cells(scope, free))
+	if (ste->ste_type == FunctionBlock && !analyze_cells(scope, free))
 		goto error;
-	if (!update_symbols(ste->ste_symbols, scope, bound, free))
+	if (!update_symbols(ste->ste_symbols, scope, bound, free,
+			    ste->ste_type == ClassBlock))
 		goto error;
 	success = 1;
  error:
 	Py_XDECREF(local);
 	Py_XDECREF(scope);
 	Py_XDECREF(newbound);
+	Py_XDECREF(newglobal);
 	if (!success)
 		assert(PyErr_Occurred());
 	return success;
@@ -499,14 +570,20 @@ analyze_block(PySTEntryObject *ste, PyObject *bound, PyObject *free)
 static int
 symtable_analyze(struct symtable *st)
 {
-	PyObject *free;
+	PyObject *free, *global;
 	int r;
 
 	free = PyDict_New();
 	if (!free)
-		return 0;
-	r = analyze_block(st->st_top, NULL, free);
+	    return 0;
+	global = PyDict_New();
+	if (!global) {
+	    Py_DECREF(global);
+	    return 0;
+	}
+	r = analyze_block(st->st_top, NULL, free, global);
 	Py_DECREF(free);
+	Py_DECREF(global);
 	return r;
 }
 
