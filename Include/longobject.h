@@ -42,6 +42,7 @@ extern long getlongvalue PROTO((object *));
 extern double dgetlongvalue PROTO((object *));
 
 object *long_scan PROTO((char *, int));
+object *long_escan PROTO((char *, char **, int));
 
 #ifdef __cplusplus
 }

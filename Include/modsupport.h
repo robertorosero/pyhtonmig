@@ -30,17 +30,27 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 /* Module support interface */
 
-#ifdef HAVE_STDARG_H
+#ifdef HAVE_STDARG_PROTOTYPES
+
 #include <stdarg.h>
+
+extern int getargs PROTO((object *, char *, ...));
+extern object *mkvalue PROTO((char *, ...));
+
 #else
+
 #include <varargs.h>
+
+/* Better to have no prototypes at all for varargs functions in this case */
+extern int getargs();
+extern object *mkvalue();
+
 #endif
 
-extern object *initmodule PROTO((char *, struct methodlist *));
-extern int getargs PROTO((object *, char *, ...));
 extern int vgetargs PROTO((object *, char *, va_list));
-extern object *mkvalue PROTO((char *, ...));
 extern object *vmkvalue PROTO((char *, va_list));
+
+extern object *initmodule PROTO((char *, struct methodlist *));
 
 /* The following are obsolete -- use getargs directly! */
 #define getnoarg(v) getargs(v, "")

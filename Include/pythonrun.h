@@ -51,6 +51,8 @@ void print_error PROTO((void));
 
 void goaway PROTO((int));
 
+void cleanup PROTO((void));
+
 #ifdef __cplusplus
 }
 #endif
