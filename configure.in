@@ -20,7 +20,7 @@ AC_DYNIX_SEQ
 
 # checks for header files
 AC_STDC_HEADERS
-AC_HAVE_HEADERS(dlfcn.h signal.h stdarg.h stdlib.h thread.h unistd.h utime.h sys/audioio.h sys/param.h sys/select.h sys/time.h sys/times.h sys/un.h sys/utsname.h)
+AC_HAVE_HEADERS(dlfcn.h fcntl.h signal.h stdarg.h stdlib.h thread.h unistd.h utime.h sys/audioio.h sys/param.h sys/select.h sys/time.h sys/times.h sys/un.h sys/utsname.h)
 AC_DIR_HEADER
 
 # checks for typedefs

@@ -51,6 +51,8 @@ EXCEPTIONS: on SVR4 derived systems, you need to pass the configure
 script the option --with-svr4.  See below for more options you can
 pass to the configure script.
 
+AIX users: read the file Misc/AIX-NOTES before trying to build.
+
 You can configure the interpreter to contain fewer or more built-in
 modules by editing the file Modules/Setup.  This file is initially
 copied (when the toplevel Makefile makes Modules/Makefile for the

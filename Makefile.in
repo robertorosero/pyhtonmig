@@ -76,9 +76,9 @@ python:		Makefiles
 		done
 
 # Test the interpreter (twice, once without .pyc files, once with)
-TESTPATH=	$(srcdir)/Lib$:$(srcdir)/Lib/test
+TESTPATH=	$(srcdir)/Lib:$(srcdir)/Lib/test
 test:		python
-		-rm -f $(srcdir)/Lib/*test*.pyc
+		-rm -f $(srcdir)/Lib/test/*.pyc
 		PYTHONPATH=$(TESTPATH) ./python -c 'import autotest'
 		PYTHONPATH=$(TESTPATH) ./python -c 'import autotest'
 
