@@ -1763,7 +1763,7 @@ class DocTestTestCase(unittest.TestCase):
                 )
 
     def debug(self):
-        runner = DebugRunner(verbose = False,
+        runner = DebugRunner(verbose=False,
                              optionflags=self.__test_runner.optionflags)
         runner.run(self._dt_test, nooutput)
 
@@ -1814,7 +1814,8 @@ def DocTestSuite(module=None, globs=None, extraglobs=None,
     tests.sort()
     suite = unittest.TestSuite()
     for test in tests:
-        if len(test.examples) == 0: continue
+        if len(test.examples) == 0:
+            continue
         if not test.filename:
             filename = module.__file__
             if filename.endswith(".pyc"):
