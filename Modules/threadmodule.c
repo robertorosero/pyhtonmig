@@ -243,6 +243,7 @@ thread_exit_thread(self, args)
 	for (;;) { } /* Should not be reached */
 }
 
+#ifndef NO_EXIT_PROG
 static object *
 thread_exit_prog(self, args)
 	object *self; /* Not used */
@@ -254,6 +255,7 @@ thread_exit_prog(self, args)
 	goaway(sts); /* Calls exit_prog(sts) or _exit_prog(sts) */
 	for (;;) { } /* Should not be reached */
 }
+#endif
 
 static object *
 thread_allocate_lock(self, args)
@@ -272,7 +274,9 @@ static struct methodlist thread_methods[] = {
 	{"allocate",		(method)thread_allocate_lock},
 	{"exit_thread",		(method)thread_exit_thread},
 	{"exit",		(method)thread_exit_thread},
+#ifndef NO_EXIT_PROG
 	{"exit_prog",		(method)thread_exit_prog},
+#endif
 	{NULL,			NULL}		/* sentinel */
 };
 
