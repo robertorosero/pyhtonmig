@@ -492,6 +492,9 @@ class DocTest:
 
       - examples: the list of examples.
 
+      - globs: The namespace (aka globals) that the examples should
+        be run in.
+
       - name: A name identifying the DocTest (typically, the name of
         the object whose docstring this DocTest was extracted from).
 
@@ -502,10 +505,13 @@ class DocTest:
         begins.  This line number is zero-based, with respect to the
         beginning of the file.
     """
-    def __init__(self, docstring, name, filename, lineno):
+    def __init__(self, docstring, globs, name, filename, lineno):
         """
         Create a new DocTest, by extracting examples from `docstring`.
+        The DocTest's globals are initialized with a copy of `globs`.
         """
+        # Store a copy of the globals
+        self.globs = globs.copy()
         # Store identifying information
         self.name = name
         self.filename = filename
@@ -650,11 +656,20 @@ class DocTestFinder:
         self._objfilter = objfilter
         self._recurse = recurse
 
-    def find(self, obj, name=None, module=None):
+    def find(self, obj, name=None, module=None, globs=None,
+             extraglobs=None):
         """
         Return a list of the DocTests that are defined by the given
         object's docstring, or by any of its contained objects'
         docstrings.
+
+        The globals for each DocTest is formed by combining `globs`
+        and `extraglobs` (bindings in `extraglobs` override bindings
+        in `globs`).  A new copy of the globals dictionary is created
+        for each DocTest.  If `globs` is not specified, then it
+        defaults to the module's `__dict__`, if specified, or {}
+        otherwise.  If `extraglobs` is not specified, then it defaults
+        to {}.
         """
         # If name was not specified, then extract it from the object.
         if name is None:
@@ -669,7 +684,6 @@ class DocTestFinder:
         # case, module will be None.
         if module is None:
             module = inspect.getmodule(obj)
-
 
         # This is a hack to help Tester.rundict.  Setting module=None
         # in Tester.rundict should make the tester ignore which module
@@ -693,9 +707,20 @@ class DocTestFinder:
         except TypeError:
             source_lines = None
 
+        # Initialize globals, and merge in extraglobs.
+        if globs is None:
+            if module is None:
+                globs = {}
+            else:
+                globs = module.__dict__.copy()
+        else:
+            globs = globs.copy()
+        if extraglobs is not None:
+            globs.update(extraglobs)
+
         # Recursively expore `obj`, extracting DocTests.
         tests = []
-        self._find(tests, obj, name, module, source_lines, {})
+        self._find(tests, obj, name, module, source_lines, globs, {})
         return tests
 
     def _filter(self, obj, prefix, base):
@@ -723,7 +748,7 @@ class DocTestFinder:
         else:
             raise ValueError("object must be a class or function")
 
-    def _find(self, tests, obj, name, module, source_lines, seen):
+    def _find(self, tests, obj, name, module, source_lines, globs, seen):
         """
         Find tests for the given object and any contained objects, and
         add them to `tests`.
@@ -737,7 +762,7 @@ class DocTestFinder:
         seen[id(obj)] = 1
 
         # Find a test for this object, and add it to the list of tests.
-        test = self._get_test(obj, name, module, source_lines)
+        test = self._get_test(obj, name, module, globs, source_lines)
         if test is not None:
             tests.append(test)
 
@@ -752,7 +777,7 @@ class DocTestFinder:
                 if ((inspect.isfunction(val) or inspect.isclass(val))
                     and self._from_module(module, val)):
                     self._find(tests, val, valname, module,
-                               source_lines, seen)
+                               source_lines, globs, seen)
 
         # Look for tests in a module's __test__ dictionary.
         if inspect.ismodule(obj) and self._recurse:
@@ -769,7 +794,8 @@ class DocTestFinder:
                                      "classes, or modules: %r" %
                                      (type(val),))
                 valname = '%s.%s' % (name, valname)
-                self._find(tests, val, valname, module, source_lines, seen)
+                self._find(tests, val, valname, module,
+                           source_lines, globs, seen)
 
         # Look for tests in a class's contained objects.
         if inspect.isclass(obj) and self._recurse:
@@ -788,9 +814,9 @@ class DocTestFinder:
                     isinstance(val, property)):
                     valname = '%s.%s' % (name, valname)
                     self._find(tests, val, valname, module,
-                               source_lines, seen)
+                               source_lines, globs, seen)
 
-    def _get_test(self, obj, name, module, source_lines):
+    def _get_test(self, obj, name, module, globs, source_lines):
         """
         Return a DocTest for the given object, if it defines a docstring;
         otherwise, return None.
@@ -819,7 +845,7 @@ class DocTestFinder:
             filename = None
         else:
             filename = getattr(module, '__file__', module.__name__)
-        return DocTest(docstring, name, filename, lineno)
+        return DocTest(docstring, globs, name, filename, lineno)
 
     def _find_lineno(self, obj, source_lines):
         """
@@ -886,7 +912,7 @@ class DocTestRunner:
         >>> tests = DocTestFinder().find(_TestClass)
         >>> runner = DocTestRunner(verbose=False)
         >>> for test in tests:
-        ...     print runner.run(test, globals())
+        ...     print runner.run(test)
         (0, 2)
         (0, 1)
         (0, 2)
@@ -952,7 +978,7 @@ class DocTestRunner:
         if verbose is None:
             verbose = '-v' in sys.argv
         self._verbose = verbose
-        self._optionflags = optionflags
+        self.optionflags = optionflags
 
         # Keep track of the examples we've run.
         self.tries = 0
@@ -985,7 +1011,7 @@ class DocTestRunner:
 
         # The values True and False replaced 1 and 0 as the return
         # value for boolean comparisons in Python 2.3.
-        if not (self._optionflags & DONT_ACCEPT_TRUE_FOR_1):
+        if not (self.optionflags & DONT_ACCEPT_TRUE_FOR_1):
             if (got,want) == ("True\n", "1\n"):
                 return True
             if (got,want) == ("False\n", "0\n"):
@@ -993,7 +1019,7 @@ class DocTestRunner:
 
         # <BLANKLINE> can be used as a special sequence to signify a
         # blank line, unless the DONT_ACCEPT_BLANKLINE flag is used.
-        if not (self._optionflags & DONT_ACCEPT_BLANKLINE):
+        if not (self.optionflags & DONT_ACCEPT_BLANKLINE):
             # Replace <BLANKLINE> in want with a blank line.
             want = re.sub('(?m)^%s\s*?$' % re.escape(BLANKLINE_MARKER),
                           '', want)
@@ -1006,7 +1032,7 @@ class DocTestRunner:
         # This flag causes doctest to ignore any differences in the
         # contents of whitespace strings.  Note that this can be used
         # in conjunction with the ELLISPIS flag.
-        if (self._optionflags & NORMALIZE_WHITESPACE):
+        if (self.optionflags & NORMALIZE_WHITESPACE):
             got = ' '.join(got.split())
             want = ' '.join(want.split())
             if got == want:
@@ -1015,7 +1041,7 @@ class DocTestRunner:
         # The ELLIPSIS flag says to let the sequence "..." in `want`
         # match any substring in `got`.  We implement this by
         # transforming `want` into a regular expression.
-        if (self._optionflags & ELLIPSIS):
+        if (self.optionflags & ELLIPSIS):
             # Escape any special regexp characters
             want_re = re.escape(want)
             # Replace ellipsis markers ('...') with .*
@@ -1037,24 +1063,24 @@ class DocTestRunner:
         """
         # If <BLANKLINE>s are being used, then replace <BLANKLINE>
         # with blank lines in the expected output string.
-        if not (self._optionflags & DONT_ACCEPT_BLANKLINE):
+        if not (self.optionflags & DONT_ACCEPT_BLANKLINE):
             want = re.sub('(?m)^%s$' % re.escape(BLANKLINE_MARKER), '', want)
 
         # Check if we should use diff.  Don't use diff if the actual
         # or expected outputs are too short, or if the expected output
         # contains an ellipsis marker.
-        if ((self._optionflags & (UNIFIED_DIFF | CONTEXT_DIFF)) and
+        if ((self.optionflags & (UNIFIED_DIFF | CONTEXT_DIFF)) and
             want.count('\n') > 2 and got.count('\n') > 2 and
-            not (self._optionflags & ELLIPSIS and '...' in want)):
+            not (self.optionflags & ELLIPSIS and '...' in want)):
             # Split want & got into lines.
             want_lines = [l+'\n' for l in want.split('\n')]
             got_lines = [l+'\n' for l in got.split('\n')]
             # Use difflib to find their differences.
-            if self._optionflags & UNIFIED_DIFF:
+            if self.optionflags & UNIFIED_DIFF:
                 diff = difflib.unified_diff(want_lines, got_lines, n=2,
                                             fromfile='Expected', tofile='Got')
                 kind = 'unified'
-            elif self._optionflags & CONTEXT_DIFF:
+            elif self.optionflags & CONTEXT_DIFF:
                 diff = difflib.context_diff(want_lines, got_lines, n=2,
                                             fromfile='Expected', tofile='Got')
                 kind = 'context'
@@ -1164,27 +1190,27 @@ class DocTestRunner:
                 flag[1:] not in OPTIONFLAGS_BY_NAME):
                 raise ValueError('Bad doctest option directive: '+flag)
             if flag[0] == '+':
-                self._optionflags |= OPTIONFLAGS_BY_NAME[flag[1:]]
+                self.optionflags |= OPTIONFLAGS_BY_NAME[flag[1:]]
             else:
-                self._optionflags &= ~OPTIONFLAGS_BY_NAME[flag[1:]]
+                self.optionflags &= ~OPTIONFLAGS_BY_NAME[flag[1:]]
         return True
 
-    def __run(self, test, globs, compileflags, out):
+    def __run(self, test, compileflags, out):
         """
-        Run the examples in `test`, in the namespace `globs`.  Write
-        the outcome of each example with one of the
-        `DocTestRunnre.report_*` methods, using the writer function
-        `out`.  `compileflags` is the set of compiler flags that
-        should be used to execute examples.  Return a tuple `(f, t)`,
-        where `t` is the number of examples tried, and `f` is the
-        number of examples that failed.
+        Run the examples in `test`.  Write the outcome of each example
+        with one of the `DocTestRunner.report_*` methods, using the
+        writer function `out`.  `compileflags` is the set of compiler
+        flags that should be used to execute examples.  Return a tuple
+        `(f, t)`, where `t` is the number of examples tried, and `f`
+        is the number of examples that failed.  The examples are run
+        in the namespace `test.globs`.
         """
         # Keep track of the number of failures and tries.
         failures = tries = 0
 
         # Save the option flags (since doctest directives can be used
         # to modify them).
-        original_optionflags = self._optionflags
+        original_optionflags = self.optionflags
 
         # Process each example.
         for example in test.examples:
@@ -1206,7 +1232,7 @@ class DocTestRunner:
                 # trailing newline.  Rather than analyze that, always
                 # append one (it never hurts).
                 exec compile(example.source + '\n', "<string>", "single",
-                             compileflags, 1) in globs
+                             compileflags, 1) in test.globs
                 exception = None
             except KeyboardInterrupt:
                 raise
@@ -1257,7 +1283,7 @@ class DocTestRunner:
                         failures += 1
 
         # Restore the option flags (in case they were modified)
-        self._optionflags = original_optionflags
+        self.optionflags = original_optionflags
 
         # Record and return the number of failures and tries.
         self.__record_outcome(test, failures, tries)
@@ -1273,17 +1299,16 @@ class DocTestRunner:
         self.failures += f
         self.tries += t
 
-    def run(self, test, globs, extraglobs=None, compileflags=None, out=None):
+    def run(self, test, compileflags=None, out=None, clear_globs=True):
         """
         Run the examples in `test`, and display the results using the
         writer function `out`.
 
-        The examples are all run in a single namespace, which is
-        created by combining `globs` and `extraglobs` (bindings in
-        `extraglobs` override bindings in `globs`).  Shallow changes
-        to this namespace by the examples will not affect `globs` or
-        `extraglobs`; but changes to objects contained in `globs` or
-        extraglobs` will be visible.
+        The examples are run in the namespace `test.globs`.  If
+        `clear_globs` is true (the default), then this namespace will
+        be cleared after the test runs, to help with garbage
+        collection.  If you would like to examine the namespace after
+        the test completes, then use `clear_globs=False`.
 
         `compileflags` gives the set of flags that should be used by
         the Python compiler when running the examples.  If not
@@ -1295,16 +1320,14 @@ class DocTestRunner:
         the `DocTestRunner.report_*` methods.
         """
         if compileflags is None:
-            compileflags = _extract_future_flags(globs)
+            compileflags = _extract_future_flags(test.globs)
         if out is None:
             out = sys.stdout.write
         saveout = sys.stdout
-        globs = globs.copy()
-        if extraglobs is not None:
-            globs.update(extraglobs)
+
         try:
             sys.stdout = self._fakeout
-            return self.__run(test, globs, compileflags, out)
+            return self.__run(test, compileflags, out)
         finally:
             sys.stdout = saveout
             # While Python gc can clean up most cycles on its own, it doesn't
@@ -1315,7 +1338,8 @@ class DocTestRunner:
             # easy to break just by clearing the namespace.  This can also
             # help to break other kinds of cycles, and even for cycles that
             # gc can break itself it's better to break them ASAP.
-            globs.clear()
+            if clear_globs:
+                test.globs.clear()
 
     #/////////////////////////////////////////////////////////////////
     # Summarization
@@ -1486,15 +1510,11 @@ def testmod(m=None, name=None, globs=None, verbose=None, isprivate=None,
     if name is None:
         name = m.__name__
 
-    # If globals were not specified, then default to the module.
-    if globs is None:
-        globs = m.__dict__
-
     # Find, parse, and run all tests in the given module.
     finder = DocTestFinder(namefilter=isprivate)
     runner = DocTestRunner(verbose=verbose, optionflags=optionflags)
-    for test in finder.find(m, name):
-        runner.run(test, globs=m.__dict__, extraglobs=extraglobs)
+    for test in finder.find(m, name, globs=globs, extraglobs=extraglobs):
+        runner.run(test)
 
     if report:
         runner.summarize()
@@ -1521,8 +1541,8 @@ def run_docstring_examples(f, globs, verbose=False, name="NoName",
     # Find, parse, and run all tests in the given module.
     finder = DocTestFinder(verbose=verbose, recurse=False)
     runner = DocTestRunner(verbose=verbose, optionflags=optionflags)
-    for test in finder.find(f, name):
-        runner.run(test, globs=globs, compileflags=compileflags)
+    for test in finder.find(f, name, globs=globs):
+        runner.run(test, compileflags=compileflags)
 
 ######################################################################
 ## 6. Tester
@@ -1550,19 +1570,20 @@ class Tester:
                                         optionflags=optionflags)
 
     def runstring(self, s, name):
-        test = DocTest(s, name, None, None)
+        test = DocTest(s, self.globs, name, None, None)
         if self.verbose:
             print "Running string", name
-        (f,t) = self.testrunner.run(test, globs=self.globs)
+        (f,t) = self.testrunner.run(test)
         if self.verbose:
             print f, "of", t, "examples failed in string", name
         return (f,t)
 
     def rundoc(self, object, name=None, module=None):
         f = t = 0
-        tests = self.testfinder.find(object, name, module=module)
+        tests = self.testfinder.find(object, name, module=module,
+                                     globs=self.globs)
         for test in tests:
-            (f2, t2) = self.testrunner.run(test, globs=self.globs)
+            (f2, t2) = self.testrunner.run(test)
             (f,t) = (f+f2, t+t2)
         return (f,t)
 
@@ -1598,13 +1619,11 @@ class DocTestTestCase(unittest.TestCase):
     always be called if the set-up ('setUp') function ran successfully.
     """
 
-    def __init__(self, test_runner, test, globs, extraglobs=None,
+    def __init__(self, test_runner, test,
                  setUp=None, tearDown=None):
         unittest.TestCase.__init__(self)
         self.__test_runner = test_runner
         self.__test = test
-        self.__globs = globs
-        self.__extraglobs = extraglobs
         self.__setUp = setUp
         self.__tearDown = tearDown
 
@@ -1622,9 +1641,7 @@ class DocTestTestCase(unittest.TestCase):
         new = StringIO()
         try:
             self.__test_runner.DIVIDER = "-"*70
-            failures, tries = self.__test_runner.run(test, self.__globs,
-                                                     self.__extraglobs,
-                                                     out=new.write)
+            failures, tries = self.__test_runner.run(test, out=new.write)
         finally:
             sys.stdout = old
 
@@ -1687,7 +1704,7 @@ def DocTestSuite(module=None, filename=None, globs=None, extraglobs=None,
             globs = {}
     else:
         module = _normalize_module(module)
-        tests = test_finder.find(module)
+        tests = test_finder.find(module, globs=globs, extraglobs=extraglobs)
         if globs is None:
             globs = module.__dict__
         if not tests: # [XX] why do we want to do this?
@@ -1704,8 +1721,8 @@ def DocTestSuite(module=None, filename=None, globs=None, extraglobs=None,
             elif filename.endswith(".pyo"):
                 filename = filename[:-1]
             test.filename = filename
-        suite.addTest(DocTestTestCase(test_runner, test, globs,
-                                      extraglobs, setUp, tearDown))
+        suite.addTest(DocTestTestCase(test_runner, test,
+                                      setUp, tearDown))
 
     return suite
 
@@ -1751,7 +1768,7 @@ def debug_src(src, pm=False, globs=None):
 
     The string is provided directly
     """
-    test = DocTest(src, 'debug', None, None)
+    test = DocTest(src, globs or {}, 'debug', None, None)
 
     testsrc = '\n'.join([
         "%s%s" % (example.source, _want_comment(example))
