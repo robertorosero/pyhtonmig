@@ -510,14 +510,21 @@
 %
 %     \begin{funcdesc}{myfunc}{\optional{parm1\optional{, parm2}}}
 %
+\let\py@badkey=\@undefined
+
 \newcommand{\optional}[1]{%
   {\textnormal{\Large[}}{#1}\hspace{0.5mm}{\textnormal{\Large]}}}
 
 % C functions ------------------------------------------------------------
-% \begin{cfuncdesc}{type}{name}{arglist}
-\newenvironment{cfuncdesc}[3]{
+% \begin{cfuncdesc}[refcount]{type}{name}{arglist}
+% Note that the [refcount] slot should only be filled in by
+% tools/anno-api.py; it pulls the value from the refcounts database.
+\newenvironment{cfuncdesc}[4][\py@badkey]{
   \begin{fulllineitems}
-    \item[\code{#1 \bfcode{#2}(\py@varvars{#3})}\index{#2@{\py@idxcode{#2()}}}]
+    \item[\code{#2 \bfcode{#3}(\py@varvars{#4})}\index{#3@{\py@idxcode{#3()}}}]
+    \ifx#1\@undefined\else%
+      \emph{Return value: \textbf{#1 reference}.}\\
+    \fi
 }{\end{fulllineitems}}
 
 % C variables ------------------------------------------------------------
@@ -529,8 +536,6 @@
 
 % C data types -----------------------------------------------------------
 % \begin{ctypedesc}[index name]{typedef name}
-\let\py@classbadkey=\@undefined
-
 \newenvironment{ctypedesc}[2][\py@badkey]{
   \begin{fulllineitems}
     \item[\bfcode{#2}%
