@@ -1,7 +1,7 @@
 # Test the windows specific win32reg module.
 # Only win32reg functions not hit here: FlushKey, LoadKey and SaveKey
 
-from winreg import *
+from _winreg import *
 import os, sys
 
 test_key_name = "SOFTWARE\\Python Registry Test Key - Delete Me"
@@ -42,23 +42,23 @@ def WriteTestData(root_key):
     int_sub_key = int(sub_key)
     CloseKey(sub_key)
     try:
-    	QueryInfoKey(int_sub_key)
-    	raise RuntimeError, "It appears the CloseKey() function does not close the actual key!"
+        QueryInfoKey(int_sub_key)
+        raise RuntimeError, "It appears the CloseKey() function does not close the actual key!"
     except EnvironmentError:
-    	pass
+        pass
     # ... and close that key that way :-)
     int_key = int(key)
     key.Close()
     try:
-    	QueryInfoKey(int_key)
-    	raise RuntimeError, "It appears the key.Close() function does not close the actual key!"
+        QueryInfoKey(int_key)
+        raise RuntimeError, "It appears the key.Close() function does not close the actual key!"
     except EnvironmentError:
-    	pass
+        pass
 
 def ReadTestData(root_key):
     # Check we can get default value for this key.
     val = QueryValue(root_key, test_key_name)
-    assert val=="Default value", "Registry didnt give back the correct value"
+    assert val=="Default value", "Registry didn't give back the correct value"
 
     key = OpenKey(root_key, test_key_name)
     # Read the sub-keys
@@ -70,9 +70,9 @@ def ReadTestData(root_key):
             data = EnumValue(sub_key, index)
         except EnvironmentError:
             break
-        assert data in test_data, "didnt read back the correct test data."
+        assert data in test_data, "Didn't read back the correct test data"
         index = index + 1
-    assert index==len(test_data), "Didnt read the correct number of items"
+    assert index==len(test_data), "Didn't read the correct number of items"
     # Check I can directly access each item
     for value_name, value_data, value_type in test_data:
         read_val, read_typ = QueryValueEx(sub_key, value_name)
@@ -115,7 +115,7 @@ def DeleteTestData(root_key):
     # Opening should now fail!
     try:
         key = OpenKey(root_key, test_key_name)
-        assert 0, "Could open the non-existant key"
+        assert 0, "Could open the non-existent key"
     except WindowsError: # Use this error name this time
         pass
 
