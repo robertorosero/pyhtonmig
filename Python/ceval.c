@@ -1009,7 +1009,7 @@ PyEval_EvalCodeEx(PyCodeObject *co, PyObject *globals, PyObject *locals,
 		case BINARY_SUBSCR:
 			w = POP();
 			v = POP();
-			if (PyList_Check(v) && PyInt_Check(w)) {
+			if (v->ob_type == &PyList_Type && PyInt_Check(w)) {
 				/* INLINE: list[int] */
 				long i = PyInt_AsLong(w);
 				if (i < 0)
