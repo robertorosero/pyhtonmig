@@ -458,6 +458,10 @@ list_ass_slice(PyListObject *a, int ilow, int ihigh, PyObject *v)
 			Py_XDECREF(*p);
 		PyMem_DEL(recycle);
 	}
+	if (a->ob_size == 0 && a->ob_item != NULL) {
+		PyMem_FREE(a->ob_item);
+		a->ob_item = NULL;
+	}
 	return 0;
 #undef b
 }
@@ -1490,6 +1494,16 @@ list_richcompare(PyObject *v, PyObject *w, int op)
 	return PyObject_RichCompare(vl->ob_item[i], wl->ob_item[i], op);
 }
 
+static PyObject *
+list_construct(PyListObject *self)
+{
+	if (self == NULL)
+		return PyList_New(0);
+	self->ob_size = 0;
+	self->ob_item = NULL;
+	return (PyObject *)self;
+}
+
 static char append_doc[] =
 "L.append(object) -- append object to end";
 static char extend_doc[] =
@@ -1569,6 +1583,9 @@ PyTypeObject PyList_Type = {
 	0,					/* tp_getset */
 	0,					/* tp_base */
 	0,					/* tp_dict */
+	0,					/* tp_descr_get */
+	0,					/* tp_descr_set */
+	(unaryfunc)list_construct,		/* tp_construct */
 };
 
 
@@ -1649,5 +1666,8 @@ static PyTypeObject immutable_list_type = {
 	0,					/* tp_getset */
 	0,					/* tp_base */
 	0,					/* tp_dict */
+	0,					/* tp_descr_get */
+	0,					/* tp_descr_set */
+	(unaryfunc)list_construct,		/* tp_construct */
 	/* NOTE: This is *not* the standard list_type struct! */
 };
