@@ -1112,10 +1112,16 @@ PyGeneric_SetAttr(PyObject *obj, PyObject *name, PyObject *value)
 			return -1;
 	}
 	descr = PyDict_GetItem(tp->tp_dict, name);
-	if (descr != NULL && (f = descr->ob_type->tp_descr_set) != NULL)
+	if (descr == NULL) {
+		PyErr_Format(PyExc_AttributeError,
+			     "'%.50s' object has no attribute '%.400s'",
+			     tp->tp_name, PyString_AS_STRING(name));
+		return -1;
+	}
+	if ((f = descr->ob_type->tp_descr_set) != NULL)
 		return (*f)(descr, obj, value);
 	PyErr_Format(PyExc_AttributeError,
-		     "'%.50s' object has no attribute '%.400s'",
+		     "'%.50s' object attribute '%.400s' is read-only",
 		     tp->tp_name, PyString_AS_STRING(name));
 	return -1;
 }
