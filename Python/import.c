@@ -38,9 +38,9 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #include "eval.h"
 #include "osdefs.h"
 
-extern int verbose; /* Defined in pythonmain.c */
+extern int verbose; /* Defined in pythonrun.c */
 
-extern long getmtime(); /* Defined in posixmodule.c */
+extern long getmtime(); /* In getmtime.c */
 
 #ifdef DEBUG
 #define D(x) x
@@ -48,7 +48,25 @@ extern long getmtime(); /* Defined in posixmodule.c */
 #define D(x)
 #endif
 
-#if defined( NeXT ) || defined( WITH_RLD )
+/* Explanation of some of the the various #defines used by dynamic linking...
+
+   symbol	-- defined for:
+
+   DYNAMIC_LINK -- any kind of dynamic linking
+   USE_RLD	-- NeXT dynamic linking
+   USE_DL	-- Jack's dl for IRIX 4 or GNU dld with emulation for Jack's dl
+   USE_SHLIB	-- SunOS or IRIX 5 (SVR4?) shared libraries
+   _AIX		-- AIX style dynamic linking
+   _DL_FUNCPTR_DEFINED	-- if the typedef dl_funcptr has been defined
+   WITH_MAC_DL	-- Mac dynamic linking (highly experimental)
+
+   (The other WITH_* symbols are used only once, to set the
+   appropriate symbols.)
+*/
+
+/* Configure dynamic linking */
+
+#if defined(NeXT) || defined(WITH_RLD)
 #define DYNAMIC_LINK
 #define USE_RLD
 #endif
@@ -63,18 +81,21 @@ extern long getmtime(); /* Defined in posixmodule.c */
 #define USE_DL
 #endif
 
-#if !defined(USE_DL) && defined(HAVE_DLFCN_H) && defined(HAVE_DLOPEN)
-#define USE_SHLIB
+#ifdef WITH_MAC_DL
 #define DYNAMIC_LINK
 #endif
 
+#if !defined(DYNAMIC_LINK) && defined(HAVE_DLFCN_H) && defined(HAVE_DLOPEN)
+#define DYNAMIC_LINK
+#define USE_SHLIB
+#endif
 
 #ifdef _AIX
+#define DYNAMIC_LINK
 #include <sys/ldr.h>
 typedef void (*dl_funcptr)();
 #define _DL_FUNCPTR_DEFINED
-static void aix_loaderror( char *name  );
-#define DYNAMIC_LINK
+static void aix_loaderror(char *name);
 #endif
 
 #ifdef DYNAMIC_LINK
@@ -91,7 +112,11 @@ typedef void (*dl_funcptr)();
 
 #ifdef USE_DL
 #include "dl.h"
-#endif /* USE_DL */
+#endif
+
+#ifdef WITH_MAC_DL
+#include "dynamic_load.h"
+#endif
 
 #ifdef USE_RLD
 #include <mach-o/rld.h>
@@ -169,6 +194,117 @@ static struct filedescr {
 	{".pyc", "rb", PY_COMPILED},
 	{0, 0}
 };
+
+#ifdef DYNAMIC_LINK
+static object *
+load_dynamic_module(name, namebuf, m, m_ret)
+	char *name;
+	char *namebuf;
+	object *m;
+	object **m_ret;
+{
+	char funcname[258];
+	dl_funcptr p = NULL;
+	if (m != NULL) {
+		err_setstr(ImportError,
+			   "cannot reload dynamically loaded module");
+		return NULL;
+	}
+	sprintf(funcname, FUNCNAME_PATTERN, name);
+#ifdef WITH_MAC_DL
+	{
+		object *v = dynamic_load(namebuf);
+		if (v == NULL)
+			return NULL;
+	}
+#else /* !WITH_MAC_DL */
+#ifdef USE_SHLIB
+	{
+#ifdef RTLD_NOW
+		/* RTLD_NOW: resolve externals now
+		   (i.e. core dump now if some are missing) */
+		void *handle = dlopen(namebuf, RTLD_NOW);
+#else
+		void *handle;
+		if (verbose)
+			printf("dlopen(\"%s\", %d);\n", namebuf, RTLD_LAZY);
+		handle = dlopen(namebuf, RTLD_LAZY);
+#endif /* RTLD_NOW */
+		if (handle == NULL) {
+			err_setstr(ImportError, dlerror());
+			return NULL;
+		}
+		p = (dl_funcptr) dlsym(handle, funcname);
+	}
+#endif /* USE_SHLIB */
+#ifdef _AIX
+	p = (dl_funcptr) load(namebuf, 1, 0);
+	if (p == NULL) {
+		aix_loaderror(namebuf);
+		return NULL;
+	}
+#endif /* _AIX */
+#ifdef USE_DL
+	p =  dl_loadmod(getprogramname(), namebuf, funcname);
+#endif /* USE_DL */
+#ifdef USE_RLD
+	{
+		NXStream *errorStream;
+		struct mach_header *new_header;
+		const char *filenames[2];
+		long ret;
+		unsigned long ptr;
+
+		errorStream = NXOpenMemory(NULL, 0, NX_WRITEONLY);
+		filenames[0] = namebuf;
+		filenames[1] = NULL;
+		ret = rld_load(errorStream, &new_header, 
+				filenames, NULL);
+
+		/* extract the error messages for the exception */
+		if(!ret) {
+			char *streamBuf;
+			int len, maxLen;
+
+			NXPutc(errorStream, (char)0);
+
+			NXGetMemoryBuffer(errorStream,
+				&streamBuf, &len, &maxLen);
+			err_setstr(ImportError, streamBuf);
+		}
+
+		if(ret && rld_lookup(errorStream, funcname, &ptr))
+			p = (dl_funcptr) ptr;
+
+		NXCloseMemory(errorStream, NX_FREEBUFFER);
+
+		if(!ret)
+			return NULL;
+	}
+#endif /* USE_RLD */
+
+	if (p == NULL) {
+		err_setstr(ImportError,
+		   "dynamic module does not define init function");
+		return NULL;
+	}
+	(*p)();
+
+#endif /* !WITH_MAC_DL */
+	*m_ret = m = dictlookup(modules, name);
+	if (m == NULL) {
+		err_setstr(SystemError,
+			   "dynamic module not initialized properly");
+		return NULL;
+	}
+	if (verbose)
+		fprintf(stderr,
+			"import %s # dynamically loaded from %s\n",
+			name, namebuf);
+	INCREF(None);
+	return None;
+}
+#endif /* DYNAMIC_LINK */
 
 static object *
 get_module(m, name, m_ret)
@@ -330,100 +466,8 @@ get_module(m, name, m_ret)
 
 #ifdef DYNAMIC_LINK
 	case C_EXTENSION:
-	      {
-		char funcname[258];
-		dl_funcptr p = NULL;
 		fclose(fp);
-		if (m != NULL) {
-			err_setstr(ImportError,
-				   "cannot reload dynamically loaded module");
-			return NULL;
-		}
-		sprintf(funcname, FUNCNAME_PATTERN, name);
-#ifdef USE_SHLIB
-		{
-#ifdef RTLD_NOW
-			/* RTLD_NOW: resolve externals now
-			   (i.e. core dump now if some are missing) */
-			void *handle = dlopen(namebuf, RTLD_NOW);
-#else
-			void *handle;
-			if (verbose)
-				printf("dlopen(\"%s\", %d);\n",
-				       namebuf, RTLD_LAZY);
-			handle = dlopen(namebuf, RTLD_LAZY);
-#endif /* RTLD_NOW */
-			if (handle == NULL) {
-				err_setstr(ImportError, dlerror());
-				return NULL;
-			}
-			p = (dl_funcptr) dlsym(handle, funcname);
-		}
-#endif /* USE_SHLIB */
-#if defined( USE_DL ) || defined( _AIX )
-#ifdef _AIX
-		p = (dl_funcptr) load( namebuf, 1, 0 );
-		if ( p == NULL ) { aix_loaderror( namebuf ); return NULL; }
-#else /* _AIX */
-		p =  dl_loadmod(getprogramname(), namebuf, funcname);
-#endif 
-#endif /* USE_DL || _AIX */
-#ifdef USE_RLD
-		{
-			NXStream *errorStream;
-			struct mach_header *new_header;
-			const char *filenames[2];
-			long ret;
-			unsigned long ptr;
-			
-			errorStream = NXOpenMemory(NULL, 0, NX_WRITEONLY);
-			filenames[0] = namebuf;
-			filenames[1] = NULL;
-			ret = rld_load(errorStream, &new_header, 
-					filenames, NULL);
-			
-			/* extract the error messages for the exception */
-			if(!ret) {
-				char *streamBuf;
-				int len, maxLen;
-				
-				NXPutc(errorStream, (char)0);
-				
-				NXGetMemoryBuffer(errorStream,
-					&streamBuf, &len, &maxLen);
-				err_setstr(ImportError, streamBuf);
-			}
-			
-			if(ret && rld_lookup(errorStream, funcname, &ptr))
-				p = (dl_funcptr) ptr;
-				
-			NXCloseMemory(errorStream, NX_FREEBUFFER);
-			
-			if(!ret)
-				return NULL;
-		}
-#endif /* USE_RLD */
-
-		if (p == NULL) {
-			err_setstr(ImportError,
-			   "dynamic module does not define init function");
-			return NULL;
-		}
-		(*p)();
-		*m_ret = m = dictlookup(modules, name);
-		if (m == NULL) {
-			err_setstr(SystemError,
-				   "dynamic module not initialized properly");
-			return NULL;
-		}
-		if (verbose)
-			fprintf(stderr,
-				"import %s # dynamically loaded from %s\n",
-				name, namebuf);
-		INCREF(None);
-		return None;
-		break;
-	      }
+		return load_dynamic_module(name, namebuf, m, m_ret);
 #endif /* DYNAMIC_LINK */
 
 	default:
@@ -603,7 +647,7 @@ init_frozen(name)
 #include <errno.h>	/* for global errno	*/
 #include <string.h>	/* for strerror()	*/
 
-void aix_loaderror( char *namebuf )
+void aix_loaderror(char *namebuf)
 {
 
 	char *message[8], errbuf[1024];
@@ -613,38 +657,40 @@ void aix_loaderror( char *namebuf )
 		int errno;
 		char *errstr;
 	} load_errtab[] = {
-		{ L_ERROR_TOOMANY,	"to many errors, rest skipped." },
-		{ L_ERROR_NOLIB,	"can't load library:" },
-		{ L_ERROR_UNDEF,	"can't find symbol in library:"},
-		{ L_ERROR_RLDBAD,	"RLD index out of range or bad relocation type:" },
-		{ L_ERROR_FORMAT,	"not a valid, executable xcoff file:" },
-		{ L_ERROR_MEMBER,	"file not an archive or does not contain requested member:" },
-		{ L_ERROR_TYPE,		"symbol table mismatch:" },
-		{ L_ERROR_ALIGN,	"text allignment in file is wrong." },
-		{ L_ERROR_SYSTEM,	"System error:" },
-		{ L_ERROR_ERRNO,	NULL }
+		{L_ERROR_TOOMANY,	"to many errors, rest skipped."},
+		{L_ERROR_NOLIB,		"can't load library:"},
+		{L_ERROR_UNDEF,		"can't find symbol in library:"},
+		{L_ERROR_RLDBAD,
+		 "RLD index out of range or bad relocation type:"},
+		{L_ERROR_FORMAT,	"not a valid, executable xcoff file:"},
+		{L_ERROR_MEMBER,
+		 "file not an archive or does not contain requested member:"},
+		{L_ERROR_TYPE,		"symbol table mismatch:"},
+		{L_ERROR_ALIGN,		"text allignment in file is wrong."},
+		{L_ERROR_SYSTEM,	"System error:"},
+		{L_ERROR_ERRNO,		NULL}
 	};
 
 #define LOAD_ERRTAB_LEN	(sizeof(load_errtab)/sizeof(load_errtab[0]))
 #define ERRBUF_APPEND(s)	strncat(errbuf, s, sizeof(errbuf))
 
-	sprintf( errbuf, " from module %s ", namebuf );
+	sprintf(errbuf, " from module %s ", namebuf);
 
-	if ( !loadquery( 1, &message[0], sizeof(message) ) ) 
-		ERRBUF_APPEND( strerror( errno ) );
-	for( i = 0; message[i] && *message[i]; i++ ) {
+	if (!loadquery(1, &message[0], sizeof(message))) 
+		ERRBUF_APPEND(strerror(errno));
+	for(i = 0; message[i] && *message[i]; i++) {
 		int nerr = atoi(message[i]);
-		for (j=0; j<LOAD_ERRTAB_LEN ; j++ ) {
-		    if ((nerr == load_errtab[i].errno) && load_errtab[i].errstr)
+		for (j=0; j<LOAD_ERRTAB_LEN ; j++) {
+		    if (nerr == load_errtab[i].errno && load_errtab[i].errstr)
 			ERRBUF_APPEND(load_errtab[i].errstr);
 		}
-		while ( isdigit(*message[i]) ) message[i]++ ; 
-		ERRBUF_APPEND( message[i] );
-		ERRBUF_APPEND( "\n" );
+		while (isdigit(*message[i])) message[i]++ ; 
+		ERRBUF_APPEND(message[i]);
+		ERRBUF_APPEND("\n");
 	}
 	errbuf[strlen(errbuf)-1] = '\0' ;	/* trim off last newline */
-	err_setstr( ImportError, errbuf ); 
+	err_setstr(ImportError, errbuf); 
 	return; 
 }
 
-#endif	/* _AIX */
+#endif /* _AIX */
