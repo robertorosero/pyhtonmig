@@ -267,6 +267,22 @@ thread_allocate_lock(self, args)
 	return (object *) newlockobject();
 }
 
+static object *
+thread_get_ident(self, args)
+	object *self; /* Not used */
+	object *args;
+{
+	long ident;
+	if (!getnoarg(args))
+		return NULL;
+	ident = get_thread_ident();
+	if (ident == -1) {
+		err_setstr(ThreadError, "no current thread ident");
+		return NULL;
+	}
+	return newintobject(ident);
+}
+
 static struct methodlist thread_methods[] = {
 	{"start_new_thread",	(method)thread_start_new_thread},
 	{"start_new",		(method)thread_start_new_thread},
@@ -274,6 +290,7 @@ static struct methodlist thread_methods[] = {
 	{"allocate",		(method)thread_allocate_lock},
 	{"exit_thread",		(method)thread_exit_thread},
 	{"exit",		(method)thread_exit_thread},
+	{"get_ident",		(method)thread_get_ident},
 #ifndef NO_EXIT_PROG
 	{"exit_prog",		(method)thread_exit_prog},
 #endif

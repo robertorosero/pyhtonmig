@@ -141,9 +141,10 @@ rotor rotormodule.o
 # installed; you may be better off switching on only 'fm' and 'gl'
 # (Font Manager and Graphics Library).
 
-#al almodule.o -laudio		# audio
-#cd cdmodule.o -lcdaudio -lds	#
-#cl clmodule.o -lcl
+#                               # ADD THESE FOR IRIX5:
+#al almodule.o -laudio
+#cd cdmodule.o -lcdaudio -lds	# -lmediad
+#cl clmodule.o -lcl		# -lawareaudio
 #fm fmmodule.o -lfm_s -lgl_s
 #gl glmodule.o -lgl_s -lX11_s
 #imgfile imgfilemodule.o -limage -lgutil
@@ -181,8 +182,16 @@ rotor rotormodule.o
 # signal signalmodule.o
 
 
+# Tommy's 'new' module (creates new empty objects of certain kinds)
+# new newmodule.o
+
+
 # John Redford's sybase module
 # sybase sybasemodule.o
+
+
+# Generic (SunOS / SVR4) dynamic loading module
+# dl dlmodule.o
 
 
 # Example -- included for reference only
