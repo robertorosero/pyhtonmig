@@ -40,7 +40,7 @@ def login():
         if cryptedpasswd == 'x' or cryptedpasswd == '*': 
             raise "Sorry, currently no support for shadow passwords"
         cleartext = getpass.getpass()
-        return crypt(cleartext, cryptedpasswd[:2]) == cryptedpasswd
+        return crypt.crypt(cleartext, cryptedpasswd[:2]) == cryptedpasswd
     else:
         return 1
 \end{verbatim}
