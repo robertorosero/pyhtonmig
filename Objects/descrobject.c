@@ -155,11 +155,12 @@ descr_set(PyDescrObject *descr, PyObject *obj, PyObject *value)
 	switch (descr->d_flavor) {
 
 	case DF_METHOD:
+	case DF_WRAPPER:
 		PyErr_Format(PyExc_TypeError,
 			     "can't %s method attribute '%.400s' "
 			     "of '%.50s' object",
 			     value==NULL ? "delete" : "assign to",
-			     descr->d_union.d_method->ml_name,
+			     descr_name(descr),
 			     obj->ob_type->tp_name);
 		return -1;
 
