@@ -1,5 +1,5 @@
 /***********************************************************
-Copyright 1991, 1992, 1993 by Stichting Mathematisch Centrum,
+Copyright 1991, 1992, 1993, 1994 by Stichting Mathematisch Centrum,
 Amsterdam, The Netherlands.
 
                         All Rights Reserved
@@ -32,12 +32,16 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
    - a malloc'ed string ending in \n normally
 */
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
 #include <stdio.h>
 #include <string.h>
 
 #include "mymalloc.h"
 
-#ifdef HAVE_READLINE
+#ifdef WITH_READLINE
 
 extern char *readline();
 
@@ -54,7 +58,7 @@ onintr(sig)
 	longjmp(jbuf, 1);
 }
 
-#endif /* HAVE_READLINE */
+#endif /* WITH_READLINE */
 
 char *
 my_readline(prompt)
@@ -62,7 +66,7 @@ my_readline(prompt)
 {
 	int n;
 	char *p;
-#ifdef HAVE_READLINE
+#ifdef WITH_READLINE
 	RETSIGTYPE (*old_inthandler)();
 	static int been_here;
 	if (!been_here) {
@@ -92,7 +96,7 @@ my_readline(prompt)
 		p[n+1] = '\0';
 	}
 	return p;
-#else /* !HAVE_READLINE */
+#else /* !WITH_READLINE */
 	n = 100;
 	if ((p = malloc(n)) == NULL)
 		return NULL;
@@ -115,5 +119,5 @@ my_readline(prompt)
 		n += strlen(p+n);
 	}
 	return realloc(p, n+1);
-#endif /* !HAVE_READLINE */
+#endif /* !WITH_READLINE */
 }

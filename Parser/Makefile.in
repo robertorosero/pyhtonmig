@@ -59,7 +59,8 @@ clobber:	clean
 		-rm -f $(PGEN) *.a tags TAGS
 
 Makefile:	Makefile.in $(TOP)/config.status
-		CONFIG_FILES=Makefile $(SHELL) $(TOP)/config.status
+		CONFIG_FILES=Makefile CONFIG_HEADERS= \
+		$(SHELL) $(TOP)/config.status
 
 depend:
 		$(MKDEP) $(CFLAGS) \
