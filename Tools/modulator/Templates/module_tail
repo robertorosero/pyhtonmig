@@ -2,36 +2,35 @@
 /* List of methods defined in the module */
 
 static struct PyMethodDef $abbrev$_methods[] = {
-	$methodlist$
+$methodlist$
 	{NULL,	 (PyCFunction)NULL, 0, NULL}		/* sentinel */
 };
 
-
-/* Initialization function for the module (*must* be called init$name$) */
 
 static char $name$_module_documentation[] = 
 ""
 ;
 
-void
-init$name$()
+#ifndef PyMODINIT_FUNC	/* declarations for DLL import/export */
+#define PyMODINIT_FUNC void
+#endif
+PyMODINIT_FUNC
+init$name$(void)
 {
-	PyObject *m, *d;
-
+	PyObject *m;
+        $ready_types$
 	/* Create the module and add the functions */
-	m = Py_InitModule4("$name$", $abbrev$_methods,
-		$name$_module_documentation,
-		(PyObject*)NULL,PYTHON_API_VERSION);
+	m = Py_InitModule3("$name$", $abbrev$_methods,
+                           $name$_module_documentation);
+
+        if (m == NULL)
+        	return;
 
 	/* Add some symbolic constants to the module */
-	d = PyModule_GetDict(m);
 	ErrorObject = PyString_FromString("$name$.error");
-	PyDict_SetItemString(d, "error", ErrorObject);
-
+        if (PyModule_AddObject(m, "error", ErrorObject) < 0)
+		return;
+        $add_types$
 	/* XXXX Add constants here */
-	
-	/* Check for errors */
-	if (PyErr_Occurred())
-		Py_FatalError("can't initialize module $name$");
 }
 

@@ -1,7 +1,7 @@
 
 static void
-$abbrev$_dealloc($abbrev$object *self)
-{
+$abbrev$_dealloc($abbrev$$object$ *self)
+{$call_clear$
 	/* XXXX Add your own cleanup code here */
-	PyMem_DEL(self);
+	self->ob_type->tp_free((PyObject*)self);
 }

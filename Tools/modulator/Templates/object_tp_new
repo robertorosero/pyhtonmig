@@ -1,0 +1,15 @@
+
+static PyObject *
+$abbrev$_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
+{
+    	$abbrev$$object$ *self;
+
+    	self = ($abbrev$$object$ *)type->tp_alloc(type, 0);
+
+    	if (self != NULL) {
+        	/* setup instance variables here */
+
+    	}
+
+    	return (PyObject *)self;
+}

@@ -1,7 +1,10 @@
 
 static PyObject *
-$abbrev$_getattr($abbrev$object *self, char *name)
+$abbrev$_getattro($abbrev$$object$ *self, PyObject *name)
 {
-	/* XXXX Add your own getattr code here */
-	return Py_FindMethod($abbrev$_methods, (PyObject *)self, name);
+	/* XXXX Add your own getattr code here 
+           Do you *really* want to do this? Rather than using
+           descriptors? */
+        Py_INCREF(Py_None);
+        return Py_None;
 }

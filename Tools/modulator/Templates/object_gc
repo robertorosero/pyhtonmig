@@ -1,0 +1,28 @@
+
+static int
+$abbrev$_traverse($abbrev$$object$ *self, visitproc visit, void *arg)
+{
+	/* For each subobject that could be involved in cycles, do
+	   code like:
+
+	if (self->xxx != NULL && visit(self->xxx, arg) < 0)
+		return -1;
+	*/
+
+	return 0;
+}
+
+static int
+$abbrev$_clear($abbrev$$object$ *self)
+{
+	/* XXXX Drop references that may have created reference
+           cycles. Immutable objects do not have to define this method
+           since they can never directly create reference cycles. Note
+           that the object must still be valid after calling this
+           method (don't just call Py_DECREF() on a reference). The
+           collector will call this method if it detects that this
+           object is involved in a reference cycle.
+        */
+	return 0;
+}
+

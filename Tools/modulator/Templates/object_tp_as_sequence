@@ -2,57 +2,79 @@
 /* Code to handle accessing $name$ objects as sequence objects */
 
 static int
-$abbrev$_length($abbrev$object *self)
+$abbrev$_length($abbrev$$object$ *self)
 {
 	/* XXXX Return the size of the object */
 }
 
 static PyObject *
-$abbrev$_concat($abbrev$object *self, PyObject *bb)
+$abbrev$_concat($abbrev$$object$ *self, PyObject *bb)
 {
 	/* XXXX Return the concatenation of self and bb */
 }
 
 static PyObject *
-$abbrev$_repeat($abbrev$object *self, int n)
+$abbrev$_repeat($abbrev$$object$ *self, int n)
 {
 	/* XXXX Return a new object that is n times self */
 }
 
 static PyObject *
-$abbrev$_item($abbrev$object *self, int i)
+$abbrev$_item($abbrev$$object$ *self, int i)
 {
 	/* XXXX Return the i-th object of self */
 }
 
 static PyObject *
-$abbrev$_slice($abbrev$object *self, int ilow, int ihigh)
+$abbrev$_slice($abbrev$$object$ *self, int ilow, int ihigh)
 {
 	/* XXXX Return the ilow..ihigh slice of self in a new object */
 }
 
 static int
-$abbrev$_ass_item($abbrev$object *self, int i, PyObject *v)
+$abbrev$_ass_item($abbrev$$object$ *self, int i, PyObject *v)
 {
 	/* XXXX Assign to the i-th element of self */
 	return 0;
 }
 
 static int
-$abbrev$_ass_slice(PyListObject *self, int ilow, int ihigh, PyObject *v)
+$abbrev$_ass_slice($abbrev$$object$ *self, int ilow, int ihigh, PyObject *v)
 {
 	/* XXXX Replace ilow..ihigh slice of self with v */
 	return 0;
 }
 
+static int
+$abbrev$_contains($abbrev$$object$ *self, PyObject *v)
+{
+	/* XXXX Does self contain v? */
+	return 0;
+}
+
+static PyObject *
+$abbrev$_inplace_concat($abbrev$$object$ *self, PyObject *v)
+{
+	/* XXXX Concat self and v in place */
+}
+
+static PyObject *
+$abbrev$_inplace_repeat($abbrev$$object$ *self, int i)
+{
+	/* XXXX Repeat self in place */
+}
+
 static PySequenceMethods $abbrev$_as_sequence = {
-	(inquiry)$abbrev$_length,		/*sq_length*/
-	(binaryfunc)$abbrev$_concat,		/*sq_concat*/
-	(intargfunc)$abbrev$_repeat,		/*sq_repeat*/
-	(intargfunc)$abbrev$_item,		/*sq_item*/
-	(intintargfunc)$abbrev$_slice,		/*sq_slice*/
-	(intobjargproc)$abbrev$_ass_item,	/*sq_ass_item*/
-	(intintobjargproc)$abbrev$_ass_slice,	/*sq_ass_slice*/
+	/* sq_length         */ (inquiry)$abbrev$_length,
+	/* sq_concat         */ (binaryfunc)$abbrev$_concat,
+	/* sq_repeat         */ (intargfunc)$abbrev$_repeat,
+	/* sq_item           */ (intargfunc)$abbrev$_item,
+	/* sq_slice          */ (intintargfunc)$abbrev$_slice,
+	/* sq_ass_item       */ (intobjargproc)$abbrev$_ass_item,
+	/* sq_ass_slice      */ (intintobjargproc)$abbrev$_ass_slice,
+	/* sq_contains       */ (objobjproc)$abbrev$_contains,
+	/* sq_inplace_concat */ (binaryfunc)$abbrev$_inplace_concat,
+	/* sq_inplace_repeat */ (intargfunc)$abbrev$_inplace_repeat,
 };
 
 /* -------------------------------------------------------------- */

@@ -26,9 +26,14 @@ error = 'genmodule.error'
 #
 # Names of functions in the object-description struct.
 #
-FUNCLIST = ['new', 'tp_dealloc', 'tp_print', 'tp_getattr', 'tp_setattr',
-            'tp_compare', 'tp_repr', 'tp_hash', 'tp_call', 'tp_str']
-TYPELIST = ['tp_as_number', 'tp_as_sequence', 'tp_as_mapping', 'structure']
+FUNCLIST = ['tp_dealloc', 'tp_init', 'tp_new',
+            'tp_print', 'tp_getattr', 'tp_setattr',
+            'tp_compare', 'tp_repr', 'tp_hash', 'tp_call', 'tp_str',
+            'tp_descr_get', 'tp_descr_set',
+            'tp_iter', 'tp_iternext'
+            ]
+TYPELIST = ['tp_as_number', 'tp_as_sequence', 'tp_as_mapping',
+            'structure', 'getset', 'gc']
 
 #
 # writer is a base class for the object and module classes
@@ -73,6 +78,8 @@ class module(writer):
         self.addcode('copyright', fp)
         self.addcode('module_head', fp)
         for o in self.objects:
+            o.module = self.name
+        for o in self.objects:
             o.writehead(fp)
         for o in self.objects:
             o.writebody(fp)
@@ -81,17 +88,43 @@ class module(writer):
             self.method = fn
             self.addcode('module_method', fp)
             new_ml = new_ml + (
-                      '{"%s",\t(PyCFunction)%s_%s,\tMETH_VARARGS,\t%s_%s__doc__},\n'
+                      '\t{"%s",\t(PyCFunction)%s_%s,\tMETH_VARARGS,\n'
+                      '\t %s_%s__doc__},\n'
                       %(fn, self.abbrev, fn, self.abbrev, fn))
         self.methodlist = new_ml
+
+        if self.objects:
+            ready_types = ['', '/* Initialize types: */']
+            add_types = ['', '/* Add types: */']
+
+            for o in self.objects:
+                ready_types.extend(['if (PyType_Ready(&%s%s) < 0)'
+                                    % (o.abbrev, o.type),
+                                    '\treturn;'
+                                    ])
+                add_types.extend(['if (PyModule_AddObject(m, "%s", '
+                                  '(PyObject *)&%s%s) < 0)'
+                                  % (o.name, o.abbrev, o.type),
+                                  '\treturn;'
+                                  ])
+            self.ready_types = '\n'.join(ready_types)+'\n'
+            self.add_types = '\n'.join(add_types)+'\n'
+            
+        else:
+            self.ready_types = self.add_types = ''
+        
         self.addcode('module_tail', fp)
 
 class object(writer):
     _type = 'object'
+
+    
     def __init__(self):
         self.typelist = []
         self.methodlist = []
-        self.funclist = ['new']
+        self.funclist = []
+        self.object = ''
+        self.type = 'Type'
         writer.__init__(self)
 
     def writecode(self, fp):
@@ -103,36 +136,53 @@ class object(writer):
         self.addcode('object_head', fp)
 
     def writebody(self, fp):
-        new_ml = ''
-        for fn in self.methodlist:
-            self.method = fn
-            self.addcode('object_method', fp)
-            new_ml = new_ml + (
-                      '{"%s",\t(PyCFunction)%s_%s,\tMETH_VARARGS,\t%s_%s__doc__},\n'
-                      %(fn, self.abbrev, fn, self.abbrev, fn))
-        self.methodlist = new_ml
-        self.addcode('object_mlist', fp)
+        if self.methodlist:
+            new_ml = ''
+            for fn in self.methodlist:
+                self.method = fn
+                self.addcode('object_method', fp)
+                new_ml = new_ml + (
+                          '\t{"%s",\t(PyCFunction)%s_%s,\tMETH_VARARGS,\n'
+                          '\t %s_%s__doc__},\n'
+                          %(fn, self.abbrev, fn, self.abbrev, fn))
+            self.methodlist = new_ml
+            self.addcode('object_mlist', fp)
 
-        # Add getattr if we have methods
-        if self.methodlist and not 'tp_getattr' in self.funclist:
-            self.funclist.insert(0, 'tp_getattr')
+            self.tp_methods = self.abbrev + '_methods'
+
+        else:
+            self.tp_methods = '0'
+
+        if 'gc' in self.typelist:
+            self.call_clear = '\n\t' + self.abbrev + '_clear(self);'
+            if 'tp_dealloc' in self.funclist:
+                self.funclist.remove('tp_dealloc')
+            self.typelist.append('tp_dealloc')
+            self.extra_flags = "\n\t| Py_TPFLAGS_HAVE_GC"
+            self.tp_traverse =  self.abbrev + "_traverse"
+            self.tp_clear = self.abbrev + "_clear"
+        else:
+            self.extra_flags = ""
+            self.tp_traverse = self.tp_clear = "0"
+            self.call_clear = ''
+            
             
         for fn in FUNCLIST:
             setattr(self, fn, '0')
 
-        #
-        # Special case for structure-access objects: put getattr in the
-        # list of functions but don't generate code for it directly,
-        # the code is obtained from the object_structure template.
-        # The same goes for setattr.
-        #
         if 'structure' in self.typelist:
-            if 'tp_getattr' in self.funclist:
-                self.funclist.remove('tp_getattr')
-            if 'tp_setattr' in self.funclist:
-                self.funclist.remove('tp_setattr')
-            self.tp_getattr = self.abbrev + '_getattr'
-            self.tp_setattr = self.abbrev + '_setattr'
+            self.tp_members = self.abbrev + '_members'
+        else:
+            self.tp_members = '0'
+
+        if 'getset' in self.typelist:
+            self.tp_getset = self.abbrev + '_getset'
+        else:
+            self.tp_getset = '0'
+
+        if 'tp_new' not in self.funclist:
+            self.tp_new = 'PyType_GenericNew'
+        
         for fn in self.funclist:
             self.addcode('object_'+fn, fp)
             setattr(self, fn, '%s_%s'%(self.abbrev, fn[3:]))

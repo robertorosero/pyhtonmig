@@ -1,0 +1,9 @@
+
+static PyObject *
+$abbrev$_iter($abbrev$$object$ *self)
+{
+	/* XXXX Return an iterator for the object. If the object is an
+           iterator, then just return the object.
+         */
+}
+

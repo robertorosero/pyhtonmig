@@ -1,31 +1,52 @@
 
-static char $Abbrev$type__doc__[] = 
+static char $Abbrev$$type$__doc__[] = 
 ""
 ;
 
-static PyTypeObject $Abbrev$type = {
-	PyObject_HEAD_INIT(&PyType_Type)
-	0,				/*ob_size*/
-	"$name$",			/*tp_name*/
-	sizeof($abbrev$object),		/*tp_basicsize*/
-	0,				/*tp_itemsize*/
-	/* methods */
-	(destructor)$tp_dealloc$,	/*tp_dealloc*/
-	(printfunc)$tp_print$,		/*tp_print*/
-	(getattrfunc)$tp_getattr$,	/*tp_getattr*/
-	(setattrfunc)$tp_setattr$,	/*tp_setattr*/
-	(cmpfunc)$tp_compare$,		/*tp_compare*/
-	(reprfunc)$tp_repr$,		/*tp_repr*/
-	$tp_as_number$,			/*tp_as_number*/
-	$tp_as_sequence$,		/*tp_as_sequence*/
-	$tp_as_mapping$,		/*tp_as_mapping*/
-	(hashfunc)$tp_hash$,		/*tp_hash*/
-	(ternaryfunc)$tp_call$,		/*tp_call*/
-	(reprfunc)$tp_str$,		/*tp_str*/
-
-	/* Space for future expansion */
-	0L,0L,0L,0L,
-	$Abbrev$type__doc__ /* Documentation string */
+static PyTypeObject $abbrev$$type$ = {
+	PyObject_HEAD_INIT(NULL)
+	/* ob_size           */ 0,
+	/* tp_name           */ "$module$."
+                                "$name$",
+	/* tp_basicsize      */ sizeof($abbrev$$object$),
+	/* tp_itemsize       */ 0,
+	/* tp_dealloc        */ (destructor)$tp_dealloc$,
+	/* tp_print          */ (printfunc)$tp_print$,
+	/* tp_getattr        */ (getattrfunc)0,
+	/* tp_setattr        */ (setattrfunc)0,
+	/* tp_compare        */ (cmpfunc)$tp_compare$,
+	/* tp_repr           */ (reprfunc)$tp_repr$,
+	/* tp_as_number      */ $tp_as_number$,
+	/* tp_as_sequence    */ $tp_as_sequence$,
+	/* tp_as_mapping     */ $tp_as_mapping$,
+	/* tp_hash           */ (hashfunc)$tp_hash$,
+	/* tp_call           */ (ternaryfunc)$tp_call$,
+	/* tp_str            */ (reprfunc)$tp_str$,
+        /* tp_getattro       */ (getattrofunc)$tp_getattr$o,
+        /* tp_setattro       */ (setattrofunc)$tp_setattr$o,
+        /* tp_as_buffer      */ 0,
+        /* tp_flags          */ Py_TPFLAGS_DEFAULT
+				| Py_TPFLAGS_BASETYPE $extra_flags$,
+	/* tp_doc            */ $Abbrev$$type$__doc__,
+        /* tp_traverse       */ (traverseproc)$tp_traverse$,
+        /* tp_clear          */ (inquiry)$tp_clear$,
+        /* tp_richcompare    */ (richcmpfunc)0,
+        /* tp_weaklistoffset */ (long)0,
+        /* tp_iter           */ (getiterfunc)$tp_iter$,
+        /* tp_iternext       */ (iternextfunc)$tp_iternext$,
+        /* tp_methods        */ $tp_methods$,
+        /* tp_members        */ $tp_members$,
+        /* tp_getset         */ $tp_getset$,
+        /* tp_base           */ 0,
+        /* tp_dict           */ 0, /* internal use */
+        /* tp_descr_get      */ (descrgetfunc)$tp_descr_get$,
+        /* tp_descr_set      */ (descrsetfunc)$tp_descr_set$,
+        /* tp_dictoffset     */ 0,
+        /* tp_init           */ (initproc)$tp_init$,
+        /* tp_alloc          */ (allocfunc)0,
+        /* tp_new            */ (newfunc)$tp_new$,
+	/* tp_free           */ 0, /* Low-level free-mem routine */
+	/* tp_is_gc          */ (inquiry)0, /* For PyObject_IS_GC */
 };
 
 /* End of code for $name$ objects */

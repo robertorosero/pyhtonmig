@@ -1,0 +1,7 @@
+
+static int
+$abbrev$_descr_set($abbrev$$object$ *self, PyObject *inst, PyObject *newvalue)
+{
+	/* XXXX Add your own set code here */
+        return 0;
+}

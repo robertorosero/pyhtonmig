@@ -1,0 +1,7 @@
+
+static PyObject *
+$abbrev$_descr_get($abbrev$$object$ *self, PyObject *inst, PyObject *cls)
+{
+	/* XXXX Add your own get code here */
+        /* Note that inst may be NULL */
+}

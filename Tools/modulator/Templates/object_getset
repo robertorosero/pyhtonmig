@@ -1,0 +1,37 @@
+
+/* Code to use getters and/or setters to support attributes */
+
+/* Create gettrs and settrs. Here's an example that gets and 
+   sets a first name. 
+*/
+
+/*
+static PyObject *
+$abbrev$_getfirst($abbrev$$object$ *self, void *closure)
+{
+    	Py_INCREF(self->first);
+        return self->first;
+}
+*/
+
+/*
+static int
+$abbrev$_setfirst($abbrev$$object$ *self, PyObject *value, void *closure)
+{
+        Py_DECREF(self->first);
+        Py_INCREF(value);
+        self->first = value;    
+
+        return 0;
+}
+*/
+
+static PyGetSetDef $abbrev$_getset[] = {
+  /*
+    {"first", 
+     (getter)$abbrev$_getfirst, (setter)$abbrev$_setfirst,
+     "first name",
+     NULL},
+  */
+    {NULL}  /* Sentinel */
+};

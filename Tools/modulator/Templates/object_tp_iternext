@@ -1,0 +1,9 @@
+
+static PyObject *
+$abbrev$_iternext($abbrev$$object$ *self)
+{
+	/* XXXX Return the next object in the iteration. Raise
+           StopIteration when done.
+         */
+     PyErr_SetObject(PyExc_StopIteration, Py_None);
+}
