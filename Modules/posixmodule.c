@@ -24,6 +24,10 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 /* POSIX module implementation */
 
+#ifdef _M_IX86
+#define NT
+#endif
+
 #include "allobjects.h"
 #include "modsupport.h"
 #include "ceval.h"
@@ -109,6 +113,14 @@ extern int symlink();
 #include <ndir.h>
 #endif /* NDIR */
 #endif /* not (DIRENT or _POSIX_VERSION) */
+
+#ifdef NT
+#include <direct.h>
+#include <io.h>
+#include <process.h>
+#include <windows.h>
+#define popen   _popen
+#endif /* NT */
 
 
 /* Return a dictionary corresponding to the POSIX environment table */
@@ -308,6 +320,62 @@ posix_link(self, args)
 	return posix_2str(args, link);
 }
 
+#ifdef NT
+static object *
+posix_listdir(self, args)
+	object *self;
+	object *args;
+{
+	char *name;
+	int len;
+	object *d, *v;
+	HANDLE hFindFile;
+	WIN32_FIND_DATA FileData;
+	char namebuf[MAX_PATH+5];
+
+	if (!getargs(args, "s#", &name, &len))
+		return NULL;
+	if (len >= MAX_PATH) {
+		err_setstr(ValueError, "path too long");
+		return NULL;
+	}
+	strcpy(namebuf, name);
+	if (namebuf[len-1] != '/' && namebuf[len-1] != '\\')
+		namebuf[len++] = '/';
+	strcpy(namebuf + len, "*.*");
+
+	if ((d = newlistobject(0)) == NULL)
+		return NULL;
+
+	hFindFile = FindFirstFile(namebuf, &FileData);
+	if (hFindFile == INVALID_HANDLE_VALUE) {
+		errno = GetLastError();
+		return posix_error();
+	}
+	do {
+		v = newstringobject(FileData.cFileName);
+		if (v == NULL) {
+			DECREF(d);
+			d = NULL;
+			break;
+		}
+		if (addlistitem(d, v) != 0) {
+			DECREF(v);
+			DECREF(d);
+			d = NULL;
+			break;
+		}
+		DECREF(v);
+	} while (FindNextFile(hFindFile, &FileData) == TRUE);
+
+	if (FindClose(hFindFile) == FALSE) {
+		errno = GetLastError();
+		return posix_error();
+	}
+
+	return d;
+}
+#else /* ! NT */
 static object *
 posix_listdir(self, args)
 	object *self;
@@ -349,6 +417,7 @@ posix_listdir(self, args)
 
 	return d;
 }
+#endif /* ! NT */
 
 static object *
 posix_mkdir(self, args)
@@ -798,8 +867,12 @@ posix_popen(self, args)
 		return posix_error();
 	/* From now on, ignore SIGPIPE and let the error checking
 	   do the work. */
+#ifdef NT
+	return newopenfileobject(fp, name, mode, fclose);
+#else /* ! NT */
 	(void) signal(SIGPIPE, SIG_IGN);
 	return newopenfileobject(fp, name, mode, pclose);
+#endif /* ! NT */
 }
 
 static object *
@@ -1179,7 +1252,9 @@ posix_fdopen(self, args)
 		return posix_error();
 	/* From now on, ignore SIGPIPE and let the error checking
 	   do the work. */
+#ifndef NT
 	(void) signal(SIGPIPE, SIG_IGN);
+#endif /* ! NT */
 	return newopenfileobject(fp, "(fdopen)", mode, fclose);
 }
 
@@ -1205,7 +1280,9 @@ static struct methodlist posix_methods[] = {
 	{"chmod",	posix_chmod},
 	{"chown",	posix_chown},
 	{"getcwd",	posix_getcwd},
+#ifndef NT
 	{"link",	posix_link},
+#endif /* ! NT */
 	{"listdir",	posix_listdir},
 	{"lstat",	posix_lstat},
 	{"mkdir",	posix_mkdir},
@@ -1227,31 +1304,39 @@ static struct methodlist posix_methods[] = {
 	{"uname",	posix_uname},
 #endif
 	{"unlink",	posix_unlink},
+#ifndef NT
 	{"utime",	posix_utime},
+#endif /* ! NT */
 #ifdef HAVE_TIMES
 	{"times",	posix_times},
 #endif
 	{"_exit",	posix__exit},
 	{"execv",	posix_execv},
 	{"execve",	posix_execve},
+#ifndef NT
 	{"fork",	posix_fork},
 	{"getegid",	posix_getegid},
 	{"geteuid",	posix_geteuid},
 	{"getgid",	posix_getgid},
+#endif /* ! NT */
 	{"getpid",	posix_getpid},
 #ifdef HAVE_GETPGRP
 	{"getpgrp",	posix_getpgrp},
 #endif
+#ifndef NT
 	{"getppid",	posix_getppid},
 	{"getuid",	posix_getuid},
 	{"kill",	posix_kill},
+#endif /* ! NT */
 	{"popen",	posix_popen},
+#ifndef NT
 	{"setuid",	posix_setuid},
 	{"setgid",	posix_setgid},
 #ifdef HAVE_SETPGRP
 	{"setpgrp",	posix_setpgrp},
 #endif
 	{"wait",	posix_wait},
+#endif /* ! NT */
 #ifdef HAVE_WAITPID
 	{"waitpid",	posix_waitpid},
 #endif
@@ -1276,12 +1361,35 @@ static struct methodlist posix_methods[] = {
 	{"write",	posix_write},
 	{"fstat",	posix_fstat},
 	{"fdopen",	posix_fdopen},
+#ifndef NT
 	{"pipe",	posix_pipe},
+#endif /* ! NT */
 
 	{NULL,		NULL}		 /* Sentinel */
 };
 
 
+#ifdef NT
+void
+initnt()
+{
+	object *m, *d, *v;
+	
+	m = initmodule("nt", posix_methods);
+	d = getmoduledict(m);
+	
+	/* Initialize nt.environ dictionary */
+	v = convertenviron();
+	if (v == NULL || dictinsert(d, "environ", v) != 0)
+		fatal("can't define nt.environ");
+	DECREF(v);
+	
+	/* Initialize nt.error exception */
+	PosixError = newstringobject("nt.error");
+	if (PosixError == NULL || dictinsert(d, "error", PosixError) != 0)
+		fatal("can't define nt.error");
+}
+#else /* ! NT */
 void
 initposix()
 {
@@ -1301,3 +1409,4 @@ initposix()
 	if (PosixError == NULL || dictinsert(d, "error", PosixError) != 0)
 		fatal("can't define posix.error");
 }
+#endif /* ! NT */

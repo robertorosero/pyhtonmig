@@ -49,8 +49,13 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #include "mytime.h"
 #endif
 
-#if HAVE_FTIME
+#ifdef HAVE_FTIME
 #include <sys/timeb.h>
+#endif
+
+#ifdef _M_IX86
+#include <windows.h>
+#define timezone _timezone
 #endif
 
 /* Forward declarations */
@@ -400,7 +405,11 @@ floatsleep(secs)
 			break;
 	}
 #else /* !MSDOS */
+#ifdef _M_IX86
+	Sleep((int)(secs*1000));
+#else /* _M_IX86 */
 	sleep((int)secs);
+#endif /* _M_IX86 */
 #endif /* !MSDOS */
 #endif /* !macintosh */
 #endif /* !HAVE_SELECT */
