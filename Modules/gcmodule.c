@@ -615,7 +615,7 @@ gc_get_debug(PyObject *self, PyObject *args)
 }
 
 static char gc_set_thresh__doc__[] =
-"set_threshold(threshold0, [threhold1, threshold2]) -> None\n"
+"set_threshold(threshold0, [threshold1, threshold2]) -> None\n"
 "\n"
 "Sets the collection thresholds.  Setting threshold0 to zero disables\n"
 "collection.\n"
@@ -819,7 +819,11 @@ _PyObject_GC_Track(PyObject *op)
 void
 _PyObject_GC_UnTrack(PyObject *op)
 {
-	_PyObject_GC_UNTRACK(op);
+#ifdef WITH_CYCLE_GC
+	PyGC_Head *gc = AS_GC(op);
+	if (gc->gc.gc_next != NULL)
+		_PyObject_GC_UNTRACK(op);
+#endif
 }
 
 PyObject *

@@ -554,8 +554,16 @@ eval_frame(PyFrameObject *f)
 /* Local variable macros */
 
 #define GETLOCAL(i)	(fastlocals[i])
-#define SETLOCAL(i, value)	do { Py_XDECREF(GETLOCAL(i)); \
-				     GETLOCAL(i) = value; } while (0)
+
+/* The SETLOCAL() macro must not DECREF the local variable in-place and
+   then store the new value; it must copy the old value to a temporary
+   value, then store the new value, and then DECREF the temporary value.
+   This is because it is possible that during the DECREF the frame is
+   accessed by other code (e.g. a __del__ method or gc.collect()) and the
+   variable would be pointing to already-freed memory. */
+#define SETLOCAL(i, value)	do { PyObject *tmp = GETLOCAL(i); \
+				     GETLOCAL(i) = value; \
+                                     Py_XDECREF(tmp); } while (0)
 
 /* Start of code */
 
@@ -1091,9 +1099,22 @@ eval_frame(PyFrameObject *f)
 			break;
 
 		case INPLACE_DIVIDE:
+			if (!_Py_QnewFlag) {
+				w = POP();
+				v = POP();
+				x = PyNumber_InPlaceDivide(v, w);
+				Py_DECREF(v);
+				Py_DECREF(w);
+				PUSH(x);
+				if (x != NULL) continue;
+				break;
+			}
+			/* -Qnew is in effect:  fall through to
+			   INPLACE_TRUE_DIVIDE */
+		case INPLACE_TRUE_DIVIDE:
 			w = POP();
 			v = POP();
-			x = PyNumber_InPlaceDivide(v, w);
+			x = PyNumber_InPlaceTrueDivide(v, w);
 			Py_DECREF(v);
 			Py_DECREF(w);
 			PUSH(x);
@@ -1104,16 +1125,6 @@ eval_frame(PyFrameObject *f)
 			w = POP();
 			v = POP();
 			x = PyNumber_InPlaceFloorDivide(v, w);
-			Py_DECREF(v);
-			Py_DECREF(w);
-			PUSH(x);
-			if (x != NULL) continue;
-			break;
-
-		case INPLACE_TRUE_DIVIDE:
-			w = POP();
-			v = POP();
-			x = PyNumber_InPlaceTrueDivide(v, w);
 			Py_DECREF(v);
 			Py_DECREF(w);
 			PUSH(x);

@@ -311,6 +311,8 @@ class HTMLRepr(Repr):
                       r'<font color="#c040c0">\1</font>',
                       self.escape(testrepr))
 
+    repr_str = repr_string
+
     def repr_instance(self, x, level):
         try:
             return self.escape(cram(stripid(repr(x)), self.maxstring))
@@ -439,7 +441,7 @@ TT { font-family: lucidatypewriter, lucida console, courier }
         pattern = re.compile(r'\b((http|ftp)://\S+[\w/]|'
                                 r'RFC[- ]?(\d+)|'
                                 r'PEP[- ]?(\d+)|'
-                                r'(self\.)?(\w+))\b')
+                                r'(self\.)?(\w+))')
         while 1:
             match = pattern.search(text, here)
             if not match: break
@@ -448,7 +450,8 @@ TT { font-family: lucidatypewriter, lucida console, courier }
 
             all, scheme, rfc, pep, selfdot, name = match.groups()
             if scheme:
-                results.append('<a href="%s">%s</a>' % (all, escape(all)))
+                url = escape(all).replace('"', '&quot;')
+                results.append('<a href="%s">%s</a>' % (url, url))
             elif rfc:
                 url = 'http://www.rfc-editor.org/rfc/rfc%d.txt' % int(rfc)
                 results.append('<a href="%s">%s</a>' % (url, escape(all)))
@@ -859,6 +862,8 @@ class TextRepr(Repr):
             # needed to make any special characters, so show a raw string.
             return 'r' + testrepr[0] + test + testrepr[0]
         return testrepr
+
+    repr_str = repr_string
 
     def repr_instance(self, x, level):
         try:

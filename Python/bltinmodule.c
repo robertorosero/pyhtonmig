@@ -9,10 +9,6 @@
 
 #include <ctype.h>
 
-#ifdef HAVE_UNISTD_H
-#include <unistd.h>
-#endif
-
 #ifdef RISCOS
 #include "unixstuff.h"
 #endif
@@ -108,6 +104,26 @@ static char apply_doc[] =
 Call a callable object with positional arguments taken from the tuple args,\n\
 and keyword arguments taken from the optional dictionary kwargs.\n\
 Note that classes are callable, as are instances with a __call__() method.";
+
+
+static PyObject *
+builtin_bool(PyObject *self, PyObject *x)
+{
+	long b = PyObject_IsTrue(x);
+	if (b < 0)
+		return NULL;
+	if (b)
+		x = Py_True;
+	else
+		x = Py_False;
+	Py_INCREF(x);
+	return x;
+}
+
+static char bool_doc[] =
+"bool(x) -> integer\n\
+\n\
+Normalize Boolean: return True (1) when x is true, False (0) otherwise.";
 
 
 static PyObject *
@@ -251,11 +267,11 @@ Fail_it:
 }
 
 static char filter_doc[] =
-"filter(function, sequence) -> list\n\
-\n\
-Return a list containing those items of sequence for which function(item)\n\
-is true.  If function is None, return a list of items that are true.";
-
+"filter(function or None, sequence) -> list, tuple, or string\n"
+"\n"
+"Return those items of sequence for which function(item) is true.  If\n"
+"function is None, return the items that are true.  If sequence is a tuple\n"
+"or string, return the same type, else return a list.";
 
 static PyObject *
 builtin_chr(PyObject *self, PyObject *args)
@@ -1777,6 +1793,7 @@ static PyMethodDef builtin_methods[] = {
  	{"__import__",	builtin___import__, METH_VARARGS, import_doc},
  	{"abs",		builtin_abs,        METH_O, abs_doc},
  	{"apply",	builtin_apply,      METH_VARARGS, apply_doc},
+	{"bool",	builtin_bool, 	    METH_O, bool_doc},
  	{"buffer",	builtin_buffer,     METH_VARARGS, buffer_doc},
  	{"callable",	builtin_callable,   METH_O, callable_doc},
  	{"chr",		builtin_chr,        METH_VARARGS, chr_doc},
@@ -1848,6 +1865,8 @@ _PyBuiltin_Init(void)
 	SETBUILTIN("None",		Py_None);
 	SETBUILTIN("Ellipsis",		Py_Ellipsis);
 	SETBUILTIN("NotImplemented",	Py_NotImplemented);
+	SETBUILTIN("True",		Py_True);
+	SETBUILTIN("False",		Py_False);
 	SETBUILTIN("classmethod",	&PyClassMethod_Type);
 #ifndef WITHOUT_COMPLEX
 	SETBUILTIN("complex",		&PyComplex_Type);

@@ -46,11 +46,6 @@ corresponding Unix manual entries for more information on calls.";
 #include <grp.h>
 #endif
 
-/* pick up declaration of confstr on some systems? */
-#ifdef HAVE_UNISTD_H
-#include <unistd.h>
-#endif /* HAVE_UNISTD_H */
-
 /* Various compilers have only certain posix functions */
 /* XXX Gosh I wish these were all moved into pyconfig.h */
 #if defined(PYCC_VACPP) && defined(PYOS_OS2)
@@ -111,10 +106,6 @@ corresponding Unix manual entries for more information on calls.";
 #endif /* ! __IBMC__ */
 
 #ifndef _MSC_VER
-
-#ifdef HAVE_UNISTD_H
-#include <unistd.h>
-#endif
 
 #if defined(sun) && !defined(__SVR4)
 /* SunOS 4.1.4 doesn't have prototypes for these: */
@@ -1309,7 +1300,8 @@ posix_rmdir(PyObject *self, PyObject *args)
 
 
 static char posix_stat__doc__[] =
-"stat(path) -> (mode,ino,dev,nlink,uid,gid,size,atime,mtime,ctime)\n\
+"stat(path) -> (st_mode, st_ino, st_dev, st_nlink, st_uid, st_gid,\n\
+                st_size, st_atime, st_mtime, st_ctime)\n\
 Perform a stat system call on the given path.";
 
 static PyObject *
@@ -3377,7 +3369,8 @@ posix_wait(PyObject *self, PyObject *args)
 
 
 static char posix_lstat__doc__[] =
-"lstat(path) -> (mode,ino,dev,nlink,uid,gid,size,atime,mtime,ctime)\n\
+"lstat(path) -> (st_mode, st_ino, st_dev, st_nlink, st_uid, st_gid,\n\
+                 st_size, st_atime, st_mtime, st_ctime)\n\
 Like stat(path), but do not follow symbolic links.";
 
 static PyObject *
@@ -6014,5 +6007,5 @@ INITFUNC(void)
 
 	statvfs_result_desc.name = MODNAME ".statvfs_result";
 	PyStructSequence_InitType(&StatVFSResultType, &statvfs_result_desc);
-	PyDict_SetItemString(d, "statvfs_result", (PyObject*) &StatResultType);
+	PyDict_SetItemString(d, "statvfs_result", (PyObject*) &StatVFSResultType);
 }

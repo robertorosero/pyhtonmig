@@ -1280,7 +1280,11 @@ elif os.name == 'nt':
                     # Per-protocol settings
                     for p in proxyServer.split(';'):
                         protocol, address = p.split('=', 1)
-                        proxies[protocol] = '%s://%s' % (protocol, address)
+                        # See if address has a type:// prefix
+                        import re
+                        if not re.match('^([^/:]+)://', address):
+                            address = '%s://%s' % (protocol, address)
+                        proxies[protocol] = address
                 else:
                     # Use one setting for all protocols
                     if proxyServer[:5] == 'http:':
@@ -1395,7 +1399,7 @@ def test(args=[]):
             '/etc/passwd',
             'file:/etc/passwd',
             'file://localhost/etc/passwd',
-            'ftp://ftp.python.org/etc/passwd',
+            'ftp://ftp.python.org/pub/python/README',
 ##          'gopher://gopher.micro.umn.edu/1/',
             'http://www.python.org/index.html',
             ]

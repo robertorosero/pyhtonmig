@@ -127,7 +127,7 @@ class install (Command):
          "filename in which to record list of installed files"),
         ]
 
-    boolean_options = ['force', 'skip-build']
+    boolean_options = ['compile', 'force', 'skip-build']
     negative_opt = {'no-compile' : 'compile'}
 
 
@@ -158,7 +158,6 @@ class install (Command):
         self.install_data = None
 
         self.compile = None
-        self.no_compile = None
         self.optimize = None
 
         # These two are for putting non-packagized distributions into their

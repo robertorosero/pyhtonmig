@@ -1,14 +1,191 @@
+What's New in Python 2.2.1 final?
+Release date: XX-Apr-2002
+=================================
+
+Core and builtins
+
+- Added new builtin function bool() and new builtin constants True and
+  False to ease backporting of code developed for Python 2.3.  In 2.2,
+  bool() returns 1 or 0, True == 1, and False == 0.
+
+- Fixed super() to work correctly with class methods.  [SF bug #535444]
+
+- Fixed two bugs reported as SF #535905: under certain conditions,
+  deallocating a deeply nested structure could cause a segfault in the
+  garbage collector, due to interaction with the "trashcan" code;
+  access to the current frame during destruction of a local variable
+  could access a pointer to freed memory.
+
+Library
+
+- The xml.sax.expatreader.ExpatParser class will no longer create
+  circular references by using itself as the locator that gets passed
+  to the content handler implementation.  [SF bug #535474]
+
+C API
+
+- A type can now inherit its metatype from its base type.  Previously,
+  when PyType_Ready() was called, if ob_type was found to be NULL, it
+  was always set to &PyType_Type; now it is set to base->ob_type,
+  where base is tp_base, defaulting to &PyObject_Type.
+
+- PyType_Ready() accidentally did not inherit tp_is_gc; now it does.
+
+Windows
+
+- Fixed a bug in urllib's proxy handling in Windows.  [SF bug #503031]
+
+- The installer now installs Start menu shortcuts under (the local
+  equivalent of) "All Users" when doing an Admin install.
+
+
+What's New in Python 2.2.1c2?
+Release date: 26-Mar-2002
+=============================
+
+There were a bunch of mostly minor fixes between 2.2.1c1 and 2.2.1c2,
+including:
+
+- I remembered to run autoconf before cutting the release tarball.
+
+Core and builtins
+
+- The floating point behavior fix-up continued into complex_pow.
+
+Library
+
+- The email package bug #531966 was fixed.  This caused exceptions to
+  occur when flattening multipart/* messages with zero or one (scalar)
+  attachment.
+
+- Support for https: urls in httplib was broken (by the sendall patch
+  mentioned below).
+
+- Minor bugs in the calendar module were fixed.
+
+- A few minor bugs in pydoc were fixed (better url recognition, proper
+  quoting of some elements).
+
+- Some distutils commands didn't list all their "boolean options"
+  which made overriding them from .cfg files not work.
+
+
+What's New in Python 2.2.1c1?
+Release date: 18-Mar-2002
+=============================
+
+This is primarily a bugfix release.  Many bugs have been fixed since
+the release of 2.2 final.  Some of the more notable are listed here.
+
+Core and builtins
+
+- If you try to pickle an instance of a class that has __slots__ but
+  doesn't define or override __getstate__, a TypeError is now raised.
+  This is done by adding a bozo __getstate__ to the class that always
+  raises TypeError.  (Before, this would appear to be pickled, but the
+  state of the slots would be lost.)
+
+- (1).__nonzero__() would dump core.
+
+- Tim has had another go at getting sensible behaviour with respect to
+  floating point underflow/overflow.
+
+- Adding an instance of subclass of int to, say, a string, could
+  erroneously return "NotImplemented" instead of raising a TypeError.
+
+- Subclassing longs could cause core dumps in certain circumstances.
+
+- PyErr_Display will provide file and line information for all
+  exceptions that have an attribute print_file_and_line, not just
+  SyntaxErrors. This fixes the bug that no proper line number is given
+  for bad \x escapes.
+
+- sys.setprofile() and sys.settrace() would dump core if called with
+  no arguments.
+
+- An obscure & small memory overrun in wide unicode builds have been
+  fixed.
+
+- __doc__ can now be of arbitrary type (in particular, it can be a
+  unicode string).
+
+- complex objects are now immutable (as they should always have been).
+
+Extension modules
+
+- A security hole ("double free") was found in zlib-1.1.3, a popular
+  third party compression library used by some Python modules.  The
+  hole was quickly plugged in zlib-1.1.4, and the Windows build of
+  Python 2.2.1 now ships with zlib-1.1.4.
+
+- new.instancemethod no longer fails for new-style classes.
+
+- The "pseudo-sequences" returned by os.stat(), os.fstat(),
+  time.localtime() can now be pickled.
+
+- Due to a cut and paste error the object exported as
+  posix.statvfs_result was in fact posix.stat_result.
+
+Library
+
+- The copy module can be used in restricted execution mode.
+
+- A few bugs in the email package have been fixed.
+
+- StringIO's attitude to unicode strings has been reverted to that of
+  the 2.1.x branch (note cStringIO still knows nothing about unicode).
+
+- webbrowser: tightened up the command passed to os.system() so that
+  arbitrary shell code can't be executed because a bogus URL was
+  passed in.
+
+- Recursive structures containing new-style classes can now by
+  deep-copied.
+
+- ftplib defaults to passive mode (again).
+
+Tools
+
+- Bugs in IDLE's autoindent when using new-style division were fixed.
+
+
 What's New in Python 2.2 final?
 Release date: 21-Dec-2001
 ===============================
 
 Type/class unification and new-style classes
 
+- pickle.py, cPickle: allow pickling instances of new-style classes
+  with a custom metaclass.
+
 Core and builtins
+
+- weakref proxy object: when comparing, unwrap both arguments if both
+  are proxies.
 
 Extension modules
 
+- binascii.b2a_base64(): fix a potential buffer overrun when encoding
+  very short strings.
+
+- cPickle: the obscure "fast" mode was suspected of causing stack
+  overflows on the Mac.  Hopefully fixed this by setting the recursion
+  limit much smaller.  If the limit is too low (it only affects
+  performance), you can change it by defining PY_CPICKLE_FAST_LIMIT
+  when compiling cPickle.c (or in pyconfig.h).
+
 Library
+
+- dumbdbm.py: fixed a dumb old bug (the file didn't get synched at
+  close or delete time).
+
+- rfc822.py: fixed a bug where the address '<>' was converted to None
+  instead of an empty string (also fixes the email.Utils module).
+
+- xmlrpclib.py: version 1.0.0; uses precision for doubles.
+
+- test suite: the pickle and cPickle tests were not executing any code
+  when run from the standard regresssion test.
 
 Tools/Demos
 
@@ -22,7 +199,22 @@ Tests
 
 Windows
 
+- distutils package: fixed broken Windows installers (bdist_wininst).
+
+- tempfile.py: prevent mysterious warnings when TemporaryFileWrapper
+  instances are deleted at process exit time.
+
+- socket.py: prevent mysterious warnings when socket instances are
+  deleted at process exit time.
+
+- posixmodule.c: fix a Windows crash with stat() of a filename ending
+  in backslash.
+
 Mac
+
+- The Carbon toolbox modules have been upgraded to Universal Headers
+  3.4, and experimental CoreGraphics and CarbonEvents modules have
+  been added.  All only for framework-enabled MacOSX.
 
 
 What's New in Python 2.2c1?

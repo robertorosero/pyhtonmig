@@ -11,6 +11,7 @@
 *.xMAP
 *.xSYM
 *Icon
+*~[0-9]
 .#*
 .DS_Store
 .cvsignore
