@@ -116,7 +116,7 @@ def dicts():
     for i in d.__iter__(): l.append(i)
     verify(l == l1)
     l = []
-    for i in type({}).__iter__(d): l.append(i)
+    for i in dictionary.__iter__(d): l.append(i)
     verify(l == l1)
     testunop({1:2,3:4}, 2, "len(a)", "__len__")
     testunop({1:2,3:4}, "{3: 4, 1: 2}", "repr(a)", "__repr__")
@@ -255,17 +255,15 @@ def spamdicts():
     testset2op(spamdict({1:2,3:4}), 2, 3, spamdict({1:2,2:3,3:4}),
                "a[b]=c", "__setitem__")
 
-DT = type({})
-
 def pydicts():
     if verbose: print "Testing Python subclass of dict..."
-    verify(issubclass(DT, DT))
-    verify(isinstance({}, DT))
-    d = DT()
+    verify(issubclass(dictionary, dictionary))
+    verify(isinstance({}, dictionary))
+    d = dictionary()
     verify(d == {})
-    verify(d.__class__ is DT)
-    verify(isinstance(d, DT))
-    class C(DT):
+    verify(d.__class__ is dictionary)
+    verify(isinstance(d, dictionary))
+    class C(dictionary):
         state = -1
         def __init__(self, *a, **kw):
             if a:
@@ -277,12 +275,12 @@ def pydicts():
             return self.get(key, 0)
         def __setitem__(self, key, value):
             assert isinstance(key, type(0))
-            DT.__setitem__(self, key, value)
+            dictionary.__setitem__(self, key, value)
         def setstate(self, state):
             self.state = state
         def getstate(self):
             return self.state
-    verify(issubclass(C, DT))
+    verify(issubclass(C, dictionary))
     a1 = C(12)
     verify(a1.state == 12)
     a2 = C(foo=1, bar=2)
@@ -307,6 +305,22 @@ def pydicts():
     for i in range(100):
         for j in range(100):
             verify(a[i][j] == i*j)
+
+def metaclass():
+    if verbose: print "Testing __metaclass__..."
+    global C
+    class C:
+        __metaclass__ = type(type(0))
+        def __init__(self):
+            self.__state = 0
+        def getstate(self):
+            return self.__state
+        def setstate(self, state):
+            self.__state = state
+    a = C()
+    verify(a.getstate() == 0)
+    a.setstate(10)
+    verify(a.getstate() == 10)
 
 import sys
 MT = type(sys)
@@ -338,11 +352,10 @@ def pymods():
                    ('getattr', '__delattr__'),
                    ("delattr", "foo")], log)
 
-def baseless():
-    if verbose: print "Testing __metaclass__ and mix-ins..."
+def multi():
+    if verbose: print "Testing multiple inheritance..."
     global C
-    class C:
-        __metaclass__ = type(type(0))
+    class C(object):
         def __init__(self):
             self.__state = 0
         def getstate(self):
@@ -353,7 +366,7 @@ def baseless():
     verify(a.getstate() == 0)
     a.setstate(10)
     verify(a.getstate() == 10)
-    class D(type({}), C):
+    class D(dictionary, C):
         def __init__(self):
             type({}).__init__(self)
             C.__init__(self)
@@ -375,8 +388,9 @@ def all():
     spamlists()
     spamdicts()
     pydicts()
+    metaclass()
     pymods()
-    baseless()
+    multi()
 
 all()
 
