@@ -5,8 +5,12 @@
 
 
 
+#ifdef _WIN32
+#include "pywintoolbox.h"
+#else
 #include "macglue.h"
 #include "pymactoolbox.h"
+#endif
 
 /* Macro to test whether a weak-loaded CFM function exists */
 #define PyMac_PRECHECK(rtn) do { if ( &rtn == NULL )  {\
@@ -876,23 +880,6 @@ static PyObject *DlgObj_GetDialogPort(DialogObject *_self, PyObject *_args)
 	return _res;
 }
 
-#if !TARGET_API_MAC_CARBON
-
-static PyObject *DlgObj_SetGrafPortOfDialog(DialogObject *_self, PyObject *_args)
-{
-	PyObject *_res = NULL;
-#ifndef SetGrafPortOfDialog
-	PyMac_PRECHECK(SetGrafPortOfDialog);
-#endif
-	if (!PyArg_ParseTuple(_args, ""))
-		return NULL;
-	SetGrafPortOfDialog(_self->ob_itself);
-	Py_INCREF(Py_None);
-	_res = Py_None;
-	return _res;
-}
-#endif
-
 static PyMethodDef DlgObj_methods[] = {
 	{"DrawDialog", (PyCFunction)DlgObj_DrawDialog, 1,
 	 "() -> None"},
@@ -974,11 +961,6 @@ static PyMethodDef DlgObj_methods[] = {
 	 "() -> None"},
 	{"GetDialogPort", (PyCFunction)DlgObj_GetDialogPort, 1,
 	 "() -> (CGrafPtr _rv)"},
-
-#if !TARGET_API_MAC_CARBON
-	{"SetGrafPortOfDialog", (PyCFunction)DlgObj_SetGrafPortOfDialog, 1,
-	 "() -> None"},
-#endif
 	{NULL, NULL, 0}
 };
 

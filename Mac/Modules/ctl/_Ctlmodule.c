@@ -5,8 +5,12 @@
 
 
 
+#ifdef _WIN32
+#include "pywintoolbox.h"
+#else
 #include "macglue.h"
 #include "pymactoolbox.h"
+#endif
 
 /* Macro to test whether a weak-loaded CFM function exists */
 #define PyMac_PRECHECK(rtn) do { if ( &rtn == NULL )  {\
@@ -41,6 +45,7 @@ staticforward PyObject *CtlObj_WhichControl(ControlHandle);
 #define GetControlRect(ctl, rectp) (*(rectp) = ((*(ctl))->contrlRect))
 #endif
 
+#define MAXTABS 32  /* maximum number of tabs that we support in a tabs control */
 /*
 ** Parse/generate ControlFontStyleRec records
 */
@@ -58,7 +63,7 @@ ControlFontStyle_New(ControlFontStyleRec *itself)
 static int
 ControlFontStyle_Convert(PyObject *v, ControlFontStyleRec *itself)
 {
-	return PyArg_ParseTuple(v, "hhhhhhO&O&", &itself->flags,
+	return PyArg_Parse(v, "(hhhhhhO&O&)", &itself->flags,
 		&itself->font, &itself->size, &itself->style, &itself->mode,
 		&itself->just, QdRGB_Convert, &itself->foreColor,
 		QdRGB_Convert, &itself->backColor);
@@ -77,9 +82,50 @@ PyControlID_New(ControlID *itself)
 static int
 PyControlID_Convert(PyObject *v, ControlID *itself)
 {
-	return PyArg_ParseTuple(v, "O&l", PyMac_GetOSType, &itself->signature, &itself->id);
+	return PyArg_Parse(v, "(O&l)", PyMac_GetOSType, &itself->signature, &itself->id);
 }
 
+/*
+** generate DataBrowserListViewColumnDesc records
+*/
+static int
+DataBrowserTableViewColumnDesc_Convert(PyObject *v, DataBrowserTableViewColumnDesc *itself)
+{
+	return PyArg_Parse(v, "(lO&l)",
+	                   &itself->propertyID,
+	                   PyMac_GetOSType, &itself->propertyType,
+	                   &itself->propertyFlags);
+}
+
+static int
+ControlButtonContentInfo_Convert(PyObject *v, ControlButtonContentInfo *itself)
+{
+	return PyArg_Parse(v, "(hO&)",
+	                   &itself->contentType,
+	                   OptResObj_Convert, &itself->u.iconSuite);
+}
+
+static int
+DataBrowserListViewHeaderDesc_Convert(PyObject *v, DataBrowserListViewHeaderDesc *itself)
+{
+	itself->version = kDataBrowserListViewLatestHeaderDesc;
+	return PyArg_Parse(v, "(HHhO&HO&O&)",
+	                   &itself->minimumWidth,
+	                   &itself->maximumWidth,
+	                   &itself->titleOffset,
+	                   CFStringRefObj_Convert, &itself->titleString,
+	                   &itself->initialOrder,
+	                   ControlFontStyle_Convert, &itself->btnFontStyle,
+	                   ControlButtonContentInfo_Convert, &itself->btnContentInfo);
+}
+
+static int
+DataBrowserListViewColumnDesc_Convert(PyObject *v, DataBrowserListViewColumnDesc *itself)
+{
+	return PyArg_Parse(v, "(O&O&)",
+	                   DataBrowserTableViewColumnDesc_Convert, &itself->propertyDesc,
+	                   DataBrowserListViewHeaderDesc_Convert, &itself->headerBtnDesc);
+}
 
 /* TrackControl and HandleControlClick callback support */
 static PyObject *tracker;
@@ -264,6 +310,62 @@ static PyObject *CtlObj_SetControlVisibility(ControlObject *_self, PyObject *_ar
 	_res = Py_None;
 	return _res;
 }
+
+#if TARGET_API_MAC_OSX
+
+static PyObject *CtlObj_IsControlEnabled(ControlObject *_self, PyObject *_args)
+{
+	PyObject *_res = NULL;
+	Boolean _rv;
+#ifndef IsControlEnabled
+	PyMac_PRECHECK(IsControlEnabled);
+#endif
+	if (!PyArg_ParseTuple(_args, ""))
+		return NULL;
+	_rv = IsControlEnabled(_self->ob_itself);
+	_res = Py_BuildValue("b",
+	                     _rv);
+	return _res;
+}
+#endif
+
+#if TARGET_API_MAC_OSX
+
+static PyObject *CtlObj_EnableControl(ControlObject *_self, PyObject *_args)
+{
+	PyObject *_res = NULL;
+	OSStatus _err;
+#ifndef EnableControl
+	PyMac_PRECHECK(EnableControl);
+#endif
+	if (!PyArg_ParseTuple(_args, ""))
+		return NULL;
+	_err = EnableControl(_self->ob_itself);
+	if (_err != noErr) return PyMac_Error(_err);
+	Py_INCREF(Py_None);
+	_res = Py_None;
+	return _res;
+}
+#endif
+
+#if TARGET_API_MAC_OSX
+
+static PyObject *CtlObj_DisableControl(ControlObject *_self, PyObject *_args)
+{
+	PyObject *_res = NULL;
+	OSStatus _err;
+#ifndef DisableControl
+	PyMac_PRECHECK(DisableControl);
+#endif
+	if (!PyArg_ParseTuple(_args, ""))
+		return NULL;
+	_err = DisableControl(_self->ob_itself);
+	if (_err != noErr) return PyMac_Error(_err);
+	Py_INCREF(Py_None);
+	_res = Py_None;
+	return _res;
+}
+#endif
 
 static PyObject *CtlObj_Draw1Control(ControlObject *_self, PyObject *_args)
 {
@@ -596,6 +698,8 @@ static PyObject *CtlObj_GetControlTitle(ControlObject *_self, PyObject *_args)
 	return _res;
 }
 
+#if TARGET_API_MAC_CARBON
+
 static PyObject *CtlObj_SetControlTitleWithCFString(ControlObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
@@ -614,6 +718,9 @@ static PyObject *CtlObj_SetControlTitleWithCFString(ControlObject *_self, PyObje
 	_res = Py_None;
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *CtlObj_CopyControlTitleAsCFString(ControlObject *_self, PyObject *_args)
 {
@@ -632,6 +739,7 @@ static PyObject *CtlObj_CopyControlTitleAsCFString(ControlObject *_self, PyObjec
 	                     CFStringRefObj_New, outString);
 	return _res;
 }
+#endif
 
 static PyObject *CtlObj_GetControlValue(ControlObject *_self, PyObject *_args)
 {
@@ -915,6 +1023,8 @@ static PyObject *CtlObj_GetControlID(ControlObject *_self, PyObject *_args)
 }
 #endif
 
+#if TARGET_API_MAC_CARBON
+
 static PyObject *CtlObj_SetControlCommandID(ControlObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
@@ -933,6 +1043,9 @@ static PyObject *CtlObj_SetControlCommandID(ControlObject *_self, PyObject *_arg
 	_res = Py_None;
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *CtlObj_GetControlCommandID(ControlObject *_self, PyObject *_args)
 {
@@ -951,6 +1064,7 @@ static PyObject *CtlObj_GetControlCommandID(ControlObject *_self, PyObject *_arg
 	                     outCommandID);
 	return _res;
 }
+#endif
 
 static PyObject *CtlObj_RemoveControlProperty(ControlObject *_self, PyObject *_args)
 {
@@ -1652,6 +1766,28 @@ static PyObject *CtlObj_GetBevelButtonMenuHandle(ControlObject *_self, PyObject 
 	return _res;
 }
 
+#if TARGET_API_MAC_CARBON
+
+static PyObject *CtlObj_SetBevelButtonContentInfo(ControlObject *_self, PyObject *_args)
+{
+	PyObject *_res = NULL;
+	OSErr _err;
+	ControlButtonContentInfo inContent;
+#ifndef SetBevelButtonContentInfo
+	PyMac_PRECHECK(SetBevelButtonContentInfo);
+#endif
+	if (!PyArg_ParseTuple(_args, "O&",
+	                      ControlButtonContentInfo_Convert, &inContent))
+		return NULL;
+	_err = SetBevelButtonContentInfo(_self->ob_itself,
+	                                 &inContent);
+	if (_err != noErr) return PyMac_Error(_err);
+	Py_INCREF(Py_None);
+	_res = Py_None;
+	return _res;
+}
+#endif
+
 static PyObject *CtlObj_SetBevelButtonTransform(ControlObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
@@ -1730,6 +1866,28 @@ static PyObject *CtlObj_SetTabEnabled(ControlObject *_self, PyObject *_args)
 	return _res;
 }
 
+#if TARGET_API_MAC_CARBON
+
+static PyObject *CtlObj_SetImageWellContentInfo(ControlObject *_self, PyObject *_args)
+{
+	PyObject *_res = NULL;
+	OSErr _err;
+	ControlButtonContentInfo inContent;
+#ifndef SetImageWellContentInfo
+	PyMac_PRECHECK(SetImageWellContentInfo);
+#endif
+	if (!PyArg_ParseTuple(_args, "O&",
+	                      ControlButtonContentInfo_Convert, &inContent))
+		return NULL;
+	_err = SetImageWellContentInfo(_self->ob_itself,
+	                               &inContent);
+	if (_err != noErr) return PyMac_Error(_err);
+	Py_INCREF(Py_None);
+	_res = Py_None;
+	return _res;
+}
+#endif
+
 static PyObject *CtlObj_SetImageWellTransform(ControlObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
@@ -1749,6 +1907,8 @@ static PyObject *CtlObj_SetImageWellTransform(ControlObject *_self, PyObject *_a
 	return _res;
 }
 
+#if TARGET_API_MAC_CARBON
+
 static PyObject *CtlObj_GetDataBrowserViewStyle(ControlObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
@@ -1766,6 +1926,9 @@ static PyObject *CtlObj_GetDataBrowserViewStyle(ControlObject *_self, PyObject *
 	                     PyMac_BuildOSType, style);
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *CtlObj_SetDataBrowserViewStyle(ControlObject *_self, PyObject *_args)
 {
@@ -1785,6 +1948,9 @@ static PyObject *CtlObj_SetDataBrowserViewStyle(ControlObject *_self, PyObject *
 	_res = Py_None;
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *CtlObj_EnableDataBrowserEditCommand(ControlObject *_self, PyObject *_args)
 {
@@ -1803,6 +1969,9 @@ static PyObject *CtlObj_EnableDataBrowserEditCommand(ControlObject *_self, PyObj
 	                     _rv);
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *CtlObj_ExecuteDataBrowserEditCommand(ControlObject *_self, PyObject *_args)
 {
@@ -1822,6 +1991,9 @@ static PyObject *CtlObj_ExecuteDataBrowserEditCommand(ControlObject *_self, PyOb
 	_res = Py_None;
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *CtlObj_GetDataBrowserSelectionAnchor(ControlObject *_self, PyObject *_args)
 {
@@ -1843,6 +2015,9 @@ static PyObject *CtlObj_GetDataBrowserSelectionAnchor(ControlObject *_self, PyOb
 	                     last);
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *CtlObj_MoveDataBrowserSelectionAnchor(ControlObject *_self, PyObject *_args)
 {
@@ -1865,6 +2040,9 @@ static PyObject *CtlObj_MoveDataBrowserSelectionAnchor(ControlObject *_self, PyO
 	_res = Py_None;
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *CtlObj_OpenDataBrowserContainer(ControlObject *_self, PyObject *_args)
 {
@@ -1884,6 +2062,9 @@ static PyObject *CtlObj_OpenDataBrowserContainer(ControlObject *_self, PyObject 
 	_res = Py_None;
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *CtlObj_CloseDataBrowserContainer(ControlObject *_self, PyObject *_args)
 {
@@ -1903,6 +2084,9 @@ static PyObject *CtlObj_CloseDataBrowserContainer(ControlObject *_self, PyObject
 	_res = Py_None;
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *CtlObj_SortDataBrowserContainer(ControlObject *_self, PyObject *_args)
 {
@@ -1925,6 +2109,9 @@ static PyObject *CtlObj_SortDataBrowserContainer(ControlObject *_self, PyObject 
 	_res = Py_None;
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *CtlObj_GetDataBrowserItems(ControlObject *_self, PyObject *_args)
 {
@@ -1953,6 +2140,9 @@ static PyObject *CtlObj_GetDataBrowserItems(ControlObject *_self, PyObject *_arg
 	_res = Py_None;
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *CtlObj_GetDataBrowserItemCount(ControlObject *_self, PyObject *_args)
 {
@@ -1980,6 +2170,9 @@ static PyObject *CtlObj_GetDataBrowserItemCount(ControlObject *_self, PyObject *
 	                     numItems);
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *CtlObj_IsDataBrowserItemSelected(ControlObject *_self, PyObject *_args)
 {
@@ -1998,6 +2191,9 @@ static PyObject *CtlObj_IsDataBrowserItemSelected(ControlObject *_self, PyObject
 	                     _rv);
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *CtlObj_GetDataBrowserItemState(ControlObject *_self, PyObject *_args)
 {
@@ -2019,6 +2215,9 @@ static PyObject *CtlObj_GetDataBrowserItemState(ControlObject *_self, PyObject *
 	                     state);
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *CtlObj_RevealDataBrowserItem(ControlObject *_self, PyObject *_args)
 {
@@ -2044,6 +2243,9 @@ static PyObject *CtlObj_RevealDataBrowserItem(ControlObject *_self, PyObject *_a
 	_res = Py_None;
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *CtlObj_SetDataBrowserActiveItems(ControlObject *_self, PyObject *_args)
 {
@@ -2063,6 +2265,9 @@ static PyObject *CtlObj_SetDataBrowserActiveItems(ControlObject *_self, PyObject
 	_res = Py_None;
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *CtlObj_GetDataBrowserActiveItems(ControlObject *_self, PyObject *_args)
 {
@@ -2081,6 +2286,9 @@ static PyObject *CtlObj_GetDataBrowserActiveItems(ControlObject *_self, PyObject
 	                     active);
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *CtlObj_SetDataBrowserScrollBarInset(ControlObject *_self, PyObject *_args)
 {
@@ -2099,6 +2307,9 @@ static PyObject *CtlObj_SetDataBrowserScrollBarInset(ControlObject *_self, PyObj
 	                     PyMac_BuildRect, &insetRect);
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *CtlObj_GetDataBrowserScrollBarInset(ControlObject *_self, PyObject *_args)
 {
@@ -2117,6 +2328,9 @@ static PyObject *CtlObj_GetDataBrowserScrollBarInset(ControlObject *_self, PyObj
 	                     PyMac_BuildRect, &insetRect);
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *CtlObj_SetDataBrowserTarget(ControlObject *_self, PyObject *_args)
 {
@@ -2136,6 +2350,9 @@ static PyObject *CtlObj_SetDataBrowserTarget(ControlObject *_self, PyObject *_ar
 	_res = Py_None;
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *CtlObj_GetDataBrowserTarget(ControlObject *_self, PyObject *_args)
 {
@@ -2154,6 +2371,9 @@ static PyObject *CtlObj_GetDataBrowserTarget(ControlObject *_self, PyObject *_ar
 	                     target);
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *CtlObj_SetDataBrowserSortOrder(ControlObject *_self, PyObject *_args)
 {
@@ -2173,6 +2393,9 @@ static PyObject *CtlObj_SetDataBrowserSortOrder(ControlObject *_self, PyObject *
 	_res = Py_None;
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *CtlObj_GetDataBrowserSortOrder(ControlObject *_self, PyObject *_args)
 {
@@ -2191,6 +2414,9 @@ static PyObject *CtlObj_GetDataBrowserSortOrder(ControlObject *_self, PyObject *
 	                     order);
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *CtlObj_SetDataBrowserScrollPosition(ControlObject *_self, PyObject *_args)
 {
@@ -2213,6 +2439,9 @@ static PyObject *CtlObj_SetDataBrowserScrollPosition(ControlObject *_self, PyObj
 	_res = Py_None;
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *CtlObj_GetDataBrowserScrollPosition(ControlObject *_self, PyObject *_args)
 {
@@ -2234,6 +2463,9 @@ static PyObject *CtlObj_GetDataBrowserScrollPosition(ControlObject *_self, PyObj
 	                     left);
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *CtlObj_SetDataBrowserHasScrollBars(ControlObject *_self, PyObject *_args)
 {
@@ -2256,6 +2488,9 @@ static PyObject *CtlObj_SetDataBrowserHasScrollBars(ControlObject *_self, PyObje
 	_res = Py_None;
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *CtlObj_GetDataBrowserHasScrollBars(ControlObject *_self, PyObject *_args)
 {
@@ -2277,6 +2512,9 @@ static PyObject *CtlObj_GetDataBrowserHasScrollBars(ControlObject *_self, PyObje
 	                     vert);
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *CtlObj_SetDataBrowserSortProperty(ControlObject *_self, PyObject *_args)
 {
@@ -2296,6 +2534,9 @@ static PyObject *CtlObj_SetDataBrowserSortProperty(ControlObject *_self, PyObjec
 	_res = Py_None;
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *CtlObj_GetDataBrowserSortProperty(ControlObject *_self, PyObject *_args)
 {
@@ -2314,6 +2555,9 @@ static PyObject *CtlObj_GetDataBrowserSortProperty(ControlObject *_self, PyObjec
 	                     property);
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *CtlObj_SetDataBrowserSelectionFlags(ControlObject *_self, PyObject *_args)
 {
@@ -2333,6 +2577,9 @@ static PyObject *CtlObj_SetDataBrowserSelectionFlags(ControlObject *_self, PyObj
 	_res = Py_None;
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *CtlObj_GetDataBrowserSelectionFlags(ControlObject *_self, PyObject *_args)
 {
@@ -2351,6 +2598,9 @@ static PyObject *CtlObj_GetDataBrowserSelectionFlags(ControlObject *_self, PyObj
 	                     selectionFlags);
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *CtlObj_SetDataBrowserPropertyFlags(ControlObject *_self, PyObject *_args)
 {
@@ -2373,6 +2623,9 @@ static PyObject *CtlObj_SetDataBrowserPropertyFlags(ControlObject *_self, PyObje
 	_res = Py_None;
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *CtlObj_GetDataBrowserPropertyFlags(ControlObject *_self, PyObject *_args)
 {
@@ -2394,6 +2647,9 @@ static PyObject *CtlObj_GetDataBrowserPropertyFlags(ControlObject *_self, PyObje
 	                     flags);
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *CtlObj_SetDataBrowserEditText(ControlObject *_self, PyObject *_args)
 {
@@ -2413,6 +2669,30 @@ static PyObject *CtlObj_SetDataBrowserEditText(ControlObject *_self, PyObject *_
 	_res = Py_None;
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_OSX
+
+static PyObject *CtlObj_CopyDataBrowserEditText(ControlObject *_self, PyObject *_args)
+{
+	PyObject *_res = NULL;
+	OSStatus _err;
+	CFStringRef text;
+#ifndef CopyDataBrowserEditText
+	PyMac_PRECHECK(CopyDataBrowserEditText);
+#endif
+	if (!PyArg_ParseTuple(_args, ""))
+		return NULL;
+	_err = CopyDataBrowserEditText(_self->ob_itself,
+	                               &text);
+	if (_err != noErr) return PyMac_Error(_err);
+	_res = Py_BuildValue("O&",
+	                     CFStringRefObj_New, text);
+	return _res;
+}
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *CtlObj_GetDataBrowserEditText(ControlObject *_self, PyObject *_args)
 {
@@ -2432,6 +2712,9 @@ static PyObject *CtlObj_GetDataBrowserEditText(ControlObject *_self, PyObject *_
 	_res = Py_None;
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *CtlObj_SetDataBrowserEditItem(ControlObject *_self, PyObject *_args)
 {
@@ -2454,6 +2737,9 @@ static PyObject *CtlObj_SetDataBrowserEditItem(ControlObject *_self, PyObject *_
 	_res = Py_None;
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *CtlObj_GetDataBrowserEditItem(ControlObject *_self, PyObject *_args)
 {
@@ -2475,6 +2761,9 @@ static PyObject *CtlObj_GetDataBrowserEditItem(ControlObject *_self, PyObject *_
 	                     property);
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *CtlObj_GetDataBrowserItemPartBounds(ControlObject *_self, PyObject *_args)
 {
@@ -2502,6 +2791,9 @@ static PyObject *CtlObj_GetDataBrowserItemPartBounds(ControlObject *_self, PyObj
 	                     PyMac_BuildRect, &bounds);
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *CtlObj_RemoveDataBrowserTableViewColumn(ControlObject *_self, PyObject *_args)
 {
@@ -2521,6 +2813,9 @@ static PyObject *CtlObj_RemoveDataBrowserTableViewColumn(ControlObject *_self, P
 	_res = Py_None;
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *CtlObj_GetDataBrowserTableViewColumnCount(ControlObject *_self, PyObject *_args)
 {
@@ -2539,6 +2834,9 @@ static PyObject *CtlObj_GetDataBrowserTableViewColumnCount(ControlObject *_self,
 	                     numColumns);
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *CtlObj_SetDataBrowserTableViewHiliteStyle(ControlObject *_self, PyObject *_args)
 {
@@ -2558,6 +2856,9 @@ static PyObject *CtlObj_SetDataBrowserTableViewHiliteStyle(ControlObject *_self,
 	_res = Py_None;
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *CtlObj_GetDataBrowserTableViewHiliteStyle(ControlObject *_self, PyObject *_args)
 {
@@ -2576,6 +2877,9 @@ static PyObject *CtlObj_GetDataBrowserTableViewHiliteStyle(ControlObject *_self,
 	                     hiliteStyle);
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *CtlObj_SetDataBrowserTableViewRowHeight(ControlObject *_self, PyObject *_args)
 {
@@ -2595,6 +2899,9 @@ static PyObject *CtlObj_SetDataBrowserTableViewRowHeight(ControlObject *_self, P
 	_res = Py_None;
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *CtlObj_GetDataBrowserTableViewRowHeight(ControlObject *_self, PyObject *_args)
 {
@@ -2613,6 +2920,9 @@ static PyObject *CtlObj_GetDataBrowserTableViewRowHeight(ControlObject *_self, P
 	                     height);
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *CtlObj_SetDataBrowserTableViewColumnWidth(ControlObject *_self, PyObject *_args)
 {
@@ -2632,6 +2942,9 @@ static PyObject *CtlObj_SetDataBrowserTableViewColumnWidth(ControlObject *_self,
 	_res = Py_None;
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *CtlObj_GetDataBrowserTableViewColumnWidth(ControlObject *_self, PyObject *_args)
 {
@@ -2650,6 +2963,9 @@ static PyObject *CtlObj_GetDataBrowserTableViewColumnWidth(ControlObject *_self,
 	                     width);
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *CtlObj_SetDataBrowserTableViewItemRowHeight(ControlObject *_self, PyObject *_args)
 {
@@ -2672,6 +2988,9 @@ static PyObject *CtlObj_SetDataBrowserTableViewItemRowHeight(ControlObject *_sel
 	_res = Py_None;
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *CtlObj_GetDataBrowserTableViewItemRowHeight(ControlObject *_self, PyObject *_args)
 {
@@ -2693,6 +3012,9 @@ static PyObject *CtlObj_GetDataBrowserTableViewItemRowHeight(ControlObject *_sel
 	                     height);
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *CtlObj_SetDataBrowserTableViewNamedColumnWidth(ControlObject *_self, PyObject *_args)
 {
@@ -2715,6 +3037,9 @@ static PyObject *CtlObj_SetDataBrowserTableViewNamedColumnWidth(ControlObject *_
 	_res = Py_None;
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *CtlObj_GetDataBrowserTableViewNamedColumnWidth(ControlObject *_self, PyObject *_args)
 {
@@ -2736,6 +3061,9 @@ static PyObject *CtlObj_GetDataBrowserTableViewNamedColumnWidth(ControlObject *_
 	                     width);
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *CtlObj_SetDataBrowserTableViewGeometry(ControlObject *_self, PyObject *_args)
 {
@@ -2758,6 +3086,9 @@ static PyObject *CtlObj_SetDataBrowserTableViewGeometry(ControlObject *_self, Py
 	_res = Py_None;
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *CtlObj_GetDataBrowserTableViewGeometry(ControlObject *_self, PyObject *_args)
 {
@@ -2779,6 +3110,9 @@ static PyObject *CtlObj_GetDataBrowserTableViewGeometry(ControlObject *_self, Py
 	                     variableHeightRows);
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *CtlObj_GetDataBrowserTableViewItemID(ControlObject *_self, PyObject *_args)
 {
@@ -2800,6 +3134,9 @@ static PyObject *CtlObj_GetDataBrowserTableViewItemID(ControlObject *_self, PyOb
 	                     item);
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *CtlObj_SetDataBrowserTableViewItemRow(ControlObject *_self, PyObject *_args)
 {
@@ -2822,6 +3159,9 @@ static PyObject *CtlObj_SetDataBrowserTableViewItemRow(ControlObject *_self, PyO
 	_res = Py_None;
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *CtlObj_GetDataBrowserTableViewItemRow(ControlObject *_self, PyObject *_args)
 {
@@ -2843,6 +3183,9 @@ static PyObject *CtlObj_GetDataBrowserTableViewItemRow(ControlObject *_self, PyO
 	                     row);
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *CtlObj_SetDataBrowserTableViewColumnPosition(ControlObject *_self, PyObject *_args)
 {
@@ -2865,6 +3208,9 @@ static PyObject *CtlObj_SetDataBrowserTableViewColumnPosition(ControlObject *_se
 	_res = Py_None;
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *CtlObj_GetDataBrowserTableViewColumnPosition(ControlObject *_self, PyObject *_args)
 {
@@ -2886,6 +3232,9 @@ static PyObject *CtlObj_GetDataBrowserTableViewColumnPosition(ControlObject *_se
 	                     position);
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *CtlObj_GetDataBrowserTableViewColumnProperty(ControlObject *_self, PyObject *_args)
 {
@@ -2907,6 +3256,9 @@ static PyObject *CtlObj_GetDataBrowserTableViewColumnProperty(ControlObject *_se
 	                     property);
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *CtlObj_AutoSizeDataBrowserListViewColumns(ControlObject *_self, PyObject *_args)
 {
@@ -2923,6 +3275,34 @@ static PyObject *CtlObj_AutoSizeDataBrowserListViewColumns(ControlObject *_self,
 	_res = Py_None;
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
+
+static PyObject *CtlObj_AddDataBrowserListViewColumn(ControlObject *_self, PyObject *_args)
+{
+	PyObject *_res = NULL;
+	OSStatus _err;
+	DataBrowserListViewColumnDesc columnDesc;
+	UInt32 position;
+#ifndef AddDataBrowserListViewColumn
+	PyMac_PRECHECK(AddDataBrowserListViewColumn);
+#endif
+	if (!PyArg_ParseTuple(_args, "O&l",
+	                      DataBrowserListViewColumnDesc_Convert, &columnDesc,
+	                      &position))
+		return NULL;
+	_err = AddDataBrowserListViewColumn(_self->ob_itself,
+	                                    &columnDesc,
+	                                    position);
+	if (_err != noErr) return PyMac_Error(_err);
+	Py_INCREF(Py_None);
+	_res = Py_None;
+	return _res;
+}
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *CtlObj_SetDataBrowserListViewHeaderBtnHeight(ControlObject *_self, PyObject *_args)
 {
@@ -2942,6 +3322,9 @@ static PyObject *CtlObj_SetDataBrowserListViewHeaderBtnHeight(ControlObject *_se
 	_res = Py_None;
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *CtlObj_GetDataBrowserListViewHeaderBtnHeight(ControlObject *_self, PyObject *_args)
 {
@@ -2960,6 +3343,9 @@ static PyObject *CtlObj_GetDataBrowserListViewHeaderBtnHeight(ControlObject *_se
 	                     height);
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *CtlObj_SetDataBrowserListViewUsePlainBackground(ControlObject *_self, PyObject *_args)
 {
@@ -2979,6 +3365,9 @@ static PyObject *CtlObj_SetDataBrowserListViewUsePlainBackground(ControlObject *
 	_res = Py_None;
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *CtlObj_GetDataBrowserListViewUsePlainBackground(ControlObject *_self, PyObject *_args)
 {
@@ -2997,6 +3386,9 @@ static PyObject *CtlObj_GetDataBrowserListViewUsePlainBackground(ControlObject *
 	                     usePlainBackground);
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *CtlObj_SetDataBrowserListViewDisclosureColumn(ControlObject *_self, PyObject *_args)
 {
@@ -3019,6 +3411,9 @@ static PyObject *CtlObj_SetDataBrowserListViewDisclosureColumn(ControlObject *_s
 	_res = Py_None;
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *CtlObj_GetDataBrowserListViewDisclosureColumn(ControlObject *_self, PyObject *_args)
 {
@@ -3040,6 +3435,9 @@ static PyObject *CtlObj_GetDataBrowserListViewDisclosureColumn(ControlObject *_s
 	                     expandableRows);
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *CtlObj_GetDataBrowserColumnViewPath(ControlObject *_self, PyObject *_args)
 {
@@ -3059,6 +3457,9 @@ static PyObject *CtlObj_GetDataBrowserColumnViewPath(ControlObject *_self, PyObj
 	_res = Py_None;
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *CtlObj_GetDataBrowserColumnViewPathLength(ControlObject *_self, PyObject *_args)
 {
@@ -3077,6 +3478,9 @@ static PyObject *CtlObj_GetDataBrowserColumnViewPathLength(ControlObject *_self,
 	                     pathLength);
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *CtlObj_SetDataBrowserColumnViewDisplayType(ControlObject *_self, PyObject *_args)
 {
@@ -3096,6 +3500,9 @@ static PyObject *CtlObj_SetDataBrowserColumnViewDisplayType(ControlObject *_self
 	_res = Py_None;
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *CtlObj_GetDataBrowserColumnViewDisplayType(ControlObject *_self, PyObject *_args)
 {
@@ -3114,6 +3521,7 @@ static PyObject *CtlObj_GetDataBrowserColumnViewDisplayType(ControlObject *_self
 	                     PyMac_BuildOSType, propertyType);
 	return _res;
 }
+#endif
 
 static PyObject *CtlObj_as_Resource(ControlObject *_self, PyObject *_args)
 {
@@ -3464,6 +3872,21 @@ static PyMethodDef CtlObj_methods[] = {
 	 "() -> None"},
 	{"SetControlVisibility", (PyCFunction)CtlObj_SetControlVisibility, 1,
 	 "(Boolean inIsVisible, Boolean inDoDraw) -> None"},
+
+#if TARGET_API_MAC_OSX
+	{"IsControlEnabled", (PyCFunction)CtlObj_IsControlEnabled, 1,
+	 "() -> (Boolean _rv)"},
+#endif
+
+#if TARGET_API_MAC_OSX
+	{"EnableControl", (PyCFunction)CtlObj_EnableControl, 1,
+	 "() -> None"},
+#endif
+
+#if TARGET_API_MAC_OSX
+	{"DisableControl", (PyCFunction)CtlObj_DisableControl, 1,
+	 "() -> None"},
+#endif
 	{"Draw1Control", (PyCFunction)CtlObj_Draw1Control, 1,
 	 "() -> None"},
 	{"GetBestControlRect", (PyCFunction)CtlObj_GetBestControlRect, 1,
@@ -3505,10 +3928,16 @@ static PyMethodDef CtlObj_methods[] = {
 	 "(Str255 title) -> None"},
 	{"GetControlTitle", (PyCFunction)CtlObj_GetControlTitle, 1,
 	 "() -> (Str255 title)"},
+
+#if TARGET_API_MAC_CARBON
 	{"SetControlTitleWithCFString", (PyCFunction)CtlObj_SetControlTitleWithCFString, 1,
 	 "(CFStringRef inString) -> None"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"CopyControlTitleAsCFString", (PyCFunction)CtlObj_CopyControlTitleAsCFString, 1,
 	 "() -> (CFStringRef outString)"},
+#endif
 	{"GetControlValue", (PyCFunction)CtlObj_GetControlValue, 1,
 	 "() -> (SInt16 _rv)"},
 	{"SetControlValue", (PyCFunction)CtlObj_SetControlValue, 1,
@@ -3549,10 +3978,16 @@ static PyMethodDef CtlObj_methods[] = {
 	{"GetControlID", (PyCFunction)CtlObj_GetControlID, 1,
 	 "() -> (ControlID outID)"},
 #endif
+
+#if TARGET_API_MAC_CARBON
 	{"SetControlCommandID", (PyCFunction)CtlObj_SetControlCommandID, 1,
 	 "(UInt32 inCommandID) -> None"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"GetControlCommandID", (PyCFunction)CtlObj_GetControlCommandID, 1,
 	 "() -> (UInt32 outCommandID)"},
+#endif
 	{"RemoveControlProperty", (PyCFunction)CtlObj_RemoveControlProperty, 1,
 	 "(OSType propertyCreator, OSType propertyTag) -> None"},
 
@@ -3680,6 +4115,11 @@ static PyMethodDef CtlObj_methods[] = {
 	 "(SInt16 inValue) -> None"},
 	{"GetBevelButtonMenuHandle", (PyCFunction)CtlObj_GetBevelButtonMenuHandle, 1,
 	 "() -> (MenuHandle outHandle)"},
+
+#if TARGET_API_MAC_CARBON
+	{"SetBevelButtonContentInfo", (PyCFunction)CtlObj_SetBevelButtonContentInfo, 1,
+	 "(ControlButtonContentInfo inContent) -> None"},
+#endif
 	{"SetBevelButtonTransform", (PyCFunction)CtlObj_SetBevelButtonTransform, 1,
 	 "(IconTransformType transform) -> None"},
 	{"SetDisclosureTriangleLastValue", (PyCFunction)CtlObj_SetDisclosureTriangleLastValue, 1,
@@ -3688,144 +4128,363 @@ static PyMethodDef CtlObj_methods[] = {
 	 "() -> (Rect outContentRect)"},
 	{"SetTabEnabled", (PyCFunction)CtlObj_SetTabEnabled, 1,
 	 "(SInt16 inTabToHilite, Boolean inEnabled) -> None"},
+
+#if TARGET_API_MAC_CARBON
+	{"SetImageWellContentInfo", (PyCFunction)CtlObj_SetImageWellContentInfo, 1,
+	 "(ControlButtonContentInfo inContent) -> None"},
+#endif
 	{"SetImageWellTransform", (PyCFunction)CtlObj_SetImageWellTransform, 1,
 	 "(IconTransformType inTransform) -> None"},
+
+#if TARGET_API_MAC_CARBON
 	{"GetDataBrowserViewStyle", (PyCFunction)CtlObj_GetDataBrowserViewStyle, 1,
 	 "() -> (OSType style)"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"SetDataBrowserViewStyle", (PyCFunction)CtlObj_SetDataBrowserViewStyle, 1,
 	 "(OSType style) -> None"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"EnableDataBrowserEditCommand", (PyCFunction)CtlObj_EnableDataBrowserEditCommand, 1,
 	 "(UInt32 command) -> (Boolean _rv)"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"ExecuteDataBrowserEditCommand", (PyCFunction)CtlObj_ExecuteDataBrowserEditCommand, 1,
 	 "(UInt32 command) -> None"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"GetDataBrowserSelectionAnchor", (PyCFunction)CtlObj_GetDataBrowserSelectionAnchor, 1,
 	 "() -> (UInt32 first, UInt32 last)"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"MoveDataBrowserSelectionAnchor", (PyCFunction)CtlObj_MoveDataBrowserSelectionAnchor, 1,
 	 "(UInt32 direction, Boolean extendSelection) -> None"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"OpenDataBrowserContainer", (PyCFunction)CtlObj_OpenDataBrowserContainer, 1,
 	 "(UInt32 container) -> None"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"CloseDataBrowserContainer", (PyCFunction)CtlObj_CloseDataBrowserContainer, 1,
 	 "(UInt32 container) -> None"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"SortDataBrowserContainer", (PyCFunction)CtlObj_SortDataBrowserContainer, 1,
 	 "(UInt32 container, Boolean sortChildren) -> None"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"GetDataBrowserItems", (PyCFunction)CtlObj_GetDataBrowserItems, 1,
 	 "(UInt32 container, Boolean recurse, UInt32 state, Handle items) -> None"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"GetDataBrowserItemCount", (PyCFunction)CtlObj_GetDataBrowserItemCount, 1,
 	 "(UInt32 container, Boolean recurse, UInt32 state) -> (UInt32 numItems)"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"IsDataBrowserItemSelected", (PyCFunction)CtlObj_IsDataBrowserItemSelected, 1,
 	 "(UInt32 item) -> (Boolean _rv)"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"GetDataBrowserItemState", (PyCFunction)CtlObj_GetDataBrowserItemState, 1,
 	 "(UInt32 item) -> (UInt32 state)"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"RevealDataBrowserItem", (PyCFunction)CtlObj_RevealDataBrowserItem, 1,
 	 "(UInt32 item, UInt32 propertyID, UInt8 options) -> None"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"SetDataBrowserActiveItems", (PyCFunction)CtlObj_SetDataBrowserActiveItems, 1,
 	 "(Boolean active) -> None"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"GetDataBrowserActiveItems", (PyCFunction)CtlObj_GetDataBrowserActiveItems, 1,
 	 "() -> (Boolean active)"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"SetDataBrowserScrollBarInset", (PyCFunction)CtlObj_SetDataBrowserScrollBarInset, 1,
 	 "() -> (Rect insetRect)"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"GetDataBrowserScrollBarInset", (PyCFunction)CtlObj_GetDataBrowserScrollBarInset, 1,
 	 "() -> (Rect insetRect)"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"SetDataBrowserTarget", (PyCFunction)CtlObj_SetDataBrowserTarget, 1,
 	 "(UInt32 target) -> None"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"GetDataBrowserTarget", (PyCFunction)CtlObj_GetDataBrowserTarget, 1,
 	 "() -> (UInt32 target)"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"SetDataBrowserSortOrder", (PyCFunction)CtlObj_SetDataBrowserSortOrder, 1,
 	 "(UInt16 order) -> None"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"GetDataBrowserSortOrder", (PyCFunction)CtlObj_GetDataBrowserSortOrder, 1,
 	 "() -> (UInt16 order)"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"SetDataBrowserScrollPosition", (PyCFunction)CtlObj_SetDataBrowserScrollPosition, 1,
 	 "(UInt32 top, UInt32 left) -> None"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"GetDataBrowserScrollPosition", (PyCFunction)CtlObj_GetDataBrowserScrollPosition, 1,
 	 "() -> (UInt32 top, UInt32 left)"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"SetDataBrowserHasScrollBars", (PyCFunction)CtlObj_SetDataBrowserHasScrollBars, 1,
 	 "(Boolean horiz, Boolean vert) -> None"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"GetDataBrowserHasScrollBars", (PyCFunction)CtlObj_GetDataBrowserHasScrollBars, 1,
 	 "() -> (Boolean horiz, Boolean vert)"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"SetDataBrowserSortProperty", (PyCFunction)CtlObj_SetDataBrowserSortProperty, 1,
 	 "(UInt32 property) -> None"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"GetDataBrowserSortProperty", (PyCFunction)CtlObj_GetDataBrowserSortProperty, 1,
 	 "() -> (UInt32 property)"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"SetDataBrowserSelectionFlags", (PyCFunction)CtlObj_SetDataBrowserSelectionFlags, 1,
 	 "(UInt32 selectionFlags) -> None"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"GetDataBrowserSelectionFlags", (PyCFunction)CtlObj_GetDataBrowserSelectionFlags, 1,
 	 "() -> (UInt32 selectionFlags)"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"SetDataBrowserPropertyFlags", (PyCFunction)CtlObj_SetDataBrowserPropertyFlags, 1,
 	 "(UInt32 property, UInt32 flags) -> None"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"GetDataBrowserPropertyFlags", (PyCFunction)CtlObj_GetDataBrowserPropertyFlags, 1,
 	 "(UInt32 property) -> (UInt32 flags)"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"SetDataBrowserEditText", (PyCFunction)CtlObj_SetDataBrowserEditText, 1,
 	 "(CFStringRef text) -> None"},
+#endif
+
+#if TARGET_API_MAC_OSX
+	{"CopyDataBrowserEditText", (PyCFunction)CtlObj_CopyDataBrowserEditText, 1,
+	 "() -> (CFStringRef text)"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"GetDataBrowserEditText", (PyCFunction)CtlObj_GetDataBrowserEditText, 1,
 	 "(CFMutableStringRef text) -> None"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"SetDataBrowserEditItem", (PyCFunction)CtlObj_SetDataBrowserEditItem, 1,
 	 "(UInt32 item, UInt32 property) -> None"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"GetDataBrowserEditItem", (PyCFunction)CtlObj_GetDataBrowserEditItem, 1,
 	 "() -> (UInt32 item, UInt32 property)"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"GetDataBrowserItemPartBounds", (PyCFunction)CtlObj_GetDataBrowserItemPartBounds, 1,
 	 "(UInt32 item, UInt32 property, OSType part) -> (Rect bounds)"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"RemoveDataBrowserTableViewColumn", (PyCFunction)CtlObj_RemoveDataBrowserTableViewColumn, 1,
 	 "(UInt32 column) -> None"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"GetDataBrowserTableViewColumnCount", (PyCFunction)CtlObj_GetDataBrowserTableViewColumnCount, 1,
 	 "() -> (UInt32 numColumns)"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"SetDataBrowserTableViewHiliteStyle", (PyCFunction)CtlObj_SetDataBrowserTableViewHiliteStyle, 1,
 	 "(UInt32 hiliteStyle) -> None"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"GetDataBrowserTableViewHiliteStyle", (PyCFunction)CtlObj_GetDataBrowserTableViewHiliteStyle, 1,
 	 "() -> (UInt32 hiliteStyle)"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"SetDataBrowserTableViewRowHeight", (PyCFunction)CtlObj_SetDataBrowserTableViewRowHeight, 1,
 	 "(UInt16 height) -> None"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"GetDataBrowserTableViewRowHeight", (PyCFunction)CtlObj_GetDataBrowserTableViewRowHeight, 1,
 	 "() -> (UInt16 height)"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"SetDataBrowserTableViewColumnWidth", (PyCFunction)CtlObj_SetDataBrowserTableViewColumnWidth, 1,
 	 "(UInt16 width) -> None"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"GetDataBrowserTableViewColumnWidth", (PyCFunction)CtlObj_GetDataBrowserTableViewColumnWidth, 1,
 	 "() -> (UInt16 width)"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"SetDataBrowserTableViewItemRowHeight", (PyCFunction)CtlObj_SetDataBrowserTableViewItemRowHeight, 1,
 	 "(UInt32 item, UInt16 height) -> None"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"GetDataBrowserTableViewItemRowHeight", (PyCFunction)CtlObj_GetDataBrowserTableViewItemRowHeight, 1,
 	 "(UInt32 item) -> (UInt16 height)"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"SetDataBrowserTableViewNamedColumnWidth", (PyCFunction)CtlObj_SetDataBrowserTableViewNamedColumnWidth, 1,
 	 "(UInt32 column, UInt16 width) -> None"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"GetDataBrowserTableViewNamedColumnWidth", (PyCFunction)CtlObj_GetDataBrowserTableViewNamedColumnWidth, 1,
 	 "(UInt32 column) -> (UInt16 width)"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"SetDataBrowserTableViewGeometry", (PyCFunction)CtlObj_SetDataBrowserTableViewGeometry, 1,
 	 "(Boolean variableWidthColumns, Boolean variableHeightRows) -> None"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"GetDataBrowserTableViewGeometry", (PyCFunction)CtlObj_GetDataBrowserTableViewGeometry, 1,
 	 "() -> (Boolean variableWidthColumns, Boolean variableHeightRows)"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"GetDataBrowserTableViewItemID", (PyCFunction)CtlObj_GetDataBrowserTableViewItemID, 1,
 	 "(UInt32 row) -> (UInt32 item)"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"SetDataBrowserTableViewItemRow", (PyCFunction)CtlObj_SetDataBrowserTableViewItemRow, 1,
 	 "(UInt32 item, UInt32 row) -> None"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"GetDataBrowserTableViewItemRow", (PyCFunction)CtlObj_GetDataBrowserTableViewItemRow, 1,
 	 "(UInt32 item) -> (UInt32 row)"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"SetDataBrowserTableViewColumnPosition", (PyCFunction)CtlObj_SetDataBrowserTableViewColumnPosition, 1,
 	 "(UInt32 column, UInt32 position) -> None"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"GetDataBrowserTableViewColumnPosition", (PyCFunction)CtlObj_GetDataBrowserTableViewColumnPosition, 1,
 	 "(UInt32 column) -> (UInt32 position)"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"GetDataBrowserTableViewColumnProperty", (PyCFunction)CtlObj_GetDataBrowserTableViewColumnProperty, 1,
 	 "(UInt32 column) -> (UInt32 property)"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"AutoSizeDataBrowserListViewColumns", (PyCFunction)CtlObj_AutoSizeDataBrowserListViewColumns, 1,
 	 "() -> None"},
+#endif
+
+#if TARGET_API_MAC_CARBON
+	{"AddDataBrowserListViewColumn", (PyCFunction)CtlObj_AddDataBrowserListViewColumn, 1,
+	 "(DataBrowserListViewColumnDesc columnDesc, UInt32 position) -> None"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"SetDataBrowserListViewHeaderBtnHeight", (PyCFunction)CtlObj_SetDataBrowserListViewHeaderBtnHeight, 1,
 	 "(UInt16 height) -> None"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"GetDataBrowserListViewHeaderBtnHeight", (PyCFunction)CtlObj_GetDataBrowserListViewHeaderBtnHeight, 1,
 	 "() -> (UInt16 height)"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"SetDataBrowserListViewUsePlainBackground", (PyCFunction)CtlObj_SetDataBrowserListViewUsePlainBackground, 1,
 	 "(Boolean usePlainBackground) -> None"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"GetDataBrowserListViewUsePlainBackground", (PyCFunction)CtlObj_GetDataBrowserListViewUsePlainBackground, 1,
 	 "() -> (Boolean usePlainBackground)"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"SetDataBrowserListViewDisclosureColumn", (PyCFunction)CtlObj_SetDataBrowserListViewDisclosureColumn, 1,
 	 "(UInt32 column, Boolean expandableRows) -> None"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"GetDataBrowserListViewDisclosureColumn", (PyCFunction)CtlObj_GetDataBrowserListViewDisclosureColumn, 1,
 	 "() -> (UInt32 column, Boolean expandableRows)"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"GetDataBrowserColumnViewPath", (PyCFunction)CtlObj_GetDataBrowserColumnViewPath, 1,
 	 "(Handle path) -> None"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"GetDataBrowserColumnViewPathLength", (PyCFunction)CtlObj_GetDataBrowserColumnViewPathLength, 1,
 	 "() -> (UInt32 pathLength)"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"SetDataBrowserColumnViewDisplayType", (PyCFunction)CtlObj_SetDataBrowserColumnViewDisplayType, 1,
 	 "(OSType propertyType) -> None"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"GetDataBrowserColumnViewDisplayType", (PyCFunction)CtlObj_GetDataBrowserColumnViewDisplayType, 1,
 	 "() -> (OSType propertyType)"},
+#endif
 	{"as_Resource", (PyCFunction)CtlObj_as_Resource, 1,
 	 "() -> (Handle _rv)"},
 	{"GetControlRect", (PyCFunction)CtlObj_GetControlRect, 1,
@@ -4035,29 +4694,6 @@ static PyObject *Ctl_FindControl(PyObject *_self, PyObject *_args)
 	return _res;
 }
 
-static PyObject *Ctl_FindControlUnderMouse(PyObject *_self, PyObject *_args)
-{
-	PyObject *_res = NULL;
-	ControlHandle _rv;
-	Point inWhere;
-	WindowPtr inWindow;
-	SInt16 outPart;
-#ifndef FindControlUnderMouse
-	PyMac_PRECHECK(FindControlUnderMouse);
-#endif
-	if (!PyArg_ParseTuple(_args, "O&O&",
-	                      PyMac_GetPoint, &inWhere,
-	                      WinObj_Convert, &inWindow))
-		return NULL;
-	_rv = FindControlUnderMouse(inWhere,
-	                            inWindow,
-	                            &outPart);
-	_res = Py_BuildValue("O&h",
-	                     CtlObj_New, _rv,
-	                     outPart);
-	return _res;
-}
-
 static PyObject *Ctl_IdleControls(PyObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
@@ -4137,7 +4773,7 @@ static PyObject *Ctl_CreateRootControl(PyObject *_self, PyObject *_args)
 	                         &outControl);
 	if (_err != noErr) return PyMac_Error(_err);
 	_res = Py_BuildValue("O&",
-	                     CtlObj_WhichControl, outControl);
+	                     CtlObj_New, outControl);
 	return _res;
 }
 
@@ -4306,6 +4942,55 @@ static PyObject *Ctl_IsAutomaticControlDragTrackingEnabledForWindow(PyObject *_s
 }
 #endif
 
+#if TARGET_API_MAC_CARBON
+
+static PyObject *Ctl_CreateBevelButtonControl(PyObject *_self, PyObject *_args)
+{
+	PyObject *_res = NULL;
+	OSStatus _err;
+	WindowPtr window;
+	Rect boundsRect;
+	CFStringRef title;
+	UInt16 thickness;
+	UInt16 behavior;
+	ControlButtonContentInfo info;
+	SInt16 menuID;
+	UInt16 menuBehavior;
+	UInt16 menuPlacement;
+	ControlHandle outControl;
+#ifndef CreateBevelButtonControl
+	PyMac_PRECHECK(CreateBevelButtonControl);
+#endif
+	if (!PyArg_ParseTuple(_args, "O&O&O&HHO&hHH",
+	                      WinObj_Convert, &window,
+	                      PyMac_GetRect, &boundsRect,
+	                      CFStringRefObj_Convert, &title,
+	                      &thickness,
+	                      &behavior,
+	                      ControlButtonContentInfo_Convert, &info,
+	                      &menuID,
+	                      &menuBehavior,
+	                      &menuPlacement))
+		return NULL;
+	_err = CreateBevelButtonControl(window,
+	                                &boundsRect,
+	                                title,
+	                                thickness,
+	                                behavior,
+	                                &info,
+	                                menuID,
+	                                menuBehavior,
+	                                menuPlacement,
+	                                &outControl);
+	if (_err != noErr) return PyMac_Error(_err);
+	_res = Py_BuildValue("O&",
+	                     CtlObj_New, outControl);
+	return _res;
+}
+#endif
+
+#if TARGET_API_MAC_CARBON
+
 static PyObject *Ctl_CreateDisclosureTriangleControl(PyObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
@@ -4340,9 +5025,12 @@ static PyObject *Ctl_CreateDisclosureTriangleControl(PyObject *_self, PyObject *
 	                                       &outControl);
 	if (_err != noErr) return PyMac_Error(_err);
 	_res = Py_BuildValue("O&",
-	                     CtlObj_WhichControl, outControl);
+	                     CtlObj_New, outControl);
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *Ctl_CreateProgressBarControl(PyObject *_self, PyObject *_args)
 {
@@ -4375,9 +5063,47 @@ static PyObject *Ctl_CreateProgressBarControl(PyObject *_self, PyObject *_args)
 	                                &outControl);
 	if (_err != noErr) return PyMac_Error(_err);
 	_res = Py_BuildValue("O&",
-	                     CtlObj_WhichControl, outControl);
+	                     CtlObj_New, outControl);
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_OSX
+
+static PyObject *Ctl_CreateRelevanceBarControl(PyObject *_self, PyObject *_args)
+{
+	PyObject *_res = NULL;
+	OSStatus _err;
+	WindowPtr window;
+	Rect boundsRect;
+	SInt32 value;
+	SInt32 minimum;
+	SInt32 maximum;
+	ControlHandle outControl;
+#ifndef CreateRelevanceBarControl
+	PyMac_PRECHECK(CreateRelevanceBarControl);
+#endif
+	if (!PyArg_ParseTuple(_args, "O&O&lll",
+	                      WinObj_Convert, &window,
+	                      PyMac_GetRect, &boundsRect,
+	                      &value,
+	                      &minimum,
+	                      &maximum))
+		return NULL;
+	_err = CreateRelevanceBarControl(window,
+	                                 &boundsRect,
+	                                 value,
+	                                 minimum,
+	                                 maximum,
+	                                 &outControl);
+	if (_err != noErr) return PyMac_Error(_err);
+	_res = Py_BuildValue("O&",
+	                     CtlObj_New, outControl);
+	return _res;
+}
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *Ctl_CreateLittleArrowsControl(PyObject *_self, PyObject *_args)
 {
@@ -4410,9 +5136,12 @@ static PyObject *Ctl_CreateLittleArrowsControl(PyObject *_self, PyObject *_args)
 	                                 &outControl);
 	if (_err != noErr) return PyMac_Error(_err);
 	_res = Py_BuildValue("O&",
-	                     CtlObj_WhichControl, outControl);
+	                     CtlObj_New, outControl);
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *Ctl_CreateChasingArrowsControl(PyObject *_self, PyObject *_args)
 {
@@ -4433,9 +5162,12 @@ static PyObject *Ctl_CreateChasingArrowsControl(PyObject *_self, PyObject *_args
 	                                  &outControl);
 	if (_err != noErr) return PyMac_Error(_err);
 	_res = Py_BuildValue("O&",
-	                     CtlObj_WhichControl, outControl);
+	                     CtlObj_New, outControl);
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *Ctl_CreateSeparatorControl(PyObject *_self, PyObject *_args)
 {
@@ -4456,9 +5188,12 @@ static PyObject *Ctl_CreateSeparatorControl(PyObject *_self, PyObject *_args)
 	                              &outControl);
 	if (_err != noErr) return PyMac_Error(_err);
 	_res = Py_BuildValue("O&",
-	                     CtlObj_WhichControl, outControl);
+	                     CtlObj_New, outControl);
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *Ctl_CreateGroupBoxControl(PyObject *_self, PyObject *_args)
 {
@@ -4485,9 +5220,12 @@ static PyObject *Ctl_CreateGroupBoxControl(PyObject *_self, PyObject *_args)
 	                             &outControl);
 	if (_err != noErr) return PyMac_Error(_err);
 	_res = Py_BuildValue("O&",
-	                     CtlObj_WhichControl, outControl);
+	                     CtlObj_New, outControl);
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *Ctl_CreateCheckGroupBoxControl(PyObject *_self, PyObject *_args)
 {
@@ -4520,9 +5258,12 @@ static PyObject *Ctl_CreateCheckGroupBoxControl(PyObject *_self, PyObject *_args
 	                                  &outControl);
 	if (_err != noErr) return PyMac_Error(_err);
 	_res = Py_BuildValue("O&",
-	                     CtlObj_WhichControl, outControl);
+	                     CtlObj_New, outControl);
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *Ctl_CreatePopupGroupBoxControl(PyObject *_self, PyObject *_args)
 {
@@ -4564,9 +5305,41 @@ static PyObject *Ctl_CreatePopupGroupBoxControl(PyObject *_self, PyObject *_args
 	                                  &outControl);
 	if (_err != noErr) return PyMac_Error(_err);
 	_res = Py_BuildValue("O&",
-	                     CtlObj_WhichControl, outControl);
+	                     CtlObj_New, outControl);
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
+
+static PyObject *Ctl_CreateImageWellControl(PyObject *_self, PyObject *_args)
+{
+	PyObject *_res = NULL;
+	OSStatus _err;
+	WindowPtr window;
+	Rect boundsRect;
+	ControlButtonContentInfo info;
+	ControlHandle outControl;
+#ifndef CreateImageWellControl
+	PyMac_PRECHECK(CreateImageWellControl);
+#endif
+	if (!PyArg_ParseTuple(_args, "O&O&O&",
+	                      WinObj_Convert, &window,
+	                      PyMac_GetRect, &boundsRect,
+	                      ControlButtonContentInfo_Convert, &info))
+		return NULL;
+	_err = CreateImageWellControl(window,
+	                              &boundsRect,
+	                              &info,
+	                              &outControl);
+	if (_err != noErr) return PyMac_Error(_err);
+	_res = Py_BuildValue("O&",
+	                     CtlObj_New, outControl);
+	return _res;
+}
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *Ctl_CreatePopupArrowControl(PyObject *_self, PyObject *_args)
 {
@@ -4593,9 +5366,12 @@ static PyObject *Ctl_CreatePopupArrowControl(PyObject *_self, PyObject *_args)
 	                               &outControl);
 	if (_err != noErr) return PyMac_Error(_err);
 	_res = Py_BuildValue("O&",
-	                     CtlObj_WhichControl, outControl);
+	                     CtlObj_New, outControl);
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *Ctl_CreatePlacardControl(PyObject *_self, PyObject *_args)
 {
@@ -4616,9 +5392,12 @@ static PyObject *Ctl_CreatePlacardControl(PyObject *_self, PyObject *_args)
 	                            &outControl);
 	if (_err != noErr) return PyMac_Error(_err);
 	_res = Py_BuildValue("O&",
-	                     CtlObj_WhichControl, outControl);
+	                     CtlObj_New, outControl);
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *Ctl_CreateClockControl(PyObject *_self, PyObject *_args)
 {
@@ -4645,9 +5424,12 @@ static PyObject *Ctl_CreateClockControl(PyObject *_self, PyObject *_args)
 	                          &outControl);
 	if (_err != noErr) return PyMac_Error(_err);
 	_res = Py_BuildValue("O&",
-	                     CtlObj_WhichControl, outControl);
+	                     CtlObj_New, outControl);
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *Ctl_CreateUserPaneControl(PyObject *_self, PyObject *_args)
 {
@@ -4671,9 +5453,12 @@ static PyObject *Ctl_CreateUserPaneControl(PyObject *_self, PyObject *_args)
 	                             &outControl);
 	if (_err != noErr) return PyMac_Error(_err);
 	_res = Py_BuildValue("O&",
-	                     CtlObj_WhichControl, outControl);
+	                     CtlObj_New, outControl);
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *Ctl_CreateEditTextControl(PyObject *_self, PyObject *_args)
 {
@@ -4706,9 +5491,12 @@ static PyObject *Ctl_CreateEditTextControl(PyObject *_self, PyObject *_args)
 	                             &outControl);
 	if (_err != noErr) return PyMac_Error(_err);
 	_res = Py_BuildValue("O&",
-	                     CtlObj_WhichControl, outControl);
+	                     CtlObj_New, outControl);
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *Ctl_CreateStaticTextControl(PyObject *_self, PyObject *_args)
 {
@@ -4735,9 +5523,76 @@ static PyObject *Ctl_CreateStaticTextControl(PyObject *_self, PyObject *_args)
 	                               &outControl);
 	if (_err != noErr) return PyMac_Error(_err);
 	_res = Py_BuildValue("O&",
-	                     CtlObj_WhichControl, outControl);
+	                     CtlObj_New, outControl);
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
+
+static PyObject *Ctl_CreatePictureControl(PyObject *_self, PyObject *_args)
+{
+	PyObject *_res = NULL;
+	OSStatus _err;
+	WindowPtr window;
+	Rect boundsRect;
+	ControlButtonContentInfo content;
+	Boolean dontTrack;
+	ControlHandle outControl;
+#ifndef CreatePictureControl
+	PyMac_PRECHECK(CreatePictureControl);
+#endif
+	if (!PyArg_ParseTuple(_args, "O&O&O&b",
+	                      WinObj_Convert, &window,
+	                      PyMac_GetRect, &boundsRect,
+	                      ControlButtonContentInfo_Convert, &content,
+	                      &dontTrack))
+		return NULL;
+	_err = CreatePictureControl(window,
+	                            &boundsRect,
+	                            &content,
+	                            dontTrack,
+	                            &outControl);
+	if (_err != noErr) return PyMac_Error(_err);
+	_res = Py_BuildValue("O&",
+	                     CtlObj_New, outControl);
+	return _res;
+}
+#endif
+
+#if TARGET_API_MAC_CARBON
+
+static PyObject *Ctl_CreateIconControl(PyObject *_self, PyObject *_args)
+{
+	PyObject *_res = NULL;
+	OSStatus _err;
+	WindowPtr window;
+	Rect boundsRect;
+	ControlButtonContentInfo icon;
+	Boolean dontTrack;
+	ControlHandle outControl;
+#ifndef CreateIconControl
+	PyMac_PRECHECK(CreateIconControl);
+#endif
+	if (!PyArg_ParseTuple(_args, "O&O&O&b",
+	                      WinObj_Convert, &window,
+	                      PyMac_GetRect, &boundsRect,
+	                      ControlButtonContentInfo_Convert, &icon,
+	                      &dontTrack))
+		return NULL;
+	_err = CreateIconControl(window,
+	                         &boundsRect,
+	                         &icon,
+	                         dontTrack,
+	                         &outControl);
+	if (_err != noErr) return PyMac_Error(_err);
+	_res = Py_BuildValue("O&",
+	                     CtlObj_New, outControl);
+	return _res;
+}
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *Ctl_CreateWindowHeaderControl(PyObject *_self, PyObject *_args)
 {
@@ -4761,9 +5616,12 @@ static PyObject *Ctl_CreateWindowHeaderControl(PyObject *_self, PyObject *_args)
 	                                 &outControl);
 	if (_err != noErr) return PyMac_Error(_err);
 	_res = Py_BuildValue("O&",
-	                     CtlObj_WhichControl, outControl);
+	                     CtlObj_New, outControl);
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *Ctl_CreatePushButtonControl(PyObject *_self, PyObject *_args)
 {
@@ -4787,9 +5645,47 @@ static PyObject *Ctl_CreatePushButtonControl(PyObject *_self, PyObject *_args)
 	                               &outControl);
 	if (_err != noErr) return PyMac_Error(_err);
 	_res = Py_BuildValue("O&",
-	                     CtlObj_WhichControl, outControl);
+	                     CtlObj_New, outControl);
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
+
+static PyObject *Ctl_CreatePushButtonWithIconControl(PyObject *_self, PyObject *_args)
+{
+	PyObject *_res = NULL;
+	OSStatus _err;
+	WindowPtr window;
+	Rect boundsRect;
+	CFStringRef title;
+	ControlButtonContentInfo icon;
+	UInt16 iconAlignment;
+	ControlHandle outControl;
+#ifndef CreatePushButtonWithIconControl
+	PyMac_PRECHECK(CreatePushButtonWithIconControl);
+#endif
+	if (!PyArg_ParseTuple(_args, "O&O&O&O&H",
+	                      WinObj_Convert, &window,
+	                      PyMac_GetRect, &boundsRect,
+	                      CFStringRefObj_Convert, &title,
+	                      ControlButtonContentInfo_Convert, &icon,
+	                      &iconAlignment))
+		return NULL;
+	_err = CreatePushButtonWithIconControl(window,
+	                                       &boundsRect,
+	                                       title,
+	                                       &icon,
+	                                       iconAlignment,
+	                                       &outControl);
+	if (_err != noErr) return PyMac_Error(_err);
+	_res = Py_BuildValue("O&",
+	                     CtlObj_New, outControl);
+	return _res;
+}
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *Ctl_CreateRadioButtonControl(PyObject *_self, PyObject *_args)
 {
@@ -4819,9 +5715,12 @@ static PyObject *Ctl_CreateRadioButtonControl(PyObject *_self, PyObject *_args)
 	                                &outControl);
 	if (_err != noErr) return PyMac_Error(_err);
 	_res = Py_BuildValue("O&",
-	                     CtlObj_WhichControl, outControl);
+	                     CtlObj_New, outControl);
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *Ctl_CreateCheckBoxControl(PyObject *_self, PyObject *_args)
 {
@@ -4851,9 +5750,12 @@ static PyObject *Ctl_CreateCheckBoxControl(PyObject *_self, PyObject *_args)
 	                             &outControl);
 	if (_err != noErr) return PyMac_Error(_err);
 	_res = Py_BuildValue("O&",
-	                     CtlObj_WhichControl, outControl);
+	                     CtlObj_New, outControl);
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *Ctl_CreatePopupButtonControl(PyObject *_self, PyObject *_args)
 {
@@ -4892,9 +5794,12 @@ static PyObject *Ctl_CreatePopupButtonControl(PyObject *_self, PyObject *_args)
 	                                &outControl);
 	if (_err != noErr) return PyMac_Error(_err);
 	_res = Py_BuildValue("O&",
-	                     CtlObj_WhichControl, outControl);
+	                     CtlObj_New, outControl);
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *Ctl_CreateRadioGroupControl(PyObject *_self, PyObject *_args)
 {
@@ -4915,9 +5820,12 @@ static PyObject *Ctl_CreateRadioGroupControl(PyObject *_self, PyObject *_args)
 	                               &outControl);
 	if (_err != noErr) return PyMac_Error(_err);
 	_res = Py_BuildValue("O&",
-	                     CtlObj_WhichControl, outControl);
+	                     CtlObj_New, outControl);
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *Ctl_CreateScrollingTextBoxControl(PyObject *_self, PyObject *_args)
 {
@@ -4953,9 +5861,76 @@ static PyObject *Ctl_CreateScrollingTextBoxControl(PyObject *_self, PyObject *_a
 	                                     &outControl);
 	if (_err != noErr) return PyMac_Error(_err);
 	_res = Py_BuildValue("O&",
-	                     CtlObj_WhichControl, outControl);
+	                     CtlObj_New, outControl);
 	return _res;
 }
+#endif
+
+#if TARGET_API_MAC_OSX
+
+static PyObject *Ctl_CreateDisclosureButtonControl(PyObject *_self, PyObject *_args)
+{
+	PyObject *_res = NULL;
+	OSStatus _err;
+	WindowPtr inWindow;
+	Rect inBoundsRect;
+	SInt32 inValue;
+	Boolean inAutoToggles;
+	ControlHandle outControl;
+#ifndef CreateDisclosureButtonControl
+	PyMac_PRECHECK(CreateDisclosureButtonControl);
+#endif
+	if (!PyArg_ParseTuple(_args, "O&O&lb",
+	                      WinObj_Convert, &inWindow,
+	                      PyMac_GetRect, &inBoundsRect,
+	                      &inValue,
+	                      &inAutoToggles))
+		return NULL;
+	_err = CreateDisclosureButtonControl(inWindow,
+	                                     &inBoundsRect,
+	                                     inValue,
+	                                     inAutoToggles,
+	                                     &outControl);
+	if (_err != noErr) return PyMac_Error(_err);
+	_res = Py_BuildValue("O&",
+	                     CtlObj_New, outControl);
+	return _res;
+}
+#endif
+
+#if TARGET_API_MAC_OSX
+
+static PyObject *Ctl_CreateRoundButtonControl(PyObject *_self, PyObject *_args)
+{
+	PyObject *_res = NULL;
+	OSStatus _err;
+	WindowPtr inWindow;
+	Rect inBoundsRect;
+	SInt16 inSize;
+	ControlButtonContentInfo inContent;
+	ControlHandle outControl;
+#ifndef CreateRoundButtonControl
+	PyMac_PRECHECK(CreateRoundButtonControl);
+#endif
+	if (!PyArg_ParseTuple(_args, "O&O&hO&",
+	                      WinObj_Convert, &inWindow,
+	                      PyMac_GetRect, &inBoundsRect,
+	                      &inSize,
+	                      ControlButtonContentInfo_Convert, &inContent))
+		return NULL;
+	_err = CreateRoundButtonControl(inWindow,
+	                                &inBoundsRect,
+	                                inSize,
+	                                &inContent,
+	                                &outControl);
+	if (_err != noErr) return PyMac_Error(_err);
+	_res = Py_BuildValue("O&",
+	                     CtlObj_New, outControl);
+	return _res;
+}
+#endif
+
+#if TARGET_API_MAC_CARBON
 
 static PyObject *Ctl_CreateDataBrowserControl(PyObject *_self, PyObject *_args)
 {
@@ -4979,7 +5954,66 @@ static PyObject *Ctl_CreateDataBrowserControl(PyObject *_self, PyObject *_args)
 	                                &outControl);
 	if (_err != noErr) return PyMac_Error(_err);
 	_res = Py_BuildValue("O&",
-	                     CtlObj_WhichControl, outControl);
+	                     CtlObj_New, outControl);
+	return _res;
+}
+#endif
+
+#if TARGET_API_MAC_OSX
+
+static PyObject *Ctl_CreateEditUnicodeTextControl(PyObject *_self, PyObject *_args)
+{
+	PyObject *_res = NULL;
+	OSStatus _err;
+	WindowPtr window;
+	Rect boundsRect;
+	CFStringRef text;
+	Boolean isPassword;
+	ControlFontStyleRec style;
+	ControlHandle outControl;
+#ifndef CreateEditUnicodeTextControl
+	PyMac_PRECHECK(CreateEditUnicodeTextControl);
+#endif
+	if (!PyArg_ParseTuple(_args, "O&O&O&bO&",
+	                      WinObj_Convert, &window,
+	                      PyMac_GetRect, &boundsRect,
+	                      CFStringRefObj_Convert, &text,
+	                      &isPassword,
+	                      ControlFontStyle_Convert, &style))
+		return NULL;
+	_err = CreateEditUnicodeTextControl(window,
+	                                    &boundsRect,
+	                                    text,
+	                                    isPassword,
+	                                    &style,
+	                                    &outControl);
+	if (_err != noErr) return PyMac_Error(_err);
+	_res = Py_BuildValue("O&",
+	                     CtlObj_New, outControl);
+	return _res;
+}
+#endif
+
+static PyObject *Ctl_FindControlUnderMouse(PyObject *_self, PyObject *_args)
+{
+	PyObject *_res = NULL;
+	ControlHandle _rv;
+	Point inWhere;
+	WindowPtr inWindow;
+	SInt16 outPart;
+#ifndef FindControlUnderMouse
+	PyMac_PRECHECK(FindControlUnderMouse);
+#endif
+	if (!PyArg_ParseTuple(_args, "O&O&",
+	                      PyMac_GetPoint, &inWhere,
+	                      WinObj_Convert, &inWindow))
+		return NULL;
+	_rv = FindControlUnderMouse(inWhere,
+	                            inWindow,
+	                            &outPart);
+	_res = Py_BuildValue("O&h",
+	                     CtlObj_WhichControl, _rv,
+	                     outPart);
 	return _res;
 }
 
@@ -5000,6 +6034,67 @@ static PyObject *Ctl_as_Control(PyObject *_self, PyObject *_args)
 	return _res;
 }
 
+#if TARGET_API_MAC_CARBON
+
+static PyObject *Ctl_CreateTabsControl(PyObject *_self, PyObject *_args)
+{
+	PyObject *_res = NULL;
+	OSStatus _err;
+	WindowPtr window;
+	Rect boundsRect;
+	UInt16 size;
+	UInt16 direction;
+	int i;
+	UInt16 numTabs;
+	ControlTabEntry tabArray[MAXTABS];
+	ControlHandle outControl;
+	PyObject *tabArrayObj, *tabEntry;
+
+#ifndef CreateTabsControl
+	PyMac_PRECHECK(CreateTabsControl);
+#endif
+	if (!PyArg_ParseTuple(_args, "O&O&HHO",
+	                      WinObj_Convert, &window,
+	                      PyMac_GetRect, &boundsRect,
+	                      &size,
+	                      &direction,
+	                      &tabArrayObj))
+		return NULL;
+
+	i = PySequence_Length(tabArrayObj);
+	if (i == -1)
+		return NULL;
+	if (i > MAXTABS) {
+		PyErr_SetString(Ctl_Error, "Too many tabs");
+		return NULL;
+	}
+	numTabs = i;
+	for (i=0; i<numTabs; i++) {
+		tabEntry = PySequence_GetItem(tabArrayObj, i);
+		if (tabEntry == NULL)
+			return NULL;
+		if (!PyArg_Parse(tabEntry, "(O&O&B)",
+		                 ControlButtonContentInfo_Convert, &tabArray[i].icon,
+		                 CFStringRefObj_Convert, &tabArray[i].name,
+		                 &tabArray[i].enabled
+		                 ))
+			return NULL;
+	}
+
+	_err = CreateTabsControl(window,
+	                         &boundsRect,
+	                         size,
+	                         direction,
+	                         numTabs,
+	                         tabArray,
+	                         &outControl);
+	if (_err != noErr) return PyMac_Error(_err);
+	_res = Py_BuildValue("O&",
+	                     CtlObj_New, outControl);
+	return _res;
+}
+#endif
+
 static PyMethodDef Ctl_methods[] = {
 	{"NewControl", (PyCFunction)Ctl_NewControl, 1,
 	 "(WindowPtr owningWindow, Rect boundsRect, Str255 controlTitle, Boolean initiallyVisible, SInt16 initialValue, SInt16 minimumValue, SInt16 maximumValue, SInt16 procID, SInt32 controlReference) -> (ControlHandle _rv)"},
@@ -5011,8 +6106,6 @@ static PyMethodDef Ctl_methods[] = {
 	 "(WindowPtr theWindow, RgnHandle updateRegion) -> None"},
 	{"FindControl", (PyCFunction)Ctl_FindControl, 1,
 	 "(Point testPoint, WindowPtr theWindow) -> (ControlPartCode _rv, ControlHandle theControl)"},
-	{"FindControlUnderMouse", (PyCFunction)Ctl_FindControlUnderMouse, 1,
-	 "(Point inWhere, WindowPtr inWindow) -> (ControlHandle _rv, SInt16 outPart)"},
 	{"IdleControls", (PyCFunction)Ctl_IdleControls, 1,
 	 "(WindowPtr inWindow) -> None"},
 
@@ -5046,52 +6139,170 @@ static PyMethodDef Ctl_methods[] = {
 	{"IsAutomaticControlDragTrackingEnabledForWindow", (PyCFunction)Ctl_IsAutomaticControlDragTrackingEnabledForWindow, 1,
 	 "(WindowPtr theWindow) -> (Boolean tracks)"},
 #endif
+
+#if TARGET_API_MAC_CARBON
+	{"CreateBevelButtonControl", (PyCFunction)Ctl_CreateBevelButtonControl, 1,
+	 "(WindowPtr window, Rect boundsRect, CFStringRef title, UInt16 thickness, UInt16 behavior, ControlButtonContentInfo info, SInt16 menuID, UInt16 menuBehavior, UInt16 menuPlacement) -> (ControlHandle outControl)"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"CreateDisclosureTriangleControl", (PyCFunction)Ctl_CreateDisclosureTriangleControl, 1,
 	 "(WindowPtr window, Rect boundsRect, UInt16 orientation, CFStringRef title, SInt32 initialValue, Boolean drawTitle, Boolean autoToggles) -> (ControlHandle outControl)"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"CreateProgressBarControl", (PyCFunction)Ctl_CreateProgressBarControl, 1,
 	 "(WindowPtr window, Rect boundsRect, SInt32 value, SInt32 minimum, SInt32 maximum, Boolean indeterminate) -> (ControlHandle outControl)"},
+#endif
+
+#if TARGET_API_MAC_OSX
+	{"CreateRelevanceBarControl", (PyCFunction)Ctl_CreateRelevanceBarControl, 1,
+	 "(WindowPtr window, Rect boundsRect, SInt32 value, SInt32 minimum, SInt32 maximum) -> (ControlHandle outControl)"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"CreateLittleArrowsControl", (PyCFunction)Ctl_CreateLittleArrowsControl, 1,
 	 "(WindowPtr window, Rect boundsRect, SInt32 value, SInt32 minimum, SInt32 maximum, SInt32 increment) -> (ControlHandle outControl)"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"CreateChasingArrowsControl", (PyCFunction)Ctl_CreateChasingArrowsControl, 1,
 	 "(WindowPtr window, Rect boundsRect) -> (ControlHandle outControl)"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"CreateSeparatorControl", (PyCFunction)Ctl_CreateSeparatorControl, 1,
 	 "(WindowPtr window, Rect boundsRect) -> (ControlHandle outControl)"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"CreateGroupBoxControl", (PyCFunction)Ctl_CreateGroupBoxControl, 1,
 	 "(WindowPtr window, Rect boundsRect, CFStringRef title, Boolean primary) -> (ControlHandle outControl)"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"CreateCheckGroupBoxControl", (PyCFunction)Ctl_CreateCheckGroupBoxControl, 1,
 	 "(WindowPtr window, Rect boundsRect, CFStringRef title, SInt32 initialValue, Boolean primary, Boolean autoToggle) -> (ControlHandle outControl)"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"CreatePopupGroupBoxControl", (PyCFunction)Ctl_CreatePopupGroupBoxControl, 1,
 	 "(WindowPtr window, Rect boundsRect, CFStringRef title, Boolean primary, SInt16 menuID, Boolean variableWidth, SInt16 titleWidth, SInt16 titleJustification, Style titleStyle) -> (ControlHandle outControl)"},
+#endif
+
+#if TARGET_API_MAC_CARBON
+	{"CreateImageWellControl", (PyCFunction)Ctl_CreateImageWellControl, 1,
+	 "(WindowPtr window, Rect boundsRect, ControlButtonContentInfo info) -> (ControlHandle outControl)"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"CreatePopupArrowControl", (PyCFunction)Ctl_CreatePopupArrowControl, 1,
 	 "(WindowPtr window, Rect boundsRect, UInt16 orientation, UInt16 size) -> (ControlHandle outControl)"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"CreatePlacardControl", (PyCFunction)Ctl_CreatePlacardControl, 1,
 	 "(WindowPtr window, Rect boundsRect) -> (ControlHandle outControl)"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"CreateClockControl", (PyCFunction)Ctl_CreateClockControl, 1,
 	 "(WindowPtr window, Rect boundsRect, UInt16 clockType, UInt32 clockFlags) -> (ControlHandle outControl)"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"CreateUserPaneControl", (PyCFunction)Ctl_CreateUserPaneControl, 1,
 	 "(WindowPtr window, Rect boundsRect, UInt32 features) -> (ControlHandle outControl)"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"CreateEditTextControl", (PyCFunction)Ctl_CreateEditTextControl, 1,
 	 "(WindowPtr window, Rect boundsRect, CFStringRef text, Boolean isPassword, Boolean useInlineInput, ControlFontStyleRec style) -> (ControlHandle outControl)"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"CreateStaticTextControl", (PyCFunction)Ctl_CreateStaticTextControl, 1,
 	 "(WindowPtr window, Rect boundsRect, CFStringRef text, ControlFontStyleRec style) -> (ControlHandle outControl)"},
+#endif
+
+#if TARGET_API_MAC_CARBON
+	{"CreatePictureControl", (PyCFunction)Ctl_CreatePictureControl, 1,
+	 "(WindowPtr window, Rect boundsRect, ControlButtonContentInfo content, Boolean dontTrack) -> (ControlHandle outControl)"},
+#endif
+
+#if TARGET_API_MAC_CARBON
+	{"CreateIconControl", (PyCFunction)Ctl_CreateIconControl, 1,
+	 "(WindowPtr window, Rect boundsRect, ControlButtonContentInfo icon, Boolean dontTrack) -> (ControlHandle outControl)"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"CreateWindowHeaderControl", (PyCFunction)Ctl_CreateWindowHeaderControl, 1,
 	 "(WindowPtr window, Rect boundsRect, Boolean isListHeader) -> (ControlHandle outControl)"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"CreatePushButtonControl", (PyCFunction)Ctl_CreatePushButtonControl, 1,
 	 "(WindowPtr window, Rect boundsRect, CFStringRef title) -> (ControlHandle outControl)"},
+#endif
+
+#if TARGET_API_MAC_CARBON
+	{"CreatePushButtonWithIconControl", (PyCFunction)Ctl_CreatePushButtonWithIconControl, 1,
+	 "(WindowPtr window, Rect boundsRect, CFStringRef title, ControlButtonContentInfo icon, UInt16 iconAlignment) -> (ControlHandle outControl)"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"CreateRadioButtonControl", (PyCFunction)Ctl_CreateRadioButtonControl, 1,
 	 "(WindowPtr window, Rect boundsRect, CFStringRef title, SInt32 initialValue, Boolean autoToggle) -> (ControlHandle outControl)"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"CreateCheckBoxControl", (PyCFunction)Ctl_CreateCheckBoxControl, 1,
 	 "(WindowPtr window, Rect boundsRect, CFStringRef title, SInt32 initialValue, Boolean autoToggle) -> (ControlHandle outControl)"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"CreatePopupButtonControl", (PyCFunction)Ctl_CreatePopupButtonControl, 1,
 	 "(WindowPtr window, Rect boundsRect, CFStringRef title, SInt16 menuID, Boolean variableWidth, SInt16 titleWidth, SInt16 titleJustification, Style titleStyle) -> (ControlHandle outControl)"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"CreateRadioGroupControl", (PyCFunction)Ctl_CreateRadioGroupControl, 1,
 	 "(WindowPtr window, Rect boundsRect) -> (ControlHandle outControl)"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"CreateScrollingTextBoxControl", (PyCFunction)Ctl_CreateScrollingTextBoxControl, 1,
 	 "(WindowPtr window, Rect boundsRect, SInt16 contentResID, Boolean autoScroll, UInt32 delayBeforeAutoScroll, UInt32 delayBetweenAutoScroll, UInt16 autoScrollAmount) -> (ControlHandle outControl)"},
+#endif
+
+#if TARGET_API_MAC_OSX
+	{"CreateDisclosureButtonControl", (PyCFunction)Ctl_CreateDisclosureButtonControl, 1,
+	 "(WindowPtr inWindow, Rect inBoundsRect, SInt32 inValue, Boolean inAutoToggles) -> (ControlHandle outControl)"},
+#endif
+
+#if TARGET_API_MAC_OSX
+	{"CreateRoundButtonControl", (PyCFunction)Ctl_CreateRoundButtonControl, 1,
+	 "(WindowPtr inWindow, Rect inBoundsRect, SInt16 inSize, ControlButtonContentInfo inContent) -> (ControlHandle outControl)"},
+#endif
+
+#if TARGET_API_MAC_CARBON
 	{"CreateDataBrowserControl", (PyCFunction)Ctl_CreateDataBrowserControl, 1,
 	 "(WindowPtr window, Rect boundsRect, OSType style) -> (ControlHandle outControl)"},
+#endif
+
+#if TARGET_API_MAC_OSX
+	{"CreateEditUnicodeTextControl", (PyCFunction)Ctl_CreateEditUnicodeTextControl, 1,
+	 "(WindowPtr window, Rect boundsRect, CFStringRef text, Boolean isPassword, ControlFontStyleRec style) -> (ControlHandle outControl)"},
+#endif
+	{"FindControlUnderMouse", (PyCFunction)Ctl_FindControlUnderMouse, 1,
+	 "(Point inWhere, WindowPtr inWindow) -> (ControlHandle _rv, SInt16 outPart)"},
 	{"as_Control", (PyCFunction)Ctl_as_Control, 1,
 	 "(Handle h) -> (ControlHandle _rv)"},
+
+#if TARGET_API_MAC_CARBON
+	{"CreateTabsControl", (PyCFunction)Ctl_CreateTabsControl, 1,
+	 "(WindowPtr window, Rect boundsRect, UInt16 size, UInt16 direction, ControlTabEntry tabArray) -> (ControlHandle outControl)"},
+#endif
 	{NULL, NULL, 0}
 };
 
