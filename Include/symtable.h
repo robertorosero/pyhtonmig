@@ -37,6 +37,7 @@ typedef struct _symtable_entry {
 	int ste_generator : 1;   /* true if namespace is a generator */
 	int ste_lineno;          /* first line of block */
 	int ste_opt_lineno;      /* lineno of last exec or import * */
+	int ste_tmpname;         /* counter for listcomp temp vars */
 	struct symtable *ste_table;
 } PySTEntryObject;
 
