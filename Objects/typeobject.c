@@ -138,6 +138,7 @@ subtype_dealloc(PyObject *self)
 }
 
 staticforward void override_slots(PyTypeObject *type, PyObject *dict);
+staticforward PyTypeObject *solid_base(PyTypeObject *type);
 
 typedef struct {
 	PyTypeObject type;
@@ -149,6 +150,19 @@ typedef struct {
 	struct memberlist members[1];
 } etype;
 
+static int
+issubtype(PyTypeObject *a, PyTypeObject *b)
+{
+	if (b == &PyBaseObject_Type)
+		return 1; /* Every type is an implicit subtype of this */
+	while (a != NULL) {
+		if (a == b)
+			return 1;
+		a = a->tp_base;
+	}
+	return 0;
+}
+
 /* TypeType's initializer; called when a type is subclassed */
 static int
 type_init(PyObject *self, PyObject *args, PyObject *kwds)
@@ -158,7 +172,7 @@ type_init(PyObject *self, PyObject *args, PyObject *kwds)
 	static char *kwlist[] = {"name", "bases", "dict", 0};
 	etype *et;
 	struct memberlist *mp;
-	int i, nslots, slotoffset, allocsize;
+	int i, n, nslots, slotoffset, allocsize;
 
 	assert(PyType_Check(self));
 	type = (PyTypeObject *)self;
@@ -172,25 +186,41 @@ type_init(PyObject *self, PyObject *args, PyObject *kwds)
 				"usage: TypeType(name, bases, dict) ");
 		return -1;
 	}
-	if (PyTuple_GET_SIZE(bases) > 1) {
-		PyErr_SetString(PyExc_TypeError,
-				"can't multiple-inherit from types (yet)");
-		return -1;
-	}
-	if (PyTuple_GET_SIZE(bases) < 1)
-		base = &PyBaseObject_Type;
-	else {
+	n = PyTuple_GET_SIZE(bases);
+	if (n > 0) {
+		PyTypeObject *winner, *candidate, *base_i;
 		base = (PyTypeObject *)PyTuple_GET_ITEM(bases, 0);
-		if (!PyType_Check((PyObject *)base)) {
-			PyErr_SetString(PyExc_TypeError,
-					"base type must be a type");
-			return -1;
+		winner = &PyBaseObject_Type;
+		for (i = 0; i < n; i++) {
+			base_i = (PyTypeObject *)PyTuple_GET_ITEM(bases, i);
+			if (!PyType_Check((PyObject *)base_i)) {
+				PyErr_SetString(
+					PyExc_TypeError,
+					"bases must be types");
+				return -1;
+			}
+			candidate = solid_base(base_i);
+			if (issubtype(winner, candidate))
+				;
+			else if (issubtype(candidate, winner)) {
+				winner = candidate;
+				base = base_i;
+			}
+			else {
+				PyErr_SetString(
+					PyExc_TypeError,
+					"multiple bases have "
+					"instance lay-out conflict");
+				return -1;
+			}
 		}
-		if (base->tp_new == NULL) {
-			PyErr_SetString(PyExc_TypeError,
-					"base type must have a tp_new slot");
-			return -1;
-		}
+	}
+	else
+		base = &PyBaseObject_Type;
+	if (base->tp_new == NULL) {
+		PyErr_SetString(PyExc_TypeError,
+				"base type must have a tp_new slot");
+		return -1;
 	}
 
 	/* Check for a __slots__ sequence variable in dict, and count it */
@@ -285,6 +315,20 @@ type_init(PyObject *self, PyObject *args, PyObject *kwds)
 	}
 	add_members(type, et->members);
 
+	/* XXX This is close, but not quite right! */
+	if (n > 1) {
+		PyTypeObject *t;
+		for (i = n; --i >= 0; ) {
+			t = (PyTypeObject *) PyTuple_GET_ITEM(bases, i);
+			x = PyObject_CallMethod(type->tp_dict,
+						"update", "O", t->tp_dict);
+			if (x == NULL) {
+				Py_DECREF(type);
+				return -1;
+			}
+		}
+	}
+
 	x = PyObject_CallMethod(type->tp_dict, "update", "O", dict);
 	if (x == NULL) {
 		Py_DECREF(type);
@@ -296,17 +340,42 @@ type_init(PyObject *self, PyObject *args, PyObject *kwds)
 }
 
 static int
-issubtype(PyTypeObject *a, PyTypeObject *b)
+extra_ivars(PyTypeObject *type, PyTypeObject *base)
 {
-	while (a != b) {
-		a = a->tp_base;
-		if (a == NULL)
-			return 0;
-	}
+	int t_size = type->tp_basicsize;
+	int b_size = base->tp_basicsize;
+
+	/* XXX what about tp_itemsize? */
+	assert((type->tp_flags & Py_TPFLAGS_GC) >=
+	       (base->tp_flags & Py_TPFLAGS_GC)); /* base has GC, type not! */
+	if (type->tp_flags & Py_TPFLAGS_GC)
+		t_size -= PyGC_HEAD_SIZE;
+	if (base->tp_flags & Py_TPFLAGS_GC)
+		b_size -= PyGC_HEAD_SIZE;
+	assert(t_size >= b_size); /* type smaller than base! */
+	if (t_size == b_size)
+		return 0;
+	if (type->tp_dictoffset != 0 && base->tp_dictoffset == 0 &&
+	    type->tp_dictoffset == b_size &&
+	    t_size == b_size + sizeof(PyObject *))
+		return 0; /* "Forgive" adding a __dict__ only */
 	return 1;
 }
 
-#define ISSUBTYPE(a, b) issubtype(a, b)
+static PyTypeObject *
+solid_base(PyTypeObject *type)
+{
+	PyTypeObject *base;
+
+	if (type->tp_base)
+		base = solid_base(type->tp_base);
+	else
+		base = &PyBaseObject_Type;
+	if (extra_ivars(type, base))
+		return type;
+	else
+		return base;
+}
 
 static PyObject *
 type_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
@@ -325,9 +394,9 @@ type_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 		for (i = 0; i < n; i++) {
 			PyObject *base_i = PyTuple_GET_ITEM(bases, i);
 			PyTypeObject *type_i = base_i->ob_type;
-			if (ISSUBTYPE(metatype, type_i))
+			if (issubtype(metatype, type_i))
 				continue;
-			if (ISSUBTYPE(type_i, metatype)) {
+			if (issubtype(type_i, metatype)) {
 				metatype = type_i;
 				continue;
 			}
