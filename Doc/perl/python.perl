@@ -479,23 +479,31 @@ sub do_cmd_withsubitem{
 sub do_cmd_makemodindex{ return $_[0]; }
 
 # We're in the document subdirectory when this happens!
-#
 open(IDXFILE, '>index.dat') || die "\n$!\n";
+print IDXFILE "<index>\n";
+
 open(INTLABELS, '>intlabels.pl') || die "\n$!\n";
 print INTLABELS "%internal_labels = ();\n";
 print INTLABELS "1;		# hack in case there are no entries\n\n";
 
-# Using \0 for this is bad because we can't use common tools to work with the
-# resulting files.  Things like grep can be useful with this stuff!
-#
-$IDXFILE_FIELD_SEP = "\1";
-
 sub write_idxfile($$){
     my($ahref, $str) = @_;
-    my $info = "$ahref$IDXFILE_FIELD_SEP$str\n";
-    $info =~ s/<a href=['"]([^'"]+)['"]>/$1/;
-    $info =~ s/###/$IDXFILE_FIELD_SEP/;
-    print IDXFILE $info;
+    $ahref =~ /<a href=['"]([^'"]+)['"]>$/;
+    my $link = $1;
+    $str =~ /(.*)###0*([1-9]\d*)$/;
+    my $text = $1;
+    my $seqno = $2;
+    my $annotation = '';
+    if ($text =~ /(.*) \(([^)]+)\)$/) {
+        $annotation = $2;
+        $text = $1;
+    }
+    print IDXFILE "  <entry link='$link'";
+    print IDXFILE " seqno='$seqno'" if $seqno;
+    print IDXFILE ">\n";
+    print IDXFILE "    <text>$text</text>\n";
+    print IDXFILE "    <annotation>$annotation</annotation>\n" if $annotation;
+    print IDXFILE "  </entry>\n";
 }
 
 

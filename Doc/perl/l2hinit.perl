@@ -318,6 +318,7 @@ sub insert_index($$$$$) {
 
 sub add_idx() {
     print "\nBuilding HTML for the index ...";
+    print IDXFILE "</index>\n";
     close(IDXFILE);
     insert_index($idx_mark, 'index.dat', $INDEX_COLUMNS, 1, '');
 }
@@ -346,19 +347,22 @@ sub add_module_idx() {
 	$prevplat = $plat;
     }
     open(MODIDXFILE, '>modindex.dat') || die "\n$!\n";
+    print MODIDXFILE "<index>\n";
     foreach $key (keys %Modules) {
 	# dump the line in the data file; just use an empty seqno field
 	my $plat = '';
 	if ($ModulePlatforms{$key} && !$allthesame) {
-	    $plat = (" <em>(<span class=\"platform\">$ModulePlatforms{$key}"
-		     . '</span>)</em>');
+	    $plat = "<span class=\"platform\">$ModulePlatforms{$key}</span>";
 	}
-        my $s = "$Modules{$key}$IDXFILE_FIELD_SEP$key";
-        $s =~ s/<a href="([^\"]+)">/$1/;
-        print MODIDXFILE ("$s$plat"
-                          . $IDXFILE_FIELD_SEP
-                          . "\n");
+        my $s = $Modules{$key};
+        $s =~ /<a href="([^\"]+)">/;
+        my $link = $1;
+        print MODIDXFILE "  <entry link='$link'>\n";
+        print MODIDXFILE "    <text>$key</text>\n";
+        print MODIDXFILE "    <annotation>$plat</annotation>\n" if $plat;
+        print MODIDXFILE "  </entry>\n";
     }
+    print MODIDXFILE "</index>\n";
     close(MODIDXFILE);
 
     if ($GLOBAL_MODULE_INDEX) {
