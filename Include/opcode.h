@@ -119,6 +119,8 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #define LOAD_LOCAL	115	/* Index in name list */
 #define LOAD_GLOBAL	116	/* Index in name list */
 
+#define SET_FUNC_ARGS	117	/* Argcount */
+
 #define SETUP_LOOP	120	/* Target address (absolute) */
 #define SETUP_EXCEPT	121	/* "" */
 #define SETUP_FINALLY	122	/* "" */
