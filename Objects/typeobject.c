@@ -320,172 +320,6 @@ best_base(PyObject *bases)
 	return base;
 }
 
-/* TypeType's initializer; called when a type is subclassed */
-
-staticforward void object_dealloc(PyObject *);
-staticforward int object_init(PyObject *, PyObject *, PyObject *);
-
-static int
-type_init(PyObject *self, PyObject *args, PyObject *kwds)
-{
-	PyObject *name, *bases, *dict, *slots;
-	PyTypeObject *type, *base;
-	static char *kwlist[] = {"name", "bases", "dict", 0};
-	etype *et;
-	struct memberlist *mp;
-	int i, nbases, nslots, slotoffset, allocsize;
-
-	assert(PyType_Check(self));
-	type = (PyTypeObject *)self;
-
-	/* Check this is a virginal type object */
-	if (type->tp_dict != NULL) {
-		PyErr_SetString(PyExc_TypeError,
-				"can't re-initialize type objects");
-		return -1;
-	}
-
-	/* Check arguments */
-	if (!PyArg_ParseTupleAndKeywords(args, kwds, "SOO:type", kwlist,
-					 &name, &bases, &dict))
-		return -1;
-	if (!PyTuple_Check(bases) || !PyDict_Check(dict)) {
-		PyErr_SetString(PyExc_TypeError,
-				"usage: type(name, bases, dict) ");
-		return -1;
-	}
-
-	/* Adjust empty bases */
-	nbases = PyTuple_GET_SIZE(bases);
-	if (nbases == 0) {
-		bases = Py_BuildValue("(O)", &PyBaseObject_Type);
-		if (bases == NULL)
-			return -1;
-		nbases = 1;
-	}
-	else
-		Py_INCREF(bases);
-
-	/* Calculate best base */
-	base = best_base(bases);
-	if (base == NULL)
-		return -1;
-	if (base->tp_init == NULL && base != &PyBaseObject_Type) {
-		PyErr_SetString(PyExc_TypeError,
-				"base type must have a constructor slot");
-		return -1;
-	}
-
-	/* Set tp_base and tp_bases */
-	type->tp_bases = bases;
-	Py_INCREF(base);
-	type->tp_base = base;
-
-	/* Check for a __slots__ sequence variable in dict, and count it */
-	/* XXX This should move to type_alloc() */
-	slots = PyDict_GetItemString(dict, "__slots__");
-	nslots = 0;
-	if (slots != NULL) {
-		/* Make it into a tuple */
-		if (PyString_Check(slots))
-			slots = Py_BuildValue("(O)", slots);
-		else
-			slots = PySequence_Tuple(slots);
-		if (slots == NULL)
-			return -1;
-		nslots = PyTuple_GET_SIZE(slots);
-		for (i = 0; i < nslots; i++) {
-			if (!PyString_Check(PyTuple_GET_ITEM(slots, i))) {
-				PyErr_SetString(PyExc_TypeError,
-				"__slots__ must be a sequence of strings");
-				Py_DECREF(slots);
-				return -1;
-			}
-		}
-	}
-	if (slots == NULL && base->tp_dictoffset == 0 &&
-	    (base->tp_setattro == PyObject_GenericSetAttr ||
-	     base->tp_setattro == NULL))
-		nslots = 1;
-
-	/* Check allocation size and initialize the type object */
-	allocsize = sizeof(etype) + nslots*sizeof(struct memberlist);
-	if (type->ob_type->tp_basicsize < allocsize) {
-		PyErr_Format(
-			PyExc_SystemError,
-			"insufficient allocated memory for subtype: "
-			"allocated %d, needed %d",
-			type->ob_type->tp_basicsize,
-			allocsize);
-		return -1;
-	}
-	et = (etype *)type;
-	Py_INCREF(name);
-	et->name = name;
-	et->slots = slots;
-	type->tp_as_number = &et->as_number;
-	type->tp_as_sequence = &et->as_sequence;
-	type->tp_as_mapping = &et->as_mapping;
-	type->tp_as_buffer = &et->as_buffer;
-	type->tp_name = PyString_AS_STRING(name);
-
-	/* Initialize tp_introduced from passed-in dict */
-	type->tp_introduced = dict = PyDict_Copy(dict);
-	if (dict == NULL)
-		return -1;
-
-	/* Add descriptors for custom slots from __slots__, or for __dict__ */
-	mp = et->members;
-	slotoffset = base->tp_basicsize;
-	if (base->tp_flags & Py_TPFLAGS_GC)
-		slotoffset -= PyGC_HEAD_SIZE;
-	if (slots != NULL) {
-		for (i = 0; i < nslots; i++, mp++) {
-			mp->name = PyString_AS_STRING(
-				PyTuple_GET_ITEM(slots, i));
-			mp->type = T_OBJECT;
-			mp->offset = slotoffset;
-			slotoffset += i*sizeof(PyObject *);
-		}
-	}
-	else if (nslots) {
-		type->tp_dictoffset = slotoffset;
-		slotoffset += sizeof(PyObject *);
-		mp->name = "__dict__";
-		mp->type = T_OBJECT;
-		mp->offset = slotoffset;
-		mp->readonly = 1;
-	}
-	type->tp_basicsize = slotoffset;
-	add_members(type, et->members);
-
-	/* Special case some slots */
-	if (type->tp_dictoffset != 0) {
-		if (base->tp_getattr == NULL && base->tp_getattro == NULL)
-			type->tp_getattro = PyObject_GenericGetAttr;
-		if (base->tp_setattr == NULL && base->tp_setattro == NULL)
-			type->tp_setattro = PyObject_GenericSetAttr;
-	}
-	if (base->tp_dealloc == NULL)
-		type->tp_dealloc = object_dealloc;
-	else
-		type->tp_dealloc = subtype_dealloc;
-	if (base->tp_new == NULL)
-		type->tp_new = PyType_GenericNew;
-	if (base->tp_alloc == NULL)
-		type->tp_alloc = PyType_GenericAlloc;
-	if (base->tp_init == NULL)
-		type->tp_init = object_init;
-
-	/* Initialize the rest */
-	if (PyType_InitDict(type) < 0)
-		return -1;
-
-	/* Override slots that deserve it */
-	override_slots(type, type->tp_dict);
-	return 0;
-}
-
 static int
 extra_ivars(PyTypeObject *type, PyTypeObject *base)
 {
@@ -528,22 +362,19 @@ solid_base(PyTypeObject *type)
 		return base;
 }
 
-static PyObject *
-type_alloc(PyTypeObject *metatype, int nitems)
-{
-	PyTypeObject *type;
-
-	type = (PyTypeObject *)PyType_GenericAlloc(metatype, nitems);
-	if (type != NULL)
-		type->tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HEAPTYPE;
-	return (PyObject *)type;
-}
+staticforward void object_dealloc(PyObject *);
+staticforward int object_init(PyObject *, PyObject *, PyObject *);
 
 static PyObject *
 type_new(PyTypeObject *metatype, PyObject *args, PyObject *kwds)
 {
 	PyObject *name, *bases, *dict;
 	static char *kwlist[] = {"name", "bases", "dict", 0};
+	PyObject *slots;
+	PyTypeObject *type, *base;
+	etype *et;
+	struct memberlist *mp;
+	int i, nbases, nslots, slotoffset;
 
 	if (PyTuple_Check(args) && PyTuple_GET_SIZE(args) == 1 &&
 	    (kwds == NULL || (PyDict_Check(kwds) && PyDict_Size(kwds) == 0))) {
@@ -553,7 +384,7 @@ type_new(PyTypeObject *metatype, PyObject *args, PyObject *kwds)
 		return (PyObject *) x->ob_type;
 	}
 
-	/* Check arguments (again?!?! yes, alas -- we need the bases!) */
+	/* Check arguments */
 	if (!PyArg_ParseTupleAndKeywords(args, kwds, "SOO:type", kwlist,
 					 &name, &bases, &dict))
 		return NULL;
@@ -576,7 +407,129 @@ type_new(PyTypeObject *metatype, PyObject *args, PyObject *kwds)
 		if (metatype->tp_new != type_new)
 			return metatype->tp_new(metatype, args, kwds);
 	}
-	return PyType_GenericNew(metatype, args, kwds);
+
+	/* Adjust empty bases */
+	nbases = PyTuple_GET_SIZE(bases);
+	if (nbases == 0) {
+		bases = Py_BuildValue("(O)", &PyBaseObject_Type);
+		if (bases == NULL)
+			return NULL;
+		nbases = 1;
+	}
+	else
+		Py_INCREF(bases);
+
+	/* Calculate best base */
+	base = best_base(bases);
+	if (base == NULL)
+		return NULL;
+	if (!PyType_HasFeature(base, Py_TPFLAGS_BASETYPE)) {
+		PyErr_Format(PyExc_TypeError,
+			     "type '%.100s' is not an acceptable base type",
+			     base->tp_name);
+		return NULL;
+	}
+
+	/* Check for a __slots__ sequence variable in dict, and count it */
+	slots = PyDict_GetItemString(dict, "__slots__");
+	nslots = 0;
+	if (slots != NULL) {
+		/* Make it into a tuple */
+		if (PyString_Check(slots))
+			slots = Py_BuildValue("(O)", slots);
+		else
+			slots = PySequence_Tuple(slots);
+		if (slots == NULL)
+			return NULL;
+		nslots = PyTuple_GET_SIZE(slots);
+		for (i = 0; i < nslots; i++) {
+			if (!PyString_Check(PyTuple_GET_ITEM(slots, i))) {
+				PyErr_SetString(PyExc_TypeError,
+				"__slots__ must be a sequence of strings");
+				Py_DECREF(slots);
+				return NULL;
+			}
+		}
+	}
+	if (slots == NULL && base->tp_dictoffset == 0 &&
+	    (base->tp_setattro == PyObject_GenericSetAttr ||
+	     base->tp_setattro == NULL))
+		nslots = 1;
+
+	/* Allocate the type object */
+	type = (PyTypeObject *)metatype->tp_alloc(metatype, nslots);
+	if (type == NULL)
+		return NULL;
+
+	/* Keep name and slots alive in the extended type object */
+	et = (etype *)type;
+	Py_INCREF(name);
+	et->name = name;
+	et->slots = slots;
+
+	/* Initialize essential fields */
+	type->tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HEAPTYPE |
+		Py_TPFLAGS_BASETYPE;
+	type->tp_as_number = &et->as_number;
+	type->tp_as_sequence = &et->as_sequence;
+	type->tp_as_mapping = &et->as_mapping;
+	type->tp_as_buffer = &et->as_buffer;
+	type->tp_name = PyString_AS_STRING(name);
+
+	/* Set tp_base and tp_bases */
+	type->tp_bases = bases;
+	Py_INCREF(base);
+	type->tp_base = base;
+
+	/* Initialize tp_introduced from passed-in dict */
+	type->tp_introduced = dict = PyDict_Copy(dict);
+	if (dict == NULL)
+		return NULL;
+
+	/* Add descriptors for custom slots from __slots__, or for __dict__ */
+	mp = et->members;
+	slotoffset = base->tp_basicsize;
+	if (base->tp_flags & Py_TPFLAGS_GC)
+		slotoffset -= PyGC_HEAD_SIZE;
+	if (slots != NULL) {
+		for (i = 0; i < nslots; i++, mp++) {
+			mp->name = PyString_AS_STRING(
+				PyTuple_GET_ITEM(slots, i));
+			mp->type = T_OBJECT;
+			mp->offset = slotoffset;
+			slotoffset += i*sizeof(PyObject *);
+		}
+	}
+	else if (nslots) {
+		type->tp_dictoffset = slotoffset;
+		slotoffset += sizeof(PyObject *);
+		mp->name = "__dict__";
+		mp->type = T_OBJECT;
+		mp->offset = slotoffset;
+		mp->readonly = 1;
+	}
+	type->tp_basicsize = slotoffset;
+	add_members(type, et->members);
+
+	/* Special case some slots */
+	if (type->tp_dictoffset != 0) {
+		if (base->tp_getattr == NULL && base->tp_getattro == NULL)
+			type->tp_getattro = PyObject_GenericGetAttr;
+		if (base->tp_setattr == NULL && base->tp_setattro == NULL)
+			type->tp_setattro = PyObject_GenericSetAttr;
+	}
+	if (base->tp_new == NULL)
+		type->tp_new = PyType_GenericNew;
+	if (base->tp_alloc == NULL)
+		type->tp_alloc = PyType_GenericAlloc;
+
+	/* Initialize the rest */
+	if (PyType_InitDict(type) < 0)
+		return NULL;
+
+	/* Override slots that deserve it */
+	override_slots(type, type->tp_dict);
+	return (PyObject *)type;
 }
 
 static PyObject *
@@ -613,8 +566,8 @@ PyTypeObject PyType_Type = {
 	PyObject_HEAD_INIT(&PyType_Type)
 	0,					/* ob_size */
 	"type",					/* tp_name */
-	sizeof(etype) + sizeof(struct memberlist), /* tp_basicsize */
-	0,					/* tp_itemsize */
+	sizeof(etype),				/* tp_basicsize */
+	sizeof(struct memberlist),		/* tp_itemsize */
 	(destructor)type_dealloc,		/* tp_dealloc */
 	0,					/* tp_print */
 	0,			 		/* tp_getattr */
@@ -630,7 +583,7 @@ PyTypeObject PyType_Type = {
 	(getattrofunc)type_getattro,		/* tp_getattro */
 	0,					/* tp_setattro */
 	0,					/* tp_as_buffer */
-	Py_TPFLAGS_DEFAULT,			/* tp_flags */
+	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE, /* tp_flags */
 	type_doc,				/* tp_doc */
 	0,					/* tp_traverse */
 	0,					/* tp_clear */
@@ -646,8 +599,8 @@ PyTypeObject PyType_Type = {
 	0,					/* tp_descr_get */
 	0,					/* tp_descr_set */
 	offsetof(PyTypeObject, tp_dict),	/* tp_dictoffset */
-	type_init,				/* tp_init */
-	type_alloc,				/* tp_alloc */
+	0,					/* tp_init */
+	PyType_GenericAlloc,			/* tp_alloc */
 	type_new,				/* tp_new */
 };
 
@@ -677,7 +630,7 @@ PyTypeObject PyBaseObject_Type = {
 	"object",				/* tp_name */
 	sizeof(PyObject),			/* tp_basicsize */
 	0,					/* tp_itemsize */
-	0/*(destructor)object_dealloc*/,	/* tp_dealloc */
+	(destructor)object_dealloc,		/* tp_dealloc */
 	0,					/* tp_print */
 	0,			 		/* tp_getattr */
 	0,					/* tp_setattr */
@@ -692,7 +645,7 @@ PyTypeObject PyBaseObject_Type = {
 	0,					/* tp_getattro */
 	0,					/* tp_setattro */
 	0,					/* tp_as_buffer */
-	Py_TPFLAGS_DEFAULT,			/* tp_flags */
+	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE, /* tp_flags */
 	"The most base type",			/* tp_doc */
 	0,					/* tp_traverse */
 	0,					/* tp_clear */
@@ -708,9 +661,9 @@ PyTypeObject PyBaseObject_Type = {
 	0,					/* tp_descr_get */
 	0,					/* tp_descr_set */
 	0,					/* tp_dictoffset */
-	0,					/* tp_init */
-	0,					/* tp_alloc */
-	0,					/* tp_new */
+	object_init,				/* tp_init */
+	PyType_GenericAlloc,			/* tp_alloc */
+	PyType_GenericNew,			/* tp_new */
 };
 
 
