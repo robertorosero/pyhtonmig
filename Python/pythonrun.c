@@ -114,6 +114,9 @@ Py_Initialize(void)
 		Py_FatalError("Py_Initialize: can't make first thread");
 	(void) PyThreadState_Swap(tstate);
 
+	if (PyType_InitDict(&PyType_Type) < 0)
+		Py_FatalError("Py_Initialize: can't initialize 'type'");
+
 	interp->modules = PyDict_New();
 	if (interp->modules == NULL)
 		Py_FatalError("Py_Initialize: can't make modules dictionary");
@@ -143,7 +146,7 @@ Py_Initialize(void)
 	_PyImport_Init();
 
 	/* initialize builtin exceptions */
-	init_exceptions();
+	_PyExc_Init();
 
 	/* phase 2 of builtins */
 	_PyImport_FixupExtension("__builtin__", "__builtin__");
@@ -237,7 +240,7 @@ Py_Finalize(void)
 	   below has been checked to make sure no exceptions are ever
 	   raised.
 	*/
-	fini_exceptions();
+	_PyExc_Fini();
 
 	/* Delete current thread */
 	PyInterpreterState_Clear(interp);
@@ -1005,7 +1008,10 @@ PyObject *
 PyRun_StringFlags(char *str, int start, PyObject *globals, PyObject *locals,
 		  PyCompilerFlags *flags)
 {
-	return run_err_node(PyParser_SimpleParseString(str, start),
+	return run_err_node(PyParser_SimpleParseStringFlags(
+				str, start,
+				(flags && flags->cf_flags & PyCF_GENERATORS) ?
+				PyPARSE_YIELD_IS_KEYWORD : 0),
 			    "<string>", globals, locals, flags);
 }
 
@@ -1341,7 +1347,7 @@ _Py_AskYesNo(char *prompt)
 {
 	char buf[256];
 	
-	printf("%s [ny] ", prompt);
+	fprintf(stderr, "%s [ny] ", prompt);
 	if (fgets(buf, sizeof buf, stdin) == NULL)
 		return 0;
 	return buf[0] == 'y' || buf[0] == 'Y';
