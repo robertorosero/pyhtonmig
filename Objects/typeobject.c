@@ -1733,7 +1733,8 @@ wrap_next(PyObject *self, PyObject *args, void *wrapped)
 }
 
 static struct wrapperbase tab_next[] = {
-	{"next", (wrapperfunc)wrap_next, "x.next() -> next value"},
+	{"next", (wrapperfunc)wrap_next,
+		"x.next() -> get the next value, or raise StopIteration"},
 	{0}
 };
 

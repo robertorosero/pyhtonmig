@@ -158,7 +158,10 @@ Some specific areas: a fair amount of code probably depends on
 specific types having __members__ and/or __methods__ attributes.
 These are currently not present (conformant to PEP 252, which proposes
 to drop them) but we may have to add them back.  This can be done in a
-generic way with not too much effort.
+generic way with not too much effort.  Tim adds:  Perhaps that dir(object)
+rarely returns anything but [] now is a consequence of this.  I'm very
+used to doing, e.g., dir([]) or dir("") in an interactive shell to jog my
+memory; also one of the reasons test_generators failed.
 
 Another area: going all the way with classes and instances means that
 type(x) == types.InstanceType won't work any more to detect instances.
@@ -284,16 +287,7 @@ Merge issues:
           Now dies with a memory error right after
               Testing Python subclass of dict...
           I expect this is a merge glitch that slipped past me.
-
-      test_generators.py
-          All of the computational tests pass.
-          It's failing because attempting to assign to the .gi_running attr
-          of a generator-iterator object was expected to raise
-              TypeError: object has read-only attributes
-          but is now raising
-              AttributeError: 'generator' object has no attribute 'gi_running'
-          How generator-iterators define attributes should be reworked.
-
+ 
 + If some non-Windows test has an expected-output file in descr-branch
   that has been removed on the trunk since descr-fork, it will probably
   fail.  The cure is to remove the expected-output file in descr-branch too.

@@ -13,6 +13,7 @@
 #include "frameobject.h"
 #include "eval.h"
 #include "opcode.h"
+#include "structmember.h"
 
 #ifdef macintosh
 #include "macglue.h"
@@ -193,35 +194,21 @@ static struct PyMethodDef gen_methods[] = {
 	{NULL,          NULL}   /* Sentinel */
 };
 
-static PyObject *
-gen_getattr(genobject *gen, char *name)
-{
-	PyObject *result;
-
-	if (strcmp(name, "gi_frame") == 0) {
-		result = (PyObject *)gen->gi_frame;
-		assert(result != NULL);
-		Py_INCREF(result);
-	}
-	else if (strcmp(name, "gi_running") == 0)
-		result = (PyObject *)PyInt_FromLong((long)gen->gi_running);
-	else if (strcmp(name, "__members__") == 0)
-		result = Py_BuildValue("[ss]", "gi_frame", "gi_running");
-	else
- 		result = Py_FindMethod(gen_methods, (PyObject *)gen, name);
- 	return result;
-}
+static struct memberlist gen_memberlist[] = {
+	{"gi_frame",	T_OBJECT, offsetof(genobject, gi_frame),	RO},
+	{"gi_running",	T_INT,    offsetof(genobject, gi_running),	RO},
+	{NULL}	/* Sentinel */
+};
 
 statichere PyTypeObject gentype = {
 	PyObject_HEAD_INIT(&PyType_Type)
-	0,					/* ob_size */
-	"generator",				/* tp_name */
-	sizeof(genobject),			/* tp_basicsize */
-	0,					/* tp_itemsize */
-	/* methods */
-	(destructor)gen_dealloc, 		/* tp_dealloc */
+	0,			/* Number of items for varobject */
+	"generator",		/* Name of this type */
+	sizeof(genobject),	/* Basic object size */
+	0,			/* Item size for varobject */
+	(destructor)gen_dealloc,		/* tp_dealloc */
 	0,					/* tp_print */
-	(getattrfunc)gen_getattr,		/* tp_getattr */
+	0, 					/* tp_getattr */
 	0,					/* tp_setattr */
 	0,					/* tp_compare */
 	0,					/* tp_repr */
@@ -231,17 +218,22 @@ statichere PyTypeObject gentype = {
 	0,					/* tp_hash */
 	0,					/* tp_call */
 	0,					/* tp_str */
-	0,					/* tp_getattro */
+	PyObject_GenericGetAttr,		/* tp_getattro */
 	0,					/* tp_setattro */
 	0,					/* tp_as_buffer */
 	Py_TPFLAGS_DEFAULT,			/* tp_flags */
- 	0,					/* tp_doc */
- 	0,					/* tp_traverse */
- 	0,					/* tp_clear */
+	0,					/* tp_doc */
+	0,					/* tp_traverse */
+	0,					/* tp_clear */
 	0,					/* tp_richcompare */
 	0,					/* tp_weaklistoffset */
 	(getiterfunc)gen_getiter,		/* tp_iter */
 	(iternextfunc)gen_iternext,		/* tp_iternext */
+	gen_methods,				/* tp_methods */
+	gen_memberlist,				/* tp_members */
+	0,					/* tp_getset */
+	0,					/* tp_base */
+	0,					/* tp_dict */
 };
 
 
