@@ -277,9 +277,11 @@ set_context(expr_ty e, expr_context_ty ctx)
             s = e->v.Tuple.elts;
             break;
         default:
-            PyErr_Format(PyExc_SyntaxError, "can't set context for %d",
-                         e->kind);
-            return -1;
+	    /* XXX It's not clear why were't getting into this code,
+	       although list comps seem like one possibility.
+	    */
+	    fprintf(stderr, "can't set context for %d\n", e->kind);
+            return 0;
     }
     if (s) {
 	int i;
@@ -326,7 +328,7 @@ ast_for_augassign(const node *n)
                 return Mult;
         default:
             PyErr_Format(PyExc_Exception, "invalid augassign: %s", STR(n));
-            return NULL;
+            return 0;
     }
 }
 
@@ -361,7 +363,7 @@ ast_for_comp_op(const node *n)
             default:
                 PyErr_Format(PyExc_Exception, "invalid comp_op: %s",
                              STR(n));
-                return NULL;
+                return 0;
 	}
     }
     else if (NCH(n) == 2) {
@@ -375,12 +377,12 @@ ast_for_comp_op(const node *n)
             default:
                 PyErr_Format(PyExc_Exception, "invalid comp_op: %s %s",
                              STR(CHILD(n, 0)), STR(CHILD(n, 1)));
-                return NULL;
+                return 0;
 	}
     }
     PyErr_Format(PyExc_Exception, "invalid comp_op: has %d children",
                  NCH(n));
-    return NULL;
+    return 0;
 }
 
 static asdl_seq *
@@ -622,6 +624,8 @@ ast_for_listcomp(const node *n)
     int i, n_fors;
     node *ch;
 
+    fprintf(stderr, "listcomp at %d\n", n->n_lineno);
+
     REQ(n, listmaker);
     assert(NCH(n) > 1);
 
@@ -629,11 +633,13 @@ ast_for_listcomp(const node *n)
     if (!elt)
         return NULL;
 
-    if (-1 == set_context(elt, Load))
+    if (set_context(elt, Load) == -1) {
+	fprintf(stderr, "XXX 2\n");
         return NULL;
+    }
 
     n_fors = count_list_fors(n);
-    if (-1 == n_fors)
+    if (n_fors == -1)
         return NULL;
 
     listcomps = asdl_seq_new(n_fors);
@@ -677,7 +683,7 @@ ast_for_listcomp(const node *n)
 
 	    ch = CHILD(ch, 4);
 	    n_ifs = count_list_ifs(ch);
-            if (-1 == n_ifs) {
+            if (n_ifs == -1) {
                 asdl_seq_free(listcomps);
                 return NULL;
             }
@@ -1294,7 +1300,7 @@ ast_for_expr_stmt(const node *n)
 		return NULL;
 	    }
 	    tmp = set_context(e, Store);
-            if (-1 == tmp) {
+            if (tmp == -1) {
                 asdl_seq_free(targets);
                 return NULL;
             }
@@ -1359,7 +1365,7 @@ ast_for_exprlist(const node *n, int context)
 	}
 	if (context) {
             int context_result = set_context(e, context);
-	    if (-1 == context_result)
+	    if (context_result == -1)
                 return NULL;
         }
 	asdl_seq_SET(seq, i / 2, e);
@@ -1970,7 +1976,7 @@ ast_for_except_clause(const node *exc, node *body)
 	expr_ty e = ast_for_expr(CHILD(exc, 3));
 	if (!e)
             return NULL;
-	if (-1 == set_context(e, Store))
+	if (set_context(e, Store) == -1)
             return NULL;
         expression = ast_for_expr(CHILD(exc, 1));
         if (!expression)
