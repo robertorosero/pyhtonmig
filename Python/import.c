@@ -48,6 +48,16 @@ extern long getmtime(); /* Defined in posixmodule.c */
 #define D(x)
 #endif
 
+#ifdef WITH_SGI_DL
+#define USE_DL
+#undef HAVE_DLFCN_H
+#endif
+
+#ifdef WITH_DL_DLD
+#define USE_DL
+#undef HAVE_DLFCN_H
+#endif
+
 #ifdef HAVE_DLFCN_H
 #define USE_DL
 #endif

@@ -12,6 +12,7 @@ RANLIB=		@RANLIB@
 DEFS=		@DEFS@
 LIBOBJS=	@LIBOBJS@
 LIBS=		@LIBS@
+DLINCLDIR=	@DLINCLDIR@
 
 
 # === Other things that are customizable but not by configure ===
@@ -63,6 +64,9 @@ clobber:	clean
 Makefile:	$(srcdir)/Makefile.in ../config.status
 		(cd ..; CONFIG_FILES=Python/Makefile CONFIG_HEADERS= \
 		$(SHELL) config.status)
+
+import.o:	import.c
+		$(CC) $(CFLAGS) -I$(DLINCLDIR) -c $(srcdir)/import.c
 
 depend:
 		$(MKDEP) $(CFLAGS) `echo $(OBJS) | tr ' ' '\012' | \
