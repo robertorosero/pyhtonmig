@@ -566,7 +566,7 @@ bug demonstration
         g_head = "Die Mieter treten hier ein werden mit einem Foerderband komfortabel den Korridor entlang, an s\xfcdl\xfcndischen Wandgem\xe4lden vorbei, gegen die rotierenden Klingen bef\xf6rdert. "
         cz_head = "Finan\xe8ni metropole se hroutily pod tlakem jejich d\xf9vtipu.. "
         utf8_head = u"\u6b63\u78ba\u306b\u8a00\u3046\u3068\u7ffb\u8a33\u306f\u3055\u308c\u3066\u3044\u307e\u305b\u3093\u3002\u4e00\u90e8\u306f\u30c9\u30a4\u30c4\u8a9e\u3067\u3059\u304c\u3001\u3042\u3068\u306f\u3067\u305f\u3089\u3081\u3067\u3059\u3002\u5b9f\u969b\u306b\u306f\u300cWenn ist das Nunstuck git und Slotermeyer? Ja! Beiherhund das Oder die Flipperwaldt gersput.\u300d\u3068\u8a00\u3063\u3066\u3044\u307e\u3059\u3002".encode("utf-8")
-        h = Header(g_head, g)
+        h = Header(g_head, g, header_name='Subject')
         h.append(cz_head, cz)
         h.append(utf8_head, utf8)
         msg = Message()
@@ -574,40 +574,32 @@ bug demonstration
         sfp = StringIO()
         g = Generator(sfp)
         g.flatten(msg)
-        eq(sfp.getvalue(), '''\
-Subject: =?iso-8859-1?q?Die_Mieter_treten_hier_ein_werden_mit_eine?=
- =?iso-8859-1?q?m_Foerderband_komfortabel_den_Korridor_ent?=
- =?iso-8859-1?q?lang=2C_an_s=FCdl=FCndischen_Wandgem=E4lden_vorbei?=
- =?iso-8859-1?q?=2C_gegen_die_rotierenden_Klingen_bef=F6rdert=2E_?=
- =?iso-8859-2?q?Finan=E8ni_metropole_se_hroutil?=
- =?iso-8859-2?q?y_pod_tlakem_jejich_d=F9vtipu=2E=2E_?=
- =?utf-8?b?5q2j56K644Gr6KiA44GG44Go57+76Kiz44Gv?=
- =?utf-8?b?44GV44KM44Gm44GE44G+44Gb44KT44CC5LiA?=
- =?utf-8?b?6YOo44Gv44OJ44Kk44OE6Kqe44Gn44GZ44GM?=
- =?utf-8?b?44CB44GC44Go44Gv44Gn44Gf44KJ44KB44Gn?=
- =?utf-8?b?44GZ44CC5a6f6Zqb44Gr44Gv44CMV2VubiBpc3QgZGE=?=
- =?utf-8?q?s_Nunstuck_git_und?=
- =?utf-8?q?_Slotermeyer=3F_Ja!_Beiherhund_das_Ode?=
- =?utf-8?q?r_die_Flipperwaldt?=
- =?utf-8?b?IGdlcnNwdXQu44CN44Go6KiA44Gj44Gm44GE44G+44GZ44CC?=
+        eq(sfp.getvalue(), """\
+Subject: =?iso-8859-1?q?Die_Mieter_treten_hier_ein_werden_mit_einem_Foerd?=
+ =?iso-8859-1?q?erband_komfortabel_den_Korridor_entlang=2C_an_s=FCdl=FCnd?=
+ =?iso-8859-1?q?ischen_Wandgem=E4lden_vorbei=2C_gegen_die_rotierenden_Kli?=
+ =?iso-8859-1?q?ngen_bef=F6rdert=2E_?= =?iso-8859-2?q?Finan=E8ni_metropol?=
+ =?iso-8859-2?q?e_se_hroutily_pod_tlakem_jejich_d=F9vtipu=2E=2E_?=
+ =?utf-8?b?5q2j56K644Gr6KiA44GG44Go57+76Kiz44Gv44GV44KM44Gm44GE44G+44Gb?=
+ =?utf-8?b?44KT44CC5LiA6YOo44Gv44OJ44Kk44OE6Kqe44Gn44GZ44GM44CB44GC44Go?=
+ =?utf-8?b?44Gv44Gn44Gf44KJ44KB44Gn44GZ44CC5a6f6Zqb44Gr44Gv44CMV2VubiBp?=
+ =?utf-8?q?st_das_Nunstuck_git_und_Slotermeyer=3F_Ja!_Beiherhund_das_Oder?=
+ =?utf-8?b?IGRpZSBGbGlwcGVyd2FsZHQgZ2Vyc3B1dC7jgI3jgajoqIDjgaPjgabjgYQ=?=
+ =?utf-8?b?44G+44GZ44CC?=
 
-''')
-        eq(h.encode(), '''\
-=?iso-8859-1?q?Die_Mieter_treten_hier_ein_werden_mit_eine?=
- =?iso-8859-1?q?m_Foerderband_komfortabel_den_Korridor_ent?=
- =?iso-8859-1?q?lang=2C_an_s=FCdl=FCndischen_Wandgem=E4lden_vorbei?=
- =?iso-8859-1?q?=2C_gegen_die_rotierenden_Klingen_bef=F6rdert=2E_?=
- =?iso-8859-2?q?Finan=E8ni_metropole_se_hroutil?=
- =?iso-8859-2?q?y_pod_tlakem_jejich_d=F9vtipu=2E=2E_?=
- =?utf-8?b?5q2j56K644Gr6KiA44GG44Go57+76Kiz44Gv?=
- =?utf-8?b?44GV44KM44Gm44GE44G+44Gb44KT44CC5LiA?=
- =?utf-8?b?6YOo44Gv44OJ44Kk44OE6Kqe44Gn44GZ44GM?=
- =?utf-8?b?44CB44GC44Go44Gv44Gn44Gf44KJ44KB44Gn?=
- =?utf-8?b?44GZ44CC5a6f6Zqb44Gr44Gv44CMV2VubiBpc3QgZGE=?=
- =?utf-8?q?s_Nunstuck_git_und?=
- =?utf-8?q?_Slotermeyer=3F_Ja!_Beiherhund_das_Ode?=
- =?utf-8?q?r_die_Flipperwaldt?=
- =?utf-8?b?IGdlcnNwdXQu44CN44Go6KiA44Gj44Gm44GE44G+44GZ44CC?=''')
+""")
+        eq(h.encode(), """\
+=?iso-8859-1?q?Die_Mieter_treten_hier_ein_werden_mit_einem_Foerd?=
+ =?iso-8859-1?q?erband_komfortabel_den_Korridor_entlang=2C_an_s=FCdl=FCnd?=
+ =?iso-8859-1?q?ischen_Wandgem=E4lden_vorbei=2C_gegen_die_rotierenden_Kli?=
+ =?iso-8859-1?q?ngen_bef=F6rdert=2E_?= =?iso-8859-2?q?Finan=E8ni_metropol?=
+ =?iso-8859-2?q?e_se_hroutily_pod_tlakem_jejich_d=F9vtipu=2E=2E_?=
+ =?utf-8?b?5q2j56K644Gr6KiA44GG44Go57+76Kiz44Gv44GV44KM44Gm44GE44G+44Gb?=
+ =?utf-8?b?44KT44CC5LiA6YOo44Gv44OJ44Kk44OE6Kqe44Gn44GZ44GM44CB44GC44Go?=
+ =?utf-8?b?44Gv44Gn44Gf44KJ44KB44Gn44GZ44CC5a6f6Zqb44Gr44Gv44CMV2VubiBp?=
+ =?utf-8?q?st_das_Nunstuck_git_und_Slotermeyer=3F_Ja!_Beiherhund_das_Oder?=
+ =?utf-8?b?IGRpZSBGbGlwcGVyd2FsZHQgZ2Vyc3B1dC7jgI3jgajoqIDjgaPjgabjgYQ=?=
+ =?utf-8?b?44G+44GZ44CC?=""")
 
     def test_long_header_encode(self):
         eq = self.ndiffAssertEqual
@@ -712,12 +704,13 @@ from modemcable093.139-201-24.que.mc.videotron.ca ([24.201.139.93]
     def test_long_8bit_header(self):
         eq = self.ndiffAssertEqual
         msg = Message()
-        h = Header('Britische Regierung gibt', 'iso-8859-1')
+        h = Header('Britische Regierung gibt', 'iso-8859-1',
+                    header_name='Subject')
         h.append('gr\xfcnes Licht f\xfcr Offshore-Windkraftprojekte')
         msg['Subject'] = h
         eq(msg.as_string(), """\
-Subject: =?iso-8859-1?q?Britische_Regierung_gibt?=
- =?iso-8859-1?q?gr=FCnes_Licht_f=FCr_Offshore-Windkraftprojekte?=
+Subject: =?iso-8859-1?q?Britische_Regierung_gibt?= =?iso-8859-1?q?gr=FCnes?=
+ =?iso-8859-1?q?_Licht_f=FCr_Offshore-Windkraftprojekte?=
 
 """)
 
@@ -729,6 +722,48 @@ Subject: =?iso-8859-1?q?Britische_Regierung_gibt?=
 Reply-To: Britische Regierung gibt gr\xfcnes Licht f\xfcr Offshore-Windkraftprojekte <a-very-long-address@example.com>
 
 """)
+
+    def test_long_to_header(self):
+        eq = self.ndiffAssertEqual
+        to = '"Someone Test #A" <someone@eecs.umich.edu>,<someone@eecs.umich.edu>,"Someone Test #B" <someone@umich.edu>, "Someone Test #C" <someone@eecs.umich.edu>, "Someone Test #D" <someone@eecs.umich.edu>'
+        msg = Message()
+        msg['To'] = to
+        eq(msg.as_string(0), '''\
+To: "Someone Test #A" <someone@eecs.umich.edu>, <someone@eecs.umich.edu>,
+\t"Someone Test #B" <someone@umich.edu>,
+\t"Someone Test #C" <someone@eecs.umich.edu>,
+\t"Someone Test #D" <someone@eecs.umich.edu>
+
+''')
+
+    def test_long_line_after_append(self):
+        eq = self.ndiffAssertEqual
+        s = 'This is an example of string which has almost the limit of header length.'
+        h = Header(s)
+        h.append('Add another line.')
+        eq(h.encode(), """\
+This is an example of string which has almost the limit of header length.
+ Add another line.""")
+
+    def test_shorter_line_with_append(self):
+        eq = self.ndiffAssertEqual
+        s = 'This is a shorter line.'
+        h = Header(s)
+        h.append('Add another sentence. (Surprise?)')
+        eq(h.encode(),
+           'This is a shorter line. Add another sentence. (Surprise?)')
+
+    def test_long_field_name(self):
+        eq = self.ndiffAssertEqual
+        fn = 'X-Very-Very-Very-Long-Header-Name'
+        gs = "Die Mieter treten hier ein werden mit einem Foerderband komfortabel den Korridor entlang, an s\xfcdl\xfcndischen Wandgem\xe4lden vorbei, gegen die rotierenden Klingen bef\xf6rdert. "
+        h = Header(gs, 'iso-8859-1', header_name=fn)
+        # BAW: this seems broken because the first line is too long
+        eq(h.encode(), """\
+X-Very-Very-Very-Long-Header-Name: =?iso-8859-1?q?Die_Mieter_treten_hier_ein_werden_mit_eine?=
+ =?iso-8859-1?q?m_Foerderband_komfortabel_den_Korridor_ent?=
+ =?iso-8859-1?q?lang=2C_an_s=FCdl=FCndischen_Wandgem=E4lden_vorbei?=
+ =?iso-8859-1?q?=2C_gegen_die_rotierenden_Klingen_bef=F6rdert=2E_?=""")
 
 
 
@@ -2181,14 +2216,14 @@ class TestHeader(TestEmailBase):
         h = Header('Hello World!')
         eq(h.encode(), 'Hello World!')
         h.append(' Goodbye World!')
-        eq(h.encode(), 'Hello World! Goodbye World!')
+        eq(h.encode(), 'Hello World!  Goodbye World!')
 
     def test_simple_surprise(self):
         eq = self.ndiffAssertEqual
         h = Header('Hello World!')
         eq(h.encode(), 'Hello World!')
         h.append('Goodbye World!')
-        eq(h.encode(), 'Hello World!Goodbye World!')
+        eq(h.encode(), 'Hello World! Goodbye World!')
 
     def test_header_needs_no_decoding(self):
         h = 'no decoding needed'
@@ -2197,7 +2232,7 @@ class TestHeader(TestEmailBase):
     def test_long(self):
         h = Header("I am the very model of a modern Major-General; I've information vegetable, animal, and mineral; I know the kings of England, and I quote the fights historical from Marathon to Waterloo, in order categorical; I'm very well acquainted, too, with matters mathematical; I understand equations, both the simple and quadratical; about binomial theorem I'm teeming with a lot o' news, with many cheerful facts about the square of the hypotenuse.",
                    maxlinelen=76)
-        for l in h.encode().split('\n '):
+        for l in h.encode(splitchars=' ').split('\n '):
             self.failUnless(len(l) <= 76)
 
     def test_multilingual(self):
@@ -2212,21 +2247,18 @@ class TestHeader(TestEmailBase):
         h.append(cz_head, cz)
         h.append(utf8_head, utf8)
         enc = h.encode()
-        eq(enc, """=?iso-8859-1?q?Die_Mieter_treten_hier_ein_werden_mit_eine?=
- =?iso-8859-1?q?m_Foerderband_komfortabel_den_Korridor_ent?=
- =?iso-8859-1?q?lang=2C_an_s=FCdl=FCndischen_Wandgem=E4lden_vorbei?=
- =?iso-8859-1?q?=2C_gegen_die_rotierenden_Klingen_bef=F6rdert=2E_?=
- =?iso-8859-2?q?Finan=E8ni_metropole_se_hroutil?=
- =?iso-8859-2?q?y_pod_tlakem_jejich_d=F9vtipu=2E=2E_?=
- =?utf-8?b?5q2j56K644Gr6KiA44GG44Go57+76Kiz44Gv?=
- =?utf-8?b?44GV44KM44Gm44GE44G+44Gb44KT44CC5LiA?=
- =?utf-8?b?6YOo44Gv44OJ44Kk44OE6Kqe44Gn44GZ44GM?=
- =?utf-8?b?44CB44GC44Go44Gv44Gn44Gf44KJ44KB44Gn?=
- =?utf-8?b?44GZ44CC5a6f6Zqb44Gr44Gv44CMV2VubiBpc3QgZGE=?=
- =?utf-8?q?s_Nunstuck_git_und?=
- =?utf-8?q?_Slotermeyer=3F_Ja!_Beiherhund_das_Ode?=
- =?utf-8?q?r_die_Flipperwaldt?=
- =?utf-8?b?IGdlcnNwdXQu44CN44Go6KiA44Gj44Gm44GE44G+44GZ44CC?=""")
+        eq(enc, """\
+=?iso-8859-1?q?Die_Mieter_treten_hier_ein_werden_mit_einem_Foerderband_ko?=
+ =?iso-8859-1?q?mfortabel_den_Korridor_entlang=2C_an_s=FCdl=FCndischen_Wa?=
+ =?iso-8859-1?q?ndgem=E4lden_vorbei=2C_gegen_die_rotierenden_Klingen_bef?=
+ =?iso-8859-1?q?=F6rdert=2E_?= =?iso-8859-2?q?Finan=E8ni_metropole_se_hro?=
+ =?iso-8859-2?q?utily_pod_tlakem_jejich_d=F9vtipu=2E=2E_?= =?utf-8?b?5q2j?=
+ =?utf-8?b?56K644Gr6KiA44GG44Go57+76Kiz44Gv44GV44KM44Gm44GE44G+44Gb44KT?=
+ =?utf-8?b?44CC5LiA6YOo44Gv44OJ44Kk44OE6Kqe44Gn44GZ44GM44CB44GC44Go44Gv?=
+ =?utf-8?b?44Gn44Gf44KJ44KB44Gn44GZ44CC5a6f6Zqb44Gr44Gv44CMV2VubiBpc3Qg?=
+ =?utf-8?q?das_Nunstuck_git_und_Slotermeyer=3F_Ja!_Beiherhund_das_Oder_di?=
+ =?utf-8?b?ZSBGbGlwcGVyd2FsZHQgZ2Vyc3B1dC7jgI3jgajoqIDjgaPjgabjgYTjgb4=?=
+ =?utf-8?b?44GZ44CC?=""")
         eq(decode_header(enc),
            [(g_head, "iso-8859-1"), (cz_head, "iso-8859-2"),
             (utf8_head, "utf-8")])
@@ -2317,6 +2349,16 @@ A very long line that must get split to something other than at the
         eq(str(Header(x, errors='replace')), x)
         h.append(x, errors='replace')
         eq(str(h), x)
+
+    def test_encoded_adjacent_nonencoded(self):
+        eq = self.assertEqual
+        h = Header()
+        h.append('hello', 'iso-8859-1')
+        h.append('world')
+        s = h.encode()
+        eq(s, '=?iso-8859-1?q?hello?= world')
+        h = make_header(decode_header(s))
+        eq(h.encode(), s)
 
 
 

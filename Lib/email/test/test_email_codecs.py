@@ -35,23 +35,12 @@ class TestEmailAsianCodecs(TestEmailBase):
         h = Header(long, j, header_name="Subject")
         # test a very long header
         enc = h.encode()
-        # BAW: The following used to pass.  Sadly, the test afterwards is what
-        # happens now.  I've no idea which is right.  Please, any Japanese and
-        # RFC 2047 experts, please verify!
-##        eq(enc, '''\
-##=?iso-2022-jp?b?dGVzdC1qYSAbJEIkWEVqOUYkNSRsJD8lYRsoQg==?=
-## =?iso-2022-jp?b?GyRCITwlayRPO0oycTxUJE4+NRsoQg==?=
-## =?iso-2022-jp?b?GyRCRyckckJUJEMkRiQkJF4kORsoQg==?=''')
-        eq(enc, """\
-=?iso-2022-jp?b?dGVzdC1qYSAbJEIkWEVqOUYkNSRsJD8lYRsoQg==?=
- =?iso-2022-jp?b?GyRCITwlayRPO0oycTxUJE4+NUcnJHJCVCRDJEYkJCReJDkbKEI=?=""")
-        # BAW: same deal here. :(
-##        self.assertEqual(
-##            decode_header(enc),
-##            [("test-ja \x1b$B$XEj9F$5$l$?%a\x1b(B\x1b$B!<%k$O;J2q<T$N>5\x1b(B\x1b$BG'$rBT$C$F$$$^$9\x1b(B", 'iso-2022-jp')])
-        self.assertEqual(
-            decode_header(enc),
-            [("test-ja \x1b$B$XEj9F$5$l$?%a\x1b(B\x1b$B!<%k$O;J2q<T$N>5G'$rBT$C$F$$$^$9\x1b(B", 'iso-2022-jp')])
+        # TK: splitting point may differ by codec design and/or Header encoding
+        eq(enc , """\
+=?iso-2022-jp?b?dGVzdC1qYSAbJEIkWEVqOUYkNSRsJD8lYSE8JWskTztKGyhC?=
+ =?iso-2022-jp?b?GyRCMnE8VCROPjVHJyRyQlQkQyRGJCQkXiQ5GyhC?=""")
+        # TK: full decode comparison
+        eq(h.__unicode__().encode('euc-jp'), long)
 
 
 
