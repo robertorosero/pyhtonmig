@@ -576,7 +576,7 @@ type_new(PyTypeObject *metatype, PyObject *args, PyObject *kwds)
 	}
 
 	/* Override slots that deserve it */
-	override_slots(type, type->tp_dict);
+	override_slots(type, type->tp_defined);
 	return (PyObject *)type;
 }
 
