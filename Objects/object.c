@@ -1357,34 +1357,35 @@ PyObject_SelfIter(PyObject *obj)
 		(descr)->ob_type->field : NULL)
 
 /* Find the dict where an attribute resides, and return it un-INCREFed.  */
-/* In addition, cache/return whether the value is a descriptor-with-set; and */
-/* cache/return the value itself if the value is a descriptor-with-get. */
+/* In addition, cache/return whether the value is a descr-with-set; and  */
+/* cache/return the value itself if the value is a descr-with-get.       */
+static inline
 PyObject *_PyObject_FindAttr(PyTypeObject *tp, PyObject *name,
 			     PyObject **descr, int *isdata)
 {
-	PyObject *triple = NULL;
-	PyObject *value;
-	PyObject *cache_where = Py_None;
-	PyObject *cache_descr = Py_None;
-	PyObject *cache_isdata = Py_False;
+	PyObject *triple, *value;
+	PyObject *cache_where, *cache_descr, *cache_isdata;
 
 	if (tp->tp_cache != NULL) {
+		/* Fetch entry from the cache. */
 		triple = PyDict_GetItem(tp->tp_cache, name);
-		/* pair is not owned by this func */
 		if (triple) {
-			cache_where = PyTuple_GET_ITEM(triple, 0);
-			cache_descr = PyTuple_GET_ITEM(triple, 1);
-			cache_isdata = PyTuple_GET_ITEM(triple, 2);
-			goto done;
+			*descr = PyTuple_GET_ITEM(triple, 1);
+			*isdata = (PyTuple_GET_ITEM(triple, 2) == Py_True);
+			return PyTuple_GET_ITEM(triple, 0);
 		}
 	}
+
+	cache_where = Py_None;
+	cache_descr = Py_None;
+	cache_isdata = Py_False;
 	
-	/* Inline _PyType_Lookup */
+	/* Just like _PyType_Lookup, but keep information for the cache. */
 	{
 		int i, n;
 		PyObject *mro, *base, *dict;
 
-		/* Look in tp_dict of types in MRO */
+		/* Look in tp_dict of types in MRO. */
 		mro = tp->tp_mro;
 		assert(mro != NULL);
 		assert(PyTuple_Check(mro));
@@ -1411,6 +1412,7 @@ PyObject *_PyObject_FindAttr(PyTypeObject *tp, PyObject *name,
 	}
 
 	if (tp->tp_cache != NULL) {
+		/* Add entry to the cache. */
 		triple = PyTuple_New(3);
 		Py_INCREF(cache_where);
 		PyTuple_SetItem(triple, 0, cache_where);
@@ -1422,16 +1424,9 @@ PyObject *_PyObject_FindAttr(PyTypeObject *tp, PyObject *name,
 		Py_DECREF(triple);
 	}
 
-  done:
-	if (cache_descr == Py_None)
-		*descr = NULL;
-	else
-		*descr = cache_descr;
+	*descr = cache_descr;
 	*isdata = (cache_isdata == Py_True);
-	if (cache_where == Py_None)
-		return NULL;
-	else
-		return cache_where;
+	return cache_where;
 }
 
 PyObject *
@@ -1439,8 +1434,8 @@ PyObject_GenericGetAttr(PyObject *obj, PyObject *name)
 {
 	PyTypeObject *tp = obj->ob_type;
 	PyObject *where;
-	PyObject *descr = NULL;
-	int isdata = 0;
+	PyObject *descr;
+	int isdata;
 	PyObject *res = NULL;
 	descrgetfunc descr_get;
 	long dictoffset;
@@ -1507,14 +1502,14 @@ PyObject_GenericGetAttr(PyObject *obj, PyObject *name)
 		}
 	}
 
-	if (descr != NULL) {
+	if (descr != Py_None) {
 		descr_get = GET_DESCR_FIELD(descr, tp_descr_get);
 		assert(descr_get != NULL);
 		res = descr_get(descr, obj, (PyObject *)tp);
 		goto done;
 	}
 
-	if (where != NULL) {
+	if (where != Py_None) {
 		res = PyDict_GetItem(where, name);
 		assert(res != NULL);
 		Py_INCREF(res);
@@ -1598,7 +1593,7 @@ PyObject_GenericSetAttr(PyObject *obj, PyObject *name, PyObject *value)
 		}
 	}
 
-	if (descr == NULL) {
+	if (descr == Py_None) {
 		PyErr_Format(PyExc_AttributeError,
 			     "'%.50s' object has no attribute '%.400s'",
 			     tp->tp_name, PyString_AS_STRING(name));
