@@ -307,6 +307,7 @@ set_context(expr_ty e, expr_context_ty ctx)
                The byte code generated seems to work fine.
                Maybe there's a problem with nested list comps?
 	    */
+	    abort();
 	    fprintf(stderr, "can't set context for %d\n", e->kind);
             return 0;
     }
@@ -678,11 +679,6 @@ ast_for_listcomp(struct compiling *c, const node *n)
     elt = ast_for_expr(c, CHILD(n, 0));
     if (!elt)
         return NULL;
-
-    if (set_context(elt, Load) == -1) {
-	fprintf(stderr, "XXX 2\n");
-        return NULL;
-    }
 
     n_fors = count_list_fors(n);
     if (n_fors == -1)
