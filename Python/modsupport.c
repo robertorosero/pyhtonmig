@@ -28,17 +28,22 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #include "modsupport.h"
 #include "import.h"
 
-#ifdef MPW		/* MPW pushes 'extended' for float and double types with varargs */
+#ifdef MPW /* MPW pushes 'extended' for float and double types with varargs */
 typedef extended va_double;
 #else 
 typedef double va_double;
 #endif
 
 
+/* initmodule2() has an additional parameter, 'passthrough', which is
+   passed as 'self' to functions defined in the module.  This is used
+   e.g. by dynamically loaded modules on the Mac. */
+
 object *
-initmodule(name, methods)
+initmodule2(name, methods, passthrough)
 	char *name;
 	struct methodlist *methods;
+	object *passthrough; 
 {
 	object *m, *d, *v;
 	struct methodlist *ml;
@@ -54,7 +59,7 @@ initmodule(name, methods)
 			fatal("out of mem for method name");
 		sprintf(namebuf, "%s.%s", name, ml->ml_name);
 		v = newmethodobject(namebuf, ml->ml_meth,
-					(object *)NULL, ml->ml_varargs);
+					(object *)passthrough, ml->ml_varargs);
 		/* XXX The malloc'ed memory in namebuf is never freed */
 		if (v == NULL || dictinsert(d, ml->ml_name, v) != 0) {
 			fprintf(stderr, "initializing module: %s\n", name);
@@ -63,6 +68,16 @@ initmodule(name, methods)
 		DECREF(v);
 	}
 	return m;
+}
+
+/* The standard initmodule() passes NULL for 'self' */
+
+object *
+initmodule(name, methods)
+	char *name;
+	struct methodlist *methods;
+{
+	return initmodule2(name, methods, (object *)NULL);
 }
 
 

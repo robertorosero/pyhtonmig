@@ -56,6 +56,10 @@ extern long getmtime(); /* Defined in posixmodule.c */
 #define USE_DL
 #endif
 
+#ifdef WITH_MAC_DL
+#define USE_DL
+#endif
+
 #if !defined(USE_DL) && defined(HAVE_DLFCN_H) && defined(HAVE_DLOPEN)
 #define USE_SHLIB
 #define USE_DL
@@ -317,6 +321,13 @@ get_module(m, name, m_ret)
 				   "cannot reload dynamically loaded module");
 			return NULL;
 		}
+#ifdef WITH_MAC_DL
+		{
+			object *v = dynamic_load(namebuf);
+			if (v == NULL)
+				return v;
+		}
+#else /* !WITH_MAC_DL */
 		sprintf(funcname, "init%s", name);
 #ifdef USE_SHLIB
 		{
@@ -352,6 +363,8 @@ get_module(m, name, m_ret)
 			return NULL;
 		}
 		(*p)();
+
+#endif /* !WITH_MAC_DL */
 		*m_ret = m = dictlookup(modules, name);
 		if (m == NULL) {
 			err_setstr(SystemError,
