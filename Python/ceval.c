@@ -1458,7 +1458,6 @@ eval_code(co, globals, locals, owner, arg)
 				why = WHY_EXCEPTION;
 			}
 		}
-		XDECREF(f->f_trace);
 	}
 	
 	if (sys_profile && why == WHY_RETURN) {
@@ -1561,6 +1560,7 @@ call_trace(p_trace, p_newtrace, f, msg, arg)
 	INCREF(arg);
 	settupleitem(arglist, 2, arg);
 	tracing++;
+	fast_2_locals(f);
 	res = call_object(*p_trace, arglist); /* May clear *p_trace! */
 	locals_2_fast(f, 1);
 	tracing--;
