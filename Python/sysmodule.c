@@ -168,6 +168,10 @@ list_builtin_module_names()
 		addlistitem(list, name);
 		DECREF(name);
 	}
+	if (sortlist(list) != 0) {
+		DECREF(list);
+		list = NULL;
+	}
 	return list;
 }
 
