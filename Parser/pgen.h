@@ -30,8 +30,6 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 /* Parser generator interface */
 
-extern grammar gram;
-
 extern grammar *meta_grammar PROTO((void));
 
 struct _node;

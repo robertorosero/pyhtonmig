@@ -35,6 +35,7 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 #include "pgenheaders.h"
 #include "grammar.h"
+#include "node.h"
 #include "token.h"
 #include "parser.h"
 
