@@ -1773,6 +1773,25 @@ blocksize(struct basicblock *b)
 	return size;
 }
 
+/* Produce output that looks rather like dis module output. */
+
+static void
+assemble_display(struct assembler *a, struct instr *i)
+{
+    /* Dispatch the simple case first. */
+    if (!i->i_hasarg) {
+	    fprintf(stderr, "%5d %-20.20s\n",
+		    a->a_offset, opnames[i->i_opcode]);
+	    return;
+    }
+    
+    fprintf(stderr, "%5d %-20.20s %d",
+	    a->a_offset, opnames[i->i_opcode], i->i_oparg);
+    if (i->i_jrel) 
+	    fprintf(stderr, " (to %d)", a->a_offset + i->i_oparg + 3);
+    fprintf(stderr, "\n");
+}
+
 static int
 assemble_emit(struct assembler *a, struct instr *i)
 {
@@ -1793,16 +1812,7 @@ assemble_emit(struct assembler *a, struct instr *i)
 		    return 0;
 	}
 	code = PyString_AS_STRING(a->a_bytecode) + a->a_offset;
-	if (i->i_hasarg) 
-	    fprintf(stderr,
-		    "emit %3d %-15s %5d\toffset = %2d\tsize = %d\text = %d\n",
-		    i->i_opcode, opnames[i->i_opcode],
-		    i->i_oparg, a->a_offset, size, ext);
-	else
-	    fprintf(stderr,
-		    "emit %3d %-15s %s\toffset = %2d\tsize = %d\text = %d\n",
-		    i->i_opcode, opnames[i->i_opcode],
-		    "     ", a->a_offset, size, ext);
+	assemble_display(a, i);
 	a->a_offset += size;
 	if (ext > 0) {
 	    *code++ = (char)EXTENDED_ARG;
@@ -1948,7 +1958,7 @@ assemble(struct compiler *c)
 	for (i = a.a_nblocks - 1; i >= 0; i--) {
 		struct basicblock *b = c->u->u_blocks[a.a_postorder[i]];
 		fprintf(stderr, 
-			"block %d: order=%d used=%d alloc=%d next=%d\n",
+			"\nblock %d: order=%d used=%d alloc=%d next=%d\n",
 			i, a.a_postorder[i], b->b_iused, b->b_ialloc,
 			b->b_next);
 		for (j = 0; j < b->b_iused; j++) {
