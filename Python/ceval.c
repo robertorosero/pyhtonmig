@@ -3223,49 +3223,19 @@ import_all_from(PyObject *locals, PyObject *v)
 static PyObject *
 build_class(PyObject *methods, PyObject *bases, PyObject *name)
 {
-	int i, n;
-	if (!PyTuple_Check(bases)) {
-		PyErr_SetString(PyExc_SystemError,
-				"build_class with non-tuple bases");
-		return NULL;
+	PyObject *metaclass = NULL;
+
+	if (PyDict_Check(methods))
+		metaclass = PyDict_GetItemString(methods, "__metaclass__");
+
+	if (metaclass == NULL) {
+		if (PyTuple_Check(bases) && PyTuple_GET_SIZE(bases) > 0)
+			metaclass = (PyObject *)
+				PyTuple_GET_ITEM(bases, 0)->ob_type;
+		else
+			metaclass = (PyObject *) &PyClass_Type;
 	}
-	if (!PyDict_Check(methods)) {
-		PyErr_SetString(PyExc_SystemError,
-				"build_class with non-dictionary");
-		return NULL;
-	}
-	if (!PyString_Check(name)) {
-		PyErr_SetString(PyExc_SystemError,
-				"build_class with non-string name");
-		return NULL;
-	}
-	n = PyTuple_Size(bases);
-	for (i = 0; i < n; i++) {
-		PyObject *base = PyTuple_GET_ITEM(bases, i);
-		if (!PyClass_Check(base)) {
-			/* If the base is a type, call its base to clone it.
-			   This is a weaker form of the Don Beaudry hook
-			   that used to be here.  It should be sufficient
-			   because types can now be subtyped. */
-			if (PyType_Check(base)) {
-				PyObject *basetype = (PyObject *)base->ob_type;
-				PyObject *args;
-				PyObject *newclass = NULL;
-				args = Py_BuildValue(
-					"(OOO)", name, bases, methods);
-				if (args != NULL) {
-					newclass = PyEval_CallObject(
-						basetype, args);
-					Py_DECREF(args);
-				}
-				return newclass;
-			}
-			PyErr_SetString(PyExc_TypeError,
-				"base is not a class object");
-			return NULL;
-		}
-	}
-	return PyClass_New(bases, methods, name);
+	return PyObject_CallFunction(metaclass, "OOO", name, bases, methods);
 }
 
 static int
