@@ -412,7 +412,7 @@ called automatically unless there's an entry in the
 \cdata{_PyImport_Inittab} table.  The easiest way to handle this is to 
 statically initialize your statically-linked modules by directly
 calling \cfunction{initspam()} after the call to
-\cfunction{Py_Initialize()}:
+\cfunction{Py_Initialize()} or \cfunction{PyMac_Initialize()}:
 
 \begin{verbatim}
 int main(int argc, char **argv)
@@ -511,8 +511,8 @@ definition:
 static PyObject *my_callback = NULL;
 
 static PyObject *
-my_set_callback(dummy, arg)
-    PyObject *dummy, *arg;
+my_set_callback(dummy, args)
+    PyObject *dummy, *args;
 {
     PyObject *result = NULL;
     PyObject *temp;
@@ -1939,7 +1939,8 @@ interpreter to run some Python code.
 So if you are embedding Python, you are providing your own main
 program.  One of the things this main program has to do is initialize
 the Python interpreter.  At the very least, you have to call the
-function \cfunction{Py_Initialize()}.  There are optional calls to
+function \cfunction{Py_Initialize()} (on MacOS, call
+\cfunction{PyMac_Initialize()} instead).  There are optional calls to
 pass command line arguments to Python.  Then later you can call the
 interpreter from any part of the application.
 
