@@ -472,6 +472,7 @@ compiler_next_instr(struct compiler *c, int block)
 		if (ptr != (void *)b) {
 			fprintf(stderr, "resize block %d\n", block);
 			c->u->u_blocks[block] = (struct basicblock *)ptr;
+			b = ptr;
 		}
 	}
 	return b->b_iused++;
@@ -815,7 +816,7 @@ compiler_if(struct compiler *c, stmt_ty s)
 		ADDOP(c, POP_TOP);
 		VISIT_SEQ(c, stmt, s->v.If.body);
 		ADDOP_JREL(c, JUMP_FORWARD, end);
-		compiler_use_block(c, next);
+		compiler_use_next_block(c, next);
 		ADDOP(c, POP_TOP);
 		if (s->v.If.orelse) {
 			stmt_ty t = asdl_seq_GET(s->v.If.orelse, 0);
@@ -1585,7 +1586,7 @@ compiler_compare(struct compiler *c, expr_ty e)
 	if (n > 1) {
 		int end = compiler_new_block(c);
 		ADDOP_JREL(c, JUMP_FORWARD, end);
-		compiler_use_block(c, cleanup);
+		compiler_use_next_block(c, cleanup);
 		ADDOP(c, ROT_TWO);
 		ADDOP(c, POP_TOP);
 		compiler_use_next_block(c, end);
