@@ -36,8 +36,6 @@ int Py_OptimizeFlag = 0;
      #: doing from __future__ import division doesn't work 
         doesn't output BINARY_TRUE_DIVISION
      #: co_names doesn't contain locals, only globals, co_varnames may work
-     #: doc strings at class scope are POPed, not stored
-        In interactive mode, they are printed. :-)
      #: ref leaks in interpreter when press return on empty line
      #: yield or return outside a function don't raise a SyntaxError
      #: line numbers are off a bit (may just need to add calls to set lineno)
@@ -613,8 +611,7 @@ compiler_addop(struct compiler *c, int opcode)
 }
 
 static int
-compiler_addop_o(struct compiler *c, int opcode, PyObject *dict,
-		     PyObject *o)
+compiler_add_o(struct compiler *c, PyObject *dict, PyObject *o)
 {
 	PyObject *t, *v;
 	int arg;
@@ -623,7 +620,7 @@ compiler_addop_o(struct compiler *c, int opcode, PyObject *dict,
         /* XXX should use: t = PyTuple_Pack(2, o, o->ob_type); */
         t = Py_BuildValue("(OO)", o, o->ob_type);
         if (t == NULL)
-            return 0;
+            return -1;
 
 	v = PyDict_GetItem(dict, t);
 	if (!v) {
@@ -631,19 +628,29 @@ compiler_addop_o(struct compiler *c, int opcode, PyObject *dict,
 		v = PyInt_FromLong(arg);
 		if (!v) {
 			Py_DECREF(t);
-			return 0;
+			return -1;
                 }
 		if (PyDict_SetItem(dict, t, v) < 0) {
 			Py_DECREF(t);
 			Py_DECREF(v);
-			return 0;
+			return -1;
 		}
 		Py_DECREF(v);
 	}
 	else
 		arg = PyInt_AsLong(v);
 	Py_DECREF(t);
-	return compiler_addop_i(c, opcode, arg);
+        return arg;
+}
+
+static int
+compiler_addop_o(struct compiler *c, int opcode, PyObject *dict,
+		     PyObject *o)
+{
+    int arg = compiler_add_o(c, dict, o);
+    if (arg < 0)
+        return 0;
+    return compiler_addop_i(c, opcode, arg);
 }
 
 /* Add an opcode with an integer argument.
@@ -873,17 +880,35 @@ compiler_make_closure(struct compiler *c, PyCodeObject *co, int args)
 }
 
 static int
+compiler_isdocstring(stmt_ty s)
+{
+    if (s->kind != Expr_kind)
+        return 0;
+    return s->v.Expr.value->kind == Str_kind;
+}
+
+static int
 compiler_function(struct compiler *c, stmt_ty s)
 {
 	PyCodeObject *co;
+        PyObject *first_const = Py_None;
 	arguments_ty args = s->v.FunctionDef.args;
-	int i, n;
+        stmt_ty st;
+	int i, n, docstring;
 	assert(s->kind == FunctionDef_kind);
 
 	if (args->defaults)
 		VISIT_SEQ(c, expr, args->defaults);
 	if (!compiler_enter_scope(c, s->v.FunctionDef.name, (void *)s))
 		return 0;
+
+        st = asdl_seq_GET(s->v.FunctionDef.body, 0);
+        docstring = compiler_isdocstring(st);
+        if (docstring)
+            first_const = st->v.Expr.value->v.Str.s;
+        if (compiler_add_o(c, c->u->u_consts, first_const) < 0)
+            return 0;
+
         /* unpack nested arguments */
         for (i = 0; i < asdl_seq_LEN(args->args); i++) {
             expr_ty arg = asdl_seq_GET(args->args, i);
@@ -897,7 +922,8 @@ compiler_function(struct compiler *c, stmt_ty s)
 
 	c->u->u_argcount = asdl_seq_LEN(args->args);
 	n = asdl_seq_LEN(s->v.FunctionDef.body);
-	for (i = 0; i < n; i++) {
+        /* if there was a docstring, we need to skip the first statement */
+	for (i = docstring; i < n; i++) {
 		stmt_ty s2 = asdl_seq_GET(s->v.FunctionDef.body, i);
 		if (i == 0 && s2->kind == Expr_kind &&
 		    s2->v.Expr.value->kind == Str_kind)
@@ -914,14 +940,6 @@ compiler_function(struct compiler *c, stmt_ty s)
 		return 0;
 
 	return 1;
-}
-
-static int
-compiler_isdocstring(stmt_ty s)
-{
-    if (s->kind != Expr_kind)
-        return 0;
-    return s->v.Expr.value->kind == Str_kind;
 }
 
 static int
@@ -956,7 +974,7 @@ compiler_class(struct compiler *c, stmt_ty s)
         stmt_ty st = asdl_seq_GET(s->v.ClassDef.body, 0);
         i = 0;
         if (compiler_isdocstring(st)) {
-            i++;
+            i = 1;
             VISIT(c, expr, st->v.Expr.value);
             if (!compiler_nameop(c, __doc__, Store))
                 return 0;
