@@ -30,11 +30,12 @@ The following values are considered false:
 \item	\code{None}
 	\withsubitem{(Built-in object)}{\ttindex{None}}
 
-\item	zero of any numeric type, e.g., \code{0}, \code{0L}, \code{0.0}.
+\item	zero of any numeric type, for example, \code{0}, \code{0L},
+        \code{0.0}, \code{0j}.
 
-\item	any empty sequence, e.g., \code{''}, \code{()}, \code{[]}.
+\item	any empty sequence, for example, \code{''}, \code{()}, \code{[]}.
 
-\item	any empty mapping, e.g., \code{\{\}}.
+\item	any empty mapping, for example, \code{\{\}}.
 
 \item	instances of user-defined classes, if the class defines a
 	\method{__nonzero__()} or \method{__len__()} method, when that
@@ -78,9 +79,9 @@ Notes:
 These only evaluate their second argument if needed for their outcome.
 
 \item[(2)]
-\samp{not} has a lower priority than non-Boolean operators, so e.g.
-\code{not a == b} is interpreted as \code{not(a == b)}, and
-\code{a == not b} is a syntax error.
+\samp{not} has a lower priority than non-Boolean operators, so
+\code{not \var{a} == \var{b}} is interpreted as \code{not (\var{a} ==
+\var{b})}, and \code{\var{a} == not \var{b}} is a syntax error.
 
 \end{description}
 
@@ -89,10 +90,11 @@ These only evaluate their second argument if needed for their outcome.
 
 Comparison operations are supported by all objects.  They all have the
 same priority (which is higher than that of the Boolean operations).
-Comparisons can be chained arbitrarily, e.g. \code{x < y <= z} is
-equivalent to \code{x < y and y <= z}, except that \code{y} is
-evaluated only once (but in both cases \code{z} is not evaluated at
-all when \code{x < y} is found to be false).
+Comparisons can be chained arbitrarily; for example, \code{\var{x} <
+\var{y} <= \var{z}} is equivalent to \code{\var{x} < \var{y} and
+\var{y} <= \var{z}}, except that \var{y} is evaluated only once (but
+in both cases \var{z} is not evaluated at all when \code{\var{x} <
+\var{y}} is found to be false).
 \indexii{chaining}{comparisons}
 
 This table summarizes the comparison operations:
@@ -144,9 +146,9 @@ defines the \method{__cmp__()} method.  Refer to the \emph{Python
 Reference Manual} for information on the use of this method to effect
 object comparisons.
 
-(Implementation note: objects of different types except numbers are
-ordered by their type names; objects of the same types that don't
-support proper comparison are ordered by their address.)
+\strong{Implementation note:} Objects of different types except
+numbers are ordered by their type names; objects of the same types
+that don't support proper comparison are ordered by their address.
 
 Two more operations with the same syntactic priority,
 \samp{in}\opindex{in} and \samp{not in}\opindex{not in}, are supported
@@ -244,7 +246,9 @@ Notes:
 \item[(1)]
 For (plain or long) integer division, the result is an integer.
 The result is always rounded towards minus infinity: 1/2 is 0, 
-(-1)/2 is -1, 1/(-2) is -1, and (-1)/(-2) is 0.
+(-1)/2 is -1, 1/(-2) is -1, and (-1)/(-2) is 0.  Note that the result
+is a long integer if either operand is a long integer, regardless of
+the numeric value.
 \indexii{integer}{division}
 \indexiii{long}{integer}{division}
 
@@ -310,14 +314,14 @@ division by \code{pow(2, \var{n})} without overflow check.
 There are three sequence types: strings, lists and tuples.
 
 Strings literals are written in single or double quotes:
-\code{'xyzzy'}, \code{"frobozz"}.  See Chapter 2 of the \emph{Python
+\code{'xyzzy'}, \code{"frobozz"}.  See chapter 2 of the \emph{Python
 Reference Manual} for more about string literals.  Lists are
 constructed with square brackets, separating items with commas:
 \code{[a, b, c]}.  Tuples are constructed by the comma operator (not
 within square brackets), with or without enclosing parentheses, but an
 empty tuple must have the enclosing parentheses, e.g.,
 \code{a, b, c} or \code{()}.  A single item tuple must have a trailing
-comma, e.g., \code{(d,)}.
+comma: \code{(d,)}.
 \indexii{sequence}{types}
 \indexii{string}{type}
 \indexii{tuple}{type}
@@ -526,6 +530,8 @@ Notes:
 
 
 \subsection{Mapping Types \label{typesmapping}}
+\indexii{mapping}{types}
+\indexii{dictionary}{type}
 
 A \dfn{mapping} object maps values of one type (the key type) to
 arbitrary objects.  Mappings are mutable objects.  There is currently
@@ -537,9 +543,6 @@ Numeric types used for keys obey the normal rules for numeric
 comparison: if two numbers compare equal (e.g. \code{1} and
 \code{1.0}) then they can be used interchangeably to index the same
 dictionary entry.
-
-\indexii{mapping}{types}
-\indexii{dictionary}{type}
 
 Dictionaries are created by placing a comma-separated list of
 \code{\var{key}: \var{value}} pairs within braces, for example:
@@ -645,7 +648,7 @@ written as \code{<module 'os' from '/usr/local/lib/python1.5/os.pyc'>}.
 \subsubsection{Classes and Class Instances \label{typesobjects}}
 \nodename{Classes and Instances}
 
-See Chapters 3 and 7 of the \emph{Python Reference Manual} for these.
+See chapters 3 and 7 of the \emph{Python Reference Manual} for these.
 
 
 \subsubsection{Functions \label{typesfunctions}}
@@ -805,7 +808,7 @@ descriptors, e.g. module \module{fcntl} or \function{os.read()} and friends.
   non-negative, it is a maximum byte count (including the trailing
   newline) and an incomplete line may be returned.
   An empty string is returned when \EOF{} is hit
-  immediately.  Note: unlike \code{stdio}'s \cfunction{fgets()}, the returned
+  immediately.  Note: Unlike \code{stdio}'s \cfunction{fgets()}, the returned
   string contains null characters (\code{'\e 0'}) if they occurred in the
   input.
 \end{methoddesc}
@@ -835,12 +838,12 @@ descriptors, e.g. module \module{fcntl} or \function{os.read()} and friends.
 Truncate the file's size.  If the optional size argument present, the
 file is truncated to (at most) that size.  The size defaults to the
 current position.  Availability of this function depends on the
-operating system version (e.g., not all \UNIX{} versions support this
+operating system version (for example, not all \UNIX{} versions support this
 operation).
 \end{methoddesc}
 
 \begin{methoddesc}[file]{write}{str}
-Write a string to the file.  There is no return value.  Note: due to
+Write a string to the file.  There is no return value.  Note: Due to
 buffering, the string may not actually show up in the file until
 the \method{flush()} or \method{close()} method is called.
 \end{methoddesc}
