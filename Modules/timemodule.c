@@ -36,14 +36,14 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #include <unistd.h>
 #endif
 
+#ifdef HAVE_SELECT
+#include "myselect.h"
+#else
 #include "mytime.h"
+#endif
 
 #if !HAVE_GETTIMEOFDAY && HAVE_FTIME
 #include <sys/timeb.h>
-#endif
-
-#ifdef HAVE_SELECT
-#include "myselect.h"
 #endif
 
 /* Forward declarations */
