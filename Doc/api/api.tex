@@ -3247,6 +3247,7 @@ must be held.
 \chapter{Memory Management \label{memory}}
 \sectionauthor{Vladimir Marangozov}{Vladimir.Marangozov@inrialpes.fr}
 
+
 \section{Overview \label{memoryOverview}}
 
 Memory management in Python involves a private heap containing all
@@ -3319,6 +3320,7 @@ appropriate actions, like garbage collection, memory compaction or
 other preventive procedures. Note that by using the C library
 allocator as shown in the previous example, the allocated memory for
 the I/O buffer escapes completely the Python memory manager.
+
 
 \section{Memory Interface \label{memoryInterface}}
 
@@ -3507,17 +3509,26 @@ setattrofunc, cmpfunc, reprfunc, hashfunc
 
 \section{Mapping Object Structures \label{mapping-structs}}
 
-PyMappingMethods
+\begin{ctypedesc}{PyMappingMethods}
+Structure used to hold pointers to the functions used to implement the 
+mapping protocol for an extension type.
+\end{ctypedesc}
 
 
 \section{Number Object Structures \label{number-structs}}
 
-PyNumberMethods
+\begin{ctypedesc}{PyNumberMethods}
+Structure used to hold pointers to the functions an extension type
+uses to implement the number protocol.
+\end{ctypedesc}
 
 
 \section{Sequence Object Structures \label{sequence-structs}}
 
-PySequenceMethods
+\begin{ctypedesc}{PySequenceMethods}
+Structure used to hold pointers to the functions which an object uses
+to implement the sequence protocol.
+\end{ctypedesc}
 
 
 \section{Buffer Object Structures \label{buffer-structs}}
@@ -3525,77 +3536,80 @@ PySequenceMethods
 
 The buffer interface exports a model where an object can expose its
 internal data as a set of chunks of data, each chunk specified as a
-pointer/length pair. These chunks are called
-``segments'' and are presumed to be non-contiguous in memory.
+pointer/length pair.  These chunks are called ``segments'' and are
+presumed to be non-contiguous in memory.
 
 If an object does not export the buffer interface, then its
 \member{tp_as_buffer} member in the \ctype{PyTypeObject} structure
 should be \NULL{}.  Otherwise, the \member{tp_as_buffer} will point to
 a \ctype{PyBufferProcs} structure.
 
-\emph{Note:} it is very important that your
+\emph{Note:} It is very important that your
 \ctype{PyTypeObject} structure uses \code{Py_TPFLAGS_DEFAULT} for the
-value of the \member{tp_flags} member. This tells the Python runtime
-that your \ctype{PyBufferProcs} structure contains the
-\member{bf_getcharbuffer} slot. Older versions of Python did not have
-this member, so a new Python interpreter using an old extension needs
-to be able to test for its presence before using it.
-
+value of the \member{tp_flags} member rather than \code{0}.  This
+tells the Python runtime that your \ctype{PyBufferProcs} structure
+contains the \member{bf_getcharbuffer} slot. Older versions of Python
+did not have this member, so a new Python interpreter using an old
+extension needs to be able to test for its presence before using it.
 
 \begin{ctypedesc}{PyBufferProcs}
-\code{PyBufferProcs} defines a set of slots for a Python type
-object. These slots are used to implement the ``buffer interface.''
+Structure used to hold the function pointers which define an
+implementation of the buffer protocol.
 
-The first slot in the \ctype{PyBufferProcs} structure is
-\member{bf_getreadbuffer}, which has type
+The first slot is \member{bf_getreadbuffer}, of type
 \ctype{getreadbufferproc}.  If this slot is \NULL{}, then the object
 does not support reading from the internal data.  This is
-non-sensical, so implementors should fill this in.  The read-buffer
-function is allowed to raise an exception and return
-\code{-1}.  Callers should test for \NULL{} before using the slot and
-should check for an exception after calling the function.  The
-\var{segment} which is passed must be zero or positive, and strictly
-less than the number of segments returned by the
-\member{bf_getsegcount} slot function.
+non-sensical, so implementors should fill this in, but callers should
+test that the slot contains a non-\NULL{} value.
 
 The next slot is \member{bf_getwritebuffer} having type
 \ctype{getwritebufferproc}. This slot may be \NULL{} if the object
-does not allow writing into its returned buffers. If the slot function 
-is present, it is allowed to raise an exception and return \code{-1}.
-The \var{segment} follows the same restrictions as for
-\member{bf_getreadbuffer}.
+does not allow writing into its returned buffers.
 
 The third slot is \member{bf_getsegcount}, with type
 \ctype{getsegcountproc}.  This slot must not be \NULL{} and is used to 
 inform the caller how many segments the object contains.  Simple
 objects such as \ctype{PyString_Type} and
-\ctype{PyBuffer_Type} objects contain a single segment.  The
-\var{lenp} parameter may be \NULL{}. If not, then the implementation
-should store the total size of all buffer segments into \code{*lenp}.
+\ctype{PyBuffer_Type} objects contain a single segment.
 
-The last slot is \member{bf_getcharbuffer}, which has type
-\ctype{getcharbufferproc}. This slot will only be present if the
+The last slot is \member{bf_getcharbuffer}, of type
+\ctype{getcharbufferproc}.  This slot will only be present if the
 \code{Py_TPFLAGS_HAVE_GETCHARBUFFER} flag is present in
-\member{tp_flags} of the object's \ctype{PyTypeObject}. Before using
+\member{tp_flags} of the object's \ctype{PyTypeObject}.  Before using
 this slot, the caller should test whether it is present by using the
-\cfunction{PyType_HasFeature()} macro. Assuming the slot is present,
-then it may be \NULL{} indicating that the object's contents cannot be 
-used a \emph{8-bit characters}. The slot function may also raise an
-error if the object's contents cannot be interpreted as 8-bit
-characters. For example, if the object is an array 
-which is configured to hold floating point values, an exception may be 
-raised if a caller attempts to use \member{bf_getcharbuffer} to fetch
-a sequence of 8-bit characters. This notion of exporting the internal
-buffers as ``text'' is used to distinguish between objects that are
-binary in nature, and those which have character-based content.
+\cfunction{PyType_HasFeature()}\ttindex{PyType_HasFeature()} function.
+If present, it may be \NULL, indicating that the object's contents
+cannot be used as \emph{8-bit characters}.
+The slot function may also raise an error if the object's contents
+cannot be interpreted as 8-bit characters.  For example, if the object
+is an array which is configured to hold floating point values, an
+exception may be raised if a caller attempts to use
+\member{bf_getcharbuffer} to fetch a sequence of 8-bit characters.
+This notion of exporting the internal buffers as ``text'' is used to
+distinguish between objects that are binary in nature, and those which
+have character-based content.
 
 \emph{Note:} The current policy seems to state that these characters
 may be multi-byte characters. This implies that a buffer size of
 \var{N} does not mean there are \var{N} characters present.
 \end{ctypedesc}
 
+\begin{datadesc}{Py_TPFLAGS_HAVE_GETCHARBUFFER}
+Flag bit set in the type structure to indicate that the
+\member{bf_getcharbuffer} slot is known.  This being set does not
+indicate that the object supports the buffer interface or that the
+\member{bf_getcharbuffer} slot is non-\NULL.
+\end{datadesc}
+
 \begin{ctypedesc}[getreadbufferproc]{int (*getreadbufferproc)
                             (PyObject *self, int segment, void **ptrptr)}
+Return a pointer to a readable segment of the buffer.  This function
+is allowed to raise an exception, in which case it must return
+\code{-1}.  The \var{segment} which is passed must be zero or
+positive, and strictly less than the number of segments returned by
+the \member{bf_getsegcount} slot function.  On success, returns
+\code{0} and sets \code{*\var{ptrptr}} to a pointer to the buffer
+memory.
 \end{ctypedesc}
 
 \begin{ctypedesc}[getwritebufferproc]{int (*getwritebufferproc)
@@ -3614,6 +3628,10 @@ read-only buffers, and \exception{SystemError} should be raised when
 
 \begin{ctypedesc}[getsegcountproc]{int (*getsegcountproc)
                             (PyObject *self, int *lenp)}
+Return the number of memory segments which comprise the buffer.  If
+\var{lenp} is not \NULL, the implementation must report the sum of the 
+sizes (in bytes) of all segments in \code{*\var{lenp}}.
+The function cannot fail.
 \end{ctypedesc}
 
 \begin{ctypedesc}[getcharbufferproc]{int (*getcharbufferproc)
