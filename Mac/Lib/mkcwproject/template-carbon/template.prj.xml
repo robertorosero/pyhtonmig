@@ -101,7 +101,7 @@
                 <SETTING><NAME>SystemSearchPaths</NAME>
                     <SETTING>
                         <SETTING><NAME>SearchPath</NAME>
-                            <SETTING><NAME>Path</NAME><VALUE>%(sysprefix)s:GUSI2Carbon:include:</VALUE></SETTING>
+                            <SETTING><NAME>Path</NAME><VALUE>%(sysprefix)s:GUSI2:include:</VALUE></SETTING>
                             <SETTING><NAME>PathFormat</NAME><VALUE>MacOS</VALUE></SETTING>
                             <SETTING><NAME>PathRoot</NAME><VALUE>%(mac_sysprefixtype)s</VALUE></SETTING>
                         </SETTING>
