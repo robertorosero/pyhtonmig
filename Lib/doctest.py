@@ -509,19 +509,22 @@ class DocTest:
         lines = string.split("\n")
         i, n = 0, len(lines)
         while i < n:
+            # Search for an example (a PS1 line).
             line = lines[i]
             i = i + 1
             m = isPS1(line)
             if m is None:
                 continue
+            # line is a PS1 line.
             j = m.end(0)  # beyond the prompt
             if isEmpty(line, j) or isComment(line, j):
                 # a bare prompt or comment -- not interesting
                 continue
+            # line is a non-trivial PS1 line.
             lineno = i - 1
             if line[j] != " ":
                 raise ValueError('line %r of the docstring for %s lacks '
-                                 'blanks after %s: %r' %
+                                 'blank after %s: %r' %
                                  (lineno, self.name, self._PS1, line))
 
             j = j + 1
@@ -541,12 +544,13 @@ class DocTest:
                     i = i + 1
                 else:
                     break
+            # get rid of useless null line from trailing empty "..."
+            if source[-1] == "":
+                assert len(source) > 1
+                del source[-1]
             if len(source) == 1:
                 source = source[0]
             else:
-                # get rid of useless null line from trailing empty "..."
-                if source[-1] == "":
-                    del source[-1]
                 source = "\n".join(source) + "\n"
             # suck up response
             if isPS1(line) or isEmpty(line):
@@ -1160,7 +1164,11 @@ class DocTestRunner:
             # any exception that gets raised.  (But don't intercept
             # keyboard interrupts.)
             try:
-                exec compile(example.source, "<string>", "single",
+                # If the example is a compound statement on one line,
+                # like "if 1: print 2", then compile() requires a
+                # trailing newline.  Rather than analyze that, always
+                # append one (it never hurts).
+                exec compile(example.source + '\n', "<string>", "single",
                              compileflags, 1) in globs
                 exception = None
             except KeyboardInterrupt:
@@ -1966,7 +1974,7 @@ ValueError: x
 x
 Traceback (most recent call last):
 [...]
-ValueError: 
+ValueError:
 foo
 
 """
