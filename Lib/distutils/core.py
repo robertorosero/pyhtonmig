@@ -97,9 +97,19 @@ def setup (**attrs):
             dist.run_commands ()
         except KeyboardInterrupt:
             raise SystemExit, "interrupted"
-        except IOError, exc:
-            # is this 1.5.2-specific? 1.5-specific?
-            raise SystemExit, "error: %s: %s" % (exc.filename, exc.strerror)
+        except (IOError, os.error), exc:
+            # check for Python 1.5.2-style {IO,OS}Error exception objects
+            if hasattr (exc, 'filename') and hasattr (exc, 'strerror'):
+                if exc.filename:
+                    raise SystemExit, \
+                          "error: %s: %s" % (exc.filename, exc.strerror)
+                else:
+                    # two-argument functions in posix module don't
+                    # include the filename in the exception object!
+                    raise SystemExit, \
+                          "error: %s" % exc.strerror
+            else:
+                raise SystemExit, "error: " + exc[-1]
 
 # setup ()
 
