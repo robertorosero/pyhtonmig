@@ -16,11 +16,7 @@ int Py_OptimizeFlag = 0;
    KNOWN BUGS:
 
    Seg Faults:
-     #: using coding statement, such as in getopt:
-       		# -*- coding: iso-8859-1 -*-
-        needs to be implemented (see also Python/ast.c encoding_decl)
      #: exec generally still has problems
-     #: test_errno fails because stackdepth() isn't implemented (assert'ed)
      #: do something about memory management!
 
    Inappropriate Exceptions:
@@ -32,6 +28,8 @@ int Py_OptimizeFlag = 0;
            def v3(a, (b, c), *rest): return a, b, c, rest
 
    Invalid behaviour:
+     #: Source encoding (via encoding_decl) is ignored.  decode_unicode()
+        seems to be running into a memory management bug.
      #: Ellipsis isn't handled properly
      #: co_names doesn't contain locals, only globals, co_varnames may work
      #: ref leaks in interpreter when press return on empty line
@@ -47,6 +45,13 @@ int Py_OptimizeFlag = 0;
      Tim mentioned that it's more common for a basic blocks representation
      to use real pointers for jump targets rather than indexes into an
      array of basic blocks.
+
+     opcode_stack_effect() function should be reviewed since stack depth bugs
+     could be really hard to find later.  Also, the stack effect of
+     MAKE_CLOSURE is not accurate.  One idea is to have the compiler generate
+     an explict BUILD_TUPLE opcode before MAKE_CLOSURE.
+
+     Dead code is being generated (i.e. after unconditional jumps).
     
 */
 
@@ -62,6 +67,37 @@ enum fblocktype { LOOP, EXCEPT, FINALLY_TRY, FINALLY_END };
 struct fblockinfo {
         enum fblocktype fb_type;
 	int fb_block;
+};
+
+#define DEFAULT_BLOCK_SIZE 16
+#define DEFAULT_BLOCKS 8
+#define DEFAULT_CODE_SIZE 128
+#define DEFAULT_LNOTAB_SIZE 16
+
+struct instr {
+	int i_jabs : 1;
+	int i_jrel : 1;
+	int i_hasarg : 1;
+	unsigned char i_opcode;
+	int i_oparg;
+	int i_target; /* target block index (if jump instruction) */
+	int i_lineno;
+};
+
+struct basicblock {
+	int b_iused;
+	int b_ialloc;
+	/* If b_next is non-zero, it is the block id of the next
+	   block reached by normal control flow.
+	   Since a valid b_next must always be > 0,
+	   0 can be reserved to mean no next block. */
+	int b_next;
+	/* b_seen is used to perform a DFS of basicblocks. */
+	int b_seen : 1;
+	/* b_return is true if a RETURN_VALUE opcode is inserted. */
+	int b_return : 1;
+	int b_startdepth; /* depth of stack upon entry of block */
+	struct instr b_instr[DEFAULT_BLOCK_SIZE];
 };
 
 /* The following items change on entry and exit of code blocks.
@@ -620,6 +656,224 @@ compiler_set_lineno(struct compiler *c, int off)
 }
 
 static int
+opcode_stack_effect(int opcode, int oparg)
+{
+	switch (opcode) {
+		case POP_TOP:
+			return -1;
+		case ROT_TWO:
+		case ROT_THREE:
+			return 0;
+		case DUP_TOP:
+			return 1;
+		case ROT_FOUR:
+			return 0;
+
+		case UNARY_POSITIVE:
+		case UNARY_NEGATIVE:
+		case UNARY_NOT:
+		case UNARY_CONVERT:
+		case UNARY_INVERT:
+			return 0;
+
+		case BINARY_POWER:
+		case BINARY_MULTIPLY:
+		case BINARY_DIVIDE:
+		case BINARY_MODULO:
+		case BINARY_ADD:
+		case BINARY_SUBTRACT:
+		case BINARY_SUBSCR:
+		case BINARY_FLOOR_DIVIDE:
+		case BINARY_TRUE_DIVIDE:
+			return -1;
+		case INPLACE_FLOOR_DIVIDE:
+		case INPLACE_TRUE_DIVIDE:
+			return -1;
+
+		case SLICE+0:
+			return 0;
+		case SLICE+1:
+			return -1;
+		case SLICE+2:
+			return -1;
+		case SLICE+3:
+			return -2;
+
+		case STORE_SLICE+0:
+			return -2;
+		case STORE_SLICE+1:
+			return -3;
+		case STORE_SLICE+2:
+			return -3;
+		case STORE_SLICE+3:
+			return -4;
+
+		case DELETE_SLICE+0:
+			return -1;
+		case DELETE_SLICE+1:
+			return -2;
+		case DELETE_SLICE+2:
+			return -2;
+		case DELETE_SLICE+3:
+			return -3;
+
+		case INPLACE_ADD:
+		case INPLACE_SUBTRACT:
+		case INPLACE_MULTIPLY:
+		case INPLACE_DIVIDE:
+		case INPLACE_MODULO:
+			return -1;
+		case STORE_SUBSCR:
+			return -3;
+		case DELETE_SUBSCR:
+			return -2;
+
+		case BINARY_LSHIFT:
+		case BINARY_RSHIFT:
+		case BINARY_AND:
+		case BINARY_XOR:
+		case BINARY_OR:
+			return -1;
+		case INPLACE_POWER:
+			return -1;
+		case GET_ITER:
+			return 0;
+
+		case PRINT_EXPR:
+			return -1;
+		case PRINT_ITEM:
+			return -1;
+		case PRINT_NEWLINE:
+			return 0;
+		case PRINT_ITEM_TO:
+			return -2;
+		case PRINT_NEWLINE_TO:
+			return -1;
+		case INPLACE_LSHIFT:
+		case INPLACE_RSHIFT:
+		case INPLACE_AND:
+		case INPLACE_XOR:
+		case INPLACE_OR:
+			return -1;
+		case BREAK_LOOP:
+			return 0;
+
+		case LOAD_LOCALS:
+			return 1;
+		case RETURN_VALUE:
+			return -1;
+		case IMPORT_STAR:
+			return -1;
+		case EXEC_STMT:
+			return -3;
+		case YIELD_VALUE:
+			return -1;
+
+		case POP_BLOCK:
+			return 0;
+		case END_FINALLY:
+			return -1; /* XXX or -2 or -3 */
+		case BUILD_CLASS:
+			return -2;
+
+		case STORE_NAME:
+			return -1;
+		case DELETE_NAME:
+			return 0;
+		case UNPACK_SEQUENCE:
+			return oparg-1;
+		case FOR_ITER:
+			return 1;
+
+		case STORE_ATTR:
+			return -2;
+		case DELETE_ATTR:
+			return -1;
+		case STORE_GLOBAL:
+			return -1;
+		case DELETE_GLOBAL:
+			return 0;
+		case DUP_TOPX:
+			return oparg;
+		case LOAD_CONST:
+			return 1;
+		case LOAD_NAME:
+			return 1;
+		case BUILD_TUPLE:
+		case BUILD_LIST:
+			return 1-oparg;
+		case BUILD_MAP:
+			return 1;
+		case LOAD_ATTR:
+			return 0;
+		case COMPARE_OP:
+			return -1;
+		case IMPORT_NAME:
+			return 0;
+		case IMPORT_FROM:
+			return 1;
+
+		case JUMP_FORWARD:
+		case JUMP_IF_FALSE:
+		case JUMP_IF_TRUE:
+		case JUMP_ABSOLUTE:
+			return 0;
+
+		case LOAD_GLOBAL:
+			return 1;
+
+		case CONTINUE_LOOP:
+			return 0;
+		case SETUP_LOOP:
+			return 0;
+		case SETUP_EXCEPT:
+		case SETUP_FINALLY:
+			return 3; /* XXX isn't this 0? */
+
+		case LOAD_FAST:
+			return 1;
+		case STORE_FAST:
+			return -1;
+		case DELETE_FAST:
+			return 0;
+
+		case RAISE_VARARGS:
+			return -oparg;
+#define NARGS(o) (((o) % 256) + 2*((o) / 256))
+		case CALL_FUNCTION:
+			return -NARGS(oparg);
+		case CALL_FUNCTION_VAR:
+		case CALL_FUNCTION_KW:
+			return -NARGS(oparg)-1;
+		case CALL_FUNCTION_VAR_KW:
+			return -NARGS(oparg)-2;
+#undef NARGS
+		case MAKE_FUNCTION:
+			return -oparg;
+		case BUILD_SLICE:
+			if (oparg == 3)
+				return -2;
+			else
+				return -1;
+
+		case MAKE_CLOSURE:
+			/* XXX Also pops free variables to creates a tuple. */
+			return -oparg;
+		case LOAD_CLOSURE:
+			return 1;
+		case LOAD_DEREF:
+			return 1;
+		case STORE_DEREF:
+			return -1;
+		default:
+			fprintf(stderr, "opcode = %d\n", opcode);
+			Py_FatalError("opcode_stack_effect()");
+
+	}
+	return 0; /* not reachable */
+}
+
+static int
 compiler_addop(struct compiler *c, int opcode)
 {
 	struct basicblock *b;
@@ -729,7 +983,7 @@ compiler_addop_j(struct compiler *c, int opcode, int block, int absolute)
 	compiler_set_lineno(c, off);
 	i = &c->u->u_blocks[c->u->u_curblock]->b_instr[off];
 	i->i_opcode = opcode;
-	i->i_oparg = block;
+	i->i_target = block;
 	i->i_hasarg = 1;
 	if (absolute)
 		i->i_jabs = 1;
@@ -2408,16 +2662,56 @@ dfs(struct compiler *c, int block, struct assembler *a)
 	for (i = 0; i < b->b_iused; i++) {
 		instr = &b->b_instr[i];
 		if (instr->i_jrel || instr->i_jabs)
-			dfs(c, instr->i_oparg, a);
+			dfs(c, instr->i_target, a);
 	}
 	a->a_postorder[a->a_nblocks++] = block;
 }
 
+int
+stackdepth_walk(struct compiler *c, int block, int depth, int maxdepth)
+{
+	int i;
+	struct instr *instr;
+	struct basicblock *b;
+	b = c->u->u_blocks[block];
+	if (b->b_seen || b->b_startdepth >= depth)
+		return maxdepth;
+	b->b_seen = 1;
+	b->b_startdepth = depth;
+	for (i = 0; i < b->b_iused; i++) {
+		instr = &b->b_instr[i];
+		depth += opcode_stack_effect(instr->i_opcode, instr->i_oparg);
+		assert(depth >= 0); /* invalid code or bug in stackdepth() */
+		if (depth > maxdepth)
+			maxdepth = depth;
+		if (instr->i_jrel || instr->i_jabs) {
+			maxdepth = stackdepth_walk(c, instr->i_target,
+						   depth, maxdepth);
+			if (instr->i_opcode == JUMP_ABSOLUTE ||
+			    instr->i_opcode == JUMP_FORWARD) {
+				goto out; /* remaining code is dead */
+			}
+		}
+	}
+	if (b->b_next)
+		maxdepth = stackdepth_walk(c, b->b_next, depth, maxdepth);
+out:
+	b->b_seen = 0;
+	return maxdepth;
+}
+
+/* Find the flow path that needs the largest stack.  We assume that
+ * cycles in the flow graph have no net effect on the stack depth.
+ */
 static int
 stackdepth(struct compiler *c)
 {
-	/* XXX need to do this */
-	return 1000;
+	int i;
+	for (i = 0; i < c->u->u_nblocks; i++) {
+		c->u->u_blocks[i]->b_seen = 0;
+		c->u->u_blocks[i]->b_startdepth = INT_MIN;
+	}
+	return stackdepth_walk(c, 0, 0, 0);
 }
 
 static int
@@ -2690,9 +2984,9 @@ assemble_jump_offsets(struct assembler *a, struct compiler *c)
 			*/
 			bsize += instrsize(instr);
 			if (instr->i_jabs)
-				instr->i_oparg = blockoff[instr->i_oparg];
+				instr->i_oparg = blockoff[instr->i_target];
 			else if (instr->i_jrel) {
-				int delta = blockoff[instr->i_oparg] - bsize;
+				int delta = blockoff[instr->i_target] - bsize;
 				instr->i_oparg = delta;
 			}
 		}
@@ -2793,8 +3087,7 @@ makecode(struct compiler *c, struct assembler *a)
 	flags = compute_code_flags(c);
 	if (flags < 0)
 	    goto error;
-	co = PyCode_New(c->u->u_argcount, nlocals, stackdepth(c),
-			flags,
+	co = PyCode_New(c->u->u_argcount, nlocals, stackdepth(c), flags,
 			a->a_bytecode, consts, names, varnames,
 			freevars, cellvars,
 			filename, c->u->u_name,
