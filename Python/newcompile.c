@@ -40,7 +40,6 @@ int Py_OptimizeFlag = 0;
         In interactive mode, they are printed. :-)
      #: ref leaks in interpreter when press return on empty line
      #: yield or return outside a function don't raise a SyntaxError
-     #: LOAD_NAME is output instead of LOAD_GLOBAL
      #: line numbers are off a bit (may just need to add calls to set lineno)
      #: Modules/parsermodule.c:496: warning: implicit declaration 
                                     of function `PyParser_SimpleParseString'
