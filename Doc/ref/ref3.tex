@@ -1099,10 +1099,10 @@ three methods.
 Called to implement evaluation of \code{\var{self}[\var{i}:\var{j}]}.
 The returned object should be of the same type as \var{self}.  Note
 that missing \var{i} or \var{j} in the slice expression are replaced
-by zero or \code{sys.maxint}, respectively, and no further
-transformations on the indices is performed.  The interpretation of
-negative indices and indices larger than the length of the sequence is
-up to the method.
+by zero or \code{sys.maxint}, respectively.  If negative indexes are
+used in the slice, the length of the sequence is added to that index.
+No guarantee is made that indexes adjusted this way are not still
+negative.  Indexes which are too large are not modified.
 \end{methoddesc}
 
 \begin{methoddesc}[sequence object]{__setslice__}{self, i, j, sequence}
