@@ -20,9 +20,8 @@ PyAPI_FUNC(int) PyCode_Addr2Line(PyCodeObject *, int);
 /* Future feature support */
 
 typedef struct {
-    int ff_found_docstring;
-    int ff_last_lineno;
-    int ff_features;
+    int ff_features;      /* flags set by future statements */
+    int ff_lineno;        /* line number of last future statement */
 } PyFutureFeatures;
 
 #define FUTURE_NESTED_SCOPES "nested_scopes"
@@ -34,6 +33,8 @@ DL_IMPORT(PyCodeObject *) PyAST_Compile(struct _mod *, const char *,
 					PyCompilerFlags *);
 DL_IMPORT(PyFutureFeatures *) PyFuture_FromAST(struct _mod *, const char *);
 
+#define ERR_LATE_FUTURE \
+"from __future__ imports must occur at the beginning of the file"
 
 #ifdef __cplusplus
 }
