@@ -267,6 +267,20 @@ MERGE BEGIN ****************************************************************
 Merge details (this section is Tim's scratchpad, but should help a lot if
 he dies of frustration while wrestling with CVS <0.9 wink>).
 ----------------------------------------------------------------------------
+2001-07-30
+
+Doing this again while the expat and Windows installer changes are still
+fresh on my mind.
+
+Tagged trunk about 23:50 EDT on the 29th:
+    cvs tag date2001-07-30 python
+
+Merged trunk delta into branch:
+
+    cvs -q -z3 up -j date2001-07-28 -j date2001-07-30 descr
+
+2 conflicts, resolved.
+----------------------------------------------------------------------------
 2001-07-28
 
 Tagged trunk about 00:31 EDT:

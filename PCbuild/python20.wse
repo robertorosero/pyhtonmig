@@ -1,57 +1,112 @@
 Document Type: WSE
 item: Global
-  Version=5.0
+  Version=8.14
   Title=Python 2.2 alpha 1
   Flags=00010100
   Languages=65 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
   Japanese Font Name=MS Gothic
   Japanese Font Size=10
-  Start Gradient=0 0 255
-  End Gradient=0 0 0
-  Windows Flags=00000100000011010010110100001000
+  Start Gradient=0 255 0
+  End Gradient=0 128 0
+  Windows Flags=00000100000011010010010100001010
   Log Pathname=%MAINDIR%\INSTALL.LOG
   Message Font=MS Sans Serif
   Font Size=8
+  Pages Modified=00010000001101000000000100000010
+  Extra Pages=00000000000000000000000010110010
   Disk Filename=SETUP
   Patch Flags=0000000000000001
   Patch Threshold=85
   Patch Memory=4000
   EXE Filename=Python-2.2a1.exe
-  Variable Name1=_SYS_
-  Variable Description1=System directory (where to find MSVCRT.DLL)
-  Variable Default1=C:\Windows\System
-  Variable Values1=C:\Windows\System
-  Variable Values1=C:\WINNT\System32
-  Variable Flags1=00000010
-  Variable Name2=_WISE_
-  Variable Description2=WISE root directory
-  Variable Default2=C:\Wise
-  Variable Flags2=00001001
-  Variable Name3=_SRC_
-  Variable Description3=Python source directory
-  Variable Default3=C:\code\python\dist\src
+  Version File=2.2a1
+  Version Description=Python Programming Language
+  Version Copyright=©2001 Python Software Foundation
+  Version Company=PythonLabs at Zope Corporation
+  Crystal Format=10111100101100000010001001001001
+  Step View=&All
+  Variable Name1=_WISE_
+  Variable Description1=WISE root directory
+  Variable Default1=C:\PROGRAM FILES\WISE INSTALLMASTER 8.1
+  Variable Flags1=00001000
+  Variable Name2=_TCLMINOR_
+  Variable Description2=Tcl/Tk Minor Version (e.g. the "3" in "8.3.1")
+  Variable Default2=3
+  Variable Flags2=00001000
+  Variable Name3=_DOC_
+  Variable Description3=The unpacked HTML doc directory.
+  Variable Default3=..\html
   Variable Flags3=00001001
-  Variable Name4=_DOC_
-  Variable Description4=HTML documentation tree directory
-  Variable Default4=C:\Code\python\dist\src\html
-  Variable Flags4=00001001
-  Variable Name5=_TCLMINOR_
-  Variable Description5=Tcl/Tk Minor Version (e.g. the "3" in "8.3.1")
-  Variable Default5=3
+  Variable Name4=_SYS_
+  Variable Description4=System directory (where to find MSVCRT.DLL)
+  Variable Default4=C:\Windows\System
+  Variable Values4=C:\Windows\System
+  Variable Values4=C:\WINNT\System32
+  Variable Flags4=00000010
+  Variable Name5=_PYMAJOR_
+  Variable Description5=Python major version number; the 2 in 2.3.
+  Variable Default5=2
   Variable Flags5=00001000
-end
-remarked item: Open/Close INSTALL.LOG
-  Flags=00000001
-end
-item: Check if File/Dir Exists
-  Pathname=%SYS%
-  Flags=10000100
+  Variable Name6=_PYMINOR_
+  Variable Description6=Python minor version number; the 3 in 2.3
+  Variable Default6=2
+  Variable Flags6=00001000
 end
 item: Set Variable
-  Variable=SYS
-  Value=%WIN%
+  Variable=APPTITLE
+  Value=Python 2.2a1
 end
-item: End Block
+item: Remark
+end
+item: Remark
+  Text=When the version number changes, set the compiler
+end
+item: Remark
+  Text=vrbls _PYMAJOR_ and  _PYMINOR_.
+end
+item: Remark
+  Text=Nothing in the script below should need fiddling then.
+end
+item: Remark
+  Text=Other things that need fiddling:
+end
+item: Remark
+  Text=    The "Title:" in the upper left corner of the GUI.
+end
+item: Remark
+  Text=    Build Settings and Version Resource on step 6 (Finish) of the Installation Expert
+end
+item: Remark
+  Text=        Be sure to select Steps->All or you may not see these!
+end
+item: Remark
+end
+item: Remark
+  Text=PY_VERSION should be major.minor only; used to create the registry key; must match MS_DLL_ID in python_nt.rc
+end
+item: Set Variable
+  Variable=PY_VERSION
+  Value=%_PYMAJOR_%.%_PYMINOR_%
+end
+item: Remark
+  Text=GROUP is the Start menu group name; user can override.
+end
+item: Set Variable
+  Variable=GROUP
+  Value=Python %PY_VERSION%
+  Flags=10000000
+end
+item: Remark
+  Text=MAINDIR is the app directory; user can override.
+end
+item: Set Variable
+  Variable=MAINDIR
+  Value=Python%_PYMAJOR_%%_PYMINOR_%
+end
+item: Remark
+end
+item: Remark
+  Text=Give non-admin users a chance to abort.
 end
 item: Check Configuration
   Flags=10011111
@@ -65,120 +120,154 @@ item: Display Message
 end
 item: End Block
 end
-item: Set Variable
-  Variable=APPTITLE
-  Value=Python 2.2a1
-end
-item: Set Variable
-  Variable=GROUP
-  Value=Python 2.2
+item: Remark
 end
 item: Remark
-  Text=PY_VERSION should be major.minor only; used to create the registry key; must match MS_DLL_ID in python_nt.rc
+  Text=BEGIN WIZARD STUFF -----------------------------------------------------------------------------------------------------------------------------
+end
+item: Remark
+  Text=Note from Tim: the "stop" on the next line is actually "pause".
+end
+item: Open/Close INSTALL.LOG
+  Flags=00000001
+end
+item: Remark
+  Text=If the destination system does not have a writable Windows\System directory, system files will be written to the Windows\ directory
+end
+item: Check if File/Dir Exists
+  Pathname=%SYS%
+  Flags=10000100
 end
 item: Set Variable
-  Variable=PY_VERSION
-  Value=2.2
+  Variable=SYS
+  Value=%WIN%
 end
-item: Set Variable
-  Variable=MAINDIR
-  Value=Python22
+item: End Block
+end
+item: Check Configuration
+  Flags=10111011
+end
+item: Get Registry Key Value
+  Variable=COMMON
+  Key=SOFTWARE\Microsoft\Windows\CurrentVersion
+  Default=C:\Program Files\Common Files
+  Value Name=CommonFilesDir
+  Flags=00000100
 end
 item: Get Registry Key Value
   Variable=PROGRAM_FILES
   Key=SOFTWARE\Microsoft\Windows\CurrentVersion
   Default=C:\Program Files
   Value Name=ProgramFilesDir
-  Flags=00000101
+  Flags=00000100
+end
+item: Set Variable
+  Variable=EXPLORER
+  Value=1
+end
+item: End Block
+end
+item: Remark
+  Text=Note from Tim:  doesn't seem to be a way to get the true boot drive, the Wizard hardcodes "C".
 end
 item: Set Variable
   Variable=MAINDIR
-  Value=%PROGRAM_FILES%\%MAINDIR%
+  Value=C:\%MAINDIR%
+  Flags=00001100
+end
+item: Remark
+  Text=BACKUP is the variable that holds the path that all backup files will be copied to when overwritten
+end
+item: Set Variable
+  Variable=BACKUP
+  Value=%MAINDIR%\BACKUP
+  Flags=10000000
+end
+item: Remark
+  Text=DOBACKUP determines if a backup will be performed.  The possible values are A (do backup) or B (do not do backup)
+end
+item: Set Variable
+  Variable=DOBACKUP
+  Value=A
+  Flags=10000000
+end
+item: Remark
+  Text=BRANDING determines if the installation will be branded with a name and company.  By default, this is written to the INST directory (installation media).
+end
+item: Set Variable
+  Variable=BRANDING
+  Value=0
+end
+item: If/While Statement
+  Variable=BRANDING
+  Value=1
+end
+item: Read INI Value
+  Variable=NAME
+  Pathname=%INST%\CUSTDATA.INI
+  Section=Registration
+  Item=Name
+end
+item: Read INI Value
+  Variable=COMPANY
+  Pathname=%INST%\CUSTDATA.INI
+  Section=Registration
+  Item=Company
+end
+item: If/While Statement
+  Variable=NAME
+end
+item: Set Variable
+  Variable=DOBRAND
+  Value=1
+end
+item: Get System Information
+  Variable=NAME
+  Flags=00000110
+end
+item: Get System Information
+  Variable=COMPANY
+  Flags=00000111
+end
+item: End Block
+end
+item: End Block
+end
+item: Remark
+  Text=END WIZARD STUFF -----------------------------------------------------------------------------------------------------------------------------
+end
+item: Remark
+end
+item: Remark
+  Text=March thru the user GUI.
+end
+item: Remark
+  Text=COMPONENTS values:
+end
+item: Remark
+  Text=A: interpreter, libraries and Tcl/Tk
+end
+item: Remark
+  Text=B: docs
+end
+item: Remark
+  Text=C: tools
+end
+item: Remark
+  Text=D: test suite
 end
 item: Set Variable
   Variable=COMPONENTS
-  Value=ABCDE
+  Value=ABCD
 end
 item: Wizard Block
   Direction Variable=DIRECTION
   Display Variable=DISPLAY
-  Bitmap Pathname=C:\Wise\DIALOGS\TEMPLATE\WIZARD.BMP
+  Bitmap Pathname=%_WISE_%\Dialogs\Template\Wizard.bmp
   X Position=9
   Y Position=10
   Filler Color=8421440
   Flags=00000011
-end
-item: Custom Dialog Set
-  Name=Welcome
-  Display Variable=DISPLAY
-  item: Dialog
-    Title=%APPTITLE% Installation
-    Title French=Installation de %APPTITLE%
-    Title German=Installation von %APPTITLE%
-    Title Spanish=Instalación de %APPTITLE%
-    Title Italian=Installazione di %APPTITLE%
-    Width=271
-    Height=224
-    Font Name=Helv
-    Font Size=8
-    item: Static
-      Rectangle=86 8 258 42
-      Create Flags=01010000000000000000000000000000
-      Flags=0000000000000001
-      Name=Times New Roman
-      Font Style=-24 0 0 0 700 255 0 0 0 3 2 1 18
-      Text=Welcome!
-      Text French=Bienvenue !
-      Text German=Willkommen!
-      Text Spanish=¡Bienvenido!
-      Text Italian=Benvenuti!
-    end
-    item: Push Button
-      Rectangle=150 187 195 202
-      Variable=DIRECTION
-      Value=N
-      Create Flags=01010000000000010000000000000001
-      Text=&Next >
-      Text French=&Suite >
-      Text German=&Weiter >
-      Text Spanish=&Siguiente >
-      Text Italian=&Avanti >
-    end
-    item: Push Button
-      Rectangle=211 186 256 201
-      Action=3
-      Create Flags=01010000000000010000000000000000
-      Text=&Cancel
-      Text French=&Annuler
-      Text German=&Abbrechen
-      Text Spanish=&Cancelar
-      Text Italian=&Annulla
-    end
-    item: Static
-      Rectangle=86 42 256 131
-      Create Flags=01010000000000000000000000000000
-      Text=This installation program will install %APPTITLE% on your system.
-      Text=
-      Text=Click the Next button to start the installation. Click the Cancel button now if you do not want to install %APPTITLE% at this time.
-      Text French=Ce programme d'installation va installer %APPTITLE%.
-      Text French=
-      Text French=Cliquez sur le bouton Suite pour démarrer l'installation. Vous pouvez cliquer sur le bouton Quitter l'installation si vous ne voulez pas installer %APPTITLE% tout de suite.
-      Text German=Mit diesem Installationsprogramm wird %APPTITLE% installiert.
-      Text German=
-      Text German=Klicken Sie auf "Weiter", um mit der Installation zu beginnen. Klicken Sie auf "Abbrechen", um die Installation von %APPTITLE% abzubrechen.
-      Text Spanish=Este programa de instalación instalará %APPTITLE%.
-      Text Spanish=
-      Text Spanish=Presione el botón Siguiente para iniciar la instalación. Puede presionar el botón Salir de instalación si no desea instalar %APPTITLE% en este momento.
-      Text Italian=Questo programma installerà %APPTITLE%.
-      Text Italian=
-      Text Italian=Per avvviare l'installazione premere il pulsante Avanti. Se non si desidera installare %APPTITLE% ora, premere il pulsante Esci dall'installazione.
-    end
-    item: Static
-      Rectangle=8 180 256 181
-      Action=3
-      Create Flags=01010000000000000000000000000111
-    end
-  end
 end
 item: Custom Dialog Set
   Name=Select Destination Directory
@@ -391,27 +480,30 @@ item: Custom Dialog Set
       Variable=COMPONENTS
       Create Flags=01010000000000010000000000000011
       Flags=0000000000000110
-      Text=Python Utility Scripts
-      Text=Python Help Files
-      Text=Python test suite
-      Text=Python interpreter and library
-      Text=Tcl/Tk support
+      Text=Python interpreter, library and Tcl/Tk
+      Text=Python HTML docs
+      Text=Python utility scripts (Tools/)
+      Text=Python test suite (Lib/test/)
       Text=
-      Text French=Python Utility Scripts
-      Text French=Python Help Files
-      Text French=Python test suite
+      Text French=Python interpreter, library and Tcl/Tk
+      Text French=Python HTML docs
+      Text French=Python utility scripts (Tools/)
+      Text French=Python test suite (Lib/test/)
       Text French=
-      Text German=Python Utility Scripts
-      Text German=Python Help Files
-      Text German=Python test suite
+      Text German=Python interpreter, library and Tcl/Tk
+      Text German=Python HTML docs
+      Text German=Python utility scripts (Tools/)
+      Text German=Python test suite (Lib/test/)
       Text German=
-      Text Spanish=Python Utility Scripts
-      Text Spanish=Python Help Files
-      Text Spanish=Python test suite
+      Text Spanish=Python interpreter, library and Tcl/Tk
+      Text Spanish=Python HTML docs
+      Text Spanish=Python utility scripts (Tools/)
+      Text Spanish=Python test suite (Lib/test/)
       Text Spanish=
-      Text Italian=Python Utility Scripts
-      Text Italian=Python Help Files
-      Text Italian=Python test suite
+      Text Italian=Python interpreter, library and Tcl/Tk
+      Text Italian=Python HTML docs
+      Text Italian=Python utility scripts (Tools/)
+      Text Italian=Python test suite (Lib/test/)
       Text Italian=
     end
     item: Static
@@ -627,309 +719,564 @@ item: Custom Dialog Set
     end
   end
 end
+item: Remark
+  Text=This reinitializes the BACKUP directory so that it reflects the change the user made to MAINDIR
+end
+item: If/While Statement
+  Variable=DISPLAY
+  Value=Select Destination Directory
+end
+item: Set Variable
+  Variable=BACKUP
+  Value=%MAINDIR%\BACKUP
+end
 item: End Block
+end
+item: End Block
+end
+item: Remark
+end
+item: Remark
+  Text=BEGIN WIZARD STUFF -----------------------------------------------------------------------------------------------------------------------------
+end
+item: Remark
+  Text=When the BACKUP feature is enabled, the BACKUPDIR is initialized
+end
+item: If/While Statement
+  Variable=DOBACKUP
+  Value=A
+end
+item: Set Variable
+  Variable=BACKUPDIR
+  Value=%BACKUP%
+end
+item: End Block
+end
+item: Remark
+  Text=The BRANDING information is written to the INI file on the installation media.
+end
+item: If/While Statement
+  Variable=BRANDING
+  Value=1
+end
+item: If/While Statement
+  Variable=DOBRAND
+  Value=1
+end
+item: Edit INI File
+  Pathname=%INST%\CUSTDATA.INI
+  Settings=[Registration]
+  Settings=NAME=%NAME%
+  Settings=COMPANY=%COMPANY%
+  Settings=
+end
+item: End Block
+end
+item: End Block
+end
+item: Remark
+  Text=Begin writing to the INSTALL.LOG 
 end
 item: Open/Close INSTALL.LOG
 end
 item: Remark
-  Text=Where system DLLs are installed (choose one of the following):
+  Text=Check free disk space calculates free disk space as well as component sizes.
+end
+item: Remark
+  Text=It should be located before all Install File actions.
+end
+item: Check Disk Space
+  Component=COMPONENTS
+end
+item: Remark
+  Text=This include script allows uninstall support
+end
+item: Include Script
+  Pathname=%_WISE_%\INCLUDE\uninstal.wse
+end
+item: Remark
+  Text=Note from Tim: these seeming no-ops actually convert to short filenames.
+end
+item: Set Variable
+  Variable=COMMON
+  Value=%COMMON%
+  Flags=00010100
+end
+item: Set Variable
+  Variable=MAINDIR
+  Value=%MAINDIR%
+  Flags=00010100
+end
+item: Remark
+  Text=This IF/THEN/ELSE reads the correct registry entries for shortcut/icon placement
+end
+item: Check Configuration
+  Flags=10111011
+end
+item: Get Registry Key Value
+  Variable=STARTUPDIR
+  Key=Software\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders
+  Default=%WIN%\Start Menu\Programs\StartUp
+  Value Name=StartUp
+  Flags=00000010
+end
+item: Get Registry Key Value
+  Variable=DESKTOPDIR
+  Key=Software\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders
+  Default=%WIN%\Desktop
+  Value Name=Desktop
+  Flags=00000010
+end
+item: Get Registry Key Value
+  Variable=STARTMENUDIR
+  Key=Software\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders
+  Default=%WIN%\Start Menu
+  Value Name=Start Menu
+  Flags=00000010
+end
+item: Get Registry Key Value
+  Variable=GROUPDIR
+  Key=Software\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders
+  Default=%WIN%\Start Menu\Programs
+  Value Name=Programs
+  Flags=00000010
+end
+item: Get Registry Key Value
+  Variable=CSTARTUPDIR
+  Key=Software\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders
+  Default=%STARTUPDIR%
+  Value Name=Common Startup
+  Flags=00000100
+end
+item: Get Registry Key Value
+  Variable=CDESKTOPDIR
+  Key=Software\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders
+  Default=%DESKTOPDIR%
+  Value Name=Common Desktop
+  Flags=00000100
+end
+item: Get Registry Key Value
+  Variable=CSTARTMENUDIR
+  Key=Software\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders
+  Default=%STARTMENUDIR%
+  Value Name=Common Start Menu
+  Flags=00000100
+end
+item: Get Registry Key Value
+  Variable=CGROUPDIR
+  Key=Software\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders
+  Default=%GROUPDIR%
+  Value Name=Common Programs
+  Flags=00000100
+end
+item: Set Variable
+  Variable=CGROUP_SAVE
+  Value=%GROUP%
+end
+item: Set Variable
+  Variable=GROUP
+  Value=%GROUPDIR%\%GROUP%
+end
+item: Else Statement
+end
+item: Remark
+  Text=Note from Tim:  the Wizard left this block empty!
+end
+item: Remark
+  Text=Perhaps it's only relevant on Windows 3.1.
+end
+item: End Block
+end
+item: Remark
+  Text=END WIZARD STUFF -----------------------------------------------------------------------------------------------------------------------------
+end
+item: Remark
+end
+item: Remark
+  Text=Long section to install files.
+end
+item: Remark
 end
 item: Set Variable
   Variable=DLLDEST
   Value=%SYS32%
 end
-item: Check Disk Space
-  Component=COMPONENTS
-end
-item: If/While Statement
-  Variable=COMPONENTS
-  Value=D
-  Flags=00001010
-end
 item: Install File
-  Source=%_SRC_%\LICENSE
+  Source=..\license
   Destination=%MAINDIR%\LICENSE.txt
   Flags=0000000000000010
 end
 item: Install File
-  Source=%_SRC_%\README
+  Source=..\readme
   Destination=%MAINDIR%\README.txt
   Flags=0000000000000010
 end
 item: Install File
-  Source=%_SRC_%\Misc\NEWS
+  Source=..\misc\news
   Destination=%MAINDIR%\NEWS.txt
   Flags=0000000000000010
 end
 item: Remark
-  Text=*** Executables ***
+end
+item: Remark
+  Text=A: interpreter, libraries and Tcl/Tk
+end
+item: If/While Statement
+  Variable=COMPONENTS
+  Value=A
+  Flags=00001010
+end
+item: Remark
+  Text=Executables
 end
 item: Install File
-  Source=%_SRC_%\PCbuild\python.exe
+  Source=.\python.exe
   Destination=%MAINDIR%\python.exe
   Flags=0000000000000010
 end
 item: Install File
-  Source=%_SRC_%\PCbuild\pythonw.exe
+  Source=.\pythonw.exe
   Destination=%MAINDIR%\pythonw.exe
   Flags=0000000000000010
 end
 item: Install File
-  Source=%_SRC_%\PCbuild\w9xpopen.exe
+  Source=.\w9xpopen.exe
   Destination=%MAINDIR%\w9xpopen.exe
   Flags=0000000000000010
 end
 item: Remark
-  Text=*** Extension module DLLs (.pyd); keep in synch with libs directory next ***
+end
+item: Remark
+  Text=Extension module DLLs (.pyd); keep in synch with libs directory next
 end
 item: Install File
-  Source=%_SRC_%\PCbuild\_winreg.pyd
+  Source=.\_winreg.pyd
   Destination=%MAINDIR%\DLLs\_winreg.pyd
   Description=Extension modules
   Flags=0000000000000010
 end
 item: Install File
-  Source=%_SRC_%\PCbuild\_sre.pyd
+  Source=.\_sre.pyd
   Destination=%MAINDIR%\DLLs\_sre.pyd
   Flags=0000000000000010
 end
 item: Install File
-  Source=%_SRC_%\PCbuild\_symtable.pyd
+  Source=.\_symtable.pyd
   Destination=%MAINDIR%\DLLs\_symtable.pyd
   Flags=0000000000000010
 end
 item: Install File
-  Source=%_SRC_%\PCbuild\_testcapi.pyd
+  Source=.\_testcapi.pyd
   Destination=%MAINDIR%\DLLs\_testcapi.pyd
   Flags=0000000000000010
 end
 item: Install File
-  Source=%_SRC_%\PCbuild\_tkinter.pyd
+  Source=.\_tkinter.pyd
   Destination=%MAINDIR%\DLLs\_tkinter.pyd
   Flags=0000000000000010
 end
 item: Install File
-  Source=%_SRC_%\PCbuild\_socket.pyd
+  Source=.\_socket.pyd
   Destination=%MAINDIR%\DLLs\_socket.pyd
   Flags=0000000000000010
 end
 item: Install File
-  Source=%_SRC_%\PCbuild\bsddb.pyd
+  Source=.\bsddb.pyd
   Destination=%MAINDIR%\DLLs\bsddb.pyd
   Flags=0000000000000010
 end
 item: Install File
-  Source=%_SRC_%\PCbuild\mmap.pyd
+  Source=.\mmap.pyd
   Destination=%MAINDIR%\DLLs\mmap.pyd
   Flags=0000000000000010
 end
 item: Install File
-  Source=%_SRC_%\PCbuild\parser.pyd
+  Source=.\parser.pyd
   Destination=%MAINDIR%\DLLs\parser.pyd
   Flags=0000000000000010
 end
 item: Install File
-  Source=%_SRC_%\PCbuild\pyexpat.pyd
+  Source=.\pyexpat.pyd
   Destination=%MAINDIR%\DLLs\pyexpat.pyd
   Flags=0000000000000010
 end
 item: Install File
-  Source=%_SRC_%\PCbuild\select.pyd
+  Source=.\select.pyd
   Destination=%MAINDIR%\DLLs\select.pyd
   Flags=0000000000000010
 end
 item: Install File
-  Source=%_SRC_%\PCbuild\unicodedata.pyd
+  Source=.\unicodedata.pyd
   Destination=%MAINDIR%\DLLs\unicodedata.pyd
   Flags=0000000000000010
 end
 item: Install File
-  Source=%_SRC_%\PCbuild\winsound.pyd
+  Source=.\winsound.pyd
   Destination=%MAINDIR%\DLLs\winsound.pyd
   Flags=0000000000000010
 end
 item: Install File
-  Source=%_SRC_%\PCbuild\zlib.pyd
+  Source=.\zlib.pyd
   Destination=%MAINDIR%\DLLs\zlib.pyd
   Flags=0000000000000010
 end
 item: Remark
-  Text=*** Link libraries (.lib); keep in synch with DLLs above, except that the Python lib lives here ***
+end
+item: Remark
+  Text=Link libraries (.lib); keep in synch with DLLs above, except that the Python lib lives here.
 end
 item: Install File
-  Source=%_SRC_%\PCbuild\_winreg.lib
+  Source=.\_winreg.lib
   Destination=%MAINDIR%\libs\_winreg.lib
   Description=Link library files
   Flags=0000000000000010
 end
 item: Install File
-  Source=%_SRC_%\PCbuild\_sre.lib
+  Source=.\_sre.lib
   Destination=%MAINDIR%\libs\_sre.lib
   Flags=0000000000000010
 end
 item: Install File
-  Source=%_SRC_%\PCbuild\_symtable.lib
+  Source=.\_symtable.lib
   Destination=%MAINDIR%\libs\_symtable.lib
   Flags=0000000000000010
 end
 item: Install File
-  Source=%_SRC_%\PCbuild\_testcapi.lib
+  Source=.\_testcapi.lib
   Destination=%MAINDIR%\libs\_testcapi.lib
   Flags=0000000000000010
 end
 item: Install File
-  Source=%_SRC_%\PCbuild\_tkinter.lib
+  Source=.\_tkinter.lib
   Destination=%MAINDIR%\libs\_tkinter.lib
   Description=Extension modules
   Flags=0000000000000010
 end
 item: Install File
-  Source=%_SRC_%\PCbuild\_socket.lib
+  Source=.\_socket.lib
   Destination=%MAINDIR%\libs\_socket.lib
   Flags=0000000000000010
 end
 item: Install File
-  Source=%_SRC_%\PCbuild\bsddb.lib
+  Source=.\bsddb.lib
   Destination=%MAINDIR%\libs\bsddb.lib
   Flags=0000000000000010
 end
 item: Install File
-  Source=%_SRC_%\PCbuild\mmap.lib
+  Source=.\mmap.lib
   Destination=%MAINDIR%\libs\mmap.lib
   Flags=0000000000000010
 end
 item: Install File
-  Source=%_SRC_%\PCbuild\parser.lib
+  Source=.\parser.lib
   Destination=%MAINDIR%\libs\parser.lib
   Flags=0000000000000010
 end
 item: Install File
-  Source=%_SRC_%\PCbuild\pyexpat.lib
+  Source=.\pyexpat.lib
   Destination=%MAINDIR%\libs\pyexpat.lib
   Flags=0000000000000010
 end
 item: Install File
-  Source=%_SRC_%\PCbuild\select.lib
+  Source=.\select.lib
   Destination=%MAINDIR%\libs\select.lib
   Flags=0000000000000010
 end
 item: Install File
-  Source=%_SRC_%\PCbuild\unicodedata.lib
+  Source=.\unicodedata.lib
   Destination=%MAINDIR%\libs\unicodedata.lib
   Flags=0000000000000010
 end
 item: Install File
-  Source=%_SRC_%\PCbuild\winsound.lib
+  Source=.\winsound.lib
   Destination=%MAINDIR%\libs\winsound.lib
   Flags=0000000000000010
 end
 item: Install File
-  Source=%_SRC_%\PCbuild\zlib.lib
+  Source=.\zlib.lib
   Destination=%MAINDIR%\libs\zlib.lib
   Flags=0000000000000010
 end
+item: Remark
+end
 item: Install File
-  Source=%_SRC_%\PCbuild\python22.lib
-  Destination=%MAINDIR%\libs\python22.lib
+  Source=.\python%_pymajor_%%_pyminor_%.lib
+  Destination=%MAINDIR%\libs\python%_PYMAJOR_%%_PYMINOR_%.lib
   Flags=0000000000000010
 end
 item: Remark
-  Text=*** More DLLs ***
+end
+item: Remark
+  Text=More DLLs
 end
 item: Install File
-  Source=%_SRC_%\..\expat\bin\xmlparse.dll
-  Destination=%MAINDIR%\DLLs\xmlparse.dll
-  Description=Expat library
-  Flags=0000000000000010
-end
-item: Install File
-  Source=%_SRC_%\..\expat\bin\xmltok.dll
-  Destination=%MAINDIR%\DLLs\xmltok.dll
+  Source=..\..\expat\libs\expat.dll
+  Destination=%MAINDIR%\DLLs\expat.dll
   Description=Expat library
   Flags=0000000000000010
 end
 item: Remark
-  Text=*** Main Python DLL ***
+end
+item: Remark
+  Text=Main Python DLL
 end
 item: Install File
-  Source=%_SRC_%\pcbuild\python22.dll
-  Destination=%DLLDEST%\python22.dll
+  Source=.\python%_pymajor_%%_pyminor_%.dll
+  Destination=%DLLDEST%\python%_PYMAJOR_%%_PYMINOR_%.dll
   Flags=0000000000000010
 end
+item: Remark
+end
+item: Remark
+  Text=Icons
+end
 item: Install File
-  Source=%_SRC_%\Pc\*.ico
+  Source=..\pc\*.ico
   Destination=%MAINDIR%
   Description=Icons
   Flags=0000000000000010
 end
+item: Remark
+end
+item: Remark
+  Text=Libraries (Lib/)
+end
+item: Remark
+  Text=Remove entire Lib directory at uninstall time.
+end
+item: Add Text to INSTALL.LOG
+  Text=File Tree: %MAINDIR%\Lib\*.*
+end
+item: Remark
+end
 item: Install File
-  Source=%_SRC_%\Lib\*.py
+  Source=..\lib\*.py
   Destination=%MAINDIR%\Lib
   Description=Library Modules
   Flags=0000000000000010
 end
 item: Remark
-  Text=***  Libraries (Lib/) ***
-end
-item: Remark
-  Text=plat-win became empty!
-end
-remarked item: Install File
-  Source=%_SRC_%\Lib\plat-win\*.py
-  Destination=%MAINDIR%\Lib\Plat-Win
-  Description=Windows-specific library modules
-  Flags=0000000000000010
 end
 item: Install File
-  Source=%_SRC_%\Lib\lib-tk\*.py
+  Source=..\lib\lib-tk\*.py
   Destination=%MAINDIR%\Lib\lib-tk
   Description=Tkinter related library modules
   Flags=0000000000000010
 end
+item: Remark
+end
 item: Install File
-  Source=%_SRC_%\Lib\encodings\*.py
+  Source=..\lib\encodings\*.py
   Destination=%MAINDIR%\Lib\encodings
   Description=Unicode encoding tables
   Flags=0000000000000010
 end
+item: Remark
+end
 item: Install File
-  Source=%_SRC_%\Lib\distutils\*.py
+  Source=..\lib\distutils\*.py
   Destination=%MAINDIR%\Lib\distutils
   Description=Distribution utility modules
-  Flags=0000000100000010
+  Flags=0000000000000010
 end
 item: Install File
-  Source=%_SRC_%\Lib\xml\*.py
+  Source=..\lib\distutils\readme
+  Destination=%MAINDIR%\Lib\distutils\README.txt
+  Flags=0000000000000010
+end
+item: Install File
+  Source=..\lib\distutils\command\*.py
+  Destination=%MAINDIR%\Lib\distutils\command
+  Flags=0000000000000010
+end
+item: Install File
+  Source=..\lib\distutils\command\command_template
+  Destination=%MAINDIR%\Lib\distutils\command\command_template
+  Flags=0000000000000010
+end
+item: Remark
+end
+item: Install File
+  Source=..\lib\xml\*.py
   Destination=%MAINDIR%\Lib\xml
   Description=XML support packages
-  Flags=0000000100000010
+  Flags=0000000000000010
 end
 item: Install File
-  Source=%_SRC_%\Lib\lib-old\*.py
+  Source=..\lib\xml\dom\*.py
+  Destination=%MAINDIR%\Lib\xml\dom
+  Flags=0000000000000010
+end
+item: Install File
+  Source=..\lib\xml\parsers\*.py
+  Destination=%MAINDIR%\Lib\xml\parsers
+  Flags=0000000000000010
+end
+item: Install File
+  Source=..\lib\xml\sax\*.py
+  Destination=%MAINDIR%\Lib\xml\sax
+  Flags=0000000000000010
+end
+item: Remark
+end
+item: Install File
+  Source=..\lib\lib-old\*.py
   Destination=%MAINDIR%\Lib\lib-old
   Description=Obsolete modules
   Flags=0000000000000010
 end
+item: Remark
+end
 item: Install File
-  Source=%_SRC_%\Lib\site-packages\README
+  Source=..\lib\site-packages\readme
   Destination=%MAINDIR%\Lib\site-packages\README.txt
   Description=Site packages
   Flags=0000000000000010
 end
 item: Remark
-  Text=*** Other ***
+end
+item: Remark
+  Text=C Include files
 end
 item: Install File
-  Source=%_SRC_%\Include\*.h
+  Source=..\include\*.h
   Destination=%MAINDIR%\include
   Description=Header files
   Flags=0000000000000010
 end
 item: Install File
-  Source=%_SRC_%\PC\pyconfig.h
+  Source=..\pc\pyconfig.h
   Destination=%MAINDIR%\include\pyconfig.h
   Description=Header files (pyconfig.h)
   Flags=0000000000000010
+end
+item: Remark
+end
+item: Remark
+  Text=Tcl/Tk
+end
+item: Install File
+  Source=..\..\tcl\bin\tcl8%_tclminor_%.dll
+  Destination=%MAINDIR%\DLLs\tcl8%_TCLMINOR_%.dll
+  Description=Tcl/Tk binaries and libraries
+  Flags=0000000000000010
+end
+item: Install File
+  Source=..\..\tcl\bin\tk8%_tclminor_%.dll
+  Destination=%MAINDIR%\DLLs\tk8%_TCLMINOR_%.dll
+  Description=Tcl/Tk binaries and libraries
+  Flags=0000000000000010
+end
+item: Install File
+  Source=..\..\tcl\lib\*.*
+  Destination=%MAINDIR%\tcl
+  Description=Tcl/Tk binaries and libraries
+  Flags=0000000100000010
+end
+item: Remark
+end
+item: Remark
+  Text=Microsoft C runtime libraries
 end
 item: Install File
   Source=%_SYS_%\MSVCIRT.DLL
@@ -945,135 +1292,10 @@ item: Install File
 end
 item: End Block
 end
-item: If/While Statement
-  Variable=COMPONENTS
-  Value=A
-  Flags=00001010
+item: Remark
 end
-item: Add Text to INSTALL.LOG
-  Text=File Tree: %MAINDIR%\Tools\*.*
-end
-item: Install File
-  Source=%_SRC_%\Tools\scripts\*.py
-  Destination=%MAINDIR%\Tools\Scripts
-  Description=Utility Scripts
-  Flags=0000000000000010
-end
-item: Install File
-  Source=%_SRC_%\Tools\scripts\*.pyw
-  Destination=%MAINDIR%\Tools\Scripts
-  Description=Utility Scripts
-  Flags=0000000000000010
-end
-item: Install File
-  Source=%_SRC_%\Tools\scripts\*.doc
-  Destination=%MAINDIR%\Tools\Scripts
-  Description=Utility Scripts
-  Flags=0000000000000010
-end
-item: Install File
-  Source=%_SRC_%\Tools\scripts\README
-  Destination=%MAINDIR%\Tools\Scripts\README.txt
-  Description=Utility Scripts
-  Flags=0000000000000010
-end
-item: Install File
-  Source=%_SRC_%\Tools\webchecker\*.py
-  Destination=%MAINDIR%\Tools\webchecker
-  Description=Web checker tool
-  Flags=0000000000000010
-end
-item: Install File
-  Source=%_SRC_%\Tools\webchecker\README
-  Destination=%MAINDIR%\Tools\webchecker\README.txt
-  Description=Web checker tool
-  Flags=0000000000000010
-end
-item: Install File
-  Source=%_SRC_%\Tools\versioncheck\*.py
-  Destination=%MAINDIR%\Tools\versioncheck
-  Description=Version checker tool
-  Flags=0000000000000010
-end
-item: Install File
-  Source=%_SRC_%\Tools\versioncheck\README
-  Destination=%MAINDIR%\Tools\versioncheck\README.txt
-  Description=Version checker tool
-  Flags=0000000000000010
-end
-item: Install File
-  Source=%_SRC_%\Tools\idle\*.py
-  Destination=%MAINDIR%\Tools\idle
-  Description=Integrated DeveLopment Environment for Python
-  Flags=0000000000000010
-end
-item: Install File
-  Source=%_SRC_%\Tools\idle\*.txt
-  Destination=%MAINDIR%\Tools\idle
-  Description=Integrated DeveLopment Environment for Python
-  Flags=0000000000000010
-end
-item: Install File
-  Source=%_SRC_%\Tools\idle\Icons\*
-  Destination=%MAINDIR%\Tools\idle\Icons
-  Description=Integrated DeveLopment Environment for Python
-  Flags=0000000000000010
-end
-item: Install File
-  Source=%_SRC_%\Tools\idle\idle.pyw
-  Destination=%MAINDIR%\Tools\idle\idle.pyw
-  Description=IDLE bootstrap script
-  Flags=0000000000000010
-end
-item: Install File
-  Source=%_SRC_%\Tools\compiler\*.py
-  Destination=%MAINDIR%\Tools\compiler
-  Description=Python compiler written in Python
-  Flags=0000000000000010
-end
-item: Install File
-  Source=%_SRC_%\Tools\compiler\compiler\*.py
-  Destination=%MAINDIR%\Tools\compiler\compiler
-  Description=Python compiler written in Python
-  Flags=0000000000000010
-end
-item: Install File
-  Source=%_SRC_%\Tools\compiler\compiler\*.txt
-  Destination=%MAINDIR%\Tools\compiler\compiler
-  Description=Python compiler written in Python
-  Flags=0000000000000010
-end
-item: Install File
-  Source=%_SRC_%\Tools\pynche\*.py
-  Destination=%MAINDIR%\Tools\pynche
-  Description=pynche color editor
-  Flags=0000000000000010
-end
-item: Install File
-  Source=%_SRC_%\Tools\pynche\X\*.txt
-  Destination=%MAINDIR%\Tools\pynche\X
-  Description=pynche color editor - X files
-  Flags=0000000000000010
-end
-item: Install File
-  Source=%_SRC_%\Tools\pynche\README
-  Destination=%MAINDIR%\Tools\pynche\README.txt
-  Description=pynche color editor - README
-  Flags=0000000100000010
-end
-item: Install File
-  Source=%_SRC_%\Tools\pynche\pynche
-  Destination=%MAINDIR%\Tools\pynche\pynche.py
-  Description=pynche color editor - main
-  Flags=0000000100000010
-end
-item: Install File
-  Source=%_SRC_%\Tools\pynche\pynche.pyw
-  Destination=%MAINDIR%\Tools\pynche\pynche.pyw
-  Description=pynche color editor - noconsole main
-  Flags=0000000100000010
-end
-item: End Block
+item: Remark
+  Text=B: docs
 end
 item: If/While Statement
   Variable=COMPONENTS
@@ -1088,118 +1310,305 @@ item: Install File
 end
 item: End Block
 end
+item: Remark
+end
+item: Remark
+  Text=C: tools
+end
 item: If/While Statement
   Variable=COMPONENTS
   Value=C
   Flags=00001010
 end
+item: Remark
+  Text=Delete entire Tools directory at uninstall time.
+end
+item: Add Text to INSTALL.LOG
+  Text=File Tree: %MAINDIR%\Tools\*.*
+end
+item: Remark
+end
 item: Install File
-  Source=%_SRC_%\Lib\test\audiotest.au
-  Destination=%MAINDIR%\Lib\test\audiotest.au
-  Description=Python Test files
+  Source=..\tools\scripts\*.py
+  Destination=%MAINDIR%\Tools\Scripts
+  Description=Utility Scripts
   Flags=0000000000000010
 end
 item: Install File
-  Source=%_SRC_%\Lib\test\*.uue
-  Destination=%MAINDIR%\Lib\test
-  Description=Python Test files
+  Source=..\tools\scripts\*.pyw
+  Destination=%MAINDIR%\Tools\Scripts
+  Description=Utility Scripts
   Flags=0000000000000010
 end
 item: Install File
-  Source=%_SRC_%\Lib\test\*.py
-  Destination=%MAINDIR%\Lib\test
-  Description=Python Test files
+  Source=..\tools\scripts\*.doc
+  Destination=%MAINDIR%\Tools\Scripts
+  Description=Utility Scripts
   Flags=0000000000000010
 end
 item: Install File
-  Source=%_SRC_%\Lib\test\*.xml
-  Destination=%MAINDIR%\Lib\test
-  Description=Python Test files
+  Source=..\tools\scripts\readme
+  Destination=%MAINDIR%\Tools\Scripts\README.txt
+  Description=Utility Scripts
+  Flags=0000000000000010
+end
+item: Remark
+end
+item: Install File
+  Source=..\tools\webchecker\*.py
+  Destination=%MAINDIR%\Tools\webchecker
+  Description=Web checker tool
   Flags=0000000000000010
 end
 item: Install File
-  Source=%_SRC_%\Lib\test\*.out
-  Destination=%MAINDIR%\Lib\test
-  Description=Python Test files
+  Source=..\tools\webchecker\readme
+  Destination=%MAINDIR%\Tools\webchecker\README.txt
+  Description=Web checker tool
+  Flags=0000000000000010
+end
+item: Remark
+end
+item: Install File
+  Source=..\tools\versioncheck\*.py
+  Destination=%MAINDIR%\Tools\versioncheck
+  Description=Version checker tool
   Flags=0000000000000010
 end
 item: Install File
-  Source=%_SRC_%\Lib\test\output\*.*
-  Destination=%MAINDIR%\Lib\test\output
-  Description=Python Test output files
+  Source=..\tools\versioncheck\readme
+  Destination=%MAINDIR%\Tools\versioncheck\README.txt
+  Description=Version checker tool
   Flags=0000000000000010
+end
+item: Remark
+end
+item: Install File
+  Source=..\tools\idle\*.py
+  Destination=%MAINDIR%\Tools\idle
+  Description=Integrated DeveLopment Environment for Python
+  Flags=0000000000000010
+end
+item: Install File
+  Source=..\tools\idle\*.txt
+  Destination=%MAINDIR%\Tools\idle
+  Description=Integrated DeveLopment Environment for Python
+  Flags=0000000000000010
+end
+item: Install File
+  Source=..\tools\idle\icons\*
+  Destination=%MAINDIR%\Tools\idle\Icons
+  Description=Integrated DeveLopment Environment for Python
+  Flags=0000000000000010
+end
+item: Install File
+  Source=..\tools\idle\idle.pyw
+  Destination=%MAINDIR%\Tools\idle\idle.pyw
+  Description=IDLE bootstrap script
+  Flags=0000000000000010
+end
+item: Remark
+end
+item: Install File
+  Source=..\tools\compiler\*.py
+  Destination=%MAINDIR%\Tools\compiler
+  Description=Python compiler written in Python
+  Flags=0000000000000010
+end
+item: Install File
+  Source=..\tools\compiler\compiler\*.py
+  Destination=%MAINDIR%\Tools\compiler\compiler
+  Description=Python compiler written in Python
+  Flags=0000000000000010
+end
+item: Install File
+  Source=..\tools\compiler\compiler\*.txt
+  Destination=%MAINDIR%\Tools\compiler\compiler
+  Description=Python compiler written in Python
+  Flags=0000000000000010
+end
+item: Remark
+end
+item: Install File
+  Source=..\tools\pynche\*.py
+  Destination=%MAINDIR%\Tools\pynche
+  Description=pynche color editor
+  Flags=0000000000000010
+end
+item: Install File
+  Source=..\tools\pynche\x\*.txt
+  Destination=%MAINDIR%\Tools\pynche\X
+  Description=pynche color editor - X files
+  Flags=0000000000000010
+end
+item: Install File
+  Source=..\tools\pynche\readme
+  Destination=%MAINDIR%\Tools\pynche\README.txt
+  Description=pynche color editor - README
+  Flags=0000000100000010
+end
+item: Install File
+  Source=..\tools\pynche\pynche
+  Destination=%MAINDIR%\Tools\pynche\pynche.py
+  Description=pynche color editor - main
+  Flags=0000000100000010
+end
+item: Install File
+  Source=..\tools\pynche\pynche.pyw
+  Destination=%MAINDIR%\Tools\pynche\pynche.pyw
+  Description=pynche color editor - noconsole main
+  Flags=0000000100000010
 end
 item: End Block
+end
+item: Remark
+end
+item: Remark
+  Text=D: test suite
 end
 item: If/While Statement
   Variable=COMPONENTS
   Value=D
   Flags=00001010
 end
-item: Add Text to INSTALL.LOG
-  Text=File Tree: %MAINDIR%\Lib\*.*
+item: Install File
+  Source=..\lib\test\audiotest.au
+  Destination=%MAINDIR%\Lib\test\audiotest.au
+  Description=Python Test files
+  Flags=0000000000000010
+end
+item: Install File
+  Source=..\lib\test\*.uue
+  Destination=%MAINDIR%\Lib\test
+  Description=Python Test files
+  Flags=0000000000000010
+end
+item: Install File
+  Source=..\lib\test\*.py
+  Destination=%MAINDIR%\Lib\test
+  Description=Python Test files
+  Flags=0000000000000010
+end
+item: Install File
+  Source=..\lib\test\*.xml
+  Destination=%MAINDIR%\Lib\test
+  Description=Python Test files
+  Flags=0000000000000010
+end
+item: Install File
+  Source=..\lib\test\*.out
+  Destination=%MAINDIR%\Lib\test
+  Description=Python Test files
+  Flags=0000000000000010
+end
+item: Remark
+end
+item: Install File
+  Source=..\lib\test\output\*.*
+  Destination=%MAINDIR%\Lib\test\output
+  Description=Python Test output files
+  Flags=0000000000000010
+end
+item: End Block
+end
+item: Remark
+end
+item: Remark
+  Text=DONE with file copying.
+end
+item: Remark
+  Text=The rest is Start menu and registry fiddling.
+end
+item: Remark
+end
+item: If/While Statement
+  Variable=COMPONENTS
+  Value=A
+  Flags=00001010
+end
+item: Remark
+  Text=Register file extensions.
 end
 item: Edit Registry
+  Total Keys=1
   Key=.py
   New Value=Python.File
 end
 item: Edit Registry
+  Total Keys=1
   Key=.py
   New Value=text/plain
   Value Name=Content Type
 end
 item: Edit Registry
+  Total Keys=1
   Key=Python.File
   New Value=Python File
 end
 item: Edit Registry
+  Total Keys=1
   Key=Python.File\shell\open\command
   New Value=%MAINDIR%\python.exe "%%1" %%*
 end
 item: Edit Registry
+  Total Keys=1
   Key=Python.File\DefaultIcon
   New Value=%MAINDIR%\Py.ico
 end
 item: Edit Registry
+  Total Keys=1
   Key=.pyw
   New Value=Python.NoConFile
 end
 item: Edit Registry
+  Total Keys=1
   Key=.pyw
   New Value=text/plain
   Value Name=Content Type
 end
 item: Edit Registry
+  Total Keys=1
   Key=Python.NoConFile
   New Value=Python File (no console)
 end
 item: Edit Registry
+  Total Keys=1
   Key=Python.NoConFile\shell\open\command
   New Value=%MAINDIR%\pythonw.exe "%%1" %%*
 end
 item: Edit Registry
+  Total Keys=1
   Key=Python.NoConFile\DefaultIcon
   New Value=%MAINDIR%\Py.ico
 end
 item: Edit Registry
+  Total Keys=1
   Key=.pyc
   New Value=Python.CompiledFile
 end
 item: Edit Registry
+  Total Keys=1
   Key=.pyo
   New Value=Python.CompiledFile
 end
 item: Edit Registry
+  Total Keys=1
   Key=Python.CompiledFile
   New Value=Compiled Python File
 end
 item: Edit Registry
+  Total Keys=1
   Key=Python.CompiledFile\shell\open\command
   New Value=%MAINDIR%\python.exe "%%1" %%*
 end
 item: Edit Registry
+  Total Keys=1
   Key=Python.CompiledFile\DefaultIcon
   New Value=%MAINDIR%\pyc.ico
+end
+item: Remark
+end
+item: Remark
+  Text=Register Python paths.
 end
 item: Remark
   Text=Write to HKLM for admin, else HKCU.  Keep these blocks otherwise identical!
@@ -1208,29 +1617,36 @@ item: Check Configuration
   Flags=10111111
 end
 item: Edit Registry
+  Total Keys=1
   Key=Software\Python\PythonCore\CurrentVersion
   Root=130
 end
 item: Edit Registry
+  Total Keys=1
   Key=Software\Python\PythonCore\%PY_VERSION%\InstallPath
   New Value=%MAINDIR%
   Root=2
 end
 item: Edit Registry
+  Total Keys=1
   Key=Software\Python\PythonCore\%PY_VERSION%\InstallPath\InstallGroup
   New Value=%GROUP%
   Root=2
 end
 item: Edit Registry
+  Total Keys=1
   Key=Software\Python\PythonCore\%PY_VERSION%\PythonPath
-  New Value=%MAINDIR%\Lib\plat-win;%MAINDIR%\Lib;%MAINDIR%\DLLs;%MAINDIR%\Lib\lib-tk
+  New Value=%MAINDIR%\Lib;%MAINDIR%\DLLs;%MAINDIR%\Lib\lib-tk
+  New Value=
   Root=2
 end
 item: Edit Registry
+  Total Keys=1
   Key=Software\Python\PythonCore\%PY_VERSION%\Modules
   Root=2
 end
 item: Edit Registry
+  Total Keys=1
   Key=Software\Microsoft\Windows\CurrentVersion\App Paths\Python.exe
   New Value=%MAINDIR%\Python.exe
   Root=2
@@ -1238,29 +1654,36 @@ end
 item: Else Statement
 end
 item: Edit Registry
+  Total Keys=1
   Key=Software\Python\PythonCore\CurrentVersion
   Root=129
 end
 item: Edit Registry
+  Total Keys=1
   Key=Software\Python\PythonCore\%PY_VERSION%\InstallPath
   New Value=%MAINDIR%
   Root=1
 end
 item: Edit Registry
+  Total Keys=1
   Key=Software\Python\PythonCore\%PY_VERSION%\InstallPath\InstallGroup
   New Value=%GROUP%
   Root=1
 end
 item: Edit Registry
+  Total Keys=1
   Key=Software\Python\PythonCore\%PY_VERSION%\PythonPath
-  New Value=%MAINDIR%\Lib\plat-win;%MAINDIR%\Lib;%MAINDIR%\DLLs;%MAINDIR%\Lib\lib-tk
+  New Value=%MAINDIR%\Lib;%MAINDIR%\DLLs;%MAINDIR%\Lib\lib-tk
+  New Value=
   Root=1
 end
 item: Edit Registry
+  Total Keys=1
   Key=Software\Python\PythonCore\%PY_VERSION%\Modules
   Root=1
 end
 item: Edit Registry
+  Total Keys=1
   Key=Software\Microsoft\Windows\CurrentVersion\App Paths\Python.exe
   New Value=%MAINDIR%\Python.exe
   Root=1
@@ -1268,6 +1691,11 @@ end
 item: End Block
 end
 item: End Block
+end
+item: Remark
+end
+item: Remark
+  Text=Registry fiddling for docs.
 end
 item: If/While Statement
   Variable=COMPONENTS
@@ -1281,6 +1709,7 @@ item: Check Configuration
   Flags=10111111
 end
 item: Edit Registry
+  Total Keys=1
   Key=Software\Python\PythonCore\%PY_VERSION%\Help\Main Python Documentation
   New Value=%MAINDIR%\Doc\index.html
   Root=2
@@ -1288,6 +1717,7 @@ end
 item: Else Statement
 end
 item: Edit Registry
+  Total Keys=1
   Key=Software\Python\PythonCore\%PY_VERSION%\Help\Main Python Documentation
   New Value=%MAINDIR%\Doc\index.html
   Root=1
@@ -1296,48 +1726,36 @@ item: End Block
 end
 item: End Block
 end
-item: Set Variable
-  Variable=MAINDIR
-  Value=%MAINDIR%
-  Flags=00010100
+item: Remark
 end
-item: Include Script
-  Pathname=C:\Wise\include\uninstal.wse
+item: Remark
+  Text=Well, *this* is cryptic!  It's setting up the app publisher and URL entries for Win2K add/remove.
 end
-item: If/While Statement
-  Variable=COMPONENTS
-  Value=D
-  Flags=00001010
+item: Edit Registry
+  Total Keys=3
+  item: Key
+    Key=Software\Microsoft\Windows\CurrentVersion\Uninstall\%APPTITLE%
+    New Value=http://www.python.org/
+    Value Name=HelpLink
+    Root=2
+  end
+  item: Key
+    Key=Software\Microsoft\Windows\CurrentVersion\Uninstall\%APPTITLE%
+    New Value=PythonLabs at Zope Corporation
+    Value Name=Publisher
+    Root=2
+  end
+  item: Key
+    Key=Software\Microsoft\Windows\CurrentVersion\Uninstall\%APPTITLE%
+    New Value=http://www.python.org/
+    Value Name=URLInfoAbout
+    Root=2
+  end
 end
-item: Get Registry Key Value
-  Variable=GROUPDIR
-  Key=Software\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders
-  Value Name=Common Programs
-  Flags=00000100
+item: Remark
 end
-item: If/While Statement
-  Variable=GROUPDIR
-end
-item: Get Registry Key Value
-  Variable=GROUPDIR
-  Key=Software\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders
-  Default=%WIN%\Start Menu\Programs
-  Value Name=Programs
-  Flags=00000010
-end
-item: End Block
-end
-item: Set Variable
-  Variable=GROUP
-  Value=%GROUPDIR%\%GROUP%
-end
-item: Create Shortcut
-  Source=%MAINDIR%\python.exe
-  Destination=%GROUP%\Python (command line).lnk
-  Working Directory=%MAINDIR%
-  Icon Pathname=%MAINDIR%\pycon.ico
-  Key Type=1536
-  Flags=00000001
+item: Remark
+  Text=Populate Start Menu
 end
 item: If/While Statement
   Variable=COMPONENTS
@@ -1353,15 +1771,30 @@ item: Create Shortcut
 end
 item: End Block
 end
+item: Remark
+end
 item: If/While Statement
   Variable=COMPONENTS
   Value=A
   Flags=00001010
 end
 item: Create Shortcut
+  Source=%MAINDIR%\python.exe
+  Destination=%GROUP%\Python (command line).lnk
+  Working Directory=%MAINDIR%
+  Icon Pathname=%MAINDIR%\pycon.ico
+  Key Type=1536
+  Flags=00000001
+end
+item: If/While Statement
+  Variable=COMPONENTS
+  Value=C
+  Flags=00001010
+end
+item: Create Shortcut
   Source=%MAINDIR%\pythonw.exe
   Destination=%GROUP%\IDLE (Python GUI).lnk
-  Command Options=%MAINDIR%\Tools\idle\idle.pyw
+  Command Options="%MAINDIR%\Tools\idle\idle.pyw"
   Working Directory=%MAINDIR%
   Key Type=1536
   Flags=00000001
@@ -1369,12 +1802,16 @@ end
 item: Create Shortcut
   Source=%MAINDIR%\pythonw.exe
   Destination=%GROUP%\Module Docs.lnk
-  Command Options=%MAINDIR%\Tools\Scripts\pydoc.pyw
+  Command Options="%MAINDIR%\Tools\Scripts\pydoc.pyw"
   Working Directory=%MAINDIR%
   Key Type=1536
   Flags=00000001
 end
 item: End Block
+end
+item: End Block
+end
+item: Remark
 end
 item: Create Shortcut
   Source=%MAINDIR%\unwise.exe
@@ -1383,44 +1820,23 @@ item: Create Shortcut
   Key Type=1536
   Flags=00000001
 end
-item: End Block
+item: Remark
+end
+item: Remark
+  Text=I don't think we need this, but have always done it.
 end
 item: Self-Register OCXs/DLLs
   Description=Updating System Configuration, Please Wait...
 end
-item: If/While Statement
-  Variable=COMPONENTS
-  Value=E
-  Flags=00001010
-end
-item: Install File
-  Source=%_SRC_%\..\tcl\bin\tcl8%_TCLMINOR_%.dll
-  Destination=%MAINDIR%\DLLs\tcl8%_TCLMINOR_%.dll
-  Description=Tcl/Tk binaries and libraries
-  Flags=0000000000000010
-end
-item: Install File
-  Source=%_SRC_%\..\tcl\bin\tk8%_TCLMINOR_%.dll
-  Destination=%MAINDIR%\DLLs\tk8%_TCLMINOR_%.dll
-  Description=Tcl/Tk binaries and libraries
-  Flags=0000000000000010
-end
-item: Install File
-  Source=%_SRC_%\..\tcl\lib\*.*
-  Destination=%MAINDIR%\tcl
-  Description=Tcl/Tk binaries and libraries
-  Flags=0000000100000010
-end
-item: End Block
+item: Remark
 end
 item: Wizard Block
   Direction Variable=DIRECTION
   Display Variable=DISPLAY
-  Bitmap Pathname=C:\Wise\DIALOGS\TEMPLATE\WIZARD.BMP
-  X Position=9
-  Y Position=10
-  Filler Color=8421440
-  Flags=00000011
+  Bitmap Pathname=%_WISE_%\Dialogs\Template\Wizard.bmp
+  X Position=0
+  Y Position=0
+  Filler Color=0
 end
 item: Custom Dialog Set
   Name=Finished
@@ -1508,4 +1924,13 @@ item: Custom Dialog Set
   end
 end
 item: End Block
+end
+item: New Event
+  Name=Cancel
+end
+item: Remark
+  Text=This include script supports a rollback to preinstallation state if the user chooses to cancel before the installation is complete.
+end
+item: Include Script
+  Pathname=%_WISE_%\INCLUDE\rollback.wse
 end
