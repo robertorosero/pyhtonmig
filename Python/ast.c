@@ -25,7 +25,9 @@ static expr_ty ast_for_testlist(const node *);
 /* Note different signature for call */
 static expr_ty ast_for_call(const node *, expr_ty);
 
-static PyObject *parsenumber(char *);
+static PyObject *parsenumber(const char *);
+static PyObject *parsestr(const char *s);
+static PyObject *parsestrplus(node *n);
 
 extern grammar _PyParser_Grammar; /* From graminit.c */
 
@@ -1444,9 +1446,9 @@ ast_for_stmt(const node *n)
 
 
 static PyObject *
-parsenumber(char *s)
+parsenumber(const char *s)
 {
-	char *end;
+	const char *end;
 	long x;
 	double dx;
 #ifndef WITHOUT_COMPLEX
@@ -1460,14 +1462,14 @@ parsenumber(char *s)
 	imflag = *end == 'j' || *end == 'J';
 #endif
 	if (*end == 'l' || *end == 'L')
-		return PyLong_FromString(s, (char **)0, 0);
+		return PyLong_FromString((char *)s, (char **)0, 0);
 	if (s[0] == '0')
-		x = (long) PyOS_strtoul((char *)s, &end, 0);
+		x = (long) PyOS_strtoul((char *)s, (char **)&end, 0);
 	else
-		x = PyOS_strtol(s, &end, 0);
+		x = PyOS_strtol((char *)s, (char **)&end, 0);
 	if (*end == '\0') {
 		if (errno != 0)
-			return PyLong_FromString(s, (char **)0, 0);
+			return PyLong_FromString((char *)s, (char **)0, 0);
 		return PyInt_FromLong(x);
 	}
 	/* XXX Huge floats may silently fail */
@@ -1487,4 +1489,187 @@ parsenumber(char *s)
 		PyFPE_END_PROTECT(dx)
 		return PyFloat_FromDouble(dx);
 	}
+}
+
+static PyObject *
+parsestr(const char *s)
+{
+	PyObject *v;
+	size_t len;
+	char *buf;
+	char *p;
+	const char *end;
+	int c;
+	int first = *s;
+	int quote = first;
+	int rawmode = 0;
+	int unicode = 0;
+
+	if (isalpha(quote) || quote == '_') {
+		if (quote == 'u' || quote == 'U') {
+			quote = *++s;
+			unicode = 1;
+		}
+		if (quote == 'r' || quote == 'R') {
+			quote = *++s;
+			rawmode = 1;
+		}
+	}
+	if (quote != '\'' && quote != '\"') {
+		PyErr_BadInternalCall();
+		return NULL;
+	}
+	s++;
+	len = strlen(s);
+	if (len > INT_MAX) {
+		PyErr_SetString(PyExc_OverflowError, 
+			  "string to parse is too long");
+		return NULL;
+	}
+	if (s[--len] != quote) {
+		PyErr_BadInternalCall();
+		return NULL;
+	}
+	if (len >= 4 && s[0] == quote && s[1] == quote) {
+		s += 2;
+		len -= 2;
+		if (s[--len] != quote || s[--len] != quote) {
+			PyErr_BadInternalCall();
+			return NULL;
+		}
+	}
+#ifdef Py_USING_UNICODE
+	if (unicode || Py_UnicodeFlag) {
+		if (rawmode)
+			v = PyUnicode_DecodeRawUnicodeEscape(
+				 s, len, NULL);
+		else
+			v = PyUnicode_DecodeUnicodeEscape(
+				s, len, NULL);
+		return v;
+			
+	}
+#endif
+	if (rawmode || strchr(s, '\\') == NULL)
+		return PyString_FromStringAndSize(s, len);
+	v = PyString_FromStringAndSize((char *)NULL, len);
+	if (v == NULL)
+		return NULL;
+	p = buf = PyString_AsString(v);
+	end = s + len;
+	while (s < end) {
+		if (*s != '\\') {
+			*p++ = *s++;
+			continue;
+		}
+		s++;
+		switch (*s++) {
+		/* XXX This assumes ASCII! */
+		case '\n': break;
+		case '\\': *p++ = '\\'; break;
+		case '\'': *p++ = '\''; break;
+		case '\"': *p++ = '\"'; break;
+		case 'b': *p++ = '\b'; break;
+		case 'f': *p++ = '\014'; break; /* FF */
+		case 't': *p++ = '\t'; break;
+		case 'n': *p++ = '\n'; break;
+		case 'r': *p++ = '\r'; break;
+		case 'v': *p++ = '\013'; break; /* VT */
+		case 'a': *p++ = '\007'; break; /* BEL, not classic C */
+		case '0': case '1': case '2': case '3':
+		case '4': case '5': case '6': case '7':
+			c = s[-1] - '0';
+			if ('0' <= *s && *s <= '7') {
+				c = (c<<3) + *s++ - '0';
+				if ('0' <= *s && *s <= '7')
+					c = (c<<3) + *s++ - '0';
+			}
+			*p++ = c;
+			break;
+		case 'x':
+			if (isxdigit(Py_CHARMASK(s[0])) 
+			    && isxdigit(Py_CHARMASK(s[1]))) {
+				unsigned int x = 0;
+				c = Py_CHARMASK(*s);
+				s++;
+				if (isdigit(c))
+					x = c - '0';
+				else if (islower(c))
+					x = 10 + c - 'a';
+				else
+					x = 10 + c - 'A';
+				x = x << 4;
+				c = Py_CHARMASK(*s);
+				s++;
+				if (isdigit(c))
+					x += c - '0';
+				else if (islower(c))
+					x += 10 + c - 'a';
+				else
+					x += 10 + c - 'A';
+				*p++ = x;
+				break;
+			}
+			Py_DECREF(v);
+			PyErr_SetString(PyExc_ValueError, 
+				  "invalid \\x escape");
+			return NULL;
+#ifndef Py_USING_UNICODE
+		case 'u':
+		case 'U':
+		case 'N':
+			if (unicode) {
+				Py_DECREF(v);
+				com_error(com, PyExc_ValueError,
+					  "Unicode escapes not legal "
+					  "when Unicode disabled");
+				return NULL;
+			}
+#endif
+		default:
+			*p++ = '\\';
+			*p++ = s[-1];
+			break;
+		}
+	}
+	_PyString_Resize(&v, (int)(p - buf));
+	return v;
+}
+
+static PyObject *
+parsestrplus(node *n)
+{
+	PyObject *v;
+	int i;
+	REQ(CHILD(n, 0), STRING);
+	if ((v = parsestr(STR(CHILD(n, 0)))) != NULL) {
+		/* String literal concatenation */
+		for (i = 1; i < NCH(n); i++) {
+		    PyObject *s;
+		    s = parsestr(STR(CHILD(n, i)));
+		    if (s == NULL)
+			goto onError;
+		    if (PyString_Check(v) && PyString_Check(s)) {
+			PyString_ConcatAndDel(&v, s);
+			if (v == NULL)
+			    goto onError;
+		    }
+#ifdef Py_USING_UNICODE
+		    else {
+			PyObject *temp;
+			temp = PyUnicode_Concat(v, s);
+			Py_DECREF(s);
+			if (temp == NULL)
+			    goto onError;
+			Py_DECREF(v);
+			v = temp;
+		    }
+#endif
+		}
+	}
+	return v;
+
+ onError:
+	Py_XDECREF(v);
+	return NULL;
 }
