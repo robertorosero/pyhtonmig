@@ -1086,46 +1086,6 @@ string_swapcase(self, args)
 	return new;
 }
 
-static PyObject *
-string_atol(self, args)
-	PyStringObject *self;
-	PyObject *args;
-{
-	char *s = PyString_AS_STRING(self), *end;
-	int base = 10;
-	PyObject *x;
-	char buffer[256]; /* For errors */
-
-	if (!PyArg_ParseTuple(args, "|i", &base))
-		return NULL;
-
-	if ((base != 0 && base < 2) || base > 36) {
-		PyErr_SetString(PyExc_ValueError, "invalid base for atol()");
-		return NULL;
-	}
-
-	while (*s && isspace(Py_CHARMASK(*s)))
-		s++;
-	if (s[0] == '\0') {
-		PyErr_SetString(PyExc_ValueError, "empty string for atol()");
-		return NULL;
-	}
-	x = PyLong_FromString(s, &end, base);
-	if (x == NULL)
-		return NULL;
-	if (base == 0 && (*end == 'l' || *end == 'L'))
-		end++;
-	while (*end && isspace(Py_CHARMASK(*end)))
-		end++;
-	if (*end != '\0') {
-		sprintf(buffer, "invalid literal for atol(): %.200s", s);
-		PyErr_SetString(PyExc_ValueError, buffer);
-		Py_DECREF(x);
-		return NULL;
-	}
-	return x;
-}
-
 
 static char translate__doc__[] =
 "S.translate(table [,deletechars]) -> string\n\
