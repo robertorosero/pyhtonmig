@@ -1847,10 +1847,7 @@ eval_code2(PyCodeObject *co, PyObject *globals, PyObject *locals,
 		case FOR_ITER:
 			/* before: [iter]; after: [iter, iter()] *or* [] */
 			v = TOP();
-			if (PyIter_Check(v)) /* Speed-up common case */
-				x = v->ob_type->tp_call(v, NULL, NULL);
-			else
-				x = PyObject_CallObject(v, NULL);
+			x = PyObject_CallObject(v, NULL);
 			if (x == NULL) {
 				if (PyErr_ExceptionMatches(PyExc_IndexError)) {
 					PyErr_Clear();
