@@ -286,6 +286,13 @@ set_context(expr_ty e, expr_context_ty ctx)
         default:
 	    /* XXX It's not clear why were't getting into this code,
 	       although list comps seem like one possibility.
+
+               This occurs in at least 2 cases:
+                 [x(i) for i in range(3)] # Call_kind (8)
+                 [i*2 for i in range(3)]  # BinOp_kind (2)
+
+               The byte code generated seems to work fine.
+               Maybe there's a problem with nested list comps?
 	    */
 	    fprintf(stderr, "can't set context for %d\n", e->kind);
             return 0;
@@ -712,14 +719,14 @@ ast_for_listcomp(const node *n)
 		ch = CHILD(ch, 0);
 		REQ(ch, list_if);
 
-		asdl_seq_APPEND(ifs, CHILD(ch, 1));
+		asdl_seq_APPEND(ifs, ast_for_expr(CHILD(ch, 1)));
 		if (NCH(ch) == 3)
 		    ch = CHILD(ch, 2);
 	    }
-	    /* XXX ifs is leaked, we surely have to do something with it */
 	    /* on exit, must guarantee that ch is a list_for */
 	    if (TYPE(ch) == list_iter)
 		ch = CHILD(ch, 0);
+            c->ifs = ifs;
 	}
 	asdl_seq_APPEND(listcomps, c);
     }

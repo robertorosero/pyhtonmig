@@ -25,10 +25,14 @@ int Py_OptimizeFlag = 0;
        LOAD_NAME is output instead of LOAD_GLOBAL
 
      4:
-       typing Ctrl-C seg faults
+       line numbers are off a bit (may just need to add calls to set lineno
 
      5:
-       line numbers are off
+       Modules/parsermodule.c:496: warning: implicit declaration 
+                                   of function `PyParser_SimpleParseString'
+
+     6:
+       while loops with try/except in them don't work
 */
 
 /* fblockinfo tracks the current frame block.
@@ -934,6 +938,10 @@ compiler_while(struct compiler *c, stmt_ty s)
 	/* XXX should the two POP instructions be in a separate block
 	   if there is no else clause ?
 	*/
+
+        /* sometimes this needs to be compiler_use_next_block 
+           (e.g., nested loops), but if the code is
+           while XXX: try: ... this is correct */
 	compiler_use_block(c, anchor);
 	ADDOP(c, POP_TOP);
 	ADDOP(c, POP_BLOCK);
@@ -1227,8 +1235,7 @@ compiler_visit_stmt(struct compiler *c, stmt_ty s)
 {
 	int i, n;
 
-	fprintf(stderr, "compile stmt %d lineno %d\n",
-		s->kind, s->lineno);
+	fprintf(stderr, "compile stmt %d lineno %d\n", s->kind, s->lineno);
 	c->u->u_lineno = s->lineno;
 	c->u->u_lineno_set = false;
 	switch (s->kind) {
@@ -1676,44 +1683,64 @@ compiler_call(struct compiler *c, expr_ty e)
 }
 
 static int
-compiler_listcomp_generator(struct compiler *c, listcomp_ty l, expr_ty elt)
+compiler_listcomp_generator(struct compiler *c, 
+                            asdl_seq *generators, int gen_index, 
+                            expr_ty elt)
 {
 	/* generate code for the iterator, then each of the ifs,
 	   and then write to the element */
 	
-	int start, anchor, skip, i, n;
+	listcomp_ty l;
+	int start, anchor, skip, if_cleanup, i, n;
 
 	start = compiler_new_block(c);
 	skip = compiler_new_block(c);
+	if_cleanup = compiler_new_block(c);
 	anchor = compiler_new_block(c);
 	
+	l = asdl_seq_GET(generators, gen_index);
 	VISIT(c, expr, l->iter);
 	ADDOP(c, GET_ITER);
 	compiler_use_next_block(c, start);
 	ADDOP_JREL(c, FOR_ITER, anchor);
 	NEXT_BLOCK(c);
 	VISIT(c, expr, l->target);
-	
+
+        /* XXX this needs to be cleaned up...a lot! */
 	n = asdl_seq_LEN(l->ifs);
 	for (i = 0; i < n; i++) {
 		expr_ty e = asdl_seq_GET(l->ifs, i);
 		VISIT(c, expr, e);
-		/* XXX not anchor? */
-		ADDOP_JREL(c, JUMP_IF_FALSE, skip);
+		ADDOP_JREL(c, JUMP_IF_FALSE, if_cleanup);
 		NEXT_BLOCK(c);
-		ADDOP(c, DUP_TOP);
+		ADDOP(c, POP_TOP);
 	} 
 
-	if (!compiler_nameop(c, c->u->u_tmp, Load))
-		return 0;
-	VISIT(c, expr, elt);
-	ADDOP_I(c, CALL_FUNCTION, 1);
-	ADDOP(c, POP_TOP);
+        if (++gen_index < asdl_seq_LEN(generators))
+            if (!compiler_listcomp_generator(c, generators, gen_index, elt))
+                return 0;
 
-	compiler_use_next_block(c, skip);
+        /* only append after the last for generator */
+        if (gen_index >= asdl_seq_LEN(generators)) {
+            if (!compiler_nameop(c, c->u->u_tmp, Load))
+		return 0;
+            VISIT(c, expr, elt);
+            ADDOP_I(c, CALL_FUNCTION, 1);
+            ADDOP(c, POP_TOP);
+
+            compiler_use_next_block(c, skip);
+        }
+	for (i = 0; i < n; i++) {
+		ADDOP_I(c, JUMP_FORWARD, 1);
+                if (i == 0)
+                    compiler_use_next_block(c, if_cleanup);
+		ADDOP(c, POP_TOP);
+	} 
 	ADDOP_JABS(c, JUMP_ABSOLUTE, start);
 	compiler_use_next_block(c, anchor);
-	if (!compiler_nameop(c, c->u->u_tmp, Del))
+        /* delete the append method added to locals */
+	if (gen_index == 1)
+            if (!compiler_nameop(c, c->u->u_tmp, Del))
 		return 0;
 	
 	return 1;
@@ -1722,7 +1749,6 @@ compiler_listcomp_generator(struct compiler *c, listcomp_ty l, expr_ty elt)
 static int
 compiler_listcomp(struct compiler *c, expr_ty e)
 {
-	int i;
 	char tmpname[256];
 	identifier tmp;
 	static identifier append;
@@ -1745,12 +1771,8 @@ compiler_listcomp(struct compiler *c, expr_ty e)
 	if (!compiler_nameop(c, tmp, Store))
 		return 0;
 	c->u->u_tmp = tmp;
-	for (i = 0; i < asdl_seq_LEN(generators); i++) {
-		if (!compiler_listcomp_generator(c,
-						 asdl_seq_GET(generators, i),
-						 e->v.ListComp.elt))
-			return 0;
-	}
+	if (!compiler_listcomp_generator(c, generators, 0, e->v.ListComp.elt))
+		return 0;
 	c->u->u_tmp = NULL;
 	return 1;
 }
@@ -2475,7 +2497,7 @@ assemble(struct compiler *c)
 	for (i = a.a_nblocks - 1; i >= 0; i--) {
 		struct basicblock *b = c->u->u_blocks[a.a_postorder[i]];
 		fprintf(stderr, 
-			"\nblock %d: order=%d used=%d alloc=%d next=%d\n",
+                        "\nblock %d: order=%d used=%d alloc=%d next=%d\n",
 			i, a.a_postorder[i], b->b_iused, b->b_ialloc,
 			b->b_next);
 		for (j = 0; j < b->b_iused; j++) {
