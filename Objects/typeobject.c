@@ -967,6 +967,52 @@ static struct wrapperbase tab_repr[] = {
 	{0}
 };
 
+static struct wrapperbase tab_getattr[] = {
+	{"__getattr__", (wrapperfunc)wrap_binaryfunc,
+	 "x.__getattr__('name') <==> x.name"},
+	{0}
+};
+
+static PyObject *
+wrap_setattr(PyObject *self, PyObject *args, void *wrapped)
+{
+	setattrofunc func = (setattrofunc)wrapped;
+	int res;
+	PyObject *name, *value;
+
+	if (!PyArg_ParseTuple(args, "OO", &name, &value))
+		return NULL;
+	res = (*func)(self, name, value);
+	if (res < 0)
+		return NULL;
+	Py_INCREF(Py_None);
+	return Py_None;
+}
+
+static PyObject *
+wrap_delattr(PyObject *self, PyObject *args, void *wrapped)
+{
+	setattrofunc func = (setattrofunc)wrapped;
+	int res;
+	PyObject *name;
+
+	if (!PyArg_ParseTuple(args, "O", &name))
+		return NULL;
+	res = (*func)(self, name, NULL);
+	if (res < 0)
+		return NULL;
+	Py_INCREF(Py_None);
+	return Py_None;
+}
+
+static struct wrapperbase tab_setattr[] = {
+	{"__setattr__", (wrapperfunc)wrap_setattr,
+	 "x.__setattr__('name', value) <==> x.name = value"},
+	{"__delattr__", (wrapperfunc)wrap_delattr,
+	 "x.__delattr__('name') <==> del x.name"},
+	{0}
+};
+
 static PyObject *
 wrap_hashfunc(PyObject *self, PyObject *args, void *wrapped)
 {
@@ -1184,7 +1230,8 @@ add_operators(PyTypeObject *type)
 		ADD(nb->nb_inplace_or, tab_ior);
 	}
 
-	/* Not yet supported: __getattr__, __setattr__ */
+	ADD(type->tp_getattro, tab_getattr);
+	ADD(type->tp_setattro, tab_setattr);
 	ADD(type->tp_compare, tab_cmp);
 	ADD(type->tp_repr, tab_repr);
 	ADD(type->tp_hash, tab_hash);
@@ -1383,6 +1430,45 @@ slot_tp_call(PyObject *self, PyObject *args, PyObject *kwds)
 
 SLOT0(tp_str, str);
 
+static PyObject *
+slot_tp_getattro(PyObject *self, PyObject *name)
+{
+	PyTypeObject *tp = self->ob_type;
+	PyObject *dict = NULL;
+	PyObject *getattr;
+
+	if (tp->tp_flags & Py_TPFLAGS_HEAPTYPE)
+		dict = tp->tp_dict;
+	if (dict == NULL) {
+		PyErr_Format(PyExc_SystemError,
+			     "'%.100s' type object has no __dict__???",
+			     tp->tp_name);
+		return NULL;
+	}
+	getattr = PyDict_GetItemString(dict, "__getattr__");
+	if (getattr == NULL) {
+		PyErr_SetString(PyExc_AttributeError, "__getattr__");
+		return NULL;
+	}
+	return PyObject_CallFunction(getattr, "OO", self, name);
+}
+
+static int
+slot_tp_setattro(PyObject *self, PyObject *name, PyObject *value)
+{
+	PyObject *res;
+
+	if (value == NULL)
+		res = PyObject_CallMethod(self, "__delattr__", "O", name);
+	else
+		res = PyObject_CallMethod(self, "__setattr__",
+					  "OO", name, value);
+	if (res == NULL)
+		return -1;
+	Py_DECREF(res);
+	return 0;
+}
+
 /* Map rich comparison operators to their __xx__ namesakes */
 static char *name_op[] = {
 	"__lt__",
@@ -1529,6 +1615,8 @@ override_slots(PyTypeObject *type, PyObject *dict)
 	TPSLOT(hash, tp_hash);
 	TPSLOT(call, tp_call);
 	TPSLOT(str, tp_str);
+	TPSLOT(getattr, tp_getattro);
+	TPSLOT(setattr, tp_setattro);
 	TPSLOT(lt, tp_richcompare);
 	TPSLOT(le, tp_richcompare);
 	TPSLOT(eq, tp_richcompare);
