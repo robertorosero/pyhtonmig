@@ -12,6 +12,7 @@ struct _symtable_entry;
 struct symtable {
 	const char *st_filename; /* name of file being compiled */
 	struct _symtable_entry *st_cur; /* current symbol table entry */
+	struct _symtable_entry *st_top; /* module entry */
 	PyObject *st_symbols;    /* dictionary of symbol table entries */
         PyObject *st_stack;      /* stack of namespace info */
 	PyObject *st_global;     /* borrowed ref to MODULE in st_symbols */
@@ -29,12 +30,12 @@ typedef struct _symtable_entry {
 	PyObject *ste_varnames;  /* list of variable names */
 	PyObject *ste_children;  /* list of child ids */
 	block_ty ste_type;       /* module, class, or function */
-	int ste_lineno;          /* first line of block */
-	int ste_optimized;       /* true if namespace can't be optimized */
-	int ste_nested;          /* true if block is nested */
-	int ste_child_free;      /* true if a child block has free variables,
+	int ste_optimized : 1;   /* true if namespace can't be optimized */
+	int ste_nested : 1;      /* true if block is nested */
+	int ste_child_free : 1;  /* true if a child block has free variables,
 				    including free refs to globals */
-	int ste_generator;       /* true if namespace is a generator */
+	int ste_generator : 1;   /* true if namespace is a generator */
+	int ste_lineno;          /* first line of block */
 	int ste_opt_lineno;      /* lineno of last exec or import * */
 	struct symtable *ste_table;
 } PySTEntryObject;
