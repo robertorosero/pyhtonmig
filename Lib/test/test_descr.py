@@ -298,12 +298,13 @@ def pydicts():
     a[42] = 24
     verify(a[42] == 24)
     if verbose: print "pydict stress test ..."
-    for i in range(100):
+    N = 50
+    for i in range(N):
         a[i] = C()
-        for j in range(100):
+        for j in range(N):
             a[i][j] = i*j
-    for i in range(100):
-        for j in range(100):
+    for i in range(N):
+        for j in range(N):
             verify(a[i][j] == i*j)
 
 def metaclass():
@@ -378,6 +379,38 @@ def multi():
     verify(d.getstate() == 0)
     d.setstate(10)
     verify(d.getstate() == 10)
+    verify(D.__mro__ == (D, dictionary, C, object))
+
+def diamond():
+    if verbose: print "Testing multiple inheritance special cases..."
+    class A(object):
+        def spam(self): return "A"
+    verify(A().spam() == "A")
+    class B(A):
+        def boo(self): return "B"
+        def spam(self): return "B"
+    verify(B().spam() == "B")
+    verify(B().boo() == "B")
+    class C(A):
+        def boo(self): return "C"
+    verify(C().spam() == "A")
+    verify(C().boo() == "C")
+    class D(B, C): pass
+    verify(D().spam() == "B")
+    verify(D().boo() == "B")
+    verify(D.__mro__ == (D, B, C, A, object))
+    class E(C, B): pass
+    verify(E().spam() == "B")
+    verify(E().boo() == "C")
+    verify(E.__mro__ == (E, C, B, A, object))
+    class F(D, E): pass
+    verify(F().spam() == "B")
+    verify(F().boo() == "B")
+    verify(F.__mro__ == (F, D, E, B, C, A, object))
+    class G(E, D): pass
+    verify(G().spam() == "B")
+    verify(G().boo() == "C")
+    verify(G.__mro__ == (G, E, D, C, B, A, object))
 
 def all():
     lists()
@@ -391,6 +424,7 @@ def all():
     metaclass()
     pymods()
     multi()
+    diamond()
 
 all()
 
