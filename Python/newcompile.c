@@ -44,6 +44,13 @@ int Py_OptimizeFlag = 0;
      #: Modules/parsermodule.c:496: warning: implicit declaration 
                                     of function `PyParser_SimpleParseString'
      #: compile.h::b_return is only set, never used
+
+    ISSUES:
+
+     Tim mentioned that it's more common for a basic blocks representation
+     to use real pointers for jump targets rather than indexes into an
+     array of basic blocks.
+    
 */
 
 /* fblockinfo tracks the current frame block.
