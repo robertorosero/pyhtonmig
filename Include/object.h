@@ -265,6 +265,8 @@ typedef struct _typeobject {
 	PyObject *tp_dict;
 	descrgetfunc tp_descr_get;
 	descrsetfunc tp_descr_set;
+	unaryfunc tp_construct;
+
 
 #ifdef COUNT_ALLOCS
 	/* these must be last and never explicitly initialized */
@@ -275,9 +277,15 @@ typedef struct _typeobject {
 #endif
 } PyTypeObject;
 
+
+/* Generic type check */
+extern DL_IMPORT(int) _PyObject_TypeCheck(PyObject *, PyTypeObject *);
+#define PyObject_TypeCheck(ob, tp) \
+	((ob)->ob_type == (tp) || _PyObject_TypeCheck(ob, tp))
+
 extern DL_IMPORT(PyTypeObject) PyType_Type; /* The type of type objects */
 
-#define PyType_Check(op) ((op)->ob_type == &PyType_Type)
+#define PyType_Check(op) PyObject_TypeCheck(op, &PyType_Type)
 
 extern DL_IMPORT(int) PyType_InitDict(PyTypeObject *);
 
