@@ -266,6 +266,7 @@ def pydicts():
     verify(d.__class__ is DT)
     verify(isinstance(d, DT))
     class C(DT):
+        state = -1
         def __getitem__(self, key):
             return self.get(key, 0)
         def __setitem__(self, key, value):
@@ -277,12 +278,8 @@ def pydicts():
             return self.state
     verify(issubclass(C, DT))
     a = C()
-    try:
-        a.getstate()
-    except AttributeError:
-        pass
-    else:
-        raise TestFailed, "undefined getstate() didn't raise AttributeError"
+    verify(a.state == -1)
+    verify(a.getstate() == -1)
     a.setstate(0)
     verify(a.state == 0)
     verify(a.getstate() == 0)
