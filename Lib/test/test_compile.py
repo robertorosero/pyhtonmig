@@ -1,81 +1,114 @@
-from test.test_support import verbose, TestFailed
+"""Test a variety of compilation edge cases.
 
-if verbose:
-    print "Testing whether compiler catches assignment to __debug__"
+Several ways to assign to __debug__
+-----------------------------------
 
-try:
-    compile('__debug__ = 1', '?', 'single')
-except SyntaxError:
-    pass
+>>> __debug__ = 1
+Traceback (most recent call last):
+ ...
+SyntaxError: can not assign to __debug__ (<string>, line 1)
 
-import __builtin__
-prev = __builtin__.__debug__
-setattr(__builtin__, '__debug__', 'sure')
-setattr(__builtin__, '__debug__', prev)
+>>> import __debug__
+Traceback (most recent call last):
+ ...
+SyntaxError: can not assign to __debug__ (<string>, line 1)
 
-if verbose:
-    print 'Running tests on argument handling'
+>>> try:
+...     1
+... except MemoryError, __debug__:
+...     pass
+Traceback (most recent call last):
+ ...
+SyntaxError: can not assign to __debug__ (<string>, line 2)
 
-try:
-    exec 'def f(a, a): pass'
-    raise TestFailed, "duplicate arguments"
-except SyntaxError:
-    pass
+Shouldn't that be line 3?
 
-if verbose:
-    print "compiling string with syntax error"
+>>> def __debug__():
+...     pass
+Traceback (most recent call last):
+ ...
+SyntaxError: can not assign to __debug__ (<string>, line 1)
 
-try:
-    compile("1+*3", "filename", "exec")
-except SyntaxError, detail:
-    if not detail.filename == "filename":
-        raise TestFailed, "expected 'filename', got %r" % detail.filename
+Not sure what the next few lines is trying to test.
 
-try:
-    exec 'def f(a = 0, a = 1): pass'
-    raise TestFailed, "duplicate keyword arguments"
-except SyntaxError:
-    pass
+>>> import __builtin__
+>>> prev = __builtin__.__debug__
+>>> setattr(__builtin__, "__debug__", "sure")
+>>> setattr(__builtin__, "__debug__", prev)
 
-try:
-    exec 'def f(a): global a; a = 1'
-    raise TestFailed, "variable is global and local"
-except SyntaxError:
-    pass
+Parameter passing
+-----------------
 
-if verbose:
-    print "testing complex args"
+>>> def f(a = 0, a = 1):
+...     pass
+Traceback (most recent call last):
+ ...
+SyntaxError: duplicate argument 'a' in function definition (<string>, line 1)
 
-def comp_args((a, b)):
-    print a,b
+Details of SyntaxError object
+-----------------------------
 
-comp_args((1, 2))
+>>> 1+*3
+Traceback (most recent call last):
+ ...
+SyntaxError: invalid syntax
 
-def comp_args((a, b)=(3, 4)):
-    print a, b
+In this case, let's explore the details fields of the exception object.
+>>> try:
+...     compile("1+*3", "filename", "exec")
+... except SyntaxError, err:
+...     pass
+>>> err.filename, err.lineno, err.offset
+('filename', 1, 3)
+>>> err.text, err.msg
+('1+*3', 'invalid syntax')
 
-comp_args((1, 2))
-comp_args()
+Complex parameter passing
+-------------------------
 
-def comp_args(a, (b, c)):
-    print a, b, c
+>>> def comp_params((a, b)):
+...     print a, b
+>>> comp_params((1, 2))
+1 2
 
-comp_args(1, (2, 3))
+>>> def comp_params((a, b)=(3, 4)):
+...     print a, b
+>>> comp_params((1, 2))
+1 2
+>>> comp_params()
+3 4
 
-def comp_args(a=2, (b, c)=(3, 4)):
-    print a, b, c
+>>> def comp_params(a, (b, c)):
+...     print a, b, c
+>>> comp_params(1, (2, 3))
+1 2 3
 
-comp_args(1, (2, 3))
-comp_args()
+>>> def comp_params(a=2, (b, c)=(3, 4)):
+...     print a, b, c
+>>> comp_params(1, (2, 3))
+1 2 3
+>>> comp_params()
+2 3 4
 
-try:
-    exec 'def f(a=1, (b, c)): pass'
-    raise TestFailed, "non-default args after default"
-except SyntaxError:
-    pass
+"""
 
-if verbose:
-    print "testing bad float literals"
+from test.test_support import verbose, TestFailed, run_doctest
+
+##try:
+##    exec 'def f(a): global a; a = 1'
+##    raise TestFailed, "variable is global and local"
+##except SyntaxError:
+##    pass
+
+##try:
+##    exec 'def f(a=1, (b, c)): pass'
+##    raise TestFailed, "non-default args after default"
+##except SyntaxError:
+##    pass
+
+# It takes less space to deal with bad float literals using a helper
+# function than it does with doctest.  The doctest needs to include
+# the exception every time.
 
 def expect_error(s):
     try:
@@ -156,3 +189,7 @@ exec """
 expect_same(all_one_bits, -1)
 expect_same("-" + all_one_bits, 1)
 """
+
+def test_main(verbose=None):
+    from test import test_compile
+    run_doctest(test_compile, verbose)
