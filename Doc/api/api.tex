@@ -1785,7 +1785,10 @@ Returns the length of the string in string object \var{string}.
 \end{cfuncdesc}
 
 \begin{cfuncdesc}{char*}{PyString_AsString}{PyObject *string}
-Resturns a \NULL{} terminated representation of the contents of \var{string}.
+Returns a \NULL{} terminated representation of the contents of
+\var{string}.  The pointer refers to the internal buffer of
+\var{string}, not a copy.  The data must not be modified in any way.
+It must not be de-allocated.
 \end{cfuncdesc}
 
 \begin{cfuncdesc}{void}{PyString_Concat}{PyObject **string,
