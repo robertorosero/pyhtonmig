@@ -294,7 +294,7 @@ The ``Hello, world'' of csv reading is
 
 \begin{verbatim}
 import csv
-reader = csv.reader(file("some.csv"))
+reader = csv.reader(open("some.csv"))
 for row in reader:
     print row
 \end{verbatim}
@@ -303,7 +303,7 @@ The corresponding simplest possible writing example is
 
 \begin{verbatim}
 import csv
-writer = csv.writer(file("some.csv", "w"))
+writer = csv.writer(open("some.csv", "w"))
 for row in someiterable:
     writer.writerow(row)
 \end{verbatim}
