@@ -66,6 +66,13 @@ fi])
 
 echo checking for --with-thread
 AC_WITH(thread, [
+if test -d "$withval"
+then LIBS="$LIBS -L$withval"
+fi
+AC_HAVE_LIBRARY(pthreads, [AC_DEFINE(WITH_THREAD)
+AC_DEFINE(_POSIX_THREADS)
+LIBS="$LIBS -lpthreads"
+LIBOBJS="$LIBOBJS thread.o"])
 AC_HAVE_LIBRARY(mpc, [AC_DEFINE(WITH_THREAD)
 LIBS="$LIBS -lmpc"
 LIBOBJS="$LIBOBJS thread.o"])
