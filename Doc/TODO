@@ -1,10 +1,45 @@
 PYTHON DOCUMENTATION TO-DO LIST			-*- indented-text -*-
 ===============================
 
+-------------------------------------------------------------
+This list pertains only to the 1.5.2p2 documentation release.
+-------------------------------------------------------------
+
+
+Python/C API
+------------
 
 * The "Very High Level Interface" in the API document has been
   requested; I guess it wouldn't hurt to fill in a bit there.  Request 
   by Albert Hofkamp <a.hofkamp@wtb.tue.nl>.  (Partly done.)
+
+* Python/C API reference is missing PyArg_ParseTuple(),
+  PyArg_ParseTupleAndKeywords(), Py_BuildValue().  Information
+  requested by Greg Kochanski <gpk@bell-labs.com>.
+
+* PyEval_EvalCode() must also be documented.  Ask Guido about source
+  comment: "Backward compatible interface".
+
+* Break up the PyBufferProcs description so that the function types
+  are independently described.  Perhaps break the chapter into
+  sections for each of the *Procs interfaces.
+
+* Make sure the reference count behavior of all the "exceptional"
+  cases in the C API is documented in the API manual, and mentioned in 
+  the extension manual if the function is mentioned.
+
+* Ask Vladimir Marangozov <marangoz@python.inrialpes.fr> to document
+  the memory allocation APIs; this could be part of his proposed
+  cleanup.  ;)
+
+* PyErr_SetInterrupt():  XXX comment about platform dependence should
+  be resolved, or explain the problem.  Ask Guido for explanation.
+
+* PySys_SetArgv() impl. doesn't seem consistent in allowing 0/NULL for
+  the params; check w/ Guido.
+
+Extending & Embedding
+---------------------
 
 * Describe implementing types in C, including use of the 'self'
   parameter to the method implementation function.  (Missing material
@@ -17,9 +52,8 @@ PYTHON DOCUMENTATION TO-DO LIST			-*- indented-text -*-
   Also noted by Albert Hofkamp <a.hofkamp@wtb.tue.nl>.
 
 * Update the pickle documentation to describe all of the current
-  behavior; only a subset is described.  __reduce__, etc.
-
-* Update the code/codeop module documentation.
+  behavior; only a subset is described.  __reduce__, etc.  Partial
+  update submitted by Jim Kerr <jbkerr@sr.hp.com>.
 
 * In the indexes, some subitem entries are separated from the item
   entries by column- or page-breaks.  Reported by Lorenzo M. Catucci
@@ -28,21 +62,10 @@ PYTHON DOCUMENTATION TO-DO LIST			-*- indented-text -*-
   and the first index entry get separated -- can change as soon as we
   change the index entries in the text.)
 
-* Fix problem with howto documents getting the last module synopsis
-  twice (in \localmoduletable) so we can get rid of the ugly 'uniq'
-  hack in tools/mkhowto.sh.  (Probably not worth the trouble of
-  fixing.)
 
-* Figure out HTMLHelp generation for the Windows world.
+Library Reference
+-----------------
 
-* Straighten out random/whrandom.
-
-
-BEFORE NEXT PYTHON RELEASE, BUT NOT UNTIL THEN:
-
-* Document that the mode parameter to wave.open() may be omitted, and
-  how it is determined if omitted.  (Same of aifc, sunau open()
-  functions.)
-
-* Document that fpformat.NotANumber is a subclass of ValueError, has
-  the string that failed as the "exception value".
+* Straighten out random/whrandom.  Things are generally in the right
+  place, but need to respond to comments in email from Jan Kim
+  <kim@mpiz-koeln.mpg.de>.
