@@ -4,6 +4,8 @@
 #include "Python.h"
 #include "structmember.h"
 
+staticforward int add_members(PyTypeObject *, struct memberlist *);
+
 struct memberlist type_members[] = {
 	{"__name__", T_STRING, offsetof(PyTypeObject, tp_name), READONLY},
 	{"__doc__", T_STRING, offsetof(PyTypeObject, tp_doc), READONLY},
@@ -87,59 +89,6 @@ type_call(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	return res;
 }
 
-static PyObject *
-type_getattro(PyTypeObject *type, PyObject *name)
-{
-	PyTypeObject *tp = type->ob_type; /* Usually == &PyType_Type below */
-	PyObject *descr;
-	descrgetfunc f;
-
-	assert(PyString_Check(name));
-
-	/* Complications: some attributes, like __class__ and __repr__, occur
-	   in the type's dict as well as in the metatype's dict.  The
-	   descriptor in the type's dict is for attributes of its instances,
-	   while the descriptor in the metatype's dict is for the attributes
-	   of the type.  Rule: if the descriptor found in the metatype's dict
-	   describes data, it wins; otherwise anything found in the type's
-	   dict wins. */
-
-	if (tp->tp_flags & Py_TPFLAGS_HAVE_CLASS) {
-		if (tp->tp_dict == NULL) {
-			if (PyType_InitDict(tp) < 0)
-				return NULL;
-		}
-		descr = PyDict_GetItem(tp->tp_dict, name);
-		if (descr != NULL && PyDescr_IsData(descr) &&
-		    (f = descr->ob_type->tp_descr_get) != NULL)
-			return (*f)(descr, (PyObject *)type);
-	}
-
-	if (type->tp_flags & Py_TPFLAGS_HAVE_CLASS) {
-		descr = PyDict_GetItem(type->tp_dict, name);
-		if (descr != NULL) {
-			f = descr->ob_type->tp_descr_get;
-			if (f != NULL)
-				return (*f)(descr, NULL);
-			/* Not a descriptor -- a plain value */
-			Py_INCREF(descr);
-			return descr;
-		}
-	}
-
-	if (tp->tp_flags & Py_TPFLAGS_HAVE_CLASS) {
-		descr = PyDict_GetItem(tp->tp_dict, name);
-		if (descr != NULL &&
-		    (f = descr->ob_type->tp_descr_get) != NULL)
-			return (*f)(descr, (PyObject *)type);
-	}
-
-	PyErr_Format(PyExc_AttributeError,
-		     "type '%.50s' has no attribute '%.400s'",
-		     type->tp_name, PyString_AS_STRING(name));
-	return NULL;
-}
-
 /* Helpers for subtyping */
 
 static PyObject *
@@ -161,55 +110,17 @@ subtype_construct(PyObject *self, PyObject *args, PyObject *kwds)
 static void
 subtype_dealloc(PyObject *self)
 {
-	self->ob_type->tp_base->tp_dealloc(self);
-	Py_DECREF(self->ob_type);
-}
-
-static PyObject *
-subtype_getattro(PyObject *self, PyObject *name)
-{
-	int dictoffset = self->ob_type->tp_members[0].offset;
-	PyObject *dict = * (PyObject **) ((char *)self + dictoffset);
-
-	if (dict != NULL) {
-		PyObject *res = PyObject_GetItem(dict, name);
-		if (res != NULL)
-			return res;
-		PyErr_Clear();
-	}
-	return PyGeneric_GetAttr(self, name);
-}
-
-static int
-subtype_setattro(PyObject *self, PyObject *name, PyObject *value)
-{
-	PyTypeObject *tp = self->ob_type;
-	PyObject *descr;
-
-	assert(tp->tp_dict != NULL && PyDict_Check(tp->tp_dict));
-	descr = PyDict_GetItem(tp->tp_dict, name);
-	if (descr == NULL || descr->ob_type->tp_descr_set == NULL) {
-		int dictoffset = self->ob_type->tp_members[0].offset;
+	int dictoffset = self->ob_type->tp_dictoffset;
+	if (dictoffset && !self->ob_type->tp_base->tp_dictoffset) {
 		PyObject **dictptr = (PyObject **) ((char *)self + dictoffset);
 		PyObject *dict = *dictptr;
-
-		if (dict == NULL) {
-			dict = PyDict_New();
-			if (dict == NULL)
-				return -1;
-			*dictptr = dict;
+		if (dict != NULL) {
+			Py_DECREF(dict);
+			*dictptr = NULL;
 		}
-		if (value == NULL) {
-			int res = PyObject_DelItem(dict, name);
-			if (res < 0 &&
-			    PyErr_ExceptionMatches(PyExc_KeyError))
-				PyErr_SetObject(PyExc_AttributeError, name);
-			return res;
-		}
-		else
-			return PyObject_SetItem(dict, name, value);
 	}
-	return PyGeneric_SetAttr(self, name, value);
+	self->ob_type->tp_base->tp_dealloc(self);
+	Py_DECREF(self->ob_type);
 }
 
 staticforward void override_slots(PyTypeObject *type, PyObject *dict);
@@ -237,6 +148,7 @@ type_construct(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	etype *et;
 	struct memberlist *mp;
 
+	/* Check arguments */
 	if (type != NULL) {
 		PyErr_SetString(PyExc_TypeError,
 				"can't construct a preallocated type");
@@ -266,6 +178,8 @@ type_construct(PyTypeObject *type, PyObject *args, PyObject *kwds)
 				"base type must be a type");
 		return NULL;
 	}
+
+	/* Allocate memory and construct a type object in it */
 	et = PyObject_MALLOC(sizeof(etype) + strlen(name));
 	if (et == NULL)
 		return NULL;
@@ -278,36 +192,46 @@ type_construct(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	type->tp_as_buffer = &et->as_buffer;
 	type->tp_name = strcpy(et->name, name);
 	type->tp_flags = Py_TPFLAGS_DEFAULT;
+
+	/* Copy slots and dict from the base type */
 	Py_INCREF(base);
 	type->tp_base = base;
-	if (base->tp_construct)
-		type->tp_construct = subtype_construct;
-	if (base->tp_dealloc)
-		type->tp_dealloc = subtype_dealloc;
-	if (base->tp_getattro == NULL ||
-	    base->tp_getattro == PyGeneric_GetAttr) {
-		type->tp_getattro = subtype_getattro;
-		type->tp_getattr = NULL;
-	}
-	if (base->tp_setattro == NULL ||
-	    base->tp_setattro == PyGeneric_SetAttr) {
-		type->tp_setattro = subtype_setattro;
-		type->tp_setattr = NULL;
-	}
-
-	type->tp_members = mp = et->members;
-	mp->name = "__dict__";
-	mp->type = T_OBJECT;
-	mp->offset = base->tp_basicsize - ((base->tp_flags & Py_TPFLAGS_GC)
-					   ? PyGC_HEAD_SIZE : 0);
-	mp->readonly = 1;
-	assert(mp+1 <= &et->members[NMEMBERS]);
-
 	if (PyType_InitDict(type) < 0) {
 		Py_DECREF(type);
 		return NULL;
 	}
-	type->tp_basicsize += sizeof(PyObject *); /* for __dict__ */
+
+	/* Override some slots with specific requirements */
+	if (type->tp_construct)
+		type->tp_construct = subtype_construct;
+	if (type->tp_dealloc)
+		type->tp_dealloc = subtype_dealloc;
+	if (type->tp_getattro == NULL) {
+		type->tp_getattro = PyGeneric_GetAttr;
+		type->tp_getattr = NULL;
+	}
+	if (type->tp_setattro == NULL) {
+		type->tp_setattro = PyGeneric_SetAttr;
+		type->tp_setattr = NULL;
+	}
+
+	/* Add a __dict__ slot if we don't already have one,
+	   but only if the getattro is generic */
+	if (type->tp_dictoffset == 0 &&
+	    type->tp_setattro == PyGeneric_SetAttr) {
+		int dictoffset = type->tp_basicsize;
+		if (type->tp_flags & Py_TPFLAGS_GC)
+			dictoffset -= PyGC_HEAD_SIZE;
+		type->tp_dictoffset = dictoffset;
+		type->tp_basicsize += sizeof(PyObject *);
+		mp = et->members;
+		mp->name = "__dict__";
+		mp->type = T_OBJECT;
+		mp->offset = dictoffset;
+		mp->readonly = 1;
+		add_members(type, mp);
+	}
+
 	x = PyObject_CallMethod(type->tp_dict, "update", "O", dict);
 	if (x == NULL) {
 		Py_DECREF(type);
@@ -336,7 +260,7 @@ PyTypeObject PyType_Type = {
 	0,					/* tp_hash */
 	(ternaryfunc)type_call,			/* tp_call */
 	0,					/* tp_str */
-	(getattrofunc)type_getattro,		/* tp_getattro */
+	PyGeneric_GetAttr,			/* tp_getattro */
 	0,					/* tp_setattro */
 	0,					/* tp_as_buffer */
 	Py_TPFLAGS_DEFAULT,			/* tp_flags */
@@ -355,6 +279,7 @@ PyTypeObject PyType_Type = {
 	0,					/* tp_descr_get */
 	0,					/* tp_descr_set */
 	(ternaryfunc)type_construct,		/* tp_construct */
+	offsetof(PyTypeObject, tp_dict),	/* tp_dictoffset */
 };
 
 /* Support for dynamic types, created by type_construct() above */
@@ -380,52 +305,6 @@ dtype_call(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	}
 	Py_DECREF(res);
 	return newobj;
-}
-
-static int
-dtype_setattro(PyTypeObject *type, PyObject *name, PyObject *value)
-{
-	PyTypeObject *tp = type->ob_type; /* Usually == &PyDynamicType_Type */
-
-	assert(PyString_Check(name));
-
-	/* If the metatype has a descriptor  this attribute with a
-	   descr_set slot, use it.  This may fail for read-only attrs! */
-	if (tp->tp_flags & Py_TPFLAGS_HAVE_CLASS) {
-		PyObject *descr;
-		descrsetfunc f;
-		if (tp->tp_dict == NULL) {
-			if (PyType_InitDict(tp) < 0)
-				return -1;
-		}
-		descr = PyDict_GetItem(tp->tp_dict, name);
-		if (descr != NULL &&
-		    (f = descr->ob_type->tp_descr_set) != NULL)
-			return (*f)(descr, (PyObject *)type, value);
-	}
-
-	/* If the type has a dict, store the value in it */
-	if (type->tp_flags & Py_TPFLAGS_HAVE_CLASS) {
-		if (type->tp_dict == NULL) {
-			if (PyType_InitDict(type) < 0)
-				return -1;
-		}
-		if (value == NULL) {
-			int res = PyObject_DelItem(type->tp_dict, name);
-			if (res < 0 &&
-			    PyErr_ExceptionMatches(PyExc_KeyError))
-				PyErr_SetObject(PyExc_AttributeError, name);
-			return res;
-		}
-		else
-			return PyObject_SetItem(type->tp_dict, name, value);
-	}
-
-	/* If the type has no dict, so we can't set attributes */
-	PyErr_Format(PyExc_AttributeError,
-		     "type '%.50s' has no writable attribute '%.400s'",
-		     type->tp_name, PyString_AS_STRING(name));
-	return -1;
 }
 
 static void
@@ -454,8 +333,8 @@ PyTypeObject PyDynamicType_Type = {
 	0,					/* tp_hash */
 	(ternaryfunc)dtype_call,		/* tp_call */
 	0,					/* tp_str */
-	(getattrofunc)type_getattro,		/* tp_getattro */
-	(setattrofunc)dtype_setattro,		/* tp_setattro */
+	PyGeneric_GetAttr,			/* tp_getattro */
+	PyGeneric_SetAttr,			/* tp_setattro */
 	0,					/* tp_as_buffer */
 	Py_TPFLAGS_DEFAULT,			/* tp_flags */
 	"Define the behavior of a particular type of object.", /* tp_doc */
@@ -473,6 +352,7 @@ PyTypeObject PyDynamicType_Type = {
 	0,					/* tp_descr_get */
 	0,					/* tp_descr_set */
 	(ternaryfunc)type_construct,		/* tp_construct */
+	offsetof(PyTypeObject, tp_dict),	/* tp_dictoffset */
 };
 
 
@@ -523,7 +403,7 @@ PyTypeObject PyTurtle_Type = {
 	0,					/* tp_hash */
 	(ternaryfunc)turtle_call,		/* tp_call */
 	0,					/* tp_str */
-	(getattrofunc)type_getattro,		/* tp_getattro */
+	PyGeneric_GetAttr,			/* tp_getattro */
 	0,					/* tp_setattro */
 	0,					/* tp_as_buffer */
 	Py_TPFLAGS_DEFAULT,			/* tp_flags */
@@ -539,6 +419,10 @@ PyTypeObject PyTurtle_Type = {
 	type_getsets,				/* tp_getset */
 	&PyType_Type,				/* tp_base */
 	0,					/* tp_dict */
+	0,					/* tp_descr_get */
+	0,					/* tp_descr_set */
+	0,					/* tp_construct */
+	offsetof(PyTypeObject, tp_dict),	/* tp_dictoffset */
 };
 
 
@@ -781,6 +665,7 @@ inherit_slots(PyTypeObject *type, PyTypeObject *base)
 		COPYSLOT(tp_descr_get);
 		COPYSLOT(tp_descr_set);
 		COPYSLOT(tp_construct);
+		COPYSLOT(tp_dictoffset);
 	}
 
 	return 0;
