@@ -96,14 +96,26 @@ and the helper functions and macros.
   switch statement.  inline code generation for simple things,
   call function compiler_xxx where xxx is kind name for others.
 
-- use VISIT macro to invoke compiler_visit_XXX
+The macros used to emit specific opcodes and to generate code for
+generic node types use string concatenation to produce calls to the
+appropriate C function for the type of the object.
 
-- user VISIT_SEQ macro to invoke compiler_visit_XXX for a sequence
-  of type XXX
+The VISIT macro generates code for an arbitrary node type, by calling
+an appropriate compiler_visit_TYPE function.  The VISIT_SEQ macro
+calls the visit function for each element of a sequence.  The VISIT
+macros take three arguments:
+
+  - the current struct compiler
+  - the name of the node's type (expr, stmt, ...)
+  - the actual node reference
+
+The name of the node's type correspond to the names in the asdl
+definition.  The string concatenation is used to allow a single VISIT
+macro to generate calls with the correct type.
 
 - all functions return true on success, false on failure
 
-- code generator uses basic blocks
+Code is generate using a simple basic block interface.
 
   - each block has single entry point
   - possibly multiple exit points
@@ -115,10 +127,22 @@ and the helper functions and macros.
 - compiler_new_block() -- create a block but don't use it
   (used for generating jumps)
 
-- code generated with ADDOP macros add opcode to current block
-  ADDOP() -- opcode with no arguments
-  ADDOP_O() -- oparg is a PyObject *
-  ADDOP_I() -- oparg is a number
+- There are five macros for generating opcodes in the current basic
+  block.  Each takes the current struct compiler * as the first
+  argument and an opcode name as the second argument.
+
+  ADDOP(c, opcode) -- opcode with no arguments
+  ADDOP_I(c, opcode, oparg) -- oparg is a C int
+  ADDOP_O(c, opcode, oparg, namespace) -- oparg is a PyObject *
+     namespace is the name of a code object member that contains
+     the set of objects.  For example,
+         ADDOP_O(c, LOAD_CONST, obj, consts)
+     will make sure that obj is in co_consts and that the opcode
+     argument will be an index into co_consts.  The valid names
+     are consts, names, varnames, ... 
+
+     - Explain what each namespace is for.
+
   ADDOP_JABS() -- oparg is an absolute jump to block id
   ADDOP_JREL() -- oparg is a relative jump to block id 
   XXX no need for JABS() and JREL(), always computed at the
