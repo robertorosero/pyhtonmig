@@ -11,6 +11,7 @@ from types import *
 from glob import glob
 
 from distutils.core import Command
+from distutils.util import abspath
 from distutils.errors import *
 
 
@@ -173,10 +174,10 @@ class BuildPy (Command):
     def find_package_modules (self, package, package_dir):
         module_files = glob (os.path.join (package_dir, "*.py"))
         module_pairs = []
-        setup_script = os.path.abspath (sys.argv[0])
+        setup_script = abspath (sys.argv[0])
 
         for f in module_files:
-            abs_f = os.path.abspath (f)
+            abs_f = abspath (f)
             if abs_f != setup_script:
                 module = os.path.splitext (os.path.basename (f))[0]
                 module_pairs.append ((module, f))
