@@ -189,7 +189,7 @@ import sys
 [2]
 import time, math
 [3]
-from time import sleep
+from time import time
 [4]
 from sys import *
 [5]
