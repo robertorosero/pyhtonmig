@@ -424,7 +424,7 @@ generic_repr(g)
 	return newstringobject(buf);
 }
 
-typeobject GenericObjecttype = {
+static typeobject GenericObjecttype = {
 	OB_HEAD_INIT(&Typetype)
 	0,				/*ob_size*/
 	"FORMS_object",			/*tp_name*/
@@ -1918,7 +1918,7 @@ form_repr(f)
 	return newstringobject(buf);
 }
 
-typeobject Formtype = {
+static typeobject Formtype = {
 	OB_HEAD_INIT(&Typetype)
 	0,				/*ob_size*/
 	"FORMS_form",			/*tp_name*/

@@ -215,7 +215,7 @@ config_getattr(self, name)
 	return findmethod(config_methods, (object *)self, name);
 }
 
-typeobject Configtype = {
+static typeobject Configtype = {
 	OB_HEAD_INIT(&Typetype)
 	0,			/*ob_size*/
 	"config",		/*tp_name*/
@@ -523,7 +523,7 @@ port_getattr(p, name)
 	return findmethod(port_methods, (object *)p, name);
 }
 
-typeobject Porttype = {
+static typeobject Porttype = {
 	OB_HEAD_INIT(&Typetype)
 	0,			/*ob_size*/
 	"port",			/*tp_name*/
