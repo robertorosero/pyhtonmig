@@ -26,7 +26,14 @@ class TestEmailAsianCodecs(TestEmailBase):
         ghello = 'Gr\xfc\xdf Gott!'
         h.append(jhello, j)
         h.append(ghello, g)
-        eq(h.encode(), 'Hello World! =?iso-2022-jp?b?GyRCJU8lbSE8JW8hPCVrJUkhKhsoQg==?=\n =?iso-8859-1?q?Gr=FC=DF_Gott!?=')
+        # BAW: This used to -- and maybe should -- fold the two iso-8859-1
+        # chunks into a single encoded word.  However it doesn't violate the
+        # standard to have them as two encoded chunks and maybe it's
+        # reasonable <wink> for each .append() call to result in a separate
+        # encoded word.
+        eq(h.encode(), """\
+Hello World! =?iso-2022-jp?b?GyRCJU8lbSE8JW8hPCVrJUkhKhsoQg==?=
+ =?iso-8859-1?q?Gr=FC=DF?= =?iso-8859-1?q?_Gott!?=""")
         eq(decode_header(h.encode()),
            [('Hello World!', None),
             ('\x1b$B%O%m!<%o!<%k%I!*\x1b(B', 'iso-2022-jp'),
