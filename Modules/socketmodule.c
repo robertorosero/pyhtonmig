@@ -1,5 +1,5 @@
 /***********************************************************
-Copyright 1991, 1992, 1993 by Stichting Mathematisch Centrum,
+Copyright 1991, 1992, 1993, 1994 by Stichting Mathematisch Centrum,
 Amsterdam, The Netherlands.
 
                         All Rights Reserved
@@ -73,7 +73,9 @@ Socket methods:
 #include "modsupport.h"
 #include "ceval.h"
 
-#include "myselect.h" /* Implies <sys/types.h>, <sys/time.h>, <sys/param.h> */
+#include <sys/types.h>
+#include "mytime.h"
+#include "myselect.h"
 
 #include <signal.h>
 #include <sys/socket.h>

@@ -1,5 +1,5 @@
 /***********************************************************
-Copyright 1991, 1992, 1993 by Stichting Mathematisch Centrum,
+Copyright 1991, 1992, 1993, 1994 by Stichting Mathematisch Centrum,
 Amsterdam, The Netherlands.
 
                         All Rights Reserved
@@ -31,7 +31,7 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 #include "thread.h"
 
-int threads_started = 0;
+extern int threads_started;
 
 static object *ThreadError;
 
@@ -43,7 +43,7 @@ typedef struct {
 	type_lock lock_lock;
 } lockobject;
 
-extern typeobject Locktype;	/* Really static, forward */
+static typeobject Locktype;
 
 #define is_lockobject(v)		((v)->ob_type == &Locktype)
 

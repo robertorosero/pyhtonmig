@@ -1,6 +1,6 @@
 /***********************************************************
-Copyright 1992 by Stichting Mathematisch Centrum, Amsterdam, The
-Netherlands.
+Copyright 1991, 1992, 1993, 1994 by Stichting Mathematisch Centrum,
+Amsterdam, The Netherlands.
 
                         All Rights Reserved
 
@@ -21,6 +21,7 @@ ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
 OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 ******************************************************************/
+
 /* MPZ module */
 
 /* This module provides an interface to an alternate Multi-Precision
@@ -993,9 +994,7 @@ mpz_mpzcoerce(z)
 	err_setstr(TypeError, "number coercion (to mpzobject) failed");
 	return NULL;
 } /* mpz_mpzcoerce() */
-
-static void mpz_divm();
-
+	
 static object *
 MPZ_powm(self, args)
 	object *self;
@@ -1183,7 +1182,7 @@ MPZ_sqrtrem(self, args)
 } /* MPZ_sqrtrem() */
 
 
-static void
+void
 #if __STDC__
 mpz_divm(MP_INT *res, const MP_INT *num, const MP_INT *den, const MP_INT *mod)
 #else
@@ -1546,7 +1545,7 @@ static struct methodlist mpz_methods[] = {
 	{"hex",			mpz_hex},
 	{"oct",			mpz_oct},
 #endif /* def MPZ_CONVERSIONS_AS_METHODS */
-	{"binary", (object * (*) (object *, object *)) mpz_binary},
+	{"binary",		mpz_binary},
 	{NULL,			NULL}		/* sentinel */
 };
 
@@ -1641,11 +1640,11 @@ static typeobject MPZtype = {
 	sizeof(mpzobject),	/*tp_size*/
 	0,			/*tp_itemsize*/
 	/* methods */
-	(void (*) (object *)) mpz_dealloc,	/*tp_dealloc*/
+	mpz_dealloc,	/*tp_dealloc*/
 	0,		/*tp_print*/
-	(object * (*)(object *, char *)) mpz_getattr,	/*tp_getattr*/
+	mpz_getattr,	/*tp_getattr*/
 	0,		/*tp_setattr*/
-	(int (*) (object *, object *))  mpz_compare,	/*tp_compare*/
+	mpz_compare,	/*tp_compare*/
 	mpz_repr,	/*tp_repr*/
         &mpz_as_number, /*tp_as_number*/
 };

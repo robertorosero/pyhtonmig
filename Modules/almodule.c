@@ -1,5 +1,5 @@
 /**********************************************************
-Copyright 1991, 1992, 1993 by Stichting Mathematisch Centrum,
+Copyright 1991, 1992, 1993, 1994 by Stichting Mathematisch Centrum,
 Amsterdam, The Netherlands.
 
                         All Rights Reserved
@@ -24,7 +24,7 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 /* AL module -- interface to Mark Callow's Audio Library (AL). */
 
-#include "audio.h"
+#include <audio.h>
 
 /* Check which version audio library we have: */
 #ifdef AL_ERROR_NUMBER
@@ -490,7 +490,6 @@ al_getstatus (self, args)
 
 static struct methodlist port_methods[] = {
 	{"closeport",		al_closeport},
-	{"close",		al_closeport},
 	{"getfd",		al_getfd},
         {"fileno",		al_getfd},
 	{"getfilled",		al_getfilled},

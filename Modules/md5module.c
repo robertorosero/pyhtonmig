@@ -1,6 +1,6 @@
 /***********************************************************
-Copyright 1992 by Stichting Mathematisch Centrum, Amsterdam, The
-Netherlands.
+Copyright 1991, 1992, 1993, 1994 by Stichting Mathematisch Centrum,
+Amsterdam, The Netherlands.
 
                         All Rights Reserved
 
@@ -40,6 +40,8 @@ typedef struct {
 extern typeobject MD5type;	/* Really static, forward */
 
 #define is_md5object(v)		((v)->ob_type == &MD5type)
+
+static const char initialiser_name[] = "md5";
 
 /* #define MD5_DEBUG */
 
@@ -205,7 +207,7 @@ typeobject MD5type = {
 /* List of functions exported by this module */
 
 static struct methodlist md5_functions[] = {
-	{"md5",			MD5_md5},
+	{initialiser_name,	MD5_md5},
 	{NULL,			NULL}		 /* Sentinel */
 };
 

@@ -1,5 +1,5 @@
 /***********************************************************
-Copyright 1991, 1992, 1993 by Stichting Mathematisch Centrum,
+Copyright 1991, 1992, 1993, 1994 by Stichting Mathematisch Centrum,
 Amsterdam, The Netherlands.
 
                         All Rights Reserved
@@ -711,7 +711,7 @@ doOpen(object *self, object *args, int (*open_func)(int, CL_Handle *),
 			err_setstr(ClError, "Open(De)Compressor failed");
 		return NULL;
 	}
-	return new;
+	return (object *)new;
 }
 
 static object *
