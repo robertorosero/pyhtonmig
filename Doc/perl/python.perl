@@ -905,11 +905,11 @@ sub figure_column_alignment{
     if ($mark eq 'c')
       { $r = ' align="center"'; }
     elsif ($mark eq 'r')
-      { $r = ' align="right" '; }
+      { $r = ' align="right"'; }
     elsif ($mark eq 'l')
-      { $r = ' align="left"  '; }
+      { $r = ' align="left"'; }
     elsif ($mark eq 'p')
-      { $r = ' align="left"  '; }
+      { $r = ' align="left"'; }
     return $r;
 }
 
@@ -954,7 +954,7 @@ sub do_env_tableii{
 	   . "\n      $th2<b>$h2</b>\&nbsp;</th>"
 	   . "\n    </thead>"
 	   . "\n  <tbody valign='baseline'>"
-	   . $_
+           . translate_commands($_)
 	   . "\n    </tbody>"
 	   . "\n</table>";
 }
@@ -993,7 +993,7 @@ sub do_env_tableiii{
 	   . "\n      $th3<b>$h3</b>\&nbsp;</th>"
 	   . "\n    </thead>"
 	   . "\n  <tbody valign='baseline'>"
-	   . $_
+	   . translate_commands($_)
 	   . "\n    </tbody>"
 	   . "\n</table>";
 }
@@ -1036,7 +1036,7 @@ sub do_env_tableiv{
 	   . "\n      $th4<b>$h4</b>\&nbsp;</th>"
 	   . "\n    </thead>"
 	   . "\n  <tbody valign='baseline'>"
-	   . $_
+	   . translate_commands($_)
 	   . "\n    </tbody>"
 	   . "\n</table>";
 }
