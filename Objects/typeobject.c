@@ -632,7 +632,8 @@ type_getattro(PyTypeObject *type, PyObject *name)
 	if (descr != NULL) {
 		f = descr->ob_type->tp_descr_get;
 		if (f != NULL && PyDescr_IsData(descr))
-			return f(descr, (PyObject *)type, metatype);
+			return f(descr,
+				 (PyObject *)type, (PyObject *)metatype);
 	}
 
 	/* Look in tp_defined of this type and its bases */
@@ -640,14 +641,14 @@ type_getattro(PyTypeObject *type, PyObject *name)
 	if (res != NULL) {
 		f = res->ob_type->tp_descr_get;
 		if (f != NULL)
-			return f(res, (PyObject *)NULL, type);
+			return f(res, (PyObject *)NULL, (PyObject *)type);
 		Py_INCREF(res);
 		return res;
 	}
 
 	/* Use the descriptor from the metatype */
 	if (f != NULL) {
-		res = f(descr, NULL, metatype);
+		res = f(descr, (PyObject *)NULL, (PyObject *)metatype);
 		return res;
 	}
 	if (descr != NULL) {
@@ -1642,12 +1643,12 @@ wrap_descr_get(PyObject *self, PyObject *args, void *wrapped)
 {
 	descrgetfunc func = (descrgetfunc)wrapped;
 	PyObject *obj;
-	PyTypeObject *type = NULL;
+	PyObject *type = NULL;
 
-	if (!PyArg_ParseTuple(args, "O|O!", &obj, &PyType_Type, &type))
+	if (!PyArg_ParseTuple(args, "O|O", &obj, &type))
 		return NULL;
 	if (type == NULL)
-		type = obj->ob_type;
+		type = (PyObject *)obj->ob_type;
 	return (*func)(self, obj, type);
 }
 
@@ -2042,7 +2043,7 @@ slot_tp_iternext(PyObject *self)
 	return PyObject_CallMethod(self, "next", "");
 }
 
-SLOT2(tp_descr_get, get, PyObject *, PyTypeObject *, OO);
+SLOT2(tp_descr_get, get, PyObject *, PyObject *, OO);
 
 static int
 slot_tp_descr_set(PyObject *self, PyObject *target, PyObject *value)

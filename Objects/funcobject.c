@@ -330,9 +330,9 @@ function_call(PyObject *func, PyObject *arg, PyObject *kw)
 
 /* Bind a function to an object */
 static PyObject *
-func_descr_get(PyObject *func, PyObject *obj, PyTypeObject *type)
+func_descr_get(PyObject *func, PyObject *obj, PyObject *type)
 {
-	return PyMethod_New(func, obj, (PyObject *)type);
+	return PyMethod_New(func, obj, type);
 }
 
 PyTypeObject PyFunction_Type = {
@@ -390,7 +390,7 @@ cm_dealloc(classmethod *cm)
 }
 
 static PyObject *
-cm_descr_get(PyObject *self, PyObject *obj, PyTypeObject *type)
+cm_descr_get(PyObject *self, PyObject *obj, PyObject *type)
 {
 	classmethod *cm = (classmethod *)self;
 
@@ -400,7 +400,7 @@ cm_descr_get(PyObject *self, PyObject *obj, PyTypeObject *type)
 		return NULL;
 	}
  	return PyMethod_New(cm->cm_callable,
-			    (PyObject *)type, (PyObject *)(type->ob_type));
+			    type, (PyObject *)(type->ob_type));
 }
 
 static int
