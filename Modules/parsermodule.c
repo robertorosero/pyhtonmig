@@ -89,7 +89,7 @@ parser_parsefile(self, args)
 	}
 	n = parse_file(fp, filename, file_input);
 	fclose(fp);
-	if (n != NULL)
+	if (n == NULL)
 		return NULL;
 	res = node2tuple(n);
 	freetree(n);
