@@ -82,7 +82,8 @@ static PyCodeObject *compiler_mod(struct compiler *, mod_ty);
 static int compiler_visit_stmt(struct compiler *, stmt_ty);
 static int compiler_visit_expr(struct compiler *, expr_ty);
 static int compiler_augassign(struct compiler *, stmt_ty);
-static int compiler_visit_slice(struct compiler *, slice_ty);
+static int compiler_visit_slice(struct compiler *c, slice_ty s, 
+				expr_context_ty ctx);
 
 static int compiler_push_fblock(struct compiler *, enum fblocktype, int);
 static void compiler_pop_fblock(struct compiler *, enum fblocktype, int);
@@ -558,6 +559,11 @@ compiler_addop_j(struct compiler *c, int opcode, int block, int absolute)
 
 #define VISIT(C, TYPE, V) {\
 	if (!compiler_visit_ ## TYPE((C), (V))) \
+		return 0; \
+}
+
+#define VISIT_SLICE(C, V, CTX) {\
+	if (!compiler_visit_slice((C), (V), (CTX))) \
 		return 0; \
 }
 
@@ -1316,28 +1322,22 @@ compiler_visit_expr(struct compiler *c, expr_ty e)
 		switch (e->v.Subscript.ctx) {
 		case AugLoad:
 			VISIT(c, expr, e->v.Subscript.value);
-			VISIT(c, slice, e->v.Subscript.slice);
-			ADDOP_I(c, DUP_TOPX, 2);
-			ADDOP(c, BINARY_SUBSCR);
+			VISIT_SLICE(c, e->v.Subscript.slice, AugLoad);
 			break;
 		case Load:
 			VISIT(c, expr, e->v.Subscript.value);
-			VISIT(c, slice, e->v.Subscript.slice);
-			ADDOP(c, BINARY_SUBSCR);
+			VISIT_SLICE(c, e->v.Subscript.slice, Load);
 			break;
 		case AugStore:
-			ADDOP(c, ROT_THREE);
-			ADDOP(c, STORE_SUBSCR);	
+			VISIT_SLICE(c, e->v.Subscript.slice, AugStore);
 			break;
 		case Store:
 			VISIT(c, expr, e->v.Subscript.value);
-			VISIT(c, slice, e->v.Subscript.slice);
-			ADDOP(c, STORE_SUBSCR);	
+			VISIT_SLICE(c, e->v.Subscript.slice, Store);
 			break;
 		case Del:
 			VISIT(c, expr, e->v.Subscript.value);
-			VISIT(c, slice, e->v.Subscript.slice);
-			ADDOP(c, DELETE_SUBSCR);
+			VISIT_SLICE(c, e->v.Subscript.slice, Del);
 			break;
 		case Param:
 			assert(0);
@@ -1455,17 +1455,85 @@ compiler_error(struct compiler *c, const char *errstr)
 }
 
 static int
-compiler_visit_slice(struct compiler *c, slice_ty s)
+compiler_slice(struct compiler *c, slice_ty s, int op, expr_context_ty ctx)
 {
+	int slice_offset = 0, stack_count = 0;
+	assert(s->kind == Slice_kind);
+	if (s->v.Slice.lower) {
+		stack_count++;
+		slice_offset |= 1;
+		if (ctx != AugStore)
+			VISIT(c, expr, s->v.Slice.lower);
+	}
+	if (s->v.Slice.upper) {
+		stack_count++;
+		slice_offset |= 2;
+		if (ctx != AugStore)
+			VISIT(c, expr, s->v.Slice.upper);
+	}
+
+	if (ctx == AugLoad) {
+		switch (stack_count) {
+		case 0: ADDOP(c, DUP_TOP); break;
+		case 1: ADDOP_I(c, DUP_TOPX, 2); break;
+		case 2: ADDOP_I(c, DUP_TOPX, 3); break;
+		}
+	}
+	else if (ctx == AugStore) {
+		switch (stack_count) {
+		case 0: ADDOP(c, ROT_TWO); break;
+		case 1: ADDOP(c, ROT_THREE); break;
+		case 2: ADDOP(c, ROT_FOUR); break;
+		}
+	}
+
+	ADDOP(c, op + slice_offset);
+	return 1;
+}
+
+static int
+compiler_visit_slice(struct compiler *c, slice_ty s, expr_context_ty ctx)
+{
+	int op;
 	switch (s->kind) {
 	case Ellipsis_kind:
+		ADDOP_O(c, LOAD_CONST, Py_Ellipsis, consts);
 		break;
 	case Slice_kind:
-		break;
+		switch (ctx) {
+		case AugLoad: /* fall through to Load */
+		case Load:    op = SLICE; break;
+		case AugStore:/* fall through to Store */
+		case Store:   op = STORE_SLICE; break;
+		case Del:     op = DELETE_SLICE; break;
+		default:
+			fprintf(stderr, "invalid slice kind %d "
+				"in compiler_visit_slice\n", ctx);
+			return 0;
+		}
+		return compiler_slice(c, s, op, ctx);
 	case ExtSlice_kind:
 		break;
 	case Index_kind:
 		VISIT(c, expr, s->v.Index.value);
+		switch (ctx) {
+		case AugLoad: /* fall through to Load */
+		case Load:    op = BINARY_SUBSCR; break;
+		case AugStore:/* fall through to Store */
+		case Store:   op = STORE_SUBSCR; break;
+		case Del:     op = DELETE_SUBSCR; break;
+		default:
+			fprintf(stderr, "invalid index kind %d "
+				"in compiler_visit_slice\n", ctx);
+			return 0;
+		}
+		if (ctx == AugLoad) {
+			ADDOP_I(c, DUP_TOPX, 2);
+		}
+		else if (ctx == AugStore) {
+			ADDOP(c, ROT_THREE);
+		}
+		ADDOP(c, op);
 		break;
 	}
 	return 1;
