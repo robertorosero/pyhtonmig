@@ -36,11 +36,11 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 #include <sys/select.h>
 
-#ifdef SYS_TIME_WITH_SYS_SELECT
+#ifdef SYS_SELECT_WITH_SYS_TIME
 #include "mytime.h"
-#else /* !SYS_TIME_WITH_SYS_SELECT */
+#else /* !SYS_SELECT_WITH_SYS_TIME */
 #include <time.h>
-#endif /* !SYS_TIME_WITH_SYS_SELECT */
+#endif /* !SYS_SELECT_WITH_SYS_TIME */
 
 #else /* !HAVE_SYS_SELECT_H */
 
