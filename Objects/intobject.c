@@ -793,22 +793,22 @@ PyTypeObject PyInt_Type = {
 	"int",
 	sizeof(PyIntObject),
 	0,
-	(destructor)int_dealloc, /*tp_dealloc*/
-	(printfunc)int_print, /*tp_print*/
-	0,		/*tp_getattr*/
-	0,		/*tp_setattr*/
-	(cmpfunc)int_compare, /*tp_compare*/
-	(reprfunc)int_repr, /*tp_repr*/
-	&int_as_number,	/*tp_as_number*/
-	0,		/*tp_as_sequence*/
-	0,		/*tp_as_mapping*/
-	(hashfunc)int_hash, /*tp_hash*/
-        0,			/*tp_call*/
-        0,			/*tp_str*/
-	PyGeneric_GetAttr,	/* tp_getattro */
-	0,			/*tp_setattro*/
-	0,			/*tp_as_buffer*/
-	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_CHECKTYPES	/*tp_flags*/
+	(destructor)int_dealloc,		/* tp_dealloc */
+	(printfunc)int_print,			/* tp_print */
+	0,					/* tp_getattr */
+	0,					/* tp_setattr */
+	(cmpfunc)int_compare,			/* tp_compare */
+	(reprfunc)int_repr,			/* tp_repr */
+	&int_as_number,				/* tp_as_number */
+	0,					/* tp_as_sequence */
+	0,					/* tp_as_mapping */
+	(hashfunc)int_hash,			/* tp_hash */
+        0,					/* tp_call */
+        0,					/* tp_str */
+	PyGeneric_GetAttr,			/* tp_getattro */
+	0,					/* tp_setattro */
+	0,					/* tp_as_buffer */
+	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_CHECKTYPES /* tp_flags */
 };
 
 void
