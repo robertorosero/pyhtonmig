@@ -86,6 +86,7 @@ sub do_cmd_let{
 # the older version of LaTeX2HTML we use doesn't support this, but we use it:
 
 sub do_cmd_textasciitilde{ '~' . @_[0]; }
+sub do_cmd_textasciicircum{ '^' . @_[0]; }
 
 
 # words typeset in a special way (not in HTML though)
@@ -103,6 +104,7 @@ sub do_cmd_e{ '&#92;' . @_[0]; }
 
 $DEVELOPER_ADDRESS = '';
 $SHORT_VERSION = '';
+$RELEASE_INFO = '';
 $PACKAGE_VERSION = '';
 
 sub do_cmd_version{ $PACKAGE_VERSION . @_[0]; }
@@ -110,6 +112,12 @@ sub do_cmd_shortversion{ $SHORT_VERSION . @_[0]; }
 sub do_cmd_release{
     local($_) = @_;
     $PACKAGE_VERSION = next_argument();
+    return $_;
+}
+
+sub do_cmd_setreleaseinfo{
+    local($_) = @_;
+    $RELEASE_INFO = next_argument();
     return $_;
 }
 
@@ -344,24 +352,25 @@ sub do_cmd_deprecated{
             . $_);
 }
 
-sub do_cmd_versionadded{
-    # one parameter:  \versionadded{version}
-    local($_) = @_;
+sub versionnote{
+    # one or two parameters:  \versionnote[explanation]{version}
+    my $type = @_[0];
+    local $_ = @_[1];
+    my $explanation = next_optional_argument();
     my $release = next_argument();
-    return ("\n<span class='versionnote'>New in version $release.</span>\n"
-            . $_);
+    my $text = "$type in version $release.";
+    if ($explanation) {
+        $text = "$type in version $release:\n$explanation.";
+    }
+    return "\n<span class='versionnote'>$text</span>\n" . $_;
+}
+
+sub do_cmd_versionadded{
+    return versionnote('New', @_);
 }
 
 sub do_cmd_versionchanged{
-    # one parameter:  \versionchanged{version}
-    local($_) = @_;
-    my $explanation = next_optional_argument();
-    my $release = next_argument();
-    my $text = "Changed in version $release.";
-    if ($explanation) {
-        $text = "Changed in version $release:\n$explanation.";
-    }
-    return "\n<span class='versionnote'>$text</span>\n" . $_;
+    return versionnote('Changed', @_);
 }
 
 #
@@ -904,6 +913,17 @@ sub do_env_classdesc{
     return handle_classlike_descriptor(@_[0], "class");
 }
 
+sub do_env_classdescstar{
+    local($_) = @_;
+    $THIS_CLASS = next_argument();
+    $idx = make_str_index_entry(
+      "<tt class=\"class\">$THIS_CLASS</tt> (class in $THIS_MODULE)");
+    $idx =~ s/ \(.*\)//;
+    return ("<dl><dt><b>class $idx</b>\n<dd>"
+            . $_
+            . '</dl>');
+}
+
 sub do_env_excclassdesc{
     return handle_classlike_descriptor(@_[0], "exception");
 }
@@ -1294,7 +1314,8 @@ sub make_my_titlepage() {
     if ($t_date) {
 	$the_title .= "\n<p>";
 	if ($PACKAGE_VERSION) {
-	    $the_title .= "<strong>Release $PACKAGE_VERSION</strong><br>\n";
+	    $the_title .= ('<strong>Release '
+                           . "$PACKAGE_VERSION$RELEASE_INFO</strong><br>\n");
         }
 	$the_title .= "<strong>$t_date</strong></p>"
     }

@@ -427,7 +427,7 @@ operands convert the integer operand to floating point:
 
 \begin{verbatim}
 >>> 4 * 2.5 / 3.3
-3.0303030303
+3.0303030303030303
 >>> 7.0 / 2
 3.5
 \end{verbatim}
@@ -477,7 +477,7 @@ TypeError: can't convert complex to float; use e.g. abs(z)
 >>> a.real
 1.5
 >>> abs(a)
-1.58113883008
+1.5811388300841898
 \end{verbatim}
 
 In interactive mode, the last printed expression is assigned to the
@@ -2609,10 +2609,10 @@ reverse quotes (\code{``}).  Some examples:
 
 \begin{verbatim}
 >>> x = 10 * 3.14
->>> y = 200*200
+>>> y = 200 * 200
 >>> s = 'The value of x is ' + `x` + ', and y is ' + `y` + '...'
 >>> print s
-The value of x is 31.4, and y is 40000...
+The value of x is 31.400000000000002, and y is 40000...
 >>> # Reverse quotes work on other types besides numbers:
 ... p = [x, y]
 >>> ps = repr(p)
@@ -3424,7 +3424,7 @@ this:
 class MyClass:
     "A simple example class"
     i = 12345
-    def f(x):
+    def f(self):
         return 'hello world'
 \end{verbatim}
 
@@ -4079,5 +4079,8 @@ mechanism might use the interpreter's symbol table.  A command to
 check (or even suggest) matching parentheses, quotes, etc., would also
 be useful.
 
+
+\chapter{History and License}
+\input{license}
 
 \end{document}
