@@ -192,7 +192,8 @@ attribute \var{version} to an appropriate string value before the
 
 Additional keyword parameters, collected in \var{x509}, are used for
 authentication with the \file{https:} scheme.  The keywords
-\var{key_file} and \var{cert_file} are supported.
+\var{key_file} and \var{cert_file} are supported; both are needed to
+actually retrieve a resource at an \file{https:} URL.
 
 \begin{methoddesc}{open}{fullurl\optional{, data}}
 Open \var{fullurl} using the appropriate protocol.  This method sets 
