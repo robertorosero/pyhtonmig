@@ -649,6 +649,32 @@ ast_for_slice(const node *n)
 }
 
 static expr_ty
+ast_for_binop(const node *n)
+{
+	/* Must account for a sequence of expressions.
+	   How should A op B op C by represented?  
+	   BinOp(BinOp(A, op, B), op, C).
+	*/
+
+	int i, nops;
+	expr_ty result;
+
+	result = BinOp(ast_for_expr(CHILD(n, 0)), get_operator(CHILD(n, 1)),
+		       ast_for_expr(CHILD(n, 2)));
+	if (!result)
+		return NULL;
+	nops = (NCH(n) - 1) / 2;
+	for (i = 1; i < nops; i++) {
+		expr_ty tmp = BinOp(result, get_operator(CHILD(n, i * 2 + 1)),
+				    ast_for_expr(CHILD(n, i * 2 + 2)));
+		if (!tmp) 
+			return NULL;
+		result = tmp;
+	}
+	return result;
+}
+
+static expr_ty
 ast_for_expr(const node *n)
 {
     /* handle the full range of simple expressions
@@ -734,9 +760,7 @@ ast_for_expr(const node *n)
 	    n = CHILD(n, 0);
 	    goto loop;
 	}
-	return BinOp(ast_for_expr(CHILD(n, 0)), get_operator(CHILD(n, 1)),
-		     ast_for_expr(CHILD(n, 2)));
-	break;
+	return ast_for_binop(n);
     case factor:
 	if (NCH(n) == 1) {
 	    n = CHILD(n, 0);
