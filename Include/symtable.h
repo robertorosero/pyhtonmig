@@ -47,9 +47,9 @@ extern DL_IMPORT(PySTEntryObject *) \
 	PySTEntry_New(struct symtable *, identifier, block_ty, void *, int);
 DL_IMPORT(int) PyST_GetScope(PySTEntryObject *, PyObject *);
 
-DL_IMPORT(struct symtable *) PyNode_CompileSymtable(struct _node *, char *);
 DL_IMPORT(struct symtable *) PySymtable_Build(mod_ty, const char *, 
 					      PyFutureFeatures *);
+DL_IMPORT(PySTEntryObject *) PySymtable_Lookup(struct symtable *, void *);
 
 DL_IMPORT(void) PySymtable_Free(struct symtable *);
 

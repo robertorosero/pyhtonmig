@@ -15,15 +15,6 @@ PySTEntry_New(struct symtable *st, identifier name, block_ty block,
 	k = PyLong_FromVoidPtr(key);
 	if (k == NULL)
 		goto fail;
-	/* XXX do we need the lookup code anymore? */
-	v = PyDict_GetItem(st->st_symbols, k);
-	if (v) {
-		assert(PySTEntry_Check(v));
-		Py_DECREF(k);
-		Py_INCREF(v);
-		return (PySTEntryObject *)v;
-	}
-	
 	ste = (PySTEntryObject *)PyObject_New(PySTEntryObject,
 					      &PySTEntry_Type);
 	ste->ste_table = st;
@@ -195,15 +186,6 @@ symtable_new(void)
 	return NULL;
 }
 
-void
-PySymtable_Free(struct symtable *st)
-{
-	Py_XDECREF(st->st_symbols);
-	Py_XDECREF(st->st_stack);
-	Py_XDECREF(st->st_cur);
-	PyMem_Free((void *)st);
-}
-
 struct symtable *
 PySymtable_Build(mod_ty mod, const char *filename, PyFutureFeatures *future)
 {
@@ -217,25 +199,63 @@ PySymtable_Build(mod_ty mod, const char *filename, PyFutureFeatures *future)
 			     (void *)mod, 0);
 	/* Any other top-level initialization? */
 	switch (mod->kind) {
-	case Module_kind: 
-	{
+	case Module_kind: {
 		int i;
 		asdl_seq *seq = mod->v.Module.body;
 		for (i = 0; i < asdl_seq_LEN(seq); i++)
-			if (!symtable_visit_stmt(st, asdl_seq_get(seq, i))) {
-				PySymtable_Free(st);
-				return NULL;
-			}
-	}
-	break;
-	case Expression_kind:
-		symtable_visit_expr(st, mod->v.Expression.body);
+			if (!symtable_visit_stmt(st, asdl_seq_GET(seq, i)))
+				goto error;
 		break;
-	default:
+	}
+	case Expression_kind:
+		if (!symtable_visit_expr(st, mod->v.Expression.body))
+			goto error;
+		break;
+	case Interactive_kind:
+		if (!symtable_visit_stmt(st, mod->v.Interactive.body)) 
+			goto error;
+		break;
+	case Suite_kind:
+		PyErr_SetString(PyExc_RuntimeError,
+				"this compiler does not handle Suites");
 		return NULL;
 	}
 	symtable_exit_block(st, (void *)mod);
 	return st;
+ error:
+	PySymtable_Free(st);
+	return NULL;
+}
+
+void
+PySymtable_Free(struct symtable *st)
+{
+	Py_XDECREF(st->st_symbols);
+	Py_XDECREF(st->st_stack);
+	Py_XDECREF(st->st_cur);
+	PyMem_Free((void *)st);
+}
+
+PySTEntryObject *
+PySymtable_Lookup(struct symtable *st, void *key)
+{
+	PyObject *k, *v;
+
+	k = PyLong_FromVoidPtr(key);
+	if (k == NULL)
+		return NULL;
+	v = PyDict_GetItem(st->st_symbols, k);
+	if (v) {
+		assert(PySTEntry_Check(v));
+		Py_DECREF(k);
+		Py_INCREF(v);
+		return (PySTEntryObject *)v;
+	}
+	else {
+		PyErr_SetString(PyExc_KeyError,
+				"unknown symbol table entry");
+		return NULL;
+	}
 }
 
 int 
@@ -578,7 +598,7 @@ symtable_add_def(struct symtable *st, PyObject *name, int flag)
 	int i; \
 	asdl_seq *seq = (SEQ); /* avoid variable capture */ \
 	for (i = 0; i < asdl_seq_LEN(seq); i++) { \
-		TYPE ## _ty elt = asdl_seq_get(seq, i); \
+		TYPE ## _ty elt = asdl_seq_GET(seq, i); \
 		if (!symtable_visit_ ## TYPE((ST), elt)) \
 			return 0; \
 	} \
@@ -691,7 +711,8 @@ symtable_visit_stmt(struct symtable *st, stmt_ty s)
 		int i;
 		asdl_seq *seq = s->v.Global.names;
 		for (i = 0; i < asdl_seq_LEN(seq); i++)
-			symtable_add_def(st, asdl_seq_get(seq, i), DEF_GLOBAL);
+			symtable_add_def(st, asdl_seq_GET(seq, i), 
+					 DEF_GLOBAL);
 		
 		break;
 	}
@@ -799,7 +820,7 @@ symtable_visit_params(struct symtable *st, asdl_seq *args, int toplevel)
 	int i;
 	
 	for (i = 0; i < asdl_seq_LEN(args); i++) {
-		expr_ty arg = asdl_seq_get(args, i);
+		expr_ty arg = asdl_seq_GET(args, i);
 		if (arg->kind == Name_kind) {
 			assert(arg->v.Name.ctx == Load);
 			if (!symtable_add_def(st, arg->v.Name.id, DEF_PARAM))
@@ -829,8 +850,9 @@ symtable_visit_arguments(struct symtable *st, arguments_ty a)
 	/* skip default arguments inside function block
 	   XXX should ast be different?
 	*/
-	if (!symtable_visit_params(st, a->args, 1))
-		return 0;
+	if (a->args)
+		if (!symtable_visit_params(st, a->args, 1))
+			return 0;
 
 	if (a->vararg)
 		if (!symtable_add_def(st, a->vararg, DEF_PARAM))
@@ -910,5 +932,4 @@ symtable_visit_slice(struct symtable *st, slice_ty s)
 	}
 	return 1;
 }
-
 
