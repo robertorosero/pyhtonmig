@@ -1,5 +1,5 @@
 #!/bin/sh
-# From configure.in Revision: 1.2.4.10 
+# From configure.in Revision: 1.2.4.11 
 #!/bin/sh
 # Guess values for system-dependent variables and create Makefiles.
 # Generated automatically using autoconf.
@@ -238,6 +238,30 @@ test -z "$RANLIB" && RANLIB=":"
 test -n "$RANLIB" && test -n "$verbose" && echo "	setting RANLIB to $RANLIB"
 
 
+for p in ar aal
+do
+if test -z "$AR"; then
+  # Extract the first word of `$p', so it can be a program name with args.
+  set dummy $p; word=$2
+  echo checking for $word
+  IFS="${IFS= 	}"; saveifs="$IFS"; IFS="${IFS}:"
+  for dir in $PATH; do
+    test -z "$dir" && dir=.
+    if test -f $dir/$word; then
+      AR="$p"
+      break
+    fi
+  done
+  IFS="$saveifs"
+fi
+
+test -n "$AR" && test -n "$verbose" && echo "	setting AR to $AR"
+
+test -n "$AR" && break
+done
+test -n "$AR" || AR="ar"
+
+
 # checks for UNIX variants that set C preprocessor variables
 echo checking for AIX
 echo checking how to run the C preprocessor
@@ -446,7 +470,7 @@ rm -f conftest*
 fi
 rm -f conftest*
 
-for hdr in dlfcn.h signal.h stdarg.h stdlib.h thread.h unistd.h utime.h sys/audioio.h sys/param.h sys/select.h sys/times.h sys/un.h sys/utsname.h
+for hdr in dlfcn.h signal.h stdarg.h stdlib.h thread.h unistd.h utime.h sys/audioio.h sys/param.h sys/select.h sys/time.h sys/times.h sys/un.h sys/utsname.h
 do
 trhdr=HAVE_`echo $hdr | tr '[a-z]./' '[A-Z]__'`
 echo checking for ${hdr}
@@ -1105,7 +1129,7 @@ fi
 
 
 # checks for library functions
-for func in clock ftime gettimeofday getpeername getpgrp getpid getwd lstat readlink select setsid setpgid setpgrp siginterrupt symlink tcgetpgrp tcsetpgrp times uname waitpid
+for func in clock ftime gettimeofday getpeername getpgrp getpid getwd lstat nice readlink select setsid setpgid setpgrp siginterrupt symlink tcgetpgrp tcsetpgrp times uname waitpid
 do
 trfunc=HAVE_`echo $func | tr '[a-z]' '[A-Z]'`
 echo checking for ${func}
@@ -1671,6 +1695,7 @@ INSTALL='$INSTALL'
 INSTALL_PROGRAM='$INSTALL_PROGRAM'
 INSTALL_DATA='$INSTALL_DATA'
 RANLIB='$RANLIB'
+AR='$AR'
 CPP='$CPP'
 DLINCLDIR='$DLINCLDIR'
 LIBOBJS='$LIBOBJS'
@@ -1707,6 +1732,7 @@ s%@INSTALL@%$INSTALL%g
 s%@INSTALL_PROGRAM@%$INSTALL_PROGRAM%g
 s%@INSTALL_DATA@%$INSTALL_DATA%g
 s%@RANLIB@%$RANLIB%g
+s%@AR@%$AR%g
 s%@CPP@%$CPP%g
 s%@DLINCLDIR@%$DLINCLDIR%g
 s%@LIBOBJS@%$LIBOBJS%g
