@@ -257,7 +257,7 @@ just "to the public"; the version and date are updated.  The new
 license has a new handle.
 
 - Vladimir Marangozov designed more rational APIs for allocating
-memory.  See pymem.h.
+memory.  See mymalloc.h.
 
 - Added the Tools/compiler package.  This is a project led by Jeremy
 Hylton to write the Python bytecode generator in Python.
