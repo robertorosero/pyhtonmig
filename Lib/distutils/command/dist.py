@@ -10,7 +10,6 @@ import sys, os, string, re
 import fnmatch
 from types import *
 from glob import glob
-from shutil import rmtree
 from distutils.core import Command
 from distutils.util import extend
 from distutils.text_file import TextFile
@@ -437,12 +436,12 @@ class Dist (Command):
         try:
             self.execute (rmtree, (base_dir,),
                           "removing %s" % base_dir)
-        except (IOError, OSError), exc:
-            if exc.filename:
+        except (IOError, os.error), exc:
+            if hasattr(exc,'filename'):
                 msg = "error removing %s: %s (%s)" % \
                        (base_dir, exc.strerror, exc.filename)
             else:
-                msg = "error removing %s: %s" % (base_dir, exc.strerror)
+                msg = "error removing %s: %s" % (base_dir, exc[-1])
             self.warn (msg)
 
 
@@ -544,11 +543,10 @@ def findall (dir = os.curdir):
 
     list = []
     stack = [dir]
-    pop = stack.pop
     push = stack.append
 
     while stack:
-        dir = pop()
+        dir = stack[-1] ; del stack[-1]
         names = os.listdir (dir)
 
         for name in names:
@@ -559,3 +557,23 @@ def findall (dir = os.curdir):
 
     list.sort()
     return list
+
+
+# Stolen from shutil.py and simplified: needed to copy it here because
+# the Python 1.5.1 version of shutil.py doesn't "import sys".  ;-(
+def rmtree (path):
+    """Recursively delete a directory tree."""
+    cmdtuples = []
+    _build_cmdtuple(path, cmdtuples)
+    for cmd in cmdtuples:
+        apply(cmd[0], (cmd[1],))
+
+# Helper for rmtree()
+def _build_cmdtuple(path, cmdtuples):
+    for f in os.listdir(path):
+        real_f = os.path.join(path,f)
+        if os.path.isdir(real_f) and not os.path.islink(real_f):
+            _build_cmdtuple(real_f, cmdtuples)
+        else:
+            cmdtuples.append(os.remove, real_f)
+    cmdtuples.append(os.rmdir, path)
