@@ -355,7 +355,7 @@ extra_ivars(PyTypeObject *type, PyTypeObject *base)
 		return 0;
 	if (type->tp_dictoffset != 0 && base->tp_dictoffset == 0 &&
 	    type->tp_dictoffset == b_size &&
-	    t_size == b_size + sizeof(PyObject *))
+	    (size_t)t_size == b_size + sizeof(PyObject *))
 		return 0; /* "Forgive" adding a __dict__ only */
 	return 1;
 }
