@@ -2,13 +2,14 @@ DESTDIR=/usr/local
 LIBDESTDIR=$DESTDIR/lib
 LIBDEST=$LIBDESTDIR/python
 DOCDESTDIR=$LIBDEST/doc
+DVIPS=	dvips -f
 
 all:	tut lib ref ext
 
 tut:
 	latex tut
 	latex tut
-	dvips tut >tut.ps
+	$(DVIPS) tut >tut.ps
 
 ref:
 	touch ref.ind
@@ -16,7 +17,7 @@ ref:
 	./fix_hack ref.idx
 	makeindex ref
 	latex ref
-	dvips ref >ref.ps
+	$(DVIPS) ref >ref.ps
 
 lib:
 	touch lib.ind
@@ -24,7 +25,7 @@ lib:
 	./fix_hack lib.idx
 	makeindex lib
 	latex lib
-	dvips lib >lib.ps
+	$(DVIPS) lib >lib.ps
 
 ext:
 	touch ext.ind
@@ -32,14 +33,14 @@ ext:
 	./fix_hack ext.idx
 	makeindex ext
 	latex ext
-	dvips ext >ext.ps
+	$(DVIPS) ext >ext.ps
 
 qua:
 	latex qua
 	bibtex qua
 	latex qua
 	latex qua
-	dvips qua >qua.ps
+	$(DVIPS) qua >qua.ps
 
 lib.texi: lib*.tex texipre.dat texipost.dat partparse.py fix.el
 	python partparse.py -o @lib.texi `whichlibs`
