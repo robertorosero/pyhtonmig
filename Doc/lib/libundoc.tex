@@ -86,14 +86,23 @@ become a tool or demo.  Requires the external program \program{sox}.
 \end{description}
 
 
-\section{Obsolete}
+\section{Obsolete \label{obsolete-modules}}
 
-These modules are not on the standard module search path;
-\indexiii{module}{search}{path}
-but are available in the directory \file{lib-old/} installed  under
-\file{\textrm{\$prefix}/lib/python1.5/}. % $ <-- bow to font lock
-To use any of these modules, add that directory to \code{sys.path},
-possibly using \envvar{PYTHONPATH}.
+These modules are not normally available for import; additional work
+must be done to make them available.
+
+Those which are written in Python will be installed into the directory 
+\file{lib-old/} installed as part of the standard library.  To use
+these, the directory must be added to \code{sys.path}, possibly using
+\envvar{PYTHONPATH}.
+
+Obsolete extension modules written in C are not built by default.
+Under \UNIX, these must be enabled by uncommenting the appropriate
+lines in \file{Modules/Setup} in the build tree and either rebuilding
+Python if the modules are statically linked, or building and
+installing the shared object if using dynamically-loaded extensions.
+
+% XXX need Windows instructions!
 
 \begin{description}
 \item[\module{newdir}]
