@@ -46,13 +46,11 @@ PySTEntry_New(struct symtable *st, identifier name, block_ty block,
 	ste->ste_opt_lineno = 0;
 	ste->ste_lineno = lineno;
 
-	if (st->st_cur == NULL)
-		ste->ste_nested = 0;
-	else if (st->st_cur->ste_nested 
-		 || st->st_cur->ste_type == FunctionBlock)
+	ste->ste_nested = 0;
+	if (st->st_cur != NULL &&
+	    (st->st_cur->ste_nested ||
+	     st->st_cur->ste_type == FunctionBlock))
 		ste->ste_nested = 1;
-	else
-		ste->ste_nested = 0;
 	ste->ste_child_free = 0;
 	ste->ste_generator = 0;
 
@@ -192,6 +190,8 @@ struct symtable *
 PySymtable_Build(mod_ty mod, const char *filename, PyFutureFeatures *future)
 {
 	struct symtable *st = symtable_new();
+	asdl_seq *seq;
+	int i;
 
 	if (st == NULL)
 		return st;
@@ -202,35 +202,30 @@ PySymtable_Build(mod_ty mod, const char *filename, PyFutureFeatures *future)
 	st->st_top = st->st_cur;
 	/* Any other top-level initialization? */
 	switch (mod->kind) {
-	case Module_kind: {
-		int i;
-		asdl_seq *seq = mod->v.Module.body;
+	case Module_kind:
+		seq = mod->v.Module.body;
 		for (i = 0; i < asdl_seq_LEN(seq); i++)
 			if (!symtable_visit_stmt(st, asdl_seq_GET(seq, i)))
 				goto error;
 		break;
-	}
 	case Expression_kind: 
 		if (!symtable_visit_expr(st, mod->v.Expression.body))
 			goto error;
 		break;
-	case Interactive_kind: {
-		int i;
-		asdl_seq *seq = mod->v.Interactive.body;
+	case Interactive_kind:
+		seq = mod->v.Interactive.body;
 		for (i = 0; i < asdl_seq_LEN(seq); i++)
 			if (!symtable_visit_stmt(st, asdl_seq_GET(seq, i)))
 				goto error;
 		break;
-	}
 	case Suite_kind:
 		PyErr_SetString(PyExc_RuntimeError,
 				"this compiler does not handle Suites");
 		return NULL;
 	}
 	symtable_exit_block(st, (void *)mod);
-	if (!symtable_analyze(st))
-	    goto error;
-	return st;
+	if (symtable_analyze(st))
+		return st;
  error:
 	PySymtable_Free(st);
 	return NULL;
@@ -269,16 +264,11 @@ PySymtable_Lookup(struct symtable *st, void *key)
 int 
 PyST_GetScope(PySTEntryObject *ste, PyObject *name)
 {
-	PyObject *v;
-	int flags;
-
-	v = PyDict_GetItem(ste->ste_symbols, name);
+	PyObject *v = PyDict_GetItem(ste->ste_symbols, name);
 	if (!v)
 		return 0;
 	assert(PyInt_Check(v));
-	flags = PyInt_AS_LONG(v);
-	flags = (flags >> SCOPE_OFF) & SCOPE_MASK;
-	return flags;
+	return (PyInt_AS_LONG(v) >> SCOPE_OFF) & SCOPE_MASK;
 }
 
 
@@ -375,7 +365,7 @@ analyze_name(PyObject *dict, PyObject *name, int flags, PyObject *bound,
    That's safe because no name can be free and local in the same scope.
 */
 
-int
+static int
 analyze_cells(PyObject *scope, PyObject *free)
 {
 	PyObject *name, *v, *w;
@@ -572,6 +562,8 @@ symtable_add_def(struct symtable *st, PyObject *name, int flag)
 	} else
 	    val = flag;
 	o = PyInt_FromLong(val);
+        if (o == NULL)
+            return 0;
 	if (PyDict_SetItem(dict, name, o) < 0) {
 		Py_DECREF(o);
 		return 0;
@@ -584,12 +576,13 @@ symtable_add_def(struct symtable *st, PyObject *name, int flag)
 	} else	if (flag & DEF_GLOBAL) {
 		/* XXX need to update DEF_GLOBAL for other flags too;
 		   perhaps only DEF_FREE_GLOBAL */
+		val = flag;
 		if ((o = PyDict_GetItem(st->st_global, name))) {
-			val = PyInt_AS_LONG(o);
-			val |= flag;
-		} else
-			val = flag;
+			val |= PyInt_AS_LONG(o);
+		}
 		o = PyInt_FromLong(val);
+		if (o == NULL)
+			return 0;
 		if (PyDict_SetItem(st->st_global, name, o) < 0) {
 			Py_DECREF(o);
 			return 0;
@@ -898,7 +891,7 @@ symtable_visit_arguments(struct symtable *st, arguments_ty a)
 	   XXX should ast be different?
 	*/
 	if (a->args && !symtable_visit_params(st, a->args, 1))
-			return 0;
+		return 0;
 	if (a->vararg) {
 		if (!symtable_add_def(st, a->vararg, DEF_PARAM))
 			return 0;
@@ -928,14 +921,8 @@ symtable_visit_excepthandler(struct symtable *st, excepthandler_ty eh)
 static int 
 symtable_visit_alias(struct symtable *st, alias_ty a)
 {
-	if (a->asname) {
-		if (!symtable_add_def(st, a->asname, DEF_IMPORT))
-			return 0;
-	}
-	else if (!symtable_add_def(st, a->name, DEF_IMPORT))
-		return 0;
-
-	return 1;
+	PyObject *name = (a->asname == NULL) ? a->name : a->asname;
+	return symtable_add_def(st, name, DEF_IMPORT);
 }
 
 
