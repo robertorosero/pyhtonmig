@@ -8,13 +8,14 @@ from distutils.util import copy_tree
 
 class install_lib (Command):
 
-    description = "install pure Python modules"
+    description = "install all Python modules (extensions and pure Python)"
 
     user_options = [
         ('install-dir=', 'd', "directory to install to"),
         ('build-dir=','b', "build directory (where to install from)"),
         ('compile', 'c', "compile .py to .pyc"),
         ('optimize', 'o', "compile .py to .pyo (optimized)"),
+        ('skip-build', None, "skip the build steps"),
         ]
                
 
@@ -24,6 +25,7 @@ class install_lib (Command):
         self.build_dir = None
         self.compile = 1
         self.optimize = 1
+        self.skip_build = None
 
     def finalize_options (self):
 
@@ -34,21 +36,29 @@ class install_lib (Command):
                                     ('build_lib', 'build_dir'),
                                     ('install_lib', 'install_dir'),
                                     ('compile_py', 'compile'),
-                                    ('optimize_py', 'optimize'))
+                                    ('optimize_py', 'optimize'),
+                                    ('skip_build', 'skip_build'),
+                                   )
 
 
     def run (self):
 
         # Make sure we have built everything we need first
-        if self.distribution.has_pure_modules():
-            self.run_peer ('build_py')
-        if self.distribution.has_ext_modules():
-            self.run_peer ('build_ext')
+        if not self.skip_build:
+            if self.distribution.has_pure_modules():
+                self.run_command ('build_py')
+            if self.distribution.has_ext_modules():
+                self.run_command ('build_ext')
 
         # Install everything: simply dump the entire contents of the build
         # directory to the installation directory (that's the beauty of
         # having a build directory!)
-        outfiles = self.copy_tree (self.build_dir, self.install_dir)
+        if os.path.isdir(self.build_dir):
+            outfiles = self.copy_tree (self.build_dir, self.install_dir)
+        else:
+            self.warn("'%s' does not exist -- no Python modules to install" %
+                      self.build_dir)
+            return
 
         # (Optionally) compile .py to .pyc
         # XXX hey! we can't control whether we optimize or not; that's up
@@ -67,8 +77,6 @@ class install_lib (Command):
                     skip_msg = "byte-compilation of %s skipped" % f
                     self.make_file (f, out_fn, compile, (f,),
                                     compile_msg, skip_msg)
-                                    
-                                    
     # run ()
 
 
@@ -77,7 +85,7 @@ class install_lib (Command):
         if not has_any:
             return []
 
-        build_cmd = self.find_peer (build_cmd)
+        build_cmd = self.get_finalized_command (build_cmd)
         build_files = build_cmd.get_outputs()
         build_dir = getattr (build_cmd, cmd_option)
 
@@ -89,6 +97,14 @@ class install_lib (Command):
         return outputs
 
     # _mutate_outputs ()
+
+    def _bytecode_filenames (self, py_filenames):
+        bytecode_files = []
+        for py_file in py_filenames:
+            bytecode = py_file + (__debug__ and "c" or "o")
+            bytecode_files.append(bytecode)
+
+        return bytecode_files
         
     def get_outputs (self):
         """Return the list of files that would be installed if this command
@@ -99,14 +115,17 @@ class install_lib (Command):
             self._mutate_outputs (self.distribution.has_pure_modules(),
                                   'build_py', 'build_lib',
                                   self.install_dir)
-
+        if self.compile:
+            bytecode_outputs = self._bytecode_filenames(pure_outputs)
+        else:
+            bytecode_outputs = []
 
         ext_outputs = \
             self._mutate_outputs (self.distribution.has_ext_modules(),
                                   'build_ext', 'build_lib',
                                   self.install_dir)
 
-        return pure_outputs + ext_outputs
+        return pure_outputs + bytecode_outputs + ext_outputs
 
     # get_outputs ()
 
@@ -119,11 +138,11 @@ class install_lib (Command):
         inputs = []
         
         if self.distribution.has_pure_modules():
-            build_py = self.find_peer ('build_py')
+            build_py = self.get_finalized_command ('build_py')
             inputs.extend (build_py.get_outputs())
 
         if self.distribution.has_ext_modules():
-            build_ext = self.find_peer ('build_ext')
+            build_ext = self.get_finalized_command ('build_ext')
             inputs.extend (build_ext.get_outputs())
 
         return inputs

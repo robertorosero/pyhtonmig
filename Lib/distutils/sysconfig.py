@@ -6,7 +6,7 @@ Email:        <fdrake@acm.org>
 Initial date: 17-Dec-1998
 """
 
-__version__ = "$Revision$"
+__revision__ = "$Id$"
 
 import os
 import re
@@ -96,6 +96,23 @@ def get_python_lib(plat_specific=0, standard_lib=0, prefix=None):
 
 # get_python_lib()
         
+
+def customize_compiler (compiler):
+    """Do any platform-specific customization of the CCompiler instance
+    'compiler'.  Mainly needed on Unix, so we can plug in the information
+    that varies across Unices and is stored in Python's Makefile.
+    """
+    if compiler.compiler_type == "unix":
+        cc_cmd = CC + ' ' + OPT
+        compiler.set_executables(
+            preprocessor=CC + " -E",    # not always!
+            compiler=cc_cmd,
+            compiler_so=cc_cmd + ' ' + CCSHARED,
+            linker_so=LDSHARED,
+            linker_exe=CC)
+
+        compiler.shared_lib_extension = SO
+
 
 def get_config_h_filename():
     """Return full pathname of installed config.h file."""
@@ -205,21 +222,6 @@ def parse_makefile(fp, g=None):
                 # bogus variable reference; just drop it since we can't deal
                 del notdone[name]
 
-    # "Fix" all pathnames in the Makefile that are explicitly relative,
-    # ie. that start with "./".  This is a kludge to fix the "./ld_so_aix"
-    # problem, the nature of which is that Python's installed Makefile
-    # refers to "./ld_so_aix", but when we are building extensions we are
-    # far from the directory where Python's Makefile (and ld_so_aix, for
-    # that matter) is installed.  Unfortunately, there are several other
-    # relative pathnames in the Makefile, and this fix doesn't fix them,
-    # because the layout of Python's source tree -- which is what the
-    # Makefile refers to -- is not fully preserved in the Python
-    # installation.  Grumble.
-    from os.path import normpath, join, dirname
-    for (name, value) in done.items():
-        if value[0:2] == "./":
-            done[name] = normpath(join(dirname(fp.name), value))
-
     # save the results in the global dictionary
     g.update(done)
     return g
@@ -229,7 +231,29 @@ def _init_posix():
     """Initialize the module as appropriate for POSIX systems."""
     g = globals()
     # load the installed Makefile:
-    parse_makefile(open(get_makefile_filename()), g)
+    try:
+        filename = get_makefile_filename()
+        file = open(filename)
+    except IOError, msg:
+        my_msg = "invalid Python installation: unable to open %s" % filename
+        if hasattr(msg, "strerror"):
+            my_msg = my_msg + " (%s)" % msg.strerror
+
+        raise DistutilsPlatformError, my_msg
+              
+    parse_makefile(file, g)
+    
+    # On AIX, there are wrong paths to the linker scripts in the Makefile
+    # -- these paths are relative to the Python source, but when installed
+    # the scripts are in another directory.
+    if sys.platform == 'aix4':          # what about AIX 3.x ?
+        # Linker script is in the config directory, not in Modules as the
+        # Makefile says.
+        python_lib = get_python_lib(standard_lib=1)
+        ld_so_aix = os.path.join(python_lib, 'config', 'ld_so_aix')
+        python_exp = os.path.join(python_lib, 'config', 'python.exp')
+
+        g['LDSHARED'] = "%s %s -bI:%s" % (ld_so_aix, g['CC'], python_exp)
 
 
 def _init_nt():
@@ -244,6 +268,23 @@ def _init_nt():
 
     g['SO'] = '.pyd'
     g['exec_prefix'] = EXEC_PREFIX
+
+    # These are needed for the CygwinCCompiler and Mingw32CCompiler
+    # classes, which are just UnixCCompiler classes that happen to work on
+    # Windows.  UnixCCompiler expects to find these values in sysconfig, so
+    # here they are.  The fact that other Windows compilers don't need
+    # these values is pure luck (hmmm).
+
+    # XXX I think these are now unnecessary...
+
+    g['CC'] = "cc"                      # not gcc?
+    g['RANLIB'] = "ranlib"
+    g['AR'] = "ar"
+    g['OPT'] = "-O2"
+    g['SO'] = ".pyd"
+    g['LDSHARED'] = "ld"
+    g['CCSHARED'] = ""
+    g['EXE'] = ".exe"
 
 
 def _init_mac():

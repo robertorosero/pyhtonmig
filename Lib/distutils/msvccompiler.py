@@ -1,4 +1,4 @@
-"""distutils.ccompiler
+"""distutils.msvccompiler
 
 Contains MSVCCompiler, an implementation of the abstract CCompiler class
 for the Microsoft Visual Studio."""
@@ -12,21 +12,26 @@ __revision__ = "$Id$"
 
 import sys, os, string
 from types import *
-from distutils.errors import *
+from distutils.errors import \
+     DistutilsExecError, DistutilsPlatformError, \
+     CompileError, LibError, LinkError
 from distutils.ccompiler import \
      CCompiler, gen_preprocess_options, gen_lib_options
 
-
 _can_read_reg = 0
 try:
-    import winreg
-    _can_read_reg = 1
-    hkey_mod = winreg
+    try:
+        import _winreg
+    except ImportError:
+        import winreg                   # for pre-2000/06/29 CVS Python
 
-    RegOpenKeyEx = winreg.OpenKeyEx
-    RegEnumKey = winreg.EnumKey
-    RegEnumValue = winreg.EnumValue
-    RegError = winreg.error
+    _can_read_reg = 1
+    hkey_mod = _winreg
+
+    RegOpenKeyEx = _winreg.OpenKeyEx
+    RegEnumKey = _winreg.EnumKey
+    RegEnumValue = _winreg.EnumValue
+    RegError = _winreg.error
 
 except ImportError:
     try:
@@ -166,6 +171,13 @@ class MSVCCompiler (CCompiler) :
 
     compiler_type = 'msvc'
 
+    # Just set this so CCompiler's constructor doesn't barf.  We currently
+    # don't use the 'set_executables()' bureaucracy provided by CCompiler,
+    # as it really isn't necessary for this sort of single-compiler class.
+    # Would be nice to have a consistent interface with UnixCCompiler,
+    # though, so it's worth thinking about.
+    executables = {}
+
     # Private class data (need to distinguish C from C++ source for compiler)
     _c_extensions = ['.c']
     _cpp_extensions = ['.cc','.cpp']
@@ -261,9 +273,12 @@ class MSVCCompiler (CCompiler) :
                 output_opt = "/Fo" + obj
 
                 self.mkpath (os.path.dirname (obj))
-                self.spawn ([self.cc] + compile_opts + pp_opts +
-                            [input_opt, output_opt] +
-                            extra_postargs)
+                try:
+                    self.spawn ([self.cc] + compile_opts + pp_opts +
+                                [input_opt, output_opt] +
+                                extra_postargs)
+                except DistutilsExecError, msg:
+                    raise CompileError, msg
 
         return objects
 
@@ -290,7 +305,11 @@ class MSVCCompiler (CCompiler) :
                 lib_args[:0] = extra_preargs
             if extra_postargs:
                 lib_args.extend (extra_postargs)
-            self.spawn ([self.link] + ld_args)
+            try:
+                self.spawn ([self.lib] + lib_args)
+            except DistutilsExecError, msg:
+                raise LibError, msg
+                
         else:
             self.announce ("skipping %s (up-to-date)" % output_filename)
 
@@ -304,18 +323,23 @@ class MSVCCompiler (CCompiler) :
                          libraries=None,
                          library_dirs=None,
                          runtime_library_dirs=None,
+                         export_symbols=None,
                          debug=0,
                          extra_preargs=None,
-                         extra_postargs=None):
+                         extra_postargs=None,
+                         build_temp=None):
 
         self.link_shared_object (objects,
                                  self.shared_library_name(output_libname),
                                  output_dir=output_dir,
                                  libraries=libraries,
                                  library_dirs=library_dirs,
+                                 runtime_library_dirs=runtime_library_dirs,
+                                 export_symbols=export_symbols,
                                  debug=debug,
                                  extra_preargs=extra_preargs,
-                                 extra_postargs=extra_postargs)
+                                 extra_postargs=extra_postargs,
+                                 build_temp=build_temp)
                     
     
     def link_shared_object (self,
@@ -325,9 +349,11 @@ class MSVCCompiler (CCompiler) :
                             libraries=None,
                             library_dirs=None,
                             runtime_library_dirs=None,
+                            export_symbols=None,
                             debug=0,
                             extra_preargs=None,
-                            extra_postargs=None):
+                            extra_postargs=None,
+                            build_temp=None):
 
         (objects, output_dir) = self._fix_object_args (objects, output_dir)
         (libraries, library_dirs, runtime_library_dirs) = \
@@ -350,8 +376,12 @@ class MSVCCompiler (CCompiler) :
             else:
                 ldflags = self.ldflags_shared
 
-            ld_args = ldflags + lib_opts + \
-                      objects + ['/OUT:' + output_filename]
+            export_opts = []
+            for sym in (export_symbols or []):
+                export_opts.append("/EXPORT:" + sym)
+
+            ld_args = (ldflags + lib_opts + export_opts + 
+                       objects + ['/OUT:' + output_filename])
 
             if extra_preargs:
                 ld_args[:0] = extra_preargs
@@ -362,7 +392,10 @@ class MSVCCompiler (CCompiler) :
             print "  output_filename =", output_filename
             print "  mkpath'ing:", os.path.dirname (output_filename)
             self.mkpath (os.path.dirname (output_filename))
-            self.spawn ([self.link] + ld_args)
+            try:
+                self.spawn ([self.link] + ld_args)
+            except DistutilsExecError, msg:
+                raise LinkError, msg
 
         else:
             self.announce ("skipping %s (up-to-date)" % output_filename)
@@ -412,7 +445,10 @@ class MSVCCompiler (CCompiler) :
                 ld_args.extend (extra_postargs)
 
             self.mkpath (os.path.dirname (output_filename))
-            self.spawn ([self.link] + ld_args)
+            try:
+                self.spawn ([self.link] + ld_args)
+            except DistutilsExecError, msg:
+                raise LinkError, msg
         else:
             self.announce ("skipping %s (up-to-date)" % output_filename)   
     
