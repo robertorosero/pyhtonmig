@@ -650,7 +650,20 @@ com_atom(c, n)
 		com_addoparg(c, LOAD_CONST, i);
 		break;
 	case STRING:
-		if ((v = parsestr(STR(ch))) == NULL) {
+		if ((v = parsestr(STR(ch))) != NULL) {
+			/* String literal concatenation */
+			for (i = 1; i < NCH(n) && v != NULL; i++) {
+				object *w;
+				if ((w = parsestr(STR(CHILD(n, i)))) == NULL) {
+					DECREF(v);
+					v = NULL;
+					break;
+				}
+				joinstring(&v, w);
+				DECREF(w);
+			}
+		}
+		if (v == NULL) {
 			c->c_errors++;
 			i = 255;
 		}
