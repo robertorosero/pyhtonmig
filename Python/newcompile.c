@@ -29,14 +29,21 @@ struct compiler_unit {
 	PySTEntryObject *u_ste;
 
 	PyObject *u_name;
-	PyObject *u_consts;
-	PyObject *u_names;
-	PyObject *u_varnames;
+	/* The following fields are dicts that map objects to
+	   the index of them in co_XXX.  The index is used as
+	   the argument for opcodes that refer to those collections.
+	*/
+	PyObject *u_consts;    /* all constants */
+	PyObject *u_names;     /* all names */
+	PyObject *u_varnames;  /* local variables */
 
-	int u_argcount;
-	int u_nblocks;
-	int u_nalloc;
-	int u_curblock;
+	int u_argcount;    /* number of arguments for block */ 
+	int u_nblocks;     /* number of used blocks in u_blocks
+			      u_nblocks < u_nalloc */
+	int u_nalloc;      /* current alloc count for u_blocks */
+	int u_curblock;    /* index of current block in u_blocks */
+	int u_tmpname;     /* temporary variables for list comps */
+	identifier u_tmp; /* name for u_tmpname */
 	struct basicblock u_exit;
 	struct basicblock **u_blocks;
 
@@ -82,8 +89,9 @@ static PyCodeObject *compiler_mod(struct compiler *, mod_ty);
 static int compiler_visit_stmt(struct compiler *, stmt_ty);
 static int compiler_visit_expr(struct compiler *, expr_ty);
 static int compiler_augassign(struct compiler *, stmt_ty);
-static int compiler_visit_slice(struct compiler *c, slice_ty s,
-				expr_context_ty ctx);
+static int compiler_visit_slice(struct compiler *, slice_ty,
+				expr_context_ty);
+static int compiler_visit_listcomp(struct compiler *, listcomp_ty);
 
 static int compiler_push_fblock(struct compiler *, enum fblocktype, int);
 static void compiler_pop_fblock(struct compiler *, enum fblocktype, int);
@@ -1290,6 +1298,34 @@ compiler_compare(struct compiler *c, expr_ty e)
 }
 
 
+static int
+compiler_listcomp(struct compiler *c, expr_ty e)
+{
+	char tmpname[256];
+	identifier tmp;
+	static identifier append;
+
+	assert(e->kind == ListComp_kind);
+	if (!append) {
+		append = PyString_InternFromString("append");
+		if (!append)
+			return 0;
+	}
+	PyOS_snprintf(tmpname, sizeof(tmpname), "_[%d]",
+		      ++c->u->u_tmpname);
+	tmp = PyString_FromString(tmpname);
+	if (!tmp)
+		return 0;
+	ADDOP_I(c, BUILD_LIST, 0);
+	ADDOP(c, DUP_TOP);
+	ADDOP_O(c, LOAD_ATTR, append, names);
+	if (!compiler_nameop(c, tmp, Store))
+		return 0;
+	c->u->u_tmp = tmp;
+	VISIT_SEQ(c, listcomp, e->v.ListComp.generators);
+	c->u->u_tmp = NULL;
+	return 1;
+}
 
 static int
 compiler_visit_expr(struct compiler *c, expr_ty e)
@@ -1326,6 +1362,7 @@ compiler_visit_expr(struct compiler *c, expr_ty e)
 		}
 		break;
         case ListComp_kind:
+		return compiler_listcomp(c, e);
 		break;
         case Compare_kind:
 		return compiler_compare(c, e);
@@ -1453,6 +1490,85 @@ compiler_augassign(struct compiler *c, stmt_ty s)
 	    fprintf(stderr, "invalid node type for augmented assignment\n");
 	    return 0;
 	}
+	return 1;
+}
+
+static int
+compiler_visit_listcomp(struct compiler *c, listcomp_ty l)
+{
+	/* generate code for the iterator, then each of the ifs,
+	   and then write to the target */
+	
+	int start, anchor, skip, i, n;
+	expr_ty load_target;
+
+	/* The target must be valid in an assignment context,
+	   which limits the kinds of expressions that are valid.
+	   We need to load and store the target, which means it
+	   must be visited in two contexts.  The ast provides
+	   a store context, so create a copy for use in the load
+	   context.
+	*/
+	switch (l->target->kind) {
+	case Attribute_kind: 
+		load_target = Attribute(l->target->v.Attribute.value,
+					l->target->v.Attribute.attr,
+					Load);
+		break;
+	case Subscript_kind:
+		load_target = Subscript(l->target->v.Subscript.value,
+					l->target->v.Subscript.slice,
+					Load);
+		break;
+	case Name_kind:
+		load_target = Name(l->target->v.Name.id, Load);
+		break;
+	case List_kind:
+		load_target = List(l->target->v.List.elts, Load);
+		break;
+	case Tuple_kind:
+		load_target = Tuple(l->target->v.Tuple.elts, Load);
+		break;
+	default:
+		PyErr_Format(PyExc_SyntaxError, 
+			     "invalid list comp target: kind %d\n",
+			     l->target->kind);
+		return 0;
+	}
+
+	start = compiler_new_block(c);
+	skip = compiler_new_block(c);
+	anchor = compiler_new_block(c);
+	
+	VISIT(c, expr, l->iter);
+	ADDOP(c, GET_ITER);
+	compiler_use_next_block(c, start);
+	ADDOP_JREL(c, FOR_ITER, anchor);
+	NEXT_BLOCK(c);
+	VISIT(c, expr, l->target);
+	
+	n = asdl_seq_LEN(l->ifs);
+	for (i = 0; i < n; i++) {
+		expr_ty e = asdl_seq_GET(l->ifs, i);
+		VISIT(c, expr, e);
+		/* XXX not anchor? */
+		ADDOP_JREL(c, JUMP_IF_FALSE, skip);
+		NEXT_BLOCK(c);
+		ADDOP(c, DUP_TOP);
+	} 
+
+	if (!compiler_nameop(c, c->u->u_tmp, Load))
+		return 0;
+	VISIT(c, expr, load_target);
+	ADDOP_I(c, CALL_FUNCTION, 1);
+	ADDOP(c, POP_TOP);
+
+	compiler_use_next_block(c, skip);
+	ADDOP_JABS(c, JUMP_ABSOLUTE, start);
+	compiler_use_next_block(c, anchor);
+	if (!compiler_nameop(c, c->u->u_tmp, Del))
+		return 0;
+	
 	return 1;
 }
 
@@ -1695,10 +1811,16 @@ assemble_emit(struct assembler *a, struct instr *i)
 		    return 0;
 	}
 	code = PyString_AS_STRING(a->a_bytecode) + a->a_offset;
-	fprintf(stderr,
-		"emit %3d %-15s %5d\toffset = %2d\tsize = %d\text = %d\n",
-		i->i_opcode, opnames[i->i_opcode],
-		i->i_oparg, a->a_offset, size, ext);
+	if (i->i_hasarg) 
+	    fprintf(stderr,
+		    "emit %3d %-15s %5d\toffset = %2d\tsize = %d\text = %d\n",
+		    i->i_opcode, opnames[i->i_opcode],
+		    i->i_oparg, a->a_offset, size, ext);
+	else
+	    fprintf(stderr,
+		    "emit %3d %-15s %s\toffset = %2d\tsize = %d\text = %d\n",
+		    i->i_opcode, opnames[i->i_opcode],
+		    "     ", a->a_offset, size, ext);
 	a->a_offset += size;
 	if (ext > 0) {
 	    *code++ = (char)EXTENDED_ARG;
@@ -1843,8 +1965,10 @@ assemble(struct compiler *c)
 	/* Emit code in reverse postorder from dfs. */
 	for (i = a.a_nblocks - 1; i >= 0; i--) {
 		struct basicblock *b = c->u->u_blocks[a.a_postorder[i]];
-		fprintf(stderr, "block %d(%d): used=%d alloc=%d next=%d\n",
-			i, a.a_postorder[i], b->b_iused, b->b_ialloc, b->b_next);
+		fprintf(stderr, 
+			"block %d: order=%d used=%d alloc=%d next=%d\n",
+			i, a.a_postorder[i], b->b_iused, b->b_ialloc,
+			b->b_next);
 		for (j = 0; j < b->b_iused; j++) {
 			if (!assemble_emit(&a, &b->b_instr[j]))
 				goto error;

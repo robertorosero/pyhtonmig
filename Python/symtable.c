@@ -774,10 +774,19 @@ symtable_visit_expr(struct symtable *st, expr_ty e)
 		VISIT_SEQ(st, expr, e->v.Dict.keys);
 		VISIT_SEQ(st, expr, e->v.Dict.values);
 		break;
-        case ListComp_kind:
+        case ListComp_kind: {
+		char tmpname[256];
+		identifier tmp;
+
+		PyOS_snprintf(tmpname, sizeof(tmpname), "_[%d]",
+			      ++st->st_cur->ste_tmpname);
+		tmp = PyString_FromString(tmpname);
+		if (!symtable_add_def(st, tmp, DEF_LOCAL))
+			return 0;
 		VISIT(st, expr, e->v.ListComp.target);
 		VISIT_SEQ(st, listcomp, e->v.ListComp.generators);
 		break;
+	}
         case Compare_kind:
 		VISIT(st, expr, e->v.Compare.left);
 		VISIT_SEQ(st, expr, e->v.Compare.comparators);
