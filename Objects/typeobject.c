@@ -55,8 +55,10 @@ type_call(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
 	char *dummy = NULL;
 	PyObject *obj, *res;
+	char buffer[100];
 
-	if (!PyArg_ParseTupleAndKeywords(args, kwds, "", &dummy))
+	sprintf(buffer, ":<type '%.80s'>", type->tp_name);
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, buffer, &dummy))
 		return NULL;
 
 	if (type->tp_construct == NULL) {
