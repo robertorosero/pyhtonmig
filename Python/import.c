@@ -61,11 +61,21 @@ extern long getmtime(); /* Defined in posixmodule.c */
 #define USE_DL
 #endif
 
+
+#ifdef _AIX
+#include <sys/ldr.h>
+typedef void (*dl_funcptr)();
+#define _DL_FUNCPTR_DEFINED
+static void aix_loaderror( char *name  );
+#endif
+
 #ifdef USE_DL
 
 #ifdef USE_SHLIB
 #include <dlfcn.h>
+#ifndef _DL_FUNCPTR_DEFINED
 typedef void (*dl_funcptr)();
+#endif
 #ifndef RTLD_LAZY
 #define RTLD_LAZY 1
 #endif
@@ -126,13 +136,13 @@ static struct filedescr {
 	char *mode;
 	enum filetype type;
 } filetab[] = {
-#ifdef USE_DL
+#if  defined(USE_DL) || defined(_AIX)
 #ifdef USE_SHLIB
 	{"module.so", "rb", C_EXTENSION},
 #else /* !USE_SHLIB */
 	{"module.o", "rb", C_EXTENSION},
 #endif /* !USE_SHLIB */
-#endif /* USE_DL */
+#endif /* USE_DL  ||  _AIX */
 	{".py", "r", PY_SOURCE},
 	{".pyc", "rb", PY_COMPILED},
 	{0, 0}
@@ -296,7 +306,7 @@ get_module(m, name, m_ret)
 				name, namebuf);
 		break;
 
-#ifdef USE_DL
+#if defined( USE_DL ) || defined( _AIX )
 	case C_EXTENSION:
 	      {
 		char funcname[258];
@@ -327,8 +337,14 @@ get_module(m, name, m_ret)
 			p = (dl_funcptr) dlsym(handle, funcname);
 		}
 #else /* !USE_SHLIB */
+#ifdef _AIX
+		p = (dl_funcptr) load( namebuf, 1, 0 );
+		if ( p == NULL ) { aix_loaderror( namebuf ); return NULL; }
+#else /* _AIX */
 		p =  dl_loadmod(getprogramname(), namebuf, funcname);
+#endif 
 #endif /* !USE_SHLIB */
+
 		if (p == NULL) {
 			err_setstr(ImportError,
 			   "dynamic module does not define init function");
@@ -520,3 +536,56 @@ init_frozen(name)
 	DECREF(v);
 	return 1;
 }
+
+
+#ifdef _AIX
+
+#include <ctype.h>	/* for isdigit()	*/
+#include <errno.h>	/* for global errno	*/
+#include <string.h>	/* for strerror()	*/
+
+void aix_loaderror( char *namebuf )
+{
+
+	char *message[8], errbuf[1024];
+	int i,j;
+
+	struct errtab { 
+		int errno;
+		char *errstr;
+	} load_errtab[] = {
+		{ L_ERROR_TOOMANY,	"to many errors, rest skipped." },
+		{ L_ERROR_NOLIB,	"can't load library:" },
+		{ L_ERROR_UNDEF,	"can't find symbol in library:"},
+		{ L_ERROR_RLDBAD,	"RLD index out of range or bad relocation type:" },
+		{ L_ERROR_FORMAT,	"not a valid, executable xcoff file:" },
+		{ L_ERROR_MEMBER,	"file not an archive or does not contain requested member:" },
+		{ L_ERROR_TYPE,		"symbol table mismatch:" },
+		{ L_ERROR_ALIGN,	"text allignment in file is wrong." },
+		{ L_ERROR_SYSTEM,	"System error:" },
+		{ L_ERROR_ERRNO,	NULL }
+	};
+
+#define LOAD_ERRTAB_LEN	(sizeof(load_errtab)/sizeof(load_errtab[0]))
+#define ERRBUF_APPEND(s)	strncat(errbuf, s, sizeof(errbuf))
+
+	sprintf( errbuf, " from module %s ", namebuf );
+
+	if ( !loadquery( 1, &message[0], sizeof(message) ) ) 
+		ERRBUF_APPEND( strerror( errno ) );
+	for( i = 0; message[i] && *message[i]; i++ ) {
+		int nerr = atoi(message[i]);
+		for (j=0; j<LOAD_ERRTAB_LEN ; j++ ) {
+		    if ((nerr == load_errtab[i].errno) && load_errtab[i].errstr)
+			ERRBUF_APPEND(load_errtab[i].errstr);
+		}
+		while ( isdigit(*message[i]) ) message[i]++ ; 
+		ERRBUF_APPEND( message[i] );
+		ERRBUF_APPEND( "\n" );
+	}
+	errbuf[strlen(errbuf)-1] = '\0' ;	/* trim off last newline */
+	err_setstr( ImportError, errbuf ); 
+	return; 
+}
+
+#endif	/* _AIX */
