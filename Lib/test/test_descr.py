@@ -413,26 +413,59 @@ def diamond():
     verify(G.__mro__ == (G, E, D, C, B, A, object))
 
 def objects():
-    if verbose: print "Testing 'object' class..."
-    # Not much to test here :-)
+    if verbose: print "Testing object class..."
     a = object()
     verify(a.__class__ == object == type(a))
     b = object()
     verify(a is not b)
-
+    verify(not hasattr(a, "foo"))
     try:
-        object().foo
-    except AttributeError:
-        pass
-    else:
-        print "Ouch: object() should not have a foo attribute!"
-
-    try:
-        object().foo = 12
+        a.foo = 12
     except AttributeError:
         pass
     else:
         print "Ouch: object() should not allow setting a foo attribute!"
+    verify(not hasattr(object(), "__dict__"))
+
+    class Cdict(object):
+        pass
+    x = Cdict()
+    verify(x.__dict__ is None)
+    x.foo = 1
+    verify(x.foo == 1)
+    verify(x.__dict__ == {'foo': 1})
+
+def slots():
+    if verbose: print "Testing __slots__..."
+    class C0(object):
+        __slots__ = []
+    x = C0()
+    verify(not hasattr(x, "__dict__"))
+    verify(not hasattr(x, "foo"))
+
+    class C1(object):
+        __slots__ = ['a']
+    x = C1()
+    verify(not hasattr(x, "__dict__"))
+    verify(x.a == None)
+    x.a = 1
+    verify(x.a == 1)
+    del x.a
+    verify(x.a == None)
+
+    class C3(object):
+        __slots__ = ['a', 'b', 'c']
+    x = C3()
+    verify(not hasattr(x, "__dict__"))
+    verify(x.a is None)
+    verify(x.b is None)
+    verify(x.c is None)
+    x.a = 1
+    x.b = 2
+    x.c = 3
+    verify(x.a == 1)
+    verify(x.b == 2)
+    verify(x.c == 3)
 
 def errors():
     if verbose: print "Testing errors..."
@@ -479,6 +512,14 @@ def errors():
     else:
         print "Ouch: __slots__ = {} should be illegal!"
 
+    try:
+        class C(object):
+            __slots__ = [1]
+    except TypeError:
+        pass
+    else:
+        print "Ouch: __slots__ = [1] should be illegal!"
+
 def all():
     lists()
     dicts()
@@ -493,6 +534,7 @@ def all():
     multi()
     diamond()
     objects()
+    slots()
     errors()
 
 all()
