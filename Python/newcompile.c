@@ -81,10 +81,13 @@ static int compiler_nameop(struct compiler *, identifier, expr_context_ty);
 static PyCodeObject *compiler_mod(struct compiler *, mod_ty);
 static int compiler_visit_stmt(struct compiler *, stmt_ty);
 static int compiler_visit_expr(struct compiler *, expr_ty);
+static int compiler_augassign(struct compiler *, stmt_ty);
 static int compiler_visit_slice(struct compiler *, slice_ty);
 
 static int compiler_push_fblock(struct compiler *, enum fblocktype, int);
 static void compiler_pop_fblock(struct compiler *, enum fblocktype, int);
+
+static int inplace_binop(struct compiler *, operator_ty);
 
 static PyCodeObject *assemble(struct compiler *);
 
@@ -885,6 +888,7 @@ compiler_visit_stmt(struct compiler *c, stmt_ty s)
 		break;
         case AugAssign_kind:
 		return compiler_augassign(c, s);
+		break;
         case Print_kind:
 		return compiler_print(c, s);
 		break;
@@ -1011,6 +1015,42 @@ binop(struct compiler *c, operator_ty op)
 	case FloorDiv:
 		return BINARY_FLOOR_DIVIDE;
 	}
+	return 0;
+}
+
+static int 
+inplace_binop(struct compiler *c, operator_ty op)
+{
+	switch (op) {
+	case Add:
+		return INPLACE_ADD;
+	case Sub:
+		return INPLACE_SUBTRACT;
+	case Mult: 
+		return INPLACE_MULTIPLY;
+	case Div:
+		if (c->c_flags && c->c_flags->cf_flags & CO_FUTURE_DIVISION)
+			return INPLACE_TRUE_DIVIDE;
+		else
+			return INPLACE_DIVIDE;
+	case Mod:
+		return INPLACE_MODULO;
+	case Pow:
+		return INPLACE_POWER;
+	case LShift: 
+		return INPLACE_LSHIFT;
+	case RShift:
+		return INPLACE_RSHIFT;
+	case BitOr:
+		return INPLACE_OR;
+	case BitXor: 
+		return INPLACE_XOR;
+	case BitAnd:
+		return INPLACE_AND;
+	case FloorDiv:
+		return INPLACE_FLOOR_DIVIDE;
+	}
+	assert(0);
 	return 0;
 }
 
@@ -1226,17 +1266,20 @@ compiler_visit_expr(struct compiler *c, expr_ty e)
         case Attribute_kind:
 		VISIT(c, expr, e->v.Attribute.value);
 		switch (e->v.Attribute.ctx) {
+		case AugLoad:
+			ADDOP(c, DUP_TOP);
+			/* Fall through to load */
 		case Load:
 			ADDOP_O(c, LOAD_ATTR, e->v.Attribute.attr, names);
 			break;
+		case AugStore:
+			ADDOP(c, ROT_TWO);
+			/* Fall through to save */
 		case Store:
 			ADDOP_O(c, STORE_ATTR, e->v.Attribute.attr, names);
 			break;
 		case Del:
 			ADDOP_O(c, DELETE_ATTR, e->v.Attribute.attr, names);
-			break;
-		case AugStore:
-			/* XXX */
 			break;
 		case Param:
 			assert(0);
@@ -1259,6 +1302,40 @@ compiler_visit_expr(struct compiler *c, expr_ty e)
 		VISIT_SEQ(c, expr, e->v.Tuple.elts);
 		ADDOP_I(c, BUILD_TUPLE, asdl_seq_LEN(e->v.Tuple.elts));
 		break;
+	}
+	return 1;
+}
+
+static int 
+compiler_augassign(struct compiler *c, stmt_ty s)
+{
+	expr_ty e = s->v.AugAssign.target;
+	expr_ty auge;
+
+	assert(s->kind == AugAssign_kind);
+
+	switch (e->kind) {
+	case Attribute_kind:
+		auge = Attribute(e->v.Attribute.value, e->v.Attribute.attr,
+				 AugLoad);
+		VISIT(c, expr, auge);
+		VISIT(c, expr, s->v.AugAssign.value);
+		ADDOP(c, inplace_binop(c, s->v.AugAssign.op));
+		auge->v.Attribute.ctx = AugStore;
+		VISIT(c, expr, auge);
+		free(auge);
+		break;
+	case Subscript_kind:
+	    break;
+	case Name_kind:
+		VISIT(c, expr, s->v.AugAssign.target);
+		VISIT(c, expr, s->v.AugAssign.value);
+		ADDOP(c, inplace_binop(c, s->v.AugAssign.op));
+		return compiler_nameop(c, e->v.Name.id, Store);
+		break;
+	default:
+	    fprintf(stderr, "invalid node type for augmented assignment\n");
+	    return 0;
 	}
 	return 1;
 }
