@@ -448,7 +448,8 @@ type_new(PyTypeObject *metatype, PyObject *args, PyObject *kwds)
 	struct memberlist *mp;
 	int i, nbases, nslots, slotoffset, dynamic;
 
-	if (PyTuple_Check(args) && PyTuple_GET_SIZE(args) == 1 &&
+	if (metatype == &PyType_Type &&
+	    PyTuple_Check(args) && PyTuple_GET_SIZE(args) == 1 &&
 	    (kwds == NULL || (PyDict_Check(kwds) && PyDict_Size(kwds) == 0))) {
 		/* type(x) -> x.__class__ */
 		PyObject *x = PyTuple_GET_ITEM(args, 0);
