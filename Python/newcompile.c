@@ -915,6 +915,8 @@ static int
 compiler_from_import(struct compiler *c, stmt_ty s)
 {
 	int i, n = asdl_seq_LEN(s->v.ImportFrom.names);
+	int star = 0;
+
 	PyObject *names = PyTuple_New(n);
 	if (!names)
 		return 0;
@@ -931,6 +933,14 @@ compiler_from_import(struct compiler *c, stmt_ty s)
 		alias_ty alias = asdl_seq_GET(s->v.ImportFrom.names, i);
 		identifier store_name;
 
+		if (i == 0 && 
+		    *PyString_AS_STRING(alias->name) == '*') {
+			assert(n == 1);
+			ADDOP(c, IMPORT_STAR);
+			star = 1;
+			break;
+		}
+		    
 		ADDOP_O(c, IMPORT_FROM, alias->name, names);
 		store_name = alias->name;
 		if (alias->asname)
@@ -939,8 +949,9 @@ compiler_from_import(struct compiler *c, stmt_ty s)
 		if (!compiler_nameop(c, store_name, Store))
 			return 0;
 	}
-	/* remove imported module */
-	ADDOP(c, POP_TOP);
+	if (!star) 
+		/* remove imported module */
+		ADDOP(c, POP_TOP);
 	return 1;
 }
 
@@ -1038,9 +1049,15 @@ compiler_visit_stmt(struct compiler *c, stmt_ty s)
 		}
 		ADDOP_I(c, RAISE_VARARGS, n);
 		break;
+	/* just visit body of try/except and try/finally.
+	   this isn't at all correct, but visits more code.
+	*/
         case TryExcept_kind:
+		VISIT_SEQ(c, stmt, s->v.TryExcept.body);
 		break;
         case TryFinally_kind:
+		VISIT_SEQ(c, stmt, s->v.TryFinally.body);
+		VISIT_SEQ(c, stmt, s->v.TryFinally.finalbody);
 		break;
         case Assert_kind:
 		return compiler_assert(c, s);
