@@ -947,6 +947,9 @@ sub do_env_tableii{
     my $h2 = next_argument();
     s/[\s\n]+//;
     $globals{'lineifont'} = $font;
+    my $a1 = $col_aligns[0];
+    my $a2 = $col_aligns[1];
+    s/\\lineii</\\lineii[$a1|$a2]</g;
     return '<table border align="center" style="border-collapse: collapse">'
            . "\n  <thead>"
            . "\n    <tr$TABLE_HEADER_BGCOLOR>"
@@ -961,12 +964,13 @@ sub do_env_tableii{
 
 sub do_cmd_lineii{
     local($_) = @_;
+    my $aligns = next_optional_argument();
     my $c1 = next_argument();
     my $c2 = next_argument();
     s/[\s\n]+//;
     my($font,$sfont,$efont) = get_table_col1_fonts();
     $c2 = '&nbsp;' if ($c2 eq '');
-    my($c1align,$c2align) = @col_aligns[0,1];
+    my($c1align,$c2align) = split('\|', $aligns);
     my $padding = '';
     if ($c1align =~ /align="right"/) {
         $padding = '&nbsp;';
@@ -985,6 +989,10 @@ sub do_env_tableiii{
     my $h3 = next_argument();
     s/[\s\n]+//;
     $globals{'lineifont'} = $font;
+    my $a1 = $col_aligns[0];
+    my $a2 = $col_aligns[1];
+    my $a3 = $col_aligns[2];
+    s/\\lineiii</\\lineiii[$a1|$a2|$a3]</g;
     return '<table border align="center" style="border-collapse: collapse">'
            . "\n  <thead>"
            . "\n    <tr$TABLE_HEADER_BGCOLOR>"
@@ -1000,13 +1008,14 @@ sub do_env_tableiii{
 
 sub do_cmd_lineiii{
     local($_) = @_;
+    my $aligns = next_optional_argument();
     my $c1 = next_argument();
     my $c2 = next_argument(); 
     my $c3 = next_argument();
     s/[\s\n]+//;
     my($font,$sfont,$efont) = get_table_col1_fonts();
     $c3 = '&nbsp;' if ($c3 eq '');
-    my($c1align,$c2align,$c3align) = @col_aligns[0,1,2];
+    my($c1align,$c2align,$c3align) = split('\|', $aligns);
     my $padding = '';
     if ($c1align =~ /align="right"/) {
         $padding = '&nbsp;';
@@ -1027,6 +1036,11 @@ sub do_env_tableiv{
     my $h4 = next_argument();
     s/[\s\n]+//;
     $globals{'lineifont'} = $font;
+    my $a1 = $col_aligns[0];
+    my $a2 = $col_aligns[1];
+    my $a3 = $col_aligns[2];
+    my $a4 = $col_aligns[3];
+    s/\\lineiv</\\lineiv[$a1|$a2|$a3|$a4]</g;
     return '<table border align="center" style="border-collapse: collapse">'
            . "\n  <thead>"
            . "\n    <tr$TABLE_HEADER_BGCOLOR>"
@@ -1043,6 +1057,7 @@ sub do_env_tableiv{
 
 sub do_cmd_lineiv{
     local($_) = @_;
+    my $aligns = next_optional_argument();
     my $c1 = next_argument();
     my $c2 = next_argument(); 
     my $c3 = next_argument();
@@ -1050,7 +1065,7 @@ sub do_cmd_lineiv{
     s/[\s\n]+//;
     my($font,$sfont,$efont) = get_table_col1_fonts();
     $c4 = '&nbsp;' if ($c4 eq '');
-    my($c1align,$c2align,$c3align,$c4align) = @col_aligns;
+    my($c1align,$c2align,$c3align,$c4align) = split('\|', $aligns);
     my $padding = '';
     if ($c1align =~ /align="right"/) {
         $padding = '&nbsp;';
