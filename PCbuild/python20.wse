@@ -1080,7 +1080,7 @@ item: If/While Statement
   Value=B
   Flags=00001010
 end
-item: Install File
+remarked item: Install File
   Source=%_DOC_%\*.*
   Destination=%MAINDIR%\Doc
   Description=Python Documentation (HTML)
