@@ -490,10 +490,9 @@ parsenumber(s)
 {
 	extern long mystrtol PROTO((const char *, char **, int));
 	extern unsigned long mystrtoul PROTO((const char *, char **, int));
-	extern double strtod PROTO((const char *, char **));
+	extern double atof PROTO((const char *));
 	char *end;
 	long x;
-	double xx;
 	errno = 0;
 	end = s + strlen(s) - 1;
 	if (*end == 'l' || *end == 'L')
@@ -510,22 +509,8 @@ parsenumber(s)
 		}
 		return newintobject(x);
 	}
-	errno = 0;
-	xx = strtod(s, &end);
-	if (*end == '\0') {
-#ifndef BROKEN_STRTOD
-		/* Some strtod() versions (e.g., in older SunOS systems)
-		   set errno incorrectly; better to ignore overflows
-		   than not to be able to use float literals at all! */
-		if (errno != 0) {
-			err_setstr(OverflowError, "float literal too large");
-			return NULL;
-		}
-#endif
-		return newfloatobject(xx);
-	}
-	err_setstr(SyntaxError, "bad number syntax");
-	return NULL;
+	/* XXX Huge floats may silently fail */
+	return newfloatobject(atof(s));
 }
 
 static object *
