@@ -10,10 +10,6 @@ __rcsid__ = "$Id$"
 import sys, os, string
 from distutils.errors import *
 
-# Python 1.5.1 compatibility:
-if not hasattr (__builtins__,'OSError'):
-    OSError = os.error
-
 
 def spawn (cmd,
            search_path=1,
@@ -69,7 +65,7 @@ def _spawn_nt ( cmd,
         # spawn for NT requires a full path to the .exe
         try:
             rc = os.spawnv (os.P_WAIT, executable, cmd)
-        except OSError, exc:
+        except os.error, exc:
             # this seems to happen when the command isn't found
             raise DistutilsExecError, \
                   "command '%s' failed: %s" % (cmd[0], exc[-1])
@@ -160,7 +156,7 @@ def _spawn_posix (cmd,
             #print "cmd[0] =", cmd[0]
             #print "cmd =", cmd
             exec_fn (cmd[0], cmd)
-        except OSError, e:
+        except os.error, e:
             sys.stderr.write ("unable to execute '%s': %s\n" %
                               (cmd[0], e[-1]))
             os._exit (1)
