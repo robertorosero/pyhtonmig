@@ -181,26 +181,15 @@ identifiers.  They must be spelled exactly as written here:
 \index{reserved word}
 
 \begin{verbatim}
-and        del        for        in         print
-break      elif       from       is         raise
-class      else       global     not        return
-continue   except     if         or         try
-def        finally    import     pass       while
+access     del        from       lambda     return    
+and        elif       global     not        try       
+break      else       if         or         while     
+class      except     import     pass      
+continue   finally    in         print     
+def        for        is         raise     
 \end{verbatim}
 
-%	# This Python program sorts and formats the above table
-%	import string
-%	l = []
-%	try:
-%		while 1:
-%			l = l + string.split(raw_input())
-%	except EOFError:
-%		pass
-%	l.sort()
-%	for i in range((len(l)+4)/5):
-%		for j in range(i, len(l), 5):
-%			print string.ljust(l[j], 10),
-%		print
+% When adding keywords, pipe it through keywords.py for reformatting
 
 \section{Literals} \label{literals}
 
