@@ -588,7 +588,6 @@ compiler_if(struct compiler *c, stmt_ty s)
 			return 0;
 		VISIT(c, expr, s->v.If.test);
 		ADDOP_JREL(c, JUMP_IF_FALSE, next);
-		NEXT_BLOCK(c);
 		ADDOP(c, POP_TOP);
 		VISIT_SEQ(c, stmt, s->v.If.body);
 		ADDOP_JREL(c, JUMP_FORWARD, end);
