@@ -227,3 +227,27 @@ responses to the feedback.  Give the community enough time to think
 over this complicated proposal.  Provide the community with a
 prototype implementation to test.  Try to do this *before* casting
 everything in stone!
+
+***************************************************************************
+***************************************************************************
+Merge details (this section is Tim's scratchpad, but should help a lot if
+he dies of frustration while wrestling with CVS <0.9 wink>).
+
+2001-07-06
+
+Tagged trunk a bit after midnight, like so:
+
+C:\Code>cvs tag date2001-07-06 python
+cvs server: Tagging python
+cvs server: Tagging python/dist
+cvs server: Tagging python/dist/src
+T python/dist/src/.cvsignore
+T python/dist/src/LICENSE
+T python/dist/src/Makefile.pre.in
+T python/dist/src/README
+... [& about 3000 lines more] ...
+
+This is the first trunk snapshot to be merged into the descr-branch.
+Gave it a date instead of a goofy name because there's going to be more
+than one of these, and at least it's obvious which of two ISO dates comes
+earlier.  These tags should go away after all merging is complete.
