@@ -92,8 +92,9 @@ sed -e 's/[ 	]*#.*//' -e '/^[ 	]*$/d' |
 	RULES=
 	while read line
 	do
+		# Output DEFS in reverse order so first definition overrides
 		case $line in
-		*=*)	DEFS="$DEFS$line$NL"; continue;;
+		*=*)	DEFS="$line$NL$DEFS"; continue;;
 		'<noobjects>')	noobjects=yes; continue;; 
 		esac
 		objs=
@@ -103,7 +104,7 @@ sed -e 's/[ 	]*#.*//' -e '/^[ 	]*$/d' |
 		do
 			case $arg in
 			-[IDUC]*)	cpps="$cpps $arg";;
-			-[Ll]*)		LIBS="$LIBS $arg";;
+			-[A-Zl]*)	LIBS="$LIBS $arg";;
 			*.a)		LIBS="$LIBS $arg";;
 			*.o)		objs="$objs $arg";;
 			*.*)		echo 1>&2 "bad word $arg in $line"
