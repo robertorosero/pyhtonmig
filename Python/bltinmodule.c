@@ -1358,22 +1358,6 @@ Return the number of items of a sequence or mapping.";
 
 
 static PyObject *
-builtin_list(PyObject *self, PyObject *args)
-{
-	PyObject *v;
-
-	if (!PyArg_ParseTuple(args, "O:list", &v))
-		return NULL;
-	return PySequence_List(v);
-}
-
-static char list_doc[] =
-"list(sequence) -> list\n\
-\n\
-Return a new list whose items are the same as those of the argument sequence.";
-
-
-static PyObject *
 builtin_slice(PyObject *self, PyObject *args)
 {
 	PyObject *start, *stop, *step;
@@ -1991,24 +1975,6 @@ If the argument is a tuple, the return value is the same object.";
 
 
 static PyObject *
-builtin_type(PyObject *self, PyObject *args)
-{
-	PyObject *v;
-
-	if (!PyArg_ParseTuple(args, "O:type", &v))
-		return NULL;
-	v = (PyObject *)v->ob_type;
-	Py_INCREF(v);
-	return v;
-}
-
-static char type_doc[] =
-"type(object) -> type object\n\
-\n\
-Return the type of the object.";
-
-
-static PyObject *
 builtin_vars(PyObject *self, PyObject *args)
 {
 	PyObject *v = NULL;
@@ -2176,7 +2142,6 @@ static PyMethodDef builtin_methods[] = {
 	{"issubclass",  builtin_issubclass, 1, issubclass_doc},
 	{"iter",	builtin_iter, 1, iter_doc},
 	{"len",		builtin_len, 1, len_doc},
-	{"list",	builtin_list, 1, list_doc},
 	{"locals",	builtin_locals, 1, locals_doc},
 	{"long",	builtin_long, 1, long_doc},
 	{"map",		builtin_map, 1, map_doc},
@@ -2196,7 +2161,6 @@ static PyMethodDef builtin_methods[] = {
 	{"slice",       builtin_slice, 1, slice_doc},
 	{"str",		builtin_str, 1, str_doc},
 	{"tuple",	builtin_tuple, 1, tuple_doc},
-	{"type",	builtin_type, 1, type_doc},
 	{"unicode",	builtin_unicode, 1, unicode_doc},
 	{"unichr",	builtin_unichr, 1, unichr_doc},
 	{"vars",	builtin_vars, 1, vars_doc},
@@ -2226,6 +2190,16 @@ _PyBuiltin_Init(void)
 		return NULL;
 	if (PyDict_SetItemString(dict, "NotImplemented",
 				 Py_NotImplemented) < 0)
+		return NULL;
+	if (PyDict_SetItemString(dict, "dictionary",
+				 (PyObject *) &PyDict_Type) < 0)
+		return NULL;
+	if (PyDict_SetItemString(dict, "list", (PyObject *) &PyList_Type) < 0)
+		return NULL;
+	if (PyDict_SetItemString(dict, "object",
+				 (PyObject *) &PyBaseObject_Type) < 0)
+		return NULL;
+	if (PyDict_SetItemString(dict, "type", (PyObject *) &PyType_Type) < 0)
 		return NULL;
 	debug = PyInt_FromLong(Py_OptimizeFlag == 0);
 	if (PyDict_SetItemString(dict, "__debug__", debug) < 0) {
