@@ -4,8 +4,9 @@
 """Classes to generate plain text from a message object tree.
 """
 
-import time
 import re
+import time
+import locale
 import random
 
 from types import ListType, StringType
@@ -364,7 +365,8 @@ class DecodedGenerator(Generator):
 def _make_boundary(text=None):
     # Craft a random boundary.  If text is given, ensure that the chosen
     # boundary doesn't appear in the text.
-    boundary = ('=' * 15) + repr(random.random()).split('.')[1] + '=='
+    dp = locale.localeconv().get('decimal_point', '.')
+    boundary = ('=' * 15) + repr(random.random()).split(dp)[1] + '=='
     if text is None:
         return boundary
     b = boundary
