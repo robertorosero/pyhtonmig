@@ -1,6 +1,7 @@
 ext.tex
 write NEWS file
 make freeze script working again (use Extensions/mkext.py as a base?)
+update versions: Doc/*.tex, README, Python/version.c; where else?
 
 Put PostScript on archive site
 

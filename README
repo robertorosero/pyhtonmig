@@ -250,6 +250,7 @@ Contrib/	Contributed code
 Demo/		Demonstration scripts, modules and programs
 Demo2/		Some more demonstrations (not distributed)
 Doc/		Documentation (in LaTeX)
+Ext-dummy/	Placeholder for Extensions in the distribution
 Extensions/	Extension modules (not distributed)
 Grammar/	Input for the parser generator
 Include/	Public header files
