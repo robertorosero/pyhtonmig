@@ -534,7 +534,6 @@ PyRun_InteractiveOneFlags(FILE *fp, char *filename, PyCompilerFlags *flags)
 {
 	PyObject *m, *d, *v, *w;
 	mod_ty mod;
-	perrdetail err;
 	char *ps1 = "", *ps2 = "";
 
 	v = PySys_GetObject("ps1");
@@ -559,14 +558,8 @@ PyRun_InteractiveOneFlags(FILE *fp, char *filename, PyCompilerFlags *flags)
 	Py_XDECREF(v);
 	Py_XDECREF(w);
 	if (mod == NULL) {
-		if (err.error == E_EOF) {
-			if (err.text)
-				PyMem_DEL(err.text);
-			return E_EOF;
-		}
-		err_input(&err);
 		PyErr_Print();
-		return err.error;
+		return -1;
 	}
 	m = PyImport_AddModule("__main__");
 	if (m == NULL)
