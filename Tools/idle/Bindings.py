@@ -1,28 +1,30 @@
-# This file defines the menu contents and key bindings.  Note that
-# there is additional configuration information in the EditorWindow
-# class (and subclasses): the menus are created there based on the
-# menu_specs (class) variable, and menus not created are silently
-# skipped by the code here.  This makes it possible to define the
-# Debug menu here, which is only present in the PythonShell window.
+"""Define the menu contents, hotkeys, and event bindings.
 
+There is additional configuration information in the EditorWindow class (and
+subclasses): the menus are created there based on the menu_specs (class)
+variable, and menus not created are silently skipped in the code here.  This
+makes it possible, for example, to define a Debug menu which is only present in
+the PythonShell window, and a Format menu which is only present in the Editor
+windows.
+
+"""
 import sys
-from keydefs import *
+from configHandler import idleConf
 
 menudefs = [
  # underscore prefixes character to underscore
  ('file', [
-   ('_New window', '<<open-new-window>>'),
+   ('_New Window', '<<open-new-window>>'),
    ('_Open...', '<<open-window-from-file>>'),
-   ('Open _module...', '<<open-module>>'),
-   ('Class _browser', '<<open-class-browser>>'),
-   ('_Path browser', '<<open-path-browser>>'),
-   ('Python shell', '<<open-python-shell>>'),
+   ('Open _Module...', '<<open-module>>'),
+   ('Class _Browser', '<<open-class-browser>>'),
+   ('_Path Browser', '<<open-path-browser>>'),
    None,
    ('_Save', '<<save-window>>'),
    ('Save _As...', '<<save-window-as-file>>'),
    ('Save Co_py As...', '<<save-copy-of-window-as-file>>'),
    None,
-   ('_Print window', '<<print-window>>'),
+   ('_Print Window', '<<print-window>>'),
    None,
    ('_Close', '<<close-window>>'),
    ('E_xit', '<<close-all-windows>>'),
@@ -31,28 +33,55 @@ menudefs = [
    ('_Undo', '<<undo>>'),
    ('_Redo', '<<redo>>'),
    None,
-   ('Cu_t', '<<Cut>>'),
-   ('_Copy', '<<Copy>>'),
-   ('_Paste', '<<Paste>>'),
+   ('Cu_t', '<<cut>>'),
+   ('_Copy', '<<copy>>'),
+   ('_Paste', '<<paste>>'),
    ('Select _All', '<<select-all>>'),
-  ]),
- ('debug', [
-   ('_Go to file/line', '<<goto-file-line>>'),
-   ('_Stack viewer', '<<open-stack-viewer>>'),
-   ('!_Debugger', '<<toggle-debugger>>'),
-   ('!_Auto-open stack viewer', '<<toggle-jit-stack-viewer>>' ),
-  ]),
- ('help', [
-   ('_Help...', '<<help>>'),
-   ('Python _Documentation...', '<<python-docs>>'),
    None,
-   ('_About IDLE...', '<<about-idle>>'),
+   ('_Find...', '<<find>>'),
+   ('Find A_gain', '<<find-again>>'),
+   ('Find _Selection', '<<find-selection>>'),
+   ('Find in Files...', '<<find-in-files>>'),
+   ('R_eplace...', '<<replace>>'),
+   ('Go to _Line', '<<goto-line>>'),
   ]),
+('format', [
+   ('_Indent Region', '<<indent-region>>'),
+   ('_Dedent Region', '<<dedent-region>>'),
+   ('Comment _Out Region', '<<comment-region>>'),
+   ('U_ncomment Region', '<<uncomment-region>>'),
+   ('Tabify Region', '<<tabify-region>>'),
+   ('Untabify Region', '<<untabify-region>>'),
+   ('Toggle Tabs', '<<toggle-tabs>>'),
+   ('New Indent Width', '<<change-indentwidth>>'),
+   ]),
+ ('run', [
+   ('Python Shell', '<<open-python-shell>>'),
+   ]),
+ ('shell', [
+   ('_View Last Restart', '<<view-restart>>'),
+   ('_Restart Shell', '<<restart-shell>>'),
+   ]),
+ ('debug', [
+   ('_Go to File/Line', '<<goto-file-line>>'),
+   ('!_Debugger', '<<toggle-debugger>>'),
+   ('_Stack Viewer', '<<open-stack-viewer>>'),
+   ('!_Auto-open Stack Viewer', '<<toggle-jit-stack-viewer>>'),
+   ]),
+ ('options', [
+   ('_Configure IDLE...', '<<open-config-dialog>>'),
+   None,
+   ('Revert to _Default Settings', '<<revert-all-settings>>'),
+   ]),
+ ('help', [
+   ('_About IDLE', '<<about-idle>>'),
+   ('IDLE _Readme', '<<view-readme>>'),
+   None,
+   ('_IDLE Help', '<<help>>'),
+   ('Python _Docs', '<<python-docs>>'),
+   ]),
 ]
 
-if sys.platform == 'win32':
-    default_keydefs = windows_keydefs
-else:
-    default_keydefs = unix_keydefs
+default_keydefs = idleConf.GetCurrentKeySet()
 
 del sys

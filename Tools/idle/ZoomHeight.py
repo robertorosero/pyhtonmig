@@ -11,13 +11,6 @@ class ZoomHeight:
          ])
     ]
 
-    windows_keydefs = {
-        '<<zoom-height>>': ['<Alt-F2>'],
-    }
-    unix_keydefs = {
-        '<<zoom-height>>': ['<Control-x><Control-z>'],
-    }
-
     def __init__(self, editwin):
         self.editwin = editwin
 
@@ -37,8 +30,10 @@ def zoom_height(top):
         newy = 0
         newheight = newheight - 72
     else:
-        newy = 24
-        newheight = newheight - 96
+        #newy = 24
+        newy = 0
+        #newheight = newheight - 96
+        newheight = newheight - 88
     if height >= newheight:
         newgeom = ""
     else:

@@ -1,8 +1,10 @@
+#!/usr/bin/python
+
 try:
-    import idle
-except SystemExit:
-    raise
-except:
-    import traceback
-    traceback.print_exc()
-    raw_input("Hit return to exit...")
+    import idlelib.PyShell
+except ImportError:
+    # IDLE is not installed, but maybe PyShell is on sys.path:
+    import PyShell
+    PyShell.main()
+else:
+    idlelib.PyShell.main()

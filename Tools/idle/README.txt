@@ -1,53 +1,38 @@
-IDLE 0.5 - February 2000
-------------------------
+IDLEfork README
+===============
 
-This is an early release of IDLE, my own attempt at a Tkinter-based
-IDE for Python.
+IDLEfork is an official experimental fork of Python's Integrated DeveLopment
+Environment, IDLE.  The biggest change is to execute Python code in a separate
+process, which is /restarted/ for each Run (F5) initiated from an editor
+window.  This enhancement of IDLE has often been requested, and is now finally
+available, complete with the IDLE debugger.  The magic "reload/import *"
+incantations are no longer required when editing/testing a module two or three
+steps down the import chain.
 
-For news about this release, see the file NEWS.txt.  (For a more
-detailed change log, see the file ChangeLog.)
+There is also a new GUI configuration manager which makes it easy to select
+fonts, colors, keybindings, and startup options.  There is new feature where
+the user can specify additional help sources, either locally or on the web.
 
-FEATURES
+IDLEfork will be merged back into the Python distribution in the near future
+(probably 2.3), replacing the current version of IDLE.
 
-IDLE has the following features:
+For information on this release, refer to NEWS.txt
 
-- coded in 100% pure Python, using the Tkinter GUI toolkit (i.e. Tcl/Tk)
+As David Scherer aptly put it in the original IDLEfork README, "It is alpha
+software and might be unstable. If it breaks, you get to keep both pieces."
 
-- cross-platform: works on Windows and Unix (on the Mac, there are
-currently problems with Tcl/Tk)
+If you find bugs let us know about them by using the IDLEfork Bug Tracker.  See
+the IDLEfork home page at
 
-- multi-window text editor with multiple undo, Python colorizing
-and many other features, e.g. smart indent and call tips
+http://idlefork.sourceforge.net 
 
-- Python shell window (a.k.a. interactive interpreter)
+for details.  Patches are always appreciated at the IDLEfork Patch Tracker, and
+Change Requests should be posted to the RFE Tracker at
 
-- debugger (not complete, but you can set breakpoints, view  and step)
+https://sourceforge.net/tracker/?group_id=9579&atid=359579  
 
-USAGE
+There is a mail list for IDLE: idle-dev@python.org.  You can join at
 
-The main program is in the file "idle.py"; on Unix, you should be able
-to run it by typing "./idle.py" to your shell.  On Windows, you can
-run it by double-clicking it; you can use idle.pyw to avoid popping up
-a DOS console.  If you want to pass command line arguments on Windows,
-use the batch file idle.bat.
+http://mail.python.org/mailman/listinfo/idle-dev
 
-Command line arguments: files passed on the command line are executed,
-not opened for editing, unless you give the -e command line option.
-Try "./idle.py -h" to see other command line options.
-
-IDLE requires Python 1.5.2 or later, so it is currently only usable
-with a Python 1.5.2 (or later) distribution.  (An older version of
-IDLE is distributed with Python 1.5.2; you can drop this version on
-top of it.)
-
-COPYRIGHT
-
-IDLE is covered by the standard Python copyright notice
-(http://www.python.org/doc/Copyright.html).
-
-FEEDBACK
-
-For feedback, please use the Python Bugs List
-(http://www.python.org/search/search_bugs.html).
-
---Guido van Rossum (home page: http://www.python.org/~guido/)
+Thanks for trying IDLEfork.

@@ -1,59 +1,53 @@
 """Extension to execute code outside the Python shell window.
 
-This adds the following commands (to the Edit menu, until there's a
-separate Python menu):
+This adds the following commands:
 
-- Check module (Alt-F5) does a full syntax check of the current module.
-It also runs the tabnanny to catch any inconsistent tabs.
+- Check module does a full syntax check of the current module.
+  It also runs the tabnanny to catch any inconsistent tabs.
 
-- Import module (F5) is equivalent to either import or reload of the
-current module.  The window must have been saved previously. The
-module is added to sys.modules, and is also added to the __main__
-namespace.  Output goes to the shell window.
+- Run module executes the module's code in the __main__ namespace.  The window
+  must have been saved previously. The module is added to sys.modules, and is
+  also added to the __main__ namespace.
 
-- Run module (Control-F5) does the same but executes the module's
-code in the __main__ namespace.
+XXX GvR Redesign this interface (yet again) as follows:
+
+- Present a dialog box for ``Run Module''
+
+- Allow specify command line arguments in the dialog box
 
 """
 
-import sys
-import os
-import imp
+import re
+import string
+import tabnanny
+import tokenize
 import tkMessageBox
+
+IDENTCHARS = string.ascii_letters + string.digits + "_"
 
 indent_message = """Error: Inconsistent indentation detected!
 
 This means that either:
 
-(1) your indentation is outright incorrect (easy to fix), or
+1) your indentation is outright incorrect (easy to fix), or
 
-(2) your indentation mixes tabs and spaces in a way that depends on \
+2) your indentation mixes tabs and spaces in a way that depends on \
 how many spaces a tab is worth.
 
 To fix case 2, change all tabs to spaces by using Select All followed \
 by Untabify Region (both in the Edit menu)."""
 
+
+# XXX 11Jun02 KBK TBD Implement stop-execution
+
 class ScriptBinding:
 
-    keydefs = {
-        '<<check-module>>': ['<Alt-F5>', '<Meta-F5>'],
-        '<<import-module>>': ['<F5>'],
-        '<<run-script>>': ['<Control-F5>'],
-    }
-
     menudefs = [
-        ('edit', [None,
-                  ('Check module', '<<check-module>>'),
-                  ('Import module', '<<import-module>>'),
-                  ('Run script', '<<run-script>>'),
-                 ]
-        ),
-    ]
+        ('run', [None,
+                 ('Check Module', '<<check-module>>'),
+                 ('Run Module', '<<run-module>>'), ]), ]
 
     def __init__(self, editwin):
-        if not editwin.runnable:
-            self.menudefs = []
-            self.keydefs = {}
         self.editwin = editwin
         # Provide instance variables referenced by Debugger
         # XXX This should be done differently
@@ -66,107 +60,108 @@ class ScriptBinding:
             return
         if not self.tabnanny(filename):
             return
-        if not self.checksyntax(filename):
-            return
+        self.checksyntax(filename)
 
     def tabnanny(self, filename):
-        import tabnanny
-        import tokenize
         f = open(filename, 'r')
         try:
             tabnanny.process_tokens(tokenize.generate_tokens(f.readline))
         except tokenize.TokenError, msg:
-            self.errorbox("Token error",
-                          "Token error:\n%s" % str(msg))
-            return 0
+            self.errorbox("Token error", "Token error:\n%s" % msg)
+            return False
         except tabnanny.NannyNag, nag:
             # The error messages from tabnanny are too confusing...
             self.editwin.gotoline(nag.get_lineno())
             self.errorbox("Tab/space error", indent_message)
-            return 0
-        return 1
+            return False
+        return True
 
     def checksyntax(self, filename):
         f = open(filename, 'r')
         source = f.read()
         f.close()
         if '\r' in source:
-            import re
             source = re.sub(r"\r\n", "\n", source)
         if source and source[-1] != '\n':
             source = source + '\n'
         try:
-            compile(source, filename, "exec")
+            # If successful, return the compiled code
+            return compile(source, filename, "exec")
         except (SyntaxError, OverflowError), err:
             try:
                 msg, (errorfilename, lineno, offset, line) = err
                 if not errorfilename:
                     err.args = msg, (filename, lineno, offset, line)
                     err.filename = filename
+                self.colorize_syntax_error(msg, lineno, offset)
             except:
-                lineno = None
                 msg = "*** " + str(err)
-            if lineno:
-                self.editwin.gotoline(lineno)
             self.errorbox("Syntax error",
                           "There's an error in your program:\n" + msg)
-        return 1
+            return False
 
-    def import_module_event(self, event):
-        filename = self.getfilename()
-        if not filename:
-            return
-
-        modname, ext = os.path.splitext(os.path.basename(filename))
-        if sys.modules.has_key(modname):
-            mod = sys.modules[modname]
+    def colorize_syntax_error(self, msg, lineno, offset):
+        text = self.editwin.text
+        pos = "0.0 + %d lines + %d chars" % (lineno-1, offset-1)
+        text.tag_add("ERROR", pos)
+        char = text.get(pos)
+        if char and char in IDENTCHARS:
+            text.tag_add("ERROR", pos + " wordstart", pos)
+        if '\n' == text.get(pos):   # error at line end
+            text.mark_set("insert", pos)
         else:
-            mod = imp.new_module(modname)
-            sys.modules[modname] = mod
-        mod.__file__ = filename
-        setattr(sys.modules['__main__'], modname, mod)
+            text.mark_set("insert", pos + "+1c")
+        text.see(pos)
 
-        dir = os.path.dirname(filename)
-        dir = os.path.normpath(os.path.abspath(dir))
-        if dir not in sys.path:
-            sys.path.insert(0, dir)
-
-        flist = self.editwin.flist
-        shell = flist.open_shell()
-        interp = shell.interp
-        interp.runcode("reload(%s)" % modname)
-
-    def run_script_event(self, event):
+    def run_module_event(self, event):
+        "Check syntax, if ok run the module in the shell top level"
         filename = self.getfilename()
         if not filename:
             return
-
+        code = self.checksyntax(filename)
+        if not code:
+            return
         flist = self.editwin.flist
         shell = flist.open_shell()
         interp = shell.interp
-        if (not sys.argv or
-            os.path.basename(sys.argv[0]) != os.path.basename(filename)):
-            # XXX Too often this discards arguments the user just set...
-            sys.argv = [filename]
-        interp.execfile(filename)
+        interp.restart_subprocess()
+        # XXX Too often this discards arguments the user just set...
+        interp.runcommand("""if 1:
+            _filename = %s
+            import sys as _sys
+            from os.path import basename as _basename
+            if (not _sys.argv or
+                _basename(_sys.argv[0]) != _basename(_filename)):
+                _sys.argv = [_filename]
+                del _filename, _sys, _basename
+                \n""" % `filename`)
+        interp.runcode(code)
 
     def getfilename(self):
-        # Logic to make sure we have a saved filename
-        # XXX Better logic would offer to save!
+        """Get source filename.  If not saved, offer to save (or create) file
+
+        The debugger requires a source file.  Make sure there is one, and that
+        the current version of the source buffer has been saved.  If the user
+        declines to save or cancels the Save As dialog, return None.
+        """
         if not self.editwin.get_saved():
-            name = (self.editwin.short_title() or
-                    self.editwin.long_title() or
-                    "Untitled")
-            self.errorbox("Not saved",
-                          "The buffer for %s is not saved.\n" % name +
-                          "Please save it first!")
-            self.editwin.text.focus_set()
-            return
+            msg = """Source Must Be Saved
+     OK to Save?"""
+            mb = tkMessageBox.Message(
+                                title="Save Before Run or Check",
+                                message=msg,
+                                icon=tkMessageBox.QUESTION,
+                                type=tkMessageBox.OKCANCEL,
+                                default=tkMessageBox.OK,
+                                master=self.editwin.text)
+            reply = mb.show()
+            if reply == "ok":
+                self.editwin.io.save(None)
+            else:
+                return None
+        # filename is None if file doesn't exist
         filename = self.editwin.io.filename
-        if not filename:
-            self.errorbox("No file name",
-                          "This window has no file name")
-            return
+        self.editwin.text.focus_set()
         return filename
 
     def errorbox(self, title, message):

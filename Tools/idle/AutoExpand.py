@@ -7,17 +7,9 @@ import re
 
 class AutoExpand:
 
-    keydefs = {
-        '<<expand-word>>': ['<Alt-slash>'],
-    }
-
-    unix_keydefs = {
-        '<<expand-word>>': ['<Meta-slash>', '<Alt-slash>'],
-    }
-
     menudefs = [
         ('edit', [
-            ('E_xpand word', '<<expand-word>>'),
+            ('E_xpand Word', '<<expand-word>>'),
          ]),
     ]
 

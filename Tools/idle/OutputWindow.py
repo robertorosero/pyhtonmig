@@ -2,7 +2,6 @@ from Tkinter import *
 from EditorWindow import EditorWindow
 import re
 import tkMessageBox
-import IOBinding
 
 class OutputWindow(EditorWindow):
 
@@ -35,14 +34,6 @@ class OutputWindow(EditorWindow):
     # Act as output file
 
     def write(self, s, tags=(), mark="insert"):
-        # Tk assumes that byte strings are Latin-1;
-        # we assume that they are in the locale's encoding
-        if isinstance(s, str):
-            try:
-                s = unicode(s, IOBinding.encoding)
-            except UnicodeError:
-                # some other encoding; let Tcl deal with it
-                pass
         self.text.insert(mark, s, tags)
         self.text.see(mark)
         self.text.update()
@@ -140,18 +131,18 @@ class OnDemandOutputWindow:
         text.tag_raise('sel')
         self.write = self.owin.write
 
-class PseudoFile:
+#class PseudoFile:
+#
+#      def __init__(self, owin, tags, mark="end"):
+#          self.owin = owin
+#          self.tags = tags
+#          self.mark = mark
 
-    def __init__(self, owin, tags, mark="end"):
-        self.owin = owin
-        self.tags = tags
-        self.mark = mark
+#      def write(self, s):
+#          self.owin.write(s, self.tags, self.mark)
 
-    def write(self, s):
-        self.owin.write(s, self.tags, self.mark)
+#      def writelines(self, l):
+#          map(self.write, l)
 
-    def writelines(self, l):
-        map(self.write, l)
-
-    def flush(self):
-        pass
+#      def flush(self):
+#          pass

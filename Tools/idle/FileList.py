@@ -1,3 +1,8 @@
+# changes by dscherer@cmu.edu
+#   - FileList.open() takes an optional 3rd parameter action, which is
+#       called instead of creating a new EditorWindow.  This enables
+#       things like 'open in same window'.
+
 import os
 from Tkinter import *
 import tkMessageBox
@@ -24,7 +29,7 @@ class FileList:
         self.inversedict = {}
         self.vars = {} # For EditorWindow.getrawvar (shared Tcl variables)
 
-    def open(self, filename):
+    def open(self, filename, action=None):
         assert filename
         filename = self.canonize(filename)
         if os.path.isdir(filename):
@@ -43,7 +48,10 @@ class FileList:
                 "New File",
                 "Opening non-existent file %s" % `filename`,
                 master=self.root)
-        return self.EditorWindow(self, filename, key)
+        if action is None:
+            return self.EditorWindow(self, filename, key)
+        else:
+            return action(filename)
 
     def gotofileline(self, filename, lineno=None):
         edit = self.open(filename)

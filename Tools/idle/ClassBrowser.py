@@ -98,7 +98,7 @@ class ModuleBrowserTreeItem(TreeItem):
         for key, cl in dict.items():
             if cl.module == name:
                 s = key
-                if hasattr(cl, "super") and cl.super:
+                if hasattr(cl, 'super') and cl.super:
                     supers = []
                     for sup in cl.super:
                         if type(sup) is type(''):
@@ -142,10 +142,11 @@ class ClassBrowserTreeItem(TreeItem):
             return "folder"
 
     def IsExpandable(self):
-        try:
-            return bool(self.cl.methods)
-        except AttributeError:
-            return False
+        if self.cl:
+            try:
+                return not not self.cl.methods
+            except AttributeError:
+                return False
 
     def GetSubList(self):
         if not self.cl:

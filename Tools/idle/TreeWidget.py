@@ -63,7 +63,7 @@ class TreeNode:
         self.parent = parent
         self.item = item
         self.state = 'collapsed'
-        self.selected = 0
+        self.selected = False
         self.children = []
         self.x = self.y = None
         self.iconimages = {} # cache of PhotoImage instances for icons
@@ -90,7 +90,7 @@ class TreeNode:
         if self.selected:
             return
         self.deselectall()
-        self.selected = 1
+        self.selected = True
         self.canvas.delete(self.image_id)
         self.drawicon()
         self.drawtext()
@@ -98,7 +98,7 @@ class TreeNode:
     def deselect(self, event=None):
         if not self.selected:
             return
-        self.selected = 0
+        self.selected = False
         self.canvas.delete(self.image_id)
         self.drawicon()
         self.drawtext()
@@ -428,8 +428,8 @@ class ScrolledCanvas:
         self.canvas.bind("<Key-Next>", self.page_down)
         self.canvas.bind("<Key-Up>", self.unit_up)
         self.canvas.bind("<Key-Down>", self.unit_down)
-        if isinstance(master, Toplevel) or isinstance(master, Tk):
-            self.canvas.bind("<Alt-F2>", self.zoom_height)
+        #if isinstance(master, Toplevel) or isinstance(master, Tk):
+        self.canvas.bind("<Alt-Key-2>", self.zoom_height)
         self.canvas.focus_set()
     def page_up(self, event):
         self.canvas.yview_scroll(-1, "page")

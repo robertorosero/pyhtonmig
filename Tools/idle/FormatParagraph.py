@@ -19,18 +19,10 @@ import re
 class FormatParagraph:
 
     menudefs = [
-        ('edit', [
+        ('format', [   # /s/edit/format   dscherer@cmu.edu
             ('Format Paragraph', '<<format-paragraph>>'),
          ])
     ]
-
-    keydefs = {
-        '<<format-paragraph>>': ['<Alt-q>'],
-    }
-
-    unix_keydefs = {
-        '<<format-paragraph>>': ['<Meta-q>'],
-    }
 
     def __init__(self, editwin):
         self.editwin = editwin
