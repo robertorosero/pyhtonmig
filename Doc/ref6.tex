@@ -175,16 +175,17 @@ key with the same value existed).
 
 \item
 If the target is a slicing: The primary expression in the reference is
-evaluated.  It should yield a mutable sequence (list) object.  The
+evaluated.  It should yield a mutable sequence object (e.g. a list).  The
 assigned object should be a sequence object of the same type.  Next,
 the lower and upper bound expressions are evaluated, insofar they are
 present; defaults are zero and the sequence's length.  The bounds
 should evaluate to (small) integers.  If either bound is negative, the
 sequence's length is added to it.  The resulting bounds are clipped to
 lie between zero and the sequence's length, inclusive.  Finally, the
-sequence object is asked to replace the items indicated by the slice
-with the items of the assigned sequence.  This may change the
-sequence's length, if it allows it.
+sequence object is asked to replace the slice with the items of the
+assigned sequence.  The length of the slice may be different from the
+length of the assigned sequence, thus changing the length of the
+target sequence, if the object allows it.
 \indexii{slicing}{assignment}
 
 \end{itemize}
@@ -325,12 +326,13 @@ break_stmt:     "break"
 \end{verbatim}
 
 \verb@break@ may only occur syntactically nested in a \verb@for@
-or \verb@while@ loop, not nested in a function or class definition.
+or \verb@while@ loop, but not nested in a function or class definition
+within that loop.
 \stindex{for}
 \stindex{while}
 \indexii{loop}{statement}
 
-It terminates the neares enclosing loop, skipping the optional
+It terminates the nearest enclosing loop, skipping the optional
 \verb@else@ clause if the loop has one.
 \kwindex{else}
 
@@ -351,10 +353,9 @@ continue_stmt:  "continue"
 \end{verbatim}
 
 \verb@continue@ may only occur syntactically nested in a \verb@for@ or
-\verb@while@ loop, not nested in a function or class definition, and
-not nested in the \verb@try@ clause of a \verb@try@ statement with a
-\verb@finally@ clause (it may occur nested in a \verb@except@ or
-\verb@finally@ clause of a \verb@try@ statement though).
+\verb@while@ loop, but not nested in a function or class definition or
+\verb@try@ statement within that loop.\footnote{Except that it may
+currently occur within an \verb@except@ clause.}
 \stindex{for}
 \stindex{while}
 \indexii{loop}{statement}
