@@ -1563,13 +1563,13 @@ class DocTestRunner:
         return totalf, totalt
 
 class DocTestFailure(Exception):
-    """A DocTest example has failed in debugging mode
+    """A DocTest example has failed in debugging mode.
 
-    The exeption instance has variables:
+    The exception instance has variables:
 
-    - test: The DocTest object being run
+    - test: the DocTest object being run
 
-    - excample: The Example object that failed
+    - excample: the Example object that failed
 
     - got: the actual output
     """
@@ -1579,9 +1579,9 @@ class DocTestFailure(Exception):
         self.got = got
 
 class DebugRunner(DocTestRunner):
-    r"""Run doc tests but raie an exception as soon as there is a failure
+    r"""Run doc tests but raise an exception as soon as there is a failure.
 
-       If an unexpected exception occurs, the exception is merely propigated
+       If an unexpected exception occurs, the exception is merely propagated
        to the caller:
 
          >>> runner = DebugRunner(verbose=False)
@@ -1617,7 +1617,6 @@ class DebugRunner(DocTestRunner):
 
          >>> failure.got
          '1\n'
-
        """
 
     def report_unexpected_exception(self, out, test, example, exc_info):
@@ -1862,8 +1861,8 @@ class DocTestTestCase(unittest.TestCase):
     """A test case that wraps a test function.
 
     This is useful for slipping pre-existing test functions into the
-    PyUnit framework. Optionally, set-up and tidy-up functions can be
-    supplied. As with TestCase, the tidy-up ('tearDown') function will
+    PyUnit framework.  Optionally, set-up and tidy-up functions can be
+    supplied.  As with TestCase, the tidy-up ('tearDown') function will
     always be called if the set-up ('setUp') function ran successfully.
     """
 
@@ -1932,15 +1931,15 @@ def DocTestSuite(module=None, globs=None, extraglobs=None,
                  optionflags=0, test_finder=None,
                  setUp=lambda: None, tearDown=lambda: None):
     """
-    Convert doctest tests for a mudule to a unittest test suite
+    Convert doctest tests for a mudule to a unittest test suite.
 
-    This tests convers each documentation string in a module that
-    contains doctest tests to a unittest test case. If any of the
-    tests in a doc string fail, then the test case fails. An error is
-    raised showing the name of the file containing the test and a
+    This converts each documentation string in a module that
+    contains doctest tests to a unittest test case.  If any of the
+    tests in a doc string fail, then the test case fails.  An exception
+    is raised showing the name of the file containing the test and a
     (sometimes approximate) line number.
 
-    A module argument provides the module to be tested. The argument
+    The `module` argument provides the module to be tested.  The argument
     can be either a module or a module name.
 
     If no argument is given, the calling module is used.
@@ -2016,17 +2015,17 @@ def DocFileSuite(*paths, **kw):
     A number of options may be provided as keyword arguments:
 
     package
-      The name of a Python package. Text-file paths will be
+      The name of a Python package.  Text-file paths will be
       interpreted relative to the directory containing this package.
       The package may be supplied as a package object or as a dotted
       package name.
 
     setUp
-      The name of a set-up function. This is called before running the
+      The name of a set-up function.  This is called before running the
       tests in each file.
 
     tearDown
-      The name of a tear-down function. This is called after running the
+      The name of a tear-down function.  This is called after running the
       tests in each file.
 
     globs
@@ -2049,12 +2048,11 @@ def DocFileSuite(*paths, **kw):
 ######################################################################
 
 def script_from_examples(s):
-    r"""Extract script from text with examples
+    r"""Extract script from text with examples.
 
-       The script_from_examples function converts text with examples
-       into a Python script.  Example input is converted to regular
-       code.  Example output and all other words are converted to
-       comments:
+       Converts text with examples to a Python script.  Example input is
+       converted to regular code.  Example output and all other words
+       are converted to comments:
 
        >>> text = '''
        ...       Here are examples of simple math.
@@ -2112,24 +2110,23 @@ def script_from_examples(s):
 
 def _want_comment(example):
     """
-    Return a comment containing the expected output for the given
-    example.
+    Return a comment containing the expected output for the given example.
     """
     # Return the expected output, if any
     want = example.want
     if want:
-        if want[-1] == '\n': want = want[:-1]
+        if want[-1] == '\n':
+            want = want[:-1]
         want = "\n#     ".join(want.split("\n"))
         want = "\n# Expected:\n#     %s" % want
     return want
 
 def testsource(module, name):
-    """Extract the test sources from a doctest test docstring as a script
+    """Extract the test sources from a doctest docstring as a script.
 
     Provide the module (or dotted name of the module) containing the
     test to be debugged and the name (within the module) of the object
     with the doc string with tests to be debugged.
-
     """
     module = _normalize_module(module)
     tests = DocTestFinder().find(module)
@@ -2141,15 +2138,12 @@ def testsource(module, name):
     return testsrc
 
 def debug_src(src, pm=False, globs=None):
-    """Debug a single doctest test doc string
-
-    The string is provided directly
-    """
+    """Debug a single doctest docstring, in argument `src`'"""
     testsrc = script_from_examples(src)
     debug_script(testsrc, pm, globs)
 
 def debug_script(src, pm=False, globs=None):
-    "Debug a test script"
+    "Debug a test script.  `src` is the script, as a string."
     import pdb
 
     srcfilename = tempfile.mktemp("doctestdebug.py")
@@ -2174,12 +2168,11 @@ def debug_script(src, pm=False, globs=None):
         pdb.run("execfile(%r)" % srcfilename, globs, globs)
 
 def debug(module, name, pm=False):
-    """Debug a single doctest test doc string
+    """Debug a single doctest docstring.
 
     Provide the module (or dotted name of the module) containing the
     test to be debugged and the name (within the module) of the object
-    with the doc string with tests to be debugged.
-
+    with the docstring with tests to be debugged.
     """
     module = _normalize_module(module)
     testsrc = testsource(module, name)
