@@ -25,11 +25,6 @@ Last modified: Mon Nov  4 15:49:46 1991 ylo
 #ifndef REGEXPR_H
 #define REGEXPR_H
 
-#if defined(__STDC__) || defined(THINK_C)
-#undef HAVE_PROTOTYPES
-#define HAVE_PROTOTYPES
-#endif
-
 #define RE_NREGS	100  /* number of registers available */
 
 typedef struct re_pattern_buffer

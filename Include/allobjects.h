@@ -37,7 +37,7 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #include <stdio.h>
 #include <string.h>
 
-#include "PROTO.h"
+#include "myproto.h"
 
 #include "object.h"
 #include "objimpl.h"

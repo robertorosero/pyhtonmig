@@ -28,38 +28,16 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 ******************************************************************/
 
-/* Common definitions for files that use the BSD select system call.
-   This is so complicated because every UNIX variant requires that
-   you include a different set of headers.  Customizing this one file
-   should be easier than patching each of the files using select()... */
+/* Include file for users of select() */
 
+/* NB caller must include <sys/types.h> */
 
-/* XXX You may have to include some of these only if not already included */
-#include <sys/types.h>
-#include <sys/time.h> /* Implies <time.h> everywhere, as far as I know */
-#include <sys/param.h>
-
-
-/* Hacks for various systems that need hand-holding... */
-
-#ifdef _SEQUENT_
-#include <sys/select.h>
-/* Sequent doesn't seem to define struct timezone anywhere?!?! */
-struct timezone {
-    int tz_minuteswest;
-    int tz_dsttime;
-};
-#endif
-
-#ifdef _AIX /* I *think* this works */
-/* AIX defines fd_set in a separate file.  Sigh... */
+#ifdef HAVE_SYS_SELECT_H
 #include <sys/select.h>
 #endif
 
-
-
-/* (Very) old versions of BSD don't define the FD_* set of macros.
-   The following will usually do... */
+/* If the fd manipulation macros aren't defined,
+   here is a set that should do the job */
 
 #ifndef	FD_SETSIZE
 #define	FD_SETSIZE	256
@@ -67,12 +45,12 @@ struct timezone {
 
 #ifndef FD_SET
 
-typedef long	fd_mask;
+typedef long fd_mask;
 
 #define NFDBITS	(sizeof(fd_mask) * NBBY)	/* bits per mask */
 #ifndef howmany
 #define	howmany(x, y)	(((x)+((y)-1))/(y))
-#endif
+#endif /* howmany */
 
 typedef	struct fd_set {
 	fd_mask	fds_bits[howmany(FD_SETSIZE, NFDBITS)];

@@ -30,11 +30,7 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 /* Module support interface */
 
-#ifdef HAVE_PROTOTYPES
-#define USE_STDARG
-#endif
-
-#ifdef USE_STDARG
+#ifdef HAVE_STDARG_H
 #include <stdarg.h>
 #else
 #include <varargs.h>
