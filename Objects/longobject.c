@@ -6,7 +6,6 @@
 #include "Python.h"
 #include "longintrepr.h"
 
-#include <assert.h>
 #include <ctype.h>
 
 #define ABS(x) ((x) < 0 ? -(x) : (x))
@@ -15,7 +14,7 @@
 static PyLongObject *long_normalize(PyLongObject *);
 static PyLongObject *mul1(PyLongObject *, wdigit);
 static PyLongObject *muladd1(PyLongObject *, wdigit, wdigit);
-static PyLongObject *divrem1(PyLongObject *, wdigit, digit *);
+static PyLongObject *divrem1(PyLongObject *, digit, digit *);
 static PyObject *long_format(PyObject *aa, int base, int addL);
 
 static int ticker;	/* XXX Could be shared with ceval? */
@@ -707,28 +706,44 @@ muladd1(PyLongObject *a, wdigit n, wdigit extra)
 	return long_normalize(z);
 }
 
+/* Divide long pin, w/ size digits, by non-zero digit n, storing quotient
+   in pout, and returning the remainder.  pin and pout point at the LSD.
+   It's OK for pin == pout on entry, which saves oodles of mallocs/frees in
+   long_format, but that should be done with great care since longs are
+   immutable. */
+
+static digit
+inplace_divrem1(digit *pout, digit *pin, int size, digit n)
+{
+	twodigits rem = 0;
+
+	assert(n > 0 && n <= MASK);
+	pin += size;
+	pout += size;
+	while (--size >= 0) {
+		digit hi;
+		rem = (rem << SHIFT) + *--pin;
+		*--pout = hi = (digit)(rem / n);
+		rem -= hi * n;
+	}
+	return (digit)rem;
+}
+
 /* Divide a long integer by a digit, returning both the quotient
    (as function result) and the remainder (through *prem).
    The sign of a is ignored; n should not be zero. */
 
 static PyLongObject *
-divrem1(PyLongObject *a, wdigit n, digit *prem)
+divrem1(PyLongObject *a, digit n, digit *prem)
 {
-	int size = ABS(a->ob_size);
+	const int size = ABS(a->ob_size);
 	PyLongObject *z;
-	int i;
-	twodigits rem = 0;
 	
 	assert(n > 0 && n <= MASK);
 	z = _PyLong_New(size);
 	if (z == NULL)
 		return NULL;
-	for (i = size; --i >= 0; ) {
-		rem = (rem << SHIFT) + a->ob_digit[i];
-		z->ob_digit[i] = (digit) (rem/n);
-		rem %= n;
-	}
-	*prem = (digit) rem;
+	*prem = inplace_divrem1(z->ob_digit, a->ob_digit, size, n);
 	return long_normalize(z);
 }
 
@@ -742,7 +757,7 @@ long_format(PyObject *aa, int base, int addL)
 	register PyLongObject *a = (PyLongObject *)aa;
 	PyStringObject *str;
 	int i;
-	int size_a = ABS(a->ob_size);
+	const int size_a = ABS(a->ob_size);
 	char *p;
 	int bits;
 	char sign = '\0';
@@ -776,44 +791,36 @@ long_format(PyObject *aa, int base, int addL)
 	}
 	else if ((base & (base - 1)) == 0) {
 		/* JRH: special case for power-of-2 bases */
-		twodigits temp = a->ob_digit[0];
-		int bitsleft = SHIFT;
-		int rem;
-		int last = abs(a->ob_size);
-		int basebits = 1;
+		twodigits accum = 0;
+		int accumbits = 0;	/* # of bits in accum */
+		int basebits = 1;	/* # of bits in base-1 */
 		i = base;
 		while ((i >>= 1) > 1)
 			++basebits;
-		
-		i = 0;
-		for (;;) {
-			while (bitsleft >= basebits) {
-				if ((temp == 0) && (i >= last - 1)) break;
-				rem = temp & (base - 1);
-				if (rem < 10)
-					rem += '0';
-				else
-					rem += 'A' - 10;
+
+		for (i = 0; i < size_a; ++i) {
+			accum |= a->ob_digit[i] << accumbits;
+			accumbits += SHIFT;
+			assert(accumbits >= basebits);
+			do {
+				char digit = (char)(accum & (base - 1));
+				digit += (digit < 10) ? '0' : 'A'-10;
 				assert(p > PyString_AS_STRING(str));
-				*--p = (char) rem;
-				bitsleft -= basebits;
-				temp >>= basebits;
-			}
-			if (++i >= last) {
-				if (temp == 0) break;
-				bitsleft = 99;
-				/* loop again to pick up final digits */
-			}
-			else {
-				temp = (a->ob_digit[i] << bitsleft) | temp;
-				bitsleft += SHIFT;
-			}
+				*--p = digit;
+				accumbits -= basebits;
+				accum >>= basebits;
+			} while (i < size_a-1 ? accumbits >= basebits :
+					 	accum > 0);
 		}
 	}
 	else {
 		/* Not 0, and base not a power of 2.  Divide repeatedly by
 		   base, but for speed use the highest power of base that
 		   fits in a digit. */
+		int size = size_a;
+		digit *pin = a->ob_digit;
+		PyLongObject *scratch;
+		/* powbasw <- largest power of base that fits in a digit. */
 		digit powbase = base;  /* powbase == base ** power */
 		int power = 1;
 		for (;;) {
@@ -823,35 +830,44 @@ long_format(PyObject *aa, int base, int addL)
 			powbase = (digit)newpow;
 			++power;
 		}
-		
-		Py_INCREF(a);
+
+		/* Get a scratch area for repeated division. */
+		scratch = _PyLong_New(size);
+		if (scratch == NULL) {
+			Py_DECREF(str);
+			return NULL;
+		}
+
+		/* Repeatedly divide by powbase. */
 		do {
 			int ntostore = power;
-			digit rem;
-			PyLongObject *temp = divrem1(a, powbase, &rem);
-			Py_DECREF(a);
-			if (temp == NULL) {
-				Py_DECREF(str);
-				return NULL;
-			}
-			a = temp;
+			digit rem = inplace_divrem1(scratch->ob_digit,
+						     pin, size, powbase);
+			pin = scratch->ob_digit; /* no need to use a again */
+			if (pin[size - 1] == 0)
+				--size;
 			SIGCHECK({
-				Py_DECREF(a);
+				Py_DECREF(scratch);
 				Py_DECREF(str);
 				return NULL;
 			})
-			while (--ntostore >= 0) {
+
+			/* Break rem into digits. */
+			assert(ntostore > 0);
+			do {
 				digit nextrem = (digit)(rem / base);
 				char c = (char)(rem - nextrem * base);
 				assert(p > PyString_AS_STRING(str));
 				c += (c < 10) ? '0' : 'A'-10;
 				*--p = c;
 				rem = nextrem;
-				if (a->ob_size == 0 && rem == 0)
-					break;  /* skip leading zeroes */
-			}
-		} while (ABS(a->ob_size) != 0);
-		Py_DECREF(a);
+				--ntostore;
+				/* Termination is a bit delicate:  must not
+				   store leading zeroes, so must get out if
+				   remaining quotient and rem are both 0. */
+			} while (ntostore && (size || rem));
+		} while (size != 0);
+		Py_DECREF(scratch);
 	}
 
 	if (base == 8) {
