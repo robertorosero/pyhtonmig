@@ -263,7 +263,7 @@ re-raised.  If the \keyword{finally} clause raises another exception or
 executes a \keyword{return} or \keyword{break} statement, the saved
 exception is lost.  A \keyword{continue} statement is illegal in the
 \keyword{finally} clause.  (The reason is a problem with the current
-implementation -- thsi restriction may be lifted in the future).  The
+implementation -- this restriction may be lifted in the future).  The
 exception information is not available to the program during execution of
 the \keyword{finally} clause.
 \kwindex{finally}
@@ -280,6 +280,7 @@ restriction may be lifted in the future).
 
 \section{Function definitions\label{function}}
 \indexii{function}{definition}
+\stindex{def}
 
 A function definition defines a user-defined function object (see
 section \ref{types}):
@@ -370,6 +371,7 @@ description of the new semantics.
 
 \section{Class definitions\label{class}}
 \indexii{class}{definition}
+\stindex{class}
 
 A class definition defines a class object (see section \ref{types}):
 \obindex{class}
@@ -401,6 +403,6 @@ are class variables; they are shared by all instances.  To define
 instance variables, they must be given a value in the the
 \method{__init__()} method or in another method.  Both class and
 instance variables are accessible through the notation
-```code{self.name}'', and an instance variable hides a class variable
+``\code{self.name}'', and an instance variable hides a class variable
 with the same name when accessed in this way.  Class variables with
 immutable values can be used as defaults for instance variables.

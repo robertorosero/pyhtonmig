@@ -44,7 +44,11 @@ FlavorFlags = Type("FlavorFlags", "l")
 DragTrackingMessage = Type("DragTrackingMessage", "h")
 
 includestuff = includestuff + """
-#include <%s>""" % MACHEADERFILE + """
+#ifdef WITHOUT_FRAMEWORKS
+#include <Drag.h>
+#else
+#include <Carbon/Carbon.h>
+#endif
 
 /* Callback glue routines */
 DragTrackingHandlerUPP dragglue_TrackingHandlerUPP;
@@ -53,6 +57,14 @@ DragSendDataUPP dragglue_SendDataUPP;
 #if 0
 DragInputUPP dragglue_InputUPP;
 DragDrawingUPP dragglue_DrawingUPP;
+#endif
+
+#ifdef USE_TOOLBOX_OBJECT_GLUE
+extern PyObject *_DragObj_New(DragRef);
+extern int _DragObj_Convert(PyObject *, DragRef *);
+
+#define DragObj_New _DragObj_New
+#define DragObj_Convert _DragObj_Convert
 #endif
 """
 
@@ -153,13 +165,18 @@ dragglue_Drawing(xxxx
 
 """
 
+initstuff = initstuff + """
+	PyMac_INIT_TOOLBOX_OBJECT_NEW(DragRef, DragObj_New);
+	PyMac_INIT_TOOLBOX_OBJECT_CONVERT(DragRef, DragObj_Convert);
+"""
+
 variablestuff = """
-dragglue_TrackingHandlerUPP = NewDragTrackingHandlerProc(dragglue_TrackingHandler);
-dragglue_ReceiveHandlerUPP = NewDragReceiveHandlerProc(dragglue_ReceiveHandler);
-dragglue_SendDataUPP = NewDragSendDataProc(dragglue_SendData);
+dragglue_TrackingHandlerUPP = NewDragTrackingHandlerUPP(dragglue_TrackingHandler);
+dragglue_ReceiveHandlerUPP = NewDragReceiveHandlerUPP(dragglue_ReceiveHandler);
+dragglue_SendDataUPP = NewDragSendDataUPP(dragglue_SendData);
 #if 0
-dragglue_InputUPP = NewDragInputProc(dragglue_Input);
-dragglue_DrawingUPP = NewDragDrawingProc(dragglue_Drawing);
+dragglue_InputUPP = NewDragInputUPP(dragglue_Input);
+dragglue_DrawingUPP = NewDragDrawingUPP(dragglue_Drawing);
 #endif
 """    
 

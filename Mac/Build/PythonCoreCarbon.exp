@@ -27,6 +27,7 @@ _PyEval_SliceIndex
 PyEval_CallObjectWithKeywords
 PyEval_CallObject
 Py_FlushLine
+PyEval_GetNestedScopes
 PyEval_GetRestricted
 PyEval_GetFrame
 PyEval_GetGlobals
@@ -57,6 +58,9 @@ PyArg_GetFloat
 PyArg_GetShort
 PyArg_GetLong
 PyArg_GetObject
+PyErr_ProgramText
+PyErr_SyntaxLocation
+PyErr_WarnExplicit
 PyErr_Warn
 PyErr_WriteUnraisable
 PyErr_NewException
@@ -147,18 +151,28 @@ Py_FatalError
 PyParser_SimpleParseString
 PyParser_SimpleParseFile
 Py_SymtableString
+Py_CompileStringFlags
 Py_CompileString
+PyRun_FileExFlags
+PyRun_FileFlags
+PyRun_StringFlags
 PyRun_FileEx
 PyRun_File
 PyRun_String
+PyErr_Display
 PyErr_PrintEx
 PyErr_Print
 PyRun_SimpleString
+PyRun_SimpleFileExFlags
 PyRun_SimpleFileEx
 PyRun_SimpleFile
+PyRun_InteractiveOneFlags
 PyRun_InteractiveOne
+PyRun_InteractiveLoopFlags
 PyRun_InteractiveLoop
+PyRun_AnyFileExFlags
 PyRun_AnyFileEx
+PyRun_AnyFileFlags
 PyRun_AnyFile
 Py_GetPythonHome
 Py_SetPythonHome
@@ -200,9 +214,11 @@ Py_OptimizeFlag
 PySymtable_Free
 PyCode_Addr2Line
 PyNode_CompileSymtable
+PyNode_CompileFlags
 PyNode_Compile
-is_free
 PyCode_New
+PyObject_IsSubclass
+PyObject_IsInstance
 PyObject_CallMethod
 PyObject_CallFunction
 PyObject_CallObject
@@ -325,8 +341,6 @@ PyFile_WriteString
 PyFile_WriteObject
 PyFile_SoftSpace
 PyFile_GetLine
-_portable_ftell
-_portable_fseek
 PyFile_SetBufSize
 PyFile_FromString
 PyFile_FromFile
@@ -454,6 +468,7 @@ PySlice_Type
 PySlice_GetIndices
 PySlice_New
 PyString_Type
+_Py_ReleaseInternedStrings
 PyString_Fini
 PyString_InternFromString
 PyString_InternInPlace
@@ -546,7 +561,6 @@ open_doc_upp
 open_app_upp
 not_upp
 PyMac_GetArgv
-PyMac_GetFullPath
 PyMac_init_process_location
 strdup
 Py_GetCompiler
@@ -559,6 +573,98 @@ Py_GetPlatform
 PyMac_ConsoleIsDead
 PyMac_AppearanceCompliant
 PyMac_OSErrException
+PyMacGluePtr_AEDesc_New
+PyMacGluePtr_AEDesc_Convert
+PyMacGluePtr_CmpObj_New
+PyMacGluePtr_CmpObj_Convert
+PyMacGluePtr_CmpInstObj_New
+PyMacGluePtr_CmpInstObj_Convert
+PyMacGluePtr_CtlObj_New
+PyMacGluePtr_CtlObj_Convert
+PyMacGluePtr_DlgObj_New
+PyMacGluePtr_DlgObj_Convert
+PyMacGluePtr_DlgObj_WhichDialog
+PyMacGluePtr_DragObj_New
+PyMacGluePtr_DragObj_Convert
+PyMacGluePtr_ListObj_New
+PyMacGluePtr_ListObj_Convert
+PyMacGluePtr_MenuObj_New
+PyMacGluePtr_MenuObj_Convert
+PyMacGluePtr_GrafObj_New
+PyMacGluePtr_GrafObj_Convert
+PyMacGluePtr_BMObj_New
+PyMacGluePtr_BMObj_Convert
+PyMacGluePtr_QdRGB_New
+PyMacGluePtr_QdRGB_Convert
+PyMacGluePtr_GWorldObj_New
+PyMacGluePtr_GWorldObj_Convert
+PyMacGluePtr_TrackObj_New
+PyMacGluePtr_TrackObj_Convert
+PyMacGluePtr_MovieObj_New
+PyMacGluePtr_MovieObj_Convert
+PyMacGluePtr_MovieCtlObj_New
+PyMacGluePtr_MovieCtlObj_Convert
+PyMacGluePtr_TimeBaseObj_New
+PyMacGluePtr_TimeBaseObj_Convert
+PyMacGluePtr_UserDataObj_New
+PyMacGluePtr_UserDataObj_Convert
+PyMacGluePtr_MediaObj_New
+PyMacGluePtr_MediaObj_Convert
+PyMacGluePtr_ResObj_New
+PyMacGluePtr_ResObj_Convert
+PyMacGluePtr_OptResObj_New
+PyMacGluePtr_OptResObj_Convert
+PyMacGluePtr_TEObj_New
+PyMacGluePtr_TEObj_Convert
+PyMacGluePtr_WinObj_New
+PyMacGluePtr_WinObj_Convert
+PyMacGluePtr_WinObj_WhichWindow
+WinObj_WhichWindow
+WinObj_Convert
+WinObj_New
+TEObj_Convert
+TEObj_New
+OptResObj_Convert
+OptResObj_New
+ResObj_Convert
+ResObj_New
+MediaObj_Convert
+MediaObj_New
+UserDataObj_Convert
+UserDataObj_New
+TimeBaseObj_Convert
+TimeBaseObj_New
+MovieCtlObj_Convert
+MovieCtlObj_New
+MovieObj_Convert
+MovieObj_New
+TrackObj_Convert
+TrackObj_New
+GWorldObj_Convert
+GWorldObj_New
+QdRGB_Convert
+QdRGB_New
+BMObj_Convert
+BMObj_New
+GrafObj_Convert
+GrafObj_New
+MenuObj_Convert
+MenuObj_New
+ListObj_Convert
+ListObj_New
+DragObj_Convert
+DragObj_New
+DlgObj_WhichDialog
+DlgObj_Convert
+DlgObj_New
+CtlObj_Convert
+CtlObj_New
+CmpInstObj_Convert
+CmpInstObj_New
+CmpObj_Convert
+CmpObj_New
+AEDesc_Convert
+AEDesc_New
 PyMac_Buildwide
 PyMac_Getwide
 PyMac_BuildFixed
@@ -568,8 +674,6 @@ PyMac_BuildPoint
 PyMac_GetPoint
 PyMac_BuildRect
 PyMac_GetRect
-PyMac_BuildFSSpec
-PyMac_GetFSSpec
 PyMac_BuildOptStr255
 PyMac_BuildStr255
 PyMac_GetStr255
@@ -577,6 +681,7 @@ PyMac_BuildNumVersion
 PyMac_BuildOSType
 PyMac_GetOSType
 SIOUXDoAboutBox
+PyMac_RaiseConsoleWindow
 PyMac_RestoreMenuBar
 PyMac_InitMenuBar
 PyMac_SetSchedParams
@@ -599,6 +704,7 @@ Pstring
 PyMac_StopGUSISpin
 RotateCursor
 SpinCursor
+PyMac_GetFullPath
 PyMac_getscript
 PyMac_AppRefNum
 PyMac_options
@@ -609,6 +715,7 @@ Py_GetPrefix
 Py_GetArgcArgv
 Py_GetProgramFullPath
 PyMac_Exit
+abort
 PyMac_OutputNotSeen
 PyMac_OutputSeen
 PyMac_InitApplication
@@ -624,8 +731,12 @@ macstat
 sync
 initgestalt
 initmacfs
+PyMac_BuildFSSpec
+PyMac_BuildFSRef
+PyMac_GetFSRef
+newmfsrobject
 newmfssobject
-mfs_GetFSSpecFSSpec
+PyMac_GetFSSpec
 initmac
 initMacOS
 Pcre_Type
@@ -654,20 +765,19 @@ _PyImport_Inittab
 CtlObj_chain
 Control_Type
 initCtl
-CtlObj_Convert
-CtlObj_New
+_CtlObj_Convert
+_CtlObj_New
 DlgObj_chain
 Dialog_Type
 initDlg
-DlgObj_ConvertToWindow
-DlgObj_Convert
-DlgObj_New
-DlgObj_WhichDialog
+_DlgObj_Convert
+_DlgObj_New
+_DlgObj_WhichDialog
 MenuObj_chain
 Menu_Type
 initMenu
-MenuObj_Convert
-MenuObj_New
+_MenuObj_Convert
+_MenuObj_New
 GrafObj_chain
 GrafPort_Type
 BMObj_chain
@@ -675,25 +785,25 @@ BitMap_Type
 QDGlobalsAccess_Type
 initQd
 BMObj_NewCopied
-BMObj_Convert
-BMObj_New
-GrafObj_Convert
-GrafObj_New
-QdRGB_Convert
-QdRGB_New
+_BMObj_Convert
+_BMObj_New
+_GrafObj_Convert
+_GrafObj_New
+_QdRGB_Convert
+_QdRGB_New
 ResObj_chain
 Resource_Type
 initRes
-OptResObj_Convert
-OptResObj_New
-ResObj_Convert
-ResObj_New
+_OptResObj_Convert
+_OptResObj_New
+_ResObj_Convert
+_ResObj_New
 WinObj_chain
 Window_Type
 initWin
-WinObj_WhichWindow
-WinObj_Convert
-WinObj_New
+_WinObj_WhichWindow
+_WinObj_Convert
+_WinObj_New
 PyBuffer_Type
 PyBuffer_New
 PyBuffer_FromReadWriteMemory
@@ -781,6 +891,8 @@ PyUnicode_Encode
 PyUnicode_Decode
 PyUnicode_FromEncodedObject
 PyUnicode_FromObject
+PyUnicode_AsWideChar
+PyUnicode_FromWideChar
 PyUnicode_FromUnicode
 PyUnicode_Resize
 initthread
@@ -797,8 +909,6 @@ PyThread_exit_thread
 PyThread_get_thread_ident
 PyThread_start_new_thread
 PyThread_init_thread
-SystemExit_methods
-SyntaxError_methods
 PyExc_Exception
 PyExc_StandardError
 PyExc_ArithmeticError
@@ -843,11 +953,10 @@ AEDesc_Type
 upp_GenericEventHandler
 upp_AEIdleProc
 initAE
-AEDesc_Convert
-AEDesc_New
+_AEDesc_Convert
+_AEDesc_New
 init_locale
 initEvt
-copyright
 init_sre
 initsha
 DragObj_chain
@@ -856,8 +965,8 @@ dragglue_TrackingHandlerUPP
 dragglue_ReceiveHandlerUPP
 dragglue_SendDataUPP
 initDrag
-DragObj_Convert
-DragObj_New
+_DragObj_Convert
+_DragObj_New
 initxreadlines
 PyCell_Type
 PyCell_Set
@@ -865,6 +974,7 @@ PyCell_Get
 PyCell_New
 PySymtableEntry_Type
 PySymtableEntry_New
+PyNode_Future
 GUSISetupConsoleStdio
 GUSIStdioFlush
 GUSIStdioClose
@@ -931,6 +1041,7 @@ DoAutoSpin__17GUSIConfigurationCFv		# GUSIConfiguration::DoAutoSpin() const
 SetDefaultFType__17GUSIConfigurationCFRC12GUSIFileSpec		# GUSIConfiguration::SetDefaultFType(const GUSIFileSpec&) const
 ConfigureSuffices__17GUSIConfigurationFsPQ217GUSIConfiguration10FileSuffix		# GUSIConfiguration::ConfigureSuffices(short,GUSIConfiguration::FileSuffix*)
 __ct__17GUSIConfigurationFs		# GUSIConfiguration::GUSIConfiguration(short)
+CreateInstance__17GUSIConfigurationFs		# GUSIConfiguration::CreateInstance(short)
 __vt__22GUSIThreadManagerProxy		# GUSIThreadManagerProxy::__vt
 __vt__18GUSIContextFactory		# GUSIContextFactory::__vt
 __vt__11GUSIContext		# GUSIContext::__vt
@@ -1488,6 +1599,7 @@ __dt__53GUSISpecificData<Q29GUSITimer5Queue,&.GUSIKillTimers>Fv		# GUSISpecificD
 get__53GUSISpecificData<Q29GUSITimer5Queue,&.GUSIKillTimers>FP17GUSISpecificTable		# GUSISpecificData<GUSITimer::Queue, &.GUSIKillTimers>::get(GUSISpecificTable*)
 __dt__9GUSITimerFv		# GUSITimer::~GUSITimer()
 Kill__9GUSITimerFv		# GUSITimer::Kill()
+Reset__9GUSITimerFv		# GUSITimer::Reset()
 Sleep__9GUSITimerFlb		# GUSITimer::Sleep(long,bool)
 __ct__9GUSITimerFbP11GUSIContext		# GUSITimer::GUSITimer(bool,GUSIContext*)
 GUSIKillTimers
@@ -1732,7 +1844,6 @@ __throw_bad_alloc__3stdFv		# std::__throw_bad_alloc()
 __dt__Q23std9bad_allocFv		# std::bad_alloc::~bad_alloc()
 qd
 exit
-abort
 clrscr
 getch
 kbhit
@@ -1782,7 +1893,6 @@ __exit
 exit
 __atexit
 atexit
-abort
 fix_start
 vec_free
 vec_realloc

@@ -402,7 +402,9 @@ eval_code2(PyCodeObject *co, PyObject *globals, PyObject *locals,
 #define BASIC_POP()	(*--stack_pointer)
 
 #ifdef LLTRACE
-#define PUSH(v)		(BASIC_PUSH(v), lltrace && prtrace(TOP(), "push"))
+#define PUSH(v)		{ (void)(BASIC_PUSH(v), \
+                               lltrace && prtrace(TOP(), "push")); \
+                               assert(STACK_LEVEL() <= f->f_stacksize); }
 #define POP()		(lltrace && prtrace(TOP(), "pop"), BASIC_POP())
 #else
 #define PUSH(v)		BASIC_PUSH(v)
@@ -412,8 +414,16 @@ eval_code2(PyCodeObject *co, PyObject *globals, PyObject *locals,
 /* Local variable macros */
 
 #define GETLOCAL(i)	(fastlocals[i])
-#define SETLOCAL(i, value)	do { Py_XDECREF(GETLOCAL(i)); \
-				     GETLOCAL(i) = value; } while (0)
+
+/* The SETLOCAL() macro must not DECREF the local variable in-place and
+   then store the new value; it must copy the old value to a temporary
+   value, then store the new value, and then DECREF the temporary value.
+   This is because it is possible that during the DECREF the frame is
+   accessed by other code (e.g. a __del__ method or gc.collect()) and the
+   variable would be pointing to already-freed memory. */
+#define SETLOCAL(i, value)	do { PyObject *tmp = GETLOCAL(i); \
+				     GETLOCAL(i) = value; \
+                                     Py_XDECREF(tmp); } while (0)
 
 /* Start of code */
 
@@ -681,6 +691,8 @@ eval_code2(PyCodeObject *co, PyObject *globals, PyObject *locals,
 	w = NULL;
 
 	for (;;) {
+		assert(stack_pointer >= f->f_valuestack);	/* else underflow */
+		assert(STACK_LEVEL() <= f->f_stacksize);	/* else overflow */
 		/* Do periodic things.  Doing this every time through
 		   the loop would add too much overhead, so we do it
 		   only every Nth instruction.  We also do it if
@@ -1941,7 +1953,13 @@ eval_code2(PyCodeObject *co, PyObject *globals, PyObject *locals,
 		       callable object.
 		    */
 		    if (PyCFunction_Check(func)) {
-			    if (PyCFunction_GET_FLAGS(func) == 0) {
+			    int flags = PyCFunction_GET_FLAGS(func);
+			    if (flags == METH_VARARGS) {
+				    PyObject *callargs;
+				    callargs = load_args(&stack_pointer, na);
+				    x = call_cfunction(func, callargs, NULL);
+				    Py_XDECREF(callargs); 
+			    } else if (flags == 0) {
 				    x = fast_cfunction(func,
 						       &stack_pointer, na);
 			    } else {
@@ -2190,8 +2208,8 @@ eval_code2(PyCodeObject *co, PyObject *globals, PyObject *locals,
 			if (b->b_type == SETUP_LOOP && why == WHY_CONTINUE) {
 				/* For a continue inside a try block,
 				   don't pop the block for the loop. */
-				PyFrame_BlockSetup(f, b->b_type, b->b_level,
-						   b->b_handler);
+				PyFrame_BlockSetup(f, b->b_type, b->b_handler,
+						   b->b_level);
 				why = WHY_NOT;
 				JUMPTO(PyInt_AS_LONG(retval));
 				Py_DECREF(retval);
@@ -2464,8 +2482,9 @@ do_raise(PyObject *type, PyObject *value, PyObject *tb)
 	else {
 		/* Not something you can raise.  You get an exception
 		   anyway, just not what you specified :-) */
-		PyErr_SetString(PyExc_TypeError,
-		    "exceptions must be strings, classes, or instances");
+		PyErr_Format(PyExc_TypeError,
+			     "exceptions must be strings, classes, or "
+			     "instances, not %s", type->ob_type->tp_name);
 		goto raise_error;
 	}
 	PyErr_Restore(type, value, tb);
@@ -2806,8 +2825,9 @@ call_object(PyObject *func, PyObject *arg, PyObject *kw)
 	else if ((call = func->ob_type->tp_call) != NULL)
 		result = (*call)(func, arg, kw);
 	else {
-		PyErr_Format(PyExc_TypeError, "object is not callable: %s",
-			     PyString_AS_STRING(PyObject_Repr(func)));
+		PyErr_Format(PyExc_TypeError,
+			     "object of type '%.100s' is not callable",
+			     func->ob_type->tp_name);
 		return NULL;
 	}
         if (result == NULL && !PyErr_Occurred())

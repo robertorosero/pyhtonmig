@@ -24,8 +24,41 @@ from macsupport import *
 # Create the type objects
 
 includestuff = includestuff + """
-#include <%s>""" % MACHEADERFILE + """
+#ifdef WITHOUT_FRAMEWORKS
+#include <Movies.h>
+#else
+/* #include <Carbon/Carbon.h> */
+#include <QuickTime/QuickTime.h>
+#endif
 
+
+#ifdef USE_TOOLBOX_OBJECT_GLUE
+extern PyObject *_TrackObj_New(Track);
+extern int _TrackObj_Convert(PyObject *, Track *);
+extern PyObject *_MovieObj_New(Movie);
+extern int _MovieObj_Convert(PyObject *, Movie *);
+extern PyObject *_MovieCtlObj_New(MovieController);
+extern int _MovieCtlObj_Convert(PyObject *, MovieController *);
+extern PyObject *_TimeBaseObj_New(TimeBase);
+extern int _TimeBaseObj_Convert(PyObject *, TimeBase *);
+extern PyObject *_UserDataObj_New(UserData);
+extern int _UserDataObj_Convert(PyObject *, UserData *);
+extern PyObject *_MediaObj_New(Media);
+extern int _MediaObj_Convert(PyObject *, Media *);
+
+#define TrackObj_New _TrackObj_New
+#define TrackObj_Convert _TrackObj_Convert
+#define MovieObj_New _MovieObj_New
+#define MovieObj_Convert _MovieObj_Convert
+#define MovieCtlObj_New _MovieCtlObj_New
+#define MovieCtlObj_Convert _MovieCtlObj_Convert
+#define TimeBaseObj_New _TimeBaseObj_New
+#define TimeBaseObj_Convert _TimeBaseObj_Convert
+#define UserDataObj_New _UserDataObj_New
+#define UserDataObj_Convert _UserDataObj_Convert
+#define MediaObj_New _MediaObj_New
+#define MediaObj_Convert _MediaObj_Convert
+#endif
 
 /* Macro to allow us to GetNextInterestingTime without duration */
 #define GetMediaNextInterestingTimeOnly(media, flags, time, rate, rv) \
@@ -35,8 +68,7 @@ includestuff = includestuff + """
 ** Parse/generate time records
 */
 static PyObject *
-QtTimeRecord_New(itself)
-	TimeRecord *itself;
+QtTimeRecord_New(TimeRecord *itself)
 {
 	if (itself->base)
 		return Py_BuildValue("O&lO&", PyMac_Buildwide, &itself->value, itself->scale, 
@@ -47,9 +79,7 @@ QtTimeRecord_New(itself)
 }
 
 static int
-QtTimeRecord_Convert(v, p_itself)
-	PyObject *v;
-	TimeRecord *p_itself;
+QtTimeRecord_Convert(PyObject *v, TimeRecord *p_itself)
 {
 	PyObject *base = NULL;
 	if( !PyArg_ParseTuple(v, "O&l|O", PyMac_Getwide, &p_itself->value, &p_itself->scale,
@@ -65,6 +95,21 @@ QtTimeRecord_Convert(v, p_itself)
 
 
 
+"""
+
+initstuff = initstuff + """
+	PyMac_INIT_TOOLBOX_OBJECT_NEW(Track, TrackObj_New);
+	PyMac_INIT_TOOLBOX_OBJECT_CONVERT(Track, TrackObj_Convert);
+	PyMac_INIT_TOOLBOX_OBJECT_NEW(Movie, MovieObj_New);
+	PyMac_INIT_TOOLBOX_OBJECT_CONVERT(Movie, MovieObj_Convert);
+	PyMac_INIT_TOOLBOX_OBJECT_NEW(MovieController, MovieCtlObj_New);
+	PyMac_INIT_TOOLBOX_OBJECT_CONVERT(MovieController, MovieCtlObj_Convert);
+	PyMac_INIT_TOOLBOX_OBJECT_NEW(TimeBase, TimeBaseObj_New);
+	PyMac_INIT_TOOLBOX_OBJECT_CONVERT(TimeBase, TimeBaseObj_Convert);
+	PyMac_INIT_TOOLBOX_OBJECT_NEW(UserData, UserDataObj_New);
+	PyMac_INIT_TOOLBOX_OBJECT_CONVERT(UserData, UserDataObj_Convert);
+	PyMac_INIT_TOOLBOX_OBJECT_NEW(Media, MediaObj_New);
+	PyMac_INIT_TOOLBOX_OBJECT_CONVERT(Media, MediaObj_Convert);
 """
 
 # Our (opaque) objects

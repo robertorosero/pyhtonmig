@@ -324,6 +324,10 @@ then
 	    OPT="-O";;
 	esac
     esac
+    case $ac_sys_system in
+    Darwin*)
+    	OPT="$OPT -no-cpp-precomp";;
+    esac
 fi
 
 # The current (beta) Monterey compiler dies with optimizations
@@ -381,10 +385,10 @@ dnl AC_MSG_RESULT($cpp_type)
 AC_HEADER_STDC
 AC_CHECK_HEADERS(dlfcn.h fcntl.h limits.h locale.h ncurses.h poll.h pthread.h \
 signal.h stdarg.h stddef.h stdlib.h thread.h unistd.h utime.h termios.h \
-sys/audioio.h sys/file.h sys/lock.h db_185.h db.h \
-sys/param.h sys/select.h sys/socket.h sys/time.h sys/times.h \
+sys/audioio.h sys/file.h sys/lock.h sys/modem.h db_185.h db.h \
+sys/param.h sys/poll.h sys/select.h sys/socket.h sys/time.h sys/times.h \
 sys/un.h sys/utsname.h sys/wait.h pty.h libutil.h \
-ndbm.h db1/ndbm.h gdbm/ndbm.h)
+ndbm.h db1/ndbm.h gdbm/ndbm.h sys/resource.h)
 AC_HEADER_DIRENT
 
 # checks for typedefs
@@ -504,9 +508,12 @@ fi
 # Minor variations in building a framework between NextStep versions 4 and 5
 AC_SUBST(LIBTOOL_CRUFT)
 case $ac_sys_system/$ac_sys_release in
-  Darwin/*)
+  Darwin/1.3*)
     ns_undef_sym='_environ'
     LIBTOOL_CRUFT="-lcc_dynamic -arch_only ppc -U $ns_undef_sym" ;;
+  Darwin/*)
+    ns_undef_sym='_environ'
+    LIBTOOL_CRUFT="-lcc_dynamic -arch_only ppc -flat_namespace -U $ns_undef_sym" ;;
   next/4*)
     ns_undef_sym='__environ'
     LIBTOOL_CRUFT="-U $ns_undef_sym" ;;
@@ -521,7 +528,10 @@ then
 	OPT="$OPT -fno-common"
 	# -U __environ is needed since bundles don't have access
 	# to crt0 when built but will always be linked against it
-	LDFLAGS="$LDFLAGS -Wl,-U,$ns_undef_sym"
+	case $ac_sys_system/$ac_sys_release in
+	    Darwin/1.3*)LDFLAGS="$LDFLAGS -Wl,-F. -Wl,-U,$ns_undef_sym";;
+	    Darwin/*)LDFLAGS="$LDFLAGS -Wl,-F. -Wl,-flat_namespace,-U,$ns_undef_sym";;
+	esac
 	AC_DEFINE(WITH_NEXT_FRAMEWORK)
 	AC_MSG_RESULT(yes)
 else
@@ -588,12 +598,17 @@ then
 	hp*|HP*) LDSHARED="ld -b";;
 	OSF*) LDSHARED="ld -shared -expect_unresolved \"*\"";;
 	DYNIX/ptx*) LDSHARED="ld -G";;
-        Darwin/*|next/*) 
+        Darwin/1.3*|next/*) 
 		if test "$ns_dyld"
 		then LDSHARED='$(CC) $(LDFLAGS) -bundle -undefined suppress'
 		else LDSHARED='$(CC) $(CFLAGS) -nostdlib -r';
 		fi
-	if test "$with_next_framework" ; then
+		if test "$with_next_framework" ; then
+		    LDSHARED="$LDSHARED \$(LDLIBRARY)"
+		fi ;;
+        Darwin/*) 
+		LDSHARED='$(CC) $(LDFLAGS) -flat_namespace -bundle -undefined suppress'
+		if test "$with_next_framework" ; then
 		    LDSHARED="$LDSHARED \$(LDLIBRARY)"
 		fi ;;
 	Linux*) LDSHARED="gcc -shared";;
@@ -819,6 +834,7 @@ else
 	LIBOBJS="$LIBOBJS thread.o"
 	AC_DEFINE(WITH_THREAD)
 	AC_DEFINE(_POSIX_THREADS)
+	posix_threads=yes
 	USE_THREAD_MODULE=""
     else
 	if test ! -z "$with_threads" -a -d "$with_threads"
@@ -842,12 +858,15 @@ else
 	AC_MSG_RESULT(no)
 	AC_CHECK_LIB(pthread, pthread_create, [AC_DEFINE(WITH_THREAD)
 	AC_DEFINE(_POSIX_THREADS)
+	posix_threads=yes
 	LIBS="-lpthread $LIBS"
 	LIBOBJS="$LIBOBJS thread.o"],[
 	AC_CHECK_FUNC(pthread_detach, [AC_DEFINE(WITH_THREAD)
 	case $ac_sys_system in
 	  Darwin*) ;;
-	  *) AC_DEFINE(_POSIX_THREADS);;
+	  *) AC_DEFINE(_POSIX_THREADS)
+	     posix_threads=yes
+             ;;
 	esac
 	LIBOBJS="$LIBOBJS thread.o"],[
 	AC_CHECK_HEADER(kernel/OS.h, [AC_DEFINE(WITH_THREAD)
@@ -855,26 +874,51 @@ else
 	LIBOBJS="$LIBOBJS thread.o"],[
 	AC_CHECK_LIB(pthreads, pthread_create, [AC_DEFINE(WITH_THREAD)
 	AC_DEFINE(_POSIX_THREADS)
+	posix_threads=yes
 	LIBS="$LIBS -lpthreads"
 	LIBOBJS="$LIBOBJS thread.o"], [
 	AC_CHECK_LIB(c_r, pthread_create, [AC_DEFINE(WITH_THREAD)
 	AC_DEFINE(_POSIX_THREADS)
+	posix_threads=yes
 	LIBS="$LIBS -lc_r"
 	LIBOBJS="$LIBOBJS thread.o"], [
 	AC_CHECK_LIB(thread, __d6_pthread_create, [AC_DEFINE(WITH_THREAD)
 	AC_DEFINE(_POSIX_THREADS)
+	posix_threads=yes
 	LIBS="$LIBS -lthread"
 	LIBOBJS="$LIBOBJS thread.o"], [
 	AC_CHECK_LIB(pthread, __pthread_create_system, [AC_DEFINE(WITH_THREAD)
 	AC_DEFINE(_POSIX_THREADS)
+	posix_threads=yes
 	LIBS="$LIBS -lpthread"
 	LIBOBJS="$LIBOBJS thread.o"], [
 	AC_CHECK_LIB(cma, pthread_create, [AC_DEFINE(WITH_THREAD)
 	AC_DEFINE(_POSIX_THREADS)
+	posix_threads=yes
 	LIBS="$LIBS -lcma"
 	LIBOBJS="$LIBOBJS thread.o"],[
 	USE_THREAD_MODULE="#"])
 	])])])])])])])])])
+        if test "$posix_threads" = "yes"; then         
+	  AC_MSG_CHECKING(if PTHREAD_SCOPE_SYSTEM is supported)
+	  AC_CACHE_VAL(ac_cv_pthread_system_supported,
+	  [AC_TRY_RUN([#include <pthread.h>
+	  void *foo(void *parm) {
+	    return NULL;
+	  }
+	  main() {
+	    pthread_attr_t attr;
+	    if (pthread_attr_init(&attr)) exit(-1);
+	    if (pthread_attr_setscope(&attr, PTHREAD_SCOPE_SYSTEM)) exit(-1);
+	    if (pthread_create(NULL, &attr, foo, NULL)) exit(-1);
+	    exit(0);
+	  }], ac_cv_pthread_system_supported=yes, ac_cv_pthread_system_supported=no)
+	  ])
+	  AC_MSG_RESULT($ac_cv_pthread_system_supported)
+	  if test "$ac_cv_pthread_system_supported" = "yes"; then
+	    AC_DEFINE(PTHREAD_SYSTEM_SCHED_SUPPORTED)
+	  fi
+	fi
 
 	AC_CHECK_LIB(mpc, usconfig, [AC_DEFINE(WITH_THREAD)
 	LIBS="$LIBS -lmpc"
@@ -1008,7 +1052,7 @@ AC_CHECK_FUNCS(alarm chown clock confstr ctermid ctermid_r execv \
  setlocale setregid setreuid setsid setpgid setuid setvbuf \
  sigaction siginterrupt sigrelse strftime strptime symlink sysconf \
  tcgetpgrp tcsetpgrp tempnam timegm times tmpfile tmpnam tmpnam_r \
- truncate uname waitpid _getpty)
+ truncate uname waitpid _getpty getpriority)
 
 # check for openpty and forkpty
 
@@ -1328,6 +1372,27 @@ AC_MSG_RESULT($ac_cv_have_getc_unlocked)
 if test "$ac_cv_have_getc_unlocked" = yes
 then
   AC_DEFINE(HAVE_GETC_UNLOCKED)
+fi
+
+# check for readline 4.2
+AC_CHECK_LIB(readline, rl_completion_matches,
+	AC_DEFINE(HAVE_RL_COMPLETION_MATCHES), , -ltermcap)
+
+AC_MSG_CHECKING(for broken nice())
+AC_CACHE_VAL(ac_cv_broken_nice, [
+AC_TRY_RUN([
+int main()
+{
+	int val1 = nice(1);
+	if (val1 != -1 && val1 == nice(2))
+		exit(0);
+	exit(1);
+}
+],ac_cv_broken_nice=yes, ac_cv_broken_nice=no)])
+AC_MSG_RESULT($ac_cv_broken_nice)
+if test "$ac_cv_broken_nice" = yes
+then
+  AC_DEFINE(HAVE_BROKEN_NICE)
 fi
 
 # THIS MUST BE LAST, IT CAN BREAK OTHER TESTS!

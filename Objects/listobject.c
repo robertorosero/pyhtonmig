@@ -176,8 +176,8 @@ static void
 list_dealloc(PyListObject *op)
 {
 	int i;
-	Py_TRASHCAN_SAFE_BEGIN(op)
 	PyObject_GC_Fini(op);
+	Py_TRASHCAN_SAFE_BEGIN(op)
 	if (op->ob_item != NULL) {
 		/* Do it backwards, for Christian Tismer.
 		   There's a simple test case where somehow this reduces
@@ -1461,7 +1461,7 @@ list_richcompare(PyObject *v, PyObject *w, int op)
 		PyObject *res;
 		switch (op) {
 		case Py_LT: cmp = vs <  ws; break;
-		case Py_LE: cmp = ws <= ws; break;
+		case Py_LE: cmp = vs <= ws; break;
 		case Py_EQ: cmp = vs == ws; break;
 		case Py_NE: cmp = vs != ws; break;
 		case Py_GT: cmp = vs >  ws; break;

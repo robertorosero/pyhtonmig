@@ -5,7 +5,6 @@
 import sys
 import os
 import string
-import regsub
 import MacOS
 
 BGENDIR=os.path.join(sys.prefix, ':Tools:bgen:bgen')
@@ -49,7 +48,7 @@ class ResourcesScanner(Scanner):
 			
 	def makegreylist(self):
 		return [
-			('#if !TARGET_API_MAC_CARBON', [
+			('#if TARGET_API_MAC_OS8', [
 				'RGetResource',
 				'OpenResFile',
 				'CreateResFile',

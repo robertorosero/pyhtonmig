@@ -344,18 +344,18 @@ class Application(FrameWork.Application):
 				# XXX and that's the last thing we want here.
 				f, filename, (suff, mode, dummy) = imp.find_module(modname)
 			except ImportError:
-				raise W.AlertError, "Can¹t find file for ³%s²" % modname
+				raise W.AlertError, "Can't find file for \"%s\"" % modname
 			else:
 				if not f:
-					raise W.AlertError, "Can¹t find file for ³%s²" % modname
+					raise W.AlertError, "Can't find file for \"%s\"" % modname
 				f.close()
 			if suff == '.py':
 				self.openscript(filename, lineno, charoffset)
 				return
 			else:
-				raise W.AlertError, "Can¹t find file for ³%s²" % modname
+				raise W.AlertError, "Can't find file for \"%s\"" % modname
 		else:
-			raise W.AlertError, "Can¹t find file Œ%s¹" % filename
+			raise W.AlertError, "Can't find file \"%s\"" % filename
 		if lineno is not None:
 			editor.selectline(lineno, charoffset)
 		return editor

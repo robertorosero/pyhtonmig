@@ -41,17 +41,19 @@ extern int ftime(struct timeb *);
 #else
 #ifdef MS_WINDOWS
 #include <windows.h>
-#ifdef MS_WIN16
+#if defined(MS_WIN16) || defined(__BORLANDC__)
 /* These overrides not needed for Win32 */
 #define timezone _timezone
 #define tzname _tzname
 #define daylight _daylight
+#endif /* MS_WIN16 || __BORLANDC__ */
+#ifdef MS_WIN16
 #define altzone _altzone
 #endif /* MS_WIN16 */
 #endif /* MS_WINDOWS */
 #endif /* !__WATCOMC__ || __QNX__ */
 
-#if defined(MS_WIN32) && !defined(MS_WIN64)
+#if defined(MS_WIN32) && !defined(MS_WIN64) && !defined(__BORLANDC__)
 /* Win32 has better clock replacement
    XXX Win64 does not yet, but might when the platform matures. */
 #include <largeint.h>
@@ -146,7 +148,7 @@ time_clock(PyObject *self, PyObject *args)
 }
 #endif /* HAVE_CLOCK */
 
-#if defined(MS_WIN32) && !defined(MS_WIN64)
+#if defined(MS_WIN32) && !defined(MS_WIN64) && !defined(__BORLANDC__)
 /* Due to Mark Hammond */
 static PyObject *
 time_clock(PyObject *self, PyObject *args)
@@ -597,7 +599,7 @@ inittime(void)
 	/* Squirrel away the module's dictionary for the y2k check */
 	Py_INCREF(d);
 	moddict = d;
-#if defined(HAVE_TZNAME) && !defined(__GLIBC__)
+#if defined(HAVE_TZNAME) && !defined(__GLIBC__) && !defined(__CYGWIN__)
 	tzset();
 #ifdef PYOS_OS2
 	ins(d, "timezone", PyInt_FromLong((long)_timezone));
@@ -615,7 +617,7 @@ inittime(void)
 #endif
 	ins(d, "daylight", PyInt_FromLong((long)daylight));
 	ins(d, "tzname", Py_BuildValue("(zz)", tzname[0], tzname[1]));
-#else /* !HAVE_TZNAME || __GLIBC__ */
+#else /* !HAVE_TZNAME || __GLIBC__ || __CYGWIN__*/
 #ifdef HAVE_TM_ZONE
 	{
 #define YEAR ((time_t)((365 * 24 + 6) * 3600))
@@ -671,7 +673,7 @@ inittime(void)
 	ins(d, "daylight", PyInt_FromLong(_daylight));
 	ins(d, "tzname", Py_BuildValue("(zz)", _tzname[0], _tzname[1]));
 #endif /* __CYGWIN__ */
-#endif /* !HAVE_TZNAME || __GLIBC__ */
+#endif /* !HAVE_TZNAME || __GLIBC__ || __CYGWIN__*/
 }
 
 

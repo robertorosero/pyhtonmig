@@ -817,7 +817,7 @@ follows:
 
 where \var{object} is the Python object to be converted and
 \var{address} is the \ctype{void *} argument that was passed to
-\cfunction{PyArg_ConvertTuple()}.  The returned \var{status} should be
+\cfunction{PyArg_ParseTuple()}.  The returned \var{status} should be
 \code{1} for a successful conversion and \code{0} if the conversion
 has failed.  When the conversion fails, the \var{converter} function
 should raise an exception.
@@ -1734,7 +1734,7 @@ implementation of CObjects (files \file{Include/cobject.h} and
 
 \chapter{Defining New Types
         \label{defining-new-types}}
-\sectionauthor{Michael Hudson}{mwh21@cam.ac.uk}
+\sectionauthor{Michael Hudson}{mwh@python.net}
 
 As mentioned in the last chapter, Python allows the writer of an
 extension module to define new types that can be manipulated from
@@ -2577,5 +2577,8 @@ corresponds to the variable of the same name in Python's top-level
 \appendix
 \chapter{Reporting Bugs}
 \input{reportingbugs}
+
+\chapter{History and License}
+\input{license}
 
 \end{document}

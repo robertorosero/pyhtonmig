@@ -118,7 +118,8 @@ class PyBuildExt(build_ext):
         # unfortunately, distutils doesn't let us provide separate C and C++
         # compilers
         if compiler is not None:
-            args['compiler_so'] = compiler
+            (ccshared,) = sysconfig.get_config_vars('CCSHARED')
+            args['compiler_so'] = compiler + ' ' + ccshared
         if linker_so is not None:
             args['linker_so'] = linker_so + ' -shared'
         self.compiler.set_executables(**args)
@@ -409,7 +410,8 @@ class PyBuildExt(build_ext):
             curses_libs = ['ncurses']
             exts.append( Extension('_curses', ['_cursesmodule.c'],
                                    libraries = curses_libs) )
-        elif (self.compiler.find_library_file(lib_dirs, 'curses')):
+        elif (self.compiler.find_library_file(lib_dirs, 'curses')) and platform[:6] != 'darwin':
+        	# OSX has an old Berkeley curses, not good enough for the _curses module.
             if (self.compiler.find_library_file(lib_dirs, 'terminfo')):
                 curses_libs = ['curses', 'terminfo']
             else:
