@@ -1693,7 +1693,7 @@ PyObject_IsInstance(PyObject *inst, PyObject *cls)
 		}
 	}
 	else if (PyType_Check(cls)) {
-		retval = ((PyObject *)(inst->ob_type) == cls);
+		retval = PyObject_TypeCheck(inst, (PyTypeObject *)cls);
 	}
 	else if (!PyInstance_Check(inst)) {
 		if (__class__ == NULL) {

@@ -458,6 +458,10 @@ list_ass_slice(PyListObject *a, int ilow, int ihigh, PyObject *v)
 			Py_XDECREF(*p);
 		PyMem_DEL(recycle);
 	}
+	if (a->ob_size == 0 && a->ob_item != NULL) {
+		PyMem_FREE(a->ob_item);
+		a->ob_item = NULL;
+	}
 	return 0;
 #undef b
 }
@@ -1490,6 +1494,16 @@ list_richcompare(PyObject *v, PyObject *w, int op)
 	return PyObject_RichCompare(vl->ob_item[i], wl->ob_item[i], op);
 }
 
+static PyObject *
+list_construct(PyListObject *self)
+{
+	if (self == NULL)
+		return PyList_New(0);
+	self->ob_size = 0;
+	self->ob_item = NULL;
+	return (PyObject *)self;
+}
+
 static char append_doc[] =
 "L.append(object) -- append object to end";
 static char extend_doc[] =
@@ -1522,12 +1536,6 @@ static PyMethodDef list_methods[] = {
 	{NULL,		NULL}		/* sentinel */
 };
 
-static PyObject *
-list_getattr(PyListObject *f, char *name)
-{
-	return Py_FindMethod(list_methods, (PyObject *)f, name);
-}
-
 static PySequenceMethods list_as_sequence = {
 	(inquiry)list_length,			/* sq_length */
 	(binaryfunc)list_concat,		/* sq_concat */
@@ -1549,7 +1557,7 @@ PyTypeObject PyList_Type = {
 	0,
 	(destructor)list_dealloc,		/* tp_dealloc */
 	(printfunc)list_print,			/* tp_print */
-	(getattrfunc)list_getattr,		/* tp_getattr */
+	0,					/* tp_getattr */
 	0,					/* tp_setattr */
 	0,					/* tp_compare */
 	(reprfunc)list_repr,			/* tp_repr */
@@ -1559,7 +1567,7 @@ PyTypeObject PyList_Type = {
 	0,					/* tp_hash */
 	0,					/* tp_call */
 	0,					/* tp_str */
-	0,					/* tp_getattro */
+	PyGeneric_GetAttr,			/* tp_getattro */
 	0,					/* tp_setattro */
 	0,					/* tp_as_buffer */
 	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_GC,	/* tp_flags */
@@ -1567,6 +1575,17 @@ PyTypeObject PyList_Type = {
  	(traverseproc)list_traverse,		/* tp_traverse */
  	(inquiry)list_clear,			/* tp_clear */
 	list_richcompare,			/* tp_richcompare */
+	0,					/* tp_weaklistoffset */
+	0,					/* tp_iter */
+	0,					/* tp_iternext */
+	list_methods,				/* tp_methods */
+	0,					/* tp_members */
+	0,					/* tp_getset */
+	0,					/* tp_base */
+	0,					/* tp_dict */
+	0,					/* tp_descr_get */
+	0,					/* tp_descr_set */
+	(unaryfunc)list_construct,		/* tp_construct */
 };
 
 
@@ -1595,12 +1614,6 @@ static PyMethodDef immutable_list_methods[] = {
 	{NULL,		NULL}		/* sentinel */
 };
 
-static PyObject *
-immutable_list_getattr(PyListObject *f, char *name)
-{
-	return Py_FindMethod(immutable_list_methods, (PyObject *)f, name);
-}
-
 static int
 immutable_list_ass(void)
 {
@@ -1627,7 +1640,7 @@ static PyTypeObject immutable_list_type = {
 	0,
 	0, /* Cannot happen */			/* tp_dealloc */
 	(printfunc)list_print,			/* tp_print */
-	(getattrfunc)immutable_list_getattr,	/* tp_getattr */
+	0,					/* tp_getattr */
 	0,					/* tp_setattr */
 	0, /* Won't be called */		/* tp_compare */
 	(reprfunc)list_repr,			/* tp_repr */
@@ -1637,7 +1650,7 @@ static PyTypeObject immutable_list_type = {
 	0,					/* tp_hash */
 	0,					/* tp_call */
 	0,					/* tp_str */
-	0,					/* tp_getattro */
+	PyGeneric_GetAttr,			/* tp_getattro */
 	0,					/* tp_setattro */
 	0,					/* tp_as_buffer */
 	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_GC,	/* tp_flags */
@@ -1645,5 +1658,16 @@ static PyTypeObject immutable_list_type = {
  	(traverseproc)list_traverse,		/* tp_traverse */
 	0,					/* tp_clear */
 	list_richcompare,			/* tp_richcompare */
+	0,					/* tp_weaklistoffset */
+	0,					/* tp_iter */
+	0,					/* tp_iternext */
+	immutable_list_methods,			/* tp_methods */
+	0,					/* tp_members */
+	0,					/* tp_getset */
+	0,					/* tp_base */
+	0,					/* tp_dict */
+	0,					/* tp_descr_get */
+	0,					/* tp_descr_set */
+	(unaryfunc)list_construct,		/* tp_construct */
 	/* NOTE: This is *not* the standard list_type struct! */
 };

@@ -236,7 +236,11 @@ extern DL_IMPORT(void) _PyObject_Del(PyObject *);
 #define PyObject_GC_Fini(op)
 #define PyObject_AS_GC(op) (op)
 #define PyObject_FROM_GC(op) (op)
- 
+#define PyType_IS_GC(t) 0
+#define PyObject_IS_GC(o) 0
+#define PyObject_AS_GC(o) (o)
+#define PyObject_FROM_GC(o) (o)
+
 #else
 
 /* Add the object into the container set */
