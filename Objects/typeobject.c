@@ -76,6 +76,8 @@ type_call(PyTypeObject *type, PyObject *args, PyObject *kwds)
 		obj = PyObject_FROM_GC(mem);
 	else
 		obj = (PyObject *)mem;
+	if (type->tp_flags & Py_TPFLAGS_HEAPTYPE)
+		Py_INCREF(type);
 	PyObject_INIT(obj, type);
 
 	res = (type->tp_construct)(obj, args, kwds);
@@ -104,28 +106,7 @@ type_call(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	return res;
 }
 
-/* Helpers for subtyping */
-
-static PyObject *
-subtype_construct(PyObject *self, PyObject *args, PyObject *kwds)
-{
-	PyObject *res;
-	PyTypeObject *base;
-	ternaryfunc f;
-
-	if (self == NULL) {
-		PyErr_SetString(PyExc_TypeError,
-				"can't allocate subtype instances");
-		return NULL;
-	}
-	base = self->ob_type->tp_base;
-	while ((f = base->tp_construct) == subtype_construct)
-		base = base->tp_base;
-	res = f(self, args, kwds);
-	if (res == self)
-		Py_INCREF(self->ob_type);
-	return res;
-}
+/* Helper for subtyping */
 
 static void
 subtype_dealloc(PyObject *self)
@@ -134,8 +115,7 @@ subtype_dealloc(PyObject *self)
 	PyTypeObject *base;
 	destructor f;
 
-	/* XXX Alternatively, we could call tp_clear to clear the object;
-	   but this is not guaranteed to delete all pointers, just likely. */
+	/* This exists so we can DECREF self->ob_type */
 
 	base = self->ob_type->tp_base;
 	while ((f = base->tp_dealloc) == subtype_dealloc)
@@ -148,8 +128,10 @@ subtype_dealloc(PyObject *self)
 			*dictptr = NULL;
 		}
 	}
-	base->tp_dealloc(self);
-	Py_DECREF(self->ob_type);
+	f(self);
+	if (self->ob_type->tp_flags & Py_TPFLAGS_HEAPTYPE) {
+		Py_DECREF(self->ob_type);
+	}
 }
 
 staticforward void override_slots(PyTypeObject *type, PyObject *dict);
@@ -273,8 +255,6 @@ type_construct(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	}
 
 	/* Override some slots with specific requirements */
-	if (type->tp_construct)
-		type->tp_construct = subtype_construct;
 	if (type->tp_dealloc)
 		type->tp_dealloc = subtype_dealloc;
 	if (type->tp_getattro == NULL) {
