@@ -33,7 +33,7 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 void err_set PROTO((object *));
 void err_setval PROTO((object *, object *));
 void err_setstr PROTO((object *, char *));
-int err_occurred PROTO((void));
+object *err_occurred PROTO((void));
 void err_get PROTO((object **, object **));
 void err_clear PROTO((void));
 
