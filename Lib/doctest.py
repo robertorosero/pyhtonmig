@@ -1058,6 +1058,8 @@ class DocTestRunner:
                                             fromfile='Expected', tofile='Got')
             else:
                 assert 0, 'Bad diff option'
+            # Remove trailing whitespace on diff output.
+            diff = [line.rstrip() + '\n' for line in diff]
             return _tag_msg("Differences (unified diff)", ''.join(diff))
 
         # If we're not using diff, then simply list the expected
