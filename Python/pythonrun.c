@@ -138,7 +138,6 @@ run_tty_1(fp, filename)
 	node *n;
 	perrdetail err;
 	char *ps1, *ps2;
-	int ret;
 	v = sysget("ps1");
 	w = sysget("ps2");
 	if (v != NULL && is_stringobject(v)) {
@@ -170,7 +169,7 @@ run_tty_1(fp, filename)
 		}
 		err_input(&err);
 		print_error();
-		return ret;
+		return err.error;
 	}
 	m = add_module("__main__");
 	if (m == NULL)
