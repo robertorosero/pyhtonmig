@@ -529,8 +529,14 @@ builtin_eval(PyObject *self, PyObject *args)
 					 PyEval_GetBuiltins()) != 0)
 			return NULL;
 	}
-	if (PyCode_Check(cmd))
+	if (PyCode_Check(cmd)) {
+		if (PyTuple_GET_SIZE(((PyCodeObject *)cmd)->co_freevars) > 0) {
+			PyErr_SetString(PyExc_TypeError,
+		"code object passed to eval() may not contain free variables");
+			return NULL;
+		}
 		return PyEval_EvalCode((PyCodeObject *) cmd, globals, locals);
+	}
 	if (!PyString_Check(cmd) &&
 	    !PyUnicode_Check(cmd)) {
 		PyErr_SetString(PyExc_TypeError,
@@ -613,6 +619,17 @@ builtin_getattr(PyObject *self, PyObject *args)
 
 	if (!PyArg_ParseTuple(args, "OO|O:getattr", &v, &name, &dflt))
 		return NULL;
+	if (PyUnicode_Check(name)) {
+		name = _PyUnicode_AsDefaultEncodedString(name, NULL);
+		if (name == NULL)
+			return NULL;
+	}
+
+	if (!PyString_Check(name)) {
+		PyErr_SetString(PyExc_TypeError,
+				"attribute name must be string");
+		return NULL;
+	}
 	result = PyObject_GetAttr(v, name);
 	if (result == NULL && dflt != NULL) {
 		PyErr_Clear();
@@ -656,6 +673,17 @@ builtin_hasattr(PyObject *self, PyObject *args)
 
 	if (!PyArg_ParseTuple(args, "OO:hasattr", &v, &name))
 		return NULL;
+	if (PyUnicode_Check(name)) {
+		name = _PyUnicode_AsDefaultEncodedString(name, NULL);
+		if (name == NULL)
+			return NULL;
+	}
+
+	if (!PyString_Check(name)) {
+		PyErr_SetString(PyExc_TypeError,
+				"attribute name must be string");
+		return NULL;
+	}
 	v = PyObject_GetAttr(v, name);
 	if (v == NULL) {
 		PyErr_Clear();

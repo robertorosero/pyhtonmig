@@ -1024,11 +1024,6 @@ PyObject_SetAttrString(PyObject *v, char *name, PyObject *w)
 	return res;
 }
 
-/* Internal API needed by PyObject_GetAttr(): */
-extern 
-PyObject *_PyUnicode_AsDefaultEncodedString(PyObject *unicode,
-				  const char *errors);
-
 PyObject *
 PyObject_GetAttr(PyObject *v, PyObject *name)
 {

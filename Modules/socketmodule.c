@@ -219,10 +219,14 @@ const char *inet_ntop(int af, const void *src, char *dst, socklen_t size);
 #endif
 
 /* I know this is a bad practice, but it is the easiest... */
-#ifndef HAVE_GETADDRINFO
+/* XXX Temporarily work around bug #445928:
+   getaddrinfo on Darwin seems to return an empty result list, with
+   no error, even if host lookup ought to work fine. So use the
+   emulation code for now. */
+#if !defined(HAVE_GETADDRINFO) || defined(__APPLE__)
 #include "getaddrinfo.c"
 #endif
-#ifndef HAVE_GETNAMEINFO
+#if !defined(HAVE_GETNAMEINFO) || defined(__APPLE__)
 #include "getnameinfo.c"
 #endif
 
@@ -2345,11 +2349,7 @@ PySocket_getaddrinfo(PyObject *self, PyObject *args)
 		return NULL;
 	}
 	if (PyInt_Check(pobj)) {
-#ifndef HAVE_SNPRINTF
-		sprintf(pbuf, "%ld", PyInt_AsLong(pobj));
-#else
-		snprintf(pbuf, sizeof(pbuf), "%ld", PyInt_AsLong(pobj));
-#endif
+		PyOS_snprintf(pbuf, sizeof(pbuf), "%ld", PyInt_AsLong(pobj));
 		pptr = pbuf;
 	} else if (PyString_Check(pobj)) {
 		pptr = PyString_AsString(pobj);
@@ -2420,11 +2420,7 @@ PySocket_getnameinfo(PyObject *self, PyObject *args)
 	n = PyArg_ParseTuple(sa, "si|ii", &hostp, &port, &flowinfo, scope_id);
 	if (n == 0)
 		goto fail;
-#ifdef HAVE_SNPRINTF
-	snprintf(pbuf, sizeof(pbuf), "%d", port);
-#else
-	sprintf(pbuf, "%d", port);
-#endif
+	PyOS_snprintf(pbuf, sizeof(pbuf), "%d", port);
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = PF_UNSPEC;
 	error = getaddrinfo(hostp, pbuf, &hints, &res);

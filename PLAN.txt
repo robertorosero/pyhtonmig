@@ -267,6 +267,20 @@ MERGE BEGIN ****************************************************************
 Merge details (this section is Tim's scratchpad, but should help a lot if
 he dies of frustration while wrestling with CVS <0.9 wink>).
 ----------------------------------------------------------------------------
+2001-08-01  Merging descr-branch back into trunk.
+
+Tagged trunk about 22:05:
+    cvs tag date2001-08-01 python
+
+Merged trunk delta into branch:
+
+    cvs -q -z3 up -j date2001-07-30 -j date2001-08-01 descr
+
+No conflicts (! first time ever!) ... but problems with pythoncore.dsp.
+Resolved.
+
+Rebuilt from scratch; ran all tests; checked into branch about 22:40.
+----------------------------------------------------------------------------
 2001-07-30
 
 Doing this again while the expat and Windows installer changes are still
