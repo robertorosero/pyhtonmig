@@ -65,8 +65,8 @@ Makefile:	$(srcdir)/Makefile.in ../config.status
 		$(SHELL) config.status)
 
 depend:
-		$(MKDEP) $(CFLAGS) \
-			`echo $(OBJS) | tr ' ' '\012' | sed 's/\.o/.c/'`
+		$(MKDEP) $(CFLAGS) `echo $(OBJS) | tr ' ' '\012' | \
+					sed 's|\(.*\)\.o|$(srcdir)/\1.c|'`
 
 .PRECIOUS:	Makefile
 
