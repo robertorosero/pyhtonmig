@@ -267,6 +267,12 @@ def pydicts():
     verify(isinstance(d, DT))
     class C(DT):
         state = -1
+        def __init__(self, *a, **kw):
+            if a:
+                assert len(a) == 1
+                self.state = a[0]
+            if kw:
+                for k, v in kw.items(): self[v] = k
         def __getitem__(self, key):
             return self.get(key, 0)
         def __setitem__(self, key, value):
@@ -277,6 +283,10 @@ def pydicts():
         def getstate(self):
             return self.state
     verify(issubclass(C, DT))
+    a1 = C(12)
+    verify(a1.state == 12)
+    a2 = C(foo=1, bar=2)
+    verify(a2[1] == 'foo' and a2[2] == 'bar')
     a = C()
     verify(a.state == -1)
     verify(a.getstate() == -1)
