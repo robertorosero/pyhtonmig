@@ -1253,7 +1253,7 @@ PyList_Sort(v)
 	return 0;
 }
 
-static PyObject *
+static void
 _listreverse(PyListObject *self)
 {
 	register PyObject **p, **q;
