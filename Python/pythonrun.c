@@ -143,7 +143,7 @@ Py_Initialize(void)
 	_PyImport_Init();
 
 	/* initialize builtin exceptions */
-	init_exceptions();
+	_PyExc_Init();
 
 	/* phase 2 of builtins */
 	_PyImport_FixupExtension("__builtin__", "__builtin__");
@@ -237,7 +237,7 @@ Py_Finalize(void)
 	   below has been checked to make sure no exceptions are ever
 	   raised.
 	*/
-	fini_exceptions();
+	_PyExc_Fini();
 
 	/* Delete current thread */
 	PyInterpreterState_Clear(interp);
