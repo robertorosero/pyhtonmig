@@ -93,10 +93,8 @@ PyObject_Init(PyObject *op, PyTypeObject *tp)
 				"NULL object passed to PyObject_Init");
 		return op;
   	}
-#ifdef WITH_CYCLE_GC
 	if (PyType_IS_GC(tp))
 		op = (PyObject *) PyObject_FROM_GC(op);
-#endif
 	/* Any changes should be reflected in PyObject_INIT (objimpl.h) */
 	op->ob_type = tp;
 	_Py_NewReference(op);
@@ -111,10 +109,8 @@ PyObject_InitVar(PyVarObject *op, PyTypeObject *tp, int size)
 				"NULL object passed to PyObject_InitVar");
 		return op;
 	}
-#ifdef WITH_CYCLE_GC
 	if (PyType_IS_GC(tp))
 		op = (PyVarObject *) PyObject_FROM_GC(op);
-#endif
 	/* Any changes should be reflected in PyObject_INIT_VAR */
 	op->ob_size = size;
 	op->ob_type = tp;
@@ -129,10 +125,8 @@ _PyObject_New(PyTypeObject *tp)
 	op = (PyObject *) PyObject_MALLOC(_PyObject_SIZE(tp));
 	if (op == NULL)
 		return PyErr_NoMemory();
-#ifdef WITH_CYCLE_GC
 	if (PyType_IS_GC(tp))
 		op = (PyObject *) PyObject_FROM_GC(op);
-#endif
 	return PyObject_INIT(op, tp);
 }
 
@@ -143,21 +137,17 @@ _PyObject_NewVar(PyTypeObject *tp, int size)
 	op = (PyVarObject *) PyObject_MALLOC(_PyObject_VAR_SIZE(tp, size));
 	if (op == NULL)
 		return (PyVarObject *)PyErr_NoMemory();
-#ifdef WITH_CYCLE_GC
 	if (PyType_IS_GC(tp))
 		op = (PyVarObject *) PyObject_FROM_GC(op);
-#endif
 	return PyObject_INIT_VAR(op, tp, size);
 }
 
 void
 _PyObject_Del(PyObject *op)
 {
-#ifdef WITH_CYCLE_GC
 	if (op && PyType_IS_GC(op->ob_type)) {
 		op = (PyObject *) PyObject_AS_GC(op);
 	}
-#endif
 	PyObject_FREE(op);
 }
 
@@ -1239,6 +1229,24 @@ PyCallable_Check(PyObject *x)
 }
 
 
+/* type test with subclassing support */
+
+int
+_PyObject_TypeCheck(PyObject *obj, PyTypeObject *type)
+{
+	PyTypeObject *tp = obj->ob_type;
+
+	do {
+		if (tp == type)
+			return 1;
+		if (!PyType_HasFeature(tp, Py_TPFLAGS_HAVE_CLASS))
+			return 0;
+		tp = tp->tp_base;
+	} while (tp != NULL);
+	return 0;
+}
+
+
 /*
 NoObject is usable as a non-NULL undefined value, used by the macro None.
 There is (and should be!) no way to create other objects of this type,
@@ -1405,7 +1413,7 @@ _Py_GetObjects(PyObject *self, PyObject *args)
 		return NULL;
 	for (i = 0; (n == 0 || i < n) && op != &refchain; i++) {
 		while (op == self || op == args || op == res || op == t ||
-		       t != NULL && op->ob_type != (PyTypeObject *) t) {
+		       (t != NULL && op->ob_type != (PyTypeObject *) t)) {
 			op = op->_ob_next;
 			if (op == &refchain)
 				return res;
