@@ -235,8 +235,8 @@ by the Python interpreter's option processing but left in
 When commands are read from a tty, the interpreter is said to be in
 \emph{interactive mode}.  In this mode it prompts for the next command
 with the \emph{primary prompt}, usually three greater-than signs
-(\samp{>>> }); for continuation lines it prompts with the
-\emph{secondary prompt}, by default three dots (\samp{... }).
+(\samp{>>>~}); for continuation lines it prompts with the
+\emph{secondary prompt}, by default three dots (\samp{...~}).
 The interpreter prints a welcome message stating its version number
 and a copyright notice before printing the first prompt, e.g.:
 
@@ -337,7 +337,7 @@ if os.environ.get('PYTHONSTARTUP') \
 \chapter{An Informal Introduction to Python \label{informal}}
 
 In the following examples, input and output are distinguished by the
-presence or absence of prompts (\samp{>>> } and \samp{... }): to repeat
+presence or absence of prompts (\samp{>>>~} and \samp{...~}): to repeat
 the example, you must type everything after the prompt, when the
 prompt appears; lines that do not begin with a prompt are output from
 the interpreter. %
@@ -405,7 +405,7 @@ variable.  The value of an assignment is not written:
 >>> width * height
 900
 \end{verbatim}
-%
+
 A value can be assigned to several variables simultaneously:
 
 \begin{verbatim}
@@ -620,6 +620,16 @@ TypeError: object doesn't support item assignment
 Traceback (innermost last):
   File "<stdin>", line 1, in ?
 TypeError: object doesn't support slice assignment
+\end{verbatim}
+
+However, creating a new string with the combined content is easy and
+efficient:
+
+\begin{verbatim}
+>>> 'x' + word[1:]
+'xelpA'
+>>> 'Splat' + word[-1:]
+'SplatA'
 \end{verbatim}
 
 Slice indices have useful defaults; an omitted first index defaults to
