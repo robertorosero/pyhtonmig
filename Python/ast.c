@@ -109,7 +109,7 @@ num_stmts(const node *n)
 mod_ty
 PyAST_FromNode(const node *n, PyCompilerFlags *flags)
 {
-    int i, j, num, total;
+    int i, j, num;
     asdl_seq *stmts = NULL;
     stmt_ty s;
     node *ch;
@@ -127,9 +127,7 @@ PyAST_FromNode(const node *n, PyCompilerFlags *flags)
 
     switch (TYPE(n)) {
         case file_input:
-            total = num_stmts(n);
-            fprintf(stderr, "file_input containing %d statements\n", total);
-            stmts = asdl_seq_new(total);
+            stmts = asdl_seq_new(num_stmts(n));
             if (!stmts)
                     return NULL;
             for (i = 0; i < NCH(n) - 1; i++) {
