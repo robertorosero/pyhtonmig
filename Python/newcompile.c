@@ -226,6 +226,41 @@ list2dict(PyObject *list)
 	return dict;
 }
 
+static void
+compiler_display_symbols(PyObject *name, PyObject *symbols)
+{
+	PyObject *key, *value;
+	int flags, pos = 0;
+
+	fprintf(stderr, "block %s\n", PyString_AS_STRING(name));
+	while (PyDict_Next(symbols, &pos, &key, &value)) {
+		flags = PyInt_AsLong(value);
+		fprintf(stderr, "var %s:", PyString_AS_STRING(key));
+		if (flags & DEF_GLOBAL)
+			fprintf(stderr, " declared_global");
+		if (flags & DEF_LOCAL)
+			fprintf(stderr, " local");
+		if (flags & DEF_PARAM)
+			fprintf(stderr, " param");
+		if (flags & DEF_STAR)
+			fprintf(stderr, " stararg");
+		if (flags & DEF_DOUBLESTAR)
+			fprintf(stderr, " starstar");
+		if (flags & DEF_INTUPLE)
+			fprintf(stderr, " tuple");
+		if (flags & DEF_FREE)
+			fprintf(stderr, " free");
+		if (flags & DEF_FREE_GLOBAL)
+			fprintf(stderr, " global");
+		if (flags & DEF_FREE_CLASS)
+			fprintf(stderr, " free/class");
+		if (flags & DEF_IMPORT)
+			fprintf(stderr, " import");
+		fprintf(stderr, "\n");
+	}
+	fprintf(stderr, "\n");
+}
+
 static int
 compiler_enter_scope(struct compiler *c, identifier name, void *key)
 {
@@ -255,6 +290,9 @@ compiler_enter_scope(struct compiler *c, identifier name, void *key)
 	u->u_names = PyDict_New();
 	if (!u->u_names)
 		return 0;
+
+	/* A little debugging output */
+	compiler_display_symbols(name, u->u_ste->ste_symbols);
 
 	/* Push the old compiler_unit on the stack. */
 	if (c->u) {
@@ -624,9 +662,6 @@ compiler_function(struct compiler *c, stmt_ty s)
 	arguments_ty args = s->v.FunctionDef.args;
 	assert(s->kind == FunctionDef_kind);
 
-	fprintf(stderr, "function %s\n",
-		PyString_AS_STRING(s->v.FunctionDef.name));
-
 	if (args->defaults)
 		VISIT_SEQ(c, expr, args->defaults);
 	if (!compiler_enter_scope(c, s->v.FunctionDef.name, (void *)s))
@@ -643,6 +678,39 @@ compiler_function(struct compiler *c, stmt_ty s)
 	ADDOP_I(c, MAKE_FUNCTION, c->u->u_argcount);
 	if (!compiler_nameop(c, s->v.FunctionDef.name, Store))
 		return 0;
+
+	return 1;
+}
+
+static int
+compiler_lambda(struct compiler *c, expr_ty e)
+{
+	PyCodeObject *co;
+	identifier name;
+	arguments_ty args = e->v.Lambda.args;
+	assert(e->kind == Lambda_kind);
+
+	name = PyString_InternFromString("lambda");
+	if (!name)
+		return 0;
+
+	if (args->defaults)
+		VISIT_SEQ(c, expr, args->defaults);
+	if (!compiler_enter_scope(c, name, (void *)e))
+		return 0;
+	c->u->u_argcount = asdl_seq_LEN(e->v.Lambda.args->args);
+	VISIT(c, expr, e->v.Lambda.body);
+	ADDOP(c, RETURN_VALUE);
+	co = assemble(c);
+	if (co == NULL)
+		return 0;
+	compiler_exit_scope(c);
+
+	/* XXX closure */
+	ADDOP_O(c, LOAD_CONST, (PyObject *)co, consts);
+	ADDOP_I(c, MAKE_FUNCTION, c->u->u_argcount);
+
+	Py_DECREF(name);
 
 	return 1;
 }
@@ -1415,7 +1483,7 @@ compiler_visit_expr(struct compiler *c, expr_ty e)
 		ADDOP(c, unaryop(e->v.UnaryOp.op));
 		break;
         case Lambda_kind:
-		break;
+		return compiler_lambda(c, e);
         case Dict_kind:
 		/* XXX get rid of arg? */
 		ADDOP_I(c, BUILD_MAP, 0);

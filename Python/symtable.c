@@ -760,16 +760,19 @@ symtable_visit_expr(struct symtable *st, expr_ty e)
         case UnaryOp_kind:
 		VISIT(st, expr, e->v.UnaryOp.operand);
 		break;
-        case Lambda_kind:
+        case Lambda_kind: {
 		if (!symtable_add_def(st, GET_IDENTIFIER(lambda), DEF_LOCAL))
 			return 0;
-		VISIT(st, arguments, e->v.Lambda.args);
+		if (e->v.Lambda.args->defaults)
+			VISIT_SEQ(st, expr, e->v.Lambda.args->defaults);
 		/* XXX how to get line numbers for expressions */
 		symtable_enter_block(st, GET_IDENTIFIER(lambda),
 				     FunctionBlock, (void *)e, 0);
+		VISIT(st, arguments, e->v.Lambda.args);
 		VISIT(st, expr, e->v.Lambda.body);
 		symtable_exit_block(st, (void *)e);
 		break;
+	}
         case Dict_kind:
 		VISIT_SEQ(st, expr, e->v.Dict.keys);
 		VISIT_SEQ(st, expr, e->v.Dict.values);
