@@ -25,7 +25,7 @@ def testbinop(a, b, res, expr="a+b", meth="__add__"):
     bm = getattr(a, meth)
     verify(bm(b) == res)
 
-def testternop(a, b, c, res, expr="a]b:c]", meth="__getslice__"):
+def testternop(a, b, c, res, expr="a[b:c]", meth="__getslice__"):
     if verbose: print "checking", expr
     dict = {'a': a, 'b': b, 'c': c}
     verify(eval(expr, dict) == res)
