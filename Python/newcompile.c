@@ -817,6 +817,26 @@ compiler_continue(struct compiler *c)
 }
 
 static int
+compiler_import(struct compiler *c, stmt_ty s)
+{
+	int i, n = asdl_seq_LEN(s->v.Import.names);
+	for (i = 0; i < n; i++) {
+		alias_ty alias = asdl_seq_GET(s->v.Import.names, i);
+		identifier store_name;
+		ADDOP_O(c, LOAD_CONST, Py_None, consts);
+		ADDOP_O(c, IMPORT_NAME, alias->name, varnames);
+
+		store_name = alias->name;
+		if (alias->asname)
+			store_name = alias->asname;
+
+		if (!compiler_nameop(c, store_name, Store))
+			return 0;
+	}
+	return 1;
+}
+
+static int
 compiler_assert(struct compiler *c, stmt_ty s)
 {
 	static PyObject *assertion_error = NULL;
@@ -922,7 +942,7 @@ compiler_visit_stmt(struct compiler *c, stmt_ty s)
         case Assert_kind:
 		return compiler_assert(c, s);
         case Import_kind:
-		break;
+		return compiler_import(c, s);
         case ImportFrom_kind:
 		break;
         case Exec_kind:
