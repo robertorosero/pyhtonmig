@@ -1,5 +1,5 @@
 /***********************************************************
-Copyright 1991, 1992, 1993 by Stichting Mathematisch Centrum,
+Copyright 1991, 1992, 1993, 1994 by Stichting Mathematisch Centrum,
 Amsterdam, The Netherlands.
 
                         All Rights Reserved
@@ -24,77 +24,84 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 /* POSIX module implementation */
 
-#ifdef AMOEBA
-#define NO_LSTAT
-#define SYSV
-#endif
-
-#ifdef __sgi
-#define DO_PG
-#endif
-
-#ifdef _NEXT_SOURCE
-#define mode_t int
-#define NO_UNAME
-#endif
-
-#include <signal.h>
-#include <string.h>
-#include <setjmp.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-
-#ifdef DO_TIMES
-#include <sys/times.h>
-#include <sys/param.h>
-#include <errno.h>
-#endif
-
-#ifdef SYSV
-
-#define UTIME_STRUCT 1
-#include <dirent.h>
-#define direct dirent
-#ifdef i386
-#define mode_t int
-#endif
-
-#else /* !SYSV */
-
-#include <sys/dir.h>
-
-#endif /* !SYSV */
-
-#ifndef NO_UNISTD
-#include <unistd.h> /* Take this out and hope the best if it doesn't exist */
-#endif
-
 #include "allobjects.h"
 #include "modsupport.h"
 #include "ceval.h"
 
-#ifdef _SEQUENT_
+#include <signal.h>
+#include <string.h>
+#include <setjmp.h>
+#include <errno.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+
+#ifdef HAVE_UNISTD_H
 #include <unistd.h>
-#else /* _SEQUENT_ */
-/* XXX Aren't these always declared in unistd.h? */
+#else /* !HAVE_UNISTD_H */
 extern int mkdir PROTO((const char *, mode_t));
 extern int chdir PROTO((const char *));
 extern int rmdir PROTO((const char *));
 extern int chmod PROTO((const char *, mode_t));
-extern char *getcwd(); /* No PROTO((char *, int)) -- non portable */
+extern char *getcwd PROTO((char *, int));
 extern char *strerror PROTO((int));
 extern int link PROTO((const char *, const char *));
 extern int rename PROTO((const char *, const char *));
 extern int stat PROTO((const char *, struct stat *));
 extern int unlink PROTO((const char *));
 extern int pclose PROTO((FILE *));
-#endif /* !_SEQUENT_ */
-#ifdef NO_LSTAT
-#define lstat stat
-#else
-extern int lstat PROTO((const char *, struct stat *));
+#ifdef HAVE_SYMLINK
 extern int symlink PROTO((const char *, const char *));
 #endif
+#ifdef HAVE_LSTAT
+extern int lstat PROTO((const char *, struct stat *));
+#endif
+#endif /* !HAVE_UNISTD_H */
+
+#if 1
+/* XXX These are for SunOS4.1.3 but shouldn't hurt elsewhere */
+extern int rename();
+extern int pclose();
+extern int lstat();
+extern int symlink();
+#endif
+
+#ifdef HAVE_UTIME_H
+#include <utime.h>
+#endif
+
+#ifdef HAVE_SYS_TIMES_H
+#include <sys/times.h>
+#endif
+
+#ifdef HAVE_SYS_PARAM_H
+#include <sys/param.h>
+#endif
+
+#ifdef HAVE_SYS_UTSNAME_H
+#include <sys/utsname.h>
+#endif
+
+#ifndef MAXPATHLEN
+#define MAXPATHLEN 1024
+#endif
+
+/* unistd.h defines _POSIX_VERSION on POSIX.1 systems.  */
+#if defined(DIRENT) || defined(_POSIX_VERSION)
+#include <dirent.h>
+#define NLENGTH(dirent) (strlen((dirent)->d_name))
+#else /* not (DIRENT or _POSIX_VERSION) */
+#define dirent direct
+#define NLENGTH(dirent) ((dirent)->d_namlen)
+#ifdef SYSNDIR
+#include <sys/ndir.h>
+#endif /* SYSNDIR */
+#ifdef SYSDIR
+#include <sys/dir.h>
+#endif /* SYSDIR */
+#ifdef NDIR
+#include <ndir.h>
+#endif /* NDIR */
+#endif /* not (DIRENT or _POSIX_VERSION) */
 
 
 /* Return a dictionary corresponding to the POSIX environment table */
@@ -275,7 +282,7 @@ posix_listdir(self, args)
 	char *name;
 	object *d, *v;
 	DIR *dirp;
-	struct direct *ep;
+	struct dirent *ep;
 	if (!getargs(args, "s", &name))
 		return NULL;
 	BGN_SAVE
@@ -331,21 +338,6 @@ posix_nice(self, args)
 		return posix_error();
 	return newintobject((long) value);
 }
-
-#if i386 && ! _SEQUENT_
-int
-rename(from, to)
-	char *from;
-	char *to;
-{
-	int status;
-	/* XXX Shouldn't this unlink the destination first? */
-	status = link(from, to);
-	if (status != 0)
-		return status;
-	return unlink(from);
-}
-#endif /* i386 && ! _SEQUENT_ */
 
 static object *
 posix_rename(self, args)
@@ -408,11 +400,7 @@ posix_unlink(self, args)
 	return posix_1str(args, unlink);
 }
 
-#ifndef NO_UNAME
-#include <sys/utsname.h>
-
-extern int uname PROTO((struct utsname *));
-
+#ifdef HAVE_UNAME
 static object *
 posix_uname(self, args)
 	object *self;
@@ -435,11 +423,7 @@ posix_uname(self, args)
 		       u.version,
 		       u.machine);
 }
-#endif /* NO_UNAME */
-
-#ifdef UTIME_STRUCT
-#include <utime.h>
-#endif
+#endif /* HAVE_UNAME */
 
 static object *
 posix_utime(self, args)
@@ -449,12 +433,11 @@ posix_utime(self, args)
 	char *path;
 	int res;
 
-#ifdef UTIME_STRUCT
+#ifdef HAVE_UTIME_H
 	struct utimbuf buf;
 #define ATIME buf.actime
 #define MTIME buf.modtime
 #define UTIME_ARG &buf
-
 #else
 	time_t buf[2];
 #define ATIME buf[0]
@@ -532,8 +515,12 @@ posix_execv(self, args)
 	}
 	argvlist[argc] = NULL;
 
+#ifdef BAD_EXEC_PROTOTYPES
+	execv(path, (const char **) argvlist);
+#else
 	execv(path, argvlist);
-	
+#endif
+
 	/* If we get here it's definitely an error */
 
 	DEL(argvlist);
@@ -614,7 +601,12 @@ posix_execve(self, args)
 	}
 	envlist[envc] = 0;
 
+
+#ifdef BAD_EXEC_PROTOTYPES
+	execve(path, (const char **)argvlist, envlist);
+#else
 	execve(path, argvlist, envlist);
+#endif
 	
 	/* If we get here it's definitely an error */
 
@@ -684,6 +676,7 @@ posix_getpid(self, args)
 	return newintobject((long)getpid());
 }
 
+#ifdef HAVE_GETPGRP
 static object *
 posix_getpgrp(self, args)
 	object *self;
@@ -691,13 +684,15 @@ posix_getpgrp(self, args)
 {
 	if (!getnoarg(args))
 		return NULL;
-#ifdef SYSV
-	return newintobject((long)getpgrp());
-#else
+#ifdef GETPGRP_HAVE_ARG
 	return newintobject((long)getpgrp(0));
+#else
+	return newintobject((long)getpgrp());
 #endif
 }
+#endif /* HAVE_GETPGRP */
 
+#ifdef HAVE_SETPGRP
 static object *
 posix_setpgrp(self, args)
 	object *self;
@@ -705,15 +700,17 @@ posix_setpgrp(self, args)
 {
 	if (!getnoarg(args))
 		return NULL;
-#ifdef SYSV
-	if (setpgrp() < 0)
-#else
+#ifdef GETPGRP_HAVE_ARG
 	if (setpgrp(0, 0) < 0)
+#else
+	if (setpgrp() < 0)
 #endif
 		return posix_error();
 	INCREF(None);
 	return None;
 }
+
+#endif /* HAVE_SETPGRP */
 
 static object *
 posix_getppid(self, args)
@@ -797,16 +794,12 @@ posix_setgid(self, args)
 	return None;
 }
 
+#ifdef HAVE_WAITPID
 static object *
 posix_waitpid(self, args)
 	object *self;
 	object *args;
 {
-#ifdef NO_WAITPID
-	err_setstr(PosixError,
-		   "posix.waitpid() not supported on this system");
-	return NULL;
-#else
 	int pid, options, sts;
 	if (!getargs(args, "(ii)", &pid, &options))
 		return NULL;
@@ -817,8 +810,8 @@ posix_waitpid(self, args)
 		return posix_error();
 	else
 		return mkvalue("ii", pid, sts);
-#endif
 }
+#endif /* HAVE_WAITPID */
 
 static object *
 posix_wait(self, args)
@@ -826,8 +819,6 @@ posix_wait(self, args)
 	object *args;
 {
 	int pid, sts;
-	if (args != NULL)
-		return posix_waitpid(self, args); /* BW compat */
 	BGN_SAVE
 	pid = wait(&sts);
 	END_SAVE
@@ -842,19 +833,20 @@ posix_lstat(self, args)
 	object *self;
 	object *args;
 {
+#ifdef HAVE_LSTAT
 	return posix_do_stat(self, args, lstat);
+#else /* !HAVE_LSTAT */
+	return posix_do_stat(self, args, stat);
+#endif /* !HAVE_LSTAT */
 }
 
+#ifdef HAVE_READLINK
 static object *
 posix_readlink(self, args)
 	object *self;
 	object *args;
 {
-#ifdef NO_LSTAT
-	err_setstr(PosixError, "readlink not implemented on this system");
-	return NULL;
-#else
-	char buf[1024]; /* XXX Should use MAXPATHLEN */
+	char buf[MAXPATHLEN];
 	char *path;
 	int n;
 	if (!getargs(args, "s", &path))
@@ -865,25 +857,23 @@ posix_readlink(self, args)
 	if (n < 0)
 		return posix_error();
 	return newsizedstringobject(buf, n);
-#endif
 }
+#endif /* HAVE_READLINK */
 
+#ifdef HAVE_SYMLINK
 static object *
 posix_symlink(self, args)
 	object *self;
 	object *args;
 {
-#ifdef NO_LSTAT
-	err_setstr(PosixError, "symlink not implemented on this system");
-	return NULL;
-#else
 	return posix_2str(args, symlink);
-#endif
 }
+#endif /* HAVE_SYMLINK */
 
-
-#ifdef DO_TIMES
-
+#ifdef HAVE_TIMES
+#ifndef HZ
+#define HZ 60 /* Universal constant :-) */
+#endif
 static object *
 posix_times(self, args)
 	object *self;
@@ -903,11 +893,9 @@ posix_times(self, args)
 		       (double)t.tms_cutime / HZ,
 		       (double)t.tms_cstime / HZ);
 }
+#endif /* HAVE_TIMES */
 
-#endif /* DO_TIMES */
-
-#ifdef DO_PG
-
+#ifdef HAVE_SETSID
 static object *
 posix_setsid(self, args)
 	object *self;
@@ -920,7 +908,9 @@ posix_setsid(self, args)
 	INCREF(None);
 	return None;
 }
+#endif /* HAVE_SETSID */
 
+#ifdef HAVE_SETPGID
 static object *
 posix_setpgid(self, args)
 	object *self;
@@ -934,7 +924,9 @@ posix_setpgid(self, args)
 	INCREF(None);
 	return None;
 }
+#endif /* HAVE_SETPGID */
 
+#ifdef HAVE_TCGETPGRP
 static object *
 posix_tcgetpgrp(self, args)
 	object *self;
@@ -948,7 +940,9 @@ posix_tcgetpgrp(self, args)
 		return posix_error();
 	return newintobject((long)pgid);
 }
+#endif /* HAVE_TCGETPGRP */
 
+#ifdef HAVE_TCSETPGRP
 static object *
 posix_tcsetpgrp(self, args)
 	object *self;
@@ -962,8 +956,7 @@ posix_tcsetpgrp(self, args)
        INCREF(None);
 	return None;
 }
-
-#endif /* DO_PG */
+#endif /* HAVE_TCSETPGRP */
 
 /* Functions acting on file descriptors */
 
@@ -1180,19 +1173,23 @@ static struct methodlist posix_methods[] = {
 	{"lstat",	posix_lstat},
 	{"mkdir",	posix_mkdir},
 	{"nice",	posix_nice},
+#ifdef HAVE_READLINK
 	{"readlink",	posix_readlink},
+#endif
 	{"rename",	posix_rename},
 	{"rmdir",	posix_rmdir},
 	{"stat",	posix_stat},
+#ifdef HAVE_SYMLINK
 	{"symlink",	posix_symlink},
+#endif
 	{"system",	posix_system},
 	{"umask",	posix_umask},
-#ifndef NO_UNAME
+#ifdef HAVE_UNAME
 	{"uname",	posix_uname},
 #endif
 	{"unlink",	posix_unlink},
 	{"utime",	posix_utime},
-#ifdef DO_TIMES
+#ifdef HAVE_TIMES
 	{"times",	posix_times},
 #endif
 	{"_exit",	posix__exit},
@@ -1203,20 +1200,32 @@ static struct methodlist posix_methods[] = {
 	{"geteuid",	posix_geteuid},
 	{"getgid",	posix_getgid},
 	{"getpid",	posix_getpid},
+#ifdef HAVE_GETPGRP
 	{"getpgrp",	posix_getpgrp},
+#endif
 	{"getppid",	posix_getppid},
 	{"getuid",	posix_getuid},
 	{"kill",	posix_kill},
 	{"popen",	posix_popen},
 	{"setuid",	posix_setuid},
 	{"setgid",	posix_setgid},
+#ifdef HAVE_SETPGRP
 	{"setpgrp",	posix_setpgrp},
+#endif
 	{"wait",	posix_wait},
+#ifdef HAVE_WAITPID
 	{"waitpid",	posix_waitpid},
-#ifdef DO_PG
+#endif
+#ifdef HAVE_SETSID
 	{"setsid",	posix_setsid},
+#endif
+#ifdef HAVE_SETPGID
 	{"setpgid",	posix_setpgid},
+#endif
+#ifdef HAVE_TCGETPGRP
 	{"tcgetpgrp",	posix_tcgetpgrp},
+#endif
+#ifdef HAVE_TCSETPGRP
 	{"tcsetpgrp",	posix_tcsetpgrp},
 #endif
 	{"open",	posix_open},
@@ -1252,18 +1261,4 @@ initposix()
 	PosixError = newstringobject("posix.error");
 	if (PosixError == NULL || dictinsert(d, "error", PosixError) != 0)
 		fatal("can't define posix.error");
-}
-
-
-/* Function used elsewhere to get a file's modification time */
-
-long
-getmtime(path)
-	char *path;
-{
-	struct stat st;
-	if (stat(path, &st) != 0)
-		return -1;
-	else
-		return st.st_mtime;
 }
