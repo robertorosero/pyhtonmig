@@ -617,6 +617,8 @@ sock_listen(s, args)
 	if (!getintarg(args, &backlog))
 		return NULL;
 	BGN_SAVE
+	if (backlog < 1)
+		backlog == 1;
 	res = listen(s->sock_fd, backlog);
 	END_SAVE
 	if (res < 0)
