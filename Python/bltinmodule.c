@@ -63,6 +63,10 @@ builtin_apply(self, args)
 	object *func, *arglist;
 	if (!getargs(args, "(OO)", &func, &arglist))
 		return NULL;
+	if (!is_tupleobject(arglist)) {
+		err_setstr(TypeError, "apply() 2nd argument must be tuple");
+		return NULL;
+	}
 	return call_object(func, arglist);
 }
 
