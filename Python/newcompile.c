@@ -986,8 +986,6 @@ compiler_nameop(struct compiler *c, identifier name, expr_context_ty ctx)
 	op = 0;
 	optype = OP_NAME;
 	scope = PyST_GetScope(c->u->u_ste, name);
-	fprintf(stderr, "nameop name=%s scope=%d\n",
-		PyString_AS_STRING(name), scope);
 	switch (scope) {
 	case FREE:
 	case CELL:
@@ -1079,8 +1077,6 @@ compiler_boolop(struct compiler *c, expr_ty e)
 		jumpi = JUMP_IF_FALSE;
 	else
 		jumpi = JUMP_IF_TRUE;
-	fprintf(stderr, "op = %d jump = %d\n",
-		e->v.BoolOp.op, jumpi);
 	end = compiler_new_block(c);
 	if (end < 0)
 		return 0;
