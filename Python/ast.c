@@ -175,6 +175,11 @@ PyAST_FromNode(const node *n)
 
                 return Interactive(stmts);
             }
+        case encoding_decl:
+	    /* XXX need to handle */
+            fprintf(stderr, "error in PyAST_FromNode()"
+                            " need to handle encoding\n");
+            break;
         default:
             goto error;
     }
