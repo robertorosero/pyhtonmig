@@ -28,6 +28,18 @@
 # to use Setup.sgi instead of Setup).
 
 
+# Some special rules to define PYTHONPATH
+# Edit the definitions below to indicate which options you are using
+
+DESTDIR=/usr/local		# Edit this if needed
+DESTLIB=$(DESTDIR)/lib/python	# Don't edit this (usually)
+#ARCHPATH=:$(DESTLIB)/sgi	# Enable this for SGI systems
+#ARCHPATH=:$(DESTLIB)/sun4	# Enable this for Sun systems
+#STDWINPATH=:$(DESTLIB)/stdwin	# Enable this if stdwin installed
+
+PYTHONPATH=.:$(DESTLIB)$(ARCHPATH)$(STDWINPATH)
+
+
 # Modules that should always be present (non UNIX dependent)
 
 array arraymodule.o	# array objects
@@ -69,7 +81,7 @@ rgbimg rgbimgmodule.o   # Read SGI RGB image files (but coded portably)
 # "-lX11_s".
 
 #STDWIN=/ufs/guido/src/stdwin
-#ARCH=sgi
+#ARCH=???
 #stdwin stdwinmodule.o -I$(STDWIN)/H $(STDWIN)/Build/$(ARCH)/x11/lib/lib.a -lX11
 
 

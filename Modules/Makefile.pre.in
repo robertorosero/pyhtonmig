@@ -61,7 +61,8 @@ $(TOP)/python:	config.o $(MYLIBS)
 		$(CC) config.o $(MYLIBS) $(LIBS) $(SYSLIBS) -o python
 		mv python $(TOP)/python
 
-config.o:	Makefile
+config.o:	config.c Makefile
+		$(CC) $(CFLAGS) -DPYTHONPATH=\"$(PYTHONPATH)\" -c config.c
 
 clean:
 		-rm -f *.o python core *~ [@,#]* *.old *.orig *.rej
