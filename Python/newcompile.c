@@ -31,6 +31,7 @@ int Py_OptimizeFlag = 0;
            def v3(a, (b, c), *rest): return a, b, c, rest
 
    Invalid behaviour:
+     #: Ellipsis isn't handled properly
      #: doing from __future__ import division doesn't work 
         doesn't output BINARY_TRUE_DIVISION
      #: co_names doesn't contain locals, only globals, co_varnames may work
@@ -980,10 +981,7 @@ compiler_function(struct compiler *c, stmt_ty s)
 	compiler_exit_scope(c);
 
         compiler_make_closure(c, co, asdl_seq_LEN(args->defaults));
-	if (!compiler_nameop(c, s->v.FunctionDef.name, Store))
-		return 0;
-
-	return 1;
+	return compiler_nameop(c, s->v.FunctionDef.name, Store);
 }
 
 static int
