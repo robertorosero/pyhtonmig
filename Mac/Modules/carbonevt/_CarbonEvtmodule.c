@@ -47,7 +47,9 @@ EventTypeSpec_New(EventTypeSpec *in)
 static int
 EventTypeSpec_Convert(PyObject *v, EventTypeSpec *out)
 {
-	if (PyArg_Parse(v, "(O&l)", PyMac_GetOSType, &(out->eventClass), &(out->eventKind)))
+	if (PyArg_Parse(v, "(O&l)",
+	                PyMac_GetOSType, &(out->eventClass),
+	                &(out->eventKind)))
 		return 1;
 	return NULL;
 }
@@ -106,7 +108,9 @@ myEventHandler(EventHandlerCallRef handlerRef, EventRef event, void *outPyObject
 	PyEval_RestoreThread(_save);
 #endif /* USE_MAC_MP_MULTITHREADING */
 
-	retValue = PyObject_CallFunction((PyObject *)outPyObject, "O&O&", EventHandlerCallRef_New, handlerRef, EventRef_New, event);
+	retValue = PyObject_CallFunction((PyObject *)outPyObject, "O&O&",
+	                                 EventHandlerCallRef_New, handlerRef,
+	                                 EventRef_New, event);
 	if (retValue == NULL) {
 		PySys_WriteStderr("Error in event handler callback:\n");
 		PyErr_Print();  /* this also clears the error */
@@ -340,6 +344,40 @@ static PyObject *EventRef_SendEventToEventTarget(EventRefObject *_self, PyObject
 	return _res;
 }
 
+static PyObject *EventRef_GetEventParameter(EventRefObject *_self, PyObject *_args)
+{
+	PyObject *_res = NULL;
+
+	UInt32 bufferSize;
+	EventParamName inName;
+	EventParamType inType;
+	OSErr _err;
+	void * buffer;
+
+	if (!PyArg_ParseTuple(_args, "O&O&", PyMac_GetOSType, &inName, PyMac_GetOSType, &inType))
+	      return NULL;
+
+	/* Figure out the size by passing a null buffer to GetEventParameter */
+	_err = GetEventParameter(_self->ob_itself, inName, inType, NULL, 0, &bufferSize, NULL);
+
+	if (_err != noErr)
+	      return PyMac_Error(_err);
+	buffer = PyMem_NEW(char, bufferSize);
+	if (buffer == NULL)
+	      return PyErr_NoMemory();
+
+	_err = GetEventParameter(_self->ob_itself, inName, inType, NULL, bufferSize, NULL, buffer);
+
+	if (_err != noErr) {
+	      PyMem_DEL(buffer);
+	      return PyMac_Error(_err);
+	}
+	_res = Py_BuildValue("s#", buffer, bufferSize);
+	PyMem_DEL(buffer);
+	return _res;
+
+}
+
 static PyMethodDef EventRef_methods[] = {
 	{"RetainEvent", (PyCFunction)EventRef_RetainEvent, 1,
 	 "() -> (EventRef _rv)"},
@@ -365,6 +403,8 @@ static PyMethodDef EventRef_methods[] = {
 	 "(UInt16 inMask) -> (Boolean _rv)"},
 	{"SendEventToEventTarget", (PyCFunction)EventRef_SendEventToEventTarget, 1,
 	 "(EventTargetRef inTarget) -> None"},
+	{"GetEventParameter", (PyCFunction)EventRef_GetEventParameter, 1,
+	 "(EventParamName eventName, EventParamType eventType) -> (String eventParamData)"},
 	{NULL, NULL, 0}
 };
 
@@ -799,6 +839,7 @@ PyTypeObject EventHandlerRef_Type;
 typedef struct EventHandlerRefObject {
 	PyObject_HEAD
 	EventHandlerRef ob_itself;
+	PyObject *ob_callback;
 } EventHandlerRefObject;
 
 PyObject *EventHandlerRef_New(EventHandlerRef itself)
@@ -807,6 +848,7 @@ PyObject *EventHandlerRef_New(EventHandlerRef itself)
 	it = PyObject_NEW(EventHandlerRefObject, &EventHandlerRef_Type);
 	if (it == NULL) return NULL;
 	it->ob_itself = itself;
+	it->ob_callback = NULL;
 	return (PyObject *)it;
 }
 int EventHandlerRef_Convert(PyObject *v, EventHandlerRef *p_itself)
@@ -822,21 +864,11 @@ int EventHandlerRef_Convert(PyObject *v, EventHandlerRef *p_itself)
 
 static void EventHandlerRef_dealloc(EventHandlerRefObject *self)
 {
-	/* Cleanup of self->ob_itself goes here */
+	if (self->ob_itself != NULL) {
+		RemoveEventHandler(self->ob_itself);
+		Py_DECREF(self->ob_callback);
+	}
 	PyMem_DEL(self);
-}
-
-static PyObject *EventHandlerRef_RemoveEventHandler(EventHandlerRefObject *_self, PyObject *_args)
-{
-	PyObject *_res = NULL;
-	OSStatus _err;
-	if (!PyArg_ParseTuple(_args, ""))
-		return NULL;
-	_err = RemoveEventHandler(_self->ob_itself);
-	if (_err != noErr) return PyMac_Error(_err);
-	Py_INCREF(Py_None);
-	_res = Py_None;
-	return _res;
 }
 
 static PyObject *EventHandlerRef_AddEventTypesToHandler(EventHandlerRefObject *_self, PyObject *_args)
@@ -845,6 +877,10 @@ static PyObject *EventHandlerRef_AddEventTypesToHandler(EventHandlerRefObject *_
 	OSStatus _err;
 	UInt32 inNumTypes;
 	EventTypeSpec inList;
+	if (_self->ob_itself == NULL) {
+		PyErr_SetString(CarbonEvents_Error, "Handler has been removed");
+		return NULL;
+	}
 	if (!PyArg_ParseTuple(_args, "lO&",
 	                      &inNumTypes,
 	                      EventTypeSpec_Convert, &inList))
@@ -864,6 +900,10 @@ static PyObject *EventHandlerRef_RemoveEventTypesFromHandler(EventHandlerRefObje
 	OSStatus _err;
 	UInt32 inNumTypes;
 	EventTypeSpec inList;
+	if (_self->ob_itself == NULL) {
+		PyErr_SetString(CarbonEvents_Error, "Handler has been removed");
+		return NULL;
+	}
 	if (!PyArg_ParseTuple(_args, "lO&",
 	                      &inNumTypes,
 	                      EventTypeSpec_Convert, &inList))
@@ -877,13 +917,34 @@ static PyObject *EventHandlerRef_RemoveEventTypesFromHandler(EventHandlerRefObje
 	return _res;
 }
 
+static PyObject *EventHandlerRef_RemoveEventHandler(EventHandlerRefObject *_self, PyObject *_args)
+{
+	PyObject *_res = NULL;
+
+	OSStatus _err;
+	if (_self->ob_itself == NULL) {
+		PyErr_SetString(CarbonEvents_Error, "Handler has been removed");
+		return NULL;
+	}
+	if (!PyArg_ParseTuple(_args, ""))
+		return NULL;
+	_err = RemoveEventHandler(_self->ob_itself);
+	if (_err != noErr) return PyMac_Error(_err);
+	_self->ob_itself = NULL;
+	Py_DECREF(_self->ob_callback);
+	_self->ob_callback = NULL;
+	Py_INCREF(Py_None);
+	_res = Py_None;
+	return _res;
+}
+
 static PyMethodDef EventHandlerRef_methods[] = {
-	{"RemoveEventHandler", (PyCFunction)EventHandlerRef_RemoveEventHandler, 1,
-	 "() -> None"},
 	{"AddEventTypesToHandler", (PyCFunction)EventHandlerRef_AddEventTypesToHandler, 1,
 	 "(UInt32 inNumTypes, EventTypeSpec inList) -> None"},
 	{"RemoveEventTypesFromHandler", (PyCFunction)EventHandlerRef_RemoveEventTypesFromHandler, 1,
 	 "(UInt32 inNumTypes, EventTypeSpec inList) -> None"},
+	{"RemoveEventHandler", (PyCFunction)EventHandlerRef_RemoveEventHandler, 1,
+	 "() -> None"},
 	{NULL, NULL, 0}
 };
 
@@ -1083,14 +1144,19 @@ static PyObject *EventTargetRef_InstallEventHandler(EventTargetRefObject *_self,
 	_err = InstallEventHandler(_self->ob_itself, myEventHandlerUPP, 1, &inSpec, (void *)callback, &outRef);
 	if (_err != noErr) return PyMac_Error(_err);
 
-	return Py_BuildValue("O&", EventHandlerRef_New, outRef);
+	_res = EventHandlerRef_New(outRef);
+	if (_res != NULL) {
+		((EventHandlerRefObject*)_res)->ob_callback = callback;
+		Py_INCREF(callback);
+	}
+	return _res;
 }
 
 static PyMethodDef EventTargetRef_methods[] = {
 	{"InstallStandardEventHandler", (PyCFunction)EventTargetRef_InstallStandardEventHandler, 1,
 	 "() -> None"},
 	{"InstallEventHandler", (PyCFunction)EventTargetRef_InstallEventHandler, 1,
-	 "(EventTargetRef inTarget, EventTypeSpec inSpec, Method callback) -> (EventHandlerRef outRef)"},
+	 "(EventTypeSpec inSpec, Method callback) -> (EventHandlerRef outRef)"},
 	{NULL, NULL, 0}
 };
 

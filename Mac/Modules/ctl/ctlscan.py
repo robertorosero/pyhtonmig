@@ -45,6 +45,7 @@ class MyScanner(Scanner):
 
 	def makeblacklistnames(self):
 		return [
+			'FindControlUnderMouse', # Generated manually, returns an existing control, not a new one.
 			'DisposeControl', # Generated manually
 			'KillControls', # Implied by close of dialog
 			'SetCtlAction',
@@ -86,14 +87,11 @@ class MyScanner(Scanner):
 			'SetControlProperty',
 			'GetControlPropertySize',
 			'SendControlMessage', # Parameter changed from long to void* from UH3.3 to UH3.4
-			# unavailable in Just's CW6 + UH 3.4 libs
-			'CreateDisclosureButtonControl',
-			'CreateRelevanceBarControl',
-			'DisableControl',
-			'EnableControl',
-			'IsControlEnabled',
-			'CreateEditUnicodeTextControl',
-			'CopyDataBrowserEditText',
+			'CreateTabsControl',  # wrote manually
+			
+			# too lazy for now
+			'GetImageWellContentInfo',
+			'GetBevelButtonContentInfo',
 			]
 
 	def makegreylist(self):
@@ -126,6 +124,110 @@ class MyScanner(Scanner):
 				'HandleControlSetCursor',
 				'GetControlClickActivation',
 				'HandleControlContextualMenuClick',
+				
+				"CreateBevelButtonControl",
+				"CreateImageWellControl",
+				"CreatePictureControl",
+				"CreateIconControl",
+				"CreatePushButtonWithIconControl",
+				"SetBevelButtonContentInfo",
+				"SetImageWellContentInfo",
+				"AddDataBrowserListViewColumn",
+				
+				"CreateDataBrowserControl",
+				"CreateScrollingTextBoxControl",
+				"CreateRadioGroupControl",
+				"CreatePopupButtonControl",
+				"CreateCheckBoxControl",
+				"CreateRadioButtonControl",
+				"CreatePushButtonControl",
+				"CreateWindowHeaderControl",
+				"CreateStaticTextControl",
+				"CreateEditTextControl",
+				"CreateUserPaneControl",
+				"CreateClockControl",
+				"CreatePlacardControl",
+				"CreatePopupArrowControl",
+				"CreatePopupGroupBoxControl",
+				"CreateCheckGroupBoxControl",
+				"CreateGroupBoxControl",
+				"CreateSeparatorControl",
+				"CreateChasingArrowsControl",
+				"CreateLittleArrowsControl",
+				"CreateProgressBarControl",
+				"CreateDisclosureTriangleControl",
+				"GetDataBrowserColumnViewDisplayType",
+				"SetDataBrowserColumnViewDisplayType",
+				"GetDataBrowserColumnViewPathLength",
+				"GetDataBrowserColumnViewPath",
+				"GetDataBrowserListViewDisclosureColumn",
+				"SetDataBrowserListViewDisclosureColumn",
+				"GetDataBrowserListViewUsePlainBackground",
+				"SetDataBrowserListViewUsePlainBackground",
+				"GetDataBrowserListViewHeaderBtnHeight",
+				"SetDataBrowserListViewHeaderBtnHeight",
+				"AutoSizeDataBrowserListViewColumns",
+				"GetDataBrowserTableViewColumnProperty",
+				"GetDataBrowserTableViewColumnPosition",
+				"SetDataBrowserTableViewColumnPosition",
+				"GetDataBrowserTableViewItemRow",
+				"SetDataBrowserTableViewItemRow",
+				"GetDataBrowserTableViewItemID",
+				"GetDataBrowserTableViewGeometry",
+				"SetDataBrowserTableViewGeometry",
+				"GetDataBrowserTableViewNamedColumnWidth",
+				"SetDataBrowserTableViewNamedColumnWidth",
+				"GetDataBrowserTableViewItemRowHeight",
+				"SetDataBrowserTableViewItemRowHeight",
+				"GetDataBrowserTableViewColumnWidth",
+				"SetDataBrowserTableViewColumnWidth",
+				"GetDataBrowserTableViewRowHeight",
+				"SetDataBrowserTableViewRowHeight",
+				"GetDataBrowserTableViewHiliteStyle",
+				"SetDataBrowserTableViewHiliteStyle",
+				"GetDataBrowserTableViewColumnCount",
+				"RemoveDataBrowserTableViewColumn",
+				"GetDataBrowserItemPartBounds",
+				"GetDataBrowserEditItem",
+				"SetDataBrowserEditItem",
+				"GetDataBrowserEditText",
+				"SetDataBrowserEditText",
+				"GetDataBrowserPropertyFlags",
+				"SetDataBrowserPropertyFlags",
+				"GetDataBrowserSelectionFlags",
+				"SetDataBrowserSelectionFlags",
+				"GetDataBrowserSortProperty",
+				"SetDataBrowserSortProperty",
+				"GetDataBrowserHasScrollBars",
+				"SetDataBrowserHasScrollBars",
+				"GetDataBrowserScrollPosition",
+				"SetDataBrowserScrollPosition",
+				"GetDataBrowserSortOrder",
+				"SetDataBrowserSortOrder",
+				"GetDataBrowserTarget",
+				"SetDataBrowserTarget",
+				"GetDataBrowserScrollBarInset",
+				"SetDataBrowserScrollBarInset",
+				"GetDataBrowserActiveItems",
+				"SetDataBrowserActiveItems",
+				"RevealDataBrowserItem",
+				"GetDataBrowserItemState",
+				"IsDataBrowserItemSelected",
+				"GetDataBrowserItemCount",
+				"GetDataBrowserItems",
+				"SortDataBrowserContainer",
+				"CloseDataBrowserContainer",
+				"OpenDataBrowserContainer",
+				"MoveDataBrowserSelectionAnchor",
+				"GetDataBrowserSelectionAnchor",
+				"ExecuteDataBrowserEditCommand",
+				"EnableDataBrowserEditCommand",
+				"SetDataBrowserViewStyle",
+				"GetDataBrowserViewStyle",
+				"GetControlCommandID",
+				"SetControlCommandID",
+				"CopyControlTitleAsCFString",
+				"SetControlTitleWithCFString",
 			]),
 			('#if ACCESSOR_CALLS_ARE_FUNCTIONS', [
 				# XXX These are silly, they should be #defined to access the fields
@@ -141,13 +243,23 @@ class MyScanner(Scanner):
 				'SetControlBounds',
 				'SetControlPopupMenuHandle',
 				'SetControlPopupMenuID',
-			])]
+			]),
+			('#if TARGET_API_MAC_OSX', [
+				'CreateRoundButtonControl',
+				'CreateDisclosureButtonControl',
+				'CreateRelevanceBarControl',
+				'DisableControl',
+				'EnableControl',
+				'IsControlEnabled',
+				'CreateEditUnicodeTextControl',
+				'CopyDataBrowserEditText',
+			]),
+			]
 			
 	def makeblacklisttypes(self):
 		return [
 			'ProcPtr',
 			'ControlActionUPP',
-			'ControlButtonContentInfoPtr',
 			'Ptr',
 			'ControlDefSpec', # Don't know how to do this yet
 			'ControlDefSpec_ptr', # ditto
@@ -155,9 +267,10 @@ class MyScanner(Scanner):
 			# not-yet-supported stuff in Universal Headers 3.4:
 			'ControlColorUPP',
 			'ControlKind',  # XXX easy: 2-tuple containing 2 OSType's
-			'ControlTabEntry_ptr', # XXX needed for tabs
-			'ControlButtonContentInfo',  # XXX ugh: a union
-			'ControlButtonContentInfo_ptr',  # XXX ugh: a union
+#			'ControlTabEntry_ptr', # XXX needed for tabs
+#			'ControlButtonContentInfoPtr',
+#			'ControlButtonContentInfo',  # XXX ugh: a union
+#			'ControlButtonContentInfo_ptr',  # XXX ugh: a union
 			'ListDefSpec_ptr',  # XXX see _Listmodule.c, tricky but possible
 			'DataBrowserItemID_ptr',  # XXX array of UInt32, for BrowserView
 			'DataBrowserItemUPP',
@@ -166,8 +279,8 @@ class MyScanner(Scanner):
 			'DataBrowserCallbacks_ptr',
 			'DataBrowserCustomCallbacks',
 			'DataBrowserCustomCallbacks_ptr',
-			'DataBrowserTableViewColumnDesc',
-			'DataBrowserListViewColumnDesc',
+##			'DataBrowserTableViewColumnDesc',
+##			'DataBrowserListViewColumnDesc',
 			'CFDataRef',
 			]
 
@@ -197,6 +310,15 @@ class MyScanner(Scanner):
 			 
 			([("Rect_ptr", "*", "ReturnMode")], # GetControlBounds
 			 [("void", "*", "ReturnMode")]),
+
+			([("DataBrowserListViewColumnDesc", "*", "OutMode")],
+			 [("DataBrowserListViewColumnDesc", "*", "InMode")]),
+			 
+			([("ControlButtonContentInfoPtr", 'outContent', "InMode")],
+			 [("ControlButtonContentInfoPtr", '*', "OutMode")]),
+			 
+			([("ControlButtonContentInfo", '*', "OutMode")],
+			 [("ControlButtonContentInfo", '*', "InMode")]),
 			]
 
 if __name__ == "__main__":
