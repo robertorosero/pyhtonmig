@@ -238,7 +238,7 @@ strop_rindex(self, args)
 	object *args;
 {
 	char *s, *sub;
-	int len, n, i;
+	int len, n, i, j;
 
 	if (getargs(args, "(s#s#i)", &s, &len, &sub, &n, &i)) {
 		if (i < 0)
@@ -252,16 +252,16 @@ strop_rindex(self, args)
 		err_clear();
 		if (!getargs(args, "(s#s#)", &s, &len, &sub, &n))
 			return NULL;
-		i = len;
+		i = 0;
 	}
 
 	if (n == 0)
 		return newintobject((long)i);
 
-	for (i -= n; i >= 0; --i)
-		if (s[i] == sub[0] &&
-		    (n == 1 || strncmp(&s[i+1], &sub[1], n-1) == 0))
-			return newintobject((long)i);
+	for (j = len-n; j >= i; --j)
+		if (s[j] == sub[0] &&
+		    (n == 1 || strncmp(&s[j+1], &sub[1], n-1) == 0))
+			return newintobject((long)j);
 
 	err_setstr(ValueError, "substring not found");
 	return NULL;

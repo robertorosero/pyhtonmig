@@ -880,7 +880,7 @@ posix_popen(self, args)
 	END_SAVE
 	if (fp == NULL)
 		return posix_error();
-	return newopenfileobject(fp, name, mode, fclose);
+	return newopenfileobject(fp, name, mode, pclose);
 }
 
 #ifdef HAVE_SETUID

@@ -183,7 +183,7 @@ rotor rotormodule.o
 # signal signalmodule.o
 
 
-# Tommy's 'new' module (creates new empty objects of certain kinds)
+# Tommy Burnette's 'new' module (creates new empty objects of certain kinds)
 # new newmodule.o
 
 
@@ -195,8 +195,12 @@ rotor rotormodule.o
 # dl dlmodule.o
 
 
-# Jack's imgformat module
+# Jack Jansen's imgformat module
 # imgformat imgformatmodule.o
+
+
+# Lance Ellinghouse's syslog module
+# syslog syslogmodule.o
 
 
 # Example -- included for reference only

@@ -64,12 +64,13 @@ list2set(list, set, fd2obj)
 	    err_badarg();
 	    return -1;
 	}
-	if ( v >= FD_SETSIZE ) {
-	    err_setstr(SystemError, "FD_SETSIZE too low in select()");
+	if ( v < 0 || v >= FD_SETSIZE ) {
+	    err_setstr(ValueError, "filedescriptor out of range in select()");
 	    return -1;
 	}
 	if ( v > max ) max = v;
 	FD_SET(v, set);
+	XDECREF(fd2obj[v]);
 	fd2obj[v] = o;
     }
     return max+1;
@@ -92,11 +93,12 @@ set2list(set, max, fd2obj)
     for(i=0; i<max; i++)
       if ( FD_ISSET(i,set) ) {
 	  if ( i > FD_SETSIZE ) {
-	      err_setstr(SystemError, "FD_SETSIZE too low in select()");
+	      err_setstr(SystemError,
+			 "filedescriptor out of range returned in select()");
 	      return NULL;
 	  }
 	  o = fd2obj[i];
-	  if ( o == 0 ) {
+	  if ( o == NULL ) {
 	      err_setstr(SystemError,
 			 "Bad filedescriptor returned from select()");
 	      return NULL;
