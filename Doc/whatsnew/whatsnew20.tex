@@ -394,9 +394,10 @@ been added to Python 2.0.  Augmented assignment operators include
 statement \code{a += 2} increments the value of the variable 
 \code{a} by 2, equivalent to the slightly lengthier \code{a = a + 2}.
 
+% The empty groups below prevent conversion to guillemets.
 The full list of supported assignment operators is \code{+=},
 \code{-=}, \code{*=}, \code{/=}, \code{\%=}, \code{**=}, \code{\&=},
-\code{|=}, \verb|^=|, \code{>>=}, and \code{<<=}.  Python classes can
+\code{|=}, \verb|^=|, \code{>{}>=}, and \code{<{}<=}.  Python classes can
 override the augmented assignment operators by defining methods named
 \method{__iadd__}, \method{__isub__}, etc.  For example, the following
 \class{Number} class stores a number and supports using += to create a
@@ -1000,7 +1001,7 @@ every starting and end tag encountered by the parser, the
 \method{characters()} method is called for every chunk of character
 data, and so forth.
 
-The advantage of the event-driven approach is that that the whole
+The advantage of the event-driven approach is that the whole
 document doesn't have to be resident in memory at any one time, which
 matters if you are processing really huge documents.  However, writing
 the SAX handler class can get very complicated if you're trying to

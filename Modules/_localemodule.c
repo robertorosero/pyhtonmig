@@ -1,5 +1,5 @@
 /***********************************************************
-Copyright (C) 1997, 2002 Martin von Loewis
+Copyright (C) 1997, 2002, 2003 Martin von Loewis
 
 Permission to use, copy, modify, and distribute this software and its
 documentation for any purpose and without fee is hereby granted,
@@ -177,7 +177,7 @@ PyLocale_setlocale(PyObject* self, PyObject* args)
         result = setlocale(category, locale);
         if (!result) {
             /* operation failed, no setting was changed */
-            PyErr_SetString(Error, "locale setting not supported");
+            PyErr_SetString(Error, "unsupported locale setting");
             return NULL;
         }
         result_object = PyString_FromString(result);
@@ -579,9 +579,25 @@ PyLocale_nl_langinfo(PyObject* self, PyObject* args)
     /* Check whether this is a supported constant. GNU libc sometimes
        returns numeric values in the char* return value, which would
        crash PyString_FromString.  */
+#ifdef RADIXCHAR
+    if (saved_numeric) {
+	if(item == RADIXCHAR) {
+            Py_INCREF(decimal_point);
+            return decimal_point;
+        }
+        if(item == THOUSEP) {
+            Py_INCREF(thousands_sep);
+            return thousands_sep;
+        }
+    }
+#endif
     for (i = 0; langinfo_constants[i].name; i++)
-	    if (langinfo_constants[i].value == item)
-		    return PyString_FromString(nl_langinfo(item));
+        if (langinfo_constants[i].value == item) {
+            /* Check NULL as a workaround for GNU libc's returning NULL
+               instead of an empty string for nl_langinfo(ERA).  */
+            const char *result = nl_langinfo(item);
+            return PyString_FromString(result != NULL ? result : "");
+        }
     PyErr_SetString(PyExc_ValueError, "unsupported langinfo constant");
     return NULL;
 }

@@ -20,7 +20,7 @@ class TestBasicOps(unittest.TestCase):
     def test_autoseed(self):
         self.gen.seed()
         state1 = self.gen.getstate()
-        time.sleep(1.1)
+        time.sleep(0.1)
         self.gen.seed()      # diffent seeds at different times
         state2 = self.gen.getstate()
         self.assertNotEqual(state1, state2)
@@ -85,6 +85,17 @@ class TestBasicOps(unittest.TestCase):
                     break
             else:
                 self.fail()
+
+    def test_sample_inputs(self):
+        # SF bug #801342 -- population can be any iterable defining __len__()
+        from sets import Set
+        self.gen.sample(Set(range(20)), 2)
+        self.gen.sample(range(20), 2)
+        self.gen.sample(xrange(20), 2)
+        self.gen.sample(dict.fromkeys('abcdefghijklmnopqrst'), 2)
+        self.gen.sample(str('abcdefghijklmnopqrst'), 2)
+        self.gen.sample(unicode('abcdefghijklmnopqrst'), 2)
+        self.gen.sample(tuple('abcdefghijklmnopqrst'), 2)
 
     def test_gauss(self):
         # Ensure that the seed() method initializes all the hidden state.  In
@@ -208,6 +219,38 @@ class MersenneTwister_TestBasicOps(TestBasicOps):
         # so don't make this horribly big.
         seed = (1L << (10000 * 8)) - 1  # about 10K bytes
         self.gen.seed(seed)
+
+    def test_53_bits_per_float(self):
+        # This should pass whenever a C double has 53 bit precision.
+        span = 2 ** 53
+        cum = 0
+        for i in xrange(100):
+            cum |= int(self.gen.random() * span)
+        self.assertEqual(cum, span-1)
+
+    def test_bigrand(self):
+        # The randrange routine should build-up the required number of bits
+        # in stages so that all bit positions are active.
+        span = 2 ** 500
+        cum = 0
+        for i in xrange(100):
+            r = self.gen.randrange(span)
+            self.assert_(0 <= r < span)
+            cum |= r
+        self.assertEqual(cum, span-1)
+
+    def test_bigrand_ranges(self):
+        for i in [40,80, 160, 200, 211, 250, 375, 512, 550]:
+            start = self.gen.randrange(2 ** i)
+            stop = self.gen.randrange(2 ** (i-2))
+            if stop <= start:
+                return
+            self.assert_(start <= self.gen.randrange(start, stop) < stop)
+
+    def test_rangelimits(self):
+        for start, stop in [(-2,0), (-(2**60)-2,-(2**60)), (2**60,2**60+2)]:
+            self.assertEqual(Set(range(start,stop)),
+                Set([self.gen.randrange(start,stop) for i in xrange(100)]))
 
 _gammacoeff = (0.9999999999995183, 676.5203681218835, -1259.139216722289,
               771.3234287757674,  -176.6150291498386, 12.50734324009056,

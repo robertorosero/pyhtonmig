@@ -899,7 +899,7 @@ offset_as_timedelta(PyObject *tzinfo, char *name, PyObject *tzinfoarg) {
  * result.  tzinfo must be an instance of the tzinfo class.  If dst()
  * returns None, call_dst returns 0 and sets *none to 1.  If dst()
  & doesn't return None or timedelta, TypeError is raised and this
- * returns -1.  If dst() returns an invalid timedelta for for a UTC offset,
+ * returns -1.  If dst() returns an invalid timedelta for a UTC offset,
  * ValueError is raised and this returns -1.  Else *none is set to 0 and
  * the offset is returned (as an int # of minutes east of UTC).
  */
@@ -2199,7 +2199,7 @@ date_new(PyTypeObject *type, PyObject *args, PyObject *kw)
 	{
 	    	PyDateTime_Date *me;
 
-		me = PyObject_New(PyDateTime_Date, type);
+		me = (PyDateTime_Date *) (type->tp_alloc(type, 0));
 		if (me != NULL) {
 			char *pdata = PyString_AS_STRING(state);
 			memcpy(me->data, pdata, _PyDateTime_DATE_DATASIZE);
@@ -3042,8 +3042,7 @@ time_new(PyTypeObject *type, PyObject *args, PyObject *kw)
 			}
 		}
 		aware = (char)(tzinfo != Py_None);
-		me = (PyDateTime_Time *) time_alloc(&PyDateTime_TimeType,
-						    aware);
+		me = (PyDateTime_Time *) (type->tp_alloc(type, aware));
 		if (me != NULL) {
 			char *pdata = PyString_AS_STRING(state);
 
@@ -3564,9 +3563,7 @@ datetime_new(PyTypeObject *type, PyObject *args, PyObject *kw)
 			}
 		}
 		aware = (char)(tzinfo != Py_None);
-		me = (PyDateTime_DateTime *) datetime_alloc(
-						&PyDateTime_DateTimeType,
-				     		aware);
+		me = (PyDateTime_DateTime *) (type->tp_alloc(type , aware));
 		if (me != NULL) {
 			char *pdata = PyString_AS_STRING(state);
 
@@ -4818,7 +4815,7 @@ z' = z + z.d = 1:MM then, and z'.d=0, and z'.d - z.d = -60 != 0 so [8]
 
 Because we know z.d said z was in daylight time (else [5] would have held and
 we would have stopped then), and we know z.d != z'.d (else [8] would have held
-and we we have stopped then), and there are only 2 possible values dst() can
+and we would have stopped then), and there are only 2 possible values dst() can
 return in Eastern, it follows that z'.d must be 0 (which it is in the example,
 but the reasoning doesn't depend on the example -- it depends on there being
 two possible dst() outcomes, one zero and the other non-zero).  Therefore

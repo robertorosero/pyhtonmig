@@ -104,6 +104,9 @@ _tkinter
     XXX
     XXX That was on Win98SE.  On Win2K:
     XXX all.tcl   Total 10480   Passed 9781    Skipped 698     Failed  1
+    XXX
+    XXX On WinXP:
+    XXX all.tcl:  Total 10480   Passed 9768    Skipped 710     Failed  2
 
     Build Tk
     --------
@@ -127,6 +130,43 @@ _tkinter
     above).  This is needed so the installer can copy various Tcl/Tk
     files into the Python distribution.
 
+tix
+    Tix, the Tk Interface eXtension, is a powerful set of user
+    interface components that expands the capabilities of your Tcl/Tk
+    and Python applications.
+
+    Get source
+    ----------
+    Go to
+        http://tix.sourceforge.net/
+    and download tix-8.1.4.tar.gz from the files section.
+    Unpack into
+        dist\tix-8.1.4
+
+    Edit win\common.mak in this directory, to set the following variables:
+        TCL_VER=8.4
+        INSTALLDIR=..\..\tix-8.1.4
+        TCL_PATCH=3
+        RMDIR=$(TKDIR)\win\rmd.bat
+        MKDIR=$(TKDIR)\win\mkd.bat
+
+    Edit win\makefile.vc:
+        TOOLS32 = <directory of bin\cl.exe>
+        TOOLS32_rc = <directory of bin\rc.exe>
+
+    Edit win\tk8.4\pkgindex.tcl, to replace
+        lappend dirs ../../Dlls
+    with
+        lappend dirs [file join [file dirname [info nameofexe]] DLLs]
+
+    nmake -f makefile.vc
+    nmake -f makefile.vc install
+
+    The tix8184.dll goes to DLLs, the tix8.1 subdirectory goes to 
+    tcl. It differs from the standard tix8.1 subdirectory only in 
+    fixing the path to the DLLs directory.
+
+    To test whether this works, execute Demo/tix/tixwidgets.py.
 
 zlib
     Python wrapper for the zlib compression library.  Get the source code
@@ -243,13 +283,13 @@ _ssl
         http://www.openssl.org
 
     You (probably) don't want the "engine" code.  For example, get
-        openssl-0.9.6g.tar.gz
+        openssl-0.9.7b.tar.gz
     not
-        openssl-engine-0.9.6g.tar.gz
+        openssl-engine-0.9.7b.tar.gz
 
     Unpack into the "dist" directory, retaining the folder name from
     the archive - for example, the latest stable OpenSSL will install as
-        dist/openssl-0.9.6g
+        dist/openssl-0.9.7b
 
     You can (theoretically) use any version of OpenSSL you like - the
     build process will automatically select the latest version.
@@ -278,7 +318,7 @@ _ssl
     Win9x note:  If, near the start of the build process, you see
     something like
 
-        C:\Code\openssl-0.9.6g>set OPTS=no-asm
+        C:\Code\openssl-0.9.7b>set OPTS=no-asm
         Out of environment space
 
     then you're in trouble, and will probably also see these errors near
@@ -288,7 +328,7 @@ _ssl
             'crypto\md5\asm\m5_win32.asm'
         Stop.
         NMAKE : fatal error U1073: don't know how to make
-            'C:\Code\openssl-0.9.6g/out32/libeay32.lib'
+            'C:\Code\openssl-0.9.7b/out32/libeay32.lib'
         Stop.
 
     You need more environment space.  Win9x only has room for 256 bytes
@@ -305,3 +345,9 @@ YOUR OWN EXTENSION DLLs
 If you want to create your own extension module DLL, there's an example
 with easy-to-follow instructions in ../PC/example/; read the file
 readme.txt there first.
+
+HTML Help
+---------
+The compiled HTML help file is built from the HTML pages by the script
+Doc/tools/prechm.py. This creates project files which must be compiled
+with MS HTML Help Workshop.

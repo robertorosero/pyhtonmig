@@ -460,8 +460,8 @@ restrict the types of objects that can be assigned to the Python
 attributes.  We expect the first and last names to be strings, but any
 Python objects can be assigned.  Further, the attributes can be
 deleted, setting the C pointers to \NULL.  Even though we can make
-sure the members are initialized to non-\NULL values, the members can
-be set to \NULL if the attributes are deleted.
+sure the members are initialized to non-\NULL{} values, the members can
+be set to \NULL{} if the attributes are deleted.
 
 We define a single method, \method{name}, that outputs the objects
 name as the concatenation of the first and last names.  
@@ -537,7 +537,7 @@ and assign them to the \member{tp_methods} slot:
     Noddy_methods,             /* tp_methods */
 \end{verbatim}
 
-Note that used the \constant{METH_NOARGS} flag to indicate that the
+Note that we used the \constant{METH_NOARGS} flag to indicate that the
 method is passed no arguments.
 
 Finally, we'll make our type usable as a base class.  We've written
@@ -683,9 +683,9 @@ when objects are involved in cycles.  For example, consider:
 \end{verbatim}
 
 In this example, we create a list that contains itself. When we delete
-it, it still has a reference from itself. It's reference count doesn't
+it, it still has a reference from itself. Its reference count doesn't
 drop to zero.  Fortunately, Python's cyclic-garbage collector will
-eventually figure out that that the list is garbage and free it.
+eventually figure out that the list is garbage and free it.
 
 In the second version of the \class{Noddy} example, we allowed any
 kind of object to be stored in the \member{first} or \member{last}
@@ -1407,7 +1407,7 @@ Python.
 
 In order to learn how to implement any specific method for your new
 datatype, do the following: Download and unpack the Python source
-distribution.  Go the the \file{Objects} directory, then search the
+distribution.  Go the \file{Objects} directory, then search the
 C source files for \code{tp_} plus the function you want (for
 example, \code{tp_print} or \code{tp_compare}).  You will find
 examples of the function you want to implement.

@@ -254,7 +254,7 @@ removed.  If given and not \code{None}, \var{chars} must be a string;
 the characters in the string will be stripped from the end of the
 string this method is called on.
 \versionchanged[The \var{chars} parameter was added.  The \var{chars}
-parameter cannot be passed in 2.2 versions]{2.2.3}
+parameter cannot be passed in earlier 2.2 versions]{2.2.3}
 \end{funcdesc}
 
 \begin{funcdesc}{strip}{s\optional{, chars}}
@@ -300,9 +300,9 @@ parameter cannot be passed in earlier 2.2 versions]{2.2.3}
   correctly.
 \end{funcdesc}
 
-\begin{funcdesc}{replace}{str, old, new\optional{, maxsplit}}
+\begin{funcdesc}{replace}{str, old, new\optional{, maxreplace}}
   Return a copy of string \var{str} with all occurrences of substring
   \var{old} replaced by \var{new}.  If the optional argument
-  \var{maxsplit} is given, the first \var{maxsplit} occurrences are
+  \var{maxreplace} is given, the first \var{maxreplace} occurrences are
   replaced.
 \end{funcdesc}

@@ -316,8 +316,9 @@ priority (operations in the same box have the same priority):
   \lineiii{\var{x} | \var{y}}{bitwise \dfn{or} of \var{x} and \var{y}}{}
   \lineiii{\var{x} \^{} \var{y}}{bitwise \dfn{exclusive or} of \var{x} and \var{y}}{}
   \lineiii{\var{x} \&{} \var{y}}{bitwise \dfn{and} of \var{x} and \var{y}}{}
-  \lineiii{\var{x} << \var{n}}{\var{x} shifted left by \var{n} bits}{(1), (2)}
-  \lineiii{\var{x} >> \var{n}}{\var{x} shifted right by \var{n} bits}{(1), (3)}
+  % The empty groups below prevent conversion to guillemets.
+  \lineiii{\var{x} <{}< \var{n}}{\var{x} shifted left by \var{n} bits}{(1), (2)}
+  \lineiii{\var{x} >{}> \var{n}}{\var{x} shifted right by \var{n} bits}{(1), (3)}
   \hline
   \lineiii{\~\var{x}}{the bits of \var{x} inverted}{}
 \end{tableiii}
@@ -416,8 +417,8 @@ specified in the syntax using a preceeding \character{u} character:
 separating items with commas: \code{[a, b, c]}.  Tuples are
 constructed by the comma operator (not within square brackets), with
 or without enclosing parentheses, but an empty tuple must have the
-enclosing parentheses, e.g., \code{a, b, c} or \code{()}.  A single
-item tuple must have a trailing comma, e.g., \code{(d,)}.
+enclosing parentheses, such as \code{a, b, c} or \code{()}.  A single
+item tuple must have a trailing comma, such as \code{(d,)}.
 \obindex{sequence}
 \obindex{string}
 \obindex{Unicode}
@@ -530,8 +531,9 @@ In Python 2.3 and beyond, \var{x} may be a string of any length.
   \code{\var{x} = \var{i} + \var{n}*\var{k}} such that \code{0}
   \code{<=} \var{n} \code{<} \code{abs(i-j)}.  If \var{i} or \var{j}
   is greater than \code{len(\var{s})}, use \code{len(\var{s})}.  If
-  \var{i} or \var{j} are ommitted then they become ``end'' values
-  (which end depends on the sign of \var{k}).
+  \var{i} or \var{j} are omitted then they become ``end'' values
+  (which end depends on the sign of \var{k}).  Note, \var{k} cannot
+  be zero.
 
 \end{description}
 
@@ -543,6 +545,8 @@ objects support:
 
 \begin{methoddesc}[string]{capitalize}{}
 Return a copy of the string with only its first character capitalized.
+
+For 8-bit strings, this method is locale-dependent.
 \end{methoddesc}
 
 \begin{methoddesc}[string]{center}{width}
@@ -562,7 +566,7 @@ Decodes the string using the codec registered for \var{encoding}.
 may be given to set a different error handling scheme.  The default is
 \code{'strict'}, meaning that encoding errors raise
 \exception{ValueError}.  Other possible values are \code{'ignore'} and
-\code{replace'}.
+\code{'replace'}.
 \versionadded{2.2}
 \end{methoddesc}
 
@@ -604,36 +608,52 @@ substring is not found.
 \begin{methoddesc}[string]{isalnum}{}
 Return true if all characters in the string are alphanumeric and there
 is at least one character, false otherwise.
+
+For 8-bit strings, this method is locale-dependent.
 \end{methoddesc}
 
 \begin{methoddesc}[string]{isalpha}{}
 Return true if all characters in the string are alphabetic and there
 is at least one character, false otherwise.
+
+For 8-bit strings, this method is locale-dependent.
 \end{methoddesc}
 
 \begin{methoddesc}[string]{isdigit}{}
-Return true if there are only digit characters, false otherwise.
+Return true if all characters in the string are digits and there
+is at least one character, false otherwise.
+
+For 8-bit strings, this method is locale-dependent.
 \end{methoddesc}
 
 \begin{methoddesc}[string]{islower}{}
 Return true if all cased characters in the string are lowercase and
 there is at least one cased character, false otherwise.
+
+For 8-bit strings, this method is locale-dependent.
 \end{methoddesc}
 
 \begin{methoddesc}[string]{isspace}{}
 Return true if there are only whitespace characters in the string and
-the string is not empty, false otherwise.
+there is at least one character, false otherwise.
+
+For 8-bit strings, this method is locale-dependent.
 \end{methoddesc}
 
 \begin{methoddesc}[string]{istitle}{}
-Return true if the string is a titlecased string: uppercase
-characters may only follow uncased characters and lowercase characters
-only cased ones.  Return false otherwise.
+Return true if the string is a titlecased string and there is at least one
+character, i.e. uppercase characters may only follow uncased
+characters and lowercase characters only cased ones.  Return false
+otherwise.
+
+For 8-bit strings, this method is locale-dependent.
 \end{methoddesc}
 
 \begin{methoddesc}[string]{isupper}{}
 Return true if all cased characters in the string are uppercase and
 there is at least one cased character, false otherwise.
+
+For 8-bit strings, this method is locale-dependent.
 \end{methoddesc}
 
 \begin{methoddesc}[string]{join}{seq}
@@ -650,6 +670,8 @@ Padding is done using spaces.  The original string is returned if
 
 \begin{methoddesc}[string]{lower}{}
 Return a copy of the string converted to lowercase.
+
+For 8-bit strings, this method is locale-dependent.
 \end{methoddesc}
 
 \begin{methoddesc}[string]{lstrip}{\optional{chars}}
@@ -661,10 +683,10 @@ the string this method is called on.
 \versionchanged[Support for the \var{chars} argument]{2.2.2}
 \end{methoddesc}
 
-\begin{methoddesc}[string]{replace}{old, new\optional{, maxsplit}}
+\begin{methoddesc}[string]{replace}{old, new\optional{, count}}
 Return a copy of the string with all occurrences of substring
 \var{old} replaced by \var{new}.  If the optional argument
-\var{maxsplit} is given, only the first \var{maxsplit} occurrences are
+\var{count} is given, only the first \var{count} occurrences are
 replaced.
 \end{methoddesc}
 
@@ -698,8 +720,22 @@ string this method is called on.
 \begin{methoddesc}[string]{split}{\optional{sep \optional{,maxsplit}}}
 Return a list of the words in the string, using \var{sep} as the
 delimiter string.  If \var{maxsplit} is given, at most \var{maxsplit}
-splits are done.  If \var{sep} is not specified or \code{None}, any
-whitespace string is a separator.
+splits are done. (thus, the list will have at most \code{\var{maxsplit}+1}
+elements).  If \var{maxsplit} is not specified or is zero, then there
+is no limit on the number of splits (all possible splits are made).
+Consecutive delimiters are not grouped together and are
+deemed to delimit empty strings (for example, \samp{'1,,2'.split(',')}
+returns \samp{['1', '', '2']}).  The \var{sep} argument may consist of
+multiple characters (for example, \samp{'1, 2, 3'.split(', ')} returns
+\samp{['1', '2', '3']}).  Splitting an empty string with a specified
+separator returns an empty list.
+
+If \var{sep} is not specified or is \code{None}, a different splitting
+algorithm is applied.  Words are separated by arbitrary length strings of
+whitespace characters (spaces, tabs, newlines, returns, and formfeeds).
+Consecutive whitespace delimiters are treated as a single delimiter
+(\samp{'1   2  3'.split()} returns \samp{['1', '2', '3']}).  Splitting an
+empty string returns \samp{['']}.
 \end{methoddesc}
 
 \begin{methoddesc}[string]{splitlines}{\optional{keepends}}
@@ -728,11 +764,15 @@ the both ends of the string this method is called on.
 \begin{methoddesc}[string]{swapcase}{}
 Return a copy of the string with uppercase characters converted to
 lowercase and vice versa.
+
+For 8-bit strings, this method is locale-dependent.
 \end{methoddesc}
 
 \begin{methoddesc}[string]{title}{}
 Return a titlecased version of the string: words start with uppercase
 characters, all remaining cased characters are lowercase.
+
+For 8-bit strings, this method is locale-dependent.
 \end{methoddesc}
 
 \begin{methoddesc}[string]{translate}{table\optional{, deletechars}}
@@ -754,6 +794,8 @@ character mapping codec using the \refmodule{codecs} module (see
 
 \begin{methoddesc}[string]{upper}{}
 Return a copy of the string converted to uppercase.
+
+For 8-bit strings, this method is locale-dependent.
 \end{methoddesc}
 
 \begin{methoddesc}[string]{zfill}{width}
@@ -994,9 +1036,7 @@ Notes:
   no longer works in Python 2.0.  Use of this misfeature has been
   deprecated since Python 1.4.
 
-\item[(3)] Raises an exception when \var{x} is not a list object.  The
-  \method{extend()} method is experimental and not supported by
-  mutable sequence types other than lists.
+\item[(3)] Raises an exception when \var{x} is not a list object.
 
 \item[(4)] Raises \exception{ValueError} when \var{x} is not found in
   \var{s}. When a negative index is passed as the second or third parameter
@@ -1081,7 +1121,7 @@ almost arbitrary values.  Only values containing lists, dictionaries
 or other mutable types (that are compared by value rather than by
 object identity) may not be used as keys.
 Numeric types used for keys obey the normal rules for numeric
-comparison: if two numbers compare equal (e.g. \code{1} and
+comparison: if two numbers compare equal (such as \code{1} and
 \code{1.0}) then they can be used interchangeably to index the same
 dictionary entry.
 
@@ -1101,6 +1141,7 @@ arbitrary objects):
   \ttindex{clear()}
   \ttindex{copy()}
   \ttindex{has_key()}
+  \ttindex{fromkeys()}    
   \ttindex{items()}
   \ttindex{keys()}
   \ttindex{update()}
@@ -1125,7 +1166,7 @@ arbitrary objects):
   \lineiii{\var{a}.clear()}{remove all items from \code{a}}{}
   \lineiii{\var{a}.copy()}{a (shallow) copy of \code{a}}{}
   \lineiii{\var{a}.has_key(\var{k})}
-          {\code{1} if \var{a} has a key \var{k}, else \code{0}}
+          {\code{True} if \var{a} has a key \var{k}, else \code{False}}
           {}
   \lineiii{\var{k} \code{in} \var{a}}
           {Equivalent to \var{a}.has_key(\var{k})}
@@ -1267,7 +1308,7 @@ Files have the following methods:
 \end{methoddesc}
 
 \begin{methoddesc}[file]{next}{}
-A file object is its own iterator, i.e. \code{iter(\var{f})} returns
+A file object is its own iterator, for example \code{iter(\var{f})} returns
 \var{f} (unless \var{f} is closed).  When a file is used as an
 iterator, typically in a \keyword{for} loop (for example,
 \code{for line in f: print line}), the \method{next()} method is
@@ -1343,7 +1384,12 @@ flush the read-ahead buffer.
   \method{seek()} operations will be undone at the next write.  If the
   file is only opened for writing in append mode (mode \code{'a'}),
   this method is essentially a no-op, but it remains useful for files
-  opened in append mode with reading enabled (mode \code{'a+'}).
+  opened in append mode with reading enabled (mode \code{'a+'}).  If the
+  file is opened in text mode (mode \code{'t'}), only offsets returned
+  by \method{tell()} are legal.  Use of other offsets causes undefined
+  behavior.
+
+  Note that not all file objects are seekable.
 \end{methoddesc}
 
 \begin{methoddesc}[file]{tell}{}
@@ -1360,7 +1406,7 @@ flush the read-ahead buffer.
   include that file may remain unchanged, increase to the specified
   size as if zero-filled, or increase to the specified size with
   undefined new content.
-  Availability:  Windows, many \UNIX variants.
+  Availability:  Windows, many \UNIX{} variants.
 \end{methoddesc}
 
 \begin{methoddesc}[file]{write}{str}
@@ -1505,8 +1551,8 @@ same as \code{\var{m}.__dict__} where \var{m} is the module in which
 the function \var{f} was defined).
 
 Function objects also support getting and setting arbitrary
-attributes, which can be used to, e.g. attach metadata to functions.
-Regular attribute dot-notation is used to get and set such
+attributes, which can be used, for example, to attach metadata to
+functions.  Regular attribute dot-notation is used to get and set such
 attributes. \emph{Note that the current implementation only supports
 function attributes on user-defined functions.  Function attributes on
 built-in functions may be supported in the future.}
@@ -1642,7 +1688,8 @@ slice objects.
 \subsection{Special Attributes \label{specialattrs}}
 
 The implementation adds a few special read-only attributes to several
-object types, where they are relevant:
+object types, where they are relevant.  Some of these are not reported
+by the \function{dir()} built-in function.
 
 \begin{memberdesc}[object]{__dict__}
 A dictionary or other mapping object used to store an
@@ -1666,4 +1713,8 @@ The class to which a class instance belongs.
 \begin{memberdesc}[class]{__bases__}
 The tuple of base classes of a class object.  If there are no base
 classes, this will be an empty tuple.
+\end{memberdesc}
+
+\begin{memberdesc}[class]{__name__}
+The name of the class or type.
 \end{memberdesc}

@@ -896,6 +896,13 @@ settrace() -- set the global debug tracing function\n\
 )
 /* end of sys_doc */ ;
 
+static int
+_check_and_flush (FILE *stream)
+{
+  int prev_fail = ferror (stream);
+  return fflush (stream) || prev_fail ? EOF : 0;
+}
+
 PyObject *
 _PySys_Init(void)
 {
@@ -905,16 +912,13 @@ _PySys_Init(void)
 #ifdef MS_WINDOWS
 	char buf[10];
 #endif
-#if defined(HAVE_LANGINFO_H) && defined(CODESET)
-	char *oldloc, *codeset;
-#endif
 
 	m = Py_InitModule3("sys", sys_methods, sys_doc);
 	sysdict = PyModule_GetDict(m);
 
-	sysin = PyFile_FromFile(stdin, "<stdin>", "r", NULL);
-	sysout = PyFile_FromFile(stdout, "<stdout>", "w", NULL);
-	syserr = PyFile_FromFile(stderr, "<stderr>", "w", NULL);
+	sysin = PyFile_FromFile(stdin, "<stdin>", "r", _check_and_flush);
+	sysout = PyFile_FromFile(stdout, "<stdout>", "w", _check_and_flush);
+	syserr = PyFile_FromFile(stderr, "<stderr>", "w", _check_and_flush);
 	if (PyErr_Occurred())
 		return NULL;
 #ifdef MS_WINDOWS
@@ -930,21 +934,6 @@ _PySys_Init(void)
 	}
 #endif
 
-#if defined(HAVE_LANGINFO_H) && defined(CODESET)
-	oldloc = setlocale(LC_CTYPE, 0);
-	setlocale(LC_CTYPE, "");
-	codeset = nl_langinfo(CODESET);
-	setlocale(LC_CTYPE, oldloc);
-	if(codeset && isatty(fileno(stdin))){
-		if (!PyFile_SetEncoding(sysin, codeset))
-			return NULL;
-	}
-	if(codeset && isatty(fileno(stdout))) {
-		if (!PyFile_SetEncoding(sysout, codeset))
-			return NULL;
-	}
-#endif
-	
 	PyDict_SetItemString(sysdict, "stdin", sysin);
 	PyDict_SetItemString(sysdict, "stdout", sysout);
 	PyDict_SetItemString(sysdict, "stderr", syserr);

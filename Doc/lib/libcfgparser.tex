@@ -57,7 +57,7 @@ does not support the magical interpolation behavior.
 
 \begin{classdesc}{ConfigParser}{\optional{defaults}}
 Derived class of \class{RawConfigParser} that implements the magical
-interpolation feature and adds optional arguments the \method{get()}
+interpolation feature and adds optional arguments to the \method{get()}
 and \method{items()} methods.  The values in \var{defaults} must be
 appropriate for the \samp{\%()s} string interpolation.  Note that
 \var{__name__} is an intrinsic default; its value is the section name,
@@ -217,10 +217,10 @@ A convenience method which coerces the \var{option} in the specified
 \begin{methoddesc}{getboolean}{section, option}
 A convenience method which coerces the \var{option} in the specified
 \var{section} to a Boolean value.  Note that the accepted values
-for the option are \code{1}, \code{yes}, \code{true}, and \code{on},
-which cause this method to return true, and \code{0}, \code{no},
-\code{false}, and \code{off}, which cause it to return false.  These
-values are checked in a case-insensitive manner.  Any other value will
+for the option are \code{"1"}, \code{"yes"}, \code{"true"}, and \code{"on"},
+which cause this method to return \code{True}, and \code{"0"}, \code{"no"},
+\code{"false"}, and \code{"off"}, which cause it to return \code{False}.  These
+string values are checked in a case-insensitive manner.  Any other value will
 cause it to raise \exception{ValueError}.
 \end{methoddesc}
 
@@ -279,8 +279,8 @@ on the defaults passed into the constructor, as well as the options
 \end{methoddesc}
 
 \begin{methoddesc}{items}{section\optional{, raw\optional{, vars}}}
-Create a generator which will return a tuple \code{(name, value)} for
-each option in the given \var{section}. Optional arguments have the
-same meaning as for the \code{get()} method.
+Return a list of \code{(\var{name}, \var{value})} pairs for each
+option in the given \var{section}. Optional arguments have the
+same meaning as for the \method{get()} method.
 \versionadded{2.3}
 \end{methoddesc}

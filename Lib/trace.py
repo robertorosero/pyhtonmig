@@ -180,7 +180,13 @@ def fullmodname(path):
             if len(dir) > len(longest):
                 longest = dir
 
-    base = path[len(longest) + 1:].replace("/", ".")
+    if longest:
+        base = path[len(longest) + 1:]
+    else:
+        base = path
+    base = base.replace(os.sep, ".")
+    if os.altsep:
+        base = base.replace(os.altsep, ".")
     filename, ext = os.path.splitext(base)
     return filename
 
@@ -200,13 +206,11 @@ class CoverageResults:
         if self.infile:
             # Try to merge existing counts file.
             try:
-                counts, calledfuncs = pickle.load(open(self.infile, 'r'))
+                counts, calledfuncs = pickle.load(open(self.infile, 'rb'))
                 self.update(self.__class__(counts, calledfuncs))
             except (IOError, EOFError, ValueError), err:
                 print >> sys.stderr, ("Skipping counts file %r: %s"
                                       % (self.infile, err))
-            except pickle.UnpicklingError:
-                self.update(self.__class__(marshal.load(open(self.infile))))
 
     def update(self, other):
         """Merge in the data from another CoverageResults"""
@@ -284,7 +288,7 @@ class CoverageResults:
             # try and store counts and module info into self.outfile
             try:
                 pickle.dump((self.counts, self.calledfuncs),
-                            open(self.outfile, 'w'), 1)
+                            open(self.outfile, 'wb'), 1)
             except IOError, err:
                 print >> sys.stderr, "Can't save counts files because %s" % err
 
@@ -296,7 +300,7 @@ class CoverageResults:
         except IOError, err:
             print >> sys.stderr, ("trace: Could not open %r for writing: %s"
                                   "- skipping" % (path, err))
-            return
+            return 0, 0
 
         n_lines = 0
         n_hits = 0
@@ -379,7 +383,7 @@ def find_executable_linenos(filename):
     """Return dict where keys are line numbers in the line number table."""
     assert filename.endswith('.py')
     try:
-        prog = open(filename).read()
+        prog = open(filename, "rU").read()
     except IOError, err:
         print >> sys.stderr, ("Not printing coverage data for %r: %s"
                               % (filename, err))

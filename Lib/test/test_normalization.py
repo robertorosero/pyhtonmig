@@ -3,7 +3,7 @@ import sys
 import os
 from unicodedata import normalize
 
-TESTDATAFILE = "NormalizationTest" + os.extsep + "txt"
+TESTDATAFILE = "NormalizationTest-3.2.0" + os.extsep + "txt"
 
 # This search allows using a build directory just inside the source
 # directory, and saving just one copy of the test data in the source
@@ -42,7 +42,7 @@ def unistr(data):
 def test_main():
     if skip_expected:
         raise TestSkipped(TESTDATAFILE + " not found, download from " +
-                    "http://www.unicode.org/Public/UNIDATA/" + TESTDATAFILE)
+                    "http://www.unicode.org/Public/3.2-Update/" + TESTDATAFILE)
 
     part1_data = {}
     for line in open(TESTDATAFILE):
@@ -83,6 +83,9 @@ def test_main():
         if X in part1_data:
             continue
         assert X == NFC(X) == NFD(X) == NFKC(X) == NFKD(X), c
+
+    # Check for bug 834676
+    normalize('NFC',u'\ud55c\uae00')
 
 if __name__ == "__main__":
     test_main()

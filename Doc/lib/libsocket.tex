@@ -107,6 +107,8 @@ The accompanying value is a pair \code{(\var{error}, \var{string})}
 representing an error returned by a library call.
 \var{string} represents the description of \var{error}, as returned
 by the \cfunction{gai_strerror()} C function.
+The \var{error} value will match one of the \constant{EAI_*} constants
+defined in this module.
 \end{excdesc}
 
 \begin{excdesc}{timeout}
@@ -445,8 +447,8 @@ Bind the socket to \var{address}.  The socket must not already be bound.
 (The format of \var{address} depends on the address family --- see
 above.)  \note{This method has historically accepted a pair
 of parameters for \constant{AF_INET} addresses instead of only a
-tuple.  This was never intentional and is no longer be available in
-Python 2.0.}
+tuple.  This was never intentional and is no longer available in
+Python 2.0 and later.}
 \end{methoddesc}
 
 \begin{methoddesc}[socket]{close}{}
@@ -473,7 +475,7 @@ operation succeeded, otherwise the value of the \cdata{errno}
 variable.  This is useful to support, for example, asynchronous connects.
 \note{This method has historically accepted a pair of
 parameters for \constant{AF_INET} addresses instead of only a tuple.
-This was never intentional and is no longer be available in Python
+This was never intentional and is no longer available in Python
 2.0 and later.}
 \end{methoddesc}
 

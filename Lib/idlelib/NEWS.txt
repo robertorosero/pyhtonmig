@@ -1,5 +1,78 @@
+What's New in IDLE 1.0.5rc1?
+============================
+
+*Release date: 26-Jan-2005*
+
+- On OpenBSD, terminating IDLE with ctrl-c from the command line caused a
+  stuck subprocess MainThread because only the SocketThread was exiting.
+
+- Saving a Keyset w/o making changes (by using the "Save as New Custom Key Set"
+  button) caused IDLE to fail on restart (no new keyset was created in
+  config-keys.cfg).  Also true for Theme/highlights.  Python Bug 1064535.
+
+- checking sys.platform for substring 'win' was breaking IDLE docs on Mac
+  (darwin).  Also, Mac Safari browser requires full file:// URIs.  SF 900580.
+
+- rpc.py:SocketIO - Large modules were generating large pickles when downloaded
+  to the execution server.  The return of the OK response from the subprocess
+  initialization was interfering and causing the sending socket to be not
+  ready.  Add an IO ready test to fix this.  Moved the polling IO ready test
+  into pollpacket(). (Backporting rpc.py rev 1.28 21Jan04)
+
+- Fix typo in rpc.py, s/b "pickle.PicklingError" not "pickle.UnpicklingError".
+
+- If an extension can't be loaded, print warning and skip it instead of
+  erroring out.
+
+- Improve error handling when .idlerc can't be created.  This is a partial
+  backport of configHandler.py, Revision 1.36,  11Jan05.
+
+- The GUI was hanging if the shell window was closed while a raw_input() 
+  was pending.  Restored the quit() of the readline() mainloop().
+  http://mail.python.org/pipermail/idle-dev/2004-December/002307.html
+
+- Added a Tk error dialog to run.py inform the user if the subprocess can't
+  connect to the user GUI process.  Added a timeout to the GUI's listening
+  socket.  Added Tk error dialogs to PyShell.py to announce a failure to bind
+  the port or connect to the subprocess.  Clean up error handling during
+  connection initiation phase.  This is an update of Python Patch 778323.
+
+What's New in IDLE 1.0.3?
+=========================
+
+*Release date: 13-May-2004*
+
+- Keybindings with the Shift modifier now work correctly.  So do bindings which
+  use the Space key.  Limit unmodified user keybindings to the function keys.
+  Python Bug 775353, IDLEfork Bugs 755647, 761557
+
+What's New in IDLE 1.0.2?
+=========================
+
+*Release date: 05-Dec-2003*
+
+- After an exception, run.py was not setting the exception vector. Noam
+  Raphael suggested correcting this so pdb's postmortem pm() would work. 
+  IDLEfork Patch 844675
+
+- IDLE now does not fail to save the file anymore if the Tk buffer is not a
+  Unicode string, yet eol_convention is.  Python Bugs 774680, 788378
+
+- IDLE will use the Python html docs on the system, if found
+
+What's New in IDLE 1.0.1?
+=========================
+
+*Release date: 23-Sep-2003*
+
+- IDLE didn't start correctly when Python was installed in "Program Files" on
+  W2K and XP.  Python Bugs 780451, 784183
+
+- config-main.def documentation incorrectly referred to idle- instead of 
+  config-  filenames.  SF 782759  Also added note about .idlerc location.
+
 What's New in IDLE 1.0?
-===================================
+=======================
 
 *Release date: 29-Jul-2003*
 
@@ -8,7 +81,7 @@ What's New in IDLE 1.0?
 
 
 What's New in IDLE 1.0 release candidate 2?
-===================================
+===========================================
 
 *Release date: 24-Jul-2003*
 
@@ -16,7 +89,7 @@ What's New in IDLE 1.0 release candidate 2?
 
 
 What's New in IDLE 1.0 release candidate 1?
-===================================
+===========================================
 
 *Release date: 18-Jul-2003*
 
@@ -37,9 +110,19 @@ What's New in IDLE 1.0 release candidate 1?
 
 
 What's New in IDLE 1.0b2?
-===================================
+=========================
 
 *Release date: 29-Jun-2003*
+
+- Extend AboutDialog.ViewFile() to support file encodings.  Make the CREDITS
+  file Latin-1.
+
+- Updated the About dialog to reflect re-integration into Python.  Provide
+  buttons to display Python's NEWS, License, and Credits, plus additional
+  buttons for IDLE's README and NEWS.
+
+- TextViewer() now has a third parameter which allows inserting text into the
+  viewer instead of reading from a file.
 
 - (Created the .../Lib/idlelib directory in the Python CVS, which is a clone of
   IDLEfork modified to install in the Python environment.  The code in the
@@ -68,7 +151,7 @@ What's New in IDLE 1.0b2?
 
 
 What's New in IDLEfork 0.9b1?
-===================================
+=============================
 
 *Release date: 02-Jun-2003*
 

@@ -444,8 +444,8 @@ series of arguments:
              {\token{identifier} "=" \token{expression}}
 \end{productionlist}
 
-A trailing comma may be present after an argument list but does not
-affect the semantics.
+A trailing comma may be present after the positional and keyword
+arguments but does not affect the semantics.
 
 The primary must evaluate to a callable object (user-defined
 functions, built-in functions, methods of built-in objects, class
@@ -753,9 +753,10 @@ The shifting operations have lower priority than the arithmetic
 operations:
 
 \begin{productionlist}
+  % The empty groups below prevent conversion to guillemets.
   \production{shift_expr}
              {\token{a_expr}
-              | \token{shift_expr} ( "<<" | ">>" ) \token{a_expr}}
+              | \token{shift_expr} ( "<{}<" | ">{}>" ) \token{a_expr}}
 \end{productionlist}
 
 These operators accept plain or long integers as arguments.  The
@@ -910,7 +911,7 @@ The set membership test has traditionally been bound to sequences; an
 object is a member of a set if the set is a sequence and contains an
 element equal to that object.  However, it is possible for an object
 to support membership tests without being a sequence.  In particular,
-dictionaries support memership testing as a nicer way of spelling
+dictionaries support membership testing as a nicer way of spelling
 \code{\var{key} in \var{dict}}; other mapping types may follow suit.
 
 For the list and tuple types, \code{\var{x} in \var{y}} is true if and
@@ -977,8 +978,8 @@ as false: \code{None}, numeric zero of all types, empty sequences
 (strings, tuples and lists), and empty mappings (dictionaries).  All
 other values are interpreted as true.
 
-The operator \keyword{not} yields \code{1} if its argument is false,
-\code{0} otherwise.
+The operator \keyword{not} yields \code{True} if its argument is false,
+\code{False} otherwise.
 \opindex{not}
 
 The expression \code{\var{x} and \var{y}} first evaluates \var{x}; if
@@ -992,19 +993,19 @@ evaluated and the resulting value is returned.
 \opindex{or}
 
 (Note that neither \keyword{and} nor \keyword{or} restrict the value
-and type they return to \code{0} and \code{1}, but rather return the
+and type they return to \code{False} and \code{True}, but rather return the
 last evaluated argument.
 This is sometimes useful, e.g., if \code{s} is a string that should be
 replaced by a default value if it is empty, the expression
 \code{s or 'foo'} yields the desired value.  Because \keyword{not} has to
 invent a value anyway, it does not bother to return a value of the
-same type as its argument, so e.g., \code{not 'foo'} yields \code{0},
+same type as its argument, so e.g., \code{not 'foo'} yields \code{False},
 not \code{''}.)
 
 \section{Lambdas\label{lambdas}}
 \indexii{lambda}{expression}
 \indexii{lambda}{form}
-\indexii{anonmymous}{function}
+\indexii{anonymous}{function}
 
 Lambda forms (lambda expressions) have the same syntactic position as
 expressions.  They are a shorthand to create anonymous functions; the
@@ -1068,9 +1069,9 @@ precedences\indexii{operator}{precedence} in Python, from lowest
 precedence (least binding) to highest precedence (most binding).
 Operators in the same box have the same precedence.  Unless the syntax
 is explicitly given, operators are binary.  Operators in the same box
-group left to right (except for comparisons, which chain from left to
-right --- see above, and exponentiation, which groups from right to
-left).
+group left to right (except for comparisons, including tests, which all
+have the same precedence and chain from left to right --- see section
+\ref{comparisons} -- and exponentiation, which groups from right to left).
 
 \begin{tableii}{c|l}{textrm}{Operator}{Description}
     \lineii{\keyword{lambda}}			{Lambda expression}

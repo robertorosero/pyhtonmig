@@ -8,6 +8,7 @@ import os
 import sys
 import stat
 import exceptions
+from os.path import abspath
 
 __all__ = ["copyfileobj","copyfile","copymode","copystat","copy","copy2",
            "copytree","move","rmtree","Error"]
@@ -127,6 +128,7 @@ def rmtree(path, ignore_errors=False, onerror=None):
     cmdtuples = []
     arg = path
     try:
+        func = os.listdir # Make sure it isn't unset
         _build_cmdtuple(path, cmdtuples)
         for func, arg in cmdtuples:
             func(arg)
@@ -164,8 +166,13 @@ def move(src, dst):
         os.rename(src, dst)
     except OSError:
         if os.path.isdir(src):
+            if destinsrc(src, dst):
+                raise Error, "Cannot move a directory '%s' into itself '%s'." % (src, dst)
             copytree(src, dst, symlinks=True)
             rmtree(src)
         else:
             copy2(src,dst)
             os.unlink(src)
+
+def destinsrc(src, dst):
+    return abspath(dst).startswith(abspath(src))

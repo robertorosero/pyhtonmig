@@ -686,12 +686,15 @@ class Marshaller:
         self.memo[i] = None
         dump = self.__dump
         write("<value><struct>\n")
-        for k in value.keys():
+        for k, v in value.items():
             write("<member>\n")
             if type(k) is not StringType:
-                raise TypeError, "dictionary key must be string"
+                if unicode and type(k) is UnicodeType:
+                    k = k.encode(self.encoding)
+                else:
+                    raise TypeError, "dictionary key must be string"
             write("<name>%s</name>\n" % escape(k))
-            dump(value[k], write)
+            dump(v, write)
             write("</member>\n")
         write("</struct></value>\n")
         del self.memo[i]
@@ -994,7 +997,7 @@ def dumps(params, methodname=None, methodresponse=None, encoding=None,
 # represents a fault condition, this function raises a Fault exception.
 #
 # @param data An XML-RPC packet, given as an 8-bit string.
-# @return A tuple containing the the unpacked data, and the method name
+# @return A tuple containing the unpacked data, and the method name
 #     (None if not present).
 # @see Fault
 

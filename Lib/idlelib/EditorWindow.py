@@ -50,6 +50,7 @@ class EditorWindow:
 
     def __init__(self, flist=None, filename=None, key=None, root=None):
         if EditorWindow.help_url is None:
+            dochome =  os.path.join(sys.prefix, 'Doc', 'index.html')
             if sys.platform.count('linux'):
                 # look for html docs in a couple of standard places
                 pyver = 'python-docs-' + '%s.%s.%s' % sys.version_info[:3]
@@ -59,8 +60,12 @@ class EditorWindow:
                     basepath = '/usr/share/doc/'  # standard location
                     dochome = os.path.join(basepath, pyver,
                                            'Doc', 'index.html')
-            else:
-                dochome =  os.path.join(sys.prefix, 'Doc', 'index.html')
+            elif sys.platform[:3] == 'win':
+                # Try the HTMLHelp file
+                chmpath = os.path.join(sys.prefix, 'Doc',
+                                       'Python%d%d.chm' % sys.version_info[:2])
+                if os.path.isfile(chmpath):
+                    dochome = chmpath
             dochome = os.path.normpath(dochome)
             if os.path.isfile(dochome):
                 EditorWindow.help_url = dochome
@@ -306,20 +311,11 @@ class EditorWindow:
         textView.TextViewer(self.top,'Help',fn)
 
     def python_docs(self, event=None):
-        if sys.platform.count('win') or sys.platform.count('nt'):
+        if sys.platform[:3] == 'win':
             os.startfile(self.help_url)
-            return "break"
         else:
             webbrowser.open(self.help_url)
-            return "break"
-
-    def display_docs(self, url):
-        if not (url.startswith('www') or url.startswith('http')):
-            url = os.path.normpath(url)
-        if sys.platform.count('win') or sys.platform.count('nt'):
-            os.startfile(url)
-        else:
-            webbrowser.open(url)
+        return "break"
 
     def cut(self,event):
         self.text.event_generate("<<Cut>>")
@@ -570,7 +566,12 @@ class EditorWindow:
     def __extra_help_callback(self, helpfile):
         "Create a callback with the helpfile value frozen at definition time"
         def display_extra_help(helpfile=helpfile):
-            self.display_docs(helpfile)
+            if not (helpfile.startswith('www') or helpfile.startswith('http')):
+                url = os.path.normpath(helpfile)
+            if sys.platform[:3] == 'win':
+                os.startfile(helpfile)
+            else:
+                webbrowser.open(helpfile)
         return display_extra_help
 
     def UpdateRecentFilesList(self,newFile=None):
@@ -765,7 +766,11 @@ class EditorWindow:
         return idleConf.GetExtensions()
 
     def load_extension(self, name):
-        mod = __import__(name, globals(), locals(), [])
+        try:
+            mod = __import__(name, globals(), locals(), [])
+        except ImportError:
+            print "\nFailed to import extension: ", name
+            return None
         cls = getattr(mod, name)
         ins = cls(self)
         self.extensions[name] = ins

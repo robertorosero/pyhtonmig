@@ -1,4 +1,12 @@
 /*
+  IMPORTANT NOTE: IF THIS FILE IS CHANGED, WININST.EXE MUST BE RECOMPILED WITH
+  THE MSVC6 WININST.DSW WORKSPACE FILE MANUALLY.
+
+  IF CHANGES TO THIS FILE ARE CHECKED INTO PYTHON CVS, THE RECOMPILED BINARY
+  MUST BE CHECKED IN AS WELL!
+*/
+
+/*
  * Written by Thomas Heller, May 2000
  *
  * $Id$
@@ -79,6 +87,11 @@
 #include <stdarg.h>
 #include <string.h>
 #include <time.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <malloc.h>
+#include <io.h>
+#include <fcntl.h>
 
 #include "archive.h"
 
@@ -139,8 +152,6 @@ char *bitmap_bytes;
 #define WM_NEXTFILE WM_USER+2
 /* wParam: number of this file */
 /* lParam: points to pathname */
-
-enum { UNSPECIFIED, ALWAYS, NEVER } allow_overwrite = UNSPECIFIED;
 
 static BOOL notify(int code, char *fmt, ...);
 
@@ -567,7 +578,7 @@ PyMethodDef meth[] = {
  * 1 if the Python-dll does not export the functions we need
  * 2 if no install-script is specified in pathname
  * 3 if the install-script file could not be opened
- * the return value of PyRun_SimpleFile() otherwise,
+ * the return value of PyRun_SimpleString() otherwise,
  * which is 0 if everything is ok, -1 if an exception had occurred
  * in the install-script.
  */
@@ -577,7 +588,7 @@ run_installscript(HINSTANCE hPython, char *pathname, int argc, char **argv)
 {
 	DECLPROC(hPython, void, Py_Initialize, (void));
 	DECLPROC(hPython, int, PySys_SetArgv, (int, char **));
-	DECLPROC(hPython, int, PyRun_SimpleFile, (FILE *, char *));
+	DECLPROC(hPython, int, PyRun_SimpleString, (char *));
 	DECLPROC(hPython, void, Py_Finalize, (void));
 	DECLPROC(hPython, PyObject *, PyImport_ImportModule, (char *));
 	DECLPROC(hPython, int, PyObject_SetAttrString,
@@ -593,10 +604,10 @@ run_installscript(HINSTANCE hPython, char *pathname, int argc, char **argv)
 	PyObject *mod;
 
 	int result = 0;
-	FILE *fp;
+	int fh;
 
 	if (!Py_Initialize || !PySys_SetArgv
-	    || !PyRun_SimpleFile || !Py_Finalize)
+	    || !PyRun_SimpleString || !Py_Finalize)
 		return 1;
 	
 	if (!PyImport_ImportModule || !PyObject_SetAttrString
@@ -616,13 +627,12 @@ run_installscript(HINSTANCE hPython, char *pathname, int argc, char **argv)
 	if (pathname == NULL || pathname[0] == '\0')
 		return 2;
 
-	fp = fopen(pathname, "r");
-	if (!fp) {
+	fh = open(pathname, _O_RDONLY);
+	if (-1 == fh) {
 		fprintf(stderr, "Could not open postinstall-script %s\n",
 			pathname);
 		return 3;
 	}
-
 	SetDlgItemText(hDialog, IDC_INFO, "Running Script...");
 		
 	Py_Initialize();
@@ -641,10 +651,22 @@ run_installscript(HINSTANCE hPython, char *pathname, int argc, char **argv)
 	}
 
 	PySys_SetArgv(argc, argv);
-	result = PyRun_SimpleFile(fp, pathname);
+	result = 3;
+	{
+		struct _stat statbuf;
+		if(0 == _fstat(fh, &statbuf)) {
+			char *script = alloca(statbuf.st_size + 5);
+			int n = read(fh, script, statbuf.st_size);
+			if (n > 0) {
+				script[n] = '\n';
+				script[n+1] = 0;
+				result = PyRun_SimpleString(script);
+			}
+		}
+	}
 	Py_Finalize();
 
-	fclose(fp);
+	close(fh);
 
 	return result;
 }
@@ -676,28 +698,6 @@ static BOOL SystemError(int error, char *msg)
 	return FALSE;
 }
 
-static BOOL AskOverwrite(char *filename)
-{
-	int result;
-  again:
-	if (allow_overwrite == ALWAYS)
-		return TRUE;
-	if (allow_overwrite == NEVER)
-		return FALSE;
-	result = MessageBox(hDialog,
-			     "Overwrite existing files?\n"
-			     "\n"
-			     "Press YES to ALWAYS overwrite existing files,\n"
-			     "press NO to NEVER overwrite existing files.",
-			     "Overwrite options",
-			     MB_YESNO | MB_ICONQUESTION);
-	if (result == IDYES)
-		allow_overwrite = ALWAYS;
-	else if (result == IDNO)
-		allow_overwrite = NEVER;
-	goto again;
-}
-
 static BOOL notify (int code, char *fmt, ...)
 {
 	char Buffer[1024];
@@ -712,7 +712,6 @@ static BOOL notify (int code, char *fmt, ...)
 	switch (code) {
 /* Questions */
 	case CAN_OVERWRITE:
-		result = AskOverwrite(Buffer);
 		break;
 
 /* Information notification */
@@ -1352,14 +1351,15 @@ SelectPythonDlgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 								    (LPARAM)pbuf);
 						result = sscanf(pbuf, "Python Version %d.%d",
 								 &py_major, &py_minor);
-						if (result == 2)
+						if (result == 2) {
 #ifdef _DEBUG
-							wsprintf(pythondll, "c:\\python22\\PCBuild\\python%d%d_d.dll",
-								  py_major, py_minor);
+							wsprintf(pythondll, "python%d%d_d.dll",
+								 py_major, py_minor);
 #else
-						wsprintf(pythondll, "python%d%d.dll",
-							  py_major, py_minor);
+							wsprintf(pythondll, "python%d%d.dll",
+								 py_major, py_minor);
 #endif
+						}
 						free(pbuf);
 					} else
 						strcpy(pythondll, "");
@@ -1523,6 +1523,31 @@ static void CloseLogfile(void)
 		fclose(logfile);
 }
 
+static HINSTANCE LoadPythonDll(char *fname)
+{
+	char fullpath[_MAX_PATH];
+	char subkey_name[80];
+	char buffer[260 + 12];
+	LONG size = sizeof(fullpath);
+	HINSTANCE h;
+
+	/* make sure PYTHONHOME is set, to that sys.path is initialized correctly */
+	wsprintf(buffer, "PYTHONHOME=%s", python_dir);
+	_putenv(buffer);
+	h = LoadLibrary(fname);
+	if (h)
+		return h;
+	wsprintf(subkey_name,
+		 "SOFTWARE\\Python\\PythonCore\\%d.%d\\InstallPath",
+		 py_major, py_minor);
+	if (ERROR_SUCCESS != RegQueryValue(HKEY_CURRENT_USER, subkey_name,
+					   fullpath, &size))
+		return NULL;
+	strcat(fullpath, "\\");
+	strcat(fullpath, fname);
+	return LoadLibrary(fullpath);
+}
+
 BOOL CALLBACK
 InstallFilesDlgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
@@ -1572,6 +1597,14 @@ InstallFilesDlgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 			/* Handle a Next button click here */
 			hDialog = hwnd;
 
+			/* Disable the buttons while we work.  Sending CANCELTOCLOSE has
+			  the effect of disabling the cancel button, which is a) as we
+			  do everything synchronously we can't cancel, and b) the next
+			  step is 'finished', when it is too late to cancel anyway.
+			  The next step being 'Finished' means we also don't need to
+			  restore the button state back */
+			PropSheet_SetWizButtons(GetParent(hwnd), 0);
+			SendMessage(GetParent(hwnd), PSM_CANCELTOCLOSE, 0, 0);
 			/* Make sure the installation directory name ends in a */
 			/* backslash */
 			if (python_dir[strlen(python_dir)-1] != '\\')
@@ -1616,7 +1649,7 @@ InstallFilesDlgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 						"Compiling files to .pyc...");
 
 				SetDlgItemText(hDialog, IDC_INFO, "Loading python...");
-				hPython = LoadLibrary(pythondll);
+				hPython = LoadPythonDll(pythondll);
 				if (hPython) {
 					errors = compile_filelist(hPython, FALSE);
 					FreeLibrary(hPython);
@@ -1635,7 +1668,7 @@ InstallFilesDlgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 						"Compiling files to .pyo...");
 
 				SetDlgItemText(hDialog, IDC_INFO, "Loading python...");
-				hPython = LoadLibrary(pythondll);
+				hPython = LoadPythonDll(pythondll);
 				if (hPython) {
 					errors = compile_filelist(hPython, TRUE);
 					FreeLibrary(hPython);
@@ -1697,7 +1730,7 @@ FinishedDlgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 			if (logfile)
 				fprintf(logfile, "300 Run Script: [%s]%s\n", pythondll, fname);
 
-			tempname = tmpnam(NULL);
+			tempname = tempnam(NULL, NULL);
 
 			if (!freopen(tempname, "a", stderr))
 				MessageBox(GetFocus(), "freopen stderr", NULL, MB_OK);
@@ -1711,7 +1744,7 @@ FinishedDlgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 
 			argv[0] = fname;
 
-			hPython = LoadLibrary(pythondll);
+			hPython = LoadPythonDll(pythondll);
 			if (hPython) {
 				int result;
 				result = run_installscript(hPython, fname, 2, argv);
@@ -1723,7 +1756,9 @@ FinishedDlgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 				fprintf(stderr, "*** Could not load Python ***");
 			}
 			fflush(stderr);
+			fclose(stderr);
 			fflush(stdout);
+			fclose(stdout);
 	    
 			fp = fopen(tempname, "rb");
 			n = fread(buffer, 1, sizeof(buffer), fp);
@@ -1957,7 +1992,7 @@ void DeleteRegistryKey(char *string)
 		MessageBox(GetFocus(), string, "Could not open key", MB_OK);
 	else {
 		result = RegDeleteKey(hKey, subkeyname);
-		if (result != ERROR_SUCCESS)
+		if (result != ERROR_SUCCESS && result != ERROR_FILE_NOT_FOUND)
 			MessageBox(GetFocus(), string, "Could not delete key", MB_OK);
 		RegCloseKey(hKey);
 	}
@@ -1999,7 +2034,7 @@ void DeleteRegistryValue(char *string)
 		MessageBox(GetFocus(), string, "Could not open key", MB_OK);
 	else {
 		result = RegDeleteValue(hKey, valuename);
-		if (result != ERROR_SUCCESS)
+		if (result != ERROR_SUCCESS && result != ERROR_FILE_NOT_FOUND)
 			MessageBox(GetFocus(), string, "Could not delete value", MB_OK);
 		RegCloseKey(hKey);
 	}
@@ -2056,7 +2091,7 @@ BOOL Run_RemoveScript(char *line)
 
 		argv[0] = scriptname;
 
-		tempname = tmpnam(NULL);
+		tempname = tempnam(NULL, NULL);
 
 		if (!freopen(tempname, "a", stderr))
 			MessageBox(GetFocus(), "freopen stderr", NULL, MB_OK);
@@ -2071,7 +2106,9 @@ BOOL Run_RemoveScript(char *line)
 		}
 	
 		fflush(stderr);
+		fclose(stderr);
 		fflush(stdout);
+		fclose(stdout);
 	
 		fp = fopen(tempname, "rb");
 		n = fread(buffer, 1, sizeof(buffer), fp);

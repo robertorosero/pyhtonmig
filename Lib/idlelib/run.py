@@ -47,6 +47,7 @@ def main(del_exitfunc=False):
     global no_exitfunc
     no_exitfunc = del_exitfunc
     port = 8833
+    #time.sleep(15) # test subprocess not responding
     if sys.argv[1:]:
         port = int(sys.argv[1])
     sys.argv[:] = [""]
@@ -90,30 +91,45 @@ def main(del_exitfunc=False):
                 continue
 
 def manage_socket(address):
-    for i in range(6):
+    for i in range(3):
         time.sleep(i)
         try:
             server = MyRPCServer(address, MyHandler)
             break
         except socket.error, err:
-            if i < 3:
-                print>>sys.__stderr__, ".. ",
-            else:
-                print>>sys.__stderr__,"\nPython subprocess socket error: "\
-                                              + err[1] + ", retrying...."
+            print>>sys.__stderr__,"IDLE Subprocess: socket error: "\
+                                        + err[1] + ", retrying...."
     else:
-        print>>sys.__stderr__, "\nConnection to Idle failed, exiting."
+        print>>sys.__stderr__, "IDLE Subprocess: Connection to "\
+                               "IDLE GUI failed, exiting."
+        show_socket_error(err, address)
         global exit_now
         exit_now = True
         return
     server.handle_request() # A single request only
 
+def show_socket_error(err, address):
+    import Tkinter
+    import tkMessageBox
+    root = Tkinter.Tk()
+    root.withdraw()
+    if err[0] == 61: # connection refused
+        msg = "IDLE's subprocess can't connect to %s:%d.  This may be due "\
+              "to your personal firewall configuration.  It is safe to "\
+              "allow this internal connection because no data is visible on "\
+              "external ports." % address
+        tkMessageBox.showerror("IDLE Subprocess Error", msg, parent=root)
+    else:
+        tkMessageBox.showerror("IDLE Subprocess Error", "Socket Error: %s" % err[1])
+    root.destroy()
+
 def print_exception():
     flush_stdout()
     efile = sys.stderr
-    typ, val, tb = sys.exc_info()
+    typ, val, tb = excinfo = sys.exc_info()
+    sys.last_type, sys.last_value, sys.last_traceback = excinfo
     tbe = traceback.extract_tb(tb)
-    print >>efile, '\nTraceback (most recent call last):'
+    print>>efile, '\nTraceback (most recent call last):'
     exclude = ("run.py", "rpc.py", "threading.py", "Queue.py",
                "RemoteDebugger.py", "bdb.py")
     cleanup_traceback(tbe, exclude)
@@ -180,6 +196,7 @@ class MyRPCServer(rpc.RPCServer):
         Interrupt the MainThread and exit server if link is dropped.
 
         """
+        global quitting
         try:
             raise
         except SystemExit:
@@ -198,7 +215,8 @@ class MyRPCServer(rpc.RPCServer):
             traceback.print_exc(file=erf)
             print>>erf, '\n*** Unrecoverable, server exiting!'
             print>>erf, '-'*40
-            exit()
+            quitting = True
+            thread.interrupt_main()
 
 
 class MyHandler(rpc.RPCHandler):

@@ -51,10 +51,11 @@ matches a particular string, which comes down to the same thing).
 
 Regular expressions can be concatenated to form new regular
 expressions; if \emph{A} and \emph{B} are both regular expressions,
-then \emph{AB} is also a regular expression.  If a string \emph{p}
-matches A and another string \emph{q} matches B, the string \emph{pq}
-will match AB if \emph{A} and \emph{B} do no specify boundary
-conditions that are no longer satisfied by \emph{pq}.  Thus, complex
+then \emph{AB} is also a regular expression.  In general, if a string
+\emph{p} matches \emph{A} and another string \emph{q} matches \emph{B},
+the string \emph{pq} will match AB.  This holds unless \emph{A} or
+\emph{B} contain low precedence operations; boundary conditions between
+\emph{A} and \emph{B}; or have numbered group references.  Thus, complex
 expressions can easily be constructed from simpler primitive
 expressions like the ones described here.  For details of the theory
 and implementation of regular expressions, consult the Friedl book
@@ -186,14 +187,13 @@ except \character{\textasciicircum}.
 \item[\character{|}]\code{A|B}, where A and B can be arbitrary REs,
 creates a regular expression that will match either A or B.  An
 arbitrary number of REs can be separated by the \character{|} in this
-way.  This can be used inside groups (see below) as well.  REs
-separated by \character{|} are tried from left to right, and the first
-one that allows the complete pattern to match is considered the
-accepted branch.  This means that if \code{A} matches, \code{B} will
-never be tested, even if it would produce a longer overall match.  In
-other words, the \character{|} operator is never greedy.  To match a
-literal \character{|}, use \regexp{\e|}, or enclose it inside a
-character class, as in \regexp{[|]}.
+way.  This can be used inside groups (see below) as well.  As the target
+string is scanned, REs separated by \character{|} are tried from left to
+right. When one pattern completely matches, that branch is accepted.
+This means that once \code{A} matches, \code{B} will not be tested further,
+even if it would produce a longer overall match.  In other words, the
+\character{|} operator is never greedy.  To match a literal \character{|},
+use \regexp{\e|}, or enclose it inside a character class, as in \regexp{[|]}.
 
 \item[\code{(...)}] Matches whatever regular expression is inside the
 parentheses, and indicates the start and end of a group; the contents
@@ -547,14 +547,15 @@ ignored.
   \var{string}.  If one or more groups are present in the pattern,
   return a list of groups; this will be a list of tuples if the
   pattern has more than one group.  Empty matches are included in the
-  result.
+  result unless they touch the beginning of another match.
   \versionadded{1.5.2}
 \end{funcdesc}
 
 \begin{funcdesc}{finditer}{pattern, string}
   Return an iterator over all non-overlapping matches for the RE
   \var{pattern} in \var{string}.  For each match, the iterator returns
-  a match object.  Empty matches are included in the result.
+  a match object.  Empty matches are included in the result unless they
+  touch the beginning of another match.
   \versionadded{2.2}
 \end{funcdesc}
 
@@ -740,7 +741,7 @@ Without arguments, \var{group1} defaults to zero (the whole match
 is returned).
 If a \var{groupN} argument is zero, the corresponding return value is the
 entire matching string; if it is in the inclusive range [1..99], it is
-the string matching the the corresponding parenthesized group.  If a
+the string matching the corresponding parenthesized group.  If a
 group number is negative or larger than the number of groups defined
 in the pattern, an \exception{IndexError} exception is raised.
 If a group is contained in a part of the pattern that did not match,
@@ -866,7 +867,7 @@ offers some more-or-less equivalent mappings between
   \lineii{\code{\%d}}
          {\regexp{[-+]?\e d+}}
   \lineii{\code{\%e}, \code{\%E}, \code{\%f}, \code{\%g}}
-         {\regexp{[-+]?(\e d+(\e.\e d*)?|\e d*\e.\e d+)([eE]\e d+)?}}
+         {\regexp{[-+]?(\e d+(\e.\e d*)?|\e d*\e.\e d+)([eE][-+]?\e d+)?}}
   \lineii{\code{\%i}}
          {\regexp{[-+]?(0[xX][\e dA-Fa-f]+|0[0-7]*|\e d+)}}
   \lineii{\code{\%o}}
