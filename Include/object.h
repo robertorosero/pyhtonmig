@@ -216,6 +216,7 @@ typedef struct _typeobject {
 	/* More standard operations (at end for binary compatibility) */
 
 	hashfunc tp_hash;
+	binaryfunc tp_call;
 #ifdef COUNT_ALLOCS
 	/* these must be last */
 	int tp_alloc;
