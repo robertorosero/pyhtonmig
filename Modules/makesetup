@@ -17,7 +17,7 @@ esac
 NL="\\
 "
 
-sed -e 's/#.*//' -e '/^[ 	]*$/d' ${*-$srcdir/Setup} |
+sed -e 's/[ 	]*#.*//' -e '/^[ 	]*$/d' ${*-$srcdir/Setup} |
 (
 	DEFS=
 	MODS=
