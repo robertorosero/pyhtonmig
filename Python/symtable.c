@@ -1,37 +1,25 @@
 #include "Python.h"
+#include "Python-ast.h"
 #include "compile.h"
 #include "symtable.h"
-#include "graminit.h"
 #include "structmember.h"
 
-/* The compiler uses this function to load a PySymtableEntry object
-   for a code block.  Each block is loaded twice, once during the
-   symbol table pass and once during the code gen pass.  Entries
-   created during the first pass are cached for the second pass, using
-   the st_symbols dictionary.  
-
-   The cache is keyed by st_nscopes.  Each code block node in a
-   module's parse tree can be assigned a unique id based on the order
-   in which the nodes are visited by the compiler.  This strategy
-   works so long as the symbol table and codegen passes visit the same
-   nodes in the same order.
-*/
-
-
-PyObject *
-PySymtableEntry_New(struct symtable *st, char *name, int type, int lineno)
+PySymtableEntryObject *
+PySymtableEntry_New(struct symtable *st, identifier name, scope_ty scope,
+		    void *key, int lineno)
 {
 	PySymtableEntryObject *ste = NULL;
 	PyObject *k, *v;
 
-	k = PyInt_FromLong(st->st_nscopes++);
+	k = PyLong_FromVoidPtr(key);
 	if (k == NULL)
 		goto fail;
 	v = PyDict_GetItem(st->st_symbols, k);
 	if (v) {
+		assert(PySymtableEntry_Check(v));
 		Py_DECREF(k);
 		Py_INCREF(v);
-		return v;
+		return (PySymtableEntryObject *)v;
 	}
 	
 	ste = (PySymtableEntryObject *)PyObject_New(PySymtableEntryObject,
@@ -39,10 +27,8 @@ PySymtableEntry_New(struct symtable *st, char *name, int type, int lineno)
 	ste->ste_table = st;
 	ste->ste_id = k;
 
-	v = PyString_FromString(name);
-	if (v == NULL)
-		goto fail;
-	ste->ste_name = v;
+	ste->ste_name = name;
+	Py_INCREF(name);
 	
 	v = PyDict_New();
 	if (v == NULL)
@@ -59,28 +45,15 @@ PySymtableEntry_New(struct symtable *st, char *name, int type, int lineno)
 	    goto fail;
 	ste->ste_children = v;
 
+	ste->ste_type = scope;
 	ste->ste_optimized = 0;
 	ste->ste_opt_lineno = 0;
 	ste->ste_lineno = lineno;
-	switch (type) {
-	case funcdef:
-	case lambdef:
-		ste->ste_type = TYPE_FUNCTION;
-		break;
-	case classdef:
-		ste->ste_type = TYPE_CLASS;
-		break;
-	case single_input:
-	case eval_input:
-	case file_input:
-		ste->ste_type = TYPE_MODULE;
-		break;
-	}
 
 	if (st->st_cur == NULL)
 		ste->ste_nested = 0;
 	else if (st->st_cur->ste_nested 
-		 || st->st_cur->ste_type == TYPE_FUNCTION)
+		 || st->st_cur->ste_type == FunctionScope)
 		ste->ste_nested = 1;
 	else
 		ste->ste_nested = 0;
@@ -90,7 +63,7 @@ PySymtableEntry_New(struct symtable *st, char *name, int type, int lineno)
 	if (PyDict_SetItem(st->st_symbols, ste->ste_id, (PyObject *)ste) < 0)
 	    goto fail;
 	
-	return (PyObject *)ste;
+	return ste;
  fail:
 	Py_XDECREF(ste);
 	return NULL;
@@ -177,3 +150,374 @@ PyTypeObject PySymtableEntry_Type = {
 	0,					/* tp_alloc */
 	0,					/* tp_new */
 };
+
+static int symtable_enter_scope(struct symtable *st, identifier name, 
+				scope_ty scope, void *ast, int lineno);
+static int symtable_exit_scope(struct symtable *st, void *ast);
+static int symtable_visit_stmt(struct symtable *st, stmt_ty s);
+static int symtable_visit_stmts(struct symtable *st, asdl_seq *seq);
+static int symtable_visit_expr(struct symtable *st, expr_ty s);
+static int symtable_visit_exprs(struct symtable *st, asdl_seq *seq); 
+
+static identifier top = NULL, lambda = NULL;
+
+#define GET_IDENTIFIER(VAR) \
+	((VAR) ? (VAR) : ((VAR) = PyString_InternFromString(# VAR)))
+
+static struct symtable *
+symtable_new(void)
+{
+	struct symtable *st;
+
+	st = (struct symtable *)PyMem_Malloc(sizeof(struct symtable));
+	if (st == NULL)
+		return NULL;
+
+	st->st_filename = NULL;
+	if ((st->st_stack = PyList_New(0)) == NULL)
+		goto fail;
+	if ((st->st_symbols = PyDict_New()) == NULL)
+		goto fail; 
+	st->st_cur = NULL;
+	st->st_errors = 0;
+	st->st_tmpname = 0;
+	st->st_private = NULL;
+	return st;
+ fail:
+	PySymtable_Free(st);
+	return NULL;
+}
+
+void
+PySymtable_Free(struct symtable *st)
+{
+	Py_XDECREF(st->st_symbols);
+	Py_XDECREF(st->st_stack);
+	Py_XDECREF(st->st_cur);
+	PyMem_Free((void *)st);
+}
+
+struct symtable *
+PySymtable_Build(mod_ty mod, const char *filename, PyFutureFeatures *future)
+{
+	struct symtable *st = symtable_new();
+
+	if (st == NULL)
+		return st;
+	st->st_filename = filename;
+	st->st_future = future;
+	/* XXX not a stmt_ty */
+	symtable_enter_scope(st, GET_IDENTIFIER(top),
+			     ModuleScope, (void *)mod, 0);
+	/* Any other top-level initialization? */
+	if (mod->kind == Module_kind)
+		symtable_visit_stmts(st, mod->v.Module.body);
+	/* XXX not a stmt_ty */
+	symtable_exit_scope(st, (void *)mod);
+	return st;
+}
+
+
+/* symtable_enter_scope() gets a reference via PySymtableEntry_New().
+   This reference is released when the scope is exited, via the DECREF
+   in symtable_exit_scope().
+*/
+
+static int
+symtable_exit_scope(struct symtable *st, void *ast)
+{
+	int end;
+
+	if (st->st_pass == 1)
+		symtable_update_free_vars(st);
+	Py_DECREF(st->st_cur);
+	end = PyList_GET_SIZE(st->st_stack) - 1;
+	st->st_cur = (PySymtableEntryObject *)PyList_GET_ITEM(st->st_stack, 
+							      end);
+	if (PySequence_DelItem(st->st_stack, end) < 0)
+		return -1;
+	return 0;
+}
+
+static int
+symtable_enter_scope(struct symtable *st, identifier name, scope_ty scope, 
+		     void *ast, int lineno)
+{
+	PySymtableEntryObject *prev = NULL;
+
+	if (st->st_cur) {
+		prev = st->st_cur;
+		if (PyList_Append(st->st_stack, (PyObject *)st->st_cur) < 0) {
+			Py_DECREF(st->st_cur);
+			st->st_errors++;
+			return 0;
+		}
+	}
+	st->st_cur = PySymtableEntry_New(st, name, scope, ast, lineno);
+	if (name == GET_IDENTIFIER(top))
+		st->st_global = st->st_cur->ste_symbols;
+	if (prev && st->st_pass == 1) {
+		if (PyList_Append(prev->ste_children, 
+				  (PyObject *)st->st_cur) < 0) {
+			st->st_errors++;
+			return 0;
+		}
+	}
+	return 1;
+}
+
+/* macros to help visit expressions that result in def or use 
+   will return 0 from current function on error.
+*/
+#define V_EXPR(ST, E) { \
+	if (!symtable_visit_expr((ST), (E))) \
+		return 0; \
+}
+						    
+#define V_EXPRS(ST, LE) { \
+	if (!symtable_visit_exprs((ST), (LE))) \
+		return 0; \
+}
+
+#define V_STMTS(ST, LS) { \
+	if (!symtable_visit_stmts((ST), (LS))) \
+		return 0; \
+}
+						    
+static int
+symtable_visit_stmts(struct symtable *st, asdl_seq *seq)
+{
+	int i;
+	for (i = 0; i < asdl_seq_LEN(seq); i++) {
+		stmt_ty s = asdl_seq_get(seq, i);
+		if (!symtable_visit_stmt(st, s))
+			return 0;
+	}
+	return 1;
+}
+
+static int
+symtable_visit_stmt(struct symtable *st, stmt_ty s)
+{
+	switch (s->kind) {
+        case FunctionDef_kind:
+		symtable_add_def_o(st, s->v.FunctionDef.name, DEF_LOCAL);
+		if (!symtable_visit_arguments(st, s->v.FunctionDef.args))
+			return 0;
+		symtable_enter_scope(st, s->v.FunctionDef.name, FunctionScope,
+				     (void *)s, s->lineno);
+		V_STMTS(st, s->v.FunctionDef.body);
+		symtable_exit_scope(st, s);
+		break;
+        case ClassDef_kind:
+		symtable_add_def_o(st, s->v.ClassDef.name, DEF_LOCAL);
+		V_EXPRS(st, s->v.ClassDef.bases);
+		symtable_enter_scope(st, s->v.ClassDef.name, ClassScope, 
+				     (void *)s, s->lineno);
+		V_STMTS(st, s->v.ClassDef.body);
+		symtable_exit_scope(st, s);
+		break;
+        case Return_kind:
+		if (s->v.Return.value)
+			V_EXPR(st, s->v.Return.value);
+		break;
+        case Yield_kind:
+		V_EXPR(st, s->v.Yield.value);
+		break;
+        case Delete_kind:
+		V_EXPRS(st, s->v.Delete.targets);
+		break;
+        case Assign_kind:
+		V_EXPRS(st, s->v.Assign.targets);
+		V_EXPR(st, s->v.Assign.value);
+		break;
+        case AugAssign_kind:
+		V_EXPR(st, s->v.AugAssign.target);
+		V_EXPR(st, s->v.AugAssign.value);
+		break;
+        case Print_kind:
+		if (s->v.Print.dest)
+			V_EXPR(st, s->v.Print.dest);
+		V_EXPRS(st, s->v.Print.value);
+		break;
+        case For_kind:
+		V_EXPR(st, s->v.For.target);
+		V_EXPR(st, s->v.For.iter);
+		V_STMTS(st, s->v.For.body);
+		if (s->v.For.orelse)
+			V_STMTS(st, s->v.For.orelse);
+		break;
+        case While_kind:
+		V_EXPR(st, s->v.While.test);
+		V_STMTS(st, s->v.While.body);
+		if (s->v.While.orelse)
+			V_STMTS(st, s->v.While.orelse);
+		break;
+        case If_kind:
+		V_EXPR(st, s->v.If.test);
+		V_STMTS(st, s->v.If.body);
+		if (s->v.If.orelse)
+			V_STMTS(st, s->v.If.orelse);
+		break;
+        case Raise_kind:
+		if (s->v.Raise.type) {
+			V_EXPR(st, s->v.Raise.type);
+			if (s->v.Raise.inst) {
+				V_EXPR(st, s->v.Raise.inst);
+				if (s->v.Raise.tback)
+					V_EXPR(st, s->v.Raise.tback);
+			}
+		}
+		break;
+        case TryExcept_kind:
+		V_STMTS(st, s->v.TryExcept.body);
+		V_STMTS(st, s->v.TryExcept.orelse);
+		if (!symtable_visit_excepthandles(st, s->v.TryExcept.handlers))
+			return 0;
+		break;
+        case TryFinally_kind:
+		V_STMTS(st, s->v.TryFinally.body);
+		V_STMTS(st, s->v.TryFinally.finalbody);
+		break;
+        case Assert_kind:
+		V_EXPR(st, s->v.Assert.test);
+		if (s->v.Assert.msg)
+			V_EXPR(st, s->v.Assert.msg);
+		break;
+        case Import_kind:
+		if (!symtable_visit_aliases(st, s->v.Import.names))
+			return 0;
+		break;
+        case ImportFrom_kind:
+		if (!symtable_visit_aliases(st, s->v.ImportFrom.names))
+			return 0;
+		break;
+        case Exec_kind:
+		V_EXPR(st, s->v.Exec.body);
+		if (s->v.Exec.globals) {
+			V_EXPR(st, s->v.Exec.globals);
+			if (s->v.Exec.locals) 
+				V_EXPR(st, s->v.Exec.locals);
+		}
+		break;
+        case Global_kind: {
+		int i;
+		asdl_seq *seq = s->v.Global.names;
+		for (i = 0; i < asdl_seq_SIZE(seq); i++)
+			symtable_add_def_o(st, asdl_seq_get(seq, i),
+					   DEF_GLOBAL);
+		
+		break;
+	}
+        case Expr_kind:
+		V_EXPR(st, s->v.Expr.value);
+		break;
+        case Pass_kind:
+        case Break_kind:
+        case Continue_kind:
+		/* nothing to do here */
+		break;
+	default:
+		PyErr_Format(PyExc_AssertionError,
+			     "invalid statement kind: %d\n", s->kind);
+		return 0;
+	}
+	return 1;
+}
+
+static int
+symtable_visit_exprs(struct symtable *st, asdl_seq *seq)
+{
+	int i;
+	for (i = 0; i < asdl_seq_LEN(seq); i++) {
+		stmt_ty s = asdl_seq_get(seq, i);
+		if (!symtable_visit_expr(st, s))
+			return 0;
+	}
+	return 1;
+}
+
+static int 
+symtable_visit_expr(struct symtable *st, expr_ty e)
+{
+	switch (e->kind) {
+        case BoolOp_kind:
+		V_EXPRS(st, e->v.BoolOp.values);
+		break;
+        case BinOp_kind:
+		V_EXPR(st, e->v.BinOp.left);
+		V_EXPR(st, e->v.BinOp.right);
+		break;
+        case UnaryOp_kind:
+		V_EXPR(st, e->v.UnaryOp.operand);
+		break;
+        case Lambda_kind:
+		symtable_add_def_o(st, GET_IDENTIFIER(lambda), DEF_LOCAL);
+		if (!symtable_visit_arguments(st, e->v.Lambda.args))
+			return 0;
+		/* XXX need to make name an identifier
+		   XXX how to get line numbers for expressions
+		*/
+		symtable_enter_scope(st, GET_IDENTIFIER(lambda),
+				     FunctionScope, (void *)e, 0);
+		V_STMTS(st, e->v.Lambda.body);
+		symtable_exit_scope(st, (void *)e);
+		break;
+        case Dict_kind:
+		V_EXPRS(st, e->v.Dict.keys);
+		V_EXPRS(st, e->v.Dict.values);
+		break;
+        case ListComp_kind:
+		V_EXPR(st, e->v.ListComp.target);
+		if (!symtable_visit_listcomp(e->v.ListComp.generators))
+			return 0;
+		break;
+        case Compare_kind:
+		V_EXPR(st, e->v.Compare.left);
+		V_EXPRS(st, e->v.Compare.comparators);
+		break;
+        case Call_kind:
+		V_EXPR(st, e->v.Call.func);
+		V_EXPRS(st, e->v.Call.args);
+		if (!symtable_visit_keyword(st, e->v.Call.keywords))
+			return 0;
+		if (e->v.Call.starargs)
+			V_EXPR(st, e->v.Call.starargs);
+		if (e->v.Call.kwargs)
+			V_EXPR(st, e->v.Call.kwargs);
+		break;
+        case Repr_kind:
+		V_EXPR(st, e->v.Repr.value);
+		break;
+        case Num_kind:
+        case Str_kind:
+		/* Nothing to do here. */
+		break;
+	/* The following exprs can be assignment targets. */
+        case Attribute_kind:
+		V_EXPR(st, e->v.Attribute.value);
+		break;
+        case Subscript_kind:
+		V_EXPR(st, e->v.Subscript.value);
+		if (!symtable_visit_slice(st, e->v.Subscript.slice))
+			return 0;
+		break;
+        case Name_kind:
+		symtable_add_def_o(st, e->v.Name.id, 
+				   e->v.Name.ctx == Load ? USE : DEF_LOCAL);
+		break;
+	/* child nodes of List and Tuple will have expr_context set */
+        case List_kind:
+		V_EXPRS(st, e->v.List.elts);
+		break;
+        case Tuple_kind:
+		V_EXPRS(st, e->v.Tuple.elts);
+		break;
+	default:
+		PyErr_Format(PyExc_AssertionError,
+			     "invalid expression kind: %d\n", e->kind);
+		return 0;
+	}
+	return 1;
+}
+

@@ -11,6 +11,7 @@
 
 #include "Python.h"
 
+#include "Python-ast.h"
 #include "node.h"
 #include "token.h"
 #include "graminit.h"
@@ -1011,7 +1012,7 @@ com_addop_varname(struct compiling *c, int kind, char *name)
 	reftype = get_ref_type(c, name);
 	switch (reftype) {
 	case LOCAL:
-		if (c->c_symtable->st_cur->ste_type == TYPE_FUNCTION)
+		if (c->c_symtable->st_cur->ste_type == FunctionScope)
 			scope = NAME_LOCAL;
 		break;
 	case GLOBAL_EXPLICIT:
@@ -4095,6 +4096,13 @@ dict_keys_inorder(PyObject *dict, int offset)
 }
 
 PyCodeObject *
+PyAST_Compile(mod_ty mod, char *filename, PyCompilerFlags *flags)
+{
+	/* XXX */
+	return NULL;
+}
+
+PyCodeObject *
 PyNode_Compile(node *n, char *filename)
 {
 	return PyNode_CompileFlags(n, filename, NULL);
@@ -4109,6 +4117,8 @@ PyNode_CompileFlags(node *n, char *filename, PyCompilerFlags *flags)
 struct symtable *
 PyNode_CompileSymtable(node *n, char *filename)
 {
+	return NULL;
+/* XXX
 	struct symtable *st;
 	PyFutureFeatures *ff;
 
@@ -4135,6 +4145,7 @@ PyNode_CompileSymtable(node *n, char *filename)
 	st->st_future = NULL;
 	PySymtable_Free(st);
 	return NULL;
+*/
 }
 
 static PyCodeObject *
@@ -4156,7 +4167,7 @@ jcompile(node *n, char *filename, struct compiling *base,
 		sc.c_symtable = base->c_symtable;
 		/* c_symtable still points to parent's symbols */
 		if (base->c_nested 
-		    || (sc.c_symtable->st_cur->ste_type == TYPE_FUNCTION))
+		    || (sc.c_symtable->st_cur->ste_type == FunctionScope))
 			sc.c_nested = 1;
 		sc.c_flags |= base->c_flags & PyCF_MASK;
 	} else {
@@ -4294,7 +4305,7 @@ get_ref_type(struct compiling *c, char *name)
 /* Helper functions to issue warnings */
 
 static int
-issue_warning(char *msg, char *filename, int lineno)
+issue_warning(char *msg, const char *filename, int lineno)
 {
 	if (PyErr_WarnExplicit(PyExc_SyntaxWarning, msg, filename,
 			       lineno, NULL, NULL) < 0)	{
@@ -4318,25 +4329,6 @@ symtable_warn(struct symtable *st, char *msg)
 }
 
 /* Helper function for setting lineno and filename */
-
-static int
-symtable_build(struct compiling *c, node *n)
-{
-	if ((c->c_symtable = symtable_init()) == NULL)
-		return -1;
-	c->c_symtable->st_future = c->c_future;
-	c->c_symtable->st_filename = c->c_filename;
-	symtable_enter_scope(c->c_symtable, TOP, TYPE(n), n->n_lineno);
-	if (c->c_symtable->st_errors > 0)
-		return -1;
-	symtable_node(c->c_symtable, n);
-	if (c->c_symtable->st_errors > 0)
-		return -1;
-	/* reset for second pass */
-	c->c_symtable->st_nscopes = 1;
-	c->c_symtable->st_pass = 2;
-	return 0;
-}
 
 static int
 symtable_init_compiling_symbols(struct compiling *c)
@@ -4393,7 +4385,7 @@ symtable_resolve_free(struct compiling *c, PyObject *name, int flags,
 	   cell var).  If it occurs in a class, then the class has a
 	   method and a free variable with the same name.
 	*/
-	if (c->c_symtable->st_cur->ste_type == TYPE_FUNCTION) {
+	if (c->c_symtable->st_cur->ste_type == FunctionScope) {
 		/* If it isn't declared locally, it can't be a cell. */
 		if (!(flags & (DEF_LOCAL | DEF_PARAM)))
 			return 0;
@@ -4584,9 +4576,9 @@ symtable_update_flags(struct compiling *c, PySymtableEntryObject *ste,
 		c->c_flags |= c->c_future->ff_features;
 	if (ste->ste_generator)
 		c->c_flags |= CO_GENERATOR;
-	if (ste->ste_type != TYPE_MODULE)
+	if (ste->ste_type != ModuleScope)
 		c->c_flags |= CO_NEWLOCALS;
-	if (ste->ste_type == TYPE_FUNCTION) {
+	if (ste->ste_type == FunctionScope) {
 		c->c_nlocals = si->si_nlocals;
 		if (ste->ste_optimized == 0)
 			c->c_flags |= CO_OPTIMIZED;
@@ -4676,7 +4668,7 @@ symtable_load_symbols(struct compiling *c)
 			if (PyDict_SetItem(c->c_locals, name, v) < 0)
 				goto fail;
 			Py_DECREF(v);
-			if (ste->ste_type != TYPE_CLASS) 
+			if (ste->ste_type != ClassScope) 
 				if (PyList_Append(c->c_varnames, name) < 0)
 					goto fail;
 		} else if (is_free(flags)) {
@@ -4774,7 +4766,7 @@ symtable_update_free_vars(struct symtable *st)
 	PyObject *o, *name, *list = NULL;
 	PySymtableEntryObject *child, *ste = st->st_cur;
 
-	if (ste->ste_type == TYPE_CLASS)
+	if (ste->ste_type == ClassScope)
 		def = DEF_FREE_CLASS;
 	else
 		def = DEF_FREE;
@@ -4813,7 +4805,7 @@ symtable_update_free_vars(struct symtable *st)
 			   because class scopes are not considered for
 			   nested scopes.
 			*/
-			if (v && (ste->ste_type != TYPE_CLASS)) {
+			if (v && (ste->ste_type != ClassScope)) {
 				int flags = PyInt_AS_LONG(v); 
 				if (flags & DEF_GLOBAL) {
 					symtable_undo_free(st, child->ste_id,
@@ -4853,7 +4845,7 @@ symtable_check_global(struct symtable *st, PyObject *child, PyObject *name)
 	int v;
 	PySymtableEntryObject *ste = st->st_cur;
 			
-	if (ste->ste_type == TYPE_CLASS)
+	if (ste->ste_type == ClassScope)
 		return symtable_undo_free(st, child, name);
 	o = PyDict_GetItem(ste->ste_symbols, name);
 	if (o == NULL)
@@ -4901,52 +4893,6 @@ symtable_undo_free(struct symtable *st, PyObject *id,
 			return x;
 	}
 	return 0;
-}
-
-/* symtable_enter_scope() gets a reference via PySymtableEntry_New().
-   This reference is released when the scope is exited, via the DECREF
-   in symtable_exit_scope().
-*/
-
-static int
-symtable_exit_scope(struct symtable *st)
-{
-	int end;
-
-	if (st->st_pass == 1)
-		symtable_update_free_vars(st);
-	Py_DECREF(st->st_cur);
-	end = PyList_GET_SIZE(st->st_stack) - 1;
-	st->st_cur = (PySymtableEntryObject *)PyList_GET_ITEM(st->st_stack, 
-							      end);
-	if (PySequence_DelItem(st->st_stack, end) < 0)
-		return -1;
-	return 0;
-}
-
-static void
-symtable_enter_scope(struct symtable *st, char *name, int type,
-		     int lineno)
-{
-	PySymtableEntryObject *prev = NULL;
-
-	if (st->st_cur) {
-		prev = st->st_cur;
-		if (PyList_Append(st->st_stack, (PyObject *)st->st_cur) < 0) {
-			Py_DECREF(st->st_cur);
-			st->st_errors++;
-			return;
-		}
-	}
-	st->st_cur = (PySymtableEntryObject *)
-		PySymtableEntry_New(st, name, type, lineno);
-	if (strcmp(name, TOP) == 0)
-		st->st_global = st->st_cur->ste_symbols;
-	if (prev && st->st_pass == 1) {
-		if (PyList_Append(prev->ste_children, 
-				  (PyObject *)st->st_cur) < 0)
-			st->st_errors++;
-	}
 }
 
 static int
@@ -5454,7 +5400,7 @@ symtable_import(struct symtable *st, node *n)
 			}
 		}
 		if (TYPE(CHILD(n, 3)) == STAR) {
-			if (st->st_cur->ste_type != TYPE_MODULE) {
+			if (st->st_cur->ste_type != ModuleScope) {
 				if (symtable_warn(st,
 				  "import * only allowed at module level") < 0)
 					return;

@@ -1,4 +1,5 @@
 #include "Python.h"
+#include "Python-ast.h"
 #include "node.h"
 #include "token.h"
 #include "graminit.h"

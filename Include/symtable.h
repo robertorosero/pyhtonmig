@@ -4,23 +4,14 @@
 extern "C" {
 #endif
 
-/* A symbol table is constructed each time PyNode_Compile() is
-   called.  The table walks the entire parse tree and identifies each
-   use or definition of a variable. 
-
-   The symbol table contains a dictionary for each code block in a
-   module: The symbol dictionary for the block.  They keys of these
-   dictionaries are the name of all variables used or defined in the
-   block; the integer values are used to store several flags,
-   e.g. DEF_PARAM indicates that a variable is a parameter to a
-   function. 
-*/
+typedef enum _scope_type { FunctionScope, ClassScope, ModuleScope }
+    scope_ty;
 
 struct _symtable_entry;
 
 struct symtable {
 	int st_pass;             /* pass == 1 or 2 */
-	char *st_filename;       /* name of file being compiled */
+	const char *st_filename; /* name of file being compiled */
 	struct _symtable_entry *st_cur; /* current symbol table entry */
 	PyObject *st_symbols;    /* dictionary of symbol table entries */
         PyObject *st_stack;      /* stack of namespace info */
@@ -39,7 +30,7 @@ typedef struct _symtable_entry {
 	PyObject *ste_name;      /* string: name of scope */
 	PyObject *ste_varnames;  /* list of variable names */
 	PyObject *ste_children;  /* list of child ids */
-	int ste_type;            /* module, class, or function */
+	scope_ty ste_type;       /* module, class, or function */
 	int ste_lineno;          /* first line of scope */
 	int ste_optimized;       /* true if namespace can't be optimized */
 	int ste_nested;          /* true if scope is nested */
@@ -54,14 +45,12 @@ extern DL_IMPORT(PyTypeObject) PySymtableEntry_Type;
 
 #define PySymtableEntry_Check(op) ((op)->ob_type == &PySymtableEntry_Type)
 
-extern DL_IMPORT(PyObject *) PySymtableEntry_New(struct symtable *,
-						 char *, int, int);
+extern DL_IMPORT(PySymtableEntryObject *) \
+	PySymtableEntry_New(struct symtable *, identifier, scope_ty, void *, 
+			    int);
 
 DL_IMPORT(struct symtable *) PyNode_CompileSymtable(struct _node *, char *);
 DL_IMPORT(void) PySymtable_Free(struct symtable *);
-
-
-#define TOP "global"
 
 /* Flags for def-use information */
 
@@ -78,10 +67,6 @@ DL_IMPORT(void) PySymtable_Free(struct symtable *);
 #define DEF_IMPORT 2<<9        /* assignment occurred via import */
 
 #define DEF_BOUND (DEF_LOCAL | DEF_PARAM | DEF_IMPORT)
-
-#define TYPE_FUNCTION 1
-#define TYPE_CLASS 2
-#define TYPE_MODULE 3
 
 #define LOCAL 1
 #define GLOBAL_EXPLICIT 2
