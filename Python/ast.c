@@ -820,6 +820,7 @@ ast_for_expr(const node *n)
     }
     default:
 	fprintf(stderr, "unhandled expr: %d\n", TYPE(n));
+	abort();
 	return NULL;
     }
     /* should never get here */
@@ -1003,17 +1004,18 @@ ast_for_flow_stmt(const node *n)
 	if (NCH(ch) == 1)
 	    return Raise(NULL, NULL, NULL, LINENO(n));
 	else if (NCH(ch) == 2)
-	    return Raise(ast_for_expr(CHILD(n, 1)), NULL, NULL, LINENO(n));
+	    return Raise(ast_for_expr(CHILD(ch, 1)), NULL, NULL, LINENO(n));
 	else if (NCH(ch) == 4)
-	    return Raise(ast_for_expr(CHILD(n, 1)),
-			 ast_for_expr(CHILD(n, 3)),
+	    return Raise(ast_for_expr(CHILD(ch, 1)),
+			 ast_for_expr(CHILD(ch, 3)),
 			 NULL, LINENO(n));
 	else if (NCH(ch) == 6)
-	    return Raise(ast_for_expr(CHILD(n, 1)),
-			 ast_for_expr(CHILD(n, 3)),
-			 ast_for_expr(CHILD(n, 5)), LINENO(n));
+	    return Raise(ast_for_expr(CHILD(ch, 1)),
+			 ast_for_expr(CHILD(ch, 3)),
+			 ast_for_expr(CHILD(ch, 5)), LINENO(n));
     default:
 	fprintf(stderr, "unexpected flow_stmt: %d\n", TYPE(ch));
+	abort();
 	return NULL;
     }
 }
@@ -1107,9 +1109,7 @@ ast_for_import_stmt(const node *n)
 	for (i = 3; i <= NCH(n); i += 2)
 	    asdl_seq_APPEND(aliases, alias_for_import_name(CHILD(n, i)));
 	import = ImportFrom(mod->name, aliases, LINENO(n));
-	/* XXX we should probably not be using PyObject_Free directly
-	       should we use asdl_seq_free?  we need to cast if so */
-	PyObject_Free(mod);
+	free(mod);
 	return import;
     }
     return NULL;
