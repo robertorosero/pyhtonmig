@@ -1849,7 +1849,9 @@ eval_code2(PyCodeObject *co, PyObject *globals, PyObject *locals,
 			v = TOP();
 			x = PyObject_CallObject(v, NULL);
 			if (x == NULL) {
-				if (PyErr_ExceptionMatches(PyExc_IndexError)) {
+				if (PyErr_ExceptionMatches(
+					PyExc_StopIteration))
+				{
 					PyErr_Clear();
 					x = v = POP();
 					Py_DECREF(v);

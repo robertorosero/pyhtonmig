@@ -35,7 +35,7 @@ iter_next(iterobject *it, PyObject *args)
 	if (PyList_Check(seq)) {
 		PyObject *item;
 		if (it->it_index >= PyList_GET_SIZE(seq)) {
-			PyErr_SetObject(PyExc_IndexError, Py_None);
+			PyErr_SetObject(PyExc_StopIteration, Py_None);
 			return NULL;
 		}
 		item = PyList_GET_ITEM(seq, it->it_index);
@@ -43,7 +43,13 @@ iter_next(iterobject *it, PyObject *args)
 		Py_INCREF(item);
 		return item;
 	}
-	return PySequence_GetItem(seq, it->it_index++);
+	else {
+		PyObject *result = PySequence_GetItem(seq, it->it_index++);
+		if (result == NULL &&
+		    PyErr_ExceptionMatches(PyExc_IndexError))
+			PyErr_SetObject(PyExc_StopIteration, Py_None);
+		return result;
+	}
 }
 
 static PyObject *
@@ -55,7 +61,7 @@ iter_getiter(PyObject *it)
 
 static PyMethodDef iter_methods[] = {
 	{"next",	(PyCFunction)iter_next,	METH_VARARGS,
-	 "it.next() -- get the next value, or raise IndexError"},
+	 "it.next() -- get the next value, or raise StopIteration"},
 	{NULL,		NULL}		/* sentinel */
 };
 
@@ -130,23 +136,17 @@ calliter_next(calliterobject *it, PyObject *args)
 	PyObject *result = PyObject_CallObject(it->it_callable, NULL);
 	if (result != NULL) {
 		if (PyObject_RichCompareBool(result, it->it_sentinel, Py_EQ)) {
-			PyErr_SetObject(PyExc_IndexError, Py_None);
+			PyErr_SetObject(PyExc_StopIteration, Py_None);
 			Py_DECREF(result);
 			result = NULL;
 		}
-	}
-	else {
-		if (PyErr_ExceptionMatches(PyExc_IndexError))
-			PyErr_SetString(PyExc_TypeError,
-					"callable in iterator raised "
-					"unexpected IndexError");
 	}
 	return result;
 }
 
 static PyMethodDef calliter_methods[] = {
 	{"next",	(PyCFunction)calliter_next,	METH_VARARGS,
-	 "it.next() -- get the next value, or raise IndexError"},
+	 "it.next() -- get the next value, or raise StopIteration"},
 	{NULL,		NULL}		/* sentinel */
 };
 

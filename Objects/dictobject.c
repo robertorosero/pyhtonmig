@@ -1368,7 +1368,7 @@ dictiter_next(dictiterobject *di, PyObject *args)
 		Py_INCREF(key);
 		return key;
 	}
-	PyErr_SetObject(PyExc_IndexError, Py_None);
+	PyErr_SetObject(PyExc_StopIteration, Py_None);
 	return NULL;
 }
 
@@ -1381,7 +1381,7 @@ dictiter_getiter(PyObject *it)
 
 static PyMethodDef dictiter_methods[] = {
 	{"next",	(PyCFunction)dictiter_next,	METH_VARARGS,
-	 "it.next() -- get the next value, or raise IndexError"},
+	 "it.next() -- get the next value, or raise StopIteration"},
 	{NULL,		NULL}		/* sentinel */
 };
 
