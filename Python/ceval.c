@@ -1,5 +1,5 @@
 /***********************************************************
-Copyright 1991, 1992, 1993 by Stichting Mathematisch Centrum,
+Copyright 1991, 1992, 1993, 1994 by Stichting Mathematisch Centrum,
 Amsterdam, The Netherlands.
 
                         All Rights Reserved
@@ -53,9 +53,6 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #define CHECKEXC 1	/* Double-check exception checking */
 #endif
 
-/* Global option, may be set by main() */
-int killprint;
-
 
 /* Forward declarations */
 
@@ -103,7 +100,7 @@ static void mergelocals PROTO(());
 
 static frameobject *current_frame;
 
-#ifdef USE_THREAD
+#ifdef WITH_THREAD
 
 #include <errno.h>
 #include "thread.h"
@@ -128,7 +125,7 @@ init_save_thread()
 object *
 save_thread()
 {
-#ifdef USE_THREAD
+#ifdef WITH_THREAD
 	if (interpreter_lock) {
 		object *res;
 		res = (object *)current_frame;
@@ -144,7 +141,7 @@ void
 restore_thread(x)
 	object *x;
 {
-#ifdef USE_THREAD
+#ifdef WITH_THREAD
 	if (interpreter_lock) {
 		int err;
 		err = errno;
@@ -195,6 +192,7 @@ eval_code(co, globals, locals, owner, arg)
 	char *name;		/* Name used by some instructions */
 	int needmerge = 0;	/* Set if need to merge locals back at end */
 	int defmode = 0;	/* Default access mode for new variables */
+	int ticker_count = 10;	/* Check for intr every Nth instruction */
 #ifdef LLTRACE
 	int lltrace;
 #endif
@@ -293,6 +291,10 @@ eval_code(co, globals, locals, owner, arg)
 			return NULL;
 		}
 	}
+
+	x = sysget("check_interval");
+	if (x != NULL && is_intobject(x))
+		ticker_count = getintvalue(x);
 	
 	next_instr = GETUSTRINGVALUE(f->f_code->co_code);
 	stack_pointer = f->f_valuestack;
@@ -312,17 +314,17 @@ eval_code(co, globals, locals, owner, arg)
 		/* Do periodic things.
 		   Doing this every time through the loop would add
 		   too much overhead (a function call per instruction).
-		   So we do it only every tenth instruction. */
+		   So we do it only every Nth instruction. */
 		
 		if (--ticker < 0) {
-			ticker = 10;
+			ticker = ticker_count;
 			if (intrcheck()) {
 				err_set(KeyboardInterrupt);
 				why = WHY_EXCEPTION;
 				goto on_error;
 			}
 
-#ifdef USE_THREAD
+#ifdef WITH_THREAD
 			if (interpreter_lock) {
 				/* Give another thread a chance */
 
@@ -642,17 +644,14 @@ eval_code(co, globals, locals, owner, arg)
 		case PRINT_EXPR:
 			v = POP();
 			/* Print value except if procedure result */
-			if (v != None) {
+			/* Before printing, also assign to '_' */
+			if (v != None &&
+			    (err = setbuiltin("_", v)) == 0) {
 				flushline();
 				x = sysget("stdout");
 				softspace(x, 1);
 				err = writeobject(v, x, 0);
 				flushline();
-				if (killprint) {
-					err_setstr(RuntimeError,
-					      "printing expression statement");
-					x = 0;
-				}
 			}
 			DECREF(v);
 			break;
@@ -692,7 +691,7 @@ eval_code(co, globals, locals, owner, arg)
 			v = POP();
 			w = POP();
 			/* A tuple is equivalent to its first element here */
-			while (is_tupleobject(w)) {
+			while (is_tupleobject(w) && gettuplesize(w) > 0) {
 				u = w;
 				w = gettupleitem(u, 0);
 				DECREF(u);
@@ -739,6 +738,14 @@ eval_code(co, globals, locals, owner, arg)
 			x = newfuncobject(v, f->f_globals);
 			DECREF(v);
 			PUSH(x);
+			break;
+
+		case SET_FUNC_ARGS:
+			v = POP(); /* The function */
+			w = POP(); /* The argument list */
+			err = setfuncargstuff(v, oparg, w);
+			PUSH(v);
+			DECREF(w);
 			break;
 		
 		case POP_BLOCK:
@@ -1160,8 +1167,8 @@ eval_code(co, globals, locals, owner, arg)
 					   "undefined local variable");
 				break;
 			}
-			if (w != NULL && is_accessobject(w)) {
-				err = setaccessvalue(w, f->f_locals,
+			if (x != NULL && is_accessobject(x)) {
+				err = setaccessvalue(x, f->f_locals,
 						     (object *)NULL);
 				break;
 			}
@@ -2038,6 +2045,8 @@ call_function(func, arg)
 	object *newlocals, *newglobals;
 	object *class = NULL;
 	object *co, *v;
+	object *argdefs;
+	int	argcount;
 	
 	if (is_instancemethodobject(func)) {
 		object *self = instancemethodgetself(func);
@@ -2065,7 +2074,6 @@ call_function(func, arg)
 			}
 		}
 		else {
-			int argcount;
 			if (arg == NULL)
 				argcount = 0;
 			else if (is_tupleobject(arg))
@@ -2097,6 +2105,39 @@ call_function(func, arg)
 		if (!is_funcobject(func)) {
 			err_setstr(TypeError, "call of non-function");
 			return NULL;
+		}
+	}
+
+	argdefs = getfuncargstuff(func, &argcount);
+	if (argdefs != NULL && arg != NULL && is_tupleobject(arg)) {
+		int actualcount, j;
+		/* Process default arguments */
+		if (argcount & 0x4000)
+			argcount ^= 0x4000;
+		actualcount = gettuplesize(arg);
+		j = gettuplesize(argdefs) - (argcount - actualcount);
+		if (actualcount < argcount && j >= 0) {
+			int i;
+			object *v;
+			if (newarg == NULL)
+				INCREF(arg);
+			newarg = newtupleobject(argcount);
+			if (newarg == NULL) {
+				DECREF(arg);
+				return NULL;
+			}
+			for (i = 0; i < actualcount; i++) {
+				v = gettupleitem(arg, i);
+				XINCREF(v);
+				settupleitem(newarg, i, v);
+			}
+			for (; i < argcount; i++, j++) {
+				v = gettupleitem(argdefs, j);
+				XINCREF(v);
+				settupleitem(newarg, i, v);
+			}
+			DECREF(arg);
+			arg = newarg;
 		}
 	}
 	
@@ -2162,18 +2203,18 @@ loop_subscript(v, w)
 	object *v, *w;
 {
 	sequence_methods *sq = v->ob_type->tp_as_sequence;
-	int i, n;
+	int i;
 	if (sq == NULL) {
 		err_setstr(TypeError, "loop over non-sequence");
 		return NULL;
 	}
 	i = getintvalue(w);
-	n = (*sq->sq_length)(v);
-	if (n < 0)
-		return NULL; /* Exception */
-	if (i >= n)
-		return NULL; /* End of loop */
-	return (*sq->sq_item)(v, i);
+	v = (*sq->sq_item)(v, i);
+	if (v)
+		return v;
+	if (err_occurred() == IndexError)
+		err_clear();
+	return NULL;
 }
 
 static int
@@ -2300,7 +2341,7 @@ static int
 cmp_member(v, w)
 	object *v, *w;
 {
-	int i, n, cmp;
+	int i, cmp;
 	object *x;
 	sequence_methods *sq;
 	/* Special case for char in string */
@@ -2327,11 +2368,15 @@ cmp_member(v, w)
 			"'in' or 'not in' needs sequence right argument");
 		return -1;
 	}
-	n = (*sq->sq_length)(w);
-	if (n < 0)
-		return -1;
-	for (i = 0; i < n; i++) {
+	for (i = 0; ; i++) {
 		x = (*sq->sq_item)(w, i);
+		if (x == NULL) {
+			if (err_occurred() == IndexError) {
+				err_clear();
+				break;
+			}
+			return -1;
+		}
 		cmp = cmpobject(v, x);
 		XDECREF(x);
 		if (cmp == 0)

@@ -1,5 +1,5 @@
 /***********************************************************
-Copyright 1991, 1992, 1993 by Stichting Mathematisch Centrum,
+Copyright 1991, 1992, 1993, 1994 by Stichting Mathematisch Centrum,
 Amsterdam, The Netherlands.
 
                         All Rights Reserved
@@ -28,109 +28,74 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #include "modsupport.h"
 #include "ceval.h"
 
-#include "sigtype.h"
-
 #include <signal.h>
 #include <setjmp.h>
 
-#ifdef BSD_TIME
-#define HAVE_GETTIMEOFDAY
-#include "myselect.h" /* Implies <sys/types.h>, <sys/time.h>, <sys/param.h> */
+#ifndef macintosh
+#include <sys/types.h>
 #endif
 
-#ifdef macintosh
-#define NO_UNISTD
+#ifdef QUICKWIN
+#include <io.h>
 #endif
 
-#ifndef NO_UNISTD
+#ifdef HAVE_UNISTD_H
 #include <unistd.h>
 #endif
 
-/* What happens here is not trivial.
-   The BSD_TIME code needs <sys/time.h> (for struct timeval).
-   The rest of the code needs only time_t, except some MS-DOS
-   code which needs clock_t as well.
-   Standard C says that time_t is defined in <time.h>, and
-   does not have <sys/types.h>; THINK C agrees (MS-DOS too?).
-   What's worse, in pure 4.3 BSD, older SunOS versions, and
-   probably everything derived from BSD, you can't #include
-   both <time.h> and <sys/time.h> in the same file, since
-   <sys/time.h> includes <time.h> without any protection,
-   and <time.h> contains a typedef, which can't be parsed twice!
-   So on traditional UNIX systems we include <sys/types.h>
-   and <sys/time.h> and hope this implies <time.h> and time_t,
-   while on other systems, including conforming Standard C
-   systems (where 'unix' can't be defined), we rely on <time.h>.
-   Still one problem: BSD_TIME won't work with strict Standard C...
-*/
+#ifdef HAVE_SELECT
+#include "myselect.h"
+#else
+#include "mytime.h"
+#endif
 
-#ifdef unix
-#include <sys/types.h>
-#include <sys/time.h> /* Implies <time.h> everywhere, as far as I know */
-#else /* !unix */
-#include <time.h>
-#endif /* !unix */
+#ifdef HAVE_FTIME
+#include <sys/timeb.h>
+#endif
 
-#ifdef SYSV
-#if defined(sun) && defined(__STDC__)
-/* Temporary hack for Solaris 2. */
-#define _timezone timezone
-#define _altzone altzone
-#define _daylight daylight
-#define _tzname tzname
+#ifdef _M_IX86
+#include <windows.h>
+#define timezone _timezone
 #endif
-/* Access timezone stuff */
-#ifdef OLDTZ				/* ANSI prepends underscore to these */
-#define _timezone	timezone	/* seconds to be added to GMT */
-#define _altzone	0		/* _timezone if daylight saving time */
-#define _daylight	0		/* if zero, _altzone is not available*/
-#define _tzname		tzname		/* Name of timezone and altzone */
-#endif
-#ifdef NOALTTZ				/* if system doesn't support alt tz */
-#undef _daylight
-#undef _altzone
-#define _daylight	0
-#define _altzone 	0
-#endif
-#endif /* SYSV */
 
 /* Forward declarations */
 static void floatsleep PROTO((double));
-static long millitimer PROTO((void)); 
-
-/* Time methods */
+static double floattime PROTO(());
 
 static object *
 time_time(self, args)
 	object *self;
 	object *args;
 {
-#ifdef HAVE_GETTIMEOFDAY
-	struct timeval t;
-	struct timezone tz;
+	double secs;
 	if (!getnoarg(args))
 		return NULL;
-	if (gettimeofday(&t, &tz) != 0) {
+	secs = floattime();
+	if (secs == 0.0) {
 		err_errno(IOError);
 		return NULL;
 	}
-	return newfloatobject(t.tv_sec*1.0 + t.tv_usec*0.000001);
-#else /* !HAVE_GETTIMEOFDAY */
-	time_t secs;
-	if (!getnoarg(args))
-		return NULL;
-	time(&secs);
-#ifdef macintosh
-/* The Mac epoch is 1904, while UNIX uses 1970; Python prefers 1970 */
-/* Moreover, the Mac returns local time.  This we cannot fix... */
-#define TIMEDIFF ((time_t) \
-	(((1970-1904)*365L + (1970-1904)/4) * 24 * 3600))
-	secs -= TIMEDIFF;
-#endif
-	return newfloatobject((double)secs);
-#endif /* !HAVE_GETTIMEOFDAY */
+	return newfloatobject(secs);
 }
 
+#ifdef HAVE_CLOCK
+
+#ifndef CLOCKS_PER_SEC
+#define CLOCKS_PER_SEC 1000000
+#endif
+
+static object *
+time_clock(self, args)
+	object *self;
+	object *args;
+{
+	if (!getnoarg(args))
+		return NULL;
+	return newfloatobject(((double)clock()) / CLOCKS_PER_SEC);
+}
+#endif /* HAVE_CLOCK */
+
+#ifdef SIGINT
 static jmp_buf sleep_intr;
 
 /* ARGSUSED */
@@ -140,6 +105,7 @@ sleep_catcher(sig)
 {
 	longjmp(sleep_intr, 1);
 }
+#endif /* SIGINT */
 
 static object *
 time_sleep(self, args)
@@ -147,9 +113,22 @@ time_sleep(self, args)
 	object *args;
 {
 	double secs;
-	SIGTYPE (*sigsave)() = 0; /* Initialized to shut lint up */
+#ifdef SIGINT
+	/* We must set the signal handler *after* calling setjmp, to
+	   avoid a race condition.  Unfortunately some compilers put
+	   the sigsave variable in a register.  Sometimes auto is
+	   enough, sometimes static is needed to avoid this (Microsoft
+	   C 7.0). */
+#ifdef WITH_THREAD
+	auto
+#else
+	static
+#endif
+	       RETSIGTYPE (*sigsave)() = 0; /* Initialized to shut lint up */
+#endif /* SIGINT */
 	if (!getargs(args, "d", &secs))
 		return NULL;
+#ifdef SIGINT
 	BGN_SAVE
 	if (setjmp(sleep_intr)) {
 		RET_SAVE
@@ -158,80 +137,22 @@ time_sleep(self, args)
 		return NULL;
 	}
 	sigsave = signal(SIGINT, SIG_IGN);
-	if (sigsave != (SIGTYPE (*)()) SIG_IGN)
+	if (sigsave != (RETSIGTYPE (*)()) SIG_IGN)
 		signal(SIGINT, sleep_catcher);
+#endif
 	floatsleep(secs);
+#ifdef SIGINT
 	END_SAVE
 	signal(SIGINT, sigsave);
+#endif
 	INCREF(None);
 	return None;
 }
-
-#ifdef macintosh
-#define DO_MILLI
-#endif
-
-#ifdef AMOEBA
-#define DO_MILLI
-extern long sys_milli();
-#define millitimer sys_milli
-#endif /* AMOEBA */
-
-#ifdef BSD_TIME
-#define DO_MILLI
-#endif /* BSD_TIME */
-
-#ifdef MSDOS
-#define DO_MILLI
-#endif
-
-#ifdef DO_MILLI
-
-static object *
-time_millisleep(self, args)
-	object *self;
-	object *args;
-{
-	long msecs;
-	SIGTYPE (*sigsave)();
-	if (!getlongarg(args, &msecs))
-		return NULL;
-	BGN_SAVE
-	if (setjmp(sleep_intr)) {
-		RET_SAVE
-		signal(SIGINT, sigsave);
-		err_set(KeyboardInterrupt);
-		return NULL;
-	}
-	sigsave = signal(SIGINT, SIG_IGN);
-	if (sigsave != (SIGTYPE (*)()) SIG_IGN)
-		signal(SIGINT, sleep_catcher);
-	floatsleep(msecs / 1000.0);
-	END_SAVE
-	signal(SIGINT, sigsave);
-	INCREF(None);
-	return None;
-}
-
-static object *
-time_millitimer(self, args)
-	object *self;
-	object *args;
-{
-	long msecs;
-	if (!getnoarg(args))
-		return NULL;
-	msecs = millitimer();
-	return newintobject(msecs);
-}
-
-#endif /* DO_MILLI */
-
 
 static object *
 time_convert(when, function)
 	time_t when;
-	struct tm * (*function) PROTO((time_t *));
+	struct tm * (*function) PROTO((const time_t *));
 {
 	struct tm *p = function(&when);
 	return mkvalue("(iiiiiiiii)",
@@ -324,8 +245,6 @@ time_ctime(self, args)
 	return newstringobject(p);
 }
 
-/* Some very old systems may not have mktime().  Comment it out then! */
-
 static object *
 time_mktime(self, args)
 	object *self;
@@ -338,12 +257,11 @@ time_mktime(self, args)
 }
 
 static struct methodlist time_methods[] = {
-#ifdef DO_MILLI
-	{"millisleep",	time_millisleep},
-	{"millitimer",	time_millitimer},
-#endif /* DO_MILLI */
-	{"sleep",	time_sleep},
 	{"time",	time_time},
+#ifdef HAVE_CLOCK
+	{"clock",	time_clock},
+#endif
+	{"sleep",	time_sleep},
 	{"gmtime",	time_gmtime},
 	{"localtime",	time_localtime},
 	{"asctime",	time_asctime},
@@ -352,26 +270,32 @@ static struct methodlist time_methods[] = {
 	{NULL,		NULL}		/* sentinel */
 };
 
-
 void
 inittime()
 {
 	object *m, *d;
 	m = initmodule("time", time_methods);
 	d = getmoduledict(m);
-#ifdef SYSV
+#ifdef HAVE_TZNAME
 	tzset();
-	dictinsert(d, "timezone", newintobject((long)_timezone));
-	dictinsert(d, "altzone", newintobject((long)_altzone));
-	dictinsert(d, "daylight", newintobject((long)_daylight));
-	dictinsert(d, "tzname", mkvalue("(zz)", _tzname[0], _tzname[1]));
-#else /* !SYSV */
+	dictinsert(d, "timezone", newintobject((long)timezone));
+#ifdef HAVE_ALTZONE
+	dictinsert(d, "altzone", newintobject((long)altzone));
+#else
+	dictinsert(d, "altzone", newintobject((long)timezone-3600));
+#endif
+	dictinsert(d, "daylight", newintobject((long)daylight));
+	dictinsert(d, "tzname", mkvalue("(zz)", tzname[0], tzname[1]));
+#else /* !HAVE_TZNAME */
+#if HAVE_TM_ZONE
 	{
 #define YEAR ((time_t)((365 * 24 + 6) * 3600))
 		time_t t;
 		struct tm *p;
 		long winterzone, summerzone;
 		char wintername[10], summername[10];
+		/* XXX This won't work on the southern hemisphere.
+		   XXX Anybody got a better idea? */
 		t = (time((time_t *)0) / YEAR) * YEAR;
 		p = localtime(&t);
 		winterzone = -p->tm_gmtoff;
@@ -389,68 +313,53 @@ inittime()
 		dictinsert(d, "tzname",
 			   mkvalue("(zz)", wintername, summername));
 	}
-#endif /* !SYSV */
+#endif /* HAVE_TM_ZONE */
+#endif /* !HAVE_TZNAME */
 }
 
 
-#ifdef macintosh
+/* Implement floattime() for various platforms */
 
-#define MacTicks	(* (long *)0x16A)
-
-#ifdef THINK_C_3_0
-sleep(secs)
-	int secs;
+static double
+floattime()
 {
-	register long deadline;
-	
-	deadline = MacTicks + mecs * 60;
-	while (MacTicks < deadline) {
-		if (intrcheck())
-			sleep_catcher(SIGINT);
-	}
-}
-#endif
-
-static void
-floatsleep(secs)
-	double secs;
-{
-	register long deadline;
-	
-	deadline = MacTicks + (long)(secs * 60.0);
-	while (MacTicks < deadline) {
-		if (intrcheck())
-			sleep_catcher(SIGINT);
-	}
-}
-
-static long
-millitimer()
-{
-	return MacTicks * 50 / 3; /* MacTicks * 1000 / 60 */
-}
-
-#endif /* macintosh */
-
-
-#ifdef unix
-
-#ifdef BSD_TIME
-
-static long
-millitimer()
-{
+	/* There are three ways to get the time:
+	   (1) gettimeofday() -- resolution in microseconds
+	   (2) ftime() -- resolution in milliseconds
+	   (3) time() -- resolution in seconds
+	   In all cases the return value is a float in seconds.
+	   Since on some systems (e.g. SCO ODT 3.0) gettimeofday() may
+	   fail, so we fall back on ftime() or time().
+	   Note: clock resolution does not imply clock accuracy! */
+#ifdef HAVE_GETTIMEOFDAY
+    {
 	struct timeval t;
-	struct timezone tz;
-	if (gettimeofday(&t, &tz) != 0)
-		return -1;
-	return t.tv_sec*1000 + t.tv_usec/1000;
+	if (gettimeofday(&t, (struct timezone *)NULL) == 0)
+		return (double)t.tv_sec + t.tv_usec*0.000001;
+    }
+#endif /* !HAVE_GETTIMEOFDAY */
+    {
+#ifdef HAVE_FTIME
+	struct timeb t;
+	ftime(&t);
+	return (double)t.time + t.millitm*0.001;
+#else /* !HAVE_FTIME */
+	time_t secs;
+	time(&secs);
+	return (double)secs;
+#endif /* !HAVE_FTIME */
+    }
 }
+
+
+/* Implement floatsleep() for various platforms */
+
 
 static void
 floatsleep(secs)
 	double secs;
 {
+#ifdef HAVE_SELECT
 	struct timeval t;
 	double frac;
 	extern double fmod PROTO((double, double));
@@ -460,50 +369,48 @@ floatsleep(secs)
 	t.tv_sec = (long)secs;
 	t.tv_usec = (long)(frac*1000000.0);
 	(void) select(0, (fd_set *)0, (fd_set *)0, (fd_set *)0, &t);
-}
-
-#else /* !BSD_TIME */
-
-static void
-floatsleep(secs)
-	double secs;
-{
-	sleep((int)secs);
-}
-
-#endif /* !BSD_TIME */
-
-#endif /* unix */
-
-
+#else /* !HAVE_SELECT */
+#ifdef macintosh
+#define MacTicks	(* (long *)0x16A)
+	long deadline;
+	deadline = MacTicks + (long)(secs * 60.0);
+	while (MacTicks < deadline) {
+		if (intrcheck())
+			sleep_catcher(SIGINT);
+	}
+#else /* !macintosh */
 #ifdef MSDOS
-
-#ifndef CLOCKS_PER_SEC
-#define CLOCKS_PER_SEC 55	/* 54.945 msec per tick (18.2 HZ clock) */
+	struct timeb t1, t2;
+	double frac;
+	extern double fmod PROTO((double, double));
+	extern double floor PROTO((double));
+	if (secs <= 0.0)
+		return;
+	frac = fmod(secs, 1.0);
+	secs = floor(secs);
+	ftime(&t1);
+	t2.time = t1.time + (int)secs;
+	t2.millitm = t1.millitm + (int)(frac*1000.0);
+	while (t2.millitm >= 1000) {
+		t2.time++;
+		t2.millitm -= 1000;
+	}
+	for (;;) {
+#ifdef QUICKWIN
+		_wyield();
 #endif
-
-static void
-floatsleep(secs)
-	double secs;
-{
-	delay(long(secs/1000.0));
+		ftime(&t1);
+		if (t1.time > t2.time ||
+		    t1.time == t2.time && t1.millitm >= t2.millitm)
+			break;
+	}
+#else /* !MSDOS */
+#ifdef _M_IX86
+	Sleep((int)(secs*1000));
+#else /* _M_IX86 */
+	sleep((int)secs);
+#endif /* _M_IX86 */
+#endif /* !MSDOS */
+#endif /* !macintosh */
+#endif /* !HAVE_SELECT */
 }
-
-static long
-millitimer()
-{
-	clock_t ticks;
-
-	ticks = clock();	/* ticks since program start */
-	return ticks * CLOCKS_PER_SEC;/* XXX shouldn't this be different? */
-}
-
-floatsleep(secs)
-      double secs;
-{
-      clock_t t= clock( );
-      while( (clock()-t)/CLOCKS_PER_SEC<secs )
-              ;
-}
-
-#endif /* MSDOS */

@@ -1,5 +1,5 @@
 /***********************************************************
-Copyright 1991, 1992, 1993 by Stichting Mathematisch Centrum,
+Copyright 1991, 1992, 1993, 1994 by Stichting Mathematisch Centrum,
 Amsterdam, The Netherlands.
 
                         All Rights Reserved
@@ -349,7 +349,7 @@ static typeobject Notype = {
 	0,		/*tp_getattr*/
 	0,		/*tp_setattr*/
 	0,		/*tp_compare*/
-	none_repr,	/*tp_repr*/
+	(reprfunc)none_repr, /*tp_repr*/
 	0,		/*tp_as_number*/
 	0,		/*tp_as_sequence*/
 	0,		/*tp_as_mapping*/

@@ -1,6 +1,9 @@
 #ifndef _THREAD_H_included
 #define _THREAD_H_included
 
+#define NO_EXIT_PROG		/* don't define exit_prog() */
+				/* (the result is no use of signals on SGI) */
+
 #ifndef PROTO
 #if defined(__STDC__) || defined(__cplusplus)
 #define PROTO(args)	args
@@ -33,8 +36,10 @@ void free_sema PROTO((type_sema));
 void down_sema PROTO((type_sema));
 void up_sema PROTO((type_sema));
 
+#ifndef NO_EXIT_PROG
 void exit_prog PROTO((int));
 void _exit_prog PROTO((int));
+#endif
 
 #ifdef __cplusplus
 }

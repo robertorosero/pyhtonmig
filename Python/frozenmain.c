@@ -1,5 +1,5 @@
 /***********************************************************
-Copyright 1991, 1992, 1993 by Stichting Mathematisch Centrum,
+Copyright 1991, 1992, 1993, 1994 by Stichting Mathematisch Centrum,
 Amsterdam, The Netherlands.
 
                         All Rights Reserved
@@ -28,9 +28,13 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 extern char *getenv();
 
+extern char *getversion();
+extern char *getcopyright();
+
 extern int debugging;
 extern int verbose;
-extern int killprint;
+
+static char *argv0;
 
 main(argc, argv)
 	int argc;
@@ -39,6 +43,9 @@ main(argc, argv)
 	char *p;
 	int n, sts;
 	int inspect = 0;
+	int unbuffered = 0;
+
+	argv0 = argv[0];
 
 	if ((p = getenv("PYTHONDEBUG")) && *p != '\0')
 		debugging = 1;
@@ -46,10 +53,17 @@ main(argc, argv)
 		verbose = 1;
 	if ((p = getenv("PYTHONINSPECT")) && *p != '\0')
 		inspect = 1;
-	if ((p = getenv("PYTHONKILLPRINT")) && *p != '\0')
-		killprint = 1;
+	if ((p = getenv("PYTHONUNBUFFERED")) && *p != '\0')
+		unbuffered = 1;
 
-	initargs(&argc, &argv);
+	if (unbuffered) {
+		setbuf(stdout, (char *)NULL);
+		setbuf(stderr, (char *)NULL);
+	}
+
+	if (verbose)
+		fprintf(stderr, "Python %s\n%s\n",
+			getversion(), getcopyright());
 	initall();
 	setpythonargv(argc, argv);
 
@@ -68,4 +82,10 @@ main(argc, argv)
 
 	goaway(sts);
 	/*NOTREACHED*/
+}
+
+char *
+getprogramname()
+{
+	return argv0;
 }

@@ -1,5 +1,5 @@
 /***********************************************************
-Copyright 1991, 1992, 1993 by Stichting Mathematisch Centrum,
+Copyright 1991, 1992, 1993, 1994 by Stichting Mathematisch Centrum,
 Amsterdam, The Netherlands.
 
                         All Rights Reserved
@@ -372,27 +372,27 @@ float_float(v)
 
 
 static number_methods float_as_number = {
-	float_add,	/*nb_add*/
-	float_sub,	/*nb_subtract*/
-	float_mul,	/*nb_multiply*/
-	float_div,	/*nb_divide*/
-	float_rem,	/*nb_remainder*/
-	float_divmod,	/*nb_divmod*/
-	float_pow,	/*nb_power*/
-	float_neg,	/*nb_negative*/
-	float_pos,	/*nb_positive*/
-	float_abs,	/*nb_absolute*/
-	float_nonzero,	/*nb_nonzero*/
+	(binaryfunc)float_add, /*nb_add*/
+	(binaryfunc)float_sub, /*nb_subtract*/
+	(binaryfunc)float_mul, /*nb_multiply*/
+	(binaryfunc)float_div, /*nb_divide*/
+	(binaryfunc)float_rem, /*nb_remainder*/
+	(binaryfunc)float_divmod, /*nb_divmod*/
+	(binaryfunc)float_pow, /*nb_power*/
+	(unaryfunc)float_neg, /*nb_negative*/
+	(unaryfunc)float_pos, /*nb_positive*/
+	(unaryfunc)float_abs, /*nb_absolute*/
+	(inquiry)float_nonzero, /*nb_nonzero*/
 	0,		/*nb_invert*/
 	0,		/*nb_lshift*/
 	0,		/*nb_rshift*/
 	0,		/*nb_and*/
 	0,		/*nb_xor*/
 	0,		/*nb_or*/
-	float_coerce,	/*nb_coerce*/
-	float_int,	/*nb_int*/
-	float_long,	/*nb_long*/
-	float_float,	/*nb_float*/
+	(coercion)float_coerce, /*nb_coerce*/
+	(unaryfunc)float_int, /*nb_int*/
+	(unaryfunc)float_long, /*nb_long*/
+	(unaryfunc)float_float, /*nb_float*/
 	0,		/*nb_oct*/
 	0,		/*nb_hex*/
 };
@@ -403,14 +403,14 @@ typeobject Floattype = {
 	"float",
 	sizeof(floatobject),
 	0,
-	float_dealloc,		/*tp_dealloc*/
-	float_print,		/*tp_print*/
+	(destructor)float_dealloc, /*tp_dealloc*/
+	(printfunc)float_print, /*tp_print*/
 	0,			/*tp_getattr*/
 	0,			/*tp_setattr*/
-	float_compare,		/*tp_compare*/
-	float_repr,		/*tp_repr*/
+	(cmpfunc)float_compare, /*tp_compare*/
+	(reprfunc)float_repr, /*tp_repr*/
 	&float_as_number,	/*tp_as_number*/
 	0,			/*tp_as_sequence*/
 	0,			/*tp_as_mapping*/
-	float_hash,		/*tp_hash */
+	(hashfunc)float_hash, /*tp_hash*/
 };

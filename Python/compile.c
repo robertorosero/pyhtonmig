@@ -1,5 +1,5 @@
 /***********************************************************
-Copyright 1991, 1992, 1993 by Stichting Mathematisch Centrum,
+Copyright 1991, 1992, 1993, 1994 by Stichting Mathematisch Centrum,
 Amsterdam, The Netherlands.
 
                         All Rights Reserved
@@ -127,16 +127,16 @@ typeobject Codetype = {
 	"code",
 	sizeof(codeobject),
 	0,
-	code_dealloc,	/*tp_dealloc*/
+	(destructor)code_dealloc, /*tp_dealloc*/
 	0,		/*tp_print*/
-	code_getattr,	/*tp_getattr*/
+	(getattrfunc)code_getattr, /*tp_getattr*/
 	0,		/*tp_setattr*/
-	code_compare,	/*tp_compare*/
-	code_repr,	/*tp_repr*/
+	(cmpfunc)code_compare, /*tp_compare*/
+	(reprfunc)code_repr, /*tp_repr*/
 	0,		/*tp_as_number*/
 	0,		/*tp_as_sequence*/
 	0,		/*tp_as_mapping*/
-	code_hash,	/*tp_hash*/
+	(hashfunc)code_hash, /*tp_hash*/
 };
 
 codeobject *
@@ -194,6 +194,7 @@ struct compiling {
 	int c_nexti;		/* index into c_code */
 	int c_errors;		/* counts errors occurred */
 	int c_infunction;	/* set when compiling a function */
+	int c_interactive;	/* generating code for interactive command */
 	int c_loops;		/* counts nested loops */
 	int c_begin;		/* begin of current loop, for 'continue' */
 	int c_block[MAXBLOCKS];	/* stack of block types */
@@ -249,6 +250,7 @@ static int com_addconst PROTO((struct compiling *, object *));
 static int com_addname PROTO((struct compiling *, object *));
 static void com_addopname PROTO((struct compiling *, int, node *));
 static void com_list PROTO((struct compiling *, node *, int));
+static int com_argdefs PROTO((struct compiling *, node *, int *));
 
 static int
 com_init(c, filename)
@@ -266,6 +268,7 @@ com_init(c, filename)
 	c->c_nexti = 0;
 	c->c_errors = 0;
 	c->c_infunction = 0;
+	c->c_interactive = 0;
 	c->c_loops = 0;
 	c->c_begin = 0;
 	c->c_nblocks = 0;
@@ -462,8 +465,8 @@ static object *
 parsenumber(s)
 	char *s;
 {
-	extern long strtol PROTO((const char *, char **, int));
-	extern unsigned long strtoul PROTO((const char *, char **, int));
+	extern long mystrtol PROTO((const char *, char **, int));
+	extern unsigned long mystrtoul PROTO((const char *, char **, int));
 	extern double strtod PROTO((const char *, char **));
 	char *end;
 	long x;
@@ -473,9 +476,9 @@ parsenumber(s)
 	if (*end == 'l' || *end == 'L')
 		return long_scan(s, 0);
 	if (s[0] == '0')
-		x = (long) strtoul(s, &end, 0);
+		x = (long) mystrtoul(s, &end, 0);
 	else
-		x = strtol(s, &end, 0);
+		x = mystrtol(s, &end, 0);
 	if (*end == '\0') {
 		if (errno != 0) {
 			err_setstr(OverflowError,
@@ -498,7 +501,7 @@ parsenumber(s)
 #endif
 		return newfloatobject(xx);
 	}
-	err_setstr(SystemError, "bad number syntax?!?!");
+	err_setstr(SyntaxError, "bad number syntax");
 	return NULL;
 }
 
@@ -510,6 +513,7 @@ parsestr(s)
 	int len;
 	char *buf;
 	char *p;
+	char *end;
 	int c;
 	int quote = *s;
 	if (quote != '\'' && quote != '\"') {
@@ -522,11 +526,20 @@ parsestr(s)
 		err_badcall();
 		return NULL;
 	}
+	if (len >= 4 && s[0] == quote && s[1] == quote) {
+		s += 2;
+		len -= 2;
+		if (s[--len] != quote || s[--len] != quote) {
+			err_badcall();
+			return NULL;
+		}
+	}
 	if (strchr(s, '\\') == NULL)
 		return newsizedstringobject(s, len);
 	v = newsizedstringobject((char *)NULL, len);
 	p = buf = getstringvalue(v);
-	while (*s != '\0' && *s != quote) {
+	end = s + len;
+	while (s < end) {
 		if (*s != '\\') {
 			*p++ = *s++;
 			continue;
@@ -534,6 +547,7 @@ parsestr(s)
 		s++;
 		switch (*s++) {
 		/* XXX This assumes ASCII! */
+		case '\n': break;
 		case '\\': *p++ = '\\'; break;
 		case '\'': *p++ = '\''; break;
 		case '\"': *p++ = '\"'; break;
@@ -649,7 +663,14 @@ com_atom(c, n)
 		com_addoparg(c, LOAD_CONST, i);
 		break;
 	case STRING:
-		if ((v = parsestr(STR(ch))) == NULL) {
+		if ((v = parsestr(STR(ch))) != NULL) {
+			/* String literal concatenation */
+			for (i = 1; i < NCH(n) && v != NULL; i++) {
+				joinstring_decref(&v,
+					parsestr(STR(CHILD(n, i))));
+			}
+		}
+		if (v == NULL) {
 			c->c_errors++;
 			i = 255;
 		}
@@ -1098,6 +1119,8 @@ com_test(c, n)
 	if (NCH(n) == 1 && TYPE(CHILD(n, 0)) == lambdef) {
 		object *v;
 		int i;
+		int argcount;
+		int ndefs = com_argdefs(c, CHILD(n, 0), &argcount);
 		v = (object *) compile(CHILD(n, 0), c->c_filename);
 		if (v == NULL) {
 			c->c_errors++;
@@ -1109,6 +1132,8 @@ com_test(c, n)
 		}
 		com_addoparg(c, LOAD_CONST, i);
 		com_addbyte(c, BUILD_FUNCTION);
+		if (ndefs > 0)
+			com_addoparg(c, SET_FUNC_ARGS, argcount);
 	}
 	else {
 		int anchor = 0;
@@ -1355,7 +1380,10 @@ com_expr_stmt(c, n)
 	REQ(n, expr_stmt); /* testlist ('=' testlist)* */
 	com_node(c, CHILD(n, NCH(n)-1));
 	if (NCH(n) == 1) {
-		com_addbyte(c, PRINT_EXPR);
+		if (c->c_interactive)
+			com_addbyte(c, PRINT_EXPR);
+		else
+			com_addbyte(c, POP_TOP);
 	}
 	else {
 		int i;
@@ -1625,25 +1653,7 @@ com_for_stmt(c, n)
 	com_backpatch(c, break_anchor);
 }
 
-/* Although 'execpt' and 'finally' clauses can be combined
-   syntactically, they are compiled separately.  In fact,
-	try: S
-	except E1: S1
-	except E2: S2
-	...
-	finally: Sf
-   is equivalent to
-	try:
-	    try: S
-	    except E1: S1
-	    except E2: S2
-	    ...
-	finally: Sf
-   meaning that the 'finally' clause is entered even if things
-   go wrong again in an exception handler.  Note that this is
-   not the case for exception handlers: at most one is entered.
-   
-   Code generated for "try: S finally: Sf" is as follows:
+/* Code generated for "try: S finally: Sf" is as follows:
    
 		SETUP_FINALLY	L
 		<code for S>
@@ -1710,86 +1720,97 @@ com_for_stmt(c, n)
 */
 
 static void
-com_try_stmt(c, n)
+com_try_except(c, n)
+	struct compiling *c;
+	node *n;
+{
+	int except_anchor = 0;
+	int end_anchor = 0;
+	int else_anchor = 0;
+	int i;
+	node *ch;
+
+	com_addfwref(c, SETUP_EXCEPT, &except_anchor);
+	block_push(c, SETUP_EXCEPT);
+	com_node(c, CHILD(n, 2));
+	com_addbyte(c, POP_BLOCK);
+	block_pop(c, SETUP_EXCEPT);
+	com_addfwref(c, JUMP_FORWARD, &else_anchor);
+	com_backpatch(c, except_anchor);
+	for (i = 3;
+	     i < NCH(n) && TYPE(ch = CHILD(n, i)) == except_clause;
+	     i += 3) {
+		/* except_clause: 'except' [expr [',' expr]] */
+		if (except_anchor == 0) {
+			err_setstr(SyntaxError,
+				"default 'except:' must be last");
+			c->c_errors++;
+			break;
+		}
+		except_anchor = 0;
+		com_addoparg(c, SET_LINENO, ch->n_lineno);
+		if (NCH(ch) > 1) {
+			com_addbyte(c, DUP_TOP);
+			com_node(c, CHILD(ch, 1));
+			com_addoparg(c, COMPARE_OP, EXC_MATCH);
+			com_addfwref(c, JUMP_IF_FALSE, &except_anchor);
+			com_addbyte(c, POP_TOP);
+		}
+		com_addbyte(c, POP_TOP);
+		if (NCH(ch) > 3)
+			com_assign(c, CHILD(ch, 3), 1/*assigning*/);
+		else
+			com_addbyte(c, POP_TOP);
+		com_addbyte(c, POP_TOP);
+		com_node(c, CHILD(n, i+2));
+		com_addfwref(c, JUMP_FORWARD, &end_anchor);
+		if (except_anchor) {
+			com_backpatch(c, except_anchor);
+			com_addbyte(c, POP_TOP);
+		}
+	}
+	com_addbyte(c, END_FINALLY);
+	com_backpatch(c, else_anchor);
+	if (i < NCH(n))
+		com_node(c, CHILD(n, i+2));
+	com_backpatch(c, end_anchor);
+}
+
+static void
+com_try_finally(c, n)
 	struct compiling *c;
 	node *n;
 {
 	int finally_anchor = 0;
-	int except_anchor = 0;
-	REQ(n, try_stmt);
-	/* 'try' ':' suite (except_clause ':' suite)*
-	 | 'try' ':' 'finally' ':' suite */
+	node *ch;
 
-	/* XXX This can be simplified because except and finally can
-	   no longer be mixed in a single try statement */
-	
-	if (NCH(n) > 3 && TYPE(CHILD(n, NCH(n)-3)) != except_clause) {
-		/* Have a 'finally' clause */
-		com_addfwref(c, SETUP_FINALLY, &finally_anchor);
-		block_push(c, SETUP_FINALLY);
-	}
-	if (NCH(n) > 3 && TYPE(CHILD(n, 3)) == except_clause) {
-		/* Have an 'except' clause */
-		com_addfwref(c, SETUP_EXCEPT, &except_anchor);
-		block_push(c, SETUP_EXCEPT);
-	}
+	com_addfwref(c, SETUP_FINALLY, &finally_anchor);
+	block_push(c, SETUP_FINALLY);
 	com_node(c, CHILD(n, 2));
-	if (except_anchor) {
-		int end_anchor = 0;
-		int i;
-		node *ch;
-		com_addbyte(c, POP_BLOCK);
-		block_pop(c, SETUP_EXCEPT);
-		com_addfwref(c, JUMP_FORWARD, &end_anchor);
-		com_backpatch(c, except_anchor);
-		for (i = 3;
-			i < NCH(n) && TYPE(ch = CHILD(n, i)) == except_clause;
-								i += 3) {
-			/* except_clause: 'except' [expr [',' expr]] */
-			if (except_anchor == 0) {
-				err_setstr(SyntaxError,
-					"default 'except:' must be last");
-				c->c_errors++;
-				break;
-			}
-			except_anchor = 0;
-			com_addoparg(c, SET_LINENO, ch->n_lineno);
-			if (NCH(ch) > 1) {
-				com_addbyte(c, DUP_TOP);
-				com_node(c, CHILD(ch, 1));
-				com_addoparg(c, COMPARE_OP, EXC_MATCH);
-				com_addfwref(c, JUMP_IF_FALSE, &except_anchor);
-				com_addbyte(c, POP_TOP);
-			}
-			com_addbyte(c, POP_TOP);
-			if (NCH(ch) > 3)
-				com_assign(c, CHILD(ch, 3), 1/*assigning*/);
-			else
-				com_addbyte(c, POP_TOP);
-			com_addbyte(c, POP_TOP);
-			com_node(c, CHILD(n, i+2));
-			com_addfwref(c, JUMP_FORWARD, &end_anchor);
-			if (except_anchor) {
-				com_backpatch(c, except_anchor);
-				com_addbyte(c, POP_TOP);
-			}
-		}
-		com_addbyte(c, END_FINALLY);
-		com_backpatch(c, end_anchor);
-	}
-	if (finally_anchor) {
-		node *ch;
-		com_addbyte(c, POP_BLOCK);
-		block_pop(c, SETUP_FINALLY);
-		block_push(c, END_FINALLY);
-		com_addoparg(c, LOAD_CONST, com_addconst(c, None));
-		com_backpatch(c, finally_anchor);
-		ch = CHILD(n, NCH(n)-1);
-		com_addoparg(c, SET_LINENO, ch->n_lineno);
-		com_node(c, ch);
-		com_addbyte(c, END_FINALLY);
-		block_pop(c, END_FINALLY);
-	}
+	com_addbyte(c, POP_BLOCK);
+	block_pop(c, SETUP_FINALLY);
+	block_push(c, END_FINALLY);
+	com_addoparg(c, LOAD_CONST, com_addconst(c, None));
+	com_backpatch(c, finally_anchor);
+	ch = CHILD(n, NCH(n)-1);
+	com_addoparg(c, SET_LINENO, ch->n_lineno);
+	com_node(c, ch);
+	com_addbyte(c, END_FINALLY);
+	block_pop(c, END_FINALLY);
+}
+
+static void
+com_try_stmt(c, n)
+	struct compiling *c;
+	node *n;
+{
+	REQ(n, try_stmt);
+	/* 'try' ':' suite (except_clause ':' suite)+ ['else' ':' suite]
+	 | 'try' ':' suite 'finally' ':' suite */
+	if (TYPE(CHILD(n, 3)) != except_clause)
+		com_try_finally(c, n);
+	else
+		com_try_except(c, n);
 }
 
 static void
@@ -1830,6 +1851,70 @@ com_continue_stmt(c, n)
 	   XXX if we could pop the exception still on the stack */
 }
 
+static int
+com_argdefs(c, n, argcount_return)
+	struct compiling *c;
+	node *n;
+	int *argcount_return;
+{
+	int i, nch, nargs, ndefs, star;
+	if (TYPE(n) == lambdef) {
+		/* lambdef: 'lambda' [varargslist] ':' test */
+		n = CHILD(n, 1);
+	}
+	else {
+		REQ(n, funcdef); /* funcdef: 'def' NAME parameters ... */
+		n = CHILD(n, 2);
+		REQ(n, parameters); /* parameters: '(' [varargslist] ')' */
+		n = CHILD(n, 1);
+	}
+	if (TYPE(n) != varargslist)
+		    return -1;
+	/* varargslist:
+		(fpdef ['=' test] ',')* '*' NAME |
+		fpdef ['=' test] (',' fpdef ['=' test])* [','] */
+	nch = NCH(n);
+	if (nch >= 2 && TYPE(CHILD(n, nch-2)) == STAR) {
+		star = 1;
+		nch -= 2;
+	}
+	else
+		star = 0;
+	nargs = 0;
+	ndefs = 0;
+	for (i = 0; i < nch; i++) {
+		int t;
+		nargs++;
+		i++;
+		if (i >= nch)
+			break;
+		t = TYPE(CHILD(n, i));
+		if (t == EQUAL) {
+			i++;
+			ndefs++;
+			com_node(c, CHILD(n, i));
+			i++;
+			t = TYPE(CHILD(n, i));
+		}
+		else {
+			/* Treat "(a=1, b)" as "(a=1, b=None)" */
+			if (ndefs) {
+				com_addoparg(c, LOAD_CONST,
+					     com_addconst(c, None));
+				ndefs++;
+			}
+		}
+		if (t != COMMA)
+			break;
+	}
+	if (star)
+		nargs ^= 0x4000;
+	*argcount_return = nargs;
+	if (ndefs > 0)
+		com_addoparg(c, BUILD_TUPLE, ndefs);
+	return ndefs;
+}
+
 static void
 com_funcdef(c, n)
 	struct compiling *c;
@@ -1842,8 +1927,12 @@ com_funcdef(c, n)
 		c->c_errors++;
 	else {
 		int i = com_addconst(c, v);
+		int argcount;
+		int ndefs = com_argdefs(c, n, &argcount);
 		com_addoparg(c, LOAD_CONST, i);
 		com_addbyte(c, BUILD_FUNCTION);
+		if (ndefs > 0)
+			com_addoparg(c, SET_FUNC_ARGS, argcount);
 		com_addopname(c, STORE_NAME, CHILD(n, 1));
 		DECREF(v);
 	}
@@ -2082,25 +2171,48 @@ com_arglist(c, n)
 	struct compiling *c;
 	node *n;
 {
-	int i, nargs, op;
+	int nch, op, nargs, i, t;
 	REQ(n, varargslist);
 	/* varargslist:
-	   (fpdef ',')* '*' NAME | fpdef (',' fpdef)* [','] */
-	op = UNPACK_ARG;
-	nargs = (NCH(n) + 1) / 2;
-	for (i = 0; i < NCH(n); i += 2) {
-		int t = TYPE(CHILD(n, i));
-		if (t == STAR) {
-			op = UNPACK_VARARG;
-			nargs = i/2;
+		(fpdef ['=' test] ',')* '*' NAME |
+		fpdef ['=' test] (',' fpdef ['=' test])* [','] */
+	nch = NCH(n);
+	if (nch >= 2 && TYPE(CHILD(n, nch-2)) == STAR) {
+		op = UNPACK_VARARG;
+		nch -= 2;
+	}
+	else
+		op = UNPACK_ARG;
+	nargs = 0;
+	for (i = 0; i < nch; i++) {
+		nargs++;
+		i++;
+		if (i >= nch)
 			break;
+		t = TYPE(CHILD(n, i));
+		if (t == EQUAL) {
+			i += 2;
+			t = TYPE(CHILD(n, i));
 		}
+		if (t != COMMA)
+			break;
 	}
 	com_addoparg(c, op, nargs);
-	for (i = 0; i < 2*nargs; i += 2)
+	for (i = 0; i < nch; i++) {
 		com_fpdef(c, CHILD(n, i));
+		i++;
+		if (i >= nch)
+			break;
+		t = TYPE(CHILD(n, i));
+		if (t == EQUAL) {
+			i += 2;
+			t = TYPE(CHILD(n, i));
+		}
+		if (t != COMMA)
+			break;
+	}
 	if (op == UNPACK_VARARG)
-		com_addopname(c, STORE_NAME, CHILD(n, 2*nargs+1));
+		com_addopname(c, STORE_NAME, CHILD(n, nch+1));
 }
 
 static void
@@ -2175,11 +2287,13 @@ compile_node(c, n)
 	
 	case single_input: /* One interactive command */
 		/* NEWLINE | simple_stmt | compound_stmt NEWLINE */
+		c->c_interactive++;
 		n = CHILD(n, 0);
 		if (TYPE(n) != NEWLINE)
 			com_node(c, n);
 		com_addoparg(c, LOAD_CONST, com_addconst(c, None));
 		com_addbyte(c, RETURN_VALUE);
+		c->c_interactive--;
 		break;
 	
 	case file_input: /* A whole file, or built-in function exec() */
@@ -2222,23 +2336,21 @@ compile_node(c, n)
    instructions that refer to local variables with LOAD_FAST etc.
    The latter instructions are much faster because they don't need to
    look up the variable name in a dictionary.
-   
-   To find all local variables, we check all STORE_NAME and IMPORT_FROM
-   instructions.  This yields all local variables, including arguments,
-   function definitions, class definitions and import statements.
-   (We don't check DELETE_NAME instructions, since if there's no
-   STORE_NAME the DELETE_NAME will surely fail.)
-   
-   There is one problem: 'from foo import *' introduces local variables
-   that we can't know while compiling.  If this is the case, wo don't
-   optimize at all (this rarely happens, since this form of import
-   statement is mostly used at the module level).
 
-   Note that, because of this optimization, code like the following
-   won't work:
-	eval('x = 1')
-	print x
-   
+   To find all local variables, we check all STORE_NAME, IMPORT_FROM and
+   DELETE_NAME instructions.  This yields all local variables, including
+   arguments, function definitions, class definitions and import
+   statements.
+
+   All remaining LOAD_NAME instructions must refer to non-local (global
+   or builtin) variables, so are replaced by LOAD_GLOBAL.
+
+   There are two problems:  'from foo import *' and 'exec' may introduce
+   local variables that we can't know while compiling.  If this is the
+   case, we don't optimize at all (this rarely happens, since exec is
+   rare, & this form of import statement is mostly used at the module
+   level).
+
    NB: this modifies the string object co->co_code!
 */
 
@@ -2300,7 +2412,7 @@ optimize(c)
 		}
 	}
 	
-	if (nlocals == 0 || dictlookup(locals, "*") != NULL) {
+	if (dictlookup(locals, "*") != NULL) {
 		/* Don't optimize anything */
 		goto end;
 	}
@@ -2332,6 +2444,8 @@ optimize(c)
 			v = dict2lookup(locals, name);
 			if (v == NULL) {
 				err_clear();
+				if (opcode == LOAD_NAME)
+					cur_instr[0] = LOAD_GLOBAL;
 				continue;
 			}
 			i = getintvalue(v);

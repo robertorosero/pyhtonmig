@@ -1,5 +1,5 @@
 /***********************************************************
-Copyright 1991, 1992, 1993 by Stichting Mathematisch Centrum,
+Copyright 1991, 1992, 1993, 1994 by Stichting Mathematisch Centrum,
 Amsterdam, The Netherlands.
 
                         All Rights Reserved
@@ -28,7 +28,6 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 extern int debugging; /* Defined in parser.c */
 extern int verbose; /* Defined in import.c */
-extern int killprint; /* Defined in ceval.c */
 
 /* Interface to getopt(): */
 extern int optind;
@@ -37,7 +36,11 @@ extern int getopt(); /* PROTO((int, char **, char *)); -- not standardized */
 
 extern char *getenv();
 
-main(argc, argv)
+extern char *getversion();
+extern char *getcopyright();
+
+int
+realmain(argc, argv)
 	int argc;
 	char **argv;
 {
@@ -48,6 +51,7 @@ main(argc, argv)
 	FILE *fp = stdin;
 	char *p;
 	int inspect = 0;
+	int unbuffered = 0;
 
 	if ((p = getenv("PYTHONDEBUG")) && *p != '\0')
 		debugging = 1;
@@ -55,12 +59,10 @@ main(argc, argv)
 		verbose = 1;
 	if ((p = getenv("PYTHONINSPECT")) && *p != '\0')
 		inspect = 1;
-	if ((p = getenv("PYTHONKILLPRINT")) && *p != '\0')
-		killprint = 1;
-	
-	initargs(&argc, &argv);
+	if ((p = getenv("PYTHONUNBUFFERED")) && *p != '\0')
+		unbuffered = 1;
 
-	while ((c = getopt(argc, argv, "c:dikv")) != EOF) {
+	while ((c = getopt(argc, argv, "c:diuv")) != EOF) {
 		if (c == 'c') {
 			/* -c is the last option; following arguments
 			   that look like options are left for the
@@ -82,8 +84,8 @@ main(argc, argv)
 			inspect++;
 			break;
 
-		case 'k':
-			killprint++;
+		case 'u':
+			unbuffered++;
 			break;
 
 		case 'v':
@@ -94,14 +96,14 @@ main(argc, argv)
 
 		default:
 			fprintf(stderr,
-"usage: %s [-d] [-i] [-k] [-v] [-c cmd | file | -] [arg] ...\n",
+"usage: %s [-d] [-i] [-u ] [-v] [-c cmd | file | -] [arg] ...\n",
 				argv[0]);
 			fprintf(stderr, "\
 \n\
 Options and arguments (and corresponding environment variables):\n\
 -d     : debug output from parser (also PYTHONDEBUG=x)\n\
 -i     : inspect interactively after running script (also PYTHONINSPECT=x)\n\
--k     : kill printing expression statement (also PYTHONKILLPRINT=x)\n\
+-u     : unbuffered stdout and stderr (also PYTHONUNBUFFERED=x)\n\
 -v     : verbose (trace import statements) (also PYTHONVERBOSE=x)\n\
 -c cmd : program passed in as string (terminates option list)\n\
 file   : program read from script file\n\
@@ -118,9 +120,19 @@ PYTHONPATH   : colon-separated list of directories prefixed to the\n\
 
 		}
 	}
-	
+
+	if (unbuffered) {
+		setbuf(stdout, (char *)NULL);
+		setbuf(stderr, (char *)NULL);
+	}
+
 	if (command == NULL && optind < argc && strcmp(argv[optind], "-") != 0)
 		filename = argv[optind];
+
+	if (verbose ||
+	    command == NULL && filename == NULL && isatty((int)fileno(fp)))
+		fprintf(stderr, "Python %s\n%s\n",
+			getversion(), getcopyright());
 	
 	if (filename != NULL) {
 		if ((fp = fopen(filename, "r")) == NULL) {
@@ -146,15 +158,22 @@ PYTHONPATH   : colon-separated list of directories prefixed to the\n\
 	else {
 		if (filename == NULL && isatty((int)fileno(fp))) {
 			char *startup = getenv("PYTHONSTARTUP");
+#ifdef macintosh
+			if (startup == NULL)
+				startup = "PythonStartup";
+#endif
 			if (startup != NULL && startup[0] != '\0') {
 				FILE *fp = fopen(startup, "r");
 				if (fp != NULL) {
 					(void) run_script(fp, startup);
 					err_clear();
+					fclose(fp);
 				}
 			}
 		}
 		sts = run(fp, filename == NULL ? "<stdin>" : filename) != 0;
+		if (filename != NULL)
+			fclose(fp);
 	}
 
 	if (inspect && isatty((int)fileno(stdin)) &&
