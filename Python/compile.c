@@ -462,8 +462,8 @@ static object *
 parsenumber(s)
 	char *s;
 {
-	extern long strtol PROTO((const char *, char **, int));
-	extern unsigned long strtoul PROTO((const char *, char **, int));
+	extern long mystrtol PROTO((const char *, char **, int));
+	extern unsigned long mystrtoul PROTO((const char *, char **, int));
 	extern double strtod PROTO((const char *, char **));
 	char *end;
 	long x;
@@ -473,9 +473,9 @@ parsenumber(s)
 	if (*end == 'l' || *end == 'L')
 		return long_scan(s, 0);
 	if (s[0] == '0')
-		x = (long) strtoul(s, &end, 0);
+		x = (long) mystrtoul(s, &end, 0);
 	else
-		x = strtol(s, &end, 0);
+		x = mystrtol(s, &end, 0);
 	if (*end == '\0') {
 		if (errno != 0) {
 			err_setstr(OverflowError,

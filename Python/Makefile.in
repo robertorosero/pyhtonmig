@@ -35,7 +35,7 @@ OBJS=		\
 		frozenmain.o \
 		getmtime.o graminit.o \
 		import.o \
-		marshal.o modsupport.o \
+		marshal.o modsupport.o mystrtoul.o \
 		pythonmain.o pythonrun.o \
 		structmember.o sysmodule.o \
 		traceback.o \
