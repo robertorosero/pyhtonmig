@@ -638,6 +638,9 @@ type_getattro(PyTypeObject *type, PyObject *name)
 	/* Look in tp_defined of this type and its bases */
 	res = _PyType_Lookup(type, name);
 	if (res != NULL) {
+		f = res->ob_type->tp_descr_get;
+		if (f != NULL)
+			return f(res, (PyObject *)NULL, type);
 		Py_INCREF(res);
 		return res;
 	}
@@ -1634,8 +1637,22 @@ static struct wrapperbase tab_next[] = {
 	{0}
 };
 
+static PyObject *
+wrap_descr_get(PyObject *self, PyObject *args, void *wrapped)
+{
+	descrgetfunc func = (descrgetfunc)wrapped;
+	PyObject *obj;
+	PyTypeObject *type = NULL;
+
+	if (!PyArg_ParseTuple(args, "O|O!", &obj, &PyType_Type, &type))
+		return NULL;
+	if (type == NULL)
+		type = obj->ob_type;
+	return (*func)(self, obj, type);
+}
+
 static struct wrapperbase tab_descr_get[] = {
-	{"__get__", (wrapperfunc)wrap_ternaryfunc,
+	{"__get__", (wrapperfunc)wrap_descr_get,
 	 "descr.__get__(obj, type) -> value"},
 	{0}
 };

@@ -373,3 +373,87 @@ PyTypeObject PyFunction_Type = {
 	0,					/* tp_descr_set */
 	offsetof(PyFunctionObject, func_dict),	/* tp_dictoffset */
 };
+
+
+/* Class method object */
+
+typedef struct {
+	PyObject_HEAD;
+	PyObject *cm_callable;
+} classmethod;
+
+static void
+cm_dealloc(classmethod *cm)
+{
+	Py_XDECREF(cm->cm_callable);
+	PyObject_DEL(cm);
+}
+
+static PyObject *
+cm_descr_get(PyObject *self, PyObject *obj, PyTypeObject *type)
+{
+	classmethod *cm = (classmethod *)self;
+
+	if (cm->cm_callable == NULL) {
+		PyErr_SetString(PyExc_RuntimeError,
+				"uninitialized classmethod object");
+		return NULL;
+	}
+ 	return PyMethod_New(cm->cm_callable,
+			    (PyObject *)type, (PyObject *)(type->ob_type));
+}
+
+static int
+cm_init(PyObject *self, PyObject *args, PyObject *kwds)
+{
+	classmethod *cm = (classmethod *)self;
+	PyObject *callable;
+
+	if (!PyArg_ParseTuple(args, "O:callable", &callable))
+		return -1;
+	Py_INCREF(callable);
+	cm->cm_callable = callable;
+	return 0;
+}
+
+PyTypeObject PyClassMethod_Type = {
+	PyObject_HEAD_INIT(&PyType_Type)
+	0,
+	"classmethod",
+	sizeof(classmethod),
+	0,
+	(destructor)cm_dealloc,			/* tp_dealloc */
+	0,					/* tp_print */
+	0,					/* tp_getattr */
+	0,					/* tp_setattr */
+	0,					/* tp_compare */
+	0,					/* tp_repr */
+	0,					/* tp_as_number */
+	0,					/* tp_as_sequence */
+	0,					/* tp_as_mapping */
+	0,					/* tp_hash */
+	0,					/* tp_call */
+	0,					/* tp_str */
+	PyObject_GenericGetAttr,		/* tp_getattro */
+	0,					/* tp_setattro */
+	0,					/* tp_as_buffer */
+	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE, /* tp_flags */
+	0,					/* tp_doc */
+	0,					/* tp_traverse */
+	0,					/* tp_clear */
+	0,					/* tp_richcompare */
+	0,					/* tp_weaklistoffset */
+	0,					/* tp_iter */
+	0,					/* tp_iternext */
+	0,					/* tp_methods */
+	0,					/* tp_members */
+	0,					/* tp_getset */
+	0,					/* tp_base */
+	0,					/* tp_dict */
+	cm_descr_get,				/* tp_descr_get */
+	0,					/* tp_descr_set */
+	0,					/* tp_dictoffset */
+	cm_init,				/* tp_init */
+	PyType_GenericAlloc,			/* tp_alloc */
+	PyType_GenericNew,			/* tp_new */
+};

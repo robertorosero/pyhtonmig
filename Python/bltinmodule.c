@@ -1792,6 +1792,9 @@ _PyBuiltin_Init(void)
 	if (PyDict_SetItemString(dict, "NotImplemented",
 				 Py_NotImplemented) < 0)
 		return NULL;
+	if (PyDict_SetItemString(dict, "classmethod",
+				 (PyObject *) &PyClassMethod_Type) < 0)
+		return NULL;
 #ifndef WITHOUT_COMPLEX
 	if (PyDict_SetItemString(dict, "complex",
 				 (PyObject *) &PyComplex_Type) < 0)
