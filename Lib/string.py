@@ -117,6 +117,21 @@ def rindex(s, sub, i = 0):
 		raise index_error, (s, sub, i)
 	return r
 
+# Count non-overlapping occurrences of substring
+def count(s, sub, i = 0):
+	if i < 0: i = i + len(s)
+	n = len(sub)
+	m = len(s) + 1 - n
+	if n == 0: return m-i
+	r = 0
+	while i < m:
+		if sub == s[i:i+n]:
+			r = r+1
+			i = i+n
+		else:
+			i = i+1
+	return r
+
 # Find substring, return -1 if not found
 def find(s, sub, i = 0):
 	try:
