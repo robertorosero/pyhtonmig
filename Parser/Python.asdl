@@ -46,7 +46,7 @@ module Python
 	      -- XXX Jython will be different
 	      attributes (int lineno)
 
-	      -- BoolOp() can yuse left & right?
+	      -- BoolOp() can use left & right?
 	expr = BoolOp(boolop op, expr* values)
 	     | BinOp(expr left, operator op, expr right)
 	     | UnaryOp(unaryop op, expr operand)
