@@ -32,13 +32,6 @@ struct compiler {
 
 	/* info that changes for each code block */
 	PySTEntryObject *c_ste;
-
-	PyObject *c_name;
-	PyObject *c_consts;
-	PyObject *c_names;
-	PyObject *c_varnames;
-
-	int c_argcount;
 	int c_nblocks;
 	int c_curblock;
 	struct basicblock c_entry;
@@ -51,37 +44,29 @@ struct compiler {
 	int c_lineno;
 };
 
-struct assembler {
-	PyObject *a_bytecode;  /* string containing bytecode */
-	int a_offset;          /* offset into bytecode */
-	int a_nblocks;         /* number of reachable blocks */
-	int *a_postorder;      /* list of block indices in dfs postorder */
-};
-
 static int compiler_enter_scope(struct compiler *, identifier, void *);
 static void compiler_free(struct compiler *);
+static PyCodeObject *compiler_get_code(struct compiler *);
 static int compiler_new_block(struct compiler *);
 static int compiler_next_instr(struct compiler *, int);
 static int compiler_addop(struct compiler *, int);
-static int compiler_addop_o(struct compiler *, int, PyObject *, PyObject *);
+static int compiler_addop_o(struct compiler *, int, PyObject *);
 static int compiler_addop_i(struct compiler *, int, int);
 static void compiler_use_block(struct compiler *, int);
 static int compiler_use_new_block(struct compiler *);
 static int compiler_error(struct compiler *, const char *);
-static int compiler_nameop(struct compiler *, identifier, expr_context_ty);
 
-static PyCodeObject *compiler_mod(struct compiler *, mod_ty);
+static int compiler_mod(struct compiler *, mod_ty);
 static int compiler_visit_stmt(struct compiler *, stmt_ty);
 static int compiler_visit_expr(struct compiler *, expr_ty);
+static int compiler_visit_arguments(struct compiler *, arguments_ty);
 static int compiler_visit_slice(struct compiler *, slice_ty);
 
 static int compiler_push_fblock(struct compiler *, enum fblocktype, int);
 static void compiler_pop_fblock(struct compiler *, enum fblocktype, int);
 
 static PyCodeObject *assemble(struct compiler *);
-
-static int is_uncond_jump(int);
-static int is_jump(int);
+static int arg_is_pyobject(int);
 
 int
 _Py_Mangle(char *p, char *name, char *buffer, size_t maxlen)
@@ -111,22 +96,20 @@ _Py_Mangle(char *p, char *name, char *buffer, size_t maxlen)
 	return 1;
 }
 
-static int
-compiler_init(struct compiler *c)
+static void 
+init(struct compiler *c)
 {
-	memset(c, 0, sizeof(struct compiler));
-
-	return 1;
+	c->c_blocks = NULL;
+	c->c_nblocks = 0;
+	c->c_interactive = 0;
 }
 
 PyCodeObject *
 PyAST_Compile(mod_ty mod, const char *filename, PyCompilerFlags *flags)
 {
 	struct compiler c;
-	PyCodeObject *co = NULL;
 
-	if (!compiler_init(&c))
-		goto error;
+	init(&c);
 	c.c_filename = filename;
 	c.c_future = PyFuture_FromAST(mod, filename);
 	if (c.c_future == NULL)
@@ -148,23 +131,19 @@ PyAST_Compile(mod_ty mod, const char *filename, PyCompilerFlags *flags)
 		}
 	}
 
-	fprintf(stderr, "ast %s\n", filename);
-
 	c.c_st = PySymtable_Build(mod, filename, c.c_future);
-	if (c.c_st == NULL) {
-		if (!PyErr_Occurred())
-			PyErr_SetString(PyExc_SystemError, "no symtable");
+	if (c.c_st == NULL)
 		goto error;
-	}
 
-	fprintf(stderr, "symtable %s\n", filename);
+	if (!compiler_mod(&c, mod))
+		goto error;
 
-	co = compiler_mod(&c, mod);
-
-	fprintf(stderr, "code %s\n", filename);
+	return assemble(&c);
  error:
 	compiler_free(&c);
-	return co;
+	if (!PyErr_Occurred())
+		PyErr_SetString(PyExc_SystemError, "PyAST_Compile() failed");
+	return NULL;
 }
 
 static void
@@ -180,11 +159,8 @@ compiler_free(struct compiler *c)
 		PyObject_Free((void *)c->c_blocks[i]);
 	if (c->c_blocks)
 		PyObject_Free((void *)c->c_blocks);
-	Py_XDECREF(c->c_name);
-	Py_XDECREF(c->c_consts);
-	Py_XDECREF(c->c_names);
-	Py_XDECREF(c->c_varnames);
 }
+
 
 static int
 compiler_enter_scope(struct compiler *c, identifier name, void *key)
@@ -192,14 +168,7 @@ compiler_enter_scope(struct compiler *c, identifier name, void *key)
 	c->c_ste = PySymtable_Lookup(c->c_st, key);
 	if (!c->c_ste) {
 		return 0;
-	}
-	Py_INCREF(name);
-	c->c_name = name;
-	c->c_varnames = c->c_ste->ste_varnames;
-	Py_INCREF(c->c_varnames);
-	fprintf(stderr, "block %s varnames %s\n",
-		PyObject_REPR(name),
-		PyObject_REPR(c->c_varnames));
+	}		
 	c->c_nblocks = 0;
 	c->c_blocks = (struct basicblock **)PyObject_Malloc(
 	    sizeof(struct basicblock *) * DEFAULT_BLOCKS);
@@ -208,27 +177,17 @@ compiler_enter_scope(struct compiler *c, identifier name, void *key)
 	memset(c->c_blocks, 0, sizeof(struct basicblock *) * DEFAULT_BLOCKS);
 	if (compiler_use_new_block(c) < 0)
 		return 0;
-	c->c_consts = PyDict_New();
-	if (!c->c_consts)
-		return 0;
-	c->c_names = PyDict_New();
-	if (!c->c_names)
-		return 0;
 	return 1;
 }
 
-static int
-compiler_exit_scope(struct compiler *c)
+static PyCodeObject *
+compiler_get_code(struct compiler *c)
 {
-	Py_DECREF(c->c_name);
-	c->c_name = NULL;
-	Py_DECREF(c->c_consts);
-	c->c_consts = NULL;
-	Py_DECREF(c->c_names);
-	c->c_names = NULL;
-	Py_DECREF(c->c_varnames);
-	c->c_varnames = NULL;
-	return 1; /* XXX void? */
+	/* get the code object for the current block.
+	   XXX may want to return a thunk instead to allow later passes
+	*/
+	PyErr_SetString(PyExc_SystemError, "compiler doesn't work");
+	return NULL;
 }
 
 /* Allocate a new block and return its index in c_blocks. 
@@ -310,39 +269,31 @@ compiler_next_instr(struct compiler *c, int block)
 static int
 compiler_addop(struct compiler *c, int opcode)
 {
+	int off;
+	off = compiler_next_instr(c, c->c_curblock);
+	if (off < 0)
+		return 0;
+	c->c_blocks[c->c_curblock]->b_instr[off].i_opcode = opcode;
+	return 1;
+}
+
+/* Add an opcode with a PyObject * argument.
+   Returns 0 on failure, 1 on success.
+*/
+
+static int
+compiler_addop_o(struct compiler *c, int opcode, PyObject *o)
+{
 	struct instr *i;
 	int off;
+	assert(arg_is_pyobject(opcode));
 	off = compiler_next_instr(c, c->c_curblock);
 	if (off < 0)
 		return 0;
 	i = &c->c_blocks[c->c_curblock]->b_instr[off];
 	i->i_opcode = opcode;
-	i->i_oparg = -1;
+	i->i_arg = o;
 	return 1;
-}
-
-static int
-compiler_addop_o(struct compiler *c, int opcode, PyObject *dict, 
-		     PyObject *o)
-{
-	PyObject *v;
-	int arg;
-
-	v = PyDict_GetItem(dict, o);
-	if (!v) {
-		arg = PyDict_Size(dict);
-		v = PyInt_FromLong(arg);
-		if (!v)
-			return 0;
-		if (PyDict_SetItem(dict, o, v) < 0) {
-			Py_DECREF(v);
-			return 0;
-		}
-		Py_DECREF(v);
-	}
-	else 
-		arg = PyInt_AsLong(v);
-	return compiler_addop_i(c, opcode, arg);
 }
 
 /* Add an opcode with an integer argument.
@@ -373,8 +324,8 @@ compiler_addop_i(struct compiler *c, int opcode, int oparg)
 		return 0; \
 }
 
-#define ADDOP_O(C, OP, O, TYPE) { \
-	if (!compiler_addop_o((C), (OP), (C)->c_ ## TYPE, (O))) \
+#define ADDOP_O(C, OP, O) { \
+	if (!compiler_addop_o((C), (OP), (O))) \
 		return 0; \
 }
 
@@ -402,18 +353,11 @@ compiler_addop_i(struct compiler *c, int opcode, int oparg)
 	} \
 }
 
-static PyCodeObject *
+static int
 compiler_mod(struct compiler *c, mod_ty mod)
 {
-	PyCodeObject *co;
-	static PyObject *module;
-	if (!module) {
-		module = PyString_FromString("<module>");
-		if (!module)
-			return NULL;
-	}
-	if (!compiler_enter_scope(c, module, mod))
-		return NULL;
+	if (!compiler_enter_scope(c, NULL, mod))
+		return 0;
 	switch (mod->kind) {
 	case Module_kind:
 		VISIT_SEQ(c, stmt, mod->v.Module.body);
@@ -430,42 +374,23 @@ compiler_mod(struct compiler *c, mod_ty mod)
 		VISIT_SEQ(c, stmt, mod->v.Suite.body);
 		break;
 	}
-	co = assemble(c);
-	compiler_exit_scope(c);
-	return co;
+	return 1;
 }
 
 static int
 compiler_function(struct compiler *c, stmt_ty s)
 {
 	PyCodeObject *co;
-	int ndefs = 0;
-	arguments_ty args = s->v.FunctionDef.args;
 	assert(s->kind == FunctionDef_kind);
 
-	fprintf(stderr, "function %s\n", 
-		PyString_AS_STRING(s->v.FunctionDef.name));
-
-	if (args->defaults)
-		VISIT_SEQ(c, expr, args->defaults);
+	if (s->v.FunctionDef.args->defaults)
+		VISIT_SEQ(c, expr, s->v.FunctionDef.args->defaults);
 	if (!compiler_enter_scope(c, s->v.FunctionDef.name, (void *)s))
 		return 0;
-	ndefs += asdl_seq_LEN(args->args);
-	c->c_argcount = ndefs;
-	if (args->vararg)
-		ndefs++;
-	if (args->kwarg)
-		ndefs++;
+	VISIT(c, arguments, s->v.FunctionDef.args);
 	VISIT_SEQ(c, stmt, s->v.FunctionDef.body);
-	co = assemble(c);
+	co = compiler_get_code(c);
 	if (co == NULL)
-		return 0;
-	compiler_exit_scope(c);
-
-	/* XXX closure */
-	ADDOP_O(c, LOAD_CONST, (PyObject *)co, consts);
-	ADDOP_I(c, MAKE_FUNCTION, ndefs);
-	if (!compiler_nameop(c, s->v.FunctionDef.name, Store))
 		return 0;
 		
 	return 1;
@@ -653,8 +578,7 @@ compiler_visit_stmt(struct compiler *c, stmt_ty s)
 {
 	int i, n;
 
-	fprintf(stderr, "compile stmt %d lineno %d\n",
-		s->kind, s->lineno);
+	fprintf(stderr, "compile stmt %d at %d\n", s->kind, s->lineno);
 	c->c_lineno = s->lineno; 	/* XXX this isn't right */
 	switch (s->kind) {
         case FunctionDef_kind:
@@ -666,7 +590,7 @@ compiler_visit_stmt(struct compiler *c, stmt_ty s)
 		if (s->v.Return.value)
 			VISIT(c, expr, s->v.Return.value)
 		else
-			ADDOP_O(c, LOAD_CONST, Py_None, consts);
+			ADDOP_O(c, LOAD_CONST, Py_None);
 		ADDOP(c, RETURN_VALUE);
 		break;
         case Yield_kind:
@@ -735,7 +659,7 @@ compiler_visit_stmt(struct compiler *c, stmt_ty s)
 				ADDOP(c, DUP_TOP);
 			}
 		} else {
-			ADDOP_O(c, LOAD_CONST, Py_None, consts);
+			ADDOP_O(c, LOAD_CONST, Py_None);
 			ADDOP(c, DUP_TOP);
 		}
 		ADDOP(c, EXEC_STMT);
@@ -792,7 +716,7 @@ binop(struct compiler *c, operator_ty op)
 	case Mult: 
 		return BINARY_MULTIPLY;
 	case Div:
-		if (c->c_flags && c->c_flags->cf_flags & CO_FUTURE_DIVISION)
+		if (c->c_flags->cf_flags & CO_FUTURE_DIVISION)
 			return BINARY_TRUE_DIVIDE;
 		else
 			return BINARY_DIVIDE;
@@ -817,7 +741,7 @@ binop(struct compiler *c, operator_ty op)
 }
 
 static int
-compiler_nameop(struct compiler *c, identifier name, expr_context_ty ctx)
+compiler_name(struct compiler *c, expr_ty e)
 {
 	int op, scope;
 	enum { OP_FAST, OP_GLOBAL, OP_DEREF, OP_NAME } optype;
@@ -825,7 +749,7 @@ compiler_nameop(struct compiler *c, identifier name, expr_context_ty ctx)
 	/* XXX AugStore isn't used anywhere! */
 	op = 0;
 	optype = OP_NAME;
-	scope = PyST_GetScope(c->c_ste, name);
+	scope = PyST_GetScope(c->c_ste, e->v.Name.id);
 	switch (scope) {
 	case FREE:
 	case CELL:
@@ -846,7 +770,7 @@ compiler_nameop(struct compiler *c, identifier name, expr_context_ty ctx)
 
 	switch (optype) {
 	case OP_DEREF:
-		switch (ctx) {
+		switch (e->v.Name.ctx) {
 		case Load: op = LOAD_DEREF; break;
 		case Store: op = STORE_DEREF; break;
 		case AugStore:
@@ -855,7 +779,7 @@ compiler_nameop(struct compiler *c, identifier name, expr_context_ty ctx)
 			assert(0); /* impossible */
 		}
 	case OP_FAST:
-		switch (ctx) {
+		switch (e->v.Name.ctx) {
 		case Load: op = LOAD_FAST; break;
 		case Store: op = STORE_FAST; break;
 		case Del: op = DELETE_FAST; break;
@@ -863,7 +787,7 @@ compiler_nameop(struct compiler *c, identifier name, expr_context_ty ctx)
 			break;
 		}
 	case OP_GLOBAL:
-		switch (ctx) {
+		switch (e->v.Name.ctx) {
 		case Load: op = LOAD_GLOBAL; break;
 		case Store: op = STORE_GLOBAL; break;
 		case Del: op = DELETE_GLOBAL; break;
@@ -871,7 +795,7 @@ compiler_nameop(struct compiler *c, identifier name, expr_context_ty ctx)
 			break;
 		}
 	case OP_NAME:
-		switch (ctx) {
+		switch (e->v.Name.ctx) {
 		case Load: op = LOAD_NAME; break;
 		case Store: op = STORE_NAME; break;
 		case Del: op = DELETE_NAME; break;
@@ -881,14 +805,8 @@ compiler_nameop(struct compiler *c, identifier name, expr_context_ty ctx)
 	}
 	
 	assert(op);
-	ADDOP_O(c, op, name, names);
+	ADDOP_O(c, op, e->v.Name.id);
 	return 1;
-}
-
-static int
-compiler_name(struct compiler *c, expr_ty e)
-{
-	return compiler_nameop(c, e->v.Name.id, e->v.Name.ctx);
 }
 
 static int
@@ -962,7 +880,7 @@ compiler_visit_expr(struct compiler *c, expr_ty e)
 		ADDOP(c, UNARY_CONVERT);
 		break;
         case Num_kind: 
-		ADDOP_O(c, LOAD_CONST, e->v.Num.n, consts);
+		ADDOP_O(c, LOAD_CONST, e->v.Num.n);
 		break;
         case Str_kind:
 		break;
@@ -971,13 +889,13 @@ compiler_visit_expr(struct compiler *c, expr_ty e)
 		VISIT(c, expr, e->v.Attribute.value);
 		switch (e->v.Attribute.ctx) {
 		case Load:
-			ADDOP_O(c, LOAD_ATTR, e->v.Attribute.attr, names);
+			ADDOP_O(c, LOAD_ATTR, e->v.Attribute.attr);
 			break;
 		case Store:
-			ADDOP_O(c, STORE_ATTR, e->v.Attribute.attr, names);
+			ADDOP_O(c, STORE_ATTR, e->v.Attribute.attr);
 			break;
 		case Del:
-			ADDOP_O(c, DELETE_ATTR, e->v.Attribute.attr, names);
+			ADDOP_O(c, DELETE_ATTR, e->v.Attribute.attr);
 			break;
 		case AugStore:
 			/* XXX */
@@ -1058,208 +976,45 @@ compiler_visit_slice(struct compiler *c, slice_ty s)
 	return 1;
 }
 
-/* do depth-first search of basic block graph, starting with block.
-   post records the block indices in post-order.
-
-   XXX must handle implicit jumps from one block to next
-*/
-
-static void
-dfs(struct compiler *c, int block, struct assembler *a)
-{
-	int i;
-	struct basicblock *b;
-
-	if (block >= c->c_nblocks)
-		return;
-	b = c->c_blocks[block];
-	if (b->b_seen)
-		return;
-	b->b_seen = 1;
-	for (i = 0; i < b->b_iused; i++)
-		if (is_jump(b->b_instr[i].i_opcode))
-			dfs(c, b->b_instr[i].i_oparg, a);
-	if (!is_uncond_jump(b->b_instr[i].i_opcode))
-		dfs(c, block + 1, a);
-	a->a_postorder[a->a_nblocks++] = block;
-}
-
 static int
-stackdepth(struct compiler *c)
+compiler_visit_arguments(struct compiler *c, arguments_ty a)
 {
-	/* XXX need to do this */
-	return 100;
-}
-
-static int
-assemble_init(struct assembler *a, int nblocks)
-{
-	memset(a, 0, sizeof(struct assembler));
-	a->a_bytecode = PyString_FromStringAndSize(NULL, DEFAULT_CODE_SIZE);
-	if (!a->a_bytecode)
-		return 0;
-	a->a_postorder = (int *)PyObject_Malloc(sizeof(int) * nblocks);
-	if (!a->a_postorder)
-		return 0;
 	return 1;
-}
-
-static void
-assemble_free(struct assembler *a)
-{
-	Py_XDECREF(a->a_bytecode);
-	if (a->a_postorder)
-		PyObject_Free(a->a_postorder);
-}
-
-static int
-assemble_emit(struct assembler *a, struct instr *i)
-{
-	int arg, size = 0, ext = i->i_oparg >> 16;
-	int len = PyString_GET_SIZE(a->a_bytecode);
-	char *code;
-	if (i->i_oparg == -1)
-		size = 1;
-	else {
-		if (ext)
-			size = 6;
-		else
-			size = 3;
-		arg = i->i_oparg;
-	}
-	if (a->a_offset + size >= len) {
-		if (_PyString_Resize(&a->a_bytecode, len * 2) < 0)
-		    return 0;
-	}
-	code = PyString_AS_STRING(a->a_bytecode) + a->a_offset;
-	fprintf(stderr, 
-		"emit %3d %5d\toffset = %2d\tsize = %d\text = %d\n",
-		i->i_opcode, i->i_oparg, a->a_offset, size, ext);
-	a->a_offset += size;
-	if (ext > 0) {
-	    *code++ = EXTENDED_ARG;
-	    *code++ = ext & 0xff;
-	    *code++ = ext >> 8;
-	    arg &= 0xffff;
-	}
-	assert(i->i_opcode > 0 && i->i_opcode < 256);
-	*code++ = i->i_opcode;
-	if (size == 1)
-		return 1;
-	*code++ = arg & 0xff;
-	*code++ = arg >> 8;
-	return 1;
-}
-
-static PyObject *
-dict_keys_inorder(PyObject *dict, int offset)
-{
-	PyObject *tuple, *k, *v;
-	int i, pos = 0, size = PyDict_Size(dict);
-
-	tuple = PyTuple_New(size);
-	if (tuple == NULL)
-		return NULL;
-	while (PyDict_Next(dict, &pos, &k, &v)) {
-		i = PyInt_AS_LONG(v);
-		Py_INCREF(k);
-		assert((i - offset) < size);
-		PyTuple_SET_ITEM(tuple, i - offset, k);
-	}
-	return tuple;
-}
-
-static PyCodeObject *
-makecode(struct compiler *c, struct assembler *a)
-{
-	PyCodeObject *co = NULL;
-	PyObject *consts = NULL;
-	PyObject *names = NULL;
-	PyObject *varnames = NULL;
-	PyObject *filename = NULL;
-	PyObject *name = NULL;
-	PyObject *nil = PyTuple_New(0);
-
-	consts = dict_keys_inorder(c->c_consts, 0);
-	if (!consts)
-		goto error;
-	names = dict_keys_inorder(c->c_names, 0);
-	if (!names)
-		goto error;
-	varnames = PySequence_Tuple(c->c_varnames);
-	if (!varnames)
-		goto error;
-	filename = PyString_FromString(c->c_filename);
-	if (!filename)
-		goto error;
-	
-	co = PyCode_New(c->c_argcount, 0, stackdepth(c), 0,
-			a->a_bytecode, consts, names, varnames,
-			nil, nil,
-			filename, c->c_name,
-			0, 
-			filename); /* XXX lnotab */
- error:
-	Py_XDECREF(consts);
-	Py_XDECREF(names);
-	Py_XDECREF(varnames);
-	Py_XDECREF(filename);
-	Py_XDECREF(name);
-	return co;
-			
 }
 
 static PyCodeObject *
 assemble(struct compiler *c)
 {
-	struct assembler a;
 	int i, j;
-	PyCodeObject *co = NULL;
 
-	/* Make sure every block that falls off the end returns None. */
-	ADDOP_O(c, LOAD_CONST, Py_None, consts);
-	ADDOP(c, RETURN_VALUE);
-
-	if (!assemble_init(&a, c->c_nblocks))
-		goto error;
-	dfs(c, 0, &a);
-
-	for (i = 0; i < a.a_nblocks; i++) {
-		struct basicblock *b = c->c_blocks[a.a_postorder[i]];
+	fprintf(stderr, "nblocks=%d curblock=%d\n",
+		c->c_nblocks, c->c_curblock);
+	for (i = 0; i < c->c_nblocks; i++) {
+		struct basicblock *b = c->c_blocks[i];
 		fprintf(stderr, "block %d: used=%d alloc=%d\n",
 			i, b->b_iused, b->b_ialloc);
 		for (j = 0; j < b->b_iused; j++) {
-			if (!assemble_emit(&a, &b->b_instr[j]))
-				goto error;
+			fprintf(stderr, "instr %d: %d\n",
+				j, b->b_instr[j].i_opcode);
 		}
 	}
-	if (_PyString_Resize(&a.a_bytecode, a.a_offset) < 0)
-		goto error;
-
-	co = makecode(c, &a);
- error:
-	assemble_free(&a);
-	return co;
+	
+	PyErr_SetString(PyExc_SystemError, "no assembler exists\n");
+	return NULL;
 }
 
 static int
-is_uncond_jump(int opcode)
+arg_is_pyobject(int opcode)
 {
-	switch(opcode) {
-	case RETURN_VALUE: case RAISE_VARARGS: case CONTINUE_LOOP:
-	case JUMP_ABSOLUTE: case JUMP_FORWARD: 
-		return 1;
-	default:
-		return 0;
-	}
-	assert(0); /* Can't get here */
-	return 0;
+    switch (opcode) {
+    case LOAD_CONST:
+    case LOAD_NAME: case LOAD_GLOBAL: case LOAD_FAST: case LOAD_DEREF:
+    case STORE_NAME: case STORE_GLOBAL: case STORE_FAST: case STORE_DEREF:
+    case DELETE_NAME: case DELETE_GLOBAL: case DELETE_FAST:
+	    return 1;
+    default:
+	    return 0;
+    }
+    assert(0); /* Can't get here */
+    return 0;
 }
-
-static int
-is_jump(int opcode)
-{
-	/* XXX doesn't know about any jumps yet */
-	return 0;
-}
-
