@@ -25,7 +25,7 @@ DL_IMPORT(PyCodeObject *) PyAST_Compile(struct _mod *, const char *,
 					PyCompilerFlags *);
 DL_IMPORT(PyFutureFeatures *) PyFuture_FromAST(struct _mod *, const char *);
 
-#define DEFAULT_BLOCK_SIZE 32
+#define DEFAULT_BLOCK_SIZE 16
 #define DEFAULT_BLOCKS 8
 #define DEFAULT_CODE_SIZE 128
 
@@ -35,6 +35,7 @@ struct instr {
 	int i_hasarg : 1;
 	unsigned char i_opcode;
 	int i_oparg;
+	int i_lineno;
 };
 
 struct basicblock {
