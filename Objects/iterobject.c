@@ -165,7 +165,7 @@ PyTypeObject PyCallIter_Type = {
 	/* methods */
 	(destructor)calliter_dealloc, 		/* tp_dealloc */
 	0,					/* tp_print */
-	(getattrfunc)iter_getattr,		/* tp_getattr */
+	(getattrfunc)calliter_getattr,		/* tp_getattr */
 	0,					/* tp_setattr */
 	0,					/* tp_compare */
 	0,					/* tp_repr */
