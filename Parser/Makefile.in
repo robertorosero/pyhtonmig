@@ -14,10 +14,9 @@ DEFS=		@DEFS@
 
 # === Other things that are customizable but not by configure ===
 
-TOP=		..
-INCLDIR=	$(TOP)/Include
+INCLDIR=	$(srcdir)/../Include
 OPT=		-g
-CFLAGS=		$(OPT) -I$(INCLDIR) $(DEFS)
+CFLAGS=		$(OPT) -I$(INCLDIR) -I.. $(DEFS)
 
 AR=		ar
 MKDEP=		mkdep
@@ -58,15 +57,32 @@ clean:
 clobber:	clean
 		-rm -f $(PGEN) *.a tags TAGS
 
-Makefile:	Makefile.in $(TOP)/config.status
-		CONFIG_FILES=Makefile CONFIG_HEADERS= \
-		$(SHELL) $(TOP)/config.status
+Makefile:	$(srcdir)/Makefile.in ../config.status
+		(cd ..; CONFIG_FILES=Parser/Makefile CONFIG_HEADERS= \
+		$(SHELL) config.status)
 
 depend:
 		$(MKDEP) $(CFLAGS) \
 			`echo $(OBJS) | tr ' ' '\012' | sed 's/\.o/.c/'`
 
 .PRECIOUS:	Makefile
+
+acceler.o: acceler.c
+grammar1.o: grammar1.c
+intrcheck.o: intrcheck.c
+listnode.o: listnode.c
+myreadline.o: myreadline.c
+node.o: node.c
+parser.o: parser.c
+parsetok.o: parsetok.c
+tokenizer.o: tokenizer.c
+bitset.o: bitset.c
+firstsets.o: firstsets.c
+grammar.o: grammar.c
+metagrammar.o: metagrammar.c
+pgen.o: pgen.c
+printgrammar.o: printgrammar.c
+pgenmain.o: pgenmain.c
 
 # DO NOT DELETE THIS LINE -- mkdep uses it.
 # DO NOT PUT ANYTHING AFTER THIS LINE, IT WILL GO AWAY.
