@@ -8,17 +8,35 @@ staticforward int add_members(PyTypeObject *, struct memberlist *);
 
 struct memberlist type_members[] = {
 	{"__name__", T_STRING, offsetof(PyTypeObject, tp_name), READONLY},
+	{"__basicsize__", T_INT, offsetof(PyTypeObject,tp_basicsize),READONLY},
+	{"__itemsize__", T_INT, offsetof(PyTypeObject, tp_itemsize), READONLY},
+	{"__flags__", T_LONG, offsetof(PyTypeObject, tp_flags), READONLY},
 	{"__doc__", T_STRING, offsetof(PyTypeObject, tp_doc), READONLY},
+	{"__weaklistoffset__", T_LONG,
+	 offsetof(PyTypeObject, tp_weaklistoffset), READONLY},
+	{"__dictoffset__", T_LONG,
+	 offsetof(PyTypeObject, tp_dictoffset), READONLY},
 	{0}
 };
 
 static PyObject *
 type_bases(PyTypeObject *type, void *context)
 {
-	if (type->tp_base == NULL)
-		return PyTuple_New(0);
-	else
-		return Py_BuildValue("(O)", type->tp_base);
+	PyObject *bases;
+	PyTypeObject *base;
+
+	bases = type->tp_bases;
+	if (bases != NULL) {
+		Py_INCREF(bases);
+		return bases;
+	}
+	base = type->tp_base;
+	if (base == NULL) {
+		if (type == &PyBaseObject_Type)
+			return PyTuple_New(0);
+		base = &PyBaseObject_Type;
+	}
+	return Py_BuildValue("(O)", base);
 }
 
 static PyObject *
@@ -31,8 +49,12 @@ static PyObject *
 type_dict(PyTypeObject *type, void *context)
 {
 	if (type->tp_dict == NULL) {
-		Py_INCREF(Py_None);
-		return Py_None;
+		if (PyType_InitDict(type) < 0)
+			return NULL;
+		if (type->tp_dict == NULL) {
+			Py_INCREF(Py_None);
+			return Py_None;
+		}
 	}
 	return PyDictProxy_New(type->tp_dict);
 }
@@ -153,12 +175,30 @@ typedef struct {
 static int
 issubtype(PyTypeObject *a, PyTypeObject *b)
 {
+	PyObject *bases;
+	PyTypeObject *base;
+	int i, n;
+
 	if (b == &PyBaseObject_Type)
 		return 1; /* Every type is an implicit subtype of this */
 	while (a != NULL) {
 		if (a == b)
 			return 1;
+		bases = a->tp_bases;
 		a = a->tp_base;
+		if (bases != NULL && PyTuple_Check(bases)) {
+			n = PyTuple_GET_SIZE(bases);
+			for (i = 0; i < n; i++) {
+				base = (PyTypeObject *)
+					PyTuple_GET_ITEM(bases, i);
+				if (base == b)
+					return 1;
+				if (base != a) {
+					if (issubtype(base, b))
+						return 1;
+				}
+			}
+		}
 	}
 	return 0;
 }
@@ -271,9 +311,16 @@ type_init(PyObject *self, PyObject *args, PyObject *kwds)
 	type->tp_name = PyString_AS_STRING(name);
 	type->tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HEAPTYPE;
 
-	/* Copy slots and dict from the base type */
+	/* Set tp_base and tp_bases properly */
+	if (PyTuple_GET_SIZE(bases) == 0)
+		bases = Py_BuildValue("(O)", &PyBaseObject_Type);
+	else
+		Py_INCREF(bases);
+	type->tp_bases = bases;
 	Py_INCREF(base);
 	type->tp_base = base;
+
+	/* Copy slots and dict from the base type */
 	if (PyType_InitDict(type) < 0) {
 		Py_DECREF(type);
 		return -1;
@@ -345,7 +392,6 @@ extra_ivars(PyTypeObject *type, PyTypeObject *base)
 	int t_size = type->tp_basicsize;
 	int b_size = base->tp_basicsize;
 
-	/* XXX what about tp_itemsize? */
 	assert((type->tp_flags & Py_TPFLAGS_GC) >=
 	       (base->tp_flags & Py_TPFLAGS_GC)); /* base has GC, type not! */
 	if (type->tp_flags & Py_TPFLAGS_GC)
@@ -353,6 +399,11 @@ extra_ivars(PyTypeObject *type, PyTypeObject *base)
 	if (base->tp_flags & Py_TPFLAGS_GC)
 		b_size -= PyGC_HEAD_SIZE;
 	assert(t_size >= b_size); /* type smaller than base! */
+	if (type->tp_itemsize || base->tp_itemsize) {
+		/* If itemsize is involved, stricter rules */
+		return t_size != b_size ||
+			type->tp_itemsize != base->tp_itemsize;
+	}
 	if (t_size == b_size)
 		return 0;
 	if (type->tp_dictoffset != 0 && base->tp_dictoffset == 0 &&
@@ -382,6 +433,14 @@ type_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
 	PyObject *name, *bases, *dict;
 	static char *kwlist[] = {"name", "bases", "dict", 0};
+
+	if (PyTuple_Check(args) && PyTuple_GET_SIZE(args) == 1 &&
+	    (kwds == NULL || (PyDict_Check(kwds) && PyDict_Size(kwds) == 0))) {
+		/* type(x) -> x.__class__ */
+		PyObject *x = PyTuple_GET_ITEM(args, 0);
+		Py_INCREF(x->ob_type);
+		return (PyObject *) x->ob_type;
+	}
 
 	/* Check arguments (again?!?! yes, alas -- we need the bases!) */
 	if (!PyArg_ParseTupleAndKeywords(args, kwds, "SOO", kwlist,
@@ -428,10 +487,10 @@ type_dealloc(PyTypeObject *type)
 
 PyTypeObject PyType_Type = {
 	PyObject_HEAD_INIT(&PyType_Type)
-	0,			/* Number of items for varobject */
-	"type",			/* Name of this type */
-	sizeof(etype) + sizeof(struct memberlist), /* Basic object size */
-	0,			/* Item size for varobject */
+	0,					/* ob_size */
+	"type",					/* tp_name */
+	sizeof(etype) + sizeof(struct memberlist), /* tp_basicsize */
+	0,					/* tp_itemsize */
 	(destructor)type_dealloc,		/* tp_dealloc */
 	0,					/* tp_print */
 	0,			 		/* tp_getattr */
@@ -444,7 +503,7 @@ PyTypeObject PyType_Type = {
 	0,					/* tp_hash */
 	(ternaryfunc)type_call,			/* tp_call */
 	0,					/* tp_str */
-	PyObject_GenericGetAttr,			/* tp_getattro */
+	PyObject_GenericGetAttr,		/* tp_getattro */
 	0,					/* tp_setattro */
 	0,					/* tp_as_buffer */
 	Py_TPFLAGS_DEFAULT,			/* tp_flags */
@@ -495,7 +554,7 @@ PyTypeObject PyBaseObject_Type = {
 	0,					/* tp_hash */
 	0,					/* tp_call */
 	0,					/* tp_str */
-	PyObject_GenericGetAttr,			/* tp_getattro */
+	PyObject_GenericGetAttr,		/* tp_getattro */
 	0,					/* tp_setattro */
 	0,					/* tp_as_buffer */
 	Py_TPFLAGS_DEFAULT,			/* tp_flags */
