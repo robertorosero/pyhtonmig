@@ -77,6 +77,8 @@ struct compiler_unit {
 	PyObject *u_consts;    /* all constants */
 	PyObject *u_names;     /* all names */
 	PyObject *u_varnames;  /* local variables */
+	PyObject *u_cellvars;  /* cell variables */
+	PyObject *u_freevars;  /* free variables */
 
 	int u_argcount;    /* number of arguments for block */ 
 	int u_nblocks;     /* number of used blocks in u_blocks
@@ -274,6 +276,37 @@ list2dict(PyObject *list)
 	return dict;
 }
 
+static PyObject *
+dictbytype(PyObject *src, int scope_type)
+{
+	int pos = 0, i = 0, scope;
+	PyObject *k, *v, *dest = PyDict_New();
+
+        if (dest == NULL)
+            return NULL;
+
+	while (PyDict_Next(src, &pos, &k, &v)) {
+            /* XXX this should probably be a macro in symtable.h */
+            assert(PyInt_Check(v));
+            scope = (PyInt_AS_LONG(v) >> SCOPE_OFF) & SCOPE_MASK;
+
+            if (scope == scope_type) {
+                PyObject *item = PyInt_FromLong(i);
+                if (item == NULL) {
+			Py_DECREF(dest);
+			return NULL;
+		}
+		if (PyDict_SetItem(dest, k, item) < 0) {
+			Py_DECREF(item);
+			Py_DECREF(dest);
+			return NULL;
+		}
+		Py_DECREF(item);
+            }
+	}
+	return dest;
+}
+
 static void
 compiler_display_symbols(PyObject *name, PyObject *symbols)
 {
@@ -323,7 +356,8 @@ compiler_enter_scope(struct compiler *c, identifier name, void *key)
 	Py_INCREF(name);
 	u->u_name = name;
 	u->u_varnames = list2dict(u->u_ste->ste_varnames);
-	Py_INCREF(u->u_varnames);
+	u->u_cellvars = dictbytype(u->u_ste->ste_symbols, CELL);
+	u->u_freevars = dictbytype(u->u_ste->ste_symbols, FREE);
 	u->u_nblocks = 0;
 	u->u_nalloc = DEFAULT_BLOCKS;
 	u->u_blocks = (struct basicblock **)PyObject_Malloc(
@@ -333,7 +367,7 @@ compiler_enter_scope(struct compiler *c, identifier name, void *key)
 	u->u_tmpname = 0;
 	u->u_nfblocks = 0;
 	u->u_lineno = 0;
-	u->u_lineno_set = true;
+	u->u_lineno_set = false;
 	memset(u->u_blocks, 0, sizeof(struct basicblock *) * DEFAULT_BLOCKS);
 	u->u_consts = PyDict_New();
 	if (!u->u_consts)
@@ -392,6 +426,8 @@ compiler_unit_free(struct compiler_unit *u)
 	Py_XDECREF(u->u_consts);
 	Py_XDECREF(u->u_names);
 	Py_XDECREF(u->u_varnames);
+	Py_XDECREF(u->u_freevars);
+	Py_XDECREF(u->u_cellvars);
 	PyObject_Free(u);
 }
 
@@ -731,6 +767,87 @@ compiler_mod(struct compiler *c, mod_ty mod)
 	return co;
 }
 
+/* The test for LOCAL must come before the test for FREE in order to
+   handle classes where name is both local and free.  The local var is
+   a method and the free var is a free var referenced within a method.
+*/
+
+static int
+get_ref_type(struct compiler *c, PyObject *name)
+{
+	int scope = PyST_GetScope(c->u->u_ste, name);
+        if (scope == 0) {
+            char buf[350];
+            PyOS_snprintf(buf, sizeof(buf),
+                          "unknown scope for %.100s in %.100s(%s) in %s\n"
+                          "symbols: %s\nlocals: %s\nglobals: %s\n",
+                          PyString_AS_STRING(name), 
+                          PyString_AS_STRING(c->u->u_name), 
+                          PyObject_REPR(c->c_st->st_cur->ste_id),
+                          c->c_filename,
+                          PyObject_REPR(c->c_st->st_cur->ste_symbols),
+                          PyObject_REPR(c->u->u_varnames),
+                          PyObject_REPR(c->u->u_names)
+		);
+            Py_FatalError(buf);
+        }
+
+        return scope;
+}
+
+static int
+compiler_lookup_arg(PyObject *dict, PyObject *name)
+{
+    PyObject *v = PyDict_GetItem(dict, name);
+    if (v == NULL)
+        return -1;
+    return PyInt_AS_LONG(v);
+}
+
+static int
+compiler_make_closure(struct compiler *c, PyCodeObject *co, int args)
+{
+	int i, free = PyCode_GetNumFree(co);
+	if (free == 0) {
+            ADDOP_O(c, LOAD_CONST, (PyObject*)co, consts);
+            ADDOP_I(c, MAKE_FUNCTION, args);
+            return 1;
+        }
+	for (i = 0; i < free; ++i) {
+		/* Bypass com_addop_varname because it will generate
+		   LOAD_DEREF but LOAD_CLOSURE is needed. 
+		*/
+		PyObject *name = PyTuple_GET_ITEM(co->co_freevars, i);
+		int arg, reftype;
+
+		/* Special case: If a class contains a method with a
+		   free variable that has the same name as a method,
+		   the name will be considered free *and* local in the
+		   class.  It should be handled by the closure, as
+		   well as by the normal name loookup logic.
+		*/
+		reftype = get_ref_type(c, name);
+		if (reftype == CELL)
+			arg = compiler_lookup_arg(c->u->u_cellvars, name);
+		else /* (reftype == FREE) */
+			arg = compiler_lookup_arg(c->u->u_freevars, name);
+		if (arg == -1) {
+			fprintf(stderr, "lookup %s in %s %d %d\n"
+				"freevars of %s: %s\n",
+				PyObject_REPR(name), 
+				PyString_AS_STRING(c->u->u_name), 
+				reftype, arg,
+				PyString_AS_STRING(co->co_name),
+				PyObject_REPR(co->co_freevars));
+			Py_FatalError("compiler_make_closure()");
+		}
+		ADDOP_I(c, LOAD_CLOSURE, arg);
+	}
+	ADDOP_O(c, LOAD_CONST, (PyObject*)co, consts);
+        ADDOP_I(c, MAKE_CLOSURE, args);
+        return 1;
+}
+
 static int
 compiler_function(struct compiler *c, stmt_ty s)
 {
@@ -768,9 +885,7 @@ compiler_function(struct compiler *c, stmt_ty s)
 		return 0;
 	compiler_exit_scope(c);
 
-	/* XXX closure */
-	ADDOP_O(c, LOAD_CONST, (PyObject *)co, consts);
-	ADDOP_I(c, MAKE_FUNCTION, asdl_seq_LEN(args->defaults));
+        compiler_make_closure(c, co, asdl_seq_LEN(args->defaults));
 	if (!compiler_nameop(c, s->v.FunctionDef.name, Store))
 		return 0;
 
@@ -815,9 +930,7 @@ compiler_class(struct compiler *c, stmt_ty s)
 		return 0;
 	compiler_exit_scope(c);
 
-	/* XXX closure */
-	ADDOP_O(c, LOAD_CONST, (PyObject *)co, consts);
-	ADDOP_I(c, MAKE_FUNCTION, 0);
+        compiler_make_closure(c, co, 0);
 	ADDOP_I(c, CALL_FUNCTION, 0);
 	ADDOP(c, BUILD_CLASS);
 	if (!compiler_nameop(c, s->v.ClassDef.name, Store))
@@ -841,7 +954,7 @@ compiler_lambda(struct compiler *c, expr_ty e)
 		VISIT_SEQ(c, expr, args->defaults);
 	if (!compiler_enter_scope(c, name, (void *)e))
 		return 0;
-	c->u->u_argcount = asdl_seq_LEN(e->v.Lambda.args->args);
+	c->u->u_argcount = asdl_seq_LEN(args->args);
 	VISIT(c, expr, e->v.Lambda.body);
 	ADDOP(c, RETURN_VALUE);
 	co = assemble(c, 1);
@@ -849,10 +962,7 @@ compiler_lambda(struct compiler *c, expr_ty e)
 		return 0;
 	compiler_exit_scope(c);
 
-	/* XXX closure */
-	ADDOP_O(c, LOAD_CONST, (PyObject *)co, consts);
-	ADDOP_I(c, MAKE_FUNCTION, asdl_seq_LEN(args->defaults));
-
+        compiler_make_closure(c, co, asdl_seq_LEN(args->defaults));
 	Py_DECREF(name);
 
 	return 1;
@@ -2521,7 +2631,8 @@ makecode(struct compiler *c, struct assembler *a)
 	PyObject *varnames = NULL;
 	PyObject *filename = NULL;
 	PyObject *name = NULL;
-	PyObject *nil = PyTuple_New(0);
+	PyObject *freevars = NULL;
+	PyObject *cellvars = NULL;
 	int nlocals;
 
 	consts = dict_keys_inorder(c->u->u_consts, 0);
@@ -2531,17 +2642,20 @@ makecode(struct compiler *c, struct assembler *a)
 	if (!names)
 		goto error;
 	varnames = PySequence_Tuple(c->u->u_ste->ste_varnames);
-	if (!varnames)
-		goto error;
+        freevars = PySequence_Tuple(c->u->u_freevars);
+        cellvars = PySequence_Tuple(c->u->u_cellvars);
+        if (!varnames || !freevars || !cellvars)
+            goto error;
+
 	filename = PyString_FromString(c->c_filename);
 	if (!filename)
 		goto error;
 
-	nlocals = PyList_GET_SIZE(c->u->u_varnames);
+        nlocals = PyDict_Size(c->u->u_varnames);
 	co = PyCode_New(c->u->u_argcount, nlocals, stackdepth(c),
 			compute_code_flags(c),
 			a->a_bytecode, consts, names, varnames,
-			nil, nil,
+			freevars, cellvars,
 			filename, c->u->u_name,
 			a->a_firstlineno,
 			a->a_lnotab);
@@ -2551,8 +2665,9 @@ makecode(struct compiler *c, struct assembler *a)
 	Py_XDECREF(varnames);
 	Py_XDECREF(filename);
 	Py_XDECREF(name);
+	Py_XDECREF(freevars);
+	Py_XDECREF(cellvars);
 	return co;
-
 }
 
 static PyCodeObject *
