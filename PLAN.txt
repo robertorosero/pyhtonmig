@@ -1,0 +1,210 @@
+Project: core implementation
+****************************
+
+Tasks:
+
+Do binary operators properly.  nb_add should try to call self.__add__
+and other.__radd__.  I think I'll exclude base types that define any
+binary operator without setting the CHECKTYPES flag.
+
+Fix comparisons.  There's some nasty stuff here: when two types are
+not the same, and they're not instances, the fallback code doesn't
+account for the possibility that they might be subtypes of a common
+base type that defines a comparison.
+
+Fix subtype_dealloc().  This currently searches through the list of
+base types until it finds a type whose tp_dealloc is not
+subtype_dealloc.  I think this is not safe.  I think the alloc/dealloc
+policy needs to be rethought.
+
+Clean up isinstance(), issubclass() and their C equivalents.  There
+are a bunch of different APIs here and not all of them do the right
+thing yet.  There should be fewer APIs and their implementation should
+be simpler.  The old "abstract subclass" test should probably
+disappear (if we want to root out ExtensionClass).
+
+Check for conflicts between base classes.  I fear that the rules used
+to decide whether multiple bases have conflicting instance variables
+aren't strict enough.  I think that sometimes two different classes
+adding __dict__ may be incompatible after all.
+
+Check for order conflicts.  Suppose there are two base classes X and
+Y.  Suppose class B derives from X and Y, and class C from Y and X (in
+that order).  Now suppose class D derives from B and C.  In which
+order should the base classes X and Y be searched?  This is an order
+conflict, and should be disallowed; currently the test for this is not
+implemented.
+
+Clean up the GC interface.  Currently, tp_basicsize includes the GC
+head size iff tp_flags includes the GC flag bit.  This makes object
+size math a pain (e.g. to see if two object types have the same
+instance size, you can't just compare the tp_basicsize fields -- you
+have to conditionally subtract the GC head size).  Neil has a patch
+that improves the API in this area, but it's backwards incompatible.
+(http://sf.net/tracker/?func=detail&aid=421893&group_id=5470&atid=305470)
+I think I know of a way to fix the incompatibility (by switching to a
+different flag bit).  *** Tim proposed a better idea: macros to access
+tp_basicsize while hiding the nastiness.  This is done now, so I think
+the rest of this task needn't be done. ***
+
+Make the __dict__ of types declared with Python class statements
+writable -- only statically declared types must have an immutable
+dict, because they're shared between interpreter instances.  Possibly
+trap writes to the __dict__ to update the corresponding tp_<slot> if
+an __<slot>__ name is affected.  *** Done as part of the next task. ***
+
+It should be an option (maybe a different metaclass, maybe a flag) to
+*not* merge __dict__ with all the bases, but instead search the
+__dict__ (or __introduced__?) of all bases in __mro__ order.  (This is
+needed anyway to unify classes completely.)  *** Partly done.
+Inheritance of slots from bases is still icky.  Also, I still need to
+think more about making sure that "special" ivars (those with
+descriptors classifying them as data) can't be overridden by things in
+the __dict__. ***
+
+Universal base class (object).  How can we make the object class
+subclassable and define simple default methods for everything without
+having these inherited by built-in types that don't want these
+defaults?  (This may be mostly fixed now.)  *** Done, really. ***
+
+Add error checking to the MRO calculation.
+
+Make __new__ overridable through a Python class method (!).  Make more
+of the sub-algorithms of type construction available as methods.
+
+More -- I'm sure new issues will crop up as we go.
+
+
+Project: loose ends and follow-through
+**************************************
+
+Tasks:
+
+Make more (most?) built-in types act as their own factory functions.
+
+Make more (most?) built-in types subtypable -- with or without
+overridable allocation.
+
+Exceptions should be types.  This changes the rules, since now almost
+anything can be raised (as maybe it should).  Or should we strive for
+enforcement of the convention that all exceptions should be derived
+from Exception?  String exceptions will be another hassle, to be
+deprecated and eventually ruled out.
+
+Standardize a module containing names for all built-in types, and
+standardize on names.  E.g. should the official name of the string
+type be 'str', 'string', or 'StringType'?
+
+Create a hierarchy of types, so that e.g. int and long are both
+subtypes of an abstract base type integer, which is itself a subtype
+of number, etc.  A lot of thinking can go into this!
+
+
+Project: making classes use the new machinery
+*********************************************
+
+Tasks:
+
+Try to get rid of all code in classobject.c by deferring to the new
+mechanisms.  How far can we get without breaking backwards
+compatibility?  This is underspecified because I haven't thought much
+about it yet.  Can we lose the use of PyInstance_Check() everywhere?
+I would hope so!
+
+
+Project: backwards compatibility
+********************************
+
+Tasks:
+
+Make sure all code checks the proper tp_flags bit before accessing
+type object fields.
+
+Identify areas of incompatibility with Python 2.1.  Design solutions.
+Implement and test.
+
+Some specific areas: a fair amount of code probably depends on
+specific types having __members__ and/or __methods__ attributes.
+These are currently not present (conformant to PEP 252, which proposes
+to drop them) but we may have to add them back.  This can be done in a
+generic way with not too much effort.
+
+Another area: going all the way with classes and instances means that
+type(x) == types.InstanceType won't work any more to detect instances.
+Should there be a mode where this still works?  Maybe this should be
+the default mode, with a warning, and an explicit way to get the new
+way to work?  (Instead of a __future__ statement, I'm thinking of a
+module global __metaclass__ which would provide the default metaclass
+for baseless class statements.)
+
+
+Project: testing
+****************
+
+Tasks:
+
+Identify new functionality that needs testing.  Conceive unit tests
+for all new functionality.  Conceive stress tests for critical
+features.  Run the tests.  Fix bugs.  Repeat until satisfied.
+
+Note: this may interact with the branch integration task.
+
+
+Project: integration with main branch
+*************************************
+
+Tasks:
+
+Merge changes in the HEAD branch into the descr-branch.  Then merge
+the descr-branch back into the HEAD branch.
+
+The longer we wait, the more effort this will be -- the descr-branch
+forked off quite a long time ago, and there are changes everywhere in
+the HEAD branch (e.g. the dict object has been radically rewritten).
+
+On the other hand, if we do this too early, we'll have to do it again
+later.
+
+
+Project: performance tuning
+***************************
+
+Tasks:
+
+Pick or create a general performance benchmark for Python.  Benchmark
+the new system vs. the old system.  Profile the new system.  Improve
+hotspots.  Repeat until satisfied.
+
+Note: this may interact with the branch integration task.
+
+
+Project: documentation
+**********************
+
+Tasks:
+
+Update PEP 252 (descriptors).  Describe more of the prototype
+implementation
+
+Update PEP 253 (subtyping).  Complicated architectural wrangling with
+metaclasses.  There is an interaction between implementation and
+description.
+
+Write PEP 254 (unification of classes).  This should discuss what
+changes for ordinary classes, and how we can make it more b/w
+compatible.
+
+Other documentation.  There needs to be user documentation,
+eventually.
+
+
+Project: community interaction
+******************************
+
+Tasks:
+
+Once the PEPs are written, solicit community feedback, and formulate
+responses to the feedback.  Give the community enough time to think
+over this complicated proposal.  Provide the community with a
+prototype implementation to test.  Try to do this *before* casting
+everything in stone!
