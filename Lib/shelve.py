@@ -140,7 +140,7 @@ class Shelf(UserDict.DictMixin):
         self.sync()
         try:
             self.dict.close()
-        except AttributeError:
+        except:
             pass
         self.dict = 0
 
@@ -228,4 +228,4 @@ def open(filename, flag='c', protocol=None, writeback=False, binary=None):
     See the module's __doc__ string for an overview of the interface.
     """
 
-    return DbfilenameShelf(filename, flag, protocol, writeback, binary)
+    return DbfilenameShelf(filename, flag, binary, writeback)

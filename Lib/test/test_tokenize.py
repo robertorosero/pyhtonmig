@@ -3,10 +3,7 @@ import tokenize, os, sys
 
 if verbose:
     print 'starting...'
-
-f = file(findfile('tokenize_tests' + os.extsep + 'txt'))
-tokenize.tokenize(f.readline)
-f.close()
-
+file = open(findfile('tokenize_tests'+os.extsep+'py'))
+tokenize.tokenize(file.readline)
 if verbose:
     print 'finished'

@@ -148,8 +148,10 @@ class MimeTypes:
 
         Return value is a list of strings giving the possible filename
         extensions, including the leading dot ('.').  The extension is not
-        guaranteed to have been associated with any particular data stream,
-        but would be mapped to the MIME type `type' by guess_type().
+        guaranteed to have been associated with any particular data
+        stream, but would be mapped to the MIME type `type' by
+        guess_type().  If no extension can be guessed for `type', None
+        is returned.
 
         Optional `strict' argument when false adds a bunch of commonly found,
         but non-standard types.
@@ -160,7 +162,8 @@ class MimeTypes:
             for ext in self.types_map_inv[False].get(type, []):
                 if ext not in extensions:
                     extensions.append(ext)
-        return extensions
+        if len(extensions):
+            return extensions
 
     def guess_extension(self, type, strict=True):
         """Guess the extension for a file based on its MIME type.
@@ -176,9 +179,9 @@ class MimeTypes:
         but non-standard types.
         """
         extensions = self.guess_all_extensions(type, strict)
-        if not extensions:
-            return None
-        return extensions[0]
+        if extensions is not None:
+            extensions = extensions[0]
+        return extensions
 
     def read(self, filename, strict=True):
         """

@@ -218,7 +218,7 @@ class TestCase:
             try:
                 testMethod()
                 ok = 1
-            except self.failureException:
+            except self.failureException, e:
                 result.addFailure(self, self.__exc_info())
             except KeyboardInterrupt:
                 raise

@@ -2,7 +2,6 @@
 
 import os
 import struct
-import sys
 
 try:
     import dbm
@@ -30,10 +29,8 @@ def whichdb(filename):
     try:
         f = open(filename + os.extsep + "pag", "rb")
         f.close()
-        # dbm linked with gdbm on OS/2 doesn't have .dir file
-        if not (dbm.library == "GNU gdbm" and sys.platform == "os2emx"):
-            f = open(filename + os.extsep + "dir", "rb")
-            f.close()
+        f = open(filename + os.extsep + "dir", "rb")
+        f.close()
         return "dbm"
     except IOError:
         # some dbm emulations based on Berkeley DB generate a .db file
@@ -53,19 +50,15 @@ def whichdb(filename):
 
     # Check for dumbdbm next -- this has a .dir and and a .dat file
     try:
-        # First check for presence of files
-        os.stat(filename + os.extsep + "dat")
-        size = os.stat(filename + os.extsep + "dir").st_size
-        # dumbdbm files with no keys are empty
-        if size == 0:
-            return "dumbdbm"
+        f = open(filename + os.extsep + "dat", "rb")
+        f.close()
         f = open(filename + os.extsep + "dir", "rb")
         try:
             if f.read(1) in ["'", '"']:
                 return "dumbdbm"
         finally:
             f.close()
-    except (OSError, IOError):
+    except IOError:
         pass
 
     # See if the file exists, return None if not
@@ -93,12 +86,11 @@ def whichdb(filename):
     if magic == 0x13579ace:
         return "gdbm"
 
-    # Check for old Berkeley db hash file format v2
+    # Check for BSD hash
     if magic in (0x00061561, 0x61150600):
-        return "bsddb185"
+        return "dbhash"
 
-    # Later versions of Berkeley db hash file have a 12-byte pad in
-    # front of the file type
+    # BSD hash v2 has a 12-byte NULL pad in front of the file type
     try:
         (magic,) = struct.unpack("=l", s16[-4:])
     except struct.error:

@@ -2,7 +2,6 @@
 
 \declaremodule{standard}{csv}
 \modulesynopsis{Write and read tabular data to and from delimited files.}
-\sectionauthor{Skip Montanaro}{skip@pobox.com}
 
 \versionadded{2.3}
 \index{csv}
@@ -30,12 +29,10 @@ The \module{csv} module's \class{reader} and \class{writer} objects read and
 write sequences.  Programmers can also read and write data in dictionary
 form using the \class{DictReader} and \class{DictWriter} classes.
 
-\begin{notice}
-  This version of the \module{csv} module doesn't support Unicode
-  input.  Also, there are currently some issues regarding \ASCII{} NUL
-  characters.  Accordingly, all input should generally be printable
-  \ASCII{} to be safe.  These restrictions will be removed in the future.
-\end{notice}
+\note{The first version of the \module{csv} module doesn't support Unicode
+input.  Also, there are currently some issues regarding \ASCII{} NUL
+characters.  Accordingly, all input should generally be plain \ASCII{} to be
+safe.  These restrictions will be removed in the future.}
 
 \begin{seealso}
 %  \seemodule{array}{Arrays of uniformly types numeric values.}
@@ -47,6 +44,7 @@ form using the \class{DictReader} and \class{DictWriter} classes.
 
 \subsection{Module Contents}
 
+
 The \module{csv} module defines the following functions:
 
 \begin{funcdesc}{reader}{csvfile\optional{,
@@ -54,9 +52,7 @@ The \module{csv} module defines the following functions:
 Return a reader object which will iterate over lines in the given
 {}\var{csvfile}.  \var{csvfile} can be any object which supports the
 iterator protocol and returns a string each time its \method{next}
-method is called.  If \var{csvfile} is a file object, it must be opened with
-the 'b' flag on platforms where that makes a difference.  An optional
-{}\var{dialect} parameter can be given
+method is called.  An optional \var{dialect} parameter can be given
 which is used to define a set of parameters specific to a particular CSV
 dialect.  It may be an instance of a subclass of the \class{Dialect}
 class or one of the strings returned by the \function{list_dialects}
@@ -73,10 +69,7 @@ conversion is performed.
 \begin{funcdesc}{writer}{csvfile\optional{,
                          dialect=\code{'excel'}\optional{, fmtparam}}}
 Return a writer object responsible for converting the user's data into
-delimited strings on the given file-like object.  \var{csvfile} can be any
-object with a \function{write} method.  If \var{csvfile} is a file object,
-it must be opened with the 'b' flag on platforms where that makes a
-difference.  An optional
+delimited strings on the given file-like object.  An optional
 {}\var{dialect} parameter can be given which is used to define a set of
 parameters specific to a particular CSV dialect.  It may be an instance
 of a subclass of the \class{Dialect} class or one of the strings
@@ -118,8 +111,8 @@ Return the names of all registered dialects.
 The \module{csv} module defines the following classes:
 
 \begin{classdesc}{DictReader}{csvfile, fieldnames\optional{,
-                              restkey=\constant{None}\optional{,
-			      restval=\constant{None}\optional{,
+                              restkey=\code{None}\optional{,
+			      restval=\code{None}\optional{,
                               dialect=\code{'excel'}\optional{,
 			      fmtparam}}}}}
 Create an object which operates like a regular reader but maps the
@@ -130,7 +123,7 @@ read has more fields than the fieldnames sequence, the remaining data is
 added as a sequence keyed by the value of \var{restkey}.  If the row read
 has fewer fields than the fieldnames sequence, the remaining keys take the
 value of the optiona \var{restval} parameter.  All other parameters are
-interpreted as for \class{reader} objects.
+interpreted as for regular readers.
 \end{classdesc}
 
 
@@ -148,38 +141,59 @@ method contains a key not found in \var{fieldnames}, the optional
 \var{extrasaction} parameter indicates what action to take.  If it is set
 to \code{'raise'} a \exception{ValueError} is raised.  If it is set to
 \code{'ignore'}, extra values in the dictionary are ignored.  All other
-parameters are interpreted as for \class{writer} objects.
+parameters are interpreted as for regular writers.
 \end{classdesc}
+
 
 \begin{classdesc*}{Dialect}{}
 The \class{Dialect} class is a container class relied on primarily for its
 attributes, which are used to define the parameters for a specific
-\class{reader} or \class{writer} instance.
+\class{reader} or \class{writer} instance.  Dialect objects support the
+following data attributes:
+
+\begin{memberdesc}[string]{delimiter}
+A one-character string used to separate fields.  It defaults to \code{","}.
+\end{memberdesc}
+
+\begin{memberdesc}[boolean]{doublequote}
+Controls how instances of \var{quotechar} appearing inside a field should be
+themselves be quoted.  When \constant{True}, the character is doubledd.
+When \constant{False}, the \var{escapechar} must be a one-character string
+which is used as a prefix to the \var{quotechar}.  It defaults to
+\constant{True}.
+\end{memberdesc}
+
+\begin{memberdesc}{escapechar}
+A one-character string used to escape the \var{delimiter} if \var{quoting}
+is set to \constant{QUOTE_NONE}.  It defaults to \constant{None}.
+\end{memberdesc}
+
+\begin{memberdesc}[string]{lineterminator}
+The string used to terminate lines in the CSV file.  It defaults to
+\code{"\e r\e n"}.
+\end{memberdesc}
+
+\begin{memberdesc}[string]{quotechar}
+A one-character string used to quote elements containing the \var{delimiter}
+or which start with the \var{quotechar}.  It defaults to \code{'"'}.
+\end{memberdesc}
+
+\begin{memberdesc}[integer]{quoting}
+Controls when quotes should be generated by the writer.  It can take on any
+of the \code{QUOTE_*} constants defined below and defaults to
+\constant{QUOTE_MINIMAL}. 
+\end{memberdesc}
+
+\begin{memberdesc}[boolean]{skipinitialspace}
+When \constant{True}, whitespace immediately following the \var{delimiter}
+is ignored.  The default is \constant{False}.
+\end{memberdesc}
+
 \end{classdesc*}
-
-\begin{classdesc}{Sniffer}{}
-The \class{Sniffer} class is used to deduce the format of a CSV file.
-\end{classdesc}
-
-The \class{Sniffer} class provides a single method:
-
-\begin{methoddesc}{sniff}{sample\optional{,delimiters=None}}
-Analyze the given \var{sample} and return a \class{Dialect} subclass
-reflecting the parameters found.  If the optional \var{delimiters} parameter
-is given, it is interpreted as a string containing possible valid delimiter
-characters.
-\end{methoddesc}
-
-\begin{methoddesc}{has_header}{sample}
-Analyze the sample text (presumed to be in CSV format) and return
-\constant{True} if the first row appears to be a series of column
-headers.
-\end{methoddesc}
-
 
 The \module{csv} module defines the following constants:
 
-\begin{datadesc}{QUOTE_ALL}
+\begin{datadesc}{QUOTE_ALWAYS}
 Instructs \class{writer} objects to quote all fields.
 \end{datadesc}
 
@@ -208,7 +222,7 @@ Raised by any of the functions when an error is detected.
 \end{excdesc}
 
 
-\subsection{Dialects and Formatting Parameters\label{csv-fmt-params}}
+\subsection{Dialects and Formatting Parameters\label{fmt-params}}
 
 To make it easier to specify the format of input and output records,
 specific formatting parameters are grouped together into dialects.  A
@@ -220,53 +234,13 @@ instead of, the \var{dialect} parameter, the programmer can also specify
 individual formatting parameters, which have the same names as the
 attributes defined above for the \class{Dialect} class.
 
-Dialects support the following attributes:
-
-\begin{memberdesc}[Dialect]{delimiter}
-A one-character string used to separate fields.  It defaults to \code{','}.
-\end{memberdesc}
-
-\begin{memberdesc}[Dialect]{doublequote}
-Controls how instances of \var{quotechar} appearing inside a field should be
-themselves be quoted.  When \constant{True}, the character is doubledd.
-When \constant{False}, the \var{escapechar} must be a one-character string
-which is used as a prefix to the \var{quotechar}.  It defaults to
-\constant{True}.
-\end{memberdesc}
-
-\begin{memberdesc}[Dialect]{escapechar}
-A one-character string used to escape the \var{delimiter} if \var{quoting}
-is set to \constant{QUOTE_NONE}.  It defaults to \constant{None}.
-\end{memberdesc}
-
-\begin{memberdesc}[Dialect]{lineterminator}
-The string used to terminate lines in the CSV file.  It defaults to
-\code{'\e r\e n'}.
-\end{memberdesc}
-
-\begin{memberdesc}[Dialect]{quotechar}
-A one-character string used to quote elements containing the \var{delimiter}
-or which start with the \var{quotechar}.  It defaults to \code{'"'}.
-\end{memberdesc}
-
-\begin{memberdesc}[Dialect]{quoting}
-Controls when quotes should be generated by the writer.  It can take on any
-of the \constant{QUOTE_*} constants defined below and defaults to
-\constant{QUOTE_MINIMAL}. 
-\end{memberdesc}
-
-\begin{memberdesc}[Dialect]{skipinitialspace}
-When \constant{True}, whitespace immediately following the \var{delimiter}
-is ignored.  The default is \constant{False}.
-\end{memberdesc}
-
 
 \subsection{Reader Objects}
 
-Reader objects (\class{DictReader} instances and objects returned by
-the \function{reader()}function) have the following public methods:
+\class{DictReader} and \var{reader} objects have the following public
+methods:
 
-\begin{methoddesc}[csv reader]{next}{}
+\begin{methoddesc}{next}{}
 Return the next row of the reader's iterable object as a list, parsed
 according to the current dialect.
 \end{methoddesc}
@@ -274,15 +248,15 @@ according to the current dialect.
 
 \subsection{Writer Objects}
 
-Writer objects (\class{DictWriter} instances and objects returned by
-the \function{writer()} function) have the following public methods:
+\class{DictWriter} and \var{writer} objects have the following public
+methods:
 
-\begin{methoddesc}[csv writer]{writerow}{row}
+\begin{methoddesc}{writerow}{row}
 Write the \var{row} parameter to the writer's file object, formatted
 according to the current dialect.
 \end{methoddesc}
 
-\begin{methoddesc}[csv writer]{writerows}{rows}
+\begin{methoddesc}{writerows}{rows}
 Write all the \var{rows} parameters to the writer's file object, formatted
 according to the current dialect.
 \end{methoddesc}
@@ -293,17 +267,15 @@ according to the current dialect.
 The ``Hello, world'' of csv reading is
 
 \begin{verbatim}
-import csv
-reader = csv.reader(file("some.csv"))
-for row in reader:
-    print row
+    reader = csv.reader(file("some.csv"))
+    for row in reader:
+        print row
 \end{verbatim}
 
 The corresponding simplest possible writing example is
 
 \begin{verbatim}
-import csv
-writer = csv.writer(file("some.csv", "w"))
-for row in someiterable:
-    writer.writerow(row)
+    writer = csv.writer(file("some.csv", "w"))
+    for row in someiterable:
+        writer.writerow(row)
 \end{verbatim}

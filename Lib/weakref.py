@@ -164,7 +164,11 @@ class WeakKeyDictionary(UserDict.UserDict):
         if dict is not None: self.update(dict)
 
     def __delitem__(self, key):
-        del self.data[ref(key)]
+        for ref in self.data.iterkeys():
+            o = ref()
+            if o == key:
+                del self.data[ref]
+                return
 
     def __getitem__(self, key):
         return self.data[ref(key)]

@@ -27,14 +27,18 @@ __all__ = ['strptime']
 
 def _getlang():
     # Figure out what the current language is set to.
-    return locale.getlocale(locale.LC_TIME)
+    current_lang = locale.getlocale(locale.LC_TIME)[0]
+    if current_lang:
+        return current_lang
+    else:
+        current_lang = locale.getdefaultlocale()[0]
+        if current_lang:
+            return current_lang
+        else:
+            return ''
 
 class LocaleTime(object):
     """Stores and handles locale-specific information related to time.
-
-    This is not thread-safe!  Attributes are lazily calculated and no
-    precaution is taken to check to see if the locale information has changed
-    since the creation of the instance in use.
 
     ATTRIBUTES (all read-only after instance creation! Instance variables that
                 store the values have mangled names):
@@ -99,10 +103,7 @@ class LocaleTime(object):
                 raise TypeError("timezone names must contain 2 items")
             else:
                 self.__timezone = self.__pad(timezone, False)
-        if lang:
-            self.__lang = lang
-        else:
-            self.__lang = _getlang()
+        self.__lang = lang
 
     def __pad(self, seq, front):
         # Add '' to seq to either front (is True), else the back.
@@ -195,7 +196,13 @@ class LocaleTime(object):
     LC_time = property(__get_LC_time, __set_nothing,
         doc="Format string for locale's time representation ('%X' format)")
 
-    lang = property(lambda self: self.__lang, __set_nothing,
+    def __get_lang(self):
+        # Fetch self.lang.
+        if not self.__lang:
+            self.__calc_lang()
+        return self.__lang
+
+    lang = property(__get_lang, __set_nothing,
                     doc="Language used for instance")
 
     def __calc_weekday(self):
@@ -276,23 +283,20 @@ class LocaleTime(object):
     def __calc_timezone(self):
         # Set self.__timezone by using time.tzname.
         #
-        # Empty string used for matching when timezone is not used/needed.
-        try:
-            time.tzset()
-        except AttributeError:
-            pass
-        time_zones = ["UTC", "GMT"]
-        if time.daylight:
-            time_zones.extend(time.tzname)
-        else:
-            time_zones.append(time.tzname[0])
-        self.__timezone = self.__pad(time_zones, 0)
+        # Empty string used for matching when timezone is not used/needed such
+        # as with UTC.
+        self.__timezone = self.__pad(time.tzname, 0)
+
+    def __calc_lang(self):
+        # Set self.__lang by using __getlang().
+        self.__lang = _getlang()
+
 
 
 class TimeRE(dict):
     """Handle conversion from format directives to regexes."""
 
-    def __init__(self, locale_time=None):
+    def __init__(self, locale_time=LocaleTime()):
         """Init inst with non-locale regexes and store LocaleTime object."""
         #XXX: Does 'Y' need to worry about having less or more than 4 digits?
         base = super(TimeRE, self)
@@ -311,10 +315,7 @@ class TimeRE(dict):
             'y': r"(?P<y>\d\d)",
             'Y': r"(?P<Y>\d\d\d\d)"})
         base.__setitem__('W', base.__getitem__('U'))
-        if locale_time:
-            self.locale_time = locale_time
-        else:
-            self.locale_time = LocaleTime()
+        self.locale_time = locale_time
 
     def __getitem__(self, fetch):
         """Try to fetch regex; if it does not exist, construct it."""
@@ -397,19 +398,31 @@ class TimeRE(dict):
         """Return a compiled re object for the format string."""
         return re_compile(self.pattern(format), IGNORECASE)
 
+# Cached TimeRE; probably only need one instance ever so cache it for performance
+_locale_cache = TimeRE()
+# Cached regex objects; same reason as for TimeRE cache
+_regex_cache = dict()
 
 def strptime(data_string, format="%a %b %d %H:%M:%S %Y"):
     """Return a time struct based on the input data and the format string."""
-    time_re = TimeRE()
-    locale_time = time_re.locale_time
-    format_regex = time_re.compile(format)
+    global _locale_cache
+    global _regex_cache
+    locale_time = _locale_cache.locale_time
+    # If the language changes, caches are invalidated, so clear them
+    if locale_time.lang != _getlang():
+        _locale_cache = TimeRE()
+        _regex_cache.clear()
+    format_regex = _regex_cache.get(format)
+    if not format_regex:
+        # Limit regex cache size to prevent major bloating of the module;
+        # The value 5 is arbitrary
+        if len(_regex_cache) > 5:
+            _regex_cache.clear()
+        format_regex = _locale_cache.compile(format)
+        _regex_cache[format] = format_regex
     found = format_regex.match(data_string)
     if not found:
-        raise ValueError("time data did not match format:  data=%s  fmt=%s" %
-                         (data_string, format))
-    if len(data_string) != found.end():
-        raise ValueError("unconverted data remains: %s" %
-                          data_string[found.end():])
+        raise ValueError("time data did not match format")
     year = 1900
     month = day = 1
     hour = minute = second = 0
@@ -437,7 +450,7 @@ def strptime(data_string, format="%a %b %d %H:%M:%S %Y"):
             month = _insensitiveindex(locale_time.a_month, found_dict['b'])
         elif group_key == 'd':
             day = int(found_dict['d'])
-        elif group_key == 'H':
+        elif group_key is 'H':
             hour = int(found_dict['H'])
         elif group_key == 'I':
             hour = int(found_dict['I'])
@@ -474,21 +487,16 @@ def strptime(data_string, format="%a %b %d %H:%M:%S %Y"):
         elif group_key == 'j':
             julian = int(found_dict['j'])
         elif group_key == 'Z':
-            # Since -1 is default value only need to worry about setting tz if
-            # it can be something other than -1.
             found_zone = found_dict['Z'].lower()
-            if locale_time.timezone[0] == locale_time.timezone[1] and \
-               time.daylight:
+            if locale_time.timezone[0] == locale_time.timezone[1]:
                 pass #Deals with bad locale setup where timezone info is
                      # the same; first found on FreeBSD 4.4.
-            elif found_zone in ("utc", "gmt"):
+            elif locale_time.timezone[0].lower() == found_zone:
                 tz = 0
-            elif locale_time.timezone[2].lower() == found_zone:
-                tz = 0
-            elif time.daylight and \
-                locale_time.timezone[3].lower() == found_zone:
+            elif locale_time.timezone[1].lower() == found_zone:
                 tz = 1
-
+            elif locale_time.timezone[2].lower() == found_zone:
+                tz = -1
     # Cannot pre-calculate datetime_date() since can change in Julian
     #calculation and thus could have different value for the day of the week
     #calculation

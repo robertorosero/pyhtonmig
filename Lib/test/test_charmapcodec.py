@@ -39,7 +39,9 @@ class CharmapCodecTest(unittest.TestCase):
         self.assertRaises(UnicodeError, unicode, 'abc\001', codecname)
 
 def test_main():
-    test.test_support.run_unittest(CharmapCodecTest)
+    suite = unittest.TestSuite()
+    suite.addTest(unittest.makeSuite(CharmapCodecTest))
+    test.test_support.run_suite(suite)
 
 if __name__ == "__main__":
     test_main()

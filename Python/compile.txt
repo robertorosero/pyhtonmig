@@ -1,0 +1,255 @@
+Developer Notes for Python Compiler
+===================================
+
+Parsing
+-------
+XXX Fill in
+
+Abstract Syntax Tree (AST)
+--------------------------
+
+The abstract syntax tree (AST) is a high-level description of the
+program structure with the syntactic details of the source text
+removed.  It is specified using the Zephyr Abstract Syntax Definition
+Language (ASDL) [Wang97]_.
+
+The Python definition is found in the file ``Parser/Python.asdl``.
+
+The definition describes the structure of statements, expressions, and
+several specialized types, like list comprehensions and exception
+handlers.  Most definitions in the AST correspond to a particular
+source construct, like an if statement or an attribute lookup.  The
+definition is independent of its realization in any particular
+programming language.
+
+The AST has concrete representations in Python and C.  There is also
+representation as a byte stream, so that AST objects can be passed
+between Python and C.  (ASDL calls this format the pickle format, but
+I avoid that term to avoid confusion with Python pickles.)  Each
+programming language has a generic representation for ASDL and a tool
+to generate a code for a specific abstract syntax.
+
+The following fragment of the Python abstract syntax demonstrates the
+approach.
+
+::
+
+  module Python
+  {
+	stmt = FunctionDef(identifier name, arguments args, stmt* body)
+	      | Return(expr? value) | Yield(expr value)
+	      attributes (int lineno)
+  }
+
+The preceding example describes three different kinds of statements --
+a function definition and return and yield statement.  The function
+definition has three arguments -- its name, its argument list, and
+zero or more statements that make up its body.  The return statement
+has an optional expression that is the return value.  The yield
+statement requires an expression.
+
+The statement definitions above generate the following C structure
+type.
+
+::
+
+  typedef struct _stmt *stmt_ty;
+
+  struct _stmt {
+        enum { FunctionDef_kind=1, Return_kind=2, Yield_kind=3 } kind;
+        union {
+                struct {
+                        identifier name;
+                        arguments_ty args;
+                        asdl_seq *body;
+                } FunctionDef;
+                
+                struct {
+                        expr_ty value;
+                } Return;
+                
+                struct {
+                        expr_ty value;
+                } Yield;
+        } v;
+        int lineno;
+   }
+
+It also generates a series of constructor functions that generate a
+``stmt_ty`` with the appropriate initialization.  The ``kind`` field
+specifies which component of the union is initialized.  The
+``FunctionDef`` C function sets ``kind`` to ``FunctionDef_kind`` and
+initializes the ``name``, ``args``, and ``body`` fields.
+
+CST to AST
+----------
+
+The parser generates a concrete syntax tree represented by a ``node
+*`` defined in ``Include/node.h``.  Node indexing starts at 0.  Every
+token that can have whitespace surrounding it is its own token.  This
+means that something like "else:" is actually two tokens: 'else' and
+':'.
+
+The abstract syntax is generated
+from the concrete syntax in ``Python/ast.c`` using the function::
+
+    mod_ty PyAST_FromNode(const node *n);
+
+It does this by calling various functions in the file that all have the
+name ast_for_xxx where xxx is what the rule of the grammar (as defined
+in ``Grammar/Grammar``) that the function handles (alias_for_import_name
+is the exception to this).  These in turn call the constructor functions
+as defined by the ASDL grammar to create the nodes of the AST.
+
+Common macros used to manipulate ``node *`` structs as defined in 
+``Include/node.h``:
+  - CHILD(node, n) -- Returns the nth child of node using zero-offset
+    indexing
+  - NCH(node) -- Number of children node has
+  - STR(node) -- String representation of node
+  - TYPE(node) -- The type of node as listed in ``Include/graminit.h``
+  - REQ(node, type) -- Assert that the node is the type that is expected
+
+Function and macros for creating and using ``asdl_seq *`` types
+as found in Python/asdl.c and Include/asdl.h:
+  - asdl_seq_new(int) -- Allocate memory for an asdl_seq for length
+    'size'
+  - asdl_seq_free(asdl_seq *) -- Free asdl_seq struct
+  - asdl_seq_GET(seq, pos) -- Get item held at 'pos'
+  - asdl_seq_SET(seq, pos, val) -- Set 'seq' at 'pos' to 'val'
+  - asdl_seq_APPEND(seq, val) -- Set the end of 'seq' to 'val'
+  - asdl_seq_LEN(seq) -- Return the length of 'seq'
+
+
+Code Generation and Basic Blocks
+--------------------------------
+
+XXX Describe the structure of the code generator, the types involved,
+and the helper functions and macros.
+
+- for each ast type (mod, stmt, expr, ...), define a function with a
+  switch statement.  inline code generation for simple things,
+  call function compiler_xxx where xxx is kind name for others.
+
+The macros used to emit specific opcodes and to generate code for
+generic node types use string concatenation to produce calls to the
+appropriate C function for the type of the object.
+
+The VISIT macro generates code for an arbitrary node type, by calling
+an appropriate compiler_visit_TYPE function.  The VISIT_SEQ macro
+calls the visit function for each element of a sequence.  The VISIT
+macros take three arguments:
+
+  - the current struct compiler
+  - the name of the node's type (expr, stmt, ...)
+  - the actual node reference
+
+The name of the node's type correspond to the names in the asdl
+definition.  The string concatenation is used to allow a single VISIT
+macro to generate calls with the correct type.
+
+- all functions return true on success, false on failure
+
+Code is generated using a simple, basic block interface.
+
+  - each block has a single entry point
+  - possibly multiple exit points
+  - when generating jumps, always jump to a block
+  - for a code unit, blocks are identified by its int id
+
+- NEW_BLOCK() -- create block and set it as current
+- NEXT_BLOCK() -- NEW_BLOCK() plus jump from current block
+- compiler_new_block() -- create a block but don't use it
+  (used for generating jumps)
+
+- There are five macros for generating opcodes in the current basic
+  block.  Each takes the current struct compiler * as the first
+  argument and an opcode name as the second argument.
+
+  ADDOP(c, opcode) -- opcode with no arguments
+  ADDOP_I(c, opcode, oparg) -- oparg is a C int
+  ADDOP_O(c, opcode, oparg, namespace) -- oparg is a PyObject * ,
+     namespace is the name of a code object member that contains
+     the set of objects.  For example,
+         ADDOP_O(c, LOAD_CONST, obj, consts)
+     will make sure that obj is in co_consts and that the opcode
+     argument will be an index into co_consts.  The valid names
+     are consts, names, varnames, ... 
+
+     - Explain what each namespace is for.
+
+  ADDOP_JABS() -- oparg is an absolute jump to block id
+  ADDOP_JREL() -- oparg is a relative jump to block id 
+  XXX no need for JABS() and JREL(), always computed at the
+  end from block id
+
+- symbol table pass and compiler_nameop()
+
+Code Objects
+------------
+
+XXX Describe Python code objects.
+
+Files
+-----
+
++ Parser/
+
+    - Python.asdl
+        ASDL syntax file
+
+    - asdl.py
+        "An implementation of the Zephyr Abstract Syntax Definition
+        Language."  Uses SPARK_ to parse the ASDL files.
+
+    - asdl_c.py
+        "Generate C code from an ASDL description."
+
+    - spark.py
+        SPARK_ parser generator
+
++ Python/
+
+    - Python-ast.c
+        Creates C structs corresponding to the ASDL types.
+        "File automatically generated by ../Parser/asdl_c.py".
+
+    - asdl.c
+        Contains code to handle the ASDL sequence type.  Also has code
+        to handle marshalling the core ASDL types, such as number and
+        identifier.
+
+    - ast.c
+        Converts Python's concrete syntax tree into the abstract syntax tree.
+
+    - compile.txt
+        This file.
+
+    - newcompile.c
+        New version of compile.c that handles the emitting of bytecode.
+
++ Include/
+
+    - Python-ast.h
+        Contains the actual definitions of the C structs as generated by
+        ../Python/Python-ast.c .
+        "Automatically generated by ../Parser/asdl_c.py".
+
+    - asdl.h
+        Header for the corresponding ../Python/ast.c .
+
+    - ast.h
+        Declares PyAST_FromNode() external (from ../Python/ast.c).
+
+References
+----------
+
+.. [Wang97]  Daniel C. Wang, Andrew W. Appel, Jeff L. Korn, and Chris
+   S. Serra.  `The Zephyr Abstract Syntax Description Language.`_
+   In Proceedings of the Conference on Domain-Specific Languages, pp.
+   213--227, 1997.
+
+.. _The Zephyr Abstract Syntax Description Language.:
+   http://www.cs.princeton.edu/~danwang/Papers/dsl97/dsl97-abstract.html.
+
+.. _SPARK: http://pages.cpsc.ucalgary.ca/~aycock/spark/

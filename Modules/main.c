@@ -2,7 +2,7 @@
 
 #include "Python.h"
 #include "osdefs.h"
-#include "compile.h" /* For CO_FUTURE_DIVISION */
+#include "code.h" /* For CO_FUTURE_DIVISION */
 
 #ifdef __VMS
 #include <unixlib.h>
@@ -416,15 +416,6 @@ Py_Main(int argc, char **argv)
 			fp,
 			filename == NULL ? "<stdin>" : filename,
 			filename != NULL, &cf) != 0;
-	}
-
-	/* Check this environment variable at the end, to give programs the
-	 * opportunity to set it from Python.
-	 */
-	if (!saw_inspect_flag &&
-	    (p = Py_GETENV("PYTHONINSPECT")) && *p != '\0')
-	{
-		inspect = 1;
 	}
 
 	if (inspect && stdin_is_interactive &&

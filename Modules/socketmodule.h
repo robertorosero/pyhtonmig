@@ -2,11 +2,7 @@
 
 /* Includes needed for the sockaddr_* symbols below */
 #ifndef MS_WINDOWS
-#ifdef __VMS
-#   include <socket.h>
-# else
-#   include <sys/socket.h>
-# endif
+# include <sys/socket.h>
 # include <netinet/in.h>
 # if !(defined(__BEOS__) || defined(__CYGWIN__) || (defined(PYOS_OS2) && defined(PYCC_VACPP)))
 #  include <netinet/tcp.h>

@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/local/bin/python2.1
 """ Python Character Mapping Codec for ROT13.
 
     See http://ucsub.colorado.edu/~kominek/rot13/ for details.

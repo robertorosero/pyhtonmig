@@ -31,6 +31,10 @@
 	rl_completion_matches((x), ((rl_compentry_func_t *)(y)))
 #endif
 
+/* Pointers needed from outside (but not declared in a header file). */
+extern DL_IMPORT(int) (*PyOS_InputHook)(void);
+extern DL_IMPORT(char) *(*PyOS_ReadlineFunctionPointer)(FILE *, FILE *,char *);
+
 
 /* Exported function to send one line to readline's init file parser */
 

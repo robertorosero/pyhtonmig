@@ -178,8 +178,6 @@ extern int WinObj_Convert(PyObject *, WindowPtr *);
 extern PyObject *WinObj_WhichWindow(WindowPtr);
 
 /* CF exports */
-extern PyObject *CFObj_New(CFTypeRef);
-extern int CFObj_Convert(PyObject *, CFTypeRef *);
 extern PyObject *CFTypeRefObj_New(CFTypeRef);
 extern int CFTypeRefObj_Convert(PyObject *, CFTypeRef *);
 extern PyObject *CFStringRefObj_New(CFStringRef);

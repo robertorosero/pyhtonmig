@@ -416,8 +416,8 @@ specified in the syntax using a preceeding \character{u} character:
 separating items with commas: \code{[a, b, c]}.  Tuples are
 constructed by the comma operator (not within square brackets), with
 or without enclosing parentheses, but an empty tuple must have the
-enclosing parentheses, e.g., \code{a, b, c} or \code{()}.  A single
-item tuple must have a trailing comma, e.g., \code{(d,)}.
+enclosing parentheses, such as \code{a, b, c} or \code{()}.  A single
+item tuple must have a trailing comma, such as \code{(d,)}.
 \obindex{sequence}
 \obindex{string}
 \obindex{Unicode}
@@ -530,8 +530,9 @@ In Python 2.3 and beyond, \var{x} may be a string of any length.
   \code{\var{x} = \var{i} + \var{n}*\var{k}} such that \code{0}
   \code{<=} \var{n} \code{<} \code{abs(i-j)}.  If \var{i} or \var{j}
   is greater than \code{len(\var{s})}, use \code{len(\var{s})}.  If
-  \var{i} or \var{j} are ommitted then they become ``end'' values
-  (which end depends on the sign of \var{k}).
+  \var{i} or \var{j} are omitted then they become ``end'' values
+  (which end depends on the sign of \var{k}).  Note, \var{k} cannot
+  be zero.
 
 \end{description}
 
@@ -562,7 +563,7 @@ Decodes the string using the codec registered for \var{encoding}.
 may be given to set a different error handling scheme.  The default is
 \code{'strict'}, meaning that encoding errors raise
 \exception{ValueError}.  Other possible values are \code{'ignore'} and
-\code{replace'}.
+\code{'replace'}.
 \versionadded{2.2}
 \end{methoddesc}
 
@@ -612,7 +613,8 @@ is at least one character, false otherwise.
 \end{methoddesc}
 
 \begin{methoddesc}[string]{isdigit}{}
-Return true if there are only digit characters, false otherwise.
+Return true if all characters in the string are digits and there
+is at least one character, false otherwise.
 \end{methoddesc}
 
 \begin{methoddesc}[string]{islower}{}
@@ -622,13 +624,14 @@ there is at least one cased character, false otherwise.
 
 \begin{methoddesc}[string]{isspace}{}
 Return true if there are only whitespace characters in the string and
-the string is not empty, false otherwise.
+there is at least one character, false otherwise.
 \end{methoddesc}
 
 \begin{methoddesc}[string]{istitle}{}
-Return true if the string is a titlecased string: uppercase
-characters may only follow uncased characters and lowercase characters
-only cased ones.  Return false otherwise.
+Return true if the string is a titlecased string and there is at least one
+character, i.e. uppercase characters may only follow uncased
+characters and lowercase characters only cased ones.  Return false
+otherwise.
 \end{methoddesc}
 
 \begin{methoddesc}[string]{isupper}{}
@@ -661,10 +664,10 @@ the string this method is called on.
 \versionchanged[Support for the \var{chars} argument]{2.2.2}
 \end{methoddesc}
 
-\begin{methoddesc}[string]{replace}{old, new\optional{, maxsplit}}
+\begin{methoddesc}[string]{replace}{old, new\optional{, count}}
 Return a copy of the string with all occurrences of substring
 \var{old} replaced by \var{new}.  If the optional argument
-\var{maxsplit} is given, only the first \var{maxsplit} occurrences are
+\var{count} is given, only the first \var{count} occurrences are
 replaced.
 \end{methoddesc}
 
@@ -994,9 +997,7 @@ Notes:
   no longer works in Python 2.0.  Use of this misfeature has been
   deprecated since Python 1.4.
 
-\item[(3)] Raises an exception when \var{x} is not a list object.  The
-  \method{extend()} method is experimental and not supported by
-  mutable sequence types other than lists.
+\item[(3)] Raises an exception when \var{x} is not a list object.
 
 \item[(4)] Raises \exception{ValueError} when \var{x} is not found in
   \var{s}. When a negative index is passed as the second or third parameter
@@ -1081,7 +1082,7 @@ almost arbitrary values.  Only values containing lists, dictionaries
 or other mutable types (that are compared by value rather than by
 object identity) may not be used as keys.
 Numeric types used for keys obey the normal rules for numeric
-comparison: if two numbers compare equal (e.g. \code{1} and
+comparison: if two numbers compare equal (such as \code{1} and
 \code{1.0}) then they can be used interchangeably to index the same
 dictionary entry.
 
@@ -1101,6 +1102,7 @@ arbitrary objects):
   \ttindex{clear()}
   \ttindex{copy()}
   \ttindex{has_key()}
+  \ttindex{fromkeys()}    
   \ttindex{items()}
   \ttindex{keys()}
   \ttindex{update()}
@@ -1125,7 +1127,7 @@ arbitrary objects):
   \lineiii{\var{a}.clear()}{remove all items from \code{a}}{}
   \lineiii{\var{a}.copy()}{a (shallow) copy of \code{a}}{}
   \lineiii{\var{a}.has_key(\var{k})}
-          {\code{1} if \var{a} has a key \var{k}, else \code{0}}
+          {\code{True} if \var{a} has a key \var{k}, else \code{False}}
           {}
   \lineiii{\var{k} \code{in} \var{a}}
           {Equivalent to \var{a}.has_key(\var{k})}
@@ -1267,7 +1269,7 @@ Files have the following methods:
 \end{methoddesc}
 
 \begin{methoddesc}[file]{next}{}
-A file object is its own iterator, i.e. \code{iter(\var{f})} returns
+A file object is its own iterator, for example \code{iter(\var{f})} returns
 \var{f} (unless \var{f} is closed).  When a file is used as an
 iterator, typically in a \keyword{for} loop (for example,
 \code{for line in f: print line}), the \method{next()} method is
@@ -1343,7 +1345,12 @@ flush the read-ahead buffer.
   \method{seek()} operations will be undone at the next write.  If the
   file is only opened for writing in append mode (mode \code{'a'}),
   this method is essentially a no-op, but it remains useful for files
-  opened in append mode with reading enabled (mode \code{'a+'}).
+  opened in append mode with reading enabled (mode \code{'a+'}).  If the
+  file is opened in text mode (mode \code{'t'}), only offsets returned
+  by \method{tell()} are legal.  Use of other offsets causes undefined
+  behavior.
+
+  Note that not all file objects are seekable.
 \end{methoddesc}
 
 \begin{methoddesc}[file]{tell}{}
@@ -1360,7 +1367,7 @@ flush the read-ahead buffer.
   include that file may remain unchanged, increase to the specified
   size as if zero-filled, or increase to the specified size with
   undefined new content.
-  Availability:  Windows, many \UNIX variants.
+  Availability:  Windows, many \UNIX{} variants.
 \end{methoddesc}
 
 \begin{methoddesc}[file]{write}{str}
@@ -1505,8 +1512,8 @@ same as \code{\var{m}.__dict__} where \var{m} is the module in which
 the function \var{f} was defined).
 
 Function objects also support getting and setting arbitrary
-attributes, which can be used to, e.g. attach metadata to functions.
-Regular attribute dot-notation is used to get and set such
+attributes, which can be used, for example, to attach metadata to
+functions.  Regular attribute dot-notation is used to get and set such
 attributes. \emph{Note that the current implementation only supports
 function attributes on user-defined functions.  Function attributes on
 built-in functions may be supported in the future.}

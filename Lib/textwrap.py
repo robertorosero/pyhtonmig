@@ -2,20 +2,15 @@
 """
 
 # Copyright (C) 1999-2001 Gregory P. Ward.
-# Copyright (C) 2002, 2003 Python Software Foundation.
+# Copyright (C) 2002 Python Software Foundation.
 # Written by Greg Ward <gward@python.net>
+
+# XXX currently this module does not work very well with Unicode
+# strings.  See http://www.python.org/sf/622831 for updates.
 
 __revision__ = "$Id$"
 
 import string, re
-
-# Do the right thing with boolean values for all known Python versions
-# (so this module can be copied to projects that don't depend on Python
-# 2.3, e.g. Optik and Docutils).
-try:
-    True, False
-except NameError:
-    (True, False) = (1, 0)
 
 __all__ = ['TextWrapper', 'wrap', 'fill']
 
@@ -80,7 +75,7 @@ class TextWrapper:
     # (after stripping out empty strings).
     wordsep_re = re.compile(r'(\s+|'                  # any whitespace
                             r'-*\w{2,}-(?=\w{2,})|'   # hyphenated words
-                            r'(?<=[\w\!\"\'\&\.\,\?])-{2,}(?=\w))')   # em-dash
+                            r'(?<=\S)-{2,}(?=\w))')   # em-dash
 
     # XXX will there be a locale-or-charset-aware version of
     # string.lowercase in 2.3?
@@ -202,8 +197,6 @@ class TextWrapper:
         lines, but apart from that whitespace is preserved.
         """
         lines = []
-        if self.width <= 0:
-            raise ValueError("invalid width %r (must be > 0)" % self.width)
 
         while chunks:
 
@@ -311,45 +304,3 @@ def fill(text, width=70, **kwargs):
     """
     w = TextWrapper(width=width, **kwargs)
     return w.fill(text)
-
-
-# -- Loosely related functionality -------------------------------------
-
-def dedent(text):
-    """dedent(text : string) -> string
-
-    Remove any whitespace than can be uniformly removed from the left
-    of every line in `text`.
-
-    This can be used e.g. to make triple-quoted strings line up with
-    the left edge of screen/whatever, while still presenting it in the
-    source code in indented form.
-
-    For example:
-
-        def test():
-            # end first line with \ to avoid the empty line!
-            s = '''\
-            hello
-              world
-            '''
-            print repr(s)          # prints '    hello\n      world\n    '
-            print repr(dedent(s))  # prints 'hello\n  world\n'
-    """
-    lines = text.expandtabs().split('\n')
-    margin = None
-    for line in lines:
-        content = line.lstrip()
-        if not content:
-            continue
-        indent = len(line) - len(content)
-        if margin is None:
-            margin = indent
-        else:
-            margin = min(margin, indent)
-
-    if margin is not None and margin > 0:
-        for i in range(len(lines)):
-            lines[i] = lines[i][margin:]
-
-    return '\n'.join(lines)

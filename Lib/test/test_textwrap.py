@@ -11,7 +11,7 @@
 import unittest
 from test import test_support
 
-from textwrap import TextWrapper, wrap, fill, dedent
+from textwrap import TextWrapper, wrap, fill
 
 
 class BaseTestCase(unittest.TestCase):
@@ -224,27 +224,11 @@ What a mess!
         self.check_split("what the--.", ["what", " ", "the--."])
         self.check_split("--text--.", ["--text--."])
 
-        # When I first read bug #596434, this is what I thought David
-        # was talking about.  I was wrong; these have always worked
-        # fine.  The real problem is tested in test_funky_parens()
-        # below...
+        # My initial mis-interpretation of part of the bug report --
+        # These were always handled correctly, but it can't hurt to make
+        # sure that they *stay* correct!
         self.check_split("--option", ["--option"])
         self.check_split("--option-opt", ["--option-", "opt"])
-        self.check_split("foo --option-opt bar",
-                         ["foo", " ", "--option-", "opt", " ", "bar"])
-
-    def test_funky_parens (self):
-        # Second part of SF bug #596434: long option strings inside
-        # parentheses.
-        self.check_split("foo (--option) bar",
-                         ["foo", " ", "(--option)", " ", "bar"])
-
-        # Related stuff -- make sure parens work in simpler contexts.
-        self.check_split("foo (bar) baz",
-                         ["foo", " ", "(bar)", " ", "baz"])
-        self.check_split("blah (ding dong), wubba",
-                         ["blah", " ", "(ding", " ", "dong),",
-                          " ", "wubba"])
 
     def test_initial_whitespace(self):
         # SF bug #622849 reported inconsistent handling of leading
@@ -277,12 +261,6 @@ What a mess!
         self.check(result,
              ["Hello", " ", "there", " ", "--", " ", "you", " ", "goof-",
               "ball,", " ", "use", " ", "the", " ", "-b", " ",  "option!"])
-
-    def test_bad_width(self):
-        # Ensure that width <= 0 is caught.
-        text = "Whatever, it doesn't matter."
-        self.assertRaises(ValueError, wrap, text, 0)
-        self.assertRaises(ValueError, wrap, text, -1)
 
 
 class LongWordTestCase (BaseTestCase):
@@ -321,6 +299,7 @@ How *do* you spell that odd word, anyways?
         # Same thing with kwargs passed to standalone wrap() function.
         result = wrap(self.text, width=30, break_long_words=0)
         self.check(result, expect)
+
 
 
 class IndentTestCases(BaseTestCase):
@@ -372,74 +351,12 @@ some (including a hanging indent).'''
         self.check(result, expect)
 
 
-# Despite the similar names, DedentTestCase is *not* the inverse
-# of IndentTestCase!
-class DedentTestCase(unittest.TestCase):
-
-    def test_dedent_nomargin(self):
-        # No lines indented.
-        text = "Hello there.\nHow are you?\nOh good, I'm glad."
-        self.assertEquals(dedent(text), text)
-
-        # Similar, with a blank line.
-        text = "Hello there.\n\nBoo!"
-        self.assertEquals(dedent(text), text)
-
-        # Some lines indented, but overall margin is still zero.
-        text = "Hello there.\n  This is indented."
-        self.assertEquals(dedent(text), text)
-
-        # Again, add a blank line.
-        text = "Hello there.\n\n  Boo!\n"
-        self.assertEquals(dedent(text), text)
-
-    def test_dedent_even(self):
-        # All lines indented by two spaces.
-        text = "  Hello there.\n  How are ya?\n  Oh good."
-        expect = "Hello there.\nHow are ya?\nOh good."
-        self.assertEquals(dedent(text), expect)
-
-        # Same, with blank lines.
-        text = "  Hello there.\n\n  How are ya?\n  Oh good.\n"
-        expect = "Hello there.\n\nHow are ya?\nOh good.\n"
-        self.assertEquals(dedent(text), expect)
-
-        # Now indent one of the blank lines.
-        text = "  Hello there.\n  \n  How are ya?\n  Oh good.\n"
-        expect = "Hello there.\n\nHow are ya?\nOh good.\n"
-        self.assertEquals(dedent(text), expect)
-
-    def test_dedent_uneven(self):
-        # Lines indented unevenly.
-        text = '''\
-        def foo():
-            while 1:
-                return foo
-        '''
-        expect = '''\
-def foo():
-    while 1:
-        return foo
-'''
-        self.assertEquals(dedent(text), expect)
-
-        # Uneven indentation with a blank line.
-        text = "  Foo\n    Bar\n\n   Baz\n"
-        expect = "Foo\n  Bar\n\n Baz\n"
-        self.assertEquals(dedent(text), expect)
-
-        # Uneven indentation with a whitespace-only line.
-        text = "  Foo\n    Bar\n \n   Baz\n"
-        expect = "Foo\n  Bar\n\n Baz\n"
-        self.assertEquals(dedent(text), expect)
-
-
-
 def test_main():
-    test_support.run_unittest(WrapTestCase,
-                              LongWordTestCase,
-                              IndentTestCases,
-                              DedentTestCase)
+    suite = unittest.TestSuite()
+    suite.addTest(unittest.makeSuite(WrapTestCase))
+    suite.addTest(unittest.makeSuite(LongWordTestCase))
+    suite.addTest(unittest.makeSuite(IndentTestCases))
+    test_support.run_suite(suite)
 
 if __name__ == '__main__':
     test_main()

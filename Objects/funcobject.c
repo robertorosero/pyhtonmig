@@ -2,7 +2,7 @@
 /* Function object implementation */
 
 #include "Python.h"
-#include "compile.h"
+#include "code.h"
 #include "eval.h"
 #include "structmember.h"
 
@@ -316,11 +316,8 @@ func_new(PyTypeObject* type, PyObject* args, PyObject* kw)
 	PyObject *closure = Py_None;
 	PyFunctionObject *newfunc;
 	int nfree, nclosure;
-	static char *kwlist[] = {"code", "globals", "name",
-				 "argdefs", "closure", 0};
 
-	if (!PyArg_ParseTupleAndKeywords(args, kw, "O!O!|OOO:function",
-			      kwlist,
+	if (!PyArg_ParseTuple(args, "O!O!|OOO:function",
 			      &PyCode_Type, &code,
 			      &PyDict_Type, &globals,
 			      &name, &defaults, &closure))
@@ -640,12 +637,6 @@ cm_init(PyObject *self, PyObject *args, PyObject *kwds)
 
 	if (!PyArg_UnpackTuple(args, "classmethod", 1, 1, &callable))
 		return -1;
-	if (!PyCallable_Check(callable)) {
-		PyErr_Format(PyExc_TypeError, "'%s' object is not callable",
-		     callable->ob_type->tp_name);
-		return -1;
-	}
-	
 	Py_INCREF(callable);
 	cm->cm_callable = callable;
 	return 0;

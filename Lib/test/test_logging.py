@@ -26,12 +26,17 @@ Copyright (C) 2001-2002 Vinay Sajip. All Rights Reserved.
 
 import select
 import os, sys, string, struct, types, cPickle, cStringIO
-import socket, threading, time
+import socket, threading, time, locale
 import logging, logging.handlers, logging.config
 
-BANNER = "-- %-10s %-6s ---------------------------------------------------\n"
+try:
+    locale.setlocale(locale.LC_ALL, '')
+except (ValueError, locale.Error):
+    # this happens on a Solaris box which only supports "C" locale
+    # or a Mac OS X box which supports very little locale stuff at all
+    pass
 
-FINISH_UP = "Finish up, it's closing time. Messages should bear numbers 0 through 24."
+BANNER = "-- %-10s %-6s ---------------------------------------------------\n"
 
 #----------------------------------------------------------------------------
 # Log receiver
@@ -63,7 +68,8 @@ class LogRecordStreamHandler(StreamRequestHandler):
                 while len(chunk) < slen:
                     chunk = chunk + self.connection.recv(slen - len(chunk))
                 obj = self.unPickle(chunk)
-                record = logging.makeLogRecord(obj)
+                record = logging.LogRecord(None, None, "", 0, "", (), None)
+                record.__dict__.update(obj)
                 self.handleLogRecord(record)
             except:
                 raise
@@ -73,15 +79,9 @@ class LogRecordStreamHandler(StreamRequestHandler):
 
     def handleLogRecord(self, record):
         logname = "logrecv.tcp." + record.name
-        #If the end-of-messages sentinel is seen, tell the server to terminate
-        if record.msg == FINISH_UP:
-            self.server.abort = 1
         record.msg = record.msg + " (via " + logname + ")"
         logger = logging.getLogger(logname)
         logger.handle(record)
-
-# The server sets socketDataProcessed when it's done.
-socketDataProcessed = threading.Event()
 
 class LogRecordSocketReceiver(ThreadingTCPServer):
     """
@@ -107,8 +107,6 @@ class LogRecordSocketReceiver(ThreadingTCPServer):
             if rd:
                 self.handle_request()
             abort = self.abort
-        #notify the main thread that we're about to exit
-        socketDataProcessed.set()
 
     def process_request(self, request, client_address):
         #import threading
@@ -197,7 +195,7 @@ def test0():
     INF_ERR_UNDEF.info(nextmessage())
     INF_ERR_UNDEF.debug(nextmessage())
 
-    INF.info(FINISH_UP)
+    INF.info("Messages should bear numbers 0 through 24.")
 
 #----------------------------------------------------------------------------
 # Test 1
@@ -400,7 +398,7 @@ def banner(nm, typ):
     sys.stdout.write(sep)
     sys.stdout.flush()
 
-def test_main_inner():
+def test_main():
     rootLogger = logging.getLogger("")
     rootLogger.setLevel(logging.DEBUG)
     hdlr = logging.StreamHandler(sys.stdout)
@@ -457,8 +455,8 @@ def test_main_inner():
         banner("log_test3", "end")
 
     finally:
-        #wait for TCP receiver to terminate
-        socketDataProcessed.wait()
+        #shut down server
+        tcpserver.abort = 1
         for thread in threads:
             thread.join()
         banner("logrecv output", "begin")
@@ -466,25 +464,6 @@ def test_main_inner():
         sockOut.close()
         banner("logrecv output", "end")
         sys.stdout.flush()
-
-def test_main():
-    import locale
-    # Set the locale to the platform-dependent default.  I have no idea
-    # why the test does this, but in any case we save the current locale
-    # first so we can restore it at the end.
-    try:
-        original_locale = locale.setlocale(locale.LC_ALL)
-        locale.setlocale(locale.LC_ALL, '')
-    except (ValueError, locale.Error):
-        # this happens on a Solaris box which only supports "C" locale
-        # or a Mac OS X box which supports very little locale stuff at all
-        original_locale = None
-
-    try:
-        test_main_inner()
-    finally:
-        if original_locale is not None:
-            locale.setlocale(locale.LC_ALL, original_locale)
 
 if __name__ == "__main__":
     sys.stdout.write("test_logging\n")

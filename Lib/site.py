@@ -158,12 +158,11 @@ def addpackage(sitedir, name):
         _dirs_in_sys_path = None
 
 prefixes = [sys.prefix]
-sitedir = None # make sure sitedir is initialized because of later 'del'
 if sys.exec_prefix != sys.prefix:
     prefixes.append(sys.exec_prefix)
 for prefix in prefixes:
     if prefix:
-        if sys.platform in ('os2emx', 'riscos'):
+        if sys.platform == 'os2emx':
             sitedirs = [os.path.join(prefix, "Lib", "site-packages")]
         elif os.sep == '/':
             sitedirs = [os.path.join(prefix,
@@ -178,7 +177,7 @@ for prefix in prefixes:
             # locations. Currently only per-user, but /Library and
             # /Network/Library could be added too
             if 'Python.framework' in prefix:
-                home = os.environ.get('HOME')
+                home = os.environ['HOME']
                 if home:
                     sitedirs.append(
                         os.path.join(home,

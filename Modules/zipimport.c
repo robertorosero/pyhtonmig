@@ -91,7 +91,6 @@ zipimporter_init(ZipImporter *self, PyObject *args, PyObject *kwds)
 	path = NULL;
 	prefix = NULL;
 	for (;;) {
-#ifndef RISCOS
 		struct stat statbuf;
 		int rv;
 
@@ -103,15 +102,6 @@ zipimporter_init(ZipImporter *self, PyObject *args, PyObject *kwds)
 				path = buf;
 			break;
 		}
-#else
-		if (object_exists(buf)) {
-			/* it exists */
-			if (isfile(buf))
-				/* it's a file */
-				path = buf;
-			break;
-		}
-#endif
 		/* back up one path element */
 		p = strrchr(buf, SEP);
 		if (prefix != NULL)
@@ -655,12 +645,11 @@ read_directory(char *archive)
 	PyObject *files = NULL;
 	FILE *fp;
 	long compress, crc, data_size, file_size, file_offset, date, time;
-	long header_offset, name_size, header_size, header_position;
+	long header_offset, name_size, header_size, header_end;
 	long i, l, length, count;
 	char path[MAXPATHLEN + 5];
 	char name[MAXPATHLEN + 5];
 	char *p, endof_central_dir[22];
-	long arc_offset; /* offset from beginning of file to start of zip-archive */
 
 	if (strlen(archive) > MAXPATHLEN) {
 		PyErr_SetString(PyExc_OverflowError,
@@ -676,7 +665,7 @@ read_directory(char *archive)
 		return NULL;
 	}
 	fseek(fp, -22, SEEK_END);
-	header_position = ftell(fp);
+	header_end = ftell(fp);
 	if (fread(endof_central_dir, 1, 22, fp) != 22) {
 		fclose(fp);
 		PyErr_Format(ZipImportError, "can't read Zip file: "
@@ -691,10 +680,7 @@ read_directory(char *archive)
 		return NULL;
 	}
 
-	header_size = get_long((unsigned char *)endof_central_dir + 12);
 	header_offset = get_long((unsigned char *)endof_central_dir + 16);
-	arc_offset = header_position - header_offset - header_size;
-	header_offset += arc_offset;
 
 	files = PyDict_New();
 	if (files == NULL)
@@ -725,7 +711,7 @@ read_directory(char *archive)
 		   PyMarshal_ReadShortFromFile(fp) +
 		   PyMarshal_ReadShortFromFile(fp);
 		fseek(fp, header_offset + 42, 0);
-		file_offset = PyMarshal_ReadLongFromFile(fp) + arc_offset;
+		file_offset = PyMarshal_ReadLongFromFile(fp);
 		if (name_size > MAXPATHLEN)
 			name_size = MAXPATHLEN;
 

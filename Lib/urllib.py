@@ -577,7 +577,10 @@ class FancyURLopener(URLopener):
         fp.close()
         # In case the server sent a relative URL, join with original:
         newurl = basejoin(self.type + ":" + url, newurl)
-        return self.open(newurl)
+        if data is None:
+            return self.open(newurl)
+        else:
+            return self.open(newurl, data)
 
     def http_error_301(self, url, fp, errcode, errmsg, headers, data=None):
         """Error 301 -- also relocated (permanently)."""
@@ -586,13 +589,6 @@ class FancyURLopener(URLopener):
     def http_error_303(self, url, fp, errcode, errmsg, headers, data=None):
         """Error 303 -- also relocated (essentially identical to 302)."""
         return self.http_error_302(url, fp, errcode, errmsg, headers, data)
-
-    def http_error_307(self, url, fp, errcode, errmsg, headers, data=None):
-        """Error 307 -- relocated, but turn POST into error."""
-        if data is None:
-            return self.http_error_302(url, fp, errcode, errmsg, headers, data)
-        else:
-            return self.http_error_default(url, fp, errcode, errmsg, headers)
 
     def http_error_401(self, url, fp, errcode, errmsg, headers, data=None):
         """Error 401 -- authentication required.

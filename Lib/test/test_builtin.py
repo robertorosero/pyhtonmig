@@ -2,7 +2,6 @@
 
 import test.test_support, unittest
 from test.test_support import fcmp, have_unicode, TESTFN, unlink
-from sets import Set
 
 import sys, warnings, cStringIO
 warnings.filterwarnings("ignore", "hex../oct.. of negative int",
@@ -200,6 +199,62 @@ class BuiltinTest(unittest.TestCase):
         self.assertRaises(ValueError, compile, 'print 42\n', '<string>', 'single', 0xff)
         if have_unicode:
             compile(unicode('print u"\xc3\xa5"\n', 'utf8'), '', 'exec')
+
+    def test_complex(self):
+        class OS:
+            def __complex__(self): return 1+10j
+        class NS(object):
+            def __complex__(self): return 1+10j
+        self.assertEqual(complex(OS()), 1+10j)
+        self.assertEqual(complex(NS()), 1+10j)
+        self.assertEqual(complex("1+10j"), 1+10j)
+        self.assertEqual(complex(10), 10+0j)
+        self.assertEqual(complex(10.0), 10+0j)
+        self.assertEqual(complex(10L), 10+0j)
+        self.assertEqual(complex(10+0j), 10+0j)
+        self.assertEqual(complex(1,10), 1+10j)
+        self.assertEqual(complex(1,10L), 1+10j)
+        self.assertEqual(complex(1,10.0), 1+10j)
+        self.assertEqual(complex(1L,10), 1+10j)
+        self.assertEqual(complex(1L,10L), 1+10j)
+        self.assertEqual(complex(1L,10.0), 1+10j)
+        self.assertEqual(complex(1.0,10), 1+10j)
+        self.assertEqual(complex(1.0,10L), 1+10j)
+        self.assertEqual(complex(1.0,10.0), 1+10j)
+        self.assertEqual(complex(3.14+0j), 3.14+0j)
+        self.assertEqual(complex(3.14), 3.14+0j)
+        self.assertEqual(complex(314), 314.0+0j)
+        self.assertEqual(complex(314L), 314.0+0j)
+        self.assertEqual(complex(3.14+0j, 0j), 3.14+0j)
+        self.assertEqual(complex(3.14, 0.0), 3.14+0j)
+        self.assertEqual(complex(314, 0), 314.0+0j)
+        self.assertEqual(complex(314L, 0L), 314.0+0j)
+        self.assertEqual(complex(0j, 3.14j), -3.14+0j)
+        self.assertEqual(complex(0.0, 3.14j), -3.14+0j)
+        self.assertEqual(complex(0j, 3.14), 3.14j)
+        self.assertEqual(complex(0.0, 3.14), 3.14j)
+        self.assertEqual(complex("1"), 1+0j)
+        self.assertEqual(complex("1j"), 1j)
+
+        c = 3.14 + 1j
+        self.assert_(complex(c) is c)
+        del c
+
+        self.assertRaises(TypeError, complex, "1", "1")
+        self.assertRaises(TypeError, complex, 1, "1")
+
+        self.assertEqual(complex("  3.14+J  "), 3.14+1j)
+        if have_unicode:
+            self.assertEqual(complex(unicode("  3.14+J  ")), 3.14+1j)
+
+        # SF bug 543840:  complex(string) accepts strings with \0
+        # Fixed in 2.3.
+        self.assertRaises(ValueError, complex, '1+1j\0j')
+
+        class Z:
+            def __complex__(self): return 3.14j
+        z = Z()
+        self.assertEqual(complex(z), 3.14j)
 
     def test_delattr(self):
         import sys
@@ -1104,9 +1159,18 @@ class BuiltinTest(unittest.TestCase):
     get_vars_f2 = staticmethod(get_vars_f2)
 
     def test_vars(self):
-        self.assertEqual(Set(vars()), Set(dir()))
+        a = b = None
+        a = vars().keys()
+        b = dir()
+        a.sort()
+        b.sort()
+        self.assertEqual(a, b)
         import sys
-        self.assertEqual(Set(vars(sys)), Set(dir(sys)))
+        a = vars(sys).keys()
+        b = dir(sys)
+        a.sort()
+        b.sort()
+        self.assertEqual(a, b)
         self.assertEqual(self.get_vars_f0(), {})
         self.assertEqual(self.get_vars_f2(), {'a': 1, 'b': 2})
         self.assertRaises(TypeError, vars, 42, 42)
@@ -1155,7 +1219,9 @@ class BuiltinTest(unittest.TestCase):
         self.assertRaises(ValueError, zip, BadSeq(), BadSeq())
 
 def test_main():
-    test.test_support.run_unittest(BuiltinTest)
+    suite = unittest.TestSuite()
+    suite.addTest(unittest.makeSuite(BuiltinTest))
+    test.test_support.run_suite(suite)
 
 if __name__ == "__main__":
     test_main()

@@ -8,7 +8,7 @@
 # regression test, the filterwarnings() call has been added to
 # regrtest.py.
 
-from test.test_support import TestFailed, verify, check_syntax
+from test.test_support import TestFailed, verify, vereq, check_syntax
 import sys
 
 print '1. Parser'
@@ -157,28 +157,31 @@ def f2(one_argument): pass
 def f3(two, arguments): pass
 def f4(two, (compound, (argument, list))): pass
 def f5((compound, first), two): pass
-verify(f2.func_code.co_varnames == ('one_argument',))
-verify(f3.func_code.co_varnames == ('two', 'arguments'))
+vereq(f2.func_code.co_varnames, ('one_argument',))
+vereq(f3.func_code.co_varnames, ('two', 'arguments'))
 if sys.platform.startswith('java'):
-    verify(f4.func_code.co_varnames ==
+    vereq(f4.func_code.co_varnames,
            ('two', '(compound, (argument, list))', 'compound', 'argument',
                         'list',))
-    verify(f5.func_code.co_varnames ==
+    vereq(f5.func_code.co_varnames,
            ('(compound, first)', 'two', 'compound', 'first'))
 else:
-    verify(f4.func_code.co_varnames == ('two', '.2', 'compound',
-                                        'argument',  'list'))
-    verify(f5.func_code.co_varnames == ('.0', 'two', 'compound', 'first'))
+    vereq(f4.func_code.co_varnames,
+          ('two', '.1', 'compound', 'argument',  'list'))
+    vereq(f5.func_code.co_varnames,
+          ('.0', 'two', 'compound', 'first'))
 def a1(one_arg,): pass
 def a2(two, args,): pass
 def v0(*rest): pass
 def v1(a, *rest): pass
 def v2(a, b, *rest): pass
 def v3(a, (b, c), *rest): return a, b, c, rest
+# ceval unpacks the formal arguments into the first argcount names;
+# thus, the names nested inside tuples must appear after these names.
 if sys.platform.startswith('java'):
     verify(v3.func_code.co_varnames == ('a', '(b, c)', 'rest', 'b', 'c'))
 else:
-    verify(v3.func_code.co_varnames == ('a', '.2', 'rest', 'b', 'c'))
+    vereq(v3.func_code.co_varnames, ('a', '.1', 'rest', 'b', 'c'))
 verify(v3(1, (2, 3), 4) == (1, 2, 3, (4,)))
 def d01(a=1): pass
 d01()
@@ -701,7 +704,6 @@ print [3 * x for x in nums]
 print [x for x in nums if x > 2]
 print [(i, s) for i in nums for s in strs]
 print [(i, s) for i in nums for s in [f for f in strs if "n" in f]]
-print [(lambda a:[a**i for i in range(a+1)])(j) for j in range(5)]
 
 def test_in_func(l):
     return [None < x < 3 for x in l if x > 2]

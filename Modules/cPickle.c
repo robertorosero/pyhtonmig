@@ -833,12 +833,8 @@ whichmodule(PyObject *global, PyObject *global_name)
 		*global_name_attr = 0, *name = 0;
 
 	module = PyObject_GetAttrString(global, "__module__");
-	if (module) 
-		return module;
-	if (PyErr_ExceptionMatches(PyExc_AttributeError))
-		PyErr_Clear();
-	else
-		return NULL;
+	if (module) return module;
+	PyErr_Clear();
 
 	if (!( modules_dict = PySys_GetObject("modules")))
 		return NULL;
@@ -850,10 +846,7 @@ whichmodule(PyObject *global, PyObject *global_name)
 
 		global_name_attr = PyObject_GetAttr(module, global_name);
 		if (!global_name_attr)  {
-			if (PyErr_ExceptionMatches(PyExc_AttributeError))
-				PyErr_Clear();
-			else
-				return NULL;
+			PyErr_Clear();
 			continue;
 		}
 
@@ -1821,10 +1814,7 @@ save_inst(Picklerobject *self, PyObject *args)
 		}
 	}
 	else {
-		if (PyErr_ExceptionMatches(PyExc_AttributeError))
-			PyErr_Clear();
-		else
-			goto finally;
+		PyErr_Clear();
 	}
 
 	if (!self->bin) {
@@ -1869,16 +1859,10 @@ save_inst(Picklerobject *self, PyObject *args)
 			goto finally;
 	}
 	else {
-		if (PyErr_ExceptionMatches(PyExc_AttributeError))
-			PyErr_Clear();
-		else
-			goto finally;
+		PyErr_Clear();
 
 		if (!( state = PyObject_GetAttr(args, __dict___str)))  {
-			if (PyErr_ExceptionMatches(PyExc_AttributeError))
-				PyErr_Clear();
-			else
-				goto finally;
+			PyErr_Clear();
 			res = 0;
 			goto finally;
 		}
@@ -2157,10 +2141,7 @@ save_reduce(Picklerobject *self, PyObject *args, PyObject *ob)
         	PyObject *temp = PyObject_GetAttr(callable, __name___str);
 
 		if (temp == NULL) {
-			if (PyErr_ExceptionMatches(PyExc_AttributeError))
-				PyErr_Clear();
-			else
-				return -1;
+			PyErr_Clear();
 			use_newobj = 0;
 		}
 		else {
@@ -2195,13 +2176,8 @@ save_reduce(Picklerobject *self, PyObject *args, PyObject *ob)
 			PyObject *ob_dot_class;
 
 			ob_dot_class = PyObject_GetAttr(ob, __class___str);
-			if (ob_dot_class == NULL) {
-				if (PyErr_ExceptionMatches(
-					    PyExc_AttributeError))
-					PyErr_Clear();
-				else
-					return -1;
-			}
+			if (ob_dot_class == NULL)
+				PyErr_Clear();
 			i = ob_dot_class != cls; /* true iff a problem */
 			Py_XDECREF(ob_dot_class);
 			if (i) {
@@ -2471,10 +2447,7 @@ save(Picklerobject *self, PyObject *args, int pers_save)
 			}
 		}
 		else {
-			if (PyErr_ExceptionMatches(PyExc_AttributeError))
-				PyErr_Clear();
-			else
-				goto finally;
+			PyErr_Clear();
 			/* Check for a __reduce__ method. */
 			__reduce__ = PyObject_GetAttr(args, __reduce___str);
 			if (__reduce__ != NULL) {
@@ -2880,7 +2853,7 @@ Pickler_dealloc(Picklerobject *self)
 	Py_XDECREF(self->inst_pers_func);
 	Py_XDECREF(self->dispatch_table);
 	PyMem_Free(self->write_buf);
-	self->ob_type->tp_free((PyObject *)self);
+	PyObject_GC_Del(self);
 }
 
 static int
@@ -3591,7 +3564,7 @@ Instance_New(PyObject *cls, PyObject *args)
 			PyObject *__getinitargs__;
 
 			__getinitargs__ = PyObject_GetAttr(cls,
-						   __getinitargs___str);
+							   __getinitargs___str);
 			if (!__getinitargs__)  {
 				/* We have a class with no __getinitargs__,
 				   so bypass usual construction  */
@@ -4280,8 +4253,6 @@ load_build(Unpicklerobject *self)
 		Py_DECREF(junk);
 		return 0;
 	}
-	if (!PyErr_ExceptionMatches(PyExc_AttributeError))
-		return -1;
 	PyErr_Clear();
 
 	/* A default __setstate__.  First see whether state embeds a
@@ -5232,7 +5203,6 @@ Unpickler_dealloc(Unpicklerobject *self)
 	Py_XDECREF(self->pers_func);
 	Py_XDECREF(self->arg);
 	Py_XDECREF(self->last_string);
-	Py_XDECREF(self->find_class);
 
 	if (self->marks) {
 		free(self->marks);
@@ -5242,7 +5212,7 @@ Unpickler_dealloc(Unpicklerobject *self)
 		free(self->buf);
 	}
 
-	self->ob_type->tp_free((PyObject *)self);
+	PyObject_GC_Del(self);
 }
 
 static int
@@ -5264,7 +5234,6 @@ Unpickler_traverse(Unpicklerobject *self, visitproc visit, void *arg)
 	VISIT(self->pers_func);
 	VISIT(self->arg);
 	VISIT(self->last_string);
-	VISIT(self->find_class);
 #undef VISIT
 	return 0;
 }
@@ -5281,7 +5250,6 @@ Unpickler_clear(Unpicklerobject *self)
 	CLEAR(self->pers_func);
 	CLEAR(self->arg);
 	CLEAR(self->last_string);
-	CLEAR(self->find_class);
 #undef CLEAR
 	return 0;
 }
@@ -5565,11 +5533,6 @@ init_stuff(PyObject *module_dict)
 	PyObject *copy_reg, *t, *r;
 
 #define INIT_STR(S) if (!( S ## _str=PyString_InternFromString(#S)))  return -1;
-
-	if (PyType_Ready(&Unpicklertype) < 0)
-		return -1;
-	if (PyType_Ready(&Picklertype) < 0)
-		return -1;
 
 	INIT_STR(__class__);
 	INIT_STR(__getinitargs__);

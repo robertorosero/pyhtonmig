@@ -120,7 +120,6 @@ except AttributeError:
 d[types.TypeType] = _copy_atomic
 d[types.XRangeType] = _copy_atomic
 d[types.ClassType] = _copy_atomic
-d[types.BuiltinFunctionType] = _copy_atomic
 
 def _copy_list(x):
     return x[:]
@@ -234,7 +233,6 @@ except AttributeError:
 d[types.TypeType] = _deepcopy_atomic
 d[types.XRangeType] = _deepcopy_atomic
 d[types.ClassType] = _deepcopy_atomic
-d[types.BuiltinFunctionType] = _deepcopy_atomic
 
 def _deepcopy_list(x, memo):
     y = []
@@ -336,7 +334,6 @@ def _reconstruct(x, info, deep, memo=None):
     if deep:
         args = deepcopy(args, memo)
     y = callable(*args)
-    memo[id(x)] = y
     if listiter is not None:
         for item in listiter:
             if deep:

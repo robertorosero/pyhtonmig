@@ -421,26 +421,14 @@ list_repeat(PyListObject *a, int n)
 	int size;
 	PyListObject *np;
 	PyObject **p;
-	PyObject *elem;
 	if (n < 0)
 		n = 0;
 	size = a->ob_size * n;
-	if (size == 0)
-              return PyList_New(0);
 	if (n && size/n != a->ob_size)
 		return PyErr_NoMemory();
 	np = (PyListObject *) PyList_New(size);
 	if (np == NULL)
 		return NULL;
-
-	if (a->ob_size == 1) {
-		elem = a->ob_item[0];
-		for (i = 0; i < n; i++) {
-			np->ob_item[i] = elem;
-			Py_INCREF(elem);
-		}
-		return (PyObject *) np;
-	}
 	p = np->ob_item;
 	for (i = 0; i < n; i++) {
 		for (j = 0; j < a->ob_size; j++) {
@@ -485,8 +473,6 @@ list_ass_slice(PyListObject *a, int ilow, int ihigh, PyObject *v)
 			/* Special case "a[i:j] = a" -- copy b first */
 			int ret;
 			v = list_slice(b, 0, n);
-			if (v == NULL)
-				return -1;
 			ret = list_ass_slice(a, ilow, ihigh, v);
 			Py_DECREF(v);
 			return ret;
@@ -502,13 +488,8 @@ list_ass_slice(PyListObject *a, int ilow, int ihigh, PyObject *v)
 		ihigh = a->ob_size;
 	item = a->ob_item;
 	d = n - (ihigh-ilow);
-	if (ihigh > ilow) {
+	if (ihigh > ilow)
 		p = recycle = PyMem_NEW(PyObject *, (ihigh-ilow));
-		if (recycle == NULL) {
-			PyErr_NoMemory();
-			return -1;
-		}
-	}
 	else
 		p = recycle = NULL;
 	if (d <= 0) { /* Delete -d items; recycle ihigh-ilow items */
@@ -1827,28 +1808,11 @@ PyList_AsTuple(PyObject *v)
 }
 
 static PyObject *
-listindex(PyListObject *self, PyObject *args)
+listindex(PyListObject *self, PyObject *v)
 {
-	int i, start=0, stop=self->ob_size;
-	PyObject *v;
+	int i;
 
-	if (!PyArg_ParseTuple(args, "O|O&O&:index", &v,
-	                            _PyEval_SliceIndex, &start,
-	                            _PyEval_SliceIndex, &stop))
-		return NULL;
-	if (start < 0) {
-		start += self->ob_size;
-		if (start < 0)
-			start = 0;
-	}
-	if (stop < 0) {
-		stop += self->ob_size;
-		if (stop < 0)
-			stop = 0;
-	}
-	else if (stop > self->ob_size)
-		stop = self->ob_size;
-	for (i = start; i < stop; i++) {
+	for (i = 0; i < self->ob_size; i++) {
 		int cmp = PyObject_RichCompareBool(self->ob_item[i], v, Py_EQ);
 		if (cmp > 0)
 			return PyInt_FromLong((long)i);
@@ -2105,7 +2069,7 @@ PyDoc_STRVAR(pop_doc,
 PyDoc_STRVAR(remove_doc,
 "L.remove(value) -- remove first occurrence of value");
 PyDoc_STRVAR(index_doc,
-"L.index(value, [start, [stop]]) -> integer -- return first index of value");
+"L.index(value) -> integer -- return index of first occurrence of value");
 PyDoc_STRVAR(count_doc,
 "L.count(value) -> integer -- return number of occurrences of value");
 PyDoc_STRVAR(reverse_doc,
@@ -2119,7 +2083,7 @@ static PyMethodDef list_methods[] = {
 	{"extend",      (PyCFunction)listextend,  METH_O, extend_doc},
 	{"pop",		(PyCFunction)listpop, 	  METH_VARARGS, pop_doc},
 	{"remove",	(PyCFunction)listremove,  METH_O, remove_doc},
-	{"index",	(PyCFunction)listindex,   METH_VARARGS, index_doc},
+	{"index",	(PyCFunction)listindex,   METH_O, index_doc},
 	{"count",	(PyCFunction)listcount,   METH_O, count_doc},
 	{"reverse",	(PyCFunction)listreverse, METH_NOARGS, reverse_doc},
 	{"sort",	(PyCFunction)listsort, 	  METH_VARARGS, sort_doc},
@@ -2411,6 +2375,8 @@ list_iter(PyObject *seq)
 		PyErr_BadInternalCall();
 		return NULL;
 	}
+	if (seq->ob_type->tp_as_sequence->sq_item != (intargfunc)list_item)
+		return PySeqIter_New(seq);
 	it = PyObject_GC_New(listiterobject, &PyListIter_Type);
 	if (it == NULL)
 		return NULL;

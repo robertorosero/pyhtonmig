@@ -14,9 +14,15 @@ class TestShutil(unittest.TestCase):
 
 
 
+def suite():
+    suite = unittest.TestSuite()
+    suite.addTest(unittest.makeSuite(TestShutil))
+    return suite
+
+
 def test_main():
-    test_support.run_unittest(TestShutil)
+    test_support.run_suite(suite())
 
 
 if __name__ == '__main__':
-    test_main()
+    unittest.main(defaultTest='suite')

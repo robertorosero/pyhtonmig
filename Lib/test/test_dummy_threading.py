@@ -12,10 +12,7 @@ class TestThread(_threading.Thread):
 
     def run(self):
         global running
-        # Uncomment if testing another module, such as the real 'threading'
-        # module.
-        #delay = random.random() * 2
-        delay = 0
+        delay = random.random() * 2
         if verbose:
             print 'task', self.getName(), 'will run for', delay, 'sec'
         sema.acquire()

@@ -24,8 +24,7 @@
 #if (PY_MAJOR_VERSION == 2 && PY_MINOR_VERSION < 2)
 /* In Python 2.0 and  2.1, disabling Unicode was not possible. */
 #define Py_USING_UNICODE
-#else
-#define FIX_TRACE
+#define NOFIX_TRACE
 #endif
 
 enum HandlerTypes {
@@ -294,7 +293,7 @@ getcode(enum HandlerTypes slot, char* func_name, int lineno)
     return NULL;
 }
 
-#ifdef FIX_TRACE
+#ifndef NOFIX_TRACE
 static int
 trace_frame(PyThreadState *tstate, PyFrameObject *f, int code, PyObject *val)
 {
@@ -321,37 +320,6 @@ trace_frame(PyThreadState *tstate, PyFrameObject *f, int code, PyObject *val)
     }	
     return result;
 }
-
-static int
-trace_frame_exc(PyThreadState *tstate, PyFrameObject *f)
-{
-    PyObject *type, *value, *traceback, *arg;
-    int err;
-
-    if (tstate->c_tracefunc == NULL)
-	return 0;
-
-    PyErr_Fetch(&type, &value, &traceback);
-    if (value == NULL) {
-	value = Py_None;
-	Py_INCREF(value);
-    }
-    arg = Py_BuildValue("(OOO)", type, value, traceback);
-    if (arg == NULL) {
-	PyErr_Restore(type, value, traceback);
-	return 0;
-    }
-    err = trace_frame(tstate, f, PyTrace_EXCEPTION, arg);
-    Py_DECREF(arg);
-    if (err == 0)
-	PyErr_Restore(type, value, traceback);
-    else {
-	Py_XDECREF(type);
-	Py_XDECREF(value);
-	Py_XDECREF(traceback);
-    }
-    return err;
-}
 #endif
 
 static PyObject*
@@ -364,31 +332,30 @@ call_with_frame(PyCodeObject *c, PyObject* func, PyObject* args)
     if (c == NULL)
         return NULL;
     
-    f = PyFrame_New(tstate, c, PyEval_GetGlobals(), NULL);
+    f = PyFrame_New(
+                    tstate,			/*back*/
+                    c,				/*code*/
+                    PyEval_GetGlobals(),	/*globals*/
+                    NULL			/*locals*/
+                    );
     if (f == NULL)
         return NULL;
     tstate->frame = f;
-#ifdef FIX_TRACE
-    if (trace_frame(tstate, f, PyTrace_CALL, Py_None) < 0) {
+#ifndef NOFIX_TRACE
+    if (trace_frame(tstate, f, PyTrace_CALL, Py_None)) {
+	Py_DECREF(f);
 	return NULL;
     }
 #endif
     res = PyEval_CallObject(func, args);
-    if (res == NULL) {
-	if (tstate->curexc_traceback == NULL)
-	    PyTraceBack_Here(f);
-#ifdef FIX_TRACE
-	if (trace_frame_exc(tstate, f) < 0) {
-	    return NULL;
-	}
-    }
+    if (res == NULL && tstate->curexc_traceback == NULL)
+        PyTraceBack_Here(f);
+#ifndef NOFIX_TRACE
     else {
-	if (trace_frame(tstate, f, PyTrace_RETURN, res) < 0) {
+	if (trace_frame(tstate, f, PyTrace_RETURN, res)) {
 	    Py_XDECREF(res);
 	    res = NULL;
 	}
-    }
-#else
     }
 #endif
     tstate->frame = f->f_back;
@@ -925,10 +892,8 @@ readinst(char *buf, int buf_size, PyObject *meth)
     if ((bytes = PyInt_FromLong(buf_size)) == NULL)
         goto finally;
 
-    if ((arg = PyTuple_New(1)) == NULL) {
-        Py_DECREF(bytes);
+    if ((arg = PyTuple_New(1)) == NULL)
         goto finally;
-    }
 
     PyTuple_SET_ITEM(arg, 0, bytes);
 
@@ -948,6 +913,7 @@ readinst(char *buf, int buf_size, PyObject *meth)
                      "read() returned too much data: "
                      "%i bytes requested, %i returned",
                      buf_size, len);
+        Py_DECREF(str);
         goto finally;
     }
     memcpy(buf, PyString_AsString(str), len);
@@ -988,10 +954,8 @@ xmlparse_ParseFile(xmlparseobject *self, PyObject *args)
     for (;;) {
         int bytes_read;
         void *buf = XML_GetBuffer(self->itself, BUF_SIZE);
-        if (buf == NULL) {
-            Py_XDECREF(readmethod);
+        if (buf == NULL)
             return PyErr_NoMemory();
-        }
 
         if (fp) {
             bytes_read = fread(buf, sizeof(char), BUF_SIZE, fp);
@@ -1002,21 +966,16 @@ xmlparse_ParseFile(xmlparseobject *self, PyObject *args)
         }
         else {
             bytes_read = readinst(buf, BUF_SIZE, readmethod);
-            if (bytes_read < 0) {
-                Py_DECREF(readmethod);
+            if (bytes_read < 0)
                 return NULL;
-            }
         }
         rv = XML_ParseBuffer(self->itself, bytes_read, bytes_read == 0);
-        if (PyErr_Occurred()) {
-            Py_XDECREF(readmethod);
+        if (PyErr_Occurred())
             return NULL;
-        }
 
         if (!rv || bytes_read == 0)
             break;
     }
-    Py_XDECREF(readmethod);
     return get_parse_result(self, rv);
 }
 

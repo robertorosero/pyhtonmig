@@ -1267,22 +1267,6 @@ def slots():
         g==g
     new_objects = len(gc.get_objects())
     vereq(orig_objects, new_objects)
-    class H(object):
-        __slots__ = ['a', 'b']
-        def __init__(self):
-            self.a = 1
-            self.b = 2
-        def __del__(self):
-            assert self.a == 1
-            assert self.b == 2
-
-    save_stderr = sys.stderr
-    sys.stderr = sys.stdout
-    h = H()
-    try:
-        del h
-    finally:
-        sys.stderr = save_stderr
 
 def slotspecials():
     if verbose: print "Testing __dict__ and __weakref__ in __slots__..."
@@ -1484,14 +1468,6 @@ def classmethods():
     veris(super(D,d).goo.im_self, D)
     vereq(super(D,D).goo(), (D,))
     vereq(super(D,d).goo(), (D,))
-
-    # Verify that argument is checked for callability (SF bug 753451)
-    try:
-        classmethod(1).__get__(1)
-    except TypeError:
-        pass
-    else:
-        raise TestFailed, "classmethod should check for callability"
 
 def classmethods_in_c():
     if verbose: print "Testing C-based class methods..."
@@ -3895,44 +3871,8 @@ def carloverre():
     else:
         raise TestFailed, "Carlo Verre __delattr__ succeeded!"
 
-def weakref_segfault():
-    # SF 742911
-    if verbose:
-        print "Testing weakref segfault..."
-
-    import weakref
-
-    class Provoker:
-        def __init__(self, referrent):
-            self.ref = weakref.ref(referrent)
-
-        def __del__(self):
-            x = self.ref()
-
-    class Oops(object):
-        pass
-
-    o = Oops()
-    o.whatever = Provoker(o)
-    del o
-
-# Fix SF #762455, segfault when sys.stdout is changed in getattr
-def filefault():
-    if verbose:
-        print "Testing sys.stdout is changed in getattr..."
-    import sys
-    class StdoutGuard:
-        def __getattr__(self, attr):
-            sys.stdout = sys.__stdout__
-            raise RuntimeError("Premature access to sys.stdout.%s" % attr)
-    sys.stdout = StdoutGuard()
-    try:
-        print "Oops!"
-    except RuntimeError:
-        pass
 
 def test_main():
-    weakref_segfault() # Must be first, somehow
     do_this_first()
     class_docstrings()
     lists()
@@ -4021,7 +3961,6 @@ def test_main():
     isinst_isclass()
     proxysuper()
     carloverre()
-    filefault()
 
     if verbose: print "All OK"
 

@@ -66,7 +66,7 @@ TOOLSDIR=	tools
 
 # This is the *documentation* release, and is used to construct the file
 # names of the downloadable tarballs.
-RELEASE=2.3c2
+RELEASE=2.3b1
 
 PYTHON=	   python
 DVIPS=	   dvips -N0 -t $(PAPER)
@@ -293,7 +293,7 @@ paper-$(PAPER)/$(WHATSNEW).pdf: whatsnew/$(WHATSNEW).tex
 # conversions, as described above.  See also the README file.
 
 info:
-	cd $(INFODIR) && $(MAKE) EMACS=$(EMACS) WHATSNEW=$(WHATSNEW)
+	cd $(INFODIR) && $(MAKE) EMACS=$(EMACS)
 
 # Targets to convert the manuals to HTML using Nikos Drakos' LaTeX to
 # HTML converter.  For more info on this program, see
@@ -314,7 +314,7 @@ info:
 $(ALLCSSFILES): html/style.css
 	cp $< $@
 
-$(INDEXFILES): $(COMMONPERL) html/stdabout.dat tools/node2label.pl
+$(INDEXFILES): $(COMMONPERL) html/about.dat tools/node2label.pl
 
 html/acks.html: ACKS $(TOOLSDIR)/support.py $(TOOLSDIR)/mkackshtml
 	$(PYTHON) $(TOOLSDIR)/mkackshtml --address $(PYTHONDOCS) \
@@ -398,7 +398,7 @@ ISILOINDEXFILES=isilo/api/api.html \
 	isilo/dist/dist.html \
 	isilo/whatsnew/$(WHATSNEW).html
 
-$(ISILOINDEXFILES): $(COMMONPERL) html/stdabout.dat perl/isilo.perl
+$(ISILOINDEXFILES): $(COMMONPERL) html/about.dat perl/isilo.perl
 
 isilo:	isilo/python-api.pdb \
 	isilo/python-doc.pdb \
@@ -528,11 +528,11 @@ paper-$(PAPER)/README: $(PSFILES) $(TOOLSDIR)/getpagecounts
 
 info-$(RELEASE).tgz: info
 	cd $(INFODIR) && tar cf - README python.dir python-*.info* \
-		| gzip -9 >../$@
+		| gzip -9 >$@
 
 info-$(RELEASE).tar.bz2: info
 	cd $(INFODIR) && tar cf - README python.dir python-*.info* \
-		| bzip2 -9 >../$@
+		| bzip2 -9 >$@
 
 latex-$(RELEASE).tgz:
 	$(PYTHON) $(TOOLSDIR)/mksourcepkg --gzip $(RELEASE)
@@ -652,10 +652,7 @@ distpdf:	tarpdf bzippdf zippdf
 distlatex:	tarlatex bziplatex ziplatex
 
 paperdist:	distpdf distps
-edist:		disthtml distinfo zipisilo
-
-pkglist:
-	$(TOOLSDIR)/mkpkglist >pkglist.html
+edist:		disthtml zipisilo
 
 distfiles:	paperdist edist
 	$(TOOLSDIR)/mksourcepkg --all $(RELEASE)

@@ -158,14 +158,6 @@ class Stats:
             self.stats[func] = add_func_stats(old_func_stat, stat)
         return self
 
-    def dump_stats(self, filename):
-        """Write the profile data to a file we know how to load back."""
-        f = file(filename, 'wb')
-        try:
-            marshal.dump(self.stats, f)
-        finally:
-            f.close()
-
     # list the tuple indices and directions for sorting,
     # along with some printable description
     sort_arg_dict_default = {
@@ -448,8 +440,8 @@ class TupleComp:
 # func_name is a triple (file:string, line:int, name:string)
 
 def func_strip_path(func_name):
-    filename, line, name = func_name
-    return os.path.basename(filename), line, name
+    file, line, name = func_name
+    return os.path.basename(file), line, name
 
 def func_get_function_name(func):
     return func[2]

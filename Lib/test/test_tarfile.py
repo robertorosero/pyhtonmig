@@ -1,7 +1,6 @@
 import sys
 import os
 import shutil
-import tempfile
 
 import unittest
 import tarfile
@@ -23,14 +22,14 @@ def path(path):
     return test_support.findfile(path)
 
 testtar = path("testtar.tar")
-tempdir = os.path.join(tempfile.gettempdir(), "testtar" + os.extsep + "dir")
-tempname = test_support.TESTFN
+tempdir = path("testtar.dir")
+tempname = path("testtar.tmp")
 membercount = 10
 
 def tarname(comp=""):
     if not comp:
         return testtar
-    return os.path.join(tempdir, "%s%s%s" % (testtar, os.extsep, comp))
+    return "%s.%s" % (testtar, comp)
 
 def dirname():
     if not os.path.exists(tempdir):
@@ -241,35 +240,36 @@ def test_main():
         # create testtar.tar.bz2
         bz2.BZ2File(tarname("bz2"), "wb").write(file(tarname(), "rb").read())
 
-    tests = [
-        ReadTest,
-        ReadStreamTest,
-        WriteTest,
-        WriteStreamTest
-    ]
-
-    if gzip:
-        tests.extend([
-            ReadTestGzip, ReadStreamTestGzip,
-            WriteTestGzip, WriteStreamTestGzip
-        ])
-
-    if bz2:
-        tests.extend([
-            ReadTestBzip2, ReadStreamTestBzip2,
-            WriteTestBzip2, WriteStreamTestBzip2
-        ])
     try:
-        test_support.run_unittest(*tests)
+        suite = unittest.TestSuite()
+
+        suite.addTest(unittest.makeSuite(ReadTest))
+        suite.addTest(unittest.makeSuite(ReadStreamTest))
+        suite.addTest(unittest.makeSuite(WriteTest))
+        suite.addTest(unittest.makeSuite(WriteStreamTest))
+
+        if gzip:
+            suite.addTest(unittest.makeSuite(ReadTestGzip))
+            suite.addTest(unittest.makeSuite(ReadStreamTestGzip))
+            suite.addTest(unittest.makeSuite(WriteTestGzip))
+            suite.addTest(unittest.makeSuite(WriteStreamTestGzip))
+
+        if bz2:
+            suite.addTest(unittest.makeSuite(ReadTestBzip2))
+            suite.addTest(unittest.makeSuite(ReadStreamTestBzip2))
+            suite.addTest(unittest.makeSuite(WriteTestBzip2))
+            suite.addTest(unittest.makeSuite(WriteStreamTestBzip2))
+
+        test_support.run_suite(suite)
     finally:
         if gzip:
             os.remove(tarname("gz"))
         if bz2:
             os.remove(tarname("bz2"))
-        if os.path.exists(dirname()):
-            shutil.rmtree(dirname())
-        if os.path.exists(tmpname()):
-            os.remove(tmpname())
+        if os.path.exists(tempdir):
+            shutil.rmtree(tempdir)
+        if os.path.exists(tempname):
+            os.remove(tempname)
 
 if __name__ == "__main__":
     test_main()

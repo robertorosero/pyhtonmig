@@ -83,7 +83,6 @@ InternalDate = re.compile(r'.*INTERNALDATE "'
         r' (?P<zonen>[-+])(?P<zoneh>[0-9][0-9])(?P<zonem>[0-9][0-9])'
         r'"')
 Literal = re.compile(r'.*{(?P<size>\d+)}$')
-MapCRLF = re.compile(r'\r\n|\r|\n')
 Response_code = re.compile(r'\[(?P<type>[A-Z-]+)( (?P<data>[^\]]*))?\]')
 Untagged_response = re.compile(r'\* (?P<type>[A-Z-]+)( (?P<data>.*))?')
 Untagged_status = re.compile(r'\* (?P<data>\d+) (?P<type>[A-Z-]+)( (?P<data2>.*))?')
@@ -309,7 +308,7 @@ class IMAP4:
             date_time = Time2Internaldate(date_time)
         else:
             date_time = None
-        self.literal = MapCRLF.sub(CRLF, message)
+        self.literal = message
         return self._simple_command(name, mailbox, flags, date_time)
 
 
@@ -330,8 +329,7 @@ class IMAP4:
         be sent instead.
         """
         mech = mechanism.upper()
-        # XXX: shouldn't this code be removed, not commented out?
-        #cap = 'AUTH=%s' % mech
+        cap = 'AUTH=%s' % mech
         #if not cap in self.capabilities:       # Let the server decide!
         #    raise self.error("Server doesn't allow %s authentication." % mech)
         self.literal = _Authenticator(authobject).process
@@ -1362,7 +1360,7 @@ if __name__ == '__main__':
     USER = getpass.getuser()
     PASSWD = getpass.getpass("IMAP password for %s on %s: " % (USER, host or "localhost"))
 
-    test_mesg = 'From: %(user)s@localhost%(lf)sSubject: IMAP4 test%(lf)s%(lf)sdata...%(lf)s' % {'user':USER, 'lf':'\n'}
+    test_mesg = 'From: %(user)s@localhost%(lf)sSubject: IMAP4 test%(lf)s%(lf)sdata...%(lf)s' % {'user':USER, 'lf':CRLF}
     test_seq1 = (
     ('login', (USER, PASSWD)),
     ('create', ('/tmp/xxx 1',)),

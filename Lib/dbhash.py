@@ -1,4 +1,4 @@
-"""Provide a (g)dbm-compatible interface to bsddb.hashopen."""
+"""Provide a (g)dbm-compatible interface to bsdhash.hashopen."""
 
 import sys
 try:

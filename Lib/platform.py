@@ -585,7 +585,7 @@ def mac_ver(release='',versioninfo=('','',''),machine=''):
                    0x2: 'PowerPC'}.get(sysa,'')
     return release,versioninfo,machine
 
-def _java_getprop(name,default):
+def _java_getprop(self,name,default):
 
     from java.lang import System
     try:
@@ -1079,7 +1079,7 @@ def _sys_version():
 
     """
     global _sys_version_cache
-    import time
+    import sys, re, time
 
     if _sys_version_cache is not None:
         return _sys_version_cache

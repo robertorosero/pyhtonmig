@@ -333,13 +333,13 @@ class NameprepTest(unittest.TestCase):
                     raise test_support.TestFailed("Test 3.%d: %s" % (pos+1, str(e)))
 
 def test_main():
-    test_support.run_unittest(
-        UTF16Test,
-        EscapeDecodeTest,
-        RecodingTest,
-        PunycodeTest,
-        NameprepTest
-    )
+    suite = unittest.TestSuite()
+    suite.addTest(unittest.makeSuite(UTF16Test))
+    suite.addTest(unittest.makeSuite(EscapeDecodeTest))
+    suite.addTest(unittest.makeSuite(RecodingTest))
+    suite.addTest(unittest.makeSuite(PunycodeTest))
+    suite.addTest(unittest.makeSuite(NameprepTest))
+    test_support.run_suite(suite)
 
 
 if __name__ == "__main__":

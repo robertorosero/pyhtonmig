@@ -428,18 +428,12 @@ def _compile_info(code, pattern, flags):
         _compile_charset(charset, flags, code)
     code[skip] = len(code) - skip
 
-try:
-    unicode
-except NameError:
-    STRING_TYPES = (type(""),)
-else:
-    STRING_TYPES = (type(""), type(unicode("")))
+STRING_TYPES = [type("")]
 
-def isstring(obj):
-    for tp in STRING_TYPES:
-        if isinstance(obj, tp):
-            return 1
-    return 0
+try:
+    STRING_TYPES.append(type(unicode("")))
+except NameError:
+    pass
 
 def _code(p, flags):
 
@@ -459,7 +453,7 @@ def _code(p, flags):
 def compile(p, flags=0):
     # internal: convert pattern list to internal format
 
-    if isstring(p):
+    if type(p) in STRING_TYPES:
         import sre_parse
         pattern = p
         p = sre_parse.parse(p, flags)

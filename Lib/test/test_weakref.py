@@ -4,7 +4,6 @@ import UserList
 import weakref
 
 from test import test_support
-from sets import Set
 
 
 class C:
@@ -168,8 +167,7 @@ class ReferencesTestCase(TestBase):
         p[:] = [2, 3]
         self.assertEqual(len(L), 2)
         self.assertEqual(len(p), 2)
-        self.failUnless(3 in p,
-                        "proxy didn't support __contains__() properly")
+        self.failUnless(3 in p, "proxy didn't support __contains__() properly")
         p[1] = 5
         self.assertEqual(L[1], 5)
         self.assertEqual(p[1], 5)
@@ -226,17 +224,6 @@ class ReferencesTestCase(TestBase):
         del proxy.foo
         self.assert_(not hasattr(o, 'foo'),
                      "object does not reflect attribute removal via proxy")
-
-    def test_proxy_deletion(self):
-        # Test clearing of SF bug #762891
-        class Foo:
-            result = None
-            def __delitem__(self, accessor):
-                self.result = accessor
-        g = Foo()
-        f = weakref.proxy(g)
-        del f[0]
-        self.assertEqual(f.result, 0)
 
     def test_getweakrefcount(self):
         o = C()
@@ -353,7 +340,9 @@ class MappingTestCase(TestBase):
                          "wrong object returned by weak dict!")
         items1 = dict.items()
         items2 = dict.copy().items()
-        self.assert_(Set(items1) == Set(items2),
+        items1.sort()
+        items2.sort()
+        self.assert_(items1 == items2,
                      "cloning of weak-keyed dictionary did not work!")
         del items1, items2
         self.assert_(len(dict) == self.COUNT)
@@ -399,8 +388,7 @@ class MappingTestCase(TestBase):
         values = dict.values()
         for v in dict.itervalues():
             values.remove(v)
-        self.assert_(len(values) == 0,
-                     "itervalues() did not touch all values")
+        self.assert_(len(values) == 0, "itervalues() did not touch all values")
 
     def test_make_weak_keyed_dict_from_dict(self):
         o = Object(3)
@@ -529,88 +517,29 @@ class MappingTestCase(TestBase):
         self.assert_(len(d) == 1)
         self.assert_(d.items() == [('something else', o2)])
 
-    def test_weak_keyed_bad_delitem(self):
-        d = weakref.WeakKeyDictionary()
-        o = Object('1')
-        # An attempt to delete an object that isn't there should raise
-        # KeyError.  It didn't before 2.3.
-        self.assertRaises(KeyError, d.__delitem__, o)
-        self.assertRaises(KeyError, d.__getitem__, o)
-
-        # If a key isn't of a weakly referencable type, __getitem__ and
-        # __setitem__ raise TypeError.  __delitem__ should too.
-        self.assertRaises(TypeError, d.__delitem__,  13)
-        self.assertRaises(TypeError, d.__getitem__,  13)
-        self.assertRaises(TypeError, d.__setitem__,  13, 13)
-
-    def test_weak_keyed_cascading_deletes(self):
-        # SF bug 742860.  For some reason, before 2.3 __delitem__ iterated
-        # over the keys via self.data.iterkeys().  If things vanished from
-        # the dict during this (or got added), that caused a RuntimeError.
-
-        d = weakref.WeakKeyDictionary()
-        mutate = False
-
-        class C(object):
-            def __init__(self, i):
-                self.value = i
-            def __hash__(self):
-                return hash(self.value)
-            def __eq__(self, other):
-                if mutate:
-                    # Side effect that mutates the dict, by removing the
-                    # last strong reference to a key.
-                    del objs[-1]
-                return self.value == other.value
-
-        objs = [C(i) for i in range(4)]
-        for o in objs:
-            d[o] = o.value
-        del o   # now the only strong references to keys are in objs
-        # Find the order in which iterkeys sees the keys.
-        objs = d.keys()
-        # Reverse it, so that the iteration implementation of __delitem__
-        # has to keep looping to find the first object we delete.
-        objs.reverse()
-
-        # Turn on mutation in C.__eq__.  The first time thru the loop,
-        # under the iterkeys() business the first comparison will delete
-        # the last item iterkeys() would see, and that causes a
-        #     RuntimeError: dictionary changed size during iteration
-        # when the iterkeys() loop goes around to try comparing the next
-        # key.  After this was fixed, it just deletes the last object *our*
-        # "for o in obj" loop would have gotten to.
-        mutate = True
-        count = 0
-        for o in objs:
-            count += 1
-            del d[o]
-        self.assertEqual(len(d), 0)
-        self.assertEqual(count, 2)
-
 from test_userdict import TestMappingProtocol
 
 class WeakValueDictionaryTestCase(TestMappingProtocol):
-    """Check that WeakValueDictionary conforms to the mapping protocol"""
+    """Check that WeakValueDictionary class conforms to the mapping protocol"""
     __ref = {"key1":Object(1), "key2":Object(2), "key3":Object(3)}
     _tested_class = weakref.WeakValueDictionary
     def _reference(self):
         return self.__ref.copy()
 
 class WeakKeyDictionaryTestCase(TestMappingProtocol):
-    """Check that WeakKeyDictionary conforms to the mapping protocol"""
+    """Check that WeakKeyDictionary class conforms to the mapping protocol"""
     __ref = {Object("key1"):1, Object("key2"):2, Object("key3"):3}
     _tested_class = weakref.WeakKeyDictionary
     def _reference(self):
         return self.__ref.copy()
 
 def test_main():
-    test_support.run_unittest(
-        ReferencesTestCase,
-        MappingTestCase,
-        WeakValueDictionaryTestCase,
-        WeakKeyDictionaryTestCase,
-        )
+    suite = unittest.TestSuite()
+    suite.addTest(unittest.makeSuite(ReferencesTestCase))
+    suite.addTest(unittest.makeSuite(MappingTestCase))
+    suite.addTest(unittest.makeSuite(WeakValueDictionaryTestCase))
+    suite.addTest(unittest.makeSuite(WeakKeyDictionaryTestCase))
+    test_support.run_suite(suite)
 
 
 if __name__ == "__main__":

@@ -50,7 +50,6 @@ import marshal
 import os
 import re
 import sys
-import threading
 import token
 import tokenize
 import types
@@ -74,9 +73,6 @@ Otherwise, exactly one of the following three options must be given:
                       and write the counts to <module>.cover for each
                       module executed, in the module's directory.
                       See also `--coverdir', `--file', `--no-report' below.
--l, --listfuncs       Keep track of which functions are executed at least
-                      once and write the results to sys.stdout after the
-                      program exits.
 -r, --report          Generate a report from a counts file; do not execute
                       any code.  `--file' must specify the results file to
                       read, which must have been created in a previous run
@@ -198,11 +194,16 @@ class CoverageResults:
         self.infile = infile
         self.outfile = outfile
         if self.infile:
-            # Try to merge existing counts file.
+            # Try and merge existing counts file.
+            # This code understand a couple of old trace.py formats.
             try:
-                counts, calledfuncs = pickle.load(open(self.infile, 'r'))
-                self.update(self.__class__(counts, calledfuncs))
-            except (IOError, EOFError, ValueError), err:
+                thingie = pickle.load(open(self.infile, 'r'))
+                if isinstance(thingie, dict):
+                    self.update(self.__class__(thingie))
+                elif isinstance(thingie, tuple) and len(thingie) == 2:
+                    counts, calledfuncs = thingie
+                    self.update(self.__class__(counts, calledfuncs))
+            except (IOError, EOFError), err:
                 print >> sys.stderr, ("Skipping counts file %r: %s"
                                       % (self.infile, err))
             except pickle.UnpicklingError:
@@ -309,16 +310,16 @@ class CoverageResults:
                 n_hits += 1
                 n_lines += 1
             elif rx_blank.match(line):
-                outfile.write("       ")
+                outfile.write("      ")
             else:
                 # lines preceded by no marks weren't hit
                 # Highlight them if so indicated, unless the line contains
                 # #pragma: NO COVER
                 if lineno in lnotab and not PRAGMA_NOCOVER in lines[i]:
                     outfile.write(">>>>>> ")
-                    n_lines += 1
                 else:
                     outfile.write("       ")
+                n_lines += 1
             outfile.write(lines[i].expandtabs(8))
         outfile.close()
 
@@ -436,26 +437,22 @@ class Trace:
         dict = __main__.__dict__
         if not self.donothing:
             sys.settrace(self.globaltrace)
-            threading.settrace(self.globaltrace)
         try:
             exec cmd in dict, dict
         finally:
             if not self.donothing:
                 sys.settrace(None)
-                threading.settrace(None)
 
     def runctx(self, cmd, globals=None, locals=None):
         if globals is None: globals = {}
         if locals is None: locals = {}
         if not self.donothing:
             sys.settrace(self.globaltrace)
-            threading.settrace(self.globaltrace)
         try:
             exec cmd in globals, locals
         finally:
             if not self.donothing:
                 sys.settrace(None)
-                threading.settrace(None)
 
     def runfunc(self, func, *args, **kw):
         result = None

@@ -16,7 +16,7 @@ typedef struct {
 	int firstpass;
 } cycleobject;
 
-static PyTypeObject cycle_type;
+PyTypeObject cycle_type;
 
 static PyObject *
 cycle_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
@@ -111,7 +111,7 @@ PyDoc_STRVAR(cycle_doc,
 Return elements from the iterable until it is exhausted.\n\
 Then repeat the sequence indefinitely.");
 
-static PyTypeObject cycle_type = {
+PyTypeObject cycle_type = {
 	PyObject_HEAD_INIT(NULL)
 	0,				/* ob_size */
 	"itertools.cycle",		/* tp_name */
@@ -151,7 +151,7 @@ static PyTypeObject cycle_type = {
 	0,				/* tp_descr_set */
 	0,				/* tp_dictoffset */
 	0,				/* tp_init */
-	0,				/* tp_alloc */
+	PyType_GenericAlloc,		/* tp_alloc */
 	cycle_new,			/* tp_new */
 	PyObject_GC_Del,		/* tp_free */
 };
@@ -166,7 +166,7 @@ typedef struct {
 	long	 start;
 } dropwhileobject;
 
-static PyTypeObject dropwhile_type;
+PyTypeObject dropwhile_type;
 
 static PyObject *
 dropwhile_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
@@ -260,7 +260,7 @@ PyDoc_STRVAR(dropwhile_doc,
 Drop items from the iterable while predicate(item) is true.\n\
 Afterwards, return every element until the iterable is exhausted.");
 
-static PyTypeObject dropwhile_type = {
+PyTypeObject dropwhile_type = {
 	PyObject_HEAD_INIT(NULL)
 	0,				/* ob_size */
 	"itertools.dropwhile",		/* tp_name */
@@ -300,7 +300,7 @@ static PyTypeObject dropwhile_type = {
 	0,				/* tp_descr_set */
 	0,				/* tp_dictoffset */
 	0,				/* tp_init */
-	0,				/* tp_alloc */
+	PyType_GenericAlloc,		/* tp_alloc */
 	dropwhile_new,			/* tp_new */
 	PyObject_GC_Del,		/* tp_free */
 };
@@ -315,7 +315,7 @@ typedef struct {
 	long	 stop;
 } takewhileobject;
 
-static PyTypeObject takewhile_type;
+PyTypeObject takewhile_type;
 
 static PyObject *
 takewhile_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
@@ -408,7 +408,7 @@ PyDoc_STRVAR(takewhile_doc,
 Return successive entries from an iterable as long as the \n\
 predicate evaluates to true for each entry.");
 
-static PyTypeObject takewhile_type = {
+PyTypeObject takewhile_type = {
 	PyObject_HEAD_INIT(NULL)
 	0,				/* ob_size */
 	"itertools.takewhile",		/* tp_name */
@@ -448,7 +448,7 @@ static PyTypeObject takewhile_type = {
 	0,				/* tp_descr_set */
 	0,				/* tp_dictoffset */
 	0,				/* tp_init */
-	0,				/* tp_alloc */
+	PyType_GenericAlloc,		/* tp_alloc */
 	takewhile_new,			/* tp_new */
 	PyObject_GC_Del,		/* tp_free */
 };
@@ -465,53 +465,33 @@ typedef struct {
 	long	cnt;
 } isliceobject;
 
-static PyTypeObject islice_type;
+PyTypeObject islice_type;
 
 static PyObject *
 islice_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
 	PyObject *seq;
-	long start=0, stop=-1, step=1;
-	PyObject *it, *a1=NULL, *a2=NULL;
+	long a1=0, a2=0, a3=0, start=0, stop=0, step=1;
+	PyObject *it;
 	int numargs;
 	isliceobject *lz;
 
 	numargs = PyTuple_Size(args);
-	if (!PyArg_ParseTuple(args, "OO|Ol:islice", &seq, &a1, &a2, &step))
+	if (!PyArg_ParseTuple(args, "Ol|ll:islice", &seq, &a1, &a2, &a3))
 		return NULL;
 
 	if (numargs == 2) {
-		if (a1 != Py_None) {
-			stop = PyInt_AsLong(a1);
-			if (stop == -1) {
-				if (PyErr_Occurred())
-					PyErr_Clear();
-				PyErr_SetString(PyExc_ValueError,
-				   "Stop argument must be an integer or None.");
-				return NULL;
-			}
-		}
+		stop = a1;
+	} else if (numargs == 3) {
+		start = a1;
+		stop = a2;
 	} else {
-		start = PyInt_AsLong(a1);
-		if (start == -1 && PyErr_Occurred()) {
-			PyErr_Clear();
-			PyErr_SetString(PyExc_ValueError,
-			   "Start argument must be an integer.");
-			return NULL;
-		}
-		if (a2 != Py_None) {
-			stop = PyInt_AsLong(a2);
-			if (stop == -1) {
-				if (PyErr_Occurred())
-					PyErr_Clear();
-				PyErr_SetString(PyExc_ValueError,
-				   "Stop argument must be an integer or None.");
-				return NULL;
-			}
-		}
+		start = a1;
+		stop = a2;
+		step = a3;
 	}
 
-	if (start<0 || stop<-1) {
+	if (start<0 || stop<0) {
 		PyErr_SetString(PyExc_ValueError,
 		   "Indices for islice() must be positive.");
 		return NULL;
@@ -574,7 +554,7 @@ islice_next(isliceobject *lz)
 		Py_DECREF(item);
 		lz->cnt++;
 	}
-	if (lz->stop != -1 && lz->cnt >= lz->stop)
+	if (lz->cnt >= lz->stop)
 		return NULL;
 	assert(PyIter_Check(it));
 	item = (*it->ob_type->tp_iternext)(it);
@@ -598,7 +578,7 @@ specified as another value, step determines how many values are \n\
 skipped between successive calls.  Works like a slice() on a list\n\
 but returns an iterator.");
 
-static PyTypeObject islice_type = {
+PyTypeObject islice_type = {
 	PyObject_HEAD_INIT(NULL)
 	0,				/* ob_size */
 	"itertools.islice",		/* tp_name */
@@ -638,7 +618,7 @@ static PyTypeObject islice_type = {
 	0,				/* tp_descr_set */
 	0,				/* tp_dictoffset */
 	0,				/* tp_init */
-	0,				/* tp_alloc */
+	PyType_GenericAlloc,		/* tp_alloc */
 	islice_new,			/* tp_new */
 	PyObject_GC_Del,		/* tp_free */
 };
@@ -652,7 +632,7 @@ typedef struct {
 	PyObject *it;
 } starmapobject;
 
-static PyTypeObject starmap_type;
+PyTypeObject starmap_type;
 
 static PyObject *
 starmap_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
@@ -737,7 +717,7 @@ PyDoc_STRVAR(starmap_doc,
 Return an iterator whose values are returned from the function evaluated\n\
 with a argument tuple taken from the given sequence.");
 
-static PyTypeObject starmap_type = {
+PyTypeObject starmap_type = {
 	PyObject_HEAD_INIT(NULL)
 	0,				/* ob_size */
 	"itertools.starmap",		/* tp_name */
@@ -777,7 +757,7 @@ static PyTypeObject starmap_type = {
 	0,				/* tp_descr_set */
 	0,				/* tp_dictoffset */
 	0,				/* tp_init */
-	0,				/* tp_alloc */
+	PyType_GenericAlloc,		/* tp_alloc */
 	starmap_new,			/* tp_new */
 	PyObject_GC_Del,		/* tp_free */
 };
@@ -791,7 +771,7 @@ typedef struct {
 	PyObject *func;
 } imapobject;
 
-static PyTypeObject imap_type;
+PyTypeObject imap_type;
 
 static PyObject *
 imap_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
@@ -882,7 +862,7 @@ the following reasons:
      None.  
 
   4) If a need does arise, it can be met by __builtins__.map() or by 
-     writing:  chain(iterable, repeat(None)).
+     writing a generator.
 
   5) Similar toolsets in Haskell and SML do not have automatic None fill-in.
 */
@@ -924,7 +904,7 @@ an iterator instead of a list and that it stops when the shortest\n\
 iterable is exhausted instead of filling in None for shorter\n\
 iterables.");
 
-static PyTypeObject imap_type = {
+PyTypeObject imap_type = {
 	PyObject_HEAD_INIT(NULL)
 	0,				/* ob_size */
 	"itertools.imap",		/* tp_name */
@@ -964,7 +944,7 @@ static PyTypeObject imap_type = {
 	0,				/* tp_descr_set */
 	0,				/* tp_dictoffset */
 	0,				/* tp_init */
-	0,				/* tp_alloc */
+	PyType_GenericAlloc,		/* tp_alloc */
 	imap_new,			/* tp_new */
 	PyObject_GC_Del,		/* tp_free */
 };
@@ -979,7 +959,7 @@ typedef struct {
 	PyObject *ittuple;		/* tuple of iterators */
 } chainobject;
 
-static PyTypeObject chain_type;
+PyTypeObject chain_type;
 
 static PyObject *
 chain_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
@@ -1010,10 +990,8 @@ chain_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 
 	/* create chainobject structure */
 	lz = (chainobject *)type->tp_alloc(type, 0);
-	if (lz == NULL) {
-		Py_DECREF(ittuple);
+	if (lz == NULL)
 		return NULL;
-	}
 
 	lz->ittuple = ittuple;
 	lz->iternum = 0;
@@ -1061,7 +1039,7 @@ Return a chain object whose .next() method returns elements from the\n\
 first iterable until it is exhausted, then elements from the next\n\
 iterable, until all of the iterables are exhausted.");
 
-static PyTypeObject chain_type = {
+PyTypeObject chain_type = {
 	PyObject_HEAD_INIT(NULL)
 	0,				/* ob_size */
 	"itertools.chain",		/* tp_name */
@@ -1101,7 +1079,7 @@ static PyTypeObject chain_type = {
 	0,				/* tp_descr_set */
 	0,				/* tp_dictoffset */
 	0,				/* tp_init */
-	0,				/* tp_alloc */
+	PyType_GenericAlloc,		/* tp_alloc */
 	chain_new,			/* tp_new */
 	PyObject_GC_Del,		/* tp_free */
 };
@@ -1115,7 +1093,7 @@ typedef struct {
 	PyObject *it;
 } ifilterobject;
 
-static PyTypeObject ifilter_type;
+PyTypeObject ifilter_type;
 
 static PyObject *
 ifilter_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
@@ -1210,7 +1188,7 @@ PyDoc_STRVAR(ifilter_doc,
 Return those items of sequence for which function(item) is true.\n\
 If function is None, return the items that are true.");
 
-static PyTypeObject ifilter_type = {
+PyTypeObject ifilter_type = {
 	PyObject_HEAD_INIT(NULL)
 	0,				/* ob_size */
 	"itertools.ifilter",		/* tp_name */
@@ -1250,7 +1228,7 @@ static PyTypeObject ifilter_type = {
 	0,				/* tp_descr_set */
 	0,				/* tp_dictoffset */
 	0,				/* tp_init */
-	0,				/* tp_alloc */
+	PyType_GenericAlloc,		/* tp_alloc */
 	ifilter_new,			/* tp_new */
 	PyObject_GC_Del,		/* tp_free */
 };
@@ -1264,7 +1242,7 @@ typedef struct {
 	PyObject *it;
 } ifilterfalseobject;
 
-static PyTypeObject ifilterfalse_type;
+PyTypeObject ifilterfalse_type;
 
 static PyObject *
 ifilterfalse_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
@@ -1359,7 +1337,7 @@ PyDoc_STRVAR(ifilterfalse_doc,
 Return those items of sequence for which function(item) is false.\n\
 If function is None, return the items that are false.");
 
-static PyTypeObject ifilterfalse_type = {
+PyTypeObject ifilterfalse_type = {
 	PyObject_HEAD_INIT(NULL)
 	0,				/* ob_size */
 	"itertools.ifilterfalse",	/* tp_name */
@@ -1399,7 +1377,7 @@ static PyTypeObject ifilterfalse_type = {
 	0,				/* tp_descr_set */
 	0,				/* tp_dictoffset */
 	0,				/* tp_init */
-	0,				/* tp_alloc */
+	PyType_GenericAlloc,		/* tp_alloc */
 	ifilterfalse_new,		/* tp_new */
 	PyObject_GC_Del,		/* tp_free */
 };
@@ -1412,7 +1390,7 @@ typedef struct {
 	long	cnt;
 } countobject;
 
-static PyTypeObject count_type;
+PyTypeObject count_type;
 
 static PyObject *
 count_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
@@ -1444,7 +1422,7 @@ PyDoc_STRVAR(count_doc,
 Return a count object whose .next() method returns consecutive\n\
 integers starting from zero or, if specified, from firstval.");
 
-static PyTypeObject count_type = {
+PyTypeObject count_type = {
 	PyObject_HEAD_INIT(NULL)
 	0,				/* ob_size */
 	"itertools.count",		/* tp_name */
@@ -1483,7 +1461,7 @@ static PyTypeObject count_type = {
 	0,				/* tp_descr_set */
 	0,				/* tp_dictoffset */
 	0,				/* tp_init */
-	0,				/* tp_alloc */
+	PyType_GenericAlloc,		/* tp_alloc */
 	count_new,			/* tp_new */
 };
 
@@ -1499,7 +1477,7 @@ typedef struct {
 	PyObject *result;
 } izipobject;
 
-static PyTypeObject izip_type;
+PyTypeObject izip_type;
 
 static PyObject *
 izip_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
@@ -1574,18 +1552,8 @@ izip_dealloc(izipobject *lz)
 static int
 izip_traverse(izipobject *lz, visitproc visit, void *arg)
 {
-	int err;
-
-	if (lz->ittuple) {
-		err = visit(lz->ittuple, arg);
-		if (err)
-			return err;
-	}
-	if (lz->result) {
-		err = visit(lz->result, arg);
-		if (err)
-			return err;
-	}
+	if (lz->ittuple)
+		return visit(lz->ittuple, arg);
 	return 0;
 }
 
@@ -1637,7 +1605,7 @@ is exhausted and then it raises StopIteration.  Works like the zip()\n\
 function but consumes less memory by returning an iterator instead of\n\
 a list.");
 
-static PyTypeObject izip_type = {
+PyTypeObject izip_type = {
 	PyObject_HEAD_INIT(NULL)
 	0,				/* ob_size */
 	"itertools.izip",		/* tp_name */
@@ -1677,7 +1645,7 @@ static PyTypeObject izip_type = {
 	0,				/* tp_descr_set */
 	0,				/* tp_dictoffset */
 	0,				/* tp_init */
-	0,				/* tp_alloc */
+	PyType_GenericAlloc,		/* tp_alloc */
 	izip_new,			/* tp_new */
 	PyObject_GC_Del,		/* tp_free */
 };
@@ -1691,7 +1659,7 @@ typedef struct {
 	long cnt;
 } repeatobject;
 
-static PyTypeObject repeat_type;
+PyTypeObject repeat_type;
 
 static PyObject *
 repeat_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
@@ -1702,9 +1670,6 @@ repeat_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 
 	if (!PyArg_ParseTuple(args, "O|l:repeat", &element, &cnt))
 		return NULL;
-
-	if (PyTuple_Size(args) == 2 && cnt < 0)
-		cnt = 0;
 
 	ro = (repeatobject *)type->tp_alloc(type, 0);
 	if (ro == NULL)
@@ -1747,7 +1712,7 @@ PyDoc_STRVAR(repeat_doc,
 for the specified number of times.  If not specified, returns the element\n\
 endlessly.");
 
-static PyTypeObject repeat_type = {
+PyTypeObject repeat_type = {
 	PyObject_HEAD_INIT(NULL)
 	0,				/* ob_size */
 	"itertools.repeat",		/* tp_name */
@@ -1787,7 +1752,7 @@ static PyTypeObject repeat_type = {
 	0,				/* tp_descr_set */
 	0,				/* tp_dictoffset */
 	0,				/* tp_init */
-	0,				/* tp_alloc */
+	PyType_GenericAlloc,		/* tp_alloc */
 	repeat_new,			/* tp_new */
 	PyObject_GC_Del,		/* tp_free */
 };
@@ -1844,9 +1809,9 @@ inititertools(void)
 	for (i=0 ; typelist[i] != NULL ; i++) {
 		if (PyType_Ready(typelist[i]) < 0)
 			return;
-		name = strchr(typelist[i]->tp_name, '.');
+		name = strchr(typelist[i]->tp_name, '.') + 1;
 		assert (name != NULL);
 		Py_INCREF(typelist[i]);
-		PyModule_AddObject(m, name+1, (PyObject *)typelist[i]);
+		PyModule_AddObject(m, name, (PyObject *)typelist[i]);
 	}
 }

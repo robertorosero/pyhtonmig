@@ -6,7 +6,7 @@ from test import test_support
 
 class TestCase(unittest.TestCase):
 
-    fn = "shelftemp" + os.extsep + "db"
+    fn = "shelftemp.db"
 
     def test_ascii_file_shelf(self):
         try:
@@ -121,15 +121,15 @@ class TestProto2MemShelve(TestShelveBase):
     _in_mem = True
 
 def test_main():
-    test_support.run_unittest(
-        TestAsciiFileShelve,
-        TestBinaryFileShelve,
-        TestProto2FileShelve,
-        TestAsciiMemShelve,
-        TestBinaryMemShelve,
-        TestProto2MemShelve,
-        TestCase
-    )
+    suite = unittest.TestSuite()
+    suite.addTest(unittest.makeSuite(TestAsciiFileShelve))
+    suite.addTest(unittest.makeSuite(TestBinaryFileShelve))
+    suite.addTest(unittest.makeSuite(TestProto2FileShelve))
+    suite.addTest(unittest.makeSuite(TestAsciiMemShelve))
+    suite.addTest(unittest.makeSuite(TestBinaryMemShelve))
+    suite.addTest(unittest.makeSuite(TestProto2MemShelve))
+    suite.addTest(unittest.makeSuite(TestCase))
+    test_support.run_suite(suite)
 
 if __name__ == "__main__":
     test_main()

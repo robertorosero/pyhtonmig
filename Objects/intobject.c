@@ -958,10 +958,8 @@ int_subtype_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	}
 
 	new = type->tp_alloc(type, 0);
-	if (new == NULL) {
-		Py_DECREF(tmp);
+	if (new == NULL)
 		return NULL;
-	}
 	((PyIntObject *)new)->ob_ival = ival;
 	Py_DECREF(tmp);
 	return new;

@@ -3,7 +3,6 @@
 import unittest
 import random
 import time
-import pickle
 from math import log, exp, sqrt, pi
 from sets import Set
 from test import test_support
@@ -103,12 +102,6 @@ class TestBasicOps(unittest.TestCase):
             self.assertEqual(x1, x2)
             self.assertEqual(y1, y2)
 
-    def test_pickling(self):
-        state = pickle.dumps(self.gen)
-        origseq = [self.gen.random() for i in xrange(10)]
-        newgen = pickle.loads(state)
-        restoredseq = [newgen.random() for i in xrange(10)]
-        self.assertEqual(origseq, restoredseq)
 
 class WichmannHill_TestBasicOps(TestBasicOps):
     gen = random.WichmannHill()
@@ -279,19 +272,21 @@ class TestModule(unittest.TestCase):
         self.failUnless(Set(random.__all__) <= Set(dir(random)))
 
 def test_main(verbose=None):
-    testclasses =    (WichmannHill_TestBasicOps,
+    suite = unittest.TestSuite()
+    for testclass in (WichmannHill_TestBasicOps,
                       MersenneTwister_TestBasicOps,
                       TestDistributions,
-                      TestModule)
-    test_support.run_unittest(*testclasses)
+                      TestModule):
+        suite.addTest(unittest.makeSuite(testclass))
+    test_support.run_suite(suite)
 
     # verify reference counting
     import sys
     if verbose and hasattr(sys, "gettotalrefcount"):
-        counts = [None] * 5
-        for i in xrange(len(counts)):
-            test_support.run_unittest(*testclasses)
-            counts[i] = sys.gettotalrefcount()
+        counts = []
+        for i in xrange(5):
+            test_support.run_suite(suite)
+            counts.append(sys.gettotalrefcount()-i)
         print counts
 
 if __name__ == "__main__":

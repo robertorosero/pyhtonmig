@@ -8,11 +8,6 @@ from test import test_support
 
 import _strptime
 
-class getlang_Tests(unittest.TestCase):
-    """Test _getlang"""
-    def test_basic(self):
-        self.failUnlessEqual(_strptime._getlang(), locale.getlocale(locale.LC_TIME))
-
 class LocaleTime_Tests(unittest.TestCase):
     """Tests for _strptime.LocaleTime."""
 
@@ -63,11 +58,9 @@ class LocaleTime_Tests(unittest.TestCase):
 
     def test_timezone(self):
         # Make sure timezone is correct
-        timezone = time.strftime("%Z", self.time_tuple)
-        if timezone:
-            self.failUnless(timezone in self.LT_ins.timezone,
-                            "timezone %s not found in %s" %
-                            (timezone, self.LT_ins.timezone))
+        if time.strftime("%Z", self.time_tuple):
+            self.compare_against_time(self.LT_ins.timezone, '%Z', 8,
+                                      "Testing against timezone failed")
 
     def test_date_time(self):
         # Check that LC_date_time, LC_date, and LC_time are correct
@@ -94,9 +87,11 @@ class LocaleTime_Tests(unittest.TestCase):
                                     "empty strings")
 
     def test_lang(self):
-        # Make sure lang is set to what _getlang() returns
-        # Assuming locale has not changed between now and when self.LT_ins was created
-        self.failUnlessEqual(self.LT_ins.lang, _strptime._getlang())
+        # Make sure lang is set
+        self.failUnless(self.LT_ins.lang in (locale.getdefaultlocale()[0],
+                                             locale.getlocale(locale.LC_TIME),
+                                             ''),
+                        "Setting of lang failed")
 
     def test_by_hand_input(self):
         # Test passed-in initialization value checks
@@ -232,10 +227,6 @@ class StrptimeTests(unittest.TestCase):
         self.assertRaises(ValueError, _strptime.strptime, data_string="%d",
                           format="%A")
 
-    def test_unconverteddata(self):
-        # Check ValueError is raised when there is unconverted data
-        self.assertRaises(ValueError, _strptime.strptime, "10 12", "%m")
-
     def helper(self, directive, position):
         """Helper fxn in testing."""
         strf_output = time.strftime("%" + directive, self.time_tuple)
@@ -298,22 +289,18 @@ class StrptimeTests(unittest.TestCase):
         # When gmtime() is used with %Z, entire result of strftime() is empty.
         # Check for equal timezone names deals with bad locale info when this
         # occurs; first found in FreeBSD 4.4.
-        strp_output = _strptime.strptime("UTC", "%Z")
-        self.failUnlessEqual(strp_output.tm_isdst, 0)
-        strp_output = _strptime.strptime("GMT", "%Z")
-        self.failUnlessEqual(strp_output.tm_isdst, 0)
         time_tuple = time.localtime()
         strf_output = time.strftime("%Z")  #UTC does not have a timezone
         strp_output = _strptime.strptime(strf_output, "%Z")
         locale_time = _strptime.LocaleTime()
-        if time.tzname[0] != time.tzname[1] or not time.daylight:
+        if locale_time.timezone[0] != locale_time.timezone[1]:
             self.failUnless(strp_output[8] == time_tuple[8],
                             "timezone check failed; '%s' -> %s != %s" %
                              (strf_output, strp_output[8], time_tuple[8]))
         else:
             self.failUnless(strp_output[8] == -1,
-                            "LocaleTime().timezone has duplicate values and "
-                             "time.daylight but timezone value not set to -1")
+                            "LocaleTime().timezone has duplicate values but "
+                             "timzone value not set to 0")
 
     def test_date_time(self):
         # Test %c directive
@@ -413,16 +400,16 @@ class CalculationTests(unittest.TestCase):
         self.failUnless(result.tm_wday == self.time_tuple.tm_wday,
                         "Calculation of day of the week failed;"
                          "%s != %s" % (result.tm_wday, self.time_tuple.tm_wday))
+
 def test_main():
-    test_support.run_unittest(
-        getlang_Tests,
-        LocaleTime_Tests,
-        TimeRETests,
-        StrptimeTests,
-        Strptime12AMPMTests,
-        JulianTests,
-        CalculationTests,
-    )
+    suite = unittest.TestSuite()
+    suite.addTest(unittest.makeSuite(LocaleTime_Tests))
+    suite.addTest(unittest.makeSuite(TimeRETests))
+    suite.addTest(unittest.makeSuite(StrptimeTests))
+    suite.addTest(unittest.makeSuite(Strptime12AMPMTests))
+    suite.addTest(unittest.makeSuite(JulianTests))
+    suite.addTest(unittest.makeSuite(CalculationTests))
+    test_support.run_suite(suite)
 
 
 if __name__ == '__main__':

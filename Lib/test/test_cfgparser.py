@@ -322,11 +322,11 @@ class SafeConfigParserTestCase(ConfigParserTestCase):
 
 
 def test_main():
-    test_support.run_unittest(
-        ConfigParserTestCase,
-        RawConfigParserTestCase,
-        SafeConfigParserTestCase
-    )
+    suite = unittest.TestSuite()
+    suite.addTests([unittest.makeSuite(ConfigParserTestCase),
+                    unittest.makeSuite(RawConfigParserTestCase),
+                    unittest.makeSuite(SafeConfigParserTestCase)])
+    test_support.run_suite(suite)
 
 if __name__ == "__main__":
     test_main()

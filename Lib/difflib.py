@@ -6,17 +6,11 @@ Module difflib -- helpers for computing deltas between objects.
 Function get_close_matches(word, possibilities, n=3, cutoff=0.6):
     Use SequenceMatcher to return list of the best "good enough" matches.
 
-Function context_diff(a, b):
-    For two lists of strings, return a delta in context diff format.
-
 Function ndiff(a, b):
     Return a delta: the difference between `a` and `b` (lists of strings).
 
 Function restore(delta, which):
     Return one of the two sequences that generated an ndiff delta.
-
-Function unified_diff(a, b):
-    For two lists of strings, return a delta in unified diff format.
 
 Class SequenceMatcher:
     A flexible class for comparing pairs of sequences of any type.
@@ -26,13 +20,7 @@ Class Differ:
 """
 
 __all__ = ['get_close_matches', 'ndiff', 'restore', 'SequenceMatcher',
-           'Differ','IS_CHARACTER_JUNK', 'IS_LINE_JUNK', 'context_diff',
-           'unified_diff']
-
-def _calculate_ratio(matches, length):
-    if length:
-        return 2.0 * matches / length
-    return 1.0
+           'Differ','IS_CHARACTER_JUNK', 'IS_LINE_JUNK']
 
 class SequenceMatcher:
 
@@ -544,54 +532,6 @@ class SequenceMatcher:
                 answer.append( ('equal', ai, i, bj, j) )
         return answer
 
-    def get_grouped_opcodes(self, n=3):
-        """ Isolate change clusters by eliminating ranges with no changes.
-
-        Return a generator of groups with upto n lines of context.
-        Each group is in the same format as returned by get_opcodes().
-
-        >>> from pprint import pprint
-        >>> a = map(str, range(1,40))
-        >>> b = a[:]
-        >>> b[8:8] = ['i']     # Make an insertion
-        >>> b[20] += 'x'       # Make a replacement
-        >>> b[23:28] = []      # Make a deletion
-        >>> b[30] += 'y'       # Make another replacement
-        >>> pprint(list(SequenceMatcher(None,a,b).get_grouped_opcodes()))
-        [[('equal', 5, 8, 5, 8), ('insert', 8, 8, 8, 9), ('equal', 8, 11, 9, 12)],
-         [('equal', 16, 19, 17, 20),
-          ('replace', 19, 20, 20, 21),
-          ('equal', 20, 22, 21, 23),
-          ('delete', 22, 27, 23, 23),
-          ('equal', 27, 30, 23, 26)],
-         [('equal', 31, 34, 27, 30),
-          ('replace', 34, 35, 30, 31),
-          ('equal', 35, 38, 31, 34)]]
-        """
-
-        codes = self.get_opcodes()
-        # Fixup leading and trailing groups if they show no changes.
-        if codes[0][0] == 'equal':
-            tag, i1, i2, j1, j2 = codes[0]
-            codes[0] = tag, max(i1, i2-n), i2, max(j1, j2-n), j2
-        if codes[-1][0] == 'equal':
-            tag, i1, i2, j1, j2 = codes[-1]
-            codes[-1] = tag, i1, min(i2, i1+n), j1, min(j2, j1+n)
-
-        nn = n + n
-        group = []
-        for tag, i1, i2, j1, j2 in codes:
-            # End the current group and start a new one whenever
-            # there is a large range with no changes.
-            if tag == 'equal' and i2-i1 > nn:
-                group.append((tag, i1, min(i2, i1+n), j1, min(j2, j1+n)))
-                yield group
-                group = []
-                i1, j1 = max(i1, i2-n), max(j1, j2-n)
-            group.append((tag, i1, i2, j1 ,j2))
-        if group and not (len(group)==1 and group[0][0] == 'equal'):
-            yield group
-
     def ratio(self):
         """Return a measure of the sequences' similarity (float in [0,1]).
 
@@ -616,7 +556,7 @@ class SequenceMatcher:
 
         matches = reduce(lambda sum, triple: sum + triple[-1],
                          self.get_matching_blocks(), 0)
-        return _calculate_ratio(matches, len(self.a) + len(self.b))
+        return 2.0 * matches / (len(self.a) + len(self.b))
 
     def quick_ratio(self):
         """Return an upper bound on ratio() relatively quickly.
@@ -645,7 +585,7 @@ class SequenceMatcher:
             avail[elt] = numb - 1
             if numb > 0:
                 matches = matches + 1
-        return _calculate_ratio(matches, len(self.a) + len(self.b))
+        return 2.0 * matches / (len(self.a) + len(self.b))
 
     def real_quick_ratio(self):
         """Return an upper bound on ratio() very quickly.
@@ -657,7 +597,7 @@ class SequenceMatcher:
         la, lb = len(self.a), len(self.b)
         # can't have more matches than the number of elements in the
         # shorter sequence
-        return _calculate_ratio(min(la, lb), la + lb)
+        return 2.0 * min(la, lb) / (la + lb)
 
 def get_close_matches(word, possibilities, n=3, cutoff=0.6):
     """Use SequenceMatcher to return list of the best "good enough" matches.
@@ -915,9 +855,8 @@ class Differ:
         Example:
 
         >>> d = Differ()
-        >>> results = d._fancy_replace(['abcDefghiJkl\n'], 0, 1,
-        ...                            ['abcdefGhijkl\n'], 0, 1)
-        >>> print ''.join(results),
+        >>> d._fancy_replace(['abcDefghiJkl\n'], 0, 1, ['abcdefGhijkl\n'], 0, 1)
+        >>> print ''.join(d.results),
         - abcDefghiJkl
         ?    ^  ^  ^
         + abcdefGhijkl
@@ -1023,9 +962,9 @@ class Differ:
         Example:
 
         >>> d = Differ()
-        >>> results = d._qformat('\tabcDefghiJkl\n', '\t\tabcdefGhijkl\n',
-        ...                      '  ^ ^  ^      ', '+  ^ ^  ^      ')
-        >>> for line in results: print repr(line)
+        >>> d._qformat('\tabcDefghiJkl\n', '\t\tabcdefGhijkl\n',
+        ...            '  ^ ^  ^      ', '+  ^ ^  ^      ')
+        >>> for line in d.results: print repr(line)
         ...
         '- \tabcDefghiJkl\n'
         '? \t ^ ^  ^\n'
@@ -1102,144 +1041,6 @@ def IS_CHARACTER_JUNK(ch, ws=" \t"):
     return ch in ws
 
 del re
-
-
-def unified_diff(a, b, fromfile='', tofile='', fromfiledate='',
-                 tofiledate='', n=3, lineterm='\n'):
-    r"""
-    Compare two sequences of lines; generate the delta as a unified diff.
-
-    Unified diffs are a compact way of showing line changes and a few
-    lines of context.  The number of context lines is set by 'n' which
-    defaults to three.
-
-    By default, the diff control lines (those with ---, +++, or @@) are
-    created with a trailing newline.  This is helpful so that inputs
-    created from file.readlines() result in diffs that are suitable for
-    file.writelines() since both the inputs and outputs have trailing
-    newlines.
-
-    For inputs that do not have trailing newlines, set the lineterm
-    argument to "" so that the output will be uniformly newline free.
-
-    The unidiff format normally has a header for filenames and modification
-    times.  Any or all of these may be specified using strings for
-    'fromfile', 'tofile', 'fromfiledate', and 'tofiledate'.  The modification
-    times are normally expressed in the format returned by time.ctime().
-
-    Example:
-
-    >>> for line in unified_diff('one two three four'.split(),
-    ...             'zero one tree four'.split(), 'Original', 'Current',
-    ...             'Sat Jan 26 23:30:50 1991', 'Fri Jun 06 10:20:52 2003',
-    ...             lineterm=''):
-    ...     print line
-    --- Original Sat Jan 26 23:30:50 1991
-    +++ Current Fri Jun 06 10:20:52 2003
-    @@ -1,4 +1,4 @@
-    +zero
-     one
-    -two
-    -three
-    +tree
-     four
-    """
-
-    started = False
-    for group in SequenceMatcher(None,a,b).get_grouped_opcodes(n):
-        if not started:
-            yield '--- %s %s%s' % (fromfile, fromfiledate, lineterm)
-            yield '+++ %s %s%s' % (tofile, tofiledate, lineterm)
-            started = True
-        i1, i2, j1, j2 = group[0][1], group[-1][2], group[0][3], group[-1][4]
-        yield "@@ -%d,%d +%d,%d @@%s" % (i1+1, i2-i1, j1+1, j2-j1, lineterm)
-        for tag, i1, i2, j1, j2 in group:
-            if tag == 'equal':
-                for line in a[i1:i2]:
-                    yield ' ' + line
-                continue
-            if tag == 'replace' or tag == 'delete':
-                for line in a[i1:i2]:
-                    yield '-' + line
-            if tag == 'replace' or tag == 'insert':
-                for line in b[j1:j2]:
-                    yield '+' + line
-
-# See http://www.unix.org/single_unix_specification/
-def context_diff(a, b, fromfile='', tofile='',
-                 fromfiledate='', tofiledate='', n=3, lineterm='\n'):
-    r"""
-    Compare two sequences of lines; generate the delta as a context diff.
-
-    Context diffs are a compact way of showing line changes and a few
-    lines of context.  The number of context lines is set by 'n' which
-    defaults to three.
-
-    By default, the diff control lines (those with *** or ---) are
-    created with a trailing newline.  This is helpful so that inputs
-    created from file.readlines() result in diffs that are suitable for
-    file.writelines() since both the inputs and outputs have trailing
-    newlines.
-
-    For inputs that do not have trailing newlines, set the lineterm
-    argument to "" so that the output will be uniformly newline free.
-
-    The context diff format normally has a header for filenames and
-    modification times.  Any or all of these may be specified using
-    strings for 'fromfile', 'tofile', 'fromfiledate', and 'tofiledate'.
-    The modification times are normally expressed in the format returned
-    by time.ctime().  If not specified, the strings default to blanks.
-
-    Example:
-
-    >>> print ''.join(context_diff('one\ntwo\nthree\nfour\n'.splitlines(1),
-    ...       'zero\none\ntree\nfour\n'.splitlines(1), 'Original', 'Current',
-    ...       'Sat Jan 26 23:30:50 1991', 'Fri Jun 06 10:22:46 2003')),
-    *** Original Sat Jan 26 23:30:50 1991
-    --- Current Fri Jun 06 10:22:46 2003
-    ***************
-    *** 1,4 ****
-      one
-    ! two
-    ! three
-      four
-    --- 1,4 ----
-    + zero
-      one
-    ! tree
-      four
-    """
-
-    started = False
-    prefixmap = {'insert':'+ ', 'delete':'- ', 'replace':'! ', 'equal':'  '}
-    for group in SequenceMatcher(None,a,b).get_grouped_opcodes(n):
-        if not started:
-            yield '*** %s %s%s' % (fromfile, fromfiledate, lineterm)
-            yield '--- %s %s%s' % (tofile, tofiledate, lineterm)
-            started = True
-
-        yield '***************%s' % (lineterm,)
-        if group[-1][2] - group[0][1] >= 2:
-            yield '*** %d,%d ****%s' % (group[0][1]+1, group[-1][2], lineterm)
-        else:
-            yield '*** %d ****%s' % (group[-1][2], lineterm)
-        visiblechanges = [e for e in group if e[0] in ('replace', 'delete')]
-        if visiblechanges:
-            for tag, i1, i2, _, _ in group:
-                if tag != 'insert':
-                    for line in a[i1:i2]:
-                        yield prefixmap[tag] + line
-
-        if group[-1][4] - group[0][3] >= 2:
-            yield '--- %d,%d ----%s' % (group[0][3]+1, group[-1][4], lineterm)
-        else:
-            yield '--- %d ----%s' % (group[-1][4], lineterm)
-        visiblechanges = [e for e in group if e[0] in ('replace', 'insert')]
-        if visiblechanges:
-            for tag, _, _, j1, j2 in group:
-                if tag != 'delete':
-                    for line in b[j1:j2]:
-                        yield prefixmap[tag] + line
 
 def ndiff(a, b, linejunk=None, charjunk=IS_CHARACTER_JUNK):
     r"""

@@ -9,8 +9,8 @@ AC_INIT(python, PYTHON_VERSION)
 AC_CONFIG_SRCDIR([Include/object.h])
 AC_CONFIG_HEADER(pyconfig.h)
 
-dnl This is for stuff that absolutely must end up in pyconfig.h.
-dnl Please use pyport.h instead, if possible.
+# This is for stuff that absolutely must end up in pyconfig.h.
+# Please use pyport.h instead, if possible.
 AH_TOP([
 #ifndef Py_PYCONFIG_H
 #define Py_PYCONFIG_H
@@ -24,12 +24,6 @@ AH_BOTTOM([
 #endif /*Py_PYCONFIG_H*/
 ])
 
-# We don't use PACKAGE_ variables, and they cause conflicts
-# with other autoconf-based packages that include Python.h
-grep -v 'define PACKAGE_' <confdefs.h >confdefs.h.new
-rm confdefs.h
-mv confdefs.h.new confdefs.h
-
 AC_SUBST(VERSION)
 VERSION=PYTHON_VERSION
 
@@ -39,16 +33,6 @@ SOVERSION=1.0
 # The later defininition of _XOPEN_SOURCE disables certain features
 # on Linux, so we need _GNU_SOURCE to re-enable them (makedev, tm_zone).
 AC_DEFINE(_GNU_SOURCE, 1, [Define on Linux to activate all library features])
-
-# The later defininition of _XOPEN_SOURCE and _POSIX_C_SOURCE disables
-# certain features on NetBSD, so we need _NETBSD_SOURCE to re-enable
-# them.
-AC_DEFINE(_NETBSD_SOURCE, 1, [Define on NetBSD to activate all library features])
-
-# The later defininition of _XOPEN_SOURCE and _POSIX_C_SOURCE disables
-# certain features on FreeBSD, so we need __BSD_VISIBLE to re-enable
-# them.
-AC_DEFINE(__BSD_VISIBLE, 1, [Define on FreeBSD to activate all library features])
 
 define_xopen_source=yes
 
@@ -117,7 +101,6 @@ then
 	cygwin*) MACHDEP="cygwin";;
 	darwin*) MACHDEP="darwin";;
 	atheos*) MACHDEP="atheos";;
-        irix646) MACHDEP="irix6";;
 	'')	MACHDEP="unknown";;
 	esac
 fi
@@ -135,20 +118,11 @@ dnl quadrigraphs "@<:@" and "@:>@" produce "[" and "]" in the output
 case $ac_sys_system/$ac_sys_release in
   # On OpenBSD, select(2) is not available if _XOPEN_SOURCE is defined,
   # even though select is a POSIX function. Reported by J. Ribbens.
-  # Reconfirmed for OpenBSD 3.3 by Zachary Hamm.
-  OpenBSD/2.* | OpenBSD/3.@<:@0123@:>@) 
+  OpenBSD/2.* | OpenBSD/3.@<:@012@:>@) 
     define_xopen_source=no;;
   # On Solaris 2.6, sys/wait.h is inconsistent in the usage
   # of union __?sigval. Reported by Stuart Bishop.
   SunOS/5.6)
-    define_xopen_source=no;;
-  # On UnixWare 7, u_long is never defined with _XOPEN_SOURCE,
-  # but used in /usr/include/netinet/tcp.h. Reported by Tim Rice.
-  OpenUNIX/8.0.0| UnixWare/7.1.@<:@0-3@:>@)
-    define_xopen_source=no;;
-  # On OpenServer 5, u_short is never defined with _XOPEN_SOURCE,
-  # but used in struct sockaddr.sa_family. Reported by Tim Rice.
-  SCO_SV/3.2)
     define_xopen_source=no;;
 esac
 
@@ -488,7 +462,7 @@ AC_MSG_CHECKING(LDLIBRARY)
 if test "$enable_framework"
 then
   LDLIBRARY='$(PYTHONFRAMEWORKDIR)/Versions/$(VERSION)/$(PYTHONFRAMEWORK)'
-  RUNSHARED=DYLD_FRAMEWORK_PATH="`pwd`:$DYLD_FRAMEWORK_PATH"
+  LDLIBRARYDIR='$(PYTHONFRAMEWORKDIR)'
   BLDLIBRARY=''
 else
   BLDLIBRARY='$(LDLIBRARY)'
@@ -507,10 +481,10 @@ if test $enable_shared = "yes"; then
           ;;
     SunOS*)
 	  LDLIBRARY='libpython$(VERSION).so'
-	  BLDLIBRARY='-Wl,-R,$(LIBDIR) -L. -lpython$(VERSION)'
+	  BLDLIBRARY='-Wl,-rpath,$(LIBDIR) -L. -lpython$(VERSION)'
 	  RUNSHARED=LD_LIBRARY_PATH=`pwd`:$LD_LIBRARY_PATH
           ;;
-    Linux*|GNU*|NetBSD*)
+    Linux*|GNU*)
 	  LDLIBRARY='libpython$(VERSION).so'
 	  BLDLIBRARY='-L. -lpython$(VERSION)'
 	  RUNSHARED=LD_LIBRARY_PATH=`pwd`:$LD_LIBRARY_PATH
@@ -642,29 +616,13 @@ AC_SUBST(BASECFLAGS)
 # tweak BASECFLAGS based on compiler and platform
 case $GCC in
 yes)
-    # Python violates C99 rules, by casting between incompatible
-    # pointer types. GCC may generate bad code as a result of that,
-    # so use -fno-strict-aliasing if supported.
-    AC_MSG_CHECKING(whether $CC accepts -fno-strict-aliasing)
-     ac_save_cc="$CC"
-     CC="$CC -fno-strict-aliasing"
-     AC_TRY_RUN([int main() { return 0; }],
-     ac_cv_no_strict_aliasing_ok=yes,
-     ac_cv_no_strict_aliasing_ok=no,
-     ac_cv_no_strict_aliasing_ok=no)
-     CC="$ac_save_cc"
-    AC_MSG_RESULT($ac_cv_no_strict_aliasing_ok)
-    if test $ac_cv_no_strict_aliasing_ok = yes
-    then
-      BASECFLAGS="$BASECFLAGS -fno-strict-aliasing"
-    fi
     case $ac_sys_system in
 	SCO_SV*)
 	    BASECFLAGS="$BASECFLAGS -m486 -DSCO5"
 	    ;;
 	# is there any other compiler on Darwin besides gcc?
 	Darwin*)
-	    BASECFLAGS="$BASECFLAGS -Wno-long-double -no-cpp-precomp -mno-fused-madd"
+	    BASECFLAGS="$BASECFLAGS -Wno-long-double -no-cpp-precomp"
 	    ;;
     esac
     ;;
@@ -674,9 +632,6 @@ yes)
     OpenUNIX*|UnixWare*)
 	BASECFLAGS="$BASECFLAGS -K pentium,host,inline,loop_unroll,alloca "
 	;;
-    OSF*)
-	BASECFLAGS="$BASECFLAGS -ieee -std"
-    	;;
     SCO_SV*)
 	BASECFLAGS="$BASECFLAGS -belf -Ki486 -DSCO5"
 	;;
@@ -752,11 +707,7 @@ int main(){
   return 0;
 }
 ],
-[
-  ac_cv_pthread_is_default=yes
-  ac_cv_kthread=no
-  ac_cv_pthread=no
-],
+  ac_cv_pthread_is_default=yes,
   ac_cv_pthread_is_default=no,
   ac_cv_pthread_is_default=no)
 ])
@@ -796,109 +747,6 @@ CC="$ac_save_cc"])
 AC_MSG_RESULT($ac_cv_kpthread)
 fi
 
-if test $ac_cv_kpthread = no -a $ac_cv_pthread_is_default = no
-then
-# -Kthread, if available, provides the right #defines
-# and linker options to make pthread_create available
-# Some compilers won't report that they do not support -Kthread,
-# so we need to run a program to see whether it really made the
-# function available.
-AC_MSG_CHECKING(whether $CC accepts -Kthread)
-AC_CACHE_VAL(ac_cv_kthread,
-[ac_save_cc="$CC"
-CC="$CC -Kthread"
-AC_TRY_RUN([
-#include <pthread.h>
-
-void* routine(void* p){return NULL;}
-
-int main(){
-  pthread_t p;
-  if(pthread_create(&p,NULL,routine,NULL)!=0)
-    return 1;
-  (void)pthread_detach(p);
-  return 0;
-}
-],
-  ac_cv_kthread=yes,
-  ac_cv_kthread=no,
-  ac_cv_kthread=no)
-CC="$ac_save_cc"])
-AC_MSG_RESULT($ac_cv_kthread)
-fi
-
-if test $ac_cv_kthread = no -a $ac_cv_pthread_is_default = no
-then
-# -pthread, if available, provides the right #defines
-# and linker options to make pthread_create available
-# Some compilers won't report that they do not support -pthread,
-# so we need to run a program to see whether it really made the
-# function available.
-AC_MSG_CHECKING(whether $CC accepts -pthread)
-AC_CACHE_VAL(ac_cv_thread,
-[ac_save_cc="$CC"
-CC="$CC -pthread"
-AC_TRY_RUN([
-#include <pthread.h>
-
-void* routine(void* p){return NULL;}
-
-int main(){
-  pthread_t p;
-  if(pthread_create(&p,NULL,routine,NULL)!=0)
-    return 1;
-  (void)pthread_detach(p);
-  return 0;
-}
-],
-  ac_cv_pthread=yes,
-  ac_cv_pthread=no,
-  ac_cv_pthread=no)
-CC="$ac_save_cc"])
-AC_MSG_RESULT($ac_cv_pthread)
-fi
-
-# If we have set a CC compiler flag for thread support then
-# check if it works for CXX, too.
-ac_cv_cxx_thread=no
-if test ! -z "$CXX"
-then
-AC_MSG_CHECKING(whether $CXX also accepts flags for thread support)
-ac_save_cxx="$CXX"
-
-if test "$ac_cv_kpthread" = "yes"
-then
-  CXX="$CXX -Kpthread"
-  ac_cv_cxx_thread=yes
-elif test "$ac_cv_kthread" = "yes"
-then
-  CXX="$CXX -Kthread"
-  ac_cv_cxx_thread=yes
-elif test "$ac_cv_pthread" = "yes"
-then 
-  CXX="$CXX -pthread"
-  ac_cv_cxx_thread=yes
-fi
-
-if test $ac_cv_cxx_thread = yes
-then
-  echo 'void foo();int main(){foo();}void foo(){}' > conftest.$ac_ext
-  $CXX -c conftest.$ac_ext 2>&5
-  if $CXX -o conftest$ac_exeext conftest.$ac_objext 2>&5 \
-     && test -s conftest$ac_exeext && ./conftest$ac_exeext
-  then
-    ac_cv_cxx_thread=yes
-  else
-    ac_cv_cxx_thread=no
-    CXX="$ac_save_cxx"
-  fi
-  rm -fr conftest*
-else
- CXX="$ac_save_cxx"
-fi
-fi
-AC_MSG_RESULT($ac_cv_cxx_thread)
-
 dnl # check for ANSI or K&R ("traditional") preprocessor
 dnl AC_MSG_CHECKING(for C preprocessor type)
 dnl AC_TRY_COMPILE([
@@ -914,7 +762,7 @@ AC_CHECK_HEADERS(dlfcn.h fcntl.h grp.h limits.h langinfo.h \
 libintl.h locale.h ncurses.h poll.h pthread.h \
 signal.h stdarg.h stddef.h stdlib.h stropts.h termios.h thread.h \
 unistd.h utime.h \
-sys/audioio.h sys/bsdtty.h sys/file.h sys/lock.h sys/mkdev.h sys/modem.h \
+sys/audioio.h sys/file.h sys/lock.h sys/mkdev.h sys/modem.h \
 sys/param.h sys/poll.h sys/select.h sys/socket.h sys/time.h sys/times.h \
 sys/un.h sys/utsname.h sys/wait.h pty.h term.h libutil.h \
 sys/resource.h netpacket/packet.h sysexits.h)
@@ -1087,10 +935,6 @@ AC_DEFINE_UNQUOTED(SIZEOF_TIME_T, $ac_cv_sizeof_time_t,
 ac_save_cc="$CC"
 if test "$ac_cv_kpthread" = "yes"
 then CC="$CC -Kpthread"
-elif test "$ac_cv_kthread" = "yes"
-then CC="$CC -Kthread"
-elif test "$ac_cv_pthread" = "yes"
-then CC="$CC -pthread"
 fi
 AC_MSG_CHECKING(for pthread_t)
 have_pthread_t=no
@@ -1153,12 +997,12 @@ case $ac_sys_system/$ac_sys_release in
   Darwin/1.3*)
     LIBTOOL_CRUFT="-lcc_dynamic -arch_only ppc"
    	LIBTOOL_CRUFT="$LIBTOOL_CRUFT $extra_frameworks"
-    LIBTOOL_CRUFT=$LIBTOOL_CRUFT' -install_name $(PYTHONFRAMEWORKINSTALLDIR)/Versions/$(VERSION)/Python'
+    LIBTOOL_CRUFT=$LIBTOOL_CRUFT' -install_name $(PYTHONFRAMEWORKDIR)/Versions/$(VERSION)/Python'
     LIBTOOL_CRUFT=$LIBTOOL_CRUFT' -compatibility_version $(VERSION) -current_version $(VERSION)';;
   Darwin/*)
     LIBTOOL_CRUFT="-lcc_dynamic -arch_only ppc"
       LIBTOOL_CRUFT="$LIBTOOL_CRUFT $extra_frameworks"
-    LIBTOOL_CRUFT=$LIBTOOL_CRUFT' -install_name $(PYTHONFRAMEWORKINSTALLDIR)/Versions/$(VERSION)/Python'
+    LIBTOOL_CRUFT=$LIBTOOL_CRUFT' -install_name $(PYTHONFRAMEWORKDIR)/Versions/$(VERSION)/Python'
     LIBTOOL_CRUFT=$LIBTOOL_CRUFT' -compatibility_version $(VERSION) -current_version $(VERSION)';;
 esac
 
@@ -1207,17 +1051,6 @@ then
 	CYGWIN*)   SO=.dll;;
 	*)	   SO=.so;;
 	esac
-else
-	# this might also be a termcap variable, see #610332
-        echo
-        echo '====================================================================='
-        echo '+                                                                   +'
-	echo '+ WARNING: You have set SO in your environment.                     +'
-        echo '+ Do you really mean to change the extension for shared libraries?  +'
-        echo '+ Continuing in 10 seconds to let you to ponder.                    +'
-        echo '+                                                                   +'
-        echo '====================================================================='
-	sleep 10
 fi
 AC_MSG_RESULT($SO)
 # LDSHARED is the ld *command* used to create shared library
@@ -1410,13 +1243,8 @@ AC_MSG_RESULT($SHLIBS)
 # checks for libraries
 AC_CHECK_LIB(dl, dlopen)	# Dynamic linking for SunOS/Solaris and SYSV
 AC_CHECK_LIB(dld, shl_load)	# Dynamic linking for HP-UX
-AC_SEARCH_LIBS(sem_init, pthread rt posix4) # 'Real Time' functions on Solaris
-					    # posix4 on Solaris 2.6
-					    # pthread (first!) on Linux
-# check if we need libintl for locale functions
-AC_CHECK_LIB(intl, textdomain,
-	AC_DEFINE(WITH_LIBINTL, 1,
-	[Define to 1 if libintl is needed for locale functions.]))
+AC_SEARCH_LIBS(sem_init, rt posix4)	# 'Real Time' functions on Solaris,
+			    		# posix4 on Solaris 2.6
 
 # checks for system dependent C++ extensions support
 case "$ac_sys_system" in
@@ -1533,18 +1361,6 @@ then
     AC_DEFINE(WITH_THREAD)
     posix_threads=yes
     THREADOBJ="Python/thread.o"
-elif test "$ac_cv_kthread" = "yes"
-then
-    CC="$CC -Kthread"
-    AC_DEFINE(WITH_THREAD)
-    posix_threads=yes
-    THREADOBJ="Python/thread.o"
-elif test "$ac_cv_pthread" = "yes"
-then
-    CC="$CC -pthread"
-    AC_DEFINE(WITH_THREAD)
-    posix_threads=yes
-    THREADOBJ="Python/thread.o"
 else
     if test ! -z "$with_threads" -a -d "$with_threads"
     then LDFLAGS="$LDFLAGS -L$with_threads"
@@ -1640,29 +1456,7 @@ pthread_create (NULL, NULL, start_routine, NULL)], [
     USE_THREAD_MODULE="#"])
     ])])])])])])])])])])])
 
-    AC_CHECK_LIB(mpc, usconfig, [AC_DEFINE(WITH_THREAD)
-    LIBS="$LIBS -lmpc"
-    THREADOBJ="Python/thread.o"
-    USE_THREAD_MODULE=""])
-
-    if test "$posix_threads" != "yes"; then     
-      AC_CHECK_LIB(thread, thr_create, [AC_DEFINE(WITH_THREAD)
-      LIBS="$LIBS -lthread"
-      THREADOBJ="Python/thread.o"
-      USE_THREAD_MODULE=""])
-    fi
-
-    if test "$USE_THREAD_MODULE" != "#"
-    then
-        # If the above checks didn't disable threads, (at least) OSF1
-        # needs this '-threads' argument during linking.
-        case $ac_sys_system in
-        OSF1) LDLAST=-threads;;
-        esac
-    fi
-fi
-
-if test "$posix_threads" = "yes"; then
+    if test "$posix_threads" = "yes"; then
       if test "$unistd_defines_pthreads" = "no"; then
          AC_DEFINE(_POSIX_THREADS, 1,
          [Define if you have POSIX threads, 
@@ -1671,12 +1465,8 @@ if test "$posix_threads" = "yes"; then
 
       # Bug 662787: Using semaphores causes unexplicable hangs on Solaris 8.
       case  $ac_sys_system/$ac_sys_release in
-  SunOS/5.6) AC_DEFINE(HAVE_PTHREAD_DESTRUCTOR, 1,
-                       Defined for Solaris 2.6 bug in pthread header.)
-		       ;;
       SunOS/5.8) AC_DEFINE(HAVE_BROKEN_POSIX_SEMAPHORES, 1,
-		       Define if the Posix semaphores do not work on your system)
-		       ;;
+                           Define if the Posix semaphores do not work on your system);;
       esac
 
       AC_MSG_CHECKING(if PTHREAD_SCOPE_SYSTEM is supported)
@@ -1701,15 +1491,38 @@ if test "$posix_threads" = "yes"; then
       if test "$ac_cv_pthread_system_supported" = "yes"; then
         AC_DEFINE(PTHREAD_SYSTEM_SCHED_SUPPORTED, 1, [Defined if PTHREAD_SCOPE_SYSTEM supported.])
       fi
-      AC_CHECK_FUNCS(pthread_sigmask,
-        [case $ac_sys_system in
-        CYGWIN*)
-          AC_DEFINE(HAVE_BROKEN_PTHREAD_SIGMASK, 1,
-            [Define if pthread_sigmask() does not work on your system.])
-            ;;
-        esac])
-fi
+      AC_CHECK_FUNCS(pthread_sigmask)
+    fi
 
+    AC_CHECK_LIB(mpc, usconfig, [AC_DEFINE(WITH_THREAD)
+    LIBS="$LIBS -lmpc"
+    THREADOBJ="Python/thread.o"
+    USE_THREAD_MODULE=""])
+
+    if test "$posix_threads" != "yes"; then     
+      AC_CHECK_LIB(thread, thr_create, [AC_DEFINE(WITH_THREAD)
+      LIBS="$LIBS -lthread"
+      THREADOBJ="Python/thread.o"
+      USE_THREAD_MODULE=""])
+    fi
+
+    if test "$USE_THREAD_MODULE" != "#"
+    then
+        # If the above checks didn't disable threads, (at least) OSF1
+        # needs this '-threads' argument during linking.
+        case $ac_sys_system in
+        OSF1) LDLAST=-threads;;
+        esac
+    fi
+
+    if test "$posix_threads" = yes -a \
+		"$ac_sys_system" = "SunOS" -a \
+		"$ac_sys_release" = "5.6"; then
+		AC_DEFINE(HAVE_PTHREAD_DESTRUCTOR, 1,
+		[Defined for Solaris 2.6 bug in pthread header.])
+	fi
+
+fi
 
 # Check for enable-ipv6
 AH_TEMPLATE(ENABLE_IPV6, [Define if --enable-ipv6 is specified])
@@ -2044,7 +1857,7 @@ AC_CHECK_FUNCS(alarm chown clock confstr ctermid execv \
  fchdir fork fsync fdatasync fpathconf ftime ftruncate \
  gai_strerror getgroups getlogin getloadavg getpeername getpgid getpid \
  getpriority getpwent getwd \
- kill killpg lchown lstat mkfifo mknod mktime \
+ hstrerror inet_aton inet_pton kill killpg lchown lstat mkfifo mknod mktime \
  mremap nice pathconf pause plock poll pthread_init \
  putenv readlink realpath \
  select setegid seteuid setgid \
@@ -2110,58 +1923,10 @@ AC_TRY_COMPILE([
   AC_MSG_RESULT(no)
 )
 
-dnl check for true
-AC_CHECK_PROGS(TRUE, true, /bin/true)
-
-dnl On some systems (e.g. Solaris 9), hstrerror and inet_aton are in -lresolv
-dnl On others, they are in the C library, so we to take no action
-AC_CHECK_LIB(c, inet_aton, [$ac_cv_prog_TRUE],
-  AC_CHECK_LIB(resolv, inet_aton)
-)
-
-AC_MSG_CHECKING(for hstrerror)
-AC_TRY_LINK([
-#include "confdefs.h" 
-#include <netdb.h>
-], void* p = hstrerror; hstrerror(0),
-  AC_DEFINE(HAVE_HSTRERROR, 1, Define if you have the 'hstrerror' function.)
-  AC_MSG_RESULT(yes),
-  AC_MSG_RESULT(no)
-)
-
-AC_MSG_CHECKING(for inet_aton)
-AC_TRY_LINK([
-#include "confdefs.h" 
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-], void* p = inet_aton;inet_aton(0,0),
-  AC_DEFINE(HAVE_INET_ATON, 1, Define if you have the 'inet_aton' function.)
-  AC_MSG_RESULT(yes),
-  AC_MSG_RESULT(no)
-)
-
-AC_MSG_CHECKING(for inet_pton)
-AC_TRY_COMPILE([
-#include "confdefs.h" 
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-], void* p = inet_pton,
-  AC_DEFINE(HAVE_INET_PTON, 1, Define if you have the 'inet_pton' function.)
-  AC_MSG_RESULT(yes),
-  AC_MSG_RESULT(no)
-)
-
-# On some systems, setgroups is in unistd.h, on others, in grp.h
 AC_MSG_CHECKING(for setgroups)
 AC_TRY_COMPILE([
 #include "confdefs.h" 
-#include <unistd.h>
-#ifdef HAVE_GRP_H
-#include <grp.h>
-#endif
+#include <unistd.h.h>
 ], 
 void* p = setgroups,
   AC_DEFINE(HAVE_SETGROUPS, 1, Define if you have the 'setgroups' function.)

@@ -350,9 +350,10 @@ xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx*/
        /*
 	 Call a callable Python object, callable_object, with a
 	 variable number of C arguments.  The C arguments are provided
-	 as PyObject * values, terminated by a NULL.  Returns the
-	 result of the call on success, or NULL on failure.  This is
-	 the equivalent of the Python expression: apply(o,args).
+	 as PyObject * values; 'n' specifies the number of arguments
+	 present.  Returns the result of the call on success, or NULL
+	 on failure.  This is the equivalent of the Python expression:
+	 apply(o,args).
        */
 
 
@@ -361,10 +362,10 @@ xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx*/
 
        /*
 	 Call the method named m of object o with a variable number of
-	 C arguments.  The C arguments are provided as PyObject *
-	 values, terminated by NULL.  Returns the result of the call
-	 on success, or NULL on failure.  This is the equivalent of
-	 the Python expression: o.method(args).
+	 C arguments.  The C arguments are provided as PyObject * values;
+	 'n' specifies the number of arguments present.  Returns the
+	 result of the call on success, or NULL on failure.  This is the
+	 equivalent of the Python expression: o.method(args).
        */
 
 

@@ -572,39 +572,10 @@ float_pow(PyObject *v, PyObject *w, PyObject *z)
 		}
 		return PyFloat_FromDouble(0.0);
 	}
-	if (iv < 0.0) {
-		/* Whether this is an error is a mess, and bumps into libm
-		 * bugs so we have to figure it out ourselves.
-		 */
-		if (iw != floor(iw)) {
-			PyErr_SetString(PyExc_ValueError, "negative number "
-				"cannot be raised to a fractional power");
-			return NULL;
-		}
-		/* iw is an exact integer, albeit perhaps a very large one.
-		 * -1 raised to an exact integer should never be exceptional.
-		 * Alas, some libms (chiefly glibc as of early 2003) return
-		 * NaN and set EDOM on pow(-1, large_int) if the int doesn't
-		 * happen to be representable in a *C* integer.  That's a
-		 * bug; we let that slide in math.pow() (which currently
-		 * reflects all platform accidents), but not for Python's **.
-		 */
-		 if (iv == -1.0 && !Py_IS_INFINITY(iw) && iw == iw) {
-		 	/* XXX the "iw == iw" was to weed out NaNs.  This
-		 	 * XXX doesn't actually work on all platforms.
-		 	 */
-		 	/* Return 1 if iw is even, -1 if iw is odd; there's
-		 	 * no guarantee that any C integral type is big
-		 	 * enough to hold iw, so we have to check this
-		 	 * indirectly.
-		 	 */
-		 	ix = floor(iw * 0.5) * 2.0;
-			return PyFloat_FromDouble(ix == iw ? 1.0 : -1.0);
-		}
-		/* Else iv != -1.0, and overflow or underflow are possible.
-		 * Unless we're to write pow() ourselves, we have to trust
-		 * the platform to do this correctly.
-		 */
+	if (iv < 0.0 && iw != floor(iw)) {
+		PyErr_SetString(PyExc_ValueError,
+				"negative number cannot be raised to a fractional power");
+		return NULL;
 	}
 	errno = 0;
 	PyFPE_START_PROTECT("pow", return NULL)
@@ -612,11 +583,8 @@ float_pow(PyObject *v, PyObject *w, PyObject *z)
 	PyFPE_END_PROTECT(ix)
 	Py_ADJUST_ERANGE1(ix);
 	if (errno != 0) {
-		/* We don't expect any errno value other than ERANGE, but
-		 * the range of libm bugs appears unbounded.
-		 */
-		PyErr_SetFromErrno(errno == ERANGE ? PyExc_OverflowError :
-						     PyExc_ValueError);
+		assert(errno == ERANGE);
+		PyErr_SetFromErrno(PyExc_OverflowError);
 		return NULL;
 	}
 	return PyFloat_FromDouble(ix);
@@ -751,10 +719,8 @@ float_subtype_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 		return NULL;
 	assert(PyFloat_CheckExact(tmp));
 	new = type->tp_alloc(type, 0);
-	if (new == NULL) {
-		Py_DECREF(tmp);
+	if (new == NULL)
 		return NULL;
-	}
 	((PyFloatObject *)new)->ob_fval = ((PyFloatObject *)tmp)->ob_fval;
 	Py_DECREF(tmp);
 	return new;

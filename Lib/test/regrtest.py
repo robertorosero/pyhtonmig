@@ -73,7 +73,7 @@ import os
 import getopt
 import traceback
 import random
-import cStringIO
+import StringIO
 import warnings
 from sets import Set
 
@@ -379,7 +379,7 @@ def runtest(test, generate, verbose, quiet, testdir = None):
     if verbose:
         cfp = None
     else:
-        cfp = cStringIO.StringIO()
+        cfp = StringIO.StringIO()
     try:
         save_stdout = sys.stdout
         try:
@@ -555,7 +555,6 @@ _expectations = {
     'win32':
         """
         test_al
-        test_bsddb185
         test_bsddb3
         test_cd
         test_cl
@@ -585,13 +584,13 @@ _expectations = {
         test_pwd
         test_resource
         test_signal
+        test_socketserver
         test_sunaudiodev
         test_timing
         """,
     'linux2':
         """
         test_al
-        test_bsddb185
         test_cd
         test_cl
         test_curses
@@ -604,6 +603,7 @@ _expectations = {
         test_nis
         test_ntpath
         test_ossaudiodev
+        test_socketserver
         test_sunaudiodev
         """,
    'mac':
@@ -611,7 +611,6 @@ _expectations = {
         test_al
         test_atexit
         test_bsddb
-        test_bsddb185
         test_bsddb3
         test_bz2
         test_cd
@@ -645,6 +644,7 @@ _expectations = {
         test_pwd
         test_resource
         test_signal
+        test_socketserver
         test_sunaudiodev
         test_sundry
         test_tarfile
@@ -654,7 +654,6 @@ _expectations = {
         """
         test_al
         test_bsddb
-        test_bsddb185
         test_cd
         test_cl
         test_dl
@@ -668,6 +667,7 @@ _expectations = {
         test_openpty
         test_pyexpat
         test_sax
+        test_socketserver
         test_sunaudiodev
         test_sundry
         """,
@@ -675,7 +675,6 @@ _expectations = {
         """
         test_al
         test_bsddb
-        test_bsddb185
         test_cd
         test_cl
         test_dl
@@ -689,6 +688,7 @@ _expectations = {
         test_openpty
         test_pyexpat
         test_sax
+        test_socketserver
         test_sunaudiodev
         test_sundry
         """,
@@ -697,7 +697,6 @@ _expectations = {
         test_al
         test_asynchat
         test_bsddb
-        test_bsddb185
         test_cd
         test_cl
         test_dl
@@ -715,6 +714,7 @@ _expectations = {
         test_pyexpat
         test_queue
         test_sax
+        test_socketserver
         test_sunaudiodev
         test_sundry
         test_thread
@@ -726,10 +726,7 @@ _expectations = {
         """
         test_al
         test_asynchat
-        test_atexit
         test_bsddb
-        test_bsddb185
-        test_bsddb3
         test_cd
         test_cl
         test_commands
@@ -753,6 +750,7 @@ _expectations = {
         test_popen2
         test_pty
         test_pwd
+        test_socketserver
         test_strop
         test_sunaudiodev
         test_sundry
@@ -784,13 +782,13 @@ _expectations = {
         test_ntpath
         test_ossaudiodev
         test_poll
+        test_socketserver
         test_sunaudiodev
         """,
     'sunos5':
         """
         test_al
         test_bsddb
-        test_bsddb185
         test_cd
         test_cl
         test_curses
@@ -803,6 +801,7 @@ _expectations = {
         test_linuxaudiodev
         test_mpz
         test_openpty
+        test_socketserver
         test_zipfile
         test_zlib
         """,
@@ -810,7 +809,6 @@ _expectations = {
         """
         test_al
         test_bsddb
-        test_bsddb185
         test_cd
         test_cl
         test_curses
@@ -828,6 +826,7 @@ _expectations = {
         test_openpty
         test_pyexpat
         test_sax
+        test_socketserver
         test_sunaudiodev
         test_zipfile
         test_zlib
@@ -835,7 +834,6 @@ _expectations = {
     'atheos':
         """
         test_al
-        test_bsddb185
         test_cd
         test_cl
         test_curses
@@ -854,12 +852,12 @@ _expectations = {
         test_poll
         test_popen2
         test_resource
+        test_socketserver
         test_sunaudiodev
         """,
     'cygwin':
         """
         test_al
-        test_bsddb185
         test_bsddb3
         test_cd
         test_cl
@@ -868,7 +866,6 @@ _expectations = {
         test_email_codecs
         test_gl
         test_imgfile
-        test_ioctl
         test_largefile
         test_linuxaudiodev
         test_locale
@@ -882,7 +879,6 @@ _expectations = {
         """
         test_al
         test_audioop
-        test_bsddb185
         test_bsddb3
         test_cd
         test_cl
@@ -903,36 +899,6 @@ _expectations = {
         test_resource
         test_signal
         test_sunaudiodev
-        """,
-     'freebsd4':
-         """
-       test_aepack
-       test_al
-       test_bsddb
-       test_bsddb3
-       test_cd
-       test_cl
-       test_email_codecs
-       test_gl
-       test_imgfile
-       test_linuxaudiodev
-       test_locale
-       test_macfs
-       test_macostools
-       test_nis
-       test_normalization
-       test_ossaudiodev
-       test_pep277
-       test_plistlib
-       test_scriptpackages
-       test_socket_ssl
-       test_socketserver
-       test_sunaudiodev
-       test_timeout
-       test_unicode_file
-       test_urllibnet
-       test_winreg
-       test_winsound
         """,
 }
 

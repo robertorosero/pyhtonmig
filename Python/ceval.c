@@ -8,7 +8,7 @@
 
 #include "Python.h"
 
-#include "compile.h"
+#include "code.h"
 #include "frameobject.h"
 #include "eval.h"
 #include "opcode.h"
@@ -290,7 +290,7 @@ static PyTypeObject gentype = {
 
 extern int _PyThread_Started; /* Flag for Py_Exit */
 
-static PyThread_type_lock interpreter_lock = 0; /* This is the GIL */
+static PyThread_type_lock interpreter_lock = 0;
 static long main_thread = 0;
 
 void
@@ -583,7 +583,7 @@ eval_frame(PyFrameObject *f)
 #ifdef LLTRACE
 	int lltrace;
 #endif
-#if defined(Py_DEBUG) || defined(LLTRACE)
+#if defined(Py_DEBUG)
 	/* Make it easier to find out where we are with a debugger */
 	char *filename;
 #endif
@@ -749,9 +749,9 @@ eval_frame(PyFrameObject *f)
 	f->f_stacktop = NULL;	/* remains NULL unless yield suspends frame */
 
 #ifdef LLTRACE
-	lltrace = PyDict_GetItemString(f->f_globals,"__lltrace__") != NULL;
+	lltrace = PyDict_GetItemString(f->f_globals, "__lltrace__") != NULL;
 #endif
-#if defined(Py_DEBUG) || defined(LLTRACE)
+#if defined(Py_DEBUG)
 	filename = PyString_AsString(co->co_filename);
 #endif
 
@@ -773,11 +773,6 @@ eval_frame(PyFrameObject *f)
 		   Py_MakePendingCalls() above. */
 
 		if (--_Py_Ticker < 0) {
-                        if (*next_instr == SETUP_FINALLY) {
-                                /* Make the last opcode before
-                                   a try: finally: block uninterruptable. */
-                                goto fast_next_opcode;
-                        }
 			_Py_Ticker = _Py_CheckInterval;
 			tstate->tick_counter++;
 			if (things_to_do) {
@@ -810,17 +805,6 @@ eval_frame(PyFrameObject *f)
 				PyThread_acquire_lock(interpreter_lock, 1);
 				if (PyThreadState_Swap(tstate) != NULL)
 					Py_FatalError("ceval: orphan tstate");
-
-				/* Check for thread interrupts */
-
-				if (tstate->async_exc != NULL) {
-					x = tstate->async_exc;
-					tstate->async_exc = NULL;
-					PyErr_SetNone(x);
-					Py_DECREF(x);
-					why = WHY_EXCEPTION;
-					goto on_error;
-				}
 			}
 #endif
 		}
@@ -835,22 +819,25 @@ eval_frame(PyFrameObject *f)
 			   for expository comments */
 			f->f_stacktop = stack_pointer;
 			
-			err = maybe_call_line_trace(tstate->c_tracefunc,
-						    tstate->c_traceobj,
-						    f, &instr_lb, &instr_ub);
-			/* Reload possibly changed frame fields */
-			JUMPTO(f->f_lasti);
-			if (f->f_stacktop != NULL) {
-				stack_pointer = f->f_stacktop;
-				f->f_stacktop = NULL;
-			}
-			if (err) {
+			if (maybe_call_line_trace(tstate->c_tracefunc,
+						  tstate->c_traceobj,
+						  f, &instr_lb, &instr_ub)) {
 				/* trace function raised an exception */
+				why = WHY_EXCEPTION;
 				goto on_error;
 			}
+			/* Reload possibly changed frame fields */
+			JUMPTO(f->f_lasti);
+			stack_pointer = f->f_stacktop;
+			assert(stack_pointer != NULL);
+			f->f_stacktop = NULL;
 		}
 
 		/* Extract opcode and argument */
+
+#if defined(Py_DEBUG)
+		f->f_lasti = INSTR_OFFSET();
+#endif
 
 		opcode = NEXTOP();
 		if (HAS_ARG(opcode))
@@ -1501,11 +1488,6 @@ eval_frame(PyFrameObject *f)
 					err = -1;
 				}
 			}
-			/* PyFile_SoftSpace() can exececute arbitrary code
-			   if sys.stdout is an instance with a __getattr__.
-			   If __getattr__ raises an exception, w will
-			   be freed, so we need to prevent that temporarily. */
-			Py_XINCREF(w);
 			if (w != NULL && PyFile_SoftSpace(w, 0))
 				err = PyFile_WriteString(" ", w);
 			if (err == 0)
@@ -1533,7 +1515,6 @@ eval_frame(PyFrameObject *f)
 			    else
 			    	PyFile_SoftSpace(w, 1);
 			}
-			Py_XDECREF(w);
 			Py_DECREF(v);
 			Py_XDECREF(stream);
 			stream = NULL;
@@ -2069,7 +2050,7 @@ eval_frame(PyFrameObject *f)
 
 		case JUMP_ABSOLUTE:
 			JUMPTO(oparg);
-			continue;
+			goto fast_next_opcode;
 
 		case GET_ITER:
 			/* before: [obj]; after [getiter(obj)] */
@@ -2185,23 +2166,11 @@ eval_frame(PyFrameObject *f)
 
 		case MAKE_CLOSURE:
 		{
-			int nfree;
 			v = POP(); /* code object */
 			x = PyFunction_New(v, f->f_globals);
-			nfree = PyCode_GetNumFree((PyCodeObject *)v);
 			Py_DECREF(v);
-			/* XXX Maybe this should be a separate opcode? */
-			if (x != NULL && nfree > 0) {
-				v = PyTuple_New(nfree);
-				if (v == NULL) {
-					Py_DECREF(x);
-					x = NULL;
-					break;
-				}
-				while (--nfree >= 0) {
-					w = POP();
-					PyTuple_SET_ITEM(v, nfree, w);
-				}
+			if (x != NULL) {
+				v = POP();
 				err = PyFunction_SetClosure(x, v);
 				Py_DECREF(v);
 			}
@@ -2604,12 +2573,18 @@ PyEval_EvalCodeEx(PyCodeObject *co, PyObject *globals, PyObject *locals,
 		if (co->co_flags & CO_VARKEYWORDS)
 			nargs++;
 
-		/* Check for cells that shadow args */
-		for (i = 0; i < f->f_ncells && j < nargs; ++i) {
+		/* Initialize each cell var, taking into account
+		   cell vars that are initialized from arguments.
+
+		   Should arrange for the compiler to put cellvars
+		   that are arguments at the beginning of the cellvars
+		   list so that we can march over it more efficiently?
+		*/
+		for (i = 0; i < f->f_ncells; ++i) {
 			cellname = PyString_AS_STRING(
 				PyTuple_GET_ITEM(co->co_cellvars, i));
 			found = 0;
-			while (j < nargs) {
+			for (j = 0; j < nargs; j++) {
 				argname = PyString_AS_STRING(
 					PyTuple_GET_ITEM(co->co_varnames, j));
 				if (strcmp(cellname, argname) == 0) {
@@ -2620,7 +2595,6 @@ PyEval_EvalCodeEx(PyCodeObject *co, PyObject *globals, PyObject *locals,
 					found = 1;
 					break;
 				}
-				j++;
 			}
 			if (found == 0) {
 				c = PyCell_New(NULL);
@@ -2628,14 +2602,6 @@ PyEval_EvalCodeEx(PyCodeObject *co, PyObject *globals, PyObject *locals,
 					goto fail;
 				SETLOCAL(f->f_nlocals + i, c);
 			}
-		}
-		/* Initialize any that are left */
-		while (i < f->f_ncells) {
-			c = PyCell_New(NULL);
-			if (c == NULL)
-				goto fail;
-			SETLOCAL(f->f_nlocals + i, c);
-			i++;
 		}
 	}
 	if (f->f_nfreevars) {
@@ -3490,7 +3456,7 @@ fast_function(PyObject *func, PyObject ***pp_stack, int n, int na, int nk)
 
 	PCALL(PCALL_FUNCTION);
 	PCALL(PCALL_FAST_FUNCTION);
-	if (argdefs == NULL && co->co_argcount == n && nk==0 &&
+	if (argdefs == NULL && co->co_argcount == n && 
 	    co->co_flags == (CO_OPTIMIZED | CO_NEWLOCALS | CO_NOFREE)) {
 		PyFrameObject *f;
 		PyObject *retval = NULL;

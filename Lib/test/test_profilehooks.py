@@ -349,10 +349,11 @@ def show_events(callable):
 
 
 def test_main():
-    test_support.run_unittest(
-        ProfileHookTestCase,
-        ProfileSimulatorTestCase
-    )
+    loader = unittest.TestLoader()
+    suite = unittest.TestSuite()
+    suite.addTest(loader.loadTestsFromTestCase(ProfileHookTestCase))
+    suite.addTest(loader.loadTestsFromTestCase(ProfileSimulatorTestCase))
+    test_support.run_suite(suite)
 
 
 if __name__ == "__main__":

@@ -123,9 +123,6 @@ class Random(_random.Random):
     def __setstate__(self, state):  # for pickle
         self.setstate(state)
 
-    def __reduce__(self):
-        return self.__class__, (), self.getstate()
-
 ## -------------------- integer methods  -------------------
 
     def randrange(self, start, stop=None, step=1, int=int, default=None):
@@ -151,19 +148,16 @@ class Random(_random.Random):
         if istop != stop:
             raise ValueError, "non-integer stop for randrange()"
         if step == 1 and istart < istop:
-            # Note that
-            #     int(istart + self.random()*(istop - istart))
-            # instead would be incorrect.  For example, consider istart
-            # = -2 and istop = 0.  Then the guts would be in
-            # -2.0 to 0.0 exclusive on both ends (ignoring that random()
-            # might return 0.0), and because int() truncates toward 0, the
-            # final result would be -1 or 0 (instead of -2 or -1).
-            #     istart + int(self.random()*(istop - istart))
-            # would also be incorrect, for a subtler reason:  the RHS
-            # can return a long, and then randrange() would also return
-            # a long, but we're supposed to return an int (for backward
-            # compatibility).
-            return int(istart + int(self.random()*(istop - istart)))
+            try:
+                return istart + int(self.random()*(istop - istart))
+            except OverflowError:
+                # This can happen if istop-istart > sys.maxint + 1, and
+                # multiplying by random() doesn't reduce it to something
+                # <= sys.maxint.  We know that the overall result fits
+                # in an int, and can still do it correctly via math.floor().
+                # But that adds another function call, so for speed we
+                # avoided that whenever possible.
+                return int(istart + _floor(self.random()*(istop - istart)))
         if step == 1:
             raise ValueError, "empty range for randrange()"
 
@@ -213,7 +207,7 @@ class Random(_random.Random):
             j = int(random() * (i+1))
             x[i], x[j] = x[j], x[i]
 
-    def sample(self, population, k):
+    def sample(self, population, k, int=int):
         """Chooses k unique random elements from a population sequence.
 
         Returns a new list containing elements from the population while
@@ -246,20 +240,19 @@ class Random(_random.Random):
         if not 0 <= k <= n:
             raise ValueError, "sample larger than population"
         random = self.random
-        _int = int
         result = [None] * k
         if n < 6 * k:     # if n len list takes less space than a k len dict
             pool = list(population)
             for i in xrange(k):         # invariant:  non-selected at [0,n-i)
-                j = _int(random() * (n-i))
+                j = int(random() * (n-i))
                 result[i] = pool[j]
                 pool[j] = pool[n-i-1]   # move non-selected item into vacancy
         else:
             selected = {}
             for i in xrange(k):
-                j = _int(random() * n)
+                j = int(random() * n)
                 while j in selected:
-                    j = _int(random() * n)
+                    j = int(random() * n)
                 result[i] = selected[j] = population[j]
         return result
 
@@ -732,20 +725,20 @@ def _test_generator(n, funccall):
     import time
     print n, 'times', funccall
     code = compile(funccall, funccall, 'eval')
-    total = 0.0
+    sum = 0.0
     sqsum = 0.0
     smallest = 1e10
     largest = -1e10
     t0 = time.time()
     for i in range(n):
         x = eval(code)
-        total += x
+        sum = sum + x
         sqsum = sqsum + x*x
         smallest = min(x, smallest)
         largest = max(x, largest)
     t1 = time.time()
     print round(t1-t0, 3), 'sec,',
-    avg = total/n
+    avg = sum/n
     stddev = _sqrt(sqsum/n - avg*avg)
     print 'avg %g, stddev %g, min %g, max %g' % \
               (avg, stddev, smallest, largest)

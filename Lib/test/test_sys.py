@@ -172,10 +172,8 @@ class SysModuleTest(unittest.TestCase):
 
     def test_setcheckinterval(self):
         self.assertRaises(TypeError, sys.setcheckinterval)
-        orig = sys.getcheckinterval()
-        for n in 0, 100, 120, orig: # orig last to restore starting state
-            sys.setcheckinterval(n)
-            self.assertEquals(sys.getcheckinterval(), n)
+        sys.setcheckinterval(120)
+        sys.setcheckinterval(100)
 
     def test_recursionlimit(self):
         self.assertRaises(TypeError, sys.getrecursionlimit, 42)
@@ -249,7 +247,9 @@ class SysModuleTest(unittest.TestCase):
         self.assert_(isinstance(vi[4], int))
 
 def test_main():
-    test.test_support.run_unittest(SysModuleTest)
+    suite = unittest.TestSuite()
+    suite.addTest(unittest.makeSuite(SysModuleTest))
+    test.test_support.run_suite(suite)
 
 if __name__ == "__main__":
     test_main()

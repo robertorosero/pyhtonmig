@@ -19,8 +19,6 @@ def pickle(ob_type, pickle_function, constructor_ob=None):
         raise TypeError("reduction functions must be callable")
     dispatch_table[ob_type] = pickle_function
 
-    # The constructor_ob function is a vestige of safe for unpickling.
-    # There is no reason for the caller to pass it anymore.
     if constructor_ob is not None:
         constructor(constructor_ob)
 
@@ -30,16 +28,10 @@ def constructor(object):
 
 # Example: provide pickling support for complex numbers.
 
-try:
-    complex
-except NameError:
-    pass
-else:
+def pickle_complex(c):
+    return complex, (c.real, c.imag)
 
-    def pickle_complex(c):
-        return complex, (c.real, c.imag)
-
-    pickle(complex, pickle_complex, complex)
+pickle(type(1j), pickle_complex, complex)
 
 # Support for pickling new-style objects
 

@@ -62,11 +62,12 @@ class PersPicklerTests(AbstractPersistentPicklerTests):
         return u.load()
 
 def test_main():
-    test_support.run_unittest(
-        PickleTests,
-        PicklerTests,
-        PersPicklerTests
-    )
+    loader = unittest.TestLoader()
+    suite = unittest.TestSuite()
+    suite.addTest(loader.loadTestsFromTestCase(PickleTests))
+    suite.addTest(loader.loadTestsFromTestCase(PicklerTests))
+    suite.addTest(loader.loadTestsFromTestCase(PersPicklerTests))
+    test_support.run_suite(suite)
     test_support.run_doctest(pickle)
 
 if __name__ == "__main__":

@@ -44,12 +44,6 @@
 # 2002-05-15 fl  Added error constants (from Andrew Kuchling)
 # 2002-06-27 fl  Merged with Python CVS version
 # 2002-10-22 fl  Added basic authentication (based on code from Phillip Eby)
-# 2003-01-22 sm  Add support for the bool type
-# 2003-02-27 gvr Remove apply calls
-# 2003-04-24 sm  Use cStringIO if available
-# 2003-04-25 ak  Add support for nil
-# 2003-06-15 gn  Add support for time.struct_time
-# 2003-07-12 gp  Correct marshalling of Faults
 #
 # Copyright (c) 1999-2002 by Secret Labs AB.
 # Copyright (c) 1999-2002 by Fredrik Lundh.
@@ -349,7 +343,7 @@ class DateTime:
 
     def __init__(self, value=0):
         if not isinstance(value, StringType):
-            if not isinstance(value, (TupleType, time.struct_time)):
+            if not isinstance(value, TupleType):
                 if value == 0:
                     value = time.time()
                 value = time.localtime(value)
@@ -392,12 +386,6 @@ def _datetime(data):
 #
 # @param data An 8-bit string containing arbitrary data.
 
-import base64
-try:
-    import cStringIO as StringIO
-except ImportError:
-    import StringIO
-
 class Binary:
     """Wrapper for binary data."""
 
@@ -418,9 +406,11 @@ class Binary:
         return cmp(self.data, other)
 
     def decode(self, data):
+        import base64
         self.data = base64.decodestring(data)
 
     def encode(self, out):
+        import base64, StringIO
         out.write("<value><base64>\n")
         base64.encode(StringIO.StringIO(self.data), out)
         out.write("</base64></value>\n")
@@ -572,11 +562,10 @@ class Marshaller:
     # by the way, if you don't understand what's going on in here,
     # that's perfectly ok.
 
-    def __init__(self, encoding=None, allow_none=0):
+    def __init__(self, encoding=None):
         self.memo = {}
         self.data = None
         self.encoding = encoding
-        self.allow_none = allow_none
 
     dispatch = {}
 
@@ -587,9 +576,7 @@ class Marshaller:
         if isinstance(values, Fault):
             # fault instance
             write("<fault>\n")
-            dump({'faultCode': values.faultCode,
-                  'faultString': values.faultString},
-                 write)
+            dump(vars(values), write)
             write("</fault>\n")
         else:
             # parameter block
@@ -614,12 +601,6 @@ class Marshaller:
             raise TypeError, "cannot marshal %s objects" % type(value)
         else:
             f(self, value, write)
-
-    def dump_nil (self, value, write):
-        if not self.allow_none:
-            raise TypeError, "cannot marshal None unless allow_none is enabled"
-        write("<value><nil/></value>")
-    dispatch[NoneType] = dump_nil
 
     def dump_int(self, value, write):
         # in case ints are > 32 bits
@@ -788,11 +769,6 @@ class Unmarshaller:
 
     dispatch = {}
 
-    def end_nil (self, data):
-        self.append(None)
-        self._value = 0
-    dispatch["nil"] = end_nil
-
     def end_boolean(self, data):
         if data == "0":
             self.append(False)
@@ -919,8 +895,7 @@ def getparser():
 # @keyparam encoding The packet encoding.
 # @return A string containing marshalled data.
 
-def dumps(params, methodname=None, methodresponse=None, encoding=None,
-          allow_none=0):
+def dumps(params, methodname=None, methodresponse=None, encoding=None):
     """data [,options] -> marshalled data
 
     Convert an argument tuple or a Fault instance to an XML-RPC
@@ -956,7 +931,7 @@ def dumps(params, methodname=None, methodresponse=None, encoding=None,
     if FastMarshaller:
         m = FastMarshaller(encoding)
     else:
-        m = Marshaller(encoding, allow_none)
+        m = Marshaller(encoding)
 
     data = m.dumps(params)
 
@@ -1279,8 +1254,7 @@ class ServerProxy:
     the given encoding.
     """
 
-    def __init__(self, uri, transport=None, encoding=None, verbose=0,
-                 allow_none=0):
+    def __init__(self, uri, transport=None, encoding=None, verbose=0):
         # establish a "logical" server connection
 
         # get the url
@@ -1301,13 +1275,11 @@ class ServerProxy:
 
         self.__encoding = encoding
         self.__verbose = verbose
-        self.__allow_none = allow_none
 
     def __request(self, methodname, params):
         # call a method on the remote server
 
-        request = dumps(params, methodname, encoding=self.__encoding,
-                        allow_none=self.__allow_none)
+        request = dumps(params, methodname, encoding=self.__encoding)
 
         response = self.__transport.request(
             self.__host,

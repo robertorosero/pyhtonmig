@@ -27,17 +27,12 @@ Written by Marc-Andre Lemburg (mal@lemburg.com).
 
 """#"
 
-import codecs, exceptions, types
+import codecs, exceptions, re
 
 _cache = {}
 _unknown = '--unknown--'
 _import_tail = ['*']
-_norm_encoding_map = ('                                              . '
-                      '0123456789       ABCDEFGHIJKLMNOPQRSTUVWXYZ     '
-                      ' abcdefghijklmnopqrstuvwxyz                     '
-                      '                                                '
-                      '                                                '
-                      '                ')
+_norm_encoding_RE = re.compile('[^a-zA-Z0-9.]')
 
 class CodecRegistryError(exceptions.LookupError,
                          exceptions.SystemError):
@@ -50,20 +45,10 @@ def normalize_encoding(encoding):
         Normalization works as follows: all non-alphanumeric
         characters except the dot used for Python package names are
         collapsed and replaced with a single underscore, e.g. '  -;#'
-        becomes '_'. Leading and trailing underscores are removed.
-
-        Note that encoding names should be ASCII only; if they do use
-        non-ASCII characters, these must be Latin-1 compatible.
+        becomes '_'.
 
     """
-    # Make sure we have an 8-bit string, because .translate() works
-    # differently for Unicode strings.
-    if type(encoding) is types.UnicodeType:
-        # Note that .encode('latin-1') does *not* use the codec
-        # registry, so this call doesn't recurse. (See unicodeobject.c
-        # PyUnicode_AsEncodedString() for details)
-        encoding = encoding.encode('latin-1')
-    return '_'.join(encoding.translate(_norm_encoding_map).split())
+    return '_'.join(_norm_encoding_RE.split(encoding))
 
 def search_function(encoding):
 

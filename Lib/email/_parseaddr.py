@@ -54,8 +54,9 @@ def parsedate_tz(data):
         del data[0]
     else:
         i = data[0].rfind(',')
-        if i >= 0:
-            data[0] = data[0][i+1:]
+        if i < 0:
+            return None
+        data[0] = data[0][i+1:]
     if len(data) == 3: # RFC 850 date, deprecated
         stuff = data[0].split('-')
         if len(stuff) == 3:
@@ -440,6 +441,9 @@ class AddressList(AddrlistClass):
 
     def __len__(self):
         return len(self.addresslist)
+
+    def __str__(self):
+        return COMMASPACE.join(map(dump_address_pair, self.addresslist))
 
     def __add__(self, other):
         # Set union

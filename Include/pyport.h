@@ -147,7 +147,6 @@ typedef PY_LONG_LONG		Py_intptr_t;
 
 #ifdef RISCOS
 #include <sys/types.h>
-#include "unixstuff.h"
 #endif
 
 #ifndef DONT_HAVE_SYS_STAT_H
@@ -516,6 +515,7 @@ typedef	struct fd_set {
 
 #ifndef INT_MAX
 #define INT_MAX 2147483647
+#define INT_MIN (-INT_MAX - 1)
 #endif
 
 #ifndef LONG_MAX

@@ -645,7 +645,10 @@ if tempfile.NamedTemporaryFile is not tempfile.TemporaryFile:
     test_classes.append(test_TemporaryFile)
 
 def test_main():
-    test_support.run_unittest(*test_classes)
+    suite = unittest.TestSuite()
+    for c in test_classes:
+        suite.addTest(unittest.makeSuite(c))
+    test_support.run_suite(suite)
 
 if __name__ == "__main__":
     test_main()

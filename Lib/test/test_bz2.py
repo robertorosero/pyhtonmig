@@ -11,7 +11,7 @@ import sys
 import bz2
 from bz2 import BZ2File, BZ2Compressor, BZ2Decompressor
 
-has_cmdline_bunzip2 = sys.platform not in ("win32", "os2emx", "riscos")
+has_cmdline_bunzip2 = sys.platform not in ("win32", "os2emx")
 
 class BaseTest(unittest.TestCase):
     "Base for other testcases."
@@ -219,15 +219,10 @@ class BZ2FileTest(BaseTest):
         bz2f.close()
 
     def testOpenDel(self):
-        # "Test opening and deleting a file many times"
         self.createTempFile()
         for i in xrange(10000):
             o = BZ2File(self.filename)
             del o
-
-    def testOpenNonexistent(self):
-        # "Test opening a nonexistent file"
-        self.assertRaises(IOError, BZ2File, "/non/existent")
 
 class BZ2CompressorTest(BaseTest):
     def testCompress(self):
@@ -309,12 +304,13 @@ class FuncTest(BaseTest):
         self.assertRaises(ValueError, bz2.decompress, self.DATA[:-10])
 
 def test_main():
-    test_support.run_unittest(
-        BZ2FileTest,
-        BZ2CompressorTest,
-        BZ2DecompressorTest,
-        FuncTest
-    )
+    suite = unittest.TestSuite()
+    for test in (BZ2FileTest,
+                 BZ2CompressorTest,
+                 BZ2DecompressorTest,
+                 FuncTest):
+        suite.addTest(unittest.makeSuite(test))
+    test_support.run_suite(suite)
 
 if __name__ == '__main__':
     test_main()

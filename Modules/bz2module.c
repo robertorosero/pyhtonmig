@@ -31,9 +31,6 @@ static char __author__[] =
 
 #define BZ2FileObject_Check(v)	((v)->ob_type == &BZ2File_Type)
 
-
-#ifdef BZ_CONFIG_ERROR
-
 #if SIZEOF_LONG >= 8
 #define BZS_TOTAL_OUT(bzs) \
 	(((long)bzs->total_out_hi32 << 32) + bzs->total_out_lo32)
@@ -44,26 +41,6 @@ static char __author__[] =
 #define BZS_TOTAL_OUT(bzs) \
 	bzs->total_out_lo32;
 #endif
-
-#else /* ! BZ_CONFIG_ERROR */
-
-#define BZ2_bzRead bzRead
-#define BZ2_bzReadOpen bzReadOpen
-#define BZ2_bzReadClose bzReadClose
-#define BZ2_bzWrite bzWrite
-#define BZ2_bzWriteOpen bzWriteOpen
-#define BZ2_bzWriteClose bzWriteClose
-#define BZ2_bzCompress bzCompress
-#define BZ2_bzCompressInit bzCompressInit
-#define BZ2_bzCompressEnd bzCompressEnd
-#define BZ2_bzDecompress bzDecompress
-#define BZ2_bzDecompressInit bzDecompressInit
-#define BZ2_bzDecompressEnd bzDecompressEnd
-
-#define BZS_TOTAL_OUT(bzs) bzs->total_out
-
-#endif /* ! BZ_CONFIG_ERROR */
-
 
 #ifdef WITH_THREAD
 #define ACQUIRE_LOCK(obj) PyThread_acquire_lock(obj->lock, 1)
@@ -140,14 +117,12 @@ Util_CatchBZ2Error(int bzerror)
 		case BZ_STREAM_END:
 			break;
 
-#ifdef BZ_CONFIG_ERROR
 		case BZ_CONFIG_ERROR:
 			PyErr_SetString(PyExc_SystemError,
 					"the bz2 library was not compiled "
 					"correctly");
 			ret = 1;
 			break;
-#endif
 
 		case BZ_PARAM_ERROR:
 			PyErr_SetString(PyExc_ValueError,
@@ -1309,9 +1284,7 @@ BZ2File_init(BZ2FileObject *self, PyObject *args, PyObject *kwargs)
 				break;
 
 			case 'U':
-#ifdef WITH_UNIVERSAL_NEWLINES
 				self->f_univ_newline = 1;
-#endif
 				break;
 
 			default:
@@ -1390,7 +1363,7 @@ BZ2File_dealloc(BZ2FileObject *self)
 			break;
 	}
 	Util_DropReadAhead(self);
-	Py_XDECREF(self->file);
+	Py_DECREF(self->file);
 	self->ob_type->tp_free((PyObject *)self);
 }
 
@@ -2167,7 +2140,7 @@ interface, one shot (de)compression functions, and types for\n\
 sequential (de)compression.\n\
 ");
 
-PyMODINIT_FUNC
+DL_EXPORT(void)
 initbz2(void)
 {
 	PyObject *m;

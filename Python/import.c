@@ -3,10 +3,11 @@
 
 #include "Python.h"
 
-#include "node.h"
-#include "token.h"
+#include "Python-ast.h"
+#include "pythonrun.h"
 #include "errcode.h"
 #include "marshal.h"
+#include "code.h"
 #include "compile.h"
 #include "eval.h"
 #include "osdefs.h"
@@ -202,7 +203,7 @@ _PyImportHooks_Init(void)
 			PyErr_Clear(); /* No zipimporter object -- okay */
 			if (Py_VerboseFlag)
 				PySys_WriteStderr(
-				    "# can't import zipimport.zipimporter\n");
+				    "# can't import zipimport.zimimporter\n");
 		}
 		else {
 			/* sys.path_hooks.append(zipimporter) */
@@ -751,17 +752,15 @@ load_compiled_module(char *name, char *cpathname, FILE *fp)
 /* Parse a source file and return the corresponding code object */
 
 static PyCodeObject *
-parse_source_module(char *pathname, FILE *fp)
+parse_source_module(const char *pathname, FILE *fp)
 {
-	PyCodeObject *co;
-	node *n;
+	PyCodeObject *co = NULL;
+	mod_ty mod;
 
-	n = PyParser_SimpleParseFile(fp, pathname, Py_file_input);
-	if (n == NULL)
-		return NULL;
-	co = PyNode_Compile(n, pathname);
-	PyNode_Free(n);
-
+	mod = PyParser_ASTFromFile(fp, pathname, Py_file_input, 0, 0, 0, 
+				   NULL);
+	if (mod)
+		co = PyAST_Compile(mod, pathname, NULL);
 	return co;
 }
 
@@ -2211,45 +2210,11 @@ ensure_fromlist(PyObject *mod, PyObject *fromlist, char *buf, int buflen,
 	/* NOTREACHED */
 }
 
-static int
-add_submodule(PyObject *mod, PyObject *submod, char *fullname, char *subname,
-	      PyObject *modules)
-{
-	if (mod == Py_None)
-		return 1;
-	/* Irrespective of the success of this load, make a
-	   reference to it in the parent package module.  A copy gets
-	   saved in the modules dictionary under the full name, so get a
-	   reference from there, if need be.  (The exception is when the
-	   load failed with a SyntaxError -- then there's no trace in
-	   sys.modules.  In that case, of course, do nothing extra.) */
-	if (submod == NULL) {
-		submod = PyDict_GetItemString(modules, fullname);
-		if (submod == NULL)
-			return 1;
-	}
-	if (PyModule_Check(mod)) {
-		/* We can't use setattr here since it can give a
-		 * spurious warning if the submodule name shadows a
-		 * builtin name */
-		PyObject *dict = PyModule_GetDict(mod);
-		if (!dict)
-			return 0;
-		if (PyDict_SetItemString(dict, subname, submod) < 0)
-			return 0;
-	}
-	else {
-		if (PyObject_SetAttrString(mod, subname, submod) < 0)
-			return 0;
-	}
-	return 1;
-}
-
 static PyObject *
 import_submodule(PyObject *mod, char *subname, char *fullname)
 {
 	PyObject *modules = PyImport_GetModuleDict();
-	PyObject *m = NULL;
+	PyObject *m, *res = NULL;
 
 	/* Require:
 	   if mod == None: subname == fullname
@@ -2291,9 +2256,23 @@ import_submodule(PyObject *mod, char *subname, char *fullname)
 		Py_XDECREF(loader);
 		if (fp)
 			fclose(fp);
-		if (!add_submodule(mod, m, fullname, subname, modules)) {
-			Py_XDECREF(m);
-			m = NULL;
+		if (mod != Py_None) {
+			/* Irrespective of the success of this load, make a
+			   reference to it in the parent package module.
+			   A copy gets saved in the modules dictionary
+			   under the full name, so get a reference from
+			   there, if need be.  (The exception is when
+			   the load failed with a SyntaxError -- then
+			   there's no trace in sys.modules.  In that case,
+			   of course, do nothing extra.) */
+			res = m;
+			if (res == NULL)
+				res = PyDict_GetItemString(modules, fullname);
+			if (res != NULL &&
+			    PyObject_SetAttrString(mod, subname, res) < 0) {
+				Py_XDECREF(m);
+				m = NULL;
+			}
 		}
 	}
 

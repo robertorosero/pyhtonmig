@@ -95,7 +95,10 @@ class ModuleTest(unittest.TestCase):
         self.assertEqual(string.capwords('ABC-def DEF-ghi GHI'), 'Abc-def Def-ghi Ghi')
 
 def test_main():
-    test_support.run_unittest(StringTest, ModuleTest)
+    suite = unittest.TestSuite()
+    suite.addTest(unittest.makeSuite(StringTest))
+    suite.addTest(unittest.makeSuite(ModuleTest))
+    test_support.run_suite(suite)
 
 if __name__ == "__main__":
     test_main()

@@ -105,12 +105,10 @@ class TestBuffercStringIO(TestcStringIO):
 
 
 def test_main():
-    test_support.run_unittest(
-        TestStringIO,
-        TestcStringIO,
-        TestBufferStringIO,
-        TestBuffercStringIO
-    )
+    test_support.run_unittest(TestStringIO)
+    test_support.run_unittest(TestcStringIO)
+    test_support.run_unittest(TestBufferStringIO)
+    test_support.run_unittest(TestBuffercStringIO)
 
 if __name__ == '__main__':
     test_main()

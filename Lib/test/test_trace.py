@@ -221,27 +221,6 @@ class RaisingTraceFuncTestCase(unittest.TestCase):
     def test_exception(self):
         self.run_test_for_event('exception')
 
-    def test_trash_stack(self):
-        def f():
-            for i in range(5):
-                print i  # line tracing will raise an exception at this line
-
-        def g(frame, why, extra):
-            if (why == 'line' and
-                frame.f_lineno == f.func_code.co_firstlineno + 2):
-                raise RuntimeError, "i am crashing"
-            return g
-
-        sys.settrace(g)
-        try:
-            f()
-        except RuntimeError:
-            # the test is really that this doesn't segfault:
-            import gc
-            gc.collect()
-        else:
-            self.fail("exception not propagated")
-
 
 # 'Jump' tests: assigning to frame.f_lineno within a trace function
 # moves the execution position - it's how debuggers implement a Jump
@@ -531,11 +510,9 @@ class JumpTestCase(unittest.TestCase):
         no_jump_without_trace_function()
 
 def test_main():
-    test_support.run_unittest(
-        TraceTestCase,
-        RaisingTraceFuncTestCase,
-        JumpTestCase
-    )
+    test_support.run_unittest(TraceTestCase)
+    test_support.run_unittest(RaisingTraceFuncTestCase)
+    test_support.run_unittest(JumpTestCase)
 
 if __name__ == "__main__":
     test_main()

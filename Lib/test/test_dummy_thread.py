@@ -12,8 +12,6 @@ import random
 import unittest
 from test import test_support
 
-DELAY = 0 # Set > 0 when testing a module other than dummy_thread, such as
-          # the 'thread' module.
 
 class LockTests(unittest.TestCase):
     """Test lock objects."""
@@ -69,17 +67,18 @@ class LockTests(unittest.TestCase):
             to_unlock.release()
 
         self.lock.acquire()
+        delay = 1  #In seconds
         start_time = int(time.time())
-        _thread.start_new_thread(delay_unlock,(self.lock, DELAY))
+        _thread.start_new_thread(delay_unlock,(self.lock, delay))
         if test_support.verbose:
             print
             print "*** Waiting for thread to release the lock "\
-            "(approx. %s sec.) ***" % DELAY
+            "(approx. %s sec.) ***" % delay
         self.lock.acquire()
         end_time = int(time.time())
         if test_support.verbose:
             print "done"
-        self.failUnless((end_time - start_time) >= DELAY,
+        self.failUnless((end_time - start_time) >= delay,
                         "Blocking by unconditional acquiring failed.")
 
 class MiscTests(unittest.TestCase):
@@ -101,19 +100,6 @@ class MiscTests(unittest.TestCase):
         self.failUnless(isinstance(_thread.allocate_lock(), _thread.LockType),
                         "_thread.LockType is not an instance of what is "
                          "returned by _thread.allocate_lock()")
-
-    def test_interrupt_main(self):
-        #Calling start_new_thread with a function that executes interrupt_main
-        # should raise KeyboardInterrupt upon completion.
-        def call_interrupt():
-            _thread.interrupt_main()
-        self.failUnlessRaises(KeyboardInterrupt, _thread.start_new_thread,
-                              call_interrupt, tuple())
-
-    def test_interrupt_in_main(self):
-        # Make sure that if interrupt_main is called in main threat that
-        # KeyboardInterrupt is raised instantly.
-        self.failUnlessRaises(KeyboardInterrupt, _thread.interrupt_main)
 
 class ThreadTests(unittest.TestCase):
     """Test thread creation."""
@@ -148,34 +134,34 @@ class ThreadTests(unittest.TestCase):
             queue.put(_thread.get_ident())
 
         thread_count = 5
+        delay = 1.5
         testing_queue = Queue.Queue(thread_count)
         if test_support.verbose:
             print
             print "*** Testing multiple thread creation "\
-            "(will take approx. %s to %s sec.) ***" % (DELAY, thread_count)
+            "(will take approx. %s to %s sec.) ***" % (delay, thread_count)
         for count in xrange(thread_count):
-            if DELAY:
-                local_delay = round(random.random(), 1)
-            else:
-                local_delay = 0
             _thread.start_new_thread(queue_mark,
-                                     (testing_queue, local_delay))
-        time.sleep(DELAY)
+                                     (testing_queue, round(random.random(), 1)))
+        time.sleep(delay)
         if test_support.verbose:
             print 'done'
         self.failUnless(testing_queue.qsize() == thread_count,
                         "Not all %s threads executed properly after %s sec." %
-                        (thread_count, DELAY))
+                        (thread_count, delay))
 
 def test_main(imported_module=None):
-    global _thread, DELAY
+    global _thread
     if imported_module:
         _thread = imported_module
-        DELAY = 2
     if test_support.verbose:
         print
         print "*** Using %s as _thread module ***" % _thread
-    test_support.run_unittest(LockTests, MiscTests, ThreadTests)
+    suite = unittest.TestSuite()
+    suite.addTest(unittest.makeSuite(LockTests))
+    suite.addTest(unittest.makeSuite(MiscTests))
+    suite.addTest(unittest.makeSuite(ThreadTests))
+    test_support.run_suite(suite)
 
 if __name__ == '__main__':
     test_main()

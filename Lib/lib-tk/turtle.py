@@ -149,7 +149,6 @@ class RawPen:
         self._filling = flag
         if flag:
             self._path.append(self._position)
-        self.forward(0)
 
     def circle(self, radius, extent=None):
         if extent is None:

@@ -248,11 +248,11 @@ class TestIsInstanceIsSubclass(unittest.TestCase):
 
 
 def test_main():
-    test_support.run_unittest(
-        TestIsInstanceExceptions,
-        TestIsSubclassExceptions,
-        TestIsInstanceIsSubclass
-    )
+    suite = unittest.TestSuite()
+    suite.addTest(unittest.makeSuite(TestIsInstanceExceptions))
+    suite.addTest(unittest.makeSuite(TestIsSubclassExceptions))
+    suite.addTest(unittest.makeSuite(TestIsInstanceIsSubclass))
+    test_support.run_suite(suite)
 
 
 if __name__ == '__main__':

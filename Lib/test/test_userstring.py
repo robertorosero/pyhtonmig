@@ -44,7 +44,9 @@ class UserStringTest(
         getattr(object, methodname)(*args)
 
 def test_main():
-    test_support.run_unittest(UserStringTest)
+    suite = unittest.TestSuite()
+    suite.addTest(unittest.makeSuite(UserStringTest))
+    test_support.run_suite(suite)
 
 if __name__ == "__main__":
     test_main()

@@ -264,6 +264,14 @@ WRAP_BINARY(proxy_getattr, PyObject_GetAttr)
 WRAP_UNARY(proxy_str, PyObject_Str)
 WRAP_TERNARY(proxy_call, PyEval_CallObjectWithKeywords)
 
+static int
+proxy_print(PyWeakReference *proxy, FILE *fp, int flags)
+{
+    if (!proxy_checkref(proxy))
+        return -1;
+    return PyObject_Print(PyWeakref_GET_OBJECT(proxy), fp, flags);
+}
+
 static PyObject *
 proxy_repr(PyWeakReference *proxy)
 {
@@ -381,11 +389,7 @@ proxy_setitem(PyWeakReference *proxy, PyObject *key, PyObject *value)
 {
     if (!proxy_checkref(proxy))
         return -1;
-
-    if (value == NULL)
-        return PyObject_DelItem(PyWeakref_GET_OBJECT(proxy), key);
-    else
-        return PyObject_SetItem(PyWeakref_GET_OBJECT(proxy), key, value);
+    return PyObject_SetItem(PyWeakref_GET_OBJECT(proxy), key, value);
 }
 
 /* iterator slots */
@@ -471,7 +475,7 @@ _PyWeakref_ProxyType = {
     0,
     /* methods */
     (destructor)weakref_dealloc,        /* tp_dealloc */
-    0,				        /* tp_print */
+    (printfunc)proxy_print,             /* tp_print */
     0,				        /* tp_getattr */
     0, 				        /* tp_setattr */
     proxy_compare,		        /* tp_compare */
@@ -506,7 +510,7 @@ _PyWeakref_CallableProxyType = {
     0,
     /* methods */
     (destructor)weakref_dealloc,        /* tp_dealloc */
-    0,				        /* tp_print */
+    (printfunc)proxy_print,             /* tp_print */
     0,				        /* tp_getattr */
     0, 				        /* tp_setattr */
     proxy_compare,		        /* tp_compare */

@@ -59,7 +59,8 @@ def find_library_file(compiler, libname, std_dirs, paths):
     dirname = os.path.dirname(result)
     for p in std_dirs:
         # Ensure path doesn't end with path separator
-        p = p.rstrip(os.sep)
+        if p.endswith(os.sep):
+            p = p.strip(os.sep)
         if p == dirname:
             return [ ]
 
@@ -67,7 +68,8 @@ def find_library_file(compiler, libname, std_dirs, paths):
     # so we have to figure out which one.
     for p in paths:
         # Ensure path doesn't end with path separator
-        p = p.rstrip(os.sep)
+        if p.endswith(os.sep):
+            p = p.strip(os.sep)
         if p == dirname:
             return [p]
     else:
@@ -232,12 +234,19 @@ class PyBuildExt(build_ext):
                           'failed with %s: %s' % (ext.name, exc_type, why),
                           level=3)
 
-    def get_platform(self):
+    def get_platform (self):
         # Get value of sys.platform
-        for platform in ['cygwin', 'beos', 'darwin', 'atheos', 'osf1']:
-            if sys.platform.startswith(platform):
-                return platform
-        return sys.platform
+        platform = sys.platform
+        if platform[:6] =='cygwin':
+            platform = 'cygwin'
+        elif platform[:4] =='beos':
+            platform = 'beos'
+        elif platform[:6] == 'darwin':
+            platform = 'darwin'
+        elif platform[:6] == 'atheos':
+            platform = 'atheos'
+
+        return platform
 
     def detect_modules(self):
         # Ensure that /usr/local is always used
@@ -277,10 +286,6 @@ class PyBuildExt(build_ext):
             lib_dirs += os.getenv('LIBRARY_PATH', '').split(os.pathsep)
             inc_dirs += ['/system/include', '/atheos/autolnk/include']
             inc_dirs += os.getenv('C_INCLUDE_PATH', '').split(os.pathsep)
-
-        # OSF/1 has some stuff in /usr/ccs/lib (like -ldb)
-        if platform == 'osf1':
-            lib_dirs += ['/usr/ccs/lib']
 
         # Check for MacOS X, which doesn't need libm.a at all
         math_libs = ['m']
@@ -330,9 +335,7 @@ class PyBuildExt(build_ext):
         if have_unicode:
             exts.append( Extension('unicodedata', ['unicodedata.c']) )
         # access to ISO C locale support
-        data = open('pyconfig.h').read()
-        m = re.search(r"#s*define\s+WITH_LIBINTL\s+1\s*", data)
-        if m is not None:
+        if platform in ['cygwin', 'aix4']:
             locale_libs = ['intl']
         else:
             locale_libs = []
@@ -440,11 +443,10 @@ class PyBuildExt(build_ext):
                               '/usr/contrib/ssl/include/'
                              ]
                              )
-        if ssl_incs is not None:
-            krb5_h = find_file('krb5.h', inc_dirs,
-                               ['/usr/kerberos/include'])
-            if krb5_h:
-                ssl_incs += krb5_h
+        krb5_h = find_file('krb5.h', inc_dirs,
+                           ['/usr/kerberos/include'])
+        if krb5_h:
+            ssl_incs += krb5_h
         ssl_libs = find_library_file(self.compiler, 'ssl',lib_dirs,
                                      ['/usr/local/ssl/lib',
                                       '/usr/contrib/ssl/lib/'
@@ -476,7 +478,7 @@ class PyBuildExt(build_ext):
         # when sorted in reverse order, keys for this dict must appear in the
         # order you wish to search - e.g., search for db4 before db3
         db_try_this = {
-            'db4': {'libs': ('db-4.1', 'db41', 'db-4.0', 'db4',),
+            'db4': {'libs': ('db-4.1', 'db-4.0',),
                     'libdirs': ('/usr/local/BerkeleyDB.4.1/lib',
                                 '/usr/local/BerkeleyDB.4.0/lib',
                                 '/usr/local/lib',
@@ -484,14 +486,13 @@ class PyBuildExt(build_ext):
                                 '/sw/lib',
                                 ),
                     'incdirs': ('/usr/local/BerkeleyDB.4.1/include',
-                                '/usr/local/include/db41',
                                 '/usr/local/BerkeleyDB.4.0/include',
                                 '/usr/local/include/db4',
                                 '/opt/sfw/include/db4',
                                 '/sw/include/db4',
                                 '/usr/include/db4',
                                 )},
-            'db3': {'libs': ('db-3.3', 'db-3.2', 'db-3.1', 'db3',),
+            'db3': {'libs': ('db-3.3', 'db-3.2', 'db-3.1'),
                     'libdirs': ('/usr/local/BerkeleyDB.3.3/lib',
                                 '/usr/local/BerkeleyDB.3.2/lib',
                                 '/usr/local/BerkeleyDB.3.1/lib',
@@ -558,29 +559,6 @@ class PyBuildExt(build_ext):
             db_incs = None
             dblibs = []
             dblib_dir = None
-
-
-        # Look for Berkeley db 1.85.   Note that it is built as a different
-        # module name so it can be included even when later versions are
-        # available.  A very restrictive search is performed to avoid
-        # accidentally building this module with a later version of the
-        # underlying db library.  May BSD-ish Unixes incorporate db 1.85
-        # symbols into libc and place the include file in /usr/include.
-        f = "/usr/include/db.h"
-        if os.path.exists(f):
-            data = open(f).read()
-            m = re.search(r"#s*define\s+HASHVERSION\s+2\s*", data)
-            if m is not None:
-                # bingo - old version used hash file format version 2
-                ### XXX this should be fixed to not be platform-dependent
-                ### but I don't have direct access to an osf1 platform and
-                ### seemed to be muffing the search somehow
-                libraries = platform == "osf1" and ['db'] or None
-                if libraries is not None:
-                    exts.append(Extension('bsddb185', ['bsddbmodule.c'],
-                                          libraries=libraries))
-                else:
-                    exts.append(Extension('bsddb185', ['bsddbmodule.c']))
 
         # The standard Unix dbm module:
         if platform not in ['cygwin']:
@@ -770,10 +748,6 @@ class PyBuildExt(build_ext):
             exts.append( Extension('_CF', ['cf/_CFmodule.c', 'cf/pycfbridge.c'],
                         extra_link_args=['-framework', 'CoreFoundation']) )
 
-            exts.append( Extension('ColorPicker', ['ColorPickermodule.c'],
-                        extra_link_args=['-framework', 'Carbon']) )
-            exts.append( Extension('autoGIL', ['autoGIL.c'],
-                        extra_link_args=['-framework', 'CoreFoundation']) )
             exts.append( Extension('gestalt', ['gestaltmodule.c'],
                         extra_link_args=['-framework', 'Carbon']) )
             exts.append( Extension('MacOS', ['macosmodule.c'],
@@ -956,7 +930,7 @@ class PyBuildExt(build_ext):
             tcl_includes = find_file('tcl.h', inc_dirs, debian_tcl_include)
             tk_includes = find_file('tk.h', inc_dirs, debian_tk_include)
 
-        if (tcllib is None or tklib is None or
+        if (tcllib is None or tklib is None and
             tcl_includes is None or tk_includes is None):
             # Something's missing, so give up
             return
@@ -1128,7 +1102,7 @@ def main():
           ext_modules=[Extension('struct', ['structmodule.c'])],
 
           # Scripts to install
-          scripts = ['Tools/scripts/pydoc', 'Tools/scripts/idle']
+          scripts = ['Tools/scripts/pydoc']
         )
 
 # --install-platlib

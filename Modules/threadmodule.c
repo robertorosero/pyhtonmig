@@ -179,28 +179,20 @@ t_bootstrap(void *boot_raw)
 	PyEval_AcquireThread(tstate);
 	res = PyEval_CallObjectWithKeywords(
 		boot->func, boot->args, boot->keyw);
+	Py_DECREF(boot->func);
+	Py_DECREF(boot->args);
+	Py_XDECREF(boot->keyw);
+	PyMem_DEL(boot_raw);
 	if (res == NULL) {
 		if (PyErr_ExceptionMatches(PyExc_SystemExit))
 			PyErr_Clear();
 		else {
-			PyObject *file;
-			PySys_WriteStderr(
-				"Unhandled exception in thread started by ");
-			file = PySys_GetObject("stderr");
-			if (file)
-				PyFile_WriteObject(boot->func, file, 0);
-			else
-				PyObject_Print(boot->func, stderr, 0);
-			PySys_WriteStderr("\n");
+			PySys_WriteStderr("Unhandled exception in thread:\n");
 			PyErr_PrintEx(0);
 		}
 	}
 	else
 		Py_DECREF(res);
-	Py_DECREF(boot->func);
-	Py_DECREF(boot->args);
-	Py_XDECREF(boot->keyw);
-	PyMem_DEL(boot_raw);
 	PyThreadState_Clear(tstate);
 	PyThreadState_DeleteCurrent();
 	PyThread_exit_thread();
@@ -278,21 +270,6 @@ PyDoc_STRVAR(exit_doc,
 This is synonymous to ``raise SystemExit''.  It will cause the current\n\
 thread to exit silently unless the exception is caught.");
 
-static PyObject *
-thread_PyThread_interrupt_main(PyObject * self)
-{
-	PyErr_SetInterrupt();
-	Py_INCREF(Py_None);
-	return Py_None;
-}
-
-PyDoc_STRVAR(interrupt_doc,
-"interrupt_main()\n\
-\n\
-Raise a KeyboardInterrupt in the main thread.\n\
-A subthread can use this function to interrupt the main thread."
-);
-
 #ifndef NO_EXIT_PROG
 static PyObject *
 thread_PyThread_exit_prog(PyObject *self, PyObject *args)
@@ -355,8 +332,6 @@ static PyMethodDef thread_methods[] = {
 	 METH_NOARGS, exit_doc},
 	{"exit",		(PyCFunction)thread_PyThread_exit_thread, 
 	 METH_NOARGS, exit_doc},
-	{"interrupt_main",	(PyCFunction)thread_PyThread_interrupt_main,
-	 METH_NOARGS, interrupt_doc},
 	{"get_ident",		(PyCFunction)thread_get_ident, 
 	 METH_NOARGS, get_ident_doc},
 #ifndef NO_EXIT_PROG

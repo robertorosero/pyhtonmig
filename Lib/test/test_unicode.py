@@ -697,15 +697,10 @@ class UnicodeTest(
         print >>out, u'def\n'
         print >>out, u'def\n'
 
-    def test_ucs4(self):
-        if sys.maxunicode == 0xFFFF:
-            return
-        x = u'\U00100000'
-        y = x.encode("raw-unicode-escape").decode("raw-unicode-escape")
-        self.assertEqual(x, y)
-
 def test_main():
-    test_support.run_unittest(UnicodeTest)
+    suite = unittest.TestSuite()
+    suite.addTest(unittest.makeSuite(UnicodeTest))
+    test_support.run_suite(suite)
 
 if __name__ == "__main__":
     test_main()

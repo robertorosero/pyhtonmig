@@ -15,7 +15,7 @@ Data members:
 */
 
 #include "Python.h"
-#include "compile.h"
+#include "code.h"
 #include "frameobject.h"
 #include "eval.h"
 
@@ -30,19 +30,6 @@ Data members:
 extern void *PyWin_DLLhModule;
 /* A string loaded from the DLL at startup: */
 extern const char *PyWin_DLLVersionString;
-#endif
-
-#ifdef __VMS
-#include <unixlib.h>
-#endif
-
-#ifdef MS_WINDOWS
-#include <windows.h>
-#endif
-
-#ifdef HAVE_LANGINFO_H
-#include <locale.h>
-#include <langinfo.h>
 #endif
 
 PyObject *
@@ -432,16 +419,6 @@ n instructions.  This also affects how often thread switches occur."
 );
 
 static PyObject *
-sys_getcheckinterval(PyObject *self, PyObject *args)
-{
-	return PyInt_FromLong(_Py_CheckInterval);
-}
-
-PyDoc_STRVAR(getcheckinterval_doc,
-"getcheckinterval() -> current check interval; see setcheckinterval()."
-);
-
-static PyObject *
 sys_setrecursionlimit(PyObject *self, PyObject *args)
 {
 	int new_limit;
@@ -733,8 +710,6 @@ static PyMethodDef sys_methods[] = {
 #endif
 	{"setcheckinterval",	sys_setcheckinterval, METH_VARARGS,
 	 setcheckinterval_doc}, 
-	{"getcheckinterval",	sys_getcheckinterval, METH_NOARGS,
-	 getcheckinterval_doc}, 
 #ifdef HAVE_DLOPEN
 	{"setdlopenflags", sys_setdlopenflags, METH_VARARGS, 
 	 setdlopenflags_doc},
@@ -902,12 +877,6 @@ _PySys_Init(void)
 	PyObject *m, *v, *sysdict;
 	PyObject *sysin, *sysout, *syserr;
 	char *s;
-#ifdef MS_WINDOWS
-	char buf[10];
-#endif
-#if defined(HAVE_LANGINFO_H) && defined(CODESET)
-	char *oldloc, *codeset;
-#endif
 
 	m = Py_InitModule3("sys", sys_methods, sys_doc);
 	sysdict = PyModule_GetDict(m);
@@ -917,34 +886,6 @@ _PySys_Init(void)
 	syserr = PyFile_FromFile(stderr, "<stderr>", "w", NULL);
 	if (PyErr_Occurred())
 		return NULL;
-#ifdef MS_WINDOWS
-	if(isatty(_fileno(stdin))){
-		sprintf(buf, "cp%d", GetConsoleCP());
-		if (!PyFile_SetEncoding(sysin, buf))
-			return NULL;
-	}
-	if(isatty(_fileno(stdout))) {
-		sprintf(buf, "cp%d", GetConsoleOutputCP());
-		if (!PyFile_SetEncoding(sysout, buf))
-			return NULL;
-	}
-#endif
-
-#if defined(HAVE_LANGINFO_H) && defined(CODESET)
-	oldloc = setlocale(LC_CTYPE, 0);
-	setlocale(LC_CTYPE, "");
-	codeset = nl_langinfo(CODESET);
-	setlocale(LC_CTYPE, oldloc);
-	if(codeset && isatty(fileno(stdin))){
-		if (!PyFile_SetEncoding(sysin, codeset))
-			return NULL;
-	}
-	if(codeset && isatty(fileno(stdout))) {
-		if (!PyFile_SetEncoding(sysout, codeset))
-			return NULL;
-	}
-#endif
-	
 	PyDict_SetItemString(sysdict, "stdin", sysin);
 	PyDict_SetItemString(sysdict, "stdout", sysout);
 	PyDict_SetItemString(sysdict, "stderr", syserr);
@@ -1109,22 +1050,7 @@ makeargvobject(int argc, char **argv)
 	if (av != NULL) {
 		int i;
 		for (i = 0; i < argc; i++) {
-#ifdef __VMS
-			PyObject *v;
-
-			/* argv[0] is the script pathname if known */
-			if (i == 0) {
-				char* fn = decc$translate_vms(argv[0]);
-				if ((fn == (char *)0) || fn == (char *)-1)
-					v = PyString_FromString(argv[0]);
-				else
-					v = PyString_FromString(
-						decc$translate_vms(argv[0]));
-			} else
-				v = PyString_FromString(argv[i]);
-#else
 			PyObject *v = PyString_FromString(argv[i]);
-#endif
 			if (v == NULL) {
 				Py_DECREF(av);
 				av = NULL;

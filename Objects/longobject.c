@@ -1201,8 +1201,8 @@ long_from_binary_base(char **str, int base)
 	bits_in_accum = 0;
 	pdigit = z->ob_digit;
 	while (--p >= start) {
-		int k;
-		char ch = *p;
+		unsigned char ch = (unsigned char)*p;
+		digit k;
 
 		if (ch <= '9')
 			k = ch - '0';
@@ -1212,8 +1212,8 @@ long_from_binary_base(char **str, int base)
 			assert(ch >= 'A');
 			k = ch - 'A' + 10;
 		}
-		assert(k >= 0 && k < base);
-		accum |= (twodigits)(k << bits_in_accum);
+		assert(k < base);
+		accum |= k << bits_in_accum;
 		bits_in_accum += bits_per_char;
 		if (bits_in_accum >= SHIFT) {
 			*pdigit++ = (digit)(accum & MASK);
@@ -1440,7 +1440,7 @@ x_divrem(PyLongObject *v1, PyLongObject *w1, PyLongObject **prem)
 			digit zz = (digit) (z >> SHIFT);
 			carry += v->ob_digit[i+k] - z
 				+ ((twodigits)zz << SHIFT);
-			v->ob_digit[i+k] = (digit)(carry & MASK);
+			v->ob_digit[i+k] = carry & MASK;
 			carry = Py_ARITHMETIC_RIGHT_SHIFT(BASE_TWODIGITS_TYPE,
 							  carry, SHIFT);
 			carry -= zz;
@@ -1459,7 +1459,7 @@ x_divrem(PyLongObject *v1, PyLongObject *w1, PyLongObject **prem)
 			carry = 0;
 			for (i = 0; i < size_w && i+k < size_v; ++i) {
 				carry += v->ob_digit[i+k] + w->ob_digit[i];
-				v->ob_digit[i+k] = (digit)(carry & MASK);
+				v->ob_digit[i+k] = carry & MASK;
 				carry = Py_ARITHMETIC_RIGHT_SHIFT(
 						BASE_TWODIGITS_TYPE,
 						carry, SHIFT);
@@ -2794,10 +2794,8 @@ long_subtype_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	if (n < 0)
 		n = -n;
 	new = (PyLongObject *)type->tp_alloc(type, n);
-	if (new == NULL) {
-		Py_DECREF(tmp);
+	if (new == NULL)
 		return NULL;
-	}
 	assert(PyLong_Check(new));
 	new->ob_size = tmp->ob_size;
 	for (i = 0; i < n; i++)

@@ -256,11 +256,11 @@ def f():
         yield i
 vereq(list(tuple(f())), range(1000))
 
-# Verify that __getitem__ overrides are not recognized by __iter__
+# Verify that __getitem__ overrides are recognized by __iter__
 class T(tuple):
-    def __getitem__(self, key):
-        return str(key) + '!!!'
-vereq(iter(T((1,2))).next(), 1)
+  def __getitem__(self, key):
+     return str(key) + '!!!'
+vereq(iter(T()).next(), '0!!!')
 
 print '6.5.3 Lists'
 # calling built-in types without argument must return empty
@@ -364,38 +364,9 @@ b.insert(-2, "foo")
 b.insert(-200, "left")
 b.insert(200, "right")
 if b != ["left",-2,-1,0,0,"foo",1,2,"right"]: raise TestFailed, 'list insert2'
-# a = [-2,-1,0,0,1,2]
 if a.count(0) != 2: raise TestFailed, ' list count'
 if a.index(0) != 2: raise TestFailed, 'list index'
-if a.index(0,2) != 2: raise TestFailed, 'list index, start argument'
-if a.index(0,-4) != 2: raise TestFailed, 'list index, -start argument'
-if a.index(-2,-10) != 0: raise TestFailed, 'list index, very -start argument'
-if a.index(0,3) != 3: raise TestFailed, 'list index, start argument'
-if a.index(0,-3) != 3: raise TestFailed, 'list index, -start argument'
-if a.index(0,3,4) != 3: raise TestFailed, 'list index, stop argument'
-if a.index(0,-3,-2) != 3: raise TestFailed, 'list index, -stop argument'
-if a.index(0,-4*sys.maxint,4*sys.maxint) != 2:
-    raise TestFailed, 'list index, -maxint, maxint argument'
-try:
-    a.index(0, 4*sys.maxint,-4*sys.maxint)
-except ValueError:
-    pass
-else:
-    raise TestFailed, 'list index, maxint,-maxint argument'
-
-try:
-    a.index(2,0,-10)
-except ValueError:
-    pass
-else:
-    raise TestFailed, 'list index, very -stop argument'
 a.remove(0)
-try:
-    a.index(2,0,4)
-except ValueError:
-    pass
-else:
-    raise TestFailed, 'list index, stop argument.'
 if a != [-2,-1,0,1,2]: raise TestFailed, 'list remove'
 a.reverse()
 if a != [2,1,0,-1,-2]: raise TestFailed, 'list reverse'
@@ -482,11 +453,11 @@ a = range(10)
 a[::2] = tuple(range(5))
 vereq(a, [0, 1, 1, 3, 2, 5, 3, 7, 4, 9])
 
-# Verify that __getitem__ overrides are not recognized by __iter__
+# Verify that __getitem__ overrides are recognized by __iter__
 class L(list):
-    def __getitem__(self, key):
-        return str(key) + '!!!'
-vereq(iter(L([1,2])).next(), 1)
+  def __getitem__(self, key):
+     return str(key) + '!!!'
+vereq(iter(L()).next(), '0!!!')
 
 
 print '6.6 Mappings == Dictionaries'

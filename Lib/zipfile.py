@@ -1,4 +1,6 @@
 "Read and write ZIP files."
+# Written by James C. Ahlstrom jim@interet.com
+# All rights transferred to CNRI pursuant to the Python contribution agreement
 
 import struct, os, time
 import binascii
@@ -114,18 +116,7 @@ class ZipInfo:
     """Class with attributes describing each file in the ZIP archive."""
 
     def __init__(self, filename="NoName", date_time=(1980,1,1,0,0,0)):
-        self.orig_filename = filename   # Original file name in archive
-# Terminate the file name at the first null byte.  Null bytes in file
-# names are used as tricks by viruses in archives.
-        null_byte = filename.find(chr(0))
-        if null_byte >= 0:
-            filename = filename[0:null_byte]
-# This is used to ensure paths in generated ZIP files always use
-# forward slashes as the directory separator, as required by the
-# ZIP format specification.
-        if os.sep != "/":
-            filename = filename.replace(os.sep, "/")
-        self.filename = filename        # Normalized file name
+        self.filename = _normpath(filename) # Name of the file in the archive
         self.date_time = date_time      # year, month, day, hour, min, sec
         # Standard values:
         self.compress_type = ZIP_STORED # Type of compression for the file
@@ -164,6 +155,17 @@ class ZipInfo:
                  compress_size, file_size,
                  len(self.filename), len(self.extra))
         return header + self.filename + self.extra
+
+
+# This is used to ensure paths in generated ZIP files always use
+# forward slashes as the directory separator, as required by the
+# ZIP format specification.
+if os.sep != "/":
+    def _normpath(path):
+        return path.replace(os.sep, "/")
+else:
+    def _normpath(path):
+        return path
 
 
 class ZipFile:
@@ -298,10 +300,10 @@ class ZipFile:
                                 + fheader[_FH_FILENAME_LENGTH]
                                 + fheader[_FH_EXTRA_FIELD_LENGTH])
             fname = fp.read(fheader[_FH_FILENAME_LENGTH])
-            if fname != data.orig_filename:
+            if fname != data.filename:
                 raise RuntimeError, \
                       'File name in directory "%s" and header "%s" differ.' % (
-                          data.orig_filename, fname)
+                          data.filename, fname)
 
     def namelist(self):
         """Return a list of file names in the archive."""
@@ -327,7 +329,7 @@ class ZipFile:
         for zinfo in self.filelist:
             try:
                 self.read(zinfo.filename)       # Check CRC-32
-            except BadZipfile:
+            except:
                 return zinfo.filename
 
     def getinfo(self, name):

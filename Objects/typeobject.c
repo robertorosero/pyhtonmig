@@ -638,20 +638,6 @@ subtype_dealloc(PyObject *self)
 	--_PyTrash_delete_nesting;
 	_PyObject_GC_TRACK(self); /* We'll untrack for real later */
 
-	/* Find the nearest base with a different tp_dealloc */
-	base = type;
-	while ((basedealloc = base->tp_dealloc) == subtype_dealloc) {
-		base = base->tp_base;
-		assert(base);
-	}
-
-	/* If we added a weaklist, we clear it.  Do this *before* calling
-	   the finalizer (__del__), clearing slots, or clearing the instance
-	   dict. */
-
-	if (type->tp_weaklistoffset && !base->tp_weaklistoffset)
-		PyObject_ClearWeakRefs(self);
-
 	/* Maybe call finalizer; exit early if resurrected */
 	if (type->tp_del) {
 		type->tp_del(self);
@@ -659,7 +645,8 @@ subtype_dealloc(PyObject *self)
 			goto endlabel;
 	}
 
-	/*  Clear slots up to the nearest base with a different tp_dealloc */
+	/* Find the nearest base with a different tp_dealloc
+	   and clear slots while we're at it */
 	base = type;
 	while ((basedealloc = base->tp_dealloc) == subtype_dealloc) {
 		if (base->ob_size)
@@ -679,6 +666,10 @@ subtype_dealloc(PyObject *self)
 			}
 		}
 	}
+
+	/* If we added weaklist, we clear it */
+	if (type->tp_weaklistoffset && !base->tp_weaklistoffset)
+		PyObject_ClearWeakRefs(self);
 
 	/* Finalize GC if the base doesn't do GC and we do */
 	if (!PyType_IS_GC(base))
@@ -1653,7 +1644,8 @@ type_new(PyTypeObject *metatype, PyObject *args, PyObject *kwds)
 
 		/* Are slots allowed? */
 		nslots = PyTuple_GET_SIZE(slots);
-		if (nslots > 0 && base->tp_itemsize != 0) {
+		if (nslots > 0 && base->tp_itemsize != 0 && !PyType_Check(base)) {
+			/* for the special case of meta types, allow slots */
 			PyErr_Format(PyExc_TypeError,
 				     "nonempty __slots__ "
 				     "not supported for subtype of '%s'",
@@ -1707,20 +1699,14 @@ type_new(PyTypeObject *metatype, PyObject *args, PyObject *kwds)
 			goto bad_slots;
 		for (i = j = 0; i < nslots; i++) {
 			char *s;
-			char buffer[256];
 			tmp = PyTuple_GET_ITEM(slots, i);
 			s = PyString_AS_STRING(tmp);
 			if ((add_dict && strcmp(s, "__dict__") == 0) ||
 			    (add_weak && strcmp(s, "__weakref__") == 0))
 				continue;
-			if (_Py_Mangle(PyString_AS_STRING(name),
-				       PyString_AS_STRING(tmp),
-				       buffer, sizeof(buffer)))
-			{
-				tmp = PyString_FromString(buffer);
-			} else {
-				Py_INCREF(tmp);
-			}
+			tmp =_Py_Mangle(name, tmp);
+                        if (!tmp)
+                            goto bad_slots;
 			PyTuple_SET_ITEM(newslots, j, tmp);
 			j++;
 		}
@@ -2543,8 +2529,6 @@ reduce_2(PyObject *obj)
 	if (getstate != NULL) {
 		state = PyObject_CallObject(getstate, NULL);
 		Py_DECREF(getstate);
-		if (state == NULL)
-			goto end;
 	}
 	else {
 		state = PyObject_GetAttrString(obj, "__dict__");
@@ -3054,25 +3038,8 @@ inherit_slots(PyTypeObject *type, PyTypeObject *base)
 		COPYSLOT(tp_dictoffset);
 		COPYSLOT(tp_init);
 		COPYSLOT(tp_alloc);
+		COPYSLOT(tp_free);
 		COPYSLOT(tp_is_gc);
-		if ((type->tp_flags & Py_TPFLAGS_HAVE_GC) ==
-		    (base->tp_flags & Py_TPFLAGS_HAVE_GC)) {
-			/* They agree about gc. */
-			COPYSLOT(tp_free);
-		}
-		else if ((type->tp_flags & Py_TPFLAGS_HAVE_GC) &&
-			 type->tp_free == NULL &&
-			 base->tp_free == _PyObject_Del) {
-			/* A bit of magic to plug in the correct default
-			 * tp_free function when a derived class adds gc,
-			 * didn't define tp_free, and the base uses the
-			 * default non-gc tp_free.
-			 */
-			type->tp_free = PyObject_GC_Del;
-		}
-		/* else they didn't agree about gc, and there isn't something
-		 * obvious to be done -- the type is on its own.
-		 */
 	}
 }
 
@@ -3174,19 +3141,6 @@ PyType_Ready(PyTypeObject *type)
 		PyObject *b = PyTuple_GET_ITEM(bases, i);
 		if (PyType_Check(b))
 			inherit_slots(type, (PyTypeObject *)b);
-	}
-
-	/* Sanity check for tp_free. */
-	if (PyType_IS_GC(type) && (type->tp_flags & Py_TPFLAGS_BASETYPE) &&
-	    (type->tp_free == NULL || type->tp_free == PyObject_Del)) {
-	    	/* This base class needs to call tp_free, but doesn't have
-	    	 * one, or its tp_free is for non-gc'ed objects.
-	    	 */
-		PyErr_Format(PyExc_TypeError, "type '%.100s' participates in "
-			     "gc and is a base type but has inappropriate "
-			     "tp_free slot",
-			     type->tp_name);
-		goto error;
 	}
 
 	/* if the type dictionary doesn't contain a __doc__, set it from
@@ -4195,15 +4149,7 @@ slot_nb_nonzero(PyObject *self)
 		PyObject *temp = PyObject_Call(func, args, NULL);
 		Py_DECREF(args);
 		if (temp != NULL) {
-			if (PyInt_CheckExact(temp) || PyBool_Check(temp))
-				result = PyObject_IsTrue(temp);
-			else {
-				PyErr_Format(PyExc_TypeError,
-					     "__nonzero__ should return "
-					     "bool or int, returned %s",
-					     temp->ob_type->tp_name);
-				result = -1;
-			}
+			result = PyObject_IsTrue(temp);
 			Py_DECREF(temp);
 		}
 	}
@@ -4829,22 +4775,16 @@ static slotdef slotdefs[] = {
 	SQSLOT("__getitem__", sq_item, slot_sq_item, wrap_sq_item,
 	       "x.__getitem__(y) <==> x[y]"),
 	SQSLOT("__getslice__", sq_slice, slot_sq_slice, wrap_intintargfunc,
-	       "x.__getslice__(i, j) <==> x[i:j]\n\
-               \n\
-               Use of negative indices is not supported."),
+	       "x.__getslice__(i, j) <==> x[i:j]"),
 	SQSLOT("__setitem__", sq_ass_item, slot_sq_ass_item, wrap_sq_setitem,
 	       "x.__setitem__(i, y) <==> x[i]=y"),
 	SQSLOT("__delitem__", sq_ass_item, slot_sq_ass_item, wrap_sq_delitem,
 	       "x.__delitem__(y) <==> del x[y]"),
 	SQSLOT("__setslice__", sq_ass_slice, slot_sq_ass_slice,
 	       wrap_intintobjargproc,
-	       "x.__setslice__(i, j, y) <==> x[i:j]=y\n\
-               \n\
-               Use  of negative indices is not supported."),
+	       "x.__setslice__(i, j, y) <==> x[i:j]=y"),
 	SQSLOT("__delslice__", sq_ass_slice, slot_sq_ass_slice, wrap_delslice,
-	       "x.__delslice__(i, j) <==> del x[i:j]\n\
-               \n\
-               Use of negative indices is not supported."),
+	       "x.__delslice__(i, j) <==> del x[i:j]"),
 	SQSLOT("__contains__", sq_contains, slot_sq_contains, wrap_objobjproc,
 	       "x.__contains__(y) <==> y in x"),
 	SQSLOT("__iadd__", sq_inplace_concat, slot_sq_inplace_concat,
@@ -5140,7 +5080,7 @@ update_one_slot(PyTypeObject *type, slotdef *p)
 			   sanity checks and constructing a new argument
 			   list.  Cut all that nonsense short -- this speeds
 			   up instance creation tremendously. */
-			specific = (void *)type->tp_new;
+			specific = type->tp_new;
 			/* XXX I'm not 100% sure that there isn't a hole
 			   in this reasoning that requires additional
 			   sanity checks.  I'll buy the first person to
@@ -5548,7 +5488,7 @@ super_descr_get(PyObject *self, PyObject *obj, PyObject *type)
 		return self;
 	}
 	if (su->ob_type != &PySuper_Type)
-		/* If su is not an instance of a subclass of super,
+		/* If su is an instance of a subclass of super,
 		   call its type */
 		return PyObject_CallFunction((PyObject *)su->ob_type,
 					     "OO", su->type, obj);

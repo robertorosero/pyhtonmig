@@ -3,7 +3,7 @@ import sys
 import os
 from unicodedata import normalize
 
-TESTDATAFILE = "NormalizationTest" + os.extsep + "txt"
+TESTDATAFILE = "NormalizationTest.txt"
 
 # This search allows using a build directory just inside the source
 # directory, and saving just one copy of the test data in the source

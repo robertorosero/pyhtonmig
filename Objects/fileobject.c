@@ -116,7 +116,6 @@ fill_file_fields(PyFileObject *f, FILE *fp, char *name, char *mode,
 
 	Py_DECREF(f->f_name);
 	Py_DECREF(f->f_mode);
-	Py_DECREF(f->f_encoding);
 #ifdef Py_USING_UNICODE
 	if (wname)
 		f->f_name = PyUnicode_FromObject(wname);
@@ -134,9 +133,7 @@ fill_file_fields(PyFileObject *f, FILE *fp, char *name, char *mode,
 	f->f_newlinetypes = NEWLINE_UNKNOWN;
 	f->f_skipnextlf = 0;
 #endif
-	Py_INCREF(Py_None);
-	f->f_encoding = Py_None;
-	
+
 	if (f->f_name == NULL || f->f_mode == NULL)
 		return NULL;
 	f->f_fp = fp;
@@ -305,21 +302,6 @@ PyFile_SetBufSize(PyObject *f, int bufsize)
 	}
 }
 
-/* Set the encoding used to output Unicode strings.
-   Returh 1 on success, 0 on failure. */
-
-int
-PyFile_SetEncoding(PyObject *f, const char *enc)
-{
-	PyFileObject *file = (PyFileObject*)f;
-	PyObject *str = PyString_FromString(enc);
-	if (!str)
-		return 0;
-	Py_DECREF(file->f_encoding);
-	file->f_encoding = str;
-	return 1;
-}
-
 static PyObject *
 err_closed(void)
 {
@@ -341,7 +323,6 @@ file_dealloc(PyFileObject *f)
 	}
 	Py_XDECREF(f->f_name);
 	Py_XDECREF(f->f_mode);
-	Py_XDECREF(f->f_encoding);
 	drop_readahead(f);
 	f->ob_type->tp_free((PyObject *)f);
 }
@@ -1686,8 +1667,6 @@ static PyMemberDef file_memberlist[] = {
 	 "file mode ('r', 'U', 'w', 'a', possibly with 'b' or '+' added)"},
 	{"name",	T_OBJECT,	OFF(f_name),	RO,
 	 "file name"},
-	{"encoding",	T_OBJECT,	OFF(f_encoding),	RO,
-	 "file encoding"},
 	/* getattr(f, "closed") is implemented without this table */
 	{NULL}	/* Sentinel */
 };
@@ -1872,8 +1851,6 @@ file_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 		((PyFileObject *)self)->f_name = not_yet_string;
 		Py_INCREF(not_yet_string);
 		((PyFileObject *)self)->f_mode = not_yet_string;
-		Py_INCREF(Py_None);
-		((PyFileObject *)self)->f_encoding = Py_None;
 	}
 	return self;
 }
@@ -1985,8 +1962,7 @@ PyTypeObject PyFile_Type = {
 	0,					/* tp_call */
 	0,					/* tp_str */
 	PyObject_GenericGetAttr,		/* tp_getattro */
-	/* softspace is writable:  we must supply tp_setattro */
-	PyObject_GenericSetAttr,		/* tp_setattro */
+	0,					/* tp_setattro */
 	0,					/* tp_as_buffer */
 	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE, /* tp_flags */
 	file_doc,				/* tp_doc */
@@ -2057,29 +2033,11 @@ PyFile_WriteObject(PyObject *v, PyObject *f, int flags)
 	}
 	else if (PyFile_Check(f)) {
 		FILE *fp = PyFile_AsFile(f);
-		PyObject *enc = ((PyFileObject*)f)->f_encoding;
-		int result;
 		if (fp == NULL) {
 			err_closed();
 			return -1;
 		}
-#ifdef Py_USING_UNICODE
-                if ((flags & Py_PRINT_RAW) && 
-		    PyUnicode_Check(v) && enc != Py_None) {
-			char *cenc = PyString_AS_STRING(enc);
-			value = PyUnicode_AsEncodedString(v, cenc, "strict");
-			if (value == NULL)
-				return -1;
-		} else {
-			value = v;
-			Py_INCREF(value);
-		}
-		result = PyObject_Print(value, fp, flags);
-		Py_DECREF(value);
-		return result;
-#else
 		return PyObject_Print(v, fp, flags);
-#endif
 	}
 	writer = PyObject_GetAttrString(f, "write");
 	if (writer == NULL)

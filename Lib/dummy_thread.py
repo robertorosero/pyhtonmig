@@ -17,7 +17,7 @@ __email__ = "brett@python.org"
 # Exports only things specified by thread documentation
 # (skipping obsolete synonyms allocate(), start_new(), exit_thread())
 __all__ = ['error', 'start_new_thread', 'exit', 'get_ident', 'allocate_lock',
-           'interrupt_main', 'LockType']
+           'LockType']
 
 import traceback as _traceback
 
@@ -36,27 +36,17 @@ def start_new_thread(function, args, kwargs={}):
     caught and nothing is done; all other exceptions are printed out
     by using traceback.print_exc().
 
-    If the executed function calls interrupt_main the KeyboardInterrupt will be
-    raised when the function returns.
-
     """
     if type(args) != type(tuple()):
         raise TypeError("2nd arg must be a tuple")
     if type(kwargs) != type(dict()):
         raise TypeError("3rd arg must be a dict")
-    global _main
-    _main = False
     try:
         function(*args, **kwargs)
     except SystemExit:
         pass
     except:
         _traceback.print_exc()
-    _main = True
-    global _interrupt
-    if _interrupt:
-        _interrupt = False
-        raise KeyboardInterrupt
 
 def exit():
     """Dummy implementation of thread.exit()."""
@@ -124,17 +114,3 @@ class LockType(object):
 
     def locked(self):
         return self.locked_status
-
-# Used to signal that interrupt_main was called in a "thread"
-_interrupt = False
-# True when not executing in a "thread"
-_main = True
-
-def interrupt_main():
-    """Set _interrupt flag to True to have start_new_thread raise
-    KeyboardInterrupt upon exiting."""
-    if _main:
-        raise KeyboardInterrupt
-    else:
-        global _interrupt
-        _interrupt = True

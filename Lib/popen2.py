@@ -25,7 +25,7 @@ class Popen3:
 
     sts = -1                    # Child not completed yet
 
-    def __init__(self, cmd, capturestderr=False, bufsize=-1):
+    def __init__(self, cmd, capturestderr=0, bufsize=-1):
         """The parameter 'cmd' is the shell command to execute in a
         sub-process.  The 'capturestderr' flag, if true, specifies that
         the object should capture standard error output of the child process.
@@ -83,11 +83,10 @@ class Popen3:
 
     def wait(self):
         """Wait for and return the exit status of the child process."""
-        if self.sts < 0:
-            pid, sts = os.waitpid(self.pid, 0)
-            if pid == self.pid:
-                self.sts = sts
-                _active.remove(self)
+        pid, sts = os.waitpid(self.pid, 0)
+        if pid == self.pid:
+            self.sts = sts
+            _active.remove(self)
         return self.sts
 
 
@@ -141,14 +140,14 @@ else:
         """Execute the shell command 'cmd' in a sub-process.  If 'bufsize' is
         specified, it sets the buffer size for the I/O pipes.  The file objects
         (child_stdout, child_stdin) are returned."""
-        inst = Popen3(cmd, False, bufsize)
+        inst = Popen3(cmd, 0, bufsize)
         return inst.fromchild, inst.tochild
 
     def popen3(cmd, bufsize=-1, mode='t'):
         """Execute the shell command 'cmd' in a sub-process.  If 'bufsize' is
         specified, it sets the buffer size for the I/O pipes.  The file objects
         (child_stdout, child_stdin, child_stderr) are returned."""
-        inst = Popen3(cmd, True, bufsize)
+        inst = Popen3(cmd, 1, bufsize)
         return inst.fromchild, inst.tochild, inst.childerr
 
     def popen4(cmd, bufsize=-1, mode='t'):

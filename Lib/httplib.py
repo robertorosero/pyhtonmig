@@ -208,11 +208,10 @@ class HTTPResponse:
 
     # See RFC 2616 sec 19.6 and RFC 1945 sec 6 for details.
 
-    def __init__(self, sock, debuglevel=0, strict=0, method=None):
+    def __init__(self, sock, debuglevel=0, strict=0):
         self.fp = sock.makefile('rb', 0)
         self.debuglevel = debuglevel
         self.strict = strict
-        self._method = method
 
         self.msg = None
 
@@ -231,10 +230,6 @@ class HTTPResponse:
         line = self.fp.readline()
         if self.debuglevel > 0:
             print "reply:", repr(line)
-        if not line:
-            # Presumably, the server closed the connection before
-            # sending a valid response.
-            raise BadStatusLine(line)
         try:
             [version, status, reason] = line.split(None, 2)
         except ValueError:
@@ -331,8 +326,7 @@ class HTTPResponse:
         # does the body have a fixed length? (of zero)
         if (status == 204 or            # No Content
             status == 304 or            # Not Modified
-            100 <= status < 200 or      # 1xx codes
-            self._method == 'HEAD'):
+            100 <= status < 200):       # 1xx codes
             self.length = 0
 
         # if the connection remains open, and we aren't using chunked, and
@@ -453,6 +447,7 @@ class HTTPResponse:
                 break
 
         # we read everything; close the "file"
+        # XXX Shouldn't the client close the file?
         self.close()
 
         return value
@@ -502,7 +497,6 @@ class HTTPConnection:
         self._buffer = []
         self.__response = None
         self.__state = _CS_IDLE
-        self._method = None
 
         self._set_hostport(host, port)
         if strict is not None:
@@ -603,7 +597,8 @@ class HTTPConnection:
         `url' specifies the object being requested, e.g. '/index.html'.
         """
 
-        # if a prior response has been completed, then forget about it.
+        # check if a prior response has been completed
+        # XXX What if it hasn't?
         if self.__response and self.__response.isclosed():
             self.__response = None
 
@@ -631,8 +626,6 @@ class HTTPConnection:
         else:
             raise CannotSendRequest()
 
-        # Save the method we use, we need it later in the response phase
-        self._method = method
         if not url:
             url = '/'
         str = '%s %s %s' % (method, url, self._http_vsn_str)
@@ -745,7 +738,7 @@ class HTTPConnection:
     def getresponse(self):
         "Get the response from the server."
 
-        # if a prior response has been completed, then forget about it.
+        # check if a prior response has been completed
         if self.__response and self.__response.isclosed():
             self.__response = None
 
@@ -770,11 +763,9 @@ class HTTPConnection:
 
         if self.debuglevel > 0:
             response = self.response_class(self.sock, self.debuglevel,
-                                           strict=self.strict,
-                                           method=self._method)
+                                           strict=self.strict)
         else:
-            response = self.response_class(self.sock, strict=self.strict,
-                                           method=self._method)
+            response = self.response_class(self.sock, strict=self.strict)
 
         response.begin()
         assert response.will_close != _UNKNOWN
@@ -958,7 +949,10 @@ class HTTPSConnection(HTTPConnection):
 
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.connect((self.host, self.port))
-        ssl = socket.ssl(sock, self.key_file, self.cert_file)
+        realsock = sock
+        if hasattr(sock, "_sock"):
+            realsock = sock._sock
+        ssl = socket.ssl(realsock, self.key_file, self.cert_file)
         self.sock = FakeSocket(sock, ssl)
 
 
