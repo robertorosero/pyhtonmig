@@ -1,5 +1,8 @@
-#ifndef CSTRINGIO_INCLUDED
-#define CSTRINGIO_INCLUDED
+#ifndef Py_CSTRINGIO_H
+#define Py_CSTRINGIO_H
+#ifdef __cplusplus
+extern "C" {
+#endif
 /*
 
   cStringIO.h,v 1.4 1997/12/07 14:27:00 jim Exp
@@ -128,4 +131,7 @@ xxxPyCObject_Import(char *module_name, char *name)
 #define PycString_IMPORT \
   PycStringIO=(struct PycStringIO_CAPI*)xxxPyCObject_Import("cStringIO", "cStringIO_CAPI")
 
-#endif /* CSTRINGIO_INCLUDED */
+#ifdef __cplusplus
+}
+#endif
+#endif /* !Py_CSTRINGIO_H */

@@ -63,7 +63,7 @@ _PyLong_Copy(PyLongObject *src)
 		i = -(i);
 	result = _PyLong_New(i);
 	if (result != NULL) {
-		result->ob_size = i;
+		result->ob_size = src->ob_size;
 		while (--i >= 0)
 			result->ob_digit[i] = src->ob_digit[i];
 	}
@@ -883,10 +883,10 @@ long_format(PyObject *aa, int base, int addL)
 			accumbits += SHIFT;
 			assert(accumbits >= basebits);
 			do {
-				char digit = (char)(accum & (base - 1));
-				digit += (digit < 10) ? '0' : 'A'-10;
+				char cdigit = (char)(accum & (base - 1));
+				cdigit += (cdigit < 10) ? '0' : 'A'-10;
 				assert(p > PyString_AS_STRING(str));
-				*--p = digit;
+				*--p = cdigit;
 				accumbits -= basebits;
 				accum >>= basebits;
 			} while (i < size_a-1 ? accumbits >= basebits :

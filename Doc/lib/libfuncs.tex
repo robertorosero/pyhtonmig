@@ -67,7 +67,7 @@ def my_import(name):
   user-defined or built-in function or method, or a class object) and
   the \var{args} argument must be a sequence.  The \var{function} is
   called with \var{args} as the argument list; the number of arguments
-  is the the length of the tuple.
+  is the length of the tuple.
   If the optional \var{keywords} argument is present, it must be a
   dictionary whose keys are strings.  It specifies keyword arguments
   to be added to the end of the the argument list.
@@ -75,6 +75,8 @@ def my_import(name):
   \code{\var{function}(\var{args})}, since in that case there is always
   exactly one argument.  The use of \function{apply()} is equivalent
   to \code{\var{function}(*\var{args}, **\var{keywords})}.
+  Use of \function{apply()} is not necessary since the ``extended call
+  syntax,'' as used in the last example, is completely equivalent.
 \end{funcdesc}
 
 \begin{funcdesc}{buffer}{object\optional{, offset\optional{, size}}}
@@ -201,25 +203,40 @@ def my_import(name):
     \item \code{dict([[2, 3], [1, 2]])}
     \item \code{dict([(i-1, i) for i in (2, 3)])}
   \end{itemize}
+
+  \versionadded{2.2}
 \end{funcdesc}
 
 \begin{funcdesc}{dir}{\optional{object}}
   Without arguments, return the list of names in the current local
   symbol table.  With an argument, attempts to return a list of valid
-  attribute for that object.  This information is gleaned from the
+  attributes for that object.  This information is gleaned from the
   object's \member{__dict__} attribute, if defined, and from the class
-  or type object.  The list is not necessarily complete.  For
-  example, for classes, attributes defined in base classes are not
-  included, and for class instances, methods are not included.
-  The resulting list is sorted alphabetically.  For example:
+  or type object.  The list is not necessarily complete.
+  If the object is a module object, the list contains the names of the
+  module's attributes.
+  If the object is a type or class object,
+  the list contains the names of its attributes,
+  and recursively of the attributes of its bases.
+  Otherwise, the list contains the object's attributes' names,
+  the names of its class's attributes,
+  and recursively of the attributes of its class's base classes.
+  The resulting list is sorted alphabetically.
+  For example:
 
 \begin{verbatim}
->>> import sys
+>>> import struct
 >>> dir()
-['sys']
->>> dir(sys)
-['argv', 'exit', 'modules', 'path', 'stderr', 'stdin', 'stdout']
+['__builtins__', '__doc__', '__name__', 'struct']
+>>> dir(struct)
+['__doc__', '__name__', 'calcsize', 'error', 'pack', 'unpack']
 \end{verbatim}
+
+  \note{Because \function{dir()} is supplied primarily as a convenience
+  for use at an interactive prompt,
+  it tries to supply an interesting set of names more than it tries to
+  supply a rigorously or consistently defined set of names,
+  and its detailed behavior may change across releases.}
 \end{funcdesc}
 
 \begin{funcdesc}{divmod}{a, b}
@@ -234,6 +251,9 @@ def my_import(name):
   \var{b} + \var{a} \%{} \var{b}} is very close to \var{a}, if
   \code{\var{a} \%{} \var{b}} is non-zero it has the same sign as
   \var{b}, and \code{0 <= abs(\var{a} \%{} \var{b}) < abs(\var{b})}.
+
+  \versionchanged[Using \function{divmod()} with complex numbers is
+                  deprecated]{2.3}
 \end{funcdesc}
 
 \begin{funcdesc}{eval}{expression\optional{, globals\optional{, locals}}}
@@ -400,6 +420,7 @@ def my_import(name):
   function, class, method, keyword, or documentation topic, and a
   help page is printed on the console.  If the argument is any other
   kind of object, a help page on the object is generated.
+  \versionadded{2.2}
 \end{funcdesc}
 
 \begin{funcdesc}{hex}{x}
@@ -661,12 +682,12 @@ def my_import(name):
 \begin{funcdesc}{reduce}{function, sequence\optional{, initializer}}
   Apply \var{function} of two arguments cumulatively to the items of
   \var{sequence}, from left to right, so as to reduce the sequence to
-  a single value.  For example,
-  \code{reduce(lambda x, y: x+y, [1, 2, 3, 4, 5])} calculates
-  \code{((((1+2)+3)+4)+5)}.
-  If the optional \var{initializer} is present, it is placed before
-  the items of the sequence in the calculation, and serves as a
-  default when the sequence is empty.
+  a single value.  For example, \code{reduce(lambda x, y: x+y, [1, 2,
+  3, 4, 5])} calculates \code{((((1+2)+3)+4)+5)}.  If the optional
+  \var{initializer} is present, it is placed before the items of the
+  sequence in the calculation, and serves as a default when the
+  sequence is empty.  If \var{initializer} is not given and
+  \var{sequence} contains only one item, the first item is returned.
 \end{funcdesc}
 
 \begin{funcdesc}{reload}{module}
@@ -803,7 +824,8 @@ def my_import(name):
   If \var{encoding} and/or \var{errors} are given, \code{unicode()}
   will decode the object which can either be an 8-bit string or a
   character buffer using the codec for \var{encoding}. The
-  \var{encoding} parameter is a string giving the name of an encoding.
+  \var{encoding} parameter is a string giving the name of an encoding;
+  if the encoding is not known, \exception{LookupError} is raised.
   Error handling is done according to \var{errors}; this specifies the
   treatment of characters which are invalid in the input encoding.  If
   \var{errors} is \code{'strict'} (the default), a
@@ -815,15 +837,18 @@ def my_import(name):
 
   If no optional parameters are given, \code{unicode()} will mimic the
   behaviour of \code{str()} except that it returns Unicode strings
-  instead of 8-bit strings. More precisely, if \var{object} is an
-  Unicode string or subclass it will return a Unicode string without
-  any additional decoding applied. For objects which provide a
-  \code{__unicode__} method, it will call this method without
-  arguments to create a Unicode string. For all other objects, the
-  8-bit string version or representation is requested and then
-  converted to a Unicode string using the codec for the default
-  encoding in \code{'strict'} mode.
+  instead of 8-bit strings. More precisely, if \var{object} is a
+  Unicode string or subclass it will return that Unicode string without
+  any additional decoding applied.
+
+  For objects which provide a \method{__unicode__()} method, it will
+  call this method without arguments to create a Unicode string. For
+  all other objects, the 8-bit string version or representation is
+  requested and then converted to a Unicode string using the codec for
+  the default encoding in \code{'strict'} mode.
+
   \versionadded{2.0}
+  \versionchanged[Support for \method{__unicode__()} added]{2.2}
 \end{funcdesc}
 
 \begin{funcdesc}{vars}{\optional{object}}

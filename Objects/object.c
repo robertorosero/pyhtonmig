@@ -79,6 +79,15 @@ inc_count(PyTypeObject *tp)
 		if (tp->tp_next != NULL) /* sanity check */
 			Py_FatalError("XXX inc_count sanity check");
 		tp->tp_next = type_list;
+		/* Note that as of Python 2.2, heap-allocated type objects
+		 * can go away, but this code requires that they stay alive
+		 * until program exit.  That's why we're careful with
+		 * refcounts here.  type_list gets a new reference to tp,
+		 * while ownership of the reference type_list used to hold
+		 * (if any) was transferred to tp->tp_next in the line above.
+		 * tp is thus effectively immortal after this.
+		 */
+		Py_INCREF(tp);
 		type_list = tp;
 	}
 	tp->tp_allocs++;
@@ -1191,8 +1200,14 @@ _PyObject_GetDictPtr(PyObject *obj)
 	if (dictoffset == 0)
 		return NULL;
 	if (dictoffset < 0) {
-		const size_t size = _PyObject_VAR_SIZE(tp,
-					((PyVarObject *)obj)->ob_size);
+		int tsize;
+		size_t size;
+
+		tsize = ((PyVarObject *)obj)->ob_size;
+		if (tsize < 0)
+			tsize = -tsize;
+		size = _PyObject_VAR_SIZE(tp, tsize);
+
 		dictoffset += (long)size;
 		assert(dictoffset > 0);
 		assert(dictoffset % SIZEOF_VOID_P == 0);
@@ -1501,14 +1516,22 @@ merge_class_dict(PyObject* dict, PyObject* aclass)
 	if (bases == NULL)
 		PyErr_Clear();
 	else {
+		/* We have no guarantee that bases is a real tuple */
 		int i, n;
-		assert(PyTuple_Check(bases));
-		n = PyTuple_GET_SIZE(bases);
-		for (i = 0; i < n; i++) {
-			PyObject *base = PyTuple_GET_ITEM(bases, i);
-			if (merge_class_dict(dict, base) < 0) {
-				Py_DECREF(bases);
-				return -1;
+		n = PySequence_Size(bases); /* This better be right */
+		if (n < 0)
+			PyErr_Clear();
+		else {
+			for (i = 0; i < n; i++) {
+				PyObject *base = PySequence_GetItem(bases, i);
+				if (base == NULL) {
+					Py_DECREF(bases);
+					return -1;
+				}
+				if (merge_class_dict(dict, base) < 0) {
+					Py_DECREF(bases);
+					return -1;
+				}
 			}
 		}
 		Py_DECREF(bases);
@@ -1870,7 +1893,7 @@ PyTypeObject *_Py_cobject_hack = &PyCObject_Type;
 
 
 /* Hack to force loading of abstract.o */
-int (*_Py_abstract_hack)(PyObject *) = &PyObject_Size;
+int (*_Py_abstract_hack)(PyObject *) = PyObject_Size;
 
 
 /* Python's malloc wrappers (see pymem.h) */
@@ -1888,11 +1911,8 @@ PyMem_Malloc(size_t nbytes)
 void *
 PyMem_Realloc(void *p, size_t nbytes)
 {
-#if _PyMem_EXTRA > 0
-	if (nbytes == 0)
-		nbytes = _PyMem_EXTRA;
-#endif
-	return PyMem_REALLOC(p, nbytes);
+	/* See comment near MALLOC_ZERO_RETURNS_NULL in pyport.h. */
+	return PyMem_REALLOC(p, nbytes ? nbytes : 1);
 }
 
 void

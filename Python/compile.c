@@ -61,7 +61,7 @@ int Py_OptimizeFlag = 0;
 "name '%.400s' is used prior to global declaration"
 
 #define LOCAL_GLOBAL \
-"name '%.400s' is a function paramter and declared global"
+"name '%.400s' is a function parameter and declared global"
 
 #define LATE_FUTURE \
 "from __future__ imports must occur at the beginning of the file"
@@ -133,11 +133,11 @@ code_compare(PyCodeObject *co, PyCodeObject *cp)
 	cmp = PyObject_Compare(co->co_name, cp->co_name);
 	if (cmp) return cmp;
 	cmp = co->co_argcount - cp->co_argcount;
-	if (cmp) return cmp;
+	if (cmp) return (cmp<0)?-1:1;
 	cmp = co->co_nlocals - cp->co_nlocals;
-	if (cmp) return cmp;
+	if (cmp) return (cmp<0)?-1:1;
 	cmp = co->co_flags - cp->co_flags;
-	if (cmp) return cmp;
+	if (cmp) return (cmp<0)?-1:1;
 	cmp = PyObject_Compare(co->co_code, cp->co_code);
 	if (cmp) return cmp;
 	cmp = PyObject_Compare(co->co_consts, cp->co_consts);
@@ -465,14 +465,21 @@ com_error(struct compiling *c, PyObject *exc, char *msg)
 		Py_INCREF(Py_None);
 		line = Py_None;
 	}
-	t = Py_BuildValue("(ziOO)", c->c_filename, c->c_lineno,
-			  Py_None, line);
-	if (t == NULL)
-		goto exit;
-	w = Py_BuildValue("(OO)", v, t);
-	if (w == NULL)
-		goto exit;
-	PyErr_SetObject(exc, w);
+	if (exc == PyExc_SyntaxError) {
+		t = Py_BuildValue("(ziOO)", c->c_filename, c->c_lineno,
+				  Py_None, line);
+		if (t == NULL)
+			goto exit;
+		w = Py_BuildValue("(OO)", v, t);
+		if (w == NULL)
+			goto exit;
+		PyErr_SetObject(exc, w);
+	} else {
+		/* Make sure additional exceptions are printed with
+		   file and line, also. */
+		PyErr_SetObject(exc, v);
+		PyErr_SyntaxLocation(c->c_filename, c->c_lineno);
+	}
  exit:
 	Py_XDECREF(t);
 	Py_XDECREF(v);
@@ -1153,7 +1160,8 @@ parsestr(struct compiling *com, char *s)
 	s++;
 	len = strlen(s);
 	if (len > INT_MAX) {
-		PyErr_SetString(PyExc_OverflowError, "string to parse is too long");
+		com_error(com, PyExc_OverflowError, 
+			  "string to parse is too long");
 		return NULL;
 	}
 	if (s[--len] != quote) {
@@ -1171,11 +1179,15 @@ parsestr(struct compiling *com, char *s)
 #ifdef Py_USING_UNICODE
 	if (unicode || Py_UnicodeFlag) {
 		if (rawmode)
-			return PyUnicode_DecodeRawUnicodeEscape(
-				s, len, NULL);
+			v = PyUnicode_DecodeRawUnicodeEscape(
+				 s, len, NULL);
 		else
-			return PyUnicode_DecodeUnicodeEscape(
+			v = PyUnicode_DecodeUnicodeEscape(
 				s, len, NULL);
+		if (v == NULL)
+			PyErr_SyntaxLocation(com->c_filename, com->c_lineno);
+		return v;
+			
 	}
 #endif
 	if (rawmode || strchr(s, '\\') == NULL)
@@ -1238,9 +1250,9 @@ parsestr(struct compiling *com, char *s)
 				*p++ = x;
 				break;
 			}
-			PyErr_SetString(PyExc_ValueError, 
-					"invalid \\x escape");
 			Py_DECREF(v);
+			com_error(com, PyExc_ValueError, 
+				  "invalid \\x escape");
 			return NULL;
 		default:
 			*p++ = '\\';
@@ -1946,7 +1958,7 @@ com_factor(struct compiling *c, node *n)
 			return;
 		}
 		if (childtype == MINUS) {
-			char *s = malloc(strlen(STR(pnum)) + 2);
+			char *s = PyMem_Malloc(strlen(STR(pnum)) + 2);
 			if (s == NULL) {
 				com_error(c, PyExc_MemoryError, "");
 				com_addbyte(c, 255);
@@ -1954,7 +1966,7 @@ com_factor(struct compiling *c, node *n)
 			}
 			s[0] = '-';
 			strcpy(s + 1, STR(pnum));
-			free(STR(pnum));
+			PyMem_Free(STR(pnum));
 			STR(pnum) = s;
 		}
 		com_atom(c, patom);
@@ -3926,6 +3938,9 @@ compile_classdef(struct compiling *c, node *n)
 	/* classdef: 'class' NAME ['(' testlist ')'] ':' suite */
 	c->c_name = STR(CHILD(n, 1));
 	c->c_private = c->c_name;
+	/* Initialize local __module__ from global __name__ */
+	com_addop_name(c, LOAD_GLOBAL, "__name__");
+	com_addop_name(c, STORE_NAME, "__module__");
 	ch = CHILD(n, NCH(n)-1); /* The suite */
 	doc = get_docstring(c, ch);
 	if (doc != NULL) {
@@ -4449,7 +4464,7 @@ symtable_check_unoptimized(struct compiling *c,
 "unqualified exec is not allowed in function '%.100s' it %s"
 
 #define ILLEGAL_EXEC_AND_IMPORT_STAR \
-"function '%.100s' uses import * and bare exec, which are illegal" \
+"function '%.100s' uses import * and bare exec, which are illegal " \
 "because it %s"
 
 	/* XXX perhaps the linenos for these opt-breaking statements

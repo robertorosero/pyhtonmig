@@ -89,7 +89,7 @@ typedef struct {
 
 staticforward PyTypeObject Xmlparsetype;
 
-typedef void (*xmlhandlersetter)(XML_Parser *self, void *meth);
+typedef void (*xmlhandlersetter)(XML_Parser self, void *meth);
 typedef void* xmlhandler;
 
 struct HandlerInfo {
@@ -352,6 +352,33 @@ getcode(enum HandlerTypes slot, char* func_name, int lineno)
     return NULL;
 }
 
+static int
+trace_frame(PyThreadState *tstate, PyFrameObject *f, int code, PyObject *val)
+{
+    int result = 0;
+    if (!tstate->use_tracing || tstate->tracing)
+	return 0;
+    if (tstate->c_profilefunc != NULL) {
+	tstate->tracing++;
+	result = tstate->c_profilefunc(tstate->c_profileobj,
+				       f, code , val);
+	tstate->use_tracing = ((tstate->c_tracefunc != NULL)
+			       || (tstate->c_profilefunc != NULL));
+	tstate->tracing--;
+	if (result)
+	    return result;
+    }
+    if (tstate->c_tracefunc != NULL) {
+	tstate->tracing++;
+	result = tstate->c_tracefunc(tstate->c_traceobj,
+				     f, code , val);
+	tstate->use_tracing = ((tstate->c_tracefunc != NULL)
+			       || (tstate->c_profilefunc != NULL));
+	tstate->tracing--;
+    }	
+    return result;
+}
+
 static PyObject*
 call_with_frame(PyCodeObject *c, PyObject* func, PyObject* args)
 {
@@ -361,18 +388,29 @@ call_with_frame(PyCodeObject *c, PyObject* func, PyObject* args)
 
     if (c == NULL)
         return NULL;
+    
     f = PyFrame_New(
                     tstate,			/*back*/
                     c,				/*code*/
-                    tstate->frame->f_globals,	/*globals*/
+                    PyEval_GetGlobals(),	/*globals*/
                     NULL			/*locals*/
                     );
     if (f == NULL)
         return NULL;
     tstate->frame = f;
+    if (trace_frame(tstate, f, PyTrace_CALL, Py_None)) {
+	Py_DECREF(f);
+	return NULL;
+    }
     res = PyEval_CallObject(func, args);
     if (res == NULL && tstate->curexc_traceback == NULL)
         PyTraceBack_Here(f);
+    else {
+	if (trace_frame(tstate, f, PyTrace_RETURN, res)) {
+	    Py_XDECREF(res);
+	    res = NULL;
+	}
+    }
     tstate->frame = f->f_back;
     Py_DECREF(f);
     return res;
@@ -1718,7 +1756,7 @@ pyxml_UpdatePairedHandlers(xmlparseobject *self,
 }
 
 static void
-pyxml_SetStartElementHandler(XML_Parser *parser, void *junk)
+pyxml_SetStartElementHandler(XML_Parser parser, void *junk)
 {
     pyxml_UpdatePairedHandlers((xmlparseobject *)XML_GetUserData(parser),
                                StartElement, EndElement,
@@ -1726,7 +1764,7 @@ pyxml_SetStartElementHandler(XML_Parser *parser, void *junk)
 }
 
 static void
-pyxml_SetEndElementHandler(XML_Parser *parser, void *junk)
+pyxml_SetEndElementHandler(XML_Parser parser, void *junk)
 {
     pyxml_UpdatePairedHandlers((xmlparseobject *)XML_GetUserData(parser), 
                                StartElement, EndElement,
@@ -1734,7 +1772,7 @@ pyxml_SetEndElementHandler(XML_Parser *parser, void *junk)
 }
 
 static void
-pyxml_SetStartNamespaceDeclHandler(XML_Parser *parser, void *junk)
+pyxml_SetStartNamespaceDeclHandler(XML_Parser parser, void *junk)
 {
     pyxml_UpdatePairedHandlers((xmlparseobject *)XML_GetUserData(parser), 
                                StartNamespaceDecl, EndNamespaceDecl,
@@ -1742,7 +1780,7 @@ pyxml_SetStartNamespaceDeclHandler(XML_Parser *parser, void *junk)
 }
 
 static void
-pyxml_SetEndNamespaceDeclHandler(XML_Parser *parser, void *junk)
+pyxml_SetEndNamespaceDeclHandler(XML_Parser parser, void *junk)
 {
     pyxml_UpdatePairedHandlers((xmlparseobject *)XML_GetUserData(parser), 
                                StartNamespaceDecl, EndNamespaceDecl,
@@ -1750,7 +1788,7 @@ pyxml_SetEndNamespaceDeclHandler(XML_Parser *parser, void *junk)
 }
 
 static void
-pyxml_SetStartCdataSection(XML_Parser *parser, void *junk)
+pyxml_SetStartCdataSection(XML_Parser parser, void *junk)
 {
     pyxml_UpdatePairedHandlers((xmlparseobject *)XML_GetUserData(parser),
                                StartCdataSection, EndCdataSection,
@@ -1758,7 +1796,7 @@ pyxml_SetStartCdataSection(XML_Parser *parser, void *junk)
 }
 
 static void
-pyxml_SetEndCdataSection(XML_Parser *parser, void *junk)
+pyxml_SetEndCdataSection(XML_Parser parser, void *junk)
 {
     pyxml_UpdatePairedHandlers((xmlparseobject *)XML_GetUserData(parser), 
                                StartCdataSection, EndCdataSection, 
@@ -1768,7 +1806,7 @@ pyxml_SetEndCdataSection(XML_Parser *parser, void *junk)
 #if EXPAT_VERSION >= 0x010200
 
 static void
-pyxml_SetStartDoctypeDeclHandler(XML_Parser *parser, void *junk)
+pyxml_SetStartDoctypeDeclHandler(XML_Parser parser, void *junk)
 {
     pyxml_UpdatePairedHandlers((xmlparseobject *)XML_GetUserData(parser),
                                StartDoctypeDecl, EndDoctypeDecl,
@@ -1776,7 +1814,7 @@ pyxml_SetStartDoctypeDeclHandler(XML_Parser *parser, void *junk)
 }
 
 static void
-pyxml_SetEndDoctypeDeclHandler(XML_Parser *parser, void *junk)
+pyxml_SetEndDoctypeDeclHandler(XML_Parser parser, void *junk)
 {
     pyxml_UpdatePairedHandlers((xmlparseobject *)XML_GetUserData(parser),
                                StartDoctypeDecl, EndDoctypeDecl,

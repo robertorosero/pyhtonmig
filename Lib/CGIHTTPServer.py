@@ -41,6 +41,7 @@ class CGIHTTPRequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
     # Determine platform specifics
     have_fork = hasattr(os, 'fork')
     have_popen2 = hasattr(os, 'popen2')
+    have_popen3 = hasattr(os, 'popen3')
 
     # Make rfile unbuffered -- we need to read one line and then pass
     # the rest to a subprocess, so we can't use buffered input.
@@ -123,7 +124,7 @@ class CGIHTTPRequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
             return
         ispy = self.is_python(scriptname)
         if not ispy:
-            if not (self.have_fork or self.have_popen2):
+            if not (self.have_fork or self.have_popen2 or self.have_popen3):
                 self.send_error(403, "CGI script is not a Python script (%s)" %
                                 `scriptname`)
                 return
@@ -181,6 +182,7 @@ class CGIHTTPRequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
             for k in ('QUERY_STRING', 'REMOTE_HOST', 'CONTENT_LENGTH',
                       'HTTP_USER_AGENT', 'HTTP_COOKIE'):
                 env.setdefault(k, "")
+        os.environ.update(env)
 
         self.send_response(200, "Script output follows")
 
@@ -192,7 +194,6 @@ class CGIHTTPRequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
             if '=' not in decoded_query:
                 args.append(decoded_query)
             nobody = nobody_uid()
-            self.rfile.flush() # Always flush before forking
             self.wfile.flush() # Always flush before forking
             pid = os.fork()
             if pid != 0:
@@ -214,10 +215,13 @@ class CGIHTTPRequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
                 self.server.handle_error(self.request, self.client_address)
                 os._exit(127)
 
-        elif self.have_popen2:
-            # Windows -- use popen2 to create a subprocess
+        elif self.have_popen2 or self.have_popen3:
+            # Windows -- use popen2 or popen3 to create a subprocess
             import shutil
-            os.environ.update(env)
+            if self.have_popen3:
+                popenx = os.popen3
+            else:
+                popenx = os.popen2
             cmdline = scriptfile
             if self.is_python(scriptfile):
                 interp = sys.executable
@@ -232,12 +236,21 @@ class CGIHTTPRequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
                 nbytes = int(length)
             except:
                 nbytes = 0
-            fi, fo = os.popen2(cmdline, 'b')
+            files = popenx(cmdline, 'b')
+            fi = files[0]
+            fo = files[1]
+            if self.have_popen3:
+                fe = files[2]
             if self.command.lower() == "post" and nbytes > 0:
                 data = self.rfile.read(nbytes)
                 fi.write(data)
             fi.close()
             shutil.copyfileobj(fo, self.wfile)
+            if self.have_popen3:
+                errors = fe.read()
+                fe.close()
+                if errors:
+                    self.log_error('%s', errors)
             sts = fo.close()
             if sts:
                 self.log_error("CGI script exit status %#x", sts)
@@ -246,7 +259,6 @@ class CGIHTTPRequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
 
         else:
             # Other O.S. -- execute script in this process
-            os.environ.update(env)
             save_argv = sys.argv
             save_stdin = sys.stdin
             save_stdout = sys.stdout

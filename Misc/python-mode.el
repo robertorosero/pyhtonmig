@@ -184,8 +184,8 @@ indentation is used as a hint for this line's indentation.  Lines that
 begin with `py-block-comment-prefix' are ignored for indentation
 purposes.
 
-When not nil or t, comment lines that begin with a `#' are used as
-indentation hints, unless the comment character is in column zero."
+When not nil or t, comment lines that begin with a single `#' are used
+as indentation hints, unless the comment character is in column zero."
   :type '(choice
 	  (const :tag "Skip all comment lines (fast)" nil)
 	  (const :tag "Single # `sets' indentation for next line" t)
@@ -204,13 +204,14 @@ indentation hints, unless the comment character is in column zero."
     (or (funcall ok (getenv "TMPDIR"))
 	(funcall ok "/usr/tmp")
 	(funcall ok "/tmp")
+	(funcall ok "/var/tmp")
 	(funcall ok  ".")
 	(error
 	 "Couldn't find a usable temp directory -- set `py-temp-directory'")))
-  "*Directory used for temp files created by a *Python* process.
+  "*Directory used for temporary files created by a *Python* process.
 By default, the first directory from this list that exists and that you
-can write into:  the value (if any) of the environment variable TMPDIR,
-/usr/tmp, /tmp, or the current directory."
+can write into: the value (if any) of the environment variable TMPDIR,
+/usr/tmp, /tmp, /var/tmp, or the current directory."
   :type 'string
   :group 'python)
 
@@ -1902,7 +1903,11 @@ dedenting."
 			     (and (not (eq py-honor-comment-indentation t))
 				  (save-excursion
 				    (back-to-indentation)
-				    (not (zerop (current-column)))))
+				    (and (not (looking-at prefix-re))
+					 (or (looking-at "[^#]")
+					     (not (zerop (current-column)))
+					     ))
+				    ))
 			     ))
 	      )))
 	;; if we landed inside a string, go to the beginning of that

@@ -313,6 +313,7 @@ typedef struct Picklerobject {
     PyObject *inst_pers_func;
     int bin;
     int fast; /* Fast mode doesn't save in memo, don't use if circ ref */
+    int nesting;
     int (*write_func)(struct Picklerobject *, char *, int);
     char *write_buf;
     int buf_size;
@@ -321,7 +322,9 @@ typedef struct Picklerobject {
     PyObject *fast_memo;
 } Picklerobject;
 
-#define FAST_LIMIT 2000
+#ifndef PY_CPICKLE_FAST_LIMIT
+#define PY_CPICKLE_FAST_LIMIT 50
+#endif
 
 staticforward PyTypeObject Picklertype;
 
@@ -891,7 +894,7 @@ static int
 fast_save_enter(Picklerobject *self, PyObject *obj)
 {
     /* if fast_container < 0, we're doing an error exit. */
-    if (++self->fast_container >= FAST_LIMIT) {
+    if (++self->fast_container >= PY_CPICKLE_FAST_LIMIT) {
 	PyObject *key = NULL;
 	if (self->fast_memo == NULL) {
 	    self->fast_memo = PyDict_New();
@@ -921,7 +924,7 @@ fast_save_enter(Picklerobject *self, PyObject *obj)
 int 
 fast_save_leave(Picklerobject *self, PyObject *obj)
 {
-    if (self->fast_container-- >= FAST_LIMIT) {
+    if (self->fast_container-- >= PY_CPICKLE_FAST_LIMIT) {
 	PyObject *key = PyLong_FromVoidPtr(obj);
 	if (key == NULL)
 	    return 0;
@@ -1671,7 +1674,7 @@ finally:
 
 static int
 save_global(Picklerobject *self, PyObject *args, PyObject *name) {
-    PyObject *global_name = 0, *module = 0, *mod = 0, *moddict = 0, *klass = 0;
+    PyObject *global_name = 0, *module = 0, *mod = 0, *klass = 0;
     char *name_str, *module_str;
     int module_size, name_size, res = -1;
 
@@ -1704,8 +1707,7 @@ save_global(Picklerobject *self, PyObject *args, PyObject *name) {
 			  "OSS", args, module, global_name);
 	goto finally;
     }
-    moddict = PyModule_GetDict(mod);        /* borrowed ref */
-    klass = PyDict_GetItemString(moddict, name_str);        /* borrowed ref */
+    klass = PyObject_GetAttrString(mod, name_str);
     if (klass == NULL) {
 	cPickle_ErrFormat(PicklingError,
 			  "Can't pickle %s: it's not found as %s.%s",
@@ -1713,11 +1715,13 @@ save_global(Picklerobject *self, PyObject *args, PyObject *name) {
 	goto finally;
     }
     if (klass != args) {
+	Py_DECREF(klass);
 	cPickle_ErrFormat(PicklingError,
 			  "Can't pickle %s: it's not the same object as %s.%s",
 			  "OSS", args, module, global_name);
 	goto finally;
     }
+    Py_DECREF(klass);
 
     if ((*self->write_func)(self, &global, 1) < 0)
         goto finally;
@@ -1847,6 +1851,12 @@ save(Picklerobject *self, PyObject *args, int  pers_save) {
     PyObject *py_ob_id = 0, *__reduce__ = 0, *t = 0, *arg_tup = 0,
              *callable = 0, *state = 0;
     int res = -1, tmp, size;
+
+    if (self->nesting++ > Py_GetRecursionLimit()){
+	    PyErr_SetString(PyExc_RuntimeError,
+			    "maximum recursion depth exceeded");
+	    goto finally;
+    }
 
     if (!pers_save && self->pers_func) {
         if ((tmp = save_pers(self, args, self->pers_func)) != 0) {
@@ -1990,16 +2000,16 @@ save(Picklerobject *self, PyObject *args, int  pers_save) {
             }
     }
 
-    if (PyType_IsSubtype(type, &PyType_Type)) {
-	res = save_global(self, args, NULL);
-	goto finally;
-    }
-
     if (!pers_save && self->inst_pers_func) {
         if ((tmp = save_pers(self, args, self->inst_pers_func)) != 0) {
             res = tmp;
             goto finally;
         }
+    }
+
+    if (PyType_IsSubtype(type, &PyType_Type)) {
+	res = save_global(self, args, NULL);
+	goto finally;
     }
 
     if ((__reduce__ = PyDict_GetItem(dispatch_table, (PyObject *)type))) {
@@ -2066,6 +2076,7 @@ save(Picklerobject *self, PyObject *args, int  pers_save) {
     PyErr_SetObject(UnpickleableError, args);
 
 finally:
+    self->nesting--;
     Py_XDECREF(py_ob_id);
     Py_XDECREF(__reduce__);
     Py_XDECREF(t);
@@ -2285,6 +2296,7 @@ newPicklerobject(PyObject *file, int bin) {
     self->write_buf = NULL;
     self->bin = bin;
     self->fast = 0;
+    self->nesting = 0;
     self->fast_container = 0;
     self->fast_memo = NULL;
     self->buf_size = 0;

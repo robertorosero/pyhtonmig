@@ -416,7 +416,7 @@ class HTTPRedirectHandler(BaseHandler):
         # XXX Probably want to forget about the state of the current
         # request, although that might interact poorly with other
         # handlers that also use handler-specific request attributes
-        new = Request(newurl, req.get_data())
+        new = Request(newurl, req.get_data(), req.headers)
         new.error_302_dict = {}
         if hasattr(req, 'error_302_dict'):
             if len(req.error_302_dict)>10 or \
@@ -456,8 +456,11 @@ class ProxyHandler(BaseHandler):
         host, XXX = splithost(r_type)
         if '@' in host:
             user_pass, host = host.split('@', 1)
-            user_pass = base64.encodestring(unquote(user_pass)).strip()
-            req.add_header('Proxy-Authorization', 'Basic '+user_pass)
+            if ':' in user_pass:
+                user, password = user_pass.split(':', 1)
+                user_pass = base64.encodestring('%s:%s' % (unquote(user),
+                                                           unquote(password)))
+                req.add_header('Proxy-Authorization', 'Basic ' + user_pass)
         host = unquote(host)
         req.set_proxy(host, type)
         if orig_type == type:
@@ -762,7 +765,9 @@ class AbstractHTTPHandler(BaseHandler):
         except socket.error, err:
             raise URLError(err)
 
-        h.putheader('Host', host)
+        scheme, sel = splittype(req.get_selector())
+        sel_host, sel_path = splithost(sel)
+        h.putheader('Host', sel_host or host)
         for args in self.parent.addheaders:
             h.putheader(*args)
         for k, v in req.headers.items():
