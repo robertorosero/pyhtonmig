@@ -6,7 +6,7 @@
 
 staticforward int add_members(PyTypeObject *, struct memberlist *);
 
-struct memberlist type_members[] = {
+static struct memberlist type_members[] = {
 	{"__name__", T_STRING, offsetof(PyTypeObject, tp_name), READONLY},
 	{"__basicsize__", T_INT, offsetof(PyTypeObject,tp_basicsize),READONLY},
 	{"__itemsize__", T_INT, offsetof(PyTypeObject, tp_itemsize), READONLY},
@@ -224,10 +224,11 @@ conservative_merge(PyObject *left, PyObject *right)
 {
 	int left_size;
 	int right_size;
-	int i, j, r;
+	int i, j, r, ok;
 	PyObject *temp, *rr;
 
-	/* XXX add error checking */
+	assert(PyList_Check(left));
+	assert(PyList_Check(right));
 
   again:
 	left_size = PyList_GET_SIZE(left);
@@ -238,14 +239,30 @@ conservative_merge(PyObject *left, PyObject *right)
 			    PyList_GET_ITEM(right, j)) {
 				/* found a merge point */
 				temp = PyList_New(0);
+				if (temp == NULL)
+					return -1;
 				for (r = 0; r < j; r++) {
 					rr = PyList_GET_ITEM(right, r);
-					if (!PySequence_Contains(left, rr))
-						PyList_Append(temp, rr);
+					ok = PySequence_Contains(left, rr);
+					if (ok < 0) {
+						Py_DECREF(temp);
+						return -1;
+					}
+					if (!ok) {
+						ok = PyList_Append(temp, rr);
+						if (ok < 0) {
+							Py_DECREF(temp);
+							return -1;
+						}
+					}
 				}
-				PyList_SetSlice(left, i, i, temp);
+				ok = PyList_SetSlice(left, i, i, temp);
 				Py_DECREF(temp);
-				PyList_SetSlice(right, 0, j+1, NULL);
+				if (ok < 0)
+					return -1;
+				ok = PyList_SetSlice(right, 0, j+1, NULL);
+				if (ok < 0)
+					return -1;
 				goto again;
 			}
 		}
@@ -260,26 +277,20 @@ serious_order_disagreements(PyObject *left, PyObject *right)
 }
 
 static PyObject *
-method_resolution_order(PyTypeObject *type)
+mro_implementation(PyTypeObject *type)
 {
-	int i, n;
-	PyObject *bases;
-	PyObject *result;
-
-	/* XXX add error checking */
-
-	if (type->tp_mro != NULL)
-		return PySequence_List(type->tp_mro);
+	int i, n, ok;
+	PyObject *bases, *result;
 
 	bases = type->tp_bases;
-	if (bases == NULL || !PyTuple_Check(bases))
-		return NULL;
 	n = PyTuple_GET_SIZE(bases);
-	result = Py_BuildValue("[O]", type);
+	result = Py_BuildValue("[O]", (PyObject *)type);
+	if (result == NULL)
+		return NULL;
 	for (i = 0; i < n; i++) {
-		PyTypeObject *base = (PyTypeObject *)
-			PyTuple_GET_ITEM(bases, i);
-		PyObject *parentMRO = method_resolution_order(base);
+		PyTypeObject *base =
+			(PyTypeObject *) PyTuple_GET_ITEM(bases, i);
+		PyObject *parentMRO = PySequence_List(base->tp_mro);
 		if (parentMRO == NULL) {
 			Py_DECREF(result);
 			return NULL;
@@ -288,13 +299,49 @@ method_resolution_order(PyTypeObject *type)
 			Py_DECREF(result);
 			return NULL;
 		}
-		conservative_merge(result, parentMRO);
+		ok = conservative_merge(result, parentMRO);
 		Py_DECREF(parentMRO);
+		if (ok < 0) {
+			Py_DECREF(result);
+			return NULL;
+		}
 	}
-	if (result != NULL && type->tp_mro == NULL)
-		type->tp_mro = PySequence_Tuple(result);
 	return result;
 }
+
+static PyObject *
+mro_external(PyObject *self, PyObject *args)
+{
+	PyTypeObject *type = (PyTypeObject *)self;
+
+	if (!PyArg_ParseTuple(args, ""))
+		return NULL;
+	return mro_implementation(type);
+}
+
+static int
+mro_internal(PyTypeObject *type)
+{
+	PyObject *mro, *result, *tuple;
+
+	if (type->ob_type == &PyType_Type) {
+		result = mro_implementation(type);
+	}
+	else {
+		mro = PyObject_GetAttrString((PyObject *)type, "mro");
+		if (mro == NULL)
+			return -1;
+		result = PyObject_CallObject(mro, NULL);
+		Py_DECREF(mro);
+	}
+	if (result == NULL)
+		return -1;
+	tuple = PySequence_Tuple(result);
+	Py_DECREF(result);
+	type->tp_mro = tuple;
+	return 0;
+}
+
 
 /* Calculate the best base amongst multiple base classes.
    This is the first one that's on the path to the "solid base". */
@@ -706,6 +753,12 @@ type_dealloc(PyTypeObject *type)
 	type->ob_type->tp_free((PyObject *)type);
 }
 
+static PyMethodDef type_methods[] = {
+	{"mro", mro_external, METH_VARARGS,
+	 "mro() -> list\nreturn a type's method resolution order"},
+	{0}
+};
+
 static char type_doc[] =
 "type(object) -> the object's type\n"
 "type(name, bases, dict) -> a new type";
@@ -739,7 +792,7 @@ PyTypeObject PyType_Type = {
 	0,					/* tp_weaklistoffset */
 	0,					/* tp_iter */
 	0,					/* tp_iternext */
-	0,					/* tp_methods */
+	type_methods,				/* tp_methods */
 	type_members,				/* tp_members */
 	type_getsets,				/* tp_getset */
 	0,					/* tp_base */
@@ -1151,28 +1204,24 @@ PyType_InitDict(PyTypeObject *type)
 			return -1;
 	}
 
+	/* Temporarily make tp_dict the same object as tp_defined.
+	   (This is needed to call mro(), and can stay this way for
+	   dynamic types). */
+	Py_INCREF(type->tp_defined);
+	type->tp_dict = type->tp_defined;
+
 	/* Calculate method resolution order */
-	x = method_resolution_order(type);
-	if (x == NULL) {
-		if (!PyErr_Occurred())
-			PyErr_SetString(PyExc_TypeError,
-					"method resolution order failed");
+	if (mro_internal(type) < 0) {
 		return -1;
 	}
-	Py_DECREF(x);
 
-	/* Initialize tp_dict */
-	if (type->tp_flags & Py_TPFLAGS_DYNAMICTYPE) {
-		/* For a dynamic type. tp_dict *is* tp_defined */
-		Py_INCREF(type->tp_defined);
-		type->tp_dict = type->tp_defined;
-	}
-	else {
+	/* Initialize tp_dict properly */
+	if (!PyType_HasFeature(type, Py_TPFLAGS_DYNAMICTYPE)) {
 		/* For a static type, tp_dict is the consolidation
 		   of the tp_defined of its bases in MRO.  Earlier
 		   bases override later bases; since d.update() works
 		   the other way, we walk the MRO sequence backwards. */
-
+		Py_DECREF(type->tp_dict);
 		type->tp_dict = PyDict_New();
 		if (type->tp_dict == NULL)
 			return -1;
