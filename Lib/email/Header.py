@@ -25,6 +25,7 @@ except NameError:
 CRLFSPACE = '\r\n '
 CRLF = '\r\n'
 NL = '\n'
+SPACE = ' '
 SPACE8 = ' ' * 8
 EMPTYSTRING = ''
 
@@ -46,6 +47,13 @@ ecre = re.compile(r'''
   (?P<encoded>.*?)      # non-greedy up to the next ?= is the encoded string
   \?=                   # literal ?=
   ''', re.VERBOSE | re.IGNORECASE)
+
+pcre = re.compile('([,;])')
+
+# Field name regexp, including trailing colon, but not separating whitespace,
+# according to RFC 2822.  Character range is from tilde to exclamation mark.
+# For use with .match()
+fcre = re.compile(r'[\041-\176]+:$')
 
 
 
@@ -126,7 +134,8 @@ def make_header(decoded_seq, maxlinelen=None, header_name=None,
 
 
 class Header:
-    def __init__(self, s=None, charset=None, maxlinelen=None, header_name=None,
+    def __init__(self, s=None, charset=None,
+                 maxlinelen=None, header_name=None,
                  continuation_ws=' ', errors='strict'):
         """Create a MIME-compliant header that can contain many character sets.
 
@@ -253,7 +262,7 @@ class Header:
                     assert False, 'utf-8 conversion failed'
         self._chunks.append((s, charset))
 
-    def _split(self, s, charset, firstline=False):
+    def _split(self, s, charset, firstline, splitchars):
         # Split up a header safely for use with encode_chunks.
         splittable = charset.to_splittable(s)
         encoded = charset.from_splittable(splittable)
@@ -280,9 +289,8 @@ class Header:
         # For now, I can only imagine doing this when the charset is us-ascii,
         # although it's possible that other charsets may also benefit from the
         # higher-level syntactic breaks.
-        #
         elif charset == 'us-ascii':
-            return self._ascii_split(s, charset, firstline)
+            return self._split_ascii(s, charset, firstline, splitchars)
         # BAW: should we use encoded?
         elif elen == len(s):
             # We can split on _maxlinelen boundaries because we know that the
@@ -296,83 +304,19 @@ class Header:
             first = charset.from_splittable(splittable[:halfway], False)
             last = charset.from_splittable(splittable[halfway:], False)
         # Do the split
-        return self._split(first, charset, firstline) + \
-               self._split(last, charset)
+        return self._split(first, charset, firstline, splitchars) + \
+               self._split(last, charset, False, splitchars)
 
-    def _ascii_split(self, s, charset, firstline):
-        # Attempt to split the line at the highest-level syntactic break
-        # possible.  Note that we don't have a lot of smarts about field
-        # syntax; we just try to break on semi-colons, then whitespace.
-        rtn = []
-        lines = s.splitlines()
-        while lines:
-            line = lines.pop(0)
-            if firstline:
-                maxlinelen = self._firstlinelen
-                firstline = False
-            else:
-                #line = line.lstrip()
-                maxlinelen = self._maxlinelen
-            # Short lines can remain unchanged
-            if len(line.replace('\t', SPACE8)) <= maxlinelen:
-                rtn.append(line)
-            else:
-                oldlen = len(line)
-                # Try to break the line on semicolons, but if that doesn't
-                # work, try to split on folding whitespace.
-                while len(line) > maxlinelen:
-                    i = line.rfind(';', 0, maxlinelen)
-                    if i < 0:
-                        break
-                    rtn.append(line[:i] + ';')
-                    line = line[i+1:]
-                # Is the remaining stuff still longer than maxlinelen?
-                if len(line) <= maxlinelen:
-                    # Splitting on semis worked
-                    rtn.append(line)
-                    continue
-                # Splitting on semis didn't finish the job.  If it did any
-                # work at all, stick the remaining junk on the front of the
-                # `lines' sequence and let the next pass do its thing.
-                if len(line) <> oldlen:
-                    lines.insert(0, line)
-                    continue
-                # Otherwise, splitting on semis didn't help at all.
-                parts = re.split(r'(\s+)', line)
-                if len(parts) == 1 or (len(parts) == 3 and
-                                       parts[0].endswith(':')):
-                    # This line can't be split on whitespace.  There's now
-                    # little we can do to get this into maxlinelen.  BAW:
-                    # We're still potentially breaking the RFC by possibly
-                    # allowing lines longer than the absolute maximum of 998
-                    # characters.  For now, let it slide.
-                    #
-                    # len(parts) will be 1 if this line has no `Field: '
-                    # prefix, otherwise it will be len(3).
-                    rtn.append(line)
-                    continue
-                # There is whitespace we can split on.
-                first = parts.pop(0)
-                sublines = [first]
-                acc = len(first)
-                while parts:
-                    len0 = len(parts[0])
-                    len1 = len(parts[1])
-                    if acc + len0 + len1 <= maxlinelen:
-                        sublines.append(parts.pop(0))
-                        sublines.append(parts.pop(0))
-                        acc += len0 + len1
-                    else:
-                        # Split it here, but don't forget to ignore the
-                        # next whitespace-only part
-                        if first <> '':
-                            rtn.append(EMPTYSTRING.join(sublines))
-                        del parts[0]
-                        first = parts.pop(0)
-                        sublines = [first]
-                        acc = len(first)
-                rtn.append(EMPTYSTRING.join(sublines))
-        return [(chunk, charset) for chunk in rtn]
+    def _split_ascii(self, s, charset, firstline, splitchars):
+        if firstline:
+            firstlen = self._firstlinelen
+            restlen = self._maxlinelen
+        else:
+            firstlen = restlen = self._maxlinelen
+        line = _split_ascii(s, firstlen, restlen,
+                            self._continuation_ws, splitchars)
+        lines = line.splitlines()
+        return zip(lines, [charset]*len(lines))
 
     def _encode_chunks(self, newchunks):
         # MIME-encode a header with many different charsets and/or encodings.
@@ -396,15 +340,14 @@ class Header:
         chunks = []
         for header, charset in newchunks:
             if charset is None or charset.header_encoding is None:
-                # There's no encoding for this chunk's charsets
-                _max_append(chunks, header, self._maxlinelen)
+                s = header
             else:
-                _max_append(chunks, charset.header_encode(header),
-                            self._maxlinelen, ' ')
+                s = charset.header_encode(header)
+            _max_append(chunks, s, self._maxlinelen, ' ')
         joiner = NL + self._continuation_ws
         return joiner.join(chunks)
 
-    def encode(self):
+    def encode(self, splitchars=';, '):
         """Encode a message header into an RFC-compliant format.
 
         There are many issues involved in converting a given string for use in
@@ -421,8 +364,71 @@ class Header:
 
         If the given charset is not known or an error occurs during
         conversion, this function will return the header untouched.
+
+        Optional splitchars is a string containing characters to split long
+        ASCII lines on, in rough support of RFC 2822's `highest level
+        syntactic breaks'.  This doesn't affect RFC 2047 encoded lines.
         """
         newchunks = []
         for s, charset in self._chunks:
-            newchunks += self._split(s, charset, True)
+            newchunks += self._split(s, charset, True, splitchars)
         return self._encode_chunks(newchunks)
+
+
+
+def _split_ascii(s, firstlen, restlen, continuation_ws, splitchars):
+    lines = []
+    maxlen = firstlen
+    for line in s.splitlines():
+        if len(line) < maxlen:
+            lines.append(line)
+            maxlen = restlen
+            continue
+        # Attempt to split the line at the highest-level syntactic break
+        # possible.  Note that we don't have a lot of smarts about field
+        # syntax; we just try to break on semi-colons, then commas, then
+        # whitespace.
+        for ch in splitchars:
+            if line.find(ch) >= 0:
+                break
+        else:
+            # There's nothing useful to split the line on, not even spaces, so
+            # just append this line unchanged
+            lines.append(line)
+            maxlen = restlen
+            continue
+        # Now split the line on the character plus trailing whitespace
+        cre = re.compile(r'%s\s*' % ch)
+        if ch in ';,':
+            eol = ch
+        else:
+            eol = ''
+        joiner = eol + ' '
+        joinlen = len(joiner)
+        wslen = len(continuation_ws.replace('\t', SPACE8))
+        this = []
+        linelen = 0
+        for part in cre.split(line):
+            curlen = linelen + max(0, len(this)-1) * joinlen
+            partlen = len(part)
+            onfirstline = not lines
+            # We don't want to split after the field name, if we're on the
+            # first line and the field name is present in the header string.
+            if ch == ' ' and onfirstline and \
+                   len(this) == 1 and fcre.match(this[0]):
+                this.append(part)
+                linelen += partlen
+            elif curlen + partlen > maxlen:
+                if this:
+                    lines.append(joiner.join(this) + eol)
+                this = [part]
+                linelen = wslen + partlen
+                maxlen = restlen
+            else:
+                this.append(part)
+                linelen += partlen
+        # Put any left over parts on a line by themselves
+        if this:
+            lines.append(joiner.join(this))
+    linejoiner = '\n' + continuation_ws
+    return linejoiner.join(lines)
