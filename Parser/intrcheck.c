@@ -24,13 +24,13 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 /* Check for interrupts */
 
-#ifdef HAVE_CONFIG_H
-#include "config.h"
-#endif
-
 #ifdef THINK_C
 #include <MacHeaders>
 #define macintosh
+#endif
+
+#ifdef HAVE_CONFIG_H
+#include "config.h"
 #endif
 
 #include "myproto.h"
