@@ -32,8 +32,7 @@ distribution when I'm fed up with it. They were last updated for 2.3a1.
   Only the :Lib:plat-xxxx should be missing. Otherwise go back to Installer Vise and
   add the missing stuff. Make sure of all settings for the new files (esp. "where"
   and "gestalt" are easy to miss).
-- test on virgin systems (OSX, OS9, OS8 without Carbon). Make sure to test
-  tkinter too.
+- test on virgin systems (both OS9 and OSX). 
 - Remove the local installation so you don't get confused by it.
 - checkin everything except PythonX.Y.vct.
 - mkdistr src.include
