@@ -714,7 +714,7 @@ compiler_function(struct compiler *c, stmt_ty s)
 
 	/* XXX closure */
 	ADDOP_O(c, LOAD_CONST, (PyObject *)co, consts);
-	ADDOP_I(c, MAKE_FUNCTION, c->u->u_argcount);
+	ADDOP_I(c, MAKE_FUNCTION, asdl_seq_LEN(args->defaults));
 	if (!compiler_nameop(c, s->v.FunctionDef.name, Store))
 		return 0;
 
