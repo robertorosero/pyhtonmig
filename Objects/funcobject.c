@@ -378,7 +378,7 @@ PyTypeObject PyFunction_Type = {
 /* Class method object */
 
 typedef struct {
-	PyObject_HEAD;
+	PyObject_HEAD
 	PyObject *cm_callable;
 } classmethod;
 
