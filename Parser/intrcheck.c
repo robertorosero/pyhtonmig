@@ -228,10 +228,3 @@ intrcheck()
 }
 
 #endif /* !OK */
-
-/* ARGSUSED */
-int
-sigcheck()
-{
-	return intrcheck();
-}
