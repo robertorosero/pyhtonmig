@@ -268,7 +268,16 @@ Merge details (this section is Tim's scratchpad, but should help a lot if
 he dies of frustration while wrestling with CVS <0.9 wink>).
 
 ----------------------------------------------------------------------------
-2001-07-07  building 2.2a1 release, from descr-branch
+2001-07-18  2.2a1 releaase
+
+Immediately after the merge just below, I tagged descr-branch via
+
+    cvs tag r22a1-branch descr
+
+Guido may or may not want to add another tag here (? maybe he wants to do
+some more Unix fiddling first).
+----------------------------------------------------------------------------
+2001-07-17  building 2.2a1 release, from descr-branch
 
 Tagged trunk about 22:00 EDT, like so:
     cvs tag date2001-07-17b python
