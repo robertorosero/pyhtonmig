@@ -150,14 +150,22 @@ tb_store(v)
 }
 
 static void
-tb_displayline(f, filename, lineno)
+tb_displayline(f, filename, lineno, name)
 	object *f;
 	char *filename;
 	int lineno;
+	char *name;
 {
 	FILE *xfp;
 	char linebuf[1000];
 	int i;
+#ifdef MPW
+	/* This is needed by MPW's File and Line commands */
+	static char *sep = ";";
+#else
+	/* This is needed by Emacs' compile command */
+	static char *sep = ",";
+#endif
 	xfp = fopen(filename, "r");
 	if (xfp == NULL) {
 		/* Search tail of filename in sys.path before giving up */
@@ -189,16 +197,8 @@ tb_displayline(f, filename, lineno)
 			}
 		}
 	}
-	sprintf(linebuf, "  File \"%.900s\"%s line %d\n",
-		filename,
-#ifdef applec /* MPW */
-		/* This is needed by MPW's File and Line commands */
-		";",
-#else
-		/* This is needed by Emacs' compile command */
-		",",
-#endif
-		lineno);
+	sprintf(linebuf, "  File \"%.900s\"%s line %d%s in %s\n",
+		filename, sep, lineno, sep, name);
 	writestring(linebuf, f);
 	if (xfp == NULL)
 		return;
@@ -234,7 +234,8 @@ tb_printinternal(tb, f, limit)
 		if (depth <= limit)
 			tb_displayline(f,
 			    getstringvalue(tb->tb_frame->f_code->co_filename),
-			    tb->tb_lineno);
+			    tb->tb_lineno,
+			    getstringvalue(tb->tb_frame->f_code->co_name));
 		depth--;
 		tb = tb->tb_next;
 	}
