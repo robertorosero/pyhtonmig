@@ -44,6 +44,10 @@ There are many new modules (including brand new XML support through
 the xml package, and i18n support through the gettext module); a list
 of all new modules is included below.  Lots of bugs have been fixed.
 
+The process for making major new changes to the language has changed
+since Python 1.6.  Enhancements must now be documented by a Python
+Enhancement Proposal (PEP) before they can be accepted.
+
 There are several important syntax enhancements, described in more
 detail below:
 
@@ -59,6 +63,21 @@ Other important changes:
 
   - Optional collection of cyclical garbage
 
+Python Enhancement Proposal (PEP)
+---------------------------------
+
+PEP stands for Python Enhancement Proposal.  A PEP is a design
+document providing information to the Python community, or describing
+a new feature for Python.  The PEP should provide a concise technical
+specification of the feature and a rationale for the feature.
+
+We intend PEPs to be the primary mechanisms for proposing new
+features, for collecting community input on an issue, and for
+documenting the design decisions that have gone into Python.  The PEP
+author is responsible for building consensus within the community and
+documenting dissenting opinions.
+
+The PEPs are available at http://python.sourceforge.net/peps/.
 
 Augmented Assignment
 --------------------
@@ -127,7 +146,7 @@ This prints
     [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
 
 List comprehensions originated as a patch set from Greg Ewing; Skip
-Montanaro and Thomas Wouters also contributed.
+Montanaro and Thomas Wouters also contributed.  Described by PEP 202.
 
 
 Extended Import Statement
@@ -157,7 +176,7 @@ Note that 'as' is not a new keyword -- it is recognized only in this
 context (this is only possible because the syntax for the import
 statement doesn't involve expressions).
 
-Implemented by Thomas Wouters.
+Implemented by Thomas Wouters.  Described by PEP 221.
 
 
 Extended Print Statement
@@ -181,7 +200,7 @@ is equivalent to
 
     print "Hello world"
 
-Design and implementation by Barry Warsaw.
+Design and implementation by Barry Warsaw.  Described by PEP 214.
 
 
 Optional Collection of Cyclical Garbage
@@ -211,7 +230,7 @@ A new function zip() was added.  zip(seq1, seq2, ...) is equivalent to
 map(None, seq1, seq2, ...) when the sequences have the same length;
 i.e. zip([1,2,3], [10,20,30]) returns [(1,10), (2,20), (3,30)].  When
 the lists are not all the same length, the shortest list wins:
-zip([1,2,3], [10,20]) returns [(1,10), (2,20)].
+zip([1,2,3], [10,20]) returns [(1,10), (2,20)].  See PEP 201.
 
 sys.version_info is a tuple (major, minor, micro, level, serial).
 
@@ -227,6 +246,28 @@ does the same work as this common idiom:
         dict[key] = []
     dict[key].append(item)
 
+There are two new variants of SyntaxError that are raised for
+indentation-related errors: IndentationError and TabError.
+
+Changed \x to consume exactly two hex digits; see PEP 223.  Added \U
+escape that consumes exactly eight hex digits.
+
+The limits on the size of expressions and file in Python source code
+have been raised from 2**16 to 2**32.  Previous versions of Python
+were limited because the maximum argument size the Python VM accepted
+was 2**16.  This limited the size of object constructor expressions,
+e.g. [1,2,3] or {'a':1, 'b':2}, and the size of source files.  This
+limit was raised thanks to a patch by Charles Waldman that effectively
+fixes the problem.  It is now much more likely that you will be
+limited by available memory than by an arbitrary limit in Python.
+
+The interpreter's maximum recursion depth can be modified by Python
+programs using sys.getrecursionlimit and sys.setrecursionlimit.  This
+limit is the maximum number of recursive calls that can be made by
+Python code.  The limit exists to prevent infinite recursion from
+overflowing the C stack and causing a core dump.  The default value is
+1000.  The maximum safe value for a particular platform can be found
+by running Misc/find_recursionlimit.py.
 
 New Modules and Packages
 ------------------------
@@ -252,15 +293,67 @@ webbrowser - a platform-independent API to launch a web browser.
 Changed Modules
 ---------------
 
-ftplib - ntransfercmd(), transfercmd(), and retrbinary() all now
+array -- new methods for array objects: count, extend, index, pop, and
+remove
+
+binascii -- new functions b2a_hex and a2b_hex that convert between
+binary data and its hex representation
+
+calendar -- Many new functions that support features including control
+over which day of the week is the first day, returning strings instead
+of printing them.  Also new symbolic constants for days of week,
+e.g. MONDAY, ..., SUNDAY.
+
+cgi -- FieldStorage objects have a getvalue method that works like a
+dictionary's get method and returns the value attribute of the object.
+
+ConfigParser -- The parser object has new methods has_option,
+remove_section, remove_option, set, and write.  They allow the module
+to be used for writing config files as well as reading them.
+
+ftplib -- ntransfercmd(), transfercmd(), and retrbinary() all now
 optionally support the RFC 959 REST command.
 
-socket - new function getfqdn()
+gzip -- readline and readlines now accept optional size arguments
 
-readline - new functions to read, write and truncate history files.  The
-readline section of the library reference manual contains an example.
+httplib -- New interfaces and support for HTTP/1.1 by Greg Stein.  See
+the module doc strings for details.
 
-XXX: I'm sure there are others
+locale -- implement getdefaultlocale for Win32 and Macintosh
+
+marshal -- no longer dumps core when marshaling deeply nested or
+recursive data structures
+
+os -- new functions isatty, seteuid, setegid, setreuid, setregid
+
+os/popen2 -- popen2/popen3/popen4 support under Windows.  popen2/popen3
+support under Unix.
+
+os/pty -- support for openpty and forkpty
+
+os.path -- fix semantics of os.path.commonprefix
+
+smtplib -- support for sending very long messages
+
+socket -- new function getfqdn()
+
+readline -- new functions to read, write and truncate history files.
+The readline section of the library reference manual contains an
+example.
+
+select -- add interface to poll system call
+
+shutil -- new copyfileobj function
+
+SimpleHTTPServer, CGIHTTPServer -- Fix problems with buffering in the
+HTTP server.
+
+Tkinter -- optimization of function flatten
+
+urllib -- scans environment variables for proxy configuration,
+e.g. http_proxy.
+
+whichdb -- recognizes dumbdbm format
 
 
 Obsolete Modules
@@ -274,7 +367,7 @@ poly, zmod, strop, util, whatsound.
 Changed, New, Obsolete Tools
 ----------------------------
 
-XXX: are there any?  If not, say "None" here.
+None.
 
 
 C-level Changes
@@ -292,10 +385,68 @@ of header files.  (Few of these ever need to be included explicitly;
 they are all included by Python.h.)
 
 Trent Mick ensured portability to 64-bit platforms, under both Linux
-and Win64, especially for the new Intel Itanium processor.
+and Win64, especially for the new Intel Itanium processor.  Mick also
+added large file support for Linux64 and Win64.
 
-Numerous new APIs were added, e.g.
+The C APIs to return an object's size have been update to consistently
+use the form PyXXX_Size, e.g. PySequence_Size and PyDict_Size.  In
+previous versions, the abstract interfaces used PyXXX_Length and the
+concrete interfaces used PyXXX_Size.  The old names,
+e.g. PyObject_Length, are still available for backwards compatibility
+at the API level, but are deprecated.
 
-	XXX: Fill this out.
+The PyOS_CheckStack function has been implemented on Windows by
+Fredrik Lundh.  It prevents Python from failing with a stack overflow
+on Windows.
+
+The GC changes resulted in creation of two new slots on object,
+tp_traverse and tp_clear.  The augmented assignment changes result in
+the createion of a new slot for each in-place operator.
+
+The GC API creates new requirements for container types implemented in
+C extesion modules.  See Include/objimpl.h for details.
+
+PyErr_Format has been updated to automatically calculate the size of
+the buffer needed to hold the formatted result string.  This change
+prevents crashes caused by programmer error.
+
+New C API calls: PyObject_AsFileDescriptor, PyErr_WriteUnraisable.
+
+PyRun_AnyFileEx, PyRun_SimpleFileEx, PyRun_FileEx -- New functions
+that are the same as their non-Ex counterparts except they take an
+extra flag argument that tells them to close the file when done.
+
+XXX There were other API changes that should be fleshed out here.
+
+
+Windows Changes
+---------------
+
+New popen2/popen3/peopen4 in os module (see Changed Modules above).
+
+os.popen is much more usable on Windows 95 and 98.  See Microsoft
+Knowledge Base article Q150956.  The Win9x workaround described there
+is implemented by the new w9xpopen.exe helper in the root of your
+Python installation.  Note that Python uses this internally; it is not
+a standalone program.
+
+Administrator privileges are no longer required to install Python
+on Windows NT or Windows 2000.  If you have administrator privileges,
+Python's registry info will be written under HKEY_LOCAL_MACHINE.
+Otherwise the installer backs off to writing Python's registry info
+under HKEY_CURRENT_USER.  The latter is sufficent for all "normal"
+uses of Python, but will prevent some advanced uses from working
+(for example, running a Python script as an NT service, or possibly
+from CGI).
+
+[This was new in 1.6] The installer no longer runs a separate Tcl/Tk
+installer; instead, it installs the needed Tcl/Tk files directly in the
+Python directory.  If you already have a Tcl/Tk installation, this
+wastes some disk space (about 4 Megs) but avoids problems with
+conflicting Tcl/Tk installations, and makes it much easier for Python
+to ensure that Tcl/Tk can find all its files.
+
+[This was new in 1.6] The Windows installer now installs by default in
+\Python20\ on the default volume, instead of \Program Files\Python-2.0\.
 
 ======================================================================
