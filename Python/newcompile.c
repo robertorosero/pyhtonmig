@@ -364,7 +364,7 @@ compiler_mod(struct compiler *c, mod_ty mod)
 		break;
 	case Interactive_kind:
 		c->c_interactive = 1;
-		VISIT(c, stmt, mod->v.Interactive.body);
+		VISIT_SEQ(c, stmt, mod->v.Interactive.body);
 		break;
 	case Expression_kind:
 		VISIT(c, expr, mod->v.Expression.body);

@@ -207,14 +207,18 @@ PySymtable_Build(mod_ty mod, const char *filename, PyFutureFeatures *future)
 				goto error;
 		break;
 	}
-	case Expression_kind:
+	case Expression_kind: 
 		if (!symtable_visit_expr(st, mod->v.Expression.body))
 			goto error;
 		break;
-	case Interactive_kind:
-		if (!symtable_visit_stmt(st, mod->v.Interactive.body)) 
-			goto error;
+	case Interactive_kind: {
+		int i;
+		asdl_seq *seq = mod->v.Interactive.body;
+		for (i = 0; i < asdl_seq_LEN(seq); i++)
+			if (!symtable_visit_stmt(st, asdl_seq_GET(seq, i)))
+				goto error;
 		break;
+	}
 	case Suite_kind:
 		PyErr_SetString(PyExc_RuntimeError,
 				"this compiler does not handle Suites");
