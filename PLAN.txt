@@ -268,6 +268,11 @@ Merge details (this section is Tim's scratchpad, but should help a lot if
 he dies of frustration while wrestling with CVS <0.9 wink>).
 
 ----------------------------------------------------------------------------
+2001-07-19
+
+Removed the r22a1-branch tag (see next entry).  Turns out Guido did add a
+r22a1 tag, so the r22a1-branch tag served no point anymore.
+----------------------------------------------------------------------------
 2001-07-18  2.2a1 releaase
 
 Immediately after the merge just below, I tagged descr-branch via
