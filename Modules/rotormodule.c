@@ -486,7 +486,7 @@ static unsigned char RTR_e_char(r, p)
 		}
 	} else {
 		while (i < r->rotors) {
-			tp = r->e_rotor[(i*r->size)+(((r->positions[i] ^ tp) % r->size))];
+			tp = r->e_rotor[(i*r->size)+(((r->positions[i] ^ tp) % (unsigned int) r->size))];
 			i++;
 		}
 	}
@@ -525,7 +525,7 @@ static unsigned char RTR_d_char(r, c)
 		}
 	} else {
 		while (0 <= i) {
-			tc = (r->positions[i] ^ r->d_rotor[(i*r->size)+tc]) % r->size;
+			tc = (r->positions[i] ^ r->d_rotor[(i*r->size)+tc]) % (unsigned int) r->size;
 			i--;
 		}
 	}
