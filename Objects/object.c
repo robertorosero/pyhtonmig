@@ -32,7 +32,7 @@ dump_counts(void)
 
 	for (tp = type_list; tp; tp = tp->tp_next)
 		fprintf(stderr, "%s alloc'd: %d, freed: %d, max in use: %d\n",
-			tp->tp_name, tp->tp_alloc, tp->tp_free,
+			tp->tp_name, tp->tp_allocs, tp->tp_free,
 			tp->tp_maxalloc);
 	fprintf(stderr, "fast tuple allocs: %d, empty: %d\n",
 		fast_tuple_allocs, tuple_zero_allocs);
@@ -53,7 +53,7 @@ get_counts(void)
 	if (result == NULL)
 		return NULL;
 	for (tp = type_list; tp; tp = tp->tp_next) {
-		v = Py_BuildValue("(siii)", tp->tp_name, tp->tp_alloc,
+		v = Py_BuildValue("(siii)", tp->tp_name, tp->tp_allocs,
 				  tp->tp_free, tp->tp_maxalloc);
 		if (v == NULL) {
 			Py_DECREF(result);
@@ -72,16 +72,16 @@ get_counts(void)
 void
 inc_count(PyTypeObject *tp)
 {
-	if (tp->tp_alloc == 0) {
+	if (tp->tp_allocs == 0) {
 		/* first time; insert in linked list */
 		if (tp->tp_next != NULL) /* sanity check */
 			Py_FatalError("XXX inc_count sanity check");
 		tp->tp_next = type_list;
 		type_list = tp;
 	}
-	tp->tp_alloc++;
-	if (tp->tp_alloc - tp->tp_free > tp->tp_maxalloc)
-		tp->tp_maxalloc = tp->tp_alloc - tp->tp_free;
+	tp->tp_allocs++;
+	if (tp->tp_allocs - tp->tp_free > tp->tp_maxalloc)
+		tp->tp_maxalloc = tp->tp_allocs - tp->tp_free;
 }
 #endif
 

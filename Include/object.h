@@ -277,7 +277,7 @@ typedef struct _typeobject {
 
 #ifdef COUNT_ALLOCS
 	/* these must be last and never explicitly initialized */
-	int tp_alloc;
+	int tp_allocs;
 	int tp_free;
 	int tp_maxalloc;
 	struct _typeobject *tp_next;

@@ -559,7 +559,7 @@ instance_dealloc(register PyInstanceObject *inst)
 	/* compensate for boost in _Py_NewReference; note that
 	 * _Py_RefTotal was also boosted; we'll knock that down later.
 	 */
-	inst->ob_type->tp_alloc--;
+	inst->ob_type->tp_allocs--;
 #endif
 #else /* !Py_TRACE_REFS */
 	/* Py_INCREF boosts _Py_RefTotal if Py_REF_DEBUG is defined */
