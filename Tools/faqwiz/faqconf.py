@@ -21,7 +21,7 @@ OWNERNAME = "GvR"			# Name for feedback
 OWNEREMAIL = "guido@python.org"		# Email for feedback
 HOMEURL = "http://www.python.org"	# Related home page
 HOMENAME = "Python home"		# Name of related home page
-RCSBINDIR = "/usr/local/bin/"		# Directory containing RCS commands
+RCSBINDIR = "/depot/gnu/plat/bin/"	# Directory containing RCS commands
 					# (must end in a slash)
 
 # Parameters you can normally leave alone
@@ -29,9 +29,6 @@ RCSBINDIR = "/usr/local/bin/"		# Directory containing RCS commands
 MAXHITS = 10				# Max #hits to be shown directly
 COOKIE_LIFETIME = 28*24*3600		# Cookie expiration in seconds
 					# (28*24*3600 = 28 days = 4 weeks)
-PROCESS_PREFORMAT = 1                   # toggle whether preformatted text
-                                        # will replace urls and emails with 
-                                        # HTML links
 
 # Markers appended to title to indicate recently change
 # (may contain HTML, e.g. <IMG>); and corresponding 
@@ -49,7 +46,7 @@ entries marked with * were changed within the last 7 days.)
 
 # Version -- don't change unless you edit faqwiz.py
 
-WIZVERSION = "1.0.3"			# FAQ Wizard version
+WIZVERSION = "0.6"			# FAQ Wizard version
 
 # This parameter is normally overwritten with a dynamic value
 
@@ -58,12 +55,12 @@ import os, sys
 FAQCGI = os.path.basename(sys.argv[0]) or FAQCGI
 del os, sys
 
-# Perl (re module) style regular expression to recognize FAQ entry
-# files: group(1) should be the section number, group(2) should be the
-# question number.  Both should be fixed width so simple-minded
-# sorting yields the right order.
+# Regular expression to recognize FAQ entry files: group(1) should be
+# the section number, group(2) should be the question number.  Both
+# should be fixed width so simple-minded sorting yields the right
+# order.
 
-OKFILENAME = r"^faq(\d\d)\.(\d\d\d)\.htp$"
+OKFILENAME = "^faq\([0-9][0-9]\)\.\([0-9][0-9][0-9]\)\.htp$"
 
 # Format to construct a FAQ entry file name
 
@@ -314,8 +311,6 @@ LAST_CHANGED = "Last changed on %c %Z"
 # "Compat" command prologue (this has no <BODY> tag)
 COMPAT = """
 <H1>The whole %(FAQNAME)s</H1>
-See also the <A HREF="%(FAQCGI)s?req=home">%(FAQNAME)s Wizard</A>.
-<P>
 """
 
 # Editing
@@ -369,13 +364,9 @@ Click this button to commit your changes.
 <HR>
 """
 
-NOCOMMIT_HEAD = """
-To commit your changes, please correct the following errors in the
-form below and click the Preview Edit button.
-<UL>
-"""
-NOCOMMIT_TAIL = """
-</UL>
+NOCOMMIT = """
+To commit your changes, please enter a log message, your name, email
+addres, and the correct password in the form below.
 <HR>
 """
 
@@ -383,7 +374,7 @@ CANTCOMMIT_HEAD = """
 Some required information is missing:
 <UL>
 """
-NEED_PASSWD = "<LI>You must provide the correct password.\n"
+NEED_PASSWD = "<LI>You must provide the correct passwd.\n"
 NEED_AUTHOR = "<LI>You must enter your name.\n"
 NEED_EMAIL = "<LI>You must enter your email address.\n"
 NEED_LOG = "<LI>You must enter a log message.\n"
@@ -459,7 +450,7 @@ Your changes have been committed.
 """
 
 COMMITFAILED = """
-Exit status %(sts)s.
+Exit status %(sts)04x.
 """
 
 # Add/Delete
@@ -479,10 +470,6 @@ ADD_SECTION = """\
 
 ADD_TAIL = """
 </UL>
-"""
-
-ROULETTE = """
-<P>Hit your browser's Reload button to play again.<P>
 """
 
 DELETE = """
