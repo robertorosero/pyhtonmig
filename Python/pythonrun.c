@@ -3,6 +3,7 @@
 
 #include "Python.h"
 
+#include "Python-ast.h"
 #include "grammar.h"
 #include "node.h"
 #include "token.h"
@@ -10,6 +11,7 @@
 #include "errcode.h"
 #include "compile.h"
 #include "symtable.h"
+#include "ast.h"
 #include "eval.h"
 #include "marshal.h"
 
@@ -1153,6 +1155,32 @@ Py_SymtableString(char *str, char *filename, int start)
 	st = PyNode_CompileSymtable(n, filename);
 	PyNode_Free(n);
 	return st;
+}
+
+/* Preferred access to parser is through AST. */
+mod_ty
+PyParser_ASTFromString(char *s, char *filename, grammar *g, int start, 
+		       perrdetail *err_ret, int flags)
+{
+	node *n;
+	n = PyParser_ParseStringFlags(s, g, start, err_ret, flags);
+	if (n)
+		return PyAST_FromNode(n);
+	else
+		return NULL;
+}
+
+mod_ty
+PyParser_ASTFromFile(FILE *fp, char *filename, grammar *g, int start, 
+		     char *ps1, char *ps2, perrdetail *err_ret, int flags)
+{
+	node *n;
+	n = PyParser_ParseFileFlags(fp, filename, g, start, ps1, ps2,
+				    err_ret, flags);
+	if (n)
+		return PyAST_FromNode(n);
+	else
+		return NULL;
 }
 
 /* Simplified interface to parsefile -- return node or set exception */

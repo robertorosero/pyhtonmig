@@ -32,6 +32,11 @@ extern DL_IMPORT(node *) PyParser_ParseFileFlags(FILE *, char *, grammar *,
 						 int, char *, char *,
 						 perrdetail *, int);
 
+extern DL_IMPORT(mod_ty) PyParser_ASTFromString(char *, char *, grammar *, 
+						int, perrdetail *, int);
+extern DL_IMPORT(mod_ty) PyParser_ASTFromFile(FILE *, char *, grammar *,
+					      int, char *, char *,
+					      perrdetail *, int);
 #ifdef __cplusplus
 }
 #endif
