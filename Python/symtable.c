@@ -335,7 +335,7 @@ PyST_GetScope(PySTEntryObject *ste, PyObject *name)
    so that y is a global
 */
 
-int 
+static int 
 analyze_name(PyObject *dict, PyObject *name, int flags, PyObject *bound,
 	     PyObject *local, PyObject *free, int nested)
 {
@@ -407,7 +407,7 @@ analyze_cells(PyObject *scope, PyObject *free)
 }
 
 /* Enter the final scope information into the st_symbols dict. */
-int
+static int
 update_symbols(PyObject *symbols, PyObject *scope)
 {
 	PyObject *name, *v, *u, *w;
@@ -430,7 +430,7 @@ update_symbols(PyObject *symbols, PyObject *scope)
 	return 1;
 }   
 
-int
+static int
 analyze_block(PySTEntryObject *ste, PyObject *bound, PyObject *free)
 {
 	PyObject *name, *v, *local = NULL, *scope = NULL, *newbound = NULL;
@@ -486,7 +486,7 @@ analyze_block(PySTEntryObject *ste, PyObject *bound, PyObject *free)
 	return success;
 }
 
-int
+static int
 symtable_analyze(struct symtable *st)
 {
 	PyObject *free;
@@ -528,8 +528,7 @@ symtable_enter_block(struct symtable *st, identifier name, block_ty block,
 {
 	PySTEntryObject *prev = NULL;
 
-	fprintf(stderr, "enter block %s %d\n",
-		PyString_AS_STRING(name), lineno);
+	// fprintf(stderr, "enter block %s %d\n", PyString_AS_STRING(name), lineno);
 
 	if (st->st_cur) {
 		prev = st->st_cur;
@@ -858,12 +857,13 @@ symtable_visit_params(struct symtable *st, asdl_seq *args, int toplevel)
 	for (i = 0; i < asdl_seq_LEN(args); i++) {
 		expr_ty arg = asdl_seq_GET(args, i);
 		if (arg->kind == Name_kind) {
-			assert(arg->v.Name.ctx == Param);
+			assert(arg->v.Name.ctx == Param ||
+                               arg->v.Name.ctx == Store);
 			if (!symtable_add_def(st, arg->v.Name.id, DEF_PARAM))
 				return 0;
 		}
 		else if (arg->kind == Tuple_kind) {
-			assert(arg->v.Tuple.ctx == Load);
+			assert(arg->v.Tuple.ctx == Store);
 			if (toplevel) {
 				if (!symtable_implicit_arg(st, i))
 					return 0;
