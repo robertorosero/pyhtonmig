@@ -1621,6 +1621,39 @@ compiler_compare(struct compiler *c, expr_ty e)
 }
 
 static int
+compiler_call(struct compiler *c, expr_ty e)
+{
+	int n, code = 0;
+
+	VISIT(c, expr, e->v.Call.func);
+	n = asdl_seq_LEN(e->v.Call.args);
+	if (e->v.Call.starargs) {
+		VISIT(c, expr, e->v.Call.starargs);
+		code |= 1;
+	}
+	if (e->v.Call.kwargs) {
+		VISIT(c, expr, e->v.Call.kwargs);
+		code |= 2;
+	}
+	VISIT_SEQ(c, expr, e->v.Call.args);
+	switch (code) {
+	case 0:
+		ADDOP_I(c, CALL_FUNCTION, n);
+		break;
+	case 1:
+		ADDOP_I(c, CALL_FUNCTION_VAR, n);
+		break;
+	case 2:
+		ADDOP_I(c, CALL_FUNCTION_KW, n);
+		break;
+	case 3:
+		ADDOP_I(c, CALL_FUNCTION_VAR_KW, n);
+		break;
+	}
+	return 1;
+}
+
+static int
 compiler_listcomp_generator(struct compiler *c, listcomp_ty l, expr_ty elt)
 {
 	/* generate code for the iterator, then each of the ifs,
@@ -1738,12 +1771,7 @@ compiler_visit_expr(struct compiler *c, expr_ty e)
         case Compare_kind:
 		return compiler_compare(c, e);
         case Call_kind:
-		VISIT(c, expr, e->v.Call.func);
-		n = asdl_seq_LEN(e->v.Call.args);
-		/* XXX other args */
-		VISIT_SEQ(c, expr, e->v.Call.args);
-		ADDOP_I(c, CALL_FUNCTION, n);
-		break;
+		return compiler_call(c, e);
         case Repr_kind:
 		VISIT(c, expr, e->v.Repr.value);
 		ADDOP(c, UNARY_CONVERT);

@@ -1149,6 +1149,7 @@ ast_for_call(const node *n, expr_ty func)
     int i, nargs, nkeywords;
     asdl_seq *args = NULL;
     asdl_seq *keywords = NULL;
+    expr_ty vararg = NULL, kwarg = NULL;
 
     REQ(n, arglist);
 
@@ -1200,10 +1201,18 @@ ast_for_call(const node *n, expr_ty func)
 		asdl_seq_SET(keywords, nkeywords++, kw);
 	    }
 	}
+	else if (TYPE(ch) == STAR) {
+	    vararg = ast_for_expr(CHILD(n, i+1));
+	    i++;
+	}
+	else if (TYPE(ch) == DOUBLESTAR) {
+	    kwarg = ast_for_expr(CHILD(n, i+1));
+	    i++;
+	}
     }
 
     /* XXX syntax error if more than 255 arguments */
-    return Call(func, args, keywords, NULL, NULL);
+    return Call(func, args, keywords, vararg, kwarg);
 
  error:
     if (args)
