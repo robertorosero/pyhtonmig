@@ -1,0 +1,58 @@
+MAKE=		make
+
+SUBDIRS=	Parser Grammar Objects Python
+SUBDIRSTOO=	Include Extensions readline
+DISTFILES=	README Makefile configure configure.in
+DIST=		$(DISTFILES) $(SUBDIRS) $(SUBDIRSTOO)
+
+all:		config.status
+		for i in $(SUBDIRS); do \
+			(echo $$i; cd $$i; $(MAKE) all); \
+		done
+
+tags:		ctags -t Parser/*.[ch] Objects/*.[ch] Python/*.[ch] Include/*.h
+
+TAGS:		etags -t Parser/*.[ch] Objects/*.[ch] Python/*.[ch] Include/*.h
+
+depend:
+		for i in $(SUBDIRS); do \
+			(echo $$i; cd $$i; $(MAKE) depend); \
+		done
+
+localclean:
+		-rm -f core *~ [@,#]* *.old *.orig *.rej
+		-(cd Include; rm -f core *~ [@,#]* *.old *.orig *.rej)
+
+clean:		localclean
+		-for i in $(SUBDIRS); do \
+			(echo $$i; cd $$i; $(MAKE) clean); \
+		done
+
+localclobber:	localclean
+		-rm -f tags TAGS config.status
+
+clobber:	localclobber
+		-for i in $(SUBDIRS); do \
+			(echo $$i; cd $$i; $(MAKE) clobber); \
+		done
+
+distclean:	clobber
+		-for i in $(SUBDIRS); do \
+			if test -f $$i/Makefile.in; then \
+				rm -f $$i/Makefile; \
+			fi; \
+		done
+
+Makefiles:	config.status
+		./config.status
+
+config.status:	configure
+		./configure
+
+configure:	configure.in
+		autoconf
+ 
+tar:		dist.tar.Z
+
+dist.tar.Z:	$(DIST)
+		tar cf - $(DIST) | compress >dist.tar.Z
