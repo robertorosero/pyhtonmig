@@ -119,6 +119,18 @@ enable these modules, you must edit the Modules/Setup file (or use the
 Setup.sgi file instead).
 
 
+Building on non-UNIX systems
+----------------------------
+
+On non-UNIX systems, you will have to fake the effect of running the
+configure script manually.  A good start is to copy the file
+Include/config.h.in to Include/config.h and edit the latter to reflect
+the actual configuration of your system.  Then arrange that the symbol
+HAVE_CONFIG_H is defined during compilation (usually by passing an
+argument of the form `-DHAVE_CONFIG_H' to the compiler, but this is
+necessarily system-dependent).
+
+
 Distribution structure
 ----------------------
 
