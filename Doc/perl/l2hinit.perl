@@ -347,17 +347,17 @@ sub add_module_idx() {
     }
     open(MODIDXFILE, '>modindex.dat') || die "\n$!\n";
     foreach $key (keys %Modules) {
-	# dump the line in the data file; just use a dummy seqno field
-	my $nkey = $1;
-	my $moditem = "$Modules{$key}";
+	# dump the line in the data file; just use an empty seqno field
 	my $plat = '';
-	$key =~ s/<tt>([a-zA-Z0-9._]*)<\/tt>/$1/;
 	if ($ModulePlatforms{$key} && !$allthesame) {
 	    $plat = (" <em>(<span class=\"platform\">$ModulePlatforms{$key}"
 		     . '</span>)</em>');
 	}
-	print MODIDXFILE $moditem . $IDXFILE_FIELD_SEP
-              . "<tt class=\"module\">$key</tt>$plat###\n";
+        my $s = "$Modules{$key}$IDXFILE_FIELD_SEP$key";
+        $s =~ s/<a href="([^\"]+)">/$1/;
+        print MODIDXFILE ("$s$plat"
+                          . $IDXFILE_FIELD_SEP
+                          . "\n");
     }
     close(MODIDXFILE);
 

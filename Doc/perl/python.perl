@@ -492,7 +492,10 @@ $IDXFILE_FIELD_SEP = "\1";
 
 sub write_idxfile($$){
     my($ahref, $str) = @_;
-    print IDXFILE $ahref, $IDXFILE_FIELD_SEP, $str, "\n";
+    my $info = "$ahref$IDXFILE_FIELD_SEP$str\n";
+    $info =~ s/<a href=['"]([^'"]+)['"]>/$1/;
+    $info =~ s/###/$IDXFILE_FIELD_SEP/;
+    print IDXFILE $info;
 }
 
 

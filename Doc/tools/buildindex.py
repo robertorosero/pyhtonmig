@@ -47,12 +47,6 @@ class Node:
     def __str__(self):
         return bang_join(self.key)
 
-    def dump(self):
-        return "%s\1%s###%s\n" \
-               % ("\1".join(self.links),
-                  bang_join(self.text),
-                  self.seqno)
-
 
 def cmp_part(s1, s2):
     result = cmp(s1, s2)
@@ -101,24 +95,18 @@ def split_entry_key(str):
 
 
 def split_entry_text(str):
-    if '<' in str:
-        m = _rmtt.match(str)
-        if m:
-            str = null_join(m.group(1, 2, 3))
     return split_entry(str, 1)
 
 
 def load(fp):
     nodes = []
-    rx = re.compile("(.*)\1(.*)###(.*)$")
     while 1:
         line = fp.readline()
         if not line:
             break
-        m = rx.match(line)
-        if m:
-            link, str, seqno = m.group(1, 2, 3)
-            nodes.append(Node(link, str, seqno))
+        parts = line.split("\1", 2)
+        if len(parts) == 3:
+            nodes.append(Node(*parts))
     return nodes
 
 
@@ -244,10 +232,11 @@ def format_column(nodes):
                 extra = ""
             append("\n<dt>%s%s\n<dd>\n%s<dl compact>"
                    % (term, extra, level * DL_LEVEL_INDENT))
-        append("\n%s<dt>%s%s</a>"
+        append('\n%s<dt><a href="%s">%s</a>'
                % (level * DL_LEVEL_INDENT, node.links[0], node.text[-1]))
         for link in node.links[1:]:
-            append(",\n%s    %s[Link]</a>" % (level * DL_LEVEL_INDENT, link))
+            append(',\n%s    <a href="%s">[Link]</a>'
+                   % (level * DL_LEVEL_INDENT, link))
         previous = current
     append("\n")
     append("</dl>" * (level + 1))
@@ -319,11 +308,6 @@ def collapse(nodes):
         else:
             i = i + 1
             prev = node
-
-
-def dump(nodes, fp):
-    for node in nodes:
-        fp.write(node.dump())
 
 
 def process_nodes(nodes, columns, letters=0, group_symbol_nodes=0):
