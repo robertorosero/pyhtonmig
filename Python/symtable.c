@@ -327,8 +327,12 @@ analyze_name(PyObject *dict, PyObject *name, int flags, PyObject *bound,
 	     PyObject *local, PyObject *free, PyObject *global, int nested)
 {
 	if (flags & DEF_GLOBAL) {
-		if (flags & DEF_PARAM)
-			return 0; /* can't declare a parameter as global */
+		if (flags & DEF_PARAM) {
+			return PyErr_Format(PyExc_SyntaxError,
+					    "name '%s' is local and global",
+					    PyString_AS_STRING(name));
+			return 0;
+		}
 		SET_SCOPE(dict, name, GLOBAL_EXPLICIT);
 		if (PyDict_SetItem(global, name, Py_None) < 0)
 			return 0;
