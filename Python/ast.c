@@ -141,8 +141,9 @@ mod_ty PyAST_FromNode(const node *n)
 	    stmts = asdl_seq_new(num);
 	    if (!stmts)
 		return NULL;
-	    if (num == 1)
+	    if (num == 1) {
 		asdl_seq_SET(stmts, 0, ast_for_stmt(n));
+	    }
 	    else {
 		/* Only a simple_stmt can contain multiple statements. */
 		REQ(n, simple_stmt);
@@ -592,7 +593,7 @@ ast_for_atom(const node *n)
 	break;
     }
     case BACKQUOTE: /* repr */
-	return Repr(ast_for_expr(CHILD(n, 1)));
+	return Repr(ast_for_testlist(CHILD(n, 1)));
 	break;
     default:
 	fprintf(stderr, "unhandled atom %d\n", TYPE(ch));
@@ -747,8 +748,7 @@ ast_for_expr(const node *n)
 	    break;
 	}
 	break;
-    case power: 
-    {
+    case power: {
 	expr_ty e = ast_for_atom(CHILD(n, 0));
 	assert(e);
 	if (NCH(n) == 1)
@@ -756,9 +756,8 @@ ast_for_expr(const node *n)
 	/* power: atom trailer* ('**' factor)* 
            trailer: '(' [arglist] ')' | '[' subscriptlist ']' | '.' NAME */
 	if (TYPE(CHILD(n, NCH(n) - 1)) == factor) {
-	    /* XXX Handle ** */
-	    assert(0);
-	    return NULL;
+	    expr_ty f = ast_for_expr(CHILD(n, NCH(n) - 1));
+	    return BinOp(e, Pow, f);
 	}
 	for (i = 1; i < NCH(n); i++) {
 	    expr_ty new;
@@ -792,6 +791,9 @@ ast_for_expr(const node *n)
 	return e;
 	break;
     }
+    default:
+	fprintf(stderr, "unhandled expr: %d\n", TYPE(n));
+	return NULL;
     }
     /* should never get here */
     return NULL;
@@ -813,7 +815,9 @@ ast_for_call(const node *n, expr_ty func)
 static expr_ty
 ast_for_testlist(const node *n)
 {
-    /* could be a testlist or a listmaker with no list_for */
+    /* n could be a testlist, a listmaker with no list_for, or
+       a testlist1 from inside backquotes. */
+       
     if (NCH(n) == 1)
 	return ast_for_expr(CHILD(n, 0));
     else 
@@ -1110,10 +1114,10 @@ ast_for_suite(const node *n)
     /* suite: simple_stmt | NEWLINE INDENT stmt+ DEDENT */
     asdl_seq *seq = NULL;
     stmt_ty s;
-    int i, total, num;
+    int i, total, num, pos = 0;
     node *ch;
 
-    fprintf(stderr, "ast_for_suite(%d)\n", TYPE(n));
+    fprintf(stderr, "ast_for_suite(%d) lineno=%d\n", TYPE(n), n->n_lineno);
     REQ(n, suite);
 
     total = num_stmts(n);
@@ -1125,7 +1129,7 @@ ast_for_suite(const node *n)
 	    s = ast_for_stmt(ch);
 	    if (!s)
 		goto error;
-	    asdl_seq_APPEND(seq, s);
+	    asdl_seq_SET(seq, pos++, s);
 	}
     }
     else {
@@ -1138,7 +1142,7 @@ ast_for_suite(const node *n)
 		s = ast_for_stmt(ch);
 		if (!s)
 		    goto error;
-		asdl_seq_APPEND(seq, s);
+		asdl_seq_SET(seq, pos++, s);
 	    }
 	    else {
 		int j;
@@ -1148,12 +1152,12 @@ ast_for_suite(const node *n)
 		    s = ast_for_stmt(CHILD(ch, j));
 		    if (!s)
 			goto error;
-		    asdl_seq_APPEND(seq, s);
+		    asdl_seq_SET(seq, pos++, s);
 		}
 	    }
 	}
     }
-    assert(seq->size == seq->offset);
+    assert(pos == seq->size);
     return seq;
  error:
     if (seq)
@@ -1345,6 +1349,9 @@ ast_for_classdef(const node *n)
 static stmt_ty
 ast_for_stmt(const node *n)
 {
+/*    _PyObject_DebugMallocStats(); */
+    fprintf(stderr, "ast_for_stmt(%d) lineno=%d\n",
+	    TYPE(n), n->n_lineno);
     if (TYPE(n) == stmt) {
 	assert(NCH(n) == 1);
 	n = CHILD(n, 0);
