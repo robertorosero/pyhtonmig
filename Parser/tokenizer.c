@@ -604,6 +604,7 @@ tok_get(tok, p_start, p_end)
 					tok->cur = tok->inp;
 					return ERRORTOKEN;
 				}
+				tripcount = 0;
 			}
 			else if (c == EOF) {
 				tok->done = E_TOKEN;
