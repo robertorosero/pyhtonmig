@@ -45,6 +45,22 @@ Traceback (most recent call last):
  ...
 SyntaxError: duplicate argument 'a' in function definition (<string>, line 1)
 
+>>> def f(a):
+...     global a
+...     a = 1
+Traceback (most recent call last):
+ ...
+SyntaxError: name 'a' is local and global
+
+XXX How hard would it be to get the location in the error?
+
+>>> def f(a=1, (b, c)):
+...     pass
+Traceback (most recent call last):
+ ...
+SyntaxError: non-default argument follows default argument (<string>, line 1)
+
+
 Details of SyntaxError object
 -----------------------------
 
@@ -93,18 +109,6 @@ Complex parameter passing
 """
 
 from test.test_support import verbose, TestFailed, run_doctest
-
-##try:
-##    exec 'def f(a): global a; a = 1'
-##    raise TestFailed, "variable is global and local"
-##except SyntaxError:
-##    pass
-
-##try:
-##    exec 'def f(a=1, (b, c)): pass'
-##    raise TestFailed, "non-default args after default"
-##except SyntaxError:
-##    pass
 
 # It takes less space to deal with bad float literals using a helper
 # function than it does with doctest.  The doctest needs to include
