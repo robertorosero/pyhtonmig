@@ -118,7 +118,7 @@ class Profile:
 					s0 = 'exception: '
 				else:
 					s0 = None
-				self.handle_return(self.cur_frame, frame, s0)
+				self.handle_return(frame, self.cur_frame, s0)
 			self.call_level = call_level
 			self.cur_frame = frame
 			return
