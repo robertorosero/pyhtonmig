@@ -270,6 +270,36 @@ SOURCE=..\Modules\arraymodule.c
 # End Source File
 # Begin Source File
 
+SOURCE=..\Python\asdl.c
+
+!IF  "$(CFG)" == "pythoncore - Win32 Release"
+
+!ELSEIF  "$(CFG)" == "pythoncore - Win32 Debug"
+
+!ELSEIF  "$(CFG)" == "pythoncore - Win32 Alpha Debug"
+
+!ELSEIF  "$(CFG)" == "pythoncore - Win32 Alpha Release"
+
+!ENDIF 
+
+# End Source File
+# Begin Source File
+
+SOURCE=..\Python\ast.c
+
+!IF  "$(CFG)" == "pythoncore - Win32 Release"
+
+!ELSEIF  "$(CFG)" == "pythoncore - Win32 Debug"
+
+!ELSEIF  "$(CFG)" == "pythoncore - Win32 Alpha Debug"
+
+!ELSEIF  "$(CFG)" == "pythoncore - Win32 Alpha Release"
+
+!ENDIF 
+
+# End Source File
+# Begin Source File
+
 SOURCE=..\Modules\audioop.c
 
 !IF  "$(CFG)" == "pythoncore - Win32 Release"
@@ -436,6 +466,21 @@ SOURCE=..\Objects\cobject.c
 # Begin Source File
 
 SOURCE=..\Python\codecs.c
+
+!IF  "$(CFG)" == "pythoncore - Win32 Release"
+
+!ELSEIF  "$(CFG)" == "pythoncore - Win32 Debug"
+
+!ELSEIF  "$(CFG)" == "pythoncore - Win32 Alpha Debug"
+
+!ELSEIF  "$(CFG)" == "pythoncore - Win32 Alpha Release"
+
+!ENDIF 
+
+# End Source File
+# Begin Source File
+
+SOURCE=..\Objects\codeobject.c
 
 !IF  "$(CFG)" == "pythoncore - Win32 Release"
 
@@ -1404,6 +1449,21 @@ SOURCE=..\Modules\pypcre.c
 # Begin Source File
 
 SOURCE=..\Python\pystate.c
+
+!IF  "$(CFG)" == "pythoncore - Win32 Release"
+
+!ELSEIF  "$(CFG)" == "pythoncore - Win32 Debug"
+
+!ELSEIF  "$(CFG)" == "pythoncore - Win32 Alpha Debug"
+
+!ELSEIF  "$(CFG)" == "pythoncore - Win32 Alpha Release"
+
+!ENDIF 
+
+# End Source File
+# Begin Source File
+
+SOURCE="..\Python\Python-ast.c"
 
 !IF  "$(CFG)" == "pythoncore - Win32 Release"
 
