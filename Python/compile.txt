@@ -44,12 +44,12 @@ steps for compilation are:
 4. Emit bytecode based on the Control Flow Graph (Python/newcompile.c)
 
 Starting with Python 2.5, the above steps are now used.  This change
-was done to simplify compilation by breaking it down to two steps.
+was done to simplify compilation by breaking it into three steps.
 The purpose of this document is to outline how the lattter three steps
 of the process works.
 
 This document does not touch on how parsing works beyond what is needed
-to explain what is needed for compilation.  It is also not exahaustive
+to explain what is needed for compilation.  It is also not exhaustive
 in terms of the how the entire system works.  You will most likely need
 to read some source to have an exact understanding of all details.
 
