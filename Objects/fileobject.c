@@ -383,10 +383,9 @@ getline(f, n)
 	for (;;) {
 		if ((c = getc(fp)) == EOF) {
 			clearerr(fp);
-			if (intrcheck()) {
+			if (sigcheck()) {
 				RET_SAVE
 				DECREF(v);
-				err_set(KeyboardInterrupt);
 				return NULL;
 			}
 			if (n < 0 && buf == BUF(v)) {

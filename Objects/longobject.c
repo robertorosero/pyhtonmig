@@ -27,7 +27,6 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 /* XXX The functional organization of this file is terrible */
 
 #include "allobjects.h"
-#include "intrcheck.h"
 #include "longintrepr.h"
 #include <math.h>
 #include <assert.h>
@@ -44,10 +43,10 @@ static object *long_format PROTO((object *aa, int base));
 
 static int ticker;	/* XXX Could be shared with ceval? */
 
-#define INTRCHECK(block) \
+#define SIGCHECK(block) \
 	if (--ticker < 0) { \
 		ticker = 100; \
-		if (intrcheck()) { block; } \
+		if (sigcheck()) { block; } \
 	}
 
 /* Normalize (remove leading zeros from) a long int object.
@@ -316,10 +315,9 @@ long_format(aa, base)
 		*--p = rem;
 		DECREF(a);
 		a = temp;
-		INTRCHECK({
+		SIGCHECK({
 			DECREF(a);
 			DECREF(str);
-			err_set(KeyboardInterrupt);
 			return NULL;
 		})
 	} while (ABS(a->ob_size) != 0);
@@ -506,10 +504,9 @@ x_divrem(v1, w1, prem)
 		stwodigits carry = 0;
 		int i;
 		
-		INTRCHECK({
+		SIGCHECK({
 			DECREF(a);
 			a = NULL;
-			err_set(KeyboardInterrupt);
 			break;
 		})
 		if (vj == w->ob_digit[size_w-1])
@@ -826,9 +823,8 @@ long_mul(a, b)
 		twodigits f = a->ob_digit[i];
 		int j;
 		
-		INTRCHECK({
+		SIGCHECK({
 			DECREF(z);
-			err_set(KeyboardInterrupt);
 			return NULL;
 		})
 		for (j = 0; j < size_b; ++j) {

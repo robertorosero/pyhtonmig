@@ -107,10 +107,8 @@ printobject(op, fp, flags)
 	int flags;
 {
 	int ret = 0;
-	if (intrcheck()) {
-		err_set(KeyboardInterrupt);
+	if (sigcheck())
 		return -1;
-	}
 	if (op == NULL) {
 		fprintf(fp, "<nil>");
 	}
@@ -159,10 +157,8 @@ object *
 reprobject(v)
 	object *v;
 {
-	if (intrcheck()) {
-		err_set(KeyboardInterrupt);
+	if (sigcheck())
 		return NULL;
-	}
 	if (v == NULL)
 		return newstringobject("<NULL>");
 	else if (v->ob_type->tp_repr == NULL) {
