@@ -30,23 +30,33 @@ mod_ty PyAST_FromNode(node *n)
     asdl_seq *stmts;
     stmt_ty s;
 
-    REQ(n, file_input);
-    stmts = asdl_seq_new(NCH(n) / 2);
-    for (i = 0; i < NCH(n); i++) {
-	if (TYPE(CHILD(n, i)) == stmt) {
-	    s = ast_for_stmt(CHILD(n, i));
-	    if (!s) {
-		asdl_seq_free(stmts);
-		return NULL;
+    switch (TYPE(n)) {
+    case file_input:
+	    stmts = asdl_seq_new(NCH(n) / 2);
+	    for (i = 0; i < NCH(n); i++) {
+		    if (TYPE(CHILD(n, i)) == stmt) {
+			    s = ast_for_stmt(CHILD(n, i));
+			    if (!s) {
+				    asdl_seq_free(stmts);
+				    return NULL;
+			    }
+			    if (asdl_seq_append(stmts, s) < 0) {
+				    return NULL;
+			    }
+		    }
+		    else
+			    fprintf(stderr, "skipping %d\n", 
+				    TYPE(CHILD(n, i)));
 	    }
-	    if (asdl_seq_append(stmts, s) < 0) {
-		return NULL;
-	    }
-	}
-	else
-	    fprintf(stderr, "skipping %d\n", TYPE(CHILD(n, i)));
+	    return Module(stmts);
+    case eval_input:
+	    return Expression(ast_for_testlist(CHILD(n, 0)));
+	    break;
+    default:
+	    return NULL;
     }
-    return Module(stmts);
+    /* Can't get here */
+    return NULL;
 }
 
 #ifndef LINENO
@@ -442,6 +452,8 @@ ast_for_atom(node *n)
 	break;
     case LSQB: /* list (or list comprehension) */
 	ch = CHILD(n, 1);
+	if (TYPE(ch) == RSQB)
+		return List(NULL, Load);
 	REQ(ch, listmaker);
 	if (NCH(ch) == 1 || TYPE(CHILD(ch, 1)) == COMMA)
 	    return List(ast_for_testlist(ch), Load);
