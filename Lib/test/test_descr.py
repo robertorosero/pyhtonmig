@@ -501,6 +501,45 @@ def slots():
     verify(x.b == 2)
     verify(x.c == 3)
 
+def dynamics():
+    if verbose: print "Testing __dynamic__..."
+    class S1:
+        __metaclass__ = type
+    verify(S1.__dynamic__ == 0)
+    class S(object):
+        pass
+    verify(C.__dynamic__ == 0)
+    class D(object):
+        __dynamic__ = 1
+    verify(D.__dynamic__ == 1)
+    class E(D, S):
+        pass
+    verify(E.__dynamic__ == 1)
+    class F(S, D):
+        pass
+    verify(F.__dynamic__ == 1)
+    try:
+        S.foo = 1
+    except (AttributeError, TypeError):
+        pass
+    else:
+        print "Ouch: assignment to a static class attribute shouldn't work!"
+    D.foo = 1
+    verify(D.foo == 1)
+    # Test that dynamic attributes are inherited
+    verify(E.foo == 1)
+    verify(F.foo == 1)
+    class SS(D):
+        __dynamic__ = 0
+    verify(SS.__dynamic__ == 0)
+    verify(SS.foo == 1)
+    try:
+        SS.foo = 1
+    except (AttributeError, TypeError):
+        pass
+    else:
+        print "Ouch: assignment to SS.foo shouldn't work!"
+
 def errors():
     if verbose: print "Testing errors..."
 
@@ -571,6 +610,7 @@ def all():
     diamond()
     objects()
     slots()
+    dynamics()
     errors()
 
 all()
