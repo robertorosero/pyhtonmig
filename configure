@@ -405,7 +405,7 @@ rm -f conftest*
 fi
 rm -f conftest*
 
-for hdr in dlfcn.h signal.h stdarg.h stdlib.h unistd.h utime.h sys/param.h sys/select.h sys/times.h sys/utsname.h
+for hdr in dlfcn.h signal.h stdarg.h stdlib.h unistd.h utime.h sys/param.h sys/select.h sys/times.h sys/un.h sys/utsname.h
 do
 trhdr=HAVE_`echo $hdr | tr '[a-z]./' '[A-Z]__'`
 echo checking for ${hdr}
@@ -948,7 +948,7 @@ fi
 
 
 # checks for library functions
-for func in clock ftime gettimeofday getpgrp getwd lstat readlink readline select setsid setpgid setpgrp siginterrupt symlink tcgetpgrp tcsetpgrp times uname waitpid
+for func in clock ftime gettimeofday getpeername getpgrp getwd lstat readlink readline select setsid setpgid setpgrp siginterrupt symlink tcgetpgrp tcsetpgrp times uname waitpid
 do
 trfunc=HAVE_`echo $func | tr '[a-z]' '[A-Z]'`
 echo checking for ${func}
