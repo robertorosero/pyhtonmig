@@ -1,5 +1,5 @@
-This is Python version 1.6 beta 1 (1.6b1)
-=========================================
+This is Python version 1.6
+==========================
 
 License information
 -------------------
@@ -732,7 +732,7 @@ is expected that it will also work with newer versions).  Tcl/Tk
 7.4/4.0 is no longer supported.  8.0 or any later non-alpha non-beta
 release is recommended.
 
-See http://sunscript.sun.com/ for more info on Tcl/Tk, including the
+See http://www.tcltk.com/ for more info on Tcl/Tk, including the
 on-line manual pages.
 
 
@@ -754,6 +754,8 @@ translated into Tcl code.
 
 A more recent introduction to Tkinter programming, by Fredrik Lundh,
 is at http://www.pythonware.com/library/tkinter/introduction/index.htm.
+At least one book has been published on Tkinter; go to the PSA bookstore
+for more information:  http://www.python.org/psa/bookstore/.
 
 There are demos in the Demo/tkinter directory, in the subdirectories
 guido, matt and www (the matt and guido subdirectories have been
