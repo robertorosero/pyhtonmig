@@ -195,12 +195,121 @@ def floats():
     if verbose: print "Testing float operations..."
     numops(100.0, 3.0)
 
+def spamlists():
+    if verbose: print "Testing spamlist operations..."
+    import copy, spam
+    def spamlist(l, memo=None):
+        import spam
+        sl = spam.list()
+        for i in l: sl.append(i)
+        return sl
+    # This is an ugly hack:
+    copy._deepcopy_dispatch[spam.SpamListType] = spamlist
+
+    testbinop(spamlist([1]), spamlist([2]), spamlist([1,2]), "a+b", "__add__")
+    testbinop(spamlist([1,2,3]), 2, 1, "b in a", "__contains__")
+    testbinop(spamlist([1,2,3]), 4, 0, "b in a", "__contains__")
+    testbinop(spamlist([1,2,3]), 1, 2, "a[b]", "__getitem__")
+    testternop(spamlist([1,2,3]), 0, 2, spamlist([1,2]),
+               "a[b:c]", "__getslice__")
+    testsetop(spamlist([1]), spamlist([2]), spamlist([1,2]),
+              "a+=b", "__iadd__")
+    testsetop(spamlist([1,2]), 3, spamlist([1,2,1,2,1,2]), "a*=b", "__imul__")
+    testunop(spamlist([1,2,3]), 3, "len(a)", "__len__")
+    testbinop(spamlist([1,2]), 3, spamlist([1,2,1,2,1,2]), "a*b", "__mul__")
+    testbinop(spamlist([1]), spamlist([2]), spamlist([2,1]), "b+a", "__radd__")
+    testbinop(spamlist([1,2]), 3, spamlist([1,2,1,2,1,2]), "b*a", "__rmul__")
+    testset2op(spamlist([1,2]), 1, 3, spamlist([1,3]), "a[b]=c", "__setitem__")
+    testset3op(spamlist([1,2,3,4]), 1, 3, spamlist([5,6]),
+               spamlist([1,5,6,4]), "a[b:c]=d", "__setslice__")
+
+def spamdicts():
+    if verbose: print "Testing spamdict operations..."
+    import copy, spam
+    def spamdict(d, memo=None):
+        import spam
+        sd = spam.dict()
+        for k, v in d.items(): sd[k] = v
+        return sd
+    # This is an ugly hack:
+    copy._deepcopy_dispatch[spam.SpamDictType] = spamdict
+
+    testbinop(spamdict({1:2}), spamdict({2:1}), -1, "cmp(a,b)", "__cmp__")
+    testbinop(spamdict({1:2,3:4}), 1, 1, "b in a", "__contains__")
+    testbinop(spamdict({1:2,3:4}), 2, 0, "b in a", "__contains__")
+    testbinop(spamdict({1:2,3:4}), 1, 2, "a[b]", "__getitem__")
+    d = spamdict({1:2,3:4})
+    l1 = []
+    for i in d.keys(): l1.append(i)
+    l = []
+    for i in iter(d): l.append(i)
+    verify(l == l1)
+    l = []
+    for i in d.__iter__(): l.append(i)
+    verify(l == l1)
+    l = []
+    for i in type(spamdict({})).__iter__(d): l.append(i)
+    verify(l == l1)
+    testunop(spamdict({1:2,3:4}), 2, "len(a)", "__len__")
+    testunop(spamdict({1:2,3:4}), "{3: 4, 1: 2}", "repr(a)", "__repr__")
+    testset2op(spamdict({1:2,3:4}), 2, 3, spamdict({1:2,2:3,3:4}),
+               "a[b]=c", "__setitem__")
+
+DT = type({})
+
+def pydicts():
+    if verbose: print "Testing Python subclass of dict..."
+    verify(issubclass(DT, DT))
+    verify(isinstance({}, DT))
+    d = DT()
+    verify(d == {})
+    verify(d.__class__ is DT)
+    verify(isinstance(d, DT))
+    class C(DT):
+        def __getitem__(self, key):
+            return self.get(key, 0)
+        def __setitem__(self, key, value):
+            assert isinstance(key, type(0))
+            DT.__setitem__(self, key, value)
+        def setstate(self, state):
+            self.state = state
+        def getstate(self):
+            return self.state
+    verify(issubclass(C, DT))
+    a = C()
+    try:
+        a.getstate()
+    except AttributeError:
+        pass
+    else:
+        raise TestFailed, "undefined getstate() didn't raise AttributeError"
+    a.setstate(0)
+    verify(a.state == 0)
+    verify(a.getstate() == 0)
+    a.setstate(10)
+    verify(a.state == 10)
+    verify(a.getstate() == 10)
+    verify(a[42] == 0)
+    a[42] = 24
+    verify(a[42] == 24)
+    if verbose: print "pydict stress test ..."
+    for i in range(100):
+        a[i] = C()
+        for j in range(100):
+            a[i][j] = i*j
+    for i in range(100):
+        for j in range(100):
+            verify(a[i][j] == i*j)
+
 def all():
     lists()
     dicts()
     ints()
     longs()
     floats()
+    spamlists()
+    spamdicts()
+    pydicts()
 
 all()
 
