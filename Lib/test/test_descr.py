@@ -119,7 +119,7 @@ def dicts():
     for i in type({}).__iter__(d): l.append(i)
     verify(l == l1)
     testunop({1:2,3:4}, 2, "len(a)", "__len__")
-    ##testunop({1:2,3:4}, "{3: 4, 1: 2}", "repr(a)", "__repr__")
+    testunop({1:2,3:4}, "{3: 4, 1: 2}", "repr(a)", "__repr__")
     testset2op({1:2,3:4}, 2, 3, {1:2,2:3,3:4}, "a[b]=c", "__setitem__")
 
 binops = {

@@ -31,6 +31,8 @@ extern DL_IMPORT(PyObject *) PyDescr_NewGetSet(PyTypeObject *,
 					       struct getsetlist *);
 extern DL_IMPORT(PyObject *) PyDescr_NewWrapper(PyTypeObject *,
 						struct wrapperbase *, void *);
+extern DL_IMPORT(int) PyDescr_IsMethod(PyObject *);
+extern DL_IMPORT(int) PyDescr_IsData(PyObject *);
 
 extern DL_IMPORT(PyObject *) PyDictProxy_New(PyObject *);
 extern DL_IMPORT(PyObject *) PyWrapper_New(PyDescrObject *, PyObject *);

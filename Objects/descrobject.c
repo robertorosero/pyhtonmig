@@ -396,6 +396,32 @@ PyTypeObject PyDescr_Type = {
 	(descrsetfunc)descr_set,		/* tp_descr_set */
 };
 
+int
+PyDescr_IsMethod(PyObject *d)
+{
+	if (PyDescr_Check(d)) {
+		switch (((PyDescrObject *)d)->d_flavor) {
+		case DF_METHOD:
+		case DF_WRAPPER:
+			return 1;
+		}
+	}
+	return 0;
+}
+
+int
+PyDescr_IsData(PyObject *d)
+{
+	if (PyDescr_Check(d)) {
+		switch (((PyDescrObject *)d)->d_flavor) {
+		case DF_MEMBER:
+		case DF_GETSET:
+			return 1;
+		}
+	}
+	return 0;
+}
+
 static PyDescrObject *
 PyDescr_New(PyTypeObject *type)
 {

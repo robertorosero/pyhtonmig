@@ -61,6 +61,10 @@ type_getattro(PyTypeObject *type, PyObject *name)
 			if (PyType_InitDict(type) < 0)
 				return NULL;
 		}
+		descr = PyDict_GetItem(type->tp_dict, name);
+		if (descr != NULL && PyDescr_IsMethod(descr) &&
+		    (f = descr->ob_type->tp_descr_get) != NULL)
+			return (*f)(descr, NULL);
 	}
 
 	if (tp->tp_flags & Py_TPFLAGS_HAVE_CLASS) {
