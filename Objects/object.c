@@ -1326,10 +1326,8 @@ PyCallable_Check(PyObject *x)
 /* type test with subclassing support */
 
 int
-_PyObject_TypeCheck(PyObject *obj, PyTypeObject *type)
+_PyObject_TypeCheck(PyTypeObject *tp, PyTypeObject *type)
 {
-	PyTypeObject *tp = obj->ob_type;
-
 	do {
 		if (tp == type)
 			return 1;

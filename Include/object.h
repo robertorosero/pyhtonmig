@@ -286,9 +286,9 @@ typedef struct _typeobject {
 
 
 /* Generic type check */
-extern DL_IMPORT(int) _PyObject_TypeCheck(PyObject *, PyTypeObject *);
+extern DL_IMPORT(int) _PyObject_TypeCheck(PyTypeObject *, PyTypeObject *);
 #define PyObject_TypeCheck(ob, tp) \
-	((ob)->ob_type == (tp) || _PyObject_TypeCheck(ob, tp))
+	((ob)->ob_type == (tp) || _PyObject_TypeCheck((ob)->ob_type, (tp)))
 
 extern DL_IMPORT(PyTypeObject) PyType_Type; /* Metatype */
 extern DL_IMPORT(PyTypeObject) PyBaseObject_Type; /* Most base object type */
