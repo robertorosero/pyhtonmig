@@ -286,6 +286,8 @@ def runcall(*args):
 	try: apply(x.runcall, args)
 	finally: x.close()
 
+def set_trace():
+	Wdb().set_trace()
 
 # Post-Mortem interface
 
