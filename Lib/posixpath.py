@@ -239,29 +239,35 @@ def expanduser(path):
 
 
 # Expand paths containing shell variable substitutions.
-# This is done by piping it through the shell.
-# Shell quoting characters (\ " ' `) are protected by a backslash.
-# NB: a future version may avoid starting a subprocess and do the
-# substitutions internally.  This may slightly change the syntax
-# for variables.
+# This expands the forms $variable and ${variable} only.
+# Non-existant variables are left unchanged.
+
+_varprog = None
 
 def expandvars(path):
+	global _varprog
 	if '$' not in path:
 		return path
-	q = ''
-	for c in path:
-		if c in ('\\', '"', '\'', '`'):
-			c = '\\' + c
-		q = q + c
-	d = '!'
-	if q == d:
-		d = '+'
-	p = posix.popen('cat <<' + d + '\n' + q + '\n' + d + '\n', 'r')
-	res = p.read()
-	del p
-	if res[-1:] == '\n':
-		res = res[:-1]
-	return res
+	if not _varprog:
+		import regex
+		_varprog = regex.compile('$\([a-zA-Z0-9_]+\|{[^}]*}\)')
+	i = 0
+	while 1:
+		i = _varprog.search(path, i)
+		if i < 0:
+			break
+		name = _varprog.group(1)
+		j = i + len(_varprog.group(0))
+		if name[:1] == '{' and name[-1:] == '}':
+			name = name[1:-1]
+		if posix.environ.has_key(name):
+			tail = path[j:]
+			path = path[:i] + posix.environ[name]
+			i = len(path)
+			path = path + tail
+		else:
+			i = j
+	return path
 
 
 # Normalize a path, e.g. A//B, A/./B and A/foo/../B all become A/B.
