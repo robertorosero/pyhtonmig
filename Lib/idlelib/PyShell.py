@@ -315,8 +315,7 @@ class PyShell(OutputWindow):
         import __builtin__
         __builtin__.quit = __builtin__.exit = "To exit, type Ctrl-D."
 
-        self.auto = self.extensions["AutoIndent"] # Required extension
-        self.auto.config(usetabs=1, indentwidth=8, context_use_ps1=1)
+        self.config(usetabs=1, indentwidth=8, context_use_ps1=1)
 
         text = self.text
         text.configure(wrap="char")
@@ -423,7 +422,6 @@ class PyShell(OutputWindow):
         # Break cycles
         self.interp = None
         self.console = None
-        self.auto = None
         self.flist.pyshell = None
         self.history = None
         OutputWindow._close(self) # Really EditorWindow._close
@@ -528,7 +526,7 @@ class PyShell(OutputWindow):
             self.text.insert("insert", "\n")
             self.text.see("insert")
         else:
-            self.auto.auto_indent(event)
+            self.auto_indent(event)
         return "break"
 
     def enter_callback(self, event):
@@ -568,7 +566,7 @@ class PyShell(OutputWindow):
         # If we're in the current input before its last line,
         # insert a newline right at the insert point
         if self.text.compare("insert", "<", "end-1c linestart"):
-            self.auto.auto_indent(event)
+            self.auto_indent(event)
             return "break"
         # We're in the last line; append a newline and submit it
         self.text.mark_set("insert", "end-1c")
@@ -576,7 +574,7 @@ class PyShell(OutputWindow):
             self.text.insert("insert", "\n")
             self.text.see("insert")
         else:
-            self.auto.auto_indent(event)
+            self.auto_indent(event)
         self.text.tag_add("stdin", "iomark", "end-1c")
         self.text.update_idletasks()
         if self.reading:
