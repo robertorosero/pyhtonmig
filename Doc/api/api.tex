@@ -325,7 +325,7 @@ long sum_sequence(PyObject *sequence)
     int i, n;
     long total = 0;
     PyObject *item;
-    n = PyObject_Size(sequence);
+    n = PySequence_Length(sequence);
     if (n < 0)
         return -1; /* Has no length */
     for (i = 0; i < n; i++) {
