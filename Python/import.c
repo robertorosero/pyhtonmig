@@ -212,11 +212,9 @@ get_module(m, name, m_ret)
 			fclose(fpc);
 		}
 		namebuf[len] = '\0';
-		err = parse_file(fp, namebuf, file_input, &n);
-		if (err != E_DONE) {
-			err_input(err);
+		n = parse_file(fp, namebuf, file_input);
+		if (n == NULL)
 			return NULL;
-		}
 		co = compile(n, namebuf);
 		freetree(n);
 		if (co == NULL)
