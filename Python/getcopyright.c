@@ -3,8 +3,8 @@
 #include "Python.h"
 
 static char cprt[] = 
-"Copyright 1991-1995 Stichting Mathematisch Centrum, Amsterdam\n\
-Copyright 1995-2000 Corporation for National Research Initiatives (CNRI)";
+"Copyright (c) Corporation for National Research Initiatives.\n\
+Copyright 1991-1995 Stichting Mathematisch Centrum, Amsterdam.";
 
 const char *
 Py_GetCopyright()
