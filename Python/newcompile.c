@@ -43,14 +43,16 @@ struct compiler_unit {
 	int u_nalloc;      /* current alloc count for u_blocks */
 	int u_curblock;    /* index of current block in u_blocks */
 	int u_tmpname;     /* temporary variables for list comps */
-	identifier u_tmp; /* name for u_tmpname */
+	identifier u_tmp;  /* name for u_tmpname */
 	struct basicblock u_exit;
 	struct basicblock **u_blocks;
 
 	int u_nfblocks;
 	struct fblockinfo u_fblock[CO_MAXBLOCKS];
 
-	int u_lineno;
+	int u_lineno;      /* the lineno for the current stmt */
+	bool u_lineno_set; /* boolean to indicate whether instr
+			      has been generated with current lineno */
 };
 
 struct compiler {
@@ -67,6 +69,7 @@ struct compiler {
 
 struct assembler {
 	PyObject *a_bytecode;  /* string containing bytecode */
+	PyObject *a_lnotab;    /* string containing lnotab */
 	int a_offset;          /* offset into bytecode */
 	int a_nblocks;         /* number of reachable blocks */
 	int *a_postorder;      /* list of block indices in dfs postorder */
@@ -284,6 +287,8 @@ compiler_enter_scope(struct compiler *c, identifier name, void *key)
 		return 0;
 	u->u_tmpname = 0;
 	u->u_nfblocks = 0;
+	u->u_lineno = 0;
+	u->u_lineno_set = true;
 	memset(u->u_blocks, 0, sizeof(struct basicblock *) * DEFAULT_BLOCKS);
 	u->u_consts = PyDict_New();
 	if (!u->u_consts)
@@ -482,6 +487,17 @@ compiler_next_instr(struct compiler *c, int block)
    Returns 0 on failure, 1 on success.
 */
 
+static void
+compiler_set_lineno(struct compiler *c, int off)
+{
+	struct basicblock *b;
+	if (c->u->u_lineno_set)
+		return;
+	c->u->u_lineno_set = true;
+	b = c->u->u_blocks[c->u->u_curblock];
+	b->b_instr[off].i_lineno = c->u->u_lineno;
+}
+
 static int
 compiler_addop(struct compiler *c, int opcode)
 {
@@ -491,6 +507,7 @@ compiler_addop(struct compiler *c, int opcode)
 	off = compiler_next_instr(c, c->u->u_curblock);
 	if (off < 0)
 		return 0;
+	compiler_set_lineno(c, off);
 	b = c->u->u_blocks[c->u->u_curblock];
 	i = &b->b_instr[off];
 	i->i_opcode = opcode;
@@ -536,6 +553,7 @@ compiler_addop_i(struct compiler *c, int opcode, int oparg)
 	off = compiler_next_instr(c, c->u->u_curblock);
 	if (off < 0)
 		return 0;
+	compiler_set_lineno(c, off);
 	i = &c->u->u_blocks[c->u->u_curblock]->b_instr[off];
 	i->i_opcode = opcode;
 	i->i_oparg = oparg;
@@ -548,9 +566,12 @@ compiler_addop_j(struct compiler *c, int opcode, int block, int absolute)
 {
 	struct instr *i;
 	int off;
+
+	assert(block >= 0);
 	off = compiler_next_instr(c, c->u->u_curblock);
 	if (off < 0)
 		return 0;
+	compiler_set_lineno(c, off);
 	i = &c->u->u_blocks[c->u->u_curblock]->b_instr[off];
 	i->i_opcode = opcode;
 	i->i_oparg = block;
@@ -1191,7 +1212,8 @@ compiler_visit_stmt(struct compiler *c, stmt_ty s)
 
 	fprintf(stderr, "compile stmt %d lineno %d\n",
 		s->kind, s->lineno);
-	c->u->u_lineno = s->lineno; 	/* XXX this isn't right */
+	c->u->u_lineno = s->lineno;
+	c->u->u_lineno_set = false;
 	switch (s->kind) {
         case FunctionDef_kind:
 		return compiler_function(c, s);
@@ -1562,7 +1584,7 @@ compiler_tuple(struct compiler *c, expr_ty e)
 static int
 compiler_compare(struct compiler *c, expr_ty e)
 {
-	int i, n, cleanup;
+	int i, n, cleanup = -1;
 
 	VISIT(c, expr, e->v.Compare.left);
 	n = asdl_seq_LEN(e->v.Compare.ops);
@@ -2025,6 +2047,56 @@ assemble_free(struct assembler *a)
 		PyObject_Free(a->a_postorder);
 }
 
+/* All about c_lnotab.
+
+c_lnotab is an array of unsigned bytes disguised as a Python string.  In -O
+mode, SET_LINENO opcodes aren't generated, and bytecode offsets are mapped
+to source code line #s (when needed for tracebacks) via c_lnotab instead.
+The array is conceptually a list of
+    (bytecode offset increment, line number increment)
+pairs.  The details are important and delicate, best illustrated by example:
+
+    byte code offset    source code line number
+        0		    1
+        6		    2
+       50		    7
+      350                 307
+      361                 308
+
+The first trick is that these numbers aren't stored, only the increments
+from one row to the next (this doesn't really work, but it's a start):
+
+    0, 1,  6, 1,  44, 5,  300, 300,  11, 1
+
+The second trick is that an unsigned byte can't hold negative values, or
+values larger than 255, so (a) there's a deep assumption that byte code
+offsets and their corresponding line #s both increase monotonically, and (b)
+if at least one column jumps by more than 255 from one row to the next, more
+than one pair is written to the table. In case #b, there's no way to know
+from looking at the table later how many were written.  That's the delicate
+part.  A user of c_lnotab desiring to find the source line number
+corresponding to a bytecode address A should do something like this
+
+    lineno = addr = 0
+    for addr_incr, line_incr in c_lnotab:
+        addr += addr_incr
+        if addr > A:
+            return lineno
+        lineno += line_incr
+
+In order for this to work, when the addr field increments by more than 255,
+the line # increment in each pair generated must be 0 until the remaining addr
+increment is < 256.  So, in the example above, com_set_lineno should not (as
+was actually done until 2.2) expand 300, 300 to 255, 255,  45, 45, but to
+255, 0,  45, 255,  0, 45.
+*/
+
+static int
+assemble_lnotab(struct assembler *a)
+{
+	return 1;
+}
+
 /* Return the size of a basic block in bytes. */
 
 static int
@@ -2250,6 +2322,8 @@ assemble(struct compiler *c)
 
 	/* Can't modify the bytecode after computing jump offsets. */
 	if (!assemble_jump_offsets(&a, c))
+		goto error;
+	if (!assemble_lnotab(&a))
 		goto error;
 
 	/* Emit code in reverse postorder from dfs. */
