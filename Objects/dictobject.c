@@ -307,7 +307,13 @@ insertdict(register dictobject *mp, PyObject *key, long hash, PyObject *value)
 {
 	PyObject *old_value;
 	register dictentry *ep;
-	ep = (mp->ma_lookup)(mp, key, hash);
+	typedef PyDictEntry *(*lookupfunc)(PyDictObject *, PyObject *, long);
+	register lookupfunc lookup;
+
+	lookup = mp->ma_lookup;
+	if (lookup == NULL)
+		mp->ma_lookup = lookup = lookdict_string;
+	ep = lookup(mp, key, hash);
 	if (ep->me_value != NULL) {
 		old_value = ep->me_value;
 		ep->me_value = value;
