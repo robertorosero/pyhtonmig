@@ -207,14 +207,12 @@ compiler_enter_scope(struct compiler *c, identifier name, void *key)
 	u->u_name = name;
 	u->u_varnames = u->u_ste->ste_varnames;
 	Py_INCREF(u->u_varnames);
-	fprintf(stderr, "block %s varnames %s\n",
-		PyObject_REPR(name),
-		PyObject_REPR(u->u_varnames));
 	u->u_nblocks = 0;
 	u->u_blocks = (struct basicblock **)PyObject_Malloc(
 		sizeof(struct basicblock *) * DEFAULT_BLOCKS);
 	if (!u->u_blocks)
 		return 0;
+	u->u_nfblocks = 0;
 	memset(u->u_blocks, 0, sizeof(struct basicblock *) * DEFAULT_BLOCKS);
 	u->u_consts = PyDict_New();
 	if (!u->u_consts)
@@ -1394,7 +1392,7 @@ makecode(struct compiler *c, struct assembler *a)
 	if (!filename)
 		goto error;
 	
-	nlocals = PyList_GET_SIZE(c->u->u_ste->ste_varnames);
+	nlocals = PyList_GET_SIZE(c->u->u_varnames);
 	co = PyCode_New(c->u->u_argcount, nlocals, stackdepth(c), 0,
 			a->a_bytecode, consts, names, varnames,
 			nil, nil,
