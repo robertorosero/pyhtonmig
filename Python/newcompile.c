@@ -41,6 +41,8 @@ int Py_OptimizeFlag = 0;
      #: ref leaks in interpreter when press return on empty line
      #: yield or return outside a function don't raise a SyntaxError
      #: line numbers are off a bit (may just need to add calls to set lineno)
+        In some cases, the line numbers for generated code aren't strictly
+        increasing.  This breaks the lnotab.
      #: Modules/parsermodule.c:496: warning: implicit declaration 
                                     of function `PyParser_SimpleParseString'
      #: compile.h::b_return is only set, never used
@@ -581,7 +583,7 @@ compiler_set_lineno(struct compiler *c, int off)
 		return;
 	c->u->u_lineno_set = true;
 	b = c->u->u_blocks[c->u->u_curblock];
-	b->b_instr[off].i_lineno = c->u->u_lineno;
+ 	b->b_instr[off].i_lineno = c->u->u_lineno;
 }
 
 static int
@@ -593,13 +595,13 @@ compiler_addop(struct compiler *c, int opcode)
 	off = compiler_next_instr(c, c->u->u_curblock);
 	if (off < 0)
 		return 0;
-	compiler_set_lineno(c, off);
 	b = c->u->u_blocks[c->u->u_curblock];
 	i = &b->b_instr[off];
 	i->i_opcode = opcode;
 	i->i_hasarg = 0;
 	if (opcode == RETURN_VALUE)
 		b->b_return = 1;
+	compiler_set_lineno(c, off);
 	return 1;
 }
 
@@ -649,11 +651,11 @@ compiler_addop_i(struct compiler *c, int opcode, int oparg)
 	off = compiler_next_instr(c, c->u->u_curblock);
 	if (off < 0)
 		return 0;
-	compiler_set_lineno(c, off);
 	i = &c->u->u_blocks[c->u->u_curblock]->b_instr[off];
 	i->i_opcode = opcode;
 	i->i_oparg = oparg;
 	i->i_hasarg = 1;
+	compiler_set_lineno(c, off);
 	return 1;
 }
 
@@ -2441,6 +2443,11 @@ assemble_lnotab(struct assembler *a, struct instr *i)
 	d_bytecode = a->a_offset - a->a_lineno_off;
 	d_lineno = i->i_lineno - a->a_lineno;
 
+	/* setup.py's get_platform() causes these asserts to fail.
+	assert(d_bytecode >= 0);
+	assert(d_lineno >= 0);
+	*/
+
 	if (d_lineno == 0)
 		return 1;
 
@@ -2501,6 +2508,7 @@ assemble_lnotab(struct assembler *a, struct instr *i)
 		*lnotab++ = d_lineno;
 	}
 	a->a_lineno = i->i_lineno;
+	a->a_lineno_off = a->a_offset;
 	return 1;
 }
 
