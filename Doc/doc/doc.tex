@@ -223,6 +223,19 @@ distribution, to create or maintain whole documents or sections.
   macros.  This section contains the reference material for these
   facilities.
 
+  \subsection{Meta-information Markup \label{meta-info}}
+
+    \begin{macrodesc}{sectionauthor}{\p{author}\p{email}}
+      Identifies the author of the current section.  \var{author}
+      should be the author's name such that it can be used for
+      presentation (though it isn't), and \var{email} should be the
+      author's email address.  The domain name portion of
+      the address should be lower case.
+
+      No presentation is generated from this markup, but it is used to 
+      help keep track of contributions.
+    \end{macrodesc}
+
   \subsection{Information Units \label{info-units}}
 
     XXX Explain terminology, or come up with something more ``lay.''
@@ -404,7 +417,8 @@ distribution, to create or maintain whole documents or sections.
 
     \begin{macrodesc}{email}{\p{address}}
       An email address.  Note that this is \emph{not} hyperlinked in
-      any of the possible output formats.
+      any of the possible output formats.  The domain name portion of
+      the address should be lower case.
     \end{macrodesc}
 
     \begin{macrodesc}{emph}{\p{text}}
