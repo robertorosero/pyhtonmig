@@ -556,10 +556,13 @@ type_dealloc(PyTypeObject *type)
 	et = (etype *)type;
 	Py_XDECREF(type->tp_base);
 	Py_XDECREF(type->tp_dict);
+	Py_XDECREF(type->tp_bases);
+	Py_XDECREF(type->tp_mro);
+	Py_XDECREF(type->tp_introduced);
+	/* XXX more? */
 	Py_XDECREF(et->name);
 	Py_XDECREF(et->slots);
-	/* XXX more, e.g. bases, mro, introduced ... */
-	PyObject_DEL(type);
+	type->ob_type->tp_free((PyObject *)type);
 }
 
 static char type_doc[] =
@@ -604,7 +607,7 @@ PyTypeObject PyType_Type = {
 	0,					/* tp_descr_set */
 	offsetof(PyTypeObject, tp_dict),	/* tp_dictoffset */
 	0,					/* tp_init */
-	PyType_GenericAlloc,			/* tp_alloc */
+	0,					/* tp_alloc */
 	type_new,				/* tp_new */
 };
 
@@ -619,6 +622,12 @@ object_init(PyObject *self, PyObject *args, PyObject *kwds)
 
 static void
 object_dealloc(PyObject *self)
+{
+	self->ob_type->tp_free(self);
+}
+
+static void
+object_free(PyObject *self)
 {
 	PyObject_Del(self);
 }
@@ -668,6 +677,7 @@ PyTypeObject PyBaseObject_Type = {
 	object_init,				/* tp_init */
 	PyType_GenericAlloc,			/* tp_alloc */
 	PyType_GenericNew,			/* tp_new */
+	object_free,				/* tp_free */
 };
 
 
@@ -919,6 +929,7 @@ inherit_slots(PyTypeObject *type, PyTypeObject *base)
 		COPYSLOT(tp_init);
 		COPYSLOT(tp_alloc);
 		COPYSLOT(tp_new);
+		COPYSLOT(tp_free);
 	}
 
 	return 0;
