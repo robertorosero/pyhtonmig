@@ -338,6 +338,34 @@ def pymods():
                    ('getattr', '__delattr__'),
                    ("delattr", "foo")], log)
 
+def baseless():
+    if verbose: print "Testing __metaclass__ and mix-ins..."
+    global C
+    class C:
+        __metaclass__ = type(type(0))
+        def __init__(self):
+            self.__state = 0
+        def getstate(self):
+            return self.__state
+        def setstate(self, state):
+            self.__state = state
+    a = C()
+    verify(a.getstate() == 0)
+    a.setstate(10)
+    verify(a.getstate() == 10)
+    class D(type({}), C):
+        def __init__(self):
+            type({}).__init__(self)
+            C.__init__(self)
+    d = D()
+    verify(d.keys() == [])
+    d["hello"] = "world"
+    verify(d.items() == [("hello", "world")])
+    verify(d["hello"] == "world")
+    verify(d.getstate() == 0)
+    d.setstate(10)
+    verify(d.getstate() == 10)
+
 def all():
     lists()
     dicts()
@@ -348,6 +376,7 @@ def all():
     spamdicts()
     pydicts()
     pymods()
+    baseless()
 
 all()
 
