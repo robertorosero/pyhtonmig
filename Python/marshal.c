@@ -304,10 +304,8 @@ r_object(p)
 	
 	case TYPE_FLOAT:
 		{
-			extern double strtod PROTO((const char *, char **));
+			extern double atof PROTO((const char *));
 			char buf[256];
-			double res;
-			char *end;
 			n = r_byte(p);
 			if (r_string(buf, (int)n, p) != n) {
 				err_setstr(EOFError,
@@ -315,18 +313,7 @@ r_object(p)
 				return NULL;
 			}
 			buf[n] = '\0';
-			errno = 0;
-			res = strtod(buf, &end);
-			if (*end != '\0') {
-				err_setstr(ValueError, "bad float syntax");
-				return NULL;
-			}
-			if (errno != 0) {
-				err_setstr(ValueError,
-					"float constant too large");
-				return NULL;
-			}
-			return newfloatobject(res);
+			return newfloatobject(atof(buf));
 		}
 	
 	case TYPE_STRING:
