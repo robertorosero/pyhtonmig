@@ -85,9 +85,12 @@ Script & n.s. for \verb@__main__@ & same as global & \\
 Interactive command & n.s. for \verb@__main__@ & same as global & \\
 Class definition & global n.s. of containing block & new n.s. & \\
 Function body & global n.s. of containing block & new n.s. & \\
-String passed to \verb@exec@ or \verb@eval@
+String passed to \verb@exec@ statement
+	& global n.s. of cobtaining block
+		& local n.s. of containing block & (1) \\
+String passed to \verb@eval()@
 	& global n.s. of caller & local n.s. of caller & (1) \\
-File read by \verb@execfile@
+File read by \verb@execfile()@
 	& global n.s. of caller & local n.s. of caller & (1) \\
 Expression read by \verb@input@
 	& global n.s. of caller & local n.s. of caller & \\
@@ -101,7 +104,7 @@ Notes:
 
 \item[n.s.] means {\em name space}
 
-\item[(1)] The global and local name space for these functions can be
+\item[(1)] The global and local name space for these can be
 overridden with optional extra arguments.
 
 \end{description}
