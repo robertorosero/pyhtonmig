@@ -2,11 +2,11 @@
  * This is the High Performance Python Profiler portion of HotShot.
  */
 
-#include <Python.h>
-#include <compile.h>
-#include <eval.h>
-#include <frameobject.h>
-#include <structmember.h>
+#include "Python.h"
+#include "compile.h"
+#include "eval.h"
+#include "frameobject.h"
+#include "structmember.h"
 
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>

@@ -10,7 +10,7 @@ and platform independent windowing toolkit, that is available to
 Python programmers using the \refmodule{Tkinter} module, and its
 extension, the \refmodule{Tix} module.
 
-\refmodule{Tkinter} is a thin object--oriented layer on top of
+The \refmodule{Tkinter} module is a thin object--oriented layer on top of
 Tcl/Tk. To use \refmodule{Tkinter}, you don't need to write Tcl code,
 but you will need to consult the Tk documentation, and occasionally
 the Tcl documentation.  \refmodule{Tkinter} is a set of wrappers that
@@ -18,10 +18,10 @@ implement the Tk widgets as Python classes.  In addition, the internal
 module \module{\_tkinter} provides a threadsafe mechanism which allows
 Python and Tcl to interact.
 
-\refmodule{Tkinter} is not the only GUI for Python, but is however the
-most commonly used one; see section~\ref{other-gui-modules},
-``Other User Interface Modules and Packages'' for more information on
-other GUI toolkits for Python.
+Tk is not the only GUI for Python, but is however the most commonly
+used one; see section~\ref{other-gui-modules}, ``Other User Interface
+Modules and Packages,'' for more information on other GUI toolkits for
+Python.
 
 % Other sections I have in mind are
 % Tkinter internals
@@ -30,11 +30,8 @@ other GUI toolkits for Python.
 \localmoduletable
 
 
-\section{Tkinter \label{tkinter}}
-\index{Tkinter}
-\sectionauthor{Fredrik Lundh}{fredrik@effbot.org}
-
-\index{Tkinter}
+\section{\module{Tkinter} ---
+         Python interface to Tcl/Tk}
 
 \declaremodule{standard}{Tkinter}
 \modulesynopsis{Interface to Tcl/Tk for graphical user interfaces}
@@ -72,12 +69,13 @@ as on Windows and Macintosh systems.
 
 \subsection{Tkinter Modules}
 
-\refmodule{Tkinter} consists of a number of modules. The Tk interface
-is located in a binary module named \module{_tkinter}.  This module
-contains the low-level interface to Tk, and should never be used
-directly by application programmers. It is usually a shared library
-(or DLL), but might in some cases be statically linked with the Python
-interpreter.
+Most of the time, the \refmodule{Tkinter} module is all you really
+need, but a number of additional modules are available as well.  The
+Tk interface is located in a binary module named \module{_tkinter}.
+This module contains the low-level interface to Tk, and should never
+be used directly by application programmers. It is usually a shared
+library (or DLL), but might in some cases be statically linked with
+the Python interpreter.
 
 In addition to the Tk interface module, \refmodule{Tkinter} includes a
 number of Python modules. The two most important modules are the
@@ -109,6 +107,23 @@ Other modules that provide Tk support include:
 % \modulesynopsis{Constants used by Tkinter}
 % FIXME 
 
+\item[\module{tkColorChooser}]
+Dialog to let the user choose a color.
+
+\item[\module{tkCommonDialog}]
+
+\item[\module{tkFileDialog}]
+Common dialogs to allow the user to specify a file to open or save.
+
+\item[\module{tkFont}]
+Utilities to help work with fonts.
+
+\item[\module{tkMessageBox}]
+Access to standard Tk dialog boxes.
+
+\item[\module{tkSimpleDialog}]
+Basic dialogs and convenience functions.
+
 \item[\module{Tkdnd}]
 Drag-and-drop support for \refmodule{Tkinter}.
 This is experimental and should become deprecated when it is replaced 
@@ -120,7 +135,8 @@ Turtle graphics in a Tk window.
 \end{description}
 
 \subsection{Tkinter Life Preserver}
-\index{Tkinter}
+\sectionauthor{Matt Conway}{}
+% Converted to LaTeX by Mike Clarkson.
 
 This section is not designed to be an exhaustive tutorial on either
 Tk or Tkinter.  Rather, it is intended as a stop gap, providing some
@@ -280,7 +296,7 @@ an application. Application programmers need not instantiate one
 explicitly, the system creates one whenever any of the other classes
 are instantiated.
 \item    The Widget class is not meant to be instantiated, it
-is meant only for subclassing to make ``real'' widgets. (in C++, this
+is meant only for subclassing to make ``real'' widgets. (in \Cpp, this
 is called an `abstract class')
 \end{itemize}
 \fi
@@ -291,7 +307,7 @@ is called an `abstract class')
 To make use of this reference material, there will be times when you
 will need to know how to read short passages of Tk and how to identify
 the various parts of a Tk command.  
-(See \ref{tkinter-basic-mapping} for the
+(See section~\ref{tkinter-basic-mapping} for the
 \refmodule{Tkinter} equivalents of what's below.)
 
 Tk scripts are Tcl programs.  Like all Tcl programs, Tk scripts are
@@ -337,7 +353,7 @@ For example:
 Once created, the pathname to the widget becomes a new command.  This
 new \var{widget command} is the programmer's handle for getting the new
 widget to perform some \var{action}.  In C, you'd express this as
-someAction(fred, someOptions), in C++, you would express this as
+someAction(fred, someOptions), in \Cpp, you would express this as
 fred.someAction(someOptions), and in Tk, you say: 
 
 \begin{verbatim}
@@ -377,8 +393,8 @@ The configuration options in Tk are given in lists of hyphened tags
 followed by values.  In Tkinter, options are specified as
 keyword-arguments in the instance constructor, and keyword-args for
 configure calls or as instance indices, in dictionary style, for
-established instances.  See \ref{tkinter-setting-options}
-on setting options. 
+established instances.  See section~\ref{tkinter-setting-options} on
+setting options.
 
 \begin{verbatim}
     button .fred -fg red        =====>  fred = Button(panel, fg = "red")
@@ -410,6 +426,9 @@ information on the Form geometry manager.
 
 
 \subsection{How Tk and Tkinter are Related} % Relationship.html
+
+\note{This was derived from a graphical image; the image will be used
+      more directly in a subsequent version of this document.}
 
 From the top down:
 \begin{description}
@@ -844,18 +863,24 @@ in a Menu widget.
 Entry widgets have options that refer to character positions in the
 text being displayed.  You can use these \refmodule{Tkinter} functions
 to access these special points in text widgets:
+
 \begin{description}
 \item[AtEnd()]
 refers to the last position in the text
+
 \item[AtInsert()]
 refers to the point where the text cursor is
+
 \item[AtSelFirst()]
 indicates the beginning point of the selected text
+
 \item[AtSelLast()]
 denotes the last point of the selected text and finally
-\item[At(x, y=None)]
-refers to the character at pixel location x, y (with y not used
-in the case of a text entry widget, which is one line of text).
+
+\item[At(x\optional{, y})]
+refers to the character at pixel location \var{x}, \var{y} (with
+\var{y} not used in the case of a text entry widget, which contains a
+single line of text).
 \end{description}
 
 \item[\b{Text widget indexes}]
@@ -888,13 +913,14 @@ that matches for menu items labelled \code{last}, \code{active}, or
 \end{description}
 
 
-\section{Tix \label{tix-widgets}}
-
-\index{Tix}
+\section{\module{Tix} ---
+         Extension widgets for Tk}
 
 \declaremodule{standard}{Tix}
 \modulesynopsis{Tk Extension Widgets for Tkinter}
 \sectionauthor{Mike Clarkson}{mikeclarkson@users.sourceforge.net}
+
+\index{Tix}
 
 The \module{Tix} (Tk Interface Extension) module provides an
 additional rich set of widgets. Although the standard Tk library has
@@ -933,15 +959,15 @@ users.
 
 \subsection{Using Tix}
 
-\begin{classdesc}{Tix}{screenName=None, baseName=None, className='Tix'}
+\begin{classdesc}{Tix}{screenName\optional{, baseName\optional{, className}}}
     Toplevel widget of Tix which represents mostly the main window
     of an application. It has an associated Tcl interpreter.
 
-The \refmodule{Tix} interface module subclasses the \refmodule{Tkinter}
-module. The former imports the latter, so to use \refmodule{Tix} with
-Tkinter, all you need to do is to import one module. In general, you
-can just import Tix, and replace the toplevel call
-to \class{Tkinter.Tk} with \class{Tix.Tk}:
+Classes in the \refmodule{Tix} module subclasses the classes in the
+\refmodule{Tkinter} module. The former imports the latter, so to use
+\refmodule{Tix} with Tkinter, all you need to do is to import one
+module. In general, you can just import \refmodule{Tix}, and replace
+the toplevel call to \class{Tkinter.Tk} with \class{Tix.Tk}:
 \begin{verbatim}
 import Tix
 from Tkconstants import *
@@ -986,66 +1012,67 @@ repertoire.  There is a demo of all the \refmodule{Tix} widgets in the
 
 \subsubsection{Basic Widgets}
 
-\index{Balloon widget}
 \begin{classdesc}{Balloon}{}
 A \ulink{Balloon}
-{http://tix.sourceforge.net/dist/current/man/html/TixCmd/tixBalloon.htm} that pops
-up over a widget to provide help.  When the user moves the cursor
-inside a widget to which a Balloon widget has been bound, a small
-pop-up window with a descriptive message will be shown on the screen.
+{http://tix.sourceforge.net/dist/current/man/html/TixCmd/tixBalloon.htm}
+that pops up over a widget to provide help.  When the user moves the
+cursor inside a widget to which a Balloon widget has been bound, a
+small pop-up window with a descriptive message will be shown on the
+screen.
 \end{classdesc}
 
-% Python Demo of: \ulink{ Balloon}{http://tix.sourceforge.net/dist/current/demos/samples/Balloon.tcl}
+% Python Demo of:
+% \ulink{Balloon}{http://tix.sourceforge.net/dist/current/demos/samples/Balloon.tcl}
 
-\index{ButtonBox widget}
 \begin{classdesc}{ButtonBox}{}
 The \ulink{ButtonBox}
-{http://tix.sourceforge.net/dist/current/man/html/TixCmd/tixButtonBox.htm} widget
-creates a box of buttons, such as is commonly used for \code{Ok Cancel}.
+{http://tix.sourceforge.net/dist/current/man/html/TixCmd/tixButtonBox.htm}
+widget creates a box of buttons, such as is commonly used for \code{Ok
+Cancel}.
 \end{classdesc}
 
-% Python Demo of: \ulink{ ButtonBox}{http://tix.sourceforge.net/dist/current/demos/samples/BtnBox.tcl}
+% Python Demo of:
+% \ulink{ButtonBox}{http://tix.sourceforge.net/dist/current/demos/samples/BtnBox.tcl}
 
-\index{ComboBox widget}
 \begin{classdesc}{ComboBox}{}
 The \ulink{ComboBox}
-{http://tix.sourceforge.net/dist/current/man/html/TixCmd/tixComboBox.htm} widget is
-similar to the combo box control in MS Windows. The user can select a
-choice by either typing in the entry subwdget or selecting from the
-listbox subwidget.
+{http://tix.sourceforge.net/dist/current/man/html/TixCmd/tixComboBox.htm}
+widget is similar to the combo box control in MS Windows. The user can
+select a choice by either typing in the entry subwdget or selecting
+from the listbox subwidget.
 \end{classdesc}
 
-% Python Demo of: \ulink{ ComboBox}{http://tix.sourceforge.net/dist/current/demos/samples/ComboBox.tcl}
+% Python Demo of:
+% \ulink{ComboBox}{http://tix.sourceforge.net/dist/current/demos/samples/ComboBox.tcl}
 
-\index{Control widget}
 \begin{classdesc}{Control}{}
 The \ulink{Control}
-{http://tix.sourceforge.net/dist/current/man/html/TixCmd/tixControl.htm} widget is
-also known as the \class{SpinBox} widget. The user can adjust the value
-by pressing the two arrow buttons or by entering the value directly
-into the entry. The new value will be checked against the user-defined
-upper and lower limits.
+{http://tix.sourceforge.net/dist/current/man/html/TixCmd/tixControl.htm}
+widget is also known as the \class{SpinBox} widget. The user can
+adjust the value by pressing the two arrow buttons or by entering the
+value directly into the entry. The new value will be checked against
+the user-defined upper and lower limits.
 \end{classdesc}
 
-% Python Demo of: \ulink{ Control}{http://tix.sourceforge.net/dist/current/demos/samples/Control.tcl}
+% Python Demo of:
+% \ulink{Control}{http://tix.sourceforge.net/dist/current/demos/samples/Control.tcl}
 
-\index{LabelEntry widget}
 \begin{classdesc}{LabelEntry}{}
 The \ulink{LabelEntry}
-{http://tix.sourceforge.net/dist/current/man/html/TixCmd/tixLabelEntry.htm} widget
-packages an entry widget and a label into one mega widget. It can be
-used be used to simplify the creation of ``entry-form'' type of interface.
+{http://tix.sourceforge.net/dist/current/man/html/TixCmd/tixLabelEntry.htm}
+widget packages an entry widget and a label into one mega widget. It
+can be used be used to simplify the creation of ``entry-form'' type of
+interface.
 \end{classdesc}
 
 % Python Demo of:
 % \ulink{LabelEntry}{http://tix.sourceforge.net/dist/current/demos/samples/LabEntry.tcl}
 
-\index{LabelFrame widget}
 \begin{classdesc}{LabelFrame}{}
 The \ulink{LabelFrame}
-{http://tix.sourceforge.net/dist/current/man/html/TixCmd/tixLabelFrame.htm} widget
-packages a frame widget and a label into one mega widget. To create
-widgets inside a LabelFrame widget, one creates the new widgets
+{http://tix.sourceforge.net/dist/current/man/html/TixCmd/tixLabelFrame.htm}
+widget packages a frame widget and a label into one mega widget.  To
+create widgets inside a LabelFrame widget, one creates the new widgets
 relative to the \member{frame} subwidget and manage them inside the
 \member{frame} subwidget.
 \end{classdesc}
@@ -1053,60 +1080,58 @@ relative to the \member{frame} subwidget and manage them inside the
 % Python Demo of:
 % \ulink{LabelFrame}{http://tix.sourceforge.net/dist/current/demos/samples/LabFrame.tcl}
 
-\index{Meter widget}
 \begin{classdesc}{Meter}{}
 The \ulink{Meter}
-{http://tix.sourceforge.net/dist/current/man/html/TixCmd/tixMeter.htm} widget can
-be used to show the progress of a background job which may take a long
-time to execute.
+{http://tix.sourceforge.net/dist/current/man/html/TixCmd/tixMeter.htm}
+widget can be used to show the progress of a background job which may
+take a long time to execute.
 \end{classdesc}
 
 % Python Demo of:
 % \ulink{Meter}{http://tix.sourceforge.net/dist/current/demos/samples/Meter.tcl}
 
-\index{OptionMenu widget}
 \begin{classdesc}{OptionMenu}{}
 The \ulink{OptionMenu}
-{http://tix.sourceforge.net/dist/current/man/html/TixCmd/tixOptionMenu.htm} creates a
-menu button of options.
+{http://tix.sourceforge.net/dist/current/man/html/TixCmd/tixOptionMenu.htm}
+creates a menu button of options.
 \end{classdesc}
 
-% Python Demo of: \ulink{ OptionMenu}{http://tix.sourceforge.net/dist/current/demos/samples/OptMenu.tcl}
+% Python Demo of:
+% \ulink{OptionMenu}{http://tix.sourceforge.net/dist/current/demos/samples/OptMenu.tcl}
 
-\index{PopupMenu widget}
 \begin{classdesc}{PopupMenu}{}
 The \ulink{PopupMenu}
-{http://tix.sourceforge.net/dist/current/man/html/TixCmd/tixPopupMenu.htm} widget can
-be used as a replacement of the \code{tk_popup} command. The advantage
-of the \refmodule{Tix} PopupMenu widget is it requires less application
-code to manipulate.
+{http://tix.sourceforge.net/dist/current/man/html/TixCmd/tixPopupMenu.htm}
+widget can be used as a replacement of the \code{tk_popup}
+command. The advantage of the \refmodule{Tix} \class{PopupMenu} widget
+is it requires less application code to manipulate.
 \end{classdesc}
 
-% Python Demo of: \ulink{ PopupMenu}{http://tix.sourceforge.net/dist/current/demos/samples/PopMenu.tcl}
+% Python Demo of:
+% \ulink{PopupMenu}{http://tix.sourceforge.net/dist/current/demos/samples/PopMenu.tcl}
 
-\index{Select widget}
 \begin{classdesc}{Select}{}
 The \ulink{Select}
-{http://tix.sourceforge.net/dist/current/man/html/TixCmd/tixSelect.htm} widget is a
-container of button subwidgets. It can be used to provide radio-box or
-check-box style of selection options for the user.
+{http://tix.sourceforge.net/dist/current/man/html/TixCmd/tixSelect.htm}
+widget is a container of button subwidgets. It can be used to provide
+radio-box or check-box style of selection options for the user.
 \end{classdesc}
 
-% Python Demo of: \ulink{ Select}{http://tix.sourceforge.net/dist/current/demos/samples/Select.tcl}
+% Python Demo of:
+% \ulink{Select}{http://tix.sourceforge.net/dist/current/demos/samples/Select.tcl}
 
-\index{StdButtonBox widget}
 \begin{classdesc}{StdButtonBox}{}
 The \ulink{StdButtonBox}
-{http://tix.sourceforge.net/dist/current/man/html/TixCmd/tixStdButtonBox.htm} widget is a
-group of Standard buttons for Motif-like dialog boxes.
+{http://tix.sourceforge.net/dist/current/man/html/TixCmd/tixStdButtonBox.htm}
+widget is a group of standard buttons for Motif-like dialog boxes.
 \end{classdesc}
 
-% Python Demo of: \ulink{ StdButtonBox}{http://tix.sourceforge.net/dist/current/demos/samples/StdBBox.tcl}
+% Python Demo of:
+% \ulink{StdButtonBox}{http://tix.sourceforge.net/dist/current/demos/samples/StdBBox.tcl}
 
 
 \subsubsection{File Selectors}
 
-\index{DirList widget}
 \begin{classdesc}{DirList}{}
 The \ulink{DirList}
 {http://tix.sourceforge.net/dist/current/man/html/TixCmd/tixDirList.htm} widget
@@ -1115,31 +1140,31 @@ sub-directories. The user can choose one of the directories displayed
 in the list or change to another directory.
 \end{classdesc}
 
-% Python Demo of: \ulink{ DirList}{http://tix.sourceforge.net/dist/current/demos/samples/DirList.tcl}
+% Python Demo of:
+% \ulink{DirList}{http://tix.sourceforge.net/dist/current/demos/samples/DirList.tcl}
 
-\index{DirTree widget}
 \begin{classdesc}{DirTree}{}
 The \ulink{DirTree}
-{http://tix.sourceforge.net/dist/current/man/html/TixCmd/tixDirTree.htm} widget
-displays a tree view of a directory, its previous directories and its
-sub-directories. The user can choose one of the directories displayed
-in the list or change to another directory.
+{http://tix.sourceforge.net/dist/current/man/html/TixCmd/tixDirTree.htm}
+widget displays a tree view of a directory, its previous directories
+and its sub-directories. The user can choose one of the directories
+displayed in the list or change to another directory.
 \end{classdesc}
 
-% Python Demo of: \ulink{ DirTree}{http://tix.sourceforge.net/dist/current/demos/samples/DirTree.tcl}
+% Python Demo of:
+% \ulink{DirTree}{http://tix.sourceforge.net/dist/current/demos/samples/DirTree.tcl}
 
-\index{DirSelectDialog widget}
 \begin{classdesc}{DirSelectDialog}{}
 The \ulink{DirSelectDialog}
-{http://tix.sourceforge.net/dist/current/man/html/TixCmd/tixDirSelectDialog.htm} widget
-presents the directories in the file system in a dialog window. The
-user can use this dialog window to navigate through the file system to
-select the desired directory.
+{http://tix.sourceforge.net/dist/current/man/html/TixCmd/tixDirSelectDialog.htm}
+widget presents the directories in the file system in a dialog
+window.  The user can use this dialog window to navigate through the
+file system to select the desired directory.
 \end{classdesc}
 
-% Python Demo of: \ulink{ DirSelectDialog}{http://tix.sourceforge.net/dist/current/demos/samples/DirDlg.tcl}
+% Python Demo of:
+% \ulink{DirSelectDialog}{http://tix.sourceforge.net/dist/current/demos/samples/DirDlg.tcl}
 
-\index{DirSelectBox widget}
 \begin{classdesc}{DirSelectBox}{}
 The \class{DirSelectBox} is similar
 to the standard Motif(TM) directory-selection box. It is generally used for
@@ -1148,151 +1173,167 @@ recently selected into a ComboBox widget so that they can be quickly
 selected again.
 \end{classdesc}
 
-\index{ExFileSelectBox widget}
 \begin{classdesc}{ExFileSelectBox}{}
 The \ulink{ExFileSelectBox}
-{http://tix.sourceforge.net/dist/current/man/html/TixCmd/tixExFileSelectBox.htm} widget is
-usually embedded in a tixExFileSelectDialog widget. It provides an
-convenient method for the user to select files. The style of the
-ExFileSelectBox widget is very similar to the standard file dialog in
-MS Windows 3.1.
+{http://tix.sourceforge.net/dist/current/man/html/TixCmd/tixExFileSelectBox.htm}
+widget is usually embedded in a tixExFileSelectDialog widget. It
+provides an convenient method for the user to select files. The style
+of the \class{ExFileSelectBox} widget is very similar to the standard
+file dialog on MS Windows 3.1.
 \end{classdesc}
 
-% Python Demo of: \ulink{ ExFileSelectDialog}{http://tix.sourceforge.net/dist/current/demos/samples/EFileDlg.tcl}
+% Python Demo of:
+%\ulink{ExFileSelectDialog}{http://tix.sourceforge.net/dist/current/demos/samples/EFileDlg.tcl}
 
-\index{FileSelectBox widget}
 \begin{classdesc}{FileSelectBox}{}
 The \ulink{FileSelectBox}
-{http://tix.sourceforge.net/dist/current/man/html/TixCmd/tixFileSelectBox.htm} is similar
-to the standard Motif(TM) file-selection box. It is generally used for
-the user to choose a file. FileSelectBox stores the files mostly
-recently selected into a ComboBox widget so that they can be quickly
-selected again.
+{http://tix.sourceforge.net/dist/current/man/html/TixCmd/tixFileSelectBox.htm}
+is similar to the standard Motif(TM) file-selection box. It is
+generally used for the user to choose a file. FileSelectBox stores the
+files mostly recently selected into a \class{ComboBox} widget so that
+they can be quickly selected again.
 \end{classdesc}
 
-% Python Demo of: \ulink{ FileSelectDialog}{http://tix.sourceforge.net/dist/current/demos/samples/FileDlg.tcl}
+% Python Demo of:
+% \ulink{FileSelectDialog}{http://tix.sourceforge.net/dist/current/demos/samples/FileDlg.tcl}
 
-\index{FileEntry widget}
 \begin{classdesc}{FileEntry}{}
 The \ulink{FileEntry}
-{http://tix.sourceforge.net/dist/current/man/html/TixCmd/tixFileEntry.htm} widget can
-be used to input a filename. The user can type in the filename
-manually. Alternatively, the user can press the button widget that
-sits next to the entry, which will bring up a file selection dialog.
+{http://tix.sourceforge.net/dist/current/man/html/TixCmd/tixFileEntry.htm}
+widget can be used to input a filename. The user can type in the
+filename manually. Alternatively, the user can press the button widget
+that sits next to the entry, which will bring up a file selection
+dialog.
 \end{classdesc}
 
-% Python Demo of: \ulink{ FileEntry}{http://tix.sourceforge.net/dist/current/demos/samples/FileEnt.tcl}
+% Python Demo of:
+% \ulink{FileEntry}{http://tix.sourceforge.net/dist/current/demos/samples/FileEnt.tcl}
 
 
 \subsubsection{Hierachical ListBox}
 
-\index{HList widget}
 \begin{classdesc}{HList}{}
 The \ulink{HList}
-{http://tix.sourceforge.net/dist/current/man/html/TixCmd/tixHList.htm} widget can be
-used to display any data that have a hierarchical structure, for
-example, file system directory trees. The list entries are indented
-and connected by branch lines according to their places in the hierachy.
+{http://tix.sourceforge.net/dist/current/man/html/TixCmd/tixHList.htm}
+widget can be used to display any data that have a hierarchical
+structure, for example, file system directory trees. The list entries
+are indented and connected by branch lines according to their places
+in the hierachy.
 \end{classdesc}
 
-% Python Demo of: \ulink{ HList}{http://tix.sourceforge.net/dist/current/demos/samples/HList1.tcl}
+% Python Demo of:
+% \ulink{HList}{http://tix.sourceforge.net/dist/current/demos/samples/HList1.tcl}
 
-\index{CheckList widget}
 \begin{classdesc}{CheckList}{}
 The \ulink{CheckList}
-{http://tix.sourceforge.net/dist/current/man/html/TixCmd/tixCheckList.htm} widget
-displays a list of items to be selected by the user. CheckList acts
-similarly to the Tk checkbutton or radiobutton widgets, except it is
-capable of handling many more items than checkbuttons or radiobuttons.
+{http://tix.sourceforge.net/dist/current/man/html/TixCmd/tixCheckList.htm}
+widget displays a list of items to be selected by the user. CheckList
+acts similarly to the Tk checkbutton or radiobutton widgets, except it
+is capable of handling many more items than checkbuttons or
+radiobuttons.
 \end{classdesc}
 
-% Python Demo of: \ulink{ CheckList}{http://tix.sourceforge.net/dist/current/demos/samples/ChkList.tcl}
-% Python Demo of: \ulink{ScrolledHList (1)}{http://tix.sourceforge.net/dist/current/demos/samples/SHList.tcl}
-% Python Demo of: \ulink{ScrolledHList (2)}{http://tix.sourceforge.net/dist/current/demos/samples/SHList2.tcl}
+% Python Demo of:
+% \ulink{ CheckList}{http://tix.sourceforge.net/dist/current/demos/samples/ChkList.tcl}
+% Python Demo of:
+% \ulink{ScrolledHList (1)}{http://tix.sourceforge.net/dist/current/demos/samples/SHList.tcl}
+% Python Demo of:
+% \ulink{ScrolledHList (2)}{http://tix.sourceforge.net/dist/current/demos/samples/SHList2.tcl}
 
-
-\index{Tree widget}
 \begin{classdesc}{Tree}{}
 The \ulink{Tree}
-{http://tix.sourceforge.net/dist/current/man/html/TixCmd/tixTree.htm} widget can be
-used to display hierachical data in a tree form. The user can adjust
-the view of the tree by opening or closing parts of the tree.
+{http://tix.sourceforge.net/dist/current/man/html/TixCmd/tixTree.htm}
+widget can be used to display hierachical data in a tree form. The
+user can adjust the view of the tree by opening or closing parts of
+the tree.
 \end{classdesc}
 
-% Python Demo of: \ulink{ Tree}{http://tix.sourceforge.net/dist/current/demos/samples/Tree.tcl}
+% Python Demo of:
+% \ulink{Tree}{http://tix.sourceforge.net/dist/current/demos/samples/Tree.tcl}
 
-% Python Demo of: \ulink{Tree (Dynamic)}{http://tix.sourceforge.net/dist/current/demos/samples/DynTree.tcl}
+% Python Demo of:
+% \ulink{Tree (Dynamic)}{http://tix.sourceforge.net/dist/current/demos/samples/DynTree.tcl}
 
 
 \subsubsection{Tabular ListBox}
 
-\index{TList widget}
 \begin{classdesc}{TList}{}
 The \ulink{TList}
-{http://tix.sourceforge.net/dist/current/man/html/TixCmd/tixTList.htm} widget can be
-used to display data in a tabular format. The list entries of a TList
-widget are similar to the entries in the Tk listbox widget. The main
-differences are (1) the TList widget can display the list entries in a
-two dimensional format and (2) you can use graphical images as well as
-multiple colors and fonts for the list entries.
+{http://tix.sourceforge.net/dist/current/man/html/TixCmd/tixTList.htm}
+widget can be used to display data in a tabular format. The list
+entries of a \class{TList} widget are similar to the entries in the Tk
+listbox widget.  The main differences are (1) the \class{TList} widget
+can display the list entries in a two dimensional format and (2) you
+can use graphical images as well as multiple colors and fonts for the
+list entries.
 \end{classdesc}
 
-% Python Demo of: \ulink{ScrolledTList (1)}{http://tix.sourceforge.net/dist/current/demos/samples/STList1.tcl}
-% Python Demo of: \ulink{ScrolledTList (2)}{http://tix.sourceforge.net/dist/current/demos/samples/STList2.tcl}
+% Python Demo of:
+% \ulink{ScrolledTList (1)}{http://tix.sourceforge.net/dist/current/demos/samples/STList1.tcl}
+% Python Demo of:
+% \ulink{ScrolledTList (2)}{http://tix.sourceforge.net/dist/current/demos/samples/STList2.tcl}
 
 % Grid has yet to be added to Python
 % \subsubsection{Grid Widget}
-% % Python Demo of: \ulink{Simple Grid}{http://tix.sourceforge.net/dist/current/demos/samples/SGrid0.tcl}
-% % Python Demo of: \ulink{ScrolledGrid}{http://tix.sourceforge.net/dist/current/demos/samples/SGrid1.tcl}
-% % Python Demo of: \ulink{Editable Grid}{http://tix.sourceforge.net/dist/current/demos/samples/EditGrid.tcl}
+% Python Demo of:
+% \ulink{Simple Grid}{http://tix.sourceforge.net/dist/current/demos/samples/SGrid0.tcl}
+% Python Demo of:
+% \ulink{ScrolledGrid}{http://tix.sourceforge.net/dist/current/demos/samples/SGrid1.tcl}
+% Python Demo of:
+% \ulink{Editable Grid}{http://tix.sourceforge.net/dist/current/demos/samples/EditGrid.tcl}
 
 
 \subsubsection{Manager Widgets}
 
-\index{PanedWindow widget}
 \begin{classdesc}{PanedWindow}{}
 The \ulink{PanedWindow}
-{http://tix.sourceforge.net/dist/current/man/html/TixCmd/tixPanedWindow.htm} widget
-allows the user to interactively manipulate the sizes of several
-panes. The panes can be arranged either vertically or horizontally.The
-user changes the sizes of the panes by dragging the resize handle
-between two panes.
+{http://tix.sourceforge.net/dist/current/man/html/TixCmd/tixPanedWindow.htm}
+widget allows the user to interactively manipulate the sizes of
+several panes.  The panes can be arranged either vertically or
+horizontally.  The user changes the sizes of the panes by dragging the
+resize handle between two panes.
 \end{classdesc}
 
-% Python Demo of: \ulink{ PanedWindow}{http://tix.sourceforge.net/dist/current/demos/samples/PanedWin.tcl}
+% Python Demo of:
+% \ulink{PanedWindow}{http://tix.sourceforge.net/dist/current/demos/samples/PanedWin.tcl}
 
-\index{ListNoteBook widget}
 \begin{classdesc}{ListNoteBook}{}
 The \ulink{ListNoteBook}
-{http://tix.sourceforge.net/dist/current/man/html/TixCmd/tixListNoteBook.htm} widget is
-very similar to the TixNoteBook widget: it can be used to display many
-windows in a limited space using a notebook metaphor. The notebook is
-divided into a stack of pages (windows). At one time only one of these
-pages can be shown. The user can navigate through these pages by
-choosing the name of the desired page in the \member{hlist} subwidget.
+{http://tix.sourceforge.net/dist/current/man/html/TixCmd/tixListNoteBook.htm}
+widget is very similar to the \class{TixNoteBook} widget: it can be
+used to display many windows in a limited space using a notebook
+metaphor. The notebook is divided into a stack of pages (windows). At
+one time only one of these pages can be shown. The user can navigate
+through these pages by choosing the name of the desired page in the
+\member{hlist} subwidget.
 \end{classdesc}
 
-% Python Demo of: \ulink{ ListNoteBook}{http://tix.sourceforge.net/dist/current/demos/samples/ListNBK.tcl}
+% Python Demo of:
+% \ulink{ListNoteBook}{http://tix.sourceforge.net/dist/current/demos/samples/ListNBK.tcl}
 
-
-\index{NoteBook widget}
 \begin{classdesc}{NoteBook}{}
 The \ulink{NoteBook}
-{http://tix.sourceforge.net/dist/current/man/html/TixCmd/tixNoteBook.htm} widget can
-be used to display many windows in a limited space using a notebook
-metaphor. The notebook is divided into a stack of pages. At one time
-only one of these pages can be shown. The user can navigate through
-these pages by choosing the visual ``tabs'' at the top of the NoteBook widget.
+{http://tix.sourceforge.net/dist/current/man/html/TixCmd/tixNoteBook.htm}
+widget can be used to display many windows in a limited space using a
+notebook metaphor. The notebook is divided into a stack of pages. At
+one time only one of these pages can be shown. The user can navigate
+through these pages by choosing the visual ``tabs'' at the top of the
+NoteBook widget.
 \end{classdesc}
 
-% Python Demo of: \ulink{ NoteBook}{http://tix.sourceforge.net/dist/current/demos/samples/NoteBook.tcl}
+% Python Demo of:
+% \ulink{NoteBook}{http://tix.sourceforge.net/dist/current/demos/samples/NoteBook.tcl}
 
 
 % \subsubsection{Scrolled Widgets}
-% Python Demo of: \ulink{ ScrolledListBox}{http://tix.sourceforge.net/dist/current/demos/samples/SListBox.tcl}
-% Python Demo of: \ulink{ ScrolledText}{http://tix.sourceforge.net/dist/current/demos/samples/SText.tcl}
-% Python Demo of: \ulink{ ScrolledWindow}{http://tix.sourceforge.net/dist/current/demos/samples/SWindow.tcl}
-% Python Demo of: \ulink{Canvas Object View}{http://tix.sourceforge.net/dist/current/demos/samples/CObjView.tcl}
+% Python Demo of:
+% \ulink{ScrolledListBox}{http://tix.sourceforge.net/dist/current/demos/samples/SListBox.tcl}
+% Python Demo of:
+% \ulink{ScrolledText}{http://tix.sourceforge.net/dist/current/demos/samples/SText.tcl}
+% Python Demo of:
+% \ulink{ScrolledWindow}{http://tix.sourceforge.net/dist/current/demos/samples/SWindow.tcl}
+% Python Demo of:
+% \ulink{Canvas Object View}{http://tix.sourceforge.net/dist/current/demos/samples/CObjView.tcl}
 
 
 \subsubsection{Image Types}
@@ -1301,9 +1342,9 @@ The \refmodule{Tix} module adds:
 \begin{itemize}
 \item 
 \ulink{pixmap}
-{http://tix.sourceforge.net/dist/current/man/html/TixCmd/pixmap.htm} capabilities
-to all \refmodule{Tix} and \refmodule{Tkinter} widgets to create color
-images from XPM files.
+{http://tix.sourceforge.net/dist/current/man/html/TixCmd/pixmap.htm}
+capabilities to all \refmodule{Tix} and \refmodule{Tkinter} widgets to
+create color images from XPM files.
 
 % Python Demo of: \ulink{XPM Image In Button}{http://tix.sourceforge.net/dist/current/demos/samples/Xpm.tcl}
 
@@ -1311,41 +1352,44 @@ images from XPM files.
 
 \item
 \ulink{Compound}
-{http://tix.sourceforge.net/dist/current/man/html/TixCmd/compound.html} image
-types can be used to create images that consists of multiple
+{http://tix.sourceforge.net/dist/current/man/html/TixCmd/compound.html}
+image types can be used to create images that consists of multiple
 horizontal lines; each line is composed of a series of items (texts,
 bitmaps, images or spaces) arranged from left to right. For example, a
 compound image can be used to display a bitmap and a text string
 simutaneously in a Tk \class{Button} widget.
 
-% Python Demo of: \ulink{Compound Image In Buttons}{http://tix.sourceforge.net/dist/current/demos/samples/CmpImg.tcl}
+% Python Demo of:
+% \ulink{Compound Image In Buttons}{http://tix.sourceforge.net/dist/current/demos/samples/CmpImg.tcl}
 
-% Python Demo of: \ulink{Compound Image In NoteBook}{http://tix.sourceforge.net/dist/current/demos/samples/CmpImg2.tcl}
+% Python Demo of:
+% \ulink{Compound Image In NoteBook}{http://tix.sourceforge.net/dist/current/demos/samples/CmpImg2.tcl}
 
-% Python Demo of: \ulink{Compound Image Notebook Color Tabs}{http://tix.sourceforge.net/dist/current/demos/samples/CmpImg4.tcl}
+% Python Demo of:
+% \ulink{Compound Image Notebook Color Tabs}{http://tix.sourceforge.net/dist/current/demos/samples/CmpImg4.tcl}
 
-% Python Demo of: \ulink{Compound Image Icons}{http://tix.sourceforge.net/dist/current/demos/samples/CmpImg3.tcl}
+% Python Demo of:
+% \ulink{Compound Image Icons}{http://tix.sourceforge.net/dist/current/demos/samples/CmpImg3.tcl}
 \end{itemize}
 
 
 \subsubsection{Miscellaneous Widgets}
 
-\index{InputOnly widget}
 \begin{classdesc}{InputOnly}{}
 The \ulink{InputOnly}
-{http://tix.sourceforge.net/dist/current/man/html/TixCmd/tixInputOnly.htm} widgets are
-to accept inputs from the user, which can be done with the \code{bind}
-command (\UNIX{} only).
+{http://tix.sourceforge.net/dist/current/man/html/TixCmd/tixInputOnly.htm}
+widgets are to accept inputs from the user, which can be done with the
+\code{bind} command (\UNIX{} only).
 \end{classdesc}
 
 \subsubsection{Form Geometry Manager}
 
 In addition, \refmodule{Tix} augments \refmodule{Tkinter} by providing:
-\index{Form widget class}
+
 \begin{classdesc}{Form}{}
 The \ulink{Form}
-{http://tix.sourceforge.net/dist/current/man/html/TixCmd/tixForm.htm} geometry
-manager based on attachment rules for all Tk widgets.
+{http://tix.sourceforge.net/dist/current/man/html/TixCmd/tixForm.htm}
+geometry manager based on attachment rules for all Tk widgets.
 \end{classdesc}
 
 
@@ -1360,91 +1404,7 @@ manager based on attachment rules for all Tk widgets.
 %end{latexonly}
 
 
-\section{Other User Interface Modules and Packages
-         \label{other-gui-modules}}
-
-
-There are an number of extension widget sets to \refmodule{Tkinter}.
-
-\begin{seealso}
-\seetitle[http://pmw.sourceforge.net/]{Python megawidgets}{is a
-toolkit for building high-level compound widgets in Python using the
-\refmodule{Tkinter} module.  It consists of a set of base classes and
-a library of flexible and extensible megawidgets built on this
-foundation. These megawidgets include notebooks, comboboxes, selection
-widgets, paned widgets, scrolled widgets, dialog windows, etc.  Also,
-with the Pmw.Blt interface to BLT, the busy, graph, stripchart, tabset
-and vector commands are be available.
-
-The initial ideas for Pmw were taken from the Tk \code{itcl}
-extensions \code{[incr Tk]} by Michael McLennan and \code{[incr
-Widgets]} by Mark Ulferts. Several of the megawidgets are direct
-translations from the itcl to Python. It offers most of the range of
-widgets that \code{[incr Widgets]} does, and is almost as complete as
-Tix, lacking however Tix's fast \class{HList} widget for drawing trees.
-}
-\seetitle[http://tkinter.effbot.org]{Tkinter3000}{
-is a Widget Construction Kit that allows you to write new Tkinter
-widgets in Python using Mixins. It is built on top of Tkinter,
-and does not offer the extended range of widgets that \refmodule{Tix} does,
-but does allow a form of  building mega-widgets. The project is
-still in the early stages.
-}
-\end{seealso}
-
-
-\refmodule{Tkinter} is not the only GUI for Python, but is however the
-most commonly used one.
-
-\begin{seealso}
-\seetitle[http://www.wxwindows.org]{wxWindows}{
-is a GUI toolkit that combines the most attractive attributes of Qt,
-Tk, Motif, and GTK+ in one powerful and efficient package. It is
-implemented in C++. wxWindows supports two flavors of Unix
-implementation: GTK+ and Motif, and under Windows, it has a standard
-Microsoft Foundation Classes (MFC) appearance, because it uses Win32
-widgets.  There is a Python class wrapper, independent of Tkinter.
-
-wxWindows is much richer in widgets than \refmodule{Tkinter}, with its
-help system, sophisticated HTML and image viewers, and other
-specialized widgets, extensive documentation, and printing capabilities.
-}
-\seetitle[http://www.thekompany.com]{PyKDE}{
-PyKDE is a SIP wrapped interface to the Qt toolkit.
-The Qt C++ toolkit lies at the heart of the KDE desktop, and the
-Qt toolkit allows very tight integration with KDE, and also Windows
-portability. SIP is a tool for generating bindings for \Cpp{} libraries
-as Python classes, and is specifically designed for Python.
-}
-\seetitle[http://fxpy.sourceforge.net/]{FXPy}{
-is a Python extension module which provides an interface to the 
-\citetitle[http://www.cfdrc.com/FOX/fox.html]{FOX} GUI.
-FOX is a C++ based Toolkit for developing Graphical User Interfaces
-easily and effectively. It offers a wide, and growing, collection of
-Controls, and provides state of the art facilities such as drag and
-drop, selection, as well as OpenGL widgets for 3D graphical
-manipulation.  FOX also implements icons, images, and user-convenience
-features such as status line help, and tooltips.  
-
-Even though FOX offers a large collection of Controls already, FOX
-leverages C++ to allow programmers to easily build additional Controls
-and GUI elements, simply by taking existing controls, and creating a
-derived class which simply adds or redefines the desired behavior.
-}
-\seetitle[http://www.daa.com.au/\~james/pygtk/]{PyGTK}{
-is a set of bindings for the \ulink{GTK}{http://www.gtk.org/} widget set.
-It provides an object oriented interface that is slightly higher
-level than the C one. It automatically does all the type casting and
-reference counting that you would have to do normally with the C
-API. There are also \ulink{bindings}{http://www.daa.com.au/\~james/gnome/}
-to  \ulink{GNOME}{http://www.gnome.org}, and a 
-\ulink{tutorial}
-{http://laguna.fmedic.unam.mx/\~daniel/pygtutorial/pygtutorial/index.html}
-is available.
-}
-\end{seealso}
-
-% XXX Reference URLs that compare the different UI packages
+\input{libturtle}
 
 
 \section{Idle \label{idle}}
@@ -1606,10 +1566,10 @@ a \samp{>>>~} prompt
 \end{itemize}
 
 \begin{itemize}
-\item   Alt-p retrieves previous command matching what you have typed
-\item   Alt-n retrieves next
+\item   \kbd{Alt-p} retrieves previous command matching what you have typed
+\item   \kbd{Alt-n} retrieves next
 \item   \kbd{Return} while on any previous command retrieves that command
-\item   Alt-/ (Expand word) is also useful here
+\item   \kbd{Alt-/} (Expand word) is also useful here
 \end{itemize}
 
 \index{indentation}
@@ -1672,3 +1632,90 @@ If there are arguments:
         session is started; the arguments are still available in
         \code{sys.argv}.
 \end{enumerate}
+
+
+\section{Other Graphical User Interface Packages
+         \label{other-gui-packages}}
+
+
+There are an number of extension widget sets to \refmodule{Tkinter}.
+
+\begin{seealso}
+\seetitle[http://pmw.sourceforge.net/]{Python megawidgets}{is a
+toolkit for building high-level compound widgets in Python using the
+\refmodule{Tkinter} module.  It consists of a set of base classes and
+a library of flexible and extensible megawidgets built on this
+foundation. These megawidgets include notebooks, comboboxes, selection
+widgets, paned widgets, scrolled widgets, dialog windows, etc.  Also,
+with the Pmw.Blt interface to BLT, the busy, graph, stripchart, tabset
+and vector commands are be available.
+
+The initial ideas for Pmw were taken from the Tk \code{itcl}
+extensions \code{[incr Tk]} by Michael McLennan and \code{[incr
+Widgets]} by Mark Ulferts. Several of the megawidgets are direct
+translations from the itcl to Python. It offers most of the range of
+widgets that \code{[incr Widgets]} does, and is almost as complete as
+Tix, lacking however Tix's fast \class{HList} widget for drawing trees.
+}
+\seetitle[http://tkinter.effbot.org]{Tkinter3000}{
+is a Widget Construction Kit that allows you to write new Tkinter
+widgets in Python using Mixins. It is built on top of Tkinter,
+and does not offer the extended range of widgets that \refmodule{Tix} does,
+but does allow a form of  building mega-widgets. The project is
+still in the early stages.
+}
+\end{seealso}
+
+
+Tk is not the only GUI for Python, but is however the
+most commonly used one.
+
+\begin{seealso}
+\seetitle[http://www.wxwindows.org]{wxWindows}{
+is a GUI toolkit that combines the most attractive attributes of Qt,
+Tk, Motif, and GTK+ in one powerful and efficient package. It is
+implemented in \Cpp. wxWindows supports two flavors of Unix
+implementation: GTK+ and Motif, and under Windows, it has a standard
+Microsoft Foundation Classes (MFC) appearance, because it uses Win32
+widgets.  There is a Python class wrapper, independent of Tkinter.
+
+wxWindows is much richer in widgets than \refmodule{Tkinter}, with its
+help system, sophisticated HTML and image viewers, and other
+specialized widgets, extensive documentation, and printing capabilities.
+}
+\seetitle[http://www.thekompany.com]{PyKDE}{
+PyKDE is a SIP wrapped interface to the Qt toolkit.
+The Qt \Cpp{} toolkit lies at the heart of the KDE desktop, and the
+Qt toolkit allows very tight integration with KDE, and also Windows
+portability. SIP is a tool for generating bindings for \Cpp{} libraries
+as Python classes, and is specifically designed for Python.
+}
+\seetitle[http://fxpy.sourceforge.net/]{FXPy}{
+is a Python extension module which provides an interface to the 
+\citetitle[http://www.cfdrc.com/FOX/fox.html]{FOX} GUI.
+FOX is a \Cpp{} based Toolkit for developing Graphical User Interfaces
+easily and effectively. It offers a wide, and growing, collection of
+Controls, and provides state of the art facilities such as drag and
+drop, selection, as well as OpenGL widgets for 3D graphical
+manipulation.  FOX also implements icons, images, and user-convenience
+features such as status line help, and tooltips.  
+
+Even though FOX offers a large collection of controls already, FOX
+leverages \Cpp{} to allow programmers to easily build additional Controls
+and GUI elements, simply by taking existing controls, and creating a
+derived class which simply adds or redefines the desired behavior.
+}
+\seetitle[http://www.daa.com.au/\~james/pygtk/]{PyGTK}{
+is a set of bindings for the \ulink{GTK}{http://www.gtk.org/} widget set.
+It provides an object oriented interface that is slightly higher
+level than the C one. It automatically does all the type casting and
+reference counting that you would have to do normally with the C
+API. There are also \ulink{bindings}{http://www.daa.com.au/\~james/gnome/}
+to  \ulink{GNOME}{http://www.gnome.org}, and a 
+\ulink{tutorial}
+{http://laguna.fmedic.unam.mx/\~daniel/pygtutorial/pygtutorial/index.html}
+is available.
+}
+\end{seealso}
+
+% XXX Reference URLs that compare the different UI packages
