@@ -105,15 +105,15 @@ Common macros used to manipulate ``node *`` structs as defined in
   - TYPE(node) -- The type of node as listed in ``Include/graminit.h``
   - REQ(node, type) -- Assert that the node is the type that is expected
 
-XXX Function and macros for creating and using ``asdl_seq *`` types
-(found in Python/asdl.c and Include/asdl.h):
-    + asdl_seq_new
-        * when to use?
-        * when to call asdl_seq_free?
-    + asdl_seq_APPEND
-    + asdl_seq_SET
-    + asdl_seq_GET
-    + asdl_seq_LEN
+Function and macros for creating and using ``asdl_seq *`` types
+as found in Python/asdl.c and Include/asdl.h:
+  - asdl_seq_new(int) -- Allocate memory for an asdl_seq for length
+    'size'
+  - asdl_seq_free(asdl_seq *) -- Free asdl_seq struct
+  - asdl_seq_GET(seq, pos) -- Get item held at 'pos'
+  - asdl_seq_SET(seq, pos, val) -- Set 'seq' at 'pos' to 'val'
+  - asdl_seq_APPEND(seq, val) -- Set the end of 'seq' to 'val'
+  - asdl_seq_LEN(seq) -- Return the length of 'seq'
 
 
 Code Generation and Basic Blocks
