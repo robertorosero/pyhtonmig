@@ -418,15 +418,6 @@ mapping_print(mp, fp, flags)
 	return 0;
 }
 
-static void
-js(pv, w)
-	object **pv;
-	object *w;
-{
-	joinstring(pv, w);
-	XDECREF(w);
-}
-
 static object *
 mapping_repr(mp)
 	mappingobject *mp;
@@ -440,16 +431,16 @@ mapping_repr(mp)
 	sepa = newstringobject(", ");
 	colon = newstringobject(": ");
 	any = 0;
-	for (i = 0, ep = mp->ma_table; i < mp->ma_size; i++, ep++) {
+	for (i = 0, ep = mp->ma_table; i < mp->ma_size && v; i++, ep++) {
 		if (ep->me_value != NULL) {
 			if (any++)
 				joinstring(&v, sepa);
-			js(&v, reprobject(ep->me_key));
+			joinstring_decref(&v, reprobject(ep->me_key));
 			joinstring(&v, colon);
-			js(&v, reprobject(ep->me_value));
+			joinstring_decref(&v, reprobject(ep->me_value));
 		}
 	}
-	js(&v, newstringobject("}"));
+	joinstring_decref(&v, newstringobject("}"));
 	XDECREF(sepa);
 	XDECREF(colon);
 	return v;

@@ -653,14 +653,8 @@ com_atom(c, n)
 		if ((v = parsestr(STR(ch))) != NULL) {
 			/* String literal concatenation */
 			for (i = 1; i < NCH(n) && v != NULL; i++) {
-				object *w;
-				if ((w = parsestr(STR(CHILD(n, i)))) == NULL) {
-					DECREF(v);
-					v = NULL;
-					break;
-				}
-				joinstring(&v, w);
-				DECREF(w);
+				joinstring_decref(&v,
+					parsestr(STR(CHILD(n, i))));
 			}
 		}
 		if (v == NULL) {

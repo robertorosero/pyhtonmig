@@ -180,26 +180,19 @@ static object *
 tuplerepr(v)
 	tupleobject *v;
 {
-	object *s, *t, *comma;
+	object *s, *comma;
 	int i;
 	s = newstringobject("(");
 	comma = newstringobject(", ");
 	for (i = 0; i < v->ob_size && s != NULL; i++) {
 		if (i > 0)
 			joinstring(&s, comma);
-		t = reprobject(v->ob_item[i]);
-		joinstring(&s, t);
-		XDECREF(t);
+		joinstring_decref(&s, reprobject(v->ob_item[i]));
 	}
 	DECREF(comma);
-	if (v->ob_size == 1) {
-		t = newstringobject(",");
-		joinstring(&s, t);
-		DECREF(t);
-	}
-	t = newstringobject(")");
-	joinstring(&s, t);
-	DECREF(t);
+	if (v->ob_size == 1)
+		joinstring_decref(&s, newstringobject(","));
+	joinstring_decref(&s, newstringobject(")"));
 	return s;
 }
 

@@ -1044,37 +1044,23 @@ array_repr(a)
 		v = array_tostring(a, (object *)NULL);
 		t = reprobject(v);
 		XDECREF(v);
-		joinstring(&s, t);
-		XDECREF(t);
-		t = newstringobject(")");
-		joinstring(&s, t);
-		XDECREF(t);
-		if (err_occurred()) {
-			XDECREF(s);
-			s = NULL;
-		}
+		joinstring_decref(&s, t);
+		joinstring_decref(&s, newstringobject(")"));
 		return s;
 	}
 	sprintf(buf, "array('%c', [", a->ob_descr->typecode);
 	s = newstringobject(buf);
 	comma = newstringobject(", ");
 	for (i = 0; i < len && !err_occurred(); i++) {
+		if (i > 0)
+			joinstring(&s, comma);
 		v = (a->ob_descr->getitem)(a, i);
 		t = reprobject(v);
 		XDECREF(v);
-		if (i > 0)
-			joinstring(&s, comma);
-		joinstring(&s, t);
-		XDECREF(t);
+		joinstring_decref(&s, t);
 	}
 	XDECREF(comma);
-	t = newstringobject("])");
-	joinstring(&s, t);
-	XDECREF(t);
-	if (err_occurred()) {
-		XDECREF(s);
-		s = NULL;
-	}
+	joinstring_decref(&s, newstringobject("])"));
 	return s;
 }
 

@@ -211,21 +211,17 @@ static object *
 list_repr(v)
 	listobject *v;
 {
-	object *s, *t, *comma;
+	object *s, *comma;
 	int i;
 	s = newstringobject("[");
 	comma = newstringobject(", ");
 	for (i = 0; i < v->ob_size && s != NULL; i++) {
 		if (i > 0)
 			joinstring(&s, comma);
-		t = reprobject(v->ob_item[i]);
-		joinstring(&s, t);
-		DECREF(t);
+		joinstring_decref(&s, reprobject(v->ob_item[i]));
 	}
-	DECREF(comma);
-	t = newstringobject("]");
-	joinstring(&s, t);
-	DECREF(t);
+	XDECREF(comma);
+	joinstring_decref(&s, newstringobject("]"));
 	return s;
 }
 

@@ -463,12 +463,27 @@ joinstring(pv, w)
 	register object *w;
 {
 	register object *v;
-	if (*pv == NULL || w == NULL || !is_stringobject(*pv))
+	if (*pv == NULL)
 		return;
+	if (w == NULL || !is_stringobject(*pv)) {
+		DECREF(*pv);
+		*pv = NULL;
+		return;
+	}
 	v = string_concat((stringobject *) *pv, w);
 	DECREF(*pv);
 	*pv = v;
 }
+
+void
+joinstring_decref(pv, w)
+	register object **pv;
+	register object *w;
+{
+	joinstring(pv, w);
+	XDECREF(w);
+}
+
 
 /* The following function breaks the notion that strings are immutable:
    it changes the size of a string.  We get away with this only if there
