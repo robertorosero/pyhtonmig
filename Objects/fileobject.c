@@ -315,16 +315,16 @@ file_read(f, args)
 	
 	if (f->f_fp == NULL)
 		return err_closed();
-	if (args == NULL) {
+	if (args == NULL)
 		n = 0;
+	else {
+		if (!getargs(args, "i", &n))
+			return NULL;
 		if (n < 0) {
 			err_setstr(ValueError, "negative read count");
 			return NULL;
 		}
 	}
-	else if (!getargs(args, "i", &n))
-		return NULL;
-	
 	n2 = n != 0 ? n : BUFSIZ;
 	v = newsizedstringobject((char *)NULL, n2);
 	if (v == NULL)
