@@ -61,6 +61,10 @@ Windows
 
 Mac
 
+- The Carbon toolbox modules have been upgraded to Universal Headers
+  3.4, and experimental CoreGraphics and CarbonEvents modules have
+  been added.  All only for framework-enabled MacOSX.
+
 
 What's New in Python 2.2c1?
 Release date: 14-Dec-2001
