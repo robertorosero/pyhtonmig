@@ -722,7 +722,7 @@
                     <PATH>InterfaceLib</PATH>
                     <PATHFORMAT>MacOS</PATHFORMAT>
                     <FILEKIND>Library</FILEKIND>
-                    <FILEFLAGS>Debug</FILEFLAGS>
+                    <FILEFLAGS>%(stdlibraryflags)s</FILEFLAGS>
                 </FILE>
             </FILELIST>
             <LINKORDER>

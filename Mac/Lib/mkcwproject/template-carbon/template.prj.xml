@@ -979,7 +979,7 @@
                     <PATHTYPE>Name</PATHTYPE>
                     <PATH>CarbonLib</PATH>
                     <PATHFORMAT>MacOS</PATHFORMAT>
-                    <FILEKIND>Library</FILEKIND>
+                    <FILEKIND>%(stdlibraryflags)s</FILEKIND>
                     <FILEFLAGS></FILEFLAGS>
                 </FILE>
             </FILELIST>
