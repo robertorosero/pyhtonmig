@@ -978,6 +978,7 @@ builtin_reduce(self, args)
 		err_clear();
 		if (!getargs(args, "(OOO)", &func, &seq, &result))
 			return NULL;
+		INCREF(result);
 	}
 
 	if ((sqf = seq->ob_type->tp_as_sequence) == NULL) {
