@@ -35,7 +35,6 @@ int Py_OptimizeFlag = 0;
      #: Ellipsis isn't handled properly
      #: co_names doesn't contain locals, only globals, co_varnames may work
      #: ref leaks in interpreter when press return on empty line
-     #: yield or return outside a function don't raise a SyntaxError
      #: line numbers are off a bit (may just need to add calls to set lineno)
         In some cases, the line numbers for generated code aren't strictly
         increasing.  This breaks the lnotab.
@@ -107,6 +106,7 @@ struct compiler {
 	PyCompilerFlags *c_flags;
 
 	int c_interactive;
+        int c_nestlevel;
 
 	struct compiler_unit *u;
 	PyObject *c_stack;
@@ -233,6 +233,7 @@ PyAST_Compile(mod_ty mod, const char *filename, PyCompilerFlags *flags)
         c.c_future->ff_features = merged;
         flags->cf_flags = merged;
         c.c_flags = flags;
+        c.c_nestlevel = 0;
 
 	/* Trivial test of marshal code for now. */
 	{
@@ -426,6 +427,7 @@ compiler_enter_scope(struct compiler *c, identifier name, void *key)
 	}
 	c->u = u;
 
+        c->c_nestlevel++;
 	if (compiler_use_new_block(c) < 0)
 		return 0;
 
@@ -474,6 +476,7 @@ compiler_exit_scope(struct compiler *c)
 	int n;
 	PyObject *wrapper;
 
+        c->c_nestlevel--;
 	compiler_unit_free(c->u);
 	/* Restore c->u to the parent unit. */
 	n = PyList_GET_SIZE(c->c_stack) - 1;
@@ -1514,6 +1517,8 @@ compiler_visit_stmt(struct compiler *c, stmt_ty s)
         case ClassDef_kind:
 		return compiler_class(c, s);
         case Return_kind:
+                if (c->c_nestlevel <= 1)
+                        return compiler_error(c, "'return' outside function");
 		if (s->v.Return.value)
 			VISIT(c, expr, s->v.Return.value)
 		else
@@ -1521,6 +1526,8 @@ compiler_visit_stmt(struct compiler *c, stmt_ty s)
 		ADDOP(c, RETURN_VALUE);
 		break;
         case Yield_kind:
+                if (c->c_nestlevel <= 1)
+                        return compiler_error(c, "'yield' outside function");
 		VISIT(c, expr, s->v.Yield.value);
 		ADDOP(c, YIELD_VALUE);
 		break;
