@@ -1317,12 +1317,12 @@ builtin_iter(PyObject *self, PyObject *args)
 }
 
 static char iter_doc[] =
-"iter(object[, sentinel]) -> iterator\n\
+"iter(collection) -> iterator\n\
+iter(callable, sentinel) -> iterator\n\
 \n\
-Get an iterator from an object.  If the sentinel argument is omitted,\n\
-the object must supply its own iterator, or be a sequence.\n\
-If a sentinel is given, the object must be callable and the iterator\n\
-calls it until it returns the sentinel.";
+Get an iterator from an object.  In the first form, the argument must\n\
+supply its own iterator, or be a sequence.\n\
+In the second form, the callable is called until it returns the sentinel.";
 
 
 static PyObject *
