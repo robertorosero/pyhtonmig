@@ -395,7 +395,8 @@ initspam()
 \end{verbatim}
 
 When the Python program imports module \module{spam} for the first
-time, \cfunction{initspam()} is called.  It calls
+time, \cfunction{initspam()} is called. (See below for comments about
+embedding Python.)  It calls
 \cfunction{Py_InitModule()}, which creates a ``module object'' (which
 is inserted in the dictionary \code{sys.modules} under the key
 \code{"spam"}), and inserts built-in function objects into the newly
@@ -405,6 +406,29 @@ structures) that was passed as its second argument.
 that it creates (which is unused here).  It aborts with a fatal error
 if the module could not be initialized satisfactorily, so the caller
 doesn't need to check for errors.
+
+When embedding Python, the \cfunction{initspam()} function is not
+called automatically unless there's an entry in the
+\cdata{_PyImport_Inittab} table.  The easiest way to handle this is to 
+statically initialize your statically-linked modules by directly
+calling \cfunction{initspam()} after the call to
+\cfunction{Py_Initialize()}:
+
+\begin{verbatim}
+int main(int argc, char **argv)
+{
+    /* Pass argv[0] to the Python interpreter */
+    Py_SetProgramName(argv[0]);
+
+    /* Initialize the Python interpreter.  Required. */
+    Py_Initialize();
+
+    /* Add a static module */
+    initspam();
+\end{verbatim}
+
+And example may be found in the file \file{Demo/embed/demo.c} in the
+Python source distribution.
 
 \strong{Note:}  Removing entries from \code{sys.modules} or importing
 compiled modules into multiple interpreters within a process (or
