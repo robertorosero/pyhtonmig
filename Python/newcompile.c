@@ -32,7 +32,6 @@ int Py_OptimizeFlag = 0;
            def v3(a, (b, c), *rest): return a, b, c, rest
 
    Invalid behaviour:
-     #: name mangling in classes (__vars) doesn't work
      #: doing from __future__ import division doesn't work 
         doesn't output BINARY_TRUE_DIVISION
      #: co_names doesn't contain locals, only globals, co_varnames may work
@@ -83,6 +82,8 @@ struct compiler_unit {
 	PyObject *u_varnames;  /* local variables */
 	PyObject *u_cellvars;  /* cell variables */
 	PyObject *u_freevars;  /* free variables */
+
+	PyObject *u_private;	/* for private name mangling */
 
 	int u_argcount;    /* number of arguments for block */ 
 	int u_nblocks;     /* number of used blocks in u_blocks
@@ -156,32 +157,41 @@ static PyCodeObject *assemble(struct compiler *, int addNone);
 static char *opnames[];
 static PyObject *__doc__;
 
-int
-_Py_Mangle(char *p, char *name, char *buffer, size_t maxlen)
+PyObject *
+_Py_Mangle(PyObject *private, PyObject *ident)
 {
 	/* Name mangling: __private becomes _classname__private.
 	   This is independent from how the name is used. */
+        const char *p, *name = PyString_AsString(ident);
+        char *buffer;
 	size_t nlen, plen;
-	if (p == NULL || name == NULL || name[0] != '_' || name[1] != '_')
-		return 0;
+	if (private == NULL || name == NULL || name[0] != '_' || name[1] != '_') {
+                Py_INCREF(ident);
+		return ident;
+        }
+        p = PyString_AsString(private);
 	nlen = strlen(name);
-	if (nlen+2 >= maxlen)
-		return 0; /* Don't mangle __extremely_long_names */
-	if (name[nlen-1] == '_' && name[nlen-2] == '_')
-		return 0; /* Don't mangle __whatever__ */
+	if (name[nlen-1] == '_' && name[nlen-2] == '_') {
+                Py_INCREF(ident);
+		return ident; /* Don't mangle __whatever__ */
+        }
 	/* Strip leading underscores from class name */
 	while (*p == '_')
 		p++;
-	if (*p == '\0')
-		return 0; /* Don't mangle if class is just underscores */
+	if (*p == '\0') {
+                Py_INCREF(ident);
+		return ident; /* Don't mangle if class is just underscores */
+        }
 	plen = strlen(p);
-	if (plen + nlen >= maxlen)
-		plen = maxlen-nlen-2; /* Truncate class name if too long */
-	/* buffer = "_" + p[:plen] + name # i.e. 1+plen+nlen bytes */
-	buffer[0] = '_';
+        ident = PyString_FromStringAndSize(NULL, 1 + nlen + plen);
+        if (!ident)
+            return 0;
+	/* ident = "_" + p[:plen] + name # i.e. 1+plen+nlen bytes */
+        buffer = PyString_AS_STRING(ident);
+        buffer[0] = '_';
 	strncpy(buffer+1, p, plen);
 	strcpy(buffer+1+plen, name);
-	return 1;
+	return ident;
 }
 
 static int
@@ -388,6 +398,8 @@ compiler_enter_scope(struct compiler *c, identifier name, void *key)
 	if (!u->u_names)
 		return 0;
 
+        u->u_private = NULL;
+
 	/* A little debugging output */
 	compiler_display_symbols(name, u->u_ste->ste_symbols);
 
@@ -398,6 +410,8 @@ compiler_enter_scope(struct compiler *c, identifier name, void *key)
 			return 0;
 		Py_DECREF(wrapper);
 		fprintf(stderr, "stack = %s\n", PyObject_REPR(c->c_stack));
+                u->u_private = c->u->u_private;
+                Py_XINCREF(u->u_private);
 	}
 	c->u = u;
 
@@ -653,6 +667,20 @@ compiler_addop_o(struct compiler *c, int opcode, PyObject *dict,
     return compiler_addop_i(c, opcode, arg);
 }
 
+static int
+compiler_addop_name(struct compiler *c, int opcode, PyObject *o)
+{
+    int arg;
+    PyObject *mangled = _Py_Mangle(c->u->u_private, o);
+    if (!mangled)
+        return 0;
+    arg = compiler_add_o(c, c->u->u_names, mangled);
+    Py_DECREF(mangled);
+    if (arg < 0)
+        return 0;
+    return compiler_addop_i(c, opcode, arg);
+}
+
 /* Add an opcode with an integer argument.
    Returns 0 on failure, 1 on success.
 */
@@ -720,6 +748,13 @@ compiler_addop_j(struct compiler *c, int opcode, int block, int absolute)
 #define ADDOP_O(C, OP, O, TYPE) { \
 	if (!compiler_addop_o((C), (OP), (C)->u->u_ ## TYPE, (O))) \
 		return 0; \
+}
+
+#define ADDOP_NAME(C, OP, O) { \
+	if (!compiler_addop_name((C), (OP), (O))) { \
+                Py_DECREF(O); \
+		return 0; \
+        } \
 }
 
 #define ADDOP_I(C, OP, O) { \
@@ -957,6 +992,8 @@ compiler_class(struct compiler *c, stmt_ty s)
 	ADDOP_I(c, BUILD_TUPLE, n);
 	if (!compiler_enter_scope(c, s->v.ClassDef.name, (void *)s))
 		return 0;
+        c->u->u_private = s->v.ClassDef.name;
+        Py_INCREF(c->u->u_private);
         str = PyString_InternFromString("__name__");
 	if (!str || !compiler_nameop(c, str, Load)) {
 		Py_XDECREF(str);
@@ -1349,7 +1386,7 @@ compiler_import(struct compiler *c, stmt_ty s)
 		alias_ty alias = asdl_seq_GET(s->v.Import.names, i);
 		identifier store_name;
 		ADDOP_O(c, LOAD_CONST, Py_None, consts);
-		ADDOP_O(c, IMPORT_NAME, alias->name, names);
+		ADDOP_NAME(c, IMPORT_NAME, alias->name);
 
                 /* XXX: handling of store_name should be cleaned up */
 		if (alias->asname) {
@@ -1394,7 +1431,7 @@ compiler_from_import(struct compiler *c, stmt_ty s)
 	}
 
 	ADDOP_O(c, LOAD_CONST, names, consts);
-	ADDOP_O(c, IMPORT_NAME, s->v.ImportFrom.module, names);
+	ADDOP_NAME(c, IMPORT_NAME, s->v.ImportFrom.module);
 	for (i = 0; i < n; i++) {
 		alias_ty alias = asdl_seq_GET(s->v.ImportFrom.names, i);
 		identifier store_name;
@@ -1406,7 +1443,7 @@ compiler_from_import(struct compiler *c, stmt_ty s)
 			break;
 		}
 		    
-		ADDOP_O(c, IMPORT_FROM, alias->name, names);
+		ADDOP_NAME(c, IMPORT_FROM, alias->name);
 		store_name = alias->name;
 		if (alias->asname)
 			store_name = alias->asname;
@@ -1760,7 +1797,7 @@ compiler_nameop(struct compiler *c, identifier name, expr_context_ty ctx)
 	}
 
 	assert(op);
-	ADDOP_O(c, op, name, names);
+	ADDOP_NAME(c, op, name);
 	return 1;
 }
 
@@ -2058,16 +2095,16 @@ compiler_visit_expr(struct compiler *c, expr_ty e)
 			ADDOP(c, DUP_TOP);
 			/* Fall through to load */
 		case Load:
-			ADDOP_O(c, LOAD_ATTR, e->v.Attribute.attr, names);
+			ADDOP_NAME(c, LOAD_ATTR, e->v.Attribute.attr);
 			break;
 		case AugStore:
 			ADDOP(c, ROT_TWO);
 			/* Fall through to save */
 		case Store:
-			ADDOP_O(c, STORE_ATTR, e->v.Attribute.attr, names);
+			ADDOP_NAME(c, STORE_ATTR, e->v.Attribute.attr);
 			break;
 		case Del:
-			ADDOP_O(c, DELETE_ATTR, e->v.Attribute.attr, names);
+			ADDOP_NAME(c, DELETE_ATTR, e->v.Attribute.attr);
 			break;
 		case Param:
 			assert(0);
