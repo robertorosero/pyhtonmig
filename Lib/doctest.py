@@ -792,7 +792,7 @@ class DocTestFinder:
     ignored.
     """
 
-    def __init__(self, verbose=False, doctest_factory=DocTest, 
+    def __init__(self, verbose=False, doctest_factory=DocTest,
                  namefilter=None, objfilter=None, recurse=True):
         """
         Create a new doctest finder.
@@ -1501,14 +1501,6 @@ class DocTestRunner:
             return self.__run(test, compileflags, out)
         finally:
             sys.stdout = saveout
-            # While Python gc can clean up most cycles on its own, it doesn't
-            # chase frame objects.  This is especially irksome when running
-            # generator tests that raise exceptions, because a named generator-
-            # iterator gets an entry in globs, and the generator-iterator
-            # object's frame's traceback info points back to globs.  This is
-            # easy to break just by clearing the namespace.  This can also
-            # help to break other kinds of cycles, and even for cycles that
-            # gc can break itself it's better to break them ASAP.
             if clear_globs:
                 test.globs.clear()
 
@@ -1588,8 +1580,8 @@ class DocTestFailure(Exception):
     def __str__(self):
         return str(self.test)
 
-    
-    
+
+
 class DebugRunner(DocTestRunner):
     r"""Run doc tests but raise an exception as soon as there is a failure.
 
@@ -1636,7 +1628,7 @@ class DebugRunner(DocTestRunner):
          >>> del test.globs['__builtins__']
          >>> test.globs
          {'x': 1}
-         
+
          >>> test = DocTest('''
          ...      >>> x = 2
          ...      >>> raise KeyError
@@ -1659,10 +1651,10 @@ class DebugRunner(DocTestRunner):
 
          >>> runner.run(test)
          (0, 1)
-         
+
          >>> test.globs
          {}
-       
+
 
        """
 
@@ -2089,7 +2081,7 @@ def DocFileTest(path, package=None, globs=None,
         globs = {}
 
     test = DocTest(doc, globs, name, path, 0)
-    
+
     return DocFileCase(test, optionflags, setUp, tearDown)
 
 def DocFileSuite(*paths, **kw):
