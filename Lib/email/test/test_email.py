@@ -1344,6 +1344,43 @@ Your message cannot be delivered to the following recipients:
         g.flatten(msg)
         self.assertEqual(sfp.getvalue(), text)
 
+    def test_no_nl_preamble(self):
+        eq = self.ndiffAssertEqual
+        msg = Message()
+        msg['From'] = 'aperson@dom.ain'
+        msg['To'] = 'bperson@dom.ain'
+        msg['Subject'] = 'Test'
+        msg.preamble = 'MIME message'
+        msg.epilogue = ''
+        msg1 = MIMEText('One')
+        msg2 = MIMEText('Two')
+        msg.add_header('Content-Type', 'multipart/mixed', boundary='BOUNDARY')
+        msg.attach(msg1)
+        msg.attach(msg2)
+        eq(msg.as_string(), """\
+From: aperson@dom.ain
+To: bperson@dom.ain
+Subject: Test
+Content-Type: multipart/mixed; boundary="BOUNDARY"
+
+MIME message
+--BOUNDARY
+Content-Type: text/plain; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+
+One
+
+--BOUNDARY
+Content-Type: text/plain; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+
+Two
+
+--BOUNDARY--
+""")
+
     def test_default_type(self):
         eq = self.assertEqual
         fp = openfile('msg_30.txt')
