@@ -134,8 +134,14 @@ PYTHONPATH   : colon-separated list of directories prefixed to the\n\
 	}
 
 	if (unbuffered) {
+#ifndef MPW
 		setbuf(stdout, (char *)NULL);
 		setbuf(stderr, (char *)NULL);
+#else
+		/* On MPW (3.2) unbuffered seems to hang */
+		setvbuf(stdout, (char *)NULL, _IOLBF, BUFSIZ);
+		setvbuf(stderr, (char *)NULL, _IOLBF, BUFSIZ);
+#endif
 	}
 
 	if (command == NULL && optind < argc && strcmp(argv[optind], "-") != 0)
