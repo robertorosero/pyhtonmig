@@ -1444,7 +1444,6 @@ err_input(perrdetail *err)
 		fprintf(stderr, "error=%d\n", err->error);
 		msg = "unknown parsing error";
 		break;
-		}
 	}
 	v = Py_BuildValue("(ziiz)", err->filename,
 			  err->lineno, err->offset, err->text);
