@@ -192,6 +192,29 @@ compiler_free(struct compiler *c)
 	Py_DECREF(c->c_stack);
 }
 
+static PyObject *
+list2dict(PyObject *list)
+{
+	int i, n;
+	PyObject *v, *dict = PyDict_New();
+
+	n = PyList_Size(list);
+	for (i = 0; i < n; i++) {
+		v = PyInt_FromLong(i);
+		if (!v) {
+			Py_DECREF(dict);
+			return NULL;
+		}
+		if (PyDict_SetItem(dict, PyList_GET_ITEM(list, i), v) < 0) {
+			Py_DECREF(v);
+			Py_DECREF(dict);
+			return NULL;
+		}
+		Py_DECREF(v);
+	}
+	return dict;
+}
+
 static int
 compiler_enter_scope(struct compiler *c, identifier name, void *key)
 {
@@ -205,7 +228,7 @@ compiler_enter_scope(struct compiler *c, identifier name, void *key)
 	}
 	Py_INCREF(name);
 	u->u_name = name;
-	u->u_varnames = u->u_ste->ste_varnames;
+	u->u_varnames = list2dict(u->u_ste->ste_varnames);
 	Py_INCREF(u->u_varnames);
 	u->u_nblocks = 0;
 	u->u_nalloc = DEFAULT_BLOCKS;
@@ -377,14 +400,21 @@ compiler_next_instr(struct compiler *c, int block)
 	assert(b);
 	if (b->b_iused == b->b_ialloc) {
 		void *ptr;
-		int newsize;
-		b->b_ialloc *= 2;
-		newsize = sizeof(struct basicblock) 
-			+ ((b->b_ialloc - DEFAULT_BLOCK_SIZE) 
-			   * sizeof(struct instr));
+		int oldsize, newsize;
+		oldsize = sizeof(struct basicblock);
+		if (b->b_ialloc > DEFAULT_BLOCK_SIZE)
+			oldsize += ((b->b_ialloc - DEFAULT_BLOCK_SIZE) 
+				    * sizeof(struct instr));
+		newsize = oldsize + b->b_ialloc * sizeof(struct instr);
+		if (newsize <= 0) {
+			PyErr_NoMemory();
+			return 0;
+		}
+		b->b_ialloc <<= 1;
 		ptr = PyObject_Realloc((void *)b, newsize);
 		if (ptr == NULL)
 			return -1;
+		memset(ptr + oldsize, 0, newsize - oldsize);
 		if (ptr != (void *)b) {
 			fprintf(stderr, "resize block %d\n", block);
 			c->u->u_blocks[block] = (struct basicblock *)ptr;
@@ -956,6 +986,8 @@ compiler_nameop(struct compiler *c, identifier name, expr_context_ty ctx)
 	op = 0;
 	optype = OP_NAME;
 	scope = PyST_GetScope(c->u->u_ste, name);
+	fprintf(stderr, "nameop name=%s scope=%d\n",
+		PyString_AS_STRING(name), scope);
 	switch (scope) {
 	case FREE:
 	case CELL:
@@ -972,9 +1004,9 @@ compiler_nameop(struct compiler *c, identifier name, expr_context_ty ctx)
 	case GLOBAL_EXPLICIT:
 		optype = OP_GLOBAL;
 		break;
-	default:
-		assert(0);
 	}
+	if (optype == OP_DEREF)
+		abort();
 
 	switch (optype) {
 	case OP_DEREF:
@@ -998,6 +1030,8 @@ compiler_nameop(struct compiler *c, identifier name, expr_context_ty ctx)
 		case Param:
 			assert(0); /* impossible */
 		}
+		ADDOP_O(c, op, name, varnames);
+		return 1;
 		break;
 	case OP_GLOBAL:
 		switch (ctx) {
@@ -1039,11 +1073,14 @@ compiler_boolop(struct compiler *c, expr_ty e)
 {
 	int end, jumpi, i, n;
 	asdl_seq *s;
-	
+
+	assert(e->kind == BoolOp_kind);
 	if (e->v.BoolOp.op == And)
 		jumpi = JUMP_IF_FALSE;
 	else
 		jumpi = JUMP_IF_TRUE;
+	fprintf(stderr, "op = %d jump = %d\n",
+		e->v.BoolOp.op, jumpi);
 	end = compiler_new_block(c);
 	if (end < 0)
 		return 0;
@@ -1052,7 +1089,6 @@ compiler_boolop(struct compiler *c, expr_ty e)
 	for (i = 0; i < n; ++i) {
 		VISIT(c, expr, asdl_seq_GET(s, i));
 		ADDOP_JREL(c, jumpi, end);
-		NEXT_BLOCK(c);
 		ADDOP(c, POP_TOP)
 	}
 	VISIT(c, expr, asdl_seq_GET(s, n));
@@ -1449,7 +1485,7 @@ makecode(struct compiler *c, struct assembler *a)
 	names = dict_keys_inorder(c->u->u_names, 0);
 	if (!names)
 		goto error;
-	varnames = PySequence_Tuple(c->u->u_varnames);
+	varnames = PySequence_Tuple(c->u->u_ste->ste_varnames);
 	if (!varnames)
 		goto error;
 	filename = PyString_FromString(c->c_filename);
