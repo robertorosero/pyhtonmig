@@ -1714,12 +1714,6 @@ compiler_nameop(struct compiler *c, identifier name, expr_context_ty ctx)
 }
 
 static int
-compiler_name(struct compiler *c, expr_ty e)
-{
-	return compiler_nameop(c, e->v.Name.id, e->v.Name.ctx);
-}
-
-static int
 compiler_boolop(struct compiler *c, expr_ty e)
 {
 	int end, jumpi, i, n;
@@ -2056,7 +2050,7 @@ compiler_visit_expr(struct compiler *c, expr_ty e)
 		}
 		break;
         case Name_kind:
-		return compiler_name(c, e);
+		return compiler_nameop(c, e->v.Name.id, e->v.Name.ctx);
 	/* child nodes of List and Tuple will have expr_context set */
         case List_kind:
 		return compiler_list(c, e);
