@@ -2166,23 +2166,11 @@ eval_frame(PyFrameObject *f)
 
 		case MAKE_CLOSURE:
 		{
-			int nfree;
 			v = POP(); /* code object */
 			x = PyFunction_New(v, f->f_globals);
-			nfree = PyCode_GetNumFree((PyCodeObject *)v);
 			Py_DECREF(v);
-			/* XXX Maybe this should be a separate opcode? */
-			if (x != NULL && nfree > 0) {
-				v = PyTuple_New(nfree);
-				if (v == NULL) {
-					Py_DECREF(x);
-					x = NULL;
-					break;
-				}
-				while (--nfree >= 0) {
-					w = POP();
-					PyTuple_SET_ITEM(v, nfree, w);
-				}
+			if (x != NULL) {
+				v = POP();
 				err = PyFunction_SetClosure(x, v);
 				Py_DECREF(v);
 			}

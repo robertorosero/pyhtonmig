@@ -47,9 +47,7 @@ int Py_OptimizeFlag = 0;
      array of basic blocks.
 
      opcode_stack_effect() function should be reviewed since stack depth bugs
-     could be really hard to find later.  Also, the stack effect of
-     MAKE_CLOSURE is not accurate.  One idea is to have the compiler generate
-     an explict BUILD_TUPLE opcode before MAKE_CLOSURE.
+     could be really hard to find later.
 
      Dead code is being generated (i.e. after unconditional jumps).
     
@@ -772,7 +770,7 @@ opcode_stack_effect(int opcode, int oparg)
 		case POP_BLOCK:
 			return 0;
 		case END_FINALLY:
-			return -1; /* XXX or -2 or -3 */
+			return -1; /* or -2 or -3 if exception occurred */
 		case BUILD_CLASS:
 			return -2;
 
@@ -828,7 +826,7 @@ opcode_stack_effect(int opcode, int oparg)
 			return 0;
 		case SETUP_EXCEPT:
 		case SETUP_FINALLY:
-			return 3; /* XXX isn't this 0? */
+			return 3; /* actually pushed by an exception */
 
 		case LOAD_FAST:
 			return 1;
@@ -857,7 +855,6 @@ opcode_stack_effect(int opcode, int oparg)
 				return -1;
 
 		case MAKE_CLOSURE:
-			/* XXX Also pops free variables to creates a tuple. */
 			return -oparg;
 		case LOAD_CLOSURE:
 			return 1;
@@ -1180,6 +1177,7 @@ compiler_make_closure(struct compiler *c, PyCodeObject *co, int args)
 		}
 		ADDOP_I(c, LOAD_CLOSURE, arg);
 	}
+        ADDOP_I(c, BUILD_TUPLE, free);
 	ADDOP_O(c, LOAD_CONST, (PyObject*)co, consts);
         ADDOP_I(c, MAKE_CLOSURE, args);
         return 1;
@@ -2678,12 +2676,14 @@ stackdepth_walk(struct compiler *c, int block, int depth, int maxdepth)
 		return maxdepth;
 	b->b_seen = 1;
 	b->b_startdepth = depth;
+	fprintf("block %d\n", block);
 	for (i = 0; i < b->b_iused; i++) {
 		instr = &b->b_instr[i];
 		depth += opcode_stack_effect(instr->i_opcode, instr->i_oparg);
 		assert(depth >= 0); /* invalid code or bug in stackdepth() */
 		if (depth > maxdepth)
 			maxdepth = depth;
+		fprintf("  %s %d\n", opnames[instr->i_opcode], depth);
 		if (instr->i_jrel || instr->i_jabs) {
 			maxdepth = stackdepth_walk(c, instr->i_target,
 						   depth, maxdepth);
