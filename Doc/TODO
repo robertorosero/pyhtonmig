@@ -27,10 +27,6 @@ Python/C API
   cases in the C API is documented in the API manual, and mentioned in 
   the extension manual if the function is mentioned.
 
-* Ask Vladimir Marangozov <marangoz@python.inrialpes.fr> to document
-  the memory allocation APIs; this could be part of his proposed
-  cleanup.  ;)
-
 * PyErr_SetInterrupt():  XXX comment about platform dependence should
   be resolved, or explain the problem.  Ask Guido for explanation.
 
@@ -50,13 +46,13 @@ Extending & Embedding
   must be linked against the C++ libraries (and possibly runtime).
   Also noted by Albert Hofkamp <a.hofkamp@wtb.tue.nl>.
 
-* Update the pickle documentation to describe all of the current
-  behavior; only a subset is described.  __reduce__, etc.  Partial
-  update submitted by Jim Kerr <jbkerr@sr.hp.com>.
-
 
 Library Reference
 -----------------
+
+* Update the pickle documentation to describe all of the current
+  behavior; only a subset is described.  __reduce__, etc.  Partial
+  update submitted by Jim Kerr <jbkerr@sr.hp.com>.
 
 * Straighten out random/whrandom.  Things are generally in the right
   place, but need to respond to comments in email from Jan Kim
