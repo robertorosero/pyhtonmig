@@ -2,23 +2,25 @@ Python release 1.0.0 BETA 3
 ===========================
 
 ==> This is still a BETA release.  I've been furiously hacking over
-    the past week.  If you think I've goofed up, please mail me an
-    error report!
+    the past two weeks.  If you think I've goofed up, please mail me
+    an error report!
 
 ==> If you don't know yet what Python is: it's an interpreted,
     extensible, embeddable, interactive, object-oriented programming
     language.  For a quick summary of what Python can mean for a
     UNIX/C programmer, read Misc/BLURB.LUTZ.
 
-==> If you want to start compiling right away (UNIX only): just type
-    "make" in the current directory.  See the section Build
-    Instructions below for more details.
+==> If you want to start compiling right away: just type "./configure"
+    in the current directory and when it finishes, type "make".  See
+    the section Build Instructions below for more details.
 
 ==> If you want to know what's new since release 0.9.9: read
-    Misc/NEWS.  Older history is in Misc/HISTORY.  [XXX Not in the
-    BETA release yet.]
+    Misc/NEWS.  Older history is in Misc/HISTORY.  [XXX Not in this
+    BETA release yet.]  News since the release of 1.0.0 BETA (the
+    first BETA release) is in ./ChangeLog.  Things left to do are in
+    ./TODO.
 
-==> All documentation is in the subdirectory doc in the form of LaTeX
+==> All documentation is in the subdirectory Doc in the form of LaTeX
     files.  In order of importance for new users: Tutorial (tut),
     Library Reference (lib), Language Reference (ref), Extending
     (ext).  Note that especially the Library Reference is of immense
@@ -33,26 +35,29 @@ Python release 1.0.0 BETA 3
 Build instructions
 ------------------
 
-To build python, you normally simply type "make" in this directory.
-The first time you do this, it will run the script "./configure",
-which figures out your system configuration and creates the Makefiles
-in most subdirectories.  (This will take a minute or two -- please be
-patient!)  It will then run "make" recursively in each of the
-subdirectories Parser, Objects, Python and Modules, creating a library
-file in each one.  The executable of the interpreter is built in the
-Modules subdirectory but moved up here when it is built.
+Before you start building Python, you must first configure it.  This
+entails (at least) running the script "./configure", which figures out
+your system configuration and creates several Makefiles.  (This will
+take a minute or two -- please be patient!)  When it is done, you are
+ready to run make.  Typing "make" in the toplevel directory will
+recursively run make in each of the subdirectories Parser, Objects,
+Python and Modules, creating a library file in each one.  The
+executable of the interpreter is built in the Modules subdirectory but
+moved up here when it is built.  If you want or need to, you can also
+chdir into each subdirectory in turn and run make there manually
+(do the Modules subdirectory last!).
 
-Exceptions: on SVR4 derived systems, you need to manually run the
-configure script, passing it the option --with-svr4.  On SOLARIS 2 you
-need to pass it --with-solaris *as well*.  (See below for more options
-you can pass to the configure script.)
+EXCEPTIONS: on SVR4 derived systems, you need to pass the configure
+script the option --with-svr4.  On SOLARIS 2 you *also* need to pass
+it --with-solaris.  See below for more options you can pass to the
+configure script.
 
 You can configure the interpreter to contain fewer or more built-in
-modules by cd'ing to the Modules subdirectory, editing the file Setup
-there, and running "make Makefile" followed by "make" there.  Read the
-comments in the Setup file for more information.  You can also edit
-Modules/Setup before running make from the toplevel directory; this
-will automatically rebuild Modules/Makefile.
+modules by editing the file Modules/Setup.  Read the comments in the
+Setup file for more information.  When you have edited this file,
+Modules/Makefile will automatically be rebuilt.  (There are some
+example Setup files which you may copy over the default Setup file for
+specific systems; have a look at Modules/Setup.*.)
 
 To test the interpreter that you have just built, type "make test".
 This runs the test set silently, twice (once with no compiled files,
@@ -137,13 +142,49 @@ a separate tar file (currently extensions.tar.Z).  See the README file
 there.
 
 
+Building for multiple architectures
+-----------------------------------
+
+If your file system is shared between multiple architectures, it
+usually is not necessary to make copies of the sources for each
+architecture you want to support.  If the make program supports the
+VPATH feature, you can create an empty build directory for each
+architecture, and in each directory run the configure script (on the
+appropriate machine with the appropriate options).  This creates the
+necessary subdirectories and the Makefiles therein.  The Makefiles
+contain a line VPATH=... which points to directory containing the
+actual sources.
+
+To use the readline library in this case, you will have to create a
+subdirectory of your build directory called readline, copy
+readline/Makefile into it, edit the Makefile to contain a proper VPATH
+line (and possibly edit the compiler flags set in the Makefile), and
+pass the configure script a --with-readline=DIRECTORY option giving it
+the absolute (!) pathname of the readline build directory.
+
+Note that Modules/Makefile copies the original Setup file to the build
+directory if it finds no Setup file there.  This means that you can
+edit the Setup file for each architecture independently.  For this
+reason, subsequent changes to the original Setup file are not tracked
+automatically, as they might overwrite local changes.  To force a copy
+of a changed original Setup file, delete the target Setup file.  (The
+makesetup script supports multiple input files, so if you want to be
+fancy you can change the rules to create an empty Setup.local if it
+doesn't exist and run it with arguments $(srcdir)/Setup Setup.local;
+however this assumes that you only need to add modules.)
+
+
 Building on non-UNIX systems
 ----------------------------
 
 On non-UNIX systems, you will have to fake the effect of running the
 configure script manually.  A good start is to copy the file
-Include/config.h.in to Include/config.h and edit the latter to reflect
-the actual configuration of your system.  Then arrange that the symbol
+config.h.in to config.h and edit the latter to reflect the actual
+configuration of your system.  Most symbols must simply be defined as
+1 only if the corresponding feature is present and can be left alone
+otherwise; however RETSIGTYPE must always be defined, either as int or
+as void, and the *_t type symbols must be defined as some variant of
+int if they need to be defined at all. Then arrange that the symbol
 HAVE_CONFIG_H is defined during compilation (usually by passing an
 argument of the form `-DHAVE_CONFIG_H' to the compiler, but this is
 necessarily system-dependent).
