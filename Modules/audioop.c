@@ -28,10 +28,10 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #define signed
 #endif
 
-#include <math.h>
-
 #include "allobjects.h"
 #include "modsupport.h"
+
+#include <math.h>
 
 /* Code shamelessly stolen from sox,
 ** (c) Craig Reese, Joe Campbell and Jeff Poskanzer 1989 */

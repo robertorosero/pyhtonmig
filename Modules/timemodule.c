@@ -30,7 +30,10 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 #include <signal.h>
 #include <setjmp.h>
+
+#ifndef macintosh
 #include <sys/types.h>
+#endif
 
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>

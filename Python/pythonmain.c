@@ -37,6 +37,9 @@ extern int getopt(); /* PROTO((int, char **, char *)); -- not standardized */
 
 extern char *getenv();
 
+extern char *getversion();
+extern char *getcopyright();
+
 int
 realmain(argc, argv)
 	int argc;
@@ -123,7 +126,8 @@ PYTHONPATH   : colon-separated list of directories prefixed to the\n\
 
 	if (verbose ||
 	    command == NULL && filename == NULL && isatty((int)fileno(fp)))
-		fprintf(stderr, "%s\n%s\n", getversion(), getcopyright());
+		fprintf(stderr, "Python %s\n%s\n",
+			getversion(), getcopyright());
 	
 	if (filename != NULL) {
 		if ((fp = fopen(filename, "r")) == NULL) {
@@ -149,11 +153,16 @@ PYTHONPATH   : colon-separated list of directories prefixed to the\n\
 	else {
 		if (filename == NULL && isatty((int)fileno(fp))) {
 			char *startup = getenv("PYTHONSTARTUP");
+#ifdef macintosh
+			if (startup == NULL)
+				startup = "PythonStartup";
+#endif
 			if (startup != NULL && startup[0] != '\0') {
 				FILE *fp = fopen(startup, "r");
 				if (fp != NULL) {
 					(void) run_script(fp, startup);
 					err_clear();
+					fclose(fp);
 				}
 			}
 		}

@@ -542,7 +542,11 @@ sighandler(sig)
 {
 	signal(sig, SIG_DFL); /* Don't catch recursive signals */
 	cleanup(); /* Do essential clean-up */
+#ifdef HAVE_GETPID
 	kill(getpid(), sig); /* Pretend the signal killed us */
+#else
+	exit(1);
+#endif
 	/*NOTREACHED*/
 }
 #endif
@@ -552,11 +556,13 @@ initsigs()
 {
 	initintr();
 #ifdef HAVE_SIGNAL_H
+#ifdef SIGHUP
 	if (signal(SIGHUP, SIG_IGN) != SIG_IGN)
 		signal(SIGHUP, sighandler);
+#endif
 	if (signal(SIGTERM, SIG_IGN) != SIG_IGN)
 		signal(SIGTERM, sighandler);
-#endif
+#endif /* HAVE_SIGNAL_H */
 }
 
 #ifdef TRACE_REFS

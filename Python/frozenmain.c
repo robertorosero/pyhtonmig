@@ -28,6 +28,9 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 extern char *getenv();
 
+extern char *getversion();
+extern char *getcopyright();
+
 extern int debugging;
 extern int verbose;
 extern int killprint;
@@ -50,7 +53,8 @@ main(argc, argv)
 		killprint = 1;
 
 	if (verbose)
-		fprintf(stderr, "%s\n%s\n", getversion(), getcopyright());
+		fprintf(stderr, "Python %s\n%s\n",
+			getversion(), getcopyright());
 	initall();
 	setpythonargv(argc, argv);
 

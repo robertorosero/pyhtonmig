@@ -51,7 +51,7 @@ LIBOBJS="$LIBOBJS thread.o"])
 ])
 
 # checks for library functions
-AC_HAVE_FUNCS(clock ftime gettimeofday getpeername getpgrp getwd lstat readlink readline select setsid setpgid setpgrp siginterrupt symlink tcgetpgrp tcsetpgrp times uname waitpid)
+AC_HAVE_FUNCS(clock ftime gettimeofday getpeername getpgrp getpid getwd lstat readlink readline select setsid setpgid setpgrp siginterrupt symlink tcgetpgrp tcsetpgrp times uname waitpid)
 AC_REPLACE_FUNCS(dup2 getcwd strerror strtod memmove)
 AC_FUNC_CHECK(getpgrp, AC_COMPILE_CHECK([argument to getpgrp], [#include <unistd.h>], [getpgrp(0);], AC_DEFINE(GETPGRP_HAVE_ARG)))
 

@@ -2532,6 +2532,7 @@ static struct methodlist stdwin_methods[] = {
 	{NULL,			NULL}		/* sentinel */
 };
 
+#ifndef macintosh
 static int
 checkstringlist(args, ps, pn)
 	object *args;
@@ -2592,6 +2593,7 @@ putbackstringlist(list, s, n)
 	DECREF(newlist);
 	return 1;
 }
+#endif /* macintosh */
 
 void
 initstdwin()
@@ -2601,6 +2603,9 @@ initstdwin()
 	char buf[1000];
 
 	if (!inited) {
+#ifdef macintosh
+		winit();
+#else
 		int argc = 0;
 		char **argv = NULL;
 		object *sys_argv = sysget("argv");
@@ -2625,6 +2630,7 @@ initstdwin()
 			if (!putbackstringlist(sys_argv, argv, argc))
 				err_clear();
 		}
+#endif
 		inited = 1;
 	}
 	m = initmodule("stdwin", stdwin_methods);
