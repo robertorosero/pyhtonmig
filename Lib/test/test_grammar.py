@@ -259,17 +259,11 @@ try: raise KeyboardInterrupt
 except KeyboardInterrupt: pass
 
 print 'import_stmt' # 'import' NAME (',' NAME)* | 'from' NAME 'import' ('*' | NAME (',' NAME)*)
-[1]
 import sys
-[2]
 import time, math
-[3]
 from time import time
-[4]
 from sys import *
-[5]
 from math import sin, cos
-[6]
 
 print 'global_stmt' # 'global' NAME (',' NAME)*
 def f():
@@ -317,12 +311,9 @@ while 0: pass
 else: pass
 
 print 'for_stmt' # 'for' exprlist 'in' exprlist ':' suite ['else' ':' suite]
-[1]
 for i in 1, 2, 3: pass
-[2]
 for i, j, k in (): pass
 else: pass
-[3]
 class Squares:
 	def __init__(self, max):
 		self.max = max
@@ -339,17 +330,22 @@ n = 0
 for x in Squares(10): n = n+x
 if n != 285: raise TestFailed, 'for over growing sequence'
 
-print 'try_stmt' # 'try' ':' suite (except_clause ':' suite)+ | 'try' ':' suite 'finally' ':' suite
+print 'try_stmt'
+### try_stmt: 'try' ':' suite (except_clause ':' suite)+ ['else' ':' suite]
+###         | 'try' ':' suite 'finally' ':' suite
 ### except_clause: 'except' [expr [',' expr]]
 try:
 	1/0
 except ZeroDivisionError:
+	pass
+else:
 	pass
 try: 1/0
 except EOFError: pass
 except TypeError, msg: pass
 except RuntimeError, msg: pass
 except: pass
+else: pass
 try: 1/0
 except (EOFError, TypeError, ZeroDivisionError): pass
 try: 1/0
