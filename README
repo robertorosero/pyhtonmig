@@ -1,63 +1,185 @@
-This is an ALPHA release of Python 1.0 for UNIX.  Currently it builds
-a rather minimal executable and requires that you already have Python
-0.9.9 (or at least its library).
+Python release 1.0.0 BETA
+=========================
 
-Instructions for building:
+==> This is still a BETA release.  I've been furiously hacking over
+    the past week.  If you think I've goofed up, please mail me an
+    error report!
 
-(1) Run the configure shell script:
+==> If you don't know yet what Python is: it's an interpreted,
+    extensible, embeddable, interactive, object-oriented programming
+    language.  For a quick summary of what Python can mean for a
+    UNIX/C programmer, read Misc/BLURB.LUTZ.
 
-	./configure
+==> If you want to start compiling right away (UNIX only): just type
+    "make" in the current directory.  See the section Build
+    Instructions below for more details.
 
-This may take a minute or two -- it does a rather thorough
-investigation of your system to find out many compile-time flags.  It
-prints messages but does not ask questions.  When finished, it will
-create config.status in the current directory, as well as Makefile in
-each of the subdirectories Parser, Objects and Python.  Note that
-unless you have the CC shell environment variable set to the name of
-your C compiler, it will attempt to find the GNU C compiler (gcc) and
-use it if it finds it.  On some systems a broken gcc may be installed;
-put CC=cc in the environment to override it.  On some systems it may
-be interesting to compare both compilers.  (Note: the Makefile has
-been rigged in such a way that it will run configure if you haven't
-done so.)
+==> If you want to know what's new since release 0.9.9: read
+    Misc/NEWS.  Older history is in Misc/HISTORY.  [XXX Not in the
+    BETA release yet.]
 
-(2) Run Make:
+==> All documentation is in the subdirectory doc in the form of LaTeX
+    files.  In order of importance for new users: Tutorial (tut),
+    Library Reference (lib), Language Reference (ref), Extending
+    (ext).  Note that especially the Library Reference is of immense
+    value since much of Python's power (including the built-in data
+    types and functions!) is described there.  [XXX The ext document
+    has not been updated to reflect this release yet.]
 
-	make
+==> Python is COPYRIGHTED but free to use for all.  See the copyright
+    notice at the end of this file.
 
-This will recursively run Make in each of the Parser, Grammar, Objects
-and Python subdirectories.  In Parser it builds an executable "pgen"
-and a library libParser.a.  In Grammar it runs Parser/pgen to generate
-graminit.[ch] which are copied to Includes and Python, respectively.
-In Objects it builds a library libObjects.a.  In Python it builds a
-library libPython.a and an executable "python".
 
-(3) Test the resulting executable:
+Build instructions
+------------------
 
-	Python/python -c 'import testall'
+To build python, you normally simply type "make" in this directory.
+The first time you do this, it will run the script "./configure",
+which figures out your system configuration and creates the Makefiles
+in most subdirectories.  It will then run "make" recursively in each
+of the subdirectories Parser, Objects, Python and Modules, creating a
+library file in each one.  The executable of the interpreter is built
+in the Modules subdirectory but moved up here when it is built.
 
-For now, this will assume that you have a working version of Python
-release 0.9.9 installed in /usr/local (it uses the Python library from
-/usr/local/lib/python) or that your PYTHONPATH shell environment
-variable points to the 0.9.9 Python library.
+You can configure the interpreter to contain fewer or more built-in
+modules by cd'ing to the Modules subdirectory, editing the file Setup
+there, and running "make Makefile" followed by "make" there.  Read the
+comments in the Setup file for more information.  You can also edit
+Modules/Setup before running make from the toplevel directory; this
+will automatically rebuild Modules/Makefile.
 
-(4) Optionally: read Extensions/README and try to build a Python with
-all the  extensions that make sense on your system.  (Note: some
-extensions are not supported yet.)
+You can also build an "extended" interpreter, using modules that are
+not contained in the Modules directory.  This is done in the
+Extensions directory; read the README file there for more details.
 
-(5) Give feedback:
+Some special cases are handled by passing environment variables or
+options to the configure script:
 
-	Mail guido@cwi.nl
+1) The configure script uses gcc (the GNU C compiler) if it finds it.
+If you don't want this, or if this compiler is installed but broken on
+your platform, pass "CC=cc" (or whatever the name of the proper C
+compiler is) in the environment.
 
-Please tell me whether the build succeeded or not.  If you needed to
-edit *any* file, tell me which file, why and how (send me a diff or a
-copy of the modified file if you can).  If you get stuck, please send
-me the error output.  Don't forget to mention the operating system,
-compiler and hardware version that you used, e.g. "Solaris 2.2 with
-gcc version cygnus-2.0.2 on a dual processor Sparcstation 10" or "IRIX
-5.1 with standard cc on an Indigo XS-24 with R4000 CPU".  If you can
-build the core interpreter but get stuck building an extended version,
-let me know which extensions gave problems and how.
+2) You can use the GNU readline library to improve the interactive
+user interface: this gives you line editing and command history when
+calling python interactively.  You need to build the GNU readline
+library before running the configure script.  Pass it the option
+--with-readline=DIRECTORY where DIRECTORY is the absolute pathname of
+the directory where you've built the readline library.
+
+3) Certain modules need to know whether you are running Sun SOLARIS
+2.x.  I currently don't know a failsafe way to determine this, so you
+have to pass the option --with-solaris to the configure script.  (This
+is currently only needed when you use threads or the sunaudiodev
+module.)
+
+4) On SGI IRIX, and on Sun SOLARIS 2.x, you can use multiple threads.
+To enable this, pass --with-thread.  On SOLARIS 2.x, also pass
+--with-solaris.  In the Modules/Setup file, enable the thread module.
+
+5) On SGI IRIX, there are modules that interface to many SGI specific
+system libraries, e.g. the GL library and the audio hardware.  To
+enable these modules, you must edit the Modules/Setup file (or use the
+Setup.sgi file instead).
+
+
+Distribution structure
+----------------------
+
+Most subdirectories have their own README file.  Most files have
+comments.
+
+Contrib/	Contributed code
+Demo/		Demonstration scripts, modules and programs
+Doc/		Documentation (in LaTeX)
+Extensions/	Extension modules (not very well supported yet)
+Grammar/	Input for the parser generator
+Include/	Public header files
+Lib/		Python library modules
+Makefile	Rules for building the distribution
+Misc/		Miscellaneous files
+Modules/	Implementation of most built-in modules
+Objects/	Implementation of most built-in object types
+Parser/		The parser and tokenizer and their input handling
+Python/		The "compiler" and interpreter
+README		The file you're reading now
+TODO		A list of things that aren't finished yet
+config.status	status from last run of configure script (not distributed)
+configure	Configuration shell script (GNU autoconf output)
+configure.in	Configuration specification (GNU autoconf input)
+python		The executable interpreter (not distributed)
+readline/	Source code for the GNU readline library
+
+
+Ftp access
+----------
+
+The latest Python source distribution can be ftp'ed from site
+ftp.cwi.nl (IP address 192.16.184.180), directory /pub/python, file
+python<version>.tar.Z.  You can also find PostScript of the main
+Python documentation there, Macintosh and PC binaries, and the latest
+STDWIN source distribution (in directory /pub/stdwin).  Mirror sites
+are gatekeeper.dec.com (/pub/plan/python/cwi) and ftp.uu.net
+(/languages/python) -- try these sites first if you are on the US
+continent, or at least closer to it than to Europe.
+
+If you don't have ftp access, send mail containing only the word HELP
+to ftpmail@decwrl.dec.com or bitftp@pucc.princeton.edu, and the
+server will send you instructions on how to make requests.
+
+
+Mailing list
+------------
+
+There is a mailing list devoted to Python programming, design and
+bugs.  To subscribe, send mail containing your real name and e-mail
+address in Internet form to "python-list-request@cwi.nl".  If you have
+built and installed Python, you are urgently to subscribe to this
+mailing list.
+
+
+Author
+------
+
+Guido van Rossum
+CWI, dept. CST
+P.O. Box 94079
+1090 GB  Amsterdam
+The Netherlands
+
+E-mail: Guido.van.Rossum@cwi.nl
+
+
+Copyright Notice
+----------------
+
+The Python source is copyrighted, but you can freely use and copy it
+as long as you don't change or remove the copyright:
+
+Copyright 1991, 1992, 1993, 1994 by Stichting Mathematisch Centrum,
+Amsterdam, The Netherlands.
+
+                        All Rights Reserved
+
+Permission to use, copy, modify, and distribute this software and its 
+documentation for any purpose and without fee is hereby granted, 
+provided that the above copyright notice appear in all copies and that
+both that copyright notice and this permission notice appear in 
+supporting documentation, and that the names of Stichting Mathematisch
+Centrum or CWI not be used in advertising or publicity pertaining to
+distribution of the software without specific, written prior permission.
+
+STICHTING MATHEMATISCH CENTRUM DISCLAIMS ALL WARRANTIES WITH REGARD TO
+THIS SOFTWARE, INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND
+FITNESS, IN NO EVENT SHALL STICHTING MATHEMATISCH CENTRUM BE LIABLE
+FOR ANY SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
+OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+
+Signature
+---------
 
 --Guido van Rossum, CWI, Amsterdam <Guido.van.Rossum@cwi.nl>
 URL:  <http://www.cwi.nl/cwi/people/Guido.van.Rossum.html>

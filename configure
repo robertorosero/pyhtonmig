@@ -130,6 +130,26 @@ esac
 configure_args="$*"
 
 
+
+echo checking for --with-solaris
+# check whether --with-solaris was given
+withval="$with_solaris"
+if test -n "$withval"; then
+  
+{
+test -n "$verbose" && \
+echo "	defining SOLARIS"
+echo "#define" SOLARIS 1 >> confdefs.h
+DEFS="$DEFS -DSOLARIS=1"
+SEDDEFS="${SEDDEFS}\${SEDdA}SOLARIS\${SEDdB}SOLARIS\${SEDdC}1\${SEDdD}
+\${SEDuA}SOLARIS\${SEDuB}SOLARIS\${SEDuC}1\${SEDuD}
+\${SEDeA}SOLARIS\${SEDeB}SOLARIS\${SEDeC}1\${SEDeD}
+"
+}
+
+fi
+
+
 # checks for alternative programs
 if test -z "$CC"; then
   # Extract the first word of `gcc', so it can be a program name with args.
@@ -218,6 +238,10 @@ test -n "$verbose" && \
 echo "	defining _ALL_SOURCE"
 echo "#define" _ALL_SOURCE 1 >> confdefs.h
 DEFS="$DEFS -D_ALL_SOURCE=1"
+SEDDEFS="${SEDDEFS}\${SEDdA}_ALL_SOURCE\${SEDdB}_ALL_SOURCE\${SEDdC}1\${SEDdD}
+\${SEDuA}_ALL_SOURCE\${SEDuB}_ALL_SOURCE\${SEDuC}1\${SEDuD}
+\${SEDeA}_ALL_SOURCE\${SEDeB}_ALL_SOURCE\${SEDeC}1\${SEDeD}
+"
 }
 
 
@@ -236,6 +260,10 @@ test -n "$verbose" && \
 echo "	defining _POSIX_SOURCE"
 echo "#define" _POSIX_SOURCE 1 >> confdefs.h
 DEFS="$DEFS -D_POSIX_SOURCE=1"
+SEDDEFS="${SEDDEFS}\${SEDdA}_POSIX_SOURCE\${SEDdB}_POSIX_SOURCE\${SEDdC}1\${SEDdD}
+\${SEDuA}_POSIX_SOURCE\${SEDuB}_POSIX_SOURCE\${SEDuC}1\${SEDuD}
+\${SEDeA}_POSIX_SOURCE\${SEDeB}_POSIX_SOURCE\${SEDeC}1\${SEDeD}
+"
 }
 
   if test -n "$GCC"; then
@@ -266,6 +294,10 @@ test -n "$verbose" && \
 echo "	defining _POSIX_SOURCE"
 echo "#define" _POSIX_SOURCE 1 >> confdefs.h
 DEFS="$DEFS -D_POSIX_SOURCE=1"
+SEDDEFS="${SEDDEFS}\${SEDdA}_POSIX_SOURCE\${SEDdB}_POSIX_SOURCE\${SEDdC}1\${SEDdD}
+\${SEDuA}_POSIX_SOURCE\${SEDuB}_POSIX_SOURCE\${SEDuC}1\${SEDuD}
+\${SEDeA}_POSIX_SOURCE\${SEDeB}_POSIX_SOURCE\${SEDeC}1\${SEDeD}
+"
 }
 
   
@@ -274,6 +306,10 @@ test -n "$verbose" && \
 echo "	defining" _POSIX_1_SOURCE to be 2
 echo "#define" _POSIX_1_SOURCE 2 >> confdefs.h
 DEFS="$DEFS -D_POSIX_1_SOURCE=2"
+SEDDEFS="${SEDDEFS}\${SEDdA}_POSIX_1_SOURCE\${SEDdB}_POSIX_1_SOURCE\${SEDdC}2\${SEDdD}
+\${SEDuA}_POSIX_1_SOURCE\${SEDuB}_POSIX_1_SOURCE\${SEDuC}2\${SEDuD}
+\${SEDeA}_POSIX_1_SOURCE\${SEDeB}_POSIX_1_SOURCE\${SEDeC}2\${SEDeD}
+"
 }
 
   
@@ -282,6 +318,10 @@ test -n "$verbose" && \
 echo "	defining _MINIX"
 echo "#define" _MINIX 1 >> confdefs.h
 DEFS="$DEFS -D_MINIX=1"
+SEDDEFS="${SEDDEFS}\${SEDdA}_MINIX\${SEDdB}_MINIX\${SEDdC}1\${SEDdD}
+\${SEDuA}_MINIX\${SEDuB}_MINIX\${SEDuC}1\${SEDuD}
+\${SEDeA}_MINIX\${SEDeB}_MINIX\${SEDeC}1\${SEDeD}
+"
 }
 
 fi
@@ -349,6 +389,10 @@ test -n "$verbose" && \
 echo "	defining STDC_HEADERS"
 echo "#define" STDC_HEADERS 1 >> confdefs.h
 DEFS="$DEFS -DSTDC_HEADERS=1"
+SEDDEFS="${SEDDEFS}\${SEDdA}STDC_HEADERS\${SEDdB}STDC_HEADERS\${SEDdC}1\${SEDdD}
+\${SEDuA}STDC_HEADERS\${SEDuB}STDC_HEADERS\${SEDuC}1\${SEDuD}
+\${SEDeA}STDC_HEADERS\${SEDeB}STDC_HEADERS\${SEDeC}1\${SEDeD}
+"
 }
 
 
@@ -362,7 +406,7 @@ rm -f conftest*
 fi
 rm -f conftest*
 
-for hdr in dlfcn.h signal.h stdarg.h unistd.h utime.h sys/param.h sys/select.h sys/times.h sys/utsname.h
+for hdr in dlfcn.h signal.h stdarg.h stdlib.h unistd.h utime.h sys/param.h sys/select.h sys/times.h sys/utsname.h
 do
 trhdr=HAVE_`echo $hdr | tr '[a-z]./' '[A-Z]__'`
 echo checking for ${hdr}
@@ -379,6 +423,10 @@ test -n "$verbose" && \
 echo "	defining ${trhdr}"
 echo "#define" ${trhdr} 1 >> confdefs.h
 DEFS="$DEFS -D${trhdr}=1"
+SEDDEFS="${SEDDEFS}\${SEDdA}${trhdr}\${SEDdB}${trhdr}\${SEDdC}1\${SEDdD}
+\${SEDuA}${trhdr}\${SEDuB}${trhdr}\${SEDuC}1\${SEDuD}
+\${SEDeA}${trhdr}\${SEDeB}${trhdr}\${SEDeC}1\${SEDeD}
+"
 }
 
 
@@ -405,6 +453,10 @@ test -n "$verbose" && \
 echo "	defining DIRENT"
 echo "#define" DIRENT 1 >> confdefs.h
 DEFS="$DEFS -DDIRENT=1"
+SEDDEFS="${SEDDEFS}\${SEDdA}DIRENT\${SEDdB}DIRENT\${SEDdC}1\${SEDdD}
+\${SEDuA}DIRENT\${SEDuB}DIRENT\${SEDuC}1\${SEDuD}
+\${SEDeA}DIRENT\${SEDeB}DIRENT\${SEDeC}1\${SEDeD}
+"
 }
  dirheader=dirent.h
 
@@ -428,6 +480,10 @@ test -n "$verbose" && \
 echo "	defining SYSNDIR"
 echo "#define" SYSNDIR 1 >> confdefs.h
 DEFS="$DEFS -DSYSNDIR=1"
+SEDDEFS="${SEDDEFS}\${SEDdA}SYSNDIR\${SEDdB}SYSNDIR\${SEDdC}1\${SEDdD}
+\${SEDuA}SYSNDIR\${SEDuB}SYSNDIR\${SEDuC}1\${SEDuD}
+\${SEDeA}SYSNDIR\${SEDeB}SYSNDIR\${SEDeC}1\${SEDeD}
+"
 }
  dirheader=sys/ndir.h
 
@@ -451,6 +507,10 @@ test -n "$verbose" && \
 echo "	defining SYSDIR"
 echo "#define" SYSDIR 1 >> confdefs.h
 DEFS="$DEFS -DSYSDIR=1"
+SEDDEFS="${SEDDEFS}\${SEDdA}SYSDIR\${SEDdB}SYSDIR\${SEDdC}1\${SEDdD}
+\${SEDuA}SYSDIR\${SEDuB}SYSDIR\${SEDuC}1\${SEDuD}
+\${SEDeA}SYSDIR\${SEDeB}SYSDIR\${SEDeC}1\${SEDeD}
+"
 }
  dirheader=sys/dir.h
 
@@ -474,6 +534,10 @@ test -n "$verbose" && \
 echo "	defining NDIR"
 echo "#define" NDIR 1 >> confdefs.h
 DEFS="$DEFS -DNDIR=1"
+SEDDEFS="${SEDDEFS}\${SEDdA}NDIR\${SEDdB}NDIR\${SEDdC}1\${SEDdD}
+\${SEDuA}NDIR\${SEDuB}NDIR\${SEDuC}1\${SEDuD}
+\${SEDeA}NDIR\${SEDeB}NDIR\${SEDeC}1\${SEDeD}
+"
 }
  dirheader=ndir.h
 
@@ -498,6 +562,10 @@ test -n "$verbose" && \
 echo "	defining VOID_CLOSEDIR"
 echo "#define" VOID_CLOSEDIR 1 >> confdefs.h
 DEFS="$DEFS -DVOID_CLOSEDIR=1"
+SEDDEFS="${SEDDEFS}\${SEDdA}VOID_CLOSEDIR\${SEDdB}VOID_CLOSEDIR\${SEDdC}1\${SEDdD}
+\${SEDuA}VOID_CLOSEDIR\${SEDuB}VOID_CLOSEDIR\${SEDuC}1\${SEDuD}
+\${SEDeA}VOID_CLOSEDIR\${SEDeB}VOID_CLOSEDIR\${SEDeC}1\${SEDeD}
+"
 }
 
 fi
@@ -505,80 +573,6 @@ rm -fr conftest*
 
 
 # checks for typedefs
-echo checking for uid_t in sys/types.h
-echo '#include "confdefs.h"
-#include <sys/types.h>' > conftest.c
-eval "$CPP conftest.c > conftest.out 2>&1"
-if egrep "uid_t" conftest.out >/dev/null 2>&1; then
-  :
-else
-  rm -rf conftest*
-  
-{
-test -n "$verbose" && \
-echo "	defining" uid_t to be int
-echo "#define" uid_t int >> confdefs.h
-DEFS="$DEFS -Duid_t=int"
-}
- 
-{
-test -n "$verbose" && \
-echo "	defining" gid_t to be int
-echo "#define" gid_t int >> confdefs.h
-DEFS="$DEFS -Dgid_t=int"
-}
-
-fi
-rm -f conftest*
-
-echo checking for type of array argument to getgroups
-prog='/* Thanks to Mike Rendell for this test.  */
-#include <sys/types.h>
-#define NGID 256
-#undef MAX
-#define MAX(x,y) ((x) > (y) ? (x) : (y))
-main()
-{
-  gid_t gidset[NGID];
-  int i, n;
-  union { gid_t gval; long lval; }  val;
-
-  val.lval = -1;
-  for (i = 0; i < NGID; i++)
-    gidset[i] = val.gval;
-  n = getgroups (sizeof (gidset) / MAX (sizeof (int), sizeof (gid_t)) - 1,
-                 gidset);
-  /* Exit non-zero if getgroups seems to require an array of ints.  This
-     happens when gid_t is short but getgroups modifies an array of ints.  */
-  exit ((n > 0 && gidset[n] != val.gval) ? 1 : 0);
-}'
-cat > conftest.c <<EOF
-#include "confdefs.h"
-$prog
-EOF
-eval $compile
-if test -s conftest && (./conftest; exit) 2>/dev/null; then
-  
-{
-test -n "$verbose" && \
-echo "	defining" GETGROUPS_T to be gid_t
-echo "#define" GETGROUPS_T gid_t >> confdefs.h
-DEFS="$DEFS -DGETGROUPS_T=gid_t"
-}
-
-
-else
-  
-{
-test -n "$verbose" && \
-echo "	defining" GETGROUPS_T to be int
-echo "#define" GETGROUPS_T int >> confdefs.h
-DEFS="$DEFS -DGETGROUPS_T=int"
-}
-
-fi
-rm -fr conftest*
-
 echo checking for mode_t in sys/types.h
 echo '#include "confdefs.h"
 #include <sys/types.h>' > conftest.c
@@ -593,6 +587,10 @@ test -n "$verbose" && \
 echo "	defining" mode_t to be int
 echo "#define" mode_t int >> confdefs.h
 DEFS="$DEFS -Dmode_t=int"
+SEDDEFS="${SEDDEFS}\${SEDdA}mode_t\${SEDdB}mode_t\${SEDdC}int\${SEDdD}
+\${SEDuA}mode_t\${SEDuB}mode_t\${SEDuC}int\${SEDuD}
+\${SEDeA}mode_t\${SEDeB}mode_t\${SEDeC}int\${SEDeD}
+"
 }
 
 fi
@@ -612,6 +610,10 @@ test -n "$verbose" && \
 echo "	defining" off_t to be long
 echo "#define" off_t long >> confdefs.h
 DEFS="$DEFS -Doff_t=long"
+SEDDEFS="${SEDDEFS}\${SEDdA}off_t\${SEDdB}off_t\${SEDdC}long\${SEDdD}
+\${SEDuA}off_t\${SEDuB}off_t\${SEDuC}long\${SEDuD}
+\${SEDeA}off_t\${SEDeB}off_t\${SEDeC}long\${SEDeD}
+"
 }
 
 fi
@@ -631,6 +633,10 @@ test -n "$verbose" && \
 echo "	defining" pid_t to be int
 echo "#define" pid_t int >> confdefs.h
 DEFS="$DEFS -Dpid_t=int"
+SEDDEFS="${SEDDEFS}\${SEDdA}pid_t\${SEDdB}pid_t\${SEDdC}int\${SEDdD}
+\${SEDuA}pid_t\${SEDuB}pid_t\${SEDuC}int\${SEDuD}
+\${SEDeA}pid_t\${SEDeB}pid_t\${SEDeC}int\${SEDeD}
+"
 }
 
 fi
@@ -656,6 +662,10 @@ test -n "$verbose" && \
 echo "	defining" RETSIGTYPE to be void
 echo "#define" RETSIGTYPE void >> confdefs.h
 DEFS="$DEFS -DRETSIGTYPE=void"
+SEDDEFS="${SEDDEFS}\${SEDdA}RETSIGTYPE\${SEDdB}RETSIGTYPE\${SEDdC}void\${SEDdD}
+\${SEDuA}RETSIGTYPE\${SEDuB}RETSIGTYPE\${SEDuC}void\${SEDuD}
+\${SEDeA}RETSIGTYPE\${SEDeB}RETSIGTYPE\${SEDeC}void\${SEDeD}
+"
 }
 
 
@@ -667,6 +677,10 @@ test -n "$verbose" && \
 echo "	defining" RETSIGTYPE to be int
 echo "#define" RETSIGTYPE int >> confdefs.h
 DEFS="$DEFS -DRETSIGTYPE=int"
+SEDDEFS="${SEDDEFS}\${SEDdA}RETSIGTYPE\${SEDdB}RETSIGTYPE\${SEDdC}int\${SEDdD}
+\${SEDuA}RETSIGTYPE\${SEDuB}RETSIGTYPE\${SEDuC}int\${SEDuD}
+\${SEDeA}RETSIGTYPE\${SEDeB}RETSIGTYPE\${SEDeC}int\${SEDeD}
+"
 }
 
 fi
@@ -687,6 +701,10 @@ test -n "$verbose" && \
 echo "	defining" size_t to be unsigned
 echo "#define" size_t unsigned >> confdefs.h
 DEFS="$DEFS -Dsize_t=unsigned"
+SEDDEFS="${SEDDEFS}\${SEDdA}size_t\${SEDdB}size_t\${SEDdC}unsigned\${SEDdD}
+\${SEDuA}size_t\${SEDuB}size_t\${SEDuC}unsigned\${SEDuD}
+\${SEDeA}size_t\${SEDeB}size_t\${SEDeC}unsigned\${SEDeD}
+"
 }
 
 fi
@@ -706,6 +724,10 @@ test -n "$verbose" && \
 echo "	defining" uid_t to be int
 echo "#define" uid_t int >> confdefs.h
 DEFS="$DEFS -Duid_t=int"
+SEDDEFS="${SEDDEFS}\${SEDdA}uid_t\${SEDdB}uid_t\${SEDdC}int\${SEDdD}
+\${SEDuA}uid_t\${SEDuB}uid_t\${SEDuC}int\${SEDuD}
+\${SEDeA}uid_t\${SEDeB}uid_t\${SEDeC}int\${SEDeD}
+"
 }
  
 {
@@ -713,6 +735,10 @@ test -n "$verbose" && \
 echo "	defining" gid_t to be int
 echo "#define" gid_t int >> confdefs.h
 DEFS="$DEFS -Dgid_t=int"
+SEDDEFS="${SEDDEFS}\${SEDdA}gid_t\${SEDdB}gid_t\${SEDdC}int\${SEDdD}
+\${SEDuA}gid_t\${SEDuB}gid_t\${SEDuC}int\${SEDuD}
+\${SEDeA}gid_t\${SEDeB}gid_t\${SEDeC}int\${SEDeD}
+"
 }
 
 fi
@@ -744,16 +770,19 @@ test -n "$verbose" && \
 echo "	defining HAVE_LIBDL"
 echo "#define" HAVE_LIBDL 1 >> confdefs.h
 DEFS="$DEFS -DHAVE_LIBDL=1"
+SEDDEFS="${SEDDEFS}\${SEDdA}HAVE_LIBDL\${SEDdB}HAVE_LIBDL\${SEDdC}1\${SEDdD}
+\${SEDuA}HAVE_LIBDL\${SEDuB}HAVE_LIBDL\${SEDuC}1\${SEDuD}
+\${SEDeA}HAVE_LIBDL\${SEDeB}HAVE_LIBDL\${SEDeC}1\${SEDeD}
+"
 }
 
    LIBS="${LIBS} -ldl"
 fi
 
-LIBS="${LIBS} -L${READLINESRC-${PWD-${CWD-`pwd`}}/readline}"
 LIBS_save="${LIBS}"
-LIBS="${LIBS} -lreadline"
+LIBS="${LIBS} -lsocket"
 have_lib=""
-echo checking for -lreadline
+echo checking for -lsocket
 cat > conftest.c <<EOF
 #include "confdefs.h"
 
@@ -771,19 +800,22 @@ if test -n "${have_lib}"; then
    
 {
 test -n "$verbose" && \
-echo "	defining HAVE_LIBREADLINE"
-echo "#define" HAVE_LIBREADLINE 1 >> confdefs.h
-DEFS="$DEFS -DHAVE_LIBREADLINE=1"
+echo "	defining HAVE_LIBSOCKET"
+echo "#define" HAVE_LIBSOCKET 1 >> confdefs.h
+DEFS="$DEFS -DHAVE_LIBSOCKET=1"
+SEDDEFS="${SEDDEFS}\${SEDdA}HAVE_LIBSOCKET\${SEDdB}HAVE_LIBSOCKET\${SEDdC}1\${SEDdD}
+\${SEDuA}HAVE_LIBSOCKET\${SEDuB}HAVE_LIBSOCKET\${SEDuC}1\${SEDuD}
+\${SEDeA}HAVE_LIBSOCKET\${SEDeB}HAVE_LIBSOCKET\${SEDeC}1\${SEDeD}
+"
 }
 
-   LIBS="${LIBS} -lreadline"
+   LIBS="${LIBS} -lsocket"
 fi
 
-if test -n "${have_lib}"; then
 LIBS_save="${LIBS}"
-LIBS="${LIBS} -ltermcap"
+LIBS="${LIBS} -lnsl"
 have_lib=""
-echo checking for -ltermcap
+echo checking for -lnsl
 cat > conftest.c <<EOF
 #include "confdefs.h"
 
@@ -801,17 +833,45 @@ if test -n "${have_lib}"; then
    
 {
 test -n "$verbose" && \
-echo "	defining HAVE_LIBTERMCAP"
-echo "#define" HAVE_LIBTERMCAP 1 >> confdefs.h
-DEFS="$DEFS -DHAVE_LIBTERMCAP=1"
+echo "	defining HAVE_LIBNSL"
+echo "#define" HAVE_LIBNSL 1 >> confdefs.h
+DEFS="$DEFS -DHAVE_LIBNSL=1"
+SEDDEFS="${SEDDEFS}\${SEDdA}HAVE_LIBNSL\${SEDdB}HAVE_LIBNSL\${SEDdC}1\${SEDdD}
+\${SEDuA}HAVE_LIBNSL\${SEDuB}HAVE_LIBNSL\${SEDuC}1\${SEDuD}
+\${SEDeA}HAVE_LIBNSL\${SEDeB}HAVE_LIBNSL\${SEDeC}1\${SEDeD}
+"
 }
 
-   LIBS="${LIBS} -ltermcap"
+   LIBS="${LIBS} -lnsl"
 fi
 
+
+echo checking for --with-readline
+# check whether --with-readline was given
+withval="$with_readline"
+if test -n "$withval"; then
+  
+{
+test -n "$verbose" && \
+echo "	defining WITH_READLINE"
+echo "#define" WITH_READLINE 1 >> confdefs.h
+DEFS="$DEFS -DWITH_READLINE=1"
+SEDDEFS="${SEDDEFS}\${SEDdA}WITH_READLINE\${SEDdB}WITH_READLINE\${SEDdC}1\${SEDdD}
+\${SEDuA}WITH_READLINE\${SEDuB}WITH_READLINE\${SEDuC}1\${SEDuD}
+\${SEDeA}WITH_READLINE\${SEDeB}WITH_READLINE\${SEDeC}1\${SEDeD}
+"
+}
+
+if test "$withval" != 1; then LIBS="$LIBS -L$withval"; fi
+LIBS="$LIBS -lreadline -ltermcap"
 fi
 
-# Check for IRIX or SOLARIS thread interface
+
+echo checking for --with-thread
+# check whether --with-thread was given
+withval="$with_thread"
+if test -n "$withval"; then
+  
 LIBS_save="${LIBS}"
 LIBS="${LIBS} -lmpc"
 have_lib=""
@@ -830,20 +890,22 @@ fi
 rm -f conftest*
 LIBS="${LIBS_save}"
 if test -n "${have_lib}"; then
-   
+   :; 
 {
 test -n "$verbose" && \
-echo "	defining HAVE_LIBMPC"
-echo "#define" HAVE_LIBMPC 1 >> confdefs.h
-DEFS="$DEFS -DHAVE_LIBMPC=1"
+echo "	defining USE_THREAD"
+echo "#define" USE_THREAD 1 >> confdefs.h
+DEFS="$DEFS -DUSE_THREAD=1"
+SEDDEFS="${SEDDEFS}\${SEDdA}USE_THREAD\${SEDdB}USE_THREAD\${SEDdC}1\${SEDdD}
+\${SEDuA}USE_THREAD\${SEDuB}USE_THREAD\${SEDuC}1\${SEDuD}
+\${SEDeA}USE_THREAD\${SEDeB}USE_THREAD\${SEDeC}1\${SEDeD}
+"
 }
 
-   LIBS="${LIBS} -lmpc"
-fi
-
-if test -n "${have_lib}"; then
-DEFS="${DEFS} -DUSE_THREAD"
-LIBOBJS="${LIBOBJS} thread.o"
+LIBS="$LIBS -lmpc"
+LIBOBJS="$LIBOBJS thread.o"
+else
+   :; 
 fi
 
 LIBS_save="${LIBS}"
@@ -864,21 +926,27 @@ fi
 rm -f conftest*
 LIBS="${LIBS_save}"
 if test -n "${have_lib}"; then
-   
+   :; 
 {
 test -n "$verbose" && \
-echo "	defining HAVE_LIBTHREAD"
-echo "#define" HAVE_LIBTHREAD 1 >> confdefs.h
-DEFS="$DEFS -DHAVE_LIBTHREAD=1"
+echo "	defining USE_THREAD"
+echo "#define" USE_THREAD 1 >> confdefs.h
+DEFS="$DEFS -DUSE_THREAD=1"
+SEDDEFS="${SEDDEFS}\${SEDdA}USE_THREAD\${SEDdB}USE_THREAD\${SEDdC}1\${SEDdD}
+\${SEDuA}USE_THREAD\${SEDuB}USE_THREAD\${SEDuC}1\${SEDuD}
+\${SEDeA}USE_THREAD\${SEDeB}USE_THREAD\${SEDeC}1\${SEDeD}
+"
 }
 
-   LIBS="${LIBS} -lthread"
+LIBS="$LIBS -lthread"
+LIBOBJS="$LIBOBJS thread.o"
+else
+   :; 
 fi
 
-if test -n "${have_lib}"; then
-DEFS="${DEFS} -DUSE_THREAD"
-LIBOBJS="${LIBOBJS} thread.o"
+
 fi
+
 
 # checks for library functions
 for func in clock ftime gettimeofday getpgrp getwd lstat readlink readline select setsid setpgid setpgrp siginterrupt symlink tcgetpgrp tcsetpgrp times uname waitpid
@@ -908,6 +976,10 @@ test -n "$verbose" && \
 echo "	defining ${trfunc}"
 echo "#define" ${trfunc} 1 >> confdefs.h
 DEFS="$DEFS -D${trfunc}=1"
+SEDDEFS="${SEDDEFS}\${SEDdA}${trfunc}\${SEDdB}${trfunc}\${SEDdC}1\${SEDdD}
+\${SEDuA}${trfunc}\${SEDuB}${trfunc}\${SEDuC}1\${SEDuD}
+\${SEDeA}${trfunc}\${SEDeB}${trfunc}\${SEDeC}1\${SEDeD}
+"
 }
 
 
@@ -979,6 +1051,10 @@ test -n "$verbose" && \
 echo "	defining GETPGRP_HAVE_ARG"
 echo "#define" GETPGRP_HAVE_ARG 1 >> confdefs.h
 DEFS="$DEFS -DGETPGRP_HAVE_ARG=1"
+SEDDEFS="${SEDDEFS}\${SEDdA}GETPGRP_HAVE_ARG\${SEDdB}GETPGRP_HAVE_ARG\${SEDdC}1\${SEDdD}
+\${SEDuA}GETPGRP_HAVE_ARG\${SEDuB}GETPGRP_HAVE_ARG\${SEDuC}1\${SEDuD}
+\${SEDeA}GETPGRP_HAVE_ARG\${SEDeB}GETPGRP_HAVE_ARG\${SEDeC}1\${SEDeD}
+"
 }
 
 
@@ -1008,6 +1084,10 @@ test -n "$verbose" && \
 echo "	defining TIME_WITH_SYS_TIME"
 echo "#define" TIME_WITH_SYS_TIME 1 >> confdefs.h
 DEFS="$DEFS -DTIME_WITH_SYS_TIME=1"
+SEDDEFS="${SEDDEFS}\${SEDdA}TIME_WITH_SYS_TIME\${SEDdB}TIME_WITH_SYS_TIME\${SEDdC}1\${SEDdD}
+\${SEDuA}TIME_WITH_SYS_TIME\${SEDuB}TIME_WITH_SYS_TIME\${SEDuC}1\${SEDuD}
+\${SEDeA}TIME_WITH_SYS_TIME\${SEDeB}TIME_WITH_SYS_TIME\${SEDeC}1\${SEDeD}
+"
 }
 
 
@@ -1032,6 +1112,10 @@ test -n "$verbose" && \
 echo "	defining TM_IN_SYS_TIME"
 echo "#define" TM_IN_SYS_TIME 1 >> confdefs.h
 DEFS="$DEFS -DTM_IN_SYS_TIME=1"
+SEDDEFS="${SEDDEFS}\${SEDdA}TM_IN_SYS_TIME\${SEDdB}TM_IN_SYS_TIME\${SEDdC}1\${SEDdD}
+\${SEDuA}TM_IN_SYS_TIME\${SEDuB}TM_IN_SYS_TIME\${SEDuC}1\${SEDuD}
+\${SEDeA}TM_IN_SYS_TIME\${SEDeB}TM_IN_SYS_TIME\${SEDeC}1\${SEDeD}
+"
 }
 
 fi
@@ -1062,6 +1146,10 @@ test -n "$verbose" && \
 echo "	defining HAVE_TM_ZONE"
 echo "#define" HAVE_TM_ZONE 1 >> confdefs.h
 DEFS="$DEFS -DHAVE_TM_ZONE=1"
+SEDDEFS="${SEDDEFS}\${SEDdA}HAVE_TM_ZONE\${SEDdB}HAVE_TM_ZONE\${SEDdC}1\${SEDdD}
+\${SEDuA}HAVE_TM_ZONE\${SEDuB}HAVE_TM_ZONE\${SEDuC}1\${SEDuD}
+\${SEDeA}HAVE_TM_ZONE\${SEDeB}HAVE_TM_ZONE\${SEDeC}1\${SEDeD}
+"
 }
 
 
@@ -1090,6 +1178,10 @@ test -n "$verbose" && \
 echo "	defining HAVE_TZNAME"
 echo "#define" HAVE_TZNAME 1 >> confdefs.h
 DEFS="$DEFS -DHAVE_TZNAME=1"
+SEDDEFS="${SEDDEFS}\${SEDdA}HAVE_TZNAME\${SEDdB}HAVE_TZNAME\${SEDdC}1\${SEDdD}
+\${SEDuA}HAVE_TZNAME\${SEDuB}HAVE_TZNAME\${SEDuC}1\${SEDuD}
+\${SEDeA}HAVE_TZNAME\${SEDeB}HAVE_TZNAME\${SEDeC}1\${SEDeD}
+"
 }
 
 
@@ -1155,6 +1247,10 @@ test -n "$verbose" && \
 echo "	defining" const to be empty
 echo "#define" const  >> confdefs.h
 DEFS="$DEFS -Dconst="
+SEDDEFS="${SEDDEFS}\${SEDdA}const\${SEDdB}const\${SEDdC}\${SEDdD}
+\${SEDuA}const\${SEDuB}const\${SEDuC}\${SEDuD}
+\${SEDeA}const\${SEDeB}const\${SEDeC}\${SEDeD}
+"
 }
 
 fi
@@ -1173,6 +1269,10 @@ test -n "$verbose" && \
 echo "	defining HAVE_PROTOTYPES"
 echo "#define" HAVE_PROTOTYPES 1 >> confdefs.h
 DEFS="$DEFS -DHAVE_PROTOTYPES=1"
+SEDDEFS="${SEDDEFS}\${SEDdA}HAVE_PROTOTYPES\${SEDdB}HAVE_PROTOTYPES\${SEDdC}1\${SEDdD}
+\${SEDuA}HAVE_PROTOTYPES\${SEDuB}HAVE_PROTOTYPES\${SEDuC}1\${SEDuD}
+\${SEDeA}HAVE_PROTOTYPES\${SEDeB}HAVE_PROTOTYPES\${SEDeC}1\${SEDeD}
+"
 }
  have_prototypes=1
 
@@ -1196,6 +1296,10 @@ test -n "$verbose" && \
 echo "	defining BAD_EXEC_PROTOTYPES"
 echo "#define" BAD_EXEC_PROTOTYPES 1 >> confdefs.h
 DEFS="$DEFS -DBAD_EXEC_PROTOTYPES=1"
+SEDDEFS="${SEDDEFS}\${SEDdA}BAD_EXEC_PROTOTYPES\${SEDdB}BAD_EXEC_PROTOTYPES\${SEDdC}1\${SEDdD}
+\${SEDuA}BAD_EXEC_PROTOTYPES\${SEDuB}BAD_EXEC_PROTOTYPES\${SEDuC}1\${SEDuD}
+\${SEDeA}BAD_EXEC_PROTOTYPES\${SEDeB}BAD_EXEC_PROTOTYPES\${SEDeC}1\${SEDeD}
+"
 }
 
 fi
@@ -1297,14 +1401,13 @@ do
   esac
 done
 
-trap 'rm -f Objects/Makefile Parser/Makefile Python/Makefile; exit 1' 1 3 15
+trap 'rm -fr Objects/Makefile Parser/Makefile Python/Makefile Modules/Makefile Include/config.h conftest*; exit 1' 1 3 15
 CC='$CC'
 RANLIB='$RANLIB'
 CPP='$CPP'
 LIBOBJS='$LIBOBJS'
 LIBS='$LIBS'
 srcdir='$srcdir'
-DEFS='$DEFS'
 prefix='$prefix'
 exec_prefix='$exec_prefix'
 prsub='$prsub'
@@ -1314,7 +1417,7 @@ cat >> config.status <<\EOF
 
 top_srcdir=$srcdir
 
-CONFIG_FILES=${CONFIG_FILES-"Objects/Makefile Parser/Makefile Python/Makefile"}
+CONFIG_FILES=${CONFIG_FILES-"Objects/Makefile Parser/Makefile Python/Makefile Modules/Makefile"}
 for file in .. ${CONFIG_FILES}; do if test "x$file" != x..; then
   srcdir=$top_srcdir
   # Remove last slash and all that follows it.  Not all systems have dirname.
@@ -1335,9 +1438,104 @@ s%@CPP@%$CPP%g
 s%@LIBOBJS@%$LIBOBJS%g
 s%@LIBS@%$LIBS%g
 s%@srcdir@%$srcdir%g
-s%@DEFS@%$DEFS%
-" $top_srcdir/${file}.in >> $file
+s%@DEFS@%-DHAVE_CONFIG_H%" $top_srcdir/${file}.in >> $file
 fi; done
+
+CONFIG_HEADERS=${CONFIG_HEADERS-"Include/config.h"}
+for file in .. ${CONFIG_HEADERS}; do if test "x$file" != x..; then
+echo creating $file
+
+# These sed commands are put into SEDDEFS when defining a macro.
+# They are broken into pieces to make the sed script easier to manage.
+# They are passed to sed as "A NAME B NAME C VALUE D", where NAME
+# is the cpp macro being defined and VALUE is the value it is being given.
+# Each defining turns into a single global substitution command.
+#
+# SEDd sets the value in "#define NAME VALUE" lines.
+SEDdA='s@^\([ 	]*\)#\([ 	]*define[ 	][ 	]*\)'
+SEDdB='\([ 	][ 	]*\)[^ 	]*@\1#\2'
+SEDdC='\3'
+SEDdD='@g'
+# SEDu turns "#undef NAME" with trailing blanks into "#define NAME VALUE".
+SEDuA='s@^\([ 	]*\)#\([ 	]*\)undef\([ 	][ 	]*\)'
+SEDuB='\([ 	]\)@\1#\2define\3'
+SEDuC=' '
+SEDuD='\4@g'
+# SEDe turns "#undef NAME" without trailing blanks into "#define NAME VALUE".
+SEDeA='s@^\([ 	]*\)#\([ 	]*\)undef\([ 	][ 	]*\)'
+SEDeB='$@\1#\2define\3'
+SEDeC=' '
+SEDeD='@g'
+rm -f conftest.sed
+EOF
+# Turn off quoting long enough to insert the sed commands.
+rm -f conftest.sh
+cat > conftest.sh <<EOF
+$SEDDEFS
+EOF
+
+# Break up $SEDDEFS (now in conftest.sh) because some shells have a limit
+# on the size of here documents.
+
+# Maximum number of lines to put in a single here document.
+maxshlines=9
+
+while :
+do
+  # wc gives bogus results for an empty file on some systems.
+  lines=`grep -c . conftest.sh`
+  if test -z "$lines" || test "$lines" -eq 0; then break; fi
+  rm -f conftest.s1 conftest.s2
+  sed ${maxshlines}q conftest.sh > conftest.s1 # Like head -20.
+  sed 1,${maxshlines}d conftest.sh > conftest.s2 # Like tail +21.
+  # Write a limited-size here document to append to conftest.sed.
+  echo 'cat >> conftest.sed <<CONFEOF' >> config.status
+  cat conftest.s1 >> config.status
+  echo 'CONFEOF' >> config.status
+  rm -f conftest.s1 conftest.sh
+  mv conftest.s2 conftest.sh
+done
+rm -f conftest.sh
+
+# Now back to your regularly scheduled config.status.
+cat >> config.status <<\EOF
+# This sed command replaces #undef's with comments.  This is necessary, for
+# example, in the case of _POSIX_SOURCE, which is predefined and required
+# on some systems where configure will not decide to define it in
+# Include/config.h.
+cat >> conftest.sed <<\CONFEOF
+s,^[ 	]*#[ 	]*undef[ 	][ 	]*[a-zA-Z_][a-zA-Z_0-9]*,/* & */,
+CONFEOF
+rm -f conftest.h
+# Break up the sed commands because old seds have small limits.
+maxsedlines=20
+cp $top_srcdir/$file.in conftest.h1
+while :
+do
+  lines=`grep -c . conftest.sed`
+  if test -z "$lines" || test "$lines" -eq 0; then break; fi
+  rm -f conftest.s1 conftest.s2 conftest.h2
+  sed ${maxsedlines}q conftest.sed > conftest.s1 # Like head -20.
+  sed 1,${maxsedlines}d conftest.sed > conftest.s2 # Like tail +21.
+  sed -f conftest.s1 < conftest.h1 > conftest.h2
+  rm -f conftest.s1 conftest.h1 conftest.sed
+  mv conftest.h2 conftest.h1
+  mv conftest.s2 conftest.sed
+done
+rm -f conftest.sed conftest.h
+echo "/* $file.  Generated automatically by configure.  */" > conftest.h
+cat conftest.h1 >> conftest.h
+rm -f conftest.h1
+if cmp -s $file conftest.h 2>/dev/null; then
+  # The file exists and we would not be changing it.
+  echo "$file is unchanged"
+  rm -f conftest.h
+else
+  rm -f $file
+  mv conftest.h $file
+fi
+fi; done
+
 
 
 exit 0
