@@ -2,7 +2,7 @@
 
 #include "Python.h"
 #include "osdefs.h"
-#include "compile.h" /* For CO_FUTURE_DIVISION */
+#include "code.h" /* For CO_FUTURE_DIVISION */
 
 #ifdef MS_WINDOWS
 #include <fcntl.h>

@@ -1,5 +1,6 @@
 #include "Python.h"
 #include "Python-ast.h"
+#include "code.h"
 #include "compile.h"
 #include "symtable.h"
 #include "structmember.h"
@@ -14,6 +15,7 @@ PySymtableEntry_New(struct symtable *st, identifier name, scope_ty scope,
 	k = PyLong_FromVoidPtr(key);
 	if (k == NULL)
 		goto fail;
+	/* XXX do we need the lookup code anymore? */
 	v = PyDict_GetItem(st->st_symbols, k);
 	if (v) {
 		assert(PySymtableEntry_Check(v));
@@ -389,7 +391,7 @@ symtable_visit_stmt(struct symtable *st, stmt_ty s)
         case Print_kind:
 		if (s->v.Print.dest)
 			VISIT(st, expr, s->v.Print.dest);
-		VISIT_SEQ(st, expr, s->v.Print.value);
+		VISIT_SEQ(st, expr, s->v.Print.values);
 		break;
         case For_kind:
 		VISIT(st, expr, s->v.For.target);
@@ -465,10 +467,6 @@ symtable_visit_stmt(struct symtable *st, stmt_ty s)
         case Continue_kind:
 		/* nothing to do here */
 		break;
-	default:
-		PyErr_Format(PyExc_AssertionError,
-			     "invalid statement kind: %d\n", s->kind);
-		return 0;
 	}
 	return 1;
 }
@@ -543,10 +541,6 @@ symtable_visit_expr(struct symtable *st, expr_ty e)
         case Tuple_kind:
 		VISIT_SEQ(st, expr, e->v.Tuple.elts);
 		break;
-	default:
-		PyErr_Format(PyExc_AssertionError,
-			     "invalid expression kind: %d\n", e->kind);
-		return 0;
 	}
 	return 1;
 }

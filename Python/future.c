@@ -3,6 +3,7 @@
 #include "node.h"
 #include "token.h"
 #include "graminit.h"
+#include "code.h"
 #include "compile.h"
 #include "symtable.h"
 

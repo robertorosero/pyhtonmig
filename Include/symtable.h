@@ -50,6 +50,9 @@ extern DL_IMPORT(PySymtableEntryObject *) \
 			    int);
 
 DL_IMPORT(struct symtable *) PyNode_CompileSymtable(struct _node *, char *);
+DL_IMPORT(struct symtable *) PySymtable_Build(mod_ty, const char *, 
+					      PyFutureFeatures *);
+
 DL_IMPORT(void) PySymtable_Free(struct symtable *);
 
 /* Flags for def-use information */

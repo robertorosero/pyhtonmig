@@ -9,6 +9,7 @@
 #include "token.h"
 #include "parsetok.h"
 #include "errcode.h"
+#include "code.h"
 #include "compile.h"
 #include "symtable.h"
 #include "ast.h"

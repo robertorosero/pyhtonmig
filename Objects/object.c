@@ -8,7 +8,7 @@
 #endif
 
 /* just for trashcan: */
-#include "compile.h"
+#include "code.h"
 #include "frameobject.h"
 #include "traceback.h"
 

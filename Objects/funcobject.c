@@ -2,7 +2,7 @@
 /* Function object implementation */
 
 #include "Python.h"
-#include "compile.h"
+#include "code.h"
 #include "eval.h"
 #include "structmember.h"
 

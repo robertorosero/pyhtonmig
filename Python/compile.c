@@ -15,6 +15,7 @@
 #include "node.h"
 #include "token.h"
 #include "graminit.h"
+#include "code.h"
 #include "compile.h"
 #include "symtable.h"
 #include "opcode.h"
@@ -4093,13 +4094,6 @@ dict_keys_inorder(PyObject *dict, int offset)
 		PyTuple_SET_ITEM(tuple, i - offset, k);
 	}
 	return tuple;
-}
-
-PyCodeObject *
-PyAST_Compile(mod_ty mod, char *filename, PyCompilerFlags *flags)
-{
-	/* XXX */
-	return NULL;
 }
 
 PyCodeObject *

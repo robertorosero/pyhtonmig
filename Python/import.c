@@ -7,6 +7,7 @@
 #include "token.h"
 #include "errcode.h"
 #include "marshal.h"
+#include "code.h"
 #include "compile.h"
 #include "eval.h"
 #include "osdefs.h"
