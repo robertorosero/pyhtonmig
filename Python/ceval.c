@@ -107,7 +107,6 @@ gen_new(PyFrameObject *f)
 	}
 	gen->gi_frame = f;
 	gen->gi_running = 0;
-	PyObject_GC_Init(gen);
 	return (PyObject *)gen;
 }
 
@@ -120,7 +119,6 @@ gen_traverse(genobject *gen, visitproc visit, void *arg)
 static void
 gen_dealloc(genobject *gen)
 {
-	PyObject_GC_Fini(gen);
 	Py_DECREF(gen->gi_frame);
 	PyObject_Del(gen);
 }
@@ -204,7 +202,7 @@ statichere PyTypeObject gentype = {
 	PyObject_HEAD_INIT(&PyType_Type)
 	0,					/* ob_size */
 	"generator",				/* tp_name */
-	sizeof(genobject) + PyGC_HEAD_SIZE,	/* tp_basicsize */
+	sizeof(genobject),			/* tp_basicsize */
 	0,					/* tp_itemsize */
 	/* methods */
 	(destructor)gen_dealloc, 		/* tp_dealloc */
@@ -222,7 +220,7 @@ statichere PyTypeObject gentype = {
 	PyObject_GenericGetAttr,		/* tp_getattro */
 	0,					/* tp_setattro */
 	0,					/* tp_as_buffer */
-	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_GC,	/* tp_flags */
+	Py_TPFLAGS_DEFAULT,			/* tp_flags */
  	0,					/* tp_doc */
  	(traverseproc)gen_traverse,		/* tp_traverse */
  	0,					/* tp_clear */
@@ -554,8 +552,16 @@ eval_frame(PyFrameObject *f)
 /* Local variable macros */
 
 #define GETLOCAL(i)	(fastlocals[i])
-#define SETLOCAL(i, value)	do { Py_XDECREF(GETLOCAL(i)); \
-				     GETLOCAL(i) = value; } while (0)
+
+/* The SETLOCAL() macro must not DECREF the local variable in-place and
+   then store the new value; it must copy the old value to a temporary
+   value, then store the new value, and then DECREF the temporary value.
+   This is because it is possible that during the DECREF the frame is
+   accessed by other code (e.g. a __del__ method or gc.collect()) and the
+   variable would be pointing to already-freed memory. */
+#define SETLOCAL(i, value)	do { PyObject *tmp = GETLOCAL(i); \
+				     GETLOCAL(i) = value; \
+                                     Py_XDECREF(tmp); } while (0)
 
 /* Start of code */
 
@@ -579,14 +585,6 @@ eval_frame(PyFrameObject *f)
 	}
 
 	tstate->frame = f;
-	co = f->f_code;
-	fastlocals = f->f_localsplus;
-	freevars = f->f_localsplus + f->f_nlocals;
-	_PyCode_GETCODEPTR(co, &first_instr);
-	next_instr = first_instr + f->f_lasti;
-	stack_pointer = f->f_stacktop;
-	assert(stack_pointer != NULL);
-	f->f_stacktop = NULL;	/* remains NULL unless yield suspends frame */
 
 	if (tstate->use_tracing) {
 		if (tstate->c_tracefunc != NULL) {
@@ -606,6 +604,8 @@ eval_frame(PyFrameObject *f)
 			if (call_trace(tstate->c_tracefunc, tstate->c_traceobj,
 				       f, PyTrace_CALL, Py_None)) {
 				/* Trace function raised an error */
+				--tstate->recursion_depth;
+				tstate->frame = f->f_back;
 				return NULL;
 			}
 		}
@@ -616,10 +616,21 @@ eval_frame(PyFrameObject *f)
 				       tstate->c_profileobj,
 				       f, PyTrace_CALL, Py_None)) {
 				/* Profile function raised an error */
+				--tstate->recursion_depth;
+				tstate->frame = f->f_back;
 				return NULL;
 			}
 		}
 	}
+
+	co = f->f_code;
+	fastlocals = f->f_localsplus;
+	freevars = f->f_localsplus + f->f_nlocals;
+	_PyCode_GETCODEPTR(co, &first_instr);
+	next_instr = first_instr + f->f_lasti;
+	stack_pointer = f->f_stacktop;
+	assert(stack_pointer != NULL);
+	f->f_stacktop = NULL;	/* remains NULL unless yield suspends frame */
 
 #ifdef LLTRACE
 	lltrace = PyDict_GetItemString(f->f_globals,"__lltrace__") != NULL;
@@ -646,6 +657,7 @@ eval_frame(PyFrameObject *f)
 
 		if (things_to_do || --tstate->ticker < 0) {
 			tstate->ticker = tstate->interp->checkinterval;
+			tstate->tick_counter++;
 			if (things_to_do) {
 				if (Py_MakePendingCalls() < 0) {
 					why = WHY_EXCEPTION;
@@ -1091,9 +1103,22 @@ eval_frame(PyFrameObject *f)
 			break;
 
 		case INPLACE_DIVIDE:
+			if (!_Py_QnewFlag) {
+				w = POP();
+				v = POP();
+				x = PyNumber_InPlaceDivide(v, w);
+				Py_DECREF(v);
+				Py_DECREF(w);
+				PUSH(x);
+				if (x != NULL) continue;
+				break;
+			}
+			/* -Qnew is in effect:  fall through to
+			   INPLACE_TRUE_DIVIDE */
+		case INPLACE_TRUE_DIVIDE:
 			w = POP();
 			v = POP();
-			x = PyNumber_InPlaceDivide(v, w);
+			x = PyNumber_InPlaceTrueDivide(v, w);
 			Py_DECREF(v);
 			Py_DECREF(w);
 			PUSH(x);
@@ -1104,16 +1129,6 @@ eval_frame(PyFrameObject *f)
 			w = POP();
 			v = POP();
 			x = PyNumber_InPlaceFloorDivide(v, w);
-			Py_DECREF(v);
-			Py_DECREF(w);
-			PUSH(x);
-			if (x != NULL) continue;
-			break;
-
-		case INPLACE_TRUE_DIVIDE:
-			w = POP();
-			v = POP();
-			x = PyNumber_InPlaceTrueDivide(v, w);
 			Py_DECREF(v);
 			Py_DECREF(w);
 			PUSH(x);
@@ -1486,7 +1501,7 @@ eval_frame(PyFrameObject *f)
 				why = (enum why_code) PyInt_AsLong(v);
 				if (why == WHY_RETURN ||
 				    why == WHY_YIELD ||
-				    why == CONTINUE_LOOP)
+				    why == WHY_CONTINUE)
 					retval = POP();
 			}
 			else if (PyString_Check(v) || PyClass_Check(v)) {
@@ -1959,6 +1974,7 @@ eval_frame(PyFrameObject *f)
 				continue;
 			/* Trace each line of code reached */
 			f->f_lasti = INSTR_OFFSET();
+			f->f_stacktop = stack_pointer;
 			/* Inline call_trace() for performance: */
 			tstate->tracing++;
 			tstate->use_tracing = 0;
@@ -1967,6 +1983,11 @@ eval_frame(PyFrameObject *f)
 			tstate->use_tracing = (tstate->c_tracefunc
 					       || tstate->c_profilefunc);
 			tstate->tracing--;
+			/* Reload possibly changed frame fields */
+			JUMPTO(f->f_lasti);
+			stack_pointer = f->f_stacktop;
+			assert(stack_pointer != NULL);
+			f->f_stacktop = NULL;
 			break;
 
 		case CALL_FUNCTION:
@@ -2282,7 +2303,7 @@ eval_frame(PyFrameObject *f)
 				}
 				else {
 					if (why == WHY_RETURN ||
-					    why == CONTINUE_LOOP)
+					    why == WHY_CONTINUE)
 						PUSH(retval);
 					v = PyInt_FromLong((long)why);
 					PUSH(v);
@@ -2928,10 +2949,9 @@ PyEval_SetTrace(Py_tracefunc func, PyObject *arg)
 PyObject *
 PyEval_GetBuiltins(void)
 {
-	PyThreadState *tstate = PyThreadState_Get();
-	PyFrameObject *current_frame = tstate->frame;
+	PyFrameObject *current_frame = (PyFrameObject *)PyEval_GetFrame();
 	if (current_frame == NULL)
-		return tstate->interp->builtins;
+		return PyThreadState_Get()->interp->builtins;
 	else
 		return current_frame->f_builtins;
 }
@@ -2939,7 +2959,7 @@ PyEval_GetBuiltins(void)
 PyObject *
 PyEval_GetLocals(void)
 {
-	PyFrameObject *current_frame = PyThreadState_Get()->frame;
+	PyFrameObject *current_frame = (PyFrameObject *)PyEval_GetFrame();
 	if (current_frame == NULL)
 		return NULL;
 	PyFrame_FastToLocals(current_frame);
@@ -2949,7 +2969,7 @@ PyEval_GetLocals(void)
 PyObject *
 PyEval_GetGlobals(void)
 {
-	PyFrameObject *current_frame = PyThreadState_Get()->frame;
+	PyFrameObject *current_frame = (PyFrameObject *)PyEval_GetFrame();
 	if (current_frame == NULL)
 		return NULL;
 	else
@@ -2959,21 +2979,21 @@ PyEval_GetGlobals(void)
 PyObject *
 PyEval_GetFrame(void)
 {
-	PyFrameObject *current_frame = PyThreadState_Get()->frame;
-	return (PyObject *)current_frame;
+	PyThreadState *tstate = PyThreadState_Get();
+	return _PyThreadState_GetFrame((PyObject *)tstate);
 }
 
 int
 PyEval_GetRestricted(void)
 {
-	PyFrameObject *current_frame = PyThreadState_Get()->frame;
+	PyFrameObject *current_frame = (PyFrameObject *)PyEval_GetFrame();
 	return current_frame == NULL ? 0 : current_frame->f_restricted;
 }
 
 int
 PyEval_MergeCompilerFlags(PyCompilerFlags *cf)
 {
-	PyFrameObject *current_frame = PyThreadState_Get()->frame;
+	PyFrameObject *current_frame = (PyFrameObject *)PyEval_GetFrame();
 	int result = 0;
 
 	if (current_frame != NULL) {

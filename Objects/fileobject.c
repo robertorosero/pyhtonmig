@@ -8,10 +8,6 @@
 #include <sys/types.h>
 #endif /* DONT_HAVE_SYS_TYPES_H */
 
-#ifdef HAVE_UNISTD_H
-#include <unistd.h>
-#endif
-
 #ifdef MS_WIN32
 #define fileno _fileno
 /* can (almost fully) duplicate with _chsize, see file_truncate */
@@ -132,8 +128,21 @@ open_the_file(PyFileObject *f, char *name, char *mode)
 			return NULL;
 		}
 #endif
+#ifdef _MSC_VER
+		/* MSVC 6 (Microsoft) leaves errno at 0 for bad mode strings,
+		 * across all Windows flavors.  When it sets EINVAL varies
+		 * across Windows flavors, the exact conditions aren't
+		 * documented, and the answer lies in the OS's implementation
+		 * of Win32's CreateFile function (whose source is secret).
+		 * Seems the best we can do is map EINVAL to ENOENT.
+		 */
+		if (errno == 0)	/* bad mode string */
+			errno = EINVAL;
+		else if (errno == EINVAL) /* unknown, but not a mode string */
+			errno = ENOENT;
+#endif
 		if (errno == EINVAL)
-			PyErr_Format(PyExc_IOError, "invalid argument: %s",
+			PyErr_Format(PyExc_IOError, "invalid mode: %s",
 				     mode);
 		else
 			PyErr_SetFromErrnoWithFilename(PyExc_IOError, name);
@@ -1157,9 +1166,7 @@ file_readlines(PyFileObject *f, PyObject *args)
 			goto error;
 	}
   cleanup:
-	if (big_buffer) {
-		Py_DECREF(big_buffer);
-	}
+	Py_XDECREF(big_buffer);
 	return list;
 }
 
@@ -1361,7 +1368,7 @@ static char readlines_doc[] =
 static char xreadlines_doc[] =
 "xreadlines() -> next line from the file, as a string.\n"
 "\n"
-"Equivalent to xreadlines.xreadlines(file).  This is like readline(), but\n"
+"Equivalent to xreadlines.xreadlines(file).  This is like readlines(), but\n"
 "often quicker, due to reading ahead internally.";
 
 static char writelines_doc[] =

@@ -164,20 +164,28 @@ def deepcopy(x, memo = None):
         copierfunction = _deepcopy_dispatch[type(x)]
     except KeyError:
         try:
-            copier = x.__deepcopy__
-        except AttributeError:
-            try:
-                reductor = x.__reduce__
-            except AttributeError:
-                raise error, \
-                      "un-deep-copyable object of type %s" % type(x)
-            else:
-                y = _reconstruct(x, reductor(), 1)
+            issc = issubclass(type(x), type)
+        except TypeError:
+            issc = 0
+        if issc:
+            y = _deepcopy_dispatch[type](x, memo)
         else:
-            y = copier(memo)
+            try:
+                copier = x.__deepcopy__
+            except AttributeError:
+                try:
+                    reductor = x.__reduce__
+                except AttributeError:
+                    raise error, \
+                       "un-deep-copyable object of type %s" % type(x)
+                else:
+                    y = _reconstruct(x, reductor(), 1, memo)
+            else:
+                y = copier(memo)
     else:
         y = copierfunction(x, memo)
     memo[d] = y
+    _keep_alive(x, memo) # Make sure x lives at least as long as d
     return y
 
 _deepcopy_dispatch = d = {}
@@ -197,7 +205,10 @@ try:
     d[types.UnicodeType] = _deepcopy_atomic
 except AttributeError:
     pass
-d[types.CodeType] = _deepcopy_atomic
+try:
+    d[types.CodeType] = _deepcopy_atomic
+except AttributeError:
+    pass
 d[types.TypeType] = _deepcopy_atomic
 d[types.XRangeType] = _deepcopy_atomic
 
@@ -259,7 +270,6 @@ def _deepcopy_inst(x, memo):
         return x.__deepcopy__(memo)
     if hasattr(x, '__getinitargs__'):
         args = x.__getinitargs__()
-        _keep_alive(args, memo)
         args = deepcopy(args, memo)
         y = apply(x.__class__, args)
     else:
@@ -268,7 +278,6 @@ def _deepcopy_inst(x, memo):
     memo[id(x)] = y
     if hasattr(x, '__getstate__'):
         state = x.__getstate__()
-        _keep_alive(state, memo)
     else:
         state = x.__dict__
     state = deepcopy(state, memo)
@@ -279,10 +288,12 @@ def _deepcopy_inst(x, memo):
     return y
 d[types.InstanceType] = _deepcopy_inst
 
-def _reconstruct(x, info, deep):
+def _reconstruct(x, info, deep, memo=None):
     if isinstance(info, str):
         return x
     assert isinstance(info, tuple)
+    if memo is None:
+        memo = {}
     n = len(info)
     assert n in (2, 3)
     callable, args = info[:2]
@@ -291,12 +302,15 @@ def _reconstruct(x, info, deep):
     else:
         state = {}
     if deep:
-        args = deepcopy(args)
+        args = deepcopy(args, memo)
     y = callable(*args)
     if state:
         if deep:
-            state = deepcopy(state)
-        y.__dict__.update(state)
+            state = deepcopy(state, memo)
+        if hasattr(y, '__setstate__'):
+            y.__setstate__(state)
+        else:
+            y.__dict__.update(state)
     return y
 
 del d

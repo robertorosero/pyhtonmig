@@ -65,6 +65,14 @@ def unpackevent(ae):
 	else:
 		parameters['----'] = unpack(dirobj)
 		del dirobj
+	# Workaround for what I feel is a bug in OSX 10.2: 'errn' won't show up in missed...
+	try:
+		dirobj = ae.AEGetParamDesc('errn', '****')
+	except AE.Error:
+		pass
+	else:
+		parameters['errn'] = unpack(dirobj)
+		del dirobj
 	while 1:
 		key = missed(ae)
 		if not key: break
@@ -157,14 +165,18 @@ class TalkTo:
 		else:
 			self.send_timeout = AppleEvents.kAEDefaultTimeout
 		if start:
-			self.start()
+			self._start()
 		
-	def start(self):
+	def _start(self):
 		"""Start the application, if it is not running yet"""
 		try:
 			self.send('ascr', 'noop')
 		except AE.Error:
 			_launch(self.target_signature)
+			
+	def start(self):
+		"""Deprecated, used _start()"""
+		self._start()
 			
 	def newevent(self, code, subcode, parameters = {}, attributes = {}):
 		"""Create a complete structure for an apple event"""

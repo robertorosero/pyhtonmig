@@ -4,6 +4,29 @@ errors = 0
 
 RFC1808_BASE = "http://a/b/c/d;p?q#f"
 
+for url, expected in [('http://www.python.org',
+                       ('http', 'www.python.org', '', '', '', '')),
+                      ('http://www.python.org#abc',
+                       ('http', 'www.python.org', '', '', '', 'abc')),
+                      ('http://www.python.org/#abc',
+                       ('http', 'www.python.org', '/', '', '', 'abc')),
+                      (RFC1808_BASE,
+                       ('http', 'a', '/b/c/d', 'p', 'q', 'f')),
+                      ('file:///tmp/junk.txt',
+                       ('file', '', '/tmp/junk.txt', '', '', '')),
+                      ]:
+    result = urlparse.urlparse(url)
+    print "%-13s = %r" % (url, result)
+    if result != expected:
+        errors += 1
+        print "urlparse(%r)" % url
+        print ("expected %r,\n"
+               "     got %r") % (expected, result)
+    # put it back together and it should be the same
+    result2 = urlparse.urlunparse(result)
+    assert(result2 == url)
+print
+
 def checkJoin(relurl, expected):
     global errors
     result = urlparse.urljoin(RFC1808_BASE, relurl)
@@ -64,3 +87,8 @@ checkJoin('g/../h', 'http://a/b/c/h')
 #checkJoin('http:', 'http:')
 
 print errors, "errors"
+
+# One more test backported from 2.3
+for u in ['Python', './Python']:
+    if urlparse.urlunparse(urlparse.urlparse(u)) != u:
+        print "*** urlparse/urlunparse failure for", `u`

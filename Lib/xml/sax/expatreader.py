@@ -26,6 +26,43 @@ AttributesImpl = xmlreader.AttributesImpl
 AttributesNSImpl = xmlreader.AttributesNSImpl
 
 import string
+import weakref
+
+# --- ExpatLocator
+
+class ExpatLocator(xmlreader.Locator):
+    """Locator for use with the ExpatParser class.
+
+    This uses a weak reference to the parser object to avoid creating
+    a circular reference between the parser and the content handler.
+    """
+    def __init__(self, parser):
+        self._ref = weakref.ref(parser)
+
+    def getColumnNumber(self):
+        parser = self._ref()
+        if parser is None or parser._parser is None:
+            return None
+        return parser._parser.ErrorColumnNumber
+
+    def getLineNumber(self):
+        parser = self._ref()
+        if parser is None or parser._parser is None:
+            return 1
+        return parser._parser.ErrorLineNumber
+
+    def getPublicId(self):
+        parser = self._ref()
+        if parser is None:
+            return None
+        return parser._source.getPublicId()
+
+    def getSystemId(self):
+        parser = self._ref()
+        if parser is None:
+            return None
+        return parser._source.getSystemId()
+
 
 # --- ExpatParser
 
@@ -40,6 +77,7 @@ class ExpatParser(xmlreader.IncrementalParser, xmlreader.Locator):
         self._lex_handler_prop = None
         self._parsing = 0
         self._entity_stack = []
+        self._ns_stack = []
 
     # XMLReader methods
 
@@ -49,7 +87,7 @@ class ExpatParser(xmlreader.IncrementalParser, xmlreader.Locator):
 
         self._source = source
         self.reset()
-        self._cont_handler.setDocumentLocator(self)
+        self._cont_handler.setDocumentLocator(ExpatLocator(self))
         xmlreader.IncrementalParser.parse(self, source)
 
     def prepareParser(self, source):
@@ -186,30 +224,48 @@ class ExpatParser(xmlreader.IncrementalParser, xmlreader.Locator):
         pair = string.split(name)
         if len(pair) == 1:
             pair = (None, name)
+            qname = name
         else:
             pair = tuple(pair)
+            qname = pair[1]
+            if self._ns_stack:
+                prefix = self._ns_stack[-1][pair[0]][-1]
+                if prefix:
+                    qname = "%s:%s" % (prefix, pair[1])
 
         newattrs = {}
+        qnames = {}
         for (aname, value) in attrs.items():
             apair = string.split(aname)
             if len(apair) == 1:
                 apair = (None, aname)
+                aqname = aname
             else:
                 apair = tuple(apair)
+                # XXX need to guess the prefix
+                prefix = self._ns_stack[-1][apair[0]][-1]
+                aqname = "%s:%s" % (prefix, apair[1])
 
             newattrs[apair] = value
+            qnames[apair] = aqname
 
-        self._cont_handler.startElementNS(pair, None,
-                                          AttributesNSImpl(newattrs, {}))
+        self._cont_handler.startElementNS(pair, qname,
+                                          AttributesNSImpl(newattrs, qnames))
 
     def end_element_ns(self, name):
         pair = string.split(name)
         if len(pair) == 1:
             pair = (None, name)
+            qname = name
         else:
             pair = tuple(pair)
+            qname = pair[1]
+            if self._ns_stack:
+                prefix = self._ns_stack[-1][pair[0]][-1]
+                if prefix:
+                    qname = "%s:%s" % (prefix, pair[1])
 
-        self._cont_handler.endElementNS(pair, None)
+        self._cont_handler.endElementNS(pair, qname)
 
     # this is not used (call directly to ContentHandler)
     def processing_instruction(self, target, data):
@@ -220,9 +276,21 @@ class ExpatParser(xmlreader.IncrementalParser, xmlreader.Locator):
         self._cont_handler.characters(data)
 
     def start_namespace_decl(self, prefix, uri):
+        if self._ns_stack:
+            d = self._ns_stack[-1].copy()
+            if d.has_key(uri):
+                L = d[uri][:]
+                d[uri] = L
+                L.append(prefix)
+            else:
+                d[uri] = [prefix]
+        else:
+            d = {uri: [prefix]}
+        self._ns_stack.append(d)
         self._cont_handler.startPrefixMapping(prefix, uri)
 
     def end_namespace_decl(self, prefix):
+        del self._ns_stack[-1]
         self._cont_handler.endPrefixMapping(prefix)
 
     def unparsed_entity_decl(self, name, base, sysid, pubid, notation_name):

@@ -163,6 +163,24 @@ def run_method_tests(test):
     test('rstrip', '   hello   ', '   hello')
     test('strip', 'hello', 'hello')
 
+    # strip/lstrip/rstrip with None arg
+    test('strip', '   hello   ', 'hello', None)
+    test('lstrip', '   hello   ', 'hello   ', None)
+    test('rstrip', '   hello   ', '   hello', None)
+    test('strip', 'hello', 'hello', None)
+
+    # strip/lstrip/rstrip with str arg
+    test('strip', 'xyzzyhelloxyzzy', 'hello', 'xyz')
+    test('lstrip', 'xyzzyhelloxyzzy', 'helloxyzzy', 'xyz')
+    test('rstrip', 'xyzzyhelloxyzzy', 'xyzzyhello', 'xyz')
+    test('strip', 'hello', 'hello', 'xyz')
+
+    # strip/lstrip/rstrip with unicode arg
+    test('strip', 'xyzzyhelloxyzzy', u'hello', u'xyz')
+    test('lstrip', 'xyzzyhelloxyzzy', u'helloxyzzy', u'xyz')
+    test('rstrip', 'xyzzyhelloxyzzy', u'xyzzyhello', u'xyz')
+    test('strip', 'hello', u'hello', u'xyz')
+
     test('swapcase', 'HeLLo cOmpUteRs', 'hEllO CoMPuTErS')
     test('translate', 'xyzabcdef', 'xyzxyz', transtable, 'def')
 
@@ -214,6 +232,19 @@ def run_method_tests(test):
     test('endswith', 'helloworld', 0, 'lowo', 3, 8)
     test('endswith', 'ab', 0, 'ab', 0, 1)
     test('endswith', 'ab', 0, 'ab', 0, 0)
+
+    test('zfill', '123', '123', 2)
+    test('zfill', '123', '123', 3)
+    test('zfill', '123', '0123', 4)
+    test('zfill', '+123', '+123', 3)
+    test('zfill', '+123', '+123', 4)
+    test('zfill', '+123', '+0123', 5)
+    test('zfill', '-123', '-123', 3)
+    test('zfill', '-123', '-123', 4)
+    test('zfill', '-123', '-0123', 5)
+    test('zfill', '', '000', 3)
+    test('zfill', '34', '34', 1)
+    test('zfill', '34', '0034', 4)
 
     # Encoding/decoding
     codecs = [('rot13', 'uryyb jbeyq'),

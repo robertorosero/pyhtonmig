@@ -81,6 +81,48 @@ for which they do not apply, they will raise a Python exception.
 \end{cfuncdesc}
 
 
+\begin{cfuncdesc}{PyObject*}{PyObject_RichCompare}{PyObject *o1,
+                                                   PyObject *o2, int opid}
+  Compare the values of \var{o1} and \var{o2} using the operation
+  specified by \var{opid}, which must be one of
+  \constant{Py_LT},
+  \constant{Py_LE},
+  \constant{Py_EQ},
+  \constant{Py_NE},
+  \constant{Py_GT}, or
+  \constant{Py_GE}, corresponding to
+  \code{<},
+  \code{<=},
+  \code{==},
+  \code{!=},
+  \code{>}, or
+  \code{>=} respectively. This is the equivalent of the Python expression
+  \samp{\var{o1} op \var{o2}}, where \code{op} is the operator
+  corresponding to \var{opid}. Returns the value of the comparison on
+  success, or \NULL{} on failure.
+\end{cfuncdesc}
+
+\begin{cfuncdesc}{int}{PyObject_RichCompareBool}{PyObject *o1,
+                                                 PyObject *o2, int opid}
+  Compare the values of \var{o1} and \var{o2} using the operation
+  specified by \var{opid}, which must be one of
+  \constant{Py_LT},
+  \constant{Py_LE},
+  \constant{Py_EQ},
+  \constant{Py_NE},
+  \constant{Py_GT}, or
+  \constant{Py_GE}, corresponding to
+  \code{<},
+  \code{<=},
+  \code{==},
+  \code{!=},
+  \code{>}, or
+  \code{>=} respectively. Returns \code{-1} on error, \code{0} if the
+  result is false, \code{1} otherwise. This is the equivalent of the
+  Python expression \samp{\var{o1} op \var{o2}}, where
+  \code{op} is the operator corresponding to \var{opid}.
+\end{cfuncdesc}
+
 \begin{cfuncdesc}{int}{PyObject_Cmp}{PyObject *o1, PyObject *o2, int *result}
   Compare the values of \var{o1} and \var{o2} using a routine provided
   by \var{o1}, if one exists, otherwise with a routine provided by
@@ -124,8 +166,8 @@ for which they do not apply, they will raise a Python exception.
   Compute a Unicode string representation of object \var{o}.  Returns
   the Unicode string representation on success, \NULL{} on failure.
   This is the equivalent of the Python expression
-  \samp{unistr(\var{o})}.  Called by the
-  \function{unistr()}\bifuncindex{unistr} built-in function.
+  \samp{unicode(\var{o})}.  Called by the
+  \function{unicode()}\bifuncindex{unicode} built-in function.
 \end{cfuncdesc}
 
 \begin{cfuncdesc}{int}{PyObject_IsInstance}{PyObject *inst, PyObject *cls}
@@ -305,6 +347,14 @@ determination.
   of the current locals; in this case, if no execution frame is active
   then \NULL{} is returned but \cfunction{PyErr_Occurred()} will
   return false.
+\end{cfuncdesc}
+
+\begin{cfuncdesc}{PyObject*}{PyObject_GetIter}{PyObject *o}
+  This is equivalent to the Python expression \samp{iter(\var{o})}.
+  It returns a new iterator for the object argument, or the object 
+  itself if the object is already an iterator.  Raises
+  \exception{TypeError} and returns \NULL{} if the object cannot be
+  iterated.
 \end{cfuncdesc}
 
 
@@ -855,18 +905,30 @@ To write a loop which iterates over an iterator, the C code should
 look something like this:
 
 \begin{verbatim}
-PyObject *iterator = ...;
+PyObject *iterator = PyObject_GetIter(obj);
 PyObject *item;
 
-while (item = PyIter_Next(iter)) {
-    /* do something with item */
+if (iterator == NULL) {
+    /* propagate error */
 }
+
+while (item = PyIter_Next(iterator)) {
+    /* do something with item */
+    ...
+    /* release reference when done */
+    Py_DECREF(item);
+}
+
+Py_DECREF(iterator);
+
 if (PyErr_Occurred()) {
-    /* propogate error */
+    /* propagate error */
 }
 else {
     /* continue doing useful work */
 }
+\end{verbatim}
+
 
 \section{Buffer Protocol \label{abstract-buffer}}
 
@@ -875,9 +937,9 @@ else {
                                               int *buffer_len}
   Returns a pointer to a read-only memory location useable as character-
   based input.  The \var{obj} argument must support the single-segment
-  character buffer interface.  On success, returns \code{1}, sets
+  character buffer interface.  On success, returns \code{0}, sets
   \var{buffer} to the memory location and \var{buffer_len} to the buffer
-  length.  Returns \code{0} and sets a \exception{TypeError} on error.
+  length.  Returns \code{-1} and sets a \exception{TypeError} on error.
   \versionadded{1.6}
 \end{cfuncdesc}
 
@@ -887,8 +949,8 @@ else {
   Returns a pointer to a read-only memory location containing
   arbitrary data.  The \var{obj} argument must support the
   single-segment readable buffer interface.  On success, returns
-  \code{1}, sets \var{buffer} to the memory location and \var{buffer_len}
-  to the buffer length.  Returns \code{0} and sets a
+  \code{0}, sets \var{buffer} to the memory location and \var{buffer_len}
+  to the buffer length.  Returns \code{-1} and sets a
   \exception{TypeError} on error.
   \versionadded{1.6}
 \end{cfuncdesc}
@@ -897,17 +959,15 @@ else {
   Returns \code{1} if \var{o} supports the single-segment readable
   buffer interface.  Otherwise returns \code{0}.
   \versionadded{2.2}
-\enc{cfuncdesc}
+\end{cfuncdesc}
 
 \begin{cfuncdesc}{int}{PyObject_AsWriteBuffer}{PyObject *obj,
-                                               const char **buffer,
+                                               char **buffer,
                                                int *buffer_len}
   Returns a pointer to a writeable memory location.  The \var{obj}
   argument must support the single-segment, character buffer
-  interface.  On success, returns \code{1}, sets \var{buffer} to the
+  interface.  On success, returns \code{0}, sets \var{buffer} to the
   memory location and \var{buffer_len} to the buffer length.  Returns
-  \code{0} and sets a \exception{TypeError} on error.
+  \code{-1} and sets a \exception{TypeError} on error.
   \versionadded{1.6}
 \end{cfuncdesc}
-
-\end{verbatim}

@@ -605,9 +605,17 @@ class Misc:
             self.tk.call('winfo', 'cells', self._w))
     def winfo_children(self):
         """Return a list of all widgets which are children of this widget."""
-        return map(self._nametowidget,
-               self.tk.splitlist(self.tk.call(
-                   'winfo', 'children', self._w)))
+        result = []
+        for child in self.tk.splitlist(
+            self.tk.call('winfo', 'children', self._w)):
+            try:
+                # Tcl sometimes returns extra windows, e.g. for
+                # menus; those need to be skipped
+                result.append(self._nametowidget(child))
+            except KeyError:
+                pass
+        return result
+
     def winfo_class(self):
         """Return window class name of this widget."""
         return self.tk.call('winfo', 'class', self._w)
@@ -2095,7 +2103,7 @@ class Canvas(Widget):
         self.tk.call(self._w, 'select', 'from', tagOrId, index)
     def select_item(self):
         """Return the item which has the selection."""
-        self.tk.call(self._w, 'select', 'item')
+        return self.tk.call(self._w, 'select', 'item') or None
     def select_to(self, tagOrId, index):
         """Set the variable end of a selection in item TAGORID to INDEX."""
         self.tk.call(self._w, 'select', 'to', tagOrId, index)
