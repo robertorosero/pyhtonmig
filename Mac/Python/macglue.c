@@ -729,7 +729,7 @@ PyMac_InitMenuBar()
 	*/
 	if ( (sioux_mbar=GetMenuBar()) == NULL )  {
 #else
-	{
+	if ( (sioux_mbar=GetMenuBar()) == NULL || GetMenuHandle(SIOUX_APPLEID) == NULL)  {
 #endif
 		/* Sioux menu not installed yet. Do so */
 		SIOUXSetupMenus();
