@@ -1670,19 +1670,23 @@ static stmt_ty
 ast_for_import_stmt(struct compiling *c, const node *n)
 {
     /*
-      import_stmt: 'import' dotted_as_name (',' dotted_as_name)*
-                 | 'from' dotted_name 'import' ('*'
-                              | import_as_name (',' import_as_name)*)
+      import_stmt: import_name | import_from
+      import_name: 'import' dotted_as_names
+      import_from: 'from' dotted_name 'import' ('*' | 
+                                                '(' import_as_names ')' | 
+                                                import_as_names)
     */
     int i;
     asdl_seq *aliases;
 
     REQ(n, import_stmt);
+    n = CHILD(n, 0);
     if (STR(CHILD(n, 0))[0] == 'i') { /* import */
-	aliases = asdl_seq_new(NCH(n) / 2);
+        n = CHILD(n, 1);
+	aliases = asdl_seq_new((NCH(n) + 1) / 2);
 	if (!aliases)
 		return NULL;
-	for (i = 1; i < NCH(n); i += 2) {
+	for (i = 0; i < NCH(n); i += 2) {
             alias_ty import_alias = alias_for_import_name(CHILD(n, i));
             if (!import_alias) {
                 asdl_seq_free(aliases);
@@ -1694,15 +1698,44 @@ ast_for_import_stmt(struct compiling *c, const node *n)
     }
     else if (STR(CHILD(n, 0))[0] == 'f') { /* from */
 	stmt_ty import;
+        int n_children;
+        const char *from_modules;
 	alias_ty mod = alias_for_import_name(CHILD(n, 1));
 	if (!mod)
             return NULL;
-	aliases = asdl_seq_new((NCH(n) - 2) / 2);
+
+        /* XXX this needs to be cleaned up */
+
+        from_modules = STR(CHILD(n, 3));
+        if (!from_modules || from_modules[0] == '*')
+            n = CHILD(n, 3);                  /* from ... import x, y, z */
+        else if (from_modules[0] == '(')
+            n = CHILD(n, 4);                  /* from ... import (x, y, z) */
+        else
+            return NULL;
+
+        n_children = NCH(n);
+        if (from_modules && from_modules[0] == '*')
+            n_children = 1;
+
+	aliases = asdl_seq_new((n_children + 1) / 2);
 	if (!aliases) {
             free(mod); /* XXX proper way to free alias_ty structs? */
             return NULL;
 	}
-	for (i = 3; i <= NCH(n); i += 2) {
+
+        /* handle "from ... import *" special b/c there's no children */
+        if (from_modules && from_modules[0] == '*') {
+            alias_ty import_alias = alias_for_import_name(n);
+            if (!import_alias) {
+                asdl_seq_free(aliases);
+                free(mod);
+                return NULL;
+            }
+	    asdl_seq_APPEND(aliases, import_alias);
+        }
+
+	for (i = 0; i < NCH(n); i += 2) {
             alias_ty import_alias = alias_for_import_name(CHILD(n, i));
             if (!import_alias) {
                 asdl_seq_free(aliases);
