@@ -154,6 +154,9 @@ static int symtable_visit_alias(struct symtable *st, alias_ty);
 static int symtable_visit_listcomp(struct symtable *st, listcomp_ty);
 static int symtable_visit_keyword(struct symtable *st, keyword_ty);
 static int symtable_visit_slice(struct symtable *st, slice_ty);
+static int symtable_visit_params(struct symtable *st, asdl_seq *args, int top);
+static int symtable_visit_params_nested(struct symtable *st, asdl_seq *args);
+
 
 static identifier top = NULL, lambda = NULL;
 
@@ -328,9 +331,9 @@ analyze_name(PyObject *dict, PyObject *name, int flags, PyObject *bound,
 {
 	if (flags & DEF_GLOBAL) {
 		if (flags & DEF_PARAM) {
-			return PyErr_Format(PyExc_SyntaxError,
-					    "name '%s' is local and global",
-					    PyString_AS_STRING(name));
+			PyErr_Format(PyExc_SyntaxError,
+				     "name '%s' is local and global",
+				     PyString_AS_STRING(name));
 			return 0;
 		}
 		SET_SCOPE(dict, name, GLOBAL_EXPLICIT);
@@ -938,9 +941,10 @@ symtable_implicit_arg(struct symtable *st, int pos)
 	PyObject *id = PyString_FromFormat(".%d", pos);
 	if (id == NULL)
 		return 0;
-	/* XXX intern id? */
-	if (!symtable_add_def(st, id, DEF_PARAM))
+	if (!symtable_add_def(st, id, DEF_PARAM)) {
+		Py_DECREF(id);
 		return 0;
+	}
 	Py_DECREF(id);
 	return 1;
 }
@@ -974,14 +978,23 @@ symtable_visit_params(struct symtable *st, asdl_seq *args, int toplevel)
 		}
 	}
 
-        /* visit all the nested arguments */
-        if (complex) {
-                for (i = 0; i < asdl_seq_LEN(args); i++) {
-                        expr_ty arg = asdl_seq_GET(args, i);
-                        if (arg->kind == Tuple_kind &&
-                            !symtable_visit_params(st, arg->v.Tuple.elts, 0))
-                            return 0;
-                }
+	if (!toplevel) {
+		if (!symtable_visit_params_nested(st, args))
+			return 0;
+	}
+
+	return 1;
+}
+
+static int
+symtable_visit_params_nested(struct symtable *st, asdl_seq *args)
+{
+	int i;
+	for (i = 0; i < asdl_seq_LEN(args); i++) {
+		expr_ty arg = asdl_seq_GET(args, i);
+		if (arg->kind == Tuple_kind &&
+		    !symtable_visit_params(st, arg->v.Tuple.elts, 0))
+			return 0;
 	}
 	
 	return 1;
@@ -1005,6 +1018,8 @@ symtable_visit_arguments(struct symtable *st, arguments_ty a)
 			return 0;
 		st->st_cur->ste_varkeywords = 1;
 	}
+	if (a->args && !symtable_visit_params_nested(st, a->args))
+		return 0;
 	return 1;
 }
 
