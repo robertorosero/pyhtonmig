@@ -103,11 +103,12 @@ maninstall:
 			$(prefix)/man/man1/python.1
 
 # install the include files
+INCLUDEPY=	$(prefix)/include/Py
 inclinstall:
-		-if test ! -d $(prefix)/include/Py; \
-		then mkdir $(prefix)/include/Py; \
+		-if test ! -d $(INCLUDEPY); \
+		then mkdir $(INCLUDEPY); \
 		fi
-		cp $(srcdir)/Include/*.h $(prefix)/include/Py
+		cp $(srcdir)/Include/*.h $(INCLUDEPY)
 
 # install the lib*.a files and miscellaneous stuff needed by extensions
 LIBP=		$(exec_prefix)/lib/python
