@@ -782,6 +782,26 @@ static PyMethodDef type_methods[] = {
 	{0}
 };
 
+static int
+type_contains(PyObject *type, PyObject *obj)
+{
+	assert(PyType_Check(type));
+	return PyType_IsSubtype(obj->ob_type, (PyTypeObject *)type);
+}
+
+static PySequenceMethods type_as_seq = {
+	0,			/* sq_length */
+	0,			/* sq_concat */
+	0,			/* sq_repeat */
+	0,			/* sq_item */
+	0,			/* sq_slice */
+	0,			/* sq_ass_item */
+	0,			/* sq_ass_slice */
+	type_contains,		/* sq_contains */
+	0,			/* sq_inplace_concat */
+	0,			/* sq_inplace_repeat */
+};
+
 static char type_doc[] =
 "type(object) -> the object's type\n"
 "type(name, bases, dict) -> a new type";
@@ -799,7 +819,7 @@ PyTypeObject PyType_Type = {
 	type_compare,				/* tp_compare */
 	(reprfunc)type_repr,			/* tp_repr */
 	0,					/* tp_as_number */
-	0,					/* tp_as_sequence */
+	&type_as_seq,				/* tp_as_sequence */
 	0,					/* tp_as_mapping */
 	(hashfunc)_Py_HashPointer,		/* tp_hash */
 	(ternaryfunc)type_call,			/* tp_call */
