@@ -13,15 +13,17 @@ exceptions is present in the standard library module
 
 For backward compatibility, when Python is invoked with the
 \code{-X} option, most of the standard exceptions are
-strings\footnote{
+strings.\footnote{
     For forward-compatibility the new exceptions
     \exception{Exception}, \exception{LookupError},
     \exception{ArithmeticError}, \exception{EnvironmentError},
     and \exception{StandardError} are tuples.
-}.  This option may be used to run code that breaks because of the
-different semantics of class based exceptions.  The \code{-X} option
-will become obsolete in future Python versions, so the recommended
-solution is to fix the code.
+}  This option may be used to run code that breaks because of the
+different semantics of class based exceptions.
+
+\strong{Deprecation warning:} The \code{-X} option will be removed in
+Python 1.6, so the recommended solution is to adjust all code to work
+with class-based exceptions.
 
 Two distinct string objects with the same value are considered different
 exceptions.  This is done to force programmers to use exception names
@@ -63,6 +65,7 @@ inappropriate error.
 The following exceptions are only used as base classes for other
 exceptions.  When string-based standard exceptions are used, they
 are tuples containing the directly derived classes.
+\strong{Note:}  These will always be classes in Python 1.6.
 
 \begin{excdesc}{Exception}
 The root class for exceptions.  All built-in exceptions are derived
