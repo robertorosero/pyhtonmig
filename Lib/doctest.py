@@ -429,6 +429,26 @@ def _tag_msg(tag, msg, indent_msg=True):
             msg = msg[:-len(INDENT)]
         return '%s:\n%s' % (tag, msg)
 
+# Override some StringIO methods.
+class _SpoofOut(StringIO):
+    def getvalue(self):
+        result = StringIO.getvalue(self)
+        # If anything at all was written, make sure there's a trailing
+        # newline.  There's no way for the expected output to indicate
+        # that a trailing newline is missing.
+        if result and not result.endswith("\n"):
+            result += "\n"
+        # Prevent softspace from screwing up the next test case, in
+        # case they used print with a trailing comma in an example.
+        if hasattr(self, "softspace"):
+            del self.softspace
+        return result
+
+    def truncate(self,   size=None):
+        StringIO.truncate(self, size)
+        if hasattr(self, "softspace"):
+            del self.softspace
+
 ######################################################################
 ## 2. Example & DocTest
 ######################################################################
@@ -932,7 +952,7 @@ class DocTestRunner:
         self._name2ft = {}
 
         # Create a fake output target for capturing doctest output.
-        self._fakeout = StringIO()
+        self._fakeout = _SpoofOut()
 
     #/////////////////////////////////////////////////////////////////
     # Output verification methods
@@ -1181,7 +1201,6 @@ class DocTestRunner:
             # doesn't have already one.
             got = self._fakeout.getvalue()
             self._fakeout.truncate(0)
-            if got and got[-1:] != '\n': got += '\n'
 
             # If the example executed without raising any exceptions,
             # then verify its output and report its outcome.
