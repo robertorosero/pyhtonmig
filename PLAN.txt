@@ -118,6 +118,18 @@ Create a hierarchy of types, so that e.g. int and long are both
 subtypes of an abstract base type integer, which is itself a subtype
 of number, etc.  A lot of thinking can go into this!
 
+*** NEW TASK??? ***
+Implement "signature" objects.  These are alluded to in PEP 252 but
+not yet specified.  Supposedly they provide an easily usable API to
+find out about function/method arguments.  Building these for Python
+functions is simple.  Building these for built-in functions will
+require a change to the PyMethodDef structure, so that a type can
+provide signature information for its C methods.  (This would also
+help in supporting keyword arguments for C methods with less work than
+PyArg_ParseTupleAndKeywords() currently requires.)  But should we do
+this?  It's additional work and not required for any of the other
+parts.
+
 
 Project: making classes use the new machinery
 *********************************************
