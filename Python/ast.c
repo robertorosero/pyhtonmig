@@ -329,10 +329,11 @@ ast_for_comp_op(const node *n)
 static asdl_seq *
 seq_for_testlist(const node *n)
 {
+    /* testlist: test (',' test)* [','] */
     asdl_seq *seq;
     int i;
 
-    seq = asdl_seq_new(NCH(n) / 2);
+    seq = asdl_seq_new((NCH(n) + 1) / 2);
     for (i = 0; i < NCH(n); i += 2) {
 	asdl_seq_SET(seq, i / 2, ast_for_expr(CHILD(n, i)));
     }
