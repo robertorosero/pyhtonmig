@@ -10,6 +10,10 @@ __rcsid__ = "$Id$"
 import sys, os, string
 from distutils.errors import *
 
+# Python 1.5.1 compatibility:
+if not hasattr (__builtins__,'OSError'):
+    OSError = os.error
+
 
 def spawn (cmd,
            search_path=1,
@@ -76,6 +80,68 @@ def _spawn_nt ( cmd,
 
     
                 
+def _examine_status (child_name, status):
+    """Examine the termination status of a child process to determine if
+    it failed or not, and what we should do next.  If the child process
+    failed (non-zero termination status), raises DistutilsExecError.  If
+    the child is merely stopped, rather than terminated, returns false.
+    If the child terminated successfully, returns true.
+
+    Note that detecting stopped child processes is only possible under
+    Python 1.5.2 and later, since earlier versions do not provide the
+    WIFSTOPPED function."""
+    
+    # Python provides the WIFSIGNALED (and friends) macros: this requires
+    # a system C library that provides those macros and Python 1.5.2
+    # or later.
+    if hasattr (os, 'WIFSIGNALED'):
+        if os.WIFSIGNALED (status):
+            raise DistutilsExecError, \
+                  "command '%s' terminated by signal %d" % \
+                  (child_name, os.WTERMSIG (status))
+
+        elif os.WIFEXITED (status):
+            exit_status = os.WEXITSTATUS (status)
+            if exit_status == 0:
+                return 1                # child process terminated successfully
+            else:
+                raise DistutilsExecError, \
+                      "command '%s' failed with exit status %d" % \
+                      (child_name, exit_status)
+
+        elif os.WIFSTOPPED (status):    # child process is stopped
+            return 0
+
+        else:
+            raise DistutilsExecError, \
+                  "unknown error executing '%s': termination status %d" % \
+                  (child_name, status)
+
+    # Old Python or non-POSIX-compliant OS: do the best we can.
+    else:
+        if status == 0:
+            return 1
+
+        else:
+            exit_status = (status >> 8) & 0xFF
+            signal = (status & 0x7F)
+            if exit_status != 0:
+                raise DistutilsExecError, \
+                      "command '%s' failed with exit status %d" % \
+                      (child_name, exit_status)
+            elif signal != 0:
+                raise DistutilsExecError, \
+                      "command '%s' terminated by signal %d" % \
+                      (child_name, signal)
+            else:
+                raise DistutilsExecError, \
+                      ("command '%s' terminated for unknown reason " +
+                       "(termination status %d)") % \
+                      (child_name, status)
+
+# _examine_status ()
+
+
 def _spawn_posix (cmd,
                   search_path=1,
                   verbose=0,
@@ -95,38 +161,21 @@ def _spawn_posix (cmd,
             #print "cmd =", cmd
             exec_fn (cmd[0], cmd)
         except OSError, e:
-            sys.stderr.write ("unable to execute %s: %s\n" %
-                              (cmd[0], e.strerror))
+            sys.stderr.write ("unable to execute '%s': %s\n" %
+                              (cmd[0], e[-1]))
             os._exit (1)
             
-        sys.stderr.write ("unable to execute %s for unknown reasons" % cmd[0])
+        sys.stderr.write ("unable to execute '%s' for unknown reasons" %
+                          cmd[0])
         os._exit (1)
 
     
     else:                               # in the parent
         # Loop until the child either exits or is terminated by a signal
         # (ie. keep waiting if it's merely stopped)
-        while 1:
+        done = 0
+        while not done:
             (pid, status) = os.waitpid (pid, 0)
-            if os.WIFSIGNALED (status):
-                raise DistutilsExecError, \
-                      "command '%s' terminated by signal %d" % \
-                      (cmd[0], os.WTERMSIG (status))
+            done = _examine_status (cmd[0], status)
 
-            elif os.WIFEXITED (status):
-                exit_status = os.WEXITSTATUS (status)
-                if exit_status == 0:
-                    return              # hey, it succeeded!
-                else:
-                    raise DistutilsExecError, \
-                          "command '%s' failed with exit status %d" % \
-                          (cmd[0], exit_status)
-        
-            elif os.WIFSTOPPED (status):
-                continue
-
-            else:
-                raise DistutilsExecError, \
-                      "unknown error executing '%s': termination status %d" % \
-                      (cmd[0], status)
 # _spawn_posix ()
