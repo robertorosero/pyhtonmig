@@ -17,6 +17,12 @@ Extension modules
 - binascii.b2a_base64(): fix a potential buffer overrun when encoding
   very short strings.
 
+- cPickle: the obscure "fast" mode was suspected of causing stack
+  overflows on the Mac.  Hopefully fixed this by setting the recursion
+  limit much smaller.  If the limit is too low (it only affects
+  performance), you can change it by defining PY_CPICKLE_FAST_LIMIT
+  when compiling cPickle.c (or in pyconfig.h).
+
 Library
 
 - dumbdbm.py: fixed a dumb old bug (the file didn't get synched at
