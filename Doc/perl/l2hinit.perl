@@ -294,7 +294,8 @@ sub add_module_idx{
 	    $plat = (" <em>(<span class='platform'>$ModulePlatforms{$key}"
 		     . '</span>)</em>');
 	}
-	print MODIDXFILE $moditem . $IDXFILE_FIELD_SEP . "$key$plat###\n";
+	print MODIDXFILE $moditem . $IDXFILE_FIELD_SEP
+              . "<tt class='module'>$key</tt>$plat###\n";
     }
     close(MODIDXFILE);
     if (!$allthesame) {

@@ -263,7 +263,7 @@ sub do_cmd_versionchanged{
 sub do_cmd_platform{
     local($_) = @_;
     my $platform = next_argument();
-    $ModulePlatforms{$THIS_MODULE} = $platform;
+    $ModulePlatforms{"<tt class='module'>$THIS_MODULE</tt>"} = $platform;
     $platform = "Macintosh"
       if $platform eq 'Mac';
     return "\n<p class='availability'>Availability: <span"
