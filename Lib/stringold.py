@@ -124,10 +124,7 @@ def join(words, sep = ' '):
     (joinfields and join are synonymous)
 
     """
-    res = ''
-    for w in words:
-	res = res + (sep + w)
-    return res[len(sep):]
+    return sep.join(words)
 joinfields = join
 
 # for a little bit of speed
