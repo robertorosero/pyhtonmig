@@ -1475,6 +1475,11 @@ static struct wrapperbase tab_mul_int[] = {
 	{0}
 };
 
+static struct wrapperbase tab_concat[] = {
+	{"__add__", (wrapperfunc)wrap_binaryfunc, "x.__add__(y) <==> x+y"},
+	{0}
+};
+
 static struct wrapperbase tab_imul_int[] = {
 	{"__imul__", (wrapperfunc)wrap_intargfunc, "x.__imul__(n) <==> x*=n"},
 	{0}
@@ -1860,7 +1865,7 @@ add_operators(PyTypeObject *type)
 
 	if ((sq = type->tp_as_sequence) != NULL) {
 		ADD(sq->sq_length, tab_len);
-		ADD(sq->sq_concat, tab_add);
+		ADD(sq->sq_concat, tab_concat);
 		ADD(sq->sq_repeat, tab_mul_int);
 		ADD(sq->sq_item, tab_getitem_int);
 		ADD(sq->sq_slice, tab_getslice);
