@@ -2,7 +2,7 @@ dnl Process this file with autoconf 2.0 or later to make a configure script.
 AC_REVISION($Revision$)
 AC_PREREQ(2.0)
 AC_INIT(Include/object.h)
-AC_CONFIG_HEADER(config.h)
+AC_CONFIG_HEADER(pyconfig.h)
 
 # Set VERSION so we only need to edit in one place (i.e., here)
 AC_SUBST(VERSION)
@@ -99,8 +99,6 @@ AC_ARG_WITH(gcc, [  --without-gcc                   never use gcc], [
 		without_gcc=$withval;;
 	esac], [
 	case $ac_sys_system in
-	OSF1)	CC=cc
-		without_gcc=;;
 	AIX*)   CC=cc_r
 		without_gcc=;;
 	BeOS*)
@@ -374,8 +372,6 @@ else
 fi
 
 # Check for enable-ipv6
-# XXX definition of ss_family disabled until author clarifies rationale.
-# DEFS="$DEFS -Dss_family=__ss_family -Dss_len=__ss_len"
 AC_MSG_CHECKING([whether to enable ipv6])
 AC_ARG_ENABLE(ipv6,
 [  --enable-ipv6                   Enable ipv6 (with ipv4) support
@@ -1181,7 +1177,7 @@ AC_CHECK_FUNCS(alarm chown clock confstr ctermid ctermid_r execv \
  nice pathconf pause plock poll pthread_init \
  putenv readlink \
  select setegid seteuid setgid \
- setlocale setregid setreuid setsid setpgid setuid setvbuf \
+ setlocale setregid setreuid setsid setpgid setuid setvbuf snprintf \
  sigaction siginterrupt sigrelse strftime strptime symlink sysconf \
  tcgetpgrp tcsetpgrp tempnam timegm times tmpfile tmpnam tmpnam_r \
  truncate uname waitpid _getpty getpriority)

@@ -43,7 +43,7 @@ def get_python_inc(plat_specific=0, prefix=None):
     If 'plat_specific' is false (the default), this is the path to the
     non-platform-specific header files, i.e. Python.h and so on;
     otherwise, this is the path to platform-specific header files
-    (namely config.h).
+    (namely pyconfig.h).
 
     If 'prefix' is supplied, use it instead of sys.prefix or
     sys.exec_prefix -- i.e., ignore 'plat_specific'.
@@ -137,10 +137,15 @@ def customize_compiler(compiler):
 
 
 def get_config_h_filename():
-    """Return full pathname of installed config.h file."""
+    """Return full pathname of installed pyconfig.h file."""
     if python_build: inc_dir = '.'
     else:            inc_dir = get_python_inc(plat_specific=1)
-    return os.path.join(inc_dir, "config.h")
+    if sys.version < '2.2':
+        config_h = 'config.h'
+    else:
+        # The name of the config.h file changed in 2.2
+        config_h = 'pyconfig.h'
+    return os.path.join(inc_dir, config_h)
 
 
 def get_makefile_filename():

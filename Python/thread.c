@@ -5,9 +5,9 @@
    which is included by this file dependent on config settings.
    Stuff shared by all thread_*.h files is collected here. */
 
-#include "config.h"
+#include "pyconfig.h"
 
-/* config.h may or may not define DL_IMPORT */
+/* pyconfig.h may or may not define DL_IMPORT */
 #ifndef DL_IMPORT	/* declarations for DLL import/export */
 #define DL_IMPORT(RTYPE) RTYPE
 #endif

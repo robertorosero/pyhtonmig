@@ -188,6 +188,7 @@ if (pai->ai_flags & AI_CANONNAME) {\
 	memcpy(ai, pai, sizeof(struct addrinfo));\
 	(ai)->ai_addr = (struct sockaddr *)((ai) + 1);\
 	memset((ai)->ai_addr, 0, (gai_afd)->a_socklen);\
+	(ai)->ai_addrlen = (gai_afd)->a_socklen;\
 	(ai)->ai_addr->sa_family = (ai)->ai_family = (gai_afd)->a_af;\
 	((struct sockinet *)(ai)->ai_addr)->si_port = port;\
 	p = (char *)((ai)->ai_addr);\
@@ -343,7 +344,7 @@ getaddrinfo(hostname, servname, hints, res)
 				pai->ai_socktype = SOCK_DGRAM;
 				pai->ai_protocol = IPPROTO_UDP;
 			}
-			port = htons(atoi(servname));
+			port = htons((u_short)atoi(servname));
 		} else {
 			struct servent *sp;
 			char *proto;
@@ -417,7 +418,9 @@ getaddrinfo(hostname, servname, hints, res)
 	for (i = 0; gai_afdl[i].a_af; i++) {
 		if (inet_pton(gai_afdl[i].a_af, hostname, pton)) {
 			u_long v4a;
+#ifdef INET6
 			u_char pfx;
+#endif
 
 			switch (gai_afdl[i].a_af) {
 			case AF_INET:
@@ -492,7 +495,10 @@ get_name(addr, gai_afd, res, numaddr, pai, port0)
 	u_short port = port0 & 0xffff;
 	struct hostent *hp;
 	struct addrinfo *cur;
-	int error = 0, h_error;
+	int error = 0;
+#ifdef INET6
+	int h_error;
+#endif
 	
 #ifdef INET6
 	hp = getipnodebyaddr(addr, gai_afd->a_addrlen, gai_afd->a_af, &h_error);
@@ -538,10 +544,6 @@ get_addr(hostname, af, res, pai, port0)
 	struct gai_afd *gai_afd;
 	int i, error = 0, h_error;
 	char *ap;
-#if !defined(INET6) && !defined(MS_WIN32)
-	/* In winsock.h, h_errno is #defined as a function call. */
-	extern int h_errno;
-#endif
 
 	top = NULL;
 	sentinel.ai_next = NULL;

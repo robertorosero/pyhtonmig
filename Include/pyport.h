@@ -1,7 +1,7 @@
 #ifndef Py_PYPORT_H
 #define Py_PYPORT_H
 
-#include "config.h" /* include for defines */
+#include "pyconfig.h" /* include for defines */
 
 /**************************************************************************
 Symbols and macros to supply platform-independent interfaces to basic
@@ -128,7 +128,7 @@ typedef unsigned LONG_LONG Py_uintptr_t;
  *      #define DONT_HAVE_STAT
  * and/or
  *      #define DONT_HAVE_FSTAT
- * to your config.h. Python code beyond this should check HAVE_STAT and
+ * to your pyconfig.h. Python code beyond this should check HAVE_STAT and
  * HAVE_FSTAT instead.
  * Also
  *      #define DONT_HAVE_SYS_STAT_H
