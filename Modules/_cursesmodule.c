@@ -78,9 +78,22 @@ char *PyCursesVersion = "1.6";
 #include <curses.h>
 #endif
 
-#if defined(__sgi__) || defined(__sun__)
+#ifdef sgi
+/*  This prototype is in <term.h>, but including this header #defines
+    many common symbols (such as "lines") which breaks the curses
+    module in other ways.  So the code will just specify an explicit
+    prototype here. */
+extern char *tigetstr(char *);
+extern char *tparm(char *instring, ...);
+#endif
+
+#if defined(sgi) || defined(__sun__)
 #define STRICT_SYSV_CURSES       /* Don't use ncurses extensions */
 typedef chtype attr_t;           /* No attr_t type is available */
+#endif
+
+#if defined(_AIX)
+#define STRICT_SYSV_CURSES
 #endif
 
 /* Definition of exception curses.error */
@@ -253,9 +266,17 @@ Window_OneArgNoReturnFunction(wattroff, attr_t, "l;attr")
 Window_OneArgNoReturnFunction(wattrset, attr_t, "l;attr")
 Window_OneArgNoReturnFunction(clearok, int, "i;True(1) or False(0)")
 Window_OneArgNoReturnFunction(idlok, int, "i;True(1) or False(0)")
+#if defined(__NetBSD__)
+Window_OneArgNoReturnVoidFunction(keypad, int, "i;True(1) or False(0)")
+#else
 Window_OneArgNoReturnFunction(keypad, int, "i;True(1) or False(0)")
+#endif
 Window_OneArgNoReturnFunction(leaveok, int, "i;True(1) or False(0)")
+#if defined(__NetBSD__)
+Window_OneArgNoReturnVoidFunction(nodelay, int, "i;True(1) or False(0)")
+#else
 Window_OneArgNoReturnFunction(nodelay, int, "i;True(1) or False(0)")
+#endif
 Window_OneArgNoReturnFunction(notimeout, int, "i;True(1) or False(0)")
 Window_OneArgNoReturnFunction(scrollok, int, "i;True(1) or False(0)")
 Window_OneArgNoReturnFunction(winsdelln, int, "i;nlines")
@@ -598,10 +619,12 @@ PyCursesWindow_EchoChar(PyCursesWindowObject *self, PyObject *args)
     return NULL;
   }
   
+#if !defined(__NetBSD__)
   if (self->win->_flags & _ISPAD)
     return PyCursesCheckERR(pechochar(self->win, ch | attr), 
 			    "echochar");
   else
+#endif
     return PyCursesCheckERR(wechochar(self->win, ch | attr), 
 			    "echochar");
 }
@@ -678,7 +701,11 @@ PyCursesWindow_GetKey(PyCursesWindowObject *self, PyObject *args)
   if (rtn<=255)
     return Py_BuildValue("c", rtn);
   else
+#if defined(__NetBSD__)
+    return PyString_FromString(unctrl(rtn));
+#else
     return PyString_FromString((char *)keyname(rtn));
+#endif
 }
 
 static PyObject *
@@ -997,7 +1024,11 @@ PyCursesWindow_NoOutRefresh(PyCursesWindowObject *self, PyObject *args)
   int pminrow,pmincol,sminrow,smincol,smaxrow,smaxcol;
   int rtn;
 
+#if defined(__NetBSD__)
+  if (0) {
+#else
   if (self->win->_flags & _ISPAD) {
+#endif
     switch(ARG_COUNT(args)) {
     case 6:
       if (!PyArg_Parse(args, 
@@ -1059,7 +1090,11 @@ PyCursesWindow_Refresh(PyCursesWindowObject *self, PyObject *args)
   int pminrow,pmincol,sminrow,smincol,smaxrow,smaxcol;
   int rtn;
   
+#if defined(__NetBSD__)
+  if (0) {
+#else
   if (self->win->_flags & _ISPAD) {
+#endif
     switch(ARG_COUNT(args)) {
     case 6:
       if (!PyArg_Parse(args, 
@@ -1123,9 +1158,11 @@ PyCursesWindow_SubWin(PyCursesWindowObject *self, PyObject *args)
   }
 
   /* printf("Subwin: %i %i %i %i   \n", nlines, ncols, begin_y, begin_x); */
+#if !defined(__NetBSD__)
   if (self->win->_flags & _ISPAD)
     win = subpad(self->win, nlines, ncols, begin_y, begin_x);
   else
+#endif
     win = subwin(self->win, nlines, ncols, begin_y, begin_x);
 
   if (win == NULL) {
@@ -1139,15 +1176,15 @@ PyCursesWindow_SubWin(PyCursesWindowObject *self, PyObject *args)
 static PyObject *
 PyCursesWindow_Scroll(PyCursesWindowObject *self, PyObject *args)
 {
-  int lines;
+  int nlines;
   switch(ARG_COUNT(args)) {
   case 0:
     return PyCursesCheckERR(scroll(self->win), "scroll");
     break;
   case 1:
-    if (!PyArg_Parse(args, "i;lines", &lines))
+    if (!PyArg_Parse(args, "i;nlines", &nlines))
       return NULL;
-    return PyCursesCheckERR(wscrl(self->win, lines), "scroll");
+    return PyCursesCheckERR(wscrl(self->win, nlines), "scroll");
   default:
     PyErr_SetString(PyExc_TypeError, "scroll requires 0 or 1 arguments");
     return NULL;
@@ -1679,7 +1716,7 @@ static PyObject *
 PyCurses_InitScr(PyObject *self, PyObject *args)
 {
   WINDOW *win;
-  PyObject *lines, *cols;
+  PyObject *nlines, *cols;
 
   if (!PyArg_NoArgs(args)) return NULL;
 
@@ -1739,19 +1776,33 @@ PyCurses_InitScr(PyObject *self, PyObject *args)
 	SetDictInt("ACS_BSBS",          (ACS_HLINE));
 	SetDictInt("ACS_SBSB",          (ACS_VLINE));
 	SetDictInt("ACS_SSSS",          (ACS_PLUS));
-#ifndef STRICT_SYSV_CURSES
-  /* The following are never available with strict SYSV curses */
+
+	/* The following are never available with strict SYSV curses */
+#ifdef ACS_S3
 	SetDictInt("ACS_S3",            (ACS_S3));
+#endif
+#ifdef ACS_S7
+	SetDictInt("ACS_S7",            (ACS_S7));
+#endif
+#ifdef ACS_LEQUAL
 	SetDictInt("ACS_LEQUAL",        (ACS_LEQUAL));
+#endif
+#ifdef ACS_GEQUAL
 	SetDictInt("ACS_GEQUAL",        (ACS_GEQUAL));
+#endif
+#ifdef ACS_PI
 	SetDictInt("ACS_PI",            (ACS_PI));
+#endif
+#ifdef ACS_NEQUAL
 	SetDictInt("ACS_NEQUAL",        (ACS_NEQUAL));
+#endif
+#ifdef ACS_STERLING
 	SetDictInt("ACS_STERLING",      (ACS_STERLING));
 #endif
 
-  lines = PyInt_FromLong((long) LINES);
-  PyDict_SetItemString(ModDict, "LINES", lines);
-  Py_DECREF(lines);
+  nlines = PyInt_FromLong((long) LINES);
+  PyDict_SetItemString(ModDict, "LINES", nlines);
+  Py_DECREF(nlines);
   cols = PyInt_FromLong((long) COLS);
   PyDict_SetItemString(ModDict, "COLS", cols);
   Py_DECREF(cols);
@@ -1779,6 +1830,7 @@ PyCurses_IntrFlush(PyObject *self, PyObject *args)
   return PyCursesCheckERR(intrflush(NULL,ch), "intrflush");
 }
 
+#if !defined(__NetBSD__)
 static PyObject *
 PyCurses_KeyName(PyObject *self, PyObject *args)
 {
@@ -1793,6 +1845,7 @@ PyCurses_KeyName(PyObject *self, PyObject *args)
 
   return PyString_FromString((knp == NULL) ? "" : (char *)knp);
 }
+#endif
 
 static PyObject *  
 PyCurses_KillChar(PyObject *self, PyObject *args)  
@@ -2192,7 +2245,9 @@ static PyMethodDef PyCurses_methods[] = {
   {"initscr",             (PyCFunction)PyCurses_InitScr},
   {"intrflush",           (PyCFunction)PyCurses_IntrFlush},
   {"isendwin",            (PyCFunction)PyCurses_isendwin},
+#if !defined(__NetBSD__)
   {"keyname",             (PyCFunction)PyCurses_KeyName},
+#endif
   {"killchar",            (PyCFunction)PyCurses_KillChar}, 
   {"longname",            (PyCFunction)PyCurses_longname}, 
   {"meta",                (PyCFunction)PyCurses_Meta},
@@ -2266,16 +2321,30 @@ init_curses(void)
 	SetDictInt("A_DIM",		A_DIM);
 	SetDictInt("A_BOLD",		A_BOLD);
 	SetDictInt("A_ALTCHARSET",	A_ALTCHARSET);
+#if !defined(__NetBSD__)
 	SetDictInt("A_INVIS",           A_INVIS);
+#endif
 	SetDictInt("A_PROTECT",         A_PROTECT);
 	SetDictInt("A_CHARTEXT",        A_CHARTEXT);
 	SetDictInt("A_COLOR",           A_COLOR);
-#ifndef STRICT_SYSV_CURSES
+
+	/* The following are never available with strict SYSV curses */
+#ifdef A_HORIZONTAL
 	SetDictInt("A_HORIZONTAL",      A_HORIZONTAL);
+#endif
+#ifdef A_LEFT
 	SetDictInt("A_LEFT",            A_LEFT);
+#endif
+#ifdef A_LOW
 	SetDictInt("A_LOW",             A_LOW);
+#endif
+#ifdef A_RIGHT
 	SetDictInt("A_RIGHT",           A_RIGHT);
+#endif
+#ifdef A_TOP
 	SetDictInt("A_TOP",             A_TOP);
+#endif
+#ifdef A_VERTICAL
 	SetDictInt("A_VERTICAL",        A_VERTICAL);
 #endif
 
@@ -2326,6 +2395,7 @@ init_curses(void)
 	  int key;
 	  char *key_n;
 	  char *key_n2;
+#if !defined(__NetBSD__)
 	  for (key=KEY_MIN;key < KEY_MAX; key++) {
 	    key_n = (char *)keyname(key);
 	    if (key_n == NULL || strcmp(key_n,"UNKNOWN KEY")==0)
@@ -2349,6 +2419,7 @@ init_curses(void)
 	    if (key_n2 != key_n)
 	      free(key_n2);
 	  }
+#endif
 	  SetDictInt("KEY_MIN", KEY_MIN);
 	  SetDictInt("KEY_MAX", KEY_MAX);
 	}
