@@ -71,14 +71,13 @@ clean:
 clobber:	clean
 		-rm -f *.a tags TAGS
 
-config.c Makefile: Makefile.pre $(srcdir)/config.c.in $(MAKESETUP) Setup
+config.c Makefile: Makefile.pre config.c.in $(MAKESETUP) Setup
 		$(SHELL) $(MAKESETUP) Setup
 
-# This rule needs no dependency on $(srcdir)/Setup!
-Setup:
-		cp $(srcdir)/Setup Setup
+Setup:		Setup.in
+		cp $(srcdir)/Setup.in Setup
 
-Makefile.pre:	$(srcdir)/Makefile.pre.in ../config.status
+Makefile.pre:	Makefile.pre.in ../config.status
 		(cd ..; CONFIG_FILES=Modules/Makefile.pre CONFIG_HEADERS= \
 		$(SHELL) config.status)
 

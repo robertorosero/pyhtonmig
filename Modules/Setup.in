@@ -1,3 +1,6 @@
+# NOTE: This file is copied by the Makefile to Setup, which you can
+# subsequently edit to suit your taste without losing the original.
+#
 # This file is used by the makesetup script to construct Makefile.in
 # and config.c, from Makefile.in.in (sic!) and config.c.in,
 # respectively.
