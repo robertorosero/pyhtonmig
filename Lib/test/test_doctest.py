@@ -661,7 +661,7 @@ The NORMALIZE_WHITESPACE flag causes all sequences of whitespace to be
 treated as equal:
 
     >>> def f(x):
-    ...     '>>> print 1, 2, 3\n  1   2 \n 3'
+    ...     '>>> print 1, 2, 3\n  1   2\n 3'
 
     >>> # Without the flag:
     >>> test = doctest.DocTestFinder().find(f)[0]
