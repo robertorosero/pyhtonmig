@@ -172,7 +172,7 @@ package (ftp://ftp.cwi.nl/pub/dynload/dl-dld-1.1.tar.Z) and an
 emulation of the SGI dl library mentioned above (the emulation can be
 found at ftp://ftp.cwi.nl/pub/dynload/dld-3.2.3.tar.Z).  To enable
 this, ftp and compile both libraries, then call the configure passing
-it the option --with-dl-dld=D_LDIRECTORY,DLD_DIRECTORY where
+it the option --with-dl-dld=DL_DIRECTORY,DLD_DIRECTORY where
 DL_DIRECTORY is the absolute pathname of the dl emulation library and
 DLD_DIRECTORY is the absolute pathname of the GNU dld library.  (Don't
 bother on SunOS 4 or 5, they already have dynamic linking using shared
