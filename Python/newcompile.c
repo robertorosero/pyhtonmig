@@ -81,6 +81,8 @@ static void compiler_pop_fblock(struct compiler *, enum fblocktype, int);
 
 static PyCodeObject *assemble(struct compiler *);
 
+static char *opnames[];
+
 #define IS_JUMP(I) ((I)->i_jrel || (I)->i_jabs)
 
 int
@@ -1021,6 +1023,11 @@ compiler_visit_expr(struct compiler *c, expr_ty e)
         case Compare_kind:
 		break;
         case Call_kind:
+		VISIT(c, expr, e->v.Call.func);
+		n = asdl_seq_LEN(e->v.Call.args);
+		/* XXX other args */
+		VISIT_SEQ(c, expr, e->v.Call.args);
+		ADDOP_I(c, CALL_FUNCTION, n);
 		break;
         case Repr_kind:
 		VISIT(c, expr, e->v.Repr.value);
@@ -1059,9 +1066,11 @@ compiler_visit_expr(struct compiler *c, expr_ty e)
 	/* child nodes of List and Tuple will have expr_context set */
         case List_kind:
 		VISIT_SEQ(c, expr, e->v.List.elts);
+		ADDOP_I(c, BUILD_LIST, asdl_seq_LEN(e->v.List.elts));
 		break;
         case Tuple_kind:
 		VISIT_SEQ(c, expr, e->v.Tuple.elts);
+		ADDOP_I(c, BUILD_TUPLE, asdl_seq_LEN(e->v.Tuple.elts));
 		break;
 	}
 	return 1;
@@ -1225,8 +1234,9 @@ assemble_emit(struct assembler *a, struct instr *i)
 	}
 	code = PyString_AS_STRING(a->a_bytecode) + a->a_offset;
 	fprintf(stderr, 
-		"emit %3d %5d\toffset = %2d\tsize = %d\text = %d\n",
-		i->i_opcode, i->i_oparg, a->a_offset, size, ext);
+		"emit %3d %-10s %5d\toffset = %2d\tsize = %d\text = %d\n",
+		i->i_opcode, opnames[i->i_opcode], 
+		i->i_oparg, a->a_offset, size, ext);
 	a->a_offset += size;
 	if (ext > 0) {
 	    *code++ = EXTENDED_ARG;
@@ -1385,3 +1395,150 @@ assemble(struct compiler *c)
 	assemble_free(&a);
 	return co;
 }
+
+static char *opnames[] = {
+	"STOP_CODE",
+	"POP_TOP",
+	"ROT_TWO",
+	"ROT_THREE",
+	"DUP_TOP",
+	"ROT_FOUR",
+	"<6>",
+	"<7>",
+	"<8>",
+	"<9>",
+	"UNARY_POSITIVE",
+	"UNARY_NEGATIVE",
+	"UNARY_NOT",
+	"UNARY_CONVERT",
+	"<14>",
+	"UNARY_INVERT",
+	"<16>",
+	"<17>",
+	"<18>",
+	"BINARY_POWER",
+	"BINARY_MULTIPLY",
+	"BINARY_DIVIDE",
+	"BINARY_MODULO",
+	"BINARY_ADD",
+	"BINARY_SUBTRACT",
+	"BINARY_SUBSCR",
+	"BINARY_FLOOR_DIVIDE",
+	"BINARY_TRUE_DIVIDE",
+	"INPLACE_FLOOR_DIVIDE",
+	"INPLACE_TRUE_DIVIDE",
+	"SLICE+0",
+	"SLICE+1",
+	"SLICE+2",
+	"SLICE+3",
+	"<34>",
+	"<35>",
+	"<36>",
+	"<37>",
+	"<38>",
+	"<39>",
+	"STORE_SLICE+0",
+	"STORE_SLICE+1",
+	"STORE_SLICE+2",
+	"STORE_SLICE+3",
+	"<44>",
+	"<45>",
+	"<46>",
+	"<47>",
+	"<48>",
+	"<49>",
+	"DELETE_SLICE+0",
+	"DELETE_SLICE+1",
+	"DELETE_SLICE+2",
+	"DELETE_SLICE+3",
+	"<54>",
+	"INPLACE_ADD",
+	"INPLACE_SUBTRACT",
+	"INPLACE_MULTIPLY",
+	"INPLACE_DIVIDE",
+	"INPLACE_MODULO",
+	"STORE_SUBSCR",
+	"DELETE_SUBSCR",
+	"BINARY_LSHIFT",
+	"BINARY_RSHIFT",
+	"BINARY_AND",
+	"BINARY_XOR",
+	"BINARY_OR",
+	"INPLACE_POWER",
+	"GET_ITER",
+	"<69>",
+	"PRINT_EXPR",
+	"PRINT_ITEM",
+	"PRINT_NEWLINE",
+	"PRINT_ITEM_TO",
+	"PRINT_NEWLINE_TO",
+	"INPLACE_LSHIFT",
+	"INPLACE_RSHIFT",
+	"INPLACE_AND",
+	"INPLACE_XOR",
+	"INPLACE_OR",
+	"BREAK_LOOP",
+	"<81>",
+	"LOAD_LOCALS",
+	"RETURN_VALUE",
+	"IMPORT_STAR",
+	"EXEC_STMT",
+	"YIELD_VALUE",
+	"POP_BLOCK",
+	"END_FINALLY",
+	"BUILD_CLASS",
+	"STORE_NAME",
+	"DELETE_NAME",
+	"UNPACK_SEQUENCE",
+	"FOR_ITER",
+	"<94>",
+	"STORE_ATTR",
+	"DELETE_ATTR",
+	"STORE_GLOBAL",
+	"DELETE_GLOBAL",
+	"DUP_TOPX",
+	"LOAD_CONST",
+	"LOAD_NAME",
+	"BUILD_TUPLE",
+	"BUILD_LIST",
+	"BUILD_MAP",
+	"LOAD_ATTR",
+	"COMPARE_OP",
+	"IMPORT_NAME",
+	"IMPORT_FROM",
+	"<109>",
+	"JUMP_FORWARD",
+	"JUMP_IF_FALSE",
+	"JUMP_IF_TRUE",
+	"JUMP_ABSOLUTE",
+	"<114>",
+	"<115>",
+	"LOAD_GLOBAL",
+	"<117>",
+	"<118>",
+	"CONTINUE_LOOP",
+	"SETUP_LOOP",
+	"SETUP_EXCEPT",
+	"SETUP_FINALLY",
+	"<123>",
+	"LOAD_FAST",
+	"STORE_FAST",
+	"DELETE_FAST",
+	"<127>",
+	"<128>",
+	"<129>",
+	"RAISE_VARARGS",
+	"CALL_FUNCTION",
+	"MAKE_FUNCTION",
+	"BUILD_SLICE",
+	"MAKE_CLOSURE",
+	"LOAD_CLOSURE",
+	"LOAD_DEREF",
+	"STORE_DEREF",
+	"<138>",
+	"<139>",
+	"CALL_FUNCTION_VAR",
+	"CALL_FUNCTION_KW",
+	"CALL_FUNCTION_VAR_KW",
+	"EXTENDED_ARG",
+};    
