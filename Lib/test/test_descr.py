@@ -308,6 +308,32 @@ def pydicts():
         for j in range(100):
             verify(a[i][j] == i*j)
 
+import sys
+MT = type(sys)
+
+def pymods():
+    if verbose: print "Testing Python subclass of module..."
+    log = []
+    class MM(MT):
+        def __getattr__(self, name):
+            log.append(("getattr", name))
+            return MT.__getattr__(self, name)
+        def __setattr__(self, name, value):
+            log.append(("setattr", name, value))
+            MT.__setattr__(self, name, value)
+        def __delattr__(self, name):
+            log.append(("delattr", name))
+            MT.__delattr__(self, name)
+    a = MM()
+    a.foo = 12
+    x = a.foo
+    del a.foo
+    verify(log == [('getattr', '__setattr__'),
+                   ("setattr", "foo", 12),
+                   ("getattr", "foo"),
+                   ('getattr', '__delattr__'),
+                   ("delattr", "foo")])
+
 def all():
     lists()
     dicts()
@@ -317,6 +343,7 @@ def all():
     spamlists()
     spamdicts()
     pydicts()
+    pymods()
 
 all()
 
