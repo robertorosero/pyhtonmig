@@ -327,6 +327,20 @@ def pydicts():
         for j in range(N):
             verify(a[i][j] == i*j)
 
+def pylists():
+    if verbose: print "Testing Python subclass of list..."
+    class C(list):
+        def __getitem__(self, i):
+            return list.__getitem__(self, i) + 100
+        def __getslice__(self, i, j):
+            return (i, j)
+    a = C()
+    a.extend([0,1,2])
+    verify(a[0] == 100)
+    verify(a[1] == 101)
+    verify(a[2] == 102)
+    verify(a[100:200] == (100,200))
+
 def metaclass():
     if verbose: print "Testing __metaclass__..."
     global C
@@ -550,6 +564,7 @@ def all():
     spamlists()
     spamdicts()
     pydicts()
+    pylists()
     metaclass()
     pymods()
     multi()
