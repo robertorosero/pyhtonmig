@@ -306,7 +306,7 @@ __all__ = [
 import __future__
 
 import sys, traceback, inspect, linecache, re, types
-import unittest, difflib
+import unittest, difflib, tempfile
 from StringIO import StringIO
 
 # Option constants.
@@ -884,7 +884,7 @@ class DocTestRunner:
     tried, and `f` is the number of test cases that failed.
 
         >>> tests = DocTestFinder().find(_TestClass)
-        >>> runner = DocTestRunner()
+        >>> runner = DocTestRunner(verbose=False)
         >>> for test in tests:
         ...     print runner.run(test, globals())
         (0, 2)
@@ -1035,17 +1035,17 @@ class DocTestRunner:
         Return a string describing the differences between the
         expected output (`want`) and the actual output (`got`).
         """
+        # If <BLANKLINE>s are being used, then replace <BLANKLINE>
+        # with blank lines in the expected output string.
+        if not (self._optionflags & DONT_ACCEPT_BLANKLINE):
+            want = re.sub('(?m)^%s$' % re.escape(BLANKLINE_MARKER), '', want)
+                          
         # Check if we should use diff.  Don't use diff if the actual
         # or expected outputs are too short, or if the expected output
         # contains an ellipsis marker.
         if ((self._optionflags & (UNIFIED_DIFF | CONTEXT_DIFF)) and
             want.count('\n') > 2 and got.count('\n') > 2 and
             not (self._optionflags & ELLIPSIS and '...' in want)):
-            # Replace <BLANKLINE> with blank lines in the expected
-            # output string (so they don't confuse difflib).
-            if not (self._optionflags & DONT_ACCEPT_BLANKLINE):
-                want = re.sub('(?m)^%s$' % re.escape(BLANKLINE_MARKER),
-                              '', want)
             # Split want & got into lines.
             want_lines = [l+'\n' for l in want.split('\n')]
             got_lines = [l+'\n' for l in got.split('\n')]
@@ -1066,10 +1066,7 @@ class DocTestRunner:
                             ''.join(diff))
 
         # If we're not using diff, then simply list the expected
-        # output followed by the actual output.  But explicitly mark
-        # blank lines in the actual output.
-        if not (self._optionflags & DONT_ACCEPT_BLANKLINE):
-            got = re.sub('(?m)^$(?!\Z)', '<BLANKLINE>', got)
+        # output followed by the actual output.
         return (_tag_msg("Expected", want or "Nothing") +
                 _tag_msg("Got", got))
 
@@ -1530,6 +1527,8 @@ def run_docstring_examples(f, globs, verbose=False, name="NoName",
 ######################################################################
 ## 6. Tester
 ######################################################################
+# This is provided only for backwards compatibility.  It's not
+# actually used in any way.
 
 class Tester:
     def __init__(self, mod=None, globs=None, verbose=None,
@@ -1713,14 +1712,19 @@ def DocTestSuite(module=None, filename=None, globs=None, extraglobs=None,
 ######################################################################
 ## 8. Debugging Support
 ######################################################################
-# [XX] This is currently broken:
 
-def _expect(expect):
+def _want_comment(example):
+    """
+    Return a comment containing the expected output for the given
+    example.
+    """
     # Return the expected output, if any
-    if expect:
-        expect = "\n# ".join(expect.split("\n"))
-        expect = "\n# Expect:\n# %s" % expect
-    return expect
+    want = example.want
+    if want:
+        if want[-1] == '\n': want = want[:-1]
+        want = "\n#     ".join(want.split("\n"))
+        want = "\n# Expected:\n#     %s" % want
+    return want
 
 def testsource(module, name):
     """Extract the test sources from a doctest test docstring as a script
@@ -1730,17 +1734,15 @@ def testsource(module, name):
     with the doc string with tests to be debugged.
 
     """
-    module = _normalizeModule(module)
-    tests = _findTests(module, "")
-    test = [doc for (tname, doc, f, l) in tests if tname == name]
+    module = _normalize_module(module)
+    tests = DocTestFinder().find(module)
+    test = [t for t in tests if t.name == name]
     if not test:
         raise ValueError(name, "not found in tests")
     test = test[0]
-    # XXX we rely on an internal doctest function:
-    examples = _extract_examples(test)
     testsrc = '\n'.join([
-        "%s%s" % (source, _expect(expect))
-        for (source, expect, lineno) in examples
+        "%s%s" % (example.source, _want_comment(example))
+        for example in test.examples
         ])
     return testsrc
 
@@ -1749,20 +1751,22 @@ def debug_src(src, pm=False, globs=None):
 
     The string is provided directly
     """
-    # XXX we rely on an internal doctest function:
-    examples = _extract_examples(src)
-    src = '\n'.join([
-        "%s%s" % (source, _expect(expect))
-        for (source, expect, lineno) in examples
+    test = DocTest(src, 'debug', None, None)
+
+    testsrc = '\n'.join([
+        "%s%s" % (example.source, _want_comment(example))
+        for example in test.examples
         ])
-    debug_script(src, pm, globs)
+    debug_script(testsrc, pm, globs)
 
 def debug_script(src, pm=False, globs=None):
     "Debug a test script"
     import pdb
 
-    srcfilename = tempfile.mktemp("doctestdebug.py")
-    open(srcfilename, 'w').write(src)
+    srcfile = tempfile.NamedTemporaryFile(prefix='doctestdebug-',
+                                          suffix='.py', mode="w")
+    srcfile.write(src)
+    srcfile.flush()
     if globs:
         globs = globs.copy()
     else:
@@ -1771,16 +1775,16 @@ def debug_script(src, pm=False, globs=None):
     try:
         if pm:
             try:
-                execfile(srcfilename, globs, globs)
+                execfile(srcfile.name, globs, globs)
             except:
                 print sys.exc_info()[1]
                 pdb.post_mortem(sys.exc_info()[2])
         else:
             # Note that %r is vital here.  '%s' instead can, e.g., cause
             # backslashes to get treated as metacharacters on Windows.
-            pdb.run("execfile(%r)" % srcfilename, globs, globs)
+            pdb.run("execfile(%r)" % srcfile.name, globs, globs)
     finally:
-        os.remove(srcfilename)
+        srcfile.close() # Automatically deletes the file.
 
 def debug(module, name, pm=False):
     """Debug a single doctest test doc string
@@ -1790,12 +1794,9 @@ def debug(module, name, pm=False):
     with the doc string with tests to be debugged.
 
     """
-    module = _normalizeModule(module)
+    module = _normalize_module(module)
     testsrc = testsource(module, name)
     debug_script(testsrc, pm, module.__dict__)
-
-
-
 
 ######################################################################
 ## 9. Example Usage
@@ -1998,24 +1999,8 @@ def test4(): """
         The exclusion of objects from outside the designated module is
         meant to be invoked automagically by testmod.
 
-        >>> testmod(m1, isprivate=is_private)
+        >>> testmod(m1, isprivate=is_private, verbose=False)
         (0, 3)
-"""
-
-def test5(): r"""
-
->>> raise ValueError('x')
-Traceback (most recent call last):
-[...]
-ValueError: x
-
->>> print 'x'; raise ValueError('\nfoo')
-x
-Traceback (most recent call last):
-[...]
-ValueError:
-foo
-
 """
 
 def _test():
