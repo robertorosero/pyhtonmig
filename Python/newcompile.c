@@ -1313,8 +1313,36 @@ compiler_visit_expr(struct compiler *c, expr_ty e)
 		}
 		break;
         case Subscript_kind:
-		VISIT(c, expr, e->v.Subscript.value);
-		VISIT(c, slice, e->v.Subscript.slice);
+		switch (e->v.Subscript.ctx) {
+		case AugLoad:
+			VISIT(c, expr, e->v.Subscript.value);
+			VISIT(c, slice, e->v.Subscript.slice);
+			ADDOP_I(c, DUP_TOPX, 2);
+			ADDOP(c, BINARY_SUBSCR);
+			break;
+		case Load:
+			VISIT(c, expr, e->v.Subscript.value);
+			VISIT(c, slice, e->v.Subscript.slice);
+			ADDOP(c, BINARY_SUBSCR);
+			break;
+		case AugStore:
+			ADDOP(c, ROT_THREE);
+			ADDOP(c, STORE_SUBSCR);	
+			break;
+		case Store:
+			VISIT(c, expr, e->v.Subscript.value);
+			VISIT(c, slice, e->v.Subscript.slice);
+			ADDOP(c, STORE_SUBSCR);	
+			break;
+		case Del:
+			VISIT(c, expr, e->v.Subscript.value);
+			VISIT(c, slice, e->v.Subscript.slice);
+			ADDOP(c, DELETE_SUBSCR);
+			break;
+		case Param:
+			assert(0);
+			break;
+		}
 		break;
         case Name_kind:
 		return compiler_name(c, e);
@@ -1352,6 +1380,14 @@ compiler_augassign(struct compiler *c, stmt_ty s)
 		free(auge);
 		break;
 	case Subscript_kind:
+		auge = Subscript(e->v.Subscript.value, e->v.Subscript.slice,
+				 AugLoad);
+		VISIT(c, expr, auge);
+		VISIT(c, expr, s->v.AugAssign.value);
+		ADDOP(c, inplace_binop(c, s->v.AugAssign.op));
+		auge->v.Subscript.ctx = AugStore;
+		VISIT(c, expr, auge);
+		free(auge);
 	    break;
 	case Name_kind:
 		VISIT(c, expr, s->v.AugAssign.target);
@@ -1421,6 +1457,17 @@ compiler_error(struct compiler *c, const char *errstr)
 static int
 compiler_visit_slice(struct compiler *c, slice_ty s)
 {
+	switch (s->kind) {
+	case Ellipsis_kind:
+		break;
+	case Slice_kind:
+		break;
+	case ExtSlice_kind:
+		break;
+	case Index_kind:
+		VISIT(c, expr, s->v.Index.value);
+		break;
+	}
 	return 1;
 }
 
