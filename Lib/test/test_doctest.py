@@ -168,7 +168,8 @@ constructor:
     ...     another
     ...     example
     ... '''
-    >>> test = doctest.DocTest(docstring, 'some_test', 'some_file', 20)
+    >>> globs = {} # globals to run the test in.
+    >>> test = doctest.DocTest(docstring, globs, 'some_test', 'some_file', 20)
     >>> print test
     <DocTest some_test from some_file:20 (2 examples)>
     >>> len(test.examples)
@@ -202,7 +203,7 @@ expected output of an example, then `DocTest` will raise a ValueError:
     ...       bad
     ...     indentation
     ...     '''
-    >>> doctest.DocTest(docstring, 'some_test', 'filename', 0)
+    >>> doctest.DocTest(docstring, globs, 'some_test', 'filename', 0)
     Traceback (most recent call last):
     ValueError: line 3 of the docstring for some_test has inconsistent leading whitespace: '    indentation'
 
@@ -214,7 +215,7 @@ continuation lines, then `DocTest` will raise a ValueError:
     ...     ...          2)
     ...       ('bad', 'indentation')
     ...     '''
-    >>> doctest.DocTest(docstring, 'some_test', 'filename', 0)
+    >>> doctest.DocTest(docstring, globs, 'some_test', 'filename', 0)
     Traceback (most recent call last):
     ValueError: line 2 of the docstring for some_test has inconsistent leading whitespace: '    ...          2)'
 
@@ -222,7 +223,7 @@ If there's no blnak space after a PS1 prompt ('>>>'), then `DocTest`
 will raise a ValueError:
 
     >>> docstring = '>>>print 1\n1'
-    >>> doctest.DocTest(docstring, 'some_test', 'filename', 0)
+    >>> doctest.DocTest(docstring, globs, 'some_test', 'filename', 0)
     Traceback (most recent call last):
     ValueError: line 0 of the docstring for some_test lacks blank after >>>: '>>>print 1'
 """
@@ -472,7 +473,7 @@ given DocTest case in a given namespace (globs).  It returns a tuple
 `(f,t)`, where `f` is the number of failed tests and `t` is the number
 of tried tests.
 
-    >>> doctest.DocTestRunner(verbose=False).run(test, {})
+    >>> doctest.DocTestRunner(verbose=False).run(test)
     (0, 3)
 
 If any example produces incorrect output, then the test runner reports
@@ -487,7 +488,7 @@ the failure and proceeds to the next example:
     ...     6
     ...     '''
     >>> test = doctest.DocTestFinder().find(f)[0]
-    >>> doctest.DocTestRunner(verbose=True).run(test, {})
+    >>> doctest.DocTestRunner(verbose=True).run(test)
     Trying: x = 12
     Expecting: nothing
     ok
@@ -517,7 +518,7 @@ output:
     ...     '''
     >>> test = doctest.DocTestFinder().find(f)[0]
 
-    >>> doctest.DocTestRunner(verbose=True).run(test, {})
+    >>> doctest.DocTestRunner(verbose=True).run(test)
     Trying: x = 12
     Expecting: nothing
     ok
@@ -537,12 +538,12 @@ iff `-v` appears in sys.argv:
 
     >>> # If -v does not appear in sys.argv, then output isn't verbose.
     >>> sys.argv = ['test']
-    >>> doctest.DocTestRunner().run(test, {})
+    >>> doctest.DocTestRunner().run(test)
     (0, 3)
 
     >>> # If -v does appear in sys.argv, then output is verbose.
     >>> sys.argv = ['test', '-v']
-    >>> doctest.DocTestRunner().run(test, {})
+    >>> doctest.DocTestRunner().run(test)
     Trying: x = 12
     Expecting: nothing
     ok
@@ -575,7 +576,7 @@ replaced with any other string:
     ...     ZeroDivisionError: integer division or modulo by zero
     ...     '''
     >>> test = doctest.DocTestFinder().find(f)[0]
-    >>> doctest.DocTestRunner(verbose=False).run(test, {})
+    >>> doctest.DocTestRunner(verbose=False).run(test)
     (0, 2)
 
 An example may generate output before it raises an exception; if it
@@ -590,7 +591,7 @@ does, then the output must match the expected output:
     ...     ZeroDivisionError: integer division or modulo by zero
     ...     '''
     >>> test = doctest.DocTestFinder().find(f)[0]
-    >>> doctest.DocTestRunner(verbose=False).run(test, {})
+    >>> doctest.DocTestRunner(verbose=False).run(test)
     (0, 2)
 
 Exception messages may contain newlines:
@@ -604,7 +605,7 @@ Exception messages may contain newlines:
     ...     message
     ...     '''
     >>> test = doctest.DocTestFinder().find(f)[0]
-    >>> doctest.DocTestRunner(verbose=False).run(test, {})
+    >>> doctest.DocTestRunner(verbose=False).run(test)
     (0, 1)
 
 If an exception is expected, but an exception with the wrong type or
@@ -617,7 +618,7 @@ message is raised, then it is reported as a failure:
     ...     ValueError: wrong message
     ...     '''
     >>> test = doctest.DocTestFinder().find(f)[0]
-    >>> doctest.DocTestRunner(verbose=False).run(test, {})
+    >>> doctest.DocTestRunner(verbose=False).run(test)
     **********************************************************************
     Failure in example: raise ValueError, 'message'
     from line #1 of f
@@ -642,15 +643,13 @@ unexpected exception:
     ...     0
     ...     '''
     >>> test = doctest.DocTestFinder().find(f)[0]
-    >>> doctest.DocTestRunner(verbose=False).run(test, {})
+    >>> doctest.DocTestRunner(verbose=False).run(test)
     **********************************************************************
     Failure in example: 1/0
     from line #1 of f
     Exception raised:
         Traceback (most recent call last):
-          File "...", line ..., in __run
-            compileflags, 1) in globs
-          File "<string>", line 1, in ?
+          ...
         ZeroDivisionError: integer division or modulo by zero
     (1, 1)
 
@@ -672,13 +671,13 @@ and 1/0:
 
     >>> # Without the flag:
     >>> test = doctest.DocTestFinder().find(f)[0]
-    >>> doctest.DocTestRunner(verbose=False).run(test, {})
+    >>> doctest.DocTestRunner(verbose=False).run(test)
     (0, 1)
 
     >>> # With the flag:
     >>> test = doctest.DocTestFinder().find(f)[0]
     >>> flags = doctest.DONT_ACCEPT_TRUE_FOR_1
-    >>> doctest.DocTestRunner(verbose=False, optionflags=flags).run(test, {})
+    >>> doctest.DocTestRunner(verbose=False, optionflags=flags).run(test)
     **********************************************************************
     Failure in example: True
     from line #0 of f
@@ -694,13 +693,13 @@ and the '<BLANKLINE>' marker:
 
     >>> # Without the flag:
     >>> test = doctest.DocTestFinder().find(f)[0]
-    >>> doctest.DocTestRunner(verbose=False).run(test, {})
+    >>> doctest.DocTestRunner(verbose=False).run(test)
     (0, 1)
 
     >>> # With the flag:
     >>> test = doctest.DocTestFinder().find(f)[0]
     >>> flags = doctest.DONT_ACCEPT_BLANKLINE
-    >>> doctest.DocTestRunner(verbose=False, optionflags=flags).run(test, {})
+    >>> doctest.DocTestRunner(verbose=False, optionflags=flags).run(test)
     **********************************************************************
     Failure in example: print "a\n\nb"
     from line #0 of f
@@ -722,7 +721,7 @@ treated as equal:
 
     >>> # Without the flag:
     >>> test = doctest.DocTestFinder().find(f)[0]
-    >>> doctest.DocTestRunner(verbose=False).run(test, {})
+    >>> doctest.DocTestRunner(verbose=False).run(test)
     **********************************************************************
     Failure in example: print 1, 2, 3
     from line #0 of f
@@ -735,7 +734,7 @@ treated as equal:
     >>> # With the flag:
     >>> test = doctest.DocTestFinder().find(f)[0]
     >>> flags = doctest.NORMALIZE_WHITESPACE
-    >>> doctest.DocTestRunner(verbose=False, optionflags=flags).run(test, {})
+    >>> doctest.DocTestRunner(verbose=False, optionflags=flags).run(test)
     (0, 1)
 
 The ELLIPSIS flag causes ellipsis marker ("...") in the expected
@@ -746,7 +745,7 @@ output to match any substring in the actual output:
 
     >>> # Without the flag:
     >>> test = doctest.DocTestFinder().find(f)[0]
-    >>> doctest.DocTestRunner(verbose=False).run(test, {})
+    >>> doctest.DocTestRunner(verbose=False).run(test)
     **********************************************************************
     Failure in example: print range(15)
     from line #0 of f
@@ -757,7 +756,7 @@ output to match any substring in the actual output:
     >>> # With the flag:
     >>> test = doctest.DocTestFinder().find(f)[0]
     >>> flags = doctest.ELLIPSIS
-    >>> doctest.DocTestRunner(verbose=False, optionflags=flags).run(test, {})
+    >>> doctest.DocTestRunner(verbose=False, optionflags=flags).run(test)
     (0, 1)
 
 The UNIFIED_DIFF flag causes failures that involve multi-line expected
@@ -777,7 +776,7 @@ and actual outputs to be displayed using a unified diff:
 
     >>> # Without the flag:
     >>> test = doctest.DocTestFinder().find(f)[0]
-    >>> doctest.DocTestRunner(verbose=False).run(test, {})
+    >>> doctest.DocTestRunner(verbose=False).run(test)
     **********************************************************************
     Failure in example: print '\n'.join('abcdefg')
     from line #1 of f
@@ -802,7 +801,7 @@ and actual outputs to be displayed using a unified diff:
     >>> # With the flag:
     >>> test = doctest.DocTestFinder().find(f)[0]
     >>> flags = doctest.UNIFIED_DIFF
-    >>> doctest.DocTestRunner(verbose=False, optionflags=flags).run(test, {})
+    >>> doctest.DocTestRunner(verbose=False, optionflags=flags).run(test)
     **********************************************************************
     Failure in example: print '\n'.join('abcdefg')
     from line #1 of f
@@ -828,7 +827,7 @@ and actual outputs to be displayed using a context diff:
     >>> # Reuse f() from the UNIFIED_DIFF example, above.
     >>> test = doctest.DocTestFinder().find(f)[0]
     >>> flags = doctest.CONTEXT_DIFF
-    >>> doctest.DocTestRunner(verbose=False, optionflags=flags).run(test, {})
+    >>> doctest.DocTestRunner(verbose=False, optionflags=flags).run(test)
     **********************************************************************
     Failure in example: print '\n'.join('abcdefg')
     from line #1 of f
@@ -877,7 +876,7 @@ directive are ignored.
     ...     [0, 1, ..., 9]
     ...     '''
     >>> test = doctest.DocTestFinder().find(f)[0]
-    >>> doctest.DocTestRunner(verbose=False).run(test, {})
+    >>> doctest.DocTestRunner(verbose=False).run(test)
     **********************************************************************
     Failure in example: print range(10)       # Should fail: no ellipsis
     from line #1 of f
@@ -900,7 +899,7 @@ Multiple flags can be toggled by a single option directive:
     ...     [0, 1,  ...,   9]
     ...     '''
     >>> test = doctest.DocTestFinder().find(f)[0]
-    >>> doctest.DocTestRunner(verbose=False).run(test, {})
+    >>> doctest.DocTestRunner(verbose=False).run(test)
     **********************************************************************
     Failure in example: print range(10)       # Should fail
     from line #1 of f
