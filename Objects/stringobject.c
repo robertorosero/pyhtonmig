@@ -659,6 +659,107 @@ string_split(self, args)
 }
 
 
+static char join__doc__[] =
+"S.join(sequence) -> string\n\
+\n\
+Return a string which is the concatenation of the string representation\n\
+of very element in the sequence.  The separator between elements is S.";
+
+static PyObject *
+string_join(self, args)
+	PyStringObject *self;
+	PyObject *args;
+{
+	char *sep = PyString_AS_STRING(self);
+	int seplen = PyString_GET_SIZE(self);
+	PyObject *res = NULL;
+	int reslen = 0;
+	char *p;
+	int seqlen = 0;
+	int sz = 100;
+	int i, slen;
+	PyObject *seq;
+
+	if (!PyArg_ParseTuple(args, "O", &seq))
+		return NULL;
+
+	seqlen = PySequence_Length(seq);
+	if (seqlen < 0 && PyErr_Occurred())
+		return NULL;
+
+	if (seqlen == 1) {
+		/* Optimization if there's only one item */
+		PyObject *item = PySequence_GetItem(seq, 0);
+		PyObject *stritem = PyObject_Str(item);
+		Py_DECREF(item);
+		return stritem;
+	}
+	if (!(res = PyString_FromStringAndSize((char*)NULL, sz)))
+		return NULL;
+	p = PyString_AsString(res);
+
+	/* optimize for lists.  all others (tuples and arbitrary sequences)
+	 * just use the abstract interface.
+	 */
+	if (PyList_Check(seq)) {
+		for (i = 0; i < seqlen; i++) {
+			PyObject *item = PyList_GET_ITEM(seq, i);
+			PyObject *sitem = PyObject_Str(item);
+			if (!sitem)
+				goto finally;
+			slen = PyString_GET_SIZE(sitem);
+			while (reslen + slen + seplen >= sz) {
+				if (_PyString_Resize(&res, sz*2))
+					goto finally;
+				sz *= 2;
+				p = PyString_AsString(res) + reslen;
+			}
+			if (i > 0) {
+				memcpy(p, sep, seplen);
+				p += seplen;
+				reslen += seplen;
+			}
+			memcpy(p, PyString_AS_STRING(sitem), slen);
+			p += slen;
+			reslen += slen;
+		}
+	}
+	else {
+		for (i = 0; i < seqlen; i++) {
+			PyObject *item = PySequence_GetItem(seq, i);
+			PyObject *sitem;
+			if (!item || !(sitem = PyObject_Str(item))) {
+				Py_XDECREF(item);
+				goto finally;
+			}
+			slen = PyString_GET_SIZE(sitem);
+			while (reslen + slen + seplen >= sz) {
+				if (_PyString_Resize(&res, sz*2))
+					goto finally;
+				sz *= 2;
+				p = PyString_AsString(res) + reslen;
+			}
+			if (i > 0) {
+				memcpy(p, sep, seplen);
+				p += seplen;
+				reslen += seplen;
+			}
+			memcpy(p, PyString_AS_STRING(sitem), slen);
+			p += slen;
+			reslen += slen;
+		}
+	}
+	if (_PyString_Resize(&res, reslen))
+		goto finally;
+	return res;
+
+  finally:
+	Py_DECREF(res);
+	return NULL;
+}
+
+
+
 static long
 string_find_internal(self, args)
 	PyStringObject *self;
@@ -1374,7 +1475,7 @@ string_startswith(self, args)
 	 * offset to be == plen, but this only returns true if prefix is
 	 * the empty string.
 	 */
-	if (start < 0 || start > len)
+	if (start < 0 || start+plen > len)
 		return PyInt_FromLong(0);
 
 	if (!memcmp(str+start, prefix, plen)) {
@@ -1435,8 +1536,7 @@ string_methods[] = {
 	{"endswith",   (PyCFunction)string_endswith,   1, endswith__doc__},
 	{"find",       (PyCFunction)string_find,       1, find__doc__},
 	{"index",      (PyCFunction)string_index,      1, index__doc__},
-	/* join */
-	/* joinfields */
+	{"join",       (PyCFunction)string_join,       1, join__doc__},
 	{"lstrip",     (PyCFunction)string_lstrip,     1, lstrip__doc__},
 	{"lower",      (PyCFunction)string_lower,      1, lower__doc__},
 	/* maketrans */
@@ -1450,6 +1550,13 @@ string_methods[] = {
 	{"swapcase",    (PyCFunction)string_swapcase,    1, swapcase__doc__},
 	{"translate",   (PyCFunction)string_translate,   1, strip__doc__},
 	{"upper",       (PyCFunction)string_upper,       1, upper__doc__},
+	/* TBD */
+/* 	{"ljust"        (PyCFunction)string_ljust,       1, ljust__doc__}, */
+/* 	{"rjust"        (PyCFunction)string_rjust,       1, rjust__doc__}, */
+/* 	{"center"       (PyCFunction)string_center,      1, center__doc__}, */
+/* 	{"zfill"        (PyCFunction)string_zfill,       1, zfill__doc__}, */
+/* 	{"expandtabs"   (PyCFunction)string_expandtabs,  1, ljust__doc__}, */
+/* 	{"capwords"     (PyCFunction)string_capwords,    1, capwords__doc__}, */
 	{NULL,     NULL}		     /* sentinel */
 };
 
