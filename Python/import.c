@@ -303,8 +303,10 @@ get_module(m, name, m_ret)
 		sprintf(funcname, "init%s", name);
 #ifdef HAVE_DLFCN_H
 		{
-		  void *handle = dlopen (namebuf, 1);
-		  p = (dl_funcptr) dlsym(handle, funcname);
+			/* RTLD_NOW: resolve externals now
+			   (i.e. core dump now if some are missing) */
+			void *handle = dlopen(namebuf, RTLD_NOW);
+			p = (dl_funcptr) dlsym(handle, funcname);
 		}
 #else /* !HAVE_DLFCN_H */
 		p =  dl_loadmod(getprogramname(), namebuf, funcname);
