@@ -149,7 +149,7 @@ def newer_group (sources, target, missing='error'):
        file listed in 'sources'.  In other words, if 'target' exists and
        is newer than every file in 'sources', return false; otherwise
        return true.  'missing' controls what we do when a source file is
-       missing; the default ("error") is to blow up with an OSError from
+       missing; the default ("error") is to blow up with an os.error from
        inside 'stat()'; if it is "ignore", we silently drop any missing
        source files; if it is "newer", any missing source files make us
        assume that 'target' is out-of-date (this is handy in "dry-run"
