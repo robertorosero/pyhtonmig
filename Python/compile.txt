@@ -3,6 +3,7 @@ Developer Notes for Python Compiler
 
 Parsing
 -------
+XXX Fill in
 
 Abstract Syntax Tree (AST)
 --------------------------
@@ -80,11 +81,29 @@ specifies which component of the union is initialized.  The
 ``FunctionDef`` C function sets ``kind`` to ``FunctionDef_kind`` and
 initializes the ``name``, ``args``, and ``body`` fields.
 
+CST to AST
+----------
+
 The parser generates a concrete syntax tree represented by a ``node
 *`` defined in ``Include/node.h``.  The abstract syntax is generated
 from the concrete syntax in ``Python/ast.c`` using the function::
 
     mod_ty PyAST_FromNode(const node *n);
+
+It does this by calling various functions in the file that all have the
+name ast_for_xxx where xxx is what the rule of the grammar (as defined
+in ``Grammar/Grammar``) that the function handles (alias_for_import_name
+is the exception to this).  These in turn call the constructor functions
+as defined by the ASDL grammar to create the nodes of the AST.
+
+Common macros used as defined in ``Include/node.h``:
+  - CHILD(node, n) -- Returns the nth child of node using zero-offset
+    indexing
+  - NCH(node) -- Number of children node has
+  - STR(node) -- String representation of node
+  - TYPE(node) -- The type of node as listed in ``Include/graminit.h``
+  - REQ(node, type) -- Assert that the node is the type that is expected
+
 
 Code Generation and Basic Blocks
 --------------------------------
@@ -92,7 +111,7 @@ Code Generation and Basic Blocks
 XXX Describe the structure of the code generator, the types involved,
 and the helper functions and macros.
 
-- for each ast type (mod, stmt, expr, ...) define function with a
+- for each ast type (mod, stmt, expr, ...), define a function with a
   switch statement.  inline code generation for simple things,
   call function compiler_xxx where xxx is kind name for others.
 
@@ -115,12 +134,12 @@ macro to generate calls with the correct type.
 
 - all functions return true on success, false on failure
 
-Code is generate using a simple basic block interface.
+Code is generated using a simple, basic block interface.
 
-  - each block has single entry point
+  - each block has a single entry point
   - possibly multiple exit points
   - when generating jumps, always jump to a block
-  - for code unit, blocks identified by int id
+  - for a code unit, blocks are identified by its int id
 
 - NEW_BLOCK() -- create block and set it as current
 - NEXT_BLOCK() -- NEW_BLOCK() plus jump from current block
@@ -133,7 +152,7 @@ Code is generate using a simple basic block interface.
 
   ADDOP(c, opcode) -- opcode with no arguments
   ADDOP_I(c, opcode, oparg) -- oparg is a C int
-  ADDOP_O(c, opcode, oparg, namespace) -- oparg is a PyObject *
+  ADDOP_O(c, opcode, oparg, namespace) -- oparg is a PyObject * ,
      namespace is the name of a code object member that contains
      the set of objects.  For example,
          ADDOP_O(c, LOAD_CONST, obj, consts)
@@ -185,7 +204,7 @@ Files
         identifier.
 
     - ast.c
-        Converts Python's concrete syntax tree into abstract syntax.
+        Converts Python's concrete syntax tree into the abstract syntax tree.
 
     - compile.txt
         This file.
