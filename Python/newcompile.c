@@ -10,9 +10,20 @@ int Py_OptimizeFlag = 0;
 
 /*
    KNOWN BUGS:
+
+     1:
        using coding statement, such as in getopt:
        		# -*- coding: iso-8859-1 -*-
-       generates:  SystemError
+       needs to be implemented (see also Python/ast.c encoding_decl)
+
+     2:
+       LOAD_NAME is output instead of LOAD_GLOBAL
+
+     3:
+       Get this err msg: XXX rd_object called with exception set
+       From Python/marshal.c::PyMarshal_ReadLastObjectFromFile()
+       This looks like it may be related to #1.
+
 */
 
 /* fblockinfo tracks the current frame block.
@@ -72,6 +83,7 @@ struct compiler {
 
 	struct compiler_unit *u;
 	PyObject *c_stack;
+	char *c_encoding;	/* source encoding (a borrowed reference) */
 };
 
 struct assembler {
@@ -199,6 +211,9 @@ PyAST_Compile(mod_ty mod, const char *filename, PyCompilerFlags *flags)
 	}
 
 	fprintf(stderr, "symtable %s\n", filename);
+
+	/* XXX initialize to NULL for now, need to handle */
+	c.c_encoding = NULL;
 
 	co = compiler_mod(&c, mod);
 
@@ -900,10 +915,11 @@ compiler_for(struct compiler *c, stmt_ty s)
 static int
 compiler_while(struct compiler *c, stmt_ty s)
 {
-	int loop, orelse, end;
+	int loop, orelse, end, anchor;
 	loop = compiler_new_block(c);
 	end = compiler_new_block(c);
-	if (loop < 0 || end < 0)
+	anchor = compiler_new_block(c);
+	if (loop < 0 || end < 0 || anchor < 0)
 		return 0;
 	if (s->v.While.orelse) {
 		orelse = compiler_new_block(c);
@@ -918,7 +934,7 @@ compiler_while(struct compiler *c, stmt_ty s)
 	if (!compiler_push_fblock(c, LOOP, loop))
 		return 0;
 	VISIT(c, expr, s->v.While.test);
-	ADDOP_JREL(c, JUMP_IF_FALSE, orelse == -1 ? end : orelse);
+	ADDOP_JREL(c, JUMP_IF_FALSE, anchor);
 	ADDOP(c, POP_TOP);
 	VISIT_SEQ(c, stmt, s->v.While.body);
 	ADDOP_JABS(c, JUMP_ABSOLUTE, loop);
@@ -926,6 +942,7 @@ compiler_while(struct compiler *c, stmt_ty s)
 	/* XXX should the two POP instructions be in a separate block
 	   if there is no else clause ?
 	*/
+	compiler_use_block(c, anchor);
 	ADDOP(c, POP_TOP);
 	ADDOP(c, POP_BLOCK);
 	compiler_pop_fblock(c, LOOP, loop);
@@ -1636,6 +1653,7 @@ compiler_call(struct compiler *c, expr_ty e)
 
 	VISIT(c, expr, e->v.Call.func);
 	n = asdl_seq_LEN(e->v.Call.args);
+	VISIT_SEQ(c, expr, e->v.Call.args);
 	if (e->v.Call.keywords) {
 		VISIT_SEQ(c, keyword, e->v.Call.keywords);
 		n |= asdl_seq_LEN(e->v.Call.keywords) << 8;
@@ -1648,7 +1666,6 @@ compiler_call(struct compiler *c, expr_ty e)
 		VISIT(c, expr, e->v.Call.kwargs);
 		code |= 2;
 	}
-	VISIT_SEQ(c, expr, e->v.Call.args);
 	switch (code) {
 	case 0:
 		ADDOP_I(c, CALL_FUNCTION, n);
