@@ -605,11 +605,11 @@ def errors():
 
     try:
         class C(object):
-            __slots__ = {}
+            __slots__ = 1
     except TypeError:
         pass
     else:
-        verify(0, "__slots__ = {} should be illegal")
+        verify(0, "__slots__ = 1 should be illegal")
 
     try:
         class C(object):
