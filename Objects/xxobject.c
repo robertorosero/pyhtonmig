@@ -42,7 +42,7 @@ typedef struct {
 	object	*x_attr;	/* Attributes dictionary */
 } xxobject;
 
-static typeobject Xxtype;	/* Forward */
+staticforward typeobject Xxtype;
 
 #define is_xxobject(v)		((v)->ob_type == &Xxtype)
 
@@ -125,7 +125,7 @@ static typeobject Xxtype = {
 	OB_HEAD_INIT(&Typetype)
 	0,			/*ob_size*/
 	"xx",			/*tp_name*/
-	sizeof(xxobject),	/*tp_size*/
+	sizeof(xxobject),	/*tp_basicsize*/
 	0,			/*tp_itemsize*/
 	/* methods */
 	(destructor)xx_dealloc, /*tp_dealloc*/
