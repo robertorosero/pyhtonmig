@@ -615,6 +615,40 @@ def errors():
     else:
         verify(0, "__slots__ = [1] should be illegal")
 
+def classmethods():
+    if verbose: print "Testing class methods..."
+    class C(object):
+        def foo(*a): return a
+        goo = classmethod(foo)
+    verify(C.goo(1) == (C, 1))
+    c = C()
+    verify(c.goo(1) == (C, 1))
+    verify(c.foo(1) == (c, 1))
+    class D(C):
+        pass
+    d = D()
+    verify(D.goo(1) == (D, 1))
+    verify(d.goo(1) == (D, 1))
+    verify(d.foo(1) == (d, 1))
+    verify(D.foo(d, 1) == (d, 1))
+
+def classic():
+    if verbose: print "Testing classic classes..."
+    class C:
+        def foo(*a): return a
+        goo = classmethod(foo)
+    verify(C.goo(1) == (C, 1))
+    c = C()
+    verify(c.goo(1) == (C, 1))
+    verify(c.foo(1) == (c, 1))
+    class D(C):
+        pass
+    d = D()
+    verify(D.goo(1) == (D, 1))
+    verify(d.goo(1) == (D, 1))
+    verify(d.foo(1) == (d, 1))
+    verify(D.foo(d, 1) == (d, 1))
+
 def all():
     lists()
     dicts()
@@ -634,6 +668,8 @@ def all():
     slots()
     dynamics()
     errors()
+    classmethods()
+    classic()
 
 all()
 
