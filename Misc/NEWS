@@ -80,7 +80,16 @@ Library
 
 - The charset alias windows_1252 has been added.
 
+- types.StringTypes is a tuple containing the defined string types;
+  usually this will be (str, unicode), but if Python was compiled
+  without Unicode support it will be just (str,).
+
+- The pulldom and minidom modules were synchronized to PyXML.
+
 Tools/Demos
+
+- A new script called Tools/scripts/google.py was added, which fires
+  off a search on Google.
 
 Build
 
@@ -119,6 +128,11 @@ Mac
 
 - In unix-Python on Mac OS X (and darwin) sys.platform is now "darwin",
   without any trailing digits.
+
+- Changed logic for finding python home in Mac OS X framework Pythons.
+  Now sys.executable points to the executable again, in stead of to
+  the shared library. The latter is used only for locating the python
+  home.
 
 
 What's New in Python 2.2b2?
