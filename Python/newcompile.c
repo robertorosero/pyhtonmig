@@ -23,7 +23,6 @@ int Py_OptimizeFlag = 0;
      #: test_errno fails because stackdepth() isn't implemented (assert'ed)
 
    Inappropriate Exceptions:
-     #: problem with cell objects (closures still have bugs)
      #: Get this err msg: XXX rd_object called with exception set
         From Python/marshal.c::PyMarshal_ReadLastObjectFromFile()
         This looks like it may be related to encoding not being implemented.
@@ -299,11 +298,12 @@ list2dict(PyObject *list)
 }
 
 static PyObject *
-dictbytype(PyObject *src, int scope_type)
+dictbytype(PyObject *src, int scope_type, int offset)
 {
-	int pos = 0, i = 0, scope;
+	int pos = 0, i = offset, scope;
 	PyObject *k, *v, *dest = PyDict_New();
 
+        assert(offset >= 0);
         if (dest == NULL)
             return NULL;
 
@@ -313,17 +313,21 @@ dictbytype(PyObject *src, int scope_type)
             scope = (PyInt_AS_LONG(v) >> SCOPE_OFF) & SCOPE_MASK;
 
             if (scope == scope_type) {
-                PyObject *item = PyInt_FromLong(i);
+                PyObject *tuple, *item = PyInt_FromLong(i);
                 if (item == NULL) {
 			Py_DECREF(dest);
 			return NULL;
 		}
-		if (PyDict_SetItem(dest, k, item) < 0) {
+                i++;
+                tuple = Py_BuildValue("(OO)", k, k->ob_type);
+		if (!tuple || PyDict_SetItem(dest, tuple, item) < 0) {
 			Py_DECREF(item);
 			Py_DECREF(dest);
+			Py_XDECREF(tuple);
 			return NULL;
 		}
 		Py_DECREF(item);
+		Py_DECREF(tuple);
             }
 	}
 	return dest;
@@ -378,8 +382,10 @@ compiler_enter_scope(struct compiler *c, identifier name, void *key)
 	Py_INCREF(name);
 	u->u_name = name;
 	u->u_varnames = list2dict(u->u_ste->ste_varnames);
-	u->u_cellvars = dictbytype(u->u_ste->ste_symbols, CELL);
-	u->u_freevars = dictbytype(u->u_ste->ste_symbols, FREE);
+	u->u_cellvars = dictbytype(u->u_ste->ste_symbols, CELL, 0);
+	u->u_freevars = dictbytype(u->u_ste->ste_symbols, FREE, 
+                                   PyDict_Size(u->u_cellvars));
+
 	u->u_nblocks = 0;
 	u->u_nalloc = DEFAULT_BLOCKS;
 	u->u_blocks = (struct basicblock **)PyObject_Malloc(
@@ -668,13 +674,14 @@ compiler_addop_o(struct compiler *c, int opcode, PyObject *dict,
 }
 
 static int
-compiler_addop_name(struct compiler *c, int opcode, PyObject *o)
+compiler_addop_name(struct compiler *c, int opcode, PyObject *dict,
+                    PyObject *o)
 {
     int arg;
     PyObject *mangled = _Py_Mangle(c->u->u_private, o);
     if (!mangled)
         return 0;
-    arg = compiler_add_o(c, c->u->u_names, mangled);
+    arg = compiler_add_o(c, dict, mangled);
     Py_DECREF(mangled);
     if (arg < 0)
         return 0;
@@ -750,11 +757,9 @@ compiler_addop_j(struct compiler *c, int opcode, int block, int absolute)
 		return 0; \
 }
 
-#define ADDOP_NAME(C, OP, O) { \
-	if (!compiler_addop_name((C), (OP), (O))) { \
-                Py_DECREF(O); \
+#define ADDOP_NAME(C, OP, O, TYPE) { \
+	if (!compiler_addop_name((C), (OP), (C)->u->u_ ## TYPE, (O))) \
 		return 0; \
-        } \
 }
 
 #define ADDOP_I(C, OP, O) { \
@@ -864,7 +869,11 @@ get_ref_type(struct compiler *c, PyObject *name)
 static int
 compiler_lookup_arg(PyObject *dict, PyObject *name)
 {
-    PyObject *v = PyDict_GetItem(dict, name);
+    PyObject *k, *v;
+    k = Py_BuildValue("(OO)", name, name->ob_type);
+    if (k == NULL)
+        return -1;
+    v = PyDict_GetItem(dict, k);
     if (v == NULL)
         return -1;
     return PyInt_AS_LONG(v);
@@ -1386,7 +1395,7 @@ compiler_import(struct compiler *c, stmt_ty s)
 		alias_ty alias = asdl_seq_GET(s->v.Import.names, i);
 		identifier store_name;
 		ADDOP_O(c, LOAD_CONST, Py_None, consts);
-		ADDOP_NAME(c, IMPORT_NAME, alias->name);
+		ADDOP_NAME(c, IMPORT_NAME, alias->name, names);
 
                 /* XXX: handling of store_name should be cleaned up */
 		if (alias->asname) {
@@ -1431,7 +1440,7 @@ compiler_from_import(struct compiler *c, stmt_ty s)
 	}
 
 	ADDOP_O(c, LOAD_CONST, names, consts);
-	ADDOP_NAME(c, IMPORT_NAME, s->v.ImportFrom.module);
+	ADDOP_NAME(c, IMPORT_NAME, s->v.ImportFrom.module, names);
 	for (i = 0; i < n; i++) {
 		alias_ty alias = asdl_seq_GET(s->v.ImportFrom.names, i);
 		identifier store_name;
@@ -1443,7 +1452,7 @@ compiler_from_import(struct compiler *c, stmt_ty s)
 			break;
 		}
 		    
-		ADDOP_NAME(c, IMPORT_FROM, alias->name);
+		ADDOP_NAME(c, IMPORT_FROM, alias->name, names);
 		store_name = alias->name;
 		if (alias->asname)
 			store_name = alias->asname;
@@ -1722,13 +1731,18 @@ compiler_nameop(struct compiler *c, identifier name, expr_context_ty ctx)
 	int op, scope;
 	enum { OP_FAST, OP_GLOBAL, OP_DEREF, OP_NAME } optype;
 
+        PyObject *dict = c->u->u_names;
 	/* XXX AugStore isn't used anywhere! */
 	op = 0;
 	optype = OP_NAME;
 	scope = PyST_GetScope(c->u->u_ste, name);
 	switch (scope) {
 	case FREE:
+                dict = c->u->u_freevars;
+		optype = OP_DEREF;
+		break;
 	case CELL:
+                dict = c->u->u_cellvars;
 		optype = OP_DEREF;
 		break;
 	case LOCAL:
@@ -1797,8 +1811,7 @@ compiler_nameop(struct compiler *c, identifier name, expr_context_ty ctx)
 	}
 
 	assert(op);
-	ADDOP_NAME(c, op, name);
-	return 1;
+	return compiler_addop_name(c, op, dict, name);
 }
 
 static int
@@ -2095,16 +2108,16 @@ compiler_visit_expr(struct compiler *c, expr_ty e)
 			ADDOP(c, DUP_TOP);
 			/* Fall through to load */
 		case Load:
-			ADDOP_NAME(c, LOAD_ATTR, e->v.Attribute.attr);
+			ADDOP_NAME(c, LOAD_ATTR, e->v.Attribute.attr, names);
 			break;
 		case AugStore:
 			ADDOP(c, ROT_TWO);
 			/* Fall through to save */
 		case Store:
-			ADDOP_NAME(c, STORE_ATTR, e->v.Attribute.attr);
+			ADDOP_NAME(c, STORE_ATTR, e->v.Attribute.attr, names);
 			break;
 		case Del:
-			ADDOP_NAME(c, DELETE_ATTR, e->v.Attribute.attr);
+			ADDOP_NAME(c, DELETE_ATTR, e->v.Attribute.attr, names);
 			break;
 		case Param:
 			assert(0);
@@ -2694,6 +2707,7 @@ dict_keys_inorder(PyObject *dict, int offset)
                 k = PyTuple_GET_ITEM(k, 0);
 		Py_INCREF(k);
 		assert((i - offset) < size);
+                assert((i - offset) >= 0);
 		PyTuple_SET_ITEM(tuple, i - offset, k);
 	}
 	return tuple;
@@ -2751,11 +2765,13 @@ makecode(struct compiler *c, struct assembler *a)
 	varnames = dict_keys_inorder(c->u->u_varnames, 0);
 	if (!consts || !names || !varnames)
 		goto error;
-        freevars = PySequence_Tuple(c->u->u_freevars);
-        cellvars = PySequence_Tuple(c->u->u_cellvars);
-        if (!varnames || !freevars || !cellvars)
+      
+        cellvars = dict_keys_inorder(c->u->u_cellvars, 0);
+        if (!cellvars)
             goto error;
-
+        freevars = dict_keys_inorder(c->u->u_freevars, PyTuple_Size(cellvars));
+        if (!freevars)
+            goto error;
 	filename = PyString_FromString(c->c_filename);
 	if (!filename)
 		goto error;
