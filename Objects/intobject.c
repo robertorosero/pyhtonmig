@@ -32,6 +32,7 @@ PERFORMANCE OF THIS SOFTWARE.
 /* Integer object implementation */
 
 #include "Python.h"
+#include <ctype.h>
 
 #ifdef HAVE_LIMITS_H
 #include <limits.h>
