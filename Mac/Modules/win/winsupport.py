@@ -44,11 +44,19 @@ WindowPositionMethod = Type("WindowPositionMethod", "l")
 WindowTransitionEffect = Type("WindowTransitionEffect", "l")
 WindowTransitionAction = Type("WindowTransitionAction", "l")
 RGBColor = OpaqueType("RGBColor", "QdRGB")
+RGBColor_ptr = RGBColor
 PropertyCreator = OSTypeType("PropertyCreator")
 PropertyTag = OSTypeType("PropertyTag")
+ScrollWindowOptions = Type("ScrollWindowOptions", "l")
+WindowPartCode = Type("WindowPartCode", "h")
 
 includestuff = includestuff + """
 #include <%s>""" % MACHEADERFILE + """
+
+#if !ACCESSOR_CALLS_ARE_FUNCTIONS
+#define GetWindowFromPort(p) ((WindowPtr)(p))
+#endif
+
 /* Function to dispose a window, with a "normal" calling sequence */
 static void
 PyMac_AutoDisposeWindow(WindowPtr w)
@@ -148,8 +156,10 @@ execfile(EDITFILE)
 
 # add the populated lists to the generator groups
 # (in a different wordl the scan program would generate this)
-for f in functions: module.add(f)
-for f in methods: object.add(f)
+for f in functions:
+	module.add(f, dupcheck=1)
+for f in methods:
+	object.add(f, dupcheck=1)
 
 
 

@@ -5,6 +5,7 @@
 
 from macsupport import *
 
+RsrcChainLocation = Type("RsrcChainLocation", "h")
 
 class ResMixIn:
 

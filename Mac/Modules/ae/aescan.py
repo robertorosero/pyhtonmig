@@ -73,8 +73,20 @@ class AppleEventsScanner(Scanner):
 			# Constants with funny definitions
 			"kAEDontDisposeOnResume",
 			"kAEUseStandardDispatch",
+			# Handled through the .data member
+			"AEGetDescData",
+			"AEGetDescDataSize",
+			# Uses an output UPP (!)
+			"AEGetSpecialHandler",
 			]
 
+	def makegreylist(self):
+		return [('#if ACCESSOR_CALLS_ARE_FUNCTIONS', [
+			'AEGetDescData',
+			'AEGetDescDataSize',
+			'AEReplaceDescData',
+			])]
+			
 	def makeblacklisttypes(self):
 		return [
 			"ProcPtr",

@@ -45,6 +45,7 @@ GDHandle = OpaqueByValueType("GDHandle", "ResObj")
 CGrafPtr = OpaqueByValueType("CGrafPtr", "GrafObj")
 GrafPtr = OpaqueByValueType("GrafPtr", "GrafObj")
 BitMap_ptr = OpaqueByValueType("BitMapPtr", "BMObj")
+const_BitMap_ptr = BitMap_ptr
 RGBColor = OpaqueType('RGBColor', 'QdRGB')
 RGBColor_ptr = RGBColor
 FontInfo = OpaqueType('FontInfo', 'QdFI')
@@ -58,6 +59,37 @@ PenState_ptr = StructInputBufferType('PenState')
 includestuff = includestuff + """
 #include <%s>""" % MACHEADERFILE + """
 
+#if !ACCESSOR_CALLS_ARE_FUNCTIONS
+#define GetPortPixMap(port) ((port)->portPixMap)
+#define GetPortTextFont(port) ((port)->txFont)
+#define GetPortTextFace(port) ((port)->txFace)
+#define GetPortTextMode(port) ((port)->txMode)
+#define GetPortTextSize(port) ((port)->txSize)
+#define GetPortChExtra(port) ((port)->chExtra)
+#define GetPortFracHPenLocation(port) ((port)->pnLocHFrac)
+#define GetPortSpExtra(port) ((port)->spExtra)
+#define GetPortPenVisibility(port) ((port)->pnVis)
+#define GetPortPenMode(port) ((port)->pnMode)
+
+#define SetPortPixMap(port, v) ((port)->portPixMap = (v))
+#define SetPortTextFont(port, v) ((port)->txFont = (v))
+#define SetPortTextFace(port, v) ((port)->txFace = (v))
+#define SetPortTextMode(port, v) ((port)->txMode = (v))
+#define SetPortTextSize(port, v) ((port)->txSize = (v))
+#define SetPortChExtra(port, v) ((port)->chExtra = (v))
+#define SetPortFracHPenLocation(port, v) ((port)->pnLocHFrac = (v))
+#define SetPortSpExtra(port, v) ((port)->spExtra = (v))
+#define SetPortPenVisibility(port, v) ((port)->pnVis = (v))
+#define SetPortPenMode(port, v) ((port)->pnMode = (v))
+#define SetPortBounds(port, v) ((port)->portRect = *(v))
+#define SetPortPenSize(port, v) ((port)->pnSize = (v))
+
+#define GetQDGlobalsRandomSeed() (qd.randSeed)
+#define GetQDGlobalsThePort() ((CGrafPtr)(qd.thePort))
+
+#define SetQDGlobalsRandomSeed(v) (qd.randSeed = (v))
+#define SetQDGlobalsArrow(v) (qd.arrow = *(v))
+#endif
 /*
 ** Parse/generate RGB records
 */

@@ -41,6 +41,8 @@ class MyScanner(Scanner):
 	def makeblacklistnames(self):
 		return [
 			"GetThemeFont",		# Funny stringbuffer in/out parameter, I think...
+			# Missing from CW Pro 6 libraries
+			"GetThemeMetric",
 			]
 
 	def makeblacklisttypes(self):

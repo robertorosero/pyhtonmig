@@ -52,6 +52,10 @@ class MyScanner(Scanner):
 			"WaitNextEvent",	# Manually generated because of optional region
 			# Constants with funny definitions
 			"osEvtMessageMask",
+			# Missing from CW Pro 6 libraries
+			"CheckEventQueueForUserCancel",
+			"GetCurrentKeyModifiers",
+			"GetGlobalMouse",
 			]
 
 	def makeblacklisttypes(self):

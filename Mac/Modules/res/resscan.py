@@ -43,9 +43,12 @@ class ResourcesScanner(Scanner):
 			"ReadPartialResource",
 			"WritePartialResource",
 			"TempInsertROMMap",
-##			"RmveResource",		# RemoveResource
-##			"SizeResource",		# GetResourceSizeOnDisk
-##			"MaxSizeRsrc",		# GetMaxResourceSize
+			# Missing from CW Pro 6 libraries
+			"GetNextResourceFile",
+			"GetTopResourceFile",
+			"FSpOpenOrphanResFile",
+			"DetachResourceFile",
+			"InsertResourceFile",
 			]
 			
 	def makegreylist(self):

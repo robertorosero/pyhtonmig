@@ -39,11 +39,16 @@ class MyScanner(Scanner):
 		return [
 			"TEDispose",
 			"TEInit",
-##			"TEGetHiliteRgn",
+			# Missing from CW Pro 6 libraries
+			"TEGetScrapHandle",
+			"TESetScrapHandle",
 			]
 
 	def makeblacklisttypes(self):
 		return [
+			"TEDoTextUPP",
+			"TERecalcUPP",
+			"TEFindWordUPP",
 			"TEClickLoopUPP",
 			"UniversalProcPtr",
 			"WordBreakUPP"

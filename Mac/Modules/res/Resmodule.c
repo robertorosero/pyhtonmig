@@ -1304,6 +1304,32 @@ static PyObject *Res_FSpCreateResFile(_self, _args)
 	return _res;
 }
 
+static PyObject *Res_FSpResourceFileAlreadyOpen(_self, _args)
+	PyObject *_self;
+	PyObject *_args;
+{
+	PyObject *_res = NULL;
+	Boolean _rv;
+	FSSpec resourceFile;
+	Boolean inChain;
+	SInt16 refNum;
+	if (!PyArg_ParseTuple(_args, "O&",
+	                      PyMac_GetFSSpec, &resourceFile))
+		return NULL;
+	_rv = FSpResourceFileAlreadyOpen(&resourceFile,
+	                                 &inChain,
+	                                 &refNum);
+	{
+		OSErr _err = ResError();
+		if (_err != noErr) return PyMac_Error(_err);
+	}
+	_res = Py_BuildValue("bbh",
+	                     _rv,
+	                     inChain,
+	                     refNum);
+	return _res;
+}
+
 static PyObject *Res_Resource(_self, _args)
 	PyObject *_self;
 	PyObject *_args;
@@ -1437,6 +1463,8 @@ static PyMethodDef Res_methods[] = {
 	 "(FSSpec spec, SignedByte permission) -> (short _rv)"},
 	{"FSpCreateResFile", (PyCFunction)Res_FSpCreateResFile, 1,
 	 "(FSSpec spec, OSType creator, OSType fileType, ScriptCode scriptTag) -> None"},
+	{"FSpResourceFileAlreadyOpen", (PyCFunction)Res_FSpResourceFileAlreadyOpen, 1,
+	 "(FSSpec resourceFile) -> (Boolean _rv, Boolean inChain, SInt16 refNum)"},
 	{"Resource", (PyCFunction)Res_Resource, 1,
 	 "Convert a string to a resource object.\n\nThe created resource object is actually just a handle,\napply AddResource() to write it to a resource file.\nSee also the Handle() docstring.\n"},
 	{"Handle", (PyCFunction)Res_Handle, 1,

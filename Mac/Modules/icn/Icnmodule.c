@@ -1248,6 +1248,22 @@ static PyObject *Icn_GetCustomIconsEnabled(_self, _args)
 	return _res;
 }
 
+static PyObject *Icn_IsIconRefMaskEmpty(_self, _args)
+	PyObject *_self;
+	PyObject *_args;
+{
+	PyObject *_res = NULL;
+	Boolean _rv;
+	IconRef iconRef;
+	if (!PyArg_ParseTuple(_args, "O&",
+	                      ResObj_Convert, &iconRef))
+		return NULL;
+	_rv = IsIconRefMaskEmpty(iconRef);
+	_res = Py_BuildValue("b",
+	                     _rv);
+	return _res;
+}
+
 static PyMethodDef Icn_methods[] = {
 	{"GetCIcon", (PyCFunction)Icn_GetCIcon, 1,
 	 "(SInt16 iconID) -> (CIconHandle _rv)"},
@@ -1364,6 +1380,8 @@ static PyMethodDef Icn_methods[] = {
 	 "(SInt16 vRefNum, Boolean enableCustomIcons) -> None"},
 	{"GetCustomIconsEnabled", (PyCFunction)Icn_GetCustomIconsEnabled, 1,
 	 "(SInt16 vRefNum) -> (Boolean customIconsEnabled)"},
+	{"IsIconRefMaskEmpty", (PyCFunction)Icn_IsIconRefMaskEmpty, 1,
+	 "(IconRef iconRef) -> (Boolean _rv)"},
 	{NULL, NULL, 0}
 };
 

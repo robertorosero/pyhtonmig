@@ -96,6 +96,8 @@ CGrafPtr = OpaqueByValueType("CGrafPtr", "GrafObj")
 GDHandle = OpaqueByValueType("GDHandle", "OptResObj")
 AliasHandle = OpaqueByValueType("AliasHandle", "ResObj")
 SoundDescriptionHandle = OpaqueByValueType("SoundDescriptionHandle", "ResObj")
+QTFloatSingle = Type("QTFloatSingle", "f")
+
 # Silly Apple, passing an OStype by reference...
 OSType_ptr = OpaqueType("OSType", "PyMac_BuildOSType", "PyMac_GetOSType")
 # And even sillier: passing floats by address
@@ -127,6 +129,7 @@ mcactionparams = InputOnlyType("void *", "s")
 QTParameterDialog = Type("QTParameterDialog", "l")
 QTAtomID = Type("QTAtomID", "l")
 MCInterfaceElement = Type("MCInterfaceElement", "l")
+CodecType = OSTypeType("CodecType")
 # Could-not-be-bothered-types (NewMovieFromFile)
 dummyshortptr = FakeType('(short *)0')
 dummyStringPtr = FakeType('(StringPtr)0')

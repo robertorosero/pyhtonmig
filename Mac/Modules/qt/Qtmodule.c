@@ -4116,6 +4116,22 @@ static PyObject *MovieObj_PrerollMovie(_self, _args)
 	return _res;
 }
 
+static PyObject *MovieObj_AbortPrePrerollMovie(_self, _args)
+	MovieObject *_self;
+	PyObject *_args;
+{
+	PyObject *_res = NULL;
+	OSErr err;
+	if (!PyArg_ParseTuple(_args, "h",
+	                      &err))
+		return NULL;
+	AbortPrePrerollMovie(_self->ob_itself,
+	                     err);
+	Py_INCREF(Py_None);
+	_res = Py_None;
+	return _res;
+}
+
 static PyObject *MovieObj_LoadMovieIntoRam(_self, _args)
 	MovieObject *_self;
 	PyObject *_args;
@@ -5620,6 +5636,50 @@ static PyObject *MovieObj_GetMovieDefaultDataRef(_self, _args)
 	return _res;
 }
 
+static PyObject *MovieObj_SetMovieAnchorDataRef(_self, _args)
+	MovieObject *_self;
+	PyObject *_args;
+{
+	PyObject *_res = NULL;
+	OSErr _err;
+	Handle dataRef;
+	OSType dataRefType;
+	if (!PyArg_ParseTuple(_args, "O&O&",
+	                      ResObj_Convert, &dataRef,
+	                      PyMac_GetOSType, &dataRefType))
+		return NULL;
+	_err = SetMovieAnchorDataRef(_self->ob_itself,
+	                             dataRef,
+	                             dataRefType);
+	if (_err != noErr) return PyMac_Error(_err);
+	Py_INCREF(Py_None);
+	_res = Py_None;
+	return _res;
+}
+
+static PyObject *MovieObj_GetMovieAnchorDataRef(_self, _args)
+	MovieObject *_self;
+	PyObject *_args;
+{
+	PyObject *_res = NULL;
+	OSErr _err;
+	Handle dataRef;
+	OSType dataRefType;
+	long outFlags;
+	if (!PyArg_ParseTuple(_args, ""))
+		return NULL;
+	_err = GetMovieAnchorDataRef(_self->ob_itself,
+	                             &dataRef,
+	                             &dataRefType,
+	                             &outFlags);
+	if (_err != noErr) return PyMac_Error(_err);
+	_res = Py_BuildValue("O&O&l",
+	                     ResObj_New, dataRef,
+	                     PyMac_BuildOSType, dataRefType,
+	                     outFlags);
+	return _res;
+}
+
 static PyObject *MovieObj_SetMovieColorTable(_self, _args)
 	MovieObject *_self;
 	PyObject *_args;
@@ -5817,6 +5877,20 @@ static PyObject *MovieObj_GetMovieStatus(_self, _args)
 	return _res;
 }
 
+static PyObject *MovieObj_GetMovieLoadState(_self, _args)
+	MovieObject *_self;
+	PyObject *_args;
+{
+	PyObject *_res = NULL;
+	long _rv;
+	if (!PyArg_ParseTuple(_args, ""))
+		return NULL;
+	_rv = GetMovieLoadState(_self->ob_itself);
+	_res = Py_BuildValue("l",
+	                     _rv);
+	return _res;
+}
+
 static PyObject *MovieObj_NewMovieController(_self, _args)
 	MovieObject *_self;
 	PyObject *_args;
@@ -5936,6 +6010,8 @@ static PyMethodDef MovieObj_methods[] = {
 	 "(long maxMilliSecToUse) -> None"},
 	{"PrerollMovie", (PyCFunction)MovieObj_PrerollMovie, 1,
 	 "(TimeValue time, Fixed Rate) -> None"},
+	{"AbortPrePrerollMovie", (PyCFunction)MovieObj_AbortPrePrerollMovie, 1,
+	 "(OSErr err) -> None"},
 	{"LoadMovieIntoRam", (PyCFunction)MovieObj_LoadMovieIntoRam, 1,
 	 "(TimeValue time, TimeValue duration, long flags) -> None"},
 	{"SetMovieActive", (PyCFunction)MovieObj_SetMovieActive, 1,
@@ -6110,6 +6186,10 @@ static PyMethodDef MovieObj_methods[] = {
 	 "(Handle dataRef, OSType dataRefType) -> None"},
 	{"GetMovieDefaultDataRef", (PyCFunction)MovieObj_GetMovieDefaultDataRef, 1,
 	 "() -> (Handle dataRef, OSType dataRefType)"},
+	{"SetMovieAnchorDataRef", (PyCFunction)MovieObj_SetMovieAnchorDataRef, 1,
+	 "(Handle dataRef, OSType dataRefType) -> None"},
+	{"GetMovieAnchorDataRef", (PyCFunction)MovieObj_GetMovieAnchorDataRef, 1,
+	 "() -> (Handle dataRef, OSType dataRefType, long outFlags)"},
 	{"SetMovieColorTable", (PyCFunction)MovieObj_SetMovieColorTable, 1,
 	 "(CTabHandle ctab) -> None"},
 	{"GetMovieColorTable", (PyCFunction)MovieObj_GetMovieColorTable, 1,
@@ -6128,6 +6208,8 @@ static PyMethodDef MovieObj_methods[] = {
 	 "(TimeValue time, TimeValue duration) -> (RgnHandle _rv)"},
 	{"GetMovieStatus", (PyCFunction)MovieObj_GetMovieStatus, 1,
 	 "() -> (ComponentResult _rv, Track firstProblemTrack)"},
+	{"GetMovieLoadState", (PyCFunction)MovieObj_GetMovieLoadState, 1,
+	 "() -> (long _rv)"},
 	{"NewMovieController", (PyCFunction)MovieObj_NewMovieController, 1,
 	 "(Rect movieRect, long someFlags) -> (MovieController _rv)"},
 	{"PutMovieOnScrap", (PyCFunction)MovieObj_PutMovieOnScrap, 1,
@@ -6324,6 +6406,40 @@ static PyObject *Qt_GetDataHandler(_self, _args)
 	                     flags);
 	_res = Py_BuildValue("O&",
 	                     CmpObj_New, _rv);
+	return _res;
+}
+
+static PyObject *Qt_OpenADataHandler(_self, _args)
+	PyObject *_self;
+	PyObject *_args;
+{
+	PyObject *_res = NULL;
+	OSErr _err;
+	Handle dataRef;
+	OSType dataHandlerSubType;
+	Handle anchorDataRef;
+	OSType anchorDataRefType;
+	TimeBase tb;
+	long flags;
+	ComponentInstance dh;
+	if (!PyArg_ParseTuple(_args, "O&O&O&O&O&l",
+	                      ResObj_Convert, &dataRef,
+	                      PyMac_GetOSType, &dataHandlerSubType,
+	                      ResObj_Convert, &anchorDataRef,
+	                      PyMac_GetOSType, &anchorDataRefType,
+	                      TimeBaseObj_Convert, &tb,
+	                      &flags))
+		return NULL;
+	_err = OpenADataHandler(dataRef,
+	                        dataHandlerSubType,
+	                        anchorDataRef,
+	                        anchorDataRefType,
+	                        tb,
+	                        flags,
+	                        &dh);
+	if (_err != noErr) return PyMac_Error(_err);
+	_res = Py_BuildValue("O&",
+	                     CmpInstObj_New, dh);
 	return _res;
 }
 
@@ -6653,6 +6769,38 @@ static PyObject *Qt_RemoveMovieResource(_self, _args)
 	return _res;
 }
 
+static PyObject *Qt_CreateShortcutMovieFile(_self, _args)
+	PyObject *_self;
+	PyObject *_args;
+{
+	PyObject *_res = NULL;
+	OSErr _err;
+	FSSpec fileSpec;
+	OSType creator;
+	ScriptCode scriptTag;
+	long createMovieFileFlags;
+	Handle targetDataRef;
+	OSType targetDataRefType;
+	if (!PyArg_ParseTuple(_args, "O&O&hlO&O&",
+	                      PyMac_GetFSSpec, &fileSpec,
+	                      PyMac_GetOSType, &creator,
+	                      &scriptTag,
+	                      &createMovieFileFlags,
+	                      ResObj_Convert, &targetDataRef,
+	                      PyMac_GetOSType, &targetDataRefType))
+		return NULL;
+	_err = CreateShortcutMovieFile(&fileSpec,
+	                               creator,
+	                               scriptTag,
+	                               createMovieFileFlags,
+	                               targetDataRef,
+	                               targetDataRefType);
+	if (_err != noErr) return PyMac_Error(_err);
+	Py_INCREF(Py_None);
+	_res = Py_None;
+	return _res;
+}
+
 static PyObject *Qt_NewMovieFromScrap(_self, _args)
 	PyObject *_self;
 	PyObject *_args;
@@ -6955,6 +7103,62 @@ static PyObject *Qt_VideoMediaGetStallCount(_self, _args)
 	return _res;
 }
 
+static PyObject *Qt_VideoMediaSetCodecParameter(_self, _args)
+	PyObject *_self;
+	PyObject *_args;
+{
+	PyObject *_res = NULL;
+	ComponentResult _rv;
+	MediaHandler mh;
+	CodecType cType;
+	OSType parameterID;
+	long parameterChangeSeed;
+	void * dataPtr;
+	long dataSize;
+	if (!PyArg_ParseTuple(_args, "O&O&O&lsl",
+	                      CmpInstObj_Convert, &mh,
+	                      PyMac_GetOSType, &cType,
+	                      PyMac_GetOSType, &parameterID,
+	                      &parameterChangeSeed,
+	                      &dataPtr,
+	                      &dataSize))
+		return NULL;
+	_rv = VideoMediaSetCodecParameter(mh,
+	                                  cType,
+	                                  parameterID,
+	                                  parameterChangeSeed,
+	                                  dataPtr,
+	                                  dataSize);
+	_res = Py_BuildValue("l",
+	                     _rv);
+	return _res;
+}
+
+static PyObject *Qt_VideoMediaGetCodecParameter(_self, _args)
+	PyObject *_self;
+	PyObject *_args;
+{
+	PyObject *_res = NULL;
+	ComponentResult _rv;
+	MediaHandler mh;
+	CodecType cType;
+	OSType parameterID;
+	Handle outParameterData;
+	if (!PyArg_ParseTuple(_args, "O&O&O&O&",
+	                      CmpInstObj_Convert, &mh,
+	                      PyMac_GetOSType, &cType,
+	                      PyMac_GetOSType, &parameterID,
+	                      ResObj_Convert, &outParameterData))
+		return NULL;
+	_rv = VideoMediaGetCodecParameter(mh,
+	                                  cType,
+	                                  parameterID,
+	                                  outParameterData);
+	_res = Py_BuildValue("l",
+	                     _rv);
+	return _res;
+}
+
 static PyObject *Qt_TextMediaAddTextSample(_self, _args)
 	PyObject *_self;
 	PyObject *_args;
@@ -7096,6 +7300,34 @@ static PyObject *Qt_TextMediaAddHiliteSample(_self, _args)
 	                     _rv,
 	                     QdRGB_New, &rgbHiliteColor,
 	                     sampleTime);
+	return _res;
+}
+
+static PyObject *Qt_TextMediaSetTextProperty(_self, _args)
+	PyObject *_self;
+	PyObject *_args;
+{
+	PyObject *_res = NULL;
+	ComponentResult _rv;
+	MediaHandler mh;
+	TimeValue atMediaTime;
+	long propertyType;
+	void * data;
+	long dataSize;
+	if (!PyArg_ParseTuple(_args, "O&llsl",
+	                      CmpInstObj_Convert, &mh,
+	                      &atMediaTime,
+	                      &propertyType,
+	                      &data,
+	                      &dataSize))
+		return NULL;
+	_rv = TextMediaSetTextProperty(mh,
+	                               atMediaTime,
+	                               propertyType,
+	                               data,
+	                               dataSize);
+	_res = Py_BuildValue("l",
+	                     _rv);
 	return _res;
 }
 
@@ -7603,6 +7835,643 @@ static PyObject *Qt_SpriteMediaGetIndImageProperty(_self, _args)
 }
 #endif
 
+static PyObject *Qt_SpriteMediaDisposeSprite(_self, _args)
+	PyObject *_self;
+	PyObject *_args;
+{
+	PyObject *_res = NULL;
+	ComponentResult _rv;
+	MediaHandler mh;
+	QTAtomID spriteID;
+	if (!PyArg_ParseTuple(_args, "O&l",
+	                      CmpInstObj_Convert, &mh,
+	                      &spriteID))
+		return NULL;
+	_rv = SpriteMediaDisposeSprite(mh,
+	                               spriteID);
+	_res = Py_BuildValue("l",
+	                     _rv);
+	return _res;
+}
+
+static PyObject *Qt_SpriteMediaSetActionVariableToString(_self, _args)
+	PyObject *_self;
+	PyObject *_args;
+{
+	PyObject *_res = NULL;
+	ComponentResult _rv;
+	MediaHandler mh;
+	QTAtomID variableID;
+	Ptr theCString;
+	if (!PyArg_ParseTuple(_args, "O&ls",
+	                      CmpInstObj_Convert, &mh,
+	                      &variableID,
+	                      &theCString))
+		return NULL;
+	_rv = SpriteMediaSetActionVariableToString(mh,
+	                                           variableID,
+	                                           theCString);
+	_res = Py_BuildValue("l",
+	                     _rv);
+	return _res;
+}
+
+static PyObject *Qt_SpriteMediaGetActionVariableAsString(_self, _args)
+	PyObject *_self;
+	PyObject *_args;
+{
+	PyObject *_res = NULL;
+	ComponentResult _rv;
+	MediaHandler mh;
+	QTAtomID variableID;
+	Handle theCString;
+	if (!PyArg_ParseTuple(_args, "O&l",
+	                      CmpInstObj_Convert, &mh,
+	                      &variableID))
+		return NULL;
+	_rv = SpriteMediaGetActionVariableAsString(mh,
+	                                           variableID,
+	                                           &theCString);
+	_res = Py_BuildValue("lO&",
+	                     _rv,
+	                     ResObj_New, theCString);
+	return _res;
+}
+
+static PyObject *Qt_FlashMediaSetPan(_self, _args)
+	PyObject *_self;
+	PyObject *_args;
+{
+	PyObject *_res = NULL;
+	ComponentResult _rv;
+	MediaHandler mh;
+	short xPercent;
+	short yPercent;
+	if (!PyArg_ParseTuple(_args, "O&hh",
+	                      CmpInstObj_Convert, &mh,
+	                      &xPercent,
+	                      &yPercent))
+		return NULL;
+	_rv = FlashMediaSetPan(mh,
+	                       xPercent,
+	                       yPercent);
+	_res = Py_BuildValue("l",
+	                     _rv);
+	return _res;
+}
+
+static PyObject *Qt_FlashMediaSetZoom(_self, _args)
+	PyObject *_self;
+	PyObject *_args;
+{
+	PyObject *_res = NULL;
+	ComponentResult _rv;
+	MediaHandler mh;
+	short factor;
+	if (!PyArg_ParseTuple(_args, "O&h",
+	                      CmpInstObj_Convert, &mh,
+	                      &factor))
+		return NULL;
+	_rv = FlashMediaSetZoom(mh,
+	                        factor);
+	_res = Py_BuildValue("l",
+	                     _rv);
+	return _res;
+}
+
+static PyObject *Qt_FlashMediaSetZoomRect(_self, _args)
+	PyObject *_self;
+	PyObject *_args;
+{
+	PyObject *_res = NULL;
+	ComponentResult _rv;
+	MediaHandler mh;
+	long left;
+	long top;
+	long right;
+	long bottom;
+	if (!PyArg_ParseTuple(_args, "O&llll",
+	                      CmpInstObj_Convert, &mh,
+	                      &left,
+	                      &top,
+	                      &right,
+	                      &bottom))
+		return NULL;
+	_rv = FlashMediaSetZoomRect(mh,
+	                            left,
+	                            top,
+	                            right,
+	                            bottom);
+	_res = Py_BuildValue("l",
+	                     _rv);
+	return _res;
+}
+
+static PyObject *Qt_FlashMediaGetRefConBounds(_self, _args)
+	PyObject *_self;
+	PyObject *_args;
+{
+	PyObject *_res = NULL;
+	ComponentResult _rv;
+	MediaHandler mh;
+	long refCon;
+	long left;
+	long top;
+	long right;
+	long bottom;
+	if (!PyArg_ParseTuple(_args, "O&l",
+	                      CmpInstObj_Convert, &mh,
+	                      &refCon))
+		return NULL;
+	_rv = FlashMediaGetRefConBounds(mh,
+	                                refCon,
+	                                &left,
+	                                &top,
+	                                &right,
+	                                &bottom);
+	_res = Py_BuildValue("lllll",
+	                     _rv,
+	                     left,
+	                     top,
+	                     right,
+	                     bottom);
+	return _res;
+}
+
+static PyObject *Qt_FlashMediaGetRefConID(_self, _args)
+	PyObject *_self;
+	PyObject *_args;
+{
+	PyObject *_res = NULL;
+	ComponentResult _rv;
+	MediaHandler mh;
+	long refCon;
+	long refConID;
+	if (!PyArg_ParseTuple(_args, "O&l",
+	                      CmpInstObj_Convert, &mh,
+	                      &refCon))
+		return NULL;
+	_rv = FlashMediaGetRefConID(mh,
+	                            refCon,
+	                            &refConID);
+	_res = Py_BuildValue("ll",
+	                     _rv,
+	                     refConID);
+	return _res;
+}
+
+static PyObject *Qt_FlashMediaIDToRefCon(_self, _args)
+	PyObject *_self;
+	PyObject *_args;
+{
+	PyObject *_res = NULL;
+	ComponentResult _rv;
+	MediaHandler mh;
+	long refConID;
+	long refCon;
+	if (!PyArg_ParseTuple(_args, "O&l",
+	                      CmpInstObj_Convert, &mh,
+	                      &refConID))
+		return NULL;
+	_rv = FlashMediaIDToRefCon(mh,
+	                           refConID,
+	                           &refCon);
+	_res = Py_BuildValue("ll",
+	                     _rv,
+	                     refCon);
+	return _res;
+}
+
+static PyObject *Qt_FlashMediaGetDisplayedFrameNumber(_self, _args)
+	PyObject *_self;
+	PyObject *_args;
+{
+	PyObject *_res = NULL;
+	ComponentResult _rv;
+	MediaHandler mh;
+	long flashFrameNumber;
+	if (!PyArg_ParseTuple(_args, "O&",
+	                      CmpInstObj_Convert, &mh))
+		return NULL;
+	_rv = FlashMediaGetDisplayedFrameNumber(mh,
+	                                        &flashFrameNumber);
+	_res = Py_BuildValue("ll",
+	                     _rv,
+	                     flashFrameNumber);
+	return _res;
+}
+
+static PyObject *Qt_FlashMediaFrameNumberToMovieTime(_self, _args)
+	PyObject *_self;
+	PyObject *_args;
+{
+	PyObject *_res = NULL;
+	ComponentResult _rv;
+	MediaHandler mh;
+	long flashFrameNumber;
+	TimeValue movieTime;
+	if (!PyArg_ParseTuple(_args, "O&l",
+	                      CmpInstObj_Convert, &mh,
+	                      &flashFrameNumber))
+		return NULL;
+	_rv = FlashMediaFrameNumberToMovieTime(mh,
+	                                       flashFrameNumber,
+	                                       &movieTime);
+	_res = Py_BuildValue("ll",
+	                     _rv,
+	                     movieTime);
+	return _res;
+}
+
+static PyObject *Qt_FlashMediaFrameLabelToMovieTime(_self, _args)
+	PyObject *_self;
+	PyObject *_args;
+{
+	PyObject *_res = NULL;
+	ComponentResult _rv;
+	MediaHandler mh;
+	Ptr theLabel;
+	TimeValue movieTime;
+	if (!PyArg_ParseTuple(_args, "O&s",
+	                      CmpInstObj_Convert, &mh,
+	                      &theLabel))
+		return NULL;
+	_rv = FlashMediaFrameLabelToMovieTime(mh,
+	                                      theLabel,
+	                                      &movieTime);
+	_res = Py_BuildValue("ll",
+	                     _rv,
+	                     movieTime);
+	return _res;
+}
+
+static PyObject *Qt_MovieMediaGetCurrentMovieProperty(_self, _args)
+	PyObject *_self;
+	PyObject *_args;
+{
+	PyObject *_res = NULL;
+	ComponentResult _rv;
+	MediaHandler mh;
+	OSType whichProperty;
+	void * value;
+	if (!PyArg_ParseTuple(_args, "O&O&s",
+	                      CmpInstObj_Convert, &mh,
+	                      PyMac_GetOSType, &whichProperty,
+	                      &value))
+		return NULL;
+	_rv = MovieMediaGetCurrentMovieProperty(mh,
+	                                        whichProperty,
+	                                        value);
+	_res = Py_BuildValue("l",
+	                     _rv);
+	return _res;
+}
+
+static PyObject *Qt_MovieMediaGetCurrentTrackProperty(_self, _args)
+	PyObject *_self;
+	PyObject *_args;
+{
+	PyObject *_res = NULL;
+	ComponentResult _rv;
+	MediaHandler mh;
+	long trackID;
+	OSType whichProperty;
+	void * value;
+	if (!PyArg_ParseTuple(_args, "O&lO&s",
+	                      CmpInstObj_Convert, &mh,
+	                      &trackID,
+	                      PyMac_GetOSType, &whichProperty,
+	                      &value))
+		return NULL;
+	_rv = MovieMediaGetCurrentTrackProperty(mh,
+	                                        trackID,
+	                                        whichProperty,
+	                                        value);
+	_res = Py_BuildValue("l",
+	                     _rv);
+	return _res;
+}
+
+static PyObject *Qt_MovieMediaGetChildMovieDataReference(_self, _args)
+	PyObject *_self;
+	PyObject *_args;
+{
+	PyObject *_res = NULL;
+	ComponentResult _rv;
+	MediaHandler mh;
+	QTAtomID dataRefID;
+	short dataRefIndex;
+	OSType dataRefType;
+	Handle dataRef;
+	QTAtomID dataRefIDOut;
+	short dataRefIndexOut;
+	if (!PyArg_ParseTuple(_args, "O&lh",
+	                      CmpInstObj_Convert, &mh,
+	                      &dataRefID,
+	                      &dataRefIndex))
+		return NULL;
+	_rv = MovieMediaGetChildMovieDataReference(mh,
+	                                           dataRefID,
+	                                           dataRefIndex,
+	                                           &dataRefType,
+	                                           &dataRef,
+	                                           &dataRefIDOut,
+	                                           &dataRefIndexOut);
+	_res = Py_BuildValue("lO&O&lh",
+	                     _rv,
+	                     PyMac_BuildOSType, dataRefType,
+	                     ResObj_New, dataRef,
+	                     dataRefIDOut,
+	                     dataRefIndexOut);
+	return _res;
+}
+
+static PyObject *Qt_MovieMediaSetChildMovieDataReference(_self, _args)
+	PyObject *_self;
+	PyObject *_args;
+{
+	PyObject *_res = NULL;
+	ComponentResult _rv;
+	MediaHandler mh;
+	QTAtomID dataRefID;
+	OSType dataRefType;
+	Handle dataRef;
+	if (!PyArg_ParseTuple(_args, "O&lO&O&",
+	                      CmpInstObj_Convert, &mh,
+	                      &dataRefID,
+	                      PyMac_GetOSType, &dataRefType,
+	                      ResObj_Convert, &dataRef))
+		return NULL;
+	_rv = MovieMediaSetChildMovieDataReference(mh,
+	                                           dataRefID,
+	                                           dataRefType,
+	                                           dataRef);
+	_res = Py_BuildValue("l",
+	                     _rv);
+	return _res;
+}
+
+static PyObject *Qt_MovieMediaLoadChildMovieFromDataReference(_self, _args)
+	PyObject *_self;
+	PyObject *_args;
+{
+	PyObject *_res = NULL;
+	ComponentResult _rv;
+	MediaHandler mh;
+	QTAtomID dataRefID;
+	if (!PyArg_ParseTuple(_args, "O&l",
+	                      CmpInstObj_Convert, &mh,
+	                      &dataRefID))
+		return NULL;
+	_rv = MovieMediaLoadChildMovieFromDataReference(mh,
+	                                                dataRefID);
+	_res = Py_BuildValue("l",
+	                     _rv);
+	return _res;
+}
+
+static PyObject *Qt_Media3DGetCurrentGroup(_self, _args)
+	PyObject *_self;
+	PyObject *_args;
+{
+	PyObject *_res = NULL;
+	ComponentResult _rv;
+	MediaHandler mh;
+	void * group;
+	if (!PyArg_ParseTuple(_args, "O&s",
+	                      CmpInstObj_Convert, &mh,
+	                      &group))
+		return NULL;
+	_rv = Media3DGetCurrentGroup(mh,
+	                             group);
+	_res = Py_BuildValue("l",
+	                     _rv);
+	return _res;
+}
+
+static PyObject *Qt_Media3DTranslateNamedObjectTo(_self, _args)
+	PyObject *_self;
+	PyObject *_args;
+{
+	PyObject *_res = NULL;
+	ComponentResult _rv;
+	MediaHandler mh;
+	char objectName;
+	Fixed x;
+	Fixed y;
+	Fixed z;
+	if (!PyArg_ParseTuple(_args, "O&O&O&O&",
+	                      CmpInstObj_Convert, &mh,
+	                      PyMac_GetFixed, &x,
+	                      PyMac_GetFixed, &y,
+	                      PyMac_GetFixed, &z))
+		return NULL;
+	_rv = Media3DTranslateNamedObjectTo(mh,
+	                                    &objectName,
+	                                    x,
+	                                    y,
+	                                    z);
+	_res = Py_BuildValue("lc",
+	                     _rv,
+	                     objectName);
+	return _res;
+}
+
+static PyObject *Qt_Media3DScaleNamedObjectTo(_self, _args)
+	PyObject *_self;
+	PyObject *_args;
+{
+	PyObject *_res = NULL;
+	ComponentResult _rv;
+	MediaHandler mh;
+	char objectName;
+	Fixed xScale;
+	Fixed yScale;
+	Fixed zScale;
+	if (!PyArg_ParseTuple(_args, "O&O&O&O&",
+	                      CmpInstObj_Convert, &mh,
+	                      PyMac_GetFixed, &xScale,
+	                      PyMac_GetFixed, &yScale,
+	                      PyMac_GetFixed, &zScale))
+		return NULL;
+	_rv = Media3DScaleNamedObjectTo(mh,
+	                                &objectName,
+	                                xScale,
+	                                yScale,
+	                                zScale);
+	_res = Py_BuildValue("lc",
+	                     _rv,
+	                     objectName);
+	return _res;
+}
+
+static PyObject *Qt_Media3DRotateNamedObjectTo(_self, _args)
+	PyObject *_self;
+	PyObject *_args;
+{
+	PyObject *_res = NULL;
+	ComponentResult _rv;
+	MediaHandler mh;
+	char objectName;
+	Fixed xDegrees;
+	Fixed yDegrees;
+	Fixed zDegrees;
+	if (!PyArg_ParseTuple(_args, "O&O&O&O&",
+	                      CmpInstObj_Convert, &mh,
+	                      PyMac_GetFixed, &xDegrees,
+	                      PyMac_GetFixed, &yDegrees,
+	                      PyMac_GetFixed, &zDegrees))
+		return NULL;
+	_rv = Media3DRotateNamedObjectTo(mh,
+	                                 &objectName,
+	                                 xDegrees,
+	                                 yDegrees,
+	                                 zDegrees);
+	_res = Py_BuildValue("lc",
+	                     _rv,
+	                     objectName);
+	return _res;
+}
+
+static PyObject *Qt_Media3DSetCameraData(_self, _args)
+	PyObject *_self;
+	PyObject *_args;
+{
+	PyObject *_res = NULL;
+	ComponentResult _rv;
+	MediaHandler mh;
+	void * cameraData;
+	if (!PyArg_ParseTuple(_args, "O&s",
+	                      CmpInstObj_Convert, &mh,
+	                      &cameraData))
+		return NULL;
+	_rv = Media3DSetCameraData(mh,
+	                           cameraData);
+	_res = Py_BuildValue("l",
+	                     _rv);
+	return _res;
+}
+
+static PyObject *Qt_Media3DGetCameraData(_self, _args)
+	PyObject *_self;
+	PyObject *_args;
+{
+	PyObject *_res = NULL;
+	ComponentResult _rv;
+	MediaHandler mh;
+	void * cameraData;
+	if (!PyArg_ParseTuple(_args, "O&s",
+	                      CmpInstObj_Convert, &mh,
+	                      &cameraData))
+		return NULL;
+	_rv = Media3DGetCameraData(mh,
+	                           cameraData);
+	_res = Py_BuildValue("l",
+	                     _rv);
+	return _res;
+}
+
+static PyObject *Qt_Media3DSetCameraAngleAspect(_self, _args)
+	PyObject *_self;
+	PyObject *_args;
+{
+	PyObject *_res = NULL;
+	ComponentResult _rv;
+	MediaHandler mh;
+	QTFloatSingle fov;
+	QTFloatSingle aspectRatioXToY;
+	if (!PyArg_ParseTuple(_args, "O&ff",
+	                      CmpInstObj_Convert, &mh,
+	                      &fov,
+	                      &aspectRatioXToY))
+		return NULL;
+	_rv = Media3DSetCameraAngleAspect(mh,
+	                                  fov,
+	                                  aspectRatioXToY);
+	_res = Py_BuildValue("l",
+	                     _rv);
+	return _res;
+}
+
+static PyObject *Qt_Media3DGetCameraAngleAspect(_self, _args)
+	PyObject *_self;
+	PyObject *_args;
+{
+	PyObject *_res = NULL;
+	ComponentResult _rv;
+	MediaHandler mh;
+	QTFloatSingle fov;
+	QTFloatSingle aspectRatioXToY;
+	if (!PyArg_ParseTuple(_args, "O&",
+	                      CmpInstObj_Convert, &mh))
+		return NULL;
+	_rv = Media3DGetCameraAngleAspect(mh,
+	                                  &fov,
+	                                  &aspectRatioXToY);
+	_res = Py_BuildValue("lff",
+	                     _rv,
+	                     fov,
+	                     aspectRatioXToY);
+	return _res;
+}
+
+static PyObject *Qt_Media3DSetCameraRange(_self, _args)
+	PyObject *_self;
+	PyObject *_args;
+{
+	PyObject *_res = NULL;
+	ComponentResult _rv;
+	MediaHandler mh;
+	void * tQ3CameraRange;
+	if (!PyArg_ParseTuple(_args, "O&s",
+	                      CmpInstObj_Convert, &mh,
+	                      &tQ3CameraRange))
+		return NULL;
+	_rv = Media3DSetCameraRange(mh,
+	                            tQ3CameraRange);
+	_res = Py_BuildValue("l",
+	                     _rv);
+	return _res;
+}
+
+static PyObject *Qt_Media3DGetCameraRange(_self, _args)
+	PyObject *_self;
+	PyObject *_args;
+{
+	PyObject *_res = NULL;
+	ComponentResult _rv;
+	MediaHandler mh;
+	void * tQ3CameraRange;
+	if (!PyArg_ParseTuple(_args, "O&s",
+	                      CmpInstObj_Convert, &mh,
+	                      &tQ3CameraRange))
+		return NULL;
+	_rv = Media3DGetCameraRange(mh,
+	                            tQ3CameraRange);
+	_res = Py_BuildValue("l",
+	                     _rv);
+	return _res;
+}
+
+static PyObject *Qt_Media3DGetViewObject(_self, _args)
+	PyObject *_self;
+	PyObject *_args;
+{
+	PyObject *_res = NULL;
+	ComponentResult _rv;
+	MediaHandler mh;
+	void * tq3viewObject;
+	if (!PyArg_ParseTuple(_args, "O&s",
+	                      CmpInstObj_Convert, &mh,
+	                      &tq3viewObject))
+		return NULL;
+	_rv = Media3DGetViewObject(mh,
+	                           tq3viewObject);
+	_res = Py_BuildValue("l",
+	                     _rv);
+	return _res;
+}
+
 static PyObject *Qt_NewTimeBase(_self, _args)
 	PyObject *_self;
 	PyObject *_args;
@@ -7792,6 +8661,8 @@ static PyMethodDef Qt_methods[] = {
 	 "(long flags) -> (Movie _rv)"},
 	{"GetDataHandler", (PyCFunction)Qt_GetDataHandler, 1,
 	 "(Handle dataRef, OSType dataHandlerSubType, long flags) -> (Component _rv)"},
+	{"OpenADataHandler", (PyCFunction)Qt_OpenADataHandler, 1,
+	 "(Handle dataRef, OSType dataHandlerSubType, Handle anchorDataRef, OSType anchorDataRefType, TimeBase tb, long flags) -> (ComponentInstance dh)"},
 	{"PasteHandleIntoMovie", (PyCFunction)Qt_PasteHandleIntoMovie, 1,
 	 "(Handle h, OSType handleType, Movie theMovie, long flags, ComponentInstance userComp) -> None"},
 	{"GetMovieImporterForDataRef", (PyCFunction)Qt_GetMovieImporterForDataRef, 1,
@@ -7820,6 +8691,8 @@ static PyMethodDef Qt_methods[] = {
 	 "(short flags, Handle dataRef, OSType dataRefType) -> (Movie m, short id)"},
 	{"RemoveMovieResource", (PyCFunction)Qt_RemoveMovieResource, 1,
 	 "(short resRefNum, short resId) -> None"},
+	{"CreateShortcutMovieFile", (PyCFunction)Qt_CreateShortcutMovieFile, 1,
+	 "(FSSpec fileSpec, OSType creator, ScriptCode scriptTag, long createMovieFileFlags, Handle targetDataRef, OSType targetDataRefType) -> None"},
 	{"NewMovieFromScrap", (PyCFunction)Qt_NewMovieFromScrap, 1,
 	 "(long newMovieFlags) -> (Movie _rv)"},
 	{"QTNewAlias", (PyCFunction)Qt_QTNewAlias, 1,
@@ -7850,12 +8723,18 @@ static PyMethodDef Qt_methods[] = {
 	 "(MediaHandler mh) -> (ComponentResult _rv)"},
 	{"VideoMediaGetStallCount", (PyCFunction)Qt_VideoMediaGetStallCount, 1,
 	 "(MediaHandler mh) -> (ComponentResult _rv, unsigned long stalls)"},
+	{"VideoMediaSetCodecParameter", (PyCFunction)Qt_VideoMediaSetCodecParameter, 1,
+	 "(MediaHandler mh, CodecType cType, OSType parameterID, long parameterChangeSeed, void * dataPtr, long dataSize) -> (ComponentResult _rv)"},
+	{"VideoMediaGetCodecParameter", (PyCFunction)Qt_VideoMediaGetCodecParameter, 1,
+	 "(MediaHandler mh, CodecType cType, OSType parameterID, Handle outParameterData) -> (ComponentResult _rv)"},
 	{"TextMediaAddTextSample", (PyCFunction)Qt_TextMediaAddTextSample, 1,
 	 "(MediaHandler mh, Ptr text, unsigned long size, short fontNumber, short fontSize, Style textFace, short textJustification, long displayFlags, TimeValue scrollDelay, short hiliteStart, short hiliteEnd, TimeValue duration) -> (ComponentResult _rv, RGBColor textColor, RGBColor backColor, Rect textBox, RGBColor rgbHiliteColor, TimeValue sampleTime)"},
 	{"TextMediaAddTESample", (PyCFunction)Qt_TextMediaAddTESample, 1,
 	 "(MediaHandler mh, TEHandle hTE, short textJustification, long displayFlags, TimeValue scrollDelay, short hiliteStart, short hiliteEnd, TimeValue duration) -> (ComponentResult _rv, RGBColor backColor, Rect textBox, RGBColor rgbHiliteColor, TimeValue sampleTime)"},
 	{"TextMediaAddHiliteSample", (PyCFunction)Qt_TextMediaAddHiliteSample, 1,
 	 "(MediaHandler mh, short hiliteStart, short hiliteEnd, TimeValue duration) -> (ComponentResult _rv, RGBColor rgbHiliteColor, TimeValue sampleTime)"},
+	{"TextMediaSetTextProperty", (PyCFunction)Qt_TextMediaSetTextProperty, 1,
+	 "(MediaHandler mh, TimeValue atMediaTime, long propertyType, void * data, long dataSize) -> (ComponentResult _rv)"},
 	{"TextMediaFindNextText", (PyCFunction)Qt_TextMediaFindNextText, 1,
 	 "(MediaHandler mh, Ptr text, long size, short findFlags, TimeValue startTime) -> (ComponentResult _rv, TimeValue foundTime, TimeValue foundDuration, long offset)"},
 	{"TextMediaHiliteTextSample", (PyCFunction)Qt_TextMediaHiliteTextSample, 1,
@@ -7901,6 +8780,62 @@ static PyMethodDef Qt_methods[] = {
 	{"SpriteMediaGetIndImageProperty", (PyCFunction)Qt_SpriteMediaGetIndImageProperty, 1,
 	 "(MediaHandler mh, short imageIndex, long imagePropertyType, void * imagePropertyValue) -> (ComponentResult _rv)"},
 #endif
+	{"SpriteMediaDisposeSprite", (PyCFunction)Qt_SpriteMediaDisposeSprite, 1,
+	 "(MediaHandler mh, QTAtomID spriteID) -> (ComponentResult _rv)"},
+	{"SpriteMediaSetActionVariableToString", (PyCFunction)Qt_SpriteMediaSetActionVariableToString, 1,
+	 "(MediaHandler mh, QTAtomID variableID, Ptr theCString) -> (ComponentResult _rv)"},
+	{"SpriteMediaGetActionVariableAsString", (PyCFunction)Qt_SpriteMediaGetActionVariableAsString, 1,
+	 "(MediaHandler mh, QTAtomID variableID) -> (ComponentResult _rv, Handle theCString)"},
+	{"FlashMediaSetPan", (PyCFunction)Qt_FlashMediaSetPan, 1,
+	 "(MediaHandler mh, short xPercent, short yPercent) -> (ComponentResult _rv)"},
+	{"FlashMediaSetZoom", (PyCFunction)Qt_FlashMediaSetZoom, 1,
+	 "(MediaHandler mh, short factor) -> (ComponentResult _rv)"},
+	{"FlashMediaSetZoomRect", (PyCFunction)Qt_FlashMediaSetZoomRect, 1,
+	 "(MediaHandler mh, long left, long top, long right, long bottom) -> (ComponentResult _rv)"},
+	{"FlashMediaGetRefConBounds", (PyCFunction)Qt_FlashMediaGetRefConBounds, 1,
+	 "(MediaHandler mh, long refCon) -> (ComponentResult _rv, long left, long top, long right, long bottom)"},
+	{"FlashMediaGetRefConID", (PyCFunction)Qt_FlashMediaGetRefConID, 1,
+	 "(MediaHandler mh, long refCon) -> (ComponentResult _rv, long refConID)"},
+	{"FlashMediaIDToRefCon", (PyCFunction)Qt_FlashMediaIDToRefCon, 1,
+	 "(MediaHandler mh, long refConID) -> (ComponentResult _rv, long refCon)"},
+	{"FlashMediaGetDisplayedFrameNumber", (PyCFunction)Qt_FlashMediaGetDisplayedFrameNumber, 1,
+	 "(MediaHandler mh) -> (ComponentResult _rv, long flashFrameNumber)"},
+	{"FlashMediaFrameNumberToMovieTime", (PyCFunction)Qt_FlashMediaFrameNumberToMovieTime, 1,
+	 "(MediaHandler mh, long flashFrameNumber) -> (ComponentResult _rv, TimeValue movieTime)"},
+	{"FlashMediaFrameLabelToMovieTime", (PyCFunction)Qt_FlashMediaFrameLabelToMovieTime, 1,
+	 "(MediaHandler mh, Ptr theLabel) -> (ComponentResult _rv, TimeValue movieTime)"},
+	{"MovieMediaGetCurrentMovieProperty", (PyCFunction)Qt_MovieMediaGetCurrentMovieProperty, 1,
+	 "(MediaHandler mh, OSType whichProperty, void * value) -> (ComponentResult _rv)"},
+	{"MovieMediaGetCurrentTrackProperty", (PyCFunction)Qt_MovieMediaGetCurrentTrackProperty, 1,
+	 "(MediaHandler mh, long trackID, OSType whichProperty, void * value) -> (ComponentResult _rv)"},
+	{"MovieMediaGetChildMovieDataReference", (PyCFunction)Qt_MovieMediaGetChildMovieDataReference, 1,
+	 "(MediaHandler mh, QTAtomID dataRefID, short dataRefIndex) -> (ComponentResult _rv, OSType dataRefType, Handle dataRef, QTAtomID dataRefIDOut, short dataRefIndexOut)"},
+	{"MovieMediaSetChildMovieDataReference", (PyCFunction)Qt_MovieMediaSetChildMovieDataReference, 1,
+	 "(MediaHandler mh, QTAtomID dataRefID, OSType dataRefType, Handle dataRef) -> (ComponentResult _rv)"},
+	{"MovieMediaLoadChildMovieFromDataReference", (PyCFunction)Qt_MovieMediaLoadChildMovieFromDataReference, 1,
+	 "(MediaHandler mh, QTAtomID dataRefID) -> (ComponentResult _rv)"},
+	{"Media3DGetCurrentGroup", (PyCFunction)Qt_Media3DGetCurrentGroup, 1,
+	 "(MediaHandler mh, void * group) -> (ComponentResult _rv)"},
+	{"Media3DTranslateNamedObjectTo", (PyCFunction)Qt_Media3DTranslateNamedObjectTo, 1,
+	 "(MediaHandler mh, Fixed x, Fixed y, Fixed z) -> (ComponentResult _rv, char objectName)"},
+	{"Media3DScaleNamedObjectTo", (PyCFunction)Qt_Media3DScaleNamedObjectTo, 1,
+	 "(MediaHandler mh, Fixed xScale, Fixed yScale, Fixed zScale) -> (ComponentResult _rv, char objectName)"},
+	{"Media3DRotateNamedObjectTo", (PyCFunction)Qt_Media3DRotateNamedObjectTo, 1,
+	 "(MediaHandler mh, Fixed xDegrees, Fixed yDegrees, Fixed zDegrees) -> (ComponentResult _rv, char objectName)"},
+	{"Media3DSetCameraData", (PyCFunction)Qt_Media3DSetCameraData, 1,
+	 "(MediaHandler mh, void * cameraData) -> (ComponentResult _rv)"},
+	{"Media3DGetCameraData", (PyCFunction)Qt_Media3DGetCameraData, 1,
+	 "(MediaHandler mh, void * cameraData) -> (ComponentResult _rv)"},
+	{"Media3DSetCameraAngleAspect", (PyCFunction)Qt_Media3DSetCameraAngleAspect, 1,
+	 "(MediaHandler mh, QTFloatSingle fov, QTFloatSingle aspectRatioXToY) -> (ComponentResult _rv)"},
+	{"Media3DGetCameraAngleAspect", (PyCFunction)Qt_Media3DGetCameraAngleAspect, 1,
+	 "(MediaHandler mh) -> (ComponentResult _rv, QTFloatSingle fov, QTFloatSingle aspectRatioXToY)"},
+	{"Media3DSetCameraRange", (PyCFunction)Qt_Media3DSetCameraRange, 1,
+	 "(MediaHandler mh, void * tQ3CameraRange) -> (ComponentResult _rv)"},
+	{"Media3DGetCameraRange", (PyCFunction)Qt_Media3DGetCameraRange, 1,
+	 "(MediaHandler mh, void * tQ3CameraRange) -> (ComponentResult _rv)"},
+	{"Media3DGetViewObject", (PyCFunction)Qt_Media3DGetViewObject, 1,
+	 "(MediaHandler mh, void * tq3viewObject) -> (ComponentResult _rv)"},
 	{"NewTimeBase", (PyCFunction)Qt_NewTimeBase, 1,
 	 "() -> (TimeBase _rv)"},
 	{"ConvertTime", (PyCFunction)Qt_ConvertTime, 1,

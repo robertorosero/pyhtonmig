@@ -69,34 +69,6 @@ static void AEDesc_dealloc(self)
 	PyMem_DEL(self);
 }
 
-static PyObject *AEDesc_AESend(_self, _args)
-	AEDescObject *_self;
-	PyObject *_args;
-{
-	PyObject *_res = NULL;
-	OSErr _err;
-	AppleEvent reply;
-	AESendMode sendMode;
-	AESendPriority sendPriority;
-	long timeOutInTicks;
-	if (!PyArg_ParseTuple(_args, "lhl",
-	                      &sendMode,
-	                      &sendPriority,
-	                      &timeOutInTicks))
-		return NULL;
-	_err = AESend(&_self->ob_itself,
-	              &reply,
-	              sendMode,
-	              sendPriority,
-	              timeOutInTicks,
-	              upp_AEIdleProc,
-	              (AEFilterUPP)0);
-	if (_err != noErr) return PyMac_Error(_err);
-	_res = Py_BuildValue("O&",
-	                     AEDesc_New, &reply);
-	return _res;
-}
-
 static PyObject *AEDesc_AEResetTimer(_self, _args)
 	AEDescObject *_self;
 	PyObject *_args;
@@ -673,8 +645,6 @@ static PyObject *AEDesc_AEPutAttributeDesc(_self, _args)
 }
 
 static PyMethodDef AEDesc_methods[] = {
-	{"AESend", (PyCFunction)AEDesc_AESend, 1,
-	 "(AESendMode sendMode, AESendPriority sendPriority, long timeOutInTicks) -> (AppleEvent reply)"},
 	{"AEResetTimer", (PyCFunction)AEDesc_AEResetTimer, 1,
 	 "() -> None"},
 	{"AESuspendTheCurrentEvent", (PyCFunction)AEDesc_AESuspendTheCurrentEvent, 1,
@@ -739,7 +709,7 @@ static PyObject *AEDesc_getattr(self, name)
 		return PyMac_BuildOSType(self->ob_itself.descriptorType);
 	if (strcmp(name, "data") == 0) {
 		PyObject *res;
-#if !TARGET_API_MAC_CARBON
+#if !ACCESSOR_CALLS_ARE_FUNCTIONS
 		char state;
 		state = HGetState(self->ob_itself.dataHandle);
 		HLock(self->ob_itself.dataHandle);
@@ -941,6 +911,44 @@ static PyObject *AE_AEGetEventHandler(_self, _args)
 	return _res;
 }
 
+static PyObject *AE_AEInstallSpecialHandler(_self, _args)
+	PyObject *_self;
+	PyObject *_args;
+{
+	PyObject *_res = NULL;
+	OSErr _err;
+	AEKeyword functionClass;
+	if (!PyArg_ParseTuple(_args, "O&",
+	                      PyMac_GetOSType, &functionClass))
+		return NULL;
+	_err = AEInstallSpecialHandler(functionClass,
+	                               upp_GenericEventHandler,
+	                               0);
+	if (_err != noErr) return PyMac_Error(_err);
+	Py_INCREF(Py_None);
+	_res = Py_None;
+	return _res;
+}
+
+static PyObject *AE_AERemoveSpecialHandler(_self, _args)
+	PyObject *_self;
+	PyObject *_args;
+{
+	PyObject *_res = NULL;
+	OSErr _err;
+	AEKeyword functionClass;
+	if (!PyArg_ParseTuple(_args, "O&",
+	                      PyMac_GetOSType, &functionClass))
+		return NULL;
+	_err = AERemoveSpecialHandler(functionClass,
+	                              upp_GenericEventHandler,
+	                              0);
+	if (_err != noErr) return PyMac_Error(_err);
+	Py_INCREF(Py_None);
+	_res = Py_None;
+	return _res;
+}
+
 static PyObject *AE_AEManagerInfo(_self, _args)
 	PyObject *_self;
 	PyObject *_args;
@@ -1072,6 +1080,35 @@ static PyObject *AE_AECreateAppleEvent(_self, _args)
 	return _res;
 }
 
+#if ACCESSOR_CALLS_ARE_FUNCTIONS
+
+static PyObject *AE_AEReplaceDescData(_self, _args)
+	PyObject *_self;
+	PyObject *_args;
+{
+	PyObject *_res = NULL;
+	OSErr _err;
+	DescType typeCode;
+	char *dataPtr__in__;
+	long dataPtr__len__;
+	int dataPtr__in_len__;
+	AEDesc theAEDesc;
+	if (!PyArg_ParseTuple(_args, "O&s#",
+	                      PyMac_GetOSType, &typeCode,
+	                      &dataPtr__in__, &dataPtr__in_len__))
+		return NULL;
+	dataPtr__len__ = dataPtr__in_len__;
+	_err = AEReplaceDescData(typeCode,
+	                         dataPtr__in__, dataPtr__len__,
+	                         &theAEDesc);
+	if (_err != noErr) return PyMac_Error(_err);
+	_res = Py_BuildValue("O&",
+	                     AEDesc_New, &theAEDesc);
+ dataPtr__error__: ;
+	return _res;
+}
+#endif
+
 static PyMethodDef AE_methods[] = {
 	{"AEProcessAppleEvent", (PyCFunction)AE_AEProcessAppleEvent, 1,
 	 "(EventRecord theEventRecord) -> None"},
@@ -1087,6 +1124,10 @@ static PyMethodDef AE_methods[] = {
 	 "(AEEventClass theAEEventClass, AEEventID theAEEventID) -> None"},
 	{"AEGetEventHandler", (PyCFunction)AE_AEGetEventHandler, 1,
 	 "(AEEventClass theAEEventClass, AEEventID theAEEventID) -> (EventHandler handler)"},
+	{"AEInstallSpecialHandler", (PyCFunction)AE_AEInstallSpecialHandler, 1,
+	 "(AEKeyword functionClass) -> None"},
+	{"AERemoveSpecialHandler", (PyCFunction)AE_AERemoveSpecialHandler, 1,
+	 "(AEKeyword functionClass) -> None"},
 	{"AEManagerInfo", (PyCFunction)AE_AEManagerInfo, 1,
 	 "(AEKeyword keyWord) -> (long result)"},
 	{"AECoercePtr", (PyCFunction)AE_AECoercePtr, 1,
@@ -1097,6 +1138,11 @@ static PyMethodDef AE_methods[] = {
 	 "(Buffer factoringPtr, Boolean isRecord) -> (AEDescList resultList)"},
 	{"AECreateAppleEvent", (PyCFunction)AE_AECreateAppleEvent, 1,
 	 "(AEEventClass theAEEventClass, AEEventID theAEEventID, AEAddressDesc target, AEReturnID returnID, AETransactionID transactionID) -> (AppleEvent result)"},
+
+#if ACCESSOR_CALLS_ARE_FUNCTIONS
+	{"AEReplaceDescData", (PyCFunction)AE_AEReplaceDescData, 1,
+	 "(DescType typeCode, Buffer dataPtr) -> (AEDesc theAEDesc)"},
+#endif
 	{NULL, NULL, 0}
 };
 

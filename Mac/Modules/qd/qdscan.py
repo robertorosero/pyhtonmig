@@ -100,15 +100,65 @@ extend						= 0x40
 			'GetPortHWND',
 			'GetHWNDPort',
 			'GetPICTFromDIB',
-			
-
+			'GetQDGlobalsScreenBits', # XXX for now
+			'GetQDGlobalsArrow', # XXX for now
+			'GetQDGlobalsDarkGray', # XXX for now
+			'GetQDGlobalsLightGray', # XXX for now
+			'GetQDGlobalsGray', # XXX for now
+			'GetQDGlobalsBlack', # XXX for now
+			'GetQDGlobalsWhite', # XXX for now
+			# This one we don't need, I think
+			'GetPortBitMapForCopyBits',
+			# Funny in/out calling sequence
+			'GetPortBounds',
+			'GetPortForeColor',
+			'GetPortBackColor',
+			'GetPortOpColor',
+			'GetPortHiliteColor',
+			'GetPortVisibleRegion',
+			'GetPortClipRegion',
+			'GetPortBackPixPat',
+			'GetPortPenPixPat',
+			'GetPortFillPixPat',
+			'GetPortPenSize',
+			'GetPortPenLocation',
+			'GetPixBounds',
+			'GetRegionBounds',
+			# I think these are dangerous
+			'CreateNewPort',
+			'DisposePort',
+			# Missing in CW Pro 6 libraries
+			'QDFlushPortBuffer',
+			'QDIsPortBufferDirty',
+			'QDIsPortBuffered',
+			'HandleToRgn',
 			]
 
+	def makegreylist(self):
+		return [
+			('#if ACCESSOR_CALLS_ARE_FUNCTIONS', [
+				'IsPortPictureBeingDefined',
+				'IsPortRegionBeingDefined',
+				'IsPortOffscreen',
+				'IsPortColor',
+				'SetPortOpColor',
+				'IsRegionRectangular',
+				'SetQDError',
+				# Don't know whether these should copy 
+				'SetPortVisibleRegion',
+				'SetPortClipRegion',
+				'SetPortPenPixPat',
+				'SetPortBackPixPat',
+				# Lazy
+				'GetPixDepth',
+			])]
+			
 	def makeblacklisttypes(self):
 		return [
 ##			'CCrsrHandle',
 			'CIconHandle', # Obsolete
 			'CQDProcs',
+			'CQDProcsPtr',
 			'CSpecArray',
 ##			'CTabHandle',
 			'ColorComplementProcPtr',
@@ -126,6 +176,9 @@ extend						= 0x40
 			'QDProcs',
 			'ReqListRec',
 			'void_ptr',
+			'CustomXFerProcPtr',
+			'Component', # Not for now??
+			'ComponentInstance', # Not for now...
 			]
 
 	def makerepairinstructions(self):

@@ -23,8 +23,17 @@ from macsupport import *
 # Create the type objects
 
 MenuHandle = OpaqueByValueType(OBJECTTYPE, OBJECTPREFIX)
+MenuBarHandle = OpaqueByValueType("MenuBarHandle", "ResObj")
 MenuRef = MenuHandle
 Handle = OpaqueByValueType("Handle", "ResObj")
+MenuID = Type("MenuID", "h")
+MenuAttributes = Type("MenuAttributes", "l")
+MenuItemAttributes = Type("MenuItemAttributes", "l")
+MenuItemIndex = Type("MenuItemIndex", "H")
+MenuCommand = Type("MenuCommand", "l")
+FMFontFamily = Type("FMFontFamily", "h")
+FMFontStyle = Type("FMFontStyle", "h")
+FMFontSize = Type("FMFontSize", "h")
 
 unsigned_char = Type('unsigned char', 'b')
 
@@ -34,6 +43,16 @@ includestuff = includestuff + """
 
 #define as_Menu(h) ((MenuHandle)h)
 #define as_Resource(h) ((Handle)h)
+
+#if !ACCESSOR_CALLS_ARE_FUNCTIONS
+#define GetMenuID(menu) ((*(menu))->menuID)
+#define GetMenuWidth(menu) ((*(menu))->menuWidth)
+#define GetMenuHeight(menu) ((*(menu))->menuHeight)
+
+#define SetMenuID(menu, v) ((*(menu))->menuID = (v))
+#define SetMenuWidth(menu, v) ((*(menu))->menuWidth = (v))
+#define SetMenuHeight(menu, v) ((*(menu))->menuHeight = (v))
+#endif
 """
 
 class MyObjectDefinition(GlobalObjectDefinition):

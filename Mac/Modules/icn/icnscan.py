@@ -43,6 +43,11 @@ class MyScanner(Scanner):
 			"kSelectorAllHugeData",
 			"kSelectorAllAvailableData",
 			"svAllAvailableData",
+			# Missing from CW Pro 6 libraries
+			"WriteIconFile",
+			"ReadIconFile",
+			"RegisterIconRefFromIconFile",
+			"GetIconRefVariant",
 			]
 
 	def makegreylist(self):

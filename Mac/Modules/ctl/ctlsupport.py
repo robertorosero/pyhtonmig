@@ -41,6 +41,10 @@ ControlFocusPart = Type("ControlFocusPart", "h")
 ControlFontStyleRec = OpaqueType('ControlFontStyleRec', 'ControlFontStyle')
 ControlFontStyleRec_ptr = ControlFontStyleRec
 
+EventModifiers = Type("EventModifiers", "H")
+ClickActivationResult = Type("ClickActivationResult", "l")
+
+DragTrackingMessage = Type("DragTrackingMessage", "h")
 includestuff = includestuff + """
 #include <%s>""" % MACHEADERFILE + """
 
@@ -54,6 +58,9 @@ staticforward PyObject *CtlObj_WhichControl(ControlHandle);
 #define GetControlRect(ctl, rectp) (*(rectp) = ((*(ctl))->contrlRect))
 #endif
 
+#if !ACCESSOR_CALLS_ARE_FUNCTIONS
+#define SetControlDataHandle(ctl, hdl) (*(ctl))->contrlData = (hdl)
+#endif
 /*
 ** Parse/generate ControlFontStyleRec records
 */
@@ -83,7 +90,7 @@ ControlFontStyle_Convert(v, itself)
 /* TrackControl and HandleControlClick callback support */
 static PyObject *tracker;
 static ControlActionUPP mytracker_upp;
-#if !TARGET_API_MAC_CARBON_NOTYET
+#if UNIVERSAL_INTERFACES_VERSION < 0x0332
 static ControlUserPaneDrawUPP mydrawproc_upp;
 static ControlUserPaneIdleUPP myidleproc_upp;
 static ControlUserPaneHitTestUPP myhittestproc_upp;
@@ -92,7 +99,7 @@ static ControlUserPaneTrackingUPP mytrackingproc_upp;
 
 extern int settrackfunc(PyObject *); 	/* forward */
 extern void clrtrackfunc(void);	/* forward */
-#if !TARGET_API_MAC_CARBON_NOTYET
+#if UNIVERSAL_INTERFACES_VERSION < 0x0332
 staticforward int setcallback(PyObject *, OSType, PyObject *, UniversalProcPtr *);
 #endif
 """
@@ -166,7 +173,7 @@ mytracker(ControlHandle ctl, short part)
 		PySys_WriteStderr("TrackControl or HandleControlClick: exception in tracker function\\n");
 }
 
-#if !TARGET_API_MAC_CARBON_NOTYET
+#if UNIVERSAL_INTERFACES_VERSION < 0x0332
 static int
 setcallback(myself, which, callback, uppp)
 	PyObject *myself;
@@ -288,7 +295,7 @@ mytrackingproc(ControlHandle control, Point startPt, ControlActionUPP actionProc
 
 initstuff = initstuff + """
 mytracker_upp = NewControlActionProc(mytracker);
-#if !TARGET_API_MAC_CARBON_NOTYET
+#if UNIVERSAL_INTERFACES_VERSION < 0x0332
 mydrawproc_upp = NewControlUserPaneDrawProc(mydrawproc);
 myidleproc_upp = NewControlUserPaneIdleProc(myidleproc);
 myhittestproc_upp = NewControlUserPaneHitTestProc(myhittestproc);
@@ -471,8 +478,8 @@ f = ManualGenerator("GetControlData", getcontroldata_body);
 f.docstring = lambda: "(part, type) -> String"
 object.add(f)
 
-# Manual Generator for SetControlDataHandle
-setcontroldatahandle_body = """
+# Manual Generator for SetControlData_fromHandle
+setcontroldata_fromhandle_body = """
 OSErr _err;
 ControlPartCode inPart;
 ResType inTagName;
@@ -496,12 +503,12 @@ _res = Py_None;
 return _res;
 """
 
-f = ManualGenerator("SetControlDataHandle", setcontroldatahandle_body);
+f = ManualGenerator("SetControlData_fromHandle", setcontroldata_fromhandle_body);
 f.docstring = lambda: "(ResObj) -> None"
 object.add(f)
 
-# Manual Generator for GetControlDataHandle
-getcontroldatahandle_body = """
+# Manual Generator for GetControlData_toHandle
+getcontroldata_tohandle_body = """
 OSErr _err;
 ControlPartCode inPart;
 ResType inTagName;
@@ -538,12 +545,12 @@ if (_err != noErr) {
 return Py_BuildValue("O&", OptResObj_New, hdl);
 """
 
-f = ManualGenerator("GetControlDataHandle", getcontroldatahandle_body);
+f = ManualGenerator("GetControlData_toHandle", getcontroldata_tohandle_body);
 f.docstring = lambda: "(part, type) -> ResObj"
 object.add(f)
 
-# Manual Generator for SetControlDataCallback
-setcontroldatacallback_body = """
+# Manual Generator for SetControlData_fromCallback
+setcontroldata_fromcallback_body = """
 OSErr _err;
 ControlPartCode inPart;
 ResType inTagName;
@@ -570,7 +577,7 @@ _res = Py_None;
 return _res;
 """
 
-f = ManualGenerator("SetControlDataCallback", setcontroldatacallback_body, condition="#if !TARGET_API_MAC_CARBON_NOTYET");
+f = ManualGenerator("SetControlData_fromCallback", setcontroldata_fromcallback_body, condition="#if UNIVERSAL_INTERFACES_VERSION < 0x0332");
 f.docstring = lambda: "(callbackfunc) -> None"
 object.add(f)
 
@@ -588,7 +595,7 @@ _res = Py_BuildValue("O&i", MenuObj_New, (*hdl)->mHandle, (int)(*hdl)->mID);
 HUnlock((Handle)hdl);
 return _res;
 """
-f = ManualGenerator("GetPopupData", getpopupdata_body, condition="#if !TARGET_API_MAC_CARBON_NOTYET")
+f = ManualGenerator("GetPopupData", getpopupdata_body, condition="#if UNIVERSAL_INTERFACES_VERSION < 0x0332")
 object.add(f)
 
 setpopupdata_body = """
@@ -608,7 +615,7 @@ hdl = (PopupPrivateDataHandle)(*_self->ob_itself)->contrlData;
 Py_INCREF(Py_None);
 return Py_None;
 """
-f = ManualGenerator("SetPopupData", setpopupdata_body, condition="#if !TARGET_API_MAC_CARBON_NOTYET")
+f = ManualGenerator("SetPopupData", setpopupdata_body, condition="#if UNIVERSAL_INTERFACES_VERSION < 0x0332")
 object.add(f)
 
 

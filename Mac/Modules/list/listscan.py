@@ -30,7 +30,7 @@ class MyScanner(Scanner):
 		if arglist:
 			t, n, m = arglist[-1]
 			# This is non-functional today
-			if t == OBJECT and m == "InMode":
+			if t in ("ListHandle", "ListRef") and m == "InMode":
 				classname = "Method"
 				listname = "methods"
 		return classname, listname
@@ -40,10 +40,32 @@ class MyScanner(Scanner):
 			"LDispose",		# Done by removing the object
 			"LSearch",		# We don't want to handle procs just yet
 			"LGetCellDataLocation",		# What does this do??
+			# XXXX Have in/out parameter. Need fixing up
+			"GetListViewBounds",
+			"GetListCellIndent",
+			"GetListCellSize",
+			"GetListVisibleCells",
+			"GetListClickLocation",
+			"GetListMouseLocation",
+			"GetListDataBounds",
+			# In parameter mistreated
+			"SetListCellIndent",
+			"SetListLastClick",
 			]
+			
+	def makegreylist(self):
+		return [
+			('#if ACCESSOR_CALLS_ARE_FUNCTIONS', [
+				'GetListDefinition',
+				'GetListDataHandle',
+			])]
 
 	def makeblacklisttypes(self):
 		return [
+			"ListDefSpec",	# XXX For now...
+			"ListDefSpec_ptr", # XXX ditto
+			"ListDefUPP",
+			'ListClickLoopUPP',
 			]
 
 	def makerepairinstructions(self):

@@ -44,6 +44,20 @@ class MyScanner(Scanner):
 			'MacCloseWindow',
 			# Constants with funny definitions
 			'kMouseUpOutOfSlop',
+			# Funny calling sequence
+			'GetWindowStandardState',
+			'GetWindowUserState',
+			'GetWindowPortBounds',
+			# Missing in CW Pro 6 libraries
+			"FindWindowOfClass",
+			"GetFrontWindowOfClass",
+			"GetNextWindowOfClass",
+			"ChangeWindowPropertyAttributes",
+			"GetWindowPropertyAttributes",
+			"ScrollWindowRegion",
+			"ScrollWindowRect",
+			"ChangeWindowAttributes",
+			"ReshapeCustomWindow",
 			]
 			
 	def makegreylist(self):
@@ -64,14 +78,22 @@ class MyScanner(Scanner):
 				'InvalRgn',
 				'InvalRect',
 				'IsValidWindowPtr', # I think this is useless for Python, but not sure...
-			])]
+			]),
+			('#if ACCESSOR_CALLS_ARE_FUNCTIONS', [
+				'GetWindowSpareFlag',
+				'IsWindowUpdatePending',
+				'GetWindowList',
+				])]
 			
 	def makeblacklisttypes(self):
 		return [
 			'ProcPtr',
 			'DragGrayRgnUPP',
+			'WindowPaintUPP',
 			'Collection',		# For now, to be done later
 			'DragReference',	# Ditto, dragmodule doesn't export it yet.
+			# XXX For now
+			'WindowDefSpec_ptr',
 			]
 
 	def makerepairinstructions(self):

@@ -53,17 +53,25 @@ class MyScanner(Scanner):
 ##			# Can't find these in the CW Pro 3 libraries
 			'SetDialogMovableModal',
 			'GetDialogControlNotificationProc',
+			# Missing from CW Pro 6 libraries
+			'GetParamText',
+			'RemoveDialogItems',
+			'InsertDialogItem',
 			]
 
 	def makegreylist(self):
 		return [
 			('#if !TARGET_API_MAC_CARBON', [
 				'SetGrafPortOfDialog',
+			]),
+			('#if ACCESSOR_CALLS_ARE_FUNCTIONS', [
+				'SetPortDialogPort',
 			])]
 			
 	def makeblacklisttypes(self):
 		return [
 			"AlertStdAlertParamPtr",	# Too much work, for now
+			"AlertStdAlertParamRec_ptr",
 			"QTModelessCallbackProcPtr",
 			]
 

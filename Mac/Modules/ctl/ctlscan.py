@@ -48,35 +48,24 @@ class MyScanner(Scanner):
 			'kControlBevelButtonCenterPopupGlyphTag', # Constant with funny definition
 			'kControlProgressBarIndeterminateTag', # ditto
 			# The following are unavailable for static 68k (appearance manager)
-##			'GetBevelButtonMenuValue',
-##			'SetBevelButtonMenuValue',
-##			'GetBevelButtonMenuHandle',
-##			'SetBevelButtonTransform',
 			'SetBevelButtonGraphicAlignment',
 			'SetBevelButtonTextAlignment',
 			'SetBevelButtonTextPlacement',
-##			'SetImageWellTransform',
-##			'GetTabContentRect',
-##			'SetTabEnabled',
-##			'SetDisclosureTriangleLastValue',
-## 			# Unavailable in CW Pro 3 libraries
-## 			'SetUpControlTextColor',
-## 			# Unavailable in Jack's CW Pro 5.1 libraries
-## 			'GetControlRegion',
-## 			'RemoveControlProperty',
-## 			'IsValidControlHandle',
-## 			'SetControl32BitMinimum',
-## 			'GetControl32BitMinimum',
-## 			'SetControl32BitMaximum',
-## 			'GetControl32BitMaximum',
-## 			'SetControl32BitValue',
-## 			'GetControl32BitValue',
-## 			'SetControlViewSize',
-## 			'GetControlViewSize',
 			# Generally Bad News
 			'GetControlProperty',
 			'SetControlProperty',
 			'GetControlPropertySize',
+			# Missing from CW Pro 6 libraries
+			'IsAutomaticControlDragTrackingEnabledForWindow',
+			'SetAutomaticControlDragTrackingEnabledForWindow',
+			'IsControlDragTrackingEnabled',
+			'SetControlDragTrackingEnabled',
+			'ChangeControlPropertyAttributes',
+			'GetControlPropertyAttributes',
+			'HandleControlSetCursor',
+			'GetControlClickActivation',
+			'HandleControlContextualMenuClick',
+			
 			]
 
 	def makegreylist(self):
@@ -93,6 +82,19 @@ class MyScanner(Scanner):
 				'GetTabContentRect',
 				'SetTabEnabled',
 				'SetDisclosureTriangleLastValue',
+			]),
+			('#if ACCESSOR_CALLS_ARE_FUNCTIONS', [
+				'GetControlBounds',
+				'IsControlHilited',
+				'GetControlHilite',
+				'GetControlOwner',
+				'GetControlDataHandle',
+				'GetControlPopupMenuHandle',
+				'GetControlPopupMenuID',
+				'SetControlBounds',
+				'SetControlPopupMenuHandle',
+				'SetControlPopupMenuID',
+ 
 			])]
 			
 	def makeblacklisttypes(self):
@@ -101,6 +103,12 @@ class MyScanner(Scanner):
 			'ControlActionUPP',
 			'ControlButtonContentInfoPtr',
 			'Ptr',
+			'ControlDefSpec',
+			'ControlDefSpec_ptr',
+			'Collection',
+			'ControlID', # XXXX For now
+			'ControlID_ptr',
+			'DragReference', # XXXX For now
 			]
 
 	def makerepairinstructions(self):

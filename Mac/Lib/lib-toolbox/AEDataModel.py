@@ -1,4 +1,4 @@
-# Generated from 'Macintosh HD:SWDev:Codewarrior Pro 5:Metrowerks CodeWarrior:MacOS Support:Universal:Interfaces:CIncludes:AEDataModel.h'
+# Generated from 'Macintosh HD:SWDev:Codewarrior 6 MPTP:Metrowerks CodeWarrior:MacOS Support:Universal:Interfaces:CIncludes:AEDataModel.h'
 
 def FOUR_CHAR_CODE(x): return x
 typeBoolean = FOUR_CHAR_CODE('bool')
@@ -45,7 +45,7 @@ typeTargetID = FOUR_CHAR_CODE('targ')
 typeProcessSerialNumber = FOUR_CHAR_CODE('psn ')
 typeKernelProcessID = FOUR_CHAR_CODE('kpid')
 typeDispatcherID = FOUR_CHAR_CODE('dspt')
-typeNull = FOUR_CHAR_CODE('null')
+typeNull = FOUR_CHAR_CODE('null')        
 keyTransactionIDAttr = FOUR_CHAR_CODE('tran')
 keyReturnIDAttr = FOUR_CHAR_CODE('rtid')
 keyEventClassAttr = FOUR_CHAR_CODE('evcl')
@@ -56,12 +56,12 @@ keyTimeoutAttr = FOUR_CHAR_CODE('timo')
 keyInteractLevelAttr = FOUR_CHAR_CODE('inte')
 keyEventSourceAttr = FOUR_CHAR_CODE('esrc')
 keyMissedKeywordAttr = FOUR_CHAR_CODE('miss')
-keyOriginalAddressAttr = FOUR_CHAR_CODE('from')
+keyOriginalAddressAttr = FOUR_CHAR_CODE('from')        
 kAEDescListFactorNone = 0
 kAEDescListFactorType = 4
 kAEDescListFactorTypeAndSize = 8
 kAutoGenerateReturnID = -1
-kAnyTransactionID = 0
+kAnyTransactionID = 0                             
 kAEDataArray = 0
 kAEPackedArray = 1
 kAEDescArray = 3

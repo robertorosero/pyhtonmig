@@ -56,6 +56,9 @@ class MyScanner(Scanner):
 			"CallComponentClose",
 			"CallComponentOpen",
 			"OpenAComponent",
+			# These appear missing in the CW Pro 6 libraries
+			"GetComponentPublicResource",
+			"CallComponentGetPublicResource",
 			]
 
 	def makegreylist(self):
@@ -77,6 +80,8 @@ class MyScanner(Scanner):
 			
 			"ComponentRoutineUPP",
 			"ComponentMPWorkFunctionUPP",
+			"ComponentFunctionUPP",
+			"GetMissingComponentResourceUPP",
 			]
 
 	def makerepairinstructions(self):

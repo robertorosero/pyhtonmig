@@ -45,13 +45,6 @@ class SoundScanner(Scanner):
 			'StartSound',
 			'StopSound',
 			'SoundDone',
-			# These do not work for cfm68k:
-## 			'SndGetInfo',
-## 			'SndSetInfo',
-## 			'GetCompressionInfo',
-## 			'GetCompressionName',
-## 			'GetSoundPreference',
-## 			'SetSoundPreference',
 			# And old calls that are no longer supported
 			'SetSoundVol',
 			'GetSoundVol',
@@ -59,7 +52,9 @@ class SoundScanner(Scanner):
 			'rate48khz',
 			'rate44khz',
 			'kInvalidSource',
-
+			# Missing from CW Pro 6 libraries
+			"SoundManagerSetInfo",
+			"SoundManagerGetInfo",
 			]
 
 	def makegreylist(self):

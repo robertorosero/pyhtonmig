@@ -21,29 +21,18 @@ from macsupport import *
 
 # Create the type objects
 
-DragReference = OpaqueByValueType(OBJECTTYPE, OBJECTPREFIX)
+#DragReference = OpaqueByValueType(OBJECTTYPE, OBJECTPREFIX)
+DragRef = OpaqueByValueType("DragRef", OBJECTPREFIX)
 
-##CCTabHandle = OpaqueByValueType("CCTabHandle", "ResObj")
-##AuxCtlHandle = OpaqueByValueType("AuxCtlHandle", "ResObj")
-##ControlPartCode = Type("ControlPartCode", "h")
-##DragConstraint = Type("DragConstraint", "h")
-##ControlVariant = Type("ControlVariant", "h")
-##IconTransformType = Type("IconTransformType", "h")
-##ControlButtonGraphicAlignment = Type("ControlButtonGraphicAlignment", "h")
-##ControlButtonTextAlignment = Type("ControlButtonTextAlignment", "h")
-##ControlButtonTextPlacement = Type("ControlButtonTextPlacement", "h")
-##ControlContentType = Type("ControlContentType", "h")
-##ControlFocusPart = Type("ControlFocusPart", "h")
-##
-##ControlFontStyleRec = OpaqueType('ControlFontStyleRec', 'ControlFontStyle')
-##ControlFontStyleRec_ptr = ControlFontStyleRec
 PixMapHandle = OpaqueByValueType("PixMapHandle", "ResObj")
 RgnHandle = OpaqueByValueType("RgnHandle", "ResObj")
 AEDesc = OpaqueType('AEDesc')
 AEDesc_ptr = AEDesc
 RGBColor = OpaqueType("RGBColor", "QdRGB")
 
-ItemReference = Type("ItemReference", "l")
+#ItemReference = Type("ItemReference", "l")
+DragItemRef = Type("DragItemRef", "l")
+DragBehaviors = Type("DragBehaviors", "l")
 FlavorType = OSTypeType("FlavorType")
 DragAttributes = Type("DragAttributes", "l")
 DragImageFlags = Type("DragImageFlags", "l")

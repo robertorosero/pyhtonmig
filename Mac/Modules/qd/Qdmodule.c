@@ -10,6 +10,37 @@
 
 #include <QuickDraw.h>
 
+#if !ACCESSOR_CALLS_ARE_FUNCTIONS
+#define GetPortPixMap(port) ((port)->portPixMap)
+#define GetPortTextFont(port) ((port)->txFont)
+#define GetPortTextFace(port) ((port)->txFace)
+#define GetPortTextMode(port) ((port)->txMode)
+#define GetPortTextSize(port) ((port)->txSize)
+#define GetPortChExtra(port) ((port)->chExtra)
+#define GetPortFracHPenLocation(port) ((port)->pnLocHFrac)
+#define GetPortSpExtra(port) ((port)->spExtra)
+#define GetPortPenVisibility(port) ((port)->pnVis)
+#define GetPortPenMode(port) ((port)->pnMode)
+
+#define SetPortPixMap(port, v) ((port)->portPixMap = (v))
+#define SetPortTextFont(port, v) ((port)->txFont = (v))
+#define SetPortTextFace(port, v) ((port)->txFace = (v))
+#define SetPortTextMode(port, v) ((port)->txMode = (v))
+#define SetPortTextSize(port, v) ((port)->txSize = (v))
+#define SetPortChExtra(port, v) ((port)->chExtra = (v))
+#define SetPortFracHPenLocation(port, v) ((port)->pnLocHFrac = (v))
+#define SetPortSpExtra(port, v) ((port)->spExtra = (v))
+#define SetPortPenVisibility(port, v) ((port)->pnVis = (v))
+#define SetPortPenMode(port, v) ((port)->pnMode = (v))
+#define SetPortBounds(port, v) ((port)->portRect = *(v))
+#define SetPortPenSize(port, v) ((port)->pnSize = (v))
+
+#define GetQDGlobalsRandomSeed() (qd.randSeed)
+#define GetQDGlobalsThePort() ((CGrafPtr)(qd.thePort))
+
+#define SetQDGlobalsRandomSeed(v) (qd.randSeed = (v))
+#define SetQDGlobalsArrow(v) (qd.arrow = *(v))
+#endif
 /*
 ** Parse/generate RGB records
 */
@@ -3702,6 +3733,540 @@ static PyObject *Qd_AngleFromSlope(_self, _args)
 	return _res;
 }
 
+static PyObject *Qd_GetPortPixMap(_self, _args)
+	PyObject *_self;
+	PyObject *_args;
+{
+	PyObject *_res = NULL;
+	PixMapHandle _rv;
+	CGrafPtr port;
+	if (!PyArg_ParseTuple(_args, "O&",
+	                      GrafObj_Convert, &port))
+		return NULL;
+	_rv = GetPortPixMap(port);
+	_res = Py_BuildValue("O&",
+	                     ResObj_New, _rv);
+	return _res;
+}
+
+static PyObject *Qd_GetPortTextFont(_self, _args)
+	PyObject *_self;
+	PyObject *_args;
+{
+	PyObject *_res = NULL;
+	short _rv;
+	CGrafPtr port;
+	if (!PyArg_ParseTuple(_args, "O&",
+	                      GrafObj_Convert, &port))
+		return NULL;
+	_rv = GetPortTextFont(port);
+	_res = Py_BuildValue("h",
+	                     _rv);
+	return _res;
+}
+
+static PyObject *Qd_GetPortTextFace(_self, _args)
+	PyObject *_self;
+	PyObject *_args;
+{
+	PyObject *_res = NULL;
+	Style _rv;
+	CGrafPtr port;
+	if (!PyArg_ParseTuple(_args, "O&",
+	                      GrafObj_Convert, &port))
+		return NULL;
+	_rv = GetPortTextFace(port);
+	_res = Py_BuildValue("b",
+	                     _rv);
+	return _res;
+}
+
+static PyObject *Qd_GetPortTextMode(_self, _args)
+	PyObject *_self;
+	PyObject *_args;
+{
+	PyObject *_res = NULL;
+	short _rv;
+	CGrafPtr port;
+	if (!PyArg_ParseTuple(_args, "O&",
+	                      GrafObj_Convert, &port))
+		return NULL;
+	_rv = GetPortTextMode(port);
+	_res = Py_BuildValue("h",
+	                     _rv);
+	return _res;
+}
+
+static PyObject *Qd_GetPortTextSize(_self, _args)
+	PyObject *_self;
+	PyObject *_args;
+{
+	PyObject *_res = NULL;
+	short _rv;
+	CGrafPtr port;
+	if (!PyArg_ParseTuple(_args, "O&",
+	                      GrafObj_Convert, &port))
+		return NULL;
+	_rv = GetPortTextSize(port);
+	_res = Py_BuildValue("h",
+	                     _rv);
+	return _res;
+}
+
+static PyObject *Qd_GetPortChExtra(_self, _args)
+	PyObject *_self;
+	PyObject *_args;
+{
+	PyObject *_res = NULL;
+	short _rv;
+	CGrafPtr port;
+	if (!PyArg_ParseTuple(_args, "O&",
+	                      GrafObj_Convert, &port))
+		return NULL;
+	_rv = GetPortChExtra(port);
+	_res = Py_BuildValue("h",
+	                     _rv);
+	return _res;
+}
+
+static PyObject *Qd_GetPortFracHPenLocation(_self, _args)
+	PyObject *_self;
+	PyObject *_args;
+{
+	PyObject *_res = NULL;
+	short _rv;
+	CGrafPtr port;
+	if (!PyArg_ParseTuple(_args, "O&",
+	                      GrafObj_Convert, &port))
+		return NULL;
+	_rv = GetPortFracHPenLocation(port);
+	_res = Py_BuildValue("h",
+	                     _rv);
+	return _res;
+}
+
+static PyObject *Qd_GetPortSpExtra(_self, _args)
+	PyObject *_self;
+	PyObject *_args;
+{
+	PyObject *_res = NULL;
+	Fixed _rv;
+	CGrafPtr port;
+	if (!PyArg_ParseTuple(_args, "O&",
+	                      GrafObj_Convert, &port))
+		return NULL;
+	_rv = GetPortSpExtra(port);
+	_res = Py_BuildValue("O&",
+	                     PyMac_BuildFixed, _rv);
+	return _res;
+}
+
+static PyObject *Qd_GetPortPenVisibility(_self, _args)
+	PyObject *_self;
+	PyObject *_args;
+{
+	PyObject *_res = NULL;
+	short _rv;
+	CGrafPtr port;
+	if (!PyArg_ParseTuple(_args, "O&",
+	                      GrafObj_Convert, &port))
+		return NULL;
+	_rv = GetPortPenVisibility(port);
+	_res = Py_BuildValue("h",
+	                     _rv);
+	return _res;
+}
+
+static PyObject *Qd_GetPortPenMode(_self, _args)
+	PyObject *_self;
+	PyObject *_args;
+{
+	PyObject *_res = NULL;
+	SInt32 _rv;
+	CGrafPtr port;
+	if (!PyArg_ParseTuple(_args, "O&",
+	                      GrafObj_Convert, &port))
+		return NULL;
+	_rv = GetPortPenMode(port);
+	_res = Py_BuildValue("l",
+	                     _rv);
+	return _res;
+}
+
+#if ACCESSOR_CALLS_ARE_FUNCTIONS
+
+static PyObject *Qd_IsPortRegionBeingDefined(_self, _args)
+	PyObject *_self;
+	PyObject *_args;
+{
+	PyObject *_res = NULL;
+	Boolean _rv;
+	CGrafPtr port;
+	if (!PyArg_ParseTuple(_args, "O&",
+	                      GrafObj_Convert, &port))
+		return NULL;
+	_rv = IsPortRegionBeingDefined(port);
+	_res = Py_BuildValue("b",
+	                     _rv);
+	return _res;
+}
+#endif
+
+#if ACCESSOR_CALLS_ARE_FUNCTIONS
+
+static PyObject *Qd_IsPortPictureBeingDefined(_self, _args)
+	PyObject *_self;
+	PyObject *_args;
+{
+	PyObject *_res = NULL;
+	Boolean _rv;
+	CGrafPtr port;
+	if (!PyArg_ParseTuple(_args, "O&",
+	                      GrafObj_Convert, &port))
+		return NULL;
+	_rv = IsPortPictureBeingDefined(port);
+	_res = Py_BuildValue("b",
+	                     _rv);
+	return _res;
+}
+#endif
+
+#if ACCESSOR_CALLS_ARE_FUNCTIONS
+
+static PyObject *Qd_IsPortOffscreen(_self, _args)
+	PyObject *_self;
+	PyObject *_args;
+{
+	PyObject *_res = NULL;
+	Boolean _rv;
+	CGrafPtr port;
+	if (!PyArg_ParseTuple(_args, "O&",
+	                      GrafObj_Convert, &port))
+		return NULL;
+	_rv = IsPortOffscreen(port);
+	_res = Py_BuildValue("b",
+	                     _rv);
+	return _res;
+}
+#endif
+
+#if ACCESSOR_CALLS_ARE_FUNCTIONS
+
+static PyObject *Qd_IsPortColor(_self, _args)
+	PyObject *_self;
+	PyObject *_args;
+{
+	PyObject *_res = NULL;
+	Boolean _rv;
+	CGrafPtr port;
+	if (!PyArg_ParseTuple(_args, "O&",
+	                      GrafObj_Convert, &port))
+		return NULL;
+	_rv = IsPortColor(port);
+	_res = Py_BuildValue("b",
+	                     _rv);
+	return _res;
+}
+#endif
+
+static PyObject *Qd_SetPortBounds(_self, _args)
+	PyObject *_self;
+	PyObject *_args;
+{
+	PyObject *_res = NULL;
+	CGrafPtr port;
+	Rect rect;
+	if (!PyArg_ParseTuple(_args, "O&O&",
+	                      GrafObj_Convert, &port,
+	                      PyMac_GetRect, &rect))
+		return NULL;
+	SetPortBounds(port,
+	              &rect);
+	Py_INCREF(Py_None);
+	_res = Py_None;
+	return _res;
+}
+
+#if ACCESSOR_CALLS_ARE_FUNCTIONS
+
+static PyObject *Qd_SetPortOpColor(_self, _args)
+	PyObject *_self;
+	PyObject *_args;
+{
+	PyObject *_res = NULL;
+	CGrafPtr port;
+	RGBColor opColor;
+	if (!PyArg_ParseTuple(_args, "O&O&",
+	                      GrafObj_Convert, &port,
+	                      QdRGB_Convert, &opColor))
+		return NULL;
+	SetPortOpColor(port,
+	               &opColor);
+	Py_INCREF(Py_None);
+	_res = Py_None;
+	return _res;
+}
+#endif
+
+#if ACCESSOR_CALLS_ARE_FUNCTIONS
+
+static PyObject *Qd_SetPortVisibleRegion(_self, _args)
+	PyObject *_self;
+	PyObject *_args;
+{
+	PyObject *_res = NULL;
+	CGrafPtr port;
+	RgnHandle visRgn;
+	if (!PyArg_ParseTuple(_args, "O&O&",
+	                      GrafObj_Convert, &port,
+	                      ResObj_Convert, &visRgn))
+		return NULL;
+	SetPortVisibleRegion(port,
+	                     visRgn);
+	Py_INCREF(Py_None);
+	_res = Py_None;
+	return _res;
+}
+#endif
+
+#if ACCESSOR_CALLS_ARE_FUNCTIONS
+
+static PyObject *Qd_SetPortClipRegion(_self, _args)
+	PyObject *_self;
+	PyObject *_args;
+{
+	PyObject *_res = NULL;
+	CGrafPtr port;
+	RgnHandle clipRgn;
+	if (!PyArg_ParseTuple(_args, "O&O&",
+	                      GrafObj_Convert, &port,
+	                      ResObj_Convert, &clipRgn))
+		return NULL;
+	SetPortClipRegion(port,
+	                  clipRgn);
+	Py_INCREF(Py_None);
+	_res = Py_None;
+	return _res;
+}
+#endif
+
+#if ACCESSOR_CALLS_ARE_FUNCTIONS
+
+static PyObject *Qd_SetPortPenPixPat(_self, _args)
+	PyObject *_self;
+	PyObject *_args;
+{
+	PyObject *_res = NULL;
+	CGrafPtr port;
+	PixPatHandle penPattern;
+	if (!PyArg_ParseTuple(_args, "O&O&",
+	                      GrafObj_Convert, &port,
+	                      ResObj_Convert, &penPattern))
+		return NULL;
+	SetPortPenPixPat(port,
+	                 penPattern);
+	Py_INCREF(Py_None);
+	_res = Py_None;
+	return _res;
+}
+#endif
+
+#if ACCESSOR_CALLS_ARE_FUNCTIONS
+
+static PyObject *Qd_SetPortBackPixPat(_self, _args)
+	PyObject *_self;
+	PyObject *_args;
+{
+	PyObject *_res = NULL;
+	CGrafPtr port;
+	PixPatHandle backPattern;
+	if (!PyArg_ParseTuple(_args, "O&O&",
+	                      GrafObj_Convert, &port,
+	                      ResObj_Convert, &backPattern))
+		return NULL;
+	SetPortBackPixPat(port,
+	                  backPattern);
+	Py_INCREF(Py_None);
+	_res = Py_None;
+	return _res;
+}
+#endif
+
+static PyObject *Qd_SetPortPenSize(_self, _args)
+	PyObject *_self;
+	PyObject *_args;
+{
+	PyObject *_res = NULL;
+	CGrafPtr port;
+	Point penSize;
+	if (!PyArg_ParseTuple(_args, "O&O&",
+	                      GrafObj_Convert, &port,
+	                      PyMac_GetPoint, &penSize))
+		return NULL;
+	SetPortPenSize(port,
+	               penSize);
+	Py_INCREF(Py_None);
+	_res = Py_None;
+	return _res;
+}
+
+static PyObject *Qd_SetPortPenMode(_self, _args)
+	PyObject *_self;
+	PyObject *_args;
+{
+	PyObject *_res = NULL;
+	CGrafPtr port;
+	SInt32 penMode;
+	if (!PyArg_ParseTuple(_args, "O&l",
+	                      GrafObj_Convert, &port,
+	                      &penMode))
+		return NULL;
+	SetPortPenMode(port,
+	               penMode);
+	Py_INCREF(Py_None);
+	_res = Py_None;
+	return _res;
+}
+
+static PyObject *Qd_SetPortFracHPenLocation(_self, _args)
+	PyObject *_self;
+	PyObject *_args;
+{
+	PyObject *_res = NULL;
+	CGrafPtr port;
+	short pnLocHFrac;
+	if (!PyArg_ParseTuple(_args, "O&h",
+	                      GrafObj_Convert, &port,
+	                      &pnLocHFrac))
+		return NULL;
+	SetPortFracHPenLocation(port,
+	                        pnLocHFrac);
+	Py_INCREF(Py_None);
+	_res = Py_None;
+	return _res;
+}
+
+#if ACCESSOR_CALLS_ARE_FUNCTIONS
+
+static PyObject *Qd_GetPixDepth(_self, _args)
+	PyObject *_self;
+	PyObject *_args;
+{
+	PyObject *_res = NULL;
+	short _rv;
+	PixMapHandle pixMap;
+	if (!PyArg_ParseTuple(_args, "O&",
+	                      ResObj_Convert, &pixMap))
+		return NULL;
+	_rv = GetPixDepth(pixMap);
+	_res = Py_BuildValue("h",
+	                     _rv);
+	return _res;
+}
+#endif
+
+static PyObject *Qd_GetQDGlobalsRandomSeed(_self, _args)
+	PyObject *_self;
+	PyObject *_args;
+{
+	PyObject *_res = NULL;
+	long _rv;
+	if (!PyArg_ParseTuple(_args, ""))
+		return NULL;
+	_rv = GetQDGlobalsRandomSeed();
+	_res = Py_BuildValue("l",
+	                     _rv);
+	return _res;
+}
+
+static PyObject *Qd_GetQDGlobalsThePort(_self, _args)
+	PyObject *_self;
+	PyObject *_args;
+{
+	PyObject *_res = NULL;
+	CGrafPtr _rv;
+	if (!PyArg_ParseTuple(_args, ""))
+		return NULL;
+	_rv = GetQDGlobalsThePort();
+	_res = Py_BuildValue("O&",
+	                     GrafObj_New, _rv);
+	return _res;
+}
+
+static PyObject *Qd_SetQDGlobalsRandomSeed(_self, _args)
+	PyObject *_self;
+	PyObject *_args;
+{
+	PyObject *_res = NULL;
+	long randomSeed;
+	if (!PyArg_ParseTuple(_args, "l",
+	                      &randomSeed))
+		return NULL;
+	SetQDGlobalsRandomSeed(randomSeed);
+	Py_INCREF(Py_None);
+	_res = Py_None;
+	return _res;
+}
+
+static PyObject *Qd_SetQDGlobalsArrow(_self, _args)
+	PyObject *_self;
+	PyObject *_args;
+{
+	PyObject *_res = NULL;
+	Cursor *arrow__in__;
+	int arrow__in_len__;
+	if (!PyArg_ParseTuple(_args, "s#",
+	                      (char **)&arrow__in__, &arrow__in_len__))
+		return NULL;
+	if (arrow__in_len__ != sizeof(Cursor))
+	{
+		PyErr_SetString(PyExc_TypeError, "buffer length should be sizeof(Cursor)");
+		goto arrow__error__;
+	}
+	SetQDGlobalsArrow(arrow__in__);
+	Py_INCREF(Py_None);
+	_res = Py_None;
+ arrow__error__: ;
+	return _res;
+}
+
+#if ACCESSOR_CALLS_ARE_FUNCTIONS
+
+static PyObject *Qd_IsRegionRectangular(_self, _args)
+	PyObject *_self;
+	PyObject *_args;
+{
+	PyObject *_res = NULL;
+	Boolean _rv;
+	RgnHandle region;
+	if (!PyArg_ParseTuple(_args, "O&",
+	                      ResObj_Convert, &region))
+		return NULL;
+	_rv = IsRegionRectangular(region);
+	_res = Py_BuildValue("b",
+	                     _rv);
+	return _res;
+}
+#endif
+
+#if ACCESSOR_CALLS_ARE_FUNCTIONS
+
+static PyObject *Qd_SetQDError(_self, _args)
+	PyObject *_self;
+	PyObject *_args;
+{
+	PyObject *_res = NULL;
+	OSErr err;
+	if (!PyArg_ParseTuple(_args, "h",
+	                      &err))
+		return NULL;
+	SetQDError(err);
+	Py_INCREF(Py_None);
+	_res = Py_None;
+	return _res;
+}
+#endif
+
 static PyObject *Qd_TextFont(_self, _args)
 	PyObject *_self;
 	PyObject *_args;
@@ -4840,6 +5405,102 @@ static PyMethodDef Qd_methods[] = {
 	 "(short angle) -> (Fixed _rv)"},
 	{"AngleFromSlope", (PyCFunction)Qd_AngleFromSlope, 1,
 	 "(Fixed slope) -> (short _rv)"},
+	{"GetPortPixMap", (PyCFunction)Qd_GetPortPixMap, 1,
+	 "(CGrafPtr port) -> (PixMapHandle _rv)"},
+	{"GetPortTextFont", (PyCFunction)Qd_GetPortTextFont, 1,
+	 "(CGrafPtr port) -> (short _rv)"},
+	{"GetPortTextFace", (PyCFunction)Qd_GetPortTextFace, 1,
+	 "(CGrafPtr port) -> (Style _rv)"},
+	{"GetPortTextMode", (PyCFunction)Qd_GetPortTextMode, 1,
+	 "(CGrafPtr port) -> (short _rv)"},
+	{"GetPortTextSize", (PyCFunction)Qd_GetPortTextSize, 1,
+	 "(CGrafPtr port) -> (short _rv)"},
+	{"GetPortChExtra", (PyCFunction)Qd_GetPortChExtra, 1,
+	 "(CGrafPtr port) -> (short _rv)"},
+	{"GetPortFracHPenLocation", (PyCFunction)Qd_GetPortFracHPenLocation, 1,
+	 "(CGrafPtr port) -> (short _rv)"},
+	{"GetPortSpExtra", (PyCFunction)Qd_GetPortSpExtra, 1,
+	 "(CGrafPtr port) -> (Fixed _rv)"},
+	{"GetPortPenVisibility", (PyCFunction)Qd_GetPortPenVisibility, 1,
+	 "(CGrafPtr port) -> (short _rv)"},
+	{"GetPortPenMode", (PyCFunction)Qd_GetPortPenMode, 1,
+	 "(CGrafPtr port) -> (SInt32 _rv)"},
+
+#if ACCESSOR_CALLS_ARE_FUNCTIONS
+	{"IsPortRegionBeingDefined", (PyCFunction)Qd_IsPortRegionBeingDefined, 1,
+	 "(CGrafPtr port) -> (Boolean _rv)"},
+#endif
+
+#if ACCESSOR_CALLS_ARE_FUNCTIONS
+	{"IsPortPictureBeingDefined", (PyCFunction)Qd_IsPortPictureBeingDefined, 1,
+	 "(CGrafPtr port) -> (Boolean _rv)"},
+#endif
+
+#if ACCESSOR_CALLS_ARE_FUNCTIONS
+	{"IsPortOffscreen", (PyCFunction)Qd_IsPortOffscreen, 1,
+	 "(CGrafPtr port) -> (Boolean _rv)"},
+#endif
+
+#if ACCESSOR_CALLS_ARE_FUNCTIONS
+	{"IsPortColor", (PyCFunction)Qd_IsPortColor, 1,
+	 "(CGrafPtr port) -> (Boolean _rv)"},
+#endif
+	{"SetPortBounds", (PyCFunction)Qd_SetPortBounds, 1,
+	 "(CGrafPtr port, Rect rect) -> None"},
+
+#if ACCESSOR_CALLS_ARE_FUNCTIONS
+	{"SetPortOpColor", (PyCFunction)Qd_SetPortOpColor, 1,
+	 "(CGrafPtr port, RGBColor opColor) -> None"},
+#endif
+
+#if ACCESSOR_CALLS_ARE_FUNCTIONS
+	{"SetPortVisibleRegion", (PyCFunction)Qd_SetPortVisibleRegion, 1,
+	 "(CGrafPtr port, RgnHandle visRgn) -> None"},
+#endif
+
+#if ACCESSOR_CALLS_ARE_FUNCTIONS
+	{"SetPortClipRegion", (PyCFunction)Qd_SetPortClipRegion, 1,
+	 "(CGrafPtr port, RgnHandle clipRgn) -> None"},
+#endif
+
+#if ACCESSOR_CALLS_ARE_FUNCTIONS
+	{"SetPortPenPixPat", (PyCFunction)Qd_SetPortPenPixPat, 1,
+	 "(CGrafPtr port, PixPatHandle penPattern) -> None"},
+#endif
+
+#if ACCESSOR_CALLS_ARE_FUNCTIONS
+	{"SetPortBackPixPat", (PyCFunction)Qd_SetPortBackPixPat, 1,
+	 "(CGrafPtr port, PixPatHandle backPattern) -> None"},
+#endif
+	{"SetPortPenSize", (PyCFunction)Qd_SetPortPenSize, 1,
+	 "(CGrafPtr port, Point penSize) -> None"},
+	{"SetPortPenMode", (PyCFunction)Qd_SetPortPenMode, 1,
+	 "(CGrafPtr port, SInt32 penMode) -> None"},
+	{"SetPortFracHPenLocation", (PyCFunction)Qd_SetPortFracHPenLocation, 1,
+	 "(CGrafPtr port, short pnLocHFrac) -> None"},
+
+#if ACCESSOR_CALLS_ARE_FUNCTIONS
+	{"GetPixDepth", (PyCFunction)Qd_GetPixDepth, 1,
+	 "(PixMapHandle pixMap) -> (short _rv)"},
+#endif
+	{"GetQDGlobalsRandomSeed", (PyCFunction)Qd_GetQDGlobalsRandomSeed, 1,
+	 "() -> (long _rv)"},
+	{"GetQDGlobalsThePort", (PyCFunction)Qd_GetQDGlobalsThePort, 1,
+	 "() -> (CGrafPtr _rv)"},
+	{"SetQDGlobalsRandomSeed", (PyCFunction)Qd_SetQDGlobalsRandomSeed, 1,
+	 "(long randomSeed) -> None"},
+	{"SetQDGlobalsArrow", (PyCFunction)Qd_SetQDGlobalsArrow, 1,
+	 "(Cursor arrow) -> None"},
+
+#if ACCESSOR_CALLS_ARE_FUNCTIONS
+	{"IsRegionRectangular", (PyCFunction)Qd_IsRegionRectangular, 1,
+	 "(RgnHandle region) -> (Boolean _rv)"},
+#endif
+
+#if ACCESSOR_CALLS_ARE_FUNCTIONS
+	{"SetQDError", (PyCFunction)Qd_SetQDError, 1,
+	 "(OSErr err) -> None"},
+#endif
 	{"TextFont", (PyCFunction)Qd_TextFont, 1,
 	 "(short font) -> None"},
 	{"TextFace", (PyCFunction)Qd_TextFace, 1,

@@ -32,12 +32,37 @@ class MyScanner(Scanner):
 
 	def makeblacklistnames(self):
 		return [
-##			"IsShowContextualMenuClick", # Can't find it in the library
-##			"InitContextualMenus", # ditto
-			"GetMenuItemProperty",	# difficult for the moment
-			"GetMenuItemPropertySize",
-			"SetMenuItemProperty",
-			"RemoveMenuItemProperty",
+			'DisposeMenuBar', # XXXX May be dangerous
+			'GetMenuCommandProperty', # XXX For now
+			'SetMenuCommandProperty', # XXX For now
+			'GetMenuItemProperty', # XXX For now
+			'SetMenuItemProperty', # XXX For now
+			# In/Out confusion
+			'GetMenuTitle',
+			# pstrcpy
+			'SetMenuTitle',
+			# Missing in CW Pro 6 libraries
+			'DuplicateMenuBar',
+			'CreateNewMenu',
+			'GetFontFamilyFromMenuSelection',
+			'UpdateStandardFontMenu',
+			'CreateStandardFontMenu',
+			'RemoveMenuCommandProperty',
+			'GetMenuCommandPropertySize',
+			'IsMenuCommandEnabled',
+			'DisableMenuCommand',
+			'EnableMenuCommand',
+			'GetIndMenuItemWithCommandID',
+			'CountMenuItemsWithCommandID',
+			'MenuHasEnabledItems',
+			'EnableAllMenuItems',
+			'DisableAllMenuItems',
+			'ChangeMenuItemAttributes',
+			'GetMenuItemAttributes',
+			'ChangeMenuAttributes',
+			'GetMenuAttributes',
+			'ChangeMenuItemPropertyAttributes',
+			'GetMenuItemPropertyAttributes',
 			]
 
 	def makegreylist(self):
@@ -64,6 +89,9 @@ class MyScanner(Scanner):
 			'MCTablePtr',
 			'AEDesc_ptr', # For now: doable, but not easy
 			'ProcessSerialNumber', # ditto
+			'MenuDefSpecPtr',
+			'MenuDefSpec_ptr',
+			'MenuTrackingData',
 			]
 
 	def makerepairinstructions(self):
