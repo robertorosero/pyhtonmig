@@ -1322,7 +1322,7 @@ static char iter_doc[] =
 Get an iterator from an object.  If the sentinel argument is omitted,\n\
 the object must supply its own iterator, or be a sequence.\n\
 If a sentinel is given, the object must be callable and the iterator\n\
-calls it until it returns or raises the sentinel.";
+calls it until it returns the sentinel.";
 
 
 static PyObject *
