@@ -244,17 +244,17 @@ postscript-$(PAPER)-$(RELEASE).zip: ps
 
 html-$(RELEASE).tgz:	html
 	(cd $(HTMLDIR); \
-		tar cf - *index.html ???/*.css ???/*.html */*.gif */*.png) \
+		tar cf - *index.html ???/*.css ???/*.html */*.gif) \
 		| gzip -9 >$@
 
 html-$(RELEASE).tar.bz2:	html
 	(cd $(HTMLDIR); \
-		tar cf - *index.html ???/*.css ???/*.html */*.gif */*.png) \
+		tar cf - *index.html ???/*.css ???/*.html */*.gif) \
 		| bzip2 -9 >$@
 
 html-$(RELEASE).zip:	html
 	(cd $(HTMLDIR); \
-		zip -9 ../$@ *index.html ???/*.css ???/*.html */*.gif */*.png)
+		zip -9 ../$@ *index.html ???/*.css ???/*.html */*.gif)
 
 # convenience targets:
 
