@@ -36,6 +36,7 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #include "allobjects.h"
 #include "modsupport.h"		/* For getargs() etc. */
 #include <assert.h>
+#include <sys/types.h>		/* For size_t */
 
 /*
 **	These are the cpp-flags used in this file...
