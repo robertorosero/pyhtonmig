@@ -1,5 +1,5 @@
 #!/bin/sh
-# From configure.in Revision: 1.2.4.19 
+# From configure.in Revision: 1.2.4.20 
 #!/bin/sh
 # Guess values for system-dependent variables and create Makefiles.
 # Generated automatically using autoconf version 1.8 
@@ -338,6 +338,18 @@ test -n "$verbose" &&
 test -n "$verbose" && echo "	setting ac_compile to '$ac_compile'"
 
 # checks for alternative programs
+test -n "$silent" || echo "checking for --with(out)-gcc"
+# check whether --with-gcc or --without-gcc was given.
+withval="$with_gcc"
+if test -n "$withval"; then
+  
+	case $withval in
+	no)	withval=cc;;
+	yes)	withval=gcc;;
+	esac
+	CC=$withval
+fi
+
 if test -z "$CC"; then
   # Extract the first word of `gcc', so it can be a program name with args.
   set ac_dummy gcc; ac_word=$2
@@ -901,6 +913,29 @@ rm -fr conftest*
 
 
 # checks for typedefs
+test -n "$silent" || echo "checking for clock_t in time.h"
+echo '#include "confdefs.h"
+#include <time.h>' > conftest.${ac_ext}
+eval "$ac_cpp conftest.${ac_ext} > conftest.out 2>&1"
+if egrep "clock_t" conftest.out >/dev/null 2>&1; then
+  :
+else
+  rm -rf conftest*
+  
+{
+test -n "$verbose" && \
+echo "	defining" clock_t to be "long"
+echo "#define" clock_t "long" >> confdefs.h
+DEFS="$DEFS -Dclock_t=long"
+ac_sed_defs="${ac_sed_defs}\${ac_dA}clock_t\${ac_dB}clock_t\${ac_dC}long\${ac_dD}
+\${ac_uA}clock_t\${ac_uB}clock_t\${ac_uC}long\${ac_uD}
+\${ac_eA}clock_t\${ac_eB}clock_t\${ac_eC}long\${ac_eD}
+"
+}
+
+fi
+rm -f conftest*
+
 test -n "$silent" || echo "checking for mode_t in sys/types.h"
 echo '#include "confdefs.h"
 #include <sys/types.h>' > conftest.${ac_ext}
