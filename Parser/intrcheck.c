@@ -62,6 +62,30 @@ intrcheck()
 
 #if defined(MSDOS) && !defined(QUICKWIN)
 
+#ifdef __GNUC__
+
+/* This is for DJGPP's GO32 extender.  I don't know how to trap
+ * control-C  (There's no API for ctrl-C, and I don't want to mess with
+ * the interrupt vectors.)  However, this DOES catch control-break.
+ * --Amrit
+ */
+
+#include <go32.h>
+
+void
+initintr()
+{
+	_go32_want_ctrl_break(1 /* TRUE */);
+}
+
+int
+intrcheck()
+{
+	return _go32_was_ctrl_break_hit();
+}
+
+#else /* !__GNUC__ */
+
 /* This might work for MS-DOS (untested though): */
 
 void
@@ -79,6 +103,8 @@ intrcheck()
 	}
 	return interrupted;
 }
+
+#endif /* __GNUC__ */
 
 #define OK
 

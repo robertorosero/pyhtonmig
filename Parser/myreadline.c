@@ -88,8 +88,8 @@ my_fgets(buf, len, fp)
 			}
 /*fprintf(stderr, "my_fgets: EINTR\n");*/
 			continue;
-#endif
 		}
+#endif
 		if (intrcheck()) {
 /*fprintf(stderr, "my_fgets: intrcheck()\n");*/
 			return 1; /* Interrupt */

@@ -267,8 +267,11 @@ tok_nextc(tok)
 					     tok->buf + curstart;
 				if (fgets(tok->inp,
 					       (int)(tok->end - tok->inp),
-					       tok->fp) == NULL)
-					break;
+					       tok->fp) == NULL) {
+					/* Last line does not end in \n,
+					   fake one */
+					strcpy(tok->inp, "\n");
+				}
 				tok->inp = strchr(tok->inp, '\0');
 				done = tok->inp[-1] == '\n';
 			}
