@@ -1948,96 +1948,95 @@ override_slots(PyTypeObject *type, PyObject *dict)
 	PyNumberMethods *nb = type->tp_as_number;
 
 #define SQSLOT(OPNAME, SLOTNAME) \
-	if (PyDict_GetItemString(dict, "__" #OPNAME "__")) { \
+	if (PyDict_GetItemString(dict, OPNAME)) { \
 		sq->SLOTNAME = slot_##SLOTNAME; \
 	}
 
 #define MPSLOT(OPNAME, SLOTNAME) \
-	if (PyDict_GetItemString(dict, "__" #OPNAME "__")) { \
+	if (PyDict_GetItemString(dict, OPNAME)) { \
 		mp->SLOTNAME = slot_##SLOTNAME; \
 	}
 
 #define NBSLOT(OPNAME, SLOTNAME) \
-	if (PyDict_GetItemString(dict, "__" #OPNAME "__")) { \
+	if (PyDict_GetItemString(dict, OPNAME)) { \
 		nb->SLOTNAME = slot_##SLOTNAME; \
 	}
 
 #define TPSLOT(OPNAME, SLOTNAME) \
-	if (PyDict_GetItemString(dict, "__" #OPNAME "__")) { \
+	if (PyDict_GetItemString(dict, OPNAME)) { \
 		type->SLOTNAME = slot_##SLOTNAME; \
 	}
 
-	SQSLOT(len, sq_length);
-	SQSLOT(add, sq_concat);
-	SQSLOT(mul, sq_repeat);
-	SQSLOT(getitem, sq_item);
-	SQSLOT(getslice, sq_slice);
-	SQSLOT(setitem, sq_ass_item);
-	SQSLOT(setslice, sq_ass_slice);
-	SQSLOT(contains, sq_contains);
-	SQSLOT(iadd, sq_inplace_concat);
-	SQSLOT(imul, sq_inplace_repeat);
+	SQSLOT("__len__", sq_length);
+	SQSLOT("__add__", sq_concat);
+	SQSLOT("__mul__", sq_repeat);
+	SQSLOT("__getitem__", sq_item);
+	SQSLOT("__getslice__", sq_slice);
+	SQSLOT("__setitem__", sq_ass_item);
+	SQSLOT("__setslice__", sq_ass_slice);
+	SQSLOT("__contains__", sq_contains);
+	SQSLOT("__iadd__", sq_inplace_concat);
+	SQSLOT("__imul__", sq_inplace_repeat);
 
-	MPSLOT(len, mp_length);
-	MPSLOT(getitem, mp_subscript);
-	MPSLOT(setitem, mp_ass_subscript);
+	MPSLOT("__len__", mp_length);
+	MPSLOT("__getitem__", mp_subscript);
+	MPSLOT("__setitem__", mp_ass_subscript);
 
-	NBSLOT(add, nb_add);
-	NBSLOT(sub, nb_subtract);
-	NBSLOT(mul, nb_multiply);
-	NBSLOT(div, nb_divide);
-	NBSLOT(mod, nb_remainder);
-	NBSLOT(divmod, nb_divmod);
-	NBSLOT(pow, nb_power);
-	NBSLOT(neg, nb_negative);
-	NBSLOT(pos, nb_positive);
-	NBSLOT(abs, nb_absolute);
-	NBSLOT(nonzero, nb_nonzero);
-	NBSLOT(invert, nb_invert);
-	NBSLOT(lshift, nb_lshift);
-	NBSLOT(rshift, nb_rshift);
-	NBSLOT(and, nb_and);
-	NBSLOT(xor, nb_xor);
-	NBSLOT(or, nb_or);
+	NBSLOT("__add__", nb_add);
+	NBSLOT("__sub__", nb_subtract);
+	NBSLOT("__mul__", nb_multiply);
+	NBSLOT("__div__", nb_divide);
+	NBSLOT("__mod__", nb_remainder);
+	NBSLOT("__divmod__", nb_divmod);
+	NBSLOT("__pow__", nb_power);
+	NBSLOT("__neg__", nb_negative);
+	NBSLOT("__pos__", nb_positive);
+	NBSLOT("__abs__", nb_absolute);
+	NBSLOT("__nonzero__", nb_nonzero);
+	NBSLOT("__invert__", nb_invert);
+	NBSLOT("__lshift__", nb_lshift);
+	NBSLOT("__rshift__", nb_rshift);
+	NBSLOT("__and__", nb_and);
+	NBSLOT("__xor__", nb_xor);
+	NBSLOT("__or__", nb_or);
 	/* Not coerce() */
-	NBSLOT(int, nb_int);
-	NBSLOT(long, nb_long);
-	NBSLOT(float, nb_float);
-	NBSLOT(oct, nb_oct);
-	NBSLOT(hex, nb_hex);
-	NBSLOT(iadd, nb_inplace_add);
-	NBSLOT(isub, nb_inplace_subtract);
-	NBSLOT(imul, nb_inplace_multiply);
-	NBSLOT(idiv, nb_inplace_divide);
-	NBSLOT(imod, nb_inplace_remainder);
-	NBSLOT(ipow, nb_inplace_power);
-	NBSLOT(ilshift, nb_inplace_lshift);
-	NBSLOT(irshift, nb_inplace_rshift);
-	NBSLOT(iand, nb_inplace_and);
-	NBSLOT(ixor, nb_inplace_xor);
-	NBSLOT(ior, nb_inplace_or);
+	NBSLOT("__int__", nb_int);
+	NBSLOT("__long__", nb_long);
+	NBSLOT("__float__", nb_float);
+	NBSLOT("__oct__", nb_oct);
+	NBSLOT("__hex__", nb_hex);
+	NBSLOT("__iadd__", nb_inplace_add);
+	NBSLOT("__isub__", nb_inplace_subtract);
+	NBSLOT("__imul__", nb_inplace_multiply);
+	NBSLOT("__idiv__", nb_inplace_divide);
+	NBSLOT("__imod__", nb_inplace_remainder);
+	NBSLOT("__ipow__", nb_inplace_power);
+	NBSLOT("__ilshift__", nb_inplace_lshift);
+	NBSLOT("__irshift__", nb_inplace_rshift);
+	NBSLOT("__iand__", nb_inplace_and);
+	NBSLOT("__ixor__", nb_inplace_xor);
+	NBSLOT("__ior__", nb_inplace_or);
 
 	if (PyDict_GetItemString(dict, "__str__") ||
 	    PyDict_GetItemString(dict, "__repr__"))
 		type->tp_print = NULL;
-	
-	TPSLOT(cmp, tp_compare);
-	TPSLOT(repr, tp_repr);
-	TPSLOT(hash, tp_hash);
-	TPSLOT(call, tp_call);
-	TPSLOT(str, tp_str);
-	TPSLOT(getattr, tp_getattro);
-	TPSLOT(setattr, tp_setattro);
-	TPSLOT(lt, tp_richcompare);
-	TPSLOT(le, tp_richcompare);
-	TPSLOT(eq, tp_richcompare);
-	TPSLOT(ne, tp_richcompare);
-	TPSLOT(gt, tp_richcompare);
-	TPSLOT(ge, tp_richcompare);
-	TPSLOT(iter, tp_iter);
-	if (PyDict_GetItemString(dict, "next"))
-		type->tp_iternext = slot_tp_iternext;
-	TPSLOT(get, tp_descr_get);
-	TPSLOT(set, tp_descr_set);
-	TPSLOT(init, tp_init);
+
+	TPSLOT("__cmp__", tp_compare);
+	TPSLOT("__repr__", tp_repr);
+	TPSLOT("__hash__", tp_hash);
+	TPSLOT("__call__", tp_call);
+	TPSLOT("__str__", tp_str);
+	TPSLOT("__getattr__", tp_getattro);
+	TPSLOT("__setattr__", tp_setattro);
+	TPSLOT("__lt__", tp_richcompare);
+	TPSLOT("__le__", tp_richcompare);
+	TPSLOT("__eq__", tp_richcompare);
+	TPSLOT("__ne__", tp_richcompare);
+	TPSLOT("__gt__", tp_richcompare);
+	TPSLOT("__ge__", tp_richcompare);
+	TPSLOT("__iter__", tp_iter);
+	TPSLOT("next", tp_iternext);
+	TPSLOT("__get__", tp_descr_get);
+	TPSLOT("__set__", tp_descr_set);
+	TPSLOT("__init__", tp_init);
 }
