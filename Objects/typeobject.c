@@ -1539,8 +1539,22 @@ static struct wrapperbase tab_iter[] = {
 	{0}
 };
 
+static PyObject *
+wrap_next(PyObject *self, PyObject *args, void *wrapped)
+{
+	unaryfunc func = (unaryfunc)wrapped;
+	PyObject *res;
+
+	if (!PyArg_ParseTuple(args, ""))
+		return NULL;
+	res = (*func)(self);
+	if (res == NULL && !PyErr_Occurred())
+		PyErr_SetNone(PyExc_StopIteration);
+	return res;
+}
+
 static struct wrapperbase tab_next[] = {
-	{"next", (wrapperfunc)wrap_unaryfunc, "x.next() -> next value"},
+	{"next", (wrapperfunc)wrap_next, "x.next() -> next value"},
 	{0}
 };
 
