@@ -931,6 +931,67 @@ compiler_continue(struct compiler *c)
 	return 1;
 }
 
+/* Code generated for "try: S finally: Sf" is as follows:
+   
+		SETUP_FINALLY	L
+		<code for body>
+		POP_BLOCK
+		LOAD_CONST	<None>
+	L:	<code for finalbody>
+		END_FINALLY
+   
+   The special instructions use the block stack.  Each block
+   stack entry contains the instruction that created it (here
+   SETUP_FINALLY), the level of the value stack at the time the
+   block stack entry was created, and a label (here L).
+   
+   SETUP_FINALLY:
+	Pushes the current value stack level and the label
+	onto the block stack.
+   POP_BLOCK:
+	Pops en entry from the block stack, and pops the value
+	stack until its level is the same as indicated on the
+	block stack.  (The label is ignored.)
+   END_FINALLY:
+	Pops a variable number of entries from the *value* stack
+	and re-raises the exception they specify.  The number of
+	entries popped depends on the (pseudo) exception type.
+   
+   The block stack is unwound when an exception is raised:
+   when a SETUP_FINALLY entry is found, the exception is pushed
+   onto the value stack (and the exception condition is cleared),
+   and the interpreter jumps to the label gotten from the block
+   stack.
+*/
+
+static int
+compiler_try_finally(struct compiler *c, stmt_ty s)
+{
+	int body, end;
+	body = compiler_new_block(c);
+	end = compiler_new_block(c);
+	if (body < 0 || end < 0)
+		return 0;
+
+	ADDOP_JREL(c, SETUP_FINALLY, end);
+	compiler_use_next_block(c, body);
+	if (!compiler_push_fblock(c, FINALLY_TRY, body))
+		return 0;
+	VISIT_SEQ(c, stmt, s->v.TryFinally.body);
+	ADDOP(c, POP_BLOCK);
+	compiler_pop_fblock(c, FINALLY_TRY, body);
+
+	ADDOP_O(c, LOAD_CONST, Py_None, consts);
+	compiler_use_next_block(c, end);
+	if (!compiler_push_fblock(c, FINALLY_END, end))
+		return 0;
+	VISIT_SEQ(c, stmt, s->v.TryFinally.finalbody);
+	ADDOP(c, END_FINALLY);
+	compiler_pop_fblock(c, FINALLY_END, end);
+
+	return 1;
+}
+
 static int
 compiler_import(struct compiler *c, stmt_ty s)
 {
@@ -1013,6 +1074,7 @@ compiler_assert(struct compiler *c, stmt_ty s)
 	if (end < 0)
 		return 0;
 	ADDOP_JREL(c, JUMP_IF_TRUE, end);
+	ADDOP(c, POP_TOP);
 	ADDOP_O(c, LOAD_GLOBAL, assertion_error, names);
 	if (s->v.Assert.msg) {
 		VISIT(c, expr, s->v.Assert.msg);
@@ -1022,6 +1084,7 @@ compiler_assert(struct compiler *c, stmt_ty s)
 		ADDOP_I(c, RAISE_VARARGS, 1);
 	}
 	compiler_use_block(c, end);
+	ADDOP(c, POP_TOP);
 	return 1;
 }
 
@@ -1095,9 +1158,7 @@ compiler_visit_stmt(struct compiler *c, stmt_ty s)
 		VISIT_SEQ(c, stmt, s->v.TryExcept.body);
 		break;
         case TryFinally_kind:
-		VISIT_SEQ(c, stmt, s->v.TryFinally.body);
-		VISIT_SEQ(c, stmt, s->v.TryFinally.finalbody);
-		break;
+		return compiler_try_finally(c, s);
         case Assert_kind:
 		return compiler_assert(c, s);
         case Import_kind:
