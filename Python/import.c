@@ -302,6 +302,11 @@ get_module(m, name, m_ret)
 		char funcname[258];
 		dl_funcptr p;
 		fclose(fp);
+		if (m != NULL) {
+			err_setstr(ImportError,
+				   "cannot reload dynamically loaded module");
+			return NULL;
+		}
 		sprintf(funcname, "init%s", name);
 #ifdef USE_SHLIB
 		{
@@ -407,6 +412,7 @@ reload_module(m)
 	object *m;
 {
 	char *name;
+	int i;
 	if (m == NULL || !is_moduleobject(m)) {
 		err_setstr(TypeError, "reload() argument must be module");
 		return NULL;
@@ -414,7 +420,21 @@ reload_module(m)
 	name = getmodulename(m);
 	if (name == NULL)
 		return NULL;
-	/* XXX Ought to check for builtin modules -- can't reload these... */
+	/* Check for built-in modules */
+	for (i = 0; inittab[i].name != NULL; i++) {
+		if (strcmp(name, inittab[i].name) == 0) {
+			err_setstr(ImportError,
+				   "cannot reload built-in module");
+			return NULL;
+		}
+	}
+	/* Check for frozen modules */
+	if ((i = init_frozen(name)) != 0) {
+		if (i < 0)
+			return NULL;
+		INCREF(None);
+		return None;
+	}
 	return get_module(m, name, (object **)NULL);
 }
 
@@ -451,6 +471,11 @@ init_builtin(name)
 	int i;
 	for (i = 0; inittab[i].name != NULL; i++) {
 		if (strcmp(name, inittab[i].name) == 0) {
+			if (inittab[i].initfunc == NULL) {
+				err_setstr(ImportError,
+					   "cannot re-init internal module");
+				return -1;
+			}
 			if (verbose)
 				fprintf(stderr, "import %s # builtin\n",
 					name);
