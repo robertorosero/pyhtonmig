@@ -1530,6 +1530,7 @@ string_endswith(self, args)
 static PyMethodDef 
 string_methods[] = {
 	/* counterparts of the obsolete stropmodule functions */
+#ifdef STRING_METHODS
 	{"capitalize", (PyCFunction)string_capitalize, 1, capitalize__doc__},
 	{"count",      (PyCFunction)string_count,      1, count__doc__},
 	{"endswith",   (PyCFunction)string_endswith,   1, endswith__doc__},
@@ -1556,6 +1557,7 @@ string_methods[] = {
 /* 	{"zfill"        (PyCFunction)string_zfill,       1, zfill__doc__}, */
 /* 	{"expandtabs"   (PyCFunction)string_expandtabs,  1, ljust__doc__}, */
 /* 	{"capwords"     (PyCFunction)string_capwords,    1, capwords__doc__}, */
+#endif /* STRING_METHODS */
 	{NULL,     NULL}		     /* sentinel */
 };
 
