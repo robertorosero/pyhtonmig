@@ -56,7 +56,7 @@ lib.info: python-lib.info
 
 # This target is very local to CWI...
 libwww: lib.texi
-	texi2html -d lib.texi /usr/local/ftp.cwi.nl/pub/www/texinfo/python
+	texi2html -d lib.texi /ufs/guido/www/texinfo/python
 
 # This one too...
 L2H=	/usr/local/LaTeX2html/latex2html
