@@ -8,6 +8,10 @@
 
 int Py_OptimizeFlag = 0;
 
+#if 1
+#define fprintf if (0) fprintf
+#endif
+
 /*
    KNOWN BUGS:
 
@@ -25,14 +29,26 @@ int Py_OptimizeFlag = 0;
        LOAD_NAME is output instead of LOAD_GLOBAL
 
      4:
-       line numbers are off a bit (may just need to add calls to set lineno
+       line numbers are off a bit (may just need to add calls to set lineno)
 
      5:
        Modules/parsermodule.c:496: warning: implicit declaration 
                                    of function `PyParser_SimpleParseString'
 
      6:
-       while loops with try/except in them don't work
+       compile.h::b_return is only set, never used
+
+     7:
+       compound arguments cause seg fault (def f5((compound, first), two):)
+
+     8:
+       exec ... in ... seg faults (exec w/o in works)
+
+     9:
+       vars() doesn't return local variables
+
+     10:
+       problem with cell objects (see test_builtins::test_map)
 */
 
 /* fblockinfo tracks the current frame block.
@@ -133,14 +149,9 @@ static void compiler_pop_fblock(struct compiler *, enum fblocktype, int);
 
 static int inplace_binop(struct compiler *, operator_ty);
 
-static PyCodeObject *assemble(struct compiler *);
+static PyCodeObject *assemble(struct compiler *, int addNone);
 
-static char *opnames[144];
-
-#define IS_JUMP(I) ((I)->i_jrel || (I)->i_jabs)
-
-#define BLOCK(U, I) (U)->u_blocks[I]
-#define CURBLOCK(U) BLOCK(U, (U)->u_curblock)
+static char *opnames[];
 
 int
 _Py_Mangle(char *p, char *name, char *buffer, size_t maxlen)
@@ -689,6 +700,7 @@ static PyCodeObject *
 compiler_mod(struct compiler *c, mod_ty mod)
 {
 	PyCodeObject *co;
+        int addNone = 1;
 	static PyObject *module;
 	if (!module) {
 		module = PyString_FromString("<module>");
@@ -707,13 +719,16 @@ compiler_mod(struct compiler *c, mod_ty mod)
 		break;
 	case Expression_kind:
 		VISIT(c, expr, mod->v.Expression.body);
+                addNone = 0;
 		break;
 	case Suite_kind:
-		assert(0);
+		assert(0);      /* XXX: what should we do here? */
 		VISIT_SEQ(c, stmt, mod->v.Suite.body);
 		break;
+        default:
+            assert(0);
 	}
-	co = assemble(c);
+	co = assemble(c, addNone);
 	compiler_exit_scope(c);
 	return co;
 }
@@ -739,7 +754,7 @@ compiler_function(struct compiler *c, stmt_ty s)
 			continue;
 		VISIT(c, stmt, s2);
 	}
-	co = assemble(c);
+	co = assemble(c, 1);
 	if (co == NULL)
 		return 0;
 	compiler_exit_scope(c);
@@ -770,7 +785,7 @@ compiler_class(struct compiler *c, stmt_ty s)
 	VISIT_SEQ(c, stmt, s->v.ClassDef.body);
 	ADDOP(c, LOAD_LOCALS);
 	ADDOP(c, RETURN_VALUE);
-	co = assemble(c);
+	co = assemble(c, 1);
 	if (co == NULL)
 		return 0;
 	compiler_exit_scope(c);
@@ -804,7 +819,7 @@ compiler_lambda(struct compiler *c, expr_ty e)
 	c->u->u_argcount = asdl_seq_LEN(e->v.Lambda.args->args);
 	VISIT(c, expr, e->v.Lambda.body);
 	ADDOP(c, RETURN_VALUE);
-	co = assemble(c);
+	co = assemble(c, 1);
 	if (co == NULL)
 		return 0;
 	compiler_exit_scope(c);
@@ -900,7 +915,7 @@ compiler_for(struct compiler *c, stmt_ty s)
 	VISIT(c, expr, s->v.For.target);
 	VISIT_SEQ(c, stmt, s->v.For.body);
 	ADDOP_JABS(c, JUMP_ABSOLUTE, start);
-	compiler_use_block(c, cleanup);
+	compiler_use_next_block(c, cleanup);
 	ADDOP(c, POP_BLOCK);
 	compiler_pop_fblock(c, LOOP, start);
 	VISIT_SEQ(c, stmt, s->v.For.orelse);
@@ -939,10 +954,7 @@ compiler_while(struct compiler *c, stmt_ty s)
 	   if there is no else clause ?
 	*/
 
-        /* sometimes this needs to be compiler_use_next_block 
-           (e.g., nested loops), but if the code is
-           while XXX: try: ... this is correct */
-	compiler_use_block(c, anchor);
+	compiler_use_next_block(c, anchor);
 	ADDOP(c, POP_TOP);
 	ADDOP(c, POP_BLOCK);
 	compiler_pop_fblock(c, LOOP, loop);
@@ -956,10 +968,11 @@ compiler_while(struct compiler *c, stmt_ty s)
 static int
 compiler_continue(struct compiler *c)
 {
+	static const char LOOP_ERROR_MSG[] = "'continue' not properly in loop";
 	int i;
 
 	if (!c->u->u_nfblocks)
-		return compiler_error(c, "'continue' outside loop");
+		return compiler_error(c, LOOP_ERROR_MSG);
 	i = c->u->u_nfblocks - 1;
 	switch (c->u->u_fblock[i].fb_type) {
 	case LOOP:
@@ -970,12 +983,12 @@ compiler_continue(struct compiler *c)
 		while (--i > 0 && c->u->u_fblock[i].fb_type != LOOP)
 			;
 		if (i == -1)
-			return compiler_error(c, "'continue' outside loop");
+			return compiler_error(c, LOOP_ERROR_MSG);
 		ADDOP_I(c, CONTINUE_LOOP, c->u->u_fblock[i].fb_block);
 		break;
 	case FINALLY_END:
 	        return compiler_error(c,
-			"'continue' not allowed in 'finally' block");
+			"'continue' not supported inside 'finally' clause");
 	}
 
 	/* If the continue wasn't an error, it will always end a block. */
@@ -1145,12 +1158,28 @@ compiler_import(struct compiler *c, stmt_ty s)
 		ADDOP_O(c, LOAD_CONST, Py_None, consts);
 		ADDOP_O(c, IMPORT_NAME, alias->name, names);
 
-		store_name = alias->name;
-		if (alias->asname)
+                /* XXX: handling of store_name should be cleaned up */
+		if (alias->asname) {
 			store_name = alias->asname;
+                        Py_INCREF(store_name);
+                }
+                else {
+                    const char *base = PyString_AS_STRING(alias->name);
+                    char *dot = strchr(base, '.');
+                    if (dot)
+                        store_name = PyString_FromStringAndSize(base,
+                                                                dot - base);
+                    else {
+                        store_name = alias->name;
+                        Py_INCREF(store_name);
+                    }
+                }
 
-		if (!compiler_nameop(c, store_name, Store))
-			return 0;
+		if (!compiler_nameop(c, store_name, Store)) {
+                    Py_DECREF(store_name);
+                    return 0;
+                }
+                Py_DECREF(store_name);
 	}
 	return 1;
 }
@@ -1337,8 +1366,7 @@ compiler_visit_stmt(struct compiler *c, stmt_ty s)
 		ADDOP(c, BREAK_LOOP);
 		break;
         case Continue_kind:
-		compiler_continue(c);
-		break;
+		return compiler_continue(c);
 	}
 	return 1;
 }
@@ -1485,8 +1513,6 @@ compiler_nameop(struct compiler *c, identifier name, expr_context_ty ctx)
 		optype = OP_GLOBAL;
 		break;
 	}
-	if (optype == OP_DEREF)
-		abort();
 
 	switch (optype) {
 	case OP_DEREF:
@@ -1697,7 +1723,10 @@ compiler_listcomp_generator(struct compiler *c,
 	skip = compiler_new_block(c);
 	if_cleanup = compiler_new_block(c);
 	anchor = compiler_new_block(c);
-	
+
+        if (start < 0 || skip < 0 || if_cleanup < 0 || anchor < 0)
+            return 0;
+
 	l = asdl_seq_GET(generators, gen_index);
 	VISIT(c, expr, l->iter);
 	ADDOP(c, GET_ITER);
@@ -1990,10 +2019,58 @@ compiler_error(struct compiler *c, const char *errstr)
 }
 
 static int
+compiler_handle_subscr(struct compiler *c, const char *kind, 
+                       expr_context_ty ctx) {
+    int op;
+
+    switch (ctx) {
+    case AugLoad: /* fall through to Load */
+    case Load:    op = BINARY_SUBSCR; break;
+    case AugStore:/* fall through to Store */
+    case Store:   op = STORE_SUBSCR; break;
+    case Del:     op = DELETE_SUBSCR; break;
+    default:
+        fprintf(stderr, "invalid %s kind %d in compiler_visit_slice\n", 
+                kind, ctx);
+        return 0;
+    }
+    if (ctx == AugLoad) {
+        ADDOP_I(c, DUP_TOPX, 2);
+    }
+    else if (ctx == AugStore) {
+        ADDOP(c, ROT_THREE);
+    }
+    ADDOP(c, op);
+    return 1;
+}
+
+static int
 compiler_slice(struct compiler *c, slice_ty s, int op, expr_context_ty ctx)
 {
 	int slice_offset = 0, stack_count = 0;
 	assert(s->kind == Slice_kind);
+
+        /* XXX: is this right?  is ExtSlice ever used? */
+	if (s->v.Slice.step) {
+            if (s->v.Slice.lower) {
+                VISIT(c, expr, s->v.Slice.lower);
+            }
+            else {
+                ADDOP_O(c, LOAD_CONST, Py_None, consts);
+            }
+                
+            if (s->v.Slice.upper) {
+                VISIT(c, expr, s->v.Slice.upper);
+            }
+            else {
+                ADDOP_O(c, LOAD_CONST, Py_None, consts);
+            }
+
+            VISIT(c, expr, s->v.Slice.step);
+            ADDOP_I(c, BUILD_SLICE, 3);   /* XXX: always 3? remove arg? */
+            return compiler_handle_subscr(c, "extended slice", ctx);
+        }
+
 	if (s->v.Slice.lower) {
 		stack_count++;
 		slice_offset |= 1;
@@ -2011,14 +2088,12 @@ compiler_slice(struct compiler *c, slice_ty s, int op, expr_context_ty ctx)
 		switch (stack_count) {
 		case 0: ADDOP(c, DUP_TOP); break;
 		case 1: ADDOP_I(c, DUP_TOPX, 2); break;
-		case 2: ADDOP_I(c, DUP_TOPX, 3); break;
 		}
 	}
 	else if (ctx == AugStore) {
 		switch (stack_count) {
 		case 0: ADDOP(c, ROT_TWO); break;
 		case 1: ADDOP(c, ROT_THREE); break;
-		case 2: ADDOP(c, ROT_FOUR); break;
 		}
 	}
 
@@ -2046,30 +2121,13 @@ compiler_visit_slice(struct compiler *c, slice_ty s, expr_context_ty ctx)
 				"in compiler_visit_slice\n", ctx);
 			return 0;
 		}
-		return compiler_slice(c, s, op, ctx);
+                return compiler_slice(c, s, op, ctx);
 	case ExtSlice_kind:
+                /* XXX: do we need to do anything?  should this be removed? */
 		break;
 	case Index_kind:
 		VISIT(c, expr, s->v.Index.value);
-		switch (ctx) {
-		case AugLoad: /* fall through to Load */
-		case Load:    op = BINARY_SUBSCR; break;
-		case AugStore:/* fall through to Store */
-		case Store:   op = STORE_SUBSCR; break;
-		case Del:     op = DELETE_SUBSCR; break;
-		default:
-			fprintf(stderr, "invalid index kind %d "
-				"in compiler_visit_slice\n", ctx);
-			return 0;
-		}
-		if (ctx == AugLoad) {
-			ADDOP_I(c, DUP_TOPX, 2);
-		}
-		else if (ctx == AugStore) {
-			ADDOP(c, ROT_THREE);
-		}
-		ADDOP(c, op);
-		break;
+                return compiler_handle_subscr(c, "index", ctx);
 	}
 	return 1;
 }
@@ -2470,7 +2528,7 @@ makecode(struct compiler *c, struct assembler *a)
 }
 
 static PyCodeObject *
-assemble(struct compiler *c)
+assemble(struct compiler *c, int addNone)
 {
 	struct assembler a;
 	int i, j;
@@ -2481,7 +2539,8 @@ assemble(struct compiler *c)
 	   block ends with a jump or return b_next shouldn't set.
 	 */
 	NEXT_BLOCK(c);
-	ADDOP_O(c, LOAD_CONST, Py_None, consts);
+        if (addNone)
+            ADDOP_O(c, LOAD_CONST, Py_None, consts);
 	ADDOP(c, RETURN_VALUE);
 
 	if (!assemble_init(&a, c->u->u_nblocks))
@@ -2668,4 +2727,3 @@ static char *opnames[] = {
 	"CALL_FUNCTION_VAR_KW",
 	"EXTENDED_ARG",
 };
-
