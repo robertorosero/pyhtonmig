@@ -9,6 +9,8 @@ VPATH=		@srcdir@
 
 CC=		@CC@
 RANLIB=		@RANLIB@
+AR=		@AR@
+
 DEFS=		@DEFS@
 LIBOBJS=	@LIBOBJS@
 LIBS=		@LIBS@
@@ -18,10 +20,9 @@ DLINCLDIR=	@DLINCLDIR@
 # === Other things that are customizable but not by configure ===
 
 INCLDIR=	$(srcdir)/../Include
-OPT=		-g
+OPT=		-O
 CFLAGS=		$(OPT) -I$(INCLDIR) -I.. $(DEFS)
 
-AR=		ar
 MKDEP=		mkdep
 SHELL=		/bin/sh
 

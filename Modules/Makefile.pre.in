@@ -20,6 +20,8 @@ VPATH=		@srcdir@
 
 CC=		@CC@
 RANLIB=		@RANLIB@
+AR=		@AR@
+
 DEFS=		@DEFS@
 LIBS=		@LIBS@
 LIBM=		@LIBM@
@@ -32,10 +34,9 @@ prefix=		/usr/local
 # === Variables that are customizable by hand ===
 
 INCLDIR=	$(srcdir)/../Include
-OPT=		-g
+OPT=		-O
 CFLAGS=		$(OPT) -I$(INCLDIR) -I.. $(DEFS)
 
-AR=		ar
 MKDEP=		mkdep
 SHELL=		/bin/sh
 
