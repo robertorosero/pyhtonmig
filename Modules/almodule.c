@@ -184,17 +184,17 @@ al_setfloatmax(self, args)
 #endif /* AL_405 */
 	
 static struct methodlist config_methods[] = {
-	{"getqueuesize",	al_getqueuesize},
-	{"setqueuesize",	al_setqueuesize},
-	{"getwidth",		al_getwidth},
-	{"setwidth",		al_setwidth},
-	{"getchannels",		al_getchannels},
-	{"setchannels",		al_setchannels},
+	{"getqueuesize",	(method)al_getqueuesize},
+	{"setqueuesize",	(method)al_setqueuesize},
+	{"getwidth",		(method)al_getwidth},
+	{"setwidth",		(method)al_setwidth},
+	{"getchannels",		(method)al_getchannels},
+	{"setchannels",		(method)al_setchannels},
 #ifdef AL_405
-	{"getsampfmt",		al_getsampfmt},
-	{"setsampfmt",		al_setsampfmt},
-	{"getfloatmax",		al_getfloatmax},
-	{"setfloatmax",		al_setfloatmax},
+	{"getsampfmt",		(method)al_getsampfmt},
+	{"setsampfmt",		(method)al_setsampfmt},
+	{"getfloatmax",		(method)al_getfloatmax},
+	{"setfloatmax",		(method)al_setfloatmax},
 #endif /* AL_405 */
 	{NULL,			NULL}		/* sentinel */
 };
@@ -489,19 +489,19 @@ al_getstatus (self, args)
 #endif /* AL_405 */
 
 static struct methodlist port_methods[] = {
-	{"closeport",		al_closeport},
-	{"getfd",		al_getfd},
-        {"fileno",		al_getfd},
-	{"getfilled",		al_getfilled},
-	{"getfillable",		al_getfillable},
-	{"readsamps",		al_readsamps},
-	{"writesamps",		al_writesamps},
-	{"setfillpoint",	al_setfillpoint},
-	{"getfillpoint",	al_getfillpoint},
-	{"setconfig",		al_setconfig},
-	{"getconfig",		al_getconfig},
+	{"closeport",		(method)al_closeport},
+	{"getfd",		(method)al_getfd},
+        {"fileno",		(method)al_getfd},
+	{"getfilled",		(method)al_getfilled},
+	{"getfillable",		(method)al_getfillable},
+	{"readsamps",		(method)al_readsamps},
+	{"writesamps",		(method)al_writesamps},
+	{"setfillpoint",	(method)al_setfillpoint},
+	{"getfillpoint",	(method)al_getfillpoint},
+	{"setconfig",		(method)al_setconfig},
+	{"getconfig",		(method)al_getconfig},
 #ifdef AL_405
-	{"getstatus",		al_getstatus},
+	{"getstatus",		(method)al_getstatus},
 #endif /* AL_405 */	    
 	{NULL,			NULL}		/* sentinel */
 };
@@ -735,14 +735,14 @@ al_getminmax(self, args)
 }
 
 static struct methodlist al_methods[] = {
-	{"openport",		al_openport},
-	{"newconfig",		al_newconfig},
-	{"queryparams",		al_queryparams},
-	{"getparams",		al_getparams},
-	{"setparams",		al_setparams},
-	{"getname",		al_getname},
-	{"getdefault",		al_getdefault},
-	{"getminmax",		al_getminmax},
+	{"openport",		(method)al_openport},
+	{"newconfig",		(method)al_newconfig},
+	{"queryparams",		(method)al_queryparams},
+	{"getparams",		(method)al_getparams},
+	{"setparams",		(method)al_setparams},
+	{"getname",		(method)al_getname},
+	{"getdefault",		(method)al_getdefault},
+	{"getminmax",		(method)al_getminmax},
 	{NULL,			NULL}		/* sentinel */
 };
 
