@@ -1084,6 +1084,7 @@ _PyExc_Init(void)
     if (i < 0) {
  err:
 	Py_FatalError("exceptions bootstrapping error.");
+	return;
     }
 
     /* This is the base class of all exceptions, so make it first. */
