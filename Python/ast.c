@@ -686,7 +686,12 @@ ast_for_expr(const node *n)
 		return NULL;
 	    asdl_seq_SET(seq, i / 2, e);
 	}
-	return BoolOp(Or, seq);
+	if (strcmp(STR(CHILD(n, 1)), "and"))
+	    return BoolOp(Or, seq);
+	else {
+	    assert(strcmp(STR(CHILD(n, 1)), "or"));
+	    return BoolOp(And, seq);
+	}
 	break;
     case not_test:
 	if (NCH(n) == 1) {
