@@ -2167,18 +2167,18 @@ loop_subscript(v, w)
 	object *v, *w;
 {
 	sequence_methods *sq = v->ob_type->tp_as_sequence;
-	int i, n;
+	int i;
 	if (sq == NULL) {
 		err_setstr(TypeError, "loop over non-sequence");
 		return NULL;
 	}
 	i = getintvalue(w);
-	n = (*sq->sq_length)(v);
-	if (n < 0)
-		return NULL; /* Exception */
-	if (i >= n)
-		return NULL; /* End of loop */
-	return (*sq->sq_item)(v, i);
+	v = (*sq->sq_item)(v, i);
+	if (v)
+		return v;
+	if (err_occurred() == IndexError)
+		err_clear();
+	return NULL;
 }
 
 static int
@@ -2305,7 +2305,7 @@ static int
 cmp_member(v, w)
 	object *v, *w;
 {
-	int i, n, cmp;
+	int i, cmp;
 	object *x;
 	sequence_methods *sq;
 	/* Special case for char in string */
@@ -2332,11 +2332,15 @@ cmp_member(v, w)
 			"'in' or 'not in' needs sequence right argument");
 		return -1;
 	}
-	n = (*sq->sq_length)(w);
-	if (n < 0)
-		return -1;
-	for (i = 0; i < n; i++) {
+	for (i = 0; ; i++) {
 		x = (*sq->sq_item)(w, i);
+		if (x == NULL) {
+			if (err_occurred() == IndexError) {
+				err_clear();
+				break;
+			}
+			return -1;
+		}
 		cmp = cmpobject(v, x);
 		XDECREF(x);
 		if (cmp == 0)
