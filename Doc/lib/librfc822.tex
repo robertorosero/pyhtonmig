@@ -8,10 +8,11 @@ This module defines a class, \class{Message}, which represents a
 collection of ``email headers'' as defined by the Internet standard
 \rfc{822}.  It is used in various contexts, usually to read such
 headers from a file.  This module also defines a helper class 
-\class{AddressList} for parsing \rfc{822} addresses.
+\class{AddressList} for parsing \rfc{822} addresses.  Please refer to
+the RFC for information on the specific syntax of \rfc{822} headers.
 
-Note that there's a separate module to read \UNIX{}, MH, and MMDF
-style mailbox files: \refmodule{mailbox}\refstmodindex{mailbox}.
+The \refmodule{mailbox}\refstmodindex{mailbox} module provides classes 
+to read mailboxes produced by various end-user mail programs.
 
 \begin{classdesc}{Message}{file\optional{, seekable}}
 A \class{Message} instance is instantiated with an input object as
@@ -85,6 +86,12 @@ elements as a local time and then compensates for the timezone
 difference; this may yield a slight error around daylight savings time
 switch dates.  Not enough to worry about for common use.
 \end{funcdesc}
+
+
+\begin{seealso}
+  \seemodule{mailbox}{Classes to read various mailbox formats produced 
+                      by end-user mail programs.}
+\end{seealso}
 
 
 \subsection{Message Objects \label{message-objects}}
