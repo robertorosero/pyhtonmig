@@ -5,6 +5,13 @@
 #include "symtable.h"
 #include "structmember.h"
 
+/* two error strings used for warnings */
+#define GLOBAL_AFTER_ASSIGN \
+"name '%.400s' is assigned to before global declaration"
+
+#define GLOBAL_AFTER_USE \
+"name '%.400s' is used prior to global declaration"
+
 PySTEntryObject *
 PySTEntry_New(struct symtable *st, identifier name, block_ty block,
 	      void *key, int lineno)
@@ -143,6 +150,7 @@ PyTypeObject PySTEntry_Type = {
 };
 
 static int symtable_analyze(struct symtable *st);
+static int symtable_warn(struct symtable *st, char *msg);
 static int symtable_enter_block(struct symtable *st, identifier name, 
 				block_ty block, void *ast, int lineno);
 static int symtable_exit_block(struct symtable *st, void *ast);
@@ -595,6 +603,21 @@ symtable_analyze(struct symtable *st)
 }
 
 
+static int
+symtable_warn(struct symtable *st, char *msg)
+{
+	if (PyErr_WarnExplicit(PyExc_SyntaxWarning, msg, st->st_filename,
+			       st->st_cur->ste_lineno, NULL, NULL) < 0)	{
+		if (PyErr_ExceptionMatches(PyExc_SyntaxWarning)) {
+			PyErr_SetString(PyExc_SyntaxError, msg);
+			PyErr_SyntaxLocation(st->st_filename, 
+					     st->st_cur->ste_lineno);
+		}
+		return 0;
+	}
+	return 1;
+}
+
 /* symtable_enter_block() gets a reference via PySTEntry_New().
    This reference is released when the block is exited, via the DECREF
    in symtable_exit_block().
@@ -644,13 +667,22 @@ symtable_enter_block(struct symtable *st, identifier name, block_ty block,
 }
 
 static int
+symtable_lookup(struct symtable *st, PyObject *name)
+{
+	PyObject *o;
+
+	o = PyDict_GetItem(st->st_cur->ste_symbols, name);
+	if (!o)
+		return 0;
+	return PyInt_AsLong(o);
+}
+
+static int
 symtable_add_def(struct symtable *st, PyObject *name, int flag) 
 {
 	PyObject *o;
 	PyObject *dict;
 	int val;
-
-	/* XXX must always be called with mangled names. */
 
 	dict = st->st_cur->ste_symbols;
 	if ((o = PyDict_GetItem(dict, name))) {
@@ -828,10 +860,29 @@ symtable_visit_stmt(struct symtable *st, stmt_ty s)
         case Global_kind: {
 		int i;
 		asdl_seq *seq = s->v.Global.names;
-		for (i = 0; i < asdl_seq_LEN(seq); i++)
-			if (!symtable_add_def(st, asdl_seq_GET(seq, i), 
-					      DEF_GLOBAL))
+		for (i = 0; i < asdl_seq_LEN(seq); i++) {
+			identifier name = asdl_seq_GET(seq, i);
+			char *c_name = PyString_AS_STRING(name);
+			int cur = symtable_lookup(st, name);
+			if (cur < 0)
 				return 0;
+			if (cur & (DEF_LOCAL | USE)) {
+				char buf[1000];
+				if (cur & DEF_LOCAL) 
+					PyOS_snprintf(buf, sizeof(buf),
+						      GLOBAL_AFTER_ASSIGN,
+						      c_name);
+				else
+					PyOS_snprintf(buf, sizeof(buf),
+						      GLOBAL_AFTER_USE,
+						      c_name);
+				symtable_warn(st, buf);
+				return 0;
+			}
+			if (!symtable_add_def(st, name, DEF_GLOBAL))
+				return 0;
+			
+		}
 		
 		break;
 	}
