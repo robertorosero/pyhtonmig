@@ -162,7 +162,7 @@ store the converted values.  More about this later.
 the right type and its components have been stored in the variables
 whose addresses are passed.  It returns false (zero) if an invalid
 argument list was passed.  In the latter case it also raises an
-appropriate exception by so the calling function can return
+appropriate exception so the calling function can return
 \NULL{} immediately (as we saw in the example).
 
 
@@ -195,7 +195,7 @@ exception.
 
 Another useful function is \cfunction{PyErr_SetFromErrno()}, which only
 takes an exception argument and constructs the associated value by
-inspection of the (\UNIX{}) global variable \cdata{errno}.  The most
+inspection of the global variable \cdata{errno}.  The most
 general function is \cfunction{PyErr_SetObject()}, which takes two object
 arguments, the exception and its associated value.  You don't need to
 \cfunction{Py_INCREF()} the objects passed to any of these functions.
@@ -231,12 +231,12 @@ want to pass the error on to the interpreter but wants to handle it
 completely by itself (e.g.\ by trying something else or pretending
 nothing happened).
 
-Note that a failing \cfunction{malloc()} call must be turned into an
+Every failing \cfunction{malloc()} call must be turned into an
 exception --- the direct caller of \cfunction{malloc()} (or
 \cfunction{realloc()}) must call \cfunction{PyErr_NoMemory()} and
 return a failure indicator itself.  All the object-creating functions
-(\cfunction{PyInt_FromLong()} etc.) already do this, so only if you
-call \cfunction{malloc()} directly this note is of importance.
+(for example, \cfunction{PyInt_FromLong()}) already do this, so this
+note is only relevant to those who call \cfunction{malloc()} directly.
 
 Also note that, with the important exception of
 \cfunction{PyArg_ParseTuple()} and friends, functions that return an
