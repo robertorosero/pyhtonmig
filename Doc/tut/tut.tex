@@ -224,11 +224,11 @@ arguments thereafter are passed to the script in the variable
 \code{sys.argv}, which is a list of strings.  Its length is at least
 one; when no script and no arguments are given, \code{sys.argv[0]} is
 an empty string.  When the script name is given as \code{'-'} (meaning 
-standard input), \code{sys.argv[0]} is set to \code{'-'}.  When \code{-c
-command} is used, \code{sys.argv[0]} is set to \code{'-c'}.  Options
-found after \code{-c command} are not consumed by the Python
-interpreter's option processing but left in \code{sys.argv} for the
-command to handle.
+standard input), \code{sys.argv[0]} is set to \code{'-'}.  When the
+\code{-c command} form is used, \code{sys.argv[0]} is set to
+\code{'-c'}.  Options found after \code{-c command} are not consumed
+by the Python interpreter's option processing but left in
+\code{sys.argv} for the command to handle.
 
 \subsection{Interactive Mode \label{interactive}}
 
@@ -236,9 +236,7 @@ When commands are read from a tty, the interpreter is said to be in
 \emph{interactive mode}.  In this mode it prompts for the next command
 with the \emph{primary prompt}, usually three greater-than signs
 (\samp{>>> }); for continuation lines it prompts with the
-\emph{secondary prompt},
-by default three dots (\samp{... }).  
-
+\emph{secondary prompt}, by default three dots (\samp{... }).
 The interpreter prints a welcome message stating its version number
 and a copyright notice before printing the first prompt, e.g.:
 
@@ -248,6 +246,18 @@ Python 1.5.2b2 (#1, Feb 28 1999, 00:02:06)  [GCC 2.8.1] on sunos5
 Copyright 1991-1995 Stichting Mathematisch Centrum, Amsterdam
 >>>
 \end{verbatim}
+
+Continuation lines are needed when entering a multi-line construct.
+As an example, take a look at this \keyword{if} statement:
+
+\begin{verbatim}
+>>> the_world_is_flat = 1
+>>> if the_world_is_flat:
+...     print "Be careful not to fall off!"
+... 
+Be careful not to fall off!
+\end{verbatim}
+
 
 \section{The Interpreter and Its Environment \label{interp}}
 
@@ -555,8 +565,8 @@ a single quote and no double quotes, else it's enclosed in single
 quotes.  (The \keyword{print} statement, described later, can be used
 to write strings without quotes or escapes.)
 
-Strings can be concatenated (glued together) with the \code{+}
-operator, and repeated with \code{*}:
+Strings can be concatenated (glued together) with the
+\code{+} operator, and repeated with \code{*}:
 
 \begin{verbatim}
 >>> word = 'Help' + 'A'
@@ -596,6 +606,20 @@ separated by a colon.
 'He'
 >>> word[2:4]
 'lp'
+\end{verbatim}
+
+Unlike a C string, Python strings cannot be changed.  Assigning to an 
+indexed position in the string results in an error:
+
+\begin{verbatim}
+>>> word[0] = 'x'
+Traceback (innermost last):
+  File "<stdin>", line 1, in ?
+TypeError: object doesn't support item assignment
+>>> word[:-1] = 'Splat'
+Traceback (innermost last):
+  File "<stdin>", line 1, in ?
+TypeError: object doesn't support slice assignment
 \end{verbatim}
 
 Slice indices have useful defaults; an omitted first index defaults to
@@ -684,7 +708,7 @@ the string; the second row gives the corresponding negative indices.
 The slice from \var{i} to \var{j} consists of all characters between
 the edges labeled \var{i} and \var{j}, respectively.
 
-For nonnegative indices, the length of a slice is the difference of
+For non-negative indices, the length of a slice is the difference of
 the indices, if both are within bounds, e.g., the length of
 \code{word[1:3]} is 2.
 
@@ -819,7 +843,8 @@ The first line contains a \emph{multiple assignment}: the variables
 \code{a} and \code{b} simultaneously get the new values 0 and 1.  On the
 last line this is used again, demonstrating that the expressions on
 the right-hand side are all evaluated first before any of the
-assignments take place.
+assignments take place.  The right-hand side expressions are evaluated 
+from the left to the right.
 
 \item
 The \keyword{while} loop executes as long as the condition (here:
@@ -840,7 +865,8 @@ complicated input for Python with a text editor; most text editors have
 an auto-indent facility.  When a compound statement is entered
 interactively, it must be followed by a blank line to indicate
 completion (since the parser cannot guess when you have typed the last
-line).
+line).  Note that each line within a basic block must be indented by
+the same amount.
 
 \item
 The \keyword{print} statement writes the value of the expression(s) it is
@@ -963,7 +989,7 @@ The given end point is never part of the generated list;
 \code{range(10)} generates a list of 10 values, exactly the legal
 indices for items of a sequence of length 10.  It is possible to let
 the range start at another number, or to specify a different increment
-(even negative):
+(even negative; sometimes this is called the `step'):
 
 \begin{verbatim}
 >>> range(5, 10)
@@ -1059,13 +1085,15 @@ arbitrary boundary:
 The keyword \keyword{def} introduces a function \emph{definition}.  It
 must be followed by the function name and the parenthesized list of
 formal parameters.  The statements that form the body of the function
-start at the next line, indented by a tab stop.  The first statement
-of the function body can optionally be a string literal; this string
-literal is the function's documentation string, or \dfn{docstring}.
-There are tools which use docstrings to automatically produce printed
-documentation, or to let the user interactively browse through code;
-it's good practice to include docstrings in code that you write, so
-try to make a habit of it.
+start at the next line, and must be indented.  The first statement of
+the function body can optionally be a string literal; this string
+literal is the function's \index{documentation strings}documentation
+string, or \dfn{docstring}.\index{docstrings}\index{strings, documentation}
+
+There are tools which use docstrings to automatically produce online
+or printed documentation, or to let the user interactively browse
+through code; it's good practice to include docstrings in code that
+you write, so try to make a habit of it.
 
 The \emph{execution} of a function introduces a new symbol table used
 for the local variables of the function.  More precisely, all variable
@@ -1353,10 +1381,14 @@ def make_incrementor(n):
     return lambda x, incr=n: x+incr
 \end{verbatim}
 
+
 \subsection{Documentation Strings \label{docstrings}}
 
 There are emerging conventions about the content and formatting of
 documentation strings.
+\index{docstrings}
+\index{documentation strings}
+\index{strings, documentation}
 
 The first line should always be a short, concise summary of the
 object's purpose.  For brevity, it should not explicitly state the
@@ -1372,16 +1404,33 @@ describing the object's calling conventions, its side effects, etc.
 
 The Python parser does not strip indentation from multi-line string
 literals in Python, so tools that process documentation have to strip
-indentation.  This is done using the following convention.  The first
-non-blank line \emph{after} the first line of the string determines the
-amount of indentation for the entire documentation string.  (We can't
-use the first line since it is generally adjacent to the string's
-opening quotes so its indentation is not apparent in the string
-literal.)  Whitespace ``equivalent'' to this indentation is then
-stripped from the start of all lines of the string.  Lines that are
-indented less should not occur, but if they occur all their leading
-whitespace should be stripped.  Equivalence of whitespace should be
-tested after expansion of tabs (to 8 spaces, normally).
+indentation if desired.  This is done using the following convention.
+The first non-blank line \emph{after} the first line of the string
+determines the amount of indentation for the entire documentation
+string.  (We can't use the first line since it is generally adjacent
+to the string's opening quotes so its indentation is not apparent in
+the string literal.)  Whitespace ``equivalent'' to this indentation is
+then stripped from the start of all lines of the string.  Lines that
+are indented less should not occur, but if they occur all their
+leading whitespace should be stripped.  Equivalence of whitespace
+should be tested after expansion of tabs (to 8 spaces, normally).
+
+Here is an example of a multi-line docstring:
+
+\begin{verbatim}
+>>> def my_function():
+...     """Do nothing, but document it.
+... 
+...     No, really, it doesn't do anything.
+...     """
+...     pass
+... 
+>>> print my_function.__doc__
+Do nothing, but document it.
+
+    No, really, it doesn't do anything.
+    
+\end{verbatim}
 
 
 
@@ -1864,18 +1913,14 @@ module's global variables with the same notation used to refer to its
 functions,
 \code{modname.itemname}.
 
-Modules can import other modules.
-It is customary but not required to place all
-\code{import}
-statements at the beginning of a module (or script, for that matter).
-The imported module names are placed in the importing module's global
-symbol table.
+Modules can import other modules.  It is customary but not required to
+place all \keyword{import} statements at the beginning of a module (or
+script, for that matter).  The imported module names are placed in the
+importing module's global symbol table.
 
-There is a variant of the
-\code{import}
-statement that imports names from a module directly into the importing
-module's symbol table.
-For example:
+There is a variant of the \keyword{import} statement that imports
+names from a module directly into the importing module's symbol
+table.  For example:
 
 \begin{verbatim}
 >>> from fibo import fib, fib2
@@ -1926,8 +1971,8 @@ use a lot of standard modules, if a file called \file{spam.pyc} exists
 in the directory where \file{spam.py} is found, this is assumed to
 contain an already-``byte-compiled'' version of the module \module{spam}.
 The modification time of the version of \file{spam.py} used to create
-\file{spam.pyc} is recorded in \file{spam.pyc}, and the file is
-ignored if these don't match.
+\file{spam.pyc} is recorded in \file{spam.pyc}, and the
+\file{.pyc} file is ignored if these don't match.
 
 Normally, you don't need to do anything to create the \file{spam.pyc} file.
 Whenever \file{spam.py} is successfully compiled, an attempt is made to
@@ -1935,7 +1980,7 @@ write the compiled version to \file{spam.pyc}.  It is not an error if
 this attempt fails; if for any reason the file is not written
 completely, the resulting \file{spam.pyc} file will be recognized as
 invalid and thus ignored later.  The contents of the \file{spam.pyc}
-file is platform independent, so a Python module directory can be
+file are platform independent, so a Python module directory can be
 shared by machines of different architectures.
 
 Some tips for experts:
@@ -1943,13 +1988,13 @@ Some tips for experts:
 \begin{itemize}
 
 \item
-When the Python interpreter is invoked with the \code{-O} flag,
-optimized code is generated and stored in \file{.pyo} files.
-The optimizer currently doesn't help much; it only removes
-\keyword{assert} statements and \code{SET_LINENO} instructions.
-When \code{-O} is used, \emph{all} bytecode is optimized; \code{.pyc}
-files are ignored and \code{.py} files are compiled to optimized
-bytecode.
+When the Python interpreter is invoked with the \code{-O} flag (that's
+the letter, not the number), optimized code is generated and stored in
+\file{.pyo} files.  The optimizer currently doesn't help much; it only
+removes \keyword{assert} statements and \code{SET_LINENO} instructions.
+When \code{-O} is used, \emph{all} bytecode is optimized;
+\file{.pyc} files are ignored and \file{.py} files are compiled to
+optimized bytecode.
 
 \item
 Passing two \code{-O} flags to the Python interpreter (\code{-OO})
@@ -1957,8 +2002,10 @@ will cause the bytecode compiler to perform optimizations that could
 in some rare cases result in malfunctioning programs.  Currently only
 \code{__doc__} strings are removed from the bytecode, resulting in more 
 compact \file{.pyo} files.  Since some programs may rely on having
-these available, you should only use this option if you know what
+\index{docstrings}\index{documentation strings}\index{strings, documentation}
+docstrings available, you should only use this option if you know what
 you're doing.
+
 
 \item
 A program doesn't run any faster when it is read from a
@@ -2084,8 +2131,8 @@ by using ``dotted module names''.  For example, the module name
 \samp{A}.  Just like the use of modules saves the authors of different
 modules from having to worry about each other's global variable names,
 the use of dotted module names saves the authors of multi-module
-packages like NumPy or PIL from having to worry about each other's
-module names.
+packages like NumPy or the Python Imaging Library from having to worry
+about each other's module names.
 
 Suppose you want to design a collection of modules (a ``package'') for
 the uniform handling of sound files and sound data.  There are many
@@ -2164,7 +2211,7 @@ from Sound.Effects.echo import echofilter
 \end{verbatim}
 
 Again, this loads the submodule \module{echo}, but this makes its function
-echofilter directly available:
+\function{echofilter()} directly available:
 
 \begin{verbatim}
 echofilter(input, output, delay=0.7, atten=4)
@@ -2175,7 +2222,8 @@ item can be either a submodule (or subpackage) of the package, or some
 other name defined in the package, like a function, class or
 variable.  The \code{import} statement first tests whether the item is
 defined in the package; if not, it assumes it is a module and attempts
-to load it.  If it fails to find it, \exception{ImportError} is raised.
+to load it.  If it fails to find it, an \exception{ImportError}
+exception is raised.
 
 Contrarily, when using syntax like \code{import
 \var{item.subitem.subsubitem}}, each item except for the last must be
@@ -2201,13 +2249,13 @@ problem for long module names.
 The only solution is for the package author to provide an explicit
 index of the package.  The import statement uses the following
 convention: if a package's \file{__init__.py} code defines a list named
-\code{__all__}, it is taken to be the list of module names that should be imported
-when \code{from \var{package} import *} is
-encountered.  It is up to the package author to keep this list
-up-to-date when a new version of the package is released.  Package
-authors may also decide not to support it, if they don't see a use for
-importing * from their package.  For example, the file
-\code{Sounds/Effects/__init__.py} could contain the following code:
+\code{__all__}, it is taken to be the list of module names that should
+be imported when \code{from \var{package} import *} is encountered.
+It is up to the package author to keep this list up-to-date when a new
+version of the package is released.  Package authors may also decide
+not to support it, if they don't see a use for importing * from their
+package.  For example, the file \file{Sounds/Effects/__init__.py}
+could contain the following code:
 
 \begin{verbatim}
 __all__ = ["echo", "surround", "reverse"]
@@ -2301,12 +2349,12 @@ your output; the first way is to do all the string handling yourself;
 using string slicing and concatenation operations you can create any
 lay-out you can imagine.  The standard module
 \module{string}\refstmodindex{string} contains some useful operations
-for padding strings to a given column width;
-these will be discussed shortly.  The second way is to use the
-\code{\%} operator with a string as the left argument.  \code{\%}
-interprets the left argument as a C \cfunction{sprintf()}-style
-format string to be applied to the right argument, and returns the
-string resulting from this formatting operation.
+for padding strings to a given column width; these will be discussed
+shortly.  The second way is to use the \code{\%} operator with a
+string as the left argument.  The \code{\%} operator interprets the
+left argument as a C much like a \cfunction{sprintf()}-style format
+string to be applied to the right argument, and returns the string
+resulting from this formatting operation.
 
 One question remains, of course: how do you convert values to strings?
 Luckily, Python has a way to convert any value to a string: pass it to
@@ -2687,8 +2735,9 @@ exception happened, in the form of a stack backtrace.
 In general it contains a stack backtrace listing source lines; however,
 it will not display lines read from standard input.
 
-The Library Reference lists the built-in exceptions and their
-meanings.
+The \emph{Python Library Reference} lists the built-in exceptions and
+their meanings.
+
 
 \section{Handling Exceptions \label{handling}}
 
@@ -2712,34 +2761,37 @@ some floating point numbers:
 \end{verbatim}
 
 The \keyword{try} statement works as follows.
+
 \begin{itemize}
 \item
-First, the \emph{try clause}
-(the statement(s) between the \keyword{try} and \keyword{except}
-keywords) is executed.
+First, the \emph{try clause} (the statement(s) between the
+\keyword{try} and \keyword{except} keywords) is executed.
+
 \item
-If no exception occurs, the
-\emph{except\ clause}
-is skipped and execution of the \keyword{try} statement is finished.
+If no exception occurs, the \emph{except\ clause} is skipped and
+execution of the \keyword{try} statement is finished.
+
 \item
-If an exception occurs during execution of the try clause,
-the rest of the clause is skipped.  Then if its type matches the
-exception named after the \keyword{except} keyword, the rest of the
-try clause is skipped, the except clause is executed, and then
-execution continues after the \keyword{try} statement.
+If an exception occurs during execution of the try clause, the rest of
+the clause is skipped.  Then if its type matches the exception named
+after the \keyword{except} keyword, the rest of the try clause is
+skipped, the except clause is executed, and then execution continues
+after the \keyword{try} statement.
+
 \item
 If an exception occurs which does not match the exception named in the
 except clause, it is passed on to outer \keyword{try} statements; if
-no handler is found, it is an \emph{unhandled exception}
-and execution stops with a message as shown above.
+no handler is found, it is an \emph{unhandled exception} and execution
+stops with a message as shown above.
+
 \end{itemize}
+
 A \keyword{try} statement may have more than one except clause, to
-specify handlers for different exceptions.
-At most one handler will be executed.
-Handlers only handle exceptions that occur in the corresponding try
-clause, not in other handlers of the same \keyword{try} statement.
-An except clause may name multiple exceptions as a parenthesized list,
-e.g.:
+specify handlers for different exceptions.  At most one handler will
+be executed.  Handlers only handle exceptions that occur in the
+corresponding try clause, not in other handlers of the same
+\keyword{try} statement. An except clause may name multiple exceptions
+as a parenthesized list, e.g.:
 
 \begin{verbatim}
 ... except (RuntimeError, TypeError, NameError):
@@ -2747,9 +2799,26 @@ e.g.:
 \end{verbatim}
 
 The last except clause may omit the exception name(s), to serve as a
-wildcard.
-Use this with extreme caution, since it is easy to mask a real
-programming error in this way!
+wildcard.  Use this with extreme caution, since it is easy to mask a
+real programming error in this way!  It can also be used to print an
+error message and then re-raise the exception (allowing a caller to
+handle the exception as well):
+
+\begin{verbatim}
+import string, sys
+
+try:
+    f = open('myfile.txt')
+    s = f.readline()
+    i = int(string.strip(s))
+except IOError, (errno, strerror):
+    print "I/O error(%s): %s" % (errno, strerror)
+except ValueError:
+    print "Could not convert data to an integer."
+except:
+    print "Unexpected error:", sys.exc_info()[0]
+    raise
+\end{verbatim}
 
 The \keyword{try} \ldots\ \keyword{except} statement has an optional
 \emph{else clause}, which must follow all except clauses.  It is
@@ -2826,25 +2895,32 @@ argument.
 \section{User-defined Exceptions \label{userExceptions}}
 
 Programs may name their own exceptions by assigning a string to a
-variable.
-For example:
+variable or creating a new exception class.  For example:
 
 \begin{verbatim}
->>> my_exc = 'my_exc'
+>>> class MyError:
+...     def __init__(self, value):
+...         self.value = value
+...     def __str__(self):
+...         return `self.value`
+... 
 >>> try:
-...     raise my_exc, 2*2
-... except my_exc, val:
-...     print 'My exception occurred, value:', val
+...     raise MyError(2*2)
+... except MyError, e:
+...     print 'My exception occurred, value:', e.value
 ... 
 My exception occurred, value: 4
->>> raise my_exc, 1
+>>> raise MyError, 1
 Traceback (innermost last):
   File "<stdin>", line 1
-my_exc: 1
+__main__.MyError: 1
 \end{verbatim}
 
 Many standard modules use this to report errors that may occur in
 functions they define.
+
+More information on classes is presented in chapter \ref{classes},
+``Classes.''
 
 
 \section{Defining Clean-up Actions \label{cleanup}}
@@ -3101,15 +3177,15 @@ class MyClass:
 \end{verbatim}
 
 then \code{MyClass.i} and \code{MyClass.f} are valid attribute
-references, returning an integer and a function object, respectively.
+references, returning an integer and a method object, respectively.
 Class attributes can also be assigned to, so you can change the value
-of \code{MyClass.i} by assignment.  \code{__doc__} is also a valid
-attribute that's read-only, returning the docstring belonging to
-the class: \code{"A simple example class"}).  
+of \code{MyClass.i} by assignment.  \member{__doc__} is also a valid
+attribute, returning the docstring belonging to the class: \code{"A
+simple example class"}). 
 
 Class \emph{instantiation} uses function notation.  Just pretend that
 the class object is a parameterless function that returns a new
-instance of the class.  For example, (assuming the above class):
+instance of the class.  For example (assuming the above class):
 
 \begin{verbatim}
 x = MyClass()
@@ -3117,6 +3193,41 @@ x = MyClass()
 
 creates a new \emph{instance} of the class and assigns this object to
 the local variable \code{x}.
+
+The instantiation operation (``calling'' a class object) creates an
+empty object.  Many classes like to create objects in a known initial
+state.  Therefore a class may define a special method named
+\method{__init__()}, like this:
+
+\begin{verbatim}
+    def __init__(self):
+        self.data = []
+\end{verbatim}
+
+When a class defines an \method{__init__()} method, class
+instantiation automatically invokes \method{__init__()} for the
+newly-created class instance.  So in this example, a new, initialized
+instance can be obtained by:
+
+\begin{verbatim}
+x = MyClass()
+\end{verbatim}
+
+Of course, the \method{__init__()} method may have arguments for
+greater flexibility.  In that case, arguments given to the class
+instantiation operator are passed on to \method{__init__()}.  For
+example,
+
+\begin{verbatim}
+>>> class Complex:
+...     def __init__(self, realpart, imagpart):
+...         self.r = realpart
+...         self.i = imagpart
+... 
+>>> x = Complex(3.0,-4.5)
+>>> x.r, x.i
+(3.0, -4.5)
+\end{verbatim}
 
 
 \subsection{Instance Objects \label{instanceObjects}}
@@ -3284,7 +3395,7 @@ Methods may call other methods by using method attributes of the
 
 \begin{verbatim}
 class Bag:
-    def empty(self):
+    def __init__(self):
         self.data = []
     def add(self, x):
         self.data.append(x)
@@ -3293,41 +3404,6 @@ class Bag:
         self.add(x)
 \end{verbatim}
 
-
-The instantiation operation (``calling'' a class object) creates an
-empty object.  Many classes like to create objects in a known initial
-state.  Therefore a class may define a special method named
-\method{__init__()}, like this:
-
-\begin{verbatim}
-    def __init__(self):
-        self.empty()
-\end{verbatim}
-
-When a class defines an \method{__init__()} method, class
-instantiation automatically invokes \method{__init__()} for the
-newly-created class instance.  So in the \class{Bag} example, a new
-and initialized instance can be obtained by:
-
-\begin{verbatim}
-x = Bag()
-\end{verbatim}
-
-Of course, the \method{__init__()} method may have arguments for
-greater flexibility.  In that case, arguments given to the class
-instantiation operator are passed on to \method{__init__()}.  For
-example,
-
-\begin{verbatim}
->>> class Complex:
-...     def __init__(self, realpart, imagpart):
-...         self.r = realpart
-...         self.i = imagpart
-... 
->>> x = Complex(3.0,-4.5)
->>> x.r, x.i
-(3.0, -4.5)
-\end{verbatim}
 
 Methods may reference global names in the same way as ordinary
 functions.  The global scope associated with a method is the module
@@ -3489,7 +3565,7 @@ class VirtualAttributes:
 
 %\emph{Warning: this is an experimental feature.}  To avoid all
 %potential problems, refrain from using identifiers starting with
-%double underscore except for predefined uses like \code{__init__}.  To
+%double underscore except for predefined uses like \samp{__init__}.  To
 %use private names while maintaining future compatibility: refrain from
 %using the same private name in classes related via subclassing; avoid
 %explicit (manual) mangling/unmangling; and assume that at some point
