@@ -1005,6 +1005,10 @@ compiler_addop_j(struct compiler *c, int opcode, int block, int absolute)
    from the current block to the new block.
 */
 
+/* XXX The returns inside these macros make it impossible to decref
+   objects created in the local function.
+*/
+
 
 #define NEW_BLOCK(C) { \
         if (compiler_use_new_block((C)) < 0) \
@@ -1717,7 +1721,19 @@ compiler_from_import(struct compiler *c, stmt_ty s)
 	/* build up the names */
 	for (i = 0; i < n; i++) {
 		alias_ty alias = asdl_seq_GET(s->v.ImportFrom.names, i);
+		Py_INCREF(alias->name);
 		PyTuple_SET_ITEM(names, i, alias->name);
+	}
+
+	if (s->lineno > c->c_future->ff_lineno) {
+		if (!strcmp(PyString_AS_STRING(s->v.ImportFrom.module),
+			    "__future__")) {
+			Py_DECREF(names);
+			return compiler_error(c, 
+				      "from __future__ imports must occur "
+                                      "at the beginning of the file");
+
+		}
 	}
 
 	ADDOP_O(c, LOAD_CONST, names, consts);
@@ -1738,8 +1754,10 @@ compiler_from_import(struct compiler *c, stmt_ty s)
 		if (alias->asname)
 			store_name = alias->asname;
 
-		if (!compiler_nameop(c, store_name, Store))
+		if (!compiler_nameop(c, store_name, Store)) {
+			Py_DECREF(names);
 			return 0;
+		}
 	}
 	if (!star) 
 		/* remove imported module */
