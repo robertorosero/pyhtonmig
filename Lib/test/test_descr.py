@@ -742,6 +742,63 @@ def altmro():
     verify(X.__mro__ == (object, A, C, B, D, X))
     verify(X().f() == "A")
 
+def overloading():
+    if verbose: print "testing operator overloading..."
+
+    class B(object):
+        "Intermediate class because object doesn't have a __setattr__"
+
+    class C(B):
+
+        def __getattr__(self, name):
+            if name == "foo":
+                return ("getattr", name)
+            else:
+                return B.__getattr__(self, name)
+        def __setattr__(self, name, value):
+            if name == "foo":
+                self.setattr = (name, value)
+            else:
+                return B.__setattr__(self, name, value)
+        def __delattr__(self, name):
+            if name == "foo":
+                self.delattr = name
+            else:
+                return B.__delattr__(self, name)
+
+        def __getitem__(self, key):
+            return ("getitem", key)
+        def __setitem__(self, key, value):
+            self.setitem = (key, value)
+        def __delitem__(self, key):
+            self.delitem = key
+
+        def __getslice__(self, i, j):
+            return ("getslice", i, j)
+        def __setslice__(self, i, j, value):
+            self.setslice = (i, j, value)
+        def __delslice__(self, i, j):
+            self.delslice = (i, j)
+
+    a = C()
+    verify(a.foo == ("getattr", "foo"))
+    a.foo = 12
+    verify(a.setattr == ("foo", 12))
+    del a.foo
+    verify(a.delattr == "foo")
+
+    verify(a[12] == ("getitem", 12))
+    a[12] = 21
+    verify(a.setitem == (12, 21))
+    del a[12]
+    verify(a.delitem == 12)
+
+    verify(a[0:10] == ("getslice", 0, 10))
+    a[0:10] = "foo"
+    verify(a.setslice == (0, 10, "foo"))
+    del a[0:10]
+    verify(a.delslice == (0, 10))
+
 def all():
     lists()
     dicts()
@@ -767,6 +824,7 @@ def all():
     compattr()
     newslot()
     altmro()
+    overloading()
 
 all()
 
