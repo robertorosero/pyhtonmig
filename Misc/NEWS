@@ -23,7 +23,7 @@ Library
   close or delete time).
 
 - rfc822.py: fixed a bug where the address '<>' was converted to None
-  instead of an empty string.
+  instead of an empty string (also fixes the email.Utils module).
 
 - xmlrpclib.py: version 1.0.0; uses precision for doubles.
 
