@@ -151,16 +151,37 @@ newcodeobject(code, consts, names, filename, name)
 	int i;
 	/* Check argument types */
 	if (code == NULL || !is_stringobject(code) ||
-		consts == NULL || !is_listobject(consts) ||
-		names == NULL || !is_listobject(names) ||
+		consts == NULL ||
+		names == NULL ||
 		name == NULL || !(is_stringobject(name) || name == None)) {
 		err_badcall();
 		return NULL;
 	}
+	/* Allow two lists instead of two tuples */
+	if (is_listobject(consts) && is_listobject(names)) {
+		consts = listtuple(consts);
+		if (consts == NULL)
+			return NULL;
+		names = listtuple(names);
+		if (names == NULL) {
+			DECREF(consts);
+			return NULL;
+		}
+	}
+	else if (!is_tupleobject(consts) && !is_tupleobject(names)) {
+		err_badcall();
+		return NULL;
+	}
+	else {
+		INCREF(consts);
+		INCREF(names);
+	}
 	/* Make sure the list of names contains only strings */
-	for (i = getlistsize(names); --i >= 0; ) {
-		object *v = getlistitem(names, i);
+	for (i = gettuplesize(names); --i >= 0; ) {
+		object *v = gettupleitem(names, i);
 		if (v == NULL || !is_stringobject(v)) {
+			DECREF(consts);
+			DECREF(names);
 			err_badcall();
 			return NULL;
 		}
@@ -169,14 +190,16 @@ newcodeobject(code, consts, names, filename, name)
 	if (co != NULL) {
 		INCREF(code);
 		co->co_code = (stringobject *)code;
-		INCREF(consts);
 		co->co_consts = consts;
-		INCREF(names);
 		co->co_names = names;
 		INCREF(filename);
 		co->co_filename = filename;
 		INCREF(name);
 		co->co_name = name;
+	}
+	else {
+		DECREF(consts);
+		DECREF(names);
 	}
 	return co;
 }
@@ -2427,7 +2450,26 @@ optimize(c)
 		if (HAS_ARG(opcode))
 			oparg = NEXTARG();
 		if (opcode == RESERVE_FAST) {
-			int i = com_addconst(c, locals);
+			int i;
+			object *localmap = newtupleobject(nlocals);
+			int pos;
+			object *key, *value;
+			if (localmap == NULL) { /* XXX mask error */
+				err_clear();
+				continue;
+			}
+			pos = 0;
+			while (mappinggetnext(locals, &pos, &key, &value)) {
+				int j;
+				if (!is_intobject(value))
+					continue;
+				j = getintvalue(value);
+				if (0 <= j && j < nlocals) {
+					INCREF(key);
+					settupleitem(localmap, j, key);
+				}
+			}
+			i = com_addconst(c, localmap);
 			cur_instr[1] = i & 0xff;
 			cur_instr[2] = (i>>8) & 0xff;
 			fast_reserved = 1;

@@ -1117,8 +1117,7 @@ eval_code(co, globals, locals, owner, arg)
 			x = GETCONST(oparg);
 			if (x == None)
 				break;
-			if (x == NULL || !is_dictobject(x)) {
-				fatal("bad RESERVE_FAST");
+			if (x == NULL || !is_tupleobject(x)) {
 				err_setstr(SystemError, "bad RESERVE_FAST");
 				x = NULL;
 				break;
@@ -1127,8 +1126,7 @@ eval_code(co, globals, locals, owner, arg)
 			XDECREF(f->f_localmap);
 			INCREF(x);
 			f->f_localmap = x;
-			f->f_fastlocals = x = newlistobject(
-			    x->ob_type->tp_as_mapping->mp_length(x));
+			f->f_fastlocals = x = newlistobject(gettuplesize(x));
 			fastlocals = (listobject *) x;
 			break;
 
@@ -1607,8 +1605,7 @@ fast_2_locals(f)
 	/* Merge f->f_fastlocals into f->f_locals */
 	object *locals, *fast, *map;
 	object *error_type, *error_value;
-	int pos;
-	object *key, *value;
+	int j;
 	if (f == NULL)
 		return;
 	locals = f->f_locals;
@@ -1617,16 +1614,12 @@ fast_2_locals(f)
 	if (locals == NULL || fast == NULL || map == NULL)
 		return;
 	if (!is_dictobject(locals) || !is_listobject(fast) ||
-	    !is_dictobject(map))
+	    !is_tupleobject(map))
 		return;
 	err_get(&error_type, &error_value);
-	pos = 0;
-	while (mappinggetnext(map, &pos, &key, &value)) {
-		int j;
-		if (!is_intobject(value))
-			continue;
-		j = getintvalue(value);
-		value = getlistitem(fast, j);
+	for (j = gettuplesize(map); --j >= 0; ) {
+		object *key = gettupleitem(map, j);
+		object *value = getlistitem(fast, j);
 		if (value == NULL) {
 			err_clear();
 			if (dict2remove(locals, key) != 0)
@@ -1648,8 +1641,7 @@ locals_2_fast(f, clear)
 	/* Merge f->f_locals into f->f_fastlocals */
 	object *locals, *fast, *map;
 	object *error_type, *error_value;
-	int pos;
-	object *key, *value;
+	int j;
 	if (f == NULL)
 		return;
 	locals = f->f_locals;
@@ -1658,16 +1650,12 @@ locals_2_fast(f, clear)
 	if (locals == NULL || fast == NULL || map == NULL)
 		return;
 	if (!is_dictobject(locals) || !is_listobject(fast) ||
-	    !is_dictobject(map))
+	    !is_tupleobject(map))
 		return;
 	err_get(&error_type, &error_value);
-	pos = 0;
-	while (mappinggetnext(map, &pos, &key, &value)) {
-		int j;
-		if (!is_intobject(value))
-			continue;
-		j = getintvalue(value);
-		value = dict2lookup(locals, key);
+	for (j = gettuplesize(map); --j >= 0; ) {
+		object *key = gettupleitem(map, j);
+		object *value = dict2lookup(locals, key);
 		if (value == NULL)
 			err_clear();
 		else
@@ -1715,7 +1703,7 @@ getowner()
 object *
 getframe()
 {
-	return current_frame;
+	return (object *)current_frame;
 }
 
 void
@@ -2525,17 +2513,13 @@ access_statement(name, vmode, f)
 	if (f->f_localmap == NULL)
 		value = dict2lookup(f->f_locals, name);
 	else {
-		value = dict2lookup(f->f_localmap, name);
-		if (value == NULL || !is_intobject(value))
-			value = NULL;
-		else {
-			fastind = getintvalue(value);
-			if (0 <= fastind &&
-			    fastind < getlistsize(f->f_fastlocals))
+		object *map = f->f_localmap;
+		value = NULL;
+		for (fastind = gettuplesize(map); --fastind >= 0; ) {
+			object *fname = gettupleitem(map, fastind);
+			if (cmpobject(name, fname) == 0) {
 				value = getlistitem(f->f_fastlocals, fastind);
-			else {
-				value = NULL;
-				fastind = -1;
+				break;
 			}
 		}
 	}
