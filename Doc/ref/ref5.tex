@@ -71,11 +71,13 @@ enclosure:      parenth_form | list_display | dict_display | string_conversion
 \index{identifier}
 
 An identifier occurring as an atom is a reference to a local, global
-or built-in name binding.  If a name can be assigned to anywhere in a
-code block, and is not mentioned in a \verb@global@ statement in that
-code block, it refers to a local name throughout that code block.
-Otherwise, it refers to a global name if one exists, else to a
-built-in name.
+or built-in name binding.  If a name is assigned to anywhere in a code
+block (even in unreachable code), and is not mentioned in a
+\verb@global@ statement in that code block, then it refers to a local
+name throughout that code block.  When it is not assigned to anywhere
+in the block, or when it is assigned to but also explicitly listed in
+a \verb@global@ statement, it refers to a global name if one exists,
+else to a built-in name (and this binding may dynamically change).
 \indexii{name}{binding}
 \index{code block}
 \stindex{global}
