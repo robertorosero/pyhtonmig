@@ -1,4 +1,4 @@
-Python release 1.0.0 BETA 2
+Python release 1.0.0 BETA 3
 ===========================
 
 ==> This is still a BETA release.  I've been furiously hacking over
@@ -42,12 +42,24 @@ subdirectories Parser, Objects, Python and Modules, creating a library
 file in each one.  The executable of the interpreter is built in the
 Modules subdirectory but moved up here when it is built.
 
+Exceptions: on SVR4 derived systems, you need to manually run the
+configure script, passing it the option --with-svr4.  On SOLARIS 2 you
+need to pass it --with-solaris *as well*.  (See below for more options
+you can pass to the configure script.)
+
 You can configure the interpreter to contain fewer or more built-in
 modules by cd'ing to the Modules subdirectory, editing the file Setup
 there, and running "make Makefile" followed by "make" there.  Read the
 comments in the Setup file for more information.  You can also edit
 Modules/Setup before running make from the toplevel directory; this
 will automatically rebuild Modules/Makefile.
+
+To test the interpreter that you have just built, type "make test".
+This runs the test set silently, twice (once with no compiled files,
+once with the compiled files left by the previous test run).  Each
+test run should print "All tests OK." and nothing more.  (The test set
+does not test the built-in modules, but will find most other problems
+with the interpreter.)
 
 To install the interpreter as /usr/local/bin/python, type "make
 install".  To install the library as /usr/local/lib/python, type "make
@@ -71,19 +83,21 @@ information initiative).  You don't need to have LaTeX installed for
 this.  Note that the Python archive sites also carry the resulting
 PostScript files, in case you have a PostScript printer but not LaTeX.
 
-You can also build an "extended" interpreter, using modules that are
-not contained in the Modules directory.  This is done in the
-Extensions directory; read the README file there for more details.
-
 Some special cases are handled by passing environment variables or
 options to the configure script:
 
-1) The configure script uses gcc (the GNU C compiler) if it finds it.
+- The configure script uses gcc (the GNU C compiler) if it finds it.
 If you don't want this, or if this compiler is installed but broken on
 your platform, pass "CC=cc" (or whatever the name of the proper C
 compiler is) in the environment.
 
-2) You can use the GNU readline library to improve the interactive
+- On System V, Release 4 derived systems (e.g. SOLARIS 2, but not
+IRIX 5) you need to call the configure script with the option
+--with-svr4.  This is needed so the libraries -lnsl and -lsocket are
+found.  (On some other systems, e.g. IRIX 5, these libraries exist but
+are incompatible with other system libraries such as X11 and GL.)
+
+- You can use the GNU readline library to improve the interactive
 user interface: this gives you line editing and command history when
 calling python interactively.  You need to build the GNU readline
 library before running the configure script.  Its sources are
@@ -100,23 +114,27 @@ w_erase' to the stdwin.h file (in the stdwin distribution,
 subdirectory H).  The GL conflict may be solvable by reordering the -l
 options on the final link command, but it appears unsafe...
 
-3) Certain modules need to know whether you are running Sun SOLARIS
-2.x.  I currently don't know a failsafe way to determine this, so you
-have to pass the option --with-solaris to the configure script.  (This
-is currently only needed when you use threads or the sunaudiodev
-module.)
+- Certain modules need to know whether you are running Sun SOLARIS 2.
+I currently don't know a failsafe way to determine this, so you have
+to pass the option --with-solaris to the configure script.  (This is
+currently only needed when you use threads or the sunaudiodev module.)
 
-4) On SGI IRIX, and on Sun SOLARIS 2.x, you can use multiple threads.
-To enable this, pass --with-thread.  On SOLARIS 2.x, also pass
+- On SGI IRIX, and on Sun SOLARIS 2, you can use multiple threads.
+To enable this, pass --with-thread.  On SOLARIS 2, also pass
 --with-solaris.  In the Modules/Setup file, enable the thread module.
 (Threads aren't enabled automatically because there are run-time
 penalties when support for them is compiled in even if you don't use
 them.)
 
-5) On SGI IRIX, there are modules that interface to many SGI specific
+- On SGI IRIX, there are modules that interface to many SGI specific
 system libraries, e.g. the GL library and the audio hardware.  To
 enable these modules, you must edit the Modules/Setup file (or use the
 Setup.sgi file instead).
+
+You can also build an "extended" interpreter, using modules that are
+not contained in the Modules directory.  Extensions are distributed as
+a separate tar file (currently extensions.tar.Z).  See the README file
+there.
 
 
 Building on non-UNIX systems
