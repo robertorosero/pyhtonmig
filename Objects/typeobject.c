@@ -1752,7 +1752,7 @@ wrap_next(PyObject *self, PyObject *args, void *wrapped)
 
 static struct wrapperbase tab_next[] = {
 	{"next", (wrapperfunc)wrap_next,
-		"x.next() -> get the next value, or raise StopIteration"},
+		"x.next() -> the next value, or raise StopIteration"},
 	{0}
 };
 
@@ -1812,7 +1812,8 @@ wrap_init(PyObject *self, PyObject *args, void *wrapped)
 
 static struct wrapperbase tab_init[] = {
 	{"__init__", (wrapperfunc)wrap_init,
-	 "x.__init__() -> initialize object"},
+	 "x.__init__(...) initializes x; "
+	 "see x.__type__.__doc__ for signature"},
 	{0}
 };
 
