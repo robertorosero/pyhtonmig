@@ -28,8 +28,10 @@ spamlist_setstate(spamlistobject *self, PyObject *args)
 }
 
 static PyMethodDef spamlist_methods[] = {
-	{"getstate", (PyCFunction)spamlist_getstate, METH_VARARGS, "getstate() -> state"},
-	{"setstate", (PyCFunction)spamlist_setstate, METH_VARARGS, "setstate(state)"},
+	{"getstate", (PyCFunction)spamlist_getstate, METH_VARARGS,
+	 "getstate() -> state"},
+	{"setstate", (PyCFunction)spamlist_setstate, METH_VARARGS,
+	 "setstate(state)"},
 	{0},
 };
 
