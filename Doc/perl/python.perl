@@ -868,20 +868,6 @@ sub do_cmd_memberlineni{
 
 $TABLE_HEADER_BGCOLOR = $NAV_BGCOLOR;
 
-sub get_th{
-    my $a = @_[0];
-    my $r = '<th>';
-    if ($a eq 'l')
-      { $r = '<th align="left">'; }
-    elsif (substr($a, 0, 1) eq 'p')
-      { $r = '<th align="left">'; }
-    elsif ($a eq 'r')
-      { $r = '<th align="right">'; }
-    elsif ($a eq 'c')
-      { $r = '<th align="center">'; }
-    return $r;
-}
-
 sub fix_font{
     # do a little magic on a font name to get the right behavior in the first
     # column of the output table
@@ -898,17 +884,34 @@ sub fix_font{
     return $font;
 }
 
+sub figure_column_alignment{
+    my $a = @_[0];
+    my $mark = substr($a, 0, 1);
+    my $r = '';
+    if ($mark eq 'c')
+      { $r = ' align="center"'; }
+    elsif ($mark eq 'r')
+      { $r = ' align="right" '; }
+    elsif ($mark eq 'l')
+      { $r = ' align="left"  '; }
+    elsif ($mark eq 'p')
+      { $r = ' align="left"  '; }
+    return $r;
+}
+
 sub setup_column_alignments{
     local($_) = @_;
-    my($a1,$a2,$a3,$a4) = split(/[|]/,$_);
-    my($th1,$th2,$th3,$th4) = ('<th>', '<th>', '<th>', '<th>');
-    $col_aligns[0] = (($a1 eq 'c') ? '<td align="center" valign="baseline">'
-		                   : '<td valign="baseline">');
-    $col_aligns[1] = (($a2 eq 'c') ? '<td align="center">' : '<td>');
-    $col_aligns[2] = (($a3 eq 'c') ? '<td align="center">' : '<td>');
-    $col_aligns[3] = (($a4 eq 'c') ? '<td align="center">' : '<td>');
+    my($s1,$s2,$s3,$s4) = split(/[|]/,$_);
+    my $a1 = figure_column_alignment($s1);
+    my $a2 = figure_column_alignment($s2);
+    my $a3 = figure_column_alignment($s3);
+    my $a4 = figure_column_alignment($s4);
+    $col_aligns[0] = "<td$a1 valign=\"baseline\">";
+    $col_aligns[1] = "<td$a2>";
+    $col_aligns[2] = "<td$a3>";
+    $col_aligns[3] = "<td$a4>";
     # return the aligned header start tags
-    return (get_th($a1), get_th($a2), get_th($a3), get_th($a4));
+    return ("<th$a1>", "<th$a2>", "<th$a3>", "<th$a4>");
 }
 
 sub get_table_col1_fonts{
@@ -933,8 +936,8 @@ sub do_env_tableii{
     return '<table border align="center" style="border-collapse: collapse">'
            . "\n  <thead>"
            . "\n    <tr$TABLE_HEADER_BGCOLOR>"
-	   . "\n      $th1<b>$h1</b>\&nbsp;\&nbsp;</th>"
-	   . "\n      $th2<b>$h2</b>\&nbsp;\&nbsp;</th>"
+	   . "\n      $th1<b>$h1</b>\&nbsp;</th>"
+	   . "\n      $th2<b>$h2</b>\&nbsp;</th>"
 	   . "\n    </thead>"
 	   . "\n  <tbody valign='baseline'>"
 	   . $_
@@ -950,7 +953,11 @@ sub do_cmd_lineii{
     my($font,$sfont,$efont) = get_table_col1_fonts();
     $c2 = '&nbsp;' if ($c2 eq '');
     my($c1align,$c2align) = @col_aligns[0,1];
-    return "\n    <tr>$c1align$sfont$c1$efont</td>\n"
+    my $padding = '';
+    if ($c1align =~ /align="right"/) {
+        $padding = '&nbsp;';
+    }
+    return "\n    <tr>$c1align$sfont$c1$efont$padding</td>\n"
            . "        $c2align$c2</td>"
 	   . $_;
 }
@@ -967,9 +974,9 @@ sub do_env_tableiii{
     return '<table border align="center" style="border-collapse: collapse">'
            . "\n  <thead>"
            . "\n    <tr$TABLE_HEADER_BGCOLOR>"
-	   . "\n      $th1<b>$h1</b>\&nbsp;\&nbsp;</th>"
-	   . "\n      $th2<b>$h2</b>\&nbsp;\&nbsp;</th>"
-	   . "\n      $th3<b>$h3</b>\&nbsp;\&nbsp;</th>"
+	   . "\n      $th1<b>$h1</b>\&nbsp;</th>"
+	   . "\n      $th2<b>$h2</b>\&nbsp;</th>"
+	   . "\n      $th3<b>$h3</b>\&nbsp;</th>"
 	   . "\n    </thead>"
 	   . "\n  <tbody valign='baseline'>"
 	   . $_
@@ -986,7 +993,11 @@ sub do_cmd_lineiii{
     my($font,$sfont,$efont) = get_table_col1_fonts();
     $c3 = '&nbsp;' if ($c3 eq '');
     my($c1align,$c2align,$c3align) = @col_aligns[0,1,2];
-    return "\n    <tr>$c1align$sfont$c1$efont</td>\n"
+    my $padding = '';
+    if ($c1align =~ /align="right"/) {
+        $padding = '&nbsp;';
+    }
+    return "\n    <tr>$c1align$sfont$c1$efont$padding</td>\n"
            . "        $c2align$c2</td>\n"
 	   . "        $c3align$c3</td>"
 	   . $_;
@@ -1005,10 +1016,10 @@ sub do_env_tableiv{
     return '<table border align="center" style="border-collapse: collapse">'
            . "\n  <thead>"
            . "\n    <tr$TABLE_HEADER_BGCOLOR>"
-	   . "\n      $th1<b>$h1</b>\&nbsp;\&nbsp;</th>"
-	   . "\n      $th2<b>$h2</b>\&nbsp;\&nbsp;</th>"
-	   . "\n      $th3<b>$h3</b>\&nbsp;\&nbsp;</th>"
-	   . "\n      $th4<b>$h4</b>\&nbsp;\&nbsp;</th>"
+	   . "\n      $th1<b>$h1</b>\&nbsp;</th>"
+	   . "\n      $th2<b>$h2</b>\&nbsp;</th>"
+	   . "\n      $th3<b>$h3</b>\&nbsp;</th>"
+	   . "\n      $th4<b>$h4</b>\&nbsp;</th>"
 	   . "\n    </thead>"
 	   . "\n  <tbody valign='baseline'>"
 	   . $_
@@ -1026,7 +1037,11 @@ sub do_cmd_lineiv{
     my($font,$sfont,$efont) = get_table_col1_fonts();
     $c4 = '&nbsp;' if ($c4 eq '');
     my($c1align,$c2align,$c3align,$c4align) = @col_aligns;
-    return "\n    <tr>$c1align$sfont$c1$efont</td>\n"
+    my $padding = '';
+    if ($c1align =~ /align="right"/) {
+        $padding = '&nbsp;';
+    }
+    return "\n    <tr>$c1align$sfont$c1$efont$padding</td>\n"
            . "        $c2align$c2</td>\n"
 	   . "        $c3align$c3</td>\n"
 	   . "        $c4align$c4</td>"
