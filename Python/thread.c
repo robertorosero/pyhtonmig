@@ -1,3 +1,5 @@
+#define DEBUG 1 /* XXX */
+
 /***********************************************************
 Copyright 1991, 1992, 1993, 1994 by Stichting Mathematisch Centrum,
 Amsterdam, The Netherlands.
@@ -26,6 +28,10 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #include "config.h"
 #endif
 
+#ifdef WITH_SGI_DL
+#define USE_DL
+#endif
+
 #ifdef HAVE_THREAD_H
 #define SOLARIS
 #endif
@@ -46,6 +52,7 @@ static int thread_debug = 0;
 #include <stdio.h>
 #include <signal.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 #include <sys/prctl.h>
 #include <ulocks.h>
 #include <errno.h>
@@ -59,7 +66,9 @@ static ulock_t wait_lock;	/* lock used to wait for other threads */
 static int waiting_for_threads;	/* protected by count_lock */
 static int nthreads;		/* protected by count_lock */
 static int exit_status;
+#ifndef NO_EXIT_PROG
 static int do_exit;		/* indicates that the program is to exit */
+#endif
 static int exiting;		/* we're already exiting (for maybe_exit) */
 static pid_t my_pid;		/* PID of main thread */
 static pid_t pidlist[MAXPROC];	/* PIDs of other threads */
@@ -73,6 +82,7 @@ static int maxpidindex;		/* # of PIDs in pidlist */
 #undef sun
 #endif
 #ifdef sun
+#include <stdlib.h>
 #include <lwp/lwp.h>
 #include <lwp/stackdep.h>
 
@@ -107,6 +117,7 @@ struct lock {
 static int initialized;
 
 #ifdef __sgi
+#ifndef NO_EXIT_PROG
 /*
  * This routine is called as a signal handler when another thread
  * exits.  When that happens, we must see whether we have to exit as
@@ -142,6 +153,7 @@ static void maybe_exit _P0()
 	}
 	exit_prog(0);
 }
+#endif /* NO_EXIT_PROG */
 #endif /* __sgi */
 
 /*
@@ -150,7 +162,9 @@ static void maybe_exit _P0()
 void init_thread _P0()
 {
 #ifdef __sgi
+#ifndef NO_EXIT_PROG
 	struct sigaction s;
+#endif /* NO_EXIT_PROG */
 #ifdef USE_DL
 	long addr, size;
 #endif /* USE_DL */
@@ -186,6 +200,7 @@ void init_thread _P0()
 	if (usconfig(CONF_INITUSERS, 16) < 0)
 		perror("usconfig - CONF_INITUSERS");
 	my_pid = getpid();	/* so that we know which is the main thread */
+#ifndef NO_EXIT_PROG
 	atexit(maybe_exit);
 	s.sa_handler = exit_sig;
 	sigemptyset(&s.sa_mask);
@@ -194,8 +209,10 @@ void init_thread _P0()
 	sigaction(SIGUSR1, &s, 0);
 	if (prctl(PR_SETEXITSIG, SIGUSR1) < 0)
 		perror("prctl - PR_SETEXITSIG");
+#endif /* NO_EXIT_PROG */
 	if (usconfig(CONF_ARENATYPE, US_SHAREDONLY) < 0)
 		perror("usconfig - CONF_ARENATYPE");
+	usconfig(CONF_LOCKTYPE, US_DEBUG); /* XXX */
 #ifdef DEBUG
 	if (thread_debug & 4)
 		usconfig(CONF_LOCKTYPE, US_DEBUGPLUS);
@@ -248,6 +265,30 @@ static void *new_func _P1(funcarg, void *funcarg)
 }
 #endif /* SOLARIS */
 
+#ifdef __sgi
+static void clean_threads _P0()
+{
+	int i;
+	pid_t pid;
+
+	/* clean up any exited threads */
+	i = 0;
+	while (i < maxpidindex) {
+		if ((pid = pidlist[i]) > 0) {
+			pid = waitpid(pid, 0, WNOHANG);
+			if (pid < 0)
+				return;
+			if (pid != 0) {
+				/* a thread has exited */
+				pidlist[i] = pidlist[--maxpidindex];
+				continue; /* don't increment i */
+			}
+		}
+		i++;
+	}
+}
+#endif /* __sgi */
+
 int start_new_thread _P2(func, void (*func) _P((void *)), arg, void *arg)
 {
 #ifdef SOLARIS
@@ -290,6 +331,7 @@ int start_new_thread _P2(func, void (*func) _P((void *)), arg, void *arg)
 				perror("usconfig - CONF_ATTACHADDR (set)");
 		}
 #endif /* USE_DL */
+		clean_threads();
 		if ((success = sproc(func, PR_SALL, arg)) < 0)
 			perror("sproc");
 #ifdef USE_DL
@@ -302,6 +344,7 @@ int start_new_thread _P2(func, void (*func) _P((void *)), arg, void *arg)
 		if (success >= 0) {
 			nthreads++;
 			pidlist[maxpidindex++] = success;
+			dprintf(("pidlist[%d] = %d\n", maxpidindex-1, success));
 		}
 	}
 	if (usunsetlock(count_lock) < 0)
@@ -344,17 +387,22 @@ static void do_exit_thread _P1(no_cleanup, int no_cleanup)
 	if (getpid() == my_pid) {
 		/* main thread; wait for other threads to exit */
 		exiting = 1;
+#ifndef NO_EXIT_PROG
 		if (do_exit) {
 			int i;
 
 			/* notify other threads */
+			clean_threads();
 			if (nthreads >= 0) {
 				dprintf(("kill other threads\n"));
 				for (i = 0; i < maxpidindex; i++)
-					(void) kill(pidlist[i], SIGKILL);
+					if (pidlist[i] > 0)
+						(void) kill(pidlist[i],
+							    SIGKILL);
 				_exit(exit_status);
 			}
 		}
+#endif /* NO_EXIT_PROG */
 		waiting_for_threads = 1;
 		if (ussetlock(wait_lock) < 0)
 			perror("ussetlock (wait_lock)");
@@ -380,8 +428,11 @@ static void do_exit_thread _P1(no_cleanup, int no_cleanup)
 		dprintf(("main thread is waiting\n"));
 		if (usunsetlock(wait_lock) < 0)
 			perror("usunsetlock (wait_lock)");
-	} else if (do_exit)
+	}
+#ifndef NO_EXIT_PROG
+	else if (do_exit)
 		(void) kill(my_pid, SIGUSR1);
+#endif /* NO_EXIT_PROG */
 	if (usunsetlock(count_lock) < 0)
 		perror("usunsetlock (count_lock)");
 	_exit(0);
@@ -407,6 +458,7 @@ void _exit_thread _P0()
 	do_exit_thread(1);
 }
 
+#ifndef NO_EXIT_PROG
 static void do_exit_prog _P2(status, int status, no_cleanup, int no_cleanup)
 {
 	dprintf(("exit_prog(%d) called\n", status));
@@ -419,16 +471,16 @@ static void do_exit_prog _P2(status, int status, no_cleanup, int no_cleanup)
 	do_exit = 1;
 	exit_status = status;
 	do_exit_thread(no_cleanup);
-#endif
+#endif /* __sgi */
 #ifdef SOLARIS
 	if (no_cleanup)
 		_exit(status);
 	else
 		exit(status);
-#endif
+#endif /* SOLARIS */
 #ifdef sun
 	pod_exit(status);
-#endif
+#endif /* sun */
 }
 
 void exit_prog _P1(status, int status)
@@ -440,6 +492,7 @@ void _exit_prog _P1(status, int status)
 {
 	do_exit_prog(status, 1);
 }
+#endif /* NO_EXIT_PROG */
 
 /*
  * Lock support.
@@ -571,6 +624,9 @@ type_sema allocate_sema _P1(value, int value)
 #endif /* __sgi */
 #ifdef SOLARIS
 	sema_t *sema;
+#endif
+#ifdef sun
+	type_sema sema = 0;
 #endif
 
 	dprintf(("allocate_sema called\n"));
