@@ -1324,22 +1324,6 @@ PyCallable_Check(PyObject *x)
 }
 
 
-/* type test with subclassing support */
-
-int
-_PyObject_TypeCheck(PyTypeObject *tp, PyTypeObject *type)
-{
-	do {
-		if (tp == type)
-			return 1;
-		if (!PyType_HasFeature(tp, Py_TPFLAGS_HAVE_CLASS))
-			return 0;
-		tp = tp->tp_base;
-	} while (tp != NULL);
-	return 0;
-}
-
-
 /*
 NoObject is usable as a non-NULL undefined value, used by the macro None.
 There is (and should be!) no way to create other objects of this type,

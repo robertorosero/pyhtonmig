@@ -183,35 +183,35 @@ typedef struct {
 	struct memberlist members[1];
 } etype;
 
-static int
-issubtype(PyTypeObject *a, PyTypeObject *b)
-{
-	PyObject *bases;
-	PyTypeObject *base;
-	int i, n;
+/* type test with subclassing support */
 
-	if (b == &PyBaseObject_Type)
-		return 1; /* Every type is an implicit subtype of this */
-	while (a != NULL) {
-		if (a == b)
-			return 1;
-		bases = a->tp_bases;
-		a = a->tp_base;
-		if (bases != NULL && PyTuple_Check(bases)) {
-			n = PyTuple_GET_SIZE(bases);
-			for (i = 0; i < n; i++) {
-				base = (PyTypeObject *)
-					PyTuple_GET_ITEM(bases, i);
-				if (base == b)
-					return 1;
-				if (base != a) {
-					if (issubtype(base, b))
-						return 1;
-				}
-			}
+int
+PyType_IsSubtype(PyTypeObject *a, PyTypeObject *b)
+{
+	PyObject *mro;
+
+	mro = a->tp_mro;
+	if (mro != NULL) {
+		/* Deal with multiple inheritance without recursion
+		   by walking the MRO tuple */
+		int i, n;
+		assert(PyTuple_Check(mro));
+		n = PyTuple_GET_SIZE(mro);
+		for (i = 0; i < n; i++) {
+			if (PyTuple_GET_ITEM(mro, i) == (PyObject *)b)
+				return 1;
 		}
+		return 0;
 	}
-	return 0;
+	else {
+		/* a is not completely initilized yet; follow tp_base */
+		do {
+			if (a == b)
+				return 1;
+			a = a->tp_base;
+		} while (a != NULL);
+		return b == &PyBaseObject_Type;
+	}
 }
 
 /* Method resolution order algorithm from "Putting Metaclasses to Work"
@@ -321,9 +321,9 @@ best_base(PyObject *bases)
 				return NULL;
 		}
 		candidate = solid_base(base_i);
-		if (issubtype(winner, candidate))
+		if (PyType_IsSubtype(winner, candidate))
 			;
-		else if (issubtype(candidate, winner)) {
+		else if (PyType_IsSubtype(candidate, winner)) {
 			winner = candidate;
 			base = base_i;
 		}
@@ -412,9 +412,9 @@ type_new(PyTypeObject *metatype, PyObject *args, PyObject *kwds)
 	for (i = 0; i < nbases; i++) {
 		tmp = PyTuple_GET_ITEM(bases, i);
 		tmptype = tmp->ob_type;
-		if (issubtype(metatype, tmptype))
+		if (PyType_IsSubtype(metatype, tmptype))
 			continue;
-		if (issubtype(tmptype, metatype)) {
+		if (PyType_IsSubtype(tmptype, metatype)) {
 			metatype = tmptype;
 			continue;
 		}
