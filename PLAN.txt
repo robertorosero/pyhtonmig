@@ -284,10 +284,24 @@ Merge issues:
           Two shallow test errors were fixed (relying on exact order of
           dict traversal -- for that matter, it still does, but now the
           correct exact order <wink>).
+
           Now dies with a memory error right after
               Testing Python subclass of dict...
           I expect this is a merge glitch that slipped past me.
- 
+
+          Small program that reproduces the problem:
+              class C(dictionary):
+                  def __init__(self):
+                      self['a'] = 1
+
+              a = C()
+
+          Gross cause:  The dictionary has not been initialized, i.e.
+          mp->ma_table is NULL when we get into lookdict_string.  But
+          mp->ma_table must never be NULL after the trunk dict rewrite (any
+          legit way of creating the dict will leave ma_table pointing to
+          ma_smalltable).
+
 + If some non-Windows test has an expected-output file in descr-branch
   that has been removed on the trunk since descr-fork, it will probably
   fail.  The cure is to remove the expected-output file in descr-branch too.
