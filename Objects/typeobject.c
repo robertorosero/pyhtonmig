@@ -4753,6 +4753,13 @@ slot_tp_init(PyObject *self, PyObject *args, PyObject *kwds)
 	Py_DECREF(meth);
 	if (res == NULL)
 		return -1;
+	if (res != Py_None) {
+		if (PyErr_Warn(PyExc_RuntimeWarning, 
+			"__init__() should return None") == -1) {
+			Py_DECREF(res);
+			return -1;
+		}
+	}
 	Py_DECREF(res);
 	return 0;
 }

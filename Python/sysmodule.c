@@ -927,6 +927,13 @@ settrace() -- set the global debug tracing function\n\
 )
 /* end of sys_doc */ ;
 
+static int
+_check_and_flush (FILE *stream)
+{
+  int prev_fail = ferror (stream);
+  return fflush (stream) || prev_fail ? EOF : 0;
+}
+
 PyObject *
 _PySys_Init(void)
 {
@@ -940,9 +947,18 @@ _PySys_Init(void)
 	m = Py_InitModule3("sys", sys_methods, sys_doc);
 	sysdict = PyModule_GetDict(m);
 
+	/* Closing the standard FILE* if sys.std* goes aways causes problems
+	 * for embedded Python usages. Closing them when somebody explicitly
+	 * invokes .close() might be possible, but the FAQ promises they get
+	 * never closed. However, we still need to get write errors when
+	 * writing fails (e.g. because stdout is redirected), so we flush the
+	 * streams and check for errors before the file objects are deleted.
+	 * On OS X, fflush()ing stdin causes an error, so we exempt stdin
+	 * from that procedure.
+	 */
 	sysin = PyFile_FromFile(stdin, "<stdin>", "r", NULL);
-	sysout = PyFile_FromFile(stdout, "<stdout>", "w", NULL);
-	syserr = PyFile_FromFile(stderr, "<stderr>", "w", NULL);
+	sysout = PyFile_FromFile(stdout, "<stdout>", "w", _check_and_flush);
+	syserr = PyFile_FromFile(stderr, "<stderr>", "w", _check_and_flush);
 	if (PyErr_Occurred())
 		return NULL;
 #ifdef MS_WINDOWS

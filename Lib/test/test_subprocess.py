@@ -343,9 +343,10 @@ class ProcessTestCase(unittest.TestCase):
 
     def test_no_leaking(self):
         # Make sure we leak no resources
-        max_handles = 1026 # too much for most UNIX systems
-        if mswindows:
-            max_handles = 65 # a full test is too slow on Windows
+        if test_support.is_resource_enabled("subprocess") and not mswindows:
+            max_handles = 1026 # too much for most UNIX systems
+        else:
+            max_handles = 65 
         for i in range(max_handles):
             p = subprocess.Popen([sys.executable, "-c",
                     "import sys;sys.stdout.write(sys.stdin.read())"],
@@ -393,6 +394,17 @@ class ProcessTestCase(unittest.TestCase):
         self.assertEqual(p.wait(), 0)
         # Subsequent invocations should just return the returncode
         self.assertEqual(p.wait(), 0)
+
+
+    def test_invalid_bufsize(self):
+        # an invalid type of the bufsize argument should raise
+        # TypeError.
+        try:
+            subprocess.Popen([sys.executable, "-c", "pass"], "orange")
+        except TypeError:
+            pass
+        else:
+            self.fail("Expected TypeError")
 
     #
     # POSIX tests

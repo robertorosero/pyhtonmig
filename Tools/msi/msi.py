@@ -1,10 +1,11 @@
 # Python MSI Generator
 # (C) 2003 Martin v. Loewis
 # See "FOO" in comments refers to MSDN sections with the title FOO.
-import msilib, schema, sequence, os, glob, time
+import msilib, schema, sequence, os, glob, time, re
 from msilib import Feature, CAB, Directory, Dialog, Binary, add_data
 import uisample
 from win32com.client import constants
+from distutils.spawn import find_executable
 
 # Settings can be overridden in config.py below
 # 1 for Itanium build
@@ -115,6 +116,52 @@ if major+minor <= "23":
     'mmap.pyd',
     'parser.pyd',
     ])
+
+# Build the mingw import library, libpythonXY.a
+# This requires 'nm' and 'dlltool' executables on your PATH
+def build_mingw_lib(lib_file, def_file, dll_file, mingw_lib):
+    warning = "WARNING: %s - libpythonXX.a not built"
+    nm = find_executable('nm')
+    dlltool = find_executable('dlltool')
+
+    if not nm or not dlltool:
+        print warning % "nm and/or dlltool were not found"
+        return False
+
+    nm_command = '%s -Cs %s' % (nm, lib_file)
+    dlltool_command = "%s --dllname %s --def %s --output-lib %s" % \
+        (dlltool, dll_file, def_file, mingw_lib)
+    export_match = re.compile(r"^_imp__(.*) in python\d+\.dll").match
+
+    f = open(def_file,'w')
+    print >>f, "LIBRARY %s" % dll_file
+    print >>f, "EXPORTS"
+
+    nm_pipe = os.popen(nm_command)
+    for line in nm_pipe.readlines():
+        m = export_match(line)
+        if m:
+            print >>f, m.group(1)
+    f.close()
+    exit = nm_pipe.close()
+
+    if exit:
+        print warning % "nm did not run successfully"
+        return False
+
+    if os.system(dlltool_command) != 0:
+        print warning % "dlltool did not run successfully"
+        return False
+
+    return True
+
+# Target files (.def and .a) go in PCBuild directory
+lib_file = os.path.join(srcdir, "PCBuild", "python%s%s.lib" % (major, minor))
+def_file = os.path.join(srcdir, "PCBuild", "python%s%s.def" % (major, minor))
+dll_file = "python%s%s.dll" % (major, minor)
+mingw_lib = os.path.join(srcdir, "PCBuild", "libpython%s%s.a" % (major, minor))
+
+have_mingw = build_mingw_lib(lib_file, def_file, dll_file, mingw_lib)
 
 if testpackage:
     ext = 'px'
@@ -295,47 +342,15 @@ def add_ui(db):
     # UpdateEditIDLE sets the REGISTRY.tcl component into
     # the installed/uninstalled state according to both the
     # Extensions and TclTk features.
-    open("inst.vbs","w").write("""
-    Function CheckDir()
-      Set FSO = CreateObject("Scripting.FileSystemObject")
-      if FSO.FolderExists(Session.Property("TARGETDIR")) then
-        Session.Property("TargetExists") = "1"
-      else
-        Session.Property("TargetExists") = "0"
-      end if
-    End Function
-    Function UpdateEditIDLE()
-      Dim ext_new, tcl_new, regtcl_old
-      ext_new = Session.FeatureRequestState("Extensions")
-      tcl_new = Session.FeatureRequestState("TclTk")
-      if ext_new=-1 then
-         ext_new = Session.FeatureCurrentState("Extensions")
-      end if
-      if tcl_new=-1 then
-         tcl_new = Session.FeatureCurrentState("TclTk")
-      end if
-      regtcl_old = Session.ComponentCurrentState("REGISTRY.tcl")
-      if ext_new=3 and (tcl_new=3 or tcl_new=4) and regtcl_old<>3 then
-         Session.ComponentRequestState("REGISTRY.tcl")=3
-      end if
-      if (ext_new=2 or tcl_new=2) and regtcl_old<>2 then
-         Session.ComponentRequestState("REGISTRY.tcl")=2
-      end if
-    End Function
-    """)
-    # To add debug messages into scripts, the following fragment can be used
-    #     set objRec = Session.Installer.CreateRecord(1)
-    #     objRec.StringData(1) = "Debug message"
-    #     Session.message &H04000000, objRec
-    add_data(db, "Binary", [("Script", msilib.Binary("inst.vbs"))])
-    # See "Custom Action Type 6"
+    if os.system("nmake /nologo /c /f msisupport.mak") != 0:
+        raise "'nmake /f msisupport.mak' failed"
+    add_data(db, "Binary", [("Script", msilib.Binary("msisupport.dll"))])
+    # See "Custom Action Type 1"
     add_data(db, "CustomAction",
-        [("CheckDir", 6, "Script", "CheckDir")])
+        [("CheckDir", 1, "Script", "_CheckDir@4")])
     if have_tcl:
         add_data(db, "CustomAction",
-        [("UpdateEditIDLE", 6, "Script", "UpdateEditIDLE")])
-    os.unlink("inst.vbs")
-
+        [("UpdateEditIDLE", 1, "Script", "_UpdateEditIDLE@4")])
 
     # UI customization properties
     add_data(db, "Property",
@@ -867,7 +882,11 @@ def add_files(db):
             if not have_tcl:
                 continue
             tcltk.set_current()
-        elif dir in ['test', 'output']:
+        elif dir in ['test', 'tests', 'data', 'output']:
+            # test: Lib, Lib/email, Lib/bsddb
+            # tests: Lib/distutils
+            # data: Lib/email/test
+            # output: Lib/test
             testsuite.set_current()
         else:
             default_feature.set_current()
@@ -956,6 +975,9 @@ def add_files(db):
     for f in dlls:
         lib.add_file(f.replace('pyd','lib'))
     lib.add_file('python%s%s.lib' % (major, minor))
+    # Add the mingw-format library
+    if have_mingw:
+	lib.add_file('libpython%s%s.a' % (major, minor))
     if have_tcl:
         # Add Tcl/Tk
         tcldirs = [(root, '../tcltk/lib', 'tcl')]
@@ -982,8 +1004,9 @@ def add_files(db):
         if f == "pynche":
             x = PyDirectory(db, cab, lib, "X", "X", "X|X")
             x.glob("*.txt")
-        if f == 'Scripts':
+        if os.path.exists(os.path.join(lib.absolute, "README")):
             lib.add_file("README.txt", src="README")
+        if f == 'Scripts':
             if have_tcl:
                 lib.start_component("pydocgui.pyw", tcltk, keyfile="pydocgui.pyw")
                 lib.add_file("pydocgui.pyw")
@@ -1111,9 +1134,9 @@ def add_registry(db):
     if have_tcl:
         tcltkshortcuts = [
               ("IDLE", "MenuDir", "IDLE|IDLE (Python GUI)", "pythonw.exe",
-               tcltk.id, r"[TARGETDIR]Lib\idlelib\idle.pyw", None, None, "python_icon.exe", 0, None, "TARGETDIR"),
+               tcltk.id, r'"[TARGETDIR]Lib\idlelib\idle.pyw"', None, None, "python_icon.exe", 0, None, "TARGETDIR"),
               ("PyDoc", "MenuDir", "MODDOCS|Module Docs", "pythonw.exe",
-               tcltk.id, r"[TARGETDIR]Tools\scripts\pydocgui.pyw", None, None, "python_icon.exe", 0, None, "TARGETDIR"),
+               tcltk.id, r'"[TARGETDIR]Tools\scripts\pydocgui.pyw"', None, None, "python_icon.exe", 0, None, "TARGETDIR"),
               ]
     add_data(db, "Shortcut",
              tcltkshortcuts +

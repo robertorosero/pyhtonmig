@@ -448,19 +448,15 @@ def parse_ns_headers(ns_headers):
     for ns_header in ns_headers:
         pairs = []
         version_set = False
-        for param in re.split(r";\s*", ns_header):
+        for ii, param in enumerate(re.split(r";\s*", ns_header)):
             param = param.rstrip()
             if param == "": continue
             if "=" not in param:
-                if param.lower() in known_attrs:
-                    k, v = param, None
-                else:
-                    # cookie with missing value
-                    k, v = param, None
+                k, v = param, None
             else:
                 k, v = re.split(r"\s*=\s*", param, 1)
                 k = k.lstrip()
-            if k is not None:
+            if ii != 0:
                 lc = k.lower()
                 if lc in known_attrs:
                     k = lc
@@ -1134,11 +1130,10 @@ class DefaultCookiePolicy(CookiePolicy):
         # having to load lots of MSIE cookie files unless necessary.
         req_host, erhn = eff_request_host(request)
         if not req_host.startswith("."):
-            dotted_req_host = "."+req_host
+            req_host = "."+req_host
         if not erhn.startswith("."):
-            dotted_erhn = "."+erhn
-        if not (dotted_req_host.endswith(domain) or
-                dotted_erhn.endswith(domain)):
+            erhn = "."+erhn
+        if not (req_host.endswith(domain) or erhn.endswith(domain)):
             #debug("   request domain %s does not match cookie domain %s",
             #      req_host, domain)
             return False
