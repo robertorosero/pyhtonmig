@@ -49,7 +49,7 @@ lib.texi: lib*.tex texipre.dat texipost.dat partparse.py
 
 python-lib.info: lib.texi fix.el
 	emacs -batch -l fix.el -f save-buffer -kill
-	makeinfo +footnote-style end +fill-column 72 +paragraph-indent 0 \
+	makeinfo --footnote-style end --fill-column 72 --paragraph-indent 0 \
 	         lib.texi
 
 lib.info: python-lib.info

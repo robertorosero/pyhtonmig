@@ -9,7 +9,7 @@
 	E-mail: {\tt guido@cwi.nl}
 }
 
-\date{26 Januari 1994 \\ Release 1.0.0} % XXX update before release!
+\date{30 January 1994 \\ Release 1.0.0} % XXX update before release!
 
 \begin{document}
 
@@ -63,7 +63,7 @@ a more formal definition of the language.
 If you ever wrote a large shell script, you probably know this
 feeling: you'd love to add yet another feature, but it's already so
 slow, and so big, and so complicated; or the feature involves a system
-call or other funcion that is only accessible from C \ldots  Usually
+call or other function that is only accessible from C \ldots  Usually
 the problem at hand isn't serious enough to warrant rewriting the
 script in C; perhaps because the problem requires variable-length
 strings or other data types (like sorted lists of file names) that are
@@ -135,9 +135,10 @@ trying out the examples shown later.
 The rest of the tutorial introduces various features of the Python
 language and system though examples, beginning with simple
 expressions, statements and data types, through functions and modules,
-and finally touching upon advanced concepts like exceptions.
+and finally touching upon advanced concepts like exceptions
+and user-defined classes.
 
-When you're through with the turtorial (or just getting bored), you
+When you're through with the tutorial (or just getting bored), you
 should read the Library Reference, which gives complete (though terse)
 reference material about built-in and standard types, functions and
 modules that can save you a lot of time when writing Python programs.
@@ -299,7 +300,7 @@ When you use Python interactively, it is frequently handy to have some
 standard commands executed every time the interpreter is started.  You
 can do this by setting an environment variable named {\tt
 PYTHONSTARTUP} to the name of a file containing your start-up
-commands.  This is similar to the {\tt /profile} feature of the UNIX
+commands.  This is similar to the {\tt .profile} feature of the UNIX
 shells.
 
 This file is only read in interactive sessions, not when Python reads
@@ -442,15 +443,20 @@ work just like in most other languages (e.g., Pascal or C); parentheses
 can be used for grouping.  For example:
 
 \bcode\begin{verbatim}
->>> # This is a comment
 >>> 2+2
 4
->>> 
+>>> # This is a comment
+... 2+2
+4
+>>> 2+2  # and a comment on the same line as code
+4
 >>> (50-5*6)/4
 5
->>> # Division truncates towards zero:
->>> 7/3
+>>> # Integer division returns the floor:
+... 7/3
 2
+>>> 7/-3
+-3
 >>> 
 \end{verbatim}\ecode
 %
@@ -468,9 +474,14 @@ variable.  The value of an assignment is not written:
 A value can be assigned to several variables simultaneously:
 
 \bcode\begin{verbatim}
->>> # Zero x, y and z
->>> x = y = z = 0
->>>
+>>> x = y = z = 0  # Zero x, y and z
+>>> x
+0
+>>> y
+0
+>>> z
+0
+>>> 
 \end{verbatim}\ecode
 %
 There is full support for floating point; operators with mixed type
@@ -487,21 +498,30 @@ operands convert the integer operand to floating point:
 \subsection{Strings}
 
 Besides numbers, Python can also manipulate strings, enclosed in
-single quotes:
+single quotes or double quotes:
 
 \bcode\begin{verbatim}
 >>> 'foo bar'
 'foo bar'
 >>> 'doesn\'t'
-'doesn\'t'
+"doesn't"
+>>> "doesn't"
+"doesn't"
+>>> '"Yes," he said.'
+'"Yes," he said.'
+>>> "\"Yes,\" he said."
+'"Yes," he said.'
+>>> '"Isn\'t," she said.'
+'"Isn\'t," she said.'
 >>> 
 \end{verbatim}\ecode
 %
 Strings are written the same way as they are typed for input: inside
-quotes and with quotes and other funny characters escaped by
-backslashes, to show the precise value.  (The {\tt print} statement,
-described later, can be used to write strings without quotes or
-escapes.)
+quotes and with quotes and other funny characters escaped by backslashes,
+to show the precise value.  The string is enclosed in double quotes if
+the string contains a single quote and no double quotes, else it's
+enclosed in single quotes.  (The {\tt print} statement, described later,
+can be used to write strings without quotes or escapes.)
 
 Strings can be concatenated (glued together) with the {\tt +}
 operator, and repeated with {\tt *}:
@@ -600,7 +620,9 @@ for single-element (non-slice) indices:
 >>> word[-100:]
 'HelpA'
 >>> word[-10]    # error
-Unhandled exception: IndexError: string index out of range
+Traceback (innermost last):
+  File "<stdin>", line 1
+IndexError: string index out of range
 >>> 
 \end{verbatim}\ecode
 %
@@ -685,15 +707,15 @@ of the list:
 
 \bcode\begin{verbatim}
 >>> # Replace some items:
->>> a[0:2] = [1, 12]
+... a[0:2] = [1, 12]
 >>> a
 [1, 12, 123, 1234]
 >>> # Remove some:
->>> a[0:2] = []
+... a[0:2] = []
 >>> a
 [123, 1234]
 >>> # Insert some:
->>> a[1:1] = ['bletch', 'xyzzy']
+... a[1:1] = ['bletch', 'xyzzy']
 >>> a
 [123, 'bletch', 'xyzzy', 1234]
 >>> a[:0] = a     # Insert (a copy of) itself at the beginning
@@ -741,8 +763,8 @@ subsequence of the {\em Fibonacci} series as follows:
 
 \bcode\begin{verbatim}
 >>> # Fibonacci series:
->>> # the sum of two elements defines the next
->>> a, b = 0, 1
+... # the sum of two elements defines the next
+... a, b = 0, 1
 >>> while b < 10:
 ...       print b
 ...       a, b = b, a+b
@@ -862,7 +884,7 @@ example (no pun intended):
 
 \bcode\begin{verbatim}
 >>> # Measure some strings:
->>> a = ['cat', 'window', 'defenestrate']
+... a = ['cat', 'window', 'defenestrate']
 >>> for x in a:
 ...     print x, len(x)
 ... 
@@ -990,7 +1012,7 @@ arbitrary boundary:
 ...           a, b = b, a+b
 ... 
 >>> # Now call the function we just defined:
->>> fib(2000)
+... fib(2000)
 1 1 2 3 5 8 13 21 34 55 89 144 233 377 610 987 1597
 >>> 
 \end{verbatim}\ecode
@@ -1004,11 +1026,12 @@ The {\em execution} of a function introduces a new symbol table used
 for the local variables of the function.  More precisely, all variable
 assignments in a function store the value in the local symbol table;
 whereas
- variable references first look in the local symbol table, then
+variable references first look in the local symbol table, then
 in the global symbol table, and then in the table of built-in names.
 Thus,
 global variables cannot be directly assigned to from within a
-function, although they may be referenced.
+function (unless named in a {\tt global} statement), although
+they may be referenced.
 
 The actual parameters (arguments) to a function call are introduced in
 the local symbol table of the called function when it is called; thus,
@@ -1079,7 +1102,7 @@ This example, as usual, demonstrates some new Python features:
 \item
 The {\tt return} statement returns with a value from a function.  {\tt
 return} without an expression argument is used to return from the middle
-of a procedure (falling off the end also returns from a proceduce), in
+of a procedure (falling off the end also returns from a procedure), in
 which case the {\tt None} value is returned.
 
 \item
@@ -1090,8 +1113,8 @@ object (this may be an expression), and {\tt methodname} is the name
 of a method that is defined by the object's type.  Different types
 define different methods.  Methods of different types may have the
 same name without causing ambiguity.  (It is possible to define your
-own object types and methods, using {\em classes}.  This is an
-advanced feature that is not discussed in this tutorial.)
+own object types and methods, using {\em classes}, as discussed later
+in this tutorial.)
 The method {\tt append} shown in the example, is defined for
 list objects; it adds a new element at the end of the list.  In this
 example
@@ -1135,12 +1158,17 @@ Sort the items of the list, in place.
 \item[{\tt reverse()}]
 Reverse the elements of the list, in place.
 
+\item[{\tt count(x)}]
+Return the number of times {\tt x} appears in the list.
+
 \end{description}
 
 An example that uses all list methods:
 
 \bcode\begin{verbatim}
 >>> a = [66.6, 333, 333, 1, 1234.5]
+>>> print a.count(333), a.count(66.6), a.count('x')
+2 1 0
 >>> a.insert(2, -1)
 >>> a.append(333)
 >>> a
@@ -1192,7 +1220,7 @@ later.
 \section{Tuples and Sequences}
 
 We saw that lists and strings have many common properties, e.g.,
-indexinging and slicing operations.  They are two examples of {\em
+indexing and slicing operations.  They are two examples of {\em
 sequence} data types.  Since Python is an evolving language, other
 sequence data types may be added.  There is also another standard
 sequence data type: the {\em tuple}.
@@ -1207,7 +1235,7 @@ instance:
 >>> t
 (12345, 54321, 'hello!')
 >>> # Tuples may be nested:
->>> u = t, (1, 2, 3, 4, 5)
+... u = t, (1, 2, 3, 4, 5)
 >>> u
 ((12345, 54321, 'hello!'), (1, 2, 3, 4, 5))
 >>>
@@ -1225,7 +1253,7 @@ simulate much of the same effect with slicing and concatenation,
 though).
 
 A special problem is the construction of tuples containing 0 or 1
-items: the syntax has some extra quirks to accomodate these.  Empty
+items: the syntax has some extra quirks to accommodate these.  Empty
 tuples are constructed by an empty pair of parentheses; a tuple with
 one item is constructed by following a value with a comma
 (it is not sufficient to enclose a single value in parentheses).
@@ -1275,7 +1303,9 @@ Another useful data type built into Python is the {\em dictionary}.
 Dictionaries are sometimes found in other languages as ``associative
 memories'' or ``associative arrays''.  Unlike sequences, which are
 indexed by a range of numbers, dictionaries are indexed by {\em keys},
-which are strings.  It is best to think of a dictionary as an unordered set of
+which are strings (the use of non-string values as keys
+is supported, but beyond the scope of this tutorial).
+It is best to think of a dictionary as an unordered set of
 {\em key:value} pairs, with the requirement that the keys are unique
 (within one dictionary).
 A pair of braces creates an empty dictionary: \verb/{}/.
@@ -1289,7 +1319,7 @@ a key:value pair
 with {\tt del}.
 If you store using a key that is already in use, the old value
 associated with that key is forgotten.  It is an error to extract a
-value using a non-existant key.
+value using a non-existent key.
 
 The {\tt keys()} method of a dictionary object returns a list of all the
 keys used in the dictionary, in random order (if you want it sorted,
@@ -1349,14 +1379,17 @@ shortcut operator, when used as a general value and not as a Boolean, is
 the last evaluated argument.
 
 It is possible to assign the result of a comparison or other Boolean
-expression to a variable, but you must enclose the entire Boolean
-expression in parentheses.  This is necessary because otherwise an
-assignment like \verb/a = b = c/ would be ambiguous: does it assign the
-value of {\tt c} to {\tt a} and {\tt b}, or does it compare {\tt b} to
-{\tt c} and assign the outcome (0 or 1) to {\tt a}?  As it is, the first
-meaning is what you get, and to get the latter you have to write
-\verb/a = (b = c)/.  (In Python, unlike C, assignment cannot occur
-inside expressions.)
+expression to a variable.  For example,
+
+\bcode\begin{verbatim}
+>>> string1, string2, string3 = '', 'Trondheim', 'Hammer Dance'
+>>> non_null = string1 or string2 or string3
+>>> non_null
+'Trondheim'
+>>> 
+\end{verbatim}\ecode
+%
+Note that in Python, unlike C, assignment cannot occur inside expressions.
 
 \section{Comparing Sequences and Other Types}
 
@@ -1366,7 +1399,7 @@ first the first two items are compared, and if they differ this
 determines the outcome of the comparison; if they are equal, the next
 two items are compared, and so on, until either sequence is exhausted.
 If two items to be compared are themselves sequences of the same type,
-the lexiographical comparison is carried out recursively.  If all
+the lexicographical comparison is carried out recursively.  If all
 items of two sequences compare equal, the sequences are considered
 equal.  If one sequence is an initial subsequence of the other, the
 shorted sequence is the smaller one.  Lexicographical ordering for
@@ -1416,9 +1449,11 @@ executed at the top level
 and in calculator mode).
 
 A module is a file containing Python definitions and statements.  The
-file name is the module name with the suffix {\tt .py} appended.  For
-instance, use your favorite text editor to create a file called {\tt
-fibo.py} in the current directory with the following contents:
+file name is the module name with the suffix {\tt .py} appended.  Within
+a module, the module's name (as a string) is available as the value of
+the global variable {\tt __name__}.  For instance, use your favorite text
+editor to create a file called {\tt fibo.py} in the current directory
+with the following contents:
 
 \bcode\begin{verbatim}
 # Fibonacci numbers module
@@ -1458,6 +1493,8 @@ Using the module name you can access the functions:
 1 1 2 3 5 8 13 21 34 55 89 144 233 377 610 987
 >>> fibo.fib2(100)
 [1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89]
+>>> fibo.__name__
+'fibo'
 >>> 
 \end{verbatim}\ecode
 %
@@ -1584,9 +1621,11 @@ defines.  It returns a sorted list of strings:
 \bcode\begin{verbatim}
 >>> import fibo, sys
 >>> dir(fibo)
-['fib', 'fib2']
+['__name__', 'fib', 'fib2']
 >>> dir(sys)
-['argv', 'exit', 'modules', 'path', 'ps1', 'ps2', 'stderr', 'stdin', 'stdout']
+['__name__', 'argv', 'builtin_module_names', 'copyright', 'exit',
+'maxint', 'modules', 'path', 'ps1', 'ps2', 'setprofile', 'settrace',
+'stderr', 'stdin', 'stdout', 'version']
 >>>
 \end{verbatim}\ecode
 %
@@ -1597,7 +1636,7 @@ Without arguments, {\tt dir()} lists the names you have defined currently:
 >>> import fibo, sys
 >>> fib = fibo.fib
 >>> dir()
-['a', 'fib', 'fibo', 'sys']
+['__name__', 'a', 'fib', 'fibo', 'sys']
 >>>
 \end{verbatim}\ecode
 %
@@ -1610,14 +1649,15 @@ If you want a list of those, they are defined in the standard module
 \bcode\begin{verbatim}
 >>> import __builtin__
 >>> dir(__builtin__)
-['AccessError', 'AttributeError', 'ConflictError', 'EOFError', 'IOError', 'I
-mportError', 'IndexError', 'KeyError', 'KeyboardInterrupt', 'MemoryError', '
-NameError', 'None', 'OverflowError', 'RuntimeError', 'SyntaxError', 'SystemE
-rror', 'SystemExit', 'TypeError', 'ValueError', 'ZeroDivisionError', 'abs', 
-'apply', 'chr', 'cmp', 'coerce', 'compile', 'dir', 'divmod', 'eval', 'execfi
-le', 'float', 'getattr', 'hasattr', 'hash', 'hex', 'id', 'input', 'int', 'le
-n', 'long', 'max', 'min', 'oct', 'open', 'ord', 'pow', 'range', 'raw_input',
- 'reload', 'repr', 'round', 'setattr', 'str', 'type']
+['AccessError', 'AttributeError', 'ConflictError', 'EOFError', 'IOError',
+'ImportError', 'IndexError', 'KeyError', 'KeyboardInterrupt',
+'MemoryError', 'NameError', 'None', 'OverflowError', 'RuntimeError',
+'SyntaxError', 'SystemError', 'SystemExit', 'TypeError', 'ValueError',
+'ZeroDivisionError', '__name__', 'abs', 'apply', 'chr', 'cmp', 'coerce',
+'compile', 'dir', 'divmod', 'eval', 'execfile', 'filter', 'float',
+'getattr', 'hasattr', 'hash', 'hex', 'id', 'input', 'int', 'len', 'long',
+'map', 'max', 'min', 'oct', 'open', 'ord', 'pow', 'range', 'raw_input',
+'reduce', 'reload', 'repr', 'round', 'setattr', 'str', 'type', 'xrange']
 >>>
 \end{verbatim}\ecode
 
@@ -1636,6 +1676,10 @@ Python is to do all the string handling yourself; using string slicing
 and concatenation operations you can create any lay-out you can imagine.
 The standard module {\tt string} contains some useful operations for
 padding strings to a given column width; these will be discussed shortly.
+Finally, the \code{\%} operator (modulo) with a string left argument
+interprets this string as a C sprintf format string to be applied to the
+right argument, and returns the string resulting from this formatting
+operation.
 
 One question remains, of course: how do you convert values to strings?
 Luckily, Python has a way to convert any value to a string: just write
@@ -1648,22 +1692,22 @@ the value between reverse quotes (\verb/``/).  Some examples:
 >>> print s
 The value of x is 31.4, and y is 40000...
 >>> # Reverse quotes work on other types besides numbers:
->>> p = [x, y]
+... p = [x, y]
 >>> ps = `p`
 >>> ps
 '[31.4, 40000]'
 >>> # Converting a string adds string quotes and backslashes:
->>> hello = 'hello, world\n'
+... hello = 'hello, world\n'
 >>> hellos = `hello`
 >>> print hellos
 'hello, world\012'
 >>> # The argument of reverse quotes may be a tuple:
->>> `x, y, ('foo', 'bar')`
-'(31.4, 40000, (\'foo\', \'bar\'))'
+... `x, y, ('foo', 'bar')`
+"(31.4, 40000, ('foo', 'bar'))"
 >>>
 \end{verbatim}\ecode
 %
-Here is how you write a table of squares and cubes:
+Here are two ways to write a table of squares and cubes:
 
 \bcode\begin{verbatim}
 >>> import string
@@ -1672,6 +1716,19 @@ Here is how you write a table of squares and cubes:
 ...     # Note trailing comma on previous line
 ...     print string.rjust(`x*x*x`, 4)
 ...
+ 1   1    1
+ 2   4    8
+ 3   9   27
+ 4  16   64
+ 5  25  125
+ 6  36  216
+ 7  49  343
+ 8  64  512
+ 9  81  729
+10 100 1000
+>>> for x in range(1,11):
+...     print '%2d %3d %4d' % (x, x*x, x*x*x)
+... 
  1   1    1
  2   4    8
  3   9   27
@@ -1700,11 +1757,7 @@ a slice operation, as in {\tt string.ljust(x,~n)[0:n]}.)
 
 There is another function, {\tt string.zfill}, which pads a numeric
 string on the left with zeros.  It understands about plus and minus
-signs:%
-\footnote{
-	Better facilities for formatting floating point numbers are
-	lacking at this moment.
-}
+signs:
 
 \bcode\begin{verbatim}
 >>> string.zfill('12', 5)
@@ -1731,10 +1784,10 @@ kind of complaint you get while you are still learning Python:
 
 \bcode\begin{verbatim}
 >>> while 1 print 'Hello world'
-Parsing error: file <stdin>, line 1:
-while 1 print 'Hello world'
-             ^
-Unhandled exception: run-time error: syntax error
+  File "<stdin>", line 1
+    while 1 print 'Hello world'
+                ^
+SyntaxError: invalid syntax
 >>> 
 \end{verbatim}\ecode
 %
@@ -1762,11 +1815,11 @@ Traceback (innermost last):
   File "<stdin>", line 1
 ZeroDivisionError: integer division or modulo
 >>> 4 + foo*3
-Stack backtrace (innermost last):
+Traceback (innermost last):
   File "<stdin>", line 1
 NameError: foo
 >>> '2' + 2
-Stack backtrace (innermost last):
+Traceback (innermost last):
   File "<stdin>", line 1
 TypeError: illegal argument type for built-in operation
 >>> 
@@ -1908,7 +1961,7 @@ For example:
 
 \bcode\begin{verbatim}
 >>> raise NameError, 'HiThere'
-Stack backtrace (innermost last):
+Traceback (innermost last):
   File "<stdin>", line 1
 NameError: HiThere
 >>> 
@@ -1930,10 +1983,10 @@ For example:
 ... except my_exc, val:
 ...     print 'My exception occurred, value:', val
 ... 
-My exception occured, value: 4
+My exception occurred, value: 4
 >>> raise my_exc, 1
-Stack backtrace (innermost last):
-  File "<stdin>", line 7
+Traceback (innermost last):
+  File "<stdin>", line 1
 my_exc: 1
 >>> 
 \end{verbatim}\ecode
@@ -1954,7 +2007,7 @@ For example:
 ...     print 'Goodbye, world!'
 ... 
 Goodbye, world!
-Stack backtrace (innermost last):
+Traceback (innermost last):
   File "<stdin>", line 2
 KeyboardInterrupt
 >>> 
@@ -1962,7 +2015,7 @@ KeyboardInterrupt
 %
 A {\tt finally} clause is executed whether or not an exception has
 occurred in the {\tt try} clause.  When an exception has occurred, it
-is re-raised after the {\tt finally} clauses is executed.  The
+is re-raised after the {\tt finally} clause is executed.  The
 {\tt finally} clause is also executed ``on the way out'' when the
 {\tt try} statement is left via a {\tt break} or {\tt return}
 statement.
@@ -1986,7 +2039,7 @@ same name.  Objects can contain an arbitrary amount of private data.
 
 In C++ terminology, all class members (including the data members) are
 {\em public}, and all member functions are {\em virtual}.  There are
-no special constructors or desctructors.  As in Modula-3, there are no
+no special constructors or destructors.  As in Modula-3, there are no
 shorthands for referencing the object's members from its methods: the
 method function is declared with an explicit first argument
 representing the object, which is provided implicitly by the call.  As
@@ -1994,9 +2047,9 @@ in Smalltalk, classes themselves are objects, albeit in the wider
 sense of the word: in Python, all data types are objects.  This
 provides semantics for importing and renaming.  But, just like in C++
 or Modula-3, built-in types cannot be used as base classes for
-extension by the user.  Also, like in Modula-3 but unlike in C++, the
+extension by the user.  Also, like in C++ but unlike in Modula-3, most
 built-in operators with special syntax (arithmetic operators,
-subscriptong etc.) cannot be redefined for class members.
+subscripting etc.) can be redefined for class members.
 
 
 \section{A word about terminology}
@@ -2312,7 +2365,7 @@ avoid accidental name conflicts, which may cause hard-to-find bugs in
 large programs, it is wise to use some kind of convention that
 minimizes the chance of conflicts, e.g., capitalize method names,
 prefix data attribute names with a small unique string (perhaps just
-an undescore), or use verbs for methods and nouns for data attributes.
+an underscore), or use verbs for methods and nouns for data attributes.
 
 
 Data attributes may be referenced by methods as well as by ordinary
@@ -2390,8 +2443,9 @@ Methods may call other methods by using method attributes of the
 
 The instantiation operation (``calling'' a class object) creates an
 empty object.  Many classes like to create objects in a known initial
-state.  There is no special syntax to enforce this, but a convention
-works almost as well: add a method named \verb\init\ to the class,
+state.  In early versions of Python, there was no special syntax to
+enforce this (see below), but a convention was widely used:
+add a method named \verb\init\ to the class,
 which initializes the instance (by assigning to some important data
 attributes) and returns the instance itself.  For example, class
 \verb\Bag\ above could have the following method:
@@ -2409,13 +2463,39 @@ statement, as follows:
         x = Bag().init()
 \end{verbatim}
 
-Of course, the \verb\init\ method may have arguments for greater
-flexibility.
+In later versions of Python, a special method named \verb\__init__\ may be
+defined instead:
 
-Warning: a common mistake is to forget the \verb\return self\ at the
-end of an init method!
+\begin{verbatim}
+                def __init__(self):
+                        self.empty()
+\end{verbatim}
 
+When a class defines an \verb\__init__\ method, class instantiation
+automatically invokes \verb\__init__\ for the newly-created class
+instance.  So in the \verb\Bag\ example, a new and initialized instance
+can be obtained by:
 
+\begin{verbatim}
+        x = Bag()
+\end{verbatim}
+
+Of course, the \verb\__init__\ method may have arguments for greater
+flexibility.  In that case, arguments given to the class instantiation
+operator are passed on to \verb\__init__\.  For example,
+
+\bcode\begin{verbatim}
+>>> class Complex:
+...     def __init__(self, realpart, imagpart):
+...         self.r = realpart
+...         self.i = imagpart
+... 
+>>> x = Complex(3.0,-4.5)
+>>> x.r, x.i
+(3.0, -4.5)
+>>> 
+\end{verbatim}\ecode
+%
 Methods may reference global names in the same way as ordinary
 functions.  The global scope associated with a method is the module
 containing the class definition.  (The class itself is never used as a
@@ -2482,7 +2562,7 @@ the base class is defined or imported directly in the global scope.)
 
 \subsection{Multiple inheritance}
 
-Poython supports a limited form of multiple inheritance as well.  A
+Python supports a limited form of multiple inheritance as well.  A
 class definition with multiple base classes looks as follows:
 
 \begin{verbatim}
