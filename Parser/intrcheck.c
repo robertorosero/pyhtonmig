@@ -56,6 +56,9 @@ intrcheck()
 
 #endif /* QUICKWIN */
 
+#ifdef _M_IX86
+#include <io.h>
+#endif
 
 #if defined(MSDOS) && !defined(QUICKWIN)
 
@@ -149,8 +152,12 @@ static int interrupted;
 
 /* ARGSUSED */
 static RETSIGTYPE
+#ifdef _M_IX86
+intcatcher(int sig)	/* So the C compiler shuts up */
+#else /* _M_IX86 */
 intcatcher(sig)
 	int sig; /* Not used by required by interface */
+#endif /* _M_IX86 */
 {
 	extern void goaway PROTO((int));
 	static char message[] =
