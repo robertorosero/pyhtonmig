@@ -345,6 +345,29 @@ extern object NoObject; /* Don't use this directly */
 
 
 /*
+A common programming style in Python requires the forward declaration
+of static, initialized structures, e.g. for a typeobject that is used
+by the functions whose address must be used in the initializer.
+Some compilers (notably SCO ODT 3.0, I seem to remember early AIX as
+well) botch this if you use the static keyword for both declarations
+(they allocate two objects, and use the first, uninitialized one until
+the second declaration is encountered).  Therefore, the forward
+declaration should use the 'forwardstatic' keyword.  This expands to
+static on most systems, but to extern on a few.  The actual storage
+and name will still be static because the second declaration is
+static, so no linker visible symbols will be generated.  (Standard C
+compilers take offense to the extern forward declaration of a static
+object, so I can't just put extern in all cases. :-( )
+*/
+
+#ifdef BAD_STATIC_FORWARD
+#define staticforward extern
+#else
+#define staticforward static
+#endif /* BAD_STATIC_FORWARD */
+
+
+/*
 123456789-123456789-123456789-123456789-123456789-123456789-123456789-12
 
 More conventions
