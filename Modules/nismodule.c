@@ -149,9 +149,11 @@ nis_cat (self, args)
 	return cat;
 }
 
-#define YPPROC_MAPLIST ((u_long)11)
-#define YPPROG ((u_long)100004)
-#define YPVERS ((u_long)2)
+/* These should be u_long on Sun h/w but not on 64-bit h/w.
+   This is not portable to machines with 16-bit ints and no prototypes */
+#define YPPROC_MAPLIST	11
+#define YPPROG		100004
+#define YPVERS		2
 
 typedef char *domainname;
 typedef char *mapname;

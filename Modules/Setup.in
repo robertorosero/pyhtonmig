@@ -117,10 +117,12 @@ md5 md5module.o md5c.o
 
 
 # The mpz module interfaces to the GNU Multiple Precision library.
-# You need to ftp the GNU MP library.  This was last tested with a
-# somewhat modified (to get around bugs) version of GMP 1.2; it will
-# likely need some work for more recent versions.  The GMP variable
-# must point to the GMP source directory.
+# You need to ftp the GNU MP library.  
+# The GMP variable must point to the GMP source directory.
+# This was originally written and tested against GMP 1.2.  I have
+# compiled it against GMP 1.3.2 (the latest I believe) and it seems to
+# work OK, but I haven't tested it thoroughly (lacking knowledge about
+# it).
 
 #GMP=/ufs/guido/src/gmp
 #mpz mpzmodule.o -I$(GMP) $(GMP)/libgmp.a
