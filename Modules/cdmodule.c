@@ -1,5 +1,5 @@
 /**********************************************************
-Copyright 1991, 1992, 1993 by Stichting Mathematisch Centrum,
+Copyright 1991, 1992, 1993, 1994 by Stichting Mathematisch Centrum,
 Amsterdam, The Netherlands.
 
                         All Rights Reserved
@@ -484,9 +484,9 @@ typeobject CdPlayertype = {
 	sizeof(cdplayerobject),	/*tp_size*/
 	0,			/*tp_itemsize*/
 	/* methods */
-	cdplayer_dealloc,	/*tp_dealloc*/
+	(destructor)cdplayer_dealloc, /*tp_dealloc*/
 	0,			/*tp_print*/
-	cdplayer_getattr,	/*tp_getattr*/
+	(getattrfunc)cdplayer_getattr, /*tp_getattr*/
 	0,			/*tp_setattr*/
 	0,			/*tp_compare*/
 	0,			/*tp_repr*/
@@ -795,9 +795,9 @@ typeobject CdParsertype = {
 	sizeof(cdparserobject),	/*tp_size*/
 	0,			/*tp_itemsize*/
 	/* methods */
-	cdparser_dealloc,	/*tp_dealloc*/
+	(destructor)cdparser_dealloc, /*tp_dealloc*/
 	0,			/*tp_print*/
-	cdparser_getattr,	/*tp_getattr*/
+	(getattrfunc)cdparser_getattr, /*tp_getattr*/
 	0,			/*tp_setattr*/
 	0,			/*tp_compare*/
 	0,			/*tp_repr*/

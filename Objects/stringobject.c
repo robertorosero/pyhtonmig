@@ -1,5 +1,5 @@
 /***********************************************************
-Copyright 1991, 1992, 1993 by Stichting Mathematisch Centrum,
+Copyright 1991, 1992, 1993, 1994 by Stichting Mathematisch Centrum,
 Amsterdam, The Netherlands.
 
                         All Rights Reserved
@@ -25,6 +25,8 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 /* String object implementation */
 
 #include "allobjects.h"
+
+#include <ctype.h>
 
 #ifdef COUNT_ALLOCS
 int null_strings, one_strings;
@@ -428,11 +430,11 @@ string_hash(a)
 }
 
 static sequence_methods string_as_sequence = {
-	string_length,	/*sq_length*/
-	string_concat,	/*sq_concat*/
-	string_repeat,	/*sq_repeat*/
-	string_item,	/*sq_item*/
-	string_slice,	/*sq_slice*/
+	(inquiry)string_length, /*sq_length*/
+	(binaryfunc)string_concat, /*sq_concat*/
+	(intargfunc)string_repeat, /*sq_repeat*/
+	(intargfunc)string_item, /*sq_item*/
+	(intintargfunc)string_slice, /*sq_slice*/
 	0,		/*sq_ass_item*/
 	0,		/*sq_ass_slice*/
 };
@@ -443,16 +445,16 @@ typeobject Stringtype = {
 	"string",
 	sizeof(stringobject),
 	sizeof(char),
-	string_dealloc,	/*tp_dealloc*/
-	string_print,	/*tp_print*/
+	(destructor)string_dealloc, /*tp_dealloc*/
+	(printfunc)string_print, /*tp_print*/
 	0,		/*tp_getattr*/
 	0,		/*tp_setattr*/
-	string_compare,	/*tp_compare*/
-	string_repr,	/*tp_repr*/
+	(cmpfunc)string_compare, /*tp_compare*/
+	(reprfunc)string_repr, /*tp_repr*/
 	0,		/*tp_as_number*/
 	&string_as_sequence,	/*tp_as_sequence*/
 	0,		/*tp_as_mapping*/
-	string_hash,	/*tp_hash*/
+	(hashfunc)string_hash, /*tp_hash*/
 };
 
 void

@@ -41,7 +41,7 @@ if maxint == 2147483647:
 		raise TestFailed, \
 			  'No OverflowError on huge integer literal ' + `s`
 elif eval('maxint == 9223372036854775807'):
-	if eval('9223372036854775807-1 != -01000000000000000000000'):
+	if eval('-9223372036854775807-1 != 01000000000000000000000'):
 		raise TestFailed, 'max negative int'
 	if eval('01777777777777777777777') != -1: raise TestFailed, 'oct -1'
 	if eval('0xffffffffffffffff') != -1: raise TestFailed, 'hex -1'
@@ -189,7 +189,7 @@ import sys
 [2]
 import time, math
 [3]
-from time import sleep
+from time import time
 [4]
 from sys import *
 [5]

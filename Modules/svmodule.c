@@ -1,5 +1,5 @@
 /**********************************************************
-Copyright 1991, 1992, 1993 by Stichting Mathematisch Centrum,
+Copyright 1991, 1992, 1993, 1994 by Stichting Mathematisch Centrum,
 Amsterdam, The Netherlands.
 
                         All Rights Reserved
@@ -316,17 +316,17 @@ capture_getattr(self, name)
 
 typeobject Capturetype = {
 	OB_HEAD_INIT(&Typetype)
-	0,			/*ob_size*/
-	"capture",		/*tp_name*/
-	sizeof(captureobject),	/*tp_size*/
-	0,			/*tp_itemsize*/
+	0,				/*ob_size*/
+	"capture",			/*tp_name*/
+	sizeof(captureobject),		/*tp_size*/
+	0,				/*tp_itemsize*/
 	/* methods */
-	capture_dealloc,	/*tp_dealloc*/
-	0,			/*tp_print*/
-	capture_getattr,	/*tp_getattr*/
-	0,			/*tp_setattr*/
-	0,			/*tp_compare*/
-	0,			/*tp_repr*/
+	(destructor)capture_dealloc,	/*tp_dealloc*/
+	0,				/*tp_print*/
+	(getattrfunc)capture_getattr,	/*tp_getattr*/
+	0,				/*tp_setattr*/
+	0,				/*tp_compare*/
+	0,				/*tp_repr*/
 };
 
 static object *
@@ -930,9 +930,9 @@ typeobject Svtype = {
 	sizeof(svobject),	/*tp_size*/
 	0,			/*tp_itemsize*/
 	/* methods */
-	svideo_dealloc,		/*tp_dealloc*/
+	(destructor)svideo_dealloc, /*tp_dealloc*/
 	0,			/*tp_print*/
-	svideo_getattr,		/*tp_getattr*/
+	(destructor)svideo_getattr, /*tp_getattr*/
 	0,			/*tp_setattr*/
 	0,			/*tp_compare*/
 	0,			/*tp_repr*/

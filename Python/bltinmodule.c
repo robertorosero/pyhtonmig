@@ -1,5 +1,5 @@
 /***********************************************************
-Copyright 1991, 1992, 1993 by Stichting Mathematisch Centrum,
+Copyright 1991, 1992, 1993, 1994 by Stichting Mathematisch Centrum,
 Amsterdam, The Netherlands.
 
                         All Rights Reserved
@@ -1291,8 +1291,8 @@ filterstring(func, strobj)
 
 	if (func == None) {
 		/* No character is ever false -- share input string */
-		INCREF(result);
-		return result;
+		INCREF(strobj);
+		return strobj;
 	}
 	if ((result = newsizedstringobject(NULL, len)) == NULL)
 		return NULL;

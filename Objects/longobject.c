@@ -1,5 +1,5 @@
 /***********************************************************
-Copyright 1991, 1992, 1993 by Stichting Mathematisch Centrum,
+Copyright 1991, 1992, 1993, 1994 by Stichting Mathematisch Centrum,
 Amsterdam, The Netherlands.
 
                         All Rights Reserved
@@ -31,6 +31,7 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #include "longintrepr.h"
 #include <math.h>
 #include <assert.h>
+#include <ctype.h>
 
 #define ABS(x) ((x) < 0 ? -(x) : (x))
 
@@ -352,23 +353,39 @@ long_format(aa, base)
 
 /* Convert a string to a long int object, in a given base.
    Base zero implies a default depending on the number.
-   External linkage: used in compile.c for literals. */
+   External linkage: used in compile.c and stropmodule.c. */
 
 object *
 long_scan(str, base)
 	char *str;
 	int base;
 {
+	return long_escan(str, (char **)NULL, base);
+}
+
+object *
+long_escan(str, pend, base)
+	char *str;
+	char **pend;
+	int base;
+{
 	int sign = 1;
 	longobject *z;
 	
-	assert(base == 0 || base >= 2 && base <= 36);
+	if (base != 0 && base < 2 || base > 36) {
+		err_setstr(ValueError, "invalid base for long literal");
+		return NULL;
+	}
+	while (*str != '\0' && isspace(*str))
+		str++;
 	if (*str == '+')
 		++str;
 	else if (*str == '-') {
 		++str;
 		sign = -1;
 	}
+	while (*str != '\0' && isspace(*str))
+		str++;
 	if (base == 0) {
 		if (str[0] != '0')
 			base = 10;
@@ -398,6 +415,8 @@ long_scan(str, base)
 	}
 	if (sign < 0 && z != NULL && z->ob_size != 0)
 		z->ob_size = -(z->ob_size);
+	if (pend)
+		*pend = str;
 	return (object *) z;
 }
 
@@ -1330,9 +1349,9 @@ long_hex(v)
 }
 
 
-#define UF (object* (*) FPROTO((object *))) /* Unary function */
-#define BF (object* (*) FPROTO((object *, object *))) /* Binary function */
-#define IF (int (*) FPROTO((object *))) /* Int function */
+#define UF (unaryfunc)
+#define BF (binaryfunc)
+#define IF (inquiry)
 
 static number_methods long_as_number = {
 	BF long_add,	/*nb_add*/
@@ -1353,7 +1372,7 @@ static number_methods long_as_number = {
 	BF long_xor,	/*nb_xor*/
 	BF long_or,	/*nb_or*/
 	(int (*) FPROTO((object **, object **)))
-	long_coerce,	/*nb_coerce*/
+	(coercion)long_coerce, /*nb_coerce*/
 	UF long_int,	/*nb_int*/
 	UF long_long,	/*nb_long*/
 	UF long_float,	/*nb_float*/
@@ -1367,16 +1386,16 @@ typeobject Longtype = {
 	"long int",
 	sizeof(longobject) - sizeof(digit),
 	sizeof(digit),
-	long_dealloc,	/*tp_dealloc*/
+	(destructor)long_dealloc, /*tp_dealloc*/
 	0,		/*tp_print*/
 	0,		/*tp_getattr*/
 	0,		/*tp_setattr*/
 	(int (*) FPROTO((object *, object *)))
-	long_compare,	/*tp_compare*/
-	long_repr,	/*tp_repr*/
+	(cmpfunc)long_compare, /*tp_compare*/
+	(reprfunc)long_repr, /*tp_repr*/
 	&long_as_number,/*tp_as_number*/
 	0,		/*tp_as_sequence*/
 	0,		/*tp_as_mapping*/
 	(long (*) FPROTO((object *)))
-	long_hash,	/*tp_hash*/
+	(hashfunc)long_hash, /*tp_hash*/
 };

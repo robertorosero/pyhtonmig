@@ -1,5 +1,5 @@
 /***********************************************************
-Copyright 1991, 1992, 1993 by Stichting Mathematisch Centrum,
+Copyright 1991, 1992, 1993, 1994 by Stichting Mathematisch Centrum,
 Amsterdam, The Netherlands.
 
                         All Rights Reserved
@@ -127,16 +127,16 @@ typeobject Codetype = {
 	"code",
 	sizeof(codeobject),
 	0,
-	code_dealloc,	/*tp_dealloc*/
+	(destructor)code_dealloc, /*tp_dealloc*/
 	0,		/*tp_print*/
-	code_getattr,	/*tp_getattr*/
+	(getattrfunc)code_getattr, /*tp_getattr*/
 	0,		/*tp_setattr*/
-	code_compare,	/*tp_compare*/
-	code_repr,	/*tp_repr*/
+	(cmpfunc)code_compare, /*tp_compare*/
+	(reprfunc)code_repr, /*tp_repr*/
 	0,		/*tp_as_number*/
 	0,		/*tp_as_sequence*/
 	0,		/*tp_as_mapping*/
-	code_hash,	/*tp_hash*/
+	(hashfunc)code_hash, /*tp_hash*/
 };
 
 codeobject *
@@ -462,8 +462,8 @@ static object *
 parsenumber(s)
 	char *s;
 {
-	extern long strtol PROTO((const char *, char **, int));
-	extern unsigned long strtoul PROTO((const char *, char **, int));
+	extern long mystrtol PROTO((const char *, char **, int));
+	extern unsigned long mystrtoul PROTO((const char *, char **, int));
 	extern double strtod PROTO((const char *, char **));
 	char *end;
 	long x;
@@ -473,9 +473,9 @@ parsenumber(s)
 	if (*end == 'l' || *end == 'L')
 		return long_scan(s, 0);
 	if (s[0] == '0')
-		x = (long) strtoul(s, &end, 0);
+		x = (long) mystrtoul(s, &end, 0);
 	else
-		x = strtol(s, &end, 0);
+		x = mystrtol(s, &end, 0);
 	if (*end == '\0') {
 		if (errno != 0) {
 			err_setstr(OverflowError,

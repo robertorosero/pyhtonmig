@@ -1,5 +1,5 @@
 /***********************************************************
-Copyright 1991, 1992, 1993 by Stichting Mathematisch Centrum,
+Copyright 1991, 1992, 1993, 1994 by Stichting Mathematisch Centrum,
 Amsterdam, The Netherlands.
 
                         All Rights Reserved
@@ -37,7 +37,11 @@ extern int getopt(); /* PROTO((int, char **, char *)); -- not standardized */
 
 extern char *getenv();
 
-main(argc, argv)
+extern char *getversion();
+extern char *getcopyright();
+
+int
+realmain(argc, argv)
 	int argc;
 	char **argv;
 {
@@ -57,8 +61,6 @@ main(argc, argv)
 		inspect = 1;
 	if ((p = getenv("PYTHONKILLPRINT")) && *p != '\0')
 		killprint = 1;
-	
-	initargs(&argc, &argv);
 
 	while ((c = getopt(argc, argv, "c:dikv")) != EOF) {
 		if (c == 'c') {
@@ -121,6 +123,11 @@ PYTHONPATH   : colon-separated list of directories prefixed to the\n\
 	
 	if (command == NULL && optind < argc && strcmp(argv[optind], "-") != 0)
 		filename = argv[optind];
+
+	if (verbose ||
+	    command == NULL && filename == NULL && isatty((int)fileno(fp)))
+		fprintf(stderr, "Python %s\n%s\n",
+			getversion(), getcopyright());
 	
 	if (filename != NULL) {
 		if ((fp = fopen(filename, "r")) == NULL) {
@@ -146,15 +153,22 @@ PYTHONPATH   : colon-separated list of directories prefixed to the\n\
 	else {
 		if (filename == NULL && isatty((int)fileno(fp))) {
 			char *startup = getenv("PYTHONSTARTUP");
+#ifdef macintosh
+			if (startup == NULL)
+				startup = "PythonStartup";
+#endif
 			if (startup != NULL && startup[0] != '\0') {
 				FILE *fp = fopen(startup, "r");
 				if (fp != NULL) {
 					(void) run_script(fp, startup);
 					err_clear();
+					fclose(fp);
 				}
 			}
 		}
 		sts = run(fp, filename == NULL ? "<stdin>" : filename) != 0;
+		if (filename != NULL)
+			fclose(fp);
 	}
 
 	if (inspect && isatty((int)fileno(stdin)) &&
