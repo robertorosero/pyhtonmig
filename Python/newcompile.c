@@ -680,13 +680,13 @@ compiler_print(struct compiler *c, stmt_ty s)
 static int
 compiler_if(struct compiler *c, stmt_ty s)
 {
-	int end, next, elif = 1;
+	int end, next;
 
 	assert(s->kind == If_kind);
 	end = compiler_new_block(c);
 	if (end < 0)
 		return 0;
-	while (elif) {
+	for (;;) {
 		next = compiler_new_block(c);
 		if (next < 0)
 			return 0;
@@ -700,15 +700,16 @@ compiler_if(struct compiler *c, stmt_ty s)
 		if (s->v.If.orelse) {
 			stmt_ty t = asdl_seq_GET(s->v.If.orelse, 0);
 			if (t->kind == If_kind) {
-				elif = 1;
 				s = t;
 				c->u->u_lineno = t->lineno;
 			}
+			else {
+				VISIT_SEQ(c, stmt, s->v.If.orelse);
+				break;
+			}
 		}
 		else
-			elif = 0;
-		if (!elif)
-			VISIT_SEQ(c, stmt, s->v.If.orelse);
+			break;
 	}
 	compiler_use_block(c, end);
 	return 1;
