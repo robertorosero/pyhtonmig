@@ -103,7 +103,7 @@ static void mergelocals PROTO(());
 
 static frameobject *current_frame;
 
-#ifdef USE_THREAD
+#ifdef WITH_THREAD
 
 #include <errno.h>
 #include "thread.h"
@@ -128,7 +128,7 @@ init_save_thread()
 object *
 save_thread()
 {
-#ifdef USE_THREAD
+#ifdef WITH_THREAD
 	if (interpreter_lock) {
 		object *res;
 		res = (object *)current_frame;
@@ -144,7 +144,7 @@ void
 restore_thread(x)
 	object *x;
 {
-#ifdef USE_THREAD
+#ifdef WITH_THREAD
 	if (interpreter_lock) {
 		int err;
 		err = errno;
@@ -322,7 +322,7 @@ eval_code(co, globals, locals, owner, arg)
 				goto on_error;
 			}
 
-#ifdef USE_THREAD
+#ifdef WITH_THREAD
 			if (interpreter_lock) {
 				/* Give another thread a chance */
 

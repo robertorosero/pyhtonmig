@@ -459,7 +459,7 @@ fatal(msg)
 
 /* Clean up and exit */
 
-#ifdef USE_THREAD
+#ifdef WITH_THREAD
 int threads_started = 0; /* Set by threadmodule.c and maybe others */
 #endif
 
@@ -502,7 +502,7 @@ goaway(sts)
 	dump_counts();
 #endif
 
-#ifdef USE_THREAD
+#ifdef WITH_THREAD
 
 	/* Other threads may still be active, so skip most of the
 	   cleanup actions usually done (these are mostly for
@@ -514,7 +514,7 @@ goaway(sts)
 	else
 		exit_prog(sts);
 	
-#else /* USE_THREAD */
+#else /* WITH_THREAD */
 	
 	doneimport();
 	
@@ -531,7 +531,7 @@ goaway(sts)
 #endif /* TRACE_REFS */
 
 	exit(sts);
-#endif /* USE_THREAD */
+#endif /* WITH_THREAD */
 	/*NOTREACHED*/
 }
 

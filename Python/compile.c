@@ -127,16 +127,16 @@ typeobject Codetype = {
 	"code",
 	sizeof(codeobject),
 	0,
-	code_dealloc,	/*tp_dealloc*/
+	(destructor)code_dealloc, /*tp_dealloc*/
 	0,		/*tp_print*/
-	code_getattr,	/*tp_getattr*/
+	(getattrfunc)code_getattr, /*tp_getattr*/
 	0,		/*tp_setattr*/
-	code_compare,	/*tp_compare*/
-	code_repr,	/*tp_repr*/
+	(cmpfunc)code_compare, /*tp_compare*/
+	(reprfunc)code_repr, /*tp_repr*/
 	0,		/*tp_as_number*/
 	0,		/*tp_as_sequence*/
 	0,		/*tp_as_mapping*/
-	code_hash,	/*tp_hash*/
+	(hashfunc)code_hash, /*tp_hash*/
 };
 
 codeobject *

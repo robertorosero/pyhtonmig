@@ -30,7 +30,7 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
    version number, the patch level, and the current date (if known to
    the compiler, else a manually inserted date). */
 
-#define VERSION "1.0.%d BETA 2 (%s)"
+#define VERSION "1.0.%d BETA 3 (%s)"
 
 #ifdef __DATE__
 #define DATE __DATE__

@@ -74,9 +74,9 @@ static typeobject Tracebacktype = {
 	"traceback",
 	sizeof(tracebackobject),
 	0,
-	tb_dealloc,	/*tp_dealloc*/
+	(destructor)tb_dealloc, /*tp_dealloc*/
 	0,		/*tp_print*/
-	tb_getattr,	/*tp_getattr*/
+	(getattrfunc)tb_getattr, /*tp_getattr*/
 	0,		/*tp_setattr*/
 	0,		/*tp_compare*/
 	0,		/*tp_repr*/

@@ -16,10 +16,9 @@ LIBS=		@LIBS@
 
 # === Other things that are customizable but not by configure ===
 
-TOP=		..
-INCLDIR=	$(TOP)/Include
+INCLDIR=	$(srcdir)/../Include
 OPT=		-g
-CFLAGS=		$(OPT) -I$(INCLDIR) $(DEFS)
+CFLAGS=		$(OPT) -I$(INCLDIR) -I.. $(DEFS)
 
 AR=		ar
 MKDEP=		mkdep
@@ -61,15 +60,41 @@ clean:
 clobber:	clean
 		-rm -f *.a tags TAGS
 
-Makefile:	Makefile.in $(TOP)/config.status
-		CONFIG_FILES=Makefile CONFIG_HEADERS= \
-		$(SHELL) $(TOP)/config.status
+Makefile:	$(srcdir)/Makefile.in ../config.status
+		(cd ..; CONFIG_FILES=Python/Makefile CONFIG_HEADERS= \
+		$(SHELL) config.status)
 
 depend:
 		$(MKDEP) $(CFLAGS) \
 			`echo $(OBJS) | tr ' ' '\012' | sed 's/\.o/.c/'`
 
 .PRECIOUS:	Makefile
+
+bltinmodule.o: bltinmodule.c
+ceval.o: ceval.c
+cgensupport.o: cgensupport.c
+compile.o: compile.c
+dup2.o: dup2.c
+errors.o: errors.c
+fmod.o: fmod.c
+frozenmain.o: frozenmain.c
+getcwd.o: getcwd.c
+getmtime.o: getmtime.c
+graminit.o: graminit.c
+import.o: import.c
+marshal.o: marshal.c
+memmove.o: memmove.c
+modsupport.o: modsupport.c
+mystrtoul.o: mystrtoul.c
+pythonmain.o: pythonmain.c
+pythonrun.o: pythonrun.c
+strerror.o: strerror.c
+strtod.o: strtod.c
+structmember.o: structmember.c
+sysmodule.o: sysmodule.c
+thread.o: thread.c
+traceback.o: traceback.c
+version.o: version.c
 
 # DO NOT DELETE THIS LINE -- mkdep uses it.
 # DO NOT PUT ANYTHING AFTER THIS LINE, IT WILL GO AWAY.
