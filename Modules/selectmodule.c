@@ -29,8 +29,7 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #include "ceval.h"
 
 #include <sys/types.h>
-#include "mytime.h"
-#include "myselect.h"
+#include "myselect.h" /* Also includes mytime.h */
 
 static object *SelectError;
 
