@@ -272,6 +272,7 @@ typedef struct _typeobject {
 	initproc tp_init;
 	allocfunc tp_alloc;
 	newfunc tp_new;
+	destructor tp_free; /* Low-level free-memory routine */
 	PyObject *tp_bases;
 	PyObject *tp_mro; /* method resolution order */
 	PyObject *tp_introduced;
@@ -279,7 +280,7 @@ typedef struct _typeobject {
 #ifdef COUNT_ALLOCS
 	/* these must be last and never explicitly initialized */
 	int tp_allocs;
-	int tp_free;
+	int tp_frees;
 	int tp_maxalloc;
 	struct _typeobject *tp_next;
 #endif
@@ -459,8 +460,8 @@ extern DL_IMPORT(void) _Py_ResetReferences(void);
 
 #ifndef Py_TRACE_REFS
 #ifdef COUNT_ALLOCS
-#define _Py_Dealloc(op) ((op)->ob_type->tp_free++, (*(op)->ob_type->tp_dealloc)((PyObject *)(op)))
-#define _Py_ForgetReference(op) ((op)->ob_type->tp_free++)
+#define _Py_Dealloc(op) ((op)->ob_type->tp_frees++, (*(op)->ob_type->tp_dealloc)((PyObject *)(op)))
+#define _Py_ForgetReference(op) ((op)->ob_type->tp_frees++)
 #else /* !COUNT_ALLOCS */
 #define _Py_Dealloc(op) (*(op)->ob_type->tp_dealloc)((PyObject *)(op))
 #define _Py_ForgetReference(op) /*empty*/
