@@ -279,8 +279,8 @@ class EditText(Wbase.SelectableWidget, _ScrollWidget):
 		selstart, selend = min(oldselstart, oldselend), max(oldselstart, oldselend)
 		if selstart <> selend and chr(self.ted.WEGetChar(selend-1)) == '\r':
 			selend = selend - 1
-		newselstart, dummy = self.ted.WEFindLine(selstart, 0)
-		dummy, newselend = self.ted.WEFindLine(selend, 0)
+		newselstart, dummy = self.ted.WEFindLine(selstart, 1)
+		dummy, newselend = self.ted.WEFindLine(selend, 1)
 		if oldselstart <> newselstart or  oldselend <> newselend:
 			self.ted.WESetSelection(newselstart, newselend)
 			self.updatescrollbars()
@@ -608,8 +608,9 @@ class TextEditor(EditText):
 
 
 import re
-commentPat = re.compile("[ \t]*\(#\)")
-indentPat = re.compile("\t*")
+commentPat = re.compile("[ \t]*(#)")
+indentPat = re.compile("[ \t]*")
+
 
 class PyEditor(TextEditor):
 	
@@ -871,7 +872,7 @@ class PyEditor(TextEditor):
 			if onoff:
 				if not __debug__:
 					import W
-					raise W.AlertError, "Can¹t debug in ³Optimize bytecode² mode.\r(see ³Default startup options² in EditPythonPreferences)"
+					raise W.AlertError, "Can't debug in \"Optimize bytecode\" mode.\r(see \"Default startup options\" in EditPythonPreferences)"
 				import PyDebugger
 				self._debugger = PyDebugger.getdebugger()
 				self._debugger.register_editor(self, self.file)

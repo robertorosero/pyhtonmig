@@ -59,6 +59,7 @@ Socket methods:
 - s.recv(buflen [,flags]) --> string
 - s.recvfrom(buflen [,flags]) --> string, sockaddr
 - s.send(string [,flags]) --> nbytes
+- s.sendall(string [,flags]) # tries to send everything in a loop
 - s.sendto(string, [flags,] sockaddr) --> nbytes
 - s.setblocking(0 | 1) --> None
 - s.setsockopt(level, optname, value) --> None
@@ -87,7 +88,7 @@ Socket methods:
 #ifdef HAVE_GETHOSTBYNAME_R
 #if defined(_AIX) || defined(__osf__)
 #define HAVE_GETHOSTBYNAME_R_3_ARG
-#elif defined(__sun__) || defined(__sgi)
+#elif defined(__sun) || defined(__sgi)
 #define HAVE_GETHOSTBYNAME_R_5_ARG
 #elif defined(linux)
 /* Rely on the configure script */
@@ -707,7 +708,7 @@ getsockaddrarg(PySocketSockObject *s, PyObject *args,
 		strncpy(ifr.ifr_name, interfaceName, sizeof(ifr.ifr_name));
 		ifr.ifr_name[(sizeof(ifr.ifr_name))-1] = '\0';
 		if (ioctl(s->sock_fd, SIOCGIFINDEX, &ifr) < 0) {
-			PyErr_SetFromErrno(PySocket_Error);
+			PySocket_Err();
 			return 0;
 		}
 		addr = &(s->sock_addr.ll);
@@ -790,6 +791,7 @@ PySocketSock_accept(PySocketSockObject *s, PyObject *args)
 		return NULL;
 	if (!getsockaddrlen(s, &addrlen))
 		return NULL;
+	memset(addrbuf, 0, addrlen);
 	Py_BEGIN_ALLOW_THREADS
 	newfd = accept(s->sock_fd, (struct sockaddr *) addrbuf, &addrlen);
 	Py_END_ALLOW_THREADS
@@ -1107,8 +1109,13 @@ PySocketSock_connect_ex(PySocketSockObject *s, PyObject *args)
 	Py_BEGIN_ALLOW_THREADS
 	res = connect(s->sock_fd, addr, addrlen);
 	Py_END_ALLOW_THREADS
-	if (res != 0)
+	if (res != 0) {
+#ifdef MS_WINDOWS
+		res = WSAGetLastError();
+#else
 		res = errno;
+#endif
+	}
 	return PyInt_FromLong((long) res);
 }
 
@@ -1212,6 +1219,7 @@ PySocketSock_getpeername(PySocketSockObject *s, PyObject *args)
 		return NULL;
 	if (!getsockaddrlen(s, &addrlen))
 		return NULL;
+	memset(addrbuf, 0, addrlen);
 	Py_BEGIN_ALLOW_THREADS
 	res = getpeername(s->sock_fd, (struct sockaddr *) addrbuf, &addrlen);
 	Py_END_ALLOW_THREADS
@@ -1316,6 +1324,11 @@ PySocketSock_recv(PySocketSockObject *s, PyObject *args)
 	PyObject *buf;
 	if (!PyArg_ParseTuple(args, "i|i:recv", &len, &flags))
 		return NULL;
+        if (len < 0) {
+		PyErr_SetString(PyExc_ValueError,
+				"negative buffersize in connect");
+		return NULL;
+	}
 	buf = PyString_FromStringAndSize((char *) 0, len);
 	if (buf == NULL)
 		return NULL;
@@ -1360,6 +1373,7 @@ PySocketSock_recvfrom(PySocketSockObject *s, PyObject *args)
 	if (buf == NULL)
 		return NULL;
 	Py_BEGIN_ALLOW_THREADS
+	memset(addrbuf, 0, addrlen);
 	n = recvfrom(s->sock_fd, PyString_AsString(buf), len, flags,
 #ifndef MS_WINDOWS
 #if defined(PYOS_OS2)
@@ -1413,10 +1427,45 @@ PySocketSock_send(PySocketSockObject *s, PyObject *args)
 }
 
 static char send_doc[] =
-"send(data[, flags])\n\
+"send(data[, flags]) -> count\n\
 \n\
 Send a data string to the socket.  For the optional flags\n\
-argument, see the Unix manual.";
+argument, see the Unix manual.  Return the number of bytes\n\
+sent; this may be less than len(data) if the network is busy.";
+
+
+/* s.sendall(data [,flags]) method */
+
+static PyObject *
+PySocketSock_sendall(PySocketSockObject *s, PyObject *args)
+{
+	char *buf;
+	int len, n, flags = 0, total = 0;
+	if (!PyArg_ParseTuple(args, "s#|i:sendall", &buf, &len, &flags))
+		return NULL;
+	Py_BEGIN_ALLOW_THREADS
+	do {
+		n = send(s->sock_fd, buf, len, flags);
+		if (n < 0)
+			break;
+		total += n;
+		buf += n;
+		len -= n;
+	} while (len > 0);
+	Py_END_ALLOW_THREADS
+	if (n < 0)
+		return PySocket_Err();
+	Py_INCREF(Py_None);
+	return Py_None;
+}
+
+static char sendall_doc[] =
+"sendall(data[, flags])\n\
+\n\
+Send a data string to the socket.  For the optional flags\n\
+argument, see the Unix manual.  This calls send() repeatedly\n\
+until all data is sent.  If an error occurs, it's impossible\n\
+to tell how much data has been sent.";
 
 
 /* s.sendto(data, [flags,] sockaddr) method */
@@ -1516,6 +1565,8 @@ static PyMethodDef PySocketSock_methods[] = {
 			recvfrom_doc},
 	{"send",	(PyCFunction)PySocketSock_send, METH_VARARGS,
 			send_doc},
+	{"sendall",	(PyCFunction)PySocketSock_sendall, METH_VARARGS,
+			sendall_doc},
 	{"sendto",	(PyCFunction)PySocketSock_sendto, METH_VARARGS,
 			sendto_doc},
 	{"setblocking",	(PyCFunction)PySocketSock_setblocking, METH_VARARGS,
@@ -2285,7 +2336,9 @@ static PyObject *SSL_SSLwrite(SSLObject *self, PyObject *args)
 	if (!PyArg_ParseTuple(args, "s#:write", &data, &len))
 		return NULL;
 
+	Py_BEGIN_ALLOW_THREADS
 	len = SSL_write(self->ssl, data, len);
+	Py_END_ALLOW_THREADS
 	return PyInt_FromLong((long)len);
 }
 
@@ -2301,7 +2354,9 @@ static PyObject *SSL_SSLread(SSLObject *self, PyObject *args)
 	if (!(buf = PyString_FromStringAndSize((char *) 0, len)))
 		return NULL;	/* Error object should already be set */
 
+	Py_BEGIN_ALLOW_THREADS
 	count = SSL_read(self->ssl, PyString_AsString(buf), len);
+	Py_END_ALLOW_THREADS
 	res = SSL_get_error(self->ssl, count);
 
 	switch (res) {
@@ -2312,6 +2367,7 @@ static PyObject *SSL_SSLread(SSLObject *self, PyObject *args)
 		assert(count == 0);
 		break;
 	default:
+		Py_DECREF(buf);
 		return PyErr_SetFromErrno(SSLErrorObject);
 	}
 

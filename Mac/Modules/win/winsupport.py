@@ -54,13 +54,28 @@ PropertyCreator = OSTypeType("PropertyCreator")
 PropertyTag = OSTypeType("PropertyTag")
 
 includestuff = includestuff + """
-#include <%s>""" % MACHEADERFILE + """
+#ifdef WITHOUT_FRAMEWORKS
+#include <Windows.h>
+#else
+#include <Carbon/Carbon.h>
+#endif
+
+#ifdef USE_TOOLBOX_OBJECT_GLUE
+extern PyObject *_WinObj_New(WindowRef);
+extern PyObject *_WinObj_WhichWindow(WindowRef);
+extern int _WinObj_Convert(PyObject *, WindowRef *);
+
+#define WinObj_New _WinObj_New
+#define WinObj_WhichWindow _WinObj_WhichWindow
+#define WinObj_Convert _WinObj_Convert
+#endif
 
 #if !ACCESSOR_CALLS_ARE_FUNCTIONS
 /* Carbon calls that we emulate in classic mode */
 #define GetWindowSpareFlag(win) (((CWindowPeek)(win))->spareFlag)
 #define GetWindowFromPort(port) ((WindowRef)(port))
 #define GetWindowPortBounds(win, rectp) (*(rectp) = ((CWindowPeek)(win))->port.portRect)
+#define IsPointerValid(p) (((long)p&3) == 0)
 #endif
 #if ACCESSOR_CALLS_ARE_FUNCTIONS
 /* Classic calls that we emulate in carbon mode */
@@ -81,8 +96,7 @@ finalstuff = finalstuff + """
 /* Return the object corresponding to the window, or NULL */
 
 PyObject *
-WinObj_WhichWindow(w)
-	WindowPtr w;
+WinObj_WhichWindow(WindowPtr w)
 {
 	PyObject *it;
 	
@@ -91,7 +105,7 @@ WinObj_WhichWindow(w)
 		Py_INCREF(it);
 	} else {
 		it = (PyObject *) GetWRefCon(w);
-		if (it == NULL || ((WindowObject *)it)->ob_itself != w || !WinObj_Check(it)) {
+		if (it == NULL || !IsPointerValid((Ptr)it) || ((WindowObject *)it)->ob_itself != w || !WinObj_Check(it)) {
 			it = WinObj_New(w);
 			((WindowObject *)it)->ob_freeit = NULL;
 		} else {
@@ -100,6 +114,12 @@ WinObj_WhichWindow(w)
 	}
 	return it;
 }
+"""
+
+initstuff = initstuff + """
+	PyMac_INIT_TOOLBOX_OBJECT_NEW(WindowPtr, WinObj_New);
+	PyMac_INIT_TOOLBOX_OBJECT_NEW(WindowPtr, WinObj_WhichWindow);
+	PyMac_INIT_TOOLBOX_OBJECT_CONVERT(WindowPtr, WinObj_Convert);
 """
 
 class MyObjectDefinition(GlobalObjectDefinition):
@@ -117,14 +137,18 @@ class MyObjectDefinition(GlobalObjectDefinition):
 		Output("it->ob_freeit = PyMac_AutoDisposeWindow;")
 		OutRbrace()
 	def outputCheckConvertArg(self):
-		OutLbrace("if (DlgObj_Check(v))")
-		Output("*p_itself = DlgObj_ConvertToWindow(v);")
-		Output("return 1;")
-		OutRbrace()
 		Out("""
 		if (v == Py_None) { *p_itself = NULL; return 1; }
 		if (PyInt_Check(v)) { *p_itself = (WindowPtr)PyInt_AsLong(v); return 1; }
 		""")
+		OutLbrace()
+		Output("DialogRef dlg;")
+		OutLbrace("if (DlgObj_Convert(v, &dlg) && dlg)")
+		Output("*p_itself = GetDialogWindow(dlg);")
+		Output("return 1;")
+		OutRbrace()
+		Output("PyErr_Clear();")
+		OutRbrace()
 	def outputCleanupStructMembers(self):
 		Output("if (self->ob_freeit && self->ob_itself)")
 		OutLbrace()
@@ -136,10 +160,7 @@ class MyObjectDefinition(GlobalObjectDefinition):
 		
 	def outputCompare(self):
 		Output()
-		Output("static int %s_compare(self, other)", self.prefix)
-		IndentLevel()
-		Output("%s *self, *other;", self.objecttype)
-		DedentLevel()
+		Output("static int %s_compare(%s *self, %s *other)", self.prefix, self.objecttype, self.objecttype)
 		OutLbrace()
 		Output("if ( self->ob_itself > other->ob_itself ) return 1;")
 		Output("if ( self->ob_itself < other->ob_itself ) return -1;")
@@ -148,20 +169,14 @@ class MyObjectDefinition(GlobalObjectDefinition):
 		
 	def outputHash(self):
 		Output()
-		Output("static int %s_hash(self)", self.prefix)
-		IndentLevel()
-		Output("%s *self;", self.objecttype)
-		DedentLevel()
+		Output("static int %s_hash(%s *self)", self.prefix, self.objecttype)
 		OutLbrace()
 		Output("return (int)self->ob_itself;")
 		OutRbrace()
 		
 	def outputRepr(self):
 		Output()
-		Output("static PyObject * %s_repr(self)", self.prefix)
-		IndentLevel()
-		Output("%s *self;", self.objecttype)
-		DedentLevel()
+		Output("static PyObject * %s_repr(%s *self)", self.prefix, self.objecttype)
 		OutLbrace()
 		Output("char buf[100];")
 		Output("""sprintf(buf, "<Window object at 0x%%08.8x for 0x%%08.8x>", self, self->ob_itself);""")

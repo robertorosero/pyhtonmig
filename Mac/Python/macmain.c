@@ -486,6 +486,11 @@ PyMac_InitApplication()
 			PyMac_FixGUSIcd();
 #endif
 		}
+		/* Check that the first argument is a text file */
+		if ( PyMac_getfiletype(argv[1]) != 'TEXT' ) {
+			Alert(NOTASCRIPT_ID, NULL);
+			exit(0);
+		}
 	}
 	Py_Main(argc, argv);
 }
@@ -521,6 +526,8 @@ Py_Main(argc, argv)
 	PyMac_InitMenuBar();
 	
 	Py_Initialize();
+	
+	PyUnicode_SetDefaultEncoding(PyMac_getscript());
 	
 	PyMac_InstallNavServicesForSF();
 
@@ -567,7 +574,16 @@ PyMac_OutputNotSeen()
 		PyMac_InitMenuBar();
 	console_output_state = STATE_LASTWRITE;
 }
-	
+
+/*
+** Override abort() - The default one is not what we want.
+*/
+void
+abort()
+{
+	console_output_state = STATE_LASTWRITE;
+	PyMac_Exit(1);
+}
 
 /*
 ** Terminate application
@@ -605,6 +621,7 @@ PyMac_Exit(status)
 		SIOUXSettings.standalone = 1;
 		SIOUXSettings.autocloseonquit = 0;
 		SIOUXSetTitle("\p\307terminated\310");
+		PyMac_RaiseConsoleWindow();
 		PyMac_RestoreMenuBar();
 #ifdef USE_MSL
 		/*

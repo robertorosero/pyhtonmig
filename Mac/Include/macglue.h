@@ -22,10 +22,14 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 ******************************************************************/
 
+#ifdef WITHOUT_FRAMEWORKS
 #include <Types.h>
 #include <Files.h>
 #include <Events.h>
 #include <StandardFile.h>
+#else
+#include <Carbon/Carbon.h>
+#endif
 
 #ifdef __cplusplus
 	extern "C" {
@@ -47,6 +51,8 @@ extern void PyMac_SetGUSISpin(void);		/* Install our private GUSI spin routine *
 #endif
 
 char *PyMac_StrError(int);			/* strerror with mac errors */
+PyObject *PyErr_Mac(PyObject *, int);		/* Exception with a mac error */
+PyObject *PyMac_Error(OSErr);			/* Uses PyMac_GetOSErrException */
 unsigned char *Pstring(char *str);		/* Convert c-string to pascal-string in static buffer */
 
 #ifdef USE_GUSI
@@ -65,29 +71,31 @@ extern int PyMac_AppearanceCompliant;	/* True if in appearance support mode */
 extern PyObject *PyMac_OSErrException;		/* Exception for OSErr */
 PyObject *PyMac_GetOSErrException(void);	/* Initialize & return it */
 
+#if !TARGET_API_MAC_OSX
 void PyMac_GetSchedParams(PyMacSchedParams *);	/* Get schedulers params */
 void PyMac_SetSchedParams(PyMacSchedParams *);	/* Set schedulers params */
-PyObject *PyErr_Mac(PyObject *, int);		/* Exception with a mac error */
-PyObject *PyMac_Error(OSErr);			/* Uses PyMac_GetOSErrException */
 int PyMac_DoYield(int, int);	/* Yield cpu. First arg is maxtime, second ok to call python */
+#endif
 int PyMac_HandleEvent(EventRecord *);	/* Handle one event, possibly in Python */
 void PyMac_HandleEventIntern(EventRecord *); /* Handle one event internal only */
 int PyMac_SetEventHandler(PyObject *);	/* set python-coded event handler */
 
+#if !TARGET_API_MAC_OSX
 void PyMac_InitMenuBar(void);			/* Setup menu bar as we want it */
 void PyMac_RestoreMenuBar(void);		/* Restore menu bar for ease of exiting */
-
+void PyMac_RaiseConsoleWindow();		/* Bring console window to front, if it exists */
+#endif
 int PyMac_FindResourceModule(PyStringObject *, char *, char *); /* Test for 'PYC ' resource in a file */
 PyObject * PyMac_LoadResourceModule(char *, char *); /* Load 'PYC ' resource from file */
 int PyMac_FindCodeResourceModule(PyStringObject *, char *, char *); /* Test for 'PYD ' resource in a file */
 PyObject * PyMac_LoadCodeResourceModule(char *, char *); /* Load 'PYD ' resource from file */
 struct filedescr *PyMac_FindModuleExtension(char *, size_t *, char *); /* Look for module in single folder */
 
-#if !TARGET_API_MAC_CARBON
+#if TARGET_API_MAC_OS8
 int PyMac_GetDirectory(FSSpec *dirfss, char *prompt);		/* Ask user for a directory */
 void PyMac_PromptGetFile(short numTypes, ConstSFTypeListPtr typeList, 
 	StandardFileReply *reply, char *prompt);	/* Ask user for file, with prompt */
-#endif /* TARGET_API_MAC_CARBON */
+#endif /* TARGET_API_MAC_OS8 */
 
 int PyMac_GetOSType(PyObject *, OSType *);	/* argument parser for OSType */
 PyObject *PyMac_BuildOSType(OSType);		/* Convert OSType to PyObject */
@@ -97,9 +105,6 @@ PyObject *PyMac_BuildNumVersion(NumVersion);	/* Convert NumVersion to PyObject *
 int PyMac_GetStr255(PyObject *, Str255);	/* argument parser for Str255 */
 PyObject *PyMac_BuildStr255(Str255);		/* Convert Str255 to PyObject */
 PyObject *PyMac_BuildOptStr255(Str255);		/* Convert Str255 to PyObject, NULL to None */
-
-int PyMac_GetFSSpec(PyObject *, FSSpec *);	/* argument parser for FSSpec */
-PyObject *PyMac_BuildFSSpec(FSSpec *);		/* Convert FSSpec to PyObject */
 
 int PyMac_GetRect(PyObject *, Rect *);		/* argument parser for Rect */
 PyObject *PyMac_BuildRect(Rect *);		/* Convert Rect to PyObject */
@@ -120,6 +125,14 @@ void PyMac_Initialize(void);			/* Initialize function for embedding Python */
 #ifdef USE_GUSI2
 short PyMac_OpenPrefFile(void);			/* From macgetpath.c, open and return preference file */
 #endif
+
+/* from macfsmodule.c: */
+int PyMac_GetFSSpec(PyObject *, FSSpec *);	/* argument parser for FSSpec */
+PyObject *PyMac_BuildFSSpec(FSSpec *);		/* Convert FSSpec to PyObject */
+
+int PyMac_GetFSRef(PyObject *, FSRef *);	/* argument parser for FSRef */
+PyObject *PyMac_BuildFSRef(FSRef *);		/* Convert FSRef to PyObject */
+
 
 /* From macfiletype.c: */
 

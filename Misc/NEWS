@@ -1,3 +1,169 @@
+What's New in Python 2.1.2 (rc1) ?
+==============================
+
+- The socket object gained a new method, 'sendall()'. This method 
+  is guaranteed to send all data - this is not guaranteed by the
+  'send()' method. See also SF patch #474307. The standard library
+  has been updated to use this method where appropriate.
+
+Many bugs were fixed. The following is a list of some of the major or
+notable fixes:
+
+- Fix for incorrectly swapped arguments to PyFrame_BlockSetup in ceval.c.
+  This bug could cause python to crash. It was related to using a 'continue'
+  inside a 'try' block.
+
+- SF bug #422004: Py_Initialise fix that allows reload(exceptions) to 
+  work - this is apparently very important for embedded python working
+  with multiple interpreters.
+
+- SF patch #500401: webbrowser: tightened up the command passed to
+  os.system() so that arbitrary shell code can't be executed because a
+  bogus URL was passed in.
+
+- The Python compiler package was updated to correctly calculate stack
+  depth in some cases. This was affecting Zope Python Scripts rather badly.
+
+- Largefile support was added (but not on by default, you'll need to follow
+  the instructions in the documentation of the posix module).
+
+- SF bug #443120: Fix a cgi.py denial-of-service attack, 
+
+- socketmodule's SSL_read and SSL_write now release the global interpreter 
+  lock.
+
+- threading uses the PTHREAD_SCOPE_SYSTEM attribute where available. 
+  This should remove the need to add tiny sleeps at the start of threads 
+  to allow other threads to be scheduled.
+
+- Lib/asyncore is now more defensive in select()
+
+- Lib/dumbdbm is now merely dumb, rather than terminally broken.
+
+- SF bug #441712: more liberal handling of ftp servers' 227 responses
+  (don't require parentheses).
+
+- SF bug #440693: make sure zip files use "/" as directory separator.
+
+- If 'unittest.py' was run from the command line with the name of a test
+  case class as a parameter, it failed with an ugly error.
+
+- SF bug #231249: cgi.py opens too many (temporary) files.
+
+- Lib/CGIHTTPServer.py supports binary data on Windows.
+
+- base64.encodestring/decodestring are much faster.
+
+- SF bug #471928: global made w/nested list comprehensions
+
+- SF patch #422106: fix segmentation fault in sys.displayhook
+
+- SF bug 476129: gc.collect sometimes hangs
+
+- SF bug #448351: select.select() puts FDs on the heap where needed.
+
+
+What's New in Python 2.1.1 (final) ?
+==============================
+
+- The following bugs were fixed:
+
+    [ #441664 ] Python crash on del of a slice of a mmap
+    [ #438050 ] configure doesn't look for poll.h in sys
+    [ #437487 ] 2.1 build on Solaris fails if CC is set
+    [ #441527 ] unixccompiler preprocessor broken
+
+
+What's New in Python 2.1.1c1 ?
+==============================
+
+- Python 2.1.1 comes with the new, GPL-compatible PSF licence.
+
+- Several insecurities in dict comparison as well as a scoping bug,
+  that could lead to the Python interpreter crashing were fixed.
+
+- Python should compile and run out of the box using the Borland C
+  compiler (under Windows), thanks to Stephen Hansen.
+
+- A large number of bugs was fixed, both in code and in the
+  documentation, including (but not limited to) the following
+  bugreports from SourceForge:
+
+    [ #416530 ] No notes for building on Mac OS X 10.0
+    [ #416573 ] makesockaddr() AF_UNIX ignores sun_len
+    [ #417030 ] print '%*s' fails for unicode string
+    [ #417093 ] Case sensitive import: dir and .py file w/ same name
+    [ #417418 ] Python 2.1 compile error on HPUX
+    [ #417587 ] compiler warnings compiling 2.1
+    [ #417845 ] Python 2.1: SocketServer.ThreadingMixIn
+    [ #417943 ] xreadlines documented twice for file obj
+    [ #418296 ] WinMain.c should use WIN32_LEAN_AND_MEAN.
+    [ #418615 ] regular expression bug in pipes.py.
+    [ #418977 ] Access Violation in PyCell_Set
+    [ #419434 ] Tutorial contains wrong sample code.
+    [ #419873 ] ThreadingTCPServer invalidating sockets
+    [ #420216 ] bad links in v2.1 docs
+    [ #420230 ] fileinput deletes backups without warnin
+    [ #420343 ] SystemError from tuple() builtin
+    [ #420399 ] wrong HTML ("trademark" symbols?)
+    [ #421999 ] wrong priority doc for ** vs unary -
+    [ #422108 ] Error in rich comparisons
+    [ #422121 ] Insecurities in dict comparison
+    [ #422702 ] dbhash.open default
+    [ #423087 ] A small typo in weakref documentation
+    [ #423429 ] very minor nit in library ref
+    [ #424776 ] SMTP Example does not work
+    [ #424951 ] ThreadingTCPServer file handle errors.
+    [ #425320 ] Typo in introduction.
+    [ #427698 ] objects with __eq__ are not hashable
+    [ #427783 ] Lang Ref section 4.1 s/is/in/
+    [ #427985 ] optional "listen" parameter in asyncore
+    [ #428419 ] include/rangeobject.h needs extern "C"
+    [ #429059 ] No docs for os.getenv()
+    [ #429070 ] Thread.getDaemon()should be isDaemon()
+    [ #429361 ] popen2.Popen3.wait() exit code
+    [ #429554 ] PyList_SET_ITEM documentation omission
+    [ #430627 ] Fixes for templates/module.tex file
+    [ #430991 ] wrong co_lnotab
+    [ #431772 ] traceback.print_exc() causes traceback
+    [ #432369 ] ConfigParser: problem w/ mixed-case opts
+    [ #433228 ] repr(list) woes when len(list) big
+    [ #433904 ] rexec: all s_* methods return None only
+    [ #434186 ] 0x80000000/2 != 0x80000000>>1
+    [ #434975 ] Typo on Posix Large File Support page
+    [ #435066 ] PyObject_ClearWeakRefs misdocumented
+    [ #436525 ] Wrong macro name
+    [ #437041 ] strfime %Z isn't an RFC 822 timezone
+    [ #437879 ] SocketServer.py related problems
+    [ #438032 ] Documentation errors in module "profile"
+    [ #439012 ] Need doc: initial state of allocs
+    [ #439104 ] Tuple richcompares has code-typo
+    [ #439798 ] Nested scopes core dump
+    [ #439823 ] poll docs should mention timeout unit
+    [ #440037 ] C API descriptions not complete/consistent
+
+
+What's New in Python 2.1 (final)?
+=================================
+
+We only changed a few things since the last release candidate, all in
+Python library code:
+
+- A bug in the locale module was fixed that affected locales which
+  define no grouping for numeric formatting.
+
+- A few bugs in the weakref module's implementations of weak
+  dictionaries (WeakValueDictionary and WeakKeyDictionary) were fixed,
+  and the test suite was updated to check for these bugs.
+
+- An old bug in the os.path.walk() function (introduced in Python
+  2.0!) was fixed: a non-existent file would cause an exception
+  instead of being ignored.
+
+- Fixed a few bugs in the new symtable module found by Neil Norwitz's
+  PyChecker.
+
+
 What's New in Python 2.1c2?
 ===========================
 

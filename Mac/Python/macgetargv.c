@@ -41,6 +41,12 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #include <Dialogs.h>
 #include <Windows.h>
 
+#if UNIVERSAL_INTERFACES_VERSION >= 0x0340
+typedef long refcontype;
+#else
+typedef unsigned long refcontype;
+#endif
+
 #include "Python.h"
 #include "macglue.h"
 
@@ -87,67 +93,6 @@ PyMac_init_process_location()
 	return 0;
 }
 
-/* Given an FSSpec, return the FSSpec of the parent folder */
-
-static OSErr
-get_folder_parent (FSSpec * fss, FSSpec * parent)
-{
-	CInfoPBRec rec;
-	short err;
-
-        * parent = * fss;
-        rec.hFileInfo.ioNamePtr = parent->name;
-        rec.hFileInfo.ioVRefNum = parent->vRefNum;
-        rec.hFileInfo.ioDirID = parent->parID;
-		rec.hFileInfo.ioFDirIndex = -1;
-        rec.hFileInfo.ioFVersNum = 0;
-        if (err = PBGetCatInfoSync (& rec))
-        	return err;
-        parent->parID = rec.dirInfo.ioDrParID;
-/*	parent->name[0] = 0; */
-        return 0;
-}
-
-/* Given an FSSpec return a full, colon-separated pathname */
-
-OSErr
-PyMac_GetFullPath (FSSpec *fss, char *buf)
-{
-	short err;
-	FSSpec fss_parent, fss_current;
-	char tmpbuf[1024];
-	int plen;
-
-	fss_current = *fss;
-	plen = fss_current.name[0];
-	memcpy(buf, &fss_current.name[1], plen);
-	buf[plen] = 0;
-	/* Special case for disk names */
-	if ( fss_current.parID <= 1 ) {
-		buf[plen++] = ':';
-		buf[plen] = 0;
-		return 0;
-	}
-	while (fss_current.parID > 1) {
-    		/* Get parent folder name */
-                if (err = get_folder_parent(&fss_current, &fss_parent))
-             		return err;
-                fss_current = fss_parent;
-                /* Prepend path component just found to buf */
-    			plen = fss_current.name[0];
-    			if (strlen(buf) + plen + 1 > 1024) {
-    				/* Oops... Not enough space (shouldn't happen) */
-    				*buf = 0;
-    				return -1;
-    			}
-    			memcpy(tmpbuf, &fss_current.name[1], plen);
-    			tmpbuf[plen] = ':';
-    			strcpy(&tmpbuf[plen+1], buf);
-    			strcpy(buf, tmpbuf);
-        }
-        return 0;
-}
-
 /* Check that there aren't any args remaining in the event */
 
 static OSErr 
@@ -170,7 +115,7 @@ static int got_one; /* Flag that we can stop getting events */
 /* Handle the Print or Quit events (by failing) */
 
 static pascal OSErr
-handle_not(const AppleEvent *theAppleEvent, AppleEvent *reply, unsigned long refCon)
+handle_not(const AppleEvent *theAppleEvent, AppleEvent *reply, refcontype refCon)
 {
 	#pragma unused (reply, refCon)
 	got_one = 1;
@@ -180,7 +125,7 @@ handle_not(const AppleEvent *theAppleEvent, AppleEvent *reply, unsigned long ref
 /* Handle the Open Application event (by ignoring it) */
 
 static pascal OSErr
-handle_open_app(const AppleEvent *theAppleEvent, AppleEvent *reply, unsigned long refCon)
+handle_open_app(const AppleEvent *theAppleEvent, AppleEvent *reply, refcontype refCon)
 {
 	#pragma unused (reply, refCon)
 #if 0
@@ -193,7 +138,7 @@ handle_open_app(const AppleEvent *theAppleEvent, AppleEvent *reply, unsigned lon
 /* Handle the Open Document event, by adding an argument */
 
 static pascal OSErr
-handle_open_doc(const AppleEvent *theAppleEvent, AppleEvent *reply, unsigned long refCon)
+handle_open_doc(const AppleEvent *theAppleEvent, AppleEvent *reply, refcontype refCon)
 {
 	#pragma unused (reply, refCon)
 	OSErr err;
@@ -231,9 +176,9 @@ AEEventHandlerUPP not_upp;
 static void
 set_ae_handlers()
 {
-	open_doc_upp = NewAEEventHandlerProc(handle_open_doc);
-	open_app_upp = NewAEEventHandlerProc(handle_open_app);
-	not_upp = NewAEEventHandlerProc(handle_not);
+	open_doc_upp = NewAEEventHandlerUPP(&handle_open_doc);
+	open_app_upp = NewAEEventHandlerUPP(&handle_open_app);
+	not_upp = NewAEEventHandlerUPP(&handle_not);
 	
 	AEInstallEventHandler(kCoreEventClass, kAEOpenApplication,
 			      open_app_upp, 0L, false);

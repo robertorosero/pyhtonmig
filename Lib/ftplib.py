@@ -155,7 +155,7 @@ class FTP:
     def putline(self, line):
         line = line + CRLF
         if self.debugging > 1: print '*put*', self.sanitize(line)
-        self.sock.send(line)
+        self.sock.sendall(line)
 
     # Internal: send one command to the server (through putline())
     def putcmd(self, line):
@@ -218,7 +218,7 @@ class FTP:
         tried.  Instead, just send the ABOR command as OOB data.'''
         line = 'ABOR' + CRLF
         if self.debugging > 1: print '*put urgent*', self.sanitize(line)
-        self.sock.send(line, MSG_OOB)
+        self.sock.sendall(line, MSG_OOB)
         resp = self.getmultiline()
         if resp[:3] not in ('426', '226'):
             raise error_proto, resp
@@ -372,7 +372,7 @@ class FTP:
         while 1:
             buf = fp.read(blocksize)
             if not buf: break
-            conn.send(buf)
+            conn.sendall(buf)
         conn.close()
         return self.voidresp()
 
@@ -386,7 +386,7 @@ class FTP:
             if buf[-2:] != CRLF:
                 if buf[-1] in CRLF: buf = buf[:-1]
                 buf = buf + CRLF
-            conn.send(buf)
+            conn.sendall(buf)
         conn.close()
         return self.voidresp()
 
@@ -503,6 +503,8 @@ def parse150(resp):
     return None
 
 
+_227_re = None
+
 def parse227(resp):
     '''Parse the '227' response for a PASV request.
     Raises error_proto if it does not contain '(h1,h2,h3,h4,p1,p2)'
@@ -510,14 +512,14 @@ def parse227(resp):
 
     if resp[:3] != '227':
         raise error_reply, resp
-    left = resp.find('(')
-    if left < 0: raise error_proto, resp
-    right = resp.find(')', left + 1)
-    if right < 0:
-        raise error_proto, resp # should contain '(h1,h2,h3,h4,p1,p2)'
-    numbers = resp[left+1:right].split(',')
-    if len(numbers) != 6:
+    global _227_re
+    if _227_re is None:
+        import re
+        _227_re = re.compile(r'(\d+),(\d+),(\d+),(\d+),(\d+),(\d+)')
+    m = _227_re.search(resp)
+    if not m:
         raise error_proto, resp
+    numbers = m.groups()
     host = '.'.join(numbers[:4])
     port = (int(numbers[4]) << 8) + int(numbers[5])
     return host, port

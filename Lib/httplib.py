@@ -74,7 +74,12 @@ try:
 except ImportError:
     from StringIO import StringIO
 
-__all__ = ["HTTP"]
+__all__ = ["HTTP", "HTTPResponse", "HTTPConnection", "HTTPSConnection",
+           "HTTPException", "NotConnected", "UnknownProtocol",
+           "UnknownTransferEncoding", "IllegalKeywordArgument",
+           "UnimplementedFileMode", "IncompleteRead",
+           "ImproperConnectionState", "CannotSendRequest", "CannotSendHeader",
+           "ResponseNotReady", "BadStatusLine", "error"]
 
 HTTP_PORT = 80
 HTTPS_PORT = 443
@@ -383,7 +388,7 @@ class HTTPConnection:
         if self.debuglevel > 0:
             print "send:", repr(str)
         try:
-            self.sock.send(str)
+            self.sock.sendall(str)
         except socket.error, v:
             if v[0] == 32:      # Broken pipe
                 self.close()
