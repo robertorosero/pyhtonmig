@@ -1460,12 +1460,6 @@ static PyMethodDef dictiter_methods[] = {
 	{NULL,		NULL}		/* sentinel */
 };
 
-static PyObject *
-dictiter_getattr(dictiterobject *di, char *name)
-{
-	return Py_FindMethod(dictiter_methods, (PyObject *)di, name);
-}
-
 static PyObject *dictiter_iternext(dictiterobject *di)
 {
 	PyObject *key;
@@ -1491,7 +1485,7 @@ PyTypeObject PyDictIter_Type = {
 	/* methods */
 	(destructor)dictiter_dealloc, 		/* tp_dealloc */
 	0,					/* tp_print */
-	(getattrfunc)dictiter_getattr,		/* tp_getattr */
+	0,					/* tp_getattr */
 	0,					/* tp_setattr */
 	0,					/* tp_compare */
 	0,					/* tp_repr */
@@ -1501,7 +1495,7 @@ PyTypeObject PyDictIter_Type = {
 	0,					/* tp_hash */
 	0,					/* tp_call */
 	0,					/* tp_str */
-	0,					/* tp_getattro */
+	PyGeneric_GetAttr,			/* tp_getattro */
 	0,					/* tp_setattro */
 	0,					/* tp_as_buffer */
 	Py_TPFLAGS_DEFAULT,			/* tp_flags */
@@ -1512,4 +1506,11 @@ PyTypeObject PyDictIter_Type = {
 	0,					/* tp_weaklistoffset */
 	(getiterfunc)dictiter_getiter,		/* tp_iter */
 	(iternextfunc)dictiter_iternext,	/* tp_iternext */
+	dictiter_methods,			/* tp_methods */
+	0,					/* tp_members */
+	0,					/* tp_getset */
+	0,					/* tp_base */
+	0,					/* tp_dict */
+	0,					/* tp_descr_get */
+	0,					/* tp_descr_set */
 };
