@@ -775,7 +775,7 @@ and actual outputs to be displayed using a context diff:
     **********************************************************************
     Failure in example: print '\n'.join('abcdefg')
     from line #1 of f
-    Differences (unified diff):
+    Differences (context diff):
         *** Expected
         --- Got
         ***************

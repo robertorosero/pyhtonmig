@@ -1053,14 +1053,17 @@ class DocTestRunner:
             if self._optionflags & UNIFIED_DIFF:
                 diff = difflib.unified_diff(want_lines, got_lines, n=2,
                                             fromfile='Expected', tofile='Got')
+                kind = 'unified'
             elif self._optionflags & CONTEXT_DIFF:
                 diff = difflib.context_diff(want_lines, got_lines, n=2,
                                             fromfile='Expected', tofile='Got')
+                kind = 'context'
             else:
                 assert 0, 'Bad diff option'
             # Remove trailing whitespace on diff output.
             diff = [line.rstrip() + '\n' for line in diff]
-            return _tag_msg("Differences (unified diff)", ''.join(diff))
+            return _tag_msg("Differences (" + kind + " diff)",
+                            ''.join(diff))
 
         # If we're not using diff, then simply list the expected
         # output followed by the actual output.  But explicitly mark
