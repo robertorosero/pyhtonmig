@@ -70,6 +70,45 @@ builtin_apply(self, args)
 	return call_object(func, arglist);
 }
 
+static int
+callable(x)
+	object *x;
+{
+	if (x == NULL)
+		return 0;
+	if (x->ob_type->tp_call != NULL ||
+	    is_funcobject(x) ||
+	    is_instancemethodobject(x) ||
+	    is_methodobject(x) ||
+	    is_classobject(x))
+		return 1;
+	if (is_instanceobject(x)) {
+		object *call = getattr(x, "__call__");
+		if (call == NULL) {
+			err_clear();
+			return 0;
+		}
+		/* Could test recursively but don't, for fear of endless
+		   recursion if some joker sets self.__call__ = self */
+		DECREF(call);
+		return 1;
+	}
+	return 0;
+}
+
+static object *
+builtin_callable(self, args)
+	object *self;
+	object *args;
+{
+	if (args == NULL) {
+		err_setstr(TypeError,
+			   "callable requires exactly one argument");
+		return NULL;
+	}
+	return newintobject((long)callable(args));
+}
+
 static object *
 builtin_filter(self, args)
 	object *self;
@@ -1137,6 +1176,7 @@ builtin_vars(self, v)
 static struct methodlist builtin_methods[] = {
 	{"abs",		builtin_abs},
 	{"apply",	builtin_apply},
+	{"callable",	builtin_callable},
 	{"chr",		builtin_chr},
 	{"cmp",		builtin_cmp},
 	{"coerce",	builtin_coerce},
