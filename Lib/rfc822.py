@@ -117,12 +117,13 @@ class Message:
 
 	# Method to determine whether a line is a legal end of
 	# RFC-822 headers.  You may override this method if your
-	# application wants to bend the rules, e.g. to accept lines
-	# ending in '\r\n', to strip trailing whitespace, or to
-	# recognise MH template separators ('--------'). 
+	# application wants to bend the rules, e.g. to strip trailing
+	# whitespace, or to recognise MH template separators
+	# ('--------').  For convenience (e.g. for code reading from
+	# sockets) a line consisting of \r\n also matches.
 
 	def islast(self, line):
-		return line == '\n'
+		return line == '\n' or line == '\r\n'
 
 
 	# Look through the list of headers and find all lines matching
