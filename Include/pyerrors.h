@@ -99,16 +99,16 @@ extern DL_IMPORT(void) PyErr_WriteUnraisable(PyObject *);
 
 /* Issue a warning or exception */
 extern DL_IMPORT(int) PyErr_Warn(PyObject *, char *);
-extern DL_IMPORT(int) PyErr_WarnExplicit(PyObject *, char *,
-					 char *, int, char *, PyObject *);
+extern DL_IMPORT(int) PyErr_WarnExplicit(PyObject *, char *, const char *, 
+					 int, char *, PyObject *);
 
 /* In sigcheck.c or signalmodule.c */
 extern DL_IMPORT(int) PyErr_CheckSignals(void);
 extern DL_IMPORT(void) PyErr_SetInterrupt(void);
 
 /* Support for adding program text to SyntaxErrors */
-extern DL_IMPORT(void) PyErr_SyntaxLocation(char *, int);
-extern DL_IMPORT(PyObject *) PyErr_ProgramText(char *, int);
+extern DL_IMPORT(void) PyErr_SyntaxLocation(const char *, int);
+extern DL_IMPORT(PyObject *) PyErr_ProgramText(const char *, int);
 
 /* These APIs aren't really part of the error implementation, but
    often needed to format error messages; the native C lib APIs are
