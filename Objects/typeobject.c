@@ -520,6 +520,7 @@ static struct wrapperbase tab_contains[] = {
 	 "x.__contains__(y) <==> y in x"},
 	{0}
 };
+
 static PyObject *
 wrap_objobjargproc(PyObject *self, PyObject *args, void *wrapped)
 {
@@ -539,6 +540,125 @@ wrap_objobjargproc(PyObject *self, PyObject *args, void *wrapped)
 static struct wrapperbase tab_setitem[] = {
 	{"__setitem__", (wrapperfunc)wrap_objobjargproc,
 	 "x.__setitem__(y, z) <==> x[y]=z"},
+	{0}
+};
+
+static PyObject *
+wrap_cmpfunc(PyObject *self, PyObject *args, void *wrapped)
+{
+	cmpfunc func = (cmpfunc)wrapped;
+	int res;
+	PyObject *other;
+
+	if (!PyArg_ParseTuple(args, "O", &other))
+		return NULL;
+	res = (*func)(self, other);
+	if (PyErr_Occurred())
+		return NULL;
+	return PyInt_FromLong((long)res);
+}
+
+static struct wrapperbase tab_cmp[] = {
+	{"__cmp__", (wrapperfunc)wrap_cmpfunc,
+	 "x.__cmp__(y) <==> cmp(x,y)"},
+	{0}
+};
+
+static struct wrapperbase tab_repr[] = {
+	{"__repr__", (wrapperfunc)wrap_unaryfunc,
+	 "x.__repr__() <==> repr(x)"},
+	{0}
+};
+
+static PyObject *
+wrap_hashfunc(PyObject *self, PyObject *args, void *wrapped)
+{
+	hashfunc func = (hashfunc)wrapped;
+	long res;
+
+	if (!PyArg_ParseTuple(args, ""))
+		return NULL;
+	res = (*func)(self);
+	if (res == -1 && PyErr_Occurred())
+		return NULL;
+	return PyInt_FromLong(res);
+}
+
+static struct wrapperbase tab_hash[] = {
+	{"__hash__", (wrapperfunc)wrap_hashfunc,
+	 "x.__hash__() <==> hash(x)"},
+	{0}
+};
+
+static PyObject *
+wrap_call(PyObject *self, PyObject *args, void *wrapped)
+{
+	ternaryfunc func = (ternaryfunc)wrapped;
+
+	/* XXX What about keyword arguments? */
+	return (*func)(self, args, NULL);
+}
+
+static struct wrapperbase tab_call[] = {
+	{"__call__", (wrapperfunc)wrap_call,
+	 "x.__call__(...) <==> x(...)"},
+	{0}
+};
+
+static struct wrapperbase tab_str[] = {
+	{"__str__", (wrapperfunc)wrap_unaryfunc,
+	 "x.__str__() <==> str(x)"},
+	{0}
+};
+
+static PyObject *
+wrap_richcmpfunc(PyObject *self, PyObject *args, void *wrapped, int op)
+{
+	richcmpfunc func = (richcmpfunc)wrapped;
+	PyObject *other;
+
+	if (!PyArg_ParseTuple(args, "O", &other))
+		return NULL;
+	return (*func)(self, other, op);
+}
+
+#undef RICHCMP_WRAPPER
+#define RICHCMP_WRAPPER(NAME, OP) \
+static PyObject * \
+richcmp_##NAME(PyObject *self, PyObject *args, void *wrapped) \
+{ \
+	return wrap_richcmpfunc(self, args, wrapped, OP); \
+}
+
+RICHCMP_WRAPPER(lt, Py_LT);
+RICHCMP_WRAPPER(le, Py_LE);
+RICHCMP_WRAPPER(eq, Py_EQ);
+RICHCMP_WRAPPER(ne, Py_NE);
+RICHCMP_WRAPPER(gt, Py_GT);
+RICHCMP_WRAPPER(ge, Py_GE);
+
+#undef RICHCMP_ENTRY
+#define RICHCMP_ENTRY(NAME, EXPR) \
+	{"__" #NAME "__", (wrapperfunc)richcmp_##NAME, \
+	 "x.__" #NAME "__(y) <==> " EXPR}
+
+static struct wrapperbase tab_richcmp[] = {
+	RICHCMP_ENTRY(lt, "x<y"),
+	RICHCMP_ENTRY(le, "x<=y"),
+	RICHCMP_ENTRY(eq, "x==y"),
+	RICHCMP_ENTRY(ne, "x!=y"),
+	RICHCMP_ENTRY(gt, "x>y"),
+	RICHCMP_ENTRY(ge, "x>=y"),
+	{0}
+};
+
+static struct wrapperbase tab_iter[] = {
+	{"__iter__", (wrapperfunc)wrap_unaryfunc, "x.__iter__() <==> iter(x)"},
+	{0}
+};
+
+static struct wrapperbase tab_next[] = {
+	{"next", (wrapperfunc)wrap_unaryfunc, "x.next() -> next value"},
 	{0}
 };
 
@@ -576,6 +696,9 @@ add_operators(PyTypeObject *type)
 		ADD(mp->mp_ass_subscript, tab_setitem);
 	}
 
+	/* We don't support "old-style numbers" because their binary
+	   operators require that both arguments have the same type;
+	   the wrappers here only work for new-style numbers. */
 	if ((type->tp_flags & Py_TPFLAGS_CHECKTYPES) &&
 	    (nb = type->tp_as_number) != NULL) {
 		ADD(nb->nb_add, tab_add);
@@ -595,6 +718,7 @@ add_operators(PyTypeObject *type)
 		ADD(nb->nb_and, tab_and);
 		ADD(nb->nb_xor, tab_xor);
 		ADD(nb->nb_or, tab_or);
+		/* We don't support coerce() -- see above comment */
 		ADD(nb->nb_int, tab_int);
 		ADD(nb->nb_long, tab_long);
 		ADD(nb->nb_float, tab_float);
@@ -613,7 +737,15 @@ add_operators(PyTypeObject *type)
 		ADD(nb->nb_inplace_or, tab_ior);
 	}
 
-	/* XXX Slots in the type object itself, e.g. tp_str, tp_repr, etc. */
+	/* Not yet supported: __getattr__, __setattr__ */
+	ADD(type->tp_compare, tab_cmp);
+	ADD(type->tp_repr, tab_repr);
+	ADD(type->tp_hash, tab_hash);
+	ADD(type->tp_call, tab_call);
+	ADD(type->tp_str, tab_str);
+	ADD(type->tp_richcompare, tab_richcmp);
+	ADD(type->tp_iter, tab_iter);
+	ADD(type->tp_iternext, tab_next);
 
 	return 0;
 }
