@@ -365,7 +365,7 @@ def metaclass():
     if verbose: print "Testing __metaclass__..."
     global C
     class C:
-        __metaclass__ = type(type(0))
+        __metaclass__ = type
         def __init__(self):
             self.__state = 0
         def getstate(self):
@@ -376,6 +376,10 @@ def metaclass():
     verify(a.getstate() == 0)
     a.setstate(10)
     verify(a.getstate() == 10)
+    class D:
+        class __metaclass__(type):
+            def myself(cls): return cls
+    verify(D.myself() == D)
 
 import sys
 MT = type(sys)
