@@ -604,7 +604,8 @@ class DocTest:
 
     # This lets us sort tests by name:
     def __cmp__(self, other):
-        if not isinstance(other, DocTest): return -1
+        if not isinstance(other, DocTest):
+            return -1
         return cmp((self.name, self.filename, self.lineno, id(self)),
                    (other.name, other.filename, other.lineno, id(other)))
 
@@ -687,7 +688,8 @@ class DocTestFinder:
         try:
             file = inspect.getsourcefile(obj) or inspect.getfile(obj)
             source_lines = linecache.getlines(file)
-            if not source_lines: source_lines = None
+            if not source_lines:
+                source_lines = None
         except TypeError:
             source_lines = None
 
@@ -730,12 +732,14 @@ class DocTestFinder:
             print 'Finding tests in %s' % name
 
         # If we've already processed this object, then ignore it.
-        if id(obj) in seen: return
+        if id(obj) in seen:
+            return
         seen[id(obj)] = 1
 
         # Find a test for this object, and add it to the list of tests.
         test = self._get_test(obj, name, module, source_lines)
-        if test is not None: tests.append(test)
+        if test is not None: 
+            tests.append(test)
 
         # Look for tests in a module's contained objects.
         if inspect.ismodule(obj) and self._recurse:
@@ -797,13 +801,15 @@ class DocTestFinder:
             docstring = obj
         else:
             try:
-                if obj.__doc__ is None: return None
+                if obj.__doc__ is None:
+                    return None
                 docstring = str(obj.__doc__)
             except (TypeError, AttributeError):
                 return None
 
         # Don't bother if the docstring is empty.
-        if not docstring: return None
+        if not docstring:
+            return None
 
         # Find the docstring's location in the file.
         lineno = self._find_lineno(obj, source_lines)
@@ -830,7 +836,8 @@ class DocTestFinder:
         # Note: this could be fooled if a class is defined multiple
         # times in a single file.
         if inspect.isclass(obj):
-            if source_lines is None: return None
+            if source_lines is None:
+                return None
             pat = re.compile(r'^\s*class\s*%s\b' %
                              getattr(obj, '__name__', '-'))
             for i, line in enumerate(source_lines):
@@ -852,7 +859,8 @@ class DocTestFinder:
         # signature, where a continuation line begins with a quote
         # mark.
         if lineno is not None:
-            if source_lines is None: return lineno+1
+            if source_lines is None:
+                return lineno+1
             pat = re.compile('(^|.*:)\s*\w*("|\')')
             for lineno in range(lineno, len(source_lines)):
                 if pat.match(source_lines[lineno]):
@@ -972,13 +980,16 @@ class DocTestRunner:
         """
         # Handle the common case first, for efficiency:
         # if they're string-identical, always return true.
-        if got == want: return True
+        if got == want: 
+            return True
 
         # The values True and False replaced 1 and 0 as the return
         # value for boolean comparisons in Python 2.3.
         if not (self._optionflags & DONT_ACCEPT_TRUE_FOR_1):
-            if (got,want) == ("True\n", "1\n"): return True
-            if (got,want) == ("False\n", "0\n"): return True
+            if (got,want) == ("True\n", "1\n"):
+                return True
+            if (got,want) == ("False\n", "0\n"):
+                return True
 
         # <BLANKLINE> can be used as a special sequence to signify a
         # blank line, unless the DONT_ACCEPT_BLANKLINE flag is used.
@@ -989,7 +1000,8 @@ class DocTestRunner:
             # If a line in got contains only spaces, then remove the
             # spaces.
             got = re.sub('(?m)^\s*?$', '', got)
-            if got == want: return True
+            if got == want:
+                return True
 
         # This flag causes doctest to ignore any differences in the
         # contents of whitespace strings.  Note that this can be used
@@ -997,7 +1009,8 @@ class DocTestRunner:
         if (self._optionflags & NORMALIZE_WHITESPACE):
             got = ' '.join(got.split())
             want = ' '.join(want.split())
-            if got == want: return True
+            if got == want: 
+                return True
 
         # The ELLIPSIS flag says to let the sequence "..." in `want`
         # match any substring in `got`.  We implement this by
@@ -1011,7 +1024,8 @@ class DocTestRunner:
             # re.DOTALL flag (with '(?s)').
             want_re = '(?s)^%s$' % want_re
             # Check if the `want_re` regexp matches got.
-            if re.match(want_re, got): return True
+            if re.match(want_re, got):
+                return True
 
         # We didn't find any match; return false.
         return False
@@ -1140,7 +1154,8 @@ class DocTestRunner:
         should not be executed).
         """
         m = self._OPTION_DIRECTIVE_RE.match(example.source)
-        if m is None: return False
+        if m is None:
+            return False
 
         for flag in m.group('flags').upper().split():
             if (flag[:1] not in '+-' or
