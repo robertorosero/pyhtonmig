@@ -110,25 +110,25 @@ $icons{'blank'} = 'blank.' . $IMAGE_TYPE;
 $CUSTOM_BUTTONS = '';
 $BLANK_ICON = "\n<td>" . img_tag('blank.' . $IMAGE_TYPE) . "</td>";
 $BLANK_ICON =~ s/alt="blank"/alt=""/;
-$NAV_BGCOLOR = " bgcolor=\"#99CCFF\"";
+$NAV_BGCOLOR = " bgcolor='#99CCFF'";
 
 sub make_nav_sectref{
     my($label,$title) = @_;
     if ($title) {
-	return ("<b class=navlabel>$label:</b> "
-		. "<span class=sectref>$title</span>\n");
+	return ("<b class='navlabel'>$label:</b> "
+		. "<span class='sectref'>$title</span>\n");
     }
     return '';
 }
 
 sub make_nav_panel{
     my $s;
-    $s = "<table align=center width=\"100%\" cellpadding=0 cellspacing=2>"
+    $s = "<table align='center' width='100%' cellpadding='0' cellspacing='2'>"
          . "\n<tr>"
 	 . "\n<td>$NEXT</td>"
 	 . "\n<td>$UP</td>"
 	 . "\n<td>$PREVIOUS</td>"
-	 . "\n<td align=center$NAV_BGCOLOR width=\"100%\">"
+	 . "\n<td align='center'$NAV_BGCOLOR width='100%'>"
 	 . "\n <b class=title>$t_title</b></td>"
 	 . ($CONTENTS ? "\n<td>$CONTENTS</td>" : $BLANK_ICON)
 	 . "\n<td>$CUSTOM_BUTTONS</td>" # module index
@@ -143,13 +143,13 @@ sub make_nav_panel{
 }
 
 sub top_navigation_panel {
-    "<div class=navigation>\n"
+    "<div class='navigation'>\n"
       . make_nav_panel()
       . '<br><hr></div>';
 }
 
 sub bot_navigation_panel {
-    "<p>\n<div class=navigation><hr>"
+    "<p>\n<div class='navigation'><hr>"
       . make_nav_panel()
       . '</div>';
 }
@@ -290,13 +290,13 @@ sub add_module_idx{
 	my $plat = '';
 	$key =~ s/<tt>([a-zA-Z0-9._]*)<\/tt>/\1/;
 	if ($ModulePlatforms{$key} && !$allthesame) {
-	    $plat = (" <em>(<span class=platform>$ModulePlatforms{$key}"
+	    $plat = (" <em>(<span class='platform'>$ModulePlatforms{$key}"
 		     . '</span>)</em>');
 	}
 	print MODIDXFILE
 	  $moditem
 	    . $IDXFILE_FIELD_SEP
-	    . "<tt class=module>$key</tt>$plat###\n";
+	    . "<tt class='module'>$key</tt>$plat###\n";
     }
     close(MODIDXFILE);
     if (!$allthesame) {
@@ -431,7 +431,7 @@ sub add_bbl_and_idx_dummy_commands {
 	         . "([\\\\]begin\\s*$O\\d+$C\\s*theindex)";
 	s/$rx/\\textohtmlmoduleindex \1 \\textohtmlindex \2/o;
 	# Add a button to the navigation areas:
-	$CUSTOM_BUTTONS .= ("<a\n href=\"modindex.html\">"
+	$CUSTOM_BUTTONS .= ("<a\n href='modindex.html'>"
 			    . img_tag('modules.'.$IMAGE_TYPE) . "</a>");
     }
     else {
@@ -505,9 +505,10 @@ sub protect_useritems {
 #
 # Note that this *must* be done in the init file, not the python.perl
 # style support file.  The %declarations must be set before initialize()
-# is called in the main script.
+# is called in the main LaTeX2HTML script (which happens before style files
+# are loaded).
 #
-%declarations = ('preform' => '<dl><dd><pre class=verbatim></pre></dl>',
+%declarations = ('preform' => '<dl><dd><pre class="verbatim"></pre></dl>',
 		 %declarations);
 
 1;	# This must be the last line
