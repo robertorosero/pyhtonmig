@@ -112,7 +112,7 @@ it is (e.g., an integer, a list, or a user-defined function; there are
 many more as explained in the \emph{Python Reference Manual}).  For 
 each of the well-known types there is a macro to check whether an 
 object is of that type; for instance, \samp{PyList_Check(\var{a})} is
-true iff the object pointed to by \var{a} is a Python list.
+true if (and only if) the object pointed to by \var{a} is a Python list.
 
 
 \subsection{Reference Counts \label{refcounts}}
@@ -540,7 +540,7 @@ the application may want to start over (make another call to
 \cfunction{Py_Initialize()}) or the application is simply done with its 
 use of Python and wants to free all memory allocated by Python.  This
 can be accomplished by calling \cfunction{Py_Finalize()}.  The function
-\cfunction{Py_IsInitialized()} returns true iff Python is currently in the
+\cfunction{Py_IsInitialized()} returns true if Python is currently in the
 initialized state.  More information about these functions is given in
 a later chapter.
 
