@@ -26,21 +26,21 @@ typedef struct {
 asdl_seq *asdl_seq_new(int size);
 void asdl_seq_free(asdl_seq *);
 
-/* XXX: Normally should be Py_DEBUG, but asserts fail instantly at startup;
-        turned off for now */
-#define asdl_seq_GET(S, I) (S)->elements[(I)]
 #ifdef Py_DEBUG
-#define asdl_seq_SET(S, I, V) (S)->elements[I] = (V)
-#define asdl_seq_APPEND(S, V) (S)->elements[(S)->offset++] = (V)
-#else
+#define asdl_seq_GET(S, I) (S)->elements[(I)]
 #define asdl_seq_SET(S, I, V) { \
-        assert((S) && (I) < (S)->size); \
-        (S)->elements[I] = (V); \
+        int _asdl_i = (I); \
+        assert((S) && _asdl_i < (S)->size); \
+        (S)->elements[_asdl_i] = (V); \
 }
 #define asdl_seq_APPEND(S, V) { \
         assert((S) && (S)->offset < (S)->size); \
         (S)->elements[(S)->offset++] = (V); \
 }
+#else
+#define asdl_seq_GET(S, I) (S)->elements[(I)]
+#define asdl_seq_SET(S, I, V) (S)->elements[I] = (V)
+#define asdl_seq_APPEND(S, V) (S)->elements[(S)->offset++] = (V)
 #endif
 #define asdl_seq_LEN(S) ((S) == NULL ? 0 : (S)->size)
 
