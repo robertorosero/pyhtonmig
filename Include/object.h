@@ -404,6 +404,9 @@ given type object has a specified feature.
 /* Set if the type allows subclassing */
 #define Py_TPFLAGS_BASETYPE (1L<<10)
 
+/* Set if the type's __dict__ may change */
+#define Py_TPFLAGS_DYNAMICTYPE (1L<<11)
+
 #define Py_TPFLAGS_DEFAULT  ( \
                              Py_TPFLAGS_HAVE_GETCHARBUFFER | \
                              Py_TPFLAGS_HAVE_SEQUENCE_IN | \
