@@ -170,7 +170,7 @@ PyTypeObject PyCFunction_Type = {
 	(hashfunc)meth_hash,			/* tp_hash */
 	0,					/* tp_call */
 	0,					/* tp_str */
-	0,					/* tp_getattro */
+	PyGeneric_GetAttr,			/* tp_getattro */
 	0,					/* tp_setattro */
 	0,					/* tp_as_buffer */
 	Py_TPFLAGS_DEFAULT,			/* tp_flags */

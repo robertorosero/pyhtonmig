@@ -2357,23 +2357,23 @@ PyTypeObject PyString_Type = {
 	"string",
 	sizeof(PyStringObject),
 	sizeof(char),
-	(destructor)string_dealloc, /*tp_dealloc*/
-	(printfunc)string_print, /*tp_print*/
-	0,		/*tp_getattr*/
-	0,		/*tp_setattr*/
-	(cmpfunc)string_compare, /*tp_compare*/
-	(reprfunc)string_repr, /*tp_repr*/
-	0,		/*tp_as_number*/
-	&string_as_sequence,	/*tp_as_sequence*/
-	0,		/*tp_as_mapping*/
-	(hashfunc)string_hash, /*tp_hash*/
-	0,		/*tp_call*/
-	0,		/*tp_str*/
-	0,		/*tp_getattro*/
-	0,		/*tp_setattro*/
-	&string_as_buffer,	/*tp_as_buffer*/
-	Py_TPFLAGS_DEFAULT,	/*tp_flags*/
-	0,		/*tp_doc*/
+	(destructor)string_dealloc, 		/* tp_dealloc */
+	(printfunc)string_print, 		/* tp_print */
+	0,					/* tp_getattr */
+	0,					/* tp_setattr */
+	(cmpfunc)string_compare, 		/* tp_compare */
+	(reprfunc)string_repr, 			/* tp_repr */
+	0,					/* tp_as_number */
+	&string_as_sequence,			/* tp_as_sequence */
+	0,					/* tp_as_mapping */
+	(hashfunc)string_hash, 			/* tp_hash */
+	0,					/* tp_call */
+	0,					/* tp_str */
+	PyGeneric_GetAttr,			/* tp_getattro */
+	0,					/* tp_setattro */
+	&string_as_buffer,			/* tp_as_buffer */
+	Py_TPFLAGS_DEFAULT,			/* tp_flags */
+	0,					/* tp_doc */
 	0,					/* tp_traverse */
 	0,					/* tp_clear */
 	0,					/* tp_richcompare */

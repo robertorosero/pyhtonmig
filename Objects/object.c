@@ -1021,21 +1021,6 @@ PyObject_SetAttrString(PyObject *v, char *name, PyObject *w)
 	return res;
 }
 
-/*
-	if (v->ob_type->tp_setattr == NULL) {
-		if (v->ob_type->tp_getattr == NULL)
-			PyErr_SetString(PyExc_TypeError,
-				   "attribute-less object (assign or del)");
-		else
-			PyErr_SetString(PyExc_TypeError,
-				   "object has read-only attributes");
-		return -1;
-	}
-	else {
-		return (*v->ob_type->tp_setattr)(v, name, w);
-	}
-*/
-
 /* Internal API needed by PyObject_GetAttr(): */
 extern 
 PyObject *_PyUnicode_AsDefaultEncodedString(PyObject *unicode,
@@ -1063,16 +1048,6 @@ PyObject_GetAttr(PyObject *v, PyObject *name)
 		return (*tp->tp_getattro)(v, name);
 	if (tp->tp_getattr != NULL)
 		return (*tp->tp_getattr)(v, PyString_AS_STRING(name));
-	if (tp->tp_flags & Py_TPFLAGS_HAVE_CLASS) {
-		PyObject *descr;
-		if (tp->tp_dict == NULL) {
-			if (PyType_InitDict(tp) < 0)
-				return NULL;
-		}
-		descr = PyDict_GetItem(tp->tp_dict, name);
-		if (descr != NULL)
-			return PyDescr_Get(descr, v);
-	}
 	PyErr_Format(PyExc_AttributeError,
 		     "'%.50s' object has no attribute '%.400s'",
 		     tp->tp_name, PyString_AS_STRING(name));
@@ -1124,20 +1099,49 @@ PyObject_SetAttr(PyObject *v, PyObject *name, PyObject *value)
 		Py_DECREF(name);
 		return err;
 	}
-	if (tp->tp_flags & Py_TPFLAGS_HAVE_CLASS) {
-		PyObject *descr;
-		if (tp->tp_dict == NULL) {
-			if (PyType_InitDict(tp) < 0)
-				return -1;
-		}
-		descr = PyDict_GetItem(tp->tp_dict, name);
-		if (descr != NULL) {
-			err = PyDescr_Set(descr, v, value);
-			Py_DECREF(name);
-			return err;
-		}
-	}
 	Py_DECREF(name);
+	PyErr_Format(PyExc_AttributeError,
+		     "'%.50s' object has no attribute '%.400s'",
+		     tp->tp_name, PyString_AS_STRING(name));
+	return -1;
+}
+
+/* Generic GetAttr functions - put these in your tp_[gs]etattro slot */
+
+PyObject *
+PyGeneric_GetAttr(PyObject *obj, PyObject *name)
+{
+	PyTypeObject *tp = obj->ob_type;
+	PyObject *descr;
+	descrgetfunc f;
+
+	if (tp->tp_dict == NULL) {
+		if (PyType_InitDict(tp) < 0)
+			return NULL;
+	}
+	descr = PyDict_GetItem(tp->tp_dict, name);
+	if (descr != NULL && (f = descr->ob_type->tp_descr_get) != NULL)
+		return (*f)(descr, obj);
+	PyErr_Format(PyExc_AttributeError,
+		     "'%.50s' object has no attribute '%.400s'",
+		     tp->tp_name, PyString_AS_STRING(name));
+	return NULL;
+}
+
+int
+PyGeneric_SetAttr(PyObject *obj, PyObject *name, PyObject *value)
+{
+	PyTypeObject *tp = obj->ob_type;
+	PyObject *descr;
+	descrsetfunc f;
+
+	if (tp->tp_dict == NULL) {
+		if (PyType_InitDict(tp) < 0)
+			return -1;
+	}
+	descr = PyDict_GetItem(tp->tp_dict, name);
+	if (descr != NULL && (f = descr->ob_type->tp_descr_set) != NULL)
+		return (*f)(descr, obj, value);
 	PyErr_Format(PyExc_AttributeError,
 		     "'%.50s' object has no attribute '%.400s'",
 		     tp->tp_name, PyString_AS_STRING(name));

@@ -22,7 +22,4 @@ extern DL_IMPORT(PyObject *) PyDescr_NewMember(PyTypeObject *,
 extern DL_IMPORT(PyObject *) PyDescr_NewGetSet(PyTypeObject *,
 					       struct getsetlist *);
 
-extern DL_IMPORT(PyObject *) PyDescr_Get(PyObject *, PyObject *);
-extern DL_IMPORT(int) PyDescr_Set(PyObject *, PyObject *, PyObject *);
-
 extern DL_IMPORT(int) PyType_InitDict(PyTypeObject *);

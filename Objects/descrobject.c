@@ -82,6 +82,106 @@ descr_repr(PyDescrObject *descr)
 }
 
 static PyObject *
+descr_get(PyObject *d, PyObject *obj)
+{
+	PyDescrObject *descr;
+
+	if (obj == NULL || !PyDescr_Check(d)) {
+		Py_INCREF(d);
+		return d;
+	}
+
+	descr = (PyDescrObject *)d;
+ 
+	if (!PyObject_IsInstance(obj, (PyObject *)(descr->d_type))) {
+		PyErr_Format(PyExc_TypeError,
+			     "descriptor for '%.100s' objects "
+			     "doesn't apply to '%.100s' object",
+			     descr->d_type->tp_name,
+			     obj->ob_type->tp_name);
+		return NULL;
+	}
+
+	switch (descr->d_flavor) {
+
+	case DF_METHOD:
+		return PyCFunction_New(descr->d_union.d_method, obj);
+
+	case DF_MEMBER:
+		return PyMember_Get((char *)obj,
+				    descr->d_union.d_member,
+				    descr->d_union.d_member->name);
+
+	case DF_GETSET:
+		if (descr->d_union.d_getset->get != NULL)
+			return descr->d_union.d_getset->get(
+				obj, descr->d_union.d_getset->closure);
+
+	}
+
+	PyErr_Format(PyExc_NotImplementedError,
+		     "PyDescr_Get() not implemented for descriptor type %d "
+		     "of '%.50s' object",
+		     descr->d_flavor, obj->ob_type->tp_name);
+	return NULL;
+}
+
+int
+descr_set(PyObject *d, PyObject *obj, PyObject *value)
+{
+	PyDescrObject *descr = (PyDescrObject *)d;
+
+	assert(PyDescr_Check(d));
+
+	if (!PyObject_IsInstance(obj, (PyObject *)(descr->d_type))) {
+		PyErr_Format(PyExc_TypeError,
+			     "descriptor for '%.100s' objects "
+			     "doesn't apply to '%.100s' object",
+			     descr->d_type->tp_name,
+			     obj->ob_type->tp_name);
+		return -1;
+	}
+
+	switch (descr->d_flavor) {
+
+	case DF_METHOD:
+		PyErr_Format(PyExc_TypeError,
+			     "can't %s method attribute '%.400s' "
+			     "of '%.50s' object",
+			     value==NULL ? "delete" : "assign to",
+			     descr->d_union.d_method->ml_name,
+			     obj->ob_type->tp_name);
+		return -1;
+
+	case DF_MEMBER:
+		return PyMember_Set((char *)obj,
+				    descr->d_union.d_member,
+				    descr->d_union.d_member->name,
+				    value);
+
+	case DF_GETSET:
+		if (descr->d_union.d_getset->set == NULL) {
+			PyErr_Format(PyExc_TypeError,
+				     "can't %s read-only attribute "
+				     "'%.400s' of '%.50s' object",
+				     value==NULL ? "delete" : "assign to",
+				     descr->d_union.d_getset->name,
+				     obj->ob_type->tp_name);
+			return -1;
+		}
+		return descr->d_union.d_getset->set(
+			obj, value, descr->d_union.d_getset->closure);
+
+	}
+
+	PyErr_Format(PyExc_NotImplementedError,
+		     "PyDescr_Set() not implemented for descriptor type %d "
+		     "of '%.50s' object",
+		     descr->d_flavor, obj->ob_type->tp_name);
+	return -1;
+}
+
+static PyObject *
 descr_call(PyDescrObject *descr, PyObject *args, PyObject *kwds)
 {
 	int argc;
@@ -130,10 +230,10 @@ descr_call(PyDescrObject *descr, PyObject *args, PyObject *kwds)
 	}
 
 	if (argc == 1)
-		return PyDescr_Get((PyObject *)descr, self);
+		return descr_get((PyObject *)descr, self);
 	if (argc == 2) {
 		PyObject *value = PyTuple_GET_ITEM(args, 1);
-		if (PyDescr_Set((PyObject *)descr, self, value) < 0)
+		if (descr_set((PyObject *)descr, self, value) < 0)
 			return NULL;
 		Py_INCREF(Py_None);
 		return Py_None;
@@ -144,33 +244,34 @@ descr_call(PyDescrObject *descr, PyObject *args, PyObject *kwds)
 }
 
 static PyObject *
-descr_get(PyObject *descr, PyObject *args)
+descr_get_api(PyObject *descr, PyObject *args)
 {
 	PyObject *obj;
 
 	if (!PyArg_ParseTuple(args, "O:get", &obj))
 		return NULL;
-	return PyDescr_Get(descr, obj);
+	return descr_get(descr, obj);
 }
 
 static PyObject *
-descr_set(PyObject *descr, PyObject *args)
+descr_set_api(PyObject *descr, PyObject *args)
 {
 	PyObject *obj, *val;
 
 	if (!PyArg_ParseTuple(args, "OO:set", &obj, &val))
 		return NULL;
-	if (PyDescr_Set(descr, obj, val) < 0)
+	if (descr_set(descr, obj, val) < 0)
 		return NULL;
 	Py_INCREF(Py_None);
 	return Py_None;
 }
 
 static PyMethodDef descr_methods[] = {
-	{"get",		descr_get,	METH_VARARGS},
-	{"set",		descr_set,	METH_VARARGS},
-	{"call",	descr_call,	METH_VARARGS|METH_KEYWORDS},
-	{"bind",	descr_get,	METH_VARARGS},
+	{"get",		(PyCFunction)descr_get_api,	METH_VARARGS},
+	{"set",		(PyCFunction)descr_set_api,	METH_VARARGS},
+	{"call",	(PyCFunction)descr_call,
+	                                  METH_KEYWORDS|METH_VARARGS},
+	{"bind",	(PyCFunction)descr_get_api,	METH_VARARGS},
 	{0}
 };
 
@@ -224,12 +325,12 @@ descr_get_readonly(PyDescrObject *descr) {
 }
 
 static struct getsetlist descr_getsets[] = {
-	{"name",	descr_get_name},
-	{"__name__",	descr_get_name},
-	{"doc",		descr_get_doc},
-	{"__doc__",	descr_get_doc},
-	{"kind",	descr_get_kind},
-	{"readonly",	descr_get_readonly},
+	{"name",	(getter)descr_get_name},
+	{"__name__",	(getter)descr_get_name},
+	{"doc",		(getter)descr_get_doc},
+	{"__doc__",	(getter)descr_get_doc},
+	{"kind",	(getter)descr_get_kind},
+	{"readonly",	(getter)descr_get_readonly},
 	{0}
 };
 
@@ -259,7 +360,7 @@ PyTypeObject PyDescr_Type = {
 	0,					/* tp_hash */
 	(ternaryfunc)descr_call,		/* tp_call */
 	0,					/* tp_str */
-	0,					/* tp_getattro */
+	PyGeneric_GetAttr,			/* tp_getattro */
 	0,					/* tp_setattro */
 	0,					/* tp_as_buffer */
 	Py_TPFLAGS_DEFAULT,			/* tp_flags */
@@ -275,6 +376,8 @@ PyTypeObject PyDescr_Type = {
 	descr_getsets,				/* tp_getset */
 	0,					/* tp_base */
 	0,					/* tp_dict */
+	(descrgetfunc)descr_get,		/* tp_descr_get */
+	(descrsetfunc)descr_set,		/* tp_descr_set */
 };
 
 static PyDescrObject *
@@ -323,106 +426,6 @@ PyDescr_NewGetSet(PyTypeObject *type, struct getsetlist *getset)
 	descr->d_union.d_getset = getset;
 	descr->d_flavor = DF_GETSET;
 	return (PyObject *)descr;
-}
-
-PyObject *
-PyDescr_Get(PyObject *d, PyObject *obj)
-{
-	PyDescrObject *descr;
-
-	if (obj == NULL || !PyDescr_Check(d)) {
-		Py_INCREF(d);
-		return d;
-	}
-
-	descr = (PyDescrObject *)d;
- 
-	if (!PyObject_IsInstance(obj, (PyObject *)(descr->d_type))) {
-		PyErr_Format(PyExc_TypeError,
-			     "descriptor for '%.100s' objects "
-			     "doesn't apply to '%.100s' object",
-			     descr->d_type->tp_name,
-			     obj->ob_type->tp_name);
-		return NULL;
-	}
-
-	switch (descr->d_flavor) {
-
-	case DF_METHOD:
-		return PyCFunction_New(descr->d_union.d_method, obj);
-
-	case DF_MEMBER:
-		return PyMember_Get((char *)obj,
-				    descr->d_union.d_member,
-				    descr->d_union.d_member->name);
-
-	case DF_GETSET:
-		if (descr->d_union.d_getset->get != NULL)
-			return descr->d_union.d_getset->get(
-				obj, descr->d_union.d_getset->closure);
-
-	}
-
-	PyErr_Format(PyExc_NotImplementedError,
-		     "PyDescr_Get() not implemented for descriptor type %d "
-		     "of '%.50s' object",
-		     descr->d_flavor, obj->ob_type->tp_name);
-	return NULL;
-}
-
-int
-PyDescr_Set(PyObject *d, PyObject *obj, PyObject *value)
-{
-	PyDescrObject *descr = (PyDescrObject *)d;
-
-	assert(PyDescr_Check(d));
-
-	if (!PyObject_IsInstance(obj, (PyObject *)(descr->d_type))) {
-		PyErr_Format(PyExc_TypeError,
-			     "descriptor for '%.100s' objects "
-			     "doesn't apply to '%.100s' object",
-			     descr->d_type->tp_name,
-			     obj->ob_type->tp_name);
-		return -1;
-	}
-
-	switch (descr->d_flavor) {
-
-	case DF_METHOD:
-		PyErr_Format(PyExc_TypeError,
-			     "can't %s method attribute '%.400s' "
-			     "of '%.50s' object",
-			     value==NULL ? "delete" : "assign to",
-			     descr->d_union.d_method->ml_name,
-			     obj->ob_type->tp_name);
-		return -1;
-
-	case DF_MEMBER:
-		return PyMember_Set((char *)obj,
-				    descr->d_union.d_member,
-				    descr->d_union.d_member->name,
-				    value);
-
-	case DF_GETSET:
-		if (descr->d_union.d_getset->set == NULL) {
-			PyErr_Format(PyExc_TypeError,
-				     "can't %s read-only attribute "
-				     "'%.400s' of '%.50s' object",
-				     value==NULL ? "delete" : "assign to",
-				     descr->d_union.d_getset->name,
-				     obj->ob_type->tp_name);
-			return -1;
-		}
-		return descr->d_union.d_getset->set(
-			obj, value, descr->d_union.d_getset->closure);
-
-	}
-
-	PyErr_Format(PyExc_NotImplementedError,
-		     "PyDescr_Set() not implemented for descriptor type %d "
-		     "of '%.50s' object",
-		     descr->d_flavor, obj->ob_type->tp_name);
-	return -1;
 }
 
 

@@ -5238,7 +5238,7 @@ PyTypeObject PyUnicode_Type = {
     (hashfunc) unicode_hash, 		/* tp_hash*/
     0, 					/* tp_call*/
     (reprfunc) unicode_str,	 	/* tp_str */
-    0,			 		/* tp_getattro */
+    PyGeneric_GetAttr,	 		/* tp_getattro */
     0,			 		/* tp_setattro */
     &unicode_as_buffer,			/* tp_as_buffer */
     Py_TPFLAGS_DEFAULT,			/* tp_flags */

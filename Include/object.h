@@ -202,6 +202,8 @@ typedef long (*hashfunc)(PyObject *);
 typedef PyObject *(*richcmpfunc) (PyObject *, PyObject *, int);
 typedef PyObject *(*getiterfunc) (PyObject *);
 typedef PyObject *(*iternextfunc) (PyObject *);
+typedef PyObject *(*descrgetfunc) (PyObject *, PyObject *);
+typedef int (*descrsetfunc) (PyObject *, PyObject *, PyObject *);
 
 typedef struct _typeobject {
 	PyObject_VAR_HEAD
@@ -261,6 +263,8 @@ typedef struct _typeobject {
 	struct getsetlist *tp_getset;
 	struct _typeobject *tp_base;
 	PyObject *tp_dict;
+	descrgetfunc tp_descr_get;
+	descrsetfunc tp_descr_set;
 
 #ifdef COUNT_ALLOCS
 	/* these must be last and never explicitly initialized */
@@ -290,6 +294,8 @@ extern DL_IMPORT(int) PyObject_HasAttrString(PyObject *, char *);
 extern DL_IMPORT(PyObject *) PyObject_GetAttr(PyObject *, PyObject *);
 extern DL_IMPORT(int) PyObject_SetAttr(PyObject *, PyObject *, PyObject *);
 extern DL_IMPORT(int) PyObject_HasAttr(PyObject *, PyObject *);
+extern DL_IMPORT(PyObject *) PyGeneric_GetAttr(PyObject *, PyObject *);
+extern DL_IMPORT(int) PyGeneric_SetAttr(PyObject *, PyObject *, PyObject *);
 extern DL_IMPORT(long) PyObject_Hash(PyObject *);
 extern DL_IMPORT(int) PyObject_IsTrue(PyObject *);
 extern DL_IMPORT(int) PyObject_Not(PyObject *);

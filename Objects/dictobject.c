@@ -1262,7 +1262,7 @@ static char clear__doc__[] =
 static char copy__doc__[] =
 "D.copy() -> a shallow copy of D";
 
-static PyMethodDef mapp_methods[] = {
+static PyMethodDef dict_methods[] = {
 	{"has_key",	(PyCFunction)dict_has_key,      METH_VARARGS,
 	 has_key__doc__},
 	{"get",         (PyCFunction)dict_get,          METH_VARARGS,
@@ -1338,7 +1338,7 @@ PyTypeObject PyDict_Type = {
 	0,					/* tp_hash */
 	0,					/* tp_call */
 	0,					/* tp_str */
-	0,					/* tp_getattro */
+	PyGeneric_GetAttr,			/* tp_getattro */
 	0,					/* tp_setattro */
 	0,					/* tp_as_buffer */
 	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_GC,	/* tp_flags */
@@ -1349,7 +1349,7 @@ PyTypeObject PyDict_Type = {
 	0,					/* tp_weaklistoffset */
 	(getiterfunc)dictiter_new,		/* tp_iter */
 	0,					/* tp_iternext */
-	mapp_methods,				/* tp_methods */
+	dict_methods,				/* tp_methods */
 	0,					/* tp_members */
 	0,					/* tp_getset */
 	0,					/* tp_base */

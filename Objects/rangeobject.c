@@ -310,22 +310,22 @@ PyTypeObject PyRange_Type = {
 	"xrange",		/* Name of this type */
 	sizeof(rangeobject),	/* Basic object size */
 	0,			/* Item size for varobject */
-	(destructor)range_dealloc, /*tp_dealloc*/
-	0,			/*tp_print*/
-	0, 			/*tp_getattr*/
-	0,			/*tp_setattr*/
-	(cmpfunc)range_compare, /*tp_compare*/
-	(reprfunc)range_repr,	/*tp_repr*/
-	0,			/*tp_as_number*/
-	&range_as_sequence,	/*tp_as_sequence*/
-	0,			/*tp_as_mapping*/
-	0,			/*tp_hash*/
-	0,			/*tp_call*/
-	0,			/*tp_str*/
-	0,			/*tp_getattro*/
-	0,			/*tp_setattro*/
-	0,			/*tp_as_buffer*/
-	Py_TPFLAGS_DEFAULT,	/*tp_flags*/
+	(destructor)range_dealloc,		/* tp_dealloc */
+	0,					/* tp_print */
+	0, 					/* tp_getattr */
+	0,					/* tp_setattr */
+	(cmpfunc)range_compare,			/* tp_compare */
+	(reprfunc)range_repr,			/* tp_repr */
+	0,					/* tp_as_number */
+	&range_as_sequence,			/* tp_as_sequence */
+	0,					/* tp_as_mapping */
+	0,					/* tp_hash */
+	0,					/* tp_call */
+	0,					/* tp_str */
+	PyGeneric_GetAttr,			/* tp_getattro */
+	0,					/* tp_setattro */
+	0,					/* tp_as_buffer */
+	Py_TPFLAGS_DEFAULT,			/* tp_flags */
 	0,					/* tp_doc */
 	0,					/* tp_traverse */
 	0,					/* tp_clear */

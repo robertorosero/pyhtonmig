@@ -35,6 +35,7 @@ type_getattro(PyTypeObject *type, PyObject *name)
 {
 	PyTypeObject *tp = type->ob_type; /* Usually == &PyType_Type below */
 	PyObject *descr;
+	descrgetfunc f;
 
 	assert(PyString_Check(name));
 
@@ -51,14 +52,16 @@ type_getattro(PyTypeObject *type, PyObject *name)
 				return NULL;
 		}
 		descr = PyDict_GetItem(tp->tp_dict, name);
-		if (descr != NULL)
-			return PyDescr_Get(descr, (PyObject *)type);
+		if (descr != NULL &&
+		    (f = descr->ob_type->tp_descr_get) != NULL)
+			return (*f)(descr, (PyObject *)type);
 	}
 
 	if (type->tp_flags & Py_TPFLAGS_HAVE_CLASS) {
 		descr = PyDict_GetItem(type->tp_dict, name);
-		if (descr != NULL)
-			return PyDescr_Get(descr, NULL);
+		if (descr != NULL &&
+		    (f = descr->ob_type->tp_descr_get) != NULL)
+			return (*f)(descr, NULL);
 	}
 
 	PyErr_Format(PyExc_AttributeError,
