@@ -491,9 +491,12 @@ static expr_ty
 compiler_complex_args(const node *n)
 {
     int i, len = (NCH(n) + 1) / 2;
+    expr_ty result;
     asdl_seq *args = asdl_seq_new(len);
     if (!args)
         return NULL;
+
+    REQ(n, fplist);
 
     for (i = 0; i < len; i++) {
         const node *child = CHILD(CHILD(n, 2*i), 0);
@@ -501,11 +504,14 @@ compiler_complex_args(const node *n)
         if (TYPE(child) == NAME)
             arg = Name(NEW_IDENTIFIER(child), Store);
         else
-            arg = compiler_complex_args(child);
+            arg = compiler_complex_args(CHILD(CHILD(n, 2*i), 1));
+	set_context(arg, Store, n);
         asdl_seq_SET(args, i, arg);
     }
 
-    return Tuple(args, Store);
+    result = Tuple(args, Store);
+    set_context(result, Store, n);
+    return result;
 }
 
 /* Create AST for argument list.
