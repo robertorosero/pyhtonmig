@@ -1832,8 +1832,13 @@ compiler_visit_stmt(struct compiler *c, stmt_ty s)
         case Return_kind:
                 if (c->c_nestlevel <= 1)
                         return compiler_error(c, "'return' outside function");
-		if (s->v.Return.value)
-			VISIT(c, expr, s->v.Return.value)
+		if (s->v.Return.value) {
+			if (c->u->u_ste->ste_generator) {
+				return compiler_error(c,
+				    "'return' with argument inside generator");
+			}
+			VISIT(c, expr, s->v.Return.value);
+		}
 		else
 			ADDOP_O(c, LOAD_CONST, Py_None, consts);
 		ADDOP(c, RETURN_VALUE);
@@ -1841,6 +1846,12 @@ compiler_visit_stmt(struct compiler *c, stmt_ty s)
         case Yield_kind:
                 if (c->c_nestlevel <= 1)
                         return compiler_error(c, "'yield' outside function");
+		for (i = 0; i < c->u->u_nfblocks; i++) {
+			if (c->u->u_fblock[i].fb_type == FINALLY_TRY)
+				return compiler_error(
+					c, "'yield' not allowed in a 'try' "
+					"block with a 'finally' clause");
+		}
 		VISIT(c, expr, s->v.Yield.value);
 		ADDOP(c, YIELD_VALUE);
 		break;
