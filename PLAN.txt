@@ -196,6 +196,20 @@ the HEAD branch (e.g. the dict object has been radically rewritten).
 On the other hand, if we do this too early, we'll have to do it again
 later.
 
+Note from Tim:  We should never again wait until literally 100s of files
+are out of synch.  I don't care how often I need to do this, provided only
+that it's a tractable task each time.  Once per week sounds like a good
+idea.  As is, even the trunk change to rangeobject.c created more than its
+proper share of merge headaches, because it confused all the other reasons
+include file merges were getting conflicts (the more changes there are, the
+worse diff does; indeed, I came up with the ndiff algorithm in the 80s
+precisely because the source-control diff program Cray used at the time
+produced minimal but *senseless* diffs, thus creating artificial conflicts;
+paying unbounded attention to context does a much better job of putting
+changes where they make semantic sense too; but we're stuck with Unix diff
+here, and it isn't robust in this sense; if we don't keep its job simple,
+it will make my job hell).
+
 Done:
 To undo or rename before final merge:  Modules/spam.c has worked its
 way into the branch Unix and Windows builds (pythoncore.dsp and
