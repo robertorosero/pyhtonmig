@@ -54,7 +54,7 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #endif
 #endif
 
-#include "PROTO.h"
+#include "myproto.h"
 #include "mymalloc.h"
 
 extern void fatal PROTO((char *));
