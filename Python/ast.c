@@ -27,7 +27,7 @@ static expr_ty ast_for_call(const node *, expr_ty);
 
 static PyObject *parsenumber(const char *);
 static PyObject *parsestr(const char *s);
-static PyObject *parsestrplus(node *n);
+static PyObject *parsestrplus(const node *n);
 
 extern grammar _PyParser_Grammar; /* From graminit.c */
 
@@ -557,7 +557,8 @@ ast_for_atom(const node *n)
 	return Name(NEW_IDENTIFIER(ch), Load);
 	break;
     case STRING:
-	return Str(PyString_FromString(STR(ch)));
+    	/* XXX parsestrplus can return NULL. */
+	return Str(parsestrplus(n));
 	break;
     case NUMBER:
 	return Num(parsenumber(STR(ch)));
@@ -1645,7 +1646,7 @@ parsestr(const char *s)
  * pasting the intermediate results together.
  */
 static PyObject *
-parsestrplus(node *n)
+parsestrplus(const node *n)
 {
 	PyObject *v;
 	int i;
