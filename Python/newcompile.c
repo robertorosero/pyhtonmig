@@ -824,7 +824,7 @@ compiler_import(struct compiler *c, stmt_ty s)
 		alias_ty alias = asdl_seq_GET(s->v.Import.names, i);
 		identifier store_name;
 		ADDOP_O(c, LOAD_CONST, Py_None, consts);
-		ADDOP_O(c, IMPORT_NAME, alias->name, varnames);
+		ADDOP_O(c, IMPORT_NAME, alias->name, names);
 
 		store_name = alias->name;
 		if (alias->asname)
@@ -833,6 +833,39 @@ compiler_import(struct compiler *c, stmt_ty s)
 		if (!compiler_nameop(c, store_name, Store))
 			return 0;
 	}
+	return 1;
+}
+
+static int
+compiler_from_import(struct compiler *c, stmt_ty s)
+{
+	int i, n = asdl_seq_LEN(s->v.ImportFrom.names);
+	PyObject *names = PyTuple_New(n);
+	if (!names)
+		return 0;
+
+	/* build up the names */
+	for (i = 0; i < n; i++) {
+		alias_ty alias = asdl_seq_GET(s->v.ImportFrom.names, i);
+		PyTuple_SET_ITEM(names, i, alias->name);
+	}
+
+	ADDOP_O(c, LOAD_CONST, names, consts);
+	ADDOP_O(c, IMPORT_NAME, s->v.ImportFrom.module, names);
+	for (i = 0; i < n; i++) {
+		alias_ty alias = asdl_seq_GET(s->v.ImportFrom.names, i);
+		identifier store_name;
+
+		ADDOP_O(c, IMPORT_FROM, alias->name, names);
+		store_name = alias->name;
+		if (alias->asname)
+			store_name = alias->asname;
+
+		if (!compiler_nameop(c, store_name, Store))
+			return 0;
+	}
+	/* remove imported module */
+	ADDOP(c, POP_TOP);
 	return 1;
 }
 
@@ -944,7 +977,7 @@ compiler_visit_stmt(struct compiler *c, stmt_ty s)
         case Import_kind:
 		return compiler_import(c, s);
         case ImportFrom_kind:
-		break;
+		return compiler_from_import(c, s);
         case Exec_kind:
 		VISIT(c, expr, s->v.Exec.body);
 		if (s->v.Exec.globals) {
