@@ -18,9 +18,12 @@ The Python definition is found in the file ``Parser/Python.asdl``.
 The definition describes the structure of statements, expressions, and
 several specialized types, like list comprehensions and exception
 handlers.  Most definitions in the AST correspond to a particular
-source construct, like an if statement or an attribute lookup.  The
+source construct, like an 'if' statement or an attribute lookup.  The
 definition is independent of its realization in any particular
 programming language.
+
+XXX Is byte stream format what marshal_* fxns create?
+XXX no AST->python yet, right?
 
 The AST has concrete representations in Python and C.  There is also
 representation as a byte stream, so that AST objects can be passed
@@ -32,6 +35,7 @@ to generate a code for a specific abstract syntax.
 The following fragment of the Python abstract syntax demonstrates the
 approach.
 
+XXX update example once decorators in
 ::
 
   module Python
@@ -76,7 +80,7 @@ type.
    }
 
 It also generates a series of constructor functions that generate a
-``stmt_ty`` with the appropriate initialization.  The ``kind`` field
+``stmt_ty`` struct with the appropriate initialization.  The ``kind`` field
 specifies which component of the union is initialized.  The
 ``FunctionDef`` C function sets ``kind`` to ``FunctionDef_kind`` and
 initializes the ``name``, ``args``, and ``body`` fields.
@@ -84,8 +88,10 @@ initializes the ``name``, ``args``, and ``body`` fields.
 CST to AST
 ----------
 
+XXX Make sure basic flow of execution is covered
+
 The parser generates a concrete syntax tree represented by a ``node
-*`` defined in ``Include/node.h``.  Node indexing starts at 0.  Every
+*`` as defined in ``Include/node.h``.  Node indexing starts at 0.  Every
 token that can have whitespace surrounding it is its own token.  This
 means that something like "else:" is actually two tokens: 'else' and
 ':'.
@@ -96,7 +102,7 @@ from the concrete syntax in ``Python/ast.c`` using the function::
     mod_ty PyAST_FromNode(const node *n);
 
 It does this by calling various functions in the file that all have the
-name ast_for_xxx where xxx is what the rule of the grammar (as defined
+name ast_for_xx where xx is what the rule of the grammar (as defined
 in ``Grammar/Grammar``) that the function handles (alias_for_import_name
 is the exception to this).  These in turn call the constructor functions
 as defined by the ASDL grammar to create the nodes of the AST.
@@ -124,12 +130,17 @@ as found in Python/asdl.c and Include/asdl.h:
 Code Generation and Basic Blocks
 --------------------------------
 
+XXX Reformat: general discussion of basic blocks and compiler ideas (namespace
+generation, etc.), then discuss code structure and helper functions
 XXX Describe the structure of the code generator, the types involved,
 and the helper functions and macros.
+XXX Make sure flow of execution (namespace resolution, etc.) is covered after
+explanation of macros/functions
 
 - for each ast type (mod, stmt, expr, ...), define a function with a
   switch statement.  inline code generation for simple things,
-  call function compiler_xxx where xxx is kind name for others.
+  call the function compiler_xx where xx is the kind of type in question for
+  others.
 
 The macros used to emit specific opcodes and to generate code for
 generic node types use string concatenation to produce calls to the
@@ -153,9 +164,17 @@ macro to generate calls with the correct type.
 Code is generated using a simple, basic block interface.
 
   - each block has a single entry point
+      * means code in basic block always starts executing at a single place
+      * does not exclude multiple blocks pointing to the same entry point
   - possibly multiple exit points
   - when generating jumps, always jump to a block
   - for a code unit, blocks are identified by its int id
+
+Thus the basic blocks are used to model control flow through an application.
+This is often called a CFG (control flow graph).  It is directed and can
+contain cycles in subgraphs since modeling loops does require it.
+
+Below are are macros and functions used for managing basic blocks:
 
 - NEW_BLOCK() -- create block and set it as current
 - NEXT_BLOCK() -- NEW_BLOCK() plus jump from current block
@@ -171,24 +190,26 @@ Code is generated using a simple, basic block interface.
   ADDOP_O(c, opcode, oparg, namespace) -- oparg is a PyObject * ,
      namespace is the name of a code object member that contains
      the set of objects.  For example,
-         ADDOP_O(c, LOAD_CONST, obj, consts)
+         ``ADDOP_O(c, LOAD_CONST, obj, consts)``
      will make sure that obj is in co_consts and that the opcode
      argument will be an index into co_consts.  The valid names
      are consts, names, varnames, ... 
+  ADDOP_NAME(c, op, o, type) -- XXX
 
-     - Explain what each namespace is for.
+     XXX Explain what each namespace is for.
 
-  ADDOP_JABS() -- oparg is an absolute jump to block id
-  ADDOP_JREL() -- oparg is a relative jump to block id 
+  ADDOP_JABS(XXX) -- oparg is an absolute jump to block id
+  ADDOP_JREL(XXX) -- oparg is a relative jump to block id 
   XXX no need for JABS() and JREL(), always computed at the
   end from block id
 
 - symbol table pass and compiler_nameop()
+XXX
 
 Code Objects
 ------------
 
-XXX Describe Python code objects.
+XXX Describe Python code objects: fields, etc.
 
 Files
 -----
@@ -211,13 +232,15 @@ Files
 + Python/
 
     - Python-ast.c
-        Creates C structs corresponding to the ASDL types.
+        Creates C structs corresponding to the ASDL types.  Also contains code
+	for marshaling AST nodes (core ASDL types have marshaling code in
+	asdl.c).
         "File automatically generated by ../Parser/asdl_c.py".
 
     - asdl.c
         Contains code to handle the ASDL sequence type.  Also has code
         to handle marshalling the core ASDL types, such as number and
-        identifier.
+        identifier.  used by Python-ast.c for marshaling AST nodes.
 
     - ast.c
         Converts Python's concrete syntax tree into the abstract syntax tree.
@@ -240,6 +263,37 @@ Files
 
     - ast.h
         Declares PyAST_FromNode() external (from ../Python/ast.c).
+
+Known Bugs/Issues
+-----------------
+
+XXX
+
+ToDo
+----
+
++ Grammar support (Parser/Python.asdl, Parser/asdl_c.py)
+    - decorators
+    - empty base class list (``class Class(): pass``)
+    - AST->Python object support
++ CST->AST support (Python/ast.c)
+    - decorators
+    - generator expressions
++ AST->bytecode support (Python/newcompile.c)
+    - decorators
+    - generator expressions
++ Stdlib support
+    - AST->Python access?
+    - rewrite compiler package to mirror AST structure?
++ Documentation
+    - flesh out this doc
+	* compiler concepts covered
+	* structure and flow of all steps clearly explained
+	* break up into more sections/subsections
++ Universal
+    - make sure entire test suite passes
+    - fix memory leaks
+    - make sure return types are properly checked for errors
 
 References
 ----------
