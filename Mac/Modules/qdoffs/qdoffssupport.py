@@ -23,7 +23,7 @@ from macsupport import *
 # Create the type objects
 
 GWorldPtr = OpaqueByValueType(OBJECTTYPE, OBJECTPREFIX)
-GWorldFlags = Type("GWorldFlags", "l")
+GWorldFlags = Type("GWorldFlags", "k")
 GDHandle = OpaqueByValueType("GDHandle", "ResObj")
 OptGDHandle = OpaqueByValueType("GDHandle", "OptResObj")
 CTabHandle = OpaqueByValueType("CTabHandle", "OptResObj")
@@ -31,7 +31,7 @@ PixPatHandle = OpaqueByValueType("PixPatHandle", "ResObj")
 PixMapHandle = OpaqueByValueType("PixMapHandle", "ResObj")
 CGrafPtr = OpaqueByValueType("CGrafPtr", "GrafObj")
 GrafPtr = OpaqueByValueType("GrafPtr", "GrafObj")
-QDErr = OSErrType("QDErr", 'h')
+QDErr = OSErrType("QDErr", 'H')
 
 includestuff = includestuff + """
 #ifdef WITHOUT_FRAMEWORKS

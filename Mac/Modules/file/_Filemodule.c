@@ -59,7 +59,7 @@ static int Alias_Convert(PyObject *v, AliasHandle *p_itself);
 static int
 UTCDateTime_Convert(PyObject *v, UTCDateTime *ptr)
 {
-	return PyArg_Parse(v, "(HlH)", &ptr->highSeconds, &ptr->lowSeconds, &ptr->fraction);
+	return PyArg_Parse(v, "(HkH)", &ptr->highSeconds, &ptr->lowSeconds, &ptr->fraction);
 }
 
 static PyObject *
@@ -173,7 +173,7 @@ static PyObject *FSCatalogInfo_get_parentDirID(FSCatalogInfoObject *self, void *
 
 static int FSCatalogInfo_set_parentDirID(FSCatalogInfoObject *self, PyObject *v, void *closure)
 {
-	return PyArg_Parse(v, "l", &self->ob_itself.parentDirID)-1;
+	return PyArg_Parse(v, "k", &self->ob_itself.parentDirID)-1;
 	return 0;
 }
 
@@ -184,7 +184,7 @@ static PyObject *FSCatalogInfo_get_nodeID(FSCatalogInfoObject *self, void *closu
 
 static int FSCatalogInfo_set_nodeID(FSCatalogInfoObject *self, PyObject *v, void *closure)
 {
-	return PyArg_Parse(v, "l", &self->ob_itself.nodeID)-1;
+	return PyArg_Parse(v, "k", &self->ob_itself.nodeID)-1;
 	return 0;
 }
 
@@ -250,7 +250,7 @@ static PyObject *FSCatalogInfo_get_permissions(FSCatalogInfoObject *self, void *
 
 static int FSCatalogInfo_set_permissions(FSCatalogInfoObject *self, PyObject *v, void *closure)
 {
-	return PyArg_Parse(v, "(llll)", &self->ob_itself.permissions[0], &self->ob_itself.permissions[1], &self->ob_itself.permissions[2], &self->ob_itself.permissions[3])-1;
+	return PyArg_Parse(v, "(kkkk)", &self->ob_itself.permissions[0], &self->ob_itself.permissions[1], &self->ob_itself.permissions[2], &self->ob_itself.permissions[3])-1;
 	return 0;
 }
 
@@ -316,7 +316,7 @@ static PyObject *FSCatalogInfo_get_sharingFlags(FSCatalogInfoObject *self, void 
 
 static int FSCatalogInfo_set_sharingFlags(FSCatalogInfoObject *self, PyObject *v, void *closure)
 {
-	return PyArg_Parse(v, "l", &self->ob_itself.sharingFlags)-1;
+	return PyArg_Parse(v, "k", &self->ob_itself.sharingFlags)-1;
 	return 0;
 }
 
@@ -718,7 +718,7 @@ static PyObject *Alias_GetAliasInfo(AliasObject *_self, PyObject *_args)
 	OSErr _err;
 	AliasInfoType index;
 	Str63 theString;
-	if (!PyArg_ParseTuple(_args, "h",
+	if (!PyArg_ParseTuple(_args, "H",
 	                      &index))
 		return NULL;
 	_err = GetAliasInfo(_self->ob_itself,
@@ -739,7 +739,7 @@ static PyObject *Alias_ResolveAliasWithMountFlags(AliasObject *_self, PyObject *
 	FSSpec target;
 	Boolean wasChanged;
 	unsigned long mountFlags;
-	if (!PyArg_ParseTuple(_args, "O&l",
+	if (!PyArg_ParseTuple(_args, "O&k",
 	                      myPyMac_GetOptFSSpecPtr, &fromFile,
 	                      &mountFlags))
 		return NULL;
@@ -789,7 +789,7 @@ static PyObject *Alias_FSResolveAliasWithMountFlags(AliasObject *_self, PyObject
 	FSRef target;
 	Boolean wasChanged;
 	unsigned long mountFlags;
-	if (!PyArg_ParseTuple(_args, "O&l",
+	if (!PyArg_ParseTuple(_args, "O&k",
 	                      myPyMac_GetOptFSRefPtr, &fromFile,
 	                      &mountFlags))
 		return NULL;
@@ -1026,14 +1026,14 @@ static PyObject *FSSpec_FSpOpenDF(FSSpecObject *_self, PyObject *_args)
 	OSErr _err;
 	SInt8 permission;
 	short refNum;
-	if (!PyArg_ParseTuple(_args, "b",
+	if (!PyArg_ParseTuple(_args, "B",
 	                      &permission))
 		return NULL;
 	_err = FSpOpenDF(&_self->ob_itself,
 	                 permission,
 	                 &refNum);
 	if (_err != noErr) return PyMac_Error(_err);
-	_res = Py_BuildValue("h",
+	_res = Py_BuildValue("H",
 	                     refNum);
 	return _res;
 }
@@ -1044,14 +1044,14 @@ static PyObject *FSSpec_FSpOpenRF(FSSpecObject *_self, PyObject *_args)
 	OSErr _err;
 	SInt8 permission;
 	short refNum;
-	if (!PyArg_ParseTuple(_args, "b",
+	if (!PyArg_ParseTuple(_args, "B",
 	                      &permission))
 		return NULL;
 	_err = FSpOpenRF(&_self->ob_itself,
 	                 permission,
 	                 &refNum);
 	if (_err != noErr) return PyMac_Error(_err);
-	_res = Py_BuildValue("h",
+	_res = Py_BuildValue("H",
 	                     refNum);
 	return _res;
 }
@@ -1063,7 +1063,7 @@ static PyObject *FSSpec_FSpCreate(FSSpecObject *_self, PyObject *_args)
 	OSType creator;
 	OSType fileType;
 	ScriptCode scriptTag;
-	if (!PyArg_ParseTuple(_args, "O&O&h",
+	if (!PyArg_ParseTuple(_args, "O&O&H",
 	                      PyMac_GetOSType, &creator,
 	                      PyMac_GetOSType, &fileType,
 	                      &scriptTag))
@@ -1084,7 +1084,7 @@ static PyObject *FSSpec_FSpDirCreate(FSSpecObject *_self, PyObject *_args)
 	OSErr _err;
 	ScriptCode scriptTag;
 	long createdDirID;
-	if (!PyArg_ParseTuple(_args, "h",
+	if (!PyArg_ParseTuple(_args, "H",
 	                      &scriptTag))
 		return NULL;
 	_err = FSpDirCreate(&_self->ob_itself,
@@ -1488,7 +1488,7 @@ static PyObject *FSRef_FSMakeFSRefUnicode(FSRefObject *_self, PyObject *_args)
 	int nameLength__in_len__;
 	TextEncoding textEncodingHint;
 	FSRef newRef;
-	if (!PyArg_ParseTuple(_args, "u#l",
+	if (!PyArg_ParseTuple(_args, "u#k",
 	                      &nameLength__in__, &nameLength__in_len__,
 	                      &textEncodingHint))
 		return NULL;
@@ -1530,7 +1530,7 @@ static PyObject *FSRef_FSCreateFileUnicode(FSRefObject *_self, PyObject *_args)
 	FSCatalogInfo catalogInfo;
 	FSRef newRef;
 	FSSpec newSpec;
-	if (!PyArg_ParseTuple(_args, "u#lO&",
+	if (!PyArg_ParseTuple(_args, "u#kO&",
 	                      &nameLength__in__, &nameLength__in_len__,
 	                      &whichInfo,
 	                      FSCatalogInfo_Convert, &catalogInfo))
@@ -1561,7 +1561,7 @@ static PyObject *FSRef_FSCreateDirectoryUnicode(FSRefObject *_self, PyObject *_a
 	FSRef newRef;
 	FSSpec newSpec;
 	UInt32 newDirID;
-	if (!PyArg_ParseTuple(_args, "u#lO&",
+	if (!PyArg_ParseTuple(_args, "u#kO&",
 	                      &nameLength__in__, &nameLength__in_len__,
 	                      &whichInfo,
 	                      FSCatalogInfo_Convert, &catalogInfo))
@@ -1575,7 +1575,7 @@ static PyObject *FSRef_FSCreateDirectoryUnicode(FSRefObject *_self, PyObject *_a
 	                                &newSpec,
 	                                &newDirID);
 	if (_err != noErr) return PyMac_Error(_err);
-	_res = Py_BuildValue("O&O&l",
+	_res = Py_BuildValue("O&O&k",
 	                     FSRef_New, &newRef,
 	                     FSSpec_New, &newSpec,
 	                     newDirID);
@@ -1638,7 +1638,7 @@ static PyObject *FSRef_FSRenameUnicode(FSRefObject *_self, PyObject *_args)
 	int nameLength__in_len__;
 	TextEncoding textEncodingHint;
 	FSRef newRef;
-	if (!PyArg_ParseTuple(_args, "u#l",
+	if (!PyArg_ParseTuple(_args, "u#k",
 	                      &nameLength__in__, &nameLength__in_len__,
 	                      &textEncodingHint))
 		return NULL;
@@ -1662,7 +1662,7 @@ static PyObject *FSRef_FSGetCatalogInfo(FSRefObject *_self, PyObject *_args)
 	HFSUniStr255 outName;
 	FSSpec fsSpec;
 	FSRef parentRef;
-	if (!PyArg_ParseTuple(_args, "l",
+	if (!PyArg_ParseTuple(_args, "k",
 	                      &whichInfo))
 		return NULL;
 	_err = FSGetCatalogInfo(&_self->ob_itself,
@@ -1686,7 +1686,7 @@ static PyObject *FSRef_FSSetCatalogInfo(FSRefObject *_self, PyObject *_args)
 	OSErr _err;
 	FSCatalogInfoBitmap whichInfo;
 	FSCatalogInfo catalogInfo;
-	if (!PyArg_ParseTuple(_args, "lO&",
+	if (!PyArg_ParseTuple(_args, "kO&",
 	                      &whichInfo,
 	                      FSCatalogInfo_Convert, &catalogInfo))
 		return NULL;
@@ -1746,7 +1746,7 @@ static PyObject *FSRef_FSOpenFork(FSRefObject *_self, PyObject *_args)
 	int forkNameLength__in_len__;
 	SInt8 permissions;
 	SInt16 forkRefNum;
-	if (!PyArg_ParseTuple(_args, "u#b",
+	if (!PyArg_ParseTuple(_args, "u#B",
 	                      &forkNameLength__in__, &forkNameLength__in_len__,
 	                      &permissions))
 		return NULL;
@@ -1756,7 +1756,7 @@ static PyObject *FSRef_FSOpenFork(FSRefObject *_self, PyObject *_args)
 	                  permissions,
 	                  &forkRefNum);
 	if (_err != noErr) return PyMac_Error(_err);
-	_res = Py_BuildValue("h",
+	_res = Py_BuildValue("H",
 	                     forkRefNum);
 	return _res;
 }
@@ -1769,7 +1769,7 @@ static PyObject *FSRef_FNNotify(FSRefObject *_self, PyObject *_args)
 	OSStatus _err;
 	FNMessage message;
 	OptionBits flags;
-	if (!PyArg_ParseTuple(_args, "ll",
+	if (!PyArg_ParseTuple(_args, "kk",
 	                      &message,
 	                      &flags))
 		return NULL;
@@ -2025,7 +2025,7 @@ static PyObject *File_UnmountVol(PyObject *_self, PyObject *_args)
 	OSErr _err;
 	Str63 volName;
 	short vRefNum;
-	if (!PyArg_ParseTuple(_args, "O&h",
+	if (!PyArg_ParseTuple(_args, "O&H",
 	                      PyMac_GetStr255, volName,
 	                      &vRefNum))
 		return NULL;
@@ -2043,7 +2043,7 @@ static PyObject *File_FlushVol(PyObject *_self, PyObject *_args)
 	OSErr _err;
 	Str63 volName;
 	short vRefNum;
-	if (!PyArg_ParseTuple(_args, "O&h",
+	if (!PyArg_ParseTuple(_args, "O&H",
 	                      PyMac_GetStr255, volName,
 	                      &vRefNum))
 		return NULL;
@@ -2062,7 +2062,7 @@ static PyObject *File_HSetVol(PyObject *_self, PyObject *_args)
 	Str63 volName;
 	short vRefNum;
 	long dirID;
-	if (!PyArg_ParseTuple(_args, "O&hl",
+	if (!PyArg_ParseTuple(_args, "O&Hl",
 	                      PyMac_GetStr255, volName,
 	                      &vRefNum,
 	                      &dirID))
@@ -2081,7 +2081,7 @@ static PyObject *File_FSClose(PyObject *_self, PyObject *_args)
 	PyObject *_res = NULL;
 	OSErr _err;
 	short refNum;
-	if (!PyArg_ParseTuple(_args, "h",
+	if (!PyArg_ParseTuple(_args, "H",
 	                      &refNum))
 		return NULL;
 	_err = FSClose(refNum);
@@ -2097,7 +2097,7 @@ static PyObject *File_Allocate(PyObject *_self, PyObject *_args)
 	OSErr _err;
 	short refNum;
 	long count;
-	if (!PyArg_ParseTuple(_args, "h",
+	if (!PyArg_ParseTuple(_args, "H",
 	                      &refNum))
 		return NULL;
 	_err = Allocate(refNum,
@@ -2114,7 +2114,7 @@ static PyObject *File_GetEOF(PyObject *_self, PyObject *_args)
 	OSErr _err;
 	short refNum;
 	long logEOF;
-	if (!PyArg_ParseTuple(_args, "h",
+	if (!PyArg_ParseTuple(_args, "H",
 	                      &refNum))
 		return NULL;
 	_err = GetEOF(refNum,
@@ -2131,7 +2131,7 @@ static PyObject *File_SetEOF(PyObject *_self, PyObject *_args)
 	OSErr _err;
 	short refNum;
 	long logEOF;
-	if (!PyArg_ParseTuple(_args, "hl",
+	if (!PyArg_ParseTuple(_args, "Hl",
 	                      &refNum,
 	                      &logEOF))
 		return NULL;
@@ -2149,7 +2149,7 @@ static PyObject *File_GetFPos(PyObject *_self, PyObject *_args)
 	OSErr _err;
 	short refNum;
 	long filePos;
-	if (!PyArg_ParseTuple(_args, "h",
+	if (!PyArg_ParseTuple(_args, "H",
 	                      &refNum))
 		return NULL;
 	_err = GetFPos(refNum,
@@ -2167,7 +2167,7 @@ static PyObject *File_SetFPos(PyObject *_self, PyObject *_args)
 	short refNum;
 	short posMode;
 	long posOff;
-	if (!PyArg_ParseTuple(_args, "hhl",
+	if (!PyArg_ParseTuple(_args, "HHl",
 	                      &refNum,
 	                      &posMode,
 	                      &posOff))
@@ -2187,13 +2187,13 @@ static PyObject *File_GetVRefNum(PyObject *_self, PyObject *_args)
 	OSErr _err;
 	short fileRefNum;
 	short vRefNum;
-	if (!PyArg_ParseTuple(_args, "h",
+	if (!PyArg_ParseTuple(_args, "H",
 	                      &fileRefNum))
 		return NULL;
 	_err = GetVRefNum(fileRefNum,
 	                  &vRefNum);
 	if (_err != noErr) return PyMac_Error(_err);
-	_res = Py_BuildValue("h",
+	_res = Py_BuildValue("H",
 	                     vRefNum);
 	return _res;
 }
@@ -2212,7 +2212,7 @@ static PyObject *File_HGetVol(PyObject *_self, PyObject *_args)
 	               &vRefNum,
 	               &dirID);
 	if (_err != noErr) return PyMac_Error(_err);
-	_res = Py_BuildValue("hl",
+	_res = Py_BuildValue("Hl",
 	                     vRefNum,
 	                     dirID);
 	return _res;
@@ -2227,7 +2227,7 @@ static PyObject *File_HOpen(PyObject *_self, PyObject *_args)
 	Str255 fileName;
 	SInt8 permission;
 	short refNum;
-	if (!PyArg_ParseTuple(_args, "hlO&b",
+	if (!PyArg_ParseTuple(_args, "HlO&B",
 	                      &vRefNum,
 	                      &dirID,
 	                      PyMac_GetStr255, fileName,
@@ -2239,7 +2239,7 @@ static PyObject *File_HOpen(PyObject *_self, PyObject *_args)
 	             permission,
 	             &refNum);
 	if (_err != noErr) return PyMac_Error(_err);
-	_res = Py_BuildValue("h",
+	_res = Py_BuildValue("H",
 	                     refNum);
 	return _res;
 }
@@ -2253,7 +2253,7 @@ static PyObject *File_HOpenDF(PyObject *_self, PyObject *_args)
 	Str255 fileName;
 	SInt8 permission;
 	short refNum;
-	if (!PyArg_ParseTuple(_args, "hlO&b",
+	if (!PyArg_ParseTuple(_args, "HlO&B",
 	                      &vRefNum,
 	                      &dirID,
 	                      PyMac_GetStr255, fileName,
@@ -2265,7 +2265,7 @@ static PyObject *File_HOpenDF(PyObject *_self, PyObject *_args)
 	               permission,
 	               &refNum);
 	if (_err != noErr) return PyMac_Error(_err);
-	_res = Py_BuildValue("h",
+	_res = Py_BuildValue("H",
 	                     refNum);
 	return _res;
 }
@@ -2279,7 +2279,7 @@ static PyObject *File_HOpenRF(PyObject *_self, PyObject *_args)
 	Str255 fileName;
 	SInt8 permission;
 	short refNum;
-	if (!PyArg_ParseTuple(_args, "hlO&b",
+	if (!PyArg_ParseTuple(_args, "HlO&B",
 	                      &vRefNum,
 	                      &dirID,
 	                      PyMac_GetStr255, fileName,
@@ -2291,7 +2291,7 @@ static PyObject *File_HOpenRF(PyObject *_self, PyObject *_args)
 	               permission,
 	               &refNum);
 	if (_err != noErr) return PyMac_Error(_err);
-	_res = Py_BuildValue("h",
+	_res = Py_BuildValue("H",
 	                     refNum);
 	return _res;
 }
@@ -2302,7 +2302,7 @@ static PyObject *File_AllocContig(PyObject *_self, PyObject *_args)
 	OSErr _err;
 	short refNum;
 	long count;
-	if (!PyArg_ParseTuple(_args, "h",
+	if (!PyArg_ParseTuple(_args, "H",
 	                      &refNum))
 		return NULL;
 	_err = AllocContig(refNum,
@@ -2322,7 +2322,7 @@ static PyObject *File_HCreate(PyObject *_self, PyObject *_args)
 	Str255 fileName;
 	OSType creator;
 	OSType fileType;
-	if (!PyArg_ParseTuple(_args, "hlO&O&O&",
+	if (!PyArg_ParseTuple(_args, "HlO&O&O&",
 	                      &vRefNum,
 	                      &dirID,
 	                      PyMac_GetStr255, fileName,
@@ -2348,7 +2348,7 @@ static PyObject *File_DirCreate(PyObject *_self, PyObject *_args)
 	long parentDirID;
 	Str255 directoryName;
 	long createdDirID;
-	if (!PyArg_ParseTuple(_args, "hlO&",
+	if (!PyArg_ParseTuple(_args, "HlO&",
 	                      &vRefNum,
 	                      &parentDirID,
 	                      PyMac_GetStr255, directoryName))
@@ -2370,7 +2370,7 @@ static PyObject *File_HDelete(PyObject *_self, PyObject *_args)
 	short vRefNum;
 	long dirID;
 	Str255 fileName;
-	if (!PyArg_ParseTuple(_args, "hlO&",
+	if (!PyArg_ParseTuple(_args, "HlO&",
 	                      &vRefNum,
 	                      &dirID,
 	                      PyMac_GetStr255, fileName))
@@ -2392,7 +2392,7 @@ static PyObject *File_HGetFInfo(PyObject *_self, PyObject *_args)
 	long dirID;
 	Str255 fileName;
 	FInfo fndrInfo;
-	if (!PyArg_ParseTuple(_args, "hlO&",
+	if (!PyArg_ParseTuple(_args, "HlO&",
 	                      &vRefNum,
 	                      &dirID,
 	                      PyMac_GetStr255, fileName))
@@ -2415,7 +2415,7 @@ static PyObject *File_HSetFInfo(PyObject *_self, PyObject *_args)
 	long dirID;
 	Str255 fileName;
 	FInfo fndrInfo;
-	if (!PyArg_ParseTuple(_args, "hlO&O&",
+	if (!PyArg_ParseTuple(_args, "HlO&O&",
 	                      &vRefNum,
 	                      &dirID,
 	                      PyMac_GetStr255, fileName,
@@ -2438,7 +2438,7 @@ static PyObject *File_HSetFLock(PyObject *_self, PyObject *_args)
 	short vRefNum;
 	long dirID;
 	Str255 fileName;
-	if (!PyArg_ParseTuple(_args, "hlO&",
+	if (!PyArg_ParseTuple(_args, "HlO&",
 	                      &vRefNum,
 	                      &dirID,
 	                      PyMac_GetStr255, fileName))
@@ -2459,7 +2459,7 @@ static PyObject *File_HRstFLock(PyObject *_self, PyObject *_args)
 	short vRefNum;
 	long dirID;
 	Str255 fileName;
-	if (!PyArg_ParseTuple(_args, "hlO&",
+	if (!PyArg_ParseTuple(_args, "HlO&",
 	                      &vRefNum,
 	                      &dirID,
 	                      PyMac_GetStr255, fileName))
@@ -2481,7 +2481,7 @@ static PyObject *File_HRename(PyObject *_self, PyObject *_args)
 	long dirID;
 	Str255 oldName;
 	Str255 newName;
-	if (!PyArg_ParseTuple(_args, "hlO&O&",
+	if (!PyArg_ParseTuple(_args, "HlO&O&",
 	                      &vRefNum,
 	                      &dirID,
 	                      PyMac_GetStr255, oldName,
@@ -2506,7 +2506,7 @@ static PyObject *File_CatMove(PyObject *_self, PyObject *_args)
 	Str255 oldName;
 	long newDirID;
 	Str255 newName;
-	if (!PyArg_ParseTuple(_args, "hlO&lO&",
+	if (!PyArg_ParseTuple(_args, "HlO&lO&",
 	                      &vRefNum,
 	                      &dirID,
 	                      PyMac_GetStr255, oldName,
@@ -2532,7 +2532,7 @@ static PyObject *File_FSMakeFSSpec(PyObject *_self, PyObject *_args)
 	long dirID;
 	Str255 fileName;
 	FSSpec spec;
-	if (!PyArg_ParseTuple(_args, "hlO&",
+	if (!PyArg_ParseTuple(_args, "HlO&",
 	                      &vRefNum,
 	                      &dirID,
 	                      PyMac_GetStr255, fileName))
@@ -2553,7 +2553,7 @@ static PyObject *File_FSGetForkPosition(PyObject *_self, PyObject *_args)
 	OSErr _err;
 	SInt16 forkRefNum;
 	SInt64 position;
-	if (!PyArg_ParseTuple(_args, "h",
+	if (!PyArg_ParseTuple(_args, "H",
 	                      &forkRefNum))
 		return NULL;
 	_err = FSGetForkPosition(forkRefNum,
@@ -2571,7 +2571,7 @@ static PyObject *File_FSSetForkPosition(PyObject *_self, PyObject *_args)
 	SInt16 forkRefNum;
 	UInt16 positionMode;
 	SInt64 positionOffset;
-	if (!PyArg_ParseTuple(_args, "hHL",
+	if (!PyArg_ParseTuple(_args, "HHL",
 	                      &forkRefNum,
 	                      &positionMode,
 	                      &positionOffset))
@@ -2591,7 +2591,7 @@ static PyObject *File_FSGetForkSize(PyObject *_self, PyObject *_args)
 	OSErr _err;
 	SInt16 forkRefNum;
 	SInt64 forkSize;
-	if (!PyArg_ParseTuple(_args, "h",
+	if (!PyArg_ParseTuple(_args, "H",
 	                      &forkRefNum))
 		return NULL;
 	_err = FSGetForkSize(forkRefNum,
@@ -2609,7 +2609,7 @@ static PyObject *File_FSSetForkSize(PyObject *_self, PyObject *_args)
 	SInt16 forkRefNum;
 	UInt16 positionMode;
 	SInt64 positionOffset;
-	if (!PyArg_ParseTuple(_args, "hHL",
+	if (!PyArg_ParseTuple(_args, "HHL",
 	                      &forkRefNum,
 	                      &positionMode,
 	                      &positionOffset))
@@ -2633,7 +2633,7 @@ static PyObject *File_FSAllocateFork(PyObject *_self, PyObject *_args)
 	SInt64 positionOffset;
 	UInt64 requestCount;
 	UInt64 actualCount;
-	if (!PyArg_ParseTuple(_args, "hHHLL",
+	if (!PyArg_ParseTuple(_args, "HHHLK",
 	                      &forkRefNum,
 	                      &flags,
 	                      &positionMode,
@@ -2647,7 +2647,7 @@ static PyObject *File_FSAllocateFork(PyObject *_self, PyObject *_args)
 	                      requestCount,
 	                      &actualCount);
 	if (_err != noErr) return PyMac_Error(_err);
-	_res = Py_BuildValue("L",
+	_res = Py_BuildValue("K",
 	                     actualCount);
 	return _res;
 }
@@ -2657,7 +2657,7 @@ static PyObject *File_FSFlushFork(PyObject *_self, PyObject *_args)
 	PyObject *_res = NULL;
 	OSErr _err;
 	SInt16 forkRefNum;
-	if (!PyArg_ParseTuple(_args, "h",
+	if (!PyArg_ParseTuple(_args, "H",
 	                      &forkRefNum))
 		return NULL;
 	_err = FSFlushFork(forkRefNum);
@@ -2672,7 +2672,7 @@ static PyObject *File_FSCloseFork(PyObject *_self, PyObject *_args)
 	PyObject *_res = NULL;
 	OSErr _err;
 	SInt16 forkRefNum;
-	if (!PyArg_ParseTuple(_args, "h",
+	if (!PyArg_ParseTuple(_args, "H",
 	                      &forkRefNum))
 		return NULL;
 	_err = FSCloseFork(forkRefNum);
@@ -2739,7 +2739,7 @@ static PyObject *File_FNNotifyByPath(PyObject *_self, PyObject *_args)
 	UInt8 * path;
 	FNMessage message;
 	OptionBits flags;
-	if (!PyArg_ParseTuple(_args, "sll",
+	if (!PyArg_ParseTuple(_args, "skk",
 	                      &path,
 	                      &message,
 	                      &flags))
@@ -2762,7 +2762,7 @@ static PyObject *File_FNNotifyAll(PyObject *_self, PyObject *_args)
 	OSStatus _err;
 	FNMessage message;
 	OptionBits flags;
-	if (!PyArg_ParseTuple(_args, "ll",
+	if (!PyArg_ParseTuple(_args, "kk",
 	                      &message,
 	                      &flags))
 		return NULL;
@@ -2855,7 +2855,7 @@ static PyObject *File_ResolveAliasFileWithMountFlags(PyObject *_self, PyObject *
 	Boolean targetIsFolder;
 	Boolean wasAliased;
 	unsigned long mountFlags;
-	if (!PyArg_ParseTuple(_args, "O&bl",
+	if (!PyArg_ParseTuple(_args, "O&bk",
 	                      FSSpec_Convert, &theSpec,
 	                      &resolveAliasChains,
 	                      &mountFlags))
@@ -2906,7 +2906,7 @@ static PyObject *File_ResolveAliasFileWithMountFlagsNoUI(PyObject *_self, PyObje
 	Boolean targetIsFolder;
 	Boolean wasAliased;
 	unsigned long mountFlags;
-	if (!PyArg_ParseTuple(_args, "O&bl",
+	if (!PyArg_ParseTuple(_args, "O&bk",
 	                      FSSpec_Convert, &theSpec,
 	                      &resolveAliasChains,
 	                      &mountFlags))
@@ -2954,7 +2954,7 @@ static PyObject *File_FSResolveAliasFileWithMountFlags(PyObject *_self, PyObject
 	Boolean targetIsFolder;
 	Boolean wasAliased;
 	unsigned long mountFlags;
-	if (!PyArg_ParseTuple(_args, "O&bl",
+	if (!PyArg_ParseTuple(_args, "O&bk",
 	                      FSRef_Convert, &theRef,
 	                      &resolveAliasChains,
 	                      &mountFlags))
@@ -3161,7 +3161,7 @@ PyMac_GetFSSpec(PyObject *v, FSSpec *spec)
 		return 1;
 	}
 
-	if (PyArg_Parse(v, "(hlO&)",
+	if (PyArg_Parse(v, "(hkO&)",
 						&refnum, &parid, PyMac_GetStr255, &path)) {
 		err = FSMakeFSSpec(refnum, parid, path, spec);
 		if ( err && err != fnfErr ) {

@@ -14,9 +14,9 @@
 
 /* Macro to test whether a weak-loaded CFM function exists */
 #define PyMac_PRECHECK(rtn) do { if ( &rtn == NULL )  {\
-    	PyErr_SetString(PyExc_NotImplementedError, \
-    	"Not available in this shared library/OS version"); \
-    	return NULL; \
+        PyErr_SetString(PyExc_NotImplementedError, \
+        "Not available in this shared library/OS version"); \
+        return NULL; \
     }} while(0)
 
 
@@ -151,7 +151,7 @@ static PyObject *TXNObj_TXNResizeFrame(TXNObjectObject *_self, PyObject *_args)
 #ifndef TXNResizeFrame
 	PyMac_PRECHECK(TXNResizeFrame);
 #endif
-	if (!PyArg_ParseTuple(_args, "lll",
+	if (!PyArg_ParseTuple(_args, "kkl",
 	                      &iWidth,
 	                      &iHeight,
 	                      &iTXNFrameID))
@@ -331,7 +331,7 @@ static PyObject *TXNObj_TXNGetSleepTicks(TXNObjectObject *_self, PyObject *_args
 	if (!PyArg_ParseTuple(_args, ""))
 		return NULL;
 	_rv = TXNGetSleepTicks(_self->ob_itself);
-	_res = Py_BuildValue("l",
+	_res = Py_BuildValue("k",
 	                     _rv);
 	return _res;
 }
@@ -374,7 +374,7 @@ static PyObject *TXNObj_TXNZoomWindow(TXNObjectObject *_self, PyObject *_args)
 #ifndef TXNZoomWindow
 	PyMac_PRECHECK(TXNZoomWindow);
 #endif
-	if (!PyArg_ParseTuple(_args, "h",
+	if (!PyArg_ParseTuple(_args, "H",
 	                      &iPart))
 		return NULL;
 	TXNZoomWindow(_self->ob_itself,
@@ -604,7 +604,7 @@ static PyObject *TXNObj_TXNCountRunsInRange(TXNObjectObject *_self, PyObject *_a
 	                           iEndOffset,
 	                           &oRunCount);
 	if (_err != noErr) return PyMac_Error(_err);
-	_res = Py_BuildValue("l",
+	_res = Py_BuildValue("k",
 	                     oRunCount);
 	return _res;
 }
@@ -619,7 +619,7 @@ static PyObject *TXNObj_TXNDataSize(TXNObjectObject *_self, PyObject *_args)
 	if (!PyArg_ParseTuple(_args, ""))
 		return NULL;
 	_rv = TXNDataSize(_self->ob_itself);
-	_res = Py_BuildValue("l",
+	_res = Py_BuildValue("k",
 	                     _rv);
 	return _res;
 }
@@ -687,7 +687,7 @@ static PyObject *TXNObj_TXNSetDataFromFile(TXNObjectObject *_self, PyObject *_ar
 #ifndef TXNSetDataFromFile
 	PyMac_PRECHECK(TXNSetDataFromFile);
 #endif
-	if (!PyArg_ParseTuple(_args, "hO&lll",
+	if (!PyArg_ParseTuple(_args, "HO&kll",
 	                      &iFileRefNum,
 	                      PyMac_GetOSType, &iFileType,
 	                      &iFileLength,
@@ -747,7 +747,7 @@ static PyObject *TXNObj_TXNGetChangeCount(TXNObjectObject *_self, PyObject *_arg
 	if (!PyArg_ParseTuple(_args, ""))
 		return NULL;
 	_rv = TXNGetChangeCount(_self->ob_itself);
-	_res = Py_BuildValue("l",
+	_res = Py_BuildValue("k",
 	                     _rv);
 	return _res;
 }
@@ -765,7 +765,7 @@ static PyObject *TXNObj_TXNSave(TXNObjectObject *_self, PyObject *_args)
 #ifndef TXNSave
 	PyMac_PRECHECK(TXNSave);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&O&lO&hh",
+	if (!PyArg_ParseTuple(_args, "O&O&lO&HH",
 	                      PyMac_GetOSType, &iType,
 	                      PyMac_GetOSType, &iResType,
 	                      &iPermanentEncoding,
@@ -995,7 +995,7 @@ static PyObject *TXNObj_TXNEchoMode(TXNObjectObject *_self, PyObject *_args)
 #ifndef TXNEchoMode
 	PyMac_PRECHECK(TXNEchoMode);
 #endif
-	if (!PyArg_ParseTuple(_args, "hlb",
+	if (!PyArg_ParseTuple(_args, "hkb",
 	                      &iEchoCharacter,
 	                      &iEncoding,
 	                      &iOn))
@@ -1020,7 +1020,7 @@ static PyObject *TXNObj_TXNDoFontMenuSelection(TXNObjectObject *_self, PyObject 
 #ifndef TXNDoFontMenuSelection
 	PyMac_PRECHECK(TXNDoFontMenuSelection);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&hh",
+	if (!PyArg_ParseTuple(_args, "O&HH",
 	                      TXNFontMenuObj_Convert, &iTXNFontMenuObject,
 	                      &iMenuID,
 	                      &iMenuItem))
@@ -1109,7 +1109,7 @@ static PyObject *TXNObj_TXNGetLineCount(TXNObjectObject *_self, PyObject *_args)
 	_err = TXNGetLineCount(_self->ob_itself,
 	                       &oLineTotal);
 	if (_err != noErr) return PyMac_Error(_err);
-	_res = Py_BuildValue("l",
+	_res = Py_BuildValue("k",
 	                     oLineTotal);
 	return _res;
 }
@@ -1124,7 +1124,7 @@ static PyObject *TXNObj_TXNGetLineMetrics(TXNObjectObject *_self, PyObject *_arg
 #ifndef TXNGetLineMetrics
 	PyMac_PRECHECK(TXNGetLineMetrics);
 #endif
-	if (!PyArg_ParseTuple(_args, "l",
+	if (!PyArg_ParseTuple(_args, "k",
 	                      &iLineNumber))
 		return NULL;
 	_err = TXNGetLineMetrics(_self->ob_itself,
@@ -1610,7 +1610,7 @@ static PyObject *Mlte_TXNNewFontMenuObject(PyObject *_self, PyObject *_args)
 #ifndef TXNNewFontMenuObject
 	PyMac_PRECHECK(TXNNewFontMenuObject);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&hh",
+	if (!PyArg_ParseTuple(_args, "O&HH",
 	                      MenuObj_Convert, &iFontMenuHandle,
 	                      &iMenuID,
 	                      &iStartHierMenuID))
@@ -1651,7 +1651,7 @@ static PyObject *Mlte_TXNInitTextension(PyObject *_self, PyObject *_args)
 	ItemCount iCountDefaultFonts = 0;
 	TXNInitOptions iUsageFlags;
 	PyMac_PRECHECK(TXNInitTextension);
-	if (!PyArg_ParseTuple(_args, "l", &iUsageFlags))
+	if (!PyArg_ParseTuple(_args, "k", &iUsageFlags))
 		return NULL;
 	_err = TXNInitTextension(iDefaultFonts,
 	                         iCountDefaultFonts,

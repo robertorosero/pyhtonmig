@@ -36,11 +36,11 @@ OptSoupHandle = OpaqueByValueType("WESoupHandle", "OptResObj")
 OptStScrpHandle = OpaqueByValueType("StScrpHandle", "OptResObj")
 
 WEStyleMode = Type("WEStyleMode", "H")
-WERulerMode = Type("WERulerMode", "l")
-WEActionKind = Type("WEActionKind", "h")
+WERulerMode = Type("WERulerMode", "k")
+WEActionKind = Type("WEActionKind", "H")
 WEAlignment = Type("WEAlignment", "B")
 WEEdge = Type("WEEdge", "B")
-WEDirection = Type("WEDirection", "h")
+WEDirection = Type("WEDirection", "H")
 WESoupHandle = OpaqueByValueType("WESoupHandle", "ResObj")
 WEFontTableHandle = OpaqueByValueType("WEFontTableHandle", "ResObj")
 WEFontTableHandle
@@ -56,8 +56,8 @@ LongPt_ptr = LongPt
 LongRect = OpaqueType("LongRect", "LongRect")
 LongRect_ptr = LongRect
 
-TextEncodingVariant = Type("TextEncodingVariant", "l")
-TextEncodingFormat = Type("TextEncodingFormat", "l")
+TextEncodingVariant = Type("TextEncodingVariant", "k")
+TextEncodingFormat = Type("TextEncodingFormat", "k")
 
 includestuff = includestuff + """
 #include <%s>""" % MACHEADERFILE + """
@@ -95,7 +95,7 @@ TextStyle_Convert(PyObject *v, TextStylePtr p_itself)
 {
 	long font, face, size;
 	
-	if( !PyArg_ParseTuple(v, "lllO&", &font, &face, &size, QdRGB_Convert, &p_itself->tsColor) )
+	if( !PyArg_ParseTuple(v, "kkkO&", &font, &face, &size, QdRGB_Convert, &p_itself->tsColor) )
 		return 0;
 	p_itself->tsFont = (short)font;
 	p_itself->tsFace = (Style)face;

@@ -8,11 +8,11 @@ from macsupport import *
 
 
 AEArrayType = Type("AEArrayType", "c")
-AESendMode = Type("AESendMode", "l")
+AESendMode = Type("AESendMode", "k")
 AESendPriority = Type("AESendPriority", "h")
 AEInteractAllowed = Type("AEInteractAllowed", "b")
 AEReturnID = Type("AEReturnID", "h")
-AETransactionID = Type("AETransactionID", "l")
+AETransactionID = Type("AETransactionID", "k")
 
 
 

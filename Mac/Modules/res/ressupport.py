@@ -18,7 +18,7 @@ class ResMixIn:
 class ResFunction(ResMixIn, OSErrWeakLinkFunctionGenerator): pass
 class ResMethod(ResMixIn, OSErrWeakLinkMethodGenerator): pass
 
-RsrcChainLocation = Type("RsrcChainLocation", "h")
+RsrcChainLocation = Type("RsrcChainLocation", "H")
 FSCatalogInfoBitmap = FakeType("0") # Type("FSCatalogInfoBitmap", "l")
 FSCatalogInfo_ptr = FakeType("(FSCatalogInfo *)0")
 

@@ -14,9 +14,9 @@
 
 /* Macro to test whether a weak-loaded CFM function exists */
 #define PyMac_PRECHECK(rtn) do { if ( &rtn == NULL )  {\
-    	PyErr_SetString(PyExc_NotImplementedError, \
-    	"Not available in this shared library/OS version"); \
-    	return NULL; \
+        PyErr_SetString(PyExc_NotImplementedError, \
+        "Not available in this shared library/OS version"); \
+        return NULL; \
     }} while(0)
 
 
@@ -121,14 +121,14 @@ static PyObject *ListObj_LAddColumn(ListObject *_self, PyObject *_args)
 	short _rv;
 	short count;
 	short colNum;
-	if (!PyArg_ParseTuple(_args, "hh",
+	if (!PyArg_ParseTuple(_args, "HH",
 	                      &count,
 	                      &colNum))
 		return NULL;
 	_rv = LAddColumn(count,
 	                 colNum,
 	                 _self->ob_itself);
-	_res = Py_BuildValue("h",
+	_res = Py_BuildValue("H",
 	                     _rv);
 	return _res;
 }
@@ -139,14 +139,14 @@ static PyObject *ListObj_LAddRow(ListObject *_self, PyObject *_args)
 	short _rv;
 	short count;
 	short rowNum;
-	if (!PyArg_ParseTuple(_args, "hh",
+	if (!PyArg_ParseTuple(_args, "HH",
 	                      &count,
 	                      &rowNum))
 		return NULL;
 	_rv = LAddRow(count,
 	              rowNum,
 	              _self->ob_itself);
-	_res = Py_BuildValue("h",
+	_res = Py_BuildValue("H",
 	                     _rv);
 	return _res;
 }
@@ -156,7 +156,7 @@ static PyObject *ListObj_LDelColumn(ListObject *_self, PyObject *_args)
 	PyObject *_res = NULL;
 	short count;
 	short colNum;
-	if (!PyArg_ParseTuple(_args, "hh",
+	if (!PyArg_ParseTuple(_args, "HH",
 	                      &count,
 	                      &colNum))
 		return NULL;
@@ -173,7 +173,7 @@ static PyObject *ListObj_LDelRow(ListObject *_self, PyObject *_args)
 	PyObject *_res = NULL;
 	short count;
 	short rowNum;
-	if (!PyArg_ParseTuple(_args, "hh",
+	if (!PyArg_ParseTuple(_args, "HH",
 	                      &count,
 	                      &rowNum))
 		return NULL;
@@ -243,7 +243,7 @@ static PyObject *ListObj_LSize(ListObject *_self, PyObject *_args)
 	PyObject *_res = NULL;
 	short listWidth;
 	short listHeight;
-	if (!PyArg_ParseTuple(_args, "hh",
+	if (!PyArg_ParseTuple(_args, "HH",
 	                      &listWidth,
 	                      &listHeight))
 		return NULL;
@@ -274,7 +274,7 @@ static PyObject *ListObj_LScroll(ListObject *_self, PyObject *_args)
 	PyObject *_res = NULL;
 	short dCols;
 	short dRows;
-	if (!PyArg_ParseTuple(_args, "hh",
+	if (!PyArg_ParseTuple(_args, "HH",
 	                      &dCols,
 	                      &dRows))
 		return NULL;
@@ -498,7 +498,7 @@ static PyObject *ListObj_LGetCellDataLocation(ListObject *_self, PyObject *_args
 	                     &len,
 	                     theCell,
 	                     _self->ob_itself);
-	_res = Py_BuildValue("hh",
+	_res = Py_BuildValue("HH",
 	                     offset,
 	                     len);
 	return _res;
@@ -619,7 +619,7 @@ static PyObject *ListObj_GetListFlags(ListObject *_self, PyObject *_args)
 	if (!PyArg_ParseTuple(_args, ""))
 		return NULL;
 	_rv = GetListFlags(_self->ob_itself);
-	_res = Py_BuildValue("l",
+	_res = Py_BuildValue("k",
 	                     _rv);
 	return _res;
 }
@@ -631,7 +631,7 @@ static PyObject *ListObj_GetListSelectionFlags(ListObject *_self, PyObject *_arg
 	if (!PyArg_ParseTuple(_args, ""))
 		return NULL;
 	_rv = GetListSelectionFlags(_self->ob_itself);
-	_res = Py_BuildValue("l",
+	_res = Py_BuildValue("k",
 	                     _rv);
 	return _res;
 }
@@ -898,7 +898,7 @@ static PyObject *List_LNew(PyObject *_self, PyObject *_args)
 	Boolean hasGrow;
 	Boolean scrollHoriz;
 	Boolean scrollVert;
-	if (!PyArg_ParseTuple(_args, "O&O&O&hO&bbbb",
+	if (!PyArg_ParseTuple(_args, "O&O&O&HO&bbbb",
 	                      PyMac_GetRect, &rView,
 	                      PyMac_GetRect, &dataBounds,
 	                      PyMac_GetPoint, &cSize,
@@ -1024,7 +1024,7 @@ static PyObject *List_SetListFlags(PyObject *_self, PyObject *_args)
 	PyObject *_res = NULL;
 	ListHandle list;
 	OptionBits listFlags;
-	if (!PyArg_ParseTuple(_args, "O&l",
+	if (!PyArg_ParseTuple(_args, "O&k",
 	                      ListObj_Convert, &list,
 	                      &listFlags))
 		return NULL;
@@ -1040,7 +1040,7 @@ static PyObject *List_SetListSelectionFlags(PyObject *_self, PyObject *_args)
 	PyObject *_res = NULL;
 	ListHandle list;
 	OptionBits selectionFlags;
-	if (!PyArg_ParseTuple(_args, "O&l",
+	if (!PyArg_ParseTuple(_args, "O&k",
 	                      ListObj_Convert, &list,
 	                      &selectionFlags))
 		return NULL;

@@ -14,9 +14,9 @@
 
 /* Macro to test whether a weak-loaded CFM function exists */
 #define PyMac_PRECHECK(rtn) do { if ( &rtn == NULL )  {\
-    	PyErr_SetString(PyExc_NotImplementedError, \
-    	"Not available in this shared library/OS version"); \
-    	return NULL; \
+        PyErr_SetString(PyExc_NotImplementedError, \
+        "Not available in this shared library/OS version"); \
+        return NULL; \
     }} while(0)
 
 
@@ -55,7 +55,7 @@ TextStyle_Convert(PyObject *v, TextStylePtr p_itself)
 {
 	long font, face, size;
 	
-	if( !PyArg_ParseTuple(v, "lllO&", &font, &face, &size, QdRGB_Convert, &p_itself->tsColor) )
+	if( !PyArg_ParseTuple(v, "kkkO&", &font, &face, &size, QdRGB_Convert, &p_itself->tsColor) )
 		return 0;
 	p_itself->tsFont = (short)font;
 	p_itself->tsFace = (Style)face;
@@ -533,7 +533,7 @@ static PyObject *wasteObj_WEGetChar(wasteObject *_self, PyObject *_args)
 		return NULL;
 	_rv = WEGetChar(inOffset,
 	                _self->ob_itself);
-	_res = Py_BuildValue("h",
+	_res = Py_BuildValue("H",
 	                     _rv);
 	return _res;
 }
@@ -908,7 +908,7 @@ static PyObject *wasteObj_WEGetPoint(wasteObject *_self, PyObject *_args)
 	SInt16 inDirection;
 	LongPt outPoint;
 	SInt16 outLineHeight;
-	if (!PyArg_ParseTuple(_args, "lh",
+	if (!PyArg_ParseTuple(_args, "lH",
 	                      &inOffset,
 	                      &inDirection))
 		return NULL;
@@ -917,7 +917,7 @@ static PyObject *wasteObj_WEGetPoint(wasteObject *_self, PyObject *_args)
 	           &outPoint,
 	           &outLineHeight,
 	           _self->ob_itself);
-	_res = Py_BuildValue("O&h",
+	_res = Py_BuildValue("O&H",
 	                     LongPt_New, &outPoint,
 	                     outLineHeight);
 	return _res;
@@ -1001,7 +1001,7 @@ static PyObject *wasteObj_WEFind(wasteObject *_self, PyObject *_args)
 	SInt32 inRangeEnd;
 	SInt32 outMatchStart;
 	SInt32 outMatchEnd;
-	if (!PyArg_ParseTuple(_args, "slllll",
+	if (!PyArg_ParseTuple(_args, "slkkll",
 	                      &inKey,
 	                      &inKeyLength,
 	                      &inKeyEncoding,
@@ -1034,7 +1034,7 @@ static PyObject *wasteObj_WEStreamRange(wasteObject *_self, PyObject *_args)
 	FlavorType inRequestedType;
 	OptionBits inStreamOptions;
 	Handle outData;
-	if (!PyArg_ParseTuple(_args, "llO&lO&",
+	if (!PyArg_ParseTuple(_args, "llO&kO&",
 	                      &inRangeStart,
 	                      &inRangeEnd,
 	                      PyMac_GetOSType, &inRequestedType,
@@ -1093,7 +1093,7 @@ static PyObject *wasteObj_WEGetTextRangeAsUnicode(wasteObject *_self, PyObject *
 	TextEncodingVariant inUnicodeVariant;
 	TextEncodingFormat inTransformationFormat;
 	OptionBits inGetOptions;
-	if (!PyArg_ParseTuple(_args, "llO&O&O&lll",
+	if (!PyArg_ParseTuple(_args, "llO&O&O&kkk",
 	                      &inRangeStart,
 	                      &inRangeEnd,
 	                      ResObj_Convert, &outUnicodeText,
@@ -1151,7 +1151,7 @@ static PyObject *wasteObj_WEGetDirection(wasteObject *_self, PyObject *_args)
 	if (!PyArg_ParseTuple(_args, ""))
 		return NULL;
 	_rv = WEGetDirection(_self->ob_itself);
-	_res = Py_BuildValue("h",
+	_res = Py_BuildValue("H",
 	                     _rv);
 	return _res;
 }
@@ -1160,7 +1160,7 @@ static PyObject *wasteObj_WESetDirection(wasteObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
 	WEDirection inDirection;
-	if (!PyArg_ParseTuple(_args, "h",
+	if (!PyArg_ParseTuple(_args, "H",
 	                      &inDirection))
 		return NULL;
 	WESetDirection(inDirection,
@@ -1269,7 +1269,7 @@ static PyObject *wasteObj_WEKey(wasteObject *_self, PyObject *_args)
 	PyObject *_res = NULL;
 	CharParameter inKey;
 	EventModifiers inModifiers;
-	if (!PyArg_ParseTuple(_args, "hH",
+	if (!PyArg_ParseTuple(_args, "HH",
 	                      &inKey,
 	                      &inModifiers))
 		return NULL;
@@ -1287,7 +1287,7 @@ static PyObject *wasteObj_WEClick(wasteObject *_self, PyObject *_args)
 	Point inHitPoint;
 	EventModifiers inModifiers;
 	UInt32 inClickTime;
-	if (!PyArg_ParseTuple(_args, "O&Hl",
+	if (!PyArg_ParseTuple(_args, "O&Hk",
 	                      PyMac_GetPoint, &inHitPoint,
 	                      &inModifiers,
 	                      &inClickTime))
@@ -1327,7 +1327,7 @@ static PyObject *wasteObj_WEIdle(wasteObject *_self, PyObject *_args)
 		return NULL;
 	WEIdle(&outMaxSleep,
 	       _self->ob_itself);
-	_res = Py_BuildValue("l",
+	_res = Py_BuildValue("k",
 	                     outMaxSleep);
 	return _res;
 }
@@ -1422,7 +1422,7 @@ static PyObject *wasteObj_WEChangeCase(wasteObject *_self, PyObject *_args)
 	PyObject *_res = NULL;
 	OSErr _err;
 	SInt16 inCase;
-	if (!PyArg_ParseTuple(_args, "h",
+	if (!PyArg_ParseTuple(_args, "H",
 	                      &inCase))
 		return NULL;
 	_err = WEChangeCase(inCase,
@@ -1542,7 +1542,7 @@ static PyObject *wasteObj_WEGetUndoInfo(wasteObject *_self, PyObject *_args)
 		return NULL;
 	_rv = WEGetUndoInfo(&outRedoFlag,
 	                    _self->ob_itself);
-	_res = Py_BuildValue("hb",
+	_res = Py_BuildValue("Hb",
 	                     _rv,
 	                     outRedoFlag);
 	return _res;
@@ -1558,7 +1558,7 @@ static PyObject *wasteObj_WEGetIndUndoInfo(wasteObject *_self, PyObject *_args)
 		return NULL;
 	_rv = WEGetIndUndoInfo(inUndoLevel,
 	                       _self->ob_itself);
-	_res = Py_BuildValue("h",
+	_res = Py_BuildValue("H",
 	                     _rv);
 	return _res;
 }
@@ -1593,7 +1593,7 @@ static PyObject *wasteObj_WEEndAction(wasteObject *_self, PyObject *_args)
 	PyObject *_res = NULL;
 	OSErr _err;
 	WEActionKind inActionKind;
-	if (!PyArg_ParseTuple(_args, "h",
+	if (!PyArg_ParseTuple(_args, "H",
 	                      &inActionKind))
 		return NULL;
 	_err = WEEndAction(inActionKind,
@@ -1611,7 +1611,7 @@ static PyObject *wasteObj_WEGetModCount(wasteObject *_self, PyObject *_args)
 	if (!PyArg_ParseTuple(_args, ""))
 		return NULL;
 	_rv = WEGetModCount(_self->ob_itself);
-	_res = Py_BuildValue("l",
+	_res = Py_BuildValue("k",
 	                     _rv);
 	return _res;
 }
@@ -1795,7 +1795,7 @@ static PyObject *wasteObj_WECharByte(wasteObject *_self, PyObject *_args)
 		return NULL;
 	_rv = WECharByte(inOffset,
 	                 _self->ob_itself);
-	_res = Py_BuildValue("h",
+	_res = Py_BuildValue("H",
 	                     _rv);
 	return _res;
 }
@@ -1810,7 +1810,7 @@ static PyObject *wasteObj_WECharType(wasteObject *_self, PyObject *_args)
 		return NULL;
 	_rv = WECharType(inOffset,
 	                 _self->ob_itself);
-	_res = Py_BuildValue("h",
+	_res = Py_BuildValue("H",
 	                     _rv);
 	return _res;
 }
@@ -1832,14 +1832,14 @@ static PyObject *wasteObj_WEFeatureFlag(wasteObject *_self, PyObject *_args)
 	SInt16 _rv;
 	SInt16 inFeature;
 	SInt16 inAction;
-	if (!PyArg_ParseTuple(_args, "hh",
+	if (!PyArg_ParseTuple(_args, "HH",
 	                      &inFeature,
 	                      &inAction))
 		return NULL;
 	_rv = WEFeatureFlag(inFeature,
 	                    inAction,
 	                    _self->ob_itself);
-	_res = Py_BuildValue("h",
+	_res = Py_BuildValue("H",
 	                     _rv);
 	return _res;
 }
@@ -1942,7 +1942,7 @@ static PyObject *wasteObj_WEGetTabSize(wasteObject *_self, PyObject *_args)
 	if (!PyArg_ParseTuple(_args, ""))
 		return NULL;
 	_rv = WEGetTabSize(_self->ob_itself);
-	_res = Py_BuildValue("h",
+	_res = Py_BuildValue("H",
 	                     _rv);
 	return _res;
 }
@@ -1952,7 +1952,7 @@ static PyObject *wasteObj_WESetTabSize(wasteObject *_self, PyObject *_args)
 	PyObject *_res = NULL;
 	OSErr _err;
 	SInt16 tabWidth;
-	if (!PyArg_ParseTuple(_args, "h",
+	if (!PyArg_ParseTuple(_args, "H",
 	                      &tabWidth))
 		return NULL;
 	_err = WESetTabSize(tabWidth,
@@ -2227,7 +2227,7 @@ static PyObject *waste_WENew(PyObject *_self, PyObject *_args)
 	LongRect inViewRect;
 	OptionBits inOptions;
 	WEReference outWE;
-	if (!PyArg_ParseTuple(_args, "O&O&l",
+	if (!PyArg_ParseTuple(_args, "O&O&k",
 	                      LongRect_Convert, &inDestRect,
 	                      LongRect_Convert, &inViewRect,
 	                      &inOptions))

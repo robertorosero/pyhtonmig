@@ -14,9 +14,9 @@
 
 /* Macro to test whether a weak-loaded CFM function exists */
 #define PyMac_PRECHECK(rtn) do { if ( &rtn == NULL )  {\
-    	PyErr_SetString(PyExc_NotImplementedError, \
-    	"Not available in this shared library/OS version"); \
-    	return NULL; \
+        PyErr_SetString(PyExc_NotImplementedError, \
+        "Not available in this shared library/OS version"); \
+        return NULL; \
     }} while(0)
 
 
@@ -37,7 +37,7 @@ static PyObject *Icn_GetCIcon(PyObject *_self, PyObject *_args)
 #ifndef GetCIcon
 	PyMac_PRECHECK(GetCIcon);
 #endif
-	if (!PyArg_ParseTuple(_args, "h",
+	if (!PyArg_ParseTuple(_args, "H",
 	                      &iconID))
 		return NULL;
 	_rv = GetCIcon(iconID);
@@ -89,7 +89,7 @@ static PyObject *Icn_GetIcon(PyObject *_self, PyObject *_args)
 #ifndef GetIcon
 	PyMac_PRECHECK(GetIcon);
 #endif
-	if (!PyArg_ParseTuple(_args, "h",
+	if (!PyArg_ParseTuple(_args, "H",
 	                      &iconID))
 		return NULL;
 	_rv = GetIcon(iconID);
@@ -128,7 +128,7 @@ static PyObject *Icn_PlotIconID(PyObject *_self, PyObject *_args)
 #ifndef PlotIconID
 	PyMac_PRECHECK(PlotIconID);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&hhh",
+	if (!PyArg_ParseTuple(_args, "O&HHH",
 	                      PyMac_GetRect, &theRect,
 	                      &align,
 	                      &transform,
@@ -218,7 +218,7 @@ static PyObject *Icn_GetIconSuite(PyObject *_self, PyObject *_args)
 #ifndef GetIconSuite
 	PyMac_PRECHECK(GetIconSuite);
 #endif
-	if (!PyArg_ParseTuple(_args, "hl",
+	if (!PyArg_ParseTuple(_args, "Hk",
 	                      &theResID,
 	                      &selector))
 		return NULL;
@@ -263,7 +263,7 @@ static PyObject *Icn_PlotIconSuite(PyObject *_self, PyObject *_args)
 #ifndef PlotIconSuite
 	PyMac_PRECHECK(PlotIconSuite);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&hhO&",
+	if (!PyArg_ParseTuple(_args, "O&HHO&",
 	                      PyMac_GetRect, &theRect,
 	                      &align,
 	                      &transform,
@@ -290,7 +290,7 @@ static PyObject *Icn_LoadIconCache(PyObject *_self, PyObject *_args)
 #ifndef LoadIconCache
 	PyMac_PRECHECK(LoadIconCache);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&hhO&",
+	if (!PyArg_ParseTuple(_args, "O&HHO&",
 	                      PyMac_GetRect, &theRect,
 	                      &align,
 	                      &transform,
@@ -316,7 +316,7 @@ static PyObject *Icn_GetLabel(PyObject *_self, PyObject *_args)
 #ifndef GetLabel
 	PyMac_PRECHECK(GetLabel);
 #endif
-	if (!PyArg_ParseTuple(_args, "hO&",
+	if (!PyArg_ParseTuple(_args, "HO&",
 	                      &labelNumber,
 	                      PyMac_GetStr255, labelString))
 		return NULL;
@@ -340,7 +340,7 @@ static PyObject *Icn_PtInIconID(PyObject *_self, PyObject *_args)
 #ifndef PtInIconID
 	PyMac_PRECHECK(PtInIconID);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&O&hh",
+	if (!PyArg_ParseTuple(_args, "O&O&HH",
 	                      PyMac_GetPoint, &testPt,
 	                      PyMac_GetRect, &iconRect,
 	                      &align,
@@ -366,7 +366,7 @@ static PyObject *Icn_PtInIconSuite(PyObject *_self, PyObject *_args)
 #ifndef PtInIconSuite
 	PyMac_PRECHECK(PtInIconSuite);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&O&hO&",
+	if (!PyArg_ParseTuple(_args, "O&O&HO&",
 	                      PyMac_GetPoint, &testPt,
 	                      PyMac_GetRect, &iconRect,
 	                      &align,
@@ -392,7 +392,7 @@ static PyObject *Icn_RectInIconID(PyObject *_self, PyObject *_args)
 #ifndef RectInIconID
 	PyMac_PRECHECK(RectInIconID);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&O&hh",
+	if (!PyArg_ParseTuple(_args, "O&O&HH",
 	                      PyMac_GetRect, &testRect,
 	                      PyMac_GetRect, &iconRect,
 	                      &align,
@@ -418,7 +418,7 @@ static PyObject *Icn_RectInIconSuite(PyObject *_self, PyObject *_args)
 #ifndef RectInIconSuite
 	PyMac_PRECHECK(RectInIconSuite);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&O&hO&",
+	if (!PyArg_ParseTuple(_args, "O&O&HO&",
 	                      PyMac_GetRect, &testRect,
 	                      PyMac_GetRect, &iconRect,
 	                      &align,
@@ -444,7 +444,7 @@ static PyObject *Icn_IconIDToRgn(PyObject *_self, PyObject *_args)
 #ifndef IconIDToRgn
 	PyMac_PRECHECK(IconIDToRgn);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&O&hh",
+	if (!PyArg_ParseTuple(_args, "O&O&HH",
 	                      ResObj_Convert, &theRgn,
 	                      PyMac_GetRect, &iconRect,
 	                      &align,
@@ -471,7 +471,7 @@ static PyObject *Icn_IconSuiteToRgn(PyObject *_self, PyObject *_args)
 #ifndef IconSuiteToRgn
 	PyMac_PRECHECK(IconSuiteToRgn);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&O&hO&",
+	if (!PyArg_ParseTuple(_args, "O&O&HO&",
 	                      ResObj_Convert, &theRgn,
 	                      PyMac_GetRect, &iconRect,
 	                      &align,
@@ -496,7 +496,7 @@ static PyObject *Icn_SetSuiteLabel(PyObject *_self, PyObject *_args)
 #ifndef SetSuiteLabel
 	PyMac_PRECHECK(SetSuiteLabel);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&h",
+	if (!PyArg_ParseTuple(_args, "O&H",
 	                      ResObj_Convert, &theSuite,
 	                      &theLabel))
 		return NULL;
@@ -520,7 +520,7 @@ static PyObject *Icn_GetSuiteLabel(PyObject *_self, PyObject *_args)
 	                      ResObj_Convert, &theSuite))
 		return NULL;
 	_rv = GetSuiteLabel(theSuite);
-	_res = Py_BuildValue("h",
+	_res = Py_BuildValue("H",
 	                     _rv);
 	return _res;
 }
@@ -536,7 +536,7 @@ static PyObject *Icn_PlotIconHandle(PyObject *_self, PyObject *_args)
 #ifndef PlotIconHandle
 	PyMac_PRECHECK(PlotIconHandle);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&hhO&",
+	if (!PyArg_ParseTuple(_args, "O&HHO&",
 	                      PyMac_GetRect, &theRect,
 	                      &align,
 	                      &transform,
@@ -563,7 +563,7 @@ static PyObject *Icn_PlotSICNHandle(PyObject *_self, PyObject *_args)
 #ifndef PlotSICNHandle
 	PyMac_PRECHECK(PlotSICNHandle);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&hhO&",
+	if (!PyArg_ParseTuple(_args, "O&HHO&",
 	                      PyMac_GetRect, &theRect,
 	                      &align,
 	                      &transform,
@@ -590,7 +590,7 @@ static PyObject *Icn_PlotCIconHandle(PyObject *_self, PyObject *_args)
 #ifndef PlotCIconHandle
 	PyMac_PRECHECK(PlotCIconHandle);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&hhO&",
+	if (!PyArg_ParseTuple(_args, "O&HHO&",
 	                      PyMac_GetRect, &theRect,
 	                      &align,
 	                      &transform,
@@ -616,7 +616,7 @@ static PyObject *Icn_IconRefToIconFamily(PyObject *_self, PyObject *_args)
 #ifndef IconRefToIconFamily
 	PyMac_PRECHECK(IconRefToIconFamily);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&l",
+	if (!PyArg_ParseTuple(_args, "O&k",
 	                      ResObj_Convert, &theIconRef,
 	                      &whichIcons))
 		return NULL;
@@ -639,7 +639,7 @@ static PyObject *Icn_IconFamilyToIconSuite(PyObject *_self, PyObject *_args)
 #ifndef IconFamilyToIconSuite
 	PyMac_PRECHECK(IconFamilyToIconSuite);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&l",
+	if (!PyArg_ParseTuple(_args, "O&k",
 	                      ResObj_Convert, &iconFamily,
 	                      &whichIcons))
 		return NULL;
@@ -662,7 +662,7 @@ static PyObject *Icn_IconSuiteToIconFamily(PyObject *_self, PyObject *_args)
 #ifndef IconSuiteToIconFamily
 	PyMac_PRECHECK(IconSuiteToIconFamily);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&l",
+	if (!PyArg_ParseTuple(_args, "O&k",
 	                      ResObj_Convert, &iconSuite,
 	                      &whichIcons))
 		return NULL;
@@ -796,7 +796,7 @@ static PyObject *Icn_GetIconRefFromFile(PyObject *_self, PyObject *_args)
 	                          &theIconRef,
 	                          &theLabel);
 	if (_err != noErr) return PyMac_Error(_err);
-	_res = Py_BuildValue("O&h",
+	_res = Py_BuildValue("O&H",
 	                     ResObj_New, theIconRef,
 	                     theLabel);
 	return _res;
@@ -813,7 +813,7 @@ static PyObject *Icn_GetIconRef(PyObject *_self, PyObject *_args)
 #ifndef GetIconRef
 	PyMac_PRECHECK(GetIconRef);
 #endif
-	if (!PyArg_ParseTuple(_args, "hO&O&",
+	if (!PyArg_ParseTuple(_args, "HO&O&",
 	                      &vRefNum,
 	                      PyMac_GetOSType, &creator,
 	                      PyMac_GetOSType, &iconType))
@@ -841,7 +841,7 @@ static PyObject *Icn_GetIconRefFromFolder(PyObject *_self, PyObject *_args)
 #ifndef GetIconRefFromFolder
 	PyMac_PRECHECK(GetIconRefFromFolder);
 #endif
-	if (!PyArg_ParseTuple(_args, "hllbb",
+	if (!PyArg_ParseTuple(_args, "HllBB",
 	                      &vRefNum,
 	                      &parentFolderID,
 	                      &folderID,
@@ -898,7 +898,7 @@ static PyObject *Icn_RegisterIconRefFromResource(PyObject *_self, PyObject *_arg
 #ifndef RegisterIconRefFromResource
 	PyMac_PRECHECK(RegisterIconRefFromResource);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&O&O&h",
+	if (!PyArg_ParseTuple(_args, "O&O&O&H",
 	                      PyMac_GetOSType, &creator,
 	                      PyMac_GetOSType, &iconType,
 	                      PyMac_GetFSSpec, &resourceFile,
@@ -964,7 +964,7 @@ static PyObject *Icn_OverrideIconRefFromResource(PyObject *_self, PyObject *_arg
 #ifndef OverrideIconRefFromResource
 	PyMac_PRECHECK(OverrideIconRefFromResource);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&O&h",
+	if (!PyArg_ParseTuple(_args, "O&O&H",
 	                      ResObj_Convert, &theIconRef,
 	                      PyMac_GetFSSpec, &resourceFile,
 	                      &resourceID))
@@ -1092,7 +1092,7 @@ static PyObject *Icn_PlotIconRef(PyObject *_self, PyObject *_args)
 #ifndef PlotIconRef
 	PyMac_PRECHECK(PlotIconRef);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&hhlO&",
+	if (!PyArg_ParseTuple(_args, "O&HHkO&",
 	                      PyMac_GetRect, &theRect,
 	                      &align,
 	                      &transform,
@@ -1122,7 +1122,7 @@ static PyObject *Icn_PtInIconRef(PyObject *_self, PyObject *_args)
 #ifndef PtInIconRef
 	PyMac_PRECHECK(PtInIconRef);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&O&hlO&",
+	if (!PyArg_ParseTuple(_args, "O&O&HkO&",
 	                      PyMac_GetPoint, &testPt,
 	                      PyMac_GetRect, &iconRect,
 	                      &align,
@@ -1151,7 +1151,7 @@ static PyObject *Icn_RectInIconRef(PyObject *_self, PyObject *_args)
 #ifndef RectInIconRef
 	PyMac_PRECHECK(RectInIconRef);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&O&hlO&",
+	if (!PyArg_ParseTuple(_args, "O&O&HkO&",
 	                      PyMac_GetRect, &testRect,
 	                      PyMac_GetRect, &iconRect,
 	                      &align,
@@ -1180,7 +1180,7 @@ static PyObject *Icn_IconRefToRgn(PyObject *_self, PyObject *_args)
 #ifndef IconRefToRgn
 	PyMac_PRECHECK(IconRefToRgn);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&O&hlO&",
+	if (!PyArg_ParseTuple(_args, "O&O&HkO&",
 	                      ResObj_Convert, &theRgn,
 	                      PyMac_GetRect, &iconRect,
 	                      &align,
@@ -1209,7 +1209,7 @@ static PyObject *Icn_GetIconSizesFromIconRef(PyObject *_self, PyObject *_args)
 #ifndef GetIconSizesFromIconRef
 	PyMac_PRECHECK(GetIconSizesFromIconRef);
 #endif
-	if (!PyArg_ParseTuple(_args, "llO&",
+	if (!PyArg_ParseTuple(_args, "kkO&",
 	                      &iconSelectorInput,
 	                      &iconServicesUsageFlags,
 	                      ResObj_Convert, &theIconRef))
@@ -1219,7 +1219,7 @@ static PyObject *Icn_GetIconSizesFromIconRef(PyObject *_self, PyObject *_args)
 	                               iconServicesUsageFlags,
 	                               theIconRef);
 	if (_err != noErr) return PyMac_Error(_err);
-	_res = Py_BuildValue("l",
+	_res = Py_BuildValue("k",
 	                     iconSelectorOutputPtr);
 	return _res;
 }
@@ -1253,7 +1253,7 @@ static PyObject *Icn_FlushIconRefsByVolume(PyObject *_self, PyObject *_args)
 #ifndef FlushIconRefsByVolume
 	PyMac_PRECHECK(FlushIconRefsByVolume);
 #endif
-	if (!PyArg_ParseTuple(_args, "h",
+	if (!PyArg_ParseTuple(_args, "H",
 	                      &vRefNum))
 		return NULL;
 	_err = FlushIconRefsByVolume(vRefNum);
@@ -1272,7 +1272,7 @@ static PyObject *Icn_SetCustomIconsEnabled(PyObject *_self, PyObject *_args)
 #ifndef SetCustomIconsEnabled
 	PyMac_PRECHECK(SetCustomIconsEnabled);
 #endif
-	if (!PyArg_ParseTuple(_args, "hb",
+	if (!PyArg_ParseTuple(_args, "Hb",
 	                      &vRefNum,
 	                      &enableCustomIcons))
 		return NULL;
@@ -1293,7 +1293,7 @@ static PyObject *Icn_GetCustomIconsEnabled(PyObject *_self, PyObject *_args)
 #ifndef GetCustomIconsEnabled
 	PyMac_PRECHECK(GetCustomIconsEnabled);
 #endif
-	if (!PyArg_ParseTuple(_args, "h",
+	if (!PyArg_ParseTuple(_args, "H",
 	                      &vRefNum))
 		return NULL;
 	_err = GetCustomIconsEnabled(vRefNum,
@@ -1338,7 +1338,7 @@ static PyObject *Icn_GetIconRefVariant(PyObject *_self, PyObject *_args)
 	_rv = GetIconRefVariant(inIconRef,
 	                        inVariant,
 	                        &outTransform);
-	_res = Py_BuildValue("O&h",
+	_res = Py_BuildValue("O&H",
 	                     ResObj_New, _rv,
 	                     outTransform);
 	return _res;

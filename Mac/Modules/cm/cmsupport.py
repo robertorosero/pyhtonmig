@@ -56,7 +56,7 @@ CmpDesc_New(ComponentDescription *itself)
 static int
 CmpDesc_Convert(PyObject *v, ComponentDescription *p_itself)
 {
-	return PyArg_ParseTuple(v, "O&O&O&ll",
+	return PyArg_ParseTuple(v, "O&O&O&kk",
 		PyMac_GetOSType, &p_itself->componentType,
 		PyMac_GetOSType, &p_itself->componentSubType,
 		PyMac_GetOSType, &p_itself->componentManufacturer,
@@ -75,7 +75,7 @@ initstuff = initstuff + """
 ComponentDescription = OpaqueType('ComponentDescription', 'CmpDesc')
 Component = OpaqueByValueType('Component', C_OBJECTPREFIX)
 ComponentInstance = OpaqueByValueType('ComponentInstance', CI_OBJECTPREFIX)
-ComponentResult = Type("ComponentResult", "l")
+ComponentResult = Type("ComponentResult", "k")
 
 ComponentResourceHandle = OpaqueByValueType("ComponentResourceHandle", "ResObj")
 

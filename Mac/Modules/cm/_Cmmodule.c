@@ -14,9 +14,9 @@
 
 /* Macro to test whether a weak-loaded CFM function exists */
 #define PyMac_PRECHECK(rtn) do { if ( &rtn == NULL )  {\
-    	PyErr_SetString(PyExc_NotImplementedError, \
-    	"Not available in this shared library/OS version"); \
-    	return NULL; \
+        PyErr_SetString(PyExc_NotImplementedError, \
+        "Not available in this shared library/OS version"); \
+        return NULL; \
     }} while(0)
 
 
@@ -55,7 +55,7 @@ CmpDesc_New(ComponentDescription *itself)
 static int
 CmpDesc_Convert(PyObject *v, ComponentDescription *p_itself)
 {
-	return PyArg_ParseTuple(v, "O&O&O&ll",
+	return PyArg_ParseTuple(v, "O&O&O&kk",
 		PyMac_GetOSType, &p_itself->componentType,
 		PyMac_GetOSType, &p_itself->componentSubType,
 		PyMac_GetOSType, &p_itself->componentManufacturer,
@@ -144,7 +144,7 @@ static PyObject *CmpInstObj_SetComponentInstanceError(ComponentInstanceObject *_
 #ifndef SetComponentInstanceError
 	PyMac_PRECHECK(SetComponentInstanceError);
 #endif
-	if (!PyArg_ParseTuple(_args, "h",
+	if (!PyArg_ParseTuple(_args, "H",
 	                      &theError))
 		return NULL;
 	SetComponentInstanceError(_self->ob_itself,
@@ -194,7 +194,7 @@ static PyObject *CmpInstObj_ComponentFunctionImplemented(ComponentInstanceObject
 #ifndef ComponentFunctionImplemented
 	PyMac_PRECHECK(ComponentFunctionImplemented);
 #endif
-	if (!PyArg_ParseTuple(_args, "h",
+	if (!PyArg_ParseTuple(_args, "H",
 	                      &ftnNumber))
 		return NULL;
 	_rv = ComponentFunctionImplemented(_self->ob_itself,
@@ -459,7 +459,7 @@ static PyObject *CmpObj_GetComponentPublicIndString(ComponentObject *_self, PyOb
 #ifndef GetComponentPublicIndString
 	PyMac_PRECHECK(GetComponentPublicIndString);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&hh",
+	if (!PyArg_ParseTuple(_args, "O&HH",
 	                      PyMac_GetStr255, theString,
 	                      &strListID,
 	                      &index))
@@ -516,7 +516,7 @@ static PyObject *CmpObj_OpenComponentResFile(ComponentObject *_self, PyObject *_
 	if (!PyArg_ParseTuple(_args, ""))
 		return NULL;
 	_rv = OpenComponentResFile(_self->ob_itself);
-	_res = Py_BuildValue("h",
+	_res = Py_BuildValue("H",
 	                     _rv);
 	return _res;
 }
@@ -531,7 +531,7 @@ static PyObject *CmpObj_GetComponentResource(ComponentObject *_self, PyObject *_
 #ifndef GetComponentResource
 	PyMac_PRECHECK(GetComponentResource);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&h",
+	if (!PyArg_ParseTuple(_args, "O&H",
 	                      PyMac_GetOSType, &resType,
 	                      &resID))
 		return NULL;
@@ -555,7 +555,7 @@ static PyObject *CmpObj_GetComponentIndString(ComponentObject *_self, PyObject *
 #ifndef GetComponentIndString
 	PyMac_PRECHECK(GetComponentIndString);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&hh",
+	if (!PyArg_ParseTuple(_args, "O&HH",
 	                      PyMac_GetStr255, theString,
 	                      &strListID,
 	                      &index))
@@ -593,7 +593,7 @@ static PyObject *CmpObj_SetDefaultComponent(ComponentObject *_self, PyObject *_a
 #ifndef SetDefaultComponent
 	PyMac_PRECHECK(SetDefaultComponent);
 #endif
-	if (!PyArg_ParseTuple(_args, "h",
+	if (!PyArg_ParseTuple(_args, "H",
 	                      &flags))
 		return NULL;
 	_err = SetDefaultComponent(_self->ob_itself,
@@ -773,7 +773,7 @@ static PyObject *Cm_RegisterComponentResource(PyObject *_self, PyObject *_args)
 #ifndef RegisterComponentResource
 	PyMac_PRECHECK(RegisterComponentResource);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&h",
+	if (!PyArg_ParseTuple(_args, "O&H",
 	                      ResObj_Convert, &cr,
 	                      &global))
 		return NULL;
@@ -844,7 +844,7 @@ static PyObject *Cm_CloseComponentResFile(PyObject *_self, PyObject *_args)
 #ifndef CloseComponentResFile
 	PyMac_PRECHECK(CloseComponentResFile);
 #endif
-	if (!PyArg_ParseTuple(_args, "h",
+	if (!PyArg_ParseTuple(_args, "H",
 	                      &refnum))
 		return NULL;
 	_err = CloseComponentResFile(refnum);
@@ -883,7 +883,7 @@ static PyObject *Cm_RegisterComponentResourceFile(PyObject *_self, PyObject *_ar
 #ifndef RegisterComponentResourceFile
 	PyMac_PRECHECK(RegisterComponentResourceFile);
 #endif
-	if (!PyArg_ParseTuple(_args, "hh",
+	if (!PyArg_ParseTuple(_args, "HH",
 	                      &resRefNum,
 	                      &global))
 		return NULL;

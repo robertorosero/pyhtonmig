@@ -14,9 +14,9 @@
 
 /* Macro to test whether a weak-loaded CFM function exists */
 #define PyMac_PRECHECK(rtn) do { if ( &rtn == NULL )  {\
-    	PyErr_SetString(PyExc_NotImplementedError, \
-    	"Not available in this shared library/OS version"); \
-    	return NULL; \
+        PyErr_SetString(PyExc_NotImplementedError, \
+        "Not available in this shared library/OS version"); \
+        return NULL; \
     }} while(0)
 
 
@@ -126,7 +126,7 @@ static PyObject *WinObj_GetWindowOwnerCount(WindowObject *_self, PyObject *_args
 	_err = GetWindowOwnerCount(_self->ob_itself,
 	                           &outCount);
 	if (_err != noErr) return PyMac_Error(_err);
-	_res = Py_BuildValue("l",
+	_res = Py_BuildValue("k",
 	                     outCount);
 	return _res;
 }
@@ -157,7 +157,7 @@ static PyObject *WinObj_GetWindowRetainCount(WindowObject *_self, PyObject *_arg
 	if (!PyArg_ParseTuple(_args, ""))
 		return NULL;
 	_rv = GetWindowRetainCount(_self->ob_itself);
-	_res = Py_BuildValue("l",
+	_res = Py_BuildValue("k",
 	                     _rv);
 	return _res;
 }
@@ -223,7 +223,7 @@ static PyObject *WinObj_GetWindowWidgetHilite(WindowObject *_self, PyObject *_ar
 	_err = GetWindowWidgetHilite(_self->ob_itself,
 	                             &outHilite);
 	if (_err != noErr) return PyMac_Error(_err);
-	_res = Py_BuildValue("h",
+	_res = Py_BuildValue("H",
 	                     outHilite);
 	return _res;
 }
@@ -241,7 +241,7 @@ static PyObject *WinObj_GetWindowClass(WindowObject *_self, PyObject *_args)
 	_err = GetWindowClass(_self->ob_itself,
 	                      &outClass);
 	if (_err != noErr) return PyMac_Error(_err);
-	_res = Py_BuildValue("l",
+	_res = Py_BuildValue("k",
 	                     outClass);
 	return _res;
 }
@@ -259,7 +259,7 @@ static PyObject *WinObj_GetWindowAttributes(WindowObject *_self, PyObject *_args
 	_err = GetWindowAttributes(_self->ob_itself,
 	                           &outAttributes);
 	if (_err != noErr) return PyMac_Error(_err);
-	_res = Py_BuildValue("l",
+	_res = Py_BuildValue("k",
 	                     outAttributes);
 	return _res;
 }
@@ -273,7 +273,7 @@ static PyObject *WinObj_ChangeWindowAttributes(WindowObject *_self, PyObject *_a
 #ifndef ChangeWindowAttributes
 	PyMac_PRECHECK(ChangeWindowAttributes);
 #endif
-	if (!PyArg_ParseTuple(_args, "ll",
+	if (!PyArg_ParseTuple(_args, "kk",
 	                      &setTheseAttributes,
 	                      &clearTheseAttributes))
 		return NULL;
@@ -294,7 +294,7 @@ static PyObject *WinObj_SetWindowClass(WindowObject *_self, PyObject *_args)
 #ifndef SetWindowClass
 	PyMac_PRECHECK(SetWindowClass);
 #endif
-	if (!PyArg_ParseTuple(_args, "l",
+	if (!PyArg_ParseTuple(_args, "k",
 	                      &inWindowClass))
 		return NULL;
 	_err = SetWindowClass(_self->ob_itself,
@@ -314,7 +314,7 @@ static PyObject *WinObj_SetWindowModality(WindowObject *_self, PyObject *_args)
 #ifndef SetWindowModality
 	PyMac_PRECHECK(SetWindowModality);
 #endif
-	if (!PyArg_ParseTuple(_args, "lO&",
+	if (!PyArg_ParseTuple(_args, "kO&",
 	                      &inModalKind,
 	                      WinObj_Convert, &inUnavailableWindow))
 		return NULL;
@@ -342,7 +342,7 @@ static PyObject *WinObj_GetWindowModality(WindowObject *_self, PyObject *_args)
 	                         &outModalKind,
 	                         &outUnavailableWindow);
 	if (_err != noErr) return PyMac_Error(_err);
-	_res = Py_BuildValue("lO&",
+	_res = Py_BuildValue("kO&",
 	                     outModalKind,
 	                     WinObj_WhichWindow, outUnavailableWindow);
 	return _res;
@@ -435,7 +435,7 @@ static PyObject *WinObj_ScrollWindowRect(WindowObject *_self, PyObject *_args)
 #ifndef ScrollWindowRect
 	PyMac_PRECHECK(ScrollWindowRect);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&hhlO&",
+	if (!PyArg_ParseTuple(_args, "O&HHkO&",
 	                      PyMac_GetRect, &inScrollRect,
 	                      &inHPixels,
 	                      &inVPixels,
@@ -466,7 +466,7 @@ static PyObject *WinObj_ScrollWindowRegion(WindowObject *_self, PyObject *_args)
 #ifndef ScrollWindowRegion
 	PyMac_PRECHECK(ScrollWindowRegion);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&hhlO&",
+	if (!PyArg_ParseTuple(_args, "O&HHkO&",
 	                      ResObj_Convert, &inScrollRgn,
 	                      &inHPixels,
 	                      &inVPixels,
@@ -618,7 +618,7 @@ static PyObject *WinObj_GetNextWindowOfClass(WindowObject *_self, PyObject *_arg
 #ifndef GetNextWindowOfClass
 	PyMac_PRECHECK(GetNextWindowOfClass);
 #endif
-	if (!PyArg_ParseTuple(_args, "lb",
+	if (!PyArg_ParseTuple(_args, "kb",
 	                      &inWindowClass,
 	                      &mustBeVisible))
 		return NULL;
@@ -758,7 +758,7 @@ static PyObject *WinObj_GetWVariant(WindowObject *_self, PyObject *_args)
 	if (!PyArg_ParseTuple(_args, ""))
 		return NULL;
 	_rv = GetWVariant(_self->ob_itself);
-	_res = Py_BuildValue("h",
+	_res = Py_BuildValue("H",
 	                     _rv);
 	return _res;
 }
@@ -776,7 +776,7 @@ static PyObject *WinObj_GetWindowFeatures(WindowObject *_self, PyObject *_args)
 	_err = GetWindowFeatures(_self->ob_itself,
 	                         &outFeatures);
 	if (_err != noErr) return PyMac_Error(_err);
-	_res = Py_BuildValue("l",
+	_res = Py_BuildValue("k",
 	                     outFeatures);
 	return _res;
 }
@@ -1093,7 +1093,7 @@ static PyObject *WinObj_SetWindowProxyCreatorAndType(WindowObject *_self, PyObje
 #ifndef SetWindowProxyCreatorAndType
 	PyMac_PRECHECK(SetWindowProxyCreatorAndType);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&O&h",
+	if (!PyArg_ParseTuple(_args, "O&O&H",
 	                      PyMac_GetOSType, &fileCreator,
 	                      PyMac_GetOSType, &fileType,
 	                      &vRefNum))
@@ -1347,7 +1347,7 @@ static PyObject *WinObj_TransitionWindow(WindowObject *_self, PyObject *_args)
 #ifndef TransitionWindow
 	PyMac_PRECHECK(TransitionWindow);
 #endif
-	if (!PyArg_ParseTuple(_args, "llO&",
+	if (!PyArg_ParseTuple(_args, "kkO&",
 	                      &effect,
 	                      &action,
 	                      PyMac_GetRect, &rect))
@@ -1375,7 +1375,7 @@ static PyObject *WinObj_TransitionWindowAndParent(WindowObject *_self, PyObject 
 #ifndef TransitionWindowAndParent
 	PyMac_PRECHECK(TransitionWindowAndParent);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&llO&",
+	if (!PyArg_ParseTuple(_args, "O&kkO&",
 	                      WinObj_Convert, &parentWindow,
 	                      &effect,
 	                      &action,
@@ -1402,7 +1402,7 @@ static PyObject *WinObj_MacMoveWindow(WindowObject *_self, PyObject *_args)
 #ifndef MacMoveWindow
 	PyMac_PRECHECK(MacMoveWindow);
 #endif
-	if (!PyArg_ParseTuple(_args, "hhb",
+	if (!PyArg_ParseTuple(_args, "HHb",
 	                      &hGlobal,
 	                      &vGlobal,
 	                      &front))
@@ -1425,7 +1425,7 @@ static PyObject *WinObj_SizeWindow(WindowObject *_self, PyObject *_args)
 #ifndef SizeWindow
 	PyMac_PRECHECK(SizeWindow);
 #endif
-	if (!PyArg_ParseTuple(_args, "hhb",
+	if (!PyArg_ParseTuple(_args, "HHb",
 	                      &w,
 	                      &h,
 	                      &fUpdate))
@@ -1488,7 +1488,7 @@ static PyObject *WinObj_ZoomWindow(WindowObject *_self, PyObject *_args)
 #ifndef ZoomWindow
 	PyMac_PRECHECK(ZoomWindow);
 #endif
-	if (!PyArg_ParseTuple(_args, "hb",
+	if (!PyArg_ParseTuple(_args, "Hb",
 	                      &partCode,
 	                      &front))
 		return NULL;
@@ -1625,7 +1625,7 @@ static PyObject *WinObj_RepositionWindow(WindowObject *_self, PyObject *_args)
 #ifndef RepositionWindow
 	PyMac_PRECHECK(RepositionWindow);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&l",
+	if (!PyArg_ParseTuple(_args, "O&k",
 	                      WinObj_Convert, &parentWindow,
 	                      &method))
 		return NULL;
@@ -1647,7 +1647,7 @@ static PyObject *WinObj_MoveWindowStructure(WindowObject *_self, PyObject *_args
 #ifndef MoveWindowStructure
 	PyMac_PRECHECK(MoveWindowStructure);
 #endif
-	if (!PyArg_ParseTuple(_args, "hh",
+	if (!PyArg_ParseTuple(_args, "HH",
 	                      &hGlobal,
 	                      &vGlobal))
 		return NULL;
@@ -1690,7 +1690,7 @@ static PyObject *WinObj_ZoomWindowIdeal(WindowObject *_self, PyObject *_args)
 #ifndef ZoomWindowIdeal
 	PyMac_PRECHECK(ZoomWindowIdeal);
 #endif
-	if (!PyArg_ParseTuple(_args, "h",
+	if (!PyArg_ParseTuple(_args, "H",
 	                      &partCode))
 		return NULL;
 	_err = ZoomWindowIdeal(_self->ob_itself,
@@ -1774,7 +1774,7 @@ static PyObject *WinObj_ConstrainWindowToScreen(WindowObject *_self, PyObject *_
 #ifndef ConstrainWindowToScreen
 	PyMac_PRECHECK(ConstrainWindowToScreen);
 #endif
-	if (!PyArg_ParseTuple(_args, "HlO&",
+	if (!PyArg_ParseTuple(_args, "HkO&",
 	                      &inRegionCode,
 	                      &inOptions,
 	                      PyMac_GetRect, &inScreenRect))
@@ -1922,7 +1922,7 @@ static PyObject *WinObj_GetWindowPropertyAttributes(WindowObject *_self, PyObjec
 	                                   propertyTag,
 	                                   &attributes);
 	if (_err != noErr) return PyMac_Error(_err);
-	_res = Py_BuildValue("l",
+	_res = Py_BuildValue("k",
 	                     attributes);
 	return _res;
 }
@@ -1938,7 +1938,7 @@ static PyObject *WinObj_ChangeWindowPropertyAttributes(WindowObject *_self, PyOb
 #ifndef ChangeWindowPropertyAttributes
 	PyMac_PRECHECK(ChangeWindowPropertyAttributes);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&O&ll",
+	if (!PyArg_ParseTuple(_args, "O&O&kk",
 	                      PyMac_GetOSType, &propertyCreator,
 	                      PyMac_GetOSType, &propertyTag,
 	                      &attributesToSet,
@@ -1964,7 +1964,7 @@ static PyObject *WinObj_TrackBox(WindowObject *_self, PyObject *_args)
 #ifndef TrackBox
 	PyMac_PRECHECK(TrackBox);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&h",
+	if (!PyArg_ParseTuple(_args, "O&H",
 	                      PyMac_GetPoint, &thePt,
 	                      &partCode))
 		return NULL;
@@ -2019,7 +2019,7 @@ static PyObject *WinObj_GetWindowKind(WindowObject *_self, PyObject *_args)
 	if (!PyArg_ParseTuple(_args, ""))
 		return NULL;
 	_rv = GetWindowKind(_self->ob_itself);
-	_res = Py_BuildValue("h",
+	_res = Py_BuildValue("H",
 	                     _rv);
 	return _res;
 }
@@ -2108,7 +2108,7 @@ static PyObject *WinObj_SetWindowKind(WindowObject *_self, PyObject *_args)
 #ifndef SetWindowKind
 	PyMac_PRECHECK(SetWindowKind);
 #endif
-	if (!PyArg_ParseTuple(_args, "h",
+	if (!PyArg_ParseTuple(_args, "H",
 	                      &kind))
 		return NULL;
 	SetWindowKind(_self->ob_itself,
@@ -2272,7 +2272,7 @@ static PyObject *WinObj_MoveWindow(WindowObject *_self, PyObject *_args)
 #ifndef MoveWindow
 	PyMac_PRECHECK(MoveWindow);
 #endif
-	if (!PyArg_ParseTuple(_args, "hhb",
+	if (!PyArg_ParseTuple(_args, "HHb",
 	                      &hGlobal,
 	                      &vGlobal,
 	                      &front))
@@ -2639,7 +2639,7 @@ static PyObject *Win_GetNewCWindow(PyObject *_self, PyObject *_args)
 #ifndef GetNewCWindow
 	PyMac_PRECHECK(GetNewCWindow);
 #endif
-	if (!PyArg_ParseTuple(_args, "hO&",
+	if (!PyArg_ParseTuple(_args, "HO&",
 	                      &windowID,
 	                      WinObj_Convert, &behind))
 		return NULL;
@@ -2665,7 +2665,7 @@ static PyObject *Win_NewWindow(PyObject *_self, PyObject *_args)
 #ifndef NewWindow
 	PyMac_PRECHECK(NewWindow);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&O&bhO&bl",
+	if (!PyArg_ParseTuple(_args, "O&O&bHO&bl",
 	                      PyMac_GetRect, &boundsRect,
 	                      PyMac_GetStr255, title,
 	                      &visible,
@@ -2696,7 +2696,7 @@ static PyObject *Win_GetNewWindow(PyObject *_self, PyObject *_args)
 #ifndef GetNewWindow
 	PyMac_PRECHECK(GetNewWindow);
 #endif
-	if (!PyArg_ParseTuple(_args, "hO&",
+	if (!PyArg_ParseTuple(_args, "HO&",
 	                      &windowID,
 	                      WinObj_Convert, &behind))
 		return NULL;
@@ -2722,7 +2722,7 @@ static PyObject *Win_NewCWindow(PyObject *_self, PyObject *_args)
 #ifndef NewCWindow
 	PyMac_PRECHECK(NewCWindow);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&O&bhO&bl",
+	if (!PyArg_ParseTuple(_args, "O&O&bHO&bl",
 	                      PyMac_GetRect, &boundsRect,
 	                      PyMac_GetStr255, title,
 	                      &visible,
@@ -2755,7 +2755,7 @@ static PyObject *Win_CreateNewWindow(PyObject *_self, PyObject *_args)
 #ifndef CreateNewWindow
 	PyMac_PRECHECK(CreateNewWindow);
 #endif
-	if (!PyArg_ParseTuple(_args, "llO&",
+	if (!PyArg_ParseTuple(_args, "kkO&",
 	                      &windowClass,
 	                      &attributes,
 	                      PyMac_GetRect, &contentBounds))
@@ -2779,7 +2779,7 @@ static PyObject *Win_CreateWindowFromResource(PyObject *_self, PyObject *_args)
 #ifndef CreateWindowFromResource
 	PyMac_PRECHECK(CreateWindowFromResource);
 #endif
-	if (!PyArg_ParseTuple(_args, "h",
+	if (!PyArg_ParseTuple(_args, "H",
 	                      &resID))
 		return NULL;
 	_err = CreateWindowFromResource(resID,
@@ -2868,7 +2868,7 @@ static PyObject *Win_MacFindWindow(PyObject *_self, PyObject *_args)
 		return NULL;
 	_rv = MacFindWindow(thePoint,
 	                    &window);
-	_res = Py_BuildValue("hO&",
+	_res = Py_BuildValue("HO&",
 	                     _rv,
 	                     WinObj_WhichWindow, window);
 	return _res;
@@ -2913,7 +2913,7 @@ static PyObject *Win_GetFrontWindowOfClass(PyObject *_self, PyObject *_args)
 #ifndef GetFrontWindowOfClass
 	PyMac_PRECHECK(GetFrontWindowOfClass);
 #endif
-	if (!PyArg_ParseTuple(_args, "lb",
+	if (!PyArg_ParseTuple(_args, "kb",
 	                      &inWindowClass,
 	                      &mustBeVisible))
 		return NULL;
@@ -2935,7 +2935,7 @@ static PyObject *Win_FindWindowOfClass(PyObject *_self, PyObject *_args)
 #ifndef FindWindowOfClass
 	PyMac_PRECHECK(FindWindowOfClass);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&l",
+	if (!PyArg_ParseTuple(_args, "O&k",
 	                      PyMac_GetPoint, &where,
 	                      &inWindowClass))
 		return NULL;
@@ -2944,7 +2944,7 @@ static PyObject *Win_FindWindowOfClass(PyObject *_self, PyObject *_args)
 	                         &outWindow,
 	                         &outWindowPart);
 	if (_err != noErr) return PyMac_Error(_err);
-	_res = Py_BuildValue("O&h",
+	_res = Py_BuildValue("O&H",
 	                     WinObj_WhichWindow, outWindow,
 	                     outWindowPart);
 	return _res;
@@ -2959,7 +2959,7 @@ static PyObject *Win_CreateStandardWindowMenu(PyObject *_self, PyObject *_args)
 #ifndef CreateStandardWindowMenu
 	PyMac_PRECHECK(CreateStandardWindowMenu);
 #endif
-	if (!PyArg_ParseTuple(_args, "l",
+	if (!PyArg_ParseTuple(_args, "k",
 	                      &inOptions))
 		return NULL;
 	_err = CreateStandardWindowMenu(inOptions,
@@ -3098,7 +3098,7 @@ static PyObject *Win_WhichWindow(PyObject *_self, PyObject *_args)
 
 	long ptr;
 
-	if ( !PyArg_ParseTuple(_args, "i", &ptr) )
+	if ( !PyArg_ParseTuple(_args, "k", &ptr) )
 		return NULL;
 	_res = WinObj_WhichWindow((WindowPtr)ptr);
 	return _res;
@@ -3119,7 +3119,7 @@ static PyObject *Win_FindWindow(PyObject *_self, PyObject *_args)
 		return NULL;
 	_rv = FindWindow(thePoint,
 	                 &theWindow);
-	_res = Py_BuildValue("hO&",
+	_res = Py_BuildValue("HO&",
 	                     _rv,
 	                     WinObj_WhichWindow, theWindow);
 	return _res;

@@ -33,7 +33,7 @@ DragConstraint = Type("DragConstraint", "H")
 ControlVariant = Type("ControlVariant", "h")
 IconTransformType = Type("IconTransformType", "h")
 EventModifiers = Type("EventModifiers", "H")
-ClickActivationResult = Type("ClickActivationResult", "l")
+ClickActivationResult = Type("ClickActivationResult", "k")
 ControlButtonGraphicAlignment = Type("ControlButtonGraphicAlignment", "h")
 ControlButtonTextAlignment = Type("ControlButtonTextAlignment", "h")
 ControlButtonTextPlacement = Type("ControlButtonTextPlacement", "h")
@@ -171,7 +171,7 @@ PyControlID_New(ControlID *itself)
 static int
 PyControlID_Convert(PyObject *v, ControlID *itself)
 {
-	return PyArg_Parse(v, "(O&l)", PyMac_GetOSType, &itself->signature, &itself->id);
+	return PyArg_Parse(v, "(O&k)", PyMac_GetOSType, &itself->signature, &itself->id);
 }
 
 /*
@@ -180,7 +180,7 @@ PyControlID_Convert(PyObject *v, ControlID *itself)
 static int
 DataBrowserTableViewColumnDesc_Convert(PyObject *v, DataBrowserTableViewColumnDesc *itself)
 {
-	return PyArg_Parse(v, "(lO&l)",
+	return PyArg_Parse(v, "(kO&k)",
 	                   &itself->propertyID,
 	                   PyMac_GetOSType, &itself->propertyType,
 	                   &itself->propertyFlags);

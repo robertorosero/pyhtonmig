@@ -116,7 +116,7 @@ EventTypeSpec_New(EventTypeSpec *in)
 static int
 EventTypeSpec_Convert(PyObject *v, EventTypeSpec *out)
 {
-	if (PyArg_Parse(v, "(O&l)",
+	if (PyArg_Parse(v, "(O&k)",
 	                PyMac_GetOSType, &(out->eventClass),
 	                &(out->eventKind)))
 		return 1;
@@ -156,7 +156,7 @@ EventHotKeyID_New(EventHotKeyID *in)
 static int
 EventHotKeyID_Convert(PyObject *v, EventHotKeyID *out)
 {
-	if (PyArg_ParseTuple(v, "ll", &out->signature, &out->id))
+	if (PyArg_ParseTuple(v, "kk", &out->signature, &out->id))
 		return 1;
 	return NULL;
 }

@@ -14,9 +14,9 @@
 
 /* Macro to test whether a weak-loaded CFM function exists */
 #define PyMac_PRECHECK(rtn) do { if ( &rtn == NULL )  {\
-    	PyErr_SetString(PyExc_NotImplementedError, \
-    	"Not available in this shared library/OS version"); \
-    	return NULL; \
+        PyErr_SetString(PyExc_NotImplementedError, \
+        "Not available in this shared library/OS version"); \
+        return NULL; \
     }} while(0)
 
 
@@ -53,7 +53,7 @@ TextStyle_Convert(PyObject *v, TextStylePtr p_itself)
 {
 	long font, face, size;
 	
-	if( !PyArg_ParseTuple(v, "lllO&", &font, &face, &size, QdRGB_Convert, &p_itself->tsColor) )
+	if( !PyArg_ParseTuple(v, "kkkO&", &font, &face, &size, QdRGB_Convert, &p_itself->tsColor) )
 		return 0;
 	p_itself->tsFont = (short)font;
 	p_itself->tsFace = (Style)face;
@@ -207,7 +207,7 @@ static PyObject *TEObj_TEKey(TEObject *_self, PyObject *_args)
 #ifndef TEKey
 	PyMac_PRECHECK(TEKey);
 #endif
-	if (!PyArg_ParseTuple(_args, "h",
+	if (!PyArg_ParseTuple(_args, "H",
 	                      &key))
 		return NULL;
 	TEKey(key,
@@ -300,7 +300,7 @@ static PyObject *TEObj_TESetAlignment(TEObject *_self, PyObject *_args)
 #ifndef TESetAlignment
 	PyMac_PRECHECK(TESetAlignment);
 #endif
-	if (!PyArg_ParseTuple(_args, "h",
+	if (!PyArg_ParseTuple(_args, "H",
 	                      &just))
 		return NULL;
 	TESetAlignment(just,
@@ -335,7 +335,7 @@ static PyObject *TEObj_TEScroll(TEObject *_self, PyObject *_args)
 #ifndef TEScroll
 	PyMac_PRECHECK(TEScroll);
 #endif
-	if (!PyArg_ParseTuple(_args, "hh",
+	if (!PyArg_ParseTuple(_args, "HH",
 	                      &dh,
 	                      &dv))
 		return NULL;
@@ -369,7 +369,7 @@ static PyObject *TEObj_TEPinScroll(TEObject *_self, PyObject *_args)
 #ifndef TEPinScroll
 	PyMac_PRECHECK(TEPinScroll);
 #endif
-	if (!PyArg_ParseTuple(_args, "hh",
+	if (!PyArg_ParseTuple(_args, "HH",
 	                      &dh,
 	                      &dv))
 		return NULL;
@@ -425,7 +425,7 @@ static PyObject *TEObj_TEGetOffset(TEObject *_self, PyObject *_args)
 		return NULL;
 	_rv = TEGetOffset(pt,
 	                  _self->ob_itself);
-	_res = Py_BuildValue("h",
+	_res = Py_BuildValue("H",
 	                     _rv);
 	return _res;
 }
@@ -438,7 +438,7 @@ static PyObject *TEObj_TEGetPoint(TEObject *_self, PyObject *_args)
 #ifndef TEGetPoint
 	PyMac_PRECHECK(TEGetPoint);
 #endif
-	if (!PyArg_ParseTuple(_args, "h",
+	if (!PyArg_ParseTuple(_args, "H",
 	                      &offset))
 		return NULL;
 	_rv = TEGetPoint(offset,
@@ -510,7 +510,7 @@ static PyObject *TEObj_TEGetStyle(TEObject *_self, PyObject *_args)
 #ifndef TEGetStyle
 	PyMac_PRECHECK(TEGetStyle);
 #endif
-	if (!PyArg_ParseTuple(_args, "h",
+	if (!PyArg_ParseTuple(_args, "H",
 	                      &offset))
 		return NULL;
 	TEGetStyle(offset,
@@ -518,7 +518,7 @@ static PyObject *TEObj_TEGetStyle(TEObject *_self, PyObject *_args)
 	           &lineHeight,
 	           &fontAscent,
 	           _self->ob_itself);
-	_res = Py_BuildValue("O&hh",
+	_res = Py_BuildValue("O&HH",
 	                     TextStyle_New, &theStyle,
 	                     lineHeight,
 	                     fontAscent);
@@ -548,7 +548,7 @@ static PyObject *TEObj_TESetStyle(TEObject *_self, PyObject *_args)
 #ifndef TESetStyle
 	PyMac_PRECHECK(TESetStyle);
 #endif
-	if (!PyArg_ParseTuple(_args, "hO&b",
+	if (!PyArg_ParseTuple(_args, "HO&b",
 	                      &mode,
 	                      TextStyle_Convert, &newStyle,
 	                      &fRedraw))
@@ -572,7 +572,7 @@ static PyObject *TEObj_TEReplaceStyle(TEObject *_self, PyObject *_args)
 #ifndef TEReplaceStyle
 	PyMac_PRECHECK(TEReplaceStyle);
 #endif
-	if (!PyArg_ParseTuple(_args, "hO&O&b",
+	if (!PyArg_ParseTuple(_args, "HO&O&b",
 	                      &mode,
 	                      TextStyle_Convert, &oldStyle,
 	                      TextStyle_Convert, &newStyle,
@@ -656,14 +656,14 @@ static PyObject *TEObj_TEContinuousStyle(TEObject *_self, PyObject *_args)
 #ifndef TEContinuousStyle
 	PyMac_PRECHECK(TEContinuousStyle);
 #endif
-	if (!PyArg_ParseTuple(_args, "hO&",
+	if (!PyArg_ParseTuple(_args, "HO&",
 	                      &mode,
 	                      TextStyle_Convert, &aStyle))
 		return NULL;
 	_rv = TEContinuousStyle(&mode,
 	                        &aStyle,
 	                        _self->ob_itself);
-	_res = Py_BuildValue("bhO&",
+	_res = Py_BuildValue("bHO&",
 	                     _rv,
 	                     mode,
 	                     TextStyle_New, &aStyle);
@@ -726,14 +726,14 @@ static PyObject *TEObj_TEFeatureFlag(TEObject *_self, PyObject *_args)
 #ifndef TEFeatureFlag
 	PyMac_PRECHECK(TEFeatureFlag);
 #endif
-	if (!PyArg_ParseTuple(_args, "hh",
+	if (!PyArg_ParseTuple(_args, "HH",
 	                      &feature,
 	                      &action))
 		return NULL;
 	_rv = TEFeatureFlag(feature,
 	                    action,
 	                    _self->ob_itself);
-	_res = Py_BuildValue("h",
+	_res = Py_BuildValue("H",
 	                     _rv);
 	return _res;
 }
@@ -1115,7 +1115,7 @@ static PyObject *TE_TETextBox(PyObject *_self, PyObject *_args)
 #ifndef TETextBox
 	PyMac_PRECHECK(TETextBox);
 #endif
-	if (!PyArg_ParseTuple(_args, "s#O&h",
+	if (!PyArg_ParseTuple(_args, "s#O&H",
 	                      &text__in__, &text__in_len__,
 	                      PyMac_GetRect, &box,
 	                      &just))

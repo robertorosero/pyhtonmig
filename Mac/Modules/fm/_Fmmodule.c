@@ -14,9 +14,9 @@
 
 /* Macro to test whether a weak-loaded CFM function exists */
 #define PyMac_PRECHECK(rtn) do { if ( &rtn == NULL )  {\
-    	PyErr_SetString(PyExc_NotImplementedError, \
-    	"Not available in this shared library/OS version"); \
-    	return NULL; \
+        PyErr_SetString(PyExc_NotImplementedError, \
+        "Not available in this shared library/OS version"); \
+        return NULL; \
     }} while(0)
 
 
@@ -67,7 +67,7 @@ static PyObject *Fm_GetFontName(PyObject *_self, PyObject *_args)
 #ifndef GetFontName
 	PyMac_PRECHECK(GetFontName);
 #endif
-	if (!PyArg_ParseTuple(_args, "h",
+	if (!PyArg_ParseTuple(_args, "H",
 	                      &familyID))
 		return NULL;
 	GetFontName(familyID,
@@ -90,7 +90,7 @@ static PyObject *Fm_GetFNum(PyObject *_self, PyObject *_args)
 		return NULL;
 	GetFNum(name,
 	        &familyID);
-	_res = Py_BuildValue("h",
+	_res = Py_BuildValue("H",
 	                     familyID);
 	return _res;
 }
@@ -104,7 +104,7 @@ static PyObject *Fm_RealFont(PyObject *_self, PyObject *_args)
 #ifndef RealFont
 	PyMac_PRECHECK(RealFont);
 #endif
-	if (!PyArg_ParseTuple(_args, "hh",
+	if (!PyArg_ParseTuple(_args, "HH",
 	                      &fontNum,
 	                      &size))
 		return NULL;
@@ -172,7 +172,7 @@ static PyObject *Fm_GetDefFontSize(PyObject *_self, PyObject *_args)
 	if (!PyArg_ParseTuple(_args, ""))
 		return NULL;
 	_rv = GetDefFontSize();
-	_res = Py_BuildValue("h",
+	_res = Py_BuildValue("H",
 	                     _rv);
 	return _res;
 }
@@ -269,7 +269,7 @@ static PyObject *Fm_GetSysFont(PyObject *_self, PyObject *_args)
 	if (!PyArg_ParseTuple(_args, ""))
 		return NULL;
 	_rv = GetSysFont();
-	_res = Py_BuildValue("h",
+	_res = Py_BuildValue("H",
 	                     _rv);
 	return _res;
 }
@@ -284,7 +284,7 @@ static PyObject *Fm_GetAppFont(PyObject *_self, PyObject *_args)
 	if (!PyArg_ParseTuple(_args, ""))
 		return NULL;
 	_rv = GetAppFont();
-	_res = Py_BuildValue("h",
+	_res = Py_BuildValue("H",
 	                     _rv);
 	return _res;
 }

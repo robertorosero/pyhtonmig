@@ -47,7 +47,7 @@ EventTypeSpec_New(EventTypeSpec *in)
 static int
 EventTypeSpec_Convert(PyObject *v, EventTypeSpec *out)
 {
-	if (PyArg_Parse(v, "(O&l)",
+	if (PyArg_Parse(v, "(O&k)",
 	                PyMac_GetOSType, &(out->eventClass),
 	                &(out->eventKind)))
 		return 1;
@@ -87,7 +87,7 @@ EventHotKeyID_New(EventHotKeyID *in)
 static int
 EventHotKeyID_Convert(PyObject *v, EventHotKeyID *out)
 {
-	if (PyArg_ParseTuple(v, "ll", &out->signature, &out->id))
+	if (PyArg_ParseTuple(v, "kk", &out->signature, &out->id))
 		return 1;
 	return NULL;
 }
@@ -193,7 +193,7 @@ static PyObject *EventRef_GetEventRetainCount(EventRefObject *_self, PyObject *_
 	if (!PyArg_ParseTuple(_args, ""))
 		return NULL;
 	_rv = GetEventRetainCount(_self->ob_itself);
-	_res = Py_BuildValue("l",
+	_res = Py_BuildValue("k",
 	                     _rv);
 	return _res;
 }
@@ -241,7 +241,7 @@ static PyObject *EventRef_GetEventClass(EventRefObject *_self, PyObject *_args)
 	if (!PyArg_ParseTuple(_args, ""))
 		return NULL;
 	_rv = GetEventClass(_self->ob_itself);
-	_res = Py_BuildValue("l",
+	_res = Py_BuildValue("k",
 	                     _rv);
 	return _res;
 }
@@ -253,7 +253,7 @@ static PyObject *EventRef_GetEventKind(EventRefObject *_self, PyObject *_args)
 	if (!PyArg_ParseTuple(_args, ""))
 		return NULL;
 	_rv = GetEventKind(_self->ob_itself);
-	_res = Py_BuildValue("l",
+	_res = Py_BuildValue("k",
 	                     _rv);
 	return _res;
 }
@@ -524,7 +524,7 @@ static PyObject *EventQueueRef_PostEventToQueue(EventQueueRefObject *_self, PyOb
 	OSStatus _err;
 	EventRef inEvent;
 	SInt16 inPriority;
-	if (!PyArg_ParseTuple(_args, "O&h",
+	if (!PyArg_ParseTuple(_args, "O&H",
 	                      EventRef_Convert, &inEvent,
 	                      &inPriority))
 		return NULL;
@@ -543,7 +543,7 @@ static PyObject *EventQueueRef_FlushEventsMatchingListFromQueue(EventQueueRefObj
 	OSStatus _err;
 	UInt32 inNumTypes;
 	EventTypeSpec inList;
-	if (!PyArg_ParseTuple(_args, "lO&",
+	if (!PyArg_ParseTuple(_args, "kO&",
 	                      &inNumTypes,
 	                      EventTypeSpec_Convert, &inList))
 		return NULL;
@@ -576,7 +576,7 @@ static PyObject *EventQueueRef_GetNumEventsInQueue(EventQueueRefObject *_self, P
 	if (!PyArg_ParseTuple(_args, ""))
 		return NULL;
 	_rv = GetNumEventsInQueue(_self->ob_itself);
-	_res = Py_BuildValue("l",
+	_res = Py_BuildValue("k",
 	                     _rv);
 	return _res;
 }
@@ -1029,7 +1029,7 @@ static PyObject *EventHandlerRef_AddEventTypesToHandler(EventHandlerRefObject *_
 		PyErr_SetString(CarbonEvents_Error, "Handler has been removed");
 		return NULL;
 	}
-	if (!PyArg_ParseTuple(_args, "lO&",
+	if (!PyArg_ParseTuple(_args, "kO&",
 	                      &inNumTypes,
 	                      EventTypeSpec_Convert, &inList))
 		return NULL;
@@ -1052,7 +1052,7 @@ static PyObject *EventHandlerRef_RemoveEventTypesFromHandler(EventHandlerRefObje
 		PyErr_SetString(CarbonEvents_Error, "Handler has been removed");
 		return NULL;
 	}
-	if (!PyArg_ParseTuple(_args, "lO&",
+	if (!PyArg_ParseTuple(_args, "kO&",
 	                      &inNumTypes,
 	                      EventTypeSpec_Convert, &inList))
 		return NULL;
@@ -1633,7 +1633,7 @@ static PyObject *CarbonEvents_ReceiveNextEvent(PyObject *_self, PyObject *_args)
 	double inTimeout;
 	Boolean inPullEvent;
 	EventRef outEvent;
-	if (!PyArg_ParseTuple(_args, "lO&db",
+	if (!PyArg_ParseTuple(_args, "kO&db",
 	                      &inNumTypes,
 	                      EventTypeSpec_Convert, &inList,
 	                      &inTimeout,
@@ -1716,7 +1716,7 @@ static PyObject *CarbonEvents_TrackMouseLocationWithOptions(PyObject *_self, PyO
 	Point outPt;
 	UInt32 outModifiers;
 	UInt16 outResult;
-	if (!PyArg_ParseTuple(_args, "O&ld",
+	if (!PyArg_ParseTuple(_args, "O&kd",
 	                      GrafObj_Convert, &inPort,
 	                      &inOptions,
 	                      &inTimeout))
@@ -1728,7 +1728,7 @@ static PyObject *CarbonEvents_TrackMouseLocationWithOptions(PyObject *_self, PyO
 	                                     &outModifiers,
 	                                     &outResult);
 	if (_err != noErr) return PyMac_Error(_err);
-	_res = Py_BuildValue("O&lH",
+	_res = Py_BuildValue("O&kH",
 	                     PyMac_BuildPoint, outPt,
 	                     outModifiers,
 	                     outResult);
@@ -2027,7 +2027,7 @@ static PyObject *CarbonEvents_RegisterEventHotKey(PyObject *_self, PyObject *_ar
 	EventTargetRef inTarget;
 	OptionBits inOptions;
 	EventHotKeyRef outRef;
-	if (!PyArg_ParseTuple(_args, "llO&O&l",
+	if (!PyArg_ParseTuple(_args, "kkO&O&k",
 	                      &inHotKeyCode,
 	                      &inHotKeyModifiers,
 	                      EventHotKeyID_Convert, &inHotKeyID,

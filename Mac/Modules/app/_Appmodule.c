@@ -14,9 +14,9 @@
 
 /* Macro to test whether a weak-loaded CFM function exists */
 #define PyMac_PRECHECK(rtn) do { if ( &rtn == NULL )  {\
-    	PyErr_SetString(PyExc_NotImplementedError, \
-    	"Not available in this shared library/OS version"); \
-    	return NULL; \
+        PyErr_SetString(PyExc_NotImplementedError, \
+        "Not available in this shared library/OS version"); \
+        return NULL; \
     }} while(0)
 
 
@@ -85,7 +85,7 @@ static PyObject *ThemeDrawingStateObj_SetThemeDrawingState(ThemeDrawingStateObje
 		return NULL;
 	_rv = SetThemeDrawingState(_self->ob_itself,
 	                           inDisposeNow);
-	_res = Py_BuildValue("l",
+	_res = Py_BuildValue("k",
 	                     _rv);
 	return _res;
 }
@@ -100,7 +100,7 @@ static PyObject *ThemeDrawingStateObj_DisposeThemeDrawingState(ThemeDrawingState
 	if (!PyArg_ParseTuple(_args, ""))
 		return NULL;
 	_rv = DisposeThemeDrawingState(_self->ob_itself);
-	_res = Py_BuildValue("l",
+	_res = Py_BuildValue("k",
 	                     _rv);
 	return _res;
 }
@@ -229,7 +229,7 @@ static PyObject *App_SetThemePen(PyObject *_self, PyObject *_args)
 #ifndef SetThemePen
 	PyMac_PRECHECK(SetThemePen);
 #endif
-	if (!PyArg_ParseTuple(_args, "hhb",
+	if (!PyArg_ParseTuple(_args, "hHb",
 	                      &inBrush,
 	                      &inDepth,
 	                      &inIsColorDevice))
@@ -253,7 +253,7 @@ static PyObject *App_SetThemeBackground(PyObject *_self, PyObject *_args)
 #ifndef SetThemeBackground
 	PyMac_PRECHECK(SetThemeBackground);
 #endif
-	if (!PyArg_ParseTuple(_args, "hhb",
+	if (!PyArg_ParseTuple(_args, "hHb",
 	                      &inBrush,
 	                      &inDepth,
 	                      &inIsColorDevice))
@@ -277,7 +277,7 @@ static PyObject *App_SetThemeTextColor(PyObject *_self, PyObject *_args)
 #ifndef SetThemeTextColor
 	PyMac_PRECHECK(SetThemeTextColor);
 #endif
-	if (!PyArg_ParseTuple(_args, "hhb",
+	if (!PyArg_ParseTuple(_args, "hHb",
 	                      &inColor,
 	                      &inDepth,
 	                      &inIsColorDevice))
@@ -324,7 +324,7 @@ static PyObject *App_DrawThemeWindowHeader(PyObject *_self, PyObject *_args)
 #ifndef DrawThemeWindowHeader
 	PyMac_PRECHECK(DrawThemeWindowHeader);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&l",
+	if (!PyArg_ParseTuple(_args, "O&k",
 	                      PyMac_GetRect, &inRect,
 	                      &inState))
 		return NULL;
@@ -345,7 +345,7 @@ static PyObject *App_DrawThemeWindowListViewHeader(PyObject *_self, PyObject *_a
 #ifndef DrawThemeWindowListViewHeader
 	PyMac_PRECHECK(DrawThemeWindowListViewHeader);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&l",
+	if (!PyArg_ParseTuple(_args, "O&k",
 	                      PyMac_GetRect, &inRect,
 	                      &inState))
 		return NULL;
@@ -366,7 +366,7 @@ static PyObject *App_DrawThemePlacard(PyObject *_self, PyObject *_args)
 #ifndef DrawThemePlacard
 	PyMac_PRECHECK(DrawThemePlacard);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&l",
+	if (!PyArg_ParseTuple(_args, "O&k",
 	                      PyMac_GetRect, &inRect,
 	                      &inState))
 		return NULL;
@@ -387,7 +387,7 @@ static PyObject *App_DrawThemeEditTextFrame(PyObject *_self, PyObject *_args)
 #ifndef DrawThemeEditTextFrame
 	PyMac_PRECHECK(DrawThemeEditTextFrame);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&l",
+	if (!PyArg_ParseTuple(_args, "O&k",
 	                      PyMac_GetRect, &inRect,
 	                      &inState))
 		return NULL;
@@ -408,7 +408,7 @@ static PyObject *App_DrawThemeListBoxFrame(PyObject *_self, PyObject *_args)
 #ifndef DrawThemeListBoxFrame
 	PyMac_PRECHECK(DrawThemeListBoxFrame);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&l",
+	if (!PyArg_ParseTuple(_args, "O&k",
 	                      PyMac_GetRect, &inRect,
 	                      &inState))
 		return NULL;
@@ -450,7 +450,7 @@ static PyObject *App_DrawThemePrimaryGroup(PyObject *_self, PyObject *_args)
 #ifndef DrawThemePrimaryGroup
 	PyMac_PRECHECK(DrawThemePrimaryGroup);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&l",
+	if (!PyArg_ParseTuple(_args, "O&k",
 	                      PyMac_GetRect, &inRect,
 	                      &inState))
 		return NULL;
@@ -471,7 +471,7 @@ static PyObject *App_DrawThemeSecondaryGroup(PyObject *_self, PyObject *_args)
 #ifndef DrawThemeSecondaryGroup
 	PyMac_PRECHECK(DrawThemeSecondaryGroup);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&l",
+	if (!PyArg_ParseTuple(_args, "O&k",
 	                      PyMac_GetRect, &inRect,
 	                      &inState))
 		return NULL;
@@ -492,7 +492,7 @@ static PyObject *App_DrawThemeSeparator(PyObject *_self, PyObject *_args)
 #ifndef DrawThemeSeparator
 	PyMac_PRECHECK(DrawThemeSeparator);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&l",
+	if (!PyArg_ParseTuple(_args, "O&k",
 	                      PyMac_GetRect, &inRect,
 	                      &inState))
 		return NULL;
@@ -513,7 +513,7 @@ static PyObject *App_DrawThemeModelessDialogFrame(PyObject *_self, PyObject *_ar
 #ifndef DrawThemeModelessDialogFrame
 	PyMac_PRECHECK(DrawThemeModelessDialogFrame);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&l",
+	if (!PyArg_ParseTuple(_args, "O&k",
 	                      PyMac_GetRect, &inRect,
 	                      &inState))
 		return NULL;
@@ -535,7 +535,7 @@ static PyObject *App_DrawThemeGenericWell(PyObject *_self, PyObject *_args)
 #ifndef DrawThemeGenericWell
 	PyMac_PRECHECK(DrawThemeGenericWell);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&lb",
+	if (!PyArg_ParseTuple(_args, "O&kb",
 	                      PyMac_GetRect, &inRect,
 	                      &inState,
 	                      &inFillCenter))
@@ -577,7 +577,7 @@ static PyObject *App_IsThemeInColor(PyObject *_self, PyObject *_args)
 #ifndef IsThemeInColor
 	PyMac_PRECHECK(IsThemeInColor);
 #endif
-	if (!PyArg_ParseTuple(_args, "hb",
+	if (!PyArg_ParseTuple(_args, "Hb",
 	                      &inDepth,
 	                      &inIsColorDevice))
 		return NULL;
@@ -615,7 +615,7 @@ static PyObject *App_DrawThemeMenuBarBackground(PyObject *_self, PyObject *_args
 #ifndef DrawThemeMenuBarBackground
 	PyMac_PRECHECK(DrawThemeMenuBarBackground);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&Hl",
+	if (!PyArg_ParseTuple(_args, "O&Hk",
 	                      PyMac_GetRect, &inBounds,
 	                      &inState,
 	                      &inAttributes))
@@ -641,7 +641,7 @@ static PyObject *App_GetThemeMenuBarHeight(PyObject *_self, PyObject *_args)
 		return NULL;
 	_err = GetThemeMenuBarHeight(&outHeight);
 	if (_err != noErr) return PyMac_Error(_err);
-	_res = Py_BuildValue("h",
+	_res = Py_BuildValue("H",
 	                     outHeight);
 	return _res;
 }
@@ -719,7 +719,7 @@ static PyObject *App_GetThemeMenuSeparatorHeight(PyObject *_self, PyObject *_arg
 		return NULL;
 	_err = GetThemeMenuSeparatorHeight(&outHeight);
 	if (_err != noErr) return PyMac_Error(_err);
-	_res = Py_BuildValue("h",
+	_res = Py_BuildValue("H",
 	                     outHeight);
 	return _res;
 }
@@ -741,7 +741,7 @@ static PyObject *App_GetThemeMenuItemExtra(PyObject *_self, PyObject *_args)
 	                             &outHeight,
 	                             &outWidth);
 	if (_err != noErr) return PyMac_Error(_err);
-	_res = Py_BuildValue("hh",
+	_res = Py_BuildValue("HH",
 	                     outHeight,
 	                     outWidth);
 	return _res;
@@ -762,7 +762,7 @@ static PyObject *App_GetThemeMenuTitleExtra(PyObject *_self, PyObject *_args)
 	_err = GetThemeMenuTitleExtra(&outWidth,
 	                              inIsSquished);
 	if (_err != noErr) return PyMac_Error(_err);
-	_res = Py_BuildValue("h",
+	_res = Py_BuildValue("H",
 	                     outWidth);
 	return _res;
 }
@@ -776,7 +776,7 @@ static PyObject *App_DrawThemeTabPane(PyObject *_self, PyObject *_args)
 #ifndef DrawThemeTabPane
 	PyMac_PRECHECK(DrawThemeTabPane);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&l",
+	if (!PyArg_ParseTuple(_args, "O&k",
 	                      PyMac_GetRect, &inRect,
 	                      &inState))
 		return NULL;
@@ -821,7 +821,7 @@ static PyObject *App_SetThemeCursor(PyObject *_self, PyObject *_args)
 #ifndef SetThemeCursor
 	PyMac_PRECHECK(SetThemeCursor);
 #endif
-	if (!PyArg_ParseTuple(_args, "l",
+	if (!PyArg_ParseTuple(_args, "k",
 	                      &inCursor))
 		return NULL;
 	_err = SetThemeCursor(inCursor);
@@ -840,7 +840,7 @@ static PyObject *App_SetAnimatedThemeCursor(PyObject *_self, PyObject *_args)
 #ifndef SetAnimatedThemeCursor
 	PyMac_PRECHECK(SetAnimatedThemeCursor);
 #endif
-	if (!PyArg_ParseTuple(_args, "ll",
+	if (!PyArg_ParseTuple(_args, "kk",
 	                      &inCursor,
 	                      &inAnimationStep))
 		return NULL;
@@ -912,7 +912,7 @@ static PyObject *App_UseThemeFont(PyObject *_self, PyObject *_args)
 #ifndef UseThemeFont
 	PyMac_PRECHECK(UseThemeFont);
 #endif
-	if (!PyArg_ParseTuple(_args, "Hh",
+	if (!PyArg_ParseTuple(_args, "HH",
 	                      &inFontID,
 	                      &inScript))
 		return NULL;
@@ -937,7 +937,7 @@ static PyObject *App_DrawThemeTextBox(PyObject *_self, PyObject *_args)
 #ifndef DrawThemeTextBox
 	PyMac_PRECHECK(DrawThemeTextBox);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&HlbO&h",
+	if (!PyArg_ParseTuple(_args, "O&HkbO&H",
 	                      CFStringRefObj_Convert, &inString,
 	                      &inFontID,
 	                      &inState,
@@ -971,7 +971,7 @@ static PyObject *App_TruncateThemeText(PyObject *_self, PyObject *_args)
 #ifndef TruncateThemeText
 	PyMac_PRECHECK(TruncateThemeText);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&Hlhh",
+	if (!PyArg_ParseTuple(_args, "O&HkHh",
 	                      CFMutableStringRefObj_Convert, &inString,
 	                      &inFontID,
 	                      &inState,
@@ -1003,7 +1003,7 @@ static PyObject *App_GetThemeTextDimensions(PyObject *_self, PyObject *_args)
 #ifndef GetThemeTextDimensions
 	PyMac_PRECHECK(GetThemeTextDimensions);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&HlbO&",
+	if (!PyArg_ParseTuple(_args, "O&HkbO&",
 	                      CFStringRefObj_Convert, &inString,
 	                      &inFontID,
 	                      &inState,
@@ -1017,7 +1017,7 @@ static PyObject *App_GetThemeTextDimensions(PyObject *_self, PyObject *_args)
 	                              &ioBounds,
 	                              &outBaseline);
 	if (_err != noErr) return PyMac_Error(_err);
-	_res = Py_BuildValue("O&h",
+	_res = Py_BuildValue("O&H",
 	                     PyMac_BuildPoint, ioBounds,
 	                     outBaseline);
 	return _res;
@@ -1033,7 +1033,7 @@ static PyObject *App_GetThemeTextShadowOutset(PyObject *_self, PyObject *_args)
 #ifndef GetThemeTextShadowOutset
 	PyMac_PRECHECK(GetThemeTextShadowOutset);
 #endif
-	if (!PyArg_ParseTuple(_args, "Hl",
+	if (!PyArg_ParseTuple(_args, "Hk",
 	                      &inFontID,
 	                      &inState))
 		return NULL;
@@ -1150,7 +1150,7 @@ static PyObject *App_DrawThemeScrollBarDelimiters(PyObject *_self, PyObject *_ar
 #ifndef DrawThemeScrollBarDelimiters
 	PyMac_PRECHECK(DrawThemeScrollBarDelimiters);
 #endif
-	if (!PyArg_ParseTuple(_args, "HO&ll",
+	if (!PyArg_ParseTuple(_args, "HO&kk",
 	                      &flavor,
 	                      PyMac_GetRect, &inContRect,
 	                      &state,
@@ -1178,7 +1178,7 @@ static PyObject *App_DrawThemeButton(PyObject *_self, PyObject *_args)
 #ifndef DrawThemeButton
 	PyMac_PRECHECK(DrawThemeButton);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&HO&O&l",
+	if (!PyArg_ParseTuple(_args, "O&HO&O&k",
 	                      PyMac_GetRect, &inBounds,
 	                      &inKind,
 	                      ThemeButtonDrawInfo_Convert, &inNewInfo,
@@ -1336,7 +1336,7 @@ static PyObject *App_DrawThemeTickMark(PyObject *_self, PyObject *_args)
 #ifndef DrawThemeTickMark
 	PyMac_PRECHECK(DrawThemeTickMark);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&l",
+	if (!PyArg_ParseTuple(_args, "O&k",
 	                      PyMac_GetRect, &bounds,
 	                      &state))
 		return NULL;
@@ -1359,7 +1359,7 @@ static PyObject *App_DrawThemeChasingArrows(PyObject *_self, PyObject *_args)
 #ifndef DrawThemeChasingArrows
 	PyMac_PRECHECK(DrawThemeChasingArrows);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&lll",
+	if (!PyArg_ParseTuple(_args, "O&kkk",
 	                      PyMac_GetRect, &bounds,
 	                      &index,
 	                      &state,
@@ -1388,7 +1388,7 @@ static PyObject *App_DrawThemePopupArrow(PyObject *_self, PyObject *_args)
 #ifndef DrawThemePopupArrow
 	PyMac_PRECHECK(DrawThemePopupArrow);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&HHll",
+	if (!PyArg_ParseTuple(_args, "O&HHkk",
 	                      PyMac_GetRect, &bounds,
 	                      &orientation,
 	                      &size,
@@ -1418,7 +1418,7 @@ static PyObject *App_DrawThemeStandaloneGrowBox(PyObject *_self, PyObject *_args
 #ifndef DrawThemeStandaloneGrowBox
 	PyMac_PRECHECK(DrawThemeStandaloneGrowBox);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&Hbl",
+	if (!PyArg_ParseTuple(_args, "O&Hbk",
 	                      PyMac_GetPoint, &origin,
 	                      &growDirection,
 	                      &isSmall,
@@ -1445,7 +1445,7 @@ static PyObject *App_DrawThemeStandaloneNoGrowBox(PyObject *_self, PyObject *_ar
 #ifndef DrawThemeStandaloneNoGrowBox
 	PyMac_PRECHECK(DrawThemeStandaloneNoGrowBox);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&Hbl",
+	if (!PyArg_ParseTuple(_args, "O&Hbk",
 	                      PyMac_GetPoint, &origin,
 	                      &growDirection,
 	                      &isSmall,
@@ -1532,7 +1532,7 @@ static PyObject *App_ApplyThemeBackground(PyObject *_self, PyObject *_args)
 #ifndef ApplyThemeBackground
 	PyMac_PRECHECK(ApplyThemeBackground);
 #endif
-	if (!PyArg_ParseTuple(_args, "lO&lhb",
+	if (!PyArg_ParseTuple(_args, "kO&kHb",
 	                      &inKind,
 	                      PyMac_GetRect, &bounds,
 	                      &inState,
@@ -1561,7 +1561,7 @@ static PyObject *App_SetThemeTextColorForWindow(PyObject *_self, PyObject *_args
 #ifndef SetThemeTextColorForWindow
 	PyMac_PRECHECK(SetThemeTextColorForWindow);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&bhb",
+	if (!PyArg_ParseTuple(_args, "O&bHb",
 	                      WinObj_Convert, &window,
 	                      &isActive,
 	                      &depth,
@@ -1605,7 +1605,7 @@ static PyObject *App_GetThemeBrushAsColor(PyObject *_self, PyObject *_args)
 #ifndef GetThemeBrushAsColor
 	PyMac_PRECHECK(GetThemeBrushAsColor);
 #endif
-	if (!PyArg_ParseTuple(_args, "hhb",
+	if (!PyArg_ParseTuple(_args, "hHb",
 	                      &inBrush,
 	                      &inDepth,
 	                      &inColorDev))
@@ -1631,7 +1631,7 @@ static PyObject *App_GetThemeTextColor(PyObject *_self, PyObject *_args)
 #ifndef GetThemeTextColor
 	PyMac_PRECHECK(GetThemeTextColor);
 #endif
-	if (!PyArg_ParseTuple(_args, "hhb",
+	if (!PyArg_ParseTuple(_args, "hHb",
 	                      &inColor,
 	                      &inDepth,
 	                      &inColorDev))
@@ -1655,7 +1655,7 @@ static PyObject *App_GetThemeMetric(PyObject *_self, PyObject *_args)
 #ifndef GetThemeMetric
 	PyMac_PRECHECK(GetThemeMetric);
 #endif
-	if (!PyArg_ParseTuple(_args, "l",
+	if (!PyArg_ParseTuple(_args, "k",
 	                      &inMetric))
 		return NULL;
 	_err = GetThemeMetric(inMetric,

@@ -63,7 +63,7 @@ Pattern = StructOutputBufferType('Pattern')
 Pattern_ptr = StructInputBufferType('Pattern')
 PenState = StructOutputBufferType('PenState')
 PenState_ptr = StructInputBufferType('PenState')
-TruncCode = Type("TruncCode", "h")
+TruncCode = Type("TruncCode", "H")
 
 includestuff = includestuff + """
 #ifdef WITHOUT_FRAMEWORKS
@@ -166,11 +166,8 @@ int QdRGB_Convert(PyObject *v, RGBColorPtr p_itself)
 {
 	long red, green, blue;
 	
-	if( !PyArg_ParseTuple(v, "lll", &red, &green, &blue) )
+	if( !PyArg_ParseTuple(v, "hhh", &p_itself->red, &p_itself->green, &p_itself->blue) )
 		return 0;
-	p_itself->red = (unsigned short)red;
-	p_itself->green = (unsigned short)green;
-	p_itself->blue = (unsigned short)blue;
 	return 1;
 }
 

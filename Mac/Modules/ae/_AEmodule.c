@@ -14,9 +14,9 @@
 
 /* Macro to test whether a weak-loaded CFM function exists */
 #define PyMac_PRECHECK(rtn) do { if ( &rtn == NULL )  {\
-    	PyErr_SetString(PyExc_NotImplementedError, \
-    	"Not available in this shared library/OS version"); \
-    	return NULL; \
+        PyErr_SetString(PyExc_NotImplementedError, \
+        "Not available in this shared library/OS version"); \
+        return NULL; \
     }} while(0)
 
 
@@ -635,7 +635,7 @@ static PyObject *AEDesc_AESend(AEDescObject *_self, PyObject *_args)
 #ifndef AESend
 	PyMac_PRECHECK(AESend);
 #endif
-	if (!PyArg_ParseTuple(_args, "lhl",
+	if (!PyArg_ParseTuple(_args, "khl",
 	                      &sendMode,
 	                      &sendPriority,
 	                      &timeOutInTicks))
@@ -750,7 +750,7 @@ static PyObject *AEDesc_AEResolve(AEDescObject *_self, PyObject *_args)
 #ifndef AEResolve
 	PyMac_PRECHECK(AEResolve);
 #endif
-	if (!PyArg_ParseTuple(_args, "h",
+	if (!PyArg_ParseTuple(_args, "H",
 	                      &callbackFlags))
 		return NULL;
 	_err = AEResolve(&_self->ob_itself,
@@ -1038,7 +1038,7 @@ static PyObject *AE_AECreateAppleEvent(PyObject *_self, PyObject *_args)
 #ifndef AECreateAppleEvent
 	PyMac_PRECHECK(AECreateAppleEvent);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&O&O&hl",
+	if (!PyArg_ParseTuple(_args, "O&O&O&hk",
 	                      PyMac_GetOSType, &theAEEventClass,
 	                      PyMac_GetOSType, &theAEEventID,
 	                      AEDesc_Convert, &target,

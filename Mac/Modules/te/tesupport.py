@@ -65,7 +65,7 @@ TextStyle_Convert(PyObject *v, TextStylePtr p_itself)
 {
 	long font, face, size;
 	
-	if( !PyArg_ParseTuple(v, "lllO&", &font, &face, &size, QdRGB_Convert, &p_itself->tsColor) )
+	if( !PyArg_ParseTuple(v, "kkkO&", &font, &face, &size, QdRGB_Convert, &p_itself->tsColor) )
 		return 0;
 	p_itself->tsFont = (short)font;
 	p_itself->tsFace = (Style)face;

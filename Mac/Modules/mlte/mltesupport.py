@@ -186,7 +186,7 @@ TXNMacOSPreferredFontDescription * iDefaultFonts = NULL;
 ItemCount iCountDefaultFonts = 0;
 TXNInitOptions iUsageFlags;
 PyMac_PRECHECK(TXNInitTextension);
-if (!PyArg_ParseTuple(_args, "l", &iUsageFlags))
+if (!PyArg_ParseTuple(_args, "k", &iUsageFlags))
 	return NULL;
 _err = TXNInitTextension(iDefaultFonts,
                          iCountDefaultFonts,

@@ -139,11 +139,11 @@ class OutputOnlyType(OutputOnlyMixIn, Type):
 # A modest collection of standard C types.
 void = None
 char = Type("char", "c")
-short = Type("short", "h")
+short = Type("short", "H")
 unsigned_short = Type("unsigned short", "H")
 int = Type("int", "i")
 long = Type("long", "l")
-unsigned_long = Type("unsigned long", "l")
+unsigned_long = Type("unsigned long", "k")
 float = Type("float", "f")
 double = Type("double", "d")
 

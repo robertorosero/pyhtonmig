@@ -14,9 +14,9 @@
 
 /* Macro to test whether a weak-loaded CFM function exists */
 #define PyMac_PRECHECK(rtn) do { if ( &rtn == NULL )  {\
-    	PyErr_SetString(PyExc_NotImplementedError, \
-    	"Not available in this shared library/OS version"); \
-    	return NULL; \
+        PyErr_SetString(PyExc_NotImplementedError, \
+        "Not available in this shared library/OS version"); \
+        return NULL; \
     }} while(0)
 
 
@@ -218,7 +218,7 @@ static PyObject *Qdoffs_NewGWorld(PyObject *_self, PyObject *_args)
 #ifndef NewGWorld
 	PyMac_PRECHECK(NewGWorld);
 #endif
-	if (!PyArg_ParseTuple(_args, "hO&O&O&l",
+	if (!PyArg_ParseTuple(_args, "HO&O&O&k",
 	                      &PixelDepth,
 	                      PyMac_GetRect, &boundsRect,
 	                      OptResObj_Convert, &cTable,
@@ -283,7 +283,7 @@ static PyObject *Qdoffs_UpdateGWorld(PyObject *_self, PyObject *_args)
 #ifndef UpdateGWorld
 	PyMac_PRECHECK(UpdateGWorld);
 #endif
-	if (!PyArg_ParseTuple(_args, "hO&O&O&l",
+	if (!PyArg_ParseTuple(_args, "HO&O&O&k",
 	                      &pixelDepth,
 	                      PyMac_GetRect, &boundsRect,
 	                      OptResObj_Convert, &cTable,
@@ -296,7 +296,7 @@ static PyObject *Qdoffs_UpdateGWorld(PyObject *_self, PyObject *_args)
 	                   cTable,
 	                   aGDevice,
 	                   flags);
-	_res = Py_BuildValue("lO&",
+	_res = Py_BuildValue("kO&",
 	                     _rv,
 	                     GWorldObj_New, offscreenGWorld);
 	return _res;
@@ -447,7 +447,7 @@ static PyObject *Qdoffs_GetPixelsState(PyObject *_self, PyObject *_args)
 	                      ResObj_Convert, &pm))
 		return NULL;
 	_rv = GetPixelsState(pm);
-	_res = Py_BuildValue("l",
+	_res = Py_BuildValue("k",
 	                     _rv);
 	return _res;
 }
@@ -460,7 +460,7 @@ static PyObject *Qdoffs_SetPixelsState(PyObject *_self, PyObject *_args)
 #ifndef SetPixelsState
 	PyMac_PRECHECK(SetPixelsState);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&l",
+	if (!PyArg_ParseTuple(_args, "O&k",
 	                      ResObj_Convert, &pm,
 	                      &state))
 		return NULL;

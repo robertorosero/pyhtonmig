@@ -14,9 +14,9 @@
 
 /* Macro to test whether a weak-loaded CFM function exists */
 #define PyMac_PRECHECK(rtn) do { if ( &rtn == NULL )  {\
-    	PyErr_SetString(PyExc_NotImplementedError, \
-    	"Not available in this shared library/OS version"); \
-    	return NULL; \
+        PyErr_SetString(PyExc_NotImplementedError, \
+        "Not available in this shared library/OS version"); \
+        return NULL; \
     }} while(0)
 
 
@@ -118,7 +118,7 @@ static PyObject *ResObj_HomeResFile(ResourceObject *_self, PyObject *_args)
 		OSErr _err = ResError();
 		if (_err != noErr) return PyMac_Error(_err);
 	}
-	_res = Py_BuildValue("h",
+	_res = Py_BuildValue("H",
 	                     _rv);
 	return _res;
 }
@@ -191,7 +191,7 @@ static PyObject *ResObj_GetResAttrs(ResourceObject *_self, PyObject *_args)
 		OSErr _err = ResError();
 		if (_err != noErr) return PyMac_Error(_err);
 	}
-	_res = Py_BuildValue("h",
+	_res = Py_BuildValue("H",
 	                     _rv);
 	return _res;
 }
@@ -215,7 +215,7 @@ static PyObject *ResObj_GetResInfo(ResourceObject *_self, PyObject *_args)
 		OSErr _err = ResError();
 		if (_err != noErr) return PyMac_Error(_err);
 	}
-	_res = Py_BuildValue("hO&O&",
+	_res = Py_BuildValue("HO&O&",
 	                     theID,
 	                     PyMac_BuildOSType, theType,
 	                     PyMac_BuildStr255, name);
@@ -230,7 +230,7 @@ static PyObject *ResObj_SetResInfo(ResourceObject *_self, PyObject *_args)
 #ifndef SetResInfo
 	PyMac_PRECHECK(SetResInfo);
 #endif
-	if (!PyArg_ParseTuple(_args, "hO&",
+	if (!PyArg_ParseTuple(_args, "HO&",
 	                      &theID,
 	                      PyMac_GetStr255, name))
 		return NULL;
@@ -255,7 +255,7 @@ static PyObject *ResObj_AddResource(ResourceObject *_self, PyObject *_args)
 #ifndef AddResource
 	PyMac_PRECHECK(AddResource);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&hO&",
+	if (!PyArg_ParseTuple(_args, "O&HO&",
 	                      PyMac_GetOSType, &theType,
 	                      &theID,
 	                      PyMac_GetStr255, name))
@@ -318,7 +318,7 @@ static PyObject *ResObj_SetResAttrs(ResourceObject *_self, PyObject *_args)
 #ifndef SetResAttrs
 	PyMac_PRECHECK(SetResAttrs);
 #endif
-	if (!PyArg_ParseTuple(_args, "h",
+	if (!PyArg_ParseTuple(_args, "H",
 	                      &attrs))
 		return NULL;
 	SetResAttrs(_self->ob_itself,
@@ -682,7 +682,7 @@ static PyObject *Res_CloseResFile(PyObject *_self, PyObject *_args)
 #ifndef CloseResFile
 	PyMac_PRECHECK(CloseResFile);
 #endif
-	if (!PyArg_ParseTuple(_args, "h",
+	if (!PyArg_ParseTuple(_args, "H",
 	                      &refNum))
 		return NULL;
 	CloseResFile(refNum);
@@ -725,7 +725,7 @@ static PyObject *Res_CurResFile(PyObject *_self, PyObject *_args)
 		OSErr _err = ResError();
 		if (_err != noErr) return PyMac_Error(_err);
 	}
-	_res = Py_BuildValue("h",
+	_res = Py_BuildValue("H",
 	                     _rv);
 	return _res;
 }
@@ -737,7 +737,7 @@ static PyObject *Res_UseResFile(PyObject *_self, PyObject *_args)
 #ifndef UseResFile
 	PyMac_PRECHECK(UseResFile);
 #endif
-	if (!PyArg_ParseTuple(_args, "h",
+	if (!PyArg_ParseTuple(_args, "H",
 	                      &refNum))
 		return NULL;
 	UseResFile(refNum);
@@ -764,7 +764,7 @@ static PyObject *Res_CountTypes(PyObject *_self, PyObject *_args)
 		OSErr _err = ResError();
 		if (_err != noErr) return PyMac_Error(_err);
 	}
-	_res = Py_BuildValue("h",
+	_res = Py_BuildValue("H",
 	                     _rv);
 	return _res;
 }
@@ -783,7 +783,7 @@ static PyObject *Res_Count1Types(PyObject *_self, PyObject *_args)
 		OSErr _err = ResError();
 		if (_err != noErr) return PyMac_Error(_err);
 	}
-	_res = Py_BuildValue("h",
+	_res = Py_BuildValue("H",
 	                     _rv);
 	return _res;
 }
@@ -796,7 +796,7 @@ static PyObject *Res_GetIndType(PyObject *_self, PyObject *_args)
 #ifndef GetIndType
 	PyMac_PRECHECK(GetIndType);
 #endif
-	if (!PyArg_ParseTuple(_args, "h",
+	if (!PyArg_ParseTuple(_args, "H",
 	                      &index))
 		return NULL;
 	GetIndType(&theType,
@@ -818,7 +818,7 @@ static PyObject *Res_Get1IndType(PyObject *_self, PyObject *_args)
 #ifndef Get1IndType
 	PyMac_PRECHECK(Get1IndType);
 #endif
-	if (!PyArg_ParseTuple(_args, "h",
+	if (!PyArg_ParseTuple(_args, "H",
 	                      &index))
 		return NULL;
 	Get1IndType(&theType,
@@ -868,7 +868,7 @@ static PyObject *Res_CountResources(PyObject *_self, PyObject *_args)
 		OSErr _err = ResError();
 		if (_err != noErr) return PyMac_Error(_err);
 	}
-	_res = Py_BuildValue("h",
+	_res = Py_BuildValue("H",
 	                     _rv);
 	return _res;
 }
@@ -889,7 +889,7 @@ static PyObject *Res_Count1Resources(PyObject *_self, PyObject *_args)
 		OSErr _err = ResError();
 		if (_err != noErr) return PyMac_Error(_err);
 	}
-	_res = Py_BuildValue("h",
+	_res = Py_BuildValue("H",
 	                     _rv);
 	return _res;
 }
@@ -903,7 +903,7 @@ static PyObject *Res_GetIndResource(PyObject *_self, PyObject *_args)
 #ifndef GetIndResource
 	PyMac_PRECHECK(GetIndResource);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&h",
+	if (!PyArg_ParseTuple(_args, "O&H",
 	                      PyMac_GetOSType, &theType,
 	                      &index))
 		return NULL;
@@ -927,7 +927,7 @@ static PyObject *Res_Get1IndResource(PyObject *_self, PyObject *_args)
 #ifndef Get1IndResource
 	PyMac_PRECHECK(Get1IndResource);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&h",
+	if (!PyArg_ParseTuple(_args, "O&H",
 	                      PyMac_GetOSType, &theType,
 	                      &index))
 		return NULL;
@@ -951,7 +951,7 @@ static PyObject *Res_GetResource(PyObject *_self, PyObject *_args)
 #ifndef GetResource
 	PyMac_PRECHECK(GetResource);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&h",
+	if (!PyArg_ParseTuple(_args, "O&H",
 	                      PyMac_GetOSType, &theType,
 	                      &theID))
 		return NULL;
@@ -975,7 +975,7 @@ static PyObject *Res_Get1Resource(PyObject *_self, PyObject *_args)
 #ifndef Get1Resource
 	PyMac_PRECHECK(Get1Resource);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&h",
+	if (!PyArg_ParseTuple(_args, "O&H",
 	                      PyMac_GetOSType, &theType,
 	                      &theID))
 		return NULL;
@@ -1054,7 +1054,7 @@ static PyObject *Res_UniqueID(PyObject *_self, PyObject *_args)
 		OSErr _err = ResError();
 		if (_err != noErr) return PyMac_Error(_err);
 	}
-	_res = Py_BuildValue("h",
+	_res = Py_BuildValue("H",
 	                     _rv);
 	return _res;
 }
@@ -1075,7 +1075,7 @@ static PyObject *Res_Unique1ID(PyObject *_self, PyObject *_args)
 		OSErr _err = ResError();
 		if (_err != noErr) return PyMac_Error(_err);
 	}
-	_res = Py_BuildValue("h",
+	_res = Py_BuildValue("H",
 	                     _rv);
 	return _res;
 }
@@ -1087,7 +1087,7 @@ static PyObject *Res_UpdateResFile(PyObject *_self, PyObject *_args)
 #ifndef UpdateResFile
 	PyMac_PRECHECK(UpdateResFile);
 #endif
-	if (!PyArg_ParseTuple(_args, "h",
+	if (!PyArg_ParseTuple(_args, "H",
 	                      &refNum))
 		return NULL;
 	UpdateResFile(refNum);
@@ -1128,7 +1128,7 @@ static PyObject *Res_GetResFileAttrs(PyObject *_self, PyObject *_args)
 #ifndef GetResFileAttrs
 	PyMac_PRECHECK(GetResFileAttrs);
 #endif
-	if (!PyArg_ParseTuple(_args, "h",
+	if (!PyArg_ParseTuple(_args, "H",
 	                      &refNum))
 		return NULL;
 	_rv = GetResFileAttrs(refNum);
@@ -1136,7 +1136,7 @@ static PyObject *Res_GetResFileAttrs(PyObject *_self, PyObject *_args)
 		OSErr _err = ResError();
 		if (_err != noErr) return PyMac_Error(_err);
 	}
-	_res = Py_BuildValue("h",
+	_res = Py_BuildValue("H",
 	                     _rv);
 	return _res;
 }
@@ -1149,7 +1149,7 @@ static PyObject *Res_SetResFileAttrs(PyObject *_self, PyObject *_args)
 #ifndef SetResFileAttrs
 	PyMac_PRECHECK(SetResFileAttrs);
 #endif
-	if (!PyArg_ParseTuple(_args, "hh",
+	if (!PyArg_ParseTuple(_args, "HH",
 	                      &refNum,
 	                      &attrs))
 		return NULL;
@@ -1174,7 +1174,7 @@ static PyObject *Res_OpenRFPerm(PyObject *_self, PyObject *_args)
 #ifndef OpenRFPerm
 	PyMac_PRECHECK(OpenRFPerm);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&hb",
+	if (!PyArg_ParseTuple(_args, "O&HB",
 	                      PyMac_GetStr255, fileName,
 	                      &vRefNum,
 	                      &permission))
@@ -1186,7 +1186,7 @@ static PyObject *Res_OpenRFPerm(PyObject *_self, PyObject *_args)
 		OSErr _err = ResError();
 		if (_err != noErr) return PyMac_Error(_err);
 	}
-	_res = Py_BuildValue("h",
+	_res = Py_BuildValue("H",
 	                     _rv);
 	return _res;
 }
@@ -1202,7 +1202,7 @@ static PyObject *Res_HOpenResFile(PyObject *_self, PyObject *_args)
 #ifndef HOpenResFile
 	PyMac_PRECHECK(HOpenResFile);
 #endif
-	if (!PyArg_ParseTuple(_args, "hlO&b",
+	if (!PyArg_ParseTuple(_args, "HlO&B",
 	                      &vRefNum,
 	                      &dirID,
 	                      PyMac_GetStr255, fileName,
@@ -1216,7 +1216,7 @@ static PyObject *Res_HOpenResFile(PyObject *_self, PyObject *_args)
 		OSErr _err = ResError();
 		if (_err != noErr) return PyMac_Error(_err);
 	}
-	_res = Py_BuildValue("h",
+	_res = Py_BuildValue("H",
 	                     _rv);
 	return _res;
 }
@@ -1230,7 +1230,7 @@ static PyObject *Res_HCreateResFile(PyObject *_self, PyObject *_args)
 #ifndef HCreateResFile
 	PyMac_PRECHECK(HCreateResFile);
 #endif
-	if (!PyArg_ParseTuple(_args, "hlO&",
+	if (!PyArg_ParseTuple(_args, "HlO&",
 	                      &vRefNum,
 	                      &dirID,
 	                      PyMac_GetStr255, fileName))
@@ -1256,7 +1256,7 @@ static PyObject *Res_FSpOpenResFile(PyObject *_self, PyObject *_args)
 #ifndef FSpOpenResFile
 	PyMac_PRECHECK(FSpOpenResFile);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&b",
+	if (!PyArg_ParseTuple(_args, "O&B",
 	                      PyMac_GetFSSpec, &spec,
 	                      &permission))
 		return NULL;
@@ -1266,7 +1266,7 @@ static PyObject *Res_FSpOpenResFile(PyObject *_self, PyObject *_args)
 		OSErr _err = ResError();
 		if (_err != noErr) return PyMac_Error(_err);
 	}
-	_res = Py_BuildValue("h",
+	_res = Py_BuildValue("H",
 	                     _rv);
 	return _res;
 }
@@ -1281,7 +1281,7 @@ static PyObject *Res_FSpCreateResFile(PyObject *_self, PyObject *_args)
 #ifndef FSpCreateResFile
 	PyMac_PRECHECK(FSpCreateResFile);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&O&O&h",
+	if (!PyArg_ParseTuple(_args, "O&O&O&H",
 	                      PyMac_GetFSSpec, &spec,
 	                      PyMac_GetOSType, &creator,
 	                      PyMac_GetOSType, &fileType,
@@ -1309,7 +1309,7 @@ static PyObject *Res_InsertResourceFile(PyObject *_self, PyObject *_args)
 #ifndef InsertResourceFile
 	PyMac_PRECHECK(InsertResourceFile);
 #endif
-	if (!PyArg_ParseTuple(_args, "hh",
+	if (!PyArg_ParseTuple(_args, "HH",
 	                      &refNum,
 	                      &where))
 		return NULL;
@@ -1329,7 +1329,7 @@ static PyObject *Res_DetachResourceFile(PyObject *_self, PyObject *_args)
 #ifndef DetachResourceFile
 	PyMac_PRECHECK(DetachResourceFile);
 #endif
-	if (!PyArg_ParseTuple(_args, "h",
+	if (!PyArg_ParseTuple(_args, "H",
 	                      &refNum))
 		return NULL;
 	_err = DetachResourceFile(refNum);
@@ -1359,7 +1359,7 @@ static PyObject *Res_FSpResourceFileAlreadyOpen(PyObject *_self, PyObject *_args
 		OSErr _err = ResError();
 		if (_err != noErr) return PyMac_Error(_err);
 	}
-	_res = Py_BuildValue("bbh",
+	_res = Py_BuildValue("bbH",
 	                     _rv,
 	                     inChain,
 	                     refNum);
@@ -1376,7 +1376,7 @@ static PyObject *Res_FSpOpenOrphanResFile(PyObject *_self, PyObject *_args)
 #ifndef FSpOpenOrphanResFile
 	PyMac_PRECHECK(FSpOpenOrphanResFile);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&b",
+	if (!PyArg_ParseTuple(_args, "O&B",
 	                      PyMac_GetFSSpec, &spec,
 	                      &permission))
 		return NULL;
@@ -1384,7 +1384,7 @@ static PyObject *Res_FSpOpenOrphanResFile(PyObject *_self, PyObject *_args)
 	                            permission,
 	                            &refNum);
 	if (_err != noErr) return PyMac_Error(_err);
-	_res = Py_BuildValue("h",
+	_res = Py_BuildValue("H",
 	                     refNum);
 	return _res;
 }
@@ -1401,7 +1401,7 @@ static PyObject *Res_GetTopResourceFile(PyObject *_self, PyObject *_args)
 		return NULL;
 	_err = GetTopResourceFile(&refNum);
 	if (_err != noErr) return PyMac_Error(_err);
-	_res = Py_BuildValue("h",
+	_res = Py_BuildValue("H",
 	                     refNum);
 	return _res;
 }
@@ -1415,13 +1415,13 @@ static PyObject *Res_GetNextResourceFile(PyObject *_self, PyObject *_args)
 #ifndef GetNextResourceFile
 	PyMac_PRECHECK(GetNextResourceFile);
 #endif
-	if (!PyArg_ParseTuple(_args, "h",
+	if (!PyArg_ParseTuple(_args, "H",
 	                      &curRefNum))
 		return NULL;
 	_err = GetNextResourceFile(curRefNum,
 	                           &nextRefNum);
 	if (_err != noErr) return PyMac_Error(_err);
-	_res = Py_BuildValue("h",
+	_res = Py_BuildValue("H",
 	                     nextRefNum);
 	return _res;
 }
@@ -1435,7 +1435,7 @@ static PyObject *Res_FSOpenResFile(PyObject *_self, PyObject *_args)
 #ifndef FSOpenResFile
 	PyMac_PRECHECK(FSOpenResFile);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&b",
+	if (!PyArg_ParseTuple(_args, "O&B",
 	                      PyMac_GetFSRef, &ref,
 	                      &permission))
 		return NULL;
@@ -1445,7 +1445,7 @@ static PyObject *Res_FSOpenResFile(PyObject *_self, PyObject *_args)
 		OSErr _err = ResError();
 		if (_err != noErr) return PyMac_Error(_err);
 	}
-	_res = Py_BuildValue("h",
+	_res = Py_BuildValue("H",
 	                     _rv);
 	return _res;
 }
@@ -1503,7 +1503,7 @@ static PyObject *Res_FSResourceFileAlreadyOpen(PyObject *_self, PyObject *_args)
 		OSErr _err = ResError();
 		if (_err != noErr) return PyMac_Error(_err);
 	}
-	_res = Py_BuildValue("bbh",
+	_res = Py_BuildValue("bbH",
 	                     _rv,
 	                     inChain,
 	                     refNum);
@@ -1560,7 +1560,7 @@ static PyObject *Res_FSOpenResourceFile(PyObject *_self, PyObject *_args)
 #ifndef FSOpenResourceFile
 	PyMac_PRECHECK(FSOpenResourceFile);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&u#b",
+	if (!PyArg_ParseTuple(_args, "O&u#B",
 	                      PyMac_GetFSRef, &ref,
 	                      &forkNameLength__in__, &forkNameLength__in_len__,
 	                      &permissions))
@@ -1571,7 +1571,7 @@ static PyObject *Res_FSOpenResourceFile(PyObject *_self, PyObject *_args)
 	                          permissions,
 	                          &refNum);
 	if (_err != noErr) return PyMac_Error(_err);
-	_res = Py_BuildValue("h",
+	_res = Py_BuildValue("H",
 	                     refNum);
 	return _res;
 }

@@ -14,9 +14,9 @@
 
 /* Macro to test whether a weak-loaded CFM function exists */
 #define PyMac_PRECHECK(rtn) do { if ( &rtn == NULL )  {\
-    	PyErr_SetString(PyExc_NotImplementedError, \
-    	"Not available in this shared library/OS version"); \
-    	return NULL; \
+        PyErr_SetString(PyExc_NotImplementedError, \
+        "Not available in this shared library/OS version"); \
+        return NULL; \
     }} while(0)
 
 
@@ -38,7 +38,7 @@ static PyObject *Folder_FindFolder(PyObject *_self, PyObject *_args)
 	Boolean createFolder;
 	short foundVRefNum;
 	long foundDirID;
-	if (!PyArg_ParseTuple(_args, "hO&b",
+	if (!PyArg_ParseTuple(_args, "HO&b",
 	                      &vRefNum,
 	                      PyMac_GetOSType, &folderType,
 	                      &createFolder))
@@ -49,7 +49,7 @@ static PyObject *Folder_FindFolder(PyObject *_self, PyObject *_args)
 	                  &foundVRefNum,
 	                  &foundDirID);
 	if (_err != noErr) return PyMac_Error(_err);
-	_res = Py_BuildValue("hl",
+	_res = Py_BuildValue("Hl",
 	                     foundVRefNum,
 	                     foundDirID);
 	return _res;
@@ -61,7 +61,7 @@ static PyObject *Folder_ReleaseFolder(PyObject *_self, PyObject *_args)
 	OSErr _err;
 	short vRefNum;
 	OSType folderType;
-	if (!PyArg_ParseTuple(_args, "hO&",
+	if (!PyArg_ParseTuple(_args, "HO&",
 	                      &vRefNum,
 	                      PyMac_GetOSType, &folderType))
 		return NULL;
@@ -81,7 +81,7 @@ static PyObject *Folder_FSFindFolder(PyObject *_self, PyObject *_args)
 	OSType folderType;
 	Boolean createFolder;
 	FSRef foundRef;
-	if (!PyArg_ParseTuple(_args, "hO&b",
+	if (!PyArg_ParseTuple(_args, "HO&b",
 	                      &vRefNum,
 	                      PyMac_GetOSType, &folderType,
 	                      &createFolder))
@@ -108,7 +108,7 @@ static PyObject *Folder_AddFolderDescriptor(PyObject *_self, PyObject *_args)
 	OSType badgeType;
 	Str255 name;
 	Boolean replaceFlag;
-	if (!PyArg_ParseTuple(_args, "O&lO&O&O&O&O&b",
+	if (!PyArg_ParseTuple(_args, "O&kO&O&O&O&O&b",
 	                      PyMac_GetOSType, &foldType,
 	                      &flags,
 	                      PyMac_GetOSType, &foldClass,
@@ -139,14 +139,14 @@ static PyObject *Folder_GetFolderTypes(PyObject *_self, PyObject *_args)
 	UInt32 requestedTypeCount;
 	UInt32 totalTypeCount;
 	FolderType theTypes;
-	if (!PyArg_ParseTuple(_args, "l",
+	if (!PyArg_ParseTuple(_args, "k",
 	                      &requestedTypeCount))
 		return NULL;
 	_err = GetFolderTypes(requestedTypeCount,
 	                      &totalTypeCount,
 	                      &theTypes);
 	if (_err != noErr) return PyMac_Error(_err);
-	_res = Py_BuildValue("lO&",
+	_res = Py_BuildValue("kO&",
 	                     totalTypeCount,
 	                     PyMac_BuildOSType, theTypes);
 	return _res;
@@ -175,7 +175,7 @@ static PyObject *Folder_GetFolderName(PyObject *_self, PyObject *_args)
 	OSType foldType;
 	short foundVRefNum;
 	Str255 name;
-	if (!PyArg_ParseTuple(_args, "hO&O&",
+	if (!PyArg_ParseTuple(_args, "HO&O&",
 	                      &vRefNum,
 	                      PyMac_GetOSType, &foldType,
 	                      PyMac_GetStr255, name))
@@ -185,7 +185,7 @@ static PyObject *Folder_GetFolderName(PyObject *_self, PyObject *_args)
 	                     &foundVRefNum,
 	                     name);
 	if (_err != noErr) return PyMac_Error(_err);
-	_res = Py_BuildValue("h",
+	_res = Py_BuildValue("H",
 	                     foundVRefNum);
 	return _res;
 }
@@ -199,7 +199,7 @@ static PyObject *Folder_AddFolderRouting(PyObject *_self, PyObject *_args)
 	FolderType routeToFolder;
 	RoutingFlags flags;
 	Boolean replaceFlag;
-	if (!PyArg_ParseTuple(_args, "O&O&O&lb",
+	if (!PyArg_ParseTuple(_args, "O&O&O&kb",
 	                      PyMac_GetOSType, &fileType,
 	                      PyMac_GetOSType, &routeFromFolder,
 	                      PyMac_GetOSType, &routeToFolder,
@@ -252,7 +252,7 @@ static PyObject *Folder_FindFolderRouting(PyObject *_self, PyObject *_args)
 	                         &routeToFolder,
 	                         &flags);
 	if (_err != noErr) return PyMac_Error(_err);
-	_res = Py_BuildValue("O&l",
+	_res = Py_BuildValue("O&k",
 	                     PyMac_BuildOSType, routeToFolder,
 	                     flags);
 	return _res;
@@ -264,7 +264,7 @@ static PyObject *Folder_InvalidateFolderDescriptorCache(PyObject *_self, PyObjec
 	OSErr _err;
 	short vRefNum;
 	long dirID;
-	if (!PyArg_ParseTuple(_args, "hl",
+	if (!PyArg_ParseTuple(_args, "Hl",
 	                      &vRefNum,
 	                      &dirID))
 		return NULL;
@@ -283,7 +283,7 @@ static PyObject *Folder_IdentifyFolder(PyObject *_self, PyObject *_args)
 	short vRefNum;
 	long dirID;
 	FolderType foldType;
-	if (!PyArg_ParseTuple(_args, "hl",
+	if (!PyArg_ParseTuple(_args, "Hl",
 	                      &vRefNum,
 	                      &dirID))
 		return NULL;

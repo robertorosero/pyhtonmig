@@ -14,9 +14,9 @@
 
 /* Macro to test whether a weak-loaded CFM function exists */
 #define PyMac_PRECHECK(rtn) do { if ( &rtn == NULL )  {\
-    	PyErr_SetString(PyExc_NotImplementedError, \
-    	"Not available in this shared library/OS version"); \
-    	return NULL; \
+        PyErr_SetString(PyExc_NotImplementedError, \
+        "Not available in this shared library/OS version"); \
+        return NULL; \
     }} while(0)
 
 
@@ -99,7 +99,7 @@ static PyObject *Evt_GetCaretTime(PyObject *_self, PyObject *_args)
 	if (!PyArg_ParseTuple(_args, ""))
 		return NULL;
 	_rv = GetCaretTime();
-	_res = Py_BuildValue("l",
+	_res = Py_BuildValue("k",
 	                     _rv);
 	return _res;
 }
@@ -129,7 +129,7 @@ static PyObject *Evt_GetDblTime(PyObject *_self, PyObject *_args)
 	if (!PyArg_ParseTuple(_args, ""))
 		return NULL;
 	_rv = GetDblTime();
-	_res = Py_BuildValue("l",
+	_res = Py_BuildValue("k",
 	                     _rv);
 	return _res;
 }
@@ -199,7 +199,7 @@ static PyObject *Evt_PostEvent(PyObject *_self, PyObject *_args)
 #ifndef PostEvent
 	PyMac_PRECHECK(PostEvent);
 #endif
-	if (!PyArg_ParseTuple(_args, "Hl",
+	if (!PyArg_ParseTuple(_args, "Hk",
 	                      &eventNum,
 	                      &eventMsg))
 		return NULL;
@@ -255,7 +255,7 @@ static PyObject *Evt_GetCurrentKeyModifiers(PyObject *_self, PyObject *_args)
 	if (!PyArg_ParseTuple(_args, ""))
 		return NULL;
 	_rv = GetCurrentKeyModifiers();
-	_res = Py_BuildValue("l",
+	_res = Py_BuildValue("k",
 	                     _rv);
 	return _res;
 }
@@ -282,7 +282,7 @@ static PyObject *Evt_KeyScript(PyObject *_self, PyObject *_args)
 #ifndef KeyScript
 	PyMac_PRECHECK(KeyScript);
 #endif
-	if (!PyArg_ParseTuple(_args, "h",
+	if (!PyArg_ParseTuple(_args, "H",
 	                      &code))
 		return NULL;
 	KeyScript(code);
@@ -300,7 +300,7 @@ static PyObject *Evt_IsCmdChar(PyObject *_self, PyObject *_args)
 #ifndef IsCmdChar
 	PyMac_PRECHECK(IsCmdChar);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&h",
+	if (!PyArg_ParseTuple(_args, "O&H",
 	                      PyMac_GetEventRecord, &event,
 	                      &test))
 		return NULL;
@@ -321,7 +321,7 @@ static PyObject *Evt_LMGetKeyThresh(PyObject *_self, PyObject *_args)
 	if (!PyArg_ParseTuple(_args, ""))
 		return NULL;
 	_rv = LMGetKeyThresh();
-	_res = Py_BuildValue("h",
+	_res = Py_BuildValue("H",
 	                     _rv);
 	return _res;
 }
@@ -333,7 +333,7 @@ static PyObject *Evt_LMSetKeyThresh(PyObject *_self, PyObject *_args)
 #ifndef LMSetKeyThresh
 	PyMac_PRECHECK(LMSetKeyThresh);
 #endif
-	if (!PyArg_ParseTuple(_args, "h",
+	if (!PyArg_ParseTuple(_args, "H",
 	                      &value))
 		return NULL;
 	LMSetKeyThresh(value);
@@ -352,7 +352,7 @@ static PyObject *Evt_LMGetKeyRepThresh(PyObject *_self, PyObject *_args)
 	if (!PyArg_ParseTuple(_args, ""))
 		return NULL;
 	_rv = LMGetKeyRepThresh();
-	_res = Py_BuildValue("h",
+	_res = Py_BuildValue("H",
 	                     _rv);
 	return _res;
 }
@@ -364,7 +364,7 @@ static PyObject *Evt_LMSetKeyRepThresh(PyObject *_self, PyObject *_args)
 #ifndef LMSetKeyRepThresh
 	PyMac_PRECHECK(LMSetKeyRepThresh);
 #endif
-	if (!PyArg_ParseTuple(_args, "h",
+	if (!PyArg_ParseTuple(_args, "H",
 	                      &value))
 		return NULL;
 	LMSetKeyRepThresh(value);
@@ -445,7 +445,7 @@ static PyObject *Evt_TickCount(PyObject *_self, PyObject *_args)
 	if (!PyArg_ParseTuple(_args, ""))
 		return NULL;
 	_rv = TickCount();
-	_res = Py_BuildValue("l",
+	_res = Py_BuildValue("k",
 	                     _rv);
 	return _res;
 }

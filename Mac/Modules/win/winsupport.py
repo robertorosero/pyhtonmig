@@ -40,19 +40,19 @@ AliasHandle = OpaqueByValueType("AliasHandle", "ResObj")
 IconRef = OpaqueByValueType("IconRef", "ResObj")
 
 WindowRegionCode = Type("WindowRegionCode", "H")
-WindowClass = Type("WindowClass", "l")
-WindowAttributes = Type("WindowAttributes", "l")
-WindowPositionMethod = Type("WindowPositionMethod", "l")
-WindowTransitionEffect = Type("WindowTransitionEffect", "l")
-WindowTransitionAction = Type("WindowTransitionAction", "l")
+WindowClass = Type("WindowClass", "k")
+WindowAttributes = Type("WindowAttributes", "k")
+WindowPositionMethod = Type("WindowPositionMethod", "k")
+WindowTransitionEffect = Type("WindowTransitionEffect", "k")
+WindowTransitionAction = Type("WindowTransitionAction", "k")
 RGBColor = OpaqueType("RGBColor", "QdRGB")
 RGBColor_ptr = RGBColor
-ScrollWindowOptions = Type("ScrollWindowOptions", "l")
-WindowPartCode = Type("WindowPartCode", "h")
-WindowDefPartCode = Type("WindowDefPartCode", "h")
-WindowModality = Type("WindowModality", "l")
+ScrollWindowOptions = Type("ScrollWindowOptions", "k")
+WindowPartCode = Type("WindowPartCode", "H")
+WindowDefPartCode = Type("WindowDefPartCode", "H")
+WindowModality = Type("WindowModality", "k")
 GDHandle = OpaqueByValueType("GDHandle", "ResObj")
-WindowConstrainOptions = Type("WindowConstrainOptions", "l")
+WindowConstrainOptions = Type("WindowConstrainOptions", "k")
 
 PropertyCreator = OSTypeType("PropertyCreator")
 PropertyTag = OSTypeType("PropertyTag")
@@ -202,7 +202,7 @@ execfile(INPUTFILE)
 whichwin_body = """
 long ptr;
 
-if ( !PyArg_ParseTuple(_args, "i", &ptr) )
+if ( !PyArg_ParseTuple(_args, "k", &ptr) )
 	return NULL;
 _res = WinObj_WhichWindow((WindowPtr)ptr);
 return _res;

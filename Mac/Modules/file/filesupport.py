@@ -23,13 +23,13 @@ from macsupport import *
 
 # Various integers:
 SInt64 = Type("SInt64", "L")
-UInt64 = Type("UInt64", "L")
-FNMessage = Type("FNMessage", "l")
+UInt64 = Type("UInt64", "K")
+FNMessage = Type("FNMessage", "k")
 FSAllocationFlags = Type("FSAllocationFlags", "H")
-FSCatalogInfoBitmap = Type("FSCatalogInfoBitmap", "l")
-FSIteratorFlags = Type("FSIteratorFlags", "l")
-FSVolumeRefNum = Type("FSVolumeRefNum", "h")
-AliasInfoType = Type("AliasInfoType", "h")
+FSCatalogInfoBitmap = Type("FSCatalogInfoBitmap", "k")
+FSIteratorFlags = Type("FSIteratorFlags", "k")
+FSVolumeRefNum = Type("FSVolumeRefNum", "H")
+AliasInfoType = Type("AliasInfoType", "H")
 
 # Various types of strings:
 #class UniCharCountBuffer(InputOnlyType):
@@ -161,7 +161,7 @@ static int Alias_Convert(PyObject *v, AliasHandle *p_itself);
 static int
 UTCDateTime_Convert(PyObject *v, UTCDateTime *ptr)
 {
-	return PyArg_Parse(v, "(HlH)", &ptr->highSeconds, &ptr->lowSeconds, &ptr->fraction);
+	return PyArg_Parse(v, "(HkH)", &ptr->highSeconds, &ptr->lowSeconds, &ptr->fraction);
 }
 
 static PyObject *
@@ -219,7 +219,7 @@ PyMac_GetFSSpec(PyObject *v, FSSpec *spec)
 		return 1;
 	}
 
-	if (PyArg_Parse(v, "(hlO&)",
+	if (PyArg_Parse(v, "(hkO&)",
 						&refnum, &parid, PyMac_GetStr255, &path)) {
 		err = FSMakeFSSpec(refnum, parid, path, spec);
 		if ( err && err != fnfErr ) {
@@ -346,12 +346,12 @@ class FSCatalogInfoDefinition(PEP253Mixin, ObjectDefinition):
 		),
 		("parentDirID",
 		 "return Py_BuildValue(\"l\", self->ob_itself.parentDirID);",
-		 "return PyArg_Parse(v, \"l\", &self->ob_itself.parentDirID)-1;",
+		 "return PyArg_Parse(v, \"k\", &self->ob_itself.parentDirID)-1;",
 		 None
 		),
 		("nodeID",
 		 "return Py_BuildValue(\"l\", self->ob_itself.nodeID);",
-		 "return PyArg_Parse(v, \"l\", &self->ob_itself.nodeID)-1;",
+		 "return PyArg_Parse(v, \"k\", &self->ob_itself.nodeID)-1;",
 		 None
 		),
 		("createDate",
@@ -381,7 +381,7 @@ class FSCatalogInfoDefinition(PEP253Mixin, ObjectDefinition):
 		),
 		("permissions",
 		 "return Py_BuildValue(\"(llll)\", self->ob_itself.permissions[0], self->ob_itself.permissions[1], self->ob_itself.permissions[2], self->ob_itself.permissions[3]);",
-		 "return PyArg_Parse(v, \"(llll)\", &self->ob_itself.permissions[0], &self->ob_itself.permissions[1], &self->ob_itself.permissions[2], &self->ob_itself.permissions[3])-1;",
+		 "return PyArg_Parse(v, \"(kkkk)\", &self->ob_itself.permissions[0], &self->ob_itself.permissions[1], &self->ob_itself.permissions[2], &self->ob_itself.permissions[3])-1;",
 		 None
 		),
 		# XXXX FinderInfo TBD
@@ -413,7 +413,7 @@ class FSCatalogInfoDefinition(PEP253Mixin, ObjectDefinition):
 		),
 		("sharingFlags",
 		 "return Py_BuildValue(\"l\", self->ob_itself.sharingFlags);",
-		 "return PyArg_Parse(v, \"l\", &self->ob_itself.sharingFlags)-1;",
+		 "return PyArg_Parse(v, \"k\", &self->ob_itself.sharingFlags)-1;",
 		 None
 		),
 		("userPrivileges",

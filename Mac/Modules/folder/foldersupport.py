@@ -21,11 +21,11 @@ ConstStrFileNameParam = ConstStr255Param
 StrFileName = Str255
 FolderClass = OSTypeType("FolderClass")
 # FolderDesc
-FolderDescFlags = Type("FolderDescFlags", "l")
+FolderDescFlags = Type("FolderDescFlags", "k")
 FolderLocation = OSTypeType("FolderLocation")
 # FolderRouting
 FolderType = OSTypeType("FolderType")
-RoutingFlags = Type("RoutingFlags", "l")
+RoutingFlags = Type("RoutingFlags", "k")
 
 
 includestuff = includestuff + """

@@ -374,7 +374,7 @@ static PyObject *DlgObj_SelectDialogItemText(DialogObject *_self, PyObject *_arg
 #ifndef SelectDialogItemText
 	PyMac_PRECHECK(SelectDialogItemText);
 #endif
-	if (!PyArg_ParseTuple(_args, "hhh",
+	if (!PyArg_ParseTuple(_args, "hHH",
 	                      &itemNo,
 	                      &strtSel,
 	                      &endSel))
@@ -598,7 +598,7 @@ static PyObject *DlgObj_GetDialogItemAsControl(DialogObject *_self, PyObject *_a
 #ifndef GetDialogItemAsControl
 	PyMac_PRECHECK(GetDialogItemAsControl);
 #endif
-	if (!PyArg_ParseTuple(_args, "h",
+	if (!PyArg_ParseTuple(_args, "H",
 	                      &inItemNo))
 		return NULL;
 	_err = GetDialogItemAsControl(_self->ob_itself,
@@ -620,7 +620,7 @@ static PyObject *DlgObj_MoveDialogItem(DialogObject *_self, PyObject *_args)
 #ifndef MoveDialogItem
 	PyMac_PRECHECK(MoveDialogItem);
 #endif
-	if (!PyArg_ParseTuple(_args, "hhh",
+	if (!PyArg_ParseTuple(_args, "HHH",
 	                      &inItemNo,
 	                      &inHoriz,
 	                      &inVert))
@@ -645,7 +645,7 @@ static PyObject *DlgObj_SizeDialogItem(DialogObject *_self, PyObject *_args)
 #ifndef SizeDialogItem
 	PyMac_PRECHECK(SizeDialogItem);
 #endif
-	if (!PyArg_ParseTuple(_args, "hhh",
+	if (!PyArg_ParseTuple(_args, "HHH",
 	                      &inItemNo,
 	                      &inWidth,
 	                      &inHeight))
@@ -669,7 +669,7 @@ static PyObject *DlgObj_AppendDialogItemList(DialogObject *_self, PyObject *_arg
 #ifndef AppendDialogItemList
 	PyMac_PRECHECK(AppendDialogItemList);
 #endif
-	if (!PyArg_ParseTuple(_args, "hh",
+	if (!PyArg_ParseTuple(_args, "Hh",
 	                      &ditlID,
 	                      &method))
 		return NULL;
@@ -691,7 +691,7 @@ static PyObject *DlgObj_SetDialogTimeout(DialogObject *_self, PyObject *_args)
 #ifndef SetDialogTimeout
 	PyMac_PRECHECK(SetDialogTimeout);
 #endif
-	if (!PyArg_ParseTuple(_args, "hl",
+	if (!PyArg_ParseTuple(_args, "Hk",
 	                      &inButtonToPress,
 	                      &inSecondsToWait))
 		return NULL;
@@ -721,7 +721,7 @@ static PyObject *DlgObj_GetDialogTimeout(DialogObject *_self, PyObject *_args)
 	                        &outSecondsToWait,
 	                        &outSecondsRemaining);
 	if (_err != noErr) return PyMac_Error(_err);
-	_res = Py_BuildValue("hll",
+	_res = Py_BuildValue("Hkk",
 	                     outButtonToPress,
 	                     outSecondsToWait,
 	                     outSecondsRemaining);
@@ -805,7 +805,7 @@ static PyObject *DlgObj_GetDialogDefaultItem(DialogObject *_self, PyObject *_arg
 	if (!PyArg_ParseTuple(_args, ""))
 		return NULL;
 	_rv = GetDialogDefaultItem(_self->ob_itself);
-	_res = Py_BuildValue("h",
+	_res = Py_BuildValue("H",
 	                     _rv);
 	return _res;
 }
@@ -820,7 +820,7 @@ static PyObject *DlgObj_GetDialogCancelItem(DialogObject *_self, PyObject *_args
 	if (!PyArg_ParseTuple(_args, ""))
 		return NULL;
 	_rv = GetDialogCancelItem(_self->ob_itself);
-	_res = Py_BuildValue("h",
+	_res = Py_BuildValue("H",
 	                     _rv);
 	return _res;
 }
@@ -835,7 +835,7 @@ static PyObject *DlgObj_GetDialogKeyboardFocusItem(DialogObject *_self, PyObject
 	if (!PyArg_ParseTuple(_args, ""))
 		return NULL;
 	_rv = GetDialogKeyboardFocusItem(_self->ob_itself);
-	_res = Py_BuildValue("h",
+	_res = Py_BuildValue("H",
 	                     _rv);
 	return _res;
 }
@@ -1044,7 +1044,7 @@ static PyObject *Dlg_NewDialog(PyObject *_self, PyObject *_args)
 #ifndef NewDialog
 	PyMac_PRECHECK(NewDialog);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&O&bhO&blO&",
+	if (!PyArg_ParseTuple(_args, "O&O&bHO&blO&",
 	                      PyMac_GetRect, &boundsRect,
 	                      PyMac_GetStr255, title,
 	                      &visible,
@@ -1077,7 +1077,7 @@ static PyObject *Dlg_GetNewDialog(PyObject *_self, PyObject *_args)
 #ifndef GetNewDialog
 	PyMac_PRECHECK(GetNewDialog);
 #endif
-	if (!PyArg_ParseTuple(_args, "hO&",
+	if (!PyArg_ParseTuple(_args, "HO&",
 	                      &dialogID,
 	                      WinObj_Convert, &behind))
 		return NULL;
@@ -1104,7 +1104,7 @@ static PyObject *Dlg_NewColorDialog(PyObject *_self, PyObject *_args)
 #ifndef NewColorDialog
 	PyMac_PRECHECK(NewColorDialog);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&O&bhO&blO&",
+	if (!PyArg_ParseTuple(_args, "O&O&bHO&blO&",
 	                      PyMac_GetRect, &boundsRect,
 	                      PyMac_GetStr255, title,
 	                      &visible,
@@ -1195,7 +1195,7 @@ static PyObject *Dlg_Alert(PyObject *_self, PyObject *_args)
 #ifndef Alert
 	PyMac_PRECHECK(Alert);
 #endif
-	if (!PyArg_ParseTuple(_args, "hO",
+	if (!PyArg_ParseTuple(_args, "HO",
 	                      &alertID,
 	                      &modalFilter))
 		return NULL;
@@ -1215,7 +1215,7 @@ static PyObject *Dlg_StopAlert(PyObject *_self, PyObject *_args)
 #ifndef StopAlert
 	PyMac_PRECHECK(StopAlert);
 #endif
-	if (!PyArg_ParseTuple(_args, "hO",
+	if (!PyArg_ParseTuple(_args, "HO",
 	                      &alertID,
 	                      &modalFilter))
 		return NULL;
@@ -1235,7 +1235,7 @@ static PyObject *Dlg_NoteAlert(PyObject *_self, PyObject *_args)
 #ifndef NoteAlert
 	PyMac_PRECHECK(NoteAlert);
 #endif
-	if (!PyArg_ParseTuple(_args, "hO",
+	if (!PyArg_ParseTuple(_args, "HO",
 	                      &alertID,
 	                      &modalFilter))
 		return NULL;
@@ -1255,7 +1255,7 @@ static PyObject *Dlg_CautionAlert(PyObject *_self, PyObject *_args)
 #ifndef CautionAlert
 	PyMac_PRECHECK(CautionAlert);
 #endif
-	if (!PyArg_ParseTuple(_args, "hO",
+	if (!PyArg_ParseTuple(_args, "HO",
 	                      &alertID,
 	                      &modalFilter))
 		return NULL;
@@ -1338,7 +1338,7 @@ static PyObject *Dlg_GetAlertStage(PyObject *_self, PyObject *_args)
 	if (!PyArg_ParseTuple(_args, ""))
 		return NULL;
 	_rv = GetAlertStage();
-	_res = Py_BuildValue("h",
+	_res = Py_BuildValue("H",
 	                     _rv);
 	return _res;
 }
@@ -1350,7 +1350,7 @@ static PyObject *Dlg_SetDialogFont(PyObject *_self, PyObject *_args)
 #ifndef SetDialogFont
 	PyMac_PRECHECK(SetDialogFont);
 #endif
-	if (!PyArg_ParseTuple(_args, "h",
+	if (!PyArg_ParseTuple(_args, "H",
 	                      &fontNum))
 		return NULL;
 	SetDialogFont(fontNum);
@@ -1414,7 +1414,7 @@ static PyObject *Dlg_NewFeaturesDialog(PyObject *_self, PyObject *_args)
 #ifndef NewFeaturesDialog
 	PyMac_PRECHECK(NewFeaturesDialog);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&O&bhO&blO&l",
+	if (!PyArg_ParseTuple(_args, "O&O&bHO&blO&k",
 	                      PyMac_GetRect, &inBoundsRect,
 	                      PyMac_GetStr255, inTitle,
 	                      &inIsVisible,

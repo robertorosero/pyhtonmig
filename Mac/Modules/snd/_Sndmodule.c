@@ -14,9 +14,9 @@
 
 /* Macro to test whether a weak-loaded CFM function exists */
 #define PyMac_PRECHECK(rtn) do { if ( &rtn == NULL )  {\
-    	PyErr_SetString(PyExc_NotImplementedError, \
-    	"Not available in this shared library/OS version"); \
-    	return NULL; \
+        PyErr_SetString(PyExc_NotImplementedError, \
+        "Not available in this shared library/OS version"); \
+        return NULL; \
     }} while(0)
 
 
@@ -35,10 +35,10 @@ SndCmd_Convert(PyObject *v, SndCommand *pc)
 	pc->param1 = 0;
 	pc->param2 = 0;
 	if (PyTuple_Check(v)) {
-		if (PyArg_ParseTuple(v, "h|hl", &pc->cmd, &pc->param1, &pc->param2))
+		if (PyArg_ParseTuple(v, "H|HK", &pc->cmd, &pc->param1, &pc->param2))
 			return 1;
 		PyErr_Clear();
-		return PyArg_ParseTuple(v, "Hhs#", &pc->cmd, &pc->param1, &pc->param2, &len);
+		return PyArg_ParseTuple(v, "HHs#", &pc->cmd, &pc->param1, &pc->param2, &len);
 	}
 	return PyArg_Parse(v, "H", &pc->cmd);
 }
@@ -141,7 +141,7 @@ static PyObject *SndCh_SndChannelStatus(SndChannelObject *_self, PyObject *_args
 	OSErr _err;
 	short theLength;
 	SCStatus theStatus__out__;
-	if (!PyArg_ParseTuple(_args, "h",
+	if (!PyArg_ParseTuple(_args, "H",
 	                      &theLength))
 		return NULL;
 	_err = SndChannelStatus(_self->ob_itself,
@@ -324,7 +324,7 @@ static PyObject *SPBObj_get_inRefNum(SPBObject *self, void *closure)
 
 static int SPBObj_set_inRefNum(SPBObject *self, PyObject *v, void *closure)
 {
-	return -1 + PyArg_Parse(v, "l", &self->ob_spb.inRefNum);
+	return -1 + PyArg_Parse(v, "k", &self->ob_spb.inRefNum);
 	return 0;
 }
 
@@ -335,7 +335,7 @@ static PyObject *SPBObj_get_count(SPBObject *self, void *closure)
 
 static int SPBObj_set_count(SPBObject *self, PyObject *v, void *closure)
 {
-	return -1 + PyArg_Parse(v, "l", &self->ob_spb.count);
+	return -1 + PyArg_Parse(v, "k", &self->ob_spb.count);
 	return 0;
 }
 
@@ -346,7 +346,7 @@ static PyObject *SPBObj_get_milliseconds(SPBObject *self, void *closure)
 
 static int SPBObj_set_milliseconds(SPBObject *self, PyObject *v, void *closure)
 {
-	return -1 + PyArg_Parse(v, "l", &self->ob_spb.milliseconds);
+	return -1 + PyArg_Parse(v, "k", &self->ob_spb.milliseconds);
 	return 0;
 }
 
@@ -441,7 +441,7 @@ static PyObject *Snd_SysBeep(PyObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
 	short duration;
-	if (!PyArg_ParseTuple(_args, "h",
+	if (!PyArg_ParseTuple(_args, "H",
 	                      &duration))
 		return NULL;
 	SysBeep(duration);
@@ -458,7 +458,7 @@ static PyObject *Snd_SndNewChannel(PyObject *_self, PyObject *_args)
 	short synth;
 	long init;
 	PyObject* userRoutine;
-	if (!PyArg_ParseTuple(_args, "hlO",
+	if (!PyArg_ParseTuple(_args, "HlO",
 	                      &synth,
 	                      &init,
 	                      &userRoutine))
@@ -504,7 +504,7 @@ static PyObject *Snd_SndManagerStatus(PyObject *_self, PyObject *_args)
 	OSErr _err;
 	short theLength;
 	SMStatus theStatus__out__;
-	if (!PyArg_ParseTuple(_args, "h",
+	if (!PyArg_ParseTuple(_args, "H",
 	                      &theLength))
 		return NULL;
 	_err = SndManagerStatus(theLength,
@@ -522,7 +522,7 @@ static PyObject *Snd_SndGetSysBeepState(PyObject *_self, PyObject *_args)
 	if (!PyArg_ParseTuple(_args, ""))
 		return NULL;
 	SndGetSysBeepState(&sysBeepState);
-	_res = Py_BuildValue("h",
+	_res = Py_BuildValue("H",
 	                     sysBeepState);
 	return _res;
 }
@@ -532,7 +532,7 @@ static PyObject *Snd_SndSetSysBeepState(PyObject *_self, PyObject *_args)
 	PyObject *_res = NULL;
 	OSErr _err;
 	short sysBeepState;
-	if (!PyArg_ParseTuple(_args, "h",
+	if (!PyArg_ParseTuple(_args, "H",
 	                      &sysBeepState))
 		return NULL;
 	_err = SndSetSysBeepState(sysBeepState);
@@ -626,7 +626,7 @@ static PyObject *Snd_GetCompressionInfo(PyObject *_self, PyObject *_args)
 	short numChannels;
 	short sampleSize;
 	CompressionInfo cp__out__;
-	if (!PyArg_ParseTuple(_args, "hO&hh",
+	if (!PyArg_ParseTuple(_args, "HO&HH",
 	                      &compressionID,
 	                      PyMac_GetOSType, &format,
 	                      &numChannels,
@@ -739,7 +739,7 @@ static PyObject *Snd_SPBSignInDevice(PyObject *_self, PyObject *_args)
 	OSErr _err;
 	short deviceRefNum;
 	Str255 deviceName;
-	if (!PyArg_ParseTuple(_args, "hO&",
+	if (!PyArg_ParseTuple(_args, "HO&",
 	                      &deviceRefNum,
 	                      PyMac_GetStr255, deviceName))
 		return NULL;
@@ -756,7 +756,7 @@ static PyObject *Snd_SPBSignOutDevice(PyObject *_self, PyObject *_args)
 	PyObject *_res = NULL;
 	OSErr _err;
 	short deviceRefNum;
-	if (!PyArg_ParseTuple(_args, "h",
+	if (!PyArg_ParseTuple(_args, "H",
 	                      &deviceRefNum))
 		return NULL;
 	_err = SPBSignOutDevice(deviceRefNum);
@@ -773,7 +773,7 @@ static PyObject *Snd_SPBGetIndexedDevice(PyObject *_self, PyObject *_args)
 	short count;
 	Str255 deviceName;
 	Handle deviceIconHandle;
-	if (!PyArg_ParseTuple(_args, "h",
+	if (!PyArg_ParseTuple(_args, "H",
 	                      &count))
 		return NULL;
 	_err = SPBGetIndexedDevice(count,
@@ -793,7 +793,7 @@ static PyObject *Snd_SPBOpenDevice(PyObject *_self, PyObject *_args)
 	Str255 deviceName;
 	short permission;
 	long inRefNum;
-	if (!PyArg_ParseTuple(_args, "O&h",
+	if (!PyArg_ParseTuple(_args, "O&H",
 	                      PyMac_GetStr255, deviceName,
 	                      &permission))
 		return NULL;
@@ -906,7 +906,7 @@ static PyObject *Snd_SPBGetRecordingStatus(PyObject *_self, PyObject *_args)
 	                             &totalMsecsToRecord,
 	                             &numberOfMsecsRecorded);
 	if (_err != noErr) return PyMac_Error(_err);
-	_res = Py_BuildValue("hhllll",
+	_res = Py_BuildValue("HHkkkk",
 	                     recordingStatus,
 	                     meterLevel,
 	                     totalSamplesToRecord,

@@ -14,9 +14,9 @@
 
 /* Macro to test whether a weak-loaded CFM function exists */
 #define PyMac_PRECHECK(rtn) do { if ( &rtn == NULL )  {\
-    	PyErr_SetString(PyExc_NotImplementedError, \
-    	"Not available in this shared library/OS version"); \
-    	return NULL; \
+        PyErr_SetString(PyExc_NotImplementedError, \
+        "Not available in this shared library/OS version"); \
+        return NULL; \
     }} while(0)
 
 
@@ -80,7 +80,7 @@ static PyObject *Help_HMSetTagDelay(PyObject *_self, PyObject *_args)
 	PyObject *_res = NULL;
 	OSStatus _err;
 	Duration inDelay;
-	if (!PyArg_ParseTuple(_args, "l",
+	if (!PyArg_ParseTuple(_args, "k",
 	                      &inDelay))
 		return NULL;
 	_err = HMSetTagDelay(inDelay);
@@ -99,7 +99,7 @@ static PyObject *Help_HMGetTagDelay(PyObject *_self, PyObject *_args)
 		return NULL;
 	_err = HMGetTagDelay(&outDelay);
 	if (_err != noErr) return PyMac_Error(_err);
-	_res = Py_BuildValue("l",
+	_res = Py_BuildValue("k",
 	                     outDelay);
 	return _res;
 }
@@ -110,7 +110,7 @@ static PyObject *Help_HMSetMenuHelpFromBalloonRsrc(PyObject *_self, PyObject *_a
 	OSStatus _err;
 	MenuRef inMenu;
 	SInt16 inHmnuRsrcID;
-	if (!PyArg_ParseTuple(_args, "O&h",
+	if (!PyArg_ParseTuple(_args, "O&H",
 	                      MenuObj_Convert, &inMenu,
 	                      &inHmnuRsrcID))
 		return NULL;
@@ -129,7 +129,7 @@ static PyObject *Help_HMSetDialogHelpFromBalloonRsrc(PyObject *_self, PyObject *
 	DialogPtr inDialog;
 	SInt16 inHdlgRsrcID;
 	SInt16 inItemStart;
-	if (!PyArg_ParseTuple(_args, "O&hh",
+	if (!PyArg_ParseTuple(_args, "O&HH",
 	                      DlgObj_Convert, &inDialog,
 	                      &inHdlgRsrcID,
 	                      &inItemStart))

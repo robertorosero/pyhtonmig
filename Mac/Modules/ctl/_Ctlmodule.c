@@ -14,9 +14,9 @@
 
 /* Macro to test whether a weak-loaded CFM function exists */
 #define PyMac_PRECHECK(rtn) do { if ( &rtn == NULL )  {\
-    	PyErr_SetString(PyExc_NotImplementedError, \
-    	"Not available in this shared library/OS version"); \
-    	return NULL; \
+        PyErr_SetString(PyExc_NotImplementedError, \
+        "Not available in this shared library/OS version"); \
+        return NULL; \
     }} while(0)
 
 
@@ -78,7 +78,7 @@ PyControlID_New(ControlID *itself)
 static int
 PyControlID_Convert(PyObject *v, ControlID *itself)
 {
-	return PyArg_Parse(v, "(O&l)", PyMac_GetOSType, &itself->signature, &itself->id);
+	return PyArg_Parse(v, "(O&k)", PyMac_GetOSType, &itself->signature, &itself->id);
 }
 
 /*
@@ -87,7 +87,7 @@ PyControlID_Convert(PyObject *v, ControlID *itself)
 static int
 DataBrowserTableViewColumnDesc_Convert(PyObject *v, DataBrowserTableViewColumnDesc *itself)
 {
-	return PyArg_Parse(v, "(lO&l)",
+	return PyArg_Parse(v, "(kO&k)",
 	                   &itself->propertyID,
 	                   PyMac_GetOSType, &itself->propertyType,
 	                   &itself->propertyFlags);
@@ -396,7 +396,7 @@ static PyObject *CtlObj_GetBestControlRect(ControlObject *_self, PyObject *_args
 	                          &outRect,
 	                          &outBaseLineOffset);
 	if (_err != noErr) return PyMac_Error(_err);
-	_res = Py_BuildValue("O&h",
+	_res = Py_BuildValue("O&H",
 	                     PyMac_BuildRect, &outRect,
 	                     outBaseLineOffset);
 	return _res;
@@ -444,7 +444,7 @@ static PyObject *CtlObj_SetUpControlBackground(ControlObject *_self, PyObject *_
 #ifndef SetUpControlBackground
 	PyMac_PRECHECK(SetUpControlBackground);
 #endif
-	if (!PyArg_ParseTuple(_args, "hb",
+	if (!PyArg_ParseTuple(_args, "Hb",
 	                      &inDepth,
 	                      &inIsColorDevice))
 		return NULL;
@@ -466,7 +466,7 @@ static PyObject *CtlObj_SetUpControlTextColor(ControlObject *_self, PyObject *_a
 #ifndef SetUpControlTextColor
 	PyMac_PRECHECK(SetUpControlTextColor);
 #endif
-	if (!PyArg_ParseTuple(_args, "hb",
+	if (!PyArg_ParseTuple(_args, "Hb",
 	                      &inDepth,
 	                      &inIsColorDevice))
 		return NULL;
@@ -563,7 +563,7 @@ static PyObject *CtlObj_GetControlClickActivation(ControlObject *_self, PyObject
 	                                 inModifiers,
 	                                 &outResult);
 	if (_err != noErr) return PyMac_Error(_err);
-	_res = Py_BuildValue("l",
+	_res = Py_BuildValue("k",
 	                     outResult);
 	return _res;
 }
@@ -578,7 +578,7 @@ static PyObject *CtlObj_HandleControlKey(ControlObject *_self, PyObject *_args)
 #ifndef HandleControlKey
 	PyMac_PRECHECK(HandleControlKey);
 #endif
-	if (!PyArg_ParseTuple(_args, "hhH",
+	if (!PyArg_ParseTuple(_args, "HHH",
 	                      &inKeyCode,
 	                      &inCharCode,
 	                      &inModifiers))
@@ -624,7 +624,7 @@ static PyObject *CtlObj_MoveControl(ControlObject *_self, PyObject *_args)
 #ifndef MoveControl
 	PyMac_PRECHECK(MoveControl);
 #endif
-	if (!PyArg_ParseTuple(_args, "hh",
+	if (!PyArg_ParseTuple(_args, "HH",
 	                      &h,
 	                      &v))
 		return NULL;
@@ -644,7 +644,7 @@ static PyObject *CtlObj_SizeControl(ControlObject *_self, PyObject *_args)
 #ifndef SizeControl
 	PyMac_PRECHECK(SizeControl);
 #endif
-	if (!PyArg_ParseTuple(_args, "hh",
+	if (!PyArg_ParseTuple(_args, "HH",
 	                      &w,
 	                      &h))
 		return NULL;
@@ -736,7 +736,7 @@ static PyObject *CtlObj_GetControlValue(ControlObject *_self, PyObject *_args)
 	if (!PyArg_ParseTuple(_args, ""))
 		return NULL;
 	_rv = GetControlValue(_self->ob_itself);
-	_res = Py_BuildValue("h",
+	_res = Py_BuildValue("H",
 	                     _rv);
 	return _res;
 }
@@ -748,7 +748,7 @@ static PyObject *CtlObj_SetControlValue(ControlObject *_self, PyObject *_args)
 #ifndef SetControlValue
 	PyMac_PRECHECK(SetControlValue);
 #endif
-	if (!PyArg_ParseTuple(_args, "h",
+	if (!PyArg_ParseTuple(_args, "H",
 	                      &newValue))
 		return NULL;
 	SetControlValue(_self->ob_itself,
@@ -768,7 +768,7 @@ static PyObject *CtlObj_GetControlMinimum(ControlObject *_self, PyObject *_args)
 	if (!PyArg_ParseTuple(_args, ""))
 		return NULL;
 	_rv = GetControlMinimum(_self->ob_itself);
-	_res = Py_BuildValue("h",
+	_res = Py_BuildValue("H",
 	                     _rv);
 	return _res;
 }
@@ -780,7 +780,7 @@ static PyObject *CtlObj_SetControlMinimum(ControlObject *_self, PyObject *_args)
 #ifndef SetControlMinimum
 	PyMac_PRECHECK(SetControlMinimum);
 #endif
-	if (!PyArg_ParseTuple(_args, "h",
+	if (!PyArg_ParseTuple(_args, "H",
 	                      &newMinimum))
 		return NULL;
 	SetControlMinimum(_self->ob_itself,
@@ -800,7 +800,7 @@ static PyObject *CtlObj_GetControlMaximum(ControlObject *_self, PyObject *_args)
 	if (!PyArg_ParseTuple(_args, ""))
 		return NULL;
 	_rv = GetControlMaximum(_self->ob_itself);
-	_res = Py_BuildValue("h",
+	_res = Py_BuildValue("H",
 	                     _rv);
 	return _res;
 }
@@ -812,7 +812,7 @@ static PyObject *CtlObj_SetControlMaximum(ControlObject *_self, PyObject *_args)
 #ifndef SetControlMaximum
 	PyMac_PRECHECK(SetControlMaximum);
 #endif
-	if (!PyArg_ParseTuple(_args, "h",
+	if (!PyArg_ParseTuple(_args, "H",
 	                      &newMaximum))
 		return NULL;
 	SetControlMaximum(_self->ob_itself,
@@ -1010,7 +1010,7 @@ static PyObject *CtlObj_SetControlCommandID(ControlObject *_self, PyObject *_arg
 #ifndef SetControlCommandID
 	PyMac_PRECHECK(SetControlCommandID);
 #endif
-	if (!PyArg_ParseTuple(_args, "l",
+	if (!PyArg_ParseTuple(_args, "k",
 	                      &inCommandID))
 		return NULL;
 	_err = SetControlCommandID(_self->ob_itself,
@@ -1034,7 +1034,7 @@ static PyObject *CtlObj_GetControlCommandID(ControlObject *_self, PyObject *_arg
 	_err = GetControlCommandID(_self->ob_itself,
 	                           &outCommandID);
 	if (_err != noErr) return PyMac_Error(_err);
-	_res = Py_BuildValue("l",
+	_res = Py_BuildValue("k",
 	                     outCommandID);
 	return _res;
 }
@@ -1080,7 +1080,7 @@ static PyObject *CtlObj_GetControlPropertyAttributes(ControlObject *_self, PyObj
 	                                    propertyTag,
 	                                    &attributes);
 	if (_err != noErr) return PyMac_Error(_err);
-	_res = Py_BuildValue("l",
+	_res = Py_BuildValue("k",
 	                     attributes);
 	return _res;
 }
@@ -1096,7 +1096,7 @@ static PyObject *CtlObj_ChangeControlPropertyAttributes(ControlObject *_self, Py
 #ifndef ChangeControlPropertyAttributes
 	PyMac_PRECHECK(ChangeControlPropertyAttributes);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&O&ll",
+	if (!PyArg_ParseTuple(_args, "O&O&kk",
 	                      PyMac_GetOSType, &propertyCreator,
 	                      PyMac_GetOSType, &propertyTag,
 	                      &attributesToSet,
@@ -1328,7 +1328,7 @@ static PyObject *CtlObj_GetControlFeatures(ControlObject *_self, PyObject *_args
 	_err = GetControlFeatures(_self->ob_itself,
 	                          &outFeatures);
 	if (_err != noErr) return PyMac_Error(_err);
-	_res = Py_BuildValue("l",
+	_res = Py_BuildValue("k",
 	                     outFeatures);
 	return _res;
 }
@@ -1538,7 +1538,7 @@ static PyObject *CtlObj_GetControlPopupMenuID(ControlObject *_self, PyObject *_a
 	if (!PyArg_ParseTuple(_args, ""))
 		return NULL;
 	_rv = GetControlPopupMenuID(_self->ob_itself);
-	_res = Py_BuildValue("h",
+	_res = Py_BuildValue("H",
 	                     _rv);
 	return _res;
 }
@@ -1601,7 +1601,7 @@ static PyObject *CtlObj_SetControlPopupMenuID(ControlObject *_self, PyObject *_a
 #ifndef SetControlPopupMenuID
 	PyMac_PRECHECK(SetControlPopupMenuID);
 #endif
-	if (!PyArg_ParseTuple(_args, "h",
+	if (!PyArg_ParseTuple(_args, "H",
 	                      &menuID))
 		return NULL;
 	SetControlPopupMenuID(_self->ob_itself,
@@ -1624,7 +1624,7 @@ static PyObject *CtlObj_GetBevelButtonMenuValue(ControlObject *_self, PyObject *
 	_err = GetBevelButtonMenuValue(_self->ob_itself,
 	                               &outValue);
 	if (_err != noErr) return PyMac_Error(_err);
-	_res = Py_BuildValue("h",
+	_res = Py_BuildValue("H",
 	                     outValue);
 	return _res;
 }
@@ -1637,7 +1637,7 @@ static PyObject *CtlObj_SetBevelButtonMenuValue(ControlObject *_self, PyObject *
 #ifndef SetBevelButtonMenuValue
 	PyMac_PRECHECK(SetBevelButtonMenuValue);
 #endif
-	if (!PyArg_ParseTuple(_args, "h",
+	if (!PyArg_ParseTuple(_args, "H",
 	                      &inValue))
 		return NULL;
 	_err = SetBevelButtonMenuValue(_self->ob_itself,
@@ -1712,7 +1712,7 @@ static PyObject *CtlObj_SetDisclosureTriangleLastValue(ControlObject *_self, PyO
 #ifndef SetDisclosureTriangleLastValue
 	PyMac_PRECHECK(SetDisclosureTriangleLastValue);
 #endif
-	if (!PyArg_ParseTuple(_args, "h",
+	if (!PyArg_ParseTuple(_args, "H",
 	                      &inValue))
 		return NULL;
 	_err = SetDisclosureTriangleLastValue(_self->ob_itself,
@@ -1750,7 +1750,7 @@ static PyObject *CtlObj_SetTabEnabled(ControlObject *_self, PyObject *_args)
 #ifndef SetTabEnabled
 	PyMac_PRECHECK(SetTabEnabled);
 #endif
-	if (!PyArg_ParseTuple(_args, "hb",
+	if (!PyArg_ParseTuple(_args, "Hb",
 	                      &inTabToHilite,
 	                      &inEnabled))
 		return NULL;
@@ -1846,7 +1846,7 @@ static PyObject *CtlObj_EnableDataBrowserEditCommand(ControlObject *_self, PyObj
 #ifndef EnableDataBrowserEditCommand
 	PyMac_PRECHECK(EnableDataBrowserEditCommand);
 #endif
-	if (!PyArg_ParseTuple(_args, "l",
+	if (!PyArg_ParseTuple(_args, "k",
 	                      &command))
 		return NULL;
 	_rv = EnableDataBrowserEditCommand(_self->ob_itself,
@@ -1864,7 +1864,7 @@ static PyObject *CtlObj_ExecuteDataBrowserEditCommand(ControlObject *_self, PyOb
 #ifndef ExecuteDataBrowserEditCommand
 	PyMac_PRECHECK(ExecuteDataBrowserEditCommand);
 #endif
-	if (!PyArg_ParseTuple(_args, "l",
+	if (!PyArg_ParseTuple(_args, "k",
 	                      &command))
 		return NULL;
 	_err = ExecuteDataBrowserEditCommand(_self->ob_itself,
@@ -1890,7 +1890,7 @@ static PyObject *CtlObj_GetDataBrowserSelectionAnchor(ControlObject *_self, PyOb
 	                                     &first,
 	                                     &last);
 	if (_err != noErr) return PyMac_Error(_err);
-	_res = Py_BuildValue("ll",
+	_res = Py_BuildValue("kk",
 	                     first,
 	                     last);
 	return _res;
@@ -1905,7 +1905,7 @@ static PyObject *CtlObj_MoveDataBrowserSelectionAnchor(ControlObject *_self, PyO
 #ifndef MoveDataBrowserSelectionAnchor
 	PyMac_PRECHECK(MoveDataBrowserSelectionAnchor);
 #endif
-	if (!PyArg_ParseTuple(_args, "lb",
+	if (!PyArg_ParseTuple(_args, "kb",
 	                      &direction,
 	                      &extendSelection))
 		return NULL;
@@ -1926,7 +1926,7 @@ static PyObject *CtlObj_OpenDataBrowserContainer(ControlObject *_self, PyObject 
 #ifndef OpenDataBrowserContainer
 	PyMac_PRECHECK(OpenDataBrowserContainer);
 #endif
-	if (!PyArg_ParseTuple(_args, "l",
+	if (!PyArg_ParseTuple(_args, "k",
 	                      &container))
 		return NULL;
 	_err = OpenDataBrowserContainer(_self->ob_itself,
@@ -1945,7 +1945,7 @@ static PyObject *CtlObj_CloseDataBrowserContainer(ControlObject *_self, PyObject
 #ifndef CloseDataBrowserContainer
 	PyMac_PRECHECK(CloseDataBrowserContainer);
 #endif
-	if (!PyArg_ParseTuple(_args, "l",
+	if (!PyArg_ParseTuple(_args, "k",
 	                      &container))
 		return NULL;
 	_err = CloseDataBrowserContainer(_self->ob_itself,
@@ -1965,7 +1965,7 @@ static PyObject *CtlObj_SortDataBrowserContainer(ControlObject *_self, PyObject 
 #ifndef SortDataBrowserContainer
 	PyMac_PRECHECK(SortDataBrowserContainer);
 #endif
-	if (!PyArg_ParseTuple(_args, "lb",
+	if (!PyArg_ParseTuple(_args, "kb",
 	                      &container,
 	                      &sortChildren))
 		return NULL;
@@ -1989,7 +1989,7 @@ static PyObject *CtlObj_GetDataBrowserItems(ControlObject *_self, PyObject *_arg
 #ifndef GetDataBrowserItems
 	PyMac_PRECHECK(GetDataBrowserItems);
 #endif
-	if (!PyArg_ParseTuple(_args, "lblO&",
+	if (!PyArg_ParseTuple(_args, "kbkO&",
 	                      &container,
 	                      &recurse,
 	                      &state,
@@ -2017,7 +2017,7 @@ static PyObject *CtlObj_GetDataBrowserItemCount(ControlObject *_self, PyObject *
 #ifndef GetDataBrowserItemCount
 	PyMac_PRECHECK(GetDataBrowserItemCount);
 #endif
-	if (!PyArg_ParseTuple(_args, "lbl",
+	if (!PyArg_ParseTuple(_args, "kbk",
 	                      &container,
 	                      &recurse,
 	                      &state))
@@ -2028,7 +2028,7 @@ static PyObject *CtlObj_GetDataBrowserItemCount(ControlObject *_self, PyObject *
 	                               state,
 	                               &numItems);
 	if (_err != noErr) return PyMac_Error(_err);
-	_res = Py_BuildValue("l",
+	_res = Py_BuildValue("k",
 	                     numItems);
 	return _res;
 }
@@ -2041,7 +2041,7 @@ static PyObject *CtlObj_IsDataBrowserItemSelected(ControlObject *_self, PyObject
 #ifndef IsDataBrowserItemSelected
 	PyMac_PRECHECK(IsDataBrowserItemSelected);
 #endif
-	if (!PyArg_ParseTuple(_args, "l",
+	if (!PyArg_ParseTuple(_args, "k",
 	                      &item))
 		return NULL;
 	_rv = IsDataBrowserItemSelected(_self->ob_itself,
@@ -2060,14 +2060,14 @@ static PyObject *CtlObj_GetDataBrowserItemState(ControlObject *_self, PyObject *
 #ifndef GetDataBrowserItemState
 	PyMac_PRECHECK(GetDataBrowserItemState);
 #endif
-	if (!PyArg_ParseTuple(_args, "l",
+	if (!PyArg_ParseTuple(_args, "k",
 	                      &item))
 		return NULL;
 	_err = GetDataBrowserItemState(_self->ob_itself,
 	                               item,
 	                               &state);
 	if (_err != noErr) return PyMac_Error(_err);
-	_res = Py_BuildValue("l",
+	_res = Py_BuildValue("k",
 	                     state);
 	return _res;
 }
@@ -2082,7 +2082,7 @@ static PyObject *CtlObj_RevealDataBrowserItem(ControlObject *_self, PyObject *_a
 #ifndef RevealDataBrowserItem
 	PyMac_PRECHECK(RevealDataBrowserItem);
 #endif
-	if (!PyArg_ParseTuple(_args, "llb",
+	if (!PyArg_ParseTuple(_args, "kkb",
 	                      &item,
 	                      &propertyID,
 	                      &options))
@@ -2178,7 +2178,7 @@ static PyObject *CtlObj_SetDataBrowserTarget(ControlObject *_self, PyObject *_ar
 #ifndef SetDataBrowserTarget
 	PyMac_PRECHECK(SetDataBrowserTarget);
 #endif
-	if (!PyArg_ParseTuple(_args, "l",
+	if (!PyArg_ParseTuple(_args, "k",
 	                      &target))
 		return NULL;
 	_err = SetDataBrowserTarget(_self->ob_itself,
@@ -2202,7 +2202,7 @@ static PyObject *CtlObj_GetDataBrowserTarget(ControlObject *_self, PyObject *_ar
 	_err = GetDataBrowserTarget(_self->ob_itself,
 	                            &target);
 	if (_err != noErr) return PyMac_Error(_err);
-	_res = Py_BuildValue("l",
+	_res = Py_BuildValue("k",
 	                     target);
 	return _res;
 }
@@ -2253,7 +2253,7 @@ static PyObject *CtlObj_SetDataBrowserScrollPosition(ControlObject *_self, PyObj
 #ifndef SetDataBrowserScrollPosition
 	PyMac_PRECHECK(SetDataBrowserScrollPosition);
 #endif
-	if (!PyArg_ParseTuple(_args, "ll",
+	if (!PyArg_ParseTuple(_args, "kk",
 	                      &top,
 	                      &left))
 		return NULL;
@@ -2281,7 +2281,7 @@ static PyObject *CtlObj_GetDataBrowserScrollPosition(ControlObject *_self, PyObj
 	                                    &top,
 	                                    &left);
 	if (_err != noErr) return PyMac_Error(_err);
-	_res = Py_BuildValue("ll",
+	_res = Py_BuildValue("kk",
 	                     top,
 	                     left);
 	return _res;
@@ -2338,7 +2338,7 @@ static PyObject *CtlObj_SetDataBrowserSortProperty(ControlObject *_self, PyObjec
 #ifndef SetDataBrowserSortProperty
 	PyMac_PRECHECK(SetDataBrowserSortProperty);
 #endif
-	if (!PyArg_ParseTuple(_args, "l",
+	if (!PyArg_ParseTuple(_args, "k",
 	                      &property))
 		return NULL;
 	_err = SetDataBrowserSortProperty(_self->ob_itself,
@@ -2362,7 +2362,7 @@ static PyObject *CtlObj_GetDataBrowserSortProperty(ControlObject *_self, PyObjec
 	_err = GetDataBrowserSortProperty(_self->ob_itself,
 	                                  &property);
 	if (_err != noErr) return PyMac_Error(_err);
-	_res = Py_BuildValue("l",
+	_res = Py_BuildValue("k",
 	                     property);
 	return _res;
 }
@@ -2375,7 +2375,7 @@ static PyObject *CtlObj_SetDataBrowserSelectionFlags(ControlObject *_self, PyObj
 #ifndef SetDataBrowserSelectionFlags
 	PyMac_PRECHECK(SetDataBrowserSelectionFlags);
 #endif
-	if (!PyArg_ParseTuple(_args, "l",
+	if (!PyArg_ParseTuple(_args, "k",
 	                      &selectionFlags))
 		return NULL;
 	_err = SetDataBrowserSelectionFlags(_self->ob_itself,
@@ -2399,7 +2399,7 @@ static PyObject *CtlObj_GetDataBrowserSelectionFlags(ControlObject *_self, PyObj
 	_err = GetDataBrowserSelectionFlags(_self->ob_itself,
 	                                    &selectionFlags);
 	if (_err != noErr) return PyMac_Error(_err);
-	_res = Py_BuildValue("l",
+	_res = Py_BuildValue("k",
 	                     selectionFlags);
 	return _res;
 }
@@ -2413,7 +2413,7 @@ static PyObject *CtlObj_SetDataBrowserPropertyFlags(ControlObject *_self, PyObje
 #ifndef SetDataBrowserPropertyFlags
 	PyMac_PRECHECK(SetDataBrowserPropertyFlags);
 #endif
-	if (!PyArg_ParseTuple(_args, "ll",
+	if (!PyArg_ParseTuple(_args, "kk",
 	                      &property,
 	                      &flags))
 		return NULL;
@@ -2435,14 +2435,14 @@ static PyObject *CtlObj_GetDataBrowserPropertyFlags(ControlObject *_self, PyObje
 #ifndef GetDataBrowserPropertyFlags
 	PyMac_PRECHECK(GetDataBrowserPropertyFlags);
 #endif
-	if (!PyArg_ParseTuple(_args, "l",
+	if (!PyArg_ParseTuple(_args, "k",
 	                      &property))
 		return NULL;
 	_err = GetDataBrowserPropertyFlags(_self->ob_itself,
 	                                   property,
 	                                   &flags);
 	if (_err != noErr) return PyMac_Error(_err);
-	_res = Py_BuildValue("l",
+	_res = Py_BuildValue("k",
 	                     flags);
 	return _res;
 }
@@ -2515,7 +2515,7 @@ static PyObject *CtlObj_SetDataBrowserEditItem(ControlObject *_self, PyObject *_
 #ifndef SetDataBrowserEditItem
 	PyMac_PRECHECK(SetDataBrowserEditItem);
 #endif
-	if (!PyArg_ParseTuple(_args, "ll",
+	if (!PyArg_ParseTuple(_args, "kk",
 	                      &item,
 	                      &property))
 		return NULL;
@@ -2543,7 +2543,7 @@ static PyObject *CtlObj_GetDataBrowserEditItem(ControlObject *_self, PyObject *_
 	                              &item,
 	                              &property);
 	if (_err != noErr) return PyMac_Error(_err);
-	_res = Py_BuildValue("ll",
+	_res = Py_BuildValue("kk",
 	                     item,
 	                     property);
 	return _res;
@@ -2560,7 +2560,7 @@ static PyObject *CtlObj_GetDataBrowserItemPartBounds(ControlObject *_self, PyObj
 #ifndef GetDataBrowserItemPartBounds
 	PyMac_PRECHECK(GetDataBrowserItemPartBounds);
 #endif
-	if (!PyArg_ParseTuple(_args, "llO&",
+	if (!PyArg_ParseTuple(_args, "kkO&",
 	                      &item,
 	                      &property,
 	                      PyMac_GetOSType, &part))
@@ -2584,7 +2584,7 @@ static PyObject *CtlObj_RemoveDataBrowserTableViewColumn(ControlObject *_self, P
 #ifndef RemoveDataBrowserTableViewColumn
 	PyMac_PRECHECK(RemoveDataBrowserTableViewColumn);
 #endif
-	if (!PyArg_ParseTuple(_args, "l",
+	if (!PyArg_ParseTuple(_args, "k",
 	                      &column))
 		return NULL;
 	_err = RemoveDataBrowserTableViewColumn(_self->ob_itself,
@@ -2608,7 +2608,7 @@ static PyObject *CtlObj_GetDataBrowserTableViewColumnCount(ControlObject *_self,
 	_err = GetDataBrowserTableViewColumnCount(_self->ob_itself,
 	                                          &numColumns);
 	if (_err != noErr) return PyMac_Error(_err);
-	_res = Py_BuildValue("l",
+	_res = Py_BuildValue("k",
 	                     numColumns);
 	return _res;
 }
@@ -2621,7 +2621,7 @@ static PyObject *CtlObj_SetDataBrowserTableViewHiliteStyle(ControlObject *_self,
 #ifndef SetDataBrowserTableViewHiliteStyle
 	PyMac_PRECHECK(SetDataBrowserTableViewHiliteStyle);
 #endif
-	if (!PyArg_ParseTuple(_args, "l",
+	if (!PyArg_ParseTuple(_args, "k",
 	                      &hiliteStyle))
 		return NULL;
 	_err = SetDataBrowserTableViewHiliteStyle(_self->ob_itself,
@@ -2645,7 +2645,7 @@ static PyObject *CtlObj_GetDataBrowserTableViewHiliteStyle(ControlObject *_self,
 	_err = GetDataBrowserTableViewHiliteStyle(_self->ob_itself,
 	                                          &hiliteStyle);
 	if (_err != noErr) return PyMac_Error(_err);
-	_res = Py_BuildValue("l",
+	_res = Py_BuildValue("k",
 	                     hiliteStyle);
 	return _res;
 }
@@ -2733,7 +2733,7 @@ static PyObject *CtlObj_SetDataBrowserTableViewItemRowHeight(ControlObject *_sel
 #ifndef SetDataBrowserTableViewItemRowHeight
 	PyMac_PRECHECK(SetDataBrowserTableViewItemRowHeight);
 #endif
-	if (!PyArg_ParseTuple(_args, "lH",
+	if (!PyArg_ParseTuple(_args, "kH",
 	                      &item,
 	                      &height))
 		return NULL;
@@ -2755,7 +2755,7 @@ static PyObject *CtlObj_GetDataBrowserTableViewItemRowHeight(ControlObject *_sel
 #ifndef GetDataBrowserTableViewItemRowHeight
 	PyMac_PRECHECK(GetDataBrowserTableViewItemRowHeight);
 #endif
-	if (!PyArg_ParseTuple(_args, "l",
+	if (!PyArg_ParseTuple(_args, "k",
 	                      &item))
 		return NULL;
 	_err = GetDataBrowserTableViewItemRowHeight(_self->ob_itself,
@@ -2776,7 +2776,7 @@ static PyObject *CtlObj_SetDataBrowserTableViewNamedColumnWidth(ControlObject *_
 #ifndef SetDataBrowserTableViewNamedColumnWidth
 	PyMac_PRECHECK(SetDataBrowserTableViewNamedColumnWidth);
 #endif
-	if (!PyArg_ParseTuple(_args, "lH",
+	if (!PyArg_ParseTuple(_args, "kH",
 	                      &column,
 	                      &width))
 		return NULL;
@@ -2798,7 +2798,7 @@ static PyObject *CtlObj_GetDataBrowserTableViewNamedColumnWidth(ControlObject *_
 #ifndef GetDataBrowserTableViewNamedColumnWidth
 	PyMac_PRECHECK(GetDataBrowserTableViewNamedColumnWidth);
 #endif
-	if (!PyArg_ParseTuple(_args, "l",
+	if (!PyArg_ParseTuple(_args, "k",
 	                      &column))
 		return NULL;
 	_err = GetDataBrowserTableViewNamedColumnWidth(_self->ob_itself,
@@ -2862,14 +2862,14 @@ static PyObject *CtlObj_GetDataBrowserTableViewItemID(ControlObject *_self, PyOb
 #ifndef GetDataBrowserTableViewItemID
 	PyMac_PRECHECK(GetDataBrowserTableViewItemID);
 #endif
-	if (!PyArg_ParseTuple(_args, "l",
+	if (!PyArg_ParseTuple(_args, "k",
 	                      &row))
 		return NULL;
 	_err = GetDataBrowserTableViewItemID(_self->ob_itself,
 	                                     row,
 	                                     &item);
 	if (_err != noErr) return PyMac_Error(_err);
-	_res = Py_BuildValue("l",
+	_res = Py_BuildValue("k",
 	                     item);
 	return _res;
 }
@@ -2883,7 +2883,7 @@ static PyObject *CtlObj_SetDataBrowserTableViewItemRow(ControlObject *_self, PyO
 #ifndef SetDataBrowserTableViewItemRow
 	PyMac_PRECHECK(SetDataBrowserTableViewItemRow);
 #endif
-	if (!PyArg_ParseTuple(_args, "ll",
+	if (!PyArg_ParseTuple(_args, "kk",
 	                      &item,
 	                      &row))
 		return NULL;
@@ -2905,14 +2905,14 @@ static PyObject *CtlObj_GetDataBrowserTableViewItemRow(ControlObject *_self, PyO
 #ifndef GetDataBrowserTableViewItemRow
 	PyMac_PRECHECK(GetDataBrowserTableViewItemRow);
 #endif
-	if (!PyArg_ParseTuple(_args, "l",
+	if (!PyArg_ParseTuple(_args, "k",
 	                      &item))
 		return NULL;
 	_err = GetDataBrowserTableViewItemRow(_self->ob_itself,
 	                                      item,
 	                                      &row);
 	if (_err != noErr) return PyMac_Error(_err);
-	_res = Py_BuildValue("l",
+	_res = Py_BuildValue("k",
 	                     row);
 	return _res;
 }
@@ -2926,7 +2926,7 @@ static PyObject *CtlObj_SetDataBrowserTableViewColumnPosition(ControlObject *_se
 #ifndef SetDataBrowserTableViewColumnPosition
 	PyMac_PRECHECK(SetDataBrowserTableViewColumnPosition);
 #endif
-	if (!PyArg_ParseTuple(_args, "ll",
+	if (!PyArg_ParseTuple(_args, "kk",
 	                      &column,
 	                      &position))
 		return NULL;
@@ -2948,14 +2948,14 @@ static PyObject *CtlObj_GetDataBrowserTableViewColumnPosition(ControlObject *_se
 #ifndef GetDataBrowserTableViewColumnPosition
 	PyMac_PRECHECK(GetDataBrowserTableViewColumnPosition);
 #endif
-	if (!PyArg_ParseTuple(_args, "l",
+	if (!PyArg_ParseTuple(_args, "k",
 	                      &column))
 		return NULL;
 	_err = GetDataBrowserTableViewColumnPosition(_self->ob_itself,
 	                                             column,
 	                                             &position);
 	if (_err != noErr) return PyMac_Error(_err);
-	_res = Py_BuildValue("l",
+	_res = Py_BuildValue("k",
 	                     position);
 	return _res;
 }
@@ -2969,14 +2969,14 @@ static PyObject *CtlObj_GetDataBrowserTableViewColumnProperty(ControlObject *_se
 #ifndef GetDataBrowserTableViewColumnProperty
 	PyMac_PRECHECK(GetDataBrowserTableViewColumnProperty);
 #endif
-	if (!PyArg_ParseTuple(_args, "l",
+	if (!PyArg_ParseTuple(_args, "k",
 	                      &column))
 		return NULL;
 	_err = GetDataBrowserTableViewColumnProperty(_self->ob_itself,
 	                                             column,
 	                                             &property);
 	if (_err != noErr) return PyMac_Error(_err);
-	_res = Py_BuildValue("l",
+	_res = Py_BuildValue("k",
 	                     property);
 	return _res;
 }
@@ -3006,7 +3006,7 @@ static PyObject *CtlObj_AddDataBrowserListViewColumn(ControlObject *_self, PyObj
 #ifndef AddDataBrowserListViewColumn
 	PyMac_PRECHECK(AddDataBrowserListViewColumn);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&l",
+	if (!PyArg_ParseTuple(_args, "O&k",
 	                      DataBrowserListViewColumnDesc_Convert, &columnDesc,
 	                      &position))
 		return NULL;
@@ -3102,7 +3102,7 @@ static PyObject *CtlObj_SetDataBrowserListViewDisclosureColumn(ControlObject *_s
 #ifndef SetDataBrowserListViewDisclosureColumn
 	PyMac_PRECHECK(SetDataBrowserListViewDisclosureColumn);
 #endif
-	if (!PyArg_ParseTuple(_args, "lb",
+	if (!PyArg_ParseTuple(_args, "kb",
 	                      &column,
 	                      &expandableRows))
 		return NULL;
@@ -3130,7 +3130,7 @@ static PyObject *CtlObj_GetDataBrowserListViewDisclosureColumn(ControlObject *_s
 	                                              &column,
 	                                              &expandableRows);
 	if (_err != noErr) return PyMac_Error(_err);
-	_res = Py_BuildValue("lb",
+	_res = Py_BuildValue("kb",
 	                     column,
 	                     expandableRows);
 	return _res;
@@ -3168,7 +3168,7 @@ static PyObject *CtlObj_GetDataBrowserColumnViewPathLength(ControlObject *_self,
 	_err = GetDataBrowserColumnViewPathLength(_self->ob_itself,
 	                                          &pathLength);
 	if (_err != noErr) return PyMac_Error(_err);
-	_res = Py_BuildValue("l",
+	_res = Py_BuildValue("k",
 	                     pathLength);
 	return _res;
 }
@@ -3960,7 +3960,7 @@ static PyObject *Ctl_NewControl(PyObject *_self, PyObject *_args)
 #ifndef NewControl
 	PyMac_PRECHECK(NewControl);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&O&O&bhhhhl",
+	if (!PyArg_ParseTuple(_args, "O&O&O&bHHHHl",
 	                      WinObj_Convert, &owningWindow,
 	                      PyMac_GetRect, &boundsRect,
 	                      PyMac_GetStr255, controlTitle,
@@ -3994,7 +3994,7 @@ static PyObject *Ctl_GetNewControl(PyObject *_self, PyObject *_args)
 #ifndef GetNewControl
 	PyMac_PRECHECK(GetNewControl);
 #endif
-	if (!PyArg_ParseTuple(_args, "hO&",
+	if (!PyArg_ParseTuple(_args, "HO&",
 	                      &resourceID,
 	                      WinObj_Convert, &owningWindow))
 		return NULL;
@@ -4319,7 +4319,7 @@ static PyObject *Ctl_CreateBevelButtonControl(PyObject *_self, PyObject *_args)
 #ifndef CreateBevelButtonControl
 	PyMac_PRECHECK(CreateBevelButtonControl);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&O&O&HHO&hHH",
+	if (!PyArg_ParseTuple(_args, "O&O&O&HHO&HHH",
 	                      WinObj_Convert, &window,
 	                      PyMac_GetRect, &boundsRect,
 	                      CFStringRefObj_Convert, &title,
@@ -4662,7 +4662,7 @@ static PyObject *Ctl_CreatePopupGroupBoxControl(PyObject *_self, PyObject *_args
 #ifndef CreatePopupGroupBoxControl
 	PyMac_PRECHECK(CreatePopupGroupBoxControl);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&O&O&bhbhhb",
+	if (!PyArg_ParseTuple(_args, "O&O&O&bHbHHB",
 	                      WinObj_Convert, &window,
 	                      PyMac_GetRect, &boundsRect,
 	                      CFStringRefObj_Convert, &title,
@@ -4779,7 +4779,7 @@ static PyObject *Ctl_CreateClockControl(PyObject *_self, PyObject *_args)
 #ifndef CreateClockControl
 	PyMac_PRECHECK(CreateClockControl);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&O&Hl",
+	if (!PyArg_ParseTuple(_args, "O&O&Hk",
 	                      WinObj_Convert, &window,
 	                      PyMac_GetRect, &boundsRect,
 	                      &clockType,
@@ -4807,7 +4807,7 @@ static PyObject *Ctl_CreateUserPaneControl(PyObject *_self, PyObject *_args)
 #ifndef CreateUserPaneControl
 	PyMac_PRECHECK(CreateUserPaneControl);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&O&l",
+	if (!PyArg_ParseTuple(_args, "O&O&k",
 	                      WinObj_Convert, &window,
 	                      PyMac_GetRect, &boundsRect,
 	                      &features))
@@ -5151,7 +5151,7 @@ static PyObject *Ctl_CreatePopupButtonControl(PyObject *_self, PyObject *_args)
 #ifndef CreatePopupButtonControl
 	PyMac_PRECHECK(CreatePopupButtonControl);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&O&O&hbhhb",
+	if (!PyArg_ParseTuple(_args, "O&O&O&HbHHB",
 	                      WinObj_Convert, &window,
 	                      PyMac_GetRect, &boundsRect,
 	                      CFStringRefObj_Convert, &title,
@@ -5214,7 +5214,7 @@ static PyObject *Ctl_CreateScrollingTextBoxControl(PyObject *_self, PyObject *_a
 #ifndef CreateScrollingTextBoxControl
 	PyMac_PRECHECK(CreateScrollingTextBoxControl);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&O&hbllH",
+	if (!PyArg_ParseTuple(_args, "O&O&HbkkH",
 	                      WinObj_Convert, &window,
 	                      PyMac_GetRect, &boundsRect,
 	                      &contentResID,
@@ -5283,7 +5283,7 @@ static PyObject *Ctl_CreateRoundButtonControl(PyObject *_self, PyObject *_args)
 #ifndef CreateRoundButtonControl
 	PyMac_PRECHECK(CreateRoundButtonControl);
 #endif
-	if (!PyArg_ParseTuple(_args, "O&O&hO&",
+	if (!PyArg_ParseTuple(_args, "O&O&HO&",
 	                      WinObj_Convert, &inWindow,
 	                      PyMac_GetRect, &inBoundsRect,
 	                      &inSize,
@@ -5379,7 +5379,7 @@ static PyObject *Ctl_FindControlUnderMouse(PyObject *_self, PyObject *_args)
 	_rv = FindControlUnderMouse(inWhere,
 	                            inWindow,
 	                            &outPart);
-	_res = Py_BuildValue("O&h",
+	_res = Py_BuildValue("O&H",
 	                     CtlObj_WhichControl, _rv,
 	                     outPart);
 	return _res;

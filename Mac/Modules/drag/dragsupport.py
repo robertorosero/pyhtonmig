@@ -22,7 +22,7 @@ from macsupport import *
 # Create the type objects
 
 DragRef = OpaqueByValueType(OBJECTTYPE, OBJECTPREFIX)
-DragItemRef = Type("ItemReference", "l")
+DragItemRef = Type("ItemReference", "k")
 # Old names
 DragReference = DragRef
 ItemReference = DragItemRef
@@ -34,13 +34,13 @@ AEDesc_ptr = AEDesc
 RGBColor = OpaqueType("RGBColor", "QdRGB")
 
 FlavorType = OSTypeType("FlavorType")
-DragAttributes = Type("DragAttributes", "l")
-DragBehaviors = Type("DragBehaviors", "l")
-DragImageFlags = Type("DragImageFlags", "l")
-DragImageTranslucency = Type("DragImageTranslucency", "l")
+DragAttributes = Type("DragAttributes", "k")
+DragBehaviors = Type("DragBehaviors", "k")
+DragImageFlags = Type("DragImageFlags", "k")
+DragImageTranslucency = Type("DragImageTranslucency", "k")
 DragRegionMessage = Type("DragRegionMessage", "h")
 ZoomAcceleration = Type("ZoomAcceleration", "h")
-FlavorFlags = Type("FlavorFlags", "l")
+FlavorFlags = Type("FlavorFlags", "k")
 DragTrackingMessage = Type("DragTrackingMessage", "h")
 
 includestuff = includestuff + """
@@ -90,7 +90,7 @@ dragglue_TrackingHandler(DragTrackingMessage theMessage, WindowPtr theWindow,
 	if ( rv == Py_None )
 		i = 0;
 	else
-		PyArg_Parse(rv, "l", &i);
+		PyArg_Parse(rv, "k", &i);
 	Py_DECREF(rv);
 	return i;
 }
@@ -116,7 +116,7 @@ dragglue_ReceiveHandler(WindowPtr theWindow, void *handlerRefCon,
 	if ( rv == Py_None )
 		i = 0;
 	else
-		PyArg_Parse(rv, "l", &i);
+		PyArg_Parse(rv, "k", &i);
 	Py_DECREF(rv);
 	return i;
 }
@@ -145,7 +145,7 @@ dragglue_SendData(FlavorType theType, void *dragSendRefCon,
 	if ( rv == Py_None )
 		i = 0;
 	else
-		PyArg_Parse(rv, "l", &i);
+		PyArg_Parse(rv, "k", &i);
 	Py_DECREF(rv);
 	return i;
 }

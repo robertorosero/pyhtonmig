@@ -1457,7 +1457,9 @@ int CFStringRefObj_Convert(PyObject *v, CFStringRef *p_itself)
 
 	if (v == Py_None) { *p_itself = NULL; return 1; }
 	if (PyString_Check(v)) {
-	    char *cStr = PyString_AsString(v);
+	    char *cStr;
+	    if (!PyArg_Parse(v, "es", "ascii", &cStr))
+	    	return NULL;
 		*p_itself = CFStringCreateWithCString((CFAllocatorRef)NULL, cStr, kCFStringEncodingASCII);
 		return 1;
 	}
@@ -3930,7 +3932,7 @@ static PyObject *CF_CFStringConvertEncodingToNSStringEncoding(PyObject *_self, P
 	                      &encoding))
 		return NULL;
 	_rv = CFStringConvertEncodingToNSStringEncoding(encoding);
-	_res = Py_BuildValue("l",
+	_res = Py_BuildValue("k",
 	                     _rv);
 	return _res;
 }
@@ -3943,7 +3945,7 @@ static PyObject *CF_CFStringConvertNSStringEncodingToEncoding(PyObject *_self, P
 #ifndef CFStringConvertNSStringEncodingToEncoding
 	PyMac_PRECHECK(CFStringConvertNSStringEncodingToEncoding);
 #endif
-	if (!PyArg_ParseTuple(_args, "l",
+	if (!PyArg_ParseTuple(_args, "k",
 	                      &encoding))
 		return NULL;
 	_rv = CFStringConvertNSStringEncodingToEncoding(encoding);
@@ -3964,7 +3966,7 @@ static PyObject *CF_CFStringConvertEncodingToWindowsCodepage(PyObject *_self, Py
 	                      &encoding))
 		return NULL;
 	_rv = CFStringConvertEncodingToWindowsCodepage(encoding);
-	_res = Py_BuildValue("l",
+	_res = Py_BuildValue("k",
 	                     _rv);
 	return _res;
 }
@@ -3977,7 +3979,7 @@ static PyObject *CF_CFStringConvertWindowsCodepageToEncoding(PyObject *_self, Py
 #ifndef CFStringConvertWindowsCodepageToEncoding
 	PyMac_PRECHECK(CFStringConvertWindowsCodepageToEncoding);
 #endif
-	if (!PyArg_ParseTuple(_args, "l",
+	if (!PyArg_ParseTuple(_args, "k",
 	                      &codepage))
 		return NULL;
 	_rv = CFStringConvertWindowsCodepageToEncoding(codepage);

@@ -104,10 +104,10 @@ SndCmd_Convert(PyObject *v, SndCommand *pc)
 	pc->param1 = 0;
 	pc->param2 = 0;
 	if (PyTuple_Check(v)) {
-		if (PyArg_ParseTuple(v, "h|hl", &pc->cmd, &pc->param1, &pc->param2))
+		if (PyArg_ParseTuple(v, "H|HK", &pc->cmd, &pc->param1, &pc->param2))
 			return 1;
 		PyErr_Clear();
-		return PyArg_ParseTuple(v, "Hhs#", &pc->cmd, &pc->param1, &pc->param2, &len);
+		return PyArg_ParseTuple(v, "HHs#", &pc->cmd, &pc->param1, &pc->param2, &len);
 	}
 	return PyArg_Parse(v, "H", &pc->cmd);
 }
@@ -216,17 +216,17 @@ class SpbObjectDefinition(PEP252Mixin, ObjectDefinition):
 		(
 		'inRefNum',
 		'return Py_BuildValue("l", self->ob_spb.inRefNum);',
-		'return -1 + PyArg_Parse(v, "l", &self->ob_spb.inRefNum);',
+		'return -1 + PyArg_Parse(v, "k", &self->ob_spb.inRefNum);',
 		None,
 		), (
 		'count',
 		'return Py_BuildValue("l", self->ob_spb.count);',
-		'return -1 + PyArg_Parse(v, "l", &self->ob_spb.count);',
+		'return -1 + PyArg_Parse(v, "k", &self->ob_spb.count);',
 		None
 		), (
 		'milliseconds',
 		'return Py_BuildValue("l", self->ob_spb.milliseconds);',
-		'return -1 + PyArg_Parse(v, "l", &self->ob_spb.milliseconds);',
+		'return -1 + PyArg_Parse(v, "k", &self->ob_spb.milliseconds);',
 		None,
 		), (
 		'error',

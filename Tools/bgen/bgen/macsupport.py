@@ -11,27 +11,27 @@ from bgen import *
 
 # Simple types
 Boolean = Type("Boolean", "b")
-SignedByte = Type("SignedByte", "b")
+SignedByte = Type("SignedByte", "B")
 Size = Type("Size", "l")
-Style = Type("Style", "b")
-StyleParameter = Type("StyleParameter", "h")
-CharParameter = Type("CharParameter", "h")
-TextEncoding = Type("TextEncoding", "l")
-ByteCount = Type("ByteCount", "l")
-Duration = Type("Duration", "l")
-ByteOffset = Type("ByteOffset", "l")
-OptionBits = Type("OptionBits", "l")
-ItemCount = Type("ItemCount", "l")
-PBVersion = Type("PBVersion", "l")
-ScriptCode = Type("ScriptCode", "h")
-LangCode = Type("LangCode", "h")
-RegionCode = Type("RegionCode", "h")
+Style = Type("Style", "B")
+StyleParameter = Type("StyleParameter", "H")
+CharParameter = Type("CharParameter", "H")
+TextEncoding = Type("TextEncoding", "k")
+ByteCount = Type("ByteCount", "k")
+Duration = Type("Duration", "k")
+ByteOffset = Type("ByteOffset", "k")
+OptionBits = Type("OptionBits", "k")
+ItemCount = Type("ItemCount", "k")
+PBVersion = Type("PBVersion", "k")
+ScriptCode = Type("ScriptCode", "H")
+LangCode = Type("LangCode", "H")
+RegionCode = Type("RegionCode", "H")
 
 UInt8 = Type("UInt8", "b")
-SInt8 = Type("SInt8", "b")
+SInt8 = Type("SInt8", "B")
 UInt16 = Type("UInt16", "H")
-SInt16 = Type("SInt16", "h")
-UInt32 = Type("UInt32", "l")
+SInt16 = Type("SInt16", "H")
+UInt32 = Type("UInt32", "k")
 SInt32 = Type("SInt32", "l")
 Float32 = Type("Float32", "f")
 
@@ -107,8 +107,8 @@ class OSErrType(Type):
     def errorCheck(self, name):
         Output("if (%s != noErr) return PyMac_Error(%s);", name, name)
         self.used = 1
-OSErr = OSErrType("OSErr", 'h')
-OSStatus = OSErrType("OSStatus", 'l')
+OSErr = OSErrType("OSErr", 'H')
+OSStatus = OSErrType("OSStatus", 'k')
 
 
 # Various buffer types
