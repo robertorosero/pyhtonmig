@@ -53,9 +53,6 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #define CHECKEXC 1	/* Double-check exception checking */
 #endif
 
-/* Global option, may be set by main() */
-int killprint;
-
 
 /* Forward declarations */
 
@@ -655,11 +652,6 @@ eval_code(co, globals, locals, owner, arg)
 				softspace(x, 1);
 				err = writeobject(v, x, 0);
 				flushline();
-				if (killprint) {
-					err_setstr(RuntimeError,
-					      "printing expression statement");
-					x = 0;
-				}
 			}
 			DECREF(v);
 			break;
