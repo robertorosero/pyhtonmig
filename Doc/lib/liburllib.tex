@@ -62,6 +62,22 @@ If the \var{url} uses the \file{http:} scheme identifier, the optional
 must in standard \file{application/x-www-form-urlencoded} format;
 see the \function{urlencode()} function below.
 
+The \function{urlopen()} function works transparently with proxies.
+In a \UNIX{} or Windows environment, set the \envvar{http_proxy},
+\envvar{ftp_proxy} or \envvar{gopher_proxy} environment variables to a
+URL that identifies the proxy server before starting the Python
+interpreter.  For example (the \character{\%} is the command prompt):
+
+\begin{verbatim}
+% http_proxy="http://www.someproxy.com:3128"
+% export http_proxy
+% python
+...
+\end{verbatim}
+
+In a Macintosh environment, \function{urlopen()} will retrieve proxy
+information from Internet\index{Internet Config} Config.
+
 \end{funcdesc}
 
 \begin{funcdesc}{urlretrieve}{url\optional{, filename\optional{, hook}}}
@@ -175,3 +191,26 @@ to parse and unparse URL strings, the recommended interface for URL
 manipulation is in module \refmodule{urlparse}\refstmodindex{urlparse}.
 
 \end{itemize}
+
+
+\subsection{Examples}
+\nodename{Urllib Examples}
+
+Here is an example session that uses the \samp{GET} method to retrieve
+a URL containing parameters:
+
+\begin{verbatim}
+>>> import urllib
+>>> params = urllib.urlencode({'spam': 1, 'eggs': 2, 'bacon': 0})
+>>> f = urllib.urlopen("http://www.musi-cal.com/cgi-bin/query?%s" % params)
+>>> print f.read()
+\end{verbatim}
+
+The following example uses the \samp{POST} method instead:
+
+\begin{verbatim}
+>>> import urllib
+>>> params = urllib.urlencode({'spam': 1, 'eggs': 2, 'bacon': 0})
+>>> f = urllib.urlopen("http://www.musi-cal.com/cgi-bin/query", params)
+>>> print f.read()
+\end{verbatim}
