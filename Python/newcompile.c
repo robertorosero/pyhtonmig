@@ -184,6 +184,7 @@ static int compiler_push_fblock(struct compiler *, enum fblocktype, int);
 static void compiler_pop_fblock(struct compiler *, enum fblocktype, int);
 
 static int inplace_binop(struct compiler *, operator_ty);
+static int expr_constant(expr_ty e);
 
 static PyCodeObject *assemble(struct compiler *, int addNone);
 
@@ -1453,10 +1454,18 @@ static int
 compiler_while(struct compiler *c, stmt_ty s)
 {
 	int loop, orelse, end, anchor;
+	int constant = expr_constant(s->v.While.test);
+
+	if (constant == 0)
+		return 1;
 	loop = compiler_new_block(c);
 	end = compiler_new_block(c);
-	anchor = compiler_new_block(c);
-	if (loop < 0 || end < 0 || anchor < 0)
+	if (constant == -1) {
+		anchor = compiler_new_block(c);
+		if (anchor < 0)
+			return 0;
+	}
+	if (loop < 0 || end < 0)
 		return 0;
 	if (s->v.While.orelse) {
 		orelse = compiler_new_block(c);
@@ -1470,9 +1479,11 @@ compiler_while(struct compiler *c, stmt_ty s)
 	compiler_use_next_block(c, loop);
 	if (!compiler_push_fblock(c, LOOP, loop))
 		return 0;
-	VISIT(c, expr, s->v.While.test);
-	ADDOP_JREL(c, JUMP_IF_FALSE, anchor);
-	ADDOP(c, POP_TOP);
+	if (constant == -1) {
+		VISIT(c, expr, s->v.While.test);
+		ADDOP_JREL(c, JUMP_IF_FALSE, anchor);
+		ADDOP(c, POP_TOP);
+	}
 	VISIT_SEQ(c, stmt, s->v.While.body);
 	ADDOP_JABS(c, JUMP_ABSOLUTE, loop);
 
@@ -1480,9 +1491,11 @@ compiler_while(struct compiler *c, stmt_ty s)
 	   if there is no else clause ?
 	*/
 
-	compiler_use_next_block(c, anchor);
-	ADDOP(c, POP_TOP);
-	ADDOP(c, POP_BLOCK);
+	if (constant == -1) {
+		compiler_use_next_block(c, anchor);
+		ADDOP(c, POP_TOP);
+		ADDOP(c, POP_BLOCK);
+	}
 	compiler_pop_fblock(c, LOOP, loop);
 	if (orelse != -1)
 		VISIT_SEQ(c, stmt, s->v.While.orelse);
@@ -2364,6 +2377,25 @@ compiler_visit_keyword(struct compiler *c, keyword_ty k)
 	ADDOP_O(c, LOAD_CONST, k->arg, consts);
 	VISIT(c, expr, k->value);
 	return 1;
+}
+
+/* Test whether expression is constant.  For constants, report
+   whether they are true or false.
+
+   Return values: 1 for true, 0 for false, -1 for non-constant.
+ */
+
+static int
+expr_constant(expr_ty e)
+{
+	switch (e->kind) {
+	case Num_kind:
+		return PyObject_IsTrue(e->v.Num.n);
+	case Str_kind:
+		return PyObject_IsTrue(e->v.Str.s);
+	default:
+		return -1;
+	}
 }
 
 static int
