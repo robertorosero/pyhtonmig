@@ -104,6 +104,14 @@ corresponding parameters to Python's \program{configure} script and
 installed in \file{\envvar{prefix}/include}, where \envvar{prefix} is
 the installation directory specified to the installer.
 
+To include the headers, place both directories (if different) on your
+compiler's search path for includes.  Do \emph{not} place the parent
+directories on the search path and then use
+\samp{\#include <python1.5/Python.h>}; this will break on
+multi-platform builds since the platform independent headers under
+\envvar{prefix} include the platform specific headers from
+\envvar{exec_prefix}.
+
 
 \section{Objects, Types and Reference Counts \label{objects}}
 
@@ -113,10 +121,12 @@ to an opaque data type representing an arbitrary Python
 object.  Since all Python object types are treated the same way by the
 Python language in most situations (e.g., assignments, scope rules,
 and argument passing), it is only fitting that they should be
-represented by a single C type.  All Python objects live on the heap:
-you never declare an automatic or static variable of type
+represented by a single C type.  Almost all Python objects live on the
+heap: you never declare an automatic or static variable of type
 \ctype{PyObject}, only pointer variables of type \ctype{PyObject*} can 
-be declared.
+be declared.  The sole exception are the type objects\obindex{type};
+since these must never be deallocated, they are typically static
+\ctype{PyTypeObject} objects.
 
 All Python objects (even Python integers) have a \dfn{type} and a
 \dfn{reference count}.  An object's type determines what kind of object 
@@ -1920,9 +1930,9 @@ number of format codes to \cfunction{PyArgs_ParseTuple()} that operate
 against an object's buffer interface, returning data from the target
 object.
 
-More information on the buffer interface is provided in chapter
-\ref{newTypes}, under the description for
-\ctype{PyBufferProcs}\ttindex{PyBufferProcs}.
+More information on the buffer interface is provided in the section
+``Buffer Object Structures'' (section \ref{buffer-structs}), under
+the description for \ctype{PyBufferProcs}\ttindex{PyBufferProcs}.
 
 A ``buffer object'' is defined in the \file{bufferobject.h} header
 (included by \file{Python.h}). These objects look very similar to
@@ -3568,7 +3578,7 @@ The same code using the macro set:
 
 Note that in the three examples above, the buffer is always
 manipulated via functions/macros belonging to the same set. Indeed, it
-is highly recommended to use the same memory API family for a given
+is required to use the same memory API family for a given
 memory block, so that the risk of mixing different allocators is
 reduced to a minimum. The following code sequence contains two errors,
 one of which is labeled as \emph{fatal} because it mixes two different
@@ -3671,16 +3681,16 @@ to implement the sequence protocol.
 \sectionauthor{Greg J. Stein}{greg@lyra.org}
 
 The buffer interface exports a model where an object can expose its
-internal data as a set of chunks of data, each chunk specified as a
-pointer/length pair.  These chunks are called ``segments'' and are
-presumed to be non-contiguous in memory.
+internal data as a set of chunks of data, where each chunk is
+specified as a pointer/length pair.  These chunks are called
+\dfn{segments} and are presumed to be non-contiguous in memory.
 
 If an object does not export the buffer interface, then its
 \member{tp_as_buffer} member in the \ctype{PyTypeObject} structure
 should be \NULL{}.  Otherwise, the \member{tp_as_buffer} will point to
 a \ctype{PyBufferProcs} structure.
 
-\emph{Note:} It is very important that your
+\strong{Note:} It is very important that your
 \ctype{PyTypeObject} structure uses \code{Py_TPFLAGS_DEFAULT} for the
 value of the \member{tp_flags} member rather than \code{0}.  This
 tells the Python runtime that your \ctype{PyBufferProcs} structure
@@ -3710,8 +3720,8 @@ objects such as \ctype{PyString_Type} and
 
 The last slot is \member{bf_getcharbuffer}, of type
 \ctype{getcharbufferproc}.  This slot will only be present if the
-\code{Py_TPFLAGS_HAVE_GETCHARBUFFER} flag is present in
-\member{tp_flags} of the object's \ctype{PyTypeObject}.  Before using
+\code{Py_TPFLAGS_HAVE_GETCHARBUFFER} flag is present in the
+\member{tp_flags} field of the object's \ctype{PyTypeObject}.  Before using
 this slot, the caller should test whether it is present by using the
 \cfunction{PyType_HasFeature()}\ttindex{PyType_HasFeature()} function.
 If present, it may be \NULL, indicating that the object's contents
@@ -3725,7 +3735,7 @@ This notion of exporting the internal buffers as ``text'' is used to
 distinguish between objects that are binary in nature, and those which
 have character-based content.
 
-\emph{Note:} The current policy seems to state that these characters
+\strong{Note:} The current policy seems to state that these characters
 may be multi-byte characters. This implies that a buffer size of
 \var{N} does not mean there are \var{N} characters present.
 \end{ctypedesc}
