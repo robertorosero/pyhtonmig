@@ -114,7 +114,7 @@ will raise a ValueError:
     >>> docstring = '>>>print 1\n1'
     >>> doctest.DocTest(docstring, 'some_test', 'filename', 0)
     Traceback (most recent call last):
-    ValueError: line 0 of the docstring for some_test lacks blanks after >>>: '>>>print 1'
+    ValueError: line 0 of the docstring for some_test lacks blank after >>>: '>>>print 1'
 """
 
 def test_DocTestFinder(): r"""
@@ -381,7 +381,7 @@ examined: a name-based filter and an object-based filter.
        7  1  A.__init__
       40  1  A.double
       40  1  A.get
-  
+
     >>> def objfilter(obj):
     ...     return isinstance(obj, (staticmethod, classmethod))
     >>> tests = doctest.DocTestFinder(objfilter=objfilter).find(A)
@@ -670,7 +670,7 @@ treated as equal:
     Failure in example: print 1, 2, 3
     from line #0 of f
     Expected:
-          1   2 
+          1   2
          3
     Got: 1 2 3
     (1, 1)
@@ -750,8 +750,8 @@ and actual outputs to be displayed using a unified diff:
     Failure in example: print '\n'.join('abcdefg')
     from line #1 of f
     Differences (unified diff):
-        --- Expected 
-        +++ Got 
+        --- Expected
+        +++ Got
         @@ -1,8 +1,8 @@
          a
         -B
@@ -776,8 +776,8 @@ and actual outputs to be displayed using a context diff:
     Failure in example: print '\n'.join('abcdefg')
     from line #1 of f
     Differences (unified diff):
-        *** Expected 
-        --- Got 
+        *** Expected
+        --- Got
         ***************
         *** 1,8 ****
           a
@@ -839,7 +839,7 @@ Multiple flags can be toggled by a single option directive:
     >>> def f(x): r'''
     ...     >>> print range(10)       # Should fail
     ...     [0, 1,  ...,   9]
-    ...     >>> doctest: +ELLIPSIS +NORMALIZE_WHITESPACE 
+    ...     >>> doctest: +ELLIPSIS +NORMALIZE_WHITESPACE
     ...     >>> print range(10)       # Should succeed
     ...     [0, 1,  ...,   9]
     ...     '''
