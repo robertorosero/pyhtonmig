@@ -852,30 +852,40 @@ symtable_implicit_arg(struct symtable *st, int pos)
 static int 
 symtable_visit_params(struct symtable *st, asdl_seq *args, int toplevel)
 {
-	int i;
+	int i, complex = 0;
 	
+        /* go through all the toplevel arguments first */
 	for (i = 0; i < asdl_seq_LEN(args); i++) {
 		expr_ty arg = asdl_seq_GET(args, i);
 		if (arg->kind == Name_kind) {
 			assert(arg->v.Name.ctx == Param ||
-                               arg->v.Name.ctx == Store);
+                               (arg->v.Name.ctx == Store && !toplevel));
 			if (!symtable_add_def(st, arg->v.Name.id, DEF_PARAM))
 				return 0;
 		}
 		else if (arg->kind == Tuple_kind) {
 			assert(arg->v.Tuple.ctx == Store);
+                        complex = 1;
 			if (toplevel) {
 				if (!symtable_implicit_arg(st, i))
 					return 0;
 			}
-			if (!symtable_visit_params(st, arg->v.Tuple.elts, 0))
-				return 0;
 		}
 		else {
 			/* syntax error */
 			fprintf(stderr, "unexpected expr in parameter list\n");
 			return 0;
 		}
+	}
+
+        /* visit all the nested arguments */
+        if (complex) {
+                for (i = 0; i < asdl_seq_LEN(args); i++) {
+                        expr_ty arg = asdl_seq_GET(args, i);
+                        if (arg->kind == Tuple_kind &&
+                            !symtable_visit_params(st, arg->v.Tuple.elts, 0))
+                            return 0;
+                }
 	}
 	
 	return 1;

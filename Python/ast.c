@@ -180,7 +180,7 @@ PyAST_FromNode(const node *n)
                 return Interactive(stmts);
             }
         case encoding_decl:
-	    /* XXX need to handle properlyi, ignore for now */
+	    /* XXX need to handle properly, ignore for now */
             stmts = asdl_seq_new(1);
             if (!stmts)
                 return NULL;
@@ -427,12 +427,31 @@ seq_for_testlist(const node *n)
     return seq;
 }
 
+static expr_ty
+compiler_complex_args(const node *n)
+{
+    int i, len = (NCH(n) + 1) / 2;
+    asdl_seq *args = asdl_seq_new(len);
+    if (!args)
+        return NULL;
+
+    for (i = 0; i < len; i++) {
+        const node *child = CHILD(CHILD(n, 2*i), 0);
+        expr_ty arg;
+        if (TYPE(child) == NAME)
+            arg = Name(NEW_IDENTIFIER(child), Store);
+        else
+            arg = compiler_complex_args(child);
+        asdl_seq_SET(args, i, arg);
+    }
+
+    return Tuple(args, Store);
+}
+
 /* Create AST for argument list.
 
    XXX TO DO:
        - check for invalid argument lists like normal after default
-       - handle nested tuple arguments
-       - handle default arguments properly (might be problem somewhere else)
 */
 
 static arguments_ty
@@ -478,9 +497,9 @@ ast_for_arguments(const node *n)
 	switch (TYPE(ch)) {
             case fpdef:
                 if (NCH(ch) == 3)
-                    /* XXX don't handle fplist yet */
-                    goto error;
-                if (TYPE(CHILD(ch, 0)) == NAME)
+                    asdl_seq_APPEND(args, 
+                                    compiler_complex_args(CHILD(ch, 1))); 
+                else if (TYPE(CHILD(ch, 0)) == NAME)
                     /* XXX check return value of Name call */
                     asdl_seq_APPEND(args, Name(NEW_IDENTIFIER(CHILD(ch, 0)),
                                                Param));
