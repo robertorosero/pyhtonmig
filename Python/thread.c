@@ -32,6 +32,14 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #include "config.h"
 #endif
 
+#include <stdio.h>
+
+#ifdef HAVE_STDLIB_H
+#include <stdlib.h>
+#else
+extern char *getenv();
+#endif
+
 #include "thread.h"
 
 #ifdef __ksr__
