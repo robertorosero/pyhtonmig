@@ -82,9 +82,9 @@ getprogramname()
 #endif /* !PYTHONPATH */
 
 #ifndef PYTHONPATH
-#ifdef MSDOS
+#if defined(MSDOS) || defined(NT)
 #define PYTHONPATH ".;..\\lib;\\python\\lib"
-#endif /* MSDOS */
+#endif /* MSDOS || NT */
 #endif /* !PYTHONPATH */
 
 #ifndef PYTHONPATH
