@@ -244,10 +244,10 @@ Merge glitches:
 + test_unicode.py fails, but due to this oddity (cause unknown, but more
   Unicode changes still need to be merged):
 
-   >>> "%*d" % (5, u"abc")
+   >>> "%*s" % (5, u"abc")
    Traceback (most recent call last):
-   File "<stdin>", line 1, in ?
-   TypeError: an integer is required
+     File "<stdin>", line 1, in ?
+   TypeError: * wants int
    >>>
 
 + test___all__.py yields:
