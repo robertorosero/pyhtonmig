@@ -134,6 +134,10 @@ rotor rotormodule.o
 # thread threadmodule.o
 
 
+# GNN's timing module
+timing timingmodule.o
+
+
 # Example -- included for reference only
 
 # xx xxmodule.o
