@@ -87,7 +87,7 @@ extern void init_save_thread PROTO((void));
 extern object *save_thread PROTO((void));
 extern void restore_thread PROTO((object *));
 
-#ifdef USE_THREAD
+#ifdef WITH_THREAD
 
 #define BGN_SAVE { \
 			object *_save; \
@@ -97,14 +97,14 @@ extern void restore_thread PROTO((object *));
 #define END_SAVE	restore_thread(_save); \
 		 }
 
-#else /* !USE_THREAD */
+#else /* !WITH_THREAD */
 
 #define BGN_SAVE {
 #define RET_SAVE
 #define RES_SAVE
 #define END_SAVE }
 
-#endif /* !USE_THREAD */
+#endif /* !WITH_THREAD */
 
 #ifdef __cplusplus
 }

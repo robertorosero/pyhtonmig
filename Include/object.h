@@ -133,47 +133,65 @@ NB: the methods for certain type groups are now contained in separate
 method blocks.
 */
 
+typedef object * (*unaryfunc) PROTO((object *));
+typedef object * (*binaryfunc) PROTO((object *, object *));
+typedef int (*inquiry) PROTO((object *));
+typedef int (*coercion) PROTO((object **, object **));
+typedef object *(*intargfunc) PROTO((object *, int));
+typedef object *(*intintargfunc) PROTO((object *, int, int));
+typedef int(*intobjargproc) PROTO((object *, int, object *));
+typedef int(*intintobjargproc) PROTO((object *, int, int, object *));
+typedef int(*objobjargproc) PROTO((object *, object *, object *));
+
 typedef struct {
-	object *(*nb_add) FPROTO((object *, object *));
-	object *(*nb_subtract) FPROTO((object *, object *));
-	object *(*nb_multiply) FPROTO((object *, object *));
-	object *(*nb_divide) FPROTO((object *, object *));
-	object *(*nb_remainder) FPROTO((object *, object *));
-	object *(*nb_divmod) FPROTO((object *, object *));
-	object *(*nb_power) FPROTO((object *, object *));
-	object *(*nb_negative) FPROTO((object *));
-	object *(*nb_positive) FPROTO((object *));
-	object *(*nb_absolute) FPROTO((object *));
-	int (*nb_nonzero) FPROTO((object *));
-	object *(*nb_invert) FPROTO((object *));
-	object *(*nb_lshift) FPROTO((object *, object *));
-	object *(*nb_rshift) FPROTO((object *, object *));
-	object *(*nb_and) FPROTO((object *, object *));
-	object *(*nb_xor) FPROTO((object *, object *));
-	object *(*nb_or) FPROTO((object *, object *));
-	int (*nb_coerce) FPROTO((object **, object **));
-	object *(*nb_int) FPROTO((object *));
-	object *(*nb_long) FPROTO((object *));
-	object *(*nb_float) FPROTO((object *));
-	object *(*nb_oct) FPROTO((object *));
-	object *(*nb_hex) FPROTO((object *));
+	binaryfunc nb_add;
+	binaryfunc nb_subtract;
+	binaryfunc nb_multiply;
+	binaryfunc nb_divide;
+	binaryfunc nb_remainder;
+	binaryfunc nb_divmod;
+	binaryfunc nb_power;
+	unaryfunc nb_negative;
+	unaryfunc nb_positive;
+	unaryfunc nb_absolute;
+	inquiry nb_nonzero;
+	unaryfunc nb_invert;
+	binaryfunc nb_lshift;
+	binaryfunc nb_rshift;
+	binaryfunc nb_and;
+	binaryfunc nb_xor;
+	binaryfunc nb_or;
+	coercion nb_coerce;
+	unaryfunc nb_int;
+	unaryfunc nb_long;
+	unaryfunc nb_float;
+	unaryfunc nb_oct;
+	unaryfunc nb_hex;
 } number_methods;
 
 typedef struct {
-	int (*sq_length) FPROTO((object *));
-	object *(*sq_concat) FPROTO((object *, object *));
-	object *(*sq_repeat) FPROTO((object *, int));
-	object *(*sq_item) FPROTO((object *, int));
-	object *(*sq_slice) FPROTO((object *, int, int));
-	int (*sq_ass_item) FPROTO((object *, int, object *));
-	int (*sq_ass_slice) FPROTO((object *, int, int, object *));
+	inquiry sq_length;
+	binaryfunc sq_concat;
+	intargfunc sq_repeat;
+	intargfunc sq_item;
+	intintargfunc sq_slice;
+	intobjargproc sq_ass_item;
+	intintobjargproc sq_ass_slice;
 } sequence_methods;
 
 typedef struct {
-	int (*mp_length) FPROTO((object *));
-	object *(*mp_subscript) FPROTO((object *, object *));
-	int (*mp_ass_subscript) FPROTO((object *, object *, object *));
+	inquiry mp_length;
+	binaryfunc mp_subscript;
+	objobjargproc mp_ass_subscript;
 } mapping_methods;
+
+typedef void (*destructor) PROTO((object *));
+typedef int (*printfunc) PROTO((object *, FILE *, int));
+typedef object *(*getattrfunc) PROTO((object *, char *));
+typedef int (*setattrfunc) PROTO((object *, char *, object *));
+typedef int (*cmpfunc) PROTO((object *, object *));
+typedef object *(*reprfunc) PROTO((object *));
+typedef long (*hashfunc) PROTO((object *));
 
 typedef struct _typeobject {
 	OB_VARHEAD
@@ -182,12 +200,12 @@ typedef struct _typeobject {
 	
 	/* Methods to implement standard operations */
 	
-	void (*tp_dealloc) FPROTO((object *));
-	int (*tp_print) FPROTO((object *, FILE *, int));
-	object *(*tp_getattr) FPROTO((object *, char *));
-	int (*tp_setattr) FPROTO((object *, char *, object *));
-	int (*tp_compare) FPROTO((object *, object *));
-	object *(*tp_repr) FPROTO((object *));
+	destructor tp_dealloc;
+	printfunc tp_print;
+	getattrfunc tp_getattr;
+	setattrfunc tp_setattr;
+	cmpfunc tp_compare;
+	reprfunc tp_repr;
 	
 	/* Method suites for standard classes */
 	
@@ -197,7 +215,7 @@ typedef struct _typeobject {
 
 	/* More standard operations (at end for binary compatibility) */
 
-	long (*tp_hash) FPROTO((object *));
+	hashfunc tp_hash;
 #ifdef COUNT_ALLOCS
 	/* these must be last */
 	int tp_alloc;
