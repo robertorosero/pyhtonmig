@@ -2206,7 +2206,7 @@ assemble_lnotab(struct assembler *a, struct instr *i)
 		d_bytecode -= ncodes * 255;
 		a->a_lnotab_off += ncodes * 2;
 	}
-	assert(d_bytecode < 255);
+	assert(d_bytecode <= 255);
 	if (d_lineno > 255) {
 		int i, nbytes, ncodes = d_lineno / 255;
 		nbytes = a->a_lnotab_off + 2 * ncodes;
@@ -2367,6 +2367,10 @@ compute_code_flags(struct compiler *c)
 		if (ste->ste_generator)
 			flags |= CO_GENERATOR;
 	}
+	if (ste->ste_varargs)
+		flags |= CO_VARARGS;
+	if (ste->ste_varkeywords)
+		flags |= CO_VARKEYWORDS;
 	return flags;
 }
 
