@@ -1,5 +1,5 @@
 #!/bin/sh
-# From configure.in Revision: 1.2.4.9 
+# From configure.in Revision: 1.2.4.10 
 #!/bin/sh
 # Guess values for system-dependent variables and create Makefiles.
 # Generated automatically using autoconf.
@@ -911,9 +911,58 @@ SEDDEFS="${SEDDEFS}\${SEDdA}WITH_READLINE\${SEDdB}WITH_READLINE\${SEDdC}1\${SEDd
 
 if test -d "$withval"
 then LIBS="$LIBS -L$withval"
-else echo proper usage is --with-readline=DIRECTORY; exit 1
+else echo proper usage is --with-readline=DIRECTORY 1>&2; exit 1
 fi
-LIBS="$LIBS -lreadline -ltermcap"
+termcap=
+LIBS_save="${LIBS}"
+LIBS="${LIBS} -ltermcap"
+have_lib=""
+echo checking for -ltermcap
+cat > conftest.c <<EOF
+#include "confdefs.h"
+
+int main() { exit(0); }
+int t() { main(); }
+EOF
+if eval $compile; then
+  rm -rf conftest*
+  have_lib="1"
+
+fi
+rm -f conftest*
+LIBS="${LIBS_save}"
+if test -n "${have_lib}"; then
+   :; termcap=termcap
+else
+   :; LIBS_save="${LIBS}"
+LIBS="${LIBS} -ltermlib"
+have_lib=""
+echo checking for -ltermlib
+cat > conftest.c <<EOF
+#include "confdefs.h"
+
+int main() { exit(0); }
+int t() { main(); }
+EOF
+if eval $compile; then
+  rm -rf conftest*
+  have_lib="1"
+
+fi
+rm -f conftest*
+LIBS="${LIBS_save}"
+if test -n "${have_lib}"; then
+   :; termcap=termlib
+else
+   :; 
+fi
+
+fi
+
+if test ! -z "$termcap"
+then LIBS="$LIBS -lreadline -l$termcap"
+else echo no working termcap/termlib, do not use --with-readline 1>&2; exit 1
+fi
 fi
 
 
@@ -1021,7 +1070,7 @@ SEDDEFS="${SEDDEFS}\${SEDdA}WITH_SGI_DL\${SEDdB}WITH_SGI_DL\${SEDdC}1\${SEDdD}
 dldir=$withval
 if test -d "$dldir"
 then LIBS="$LIBS -L$dldir"
-else echo proper usage is --with-sgi-dl=DIRECTORY; exit 1
+else echo proper usage is --with-sgi-dl=DIRECTORY 1>&2; exit 1
 fi
 DLINCLDIR=${dldir}
 LIBS="$LIBS -ldl -lmld"
@@ -1048,7 +1097,7 @@ dldir=`echo "$withval" | sed 's/,.*//'`
 dlddir=`echo "$withval" | sed 's/.*,//'`
 if test -d "$dldir" -a -d "$dlddir"
 then LIBS="$LIBS -L$dldir -L$dlddir"
-else echo proper usage is --with-dl-dld=DL_DIRECTORY,DLD_DIRECTORY; exit 1
+else echo proper usage is --with-dl-dld=DL_DIRECTORY,DLD_DIRECTORY 1>&2; exit 1
 fi
 DLINCLDIR=${dldir}
 LIBS="$LIBS -ldl -ldld"
@@ -1056,7 +1105,7 @@ fi
 
 
 # checks for library functions
-for func in clock ftime gettimeofday getpeername getpgrp getpid getwd lstat readlink readline select setsid setpgid setpgrp siginterrupt symlink tcgetpgrp tcsetpgrp times uname waitpid
+for func in clock ftime gettimeofday getpeername getpgrp getpid getwd lstat readlink select setsid setpgid setpgrp siginterrupt symlink tcgetpgrp tcsetpgrp times uname waitpid
 do
 trfunc=HAVE_`echo $func | tr '[a-z]' '[A-Z]'`
 echo checking for ${func}
@@ -1297,6 +1346,31 @@ rm -f conftest*
 
 fi
 
+echo checking for whether we have altzone
+cat > conftest.c <<EOF
+#include "confdefs.h"
+#include <time.h>
+int main() { exit(0); }
+int t() { return altzone; }
+EOF
+if eval $compile; then
+  rm -rf conftest*
+  
+{
+test -n "$verbose" && \
+echo "	defining HAVE_ALTZONE"
+echo "#define" HAVE_ALTZONE 1 >> confdefs.h
+DEFS="$DEFS -DHAVE_ALTZONE=1"
+SEDDEFS="${SEDDEFS}\${SEDdA}HAVE_ALTZONE\${SEDdB}HAVE_ALTZONE\${SEDdC}1\${SEDdD}
+\${SEDuA}HAVE_ALTZONE\${SEDuB}HAVE_ALTZONE\${SEDuC}1\${SEDuD}
+\${SEDeA}HAVE_ALTZONE\${SEDeB}HAVE_ALTZONE\${SEDeC}1\${SEDeD}
+"
+}
+
+
+fi
+rm -f conftest*
+
 echo checking for whether sys/select.h and sys/time.h may both be included
 cat > conftest.c <<EOF
 #include "confdefs.h"
@@ -1533,7 +1607,7 @@ withval="$with_libm"
 if test -n "$withval"; then
   if test "$withval" != 1
 then LIBM=$withval
-else echo proper usage is --with-libm=STRING; exit 1
+else echo proper usage is --with-libm=STRING 1>&2; exit 1
 fi
 fi
 
@@ -1545,7 +1619,7 @@ withval="$with_libc"
 if test -n "$withval"; then
   if test "$withval" != 1
 then LIBC=$withval
-else echo proper usage is --with-libc=STRING; exit 1
+else echo proper usage is --with-libc=STRING 1>&2; exit 1
 fi
 fi
 
