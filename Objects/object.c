@@ -1151,28 +1151,15 @@ PyObject_GenericGetAttr(PyObject *obj, PyObject *name)
 	}
 
 	if (tp->tp_flags & Py_TPFLAGS_DYNAMICTYPE) {
-		/* Look through base classes tp_defined, in MRO,
-		   skipping first base (which should be tp) */
-		int i, n;
-		PyObject *mro = tp->tp_mro;
-		PyTypeObject *t;
-		assert(PyTuple_Check(mro));
-		n = PyTuple_GET_SIZE(mro);
-		assert(n > 0 && PyTuple_GET_ITEM(mro, 0) == (PyObject *)tp);
-		descr = NULL;
-		for (i = 1; i < n; i++) {
-			t = (PyTypeObject *) PyTuple_GET_ITEM(mro, i);
-			assert(PyType_Check(t));
-			assert(t->tp_dict && PyDict_Check(t->tp_dict));
-			descr = PyDict_GetItem(t->tp_dict, name);
-			if (descr != NULL) {
-				f = descr->ob_type->tp_descr_get;
-				if (f != NULL)
-					return f(descr, obj);
-				else {
-					Py_INCREF(descr);
-					return descr;
-				}
+		/* Look through base classes tp_defined, in MRO */
+		descr = _PyType_Lookup(tp, name);
+		if (descr != NULL) {
+			f = descr->ob_type->tp_descr_get;
+			if (f != NULL)
+				return f(descr, obj);
+			else {
+				Py_INCREF(descr);
+				return descr;
 			}
 		}
 	}
