@@ -113,7 +113,8 @@ x = eval('1, 0 or 1')
 print 'funcdef'
 ### 'def' NAME parameters ':' suite
 ### parameters: '(' [varargslist] ')'
-### varargslist: (fpdef ',')* '*' NAME | fpdef (',' fpdef)* [',']
+### varargslist: (fpdef ['=' test] ',')* '*' NAME
+###            | fpdef ['=' test] (',' fpdef ['=' test])* [',']
 ### fpdef: NAME | '(' fplist ')'
 ### fplist: fpdef (',' fpdef)* [',']
 def f1(): pass
@@ -126,6 +127,54 @@ def v0(*rest): pass
 def v1(a, *rest): pass
 def v2(a, b, *rest): pass
 def v3(a, (b, c), *rest): pass
+def d01(a=1): pass
+d01()
+d01(1)
+def d11(a, b=1): pass
+d11(1)
+d11(1, 2)
+def d21(a, b, c=1): pass
+d21(1, 2)
+d21(1, 2, 3)
+def d02(a=1, b=2): pass
+d02()
+d02(1)
+d02(1, 2)
+def d12(a, b=1, c=2): pass
+d12(1)
+d12(1, 2)
+d12(1, 2, 3)
+def d22(a, b, c=1, d=2): pass
+d22(1, 2)
+d22(1, 2, 3)
+d22(1, 2, 3, 4)
+def d01v(a=1, *rest): pass
+d01v()
+d01v(1)
+d01v(1, 2)
+def d11v(a, b=1, *rest): pass
+d11v(1)
+d11v(1, 2)
+d11v(1, 2, 3)
+def d21v(a, b, c=1, *rest): pass
+d21v(1, 2)
+d21v(1, 2, 3)
+d21v(1, 2, 3, 4)
+def d02v(a=1, b=2, *rest): pass
+d02v()
+d02v(1)
+d02v(1, 2)
+d02v(1, 2, 3)
+def d12v(a, b=1, c=2, *rest): pass
+d12v(1)
+d12v(1, 2)
+d12v(1, 2, 3)
+d12v(1, 2, 3, 4)
+def d22v(a, b, c=1, d=2, *rest): pass
+d22v(1, 2)
+d22v(1, 2, 3)
+d22v(1, 2, 3, 4)
+d22v(1, 2, 3, 4, 5)
 
 ### stmt: simple_stmt | compound_stmt
 # Tested below
