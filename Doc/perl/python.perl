@@ -159,9 +159,11 @@ sub do_cmd_dfn{
 sub do_cmd_emph{
     return use_italics(@_); }
 sub do_cmd_file{
-    return use_wrappers(@_[0], '<tt class="file">', '</tt>'); }
+    return use_wrappers(@_[0],
+                        '<font class="file" face="sans-serif">',
+                        '</font>'); }
 sub do_cmd_filenq{
-    return use_wrappers(@_[0], '<tt class="file">', '</tt>'); }
+    return do_cmd_file(@_[0]); }
 sub do_cmd_samp{
     return use_wrappers(@_[0], '"<tt class="samp">', '</tt>"'); }
 sub do_cmd_kbd{
@@ -481,7 +483,8 @@ sub make_mod_index_entry{
 
     if ($define eq 'DEF') {
 	# add to the module index
-	my($nstr,$garbage) = split / /, $str, 2;
+        $str =~ /(<tt.*<\/tt>)/;
+        my $nstr = $1;
 	$Modules{$nstr} .= $ahref;
     }
     return "$aname$anchor_invisible_mark</a>";
