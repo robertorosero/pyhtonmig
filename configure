@@ -1,5 +1,5 @@
 #!/bin/sh
-# From configure.in Revision: 1.2.4.16 
+# From configure.in Revision: 1.2.4.17 
 #!/bin/sh
 # Guess values for system-dependent variables and create Makefiles.
 # Generated automatically using autoconf version 1.8 
@@ -1294,6 +1294,57 @@ echo checking for --with-thread
 withval="$with_thread"
 if test -n "$withval"; then
   
+if test -d "$withval"
+then LIBS="$LIBS -L$withval"
+fi
+ac_save_LIBS="${LIBS}"
+LIBS="${LIBS} -lpthreads"
+ac_have_lib=""
+test -n "$silent" || echo "checking for -lpthreads"
+cat > conftest.${ac_ext} <<EOF
+#include "confdefs.h"
+
+int main() { return 0; }
+int t() { main();; return 0; }
+EOF
+if eval $ac_compile; then
+  rm -rf conftest*
+  ac_have_lib="1"
+
+fi
+rm -f conftest*
+LIBS="${ac_save_LIBS}"
+if test -n "${ac_have_lib}"; then
+   :; 
+{
+test -n "$verbose" && \
+echo "	defining WITH_THREAD"
+echo "#define" WITH_THREAD "1" >> confdefs.h
+DEFS="$DEFS -DWITH_THREAD=1"
+ac_sed_defs="${ac_sed_defs}\${ac_dA}WITH_THREAD\${ac_dB}WITH_THREAD\${ac_dC}1\${ac_dD}
+\${ac_uA}WITH_THREAD\${ac_uB}WITH_THREAD\${ac_uC}1\${ac_uD}
+\${ac_eA}WITH_THREAD\${ac_eB}WITH_THREAD\${ac_eC}1\${ac_eD}
+"
+}
+
+
+{
+test -n "$verbose" && \
+echo "	defining _POSIX_THREADS"
+echo "#define" _POSIX_THREADS "1" >> confdefs.h
+DEFS="$DEFS -D_POSIX_THREADS=1"
+ac_sed_defs="${ac_sed_defs}\${ac_dA}_POSIX_THREADS\${ac_dB}_POSIX_THREADS\${ac_dC}1\${ac_dD}
+\${ac_uA}_POSIX_THREADS\${ac_uB}_POSIX_THREADS\${ac_uC}1\${ac_uD}
+\${ac_eA}_POSIX_THREADS\${ac_eB}_POSIX_THREADS\${ac_eC}1\${ac_eD}
+"
+}
+
+LIBS="$LIBS -lpthreads"
+LIBOBJS="$LIBOBJS thread.o"
+else
+   :; 
+fi
+
 ac_save_LIBS="${LIBS}"
 LIBS="${LIBS} -lmpc"
 ac_have_lib=""
