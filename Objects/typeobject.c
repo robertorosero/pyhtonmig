@@ -95,13 +95,18 @@ static PyObject *
 subtype_construct(PyObject *self, PyObject *args, PyObject *kwds)
 {
 	PyObject *res;
+	PyTypeObject *base;
+	ternaryfunc f;
 
 	if (self == NULL) {
 		PyErr_SetString(PyExc_TypeError,
 				"can't allocate subtype instances");
 		return NULL;
 	}
-	res = self->ob_type->tp_base->tp_construct(self, args, kwds);
+	base = self->ob_type->tp_base;
+	while ((f = base->tp_construct) == subtype_construct)
+		base = base->tp_base;
+	res = f(self, args, kwds);
 	if (res == self)
 		Py_INCREF(self->ob_type);
 	return res;
@@ -111,7 +116,13 @@ static void
 subtype_dealloc(PyObject *self)
 {
 	int dictoffset = self->ob_type->tp_dictoffset;
-	if (dictoffset && !self->ob_type->tp_base->tp_dictoffset) {
+	PyTypeObject *base;
+	destructor f;
+
+	base = self->ob_type->tp_base;
+	while ((f = base->tp_dealloc) == subtype_dealloc)
+		base = base->tp_base;
+	if (dictoffset && !base->tp_dictoffset) {
 		PyObject **dictptr = (PyObject **) ((char *)self + dictoffset);
 		PyObject *dict = *dictptr;
 		if (dict != NULL) {
@@ -119,7 +130,7 @@ subtype_dealloc(PyObject *self)
 			*dictptr = NULL;
 		}
 	}
-	self->ob_type->tp_base->tp_dealloc(self);
+	base->tp_dealloc(self);
 	Py_DECREF(self->ob_type);
 }
 
