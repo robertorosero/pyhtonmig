@@ -569,10 +569,7 @@ ast_for_atom(const node *n)
 		return List(NULL, Load);
 	REQ(ch, listmaker);
 	if (NCH(ch) == 1 || TYPE(CHILD(ch, 1)) == COMMA) {
-	    asdl_seq *elts = asdl_seq_new(1);
-	    if (!elts)
-		return NULL;
-	    asdl_seq_SET(elts, 0, ast_for_testlist(ch));
+	    asdl_seq *elts = seq_for_testlist(ch);
 	    return List(elts, Load);
 	}
 	else
