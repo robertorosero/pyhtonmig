@@ -697,7 +697,7 @@ eval_code(co, globals, locals, owner, arg)
 			v = POP();
 			w = POP();
 			/* A tuple is equivalent to its first element here */
-			while (is_tupleobject(w)) {
+			while (is_tupleobject(w) && gettuplesize(w) > 0) {
 				u = w;
 				w = gettupleitem(u, 0);
 				DECREF(u);
@@ -744,6 +744,14 @@ eval_code(co, globals, locals, owner, arg)
 			x = newfuncobject(v, f->f_globals);
 			DECREF(v);
 			PUSH(x);
+			break;
+
+		case SET_FUNC_ARGS:
+			v = POP(); /* The function */
+			w = POP(); /* The argument list */
+			err = setfuncargstuff(v, oparg, w);
+			PUSH(v);
+			DECREF(w);
 			break;
 		
 		case POP_BLOCK:
@@ -1165,8 +1173,8 @@ eval_code(co, globals, locals, owner, arg)
 					   "undefined local variable");
 				break;
 			}
-			if (w != NULL && is_accessobject(w)) {
-				err = setaccessvalue(w, f->f_locals,
+			if (x != NULL && is_accessobject(x)) {
+				err = setaccessvalue(x, f->f_locals,
 						     (object *)NULL);
 				break;
 			}
@@ -2043,6 +2051,8 @@ call_function(func, arg)
 	object *newlocals, *newglobals;
 	object *class = NULL;
 	object *co, *v;
+	object *argdefs;
+	int	argcount;
 	
 	if (is_instancemethodobject(func)) {
 		object *self = instancemethodgetself(func);
@@ -2070,7 +2080,6 @@ call_function(func, arg)
 			}
 		}
 		else {
-			int argcount;
 			if (arg == NULL)
 				argcount = 0;
 			else if (is_tupleobject(arg))
@@ -2102,6 +2111,39 @@ call_function(func, arg)
 		if (!is_funcobject(func)) {
 			err_setstr(TypeError, "call of non-function");
 			return NULL;
+		}
+	}
+
+	argdefs = getfuncargstuff(func, &argcount);
+	if (argdefs != NULL && arg != NULL && is_tupleobject(arg)) {
+		int actualcount, j;
+		/* Process default arguments */
+		if (argcount & 0x8000)
+			argcount ^= 0xffff;
+		actualcount = gettuplesize(arg);
+		j = gettuplesize(argdefs) - (argcount - actualcount);
+		if (actualcount < argcount && j >= 0) {
+			int i;
+			object *v;
+			if (newarg == NULL)
+				INCREF(arg);
+			newarg = newtupleobject(argcount);
+			if (newarg == NULL) {
+				DECREF(arg);
+				return NULL;
+			}
+			for (i = 0; i < actualcount; i++) {
+				v = gettupleitem(arg, i);
+				XINCREF(v);
+				settupleitem(newarg, i, v);
+			}
+			for (; i < argcount; i++, j++) {
+				v = gettupleitem(argdefs, j);
+				XINCREF(v);
+				settupleitem(newarg, i, v);
+			}
+			DECREF(arg);
+			arg = newarg;
 		}
 	}
 	

@@ -249,6 +249,7 @@ static int com_addconst PROTO((struct compiling *, object *));
 static int com_addname PROTO((struct compiling *, object *));
 static void com_addopname PROTO((struct compiling *, int, node *));
 static void com_list PROTO((struct compiling *, node *, int));
+static int com_argdefs PROTO((struct compiling *, node *, int *));
 
 static int
 com_init(c, filename)
@@ -1098,6 +1099,8 @@ com_test(c, n)
 	if (NCH(n) == 1 && TYPE(CHILD(n, 0)) == lambdef) {
 		object *v;
 		int i;
+		int argcount;
+		int ndefs = com_argdefs(c, CHILD(n, 0), &argcount);
 		v = (object *) compile(CHILD(n, 0), c->c_filename);
 		if (v == NULL) {
 			c->c_errors++;
@@ -1109,6 +1112,8 @@ com_test(c, n)
 		}
 		com_addoparg(c, LOAD_CONST, i);
 		com_addbyte(c, BUILD_FUNCTION);
+		if (ndefs > 0)
+			com_addoparg(c, SET_FUNC_ARGS, argcount);
 	}
 	else {
 		int anchor = 0;
@@ -1830,6 +1835,70 @@ com_continue_stmt(c, n)
 	   XXX if we could pop the exception still on the stack */
 }
 
+static int
+com_argdefs(c, n, argcount_return)
+	struct compiling *c;
+	node *n;
+	int *argcount_return;
+{
+	int i, nch, nargs, ndefs, star;
+	if (TYPE(n) == lambdef) {
+		/* lambdef: 'lambda' [varargslist] ':' test */
+		n = CHILD(n, 1);
+	}
+	else {
+		REQ(n, funcdef); /* funcdef: 'def' NAME parameters ... */
+		n = CHILD(n, 2);
+		REQ(n, parameters); /* parameters: '(' [varargslist] ')' */
+		n = CHILD(n, 1);
+	}
+	if (TYPE(n) != varargslist)
+		    return -1;
+	/* varargslist:
+		(fpdef ['=' test] ',')* '*' NAME |
+		fpdef ['=' test] (',' fpdef ['=' test])* [','] */
+	nch = NCH(n);
+	if (nch >= 2 && TYPE(CHILD(n, nch-2)) == STAR) {
+		star = 1;
+		nch -= 2;
+	}
+	else
+		star = 0;
+	nargs = 0;
+	ndefs = 0;
+	for (i = 0; i < nch; i++) {
+		int t;
+		nargs++;
+		i++;
+		if (i >= nch)
+			break;
+		t = TYPE(CHILD(n, i));
+		if (t == EQUAL) {
+			i++;
+			ndefs++;
+			com_node(c, CHILD(n, i));
+			i++;
+			t = TYPE(CHILD(n, i));
+		}
+		else {
+			/* Treat "(a=1, b)" as "(a=1, b=None)" */
+			if (ndefs) {
+				com_addoparg(c, LOAD_CONST,
+					     com_addconst(c, None));
+				ndefs++;
+			}
+		}
+		if (t != COMMA)
+			break;
+	}
+	if (star)
+		nargs ^= 0xffff;
+	*argcount_return = nargs;
+	if (ndefs > 0)
+		com_addoparg(c, BUILD_TUPLE, ndefs);
+	return ndefs;
+}
+
 static void
 com_funcdef(c, n)
 	struct compiling *c;
@@ -1842,8 +1911,12 @@ com_funcdef(c, n)
 		c->c_errors++;
 	else {
 		int i = com_addconst(c, v);
+		int argcount;
+		int ndefs = com_argdefs(c, n, &argcount);
 		com_addoparg(c, LOAD_CONST, i);
 		com_addbyte(c, BUILD_FUNCTION);
+		if (ndefs > 0)
+			com_addoparg(c, SET_FUNC_ARGS, argcount);
 		com_addopname(c, STORE_NAME, CHILD(n, 1));
 		DECREF(v);
 	}
@@ -2082,25 +2155,48 @@ com_arglist(c, n)
 	struct compiling *c;
 	node *n;
 {
-	int i, nargs, op;
+	int nch, op, nargs, i, t;
 	REQ(n, varargslist);
 	/* varargslist:
-	   (fpdef ',')* '*' NAME | fpdef (',' fpdef)* [','] */
-	op = UNPACK_ARG;
-	nargs = (NCH(n) + 1) / 2;
-	for (i = 0; i < NCH(n); i += 2) {
-		int t = TYPE(CHILD(n, i));
-		if (t == STAR) {
-			op = UNPACK_VARARG;
-			nargs = i/2;
+		(fpdef ['=' test] ',')* '*' NAME |
+		fpdef ['=' test] (',' fpdef ['=' test])* [','] */
+	nch = NCH(n);
+	if (nch >= 2 && TYPE(CHILD(n, nch-2)) == STAR) {
+		op = UNPACK_VARARG;
+		nch -= 2;
+	}
+	else
+		op = UNPACK_ARG;
+	nargs = 0;
+	for (i = 0; i < nch; i++) {
+		nargs++;
+		i++;
+		if (i >= nch)
 			break;
+		t = TYPE(CHILD(n, i));
+		if (t == EQUAL) {
+			i += 2;
+			t = TYPE(CHILD(n, i));
 		}
+		if (t != COMMA)
+			break;
 	}
 	com_addoparg(c, op, nargs);
-	for (i = 0; i < 2*nargs; i += 2)
+	for (i = 0; i < nch; i++) {
 		com_fpdef(c, CHILD(n, i));
+		i++;
+		if (i >= nch)
+			break;
+		t = TYPE(CHILD(n, i));
+		if (t == EQUAL) {
+			i += 2;
+			t = TYPE(CHILD(n, i));
+		}
+		if (t != COMMA)
+			break;
+	}
 	if (op == UNPACK_VARARG)
-		com_addopname(c, STORE_NAME, CHILD(n, 2*nargs+1));
+		com_addopname(c, STORE_NAME, CHILD(n, nch+1));
 }
 
 static void
@@ -2222,23 +2318,21 @@ compile_node(c, n)
    instructions that refer to local variables with LOAD_FAST etc.
    The latter instructions are much faster because they don't need to
    look up the variable name in a dictionary.
-   
-   To find all local variables, we check all STORE_NAME and IMPORT_FROM
-   instructions.  This yields all local variables, including arguments,
-   function definitions, class definitions and import statements.
-   (We don't check DELETE_NAME instructions, since if there's no
-   STORE_NAME the DELETE_NAME will surely fail.)
-   
-   There is one problem: 'from foo import *' introduces local variables
-   that we can't know while compiling.  If this is the case, wo don't
-   optimize at all (this rarely happens, since this form of import
-   statement is mostly used at the module level).
 
-   Note that, because of this optimization, code like the following
-   won't work:
-	eval('x = 1')
-	print x
-   
+   To find all local variables, we check all STORE_NAME, IMPORT_FROM and
+   DELETE_NAME instructions.  This yields all local variables, including
+   arguments, function definitions, class definitions and import
+   statements.
+
+   All remaining LOAD_NAME instructions must refer to non-local (global
+   or builtin) variables, so are replaced by LOAD_GLOBAL.
+
+   There are two problems:  'from foo import *' and 'exec' may introduce
+   local variables that we can't know while compiling.  If this is the
+   case, we don't optimize at all (this rarely happens, since exec is
+   rare, & this form of import statement is mostly used at the module
+   level).
+
    NB: this modifies the string object co->co_code!
 */
 
@@ -2300,7 +2394,7 @@ optimize(c)
 		}
 	}
 	
-	if (nlocals == 0 || dictlookup(locals, "*") != NULL) {
+	if (dictlookup(locals, "*") != NULL) {
 		/* Don't optimize anything */
 		goto end;
 	}
@@ -2332,6 +2426,8 @@ optimize(c)
 			v = dict2lookup(locals, name);
 			if (v == NULL) {
 				err_clear();
+				if (opcode == LOAD_NAME)
+					cur_instr[0] = LOAD_GLOBAL;
 				continue;
 			}
 			i = getintvalue(v);
