@@ -590,7 +590,12 @@ Notes:
 \item[(1)] Raises a \exception{KeyError} exception if \var{k} is not
 in the map.
 
-\item[(2)] Keys and values are listed in random order.
+\item[(2)] Keys and values are listed in random order.  If
+\method{keys()} and \method{values()} are called with no intervening
+modifications to the dictionary, the two lists will directly
+correspond.  This allows the creation of \code{(\var{value},
+\var{key})} pairs using \function{map()}: \samp{pairs = map(None,
+\var{a}.values(), \var{a}.keys())}.
 
 \item[(3)] \var{b} must be of the same type as \var{a}.
 
