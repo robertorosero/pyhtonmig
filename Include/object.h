@@ -259,7 +259,7 @@ typedef struct _typeobject {
 	getiterfunc tp_iter;
 	iternextfunc tp_iternext;
 
-	/* Attribute descriptor stuff */
+	/* Attribute descriptor and subclassing stuff */
 	struct PyMethodDef *tp_methods;
 	struct memberlist *tp_members;
 	struct getsetlist *tp_getset;
@@ -271,6 +271,9 @@ typedef struct _typeobject {
 	initproc tp_init;
 	allocfunc tp_alloc;
 	allocfunc tp_new;
+	PyObject *tp_bases;
+	PyObject *tp_mro; /* method resolution order */
+	PyObject *tp_introduced;
 
 #ifdef COUNT_ALLOCS
 	/* these must be last and never explicitly initialized */
