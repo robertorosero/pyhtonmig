@@ -87,22 +87,6 @@ type_call(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	}
 	if (PyType_IS_GC(type))
 		PyObject_GC_Init(res);
-	if (type->tp_flags & Py_TPFLAGS_HEAPTYPE) {
-		PyObject *init, *dummy;
-
-		init = PyObject_GetAttrString(res, "__init__");
-		if (init == NULL) {
-			PyErr_Clear();
-			return res;
-		}
-		dummy = PyObject_Call(init, args, kwds);
-		Py_DECREF(init);
-		if (dummy == NULL) {
-			Py_DECREF(obj);
-			return NULL;
-		}
-		Py_DECREF(dummy);
-	}
 	return res;
 }
 
@@ -1075,6 +1059,56 @@ static struct wrapperbase tab_next[] = {
 	{0}
 };
 
+static struct wrapperbase tab_descr_get[] = {
+	{"__get__", (wrapperfunc)wrap_binaryfunc,
+	 "descr.__get__(obj) -> value"},
+	{0}
+};
+
+static PyObject *
+wrap_descrsetfunc(PyObject *self, PyObject *args, void *wrapped)
+{
+	descrsetfunc func = (descrsetfunc)wrapped;
+	PyObject *obj, *value;
+	int ret;
+
+	if (!PyArg_ParseTuple(args, "OO", &obj, &value))
+		return NULL;
+	ret = (*func)(self, obj, value);
+	if (ret < 0)
+		return NULL;
+	Py_INCREF(Py_None);
+	return Py_None;
+}
+
+static struct wrapperbase tab_descr_set[] = {
+	{"__set__", (wrapperfunc)wrap_descrsetfunc,
+	 "descr.__set__(obj, value)"},
+	{0}
+};
+
+static PyObject *
+wrap_init(PyObject *self, PyObject *args, void *wrapped)
+{
+	ternaryfunc func = (ternaryfunc)wrapped;
+	PyObject *res;
+
+	/* XXX What about keyword arguments? */
+	res = (*func)(self, args, NULL);
+	if (res == NULL)
+		return NULL;
+	/* tp_construct doesn't return a new object; it just returns self,
+	   un-INCREF-ed */
+	Py_INCREF(Py_None);
+	return Py_None;
+}
+
+static struct wrapperbase tab_init[] = {
+	{"__init__", (wrapperfunc)wrap_init,
+	 "x.__init__() -> initialize object"},
+	{0}
+};
+
 static int
 add_operators(PyTypeObject *type)
 {
@@ -1159,6 +1193,9 @@ add_operators(PyTypeObject *type)
 	ADD(type->tp_richcompare, tab_richcmp);
 	ADD(type->tp_iter, tab_iter);
 	ADD(type->tp_iternext, tab_next);
+	ADD(type->tp_descr_get, tab_descr_get);
+	ADD(type->tp_descr_set, tab_descr_set);
+	ADD(type->tp_construct, tab_init);
 
 	return 0;
 }
@@ -1377,6 +1414,35 @@ slot_tp_iternext(PyObject *self)
 	return PyObject_CallMethod(self, "next", "");
 }
 
+SLOT1(tp_descr_get, get, PyObject *, O);
+
+static int
+slot_tp_descr_set(PyObject *self, PyObject *target, PyObject *value)
+{
+	PyObject *res = PyObject_CallMethod(self, "__set__",
+					    "OO", target, value);
+	if (res == NULL)
+		return -1;
+	Py_DECREF(res);
+	return 0;
+}
+
+static PyObject *
+slot_tp_construct(PyObject *self, PyObject *args, PyObject *kwds)
+{
+	PyObject *meth = PyObject_GetAttrString(self, "__init__");
+	PyObject *res;
+
+	if (meth == NULL)
+		return NULL;
+	res = PyObject_Call(meth, args, kwds);
+	Py_DECREF(meth);
+	if (res == NULL)
+		return NULL;
+	Py_DECREF(res);
+	return self;
+}
+
 static void
 override_slots(PyTypeObject *type, PyObject *dict)
 {
@@ -1470,5 +1536,9 @@ override_slots(PyTypeObject *type, PyObject *dict)
 	TPSLOT(gt, tp_richcompare);
 	TPSLOT(ge, tp_richcompare);
 	TPSLOT(iter, tp_iter);
-	TPSLOT(next, tp_iternext);
+	if (PyDict_GetItemString(dict, "next"))
+		type->tp_iternext = slot_tp_iternext;
+	TPSLOT(get, tp_descr_get);
+	TPSLOT(set, tp_descr_set);
+	TPSLOT(init, tp_construct);
 }
