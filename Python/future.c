@@ -21,7 +21,7 @@ future_check_features(PyFutureFeatures *ff, stmt_ty s, const char *filename)
 
 	names = s->v.ImportFrom.names;
 	for (i = 0; i < asdl_seq_LEN(names); i++) {
-		feature = PyString_AsString(asdl_seq_get(names, i));
+		feature = PyString_AsString(asdl_seq_GET(names, i));
 		if (!feature)
 			return 0;
 		if (strcmp(feature, FUTURE_NESTED_SCOPES) == 0) {
@@ -60,7 +60,7 @@ future_parse(PyFutureFeatures *ff, mod_ty mod, const char *filename)
 	if (mod->kind != Module_kind) /* XXX */
 		return 1;
 	for (i = 0; i < asdl_seq_LEN(mod->v.Module.body); i++) {
-		stmt_ty s = asdl_seq_get(mod->v.Module.body, i);
+		stmt_ty s = asdl_seq_GET(mod->v.Module.body, i);
 
 		/* The tests below will return from this function unless it is
 		   still possible to find a future statement.  The only things
