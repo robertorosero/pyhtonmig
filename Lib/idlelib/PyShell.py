@@ -97,7 +97,8 @@ class PyShellEditorWindow(EditorWindow):
 
     # Regular text edit window when a shell is present
     # XXX ought to merge with regular editor window
-
+    runnable = True  # Shell not present, enable Import Module and Run Script
+    
     def __init__(self, *args):
         apply(EditorWindow.__init__, (self,) + args)
         self.text.bind("<<set-breakpoint-here>>", self.set_breakpoint_here)
