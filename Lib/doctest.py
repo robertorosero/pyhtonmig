@@ -1585,6 +1585,11 @@ class DocTestFailure(Exception):
         self.example = example
         self.got = got
 
+    def __str__(self):
+        return str(self.test)
+
+    
+    
 class DebugRunner(DocTestRunner):
     r"""Run doc tests but raise an exception as soon as there is a failure.
 
@@ -1625,7 +1630,47 @@ class DebugRunner(DocTestRunner):
 
          >>> failure.got
          '1\n'
+
+       If a failure or error occurs, the globals are left intact:
+
+         >>> del test.globs['__builtins__']
+         >>> test.globs
+         {'x': 1}
+         
+         >>> test = DocTest('''
+         ...      >>> x = 2
+         ...      >>> raise KeyError
+         ...      ''', {}, 'foo', 'foo.py', 0)
+
+         >>> runner.run(test)
+         Traceback (most recent call last):
+         ...
+         KeyError
+
+         >>> del test.globs['__builtins__']
+         >>> test.globs
+         {'x': 2}
+
+       But the globals are cleared if there is no error:
+
+         >>> test = DocTest('''
+         ...      >>> x = 2
+         ...      ''', {}, 'foo', 'foo.py', 0)
+
+         >>> runner.run(test)
+         (0, 1)
+         
+         >>> test.globs
+         {}
+       
+
        """
+
+    def run(self, test, compileflags=None, out=None, clear_globs=True):
+        r = DocTestRunner.run(self, test, compileflags, out, False)
+        if clear_globs:
+            test.globs.clear()
+        return r
 
     def report_unexpected_exception(self, out, test, example, exc_info):
         raise exc_info[0], exc_info[1], exc_info[2]
