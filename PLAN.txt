@@ -268,6 +268,14 @@ Merge details (this section is Tim's scratchpad, but should help a lot if
 he dies of frustration while wrestling with CVS <0.9 wink>).
 
 ----------------------------------------------------------------------------
+2001-07-17
+
+Tagged trunk about 00:05 EDT, like so:
+    cvs tag date2001-07-17a python
+
+Merged trunk delta into branch via:
+    cvs -q -z3 up -j date2001-07-16 -j date2001-07-17a descr
+----------------------------------------------------------------------------
 2001-07-16
 
 Tagged trunk about 15:20 EDT, like so:
