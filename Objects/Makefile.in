@@ -15,7 +15,7 @@ DEFS=		@DEFS@
 # === Other things that are customizable but not by configure ===
 
 TOP=		..
-INCLDIR=	$(TOP)/Py
+INCLDIR=	$(TOP)/Include
 OPT=		-g
 CFLAGS=		$(OPT) -I$(INCLDIR) $(DEFS)
 
