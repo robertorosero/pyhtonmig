@@ -124,6 +124,14 @@ class LocaleTime_Tests(unittest.TestCase):
         self.assertRaises(TypeError, _strptime.LocaleTime, timezone=range(1))
         self.assertRaises(TypeError, _strptime.LocaleTime, timezone=range(3))
 
+    def test_unknowntimezone(self):
+        # Handle timezone set to ('','') properly.
+        # Fixes bug #661354
+        locale_time = _strptime.LocaleTime(timezone=('',''))
+        self.failUnless("%Z" not in locale_time.LC_date,
+                        "when timezone == ('',''), string.replace('','%Z') is "
+                         "occuring")
+
 class TimeRETests(unittest.TestCase):
     """Tests for TimeRE."""
 
@@ -180,11 +188,18 @@ class TimeRETests(unittest.TestCase):
                           found.group('b')))
         for directive in ('a','A','b','B','c','d','H','I','j','m','M','p','S',
                           'U','w','W','x','X','y','Y','Z','%'):
-            compiled = self.time_re.compile("%%%s"% directive)
-            found = compiled.match(time.strftime("%%%s" % directive))
+            compiled = self.time_re.compile("%" + directive)
+            found = compiled.match(time.strftime("%" + directive))
             self.failUnless(found, "Matching failed on '%s' using '%s' regex" %
-                                    (time.strftime("%%%s" % directive),
+                                    (time.strftime("%" + directive),
                                      compiled.pattern))
+
+    def test_blankpattern(self):
+        # Make sure when tuple or something has no values no regex is generated.
+        # Fixes bug #661354
+        test_locale = _strptime.LocaleTime(timezone=('',''))
+        self.failUnless(_strptime.TimeRE(test_locale).pattern("%Z") == '',
+                        "with timezone == ('',''), TimeRE().pattern('%Z') != ''")
 
 class StrptimeTests(unittest.TestCase):
     """Tests for _strptime.strptime."""
@@ -262,7 +277,7 @@ class StrptimeTests(unittest.TestCase):
         # Test timezone directives.
         # When gmtime() is used with %Z, entire result of strftime() is empty.
         # Check for equal timezone names deals with bad locale info when this
-        # occurs; first found in FreeBSD 4.4 -current
+        # occurs; first found in FreeBSD 4.4.
         time_tuple = time.localtime()
         strf_output = time.strftime("%Z")  #UTC does not have a timezone
         strp_output = _strptime.strptime(strf_output, "%Z")
@@ -384,7 +399,6 @@ class JulianTests(unittest.TestCase):
 
     def test_all_julian_days(self):
         eq = self.assertEqual
-        # XXX: should 0 be accepted?
         for i in range(1, 367):
             # use 2004, since it is a leap year, we have 366 days
             eq(_strptime.strptime('%d 2004' % i, '%j %Y')[7], i)
