@@ -1227,58 +1227,6 @@ same value.";
 
 
 static PyObject *
-builtin_long(PyObject *self, PyObject *args)
-{
-	PyObject *v;
-	int base = -909;		     /* unlikely! */
-
-	if (!PyArg_ParseTuple(args, "O|i:long", &v, &base))
-		return NULL;
-	if (base == -909)
-		return PyNumber_Long(v);
-	else if (PyString_Check(v))
-		return PyLong_FromString(PyString_AS_STRING(v), NULL, base);
-	else if (PyUnicode_Check(v))
-		return PyLong_FromUnicode(PyUnicode_AS_UNICODE(v),
-					  PyUnicode_GET_SIZE(v),
-					  base);
-	else {
-		PyErr_SetString(PyExc_TypeError,
-				"long() can't convert non-string with explicit base");
-		return NULL;
-	}
-}
-
-static char long_doc[] =
-"long(x) -> long integer\n\
-long(x, base) -> long integer\n\
-\n\
-Convert a string or number to a long integer, if possible.  A floating\n\
-point argument will be truncated towards zero (this does not include a\n\
-string representation of a floating point number!)  When converting a\n\
-string, use the given base.  It is an error to supply a base when\n\
-converting a non-string.";
-
-
-static PyObject *
-builtin_float(PyObject *self, PyObject *args)
-{
-	PyObject *v;
-
-	if (!PyArg_ParseTuple(args, "O:float", &v))
-		return NULL;
-	if (PyString_Check(v))
-		return PyFloat_FromString(v, NULL);
-	return PyNumber_Float(v);
-}
-
-static char float_doc[] =
-"float(x) -> floating point number\n\
-\n\
-Convert a string or number to a floating point number, if possible.";
-
-
-static PyObject *
 builtin_iter(PyObject *self, PyObject *args)
 {
 	PyObject *v, *w = NULL;
@@ -1908,40 +1856,6 @@ This always returns a floating point number.  Precision may be negative.";
 
 
 static PyObject *
-builtin_str(PyObject *self, PyObject *args)
-{
-	PyObject *v;
-
-	if (!PyArg_ParseTuple(args, "O:str", &v))
-		return NULL;
-	return PyObject_Str(v);
-}
-
-static char str_doc[] =
-"str(object) -> string\n\
-\n\
-Return a nice string representation of the object.\n\
-If the argument is a string, the return value is the same object.";
-
-
-static PyObject *
-builtin_tuple(PyObject *self, PyObject *args)
-{
-	PyObject *v;
-
-	if (!PyArg_ParseTuple(args, "O:tuple", &v))
-		return NULL;
-	return PySequence_Tuple(v);
-}
-
-static char tuple_doc[] =
-"tuple(sequence) -> list\n\
-\n\
-Return a tuple whose items are the same as those of the argument sequence.\n\
-If the argument is a tuple, the return value is the same object.";
-
-
-static PyObject *
 builtin_vars(PyObject *self, PyObject *args)
 {
 	PyObject *v = NULL;
@@ -2095,7 +2009,6 @@ static PyMethodDef builtin_methods[] = {
 	{"eval",	builtin_eval, 1, eval_doc},
 	{"execfile",	builtin_execfile, 1, execfile_doc},
 	{"filter",	builtin_filter, 1, filter_doc},
-	{"float",	builtin_float, 1, float_doc},
 	{"getattr",	builtin_getattr, 1, getattr_doc},
 	{"globals",	builtin_globals, 1, globals_doc},
 	{"hasattr",	builtin_hasattr, 1, hasattr_doc},
@@ -2109,7 +2022,6 @@ static PyMethodDef builtin_methods[] = {
 	{"iter",	builtin_iter, 1, iter_doc},
 	{"len",		builtin_len, 1, len_doc},
 	{"locals",	builtin_locals, 1, locals_doc},
-	{"long",	builtin_long, 1, long_doc},
 	{"map",		builtin_map, 1, map_doc},
 	{"max",		builtin_max, 1, max_doc},
 	{"min",		builtin_min, 1, min_doc},
@@ -2125,8 +2037,6 @@ static PyMethodDef builtin_methods[] = {
 	{"round",	builtin_round, 1, round_doc},
 	{"setattr",	builtin_setattr, 1, setattr_doc},
 	{"slice",       builtin_slice, 1, slice_doc},
-	{"str",		builtin_str, 1, str_doc},
-	{"tuple",	builtin_tuple, 1, tuple_doc},
 	{"unicode",	builtin_unicode, 1, unicode_doc},
 	{"unichr",	builtin_unichr, 1, unichr_doc},
 	{"vars",	builtin_vars, 1, vars_doc},
@@ -2160,12 +2070,22 @@ _PyBuiltin_Init(void)
 	if (PyDict_SetItemString(dict, "dictionary",
 				 (PyObject *) &PyDict_Type) < 0)
 		return NULL;
-	if (PyDict_SetItemString(dict, "list", (PyObject *) &PyList_Type) < 0)
+	if (PyDict_SetItemString(dict, "float",
+				 (PyObject *) &PyFloat_Type) < 0)
 		return NULL;
 	if (PyDict_SetItemString(dict, "int", (PyObject *) &PyInt_Type) < 0)
 		return NULL;
+	if (PyDict_SetItemString(dict, "list", (PyObject *) &PyList_Type) < 0)
+		return NULL;
+	if (PyDict_SetItemString(dict, "long", (PyObject *) &PyLong_Type) < 0)
+		return NULL;
 	if (PyDict_SetItemString(dict, "object",
 				 (PyObject *) &PyBaseObject_Type) < 0)
+		return NULL;
+	if (PyDict_SetItemString(dict, "str", (PyObject *) &PyString_Type) < 0)
+		return NULL;
+	if (PyDict_SetItemString(dict, "tuple",
+				 (PyObject *) &PyTuple_Type) < 0)
 		return NULL;
 	if (PyDict_SetItemString(dict, "type", (PyObject *) &PyType_Type) < 0)
 		return NULL;
