@@ -349,7 +349,7 @@ sub add_index_entry{
 
 sub new_link_info{
     my $name = "l2h-" . ++$globals{'max_id'};
-    my $aname = '<a name="' . $name . '">';
+    my $aname = "<a name='$name'>";
     my $ahref = gen_link($CURRENT_FILE, $name);
     return ($name, $aname, $ahref);
 }
@@ -622,13 +622,24 @@ sub do_env_cfuncdesc{
            . '</dl>';
 }
 
+sub do_env_csimplemacrodesc{
+    local($_) = @_;
+    my $name = next_argument();
+    my $idx = make_str_index_entry("<tt class='macro'>$name</tt>");
+    return "<dl><dt><b>$idx</b>\n<dd>"
+           . $_
+           . '</dl>'
+}
+
 sub do_env_ctypedesc{
     local($_) = @_;
+    my $index_name = next_optional_argument();
     my $type_name = next_argument();
-    my $idx = make_str_index_entry("<tt class='ctype'>$type_name</tt>"
-				   . get_indexsubitem());
-    $idx =~ s/ \(.*\)//;
-    return "<dl><dt><b>$idx</b>\n<dd>"
+    $index_name = $type_name
+      unless $index_name;
+    my($name,$aname,$ahref) = new_link_info();
+    add_index_entry("<tt class='ctype'>$index_name</tt> (C type)", $ahref);
+    return "<dl><dt><b><tt class='ctype'>$aname$type_name</a></tt></b>\n<dd>"
            . $_
            . '</dl>'
 }
