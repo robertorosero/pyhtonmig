@@ -16,10 +16,6 @@ typedef struct {
     int ff_features;
 } PyFutureFeatures;
 
-DL_IMPORT(PyFutureFeatures *) PyNode_Future(struct _node *, char *);
-DL_IMPORT(PyCodeObject *) PyNode_CompileFlags(struct _node *, char *,
-					      PyCompilerFlags *);
-
 #define FUTURE_NESTED_SCOPES "nested_scopes"
 #define FUTURE_GENERATORS "generators"
 #define FUTURE_DIVISION "division"
@@ -41,6 +37,7 @@ struct instr {
 struct basicblock {
 	size_t b_iused;
 	size_t b_ialloc;
+	int next;
 	struct instr b_instr[DEFAULT_BLOCK_SIZE];
 };
 
