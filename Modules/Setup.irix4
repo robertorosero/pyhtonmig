@@ -1,7 +1,3 @@
-# This file is used by the makesetup script to construct Makefile.in
-# and config.c, from Makefile.in.in (sic!) and config.c.in,
-# respectively.
-#
 # Each line in this file describes one or more optional modules.
 # Comment out lines to suppress modules.
 # Lines have the following structure:
@@ -31,11 +27,10 @@
 # Some special rules to define PYTHONPATH
 # Edit the definitions below to indicate which options you are using
 
-DESTDIR=/usr/local		# Edit this if needed
-DESTLIB=$(DESTDIR)/lib/python	# Don't edit this (usually)
-ARCHPATH=:$(DESTLIB)/sgi	# Enable this for SGI systems
-#ARCHPATH=:$(DESTLIB)/sun4	# Enable this for Sun systems
-#STDWINPATH=:$(DESTLIB)/stdwin	# Enable this if stdwin installed
+DESTLIB=$(prefix)/lib/python
+ARCHPATH=:$(DESTLIB)/sgi
+#ARCHPATH=:$(DESTLIB)/sun4
+#STDWINPATH=:$(DESTLIB)/stdwin
 
 PYTHONPATH=.:$(DESTLIB)$(ARCHPATH)$(STDWINPATH)
 
