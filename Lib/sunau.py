@@ -128,8 +128,6 @@ _simple_encodings = [AUDIO_FILE_ENCODING_MULAW_8,
 		     AUDIO_FILE_ENCODING_LINEAR_32,
 		     AUDIO_FILE_ENCODING_ALAW_8]
 
-Error = 'sunau.Error'
-
 def _read_u32(file):
 	x = 0L
 	for i in range(4):
@@ -410,7 +408,7 @@ class Au_write:
 	#
 	# private methods
 	#
-	if 0: access *: private
+	access *: private
 
 	def _ensure_header_written(self):
 		if not self._nframeswritten:

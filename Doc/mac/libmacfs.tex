@@ -48,10 +48,6 @@ object and a flag indicating that the user completed the dialog
 without cancelling.
 \end{funcdesc}
 
-\begin{funcdesc}{PromptGetFile}{prompt\optional{\, type\, ...}}
-Similar to \var{StandardGetFile} but allows you to specify a prompt.
-\end{funcdesc}
-
 \begin{funcdesc}{StandardPutFile}{prompt\, \optional{default}}
 Present the user with a standard ``open output file''
 dialog. \var{prompt} is the prompt string, and the optional
@@ -60,10 +56,9 @@ returns an FSSpec object and a flag indicating that the user completed
 the dialog without cancelling.
 \end{funcdesc}
 
-\begin{funcdesc}{GetDirectory}{\optional{prompt}}
+\begin{funcdesc}{GetDirectory}{}
 Present the user with a non-standard ``select a directory''
-dialog. \var{prompt} is the prompt string, and the optional.
-Return an FSSpec object and a success-indicator.
+dialog. Return an FSSpec object and a success-indicator.
 \end{funcdesc}
 
 \begin{funcdesc}{FindFolder}{where\, which\, create}
