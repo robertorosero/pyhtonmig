@@ -2380,7 +2380,7 @@ If the argument is a string, the return value is the same object.";
 PyTypeObject PyString_Type = {
 	PyObject_HEAD_INIT(&PyType_Type)
 	0,
-	"string",
+	"str",
 	sizeof(PyStringObject),
 	sizeof(char),
 	(destructor)string_dealloc, 		/* tp_dealloc */
