@@ -299,12 +299,14 @@ for each thread.
 \end{cfuncdesc}
 
 \begin{cfuncdesc}{void}{PyErr_SetInterrupt}{}
-  This function is obsolete.  It simulates the effect of a
+  This function simulates the effect of a
   \constant{SIGINT}\ttindex{SIGINT} signal arriving --- the next time
   \cfunction{PyErr_CheckSignals()} is called,
   \withsubitem{(built-in exception)}{\ttindex{KeyboardInterrupt}}
   \exception{KeyboardInterrupt} will be raised.  It may be called
   without holding the interpreter lock.
+  % XXX This was described as obsolete, but is used in
+  % thread.interrupt_main() (used from IDLE), so it's still needed.
 \end{cfuncdesc}
 
 \begin{cfuncdesc}{PyObject*}{PyErr_NewException}{char *name,
@@ -331,9 +333,8 @@ for each thread.
   example, when an exception occurs in an \method{__del__()} method.
 
   The function is called with a single argument \var{obj} that
-  identifies where the context in which the unraisable exception
-  occurred.  The repr of \var{obj} will be printed in the warning
-  message.
+  identifies the context in which the unraisable exception occurred.
+  The repr of \var{obj} will be printed in the warning message.
 \end{cfuncdesc}
 
 \section{Standard Exceptions \label{standardExceptions}}

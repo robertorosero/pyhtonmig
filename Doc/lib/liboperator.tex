@@ -66,10 +66,12 @@ constructor.
 
 \begin{funcdesc}{is_}{a, b}
 Return \code{\var{a} is \var{b}}.  Tests object identity.
+\versionadded{2.3}
 \end{funcdesc}
 
 \begin{funcdesc}{is_not}{a, b}
 Return \code{\var{a} is not \var{b}}.  Tests object identity.
+\versionadded{2.3}
 \end{funcdesc}
 
 
@@ -247,7 +249,7 @@ measure of reliability with instance objects.  For example:}
 >>> import operator
 >>> o = C()
 >>> operator.isMappingType(o)
-1
+True
 \end{verbatim}
 
 \begin{funcdesc}{isCallable}{o}

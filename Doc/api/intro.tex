@@ -37,9 +37,12 @@ API are included in your code by the following line:
 This implies inclusion of the following standard headers:
 \code{<stdio.h>}, \code{<string.h>}, \code{<errno.h>},
 \code{<limits.h>}, and \code{<stdlib.h>} (if available).
-Since Python may define some pre-processor definitions which affect
-the standard headers on some systems, you must include \file{Python.h}
-before any standard headers are included.
+
+\begin{notice}[warning]
+  Since Python may define some pre-processor definitions which affect
+  the standard headers on some systems, you \emph{must} include
+  \file{Python.h} before any standard headers are included.
+\end{notice}
 
 All user visible names defined by Python.h (except those defined by
 the included standard headers) have one of the prefixes \samp{Py} or
@@ -169,12 +172,16 @@ becomes second nature.
 \subsubsection{Reference Count Details \label{refcountDetails}}
 
 The reference count behavior of functions in the Python/C API is best 
-explained in terms of \emph{ownership of references}.  Note that we 
-talk of owning references, never of owning objects; objects are always 
-shared!  When a function owns a reference, it has to dispose of it 
-properly --- either by passing ownership on (usually to its caller) or 
-by calling \cfunction{Py_DECREF()} or \cfunction{Py_XDECREF()}.  When
-a function passes ownership of a reference on to its caller, the
+explained in terms of \emph{ownership of references}.  Ownership
+pertains to references, never to objects (objects are not owned: they
+are always shared).  "Owning a reference" means being responsible for
+calling Py_DECREF on it when the reference is no longer needed. 
+Ownership can also be transferred, meaning that the code that receives
+ownership of the reference then becomes responsible for eventually
+decref'ing it by calling \cfunction{Py_DECREF()} or
+\cfunction{Py_XDECREF()} when it's no longer needed --or passing on
+this responsibility (usually to its caller).
+When a function passes ownership of a reference on to its caller, the
 caller is said to receive a \emph{new} reference.  When no ownership
 is transferred, the caller is said to \emph{borrow} the reference.
 Nothing needs to be done for a borrowed reference.
@@ -280,7 +287,7 @@ caller becomes the owner of the reference).
 
 It is important to realize that whether you own a reference returned 
 by a function depends on which function you call only --- \emph{the
-plumage} (the type of the type of the object passed as an
+plumage} (the type of the object passed as an
 argument to the function) \emph{doesn't enter into it!}  Thus, if you 
 extract an item from a list using \cfunction{PyList_GetItem()}, you
 don't own the reference --- but if you obtain the same item from the

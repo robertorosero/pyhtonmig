@@ -148,10 +148,11 @@ distribution, to create or maintain whole documents or sections.
         the formatting processes.
 
         \begin{tableii}{p{.75in}|p{3in}}{filenq}{Directory}{Contents}
-          \lineii{perl/}{Support for \LaTeX2HTML processing}
+          \lineii{commontex/}{Document content shared among documents}
+          \lineii{perl/}     {Support for \LaTeX2HTML processing}
           \lineii{templates/}{Example files for source documents}
           \lineii{texinputs/}{Style implementation for \LaTeX}
-          \lineii{tools/}{Custom processing scripts}
+          \lineii{tools/}    {Custom processing scripts}
         \end{tableii}
 
   \end{definitions}
@@ -321,7 +322,7 @@ Still more text.
 \end{verbatim}
 
     A macro which takes an optional parameter would be typed like this
-    when the optional paramter is given:
+    when the optional parameter is given:
 
 \begin{verbatim}
 \name[optional]
@@ -1399,6 +1400,15 @@ This \UNIX\ is also followed by a space.
     These macros are only defined within the content of the
     \env{seealso} and \env{seealso*} environments.
 
+    \begin{macrodesc}{seelink}{\p{url}\p{linktext}\p{why}}
+      References to specific on-line resources should be given using
+      the \macro{seelink} macro if they don't have a meaningful title
+      but there is some short description of what's at the end of the
+      link.  Online documents which have identifiable titles should be
+      referenced using the \macro{seetitle} macro, using the optional
+      parameter to that macro to provide the URL.
+    \end{macrodesc}
+
     \begin{macrodesc}{seemodule}{\op{key}\p{name}\p{why}}
       Refer to another module.  \var{why} should be a brief
       explanation of why the reference may be interesting.  The module
@@ -1815,7 +1825,7 @@ This \UNIX\ is also followed by a space.
     using this command to build and install the software:
 
 \begin{verbatim}
-% configure && make install
+% ./configure && make install
 \end{verbatim}
 
     You should now be able to build at least the HTML, PDF, and
@@ -1911,7 +1921,7 @@ This \UNIX\ is also followed by a space.
     interested parties.
 
     Comments and bug reports on the standard documents should be sent
-    to \email{python-docs@python.org}.  This may include comments
+    to \email{docs@python.org}.  This may include comments
     about formatting, content, grammatical and spelling errors, or
     this document.  You can also send comments on this document
     directly to the author at \email{fdrake@acm.org}.

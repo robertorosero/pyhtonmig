@@ -135,8 +135,8 @@ dnl quadrigraphs "@<:@" and "@:>@" produce "[" and "]" in the output
 case $ac_sys_system/$ac_sys_release in
   # On OpenBSD, select(2) is not available if _XOPEN_SOURCE is defined,
   # even though select is a POSIX function. Reported by J. Ribbens.
-  # Reconfirmed for OpenBSD 3.3 by Zachary Hamm.
-  OpenBSD/2.* | OpenBSD/3.@<:@0123@:>@) 
+  # Reconfirmed for OpenBSD 3.3 by Zachary Hamm, for 3.4 by Jason Ish.
+  OpenBSD/2.* | OpenBSD/3.@<:@01234@:>@) 
     define_xopen_source=no;;
   # On Solaris 2.6, sys/wait.h is inconsistent in the usage
   # of union __?sigval. Reported by Stuart Bishop.
@@ -144,11 +144,23 @@ case $ac_sys_system/$ac_sys_release in
     define_xopen_source=no;;
   # On UnixWare 7, u_long is never defined with _XOPEN_SOURCE,
   # but used in /usr/include/netinet/tcp.h. Reported by Tim Rice.
-  OpenUNIX/8.0.0| UnixWare/7.1.@<:@0-3@:>@)
+  # Reconfirmed for 7.1.4 by Martin v. Loewis.
+  OpenUNIX/8.0.0| UnixWare/7.1.@<:@0-4@:>@)
     define_xopen_source=no;;
   # On OpenServer 5, u_short is never defined with _XOPEN_SOURCE,
   # but used in struct sockaddr.sa_family. Reported by Tim Rice.
   SCO_SV/3.2)
+    define_xopen_source=no;;
+  # On FreeBSD 4.8 and MacOS X 10.2, a bug in ncurses.h means that
+  # it craps out if _XOPEN_EXTENDED_SOURCE is defined. Apparently,
+  # this is fixed in 10.3, which identifies itself as Darwin/7.*
+  # This should hopefully be fixed in FreeBSD 4.9
+  FreeBSD/4.8* | Darwin/6* )
+    define_xopen_source=no;;
+  # On AIX 4, mbstate_t is defined only when _XOPEN_SOURCE == 500 but used in
+  # wcsnrtombs() and mbsnrtowcs() even if _XOPEN_SOURCE is not defined or
+  # has another value. By not (re)defining it, the defaults come in place.
+  AIX/4)
     define_xopen_source=no;;
 esac
 
@@ -508,23 +520,24 @@ if test $enable_shared = "yes"; then
     SunOS*)
 	  LDLIBRARY='libpython$(VERSION).so'
 	  BLDLIBRARY='-Wl,-R,$(LIBDIR) -L. -lpython$(VERSION)'
-	  RUNSHARED=LD_LIBRARY_PATH=`pwd`:$LD_LIBRARY_PATH
+	  RUNSHARED=LD_LIBRARY_PATH=`pwd`:${LD_LIBRARY_PATH}
+	  INSTSONAME="$LDLIBRARY".$SOVERSION
           ;;
     Linux*|GNU*|NetBSD*)
 	  LDLIBRARY='libpython$(VERSION).so'
 	  BLDLIBRARY='-L. -lpython$(VERSION)'
-	  RUNSHARED=LD_LIBRARY_PATH=`pwd`:$LD_LIBRARY_PATH
+	  RUNSHARED=LD_LIBRARY_PATH=`pwd`:${LD_LIBRARY_PATH}
 	  INSTSONAME="$LDLIBRARY".$SOVERSION
 	  ;;
     hp*|HP*)
 	  LDLIBRARY='libpython$(VERSION).sl'
 	  BLDLIBRARY='-Wl,+b,$(LIBDIR) -L. -lpython$(VERSION)'
-	  RUNSHARED=SHLIB_PATH=`pwd`:$SHLIB_PATH
+	  RUNSHARED=SHLIB_PATH=`pwd`:${SHLIB_PATH}
 	  ;;
     OSF*)
 	  LDLIBRARY='libpython$(VERSION).so'
          BLDLIBRARY='-rpath $(LIBDIR) -L. -lpython$(VERSION)'
-	  RUNSHARED=LD_LIBRARY_PATH=`pwd`:$LD_LIBRARY_PATH
+	  RUNSHARED=LD_LIBRARY_PATH=`pwd`:${LD_LIBRARY_PATH}
 	  ;;
     atheos*)
 	  LDLIBRARY='libpython$(VERSION).so'
@@ -868,7 +881,7 @@ ac_save_cxx="$CXX"
 
 if test "$ac_cv_kpthread" = "yes"
 then
-  CXX="$CXX -Kpthread"
+  CXX="$CXX -Kpthread"  
   ac_cv_cxx_thread=yes
 elif test "$ac_cv_kthread" = "yes"
 then
@@ -890,13 +903,11 @@ then
     ac_cv_cxx_thread=yes
   else
     ac_cv_cxx_thread=no
-    CXX="$ac_save_cxx"
   fi
   rm -fr conftest*
-else
- CXX="$ac_save_cxx"
 fi
 fi
+CXX="$ac_save_cxx"
 AC_MSG_RESULT($ac_cv_cxx_thread)
 
 dnl # check for ANSI or K&R ("traditional") preprocessor
@@ -1410,9 +1421,14 @@ AC_MSG_RESULT($SHLIBS)
 # checks for libraries
 AC_CHECK_LIB(dl, dlopen)	# Dynamic linking for SunOS/Solaris and SYSV
 AC_CHECK_LIB(dld, shl_load)	# Dynamic linking for HP-UX
-AC_SEARCH_LIBS(sem_init, pthread rt posix4) # 'Real Time' functions on Solaris
-					    # posix4 on Solaris 2.6
-					    # pthread (first!) on Linux
+
+# only check for sem_ini if thread support is requested
+if test "$with_threads" = "yes" -o -z "$with_threads"; then
+    AC_SEARCH_LIBS(sem_init, pthread rt posix4) # 'Real Time' functions on Solaris
+						# posix4 on Solaris 2.6
+						# pthread (first!) on Linux
+fi
+
 # check if we need libintl for locale functions
 AC_CHECK_LIB(intl, textdomain,
 	AC_DEFINE(WITH_LIBINTL, 1,
@@ -1530,18 +1546,27 @@ then
 elif test "$ac_cv_kpthread" = "yes"
 then
     CC="$CC -Kpthread"
+    if test "$ac_cv_cxx_thread" = "yes"; then
+        CXX="$CXX -Kpthread"
+    fi
     AC_DEFINE(WITH_THREAD)
     posix_threads=yes
     THREADOBJ="Python/thread.o"
 elif test "$ac_cv_kthread" = "yes"
 then
     CC="$CC -Kthread"
+    if test "$ac_cv_cxx_thread" = "yes"; then
+        CXX="$CXX -Kthread"
+    fi
     AC_DEFINE(WITH_THREAD)
     posix_threads=yes
     THREADOBJ="Python/thread.o"
 elif test "$ac_cv_pthread" = "yes"
 then
     CC="$CC -pthread"
+    if test "$ac_cv_cxx_thread" = "yes"; then
+        CXX="$CXX -pthread"
+    fi
     AC_DEFINE(WITH_THREAD)
     posix_threads=yes
     THREADOBJ="Python/thread.o"
@@ -2005,7 +2030,12 @@ AC_MSG_CHECKING(DYNLOADFILE)
 if test -z "$DYNLOADFILE"
 then
 	case $ac_sys_system/$ac_sys_release in
-	AIX*) DYNLOADFILE="dynload_aix.o";;
+	AIX*) # Use dynload_shlib.c and dlopen() if we have it; otherwise dynload_aix.c
+	if test "$ac_cv_func_dlopen" = yes
+	then DYNLOADFILE="dynload_shlib.o"
+	else DYNLOADFILE="dynload_aix.o"
+	fi
+	;;
 	BeOS*) DYNLOADFILE="dynload_beos.o";;
 	hp*|HP*) DYNLOADFILE="dynload_hpux.o";;
 	Darwin/*) DYNLOADFILE="dynload_next.o";;
@@ -2041,7 +2071,7 @@ AC_MSG_RESULT(MACHDEP_OBJS)
 
 # checks for library functions
 AC_CHECK_FUNCS(alarm chown clock confstr ctermid execv \
- fchdir fork fsync fdatasync fpathconf ftime ftruncate \
+ fork fpathconf ftime ftruncate \
  gai_strerror getgroups getlogin getloadavg getpeername getpgid getpid \
  getpriority getpwent getwd \
  kill killpg lchown lstat mkfifo mknod mktime \
@@ -2070,6 +2100,24 @@ AC_TRY_COMPILE([#include <unistd.h>], void *x=link,
 AC_MSG_CHECKING(for symlink)
 AC_TRY_COMPILE([#include <unistd.h>], void *x=symlink,
   AC_DEFINE(HAVE_SYMLINK, 1, Define if you have the 'symlink' function.)
+  AC_MSG_RESULT(yes),
+  AC_MSG_RESULT(no)
+)
+AC_MSG_CHECKING(for fchdir)
+AC_TRY_COMPILE([#include <unistd.h>], void *x=fchdir,
+  AC_DEFINE(HAVE_FCHDIR, 1, Define if you have the 'fchdir' function.)
+  AC_MSG_RESULT(yes),
+  AC_MSG_RESULT(no)
+)
+AC_MSG_CHECKING(for fsync)
+AC_TRY_COMPILE([#include <unistd.h>], void *x=fsync,
+  AC_DEFINE(HAVE_FSYNC, 1, Define if you have the 'fsync' function.)
+  AC_MSG_RESULT(yes),
+  AC_MSG_RESULT(no)
+)
+AC_MSG_CHECKING(for fdatasync)
+AC_TRY_COMPILE([#include <unistd.h>], void *x=fdatasync,
+  AC_DEFINE(HAVE_FDATASYNC, 1, Define if you have the 'fdatasync' function.)
   AC_MSG_RESULT(yes),
   AC_MSG_RESULT(no)
 )
@@ -2251,6 +2299,7 @@ main()
     hints.ai_family = AF_UNSPEC;
     hints.ai_flags = passive ? AI_PASSIVE : 0;
     hints.ai_socktype = SOCK_STREAM;
+    hints.ai_protocol = IPPROTO_TCP;
     if ((gaierr = getaddrinfo(NULL, "54321", &hints, &aitop)) != 0) {
       (void)gai_strerror(gaierr);
       goto bad;
@@ -2635,6 +2684,18 @@ then
   AC_CHECK_SIZEOF(wchar_t, 4, [#include <wchar.h>])
 fi
 
+AC_MSG_CHECKING(for UCS-4 tcl)
+have_ucs4_tcl=no
+AC_TRY_COMPILE([
+#include <tcl.h>
+#if TCL_UTF_MAX != 6
+# error "NOT UCS4_TCL"
+#endif], [], [
+  AC_DEFINE(HAVE_UCS4_TCL, 1, [Define this if you have tcl and TCL_UTF_MAX==6])
+  have_ucs4_tcl=yes
+])
+AC_MSG_RESULT($have_ucs4_tcl)
+
 AC_MSG_CHECKING(what type to use for unicode)
 dnl quadrigraphs "@<:@" and "@:>@" produce "[" and "]" in the output
 AC_ARG_ENABLE(unicode, 
@@ -2645,7 +2706,12 @@ AC_ARG_ENABLE(unicode,
 if test $enable_unicode = yes
 then
   # Without any arguments, Py_UNICODE defaults to two-byte mode
-  enable_unicode="ucs2"
+  case "$have_ucs4_tcl" in
+  yes) enable_unicode="ucs4"
+       ;;
+  *)   enable_unicode="ucs2"
+       ;;
+  esac
 fi
 
 AH_TEMPLATE(Py_UNICODE_SIZE,
@@ -2775,26 +2841,82 @@ then
   [Define if nice() returns success/failure instead of the new priority.])
 fi
 
+AC_MSG_CHECKING(for broken poll())
+AC_TRY_RUN([
+#include <poll.h>
+
+int main (void)
+    {
+    struct pollfd poll_struct = { 42, POLLIN|POLLPRI|POLLOUT, 0 };
+    
+    close (42);
+
+    int poll_test = poll (&poll_struct, 1, 0);
+
+    if (poll_test < 0)
+        {
+        exit(0);
+        }
+    else if (poll_test == 0 && poll_struct.revents != POLLNVAL)
+        {
+        exit(0);
+        }
+    else
+        {
+        exit(1);
+        }
+    }
+],
+ac_cv_broken_poll=yes,
+ac_cv_broken_poll=no,
+ac_cv_broken_poll=no)
+AC_MSG_RESULT($ac_cv_broken_poll)
+if test "$ac_cv_broken_poll" = yes
+then
+  AC_DEFINE(HAVE_BROKEN_POLL, 1,
+      [Define if poll() sets errno on invalid file descriptors.])
+fi
+
+
 # tzset(3) exists and works like we expect it to
 AC_MSG_CHECKING(for working tzset())
 AC_CACHE_VAL(ac_cv_working_tzset, [
 AC_TRY_RUN([
 #include <stdlib.h>
 #include <time.h>
+#include <string.h>
 int main()
 {
-	int gmt_hour;
-	int eastern_hour;
-	time_t now;
-	now = time((time_t*)NULL);
+	/* Note that we need to ensure that not only does tzset(3)
+	   do 'something' with localtime, but it works as documented
+	   in the library reference and as expected by the test suite.
+
+	   Linux 6.2 doesn't understand the southern hemisphere 
+	   after New Year's Day.
+	*/
+
+	time_t groundhogday = 1044144000; /* GMT-based, well, it's a colony */
+	time_t midyear = groundhogday + (365 * 24 * 3600 / 2);
+
 	putenv("TZ=UTC+0");
 	tzset();
-	gmt_hour = localtime(&now)->tm_hour;
+	if (localtime(&groundhogday)->tm_hour != 0)
+	    exit(1);
+
 	putenv("TZ=EST+5EDT,M4.1.0,M10.5.0");
 	tzset();
-	eastern_hour = localtime(&now)->tm_hour;
-	if (eastern_hour == gmt_hour)
+	if (localtime(&groundhogday)->tm_hour != 19)
 	    exit(1);
+
+	putenv("TZ=AEST-10AEDT-11,M10.5.0,M3.5.0");
+	tzset();
+	if (localtime(&groundhogday)->tm_hour != 11)
+	    exit(1);
+	if (strcmp(localtime(&groundhogday)->tm_zone, "AEDT"))
+	    exit(1);
+	if (strcmp(localtime(&midyear)->tm_zone, "AEST"))
+	    exit(1);
+
 	exit(0);
 }
 ],

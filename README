@@ -1,7 +1,7 @@
-This is Python version 2.3 release candidate 2
-==============================================
+This is Python version 2.3.4
+============================
 
-Copyright (c) 2001, 2002, 2003 Python Software Foundation.
+Copyright (c) 2001, 2002, 2003, 2004 Python Software Foundation.
 All rights reserved.
 
 Copyright (c) 2000 BeOpen.com.
@@ -34,6 +34,7 @@ What's new in this release?
 ---------------------------
 
 See the file "Misc/NEWS".
+
 
 If you don't read instructions
 ------------------------------
@@ -224,6 +225,7 @@ old K&R-C-only compilers is no longer possible.  ANSI C compilers are
 available for all modern systems, either in the form of updated
 compilers from the vendor, or one of the free compilers (gcc).
 
+
 Unsupported systems
 -------------------
 
@@ -246,6 +248,7 @@ longer:
   or PY_PTHREAD_D7 in thread_pthread.h
 - Systems using --with-dl-dld
 - Systems using --without-universal-newlines
+
 
 Platform specific notes
 -----------------------
@@ -366,7 +369,14 @@ AIX:	A complete overhaul of the shared library support is now in
 HP-UX:	When using threading, you may have to add -D_REENTRANT to the
 	OPT variable in the top-level Makefile; reported by Pat Knight,
 	this seems to make a difference (at least for HP-UX 10.20)
-	even though pyconfig.h defines it.
+	even though pyconfig.h defines it. This seems unnecessary when
+	using HP/UX 11 and later - threading works "out of the box".
+
+HP-UX ia64: When building on the ia64 (Itanium) platform using HP's 
+        compiler, some experience has shown that the compiler's
+        optimiser produces a completely broken version of python
+        (see http://www.python.org/sf/814976). To work around this,
+        edit the Makefile and remove -O from the OPT line.
 
 HP PA-RISC 2.0: A recent bug report (http://www.python.org/sf/546117)
 	suggests that the C compiler in this 64-bit system has bugs
@@ -657,6 +667,7 @@ AtheOS: From Octavian Cerna <tavy at ylabs.com>:
 	    - select: poll is available in the C library, but does not
 	      work (It does not return POLLNVAL for bad fds and
 	      hangs).
+              (Believed fixed, unverified - autoconf check for broken poll)
 	    - posix: statvfs and fstatvfs always return ENOSYS.
 	    - disabled modules:
 		- mmap: not yet implemented in AtheOS

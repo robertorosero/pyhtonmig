@@ -94,6 +94,12 @@ cycle_next(cycleobject *lz)
 				PyList_Append(lz->saved, item);
 			return item;
 		}
+		if (PyErr_Occurred()) {
+			if (PyErr_ExceptionMatches(PyExc_StopIteration))
+				PyErr_Clear();
+			else
+				return NULL;
+		}
 		if (PyList_Size(lz->saved) == 0) 
 			return NULL;
 		it = PyObject_GetIter(lz->saved);
@@ -1049,6 +1055,12 @@ chain_next(chainobject *lz)
 		item = PyIter_Next(it);
 		if (item != NULL)
 			return item;
+		if (PyErr_Occurred()) {
+			if (PyErr_ExceptionMatches(PyExc_StopIteration))
+				PyErr_Clear();
+			else
+				return NULL;
+		}
 		lz->iternum++;
 	}
 	return NULL;
@@ -1510,12 +1522,6 @@ izip_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	PyObject *result;
 	int tuplesize = PySequence_Length(args);
 
-	if (tuplesize < 1) {
-		PyErr_SetString(PyExc_TypeError,
-				"izip() requires at least one sequence");
-		return NULL;
-	}
-
 	/* args must be a tuple */
 	assert(PyTuple_Check(args));
 
@@ -1597,18 +1603,24 @@ izip_next(izipobject *lz)
 	PyObject *result = lz->result;
 	PyObject *it;
 	PyObject *item;
+	PyObject *olditem;
 
+	if (tuplesize == 0)
+		return NULL;
 	if (result->ob_refcnt == 1) {
+		Py_INCREF(result);
 		for (i=0 ; i < tuplesize ; i++) {
 			it = PyTuple_GET_ITEM(lz->ittuple, i);
 			assert(PyIter_Check(it));
 			item = (*it->ob_type->tp_iternext)(it);
-			if (item == NULL)
+			if (item == NULL) {
+				Py_DECREF(result);
 				return NULL;
-			Py_DECREF(PyTuple_GET_ITEM(result, i));
+			}
+			olditem = PyTuple_GET_ITEM(result, i);
 			PyTuple_SET_ITEM(result, i, item);
+			Py_DECREF(olditem);
 		}
-		Py_INCREF(result);
 	} else {
 		result = PyTuple_New(tuplesize);
 		if (result == NULL)

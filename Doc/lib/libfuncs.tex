@@ -60,49 +60,27 @@ def my_import(name):
   complex number, its magnitude is returned.
 \end{funcdesc}
 
-\begin{funcdesc}{apply}{function, args\optional{, keywords}}
-  The \var{function} argument must be a callable object (a
-  user-defined or built-in function or method, or a class object) and
-  the \var{args} argument must be a sequence.  The \var{function} is
-  called with \var{args} as the argument list; the number of arguments
-  is the length of the tuple.
-  If the optional \var{keywords} argument is present, it must be a
-  dictionary whose keys are strings.  It specifies keyword arguments
-  to be added to the end of the the argument list.
-  Calling \function{apply()} is different from just calling
-  \code{\var{function}(\var{args})}, since in that case there is always
-  exactly one argument.  The use of \function{apply()} is equivalent
-  to \code{\var{function}(*\var{args}, **\var{keywords})}.
-  Use of \function{apply()} is not necessary since the ``extended call
-  syntax,'' as used in the last example, is completely equivalent.
-
-  \deprecated{2.3}{Use the extended call syntax instead, as described
-                   above.}
+\begin{funcdesc}{basestring}{}
+  This abstract type is the superclass for \class{str} and \class{unicode}.
+  It cannot be called or instantiated, but it can be used to test whether
+  an object is an instance of \class{str} or \class{unicode}.
+  \code{isinstance(obj, basestring)} is equivalent to
+  \code{isinstance(obj, (str, unicode))}.
+  \versionadded{2.3}
 \end{funcdesc}
 
 \begin{funcdesc}{bool}{\optional{x}}
   Convert a value to a Boolean, using the standard truth testing
-  procedure.  If \code{x} is false, this returns \code{False};
-  otherwise it returns \code{True}.  \code{bool} is also a class,
-  which is a subclass of \code{int}.  Class \code{bool} cannot be
-  subclassed further.  Its only instances are \code{False} and
-  \code{True}.
+  procedure.  If \var{x} is false or omitted, this returns
+  \constant{False}; otherwise it returns \constant{True}.
+  \class{bool} is also a class, which is a subclass of \class{int}.
+  Class \class{bool} cannot be subclassed further.  Its only instances
+  are \constant{False} and \constant{True}.
 
-\indexii{Boolean}{type}
-\versionadded{2.2.1}
-
+  \indexii{Boolean}{type}
+  \versionadded{2.2.1}
   \versionchanged[If no argument is given, this function returns 
-                  \code{False}]{2.3}
-\end{funcdesc}
-
-\begin{funcdesc}{buffer}{object\optional{, offset\optional{, size}}}
-  The \var{object} argument must be an object that supports the buffer
-  call interface (such as strings, arrays, and buffers).  A new buffer
-  object will be created which references the \var{object} argument.
-  The buffer object will be a slice from the beginning of \var{object}
-  (or from the specified \var{offset}). The slice will extend to the
-  end of \var{object} (or will have a length given by the \var{size}
-  argument).
+                  \constant{False}]{2.3}
 \end{funcdesc}
 
 \begin{funcdesc}{callable}{object}
@@ -151,12 +129,6 @@ class C:
   according to the outcome.  The return value is negative if \code{\var{x}
   < \var{y}}, zero if \code{\var{x} == \var{y}} and strictly positive if
   \code{\var{x} > \var{y}}.
-\end{funcdesc}
-
-\begin{funcdesc}{coerce}{x, y}
-  Return a tuple consisting of the two numeric arguments converted to
-  a common type, using the same rules as used by arithmetic
-  operations.
 \end{funcdesc}
 
 \begin{funcdesc}{compile}{string, filename, kind\optional{,
@@ -380,7 +352,9 @@ class C:
 \end{funcdesc}
 
 \begin{funcdesc}{file}{filename\optional{, mode\optional{, bufsize}}}
-  Return a new file object (described earlier under Built-in Types).
+  Return a new file object (described in
+  section~\ref{bltin-file-objects}, ``\ulink{File
+  Objects}{bltin-file-objects.html}'').
   The first two arguments are the same as for \code{stdio}'s
   \cfunction{fopen()}: \var{filename} is the file name to be opened,
   \var{mode} indicates how the file is to be opened: \code{'r'} for
@@ -422,7 +396,7 @@ class C:
   file's desired buffer size: 0 means unbuffered, 1 means line
   buffered, any other positive value means use a buffer of
   (approximately) that size.  A negative \var{bufsize} means to use
-  the system default, which is usually line buffered for for tty
+  the system default, which is usually line buffered for tty
   devices and fully buffered for other files.  If omitted, the system
   default is used.\footnote{
     Specifying a buffer size currently has no effect on systems that
@@ -485,8 +459,8 @@ class C:
 \end{funcdesc}
 
 \begin{funcdesc}{hasattr}{object, name}
-  The arguments are an object and a string.  The result is 1 if the
-  string is the name of one of the object's attributes, 0 if not.
+  The arguments are an object and a string.  The result is \code{True} if the
+  string is the name of one of the object's attributes, \code{False} if not.
   (This is implemented by calling \code{getattr(\var{object},
   \var{name})} and seeing whether it raises an exception or not.)
 \end{funcdesc}
@@ -560,21 +534,6 @@ class C:
   point numbers to integers truncates (towards zero).
   If the argument is outside the integer range a long object will
   be returned instead.  If no arguments are given, returns \code{0}.
-\end{funcdesc}
-
-\begin{funcdesc}{intern}{string}
-  Enter \var{string} in the table of ``interned'' strings and return
-  the interned string -- which is \var{string} itself or a copy.
-  Interning strings is useful to gain a little performance on
-  dictionary lookup -- if the keys in a dictionary are interned, and
-  the lookup key is interned, the key comparisons (after hashing) can
-  be done by a pointer compare instead of a string compare.  Normally,
-  the names used in Python programs are automatically interned, and
-  the dictionaries used to hold module, class or instance attributes
-  have interned keys.  \versionchanged[Interned strings are not
-  immortal (like they used to be in Python 2.2 and before);
-  you must keep a reference to the return value of \function{intern()}
-  around to benefit from it]{2.3}
 \end{funcdesc}
 
 \begin{funcdesc}{isinstance}{object, classinfo}
@@ -707,7 +666,7 @@ class C:
 \begin{funcdesc}{ord}{c}
   Return the \ASCII{} value of a string of one character or a Unicode
   character.  E.g., \code{ord('a')} returns the integer \code{97},
-  \code{ord(u'\\u2020')} returns \code{8224}.  This is the inverse of
+  \code{ord(u'\e u2020')} returns \code{8224}.  This is the inverse of
   \function{chr()} for strings and of \function{unichr()} for Unicode
   characters.
 \end{funcdesc}
@@ -807,7 +766,9 @@ class C(object):
   Apply \var{function} of two arguments cumulatively to the items of
   \var{sequence}, from left to right, so as to reduce the sequence to
   a single value.  For example, \code{reduce(lambda x, y: x+y, [1, 2,
-  3, 4, 5])} calculates \code{((((1+2)+3)+4)+5)}.  If the optional
+  3, 4, 5])} calculates \code{((((1+2)+3)+4)+5)}.  The left argument,
+  \var{x}, is the accumulated value and the right argument, \var{y},
+  is the update value from the \var{sequence}.  If the optional
   \var{initializer} is present, it is placed before the items of the
   sequence in the calculation, and serves as a default when the
   sequence is empty.  If \var{initializer} is not given and
@@ -922,6 +883,16 @@ class C:
   \versionadded{2.2}
 \end{funcdesc}
 
+\begin{funcdesc}{str}{\optional{object}}
+  Return a string containing a nicely printable representation of an
+  object.  For strings, this returns the string itself.  The
+  difference with \code{repr(\var{object})} is that
+  \code{str(\var{object})} does not always attempt to return a string
+  that is acceptable to \function{eval()}; its goal is to return a
+  printable string.  If no argument is given, returns the empty
+  string, \code{''}.
+\end{funcdesc}
+
 \begin{funcdesc}{sum}{sequence\optional{, start}}
   Sums \var{start} and the items of a \var{sequence}, from left to
   right, and returns the total.  \var{start} defaults to \code{0}.
@@ -933,7 +904,7 @@ class C:
   \versionadded{2.3}
 \end{funcdesc}
 
-\begin{funcdesc}{super}{type\optional{object-or-type}}
+\begin{funcdesc}{super}{type\optional{, object-or-type}}
   Return the superclass of \var{type}.  If the second argument is omitted
   the super object returned is unbound.  If the second argument is an
   object, \code{isinstance(\var{obj}, \var{type})} must be true.  If
@@ -950,23 +921,13 @@ class C(B):
 \versionadded{2.2}
 \end{funcdesc}
 
-\begin{funcdesc}{str}{\optional{object}}
-  Return a string containing a nicely printable representation of an
-  object.  For strings, this returns the string itself.  The
-  difference with \code{repr(\var{object})} is that
-  \code{str(\var{object})} does not always attempt to return a string
-  that is acceptable to \function{eval()}; its goal is to return a
-  printable string.  If no argument is given, returns the empty
-  string, \code{''}.
-\end{funcdesc}
-
 \begin{funcdesc}{tuple}{\optional{sequence}}
   Return a tuple whose items are the same and in the same order as
   \var{sequence}'s items.  \var{sequence} may be a sequence, a
   container that supports iteration, or an iterator object.
   If \var{sequence} is already a tuple, it
   is returned unchanged.  For instance, \code{tuple('abc')} returns
-  returns \code{('a', 'b', 'c')} and \code{tuple([1, 2, 3])} returns
+  \code{('a', 'b', 'c')} and \code{tuple([1, 2, 3])} returns
   \code{(1, 2, 3)}.  If no argument is given, returns a new empty
   tuple, \code{()}.
 \end{funcdesc}
@@ -1073,4 +1034,72 @@ It's a function
   similar to \function{map()} with an initial argument of \code{None}.
   With a single sequence argument, it returns a list of 1-tuples.
   \versionadded{2.0}
+\end{funcdesc}
+
+
+% ---------------------------------------------------------------------------	
+
+
+\section{Non-essential Built-in Functions \label{non-essential-built-in-funcs}}
+
+There are several built-in functions that are no longer essential to learn,
+know or use in modern Python programming.  They have been kept here to
+maintain backwards compatability with programs written for older versions
+of Python.
+
+Python programmers, trainers, students and bookwriters should feel free to
+bypass these functions without concerns about missing something important.
+
+
+\setindexsubitem{(non-essential built-in functions)}
+
+\begin{funcdesc}{apply}{function, args\optional{, keywords}}
+  The \var{function} argument must be a callable object (a
+  user-defined or built-in function or method, or a class object) and
+  the \var{args} argument must be a sequence.  The \var{function} is
+  called with \var{args} as the argument list; the number of arguments
+  is the length of the tuple.
+  If the optional \var{keywords} argument is present, it must be a
+  dictionary whose keys are strings.  It specifies keyword arguments
+  to be added to the end of the argument list.
+  Calling \function{apply()} is different from just calling
+  \code{\var{function}(\var{args})}, since in that case there is always
+  exactly one argument.  The use of \function{apply()} is equivalent
+  to \code{\var{function}(*\var{args}, **\var{keywords})}.
+  Use of \function{apply()} is not necessary since the ``extended call
+  syntax,'' as used in the last example, is completely equivalent.
+
+  \deprecated{2.3}{Use the extended call syntax instead, as described
+                   above.}
+\end{funcdesc}
+
+\begin{funcdesc}{buffer}{object\optional{, offset\optional{, size}}}
+  The \var{object} argument must be an object that supports the buffer
+  call interface (such as strings, arrays, and buffers).  A new buffer
+  object will be created which references the \var{object} argument.
+  The buffer object will be a slice from the beginning of \var{object}
+  (or from the specified \var{offset}). The slice will extend to the
+  end of \var{object} (or will have a length given by the \var{size}
+  argument).
+\end{funcdesc}
+
+\begin{funcdesc}{coerce}{x, y}
+  Return a tuple consisting of the two numeric arguments converted to
+  a common type, using the same rules as used by arithmetic
+  operations.
+\end{funcdesc}
+
+\begin{funcdesc}{intern}{string}
+  Enter \var{string} in the table of ``interned'' strings and return
+  the interned string -- which is \var{string} itself or a copy.
+  Interning strings is useful to gain a little performance on
+  dictionary lookup -- if the keys in a dictionary are interned, and
+  the lookup key is interned, the key comparisons (after hashing) can
+  be done by a pointer compare instead of a string compare.  Normally,
+  the names used in Python programs are automatically interned, and
+  the dictionaries used to hold module, class or instance attributes
+  have interned keys.  \versionchanged[Interned strings are not
+  immortal (like they used to be in Python 2.2 and before);
+  you must keep a reference to the return value of \function{intern()}
+  around to benefit from it]{2.3}
 \end{funcdesc}

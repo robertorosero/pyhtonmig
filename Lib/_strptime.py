@@ -40,9 +40,9 @@ class LocaleTime(object):
                 store the values have mangled names):
         f_weekday -- full weekday names (7-item list)
         a_weekday -- abbreviated weekday names (7-item list)
-        f_month -- full weekday names (14-item list; dummy value in [0], which
+        f_month -- full month names (13-item list; dummy value in [0], which
                     is added by code)
-        a_month -- abbreviated weekday names (13-item list, dummy value in
+        a_month -- abbreviated month names (13-item list, dummy value in
                     [0], which is added by code)
         am_pm -- AM/PM representation (2-item list)
         LC_date_time -- format string for date/time representation (string)
@@ -381,7 +381,7 @@ class TimeRE(dict):
         processed_format = ''
         # The sub() call escapes all characters that might be misconstrued
         # as regex syntax.
-        regex_chars = re_compile(r"([\\.^$*+?{}\[\]|])")
+        regex_chars = re_compile(r"([\\.^$*+?i\(\){}\[\]|])")
         format = regex_chars.sub(r"\\\1", format)
         whitespace_replacement = re_compile('\s+')
         format = whitespace_replacement.sub('\s*', format)
@@ -397,12 +397,28 @@ class TimeRE(dict):
         """Return a compiled re object for the format string."""
         return re_compile(self.pattern(format), IGNORECASE)
 
+# Cached TimeRE; probably only need one instance ever so cache it for performance
+_locale_cache = TimeRE()
+# Cached regex objects; same reason as for TimeRE cache
+_regex_cache = dict()
 
 def strptime(data_string, format="%a %b %d %H:%M:%S %Y"):
     """Return a time struct based on the input data and the format string."""
-    time_re = TimeRE()
-    locale_time = time_re.locale_time
-    format_regex = time_re.compile(format)
+    global _locale_cache
+    global _regex_cache
+    locale_time = _locale_cache.locale_time
+    # If the language changes, caches are invalidated, so clear them
+    if locale_time.lang != _getlang():
+        _locale_cache = TimeRE()
+        _regex_cache.clear()
+    format_regex = _regex_cache.get(format)
+    if not format_regex:
+        # Limit regex cache size to prevent major bloating of the module;
+        # The value 5 is arbitrary
+        if len(_regex_cache) > 5:
+            _regex_cache.clear()
+        format_regex = _locale_cache.compile(format)
+        _regex_cache[format] = format_regex
     found = format_regex.match(data_string)
     if not found:
         raise ValueError("time data did not match format:  data=%s  fmt=%s" %
@@ -477,12 +493,12 @@ def strptime(data_string, format="%a %b %d %H:%M:%S %Y"):
             # Since -1 is default value only need to worry about setting tz if
             # it can be something other than -1.
             found_zone = found_dict['Z'].lower()
-            if locale_time.timezone[0] == locale_time.timezone[1] and \
-               time.daylight:
-                pass #Deals with bad locale setup where timezone info is
-                     # the same; first found on FreeBSD 4.4.
-            elif found_zone in ("utc", "gmt"):
+            if found_zone in ("utc", "gmt"):
                 tz = 0
+            elif time.tzname[0] == time.tzname[1] and \
+               time.daylight:
+                continue #Deals with bad locale setup where timezone info is
+                         # the same; first found on FreeBSD 4.4.
             elif locale_time.timezone[2].lower() == found_zone:
                 tz = 0
             elif time.daylight and \

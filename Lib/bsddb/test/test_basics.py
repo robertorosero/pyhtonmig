@@ -370,7 +370,7 @@ class BasicTestCase(unittest.TestCase):
             rec = c.set_range('011',dlen=0,doff=0)
             if verbose:
                 print "searched (partial) for '011', found: ", rec
-            if rec[1] != '': set.fail('expected empty data portion')
+            if rec[1] != '': self.fail('expected empty data portion')
 
         c.set('0499')
         c.delete()

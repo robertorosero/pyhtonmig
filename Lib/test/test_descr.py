@@ -2064,6 +2064,20 @@ def supers():
     vereq(dd.x, "hello")
     vereq(super(DDsub, dd).x, 42)
 
+    # Ensure that super() lookup of descriptor from classmethod
+    # works (SF ID# 743627)
+
+    class Base(object):
+        aProp = property(lambda self: "foo")
+
+    class Sub(Base):
+        def test(klass):
+            return super(Sub,klass).aProp
+        test = classmethod(test)
+
+    veris(Sub.test(), Base.aProp)
+
+
 def inherits():
     if verbose: print "Testing inheritance from basic types..."
 
@@ -3584,6 +3598,13 @@ def test_mutable_bases():
     else:
         # actually, we'll have crashed by here...
         raise TestFailed, "shouldn't be able to create inheritance cycles"
+
+    try:
+        D.__bases__ = (C, C)
+    except TypeError:
+        pass
+    else:
+        raise TestFailed, "didn't detect repeated base classes"
 
     try:
         D.__bases__ = (E,)

@@ -30,7 +30,7 @@
 #################################
 
 %define name python
-%define version 2.3b1
+%define version 2.3.4
 %define libvers 2.3
 %define release 1pydotorg
 %define __prefix /usr
@@ -41,6 +41,9 @@
 %define binsuffix %(if [ "%{config_binsuffix}" = none ]; then echo ; else echo "%{config_binsuffix}"; fi)
 %define include_tkinter %(if [ \\( "%{config_tkinter}" = auto -a -f /usr/bin/wish \\) -o "%{config_tkinter}" = yes ]; then echo 1; else echo 0; fi)
 
+#  detect if documentation is available
+%define include_docs %(if [ -f "%{_sourcedir}/html-%{version}.tar.bz2" ]; then echo 1; else echo 0; fi)
+
 Summary: An interpreted, interactive, object-oriented programming language.
 Name: %{name}%{binsuffix}
 Version: %{version}
@@ -48,10 +51,10 @@ Release: %{release}
 Copyright: Modified CNRI Open Source License
 Group: Development/Languages
 Source: Python-%{version}.tgz
+%if %{include_docs}
 Source1: html-%{version}.tar.bz2
-Patch0: Python-2.1-pythonpath.patch
-#Patch1: Python-2.1-expat.patch
-BuildRoot: /var/tmp/%{name}-%{version}-root
+%endif
+BuildRoot: %{_tmppath}/%{name}-%{version}-root
 BuildPrereq: expat-devel
 BuildPrereq: db4-devel
 BuildPrereq: gdbm-devel
@@ -113,6 +116,7 @@ Install python-tools if you want to use these tools to develop
 Python programs.  You will also need to install the python and
 tkinter packages.
 
+%if %{include_docs}
 %package docs
 Summary: Python-related documentation.
 Group: Development/Documentation
@@ -120,8 +124,24 @@ Group: Development/Documentation
 %description docs
 Documentation relating to the Python programming language in HTML and info
 formats.
+%endif
 
 %changelog
+* Sat Mar 27 2004 Sean Reifschneider <jafo-rpms@tummy.com> [2.3.2-3pydotorg]
+- Being more agressive about finding the paths to fix for
+  #!/usr/local/bin/python.
+
+* Sat Feb 07 2004 Sean Reifschneider <jafo-rpms@tummy.com> [2.3.3-2pydotorg]
+- Adding code to remove "#!/usr/local/bin/python" from particular files and
+  causing the RPM build to terminate if there are any unexpected files
+  which have that line in them.
+
+* Mon Oct 13 2003 Sean Reifschneider <jafo-rpms@tummy.com> [2.3.2-1pydotorg]
+- Adding code to detect wether documentation is available to build.
+
+* Fri Sep 19 2003 Sean Reifschneider <jafo-rpms@tummy.com> [2.3.1-1pydotorg]
+- Updating to the 2.3.1 release.
+
 * Mon Feb 24 2003 Sean Reifschneider <jafo-rpms@tummy.com> [2.3b1-1pydotorg]
 - Updating to 2.3b1 release.
 
@@ -175,14 +195,12 @@ formats.
 #######
 %prep
 %setup -n Python-%{version}
-%patch0 -p1
-#%patch1
 
 ########
 #  BUILD
 ########
 %build
-./configure %{ipv6} %{pymalloc} --prefix=%{__prefix}
+./configure --enable-unicode=ucs4 %{ipv6} %{pymalloc} --prefix=%{__prefix}
 make
 
 ##########
@@ -223,7 +241,7 @@ fi
 ########
 #  Tools
 echo '#!/bin/bash' >${RPM_BUILD_ROOT}%{_bindir}/idle%{binsuffix}
-echo 'exec %{_prefix}/bin/python%{binsuffix} /usr/lib/python%{libvers}/Tools/idle/idle.py' >>$RPM_BUILD_ROOT%{_bindir}/idle%{binsuffix}
+echo 'exec %{_prefix}/bin/python%{binsuffix} /usr/lib/python%{libvers}/idlelib/idle.py' >>$RPM_BUILD_ROOT%{_bindir}/idle%{binsuffix}
 chmod 755 $RPM_BUILD_ROOT%{_bindir}/idle%{binsuffix}
 cp -a Tools $RPM_BUILD_ROOT%{_prefix}/lib/python%{libvers}
 
@@ -237,23 +255,56 @@ find "$RPM_BUILD_ROOT""%{__prefix}"/bin -type f |
 	grep -v -e '/bin/idle%{binsuffix}$' >>mainpkg.files
 
 rm -f tools.files
-find "$RPM_BUILD_ROOT""%{__prefix}"/lib/python%{libvers}/Tools -type f |
-	sed "s|^${RPM_BUILD_ROOT}|/|" >tools.files
+find "$RPM_BUILD_ROOT""%{__prefix}"/lib/python%{libvers}/idlelib \
+      "$RPM_BUILD_ROOT""%{__prefix}"/lib/python%{libvers}/Tools -type f |
+      sed "s|^${RPM_BUILD_ROOT}|/|" >tools.files
 echo "%{__prefix}"/bin/idle%{binsuffix} >>tools.files
 
 ######
 # Docs
+%if %{include_docs}
 mkdir -p "$RPM_BUILD_ROOT"/var/www/html/python
 (
    cd "$RPM_BUILD_ROOT"/var/www/html/python
    bunzip2 < %{SOURCE1} | tar x
 )
+%endif
+
+#  fix the #! line in installed files
+find . -type f -print0 | xargs -0 grep -l /usr/local/bin/python |
+      while read file
+do
+   sed 's|^#!.*python|#!/usr/bin/env python'"%{binsuffix}"'|' \
+         "$RPM_BUILD_ROOT"/"$file" >/tmp/fix-python-path.$$
+   cat /tmp/fix-python-path.$$ >"$RPM_BUILD_ROOT"/"$file"
+   rm -f /tmp/fix-python-path.$$
+done
+
+#  check to see if there are any straggling #! lines
+find "$RPM_BUILD_ROOT" -type f | xargs egrep -n '^#! */usr/local/bin/python' \
+      | grep ':1:#!' >/tmp/python-rpm-files.$$ || true
+if [ -s /tmp/python-rpm-files.$$ ]
+then
+   echo '*****************************************************'
+   cat /tmp/python-rpm-files.$$
+   cat <<@EOF
+   *****************************************************
+     There are still files referencing /usr/local/bin/python in the
+     install directory.  They are listed above.  Please fix the .spec
+     file and try again.  If you are an end-user, you probably want
+     to report this to jafo-rpms@tummy.com as well.
+   *****************************************************
+@EOF
+   rm -f /tmp/python-rpm-files.$$
+   exit 1
+fi
+rm -f /tmp/python-rpm-files.$$
 
 ########
 #  CLEAN
 ########
 %clean
-rm -fr $RPM_BUILD_ROOT
+[ -n "$RPM_BUILD_ROOT" -a "$RPM_BUILD_ROOT" != / ] && rm -rf $RPM_BUILD_ROOT
 rm -f mainpkg.files tools.files
 
 ########
@@ -274,7 +325,6 @@ rm -f mainpkg.files tools.files
 %{__prefix}/lib/python%{libvers}/curses
 %{__prefix}/lib/python%{libvers}/distutils
 %{__prefix}/lib/python%{libvers}/encodings
-%dir %{__prefix}/lib/python%{libvers}/lib-old
 %{__prefix}/lib/python%{libvers}/plat-linux2
 %{__prefix}/lib/python%{libvers}/site-packages
 %{__prefix}/lib/python%{libvers}/test
@@ -301,6 +351,8 @@ rm -f mainpkg.files tools.files
 %{__prefix}/lib/python%{libvers}/lib-dynload/_tkinter.so*
 %endif
 
+%if %{include_docs}
 %files docs
 %defattr(-,root,root)
 /var/www/html/python/*
+%endif
