@@ -32,7 +32,7 @@ dump_counts(void)
 
 	for (tp = type_list; tp; tp = tp->tp_next)
 		fprintf(stderr, "%s alloc'd: %d, freed: %d, max in use: %d\n",
-			tp->tp_name, tp->tp_allocs, tp->tp_free,
+			tp->tp_name, tp->tp_allocs, tp->tp_frees,
 			tp->tp_maxalloc);
 	fprintf(stderr, "fast tuple allocs: %d, empty: %d\n",
 		fast_tuple_allocs, tuple_zero_allocs);
@@ -54,7 +54,7 @@ get_counts(void)
 		return NULL;
 	for (tp = type_list; tp; tp = tp->tp_next) {
 		v = Py_BuildValue("(siii)", tp->tp_name, tp->tp_allocs,
-				  tp->tp_free, tp->tp_maxalloc);
+				  tp->tp_frees, tp->tp_maxalloc);
 		if (v == NULL) {
 			Py_DECREF(result);
 			return NULL;
@@ -80,8 +80,8 @@ inc_count(PyTypeObject *tp)
 		type_list = tp;
 	}
 	tp->tp_allocs++;
-	if (tp->tp_allocs - tp->tp_free > tp->tp_maxalloc)
-		tp->tp_maxalloc = tp->tp_allocs - tp->tp_free;
+	if (tp->tp_allocs - tp->tp_frees > tp->tp_maxalloc)
+		tp->tp_maxalloc = tp->tp_allocs - tp->tp_frees;
 }
 #endif
 
@@ -1465,7 +1465,7 @@ _Py_ForgetReference(register PyObject *op)
 	op->_ob_prev->_ob_next = op->_ob_next;
 	op->_ob_next = op->_ob_prev = NULL;
 #ifdef COUNT_ALLOCS
-	op->ob_type->tp_free++;
+	op->ob_type->tp_frees++;
 #endif
 }
 
