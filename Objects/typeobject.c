@@ -96,16 +96,13 @@ type_getattro(PyTypeObject *type, PyObject *name)
 
 	assert(PyString_Check(name));
 
-	if (type->tp_flags & Py_TPFLAGS_HAVE_CLASS) {
-		if (type->tp_dict == NULL) {
-			if (PyType_InitDict(type) < 0)
-				return NULL;
-		}
-		descr = PyDict_GetItem(type->tp_dict, name);
-		if (descr != NULL && PyDescr_IsMethod(descr) &&
-		    (f = descr->ob_type->tp_descr_get) != NULL)
-			return (*f)(descr, NULL);
-	}
+	/* Complications: some attributes, like __class__ and __repr__, occur
+	   in the type's dict as well as in the metatype's dict.  The
+	   descriptor in the type's dict is for attributes of its instances,
+	   while the descriptor in the metatype's dict is for the attributes
+	   of the type.  Rule: if the descriptor found in the metatype's dict
+	   describes data, it wins; otherwise anything found in the type's
+	   dict wins. */
 
 	if (tp->tp_flags & Py_TPFLAGS_HAVE_CLASS) {
 		if (tp->tp_dict == NULL) {
@@ -113,7 +110,7 @@ type_getattro(PyTypeObject *type, PyObject *name)
 				return NULL;
 		}
 		descr = PyDict_GetItem(tp->tp_dict, name);
-		if (descr != NULL &&
+		if (descr != NULL && PyDescr_IsData(descr) &&
 		    (f = descr->ob_type->tp_descr_get) != NULL)
 			return (*f)(descr, (PyObject *)type);
 	}
@@ -128,6 +125,13 @@ type_getattro(PyTypeObject *type, PyObject *name)
 			Py_INCREF(descr);
 			return descr;
 		}
+	}
+
+	if (tp->tp_flags & Py_TPFLAGS_HAVE_CLASS) {
+		descr = PyDict_GetItem(tp->tp_dict, name);
+		if (descr != NULL &&
+		    (f = descr->ob_type->tp_descr_get) != NULL)
+			return (*f)(descr, (PyObject *)type);
 	}
 
 	PyErr_Format(PyExc_AttributeError,
@@ -266,7 +270,7 @@ type_construct(PyTypeObject *type, PyObject *args, PyObject *kwds)
 		return NULL;
 	memset(et, '\0', sizeof(etype));
 	type = &et->type;
-	PyObject_INIT(type, &PyType_Type);
+	PyObject_INIT(type, &PyDynamicType_Type);
 	type->tp_as_number = &et->as_number;
 	type->tp_as_sequence = &et->as_sequence;
 	type->tp_as_mapping = &et->as_mapping;
@@ -313,22 +317,13 @@ type_construct(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	return (PyObject *)type;
 }
 
-/* Only for dynamic types, created by type_construct() above */
-static void
-type_dealloc(PyTypeObject *type)
-{
-	Py_XDECREF(type->tp_base);
-	Py_XDECREF(type->tp_dict);
-	PyObject_DEL(type);
-}
-
 PyTypeObject PyType_Type = {
 	PyObject_HEAD_INIT(&PyTurtle_Type)
 	0,			/* Number of items for varobject */
 	"type",			/* Name of this type */
 	sizeof(PyTypeObject),	/* Basic object size */
 	0,			/* Item size for varobject */
-	(destructor)type_dealloc,		/* tp_dealloc */
+	0,					/* tp_dealloc */
 	0,					/* tp_print */
 	0,			 		/* tp_getattr */
 	0,					/* tp_setattr */
@@ -342,6 +337,101 @@ PyTypeObject PyType_Type = {
 	0,					/* tp_str */
 	(getattrofunc)type_getattro,		/* tp_getattro */
 	0,					/* tp_setattro */
+	0,					/* tp_as_buffer */
+	Py_TPFLAGS_DEFAULT,			/* tp_flags */
+	"Define the behavior of a particular type of object.", /* tp_doc */
+	0,					/* tp_traverse */
+	0,					/* tp_clear */
+	0,					/* tp_richcompare */
+	0,					/* tp_weaklistoffset */
+	0,					/* tp_iter */
+	0,					/* tp_iternext */
+	0,					/* tp_methods */
+	type_members,				/* tp_members */
+	type_getsets,				/* tp_getset */
+	0,					/* tp_base */
+	0,					/* tp_dict */
+	0,					/* tp_descr_get */
+	0,					/* tp_descr_set */
+	(ternaryfunc)type_construct,		/* tp_construct */
+};
+
+/* Support for dynamic types, created by type_construct() above */
+
+static int
+dtype_setattro(PyTypeObject *type, PyObject *name, PyObject *value)
+{
+	PyTypeObject *tp = type->ob_type; /* Usually == &PyDynamicType_Type */
+
+	assert(PyString_Check(name));
+
+	/* If the metatype has a descriptor  this attribute with a
+	   descr_set slot, use it.  This may fail for read-only attrs! */
+	if (tp->tp_flags & Py_TPFLAGS_HAVE_CLASS) {
+		PyObject *descr;
+		descrsetfunc f;
+		if (tp->tp_dict == NULL) {
+			if (PyType_InitDict(tp) < 0)
+				return -1;
+		}
+		descr = PyDict_GetItem(tp->tp_dict, name);
+		if (descr != NULL &&
+		    (f = descr->ob_type->tp_descr_set) != NULL)
+			return (*f)(descr, (PyObject *)type, value);
+	}
+
+	/* If the type has a dict, store the value in it */
+	if (type->tp_flags & Py_TPFLAGS_HAVE_CLASS) {
+		if (type->tp_dict == NULL) {
+			if (PyType_InitDict(type) < 0)
+				return -1;
+		}
+		if (value == NULL) {
+			int res = PyObject_DelItem(type->tp_dict, name);
+			if (res < 0 &&
+			    PyErr_ExceptionMatches(PyExc_KeyError))
+				PyErr_SetObject(PyExc_AttributeError, name);
+			return res;
+		}
+		else
+			return PyObject_SetItem(type->tp_dict, name, value);
+	}
+
+	/* If the type has no dict, so we can't set attributes */
+	PyErr_Format(PyExc_AttributeError,
+		     "type '%.50s' has no writable attribute '%.400s'",
+		     type->tp_name, PyString_AS_STRING(name));
+	return -1;
+}
+
+static void
+dtype_dealloc(PyTypeObject *type)
+{
+	Py_XDECREF(type->tp_base);
+	Py_XDECREF(type->tp_dict);
+	PyObject_DEL(type);
+}
+
+PyTypeObject PyDynamicType_Type = {
+	PyObject_HEAD_INIT(&PyTurtle_Type)
+	0,			/* Number of items for varobject */
+	"dynamic-type",		/* Name of this type */
+	sizeof(PyTypeObject),	/* Basic object size */
+	0,			/* Item size for varobject */
+	(destructor)dtype_dealloc,		/* tp_dealloc */
+	0,					/* tp_print */
+	0,			 		/* tp_getattr */
+	0,					/* tp_setattr */
+	0,					/* tp_compare */
+	(reprfunc)type_repr,			/* tp_repr */
+	0,					/* tp_as_number */
+	0,					/* tp_as_sequence */
+	0,					/* tp_as_mapping */
+	0,					/* tp_hash */
+	(ternaryfunc)type_call,			/* tp_call */
+	0,					/* tp_str */
+	(getattrofunc)type_getattro,		/* tp_getattro */
+	(setattrofunc)dtype_setattro,		/* tp_setattro */
 	0,					/* tp_as_buffer */
 	Py_TPFLAGS_DEFAULT,			/* tp_flags */
 	"Define the behavior of a particular type of object.", /* tp_doc */
