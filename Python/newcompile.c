@@ -1389,7 +1389,8 @@ instrsize(struct instr *instr)
 static int
 blocksize(struct basicblock *b)
 {
-	int i, size = 0;
+	int i;
+	int size = 0;
 
 	for (i = 0; i < b->b_iused; i++)
 		size += instrsize(&b->b_instr[i]);
@@ -1422,7 +1423,7 @@ assemble_emit(struct assembler *a, struct instr *i)
 		i->i_oparg, a->a_offset, size, ext);
 	a->a_offset += size;
 	if (ext > 0) {
-	    *code++ = EXTENDED_ARG;
+	    *code++ = (char)EXTENDED_ARG;
 	    *code++ = ext & 0xff;
 	    *code++ = ext >> 8;
 	    arg &= 0xffff;

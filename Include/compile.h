@@ -38,8 +38,8 @@ struct instr {
 };
 
 struct basicblock {
-	size_t b_iused;
-	size_t b_ialloc;
+	int b_iused;
+	int b_ialloc;
 	/* If b_next is non-zero, it is the block id of the next
 	   block reached by normal control flow.
 	   Since a valid b_next must always be > 0,
