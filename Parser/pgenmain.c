@@ -104,6 +104,7 @@ getgrammar(filename)
 	FILE *fp;
 	node *n;
 	grammar *g0, *g;
+	perrdetail err;
 	
 	fp = fopen(filename, "r");
 	if (fp == NULL) {
@@ -111,11 +112,27 @@ getgrammar(filename)
 		goaway(1);
 	}
 	g0 = meta_grammar();
-	n = NULL;
-	parsefile(fp, filename, g0, g0->g_start, (char *)NULL, (char *)NULL, &n);
+	n = parsefile(fp, filename, g0, g0->g_start,
+		      (char *)NULL, (char *)NULL, &err);
 	fclose(fp);
 	if (n == NULL) {
-		fprintf(stderr, "Parsing error.\n");
+		fprintf(stderr, "Parsing error %d, line %d.\n",
+			err.error, err.lineno);
+		if (err.text != NULL) {
+			int i;
+			fprintf(stderr, "%s", err.text);
+			i = strlen(err.text);
+			if (i == 0 || err.text[i-1] != '\n')
+				fprintf(stderr, "\n");
+			for (i = 0; i < err.offset; i++) {
+				if (err.text[i] == '\t')
+					putc('\t', stderr);
+				else
+					putc(' ', stderr);
+			}
+			fprintf(stderr, "^\n");
+			free(err.text);
+		}
 		goaway(1);
 	}
 	g = pgen(n);
