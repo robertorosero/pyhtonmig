@@ -192,17 +192,24 @@ String literals are described by the following lexical definitions:
 \index{string literal}
 
 \begin{verbatim}
-stringliteral:  "'" stringitem* "'"
-stringitem:     stringchar | escapeseq
-stringchar:     <any ASCII character except newline or "\" or "'">
-escapeseq:      "\" <any ASCII character except newline>
+stringliteral:   shortstring | longstring
+shortstring:     "'" shortstringitem* "'" | '"' shortstringitem* '"'
+longstring:      "'''" longstringitem* "'''" | '"""' longstringitem* '"""'
+shortstringitem: shortstringchar | escapeseq
+shortstringchar: <any ASCII character except "\" or newline or the quote>
+longstringchar:  <any ASCII character except "\">
+escapeseq:       "\" <any ASCII character>
 \end{verbatim}
 \index{ASCII}
 
-String literals cannot span physical line boundaries.  Escape
-sequences in strings are actually interpreted according to rules
-similar to those used by Standard C.  The recognized escape sequences
-are:
+In ``long strings'' (strings surrounded by sets of three quotes),
+unescaped newlines and quotes are allowed (and are retained), except
+that three unescaped quotes in a row terminate the string.  (A
+``quote'' is the character used to open the string, i.e. either
+\verb/'/ or \verb/"/.)
+
+Escape sequences in strings are interpreted according to rules similar
+to those used by Standard C.  The recognized escape sequences are:
 \index{physical line}
 \index{escape sequence}
 \index{Standard C}
@@ -211,8 +218,10 @@ are:
 \begin{center}
 \begin{tabular}{|l|l|}
 \hline
+\verb/\/{newline}	& Ignored \\
 \verb/\\/	& Backslash (\verb/\/) \\
 \verb/\'/	& Single quote (\verb/'/) \\
+\verb/\"/	& Double quote (\verb/"/) \\
 \verb/\a/	& ASCII Bell (BEL) \\
 \verb/\b/	& ASCII Backspace (BS) \\
 %\verb/\E/	& ASCII Escape (ESC) \\
