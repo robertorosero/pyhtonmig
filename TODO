@@ -1,20 +1,8 @@
-Mac binary
 Add NEWS and HISTORY to Misc directory
 non-Sun dynamic linking (SGI 4 dl, and dl-dld elsewhere)
 make freeze script working again (use Extensions/mkext.py as a base?)
 update documentation (especially ext.tex!)
-fix compilation warnings
-add ../embed to Demo subdirectory
 
-and maybe:
-
-write porting guide
-put some stuff into Contrib dir (but what?)
-renaming project?  (promised but not even started yet!)
-test set?
-.
-.
-.
-release!
+release
 
 Put PostScript on archive site
