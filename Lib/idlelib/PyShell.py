@@ -6,6 +6,7 @@ import string
 import getopt
 import re
 import warnings
+import types
 
 import linecache
 from code import InteractiveInterpreter
@@ -34,6 +35,9 @@ def linecache_checkcache(orig_checkcache=linecache.checkcache):
     orig_checkcache()
     cache.update(save)
 linecache.checkcache = linecache_checkcache
+
+
+IDENTCHARS = string.ascii_letters + string.digits + "_"
 
 
 # Note: <<newline-and-indent>> event is defined in AutoIndent.py
@@ -73,6 +77,7 @@ class PyShellEditorWindow(EditorWindow):
 
     # Regular text edit window when a shell is present
     # XXX ought to merge with regular editor window
+    runnable = True  # Shell not present, enable Import Module and Run Script
 
     def __init__(self, *args):
         apply(EditorWindow.__init__, (self,) + args)
@@ -184,6 +189,14 @@ class ModifiedInterpreter(InteractiveInterpreter):
         self.more = 0
         self.save_warnings_filters = warnings.filters[:]
         warnings.filterwarnings(action="error", category=SyntaxWarning)
+        if isinstance(source, types.UnicodeType):
+            import IOBinding
+            try:
+                source = source.encode(IOBinding.encoding)
+            except UnicodeError:
+                self.tkconsole.resetoutput()
+                self.write("Unsupported characters in input")
+                return
         try:
             return InteractiveInterpreter.runsource(self, source, filename)
         finally:
@@ -195,7 +208,7 @@ class ModifiedInterpreter(InteractiveInterpreter):
         # Stuff source in the filename cache
         filename = "<pyshell#%d>" % self.gid
         self.gid = self.gid + 1
-        lines = string.split(source, "\n")
+        lines = source.split("\n")
         linecache.cache[filename] = len(source)+1, 0, lines, filename
         return filename
 
@@ -217,7 +230,7 @@ class ModifiedInterpreter(InteractiveInterpreter):
         text.tag_add("ERROR", pos)
         text.see(pos)
         char = text.get(pos)
-        if char and char in string.letters + string.digits + "_":
+        if char and char in IDENTCHARS:
             text.tag_add("ERROR", pos + " wordstart", pos)
         self.tkconsole.resetoutput()
         self.write("SyntaxError: %s\n" % str(msg))
@@ -237,7 +250,6 @@ class ModifiedInterpreter(InteractiveInterpreter):
 
     def showtraceback(self):
         # Extend base class method to reset output properly
-        text = self.tkconsole.text
         self.tkconsole.resetoutput()
         self.checklinecache()
         InteractiveInterpreter.showtraceback(self)
@@ -436,7 +448,7 @@ class PyShell(OutputWindow):
 
     def ispythonsource(self, filename):
         # Override this so EditorWindow never removes the colorizer
-        return 1
+        return True
 
     def short_title(self):
         return self.shell_title
@@ -479,7 +491,7 @@ class PyShell(OutputWindow):
         return line
 
     def isatty(self):
-        return 1
+        return True
 
     def cancel_callback(self, event):
         try:
@@ -569,7 +581,7 @@ class PyShell(OutputWindow):
         # If we're in the current input and there's only whitespace
         # beyond the cursor, erase that whitespace first
         s = self.text.get("insert", "end-1c")
-        if s and not string.strip(s):
+        if s and not s.strip():
             self.text.delete("insert", "end-1c")
         # If we're in the current input before its last line,
         # insert a newline right at the insert point
@@ -682,7 +694,7 @@ class PseudoFile:
         pass
 
     def isatty(self):
-        return 1
+        return True
 
 
 usage_msg = """\
