@@ -1254,7 +1254,8 @@ PyList_Sort(v)
 }
 
 static void
-_listreverse(PyListObject *self)
+_listreverse(self)
+	PyListObject *self;
 {
 	register PyObject **p, **q;
 	register PyObject *tmp;
@@ -1272,7 +1273,9 @@ _listreverse(PyListObject *self)
 }
 
 static PyObject *
-listreverse(PyListObject *self, PyObject *args)
+listreverse(self, args)
+	PyListObject *self;
+	PyObject *args;
 {
 	if (!PyArg_ParseTuple(args, ":reverse"))
 		return NULL;
@@ -1282,7 +1285,8 @@ listreverse(PyListObject *self, PyObject *args)
 }
 
 int
-PyList_Reverse(PyObject *v)
+PyList_Reverse(v)
+	PyObject *v;
 {
 	if (v == NULL || !PyList_Check(v)) {
 		PyErr_BadInternalCall();
