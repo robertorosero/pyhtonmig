@@ -3,6 +3,17 @@ What's New in Python 2.2a0?
 
 Core
 
+- TENTATIVELY, a large amount of code implementing much of what's
+  described in PEP 252 (Making Types Look More Like Classes) and PEP
+  253 (Subtyping Built-in Types) was added.  This will be released
+  with Python 2.2a1.  Documentation will be provided separately
+  through http://www.python.org/2.2/.  The purpose of releasing this
+  with Python 2.2a1 is to test backwards compatibility.  It is
+  possible, though not likely, that a decision is made not to release
+  this code as part of 2.2 final, if any serious backwards
+  incompapatibilities are found during alpha testing that cannot be
+  repaired.
+
 - The UTF-16 codec was modified to be more RFC compliant. It will now
   only remove BOM characters at the start of the string and then
   only if running in native mode (UTF-16-LE and -BE won't remove a
