@@ -230,7 +230,11 @@ class Parser:
                 # to the text.
                 container.set_payload(preamble)
                 return container
-            container.preamble = preamble
+            if preamble:
+                container.preamble = preamble
+            else:
+                # The module docs specify an empty preamble is None, not ''
+                container.preamble = None
             while 1:
                 subobj = self._class()
                 if isdigest:
@@ -250,7 +254,6 @@ class Parser:
                 maintype = subobj.get_content_maintype()
                 hassubparts = (subobj.get_content_maintype() in 
                                                 ( "message", "multipart" ))
-                rfc822 = (subobj.get_content_type() == "message/rfc822")
                 if hassubparts:
                     subobj = self._parsemessage(subobj, fp)
 
@@ -266,12 +269,13 @@ class Parser:
                     trailer = trailer[:-len(linesep)]
                 if trailer:
                     self._attach_trailer(subobj, trailer)
-                if matchobj.group('end'):
+                if matchobj is None or matchobj.group('end'):
                     # That was the last piece of data. Let our caller attach
                     # the epilogue to us. But before we do that, push the
                     # line ending of the match group back into the readline
                     # buffer, as it's part of the epilogue.
-                    fp.unreadline(matchobj.group('linesep'))
+                    if matchobj:
+                        fp.unreadline(matchobj.group('linesep'))
                     return container
 
         elif container.get_content_maintype() == "multipart":
@@ -281,7 +285,6 @@ class Parser:
         elif container.get_content_maintype() == "message":
             ct = container.get_content_type()
             if ct == "message/rfc822":
-                # Error.
                 submessage = self._class()
                 self._parseheaders(submessage, fp)
                 self._parsemessage(submessage, fp)
@@ -301,7 +304,11 @@ class Parser:
                         break
                 return container
             else:
-                raise ValueError, "%s not implemented yet"%(ct)
+                # Other sort of message object (e.g. external-body)
+                msg = self._class()
+                self._parsemessage(msg, fp)
+                container.attach(msg)
+                return msg
         else:
             # single body section. We let our caller set the payload.
             return container
