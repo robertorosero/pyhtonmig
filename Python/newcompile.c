@@ -69,10 +69,13 @@ struct compiler {
 
 struct assembler {
 	PyObject *a_bytecode;  /* string containing bytecode */
-	PyObject *a_lnotab;    /* string containing lnotab */
 	int a_offset;          /* offset into bytecode */
 	int a_nblocks;         /* number of reachable blocks */
 	int *a_postorder;      /* list of block indices in dfs postorder */
+	PyObject *a_lnotab;    /* string containing lnotab */
+	int a_lnotab_off;      /* offset into lnotab */
+	int a_lineno;          /* last lineno of emitted instruction */
+	int a_lineno_off;      /* bytecode offset of last lineno */
 };
 
 static int compiler_enter_scope(struct compiler *, identifier, void *);
@@ -491,6 +494,8 @@ static void
 compiler_set_lineno(struct compiler *c, int off)
 {
 	struct basicblock *b;
+	fprintf(stderr, "set_lineno() set=%d lineno=%d\n",
+		c->u->u_lineno_set, c->u->u_lineno);
 	if (c->u->u_lineno_set)
 		return;
 	c->u->u_lineno_set = true;
@@ -2030,8 +2035,12 @@ static int
 assemble_init(struct assembler *a, int nblocks)
 {
 	memset(a, 0, sizeof(struct assembler));
+	a->a_lineno = 1;
 	a->a_bytecode = PyString_FromStringAndSize(NULL, DEFAULT_CODE_SIZE);
 	if (!a->a_bytecode)
+		return 0;
+	a->a_lnotab = PyString_FromStringAndSize(NULL, DEFAULT_LNOTAB_SIZE);
+	if (!a->a_lnotab)
 		return 0;
 	a->a_postorder = (int *)PyObject_Malloc(sizeof(int) * nblocks);
 	if (!a->a_postorder)
@@ -2043,15 +2052,61 @@ static void
 assemble_free(struct assembler *a)
 {
 	Py_XDECREF(a->a_bytecode);
+	Py_XDECREF(a->a_lnotab);
 	if (a->a_postorder)
 		PyObject_Free(a->a_postorder);
 }
 
-/* All about c_lnotab.
+/* Return the size of a basic block in bytes. */
 
-c_lnotab is an array of unsigned bytes disguised as a Python string.  In -O
-mode, SET_LINENO opcodes aren't generated, and bytecode offsets are mapped
-to source code line #s (when needed for tracebacks) via c_lnotab instead.
+static int
+instrsize(struct instr *instr)
+{
+	int size = 1;
+	if (instr->i_hasarg) {
+		size += 2;
+		if (instr->i_oparg >> 16)
+			size += 2;
+	}
+	return size;
+}
+
+static int
+blocksize(struct basicblock *b)
+{
+	int i;
+	int size = 0;
+
+	for (i = 0; i < b->b_iused; i++)
+		size += instrsize(&b->b_instr[i]);
+	return size;
+}
+
+/* Produce output that looks rather like dis module output. */
+
+static void
+assemble_display(struct assembler *a, struct instr *i)
+{
+    /* Dispatch the simple case first. */
+    if (!i->i_hasarg) {
+	    fprintf(stderr, "%5d %-20.20s %d\n",
+		    a->a_offset, opnames[i->i_opcode], i->i_lineno);
+	    return;
+    }
+    
+    fprintf(stderr, "%5d %-20.20s %d %d",
+	    a->a_offset, opnames[i->i_opcode], i->i_oparg, i->i_lineno);
+    if (i->i_jrel) 
+	    fprintf(stderr, " (to %d)", a->a_offset + i->i_oparg + 3);
+    fprintf(stderr, "\n");
+}
+
+/* All about a_lnotab.
+
+c_lnotab is an array of unsigned bytes disguised as a Python string.
+It is used to map bytecode offsets to source code line #s (when needed
+for tracebacks).
+
 The array is conceptually a list of
     (bytecode offset increment, line number increment)
 pairs.  The details are important and delicate, best illustrated by example:
@@ -2092,54 +2147,38 @@ was actually done until 2.2) expand 300, 300 to 255, 255,  45, 45, but to
 */
 
 static int
-assemble_lnotab(struct assembler *a)
+assemble_lnotab(struct assembler *a, struct instr *i)
 {
+	int d_bytecode, d_lineno;
+	int len;
+	char *lnotab;
+
+	d_bytecode = a->a_offset - a->a_lineno_off;
+	d_lineno = i->i_lineno - a->a_lineno;
+
+	if (d_lineno == 0)
+		return 1;
+
+	/* XXX for now */
+	assert(d_bytecode < 256);
+	assert(d_lineno < 256);
+
+	len = PyString_GET_SIZE(a->a_lnotab);
+	if (a->a_lnotab_off + 2 >= len) {
+		if (_PyString_Resize(&a->a_lnotab, len * 2) < 0)
+			return 0;
+	}
+	lnotab = PyString_AS_STRING(a->a_lnotab) + a->a_lnotab_off;
+	*lnotab++ = d_bytecode;
+	*lnotab++ = d_lineno;
+	a->a_lnotab_off += 2;
 	return 1;
 }
 
-/* Return the size of a basic block in bytes. */
-
-static int
-instrsize(struct instr *instr)
-{
-	int size = 1;
-	if (instr->i_hasarg) {
-		size += 2;
-		if (instr->i_oparg >> 16)
-			size += 2;
-	}
-	return size;
-}
-
-static int
-blocksize(struct basicblock *b)
-{
-	int i;
-	int size = 0;
-
-	for (i = 0; i < b->b_iused; i++)
-		size += instrsize(&b->b_instr[i]);
-	return size;
-}
-
-/* Produce output that looks rather like dis module output. */
-
-static void
-assemble_display(struct assembler *a, struct instr *i)
-{
-    /* Dispatch the simple case first. */
-    if (!i->i_hasarg) {
-	    fprintf(stderr, "%5d %-20.20s\n",
-		    a->a_offset, opnames[i->i_opcode]);
-	    return;
-    }
-    
-    fprintf(stderr, "%5d %-20.20s %d",
-	    a->a_offset, opnames[i->i_opcode], i->i_oparg);
-    if (i->i_jrel) 
-	    fprintf(stderr, " (to %d)", a->a_offset + i->i_oparg + 3);
-    fprintf(stderr, "\n");
-}
+/* assemble_emit()
+   Extend the bytecode with a new instruction.
+   Update lnotab if necessary.
+*/
 
 static int
 assemble_emit(struct assembler *a, struct instr *i)
@@ -2156,6 +2195,8 @@ assemble_emit(struct assembler *a, struct instr *i)
 			size = 3;
 		arg = i->i_oparg;
 	}
+	if (i->i_lineno && !assemble_lnotab(a, i))
+			return 0;
 	if (a->a_offset + size >= len) {
 		if (_PyString_Resize(&a->a_bytecode, len * 2) < 0)
 		    return 0;
@@ -2290,7 +2331,7 @@ makecode(struct compiler *c, struct assembler *a)
 			nil, nil,
 			filename, c->u->u_name,
 			0,
-			filename); /* XXX lnotab */
+			a->a_lnotab);
  error:
 	Py_XDECREF(consts);
 	Py_XDECREF(names);
@@ -2323,8 +2364,6 @@ assemble(struct compiler *c)
 	/* Can't modify the bytecode after computing jump offsets. */
 	if (!assemble_jump_offsets(&a, c))
 		goto error;
-	if (!assemble_lnotab(&a))
-		goto error;
 
 	/* Emit code in reverse postorder from dfs. */
 	for (i = a.a_nblocks - 1; i >= 0; i--) {
@@ -2340,6 +2379,8 @@ assemble(struct compiler *c)
 	}
 	fprintf(stderr, "\n");
 
+	if (_PyString_Resize(&a.a_lnotab, a.a_lnotab_off) < 0)
+		goto error;
 	if (_PyString_Resize(&a.a_bytecode, a.a_offset) < 0)
 		goto error;
 
