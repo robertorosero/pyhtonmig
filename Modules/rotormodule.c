@@ -89,7 +89,7 @@ typedef struct {
 	unsigned char *advances; /* [num_rotors] */
 } rotorobject;
 
-static typeobject Rotortype;	/* Forward */
+staticforward typeobject Rotortype;
 
 #define is_rotorobject(v)		((v)->ob_type == &Rotortype)
 

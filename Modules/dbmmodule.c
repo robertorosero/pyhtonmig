@@ -39,7 +39,7 @@ typedef struct {
 	DBM *di_dbm;
 } dbmobject;
 
-static typeobject Dbmtype;	/* Forward */
+staticforward typeobject Dbmtype;
 
 #define is_dbmobject(v) ((v)->ob_type == &Dbmtype)
 

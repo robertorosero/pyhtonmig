@@ -56,7 +56,7 @@ typedef struct {
 	object *ob_callback_arg;
 } genericobject;
 
-extern typeobject GenericObjecttype; /* Forward */
+staticforward typeobject GenericObjecttype;
 
 #define is_genericobject(g) ((g)->ob_type == &GenericObjecttype)
 
@@ -1399,7 +1399,7 @@ typedef struct {
 	FL_FORM *ob_form;
 } formobject;
 
-extern typeobject Formtype; /* Forward */
+staticforward typeobject Formtype;
 
 #define is_formobject(v) ((v)->ob_type == &Formtype)
 

@@ -50,7 +50,7 @@ typedef struct {
 	ALconfig ob_config;
 } configobject;
 
-extern typeobject Configtype; /* Forward */
+staticforward typeobject Configtype;
 
 #define is_configobject(v) ((v)->ob_type == &Configtype)
 
@@ -250,7 +250,7 @@ typedef struct {
 	ALport ob_port;
 } portobject;
 
-extern typeobject Porttype; /* Forward */
+staticforward typeobject Porttype;
 
 #define is_portobject(v) ((v)->ob_type == &Porttype)
 

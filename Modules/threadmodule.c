@@ -48,7 +48,7 @@ typedef struct {
 	type_lock lock_lock;
 } lockobject;
 
-static typeobject Locktype;
+staticforward typeobject Locktype;
 
 #define is_lockobject(v)		((v)->ob_type == &Locktype)
 

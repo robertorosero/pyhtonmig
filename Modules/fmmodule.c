@@ -40,7 +40,7 @@ typedef struct {
 	fmfonthandle fh_fh;
 } fhobject;
 
-static typeobject Fhtype;	/* Forward */
+staticforward typeobject Fhtype;
 
 #define is_fhobject(v)		((v)->ob_type == &Fhtype)
 

@@ -46,7 +46,7 @@ typedef struct arrayobject {
 	struct arraydescr *ob_descr;
 } arrayobject;
 
-extern typeobject Arraytype;
+staticforward typeobject Arraytype;
 
 #define is_arrayobject(op) ((op)->ob_type == &Arraytype)
 

@@ -90,7 +90,7 @@ typedef struct {
         MP_INT	mpz;		/* the actual number */
 } mpzobject;
 
-static typeobject MPZtype;	/* Forward */
+staticforward typeobject MPZtype;
 
 #define is_mpzobject(v)		((v)->ob_type == &MPZtype)
 

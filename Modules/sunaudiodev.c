@@ -56,8 +56,8 @@ typedef struct {
 	audio_info_t ai;
 } sadstatusobject;
 
-static typeobject Sadtype;		/* Forward */
-static typeobject Sadstatustype;	/* Forward */
+staticforward typeobject Sadtype;
+staticforward typeobject Sadstatustype;
 static sadstatusobject *sads_alloc();	/* Forward */
 
 static object *SunAudioError;

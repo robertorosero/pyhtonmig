@@ -120,7 +120,7 @@ typedef struct {
    some of which call newsocobject(), which uses Socktype, so
    there has to be a circular reference. */
 
-extern typeobject Socktype; /* Forward */
+staticforward typeobject Socktype;
 
 
 /* Create a new socket object.

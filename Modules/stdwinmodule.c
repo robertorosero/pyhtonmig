@@ -113,7 +113,7 @@ typedef struct {
 	object	*w_attr;	/* Attributes dictionary */
 } windowobject;
 
-static typeobject Windowtype;	/* Forward */
+staticforward typeobject Windowtype;
 
 #define is_windowobject(wp) ((wp)->ob_type == &Windowtype)
 
@@ -124,7 +124,7 @@ typedef struct {
 	object	*m_attr;	/* Attributes dictionary */
 } menuobject;
 
-static typeobject Menutype;	/* Forward */
+staticforward typeobject Menutype;
 
 #define is_menuobject(mp) ((mp)->ob_type == &Menutype)
 
@@ -134,7 +134,7 @@ typedef struct {
 	object	*b_attr;	/* Attributes dictionary */
 } bitmapobject;
 
-static typeobject Bitmaptype;	/* Forward */
+staticforward typeobject Bitmaptype;
 
 #define is_bitmapobject(mp) ((mp)->ob_type == &Bitmaptype)
 
@@ -809,7 +809,7 @@ typedef struct {
 	object		*t_attr;	/* Attributes dictionary */
 } textobject;
 
-static typeobject Texttype;	/* Forward */
+staticforward typeobject Texttype;
 
 static textobject *
 newtextobject(wp, left, top, right, bottom)
