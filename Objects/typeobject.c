@@ -663,7 +663,7 @@ type_getattro(PyTypeObject *type, PyObject *name)
 
 	/* Use the descriptor from the metatype */
 	if (f != NULL) {
-		res = f(descr, (PyObject *)NULL, (PyObject *)metatype);
+		res = f(descr, (PyObject *)type, (PyObject *)metatype);
 		return res;
 	}
 	if (descr != NULL) {
