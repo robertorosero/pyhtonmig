@@ -10,6 +10,14 @@ struct getsetlist {
 	void *closure;
 };
 
+typedef PyObject *(*wrapperfunc)(PyObject *self, PyObject *args, void *wrapped);
+
+struct wrapperbase {
+	char *name;
+	wrapperfunc wrapper;
+	char *doc;
+};
+
 extern PyTypeObject PyDescr_Type;
 
 #define PyDescr_Check(d) ((d)->ob_type == &PyDescr_Type)
@@ -21,5 +29,8 @@ extern DL_IMPORT(PyObject *) PyDescr_NewMember(PyTypeObject *,
 					       struct memberlist *);
 extern DL_IMPORT(PyObject *) PyDescr_NewGetSet(PyTypeObject *,
 					       struct getsetlist *);
+extern DL_IMPORT(PyObject *) PyDescr_NewWrapper(PyTypeObject *,
+						struct wrapperbase *, void *);
 
 extern DL_IMPORT(PyObject *) PyDictProxy_New(PyObject *);
+extern DL_IMPORT(PyObject *) PyWrapper_New(PyDescrObject *, PyObject *);
