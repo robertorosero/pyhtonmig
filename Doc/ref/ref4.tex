@@ -81,7 +81,9 @@ the built-in one.}
 The following table lists the meaning of the local and global name
 space for various types of code blocks.  The name space for a
 particular module is automatically created when the module is first
-referenced.
+referenced.  Note that in almost all cases, the global name space is
+the name space of the containing module -- scopes in Python do not
+nest!
 
 \begin{center}
 \begin{tabular}{|l|l|l|l|}
