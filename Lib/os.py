@@ -14,40 +14,29 @@
 # and opendir), and leave all pathname manipulation to os.path
 # (e.g., split and join).
 
-# XXX This is incorrect if the import *path fails...
+_osindex = {
+	  'posix': ('.', '..', '/'),
+	  'dos':   ('.', '..', '\\'),
+	  'mac':   (':', '::', ':'),
+	  'nt':   ('.', '..', '\\'),
+}
 
-try:
-	from posix import *
-	try:
-		from posix import _exit
-	except ImportError:
-		pass
-	name = 'posix'
-	curdir = '.'
-	pardir = '..'
-	sep = '/'
-	import posixpath
-	path = posixpath
-	del posixpath
-except ImportError:
-	try:
-		from mac import *
-		name = 'mac'
-		curdir = ':'
-		pardir = '::'
-		sep = ':'
-		import macpath
-		path = macpath
-		del macpath
-	except ImportError:
-		from dos import *
-		name = 'dos'
-		curdir = '.'		# XXX doesn't always work
-		pardir = '..'		# XXX doesn't always work
-		sep = '/'		# XXX or '\\' ???
-		import dospath
-		path = dospath
-		del dospath
+import sys
+for name in _osindex.keys():
+	if name in sys.builtin_module_names:
+		curdir, pardir, sep = _osindex[name]
+		exec 'from %s import *' % name
+		exec 'import %spath' % name
+		exec 'path = %spath' % name
+		exec 'del %spath' % name
+		try:
+			exec 'from %s import _exit' % name
+		except ImportError:
+			pass
+		break
+else:
+	del name
+	raise ImportError, 'no os specific module found'
 
 def execl(file, *args):
 	execv(file, args)

@@ -78,5 +78,3 @@ def test():
 		x = localtime(t)
 		tm = x[:-1] + (0,)
 		print 'd =', d, 't =', t, '=', asctime(tm), x[-1]
-
-test()

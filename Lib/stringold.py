@@ -157,7 +157,7 @@ def atof(str):
 	if regex.match('[0-9]*\(\.[0-9]*\)?\([eE][-+]?[0-9]+\)?', s) != len(s):
 		raise atof_error, str
 	try:
-		return eval(sign + s)
+		return float(eval(sign + s))
 	except SyntaxError:
 		raise atof_error, str
 
@@ -242,12 +242,36 @@ def expandtabs(s, tabsize):
 # it redefines some string operations that are 100-1000 times faster.
 # It also defines values for whitespace, lowercase and uppercase
 # that match <ctype.h>'s definitions.
-# The manipulation with index_error is needed for compatibility.
 
 try:
 	from strop import *
 	letters = lowercase + uppercase
+except ImportError:
+	pass # Use the original, slow versions
+
+# If certain functions are found, redefine the corresponding exceptions
+# as ValueError
+
+try:
 	from strop import index
 	index_error = ValueError
+except ImportError:
+	pass # Use the original, slow versions
+
+try:
+	from strop import atoi
+	atoi_error = ValueError
+except ImportError:
+	pass # Use the original, slow versions
+
+try:
+	from strop import atof
+	atof_error = ValueError
+except ImportError:
+	pass # Use the original, slow versions
+
+try:
+	from strop import atol
+	atol_error = ValueError
 except ImportError:
 	pass # Use the original, slow versions
