@@ -28,7 +28,7 @@ iter_dealloc(iterobject *it)
 }
 
 static PyObject *
-iter_call(iterobject *it, PyObject *args)
+iter_next(iterobject *it, PyObject *args)
 {
 	PyObject *seq = it->it_seq;
 
@@ -53,6 +53,18 @@ iter_getiter(PyObject *it)
 	return it;
 }
 
+static PyMethodDef iter_methods[] = {
+	{"next",	(PyCFunction)iter_next,	METH_VARARGS,
+	 "it.next() -- get the next value, or raise IndexError"},
+	{NULL,		NULL}		/* sentinel */
+};
+
+static PyObject *
+iter_getattr(iterobject *it, char *name)
+{
+	return Py_FindMethod(iter_methods, (PyObject *)it, name);
+}
+
 PyTypeObject PyIter_Type = {
 	PyObject_HEAD_INIT(&PyType_Type)
 	0,					/* ob_size */
@@ -62,15 +74,15 @@ PyTypeObject PyIter_Type = {
 	/* methods */
 	(destructor)iter_dealloc, 		/* tp_dealloc */
 	0,					/* tp_print */
-	(getattrfunc)0,				/* tp_getattr */
-	(setattrfunc)0,				/* tp_setattr */
+	(getattrfunc)iter_getattr,		/* tp_getattr */
+	0,					/* tp_setattr */
 	0,					/* tp_compare */
 	0,					/* tp_repr */
 	0,					/* tp_as_number */
 	0,					/* tp_as_sequence */
 	0,					/* tp_as_mapping */
 	0,					/* tp_hash */
-	(ternaryfunc)iter_call,			/* tp_call */
+	0,					/* tp_call */
 	0,					/* tp_str */
 	0,					/* tp_getattro */
 	0,					/* tp_setattro */
@@ -113,7 +125,7 @@ calliter_dealloc(calliterobject *it)
 	PyObject_DEL(it);
 }
 static PyObject *
-calliter_call(calliterobject *it, PyObject *args)
+calliter_next(calliterobject *it, PyObject *args)
 {
 	PyObject *result = PyObject_CallObject(it->it_callable, NULL);
 	if (result != NULL) {
@@ -132,6 +144,18 @@ calliter_call(calliterobject *it, PyObject *args)
 	return result;
 }
 
+static PyMethodDef calliter_methods[] = {
+	{"next",	(PyCFunction)calliter_next,	METH_VARARGS,
+	 "it.next() -- get the next value, or raise IndexError"},
+	{NULL,		NULL}		/* sentinel */
+};
+
+static PyObject *
+calliter_getattr(calliterobject *it, char *name)
+{
+	return Py_FindMethod(calliter_methods, (PyObject *)it, name);
+}
+
 PyTypeObject PyCallIter_Type = {
 	PyObject_HEAD_INIT(&PyType_Type)
 	0,					/* ob_size */
@@ -141,7 +165,7 @@ PyTypeObject PyCallIter_Type = {
 	/* methods */
 	(destructor)calliter_dealloc, 		/* tp_dealloc */
 	0,					/* tp_print */
-	0,					/* tp_getattr */
+	(getattrfunc)iter_getattr,		/* tp_getattr */
 	0,					/* tp_setattr */
 	0,					/* tp_compare */
 	0,					/* tp_repr */
@@ -149,7 +173,7 @@ PyTypeObject PyCallIter_Type = {
 	0,					/* tp_as_sequence */
 	0,					/* tp_as_mapping */
 	0,					/* tp_hash */
-	(ternaryfunc)calliter_call,		/* tp_call */
+	0,					/* tp_call */
 	0,					/* tp_str */
 	0,					/* tp_getattro */
 	0,					/* tp_setattro */
