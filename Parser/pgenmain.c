@@ -32,6 +32,10 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
    Error messages and status info during the generation process are
    written to stdout, or sometimes to stderr. */
 
+/* XXX TO DO:
+   - check for duplicate definitions of names (instead of fatal err)
+*/
+
 #include "pgenheaders.h"
 #include "grammar.h"
 #include "node.h"
@@ -160,6 +164,25 @@ guesstabsize(path)
 }
 #endif
 
-/* XXX TO DO:
-   - check for duplicate definitions of names (instead of fatal err)
-*/
+/* No-nonsense my_readline() for tokenizer.c */
+
+char *
+my_readline(prompt)
+	char *prompt;
+{
+	int n = 1000;
+	char *p = malloc(n);
+	char *q;
+	if (p == NULL)
+		return NULL;
+	fprintf(stderr, "%s", prompt);
+	q = fgets(p, n, stdin);
+	if (q == NULL) {
+		*p = '\0';
+		return p;
+	}
+	n = strlen(p);
+	if (n > 0 && p[n-1] != '\n')
+		p[n-1] = '\n';
+	return realloc(p, n+1);
+}

@@ -25,13 +25,11 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 /* Check for interrupts */
 
 #ifdef THINK_C
-/* This is for THINK C 4.0.
-   For 3.0, you may have to remove the signal stuff. */
 #include <MacHeaders>
 #define macintosh
 #endif
 
-#include "PROTO.h"
+#include "myproto.h"
 #include "intrcheck.h"
 
 
@@ -57,7 +55,7 @@ intrcheck()
 
 #define OK
 
-#endif
+#endif /* MSDOS */
 
 
 #ifdef macintosh
@@ -65,15 +63,14 @@ intrcheck()
 #ifdef applec /* MPW */
 #include <OSEvents.h>
 #include <SysEqu.h>
-#endif
+#endif /* applec */
 
 #include <signal.h>
-#include "sigtype.h"
 
 static int interrupted;
 
-static SIGTYPE intcatcher PROTO((int));
-static SIGTYPE
+static RETSIGTYPE intcatcher PROTO((int));
+static RETSIGTYPE
 intcatcher(sig)
 	int sig;
 {
@@ -121,13 +118,13 @@ intrcheck()
 /* Default version -- for real operating systems and for Standard C */
 
 #include <stdio.h>
+#include <string.h>
 #include <signal.h>
-#include "sigtype.h"
 
 static int interrupted;
 
 /* ARGSUSED */
-static SIGTYPE
+static RETSIGTYPE
 intcatcher(sig)
 	int sig; /* Not used by required by interface */
 {
@@ -153,7 +150,7 @@ initintr()
 {
 	if (signal(SIGINT, SIG_IGN) != SIG_IGN)
 		signal(SIGINT, intcatcher);
-#ifdef SV_INTERRUPT
+#ifdef HAVE_SIGINTERRUPT
 	/* This is for SunOS and other modern BSD derivatives.
 	   It means that system calls (like read()) are not restarted
 	   after an interrupt.  This is necessary so interrupting a
@@ -161,7 +158,7 @@ initintr()
 	   XXX On old BSD (pure 4.2 or older) you may have to do this
 	   differently! */
 	siginterrupt(SIGINT, 1);
-#endif
+#endif /* HAVE_SIGINTERRUPT */
 }
 
 int
