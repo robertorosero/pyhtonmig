@@ -30,7 +30,7 @@ This module provides an interface to Berkeley socket IPC.
 Limitations:
 
 - only AF_INET and AF_UNIX address families are supported
-- no asynchronous I/O (but read polling: avail)
+- no asynchronous I/O (but you can use select() on sockets)
 - no read/write operations (use send/recv or makefile instead)
 - setsockopt() and getsockopt() only support integer options
 
@@ -51,7 +51,6 @@ Interface:
 Socket methods:
 
 - s.accept() --> new socket object, sockaddr
-- s.avail() --> boolean
 - s.setsockopt(level, optname, flag) --> None
 - s.getsockopt(level, optname) --> flag
 - s.bind(sockaddr) --> None
@@ -75,7 +74,6 @@ Socket methods:
 
 #include <sys/types.h>
 #include "mytime.h"
-#include "myselect.h"
 
 #include <signal.h>
 #include <netdb.h>
@@ -484,29 +482,6 @@ sock_getsockopt(s, args)
 }
 
 
-/* s.avail() method */
-
-static object *
-sock_avail(s, args)
-	sockobject *s;
-	object *args;
-{
-	struct timeval timeout;
-	fd_set readers;
-	int n;
-	if (!getnoarg(args))
-		return NULL;
-	timeout.tv_sec = 0;
-	timeout.tv_usec = 0;
-	FD_ZERO(&readers);
-	FD_SET(s->sock_fd, &readers);
-	n = select(s->sock_fd+1, &readers, (fd_set *)0, (fd_set *)0, &timeout);
-	if (n < 0)
-		return socket_error();
-	return newintobject((long) (n != 0));
-}
-
-
 /* s.bind(sockaddr) method */
 
 static object *
@@ -821,7 +796,6 @@ sock_shutdown(s, args)
 
 static struct methodlist sock_methods[] = {
 	{"accept",	sock_accept},
-	{"avail",	sock_avail},
 	{"allowbroadcast",	sock_allowbroadcast},
 	{"setsockopt",	sock_setsockopt},
 	{"getsockopt",	sock_getsockopt},
