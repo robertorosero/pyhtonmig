@@ -2,11 +2,17 @@
 /* Module object implementation */
 
 #include "Python.h"
+#include "structmember.h"
 
 typedef struct {
 	PyObject_HEAD
 	PyObject *md_dict;
 } PyModuleObject;
+
+struct memberlist module_members[] = {
+	{"__dict__", T_OBJECT, offsetof(PyModuleObject, md_dict), READONLY},
+	{0}
+};
 
 PyObject *
 PyModule_New(char *name)
@@ -161,58 +167,6 @@ module_repr(PyModuleObject *m)
 	return PyString_FromString(buf);
 }
 
-static PyObject *
-module_getattr(PyModuleObject *m, char *name)
-{
-	PyObject *res;
-	char* modname;
-	if (strcmp(name, "__dict__") == 0) {
-		Py_INCREF(m->md_dict);
-		return m->md_dict;
-	}
-	res = PyDict_GetItemString(m->md_dict, name);
-	if (res == NULL) {
-		modname = PyModule_GetName((PyObject *)m);
-		if (modname == NULL) {
-			PyErr_Clear();
-			modname = "?";
-		}
-		PyErr_Format(PyExc_AttributeError,
-			     "'%.50s' module has no attribute '%.400s'",
-			     modname, name);
-	}
-	else
-		Py_INCREF(res);
-	return res;
-}
-
-static int
-module_setattr(PyModuleObject *m, char *name, PyObject *v)
-{
-	char* modname;
-	if (name[0] == '_' && strcmp(name, "__dict__") == 0) {
-		PyErr_SetString(PyExc_TypeError,
-				"read-only special attribute");
-		return -1;
-	}
-	if (v == NULL) {
-		int rv = PyDict_DelItemString(m->md_dict, name);
-		if (rv < 0) {
-			modname = PyModule_GetName((PyObject *)m);
-			if (modname == NULL) {
-				PyErr_Clear();
-				modname = "?";
-			}
-			PyErr_Format(PyExc_AttributeError,
-				     "'%.50s' module has no attribute '%.400s'",
-				     modname, name);
-		}
-		return rv;
-	}
-	else
-		return PyDict_SetItemString(m->md_dict, name, v);
-}
-
 /* We only need a traverse function, no clear function: If the module
    is in a cycle, md_dict will be cleared as well, which will break
    the cycle. */
@@ -226,26 +180,40 @@ module_traverse(PyModuleObject *m, visitproc visit, void *arg)
 
 PyTypeObject PyModule_Type = {
 	PyObject_HEAD_INIT(&PyType_Type)
-	0,			/*ob_size*/
-	"module",		/*tp_name*/
-	sizeof(PyModuleObject) + PyGC_HEAD_SIZE,	/*tp_size*/
-	0,			/*tp_itemsize*/
-	(destructor)module_dealloc, /*tp_dealloc*/
-	0,			/*tp_print*/
-	(getattrfunc)module_getattr, /*tp_getattr*/
-	(setattrfunc)module_setattr, /*tp_setattr*/
-	0,			/*tp_compare*/
-	(reprfunc)module_repr, /*tp_repr*/
-	0,			/*tp_as_number*/
-	0,			/*tp_as_sequence*/
-	0,		/*tp_as_mapping*/
-	0,		/* tp_hash */
-	0,		/* tp_call */
-	0,		/* tp_str */
-	0,		/* tp_getattro */
-	0,		/* tp_setattro */
-	0,		/* tp_as_buffer */
-	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_GC, /*tp_flags*/
-	0,		/* tp_doc */
-	(traverseproc)module_traverse,	/* tp_traverse */
+	0,					/* ob_size */
+	"module",				/* tp_name */
+	sizeof(PyModuleObject) + PyGC_HEAD_SIZE, /* tp_size */
+	0,					/* tp_itemsize */
+	(destructor)module_dealloc,		/* tp_dealloc */
+	0,					/* tp_print */
+	0,					/* tp_getattr */
+	0,					/* tp_setattr */
+	0,					/* tp_compare */
+	(reprfunc)module_repr,			/* tp_repr */
+	0,					/* tp_as_number */
+	0,					/* tp_as_sequence */
+	0,					/* tp_as_mapping */
+	0,					/* tp_hash */
+	0,					/* tp_call */
+	0,					/* tp_str */
+	PyGeneric_GetAttr,			/* tp_getattro */
+	PyGeneric_SetAttr,			/* tp_setattro */
+	0,					/* tp_as_buffer */
+	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_GC,	/* tp_flags */
+	0,					/* tp_doc */
+	(traverseproc)module_traverse,		/* tp_traverse */
+	0,					/* tp_clear */
+	0,					/* tp_richcompare */
+	0,					/* tp_weaklistoffset */
+	0,					/* tp_iter */
+	0,					/* tp_iternext */
+	0,					/* tp_methods */
+	module_members,				/* tp_members */
+	0,					/* tp_getset */
+	0,					/* tp_base */
+	0,					/* tp_dict */
+	0,					/* tp_descr_get */
+	0,					/* tp_descr_set */
+	0,					/* tp_construct */
+	offsetof(PyModuleObject, md_dict),	/* tp_dictoffset */
 };
