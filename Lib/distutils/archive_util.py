@@ -93,7 +93,7 @@ def make_zipfile (base_name, base_dir, verbose=0, dry_run=0):
 
         def visit (z, dirname, names):
             for name in names:
-                path = os.path.join (dirname, name)
+                path = os.path.normpath(os.path.join(dirname, name))
                 if os.path.isfile (path):
                     z.write (path, path)
 
@@ -110,11 +110,11 @@ def make_zipfile (base_name, base_dir, verbose=0, dry_run=0):
 
 
 ARCHIVE_FORMATS = {
-    'gztar': (make_tarball, [('compress', 'gzip')]),
-    'bztar': (make_tarball, [('compress', 'bzip2')]),
-    'ztar':  (make_tarball, [('compress', 'compress')]),
-    'tar':   (make_tarball, [('compress', None)]),
-    'zip':   (make_zipfile, [])
+    'gztar': (make_tarball, [('compress', 'gzip')], "gzip'ed tar-file"),
+    'bztar': (make_tarball, [('compress', 'bzip2')], "bzip2'ed tar-file"),
+    'ztar':  (make_tarball, [('compress', 'compress')], "compressed tar file"),
+    'tar':   (make_tarball, [('compress', None)], "uncompressed tar file"),
+    'zip':   (make_zipfile, [],"zip-file")
     }
 
 def check_archive_formats (formats):
@@ -127,7 +127,6 @@ def check_archive_formats (formats):
 def make_archive (base_name, format,
                   root_dir=None, base_dir=None,
                   verbose=0, dry_run=0):
-
     """Create an archive file (eg. zip or tar).  'base_name' is the name
     of the file to create, minus any format-specific extension; 'format'
     is the archive format: one of "zip", "tar", "ztar", or "gztar".
@@ -136,8 +135,8 @@ def make_archive (base_name, format,
     archive.  'base_dir' is the directory where we start archiving from;
     ie. 'base_dir' will be the common prefix of all files and
     directories in the archive.  'root_dir' and 'base_dir' both default
-    to the current directory."""
-
+    to the current directory.  Returns the name of the archive file.
+    """
     save_cwd = os.getcwd()
     if root_dir is not None:
         if verbose:
@@ -160,11 +159,13 @@ def make_archive (base_name, format,
     func = format_info[0]
     for (arg,val) in format_info[1]:
         kwargs[arg] = val
-    apply (func, (base_name, base_dir), kwargs)
+    filename = apply (func, (base_name, base_dir), kwargs)
 
     if root_dir is not None:
         if verbose:
             print "changing back to '%s'" % save_cwd
         os.chdir (save_cwd)
+
+    return filename
 
 # make_archive ()

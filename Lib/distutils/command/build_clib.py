@@ -23,7 +23,12 @@ import os, string
 from types import *
 from distutils.core import Command
 from distutils.errors import *
-from distutils.ccompiler import new_compiler
+from distutils.sysconfig import customize_compiler
+
+
+def show_compilers ():
+    from distutils.ccompiler import show_compilers
+    show_compilers()
 
 
 class build_clib (Command):
@@ -38,8 +43,15 @@ class build_clib (Command):
         ('debug', 'g',
          "compile with debugging information"),
         ('force', 'f',
-         "forcibly build everything (ignore file timestamps"),
+         "forcibly build everything (ignore file timestamps)"),
+        ('compiler=', 'c',
+         "specify the compiler type"),
         ]
+
+    help_options = [
+        ('help-compiler', None,
+         "list available compilers", show_compilers),
+	]
 
     def initialize_options (self):
         self.build_clib = None
@@ -54,6 +66,7 @@ class build_clib (Command):
         self.undef = None
         self.debug = None
         self.force = 0
+        self.compiler = None
 
     # initialize_options()
 
@@ -68,6 +81,7 @@ class build_clib (Command):
         self.set_undefined_options ('build',
                                     ('build_temp', 'build_clib'),
                                     ('build_temp', 'build_temp'),
+                                    ('compiler', 'compiler'),
                                     ('debug', 'debug'),
                                     ('force', 'force'))
 
@@ -93,9 +107,13 @@ class build_clib (Command):
             return
 
         # Yech -- this is cut 'n pasted from build_ext.py!
-        self.compiler = new_compiler (verbose=self.verbose,
+        from distutils.ccompiler import new_compiler
+        self.compiler = new_compiler (compiler=self.compiler,
+                                      verbose=self.verbose,
                                       dry_run=self.dry_run,
                                       force=self.force)
+        customize_compiler(self.compiler)
+
         if self.include_dirs is not None:
             self.compiler.set_include_dirs (self.include_dirs)
         if self.define is not None:
@@ -201,4 +219,4 @@ class build_clib (Command):
 
     # build_libraries ()
 
-# class BuildLib
+# class build_lib

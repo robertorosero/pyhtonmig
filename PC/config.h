@@ -255,8 +255,10 @@ typedef int pid_t;
 
 #ifdef MS_WIN32
 
-#ifndef USE_DL_EXPORT
-/* So nobody needs to specify the .lib in their Makefile any more */
+#if !defined(USE_DL_EXPORT) && defined(_MSC_VER)
+/* So nobody using MSVC needs to specify the .lib in their Makefile any
+   more (other compilers will still need it, but that's taken care
+   of by the Distutils, so it's not a problem). */
 #ifdef _DEBUG
 #pragma comment(lib,"python16_d.lib")
 #else

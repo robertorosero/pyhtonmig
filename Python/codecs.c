@@ -4,12 +4,15 @@
 
 Written by Marc-Andre Lemburg (mal@lemburg.com).
 
-(c) Copyright CNRI, All Rights Reserved. NO WARRANTY.
+Copyright (c) Corporation for National Research Initiatives.
 
    ------------------------------------------------------------------------ */
 
 #include "Python.h"
 #include <ctype.h>
+#ifdef HAVE_LIMITS_H
+#include <limits.h>
+#endif
 
 /* --- Globals ------------------------------------------------------------ */
 
@@ -33,7 +36,7 @@ static int import_encodings_called = 0;
 */
 
 static
-int import_encodings() 
+int import_encodings(void)
 {
     PyObject *mod;
     
@@ -82,12 +85,17 @@ int PyCodec_Register(PyObject *search_function)
 static
 PyObject *normalizestring(const char *string)
 {
-    register int i;
-    int len = strlen(string);
+    register size_t i;
+    size_t len = strlen(string);
     char *p;
     PyObject *v;
     
-    v = PyString_FromStringAndSize(NULL, len);
+	if (len > INT_MAX) {
+		PyErr_SetString(PyExc_OverflowError, "string is too large");
+		return NULL;
+	}
+	
+    v = PyString_FromStringAndSize(NULL, (int)len);
     if (v == NULL)
 	return NULL;
     p = PyString_AS_STRING(v);
@@ -138,7 +146,7 @@ PyObject *_PyCodec_Lookup(const char *encoding)
     }
 
     /* Convert the encoding to a normalized Python string: all
-       characters are converted to lower case, spaces and hypens are
+       characters are converted to lower case, spaces and hyphens are
        replaced with underscores. */
     v = normalizestring(encoding);
     if (v == NULL)
@@ -411,7 +419,7 @@ PyObject *PyCodec_Decode(PyObject *object,
     return NULL;
 }
 
-void _PyCodecRegistry_Init()
+void _PyCodecRegistry_Init(void)
 {
     if (_PyCodec_SearchPath == NULL)
 	_PyCodec_SearchPath = PyList_New(0);
@@ -419,10 +427,10 @@ void _PyCodecRegistry_Init()
 	_PyCodec_SearchCache = PyDict_New();
     if (_PyCodec_SearchPath == NULL || 
 	_PyCodec_SearchCache == NULL)
-	Py_FatalError("can't intialize codec registry");
+	Py_FatalError("can't initialize codec registry");
 }
 
-void _PyCodecRegistry_Fini()
+void _PyCodecRegistry_Fini(void)
 {
     Py_XDECREF(_PyCodec_SearchPath);
     _PyCodec_SearchPath = NULL;

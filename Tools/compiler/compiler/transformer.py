@@ -1,3 +1,19 @@
+#
+# Copyright (C) 1997-1998 Greg Stein. All Rights Reserved.
+#
+# This module is provided under a BSD-ish license. See
+#   http://www.opensource.org/licenses/bsd-license.html
+# and replace OWNER, ORGANIZATION, and YEAR as appropriate.
+#
+#
+# Written by Greg Stein (gstein@lyra.org)
+#        and Bill Tutt (rassilon@lima.mudlib.org)
+# February 1997.
+#
+# Support for ast.Node subclasses written and other revisions by
+#  Jeremy Hylton (jeremy@beopen.com)
+#
+
 """Parse tree transformation module.
 
 Transforms Python source code into an abstract syntax tree (AST)
@@ -8,14 +24,6 @@ parse(buf) -> AST
 parseFile(path) -> AST
 """
 
-# Copyright 1997-1998 Greg Stein and Bill Tutt
-#
-# Written by Greg Stein (gstein@lyra.org)
-#        and Bill Tutt (rassilon@lima.mudlib.org)
-# February 1997.
-#
-# Support for Node subclasses written and other revisions by
-#  Jeremy Hylton (jeremy@cnri.reston.va.us)
 #
 # The output tree has the following nodes:
 #
@@ -993,6 +1001,9 @@ class Transformer:
       args.append(result)
     else:
         i = i + 1 # No broken by star arg, so skip the last one we processed.
+    if i < len_nodelist and nodelist[i][0] == token.COMMA:
+        # need to accept an application that looks like "f(a, b,)"
+        i = i + 1
     star_node = dstar_node = None
     while i < len_nodelist:
         tok = nodelist[i]

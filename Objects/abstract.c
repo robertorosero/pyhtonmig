@@ -1,34 +1,3 @@
-/***********************************************************
-Copyright 1991-1995 by Stichting Mathematisch Centrum, Amsterdam,
-The Netherlands.
-
-                        All Rights Reserved
-
-Permission to use, copy, modify, and distribute this software and its
-documentation for any purpose and without fee is hereby granted,
-provided that the above copyright notice appear in all copies and that
-both that copyright notice and this permission notice appear in
-supporting documentation, and that the names of Stichting Mathematisch
-Centrum or CWI or Corporation for National Research Initiatives or
-CNRI not be used in advertising or publicity pertaining to
-distribution of the software without specific, written prior
-permission.
-
-While CWI is the initial source for this software, a modified version
-is made available by the Corporation for National Research Initiatives
-(CNRI) at the Internet address ftp://ftp.python.org.
-
-STICHTING MATHEMATISCH CENTRUM AND CNRI DISCLAIM ALL WARRANTIES WITH
-REGARD TO THIS SOFTWARE, INCLUDING ALL IMPLIED WARRANTIES OF
-MERCHANTABILITY AND FITNESS, IN NO EVENT SHALL STICHTING MATHEMATISCH
-CENTRUM OR CNRI BE LIABLE FOR ANY SPECIAL, INDIRECT OR CONSEQUENTIAL
-DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR
-PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
-TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
-PERFORMANCE OF THIS SOFTWARE.
-
-******************************************************************/
-
 /* Abstract Object Interface (many thanks to Jim Fulton) */
 
 #include "Python.h"
@@ -37,15 +6,14 @@ PERFORMANCE OF THIS SOFTWARE.
 /* Shorthands to return certain errors */
 
 static PyObject *
-type_error(msg)
-	char *msg;
+type_error(const char *msg)
 {
 	PyErr_SetString(PyExc_TypeError, msg);
 	return NULL;
 }
 
 static PyObject *
-null_error()
+null_error(void)
 {
 	if (!PyErr_Occurred())
 		PyErr_SetString(PyExc_SystemError,
@@ -56,10 +24,7 @@ null_error()
 /* Operations on any object */
 
 int
-PyObject_Cmp(o1, o2, result)
-	PyObject *o1;
-	PyObject *o2;
-	int *result;
+PyObject_Cmp(PyObject *o1, PyObject *o2, int *result)
 {
 	int r;
 
@@ -75,8 +40,7 @@ PyObject_Cmp(o1, o2, result)
 }
 
 PyObject *
-PyObject_Type(o)
-	PyObject *o;
+PyObject_Type(PyObject *o)
 {
 	PyObject *v;
 
@@ -88,8 +52,7 @@ PyObject_Type(o)
 }
 
 int
-PyObject_Length(o)
-	PyObject *o;
+PyObject_Size(PyObject *o)
 {
 	PySequenceMethods *m;
 
@@ -102,13 +65,19 @@ PyObject_Length(o)
 	if (m && m->sq_length)
 		return m->sq_length(o);
 
-	return PyMapping_Length(o);
+	return PyMapping_Size(o);
 }
 
+#undef PyObject_Length
+int
+PyObject_Length(PyObject *o)
+{
+	return PyObject_Size(o);
+}
+#define PyObject_Length PyObject_Size
+
 PyObject *
-PyObject_GetItem(o, key)
-	PyObject *o;
-	PyObject *key;
+PyObject_GetItem(PyObject *o, PyObject *key)
 {
 	PyMappingMethods *m;
 
@@ -135,10 +104,7 @@ PyObject_GetItem(o, key)
 }
 
 int
-PyObject_SetItem(o, key, value)
-	PyObject *o;
-	PyObject *key;
-	PyObject *value;
+PyObject_SetItem(PyObject *o, PyObject *key, PyObject *value)
 {
 	PyMappingMethods *m;
 
@@ -168,9 +134,7 @@ PyObject_SetItem(o, key, value)
 }
 
 int
-PyObject_DelItem(o, key)
-	PyObject *o;
-	PyObject *key;
+PyObject_DelItem(PyObject *o, PyObject *key)
 {
 	PyMappingMethods *m;
 
@@ -310,8 +274,7 @@ int PyObject_AsWriteBuffer(PyObject *obj,
 /* Operations on numbers */
 
 int
-PyNumber_Check(o)
-	PyObject *o;
+PyNumber_Check(PyObject *o)
 {
 	return o && o->ob_type->tp_as_number;
 }
@@ -323,15 +286,12 @@ PyNumber_Check(o)
 		return PyInstance_DoBinOp(v, w, opname, ropname, thisfunc)
 
 PyObject *
-PyNumber_Or(v, w)
-	PyObject *v, *w;
+PyNumber_Or(PyObject *v, PyObject *w)
 {
-        extern int PyNumber_Coerce();
-
 	BINOP(v, w, "__or__", "__ror__", PyNumber_Or);
 	if (v->ob_type->tp_as_number != NULL) {
 		PyObject *x = NULL;
-		PyObject * (*f) Py_FPROTO((PyObject *, PyObject *));
+		PyObject * (*f)(PyObject *, PyObject *);
 		if (PyNumber_Coerce(&v, &w) != 0)
 			return NULL;
 		if ((f = v->ob_type->tp_as_number->nb_or) != NULL)
@@ -345,15 +305,12 @@ PyNumber_Or(v, w)
 }
 
 PyObject *
-PyNumber_Xor(v, w)
-	PyObject *v, *w;
+PyNumber_Xor(PyObject *v, PyObject *w)
 {
-        extern int PyNumber_Coerce();
-
 	BINOP(v, w, "__xor__", "__rxor__", PyNumber_Xor);
 	if (v->ob_type->tp_as_number != NULL) {
 		PyObject *x = NULL;
-		PyObject * (*f) Py_FPROTO((PyObject *, PyObject *));
+		PyObject * (*f)(PyObject *, PyObject *);
 		if (PyNumber_Coerce(&v, &w) != 0)
 			return NULL;
 		if ((f = v->ob_type->tp_as_number->nb_xor) != NULL)
@@ -367,13 +324,12 @@ PyNumber_Xor(v, w)
 }
 
 PyObject *
-PyNumber_And(v, w)
-	PyObject *v, *w;
+PyNumber_And(PyObject *v, PyObject *w)
 {
 	BINOP(v, w, "__and__", "__rand__", PyNumber_And);
 	if (v->ob_type->tp_as_number != NULL) {
 		PyObject *x = NULL;
-		PyObject * (*f) Py_FPROTO((PyObject *, PyObject *));
+		PyObject * (*f)(PyObject *, PyObject *);
 		if (PyNumber_Coerce(&v, &w) != 0)
 			return NULL;
 		if ((f = v->ob_type->tp_as_number->nb_and) != NULL)
@@ -387,13 +343,12 @@ PyNumber_And(v, w)
 }
 
 PyObject *
-PyNumber_Lshift(v, w)
-	PyObject *v, *w;
+PyNumber_Lshift(PyObject *v, PyObject *w)
 {
 	BINOP(v, w, "__lshift__", "__rlshift__", PyNumber_Lshift);
 	if (v->ob_type->tp_as_number != NULL) {
 		PyObject *x = NULL;
-		PyObject * (*f) Py_FPROTO((PyObject *, PyObject *));
+		PyObject * (*f)(PyObject *, PyObject *);
 		if (PyNumber_Coerce(&v, &w) != 0)
 			return NULL;
 		if ((f = v->ob_type->tp_as_number->nb_lshift) != NULL)
@@ -407,13 +362,12 @@ PyNumber_Lshift(v, w)
 }
 
 PyObject *
-PyNumber_Rshift(v, w)
-	PyObject *v, *w;
+PyNumber_Rshift(PyObject *v, PyObject *w)
 {
 	BINOP(v, w, "__rshift__", "__rrshift__", PyNumber_Rshift);
 	if (v->ob_type->tp_as_number != NULL) {
 		PyObject *x = NULL;
-		PyObject * (*f) Py_FPROTO((PyObject *, PyObject *));
+		PyObject * (*f)(PyObject *, PyObject *);
 		if (PyNumber_Coerce(&v, &w) != 0)
 			return NULL;
 		if ((f = v->ob_type->tp_as_number->nb_rshift) != NULL)
@@ -427,8 +381,7 @@ PyNumber_Rshift(v, w)
 }
 
 PyObject *
-PyNumber_Add(v, w)
-	PyObject *v, *w;
+PyNumber_Add(PyObject *v, PyObject *w)
 {
 	PySequenceMethods *m;
 
@@ -438,7 +391,7 @@ PyNumber_Add(v, w)
 		return (*m->sq_concat)(v, w);
 	else if (v->ob_type->tp_as_number != NULL) {
 		PyObject *x = NULL;
-		PyObject * (*f) Py_FPROTO((PyObject *, PyObject *));
+		PyObject * (*f)(PyObject *, PyObject *);
 		if (PyNumber_Coerce(&v, &w) != 0)
 			return NULL;
 		if ((f = v->ob_type->tp_as_number->nb_add) != NULL)
@@ -452,13 +405,12 @@ PyNumber_Add(v, w)
 }
 
 PyObject *
-PyNumber_Subtract(v, w)
-	PyObject *v, *w;
+PyNumber_Subtract(PyObject *v, PyObject *w)
 {
 	BINOP(v, w, "__sub__", "__rsub__", PyNumber_Subtract);
 	if (v->ob_type->tp_as_number != NULL) {
 		PyObject *x = NULL;
-		PyObject * (*f) Py_FPROTO((PyObject *, PyObject *));
+		PyObject * (*f)(PyObject *, PyObject *);
 		if (PyNumber_Coerce(&v, &w) != 0)
 			return NULL;
 		if ((f = v->ob_type->tp_as_number->nb_subtract) != NULL)
@@ -472,8 +424,7 @@ PyNumber_Subtract(v, w)
 }
 
 PyObject *
-PyNumber_Multiply(v, w)
-	PyObject *v, *w;
+PyNumber_Multiply(PyObject *v, PyObject *w)
 {
 	PyTypeObject *tp = v->ob_type;
 	PySequenceMethods *m;
@@ -490,7 +441,7 @@ PyNumber_Multiply(v, w)
 	}
 	if (tp->tp_as_number != NULL) {
 		PyObject *x = NULL;
-		PyObject * (*f) Py_FPROTO((PyObject *, PyObject *));
+		PyObject * (*f)(PyObject *, PyObject *);
 		if (PyInstance_Check(v)) {
 			/* Instances of user-defined classes get their
 			   other argument uncoerced, so they may
@@ -530,13 +481,12 @@ PyNumber_Multiply(v, w)
 }
 
 PyObject *
-PyNumber_Divide(v, w)
-	PyObject *v, *w;
+PyNumber_Divide(PyObject *v, PyObject *w)
 {
 	BINOP(v, w, "__div__", "__rdiv__", PyNumber_Divide);
 	if (v->ob_type->tp_as_number != NULL) {
 		PyObject *x = NULL;
-		PyObject * (*f) Py_FPROTO((PyObject *, PyObject *));
+		PyObject * (*f)(PyObject *, PyObject *);
 		if (PyNumber_Coerce(&v, &w) != 0)
 			return NULL;
 		if ((f = v->ob_type->tp_as_number->nb_divide) != NULL)
@@ -550,8 +500,7 @@ PyNumber_Divide(v, w)
 }
 
 PyObject *
-PyNumber_Remainder(v, w)
-	PyObject *v, *w;
+PyNumber_Remainder(PyObject *v, PyObject *w)
 {
 	if (PyString_Check(v))
 		return PyString_Format(v, w);
@@ -560,7 +509,7 @@ PyNumber_Remainder(v, w)
 	BINOP(v, w, "__mod__", "__rmod__", PyNumber_Remainder);
 	if (v->ob_type->tp_as_number != NULL) {
 		PyObject *x = NULL;
-		PyObject * (*f) Py_FPROTO((PyObject *, PyObject *));
+		PyObject * (*f)(PyObject *, PyObject *);
 		if (PyNumber_Coerce(&v, &w) != 0)
 			return NULL;
 		if ((f = v->ob_type->tp_as_number->nb_remainder) != NULL)
@@ -574,13 +523,12 @@ PyNumber_Remainder(v, w)
 }
 
 PyObject *
-PyNumber_Divmod(v, w)
-	PyObject *v, *w;
+PyNumber_Divmod(PyObject *v, PyObject *w)
 {
 	BINOP(v, w, "__divmod__", "__rdivmod__", PyNumber_Divmod);
 	if (v->ob_type->tp_as_number != NULL) {
 		PyObject *x = NULL;
-		PyObject * (*f) Py_FPROTO((PyObject *, PyObject *));
+		PyObject * (*f)(PyObject *, PyObject *);
 		if (PyNumber_Coerce(&v, &w) != 0)
 			return NULL;
 		if ((f = v->ob_type->tp_as_number->nb_divmod) != NULL)
@@ -596,11 +544,10 @@ PyNumber_Divmod(v, w)
 /* Power (binary or ternary) */
 
 static PyObject *
-do_pow(v, w)
-	PyObject *v, *w;
+do_pow(PyObject *v, PyObject *w)
 {
 	PyObject *res;
-	PyObject * (*f) Py_FPROTO((PyObject *, PyObject *, PyObject *));
+	PyObject * (*f)(PyObject *, PyObject *, PyObject *);
 	BINOP(v, w, "__pow__", "__rpow__", do_pow);
 	if (v->ob_type->tp_as_number == NULL ||
 	    w->ob_type->tp_as_number == NULL) {
@@ -620,12 +567,11 @@ do_pow(v, w)
 }
 
 PyObject *
-PyNumber_Power(v, w, z)
-	PyObject *v, *w, *z;
+PyNumber_Power(PyObject *v, PyObject *w, PyObject *z)
 {
 	PyObject *res;
 	PyObject *v1, *z1, *w2, *z2;
-	PyObject * (*f) Py_FPROTO((PyObject *, PyObject *, PyObject *));
+	PyObject * (*f)(PyObject *, PyObject *, PyObject *);
 
 	if (z == Py_None)
 		return do_pow(v, w);
@@ -667,8 +613,7 @@ PyNumber_Power(v, w, z)
 /* Unary operators and functions */
 
 PyObject *
-PyNumber_Negative(o)
-	PyObject *o;
+PyNumber_Negative(PyObject *o)
 {
 	PyNumberMethods *m;
 
@@ -682,8 +627,7 @@ PyNumber_Negative(o)
 }
 
 PyObject *
-PyNumber_Positive(o)
-	PyObject *o;
+PyNumber_Positive(PyObject *o)
 {
 	PyNumberMethods *m;
 
@@ -697,8 +641,7 @@ PyNumber_Positive(o)
 }
 
 PyObject *
-PyNumber_Invert(o)
-	PyObject *o;
+PyNumber_Invert(PyObject *o)
 {
 	PyNumberMethods *m;
 
@@ -712,8 +655,7 @@ PyNumber_Invert(o)
 }
 
 PyObject *
-PyNumber_Absolute(o)
-	PyObject *o;
+PyNumber_Absolute(PyObject *o)
 {
 	PyNumberMethods *m;
 
@@ -728,9 +670,7 @@ PyNumber_Absolute(o)
 
 /* Add a check for embedded NULL-bytes in the argument. */
 static PyObject *
-int_from_string(s, len)
-	const char *s;
-	int len;
+int_from_string(const char *s, int len)
 {
 	char *end;
 	PyObject *x;
@@ -748,8 +688,7 @@ int_from_string(s, len)
 }
 
 PyObject *
-PyNumber_Int(o)
-	PyObject *o;
+PyNumber_Int(PyObject *o)
 {
 	PyNumberMethods *m;
 	const char *buffer;
@@ -779,9 +718,7 @@ PyNumber_Int(o)
 
 /* Add a check for embedded NULL-bytes in the argument. */
 static PyObject *
-long_from_string(s, len)
-	const char *s;
-	int len;
+long_from_string(const char *s, int len)
 {
 	char *end;
 	PyObject *x;
@@ -799,8 +736,7 @@ long_from_string(s, len)
 }
 
 PyObject *
-PyNumber_Long(o)
-	PyObject *o;
+PyNumber_Long(PyObject *o)
 {
 	PyNumberMethods *m;
 	const char *buffer;
@@ -834,8 +770,7 @@ PyNumber_Long(o)
 }
 
 PyObject *
-PyNumber_Float(o)
-	PyObject *o;
+PyNumber_Float(PyObject *o)
 {
 	PyNumberMethods *m;
 
@@ -856,15 +791,13 @@ PyNumber_Float(o)
 /* Operations on sequences */
 
 int
-PySequence_Check(s)
-	PyObject *s;
+PySequence_Check(PyObject *s)
 {
 	return s != NULL && s->ob_type->tp_as_sequence;
 }
 
 int
-PySequence_Length(s)
-	PyObject *s;
+PySequence_Size(PyObject *s)
 {
 	PySequenceMethods *m;
 
@@ -881,10 +814,16 @@ PySequence_Length(s)
 	return -1;
 }
 
+#undef PySequence_Length
+int
+PySequence_Length(PyObject *s)
+{
+	return PySequence_Size(s);
+}
+#define PySequence_Length PySequence_Size
+
 PyObject *
-PySequence_Concat(s, o)
-	PyObject *s;
-	PyObject *o;
+PySequence_Concat(PyObject *s, PyObject *o)
 {
 	PySequenceMethods *m;
 
@@ -899,9 +838,7 @@ PySequence_Concat(s, o)
 }
 
 PyObject *
-PySequence_Repeat(o, count)
-	PyObject *o;
-	int count;
+PySequence_Repeat(PyObject *o, int count)
 {
 	PySequenceMethods *m;
 
@@ -916,9 +853,7 @@ PySequence_Repeat(o, count)
 }
 
 PyObject *
-PySequence_GetItem(s, i)
-	PyObject *s;
-	int i;
+PySequence_GetItem(PyObject *s, int i)
 {
 	PySequenceMethods *m;
 
@@ -942,10 +877,7 @@ PySequence_GetItem(s, i)
 }
 
 PyObject *
-PySequence_GetSlice(s, i1, i2)
-	PyObject *s;
-	int i1;
-	int i2;
+PySequence_GetSlice(PyObject *s, int i1, int i2)
 {
 	PySequenceMethods *m;
 
@@ -971,10 +903,7 @@ PySequence_GetSlice(s, i1, i2)
 }
 
 int
-PySequence_SetItem(s, i, o)
-	PyObject *s;
-	int i;
-	PyObject *o;
+PySequence_SetItem(PyObject *s, int i, PyObject *o)
 {
 	PySequenceMethods *m;
 
@@ -1001,9 +930,7 @@ PySequence_SetItem(s, i, o)
 }
 
 int
-PySequence_DelItem(s, i)
-	PyObject *s;
-	int i;
+PySequence_DelItem(PyObject *s, int i)
 {
 	PySequenceMethods *m;
 
@@ -1030,11 +957,7 @@ PySequence_DelItem(s, i)
 }
 
 int
-PySequence_SetSlice(s, i1, i2, o)
-	PyObject *s;
-	int i1;
-	int i2;
-	PyObject *o;
+PySequence_SetSlice(PyObject *s, int i1, int i2, PyObject *o)
 {
 	PySequenceMethods *m;
 
@@ -1063,10 +986,7 @@ PySequence_SetSlice(s, i1, i2, o)
 }
 
 int
-PySequence_DelSlice(s, i1, i2)
-	PyObject *s;
-	int i1;
-	int i2;
+PySequence_DelSlice(PyObject *s, int i1, int i2)
 {
 	PySequenceMethods *m;
 
@@ -1095,8 +1015,7 @@ PySequence_DelSlice(s, i1, i2)
 }
 
 PyObject *
-PySequence_Tuple(v)
-	PyObject *v;
+PySequence_Tuple(PyObject *v)
 {
 	PySequenceMethods *m;
 
@@ -1119,7 +1038,7 @@ PySequence_Tuple(v)
 	if (m && m->sq_item) {
 		int i;
 		PyObject *t;
-		int n = PySequence_Length(v);
+		int n = PySequence_Size(v);
 		if (n < 0)
 			return NULL;
 		t = PyTuple_New(n);
@@ -1156,8 +1075,7 @@ PySequence_Tuple(v)
 }
 
 PyObject *
-PySequence_List(v)
-	PyObject *v;
+PySequence_List(PyObject *v)
 {
 	PySequenceMethods *m;
 
@@ -1171,7 +1089,7 @@ PySequence_List(v)
 	if (m && m->sq_item) {
 		int i;
 		PyObject *l;
-		int n = PySequence_Length(v);
+		int n = PySequence_Size(v);
 		if (n < 0)
 			return NULL;
 		l = PyList_New(n);
@@ -1207,10 +1125,26 @@ PySequence_List(v)
 	return type_error("list() argument must be a sequence");
 }
 
+PyObject *
+PySequence_Fast(PyObject *v, const char *m)
+{
+	if (v == NULL)
+		return null_error();
+
+	if (PyList_Check(v) || PyTuple_Check(v)) {
+		Py_INCREF(v);
+		return v;
+	}
+
+	v = PySequence_Tuple(v);
+	if (v == NULL && PyErr_ExceptionMatches(PyExc_TypeError))
+		return type_error(m);
+
+	return v;
+}
+
 int
-PySequence_Count(s, o)
-	PyObject *s;
-	PyObject *o;
+PySequence_Count(PyObject *s, PyObject *o)
 {
 	int l, i, n, cmp, err;
 	PyObject *item;
@@ -1220,7 +1154,7 @@ PySequence_Count(s, o)
 		return -1;
 	}
 	
-	l = PySequence_Length(s);
+	l = PySequence_Size(s);
 	if (l < 0)
 		return -1;
 
@@ -1240,9 +1174,7 @@ PySequence_Count(s, o)
 }
 
 int
-PySequence_Contains(w, v) /* v in w */
-	PyObject *w;
-	PyObject *v;
+PySequence_Contains(PyObject *w, PyObject *v) /* v in w */
 {
 	int i, cmp;
 	PyObject *x;
@@ -1286,17 +1218,13 @@ PySequence_Contains(w, v) /* v in w */
 /* Backwards compatibility */
 #undef PySequence_In
 int
-PySequence_In(w, v)
-	PyObject *w;
-	PyObject *v;
+PySequence_In(PyObject *w, PyObject *v)
 {
 	return PySequence_Contains(w, v);
 }
 
 int
-PySequence_Index(s, o)
-	PyObject *s;
-	PyObject *o;
+PySequence_Index(PyObject *s, PyObject *o)
 {
 	int l, i, cmp, err;
 	PyObject *item;
@@ -1306,7 +1234,7 @@ PySequence_Index(s, o)
 		return -1;
 	}
 	
-	l = PySequence_Length(s);
+	l = PySequence_Size(s);
 	if (l < 0)
 		return -1;
 
@@ -1329,15 +1257,13 @@ PySequence_Index(s, o)
 /* Operations on mappings */
 
 int
-PyMapping_Check(o)
-	PyObject *o;
+PyMapping_Check(PyObject *o)
 {
 	return o && o->ob_type->tp_as_mapping;
 }
 
 int
-PyMapping_Length(o)
-	PyObject *o;
+PyMapping_Size(PyObject *o)
 {
 	PyMappingMethods *m;
 
@@ -1354,10 +1280,16 @@ PyMapping_Length(o)
 	return -1;
 }
 
+#undef PyMapping_Length
+int
+PyMapping_Length(PyObject *o)
+{
+	return PyMapping_Size(o);
+}
+#define PyMapping_Length PyMapping_Size
+
 PyObject *
-PyMapping_GetItemString(o, key)
-	PyObject *o;
-	char *key;
+PyMapping_GetItemString(PyObject *o, char *key)
 {
 	PyObject *okey, *r;
 
@@ -1373,10 +1305,7 @@ PyMapping_GetItemString(o, key)
 }
 
 int
-PyMapping_SetItemString(o, key, value)
-	PyObject *o;
-	char *key;
-	PyObject *value;
+PyMapping_SetItemString(PyObject *o, char *key, PyObject *value)
 {
 	PyObject *okey;
 	int r;
@@ -1395,9 +1324,7 @@ PyMapping_SetItemString(o, key, value)
 }
 
 int
-PyMapping_HasKeyString(o, key)
-	PyObject *o;
-	char *key;
+PyMapping_HasKeyString(PyObject *o, char *key)
 {
 	PyObject *v;
 
@@ -1411,9 +1338,7 @@ PyMapping_HasKeyString(o, key)
 }
 
 int
-PyMapping_HasKey(o, key)
-	PyObject *o;
-	PyObject *key;
+PyMapping_HasKey(PyObject *o, PyObject *key)
 {
 	PyObject *v;
 
@@ -1431,8 +1356,7 @@ PyMapping_HasKey(o, key)
 /* XXX PyCallable_Check() is in object.c */
 
 PyObject *
-PyObject_CallObject(o, a)
-	PyObject *o, *a;
+PyObject_CallObject(PyObject *o, PyObject *a)
 {
 	PyObject *r;
 	PyObject *args = a;
@@ -1453,25 +1377,11 @@ PyObject_CallObject(o, a)
 }
 
 PyObject *
-#ifdef HAVE_STDARG_PROTOTYPES
-/* VARARGS 2 */
 PyObject_CallFunction(PyObject *callable, char *format, ...)
-#else
-/* VARARGS */
-	PyObject_CallFunction(va_alist) va_dcl
-#endif
 {
 	va_list va;
 	PyObject *args, *retval;
-#ifdef HAVE_STDARG_PROTOTYPES
 	va_start(va, format);
-#else
-	PyObject *callable;
-	char *format;
-	va_start(va);
-	callable = va_arg(va, PyObject *);
-	format   = va_arg(va, char *);
-#endif
 
 	if (callable == NULL) {
 		va_end(va);
@@ -1506,27 +1416,11 @@ PyObject_CallFunction(PyObject *callable, char *format, ...)
 }
 
 PyObject *
-#ifdef HAVE_STDARG_PROTOTYPES
-/* VARARGS 2 */
 PyObject_CallMethod(PyObject *o, char *name, char *format, ...)
-#else
-/* VARARGS */
-	PyObject_CallMethod(va_alist) va_dcl
-#endif
 {
 	va_list va;
 	PyObject *args, *func = 0, *retval;
-#ifdef HAVE_STDARG_PROTOTYPES
 	va_start(va, format);
-#else
-	PyObject *o;
-	char *name;
-	char *format;
-	va_start(va);
-	o      = va_arg(va, PyObject *);
-	name   = va_arg(va, char *);
-	format = va_arg(va, char *);
-#endif
 
 	if (o == NULL || name == NULL) {
 		va_end(va);

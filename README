@@ -1,9 +1,18 @@
 This is Python version 1.6
 ==========================
 
-There are various alpha and beta versions -- these are distinguishable
-through Include/patchlevel.h or by the name of the top-level directory
-and the tar file.
+Copyright (c) 1995-2000 Corporation for National Research Initiatives.
+All rights reserved.
+
+Copyright (c) 1991-1995 Stichting Mathematisch Centrum.
+All rights reserved.
+
+License information
+-------------------
+
+See the file "LICENSE" for information on terms & conditions for
+accessing and otherwise using this software, and for a DISCLAIMER OF
+ALL WARRANTIES.
 
 
 What's new in this release?
@@ -30,21 +39,6 @@ often compared to Tcl, Perl, Java or Scheme.  To find out more, point
 your browser to http://www.python.org/.
 
 
-A modest plug
--------------
-
-************************************************************************
-* Without your support, I won't be able to continue to work on Python! *
-************************************************************************
-
-If you use Python, please consider joining the Python Software
-Activity (PSA).  See http://www.python.org/psa/.
-
-Organizations that make heavy use of Python are especially encouraged
-to become corporate members -- or better still, to join the Python
-Consortium (see http://www.python.org/consortium/).
-
-
 How do I learn Python?
 ----------------------
 
@@ -54,17 +48,6 @@ well as a list of other introductions, and reference documentation.
 
 There's a quickly growing set of books on Python.  See
 http://www.python.org/psa/bookstore/ for a list.
-
-
-Copyright issues
-----------------
-
-Python is COPYRIGHTED but free to use for all.  See the full copyright
-notice at the end of this file and in the file Misc/COPYRIGHT.
-
-The Python distribution is *not* affected by the GNU Public Licence
-(GPL).  There are interfaces to some GNU code but these are entirely
-optional and no GNU code is distributed with Python.
 
 
 Build instructions
@@ -679,7 +662,7 @@ Emacs mode
 There's an excellent Emacs editing mode for Python code; see the file
 Misc/python-mode.el.  Originally written by the famous Tim Peters, it
 is now maintained by the equally famous Barry Warsaw
-<bwarsaw@cnri.reston.va.us>.  The latest version, along with various
+<bwarsaw@beopen.com>.  The latest version, along with various
 other contributed Python-related Emacs goodies, is online at
 <http://www.python.org/emacs/python-mode>.  And if you are planning to
 edit the Python C code, please pick up the latest version of CC Mode
@@ -722,14 +705,11 @@ See http://www.python.org/psa/MailingLists.html for an overview of the
 many Python related mailing lists.
 
 
-Bug reports
------------
+Bug reports and patches
+-----------------------
 
-Bugs are best reported to the comp.lang.python newsgroup (or the
-Python mailing list) -- see the section "Newsgroups" above.  Before
-posting, check the newsgroup archives (see above) to see if your bug
-has already been reported!  If you don't want to go public, send them
-to me: <guido@python.org>.
+To report a bug or contribute a patch, use the Python project at
+SourceForge: http://sourceforge.net/projects/python.
 
 
 Questions
@@ -755,7 +735,7 @@ is expected that it will also work with newer versions).  Tcl/Tk
 7.4/4.0 is no longer supported.  8.0 or any later non-alpha non-beta
 release is recommended.
 
-See http://sunscript.sun.com/ for more info on Tcl/Tk, including the
+See http://www.tcltk.com/ for more info on Tcl/Tk, including the
 on-line manual pages.
 
 
@@ -777,6 +757,8 @@ translated into Tcl code.
 
 A more recent introduction to Tkinter programming, by Fredrik Lundh,
 is at http://www.pythonware.com/library/tkinter/introduction/index.htm.
+At least one book has been published on Tkinter; go to the PSA bookstore
+for more information:  http://www.python.org/psa/bookstore/.
 
 There are demos in the Demo/tkinter directory, in the subdirectories
 guido, matt and www (the matt and guido subdirectories have been
@@ -836,54 +818,8 @@ python          The executable interpreter
 tags, TAGS      Tags files for vi and Emacs
 
 
-Author's address
-================
-
-Guido van Rossum
-CNRI
-1895 Preston White Drive
-Reston, VA 20191
-USA
-
-E-mail: guido@cnri.reston.va.us or guido@python.org
+That's all, folks!
+------------------
 
 
-
-Copyright notice
-================
-
-The Python source is copyrighted, but you can freely use and copy it
-as long as you don't change or remove the copyright notice:
-
-----------------------------------------------------------------------
-Copyright 1991-1995 by Stichting Mathematisch Centrum, Amsterdam,
-The Netherlands.
-
-                        All Rights Reserved
-
-Permission to use, copy, modify, and distribute this software and its
-documentation for any purpose and without fee is hereby granted,
-provided that the above copyright notice appear in all copies and that
-both that copyright notice and this permission notice appear in
-supporting documentation, and that the names of Stichting Mathematisch
-Centrum or CWI or Corporation for National Research Initiatives or
-CNRI not be used in advertising or publicity pertaining to
-distribution of the software without specific, written prior
-permission.
-
-While CWI is the initial source for this software, a modified version
-is made available by the Corporation for National Research Initiatives
-(CNRI) at the Internet address ftp://ftp.python.org.
-
-STICHTING MATHEMATISCH CENTRUM AND CNRI DISCLAIM ALL WARRANTIES WITH
-REGARD TO THIS SOFTWARE, INCLUDING ALL IMPLIED WARRANTIES OF
-MERCHANTABILITY AND FITNESS, IN NO EVENT SHALL STICHTING MATHEMATISCH
-CENTRUM OR CNRI BE LIABLE FOR ANY SPECIAL, INDIRECT OR CONSEQUENTIAL
-DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR
-PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
-TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
-PERFORMANCE OF THIS SOFTWARE.
-----------------------------------------------------------------------
-
-
---Guido van Rossum (home page: http://www.python.org/~guido/)
+--Guido van Rossum (home page: http://www.pythonlabs.com/~guido/)

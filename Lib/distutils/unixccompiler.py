@@ -20,8 +20,11 @@ __revision__ = "$Id$"
 import string, re, os
 from types import *
 from copy import copy
-from distutils import sysconfig
-from distutils.ccompiler import CCompiler, gen_preprocess_options, gen_lib_options
+from distutils.dep_util import newer
+from distutils.ccompiler import \
+     CCompiler, gen_preprocess_options, gen_lib_options
+from distutils.errors import \
+     DistutilsExecError, CompileError, LibError, LinkError
 
 # XXX Things not currently handled:
 #   * optimization/debug/warning flags; we just use whatever's in Python's
@@ -41,64 +44,73 @@ from distutils.ccompiler import CCompiler, gen_preprocess_options, gen_lib_optio
 
 class UnixCCompiler (CCompiler):
 
-    # XXX perhaps there should really be *three* kinds of include
-    # directories: those built in to the preprocessor, those from Python's
-    # Makefiles, and those supplied to {add,set}_include_dirs().  Currently
-    # we make no distinction between the latter two at this point; it's all
-    # up to the client class to select the include directories to use above
-    # and beyond the compiler's defaults.  That is, both the Python include
-    # directories and any module- or package-specific include directories
-    # are specified via {add,set}_include_dirs(), and there's no way to
-    # distinguish them.  This might be a bug.
-
     compiler_type = 'unix'
 
-    # Needed for the filename generation methods provided by the
-    # base class, CCompiler.
+    # These are used by CCompiler in two places: the constructor sets
+    # instance attributes 'preprocessor', 'compiler', etc. from them, and
+    # 'set_executable()' allows any of these to be set.  The defaults here
+    # are pretty generic; they will probably have to be set by an outsider
+    # (eg. using information discovered by the sysconfig about building
+    # Python extensions).
+    executables = {'preprocessor' : None,
+                   'compiler'     : ["cc"],
+                   'compiler_so'  : ["cc"],
+                   'linker_so'    : ["cc", "-shared"],
+                   'linker_exe'   : ["cc"],
+                   'archiver'     : ["ar", "-cr"],
+                   'ranlib'       : None,
+                  }
+
+    # Needed for the filename generation methods provided by the base
+    # class, CCompiler.  NB. whoever instantiates/uses a particular
+    # UnixCCompiler instance should set 'shared_lib_ext' -- we set a
+    # reasonable common default here, but it's not necessarily used on all
+    # Unices!
+
     src_extensions = [".c",".C",".cc",".cxx",".cpp"]
     obj_extension = ".o"
     static_lib_extension = ".a"
-    shared_lib_extension = sysconfig.SO
+    shared_lib_extension = ".so"
     static_lib_format = shared_lib_format = "lib%s%s"
 
-    # Command to create a static library: seems to be pretty consistent
-    # across the major Unices.  Might have to move down into the
-    # constructor if we need platform-specific guesswork.
-    archiver = sysconfig.AR
-    archiver_options = "-cr"
-    ranlib = sysconfig.RANLIB
 
 
     def __init__ (self,
                   verbose=0,
                   dry_run=0,
                   force=0):
-
         CCompiler.__init__ (self, verbose, dry_run, force)
 
-        self.preprocess_options = None
-        self.compile_options = None
 
-        # Munge CC and OPT together in case there are flags stuck in CC.
-        # Note that using these variables from sysconfig immediately makes
-        # this module specific to building Python extensions and
-        # inappropriate as a general-purpose C compiler front-end.  So sue
-        # me.  Note also that we use OPT rather than CFLAGS, because CFLAGS
-        # is the flags used to compile Python itself -- not only are there
-        # -I options in there, they are the *wrong* -I options.  We'll
-        # leave selection of include directories up to the class using
-        # UnixCCompiler!
+    def preprocess (self,
+                    source,
+                    output_file=None,
+                    macros=None,
+                    include_dirs=None,
+                    extra_preargs=None,
+                    extra_postargs=None):
 
-        (self.cc, self.ccflags) = \
-            _split_command (sysconfig.CC + ' ' + sysconfig.OPT)
-        self.ccflags_shared = string.split (sysconfig.CCSHARED)
+        (_, macros, include_dirs) = \
+            self._fix_compile_args (None, macros, include_dirs)
+        pp_opts = gen_preprocess_options (macros, include_dirs)
+        pp_args = self.preprocessor + pp_opts
+        if output_file:
+            pp_args.extend(['-o', output_file])
+        if extra_preargs:
+            pp_args[:0] = extra_preargs
+        if extra_postargs:
+            extra_postargs.extend(extra_postargs)
 
-        (self.ld_shared, self.ldflags_shared) = \
-            _split_command (sysconfig.LDSHARED)
-
-        self.ld_exec = self.cc
-
-    # __init__ ()
+        # We need to preprocess: either we're being forced to, or the
+        # source file is newer than the target (or the target doesn't
+        # exist).
+        if self.force or (output_file and newer(source, output_file)):
+            if output_file:
+                self.mkpath(os.path.dirname(output_file))
+            try:
+                self.spawn (pp_args)
+            except DistutilsExecError, msg:
+                raise CompileError, msg
 
 
     def compile (self,
@@ -116,7 +128,7 @@ class UnixCCompiler (CCompiler):
 
         # Figure out the options for the compiler command line.
         pp_opts = gen_preprocess_options (macros, include_dirs)
-        cc_args = ['-c'] + pp_opts + self.ccflags + self.ccflags_shared
+        cc_args = pp_opts + ['-c']
         if debug:
             cc_args[:0] = ['-g']
         if extra_preargs:
@@ -132,7 +144,12 @@ class UnixCCompiler (CCompiler):
                 self.announce ("skipping %s (%s up-to-date)" % (src, obj))
             else:
                 self.mkpath (os.path.dirname (obj))
-                self.spawn ([self.cc] + cc_args + [src, '-o', obj] + extra_postargs)
+                try:
+                    self.spawn (self.compiler_so + cc_args +
+                                [src, '-o', obj] +
+                                extra_postargs)
+                except DistutilsExecError, msg:
+                    raise CompileError, msg
 
         # Return *all* object filenames, not just the ones we just built.
         return objects
@@ -153,9 +170,8 @@ class UnixCCompiler (CCompiler):
 
         if self._need_link (objects, output_filename):
             self.mkpath (os.path.dirname (output_filename))
-            self.spawn ([self.archiver,
-                         self.archiver_options,
-                         output_filename] +
+            self.spawn (self.archiver +
+                        [output_filename] +
                         objects + self.objects)
 
             # Not many Unices required ranlib anymore -- SunOS 4.x is, I
@@ -163,8 +179,11 @@ class UnixCCompiler (CCompiler):
             # platform intelligence here to skip ranlib if it's not
             # needed -- or maybe Python's configure script took care of
             # it for us, hence the check for leading colon.
-            if self.ranlib[0] != ':':
-                self.spawn ([self.ranlib, output_filename])
+            if self.ranlib:
+                try:
+                    self.spawn (self.ranlib + [output_filename])
+                except DistutilsExecError, msg:
+                    raise LibError, msg
         else:
             self.announce ("skipping %s (up-to-date)" % output_filename)
 
@@ -178,19 +197,24 @@ class UnixCCompiler (CCompiler):
                          libraries=None,
                          library_dirs=None,
                          runtime_library_dirs=None,
+                         export_symbols=None,
                          debug=0,
                          extra_preargs=None,
-                         extra_postargs=None):
+                         extra_postargs=None,
+                         build_temp=None):
+
         self.link_shared_object (
             objects,
-            self.shared_library_filename (output_libname),
+            self.library_filename (output_libname, lib_type='shared'),
             output_dir,
             libraries,
             library_dirs,
             runtime_library_dirs,
+            export_symbols,
             debug,
             extra_preargs,
-            extra_postargs)
+            extra_postargs,
+            build_temp)
         
 
     def link_shared_object (self,
@@ -200,9 +224,11 @@ class UnixCCompiler (CCompiler):
                             libraries=None,
                             library_dirs=None,
                             runtime_library_dirs=None,
+                            export_symbols=None,
                             debug=0,
                             extra_preargs=None,
-                            extra_postargs=None):
+                            extra_postargs=None,
+                            build_temp=None):
 
         (objects, output_dir) = self._fix_object_args (objects, output_dir)
         (libraries, library_dirs, runtime_library_dirs) = \
@@ -217,7 +243,7 @@ class UnixCCompiler (CCompiler):
             output_filename = os.path.join (output_dir, output_filename)
 
         if self._need_link (objects, output_filename):
-            ld_args = (self.ldflags_shared + objects + self.objects + 
+            ld_args = (objects + self.objects + 
                        lib_opts + ['-o', output_filename])
             if debug:
                 ld_args[:0] = ['-g']
@@ -226,7 +252,10 @@ class UnixCCompiler (CCompiler):
             if extra_postargs:
                 ld_args.extend (extra_postargs)
             self.mkpath (os.path.dirname (output_filename))
-            self.spawn ([self.ld_shared] + ld_args)
+            try:
+                self.spawn (self.linker_so + ld_args)
+            except DistutilsExecError, msg:
+                raise LinkError, msg
         else:
             self.announce ("skipping %s (up-to-date)" % output_filename)
 
@@ -264,7 +293,10 @@ class UnixCCompiler (CCompiler):
             if extra_postargs:
                 ld_args.extend (extra_postargs)
             self.mkpath (os.path.dirname (output_filename))
-            self.spawn ([self.ld_exec] + ld_args)
+            try:
+                self.spawn (self.linker_exe + ld_args)
+            except DistutilsExecError, msg:
+                raise LinkError, msg
         else:
             self.announce ("skipping %s (up-to-date)" % output_filename)
 
@@ -285,11 +317,13 @@ class UnixCCompiler (CCompiler):
         return "-l" + lib
 
 
-    def find_library_file (self, dirs, lib):
+    def find_library_file (self, dirs, lib, debug=0):
 
         for dir in dirs:
-            shared = os.path.join (dir, self.shared_library_filename (lib))
-            static = os.path.join (dir, self.library_filename (lib))
+            shared = os.path.join (
+                dir, self.library_filename (lib, lib_type='shared'))
+            static = os.path.join (
+                dir, self.library_filename (lib, lib_type='static'))
 
             # We're second-guessing the linker here, with not much hard
             # data to go on: GCC seems to prefer the shared library, so I'm
@@ -307,10 +341,3 @@ class UnixCCompiler (CCompiler):
     # find_library_file ()
 
 # class UnixCCompiler
-
-
-def _split_command (cmd):
-    """Split a command string up into the progam to run (a string) and
-       the list of arguments; return them as (cmd, arglist)."""
-    args = string.split (cmd)
-    return (args[0], args[1:])

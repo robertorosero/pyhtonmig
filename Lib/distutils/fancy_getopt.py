@@ -93,6 +93,7 @@ class FancyGetopt:
     
 
     def _build_index (self):
+        self.option_index.clear()
         for option in self.option_table:
             self.option_index[option[0]] = option
 
@@ -152,6 +153,10 @@ class FancyGetopt:
         """Populate the various data structures that keep tabs on
            the option table.  Called by 'getopt()' before it can do
            anything worthwhile."""
+
+        self.long_opts = []
+        self.short_opts = []
+        self.short2long.clear()
 
         for option in self.option_table:
             try:
@@ -369,9 +374,6 @@ class FancyGetopt:
                 else:
                     lines.append ("  --%-*s  " % (max_opt, long))
 
-                for l in text[1:]:
-                    lines.append (big_indent + l)
-
             # Case 2: we have a short option, so we have to include it
             # just after the long option
             else:
@@ -381,6 +383,9 @@ class FancyGetopt:
                                   (max_opt, opt_names, text[0]))
                 else:
                     lines.append ("  --%-*s" % opt_names)
+
+            for l in text[1:]:
+                lines.append (big_indent + l)
 
         # for self.option_table
 
@@ -465,7 +470,14 @@ def wrap_text (text, width):
 class OptionDummy:
     """Dummy class just used as a place to hold command-line option
     values as instance attributes."""
-    pass
+
+    def __init__ (self, options=[]):
+        """Create a new OptionDummy instance.  The attributes listed in
+        'options' will be initialized to None."""
+        for opt in options:
+            setattr(self, opt, None)
+
+# class OptionDummy
     
 
 if __name__ == "__main__":
