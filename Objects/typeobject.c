@@ -944,7 +944,6 @@ inherit_slots(PyTypeObject *type, PyTypeObject *base)
 	COPYSLOT(tp_str);
 	COPYSLOT(tp_as_buffer);
 	COPYSLOT(tp_flags);
-	COPYSLOT(tp_doc);
 	if (type->tp_flags & base->tp_flags & Py_TPFLAGS_HAVE_RICHCOMPARE) {
 		if (type->tp_compare == NULL && type->tp_richcompare == NULL) {
 			type->tp_compare = base->tp_compare;
