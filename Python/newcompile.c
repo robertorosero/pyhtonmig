@@ -257,7 +257,7 @@ static PyObject *
 list2dict(PyObject *list)
 {
 	int i, n;
-	PyObject *v, *dict = PyDict_New();
+	PyObject *v, *k, *dict = PyDict_New();
 
 	n = PyList_Size(list);
 	for (i = 0; i < n; i++) {
@@ -266,7 +266,10 @@ list2dict(PyObject *list)
 			Py_DECREF(dict);
 			return NULL;
 		}
-		if (PyDict_SetItem(dict, PyList_GET_ITEM(list, i), v) < 0) {
+                k = PyList_GET_ITEM(list, i);
+                k = Py_BuildValue("(OO)", k, k->ob_type);
+		if (k == NULL || PyDict_SetItem(dict, k, v) < 0) {
+			Py_XDECREF(k);
 			Py_DECREF(v);
 			Py_DECREF(dict);
 			return NULL;
@@ -602,16 +605,25 @@ static int
 compiler_addop_o(struct compiler *c, int opcode, PyObject *dict,
 		     PyObject *o)
 {
-	PyObject *v;
+	PyObject *t, *v;
 	int arg;
 
-	v = PyDict_GetItem(dict, o);
+        /* necessary to make sure types aren't coerced (e.g., int and long) */
+        /* XXX should use: t = PyTuple_Pack(2, o, o->ob_type); */
+        t = Py_BuildValue("(OO)", o, o->ob_type);
+        if (t == NULL)
+            return 0;
+
+	v = PyDict_GetItem(dict, t);
 	if (!v) {
 		arg = PyDict_Size(dict);
 		v = PyInt_FromLong(arg);
-		if (!v)
+		if (!v) {
+			Py_DECREF(t);
 			return 0;
-		if (PyDict_SetItem(dict, o, v) < 0) {
+                }
+		if (PyDict_SetItem(dict, t, v) < 0) {
+			Py_DECREF(t);
 			Py_DECREF(v);
 			return 0;
 		}
@@ -619,6 +631,7 @@ compiler_addop_o(struct compiler *c, int opcode, PyObject *dict,
 	}
 	else
 		arg = PyInt_AsLong(v);
+	Py_DECREF(t);
 	return compiler_addop_i(c, opcode, arg);
 }
 
@@ -2593,6 +2606,7 @@ dict_keys_inorder(PyObject *dict, int offset)
 		return NULL;
 	while (PyDict_Next(dict, &pos, &k, &v)) {
 		i = PyInt_AS_LONG(v);
+                k = PyTuple_GET_ITEM(k, 0);
 		Py_INCREF(k);
 		assert((i - offset) < size);
 		PyTuple_SET_ITEM(tuple, i - offset, k);
