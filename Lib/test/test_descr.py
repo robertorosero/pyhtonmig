@@ -620,8 +620,8 @@ def classmethods():
     class C(object):
         def foo(*a): return a
         goo = classmethod(foo)
-    verify(C.goo(1) == (C, 1))
     c = C()
+    verify(C.goo(1) == (C, 1))
     verify(c.goo(1) == (C, 1))
     verify(c.foo(1) == (c, 1))
     class D(C):
@@ -632,13 +632,30 @@ def classmethods():
     verify(d.foo(1) == (d, 1))
     verify(D.foo(d, 1) == (d, 1))
 
+def staticmethods():
+    if verbose: print "Testing static methods..."
+    class C(object):
+        def foo(*a): return a
+        goo = staticmethod(foo)
+    c = C()
+    verify(C.goo(1) == (1,))
+    verify(c.goo(1) == (1,))
+    verify(c.foo(1) == (c, 1,))
+    class D(C):
+        pass
+    d = D()
+    verify(D.goo(1) == (1,))
+    verify(d.goo(1) == (1,))
+    verify(d.foo(1) == (d, 1))
+    verify(D.foo(d, 1) == (d, 1))
+
 def classic():
     if verbose: print "Testing classic classes..."
     class C:
         def foo(*a): return a
         goo = classmethod(foo)
-    verify(C.goo(1) == (C, 1))
     c = C()
+    verify(C.goo(1) == (C, 1))
     verify(c.goo(1) == (C, 1))
     verify(c.foo(1) == (c, 1))
     class D(C):
@@ -714,6 +731,7 @@ def all():
     dynamics()
     errors()
     classmethods()
+    staticmethods()
     classic()
     compattr()
     newslot()
