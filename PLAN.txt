@@ -57,15 +57,12 @@ It should be an option (maybe a different metaclass, maybe a flag) to
 *not* merge __dict__ with all the bases, but instead search the
 __dict__ (or __introduced__?) of all bases in __mro__ order.  (This is
 needed anyway to unify classes completely.)  *** Partly done.
-Inheritance of slots from bases is still icky.  Also, I still need to
-think more about making sure that "special" ivars (those with
-descriptors classifying them as data) can't be overridden by things in
-the __dict__. ***
+Inheritance of slots from bases is still icky.  ***
 
 Universal base class (object).  How can we make the object class
 subclassable and define simple default methods for everything without
 having these inherited by built-in types that don't want these
-defaults?  (This may be mostly fixed now.)  *** Done, really. ***
+defaults?  *** Done, really. ***
 
 Add error checking to the MRO calculation.
 
