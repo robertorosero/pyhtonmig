@@ -19,6 +19,7 @@ PySTEntry_New(struct symtable *st, identifier name, block_ty block,
 					      &PySTEntry_Type);
 	ste->ste_table = st;
 	ste->ste_id = k;
+	ste->ste_tmpname = 0;
 
 	ste->ste_name = name;
 	Py_INCREF(name);
