@@ -325,11 +325,11 @@ long sum_sequence(PyObject *sequence)
     int i, n;
     long total = 0;
     PyObject *item;
-    n = PyObject_Size(list);
+    n = PyObject_Size(sequence);
     if (n < 0)
         return -1; /* Has no length */
     for (i = 0; i < n; i++) {
-        item = PySequence_GetItem(list, i);
+        item = PySequence_GetItem(sequence, i);
         if (item == NULL)
             return -1; /* Not a sequence, or other failure */
         if (PyInt_Check(item))
