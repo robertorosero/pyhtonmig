@@ -651,7 +651,7 @@ ast_for_listcomp(const node *n)
 
     listcomps = asdl_seq_new(n_fors);
     if (!listcomps) {
-	/* XXX free elt? */
+	/* XXX free(elt); */
     	return NULL;
     }
     
@@ -666,11 +666,13 @@ ast_for_listcomp(const node *n)
 	t = ast_for_exprlist(CHILD(ch, 1), Store);
         if (!t) {
             asdl_seq_free(listcomps);
+	    /* XXX free(elt); */
             return NULL;
         }
         expression = ast_for_testlist(CHILD(ch, 3));
         if (!expression) {
             asdl_seq_free(listcomps);
+	    /* XXX free(elt); */
             return NULL;
         }
 
@@ -681,6 +683,7 @@ ast_for_listcomp(const node *n)
 
         if (!c) {
             asdl_seq_free(listcomps);
+	    /* XXX free(elt); */
             return NULL;
         }
 
@@ -692,13 +695,14 @@ ast_for_listcomp(const node *n)
 	    n_ifs = count_list_ifs(ch);
             if (n_ifs == -1) {
                 asdl_seq_free(listcomps);
+		/* XXX free(elt); */
                 return NULL;
             }
 
 	    ifs = asdl_seq_new(n_ifs);
 	    if (!ifs) {
-		/* XXX free elt? */
 		asdl_seq_free(listcomps);
+		/* XXX free(elt); */
 		return NULL;
 	    }
 
@@ -1086,8 +1090,10 @@ ast_for_expr(const node *n)
             */
             if (TYPE(CHILD(n, NCH(n) - 1)) == factor) {
                 expr_ty f = ast_for_expr(CHILD(n, NCH(n) - 1));
-                if (!f)
+                if (!f) {
+		    /* XXX free(e); */
                     return NULL;
+		}
                 return BinOp(e, Pow, f);
             }
             for (i = 1; i < NCH(n); i++) {
@@ -1099,44 +1105,61 @@ ast_for_expr(const node *n)
                     else
                         new = ast_for_call(CHILD(ch, 1), new);
 
-                    if (!new)
+                    if (!new) {
+		        /* XXX free(e); */
                         return NULL;
+		    }
                 }
                 else if (TYPE(CHILD(ch, 0)) == LSQB) {
                     REQ(CHILD(ch, 2), RSQB);
                     ch = CHILD(ch, 1);
                     if (NCH(ch) <= 2) {
                         slice_ty slc = ast_for_slice(CHILD(ch, 0));
-                        if (!slc)
+                        if (!slc) {
+		            /* XXX free(e); */
                             return NULL;
+			}
 
                         new = Subscript(e, slc, Load);
-                        if (!new)
+                        if (!new) {
+		            /* XXX free(e); */
+		            /* XXX free(slc); */
                             return NULL;
+			}
                     }
                     else {
                         int j;
                         slice_ty slc;
                         asdl_seq *slices = asdl_seq_new(NCH(ch) / 2);
-                        if (!slices)
+                        if (!slices) {
+		            /* XXX free(e); */
                             return NULL;
+			}
 
                         for (j = 0; j < NCH(ch); j += 2) {
                             slc = ast_for_slice(CHILD(ch, j));
-                            if (!slc)
+                            if (!slc) {
+		                /* XXX free(e); */
+		                asdl_seq_free(slices);
                                 return NULL;
+			    }
                             asdl_seq_SET(slices, j / 2, slc);
                         }
                         new = Subscript(e, ExtSlice(slices), Load);
-                        if (!new)
+                        if (!new) {
+		            /* XXX free(e); */
+		            asdl_seq_free(slices);
                             return NULL;
+			}
                     }
                 }
                 else {
                     assert(TYPE(CHILD(ch, 0)) == DOT);
                     new = Attribute(e, NEW_IDENTIFIER(CHILD(ch, 1)), Load);
-                    if (!new)
+                    if (!new) {
+		        /* XXX free(e); */
                         return NULL;
+		    }
                 }
                 e = new;
             }
@@ -1342,8 +1365,10 @@ ast_for_print_stmt(const node *n)
 	return NULL;
     for (i = start; i < NCH(n); i += 2) {
         expression = ast_for_expr(CHILD(n, i));
-        if (!expression)
+        if (!expression) {
+	    asdl_seq_free(seq);
             return NULL;
+	}
 
 	asdl_seq_APPEND(seq, expression);
     }
@@ -2089,8 +2114,10 @@ ast_for_classdef(const node *n)
 	asdl_seq_SET(bases, 0, _bases);
     }
     s = ast_for_suite(CHILD(n, 6));
-    if (!s)
+    if (!s) {
+        asdl_seq_free(bases);   /* XXX is this right for Tuples??? */
         return NULL;
+    }
     return ClassDef(NEW_IDENTIFIER(CHILD(n, 1)), bases, s, LINENO(n));
 }
 
