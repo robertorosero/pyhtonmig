@@ -873,14 +873,7 @@ posix_popen(self, args)
 	END_SAVE
 	if (fp == NULL)
 		return posix_error();
-	/* From now on, ignore SIGPIPE and let the error checking
-	   do the work. */
-#ifdef NT
 	return newopenfileobject(fp, name, mode, fclose);
-#else /* ! NT */
-	(void) signal(SIGPIPE, SIG_IGN);
-	return newopenfileobject(fp, name, mode, pclose);
-#endif /* ! NT */
 }
 
 static object *
