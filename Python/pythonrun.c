@@ -1171,8 +1171,9 @@ PyParser_ASTFromString(const char *s, const char *filename, int start,
 	node *n;
 	mod_ty mod;
 	perrdetail err;
-	n = PyParser_ParseStringFlags(s, &_PyParser_Grammar, start, &err, 
-				      PARSER_FLAGS(flags));
+	n = PyParser_ParseStringFlagsFilename(s, filename, &_PyParser_Grammar,
+					      start, &err, 
+					      PARSER_FLAGS(flags));
 	if (n) {
 		mod = PyAST_FromNode(n, flags, filename);
 		PyNode_Free(n);
