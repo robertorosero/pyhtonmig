@@ -87,7 +87,9 @@ Tasks:
 Make more (most?) built-in types act as their own factory functions.
 
 Make more (most?) built-in types subtypable -- with or without
-overridable allocation.
+overridable allocation.  *** This includes descriptors!  It should be
+possible to write descriptors in Python, so metaclasses can do clever
+things with them. ***
 
 Exceptions should be types.  This changes the rules, since now almost
 anything can be raised (as maybe it should).  Or should we strive for
