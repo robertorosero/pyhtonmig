@@ -1,5 +1,7 @@
 #include "Python.h"
 
+/* Examples showing how to subtype the builtin list and dict types from C. */
+
 /* spamlist -- a list subtype */
 
 typedef struct {
@@ -29,10 +31,10 @@ spamlist_setstate(spamlistobject *self, PyObject *args)
 
 static PyMethodDef spamlist_methods[] = {
 	{"getstate", (PyCFunction)spamlist_getstate, METH_VARARGS,
-	 "getstate() -> state"},
+	 	"getstate() -> state"},
 	{"setstate", (PyCFunction)spamlist_setstate, METH_VARARGS,
-	 "setstate(state)"},
-	{0},
+	 	"setstate(state)"},
+	{NULL,	NULL},
 };
 
 staticforward PyTypeObject spamlist_type;
@@ -117,10 +119,10 @@ spamdict_setstate(spamdictobject *self, PyObject *args)
 
 static PyMethodDef spamdict_methods[] = {
 	{"getstate", (PyCFunction)spamdict_getstate, METH_VARARGS,
-	 "getstate() -> state"},
+	 	"getstate() -> state"},
 	{"setstate", (PyCFunction)spamdict_setstate, METH_VARARGS,
-	 "setstate(state)"},
-	{0},
+	 	"setstate(state)"},
+	{NULL,	NULL},
 };
 
 staticforward PyTypeObject spamdict_type;
@@ -196,30 +198,34 @@ spam_bench(PyObject *self, PyObject *args)
 	return PyFloat_FromDouble((double)(t1-t0) / CLOCKS_PER_SEC);
 }
 
-static PyMethodDef spam_functions[] = {
-	{"bench", spam_bench, 1},
-	{NULL,			NULL}		/* sentinel */
+static PyMethodDef xxsubtype_functions[] = {
+	{"bench",	spam_bench, 	METH_VARARGS},
+	{NULL,		NULL}		/* sentinel */
 };
 
 DL_EXPORT(void)
-initspam(void)
+initxxsubtype(void)
 {
 	PyObject *m, *d;
 
-	m = Py_InitModule("spam", spam_functions);
+	m = Py_InitModule("xxsubtype", xxsubtype_functions);
 	if (m == NULL)
 		return;
+
 	if (PyType_InitDict(&spamlist_type) < 0)
 		return;
 	if (PyType_InitDict(&spamdict_type) < 0)
 		return;
+
 	d = PyModule_GetDict(m);
 	if (d == NULL)
 		return;
+
 	Py_INCREF(&spamlist_type);
 	if (PyDict_SetItemString(d, "spamlist",
 				 (PyObject *) &spamlist_type) < 0)
 		return;
+
 	Py_INCREF(&spamdict_type);
 	if (PyDict_SetItemString(d, "spamdict",
 				 (PyObject *) &spamdict_type) < 0)

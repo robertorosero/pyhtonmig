@@ -217,9 +217,9 @@ def complexes():
 
 def spamlists():
     if verbose: print "Testing spamlist operations..."
-    import copy, spam
+    import copy, xxsubtype as spam
     def spamlist(l, memo=None):
-        import spam
+        import xxsubtype as spam
         return spam.spamlist(l)
     # This is an ugly hack:
     copy._deepcopy_dispatch[spam.spamlist] = spamlist
@@ -254,9 +254,9 @@ def spamlists():
 
 def spamdicts():
     if verbose: print "Testing spamdict operations..."
-    import copy, spam
+    import copy, xxsubtype as spam
     def spamdict(d, memo=None):
-        import spam
+        import xxsubtype as spam
         sd = spam.spamdict()
         for k, v in d.items(): sd[k] = v
         return sd

@@ -1497,21 +1497,6 @@ SOURCE=..\Objects\sliceobject.c
 # End Source File
 # Begin Source File
 
-SOURCE=..\Modules\spam.c
-
-!IF  "$(CFG)" == "pythoncore - Win32 Release"
-
-!ELSEIF  "$(CFG)" == "pythoncore - Win32 Debug"
-
-!ELSEIF  "$(CFG)" == "pythoncore - Win32 Alpha Debug"
-
-!ELSEIF  "$(CFG)" == "pythoncore - Win32 Alpha Release"
-
-!ENDIF 
-
-# End Source File
-# Begin Source File
-
 SOURCE=..\Objects\stringobject.c
 
 !IF  "$(CFG)" == "pythoncore - Win32 Release"
@@ -1738,6 +1723,21 @@ SOURCE=..\Objects\unicodeobject.c
 # Begin Source File
 
 SOURCE=..\Modules\xreadlinesmodule.c
+
+!IF  "$(CFG)" == "pythoncore - Win32 Release"
+
+!ELSEIF  "$(CFG)" == "pythoncore - Win32 Debug"
+
+!ELSEIF  "$(CFG)" == "pythoncore - Win32 Alpha Debug"
+
+!ELSEIF  "$(CFG)" == "pythoncore - Win32 Alpha Release"
+
+!ENDIF 
+
+# End Source File
+# Begin Source File
+
+SOURCE=..\Modules\xxsubtype.c
 
 !IF  "$(CFG)" == "pythoncore - Win32 Release"
 
