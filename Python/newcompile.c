@@ -282,6 +282,7 @@ compiler_enter_scope(struct compiler *c, identifier name, void *key)
 		sizeof(struct basicblock *) * DEFAULT_BLOCKS);
 	if (!u->u_blocks)
 		return 0;
+	u->u_tmpname = 0;
 	u->u_nfblocks = 0;
 	memset(u->u_blocks, 0, sizeof(struct basicblock *) * DEFAULT_BLOCKS);
 	u->u_consts = PyDict_New();
@@ -311,10 +312,28 @@ compiler_enter_scope(struct compiler *c, identifier name, void *key)
 }
 
 static void
+compiler_unit_check(struct compiler_unit *u)
+{
+	int i;
+	assert(u->u_curblock < u->u_nblocks);
+	assert(u->u_nblocks <= u->u_nalloc);
+	for (i = 0; i < u->u_nblocks; i++) {
+		struct basicblock *block = u->u_blocks[i];
+		assert(block);
+		assert(block != (void *)0xcbcbcbcb);
+		assert(block != (void *)0xfbfbfbfb);
+		assert(block->b_ialloc > 0);
+		assert(block->b_iused >= 0 
+		       && block->b_ialloc >= block->b_iused);
+	}
+}
+
+static void
 compiler_unit_free(struct compiler_unit *u)
 {
 	int i;
 
+	compiler_unit_check(u);
 	for (i = 0; i < u->u_nblocks; i++)
 		PyObject_Free((void *)u->u_blocks[i]);
 	if (u->u_blocks)
@@ -324,19 +343,6 @@ compiler_unit_free(struct compiler_unit *u)
 	Py_XDECREF(u->u_names);
 	Py_XDECREF(u->u_varnames);
 	PyObject_Free(u);
-}
-
-static void
-compiler_unit_check(struct compiler_unit *u)
-{
-    int i;
-    assert(u->u_curblock < u->u_nblocks);
-    assert(u->u_nblocks <= u->u_nalloc);
-    for (i = 0; i < u->u_nblocks; i++) {
-	assert(u->u_blocks[i]);
-	assert(u->u_blocks[i] != (void *)0xcbcbcbcb);
-	assert(u->u_blocks[i] != (void *)0xfbfbfbfb);
-    }
 }
 
 static int
@@ -384,7 +390,6 @@ compiler_new_block(struct compiler *c)
 		       sizeof(struct basicblock *) * u->u_nalloc);
 		u->u_nalloc += u->u_nalloc;
 	}
-	compiler_unit_check(u);
 	b = (struct basicblock *)PyObject_Malloc(sizeof(struct basicblock));
 	if (b == NULL)
 		return -1;
@@ -912,7 +917,6 @@ compiler_continue(struct compiler *c)
 	switch (c->u->u_fblock[i].fb_type) {
 	case LOOP:
 		ADDOP_JABS(c, JUMP_ABSOLUTE, c->u->u_fblock[i].fb_block);
-		NEW_BLOCK(c);
 		break;
 	case EXCEPT:
 	case FINALLY_TRY:
@@ -921,13 +925,14 @@ compiler_continue(struct compiler *c)
 		if (i == -1)
 			return compiler_error(c, "'continue' outside loop");
 		ADDOP_I(c, CONTINUE_LOOP, c->u->u_fblock[i].fb_block);
-		NEW_BLOCK(c);
 		break;
 	case FINALLY_END:
 	        return compiler_error(c,
 			"'continue' not allowed in 'finally' block");
 	}
 
+	/* If the continue wasn't an error, it will always end a block. */
+	NEW_BLOCK(c);
 	return 1;
 }
 
@@ -1125,8 +1130,7 @@ compiler_from_import(struct compiler *c, stmt_ty s)
 		alias_ty alias = asdl_seq_GET(s->v.ImportFrom.names, i);
 		identifier store_name;
 
-		if (i == 0 && 
-		    *PyString_AS_STRING(alias->name) == '*') {
+		if (i == 0 && *PyString_AS_STRING(alias->name) == '*') {
 			assert(n == 1);
 			ADDOP(c, IMPORT_STAR);
 			star = 1;
@@ -2109,12 +2113,13 @@ assemble_jump_offsets(struct assembler *a, struct compiler *c)
 
 	/* Compute the size of each block and fixup jump args.
 	   Replace block index with position in bytecode. */
-	blockoff = malloc(sizeof(int) * a->a_nblocks);
+	blockoff = malloc(sizeof(int) * c->u->u_nblocks);
 	if (!blockoff)
 		return 0;
 	/* blockoff computed in dfs postorder, but stored using
 	   c_blocks[] indices.
 	*/
+	assert(a->a_nblocks <= c->u->u_nblocks);
 	for (i = a->a_nblocks - 1; i >= 0; i--) {
 		int block = a->a_postorder[i];
 		bsize = blocksize(c->u->u_blocks[block]);
@@ -2139,6 +2144,7 @@ assemble_jump_offsets(struct assembler *a, struct compiler *c)
 			}
 		}
 	}
+	free(blockoff);
 
 	return 1;
 }
