@@ -64,6 +64,19 @@ def reflow_lines(s, depth):
         lines.append(padding + cur)
     return lines
 
+def is_simple(sum):
+    """Return true if a sum is a simple.
+
+    A sum is simple if its types have no fields, e.g.
+    unaryop = Invert | Not | UAdd | USub
+    """
+    simple = True
+    for t in sum.types:
+        if t.fields:
+            simple = False
+            break
+    return simple
+
 class EmitVisitor(asdl.VisitorBase):
     """Visit that emits lines"""
 
@@ -81,19 +94,6 @@ class EmitVisitor(asdl.VisitorBase):
             line = (" " * TABSIZE * depth) + line + "\n"
             self.file.write(line)
 
-    def is_simple(self, sum):
-        """Return true if a sum is a simple.
-
-        A sum is simple if its types have no fields, e.g.
-        unaryop = Invert | Not | UAdd | USub
-        """
-        simple = 1
-        for t in sum.types:
-            if t.fields:
-                simple = 0
-                break
-        return simple
-
 class TypeDefVisitor(EmitVisitor):
     def visitModule(self, mod):
         for dfn in mod.dfns:
@@ -103,7 +103,7 @@ class TypeDefVisitor(EmitVisitor):
         self.visit(type.value, type.name, depth)
 
     def visitSum(self, sum, name, depth):
-        if self.is_simple(sum):
+        if is_simple(sum):
             self.simple_sum(sum, name, depth)
         else:
             self.sum_with_constructors(sum, name, depth)
@@ -142,7 +142,7 @@ class StructVisitor(EmitVisitor):
         self.visit(type.value, type.name, depth)
 
     def visitSum(self, sum, name, depth):
-        if not self.is_simple(sum):
+        if not is_simple(sum):
             self.sum_with_constructors(sum, name, depth)
 
     def sum_with_constructors(self, sum, name, depth):
@@ -206,7 +206,7 @@ class PrototypeVisitor(EmitVisitor):
         self.visit(type.value, type.name)
 
     def visitSum(self, sum, name):
-        if self.is_simple(sum):
+        if is_simple(sum):
             pass # XXX
         else:
             for t in sum.types:
@@ -337,12 +337,96 @@ class MarshalPrototypeVisitor(PickleVisitor):
 
     visitProduct = visitSum = prototype
 
+class FreePrototypeVisitor(PickleVisitor):
+
+    def prototype(self, sum, name):
+        ctype = get_c_type(name)
+        self.emit("void free_%s(%s);" % (name, ctype), 0)
+
+    visitProduct = visitSum = prototype
+
 def find_sequence(fields):
     """Return True if any field uses a sequence."""
     for f in fields:
         if f.seq:
-            return 1
-    return 0
+            return True
+    return False
+
+def has_sequence(types):
+    for t in types:
+        if find_sequence(t.fields):
+            return True
+    return False
+
+class FreeVisitor(PickleVisitor):
+
+    def func_begin(self, name, has_seq):
+        ctype = get_c_type(name)
+        self.emit("void", 0)
+        self.emit("free_%s(%s o)" % (name, ctype), 0)
+        self.emit("{", 0)
+        if has_seq:
+            self.emit("int i, n;", 1)
+            self.emit("asdl_seq *seq;", 1)
+
+    def func_end(self):
+        self.emit("}", 0)
+        self.emit("", 0)
+
+    def visitSum(self, sum, name):
+        has_seq = has_sequence(sum.types)
+        self.func_begin(name, has_seq)
+        if not is_simple(sum):
+            self.emit("switch (o->kind) {", 1)
+            for i in range(len(sum.types)):
+                t = sum.types[i]
+                self.visitConstructor(t, i + 1, name)
+            self.emit("}", 1)
+        self.func_end()
+
+    def visitProduct(self, prod, name):
+        self.func_begin(name, find_sequence(prod.fields))
+        for field in prod.fields:
+            self.visitField(field, name, 1, True)
+        self.func_end()
+        
+    def visitConstructor(self, cons, enum, name):
+        self.emit("case %s_kind:" % cons.name, 1)
+        for f in cons.fields:
+            self.visitField(f, cons.name, 2, False)
+        self.emit("break;", 2)
+
+    def visitField(self, field, name, depth, product):
+        def emit(s, d):
+            self.emit(s, depth + d)
+        if product:
+            value = "o->%s" % field.name
+        else:
+            value = "o->v.%s.%s" % (name, field.name)
+        if field.seq:
+            emit("seq = %s;" % value, 0)
+            emit("n = asdl_seq_LEN(seq);", 0)
+            emit("for (i = 0; i < n; i++)", 0)
+            self.free(field, "asdl_seq_GET(seq, i)", depth + 1)
+
+        # XXX need to know the simple types in advance, so that we
+        # don't call free_TYPE() for them.
+
+        elif field.opt:
+            emit("if (%s)" % value, 0)
+            self.free(field, value, depth + 1)
+        else:
+            self.free(field, value, depth)
+
+    def free(self, field, value, depth):
+        if str(field.type) in ("identifier", "string"):
+            self.emit("Py_DECREF(%s);" % value, depth)
+        elif str(field.type) == "bool":
+            return
+        else:
+            print >> sys.stderr, field.type
+            self.emit("free_%s(%s);" % (field.type, value), depth)
+        
 
 class MarshalFunctionVisitor(PickleVisitor):
 
@@ -361,13 +445,9 @@ class MarshalFunctionVisitor(PickleVisitor):
         self.emit("", 0)
     
     def visitSum(self, sum, name):
-        has_seq = 0
-        for t in sum.types:
-            if find_sequence(t.fields):
-                has_seq = 1
-                break
+        has_seq = has_sequence(sum.types)
         self.func_begin(name, has_seq)
-        simple = self.is_simple(sum)
+        simple = is_simple(sum)
         if simple:
             self.emit("switch (o) {", 1)
         else:
@@ -442,6 +522,7 @@ def main(srcfile):
     c = ChainOfVisitors(TypeDefVisitor(f),
                         StructVisitor(f),
                         PrototypeVisitor(f),
+                        FreePrototypeVisitor(f),
                         MarshalPrototypeVisitor(f),
                         )
     c.visit(mod)
@@ -457,6 +538,7 @@ def main(srcfile):
     print >> f, '#include "%s-ast.h"' % mod.name
     print >> f
     v = ChainOfVisitors(FunctionVisitor(f),
+                        FreeVisitor(f),
                         MarshalFunctionVisitor(f),
                         )
     v.visit(mod)
