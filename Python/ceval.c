@@ -195,6 +195,7 @@ eval_code(co, globals, locals, owner, arg)
 	char *name;		/* Name used by some instructions */
 	int needmerge = 0;	/* Set if need to merge locals back at end */
 	int defmode = 0;	/* Default access mode for new variables */
+	int ticker_count = 10;	/* Check for intr every Nth instruction */
 #ifdef LLTRACE
 	int lltrace;
 #endif
@@ -293,6 +294,10 @@ eval_code(co, globals, locals, owner, arg)
 			return NULL;
 		}
 	}
+
+	x = sysget("check_interval");
+	if (x != NULL && is_intobject(x))
+		ticker_count = getintvalue(x);
 	
 	next_instr = GETUSTRINGVALUE(f->f_code->co_code);
 	stack_pointer = f->f_valuestack;
@@ -312,10 +317,10 @@ eval_code(co, globals, locals, owner, arg)
 		/* Do periodic things.
 		   Doing this every time through the loop would add
 		   too much overhead (a function call per instruction).
-		   So we do it only every tenth instruction. */
+		   So we do it only every Nth instruction. */
 		
 		if (--ticker < 0) {
-			ticker = 10;
+			ticker = ticker_count;
 			if (intrcheck()) {
 				err_set(KeyboardInterrupt);
 				why = WHY_EXCEPTION;
