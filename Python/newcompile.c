@@ -2910,12 +2910,12 @@ assemble_display(struct assembler *a, struct instr *i)
 {
     /* Dispatch the simple case first. */
     if (!i->i_hasarg) {
-	    fprintf(stderr, "%5d %-20.20s %d\n",
+	    fprintf(stderr, "%5d %-20.20s     %d\n",
 		    a->a_offset, opnames[i->i_opcode], i->i_lineno);
 	    return;
     }
     
-    fprintf(stderr, "%5d %-20.20s %d %d",
+    fprintf(stderr, "%5d %-20.20s %3d %d",
 	    a->a_offset, opnames[i->i_opcode], i->i_oparg, i->i_lineno);
     if (i->i_jrel) 
 	    fprintf(stderr, " (to %d)", a->a_offset + i->i_oparg + 3);
@@ -2977,10 +2977,8 @@ assemble_lnotab(struct assembler *a, struct instr *i)
 	d_bytecode = a->a_offset - a->a_lineno_off;
 	d_lineno = i->i_lineno - a->a_lineno;
 
-	/* setup.py's get_platform() causes these asserts to fail.
 	assert(d_bytecode >= 0);
 	assert(d_lineno >= 0);
-	*/
 
 	if (d_lineno == 0)
 		return 1;
@@ -3057,6 +3055,8 @@ assemble_emit(struct assembler *a, struct instr *i)
 	int arg = 0, size = 0, ext = i->i_oparg >> 16;
 	int len = PyString_GET_SIZE(a->a_bytecode);
 	char *code;
+
+	assemble_display(a, i);
 	if (!i->i_hasarg)
 		size = 1;
 	else {
@@ -3073,7 +3073,6 @@ assemble_emit(struct assembler *a, struct instr *i)
 		    return 0;
 	}
 	code = PyString_AS_STRING(a->a_bytecode) + a->a_offset;
-	assemble_display(a, i);
 	a->a_offset += size;
 	if (ext > 0) {
 	    *code++ = (char)EXTENDED_ARG;
