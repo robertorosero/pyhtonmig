@@ -8,6 +8,7 @@ import linecache
 import cmd
 import bdb
 import repr
+import codehack
 
 
 class Pdb(bdb.Bdb, cmd.Cmd):
@@ -74,17 +75,28 @@ class Pdb(bdb.Bdb, cmd.Cmd):
 	# Return true to exit from the command loop 
 	
 	do_h = cmd.Cmd.do_help
-	
+
 	def do_break(self, arg):
 		if not arg:
 			print self.get_all_breaks() # XXX
 			return
-		try:
+		# Try line number as argument
+		try:	
 			lineno = int(eval(arg))
+			filename = self.curframe.f_code.co_filename
 		except:
-			print '*** Error in argument:', `arg`
-			return
-		filename = self.curframe.f_code.co_filename
+			# Try function name as the argument
+			try:
+				g_frame = self.curframe.f_globals
+			        # get code object
+				code = eval(arg,g_frame).func_code 
+				lineno = codehack.getlineno(code)
+				filename = code.co_filename
+			except:
+				print '*** Could not eval argument:', arg
+				return
+
+		# now set the break point
 		err = self.set_break(filename, lineno)
 		if err: print '***', err
 	do_b = do_break
