@@ -238,8 +238,8 @@ compiler_exit_scope(struct compiler *c)
 static int
 compiler_new_block(struct compiler *c)
 {
-	int i;
 	struct basicblock *b;
+	int block;
 
 	if (c->c_nblocks && c->c_nblocks % DEFAULT_BLOCKS == 0) {
 		/* XXX should double */
@@ -249,14 +249,14 @@ compiler_new_block(struct compiler *c)
 		if (c->c_blocks == NULL)
 			return -1;
 	}
-	i = c->c_nblocks++;
 	b = (struct basicblock *)PyObject_Malloc(sizeof(struct basicblock));
 	if (b == NULL)
 		return -1;
 	memset((void *)b, 0, sizeof(struct basicblock));
 	b->b_ialloc = DEFAULT_BLOCK_SIZE;
-	c->c_blocks[i] = b;
-	return i;
+	block = c->c_nblocks++;
+	c->c_blocks[block] = b;
+	return block;
 }
 
 static void
@@ -550,16 +550,15 @@ compiler_print(struct compiler *c, stmt_ty s)
 		dest = true;
 	}
 	for (i = 0; i < n; i++) {
+		expr_ty e = (expr_ty)asdl_seq_GET(s->v.Print.values, i);
 		if (dest) {
 			ADDOP(c, DUP_TOP);
-			VISIT(c, expr, 
-			      (expr_ty)asdl_seq_GET(s->v.Print.values, i));
+			VISIT(c, expr, e);
 			ADDOP(c, ROT_TWO);
 			ADDOP(c, PRINT_ITEM_TO);
 		}
 		else {
-			VISIT(c, expr, 
-			      (expr_ty)asdl_seq_GET(s->v.Print.values, i));
+			VISIT(c, expr, e);
 			ADDOP(c, PRINT_ITEM);
 		}
 	}
@@ -589,7 +588,7 @@ compiler_if(struct compiler *c, stmt_ty s)
 			return 0;
 		VISIT(c, expr, s->v.If.test);
 		ADDOP_JREL(c, JUMP_IF_FALSE, next);
-/*		NEXT_BLOCK(c); */
+		NEXT_BLOCK(c);
 		ADDOP(c, POP_TOP);
 		VISIT_SEQ(c, stmt, s->v.If.body);
 		ADDOP_JREL(c, JUMP_FORWARD, end);
@@ -603,6 +602,8 @@ compiler_if(struct compiler *c, stmt_ty s)
 				c->c_lineno = t->lineno;
 			}
 		}
+		else
+			elif = 0;
 		if (!elif)
 			VISIT_SEQ(c, stmt, s->v.If.orelse);
 	}
