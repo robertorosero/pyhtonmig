@@ -22,6 +22,9 @@ static asdl_seq *ast_for_suite(const node *);
 static asdl_seq *ast_for_exprlist(const node *, int);
 static expr_ty ast_for_testlist(const node *);
 
+/* Note different signature for call */
+static expr_ty ast_for_call(const node *, expr_ty);
+
 static PyObject *parsenumber(char *);
 
 extern grammar _PyParser_Grammar; /* From graminit.c */
@@ -641,42 +644,6 @@ ast_for_slice(const node *n)
 }
 
 static expr_ty
-ast_for_subscript(const node *n)
-{
-    node *t, *s;
-    int nch;
-
-    /* power: atom trailer* ('**' factor)* 
-       trailer: '(' [arglist] ')' | '[' subscriptlist ']' | '.' NAME 
-       subscriptlist: subscript (',' subscript)* [',']
-    */
-
-    REQ(n, power);
-    REQ(CHILD(n, 0), atom);
-    t = CHILD(n, 1);
-    REQ(t, trailer);
-
-    REQ(CHILD(t, 0), LSQB);
-    s = CHILD(t, 1);
-    REQ(CHILD(t, 2), RSQB);
-
-    nch = NCH(s);
-    if (nch <= 2) {
-	return Subscript(ast_for_atom(CHILD(n, 0)), 
-			 ast_for_slice(CHILD(s, 0)), Load);
-    } else {
-	int i;
-	asdl_seq *slices = asdl_seq_new(nch / 2);
-	for (i = 0; i < nch ; i += 2)
-	    asdl_seq_SET(slices, i / 2, ast_for_slice(CHILD(s, i)));
-	return Subscript(ast_for_atom(CHILD(n, 0)),
-			 ExtSlice(slices), Load);
-    }
-
-    return NULL;
-}
-
-static expr_ty
 ast_for_expr(const node *n)
 {
     /* handle the full range of simple expressions
@@ -780,18 +747,24 @@ ast_for_expr(const node *n)
     case power: 
     {
 	expr_ty e = ast_for_atom(CHILD(n, 0));
+	assert(e);
 	if (NCH(n) == 1)
 	    return e;
 	/* power: atom trailer* ('**' factor)* 
            trailer: '(' [arglist] ')' | '[' subscriptlist ']' | '.' NAME */
 	if (TYPE(CHILD(n, NCH(n) - 1)) == factor) {
 	    /* XXX Handle ** */
+	    assert(0);
 	    return NULL;
 	}
 	for (i = 1; i < NCH(n); i++) {
 	    expr_ty new;
 	    node *ch = CHILD(n, i);
 	    if (TYPE(CHILD(ch, 0)) == LPAR) {
+		if (NCH(ch) == 2)
+		    return Call(e, NULL, NULL, NULL, NULL);
+		else
+		    return ast_for_call(CHILD(ch, 1), e);
 	    }
 	    else if (TYPE(CHILD(ch, 0)) == LSQB) {
 		REQ(CHILD(ch, 2), RSQB);
@@ -819,6 +792,19 @@ ast_for_expr(const node *n)
     }
     /* should never get here */
     return NULL;
+}
+
+static expr_ty 
+ast_for_call(const node *n, expr_ty func)
+{
+    /*
+      arglist: (argument ',')* (argument [',']| '*' test [',' '**' test] 
+               | '**' test)
+      argument: [test '='] test	# Really [keyword '='] test
+    */
+
+    REQ(n, arglist);
+    return Call(func, NULL, NULL, NULL, NULL);
 }
 
 static expr_ty
@@ -1122,7 +1108,7 @@ ast_for_suite(const node *n)
     asdl_seq *seq = NULL;
     stmt_ty s;
     int i, total, num;
-    node *ch, *ch2;
+    node *ch;
 
     fprintf(stderr, "ast_for_suite(%d)\n", TYPE(n));
     REQ(n, suite);
@@ -1142,8 +1128,10 @@ ast_for_suite(const node *n)
     else {
 	for (i = 2; i < (NCH(n) - 1); i++) {
 	    ch = CHILD(n, i);
+	    REQ(ch, stmt);
 	    num = num_stmts(ch);
 	    if (num == 1) {
+		/* small_stmt or compound_stmt with only one child */
 		s = ast_for_stmt(ch);
 		if (!s)
 		    goto error;
@@ -1151,10 +1139,10 @@ ast_for_suite(const node *n)
 	    }
 	    else {
 		int j;
-		for (j = 0; j < num; j++) {
-		    ch2 = CHILD(ch, j);
-		    REQ(ch2, small_stmt);
-		    s = ast_for_stmt(ch2);
+		ch = CHILD(ch, 0);
+		REQ(ch, simple_stmt);
+		for (j = 0; j < NCH(ch); j += 2) {
+		    s = ast_for_stmt(CHILD(ch, j));
 		    if (!s)
 			goto error;
 		    asdl_seq_APPEND(seq, s);
@@ -1162,6 +1150,7 @@ ast_for_suite(const node *n)
 	    }
 	}
     }
+    assert(seq->size == seq->offset);
     return seq;
  error:
     if (seq)
@@ -1357,7 +1346,6 @@ ast_for_stmt(const node *n)
 	assert(NCH(n) == 1);
 	n = CHILD(n, 0);
     }
-    fprintf(stderr, "stmt lineno %d\n", n->n_lineno);
     if (TYPE(n) == simple_stmt) {
 	assert(num_stmts(n) == 1);
 	n = CHILD(n, 0);
