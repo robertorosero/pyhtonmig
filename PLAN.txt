@@ -267,7 +267,7 @@ MERGE BEGIN ****************************************************************
 Merge details (this section is Tim's scratchpad, but should help a lot if
 he dies of frustration while wrestling with CVS <0.9 wink>).
 
-------------------------------------------------------------------
+----------------------------------------------------------------------------
 2001-07-07
 
 Merge of trunk tag date2001-07-06 into descr-branch, via
@@ -285,34 +285,34 @@ Merge issues:
           dict traversal -- for that matter, it still does, but now the
           correct exact order <wink>).
 
-          Now dies with a memory error right after
-              Testing Python subclass of dict...
+          A core dump was "fixed" (unsure about that!) via adding a
+          tp_new slot to dict objects, to ensure that they're initialized
+          before being used.
 
-          Small program that reproduces the problem:
-              class C(dictionary):
-                  def __init__(self):
-                      self['a'] = 1
+          Now dies with
+            File "../lib/test\test_descr.py", line 325, in pydicts
+                verify(a1.state == 12)
+            AttributeError: 'dictionary' object has no attribute 'state'
 
-              a = C()
+          I don't understand what tp_new is supposed to do for dicts,
+          exactly.  PEP 253 says
 
-          Gross cause:  The dictionary has not been initialized, i.e.
-          mp->ma_table is NULL when we get into lookdict_string.  But
-          mp->ma_table must never be NULL after the trunk dict rewrite (any
-          legit way of creating the dict will leave ma_table pointing to
-          the ma_smalltable member).
+          - If the base type defines tp_init as well as tp_new, its tp_new
+            should be inheritable: it should call the tp_alloc and the
+            tp_init of the type passed in as its first argument.
 
-          Note:  We get into lookdict_string because insertdict forces
-          mp->ma_lookup to lookdict_string if mp->ma_lookup is NULL.  It
-          is in this case.  But that again says this object never went thru
-          dict initialization:  insertdict should really be asserting that
-          mp->ma_lookup is not NULL on entry!  The trunk version simply
-          assumes it's not NULL (it's impossible to create a dict object
-          with it NULL).
+          The tp_new I added doesn't do that, mostly because I couldn't find
+          any code that already does that in order to fill in the fine
+          points.  PEP 253 also says tp_alloc has signature:
 
-          Looks like Guido added this in descr-branch rev 2.80.2.6
-          of dictobject.c; but this form of casting cheat doesn't work
-          anymore on dicts.
-------------------------------------------------------------------
+            PyObject *tp_alloc(PyTypeObject *type,
+                               PyObject *args,
+                               PyObject *kwds)
+
+          but in reality it appears to be this instead:
+
+              typedef PyObject *(*allocfunc)(struct _typeobject *, int);
+----------------------------------------------------------------------------
 2001-07-06
 
 Tagged trunk a bit after midnight, like so:

@@ -159,6 +159,12 @@ PyDict_New(void)
 	return (PyObject *)mp;
 }
 
+static PyObject *
+dict_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
+{
+	return PyDict_New();
+}
+
 /*
 The basic lookup function used by all operations.
 This is based on Algorithm D from Knuth Vol. 3, Sec. 6.4.
@@ -1731,7 +1737,7 @@ PyTypeObject PyDict_Type = {
 	0,					/* tp_dictoffset */
 	(initproc)dict_init,			/* tp_init */
 	PyType_GenericAlloc,			/* tp_alloc */
-	PyType_GenericNew,			/* tp_new */
+	dict_new,				/* tp_new */
 };
 
 /* For backward compatibility with old dictionary interface */
