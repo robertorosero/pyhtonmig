@@ -56,6 +56,7 @@ static void initsigs PROTO((void));
 
 int debugging; /* Needed by parser.c */
 int verbose; /* Needed by import.c */
+int suppress_print; /* Needed by ceval.c */
 
 /* Initialize all */
 

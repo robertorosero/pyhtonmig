@@ -26,8 +26,9 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 #include "allobjects.h"
 
-extern int debugging; /* Defined in parser.c */
-extern int verbose; /* Defined in import.c */
+extern int debugging; /* Needed in parser.c, declared in pythonrun.c */
+extern int verbose; /* Needed in import.c, declared in pythonrun.c */
+extern int suppress_print; /* Needed in ceval.c, declared in pythonrun.c */
 
 /* Interface to getopt(): */
 extern int optind;
@@ -55,6 +56,8 @@ realmain(argc, argv)
 
 	if ((p = getenv("PYTHONDEBUG")) && *p != '\0')
 		debugging = 1;
+	if ((p = getenv("PYTHONSUPPRESS")) && *p != '\0')
+		suppress_print = 1;
 	if ((p = getenv("PYTHONVERBOSE")) && *p != '\0')
 		verbose = 1;
 	if ((p = getenv("PYTHONINSPECT")) && *p != '\0')
@@ -62,7 +65,7 @@ realmain(argc, argv)
 	if ((p = getenv("PYTHONUNBUFFERED")) && *p != '\0')
 		unbuffered = 1;
 
-	while ((c = getopt(argc, argv, "c:diuv")) != EOF) {
+	while ((c = getopt(argc, argv, "c:disuv")) != EOF) {
 		if (c == 'c') {
 			/* -c is the last option; following arguments
 			   that look like options are left for the
@@ -84,6 +87,10 @@ realmain(argc, argv)
 			inspect++;
 			break;
 
+		case 's':
+			suppress_print++;
+			break;
+
 		case 'u':
 			unbuffered++;
 			break;
@@ -96,13 +103,14 @@ realmain(argc, argv)
 
 		default:
 			fprintf(stderr,
-"usage: %s [-d] [-i] [-u ] [-v] [-c cmd | file | -] [arg] ...\n",
+"usage: %s [-d] [-i] [-s] [-u ] [-v] [-c cmd | file | -] [arg] ...\n",
 				argv[0]);
 			fprintf(stderr, "\
 \n\
 Options and arguments (and corresponding environment variables):\n\
 -d     : debug output from parser (also PYTHONDEBUG=x)\n\
 -i     : inspect interactively after running script (also PYTHONINSPECT=x)\n\
+-s     : suppress the printing of top level expressions (also PYTHONSUPPRESS=x)\n\
 -u     : unbuffered stdout and stderr (also PYTHONUNBUFFERED=x)\n\
 -v     : verbose (trace import statements) (also PYTHONVERBOSE=x)\n\
 -c cmd : program passed in as string (terminates option list)\n\

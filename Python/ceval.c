@@ -40,6 +40,8 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 #include <ctype.h>
 
+extern int suppress_print; /* Declared in pythonrun.c, set in pythonmain.c */
+
 /* Turn this on if your compiler chokes on the big switch: */
 /* #define CASE_TOO_BIG 1  	/**/
 
@@ -647,7 +649,8 @@ eval_code(co, globals, locals, owner, arg)
 			/* Print value except if procedure result */
 			/* Before printing, also assign to '_' */
 			if (v != None &&
-			    (err = setbuiltin("_", v)) == 0) {
+			    (err = setbuiltin("_", v)) == 0 &&
+			    !suppress_print) {
 				flushline();
 				x = sysget("stdout");
 				softspace(x, 1);

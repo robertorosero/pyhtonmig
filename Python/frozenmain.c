@@ -33,6 +33,7 @@ extern char *getcopyright();
 
 extern int debugging;
 extern int verbose;
+extern int suppress_print;
 
 static char *argv0;
 
@@ -49,6 +50,8 @@ main(argc, argv)
 
 	if ((p = getenv("PYTHONDEBUG")) && *p != '\0')
 		debugging = 1;
+	if ((p = getenv("PYTHONSUPPRESS")) && *p != '\0')
+		suppress_print = 1;
 	if ((p = getenv("PYTHONVERBOSE")) && *p != '\0')
 		verbose = 1;
 	if ((p = getenv("PYTHONINSPECT")) && *p != '\0')
