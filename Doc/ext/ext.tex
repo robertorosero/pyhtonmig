@@ -44,7 +44,7 @@ dynamically (at run time) into the interpreter, if the underlying
 operating system supports this feature.
 
 This document assumes basic knowledge about Python.  For an informal
-introduction to the language, see the Python Tutorial.  The \emph{Python
+introduction to the language, see the \emph{Python Tutorial}.  The \emph{Python
 Reference Manual} gives a more formal definition of the language.  The
 \emph{Python Library Reference} documents the existing object types,
 functions and modules (both built-in and written in Python) that give
@@ -74,7 +74,7 @@ Python API is incorporated in a C source file by including the header
 \code{"Python.h"}.
 
 The compilation of an extension module depends on its intended use as
-well as on your system setup; details are given in a later section.
+well as on your system setup; details are given in later chapters.
 
 
 \section{A Simple Example
@@ -94,7 +94,7 @@ as follows:
 >>> status = spam.system("ls -l")
 \end{verbatim}
 
-Begin by creating a file \file{spammodule.c}.  (In general, if a
+Begin by creating a file \file{spammodule.c}.  (Historically, if a
 module is called \samp{spam}, the C file containing its implementation
 is called \file{spammodule.c}; if the module name is very long, like
 \samp{spammify}, the module name can be just \file{spammify.c}.)
@@ -102,7 +102,7 @@ is called \file{spammodule.c}; if the module name is very long, like
 The first line of our file can be:
 
 \begin{verbatim}
-#include "Python.h"
+#include <Python.h>
 \end{verbatim}
 
 which pulls in the Python API (you can add a comment describing the
@@ -1628,7 +1628,7 @@ comment lines that start with \character{\#}.
 
 A module description line includes a module name, source files,
 options, variable references, and other input files, such
-as libraries or object files.  Consider a simple example::
+as libraries or object files.  Consider a simple example:
 
 \begin{verbatim}
 ExtensionClass ExtensionClass.c
@@ -1803,13 +1803,13 @@ Copy the \file{config.h} from the \file{PC/} directory into the
 \file{include/} directory created by the installer.
 
 Create a \file{Setup} file for your extension module, as described in
-Chapter \ref{building-on-unix}.
+chapter \ref{building-on-unix}.
 
 Get David Ascher's \file{compile.py} script from
 \url{http://starship.python.net/crew/da/compile/}.  Run the script to
 create Microsoft Visual \Cpp{} project files.
 
-Open the DSW file in V\Cpp{} and select \strong{Build}.
+Open the DSW file in Visual \Cpp{} and select \strong{Build}.
 
 If your module creates a new type, you may have trouble with this line:
 
@@ -1843,7 +1843,7 @@ do this.
 loading of code.  Before you try to build a module that can be
 dynamically loaded, be aware of how your system works.
 
-In \UNIX{}, a shared object (.so) file contains code to be used by the
+In \UNIX{}, a shared object (\file{.so}) file contains code to be used by the
 program, and also the names of functions and data that it expects to
 find in the program.  When the file is joined to the program, all
 references to those functions and data in the file's code are changed
