@@ -226,6 +226,7 @@ PYTHON_OBJS=	\
 		Python/bltinmodule.o \
 		Python/exceptions.o \
 		Python/ceval.o \
+		Python/newcompile.o \
 		Python/compile.o \
 		Python/codecs.o \
 		Python/errors.o \
@@ -267,6 +268,7 @@ OBJECT_OBJS=	\
 		Objects/cellobject.o \
 		Objects/classobject.o \
 		Objects/cobject.o \
+		Objects/codeobject.o \
 		Objects/complexobject.o \
 		Objects/descrobject.o \
 		Objects/enumobject.o \
@@ -454,6 +456,7 @@ PYTHON_HEADERS= \
 		Include/ceval.h \
 		Include/classobject.h \
 		Include/cobject.h \
+		Include/code.h \
 		Include/codecs.h \
 		Include/compile.h \
 		Include/complexobject.h \

@@ -1,0 +1,547 @@
+#include "Python.h"
+
+#include "Python-ast.h"
+#include "code.h"
+#include "compile.h"
+#include "symtable.h"
+#include "opcode.h"
+
+struct compiler {
+	const char *c_filename;
+	struct symtable *c_st;
+        PyFutureFeatures *c_future; /* pointer to module's __future__ */
+	PyCompilerFlags *c_flags;
+
+	int c_interactive;
+
+	/* info that changes for each code block */
+	PySymtableEntryObject *c_symbols;
+	int c_nblocks;
+	int c_curblock;
+	struct basicblock c_entry;
+	struct basicblock c_exit;
+	struct basicblock **c_blocks;
+};
+
+static void
+compiler_free(struct compiler *c)
+{
+	int i;
+
+	if (c->c_st)
+		PySymtable_Free(c->c_st);
+	if (c->c_future)
+		PyMem_Free((void *)c->c_future);
+	for (i = 0; i < c->c_nblocks; i++) 
+		free((void *)c->c_blocks[i]);
+	if (c->c_blocks)
+		free((void *)c->c_blocks);
+}
+
+
+PyCodeObject *
+PyAST_Compile(mod_ty mod, const char *filename, PyCompilerFlags *flags)
+{
+	struct compiler c;
+	PyCodeObject *co;
+
+	c.c_filename = filename;
+	c.c_future = PyFuture_FromAST(mod, filename);
+	if (c.c_future == NULL)
+		goto error;
+	if (flags) {
+		int merged = c.c_future->ff_features | flags->cf_flags;
+		c.c_future->ff_features = merged;
+		flags->cf_flags = merged;
+	}
+	
+	c.c_st = PySymtable_Build(mod, filename, flags);
+	if (c.c_st == NULL)
+		goto error;
+	return NULL;
+
+	compiler_mod(&c, mod);
+
+ error:
+	compiler_free(&c);
+	return NULL;
+}
+
+static int
+compiler_enter_scope(struct compiler *c, identifier name, void *key)
+{
+	/* XXX need stack of info */
+	PyObject *k, *v;
+
+	k = PyLong_FromVoidPtr(key);
+	if (k == NULL)
+		return 0;
+	v = PyDict_GetItem(c->c_st->st_symbols, k);
+	if (!v) {
+		/* XXX */
+		PyErr_SetObject(PyExc_KeyError, name);
+		return 0;
+	}
+	assert(PySymtableEntry_Check(v));
+	c->c_symbols = v;
+
+	c->c_nblocks = 0;
+	c->c_blocks = (struct basicblock **)malloc(sizeof(struct basicblock *) 
+						   * DEFAULT_BLOCKS);
+	if (!c->c_blocks)
+		return 0;
+	return 1;
+}
+
+static int
+compiler_exit_scope(struct compiler *c, identifier name, void *key)
+{
+	/* pop current scope off stack & reinit */
+	return 1;
+}
+
+static PyCodeObject *
+compiler_get_code(struct compiler *c)
+{
+	/* get the code object for the current block.
+	   XXX may want to return a thunk insttead
+	       to allow later passes
+	*/
+	return NULL;
+}
+
+static int
+compiler_new_block(struct compiler *c)
+{
+	int i;
+	struct basicblock *b;
+
+	if (c->c_nblocks && c->c_nblocks % DEFAULT_BLOCKS == 0) {
+		/* XXX should double */
+		int newsize = c->c_nblocks + DEFAULT_BLOCKS;
+		c->c_blocks = (struct basicblock **)realloc(c->c_blocks,
+							    newsize);
+		if (c->c_blocks == NULL)
+			return 0;
+	}
+	i = c->c_nblocks++;
+	b = (struct basicblock *)malloc(sizeof(struct basicblock));
+	if (b == NULL)
+		return 0;
+	memset((void *)b, 0, sizeof(struct basicblock));
+	b->b_ialloc = DEFAULT_BLOCK_SIZE;
+	c->c_blocks[i] = b;
+	return i;
+}
+
+/* Note: returns -1 on failure */
+static int
+compiler_next_instr(struct compiler *c, int block)
+{
+	struct basicblock *b;
+	assert(block < c->c_nblocks);
+	b = c->c_blocks[block];
+	if (b->b_ioffset == b->b_ialloc) {
+		void *ptr;
+		int newsize;
+		b->b_ialloc *= 2;
+		/* XXX newsize is wrong */
+		ptr = realloc((void *)b, newsize);
+		if (ptr == NULL)
+			return -1;
+		if (ptr != (void *)b)
+			c->c_blocks[block] = (struct basicblock *)ptr;
+	}
+	return b->b_ioffset++;
+}
+
+static int
+compiler_addop(struct compiler *c, int opcode)
+{
+	int off;
+	off = compiler_next_instr(c, c->c_curblock);
+	if (off < 0)
+		return 0;
+	c->c_blocks[c->c_curblock]->b_instr[off].i_opcode = opcode;
+	return 1;
+}
+
+static int
+compiler_addop_o(struct compiler *c, int opcode, PyObject *o)
+{
+	struct instr *i;
+	int off;
+	off = compiler_next_instr(c, c->c_curblock);
+	if (off < 0)
+		return 0;
+	i = c->c_blocks[c->c_curblock];
+	i->i_opcode = i->i_opcode;
+	i->i_arg = o;
+	return 1;
+}
+
+static int
+compiler_addop_i(struct compiler *c, int opcode, int oparg)
+{
+	struct instr *i;
+	int off;
+	off = compiler_next_instr(c, c->c_curblock);
+	if (off < 0)
+		return 0;
+	i = c->c_blocks[c->c_curblock];
+	i->i_opcode = i->i_opcode;
+	i->i_oparg = oparg;
+	return 1;
+}
+
+/* VISIT and VISIT_SEQ takes an ASDL type as their second argument.  They use
+   the ASDL name to synthesize the name of the C type and the visit function. 
+*/
+
+#define ADDOP(C, OP) { \
+	if (!compiler_addop((C), (OP))) \
+		return 0; \
+}
+
+#define ADDOP_O(C, OP, O) { \
+	if (!compiler_addop_o((C), (OP), (O))) \
+		return 0; \
+}
+
+#define ADDOP_I(C, OP, O) { \
+	if (!compiler_addop_i((C), (OP), (O))) \
+		return 0; \
+}
+
+#define VISIT(C, TYPE, V) {\
+	if (!compiler_visit_ ## TYPE((C), (V))) \
+		return 0; \
+}
+						    
+#define VISIT_SEQ(C, TYPE, SEQ) { \
+	int i; \
+	asdl_seq *seq = (SEQ); /* avoid variable capture */ \
+	for (i = 0; i < asdl_seq_LEN(seq); i++) { \
+		TYPE ## _ty elt = asdl_seq_get(seq, i); \
+		if (!compiler_visit_ ## TYPE((C), elt)) \
+			return 0; \
+	} \
+}
+
+static int
+compiler_mod(struct compiler *c, mod_ty mod)
+{
+	switch (mod->kind) {
+	case Module_kind:
+		break;
+	case Interactive_kind:
+		break;
+	case Expression_kind:
+		break;
+	case Suite_kind:
+		break;
+	}
+	return 1;
+}
+
+static int
+compiler_function(struct compiler *c, stmt_ty s)
+{
+	PyCodeObject *co;
+	assert(s->kind == Function_kind);
+
+	if (s->v.FunctionDef.args->defaults)
+		VISIT_SEQ(c, expr, s->v.FunctionDef.args->defaults);
+	if (!compiler_enter_scope(c, s->v.FunctionDef.name, (void *)s))
+		return 0;
+	VISIT(c, arguments, s->v.FunctionDef.args);
+	VISIT_SEQ(c, stmt, s->v.FunctionDef.body);
+	co = compiler_get_code(c);
+	if (co == NULL)
+		return 0;
+		
+	return 1;
+}
+
+static int
+compiler_print(struct compiler *c, stmt_ty s)
+{
+	int i, n;
+	bool dest;
+
+	assert(s->kind == Print_kind);
+	n = asdl_seq_LEN(s->v.Print.values);
+	dest = false;
+	if (s->v.Print.dest) {
+		VISIT(C, EXPR, s->v.Print.dest);
+		dest = true;
+	}
+	for (i = 0; i < n; i++) {
+		if (dest) {
+			ADDOP(c, DUP_TOP);
+			VISIT(c, expr, asdl_get_seq(s->v.Print.values, i));
+			ADDOP(c, ROT_TWO);
+			ADDOP(c, PRINT_ITEM_TO);
+		}
+		else {
+			VISIT(c, expr, asdl_get_seq(s->v.Print.values, i));
+			ADDOP(c, PRINT_ITEM);
+		}
+	}
+	if (s->v.Print.nl) {
+		if (dest)
+			ADDOP(c, PRINT_NEWLINE_TO);
+		else
+			ADDOP(c, PRINT_NEWLINE);
+	}
+	else if (dest)
+		ADDOP(c, POP_TOP);
+	return 1;
+}
+
+static int
+compiler_function(struct compiler *c, stmt_ty s)
+{
+	int i, n;
+	
+	assert(s->kind == If_kind);
+
+}
+
+static int
+compiler_stmt(struct compiler *c, stmt_ty s)
+{
+	int i, n;
+	
+	switch (s->kind) {
+        case FunctionDef_kind:
+		return compiler_function(c, s);
+		break;
+        case ClassDef_kind:
+		break;
+        case Return_kind:
+		if (s->v.Return.value)
+			VISIT(c, expr, s->v.Return.value)
+		else
+			ADDOP_O(c, LOAD_CONST, Py_None);
+		ADDOP(c, RETURN_VALUE);
+		break;
+        case Yield_kind:
+		VISIT(c, expr, s->v.Yield.value);
+		ADDOP(c, YIELD_VALUE);
+		break;
+        case Delete_kind:
+		VISIT_SEQ(c, expr, s->v.Delete.targets)
+		break;
+        case Assign_kind:
+		n = asdl_seq_LEN(s->v.Assign.targets);
+		VISIT(c, expr, s->v.Assign.value);
+		for (i = 0; i < n; i++) {
+			if (i < n - 1)
+				ADDOP(c, DUP_TOP);
+			VISIT(c, expr, asdl_get_seq(s->v.Assign.targets, i));
+		}
+		break;
+        case AugAssign_kind:
+		break;
+        case Print_kind:
+		return compiler_print(c, s);
+		break;
+        case For_kind:
+		break;
+        case While_kind:
+		break;
+        case If_kind:
+		return compiler_if(c, s);
+		break;
+        case Raise_kind:
+		if (s->v.Raise.type) {
+			VISIT(st, expr, s->v.Raise.type);
+			n++;
+			if (s->v.Raise.inst) {
+				VISIT(st, expr, s->v.Raise.inst);
+				n++;
+				if (s->v.Raise.tback) {
+					VISIT(st, expr, s->v.Raise.tback);
+					n++;
+				}
+			}
+		}
+		ADDOP_I(c, RAISE_VARARGS, n);
+		break;
+        case TryExcept_kind:
+		break;
+        case TryFinally_kind:
+		break;
+        case Assert_kind:
+		break;
+        case Import_kind:
+		break;
+        case ImportFrom_kind:
+		break;
+        case Exec_kind:
+		VISIT(st, expr, s->v.Exec.body);
+		if (s->v.Exec.globals) {
+			VISIT(st, expr, s->v.Exec.globals);
+			if (s->v.Exec.locals) 
+				VISIT(st, expr, s->v.Exec.locals);
+			else
+				ADDOP(c, DUP_TOP);
+		} else {
+			ADDOP_O(c, LOAD_CONST, Py_None);
+			ADDOP(c, DUP_TOP);
+		}
+		ADDOP(c, EXEC_STMT);
+		break;
+        case Global_kind:
+		break;
+        case Expr_kind:
+		VISIT(c, expr, s->v.Expr.value);
+		if (c->c_interactive)
+			ADDOP(c, PRINT_EXPR);
+		else
+			ADDOP(c, DUP_TOP);
+		break;
+        case Pass_kind:
+		break;
+        case Break_kind:
+		break;
+        case Continue_kind:
+		break;
+	}
+	return 1;
+}
+
+static int
+unaryop(unaryop_ty op)
+{
+	switch (op) {
+	case Invert:
+		return UNARY_INVERT;
+	case Not:
+		return UNARY_NOT;
+	case UAdd:
+		return UNARY_POSITIVE;
+	case USub:
+		return UNARY_NEGATIVE;
+	}
+}
+
+static int 
+binop(operator_ty op)
+{
+	switch (op) {
+	case Add:
+		return BINARY_ADD;
+	case Sub:
+		return BINARY_SUBTRACT;
+	case Mult: 
+		return BINARY_MULTIPLY;
+	case Div:
+		if (c->c_flags & CO_FUTURE_DIVISION)
+			return BINARY_TRUE_DIVIDE;
+		else
+			return BINARY_DIVIDE;
+	case Mod:
+		return BINARY_MODULO;
+	case Pow:
+		return BINARY_POWER;
+	case LShift: 
+		return BINARY_LSHIFT;
+	case RShift:
+		return BINARY_RSHIFT;
+	case BitOr:
+		return BINARY_OR;
+	case BitXor: 
+		return BINARY_XOR;
+	case BitAnd:
+		return BINARY_AND;
+	case FloorDiv:
+		return BINARY_FLOOR_DIVIDE;
+	}
+}
+	
+static int 
+compiler_visit_expr(struct compiler *c, expr_ty e)
+{
+	int i, n;
+
+	switch (e->kind) {
+        case BoolOp_kind:
+		break;
+        case BinOp_kind:
+		VISIT(c, expr, e->v.BinOp.left);
+		VISIT(c, expr, e->v.BinOp.right);
+		ADDOP(c, binop(e->v.BinOp.op));
+		break;
+        case UnaryOp_kind:
+		VISIT(c, expr, e->v.UnaryOp.operand);
+		ADDOP(c, unaryop(e->v.UnaryOp.op));
+		break;
+        case Lambda_kind:
+		break;
+        case Dict_kind:
+		/* XXX get rid of arg? */
+		ADDOP_I(c, BUILD_MAP, 0);
+		n = asdl_seq_LEN(e->v.Dict.values);
+		/* We must arrange things just right for STORE_SUBSCR.
+		   It wants the stack to look like (value) (dict) (key) */
+		for (i = 0; i < n; i++) {
+			ADDOP(c, DUP_TOP);
+			VISIT(c, expr, asdl_seq_get(e->v.Dict.values, i));
+			ADDOP(c, ROT_TWO);
+			VISIT(c, expr, asdl_seq_get(e->v.Dict.keys, i));
+			ADDOP(c, STORE_SUBSCR);
+		}
+		break;
+        case ListComp_kind:
+		break;
+        case Compare_kind:
+		break;
+        case Call_kind:
+		break;
+        case Repr_kind:
+		VISIT(c, expr, e->v.Repr.value);
+		ADDOP(c, UNARY_CONVERT);
+		break;
+        case Num_kind:
+		break;
+        case Str_kind:
+		break;
+	/* The following exprs can be assignment targets. */
+        case Attribute_kind:
+		VISIT(c, expr, e->v.Attribute.value);
+		switch (e->v.Attribute.ctx) {
+		case Load:
+			ADDOP_O(c, LOAD_ATTR, e->v.Attribute.attr);
+			break;
+		case Store:
+			ADDOP_O(c, STORE_ATTR, e->v.Attribute.attr);
+			break;
+		case Del:
+			ADDOP_O(c, DELETE_ATTR, e->v.Attribute.attr);
+			break;
+		case AugStore:
+			/* XXX */
+			break;
+		}
+		break;
+        case Subscript_kind:
+		VISIT(c, expr, e->v.Subscript.value);
+		VISIT(c, slice, e->v.Subscript.slice);
+		break;
+        case Name_kind:
+		compiler_add_def(c, e->v.Name.id, 
+				 e->v.Name.ctx == Load ? USE : DEF_LOCAL);
+		break;
+	/* child nodes of List and Tuple will have expr_context set */
+        case List_kind:
+		VISIT_SEQ(c, expr, e->v.List.elts);
+		break;
+        case Tuple_kind:
+		VISIT_SEQ(c, expr, e->v.Tuple.elts);
+		break;
+	}
+	return 1;
+}
+
