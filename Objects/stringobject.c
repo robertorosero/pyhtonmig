@@ -590,18 +590,16 @@ split_whitespace(s, len, maxsplit)
 }
 
 
-static char splitfields__doc__[] =
+static char split__doc__[] =
 "S.split([sep [,maxsplit]]) -> list of strings\n\
 \n\
 Return a list of the words in the string S, using sep as the\n\
 delimiter string.  If maxsplit is nonzero, splits into at most\n\
 maxsplit words If sep is not specified, any whitespace string\n\
-is a separator.  Maxsplit defaults to 0.\n\
-\n\
-(split and splitfields are synonymous)";
+is a separator.  Maxsplit defaults to 0.";
 
 static PyObject *
-string_splitfields(self, args)
+string_split(self, args)
 	PyStringObject *self;
 	PyObject *args;
 {
@@ -1351,10 +1349,11 @@ string_replace(self, args)
 
 
 static char startswith__doc__[] =
-"S.startsWith(prefix[, offset]) -> int\n\
+"S.startswith(prefix[, start[, end]]) -> int\n\
 \n\
-Return 1 if S starts with the specified prefix, otherwise return 0.\n\
-With optional offset, test S beginning at that position.";
+Return 1 if S starts with the specified prefix, otherwise return 0.  With\n\
+optional start, test S beginning at that position.  With optional end, stop\n\
+comparing S at that position.";
 
 static PyObject *
 string_startswith(self, args)
@@ -1365,29 +1364,38 @@ string_startswith(self, args)
 	int len = PyString_GET_SIZE(self);
 	char* prefix;
 	int plen;
-	int offset = 0;
+	int start = 0;
+	int end = -1;
 
-	if (!PyArg_ParseTuple(args, "t#|i", &prefix, &plen, &offset))
+	if (!PyArg_ParseTuple(args, "t#|ii", &prefix, &plen, &start, &end))
 		return NULL;
 
 	/* adopt Java semantics for index out of range.  it is legal for
 	 * offset to be == plen, but this only returns true if prefix is
 	 * the empty string.
 	 */
-	if (offset < 0 || offset > len)
+	if (start < 0 || start > len)
 		return PyInt_FromLong(0);
 
-	if (!memcmp(str+offset, prefix, plen))
-		return PyInt_FromLong(1);
-
+	if (!memcmp(str+start, prefix, plen)) {
+		/* did the match end after the specified end? */
+		if (end < 0)
+			return PyInt_FromLong(1);
+		else if (end - start < plen)
+			return PyInt_FromLong(0);
+		else
+			return PyInt_FromLong(1);
+	}
 	else return PyInt_FromLong(0);
 }
 
 
 static char endswith__doc__[] =
-"S.endsWith(suffix) -> int\n\
+"S.endswith(suffix[, start[, end]]) -> int\n\
 \n\
-Return 1 if S ends with the specified suffix, otherwise return 0.";
+Return 1 if S ends with the specified suffix, otherwise return 0.  With\n\
+optional start, test S beginning at that position.  With optional end, stop\n\
+comparing S at that position.";
 
 static PyObject *
 string_endswith(self, args)
@@ -1398,16 +1406,22 @@ string_endswith(self, args)
 	int len = PyString_GET_SIZE(self);
 	char* suffix;
 	int plen;
+	int start = 0;
+	int end = -1;
+	int lower, upper;
 
-	if (!PyArg_ParseTuple(args, "t#", &suffix, &plen))
+	if (!PyArg_ParseTuple(args, "t#|ii", &suffix, &plen, &start, &end))
 		return NULL;
 
-	if (plen > len)
+	if (start < 0 || start > len || plen > len)
 		return PyInt_FromLong(0);
 
-	if (!memcmp(str+plen+1, suffix, plen))
-		return PyInt_FromLong(1);
+	upper = (end > 0 && end <= len) ? end : len;
+	lower = (upper - plen) > start ? (upper - plen) : start;
 
+	if (!memcmp(str+lower, suffix, plen))
+		return PyInt_FromLong(1);
+	
 	else return PyInt_FromLong(0);
 }
 
@@ -1430,10 +1444,7 @@ string_methods[] = {
 	{"rfind",       (PyCFunction)string_rfind,       1, rfind__doc__},
 	{"rindex",      (PyCFunction)string_rindex,      1, rindex__doc__},
 	{"rstrip",      (PyCFunction)string_rstrip,      1, rstrip__doc__},
-	{"split",       (PyCFunction)string_splitfields, 1,
-	 splitfields__doc__},
-	{"splitfields", (PyCFunction)string_splitfields, 1,
-	 splitfields__doc__},
+	{"split",       (PyCFunction)string_split,       1, split__doc__},
 	{"startswith",  (PyCFunction)string_startswith,  1, startswith__doc__},
 	{"strip",       (PyCFunction)string_strip,       1, strip__doc__},
 	{"swapcase",    (PyCFunction)string_swapcase,    1, swapcase__doc__},
