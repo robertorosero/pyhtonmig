@@ -224,6 +224,51 @@ class Message:
 		return parsedate(data)
 
 
+	# Access as a dictionary (only finds first header of each type):
+
+	def __len__(self):
+		types = {}
+		for line in self.headers:
+			if line[0] in string.whitespace: continue
+			i = string.find(line, ':')
+			if i > 0:
+				name = string.lower(line[:i])
+				types[name] = None
+		return len(types)
+
+	def __getitem__(self, name):
+		value = self.getheader(name)
+		if value is None: raise KeyError, name
+		return value
+
+	def has_key(self, name):
+		value = self.getheader(name)
+		return value is not None
+
+	def keys(self):
+		types = {}
+		for line in self.headers:
+			if line[0] in string.whitespace: continue
+			i = string.find(line, ':')
+			if i > 0:
+				name = line[:i]
+				key = string.lower(name)
+				types[key] = name
+		return types.values()
+
+	def values(self):
+		values = []
+		for name in self.keys():
+			values.append(self[name])
+		return values
+
+	def items(self):
+		items = []
+		for name in self.keys():
+			items.append(name, self[name])
+		return items
+
+
 
 # Utility functions
 # -----------------
@@ -319,7 +364,9 @@ def parsedate(data):
 
 if __name__ == '__main__':
 	import sys
-	f = open(sys.argv[1], 'r')
+	file = '/ufs/guido/Mail/drafts/,1'
+	if sys.argv[1:]: file = sys.argv[1]
+	f = open(file, 'r')
 	m = Message(f)
 	print 'From:', m.getaddr('from')
 	print 'To:', m.getaddrlist('to')
@@ -335,3 +382,11 @@ if __name__ == '__main__':
 	while f.readline():
 		n = n + 1
 	print 'Lines:', n
+	print '-'*70
+	print 'len =', len(m)
+	if m.has_key('Date'): print 'Date =', m['Date']
+	if m.has_key('X-Nonsense'): pass
+	print 'keys =', m.keys()
+	print 'values =', m.values()
+	print 'items =', m.items()
+	
