@@ -47,7 +47,7 @@ The Library Reference can now also be read in hypertext form using the
 Emacs INFO system.  This uses Texinfo format as an intermediate step.
 It requires texinfo version 2 (we have used 2.14).
 
-To build the info files (python-lib.info*), say "make libinfo".  This
+To build the info files (python-lib.info*), say "make lib.info".  This
 takes a while, even on machines with 33 MIPS and 16 Mbytes :-) You can
 ignore the output.
 
