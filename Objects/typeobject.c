@@ -35,6 +35,10 @@ type_dict(PyTypeObject *type, void *context)
 		Py_INCREF(Py_None);
 		return Py_None;
 	}
+	if (type->tp_flags & Py_TPFLAGS_DYNAMICTYPE) {
+		Py_INCREF(type->tp_dict);
+		return type->tp_dict;
+	}
 	return PyDictProxy_New(type->tp_dict);
 }
 
@@ -44,6 +48,10 @@ type_defined(PyTypeObject *type, void *context)
 	if (type->tp_defined == NULL) {
 		Py_INCREF(Py_None);
 		return Py_None;
+	}
+	if (type->tp_flags & Py_TPFLAGS_DYNAMICTYPE) {
+		Py_INCREF(type->tp_defined);
+		return type->tp_defined;
 	}
 	return PyDictProxy_New(type->tp_defined);
 }
@@ -370,11 +378,11 @@ type_new(PyTypeObject *metatype, PyObject *args, PyObject *kwds)
 {
 	PyObject *name, *bases, *dict;
 	static char *kwlist[] = {"name", "bases", "dict", 0};
-	PyObject *slots;
-	PyTypeObject *type, *base;
+	PyObject *slots, *tmp;
+	PyTypeObject *type, *base, *tmptype;
 	etype *et;
 	struct memberlist *mp;
-	int i, nbases, nslots, slotoffset;
+	int i, nbases, nslots, slotoffset, dynamic;
 
 	if (PyTuple_Check(args) && PyTuple_GET_SIZE(args) == 1 &&
 	    (kwds == NULL || (PyDict_Check(kwds) && PyDict_Size(kwds) == 0))) {
@@ -385,31 +393,34 @@ type_new(PyTypeObject *metatype, PyObject *args, PyObject *kwds)
 	}
 
 	/* Check arguments */
-	if (!PyArg_ParseTupleAndKeywords(args, kwds, "SOO:type", kwlist,
-					 &name, &bases, &dict))
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "SO!O!:type", kwlist,
+					 &name,
+					 &PyTuple_Type, &bases,
+					 &PyDict_Type, &dict))
 		return NULL;
-	if (PyTuple_Check(bases)) {
-		int i, n;
-		n = PyTuple_GET_SIZE(bases);
-		for (i = 0; i < n; i++) {
-			PyObject *base_i = PyTuple_GET_ITEM(bases, i);
-			PyTypeObject *type_i = base_i->ob_type;
-			if (issubtype(metatype, type_i))
-				continue;
-			if (issubtype(type_i, metatype)) {
-				metatype = type_i;
-				continue;
-			}
-			PyErr_SetString(PyExc_TypeError,
-					"metaclass conflict among bases");
-			return NULL;
-		}
-		if (metatype->tp_new != type_new)
-			return metatype->tp_new(metatype, args, kwds);
-	}
 
-	/* Adjust empty bases */
+	/* Determine the proper metatype to deal with this,
+	   and check for metatype conflicts while we're at it.
+	   Note that if some other metatype wins to contract,
+	   it's possible that its instances are not types. */
 	nbases = PyTuple_GET_SIZE(bases);
+	for (i = 0; i < nbases; i++) {
+		tmp = PyTuple_GET_ITEM(bases, i);
+		tmptype = tmp->ob_type;
+		if (issubtype(metatype, tmptype))
+			continue;
+		if (issubtype(tmptype, metatype)) {
+			metatype = tmptype;
+			continue;
+		}
+		PyErr_SetString(PyExc_TypeError,
+				"metatype conflict among bases");
+		return NULL;
+	}
+	if (metatype->tp_new != type_new) /* Pass it to the winner */
+		return metatype->tp_new(metatype, args, kwds);
+
+	/* Adjust for empty tuple bases */
 	if (nbases == 0) {
 		bases = Py_BuildValue("(O)", &PyBaseObject_Type);
 		if (bases == NULL)
@@ -419,7 +430,9 @@ type_new(PyTypeObject *metatype, PyObject *args, PyObject *kwds)
 	else
 		Py_INCREF(bases);
 
-	/* Calculate best base */
+	/* XXX From here until type is allocated, "return NULL" leaks bases! */
+
+	/* Calculate best base, and check that all bases are type objects */
 	base = best_base(bases);
 	if (base == NULL)
 		return NULL;
@@ -428,6 +441,34 @@ type_new(PyTypeObject *metatype, PyObject *args, PyObject *kwds)
 			     "type '%.100s' is not an acceptable base type",
 			     base->tp_name);
 		return NULL;
+	}
+
+	/* Should this be a dynamic class (i.e. modifiable __dict__)? */
+	tmp = PyDict_GetItemString(dict, "__dynamic__");
+	if (tmp != NULL) {
+		/* The class author has a preference */
+		dynamic = PyObject_IsTrue(tmp);
+		Py_DECREF(tmp);
+		if (dynamic < 0)
+			return NULL;
+	}
+	else {
+		/* Make a new class dynamic if any of its bases is dynamic.
+		   This is not always the same as inheriting the __dynamic__
+		   class attribute! */
+		dynamic = 0;
+		for (i = 0; i < nbases; i++) {
+			tmptype = (PyTypeObject *)PyTuple_GET_ITEM(bases, i);
+			if (tmptype->tp_flags & Py_TPFLAGS_DYNAMICTYPE) {
+				dynamic = 1;
+				break;
+			}
+		}
+
+		/* Set the __dynamic__ attribute */
+		if (PyDict_SetItemString(dict, "__dynamic__",
+					 dynamic ? Py_True : Py_False) < 0)
+			return NULL;
 	}
 
 	/* Check for a __slots__ sequence variable in dict, and count it */
@@ -456,6 +497,9 @@ type_new(PyTypeObject *metatype, PyObject *args, PyObject *kwds)
 	     base->tp_setattro == NULL))
 		nslots = 1;
 
+	/* XXX From here until type is safely allocated,
+	   "return NULL" may leak slots! */
+
 	/* Allocate the type object */
 	type = (PyTypeObject *)metatype->tp_alloc(metatype, nslots);
 	if (type == NULL)
@@ -470,6 +514,8 @@ type_new(PyTypeObject *metatype, PyObject *args, PyObject *kwds)
 	/* Initialize essential fields */
 	type->tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HEAPTYPE |
 		Py_TPFLAGS_BASETYPE;
+	if (dynamic)
+		type->tp_flags |= Py_TPFLAGS_DYNAMICTYPE;
 	type->tp_as_number = &et->as_number;
 	type->tp_as_sequence = &et->as_sequence;
 	type->tp_as_mapping = &et->as_mapping;
@@ -514,7 +560,7 @@ type_new(PyTypeObject *metatype, PyObject *args, PyObject *kwds)
 	add_members(type, et->members);
 
 	/* Special case some slots */
-	if (type->tp_dictoffset != 0) {
+	if (type->tp_dictoffset != 0 || nslots > 0) {
 		if (base->tp_getattr == NULL && base->tp_getattro == NULL)
 			type->tp_getattro = PyObject_GenericGetAttr;
 		if (base->tp_setattr == NULL && base->tp_setattro == NULL)
@@ -536,14 +582,61 @@ type_new(PyTypeObject *metatype, PyObject *args, PyObject *kwds)
 	return (PyObject *)type;
 }
 
+/* Internal API to look for a name through the MRO.
+   This returns a borrowed reference, and doesn't set an exception! */
+PyObject *
+_PyType_Lookup(PyTypeObject *type, PyObject *name)
+{
+	int i, n;
+	PyObject *mro = type->tp_mro, *res;
+
+	assert(PyTuple_Check(mro));
+	n = PyTuple_GET_SIZE(mro);
+	for (i = 0; i < n; i++) {
+		type = (PyTypeObject *) PyTuple_GET_ITEM(mro, i);
+		assert(PyType_Check(type));
+		assert(type->tp_dict && PyDict_Check(type->tp_dict));
+		res = PyDict_GetItem(type->tp_dict, name);
+		if (res != NULL)
+			return res;
+	}
+	return NULL;
+}
+
 static PyObject *
 type_getattro(PyTypeObject *type, PyObject *name)
 {
+	PyObject *descr, *res;
+	descrgetfunc f;
+
 	if (type->tp_dict == NULL) {
 		if (PyType_InitDict(type) < 0)
 			return NULL;
 	}
-	return PyObject_GenericGetAttr((PyObject *)type, name);
+	descr = PyObject_GenericGetAttr((PyObject *)type, name);
+	if (descr == NULL) {
+		descr = _PyType_Lookup(type, name);
+		if (descr == NULL)
+			return NULL;
+		PyErr_Clear();
+		Py_INCREF(descr);
+	}
+	f = descr->ob_type->tp_descr_get;
+	if (f != NULL) {
+		res = f(descr, NULL);
+		Py_DECREF(descr);
+		return res;
+	}
+	return descr;
+}
+
+static int
+type_setattro(PyTypeObject *type, PyObject *name, PyObject *value)
+{
+	if (type->tp_flags & Py_TPFLAGS_DYNAMICTYPE)
+		return PyObject_GenericSetAttr((PyObject *)type, name, value);
+	PyErr_SetString(PyExc_TypeError, "can't set type attributes");
+	return -1;
 }
 
 static void
@@ -588,7 +681,7 @@ PyTypeObject PyType_Type = {
 	(ternaryfunc)type_call,			/* tp_call */
 	0,					/* tp_str */
 	(getattrofunc)type_getattro,		/* tp_getattro */
-	0,					/* tp_setattro */
+	(setattrofunc)type_setattro,		/* tp_setattro */
 	0,					/* tp_as_buffer */
 	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE, /* tp_flags */
 	type_doc,				/* tp_doc */
@@ -993,17 +1086,6 @@ PyType_InitDict(PyTypeObject *type)
 			return -1;
 	}
 
-	/* Initialize tp_dict from tp_defined */
-	type->tp_dict = PyDict_Copy(dict);
-	if (type->tp_dict == NULL)
-		return -1;
-
-	/* Inherit base class slots */
-	if (base) {
-		if (inherit_slots(type, base) < 0)
-			return -1;
-	}
-
 	/* Calculate method resolution order */
 	x = method_resolution_order(type);
 	if (x == NULL) {
@@ -1014,20 +1096,31 @@ PyType_InitDict(PyTypeObject *type)
 	}
 	Py_DECREF(x);
 
-	/* Inherit methods, updating from last base backwards */
-	bases = type->tp_mro;
-	assert(bases != NULL);
-	assert(PyTuple_Check(bases));
-	n = PyTuple_GET_SIZE(bases);
- 	for (i = n; --i >= 0; ) {
-		base = (PyTypeObject *)PyTuple_GET_ITEM(bases, i);
-		assert(PyType_Check(base));
-		x = base->tp_defined;
-		if (x != NULL) {
-			x = PyObject_CallMethod(type->tp_dict, "update","O",x);
-			if (x == NULL)
+	/* Initialize tp_dict */
+	if (type->tp_flags & Py_TPFLAGS_DYNAMICTYPE) {
+		/* For a dynamic type. tp_dict *is* tp_defined */
+		Py_INCREF(type->tp_defined);
+		type->tp_dict = type->tp_defined;
+	}
+	else {
+		/* For a static type, tp_dict is the consolidation
+		   of the tp_defined of its bases in MRO.  Earlier
+		   bases override later bases; since d.update() works
+		   the other way, we walk the MRO sequence backwards. */
+
+		type->tp_dict = PyDict_New();
+		if (type->tp_dict == NULL)
+			return -1;
+		bases = type->tp_mro;
+		assert(bases != NULL);
+		assert(PyTuple_Check(bases));
+		n = PyTuple_GET_SIZE(bases);
+		for (i = n; --i >= 0; ) {
+			base = (PyTypeObject *)PyTuple_GET_ITEM(bases, i);
+			assert(PyType_Check(base));
+			x = base->tp_defined;
+			if (x != NULL && PyDict_Update(type->tp_dict, x) < 0)
 				return -1;
-			Py_DECREF(x); /* throw away None */
 		}
 	}
 
