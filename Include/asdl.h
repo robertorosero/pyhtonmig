@@ -26,6 +26,8 @@ typedef struct {
 asdl_seq *asdl_seq_new(int size);
 void asdl_seq_free(asdl_seq *);
 
+/* XXX: Normally should be Py_DEBUG, but asserts fail instantly at startup;
+        turned off for now */
 #define asdl_seq_GET(S, I) (S)->elements[(I)]
 #ifdef Py_DEBUG
 #define asdl_seq_SET(S, I, V) (S)->elements[I] = (V)
