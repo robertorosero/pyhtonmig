@@ -371,6 +371,10 @@ class FreeVisitor(PickleVisitor):
         if has_seq:
             self.emit("int i, n;", 1)
             self.emit("asdl_seq *seq;", 1)
+        self.emit('', 0)
+        self.emit('if (!o)', 1)
+        self.emit('return;', 2)
+        self.emit('', 0)
 
     def func_end(self):
         self.emit("}", 0)

@@ -47,6 +47,34 @@ extern grammar _PyParser_Grammar; /* From graminit.c */
 
 #define NEW_IDENTIFIER(n) PyString_InternFromString(STR(n))
 
+static void
+asdl_stmt_seq_free(asdl_seq* seq)
+{
+    int n, i;
+
+    if (!seq)
+	return;
+             
+    n = asdl_seq_LEN(seq);
+    for (i = 0; i < n; i++)
+	free_stmt(asdl_seq_GET(seq, i));
+    asdl_seq_free(seq);
+}
+
+static void
+asdl_expr_seq_free(asdl_seq* seq)
+{
+    int n, i;
+
+    if (!seq)
+	return;
+             
+    n = asdl_seq_LEN(seq);
+    for (i = 0; i < n; i++)
+	free_expr(asdl_seq_GET(seq, i));
+    asdl_seq_free(seq);
+}
+
 /* This routine provides an invalid object for the syntax error.
    The outermost routine must unpack this error and create the
    proper object.  We do this so that we don't have to pass
@@ -260,7 +288,7 @@ PyAST_FromNode(const node *n, PyCompilerFlags *flags, const char *filename)
     }
  error:
     if (stmts)
-	asdl_seq_free(stmts);
+	asdl_stmt_seq_free(stmts);
     ast_error_finish(filename);
     return NULL;
 }
@@ -615,23 +643,154 @@ ast_for_arguments(struct compiling *c, const node *n)
     return NULL;
 }
 
+static expr_ty
+ast_for_dotted_name(struct compiling *c, const node *n)
+{
+    expr_ty e = NULL;
+    expr_ty attrib = NULL;
+    identifier id = NULL;
+    int i;
+
+    REQ(n, dotted_name);
+    
+    id = NEW_IDENTIFIER(CHILD(n, 0));
+    if (!id)
+        goto error;
+    e = Name(id, Load);
+    if (!e)
+	goto error;
+    id = NULL;
+
+    for (i = 2; i < NCH(n); i+=2) {
+        id = NEW_IDENTIFIER(CHILD(n, i));
+	if (!id)
+	    goto error;
+	attrib = Attribute(e, id, Load);
+	if (!attrib)
+	    goto error;
+	e = attrib;
+	attrib = NULL;
+    }
+
+    return e;
+    
+  error:
+    Py_XDECREF(id);
+    free_expr(e);
+    return NULL;
+}
+
+static expr_ty
+ast_for_decorator(struct compiling *c, const node *n)
+{
+    /* decorator: '@' dotted_name [ '(' [arglist] ')' ] NEWLINE */
+    expr_ty d = NULL;
+    expr_ty name_expr = NULL;
+    
+    REQ(n, decorator);
+    
+    if ((NCH(n) < 3 && NCH(n) != 5 && NCH(n) != 6)
+	|| TYPE(CHILD(n, 0)) != AT || TYPE(RCHILD(n, -1)) != NEWLINE) {
+	ast_error(n, "Invalid decorator node");
+	goto error;
+    }
+    
+    name_expr = ast_for_dotted_name(c, CHILD(n, 1));
+    if (!name_expr)
+	goto error;
+	
+    if (NCH(n) == 3) { /* No arguments */
+	d = name_expr;
+	name_expr = NULL;
+    }
+    else if (NCH(n) == 5) { /* Call with no arguments */
+	d = Call(name_expr, NULL, NULL, NULL, NULL);
+	if (!d)
+	    goto error;
+	name_expr = NULL;
+    }
+    else {
+	d = ast_for_call(c, CHILD(n, 3), name_expr);
+	if (!d)
+	    goto error;
+	name_expr = NULL;
+    }
+
+    return d;
+    
+  error:
+    free_expr(name_expr);
+    free_expr(d);
+    return NULL;
+}
+
+static asdl_seq*
+ast_for_decorators(struct compiling *c, const node *n)
+{
+    asdl_seq* decorator_seq = NULL;
+    expr_ty d = NULL;
+    int i;
+    
+    REQ(n, decorators);
+
+    decorator_seq = asdl_seq_new(NCH(n));
+    if (!decorator_seq)
+        return NULL;
+	
+    for (i = 0; i < NCH(n); i++) {
+	d = ast_for_decorator(c, CHILD(n, i));
+	if (!d)
+	    goto error;
+	asdl_seq_APPEND(decorator_seq, d);
+	d = NULL;
+    }
+    return decorator_seq;
+  error:
+    asdl_expr_seq_free(decorator_seq);
+    free_expr(d);
+    return NULL;
+}
+
 static stmt_ty
 ast_for_funcdef(struct compiling *c, const node *n)
 {
-    /* funcdef: 'def' NAME parameters ':' suite */
-    identifier name = NEW_IDENTIFIER(CHILD(n, 1));
-    arguments_ty args;
-    asdl_seq *body;
-    
-    REQ(n, funcdef);
-    args = ast_for_arguments(c, CHILD(n, 2));
-    if (!args)
-        return NULL;
-    body = ast_for_suite(c, CHILD(n, 4));
-    if (!body)
-        return NULL;
+    /* funcdef: 'def' [decorators] NAME parameters ':' suite */
+    identifier name = NULL;
+    arguments_ty args = NULL;
+    asdl_seq *body = NULL;
+    asdl_seq *decorator_seq = NULL;
+    int name_i;
 
-    return FunctionDef(name, args, body, LINENO(n));
+    REQ(n, funcdef);
+
+    if (NCH(n) == 6) { /* decorators are present */
+	decorator_seq = ast_for_decorators(c, CHILD(n, 0));
+	if (!decorator_seq)
+	    goto error;
+	name_i = 2;
+    }
+    else {
+	name_i = 1;
+    }
+
+    name = NEW_IDENTIFIER(CHILD(n, name_i));
+    if (!name)
+	goto error;
+    args = ast_for_arguments(c, CHILD(n, name_i + 1));
+    if (!args)
+	goto error;
+    body = ast_for_suite(c, CHILD(n, name_i + 3));
+    if (!body)
+	goto error;
+
+    return FunctionDef(name, args, body, decorator_seq, LINENO(n));
+
+error:
+    asdl_stmt_seq_free(body);
+    asdl_expr_seq_free(decorator_seq);
+    free_arguments(args);
+    Py_XDECREF(name);
+    return NULL;
 }
 
 static expr_ty

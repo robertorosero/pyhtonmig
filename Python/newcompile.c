@@ -1366,15 +1366,32 @@ compiler_make_closure(struct compiler *c, PyCodeObject *co, int args)
 }
 
 static int
+compiler_decorators(struct compiler *c, asdl_seq* decos)
+{
+	int i;
+
+	if (!decos)
+		return 1;
+
+	for (i = 0; i < asdl_seq_LEN(decos); i++) {
+		VISIT(c, expr, asdl_seq_GET(decos, i));
+	}
+	return 1;
+}
+
+static int
 compiler_function(struct compiler *c, stmt_ty s)
 {
 	PyCodeObject *co;
         PyObject *first_const = Py_None;
 	arguments_ty args = s->v.FunctionDef.args;
+	asdl_seq* decos = s->v.FunctionDef.decorators;
         stmt_ty st;
 	int i, n, docstring;
 	assert(s->kind == FunctionDef_kind);
 
+	if (!compiler_decorators(c, decos))
+		return 0;
 	if (args->defaults)
 		VISIT_SEQ(c, expr, args->defaults);
 	if (!compiler_enter_scope(c, s->v.FunctionDef.name, (void *)s,
@@ -1421,6 +1438,11 @@ compiler_function(struct compiler *c, stmt_ty s)
 	compiler_exit_scope(c);
 
         compiler_make_closure(c, co, asdl_seq_LEN(args->defaults));
+
+	for (i = 0; i < asdl_seq_LEN(decos); i++) {
+		ADDOP_I(c, CALL_FUNCTION, 1);
+	}
+
 	return compiler_nameop(c, s->v.FunctionDef.name, Store);
 }
 

@@ -756,6 +756,8 @@ symtable_visit_stmt(struct symtable *st, stmt_ty s)
 			return 0;
 		if (s->v.FunctionDef.args->defaults)
 			VISIT_SEQ(st, expr, s->v.FunctionDef.args->defaults);
+		if (s->v.FunctionDef.decorators)
+			VISIT_SEQ(st, expr, s->v.FunctionDef.decorators);
 		if (!symtable_enter_block(st, s->v.FunctionDef.name, 
 					  FunctionBlock, (void *)s, s->lineno))
 			return 0;

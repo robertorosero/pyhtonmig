@@ -9,7 +9,8 @@ module Python
 	    -- not really an actual node but useful in Jython's typesystem.
 	    | Suite(stmt* body)
 
-	stmt = FunctionDef(identifier name, arguments args, stmt* body)
+	stmt = FunctionDef(identifier name, arguments args, 
+                           stmt* body, expr* decorators)
 	      | ClassDef(identifier name, expr* bases, stmt* body)
 	      | Return(expr? value) | Yield(expr value)
 
