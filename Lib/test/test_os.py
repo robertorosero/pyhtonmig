@@ -4,6 +4,10 @@
 
 import os
 import unittest
+import warnings
+
+warnings.filterwarnings("ignore", "tempnam", RuntimeWarning, __name__)
+warnings.filterwarnings("ignore", "tmpnam", RuntimeWarning, __name__)
 
 from test_support import TESTFN, run_unittest
 
