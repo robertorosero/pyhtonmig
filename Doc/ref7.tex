@@ -183,6 +183,7 @@ code for a group of statements:
 try_stmt:       try_exc_stmt | try_fin_stmt
 try_exc_stmt:   "try" ":" suite
                ("except" [condition ["," target]] ":" suite)+
+               ["else" ":" suite]
 try_fin_stmt:   "try" ":" suite
                "finally" ":" suite
 \end{verbatim}
@@ -235,6 +236,11 @@ exception occurred.
 \ttindex{exc_value}
 \ttindex{exc_traceback}
 \obindex{traceback}
+
+The optional \verb@else@ clause is executed when no exception occurs
+in the \verb@try@ clause.  Exceptions in the \verb@else@ clause are
+not handled by the preceding \verb@except@ clauses.
+\kwindex{else}
 
 The \verb@try...finally@ form specifies a `cleanup' handler.  The
 \verb@try@ clause is executed.  When no exception occurs, the
