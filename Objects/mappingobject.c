@@ -483,9 +483,9 @@ mapping_ass_sub(mp, v, w)
 }
 
 static mapping_methods mapping_as_mapping = {
-	mapping_length,	/*mp_length*/
-	mapping_subscript,	/*mp_subscript*/
-	mapping_ass_sub,	/*mp_ass_subscript*/
+	(inquiry)mapping_length, /*mp_length*/
+	(binaryfunc)mapping_subscript, /*mp_subscript*/
+	(objobjargproc)mapping_ass_sub, /*mp_ass_subscript*/
 };
 
 static object *
@@ -702,10 +702,10 @@ mapping_has_key(mp, args)
 }
 
 static struct methodlist mapp_methods[] = {
-	{"has_key",	mapping_has_key},
-	{"items",	mapping_items},
-	{"keys",	mapping_keys},
-	{"values",	mapping_values},
+	{"has_key",	(method)mapping_has_key},
+	{"items",	(method)mapping_items},
+	{"keys",	(method)mapping_keys},
+	{"values",	(method)mapping_values},
 	{NULL,		NULL}		/* sentinel */
 };
 
@@ -723,12 +723,12 @@ typeobject Mappingtype = {
 	"dictionary",
 	sizeof(mappingobject),
 	0,
-	mapping_dealloc,	/*tp_dealloc*/
-	mapping_print,		/*tp_print*/
-	mapping_getattr,	/*tp_getattr*/
+	(destructor)mapping_dealloc, /*tp_dealloc*/
+	(printfunc)mapping_print, /*tp_print*/
+	(getattrfunc)mapping_getattr, /*tp_getattr*/
 	0,			/*tp_setattr*/
-	mapping_compare,	/*tp_compare*/
-	mapping_repr,		/*tp_repr*/
+	(cmpfunc)mapping_compare, /*tp_compare*/
+	(reprfunc)mapping_repr, /*tp_repr*/
 	0,			/*tp_as_number*/
 	0,			/*tp_as_sequence*/
 	&mapping_as_mapping,	/*tp_as_mapping*/

@@ -42,7 +42,7 @@ typedef struct {
 	object	*x_attr;	/* Attributes dictionary */
 } xxobject;
 
-extern typeobject Xxtype;	/* Really static, forward */
+static typeobject Xxtype;	/* Forward */
 
 #define is_xxobject(v)		((v)->ob_type == &Xxtype)
 
@@ -80,7 +80,7 @@ xx_demo(self, args)
 }
 
 static struct methodlist xx_methods[] = {
-	{"demo",	xx_demo},
+	{"demo",	(method)xx_demo},
 	{NULL,		NULL}		/* sentinel */
 };
 
@@ -128,10 +128,10 @@ static typeobject Xxtype = {
 	sizeof(xxobject),	/*tp_size*/
 	0,			/*tp_itemsize*/
 	/* methods */
-	xx_dealloc,		/*tp_dealloc*/
+	(destructor)xx_dealloc, /*tp_dealloc*/
 	0,			/*tp_print*/
-	xx_getattr,		/*tp_getattr*/
-	xx_setattr,		/*tp_setattr*/
+	(getattrfunc)xx_getattr, /*tp_getattr*/
+	(setattrfunc)xx_setattr, /*tp_setattr*/
 	0,			/*tp_compare*/
 	0,			/*tp_repr*/
 	0,			/*tp_as_number*/

@@ -48,5 +48,5 @@ typeobject Typetype = {
 	0,			/*tp_getattr*/
 	0,			/*tp_setattr*/
 	0,			/*tp_compare*/
-	type_repr,		/*tp_repr*/
+	(reprfunc)type_repr, /*tp_repr*/
 };

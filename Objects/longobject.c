@@ -1330,9 +1330,9 @@ long_hex(v)
 }
 
 
-#define UF (object* (*) FPROTO((object *))) /* Unary function */
-#define BF (object* (*) FPROTO((object *, object *))) /* Binary function */
-#define IF (int (*) FPROTO((object *))) /* Int function */
+#define UF (unaryfunc)
+#define BF (binaryfunc)
+#define IF (inquiry)
 
 static number_methods long_as_number = {
 	BF long_add,	/*nb_add*/
@@ -1353,7 +1353,7 @@ static number_methods long_as_number = {
 	BF long_xor,	/*nb_xor*/
 	BF long_or,	/*nb_or*/
 	(int (*) FPROTO((object **, object **)))
-	long_coerce,	/*nb_coerce*/
+	(coercion)long_coerce, /*nb_coerce*/
 	UF long_int,	/*nb_int*/
 	UF long_long,	/*nb_long*/
 	UF long_float,	/*nb_float*/
@@ -1367,16 +1367,16 @@ typeobject Longtype = {
 	"long int",
 	sizeof(longobject) - sizeof(digit),
 	sizeof(digit),
-	long_dealloc,	/*tp_dealloc*/
+	(destructor)long_dealloc, /*tp_dealloc*/
 	0,		/*tp_print*/
 	0,		/*tp_getattr*/
 	0,		/*tp_setattr*/
 	(int (*) FPROTO((object *, object *)))
-	long_compare,	/*tp_compare*/
-	long_repr,	/*tp_repr*/
+	(cmpfunc)long_compare, /*tp_compare*/
+	(reprfunc)long_repr, /*tp_repr*/
 	&long_as_number,/*tp_as_number*/
 	0,		/*tp_as_sequence*/
 	0,		/*tp_as_mapping*/
 	(long (*) FPROTO((object *)))
-	long_hash,	/*tp_hash*/
+	(hashfunc)long_hash, /*tp_hash*/
 };

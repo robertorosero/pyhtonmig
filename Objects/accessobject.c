@@ -321,12 +321,12 @@ typeobject Accesstype = {
 	sizeof(accessobject),	/*tp_size*/
 	0,			/*tp_itemsize*/
 	/* methods */
-	access_dealloc,		/*tp_dealloc*/
+	(destructor)access_dealloc, /*tp_dealloc*/
 	0,			/*tp_print*/
-	access_getattr,		/*tp_getattr*/
+	(getattrfunc)access_getattr, /*tp_getattr*/
 	0,			/*tp_setattr*/
 	0,			/*tp_compare*/
-	access_repr,		/*tp_repr*/
+	(reprfunc)access_repr, /*tp_repr*/
 	0,			/*tp_as_number*/
 	0,			/*tp_as_sequence*/
 	0,			/*tp_as_mapping*/

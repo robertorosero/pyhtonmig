@@ -535,29 +535,29 @@ int_hex(v)
 }
 
 static number_methods int_as_number = {
-	int_add,	/*nb_add*/
-	int_sub,	/*nb_subtract*/
-	int_mul,	/*nb_multiply*/
-	int_div,	/*nb_divide*/
-	int_mod,	/*nb_remainder*/
-	int_divmod,	/*nb_divmod*/
-	int_pow,	/*nb_power*/
-	int_neg,	/*nb_negative*/
-	int_pos,	/*nb_positive*/
-	int_abs,	/*nb_absolute*/
-	int_nonzero,	/*nb_nonzero*/
-	int_invert,	/*nb_invert*/
-	int_lshift,	/*nb_lshift*/
-	int_rshift,	/*nb_rshift*/
-	int_and,	/*nb_and*/
-	int_xor,	/*nb_xor*/
-	int_or,		/*nb_or*/
+	(binaryfunc)int_add, /*nb_add*/
+	(binaryfunc)int_sub, /*nb_subtract*/
+	(binaryfunc)int_mul, /*nb_multiply*/
+	(binaryfunc)int_div, /*nb_divide*/
+	(binaryfunc)int_mod, /*nb_remainder*/
+	(binaryfunc)int_divmod, /*nb_divmod*/
+	(binaryfunc)int_pow, /*nb_power*/
+	(unaryfunc)int_neg, /*nb_negative*/
+	(unaryfunc)int_pos, /*nb_positive*/
+	(unaryfunc)int_abs, /*nb_absolute*/
+	(inquiry)int_nonzero, /*nb_nonzero*/
+	(unaryfunc)int_invert, /*nb_invert*/
+	(binaryfunc)int_lshift, /*nb_lshift*/
+	(binaryfunc)int_rshift, /*nb_rshift*/
+	(binaryfunc)int_and, /*nb_and*/
+	(binaryfunc)int_xor, /*nb_xor*/
+	(binaryfunc)int_or, /*nb_or*/
 	0,		/*nb_coerce*/
-	int_int,	/*nb_int*/
-	int_long,	/*nb_long*/
-	int_float,	/*nb_float*/
-	int_oct,	/*nb_oct*/
-	int_hex,	/*nb_hex*/
+	(unaryfunc)int_int, /*nb_int*/
+	(unaryfunc)int_long, /*nb_long*/
+	(unaryfunc)int_float, /*nb_float*/
+	(unaryfunc)int_oct, /*nb_oct*/
+	(unaryfunc)int_hex, /*nb_hex*/
 };
 
 typeobject Inttype = {
@@ -566,14 +566,14 @@ typeobject Inttype = {
 	"int",
 	sizeof(intobject),
 	0,
-	int_dealloc,	/*tp_dealloc*/
-	int_print,	/*tp_print*/
+	(destructor)int_dealloc, /*tp_dealloc*/
+	(printfunc)int_print, /*tp_print*/
 	0,		/*tp_getattr*/
 	0,		/*tp_setattr*/
-	int_compare,	/*tp_compare*/
-	int_repr,	/*tp_repr*/
+	(cmpfunc)int_compare, /*tp_compare*/
+	(reprfunc)int_repr, /*tp_repr*/
 	&int_as_number,	/*tp_as_number*/
 	0,		/*tp_as_sequence*/
 	0,		/*tp_as_mapping*/
-	int_hash,	/*tp_hash*/
+	(hashfunc)int_hash, /*tp_hash*/
 };
