@@ -3,7 +3,13 @@ import unittest
 from cStringIO import StringIO
 from pickletester import AbstractPickleTests, AbstractPickleModuleTests
 from test import test_support
+import sys
 
+if sys.platform == 'mac':
+    NRECURSION=50
+else:
+    NRECURSION=100
+	
 class cPickleTests(AbstractPickleTests, AbstractPickleModuleTests):
 
     def setUp(self):
@@ -82,7 +88,7 @@ class cPickleFastPicklerTests(AbstractPickleTests):
 
     def test_nonrecursive_deep(self):
         a = []
-        for i in range(100):
+        for i in range(NRECURSION):
             a = [a]
         b = self.loads(self.dumps(a))
         self.assertEqual(a, b)
