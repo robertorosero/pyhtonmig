@@ -256,16 +256,16 @@ PyImport_Import:PyObject*:name:0:
 PyImport_ImportFrozenModule:int:::
 PyImport_ImportFrozenModule:char*:::
 
-PyImport_ImportModule:PyObject*::1:not sure...
+PyImport_ImportModule:PyObject*::+1:
 PyImport_ImportModule:char*:name::
 
-PyImport_ImportModuleEx:PyObject*::0:???
+PyImport_ImportModuleEx:PyObject*::+1:
 PyImport_ImportModuleEx:char*:name::
 PyImport_ImportModuleEx:PyObject*:globals:0:???
 PyImport_ImportModuleEx:PyObject*:locals:0:???
 PyImport_ImportModuleEx:PyObject*:fromlist:0:???
 
-PyImport_ReloadModule:PyObject*::0:
+PyImport_ReloadModule:PyObject*::+1:
 PyImport_ReloadModule:PyObject*:m:0:
 
 PyInt_AS_LONG:long:::
