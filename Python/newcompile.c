@@ -42,30 +42,12 @@ int Py_OptimizeFlag = 0;
 
     ISSUES:
 
-     Tim mentioned that it's more common for a basic blocks representation
-     to use real pointers for jump targets rather than indexes into an
-     array of basic blocks.
-
      opcode_stack_effect() function should be reviewed since stack depth bugs
      could be really hard to find later.
 
      Dead code is being generated (i.e. after unconditional jumps).
     
 */
-
-/* fblockinfo tracks the current frame block.
-
-   A frame block is used to handle loops, try/except, and try/finally.
-   It's called a frame block to distinguish it from a basic block in the
-   compiler IR.
-*/
-
-enum fblocktype { LOOP, EXCEPT, FINALLY_TRY, FINALLY_END };
-
-struct fblockinfo {
-        enum fblocktype fb_type;
-	int fb_block;
-};
 
 #define DEFAULT_BLOCK_SIZE 16
 #define DEFAULT_BLOCKS 8
@@ -78,24 +60,42 @@ struct instr {
 	int i_hasarg : 1;
 	unsigned char i_opcode;
 	int i_oparg;
-	int i_target; /* target block index (if jump instruction) */
+	struct basicblock_ *i_target; /* target block (if jump instruction) */
 	int i_lineno;
 };
 
-struct basicblock {
+typedef struct basicblock_ {
+	/* number of instructions used */
 	int b_iused;
+	/* length of instruction array (b_instr) */
 	int b_ialloc;
-	/* If b_next is non-zero, it is the block id of the next
-	   block reached by normal control flow.
-	   Since a valid b_next must always be > 0,
-	   0 can be reserved to mean no next block. */
-	int b_next;
+	/* pointer to an array of instructions, initially NULL */
+	struct instr *b_instr;
+	/* If b_next is non-NULL, it is a pointer to the next
+	   block reached by normal control flow. */
+	struct basicblock_ *b_next;
 	/* b_seen is used to perform a DFS of basicblocks. */
 	int b_seen : 1;
 	/* b_return is true if a RETURN_VALUE opcode is inserted. */
 	int b_return : 1;
-	int b_startdepth; /* depth of stack upon entry of block */
-	struct instr b_instr[DEFAULT_BLOCK_SIZE];
+	/* depth of stack upon entry of block, computed by stackdepth() */
+	int b_startdepth;
+	/* instruction offset for block, computed by assemble_jump_offsets() */
+        int b_offset;
+} basicblock;
+
+/* fblockinfo tracks the current frame block.
+
+   A frame block is used to handle loops, try/except, and try/finally.
+   It's called a frame block to distinguish it from a basic block in the
+   compiler IR.
+*/
+
+enum fblocktype { LOOP, EXCEPT, FINALLY_TRY, FINALLY_END };
+
+struct fblockinfo {
+        enum fblocktype fb_type;
+	basicblock *fb_block;
 };
 
 /* The following items change on entry and exit of code blocks.
@@ -121,9 +121,9 @@ struct compiler_unit {
 	int u_nblocks;     /* number of used blocks in u_blocks
 			      u_nblocks < u_nalloc */
 	int u_nalloc;      /* current alloc count for u_blocks */
-	int u_curblock;    /* index of current block in u_blocks */
+	basicblock *u_curblock; /* pointer to current block (from u_blocks) */
 	int u_tmpname;     /* temporary variables for list comps */
-	struct basicblock **u_blocks;
+	basicblock **u_blocks;
 
 	int u_nfblocks;
 	struct fblockinfo u_fblock[CO_MAXBLOCKS];
@@ -152,7 +152,7 @@ struct assembler {
 	PyObject *a_bytecode;  /* string containing bytecode */
 	int a_offset;          /* offset into bytecode */
 	int a_nblocks;         /* number of reachable blocks */
-	int *a_postorder;      /* list of block indices in dfs postorder */
+	basicblock **a_postorder; /* list of blocks in dfs postorder */
 	PyObject *a_lnotab;    /* string containing lnotab */
 	int a_lnotab_off;      /* offset into lnotab */
 	int a_lineno;          /* last lineno of emitted instruction */
@@ -161,14 +161,14 @@ struct assembler {
 
 static int compiler_enter_scope(struct compiler *, identifier, void *, int);
 static void compiler_free(struct compiler *);
-static int compiler_new_block(struct compiler *);
-static int compiler_next_instr(struct compiler *, int);
+static basicblock *compiler_new_block(struct compiler *);
+static int compiler_next_instr(struct compiler *, basicblock *);
 static int compiler_addop(struct compiler *, int);
 static int compiler_addop_o(struct compiler *, int, PyObject *, PyObject *);
 static int compiler_addop_i(struct compiler *, int, int);
-static int compiler_addop_j(struct compiler *, int, int, int);
-static void compiler_use_block(struct compiler *, int);
-static int compiler_use_new_block(struct compiler *);
+static int compiler_addop_j(struct compiler *, int, basicblock *, int);
+static void compiler_use_block(struct compiler *, basicblock *);
+static basicblock *compiler_use_new_block(struct compiler *);
 static int compiler_error(struct compiler *, const char *);
 static int compiler_nameop(struct compiler *, identifier, expr_context_ty);
 
@@ -180,8 +180,10 @@ static int compiler_augassign(struct compiler *, stmt_ty);
 static int compiler_visit_slice(struct compiler *, slice_ty,
 				expr_context_ty);
 
-static int compiler_push_fblock(struct compiler *, enum fblocktype, int);
-static void compiler_pop_fblock(struct compiler *, enum fblocktype, int);
+static int compiler_push_fblock(struct compiler *, enum fblocktype,
+				basicblock *);
+static void compiler_pop_fblock(struct compiler *, enum fblocktype,
+				basicblock *);
 
 static int inplace_binop(struct compiler *, operator_ty);
 static int expr_constant(expr_ty e);
@@ -438,8 +440,8 @@ compiler_enter_scope(struct compiler *c, identifier name, void *key,
 
 	u->u_nblocks = 0;
 	u->u_nalloc = DEFAULT_BLOCKS;
-	u->u_blocks = (struct basicblock **)PyObject_Malloc(
-		sizeof(struct basicblock *) * DEFAULT_BLOCKS);
+	u->u_blocks = (basicblock **)PyObject_Malloc(
+		sizeof(basicblock *) * DEFAULT_BLOCKS);
 	if (!u->u_blocks)
 		return 0;
 	u->u_tmpname = 0;
@@ -447,7 +449,7 @@ compiler_enter_scope(struct compiler *c, identifier name, void *key,
 	u->u_firstlineno = lineno;
 	u->u_lineno = 0;
 	u->u_lineno_set = false;
-	memset(u->u_blocks, 0, sizeof(struct basicblock *) * DEFAULT_BLOCKS);
+	memset(u->u_blocks, 0, sizeof(basicblock *) * DEFAULT_BLOCKS);
 	u->u_consts = PyDict_New();
 	if (!u->u_consts)
 		return 0;
@@ -483,16 +485,22 @@ static void
 compiler_unit_check(struct compiler_unit *u)
 {
 	int i;
-	assert(u->u_curblock < u->u_nblocks);
 	assert(u->u_nblocks <= u->u_nalloc);
 	for (i = 0; i < u->u_nblocks; i++) {
-		struct basicblock *block = u->u_blocks[i];
+		basicblock *block = u->u_blocks[i];
 		assert(block);
 		assert(block != (void *)0xcbcbcbcb);
 		assert(block != (void *)0xfbfbfbfb);
-		assert(block->b_ialloc > 0);
-		assert(block->b_iused >= 0 
-		       && block->b_ialloc >= block->b_iused);
+		assert(block != (void *)0xdbdbdbdb);
+		if (block->b_instr != NULL) {
+			assert(block->b_ialloc > 0);
+			assert(block->b_iused > 0);
+			assert(block->b_ialloc >= block->b_iused);
+		}
+		else {
+			assert (block->b_iused == 0);
+			assert (block->b_ialloc == 0);
+		}
 	}
 }
 
@@ -502,8 +510,12 @@ compiler_unit_free(struct compiler_unit *u)
 	int i;
 
 	compiler_unit_check(u);
-	for (i = 0; i < u->u_nblocks; i++)
-		PyObject_Free((void *)u->u_blocks[i]);
+	for (i = 0; i < u->u_nblocks; i++) {
+		basicblock *b = u->u_blocks[i];
+		if (b->b_instr)
+			PyObject_Free((void *)b->b_instr);
+		PyObject_Free((void *)b);
+	}
 	if (u->u_blocks)
 		PyObject_Free((void *)u->u_blocks);
 	Py_XDECREF(u->u_ste);
@@ -540,75 +552,73 @@ compiler_exit_scope(struct compiler *c)
 	return 1; /* XXX void? */
 }
 
-/* Allocate a new block and return its index in c_blocks.
-   Returns -1 on error.
+/* Allocate a new block and return a pointer to it.
+   Returns NULL on error.
 */
 
-static int
+static basicblock *
 compiler_new_block(struct compiler *c)
 {
-	struct basicblock *b;
+	basicblock *b;
 	struct compiler_unit *u;
-	int block;
+	int i;
 
 	u = c->u;
 	if (u->u_nblocks == u->u_nalloc) {
 		int newsize = ((u->u_nalloc + u->u_nalloc)
-			       * sizeof(struct basicblock *));
-		u->u_blocks = (struct basicblock **)PyObject_Realloc(
+			       * sizeof(basicblock *));
+		u->u_blocks = (basicblock **)PyObject_Realloc(
 			u->u_blocks, newsize);
 		if (u->u_blocks == NULL)
-			return -1;
+			return NULL;
 		memset(u->u_blocks + u->u_nalloc, 0,
-		       sizeof(struct basicblock *) * u->u_nalloc);
+		       sizeof(basicblock *) * u->u_nalloc);
 		u->u_nalloc += u->u_nalloc;
 	}
-	b = (struct basicblock *)PyObject_Malloc(sizeof(struct basicblock));
+	b = (basicblock *)PyObject_Malloc(sizeof(basicblock));
 	if (b == NULL)
-		return -1;
-	memset((void *)b, 0, sizeof(struct basicblock));
-	b->b_ialloc = DEFAULT_BLOCK_SIZE;
-	block = u->u_nblocks++;
-	assert(u->u_blocks[block] == NULL);
-	u->u_blocks[block] = b;
-	return block;
+		return NULL;
+	memset((void *)b, 0, sizeof(basicblock));
+	assert (b->b_next == NULL);
+	i = u->u_nblocks++;
+	assert(u->u_blocks[i] == NULL);
+	u->u_blocks[i] = b;
+	return b;
 }
 
 static void
-compiler_use_block(struct compiler *c, int block)
+compiler_use_block(struct compiler *c, basicblock *block)
 {
-	assert(block < c->u->u_nblocks);
+        assert (block != NULL);
 	c->u->u_curblock = block;
-	assert(c->u->u_blocks[block]);
 }
 
-static int
+static basicblock *
 compiler_use_new_block(struct compiler *c)
 {
-	int block = compiler_new_block(c);
-	if (block < 0)
-		return 0;
+	basicblock *block = compiler_new_block(c);
+	if (block == NULL)
+		return NULL;
 	c->u->u_curblock = block;
 	return block;
 }
 
-static int
+static basicblock *
 compiler_next_block(struct compiler *c)
 {
-	int block = compiler_new_block(c);
-	if (block < 0)
-		return 0;
-	c->u->u_blocks[c->u->u_curblock]->b_next = block;
+	basicblock *block = compiler_new_block(c);
+	if (block == NULL)
+		return NULL;
+	c->u->u_curblock->b_next = block;
 	c->u->u_curblock = block;
 	return block;
 }
 
-static int
-compiler_use_next_block(struct compiler *c, int block)
+static basicblock *
+compiler_use_next_block(struct compiler *c, basicblock *block)
 {
-	assert(block < c->u->u_nblocks);
-	c->u->u_blocks[c->u->u_curblock]->b_next = block;
-	assert(c->u->u_blocks[block]);
+	assert(block != NULL);
+	c->u->u_curblock->b_next = block;
 	c->u->u_curblock = block;
 	return block;
 }
@@ -619,34 +629,33 @@ compiler_use_next_block(struct compiler *c, int block)
  */
 
 static int
-compiler_next_instr(struct compiler *c, int block)
+compiler_next_instr(struct compiler *c, basicblock *b)
 {
-	struct basicblock *b;
-	assert(block < c->u->u_nblocks);
-	b = c->u->u_blocks[block];
-	assert(b);
-	if (b->b_iused == b->b_ialloc) {
-		void *ptr;
-		int oldsize, newsize;
-		oldsize = sizeof(struct basicblock);
-		if (b->b_ialloc > DEFAULT_BLOCK_SIZE)
-			oldsize += ((b->b_ialloc - DEFAULT_BLOCK_SIZE)
-				    * sizeof(struct instr));
-		newsize = oldsize + b->b_ialloc * sizeof(struct instr);
-		if (newsize <= 0) {
+	assert(b != NULL);
+        if (b->b_instr == NULL) {
+		b->b_instr = PyObject_Malloc(sizeof(struct instr) *
+					     DEFAULT_BLOCK_SIZE);
+		if (b->b_instr == NULL) {
+			PyErr_NoMemory();
+			return -1;
+		}
+		b->b_ialloc = DEFAULT_BLOCK_SIZE;
+		memset((char *)b->b_instr, 0,
+		       sizeof(struct instr) * DEFAULT_BLOCK_SIZE);
+        }
+	else if (b->b_iused == b->b_ialloc) {
+		size_t oldsize, newsize;
+		oldsize = b->b_ialloc * sizeof(struct instr);
+		newsize = oldsize << 1;
+		if (newsize == 0) {
 			PyErr_NoMemory();
 			return -1;
 		}
 		b->b_ialloc <<= 1;
-		ptr = PyObject_Realloc((void *)b, newsize);
-		if (ptr == NULL)
+		b->b_instr = PyObject_Realloc((void *)b->b_instr, newsize);
+		if (b->b_instr == NULL)
 			return -1;
-		memset((char *)ptr + oldsize, 0, newsize - oldsize);
-		if (ptr != (void *)b) {
-			fprintf(stderr, "resize block %d\n", block);
-			c->u->u_blocks[block] = (struct basicblock *)ptr;
-			b = ptr;
-		}
+		memset((char *)b->b_instr + oldsize, 0, newsize - oldsize);
 	}
 	return b->b_iused++;
 }
@@ -658,11 +667,11 @@ compiler_next_instr(struct compiler *c, int block)
 static void
 compiler_set_lineno(struct compiler *c, int off)
 {
-	struct basicblock *b;
+	basicblock *b;
 	if (c->u->u_lineno_set)
 		return;
 	c->u->u_lineno_set = true;
-	b = c->u->u_blocks[c->u->u_curblock];
+	b = c->u->u_curblock;
  	b->b_instr[off].i_lineno = c->u->u_lineno;
 }
 
@@ -886,13 +895,13 @@ opcode_stack_effect(int opcode, int oparg)
 static int
 compiler_addop(struct compiler *c, int opcode)
 {
-	struct basicblock *b;
+	basicblock *b;
 	struct instr *i;
 	int off;
 	off = compiler_next_instr(c, c->u->u_curblock);
 	if (off < 0)
 		return 0;
-	b = c->u->u_blocks[c->u->u_curblock];
+	b = c->u->u_curblock;
 	i = &b->b_instr[off];
 	i->i_opcode = opcode;
 	i->i_hasarg = 0;
@@ -972,7 +981,7 @@ compiler_addop_i(struct compiler *c, int opcode, int oparg)
 	off = compiler_next_instr(c, c->u->u_curblock);
 	if (off < 0)
 		return 0;
-	i = &c->u->u_blocks[c->u->u_curblock]->b_instr[off];
+	i = &c->u->u_curblock->b_instr[off];
 	i->i_opcode = opcode;
 	i->i_oparg = oparg;
 	i->i_hasarg = 1;
@@ -981,19 +990,19 @@ compiler_addop_i(struct compiler *c, int opcode, int oparg)
 }
 
 static int
-compiler_addop_j(struct compiler *c, int opcode, int block, int absolute)
+compiler_addop_j(struct compiler *c, int opcode, basicblock *b, int absolute)
 {
 	struct instr *i;
 	int off;
 
-	assert(block >= 0);
+	assert(b != NULL);
 	off = compiler_next_instr(c, c->u->u_curblock);
 	if (off < 0)
 		return 0;
 	compiler_set_lineno(c, off);
-	i = &c->u->u_blocks[c->u->u_curblock]->b_instr[off];
+	i = &c->u->u_curblock->b_instr[off];
 	i->i_opcode = opcode;
-	i->i_target = block;
+	i->i_target = b;
 	i->i_hasarg = 1;
 	if (absolute)
 		i->i_jabs = 1;
@@ -1014,12 +1023,12 @@ compiler_addop_j(struct compiler *c, int opcode, int block, int absolute)
 
 
 #define NEW_BLOCK(C) { \
-        if (compiler_use_new_block((C)) < 0) \
+        if (compiler_use_new_block((C)) == NULL) \
 	        return 0; \
 }
 
 #define NEXT_BLOCK(C) { \
-        if (compiler_next_block((C)) < 0) \
+        if (compiler_next_block((C)) == NULL) \
 	        return 0; \
 }
 
@@ -1410,14 +1419,14 @@ compiler_print(struct compiler *c, stmt_ty s)
 static int
 compiler_if(struct compiler *c, stmt_ty s)
 {
-	int end, next;
+	basicblock *end, *next;
 
 	assert(s->kind == If_kind);
 	end = compiler_new_block(c);
-	if (end < 0)
+	if (end == NULL)
 		return 0;
         next = compiler_new_block(c);
-        if (next < 0)
+        if (next == NULL)
             return 0;
         VISIT(c, expr, s->v.If.test);
         ADDOP_JREL(c, JUMP_IF_FALSE, next);
@@ -1435,12 +1444,12 @@ compiler_if(struct compiler *c, stmt_ty s)
 static int
 compiler_for(struct compiler *c, stmt_ty s)
 {
-	int start, cleanup, end;
+	basicblock *start, *cleanup, *end;
 
 	start = compiler_new_block(c);
 	cleanup = compiler_new_block(c);
 	end = compiler_new_block(c);
-	if (start < 0 || end < 0 || cleanup < 0)
+	if (start == NULL || end == NULL || cleanup == NULL)
 		return 0;
 	ADDOP_JREL(c, SETUP_LOOP, end);
 	if (!compiler_push_fblock(c, LOOP, start))
@@ -1463,7 +1472,7 @@ compiler_for(struct compiler *c, stmt_ty s)
 static int
 compiler_while(struct compiler *c, stmt_ty s)
 {
-	int loop, orelse, end, anchor;
+	basicblock *loop, *orelse, *end, *anchor;
 	int constant = expr_constant(s->v.While.test);
 
 	if (constant == 0)
@@ -1472,18 +1481,18 @@ compiler_while(struct compiler *c, stmt_ty s)
 	end = compiler_new_block(c);
 	if (constant == -1) {
 		anchor = compiler_new_block(c);
-		if (anchor < 0)
+		if (anchor == NULL)
 			return 0;
 	}
-	if (loop < 0 || end < 0)
+	if (loop == NULL || end == NULL)
 		return 0;
 	if (s->v.While.orelse) {
 		orelse = compiler_new_block(c);
-		if (orelse < 0)
+		if (orelse == NULL)
 			return 0;
 	}
 	else
-		orelse = -1;
+		orelse = NULL;
 
 	ADDOP_JREL(c, SETUP_LOOP, end);
 	compiler_use_next_block(c, loop);
@@ -1507,7 +1516,7 @@ compiler_while(struct compiler *c, stmt_ty s)
 		ADDOP(c, POP_BLOCK);
 	}
 	compiler_pop_fblock(c, LOOP, loop);
-	if (orelse != -1)
+	if (orelse != NULL)
 		VISIT_SEQ(c, stmt, s->v.While.orelse);
 	compiler_use_next_block(c, end);
 
@@ -1579,10 +1588,10 @@ compiler_continue(struct compiler *c)
 static int
 compiler_try_finally(struct compiler *c, stmt_ty s)
 {
-	int body, end;
+	basicblock *body, *end;
 	body = compiler_new_block(c);
 	end = compiler_new_block(c);
-	if (body < 0 || end < 0)
+	if (body == NULL || end == NULL)
 		return 0;
 
 	ADDOP_JREL(c, SETUP_FINALLY, end);
@@ -1641,13 +1650,14 @@ compiler_try_finally(struct compiler *c, stmt_ty s)
 static int
 compiler_try_except(struct compiler *c, stmt_ty s)
 {
-	int i, n, body, orelse, except, end;
+        basicblock *body, *orelse, *except, *end;
+	int i, n;
 
 	body = compiler_new_block(c);
 	except = compiler_new_block(c);
 	orelse = compiler_new_block(c);
 	end = compiler_new_block(c);
-	if (body < 0 || except < 0 || orelse < 0 || end < 0)
+	if (body == NULL || except == NULL || orelse == NULL || end == NULL)
 		return 0;
 	ADDOP_JREL(c, SETUP_EXCEPT, except);
 	compiler_use_next_block(c, body);
@@ -1665,7 +1675,7 @@ compiler_try_except(struct compiler *c, stmt_ty s)
 		if (!handler->type && i < n-1)
 		    return compiler_error(c, "default 'except:' must be last");
 		except = compiler_new_block(c);
-		if (except < 0)
+		if (except == NULL)
 			return 0;
 		if (handler->type) {
 			ADDOP(c, DUP_TOP);
@@ -1792,7 +1802,7 @@ static int
 compiler_assert(struct compiler *c, stmt_ty s)
 {
 	static PyObject *assertion_error = NULL;
-	int end;
+	basicblock *end;
 
 	if (Py_OptimizeFlag)
 		return 1;
@@ -1803,7 +1813,7 @@ compiler_assert(struct compiler *c, stmt_ty s)
 	}
 	VISIT(c, expr, s->v.Assert.test);
 	end = compiler_new_block(c);
-	if (end < 0)
+	if (end == NULL)
 		return 0;
 	ADDOP_JREL(c, JUMP_IF_TRUE, end);
 	ADDOP(c, POP_TOP);
@@ -2167,7 +2177,8 @@ compiler_nameop(struct compiler *c, identifier name, expr_context_ty ctx)
 static int
 compiler_boolop(struct compiler *c, expr_ty e)
 {
-	int end, jumpi, i, n;
+	basicblock *end;
+	int jumpi, i, n;
 	asdl_seq *s;
 
 	assert(e->kind == BoolOp_kind);
@@ -2221,7 +2232,8 @@ compiler_tuple(struct compiler *c, expr_ty e)
 static int
 compiler_compare(struct compiler *c, expr_ty e)
 {
-	int i, n, cleanup = -1;
+	int i, n;
+        basicblock *cleanup = NULL;
 
 	/* XXX the logic can be cleaned up for 1 or multiple comparisons */
 	VISIT(c, expr, e->v.Compare.left);
@@ -2229,6 +2241,8 @@ compiler_compare(struct compiler *c, expr_ty e)
 	assert(n > 0);
 	if (n > 1) {
 		cleanup = compiler_new_block(c);
+                if (cleanup == NULL)
+                    return 0;
 		VISIT(c, expr, asdl_seq_GET(e->v.Compare.comparators, 0));
 	}
 	for (i = 1; i < n; i++) {
@@ -2248,7 +2262,9 @@ compiler_compare(struct compiler *c, expr_ty e)
 		/* XXX We're casting a void* to cmpop_ty in the next stmt. */
 	       cmpop((cmpop_ty)asdl_seq_GET(e->v.Compare.ops, n - 1)));
 	if (n > 1) {
-		int end = compiler_new_block(c);
+		basicblock *end = compiler_new_block(c);
+                if (end == NULL)
+                    return 0;
 		ADDOP_JREL(c, JUMP_FORWARD, end);
 		compiler_use_next_block(c, cleanup);
 		ADDOP(c, ROT_TWO);
@@ -2304,14 +2320,16 @@ compiler_listcomp_generator(struct compiler *c, PyObject *tmpname,
 	   and then write to the element */
 
 	comprehension_ty l;
-	int start, anchor, skip, if_cleanup, i, n;
+	basicblock *start, *anchor, *skip, *if_cleanup;
+        int i, n;
 
 	start = compiler_new_block(c);
 	skip = compiler_new_block(c);
 	if_cleanup = compiler_new_block(c);
 	anchor = compiler_new_block(c);
 
-        if (start < 0 || skip < 0 || if_cleanup < 0 || anchor < 0)
+        if (start == NULL || skip == NULL || if_cleanup == NULL ||
+                anchor == NULL)
             return 0;
 
 	l = asdl_seq_GET(generators, gen_index);
@@ -2585,7 +2603,7 @@ compiler_augassign(struct compiler *c, stmt_ty s)
 }
 
 static int
-compiler_push_fblock(struct compiler *c, enum fblocktype t, int b)
+compiler_push_fblock(struct compiler *c, enum fblocktype t, basicblock *b)
 {
 	struct fblockinfo *f;
 	if (c->u->u_nfblocks >= CO_MAXBLOCKS)
@@ -2597,7 +2615,7 @@ compiler_push_fblock(struct compiler *c, enum fblocktype t, int b)
 }
 
 static void
-compiler_pop_fblock(struct compiler *c, enum fblocktype t, int b)
+compiler_pop_fblock(struct compiler *c, enum fblocktype t, basicblock *b)
 {
 	struct compiler_unit *u = c->u;
 	assert(u->u_nfblocks > 0);
@@ -2809,40 +2827,34 @@ compiler_visit_slice(struct compiler *c, slice_ty s, expr_context_ty ctx)
 */
 
 static void
-dfs(struct compiler *c, int block, struct assembler *a)
+dfs(struct compiler *c, basicblock *b, struct assembler *a)
 {
 	int i;
-	struct basicblock *b;
 	struct instr *instr = NULL;
 
-	if (block >= c->u->u_nblocks)
-		return;
-	b = c->u->u_blocks[block];
 	if (b->b_seen)
 		return;
 	b->b_seen = 1;
-	if (b->b_next)
+	if (b->b_next != NULL)
 		dfs(c, b->b_next, a);
 	for (i = 0; i < b->b_iused; i++) {
 		instr = &b->b_instr[i];
 		if (instr->i_jrel || instr->i_jabs)
 			dfs(c, instr->i_target, a);
 	}
-	a->a_postorder[a->a_nblocks++] = block;
+	a->a_postorder[a->a_nblocks++] = b;
 }
 
 int
-stackdepth_walk(struct compiler *c, int block, int depth, int maxdepth)
+stackdepth_walk(struct compiler *c, basicblock *b, int depth, int maxdepth)
 {
 	int i;
 	struct instr *instr;
-	struct basicblock *b;
-	b = c->u->u_blocks[block];
 	if (b->b_seen || b->b_startdepth >= depth)
 		return maxdepth;
 	b->b_seen = 1;
 	b->b_startdepth = depth;
-	fprintf(stderr, "block %d\n", block);
+	fprintf(stderr, "block %p\n", b);
 	for (i = 0; i < b->b_iused; i++) {
 		instr = &b->b_instr[i];
 		depth += opcode_stack_effect(instr->i_opcode, instr->i_oparg);
@@ -2879,7 +2891,7 @@ stackdepth(struct compiler *c)
 		c->u->u_blocks[i]->b_seen = 0;
 		c->u->u_blocks[i]->b_startdepth = INT_MIN;
 	}
-	return stackdepth_walk(c, 0, 0, 0);
+	return stackdepth_walk(c, c->u->u_blocks[0], 0, 0);
 }
 
 static int
@@ -2893,7 +2905,8 @@ assemble_init(struct assembler *a, int nblocks)
 	a->a_lnotab = PyString_FromStringAndSize(NULL, DEFAULT_LNOTAB_SIZE);
 	if (!a->a_lnotab)
 		return 0;
-	a->a_postorder = (int *)PyObject_Malloc(sizeof(int) * nblocks);
+	a->a_postorder = (basicblock **)PyObject_Malloc(
+                                            sizeof(basicblock *) * nblocks);
 	if (!a->a_postorder)
 		return 0;
 	return 1;
@@ -2923,7 +2936,7 @@ instrsize(struct instr *instr)
 }
 
 static int
-blocksize(struct basicblock *b)
+blocksize(basicblock *b)
 {
 	int i;
 	int size = 0;
@@ -3121,28 +3134,21 @@ assemble_emit(struct assembler *a, struct instr *i)
 static int
 assemble_jump_offsets(struct assembler *a, struct compiler *c)
 {
-	int *blockoff;
 	int bsize, totsize = 0;
 	int i, j;
 
 	/* Compute the size of each block and fixup jump args.
-	   Replace block index with position in bytecode. */
-	blockoff = malloc(sizeof(int) * c->u->u_nblocks);
-	if (!blockoff)
-		return 0;
-	/* blockoff computed in dfs postorder, but stored using
-	   c_blocks[] indices.
-	*/
+	   Replace block pointer with position in bytecode. */
 	assert(a->a_nblocks <= c->u->u_nblocks);
 	for (i = a->a_nblocks - 1; i >= 0; i--) {
-		int block = a->a_postorder[i];
-		bsize = blocksize(c->u->u_blocks[block]);
-		blockoff[block] = totsize;
+		basicblock *b = a->a_postorder[i];
+		bsize = blocksize(b);
+		b->b_offset = totsize;
 		totsize += bsize;
 	}
 	for (i = 0; i < c->u->u_nblocks; i++) {
-		struct basicblock *b = c->u->u_blocks[i];
-		bsize = blockoff[i];
+		basicblock *b = c->u->u_blocks[i];
+		bsize = b->b_offset;
 		for (j = 0; j < b->b_iused; j++) {
 			struct instr *instr = &b->b_instr[j];
 			/* Relative jumps are computed relative to
@@ -3151,15 +3157,13 @@ assemble_jump_offsets(struct assembler *a, struct compiler *c)
 			*/
 			bsize += instrsize(instr);
 			if (instr->i_jabs)
-				instr->i_oparg = blockoff[instr->i_target];
+				instr->i_oparg = instr->i_target->b_offset;
 			else if (instr->i_jrel) {
-				int delta = blockoff[instr->i_target] - bsize;
+				int delta = instr->i_target->b_offset - bsize;
 				instr->i_oparg = delta;
 			}
 		}
 	}
-	free(blockoff);
-
 	return 1;
 }
 
@@ -3289,7 +3293,7 @@ assemble(struct compiler *c, int addNone)
 
 	if (!assemble_init(&a, c->u->u_nblocks))
 		goto error;
-	dfs(c, 0, &a);
+	dfs(c, c->u->u_blocks[0], &a);
 
 	/* Can't modify the bytecode after computing jump offsets. */
 	if (!assemble_jump_offsets(&a, c))
@@ -3297,10 +3301,10 @@ assemble(struct compiler *c, int addNone)
 
 	/* Emit code in reverse postorder from dfs. */
 	for (i = a.a_nblocks - 1; i >= 0; i--) {
-		struct basicblock *b = c->u->u_blocks[a.a_postorder[i]];
+		basicblock *b = a.a_postorder[i];
 		fprintf(stderr, 
-                        "\nblock %d: order=%d used=%d alloc=%d next=%d\n",
-			i, a.a_postorder[i], b->b_iused, b->b_ialloc,
+                        "\nblock %p: order=%d used=%d alloc=%d next=%p\n",
+			a.a_postorder[i], i, b->b_iused, b->b_ialloc,
 			b->b_next);
 		for (j = 0; j < b->b_iused; j++)
 			if (!assemble_emit(&a, &b->b_instr[j]))
