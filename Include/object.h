@@ -204,6 +204,8 @@ typedef PyObject *(*getiterfunc) (PyObject *);
 typedef PyObject *(*iternextfunc) (PyObject *);
 typedef PyObject *(*descrgetfunc) (PyObject *, PyObject *);
 typedef int (*descrsetfunc) (PyObject *, PyObject *, PyObject *);
+typedef int (*initproc)(PyObject *, PyObject *, PyObject *);
+typedef PyObject *(*allocfunc)(struct _typeobject *, PyObject *, PyObject *);
 
 typedef struct _typeobject {
 	PyObject_VAR_HEAD
@@ -265,9 +267,10 @@ typedef struct _typeobject {
 	PyObject *tp_dict;
 	descrgetfunc tp_descr_get;
 	descrsetfunc tp_descr_set;
-	ternaryfunc tp_construct;
 	long tp_dictoffset;
-
+	initproc tp_init;
+	allocfunc tp_alloc;
+	allocfunc tp_new;
 
 #ifdef COUNT_ALLOCS
 	/* these must be last and never explicitly initialized */
@@ -289,6 +292,10 @@ extern DL_IMPORT(PyTypeObject) PyType_Type; /* Metatype */
 #define PyType_Check(op) PyObject_TypeCheck(op, &PyType_Type)
 
 extern DL_IMPORT(int) PyType_InitDict(PyTypeObject *);
+extern DL_IMPORT(PyObject *) PyType_GenericAlloc(PyTypeObject *,
+						 PyObject *, PyObject *);
+extern DL_IMPORT(PyObject *) PyType_GenericNew(PyTypeObject *,
+					       PyObject *, PyObject *);
 
 /* Generic operations on objects */
 extern DL_IMPORT(int) PyObject_Print(PyObject *, FILE *, int);

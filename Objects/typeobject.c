@@ -55,16 +55,22 @@ type_repr(PyTypeObject *type)
 static PyObject *
 type_call(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
-	int size;
-	void *mem;
-	PyObject *obj, *res;
-
-	if (type->tp_construct == NULL) {
+	if (type->tp_new == NULL) {
 		PyErr_Format(PyExc_TypeError,
 			     "cannot construct '%.100s' instances",
 			     type->tp_name);
 		return NULL;
 	}
+
+	return type->tp_new(type, args, kwds);
+}
+
+PyObject *
+PyType_GenericAlloc(PyTypeObject *type, PyObject *args, PyObject *kwds)
+{
+	int size;
+	void *mem;
+	PyObject *obj;
 
 	/* Inline PyObject_New() so we can zero the memory */
 	size = _PyObject_SIZE(type);
@@ -79,15 +85,24 @@ type_call(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	if (type->tp_flags & Py_TPFLAGS_HEAPTYPE)
 		Py_INCREF(type);
 	PyObject_INIT(obj, type);
+	if (PyType_IS_GC(type))
+		PyObject_GC_Init(obj);
+	return obj;
+}
 
-	res = (type->tp_construct)(obj, args, kwds);
-	if (res == NULL) {
-		Py_DECREF(obj);
+PyObject *
+PyType_GenericNew(PyTypeObject *type, PyObject *args, PyObject *kwds)
+{
+	PyObject *self;
+
+	self = type->tp_alloc(type, args, kwds);
+	if (self == NULL)
+		return NULL;
+	if (type->tp_init(self, args, kwds) < 0) {
+		Py_DECREF(self);
 		return NULL;
 	}
-	if (PyType_IS_GC(type))
-		PyObject_GC_Init(res);
-	return res;
+	return self;
 }
 
 /* Helper for subtyping */
@@ -132,7 +147,7 @@ typedef struct {
 
 /* TypeType's constructor is called when a type is subclassed */
 static PyObject *
-type_construct(PyTypeObject *type, PyObject *args, PyObject *kwds)
+type_init(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
 	PyObject *name, *bases, *dict, *x, *slots;
 	PyTypeObject *base;
@@ -166,7 +181,7 @@ type_construct(PyTypeObject *type, PyObject *args, PyObject *kwds)
 				"base type must be a type");
 		return NULL;
 	}
-	if (base->tp_construct == NULL) {
+	if (base->tp_init == NULL) {
 		PyErr_SetString(PyExc_TypeError,
 				"base type must have a constructor slot");
 		return NULL;
@@ -336,8 +351,10 @@ PyTypeObject PyType_Type = {
 	0,					/* tp_dict */
 	0,					/* tp_descr_get */
 	0,					/* tp_descr_set */
-	(ternaryfunc)type_construct,		/* tp_construct */
 	offsetof(PyTypeObject, tp_dict),	/* tp_dictoffset */
+	(initproc)type_init,			/* tp_init */
+	PyType_GenericAlloc,			/* tp_alloc */
+	PyType_GenericNew,			/* tp_new */
 };
 
 
@@ -579,8 +596,10 @@ inherit_slots(PyTypeObject *type, PyTypeObject *base)
 	if (type->tp_flags & base->tp_flags & Py_TPFLAGS_HAVE_CLASS) {
 		COPYSLOT(tp_descr_get);
 		COPYSLOT(tp_descr_set);
-		COPYSLOT(tp_construct);
 		COPYSLOT(tp_dictoffset);
+		COPYSLOT(tp_init);
+		COPYSLOT(tp_alloc);
+		COPYSLOT(tp_new);
 	}
 
 	return 0;
@@ -1136,15 +1155,11 @@ static struct wrapperbase tab_descr_set[] = {
 static PyObject *
 wrap_init(PyObject *self, PyObject *args, void *wrapped)
 {
-	ternaryfunc func = (ternaryfunc)wrapped;
-	PyObject *res;
+	initproc func = (initproc)wrapped;
 
 	/* XXX What about keyword arguments? */
-	res = (*func)(self, args, NULL);
-	if (res == NULL)
+	if (func(self, args, NULL) < 0)
 		return NULL;
-	/* tp_construct doesn't return a new object; it just returns self,
-	   un-INCREF-ed */
 	Py_INCREF(Py_None);
 	return Py_None;
 }
@@ -1242,7 +1257,7 @@ add_operators(PyTypeObject *type)
 	ADD(type->tp_iternext, tab_next);
 	ADD(type->tp_descr_get, tab_descr_get);
 	ADD(type->tp_descr_set, tab_descr_set);
-	ADD(type->tp_construct, tab_init);
+	ADD(type->tp_init, tab_init);
 
 	return 0;
 }
@@ -1513,20 +1528,20 @@ slot_tp_descr_set(PyObject *self, PyObject *target, PyObject *value)
 	return 0;
 }
 
-static PyObject *
-slot_tp_construct(PyObject *self, PyObject *args, PyObject *kwds)
+static int
+slot_tp_init(PyObject *self, PyObject *args, PyObject *kwds)
 {
 	PyObject *meth = PyObject_GetAttrString(self, "__init__");
 	PyObject *res;
 
 	if (meth == NULL)
-		return NULL;
+		return -1;
 	res = PyObject_Call(meth, args, kwds);
 	Py_DECREF(meth);
 	if (res == NULL)
-		return NULL;
+		return -1;
 	Py_DECREF(res);
-	return self;
+	return 0;
 }
 
 static void
@@ -1628,5 +1643,5 @@ override_slots(PyTypeObject *type, PyObject *dict)
 		type->tp_iternext = slot_tp_iternext;
 	TPSLOT(get, tp_descr_get);
 	TPSLOT(set, tp_descr_set);
-	TPSLOT(init, tp_construct);
+	TPSLOT(init, tp_init);
 }

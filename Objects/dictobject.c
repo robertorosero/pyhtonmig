@@ -1276,11 +1276,9 @@ static PySequenceMethods dict_as_sequence = {
 
 staticforward PyObject *dictiter_new(dictobject *);
 
-static PyObject *
-dict_construct(PyDictObject *self, PyObject *args, PyObject *kw)
+static int
+dict_init(PyDictObject *self, PyObject *args, PyObject *kw)
 {
-	if (self == NULL)
-		return PyDict_New();
 	self->ma_size = 0;
 	self->ma_poly = 0;
 	self->ma_table = NULL;
@@ -1290,7 +1288,7 @@ dict_construct(PyDictObject *self, PyObject *args, PyObject *kw)
 #ifdef SHOW_CONVERSION_COUNTS
 	++created;
 #endif
-	return (PyObject *)self;
+	return 0;
 }
 
 PyTypeObject PyDict_Type = {
@@ -1329,7 +1327,10 @@ PyTypeObject PyDict_Type = {
 	0,					/* tp_dict */
 	0,					/* tp_descr_get */
 	0,					/* tp_descr_set */
-	(ternaryfunc)dict_construct,		/* tp_construct */
+	0,					/* tp_dictoffset */
+	(initproc)dict_init,			/* tp_init */
+	PyType_GenericAlloc,			/* tp_alloc */
+	PyType_GenericNew,			/* tp_new */
 };
 
 /* For backward compatibility with old dictionary interface */

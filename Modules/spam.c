@@ -37,25 +37,13 @@ static PyMethodDef spamlist_methods[] = {
 
 staticforward PyTypeObject spamlist_type;
 
-static PyObject *
-spamlist_construct(spamlistobject *arg, PyObject *args, PyObject *kwds)
+static int
+spamlist_init(spamlistobject *self, PyObject *args, PyObject *kwds)
 {
-	spamlistobject *self;
-
-	if (arg != NULL)
-		self = arg;
-	else {
-		self = PyObject_New(spamlistobject, &spamlist_type);
-		if (self == NULL)
-			return NULL;
-	}
-	if (PyList_Type.tp_construct((PyObject *)self, args, kwds) == NULL) {
-		if (self != arg)
-			PyObject_Del(self);
-		return NULL;
-	}
+	if (PyList_Type.tp_init((PyObject *)self, args, kwds) < 0)
+		return -1;
 	self->state = 0;
-	return (PyObject *)self;
+	return 0;
 }
 
 static PyTypeObject spamlist_type = {
@@ -94,7 +82,10 @@ static PyTypeObject spamlist_type = {
 	0,					/* tp_dict */
 	0,					/* tp_descr_get */
 	0,					/* tp_descr_set */
-	(ternaryfunc)spamlist_construct,	/* tp_construct */
+	0,					/* tp_dictoffset */
+	(initproc)spamlist_init,		/* tp_init */
+	PyType_GenericAlloc,			/* tp_alloc */
+	PyType_GenericNew,			/* tp_new */
 };
 
 static PyObject *
@@ -140,25 +131,13 @@ static PyMethodDef spamdict_methods[] = {
 
 staticforward PyTypeObject spamdict_type;
 
-static PyObject *
-spamdict_construct(spamdictobject *arg, PyObject *args, PyObject *kwds)
+static int
+spamdict_init(spamdictobject *self, PyObject *args, PyObject *kwds)
 {
-	spamdictobject *self;
-
-	if (arg != NULL)
-		self = arg;
-	else {
-		self = PyObject_New(spamdictobject, &spamdict_type);
-		if (self == NULL)
-			return NULL;
-	}
-	if (PyDict_Type.tp_construct((PyObject *)self, args, kwds) == NULL) {
-		if (self != arg)
-			PyObject_Del(self);
-		return NULL;
-	}
+	if (PyDict_Type.tp_init((PyObject *)self, args, kwds) < 0)
+		return -1;
 	self->state = 0;
-	return (PyObject *)self;
+	return 0;
 }
 
 static PyTypeObject spamdict_type = {
@@ -197,7 +176,10 @@ static PyTypeObject spamdict_type = {
 	0,					/* tp_dict */
 	0,					/* tp_descr_get */
 	0,					/* tp_descr_set */
-	(ternaryfunc)spamdict_construct,	/* tp_construct */
+	0,					/* tp_dictoffset */
+	(initproc)spamdict_init,		/* tp_init */
+	PyType_GenericAlloc,			/* tp_alloc */
+	PyType_GenericNew,			/* tp_new */
 };
 
 static PyObject *

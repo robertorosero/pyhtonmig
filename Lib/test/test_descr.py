@@ -316,6 +316,8 @@ def pymods():
     global log
     log = []
     class MM(MT):
+        def __init__(self):
+            MT.__init__(self)
         def __getattr__(self, name):
             log.append(("getattr", name))
             return MT.__getattr__(self, name)
@@ -329,11 +331,12 @@ def pymods():
     a.foo = 12
     x = a.foo
     del a.foo
-    verify(log == [('getattr', '__setattr__'),
+    verify(log == [('getattr', '__init__'),
+                   ('getattr', '__setattr__'),
                    ("setattr", "foo", 12),
                    ("getattr", "foo"),
                    ('getattr', '__delattr__'),
-                   ("delattr", "foo")])
+                   ("delattr", "foo")], log)
 
 def all():
     lists()

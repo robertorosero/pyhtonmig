@@ -1242,16 +1242,18 @@ listsort(PyListObject *self, PyObject *args)
 {
 	int err;
 	PyObject *compare = NULL;
+	PyTypeObject *savetype;
 
 	if (args != NULL) {
 		if (!PyArg_ParseTuple(args, "|O:sort", &compare))
 			return NULL;
 	}
+	savetype = self->ob_type;
 	self->ob_type = &immutable_list_type;
 	err = samplesortslice(self->ob_item,
 			      self->ob_item + self->ob_size,
 			      compare);
-	self->ob_type = &PyList_Type;
+	self->ob_type = savetype;
 	if (err < 0)
 		return NULL;
 	Py_INCREF(Py_None);
@@ -1494,14 +1496,12 @@ list_richcompare(PyObject *v, PyObject *w, int op)
 	return PyObject_RichCompare(vl->ob_item[i], wl->ob_item[i], op);
 }
 
-static PyObject *
-list_construct(PyListObject *self, PyObject *args, PyObject *kw)
+static int
+list_init(PyListObject *self, PyObject *args, PyObject *kw)
 {
-	if (self == NULL)
-		return PyList_New(0);
 	self->ob_size = 0;
 	self->ob_item = NULL;
-	return (PyObject *)self;
+	return 0;
 }
 
 static char append_doc[] =
@@ -1585,7 +1585,10 @@ PyTypeObject PyList_Type = {
 	0,					/* tp_dict */
 	0,					/* tp_descr_get */
 	0,					/* tp_descr_set */
-	(ternaryfunc)list_construct,		/* tp_construct */
+	0,					/* tp_dictoffset */
+	(initproc)list_init,			/* tp_init */
+	PyType_GenericAlloc,			/* tp_alloc */
+	PyType_GenericNew,			/* tp_new */
 };
 
 
@@ -1668,6 +1671,6 @@ static PyTypeObject immutable_list_type = {
 	0,					/* tp_dict */
 	0,					/* tp_descr_get */
 	0,					/* tp_descr_set */
-	(ternaryfunc)list_construct,		/* tp_construct */
+	0,					/* tp_init */
 	/* NOTE: This is *not* the standard list_type struct! */
 };

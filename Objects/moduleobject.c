@@ -134,15 +134,13 @@ _PyModule_Clear(PyObject *m)
 
 /* Methods */
 
-static PyObject *
-module_construct(PyModuleObject *m, PyObject *args, PyObject *kw)
+static int
+module_init(PyModuleObject *m, PyObject *args, PyObject *kw)
 {
-	if (m == NULL)
-		return PyModule_New("?");
 	m->md_dict = PyDict_New();
 	if (m->md_dict == NULL)
-		return NULL;
-	return (PyObject *)m;
+		return -1;
+	return 0;
 }
 
 static void
@@ -225,6 +223,8 @@ PyTypeObject PyModule_Type = {
 	0,					/* tp_dict */
 	0,					/* tp_descr_get */
 	0,					/* tp_descr_set */
-	(ternaryfunc)module_construct,		/* tp_construct */
 	offsetof(PyModuleObject, md_dict),	/* tp_dictoffset */
+	(initproc)module_init,			/* tp_init */
+	PyType_GenericAlloc,			/* tp_alloc */
+	PyType_GenericNew,			/* tp_new */
 };

@@ -376,6 +376,5 @@ PyTypeObject PyFunction_Type = {
 	0,					/* tp_dict */
 	func_descr_get,				/* tp_descr_get */
 	0,					/* tp_descr_set */
-	0,					/* tp_construct */
 	offsetof(PyFunctionObject, func_dict),	/* tp_dictoffset */
 };
