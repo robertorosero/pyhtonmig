@@ -1130,6 +1130,7 @@ compiler_compare(struct compiler *c, expr_ty e)
 
 	VISIT(c, expr, e->v.Compare.left);
 	n = asdl_seq_LEN(e->v.Compare.ops);
+	assert(n > 0);
 	if (n > 1)
 		cleanup = compiler_new_block(c);
 	for (i = 1; i < n; i++) {
@@ -1142,11 +1143,9 @@ compiler_compare(struct compiler *c, expr_ty e)
 		NEXT_BLOCK(c);
 		ADDOP(c, POP_TOP);
 	} 
-	if (n) {
-		VISIT(c, expr, asdl_seq_GET(e->v.Compare.comparators, n - 1));
-		ADDOP_I(c, COMPARE_OP,
-		       (cmpop_ty)asdl_seq_GET(e->v.Compare.ops, n - 1));
-	}
+	VISIT(c, expr, asdl_seq_GET(e->v.Compare.comparators, n - 1));
+	ADDOP_I(c, COMPARE_OP,
+	       (cmpop_ty)asdl_seq_GET(e->v.Compare.ops, n - 1));
 	if (n > 1) {
 		int end = compiler_new_block(c);
 		ADDOP_JREL(c, JUMP_FORWARD, end);
