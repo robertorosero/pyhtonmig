@@ -608,6 +608,32 @@ sortlist(v)
 	return 0;
 }
 
+object *
+listtuple(v)
+	object *v;
+{
+	object *w;
+	object **p;
+	int n;
+	if (v == NULL || !is_listobject(v)) {
+		err_badcall();
+		return NULL;
+	}
+	n = ((listobject *)v)->ob_size;
+	w = newtupleobject(n);
+	if (w == NULL)
+		return NULL;
+	p = ((tupleobject *)w)->ob_item;
+	memcpy((ANY *)p,
+	       (ANY *)((listobject *)v)->ob_item,
+	       n*sizeof(object *));
+	while (--n >= 0) {
+		INCREF(*p);
+		p++;
+	}
+	return w;
+}
+
 static object *
 listindex(self, args)
 	listobject *self;

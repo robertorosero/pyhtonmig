@@ -156,8 +156,15 @@ static int
 func_compare(f, g)
 	funcobject *f, *g;
 {
+	int c;
 	if (f->func_globals != g->func_globals)
 		return (f->func_globals < g->func_globals) ? -1 : 1;
+	c = f->func_argcount < g->func_argcount;
+	if (c != 0)
+		return c < 0 ? -1 : 1;
+	c = cmpobject(f->func_argdefs, g->func_argdefs);
+	if (c != 0)
+		return c;
 	return cmpobject(f->func_code, g->func_code);
 }
 
