@@ -1551,7 +1551,7 @@ return the number of keys for which \code{\var{o}[\var{key}] ==
 the Python expression \samp{\var{o}.count(\var{value})}.
 \end{cfuncdesc}
 
-\begin{cfuncdesc}{int}{PySequence_In}{PyObject *o, PyObject *value}
+\begin{cfuncdesc}{int}{PySequence_Contains}{PyObject *o, PyObject *value}
 Determine if \var{o} contains \var{value}.  If an item in \var{o} is
 equal to \var{value}, return \code{1}, otherwise return \code{0}.  On
 error, return \code{-1}.  This is equivalent to the Python expression
