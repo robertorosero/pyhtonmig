@@ -276,11 +276,6 @@ Merged trunk delta into branch:
     cvs -q -z3 up -j date2001-07-21 -j date2001-07-28 descr
 
 4 conflicts, all RCS Ids.  Resolved.
-
-Legit failure in new test_repr, because repr.py dispatches on the exact
-string returned by type(x).  type(1L) and type('s') differ in descr-branch
-now, and repr.py didn't realize that, falling back to the "unknown type"
-case for longs and strings.  Repaired descr-branch repr.py.
 ----------------------------------------------------------------------------
 2001-07-21
 
