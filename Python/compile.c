@@ -194,6 +194,7 @@ struct compiling {
 	int c_nexti;		/* index into c_code */
 	int c_errors;		/* counts errors occurred */
 	int c_infunction;	/* set when compiling a function */
+	int c_interactive;	/* generating code for interactive command */
 	int c_loops;		/* counts nested loops */
 	int c_begin;		/* begin of current loop, for 'continue' */
 	int c_block[MAXBLOCKS];	/* stack of block types */
@@ -267,6 +268,7 @@ com_init(c, filename)
 	c->c_nexti = 0;
 	c->c_errors = 0;
 	c->c_infunction = 0;
+	c->c_interactive = 0;
 	c->c_loops = 0;
 	c->c_begin = 0;
 	c->c_nblocks = 0;
@@ -499,7 +501,7 @@ parsenumber(s)
 #endif
 		return newfloatobject(xx);
 	}
-	err_setstr(SystemError, "bad number syntax?!?!");
+	err_setstr(SyntaxError, "bad number syntax");
 	return NULL;
 }
 
@@ -511,6 +513,7 @@ parsestr(s)
 	int len;
 	char *buf;
 	char *p;
+	char *end;
 	int c;
 	int quote = *s;
 	if (quote != '\'' && quote != '\"') {
@@ -523,11 +526,20 @@ parsestr(s)
 		err_badcall();
 		return NULL;
 	}
+	if (len >= 4 && s[0] == quote && s[1] == quote) {
+		s += 2;
+		len -= 2;
+		if (s[--len] != quote || s[--len] != quote) {
+			err_badcall();
+			return NULL;
+		}
+	}
 	if (strchr(s, '\\') == NULL)
 		return newsizedstringobject(s, len);
 	v = newsizedstringobject((char *)NULL, len);
 	p = buf = getstringvalue(v);
-	while (*s != '\0' && *s != quote) {
+	end = s + len;
+	while (s < end) {
 		if (*s != '\\') {
 			*p++ = *s++;
 			continue;
@@ -535,6 +547,7 @@ parsestr(s)
 		s++;
 		switch (*s++) {
 		/* XXX This assumes ASCII! */
+		case '\n': break;
 		case '\\': *p++ = '\\'; break;
 		case '\'': *p++ = '\''; break;
 		case '\"': *p++ = '\"'; break;
@@ -1367,7 +1380,10 @@ com_expr_stmt(c, n)
 	REQ(n, expr_stmt); /* testlist ('=' testlist)* */
 	com_node(c, CHILD(n, NCH(n)-1));
 	if (NCH(n) == 1) {
-		com_addbyte(c, PRINT_EXPR);
+		if (c->c_interactive)
+			com_addbyte(c, PRINT_EXPR);
+		else
+			com_addbyte(c, POP_TOP);
 	}
 	else {
 		int i;
@@ -2278,11 +2294,13 @@ compile_node(c, n)
 	
 	case single_input: /* One interactive command */
 		/* NEWLINE | simple_stmt | compound_stmt NEWLINE */
+		c->c_interactive++;
 		n = CHILD(n, 0);
 		if (TYPE(n) != NEWLINE)
 			com_node(c, n);
 		com_addoparg(c, LOAD_CONST, com_addconst(c, None));
 		com_addbyte(c, RETURN_VALUE);
+		c->c_interactive--;
 		break;
 	
 	case file_input: /* A whole file, or built-in function exec() */
