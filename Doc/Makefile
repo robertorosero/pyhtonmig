@@ -219,6 +219,7 @@ latex-$(RELEASE).tar.bz2:
 	$(TOOLSDIR)/mksourcepkg --bzip2 $(RELEASE)
 
 latex-$(RELEASE).zip:
+	rm -f $@
 	$(TOOLSDIR)/mksourcepkg --zip $(RELEASE)
 
 pdf-$(PAPER)-$(RELEASE).tgz: pdf
@@ -228,7 +229,8 @@ pdf-$(PAPER)-$(RELEASE).tar.bz2: pdf
 	(cd paper-$(PAPER); tar cf - *.pdf) | bzip2 -9 >$@
 
 pdf-$(PAPER)-$(RELEASE).zip: pdf
-	(cd paper-$(PAPER); zip -9 ../$@ *.pdf)
+	rm -f $@
+	(cd paper-$(PAPER); zip -q -9 ../$@ *.pdf)
 
 postscript-$(PAPER)-$(RELEASE).tar.bz2: ps
 	(cd paper-$(PAPER); $(MAKE) README)
@@ -240,7 +242,8 @@ postscript-$(PAPER)-$(RELEASE).tgz: ps
 
 postscript-$(PAPER)-$(RELEASE).zip: ps
 	(cd paper-$(PAPER); $(MAKE) README)
-	(cd paper-$(PAPER); zip -9 ../$@ *.ps README)
+	rm -f $@
+	(cd paper-$(PAPER); zip -q -9 ../$@ *.ps README)
 
 html-$(RELEASE).tgz:	html
 	(cd $(HTMLDIR); \
@@ -253,8 +256,9 @@ html-$(RELEASE).tar.bz2:	html
 		| bzip2 -9 >$@
 
 html-$(RELEASE).zip:	html
+	rm -f $@
 	(cd $(HTMLDIR); \
-		zip -9 ../$@ *index.html ???/*.css ???/*.html */*.gif)
+		zip -q -9 ../$@ *index.html ???/*.css ???/*.html */*.gif)
 
 # convenience targets:
 
