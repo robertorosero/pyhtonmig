@@ -298,8 +298,8 @@ __all__ = [
     'Tester',
     'DocTestTestCase',
     'DocTestSuite',
-#    'testsource',
-#    'debug',
+    'testsource',
+    'debug',
 #    'master',
 ]
 
@@ -657,11 +657,24 @@ class DocTestFinder:
         self._recurse = recurse
 
     def find(self, obj, name=None, module=None, globs=None,
-             extraglobs=None):
+             extraglobs=None, ignore_imports=True):
         """
         Return a list of the DocTests that are defined by the given
         object's docstring, or by any of its contained objects'
         docstrings.
+
+        The optional parameter `module` is the module that contains
+        the given object.  If the module is not specified, then the
+        test finder will attempt to automatically determine the
+        correct module.  The object's module is used:
+
+            - As a default namespace, if `globs` is not specified.
+            - To prevent the DocTestFinder from extracting DocTests
+              from objects that are imported from other modules
+              (as long as `ignore_imports` is true).
+            - To find the name of the file containing the object.
+            - To help find the line number of the object within its
+              file.
 
         The globals for each DocTest is formed by combining `globs`
         and `extraglobs` (bindings in `extraglobs` override bindings
@@ -670,6 +683,11 @@ class DocTestFinder:
         defaults to the module's `__dict__`, if specified, or {}
         otherwise.  If `extraglobs` is not specified, then it defaults
         to {}.
+
+        If the optional flag `ignore_imports` is true, then the
+        doctest finder will ignore any contained objects whose module
+        does not match `module`.  Otherwise, it will extract tests
+        from all contained objects, including imported objects.
         """
         # If name was not specified, then extract it from the object.
         if name is None:
@@ -681,20 +699,9 @@ class DocTestFinder:
 
         # Find the module that contains the given object (if obj is
         # a module, then module=obj.).  Note: this may fail, in which
-        # case, module will be None.
+        # case module will be None.
         if module is None:
             module = inspect.getmodule(obj)
-
-        # This is a hack to help Tester.rundict.  Setting module=None
-        # in Tester.rundict should make the tester ignore which module
-        # a function comes from; but DocTestFinder.find will attempt
-        # to derive the correct module if one isn't specified.  So
-        # Tester.rundict can explicitly request that no module be
-        # found by using module='(None)'.  Note that this means that
-        # DocTestFinder will be unable to find the test examples'
-        # filenames and line numbers, so they will be set to None.
-        if module == '(None)':
-            module = None
 
         # Read the module's source code.  This is used by
         # DocTestFinder._find_lineno to find the line number for a
@@ -720,7 +727,8 @@ class DocTestFinder:
 
         # Recursively expore `obj`, extracting DocTests.
         tests = []
-        self._find(tests, obj, name, module, source_lines, globs, {})
+        self._find(tests, obj, name, module, source_lines,
+                   globs, ignore_imports, {})
         return tests
 
     def _filter(self, obj, prefix, base):
@@ -745,10 +753,15 @@ class DocTestFinder:
             return module.__name__ == object.__module__
         elif inspect.getmodule(object) is not None:
             return module is inspect.getmodule(object)
+        elif hasattr(object, '__module__'):
+            return module.__name__ == object.__module__
+        elif isinstance(object, property):
+            return True # [XX] no way not be sure.
         else:
             raise ValueError("object must be a class or function")
 
-    def _find(self, tests, obj, name, module, source_lines, globs, seen):
+    def _find(self, tests, obj, name, module, source_lines,
+              globs, ignore_imports, seen):
         """
         Find tests for the given object and any contained objects, and
         add them to `tests`.
@@ -774,10 +787,10 @@ class DocTestFinder:
                     continue
                 valname = '%s.%s' % (name, valname)
                 # Recurse to functions & classes.
-                if ((inspect.isfunction(val) or inspect.isclass(val))
-                    and self._from_module(module, val)):
-                    self._find(tests, val, valname, module,
-                               source_lines, globs, seen)
+                if ((inspect.isfunction(val) or inspect.isclass(val)) and
+                    (self._from_module(module, val) or not ignore_imports)):
+                    self._find(tests, val, valname, module, source_lines,
+                               globs, ignore_imports, seen)
 
         # Look for tests in a module's __test__ dictionary.
         if inspect.ismodule(obj) and self._recurse:
@@ -794,8 +807,8 @@ class DocTestFinder:
                                      "classes, or modules: %r" %
                                      (type(val),))
                 valname = '%s.%s' % (name, valname)
-                self._find(tests, val, valname, module,
-                           source_lines, globs, seen)
+                self._find(tests, val, valname, module, source_lines,
+                           globs, ignore_imports, seen)
 
         # Look for tests in a class's contained objects.
         if inspect.isclass(obj) and self._recurse:
@@ -810,11 +823,12 @@ class DocTestFinder:
                     val = getattr(obj, valname).im_func
 
                 # Recurse to methods, properties, and nested classes.
-                if (inspect.isfunction(val) or inspect.isclass(val) or
-                    isinstance(val, property)):
+                if ((inspect.isfunction(val) or inspect.isclass(val) or
+                    isinstance(val, property)) and
+                    (self._from_module(module, val) or not ignore_imports)):
                     valname = '%s.%s' % (name, valname)
-                    self._find(tests, val, valname, module,
-                               source_lines, globs, seen)
+                    self._find(tests, val, valname, module, source_lines,
+                               globs, ignore_imports, seen)
 
     def _get_test(self, obj, name, module, globs, source_lines):
         """
@@ -1170,16 +1184,17 @@ class DocTestRunner:
                                ('most recent call last', 'innermost last'),
                                re.MULTILINE | re.DOTALL)
 
-    _OPTION_DIRECTIVE_RE = re.compile('\s*doctest:\s*(?P<flags>[^#]*)')
+    _OPTION_DIRECTIVE_RE = re.compile('\s*doctest:\s*(?P<flags>[^#\n]*)')
 
     def __handle_directive(self, example):
         """
         Check if the given example is actually a directive to doctest
-        (to turn an optionflag on or off; and if it is, then handle
+        (to turn an optionflag on or off); and if it is, then handle
         the directive.
 
         Return true iff the example is actually a directive (and so
         should not be executed).
+
         """
         m = self._OPTION_DIRECTIVE_RE.match(example.source)
         if m is None:
@@ -1208,7 +1223,7 @@ class DocTestRunner:
         # Keep track of the number of failures and tries.
         failures = tries = 0
 
-        # Save the option flags (since doctest directives can be used
+        # Save the option flags (since option directives can be used
         # to modify them).
         original_optionflags = self.optionflags
 
@@ -1578,10 +1593,11 @@ class Tester:
             print f, "of", t, "examples failed in string", name
         return (f,t)
 
-    def rundoc(self, object, name=None, module=None):
+    def rundoc(self, object, name=None, module=None, ignore_imports=True):
         f = t = 0
         tests = self.testfinder.find(object, name, module=module,
-                                     globs=self.globs)
+                                     globs=self.globs,
+                                     ignore_imports=ignore_imports)
         for test in tests:
             (f2, t2) = self.testrunner.run(test)
             (f,t) = (f+f2, t+t2)
@@ -1591,8 +1607,8 @@ class Tester:
         import new
         m = new.module(name)
         m.__dict__.update(d)
-        if module is None: module = '(None)'
-        return self.rundoc(m, name, module)
+        ignore_imports = (module is not None)
+        return self.rundoc(m, name, module, ignore_imports)
 
     def run__test__(self, d, name):
         import new
@@ -1604,7 +1620,15 @@ class Tester:
         return self.testrunner.summarize(verbose)
 
     def merge(self, other):
-        pass # [XX] not implemented yet.
+        d = self.testrunner._name2ft
+        for name, (f, t) in other.testrunner._name2ft.items():
+            if name in d:
+                print "*** Tester.merge: '" + name + "' in both" \
+                    " testers; summing outcomes."
+                f2, t2 = d[name]
+                f = f + f2
+                t = t + t2
+            d[name] = f, t
 
 ######################################################################
 ## 7. Unittest Support
