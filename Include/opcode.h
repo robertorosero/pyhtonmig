@@ -119,8 +119,6 @@ extern "C" {
 #define STORE_FAST	125	/* Local variable number */
 #define DELETE_FAST	126	/* Local variable number */
 
-#define SET_LINENO	127	/* Current line number */
-
 #define RAISE_VARARGS	130	/* Number of raise arguments (1, 2 or 3) */
 /* CALL_FUNCTION_XXX opcodes defined below depend on this definition */
 #define CALL_FUNCTION	131	/* #args + (#kwargs<<8) */

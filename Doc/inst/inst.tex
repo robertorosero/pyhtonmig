@@ -17,7 +17,7 @@
 % and Feeding of a Python Installation" talk in here somewhere.  Yow!
 
 \author{Greg Ward}
-\authoraddress{Email: \email{gward@python.net}}
+\authoraddress{Email: \email{distutils-sig@python.org}}
 
 \makeindex
 
@@ -119,7 +119,7 @@ python setup.py install
 \end{verbatim}
 
 If all these things are true, then you already know how to build and
-install the modules you've just downloaded: run the command above.
+install the modules you've just downloaded:  Run the command above.
 Unless you need to install things in a non-standard way or customize the
 build process, you don't really need this manual.  Or rather, the above
 command is everything you need to get out of this manual.
@@ -168,22 +168,11 @@ cd c:\Temp\foo-1.0
 python setup.py install
 \end{verbatim}
 
-On Mac OS, you have to go through a bit more effort to supply
-command-line arguments to the setup script:
-\begin{itemize}
-\item hit option-double-click on the script's icon (or option-drop it
-  onto the Python interpreter's icon)
-\item press the ``Set unix-style command line'' button
-\item set the ``Keep stdio window open on termination'' if you're
-  interested in seeing the output of the setup script (which is usually
-  voluminous and often useful)
-\item when the command-line dialog pops up, enter ``install'' (you
-  can, of course, enter any Distutils command-line as described in this
-  document or in \citetitle[../dist/dist.html]{Distributing Python
-  Modules}: just leave off the initial \code{python setup.py} and
-  you'll be fine)
-\end{itemize}
-
+On Mac OS 9, you double-click the \file{setup.py} script. It will bring
+up a dialog where you can select the \command{install} command. Then
+selecting the \command{run} button will install your distribution.
+The dialog is built dynamically, so all commands and options for this
+specific distribution are listed.
 
 \subsection{Splitting the job up}
 \label{splitting-up}
@@ -193,7 +182,7 @@ run.  If you prefer to work incrementally---especially useful if you
 want to customize the build process, or if things are going wrong---you
 can use the setup script to do one thing at a time.  This is
 particularly helpful when the build and install will be done by
-different users---e.g., you might want to build a module distribution
+different users---for example, you might want to build a module distribution
 and hand it off to a system administrator for installation (or do it
 yourself, with super-user privileges).
 
@@ -320,7 +309,7 @@ installation uses for \filevar{prefix} and \filevar{exec-prefix} by
 running Python in interactive mode and typing a few simple commands.
 Under \UNIX, just type \code{python} at the shell prompt.  Under
 Windows, choose \menuselection{Start \sub Programs \sub Python
-2.1 \sub Python (command line)}.  Under Mac OS, \XXX{???}.
+2.1 \sub Python (command line)}.  Under Mac OS 9, start \file{PythonInterpreter}.
 Once the interpreter is started, you type Python code at the
 prompt.  For example, on my Linux system, I type the three Python
 statements shown below, and get the output as shown, to find out my
@@ -598,13 +587,11 @@ two types of modules to worry about, pure modules and non-pure modules
 python setup.py install --install-purelib=Site --install-platlib=Site
 \end{verbatim}
 
-The specified installation directories are relative to \filevar{prefix}.
-Of course, you also have to ensure that these directories are in
-Python's module search path, e.g. by putting a \file{.pth} file in
-\filevar{prefix}.
-
-% \XXX should have a section describing \file{.pth} files and
-% cross-ref it here
+The specified installation directories are relative to
+\filevar{prefix}.  Of course, you also have to ensure that these
+directories are in Python's module search path, such as by putting a
+\file{.pth} file in \filevar{prefix}.  See section~\ref{search-path}
+to find out how to modify Python's search path.
 
 If you want to define an entire installation scheme, you just have to
 supply all of the installation directory options.  The recommended way
@@ -682,12 +669,97 @@ In fact, you can use environment variables in config files on
 platforms that have such a notion but the Distutils additionally
 define a few extra variables that may not be in your environment, such
 as \code{\$PLAT}.  (And of course, on systems that don't have
-environment variables, such as Mac OS (\XXX{true?}), the configuration
+environment variables, such as Mac OS 9, the configuration
 variables supplied by the Distutils are the only ones you can use.)
 See section~\ref{config-files} for details.
 
 % XXX need some Windows and Mac OS examples---when would custom
 % installation schemes be needed on those platforms?
+
+
+% XXX I'm not sure where this section should go.
+\subsection{Modifying Python's Search Path}
+\label{search-path}
+
+When the Python interpreter executes an \keyword{import} statement, it
+searches for both Python code and extension modules along a search
+path.  A default value for the path is configured into the Python
+binary when the interpreter is built.  You can determine the path by
+importing the \module{sys} module and printing the value of
+\code{sys.path}.  
+
+\begin{verbatim}
+$ python
+Python 2.2 (#11, Oct  3 2002, 13:31:27)
+[GCC 2.96 20000731 (Red Hat Linux 7.3 2.96-112)] on linux2
+Type ``help'', ``copyright'', ``credits'' or ``license'' for more information.
+>>> import sys
+>>> sys.path
+['', '/usr/local/lib/python2.3', '/usr/local/lib/python2.3/plat-linux2', 
+ '/usr/local/lib/python2.3/lib-tk', '/usr/local/lib/python2.3/lib-dynload', 
+ '/usr/local/lib/python2.3/site-packages']
+>>>
+\end{verbatim}
+
+The null string in \code{sys.path} represents the current working
+directory.   
+
+The expected convention for locally installed packages is to put them
+in the \file{.../site-packages/} directory, but you may want to
+install Python modules into some arbitrary directory.  For example,
+your site may have a convention of keeping all software related to the
+web server under \file{/www}.  Add-on Python modules might then belong
+in \file{/www/python}, and in order to import them, this directory
+must be added to \code{sys.path}.  There are several different ways to
+add the directory.
+
+The most convenient way is to add a path configuration file to a
+directory that's already on Python's path, usually to the
+\file{.../site-packages/} directory.  Path configuration files have an
+extension of \file{.pth}, and each line must contain a single path
+that will be appended to \code{sys.path}.  (Because the new paths are
+appended to \code{sys.path}, modules in the added directories will not
+override standard modules.  This means you can't use this mechanism
+for installing fixed versions of standard modules.)
+
+Paths can be absolute or relative, in which case they're relative to
+the directory containing the \file{.pth} file.  Any directories added
+to the search path will be scanned in turn for \file{.pth} files.  See
+\citetitle[http://www.python.org/dev/doc/devel/lib/module-site.html]{the
+documentation for the \module{site} module} for more information.
+
+A slightly less convenient way is to edit the \file{site.py} file in
+Python's standard library, and modify \code{sys.path}.  \file{site.py}
+is automatically imported when the Python interpreter is executed,
+unless the \programopt{-S} switch is supplied to suppress this
+behaviour.  So you could simply edit \file{site.py} and add two lines to it:
+
+\begin{verbatim}
+import sys
+sys.path.append('/www/python/')
+\end{verbatim}
+
+However, if you reinstall the same major version of Python (perhaps
+when upgrading from 2.2 to 2.2.2, for example) \file{site.py} will be
+overwritten by the stock version.  You'd have to remember that it was
+modified and save a copy before doing the installation.
+
+There are two environment variables that can modify \code{sys.path}.
+\envvar{PYTHONHOME} sets an alternate value for the prefix of the
+Python installation.  For example, if \envvar{PYTHONHOME} is set to
+\samp{/www/python}, the search path will be set to \code{['',
+'/www/python/lib/python2.2/', '/www/python/lib/python2.3/plat-linux2',
+...]}.  
+
+The \envvar{PYTHONPATH} variable can be set to a list of paths that
+will be added to the beginning of \code{sys.path}.  For example, if
+\envvar{PYTHONPATH} is set to \samp{/www/python:/opt/py}, the search
+path will begin with \code{['/www/python', '/opt/py']}.  (Note that
+directories must exist in order to be added to \code{sys.path}; the
+\module{site} module removes paths that don't exist.)
+
+Finally, \code{sys.path} is just a regular Python list, so any Python
+application can modify it by adding or removing entries.
 
 
 \section{Distutils Configuration Files}
@@ -720,7 +792,7 @@ On Windows, the configuration files are:
 \begin{tableiii}{l|l|c}{textrm}
   {Type of file}{Location and filename}{Notes}
   \lineiii{system}{\filenq{\filevar{prefix}\textbackslash{}Lib\textbackslash{}distutils\textbackslash{}distutils.cfg}}{(4)}
-  \lineiii{personal}{\filenq{\%HOME\textbackslash{}pydistutils.cfg}}{(5)}
+  \lineiii{personal}{\filenq{\%HOME\%\textbackslash{}pydistutils.cfg}}{(5)}
   \lineiii{local}{\filenq{setup.cfg}}{(3)}
 \end{tableiii}
 
@@ -743,7 +815,8 @@ And on Mac OS, they are:
   1.5.2.
 \item[(2)] On \UNIX, if the \envvar{HOME} environment variable is not
   defined, the user's home directory will be determined with the
-  \function{getpwuid()} function from the standard \module{pwd} module.
+  \function{getpwuid()} function from the standard
+  \ulink{\module{pwd}}{../lib/module-pwd.html} module.
 \item[(3)] I.e., in the current directory (usually the location of the
   setup script).
 \item[(4)] (See also note (1).)  Under Python 1.6 and later, Python's
@@ -860,29 +933,32 @@ A \file{Setup} file, if present, is parsed in order to get a list of
 extensions to build.  Each line in a \file{Setup} describes a single
 module.  Lines have the following structure:
 
-\begin{verbatim}
- <module> ... [<sourcefile> ...] [<cpparg> ...] [<library> ...]
-\end{verbatim}
+\begin{alltt}
+\var{module} ... [\var{sourcefile} ...] [\var{cpparg} ...] [\var{library} ...]
+\end{alltt}
 
 Let's examine each of the fields in turn.
 
 \begin{itemize}
 
 \item \var{module} is the name of the extension module to be built,
-and should be a valid Python identifier.  You can't just change this
-in order to rename a module (edits to the source code would also be
-needed), so this should be left alone.
+      and should be a valid Python identifier.  You can't just change
+      this in order to rename a module (edits to the source code would
+      also be needed), so this should be left alone.
 
 \item \var{sourcefile} is anything that's likely to be a source code
-file, at least judging by the filename.  Filenames ending in .c are
-assumed to be written in C, filenames ending in .C, .cc, .c++ are
-assumed to be \Cpp, and filenames ending in .m or .mm are assumed to
-be in Objective C.
+      file, at least judging by the filename.  Filenames ending in
+      \file{.c} are assumed to be written in C, filenames ending in
+      \file{.C}, \file{.cc}, and \file{.c++} are assumed to be
+      \Cpp, and filenames ending in \file{.m} or \file{.mm} are
+      assumed to be in Objective C.
 
 \item \var{cpparg} is an argument for the C preprocessor, 
-and is anything starting with -I, -D, -U or -C .
+      and is anything starting with \programopt{-I}, \programopt{-D},
+      \programopt{-U} or \programopt{-C}.
 
-\item <library> is anything ending in .a or beginning with -l or -L.
+\item \var{library} is anything ending in \file{.a} or beginning with
+      \programopt{-l} or \programopt{-L}.
 \end{itemize}
 
 If a particular platform requires a special library on your platform,
@@ -894,27 +970,28 @@ foo foomodule.c
 \end{verbatim}
 
 must be linked with the math library \file{libm.a} on your platform,
-simply add \samp{-lm} to the line:
+simply add \programopt{-lm} to the line:
 
 \begin{verbatim}
 foo foomodule.c -lm
 \end{verbatim}
 
 Arbitrary switches intended for the compiler or the linker can be
-supplied with the \code{-Xcompiler \var{arg}} and \code{-Xlinker
-\var{arg}} options:
+supplied with the \programopt{-Xcompiler} \var{arg} and
+\programopt{-Xlinker} \var{arg} options:
 
 \begin{verbatim}
 foo foomodule.c -Xcompiler -o32 -Xlinker -shared -lm
 \end{verbatim}
 
-The next option after \code{-Xcompiler} and \code{-Xlinker} will be
-appended to the proper command line, so in the above example the
-compiler will be passed the \samp{-o32} option, and the linker will be
-passed \samp{-shared}.  If a compiler option requires an argument,
-you'll have to supply multiple \code{-Xcompiler} options; for example,
-to pass \code{-x c++} the \file{Setup} file would have to contain
-\code{-Xcompiler -x -Xcompiler c++}.  
+The next option after \programopt{-Xcompiler} and
+\programopt{-Xlinker} will be appended to the proper command line, so
+in the above example the compiler will be passed the \programopt{-o32}
+option, and the linker will be passed \programopt{-shared}.  If a
+compiler option requires an argument, you'll have to supply multiple
+\programopt{-Xcompiler} options; for example, to pass \code{-x c++} the
+\file{Setup} file would have to contain
+\code{-Xcompiler -x -Xcompiler c++}.
 
 Compiler flags can also be supplied through setting the
 \envvar{CFLAGS} environment variable.  If set, the contents of
@@ -977,25 +1054,24 @@ for Distutils (see section~\ref{config-files}.)
     {Information about the free \Cpp{} compiler from Borland,
      including links to the download pages.}
 
-  \seetitle[http://www.cyberus.ca/~g_will/pyExtenDL.shtml]
+  \seetitle[http://www.cyberus.ca/\~{}g_will/pyExtenDL.shtml]
     {Creating Python Extensions Using Borland's Free Compiler}
     {Document describing how to use Borland's free command-line C++
      compiler to build Python.}
 \end{seealso}
 
 
-\subsubsection{GNU C / Cygwin / MinGW32}
+\subsubsection{GNU C / Cygwin / MinGW}
 
 This section describes the necessary steps to use Distutils with the
-GNU C/\Cpp{} compilers in their Cygwin and MinGW32
+GNU C/\Cpp{} compilers in their Cygwin and MinGW
 distributions.\footnote{Check
 \url{http://sources.redhat.com/cygwin/} and
 \url{http://www.mingw.org/} for more information}
+For a Python interpreter that was built with Cygwin, everything should
+work without any of these following steps.
 
-\XXX{For a Python which was built with Cygwin, all should work without 
-any of these following steps.}
-
-These compilers also require some special libraries.
+These compilers require some special libraries.
 This task is more complex than for Borland's \Cpp, because there is no
 program to convert the library.
 % I don't understand what the next line means. --amk
@@ -1033,7 +1109,7 @@ python setup.py build --compiler=cygwin
 
 and for Cygwin in no-cygwin mode\footnote{Then you have no
 \POSIX{} emulation available, but you also don't need
-\file{cygwin1.dll}.} or for MinGW32 type:
+\file{cygwin1.dll}.} or for MinGW type:
  
 \begin{verbatim}
 python setup.py build --compiler=mingw32
@@ -1045,12 +1121,12 @@ for Distutils (see section~\ref{config-files}.)
 
 \begin{seealso}
   \seetitle[http://www.zope.org/Members/als/tips/win32_mingw_modules]
-    {Building Python modules on MS Windows platform with MinGW32}
-    {Information about building the required libraries for the MinGW32
+    {Building Python modules on MS Windows platform with MinGW}
+    {Information about building the required libraries for the MinGW
      environment.}
 
   \seeurl{http://pyopengl.sourceforge.net/ftp/win32-stuff/}
-    {Converted import libraries in Cygwin/MinGW32 and Borland format,
+    {Converted import libraries in Cygwin/MinGW and Borland format,
      and a script to create the registry entries needed for Distutils
      to locate the built Python.}
 \end{seealso}

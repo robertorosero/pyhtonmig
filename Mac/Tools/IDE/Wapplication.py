@@ -8,6 +8,7 @@ import traceback
 from types import *
 from Carbon import Menu; MenuToolbox = Menu; del Menu
 import macresource
+from Carbon import File
 
 if hasattr(Win, "FrontNonFloatingWindow"):
 	MyFrontWindow = Win.FrontNonFloatingWindow
@@ -190,6 +191,8 @@ class Application(FrameWork.Application):
 			self.checkmenus(None)
 		result = MenuToolbox.MenuSelect(where)
 		id = (result>>16) & 0xffff	# Hi word
+		if id >= 0x8000:
+			id = -0x10000 + id
 		item = result & 0xffff		# Lo word
 		self.do_rawmenu(id, item, window, event)
 	
@@ -271,7 +274,7 @@ class Application(FrameWork.Application):
 		if done.has_key(top):
 			return
 		done[top] = 1
-		import os, macfs, string
+		import os, string
 		try:
 			names = os.listdir(top)
 		except os.error:
@@ -283,21 +286,23 @@ class Application(FrameWork.Application):
 			if name == "CVS":
 				continue
 			try:
-				fss, isdir, isalias = macfs.ResolveAliasFile(name)
+				fsr, isdir, isalias = File.FSResolveAliasFile(name, 1)
 			except:
 				# maybe a broken alias
 				continue
-			path = fss.as_pathname()
+			path = fsr.as_pathname()
 			if done.has_key(path):
 				continue
 			name = string.strip(name)
+			if os.name == "posix":
+				name = unicode(name, "utf-8")
 			if name[-3:] == '---':
 				menu.addseparator()
 			elif isdir:
 				submenu = FrameWork.SubMenu(menu, name)
 				self.scriptswalk(path, submenu, done)
 			else:
-				creator, type = fss.GetCreatorType()
+				creator, type = MacOS.GetCreatorAndType(path)
 				if type == 'TEXT':
 					if name[-3:] == '.py':
 						name = name[:-3]

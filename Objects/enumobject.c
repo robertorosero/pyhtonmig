@@ -54,44 +54,37 @@ enum_next(enumobject *en)
 {
 	PyObject *result;
 	PyObject *next_index;
-
-	PyObject *next_item = PyIter_Next(en->en_sit);
-	if (next_item == NULL)
-		return NULL;
+	PyObject *next_item;
 
 	result = PyTuple_New(2);
-	if (result == NULL) {
-		Py_DECREF(next_item);
+	if (result == NULL)
+		return NULL;
+
+	next_index = PyInt_FromLong(en->en_index);
+	if (next_index == NULL) {
+		Py_DECREF(result);
 		return NULL;
 	}
+	PyTuple_SET_ITEM(result, 0, next_index);
 
-	next_index = PyInt_FromLong(en->en_index++);
-	if (next_index == NULL) {
-		Py_DECREF(next_item);
+	next_item = PyIter_Next(en->en_sit);
+	if (next_item == NULL) {
 		Py_DECREF(result);
 		return NULL;
 	}
 
-	PyTuple_SET_ITEM(result, 0, next_index);
+	en->en_index++;
 	PyTuple_SET_ITEM(result, 1, next_item);
 	return result;
 }
 
-static PyObject *
-enum_getiter(PyObject *en)
-{
-	Py_INCREF(en);
-	return en;
-}
-
-static PyMethodDef enum_methods[] = {
-	{"next",    (PyCFunction)enum_next, METH_NOARGS,
-	 "return the next (index, value) pair, or raise StopIteration"},
-	{NULL,      NULL}       /* sentinel */
-};
-
 PyDoc_STRVAR(enum_doc,
-"enumerate(iterable) -> create an enumerating-iterator");
+"enumerate(iterable) -> iterator for index, value of iterable\n"
+"\n"
+"Return an enumerate object.  iterable must be an other object that supports\n"
+"iteration.  The enumerate object yields pairs containing a count (from\n"
+"zero) and a value yielded by the iterable argument.  enumerate is useful\n"
+"for obtaining an indexed list: (0, seq[0]), (1, seq[1]), (2, seq[2]), ...");
 
 PyTypeObject PyEnum_Type = {
 	PyObject_HEAD_INIT(&PyType_Type)
@@ -122,9 +115,9 @@ PyTypeObject PyEnum_Type = {
 	0,                              /* tp_clear */
 	0,                              /* tp_richcompare */
 	0,                              /* tp_weaklistoffset */
-	(getiterfunc)enum_getiter,      /* tp_iter */
+	PyObject_SelfIter,		/* tp_iter */
 	(iternextfunc)enum_next,        /* tp_iternext */
-	enum_methods,                   /* tp_methods */
+	0,                              /* tp_methods */
 	0,                              /* tp_members */
 	0,                              /* tp_getset */
 	0,                              /* tp_base */

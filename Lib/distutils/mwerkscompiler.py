@@ -4,6 +4,10 @@ Contains MWerksCompiler, an implementation of the abstract CCompiler class
 for MetroWerks CodeWarrior on the Macintosh. Needs work to support CW on
 Windows."""
 
+# This module should be kept compatible with Python 1.5.2.
+
+__revision__ = "$Id$"
+
 import sys, os, string
 from types import *
 from distutils.errors import \
@@ -84,7 +88,8 @@ class MWerksCompiler (CCompiler) :
               debug=0,
               extra_preargs=None,
               extra_postargs=None,
-              build_temp=None):
+              build_temp=None,
+              target_lang=None):
         # First fixup.
         (objects, output_dir) = self._fix_object_args (objects, output_dir)
         (libraries, library_dirs, runtime_library_dirs) = \

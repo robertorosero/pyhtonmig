@@ -1,13 +1,28 @@
 """Text wrapping and filling.
 """
 
-# Copyright (C) 2001 Gregory P. Ward.
+# Copyright (C) 1999-2001 Gregory P. Ward.
 # Copyright (C) 2002 Python Software Foundation.
 # Written by Greg Ward <gward@python.net>
+
+# XXX currently this module does not work very well with Unicode
+# strings.  See http://www.python.org/sf/622831 for updates.
 
 __revision__ = "$Id$"
 
 import string, re
+
+__all__ = ['TextWrapper', 'wrap', 'fill']
+
+# Hardcode the recognized whitespace characters to the US-ASCII
+# whitespace characters.  The main reason for doing this is that in
+# ISO-8859-1, 0xa0 is non-breaking whitespace, so in certain locales
+# that character winds up in string.whitespace.  Respecting
+# string.whitespace in those cases would 1) make textwrap treat 0xa0 the
+# same as any other whitespace char, which is clearly wrong (it's a
+# *non-breaking* space), 2) possibly cause problems with Unicode,
+# since 0xa0 is not in range(128).
+_whitespace = '\t\n\x0b\x0c\r '
 
 class TextWrapper:
     """
@@ -38,25 +53,29 @@ class TextWrapper:
         single space!
       fix_sentence_endings (default: false)
         Ensure that sentence-ending punctuation is always followed
-        by two spaces.  Off by default becaus the algorithm is
+        by two spaces.  Off by default because the algorithm is
         (unavoidably) imperfect.
       break_long_words (default: true)
         Break words longer than 'width'.  If false, those words will not
         be broken, and some lines might be longer than 'width'.
     """
 
-    whitespace_trans = string.maketrans(string.whitespace,
-                                        ' ' * len(string.whitespace))
+    whitespace_trans = string.maketrans(_whitespace, ' ' * len(_whitespace))
 
-    # This funky little regex is just the trick for splitting 
+    unicode_whitespace_trans = {}
+    uspace = ord(u' ')
+    for x in map(ord, _whitespace):
+        unicode_whitespace_trans[x] = uspace
+
+    # This funky little regex is just the trick for splitting
     # text up into word-wrappable chunks.  E.g.
     #   "Hello there -- you goof-ball, use the -b option!"
     # splits into
     #   Hello/ /there/ /--/ /you/ /goof-/ball,/ /use/ /the/ /-b/ /option!
     # (after stripping out empty strings).
     wordsep_re = re.compile(r'(\s+|'                  # any whitespace
-                            r'\w{2,}-(?=\w{2,})|'     # hyphenated words
-                            r'(?<=\w)-{2,}(?=\w))')   # em-dash
+                            r'-*\w{2,}-(?=\w{2,})|'   # hyphenated words
+                            r'(?<=\S)-{2,}(?=\w))')   # em-dash
 
     # XXX will there be a locale-or-charset-aware version of
     # string.lowercase in 2.3?
@@ -81,7 +100,7 @@ class TextWrapper:
         self.replace_whitespace = replace_whitespace
         self.fix_sentence_endings = fix_sentence_endings
         self.break_long_words = break_long_words
-        
+
 
     # -- Private methods -----------------------------------------------
     # (possibly useful for subclasses to override)
@@ -96,7 +115,10 @@ class TextWrapper:
         if self.expand_tabs:
             text = text.expandtabs()
         if self.replace_whitespace:
-            text = text.translate(self.whitespace_trans)
+            if isinstance(text, str):
+                text = text.translate(self.whitespace_trans)
+            elif isinstance(text, unicode):
+                text = text.translate(self.unicode_whitespace_trans)
         return text
 
 
@@ -192,8 +214,9 @@ class TextWrapper:
             # Maximum width for this line.
             width = self.width - len(indent)
 
-            # First chunk on line is whitespace -- drop it.
-            if chunks[0].strip() == '':
+            # First chunk on line is whitespace -- drop it, unless this
+            # is the very beginning of the text (ie. no lines started yet).
+            if chunks[0].strip() == '' and lines:
                 del chunks[0]
 
             while chunks:
@@ -209,7 +232,7 @@ class TextWrapper:
                     break
 
             # The current line is full, and the next chunk is too big to
-            # fit on *any* line (not just this one).  
+            # fit on *any* line (not just this one).
             if chunks and len(chunks[0]) > width:
                 self._handle_long_word(chunks, cur_line, cur_len, width)
 
@@ -237,8 +260,9 @@ class TextWrapper:
         converted to space.
         """
         text = self._munge_whitespace(text)
-        if len(text) <= self.width:
-            return [text]
+        indent = self.initial_indent
+        if len(text) + len(indent) <= self.width:
+            return [indent + text]
         chunks = self._split(text)
         if self.fix_sentence_endings:
             self._fix_sentence_endings(chunks)

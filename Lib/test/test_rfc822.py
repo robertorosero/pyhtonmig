@@ -1,7 +1,7 @@
 import rfc822
 import sys
-import test_support
 import unittest
+from test import test_support
 
 try:
     from cStringIO import StringIO
@@ -221,6 +221,12 @@ A test message.
            ('Bea A. Person', 'bperson@dom.ain'))
         eq(rfc822.parseaddr('Cynthia Person <cperson@dom.ain>'),
            ('Cynthia Person', 'cperson@dom.ain'))
+
+    def test_quote_unquote(self):
+        eq = self.assertEqual
+        eq(rfc822.quote('foo\\wacky"name'), 'foo\\\\wacky\\"name')
+        eq(rfc822.unquote('"foo\\\\wacky\\"name"'), 'foo\\wacky"name')
+
 
 def test_main():
     test_support.run_unittest(MessageTestCase)

@@ -9,7 +9,7 @@ import warnings
 warnings.filterwarnings("ignore", "tempnam", RuntimeWarning, __name__)
 warnings.filterwarnings("ignore", "tmpnam", RuntimeWarning, __name__)
 
-from test_support import TESTFN, run_unittest
+from test.test_support import TESTFN, run_suite
 
 class TemporaryFileTests(unittest.TestCase):
     def setUp(self):
@@ -185,9 +185,29 @@ class StatAttributeTests(unittest.TestCase):
         except TypeError:
             pass
 
+from test_userdict import TestMappingProtocol
+
+class EnvironTests(TestMappingProtocol):
+    """check that os.environ object conform to mapping protocol"""
+    _tested_class = None
+    def _reference(self):
+        return {"KEY1":"VALUE1", "KEY2":"VALUE2", "KEY3":"VALUE3"}
+    def _empty_mapping(self):
+        os.environ.clear()
+        return os.environ
+    def setUp(self):
+        self.__save = dict(os.environ)
+        os.environ.clear()
+    def tearDown(self):
+        os.environ.clear()
+        os.environ.update(self.__save)
+
 def test_main():
-    run_unittest(TemporaryFileTests)
-    run_unittest(StatAttributeTests)
+    suite = unittest.TestSuite()
+    suite.addTest(unittest.makeSuite(TemporaryFileTests))
+    suite.addTest(unittest.makeSuite(StatAttributeTests))
+    suite.addTest(unittest.makeSuite(EnvironTests))
+    run_suite(suite)
 
 if __name__ == "__main__":
     test_main()

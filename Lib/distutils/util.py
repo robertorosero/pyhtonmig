@@ -4,8 +4,6 @@ Miscellaneous utility functions -- anything that doesn't fit into
 one of the other *util.py modules.
 """
 
-# created 1999/03/08, Greg Ward
-
 __revision__ = "$Id$"
 
 import sys, os, string, re
@@ -42,10 +40,11 @@ def get_platform ():
 
     (osname, host, release, version, machine) = os.uname()
 
-    # Convert the OS name to lowercase and remove '/' characters
-    # (to accommodate BSD/OS)
+    # Convert the OS name to lowercase, remove '/' characters
+    # (to accommodate BSD/OS), and translate spaces (for "Power Macintosh")
     osname = string.lower(osname)
     osname = string.replace(osname, '/', '')
+    machine = string.replace(machine, ' ', '_')
 
     if osname[:5] == "linux":
         # At least on Linux/Intel, 'machine' is the processor --
@@ -84,9 +83,11 @@ def convert_path (pathname):
     """
     if os.sep == '/':
         return pathname
-    if pathname and pathname[0] == '/':
+    if not pathname:
+        return pathname
+    if pathname[0] == '/':
         raise ValueError, "path '%s' cannot be absolute" % pathname
-    if pathname and pathname[-1] == '/':
+    if pathname[-1] == '/':
         raise ValueError, "path '%s' cannot end with '/'" % pathname
 
     paths = string.split(pathname, '/')
@@ -359,11 +360,18 @@ def byte_compile (py_files,
     # "Indirect" byte-compilation: write a temporary script and then
     # run it with the appropriate flags.
     if not direct:
-        from tempfile import mktemp
-        script_name = mktemp(".py")
+        try:
+            from tempfile import mkstemp
+            (script_fd, script_name) = mkstemp(".py")
+        except ImportError:
+            from tempfile import mktemp
+            (script_fd, script_name) = None, mktemp(".py")
         log.info("writing byte-compilation script '%s'", script_name)
         if not dry_run:
-            script = open(script_name, "w")
+            if script_fd is not None:
+                script = os.fdopen(script_fd, "w")
+            else:
+                script = open(script_name, "w")
 
             script.write("""\
 from distutils.util import byte_compile

@@ -128,15 +128,11 @@ extern int _CtlObj_Convert(PyObject *, ControlHandle *);
 #define CtlObj_Convert _CtlObj_Convert
 #endif
 
-staticforward PyObject *CtlObj_WhichControl(ControlHandle);
+static PyObject *CtlObj_WhichControl(ControlHandle);
 
 #define as_Control(h) ((ControlHandle)h)
 #define as_Resource(ctl) ((Handle)ctl)
-#if TARGET_API_MAC_CARBON
 #define GetControlRect(ctl, rectp) GetControlBounds(ctl, rectp)
-#else
-#define GetControlRect(ctl, rectp) (*(rectp) = ((*(ctl))->contrlRect))
-#endif
 
 #define MAXTABS 32  /* maximum number of tabs that we support in a tabs control */
 /*
@@ -232,9 +228,9 @@ static ControlUserPaneIdleUPP myidleproc_upp;
 static ControlUserPaneHitTestUPP myhittestproc_upp;
 static ControlUserPaneTrackingUPP mytrackingproc_upp;
 
-staticforward int settrackfunc(PyObject *); 	/* forward */
-staticforward void clrtrackfunc(void);	/* forward */
-staticforward int setcallback(PyObject *, OSType, PyObject *, UniversalProcPtr *);
+static int settrackfunc(PyObject *); 	/* forward */
+static void clrtrackfunc(void);	/* forward */
+static int setcallback(PyObject *, OSType, PyObject *, UniversalProcPtr *);
 """
 
 finalstuff = finalstuff + """
@@ -490,7 +486,7 @@ PyMac_INIT_TOOLBOX_OBJECT_NEW(ControlHandle, CtlObj_New);
 PyMac_INIT_TOOLBOX_OBJECT_CONVERT(ControlHandle, CtlObj_Convert);
 """
 
-class MyObjectDefinition(ObjectIdentityMixin, GlobalObjectDefinition):
+class MyObjectDefinition(PEP253Mixin, ObjectIdentityMixin, GlobalObjectDefinition):
 	def outputStructMembers(self):
 		GlobalObjectDefinition.outputStructMembers(self)
 		Output("PyObject *ob_callbackdict;")
@@ -769,42 +765,6 @@ f = ManualGenerator("SetControlData_Callback", setcontroldata_callback_body);
 f.docstring = lambda: "(callbackfunc) -> None"
 object.add(f)
 
-# And manual generators to get/set popup menu information
-getpopupdata_body = """
-PopupPrivateDataHandle hdl;
-
-if ( (*_self->ob_itself)->contrlData == NULL ) {
-	PyErr_SetString(Ctl_Error, "No contrlData handle in control");
-	return 0;
-}
-hdl = (PopupPrivateDataHandle)(*_self->ob_itself)->contrlData;
-HLock((Handle)hdl);
-_res = Py_BuildValue("O&i", MenuObj_New, (*hdl)->mHandle, (int)(*hdl)->mID);
-HUnlock((Handle)hdl);
-return _res;
-"""
-f = ManualGenerator("GetPopupData", getpopupdata_body, condition="#if !TARGET_API_MAC_CARBON")
-object.add(f)
-
-setpopupdata_body = """
-PopupPrivateDataHandle hdl;
-MenuHandle mHandle;
-short mID;
-
-if (!PyArg_ParseTuple(_args, "O&h", MenuObj_Convert, &mHandle, &mID) )
-	return 0;
-if ( (*_self->ob_itself)->contrlData == NULL ) {
-	PyErr_SetString(Ctl_Error, "No contrlData handle in control");
-	return 0;
-}
-hdl = (PopupPrivateDataHandle)(*_self->ob_itself)->contrlData;
-(*hdl)->mHandle = mHandle;
-(*hdl)->mID = mID;
-Py_INCREF(Py_None);
-return Py_None;
-"""
-f = ManualGenerator("SetPopupData", setpopupdata_body, condition="#if !TARGET_API_MAC_CARBON")
-object.add(f)
 
 
 createtabscontrol_body = """\
@@ -862,7 +822,7 @@ _res = Py_BuildValue("O&",
                      CtlObj_New, outControl);
 return _res;"""
 
-f = ManualGenerator("CreateTabsControl", createtabscontrol_body, condition="#if TARGET_API_MAC_CARBON")
+f = ManualGenerator("CreateTabsControl", createtabscontrol_body)
 f.docstring = lambda: "(WindowPtr window, Rect boundsRect, UInt16 size, UInt16 direction, ControlTabEntry tabArray) -> (ControlHandle outControl)"
 module.add(f)
 

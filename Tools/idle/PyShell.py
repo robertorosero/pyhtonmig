@@ -6,6 +6,7 @@ import string
 import getopt
 import re
 import warnings
+import types
 
 import linecache
 from code import InteractiveInterpreter
@@ -188,6 +189,14 @@ class ModifiedInterpreter(InteractiveInterpreter):
         self.more = 0
         self.save_warnings_filters = warnings.filters[:]
         warnings.filterwarnings(action="error", category=SyntaxWarning)
+        if isinstance(source, types.UnicodeType):
+            import IOBinding
+            try:
+                source = source.encode(IOBinding.encoding)
+            except UnicodeError:
+                self.tkconsole.resetoutput()
+                self.write("Unsupported characters in input")
+                return
         try:
             return InteractiveInterpreter.runsource(self, source, filename)
         finally:
@@ -199,7 +208,7 @@ class ModifiedInterpreter(InteractiveInterpreter):
         # Stuff source in the filename cache
         filename = "<pyshell#%d>" % self.gid
         self.gid = self.gid + 1
-        lines = string.split(source, "\n")
+        lines = source.split("\n")
         linecache.cache[filename] = len(source)+1, 0, lines, filename
         return filename
 
@@ -241,7 +250,6 @@ class ModifiedInterpreter(InteractiveInterpreter):
 
     def showtraceback(self):
         # Extend base class method to reset output properly
-        text = self.tkconsole.text
         self.tkconsole.resetoutput()
         self.checklinecache()
         InteractiveInterpreter.showtraceback(self)
@@ -573,7 +581,7 @@ class PyShell(OutputWindow):
         # If we're in the current input and there's only whitespace
         # beyond the cursor, erase that whitespace first
         s = self.text.get("insert", "end-1c")
-        if s and not string.strip(s):
+        if s and not s.strip():
             self.text.delete("insert", "end-1c")
         # If we're in the current input before its last line,
         # insert a newline right at the insert point

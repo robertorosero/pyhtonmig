@@ -1,6 +1,10 @@
 """Python part of the warnings subsystem."""
 
+# Note: function level imports should *not* be used
+# in this module as it may cause import lock deadlock.
+# See bug 683658.
 import sys, re, types
+import linecache
 
 __all__ = ["warn", "showwarning", "formatwarning", "filterwarnings",
            "resetwarnings"]
@@ -107,11 +111,13 @@ def showwarning(message, category, filename, lineno, file=None):
     """Hook to write a warning to a file; replace if you like."""
     if file is None:
         file = sys.stderr
-    file.write(formatwarning(message, category, filename, lineno))
+    try:
+        file.write(formatwarning(message, category, filename, lineno))
+    except IOError:
+        pass # the file (probably stderr) is invalid - this warning gets lost.
 
 def formatwarning(message, category, filename, lineno):
     """Function to format a warning the standard way."""
-    import linecache
     s =  "%s:%s: %s: %s\n" % (filename, lineno, category.__name__, message)
     line = linecache.getline(filename, lineno).strip()
     if line:
@@ -125,10 +131,10 @@ def filterwarnings(action, message="", category=Warning, module="", lineno=0,
     Use assertions to check that all arguments have the right type."""
     assert action in ("error", "ignore", "always", "default", "module",
                       "once"), "invalid action: %s" % `action`
-    assert isinstance(message, str), "message must be a string"
+    assert isinstance(message, basestring), "message must be a string"
     assert isinstance(category, types.ClassType), "category must be a class"
     assert issubclass(category, Warning), "category must be a Warning subclass"
-    assert isinstance(module, str), "module must be a string"
+    assert isinstance(module, basestring), "module must be a string"
     assert isinstance(lineno, int) and lineno >= 0, \
            "lineno must be an int >= 0"
     item = (action, re.compile(message, re.I), category,

@@ -33,10 +33,10 @@ The following values are considered false:
 \begin{itemize}
 
 \item	\code{None}
-	\withsubitem{(Built-in object)}{\ttindex{None}}
+        \withsubitem{(Built-in object)}{\ttindex{None}}
 
 \item	\code{False}
-	\withsubitem{(Built-in object)}{\ttindex{False}}
+        \withsubitem{(Built-in object)}{\ttindex{False}}
 
 \item	zero of any numeric type, for example, \code{0}, \code{0L},
         \code{0.0}, \code{0j}.
@@ -46,10 +46,11 @@ The following values are considered false:
 \item	any empty mapping, for example, \code{\{\}}.
 
 \item	instances of user-defined classes, if the class defines a
-	\method{__nonzero__()} or \method{__len__()} method, when that
-	method returns zero.\footnote{Additional information on these
-special methods may be found in the \citetitle[../ref/ref.html]{Python
-Reference Manual}.}
+        \method{__nonzero__()} or \method{__len__()} method, when that
+        method returns the integer zero or \class{bool} value
+        \code{False}.\footnote{Additional 
+information on these special methods may be found in the
+\citetitle[../ref/ref.html]{Python Reference Manual}.}
 
 \end{itemize}
 
@@ -227,8 +228,8 @@ to produce numbers of a specific type.
 \bifuncindex{float}
 \bifuncindex{complex}
 
-All numeric types support the following operations, sorted by
-ascending priority (operations in the same box have the same
+All numeric types (except complex) support the following operations,
+sorted by ascending priority (operations in the same box have the same
 priority; all numeric operations have a higher priority than
 comparison operations):
 
@@ -238,7 +239,7 @@ comparison operations):
   \hline
   \lineiii{\var{x} * \var{y}}{product of \var{x} and \var{y}}{}
   \lineiii{\var{x} / \var{y}}{quotient of \var{x} and \var{y}}{(1)}
-  \lineiii{\var{x} \%{} \var{y}}{remainder of \code{\var{x} / \var{y}}}{}
+  \lineiii{\var{x} \%{} \var{y}}{remainder of \code{\var{x} / \var{y}}}{(4)}
   \hline
   \lineiii{-\var{x}}{\var{x} negated}{}
   \lineiii{+\var{x}}{\var{x} unchanged}{}
@@ -249,7 +250,7 @@ comparison operations):
   \lineiii{float(\var{x})}{\var{x} converted to floating point}{}
   \lineiii{complex(\var{re},\var{im})}{a complex number with real part \var{re}, imaginary part \var{im}.  \var{im} defaults to zero.}{}
   \lineiii{\var{c}.conjugate()}{conjugate of the complex number \var{c}}{}
-  \lineiii{divmod(\var{x}, \var{y})}{the pair \code{(\var{x} / \var{y}, \var{x} \%{} \var{y})}}{(3)}
+  \lineiii{divmod(\var{x}, \var{y})}{the pair \code{(\var{x} / \var{y}, \var{x} \%{} \var{y})}}{(3)(4)}
   \lineiii{pow(\var{x}, \var{y})}{\var{x} to the power \var{y}}{}
   \lineiii{\var{x} ** \var{y}}{\var{x} to the power \var{y}}{}
 \end{tableiii}
@@ -281,6 +282,12 @@ for well-defined conversions.
 \item[(3)]
 See section \ref{built-in-funcs}, ``Built-in Functions,'' for a full
 description.
+
+\item[(4)]
+Complex floor division operator, modulo operator, and \function{divmod()}.
+
+\deprecated{2.3}{Instead convert to float using \function{abs()}
+if appropriate.}
 
 \end{description}
 % XXXJH exceptions: overflow (when? what operations?) zerodivision
@@ -377,6 +384,13 @@ general and specific sequence types, dictionaries, and other more
 specialized forms.  The specific types are not important beyond their
 implementation of the iterator protocol.
 
+The intention of the protocol is that once an iterator's
+\method{next()} method raises \exception{StopIteration}, it will
+continue to do so on subsequent calls.  Implementations that
+do not obey this property are deemed broken.  (This constraint
+was added in Python 2.3; in Python 2.2, various iterators are
+broken according to this rule.)
+
 
 \subsection{Sequence Types \label{typesseq}}
 
@@ -402,7 +416,7 @@ item tuple must have a trailing comma, e.g., \code{(d,)}.
 
 Buffer objects are not directly supported by Python syntax, but can be
 created by calling the builtin function
-\function{buffer()}.\bifuncindex{buffer}.  They don't support
+\function{buffer()}.\bifuncindex{buffer}  They don't support
 concatenation or repetition.
 \obindex{buffer}
 
@@ -425,15 +439,16 @@ This table lists the sequence operations sorted in ascending priority
 and \var{j} are integers:
 
 \begin{tableiii}{c|l|c}{code}{Operation}{Result}{Notes}
-  \lineiii{\var{x} in \var{s}}{\code{1} if an item of \var{s} is equal to \var{x}, else \code{0}}{}
+  \lineiii{\var{x} in \var{s}}{\code{1} if an item of \var{s} is equal to \var{x}, else \code{0}}{(1)}
   \lineiii{\var{x} not in \var{s}}{\code{0} if an item of \var{s} is
-equal to \var{x}, else \code{1}}{}
+equal to \var{x}, else \code{1}}{(1)}
   \hline
   \lineiii{\var{s} + \var{t}}{the concatenation of \var{s} and \var{t}}{}
-  \lineiii{\var{s} * \var{n}\textrm{,} \var{n} * \var{s}}{\var{n} shallow copies of \var{s} concatenated}{(1)}
+  \lineiii{\var{s} * \var{n}\textrm{,} \var{n} * \var{s}}{\var{n} shallow copies of \var{s} concatenated}{(2)}
   \hline
-  \lineiii{\var{s}[\var{i}]}{\var{i}'th item of \var{s}, origin 0}{(2)}
-  \lineiii{\var{s}[\var{i}:\var{j}]}{slice of \var{s} from \var{i} to \var{j}}{(2), (3)}
+  \lineiii{\var{s}[\var{i}]}{\var{i}'th item of \var{s}, origin 0}{(3)}
+  \lineiii{\var{s}[\var{i}:\var{j}]}{slice of \var{s} from \var{i} to \var{j}}{(3), (4)}
+  \lineiii{\var{s}[\var{i}:\var{j}:\var{k}]}{slice of \var{s} from \var{i} to \var{j} with step \var{k}}{(3), (5)}
   \hline
   \lineiii{len(\var{s})}{length of \var{s}}{}
   \lineiii{min(\var{s})}{smallest item of \var{s}}{}
@@ -447,6 +462,7 @@ equal to \var{x}, else \code{1}}{}
 \indexii{repetition}{operation}
 \indexii{subscript}{operation}
 \indexii{slice}{operation}
+\indexii{extended slice}{operation}
 \opindex{in}
 \opindex{not in}
 
@@ -454,7 +470,12 @@ equal to \var{x}, else \code{1}}{}
 Notes:
 
 \begin{description}
-\item[(1)] Values of \var{n} less than \code{0} are treated as
+\item[(1)] When \var{s} is a string or Unicode string object the
+\code{in} and \code{not in} operations act like a substring test.  In
+Python versions before 2.3, \var{x} had to be a string of length 1.
+In Python 2.3 and beyond, \var{x} may be a string of any length.
+
+\item[(2)] Values of \var{n} less than \code{0} are treated as
   \code{0} (which yields an empty sequence of the same type as
   \var{s}).  Note also that the copies are shallow; nested structures
   are not copied.  This often haunts new Python programmers; consider:
@@ -482,17 +503,26 @@ Notes:
 [[3], [5], [7]]
 \end{verbatim}
 
-\item[(2)] If \var{i} or \var{j} is negative, the index is relative to
+\item[(3)] If \var{i} or \var{j} is negative, the index is relative to
   the end of the string: \code{len(\var{s}) + \var{i}} or
   \code{len(\var{s}) + \var{j}} is substituted.  But note that \code{-0} is
   still \code{0}.
 
-\item[(3)] The slice of \var{s} from \var{i} to \var{j} is defined as
+\item[(4)] The slice of \var{s} from \var{i} to \var{j} is defined as
   the sequence of items with index \var{k} such that \code{\var{i} <=
   \var{k} < \var{j}}.  If \var{i} or \var{j} is greater than
   \code{len(\var{s})}, use \code{len(\var{s})}.  If \var{i} is omitted,
   use \code{0}.  If \var{j} is omitted, use \code{len(\var{s})}.  If
   \var{i} is greater than or equal to \var{j}, the slice is empty.
+
+\item[(5)] The slice of \var{s} from \var{i} to \var{j} with step
+  \var{k} is defined as the sequence of items with index 
+  \code{\var{x} = \var{i} + \var{n}*\var{k}} such that \code{0}
+  \code{<=} \var{n} \code{<} \code{abs(i-j)}.  If \var{i} or \var{j}
+  is greater than \code{len(\var{s})}, use \code{len(\var{s})}.  If
+  \var{i} or \var{j} are ommitted then they become ``end'' values
+  (which end depends on the sign of \var{k}).
+
 \end{description}
 
 
@@ -537,8 +567,8 @@ error handling scheme.  The default for \var{errors} is
 \end{methoddesc}
 
 \begin{methoddesc}[string]{endswith}{suffix\optional{, start\optional{, end}}}
-Return true if the string ends with the specified \var{suffix},
-otherwise return false.  With optional \var{start}, test beginning at
+Return \code{True} if the string ends with the specified \var{suffix},
+otherwise return \code{False}.  With optional \var{start}, test beginning at
 that position.  With optional \var{end}, stop comparing at that position.
 \end{methoddesc}
 
@@ -618,6 +648,7 @@ Return a copy of the string with leading characters removed.  If
 removed.  If given and not \code{None}, \var{chars} must be a string;
 the characters in the string will be stripped from the beginning of
 the string this method is called on.
+\versionchanged[Support for the \var{chars} argument]{2.2.2}
 \end{methoddesc}
 
 \begin{methoddesc}[string]{replace}{old, new\optional{, maxsplit}}
@@ -651,6 +682,7 @@ Return a copy of the string with trailing characters removed.  If
 removed.  If given and not \code{None}, \var{chars} must be a string;
 the characters in the string will be stripped from the end of the
 string this method is called on.
+\versionchanged[Support for the \var{chars} argument]{2.2.2}
 \end{methoddesc}
 
 \begin{methoddesc}[string]{split}{\optional{sep \optional{,maxsplit}}}
@@ -668,8 +700,8 @@ boundaries.  Line breaks are not included in the resulting list unless
 
 \begin{methoddesc}[string]{startswith}{prefix\optional{,
                                        start\optional{, end}}}
-Return true if string starts with the \var{prefix}, otherwise
-return false.  With optional \var{start}, test string beginning at
+Return \code{True} if string starts with the \var{prefix}, otherwise
+return \code{False}.  With optional \var{start}, test string beginning at
 that position.  With optional \var{end}, stop comparing string at that
 position.
 \end{methoddesc}
@@ -680,6 +712,7 @@ removed.  If \var{chars} is omitted or \code{None}, whitespace
 characters are removed.  If given and not \code{None}, \var{chars}
 must be a string; the characters in the string will be stripped from
 the both ends of the string this method is called on.
+\versionchanged[Support for the \var{chars} argument]{2.2.2}
 \end{methoddesc}
 
 \begin{methoddesc}[string]{swapcase}{}
@@ -707,6 +740,7 @@ Return a copy of the string converted to uppercase.
 Return the numeric string left filled with zeros in a string
 of length \var{width}. The original string is returned if
 \var{width} is less than \code{len(\var{s})}.
+\versionadded{2.2.2}
 \end{methoddesc}
 
 
@@ -783,9 +817,9 @@ The conversion flag characters are:
 \begin{tableii}{c|l}{character}{Flag}{Meaning}
   \lineii{\#}{The value conversion will use the ``alternate form''
               (where defined below).}
-  \lineii{0}{The conversion will be zero padded.}
+  \lineii{0}{The conversion will be zero padded for numeric values.}
   \lineii{-}{The converted value is left adjusted (overrides
-             \character{-}).}
+             the \character{0} conversion if both are given).}
   \lineii{{~}}{(a space) A blank should be left before a positive number
              (or empty string) produced by a signed conversion.}
   \lineii{+}{A sign character (\character{+} or \character{-}) will
@@ -797,35 +831,53 @@ present, but are ignored as they are not necessary for Python.
 
 The conversion types are:
 
-\begin{tableii}{c|l}{character}{Conversion}{Meaning}
-  \lineii{d}{Signed integer decimal.}
-  \lineii{i}{Signed integer decimal.}
-  \lineii{o}{Unsigned octal.}
-  \lineii{u}{Unsigned decimal.}
-  \lineii{x}{Unsigned hexidecimal (lowercase).}
-  \lineii{X}{Unsigned hexidecimal (uppercase).}
-  \lineii{e}{Floating point exponential format (lowercase).}
-  \lineii{E}{Floating point exponential format (uppercase).}
-  \lineii{f}{Floating point decimal format.}
-  \lineii{F}{Floating point decimal format.}
-  \lineii{g}{Same as \character{e} if exponent is greater than -4 or
-             less than precision, \character{f} otherwise.}
-  \lineii{G}{Same as \character{E} if exponent is greater than -4 or
-             less than precision, \character{F} otherwise.}
-  \lineii{c}{Single character (accepts integer or single character
-             string).}
-  \lineii{r}{String (converts any python object using
-             \function{repr()}).}
-  \lineii{s}{String (converts any python object using
-             \function{str()}).}
-  \lineii{\%}{No argument is converted, results in a \character{\%}
-              character in the result.  (The complete specification is
-              \code{\%\%}.)}
-\end{tableii}
+\begin{tableiii}{c|l|c}{character}{Conversion}{Meaning}{Notes}
+  \lineiii{d}{Signed integer decimal.}{}
+  \lineiii{i}{Signed integer decimal.}{}
+  \lineiii{o}{Unsigned octal.}{(1)}
+  \lineiii{u}{Unsigned decimal.}{}
+  \lineiii{x}{Unsigned hexidecimal (lowercase).}{(2)}
+  \lineiii{X}{Unsigned hexidecimal (uppercase).}{(2)}
+  \lineiii{e}{Floating point exponential format (lowercase).}{}
+  \lineiii{E}{Floating point exponential format (uppercase).}{}
+  \lineiii{f}{Floating point decimal format.}{}
+  \lineiii{F}{Floating point decimal format.}{}
+  \lineiii{g}{Same as \character{e} if exponent is greater than -4 or
+              less than precision, \character{f} otherwise.}{}
+  \lineiii{G}{Same as \character{E} if exponent is greater than -4 or
+              less than precision, \character{F} otherwise.}{}
+  \lineiii{c}{Single character (accepts integer or single character
+              string).}{}
+  \lineiii{r}{String (converts any python object using
+              \function{repr()}).}{(3)}
+  \lineiii{s}{String (converts any python object using
+              \function{str()}).}{(4)}
+  \lineiii{\%}{No argument is converted, results in a \character{\%}
+               character in the result.}{}
+\end{tableiii}
+
+\noindent
+Notes:
+\begin{description}
+  \item[(1)]
+    The alternate form causes a leading zero (\character{0}) to be
+    inserted between left-hand padding and the formatting of the
+    number if the leading character of the result is not already a
+    zero.
+  \item[(2)]
+    The alternate form causes a leading \code{'0x'} or \code{'0X'}
+    (depending on whether the \character{x} or \character{X} format
+    was used) to be inserted between left-hand padding and the
+    formatting of the number if the leading character of the result is
+    not already a zero.
+  \item[(3)]
+    The \code{\%r} conversion was added in Python 2.0.
+  \item[(4)]
+    If the object or format provided is a \class{unicode} string,
+    the resulting string will also be \class{unicode}.
+\end{description}
 
 % XXX Examples?
-
-(The \code{\%r} conversion was added in Python 2.0.)
 
 Since Python strings have an explicit length, \code{\%s} conversions
 do not assume that \code{'\e0'} is the end of the string.
@@ -852,8 +904,8 @@ xrange object will always take the same amount of memory, no matter the
 size of the range it represents.  There are no consistent performance
 advantages.
 
-XRange objects have very little behavior: they only support indexing
-and the \function{len()} function.
+XRange objects have very little behavior: they only support indexing,
+iteration, and the \function{len()} function.
 
 
 \subsubsection{Mutable Sequence Types \label{typesseq-mutable}}
@@ -876,31 +928,35 @@ The following operations are defined on mutable sequence types (where
   	{slice of \var{s} from \var{i} to \var{j} is replaced by \var{t}}{}
   \lineiii{del \var{s}[\var{i}:\var{j}]}
 	{same as \code{\var{s}[\var{i}:\var{j}] = []}}{}
+  \lineiii{\var{s}[\var{i}:\var{j}:\var{k}] = \var{t}}
+  	{the elements of \code{\var{s}[\var{i}:\var{j}:\var{k}]} are replaced by those of \var{t}}{(1)}
+  \lineiii{del \var{s}[\var{i}:\var{j}:\var{k}]}
+	{removes the elements of \code{\var{s}[\var{i}:\var{j}:\var{k}]} from the list}{}
   \lineiii{\var{s}.append(\var{x})}
-	{same as \code{\var{s}[len(\var{s}):len(\var{s})] = [\var{x}]}}{(1)}
+	{same as \code{\var{s}[len(\var{s}):len(\var{s})] = [\var{x}]}}{(2)}
   \lineiii{\var{s}.extend(\var{x})}
-        {same as \code{\var{s}[len(\var{s}):len(\var{s})] = \var{x}}}{(2)}
+        {same as \code{\var{s}[len(\var{s}):len(\var{s})] = \var{x}}}{(3)}
   \lineiii{\var{s}.count(\var{x})}
     {return number of \var{i}'s for which \code{\var{s}[\var{i}] == \var{x}}}{}
   \lineiii{\var{s}.index(\var{x})}
-    {return smallest \var{i} such that \code{\var{s}[\var{i}] == \var{x}}}{(3)}
+    {return smallest \var{i} such that \code{\var{s}[\var{i}] == \var{x}}}{(4)}
   \lineiii{\var{s}.insert(\var{i}, \var{x})}
-	{same as \code{\var{s}[\var{i}:\var{i}] = [\var{x}]}
-	  if \code{\var{i} >= 0}}{(4)}
+	{same as \code{\var{s}[\var{i}:\var{i}] = [\var{x}]}}{(5)}
   \lineiii{\var{s}.pop(\optional{\var{i}})}
-    {same as \code{\var{x} = \var{s}[\var{i}]; del \var{s}[\var{i}]; return \var{x}}}{(5)}
+    {same as \code{\var{x} = \var{s}[\var{i}]; del \var{s}[\var{i}]; return \var{x}}}{(6)}
   \lineiii{\var{s}.remove(\var{x})}
-	{same as \code{del \var{s}[\var{s}.index(\var{x})]}}{(3)}
+	{same as \code{del \var{s}[\var{s}.index(\var{x})]}}{(4)}
   \lineiii{\var{s}.reverse()}
-	{reverses the items of \var{s} in place}{(6)}
-  \lineiii{\var{s}.sort(\optional{\var{cmpfunc}})}
-	{sort the items of \var{s} in place}{(6), (7)}
+	{reverses the items of \var{s} in place}{(7)}
+  \lineiii{\var{s}.sort(\optional{\var{cmpfunc=None}})}
+	{sort the items of \var{s} in place}{(7), (8), (9), (10)}
 \end{tableiii}
 \indexiv{operations on}{mutable}{sequence}{types}
 \indexiii{operations on}{sequence}{types}
 \indexiii{operations on}{list}{type}
 \indexii{subscript}{assignment}
 \indexii{slice}{assignment}
+\indexii{extended slice}{assignment}
 \stindex{del}
 \withsubitem{(list method)}{
   \ttindex{append()}\ttindex{extend()}\ttindex{count()}\ttindex{index()}
@@ -909,41 +965,83 @@ The following operations are defined on mutable sequence types (where
 \noindent
 Notes:
 \begin{description}
-\item[(1)] The C implementation of Python historically accepted
-  multiple parameters and implicitly joined them into a tuple;
-  Use of this misfeature has been deprecated since Python 1.4,
-  and became an error with the introduction of Python 2.0.
+\item[(1)] \var{t} must have the same length as the slice it is 
+  replacing.
 
-\item[(2)] Raises an exception when \var{x} is not a list object.  The
+\item[(2)] The C implementation of Python has historically accepted
+  multiple parameters and implicitly joined them into a tuple; this
+  no longer works in Python 2.0.  Use of this misfeature has been
+  deprecated since Python 1.4.
+
+\item[(3)] Raises an exception when \var{x} is not a list object.  The
   \method{extend()} method is experimental and not supported by
   mutable sequence types other than lists.
 
-\item[(3)] Raises \exception{ValueError} when \var{x} is not found in
+\item[(4)] Raises \exception{ValueError} when \var{x} is not found in
   \var{s}.
 
-\item[(4)] When a negative index is passed as the first parameter to
-  the \method{insert()} method, the new element is prepended to the
-  sequence.
+\item[(5)] When a negative index is passed as the first parameter to
+  the \method{insert()} method, the list length is added, as for slice
+  indices.  If it is still negative, it is truncated to zero, as for
+  slice indices.  \versionchanged[Previously, all negative indices
+  were truncated to zero]{2.3}
 
-\item[(5)] The \method{pop()} method is only supported by the list and
+\item[(6)] The \method{pop()} method is only supported by the list and
   array types.  The optional argument \var{i} defaults to \code{-1},
   so that by default the last item is removed and returned.
 
-\item[(6)] The \method{sort()} and \method{reverse()} methods modify the
+\item[(7)] The \method{sort()} and \method{reverse()} methods modify the
   list in place for economy of space when sorting or reversing a large
   list.  To remind you that they operate by side effect, they don't return
   the sorted or reversed list.
 
-\item[(7)] The \method{sort()} method takes an optional argument
+\item[(8)] The \method{sort()} method takes an optional argument
   specifying a comparison function of two arguments (list items) which
   should return a negative, zero or positive number depending on whether
   the first argument is considered smaller than, equal to, or larger
   than the second argument.  Note that this slows the sorting process
-  down considerably; e.g. to sort a list in reverse order it is much
-  faster to use calls to the methods \method{sort()} and
-  \method{reverse()} than to use the built-in function
-  \function{sort()} with a comparison function that reverses the
-  ordering of the elements.
+  down considerably; for example to sort a list in reverse order it is much
+  faster to call \method{sort()} followed by \method{reverse()}
+  than to use \method{sort()} with a comparison function that
+  reverses the ordering of the elements.  Passing \constant{None} as the
+  comparison function is semantically equivalent to calling
+  \method{sort()} with no comparison function.
+  \versionchanged[Support for \code{None} as an equivalent to omitting
+  \var{cmpfunc} was added]{2.3}
+
+  As an example of using the \var{cmpfunc} argument to the
+  \method{sort()} method, consider sorting a list of sequences by the
+  second element of that list:
+
+\begin{verbatim}
+def mycmp(a, b):
+    return cmp(a[1], b[1])
+
+mylist.sort(mycmp)
+\end{verbatim}
+
+  A more time-efficient approach for reasonably-sized data structures can
+  often be used:
+
+\begin{verbatim}
+tmplist = [(x[1], x) for x in mylist]
+tmplist.sort()
+mylist = [x for (key, x) in tmplist]
+\end{verbatim}
+
+\item[(9)] Whether the \method{sort()} method is stable is not defined by
+  the language (a sort is stable if it guarantees not to change the
+  relative order of elements that compare equal).  In the C
+  implementation of Python, sorts were stable only by accident through
+  Python 2.2.  The C implementation of Python 2.3 introduced a stable
+  \method{sort()} method, but code that intends to be portable across
+  implementations and versions must not rely on stability.
+
+\item[(10)] While a list is being sorted, the effect of attempting to
+  mutate, or even inspect, the list is undefined.  The C implementation
+  of Python 2.3 makes the list appear empty for the duration, and raises
+  \exception{ValueError} if it can detect that the list has been
+  mutated during a sort.
 \end{description}
 
 
@@ -982,7 +1080,13 @@ arbitrary objects):
   \ttindex{keys()}
   \ttindex{update()}
   \ttindex{values()}
-  \ttindex{get()}}
+  \ttindex{get()}
+  \ttindex{setdefault()}
+  \ttindex{pop()}
+  \ttindex{popitem()}
+  \ttindex{iteritems()}
+  \ttindex{iterkeys)}
+  \ttindex{itervalues()}}
 
 \begin{tableiii}{c|l|c}{code}{Operation}{Result}{Notes}
   \lineiii{len(\var{a})}{the number of items in \var{a}}{}
@@ -1009,8 +1113,11 @@ arbitrary objects):
           {(3)}
   \lineiii{\var{a}.keys()}{a copy of \var{a}'s list of keys}{(3)}
   \lineiii{\var{a}.update(\var{b})}
-          {\code{for k in \var{b}.keys(): \var{a}[k] = \var{b}[k]}}
+          {\code{for \var{k} in \var{b}.keys(): \var{a}[\var{k}] = \var{b}[\var{k}]}}
           {}
+  \lineiii{\var{a}.fromkeys(\var{seq}\optional{, \var{value}})}
+          {Creates a new dictionary with keys from \var{seq} and values set to \var{value}}
+          {(7)}			   
   \lineiii{\var{a}.values()}{a copy of \var{a}'s list of values}{(3)}
   \lineiii{\var{a}.get(\var{k}\optional{, \var{x}})}
           {\code{\var{a}[\var{k}]} if \code{\var{k} in \var{a}},
@@ -1020,21 +1127,22 @@ arbitrary objects):
           {\code{\var{a}[\var{k}]} if \code{\var{k} in \var{a}},
            else \var{x} (also setting it)}
           {(5)}
-  \lineiii{\var{a}.pop(\var{k})}
-          {remove specified \var{key} and return corresponding \var{value}}
-          {}			     
+  \lineiii{\var{a}.pop(\var{k}\optional{, \var{x}})}
+          {\code{\var{a}[\var{k}]} if \code{\var{k} in \var{a}},
+           else \var{x} (and remove k)}
+          {(8)}
   \lineiii{\var{a}.popitem()}
           {remove and return an arbitrary (\var{key}, \var{value}) pair}
           {(6)}
   \lineiii{\var{a}.iteritems()}
           {return an iterator over (\var{key}, \var{value}) pairs}
-          {(2)}
+          {(2), (3)}
   \lineiii{\var{a}.iterkeys()}
           {return an iterator over the mapping's keys}
-          {(2)}
+          {(2), (3)}
   \lineiii{\var{a}.itervalues()}
           {return an iterator over the mapping's values}
-          {(2)}
+          {(2), (3)}
 \end{tableiii}
 
 \noindent
@@ -1046,11 +1154,17 @@ in the map.
 \item[(2)] \versionadded{2.2}
 
 \item[(3)] Keys and values are listed in random order.  If
-\method{keys()} and \method{values()} are called with no intervening
-modifications to the dictionary, the two lists will directly
-correspond.  This allows the creation of \code{(\var{value},
-\var{key})} pairs using \function{zip()}: \samp{pairs =
-zip(\var{a}.values(), \var{a}.keys())}.
+\method{items()}, \method{keys()}, \method{values()},
+\method{iteritems()}, \method{iterkeys()}, and \method{itervalues()}
+are called with no intervening modifications to the dictionary, the
+lists will directly correspond.  This allows the creation of
+\code{(\var{value}, \var{key})} pairs using \function{zip()}:
+\samp{pairs = zip(\var{a}.values(), \var{a}.keys())}.  The same
+relationship holds for the \method{iterkeys()} and
+\method{itervalues()} methods: \samp{pairs = zip(\var{a}.itervalues(),
+\var{a}.iterkeys())} provides the same value for \code{pairs}.
+Another way to create the same list is \samp{pairs = [(v, k) for (k,
+v) in \var{a}.iteritems()]}.
 
 \item[(4)] Never raises an exception if \var{k} is not in the map,
 instead it returns \var{x}.  \var{x} is optional; when \var{x} is not
@@ -1062,6 +1176,12 @@ the dictionary as the value of \var{k}.
 
 \item[(6)] \function{popitem()} is useful to destructively iterate
 over a dictionary, as often used in set algorithms.
+
+\item[(7)] \function{fromkeys()} is a class method that returns a
+new dictionary. \var{value} defaults to \code{None}.  \versionadded{2.3}
+
+\item[(8)] \function{pop()} raises a \exception{KeyError} when no default
+value is given and the key is not found.  \versionadded{2.3}
 \end{description}
 
 
@@ -1102,12 +1222,6 @@ Files have the following methods:
   objects.
 \end{methoddesc}
 
-\begin{methoddesc}[file]{isatty}{}
-  Return \code{True} if the file is connected to a tty(-like) device, else
-  \code{False}.  \note{If a file-like object is not associated
-  with a real file, this method should \emph{not} be implemented.}
-\end{methoddesc}
-
 \begin{methoddesc}[file]{fileno}{}
   \index{file descriptor}
   \index{descriptor, file}
@@ -1121,6 +1235,29 @@ Files have the following methods:
   this method!}
 \end{methoddesc}
 
+\begin{methoddesc}[file]{isatty}{}
+  Return \code{True} if the file is connected to a tty(-like) device, else
+  \code{False}.  \note{If a file-like object is not associated
+  with a real file, this method should \emph{not} be implemented.}
+\end{methoddesc}
+
+\begin{methoddesc}[file]{next}{}
+A file object is its own iterator, i.e. \code{iter(\var{f})} returns
+\var{f} (unless \var{f} is closed).  When a file is used as an
+iterator, typically in a \keyword{for} loop (for example,
+\code{for line in f: print line}), the \method{next()} method is
+called repeatedly.  This method returns the next input line, or raises
+\exception{StopIteration} when \EOF{} is hit.  In order to make a
+\keyword{for} loop the most efficient way of looping over the lines of
+a file (a very common operation), the \method{next()} method uses a
+hidden read-ahead buffer.  As a consequence of using a read-ahead
+buffer, combining \method{next()} with other file methods (like
+\method{readline()}) does not work right.  However, using
+\method{seek()} to reposition the file to an absolute position will
+flush the read-ahead buffer.
+\versionadded{2.3}
+\end{methoddesc}
+
 \begin{methoddesc}[file]{read}{\optional{size}}
   Read at most \var{size} bytes from the file (less if the read hits
   \EOF{} before obtaining \var{size} bytes).  If the \var{size}
@@ -1130,7 +1267,9 @@ Files have the following methods:
   certain files, like ttys, it makes sense to continue reading after
   an \EOF{} is hit.)  Note that this method may call the underlying
   C function \cfunction{fread()} more than once in an effort to
-  acquire as close to \var{size} bytes as possible.
+  acquire as close to \var{size} bytes as possible. Also note that
+  when in non-blocking mode, less data than what was requested may
+  be returned, even if no \var{size} parameter was given.
 \end{methoddesc}
 
 \begin{methoddesc}[file]{readline}{\optional{size}}
@@ -1164,10 +1303,9 @@ Files have the following methods:
 \end{methoddesc}
 
 \begin{methoddesc}[file]{xreadlines}{}
-  Equivalent to
-  \function{xreadlines.xreadlines(\var{file})}.\refstmodindex{xreadlines}
-  (See the \refmodule{xreadlines} module for more information.)
+  This method returns the same thing as \code{iter(f)}.
   \versionadded{2.1}
+  \deprecated{2.3}{Use \code{for line in file} instead.}
 \end{methoddesc}
 
 \begin{methoddesc}[file]{seek}{offset\optional{, whence}}
@@ -1242,6 +1380,18 @@ If the file object was created using \function{open()}, the name of
 the file.  Otherwise, some string that indicates the source of the
 file object, of the form \samp{<\mbox{\ldots}>}.  This is a read-only
 attribute and may not be present on all file-like objects.
+\end{memberdesc}
+
+\begin{memberdesc}[file]{newlines}
+If Python was built with the \code{--with-universal-newlines} option
+(the default) this read-only attribute exists, and for files opened in
+universal newline read mode it keeps track of the types of newlines
+encountered while reading the file. The values it can take are
+\code{'\e r'}, \code{'\e n'}, \code{'\e r\e n'}, \code{None} (unknown,
+no newlines read yet) or a tuple containing all the newline
+types seen, to indicate that multiple
+newline conventions were encountered. For files not opened in universal
+newline read mode the value of this attribute will be \code{None}.
 \end{memberdesc}
 
 \begin{memberdesc}[file]{softspace}

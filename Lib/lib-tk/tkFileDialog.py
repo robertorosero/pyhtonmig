@@ -29,12 +29,16 @@
 #
 # - title: dialog title
 #
+# - multiple: if true user may select more than one file
+#
 # options for the directory chooser:
 #
 # - initialdir, parent, title: see above
 #
 # - mustexist: if true, user must pick an existing directory
 #
+#
+
 
 from tkCommonDialog import Dialog
 
@@ -51,6 +55,12 @@ class _Dialog(Dialog):
         if result:
             # keep directory and filename until next time
             import os
+            # convert Tcl path objects to strings
+            try:
+                result = result.string
+            except AttributeError:
+                # it already is a string
+                pass
             path, file = os.path.split(result)
             self.options["initialdir"] = path
             self.options["initialfile"] = file
@@ -98,7 +108,18 @@ def asksaveasfilename(**options):
 
     return SaveAs(**options).show()
 
-# FIXME: are the following two perhaps a bit too convenient?
+def askopenfilenames(**options):
+    """Ask for multiple filenames to open
+    
+    Returns a list of filenames or empty list if 
+    cancel button selected
+    """
+    options["multiple"]=1
+    files=Open(**options).show()
+    return files.split()
+
+
+# FIXME: are the following  perhaps a bit too convenient?
 
 def askopenfile(mode = "r", **options):
     "Ask for a filename to open, and returned the opened file"
@@ -107,6 +128,23 @@ def askopenfile(mode = "r", **options):
     if filename:
         return open(filename, mode)
     return None
+
+def askopenfiles(mode = "r", **options):
+    """Ask for multiple filenames and return the open file
+    objects
+    
+    returns a list of open file objects or an empty list if 
+    cancel selected
+    """
+
+    files = askopenfilenames(**options)
+    if files:
+        ofiles=[]
+        for filename in files:
+            ofiles.append(open(filename, mode))
+        files=ofiles
+    return files
+
 
 def asksaveasfile(mode = "w", **options):
     "Ask for a filename to save as, and returned the opened file"

@@ -1,6 +1,6 @@
 # Test properties of bool promised by PEP 285
 
-from test_support import verbose, TestFailed, TESTFN, vereq, have_unicode
+from test.test_support import verbose, TestFailed, TESTFN, vereq, have_unicode
 import os
 
 def veris(a, b):
@@ -137,6 +137,7 @@ veris(bool(-1), True)
 veris(bool(0), False)
 veris(bool("hello"), True)
 veris(bool(""), False)
+veris(bool(), False)
 
 veris(hasattr([], "append"), True)
 veris(hasattr([], "wobble"), False)

@@ -1,4 +1,3 @@
-
 /* Range object implementation */
 
 #include "Python.h"
@@ -114,8 +113,8 @@ PyDoc_STRVAR(range_doc,
 "xrange([start,] stop[, step]) -> xrange object\n\
 \n\
 Like range(), but instead of returning a list, returns an object that\n\
-generates the numbers in the range on demand.  This is slightly slower\n\
-than range() but more memory efficient.");
+generates the numbers in the range on demand.  For looping, this is \n\
+slightly faster than range() and more memory efficient.");
 
 static PyObject *
 range_item(rangeobject *r, int i)
@@ -131,7 +130,14 @@ range_item(rangeobject *r, int i)
 static int
 range_length(rangeobject *r)
 {
-	return r->len;
+#if LONG_MAX != INT_MAX
+	if (r->len > INT_MAX) {
+		PyErr_SetString(PyExc_ValueError,
+				"xrange object size cannot be reported");
+		return -1;
+	}
+#endif
+	return (int)(r->len);
 }
 
 static PyObject *
@@ -164,7 +170,7 @@ static PySequenceMethods range_as_sequence = {
 	0,			/* sq_slice */
 };
 
-staticforward PyObject * range_iter(PyObject *seq);
+static PyObject * range_iter(PyObject *seq);
 
 PyTypeObject PyRange_Type = {
 	PyObject_HEAD_INIT(&PyType_Type)
@@ -184,7 +190,7 @@ PyTypeObject PyRange_Type = {
 	0,				/* tp_hash */
 	0,				/* tp_call */
 	0,				/* tp_str */
-	0,				/* tp_getattro */
+	PyObject_GenericGetAttr,	/* tp_getattro */
 	0,				/* tp_setattro */
 	0,				/* tp_as_buffer */
 	Py_TPFLAGS_DEFAULT,		/* tp_flags */
@@ -218,7 +224,7 @@ typedef struct {
 	long	len;
 } rangeiterobject;
 
-staticforward PyTypeObject Pyrangeiter_Type;
+static PyTypeObject Pyrangeiter_Type;
 
 static PyObject *
 range_iter(PyObject *seq)
@@ -240,26 +246,12 @@ range_iter(PyObject *seq)
 }
 
 static PyObject *
-rangeiter_getiter(PyObject *it)
-{
-	Py_INCREF(it);
-	return it;
-}
-
-static PyObject *
 rangeiter_next(rangeiterobject *r)
 {
 	if (r->index < r->len) 
 		return PyInt_FromLong(r->start + (r->index++) * r->step);
-	PyErr_SetObject(PyExc_StopIteration, Py_None);
 	return NULL;
 }
-
-static PyMethodDef rangeiter_methods[] = {
-	{"next",        (PyCFunction)rangeiter_next,     METH_NOARGS,
-	 "it.next() -- get the next value, or raise StopIteration"},
-	{NULL,          NULL}           /* sentinel */
-};
 
 static PyTypeObject Pyrangeiter_Type = {
 	PyObject_HEAD_INIT(&PyType_Type)
@@ -289,8 +281,7 @@ static PyTypeObject Pyrangeiter_Type = {
 	0,                                      /* tp_clear */
 	0,                                      /* tp_richcompare */
 	0,                                      /* tp_weaklistoffset */
-	(getiterfunc)rangeiter_getiter,		/* tp_iter */
+	PyObject_SelfIter,			/* tp_iter */
 	(iternextfunc)rangeiter_next,		/* tp_iternext */
-	rangeiter_methods,			/* tp_methods */
+	0,					/* tp_methods */
 };
-

@@ -1,5 +1,10 @@
 /* pyconfig.h.in.  Generated from configure.in by autoheader.  */
 
+
+#ifndef Py_PYCONFIG_H
+#define Py_PYCONFIG_H
+
+
 /* Define for AIX if your compiler is a genuine IBM xlC/xlC_r and you want
    support for AIX C++ shared extension modules. */
 #undef AIX_GENUINE_CPLUSPLUS
@@ -10,10 +15,6 @@
 /* Define if your <unistd.h> contains bad prototypes for exec*() (as it does
    on SGI IRIX 4.x) */
 #undef BAD_EXEC_PROTOTYPES
-
-/* Define if your compiler botches static forward declarations (as it does on
-   SCI ODT 3.0) */
-#undef BAD_STATIC_FORWARD
 
 /* Define this if you have BeOS threads. */
 #undef BEOS_THREADS
@@ -43,10 +44,13 @@
 /* Define if nice() returns success/failure instead of the new priority. */
 #undef HAVE_BROKEN_NICE
 
+/* Define if the Posix semaphores do not work on your system */
+#undef HAVE_BROKEN_POSIX_SEMAPHORES
+
 /* Define to 1 if you have the `chown' function. */
 #undef HAVE_CHOWN
 
-/* Define to 1 if you have the `chroot' function. */
+/* Define if you have the 'chroot' function. */
 #undef HAVE_CHROOT
 
 /* Define to 1 if you have the `clock' function. */
@@ -58,8 +62,17 @@
 /* Define to 1 if you have the `ctermid' function. */
 #undef HAVE_CTERMID
 
-/* Define to 1 if you have the `ctermid_r' function. */
+/* Define if you have the 'ctermid_r' function. */
 #undef HAVE_CTERMID_R
+
+/* Define to 1 if you have the device macros. */
+#undef HAVE_DEVICE_MACROS
+
+/* Define if we have /dev/ptc. */
+#undef HAVE_DEV_PTC
+
+/* Define if we have /dev/ptmx. */
+#undef HAVE_DEV_PTMX
 
 /* Define to 1 if you have the <dirent.h> header file, and it defines `DIR'.
    */
@@ -89,7 +102,7 @@
 /* Define to 1 if you have the `fdatasync' function. */
 #undef HAVE_FDATASYNC
 
-/* Define to 1 if you have the `flock' function. */
+/* Define if you have the 'flock' function. */
 #undef HAVE_FLOCK
 
 /* Define to 1 if you have the `fork' function. */
@@ -128,9 +141,6 @@
 /* Define to 1 if you have the `gai_strerror' function. */
 #undef HAVE_GAI_STRERROR
 
-/* Define to 1 if you have the <gdbm/ndbm.h> header file. */
-#undef HAVE_GDBM_NDBM_H
-
 /* Define if you have the getaddrinfo function. */
 #undef HAVE_GETADDRINFO
 
@@ -158,11 +168,17 @@
 /* Define this if you have the 6-arg version of gethostbyname_r(). */
 #undef HAVE_GETHOSTBYNAME_R_6_ARG
 
+/* Define to 1 if you have the `getloadavg' function. */
+#undef HAVE_GETLOADAVG
+
 /* Define to 1 if you have the `getlogin' function. */
 #undef HAVE_GETLOGIN
 
 /* Define to 1 if you have the `getnameinfo' function. */
 #undef HAVE_GETNAMEINFO
+
+/* Define if you have the 'getpagesize' function. */
+#undef HAVE_GETPAGESIZE
 
 /* Define to 1 if you have the `getpeername' function. */
 #undef HAVE_GETPEERNAME
@@ -197,6 +213,9 @@
 /* Define to 1 if you have the `hypot' function. */
 #undef HAVE_HYPOT
 
+/* Define to 1 if you have the `inet_aton' function. */
+#undef HAVE_INET_ATON
+
 /* Define to 1 if you have the `inet_pton' function. */
 #undef HAVE_INET_PTON
 
@@ -218,6 +237,9 @@
    Solaris and Linux, the necessary defines are already defined.) */
 #undef HAVE_LARGEFILE_SUPPORT
 
+/* Define to 1 if you have the `lchown' function. */
+#undef HAVE_LCHOWN
+
 /* Define to 1 if you have the `dl' library (-ldl). */
 #undef HAVE_LIBDL
 
@@ -230,16 +252,13 @@
 /* Define to 1 if you have the <libintl.h> header file. */
 #undef HAVE_LIBINTL_H
 
-/* Define to 1 if you have the `rt' library (-lrt). */
-#undef HAVE_LIBRT
-
 /* Define to 1 if you have the <libutil.h> header file. */
 #undef HAVE_LIBUTIL_H
 
 /* Define to 1 if you have the <limits.h> header file. */
 #undef HAVE_LIMITS_H
 
-/* Define to 1 if you have the `link' function. */
+/* Define if you have the 'link' function. */
 #undef HAVE_LINK
 
 /* Define to 1 if you have the <locale.h> header file. */
@@ -250,6 +269,9 @@
 
 /* Define to 1 if you have the `lstat' function. */
 #undef HAVE_LSTAT
+
+/* Define this if you have the makedev macro. */
+#undef HAVE_MAKEDEV
 
 /* Define to 1 if you have the `memmove' function. */
 #undef HAVE_MEMMOVE
@@ -271,9 +293,6 @@
 
 /* Define to 1 if you have the <ncurses.h> header file. */
 #undef HAVE_NCURSES_H
-
-/* Define to 1 if you have the <ndbm.h> header file. */
-#undef HAVE_NDBM_H
 
 /* Define to 1 if you have the <ndir.h> header file, and it defines `DIR'. */
 #undef HAVE_NDIR_H
@@ -308,6 +327,9 @@
 /* Define if you have GNU PTH threads. */
 #undef HAVE_PTH
 
+/* Defined for Solaris 2.6 bug in pthread header. */
+#undef HAVE_PTHREAD_DESTRUCTOR
+
 /* Define to 1 if you have the <pthread.h> header file. */
 #undef HAVE_PTHREAD_H
 
@@ -325,6 +347,12 @@
 
 /* Define to 1 if you have the `readlink' function. */
 #undef HAVE_READLINK
+
+/* Define to 1 if you have the `realpath' function. */
+#undef HAVE_REALPATH
+
+/* Define if you have readline 2.2 */
+#undef HAVE_RL_COMPLETION_APPEND_CHARACTER
 
 /* Define if you have readline 4.2 */
 #undef HAVE_RL_COMPLETION_MATCHES
@@ -344,7 +372,7 @@
 /* Define to 1 if you have the `setgid' function. */
 #undef HAVE_SETGID
 
-/* Define to 1 if you have the `setgroups' function. */
+/* Define if you have the 'setgroups' function. */
 #undef HAVE_SETGROUPS
 
 /* Define to 1 if you have the `setlocale' function. */
@@ -395,6 +423,9 @@
 /* Define to 1 if you have the `statvfs' function. */
 #undef HAVE_STATVFS
 
+/* Define if you have struct stat.st_mtim.tv_nsec */
+#undef HAVE_STAT_TV_NSEC
+
 /* Define to 1 if you have the <stdarg.h> header file. */
 #undef HAVE_STDARG_H
 
@@ -426,6 +457,9 @@
 /* Define to 1 if you have the <string.h> header file. */
 #undef HAVE_STRING_H
 
+/* Define to 1 if you have the <stropts.h> header file. */
+#undef HAVE_STROPTS_H
+
 /* Define to 1 if you have the `strptime' function. */
 #undef HAVE_STRPTIME
 
@@ -441,23 +475,18 @@
 /* Define to 1 if `tm_zone' is member of `struct tm'. */
 #undef HAVE_STRUCT_TM_TM_ZONE
 
-/* Define to 1 if your `struct stat' has `st_blksize'. Deprecated, use
-   `HAVE_STRUCT_STAT_ST_BLKSIZE' instead. */
-#undef HAVE_ST_BLKSIZE
-
 /* Define to 1 if your `struct stat' has `st_blocks'. Deprecated, use
    `HAVE_STRUCT_STAT_ST_BLOCKS' instead. */
 #undef HAVE_ST_BLOCKS
 
-/* Define to 1 if your `struct stat' has `st_rdev'. Deprecated, use
-   `HAVE_STRUCT_STAT_ST_RDEV' instead. */
-#undef HAVE_ST_RDEV
-
-/* Define to 1 if you have the `symlink' function. */
+/* Define if you have the 'symlink' function. */
 #undef HAVE_SYMLINK
 
 /* Define to 1 if you have the `sysconf' function. */
 #undef HAVE_SYSCONF
+
+/* Define to 1 if you have the <sysexits.h> header file. */
+#undef HAVE_SYSEXITS_H
 
 /* Define to 1 if you have the <sys/audioio.h> header file. */
 #undef HAVE_SYS_AUDIOIO_H
@@ -578,6 +607,9 @@
    wchar_t must be 16-bit unsigned type. (see Include/unicodeobject.h). */
 #undef HAVE_USABLE_WCHAR_T
 
+/* Define to 1 if you have the `utimes' function. */
+#undef HAVE_UTIMES
+
 /* Define to 1 if you have the <utime.h> header file. */
 #undef HAVE_UTIME_H
 
@@ -586,6 +618,13 @@
 
 /* Define if the compiler provides a wchar.h header file. */
 #undef HAVE_WCHAR_H
+
+/* Define to 1 if you have the `wcscoll' function. */
+#undef HAVE_WCSCOLL
+
+/* Define if tzset() actually switches the local timezone in a meaningful way.
+   */
+#undef HAVE_WORKING_TZSET
 
 /* Define to 1 if you have the `_getpty' function. */
 #undef HAVE__GETPTY
@@ -596,8 +635,13 @@
 /* Define if you are using Mach cthreads under mach / */
 #undef MACH_C_THREADS
 
-/* Define if malloc(0) returns a NULL pointer. */
-#undef MALLOC_ZERO_RETURNS_NULL
+/* Define to 1 if `major', `minor', and `makedev' are declared in <mkdev.h>.
+   */
+#undef MAJOR_IN_MKDEV
+
+/* Define to 1 if `major', `minor', and `makedev' are declared in
+   <sysmacros.h>. */
+#undef MAJOR_IN_SYSMACROS
 
 /* Define if mvwdelch in curses.h is an expression. */
 #undef MVWDELCH_IS_EXPRESSION
@@ -625,6 +669,9 @@
 
 /* Define if you want to build an interpreter with many run-time checks. */
 #undef Py_DEBUG
+
+/* Defined if Python is built as a shared library. */
+#undef Py_ENABLE_SHARED
 
 /* Define as the size of the unicode type. */
 #undef Py_UNICODE_SIZE
@@ -712,9 +759,6 @@
 /* Define if WINDOW in curses.h offers a field _flags. */
 #undef WINDOW_HAS_FLAGS
 
-/* Define if you want to compile in cycle garbage collection. */
-#undef WITH_CYCLE_GC
-
 /* Define if you want to emulate SGI (IRIX 4) dynamic linking. This is
    rumoured to work on VAX (Ultrix), Sun3 (SunOS 3.4), Sequent Symmetry
    (Dynix), and Atari ST. This requires the 'dl-dld' library,
@@ -764,15 +808,24 @@
 /* This must be set to 64 on some systems to enable large file support. */
 #undef _FILE_OFFSET_BITS
 
+/* Define on Linux to activate all library features */
+#undef _GNU_SOURCE
+
 /* This must be defined on some systems to enable large file support. */
 #undef _LARGEFILE_SOURCE
 
 /* Define to 1 if on MINIX. */
 #undef _MINIX
 
+/* Define _OSF_SOURCE to get the makedev macro. */
+#undef _OSF_SOURCE
+
 /* Define to 2 if the system does not provide POSIX.1 features except with
    this defined. */
 #undef _POSIX_1_SOURCE
+
+/* Define to activate features from IEEE Stds 1003.1-2001 */
+#undef _POSIX_C_SOURCE
 
 /* Define to 1 if you need to in order for `stat' and other things to work. */
 #undef _POSIX_SOURCE
@@ -782,6 +835,12 @@
 
 /* Define to force use of thread-safe errno, h_errno, and other functions */
 #undef _REENTRANT
+
+/* Define to the level of X/Open that your system supports */
+#undef _XOPEN_SOURCE
+
+/* Define to activate Unix95-and-earlier features */
+#undef _XOPEN_SOURCE_EXTENDED
 
 /* Define to 1 if type `char' is unsigned and you are not using gcc.  */
 #ifndef __CHAR_UNSIGNED__
@@ -815,7 +874,7 @@
 /* Define to `unsigned' if <sys/types.h> does not define. */
 #undef size_t
 
-/* Define to `int' if <sys/types.h> does not define. */
+/* Define to `int' if <sys/socket.h> does not define. */
 #undef socklen_t
 
 /* Define to `int' if <sys/types.h> doesn't define. */
@@ -829,4 +888,6 @@
 #if defined(__USLC__) && defined(__SCO_VERSION__)
 #define STRICT_SYSV_CURSES /* Don't use ncurses extensions */
 #endif
+
+#endif /*Py_PYCONFIG_H*/
 

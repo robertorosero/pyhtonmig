@@ -1,9 +1,9 @@
 r"""OS routines for Mac, DOS, NT, or Posix depending on what system we're on.
 
 This exports:
-  - all functions from posix, nt, dos, os2, mac, or ce, e.g. unlink, stat, etc.
-  - os.path is one of the modules posixpath, ntpath, macpath, or dospath
-  - os.name is 'posix', 'nt', 'dos', 'os2', 'mac', 'ce' or 'riscos'
+  - all functions from posix, nt, os2, mac, or ce, e.g. unlink, stat, etc.
+  - os.path is one of the modules posixpath, ntpath, or macpath
+  - os.name is 'posix', 'nt', 'os2', 'mac', 'ce' or 'riscos'
   - os.curdir is a string representing the current directory ('.' or ':')
   - os.pardir is a string representing the parent directory ('..' or '::')
   - os.sep is the (or a most common) pathname separator ('/' or ':' or '\\')
@@ -26,10 +26,8 @@ import sys
 
 _names = sys.builtin_module_names
 
-altsep = None
-
 __all__ = ["altsep", "curdir", "pardir", "sep", "pathsep", "linesep",
-           "defpath", "name"]
+           "defpath", "name", "path"]
 
 def _get_exports_list(module):
     try:
@@ -38,18 +36,15 @@ def _get_exports_list(module):
         return [n for n in dir(module) if n[0] != '_']
 
 if 'posix' in _names:
+    print "hello"
     name = 'posix'
     linesep = '\n'
-    curdir = '.'; pardir = '..'; sep = '/'; pathsep = ':'
-    defpath = ':/bin:/usr/bin'
     from posix import *
     try:
         from posix import _exit
     except ImportError:
         pass
-    import posixpath
-    path = posixpath
-    del posixpath
+    import posixpath as path
 
     import posix
     __all__.extend(_get_exports_list(posix))
@@ -58,64 +53,29 @@ if 'posix' in _names:
 elif 'nt' in _names:
     name = 'nt'
     linesep = '\r\n'
-    curdir = '.'; pardir = '..'; sep = '\\'; pathsep = ';'
-    defpath = '.;C:\\bin'
     from nt import *
-    for i in ['_exit']:
-        try:
-            exec "from nt import " + i
-        except ImportError:
-            pass
-    import ntpath
-    path = ntpath
-    del ntpath
+    try:
+        from nt import _exit
+    except ImportError:
+        pass
+    import ntpath as path
 
     import nt
     __all__.extend(_get_exports_list(nt))
     del nt
 
-elif 'dos' in _names:
-    name = 'dos'
-    linesep = '\r\n'
-    curdir = '.'; pardir = '..'; sep = '\\'; pathsep = ';'
-    defpath = '.;C:\\bin'
-    from dos import *
-    try:
-        from dos import _exit
-    except ImportError:
-        pass
-    import dospath
-    path = dospath
-    del dospath
-
-    import dos
-    __all__.extend(_get_exports_list(dos))
-    del dos
-
 elif 'os2' in _names:
     name = 'os2'
     linesep = '\r\n'
-    curdir = '.'; pardir = '..'; pathsep = ';'
-    if sys.version.find('EMX GCC') == -1:
-        # standard OS/2 compiler (VACPP or Watcom?)
-        sep = '\\'; altsep = '/'
-    else:
-        # EMX
-        sep = '/'; altsep = '\\'
-    defpath = '.;C:\\bin'
     from os2 import *
     try:
         from os2 import _exit
     except ImportError:
         pass
     if sys.version.find('EMX GCC') == -1:
-        import ntpath
-        path = ntpath
-        del ntpath
+        import ntpath as path
     else:
-        import os2emxpath
-        path = os2emxpath
-        del os2emxpath
+        import os2emxpath as path
 
     import os2
     __all__.extend(_get_exports_list(os2))
@@ -124,16 +84,12 @@ elif 'os2' in _names:
 elif 'mac' in _names:
     name = 'mac'
     linesep = '\r'
-    curdir = ':'; pardir = '::'; sep = ':'; pathsep = '\n'
-    defpath = ':'
     from mac import *
     try:
         from mac import _exit
     except ImportError:
         pass
-    import macpath
-    path = macpath
-    del macpath
+    import macpath as path
 
     import mac
     __all__.extend(_get_exports_list(mac))
@@ -142,18 +98,13 @@ elif 'mac' in _names:
 elif 'ce' in _names:
     name = 'ce'
     linesep = '\r\n'
-    curdir = '.'; pardir = '..'; sep = '\\'; pathsep = ';'
-    defpath = '\\Windows'
     from ce import *
-    for i in ['_exit']:
-        try:
-            exec "from ce import " + i
-        except ImportError:
-            pass
+    try:
+        from ce import _exit
+    except ImportError:
+        pass
     # We can use the standard Windows path.
-    import ntpath
-    path = ntpath
-    del ntpath
+    import ntpath as path
 
     import ce
     __all__.extend(_get_exports_list(ce))
@@ -162,16 +113,12 @@ elif 'ce' in _names:
 elif 'riscos' in _names:
     name = 'riscos'
     linesep = '\n'
-    curdir = '@'; pardir = '^'; sep = '.'; pathsep = ','
-    defpath = '<Run$Dir>'
     from riscos import *
     try:
         from riscos import _exit
     except ImportError:
         pass
-    import riscospath
-    path = riscospath
-    del riscospath
+    import riscospath as path
 
     import riscos
     __all__.extend(_get_exports_list(riscos))
@@ -180,17 +127,10 @@ elif 'riscos' in _names:
 else:
     raise ImportError, 'no os specific module found'
 
-
-if sep=='.':
-    extsep = '/'
-else:
-    extsep = '.'
-
-__all__.append("path")
+sys.modules['os.path'] = path
+from os.path import curdir, pardir, sep, pathsep, defpath, extsep, altsep
 
 del _names
-
-sys.modules['os.path'] = path
 
 #'
 
@@ -309,7 +249,7 @@ def execvp(file, args):
     _execvpe(file, args)
 
 def execvpe(file, args, env):
-    """execv(file, args, env)
+    """execvpe(file, args, env)
 
     Execute the executable file (which is searched for along $PATH)
     with argument list args and environment env , replacing the
@@ -319,8 +259,9 @@ def execvpe(file, args, env):
 
 __all__.extend(["execl","execle","execlp","execlpe","execvp","execvpe"])
 
-_notfound = None
 def _execvpe(file, args, env=None):
+    from errno import ENOENT, ENOTDIR
+
     if env is not None:
         func = execve
         argrest = (args, env)
@@ -328,40 +269,31 @@ def _execvpe(file, args, env=None):
         func = execv
         argrest = (args,)
         env = environ
-    global _notfound
+
     head, tail = path.split(file)
     if head:
-        apply(func, (file,) + argrest)
+        func(file, *argrest)
         return
     if 'PATH' in env:
         envpath = env['PATH']
     else:
         envpath = defpath
     PATH = envpath.split(pathsep)
-    if not _notfound:
-        if sys.platform[:4] == 'beos':
-            #  Process handling (fork, wait) under BeOS (up to 5.0)
-            #  doesn't interoperate reliably with the thread interlocking
-            #  that happens during an import.  The actual error we need
-            #  is the same on BeOS for posix.open() et al., ENOENT.
-            try: unlink('/_#.# ## #.#')
-            except error, _notfound: pass
-        else:
-            import tempfile
-            t = tempfile.mktemp()
-            # Exec a file that is guaranteed not to exist
-            try: execv(t, ('blah',))
-            except error, _notfound: pass
-    exc, arg = error, _notfound
+    saved_exc = None
+    saved_tb = None
     for dir in PATH:
         fullname = path.join(dir, file)
         try:
-            apply(func, (fullname,) + argrest)
-        except error, (errno, msg):
-            if errno != arg[0]:
-                exc, arg = error, (errno, msg)
-    raise exc, arg
-
+            func(fullname, *argrest)
+        except error, e:
+            tb = sys.exc_info()[2]
+            if (e.errno != ENOENT and e.errno != ENOTDIR
+                and saved_exc is None):
+                saved_exc = e
+                saved_tb = tb
+    if saved_exc:
+        raise error, saved_exc, saved_tb
+    raise error, e, tb
 
 # Change environ to automatically call putenv() if it exists
 try:
@@ -373,19 +305,19 @@ else:
     import UserDict
 
     # Fake unsetenv() for Windows
-    # not sure about os2 and dos here but
+    # not sure about os2 here but
     # I'm guessing they are the same.
 
-    if name in ('os2', 'nt', 'dos'):
+    if name in ('os2', 'nt'):
         def unsetenv(key):
             putenv(key, "")
 
     if name == "riscos":
         # On RISC OS, all env access goes through getenv and putenv
         from riscosenviron import _Environ
-    elif name in ('os2', 'nt', 'dos'):  # Where Env Var Names Must Be UPPERCASE
+    elif name in ('os2', 'nt'):  # Where Env Var Names Must Be UPPERCASE
         # But we store them as upper case
-        class _Environ(UserDict.UserDict):
+        class _Environ(UserDict.IterableUserDict):
             def __init__(self, environ):
                 UserDict.UserDict.__init__(self)
                 data = self.data
@@ -418,7 +350,7 @@ else:
                 return dict(self)
 
     else:  # Where Env Var Names Can Be Mixed Case
-        class _Environ(UserDict.UserDict):
+        class _Environ(UserDict.IterableUserDict):
             def __init__(self, environ):
                 UserDict.UserDict.__init__(self)
                 self.data = environ
@@ -442,11 +374,11 @@ else:
 
     environ = _Environ(environ)
 
-    def getenv(key, default=None):
-        """Get an environment variable, return None if it doesn't exist.
-        The optional second argument can specify an alternate default."""
-        return environ.get(key, default)
-    __all__.append("getenv")
+def getenv(key, default=None):
+    """Get an environment variable, return None if it doesn't exist.
+    The optional second argument can specify an alternate default."""
+    return environ.get(key, default)
+__all__.append("getenv")
 
 def _exists(name):
     try:

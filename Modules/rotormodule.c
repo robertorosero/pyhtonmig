@@ -78,7 +78,7 @@ typedef struct {
 	unsigned char *advances;	     /* [num_rotors] */
 } Rotorobj;
 
-staticforward PyTypeObject Rotor_Type;
+static PyTypeObject Rotor_Type;
 
 #define is_rotor(v)		((v)->ob_type == &Rotor_Type)
 
@@ -575,7 +575,7 @@ rotorobj_getattr(Rotorobj *s, char *name)
 }
 
 
-statichere PyTypeObject Rotor_Type = {
+static PyTypeObject Rotor_Type = {
 	PyObject_HEAD_INIT(NULL)
 	0,				/*ob_size*/
 	"rotor.rotor",			/*tp_name*/
@@ -615,9 +615,13 @@ rotor_methods[] = {
 };
 
 
-DL_EXPORT(void)
+PyMODINIT_FUNC
 initrotor(void)
 {
 	Rotor_Type.ob_type = &PyType_Type;
 	(void)Py_InitModule("rotor", rotor_methods);
+	if (PyErr_Warn(PyExc_DeprecationWarning,
+		       "the rotor module uses an insecure algorithm "
+                       "and is deprecated") < 0)
+		return;
 }

@@ -65,21 +65,21 @@ spamlist_specialmeth(PyObject *self, PyObject *args, PyObject *kw)
 
 static PyMethodDef spamlist_methods[] = {
 	{"getstate", (PyCFunction)spamlist_getstate, METH_VARARGS,
-	 	"getstate() -> state"},
+	 	PyDoc_STR("getstate() -> state")},
 	{"setstate", (PyCFunction)spamlist_setstate, METH_VARARGS,
-	 	"setstate(state)"},
+	 	PyDoc_STR("setstate(state)")},
 	/* These entries differ only in the flags; they are used by the tests
 	   in test.test_descr. */
 	{"classmeth", (PyCFunction)spamlist_specialmeth,
 		METH_VARARGS | METH_KEYWORDS | METH_CLASS,
-	 	"classmeth(*args, **kw)"},
+	 	PyDoc_STR("classmeth(*args, **kw)")},
 	{"staticmeth", (PyCFunction)spamlist_specialmeth,
 		METH_VARARGS | METH_KEYWORDS | METH_STATIC,
-	 	"staticmeth(*args, **kw)"},
+	 	PyDoc_STR("staticmeth(*args, **kw)")},
 	{NULL,	NULL},
 };
 
-staticforward PyTypeObject spamlist_type;
+static PyTypeObject spamlist_type;
 
 static int
 spamlist_init(spamlistobject *self, PyObject *args, PyObject *kwds)
@@ -98,7 +98,7 @@ spamlist_state_get(spamlistobject *self)
 
 static PyGetSetDef spamlist_getsets[] = {
 	{"state", (getter)spamlist_state_get, NULL,
-	 "an int variable for demonstration purposes"},
+	 PyDoc_STR("an int variable for demonstration purposes")},
 	{0}
 };
 
@@ -173,13 +173,13 @@ spamdict_setstate(spamdictobject *self, PyObject *args)
 
 static PyMethodDef spamdict_methods[] = {
 	{"getstate", (PyCFunction)spamdict_getstate, METH_VARARGS,
-	 	"getstate() -> state"},
+	 	PyDoc_STR("getstate() -> state")},
 	{"setstate", (PyCFunction)spamdict_setstate, METH_VARARGS,
-	 	"setstate(state)"},
+	 	PyDoc_STR("setstate(state)")},
 	{NULL,	NULL},
 };
 
-staticforward PyTypeObject spamdict_type;
+static PyTypeObject spamdict_type;
 
 static int
 spamdict_init(spamdictobject *self, PyObject *args, PyObject *kwds)
@@ -192,7 +192,7 @@ spamdict_init(spamdictobject *self, PyObject *args, PyObject *kwds)
 
 static PyMemberDef spamdict_members[] = {
 	{"state", T_INT, offsetof(spamdictobject, state), READONLY,
-	 "an int variable for demonstration purposes"},
+	 PyDoc_STR("an int variable for demonstration purposes")},
 	{0}
 };
 
@@ -263,7 +263,7 @@ static PyMethodDef xxsubtype_functions[] = {
 	{NULL,		NULL}		/* sentinel */
 };
 
-DL_EXPORT(void)
+PyMODINIT_FUNC
 initxxsubtype(void)
 {
 	PyObject *m;

@@ -52,20 +52,11 @@ class UserString:
             return self.__class__(other + self.data)
         else:
             return self.__class__(str(other) + self.data)
-    def __iadd__(self, other):
-        if isinstance(other, UserString):
-            self.data += other.data
-        elif isinstance(other, StringTypes):
-            self.data += other
-        else:
-            self.data += str(other)
-        return self
     def __mul__(self, n):
         return self.__class__(self.data*n)
     __rmul__ = __mul__
-    def __imul__(self, n):
-        self.data *= n
-        return self
+    def __mod__(self, args):
+        return self.__class__(self.data % args)
 
     # the following methods are defined in alphabetical order:
     def capitalize(self): return self.__class__(self.data.capitalize())
@@ -108,7 +99,7 @@ class UserString:
     def join(self, seq): return self.data.join(seq)
     def ljust(self, width): return self.__class__(self.data.ljust(width))
     def lower(self): return self.__class__(self.data.lower())
-    def lstrip(self, sep=None): return self.__class__(self.data.lstrip(sep))
+    def lstrip(self, chars=None): return self.__class__(self.data.lstrip(chars))
     def replace(self, old, new, maxsplit=-1):
         return self.__class__(self.data.replace(old, new, maxsplit))
     def rfind(self, sub, start=0, end=sys.maxint):
@@ -116,13 +107,13 @@ class UserString:
     def rindex(self, sub, start=0, end=sys.maxint):
         return self.data.rindex(sub, start, end)
     def rjust(self, width): return self.__class__(self.data.rjust(width))
-    def rstrip(self, sep=None): return self.__class__(self.data.rstrip(sep))
+    def rstrip(self, chars=None): return self.__class__(self.data.rstrip(chars))
     def split(self, sep=None, maxsplit=-1):
         return self.data.split(sep, maxsplit)
     def splitlines(self, keepends=0): return self.data.splitlines(keepends)
     def startswith(self, prefix, start=0, end=sys.maxint):
         return self.data.startswith(prefix, start, end)
-    def strip(self, sep=None): return self.__class__(self.data.strip(sep))
+    def strip(self, chars=None): return self.__class__(self.data.strip(chars))
     def swapcase(self): return self.__class__(self.data.swapcase())
     def title(self): return self.__class__(self.data.title())
     def translate(self, *args):
@@ -168,15 +159,24 @@ class MutableString(UserString):
         self.data = self.data[:start] + self.data[end:]
     def immutable(self):
         return UserString(self.data)
+    def __iadd__(self, other):
+        if isinstance(other, UserString):
+            self.data += other.data
+        elif isinstance(other, StringTypes):
+            self.data += other
+        else:
+            self.data += str(other)
+        return self
+    def __imul__(self, n):
+        self.data *= n
+        return self
 
 if __name__ == "__main__":
     # execute the regression test to stdout, if called as a script:
     import os
     called_in_dir, called_as = os.path.split(sys.argv[0])
-    called_in_dir = os.path.abspath(called_in_dir)
     called_as, py = os.path.splitext(called_as)
-    sys.path.append(os.path.join(called_in_dir, 'test'))
     if '-q' in sys.argv:
-        import test_support
+        from test import test_support
         test_support.verbose = 0
-    __import__('test_' + called_as.lower())
+    __import__('test.test_' + called_as.lower())

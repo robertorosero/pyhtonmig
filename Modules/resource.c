@@ -5,6 +5,10 @@
 #include <sys/time.h>
 #include <string.h>
 #include <errno.h>
+/* for sysconf */
+#if defined(HAVE_UNISTD_H)
+#include <unistd.h>
+#endif
 
 /* On some systems, these aren't in any header file.
    On others they are, with inconsistent prototypes.
@@ -128,11 +132,11 @@ resource_getrlimit(PyObject *self, PyObject *args)
 #if defined(HAVE_LONG_LONG)
 	if (sizeof(rl.rlim_cur) > sizeof(long)) {
 		return Py_BuildValue("LL",
-				     (LONG_LONG) rl.rlim_cur,
-				     (LONG_LONG) rl.rlim_max);
+				     (PY_LONG_LONG) rl.rlim_cur,
+				     (PY_LONG_LONG) rl.rlim_max);
 	}
 #endif
-	return Py_BuildValue("ii", (long) rl.rlim_cur, (long) rl.rlim_max);
+	return Py_BuildValue("ll", (long) rl.rlim_cur, (long) rl.rlim_max);
 }
 
 static PyObject *
@@ -191,9 +195,17 @@ resource_setrlimit(PyObject *self, PyObject *args)
 static PyObject *
 resource_getpagesize(PyObject *self, PyObject *args)
 {
+	long pagesize = 0;
 	if (!PyArg_ParseTuple(args, ":getpagesize"))
 		return NULL;
-	return Py_BuildValue("i", getpagesize());
+
+#if defined(HAVE_GETPAGESIZE)
+	pagesize = getpagesize();
+#elif defined(HAVE_SYSCONF)
+	pagesize = sysconf(_SC_PAGE_SIZE);
+#endif
+	return Py_BuildValue("i", pagesize);
+
 }
 
 /* List of functions */
@@ -210,7 +222,7 @@ resource_methods[] = {
 
 /* Module initialization */
 
-DL_EXPORT(void)
+PyMODINIT_FUNC
 initresource(void)
 {
 	PyObject *m, *v;
@@ -292,7 +304,7 @@ initresource(void)
 
 #if defined(HAVE_LONG_LONG)
 	if (sizeof(RLIM_INFINITY) > sizeof(long)) {
-		v = PyLong_FromLongLong((LONG_LONG) RLIM_INFINITY);
+		v = PyLong_FromLongLong((PY_LONG_LONG) RLIM_INFINITY);
 	} else 
 #endif
 	{

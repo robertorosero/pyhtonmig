@@ -1,7 +1,10 @@
 """Unit tests for socket timeout feature."""
 
 import unittest
-import test_support
+from test import test_support
+
+# This requires the 'network' resource as given on the regrtest command line.
+skip_expected = not test_support.is_resource_enabled('network')
 
 import time
 import socket
@@ -17,12 +20,12 @@ class CreationTestCase(unittest.TestCase):
         self.sock.close()
 
     def testObjectCreation(self):
-        "Test Socket creation"
+        # Test Socket creation
         self.assertEqual(self.sock.gettimeout(), None,
                          "timeout not disabled by default")
 
     def testFloatReturnValue(self):
-        "Test return value of gettimeout()"
+        # Test return value of gettimeout()
         self.sock.settimeout(7.345)
         self.assertEqual(self.sock.gettimeout(), 7.345)
 
@@ -33,7 +36,7 @@ class CreationTestCase(unittest.TestCase):
         self.assertEqual(self.sock.gettimeout(), None)
 
     def testReturnType(self):
-        "Test return type of gettimeout()"
+        # Test return type of gettimeout()
         self.sock.settimeout(1)
         self.assertEqual(type(self.sock.gettimeout()), type(1.0))
 
@@ -41,7 +44,7 @@ class CreationTestCase(unittest.TestCase):
         self.assertEqual(type(self.sock.gettimeout()), type(1.0))
 
     def testTypeCheck(self):
-        "Test type checking by settimeout()"
+        # Test type checking by settimeout()
         self.sock.settimeout(0)
         self.sock.settimeout(0L)
         self.sock.settimeout(0.0)
@@ -54,13 +57,13 @@ class CreationTestCase(unittest.TestCase):
         self.assertRaises(TypeError, self.sock.settimeout, 0j)
 
     def testRangeCheck(self):
-        "Test range checking by settimeout()"
+        # Test range checking by settimeout()
         self.assertRaises(ValueError, self.sock.settimeout, -1)
         self.assertRaises(ValueError, self.sock.settimeout, -1L)
         self.assertRaises(ValueError, self.sock.settimeout, -1.0)
 
     def testTimeoutThenBlocking(self):
-        "Test settimeout() followed by setblocking()"
+        # Test settimeout() followed by setblocking()
         self.sock.settimeout(10)
         self.sock.setblocking(1)
         self.assertEqual(self.sock.gettimeout(), None)
@@ -74,7 +77,7 @@ class CreationTestCase(unittest.TestCase):
         self.assertEqual(self.sock.gettimeout(), None)
 
     def testBlockingThenTimeout(self):
-        "Test setblocking() followed by settimeout()"
+        # Test setblocking() followed by settimeout()
         self.sock.setblocking(0)
         self.sock.settimeout(1)
         self.assertEqual(self.sock.gettimeout(), 1)
@@ -87,7 +90,13 @@ class CreationTestCase(unittest.TestCase):
 class TimeoutTestCase(unittest.TestCase):
     """Test case for socket.socket() timeout functions"""
 
-    fuzz = 1.0
+    # There are a number of tests here trying to make sure that an operation
+    # doesn't take too much longer than expected.  But competing machine
+    # activity makes it inevitable that such tests will fail at times.
+    # When fuzz was at 1.0, I (tim) routinely saw bogus failures on Win2K
+    # and Win98SE.  Boosting it to 2.0 helped a lot, but isn't a real
+    # solution.
+    fuzz = 2.0
 
     def setUp(self):
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -98,8 +107,8 @@ class TimeoutTestCase(unittest.TestCase):
         self.sock.close()
 
     def testConnectTimeout(self):
-        "Test connect() timeout"
-        _timeout = 0.02
+        # Test connect() timeout
+        _timeout = 0.001
         self.sock.settimeout(_timeout)
 
         _t1 = time.time()
@@ -113,7 +122,7 @@ class TimeoutTestCase(unittest.TestCase):
                      %(_delta, self.fuzz, _timeout))
 
     def testRecvTimeout(self):
-        "Test recv() timeout"
+        # Test recv() timeout
         _timeout = 0.02
         self.sock.connect(self.addr_remote)
         self.sock.settimeout(_timeout)
@@ -128,7 +137,7 @@ class TimeoutTestCase(unittest.TestCase):
                      %(_delta, self.fuzz, _timeout))
 
     def testAcceptTimeout(self):
-        "Test accept() timeout"
+        # Test accept() timeout
         _timeout = 2
         self.sock.settimeout(_timeout)
         self.sock.bind(self.addr_local)
@@ -144,7 +153,7 @@ class TimeoutTestCase(unittest.TestCase):
                      %(_delta, self.fuzz, _timeout))
 
     def testRecvfromTimeout(self):
-        "Test recvfrom() timeout"
+        # Test recvfrom() timeout
         _timeout = 2
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sock.settimeout(_timeout)
@@ -160,26 +169,27 @@ class TimeoutTestCase(unittest.TestCase):
                      %(_delta, self.fuzz, _timeout))
 
     def testSend(self):
-        "Test send() timeout"
+        # Test send() timeout
         # couldn't figure out how to test it
         pass
 
     def testSendto(self):
-        "Test sendto() timeout"
+        # Test sendto() timeout
         # couldn't figure out how to test it
         pass
 
     def testSendall(self):
-        "Test sendall() timeout"
+        # Test sendall() timeout
         # couldn't figure out how to test it
         pass
 
 
-def main():
-    suite = unittest.TestSuite()
-    suite.addTest(unittest.makeSuite(CreationTestCase))
+def test_main():
+    test_support.requires('network')
+
+    suite = unittest.makeSuite(CreationTestCase)
     suite.addTest(unittest.makeSuite(TimeoutTestCase))
     test_support.run_suite(suite)
 
 if __name__ == "__main__":
-    main()
+    test_main()

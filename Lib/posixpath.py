@@ -15,9 +15,20 @@ import stat
 
 __all__ = ["normcase","isabs","join","splitdrive","split","splitext",
            "basename","dirname","commonprefix","getsize","getmtime",
-           "getatime","islink","exists","isdir","isfile","ismount",
+           "getatime","getctime","islink","exists","isdir","isfile","ismount",
            "walk","expanduser","expandvars","normpath","abspath",
-           "samefile","sameopenfile","samestat"]
+           "samefile","sameopenfile","samestat",
+           "curdir","pardir","sep","pathsep","defpath","altsep","extsep",
+           "realpath","supports_unicode_filenames"]
+
+# strings representing various path-related bits and pieces
+curdir = '.'
+pardir = '..'
+extsep = '.'
+sep = '/'
+pathsep = ':'
+defpath = ':/bin:/usr/bin'
+altsep = None
 
 # Normalize the case of a pathname.  Trivial in Posix, string.lower on Mac.
 # On MS-DOS this may also turn slashes into backslashes; however, other
@@ -78,20 +89,11 @@ def split(p):
 def splitext(p):
     """Split the extension from a pathname.  Extension is everything from the
     last dot to the end.  Returns "(root, ext)", either part may be empty."""
-    root, ext = '', ''
-    for c in p:
-        if c == '/':
-            root, ext = root + ext + c, ''
-        elif c == '.':
-            if ext:
-                root, ext = root + ext, c
-            else:
-                ext = c
-        elif ext:
-            ext = ext + c
-        else:
-            root = root + c
-    return root, ext
+    i = p.rfind('.')
+    if i<=p.rfind('/'):
+        return p, ''
+    else:
+        return p[:i], p[i:]
 
 
 # Split a pathname into a drive specification and the rest of the
@@ -146,6 +148,9 @@ def getatime(filename):
     """Return the last access time of a file, reported by os.stat()."""
     return os.stat(filename).st_atime
 
+def getctime(filename):
+    """Return the creation time of a file, reported by os.stat()."""
+    return os.stat(filename).st_ctime
 
 # Is a path a symbolic link?
 # This will always return false on systems where os.lstat doesn't exist.
@@ -303,8 +308,10 @@ def expanduser(path):
         i = i + 1
     if i == 1:
         if not 'HOME' in os.environ:
-            return path
-        userhome = os.environ['HOME']
+            import pwd
+            userhome = pwd.getpwuid(os.getuid())[5]
+        else:
+            userhome = os.environ['HOME']
     else:
         import pwd
         try:
@@ -407,3 +414,5 @@ symbolic links encountered in the path."""
             return realpath(newpath)
 
     return filename
+
+supports_unicode_filenames = False

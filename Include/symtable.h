@@ -41,19 +41,19 @@ typedef struct _symtable_entry {
 	struct symtable *ste_table;
 } PySTEntryObject;
 
-extern DL_IMPORT(PyTypeObject) PySTEntry_Type;
+PyAPI_DATA(PyTypeObject) PySTEntry_Type;
 
 #define PySTEntry_Check(op) ((op)->ob_type == &PySTEntry_Type)
 
-extern DL_IMPORT(PySTEntryObject *) \
+PyAPI_FUNC(PySTEntryObject *) \
 	PySTEntry_New(struct symtable *, identifier, block_ty, void *, int);
-DL_IMPORT(int) PyST_GetScope(PySTEntryObject *, PyObject *);
+PyAPI_FUNC(int) PyST_GetScope(PySTEntryObject *, PyObject *);
 
-DL_IMPORT(struct symtable *) PySymtable_Build(mod_ty, const char *, 
+PyAPI_FUNC(struct symtable *) PySymtable_Build(mod_ty, const char *, 
 					      PyFutureFeatures *);
-DL_IMPORT(PySTEntryObject *) PySymtable_Lookup(struct symtable *, void *);
+PyAPI_FUNC(PySTEntryObject *) PySymtable_Lookup(struct symtable *, void *);
 
-DL_IMPORT(void) PySymtable_Free(struct symtable *);
+PyAPI_FUNC(void) PySymtable_Free(struct symtable *);
 
 /* Flags for def-use information */
 

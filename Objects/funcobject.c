@@ -14,6 +14,7 @@ PyFunction_New(PyObject *code, PyObject *globals)
 	if (op != NULL) {
 		PyObject *doc;
 		PyObject *consts;
+		PyObject *module;
 		op->func_weakreflist = NULL;
 		Py_INCREF(code);
 		op->func_code = code;
@@ -34,6 +35,16 @@ PyFunction_New(PyObject *code, PyObject *globals)
 		Py_INCREF(doc);
 		op->func_doc = doc;
 		op->func_dict = NULL;
+		op->func_module = NULL;
+
+		/* __module__: If module name is in globals, use it.
+		   Otherwise, use None.
+		*/
+		module = PyDict_GetItemString(globals, "__name__");
+		if (module) {
+		    Py_INCREF(module);
+		    op->func_module = module;
+		}
 	}
 	else
 		return NULL;
@@ -59,6 +70,16 @@ PyFunction_GetGlobals(PyObject *op)
 		return NULL;
 	}
 	return ((PyFunctionObject *) op) -> func_globals;
+}
+
+PyObject *
+PyFunction_GetModule(PyObject *op)
+{
+	if (!PyFunction_Check(op)) {
+		PyErr_BadInternalCall();
+		return NULL;
+	}
+	return ((PyFunctionObject *) op) -> func_module;
 }
 
 PyObject *
@@ -138,6 +159,7 @@ static PyMemberDef func_memberlist[] = {
 	 RESTRICTED|READONLY},
         {"func_name",     T_OBJECT,     OFF(func_name),         READONLY},
         {"__name__",      T_OBJECT,     OFF(func_name),         READONLY},
+        {"__module__",    T_OBJECT,     OFF(func_module), WRITE_RESTRICTED},
         {NULL}  /* Sentinel */
 };
 
@@ -267,46 +289,99 @@ static PyGetSetDef func_getsetlist[] = {
 };
 
 PyDoc_STRVAR(func_doc,
-"function(code, globals[, name[, argdefs]])\n\
+"function(code, globals[, name[, argdefs[, closure]]])\n\
 \n\
 Create a function object from a code object and a dictionary.\n\
 The optional name string overrides the name from the code object.\n\
-The optional argdefs tuple specifies the default argument values.");
+The optional argdefs tuple specifies the default argument values.\n\
+The optional closure tuple supplies the bindings for free variables.");
+
+/* func_new() maintains the following invariants for closures.  The
+   closure must correspond to the free variables of the code object.
+   
+   if len(code.co_freevars) == 0: 
+           closure = NULL
+   else:
+           len(closure) == len(code.co_freevars)
+   for every elt in closure, type(elt) == cell
+*/
 
 static PyObject *
 func_new(PyTypeObject* type, PyObject* args, PyObject* kw)
 {
-	PyObject *code;
+	PyCodeObject *code;
 	PyObject *globals;
 	PyObject *name = Py_None;
 	PyObject *defaults = Py_None;
+	PyObject *closure = Py_None;
 	PyFunctionObject *newfunc;
+	int nfree, nclosure;
 
-	if (!PyArg_ParseTuple(args, "O!O!|OO!:function",
+	if (!PyArg_ParseTuple(args, "O!O!|OOO:function",
 			      &PyCode_Type, &code,
 			      &PyDict_Type, &globals,
-			      &name,
-			      &PyTuple_Type, &defaults))
+			      &name, &defaults, &closure))
 		return NULL;
 	if (name != Py_None && !PyString_Check(name)) {
 		PyErr_SetString(PyExc_TypeError,
 				"arg 3 (name) must be None or string");
 		return NULL;
 	}
+	if (defaults != Py_None && !PyTuple_Check(defaults)) {
+		PyErr_SetString(PyExc_TypeError,
+				"arg 4 (defaults) must be None or tuple");
+		return NULL;
+	}
+	nfree = PyTuple_GET_SIZE(code->co_freevars);
+	if (!PyTuple_Check(closure)) {
+		if (nfree && closure == Py_None) {
+			PyErr_SetString(PyExc_TypeError,
+					"arg 5 (closure) must be tuple");
+			return NULL;
+		}
+		else if (closure != Py_None) {
+			PyErr_SetString(PyExc_TypeError,
+				"arg 5 (closure) must be None or tuple");
+			return NULL;
+		}
+	}
 
-	newfunc = (PyFunctionObject *)PyFunction_New(code, globals);
+	/* check that the closure is well-formed */
+	nclosure = closure == Py_None ? 0 : PyTuple_GET_SIZE(closure);
+	if (nfree != nclosure)
+		return PyErr_Format(PyExc_ValueError,
+				    "%s requires closure of length %d, not %d",
+				    PyString_AS_STRING(code->co_name),
+				    nfree, nclosure);
+	if (nclosure) {
+		int i;
+		for (i = 0; i < nclosure; i++) {
+			PyObject *o = PyTuple_GET_ITEM(closure, i);
+			if (!PyCell_Check(o)) {
+				return PyErr_Format(PyExc_TypeError,
+				    "arg 5 (closure) expected cell, found %s",
+						    o->ob_type->tp_name);
+			}
+		}
+	}
+	
+	newfunc = (PyFunctionObject *)PyFunction_New((PyObject *)code, 
+						     globals);
 	if (newfunc == NULL)
 		return NULL;
-
+	
 	if (name != Py_None) {
-		Py_XINCREF(name);
-		Py_XDECREF(newfunc->func_name);
+		Py_INCREF(name);
+		Py_DECREF(newfunc->func_name);
 		newfunc->func_name = name;
 	}
 	if (defaults != Py_None) {
-		Py_XINCREF(defaults);
-		Py_XDECREF(newfunc->func_defaults);
+		Py_INCREF(defaults);
 		newfunc->func_defaults  = defaults;
+	}
+	if (closure != Py_None) {
+		Py_INCREF(closure);
+		newfunc->func_closure = closure;
 	}
 
 	return (PyObject *)newfunc;
@@ -320,6 +395,7 @@ func_dealloc(PyFunctionObject *op)
 		PyObject_ClearWeakRefs((PyObject *) op);
 	Py_DECREF(op->func_code);
 	Py_DECREF(op->func_globals);
+	Py_XDECREF(op->func_module);
 	Py_DECREF(op->func_name);
 	Py_XDECREF(op->func_defaults);
 	Py_XDECREF(op->func_doc);
@@ -349,6 +425,11 @@ func_traverse(PyFunctionObject *f, visitproc visit, void *arg)
 	}
 	if (f->func_globals) {
 		err = visit(f->func_globals, arg);
+		if (err)
+			return err;
+	}
+	if (f->func_module) {
+		err = visit(f->func_module, arg);
 		if (err)
 			return err;
 	}
@@ -509,9 +590,28 @@ typedef struct {
 static void
 cm_dealloc(classmethod *cm)
 {
+	_PyObject_GC_UNTRACK((PyObject *)cm);
 	Py_XDECREF(cm->cm_callable);
 	cm->ob_type->tp_free((PyObject *)cm);
 }
+
+static int
+cm_traverse(classmethod *cm, visitproc visit, void *arg)
+{
+	if (!cm->cm_callable)
+		return 0;
+	return visit(cm->cm_callable, arg);
+}
+
+static int
+cm_clear(classmethod *cm)
+{
+	Py_XDECREF(cm->cm_callable);
+	cm->cm_callable = NULL;
+
+	return 0;
+}
+
 
 static PyObject *
 cm_descr_get(PyObject *self, PyObject *obj, PyObject *type)
@@ -535,7 +635,7 @@ cm_init(PyObject *self, PyObject *args, PyObject *kwds)
 	classmethod *cm = (classmethod *)self;
 	PyObject *callable;
 
-	if (!PyArg_ParseTuple(args, "O:classmethod", &callable))
+	if (!PyArg_UnpackTuple(args, "classmethod", 1, 1, &callable))
 		return -1;
 	Py_INCREF(callable);
 	cm->cm_callable = callable;
@@ -584,10 +684,10 @@ PyTypeObject PyClassMethod_Type = {
 	PyObject_GenericGetAttr,		/* tp_getattro */
 	0,					/* tp_setattro */
 	0,					/* tp_as_buffer */
-	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE, /* tp_flags */
+	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC,
 	classmethod_doc,			/* tp_doc */
-	0,					/* tp_traverse */
-	0,					/* tp_clear */
+	(traverseproc)cm_traverse,		/* tp_traverse */
+	(inquiry)cm_clear,			/* tp_clear */
 	0,					/* tp_richcompare */
 	0,					/* tp_weaklistoffset */
 	0,					/* tp_iter */
@@ -603,7 +703,7 @@ PyTypeObject PyClassMethod_Type = {
 	cm_init,				/* tp_init */
 	PyType_GenericAlloc,			/* tp_alloc */
 	PyType_GenericNew,			/* tp_new */
-	PyObject_Del,		                /* tp_free */
+	PyObject_GC_Del,	                /* tp_free */
 };
 
 PyObject *
@@ -643,8 +743,26 @@ typedef struct {
 static void
 sm_dealloc(staticmethod *sm)
 {
+	_PyObject_GC_UNTRACK((PyObject *)sm);
 	Py_XDECREF(sm->sm_callable);
 	sm->ob_type->tp_free((PyObject *)sm);
+}
+
+static int
+sm_traverse(staticmethod *sm, visitproc visit, void *arg)
+{
+	if (!sm->sm_callable)
+		return 0;
+	return visit(sm->sm_callable, arg);
+}
+
+static int
+sm_clear(staticmethod *sm)
+{
+	Py_XDECREF(sm->sm_callable);
+	sm->sm_callable = NULL;
+
+	return 0;
 }
 
 static PyObject *
@@ -667,7 +785,7 @@ sm_init(PyObject *self, PyObject *args, PyObject *kwds)
 	staticmethod *sm = (staticmethod *)self;
 	PyObject *callable;
 
-	if (!PyArg_ParseTuple(args, "O:staticmethod", &callable))
+	if (!PyArg_UnpackTuple(args, "staticmethod", 1, 1, &callable))
 		return -1;
 	Py_INCREF(callable);
 	sm->sm_callable = callable;
@@ -713,10 +831,10 @@ PyTypeObject PyStaticMethod_Type = {
 	PyObject_GenericGetAttr,		/* tp_getattro */
 	0,					/* tp_setattro */
 	0,					/* tp_as_buffer */
-	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE, /* tp_flags */
+	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC,
 	staticmethod_doc,			/* tp_doc */
-	0,					/* tp_traverse */
-	0,					/* tp_clear */
+	(traverseproc)sm_traverse,		/* tp_traverse */
+	(inquiry)sm_clear,			/* tp_clear */
 	0,					/* tp_richcompare */
 	0,					/* tp_weaklistoffset */
 	0,					/* tp_iter */
@@ -732,7 +850,7 @@ PyTypeObject PyStaticMethod_Type = {
 	sm_init,				/* tp_init */
 	PyType_GenericAlloc,			/* tp_alloc */
 	PyType_GenericNew,			/* tp_new */
-	PyObject_Del,           		/* tp_free */
+	PyObject_GC_Del,           		/* tp_free */
 };
 
 PyObject *

@@ -94,9 +94,9 @@ is_sep(char ch)	/* determine if "ch" is a separator character */
 #endif
 }
 
-/* assumes 'dir' null terminated in bounds.  Never writes
-   beyond existing terminator.
-*/
+/* assumes 'dir' null terminated in bounds.
+ * Never writes beyond existing terminator.
+ */
 static void
 reduce(char *dir)
 {
@@ -113,11 +113,12 @@ exists(char *filename)
 	return stat(filename, &buf) == 0;
 }
 
-/* Assumes 'filename' MAXPATHLEN+1 bytes long - 
-   may extend 'filename' by one character.
-*/
+/* Is module  (check for .pyc/.pyo too)
+ * Assumes 'filename' MAXPATHLEN+1 bytes long - 
+ * may extend 'filename' by one character.
+ */
 static int
-ismodule(char *filename)	/* Is module -- check for .pyc/.pyo too */
+ismodule(char *filename)
 {
 	if (exists(filename))
 		return 1;
@@ -151,9 +152,9 @@ join(char *buffer, char *stuff)
 }
 
 /* gotlandmark only called by search_for_prefix, which ensures
-   'prefix' is null terminated in bounds.  join() ensures
-   'landmark' can not overflow prefix if too long.
-*/
+ * 'prefix' is null terminated in bounds.  join() ensures
+ * 'landmark' can not overflow prefix if too long.
+ */
 static int
 gotlandmark(char *landmark)
 {
@@ -167,7 +168,8 @@ gotlandmark(char *landmark)
 }
 
 /* assumes argv0_path is MAXPATHLEN+1 bytes long, already \0 term'd. 
-   assumption provided by only caller, calculate_path() */
+ * assumption provided by only caller, calculate_path()
+ */
 static int
 search_for_prefix(char *argv0_path, char *landmark)
 {
@@ -250,6 +252,8 @@ calculate_path(void)
 	size_t bufsz;
 	char *pythonhome = Py_GetPythonHome();
 	char *envpath = getenv("PYTHONPATH");
+	char zip_path[MAXPATHLEN+1];
+	size_t len;
 
 	get_progpath();
 	/* progpath guaranteed \0 terminated in MAXPATH+1 bytes. */
@@ -267,13 +271,27 @@ calculate_path(void)
 	if (envpath && *envpath == '\0')
 		envpath = NULL;
 
+	/* Calculate zip archive path */
+	strncpy(zip_path, progpath, MAXPATHLEN);
+	zip_path[MAXPATHLEN] = '\0';
+	len = strlen(zip_path);
+	if (len > 4) {
+		zip_path[len-3] = 'z';  /* change ending to "zip" */
+		zip_path[len-2] = 'i';
+		zip_path[len-1] = 'p';
+	}
+	else {
+		zip_path[0] = 0;
+	}
+
 	/* We need to construct a path from the following parts.
-	   (1) the PYTHONPATH environment variable, if set;
-	   (2) the PYTHONPATH config macro, with the leading "."
-	       of each component replaced with pythonhome, if set;
-	   (3) the directory containing the executable (argv0_path).
-	   The length calculation calculates #2 first.
-	*/
+	 * (1) the PYTHONPATH environment variable, if set;
+	 * (2) the zip archive file path;
+	 * (3) the PYTHONPATH config macro, with the leading "."
+	 *     of each component replaced with pythonhome, if set;
+	 * (4) the directory containing the executable (argv0_path).
+	 * The length calculation calculates #3 first.
+	 */
 
 	/* Calculate size of return buffer */
 	if (pythonhome != NULL) {
@@ -289,6 +307,7 @@ calculate_path(void)
 		bufsz = 0;
 	bufsz += strlen(PYTHONPATH) + 1;
 	bufsz += strlen(argv0_path) + 1;
+	bufsz += strlen(zip_path) + 1;
 	if (envpath != NULL)
 		bufsz += strlen(envpath) + 1;
 
@@ -309,6 +328,11 @@ calculate_path(void)
 
 	if (envpath) {
 		strcpy(buf, envpath);
+		buf = strchr(buf, '\0');
+		*buf++ = DELIM;
+	}
+	if (zip_path[0]) {
+		strcpy(buf, zip_path);
 		buf = strchr(buf, '\0');
 		*buf++ = DELIM;
 	}

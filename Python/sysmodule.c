@@ -17,8 +17,14 @@ Data members:
 #include "Python.h"
 #include "code.h"
 #include "frameobject.h"
+#include "eval.h"
 
 #include "osdefs.h"
+
+#ifdef MS_WINDOWS
+#define WIN32_LEAN_AND_MEAN
+#include "windows.h"
+#endif /* MS_WINDOWS */
 
 #ifdef MS_COREDLL
 extern void *PyWin_DLLhModule;
@@ -127,7 +133,7 @@ PyDoc_STRVAR(excepthook_doc,
 );
 
 static PyObject *
-sys_exc_info(PyObject *self)
+sys_exc_info(PyObject *self, PyObject *noargs)
 {
 	PyThreadState *tstate;
 	tstate = PyThreadState_Get();
@@ -142,8 +148,39 @@ sys_exc_info(PyObject *self)
 PyDoc_STRVAR(exc_info_doc,
 "exc_info() -> (type, value, traceback)\n\
 \n\
-Return information about the exception that is currently being handled.\n\
-This should be called from inside an except clause only."
+Return information about the most recent exception caught by an except\n\
+clause in the current stack frame or in an older stack frame."
+);
+
+static PyObject *
+sys_exc_clear(PyObject *self, PyObject *noargs)
+{
+	PyThreadState *tstate = PyThreadState_Get();
+	PyObject *tmp_type, *tmp_value, *tmp_tb;
+	tmp_type = tstate->exc_type;
+	tmp_value = tstate->exc_value;
+	tmp_tb = tstate->exc_traceback;
+	tstate->exc_type = NULL;
+	tstate->exc_value = NULL;
+	tstate->exc_traceback = NULL;
+	Py_XDECREF(tmp_type);
+	Py_XDECREF(tmp_value);
+	Py_XDECREF(tmp_tb);
+	/* For b/w compatibility */
+	PySys_SetObject("exc_type", Py_None);
+	PySys_SetObject("exc_value", Py_None);
+	PySys_SetObject("exc_traceback", Py_None);
+	Py_INCREF(Py_None);
+	return Py_None;
+}
+
+PyDoc_STRVAR(exc_clear_doc,
+"exc_clear() -> None\n\
+\n\
+Clear global information on the current exception.  Subsequent calls to\n\
+exc_info() will return (None,None,None) until another exception is raised\n\
+in the current thread or the execution stack returns to a frame where\n\
+another exception is being handled."
 );
 
 static PyObject *
@@ -198,6 +235,22 @@ PyDoc_STRVAR(setdefaultencoding_doc,
 "setdefaultencoding(encoding)\n\
 \n\
 Set the current default string encoding used by the Unicode implementation."
+);
+
+static PyObject *
+sys_getfilesystemencoding(PyObject *self)
+{
+	if (Py_FileSystemDefaultEncoding)
+		return PyString_FromString(Py_FileSystemDefaultEncoding);
+	Py_INCREF(Py_None);
+	return Py_None;
+}
+
+PyDoc_STRVAR(getfilesystemencoding_doc,
+"getfilesystemencoding() -> string\n\
+\n\
+Return the encoding used to convert Unicode filenames in\n\
+operating system filenames."
 );
 
 #endif
@@ -352,8 +405,7 @@ and return.  See the profiler chapter in the library manual."
 static PyObject *
 sys_setcheckinterval(PyObject *self, PyObject *args)
 {
-	PyThreadState *tstate = PyThreadState_Get();
-	if (!PyArg_ParseTuple(args, "i:setcheckinterval", &tstate->interp->checkinterval))
+	if (!PyArg_ParseTuple(args, "i:setcheckinterval", &_Py_CheckInterval))
 		return NULL;
 	Py_INCREF(Py_None);
 	return Py_None;
@@ -404,6 +456,34 @@ Return the current value of the recursion limit, the maximum depth\n\
 of the Python interpreter stack.  This limit prevents infinite\n\
 recursion from causing an overflow of the C stack and crashing Python."
 );
+
+#ifdef MS_WINDOWS
+PyDoc_STRVAR(getwindowsversion_doc,
+"getwindowsversion()\n\
+\n\
+Return information about the running version of Windows.\n\
+The result is a tuple of (major, minor, build, platform, text)\n\
+All elements are numbers, except text which is a string.\n\
+Platform may be 0 for win32s, 1 for Windows 9x/ME, 2 for Windows NT/2000/XP\n\
+"
+);
+
+static PyObject *
+sys_getwindowsversion(PyObject *self)
+{
+	OSVERSIONINFO ver;
+	ver.dwOSVersionInfoSize = sizeof(ver);
+	if (!GetVersionEx(&ver))
+		return PyErr_SetFromWindowsErr(0);
+	return Py_BuildValue("HHHHs",
+	                     ver.dwMajorVersion,
+	                     ver.dwMinorVersion,
+	                     ver.dwBuildNumber,
+	                     ver.dwPlatformId,
+	                     ver.szCSDVersion);
+}
+
+#endif /* MS_WINDOWS */
 
 #ifdef HAVE_DLOPEN
 static PyObject *
@@ -469,11 +549,10 @@ sys_getrefcount(PyObject *self, PyObject *arg)
 	return PyInt_FromLong(arg->ob_refcnt);
 }
 
-#ifdef Py_TRACE_REFS
+#ifdef Py_REF_DEBUG
 static PyObject *
 sys_gettotalrefcount(PyObject *self)
 {
-	extern long _Py_RefTotal;
 	return PyInt_FromLong(_Py_RefTotal);
 }
 
@@ -531,6 +610,45 @@ sys_getframe(PyObject *self, PyObject *args)
 	return (PyObject*)f;
 }
 
+PyDoc_STRVAR(call_tracing_doc,
+"call_tracing(func, args) -> object\n\
+\n\
+Call func(*args), while tracing is enabled.  The tracing state is\n\
+saved, and restored afterwards.  This is intended to be called from\n\
+a debugger from a checkpoint, to recursively debug some other code."
+);
+
+static PyObject *
+sys_call_tracing(PyObject *self, PyObject *args)
+{
+	PyObject *func, *funcargs;
+	if (!PyArg_ParseTuple(args, "OO:call_tracing", &func, &funcargs))
+		return NULL;
+	return _PyEval_CallTracing(func, funcargs);
+}
+
+PyDoc_STRVAR(callstats_doc,
+"callstats() -> tuple of integers\n\
+\n\
+Return a tuple of function call statistics, if CALL_PROFILE was defined\n\
+when Python was built.  Otherwise, return None.\n\
+\n\
+When enabled, this function returns detailed, implementation-specific\n\
+details about the number of function calls executed. The return value is\n\
+a 11-tuple where the entries in the tuple are counts of:\n\
+0. all function calls\n\
+1. calls to PyFunction_Type objects\n\
+2. PyFunction calls that do not create an argument tuple\n\
+3. PyFunction calls that do not create an argument tuple\n\
+   and bypass PyEval_EvalCodeEx()\n\
+4. PyMethod calls\n\
+5. PyMethod calls on bound methods\n\
+6. PyType calls\n\
+7. PyCFunction calls\n\
+8. generator calls\n\
+9. All other calls\n\
+10. Number of stack pops performed by call_function()"
+);
 
 #ifdef Py_TRACE_REFS
 /* Defined in objects.c because it uses static globals if that file */
@@ -544,13 +662,16 @@ extern PyObject *_Py_GetDXProfile(PyObject *,  PyObject *);
 
 static PyMethodDef sys_methods[] = {
 	/* Might as well keep this in alphabetic order */
+	{"callstats", (PyCFunction)PyEval_GetCallStats, METH_NOARGS, 
+	 callstats_doc},
 	{"displayhook",	sys_displayhook, METH_O, displayhook_doc},
-	{"exc_info",	(PyCFunction)sys_exc_info, METH_NOARGS, exc_info_doc},
+	{"exc_info",	sys_exc_info, METH_NOARGS, exc_info_doc},
+	{"exc_clear",	sys_exc_clear, METH_NOARGS, exc_clear_doc},
 	{"excepthook",	sys_excepthook, METH_VARARGS, excepthook_doc},
 	{"exit",	sys_exit, METH_VARARGS, exit_doc},
 #ifdef Py_USING_UNICODE
-	{"getdefaultencoding", (PyCFunction)sys_getdefaultencoding, METH_NOARGS,
-	 getdefaultencoding_doc}, 
+	{"getdefaultencoding", (PyCFunction)sys_getdefaultencoding, 
+	 METH_NOARGS, getdefaultencoding_doc}, 
 #endif
 #ifdef HAVE_DLOPEN
 	{"getdlopenflags", (PyCFunction)sys_getdlopenflags, METH_NOARGS, 
@@ -562,14 +683,24 @@ static PyMethodDef sys_methods[] = {
 #ifdef DYNAMIC_EXECUTION_PROFILE
 	{"getdxp",	_Py_GetDXProfile, METH_VARARGS},
 #endif
+#ifdef Py_USING_UNICODE
+	{"getfilesystemencoding", (PyCFunction)sys_getfilesystemencoding,
+	 METH_NOARGS, getfilesystemencoding_doc}, 
+#endif
 #ifdef Py_TRACE_REFS
 	{"getobjects",	_Py_GetObjects, METH_VARARGS},
+#endif
+#ifdef Py_REF_DEBUG
 	{"gettotalrefcount", (PyCFunction)sys_gettotalrefcount, METH_NOARGS},
 #endif
 	{"getrefcount",	(PyCFunction)sys_getrefcount, METH_O, getrefcount_doc},
 	{"getrecursionlimit", (PyCFunction)sys_getrecursionlimit, METH_NOARGS,
 	 getrecursionlimit_doc},
 	{"_getframe", sys_getframe, METH_VARARGS, getframe_doc},
+#ifdef MS_WINDOWS
+	{"getwindowsversion", (PyCFunction)sys_getwindowsversion, METH_NOARGS,
+	 getwindowsversion_doc},
+#endif /* MS_WINDOWS */
 #ifdef USE_MALLOPT
 	{"mdebug",	sys_mdebug, METH_VARARGS},
 #endif
@@ -587,6 +718,7 @@ static PyMethodDef sys_methods[] = {
 	{"setrecursionlimit", sys_setrecursionlimit, METH_VARARGS,
 	 setrecursionlimit_doc},
 	{"settrace",	sys_settrace, METH_O, settrace_doc},
+	{"call_tracing", sys_call_tracing, METH_VARARGS, call_tracing_doc},
 	{NULL,		NULL}		/* sentinel */
 };
 
@@ -725,6 +857,7 @@ Functions:\n\
 displayhook() -- print an object to the screen, and save it in __builtin__._\n\
 excepthook() -- print an exception and its traceback to sys.stderr\n\
 exc_info() -- return thread-safe information about the current exception\n\
+exc_clear() -- clear the exception state for the current thread\n\
 exit() -- exit the interpreter by raising SystemExit\n\
 getdlopenflags() -- returns flags to be used for dlopen() calls\n\
 getrefcount() -- return the reference count for an object (plus one :-)\n\
@@ -791,6 +924,9 @@ _PySys_Init(void)
 					       PY_MINOR_VERSION,
 					       PY_MICRO_VERSION, s,
 					       PY_RELEASE_SERIAL));
+	Py_XDECREF(v);
+	PyDict_SetItemString(sysdict, "api_version",
+			     v = PyInt_FromLong(PYTHON_API_VERSION));
 	Py_XDECREF(v);
 	PyDict_SetItemString(sysdict, "copyright",
 			     v = PyString_FromString(Py_GetCopyright()));
@@ -929,6 +1065,11 @@ makeargvobject(int argc, char **argv)
 void
 PySys_SetArgv(int argc, char **argv)
 {
+#if defined(HAVE_REALPATH)
+	char fullpath[MAXPATHLEN];
+#elif defined(MS_WINDOWS)
+	char fullpath[MAX_PATH];
+#endif
 	PyObject *av = makeargvobject(argc, argv);
 	PyObject *path = PySys_GetObject("path");
 	if (av == NULL)
@@ -971,6 +1112,15 @@ PySys_SetArgv(int argc, char **argv)
 #if SEP == '\\' /* Special case for MS filename syntax */
 		if (argc > 0 && argv0 != NULL) {
 			char *q;
+#ifdef MS_WINDOWS
+			char *ptemp;
+			if (GetFullPathName(argv0,
+					   sizeof(fullpath),
+					   fullpath,
+					   &ptemp)) {
+				argv0 = fullpath;
+			}
+#endif
 			p = strrchr(argv0, SEP);
 			/* Test for alternate separator */
 			q = strrchr(p ? p : argv0, '/');
@@ -983,8 +1133,14 @@ PySys_SetArgv(int argc, char **argv)
 			}
 		}
 #else /* All other filename syntaxes */
-		if (argc > 0 && argv0 != NULL)
+		if (argc > 0 && argv0 != NULL) {
+#if defined(HAVE_REALPATH)
+			if (realpath(argv0, fullpath)) {
+				argv0 = fullpath;
+			}
+#endif
 			p = strrchr(argv0, SEP);
+		}
 		if (p != NULL) {
 #ifndef RISCOS
 			n = p + 1 - argv0;

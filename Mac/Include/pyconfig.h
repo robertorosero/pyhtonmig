@@ -283,9 +283,6 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
    one supplied by Python itself. (see Include/unicodectype.h). */
 #undef WANT_WCTYPE_FUNCTIONS
 
-/* Define if you want to compile in cycle garbage collection */
-#define WITH_CYCLE_GC 1
-
 /* Define if you want cross-platform newline support for reading */
 #define WITH_UNIVERSAL_NEWLINES
 
@@ -309,7 +306,7 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #undef WITH_DYLD
 
 /* Define if you want to compile in Python-specific mallocs */
-#define WITH_PYMALLOC
+#define WITH_PYMALLOC 1
 
 /* Define if you want to produce an OpenStep/Rhapsody framework
    (shared library plus accessory files). */

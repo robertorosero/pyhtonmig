@@ -2,7 +2,7 @@ import sys
 import os
 from array import array
 
-from test_support import verify, TESTFN, TestFailed
+from test.test_support import verify, TESTFN, TestFailed
 from UserList import UserList
 
 # verify writelines with instance sequence
@@ -89,7 +89,9 @@ f.close()
 if not f.closed:
     raise TestFailed, 'file.closed should be true'
 
-methods = ['fileno', 'flush', 'isatty', 'read', 'readinto', 'readline', 'readlines', 'seek', 'tell', 'truncate', 'write', 'xreadlines' ]
+methods = ['fileno', 'flush', 'isatty', 'next', 'read', 'readinto',
+           'readline', 'readlines', 'seek', 'tell', 'truncate', 'write',
+           'xreadlines', '__iter__']
 if sys.platform.startswith('atheos'):
     methods.remove('truncate')
 

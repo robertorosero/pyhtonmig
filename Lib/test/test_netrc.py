@@ -1,5 +1,6 @@
 
-import netrc, os, tempfile, test_support, unittest
+import netrc, os, unittest
+from test import test_support
 
 TEST_NETRC = """
 machine foo login log1 password pass1 account acct1
@@ -16,7 +17,7 @@ default login log2 password pass2
 
 """
 
-temp_filename = tempfile.mktemp()
+temp_filename = test_support.TESTFN
 
 class NetrcTestCase(unittest.TestCase):
 
@@ -37,6 +38,8 @@ class NetrcTestCase(unittest.TestCase):
         self.assert_(self.netrc.hosts['foo'] == ('log1', 'acct1', 'pass1'))
         self.assert_(self.netrc.hosts['default'] == ('log2', None, 'pass2'))
 
+def test_main():
+    test_support.run_unittest(NetrcTestCase)
 
 if __name__ == "__main__":
-    test_support.run_unittest(NetrcTestCase)
+    test_main()

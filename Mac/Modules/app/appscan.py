@@ -2,10 +2,9 @@
 
 import sys
 import os
-BGENDIR=os.path.join(sys.prefix, ':Tools:bgen:bgen')
+from bgenlocations import TOOLBOXDIR, BGENDIR
 sys.path.append(BGENDIR)
 from scantools import Scanner
-from bgenlocations import TOOLBOXDIR
 
 LONG = "Appearance"
 SHORT = "app"
@@ -18,6 +17,8 @@ def main():
 	scanner = MyScanner(input, output, defsoutput)
 	scanner.scan()
 	scanner.close()
+	print "=== Testing definitions output code ==="
+	execfile(defsoutput, {}, {})
 	print "=== Done scanning and generating, now importing the generated code... ==="
 	exec "import " + SHORT + "support"
 	print "=== Done.  It's up to you to compile it now! ==="
@@ -50,16 +51,6 @@ class MyScanner(Scanner):
 			"appearanceBadCursorIndexErr",
 			]
 
-	def makegreylist(self):
-		return [
-			('#if TARGET_API_MAC_CARBON', [
-				'GetThemeMetric',
-				'GetThemeTextShadowOutset',
-				'GetThemeTextDimensions',
-				'TruncateThemeText',
-				'DrawThemeTextBox',
-			])]
-			
 	def makeblacklisttypes(self):
 		return [
 			"MenuTitleDrawingUPP",

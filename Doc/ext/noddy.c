@@ -1,6 +1,6 @@
 #include <Python.h>
 
-staticforward PyTypeObject noddy_NoddyType;
+static PyTypeObject noddy_NoddyType;
 
 typedef struct {
     PyObject_HEAD
@@ -29,7 +29,7 @@ noddy_noddy_dealloc(PyObject* self)
     PyObject_Del(self);
 }
 
-statichere PyTypeObject noddy_NoddyType = {
+static PyTypeObject noddy_NoddyType = {
     PyObject_HEAD_INIT(NULL)
     0,
     "Noddy",
@@ -54,7 +54,7 @@ static PyMethodDef noddy_methods[] = {
     {NULL}  /* Sentinel */
 };
 
-DL_EXPORT(void)
+PyMODINIT_FUNC
 initnoddy(void) 
 {
     noddy_NoddyType.ob_type = &PyType_Type;

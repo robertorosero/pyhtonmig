@@ -86,7 +86,7 @@ static Sigfunc sigfpe_handler;
 static void fpe_reset(Sigfunc *);
 
 static PyObject *fpe_error;
-DL_EXPORT(void) initfpectl(void);
+PyMODINIT_FUNC initfpectl(void);
 static PyObject *turnon_sigfpe            (PyObject *self,PyObject *args);
 static PyObject *turnoff_sigfpe           (PyObject *self,PyObject *args);
 
@@ -180,6 +180,14 @@ static void fpe_reset(Sigfunc *handler)
     ieee_set_fp_control(fp_control);
     PyOS_setsig(SIGFPE, handler);
 
+/*-- DEC ALPHA LINUX ------------------------------------------------------*/
+#elif defined(__alpha) && defined(linux)
+#include <asm/fpu.h>
+    unsigned long fp_control =
+    IEEE_TRAP_ENABLE_INV | IEEE_TRAP_ENABLE_DZE | IEEE_TRAP_ENABLE_OVF;
+    ieee_set_fp_control(fp_control);
+    PyOS_setsig(SIGFPE, handler);
+
 /*-- Cray Unicos ----------------------------------------------------------*/
 #elif defined(cray)
     /* UNICOS delivers SIGFPE by default, but no matherr */
@@ -249,7 +257,7 @@ static void sigfpe_handler(int signo)
     }
 }
 
-DL_EXPORT(void) initfpectl(void)
+PyMODINIT_FUNC initfpectl(void)
 {
     PyObject *m, *d;
     m = Py_InitModule("fpectl", fpectl_methods);

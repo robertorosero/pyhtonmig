@@ -15,12 +15,25 @@ FTEXT, FHCRC, FEXTRA, FNAME, FCOMMENT = 1, 2, 4, 8, 16
 
 READ, WRITE = 1, 2
 
+def U32(i):
+    """Return i as an unsigned integer, assuming it fits in 32 bits.
+
+    If it's >= 2GB when viewed as a 32-bit unsigned int, return a long.
+    """
+    if i < 0:
+        i += 1L << 32
+    return i
+
+def LOWU32(i):
+    """Return the low-order 32 bits of an int, as a non-negative int."""
+    return i & 0xFFFFFFFFL
+
 def write32(output, value):
     output.write(struct.pack("<l", value))
 
 def write32u(output, value):
-    if value < 0:
-        value = value + 0x100000000L
+    # The L format writes the bit pattern correctly whether signed
+    # or unsigned.
     output.write(struct.pack("<L", value))
 
 def read32(input):
@@ -37,7 +50,7 @@ def open(filename, mode="rb", compresslevel=9):
 
 class GzipFile:
     """The GzipFile class simulates most of the methods of a file object with
-    the exception of the readinto(), truncate(), and xreadlines() methods.
+    the exception of the readinto() and truncate() methods.
 
     """
 
@@ -157,19 +170,21 @@ class GzipFile:
 
         if flag & FEXTRA:
             # Read & discard the extra field, if present
-            xlen=ord(self.fileobj.read(1))
-            xlen=xlen+256*ord(self.fileobj.read(1))
+            xlen = ord(self.fileobj.read(1))
+            xlen = xlen + 256*ord(self.fileobj.read(1))
             self.fileobj.read(xlen)
         if flag & FNAME:
             # Read and discard a null-terminated string containing the filename
             while True:
-                s=self.fileobj.read(1)
-                if not s or s=='\000': break
+                s = self.fileobj.read(1)
+                if not s or s=='\000':
+                    break
         if flag & FCOMMENT:
             # Read and discard a null-terminated string containing a comment
             while True:
-                s=self.fileobj.read(1)
-                if not s or s=='\000': break
+                s = self.fileobj.read(1)
+                if not s or s=='\000':
+                    break
         if flag & FHCRC:
             self.fileobj.read(2)     # Read & discard the 16-bit header CRC
 
@@ -225,7 +240,8 @@ class GzipFile:
         self.offset -= len(buf)
 
     def _read(self, size=1024):
-        if self.fileobj is None: raise EOFError, "Reached EOF"
+        if self.fileobj is None:
+            raise EOFError, "Reached EOF"
 
         if self._new_member:
             # If the _new_member flag is set, we have to
@@ -283,20 +299,22 @@ class GzipFile:
         # We've read to the end of the file, so we have to rewind in order
         # to reread the 8 bytes containing the CRC and the file size.
         # We check the that the computed CRC and size of the
-        # uncompressed data matches the stored values.
+        # uncompressed data matches the stored values.  Note that the size
+        # stored is the true file size mod 2**32.
         self.fileobj.seek(-8, 1)
         crc32 = read32(self.fileobj)
-        isize = read32(self.fileobj)
-        if crc32%0x100000000L != self.crc%0x100000000L:
-            raise ValueError, "CRC check failed"
-        elif isize != self.size:
-            raise ValueError, "Incorrect length of data produced"
+        isize = U32(read32(self.fileobj))   # may exceed 2GB
+        if U32(crc32) != U32(self.crc):
+            raise IOError, "CRC check failed"
+        elif isize != LOWU32(self.size):
+            raise IOError, "Incorrect length of data produced"
 
     def close(self):
         if self.mode == WRITE:
             self.fileobj.write(self.compress.flush())
             write32(self.fileobj, self.crc)
-            write32(self.fileobj, self.size)
+            # self.size may exceed 2GB, or even 4GB
+            write32u(self.fileobj, LOWU32(self.size))
             self.fileobj = None
         elif self.mode == READ:
             self.fileobj = None
@@ -338,15 +356,16 @@ class GzipFile:
             if offset < self.offset:
                 raise IOError('Negative seek in write mode')
             count = offset - self.offset
-            for i in range(count/1024):
-                self.write(1024*'\0')
-            self.write((count%1024)*'\0')
+            for i in range(count // 1024):
+                self.write(1024 * '\0')
+            self.write((count % 1024) * '\0')
         elif self.mode == READ:
             if offset < self.offset:
                 # for negative seek, rewind and do positive seek
                 self.rewind()
             count = offset - self.offset
-            for i in range(count/1024): self.read(1024)
+            for i in range(count // 1024):
+                self.read(1024)
             self.read(count % 1024)
 
     def readline(self, size=-1):
@@ -379,11 +398,13 @@ class GzipFile:
 
     def readlines(self, sizehint=0):
         # Negative numbers result in reading all the lines
-        if sizehint <= 0: sizehint = sys.maxint
+        if sizehint <= 0:
+            sizehint = sys.maxint
         L = []
         while sizehint > 0:
             line = self.readline()
-            if line == "": break
+            if line == "":
+                break
             L.append(line)
             sizehint = sizehint - len(line)
 

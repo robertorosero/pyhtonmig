@@ -1,4 +1,4 @@
-from test_support import TESTFN, TestFailed
+from test.test_support import TESTFN, TestFailed
 
 import os
 import random
@@ -107,5 +107,4 @@ def test_module_with_large_stack(module):
         if os.path.exists(fname):
             os.unlink(fname)
 
-if sys.platform != 'mac':
-    test_module_with_large_stack('longlist')
+test_module_with_large_stack('longlist')

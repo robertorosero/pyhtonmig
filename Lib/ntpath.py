@@ -7,11 +7,28 @@ module as os.path.
 
 import os
 import stat
+import sys
 
 __all__ = ["normcase","isabs","join","splitdrive","split","splitext",
            "basename","dirname","commonprefix","getsize","getmtime",
-           "getatime","islink","exists","isdir","isfile","ismount",
-           "walk","expanduser","expandvars","normpath","abspath","splitunc"]
+           "getatime","getctime", "islink","exists","isdir","isfile","ismount",
+           "walk","expanduser","expandvars","normpath","abspath","splitunc",
+           "curdir","pardir","sep","pathsep","defpath","altsep","extsep",
+           "realpath","supports_unicode_filenames"]
+
+# strings representing various path-related bits and pieces
+curdir = '.'
+pardir = '..'
+extsep = '.'
+sep = '\\'
+pathsep = ';'
+altsep = '/'
+defpath = '.;C:\\bin'
+if 'ce' in sys.builtin_module_names:
+    defpath = '\\Windows'
+elif 'os2' in sys.builtin_module_names:
+    # OS/2 w/ VACPP
+    altsep = '/'
 
 # Normalize the case of a pathname and map slashes to backslashes.
 # Other normalizations (such as optimizing '../' away) are not done
@@ -167,20 +184,12 @@ def splitext(p):
 
     Extension is everything from the last dot to the end.
     Return (root, ext), either part may be empty."""
-    root, ext = '', ''
-    for c in p:
-        if c in ['/','\\']:
-            root, ext = root + ext + c, ''
-        elif c == '.':
-            if ext:
-                root, ext = root + ext, c
-            else:
-                ext = c
-        elif ext:
-            ext = ext + c
-        else:
-            root = root + c
-    return root, ext
+
+    i = p.rfind('.')
+    if i<=max(p.rfind('/'), p.rfind('\\')):
+        return p, ''
+    else:
+        return p[:i], p[i:]
 
 
 # Return the tail (basename) part of a path.
@@ -226,6 +235,9 @@ def getatime(filename):
     """Return the last access time of a file, reported by os.stat()"""
     return os.stat(filename).st_atime
 
+def getctime(filename):
+    """Return the creation time of a file, reported by os.stat()."""
+    return os.stat(filename).st_ctime
 
 # Is a path a symbolic link?
 # This will always return false on systems where posix.lstat doesn't exist.
@@ -476,3 +488,6 @@ def abspath(path):
 
 # realpath is a no-op on systems without islink support
 realpath = abspath
+# Win9x family and earlier have no Unicode filename support.
+supports_unicode_filenames = (hasattr(sys, "getwindowsversion") and
+                              sys.getwindowsversion()[3] >= 2)

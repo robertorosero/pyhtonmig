@@ -7,9 +7,8 @@ import os
 import string
 import MacOS
 
-BGENDIR=os.path.join(sys.prefix, ':Tools:bgen:bgen')
+from bgenlocations import TOOLBOXDIR, BGENDIR
 sys.path.append(BGENDIR)
-from bgenlocations import TOOLBOXDIR
 
 from scantools import Scanner
 
@@ -20,6 +19,8 @@ def main():
 	scanner = ResourcesScanner(input, output, defsoutput)
 	scanner.scan()
 	scanner.close()
+	print "=== Testing definitions output code ==="
+	execfile(defsoutput, {}, {})
 	print "=== Done scanning and generating, now doing 'import ressupport' ==="
 	import ressupport
 	print "=== Done 'import ressupport'.  It's up to you to compile Resmodule.c ==="
@@ -44,33 +45,19 @@ class ResourcesScanner(Scanner):
 ##			"RmveResource",		# RemoveResource
 ##			"SizeResource",		# GetResourceSizeOnDisk
 ##			"MaxSizeRsrc",		# GetMaxResourceSize
+			# OS8 only
+			'RGetResource',
+			'OpenResFile',
+			'CreateResFile',
+			'RsrcZoneInit',
+			'InitResources',
+			'RsrcMapEntry',
 			]
 			
 	def makeblacklisttypes(self):
 		return [
 			]
 			
-	def makegreylist(self):
-		return [
-			('#if TARGET_API_MAC_OS8', [
-				'RGetResource',
-				'OpenResFile',
-				'CreateResFile',
-				'RsrcZoneInit',
-				'InitResources',
-				'RsrcMapEntry',
-			]),
-			('#if TARGET_API_MAC_CARBON', [
-				'GetNextResourceFile',
-				'GetTopResourceFile',
-				'FSpOpenOrphanResFile',
-				'DetachResourceFile',
-				'InsertResourceFile',
-				'FSpResourceFileAlreadyOpen',
-				'FSOpenResourceFile',
-				'FSCreateResourceFile',
-			])]
-
 	def makerepairinstructions(self):
 		return [
 			([("Str255", "*", "InMode")],

@@ -5,6 +5,8 @@ platform-independent data files."""
 
 # contributed by Bastian Kleineidam
 
+# This module should be kept compatible with Python 1.5.2.
+
 __revision__ = "$Id$"
 
 import os
@@ -46,7 +48,7 @@ class install_data (Command):
     def run (self):
         self.mkpath(self.install_dir)
         for f in self.data_files:
-            if type(f) == StringType:
+            if type(f) is StringType:
                 # it's a simple file, so copy it
                 f = convert_path(f)
                 if self.warn_dir:

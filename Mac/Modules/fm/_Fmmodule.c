@@ -59,23 +59,6 @@ FMRec_Convert(PyObject *v, FMetricRec *p_itself)
 
 static PyObject *Fm_Error;
 
-#if !TARGET_API_MAC_CARBON
-
-static PyObject *Fm_InitFonts(PyObject *_self, PyObject *_args)
-{
-	PyObject *_res = NULL;
-#ifndef InitFonts
-	PyMac_PRECHECK(InitFonts);
-#endif
-	if (!PyArg_ParseTuple(_args, ""))
-		return NULL;
-	InitFonts();
-	Py_INCREF(Py_None);
-	_res = Py_None;
-	return _res;
-}
-#endif
-
 static PyObject *Fm_GetFontName(PyObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
@@ -131,25 +114,6 @@ static PyObject *Fm_RealFont(PyObject *_self, PyObject *_args)
 	                     _rv);
 	return _res;
 }
-
-#if !TARGET_API_MAC_CARBON
-
-static PyObject *Fm_SetFontLock(PyObject *_self, PyObject *_args)
-{
-	PyObject *_res = NULL;
-	Boolean lockFlag;
-#ifndef SetFontLock
-	PyMac_PRECHECK(SetFontLock);
-#endif
-	if (!PyArg_ParseTuple(_args, "b",
-	                      &lockFlag))
-		return NULL;
-	SetFontLock(lockFlag);
-	Py_INCREF(Py_None);
-	_res = Py_None;
-	return _res;
-}
-#endif
 
 static PyObject *Fm_SetFScaleDisable(PyObject *_self, PyObject *_args)
 {
@@ -295,25 +259,6 @@ static PyObject *Fm_GetPreserveGlyph(PyObject *_self, PyObject *_args)
 	return _res;
 }
 
-#if !TARGET_API_MAC_CARBON
-
-static PyObject *Fm_FlushFonts(PyObject *_self, PyObject *_args)
-{
-	PyObject *_res = NULL;
-	OSErr _err;
-#ifndef FlushFonts
-	PyMac_PRECHECK(FlushFonts);
-#endif
-	if (!PyArg_ParseTuple(_args, ""))
-		return NULL;
-	_err = FlushFonts();
-	if (_err != noErr) return PyMac_Error(_err);
-	Py_INCREF(Py_None);
-	_res = Py_None;
-	return _res;
-}
-#endif
-
 static PyObject *Fm_GetSysFont(PyObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
@@ -366,51 +311,36 @@ static PyObject *Fm_QDTextBounds(PyObject *_self, PyObject *_args)
 }
 
 static PyMethodDef Fm_methods[] = {
-
-#if !TARGET_API_MAC_CARBON
-	{"InitFonts", (PyCFunction)Fm_InitFonts, 1,
-	 "() -> None"},
-#endif
 	{"GetFontName", (PyCFunction)Fm_GetFontName, 1,
-	 "(short familyID) -> (Str255 name)"},
+	 PyDoc_STR("(short familyID) -> (Str255 name)")},
 	{"GetFNum", (PyCFunction)Fm_GetFNum, 1,
-	 "(Str255 name) -> (short familyID)"},
+	 PyDoc_STR("(Str255 name) -> (short familyID)")},
 	{"RealFont", (PyCFunction)Fm_RealFont, 1,
-	 "(short fontNum, short size) -> (Boolean _rv)"},
-
-#if !TARGET_API_MAC_CARBON
-	{"SetFontLock", (PyCFunction)Fm_SetFontLock, 1,
-	 "(Boolean lockFlag) -> None"},
-#endif
+	 PyDoc_STR("(short fontNum, short size) -> (Boolean _rv)")},
 	{"SetFScaleDisable", (PyCFunction)Fm_SetFScaleDisable, 1,
-	 "(Boolean fscaleDisable) -> None"},
+	 PyDoc_STR("(Boolean fscaleDisable) -> None")},
 	{"FontMetrics", (PyCFunction)Fm_FontMetrics, 1,
-	 "() -> (FMetricRec theMetrics)"},
+	 PyDoc_STR("() -> (FMetricRec theMetrics)")},
 	{"SetFractEnable", (PyCFunction)Fm_SetFractEnable, 1,
-	 "(Boolean fractEnable) -> None"},
+	 PyDoc_STR("(Boolean fractEnable) -> None")},
 	{"GetDefFontSize", (PyCFunction)Fm_GetDefFontSize, 1,
-	 "() -> (short _rv)"},
+	 PyDoc_STR("() -> (short _rv)")},
 	{"IsOutline", (PyCFunction)Fm_IsOutline, 1,
-	 "(Point numer, Point denom) -> (Boolean _rv)"},
+	 PyDoc_STR("(Point numer, Point denom) -> (Boolean _rv)")},
 	{"SetOutlinePreferred", (PyCFunction)Fm_SetOutlinePreferred, 1,
-	 "(Boolean outlinePreferred) -> None"},
+	 PyDoc_STR("(Boolean outlinePreferred) -> None")},
 	{"GetOutlinePreferred", (PyCFunction)Fm_GetOutlinePreferred, 1,
-	 "() -> (Boolean _rv)"},
+	 PyDoc_STR("() -> (Boolean _rv)")},
 	{"SetPreserveGlyph", (PyCFunction)Fm_SetPreserveGlyph, 1,
-	 "(Boolean preserveGlyph) -> None"},
+	 PyDoc_STR("(Boolean preserveGlyph) -> None")},
 	{"GetPreserveGlyph", (PyCFunction)Fm_GetPreserveGlyph, 1,
-	 "() -> (Boolean _rv)"},
-
-#if !TARGET_API_MAC_CARBON
-	{"FlushFonts", (PyCFunction)Fm_FlushFonts, 1,
-	 "() -> None"},
-#endif
+	 PyDoc_STR("() -> (Boolean _rv)")},
 	{"GetSysFont", (PyCFunction)Fm_GetSysFont, 1,
-	 "() -> (short _rv)"},
+	 PyDoc_STR("() -> (short _rv)")},
 	{"GetAppFont", (PyCFunction)Fm_GetAppFont, 1,
-	 "() -> (short _rv)"},
+	 PyDoc_STR("() -> (short _rv)")},
 	{"QDTextBounds", (PyCFunction)Fm_QDTextBounds, 1,
-	 "(Buffer inText) -> (Rect bounds)"},
+	 PyDoc_STR("(Buffer inText) -> (Rect bounds)")},
 	{NULL, NULL, 0}
 };
 

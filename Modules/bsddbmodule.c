@@ -39,7 +39,7 @@ typedef struct {
 #endif
 } bsddbobject;
 
-staticforward PyTypeObject Bsddbtype;
+static PyTypeObject Bsddbtype;
 
 #define is_bsddbobject(v) ((v)->ob_type == &Bsddbtype)
 #define check_bsddbobject_open(v, r) if ((v)->di_bsddb == NULL) \
@@ -841,12 +841,12 @@ static PyMethodDef bsddbmodule_methods[] = {
 	{0,		0},
 };
 
-DL_EXPORT(void)
-initbsddb(void) {
+PyMODINIT_FUNC
+initbsddb185(void) {
 	PyObject *m, *d;
 
 	Bsddbtype.ob_type = &PyType_Type;
-	m = Py_InitModule("bsddb", bsddbmodule_methods);
+	m = Py_InitModule("bsddb185", bsddbmodule_methods);
 	d = PyModule_GetDict(m);
 	BsddbError = PyErr_NewException("bsddb.error", NULL, NULL);
 	if (BsddbError != NULL)

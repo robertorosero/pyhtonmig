@@ -6,7 +6,12 @@
 
 /* Public interface */
 struct _node; /* Declare the existence of this type */
-DL_IMPORT(PyCodeObject *) PyNode_Compile(struct _node *, char *);
+PyAPI_FUNC(PyCodeObject *) PyNode_Compile(struct _node *, const char *);
+PyAPI_FUNC(PyCodeObject *) PyCode_New(
+	int, int, int, int, PyObject *, PyObject *, PyObject *, PyObject *,
+	PyObject *, PyObject *, PyObject *, PyObject *, int, PyObject *); 
+        /* same as struct above */
+PyAPI_FUNC(int) PyCode_Addr2Line(PyCodeObject *, int);
 
 /* Future feature support */
 
@@ -28,6 +33,7 @@ DL_IMPORT(PyFutureFeatures *) PyFuture_FromAST(struct _mod *, const char *);
 #define DEFAULT_BLOCK_SIZE 16
 #define DEFAULT_BLOCKS 8
 #define DEFAULT_CODE_SIZE 128
+#define DEFAULT_LNOTAB_SIZE 16
 
 struct instr {
 	int i_jabs : 1;

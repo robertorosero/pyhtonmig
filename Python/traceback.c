@@ -103,8 +103,7 @@ PyTypeObject PyTraceBack_Type = {
 };
 
 static tracebackobject *
-newtracebackobject(tracebackobject *next, PyFrameObject *frame, int lasti,
-		   int lineno)
+newtracebackobject(tracebackobject *next, PyFrameObject *frame)
 {
 	tracebackobject *tb;
 	if ((next != NULL && !PyTraceBack_Check(next)) ||
@@ -118,8 +117,9 @@ newtracebackobject(tracebackobject *next, PyFrameObject *frame, int lasti,
 		tb->tb_next = next;
 		Py_XINCREF(frame);
 		tb->tb_frame = frame;
-		tb->tb_lasti = lasti;
-		tb->tb_lineno = lineno;
+		tb->tb_lasti = frame->f_lasti;
+		tb->tb_lineno = PyCode_Addr2Line(frame->f_code, 
+						 frame->f_lasti);
 		PyObject_GC_Track(tb);
 	}
 	return tb;
@@ -130,8 +130,7 @@ PyTraceBack_Here(PyFrameObject *frame)
 {
 	PyThreadState *tstate = frame->f_tstate;
 	tracebackobject *oldtb = (tracebackobject *) tstate->curexc_traceback;
-	tracebackobject *tb = newtracebackobject(oldtb,
-				frame, frame->f_lasti, frame->f_lineno);
+	tracebackobject *tb = newtracebackobject(oldtb, frame);
 	if (tb == NULL)
 		return -1;
 	tstate->curexc_traceback = (PyObject *)tb;
@@ -239,9 +238,6 @@ tb_printinternal(tracebackobject *tb, PyObject *f, int limit)
 	}
 	while (tb != NULL && err == 0) {
 		if (depth <= limit) {
-			if (Py_OptimizeFlag)
-				tb->tb_lineno = PyCode_Addr2Line(
-					tb->tb_frame->f_code, tb->tb_lasti);
 			err = tb_displayline(f,
 			    PyString_AsString(
 				    tb->tb_frame->f_code->co_filename),

@@ -5,6 +5,9 @@
 
 
 
+#ifndef PyDoc_STR
+#define PyDoc_STR(x) (x)
+#endif
 #ifdef _WIN32
 #include "pywintoolbox.h"
 #else
@@ -26,25 +29,8 @@
 #include <Carbon/Carbon.h>
 #endif
 
-#if TARGET_API_MAC_OS8
-
-/*
-** Generate ScrapInfo records
-*/
-static PyObject *
-SCRRec_New(itself)
-	ScrapStuff *itself;
-{
-
-	return Py_BuildValue("lO&hhO&", itself->scrapSize,
-		ResObj_New, itself->scrapHandle, itself->scrapCount, itself->scrapState,
-		PyMac_BuildStr255, itself->scrapName);
-}
-#endif
-
 static PyObject *Scrap_Error;
 
-#if !TARGET_API_MAC_OS8
 /* ----------------------- Object type Scrap ------------------------ */
 
 PyTypeObject Scrap_Type;
@@ -141,7 +127,6 @@ static PyObject *ScrapObj_GetScrapFlavorData(ScrapObject *_self, PyObject *_args
 		Py_XDECREF(_res);
 		return PyMac_Error(_err);
 	}
- destination__error__: ;
 	return _res;
 }
 
@@ -153,7 +138,7 @@ static PyObject *ScrapObj_PutScrapFlavor(ScrapObject *_self, PyObject *_args)
 	ScrapFlavorFlags flavorFlags;
 	char *flavorData__in__;
 	int flavorData__in_len__;
-	if (!PyArg_ParseTuple(_args, "O&ls#",
+	if (!PyArg_ParseTuple(_args, "O&Ks#",
 	                      PyMac_GetOSType, &flavorType,
 	                      &flavorFlags,
 	                      &flavorData__in__, &flavorData__in_len__))
@@ -166,7 +151,6 @@ static PyObject *ScrapObj_PutScrapFlavor(ScrapObject *_self, PyObject *_args)
 	if (_err != noErr) return PyMac_Error(_err);
 	Py_INCREF(Py_None);
 	_res = Py_None;
- flavorData__error__: ;
 	return _res;
 }
 
@@ -277,7 +261,6 @@ PyTypeObject Scrap_Type = {
 };
 
 /* --------------------- End object type Scrap ---------------------- */
-#endif /* !TARGET_API_MAC_OS8 */
 
 static PyObject *Scrap_LoadScrap(PyObject *_self, PyObject *_args)
 {
@@ -305,79 +288,6 @@ static PyObject *Scrap_UnloadScrap(PyObject *_self, PyObject *_args)
 	return _res;
 }
 
-#if TARGET_API_MAC_OS8
-
-static PyObject *Scrap_InfoScrap(PyObject *_self, PyObject *_args)
-{
-	PyObject *_res = NULL;
-	ScrapStuffPtr _rv;
-	if (!PyArg_ParseTuple(_args, ""))
-		return NULL;
-	_rv = InfoScrap();
-	_res = Py_BuildValue("O&",
-	                     SCRRec_New, _rv);
-	return _res;
-}
-
-static PyObject *Scrap_GetScrap(PyObject *_self, PyObject *_args)
-{
-	PyObject *_res = NULL;
-	long _rv;
-	Handle destination;
-	ScrapFlavorType flavorType;
-	SInt32 offset;
-	if (!PyArg_ParseTuple(_args, "O&O&",
-	                      ResObj_Convert, &destination,
-	                      PyMac_GetOSType, &flavorType))
-		return NULL;
-	_rv = GetScrap(destination,
-	               flavorType,
-	               &offset);
-	_res = Py_BuildValue("ll",
-	                     _rv,
-	                     offset);
-	return _res;
-}
-
-static PyObject *Scrap_ZeroScrap(PyObject *_self, PyObject *_args)
-{
-	PyObject *_res = NULL;
-	OSStatus _err;
-	if (!PyArg_ParseTuple(_args, ""))
-		return NULL;
-	_err = ZeroScrap();
-	if (_err != noErr) return PyMac_Error(_err);
-	Py_INCREF(Py_None);
-	_res = Py_None;
-	return _res;
-}
-
-static PyObject *Scrap_PutScrap(PyObject *_self, PyObject *_args)
-{
-	PyObject *_res = NULL;
-	OSStatus _err;
-	SInt32 sourceBufferByteCount;
-	ScrapFlavorType flavorType;
-	char *sourceBuffer__in__;
-	int sourceBuffer__len__;
-	int sourceBuffer__in_len__;
-	if (!PyArg_ParseTuple(_args, "lO&s#",
-	                      &sourceBufferByteCount,
-	                      PyMac_GetOSType, &flavorType,
-	                      &sourceBuffer__in__, &sourceBuffer__in_len__))
-		return NULL;
-	_err = PutScrap(sourceBufferByteCount,
-	                flavorType,
-	                sourceBuffer__in__);
-	if (_err != noErr) return PyMac_Error(_err);
-	Py_INCREF(Py_None);
-	_res = Py_None;
- sourceBuffer__error__: ;
-	return _res;
-}
-#endif /* TARGET_API_MAC_OS8 */
-
-#if !TARGET_API_MAC_OS8
 static PyObject *Scrap_GetCurrentScrap(PyObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
@@ -417,33 +327,18 @@ static PyObject *Scrap_CallInScrapPromises(PyObject *_self, PyObject *_args)
 	_res = Py_None;
 	return _res;
 }
-#endif
 
 static PyMethodDef Scrap_methods[] = {
 	{"LoadScrap", (PyCFunction)Scrap_LoadScrap, 1,
 	 "() -> None"},
 	{"UnloadScrap", (PyCFunction)Scrap_UnloadScrap, 1,
 	 "() -> None"},
-
-#if TARGET_API_MAC_OS8
-	{"InfoScrap", (PyCFunction)Scrap_InfoScrap, 1,
-	 "() -> (ScrapStuffPtr _rv)"},
-	{"GetScrap", (PyCFunction)Scrap_GetScrap, 1,
-	 "(Handle destination, ScrapFlavorType flavorType) -> (long _rv, SInt32 offset)"},
-	{"ZeroScrap", (PyCFunction)Scrap_ZeroScrap, 1,
-	 "() -> None"},
-	{"PutScrap", (PyCFunction)Scrap_PutScrap, 1,
-	 "(SInt32 sourceBufferByteCount, ScrapFlavorType flavorType, Buffer sourceBuffer) -> None"},
-#endif
-
-#if !TARGET_API_MAC_OS8
 	{"GetCurrentScrap", (PyCFunction)Scrap_GetCurrentScrap, 1,
 	 "() -> (ScrapRef scrap)"},
 	{"ClearCurrentScrap", (PyCFunction)Scrap_ClearCurrentScrap, 1,
 	 "() -> None"},
 	{"CallInScrapPromises", (PyCFunction)Scrap_CallInScrapPromises, 1,
 	 "() -> None"},
-#endif
 	{NULL, NULL, 0}
 };
 
@@ -464,12 +359,10 @@ void init_Scrap(void)
 	if (Scrap_Error == NULL ||
 	    PyDict_SetItemString(d, "Error", Scrap_Error) != 0)
 		return;
-#if !TARGET_API_MAC_OS8
 	Scrap_Type.ob_type = &PyType_Type;
 	Py_INCREF(&Scrap_Type);
 	if (PyDict_SetItemString(d, "ScrapType", (PyObject *)&Scrap_Type) != 0)
 		Py_FatalError("can't initialize ScrapType");
-#endif
 }
 
 /* ======================= End module _Scrap ======================== */

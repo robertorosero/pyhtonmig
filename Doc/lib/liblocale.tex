@@ -3,8 +3,8 @@
 
 \declaremodule{standard}{locale}
 \modulesynopsis{Internationalization services.}
-\moduleauthor{Martin von L\"owis}{loewis@informatik.hu-berlin.de}
-\sectionauthor{Martin von L\"owis}{loewis@informatik.hu-berlin.de}
+\moduleauthor{Martin von L\"owis}{martin@v.loewis.de}
+\sectionauthor{Martin von L\"owis}{martin@v.loewis.de}
 
 
 The \module{locale} module opens access to the \POSIX{} locale
@@ -153,6 +153,20 @@ for which symbolic constants are available in the locale module.
   \rfc{1766}.  \var{language code} and \var{encoding} may be
   \code{None} if their values cannot be determined.
   \versionadded{2.0}
+\end{funcdesc}
+
+\begin{funcdesc}{getpreferredencoding}{\optional{do_setlocale}}
+  Return the encoding used for text data, according to user
+  preferences.  User preferences are expressed differently on
+  different systems, and might not be available programmatically on
+  some systems, so this function only returns a guess.
+
+  On some systems, it is necessary to invoke \function{setlocale}
+  to obtain the user preferences, so this function is not thread-safe.
+  If invoking setlocale is not necessary or desired, \var{do_setlocale}
+  should be set to \code{False}.
+
+  \versionadded{2.3}
 \end{funcdesc}
 
 \begin{funcdesc}{normalize}{localename}

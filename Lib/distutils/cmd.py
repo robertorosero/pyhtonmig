@@ -4,8 +4,7 @@ Provides the Command class, the base class for the command classes
 in the distutils.command package.
 """
 
-# created 2000/04/03, Greg Ward
-# (extricated from core.py; actually dates back to the beginning)
+# This module should be kept compatible with Python 1.5.2.
 
 __revision__ = "$Id$"
 
@@ -192,13 +191,13 @@ class Command:
         """If the current verbosity level is of greater than or equal to
         'level' print 'msg' to stdout.
         """
-        log.debug(msg)
+        log.log(level, msg)
 
     def debug_print (self, msg):
         """Print 'msg' to stdout if the global DEBUG (taken from the
         DISTUTILS_DEBUG environment variable) flag is true.
         """
-        from distutils.core import DEBUG
+        from distutils.debug import DEBUG
         if DEBUG:
             print msg
             sys.stdout.flush()

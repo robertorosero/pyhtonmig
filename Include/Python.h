@@ -2,29 +2,23 @@
 #define Py_PYTHON_H
 /* Since this is a "meta-include" file, no #ifdef __cplusplus / extern "C" { */
 
-
-/* Enable compiler features; switching on C lib defines doesn't work
-   here, because the symbols haven't necessarily been defined yet. */
-#ifndef _GNU_SOURCE
-# define _GNU_SOURCE	1
-#endif
-
-/* Forcing SUSv2 compatibility still produces problems on some
-   platforms, True64 and SGI IRIX being two of them, so for now the
-   define is switched off. */
-#if 0
-#ifndef _XOPEN_SOURCE
-# define _XOPEN_SOURCE	500
-#endif
-#endif
-
 /* Include nearly all Python header files */
 
 #include "patchlevel.h"
 #include "pyconfig.h"
 
+/* Cyclic gc is always enabled, starting with release 2.3a1.  Supply the
+ * old symbol for the benefit of extension modules written before then
+ * that may be conditionalizing on it.  The core doesn't use it anymore.
+ */
+#ifndef WITH_CYCLE_GC
+#define WITH_CYCLE_GC 1
+#endif
+
 #ifdef HAVE_LIMITS_H
 #include <limits.h>
+#else
+#error "limits.h is required by std C -- why isn't HAVE_LIMITS_H defined?"
 #endif
 
 #if defined(__sgi) && defined(WITH_THREAD) && !defined(_SGI_MP_SOURCE)
@@ -120,7 +114,7 @@
 #include "abstract.h"
 
 /* _Py_Mangle is defined in compile.c */
-extern DL_IMPORT(int) _Py_Mangle(char *p, char *name, \
+PyAPI_FUNC(int) _Py_Mangle(char *p, char *name, \
 				 char *buffer, size_t maxlen);
 
 /* PyArg_GetInt is deprecated and should not be used, use PyArg_Parse(). */

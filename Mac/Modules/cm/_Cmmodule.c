@@ -69,7 +69,7 @@ static PyObject *Cm_Error;
 
 PyTypeObject ComponentInstance_Type;
 
-#define CmpInstObj_Check(x) ((x)->ob_type == &ComponentInstance_Type)
+#define CmpInstObj_Check(x) ((x)->ob_type == &ComponentInstance_Type || PyObject_TypeCheck((x), &ComponentInstance_Type))
 
 typedef struct ComponentInstanceObject {
 	PyObject_HEAD
@@ -102,7 +102,7 @@ int CmpInstObj_Convert(PyObject *v, ComponentInstance *p_itself)
 static void CmpInstObj_dealloc(ComponentInstanceObject *self)
 {
 	/* Cleanup of self->ob_itself goes here */
-	PyObject_Del(self);
+	self->ob_type->tp_free((PyObject *)self);
 }
 
 static PyObject *CmpInstObj_CloseComponent(ComponentInstanceObject *_self, PyObject *_args)
@@ -186,44 +186,6 @@ static PyObject *CmpInstObj_SetComponentInstanceStorage(ComponentInstanceObject 
 	return _res;
 }
 
-#if !TARGET_API_MAC_CARBON
-
-static PyObject *CmpInstObj_GetComponentInstanceA5(ComponentInstanceObject *_self, PyObject *_args)
-{
-	PyObject *_res = NULL;
-	long _rv;
-#ifndef GetComponentInstanceA5
-	PyMac_PRECHECK(GetComponentInstanceA5);
-#endif
-	if (!PyArg_ParseTuple(_args, ""))
-		return NULL;
-	_rv = GetComponentInstanceA5(_self->ob_itself);
-	_res = Py_BuildValue("l",
-	                     _rv);
-	return _res;
-}
-#endif
-
-#if !TARGET_API_MAC_CARBON
-
-static PyObject *CmpInstObj_SetComponentInstanceA5(ComponentInstanceObject *_self, PyObject *_args)
-{
-	PyObject *_res = NULL;
-	long theA5;
-#ifndef SetComponentInstanceA5
-	PyMac_PRECHECK(SetComponentInstanceA5);
-#endif
-	if (!PyArg_ParseTuple(_args, "l",
-	                      &theA5))
-		return NULL;
-	SetComponentInstanceA5(_self->ob_itself,
-	                       theA5);
-	Py_INCREF(Py_None);
-	_res = Py_None;
-	return _res;
-}
-#endif
-
 static PyObject *CmpInstObj_ComponentFunctionImplemented(ComponentInstanceObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
@@ -277,48 +239,50 @@ static PyObject *CmpInstObj_ComponentSetTarget(ComponentInstanceObject *_self, P
 
 static PyMethodDef CmpInstObj_methods[] = {
 	{"CloseComponent", (PyCFunction)CmpInstObj_CloseComponent, 1,
-	 "() -> None"},
+	 PyDoc_STR("() -> None")},
 	{"GetComponentInstanceError", (PyCFunction)CmpInstObj_GetComponentInstanceError, 1,
-	 "() -> None"},
+	 PyDoc_STR("() -> None")},
 	{"SetComponentInstanceError", (PyCFunction)CmpInstObj_SetComponentInstanceError, 1,
-	 "(OSErr theError) -> None"},
+	 PyDoc_STR("(OSErr theError) -> None")},
 	{"GetComponentInstanceStorage", (PyCFunction)CmpInstObj_GetComponentInstanceStorage, 1,
-	 "() -> (Handle _rv)"},
+	 PyDoc_STR("() -> (Handle _rv)")},
 	{"SetComponentInstanceStorage", (PyCFunction)CmpInstObj_SetComponentInstanceStorage, 1,
-	 "(Handle theStorage) -> None"},
-
-#if !TARGET_API_MAC_CARBON
-	{"GetComponentInstanceA5", (PyCFunction)CmpInstObj_GetComponentInstanceA5, 1,
-	 "() -> (long _rv)"},
-#endif
-
-#if !TARGET_API_MAC_CARBON
-	{"SetComponentInstanceA5", (PyCFunction)CmpInstObj_SetComponentInstanceA5, 1,
-	 "(long theA5) -> None"},
-#endif
+	 PyDoc_STR("(Handle theStorage) -> None")},
 	{"ComponentFunctionImplemented", (PyCFunction)CmpInstObj_ComponentFunctionImplemented, 1,
-	 "(short ftnNumber) -> (long _rv)"},
+	 PyDoc_STR("(short ftnNumber) -> (long _rv)")},
 	{"GetComponentVersion", (PyCFunction)CmpInstObj_GetComponentVersion, 1,
-	 "() -> (long _rv)"},
+	 PyDoc_STR("() -> (long _rv)")},
 	{"ComponentSetTarget", (PyCFunction)CmpInstObj_ComponentSetTarget, 1,
-	 "(ComponentInstance target) -> (long _rv)"},
+	 PyDoc_STR("(ComponentInstance target) -> (long _rv)")},
 	{NULL, NULL, 0}
 };
 
-PyMethodChain CmpInstObj_chain = { CmpInstObj_methods, NULL };
+#define CmpInstObj_getsetlist NULL
 
-static PyObject *CmpInstObj_getattr(ComponentInstanceObject *self, char *name)
-{
-	return Py_FindMethodInChain(&CmpInstObj_chain, (PyObject *)self, name);
-}
-
-#define CmpInstObj_setattr NULL
 
 #define CmpInstObj_compare NULL
 
 #define CmpInstObj_repr NULL
 
 #define CmpInstObj_hash NULL
+#define CmpInstObj_tp_init 0
+
+#define CmpInstObj_tp_alloc PyType_GenericAlloc
+
+static PyObject *CmpInstObj_tp_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
+{
+	PyObject *self;
+	ComponentInstance itself;
+	char *kw[] = {"itself", 0};
+
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "O&", kw, CmpInstObj_Convert, &itself)) return NULL;
+	if ((self = type->tp_alloc(type, 0)) == NULL) return NULL;
+	((ComponentInstanceObject *)self)->ob_itself = itself;
+	return self;
+}
+
+#define CmpInstObj_tp_free PyObject_Del
+
 
 PyTypeObject ComponentInstance_Type = {
 	PyObject_HEAD_INIT(NULL)
@@ -329,14 +293,39 @@ PyTypeObject ComponentInstance_Type = {
 	/* methods */
 	(destructor) CmpInstObj_dealloc, /*tp_dealloc*/
 	0, /*tp_print*/
-	(getattrfunc) CmpInstObj_getattr, /*tp_getattr*/
-	(setattrfunc) CmpInstObj_setattr, /*tp_setattr*/
+	(getattrfunc)0, /*tp_getattr*/
+	(setattrfunc)0, /*tp_setattr*/
 	(cmpfunc) CmpInstObj_compare, /*tp_compare*/
 	(reprfunc) CmpInstObj_repr, /*tp_repr*/
 	(PyNumberMethods *)0, /* tp_as_number */
 	(PySequenceMethods *)0, /* tp_as_sequence */
 	(PyMappingMethods *)0, /* tp_as_mapping */
 	(hashfunc) CmpInstObj_hash, /*tp_hash*/
+	0, /*tp_call*/
+	0, /*tp_str*/
+	PyObject_GenericGetAttr, /*tp_getattro*/
+	PyObject_GenericSetAttr, /*tp_setattro */
+	0, /*tp_as_buffer*/
+	Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE, /* tp_flags */
+	0, /*tp_doc*/
+	0, /*tp_traverse*/
+	0, /*tp_clear*/
+	0, /*tp_richcompare*/
+	0, /*tp_weaklistoffset*/
+	0, /*tp_iter*/
+	0, /*tp_iternext*/
+	CmpInstObj_methods, /* tp_methods */
+	0, /*tp_members*/
+	CmpInstObj_getsetlist, /*tp_getset*/
+	0, /*tp_base*/
+	0, /*tp_dict*/
+	0, /*tp_descr_get*/
+	0, /*tp_descr_set*/
+	0, /*tp_dictoffset*/
+	CmpInstObj_tp_init, /* tp_init */
+	CmpInstObj_tp_alloc, /* tp_alloc */
+	CmpInstObj_tp_new, /* tp_new */
+	CmpInstObj_tp_free, /* tp_free */
 };
 
 /* --------------- End object type ComponentInstance ---------------- */
@@ -346,7 +335,7 @@ PyTypeObject ComponentInstance_Type = {
 
 PyTypeObject Component_Type;
 
-#define CmpObj_Check(x) ((x)->ob_type == &Component_Type)
+#define CmpObj_Check(x) ((x)->ob_type == &Component_Type || PyObject_TypeCheck((x), &Component_Type))
 
 typedef struct ComponentObject {
 	PyObject_HEAD
@@ -384,7 +373,7 @@ int CmpObj_Convert(PyObject *v, Component *p_itself)
 static void CmpObj_dealloc(ComponentObject *self)
 {
 	/* Cleanup of self->ob_itself goes here */
-	PyObject_Del(self);
+	self->ob_type->tp_free((PyObject *)self);
 }
 
 static PyObject *CmpObj_UnregisterComponent(ComponentObject *_self, PyObject *_args)
@@ -669,52 +658,64 @@ static PyObject *CmpObj_GetComponentIconSuite(ComponentObject *_self, PyObject *
 
 static PyMethodDef CmpObj_methods[] = {
 	{"UnregisterComponent", (PyCFunction)CmpObj_UnregisterComponent, 1,
-	 "() -> None"},
+	 PyDoc_STR("() -> None")},
 	{"GetComponentInfo", (PyCFunction)CmpObj_GetComponentInfo, 1,
-	 "(Handle componentName, Handle componentInfo, Handle componentIcon) -> (ComponentDescription cd)"},
+	 PyDoc_STR("(Handle componentName, Handle componentInfo, Handle componentIcon) -> (ComponentDescription cd)")},
 	{"OpenComponent", (PyCFunction)CmpObj_OpenComponent, 1,
-	 "() -> (ComponentInstance _rv)"},
+	 PyDoc_STR("() -> (ComponentInstance _rv)")},
 	{"ResolveComponentAlias", (PyCFunction)CmpObj_ResolveComponentAlias, 1,
-	 "() -> (Component _rv)"},
+	 PyDoc_STR("() -> (Component _rv)")},
 	{"GetComponentPublicIndString", (PyCFunction)CmpObj_GetComponentPublicIndString, 1,
-	 "(Str255 theString, short strListID, short index) -> None"},
+	 PyDoc_STR("(Str255 theString, short strListID, short index) -> None")},
 	{"GetComponentRefcon", (PyCFunction)CmpObj_GetComponentRefcon, 1,
-	 "() -> (long _rv)"},
+	 PyDoc_STR("() -> (long _rv)")},
 	{"SetComponentRefcon", (PyCFunction)CmpObj_SetComponentRefcon, 1,
-	 "(long theRefcon) -> None"},
+	 PyDoc_STR("(long theRefcon) -> None")},
 	{"OpenComponentResFile", (PyCFunction)CmpObj_OpenComponentResFile, 1,
-	 "() -> (short _rv)"},
+	 PyDoc_STR("() -> (short _rv)")},
 	{"GetComponentResource", (PyCFunction)CmpObj_GetComponentResource, 1,
-	 "(OSType resType, short resID) -> (Handle theResource)"},
+	 PyDoc_STR("(OSType resType, short resID) -> (Handle theResource)")},
 	{"GetComponentIndString", (PyCFunction)CmpObj_GetComponentIndString, 1,
-	 "(Str255 theString, short strListID, short index) -> None"},
+	 PyDoc_STR("(Str255 theString, short strListID, short index) -> None")},
 	{"CountComponentInstances", (PyCFunction)CmpObj_CountComponentInstances, 1,
-	 "() -> (long _rv)"},
+	 PyDoc_STR("() -> (long _rv)")},
 	{"SetDefaultComponent", (PyCFunction)CmpObj_SetDefaultComponent, 1,
-	 "(short flags) -> None"},
+	 PyDoc_STR("(short flags) -> None")},
 	{"CaptureComponent", (PyCFunction)CmpObj_CaptureComponent, 1,
-	 "(Component capturingComponent) -> (Component _rv)"},
+	 PyDoc_STR("(Component capturingComponent) -> (Component _rv)")},
 	{"UncaptureComponent", (PyCFunction)CmpObj_UncaptureComponent, 1,
-	 "() -> None"},
+	 PyDoc_STR("() -> None")},
 	{"GetComponentIconSuite", (PyCFunction)CmpObj_GetComponentIconSuite, 1,
-	 "() -> (Handle iconSuite)"},
+	 PyDoc_STR("() -> (Handle iconSuite)")},
 	{NULL, NULL, 0}
 };
 
-PyMethodChain CmpObj_chain = { CmpObj_methods, NULL };
+#define CmpObj_getsetlist NULL
 
-static PyObject *CmpObj_getattr(ComponentObject *self, char *name)
-{
-	return Py_FindMethodInChain(&CmpObj_chain, (PyObject *)self, name);
-}
-
-#define CmpObj_setattr NULL
 
 #define CmpObj_compare NULL
 
 #define CmpObj_repr NULL
 
 #define CmpObj_hash NULL
+#define CmpObj_tp_init 0
+
+#define CmpObj_tp_alloc PyType_GenericAlloc
+
+static PyObject *CmpObj_tp_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
+{
+	PyObject *self;
+	Component itself;
+	char *kw[] = {"itself", 0};
+
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "O&", kw, CmpObj_Convert, &itself)) return NULL;
+	if ((self = type->tp_alloc(type, 0)) == NULL) return NULL;
+	((ComponentObject *)self)->ob_itself = itself;
+	return self;
+}
+
+#define CmpObj_tp_free PyObject_Del
+
 
 PyTypeObject Component_Type = {
 	PyObject_HEAD_INIT(NULL)
@@ -725,14 +726,39 @@ PyTypeObject Component_Type = {
 	/* methods */
 	(destructor) CmpObj_dealloc, /*tp_dealloc*/
 	0, /*tp_print*/
-	(getattrfunc) CmpObj_getattr, /*tp_getattr*/
-	(setattrfunc) CmpObj_setattr, /*tp_setattr*/
+	(getattrfunc)0, /*tp_getattr*/
+	(setattrfunc)0, /*tp_setattr*/
 	(cmpfunc) CmpObj_compare, /*tp_compare*/
 	(reprfunc) CmpObj_repr, /*tp_repr*/
 	(PyNumberMethods *)0, /* tp_as_number */
 	(PySequenceMethods *)0, /* tp_as_sequence */
 	(PyMappingMethods *)0, /* tp_as_mapping */
 	(hashfunc) CmpObj_hash, /*tp_hash*/
+	0, /*tp_call*/
+	0, /*tp_str*/
+	PyObject_GenericGetAttr, /*tp_getattro*/
+	PyObject_GenericSetAttr, /*tp_setattro */
+	0, /*tp_as_buffer*/
+	Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE, /* tp_flags */
+	0, /*tp_doc*/
+	0, /*tp_traverse*/
+	0, /*tp_clear*/
+	0, /*tp_richcompare*/
+	0, /*tp_weaklistoffset*/
+	0, /*tp_iter*/
+	0, /*tp_iternext*/
+	CmpObj_methods, /* tp_methods */
+	0, /*tp_members*/
+	CmpObj_getsetlist, /*tp_getset*/
+	0, /*tp_base*/
+	0, /*tp_dict*/
+	0, /*tp_descr_get*/
+	0, /*tp_descr_set*/
+	0, /*tp_dictoffset*/
+	CmpObj_tp_init, /* tp_init */
+	CmpObj_tp_alloc, /* tp_alloc */
+	CmpObj_tp_new, /* tp_new */
+	CmpObj_tp_free, /* tp_free */
 };
 
 /* ------------------- End object type Component -------------------- */
@@ -870,19 +896,19 @@ static PyObject *Cm_RegisterComponentResourceFile(PyObject *_self, PyObject *_ar
 
 static PyMethodDef Cm_methods[] = {
 	{"RegisterComponentResource", (PyCFunction)Cm_RegisterComponentResource, 1,
-	 "(ComponentResourceHandle cr, short global) -> (Component _rv)"},
+	 PyDoc_STR("(ComponentResourceHandle cr, short global) -> (Component _rv)")},
 	{"FindNextComponent", (PyCFunction)Cm_FindNextComponent, 1,
-	 "(Component aComponent, ComponentDescription looking) -> (Component _rv)"},
+	 PyDoc_STR("(Component aComponent, ComponentDescription looking) -> (Component _rv)")},
 	{"CountComponents", (PyCFunction)Cm_CountComponents, 1,
-	 "(ComponentDescription looking) -> (long _rv)"},
+	 PyDoc_STR("(ComponentDescription looking) -> (long _rv)")},
 	{"GetComponentListModSeed", (PyCFunction)Cm_GetComponentListModSeed, 1,
-	 "() -> (long _rv)"},
+	 PyDoc_STR("() -> (long _rv)")},
 	{"CloseComponentResFile", (PyCFunction)Cm_CloseComponentResFile, 1,
-	 "(short refnum) -> None"},
+	 PyDoc_STR("(short refnum) -> None")},
 	{"OpenDefaultComponent", (PyCFunction)Cm_OpenDefaultComponent, 1,
-	 "(OSType componentType, OSType componentSubType) -> (ComponentInstance _rv)"},
+	 PyDoc_STR("(OSType componentType, OSType componentSubType) -> (ComponentInstance _rv)")},
 	{"RegisterComponentResourceFile", (PyCFunction)Cm_RegisterComponentResourceFile, 1,
-	 "(short resRefNum, short global) -> (long _rv)"},
+	 PyDoc_STR("(short resRefNum, short global) -> (long _rv)")},
 	{NULL, NULL, 0}
 };
 
@@ -909,13 +935,19 @@ void init_Cm(void)
 	    PyDict_SetItemString(d, "Error", Cm_Error) != 0)
 		return;
 	ComponentInstance_Type.ob_type = &PyType_Type;
+	if (PyType_Ready(&ComponentInstance_Type) < 0) return;
 	Py_INCREF(&ComponentInstance_Type);
-	if (PyDict_SetItemString(d, "ComponentInstanceType", (PyObject *)&ComponentInstance_Type) != 0)
-		Py_FatalError("can't initialize ComponentInstanceType");
+	PyModule_AddObject(m, "ComponentInstance", (PyObject *)&ComponentInstance_Type);
+	/* Backward-compatible name */
+	Py_INCREF(&ComponentInstance_Type);
+	PyModule_AddObject(m, "ComponentInstanceType", (PyObject *)&ComponentInstance_Type);
 	Component_Type.ob_type = &PyType_Type;
+	if (PyType_Ready(&Component_Type) < 0) return;
 	Py_INCREF(&Component_Type);
-	if (PyDict_SetItemString(d, "ComponentType", (PyObject *)&Component_Type) != 0)
-		Py_FatalError("can't initialize ComponentType");
+	PyModule_AddObject(m, "Component", (PyObject *)&Component_Type);
+	/* Backward-compatible name */
+	Py_INCREF(&Component_Type);
+	PyModule_AddObject(m, "ComponentType", (PyObject *)&Component_Type);
 }
 
 /* ========================= End module _Cm ========================= */

@@ -69,6 +69,32 @@ Like \function{gettext()}, but look the message up in the specified
 \var{domain}.
 \end{funcdesc}
 
+\begin{funcdesc}{ngettext}{singular, plural, n}
+
+Like \function{gettext()}, but consider plural forms. If a translation
+is found, apply the plural formula to \var{n}, and return the
+resulting message (some languages have more than two plural forms).
+If no translation is found, return \var{singular} if \var{n} is 1;
+return \var{plural} otherwise.
+
+The Plural formula is taken from the catalog header. It is a C or
+Python expression that has a free variable n; the expression evaluates
+to the index of the plural in the catalog. See the GNU gettext
+documentation for the precise syntax to be used in .po files, and the
+formulas for a variety of languages.
+
+\versionadded{2.3}
+
+\end{funcdesc}
+
+\begin{funcdesc}{dngettext}{domain, singular, plural, n}
+Like \function{ngettext()}, but look the message up in the specified
+\var{domain}.
+
+\versionadded{2.3}
+\end{funcdesc}
+
+
 Note that GNU \program{gettext} also defines a \function{dcgettext()}
 method, but this was deemed not useful and so it is currently
 unimplemented.
@@ -207,6 +233,21 @@ Otherwise, return the translated message as a Unicode string.
 Overridden in derived classes.
 \end{methoddesc}
 
+\begin{methoddesc}[NullTranslations]{ngettext}{singular, plural, n}
+If a fallback has been set, forward \method{ngettext} to the fallback.
+Otherwise, return the translated message.  Overridden in derived classes.
+
+\versionadded{2.3}
+\end{methoddesc}
+
+\begin{methoddesc}[NullTranslations]{ungettext}{singular, plural, n}
+If a fallback has been set, forward \method{ungettext} to the fallback.
+Otherwise, return the translated message as a Unicode string.
+Overridden in derived classes.
+
+\versionadded{2.3}
+\end{methoddesc}
+
 \begin{methoddesc}[NullTranslations]{info}{}
 Return the ``protected'' \member{_info} variable.
 \end{methoddesc}
@@ -244,13 +285,17 @@ The \module{gettext} module provides one additional class derived from
 \class{NullTranslations}: \class{GNUTranslations}.  This class
 overrides \method{_parse()} to enable reading GNU \program{gettext}
 format \file{.mo} files in both big-endian and little-endian format.
+It also adds the ability to coerce both message ids and message
+strings to Unicode.
 
-It also parses optional meta-data out of the translation catalog.  It
-is convention with GNU \program{gettext} to include meta-data as the
-translation for the empty string.  This meta-data is in \rfc{822}-style
-\code{key: value} pairs.  If the key \code{Content-Type} is found,
-then the \code{charset} property is used to initialize the
-``protected'' \member{_charset} instance variable.  The entire set of
+\class{GNUTranslations} parses optional meta-data out of the
+translation catalog.  It is convention with GNU \program{gettext} to
+include meta-data as the translation for the empty string.  This
+meta-data is in \rfc{822}-style \code{key: value} pairs, and must
+contain the \code{Project-Id-Version}.  If the key
+\code{Content-Type} is found, then the \code{charset} property is used
+to initialize the ``protected'' \member{_charset} instance variable,
+defaulting to \code{None} if not found.  The entire set of
 key/value pairs are placed into a dictionary and set as the
 ``protected'' \member{_info} instance variable.
 
@@ -261,7 +306,26 @@ can raise \exception{IOError}.
 The other usefully overridden method is \method{ugettext()}, which
 returns a Unicode string by passing both the translated message string
 and the value of the ``protected'' \member{_charset} variable to the
-builtin \function{unicode()} function.
+builtin \function{unicode()} function.  Note that if you use
+\method{ugettext()} you probably also want your message ids to be
+Unicode.  To do this, set the variable \var{coerce} to \code{True} in
+the \class{GNUTranslations} constructor.  This ensures that both the
+message ids and message strings are decoded to Unicode when the file
+is read, using the file's \code{charset} value.  If you do this, you
+will not want to use the \method{gettext()} method -- always use
+\method{ugettext()} instead.
+
+To facilitate plural forms, the methods \method{ngettext} and
+\method{ungettext} are overridden as well.
+
+\begin{methoddesc}[GNUTranslations]{__init__}{
+    \optional{fp\optional{, coerce}}}
+Constructs and parses a translation catalog in GNU gettext format.
+\var{fp} is passed to the base class (\class{NullTranslations})
+constructor.  \var{coerce} is a flag specifying whether message ids
+and message strings should be converted to Unicode when the file is
+parsed.  It defaults to \code{False} for backward compatibility.
+\end{methoddesc}
 
 \subsubsection{Solaris message catalog support}
 
@@ -534,6 +598,7 @@ this module:
 \begin{itemize}
     \item Peter Funk
     \item James Henstridge
+    \item Juan David Ib\'a\~nez Palomar
     \item Marc-Andr\'e Lemburg
     \item Martin von L\"owis
     \item Fran\c cois Pinard

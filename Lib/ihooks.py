@@ -83,7 +83,7 @@ class _Verbose:
 
     def note(self, *args):
         if self.verbose:
-            apply(self.message, args)
+            self.message(*args)
 
     def message(self, format, *args):
         if args:
@@ -194,7 +194,7 @@ class Hooks(_Verbose):
     def path_islink(self, x): return os.path.islink(x)
     # etc.
 
-    def openfile(self, *x): return apply(open, x)
+    def openfile(self, *x): return open(*x)
     openfile_error = IOError
     def listdir(self, x): return os.listdir(x)
     listdir_error = os.error
@@ -352,6 +352,7 @@ class BasicModuleImporter(_Verbose):
         return self.loader.set_hooks(hooks)
 
     def import_module(self, name, globals={}, locals={}, fromlist=[]):
+        name = str(name)
         if name in self.modules:
             return self.modules[name] # Fast path
         stuff = self.loader.find_module(name)
@@ -360,14 +361,14 @@ class BasicModuleImporter(_Verbose):
         return self.loader.load_module(name, stuff)
 
     def reload(self, module, path = None):
-        name = module.__name__
+        name = str(module.__name__)
         stuff = self.loader.find_module(name, path)
         if not stuff:
             raise ImportError, "Module %s not found for reload" % name
         return self.loader.load_module(name, stuff)
 
     def unload(self, module):
-        del self.modules[module.__name__]
+        del self.modules[str(module.__name__)]
         # XXX Should this try to clear the module's namespace?
 
     def install(self):
@@ -394,7 +395,7 @@ class ModuleImporter(BasicModuleImporter):
 
     def import_module(self, name, globals=None, locals=None, fromlist=None):
         parent = self.determine_parent(globals)
-        q, tail = self.find_head_package(parent, name)
+        q, tail = self.find_head_package(parent, str(name))
         m = self.load_tail(q, tail)
         if not fromlist:
             return q
@@ -480,16 +481,18 @@ class ModuleImporter(BasicModuleImporter):
             path = parent and parent.__path__
         except AttributeError:
             return None
+        partname = str(partname)
         stuff = self.loader.find_module(partname, path)
         if not stuff:
             return None
+        fqname = str(fqname)
         m = self.loader.load_module(fqname, stuff)
         if parent:
             setattr(parent, partname, m)
         return m
 
     def reload(self, module):
-        name = module.__name__
+        name = str(module.__name__)
         if '.' not in name:
             return self.import_it(name, name, None, force_load=1)
         i = name.rfind('.')

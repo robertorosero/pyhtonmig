@@ -4,19 +4,24 @@ Provides the Distribution class, which represents the module distribution
 being built/installed/distributed.
 """
 
-# created 2000/04/03, Greg Ward
-# (extricated from core.py; actually dates back to the beginning)
+# This module should be kept compatible with Python 1.5.2.
 
 __revision__ = "$Id$"
 
 import sys, os, string, re
 from types import *
 from copy import copy
+
+try:
+    import warnings
+except ImportError:
+    warnings = None
+
 from distutils.errors import *
 from distutils.fancy_getopt import FancyGetopt, translate_longopt
 from distutils.util import check_environ, strtobool, rfc822_escape
 from distutils import log
-from distutils.core import DEBUG
+from distutils.debug import DEBUG
 
 # Regex to define acceptable Distutils command names.  This is not *quite*
 # the same as a Python NAME -- I don't allow leading underscores.  The fact
@@ -88,6 +93,8 @@ class Distribution:
          "print the long package description"),
         ('platforms', None,
          "print the list of platforms"),
+        ('classifiers', None,
+         "print the list of classifiers"),
         ('keywords', None,
          "print the list of keywords"),
         ]
@@ -198,6 +205,15 @@ class Distribution:
                     for (opt, val) in cmd_options.items():
                         opt_dict[opt] = ("setup script", val)
 
+            if attrs.has_key('licence'):
+                attrs['license'] = attrs['licence']
+                del attrs['licence']
+                msg = "'licence' distribution option is deprecated; use 'license'"
+                if warnings is not None:
+                    warnings.warn(msg)
+                else:
+                    sys.stderr.write(msg + "\n")
+
             # Now work on the rest of the attributes.  Any attribute that's
             # not already defined is invalid!
             for (key,val) in attrs.items():
@@ -206,8 +222,11 @@ class Distribution:
                 elif hasattr(self, key):
                     setattr(self, key, val)
                 else:
-                    raise DistutilsSetupError, \
-                          "invalid distribution option '%s'" % key
+                    msg = "Unknown distribution option: %s" % repr(key)
+                    if warnings is not None:
+                        warnings.warn(msg)
+                    else:
+                        sys.stderr.write(msg + "\n")
 
         self.finalize_options()
 
@@ -626,6 +645,8 @@ class Distribution:
                 value = getattr(self.metadata, "get_"+opt)()
                 if opt in ['keywords', 'platforms']:
                     print string.join(value, ',')
+                elif opt == 'classifiers':
+                    print string.join(value, '\n')
                 else:
                     print value
                 any_display_options = 1
@@ -954,7 +975,8 @@ class DistributionMetadata:
                          "maintainer", "maintainer_email", "url",
                          "license", "description", "long_description",
                          "keywords", "platforms", "fullname", "contact",
-                         "contact_email", "licence")
+                         "contact_email", "license", "classifiers",
+                         "download_url")
 
     def __init__ (self):
         self.name = None
@@ -969,6 +991,8 @@ class DistributionMetadata:
         self.long_description = None
         self.keywords = None
         self.platforms = None
+        self.classifiers = None
+        self.download_url = None
 
     def write_pkg_info (self, base_dir):
         """Write the PKG-INFO file into the release tree.
@@ -984,6 +1008,8 @@ class DistributionMetadata:
         pkg_info.write('Author: %s\n' % self.get_contact() )
         pkg_info.write('Author-email: %s\n' % self.get_contact_email() )
         pkg_info.write('License: %s\n' % self.get_license() )
+        if self.download_url:
+            pkg_info.write('Download-URL: %s\n' % self.download_url)
 
         long_desc = rfc822_escape( self.get_long_description() )
         pkg_info.write('Description: %s\n' % long_desc)
@@ -994,6 +1020,9 @@ class DistributionMetadata:
 
         for platform in self.get_platforms():
             pkg_info.write('Platform: %s\n' % platform )
+
+        for classifier in self.get_classifiers():
+            pkg_info.write('Classifier: %s\n' % classifier )
 
         pkg_info.close()
 
@@ -1050,6 +1079,12 @@ class DistributionMetadata:
 
     def get_platforms(self):
         return self.platforms or ["UNKNOWN"]
+
+    def get_classifiers(self):
+        return self.classifiers or []
+
+    def get_download_url(self):
+        return self.download_url or "UNKNOWN"
 
 # class DistributionMetadata
 

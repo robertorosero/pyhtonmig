@@ -3,7 +3,7 @@
 # testing of error conditions uncovered when using extension types.
 
 import unittest
-import test_support
+from test import test_support
 
 
 
@@ -165,6 +165,13 @@ class Super:
 class Child(Super):
     pass
 
+# new-style classes
+class NewSuper(object):
+    pass
+
+class NewChild(NewSuper):
+    pass
+
 
 
 class TestIsInstanceIsSubclass(unittest.TestCase):
@@ -217,6 +224,25 @@ class TestIsInstanceIsSubclass(unittest.TestCase):
         self.assertEqual(True, issubclass(AbstractChild, AbstractSuper))
         self.assertEqual(False, issubclass(AbstractChild, Super))
         self.assertEqual(False, issubclass(AbstractChild, Child))
+
+    def test_subclass_tuple(self):
+        # test with a tuple as the second argument classes
+        self.assertEqual(True, issubclass(Child, (Child,)))
+        self.assertEqual(True, issubclass(Child, (Super,)))
+        self.assertEqual(False, issubclass(Super, (Child,)))
+        self.assertEqual(True, issubclass(Super, (Child, Super)))
+        self.assertEqual(False, issubclass(Child, ()))
+        self.assertEqual(True, issubclass(Super, (Child, (Super,))))
+
+        self.assertEqual(True, issubclass(NewChild, (NewChild,)))
+        self.assertEqual(True, issubclass(NewChild, (NewSuper,)))
+        self.assertEqual(False, issubclass(NewSuper, (NewChild,)))
+        self.assertEqual(True, issubclass(NewSuper, (NewChild, NewSuper)))
+        self.assertEqual(False, issubclass(NewChild, ()))
+        self.assertEqual(True, issubclass(NewSuper, (NewChild, (NewSuper,))))
+
+        self.assertEqual(True, issubclass(int, (long, (float, int))))
+        self.assertEqual(True, issubclass(str, (unicode, (Child, NewChild, basestring))))
 
 
 

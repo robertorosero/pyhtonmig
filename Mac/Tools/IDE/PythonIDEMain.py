@@ -7,8 +7,10 @@ import Wapplication
 import W
 import os
 import sys
-import macfs
 import MacOS
+import EasyDialogs
+from Carbon import File
+from Carbon import Files
 
 if MacOS.runtimemodel == 'macho':
 	ELIPSES = '...'
@@ -22,11 +24,15 @@ def runningOnOSX():
 	value = gestalt("menu") & gestaltMenuMgrAquaLayoutMask
 	return not not value
 
+def getmodtime(file):
+	file = File.FSRef(file)
+	catinfo, d1, d2, d3 = file.FSGetCatalogInfo(Files.kFSCatInfoContentMod)
+	return catinfo.contentModDate
 
 class PythonIDE(Wapplication.Application):
 	
 	def __init__(self):
-		self.preffilepath = ":Python:PythonIDE preferences"
+		self.preffilepath = os.path.join("Python", "PythonIDE preferences")
 		Wapplication.Application.__init__(self, 'Pide')
 		from Carbon import AE
 		from Carbon import AppleEvents
@@ -43,6 +49,11 @@ class PythonIDE(Wapplication.Application):
 				self.quitevent)
 		import PyConsole, PyEdit
 		Splash.wait()
+		if sys.platform == "darwin":
+			if sys.argv and sys.argv[0].startswith("-psn"):
+				home = os.getenv("HOME")
+				if home:
+					os.chdir(home)
 		# With -D option (OSX command line only) keep stderr, for debugging the IDE
 		# itself.
 		debug_stderr = None
@@ -54,30 +65,28 @@ class PythonIDE(Wapplication.Application):
 		if debug_stderr:
 			sys.stderr = debug_stderr
 		for path in sys.argv[1:]:
+			if path.startswith("-p"):
+				# process number added by the OS
+				continue
 			self.opendoc(path)
-		try:
-			import Wthreading
-		except ImportError:
-			self.mainloop()
-		else:
-			if Wthreading.haveThreading:
-				self.mainthread = Wthreading.Thread("IDE event loop", self.mainloop)
-				self.mainthread.start()
-				#self.mainthread.setResistant(1)
-				Wthreading.run()
-			else:
-				self.mainloop()
+		self.mainloop()
 	
 	def makeusermenus(self):
 		m = Wapplication.Menu(self.menubar, "File")
 		newitem = FrameWork.MenuItem(m, "New", "N", 'new')
 		openitem = FrameWork.MenuItem(m, "Open"+ELIPSES, "O", 'open')
+		openbynameitem = FrameWork.MenuItem(m, "Open File by Name"+ELIPSES, "D", 'openbyname')
+		self.openrecentmenu = FrameWork.SubMenu(m, "Open Recent")
+		self.makeopenrecentmenu()
 		FrameWork.Separator(m)
 		closeitem = FrameWork.MenuItem(m, "Close", "W", 'close')
 		saveitem = FrameWork.MenuItem(m, "Save", "S", 'save')
 		saveasitem = FrameWork.MenuItem(m, "Save as"+ELIPSES, None, 'save_as')
 		FrameWork.Separator(m)
 		saveasappletitem = FrameWork.MenuItem(m, "Save as Applet"+ELIPSES, None, 'save_as_applet')
+		FrameWork.Separator(m)
+		instmgritem = FrameWork.MenuItem(m, "Package Manager", None, 'openpackagemanager')
+		gensuiteitem = FrameWork.MenuItem(m, "Generate OSA Suite...", None, 'gensuite')
 		if not runningOnOSX():
 			# On OSX there's a special "magic" quit menu, so we shouldn't add
 			# it to the File menu.
@@ -126,36 +135,35 @@ class PythonIDE(Wapplication.Application):
 		
 		prefs = self.getprefs()
 		try:
-			fss, fss_changed = macfs.RawAlias(prefs.scriptsfolder).Resolve()
-			self.scriptsfolder = fss.NewAlias()
+			fsr, d = File.Alias(rawdata=prefs.scriptsfolder).FSResolveAlias(None)
+			self.scriptsfolder = fsr.FSNewAliasMinimal()
 		except:
-			path = os.path.join(os.getcwd(), ":Mac:IDE scripts")
+			path = os.path.join(os.getcwd(), "Mac", "IDE scripts")
 			if not os.path.exists(path):
 				path = os.path.join(os.getcwd(), "Scripts")
 				if not os.path.exists(path):
 					os.mkdir(path)
 					f = open(os.path.join(path, "Place your scripts here"+ELIPSES), "w")
 					f.close()
-			fss = macfs.FSSpec(path)
-			self.scriptsfolder = fss.NewAlias()
-			self.scriptsfoldermodtime = fss.GetDates()[1]
+			fsr = File.FSRef(path)
+			self.scriptsfolder = fsr.FSNewAliasMinimal()
+			self.scriptsfoldermodtime = getmodtime(fsr)
 		else:
-			self.scriptsfoldermodtime = fss.GetDates()[1]
+			self.scriptsfoldermodtime = getmodtime(fsr)
 		prefs.scriptsfolder = self.scriptsfolder.data
 		self._scripts = {}
 		self.scriptsmenu = None
 		self.makescriptsmenu()
+		self.makehelpmenu()
 	
 	def quitevent(self, theAppleEvent, theReply):
-		from Carbon import AE
-		AE.AEInteractWithUser(50000000)
 		self._quit()
 	
 	def suspendresume(self, onoff):
 		if onoff:
-			fss, fss_changed = self.scriptsfolder.Resolve()
-			modtime = fss.GetDates()[1]
-			if self.scriptsfoldermodtime <> modtime or fss_changed:
+			fsr, changed = self.scriptsfolder.FSResolveAlias(None)
+			modtime = getmodtime(fsr)
+			if self.scriptsfoldermodtime <> modtime or changed:
 				self.scriptsfoldermodtime = modtime
 				W.SetCursor('watch')
 				self.makescriptsmenu()
@@ -171,12 +179,12 @@ class PythonIDE(Wapplication.Application):
 		if type(docs) <> type([]):
 			docs = [docs]
 		for doc in docs:
-			fss, a = doc.Resolve()
-			path = fss.as_pathname()
+			fsr, a = doc.FSResolveAlias(None)
+			path = fsr.as_pathname()
 			self.opendoc(path)
 	
 	def opendoc(self, path):
-		fcreator, ftype = macfs.FSSpec(path).GetCreatorType()
+		fcreator, ftype = MacOS.GetCreatorAndType(path)
 		if ftype == 'TEXT':
 			self.openscript(path)
 		elif ftype == '\0\0\0\0' and path[-3:] == '.py':
@@ -191,10 +199,11 @@ class PythonIDE(Wapplication.Application):
 		Splash.about()
 	
 	def do_setscriptsfolder(self, *args):
-		fss, ok = macfs.GetDirectory("Select Scripts Folder")
-		if ok:
+		fsr = EasyDialogs.AskFolder(message="Select Scripts Folder",
+			wanted=File.FSRef)
+		if fsr:
 			prefs = self.getprefs()
-			alis = fss.NewAlias()
+			alis = fsr.FSNewAliasMinimal()
 			prefs.scriptsfolder = alis.data
 			self.scriptsfolder = alis
 			self.makescriptsmenu()
@@ -206,9 +215,25 @@ class PythonIDE(Wapplication.Application):
 		ModuleBrowser.ModuleBrowser()
 	
 	def domenu_open(self, *args):
-		fss, ok = macfs.StandardGetFile("TEXT")
-		if ok:
-			self.openscript(fss.as_pathname())
+		filename = EasyDialogs.AskFileForOpen(typeList=("TEXT",))
+		if filename:
+			self.openscript(filename)
+	
+	def domenu_openbyname(self, *args):
+		# Open a file by name. If the clipboard contains a filename
+		# use that as the default.
+		from Carbon import Scrap
+		try:
+			sc = Scrap.GetCurrentScrap()
+			dft = sc.GetScrapFlavorData("TEXT")
+		except Scrap.Error:
+			dft = ""
+		else:
+			if not os.path.exists(dft):
+				dft = ""
+		filename = EasyDialogs.AskString("Open File Named:", default=dft, ok="Open")
+		if filename:
+			self.openscript(filename)
 	
 	def domenu_new(self, *args):
 		W.SetCursor('watch')
@@ -229,8 +254,8 @@ class PythonIDE(Wapplication.Application):
 		self.scriptsmenu = FrameWork.Menu(self.menubar, "Scripts")
 		#FrameWork.MenuItem(self.scriptsmenu, "New script", None, self.domenu_new)
 		#self.scriptsmenu.addseparator()
-		fss, fss_changed = self.scriptsfolder.Resolve()
-		self.scriptswalk(fss.as_pathname(), self.scriptsmenu)
+		fsr, d1 = self.scriptsfolder.FSResolveAlias(None)
+		self.scriptswalk(fsr.as_pathname(), self.scriptsmenu)
 	
 	def makeopenwindowsmenu(self):
 		for i in range(len(self.openwindowsmenu.items)):
@@ -254,10 +279,48 @@ class PythonIDE(Wapplication.Application):
 		self._openwindowscheckmark = 0
 		self.checkopenwindowsmenu()
 		
+	def makeopenrecentmenu(self):
+		for i in range(len(self.openrecentmenu.items)):
+			self.openrecentmenu.menu.DeleteMenuItem(1)
+			self.openrecentmenu.items = []
+		prefs = self.getprefs()
+		filelist = prefs.recentfiles
+		if not filelist:
+			self.openrecentmenu.enable(0)
+			return
+		self.openrecentmenu.enable(1)
+		for filename in filelist:
+			item = FrameWork.MenuItem(self.openrecentmenu, filename, None, callback = self.domenu_openrecent)
+		
+	def addrecentfile(self, file):
+		prefs = self.getprefs()
+		filelist = prefs.recentfiles
+		if not filelist:
+			filelist = []
+		
+		if file in filelist:
+			if file == filelist[0]:
+				return
+			filelist.remove(file)
+		filelist.insert(0, file)
+		filelist = filelist[:10]
+		prefs.recentfiles = filelist
+		prefs.save()
+		self.makeopenrecentmenu()
+		
 	def domenu_openwindows(self, id, item, window, event):
 		w = self._openwindows[item]
 		w.ShowWindow()
 		w.SelectWindow()
+	
+	def domenu_openrecent(self, id, item, window, event):
+		prefs = self.getprefs()
+		filelist = prefs.recentfiles
+		if not filelist:
+			filelist = []
+		item = item - 1
+		filename = filelist[item]
+		self.openscript(filename)
 	
 	def domenu_quit(self):
 		self._quit()
@@ -267,9 +330,6 @@ class PythonIDE(Wapplication.Application):
 	
 	def _quit(self):
 		import PyConsole, PyEdit
-		PyConsole.console.writeprefs()
-		PyConsole.output.writeprefs()
-		PyEdit.searchengine.writeprefs()
 		for window in self._windows.values():
 			try:
 				rv = window.close() # ignore any errors while quitting
@@ -277,7 +337,133 @@ class PythonIDE(Wapplication.Application):
 				rv = 0   # (otherwise, we can get stuck!)
 			if rv and rv > 0:
 				return
+		try:
+			PyConsole.console.writeprefs()
+			PyConsole.output.writeprefs()
+			PyEdit.searchengine.writeprefs()
+		except:
+			# Write to __stderr__ so the msg end up in Console.app and has
+			# at least _some_ chance of getting read...
+			# But: this is a workaround for way more serious problems with
+			# the Python 2.2 Jaguar addon.
+			sys.__stderr__.write("*** PythonIDE: Can't write preferences ***\n")
 		self.quitting = 1
+		
+	def domenu_openpackagemanager(self):
+		import PackageManager
+		PackageManager.PackageBrowser()
+		
+	def domenu_gensuite(self):
+		import gensuitemodule
+		gensuitemodule.main_interactive()
+		
+	def makehelpmenu(self):
+		hashelp, hasdocs = self.installdocumentation()
+		self.helpmenu = m = self.gethelpmenu()
+		helpitem = FrameWork.MenuItem(m, "MacPython Help", None, self.domenu_localhelp)
+		helpitem.enable(hashelp)
+		docitem = FrameWork.MenuItem(m, "Python Documentation", None, self.domenu_localdocs)
+		docitem.enable(hasdocs)
+		finditem = FrameWork.MenuItem(m, "Lookup in Python Documentation", None, 'lookuppython')
+		finditem.enable(hasdocs)
+		if runningOnOSX():
+			FrameWork.Separator(m)
+			doc2item = FrameWork.MenuItem(m, "Apple Developer Documentation", None, self.domenu_appledocs)
+			find2item = FrameWork.MenuItem(m, "Lookup in Carbon Documentation", None, 'lookupcarbon')
+		FrameWork.Separator(m)
+		webitem = FrameWork.MenuItem(m, "Python Documentation on the Web", None, self.domenu_webdocs)
+		web2item = FrameWork.MenuItem(m, "Python on the Web", None, self.domenu_webpython)
+		web3item = FrameWork.MenuItem(m, "MacPython on the Web", None, self.domenu_webmacpython)
+		
+	def domenu_localdocs(self, *args):
+		from Carbon import AH
+		AH.AHGotoPage("Python Documentation", None, None)
+		
+	def domenu_localhelp(self, *args):
+		from Carbon import AH
+		AH.AHGotoPage("MacPython Help", None, None)
+		
+	def domenu_appledocs(self, *args):
+		from Carbon import AH, AppleHelp
+		try:
+			AH.AHGotoMainTOC(AppleHelp.kAHTOCTypeDeveloper)
+		except AH.Error, arg:
+			if arg[0] == -50:
+				W.Message("Developer documentation not installed")
+			else:
+				W.Message("AppleHelp Error: %s" % `arg`)
+		
+	def domenu_lookuppython(self, *args):
+		from Carbon import AH
+		searchstring = self._getsearchstring()
+		if not searchstring:
+			return
+		try:
+			AH.AHSearch("Python Documentation", searchstring)
+		except AH.Error, arg:
+			W.Message("AppleHelp Error: %s" % `arg`)
+			
+	def domenu_lookupcarbon(self, *args):
+		from Carbon import AH
+		searchstring = self._getsearchstring()
+		if not searchstring:
+			return
+		try:
+			AH.AHSearch("Carbon", searchstring)
+		except AH.Error, arg:
+			W.Message("AppleHelp Error: %s" % `arg`)
+			
+	def _getsearchstring(self):
+		import PyEdit
+		editor = PyEdit.findeditor(None, fromtop=1)
+		if editor:
+			text = editor.getselectedtext()
+			if text:
+				return text
+		# This is a cop-out. We should have disabled the menus
+		# if there is no selection, but the can_ methods only seem
+		# to work for Windows. Or not for the Help menu, maybe?
+		text = EasyDialogs.AskString("Search documentation for", ok="Search")
+		return text
+		
+	def domenu_webdocs(self, *args):
+		import webbrowser
+		major, minor, micro, state, nano = sys.version_info
+		if state in ('alpha', 'beta'):
+			docversion = 'dev/doc/devel'
+		elif micro == 0:
+			docversion = 'doc/%d.%d' % (major, minor)
+		else:
+			docversion = 'doc/%d.%d.%d' % (major, minor, micro)
+		webbrowser.open("http://www.python.org/%s" % docversion)
+		
+	def domenu_webpython(self, *args):
+		import webbrowser
+		webbrowser.open("http://www.python.org/")
+		
+	def domenu_webmacpython(self, *args):
+		import webbrowser
+		webbrowser.open("http://www.cwi.nl/~jack/macpython.html")
+		
+	def installdocumentation(self):
+		# This is rather much of a hack. Someone has to tell the Help Viewer
+		# about the Python documentation, so why not us. The documentation
+		# is located in the framework, but there's a symlink in Python.app.
+		# And as AHRegisterHelpBook wants a bundle (with the right bits in
+		# the plist file) we refer it to Python.app
+		python_app = os.path.join(sys.prefix, 'Resources/Python.app')
+		help_source = os.path.join(python_app, 'Contents/Resources/English.lproj/Documentation')
+		doc_source = os.path.join(python_app, 'Contents/Resources/English.lproj/PythonDocumentation')
+		has_help = os.path.isdir(help_source)
+		has_doc = os.path.isdir(doc_source)
+		if has_help or has_doc:
+			try:
+				from Carbon import AH
+				AH.AHRegisterHelpBook(python_app)
+			except (ImportError, MacOS.Error), arg:
+				pass # W.Message("Cannot register Python Documentation: %s" % str(arg))
+		return has_help, has_doc
+	
 
 PythonIDE()
 

@@ -1,14 +1,14 @@
 
 /* Support for dynamic loading of extension modules */
 
+#include "Python.h"
+#include "importdl.h"
+
 #include <ctype.h>	/*  for isdigit()	  */
 #include <errno.h>	/*  for global errno      */
 #include <string.h>	/*  for strerror()        */
 #include <stdlib.h>	/*  for malloc(), free()  */
 #include <sys/ldr.h>
-
-#include "Python.h"
-#include "importdl.h"
 
 
 #ifdef AIX_GENUINE_CPLUSPLUS
@@ -77,8 +77,7 @@ aix_getoldmodules(void **modlistptr)
 			-- "libpython[version].a" in case it's a shared lib).
 			*/
 			offset = (unsigned int)ldiptr->ldinfo_next;
-			ldiptr = (struct ld_info *)((unsigned int)
-						    ldiptr + offset);
+			ldiptr = (struct ld_info *)((char*)ldiptr + offset);
 			continue;
 		}
 		if ((modptr = (ModulePtr)malloc(sizeof(Module))) == NULL) {
@@ -98,7 +97,7 @@ aix_getoldmodules(void **modlistptr)
 			prevmodptr->next = modptr;
 		prevmodptr = modptr;
 		offset = (unsigned int)ldiptr->ldinfo_next;
-		ldiptr = (struct ld_info *)((unsigned int)ldiptr + offset);
+		ldiptr = (struct ld_info *)((char*)ldiptr + offset);
 	} while (offset);
 	free(ldibuf);
 	return 0;

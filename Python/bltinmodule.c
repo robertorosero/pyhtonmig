@@ -18,12 +18,17 @@
 */
 #if defined(MS_WINDOWS) && defined(HAVE_USABLE_WCHAR_T)
 const char *Py_FileSystemDefaultEncoding = "mbcs";
+#elif defined(__APPLE__)
+const char *Py_FileSystemDefaultEncoding = "utf-8";
 #else
 const char *Py_FileSystemDefaultEncoding = NULL; /* use default */
 #endif
 
 /* Forward */
 static PyObject *filterstring(PyObject *, PyObject *);
+#ifdef Py_USING_UNICODE
+static PyObject *filterunicode(PyObject *, PyObject *);
+#endif
 static PyObject *filtertuple (PyObject *, PyObject *);
 
 static PyObject *
@@ -70,13 +75,17 @@ builtin_apply(PyObject *self, PyObject *args)
 	PyObject *func, *alist = NULL, *kwdict = NULL;
 	PyObject *t = NULL, *retval = NULL;
 
-	if (!PyArg_ParseTuple(args, "O|OO:apply", &func, &alist, &kwdict))
+	if (PyErr_Warn(PyExc_PendingDeprecationWarning,
+		       "use func(*args, **kwargs) instead of "
+		       "apply(func, args, kwargs)") < 0)
+		return NULL;
+	if (!PyArg_UnpackTuple(args, "apply", 1, 3, &func, &alist, &kwdict))
 		return NULL;
 	if (alist != NULL) {
 		if (!PyTuple_Check(alist)) {
 			if (!PySequence_Check(alist)) {
 				PyErr_Format(PyExc_TypeError,
-				     "apply() arg 2 expect sequence, found %s",
+				     "apply() arg 2 expected sequence, found %s",
 					     alist->ob_type->tp_name);
 				return NULL;
 			}
@@ -103,7 +112,10 @@ PyDoc_STRVAR(apply_doc,
 \n\
 Call a callable object with positional arguments taken from the tuple args,\n\
 and keyword arguments taken from the optional dictionary kwargs.\n\
-Note that classes are callable, as are instances with a __call__() method.");
+Note that classes are callable, as are instances with a __call__() method.\n\
+\n\
+Deprecated since release 2.3. Instead, use the extended call syntax:\n\
+    function(*args, **keywords).");
 
 
 static PyObject *
@@ -122,16 +134,20 @@ Note that classes are callable, as are instances with a __call__() method.");
 static PyObject *
 builtin_filter(PyObject *self, PyObject *args)
 {
-	PyObject *func, *seq, *result, *it;
+	PyObject *func, *seq, *result, *it, *arg;
 	int len;   /* guess for result list size */
 	register int j;
 
-	if (!PyArg_ParseTuple(args, "OO:filter", &func, &seq))
+	if (!PyArg_UnpackTuple(args, "filter", 2, 2, &func, &seq))
 		return NULL;
 
 	/* Strings and tuples return a result of the same type. */
 	if (PyString_Check(seq))
 		return filterstring(func, seq);
+#ifdef Py_USING_UNICODE
+	if (PyUnicode_Check(seq))
+		return filterunicode(func, seq);
+#endif
 	if (PyTuple_Check(seq))
 		return filtertuple(func, seq);
 
@@ -151,6 +167,11 @@ builtin_filter(PyObject *self, PyObject *args)
 	if (len < 0)
 		len = 8;  /* arbitrary */
 
+	/* Pre-allocate argument list tuple. */
+	arg = PyTuple_New(1);
+	if (arg == NULL)
+		goto Fail_arg;
+
 	/* Get a result list. */
 	if (PyList_Check(seq) && seq->ob_refcnt == 1) {
 		/* Eww - can modify the list in-place. */
@@ -166,7 +187,7 @@ builtin_filter(PyObject *self, PyObject *args)
 	/* Build the result list. */
 	j = 0;
 	for (;;) {
-		PyObject *item, *good;
+		PyObject *item;
 		int ok;
 
 		item = PyIter_Next(it);
@@ -177,24 +198,20 @@ builtin_filter(PyObject *self, PyObject *args)
 		}
 
 		if (func == Py_None) {
-			good = item;
-			Py_INCREF(good);
+			ok = PyObject_IsTrue(item);
 		}
 		else {
-			PyObject *arg = Py_BuildValue("(O)", item);
-			if (arg == NULL) {
-				Py_DECREF(item);
-				goto Fail_result_it;
-			}
-			good = PyEval_CallObject(func, arg);
-			Py_DECREF(arg);
+			PyObject *good;
+			PyTuple_SET_ITEM(arg, 0, item);
+			good = PyObject_Call(func, arg, NULL);
+			PyTuple_SET_ITEM(arg, 0, NULL);
 			if (good == NULL) {
 				Py_DECREF(item);
 				goto Fail_result_it;
 			}
+			ok = PyObject_IsTrue(good);
+			Py_DECREF(good);
 		}
-		ok = PyObject_IsTrue(good);
-		Py_DECREF(good);
 		if (ok) {
 			if (j < len)
 				PyList_SET_ITEM(result, j, item);
@@ -216,12 +233,15 @@ builtin_filter(PyObject *self, PyObject *args)
 		goto Fail_result_it;
 
 	Py_DECREF(it);
+	Py_DECREF(arg);
 	return result;
 
 Fail_result_it:
 	Py_DECREF(result);
 Fail_it:
 	Py_DECREF(it);
+Fail_arg:
+	Py_DECREF(arg);
 	return NULL;
 }
 
@@ -260,44 +280,11 @@ static PyObject *
 builtin_unichr(PyObject *self, PyObject *args)
 {
 	long x;
-	Py_UNICODE s[2];
 
 	if (!PyArg_ParseTuple(args, "l:unichr", &x))
 		return NULL;
 
-#ifdef Py_UNICODE_WIDE
-	if (x < 0 || x > 0x10ffff) {
-		PyErr_SetString(PyExc_ValueError,
-				"unichr() arg not in range(0x110000) "
-				"(wide Python build)");
-		return NULL;
-	}
-#else
-	if (x < 0 || x > 0xffff) {
-		PyErr_SetString(PyExc_ValueError,
-				"unichr() arg not in range(0x10000) "
-				"(narrow Python build)");
-		return NULL;
-	}
-#endif
-
-	if (x <= 0xffff) {
-		/* UCS-2 character */
-		s[0] = (Py_UNICODE) x;
-		return PyUnicode_FromUnicode(s, 1);
-	}
-	else {
-#ifndef Py_UNICODE_WIDE
-		/* UCS-4 character.  store as two surrogate characters */
-		x -= 0x10000L;
-		s[0] = 0xD800 + (Py_UNICODE) (x >> 10);
-		s[1] = 0xDC00 + (Py_UNICODE) (x & 0x03FF);
-		return PyUnicode_FromUnicode(s, 2);
-#else
-		s[0] = (Py_UNICODE)x;
-		return PyUnicode_FromUnicode(s, 1);
-#endif
-	}
+	return PyUnicode_FromOrdinal(x);
 }
 
 PyDoc_STRVAR(unichr_doc,
@@ -313,7 +300,7 @@ builtin_cmp(PyObject *self, PyObject *args)
 	PyObject *a, *b;
 	int c;
 
-	if (!PyArg_ParseTuple(args, "OO:cmp", &a, &b))
+	if (!PyArg_UnpackTuple(args, "cmp", 2, 2, &a, &b))
 		return NULL;
 	if (PyObject_Cmp(a, b, &c) < 0)
 		return NULL;
@@ -332,7 +319,7 @@ builtin_coerce(PyObject *self, PyObject *args)
 	PyObject *v, *w;
 	PyObject *res;
 
-	if (!PyArg_ParseTuple(args, "OO:coerce", &v, &w))
+	if (!PyArg_UnpackTuple(args, "coerce", 2, 2, &v, &w))
 		return NULL;
 	if (PyNumber_Coerce(&v, &w) < 0)
 		return NULL;
@@ -359,10 +346,31 @@ builtin_compile(PyObject *self, PyObject *args)
 	int dont_inherit = 0;
 	int supplied_flags = 0;
 	PyCompilerFlags cf;
+	PyObject *result, *cmd, *tmp = NULL;
+	int length;
 
-	if (!PyArg_ParseTuple(args, "sss|ii:compile", &str, &filename,
+	if (!PyArg_ParseTuple(args, "Oss|ii:compile", &cmd, &filename,
 			      &startstr, &supplied_flags, &dont_inherit))
 		return NULL;
+
+	cf.cf_flags = supplied_flags;
+
+#ifdef Py_USING_UNICODE
+	if (PyUnicode_Check(cmd)) {
+		tmp = PyUnicode_AsUTF8String(cmd);
+		if (tmp == NULL)
+			return NULL;
+		cmd = tmp;
+		cf.cf_flags |= PyCF_SOURCE_IS_UTF8;
+	}
+#endif
+	if (PyObject_AsReadBuffer(cmd, (const void **)&str, &length))
+		return NULL;
+	if ((size_t)length != strlen(str)) {
+		PyErr_SetString(PyExc_TypeError,
+				"compile() expected string without null bytes");
+		return NULL;
+	}
 
 	if (strcmp(startstr, "exec") == 0)
 		start = Py_file_input;
@@ -376,18 +384,21 @@ builtin_compile(PyObject *self, PyObject *args)
 		return NULL;
 	}
 
-	if (supplied_flags & ~(PyCF_MASK | PyCF_MASK_OBSOLETE)) {
+	if (supplied_flags &
+	    ~(PyCF_MASK | PyCF_MASK_OBSOLETE | PyCF_DONT_IMPLY_DEDENT))
+	{
 		PyErr_SetString(PyExc_ValueError,
 				"compile(): unrecognised flags");
 		return NULL;
 	}
 	/* XXX Warn if (supplied_flags & PyCF_MASK_OBSOLETE) != 0? */
 
-	cf.cf_flags = supplied_flags;
 	if (!dont_inherit) {
 		PyEval_MergeCompilerFlags(&cf);
 	}
-	return Py_CompileStringFlags(str, filename, start, &cf);
+	result = Py_CompileStringFlags(str, filename, start, &cf);
+	Py_XDECREF(tmp);
+	return result;
 }
 
 PyDoc_STRVAR(compile_doc,
@@ -410,7 +421,7 @@ builtin_dir(PyObject *self, PyObject *args)
 {
 	PyObject *arg = NULL;
 
-	if (!PyArg_ParseTuple(args, "|O:dir", &arg))
+	if (!PyArg_UnpackTuple(args, "dir", 0, 1, &arg))
 		return NULL;
 	return PyObject_Dir(arg);
 }
@@ -433,7 +444,7 @@ builtin_divmod(PyObject *self, PyObject *args)
 {
 	PyObject *v, *w;
 
-	if (!PyArg_ParseTuple(args, "OO:divmod", &v, &w))
+	if (!PyArg_UnpackTuple(args, "divmod", 2, 2, &v, &w))
 		return NULL;
 	return PyNumber_Divmod(v, w);
 }
@@ -447,7 +458,7 @@ Return the tuple ((x-x%y)/y, x%y).  Invariant: div*y + mod == x.");
 static PyObject *
 builtin_eval(PyObject *self, PyObject *args)
 {
-	PyObject *cmd;
+	PyObject *cmd, *result, *tmp = NULL;
 	PyObject *globals = Py_None, *locals = Py_None;
 	char *str;
 	PyCompilerFlags cf;
@@ -486,14 +497,26 @@ builtin_eval(PyObject *self, PyObject *args)
 			   "eval() arg 1 must be a string or code object");
 		return NULL;
 	}
+	cf.cf_flags = 0;
+
+#ifdef Py_USING_UNICODE
+	if (PyUnicode_Check(cmd)) {
+		tmp = PyUnicode_AsUTF8String(cmd);
+		if (tmp == NULL)
+			return NULL;
+		cmd = tmp;
+		cf.cf_flags |= PyCF_SOURCE_IS_UTF8;
+	}
+#endif
 	if (PyString_AsStringAndSize(cmd, &str, NULL))
 		return NULL;
 	while (*str == ' ' || *str == '\t')
 		str++;
 
-	cf.cf_flags = 0;
 	(void)PyEval_MergeCompilerFlags(&cf);
-	return PyRun_StringFlags(str, Py_eval_input, globals, locals, &cf);
+	result = PyRun_StringFlags(str, Py_eval_input, globals, locals, &cf);
+	Py_XDECREF(tmp);
+	return result;
 }
 
 PyDoc_STRVAR(eval_doc,
@@ -582,7 +605,7 @@ builtin_execfile(PyObject *self, PyObject *args)
         }
 
 	if (!exists) {
-		PyErr_SetFromErrno(PyExc_IOError);
+		PyErr_SetFromErrnoWithFilename(PyExc_IOError, filename);
 		return NULL;
 	}
 	cf.cf_flags = 0;
@@ -609,7 +632,7 @@ builtin_getattr(PyObject *self, PyObject *args)
 	PyObject *v, *result, *dflt = NULL;
 	PyObject *name;
 
-	if (!PyArg_ParseTuple(args, "OO|O:getattr", &v, &name, &dflt))
+	if (!PyArg_UnpackTuple(args, "getattr", 2, 3, &v, &name, &dflt))
 		return NULL;
 #ifdef Py_USING_UNICODE
 	if (PyUnicode_Check(name)) {
@@ -621,7 +644,7 @@ builtin_getattr(PyObject *self, PyObject *args)
 
 	if (!PyString_Check(name)) {
 		PyErr_SetString(PyExc_TypeError,
-				"attribute name must be string");
+				"getattr(): attribute name must be string");
 		return NULL;
 	}
 	result = PyObject_GetAttr(v, name);
@@ -665,7 +688,7 @@ builtin_hasattr(PyObject *self, PyObject *args)
 	PyObject *v;
 	PyObject *name;
 
-	if (!PyArg_ParseTuple(args, "OO:hasattr", &v, &name))
+	if (!PyArg_UnpackTuple(args, "hasattr", 2, 2, &v, &name))
 		return NULL;
 #ifdef Py_USING_UNICODE
 	if (PyUnicode_Check(name)) {
@@ -677,7 +700,7 @@ builtin_hasattr(PyObject *self, PyObject *args)
 
 	if (!PyString_Check(name)) {
 		PyErr_SetString(PyExc_TypeError,
-				"attribute name must be string");
+				"hasattr(): attribute name must be string");
 		return NULL;
 	}
 	v = PyObject_GetAttr(v, name);
@@ -885,7 +908,7 @@ builtin_setattr(PyObject *self, PyObject *args)
 	PyObject *name;
 	PyObject *value;
 
-	if (!PyArg_ParseTuple(args, "OOO:setattr", &v, &name, &value))
+	if (!PyArg_UnpackTuple(args, "setattr", 3, 3, &v, &name, &value))
 		return NULL;
 	if (PyObject_SetAttr(v, name, value) != 0)
 		return NULL;
@@ -906,7 +929,7 @@ builtin_delattr(PyObject *self, PyObject *args)
 	PyObject *v;
 	PyObject *name;
 
-	if (!PyArg_ParseTuple(args, "OO:delattr", &v, &name))
+	if (!PyArg_UnpackTuple(args, "delattr", 2, 2, &v, &name))
 		return NULL;
 	if (PyObject_SetAttr(v, name, (PyObject *)NULL) != 0)
 		return NULL;
@@ -1019,7 +1042,7 @@ builtin_iter(PyObject *self, PyObject *args)
 {
 	PyObject *v, *w = NULL;
 
-	if (!PyArg_ParseTuple(args, "O|O:iter", &v, &w))
+	if (!PyArg_UnpackTuple(args, "iter", 1, 2, &v, &w))
 		return NULL;
 	if (w == NULL)
 		return PyObject_GetIter(v);
@@ -1070,7 +1093,7 @@ builtin_locals(PyObject *self)
 PyDoc_STRVAR(locals_doc,
 "locals() -> dictionary\n\
 \n\
-Return the dictionary containing the current scope's local variables.");
+Update and return a dictionary containing the current scope's local variables.");
 
 
 static PyObject *
@@ -1080,7 +1103,7 @@ min_max(PyObject *args, int op)
 
 	if (PyTuple_Size(args) > 1)
 		v = args;
-	else if (!PyArg_ParseTuple(args, "O:min/max", &v))
+	else if (!PyArg_UnpackTuple(args, (op==Py_LT) ? "min" : "max", 1, 1, &v))
 		return NULL;
 
 	it = PyObject_GetIter(v);
@@ -1217,7 +1240,7 @@ builtin_pow(PyObject *self, PyObject *args)
 {
 	PyObject *v, *w, *z = Py_None;
 
-	if (!PyArg_ParseTuple(args, "OO|O:pow", &v, &w, &z))
+	if (!PyArg_UnpackTuple(args, "pow", 2, 3, &v, &w, &z))
 		return NULL;
 	return PyNumber_Power(v, w, z);
 }
@@ -1228,6 +1251,205 @@ PyDoc_STRVAR(pow_doc,
 With two arguments, equivalent to x**y.  With three arguments,\n\
 equivalent to (x**y) % z, but may be more efficient (e.g. for longs).");
 
+
+
+/* Return number of items in range (lo, hi, step), when arguments are
+ * PyInt or PyLong objects.  step > 0 required.  Return a value < 0 if
+ * & only if the true value is too large to fit in a signed long.
+ * Arguments MUST return 1 with either PyInt_Check() or
+ * PyLong_Check().  Return -1 when there is an error.
+ */
+static long
+get_len_of_range_longs(PyObject *lo, PyObject *hi, PyObject *step)
+{
+	/* -------------------------------------------------------------
+	Algorithm is equal to that of get_len_of_range(), but it operates
+	on PyObjects (which are assumed to be PyLong or PyInt objects).
+	---------------------------------------------------------------*/
+	long n;
+	PyObject *diff = NULL;
+	PyObject *one = NULL;
+	PyObject *tmp1 = NULL, *tmp2 = NULL, *tmp3 = NULL;
+		/* holds sub-expression evaluations */
+
+	/* if (lo >= hi), return length of 0. */
+	if (PyObject_Compare(lo, hi) >= 0)
+		return 0;
+
+	if ((one = PyLong_FromLong(1L)) == NULL)
+		goto Fail;
+
+	if ((tmp1 = PyNumber_Subtract(hi, lo)) == NULL)
+		goto Fail;
+
+	if ((diff = PyNumber_Subtract(tmp1, one)) == NULL)
+		goto Fail;
+
+	if ((tmp2 = PyNumber_FloorDivide(diff, step)) == NULL)
+		goto Fail;
+
+	if ((tmp3 = PyNumber_Add(tmp2, one)) == NULL)
+		goto Fail;
+
+	n = PyLong_AsLong(tmp3);
+	if (PyErr_Occurred()) {  /* Check for Overflow */
+		PyErr_Clear();
+		goto Fail;
+	}
+
+	Py_DECREF(tmp3);
+	Py_DECREF(tmp2);
+	Py_DECREF(diff);
+	Py_DECREF(tmp1);
+	Py_DECREF(one);
+	return n;
+
+  Fail:
+	Py_XDECREF(tmp3);
+	Py_XDECREF(tmp2);
+	Py_XDECREF(diff);
+	Py_XDECREF(tmp1);
+	Py_XDECREF(one);
+	return -1;
+}
+
+/* An extension of builtin_range() that handles the case when PyLong
+ * arguments are given. */
+static PyObject *
+handle_range_longs(PyObject *self, PyObject *args)
+{
+	PyObject *ilow;
+	PyObject *ihigh = NULL;
+	PyObject *istep = NULL;
+
+	PyObject *curnum = NULL;
+	PyObject *v = NULL;
+	long bign;
+	int i, n;
+	int cmp_result;
+
+	PyObject *zero = PyLong_FromLong(0);
+
+	if (zero == NULL)
+		return NULL;
+
+	if (!PyArg_UnpackTuple(args, "range", 1, 3, &ilow, &ihigh, &istep)) {
+		Py_DECREF(zero);
+		return NULL;
+	}
+
+	/* Figure out which way we were called, supply defaults, and be
+	 * sure to incref everything so that the decrefs at the end
+	 * are correct.
+	 */
+	assert(ilow != NULL);
+	if (ihigh == NULL) {
+		/* only 1 arg -- it's the upper limit */
+		ihigh = ilow;
+		ilow = NULL;
+	}
+	assert(ihigh != NULL);
+	Py_INCREF(ihigh);
+
+	/* ihigh correct now; do ilow */
+	if (ilow == NULL)
+		ilow = zero;
+	Py_INCREF(ilow);
+
+	/* ilow and ihigh correct now; do istep */
+	if (istep == NULL) {
+		istep = PyLong_FromLong(1L);
+		if (istep == NULL)
+			goto Fail;
+	}
+	else {
+		Py_INCREF(istep);
+	}
+
+	if (!PyInt_Check(ilow) && !PyLong_Check(ilow)) {
+		PyErr_Format(PyExc_TypeError,
+			     "range() integer start argument expected, got %s.",
+			     ilow->ob_type->tp_name);
+		goto Fail;
+	}
+
+	if (!PyInt_Check(ihigh) && !PyLong_Check(ihigh)) {
+		PyErr_Format(PyExc_TypeError,
+			     "range() integer end argument expected, got %s.",
+			     ihigh->ob_type->tp_name);
+		goto Fail;
+	}
+
+	if (!PyInt_Check(istep) && !PyLong_Check(istep)) {
+		PyErr_Format(PyExc_TypeError,
+			     "range() integer step argument expected, got %s.",
+			     istep->ob_type->tp_name);
+		goto Fail;
+	}
+
+	if (PyObject_Cmp(istep, zero, &cmp_result) == -1)
+		goto Fail;
+	if (cmp_result == 0) {
+		PyErr_SetString(PyExc_ValueError,
+				"range() step argument must not be zero");
+		goto Fail;
+	}
+
+	if (cmp_result > 0)
+		bign = get_len_of_range_longs(ilow, ihigh, istep);
+	else {
+		PyObject *neg_istep = PyNumber_Negative(istep);
+		if (neg_istep == NULL)
+			goto Fail;
+		bign = get_len_of_range_longs(ihigh, ilow, neg_istep);
+		Py_DECREF(neg_istep);
+	}
+
+	n = (int)bign;
+	if (bign < 0 || (long)n != bign) {
+		PyErr_SetString(PyExc_OverflowError,
+				"range() result has too many items");
+		goto Fail;
+	}
+
+	v = PyList_New(n);
+	if (v == NULL)
+		goto Fail;
+
+	curnum = ilow;
+	Py_INCREF(curnum);
+
+	for (i = 0; i < n; i++) {
+		PyObject *w = PyNumber_Long(curnum);
+		PyObject *tmp_num;
+		if (w == NULL)
+			goto Fail;
+
+		PyList_SET_ITEM(v, i, w);
+
+		tmp_num = PyNumber_Add(curnum, istep);
+		if (tmp_num == NULL)
+			goto Fail;
+
+		Py_DECREF(curnum);
+		curnum = tmp_num;
+	}
+	Py_DECREF(ilow);
+	Py_DECREF(ihigh);
+	Py_DECREF(istep);
+	Py_DECREF(zero);
+	Py_DECREF(curnum);
+	return v;
+
+  Fail:
+	Py_DECREF(ilow);
+	Py_DECREF(ihigh);
+	Py_XDECREF(istep);
+	Py_DECREF(zero);
+	Py_XDECREF(curnum);
+	Py_XDECREF(v);
+	return NULL;
+}
 
 /* Return number of items in range/xrange (lo, hi, step).  step > 0
  * required.  Return a value < 0 if & only if the true value is too
@@ -1270,17 +1492,22 @@ builtin_range(PyObject *self, PyObject *args)
 	if (PyTuple_Size(args) <= 1) {
 		if (!PyArg_ParseTuple(args,
 				"l;range() requires 1-3 int arguments",
-				&ihigh))
-			return NULL;
+				&ihigh)) {
+			PyErr_Clear();
+			return handle_range_longs(self, args);
+		}
 	}
 	else {
 		if (!PyArg_ParseTuple(args,
 				"ll|l;range() requires 1-3 int arguments",
-				&ilow, &ihigh, &istep))
-			return NULL;
+				&ilow, &ihigh, &istep)) {
+			PyErr_Clear();
+			return handle_range_longs(self, args);
+		}
 	}
 	if (istep == 0) {
-		PyErr_SetString(PyExc_ValueError, "range() arg 3 must not be zero");
+		PyErr_SetString(PyExc_ValueError,
+				"range() step argument must not be zero");
 		return NULL;
 	}
 	if (istep > 0)
@@ -1322,13 +1549,27 @@ static PyObject *
 builtin_raw_input(PyObject *self, PyObject *args)
 {
 	PyObject *v = NULL;
-	PyObject *f;
+	PyObject *fin = PySys_GetObject("stdin");
+	PyObject *fout = PySys_GetObject("stdout");
 
-	if (!PyArg_ParseTuple(args, "|O:[raw_]input", &v))
+	if (!PyArg_UnpackTuple(args, "[raw_]input", 0, 1, &v))
 		return NULL;
-	if (PyFile_AsFile(PySys_GetObject("stdin")) == stdin &&
-	    PyFile_AsFile(PySys_GetObject("stdout")) == stdout &&
-	    isatty(fileno(stdin)) && isatty(fileno(stdout))) {
+
+	if (fin == NULL) {
+		PyErr_SetString(PyExc_RuntimeError, "[raw_]input: lost sys.stdin");
+		return NULL;
+	}
+	if (fout == NULL) {
+		PyErr_SetString(PyExc_RuntimeError, "[raw_]input: lost sys.stdout");
+		return NULL;
+	}
+	if (PyFile_SoftSpace(fout, 0)) {
+		if (PyFile_WriteString(" ", fout) != 0)
+			return NULL;
+	}
+	if (PyFile_Check (fin) && PyFile_Check (fout)
+            && isatty(fileno(PyFile_AsFile(fin)))
+            && isatty(fileno(PyFile_AsFile(fout)))) {
 		PyObject *po;
 		char *prompt;
 		char *s;
@@ -1345,7 +1586,8 @@ builtin_raw_input(PyObject *self, PyObject *args)
 			po = NULL;
 			prompt = "";
 		}
-		s = PyOS_Readline(prompt);
+		s = PyOS_Readline(PyFile_AsFile (fin), PyFile_AsFile (fout),
+                                  prompt);
 		Py_XDECREF(po);
 		if (s == NULL) {
 			PyErr_SetNone(PyExc_KeyboardInterrupt);
@@ -1358,32 +1600,23 @@ builtin_raw_input(PyObject *self, PyObject *args)
 		else { /* strip trailing '\n' */
 			size_t len = strlen(s);
 			if (len > INT_MAX) {
-				PyErr_SetString(PyExc_OverflowError, "input too long");
+				PyErr_SetString(PyExc_OverflowError,
+						"[raw_]input: input too long");
 				result = NULL;
 			}
 			else {
-				result = PyString_FromStringAndSize(s, (int)(len-1));
+				result = PyString_FromStringAndSize(s,
+								(int)(len-1));
 			}
 		}
 		PyMem_FREE(s);
 		return result;
 	}
 	if (v != NULL) {
-		f = PySys_GetObject("stdout");
-		if (f == NULL) {
-			PyErr_SetString(PyExc_RuntimeError, "lost sys.stdout");
-			return NULL;
-		}
-		if (Py_FlushLine() != 0 ||
-		    PyFile_WriteObject(v, f, Py_PRINT_RAW) != 0)
+		if (PyFile_WriteObject(v, fout, Py_PRINT_RAW) != 0)
 			return NULL;
 	}
-	f = PySys_GetObject("stdin");
-	if (f == NULL) {
-		PyErr_SetString(PyExc_RuntimeError, "lost sys.stdin");
-		return NULL;
-	}
-	return PyFile_GetLine(f, -1);
+	return PyFile_GetLine(fin, -1);
 }
 
 PyDoc_STRVAR(raw_input_doc,
@@ -1400,7 +1633,7 @@ builtin_reduce(PyObject *self, PyObject *args)
 {
 	PyObject *seq, *func, *result = NULL, *it;
 
-	if (!PyArg_ParseTuple(args, "OO|O:reduce", &func, &seq, &result))
+	if (!PyArg_UnpackTuple(args, "reduce", 2, 3, &func, &seq, &result))
 		return NULL;
 	if (result != NULL)
 		Py_INCREF(result);
@@ -1536,14 +1769,14 @@ builtin_vars(PyObject *self, PyObject *args)
 	PyObject *v = NULL;
 	PyObject *d;
 
-	if (!PyArg_ParseTuple(args, "|O:vars", &v))
+	if (!PyArg_UnpackTuple(args, "vars", 0, 1, &v))
 		return NULL;
 	if (v == NULL) {
 		d = PyEval_GetLocals();
 		if (d == NULL) {
 			if (!PyErr_Occurred())
 				PyErr_SetString(PyExc_SystemError,
-						"no locals!?");
+						"vars(): no locals!?");
 		}
 		else
 			Py_INCREF(d);
@@ -1565,6 +1798,66 @@ PyDoc_STRVAR(vars_doc,
 Without arguments, equivalent to locals().\n\
 With an argument, equivalent to object.__dict__.");
 
+
+static PyObject*
+builtin_sum(PyObject *self, PyObject *args)
+{
+	PyObject *seq;
+	PyObject *result = NULL;
+	PyObject *temp, *item, *iter;
+
+	if (!PyArg_ParseTuple(args, "O|O:sum", &seq, &result))
+		return NULL;
+
+	iter = PyObject_GetIter(seq);
+	if (iter == NULL)
+		return NULL;
+
+	if (result == NULL) {
+		result = PyInt_FromLong(0);
+		if (result == NULL) {
+			Py_DECREF(iter);
+			return NULL;
+		}
+	} else {
+		/* reject string values for 'start' parameter */
+		if (PyObject_TypeCheck(result, &PyBaseString_Type)) {
+			PyErr_SetString(PyExc_TypeError,
+				"sum() can't sum strings [use ''.join(seq) instead]");
+			Py_DECREF(iter);
+			return NULL;
+		}
+		Py_INCREF(result);
+	}
+
+	for(;;) {
+		item = PyIter_Next(iter);
+		if (item == NULL) {
+			/* error, or end-of-sequence */
+			if (PyErr_Occurred()) {
+				Py_DECREF(result);
+				result = NULL;
+			}
+			break;
+		}
+		temp = PyNumber_Add(result, item);
+		Py_DECREF(result);
+		Py_DECREF(item);
+		result = temp;
+		if (result == NULL)
+			break;
+	}
+	Py_DECREF(iter);
+	return result;
+}
+
+PyDoc_STRVAR(sum_doc,
+"sum(sequence, start=0) -> value\n\
+\n\
+Returns the sum of a sequence of numbers (NOT strings) plus the value\n\
+of parameter 'start'.  When the sequence is empty, returns start.");
+
+
 static PyObject *
 builtin_isinstance(PyObject *self, PyObject *args)
 {
@@ -1572,7 +1865,7 @@ builtin_isinstance(PyObject *self, PyObject *args)
 	PyObject *cls;
 	int retval;
 
-	if (!PyArg_ParseTuple(args, "OO:isinstance", &inst, &cls))
+	if (!PyArg_UnpackTuple(args, "isinstance", 2, 2, &inst, &cls))
 		return NULL;
 
 	retval = PyObject_IsInstance(inst, cls);
@@ -1597,7 +1890,7 @@ builtin_issubclass(PyObject *self, PyObject *args)
 	PyObject *cls;
 	int retval;
 
-	if (!PyArg_ParseTuple(args, "OO:issubclass", &derived, &cls))
+	if (!PyArg_UnpackTuple(args, "issubclass", 2, 2, &derived, &cls))
 		return NULL;
 
 	retval = PyObject_IsSubclass(derived, cls);
@@ -1609,7 +1902,9 @@ builtin_issubclass(PyObject *self, PyObject *args)
 PyDoc_STRVAR(issubclass_doc,
 "issubclass(C, B) -> bool\n\
 \n\
-Return whether class C is a subclass (i.e., a derived class) of class B.");
+Return whether class C is a subclass (i.e., a derived class) of class B.\n\
+When using a tuple as the second argument issubclass(X, (A, B, ...)),\n\
+is a shortcut for issubclass(X, A) or issubclass(X, B) or ... (etc.).");
 
 
 static PyObject*
@@ -1766,6 +2061,7 @@ static PyMethodDef builtin_methods[] = {
  	{"repr",	builtin_repr,       METH_O, repr_doc},
  	{"round",	builtin_round,      METH_VARARGS, round_doc},
  	{"setattr",	builtin_setattr,    METH_VARARGS, setattr_doc},
+ 	{"sum",		builtin_sum,        METH_VARARGS, sum_doc},
 #ifdef Py_USING_UNICODE
  	{"unichr",	builtin_unichr,     METH_VARARGS, unichr_doc},
 #endif
@@ -1790,9 +2086,22 @@ _PyBuiltin_Init(void)
 		return NULL;
 	dict = PyModule_GetDict(mod);
 
+#ifdef Py_TRACE_REFS
+	/* __builtin__ exposes a number of statically allocated objects
+	 * that, before this code was added in 2.3, never showed up in
+	 * the list of "all objects" maintained by Py_TRACE_REFS.  As a
+	 * result, programs leaking references to None and False (etc)
+	 * couldn't be diagnosed by examining sys.getobjects(0).
+	 */
+#define ADD_TO_ALL(OBJECT) _Py_AddToAllObjects((PyObject *)(OBJECT), 0)
+#else
+#define ADD_TO_ALL(OBJECT) (void)0
+#endif
+
 #define SETBUILTIN(NAME, OBJECT) \
-	if (PyDict_SetItemString(dict, NAME, (PyObject *)OBJECT) < 0) \
-		return NULL
+	if (PyDict_SetItemString(dict, NAME, (PyObject *)OBJECT) < 0)	\
+		return NULL;						\
+	ADD_TO_ALL(OBJECT)
 
 	SETBUILTIN("None",		Py_None);
 	SETBUILTIN("Ellipsis",		Py_Ellipsis);
@@ -1836,6 +2145,7 @@ _PyBuiltin_Init(void)
 	Py_XDECREF(debug);
 
 	return mod;
+#undef ADD_TO_ALL
 #undef SETBUILTIN
 }
 
@@ -1849,7 +2159,10 @@ filtertuple(PyObject *func, PyObject *tuple)
 	int len = PyTuple_Size(tuple);
 
 	if (len == 0) {
-		Py_INCREF(tuple);
+		if (PyTuple_CheckExact(tuple))
+			Py_INCREF(tuple);
+		else
+			tuple = PyTuple_New(0);
 		return tuple;
 	}
 
@@ -1860,8 +2173,13 @@ filtertuple(PyObject *func, PyObject *tuple)
 		PyObject *item, *good;
 		int ok;
 
-		if ((item = PyTuple_GetItem(tuple, i)) == NULL)
+		if (tuple->ob_type->tp_as_sequence &&
+		    tuple->ob_type->tp_as_sequence->sq_item) {
+			item = tuple->ob_type->tp_as_sequence->sq_item(tuple, i);
+		} else {
+			PyErr_SetString(PyExc_TypeError, "filter(): unsubscriptable tuple");
 			goto Fail_1;
+		}
 		if (func == Py_None) {
 			Py_INCREF(item);
 			good = item;
@@ -1903,13 +2221,114 @@ filterstring(PyObject *func, PyObject *strobj)
 	PyObject *result;
 	register int i, j;
 	int len = PyString_Size(strobj);
+	int outlen = len;
 
 	if (func == Py_None) {
-		/* No character is ever false -- share input string */
-		Py_INCREF(strobj);
-		return strobj;
+		/* If it's a real string we can return the original,
+		 * as no character is ever false and __getitem__
+		 * does return this character. If it's a subclass
+		 * we must go through the __getitem__ loop */
+		if (PyString_CheckExact(strobj)) {
+			Py_INCREF(strobj);
+			return strobj;
+		}
 	}
 	if ((result = PyString_FromStringAndSize(NULL, len)) == NULL)
+		return NULL;
+
+	for (i = j = 0; i < len; ++i) {
+		PyObject *item;
+		int ok;
+
+		item = (*strobj->ob_type->tp_as_sequence->sq_item)(strobj, i);
+		if (item == NULL)
+			goto Fail_1;
+		if (func==Py_None) {
+			ok = 1;
+		} else {
+			PyObject *arg, *good;
+			arg = Py_BuildValue("(O)", item);
+			if (arg == NULL) {
+				Py_DECREF(item);
+				goto Fail_1;
+			}
+			good = PyEval_CallObject(func, arg);
+			Py_DECREF(arg);
+			if (good == NULL) {
+				Py_DECREF(item);
+				goto Fail_1;
+			}
+			ok = PyObject_IsTrue(good);
+			Py_DECREF(good);
+		}
+		if (ok) {
+			int reslen;
+			if (!PyString_Check(item)) {
+				PyErr_SetString(PyExc_TypeError, "can't filter str to str:"
+					" __getitem__ returned different type");
+				Py_DECREF(item);
+				goto Fail_1;
+			}
+			reslen = PyString_GET_SIZE(item);
+			if (reslen == 1) {
+				PyString_AS_STRING(result)[j++] =
+					PyString_AS_STRING(item)[0];
+			} else {
+				/* do we need more space? */
+				int need = j + reslen + len-i-1;
+				if (need > outlen) {
+					/* overallocate, to avoid reallocations */
+					if (need<2*outlen)
+						need = 2*outlen;
+					if (_PyString_Resize(&result, need)) {
+						Py_DECREF(item);
+						return NULL;
+					}
+					outlen = need;
+				}
+				memcpy(
+					PyString_AS_STRING(result) + j,
+					PyString_AS_STRING(item),
+					reslen
+				);
+				j += reslen;
+			}
+		}
+		Py_DECREF(item);
+	}
+
+	if (j < outlen)
+		_PyString_Resize(&result, j);
+
+	return result;
+
+Fail_1:
+	Py_DECREF(result);
+	return NULL;
+}
+
+#ifdef Py_USING_UNICODE
+/* Helper for filter(): filter a Unicode object through a function */
+
+static PyObject *
+filterunicode(PyObject *func, PyObject *strobj)
+{
+	PyObject *result;
+	register int i, j;
+	int len = PyUnicode_GetSize(strobj);
+	int outlen = len;
+
+	if (func == Py_None) {
+		/* If it's a real string we can return the original,
+		 * as no character is ever false and __getitem__
+		 * does return this character. If it's a subclass
+		 * we must go through the __getitem__ loop */
+		if (PyUnicode_CheckExact(strobj)) {
+			Py_INCREF(strobj);
+			return strobj;
+		}
+	}
+	if ((result = PyUnicode_FromUnicode(NULL, len)) == NULL)
 		return NULL;
 
 	for (i = j = 0; i < len; ++i) {
@@ -1919,27 +2338,61 @@ filterstring(PyObject *func, PyObject *strobj)
 		item = (*strobj->ob_type->tp_as_sequence->sq_item)(strobj, i);
 		if (item == NULL)
 			goto Fail_1;
-		arg = Py_BuildValue("(O)", item);
-		if (arg == NULL) {
-			Py_DECREF(item);
-			goto Fail_1;
+		if (func == Py_None) {
+			ok = 1;
+		} else {
+			arg = Py_BuildValue("(O)", item);
+			if (arg == NULL) {
+				Py_DECREF(item);
+				goto Fail_1;
+			}
+			good = PyEval_CallObject(func, arg);
+			Py_DECREF(arg);
+			if (good == NULL) {
+				Py_DECREF(item);
+				goto Fail_1;
+			}
+			ok = PyObject_IsTrue(good);
+			Py_DECREF(good);
 		}
-		good = PyEval_CallObject(func, arg);
-		Py_DECREF(arg);
-		if (good == NULL) {
-			Py_DECREF(item);
-			goto Fail_1;
+		if (ok) {
+			int reslen;
+			if (!PyUnicode_Check(item)) {
+				PyErr_SetString(PyExc_TypeError, "can't filter unicode to unicode:"
+					" __getitem__ returned different type");
+				Py_DECREF(item);
+				goto Fail_1;
+			}
+			reslen = PyUnicode_GET_SIZE(item);
+			if (reslen == 1) {
+				PyUnicode_AS_UNICODE(result)[j++] =
+					PyUnicode_AS_UNICODE(item)[0];
+			} else {
+				/* do we need more space? */
+				int need = j + reslen + len-i-1;
+				if (need > outlen) {
+					/* overallocate, to avoid reallocations */
+					if (need<2*outlen)
+						need = 2*outlen;
+					if (PyUnicode_Resize(&result, need)) {
+						Py_DECREF(item);
+						goto Fail_1;
+					}
+					outlen = need;
+				}
+				memcpy(
+					PyUnicode_AS_UNICODE(result) + j,
+					PyUnicode_AS_UNICODE(item),
+					reslen*sizeof(Py_UNICODE)
+				);
+				j += reslen;
+			}
 		}
-		ok = PyObject_IsTrue(good);
-		Py_DECREF(good);
-		if (ok)
-			PyString_AS_STRING((PyStringObject *)result)[j++] =
-				PyString_AS_STRING((PyStringObject *)item)[0];
 		Py_DECREF(item);
 	}
 
-	if (j < len)
-		_PyString_Resize(&result, j);
+	if (j < outlen)
+		PyUnicode_Resize(&result, j);
 
 	return result;
 
@@ -1947,3 +2400,4 @@ Fail_1:
 	Py_DECREF(result);
 	return NULL;
 }
+#endif

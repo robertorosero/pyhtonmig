@@ -208,12 +208,15 @@ select_select(PyObject *self, PyObject *args)
 
 	if (tout == Py_None)
 		tvp = (struct timeval *)0;
-	else if (!PyArg_Parse(tout, "d", &timeout)) {
+	else if (!PyNumber_Check(tout)) {
 		PyErr_SetString(PyExc_TypeError,
 				"timeout must be a float or None");
 		return NULL;
 	}
 	else {
+		timeout = PyFloat_AsDouble(tout);
+		if (timeout == -1 && PyErr_Occurred())
+			return NULL;
 		if (timeout > (double)LONG_MAX) {
 			PyErr_SetString(PyExc_OverflowError,
 					"timeout period too long");
@@ -245,7 +248,7 @@ select_select(PyObject *self, PyObject *args)
 		if (rfd2obj) PyMem_DEL(rfd2obj);
 		if (wfd2obj) PyMem_DEL(wfd2obj);
 		if (efd2obj) PyMem_DEL(efd2obj);
-		return NULL;
+		return PyErr_NoMemory();
 	}
 #endif /* SELECT_USES_HEAP */
 	/* Convert lists to fd_sets, and get maximum fd number
@@ -268,9 +271,15 @@ select_select(PyObject *self, PyObject *args)
 	n = select(max, &ifdset, &ofdset, &efdset, tvp);
 	Py_END_ALLOW_THREADS
 
+#ifdef MS_WINDOWS
+	if (n == SOCKET_ERROR) {
+		PyErr_SetExcFromWindowsErr(SelectError, WSAGetLastError());
+	}
+#else
 	if (n < 0) {
 		PyErr_SetFromErrno(SelectError);
 	}
+#endif
 	else if (n == 0) {
                 /* optimization */
 		ifdlist = PyList_New(0);
@@ -322,7 +331,7 @@ typedef struct {
         struct pollfd *ufds;
 } pollObject;
 
-staticforward PyTypeObject poll_Type;
+static PyTypeObject poll_Type;
 
 /* Update the malloc'ed array of pollfds to match the dictionary 
    contained within a pollObject.  Return 1 on success, 0 on an error.
@@ -450,10 +459,17 @@ poll_poll(pollObject *self, PyObject *args)
 	/* Check values for timeout */
 	if (tout == NULL || tout == Py_None)
 		timeout = -1;
-	else if (!PyArg_Parse(tout, "i", &timeout)) {
+	else if (!PyNumber_Check(tout)) {
 		PyErr_SetString(PyExc_TypeError,
 				"timeout must be an integer or None");
 		return NULL;
+	}
+	else {
+		tout = PyNumber_Int(tout);
+		if (!tout)
+			return NULL;
+		timeout = PyInt_AsLong(tout);
+		Py_DECREF(tout);
 	}
 
 	/* Ensure the ufd array is up to date */
@@ -559,7 +575,7 @@ poll_getattr(pollObject *self, char *name)
 	return Py_FindMethod(poll_methods, (PyObject *)self, name);
 }
 
-statichere PyTypeObject poll_Type = {
+static PyTypeObject poll_Type = {
 	/* The ob_type field must be initialized in the module init function
 	 * to be portable to Windows without using C++. */
 	PyObject_HEAD_INIT(NULL)
@@ -635,7 +651,7 @@ PyDoc_STRVAR(module_doc,
 *** IMPORTANT NOTICE ***\n\
 On Windows, only sockets are supported; on Unix, all file descriptors.");
 
-DL_EXPORT(void)
+PyMODINIT_FUNC
 initselect(void)
 {
 	PyObject *m;

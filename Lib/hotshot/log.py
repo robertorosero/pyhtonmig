@@ -21,12 +21,6 @@ EXIT  = WHAT_EXIT
 LINE  = WHAT_LINENO
 
 
-try:
-    StopIteration
-except NameError:
-    StopIteration = IndexError
-
-
 class LogReader:
     def __init__(self, logfn):
         # fileno -> filename
@@ -50,6 +44,13 @@ class LogReader:
         self._stack = []
         self._append = self._stack.append
         self._pop = self._stack.pop
+
+    def close(self):
+        self._reader.close()
+
+    def fileno(self):
+        """Return the file descriptor of the log reader's log file."""
+        return self._reader.fileno()
 
     def addinfo(self, key, value):
         """This method is called for each additional ADD_INFO record.
@@ -94,12 +95,8 @@ class LogReader:
 
     def next(self, index=0):
         while 1:
-            try:
-                what, tdelta, fileno, lineno = self._nextitem()
-            except TypeError:
-                # logreader().next() returns None at the end
-                self._reader.close()
-                raise StopIteration()
+            # This call may raise StopIteration:
+            what, tdelta, fileno, lineno = self._nextitem()
 
             # handle the most common cases first
 
@@ -132,13 +129,8 @@ class LogReader:
             else:
                 raise ValueError, "unknown event type"
 
-    if sys.version < "2.2":
-        # Don't add this for newer Python versions; we only want iteration
-        # support, not general sequence support.
-        __getitem__ = next
-    else:
-        def __iter__(self):
-            return self
+    def __iter__(self):
+        return self
 
     #
     #  helpers

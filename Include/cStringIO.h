@@ -1,5 +1,5 @@
-#ifndef CSTRINGIO_INCLUDED
-#define CSTRINGIO_INCLUDED
+#ifndef Py_CSTRINGIO_H
+#define Py_CSTRINGIO_H
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -18,27 +18,37 @@ extern "C" {
   This would typically be done in your init function.
 
 */
+#define PycString_IMPORT \
+  PycStringIO = (struct PycStringIO_CAPI*)PyCObject_Import("cStringIO", \
+                                                           "cStringIO_CAPI")
 
 /* Basic functions to manipulate cStringIO objects from C */
 
 static struct PycStringIO_CAPI {
   
-  /* Read a string.  If the last argument is -1, the remainder will be read. */
+ /* Read a string from an input object.  If the last argument
+    is -1, the remainder will be read.
+    */
   int(*cread)(PyObject *, char **, int);
 
-  /* Read a line */
+ /* Read a line from an input object.  Returns the length of the read
+    line as an int and a pointer inside the object buffer as char** (so
+    the caller doesn't have to provide its own buffer as destination).
+    */
   int(*creadline)(PyObject *, char **);
 
-  /* Write a string */
+  /* Write a string to an output object*/
   int(*cwrite)(PyObject *, char *, int);
 
-  /* Get the cStringIO object as a Python string */
+  /* Get the output object as a Python string (returns new reference). */
   PyObject *(*cgetvalue)(PyObject *);
 
   /* Create a new output object */
   PyObject *(*NewOutput)(int);
 
-  /* Create an input object from a Python string */
+  /* Create an input object from a Python string
+     (copies the Python string reference).
+     */
   PyObject *(*NewInput)(PyObject *);
 
   /* The Python types for cStringIO input and output objects.
@@ -46,7 +56,7 @@ static struct PycStringIO_CAPI {
      */
   PyTypeObject *InputType, *OutputType;
 
-} * PycStringIO = NULL;
+} *PycStringIO;
 
 /* These can be used to test if you have one */
 #define PycStringIO_InputCheck(O) \
@@ -54,29 +64,7 @@ static struct PycStringIO_CAPI {
 #define PycStringIO_OutputCheck(O) \
   ((O)->ob_type==PycStringIO->OutputType)
 
-static void *
-xxxPyCObject_Import(char *module_name, char *name)
-{
-  PyObject *m, *c;
-  void *r=NULL;
-  
-  if((m=PyImport_ImportModule(module_name)))
-    {
-      if((c=PyObject_GetAttrString(m,name)))
-	{
-	  r=PyCObject_AsVoidPtr(c);
-	  Py_DECREF(c);
-	}
-      Py_DECREF(m);
-    }
-
-  return r;
-}
-
-#define PycString_IMPORT \
-  PycStringIO=(struct PycStringIO_CAPI*)xxxPyCObject_Import("cStringIO", "cStringIO_CAPI")
-
 #ifdef __cplusplus
 }
 #endif
-#endif /* CSTRINGIO_INCLUDED */
+#endif /* !Py_CSTRINGIO_H */

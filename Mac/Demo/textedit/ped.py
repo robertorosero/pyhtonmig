@@ -21,7 +21,7 @@ class TEWindow(ScrolledWindow):
 		r = windowbounds(400, 400)
 		w = Win.NewWindow(r, name, 1, 0, -1, 1, 0)
 		self.wid = w
-		x0, y0, x1, y1 = self.wid.GetWindowPort().portRect
+		x0, y0, x1, y1 = self.wid.GetWindowPort().GetPortBounds()
 		x0 = x0 + 4
 		y0 = y0 + 4
 		x1 = x1 - 20
@@ -87,8 +87,8 @@ class TEWindow(ScrolledWindow):
 			self.ted.TEDeactivate()
 
 	def do_update(self, wid, event):
-		Qd.EraseRect(wid.GetWindowPort().portRect)
-		self.ted.TEUpdate(wid.GetWindowPort().portRect)
+		Qd.EraseRect(wid.GetWindowPort().GetPortBounds())
+		self.ted.TEUpdate(wid.GetWindowPort().GetPortBounds())
 		self.updatescrollbars()
 		
 	def do_contentclick(self, local, modifiers, evt):
@@ -131,9 +131,9 @@ class TEWindow(ScrolledWindow):
 		self.changed = 0
 		
 	def menu_save_as(self):
-		fss, ok = macfs.StandardPutFile('Save as:')
-		if not ok: return
-		self.path = fss.as_pathname()
+		path = EasyDialogs.AskFileForSave(message='Save as:')
+		if not path: return
+		self.path = path
 		self.name = os.path.split(self.path)[-1]
 		self.wid.SetWTitle(self.name)
 		self.menu_save()
@@ -265,10 +265,9 @@ class Ped(Application):
 
 	def _open(self, askfile):
 		if askfile:
-			fss, ok = macfs.StandardGetFile('TEXT')
-			if not ok:
+			path = EasyDialogs.AskFileForOpen(typeList=('TEXT',))
+			if not path:
 				return
-			path = fss.as_pathname()
 			name = os.path.split(path)[-1]
 			try:
 				fp = open(path, 'rb') # NOTE binary, we need cr as end-of-line
@@ -350,7 +349,7 @@ class Ped(Application):
 		if self.active:
 			self.active.do_idle()
 		else:
-			Qd.SetCursor(Qd.qd.arrow)
+			Qd.SetCursor(Qd.GetQDGlobalsArrow())
 
 def main():
 	App = Ped()

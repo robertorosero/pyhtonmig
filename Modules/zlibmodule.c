@@ -55,8 +55,8 @@ static PyThread_type_lock zlib_lock = NULL; /* initialized on module load */
 #define DEFAULTALLOC (16*1024)
 #define PyInit_zlib initzlib
 
-staticforward PyTypeObject Comptype;
-staticforward PyTypeObject Decomptype;
+static PyTypeObject Comptype;
+static PyTypeObject Decomptype;
 
 static PyObject *ZlibError;
 
@@ -656,26 +656,57 @@ PyDoc_STRVAR(decomp_flush__doc__,
 
 static PyObject *
 PyZlib_unflush(compobject *self, PyObject *args)
-/*decompressor flush is a no-op because all pending data would have been
-  flushed by the decompress method. However, this routine previously called
-  inflateEnd, causing any further decompress or flush calls to raise
-  exceptions. This behaviour has been preserved.*/
 {
-    int err;
+    int err, length = DEFAULTALLOC;
     PyObject * retval = NULL;
+    unsigned long start_total_out;
 
-    if (!PyArg_ParseTuple(args, ""))
+    if (!PyArg_ParseTuple(args, "|i:flush", &length))
 	return NULL;
+    if (!(retval = PyString_FromStringAndSize(NULL, length)))
+	return NULL;
+
 
     ENTER_ZLIB
 
-    err = inflateEnd(&(self->zst));
-    if (err != Z_OK)
-	zlib_error(self->zst, err, "from inflateEnd()");
-    else {
-	self->is_initialised = 0;
-	retval = PyString_FromStringAndSize(NULL, 0);
+    start_total_out = self->zst.total_out;
+    self->zst.avail_out = length;
+    self->zst.next_out = (Byte *)PyString_AS_STRING(retval);
+
+    Py_BEGIN_ALLOW_THREADS
+    err = inflate(&(self->zst), Z_FINISH);
+    Py_END_ALLOW_THREADS
+
+    /* while Z_OK and the output buffer is full, there might be more output,
+       so extend the output buffer and try again */
+    while ((err == Z_OK || err == Z_BUF_ERROR) && self->zst.avail_out == 0) {
+	if (_PyString_Resize(&retval, length << 1) < 0)
+	    goto error;
+	self->zst.next_out = (Byte *)PyString_AS_STRING(retval) + length;
+	self->zst.avail_out = length;
+	length = length << 1;
+
+	Py_BEGIN_ALLOW_THREADS
+	err = inflate(&(self->zst), Z_FINISH);
+	Py_END_ALLOW_THREADS
     }
+
+    /* If flushmode is Z_FINISH, we also have to call deflateEnd() to free
+       various data structures. Note we should only get Z_STREAM_END when
+       flushmode is Z_FINISH */
+    if (err == Z_STREAM_END) {
+	err = inflateEnd(&(self->zst));
+        self->is_initialised = 0;
+	if (err != Z_OK) {
+	    zlib_error(self->zst, err, "from inflateEnd()");
+	    Py_DECREF(retval);
+	    retval = NULL;
+	    goto error;
+	}
+    }
+    _PyString_Resize(&retval, self->zst.total_out - start_total_out);
+
+error:
 
     LEAVE_ZLIB
 
@@ -785,7 +816,7 @@ static PyMethodDef zlib_methods[] =
     {NULL, NULL}
 };
 
-statichere PyTypeObject Comptype = {
+static PyTypeObject Comptype = {
     PyObject_HEAD_INIT(0)
     0,
     "zlib.Compress",
@@ -802,7 +833,7 @@ statichere PyTypeObject Comptype = {
     0,                              /*tp_as_mapping*/
 };
 
-statichere PyTypeObject Decomptype = {
+static PyTypeObject Decomptype = {
     PyObject_HEAD_INIT(0)
     0,
     "zlib.Decompress",
@@ -834,7 +865,7 @@ PyDoc_STRVAR(zlib_module_documentation,
 "Compressor objects support compress() and flush() methods; decompressor\n"
 "objects support decompress() and flush().");
 
-DL_EXPORT(void)
+PyMODINIT_FUNC
 PyInit_zlib(void)
 {
     PyObject *m, *ver;
@@ -867,6 +898,8 @@ PyInit_zlib(void)
     ver = PyString_FromString(ZLIB_VERSION);
     if (ver != NULL)
 	PyModule_AddObject(m, "ZLIB_VERSION", ver);
+
+    PyModule_AddStringConstant(m, "__version__", "1.0");
 
 #ifdef WITH_THREAD
     zlib_lock = PyThread_allocate_lock();

@@ -13,6 +13,8 @@ subdirectories listed here are distributed.  They are listed just
 in case I change my mind about them.
 
 
+cgi             CGI examples (see also ../Tools/faqwiz/.)
+
 classes		Some examples of how to use classes.
 
 comparisons	A set of responses to a really old language-comparison
@@ -42,12 +44,6 @@ rpc		A set of classes for building clients and servers for
 
 scripts		Some useful Python scripts that I put in my bin
 		directory.  No optional built-in modules needed.
-
-sgi		Demos that only run on Silicon Graphics machines.
-		These require at least one of the optional built-in
-		modules that only make sense for the SGI, such as
-		'gl', 'al', and 'sv'.  Split in subdirectories
-		per subject.
 
 sockets		Examples for the new built-in module 'socket'.
 

@@ -30,7 +30,8 @@ import string, re
 from token import *
 
 import token
-__all__ = [x for x in dir(token) if x[0] != '_'] + ["COMMENT", "tokenize", "NL"]
+__all__ = [x for x in dir(token) if x[0] != '_'] + ["COMMENT", "tokenize",
+           "generate_tokens", "NL"]
 del x
 del token
 
@@ -41,8 +42,8 @@ tok_name[NL] = 'NL'
 N_TOKENS += 2
 
 def group(*choices): return '(' + '|'.join(choices) + ')'
-def any(*choices): return apply(group, choices) + '*'
-def maybe(*choices): return apply(group, choices) + '?'
+def any(*choices): return group(*choices) + '*'
+def maybe(*choices): return group(*choices) + '?'
 
 Whitespace = r'[ \f\t]*'
 Comment = r'#[^\r\n]*'
@@ -110,6 +111,21 @@ endprogs = {"'": re.compile(Single), '"': re.compile(Double),
             "UR'''": single3prog, 'UR"""': double3prog,
             'r': None, 'R': None, 'u': None, 'U': None}
 
+triple_quoted = {}
+for t in ("'''", '"""',
+          "r'''", 'r"""', "R'''", 'R"""',
+          "u'''", 'u"""', "U'''", 'U"""',
+          "ur'''", 'ur"""', "Ur'''", 'Ur"""',
+          "uR'''", 'uR"""', "UR'''", 'UR"""'):
+    triple_quoted[t] = t
+single_quoted = {}
+for t in ("'", '"',
+          "r'", 'r"', "R'", 'R"',
+          "u'", 'u"', "U'", 'U"',
+          "ur'", 'ur"', "Ur'", 'Ur"',
+          "uR'", 'uR"', "UR'", 'UR"' ):
+    single_quoted[t] = t
+
 tabsize = 8
 
 class TokenError(Exception): pass
@@ -141,7 +157,7 @@ def tokenize(readline, tokeneater=printtoken):
 # backwards compatible interface
 def tokenize_loop(readline, tokeneater):
     for token_info in generate_tokens(readline):
-        apply(tokeneater, token_info)
+        tokeneater(*token_info)
 
 def generate_tokens(readline):
     """
@@ -232,11 +248,7 @@ def generate_tokens(readline):
                                token, spos, epos, line)
                 elif initial == '#':
                     yield (COMMENT, token, spos, epos, line)
-                elif token in ("'''", '"""',               # triple-quoted
-                               "r'''", 'r"""', "R'''", 'R"""',
-                               "u'''", 'u"""', "U'''", 'U"""',
-                               "ur'''", 'ur"""', "Ur'''", 'Ur"""',
-                               "uR'''", 'uR"""', "UR'''", 'UR"""'):
+                elif token in triple_quoted:
                     endprog = endprogs[token]
                     endmatch = endprog.match(line, pos)
                     if endmatch:                           # all on one line
@@ -248,11 +260,9 @@ def generate_tokens(readline):
                         contstr = line[start:]
                         contline = line
                         break
-                elif initial in ("'", '"') or \
-                    token[:2] in ("r'", 'r"', "R'", 'R"',
-                                  "u'", 'u"', "U'", 'U"') or \
-                    token[:3] in ("ur'", 'ur"', "Ur'", 'Ur"',
-                                  "uR'", 'uR"', "UR'", 'UR"' ):
+                elif initial in single_quoted or \
+                    token[:2] in single_quoted or \
+                    token[:3] in single_quoted:
                     if token[-1] == '\n':                  # continued string
                         strstart = (lnum, start)
                         endprog = (endprogs[initial] or endprogs[token[1]] or

@@ -4,8 +4,7 @@ Implements the Distutils 'build_clib' command, to build a C/C++ library
 that is included in the module distribution and needed by an extension
 module."""
 
-# created (an empty husk) 1999/12/18, Greg Ward
-# fleshed out 2000/02/03-04
+# This module should be kept compatible with Python 1.5.2.
 
 __revision__ = "$Id$"
 

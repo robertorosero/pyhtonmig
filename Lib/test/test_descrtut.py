@@ -8,7 +8,7 @@
 # of much interest anymore), and a few were fiddled to make the output
 # deterministic.
 
-from test_support import sortdict
+from test.test_support import sortdict
 import pprint
 
 class defaultdict(dict):
@@ -106,8 +106,8 @@ just like classic classes:
     >>> d = dir(a)
     >>> 'default' in d and 'x1' in d and 'x2' in d
     True
-    >>> print a.__dict__
-    {'default': -1000, 'x2': 200, 'x1': 100}
+    >>> print sortdict(a.__dict__)
+    {'default': -1000, 'x1': 100, 'x2': 200}
     >>>
 """
 
@@ -210,6 +210,7 @@ Instead, you can get the same information from the list type:
      '__ne__',
      '__new__',
      '__reduce__',
+     '__reduce_ex__',
      '__repr__',
      '__rmul__',
      '__setattr__',
@@ -494,8 +495,8 @@ def test_main(verbose=None):
     # into the doctest examples, and unless the full test.test_descrtut
     # business is used the name can change depending on how the test is
     # invoked.
-    import test_support, test.test_descrtut
-    test_support.run_doctest(test.test_descrtut, verbose)
+    from test import test_support, test_descrtut
+    test_support.run_doctest(test_descrtut, verbose)
 
 # This part isn't needed for regrtest, but for running the test directly.
 if __name__ == "__main__":

@@ -8,7 +8,7 @@ additional features:
   * options set attributes of a passed-in object
 """
 
-# created 1999/03/03, Greg Ward
+# This module should be kept compatible with Python 1.5.2.
 
 __revision__ = "$Id$"
 

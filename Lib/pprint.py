@@ -34,20 +34,15 @@ saferepr()
 
 """
 
-from types import DictType, ListType, TupleType, StringType
-import sys
+import sys as _sys
 
-try:
-    from cStringIO import StringIO
-except ImportError:
-    from StringIO import StringIO
+from cStringIO import StringIO as _StringIO
 
 __all__ = ["pprint","pformat","isreadable","isrecursive","saferepr",
            "PrettyPrinter"]
 
 # cache these for faster access:
 _commajoin = ", ".join
-_sys_modules = sys.modules
 _id = id
 _len = len
 _type = type
@@ -98,106 +93,106 @@ class PrettyPrinter:
         assert indent >= 0
         assert depth is None or depth > 0, "depth must be > 0"
         assert width
-        self.__depth = depth
-        self.__indent_per_level = indent
-        self.__width = width
+        self._depth = depth
+        self._indent_per_level = indent
+        self._width = width
         if stream is not None:
-            self.__stream = stream
+            self._stream = stream
         else:
-            self.__stream = sys.stdout
+            self._stream = _sys.stdout
 
     def pprint(self, object):
-        self.__stream.write(self.pformat(object) + "\n")
+        self._stream.write(self.pformat(object) + "\n")
 
     def pformat(self, object):
-        sio = StringIO()
-        self.__format(object, sio, 0, 0, {}, 0)
+        sio = _StringIO()
+        self._format(object, sio, 0, 0, {}, 0)
         return sio.getvalue()
 
     def isrecursive(self, object):
-        return self.format(object, {}, 0)[2]
+        return self.format(object, {}, 0, 0)[2]
 
     def isreadable(self, object):
-        s, readable, recursive = self.format(object, {}, 0)
+        s, readable, recursive = self.format(object, {}, 0, 0)
         return readable and not recursive
 
-    def __format(self, object, stream, indent, allowance, context, level):
+    def _format(self, object, stream, indent, allowance, context, level):
         level = level + 1
         objid = _id(object)
         if objid in context:
             stream.write(_recursion(object))
-            self.__recursive = True
-            self.__readable = False
+            self._recursive = True
+            self._readable = False
             return
-        rep = self.__repr(object, context, level - 1)
+        rep = self._repr(object, context, level - 1)
         typ = _type(object)
-        sepLines = _len(rep) > (self.__width - 1 - indent - allowance)
+        sepLines = _len(rep) > (self._width - 1 - indent - allowance)
         write = stream.write
 
         if sepLines:
-            if typ is DictType:
+            if typ is dict:
                 write('{')
-                if self.__indent_per_level > 1:
-                    write((self.__indent_per_level - 1) * ' ')
+                if self._indent_per_level > 1:
+                    write((self._indent_per_level - 1) * ' ')
                 length = _len(object)
                 if length:
                     context[objid] = 1
-                    indent = indent + self.__indent_per_level
+                    indent = indent + self._indent_per_level
                     items  = object.items()
                     items.sort()
                     key, ent = items[0]
-                    rep = self.__repr(key, context, level)
+                    rep = self._repr(key, context, level)
                     write(rep)
                     write(': ')
-                    self.__format(ent, stream, indent + _len(rep) + 2,
+                    self._format(ent, stream, indent + _len(rep) + 2,
                                   allowance + 1, context, level)
                     if length > 1:
                         for key, ent in items[1:]:
-                            rep = self.__repr(key, context, level)
+                            rep = self._repr(key, context, level)
                             write(',\n%s%s: ' % (' '*indent, rep))
-                            self.__format(ent, stream, indent + _len(rep) + 2,
+                            self._format(ent, stream, indent + _len(rep) + 2,
                                           allowance + 1, context, level)
-                    indent = indent - self.__indent_per_level
+                    indent = indent - self._indent_per_level
                     del context[objid]
                 write('}')
                 return
 
-            if typ is ListType or typ is TupleType:
-                if typ is ListType:
+            if typ is list or typ is tuple:
+                if typ is list:
                     write('[')
                     endchar = ']'
                 else:
                     write('(')
                     endchar = ')'
-                if self.__indent_per_level > 1:
-                    write((self.__indent_per_level - 1) * ' ')
+                if self._indent_per_level > 1:
+                    write((self._indent_per_level - 1) * ' ')
                 length = _len(object)
                 if length:
                     context[objid] = 1
-                    indent = indent + self.__indent_per_level
-                    self.__format(object[0], stream, indent, allowance + 1,
-                                  context, level)
+                    indent = indent + self._indent_per_level
+                    self._format(object[0], stream, indent, allowance + 1,
+                                 context, level)
                     if length > 1:
                         for ent in object[1:]:
                             write(',\n' + ' '*indent)
-                            self.__format(ent, stream, indent,
+                            self._format(ent, stream, indent,
                                           allowance + 1, context, level)
-                    indent = indent - self.__indent_per_level
+                    indent = indent - self._indent_per_level
                     del context[objid]
-                if typ is TupleType and length == 1:
+                if typ is tuple and length == 1:
                     write(',')
                 write(endchar)
                 return
 
         write(rep)
 
-    def __repr(self, object, context, level):
+    def _repr(self, object, context, level):
         repr, readable, recursive = self.format(object, context.copy(),
-                                                self.__depth, level)
+                                                self._depth, level)
         if not readable:
-            self.__readable = False
+            self._readable = False
         if recursive:
-            self.__recursive = True
+            self._recursive = True
         return repr
 
     def format(self, object, context, maxlevels, level):
@@ -212,8 +207,8 @@ class PrettyPrinter:
 
 def _safe_repr(object, context, maxlevels, level):
     typ = _type(object)
-    if typ is StringType:
-        if 'locale' not in _sys_modules:
+    if typ is str:
+        if 'locale' not in _sys.modules:
             return `object`, True, False
         if "'" in object and '"' not in object:
             closure = '"'
@@ -222,7 +217,7 @@ def _safe_repr(object, context, maxlevels, level):
             closure = "'"
             quotes = {"'": "\\'"}
         qget = quotes.get
-        sio = StringIO()
+        sio = _StringIO()
         write = sio.write
         for char in object:
             if char.isalpha():
@@ -231,7 +226,7 @@ def _safe_repr(object, context, maxlevels, level):
                 write(qget(char, `char`[1:-1]))
         return ("%s%s%s" % (closure, sio.getvalue(), closure)), True, False
 
-    if typ is DictType:
+    if typ is dict:
         if not object:
             return "{}", True, False
         objid = _id(object)
@@ -256,8 +251,8 @@ def _safe_repr(object, context, maxlevels, level):
         del context[objid]
         return "{%s}" % _commajoin(components), readable, recursive
 
-    if typ is ListType or typ is TupleType:
-        if typ is ListType:
+    if typ is list or typ is tuple:
+        if typ is list:
             if not object:
                 return "[]", True, False
             format = "[%s]"

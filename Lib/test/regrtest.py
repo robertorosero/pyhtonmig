@@ -46,6 +46,10 @@ resources to test.  Currently only the following are defined:
 
     all -       Enable all special resources.
 
+    audio -     Tests that use the audio device.  (There are known
+                cases of broken audio drivers that can crash Python or
+                even the Linux kernel.)
+
     curses -    Tests that use curses and will modify the terminal's
                 state and output modes.
 
@@ -55,6 +59,13 @@ resources to test.  Currently only the following are defined:
 
     network -   It is okay to run tests that use external network
                 resource, e.g. testing SSL support for sockets.
+
+    bsddb -     It is okay to run the bsddb testsuite, which takes
+                a long time to complete.
+
+To enable all resources except one, use '-uall,-<resource>'.  For
+example, to run all the tests except for the bsddb tests, give the
+option '-uall,-bsddb'.
 """
 
 import sys
@@ -63,11 +74,38 @@ import getopt
 import traceback
 import random
 import StringIO
+import warnings
+from sets import Set
 
-import test_support
+# I see no other way to suppress these warnings;
+# putting them in test_grammar.py has no effect:
+warnings.filterwarnings("ignore", "hex/oct constants", FutureWarning,
+                        ".*test.test_grammar$")
+if sys.maxint > 0x7fffffff:
+    # Also suppress them in <string>, because for 64-bit platforms,
+    # that's where test_grammar.py hides them.
+    warnings.filterwarnings("ignore", "hex/oct constants", FutureWarning,
+                            "<string>")
 
+# MacOSX (a.k.a. Darwin) has a default stack size that is too small
+# for deeply recursive regular expressions.  We see this as crashes in
+# the Python test suite when running test_re.py and test_sre.py.  The
+# fix is to set the stack limit to 2048.
+# This approach may also be useful for other Unixy platforms that
+# suffer from small default stack limits.
+if sys.platform == 'darwin':
+    try:
+        import resource
+    except ImportError:
+        pass
+    else:
+        soft, hard = resource.getrlimit(resource.RLIMIT_STACK)
+        newsoft = min(hard, max(soft, 1024*2048))
+        resource.setrlimit(resource.RLIMIT_STACK, (newsoft, hard))
 
-RESOURCE_NAMES = ('curses', 'largefile', 'network')
+from test import test_support
+
+RESOURCE_NAMES = ('audio', 'curses', 'largefile', 'network', 'bsddb')
 
 
 def usage(code, msg=''):
@@ -141,11 +179,18 @@ def main(tests=None, testdir=None, verbose=0, quiet=0, generate=0,
             u = [x.lower() for x in a.split(',')]
             for r in u:
                 if r == 'all':
-                    use_resources = RESOURCE_NAMES
-                    break
+                    use_resources[:] = RESOURCE_NAMES
+                    continue
+                remove = False
+                if r[0] == '-':
+                    remove = True
+                    r = r[1:]
                 if r not in RESOURCE_NAMES:
                     usage(1, 'Invalid -u/--use option: ' + a)
-                if r not in use_resources:
+                if remove:
+                    if r in use_resources:
+                        use_resources.remove(r)
+                elif r not in use_resources:
                     use_resources.append(r)
     if generate and verbose:
         usage(2, "-g and -v don't go together!")
@@ -155,6 +200,7 @@ def main(tests=None, testdir=None, verbose=0, quiet=0, generate=0,
     good = []
     bad = []
     skipped = []
+    resource_denieds = []
 
     if findleaks:
         try:
@@ -214,6 +260,7 @@ def main(tests=None, testdir=None, verbose=0, quiet=0, generate=0,
     for test in tests:
         if not quiet:
             print test
+            sys.stdout.flush()
         ok = runtest(test, generate, verbose, quiet, testdir)
         if ok > 0:
             good.append(test)
@@ -221,6 +268,8 @@ def main(tests=None, testdir=None, verbose=0, quiet=0, generate=0,
             bad.append(test)
         else:
             skipped.append(test)
+            if ok == -2:
+                resource_denieds.append(test)
         if findleaks:
             gc.collect()
             if gc.garbage:
@@ -245,8 +294,8 @@ def main(tests=None, testdir=None, verbose=0, quiet=0, generate=0,
             print "All",
         print count(len(good), "test"), "OK."
         if verbose:
-            print "CAUTION:  stdout isn't compared in verbose mode:  a test"
-            print "that passes in verbose mode may fail without it."
+            print "CAUTION:  stdout isn't compared in verbose mode:"
+            print "a test that passes in verbose mode may fail without it."
     if bad:
         print count(len(bad), "test"), "failed:"
         printlist(bad)
@@ -257,7 +306,7 @@ def main(tests=None, testdir=None, verbose=0, quiet=0, generate=0,
         e = _ExpectedSkips()
         plat = sys.platform
         if e.isvalid():
-            surprise = _Set(skipped) - e.getexpected()
+            surprise = Set(skipped) - e.getexpected() - Set(resource_denieds)
             if surprise:
                 print count(len(surprise), "skip"), \
                       "unexpected on", plat + ":"
@@ -296,8 +345,6 @@ STDTESTS = [
 
 NOTTESTS = [
     'test_support',
-    'test_b1',
-    'test_b2',
     'test_future1',
     'test_future2',
     'test_future3',
@@ -339,7 +386,13 @@ def runtest(test, generate, verbose, quiet, testdir = None):
             if cfp:
                 sys.stdout = cfp
                 print test              # Output file starts with test name
-            the_module = __import__(test, globals(), locals(), [])
+            if test.startswith('test.'):
+                abstest = test
+            else:
+                # Always import it from the test package
+                abstest = 'test.' + test
+            the_package = __import__(abstest, globals(), locals(), [])
+            the_module = getattr(the_package, test)
             # Most tests run to completion simply as a side-effect of
             # being imported.  For the benefit of tests that can't run
             # that way (like test_threaded_import), explicitly invoke
@@ -349,20 +402,29 @@ def runtest(test, generate, verbose, quiet, testdir = None):
                 indirect_test()
         finally:
             sys.stdout = save_stdout
+    except test_support.ResourceDenied, msg:
+        if not quiet:
+            print test, "skipped --", msg
+            sys.stdout.flush()
+        return -2
     except (ImportError, test_support.TestSkipped), msg:
         if not quiet:
-            print "test", test, "skipped --", msg
+            print test, "skipped --", msg
+            sys.stdout.flush()
         return -1
     except KeyboardInterrupt:
         raise
     except test_support.TestFailed, msg:
         print "test", test, "failed --", msg
+        sys.stdout.flush()
         return 0
     except:
         type, value = sys.exc_info()[:2]
         print "test", test, "crashed --", str(type) + ":", value
+        sys.stdout.flush()
         if verbose:
             traceback.print_exc(file=sys.stdout)
+            sys.stdout.flush()
         return 0
     else:
         if not cfp:
@@ -392,7 +454,9 @@ def runtest(test, generate, verbose, quiet, testdir = None):
         if output == expected:
             return 1
         print "test", test, "produced unexpected output:"
+        sys.stdout.flush()
         reportdiff(expected, output)
+        sys.stdout.flush()
         return 0
 
 def reportdiff(expected, output):
@@ -457,7 +521,7 @@ def count(n, word):
         return "%d %ss" % (n, word)
 
 def printlist(x, width=70, indent=4):
-    """Print the elements of a sequence to stdout.
+    """Print the elements of iterable x to stdout.
 
     Optional arg width (default 70) is the maximum line length.
     Optional arg indent (default 4) is the number of blanks with which to
@@ -469,41 +533,29 @@ def printlist(x, width=70, indent=4):
     print fill(' '.join(map(str, x)), width,
                initial_indent=blanks, subsequent_indent=blanks)
 
-class _Set:
-    def __init__(self, seq=[]):
-        data = self.data = {}
-        for x in seq:
-            data[x] = 1
-
-    def __len__(self):
-        return len(self.data)
-
-    def __sub__(self, other):
-        "Return set of all elements in self not in other."
-        result = _Set()
-        data = result.data = self.data.copy()
-        for x in other.data:
-            if x in data:
-                del data[x]
-        return result
-
-    def __iter__(self):
-        return iter(self.data)
-
-    def tolist(self, sorted=1):
-        "Return _Set elements as a list."
-        data = self.data.keys()
-        if sorted:
-            data.sort()
-        return data
-
 # Map sys.platform to a string containing the basenames of tests
 # expected to be skipped on that platform.
+#
+# Special cases:
+#     test_pep277
+#         The _ExpectedSkips constructor adds this to the set of expected
+#         skips if not os.path.supports_unicode_filenames.
+#     test_normalization
+#         Whether a skip is expected here depends on whether a large test
+#         input file has been downloaded.  test_normalization.skip_expected
+#         controls that.
+#     test_socket_ssl
+#         Controlled by test_socket_ssl.skip_expected.  Requires the network
+#         resource, and a socket module with ssl support.
+#     test_timeout
+#         Controlled by test_timeout.skip_expected.  Requires the network
+#         resource and a socket module.
 
 _expectations = {
     'win32':
         """
         test_al
+        test_bsddb3
         test_cd
         test_cl
         test_commands
@@ -518,18 +570,20 @@ _expectations = {
         test_gl
         test_grp
         test_imgfile
+        test_ioctl
         test_largefile
         test_linuxaudiodev
         test_mhlib
         test_mpz
         test_nis
         test_openpty
+        test_ossaudiodev
         test_poll
+        test_posix
         test_pty
         test_pwd
         test_resource
         test_signal
-        test_socket_ssl
         test_socketserver
         test_sunaudiodev
         test_timing
@@ -545,19 +599,20 @@ _expectations = {
         test_gl
         test_imgfile
         test_largefile
+        test_linuxaudiodev
         test_nis
         test_ntpath
-        test_socket_ssl
+        test_ossaudiodev
         test_socketserver
         test_sunaudiodev
-        test_unicode_file
-        test_winreg
-        test_winsound
         """,
    'mac':
         """
         test_al
+        test_atexit
         test_bsddb
+        test_bsddb3
+        test_bz2
         test_cd
         test_cl
         test_commands
@@ -565,33 +620,37 @@ _expectations = {
         test_curses
         test_dbm
         test_dl
+        test_email_codecs
         test_fcntl
         test_fork1
         test_gl
         test_grp
+        test_ioctl
         test_imgfile
         test_largefile
         test_linuxaudiodev
         test_locale
         test_mmap
+        test_mpz
         test_nis
         test_ntpath
         test_openpty
+        test_ossaudiodev
         test_poll
+        test_popen
         test_popen2
+        test_posix
         test_pty
         test_pwd
+        test_resource
         test_signal
-        test_socket_ssl
         test_socketserver
         test_sunaudiodev
         test_sundry
+        test_tarfile
         test_timing
-        test_unicode_file
-        test_winreg
-        test_winsound
         """,
-    'unixware5':
+    'unixware7':
         """
         test_al
         test_bsddb
@@ -611,9 +670,57 @@ _expectations = {
         test_socketserver
         test_sunaudiodev
         test_sundry
-        test_unicode_file
-        test_winreg
-        test_winsound
+        """,
+    'openunix8':
+        """
+        test_al
+        test_bsddb
+        test_cd
+        test_cl
+        test_dl
+        test_gl
+        test_imgfile
+        test_largefile
+        test_linuxaudiodev
+        test_minidom
+        test_nis
+        test_ntpath
+        test_openpty
+        test_pyexpat
+        test_sax
+        test_socketserver
+        test_sunaudiodev
+        test_sundry
+        """,
+    'sco_sv3':
+        """
+        test_al
+        test_asynchat
+        test_bsddb
+        test_cd
+        test_cl
+        test_dl
+        test_fork1
+        test_gettext
+        test_gl
+        test_imgfile
+        test_largefile
+        test_linuxaudiodev
+        test_locale
+        test_minidom
+        test_nis
+        test_ntpath
+        test_openpty
+        test_pyexpat
+        test_queue
+        test_sax
+        test_socketserver
+        test_sunaudiodev
+        test_sundry
+        test_thread
+        test_threaded_import
+        test_threadedtempfile
+        test_threading
         """,
     'riscos':
         """
@@ -643,7 +750,6 @@ _expectations = {
         test_popen2
         test_pty
         test_pwd
-        test_socket_ssl
         test_socketserver
         test_strop
         test_sunaudiodev
@@ -653,32 +759,51 @@ _expectations = {
         test_threadedtempfile
         test_threading
         test_timing
-        test_unicode_file
-        test_winreg
-        test_winsound
         """,
     'darwin':
         """
         test_al
+        test_bsddb
+        test_bsddb3
         test_cd
         test_cl
         test_curses
         test_dl
+        test_email_codecs
         test_gdbm
         test_gl
         test_imgfile
         test_largefile
         test_linuxaudiodev
+        test_locale
         test_minidom
+        test_mpz
         test_nis
         test_ntpath
+        test_ossaudiodev
         test_poll
-        test_socket_ssl
         test_socketserver
         test_sunaudiodev
-        test_unicode_file
-        test_winreg
-        test_winsound
+        """,
+    'sunos5':
+        """
+        test_al
+        test_bsddb
+        test_cd
+        test_cl
+        test_curses
+        test_dbm
+        test_email_codecs
+        test_gdbm
+        test_gl
+        test_gzip
+        test_imgfile
+        test_linuxaudiodev
+        test_mpz
+        test_openpty
+        test_socketserver
+        test_zipfile
+        test_zlib
         """,
     'hp-ux11':
         """
@@ -701,52 +826,119 @@ _expectations = {
         test_openpty
         test_pyexpat
         test_sax
-        test_socket_ssl
         test_socketserver
         test_sunaudiodev
-        test_unicode_file
-        test_winreg
-        test_winsound
         test_zipfile
         test_zlib
         """,
     'atheos':
-	"""
-	test_al
-	test_cd
-	test_cl
-	test_curses
-	test_dl
-	test_email_codecs
-	test_gdbm
-	test_gl
-	test_imgfile
-	test_largefile
-	test_linuxaudiodev
-	test_locale
-	test_mhlib
-	test_mmap
-	test_mpz
-	test_nis
-	test_poll
-	test_popen2
-	test_resource
-	test_socket_ssl
-	test_socketserver
-	test_sunaudiodev
-	test_unicode_file
-	test_winreg
-	test_winsound
-	""",
+        """
+        test_al
+        test_cd
+        test_cl
+        test_curses
+        test_dl
+        test_email_codecs
+        test_gdbm
+        test_gl
+        test_imgfile
+        test_largefile
+        test_linuxaudiodev
+        test_locale
+        test_mhlib
+        test_mmap
+        test_mpz
+        test_nis
+        test_poll
+        test_popen2
+        test_resource
+        test_socketserver
+        test_sunaudiodev
+        """,
+    'cygwin':
+        """
+        test_al
+        test_bsddb3
+        test_cd
+        test_cl
+        test_curses
+        test_dbm
+        test_email_codecs
+        test_gl
+        test_imgfile
+        test_largefile
+        test_linuxaudiodev
+        test_locale
+        test_mpz
+        test_nis
+        test_ossaudiodev
+        test_socketserver
+        test_sunaudiodev
+        """,
+    'os2emx':
+        """
+        test_al
+        test_audioop
+        test_bsddb3
+        test_cd
+        test_cl
+        test_commands
+        test_curses
+        test_dl
+        test_email_codecs
+        test_gl
+        test_imgfile
+        test_largefile
+        test_linuxaudiodev
+        test_mhlib
+        test_mmap
+        test_nis
+        test_openpty
+        test_ossaudiodev
+        test_pty
+        test_resource
+        test_signal
+        test_sunaudiodev
+        """,
 }
 
 class _ExpectedSkips:
     def __init__(self):
-        self.valid = 0
+        import os.path
+        from test import test_normalization
+        from test import test_socket_ssl
+        from test import test_timeout
+
+        self.valid = False
         if sys.platform in _expectations:
             s = _expectations[sys.platform]
-            self.expected = _Set(s.split())
-            self.valid = 1
+            self.expected = Set(s.split())
+
+            if not os.path.supports_unicode_filenames:
+                self.expected.add('test_pep277')
+
+            if test_normalization.skip_expected:
+                self.expected.add('test_normalization')
+
+            if test_socket_ssl.skip_expected:
+                self.expected.add('test_socket_ssl')
+
+            if test_timeout.skip_expected:
+                self.expected.add('test_timeout')
+
+            if not sys.platform in ("mac", "darwin"):
+                MAC_ONLY = ["test_macostools", "test_macfs", "test_aepack",
+                            "test_plistlib", "test_scriptpackages"]
+                for skip in MAC_ONLY:
+                    self.expected.add(skip)
+
+            if sys.platform != "win32":
+                WIN_ONLY = ["test_unicode_file", "test_winreg",
+                            "test_winsound"]
+                for skip in WIN_ONLY:
+                    self.expected.add(skip)
+
+            self.valid = True
 
     def isvalid(self):
         "Return true iff _ExpectedSkips knows about the current platform."
@@ -762,4 +954,18 @@ class _ExpectedSkips:
         return self.expected
 
 if __name__ == '__main__':
+    # Remove regrtest.py's own directory from the module search path.  This
+    # prevents relative imports from working, and relative imports will screw
+    # up the testing framework.  E.g. if both test.test_support and
+    # test_support are imported, they will not contain the same globals, and
+    # much of the testing framework relies on the globals in the
+    # test.test_support module.
+    mydir = os.path.abspath(os.path.normpath(os.path.dirname(sys.argv[0])))
+    i = pathlen = len(sys.path)
+    while i >= 0:
+        i -= 1
+        if os.path.abspath(os.path.normpath(sys.path[i])) == mydir:
+            del sys.path[i]
+    if len(sys.path) == pathlen:
+        print 'Could not find %r in sys.path to remove it' % mydir
     main()

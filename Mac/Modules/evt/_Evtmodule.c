@@ -211,52 +211,6 @@ static PyObject *Evt_PostEvent(PyObject *_self, PyObject *_args)
 	return _res;
 }
 
-#if !TARGET_API_MAC_CARBON
-
-static PyObject *Evt_OSEventAvail(PyObject *_self, PyObject *_args)
-{
-	PyObject *_res = NULL;
-	Boolean _rv;
-	EventMask mask;
-	EventRecord theEvent;
-#ifndef OSEventAvail
-	PyMac_PRECHECK(OSEventAvail);
-#endif
-	if (!PyArg_ParseTuple(_args, "H",
-	                      &mask))
-		return NULL;
-	_rv = OSEventAvail(mask,
-	                   &theEvent);
-	_res = Py_BuildValue("bO&",
-	                     _rv,
-	                     PyMac_BuildEventRecord, &theEvent);
-	return _res;
-}
-#endif
-
-#if !TARGET_API_MAC_CARBON
-
-static PyObject *Evt_GetOSEvent(PyObject *_self, PyObject *_args)
-{
-	PyObject *_res = NULL;
-	Boolean _rv;
-	EventMask mask;
-	EventRecord theEvent;
-#ifndef GetOSEvent
-	PyMac_PRECHECK(GetOSEvent);
-#endif
-	if (!PyArg_ParseTuple(_args, "H",
-	                      &mask))
-		return NULL;
-	_rv = GetOSEvent(mask,
-	                 &theEvent);
-	_res = Py_BuildValue("bO&",
-	                     _rv,
-	                     PyMac_BuildEventRecord, &theEvent);
-	return _res;
-}
-#endif
-
 static PyObject *Evt_FlushEvents(PyObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
@@ -276,67 +230,6 @@ static PyObject *Evt_FlushEvents(PyObject *_self, PyObject *_args)
 	return _res;
 }
 
-#if !TARGET_API_MAC_CARBON
-
-static PyObject *Evt_SystemClick(PyObject *_self, PyObject *_args)
-{
-	PyObject *_res = NULL;
-	EventRecord theEvent;
-	WindowPtr theWindow;
-#ifndef SystemClick
-	PyMac_PRECHECK(SystemClick);
-#endif
-	if (!PyArg_ParseTuple(_args, "O&O&",
-	                      PyMac_GetEventRecord, &theEvent,
-	                      WinObj_Convert, &theWindow))
-		return NULL;
-	SystemClick(&theEvent,
-	            theWindow);
-	Py_INCREF(Py_None);
-	_res = Py_None;
-	return _res;
-}
-#endif
-
-#if !TARGET_API_MAC_CARBON
-
-static PyObject *Evt_SystemTask(PyObject *_self, PyObject *_args)
-{
-	PyObject *_res = NULL;
-#ifndef SystemTask
-	PyMac_PRECHECK(SystemTask);
-#endif
-	if (!PyArg_ParseTuple(_args, ""))
-		return NULL;
-	SystemTask();
-	Py_INCREF(Py_None);
-	_res = Py_None;
-	return _res;
-}
-#endif
-
-#if !TARGET_API_MAC_CARBON
-
-static PyObject *Evt_SystemEvent(PyObject *_self, PyObject *_args)
-{
-	PyObject *_res = NULL;
-	Boolean _rv;
-	EventRecord theEvent;
-#ifndef SystemEvent
-	PyMac_PRECHECK(SystemEvent);
-#endif
-	if (!PyArg_ParseTuple(_args, "O&",
-	                      PyMac_GetEventRecord, &theEvent))
-		return NULL;
-	_rv = SystemEvent(&theEvent);
-	_res = Py_BuildValue("b",
-	                     _rv);
-	return _res;
-}
-#endif
-
-#if TARGET_API_MAC_CARBON
-
 static PyObject *Evt_GetGlobalMouse(PyObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
@@ -351,9 +244,6 @@ static PyObject *Evt_GetGlobalMouse(PyObject *_self, PyObject *_args)
 	                     PyMac_BuildPoint, globalMouse);
 	return _res;
 }
-#endif
-
-#if TARGET_API_MAC_CARBON
 
 static PyObject *Evt_GetCurrentKeyModifiers(PyObject *_self, PyObject *_args)
 {
@@ -369,9 +259,6 @@ static PyObject *Evt_GetCurrentKeyModifiers(PyObject *_self, PyObject *_args)
 	                     _rv);
 	return _res;
 }
-#endif
-
-#if TARGET_API_MAC_CARBON
 
 static PyObject *Evt_CheckEventQueueForUserCancel(PyObject *_self, PyObject *_args)
 {
@@ -387,7 +274,6 @@ static PyObject *Evt_CheckEventQueueForUserCancel(PyObject *_self, PyObject *_ar
 	                     _rv);
 	return _res;
 }
-#endif
 
 static PyObject *Evt_KeyScript(PyObject *_self, PyObject *_args)
 {
@@ -592,93 +478,59 @@ static PyObject *Evt_WaitNextEvent(PyObject *_self, PyObject *_args)
 
 static PyMethodDef Evt_methods[] = {
 	{"GetMouse", (PyCFunction)Evt_GetMouse, 1,
-	 "() -> (Point mouseLoc)"},
+	 PyDoc_STR("() -> (Point mouseLoc)")},
 	{"Button", (PyCFunction)Evt_Button, 1,
-	 "() -> (Boolean _rv)"},
+	 PyDoc_STR("() -> (Boolean _rv)")},
 	{"StillDown", (PyCFunction)Evt_StillDown, 1,
-	 "() -> (Boolean _rv)"},
+	 PyDoc_STR("() -> (Boolean _rv)")},
 	{"WaitMouseUp", (PyCFunction)Evt_WaitMouseUp, 1,
-	 "() -> (Boolean _rv)"},
+	 PyDoc_STR("() -> (Boolean _rv)")},
 	{"GetCaretTime", (PyCFunction)Evt_GetCaretTime, 1,
-	 "() -> (UInt32 _rv)"},
+	 PyDoc_STR("() -> (UInt32 _rv)")},
 	{"GetKeys", (PyCFunction)Evt_GetKeys, 1,
-	 "() -> (KeyMap theKeys)"},
+	 PyDoc_STR("() -> (KeyMap theKeys)")},
 	{"GetDblTime", (PyCFunction)Evt_GetDblTime, 1,
-	 "() -> (UInt32 _rv)"},
+	 PyDoc_STR("() -> (UInt32 _rv)")},
 	{"SetEventMask", (PyCFunction)Evt_SetEventMask, 1,
-	 "(EventMask value) -> None"},
+	 PyDoc_STR("(EventMask value) -> None")},
 	{"GetNextEvent", (PyCFunction)Evt_GetNextEvent, 1,
-	 "(EventMask eventMask) -> (Boolean _rv, EventRecord theEvent)"},
+	 PyDoc_STR("(EventMask eventMask) -> (Boolean _rv, EventRecord theEvent)")},
 	{"EventAvail", (PyCFunction)Evt_EventAvail, 1,
-	 "(EventMask eventMask) -> (Boolean _rv, EventRecord theEvent)"},
+	 PyDoc_STR("(EventMask eventMask) -> (Boolean _rv, EventRecord theEvent)")},
 	{"PostEvent", (PyCFunction)Evt_PostEvent, 1,
-	 "(EventKind eventNum, UInt32 eventMsg) -> None"},
-
-#if !TARGET_API_MAC_CARBON
-	{"OSEventAvail", (PyCFunction)Evt_OSEventAvail, 1,
-	 "(EventMask mask) -> (Boolean _rv, EventRecord theEvent)"},
-#endif
-
-#if !TARGET_API_MAC_CARBON
-	{"GetOSEvent", (PyCFunction)Evt_GetOSEvent, 1,
-	 "(EventMask mask) -> (Boolean _rv, EventRecord theEvent)"},
-#endif
+	 PyDoc_STR("(EventKind eventNum, UInt32 eventMsg) -> None")},
 	{"FlushEvents", (PyCFunction)Evt_FlushEvents, 1,
-	 "(EventMask whichMask, EventMask stopMask) -> None"},
-
-#if !TARGET_API_MAC_CARBON
-	{"SystemClick", (PyCFunction)Evt_SystemClick, 1,
-	 "(EventRecord theEvent, WindowPtr theWindow) -> None"},
-#endif
-
-#if !TARGET_API_MAC_CARBON
-	{"SystemTask", (PyCFunction)Evt_SystemTask, 1,
-	 "() -> None"},
-#endif
-
-#if !TARGET_API_MAC_CARBON
-	{"SystemEvent", (PyCFunction)Evt_SystemEvent, 1,
-	 "(EventRecord theEvent) -> (Boolean _rv)"},
-#endif
-
-#if TARGET_API_MAC_CARBON
+	 PyDoc_STR("(EventMask whichMask, EventMask stopMask) -> None")},
 	{"GetGlobalMouse", (PyCFunction)Evt_GetGlobalMouse, 1,
-	 "() -> (Point globalMouse)"},
-#endif
-
-#if TARGET_API_MAC_CARBON
+	 PyDoc_STR("() -> (Point globalMouse)")},
 	{"GetCurrentKeyModifiers", (PyCFunction)Evt_GetCurrentKeyModifiers, 1,
-	 "() -> (UInt32 _rv)"},
-#endif
-
-#if TARGET_API_MAC_CARBON
+	 PyDoc_STR("() -> (UInt32 _rv)")},
 	{"CheckEventQueueForUserCancel", (PyCFunction)Evt_CheckEventQueueForUserCancel, 1,
-	 "() -> (Boolean _rv)"},
-#endif
+	 PyDoc_STR("() -> (Boolean _rv)")},
 	{"KeyScript", (PyCFunction)Evt_KeyScript, 1,
-	 "(short code) -> None"},
+	 PyDoc_STR("(short code) -> None")},
 	{"IsCmdChar", (PyCFunction)Evt_IsCmdChar, 1,
-	 "(EventRecord event, short test) -> (Boolean _rv)"},
+	 PyDoc_STR("(EventRecord event, short test) -> (Boolean _rv)")},
 	{"LMGetKeyThresh", (PyCFunction)Evt_LMGetKeyThresh, 1,
-	 "() -> (SInt16 _rv)"},
+	 PyDoc_STR("() -> (SInt16 _rv)")},
 	{"LMSetKeyThresh", (PyCFunction)Evt_LMSetKeyThresh, 1,
-	 "(SInt16 value) -> None"},
+	 PyDoc_STR("(SInt16 value) -> None")},
 	{"LMGetKeyRepThresh", (PyCFunction)Evt_LMGetKeyRepThresh, 1,
-	 "() -> (SInt16 _rv)"},
+	 PyDoc_STR("() -> (SInt16 _rv)")},
 	{"LMSetKeyRepThresh", (PyCFunction)Evt_LMSetKeyRepThresh, 1,
-	 "(SInt16 value) -> None"},
+	 PyDoc_STR("(SInt16 value) -> None")},
 	{"LMGetKbdLast", (PyCFunction)Evt_LMGetKbdLast, 1,
-	 "() -> (UInt8 _rv)"},
+	 PyDoc_STR("() -> (UInt8 _rv)")},
 	{"LMSetKbdLast", (PyCFunction)Evt_LMSetKbdLast, 1,
-	 "(UInt8 value) -> None"},
+	 PyDoc_STR("(UInt8 value) -> None")},
 	{"LMGetKbdType", (PyCFunction)Evt_LMGetKbdType, 1,
-	 "() -> (UInt8 _rv)"},
+	 PyDoc_STR("() -> (UInt8 _rv)")},
 	{"LMSetKbdType", (PyCFunction)Evt_LMSetKbdType, 1,
-	 "(UInt8 value) -> None"},
+	 PyDoc_STR("(UInt8 value) -> None")},
 	{"TickCount", (PyCFunction)Evt_TickCount, 1,
-	 "() -> (UInt32 _rv)"},
+	 PyDoc_STR("() -> (UInt32 _rv)")},
 	{"WaitNextEvent", (PyCFunction)Evt_WaitNextEvent, 1,
-	 "(EventMask eventMask, UInt32 sleep [,RegionHandle]) -> (Boolean _rv, EventRecord theEvent)"},
+	 PyDoc_STR("(EventMask eventMask, UInt32 sleep [,RegionHandle]) -> (Boolean _rv, EventRecord theEvent)")},
 	{NULL, NULL, 0}
 };
 

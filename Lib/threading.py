@@ -1,31 +1,26 @@
-"""Proposed new threading module, emulating a subset of Java's threading model."""
+"""Thread module emulating a subset of Java's threading model."""
 
-import sys
-import time
-import thread
-import traceback
-import StringIO
+import sys as _sys
+
+try:
+    import thread
+except ImportError:
+    del _sys.modules[__name__]
+    raise
+
+from StringIO import StringIO as _StringIO
+from time import time as _time, sleep as _sleep
+from traceback import print_exc as _print_exc
 
 # Rename some stuff so "from threading import *" is safe
-
-_sys = sys
-del sys
-
-_time = time.time
-_sleep = time.sleep
-del time
+__all__ = ['activeCount', 'Condition', 'currentThread', 'enumerate', 'Event',
+           'Lock', 'RLock', 'Semaphore', 'BoundedSemaphore', 'Thread', 'Timer']
 
 _start_new_thread = thread.start_new_thread
 _allocate_lock = thread.allocate_lock
 _get_ident = thread.get_ident
 ThreadError = thread.error
 del thread
-
-_print_exc = traceback.print_exc
-del traceback
-
-_StringIO = StringIO.StringIO
-del StringIO
 
 
 # Debug support (adapted from ihooks.py)
@@ -62,7 +57,7 @@ else:
 Lock = _allocate_lock
 
 def RLock(*args, **kwargs):
-    return apply(_RLock, args, kwargs)
+    return _RLock(*args, **kwargs)
 
 class _RLock(_Verbose):
 
@@ -133,7 +128,7 @@ class _RLock(_Verbose):
 
 
 def Condition(*args, **kwargs):
-    return apply(_Condition, args, kwargs)
+    return _Condition(*args, **kwargs)
 
 class _Condition(_Verbose):
 
@@ -172,6 +167,8 @@ class _Condition(_Verbose):
         self.__lock.acquire()           # Ignore saved state
 
     def _is_owned(self):
+        # Return True if lock is owned by currentThread.
+        # This method is called only if __lock doesn't have _is_owned().
         if self.__lock.acquire(0):
             self.__lock.release()
             return False
@@ -179,7 +176,7 @@ class _Condition(_Verbose):
             return True
 
     def wait(self, timeout=None):
-        me = currentThread()
+        currentThread() # for side-effect
         assert self._is_owned(), "wait() of un-acquire()d lock"
         waiter = _allocate_lock()
         waiter.acquire()
@@ -221,7 +218,7 @@ class _Condition(_Verbose):
             self._acquire_restore(saved_state)
 
     def notify(self, n=1):
-        me = currentThread()
+        currentThread() # for side-effect
         assert self._is_owned(), "notify() of un-acquire()d lock"
         __waiters = self.__waiters
         waiters = __waiters[:n]
@@ -243,7 +240,7 @@ class _Condition(_Verbose):
 
 
 def Semaphore(*args, **kwargs):
-    return apply(_Semaphore, args, kwargs)
+    return _Semaphore(*args, **kwargs)
 
 class _Semaphore(_Verbose):
 
@@ -285,7 +282,7 @@ class _Semaphore(_Verbose):
 
 
 def BoundedSemaphore(*args, **kwargs):
-    return apply(_BoundedSemaphore, args, kwargs)
+    return _BoundedSemaphore(*args, **kwargs)
 
 class _BoundedSemaphore(_Semaphore):
     """Semaphore that checks that # releases is <= # acquires"""
@@ -300,7 +297,7 @@ class _BoundedSemaphore(_Semaphore):
 
 
 def Event(*args, **kwargs):
-    return apply(_Event, args, kwargs)
+    return _Event(*args, **kwargs)
 
 class _Event(_Verbose):
 
@@ -316,20 +313,26 @@ class _Event(_Verbose):
 
     def set(self):
         self.__cond.acquire()
-        self.__flag = True
-        self.__cond.notifyAll()
-        self.__cond.release()
+        try:
+            self.__flag = True
+            self.__cond.notifyAll()
+        finally:
+            self.__cond.release()
 
     def clear(self):
         self.__cond.acquire()
-        self.__flag = False
-        self.__cond.release()
+        try:
+            self.__flag = False
+        finally:
+            self.__cond.release()
 
     def wait(self, timeout=None):
         self.__cond.acquire()
-        if not self.__flag:
-            self.__cond.wait(timeout)
-        self.__cond.release()
+        try:
+            if not self.__flag:
+                self.__cond.wait(timeout)
+        finally:
+            self.__cond.release()
 
 # Helper to generate new thread names
 _counter = 0
@@ -393,7 +396,7 @@ class Thread(_Verbose):
 
     def run(self):
         if self.__target:
-            apply(self.__target, self.__args, self.__kwargs)
+            self.__target(*self.__args, **self.__kwargs)
 
     def __bootstrap(self):
         try:

@@ -11,7 +11,6 @@ import sys
 sys.stdout = sys.stderr
 
 import os
-import macfs
 import MacOS
 import EasyDialogs
 import buildtools
@@ -35,18 +34,18 @@ def buildapplet():
 	# Ask for source text if not specified in sys.argv[1:]
 	
 	if not sys.argv[1:]:
-		srcfss, ok = macfs.PromptGetFile('Select Python source or applet:', 'TEXT', 'APPL')
-		if not ok:
+		filename = EasyDialogs.AskFileForOpen(message='Select Python source or applet:', 
+			typeList=('TEXT', 'APPL'))
+		if not filename:
 			return
-		filename = srcfss.as_pathname()
 		tp, tf = os.path.split(filename)
 		if tf[-3:] == '.py':
 			tf = tf[:-3]
 		else:
 			tf = tf + '.applet'
-		dstfss, ok = macfs.StandardPutFile('Save application as:', tf)
-		if not ok: return
-		dstfilename = dstfss.as_pathname()
+		dstfilename = EasyDialogs.AskFileForSave(message='Save application as:', 
+			savedFileName=tf)
+		if not dstfilename: return
 		cr, tp = MacOS.GetCreatorAndType(filename)
 		if tp == 'APPL':
 			buildtools.update(template, filename, dstfilename)
@@ -76,11 +75,16 @@ def buildapplet():
 			elif opt in ('-n', '--noargv'):
 				raw = 1
 			elif opt in ('-e', '--extra'):
+				if ':' in arg:
+					arg = arg.split(':')
 				extras.append(arg)
 			elif opt in ('-v', '--verbose'):
 				verbose = Verbose()
 			elif opt in ('-?', '--help'):
 				usage()
+		# On OS9 always be verbose
+		if sys.platform == 'mac' and not verbose:
+			verbose = 'default'
 		# Loop over all files to be processed
 		for filename in args:
 			cr, tp = MacOS.GetCreatorAndType(filename)
@@ -97,12 +101,12 @@ def usage():
 	print "  BuildApplet src1.py src2.py ...   non-interactive multiple file"
 	print "  BuildApplet [options] src.py    non-interactive single file"
 	print "Options:"
-	print "  --output o    Output file; default based on source filename, short -o"
-	print "  --resource r  Resource file; default based on source filename, short -r"
-	print "  --noargv      Build applet without drag-and-drop sys.argv emulation, short -n, OSX only"
-	print "  --extra f     Extra file to put in .app bundle, short -e, OSX only"
-	print "  --verbose     Verbose, short -v"
-	print "  --help        This message, short -?"
+	print "  --output o        Output file; default based on source filename, short -o"
+	print "  --resource r      Resource file; default based on source filename, short -r"
+	print "  --noargv          Build applet without drag-and-drop sys.argv emulation, short -n, OSX only"
+	print "  --extra src[:dst] Extra file to put in .app bundle, short -e, OSX only"
+	print "  --verbose         Verbose, short -v"
+	print "  --help            This message, short -?"
 	sys.exit(1)
 
 class Verbose:

@@ -17,7 +17,7 @@ $NUMBERED_FOOTNOTES = 1;
 #
 $SHOW_SECTION_NUMBERS = 1;
 
-$ICONSERVER = '../icons';
+$ICONSERVER = '.';
 $IMAGE_TYPE = 'gif';
 
 # Control where the navigation bars should show up:
@@ -88,7 +88,7 @@ sub custom_driver_hook {
     # seems to be sufficiently general that it should be fine for HOWTO
     # processing.
     #
-    my $file = @_[0];
+    my $file = $_[0];
     my($jobname, $dir, $ext) = fileparse($file, '\..*');
     $dir = L2hos->Make_directory_absolute($dir);
     $dir =~ s/$dd$//;
@@ -128,7 +128,7 @@ $my_icon_names{'previous_page'} = 'previous';
 $my_icon_names{'next_page'} = 'next';
 
 sub get_my_icon($) {
-    my $name = @_[0];
+    my $name = $_[0];
     my $text = $my_icon_tags{$name};
     if ($my_icon_names{$name}) {
         $name = $my_icon_names{$name};
@@ -137,12 +137,12 @@ sub get_my_icon($) {
         $name = 'blank';
     }
     my $iconserver = ($ICONSERVER eq '.') ? '' : "$ICONSERVER/";
-    return "<img src=\"$iconserver$name.$IMAGE_TYPE\"\n  border=\"0\""
-           . " height=\"32\"\n  alt=\"$text\" width=\"32\">";
+    return "<img src='$iconserver$name.$IMAGE_TYPE'\n  border='0'"
+           . " height='32'  alt='$text' width='32'>";
 }
 
 sub use_my_icon($) {
-    my $s = @_[0];
+    my $s = $_[0];
     if ($s =~ /\<tex2html_([a-z_]+)_visible_mark\>/) {
         my $r = get_my_icon($1);
         $s =~ s/\<tex2html_[a-z_]+_visible_mark\>/$r/;
@@ -276,7 +276,7 @@ sub replace_icons_hook {}
 
 sub do_cmd_arabic {
     # get rid of that nasty <SPAN CLASS="arabic">...</SPAN>
-    my($ctr, $val, $id, $text) = &read_counter_value(@_[0]);
+    my($ctr, $val, $id, $text) = &read_counter_value($_[0]);
     return ($val ? farabic($val) : "0") . $text;
 }
 
@@ -320,7 +320,7 @@ sub add_module_idx() {
     my $allthesame = 1;
     my $prefix = '';
     foreach $key (keys %Modules) {
-	$key =~ s/<tt>([a-zA-Z0-9._]*)<\/tt>/\1/;
+	$key =~ s/<tt>([a-zA-Z0-9._]*)<\/tt>/$1/;
 	my $plat = "$ModulePlatforms{$key}";
 	$plat = ''
 	  if ($plat eq $IGNORE_PLATFORM_ANNOTATION);
@@ -337,7 +337,7 @@ sub add_module_idx() {
 	my $nkey = $1;
 	my $moditem = "$Modules{$key}";
 	my $plat = '';
-	$key =~ s/<tt>([a-zA-Z0-9._]*)<\/tt>/\1/;
+	$key =~ s/<tt>([a-zA-Z0-9._]*)<\/tt>/$1/;
 	if ($ModulePlatforms{$key} && !$allthesame) {
 	    $plat = (" <em>(<span class=\"platform\">$ModulePlatforms{$key}"
 		     . '</span>)</em>');
@@ -503,7 +503,7 @@ sub add_bbl_and_idx_dummy_commands {
         print "\nadd_bbl_and_idx_dummy_commands ==> adding module index";
         my $rx = "([\\\\]begin\\s*$O\\d+$C\\s*theindex[\\s\\S]*)"
           . "([\\\\]begin\\s*$O\\d+$C\\s*theindex)";
-        s/$rx/\\textohtmlmoduleindex \1 \\textohtmlindex \2/o;
+        s/$rx/\\textohtmlmoduleindex $1 \\textohtmlindex $2/o;
         # Add a button to the navigation areas:
         $CUSTOM_BUTTONS .= ('<a href="modindex.html" title="Module Index">'
                             . get_my_icon('modules')
@@ -514,7 +514,7 @@ sub add_bbl_and_idx_dummy_commands {
     elsif (scalar(@parts) == 2) {
         print "\nadd_bbl_and_idx_dummy_commands ==> adding general index";
         my $rx = "([\\\\]begin\\s*$O\\d+$C\\s*theindex)";
-        s/$rx/\\textohtmlindex \1/o;
+        s/$rx/\\textohtmlindex $1/o;
         $HAVE_GENERAL_INDEX = 1;
     }
     elsif (scalar(@parts) == 1) {
@@ -613,37 +613,60 @@ sub make_head_and_body($$) {
     if ($MY_PARTIAL_HEADER eq '') {
         $STYLESHEET = $FILE.".css" unless $STYLESHEET;
         $MY_PARTIAL_HEADER = join('',
-            ($CHARSET && $HTML_VERSION ge "2.1"
-             ? ('<meta http-equiv="Content-Type" content="text/html; '
-                . "charset=$CHARSET\">\n")
-             : ''),
+            ($DOCTYPE ? $DTDcomment : ''),
+            "<html>\n<head>\n",
             ($BASE ? "<base href=\"$BASE\">\n" : ''),
             "<link rel=\"STYLESHEET\" href=\"$STYLESHEET\" type='text/css'>\n",
-            "<link rel=\"first\" href=\"$FILE.html\">\n",
+            ($FAVORITES_ICON
+             ? ('<link rel="SHORTCUT ICON" href="' . "$FAVORITES_ICON\">\n")
+             : ''),
+            ($EXTERNAL_UP_LINK
+             ? ('<link rel="start" href="' . "$EXTERNAL_UP_LINK\""
+                . ($EXTERNAL_UP_TITLE ? " title='$EXTERNAL_UP_TITLE'" : '')
+                . ">\n")
+             : ''),
+            "<link rel=\"first\" href=\"$FILE.html\"",
+            ($t_title ? " title='$t_title'" : ''),
+            ">\n",
             ($HAVE_TABLE_OF_CONTENTS
              ? ('<link rel="contents" href="contents.html" title="Contents">'
-                . "\n")
+                . ($HAVE_GENERAL_INDEX ? "\n" : ''))
              : ''),
             ($HAVE_GENERAL_INDEX
-             ? '<link rel="index" href="genindex.html" title="Index">'
+             ? '<link rel="index" href="genindex.html" title="Index">' . "\n"
              : ''),
             # disable for now -- Mozilla doesn't do well with multiple indexes
             # ($HAVE_MODULE_INDEX
             #  ? '<link rel="index" href="modindex.html" title="Module Index">'
             #    . "\n"
             #  : ''),
-            $more_links_mark);
+            ($INFO
+             # XXX We can do this with the Python tools since the About...
+             # page always gets copied to about.html, even when we use the
+             # generated node###.html page names.  Won't work with the
+             # rest of the Python doc tools.
+             ? ("<link rel='last' href='about.html'"
+                . " title='About this document...'>\n"
+                . "<link rel='help' href='about.html'"
+                . " title='About this document...'>\n")
+             : ''),
+            $more_links_mark,
+            "\n",
+            ($CHARSET && $HTML_VERSION ge "2.1"
+             ? ('<meta http-equiv="Content-Type" content="text/html; '
+                . "charset=$CHARSET\">\n")
+             : ''),
+            ($AESOP_META_TYPE
+             ? "<meta name='aesop' content='$AESOP_META_TYPE'>\n" : ''));
     }
-
-    if (!$charset && $CHARSET) { $charset = $CHARSET; $charset =~ s/_/\-/go; }
-
-    join('', ($DOCTYPE ? $DTDcomment : '' )
-         , "<html>\n<head>\n<title>", $title, "</title>\n"
-         , &meta_information($title)
-         , $MY_PARTIAL_HEADER
-         , ($AESOP_META_TYPE eq '' ? ''
-            : "\n<meta name='aesop' content='$AESOP_META_TYPE'>")
-         , "\n</head>\n<body$body>");
+    if (!$charset && $CHARSET) {
+        $charset = $CHARSET;
+        $charset =~ s/_/\-/go;
+    }
+    join('',
+         $MY_PARTIAL_HEADER,
+         &meta_information($title),
+         "<title>", $title, "</title>\n</head>\n<body$body>");
 }
 
 1;	# This must be the last line

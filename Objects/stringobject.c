@@ -15,6 +15,17 @@ int null_strings, one_strings;
 static PyStringObject *characters[UCHAR_MAX + 1];
 static PyStringObject *nullstring;
 
+/* This dictionary holds all interned strings.  Note that references to
+   strings in this dictionary are *not* counted in the string's ob_refcnt.
+   When the interned string reaches a refcnt of 0 the string deallocation
+   function will delete the reference from this dictionary.
+
+   Another way to look at this is that to say that the actual reference 
+   count of a string is:  s->ob_refcnt + (s->ob_sstate?2:0)
+*/
+static PyObject *interned;
+
+
 /*
    For both PyString_FromString() and PyString_FromStringAndSize(), the
    parameter `size' denotes number of characters to allocate, not counting any
@@ -62,14 +73,14 @@ PyString_FromStringAndSize(const char *str, int size)
 		return (PyObject *)op;
 	}
 
-	/* PyObject_NewVar is inlined */
+	/* Inline PyObject_NewVar */
 	op = (PyStringObject *)
 		PyObject_MALLOC(sizeof(PyStringObject) + size * sizeof(char));
 	if (op == NULL)
 		return PyErr_NoMemory();
 	PyObject_INIT_VAR(op, &PyString_Type, size);
 	op->ob_shash = -1;
-	op->ob_sinterned = NULL;
+	op->ob_sstate = SSTATE_NOT_INTERNED;
 	if (str != NULL)
 		memcpy(op->ob_sval, str, size);
 	op->ob_sval[size] = '\0';
@@ -118,14 +129,14 @@ PyString_FromString(const char *str)
 		return (PyObject *)op;
 	}
 
-	/* PyObject_NewVar is inlined */
+	/* Inline PyObject_NewVar */
 	op = (PyStringObject *)
 		PyObject_MALLOC(sizeof(PyStringObject) + size * sizeof(char));
 	if (op == NULL)
 		return PyErr_NoMemory();
 	PyObject_INIT_VAR(op, &PyString_Type, size);
 	op->ob_shash = -1;
-	op->ob_sinterned = NULL;
+	op->ob_sstate = SSTATE_NOT_INTERNED;
 	memcpy(op->ob_sval, str, size+1);
 	/* share short strings */
 	if (size == 0) {
@@ -156,7 +167,11 @@ PyString_FromFormatV(const char *format, va_list vargs)
 #ifdef VA_LIST_IS_ARRAY
 	memcpy(count, vargs, sizeof(va_list));
 #else
+#ifdef  __va_copy
+	__va_copy(count, vargs);
+#else
 	count = vargs;
+#endif
 #endif
 	/* step 1: figure out how large a buffer we need */
 	for (f = format; *f; f++) {
@@ -482,7 +497,177 @@ PyObject *PyString_AsEncodedString(PyObject *str,
 static void
 string_dealloc(PyObject *op)
 {
+	switch (PyString_CHECK_INTERNED(op)) {
+		case SSTATE_NOT_INTERNED:
+			break;
+
+		case SSTATE_INTERNED_MORTAL:
+			/* revive dead object temporarily for DelItem */
+			op->ob_refcnt = 3;
+			if (PyDict_DelItem(interned, op) != 0)
+				Py_FatalError(
+					"deletion of interned string failed");
+			break;
+
+		case SSTATE_INTERNED_IMMORTAL:
+			Py_FatalError("Immortal interned string died.");
+
+		default:
+			Py_FatalError("Inconsistent interned string state.");
+	}
 	op->ob_type->tp_free(op);
+}
+
+/* Unescape a backslash-escaped string. If unicode is non-zero,
+   the string is a u-literal. If recode_encoding is non-zero,
+   the string is UTF-8 encoded and should be re-encoded in the
+   specified encoding.  */
+
+PyObject *PyString_DecodeEscape(const char *s,
+				int len,
+				const char *errors,
+				int unicode,
+				const char *recode_encoding)
+{
+	int c;
+	char *p, *buf;
+	const char *end;
+	PyObject *v;
+	int newlen = recode_encoding ? 4*len:len;
+	v = PyString_FromStringAndSize((char *)NULL, newlen);
+	if (v == NULL)
+		return NULL;
+	p = buf = PyString_AsString(v);
+	end = s + len;
+	while (s < end) {
+		if (*s != '\\') {
+		  non_esc:
+#ifdef Py_USING_UNICODE
+			if (recode_encoding && (*s & 0x80)) {
+				PyObject *u, *w;
+				char *r;
+				const char* t;
+				int rn;
+				t = s;
+				/* Decode non-ASCII bytes as UTF-8. */
+				while (t < end && (*t & 0x80)) t++;
+				u = PyUnicode_DecodeUTF8(s, t - s, errors);
+				if(!u) goto failed;
+
+				/* Recode them in target encoding. */
+				w = PyUnicode_AsEncodedString(
+					u, recode_encoding, errors);
+				Py_DECREF(u);
+				if (!w)	goto failed;
+
+				/* Append bytes to output buffer. */
+				r = PyString_AsString(w);
+				rn = PyString_Size(w);
+				memcpy(p, r, rn);
+				p += rn;
+				Py_DECREF(w);
+				s = t;
+			} else {
+				*p++ = *s++;
+			}
+#else
+			*p++ = *s++;
+#endif
+			continue;
+		}
+		s++;
+                if (s==end) {
+			PyErr_SetString(PyExc_ValueError,
+					"Trailing \\ in string");
+			goto failed;
+		}
+		switch (*s++) {
+		/* XXX This assumes ASCII! */
+		case '\n': break;
+		case '\\': *p++ = '\\'; break;
+		case '\'': *p++ = '\''; break;
+		case '\"': *p++ = '\"'; break;
+		case 'b': *p++ = '\b'; break;
+		case 'f': *p++ = '\014'; break; /* FF */
+		case 't': *p++ = '\t'; break;
+		case 'n': *p++ = '\n'; break;
+		case 'r': *p++ = '\r'; break;
+		case 'v': *p++ = '\013'; break; /* VT */
+		case 'a': *p++ = '\007'; break; /* BEL, not classic C */
+		case '0': case '1': case '2': case '3':
+		case '4': case '5': case '6': case '7':
+			c = s[-1] - '0';
+			if ('0' <= *s && *s <= '7') {
+				c = (c<<3) + *s++ - '0';
+				if ('0' <= *s && *s <= '7')
+					c = (c<<3) + *s++ - '0';
+			}
+			*p++ = c;
+			break;
+		case 'x':
+			if (isxdigit(Py_CHARMASK(s[0])) 
+			    && isxdigit(Py_CHARMASK(s[1]))) {
+				unsigned int x = 0;
+				c = Py_CHARMASK(*s);
+				s++;
+				if (isdigit(c))
+					x = c - '0';
+				else if (islower(c))
+					x = 10 + c - 'a';
+				else
+					x = 10 + c - 'A';
+				x = x << 4;
+				c = Py_CHARMASK(*s);
+				s++;
+				if (isdigit(c))
+					x += c - '0';
+				else if (islower(c))
+					x += 10 + c - 'a';
+				else
+					x += 10 + c - 'A';
+				*p++ = x;
+				break;
+			}
+			if (!errors || strcmp(errors, "strict") == 0) {
+				PyErr_SetString(PyExc_ValueError, 
+						"invalid \\x escape");
+				goto failed;
+			}
+			if (strcmp(errors, "replace") == 0) {
+				*p++ = '?';
+			} else if (strcmp(errors, "ignore") == 0)
+				/* do nothing */;
+			else {
+				PyErr_Format(PyExc_ValueError,
+					     "decoding error; "
+					     "unknown error handling code: %.400s",
+					     errors);
+				goto failed;
+			}
+#ifndef Py_USING_UNICODE
+		case 'u':
+		case 'U':
+		case 'N':
+			if (unicode) {
+				PyErr_SetString(PyExc_ValueError,
+					  "Unicode escapes not legal "
+					  "when Unicode disabled");
+				goto failed;
+			}
+#endif
+		default:
+			*p++ = '\\';
+			s--;
+			goto non_esc; /* an arbitry number of unescaped
+					 UTF-8 bytes may follow. */
+		}
+	}
+	if (p-buf < newlen)
+		_PyString_Resize(&v, (int)(p - buf));
+	return v;
+  failed:
+	Py_DECREF(v);
+	return NULL;
 }
 
 static int
@@ -580,7 +765,11 @@ string_print(PyStringObject *op, FILE *fp, int flags)
 		return ret;
 	}
 	if (flags & Py_PRINT_RAW) {
-		fwrite(op->ob_sval, 1, (int) op->ob_size, fp);
+#ifdef __VMS
+                if (op->ob_size) fwrite(op->ob_sval, (int) op->ob_size, 1, fp);
+#else
+                fwrite(op->ob_sval, 1, (int) op->ob_size, fp);
+#endif
 		return 0;
 	}
 
@@ -610,9 +799,10 @@ string_print(PyStringObject *op, FILE *fp, int flags)
 	return 0;
 }
 
-static PyObject *
-string_repr(register PyStringObject *op)
+PyObject *
+PyString_Repr(PyObject *obj, int smartquotes)
 {
+	register PyStringObject* op = (PyStringObject*) obj;
 	size_t newsize = 2 + 4 * op->ob_size * sizeof(char);
 	PyObject *v;
 	if (newsize > INT_MAX) {
@@ -631,7 +821,8 @@ string_repr(register PyStringObject *op)
 
 		/* figure out which quote to use; single is preferred */
 		quote = '\'';
-		if (memchr(op->ob_sval, '\'', op->ob_size) &&
+		if (smartquotes && 
+		    memchr(op->ob_sval, '\'', op->ob_size) &&
 		    !memchr(op->ob_sval, '"', op->ob_size))
 			quote = '"';
 
@@ -667,6 +858,12 @@ string_repr(register PyStringObject *op)
 			&v, (int) (p - PyString_AS_STRING(v)));
 		return v;
 	}
+}
+
+static PyObject *
+string_repr(PyObject *op)
+{
+	return PyString_Repr(op, 1);
 }
 
 static PyObject *
@@ -717,14 +914,14 @@ string_concat(register PyStringObject *a, register PyObject *bb)
 		return (PyObject *)a;
 	}
 	size = a->ob_size + b->ob_size;
-	/* PyObject_NewVar is inlined */
+	/* Inline PyObject_NewVar */
 	op = (PyStringObject *)
 		PyObject_MALLOC(sizeof(PyStringObject) + size * sizeof(char));
 	if (op == NULL)
 		return PyErr_NoMemory();
 	PyObject_INIT_VAR(op, &PyString_Type, size);
 	op->ob_shash = -1;
-	op->ob_sinterned = NULL;
+	op->ob_sstate = SSTATE_NOT_INTERNED;
 	memcpy(op->ob_sval, a->ob_sval, (int) a->ob_size);
 	memcpy(op->ob_sval + a->ob_size, b->ob_sval, (int) b->ob_size);
 	op->ob_sval[size] = '\0';
@@ -736,6 +933,7 @@ static PyObject *
 string_repeat(register PyStringObject *a, register int n)
 {
 	register int i;
+	register int j;
 	register int size;
 	register PyStringObject *op;
 	size_t nbytes;
@@ -767,10 +965,22 @@ string_repeat(register PyStringObject *a, register int n)
 		return PyErr_NoMemory();
 	PyObject_INIT_VAR(op, &PyString_Type, size);
 	op->ob_shash = -1;
-	op->ob_sinterned = NULL;
-	for (i = 0; i < size; i += a->ob_size)
-		memcpy(op->ob_sval+i, a->ob_sval, (int) a->ob_size);
+	op->ob_sstate = SSTATE_NOT_INTERNED;
 	op->ob_sval[size] = '\0';
+	if (a->ob_size == 1 && n > 0) {
+		memset(op->ob_sval, a->ob_sval[0] , n);
+		return (PyObject *) op;
+	}
+	i = 0;
+	if (i < size) {
+		memcpy(op->ob_sval, a->ob_sval, (int) a->ob_size);
+		i = (int) a->ob_size;
+	}
+	while (i < size) {
+		j = (i <= size-i)  ?  i  :  size-i;
+		memcpy(op->ob_sval+i, op->ob_sval, j);
+		i += j;
+	}
 	return (PyObject *) op;
 }
 
@@ -799,24 +1009,34 @@ string_slice(register PyStringObject *a, register int i, register int j)
 static int
 string_contains(PyObject *a, PyObject *el)
 {
-	register char *s, *end;
-	register char c;
+	const char *lhs, *rhs, *end;
+	int size;
+
+	if (!PyString_CheckExact(el)) {
 #ifdef Py_USING_UNICODE
-	if (PyUnicode_Check(el))
-		return PyUnicode_Contains(a, el);
+		if (PyUnicode_Check(el))
+			return PyUnicode_Contains(a, el);
 #endif
-	if (!PyString_Check(el) || PyString_Size(el) != 1) {
-		PyErr_SetString(PyExc_TypeError,
-		    "'in <string>' requires character as left operand");
-		return -1;
+		if (!PyString_Check(el)) {
+			PyErr_SetString(PyExc_TypeError,
+			    "'in <string>' requires string as left operand");
+			return -1;
+		}
 	}
-	c = PyString_AsString(el)[0];
-	s = PyString_AsString(a);
-	end = s + PyString_Size(a);
-	while (s < end) {
-		if (c == *s++)
+	size = PyString_GET_SIZE(el);
+	rhs = PyString_AS_STRING(el);
+	lhs = PyString_AS_STRING(a);
+
+	/* optimize for a single character */
+	if (size == 1)
+		return memchr(lhs, *rhs, PyString_GET_SIZE(a)) != NULL;
+
+	end = lhs + (PyString_GET_SIZE(a) - size);
+	while (lhs <= end) {
+		if (memcmp(lhs++, rhs, size) == 0)
 			return 1;
 	}
+
 	return 0;
 }
 
@@ -925,9 +1145,6 @@ string_hash(PyStringObject *a)
 
 	if (a->ob_shash != -1)
 		return a->ob_shash;
-	if (a->ob_sinterned != NULL)
-		return (a->ob_shash =
-			((PyStringObject *)(a->ob_sinterned))->ob_shash);
 	len = a->ob_size;
 	p = (unsigned char *) a->ob_sval;
 	x = *p << 7;
@@ -1122,8 +1339,8 @@ PyDoc_STRVAR(split__doc__,
 \n\
 Return a list of the words in the string S, using sep as the\n\
 delimiter string.  If maxsplit is given, at most maxsplit\n\
-splits are done. If sep is not specified, any whitespace string\n\
-is a separator.");
+splits are done. If sep is not specified or is None, any\n\
+whitespace string is a separator.");
 
 static PyObject *
 string_split(PyStringObject *self, PyObject *args)
@@ -1342,7 +1559,7 @@ string_find_internal(PyStringObject *self, PyObject *args, int dir)
 	}
 #ifdef Py_USING_UNICODE
 	else if (PyUnicode_Check(subobj))
-		return PyUnicode_Find((PyObject *)self, subobj, i, last, 1);
+		return PyUnicode_Find((PyObject *)self, subobj, i, last, dir);
 #endif
 	else if (PyObject_AsCharBuffer(subobj, &sub, &n))
 		return -2;
@@ -1403,7 +1620,7 @@ string_index(PyStringObject *self, PyObject *args)
 		return NULL;
 	if (result == -1) {
 		PyErr_SetString(PyExc_ValueError,
-				"substring not found in string.index");
+				"substring not found");
 		return NULL;
 	}
 	return PyInt_FromLong(result);
@@ -1442,7 +1659,7 @@ string_rindex(PyStringObject *self, PyObject *args)
 		return NULL;
 	if (result == -1) {
 		PyErr_SetString(PyExc_ValueError,
-				"substring not found in string.rindex");
+				"substring not found");
 		return NULL;
 	}
 	return PyInt_FromLong(result);
@@ -1553,12 +1770,12 @@ do_argstrip(PyStringObject *self, int striptype, PyObject *args)
 
 
 PyDoc_STRVAR(strip__doc__,
-"S.strip([sep]) -> string or unicode\n\
+"S.strip([chars]) -> string or unicode\n\
 \n\
 Return a copy of the string S with leading and trailing\n\
 whitespace removed.\n\
-If sep is given and not None, remove characters in sep instead.\n\
-If sep is unicode, S will be converted to unicode before stripping");
+If chars is given and not None, remove characters in chars instead.\n\
+If chars is unicode, S will be converted to unicode before stripping");
 
 static PyObject *
 string_strip(PyStringObject *self, PyObject *args)
@@ -1571,11 +1788,11 @@ string_strip(PyStringObject *self, PyObject *args)
 
 
 PyDoc_STRVAR(lstrip__doc__,
-"S.lstrip([sep]) -> string or unicode\n\
+"S.lstrip([chars]) -> string or unicode\n\
 \n\
 Return a copy of the string S with leading whitespace removed.\n\
-If sep is given and not None, remove characters in sep instead.\n\
-If sep is unicode, S will be converted to unicode before stripping");
+If chars is given and not None, remove characters in chars instead.\n\
+If chars is unicode, S will be converted to unicode before stripping");
 
 static PyObject *
 string_lstrip(PyStringObject *self, PyObject *args)
@@ -1588,11 +1805,11 @@ string_lstrip(PyStringObject *self, PyObject *args)
 
 
 PyDoc_STRVAR(rstrip__doc__,
-"S.rstrip([sep]) -> string or unicode\n\
+"S.rstrip([chars]) -> string or unicode\n\
 \n\
 Return a copy of the string S with trailing whitespace removed.\n\
-If sep is given and not None, remove characters in sep instead.\n\
-If sep is unicode, S will be converted to unicode before stripping");
+If chars is given and not None, remove characters in chars instead.\n\
+If chars is unicode, S will be converted to unicode before stripping");
 
 static PyObject *
 string_rstrip(PyStringObject *self, PyObject *args)
@@ -1842,7 +2059,7 @@ string_translate(PyStringObject *self, PyObject *args)
 	int trans_table[256];
 	PyObject *tableobj, *delobj = NULL;
 
-	if (!PyArg_ParseTuple(args, "O|O:translate",
+	if (!PyArg_UnpackTuple(args, "translate", 1, 2,
 			      &tableobj, &delobj))
 		return NULL;
 
@@ -1866,6 +2083,12 @@ string_translate(PyStringObject *self, PyObject *args)
 	else if (PyObject_AsCharBuffer(tableobj, &table1, &tablen))
 		return NULL;
 
+	if (tablen != 256) {
+		PyErr_SetString(PyExc_ValueError,
+		  "translation table must be 256 characters long");
+		return NULL;
+	}
+
 	if (delobj != NULL) {
 		if (PyString_Check(delobj)) {
 			del_table = PyString_AS_STRING(delobj);
@@ -1880,12 +2103,6 @@ string_translate(PyStringObject *self, PyObject *args)
 #endif
 		else if (PyObject_AsCharBuffer(delobj, &del_table, &dellen))
 			return NULL;
-
-		if (tablen != 256) {
-			PyErr_SetString(PyExc_ValueError,
-			  "translation table must be 256 characters long");
-			return NULL;
-		}
 	}
 	else {
 		del_table = NULL;
@@ -2021,11 +2238,11 @@ mymemreplace(const char *str, int len,		/* input string */
 	char *new_s;
 	int nfound, offset, new_len;
 
-	if (len == 0 || pat_len > len)
+	if (len == 0 || (pat_len == 0 && sub_len == 0) || pat_len > len)
 		goto return_same;
 
 	/* find length of output string */
-	nfound = mymemcnt(str, len, pat, pat_len);
+	nfound = (pat_len > 0) ? mymemcnt(str, len, pat, pat_len) : len + 1;
 	if (count < 0)
 		count = INT_MAX;
 	else if (nfound > count)
@@ -2048,25 +2265,38 @@ mymemreplace(const char *str, int len,		/* input string */
 			return NULL;
 		out_s = new_s;
 
-		for (; count > 0 && len > 0; --count) {
-			/* find index of next instance of pattern */
-			offset = mymemfind(str, len, pat, pat_len);
-			if (offset == -1)
-				break;
+		if (pat_len > 0) {
+			for (; nfound > 0; --nfound) {
+				/* find index of next instance of pattern */
+				offset = mymemfind(str, len, pat, pat_len);
+				if (offset == -1)
+					break;
 
-			/* copy non matching part of input string */
-			memcpy(new_s, str, offset);
-			str += offset + pat_len;
-			len -= offset + pat_len;
+				/* copy non matching part of input string */
+				memcpy(new_s, str, offset);
+				str += offset + pat_len;
+				len -= offset + pat_len;
 
-			/* copy substitute into the output string */
-			new_s += offset;
-			memcpy(new_s, sub, sub_len);
-			new_s += sub_len;
+				/* copy substitute into the output string */
+				new_s += offset;
+				memcpy(new_s, sub, sub_len);
+				new_s += sub_len;
+			}
+			/* copy any remaining values into output string */
+			if (len > 0)
+				memcpy(new_s, str, len);
 		}
-		/* copy any remaining values into output string */
-		if (len > 0)
-			memcpy(new_s, str, len);
+		else {
+			for (;;++str, --len) {
+				memcpy(new_s, sub, sub_len);
+				new_s += sub_len;
+				if (--nfound <= 0) {
+					memcpy(new_s, str, len);
+					break;
+				}
+				*new_s++ = *str;
+			}
+		}
 	}
 	*out_len = new_len;
 	return out_s;
@@ -2123,10 +2353,6 @@ string_replace(PyStringObject *self, PyObject *args)
 	else if (PyObject_AsCharBuffer(replobj, &repl, &repl_len))
 		return NULL;
 
-	if (sub_len <= 0) {
-		PyErr_SetString(PyExc_ValueError, "empty pattern string");
-		return NULL;
-	}
 	new_s = mymemreplace(str,len,sub,sub_len,repl,repl_len,count,&out_len);
 	if (new_s == NULL) {
 		PyErr_NoMemory();
@@ -2155,9 +2381,9 @@ string_replace(PyStringObject *self, PyObject *args)
 PyDoc_STRVAR(startswith__doc__,
 "S.startswith(prefix[, start[, end]]) -> bool\n\
 \n\
-Return True if S starts with the specified prefix, False otherwise.  With\n\
-optional start, test S beginning at that position.  With optional end, stop\n\
-comparing S at that position.");
+Return True if S starts with the specified prefix, False otherwise.\n\
+With optional start, test S beginning at that position.\n\
+With optional end, stop comparing S at that position.");
 
 static PyObject *
 string_startswith(PyStringObject *self, PyObject *args)
@@ -2206,9 +2432,9 @@ string_startswith(PyStringObject *self, PyObject *args)
 PyDoc_STRVAR(endswith__doc__,
 "S.endswith(suffix[, start[, end]]) -> bool\n\
 \n\
-Return True if S ends with the specified suffix, False otherwise.  With\n\
-optional start, test S beginning at that position.  With optional end, stop\n\
-comparing S at that position.");
+Return True if S ends with the specified suffix, False otherwise.\n\
+With optional start, test S beginning at that position.\n\
+With optional end, stop comparing S at that position.");
 
 static PyObject *
 string_endswith(PyStringObject *self, PyObject *args)
@@ -2262,7 +2488,9 @@ PyDoc_STRVAR(encode__doc__,
 Encodes S using the codec registered for encoding. encoding defaults\n\
 to the default encoding. errors may be given to set a different error\n\
 handling scheme. Default is 'strict' meaning that encoding errors raise\n\
-a ValueError. Other possible values are 'ignore' and 'replace'.");
+a UnicodeEncodeError. Other possible values are 'ignore', 'replace' and\n\
+'xmlcharrefreplace' as well as any other name registered with\n\
+codecs.register_error that is able to handle UnicodeEncodeErrors.");
 
 static PyObject *
 string_encode(PyStringObject *self, PyObject *args)
@@ -2281,7 +2509,9 @@ PyDoc_STRVAR(decode__doc__,
 Decodes S using the codec registered for encoding. encoding defaults\n\
 to the default encoding. errors may be given to set a different error\n\
 handling scheme. Default is 'strict' meaning that encoding errors raise\n\
-a ValueError. Other possible values are 'ignore' and 'replace'.");
+a UnicodeDecodeError. Other possible values are 'ignore' and 'replace'\n\
+as well as any other name registerd with codecs.register_error that is\n\
+able to handle UnicodeDecodeErrors.");
 
 static PyObject *
 string_decode(PyStringObject *self, PyObject *args)
@@ -2815,6 +3045,12 @@ string_splitlines(PyStringObject *self, PyObject *args)
 
 #undef SPLIT_APPEND
 
+static PyObject *
+string_getnewargs(PyStringObject *v)
+{
+	return Py_BuildValue("(s#)", v->ob_sval, v->ob_size);
+}
+
 
 static PyMethodDef
 string_methods[] = {
@@ -2861,10 +3097,11 @@ string_methods[] = {
 	 expandtabs__doc__},
 	{"splitlines", (PyCFunction)string_splitlines, METH_VARARGS,
 	 splitlines__doc__},
+	{"__getnewargs__",	(PyCFunction)string_getnewargs,	METH_NOARGS},
 	{NULL,     NULL}		     /* sentinel */
 };
 
-staticforward PyObject *
+static PyObject *
 str_subtype_new(PyTypeObject *type, PyObject *args, PyObject *kwds);
 
 static PyObject *
@@ -2899,8 +3136,7 @@ str_subtype_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 		memcpy(PyString_AS_STRING(pnew), PyString_AS_STRING(tmp), n+1);
 		((PyStringObject *)pnew)->ob_shash =
 			((PyStringObject *)tmp)->ob_shash;
-		((PyStringObject *)pnew)->ob_sinterned =
-			((PyStringObject *)tmp)->ob_sinterned;
+		((PyStringObject *)pnew)->ob_sstate = SSTATE_NOT_INTERNED;
 	}
 	Py_DECREF(tmp);
 	return pnew;
@@ -2914,8 +3150,27 @@ basestring_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	return NULL;
 }
 
+static PyObject *
+string_mod(PyObject *v, PyObject *w)
+{
+	if (!PyString_Check(v)) {
+		Py_INCREF(Py_NotImplemented);
+		return Py_NotImplemented;
+	}
+	return PyString_Format(v, w);
+}
+
 PyDoc_STRVAR(basestring_doc,
 "Type basestring cannot be instantiated; it is the base for str and unicode.");
+
+static PyNumberMethods string_as_number = {
+	0,			/*nb_add*/
+	0,			/*nb_subtract*/
+	0,			/*nb_multiply*/
+	0, 			/*nb_divide*/
+	string_mod,		/*nb_remainder*/
+};
+
 
 PyTypeObject PyBaseString_Type = {
 	PyObject_HEAD_INIT(&PyType_Type)
@@ -2978,7 +3233,7 @@ PyTypeObject PyString_Type = {
 	0,					/* tp_setattr */
 	0,					/* tp_compare */
 	(reprfunc)string_repr, 			/* tp_repr */
-	0,					/* tp_as_number */
+	&string_as_number,			/* tp_as_number */
 	&string_as_sequence,			/* tp_as_sequence */
 	&string_as_mapping,			/* tp_as_mapping */
 	(hashfunc)string_hash, 			/* tp_hash */
@@ -2987,7 +3242,8 @@ PyTypeObject PyString_Type = {
 	PyObject_GenericGetAttr,		/* tp_getattro */
 	0,					/* tp_setattro */
 	&string_as_buffer,			/* tp_as_buffer */
-	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE, /* tp_flags */
+	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_CHECKTYPES | 
+		Py_TPFLAGS_BASETYPE,		/* tp_flags */
 	string_doc,				/* tp_doc */
 	0,					/* tp_traverse */
 	0,					/* tp_clear */
@@ -3053,16 +3309,14 @@ _PyString_Resize(PyObject **pv, int newsize)
 	register PyObject *v;
 	register PyStringObject *sv;
 	v = *pv;
-	if (!PyString_Check(v) || v->ob_refcnt != 1) {
+	if (!PyString_Check(v) || v->ob_refcnt != 1 || newsize < 0) {
 		*pv = 0;
 		Py_DECREF(v);
 		PyErr_BadInternalCall();
 		return -1;
 	}
 	/* XXX UNREF/NEWREF interface should be more symmetrical */
-#ifdef Py_REF_DEBUG
-	--_Py_RefTotal;
-#endif
+	_Py_DEC_REFTOTAL;
 	_Py_ForgetReference(v);
 	*pv = (PyObject *)
 		PyObject_REALLOC((char *)v,
@@ -3118,27 +3372,40 @@ formatfloat(char *buf, size_t buflen, int flags,
 	   worst case length = 3 + 10 (len of INT_MAX) + 1 = 14 (use 20)*/
 	char fmt[20];
 	double x;
-	if (!PyArg_Parse(v, "d;float argument required", &x))
+	x = PyFloat_AsDouble(v);
+	if (x == -1.0 && PyErr_Occurred()) {
+		PyErr_SetString(PyExc_TypeError, "float argument required");
 		return -1;
+	}
 	if (prec < 0)
 		prec = 6;
 	if (type == 'f' && fabs(x)/1e25 >= 1e25)
 		type = 'g';
-	PyOS_snprintf(fmt, sizeof(fmt), "%%%s.%d%c",
-		      (flags&F_ALT) ? "#" : "",
-		      prec, type);
-	/* worst case length calc to ensure no buffer overrun:
+	/* Worst case length calc to ensure no buffer overrun:
+
+	   'g' formats:
 	     fmt = %#.<prec>g
 	     buf = '-' + [0-9]*prec + '.' + 'e+' + (longest exp
 	        for any double rep.)
 	     len = 1 + prec + 1 + 2 + 5 = 9 + prec
+
+	   'f' formats:
+	     buf = '-' + [0-9]*x + '.' + [0-9]*prec (with x < 50)
+	     len = 1 + 50 + 1 + prec = 52 + prec
+
 	   If prec=0 the effective precision is 1 (the leading digit is
-	   always given), therefore increase by one to 10+prec. */
-	if (buflen <= (size_t)10 + (size_t)prec) {
+	   always given), therefore increase the length by one. 
+
+	*/
+	if ((type == 'g' && buflen <= (size_t)10 + (size_t)prec) ||
+	    (type == 'f' && buflen <= (size_t)53 + (size_t)prec)) {
 		PyErr_SetString(PyExc_OverflowError,
 			"formatted float is too long (precision too large?)");
 		return -1;
 	}
+	PyOS_snprintf(fmt, sizeof(fmt), "%%%s.%d%c",
+		      (flags&F_ALT) ? "#" : "",
+		      prec, type);
 	PyOS_snprintf(buf, buflen, fmt, x);
 	return strlen(buf);
 }
@@ -3294,8 +3561,17 @@ formatint(char *buf, size_t buflen, int flags,
 	char fmt[64];	/* plenty big enough! */
 	long x;
 
-	if (!PyArg_Parse(v, "l;int argument required", &x))
+	x = PyInt_AsLong(v);
+	if (x == -1 && PyErr_Occurred()) {
+		PyErr_SetString(PyExc_TypeError, "int argument required");
 		return -1;
+	}
+	if (x < 0 && type != 'd' && type != 'i') {
+		if (PyErr_Warn(PyExc_FutureWarning,
+			       "%u/%o/%x/%X of negative int will return "
+			       "a signed string in Python 2.4 and up") < 0)
+			return -1;
+	}
 	if (prec < 0)
 		prec = 1;
 
@@ -3400,7 +3676,8 @@ PyString_Format(PyObject *format, PyObject *args)
 		arglen = -1;
 		argidx = -2;
 	}
-	if (args->ob_type->tp_as_mapping && !PyTuple_Check(args))
+	if (args->ob_type->tp_as_mapping && !PyTuple_Check(args) &&
+	    !PyObject_TypeCheck(args, &PyBaseString_Type))
 		dict = args;
 	while (--fmtcnt >= 0) {
 		if (*fmt != '%') {
@@ -3582,7 +3859,6 @@ PyString_Format(PyObject *format, PyObject *args)
 				len = 1;
 				break;
 			case 's':
-  			case 'r':
 #ifdef Py_USING_UNICODE
 				if (PyUnicode_Check(v)) {
 					fmt = fmt_start;
@@ -3590,6 +3866,8 @@ PyString_Format(PyObject *format, PyObject *args)
 					goto unicode;
 				}
 #endif
+				/* Fall through */
+  			case 'r':
 				if (c == 's')
 					temp = PyObject_Str(v);
 				else
@@ -3597,6 +3875,9 @@ PyString_Format(PyObject *format, PyObject *args)
 				if (temp == NULL)
 					goto error;
 				if (!PyString_Check(temp)) {
+					/* XXX Note: this should never happen,
+					   since PyObject_Repr() and
+					   PyObject_Str() assure this */
 					PyErr_SetString(PyExc_TypeError,
 					  "%s argument has non-string str()");
 					Py_DECREF(temp);
@@ -3652,6 +3933,13 @@ PyString_Format(PyObject *format, PyObject *args)
 					fill = '0';
 				break;
 			case 'c':
+#ifdef Py_USING_UNICODE
+				if (PyUnicode_Check(v)) {
+					fmt = fmt_start;
+					argidx = argidx_start;
+					goto unicode;
+				}
+#endif
 				pbuf = formatbuf;
 				len = formatchar(pbuf, sizeof(formatbuf), v);
 				if (len < 0)
@@ -3661,7 +3949,8 @@ PyString_Format(PyObject *format, PyObject *args)
 				PyErr_Format(PyExc_ValueError,
 				  "unsupported format character '%c' (0x%x) "
 				  "at index %i",
-				  c, c, fmt - 1 - PyString_AsString(format));
+				  c, c,
+				  (int)(fmt - 1 - PyString_AsString(format)));
 				goto error;
 			}
 			if (sign) {
@@ -3678,10 +3967,14 @@ PyString_Format(PyObject *format, PyObject *args)
 			}
 			if (width < len)
 				width = len;
-			if (rescnt < width + (sign != 0)) {
+			if (rescnt - (sign != 0) < width) {
 				reslen -= rescnt;
 				rescnt = width + fmtcnt + 100;
 				reslen += rescnt;
+				if (reslen < 0) {
+					Py_DECREF(result);
+					return PyErr_NoMemory();
+				}
 				if (_PyString_Resize(&result, reslen) < 0)
 					return NULL;
 				res = PyString_AS_STRING(result)
@@ -3805,22 +4098,6 @@ PyString_Format(PyObject *format, PyObject *args)
 	return NULL;
 }
 
-
-
-/* This dictionary will leak at PyString_Fini() time.  That's acceptable
- * because PyString_Fini() specifically frees interned strings that are
- * only referenced by this dictionary.  The CVS log entry for revision 2.45
- * says:
- *
- *    Change the Fini function to only remove otherwise unreferenced
- *    strings from the interned table.  There are references in
- *    hard-to-find static variables all over the interpreter, and it's not
- *    worth trying to get rid of all those; but "uninterning" isn't fair
- *    either and may cause subtle failures later -- so we have to keep them
- *    in the interned table.
- */
-static PyObject *interned;
-
 void
 PyString_InternInPlace(PyObject **p)
 {
@@ -3828,47 +4105,55 @@ PyString_InternInPlace(PyObject **p)
 	PyObject *t;
 	if (s == NULL || !PyString_Check(s))
 		Py_FatalError("PyString_InternInPlace: strings only please!");
-	if ((t = s->ob_sinterned) != NULL) {
-		if (t == (PyObject *)s)
-			return;
-		Py_INCREF(t);
-		*p = t;
-		Py_DECREF(s);
+	if (PyString_CHECK_INTERNED(s))
 		return;
-	}
 	if (interned == NULL) {
 		interned = PyDict_New();
-		if (interned == NULL)
+		if (interned == NULL) {
+			PyErr_Clear(); /* Don't leave an exception */
 			return;
+		}
 	}
 	if ((t = PyDict_GetItem(interned, (PyObject *)s)) != NULL) {
 		Py_INCREF(t);
-		*p = s->ob_sinterned = t;
-		Py_DECREF(s);
+		Py_DECREF(*p);
+		*p = t;
 		return;
 	}
-	/* Ensure that only true string objects appear in the intern dict,
-	   and as the value of ob_sinterned. */
-	if (PyString_CheckExact(s)) {
-		t = (PyObject *)s;
-		if (PyDict_SetItem(interned, t, t) == 0) {
-			s->ob_sinterned = t;
-			return;
-		}
-	}
-	else {
+	/* Ensure that only true string objects appear in the intern dict */
+	if (!PyString_CheckExact(s)) {
 		t = PyString_FromStringAndSize(PyString_AS_STRING(s),
 						PyString_GET_SIZE(s));
-		if (t != NULL) {
-			if (PyDict_SetItem(interned, t, t) == 0) {
-				*p = s->ob_sinterned = t;
-				Py_DECREF(s);
-				return;
-			}
-			Py_DECREF(t);
+		if (t == NULL) {
+			PyErr_Clear();
+			return;
 		}
+	} else {
+		t = (PyObject*) s;
+		Py_INCREF(t);
 	}
+
+	if (PyDict_SetItem(interned, t, t) == 0) {
+		/* The two references in interned are not counted by
+		refcnt.  The string deallocator will take care of this */
+		((PyObject *)t)->ob_refcnt-=2;
+		PyString_CHECK_INTERNED(t) = SSTATE_INTERNED_MORTAL;
+		Py_DECREF(*p);
+		*p = t;
+		return;
+	}
+	Py_DECREF(t);
 	PyErr_Clear();
+}
+
+void
+PyString_InternImmortal(PyObject **p)
+{
+	PyString_InternInPlace(p);
+	if (PyString_CHECK_INTERNED(*p) != SSTATE_INTERNED_IMMORTAL) {
+		PyString_CHECK_INTERNED(*p) = SSTATE_INTERNED_IMMORTAL;
+		Py_INCREF(*p);
+	}
 }
 
 
@@ -3892,28 +4177,48 @@ PyString_Fini(void)
 	}
 	Py_XDECREF(nullstring);
 	nullstring = NULL;
-	if (interned) {
-		int pos, changed;
-		PyObject *key, *value;
-		do {
-			changed = 0;
-			pos = 0;
-			while (PyDict_Next(interned, &pos, &key, &value)) {
-				if (key->ob_refcnt == 2 && key == value) {
-					PyDict_DelItem(interned, key);
-					changed = 1;
-				}
-			}
-		} while (changed);
-	}
 }
 
 void _Py_ReleaseInternedStrings(void)
 {
-	if (interned) {
-		fprintf(stderr, "releasing interned strings\n");
-		PyDict_Clear(interned);
-		Py_DECREF(interned);
-		interned = NULL;
+	PyObject *keys;
+	PyStringObject *s;
+	int i, n;
+
+	if (interned == NULL || !PyDict_Check(interned))
+		return;
+	keys = PyDict_Keys(interned);
+	if (keys == NULL || !PyList_Check(keys)) {
+		PyErr_Clear();
+		return;
 	}
+
+	/* Since _Py_ReleaseInternedStrings() is intended to help a leak
+	   detector, interned strings are not forcibly deallocated; rather, we
+	   give them their stolen references back, and then clear and DECREF
+	   the interned dict. */
+	   
+	fprintf(stderr, "releasing interned strings\n");
+	n = PyList_GET_SIZE(keys);
+	for (i = 0; i < n; i++) {
+		s = (PyStringObject *) PyList_GET_ITEM(keys, i);
+		switch (s->ob_sstate) {
+		case SSTATE_NOT_INTERNED:
+			/* XXX Shouldn't happen */
+			break;
+		case SSTATE_INTERNED_IMMORTAL:
+			s->ob_refcnt += 1;
+			break;
+		case SSTATE_INTERNED_MORTAL:
+			s->ob_refcnt += 2;
+			break;
+		default:
+			Py_FatalError("Inconsistent interned string state.");
+		}
+		s->ob_sstate = SSTATE_NOT_INTERNED;
+	}
+	Py_DECREF(keys);
+	PyDict_Clear(interned);
+	Py_DECREF(interned);
+	interned = NULL;
 }

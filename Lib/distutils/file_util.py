@@ -3,7 +3,7 @@
 Utility functions for operating on single files.
 """
 
-# created 2000/04/03, Greg Ward (extracted from util.py)
+# This module should be kept compatible with Python 1.5.2.
 
 __revision__ = "$Id$"
 

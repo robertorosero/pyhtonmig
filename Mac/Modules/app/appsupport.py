@@ -69,8 +69,6 @@ ThemeDragSoundKind = OSTypeType("ThemeDragSoundKind")
 ThemeBackgroundKind = Type("ThemeBackgroundKind", "l")
 ThemeMetric = Type("ThemeMetric", "l")
 RGBColor = OpaqueType("RGBColor", "QdRGB")
-CFStringRef = OpaqueByValueType("CFStringRef", "CFStringRefObj")
-CFMutableStringRef = OpaqueByValueType("CFMutableStringRef", "CFMutableStringRefObj")
 TruncCode = Type("TruncCode", "h")
 
 
@@ -96,7 +94,7 @@ int ThemeButtonDrawInfo_Convert(PyObject *v, ThemeButtonDrawInfo *p_itself)
 
 """
 
-class MyObjectDefinition(GlobalObjectDefinition):
+class MyObjectDefinition(PEP253Mixin, GlobalObjectDefinition):
 	pass
 ## 	def outputCheckNewArg(self):
 ## 		Output("if (itself == NULL) return PyMac_Error(resNotFound);")

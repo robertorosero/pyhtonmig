@@ -26,6 +26,9 @@ from macsupport import *
 ScrapRef = OpaqueByValueType(OBJECTTYPE, OBJECTPREFIX)
 
 includestuff = includestuff + """
+#ifndef PyDoc_STR
+#define PyDoc_STR(x) (x)
+#endif
 #ifdef WITHOUT_FRAMEWORKS
 #include <Scrap.h>
 #else
@@ -52,7 +55,7 @@ ScrapFlavorFlags = Type('ScrapFlavorFlags', 'l')
 #ScrapFlavorInfo = OpaqueType('ScrapFlavorInfo', 'ScrapFlavorInfo')
 putscrapbuffer = FixedInputBufferType('void *')
 
-class MyObjectDefinition(GlobalObjectDefinition):
+class MyObjectDefinition(PEP253Mixin, GlobalObjectDefinition):
 	pass
 
 # Create the generator groups and link them

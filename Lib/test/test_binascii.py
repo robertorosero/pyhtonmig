@@ -1,6 +1,6 @@
 """Test the binascii C module."""
 
-from test_support import verify, verbose, have_unicode
+from test.test_support import verify, verbose, have_unicode
 import binascii
 
 # Show module doc string
@@ -68,6 +68,10 @@ for line in map(addnoise, lines):
     b = binascii.a2b_base64(line)
     res = res + b
 verify(res == testdata)
+
+# Test base64 with just invalid characters, which should return
+# empty strings. TBD: shouldn't it raise an exception instead ?
+verify(binascii.a2b_base64(fillers) == '')
 
 # Test uu
 print "uu test"

@@ -17,7 +17,7 @@ typedef struct {
         MD5_CTX	md5;		/* the context holder */
 } md5object;
 
-staticforward PyTypeObject MD5type;
+static PyTypeObject MD5type;
 
 #define is_md5object(v)		((v)->ob_type == &MD5type)
 
@@ -185,9 +185,10 @@ Methods:\n\
 \n\
 update() -- updates the current digest with an additional string\n\
 digest() -- return the current digest value\n\
+hexdigest() -- return the current digest as a string of hexadecimal digits\n\
 copy() -- return a copy of the current md5 object");
 
-statichere PyTypeObject MD5type = {
+static PyTypeObject MD5type = {
 	PyObject_HEAD_INIT(NULL)
 	0,			  /*ob_size*/
 	"md5.md5",		  /*tp_name*/
@@ -253,7 +254,7 @@ static PyMethodDef md5_functions[] = {
 
 /* Initialize this module. */
 
-DL_EXPORT(void)
+PyMODINIT_FUNC
 initmd5(void)
 {
 	PyObject *m, *d;

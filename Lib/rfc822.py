@@ -443,7 +443,7 @@ class Message:
 
     def __contains__(self, name):
         """Determine whether a message contains the named header."""
-        return name.lower() in self.dict        
+        return name.lower() in self.dict
 
     def keys(self):
         """Get all of a message's header field names."""
@@ -477,9 +477,9 @@ class Message:
 def unquote(str):
     """Remove quotes from a string."""
     if len(str) > 1:
-        if str[0] == '"' and str[-1:] == '"':
-            return str[1:-1]
-        if str[0] == '<' and str[-1:] == '>':
+        if str.startswith('"') and str.endswith('"'):
+            return str[1:-1].replace('\\\\', '\\').replace('\\"', '"')
+        if str.startswith('<') and str.endswith('>'):
             return str[1:-1]
     return str
 

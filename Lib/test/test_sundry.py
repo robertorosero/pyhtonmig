@@ -8,7 +8,7 @@ warnings.filterwarnings('ignore', r".*statcache module",
 warnings.filterwarnings('ignore', r".*'re' module",
                         DeprecationWarning, 'pre$')
 
-from test_support import verbose
+from test.test_support import verbose
 
 import BaseHTTPServer
 import CGIHTTPServer
@@ -36,7 +36,6 @@ import distutils
 import doctest
 import dumbdbm
 import encodings
-import filecmp
 import fnmatch
 import formatter
 import fpformat
@@ -51,7 +50,6 @@ import imaplib
 import imghdr
 import imputil
 import keyword
-#import knee
 import macpath
 import macurl2path
 import mailcap
@@ -70,7 +68,6 @@ import pre
 import profile
 import pstats
 import py_compile
-import pyclbr
 #import reconvert
 import repr
 try:

@@ -13,13 +13,19 @@ import warnings
 from cStringIO import StringIO
 from types import ListType
 
-from rfc822 import unquote, quote
-from rfc822 import AddressList as _AddressList
-from rfc822 import mktime_tz
+from email._parseaddr import quote
+from email._parseaddr import AddressList as _AddressList
+from email._parseaddr import mktime_tz
 
 # We need wormarounds for bugs in these methods in older Pythons (see below)
-from rfc822 import parsedate as _parsedate
-from rfc822 import parsedate_tz as _parsedate_tz
+from email._parseaddr import parsedate as _parsedate
+from email._parseaddr import parsedate_tz as _parsedate_tz
+
+try:
+    True, False
+except NameError:
+    True = 1
+    False = 0
 
 try:
     from quopri import decodestring as _qdecode
@@ -30,12 +36,11 @@ except ImportError:
 
         if not s:
             return s
-        hasnewline = (s[-1] == '\n')
         infp = StringIO(s)
         outfp = StringIO()
         _quopri.decode(infp, outfp)
         value = outfp.getvalue()
-        if not hasnewline and value[-1] =='\n':
+        if not s.endswith('\n') and value.endswith('\n'):
             return value[:-1]
         return value
 
@@ -49,8 +54,8 @@ EMPTYSTRING = ''
 UEMPTYSTRING = u''
 CRLF = '\r\n'
 
-specialsre = re.compile(r'[][\()<>@,:;".]')
-escapesre = re.compile(r'[][\()"]')
+specialsre = re.compile(r'[][\\()<>@,:;".]')
+escapesre = re.compile(r'[][\\()"]')
 
 
 
@@ -61,15 +66,12 @@ def _identity(s):
 
 
 def _bdecode(s):
-    if not s:
-        return s
     # We can't quite use base64.encodestring() since it tacks on a "courtesy
     # newline".  Blech!
     if not s:
         return s
-    hasnewline = (s[-1] == '\n')
     value = base64.decodestring(s)
-    if not hasnewline and value[-1] == '\n':
+    if not s.endswith('\n') and value.endswith('\n'):
         return value[:-1]
     return value
 
@@ -88,7 +90,7 @@ def fix_eols(s):
 def formataddr(pair):
     """The inverse of parseaddr(), this takes a 2-tuple of the form
     (realname, email_address) and returns the string value suitable
-    for an RFC 2822 From:, To: or Cc:.
+    for an RFC 2822 From, To or Cc header.
 
     If the first element of pair is false, then the second element is
     returned unmodified.
@@ -170,7 +172,7 @@ def encode(s, charset='iso-8859-1', encoding='q'):
 
 
 
-def formatdate(timeval=None, localtime=0):
+def formatdate(timeval=None, localtime=False):
     """Returns a date string as specified by RFC 2822, e.g.:
 
     Fri, 09 Nov 2001 01:08:47 -0000
@@ -178,7 +180,7 @@ def formatdate(timeval=None, localtime=0):
     Optional timeval if given is a floating point time value as accepted by
     gmtime() and localtime(), otherwise the current time is used.
 
-    Optional localtime is a flag that when true, interprets timeval, and
+    Optional localtime is a flag that when True, interprets timeval, and
     returns a date relative to the local timezone instead of UTC, properly
     taking daylight savings time into account.
     """
@@ -217,12 +219,12 @@ def formatdate(timeval=None, localtime=0):
 
 
 def make_msgid(idstring=None):
-    """Returns a string suitable for RFC 2822 compliant Message-ID:, e.g:
+    """Returns a string suitable for RFC 2822 compliant Message-ID, e.g:
 
     <20020201195627.33539.96671@nightshade.la.mastaler.com>
 
     Optional idstring if given is a string used to strengthen the
-    uniqueness of the Message-ID, otherwise an empty string is used.
+    uniqueness of the message id.
     """
     timeval = time.time()
     utcdate = time.strftime('%Y%m%d%H%M%S', time.gmtime(timeval))
@@ -260,30 +262,52 @@ def parseaddr(addr):
     return addrs[0]
 
 
+# rfc822.unquote() doesn't properly de-backslash-ify in Python pre-2.3.
+def unquote(str):
+    """Remove quotes from a string."""
+    if len(str) > 1:
+        if str.startswith('"') and str.endswith('"'):
+            return str[1:-1].replace('\\\\', '\\').replace('\\"', '"')
+        if str.startswith('<') and str.endswith('>'):
+            return str[1:-1]
+    return str
+
+
 
 # RFC2231-related functions - parameter encoding and decoding
 def decode_rfc2231(s):
     """Decode string according to RFC 2231"""
     import urllib
-    charset, language, s = s.split("'", 2)
-    s = urllib.unquote(s)
-    return charset, language, s
+    parts = s.split("'", 2)
+    if len(parts) == 1:
+        return None, None, s
+    charset, language, s = parts
+    return charset, language, urllib.unquote(s)
 
 
 def encode_rfc2231(s, charset=None, language=None):
-    """Encode string according to RFC 2231"""
+    """Encode string according to RFC 2231.
+
+    If neither charset nor language is given, then s is returned as-is.  If
+    charset is given but not language, the string is encoded using the empty
+    string for language.
+    """
     import urllib
     s = urllib.quote(s, safe='')
     if charset is None and language is None:
         return s
-    else:
-        return "%s'%s'%s" % (charset, language, s)
+    if language is None:
+        language = ''
+    return "%s'%s'%s" % (charset, language, s)
 
 
 rfc2231_continuation = re.compile(r'^(?P<name>\w+)\*((?P<num>[0-9]+)\*?)?$')
 
 def decode_params(params):
-    """Decode parameters list according to RFC 2231"""
+    """Decode parameters list according to RFC 2231.
+
+    params is a sequence of 2-tuples containing (content type, string value).
+    """
     new_params = []
     # maps parameter's name to a list of continuations
     rfc2231_params = {}
@@ -311,6 +335,6 @@ def decode_params(params):
             for num, continuation in continuations:
                 value.append(continuation)
             charset, language, value = decode_rfc2231(EMPTYSTRING.join(value))
-            new_params.append((name,
-                               (charset, language, '"%s"' % quote(value))))
+            new_params.append(
+                (name, (charset, language, '"%s"' % quote(value))))
     return new_params

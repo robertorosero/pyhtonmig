@@ -1,4 +1,4 @@
-# created 1999/03/13, Greg Ward
+# This module should be kept compatible with Python 1.5.2.
 
 __revision__ = "$Id$"
 

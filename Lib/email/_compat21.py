@@ -7,6 +7,9 @@
 from cStringIO import StringIO
 from types import StringType, UnicodeType
 
+False = 0
+True = 1
+
 
 
 # This function will become a method of the Message class
@@ -30,15 +33,22 @@ def _floordiv(i, j):
     return i / j
 
 
+def _isstring(obj):
+    return isinstance(obj, StringType) or isinstance(obj, UnicodeType)
+
+
 
 # These two functions are imported into the Iterators.py interface module.
 # The Python 2.2 version uses generators for efficiency.
-def body_line_iterator(msg):
-    """Iterate over the parts, returning string payloads line-by-line."""
+def body_line_iterator(msg, decode=False):
+    """Iterate over the parts, returning string payloads line-by-line.
+
+    Optional decode (default False) is passed through to .get_payload().
+    """
     lines = []
     for subpart in msg.walk():
-        payload = subpart.get_payload()
-        if isinstance(payload, StringType) or isinstance(payload, UnicodeType):
+        payload = subpart.get_payload(decode=decode)
+        if _isstring(payload):
             for line in StringIO(payload).readlines():
                 lines.append(line)
     return lines
@@ -53,7 +63,7 @@ def typed_subpart_iterator(msg, maintype='text', subtype=None):
     """
     parts = []
     for subpart in msg.walk():
-        if subpart.get_main_type('text') == maintype:
-            if subtype is None or subpart.get_subtype('plain') == subtype:
+        if subpart.get_content_maintype() == maintype:
+            if subtype is None or subpart.get_content_subtype() == subtype:
                 parts.append(subpart)
     return parts

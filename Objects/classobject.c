@@ -487,6 +487,14 @@ PyClass_IsSubclass(PyObject *class, PyObject *base)
 	PyClassObject *cp;
 	if (class == base)
 		return 1;
+	if (PyTuple_Check(base)) {
+		n = PyTuple_GET_SIZE(base);
+		for (i = 0; i < n; i++) {
+			if (PyClass_IsSubclass(class, PyTuple_GET_ITEM(base, i)))
+				return 1;
+		}
+		return 0;
+	}
 	if (class == NULL || !PyClass_Check(class))
 		return 0;
 	cp = (PyClassObject *)class;
@@ -549,6 +557,10 @@ PyInstance_New(PyObject *klass, PyObject *arg, PyObject *kw)
 		initstr = PyString_InternFromString("__init__");
 	init = instance_getattr2(inst, initstr);
 	if (init == NULL) {
+		if (PyErr_Occurred()) {
+			Py_DECREF(inst);
+			return NULL;
+		}
 		if ((arg != NULL && (!PyTuple_Check(arg) ||
 				     PyTuple_Size(arg) != 0))
 		    || (kw != NULL && (!PyDict_Check(kw) ||
@@ -615,31 +627,15 @@ instance_dealloc(register PyInstanceObject *inst)
 	PyObject *error_type, *error_value, *error_traceback;
 	PyObject *del;
 	static PyObject *delstr;
-#ifdef Py_REF_DEBUG
-	extern long _Py_RefTotal;
-#endif
+
 	_PyObject_GC_UNTRACK(inst);
 	if (inst->in_weakreflist != NULL)
 		PyObject_ClearWeakRefs((PyObject *) inst);
 
 	/* Temporarily resurrect the object. */
-#ifdef Py_TRACE_REFS
-#ifndef Py_REF_DEBUG
-#   error "Py_TRACE_REFS defined but Py_REF_DEBUG not."
-#endif
-	/* much too complicated if Py_TRACE_REFS defined */
-	inst->ob_type = &PyInstance_Type;
-	_Py_NewReference((PyObject *)inst);
-#ifdef COUNT_ALLOCS
-	/* compensate for boost in _Py_NewReference; note that
-	 * _Py_RefTotal was also boosted; we'll knock that down later.
-	 */
-	inst->ob_type->tp_allocs--;
-#endif
-#else /* !Py_TRACE_REFS */
-	/* Py_INCREF boosts _Py_RefTotal if Py_REF_DEBUG is defined */
-	Py_INCREF(inst);
-#endif /* !Py_TRACE_REFS */
+	assert(inst->ob_type == &PyInstance_Type);
+	assert(inst->ob_refcnt == 0);
+	inst->ob_refcnt = 1;
 
 	/* Save the current exception, if any. */
 	PyErr_Fetch(&error_type, &error_value, &error_traceback);
@@ -656,35 +652,37 @@ instance_dealloc(register PyInstanceObject *inst)
 	}
 	/* Restore the saved exception. */
 	PyErr_Restore(error_type, error_value, error_traceback);
+
 	/* Undo the temporary resurrection; can't use DECREF here, it would
 	 * cause a recursive call.
 	 */
-#ifdef Py_REF_DEBUG
-	/* _Py_RefTotal was boosted either by _Py_NewReference or
-	 * Py_INCREF above.
-	 */
-	_Py_RefTotal--;
-#endif
-	if (--inst->ob_refcnt > 0) {
-#ifdef COUNT_ALLOCS
-		inst->ob_type->tp_frees--;
-#endif
-		_PyObject_GC_TRACK(inst);
-		return; /* __del__ added a reference; don't delete now */
+	assert(inst->ob_refcnt > 0);
+	if (--inst->ob_refcnt == 0) {
+		Py_DECREF(inst->in_class);
+		Py_XDECREF(inst->in_dict);
+		PyObject_GC_Del(inst);
 	}
-#ifdef Py_TRACE_REFS
-	_Py_ForgetReference((PyObject *)inst);
+	else {
+		int refcnt = inst->ob_refcnt;
+		/* __del__ resurrected it!  Make it look like the original
+		 * Py_DECREF never happened.
+		 */
+		_Py_NewReference((PyObject *)inst);
+		inst->ob_refcnt = refcnt;
+		_PyObject_GC_TRACK(inst);
+		/* If Py_REF_DEBUG, the original decref dropped _Py_RefTotal,
+		 * but _Py_NewReference bumped it again, so that's a wash.
+		 * If Py_TRACE_REFS, _Py_NewReference re-added self to the
+		 * object chain, so no more to do there either.
+		 * If COUNT_ALLOCS, the original decref bumped tp_frees, and
+		 * _Py_NewReference bumped tp_allocs:  both of those need to
+		 * be undone.
+		 */
 #ifdef COUNT_ALLOCS
-	/* compensate for increment in _Py_ForgetReference */
-	inst->ob_type->tp_frees--;
+		--inst->ob_type->tp_frees;
+		--inst->ob_type->tp_allocs;
 #endif
-#ifndef WITH_CYCLE_GC
-	inst->ob_type = NULL;
-#endif
-#endif
-	Py_DECREF(inst->in_class);
-	Py_XDECREF(inst->in_dict);
-	PyObject_GC_Del(inst);
+	}
 }
 
 static PyObject *
@@ -708,7 +706,7 @@ instance_getattr1(register PyInstanceObject *inst, PyObject *name)
 		}
 	}
 	v = instance_getattr2(inst, name);
-	if (v == NULL) {
+	if (v == NULL && !PyErr_Occurred()) {
 		PyErr_Format(PyExc_AttributeError,
 			     "%.50s instance has no attribute '%.400s'",
 			     PyString_AS_STRING(inst->in_class->cl_name), sname);
@@ -759,6 +757,27 @@ instance_getattr(register PyInstanceObject *inst, PyObject *name)
 		Py_DECREF(args);
 	}
 	return res;
+}
+
+/* See classobject.h comments:  this only does dict lookups, and is always
+ * safe to call.
+ */
+PyObject *
+_PyInstance_Lookup(PyObject *pinst, PyObject *name)
+{
+	PyObject *v;
+	PyClassObject *class;
+	PyInstanceObject *inst;	/* pinst cast to the right type */
+
+	assert(PyInstance_Check(pinst));
+	inst = (PyInstanceObject *)pinst;
+
+	assert(PyString_Check(name));
+
+ 	v = PyDict_GetItem(inst->in_dict, name);
+	if (v == NULL)
+		v = class_lookup(inst->in_class, name, &class);
+	return v;
 }
 
 static int
@@ -1100,7 +1119,7 @@ sliceobj_from_intint(int i, int j)
 	start = PyInt_FromLong((long)i);
 	if (!start)
 		return NULL;
-	
+
 	end = PyInt_FromLong((long)j);
 	if (!end) {
 		Py_DECREF(start);
@@ -1134,9 +1153,9 @@ instance_slice(PyInstanceObject *inst, int i, int j)
 		if (func == NULL)
 			return NULL;
 		arg = Py_BuildValue("(N)", sliceobj_from_intint(i, j));
-	} else 
+	} else
 		arg = Py_BuildValue("(ii)", i, j);
-		
+
 	if (arg == NULL) {
 		Py_DECREF(func);
 		return NULL;
@@ -1269,7 +1288,7 @@ instance_contains(PyInstanceObject *inst, PyObject *member)
 		res = PyEval_CallObject(func, arg);
 		Py_DECREF(func);
 		Py_DECREF(arg);
-		if(res == NULL) 
+		if(res == NULL)
 			return -1;
 		ret = PyObject_IsTrue(res);
 		Py_DECREF(res);
@@ -1342,7 +1361,7 @@ static PyObject *coerce_obj;
 
 /* Try one half of a binary operator involving a class instance. */
 static PyObject *
-half_binop(PyObject *v, PyObject *w, char *opname, binaryfunc thisfunc, 
+half_binop(PyObject *v, PyObject *w, char *opname, binaryfunc thisfunc,
 		int swapped)
 {
 	PyObject *args;
@@ -1350,7 +1369,7 @@ half_binop(PyObject *v, PyObject *w, char *opname, binaryfunc thisfunc,
 	PyObject *coerced = NULL;
 	PyObject *v1;
 	PyObject *result;
-	
+
 	if (!PyInstance_Check(v)) {
 		Py_INCREF(Py_NotImplemented);
 		return Py_NotImplemented;
@@ -1371,6 +1390,7 @@ half_binop(PyObject *v, PyObject *w, char *opname, binaryfunc thisfunc,
 
 	args = Py_BuildValue("(O)", w);
 	if (args == NULL) {
+		Py_DECREF(coercefunc);
 		return NULL;
 	}
 	coerced = PyEval_CallObject(coercefunc, args);
@@ -1567,8 +1587,10 @@ half_cmp(PyObject *v, PyObject *w)
 	}
 
 	args = Py_BuildValue("(O)", w);
-	if (args == NULL)
+	if (args == NULL) {
+		Py_DECREF(cmp_func);
 		return -2;
+	}
 
 	result = PyEval_CallObject(cmp_func, args);
 	Py_DECREF(args);
@@ -1711,7 +1733,7 @@ bin_power(PyObject *v, PyObject *w)
 /* This version is for ternary calls only (z != None) */
 static PyObject *
 instance_pow(PyObject *v, PyObject *w, PyObject *z)
-{	
+{
 	if (z == Py_None) {
 		return do_binop(v, w, "__pow__", "__rpow__", bin_power);
 	}
@@ -1780,7 +1802,7 @@ instance_ipow(PyObject *v, PyObject *w, PyObject *z)
 #define NAME_OPS 6
 static PyObject **name_op = NULL;
 
-static int 
+static int
 init_name_op(void)
 {
 	int i;
@@ -1820,25 +1842,20 @@ half_richcompare(PyObject *v, PyObject *w, int op)
 	/* If the instance doesn't define an __getattr__ method, use
 	   instance_getattr2 directly because it will not set an
 	   exception on failure. */
-	if (((PyInstanceObject *)v)->in_class->cl_getattr == NULL) {
-		method = instance_getattr2((PyInstanceObject *)v, 
+	if (((PyInstanceObject *)v)->in_class->cl_getattr == NULL)
+		method = instance_getattr2((PyInstanceObject *)v,
 					   name_op[op]);
-		if (method == NULL) {
-			assert(!PyErr_Occurred());
-			res = Py_NotImplemented;
-			Py_INCREF(res);
-			return res;
-		}
-	} else {
+	else
 		method = PyObject_GetAttr(v, name_op[op]);
-		if (method == NULL) {
+	if (method == NULL) {
+		if (PyErr_Occurred()) {
 			if (!PyErr_ExceptionMatches(PyExc_AttributeError))
 				return NULL;
 			PyErr_Clear();
-			res = Py_NotImplemented;
-			Py_INCREF(res);
-			return res;
 		}
+		res = Py_NotImplemented;
+		Py_INCREF(res);
+		return res;
 	}
 
 	args = Py_BuildValue("(O)", w);
@@ -2180,9 +2197,9 @@ instancemethod_new(PyTypeObject* type, PyObject* args, PyObject *kw)
 {
 	PyObject *func;
 	PyObject *self;
-	PyObject *classObj;
+	PyObject *classObj = NULL;
 
-	if (!PyArg_ParseTuple(args, "OOO:instancemethod",
+	if (!PyArg_UnpackTuple(args, "instancemethod", 2, 3,
 			      &func, &self, &classObj))
 		return NULL;
 	if (!PyCallable_Check(func)) {
@@ -2314,37 +2331,38 @@ instancemethod_traverse(PyMethodObject *im, visitproc visit, void *arg)
 	return 0;
 }
 
-static char *
-getclassname(PyObject *class)
+static void
+getclassname(PyObject *class, char *buf, int bufsize)
 {
 	PyObject *name;
 
+	assert(bufsize > 1);
+	strcpy(buf, "?"); /* Default outcome */
 	if (class == NULL)
-		name = NULL;
-	else
-		name = PyObject_GetAttrString(class, "__name__");
+		return;
+	name = PyObject_GetAttrString(class, "__name__");
 	if (name == NULL) {
 		/* This function cannot return an exception */
 		PyErr_Clear();
-		return "?";
+		return;
 	}
-	if (!PyString_Check(name)) {
-		Py_DECREF(name);
-		return "?";
+	if (PyString_Check(name)) {
+		strncpy(buf, PyString_AS_STRING(name), bufsize);
+		buf[bufsize-1] = '\0';
 	}
-	PyString_InternInPlace(&name);
 	Py_DECREF(name);
-	return PyString_AS_STRING(name);
 }
 
-static char *
-getinstclassname(PyObject *inst)
+static void
+getinstclassname(PyObject *inst, char *buf, int bufsize)
 {
 	PyObject *class;
-	char *name;
 
-	if (inst == NULL)
-		return "nothing";
+	if (inst == NULL) {
+		assert(bufsize > 0 && (size_t)bufsize > strlen("nothing"));
+		strcpy(buf, "nothing");
+		return;
+	}
 
 	class = PyObject_GetAttrString(inst, "__class__");
 	if (class == NULL) {
@@ -2353,9 +2371,8 @@ getinstclassname(PyObject *inst)
 		class = (PyObject *)(inst->ob_type);
 		Py_INCREF(class);
 	}
-	name = getclassname(class);
+	getclassname(class, buf, bufsize);
 	Py_XDECREF(class);
-	return name;
 }
 
 static PyObject *
@@ -2380,14 +2397,18 @@ instancemethod_call(PyObject *func, PyObject *arg, PyObject *kw)
 				return NULL;
 		}
 		if (!ok) {
+			char clsbuf[256];
+			char instbuf[256];
+			getclassname(class, clsbuf, sizeof(clsbuf));
+			getinstclassname(self, instbuf, sizeof(instbuf));
 			PyErr_Format(PyExc_TypeError,
 				     "unbound method %s%s must be called with "
 				     "%s instance as first argument "
 				     "(got %s%s instead)",
 				     PyEval_GetFuncName(func),
 				     PyEval_GetFuncDesc(func),
-				     getclassname(class),
-				     getinstclassname(self),
+				     clsbuf,
+				     instbuf,
 				     self == NULL ? "" : " instance");
 			return NULL;
 		}
@@ -2414,19 +2435,29 @@ instancemethod_call(PyObject *func, PyObject *arg, PyObject *kw)
 }
 
 static PyObject *
-instancemethod_descr_get(PyObject *meth, PyObject *obj, PyObject *class)
+instancemethod_descr_get(PyObject *meth, PyObject *obj, PyObject *cls)
 {
 	/* Don't rebind an already bound method, or an unbound method
-	   of a class that's not a base class of class */
-	if (PyMethod_GET_SELF(meth) != NULL ||
-	    (PyMethod_GET_CLASS(meth) != NULL &&
-	     !PyObject_IsSubclass(class,  PyMethod_GET_CLASS(meth)))) {
+	   of a class that's not a base class of cls. */
+
+	if (PyMethod_GET_SELF(meth) != NULL) {
+		/* Already bound */
 		Py_INCREF(meth);
 		return meth;
 	}
-	if (obj == Py_None)
-		obj = NULL;
-	return PyMethod_New(PyMethod_GET_FUNCTION(meth), obj, class);
+	/* No, it is an unbound method */
+	if (PyMethod_GET_CLASS(meth) != NULL && cls != NULL) {
+		/* Do subclass test.  If it fails, return meth unchanged. */
+		int ok = PyObject_IsSubclass(cls, PyMethod_GET_CLASS(meth));
+		if (ok < 0)
+			return NULL;
+		if (!ok) {
+			Py_INCREF(meth);
+			return meth;
+		}
+	}
+	/* Bind it to obj */
+	return PyMethod_New(PyMethod_GET_FUNCTION(meth), obj, cls);
 }
 
 PyTypeObject PyMethod_Type = {

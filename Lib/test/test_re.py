@@ -1,7 +1,7 @@
 import sys
 sys.path = ['.'] + sys.path
 
-from test_support import verify, verbose, TestFailed
+from test.test_support import verify, verbose, TestFailed
 import re
 import sys, os, traceback
 
@@ -267,7 +267,7 @@ try:
 except RuntimeError, v:
     print v
 
-from re_tests import *
+from test.re_tests import *
 
 if verbose:
     print 'Running re_tests test suite'

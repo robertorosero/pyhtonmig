@@ -3,10 +3,11 @@
 Contains MSVCCompiler, an implementation of the abstract CCompiler class
 for the Microsoft Visual Studio."""
 
-
-# created 1999/08/19, Perry Stoll
+# Written by Perry Stoll
 # hacked by Robin Becker and Thomas Heller to do a better job of
 #   finding DevStudio (through the registry)
+
+# This module should be kept compatible with Python 1.5.2.
 
 __revision__ = "$Id$"
 
@@ -309,7 +310,7 @@ class MSVCCompiler (CCompiler) :
                 input_opt = src
                 output_opt = "/fo" + obj
                 try:
-                    self.spawn ([self.rc] +
+                    self.spawn ([self.rc] + pp_opts +
                                 [output_opt] + [input_opt])
                 except DistutilsExecError, msg:
                     raise CompileError, msg
@@ -367,8 +368,7 @@ class MSVCCompiler (CCompiler) :
                            output_libname,
                            output_dir=None,
                            debug=0,
-                           extra_preargs=None,
-                           extra_postargs=None):
+                           target_lang=None):
 
         (objects, output_dir) = self._fix_object_args (objects, output_dir)
         output_filename = \
@@ -378,10 +378,6 @@ class MSVCCompiler (CCompiler) :
             lib_args = objects + ['/OUT:' + output_filename]
             if debug:
                 pass                    # XXX what goes here?
-            if extra_preargs:
-                lib_args[:0] = extra_preargs
-            if extra_postargs:
-                lib_args.extend (extra_postargs)
             try:
                 self.spawn ([self.lib] + lib_args)
             except DistutilsExecError, msg:
@@ -404,7 +400,8 @@ class MSVCCompiler (CCompiler) :
               debug=0,
               extra_preargs=None,
               extra_postargs=None,
-              build_temp=None):
+              build_temp=None,
+              target_lang=None):
 
         (objects, output_dir) = self._fix_object_args (objects, output_dir)
         (libraries, library_dirs, runtime_library_dirs) = \

@@ -346,10 +346,6 @@ binascii_a2b_base64(PyObject *self, PyObject *args)
 	if ( !PyArg_ParseTuple(args, "t#:a2b_base64", &ascii_data, &ascii_len) )
 		return NULL;
 
-	if ( ascii_len == 0) {
-		PyErr_SetString(Error, "Cannot decode empty input");
-		return NULL;
-	}
 	bin_len = ((ascii_len+3)/4)*3; /* Upper bound, corrected later */
 
 	/* Allocate the buffer */
@@ -412,8 +408,16 @@ binascii_a2b_base64(PyObject *self, PyObject *args)
 		return NULL;
 	}
 
-	/* and set string size correctly */
-	_PyString_Resize(&rv, bin_len);
+	/* And set string size correctly. If the result string is empty
+	** (because the input was all invalid) return the shared empty
+	** string instead; _PyString_Resize() won't do this for us.
+	*/
+	if (bin_len > 0)
+		_PyString_Resize(&rv, bin_len);
+	else {
+		Py_DECREF(rv);
+		rv = PyString_FromString("");
+	}
 	return rv;
 }
 
@@ -1313,7 +1317,7 @@ static struct PyMethodDef binascii_module_methods[] = {
 /* Initialization function for the module (*must* be called initbinascii) */
 PyDoc_STRVAR(doc_binascii, "Conversion between binary data and ASCII");
 
-DL_EXPORT(void)
+PyMODINIT_FUNC
 initbinascii(void)
 {
 	PyObject *m, *d, *x;

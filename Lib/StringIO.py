@@ -59,7 +59,15 @@ class StringIO:
         self.softspace = 0
 
     def __iter__(self):
-        return iter(self.readline, '')
+        return self
+
+    def next(self):
+        if self.closed:
+            raise StopIteration
+        r = self.readline()
+        if not r:
+            raise StopIteration
+        return r
 
     def close(self):
         """Free the memory buffer.
@@ -152,6 +160,10 @@ class StringIO:
         # Force s to be a string or unicode
         if not isinstance(s, basestring):
             s = str(s)
+        if self.pos == self.len:
+            self.buflist.append(s)
+            self.len = self.pos = self.pos + len(s)
+            return
         if self.pos > self.len:
             self.buflist.append('\0'*(self.pos - self.len))
             self.len = self.pos

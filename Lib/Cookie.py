@@ -51,7 +51,7 @@ Importing is easy..
    >>> import Cookie
 
 Most of the time you start by creating a cookie.  Cookies come in
-three flavors, each with slighly different encoding semanitcs, but
+three flavors, each with slightly different encoding semantics, but
 more on that later.
 
    >>> C = Cookie.SimpleCookie()
@@ -222,10 +222,7 @@ try:
 except ImportError:
     from pickle import dumps, loads
 
-try:
-    import re
-except ImportError:
-    raise ImportError, "Cookie.py requires 're' from Python 1.5 or later"
+import re, warnings
 
 __all__ = ["CookieError","BaseCookie","SimpleCookie","SerialCookie",
            "SmartCookie","Cookie"]
@@ -685,6 +682,11 @@ class SerialCookie(BaseCookie):
     Note: HTTP has a 2k limit on the size of a cookie.  This class
     does not check for this limit, so be careful!!!
     """
+    def __init__(self, input=None):
+        warnings.warn("SerialCookie class is insecure; do not use it",
+                      DeprecationWarning)
+        BaseCookie.__init__(self, input)
+    # end __init__
     def value_decode(self, val):
         # This could raise an exception!
         return loads( _unquote(val) ), val
@@ -705,6 +707,11 @@ class SmartCookie(BaseCookie):
     Note: HTTP has a 2k limit on the size of a cookie.  This class
     does not check for this limit, so be careful!!!
     """
+    def __init__(self, input=None):
+        warnings.warn("Cookie/SmartCookie class is insecure; do not use it",
+                      DeprecationWarning)
+        BaseCookie.__init__(self, input)
+    # end __init__
     def value_decode(self, val):
         strval = _unquote(val)
         try:

@@ -139,7 +139,10 @@
  * getpagesize() call or deduced from various header files. To make
  * things simpler, we assume that it is 4K, which is OK for most systems.
  * It is probably better if this is the native page size, but it doesn't
- * have to be.
+ * have to be.  In theory, if SYSTEM_PAGE_SIZE is larger than the native page 
+ * size, then `POOL_ADDR(p)->arenaindex' could rarely cause a segmentation 
+ * violation fault.  4K is apparently OK for all the platforms that python 
+ * currently targets.
  */
 #define SYSTEM_PAGE_SIZE	(4 * 1024)
 #define SYSTEM_PAGE_SIZE_MASK	(SYSTEM_PAGE_SIZE - 1)
@@ -260,7 +263,7 @@ typedef struct pool_header *poolp;
 /*
  * This malloc lock
  */
-SIMPLELOCK_DECL(_malloc_lock);
+SIMPLELOCK_DECL(_malloc_lock)
 #define LOCK()		SIMPLELOCK_LOCK(_malloc_lock)
 #define UNLOCK()	SIMPLELOCK_UNLOCK(_malloc_lock)
 #define LOCK_INIT()	SIMPLELOCK_INIT(_malloc_lock)
@@ -437,7 +440,7 @@ new_arena(void)
 	arenabase = bp;
 	nfreepools = ARENA_SIZE / POOL_SIZE;
 	assert(POOL_SIZE * nfreepools == ARENA_SIZE);
-	excess = (uint)bp & POOL_SIZE_MASK;
+	excess = (uint) ((Py_uintptr_t)bp & POOL_SIZE_MASK);
 	if (excess != 0) {
 		--nfreepools;
 		arenabase += POOL_SIZE - excess;
@@ -685,10 +688,8 @@ redirect:
 	 * last chance to serve the request) or when the max memory limit
 	 * has been reached.
 	 */
-#ifdef MALLOC_ZERO_RETURNS_NULL
 	if (nbytes == 0)
 		nbytes = 1;
-#endif
 	return (void *)malloc(nbytes);
 }
 
@@ -881,7 +882,7 @@ PyObject_Free(void *p)
 #undef DEADBYTE
 #undef FORBIDDENBYTE
 #define CLEANBYTE      0xCB    /* clean (newly allocated) memory */
-#define DEADBYTE       0xDB    /* deed (newly freed) memory */
+#define DEADBYTE       0xDB    /* dead (newly freed) memory */
 #define FORBIDDENBYTE  0xFB    /* untouchable bytes at each end of a block */
 
 static ulong serialno = 0;	/* incremented on each debug {m,re}alloc */

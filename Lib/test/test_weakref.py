@@ -3,7 +3,7 @@ import unittest
 import UserList
 import weakref
 
-import test_support
+from test import test_support
 
 
 class C:
@@ -74,8 +74,7 @@ class ReferencesTestCase(TestBase):
                      "callback not called the right number of times")
 
     def test_multiple_selfref_callbacks(self):
-        """Make sure all references are invalidated before callbacks
-        are called."""
+        # Make sure all references are invalidated before callbacks are called
         #
         # What's important here is that we're using the first
         # reference in the callback invoked on the second reference
@@ -262,7 +261,7 @@ class ReferencesTestCase(TestBase):
         self.assert_(1.0 + p == 3.0)  # this used to SEGV
 
     def test_callbacks_protected(self):
-        """Callbacks protected from already-set exceptions?"""
+        # Callbacks protected from already-set exceptions?
         # Regression test for SF bug #478534.
         class BogusError(Exception):
             pass
@@ -518,12 +517,28 @@ class MappingTestCase(TestBase):
         self.assert_(len(d) == 1)
         self.assert_(d.items() == [('something else', o2)])
 
+from test_userdict import TestMappingProtocol
+
+class WeakValueDictionaryTestCase(TestMappingProtocol):
+    """Check that WeakValueDictionary class conforms to the mapping protocol"""
+    __ref = {"key1":Object(1), "key2":Object(2), "key3":Object(3)}
+    _tested_class = weakref.WeakValueDictionary
+    def _reference(self):
+        return self.__ref.copy()
+
+class WeakKeyDictionaryTestCase(TestMappingProtocol):
+    """Check that WeakKeyDictionary class conforms to the mapping protocol"""
+    __ref = {Object("key1"):1, Object("key2"):2, Object("key3"):3}
+    _tested_class = weakref.WeakKeyDictionary
+    def _reference(self):
+        return self.__ref.copy()
 
 def test_main():
-    loader = unittest.TestLoader()
     suite = unittest.TestSuite()
-    suite.addTest(loader.loadTestsFromTestCase(ReferencesTestCase))
-    suite.addTest(loader.loadTestsFromTestCase(MappingTestCase))
+    suite.addTest(unittest.makeSuite(ReferencesTestCase))
+    suite.addTest(unittest.makeSuite(MappingTestCase))
+    suite.addTest(unittest.makeSuite(WeakValueDictionaryTestCase))
+    suite.addTest(unittest.makeSuite(WeakKeyDictionaryTestCase))
     test_support.run_suite(suite)
 
 

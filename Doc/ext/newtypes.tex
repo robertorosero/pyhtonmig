@@ -38,18 +38,13 @@ seem familiar from the last chapter.
 The first bit that will be new is:
 
 \begin{verbatim}
-staticforward PyTypeObject noddy_NoddyType;
+static PyTypeObject noddy_NoddyType;
 \end{verbatim}
 
 This names the type object that will be defining further down in the
 file.  It can't be defined here because its definition has to refer to
-functions that have no yet been defined, but we need to be able to
+functions that have not yet been defined, but we need to be able to
 refer to it, hence the declaration.
-
-The \code{staticforward} is required to placate various brain dead
-compilers.  The actual definition of the object declared using
-\code{staticforward} should use \code{statichere} instead of
-\keyword{static}.
 
 \begin{verbatim}
 typedef struct {
@@ -57,8 +52,8 @@ typedef struct {
 } noddy_NoddyObject;
 \end{verbatim}
 
-This is what a Noddy object will contain.  In this case nothing more
-than every Python object contains - a refcount and a pointer to a type
+This is what a Noddy object will contain---in this case, nothing more
+than every Python object contains, namely a refcount and a pointer to a type
 object.  These are the fields the \code{PyObject_HEAD} macro brings
 in.  The reason for the macro is to standardize the layout and to
 enable special debugging fields in debug builds.  Note that there is
@@ -66,7 +61,7 @@ no semicolon after the \code{PyObject_HEAD} macro; one is included in
 the macro definition.  Be wary of adding one by accident; it's easy to
 do from habit, and your compiler might not complain, but someone
 else's probably will!  (On Windows, MSVC is known to call this an
-error and refuse to produce compiled code.)
+error and refuse to compile the code.)
 
 For contrast, let's take a look at the corresponding definition for
 standard Python integers:
@@ -156,7 +151,7 @@ Python objects, one would decref them here.
 Moving on, we come to the crunch --- the type object.
 
 \begin{verbatim}
-statichere PyTypeObject noddy_NoddyType = {
+static PyTypeObject noddy_NoddyType = {
     PyObject_HEAD_INIT(NULL)
     0,                          /* ob_size */
     "Noddy",                    /* tp_name */
@@ -174,9 +169,6 @@ statichere PyTypeObject noddy_NoddyType = {
     0,                          /* tp_hash */
 };
 \end{verbatim}
-
-(Note the use of \code{statichere} instead of \keyword{static}, since
-we used \code{staticforward} in the declaration.)
 
 Now if you go and look up the definition of \ctype{PyTypeObject} in
 \file{object.h} you'll see that it has many, many more fields that the
@@ -206,7 +198,7 @@ oppourtunity --- in \cfunction{initnoddy()}.
     0,                          /* ob_size */
 \end{verbatim}
 
-The \member{ob_size} field of the header is not used; it's presence in
+The \member{ob_size} field of the header is not used; its presence in
 the type structure is a historical artifact that is maintained for
 binary compatibility with extension modules compiled for older
 versions of Python.  Always set this field to zero.
@@ -322,7 +314,7 @@ Try to choose something that will be helpful in such a situation!
 \end{verbatim}
 
 These fields tell the runtime how much memory to allocate when new
-objects of this typed are created.  Python has some builtin support
+objects of this type are created.  Python has some builtin support
 for variable length structures (think: strings, lists) which is where
 the \member{tp_itemsize} field comes in.  This will be dealt with
 later.
@@ -450,7 +442,7 @@ uniquely-identifying value for the object.
 The \member{tp_str} handler is to \function{str()} what the
 \member{tp_repr} handler described above is to \function{repr()}; that
 is, it is called when Python code calls \function{str()} on an
-instance of your object.  It's implementation is very similar to the
+instance of your object.  Its implementation is very similar to the
 \member{tp_repr} function, but the resulting string is intended for
 human consumption.  If \member{tp_str} is not specified, the
 \member{tp_repr} handler is used instead.
@@ -545,7 +537,7 @@ that must be met:
   \item   The name of the attributes must be known when
           \cfunction{PyType_Ready()} is called.
 
-  \item   No special processing is need to record that an attribute
+  \item   No special processing is needed to record that an attribute
           was looked up or set, nor do actions need to be taken based
           on the value.
 \end{enumerate}
@@ -888,7 +880,7 @@ XXX some fields need to be added here...
 \end{verbatim}
 
 These functions provide support for the iterator protocol.  Any object
-which wishes to support iteration over it's contents (which may be
+which wishes to support iteration over its contents (which may be
 generated during iteration) must implement the \code{tp_iter}
 handler.  Objects which are returned by a \code{tp_iter} handler must
 implement both the \code{tp_iter} and \code{tp_iternext} handlers.

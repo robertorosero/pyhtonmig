@@ -88,7 +88,7 @@ def initlog(*allargs):
         log = nolog
     else:
         log = dolog
-    apply(log, allargs)
+    log(*allargs)
 
 def dolog(fmt, *args):
     """Write a log message to the log file.  See initlog() for docs."""
@@ -524,6 +524,9 @@ class FieldStorage:
         """Return a printable representation."""
         return "FieldStorage(%s, %s, %s)" % (
                 `self.name`, `self.filename`, `self.value`)
+
+    def __iter__(self):
+        return iter(self.keys())
 
     def __getattr__(self, name):
         if name != 'value':

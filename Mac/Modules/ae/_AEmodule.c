@@ -20,6 +20,9 @@
     }} while(0)
 
 
+#ifndef PyDoc_STR
+#define PyDoc_STR(x) (x)
+#endif
 #ifdef WITHOUT_FRAMEWORKS
 #include <AppleEvents.h>
 #include <AEObjects.h>
@@ -32,10 +35,13 @@ extern PyObject *_AEDesc_New(AEDesc *);
 extern int _AEDesc_Convert(PyObject *, AEDesc *);
 
 #define AEDesc_New _AEDesc_New
+#define AEDesc_NewBorrowed _AEDesc_NewBorrowed
 #define AEDesc_Convert _AEDesc_Convert
 #endif
 
-static pascal OSErr GenericEventHandler(); /* Forward */
+typedef long refcontype;
+
+static pascal OSErr GenericEventHandler(const AppleEvent *request, AppleEvent *reply, refcontype refcon); /* Forward */
 
 AEEventHandlerUPP upp_GenericEventHandler;
 
@@ -60,11 +66,12 @@ static PyObject *AE_Error;
 
 PyTypeObject AEDesc_Type;
 
-#define AEDesc_Check(x) ((x)->ob_type == &AEDesc_Type)
+#define AEDesc_Check(x) ((x)->ob_type == &AEDesc_Type || PyObject_TypeCheck((x), &AEDesc_Type))
 
 typedef struct AEDescObject {
 	PyObject_HEAD
 	AEDesc ob_itself;
+	int ob_owned;
 } AEDescObject;
 
 PyObject *AEDesc_New(AEDesc *itself)
@@ -73,6 +80,7 @@ PyObject *AEDesc_New(AEDesc *itself)
 	it = PyObject_NEW(AEDescObject, &AEDesc_Type);
 	if (it == NULL) return NULL;
 	it->ob_itself = *itself;
+	it->ob_owned = 1;
 	return (PyObject *)it;
 }
 int AEDesc_Convert(PyObject *v, AEDesc *p_itself)
@@ -88,8 +96,8 @@ int AEDesc_Convert(PyObject *v, AEDesc *p_itself)
 
 static void AEDesc_dealloc(AEDescObject *self)
 {
-	AEDisposeDesc(&self->ob_itself);
-	PyObject_Del(self);
+	if (self->ob_owned) AEDisposeDesc(&self->ob_itself);
+	self->ob_type->tp_free((PyObject *)self);
 }
 
 static PyObject *AEDesc_AECoerceDesc(AEDescObject *_self, PyObject *_args)
@@ -601,8 +609,6 @@ static PyObject *AEDesc_AEPutAttributeDesc(AEDescObject *_self, PyObject *_args)
 	return _res;
 }
 
-#if TARGET_API_MAC_CARBON
-
 static PyObject *AEDesc_AEGetDescDataSize(AEDescObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
@@ -617,7 +623,6 @@ static PyObject *AEDesc_AEGetDescDataSize(AEDescObject *_self, PyObject *_args)
 	                     _rv);
 	return _res;
 }
-#endif
 
 static PyObject *AEDesc_AESend(AEDescObject *_self, PyObject *_args)
 {
@@ -757,115 +762,140 @@ static PyObject *AEDesc_AEResolve(AEDescObject *_self, PyObject *_args)
 	return _res;
 }
 
+static PyObject *AEDesc_AutoDispose(AEDescObject *_self, PyObject *_args)
+{
+	PyObject *_res = NULL;
+
+	int onoff, old;
+	if (!PyArg_ParseTuple(_args, "i", &onoff))
+	        return NULL;
+	old = _self->ob_owned;
+	_self->ob_owned = onoff;
+	_res = Py_BuildValue("i", old);
+	return _res;
+
+}
+
 static PyMethodDef AEDesc_methods[] = {
 	{"AECoerceDesc", (PyCFunction)AEDesc_AECoerceDesc, 1,
-	 "(DescType toType) -> (AEDesc result)"},
+	 PyDoc_STR("(DescType toType) -> (AEDesc result)")},
 	{"AEDuplicateDesc", (PyCFunction)AEDesc_AEDuplicateDesc, 1,
-	 "() -> (AEDesc result)"},
+	 PyDoc_STR("() -> (AEDesc result)")},
 	{"AECountItems", (PyCFunction)AEDesc_AECountItems, 1,
-	 "() -> (long theCount)"},
+	 PyDoc_STR("() -> (long theCount)")},
 	{"AEPutPtr", (PyCFunction)AEDesc_AEPutPtr, 1,
-	 "(long index, DescType typeCode, Buffer dataPtr) -> None"},
+	 PyDoc_STR("(long index, DescType typeCode, Buffer dataPtr) -> None")},
 	{"AEPutDesc", (PyCFunction)AEDesc_AEPutDesc, 1,
-	 "(long index, AEDesc theAEDesc) -> None"},
+	 PyDoc_STR("(long index, AEDesc theAEDesc) -> None")},
 	{"AEGetNthPtr", (PyCFunction)AEDesc_AEGetNthPtr, 1,
-	 "(long index, DescType desiredType, Buffer dataPtr) -> (AEKeyword theAEKeyword, DescType typeCode, Buffer dataPtr)"},
+	 PyDoc_STR("(long index, DescType desiredType, Buffer dataPtr) -> (AEKeyword theAEKeyword, DescType typeCode, Buffer dataPtr)")},
 	{"AEGetNthDesc", (PyCFunction)AEDesc_AEGetNthDesc, 1,
-	 "(long index, DescType desiredType) -> (AEKeyword theAEKeyword, AEDesc result)"},
+	 PyDoc_STR("(long index, DescType desiredType) -> (AEKeyword theAEKeyword, AEDesc result)")},
 	{"AESizeOfNthItem", (PyCFunction)AEDesc_AESizeOfNthItem, 1,
-	 "(long index) -> (DescType typeCode, Size dataSize)"},
+	 PyDoc_STR("(long index) -> (DescType typeCode, Size dataSize)")},
 	{"AEDeleteItem", (PyCFunction)AEDesc_AEDeleteItem, 1,
-	 "(long index) -> None"},
+	 PyDoc_STR("(long index) -> None")},
 	{"AEPutParamPtr", (PyCFunction)AEDesc_AEPutParamPtr, 1,
-	 "(AEKeyword theAEKeyword, DescType typeCode, Buffer dataPtr) -> None"},
+	 PyDoc_STR("(AEKeyword theAEKeyword, DescType typeCode, Buffer dataPtr) -> None")},
 	{"AEPutParamDesc", (PyCFunction)AEDesc_AEPutParamDesc, 1,
-	 "(AEKeyword theAEKeyword, AEDesc theAEDesc) -> None"},
+	 PyDoc_STR("(AEKeyword theAEKeyword, AEDesc theAEDesc) -> None")},
 	{"AEGetParamPtr", (PyCFunction)AEDesc_AEGetParamPtr, 1,
-	 "(AEKeyword theAEKeyword, DescType desiredType, Buffer dataPtr) -> (DescType typeCode, Buffer dataPtr)"},
+	 PyDoc_STR("(AEKeyword theAEKeyword, DescType desiredType, Buffer dataPtr) -> (DescType typeCode, Buffer dataPtr)")},
 	{"AEGetParamDesc", (PyCFunction)AEDesc_AEGetParamDesc, 1,
-	 "(AEKeyword theAEKeyword, DescType desiredType) -> (AEDesc result)"},
+	 PyDoc_STR("(AEKeyword theAEKeyword, DescType desiredType) -> (AEDesc result)")},
 	{"AESizeOfParam", (PyCFunction)AEDesc_AESizeOfParam, 1,
-	 "(AEKeyword theAEKeyword) -> (DescType typeCode, Size dataSize)"},
+	 PyDoc_STR("(AEKeyword theAEKeyword) -> (DescType typeCode, Size dataSize)")},
 	{"AEDeleteParam", (PyCFunction)AEDesc_AEDeleteParam, 1,
-	 "(AEKeyword theAEKeyword) -> None"},
+	 PyDoc_STR("(AEKeyword theAEKeyword) -> None")},
 	{"AEGetAttributePtr", (PyCFunction)AEDesc_AEGetAttributePtr, 1,
-	 "(AEKeyword theAEKeyword, DescType desiredType, Buffer dataPtr) -> (DescType typeCode, Buffer dataPtr)"},
+	 PyDoc_STR("(AEKeyword theAEKeyword, DescType desiredType, Buffer dataPtr) -> (DescType typeCode, Buffer dataPtr)")},
 	{"AEGetAttributeDesc", (PyCFunction)AEDesc_AEGetAttributeDesc, 1,
-	 "(AEKeyword theAEKeyword, DescType desiredType) -> (AEDesc result)"},
+	 PyDoc_STR("(AEKeyword theAEKeyword, DescType desiredType) -> (AEDesc result)")},
 	{"AESizeOfAttribute", (PyCFunction)AEDesc_AESizeOfAttribute, 1,
-	 "(AEKeyword theAEKeyword) -> (DescType typeCode, Size dataSize)"},
+	 PyDoc_STR("(AEKeyword theAEKeyword) -> (DescType typeCode, Size dataSize)")},
 	{"AEPutAttributePtr", (PyCFunction)AEDesc_AEPutAttributePtr, 1,
-	 "(AEKeyword theAEKeyword, DescType typeCode, Buffer dataPtr) -> None"},
+	 PyDoc_STR("(AEKeyword theAEKeyword, DescType typeCode, Buffer dataPtr) -> None")},
 	{"AEPutAttributeDesc", (PyCFunction)AEDesc_AEPutAttributeDesc, 1,
-	 "(AEKeyword theAEKeyword, AEDesc theAEDesc) -> None"},
-
-#if TARGET_API_MAC_CARBON
+	 PyDoc_STR("(AEKeyword theAEKeyword, AEDesc theAEDesc) -> None")},
 	{"AEGetDescDataSize", (PyCFunction)AEDesc_AEGetDescDataSize, 1,
-	 "() -> (Size _rv)"},
-#endif
+	 PyDoc_STR("() -> (Size _rv)")},
 	{"AESend", (PyCFunction)AEDesc_AESend, 1,
-	 "(AESendMode sendMode, AESendPriority sendPriority, long timeOutInTicks) -> (AppleEvent reply)"},
+	 PyDoc_STR("(AESendMode sendMode, AESendPriority sendPriority, long timeOutInTicks) -> (AppleEvent reply)")},
 	{"AEResetTimer", (PyCFunction)AEDesc_AEResetTimer, 1,
-	 "() -> None"},
+	 PyDoc_STR("() -> None")},
 	{"AESuspendTheCurrentEvent", (PyCFunction)AEDesc_AESuspendTheCurrentEvent, 1,
-	 "() -> None"},
+	 PyDoc_STR("() -> None")},
 	{"AEResumeTheCurrentEvent", (PyCFunction)AEDesc_AEResumeTheCurrentEvent, 1,
-	 "(AppleEvent reply, EventHandler dispatcher) -> None"},
+	 PyDoc_STR("(AppleEvent reply, EventHandler dispatcher) -> None")},
 	{"AEGetTheCurrentEvent", (PyCFunction)AEDesc_AEGetTheCurrentEvent, 1,
-	 "() -> None"},
+	 PyDoc_STR("() -> None")},
 	{"AESetTheCurrentEvent", (PyCFunction)AEDesc_AESetTheCurrentEvent, 1,
-	 "() -> None"},
+	 PyDoc_STR("() -> None")},
 	{"AEResolve", (PyCFunction)AEDesc_AEResolve, 1,
-	 "(short callbackFlags) -> (AEDesc theToken)"},
+	 PyDoc_STR("(short callbackFlags) -> (AEDesc theToken)")},
+	{"AutoDispose", (PyCFunction)AEDesc_AutoDispose, 1,
+	 PyDoc_STR("(int)->int. Automatically AEDisposeDesc the object on Python object cleanup")},
 	{NULL, NULL, 0}
 };
 
-PyMethodChain AEDesc_chain = { AEDesc_methods, NULL };
-
-static PyObject *AEDesc_getattr(AEDescObject *self, char *name)
+static PyObject *AEDesc_get_type(AEDescObject *self, void *closure)
 {
-
-	if (strcmp(name, "type") == 0)
-		return PyMac_BuildOSType(self->ob_itself.descriptorType);
-	if (strcmp(name, "data") == 0) {
-		PyObject *res;
-#if !TARGET_API_MAC_CARBON
-		char state;
-		state = HGetState(self->ob_itself.dataHandle);
-		HLock(self->ob_itself.dataHandle);
-		res = PyString_FromStringAndSize(
-			*self->ob_itself.dataHandle,
-			GetHandleSize(self->ob_itself.dataHandle));
-		HUnlock(self->ob_itself.dataHandle);
-		HSetState(self->ob_itself.dataHandle, state);
-#else
-		Size size;
-		char *ptr;
-		OSErr err;
-		
-		size = AEGetDescDataSize(&self->ob_itself);
-		if ( (res = PyString_FromStringAndSize(NULL, size)) == NULL )
-			return NULL;
-		if ( (ptr = PyString_AsString(res)) == NULL )
-			return NULL;
-		if ( (err=AEGetDescData(&self->ob_itself, ptr, size)) < 0 )
-			return PyMac_Error(err);	
-#endif
-		return res;
-	}
-	if (strcmp(name, "__members__") == 0)
-		return Py_BuildValue("[ss]", "data", "type");
-
-	return Py_FindMethodInChain(&AEDesc_chain, (PyObject *)self, name);
+	return PyMac_BuildOSType(self->ob_itself.descriptorType);
 }
 
-#define AEDesc_setattr NULL
+#define AEDesc_set_type NULL
+
+static PyObject *AEDesc_get_data(AEDescObject *self, void *closure)
+{
+
+			PyObject *res;
+			Size size;
+			char *ptr;
+			OSErr err;
+			
+			size = AEGetDescDataSize(&self->ob_itself);
+			if ( (res = PyString_FromStringAndSize(NULL, size)) == NULL )
+				return NULL;
+			if ( (ptr = PyString_AsString(res)) == NULL )
+				return NULL;
+			if ( (err=AEGetDescData(&self->ob_itself, ptr, size)) < 0 )
+				return PyMac_Error(err);	
+			return res;
+			
+}
+
+#define AEDesc_set_data NULL
+
+static PyGetSetDef AEDesc_getsetlist[] = {
+	{"type", (getter)AEDesc_get_type, (setter)AEDesc_set_type, "Type of this AEDesc"},
+	{"data", (getter)AEDesc_get_data, (setter)AEDesc_set_data, "The raw data in this AEDesc"},
+	{NULL, NULL, NULL, NULL},
+};
+
 
 #define AEDesc_compare NULL
 
 #define AEDesc_repr NULL
 
 #define AEDesc_hash NULL
+#define AEDesc_tp_init 0
+
+#define AEDesc_tp_alloc PyType_GenericAlloc
+
+static PyObject *AEDesc_tp_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
+{
+	PyObject *self;
+	AEDesc itself;
+	char *kw[] = {"itself", 0};
+
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "O&", kw, AEDesc_Convert, &itself)) return NULL;
+	if ((self = type->tp_alloc(type, 0)) == NULL) return NULL;
+	((AEDescObject *)self)->ob_itself = itself;
+	return self;
+}
+
+#define AEDesc_tp_free PyObject_Del
+
 
 PyTypeObject AEDesc_Type = {
 	PyObject_HEAD_INIT(NULL)
@@ -876,14 +906,39 @@ PyTypeObject AEDesc_Type = {
 	/* methods */
 	(destructor) AEDesc_dealloc, /*tp_dealloc*/
 	0, /*tp_print*/
-	(getattrfunc) AEDesc_getattr, /*tp_getattr*/
-	(setattrfunc) AEDesc_setattr, /*tp_setattr*/
+	(getattrfunc)0, /*tp_getattr*/
+	(setattrfunc)0, /*tp_setattr*/
 	(cmpfunc) AEDesc_compare, /*tp_compare*/
 	(reprfunc) AEDesc_repr, /*tp_repr*/
 	(PyNumberMethods *)0, /* tp_as_number */
 	(PySequenceMethods *)0, /* tp_as_sequence */
 	(PyMappingMethods *)0, /* tp_as_mapping */
 	(hashfunc) AEDesc_hash, /*tp_hash*/
+	0, /*tp_call*/
+	0, /*tp_str*/
+	PyObject_GenericGetAttr, /*tp_getattro*/
+	PyObject_GenericSetAttr, /*tp_setattro */
+	0, /*tp_as_buffer*/
+	Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE, /* tp_flags */
+	0, /*tp_doc*/
+	0, /*tp_traverse*/
+	0, /*tp_clear*/
+	0, /*tp_richcompare*/
+	0, /*tp_weaklistoffset*/
+	0, /*tp_iter*/
+	0, /*tp_iternext*/
+	AEDesc_methods, /* tp_methods */
+	0, /*tp_members*/
+	AEDesc_getsetlist, /*tp_getset*/
+	0, /*tp_base*/
+	0, /*tp_dict*/
+	0, /*tp_descr_get*/
+	0, /*tp_descr_set*/
+	0, /*tp_dictoffset*/
+	AEDesc_tp_init, /* tp_init */
+	AEDesc_tp_alloc, /* tp_alloc */
+	AEDesc_tp_new, /* tp_new */
+	AEDesc_tp_free, /* tp_free */
 };
 
 /* --------------------- End object type AEDesc --------------------- */
@@ -1002,8 +1057,6 @@ static PyObject *AE_AECreateAppleEvent(PyObject *_self, PyObject *_args)
 	return _res;
 }
 
-#if TARGET_API_MAC_CARBON
-
 static PyObject *AE_AEReplaceDescData(PyObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
@@ -1029,7 +1082,6 @@ static PyObject *AE_AEReplaceDescData(PyObject *_self, PyObject *_args)
 	                     AEDesc_New, &theAEDesc);
 	return _res;
 }
-#endif
 
 static PyObject *AE_AEProcessAppleEvent(PyObject *_self, PyObject *_args)
 {
@@ -1307,54 +1359,45 @@ static PyObject *AE_AECallObjectAccessor(PyObject *_self, PyObject *_args)
 
 static PyMethodDef AE_methods[] = {
 	{"AECoercePtr", (PyCFunction)AE_AECoercePtr, 1,
-	 "(DescType typeCode, Buffer dataPtr, DescType toType) -> (AEDesc result)"},
+	 PyDoc_STR("(DescType typeCode, Buffer dataPtr, DescType toType) -> (AEDesc result)")},
 	{"AECreateDesc", (PyCFunction)AE_AECreateDesc, 1,
-	 "(DescType typeCode, Buffer dataPtr) -> (AEDesc result)"},
+	 PyDoc_STR("(DescType typeCode, Buffer dataPtr) -> (AEDesc result)")},
 	{"AECreateList", (PyCFunction)AE_AECreateList, 1,
-	 "(Buffer factoringPtr, Boolean isRecord) -> (AEDescList resultList)"},
+	 PyDoc_STR("(Buffer factoringPtr, Boolean isRecord) -> (AEDescList resultList)")},
 	{"AECreateAppleEvent", (PyCFunction)AE_AECreateAppleEvent, 1,
-	 "(AEEventClass theAEEventClass, AEEventID theAEEventID, AEAddressDesc target, AEReturnID returnID, AETransactionID transactionID) -> (AppleEvent result)"},
-
-#if TARGET_API_MAC_CARBON
+	 PyDoc_STR("(AEEventClass theAEEventClass, AEEventID theAEEventID, AEAddressDesc target, AEReturnID returnID, AETransactionID transactionID) -> (AppleEvent result)")},
 	{"AEReplaceDescData", (PyCFunction)AE_AEReplaceDescData, 1,
-	 "(DescType typeCode, Buffer dataPtr) -> (AEDesc theAEDesc)"},
-#endif
+	 PyDoc_STR("(DescType typeCode, Buffer dataPtr) -> (AEDesc theAEDesc)")},
 	{"AEProcessAppleEvent", (PyCFunction)AE_AEProcessAppleEvent, 1,
-	 "(EventRecord theEventRecord) -> None"},
+	 PyDoc_STR("(EventRecord theEventRecord) -> None")},
 	{"AEGetInteractionAllowed", (PyCFunction)AE_AEGetInteractionAllowed, 1,
-	 "() -> (AEInteractAllowed level)"},
+	 PyDoc_STR("() -> (AEInteractAllowed level)")},
 	{"AESetInteractionAllowed", (PyCFunction)AE_AESetInteractionAllowed, 1,
-	 "(AEInteractAllowed level) -> None"},
+	 PyDoc_STR("(AEInteractAllowed level) -> None")},
 	{"AEInteractWithUser", (PyCFunction)AE_AEInteractWithUser, 1,
-	 "(long timeOutInTicks) -> None"},
+	 PyDoc_STR("(long timeOutInTicks) -> None")},
 	{"AEInstallEventHandler", (PyCFunction)AE_AEInstallEventHandler, 1,
-	 "(AEEventClass theAEEventClass, AEEventID theAEEventID, EventHandler handler) -> None"},
+	 PyDoc_STR("(AEEventClass theAEEventClass, AEEventID theAEEventID, EventHandler handler) -> None")},
 	{"AERemoveEventHandler", (PyCFunction)AE_AERemoveEventHandler, 1,
-	 "(AEEventClass theAEEventClass, AEEventID theAEEventID) -> None"},
+	 PyDoc_STR("(AEEventClass theAEEventClass, AEEventID theAEEventID) -> None")},
 	{"AEGetEventHandler", (PyCFunction)AE_AEGetEventHandler, 1,
-	 "(AEEventClass theAEEventClass, AEEventID theAEEventID) -> (EventHandler handler)"},
+	 PyDoc_STR("(AEEventClass theAEEventClass, AEEventID theAEEventID) -> (EventHandler handler)")},
 	{"AEInstallSpecialHandler", (PyCFunction)AE_AEInstallSpecialHandler, 1,
-	 "(AEKeyword functionClass) -> None"},
+	 PyDoc_STR("(AEKeyword functionClass) -> None")},
 	{"AERemoveSpecialHandler", (PyCFunction)AE_AERemoveSpecialHandler, 1,
-	 "(AEKeyword functionClass) -> None"},
+	 PyDoc_STR("(AEKeyword functionClass) -> None")},
 	{"AEManagerInfo", (PyCFunction)AE_AEManagerInfo, 1,
-	 "(AEKeyword keyWord) -> (long result)"},
+	 PyDoc_STR("(AEKeyword keyWord) -> (long result)")},
 	{"AEObjectInit", (PyCFunction)AE_AEObjectInit, 1,
-	 "() -> None"},
+	 PyDoc_STR("() -> None")},
 	{"AEDisposeToken", (PyCFunction)AE_AEDisposeToken, 1,
-	 "() -> (AEDesc theToken)"},
+	 PyDoc_STR("() -> (AEDesc theToken)")},
 	{"AECallObjectAccessor", (PyCFunction)AE_AECallObjectAccessor, 1,
-	 "(DescType desiredClass, AEDesc containerToken, DescType containerClass, DescType keyForm, AEDesc keyData) -> (AEDesc token)"},
+	 PyDoc_STR("(DescType desiredClass, AEDesc containerToken, DescType containerClass, DescType keyForm, AEDesc keyData) -> (AEDesc token)")},
 	{NULL, NULL, 0}
 };
 
 
-
-#if UNIVERSAL_INTERFACES_VERSION >= 0x0340
-typedef long refcontype;
-#else
-typedef unsigned long refcontype;
-#endif
 
 static pascal OSErr
 GenericEventHandler(const AppleEvent *request, AppleEvent *reply, refcontype refcon)
@@ -1389,6 +1432,17 @@ GenericEventHandler(const AppleEvent *request, AppleEvent *reply, refcontype ref
 	return noErr;
 }
 
+PyObject *AEDesc_NewBorrowed(AEDesc *itself)
+{
+	PyObject *it;
+	
+	it = AEDesc_New(itself);
+	if (it)
+		((AEDescObject *)it)->ob_owned = 0;
+	return (PyObject *)it;
+}
+
+
 
 void init_AE(void)
 {
@@ -1398,12 +1452,9 @@ void init_AE(void)
 
 
 		upp_AEIdleProc = NewAEIdleUPP(AEIdleProc);
-#if UNIVERSAL_INTERFACES_VERSION >= 0x03400
-		upp_GenericEventHandler = NewAEEventHandlerUPP(&GenericEventHandler);
-#else
 		upp_GenericEventHandler = NewAEEventHandlerUPP(GenericEventHandler);
-#endif
 		PyMac_INIT_TOOLBOX_OBJECT_NEW(AEDesc *, AEDesc_New);
+		PyMac_INIT_TOOLBOX_OBJECT_NEW(AEDesc *, AEDesc_NewBorrowed);
 		PyMac_INIT_TOOLBOX_OBJECT_CONVERT(AEDesc, AEDesc_Convert);
 
 
@@ -1414,9 +1465,12 @@ void init_AE(void)
 	    PyDict_SetItemString(d, "Error", AE_Error) != 0)
 		return;
 	AEDesc_Type.ob_type = &PyType_Type;
+	if (PyType_Ready(&AEDesc_Type) < 0) return;
 	Py_INCREF(&AEDesc_Type);
-	if (PyDict_SetItemString(d, "AEDescType", (PyObject *)&AEDesc_Type) != 0)
-		Py_FatalError("can't initialize AEDescType");
+	PyModule_AddObject(m, "AEDesc", (PyObject *)&AEDesc_Type);
+	/* Backward-compatible name */
+	Py_INCREF(&AEDesc_Type);
+	PyModule_AddObject(m, "AEDescType", (PyObject *)&AEDesc_Type);
 }
 
 /* ========================= End module _AE ========================= */

@@ -9,7 +9,7 @@ configure-like tasks: "try to compile this C code", or "figure out where
 this header file lives".
 """
 
-# created 2000/05/29, Greg Ward
+# This module should be kept compatible with Python 1.5.2.
 
 __revision__ = "$Id$"
 
@@ -17,6 +17,7 @@ import sys, os, string, re
 from types import *
 from distutils.core import Command
 from distutils.errors import DistutilsExecError
+from distutils.sysconfig import customize_compiler
 from distutils import log
 
 LANG_EXT = {'c': '.c',
@@ -104,6 +105,7 @@ class config (Command):
         if not isinstance(self.compiler, CCompiler):
             self.compiler = new_compiler(compiler=self.compiler,
                                          dry_run=self.dry_run, force=1)
+            customize_compiler(self.compiler)
             if self.include_dirs:
                 self.compiler.set_include_dirs(self.include_dirs)
             if self.libraries:
@@ -148,9 +150,11 @@ class config (Command):
         prog = os.path.splitext(os.path.basename(src))[0]
         self.compiler.link_executable([obj], prog,
                                       libraries=libraries,
-                                      library_dirs=library_dirs)
+                                      library_dirs=library_dirs,
+                                      target_lang=lang)
 
-        prog = prog + self.compiler.exe_extension
+        if self.compiler.exe_extension is not None:
+            prog = prog + self.compiler.exe_extension
         self.temp_files.append(prog)
 
         return (src, obj, prog)
@@ -346,7 +350,8 @@ class config (Command):
         exists and can be found by the preprocessor; return true if so,
         false otherwise.
         """
-        return self.try_cpp(headers=[header], include_dirs=include_dirs)
+        return self.try_cpp(body="/* No body */", headers=[header],
+                            include_dirs=include_dirs)
 
 
 # class config

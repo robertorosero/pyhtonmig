@@ -5,7 +5,7 @@
 /* See below for information about the original code this module was
    based upon. Additional work performed by:
 
-   Andrew Kuchling (akuchlin@mems-exchange.org)
+   Andrew Kuchling (amk@amk.ca)
    Greg Stein (gstein@lyra.org)
 */
 
@@ -330,7 +330,7 @@ sha_final(unsigned char digest[20], SHAobject *sha_info)
  * ------------------------------------------------------------------------
  */
 
-staticforward PyTypeObject SHAtype;
+static PyTypeObject SHAtype;
 
 
 static SHAobject *
@@ -525,7 +525,7 @@ static struct PyMethodDef SHA_functions[] = {
 
 #define insint(n,v) { PyModule_AddIntConstant(m,n,v); }
 
-DL_EXPORT(void)
+PyMODINIT_FUNC
 initsha(void)
 {
     PyObject *m;

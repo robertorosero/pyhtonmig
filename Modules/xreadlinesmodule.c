@@ -14,7 +14,7 @@ typedef struct {
 	int abslineno;
 } PyXReadlinesObject;
 
-staticforward PyTypeObject XReadlinesObject_Type;
+static PyTypeObject XReadlinesObject_Type;
 
 static void
 xreadlines_dealloc(PyXReadlinesObject *op)
@@ -79,13 +79,6 @@ xreadlines_item(PyXReadlinesObject *a, int i)
 		return NULL;
 	}
 	return xreadlines_common(a);
-}
-
-static PyObject *
-xreadlines_getiter(PyXReadlinesObject *a)
-{
-	Py_INCREF(a);
-	return (PyObject *)a;
 }
 
 static PyObject *
@@ -159,7 +152,7 @@ static PyTypeObject XReadlinesObject_Type = {
  	0,					/* tp_clear */
 	0,					/* tp_richcompare */
 	0,					/* tp_weaklistoffset */
-	(getiterfunc)xreadlines_getiter,	/* tp_iter */
+	PyObject_SelfIter,			/* tp_iter */
 	(iternextfunc)xreadlines_iternext,	/* tp_iternext */
 };
 
@@ -168,9 +161,11 @@ static PyMethodDef xreadlines_functions[] = {
 	{NULL, NULL}
 };
 
-DL_EXPORT(void)
+PyMODINIT_FUNC
 initxreadlines(void)
 {
 	XReadlinesObject_Type.ob_type = &PyType_Type;
 	Py_InitModule("xreadlines", xreadlines_functions);
+	PyErr_Warn(PyExc_DeprecationWarning,
+		   "xreadlines is deprecated; use 'for line in file'.");
 }

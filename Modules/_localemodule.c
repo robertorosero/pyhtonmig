@@ -25,12 +25,16 @@ This software comes with no warranty. Use at your own risk.
 #include <libintl.h>
 #endif
 
+#ifdef HAVE_WCHAR_H
+#include <wchar.h>
+#endif
+
 #if defined(MS_WINDOWS)
-#define WINDOWS_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #endif
 
-#ifdef macintosh
+#if defined(__APPLE__) || defined(__MWERKS__)
 #include "macglue.h"
 #endif
 
@@ -157,10 +161,6 @@ fixup_ulcase(void)
     Py_DECREF(ulo);
 }
 
-#if defined(HAVE_LANGINFO_H) && defined(CODESET)
-static int fileencoding_uses_locale = 0;
-#endif
-
 static PyObject*
 PyLocale_setlocale(PyObject* self, PyObject* args)
 {
@@ -209,22 +209,6 @@ PyLocale_setlocale(PyObject* self, PyObject* args)
             fixup_ulcase();
         /* things that got wrong up to here are ignored */
         PyErr_Clear();
-#if defined(HAVE_LANGINFO_H) && defined(CODESET)
-	if (Py_FileSystemDefaultEncoding == NULL)
-	    fileencoding_uses_locale = 1;
-	if (fileencoding_uses_locale) {
-	    char *codeset = nl_langinfo(CODESET);
-	    PyObject *enc = NULL;
-	    if (*codeset && (enc = PyCodec_Encoder(codeset))) {
-		/* Release previous file encoding */
-		if (Py_FileSystemDefaultEncoding)
-		    free((char *)Py_FileSystemDefaultEncoding);
-		Py_FileSystemDefaultEncoding = strdup(codeset);
-		Py_DECREF(enc);
-	    } else
-		PyErr_Clear();
-	}
-#endif
     } else {
         /* get locale */
         /* restore LC_NUMERIC first, if appropriate */
@@ -325,12 +309,75 @@ PyDoc_STRVAR(strcoll__doc__,
 static PyObject*
 PyLocale_strcoll(PyObject* self, PyObject* args)
 {
-  char *s1,*s2;
-
-  if (!PyArg_ParseTuple(args, "ss:strcoll", &s1, &s2))
-      return NULL;
-  return PyInt_FromLong(strcoll(s1, s2));
+#if !defined(HAVE_WCSCOLL) || !defined(Py_USING_UNICODE)
+    char *s1,*s2;
+    
+    if (!PyArg_ParseTuple(args, "ss:strcoll", &s1, &s2))
+        return NULL;
+    return PyInt_FromLong(strcoll(s1, s2));
+#else
+    PyObject *os1, *os2, *result = NULL;
+    wchar_t *ws1 = NULL, *ws2 = NULL;
+    int rel1 = 0, rel2 = 0, len1, len2;
+    
+    if (!PyArg_ParseTuple(args, "OO:strcoll", &os1, &os2))
+        return NULL;
+    /* If both arguments are byte strings, use strcoll.  */
+    if (PyString_Check(os1) && PyString_Check(os2))
+        return PyInt_FromLong(strcoll(PyString_AS_STRING(os1),
+                                      PyString_AS_STRING(os2)));
+    /* If neither argument is unicode, it's an error.  */
+    if (!PyUnicode_Check(os1) && !PyUnicode_Check(os2)) {
+        PyErr_SetString(PyExc_ValueError, "strcoll arguments must be strings");
+    }
+    /* Convert the non-unicode argument to unicode. */
+    if (!PyUnicode_Check(os1)) {
+        os1 = PyUnicode_FromObject(os1);
+        if (!os1)
+            return NULL;
+        rel1 = 1;
+    }
+    if (!PyUnicode_Check(os2)) {
+        os2 = PyUnicode_FromObject(os2);
+        if (!os2) {
+            Py_DECREF(os1);
+            return NULL;
+        } 
+        rel2 = 1;
+    }
+    /* Convert the unicode strings to wchar[]. */
+    len1 = PyUnicode_GET_SIZE(os1) + 1;
+    len2 = PyUnicode_GET_SIZE(os2) + 1;
+    ws1 = PyMem_MALLOC(len1 * sizeof(wchar_t));
+    if (!ws1) {
+        PyErr_NoMemory();
+        goto done;
+    }
+    if (PyUnicode_AsWideChar((PyUnicodeObject*)os1, ws1, len1) == -1)
+        goto done;
+    ws2 = PyMem_MALLOC(len2 * sizeof(wchar_t));
+    if (!ws2) {
+        PyErr_NoMemory();
+        goto done;
+    }
+    if (PyUnicode_AsWideChar((PyUnicodeObject*)os2, ws2, len2) == -1)
+        goto done;
+    /* Collate the strings. */
+    result = PyInt_FromLong(wcscoll(ws1, ws2));
+  done:
+    /* Deallocate everything. */
+    if (ws1) PyMem_FREE(ws1);
+    if (ws2) PyMem_FREE(ws2);
+    if (rel1) {
+        Py_DECREF(os1);
+    }
+    if (rel2) {
+        Py_DECREF(os2);
+    }
+    return result;
+#endif
 }
+
 
 PyDoc_STRVAR(strxfrm__doc__,
 "string -> string. Returns a string that behaves for cmp locale-aware.");
@@ -400,7 +447,7 @@ PyLocale_getdefaultlocale(PyObject* self)
 }
 #endif
 
-#if defined(macintosh)
+#if defined(__APPLE__)
 static PyObject*
 PyLocale_getdefaultlocale(PyObject* self)
 {
@@ -627,7 +674,7 @@ static struct PyMethodDef PyLocale_Methods[] = {
    METH_VARARGS, strcoll__doc__},
   {"strxfrm", (PyCFunction) PyLocale_strxfrm, 
    METH_VARARGS, strxfrm__doc__},
-#if defined(MS_WINDOWS) || defined(macintosh)
+#if defined(MS_WINDOWS) || defined(__APPLE__)
   {"_getdefaultlocale", (PyCFunction) PyLocale_getdefaultlocale, METH_NOARGS},
 #endif
 #ifdef HAVE_LANGINFO_H
@@ -649,7 +696,7 @@ static struct PyMethodDef PyLocale_Methods[] = {
   {NULL, NULL}
 };
 
-DL_EXPORT(void)
+PyMODINIT_FUNC
 init_locale(void)
 {
     PyObject *m, *d, *x;
@@ -709,3 +756,10 @@ init_locale(void)
     }
 #endif
 }
+
+/* 
+Local variables:
+c-basic-offset: 4
+indent-tabs-mode: nil
+End:
+*/

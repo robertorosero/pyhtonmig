@@ -199,7 +199,7 @@ PyComplex_FromCComplex(Py_complex cval)
 {
 	register PyComplexObject *op;
 
-	/* PyObject_New is inlined */
+	/* Inline PyObject_New */
 	op = (PyComplexObject *) PyObject_MALLOC(sizeof(PyComplexObject));
 	if (op == NULL)
 		return PyErr_NoMemory();
@@ -639,8 +639,15 @@ complex_conjugate(PyObject *self)
 	return PyComplex_FromCComplex(c);
 }
 
+static PyObject *
+complex_getnewargs(PyComplexObject *v)
+{
+	return Py_BuildValue("(D)", &v->cval);
+}
+
 static PyMethodDef complex_methods[] = {
 	{"conjugate",	(PyCFunction)complex_conjugate,	METH_NOARGS},
+	{"__getnewargs__",	(PyCFunction)complex_getnewargs,	METH_NOARGS},
 	{NULL,		NULL}		/* sentinel */
 };
 
@@ -823,6 +830,16 @@ complex_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	if (!PyArg_ParseTupleAndKeywords(args, kwds, "|OO:complex", kwlist,
 					 &r, &i))
 		return NULL;
+
+	/* Special-case for single argumet that is already complex */
+	if (PyComplex_CheckExact(r) && i == NULL &&
+	    type == &PyComplex_Type) {
+		/* Note that we can't know whether it's safe to return
+		   a complex *subclass* instance as-is, hence the restriction
+		   to exact complexes here.  */
+		Py_INCREF(r);
+		return r;
+	}
 	if (PyString_Check(r) || PyUnicode_Check(r)) {
 		if (i != NULL) {
 			PyErr_SetString(PyExc_TypeError,

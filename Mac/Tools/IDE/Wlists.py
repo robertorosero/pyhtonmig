@@ -2,7 +2,7 @@ import Wbase
 import Wkeys
 import string
 from Carbon import Evt, Events, Fm, Lists, Qd, Scrap, Win
-from Carbon.List import LNew, CreateCustomList, GetListPort
+from Carbon.List import LNew, CreateCustomList
 from Carbon.Lists import kListDefUserProcType, lInitMsg, lDrawMsg, lHiliteMsg, lCloseMsg
 from Carbon.QuickDraw import hilitetransfermode
 from Carbon import App
@@ -74,7 +74,7 @@ class List(Wbase.SelectableWidget):
 			# now *why* doesn't the list manager recalc the cellrect???
 			l, t, r, b = self._list.LRect((0,0))
 			cellheight = b - t
-			self._list.LCellSize((width, cellheight))
+			self._list.LCellSize((width/self._cols, cellheight))
 			# reset visRgn
 			self._parentwindow.wid.CalcVis()
 		else:
@@ -435,7 +435,7 @@ class TwoLineList(CustomList):
 	def listDefDraw(self, selected, cellRect, theCell,
 			dataOffset, dataLen, theList):
 		savedPort = Qd.GetPort()
-		Qd.SetPort(GetListPort(theList))
+		Qd.SetPort(theList.GetListPort())
 		savedClip = Qd.NewRgn()
 		Qd.GetClip(savedClip)
 		Qd.ClipRect(cellRect)
@@ -456,10 +456,10 @@ class TwoLineList(CustomList):
 				line2 = lines[1]
 			else:
 				line2 = ""
-			Qd.MoveTo(left + 4, top + ascent)
+			Qd.MoveTo(int(left + 4), int(top + ascent))
 			Qd.DrawText(line1, 0, len(line1))
 			if line2:
-				Qd.MoveTo(left + 4, top + ascent + linefeed)
+				Qd.MoveTo(int(left + 4), int(top + ascent + linefeed))
 				Qd.DrawText(line2, 0, len(line2))
 			Qd.PenPat("\x11\x11\x11\x11\x11\x11\x11\x11")
 			bottom = top + theList.cellSize[1]
@@ -477,7 +477,7 @@ class TwoLineList(CustomList):
 	def listDefHighlight(self, selected, cellRect, theCell,
 			dataOffset, dataLen, theList):
 		savedPort = Qd.GetPort()
-		Qd.SetPort(GetListPort(theList))
+		Qd.SetPort(theList.GetListPort())
 		savedClip = Qd.NewRgn()
 		Qd.GetClip(savedClip)
 		Qd.ClipRect(cellRect)
@@ -573,9 +573,10 @@ class MultiList(List):
 			return
 		set_sel = self._list.LSetSelect
 		for i in range(len(self.items)):
-			if i in selection:
-				set_sel(1, (0, i))
-			else:
-				set_sel(0, (0, i))
+			for j in range(len(self.items[i])):
+				if i in selection:
+					set_sel(1, (j, i))
+				else:
+					set_sel(0, (j, i))
 		#self._list.LAutoScroll()
 

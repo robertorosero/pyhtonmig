@@ -8,6 +8,7 @@
 #include "parser.h"
 #include "parsetok.h"
 #include "errcode.h"
+#include "graminit.h"
 
 int Py_TabcheckFlag;
 
@@ -18,27 +19,35 @@ static void initerr(perrdetail *err_ret, const char* filename);
 
 /* Parse input coming from a string.  Return error code, print some errors. */
 node *
-PyParser_ParseString(char *s, grammar *g, int start, perrdetail *err_ret)
+PyParser_ParseString(const char *s, grammar *g, int start, perrdetail *err_ret)
 {
-	return PyParser_ParseStringFlags(s, g, start, err_ret, 0);
+	return PyParser_ParseStringFlagsFilename(s, NULL, g, start, err_ret, 0);
 }
 
 node *
 PyParser_ParseStringFlags(const char *s, grammar *g, int start,
 		          perrdetail *err_ret, int flags)
 {
+	return PyParser_ParseStringFlagsFilename(s, NULL,
+						 g, start, err_ret, 0);
+}
+
+node *
+PyParser_ParseStringFlagsFilename(const char *s, const char *filename,
+			  grammar *g, int start,
+		          perrdetail *err_ret, int flags)
+{
 	struct tok_state *tok;
 
-	initerr(err_ret, NULL);
+	initerr(err_ret, filename);
 
-	/* XXX Don't want to chase const into parser right now. */
-	if ((tok = PyTokenizer_FromString((char *)s)) == NULL) {
+	if ((tok = PyTokenizer_FromString(s)) == NULL) {
 		err_ret->error = E_NOMEM;
 		return NULL;
 	}
 
+        tok->filename = filename ? filename : "<string>";
 	if (Py_TabcheckFlag || Py_VerboseFlag) {
-		tok->filename = "<string>";
 		tok->altwarning = (tok->filename != NULL);
 		if (Py_TabcheckFlag >= 2)
 			tok->alterror++;
@@ -47,11 +56,10 @@ PyParser_ParseStringFlags(const char *s, grammar *g, int start,
 	return parsetok(tok, g, start, err_ret, flags);
 }
 
-
 /* Parse input coming from a file.  Return error code, print some errors. */
 
 node *
-PyParser_ParseFile(FILE *fp, char *filename, grammar *g, int start,
+PyParser_ParseFile(FILE *fp, const char *filename, grammar *g, int start,
 		   char *ps1, char *ps2, perrdetail *err_ret)
 {
 	return PyParser_ParseFileFlags(fp, filename, g, start, ps1, ps2,
@@ -70,8 +78,8 @@ PyParser_ParseFileFlags(FILE *fp, const char *filename, grammar *g, int start,
 		err_ret->error = E_NOMEM;
 		return NULL;
 	}
+	tok->filename = filename;
 	if (Py_TabcheckFlag || Py_VerboseFlag) {
-		tok->filename = filename;
 		tok->altwarning = (filename != NULL);
 		if (Py_TabcheckFlag >= 2)
 			tok->alterror++;
@@ -121,11 +129,20 @@ parsetok(struct tok_state *tok, grammar *g, int start, perrdetail *err_ret,
 		if (type == ENDMARKER && started) {
 			type = NEWLINE; /* Add an extra newline */
 			started = 0;
+			/* Add the right number of dedent tokens,
+			   except if a certain flag is given --
+			   codeop.py uses this. */
+			if (tok->indent &&
+			    !(flags & PyPARSE_DONT_IMPLY_DEDENT))
+			{
+				tok->pendin = -tok->indent;
+				tok->indent = 0;
+			}
 		}
 		else
 			started = 1;
 		len = b - a; /* XXX this may compute NULL - NULL */
-		str = PyMem_NEW(char, len + 1);
+		str = (char *) PyObject_MALLOC(len + 1);
 		if (str == NULL) {
 			fprintf(stderr, "no mem for next token\n");
 			err_ret->error = E_NOMEM;
@@ -149,7 +166,7 @@ parsetok(struct tok_state *tok, grammar *g, int start, perrdetail *err_ret,
 		     PyParser_AddToken(ps, (int)type, str, tok->lineno,
 				       &(err_ret->expected))) != E_OK) {
 			if (err_ret->error != E_DONE)
-				PyMem_DEL(str);
+				PyObject_FREE(str);
 			break;
 		}
 	}
@@ -170,13 +187,20 @@ parsetok(struct tok_state *tok, grammar *g, int start, perrdetail *err_ret,
 		err_ret->offset = tok->cur - tok->buf;
 		if (tok->buf != NULL) {
 			size_t len = tok->inp - tok->buf;
-			err_ret->text = PyMem_NEW(char, len + 1);
+			err_ret->text = (char *) PyObject_MALLOC(len + 1);
 			if (err_ret->text != NULL) {
 				if (len > 0)
 					strncpy(err_ret->text, tok->buf, len);
 				err_ret->text[len] = '\0';
 			}
 		}
+	} else if (tok->encoding != NULL) {
+		node* r = PyNode_New(encoding_decl);
+		r->n_str = tok->encoding;
+		r->n_nchildren = 1;
+		r->n_child = n;
+		tok->encoding = NULL;
+		n = r;
 	}
 
 	PyTokenizer_Free(tok);

@@ -1,5 +1,7 @@
 """A simple log mechanism styled after PEP 282."""
 
+# This module should be kept compatible with Python 1.5.2.
+
 # The class here is styled after PEP 282 so that it could later be
 # replaced with a standard Python logging implementation.
 
@@ -9,6 +11,8 @@ WARN = 3
 ERROR = 4
 FATAL = 5
 
+import sys
+
 class Log:
 
     def __init__(self, threshold=WARN):
@@ -17,6 +21,7 @@ class Log:
     def _log(self, level, msg, args):
         if level >= self.threshold:
             print msg % args
+            sys.stdout.flush()
 
     def log(self, level, msg, *args):
         self._log(level, msg, args)
@@ -48,9 +53,9 @@ def set_threshold(level):
     _global_log.threshold = level
 
 def set_verbosity(v):
-    if v == 0:
+    if v <= 0:
         set_threshold(WARN)
-    if v == 1:
+    elif v == 1:
         set_threshold(INFO)
-    if v == 2:
+    elif v >= 2:
         set_threshold(DEBUG)

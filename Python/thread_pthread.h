@@ -3,11 +3,11 @@
 
 #include <stdlib.h>
 #include <string.h>
-#ifdef __APPLE__
+#if defined(__APPLE__) || defined(HAVE_PTHREAD_DESTRUCTOR)
 #define destructor xxdestructor
 #endif
 #include <pthread.h>
-#ifdef __APPLE__
+#if defined(__APPLE__) || defined(HAVE_PTHREAD_DESTRUCTOR)
 #undef destructor
 #endif
 #include <signal.h>
@@ -31,11 +31,13 @@
 #if defined(__ultrix) && defined(__mips) && defined(_DECTHREADS_)
 /* _DECTHREADS_ is defined in cma.h which is included by pthread.h */
 #  define PY_PTHREAD_D4
+#  error Systems with PY_PTHREAD_D4 are unsupported. See README.
 
 #elif defined(__osf__) && defined (__alpha)
 /* _DECTHREADS_ is defined in cma.h which is included by pthread.h */
 #  if !defined(_PTHREAD_ENV_ALPHA) || defined(_PTHREAD_USE_D4) || defined(PTHREAD_USE_D4)
 #    define PY_PTHREAD_D4
+#    error Systems with PY_PTHREAD_D4 are unsupported. See README.
 #  else
 #    define PY_PTHREAD_STD
 #  endif
@@ -50,13 +52,16 @@
 #    define PY_PTHREAD_STD
 #  else
 #    define PY_PTHREAD_D7
+#    error Systems with PY_PTHREAD_D7 are unsupported. See README.
 #  endif
 
 #elif defined(__DGUX)
 #  define PY_PTHREAD_D6
+#  error Systems with PY_PTHREAD_D6 are unsupported. See README.
 
 #elif defined(__hpux) && defined(_DECTHREADS_)
 #  define PY_PTHREAD_D4
+#  error Systems with PY_PTHREAD_D4 are unsupported. See README.
 
 #else /* Default case */
 #  define PY_PTHREAD_STD
@@ -74,20 +79,32 @@
 /* set default attribute object for different versions */
 
 #if defined(PY_PTHREAD_D4) || defined(PY_PTHREAD_D7)
+#if !defined(pthread_attr_default)
 #  define pthread_attr_default pthread_attr_default
+#endif
+#if !defined(pthread_mutexattr_default)
 #  define pthread_mutexattr_default pthread_mutexattr_default
+#endif
+#if !defined(pthread_condattr_default)
 #  define pthread_condattr_default pthread_condattr_default
+#endif
 #elif defined(PY_PTHREAD_STD) || defined(PY_PTHREAD_D6)
+#if !defined(pthread_attr_default)
 #  define pthread_attr_default ((pthread_attr_t *)NULL)
+#endif
+#if !defined(pthread_mutexattr_default)
 #  define pthread_mutexattr_default ((pthread_mutexattr_t *)NULL)
+#endif
+#if !defined(pthread_condattr_default)
 #  define pthread_condattr_default ((pthread_condattr_t *)NULL)
+#endif
 #endif
 
 
 /* Whether or not to use semaphores directly rather than emulating them with
  * mutexes and condition variables:
  */
-#ifdef _POSIX_SEMAPHORES
+#if defined(_POSIX_SEMAPHORES) && !defined(HAVE_BROKEN_POSIX_SEMAPHORES)
 #  define USE_SEMAPHORES
 #else
 #  undef USE_SEMAPHORES
@@ -171,7 +188,7 @@ long
 PyThread_start_new_thread(void (*func)(void *), void *arg)
 {
 	pthread_t th;
-	int success;
+	int status;
  	sigset_t oldmask, newmask;
 #if defined(THREAD_STACK_SIZE) || defined(PTHREAD_SYSTEM_SCHED_SUPPORTED)
 	pthread_attr_t attrs;
@@ -197,7 +214,7 @@ PyThread_start_new_thread(void (*func)(void *), void *arg)
 	sigfillset(&newmask);
 	SET_THREAD_SIGMASK(SIG_BLOCK, &newmask, &oldmask);
 
-	success = pthread_create(&th, 
+	status = pthread_create(&th, 
 #if defined(PY_PTHREAD_D4)
 				 pthread_attr_default,
 				 (pthread_startroutine_t)func, 
@@ -227,13 +244,15 @@ PyThread_start_new_thread(void (*func)(void *), void *arg)
 #if defined(THREAD_STACK_SIZE) || defined(PTHREAD_SYSTEM_SCHED_SUPPORTED)
 	pthread_attr_destroy(&attrs);
 #endif
-	if (success == 0) {
+	if (status != 0)
+            return -1;
+
 #if defined(PY_PTHREAD_D4) || defined(PY_PTHREAD_D6) || defined(PY_PTHREAD_D7)
-		pthread_detach(&th);
+        pthread_detach(&th);
 #elif defined(PY_PTHREAD_STD)
-		pthread_detach(th);
+        pthread_detach(th);
 #endif
-	}
+
 #if SIZEOF_PTHREAD_T <= SIZEOF_LONG
 	return (long) th;
 #else
@@ -480,27 +499,23 @@ PyThread_acquire_lock(PyThread_type_lock lock, int waitflag)
 	status = pthread_mutex_lock( &thelock->mut );
 	CHECK_STATUS("pthread_mutex_lock[1]");
 	success = thelock->locked == 0;
-	if (success) thelock->locked = 1;
-	status = pthread_mutex_unlock( &thelock->mut );
-	CHECK_STATUS("pthread_mutex_unlock[1]");
 
 	if ( !success && waitflag ) {
 		/* continue trying until we get the lock */
 
 		/* mut must be locked by me -- part of the condition
 		 * protocol */
-		status = pthread_mutex_lock( &thelock->mut );
-		CHECK_STATUS("pthread_mutex_lock[2]");
 		while ( thelock->locked ) {
 			status = pthread_cond_wait(&thelock->lock_released,
 						   &thelock->mut);
 			CHECK_STATUS("pthread_cond_wait");
 		}
-		thelock->locked = 1;
-		status = pthread_mutex_unlock( &thelock->mut );
-		CHECK_STATUS("pthread_mutex_unlock[2]");
 		success = 1;
 	}
+	if (success) thelock->locked = 1;
+	status = pthread_mutex_unlock( &thelock->mut );
+	CHECK_STATUS("pthread_mutex_unlock[1]");
+
 	if (error) success = 0;
 	dprintf(("PyThread_acquire_lock(%p, %d) -> %d\n", lock, waitflag, success));
 	return success;

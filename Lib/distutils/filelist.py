@@ -4,10 +4,7 @@ Provides the FileList class, used for poking about the filesystem
 and building lists of files.
 """
 
-# created 2000/07/17, Rene Liebscher (as template.py)
-# most parts taken from commands/sdist.py
-# renamed 2000/07/29 (to filelist.py) and officially added to
-#  the Distutils source, Greg Ward
+# This module should be kept compatible with Python 1.5.2.
 
 __revision__ = "$Id$"
 
@@ -54,7 +51,7 @@ class FileList:
         """Print 'msg' to stdout if the global DEBUG (taken from the
         DISTUTILS_DEBUG environment variable) flag is true.
         """
-        from distutils.core import DEBUG
+        from distutils.debug import DEBUG
         if DEBUG:
             print msg
 

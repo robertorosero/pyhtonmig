@@ -1,13 +1,14 @@
 #!/usr/bin/env python
 
 import unittest
-import test_support
+from test import test_support
 
 import socket
 import select
 import time
 import thread, threading
 import Queue
+import sys
 
 PORT = 50007
 HOST = 'localhost'
@@ -191,7 +192,7 @@ class SocketConnectedTest(ThreadedTCPSocketTest):
 class GeneralModuleTests(unittest.TestCase):
 
     def testSocketError(self):
-        """Testing that socket module exceptions."""
+        # Testing socket module exceptions
         def raise_error(*args, **kwargs):
             raise socket.error
         def raise_herror(*args, **kwargs):
@@ -206,7 +207,7 @@ class GeneralModuleTests(unittest.TestCase):
                               "Error raising socket exception.")
 
     def testCrucialConstants(self):
-        """Testing for mission critical constants."""
+        # Testing for mission critical constants
         socket.AF_INET
         socket.SOCK_STREAM
         socket.SOCK_DGRAM
@@ -216,60 +217,27 @@ class GeneralModuleTests(unittest.TestCase):
         socket.SOL_SOCKET
         socket.SO_REUSEADDR
 
-    def testNonCrucialConstants(self):
-        """Testing for existance of non-crucial constants."""
-        for const in (
-                 "AF_UNIX",
-
-                 "SO_DEBUG", "SO_ACCEPTCONN", "SO_REUSEADDR", "SO_KEEPALIVE",
-                 "SO_DONTROUTE", "SO_BROADCAST", "SO_USELOOPBACK", "SO_LINGER",
-                 "SO_OOBINLINE", "SO_REUSEPORT", "SO_SNDBUF", "SO_RCVBUF",
-                 "SO_SNDLOWAT", "SO_RCVLOWAT", "SO_SNDTIMEO", "SO_RCVTIMEO",
-                 "SO_ERROR", "SO_TYPE", "SOMAXCONN",
-
-                 "MSG_OOB", "MSG_PEEK", "MSG_DONTROUTE", "MSG_EOR",
-                 "MSG_TRUNC", "MSG_CTRUNC", "MSG_WAITALL", "MSG_BTAG",
-                 "MSG_ETAG",
-
-                 "SOL_SOCKET",
-
-                 "IPPROTO_IP", "IPPROTO_ICMP", "IPPROTO_IGMP",
-                 "IPPROTO_GGP", "IPPROTO_TCP", "IPPROTO_EGP",
-                 "IPPROTO_PUP", "IPPROTO_UDP", "IPPROTO_IDP",
-                 "IPPROTO_HELLO", "IPPROTO_ND", "IPPROTO_TP",
-                 "IPPROTO_XTP", "IPPROTO_EON", "IPPROTO_BIP",
-                 "IPPROTO_RAW", "IPPROTO_MAX",
-
-                 "IPPORT_RESERVED", "IPPORT_USERRESERVED",
-
-                 "INADDR_ANY", "INADDR_BROADCAST", "INADDR_LOOPBACK",
-                 "INADDR_UNSPEC_GROUP", "INADDR_ALLHOSTS_GROUP",
-                 "INADDR_MAX_LOCAL_GROUP", "INADDR_NONE",
-
-                 "IP_OPTIONS", "IP_HDRINCL", "IP_TOS", "IP_TTL",
-                 "IP_RECVOPTS", "IP_RECVRETOPTS", "IP_RECVDSTADDR",
-                 "IP_RETOPTS", "IP_MULTICAST_IF", "IP_MULTICAST_TTL",
-                 "IP_MULTICAST_LOOP", "IP_ADD_MEMBERSHIP",
-                 "IP_DROP_MEMBERSHIP",
-                  ):
-            try:
-                getattr(socket, const)
-            except AttributeError:
-                pass
-
     def testHostnameRes(self):
-        """Testing hostname resolution mechanisms."""
+        # Testing hostname resolution mechanisms
         hostname = socket.gethostname()
-        ip = socket.gethostbyname(hostname)
+        try:
+            ip = socket.gethostbyname(hostname)
+        except socket.error:
+            # Probably name lookup wasn't set up right; skip this test
+            return
         self.assert_(ip.find('.') >= 0, "Error resolving host to ip.")
-        hname, aliases, ipaddrs = socket.gethostbyaddr(ip)
+        try:
+            hname, aliases, ipaddrs = socket.gethostbyaddr(ip)
+        except socket.error:
+            # Probably a similar problem as above; skip this test
+            return
         all_host_names = [hname] + aliases
         fqhn = socket.getfqdn()
         if not fqhn in all_host_names:
             self.fail("Error testing host resolution mechanisms.")
 
     def testRefCountGetNameInfo(self):
-        """Testing reference count for getnameinfo."""
+        # Testing reference count for getnameinfo
         import sys
         if hasattr(sys, "getrefcount"):
             try:
@@ -281,42 +249,104 @@ class GeneralModuleTests(unittest.TestCase):
                     self.fail("socket.getnameinfo loses a reference")
 
     def testInterpreterCrash(self):
-        """Making sure getnameinfo doesn't crash the interpreter."""
+        # Making sure getnameinfo doesn't crash the interpreter
         try:
             # On some versions, this crashes the interpreter.
             socket.getnameinfo(('x', 0, 0, 0), 0)
         except socket.error:
             pass
 
+    def testNtoH(self):
+        # This just checks that htons etc. are their own inverse,
+        # when looking at the lower 16 or 32 bits.
+        sizes = {socket.htonl: 32, socket.ntohl: 32,
+                 socket.htons: 16, socket.ntohs: 16}
+        for func, size in sizes.items():
+            mask = (1L<<size) - 1
+            for i in (0, 1, 0xffff, ~0xffff, 2, 0x01234567, 0x76543210):
+                self.assertEqual(i & mask, func(func(i&mask)) & mask)
+
+            swapped = func(mask)
+            self.assertEqual(swapped & mask, mask)
+            self.assertRaises(OverflowError, func, 1L<<34)
+
     def testGetServByName(self):
-        """Testing getservbyname()."""
-        if hasattr(socket, 'getservbyname'):
-            socket.getservbyname('telnet', 'tcp')
+        # Testing getservbyname()
+        # try a few protocols - not everyone has telnet enabled
+        found = 0
+        for proto in ("telnet", "ssh", "www", "ftp"):
             try:
-                socket.getservbyname('telnet', 'udp')
+                socket.getservbyname(proto, 'tcp')
+                found = 1
+                break
             except socket.error:
                 pass
+            try:
+                socket.getservbyname(proto, 'udp')
+                found = 1
+                break
+            except socket.error:
+                pass
+            if not found:
+                raise socket.error
+
+    def testDefaultTimeout(self):
+        # Testing default timeout
+        # The default timeout should initially be None
+        self.assertEqual(socket.getdefaulttimeout(), None)
+        s = socket.socket()
+        self.assertEqual(s.gettimeout(), None)
+        s.close()
+
+        # Set the default timeout to 10, and see if it propagates
+        socket.setdefaulttimeout(10)
+        self.assertEqual(socket.getdefaulttimeout(), 10)
+        s = socket.socket()
+        self.assertEqual(s.gettimeout(), 10)
+        s.close()
+
+        # Reset the default timeout to None, and see if it propagates
+        socket.setdefaulttimeout(None)
+        self.assertEqual(socket.getdefaulttimeout(), None)
+        s = socket.socket()
+        self.assertEqual(s.gettimeout(), None)
+        s.close()
+
+        # Check that setting it to an invalid value raises ValueError
+        self.assertRaises(ValueError, socket.setdefaulttimeout, -1)
+
+        # Check that setting it to an invalid type raises TypeError
+        self.assertRaises(TypeError, socket.setdefaulttimeout, "spam")
+
+    # XXX The following don't test module-level functionality...
 
     def testSockName(self):
-        """Testing getsockname()."""
+        # Testing getsockname()
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.bind(("0.0.0.0", PORT+1))
         name = sock.getsockname()
         self.assertEqual(name, ("0.0.0.0", PORT+1))
 
     def testGetSockOpt(self):
-        """Testing getsockopt()."""
+        # Testing getsockopt()
         # We know a socket should start without reuse==0
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         reuse = sock.getsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR)
         self.failIf(reuse != 0, "initial mode is reuse")
 
     def testSetSockOpt(self):
-        """Testing setsockopt()."""
+        # Testing setsockopt()
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         reuse = sock.getsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR)
         self.failIf(reuse == 0, "failed to set reuse mode")
+
+    def testSendAfterClose(self):
+        # testing send() after close() with timeout
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(1)
+        sock.close()
+        self.assertRaises(socket.error, sock.send, "spam")
 
 class BasicTCPTest(SocketConnectedTest):
 
@@ -324,7 +354,7 @@ class BasicTCPTest(SocketConnectedTest):
         SocketConnectedTest.__init__(self, methodName=methodName)
 
     def testRecv(self):
-        """Testing large receive over TCP."""
+        # Testing large receive over TCP
         msg = self.cli_conn.recv(1024)
         self.assertEqual(msg, MSG)
 
@@ -332,7 +362,7 @@ class BasicTCPTest(SocketConnectedTest):
         self.serv_conn.send(MSG)
 
     def testOverFlowRecv(self):
-        """Testing receive in chunks over TCP."""
+        # Testing receive in chunks over TCP
         seg1 = self.cli_conn.recv(len(MSG) - 3)
         seg2 = self.cli_conn.recv(1024)
         msg = seg1 + seg2
@@ -342,43 +372,39 @@ class BasicTCPTest(SocketConnectedTest):
         self.serv_conn.send(MSG)
 
     def testRecvFrom(self):
-        """Testing large recvfrom() over TCP."""
+        # Testing large recvfrom() over TCP
         msg, addr = self.cli_conn.recvfrom(1024)
-        hostname, port = addr
-        ##self.assertEqual(hostname, socket.gethostbyname('localhost'))
         self.assertEqual(msg, MSG)
 
     def _testRecvFrom(self):
         self.serv_conn.send(MSG)
 
     def testOverFlowRecvFrom(self):
-        """Testing recvfrom() in chunks over TCP."""
+        # Testing recvfrom() in chunks over TCP
         seg1, addr = self.cli_conn.recvfrom(len(MSG)-3)
         seg2, addr = self.cli_conn.recvfrom(1024)
         msg = seg1 + seg2
-        hostname, port = addr
-        ##self.assertEqual(hostname, socket.gethostbyname('localhost'))
         self.assertEqual(msg, MSG)
 
     def _testOverFlowRecvFrom(self):
         self.serv_conn.send(MSG)
 
     def testSendAll(self):
-        """Testing sendall() with a 2048 byte string over TCP."""
+        # Testing sendall() with a 2048 byte string over TCP
+        msg = ''
         while 1:
             read = self.cli_conn.recv(1024)
             if not read:
                 break
-            self.assert_(len(read) == 1024, "Error performing sendall.")
-            read = filter(lambda x: x == 'f', read)
-            self.assert_(len(read) == 1024, "Error performing sendall.")
+            msg += read
+        self.assertEqual(msg, 'f' * 2048)
 
     def _testSendAll(self):
         big_chunk = 'f' * 2048
         self.serv_conn.sendall(big_chunk)
 
     def testFromFd(self):
-        """Testing fromfd()."""
+        # Testing fromfd()
         if not hasattr(socket, "fromfd"):
             return # On Windows, this doesn't exist
         fd = self.cli_conn.fileno()
@@ -390,7 +416,7 @@ class BasicTCPTest(SocketConnectedTest):
         self.serv_conn.send(MSG)
 
     def testShutdown(self):
-        """Testing shutdown()."""
+        # Testing shutdown()
         msg = self.cli_conn.recv(1024)
         self.assertEqual(msg, MSG)
 
@@ -404,7 +430,7 @@ class BasicUDPTest(ThreadedUDPSocketTest):
         ThreadedUDPSocketTest.__init__(self, methodName=methodName)
 
     def testSendtoAndRecv(self):
-        """Testing sendto() and Recv() over UDP."""
+        # Testing sendto() and Recv() over UDP
         msg = self.serv.recv(len(MSG))
         self.assertEqual(msg, MSG)
 
@@ -412,10 +438,8 @@ class BasicUDPTest(ThreadedUDPSocketTest):
         self.cli.sendto(MSG, 0, (HOST, PORT))
 
     def testRecvFrom(self):
-        """Testing recvfrom() over UDP."""
+        # Testing recvfrom() over UDP
         msg, addr = self.serv.recvfrom(len(MSG))
-        hostname, port = addr
-        ##self.assertEqual(hostname, socket.gethostbyname('localhost'))
         self.assertEqual(msg, MSG)
 
     def _testRecvFrom(self):
@@ -427,7 +451,7 @@ class NonBlockingTCPTests(ThreadedTCPSocketTest):
         ThreadedTCPSocketTest.__init__(self, methodName=methodName)
 
     def testSetBlocking(self):
-        """Testing whether set blocking works."""
+        # Testing whether set blocking works
         self.serv.setblocking(0)
         start = time.time()
         try:
@@ -441,7 +465,7 @@ class NonBlockingTCPTests(ThreadedTCPSocketTest):
         pass
 
     def testAccept(self):
-        """Testing non-blocking accept."""
+        # Testing non-blocking accept
         self.serv.setblocking(0)
         try:
             conn, addr = self.serv.accept()
@@ -456,10 +480,11 @@ class NonBlockingTCPTests(ThreadedTCPSocketTest):
             self.fail("Error trying to do accept after select.")
 
     def _testAccept(self):
+        time.sleep(0.1)
         self.cli.connect((HOST, PORT))
 
     def testConnect(self):
-        """Testing non-blocking connect."""
+        # Testing non-blocking connect
         conn, addr = self.serv.accept()
 
     def _testConnect(self):
@@ -467,7 +492,7 @@ class NonBlockingTCPTests(ThreadedTCPSocketTest):
         self.cli.connect((HOST, PORT))
 
     def testRecv(self):
-        """Testing non-blocking recv."""
+        # Testing non-blocking recv
         conn, addr = self.serv.accept()
         conn.setblocking(0)
         try:
@@ -485,16 +510,19 @@ class NonBlockingTCPTests(ThreadedTCPSocketTest):
 
     def _testRecv(self):
         self.cli.connect((HOST, PORT))
+        time.sleep(0.1)
         self.cli.send(MSG)
 
 class FileObjectClassTestCase(SocketConnectedTest):
+
+    bufsize = -1 # Use default buffer size
 
     def __init__(self, methodName='runTest'):
         SocketConnectedTest.__init__(self, methodName=methodName)
 
     def setUp(self):
         SocketConnectedTest.setUp(self)
-        self.serv_file = socket._fileobject(self.cli_conn, 'rb', 8192)
+        self.serv_file = self.cli_conn.makefile('rb', self.bufsize)
 
     def tearDown(self):
         self.serv_file.close()
@@ -503,7 +531,7 @@ class FileObjectClassTestCase(SocketConnectedTest):
 
     def clientSetUp(self):
         SocketConnectedTest.clientSetUp(self)
-        self.cli_file = socket._fileobject(self.serv_conn, 'rb', 8192)
+        self.cli_file = self.serv_conn.makefile('wb')
 
     def clientTearDown(self):
         self.cli_file.close()
@@ -511,7 +539,7 @@ class FileObjectClassTestCase(SocketConnectedTest):
         SocketConnectedTest.clientTearDown(self)
 
     def testSmallRead(self):
-        """Performing small file read test."""
+        # Performing small file read test
         first_seg = self.serv_file.read(len(MSG)-3)
         second_seg = self.serv_file.read(3)
         msg = first_seg + second_seg
@@ -521,22 +549,31 @@ class FileObjectClassTestCase(SocketConnectedTest):
         self.cli_file.write(MSG)
         self.cli_file.flush()
 
+    def testFullRead(self):
+        # read until EOF
+        msg = self.serv_file.read()
+        self.assertEqual(msg, MSG)
+
+    def _testFullRead(self):
+        self.cli_file.write(MSG)
+        self.cli_file.close()
+
     def testUnbufferedRead(self):
-        """Performing unbuffered file read test."""
+        # Performing unbuffered file read test
         buf = ''
         while 1:
             char = self.serv_file.read(1)
-            self.failIf(not char)
-            buf += char
-            if buf == MSG:
+            if not char:
                 break
+            buf += char
+        self.assertEqual(buf, MSG)
 
     def _testUnbufferedRead(self):
         self.cli_file.write(MSG)
         self.cli_file.flush()
 
     def testReadline(self):
-        """Performing file readline test."""
+        # Performing file readline test
         line = self.serv_file.readline()
         self.assertEqual(line, MSG)
 
@@ -544,14 +581,52 @@ class FileObjectClassTestCase(SocketConnectedTest):
         self.cli_file.write(MSG)
         self.cli_file.flush()
 
-def main():
+class UnbufferedFileObjectClassTestCase(FileObjectClassTestCase):
+
+    """Repeat the tests from FileObjectClassTestCase with bufsize==0.
+
+    In this case (and in this case only), it should be possible to
+    create a file object, read a line from it, create another file
+    object, read another line from it, without loss of data in the
+    first file object's buffer.  Note that httplib relies on this
+    when reading multiple requests from the same socket."""
+
+    bufsize = 0 # Use unbuffered mode
+
+    def testUnbufferedReadline(self):
+        # Read a line, create a new file object, read another line with it
+        line = self.serv_file.readline() # first line
+        self.assertEqual(line, "A. " + MSG) # first line
+        self.serv_file = self.cli_conn.makefile('rb', 0)
+        line = self.serv_file.readline() # second line
+        self.assertEqual(line, "B. " + MSG) # second line
+
+    def _testUnbufferedReadline(self):
+        self.cli_file.write("A. " + MSG)
+        self.cli_file.write("B. " + MSG)
+        self.cli_file.flush()
+
+class LineBufferedFileObjectClassTestCase(FileObjectClassTestCase):
+
+    bufsize = 1 # Default-buffered for reading; line-buffered for writing
+
+
+class SmallBufferedFileObjectClassTestCase(FileObjectClassTestCase):
+
+    bufsize = 2 # Exercise the buffering code
+
+def test_main():
     suite = unittest.TestSuite()
     suite.addTest(unittest.makeSuite(GeneralModuleTests))
     suite.addTest(unittest.makeSuite(BasicTCPTest))
-    suite.addTest(unittest.makeSuite(BasicUDPTest))
+    if sys.platform != 'mac':
+        suite.addTest(unittest.makeSuite(BasicUDPTest))
     suite.addTest(unittest.makeSuite(NonBlockingTCPTests))
     suite.addTest(unittest.makeSuite(FileObjectClassTestCase))
+    suite.addTest(unittest.makeSuite(UnbufferedFileObjectClassTestCase))
+    suite.addTest(unittest.makeSuite(LineBufferedFileObjectClassTestCase))
+    suite.addTest(unittest.makeSuite(SmallBufferedFileObjectClassTestCase))
     test_support.run_suite(suite)
 
 if __name__ == "__main__":
-    main()
+    test_main()

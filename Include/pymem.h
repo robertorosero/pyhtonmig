@@ -47,9 +47,9 @@ extern "C" {
    performed on failure (no exception is set, no warning is printed, etc).
 */
 
-extern DL_IMPORT(void *) PyMem_Malloc(size_t);
-extern DL_IMPORT(void *) PyMem_Realloc(void *, size_t);
-extern DL_IMPORT(void) PyMem_Free(void *);
+PyAPI_FUNC(void *) PyMem_Malloc(size_t);
+PyAPI_FUNC(void *) PyMem_Realloc(void *, size_t);
+PyAPI_FUNC(void) PyMem_Free(void *);
 
 /* Starting from Python 1.6, the wrappers Py_{Malloc,Realloc,Free} are
    no longer supported. They used to call PyErr_NoMemory() on failure. */
@@ -62,16 +62,11 @@ extern DL_IMPORT(void) PyMem_Free(void *);
 
 #else	/* ! PYMALLOC_DEBUG */
 
-#ifdef MALLOC_ZERO_RETURNS_NULL
+/* PyMem_MALLOC(0) means malloc(1). Some systems would return NULL
+   for malloc(0), which would be treated as an error. Some platforms
+   would return a pointer with no memory behind it, which would break
+   pymalloc. To solve these problems, allocate an extra byte. */
 #define PyMem_MALLOC(n)         malloc((n) ? (n) : 1)
-#else
-#define PyMem_MALLOC		malloc
-#endif
-
-/* Caution:  whether MALLOC_ZERO_RETURNS_NULL is #defined has nothing to
-   do with whether platform realloc(non-NULL, 0) normally frees the memory
-   or returns NULL.  Rather than introduce yet another config variation,
-   just make a realloc to 0 bytes act as if to 1 instead. */
 #define PyMem_REALLOC(p, n)     realloc((p), (n) ? (n) : 1)
 
 #endif	/* PYMALLOC_DEBUG */

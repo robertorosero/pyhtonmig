@@ -927,8 +927,8 @@ This \UNIX\ is also followed by a space.
     \begin{macrodesc}{program}{\p{name}}
       The name of an executable program.  This may differ from the
       file name for the executable for some platforms.  In particular, 
-      the \file{.exe} (or other) extension should be omitted for DOS
-      and Windows programs.
+      the \file{.exe} (or other) extension should be omitted for 
+      Windows programs.
     \end{macrodesc}
 
     \begin{macrodesc}{programopt}{\p{option}}
@@ -1306,6 +1306,9 @@ This \UNIX\ is also followed by a space.
           features.}
   \lineii{RuntimeWarning}
          {Base category for warnings about dubious runtime features.}
+  \lineii{FutureWarning}
+	 {Base category for warnings about constructs that will change
+	 semantically in the future.}
 \end{tableii}
 \end{verbatim}
 
@@ -1638,10 +1641,37 @@ This \UNIX\ is also followed by a space.
 \end{verbatim}
 
 
-\section{Graphical Interface Components \label{gui-markup}}
+\subsection{Graphical Interface Components \label{gui-markup}}
 
   The components of graphical interfaces will be assigned markup, but
-  the specifics have not been determined.
+  most of the specifics have not been determined.
+
+  \begin{macrodesc}{menuselection}{\p{menupath}}
+    Menu selections should be marked using a combination of
+    \macro{menuselection} and \macro{sub}.  This macro is used to mark
+    a complete sequence of menu selections, including selecting
+    submenus and choosing a specific operation, or any subsequence of
+    such a sequence.  The names of individual selections should be
+    separated by occurances of \macro{sub}.
+
+    For example, to mark the selection ``\menuselection{Start \sub
+    Programs}'', use this markup:
+
+\begin{verbatim}
+\menuselection{Start \sub Programs}
+\end{verbatim}
+
+    When including a selection that includes some trailing indicator,
+    such as the ellipsis some operating systems use to indicate that
+    the command opens a dialog, the indicator should be omitted from
+    the selection name.
+  \end{macrodesc}
+
+  \begin{macrodesc}{sub}{}
+    Separator for menu selections that include multiple levels.  This
+    macro is only defined within the context of the
+    \macro{menuselection} macro.
+  \end{macrodesc}
 
 
 \section{Processing Tools \label{tools}}
@@ -1749,10 +1779,9 @@ This \UNIX\ is also followed by a space.
         command line options.
 
         \program{mkhowto} can be used for both \code{howto} and
-        \code{manual} class documents.  (For the later, be sure to get 
-	the latest version from the Python CVS repository rather than
-        the version distributed in the \file{latex-1.5.2.tgz} source
-	archive.)
+        \code{manual} class documents.  It is usually a good idea to
+        always use the latest version of this tool rather than a
+        version from an older source release of Python.
 
 	XXX  Need more here.
     \end{description}

@@ -184,9 +184,6 @@
 /* Define if nice() returns success/failure instead of the new priority. */
 #undef HAVE_BROKEN_NICE
 
-/* Define if malloc(0) returns a NULL pointer */
-#undef MALLOC_ZERO_RETURNS_NULL
-
 /* Define if you have POSIX threads */
 #undef _POSIX_THREADS
 
@@ -235,9 +232,6 @@
 /* Define if you want wctype.h functions to be used instead of the
    one supplied by Python itself. (see Include/unicodectype.h). */
 #undef WANT_WCTYPE_FUNCTIONS
-
-/* Define if you want to compile in cycle garbage collection */
-#define WITH_CYCLE_GC 1
 
 /* Define if you want to emulate SGI (IRIX 4) dynamic linking.
    This is rumoured to work on VAX (Ultrix), Sun3 (SunOS 3.4),

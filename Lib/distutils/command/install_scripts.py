@@ -5,6 +5,8 @@ Python scripts."""
 
 # contributed by Bastian Kleineidam
 
+# This module should be kept compatible with Python 1.5.2.
+
 __revision__ = "$Id$"
 
 import os
@@ -51,7 +53,7 @@ class install_scripts (Command):
                 if self.dry_run:
                     log.info("changing mode of %s", file)
                 else:
-                    mode = ((os.stat(file)[ST_MODE]) | 0111) & 07777
+                    mode = ((os.stat(file)[ST_MODE]) | 0555) & 07777
                     log.info("changing mode of %s to %o", file, mode)
                     os.chmod(file, mode)
 

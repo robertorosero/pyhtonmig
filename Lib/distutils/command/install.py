@@ -4,13 +4,14 @@ Implements the Distutils 'install' command."""
 
 from distutils import log
 
-# created 1999/03/13, Greg Ward
+# This module should be kept compatible with Python 1.5.2.
 
 __revision__ = "$Id$"
 
 import sys, os, string
 from types import *
-from distutils.core import Command, DEBUG
+from distutils.core import Command
+from distutils.debug import DEBUG
 from distutils.sysconfig import get_config_vars
 from distutils.errors import DistutilsPlatformError
 from distutils.file_util import write_file

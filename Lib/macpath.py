@@ -5,8 +5,19 @@ from stat import *
 
 __all__ = ["normcase","isabs","join","splitdrive","split","splitext",
            "basename","dirname","commonprefix","getsize","getmtime",
-           "getatime","islink","exists","isdir","isfile",
-           "walk","expanduser","expandvars","normpath","abspath"]
+           "getatime","getctime", "islink","exists","isdir","isfile",
+           "walk","expanduser","expandvars","normpath","abspath",
+           "curdir","pardir","sep","pathsep","defpath","altsep","extsep",
+           "realpath","supports_unicode_filenames"]
+
+# strings representing various path-related bits and pieces
+curdir = ':'
+pardir = '::'
+extsep = '.'
+sep = ':'
+pathsep = '\n'
+defpath = ':'
+altsep = None
 
 # Normalize the case of a pathname.  Dummy in Posix, but <s>.lower() here.
 
@@ -61,20 +72,11 @@ def splitext(p):
     pathname component; the root is everything before that.
     It is always true that root + ext == p."""
 
-    root, ext = '', ''
-    for c in p:
-        if c == ':':
-            root, ext = root + ext + c, ''
-        elif c == '.':
-            if ext:
-                root, ext = root + ext, c
-            else:
-                ext = c
-        elif ext:
-            ext = ext + c
-        else:
-            root = root + c
-    return root, ext
+    i = p.rfind('.')
+    if i<=p.rfind(':'):
+        return p, ''
+    else:
+        return p[:i], p[i:]
 
 
 def splitdrive(p):
@@ -92,6 +94,11 @@ def splitdrive(p):
 def dirname(s): return split(s)[0]
 def basename(s): return split(s)[1]
 
+def ismount(s):
+    if not isabs(s):
+        return False
+    components = split(s)
+    return len(components) == 2 and components[1] == ''
 
 def isdir(s):
     """Return true if the pathname refers to an existing directory."""
@@ -122,8 +129,8 @@ def islink(s):
     """Return true if the pathname refers to a symbolic link."""
 
     try:
-        import macfs
-        return macfs.ResolveAliasFile(s)[2]
+        import Carbon.File
+        return Carbon.File.ResolveAliasFile(s, 0)[2]
     except:
         return False
 
@@ -137,6 +144,9 @@ def isfile(s):
         return False
     return S_ISREG(st.st_mode)
 
+def getctime(filename):
+    """Return the creation time of a file, reported by os.stat()."""
+    return os.stat(filename).st_ctime
 
 def exists(s):
     """Return True if the pathname refers to an existing file or directory."""
@@ -237,7 +247,7 @@ def abspath(path):
 def realpath(path):
     path = abspath(path)
     try:
-        import macfs
+        import Carbon.File
     except ImportError:
         return path
     if not path:
@@ -246,5 +256,7 @@ def realpath(path):
     path = components[0] + ':'
     for c in components[1:]:
         path = join(path, c)
-        path = macfs.ResolveAliasFile(path)[0].as_pathname()
+        path = Carbon.File.FSResolveAliasFile(path, 1)[0].as_pathname()
     return path
+
+supports_unicode_filenames = False

@@ -4,7 +4,7 @@ Implements the Distutils 'build_ext' command, for building extension
 modules (currently limited to C extensions, should accommodate C++
 extensions ASAP)."""
 
-# created 1999/08/09, Greg Ward
+# This module should be kept compatible with Python 1.5.2.
 
 __revision__ = "$Id$"
 
@@ -12,7 +12,7 @@ import sys, os, string, re
 from types import *
 from distutils.core import Command
 from distutils.errors import *
-from distutils.sysconfig import customize_compiler
+from distutils.sysconfig import customize_compiler, get_python_version
 from distutils.dep_util import newer_group
 from distutils.extension import Extension
 from distutils import log
@@ -184,7 +184,7 @@ class build_ext (Command):
             if string.find(sys.executable, sys.exec_prefix) != -1:
                 # building third party extensions
                 self.library_dirs.append(os.path.join(sys.prefix, "lib",
-                                                      "python" + sys.version[:3],
+                                                      "python" + get_python_version(),
                                                       "config"))
             else:
                 # building python standard extensions
@@ -451,14 +451,6 @@ class build_ext (Command):
         for undef in ext.undef_macros:
             macros.append((undef,))
 
-        # XXX and if we support CFLAGS, why not CC (compiler
-        # executable), CPPFLAGS (pre-processor options), and LDFLAGS
-        # (linker options) too?
-        # XXX should we use shlex to properly parse CFLAGS?
-
-        if os.environ.has_key('CFLAGS'):
-            extra_args.extend(string.split(os.environ['CFLAGS']))
-
         objects = self.compiler.compile(sources,
                                         output_dir=self.build_temp,
                                         macros=macros,
@@ -485,6 +477,8 @@ class build_ext (Command):
             objects.extend(ext.extra_objects)
         extra_args = ext.extra_link_args or []
 
+        # Detect target language, if not provided
+        language = ext.language or self.compiler.detect_language(sources)
 
         self.compiler.link_shared_object(
             objects, ext_filename,
@@ -494,7 +488,8 @@ class build_ext (Command):
             extra_postargs=extra_args,
             export_symbols=self.get_export_symbols(ext),
             debug=self.debug,
-            build_temp=self.build_temp)
+            build_temp=self.build_temp,
+            target_lang=language)
 
 
     def swig_sources (self, sources):
@@ -635,6 +630,8 @@ class build_ext (Command):
                 # don't extend ext.libraries, it may be shared with other
                 # extensions, it is a reference to the original list
                 return ext.libraries + [pythonlib]
+            else:
+                return ext.libraries
         elif sys.platform == "os2emx":
             # EMX/GCC requires the python library explicitly, and I
             # believe VACPP does as well (though not confirmed) - AIM Apr01

@@ -6,7 +6,7 @@
 
 #ifndef WITH_THREAD
 #error "Error!  The rest of Python is not compiled with thread support."
-#error "Rerun configure, adding a --with-thread option."
+#error "Rerun configure, adding a --with-threads option."
 #error "Then run `make clean' followed by `make'."
 #endif
 
@@ -22,7 +22,7 @@ typedef struct {
 	PyThread_type_lock lock_lock;
 } lockobject;
 
-staticforward PyTypeObject Locktype;
+static PyTypeObject Locktype;
 
 static lockobject *
 newlockobject(void)
@@ -360,7 +360,7 @@ A lock is not owned by the thread that locked it; another thread may\n\
 unlock it.  A thread attempting to lock a lock that it has already locked\n\
 will block until another thread unlocks it.  Deadlocks may ensue.");
 
-DL_EXPORT(void)
+PyMODINIT_FUNC
 initthread(void)
 {
 	PyObject *m, *d;

@@ -444,15 +444,15 @@ Subject: Re: PEP 255: Simple Generators
 >>> roots = sets[:]
 
 >>> import random
->>> random.seed(42)
+>>> gen = random.WichmannHill(42)
 >>> while 1:
 ...     for s in sets:
 ...         print "%s->%s" % (s, s.find()),
 ...     print
 ...     if len(roots) > 1:
-...         s1 = random.choice(roots)
+...         s1 = gen.choice(roots)
 ...         roots.remove(s1)
-...         s2 = random.choice(roots)
+...         s2 = gen.choice(roots)
 ...         s1.union(s2)
 ...         print "merged", s1, "into", s2
 ...     else:
@@ -483,6 +483,7 @@ A->A B->G C->A D->G E->G F->A G->G H->G I->A J->G K->A L->A M->G
 merged A into G
 A->G B->G C->G D->G E->G F->G G->G H->G I->G J->G K->G L->G M->G
 """
+# Emacs turd '
 
 # Fun tests (for sufficiently warped notions of "fun").
 
@@ -814,7 +815,7 @@ This one caused a crash (see SF bug 567538):
 ...             continue
 ...         finally:
 ...             yield i
-... 
+...
 >>> g = f()
 >>> print g.next()
 0
@@ -1358,19 +1359,46 @@ Solution 2
 +---+---+---+---+---+---+---+---+---+---+
 """
 
+weakref_tests = """\
+Generators are weakly referencable:
+
+>>> import weakref
+>>> def gen():
+...     yield 'foo!'
+...
+>>> wr = weakref.ref(gen)
+>>> wr() is gen
+True
+>>> p = weakref.proxy(gen)
+
+Generator-iterators are weakly referencable as well:
+
+>>> gi = gen()
+>>> wr = weakref.ref(gi)
+>>> wr() is gi
+True
+>>> p = weakref.proxy(gi)
+>>> list(p)
+['foo!']
+
+"""
+
 __test__ = {"tut":      tutorial_tests,
             "pep":      pep_tests,
             "email":    email_tests,
             "fun":      fun_tests,
             "syntax":   syntax_tests,
-            "conjoin":  conjoin_tests}
+            "conjoin":  conjoin_tests,
+            "weakref":  weakref_tests,
+            }
 
 # Magic test name that regrtest.py invokes *after* importing this module.
 # This worms around a bootstrap problem.
 # Note that doctest and regrtest both look in sys.argv for a "-v" argument,
 # so this works as expected in both ways of running regrtest.
 def test_main(verbose=None):
-    import doctest, test_support, test_generators
+    import doctest
+    from test import test_support, test_generators
     if 0:   # change to 1 to run forever (to check for leaks)
         while 1:
             doctest.master = None

@@ -8,8 +8,7 @@
  *   Version 1.5b1, heavily extended for ncurses by Oliver Andrich:
  *   Copyright 1996,1997 by Oliver Andrich, Koblenz, Germany.
  *
- *   Tidied for Python 1.6, and currently maintained by
- *   <akuchlin@mems-exchange.org>.
+ *   Tidied for Python 1.6, and currently maintained by <amk@amk.ca>.
  *
  *   Permission is hereby granted, free of charge, to any person obtaining
  *   a copy of this source file to use, copy, modify, merge, or publish it
@@ -103,12 +102,10 @@ char *PyCursesVersion = "2.2";
 #include "Python.h"
 
 #ifdef __osf__
-#define _XOPEN_SOURCE_EXTENDED  /* Define macro for OSF/1 */
 #define STRICT_SYSV_CURSES      /* Don't use ncurses extensions */
 #endif
 
 #ifdef __hpux
-#define _XOPEN_SOURCE_EXTENDED
 #define STRICT_SYSV_CURSES
 #endif
 
@@ -124,7 +121,7 @@ extern int setupterm(char *,int,int *);
 #include <term.h>
 #endif
 
-#if !defined(HAVE_NCURSES_H) && (defined(sgi) || defined(__sun))
+#if !defined(HAVE_NCURSES_H) && (defined(sgi) || defined(__sun) || defined(SCO5))
 #define STRICT_SYSV_CURSES       /* Don't use ncurses extensions */
 typedef chtype attr_t;           /* No attr_t type is available */
 #endif
@@ -735,7 +732,7 @@ static PyObject *
 PyCursesWindow_GetCh(PyCursesWindowObject *self, PyObject *args)
 {
   int x, y;
-  chtype rtn;
+  int rtn;
 
   switch (PyTuple_Size(args)) {
   case 0:
@@ -761,7 +758,7 @@ static PyObject *
 PyCursesWindow_GetKey(PyCursesWindowObject *self, PyObject *args)
 {
   int x, y;
-  chtype rtn;
+  int rtn;
 
   switch (PyTuple_Size(args)) {
   case 0:
@@ -780,7 +777,11 @@ PyCursesWindow_GetKey(PyCursesWindowObject *self, PyObject *args)
     PyErr_SetString(PyExc_TypeError, "getkey requires 0 or 2 arguments");
     return NULL;
   }
-  if (rtn<=255)
+  if (rtn == ERR) {
+    /* getch() returns ERR in nodelay mode */
+    PyErr_SetString(PyCursesError, "no input");
+    return NULL;
+  } else if (rtn<=255)
     return Py_BuildValue("c", rtn);
   else
 #if defined(__NetBSD__)
@@ -1956,6 +1957,10 @@ PyCurses_KeyName(PyObject *self, PyObject *args)
 
   if (!PyArg_ParseTuple(args,"i",&ch)) return NULL;
 
+  if (ch < 0) {
+    PyErr_SetString(PyExc_ValueError, "invalid key number");
+    return NULL;
+  }
   knp = keyname(ch);
 
   return PyString_FromString((knp == NULL) ? "" : (char *)knp);
@@ -2255,7 +2260,7 @@ PyCurses_tparm(PyObject *self, PyObject *args)
 {
 	char* fmt;
 	char* result = NULL;
-	int i1,i2,i3,i4,i5,i6,i7,i8,i9;
+	int i1=0,i2=0,i3=0,i4=0,i5=0,i6=0,i7=0,i8=0,i9=0;
 
 	PyCursesSetupTermCalled;
 
@@ -2264,49 +2269,9 @@ PyCurses_tparm(PyObject *self, PyObject *args)
 			      &i5, &i6, &i7, &i8, &i9)) {
 		return NULL;
 	}
-	
-#if defined(__hpux) || defined(_AIX)
-	/* tparm is declared with 10 arguments on a few platforms
-	   (HP-UX, AIX). If this proves to be a problem on other 
-	   platforms as well, perhaps an autoconf test should be 
-	   added to determine whether tparm can be called with a 
-	   variable number of arguments. Perhaps the other arguments 
-	   should be initialized in this case also. */
+
 	result = tparm(fmt,i1,i2,i3,i4,i5,i6,i7,i8,i9);
-#else
-	switch (PyTuple_GET_SIZE(args)) {
-	case 1:
-		result = tparm(fmt);
-		break;
-	case 2:
-		result = tparm(fmt,i1);
-		break;
-	case 3:
-		result = tparm(fmt,i1,i2);
-		break;
-	case 4:
-		result = tparm(fmt,i1,i2,i3);
-		break;
-	case 5:
-		result = tparm(fmt,i1,i2,i3,i4);
-		break;
-	case 6:
-		result = tparm(fmt,i1,i2,i3,i4,i5);
-		break;
-	case 7:
-		result = tparm(fmt,i1,i2,i3,i4,i5,i6);
-		break;
-	case 8:
-		result = tparm(fmt,i1,i2,i3,i4,i5,i6,i7);
-		break;
-	case 9:
-		result = tparm(fmt,i1,i2,i3,i4,i5,i6,i7,i8);
-		break;
-	case 10:
-		result = tparm(fmt,i1,i2,i3,i4,i5,i6,i7,i8,i9);
-		break;
-	}
-#endif /* defined(__hpux) || defined(_AIX) */
+
 	return PyString_FromString(result);
 }
 
@@ -2350,16 +2315,16 @@ static PyObject *
 PyCurses_UngetCh(PyObject *self, PyObject *args)
 {
   PyObject *temp;
-  chtype ch;
+  int ch;
 
   PyCursesInitialised
 
   if (!PyArg_ParseTuple(args,"O;ch or int",&temp)) return NULL;
 
   if (PyInt_Check(temp))
-    ch = (chtype) PyInt_AsLong(temp);
+    ch = (int) PyInt_AsLong(temp);
   else if (PyString_Check(temp))
-    ch = (chtype) *PyString_AsString(temp);
+    ch = (int) *PyString_AsString(temp);
   else {
     PyErr_SetString(PyExc_TypeError, "argument must be a ch or an int");
     return NULL;
@@ -2474,7 +2439,7 @@ static PyMethodDef PyCurses_methods[] = {
 
 /* Initialization function for the module */
 
-DL_EXPORT(void)
+PyMODINIT_FUNC
 init_curses(void)
 {
 	PyObject *m, *d, *v, *c_api_object;

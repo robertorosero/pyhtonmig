@@ -129,6 +129,25 @@ There is no \cfunction{PyNone_Check()} function for the same reason.
   \versionadded{2.2}
 \end{cfuncdesc}
 
+\begin{cfuncdesc}{PyObject*}{PyInt_FromString}{char *str, char **pend,
+                                               int base}
+  Return a new \ctype{PyIntObject} or \ctype{PyLongObject} based on the
+  string value in \var{str}, which is interpreted according to the radix in
+  \var{base}.  If \var{pend} is non-\NULL, \code{*\var{pend}} will point to
+  the first character in \var{str} which follows the representation of the
+  number.  If \var{base} is \code{0}, the radix will be determined based on
+  the leading characters of \var{str}: if \var{str} starts with \code{'0x'}
+  or \code{'0X'}, radix 16 will be used; if \var{str} starts with
+  \code{'0'}, radix 8 will be used; otherwise radix 10 will be used.  If
+  \var{base} is not \code{0}, it must be between \code{2} and \code{36},
+  inclusive.  Leading spaces are ignored.  If there are no digits,
+  \exception{ValueError} will be raised.  If the string represents a number
+  too large to be contained within the machine's \ctype{long int} type and
+  overflow warnings are being suppressed, a \ctype{PyLongObject} will be
+  returned.  If overflow warnings are not being suppressed, \NULL{} will be
+  returned in this case.
+\end{cfuncdesc}
+
 \begin{cfuncdesc}{PyObject*}{PyInt_FromLong}{long ival}
   Creates a new integer object with a value of \var{ival}.
 
@@ -147,6 +166,20 @@ There is no \cfunction{PyNone_Check()} function for the same reason.
 \begin{cfuncdesc}{long}{PyInt_AS_LONG}{PyObject *io}
   Returns the value of the object \var{io}.  No error checking is
   performed.
+\end{cfuncdesc}
+
+\begin{cfuncdesc}{unsigned long}{PyInt_AsUnsignedLongMask}{PyObject *io}
+  Will first attempt to cast the object to a \ctype{PyIntObject} or
+  \ctype{PyLongObject}, if it is not already one, and then return its
+  value as unsigned long.  This function does not check for overflow.
+  \versionadded{2.3}
+\end{cfuncdesc}
+
+\begin{cfuncdesc}{unsigned long}{PyInt_AsUnsignedLongLongMask}{PyObject *io}
+  Will first attempt to cast the object to a \ctype{PyIntObject} or
+  \ctype{PyLongObject}, if it is not already one, and then return its
+  value as unsigned long long, without checking for overflow.
+  \versionadded{2.3}
 \end{cfuncdesc}
 
 \begin{cfuncdesc}{long}{PyInt_GetMax}{}
@@ -214,7 +247,7 @@ There is no \cfunction{PyNone_Check()} function for the same reason.
   \var{base}.  If \var{pend} is non-\NULL, \code{*\var{pend}} will
   point to the first character in \var{str} which follows the
   representation of the number.  If \var{base} is \code{0}, the radix
-  will be determined base on the leading characters of \var{str}: if
+  will be determined based on the leading characters of \var{str}: if
   \var{str} starts with \code{'0x'} or \code{'0X'}, radix 16 will be
   used; if \var{str} starts with \code{'0'}, radix 8 will be used;
   otherwise radix 10 will be used.  If \var{base} is not \code{0}, it
@@ -274,6 +307,18 @@ There is no \cfunction{PyNone_Check()} function for the same reason.
   \versionadded{2.2}
 \end{cfuncdesc}
 
+\begin{cfuncdesc}{unsigned long}{PyLong_AsUnsignedLongMask}{PyObject *io}
+  Return a C \ctype{unsigned long} from a Python long integer, without
+  checking for overflow.
+  \versionadded{2.3}
+\end{cfuncdesc}
+
+\begin{cfuncdesc}{unsigned long}{PyLong_AsUnsignedLongLongMask}{PyObject *io}
+  Return a C \ctype{unsigned long long} from a Python long integer, without
+  checking for overflow.
+  \versionadded{2.3}
+\end{cfuncdesc}
+
 \begin{cfuncdesc}{double}{PyLong_AsDouble}{PyObject *pylong}
   Returns a C \ctype{double} representation of the contents of
   \var{pylong}.  If \var{pylong} cannot be approximately represented
@@ -315,6 +360,12 @@ There is no \cfunction{PyNone_Check()} function for the same reason.
   Returns true if its argument is a \ctype{PyFloatObject}, but not a
   subtype of \ctype{PyFloatObject}.
   \versionadded{2.2}
+\end{cfuncdesc}
+
+\begin{cfuncdesc}{PyObject*}{PyFloat_FromString}{PyObject *str, char **pend}
+  Creates a \ctype{PyFloatObject} object based on the string value in
+  \var{str}, or \NULL{} on failure.  The \var{pend} argument is ignored.  It
+  remains only for backward compatibility.
 \end{cfuncdesc}
 
 \begin{cfuncdesc}{PyObject*}{PyFloat_FromDouble}{double v}
@@ -533,36 +584,45 @@ parameter and are called with a non-string parameter.
 \end{cfuncdesc}
 
 \begin{cfuncdesc}{char*}{PyString_AsString}{PyObject *string}
-  Returns a null-terminated representation of the contents of
+  Returns a NUL-terminated representation of the contents of
   \var{string}.  The pointer refers to the internal buffer of
   \var{string}, not a copy.  The data must not be modified in any way,
   unless the string was just created using
   \code{PyString_FromStringAndSize(NULL, \var{size})}.
-  It must not be deallocated.
+  It must not be deallocated.  If \var{string} is a Unicode object,
+  this function computes the default encoding of \var{string} and
+  operates on that.  If \var{string} is not a string object at all,
+  \cfunction{PyString_AsString()} returns \NULL{} and raises
+  \exception{TypeError}.
 \end{cfuncdesc}
 
 \begin{cfuncdesc}{char*}{PyString_AS_STRING}{PyObject *string}
   Macro form of \cfunction{PyString_AsString()} but without error
-  checking.
+  checking.  Only string objects are supported; no Unicode objects
+  should be passed.
 \end{cfuncdesc}
 
 \begin{cfuncdesc}{int}{PyString_AsStringAndSize}{PyObject *obj,
                                                  char **buffer,
                                                  int *length}
-  Returns a null-terminated representation of the contents of the
+  Returns a NUL-terminated representation of the contents of the
   object \var{obj} through the output variables \var{buffer} and
   \var{length}.
 
   The function accepts both string and Unicode objects as input. For
   Unicode objects it returns the default encoded version of the
-  object.  If \var{length} is set to \NULL, the resulting buffer may
-  not contain null characters; if it does, the function returns -1 and
-  a \exception{TypeError} is raised.
+  object.  If \var{length} is \NULL, the resulting buffer may not
+  contain NUL characters; if it does, the function returns \code{-1}
+  and a \exception{TypeError} is raised.
 
   The buffer refers to an internal string buffer of \var{obj}, not a
   copy. The data must not be modified in any way, unless the string
   was just created using \code{PyString_FromStringAndSize(NULL,
-  \var{size})}.  It must not be deallocated.
+  \var{size})}.  It must not be deallocated.  If \var{string} is a
+  Unicode object, this function computes the default encoding of
+  \var{string} and operates on that.  If \var{string} is not a string
+  object at all, \cfunction{PyString_AsString()} returns \NULL{} and
+  raises \exception{TypeError}.
 \end{cfuncdesc}
 
 \begin{cfuncdesc}{void}{PyString_Concat}{PyObject **string,
@@ -1285,10 +1345,11 @@ They all return \NULL{} or \code{-1} if an exception occurs.
 \end{cfuncdesc}
 
 \begin{cfuncdesc}{PyObject*}{PyUnicode_Splitlines}{PyObject *s,
-                                                   int maxsplit}
+                                                   int keepend}
   Split a Unicode string at line breaks, returning a list of Unicode
-  strings.  CRLF is considered to be one line break.  The Line break
-  characters are not included in the resulting strings.
+  strings.  CRLF is considered to be one line break.  If \var{keepend}
+  is 0, the Line break characters are not included in the resulting
+  strings.
 \end{cfuncdesc}
 
 \begin{cfuncdesc}{PyObject*}{PyUnicode_Translate}{PyObject *str,
@@ -2375,7 +2436,7 @@ acts as a proxy for the original object as much as it can.
 
 \begin{cfuncdesc}{PyObject*}{PyWeakref_GetObject}{PyObject *ref}
   Returns the referenced object from a weak reference, \var{ref}.  If
-  the referent is no longer live, returns \NULL.
+  the referent is no longer live, returns \code{None}.
   \versionadded{2.2}
 \end{cfuncdesc}
 

@@ -3,7 +3,7 @@
    Roger E. Masse
 """
 import array
-from test_support import verbose, TESTFN, unlink, TestFailed,\
+from test.test_support import verbose, TESTFN, unlink, TestFailed,\
      have_unicode, vereq
 
 def main():
@@ -336,6 +336,9 @@ def testtype(type, example):
         a = array.array(type, range(5))
         del a[1::-2]
         vereq(a, array.array(type, [0,2,3,4]))
+        a = array.array(type, range(10))
+        del a[::1000]
+        vereq(a, array.array(type, [1,2,3,4,5,6,7,8,9]))
         #  assignment
         a = array.array(type, range(10))
         a[::2] = array.array(type, [-1]*5)
@@ -353,6 +356,12 @@ def testtype(type, example):
         a[2:3] = ins
         b[slice(2,3)] = ins
         c[2:3:] = ins
+        # iteration and contains
+        a = array.array(type, range(10))
+        vereq(list(a), range(10))
+        b = array.array(type, [20])
+        vereq(a[-1] in a, True)
+        vereq(b[0] not in a, True)
 
     # test that overflow exceptions are raised as expected for assignment
     # to array of specific integral types

@@ -26,6 +26,7 @@ import sys
 import urllib
 import BaseHTTPServer
 import SimpleHTTPServer
+import select
 
 
 class CGIHTTPRequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
@@ -182,6 +183,7 @@ class CGIHTTPRequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
             for k in ('QUERY_STRING', 'REMOTE_HOST', 'CONTENT_LENGTH',
                       'HTTP_USER_AGENT', 'HTTP_COOKIE'):
                 env.setdefault(k, "")
+        os.environ.update(env)
 
         self.send_response(200, "Script output follows")
 
@@ -193,12 +195,14 @@ class CGIHTTPRequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
             if '=' not in decoded_query:
                 args.append(decoded_query)
             nobody = nobody_uid()
-            self.rfile.flush() # Always flush before forking
             self.wfile.flush() # Always flush before forking
             pid = os.fork()
             if pid != 0:
                 # Parent
                 pid, sts = os.waitpid(pid, 0)
+                # throw away additional data [see bug #427345]
+                while select.select([self.rfile], [], [], 0)[0]:
+                    waste = self.rfile.read(1)
                 if sts:
                     self.log_error("CGI script exit status %#x", sts)
                 return
@@ -222,7 +226,6 @@ class CGIHTTPRequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
                 popenx = os.popen3
             else:
                 popenx = os.popen2
-            os.environ.update(env)
             cmdline = scriptfile
             if self.is_python(scriptfile):
                 interp = sys.executable
@@ -235,7 +238,7 @@ class CGIHTTPRequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
             self.log_message("command: %s", cmdline)
             try:
                 nbytes = int(length)
-            except ValueError:
+            except (TypeError, ValueError):
                 nbytes = 0
             files = popenx(cmdline, 'b')
             fi = files[0]
@@ -245,6 +248,9 @@ class CGIHTTPRequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
             if self.command.lower() == "post" and nbytes > 0:
                 data = self.rfile.read(nbytes)
                 fi.write(data)
+            # throw away additional data [see bug #427345]
+            while select.select([self.rfile._sock], [], [], 0)[0]:
+                waste = self.rfile._sock.recv(1)
             fi.close()
             shutil.copyfileobj(fo, self.wfile)
             if self.have_popen3:
@@ -260,7 +266,6 @@ class CGIHTTPRequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
 
         else:
             # Other O.S. -- execute script in this process
-            os.environ.update(env)
             save_argv = sys.argv
             save_stdin = sys.stdin
             save_stdout = sys.stdout

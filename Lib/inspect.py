@@ -1,3 +1,4 @@
+# -*- coding: iso-8859-1 -*-
 """Get useful information from live Python objects.
 
 This module encapsulates the interface provided by the internal special
@@ -274,15 +275,23 @@ def getdoc(object):
     except UnicodeError:
         return None
     else:
-        margin = None
+        # Find minimum indentation of any non-blank lines after first line.
+        margin = sys.maxint
         for line in lines[1:]:
             content = len(string.lstrip(line))
-            if not content: continue
-            indent = len(line) - content
-            if margin is None: margin = indent
-            else: margin = min(margin, indent)
-        if margin is not None:
+            if content:
+                indent = len(line) - content
+                margin = min(margin, indent)
+        # Remove indentation.
+        if lines:
+            lines[0] = lines[0].lstrip()
+        if margin < sys.maxint:
             for i in range(1, len(lines)): lines[i] = lines[i][margin:]
+        # Remove any trailing or leading blank lines.
+        while lines and not lines[-1]:
+            lines.pop()
+        while lines and not lines[0]:
+            lines.pop(0)
         return string.join(lines, '\n')
 
 def getfile(object):
@@ -357,12 +366,12 @@ def getmodule(object):
     except TypeError:
         return None
     if file in modulesbyfile:
-        return sys.modules[modulesbyfile[file]]
+        return sys.modules.get(modulesbyfile[file])
     for module in sys.modules.values():
         if hasattr(module, '__file__'):
             modulesbyfile[getabsfile(module)] = module.__name__
     if file in modulesbyfile:
-        return sys.modules[modulesbyfile[file]]
+        return sys.modules.get(modulesbyfile[file])
     main = sys.modules['__main__']
     if hasattr(main, object.__name__):
         mainobject = getattr(main, object.__name__)
@@ -408,7 +417,7 @@ def findsource(object):
         if not hasattr(object, 'co_firstlineno'):
             raise IOError, 'could not find function definition'
         lnum = object.co_firstlineno - 1
-        pat = re.compile(r'^\s*def\s')
+        pat = re.compile(r'^(\s*def\s)|(.*\slambda(:|\s))')
         while lnum > 0:
             if pat.match(lines[lnum]): break
             lnum = lnum - 1
@@ -492,6 +501,8 @@ class BlockFinder:
         elif type == tokenize.DEDENT:
             self.indent = self.indent - 1
             if self.indent == 0: raise EndOfBlock, self.last
+        elif type == tokenize.NAME and scol == 0:
+            raise EndOfBlock, self.last
 
 def getblock(lines):
     """Extract the block of code at the top of the given list of lines."""
@@ -499,6 +510,8 @@ def getblock(lines):
         tokenize.tokenize(ListReader(lines).readline, BlockFinder().tokeneater)
     except EndOfBlock, eob:
         return lines[:eob.args[0]]
+    # Fooling the indent/dedent logic implies a one-line definition
+    return lines[:1]
 
 def getsourcelines(object):
     """Return a list of source lines and starting line number for an object.
@@ -710,7 +723,7 @@ def getframeinfo(frame, context=1):
         raise TypeError, 'arg is not a frame or traceback object'
 
     filename = getsourcefile(frame) or getfile(frame)
-    lineno = getlineno(frame)
+    lineno = frame.f_lineno
     if context > 0:
         start = lineno - 1 - context//2
         try:
@@ -729,18 +742,8 @@ def getframeinfo(frame, context=1):
 
 def getlineno(frame):
     """Get the line number from a frame object, allowing for optimization."""
-    # Written by Marc-André Lemburg; revised by Jim Hugunin and Fredrik Lundh.
-    lineno = frame.f_lineno
-    code = frame.f_code
-    if hasattr(code, 'co_lnotab'):
-        table = code.co_lnotab
-        lineno = code.co_firstlineno
-        addr = 0
-        for i in range(0, len(table), 2):
-            addr = addr + ord(table[i])
-            if addr > frame.f_lasti: break
-            lineno = lineno + ord(table[i+1])
-    return lineno
+    # FrameType.f_lineno is now a descriptor that grovels co_lnotab
+    return frame.f_lineno
 
 def getouterframes(frame, context=1):
     """Get a list of records for a frame and all higher (calling) frames.

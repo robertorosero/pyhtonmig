@@ -58,9 +58,9 @@
   allocated by the Python interpreter may not be freed (if you find a
   leak, please report it).  Memory tied up in circular references
   between objects is not freed.  Some memory allocated by extension
-  modules may not be freed.  Some extension may not work properly if
+  modules may not be freed.  Some extensions may not work properly if
   their initialization routine is called more than once; this can
-  happen if an applcation calls \cfunction{Py_Initialize()} and
+  happen if an application calls \cfunction{Py_Initialize()} and
   \cfunction{Py_Finalize()} more than once.
 \end{cfuncdesc}
 
@@ -233,7 +233,7 @@
   environment variables.  The returned string consists of a series of
   directory names separated by a platform dependent delimiter
   character.  The delimiter character is \character{:} on \UNIX,
-  \character{;} on DOS/Windows, and \character{\e n} (the \ASCII{}
+  \character{;} on Windows, and \character{\e n} (the \ASCII{}
   newline character) on Macintosh.  The returned string points into
   static storage; the caller should not modify its value.  The value
   is available to Python code as the list
@@ -256,7 +256,7 @@
   Python version; the first three characters are the major and minor
   version separated by a period.  The returned string points into
   static storage; the caller should not modify its value.  The value
-  is available to Python code as the list \code{sys.version}.
+  is available to Python code as \code{sys.version}.
   \withsubitem{(in module sys)}{\ttindex{version}}
 \end{cfuncdesc}
 
@@ -279,8 +279,8 @@
   \code{'Copyright 1991-1995 Stichting Mathematisch Centrum, Amsterdam'}
 
   The returned string points into static storage; the caller should
-  not modify its value.  The value is available to Python code as the
-  list \code{sys.copyright}.
+  not modify its value.  The value is available to Python code as
+  \code{sys.copyright}.
   \withsubitem{(in module sys)}{\ttindex{copyright}}
 \end{cfuncdesc}
 
@@ -466,6 +466,28 @@ you must obtain the thread state and access its \member{interp} member;
 this must be done by a thread that is created by Python or by the main
 thread after Python is initialized).
 
+Assuming you have access to an interpreter object, the typical idiom
+for calling into Python from a C thread is
+
+\begin{verbatim}
+    PyThreadState *tstate;
+    PyObject *result;
+
+    /* interp is your reference to an interpreter object. */
+    tstate = PyThreadState_New(interp);
+    PyEval_AcquireThread(tstate);
+
+    /* Perform Python actions here.  */
+    result = CallSomeFunction();
+    /* evaluate result */
+
+    /* Release the thread. No Python API allowed beyond this point. */
+    PyEval_ReleaseThread(tstate);
+
+    /* You can either delete the thread state, or save it
+       until you need it the next time. */
+    PyThreadState_Delete(tstate);
+\end{verbatim}
 
 \begin{ctypedesc}{PyInterpreterState}
   This data structure represents the state shared by a number of
@@ -655,9 +677,12 @@ interpreter lock has been created.
 \begin{cfuncdesc}{PyObject*}{PyThreadState_GetDict}{}
   Return a dictionary in which extensions can store thread-specific
   state information.  Each extension should use a unique key to use to
-  store state in the dictionary.  If this function returns \NULL, an
-  exception has been raised and the caller should allow it to
-  propogate.
+  store state in the dictionary.  It is okay to call this function
+  when no current thread state is available.
+  If this function returns \NULL, no exception has been raised and the
+  caller should assume no current thread state is available.
+  \versionchanged[Previously this could only be called when a current
+  thread is active, and \NULL meant that an exception was raised]{2.3}
 \end{cfuncdesc}
 
 
@@ -715,7 +740,7 @@ previous versions.
   processed after which the exception becomes set within the frame
   being executed.  The effect of this is that as exception propogation
   causes the Python stack to unwind, the callback is called upon
-  return to each frame as the exception propogates.  Only trace
+  return to each frame as the exception propagates.  Only trace
   functions receives these events; they are not needed by the
   profiler.
 \end{cvardesc}

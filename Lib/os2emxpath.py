@@ -10,8 +10,19 @@ import stat
 
 __all__ = ["normcase","isabs","join","splitdrive","split","splitext",
            "basename","dirname","commonprefix","getsize","getmtime",
-           "getatime","islink","exists","isdir","isfile","ismount",
-           "walk","expanduser","expandvars","normpath","abspath","splitunc"]
+           "getatime","getctime", "islink","exists","isdir","isfile","ismount",
+           "walk","expanduser","expandvars","normpath","abspath","splitunc",
+           "curdir","pardir","sep","pathsep","defpath","altsep","extsep",
+           "realpath","supports_unicode_filenames"]
+
+# strings representing various path-related bits and pieces
+curdir = '.'
+pardir = '..'
+extsep = '.'
+sep = '/'
+altsep = '\\'
+pathsep = ';'
+defpath = '.;C:\\bin'
 
 # Normalize the case of a pathname and map slashes to backslashes.
 # Other normalizations (such as optimizing '../' away) are not done
@@ -185,6 +196,9 @@ def getatime(filename):
     """Return the last access time of a file, reported by os.stat()"""
     return os.stat(filename).st_atime
 
+def getctime(filename):
+    """Return the creation time of a file, reported by os.stat()."""
+    return os.stat(filename).st_ctime
 
 # Is a path a symbolic link?
 # This will always return false on systems where posix.lstat doesn't exist.
@@ -400,3 +414,8 @@ def abspath(path):
     if not isabs(path):
         path = join(os.getcwd(), path)
     return normpath(path)
+
+# realpath is a no-op on systems without islink support
+realpath = abspath
+
+supports_unicode_filenames = False

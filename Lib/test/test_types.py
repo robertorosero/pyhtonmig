@@ -1,6 +1,6 @@
 # Python test set -- part 6, built-in types
 
-from test_support import *
+from test.test_support import *
 
 print '6. Built-in types'
 
@@ -86,6 +86,10 @@ if 0 != 0L or 0 != 0.0 or 0L != 0.0: raise TestFailed, 'mixed comparisons'
 if 1 != 1L or 1 != 1.0 or 1L != 1.0: raise TestFailed, 'mixed comparisons'
 if -1 != -1L or -1 != -1.0 or -1L != -1.0:
     raise TestFailed, 'int/long/float value not equal'
+# calling built-in types without argument must return 0
+if int() != 0: raise TestFailed, 'int() does not return 0'
+if long() != 0L: raise TestFailed, 'long() does not return 0L'
+if float() != 0.0: raise TestFailed, 'float() does not return 0.0'
 if int(1.9) == 1 == int(1.1) and int(-1.1) == -1 == int(-1.9): pass
 else: raise TestFailed, 'int() does not round properly'
 if long(1.9) == 1L == long(1.1) and long(-1.1) == -1L == long(-1.9): pass
@@ -138,16 +142,16 @@ if not 12L < 24L: raise TestFailed, 'long op'
 if not -24L < -12L: raise TestFailed, 'long op'
 x = sys.maxint
 if int(long(x)) != x: raise TestFailed, 'long op'
-try: int(long(x)+1L)
-except OverflowError: pass
-else:raise TestFailed, 'long op'
+try: y = int(long(x)+1L)
+except OverflowError: raise TestFailed, 'long op'
+if not isinstance(y, long): raise TestFailed, 'long op'
 x = -x
 if int(long(x)) != x: raise TestFailed, 'long op'
 x = x-1
 if int(long(x)) != x: raise TestFailed, 'long op'
-try: int(long(x)-1L)
-except OverflowError: pass
-else:raise TestFailed, 'long op'
+try: y = int(long(x)-1L)
+except OverflowError: raise TestFailed, 'long op'
+if not isinstance(y, long): raise TestFailed, 'long op'
 
 try: 5 << -5
 except ValueError: pass
@@ -211,9 +215,11 @@ if have_unicode:
     vereq(a[-100:100:], a)
     vereq(a[100:-100:-1], a[::-1])
     vereq(a[-100L:100L:2L], unicode('02468', 'ascii'))
-    
+
 
 print '6.5.2 Tuples'
+# calling built-in types without argument must return empty
+if tuple() != (): raise TestFailed,'tuple() does not return ()'
 if len(()) != 0: raise TestFailed, 'len(())'
 if len((1,)) != 1: raise TestFailed, 'len((1,))'
 if len((1,2,3,4,5,6)) != 6: raise TestFailed, 'len((1,2,3,4,5,6))'
@@ -250,7 +256,15 @@ def f():
         yield i
 vereq(list(tuple(f())), range(1000))
 
+# Verify that __getitem__ overrides are recognized by __iter__
+class T(tuple):
+  def __getitem__(self, key):
+     return str(key) + '!!!'
+vereq(iter(T()).next(), '0!!!')
+
 print '6.5.3 Lists'
+# calling built-in types without argument must return empty
+if list() != []: raise TestFailed,'list() does not return []'
 if len([]) != 0: raise TestFailed, 'len([])'
 if len([1,]) != 1: raise TestFailed, 'len([1,])'
 if len([1,2,3,4,5,6]) != 6: raise TestFailed, 'len([1,2,3,4,5,6])'
@@ -297,6 +311,10 @@ a *= 0
 if a != []:
     raise TestFailed, "list inplace repeat"
 
+a = []
+a[:] = tuple(range(10))
+if a != range(10):
+    raise TestFailed, "assigning tuple to slice"
 
 print '6.5.3a Additional list operations'
 a = [0,1,2,3,4]
@@ -341,6 +359,11 @@ a.insert(0, -2)
 a.insert(1, -1)
 a.insert(2,0)
 if a != [-2,-1,0,0,1,2]: raise TestFailed, 'list insert'
+b = a[:]
+b.insert(-2, "foo")
+b.insert(-200, "left")
+b.insert(200, "right")
+if b != ["left",-2,-1,0,0,"foo",1,2,"right"]: raise TestFailed, 'list insert2'
 if a.count(0) != 2: raise TestFailed, ' list count'
 if a.index(0) != 2: raise TestFailed, 'list index'
 a.remove(0)
@@ -363,10 +386,10 @@ except TypeError: pass
 else: raise TestFailed, 'list sort compare function is not callable'
 
 def selfmodifyingComparison(x,y):
-    z[0] = 1
+    z.append(1)
     return cmp(x, y)
 try: z.sort(selfmodifyingComparison)
-except TypeError: pass
+except ValueError: pass
 else: raise TestFailed, 'modifying list during sort'
 
 try: z.sort(lambda x, y: 's')
@@ -405,6 +428,9 @@ vereq(a, [0,2,4])
 a = range(5)
 del a[1::-2]
 vereq(a, [0,2,3,4])
+a = range(10)
+del a[::1000]
+vereq(a, [1, 2, 3, 4, 5, 6, 7, 8, 9])
 #  assignment
 a = range(10)
 a[::2] = [-1]*5
@@ -423,8 +449,20 @@ b[slice(2,3)] = ["two", "elements"]
 c[2:3:] = ["two", "elements"]
 vereq(a, b)
 vereq(a, c)
+a = range(10)
+a[::2] = tuple(range(5))
+vereq(a, [0, 1, 1, 3, 2, 5, 3, 7, 4, 9])
+
+# Verify that __getitem__ overrides are recognized by __iter__
+class L(list):
+  def __getitem__(self, key):
+     return str(key) + '!!!'
+vereq(iter(L()).next(), '0!!!')
+
 
 print '6.6 Mappings == Dictionaries'
+# calling built-in types without argument must return empty
+if dict() != {}: raise TestFailed,'dict() does not return {}'
 d = {}
 if d.keys() != []: raise TestFailed, '{}.keys()'
 if d.values() != []: raise TestFailed, '{}.values()'
@@ -523,6 +561,41 @@ class FailingUserDict:
 try: d.update(FailingUserDict())
 except ValueError: pass
 else: raise TestFailed, 'dict.update(), __getitem__ expected ValueError'
+# dict.fromkeys()
+if dict.fromkeys('abc') != {'a':None, 'b':None, 'c':None}:
+    raise TestFailed, 'dict.fromkeys did not work as a class method'
+d = {}
+if d.fromkeys('abc') is d:
+    raise TestFailed, 'dict.fromkeys did not return a new dict'
+if d.fromkeys('abc') != {'a':None, 'b':None, 'c':None}:
+    raise TestFailed, 'dict.fromkeys failed with default value'
+if d.fromkeys((4,5),0) != {4:0, 5:0}:
+    raise TestFailed, 'dict.fromkeys failed with specified value'
+if d.fromkeys([]) != {}:
+    raise TestFailed, 'dict.fromkeys failed with null sequence'
+def g():
+    yield 1
+if d.fromkeys(g()) != {1:None}:
+    raise TestFailed, 'dict.fromkeys failed with a generator'
+try: {}.fromkeys(3)
+except TypeError: pass
+else: raise TestFailed, 'dict.fromkeys failed to raise TypeError'
+class dictlike(dict): pass
+if dictlike.fromkeys('a') != {'a':None}:
+    raise TestFailed, 'dictsubclass.fromkeys did not inherit'
+if dictlike().fromkeys('a') != {'a':None}:
+    raise TestFailed, 'dictsubclass.fromkeys did not inherit'
+if type(dictlike.fromkeys('a')) is not dictlike:
+    raise TestFailed, 'dictsubclass.fromkeys created wrong type'
+if type(dictlike().fromkeys('a')) is not dictlike:
+    raise TestFailed, 'dictsubclass.fromkeys created wrong type'
+from UserDict import UserDict
+class mydict(dict):
+    def __new__(cls):
+        return UserDict()
+ud = mydict.fromkeys('ab')
+if ud != {'a':None, 'b':None} or not isinstance(ud,UserDict):
+    raise TestFailed, 'fromkeys did not instantiate using  __new__'
 # dict.copy()
 d = {1:1, 2:2, 3:3}
 if d.copy() != {1:1, 2:2, 3:3}: raise TestFailed, 'dict copy'
@@ -592,6 +665,18 @@ if len(d) > 0: raise TestFailed, "{}.pop(k) failed to remove the specified pair"
 try: d.pop(k)
 except KeyError: pass
 else: raise TestFailed, "{}.pop(k) doesn't raise KeyError when dictionary is empty"
+
+# verify longs/ints get same value when key > 32 bits (for 64-bit archs)
+# see SF bug #689659
+x = 4503599627370496L
+y = 4503599627370496
+h = {x: 'anything', y: 'something else'}
+if h[x] != h[y]:
+    raise TestFailed, "long/int key should match"
+
+if d.pop(k, v) != v: raise TestFailed, "{}.pop(k, v) doesn't return default value"
+d[k] = v
+if d.pop(k, 1) != v: raise TestFailed, "{}.pop(k, v) doesn't find known key/value pair"
 
 d[1] = 1
 try:

@@ -43,7 +43,7 @@ static PyObject *Qdoffs_Error;
 
 PyTypeObject GWorld_Type;
 
-#define GWorldObj_Check(x) ((x)->ob_type == &GWorld_Type)
+#define GWorldObj_Check(x) ((x)->ob_type == &GWorld_Type || PyObject_TypeCheck((x), &GWorld_Type))
 
 typedef struct GWorldObject {
 	PyObject_HEAD
@@ -73,7 +73,7 @@ int GWorldObj_Convert(PyObject *v, GWorldPtr *p_itself)
 static void GWorldObj_dealloc(GWorldObject *self)
 {
 	DisposeGWorld(self->ob_itself);
-	PyObject_Del(self);
+	self->ob_type->tp_free((PyObject *)self);
 }
 
 static PyObject *GWorldObj_GetGWorldDevice(GWorldObject *_self, PyObject *_args)
@@ -123,28 +123,40 @@ static PyObject *GWorldObj_as_GrafPtr(GWorldObject *_self, PyObject *_args)
 
 static PyMethodDef GWorldObj_methods[] = {
 	{"GetGWorldDevice", (PyCFunction)GWorldObj_GetGWorldDevice, 1,
-	 "() -> (GDHandle _rv)"},
+	 PyDoc_STR("() -> (GDHandle _rv)")},
 	{"GetGWorldPixMap", (PyCFunction)GWorldObj_GetGWorldPixMap, 1,
-	 "() -> (PixMapHandle _rv)"},
+	 PyDoc_STR("() -> (PixMapHandle _rv)")},
 	{"as_GrafPtr", (PyCFunction)GWorldObj_as_GrafPtr, 1,
-	 "() -> (GrafPtr _rv)"},
+	 PyDoc_STR("() -> (GrafPtr _rv)")},
 	{NULL, NULL, 0}
 };
 
-PyMethodChain GWorldObj_chain = { GWorldObj_methods, NULL };
+#define GWorldObj_getsetlist NULL
 
-static PyObject *GWorldObj_getattr(GWorldObject *self, char *name)
-{
-	return Py_FindMethodInChain(&GWorldObj_chain, (PyObject *)self, name);
-}
-
-#define GWorldObj_setattr NULL
 
 #define GWorldObj_compare NULL
 
 #define GWorldObj_repr NULL
 
 #define GWorldObj_hash NULL
+#define GWorldObj_tp_init 0
+
+#define GWorldObj_tp_alloc PyType_GenericAlloc
+
+static PyObject *GWorldObj_tp_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
+{
+	PyObject *self;
+	GWorldPtr itself;
+	char *kw[] = {"itself", 0};
+
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "O&", kw, GWorldObj_Convert, &itself)) return NULL;
+	if ((self = type->tp_alloc(type, 0)) == NULL) return NULL;
+	((GWorldObject *)self)->ob_itself = itself;
+	return self;
+}
+
+#define GWorldObj_tp_free PyObject_Del
+
 
 PyTypeObject GWorld_Type = {
 	PyObject_HEAD_INIT(NULL)
@@ -155,14 +167,39 @@ PyTypeObject GWorld_Type = {
 	/* methods */
 	(destructor) GWorldObj_dealloc, /*tp_dealloc*/
 	0, /*tp_print*/
-	(getattrfunc) GWorldObj_getattr, /*tp_getattr*/
-	(setattrfunc) GWorldObj_setattr, /*tp_setattr*/
+	(getattrfunc)0, /*tp_getattr*/
+	(setattrfunc)0, /*tp_setattr*/
 	(cmpfunc) GWorldObj_compare, /*tp_compare*/
 	(reprfunc) GWorldObj_repr, /*tp_repr*/
 	(PyNumberMethods *)0, /* tp_as_number */
 	(PySequenceMethods *)0, /* tp_as_sequence */
 	(PyMappingMethods *)0, /* tp_as_mapping */
 	(hashfunc) GWorldObj_hash, /*tp_hash*/
+	0, /*tp_call*/
+	0, /*tp_str*/
+	PyObject_GenericGetAttr, /*tp_getattro*/
+	PyObject_GenericSetAttr, /*tp_setattro */
+	0, /*tp_as_buffer*/
+	Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE, /* tp_flags */
+	0, /*tp_doc*/
+	0, /*tp_traverse*/
+	0, /*tp_clear*/
+	0, /*tp_richcompare*/
+	0, /*tp_weaklistoffset*/
+	0, /*tp_iter*/
+	0, /*tp_iternext*/
+	GWorldObj_methods, /* tp_methods */
+	0, /*tp_members*/
+	GWorldObj_getsetlist, /*tp_getset*/
+	0, /*tp_base*/
+	0, /*tp_dict*/
+	0, /*tp_descr_get*/
+	0, /*tp_descr_set*/
+	0, /*tp_dictoffset*/
+	GWorldObj_tp_init, /* tp_init */
+	GWorldObj_tp_alloc, /* tp_alloc */
+	GWorldObj_tp_new, /* tp_new */
+	GWorldObj_tp_free, /* tp_free */
 };
 
 /* --------------------- End object type GWorld --------------------- */
@@ -604,51 +641,51 @@ static PyObject *Qdoffs_PutPixMapBytes(PyObject *_self, PyObject *_args)
 
 static PyMethodDef Qdoffs_methods[] = {
 	{"NewGWorld", (PyCFunction)Qdoffs_NewGWorld, 1,
-	 "(short PixelDepth, Rect boundsRect, CTabHandle cTable, GDHandle aGDevice, GWorldFlags flags) -> (GWorldPtr offscreenGWorld)"},
+	 PyDoc_STR("(short PixelDepth, Rect boundsRect, CTabHandle cTable, GDHandle aGDevice, GWorldFlags flags) -> (GWorldPtr offscreenGWorld)")},
 	{"LockPixels", (PyCFunction)Qdoffs_LockPixels, 1,
-	 "(PixMapHandle pm) -> (Boolean _rv)"},
+	 PyDoc_STR("(PixMapHandle pm) -> (Boolean _rv)")},
 	{"UnlockPixels", (PyCFunction)Qdoffs_UnlockPixels, 1,
-	 "(PixMapHandle pm) -> None"},
+	 PyDoc_STR("(PixMapHandle pm) -> None")},
 	{"UpdateGWorld", (PyCFunction)Qdoffs_UpdateGWorld, 1,
-	 "(short pixelDepth, Rect boundsRect, CTabHandle cTable, GDHandle aGDevice, GWorldFlags flags) -> (GWorldFlags _rv, GWorldPtr offscreenGWorld)"},
+	 PyDoc_STR("(short pixelDepth, Rect boundsRect, CTabHandle cTable, GDHandle aGDevice, GWorldFlags flags) -> (GWorldFlags _rv, GWorldPtr offscreenGWorld)")},
 	{"GetGWorld", (PyCFunction)Qdoffs_GetGWorld, 1,
-	 "() -> (CGrafPtr port, GDHandle gdh)"},
+	 PyDoc_STR("() -> (CGrafPtr port, GDHandle gdh)")},
 	{"SetGWorld", (PyCFunction)Qdoffs_SetGWorld, 1,
-	 "(CGrafPtr port, GDHandle gdh) -> None"},
+	 PyDoc_STR("(CGrafPtr port, GDHandle gdh) -> None")},
 	{"CTabChanged", (PyCFunction)Qdoffs_CTabChanged, 1,
-	 "(CTabHandle ctab) -> None"},
+	 PyDoc_STR("(CTabHandle ctab) -> None")},
 	{"PixPatChanged", (PyCFunction)Qdoffs_PixPatChanged, 1,
-	 "(PixPatHandle ppat) -> None"},
+	 PyDoc_STR("(PixPatHandle ppat) -> None")},
 	{"PortChanged", (PyCFunction)Qdoffs_PortChanged, 1,
-	 "(GrafPtr port) -> None"},
+	 PyDoc_STR("(GrafPtr port) -> None")},
 	{"GDeviceChanged", (PyCFunction)Qdoffs_GDeviceChanged, 1,
-	 "(GDHandle gdh) -> None"},
+	 PyDoc_STR("(GDHandle gdh) -> None")},
 	{"AllowPurgePixels", (PyCFunction)Qdoffs_AllowPurgePixels, 1,
-	 "(PixMapHandle pm) -> None"},
+	 PyDoc_STR("(PixMapHandle pm) -> None")},
 	{"NoPurgePixels", (PyCFunction)Qdoffs_NoPurgePixels, 1,
-	 "(PixMapHandle pm) -> None"},
+	 PyDoc_STR("(PixMapHandle pm) -> None")},
 	{"GetPixelsState", (PyCFunction)Qdoffs_GetPixelsState, 1,
-	 "(PixMapHandle pm) -> (GWorldFlags _rv)"},
+	 PyDoc_STR("(PixMapHandle pm) -> (GWorldFlags _rv)")},
 	{"SetPixelsState", (PyCFunction)Qdoffs_SetPixelsState, 1,
-	 "(PixMapHandle pm, GWorldFlags state) -> None"},
+	 PyDoc_STR("(PixMapHandle pm, GWorldFlags state) -> None")},
 	{"GetPixRowBytes", (PyCFunction)Qdoffs_GetPixRowBytes, 1,
-	 "(PixMapHandle pm) -> (long _rv)"},
+	 PyDoc_STR("(PixMapHandle pm) -> (long _rv)")},
 	{"NewScreenBuffer", (PyCFunction)Qdoffs_NewScreenBuffer, 1,
-	 "(Rect globalRect, Boolean purgeable) -> (GDHandle gdh, PixMapHandle offscreenPixMap)"},
+	 PyDoc_STR("(Rect globalRect, Boolean purgeable) -> (GDHandle gdh, PixMapHandle offscreenPixMap)")},
 	{"DisposeScreenBuffer", (PyCFunction)Qdoffs_DisposeScreenBuffer, 1,
-	 "(PixMapHandle offscreenPixMap) -> None"},
+	 PyDoc_STR("(PixMapHandle offscreenPixMap) -> None")},
 	{"QDDone", (PyCFunction)Qdoffs_QDDone, 1,
-	 "(GrafPtr port) -> (Boolean _rv)"},
+	 PyDoc_STR("(GrafPtr port) -> (Boolean _rv)")},
 	{"OffscreenVersion", (PyCFunction)Qdoffs_OffscreenVersion, 1,
-	 "() -> (long _rv)"},
+	 PyDoc_STR("() -> (long _rv)")},
 	{"NewTempScreenBuffer", (PyCFunction)Qdoffs_NewTempScreenBuffer, 1,
-	 "(Rect globalRect, Boolean purgeable) -> (GDHandle gdh, PixMapHandle offscreenPixMap)"},
+	 PyDoc_STR("(Rect globalRect, Boolean purgeable) -> (GDHandle gdh, PixMapHandle offscreenPixMap)")},
 	{"PixMap32Bit", (PyCFunction)Qdoffs_PixMap32Bit, 1,
-	 "(PixMapHandle pmHandle) -> (Boolean _rv)"},
+	 PyDoc_STR("(PixMapHandle pmHandle) -> (Boolean _rv)")},
 	{"GetPixMapBytes", (PyCFunction)Qdoffs_GetPixMapBytes, 1,
-	 "(pixmap, int start, int size) -> string. Return bytes from the pixmap"},
+	 PyDoc_STR("(pixmap, int start, int size) -> string. Return bytes from the pixmap")},
 	{"PutPixMapBytes", (PyCFunction)Qdoffs_PutPixMapBytes, 1,
-	 "(pixmap, int start, string data). Store bytes into the pixmap"},
+	 PyDoc_STR("(pixmap, int start, string data). Store bytes into the pixmap")},
 	{NULL, NULL, 0}
 };
 
@@ -673,9 +710,12 @@ void init_Qdoffs(void)
 	    PyDict_SetItemString(d, "Error", Qdoffs_Error) != 0)
 		return;
 	GWorld_Type.ob_type = &PyType_Type;
+	if (PyType_Ready(&GWorld_Type) < 0) return;
 	Py_INCREF(&GWorld_Type);
-	if (PyDict_SetItemString(d, "GWorldType", (PyObject *)&GWorld_Type) != 0)
-		Py_FatalError("can't initialize GWorldType");
+	PyModule_AddObject(m, "GWorld", (PyObject *)&GWorld_Type);
+	/* Backward-compatible name */
+	Py_INCREF(&GWorld_Type);
+	PyModule_AddObject(m, "GWorldType", (PyObject *)&GWorld_Type);
 }
 
 /* ======================= End module _Qdoffs ======================= */

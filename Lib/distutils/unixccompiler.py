@@ -13,8 +13,6 @@ the "typical" Unix-style command-line C compiler:
   * link shared library handled by 'cc -shared'
 """
 
-# created 1999/07/05, Greg Ward
-
 __revision__ = "$Id$"
 
 import os, sys
@@ -57,6 +55,7 @@ class UnixCCompiler(CCompiler):
     executables = {'preprocessor' : None,
                    'compiler'     : ["cc"],
                    'compiler_so'  : ["cc"],
+                   'compiler_cxx' : ["cc"],
                    'linker_so'    : ["cc", "-shared"],
                    'linker_exe'   : ["cc"],
                    'archiver'     : ["ar", "-cr"],
@@ -78,6 +77,8 @@ class UnixCCompiler(CCompiler):
     shared_lib_extension = ".so"
     dylib_lib_extension = ".dylib"
     static_lib_format = shared_lib_format = dylib_lib_format = "lib%s%s"
+    if sys.platform == "cygwin":
+        exe_extension = ".exe"
 
     def preprocess(self, source,
                    output_file=None, macros=None, include_dirs=None,
@@ -92,6 +93,7 @@ class UnixCCompiler(CCompiler):
             pp_args[:0] = extra_preargs
         if extra_postargs:
             pp_args.extend(extra_postargs)
+        pp_args.append(source)
 
         # We need to preprocess: either we're being forced to, or we're
         # generating output to stdout, or there's a target output file and
@@ -113,7 +115,7 @@ class UnixCCompiler(CCompiler):
             raise CompileError, msg
 
     def create_static_lib(self, objects, output_libname,
-                          output_dir=None, debug=0):
+                          output_dir=None, debug=0, target_lang=None):
         objects, output_dir = self._fix_object_args(objects, output_dir)
 
         output_filename = \
@@ -142,7 +144,7 @@ class UnixCCompiler(CCompiler):
              output_filename, output_dir=None, libraries=None,
              library_dirs=None, runtime_library_dirs=None,
              export_symbols=None, debug=0, extra_preargs=None,
-             extra_postargs=None, build_temp=None):
+             extra_postargs=None, build_temp=None, target_lang=None):
         objects, output_dir = self._fix_object_args(objects, output_dir)
         libraries, library_dirs, runtime_library_dirs = \
             self._fix_lib_args(libraries, library_dirs, runtime_library_dirs)
@@ -166,9 +168,12 @@ class UnixCCompiler(CCompiler):
             self.mkpath(os.path.dirname(output_filename))
             try:
                 if target_desc == CCompiler.EXECUTABLE:
-                    self.spawn(self.linker_exe + ld_args)
+                    linker = self.linker_exe[:]
                 else:
-                    self.spawn(self.linker_so + ld_args)
+                    linker = self.linker_so[:]
+                if target_lang == "c++" and self.compiler_cxx:
+                    linker[0] = self.compiler_cxx[0]
+                self.spawn(linker + ld_args)
             except DistutilsExecError, msg:
                 raise LinkError, msg
         else:
@@ -195,7 +200,10 @@ class UnixCCompiler(CCompiler):
         # the configuration data stored in the Python installation, so
         # we use this hack.
         compiler = os.path.basename(sysconfig.get_config_var("CC"))
-        if compiler == "gcc" or compiler == "g++":
+        if sys.platform[:6] == "darwin":
+            # MacOSX's linker doesn't understand the -R flag at all
+            return "-L" + dir
+        elif compiler[:3] == "gcc" or compiler[:3] == "g++":
             return "-Wl,-R" + dir
         else:
             return "-R" + dir

@@ -114,16 +114,15 @@ PySlice_GetIndicesEx(PySliceObject *r, int length,
 		     int *start, int *stop, int *step, int *slicelength)
 {
 	/* this is harder to get right than you might think */
+
 	int defstart, defstop;
 
 	if (r->step == Py_None) {
 		*step = 1;
-	} else {
-		*step = PyInt_AsLong(r->step);
-		if (*step == -1 && PyErr_Occurred()) {
-			return -1;
-		}
-		else if (*step == 0) {
+	} 
+	else {
+		if (!_PyEval_SliceIndex(r->step, step)) return -1;
+		if (*step == 0) {
 			PyErr_SetString(PyExc_ValueError,
 					"slice step cannot be zero");
 			return -1;
@@ -135,7 +134,8 @@ PySlice_GetIndicesEx(PySliceObject *r, int length,
 
 	if (r->start == Py_None) {
 		*start = defstart;
-	} else {
+	}
+	else {
 		if (!_PyEval_SliceIndex(r->start, start)) return -1;
 		if (*start < 0) *start += length;
 		if (*start < 0) *start = (*step < 0) ? -1 : 0;
@@ -145,19 +145,22 @@ PySlice_GetIndicesEx(PySliceObject *r, int length,
 
 	if (r->stop == Py_None) {
 		*stop = defstop;
-	} else {
+	}
+	else {
 		if (!_PyEval_SliceIndex(r->stop, stop)) return -1;
 		if (*stop < 0) *stop += length;
 		if (*stop < 0) *stop = -1;
 		if (*stop > length) *stop = length;
 	}
-	
-	if ((*stop - *start)*(*step) <= 0) {
+
+	if ((*step < 0 && *stop >= *start) 
+	    || (*step > 0 && *start >= *stop)) {
 		*slicelength = 0;
 	}
 	else if (*step < 0) {
 		*slicelength = (*stop-*start+1)/(*step)+1;
-	} else {
+	}
+	else {
 		*slicelength = (*stop-*start-1)/(*step)+1;
 	}
 
@@ -171,7 +174,7 @@ slice_new(PyTypeObject *type, PyObject *args, PyObject *kw)
 
 	start = stop = step = NULL;
 
-	if (!PyArg_ParseTuple(args, "O|OO:slice", &start, &stop, &step))
+	if (!PyArg_UnpackTuple(args, "slice", 1, 3, &start, &stop, &step))
 		return NULL;
 
 	/* This swapping of stop and start is to maintain similarity with
@@ -219,6 +222,39 @@ static PyMemberDef slice_members[] = {
 	{"stop", T_OBJECT, offsetof(PySliceObject, stop), READONLY},
 	{"step", T_OBJECT, offsetof(PySliceObject, step), READONLY},
 	{0}
+};
+
+static PyObject*
+slice_indices(PySliceObject* self, PyObject* len)
+{
+	int ilen, start, stop, step, slicelength;
+
+	ilen = PyInt_AsLong(len);
+
+	if (ilen == -1 && PyErr_Occurred()) {
+		return NULL;
+	}
+
+	if (PySlice_GetIndicesEx(self, ilen, &start, &stop, 
+				 &step, &slicelength) < 0) {
+		return NULL;
+	}
+
+	return Py_BuildValue("(iii)", start, stop, step);
+}
+
+PyDoc_STRVAR(slice_indices_doc,
+"S.indices(len) -> (start, stop, stride)\n\
+\n\
+Assuming a sequence of length len, calculate the start and stop\n\
+indices, and the stride length of the extended slice described by\n\
+S. Out of bounds indices are clipped in a manner consistent with the\n\
+handling of normal slices.");
+
+static PyMethodDef slice_methods[] = {
+	{"indices",	(PyCFunction)slice_indices,
+	 METH_O,	slice_indices_doc},
+	{NULL, NULL}
 };
 
 static int
@@ -271,7 +307,7 @@ PyTypeObject PySlice_Type = {
 	0,					/* tp_weaklistoffset */
 	0,					/* tp_iter */
 	0,					/* tp_iternext */
-	0,					/* tp_methods */
+	slice_methods,				/* tp_methods */
 	slice_members,				/* tp_members */
 	0,					/* tp_getset */
 	0,					/* tp_base */

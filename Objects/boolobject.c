@@ -16,7 +16,7 @@ bool_print(PyBoolObject *self, FILE *fp, int flags)
 static PyObject *false_str = NULL;
 static PyObject *true_str = NULL;
 
-PyObject *
+static PyObject *
 bool_repr(PyBoolObject *self)
 {
 	PyObject *s;
@@ -47,14 +47,14 @@ PyObject *PyBool_FromLong(long ok)
 
 /* We define bool_new to always return either Py_True or Py_False */
 
-PyObject *
+static PyObject *
 bool_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
 	static char *kwlist[] = {"x", 0};
-	PyObject *x;
+	PyObject *x = Py_False;
 	long ok;
 
-	if (!PyArg_ParseTupleAndKeywords(args, kwds, "O:bool", kwlist, &x))
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "|O:bool", kwlist, &x))
 		return NULL;
 	ok = PyObject_IsTrue(x);
 	if (ok < 0)

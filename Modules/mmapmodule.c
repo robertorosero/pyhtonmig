@@ -141,8 +141,10 @@ mmap_close_method(mmap_object *self, PyObject *args)
 #endif /* MS_WINDOWS */
 
 #ifdef UNIX
-	munmap(self->data, self->size);
-	self->data = NULL;
+	if (self->data != NULL) {
+		munmap(self->data, self->size);
+		self->data = NULL;
+	}
 #endif
 
 	Py_INCREF (Py_None);
@@ -152,7 +154,7 @@ mmap_close_method(mmap_object *self, PyObject *args)
 #ifdef MS_WINDOWS
 #define CHECK_VALID(err)						\
 do {									\
-    if (!self->map_handle) {						\
+    if (self->map_handle == INVALID_HANDLE_VALUE) {						\
 	PyErr_SetString (PyExc_ValueError, "mmap closed or invalid");	\
 	return err;							\
     }									\
@@ -290,7 +292,7 @@ static PyObject *
 mmap_write_method(mmap_object *self,
 		  PyObject *args)
 {
-	long length;
+	int length;
 	char *data;
 
 	CHECK_VALID(NULL);
@@ -850,6 +852,9 @@ _GetMapSize(PyObject *o)
 static PyObject *
 new_mmap_object(PyObject *self, PyObject *args, PyObject *kwdict)
 {
+#ifdef HAVE_FSTAT
+	struct stat st;
+#endif
 	mmap_object *m_obj;
 	PyObject *map_size_obj = NULL;
 	int map_size;
@@ -890,7 +895,14 @@ new_mmap_object(PyObject *self, PyObject *args, PyObject *kwdict)
 		return PyErr_Format(PyExc_ValueError, 
 				    "mmap invalid access parameter.");
 	}
-	
+
+#ifdef HAVE_FSTAT
+	if (fstat(fd, &st) == 0 && (size_t)map_size > st.st_size) {
+		PyErr_SetString(PyExc_ValueError, 
+				"mmap length is greater than file size");
+		return NULL;
+	}
+#endif
 	m_obj = PyObject_New (mmap_object, &mmap_object_type);
 	if (m_obj == NULL) {return NULL;}
 	m_obj->size = (size_t) map_size;
@@ -962,7 +974,7 @@ new_mmap_object(PyObject *self, PyObject *args, PyObject *kwdict)
 			return NULL;
 		}
 		/* Win9x appears to need us seeked to zero */
-		fseek(&_iob[fileno], 0, SEEK_SET);
+		lseek(fileno, 0, SEEK_SET);
 	}
 
 	m_obj = PyObject_New (mmap_object, &mmap_object_type);
@@ -1051,7 +1063,7 @@ static struct PyMethodDef mmap_functions[] = {
 	{NULL,		NULL}	     /* Sentinel */
 };
 
-DL_EXPORT(void)
+PyMODINIT_FUNC
 	initmmap(void)
 {
 	PyObject *dict, *module;

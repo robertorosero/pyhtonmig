@@ -19,12 +19,14 @@ Module interface:
 	a subclass of socket.error
 - socket.herror: exception raised for gethostby* errors,
 	a subclass of socket.error
+- socket.fromfd(fd, family, type[, proto]) --> new socket object (created
+        from an existing file descriptor)
 - socket.gethostbyname(hostname) --> host IP address (string: 'dd.dd.dd.dd')
 - socket.gethostbyaddr(IP address) --> (hostname, [alias, ...], [IP addr, ...])
 - socket.gethostname() --> host name (string: 'spam' or 'spam.domain.com')
 - socket.getprotobyname(protocolname) --> protocol number
 - socket.getservbyname(servicename, protocolname) --> port number
-- socket.socket(family, type [, proto]) --> new socket object
+- socket.socket([family[, type [, proto]]]) --> new socket object
 - socket.ntohs(16 bit value) --> new int object
 - socket.ntohl(32 bit value) --> new int object
 - socket.htons(16 bit value) --> new int object
@@ -35,6 +37,8 @@ Module interface:
 - socket.AF_INET, socket.SOCK_STREAM, etc.: constants from <socket.h>
 - socket.inet_aton(IP address) -> 32-bit packed IP representation
 - socket.inet_ntoa(packed IP) -> IP address string
+- socket.getdefaulttimeout() -> None | float
+- socket.setdefaulttimeout(None | float)
 - an Internet socket address is a pair (hostname, port)
   where hostname can be anything recognized by gethostbyname()
   (including the dd.dd.dd.dd notation) and port is in host byte order
@@ -144,11 +148,30 @@ shutdown(how) -- shut down traffic in one or both directions\n\
 # include <ctype.h>
 #endif
 
+#if defined(__VMS)
+#if ! defined(_SOCKADDR_LEN)
+#   ifdef getaddrinfo
+#      undef getaddrinfo
+#   endif
+#  include "TCPIP_IOCTL_ROUTINE"
+#else
+#  include <ioctl.h>
+#endif
+#endif
+
 #if defined(PYOS_OS2)
 # define  INCL_DOS
 # define  INCL_DOSERRORS
 # define  INCL_NOPMAPI
 # include <os2.h>
+#endif
+
+#if defined(__sgi)&&_COMPILER_VERSION>700 && !_SGIAPI
+/* make sure that the reentrant (gethostbyaddr_r etc)
+   functions are declared correctly if compiling with
+   MIPSPro 7.x in ANSI C mode (default) */
+#define _SGIAPI 1
+#include "netdb.h"
 #endif
 
 /* Generic includes */
@@ -199,8 +222,8 @@ int h_errno; /* not used */
 # define offsetof(type, member)	((size_t)(&((type *)0)->member))
 #endif
 
-#ifndef O_NDELAY
-# define O_NDELAY O_NONBLOCK	/* For QNX only? */
+#ifndef O_NONBLOCK
+# define O_NONBLOCK O_NDELAY
 #endif
 
 #include "addrinfo.h"
@@ -258,6 +281,11 @@ const char *inet_ntop(int af, const void *src, char *dst, socklen_t size);
 #define SOCKETCLOSE close
 #endif
 
+#ifdef __VMS
+/* TCP/IP Services for VMS uses a maximum send/revc buffer length of 65535 */
+#define SEGMENT_SIZE 65535
+#endif
+
 /* XXX There's a problem here: *static* functions are not supposed to have
    a Py prefix (or use CapitalizedWords).  Later... */
 
@@ -276,7 +304,7 @@ static int taskwindow;
    The sock_type variable contains pointers to various functions,
    some of which call new_sockobject(), which uses sock_type, so
    there has to be a circular reference. */
-staticforward PyTypeObject sock_type;
+static PyTypeObject sock_type;
 
 /* Convenience function to raise an error according to errno
    and return a NULL pointer from a function. */
@@ -473,12 +501,15 @@ internal_setblocking(PySocketSockObject *s, int block)
 #if defined(PYOS_OS2) && !defined(PYCC_GCC)
 	block = !block;
 	ioctl(s->sock_fd, FIONBIO, (caddr_t)&block, sizeof(block));
-#else /* !PYOS_OS2 */
+#elif defined(__VMS)
+	block = !block;
+	ioctl(s->sock_fd, FIONBIO, (char *)&block);
+#else  /* !PYOS_OS2 && !_VMS */
 	delay_flag = fcntl(s->sock_fd, F_GETFL, 0);
 	if (block)
-		delay_flag &= (~O_NDELAY);
+		delay_flag &= (~O_NONBLOCK);
 	else
-		delay_flag |= O_NDELAY;
+		delay_flag |= O_NONBLOCK;
 	fcntl(s->sock_fd, F_SETFL, delay_flag);
 #endif /* !PYOS_OS2 */
 #else /* MS_WINDOWS */
@@ -503,7 +534,12 @@ internal_select(PySocketSockObject *s, int writing)
 	fd_set fds;
 	struct timeval tv;
 
+	/* Nothing to do unless we're in timeout mode (not non-blocking) */
 	if (s->sock_timeout <= 0.0)
+		return;
+
+	/* Guard against closed socket */
+	if (s->sock_fd < 0)
 		return;
 
 	/* Construct the arguments to select */
@@ -521,7 +557,9 @@ internal_select(PySocketSockObject *s, int writing)
 
 /* Initialize a new socket object. */
 
-static void
+static double defaulttimeout = -1.0; /* Default timeout for new sockets */
+
+PyMODINIT_FUNC
 init_sockobject(PySocketSockObject *s,
 		SOCKET_T fd, int family, int type, int proto)
 {
@@ -532,9 +570,13 @@ init_sockobject(PySocketSockObject *s,
 	s->sock_family = family;
 	s->sock_type = type;
 	s->sock_proto = proto;
-	s->sock_timeout = -1.0; /* Start without timeout */
+	s->sock_timeout = defaulttimeout;
 
 	s->errorhandler = &set_error;
+
+	if (defaulttimeout >= 0.0)
+		internal_setblocking(s, 0);
+
 #ifdef RISCOS
 	if (taskwindow)
 		socketioctl(s->sock_fd, 0x80046679, (u_long*)&block);
@@ -573,7 +615,7 @@ PyThread_type_lock gethostbyname_lock;
    an error occurred; then an exception is raised. */
 
 static int
-setipaddr(char *name, struct sockaddr *addr_ret, int af)
+setipaddr(char *name, struct sockaddr *addr_ret, size_t addr_ret_size, int af)
 {
 	struct addrinfo hints, *res;
 	int error;
@@ -611,13 +653,15 @@ setipaddr(char *name, struct sockaddr *addr_ret, int af)
 				"wildcard resolved to multiple address");
 			return -1;
 		}
-		memcpy(addr_ret, res->ai_addr, res->ai_addrlen);
+		if (res->ai_addrlen < addr_ret_size)
+			addr_ret_size = res->ai_addrlen;
+		memcpy(addr_ret, res->ai_addr, addr_ret_size);
 		freeaddrinfo(res);
 		return siz;
 	}
 	if (name[0] == '<' && strcmp(name, "<broadcast>") == 0) {
 		struct sockaddr_in *sin;
-		if (af != PF_INET && af != PF_UNSPEC) {
+		if (af != AF_INET && af != AF_UNSPEC) {
 			PyErr_SetString(socket_error,
 				"address family mismatched");
 			return -1;
@@ -646,7 +690,9 @@ setipaddr(char *name, struct sockaddr *addr_ret, int af)
 		set_gaierror(error);
 		return -1;
 	}
-	memcpy((char *) addr_ret, res->ai_addr, res->ai_addrlen);
+	if (res->ai_addrlen < addr_ret_size)
+		addr_ret_size = res->ai_addrlen;
+	memcpy((char *) addr_ret, res->ai_addr, addr_ret_size);
 	freeaddrinfo(res);
 	switch (addr_ret->sa_family) {
 	case AF_INET:
@@ -717,7 +763,7 @@ makesockaddr(int sockfd, struct sockaddr *addr, int addrlen)
 		return ret;
 	}
 
-#ifdef AF_UNIX
+#if defined(AF_UNIX) && !defined(PYOS_OS2)
 	case AF_UNIX:
 	{
 		struct sockaddr_un *a = (struct sockaddr_un *) addr;
@@ -791,7 +837,7 @@ getsockaddrarg(PySocketSockObject *s, PyObject *args,
 {
 	switch (s->sock_family) {
 
-#ifdef AF_UNIX
+#if defined(AF_UNIX) && !defined(PYOS_OS2)
 	case AF_UNIX:
 	{
 		struct sockaddr_un* addr;
@@ -828,9 +874,10 @@ getsockaddrarg(PySocketSockObject *s, PyObject *args,
 				args->ob_type->tp_name);
 			return 0;
 		}
-		if (!PyArg_ParseTuple(args, "si:getsockaddrarg", &host, &port))
+		if (!PyArg_ParseTuple(args, "eti:getsockaddrarg", 
+				      "idna", &host, &port))
 			return 0;
-		if (setipaddr(host, (struct sockaddr *)addr, AF_INET) < 0)
+		if (setipaddr(host, (struct sockaddr *)addr, sizeof(*addr),  AF_INET) < 0)
 			return 0;
 		addr->sin_family = AF_INET;
 		addr->sin_port = htons((short)port);
@@ -847,11 +894,12 @@ getsockaddrarg(PySocketSockObject *s, PyObject *args,
 		int port, flowinfo, scope_id;
  		addr = (struct sockaddr_in6*)&(s->sock_addr).in6;
 		flowinfo = scope_id = 0;
-		if (!PyArg_ParseTuple(args, "si|ii", &host, &port, &flowinfo,
+		if (!PyArg_ParseTuple(args, "eti|ii", 
+				      "idna", &host, &port, &flowinfo,
 				      &scope_id)) {
 			return 0;
 		}
-		if (setipaddr(host, (struct sockaddr *)addr, AF_INET6) < 0)
+		if (setipaddr(host, (struct sockaddr *)addr,  sizeof(*addr), AF_INET6) < 0)
 			return 0;
 		addr->sin6_family = s->sock_family;
 		addr->sin6_port = htons((short)port);
@@ -914,7 +962,7 @@ getsockaddrlen(PySocketSockObject *s, socklen_t *len_ret)
 {
 	switch (s->sock_family) {
 
-#ifdef AF_UNIX
+#if defined(AF_UNIX) && !defined(PYOS_OS2)
 	case AF_UNIX:
 	{
 		*len_ret = sizeof (struct sockaddr_un);
@@ -1093,7 +1141,7 @@ sock_gettimeout(PySocketSockObject *s)
 }
 
 PyDoc_STRVAR(gettimeout_doc,
-"gettimeout()\n\
+"gettimeout() -> timeout\n\
 \n\
 Returns the timeout in floating seconds associated with socket \n\
 operations. A timeout of None indicates that timeouts on socket \n\
@@ -1196,7 +1244,11 @@ sock_getsockopt(PySocketSockObject *s, PyObject *args)
 			return s->errorhandler();
 		return PyInt_FromLong(flag);
 	}
+#ifdef __VMS
+	if (buflen > 1024) {
+#else
 	if (buflen <= 0 || buflen > 1024) {
+#endif
 		PyErr_SetString(socket_error,
 				"getsockopt buflen out of range");
 		return NULL;
@@ -1286,10 +1338,19 @@ internal_connect(PySocketSockObject *s, struct sockaddr *addr, int addrlen)
 
 	if (s->sock_timeout > 0.0) {
 		if (res < 0 && WSAGetLastError() == WSAEWOULDBLOCK) {
-			internal_select(s, 1);
-			res = connect(s->sock_fd, addr, addrlen);
-			if (res < 0 && WSAGetLastError() == WSAEISCONN)
+			/* This is a mess.  Best solution: trust select */
+			fd_set fds;
+			struct timeval tv;
+			tv.tv_sec = (int)s->sock_timeout;
+			tv.tv_usec = (int)((s->sock_timeout - tv.tv_sec) * 1e6);
+			FD_ZERO(&fds);
+			FD_SET(s->sock_fd, &fds);
+			res = select(s->sock_fd+1, NULL, &fds, NULL, &tv);
+			if (res == 0)
+				res = WSAEWOULDBLOCK;
+			else if (res > 0)
 				res = 0;
+			/* else if (res < 0) an error occurred */
 		}
 	}
 
@@ -1302,6 +1363,8 @@ internal_connect(PySocketSockObject *s, struct sockaddr *addr, int addrlen)
 		if (res < 0 && errno == EINPROGRESS) {
 			internal_select(s, 1);
 			res = connect(s->sock_fd, addr, addrlen);
+			if (res < 0 && errno == EISCONN)
+				res = 0;
 		}
 	}
 
@@ -1362,7 +1425,7 @@ sock_connect_ex(PySocketSockObject *s, PyObject *addro)
 }
 
 PyDoc_STRVAR(connect_ex_doc,
-"connect_ex(address)\n\
+"connect_ex(address) -> errno\n\
 \n\
 This is like connect(address), but returns an error code (the errno value)\n\
 instead of raising an exception when an error occurs.");
@@ -1376,7 +1439,7 @@ sock_fileno(PySocketSockObject *s)
 #if SIZEOF_SOCKET_T <= SIZEOF_LONG
 	return PyInt_FromLong((long) s->sock_fd);
 #else
-	return PyLong_FromLongLong((LONG_LONG)s->sock_fd);
+	return PyLong_FromLongLong((PY_LONG_LONG)s->sock_fd);
 #endif
 }
 
@@ -1523,9 +1586,23 @@ sock_makefile(PySocketSockObject *s, PyObject *args)
 #endif
 	FILE *fp;
 	PyObject *f;
+#ifdef __VMS
+	char *mode_r = "r";
+	char *mode_w = "w";
+#endif
 
 	if (!PyArg_ParseTuple(args, "|si:makefile", &mode, &bufsize))
 		return NULL;
+#ifdef __VMS
+	if (strcmp(mode,"rb") == 0) {
+	    mode = mode_r;
+	}
+	else {
+		if (strcmp(mode,"wb") == 0) {
+			mode = mode_w;
+		}
+	}
+#endif
 #ifdef MS_WIN32
 	if (((fd = _open_osfhandle(s->sock_fd, _O_BINARY)) < 0) ||
 	    ((fd = dup(fd)) < 0) || ((fp = fdopen(fd, mode)) == NULL))
@@ -1564,6 +1641,10 @@ sock_recv(PySocketSockObject *s, PyObject *args)
 {
 	int len, n, flags = 0;
 	PyObject *buf;
+#ifdef __VMS
+	int read_length;
+	char *read_buf;
+#endif
 
 	if (!PyArg_ParseTuple(args, "i|i:recv", &len, &flags))
 		return NULL;
@@ -1578,6 +1659,7 @@ sock_recv(PySocketSockObject *s, PyObject *args)
 	if (buf == NULL)
 		return NULL;
 
+#ifndef __VMS
 	Py_BEGIN_ALLOW_THREADS
 	internal_select(s, 0);
 	n = recv(s->sock_fd, PyString_AS_STRING(buf), len, flags);
@@ -1589,6 +1671,42 @@ sock_recv(PySocketSockObject *s, PyObject *args)
 	}
 	if (n != len)
 		_PyString_Resize(&buf, n);
+#else
+	read_buf = PyString_AsString(buf);
+	read_length = len;
+	while (read_length != 0) {
+		unsigned int segment;
+
+		segment = read_length /SEGMENT_SIZE;
+		if (segment != 0) {
+			segment = SEGMENT_SIZE;
+		}
+		else {
+			segment = read_length;
+		}
+
+		Py_BEGIN_ALLOW_THREADS
+ 	  	internal_select(s, 0);
+		n = recv(s->sock_fd, read_buf, segment, flags);
+		Py_END_ALLOW_THREADS
+
+		if (n < 0) {
+			Py_DECREF(buf);
+			return s->errorhandler();
+		}
+		if (n != read_length) {
+			read_buf += n;
+			break;
+		}
+
+		read_length -= segment;
+		read_buf += segment;
+	}
+	if (_PyString_Resize(&buf, (read_buf - PyString_AsString(buf))) < 0)
+	{
+	    return NULL;
+	}
+#endif /* !__VMS */
 	return buf;
 }
 
@@ -1670,10 +1788,14 @@ sock_send(PySocketSockObject *s, PyObject *args)
 {
 	char *buf;
 	int len, n, flags = 0;
+#ifdef __VMS
+	int send_length;
+#endif
 
 	if (!PyArg_ParseTuple(args, "s#|i:send", &buf, &len, &flags))
 		return NULL;
 
+#ifndef __VMS
 	Py_BEGIN_ALLOW_THREADS
 	internal_select(s, 1);
 	n = send(s->sock_fd, buf, len, flags);
@@ -1681,6 +1803,31 @@ sock_send(PySocketSockObject *s, PyObject *args)
 
 	if (n < 0)
 		return s->errorhandler();
+#else
+	/* Divide packet into smaller segments for	*/
+	/*  TCP/IP Services for OpenVMS			*/
+	send_length = len;
+	while (send_length != 0) {
+		unsigned int segment;
+
+		segment = send_length / SEGMENT_SIZE;
+		if (segment != 0) {
+			segment = SEGMENT_SIZE;
+		}
+		else {
+			segment = send_length;
+		}
+		Py_BEGIN_ALLOW_THREADS
+		internal_select(s, 1);
+		n = send(s->sock_fd, buf, segment, flags);
+		Py_END_ALLOW_THREADS
+		if (n < 0) {
+			return s->errorhandler();
+		}
+		send_length -= segment;
+		buf += segment;
+	} /* end while */
+#endif /* !__VMS */
 	return PyInt_FromLong((long)n);
 }
 
@@ -1704,8 +1851,8 @@ sock_sendall(PySocketSockObject *s, PyObject *args)
 		return NULL;
 
 	Py_BEGIN_ALLOW_THREADS
-	internal_select(s, 1);
 	do {
+		internal_select(s, 1);
 		n = send(s->sock_fd, buf, len, flags);
 		if (n < 0)
 			break;
@@ -1762,7 +1909,7 @@ sock_sendto(PySocketSockObject *s, PyObject *args)
 }
 
 PyDoc_STRVAR(sendto_doc,
-"sendto(data[, flags], address)\n\
+"sendto(data[, flags], address) -> count\n\
 \n\
 Like send(data, flags) but allows specifying the destination address.\n\
 For IP sockets, the address is a pair (hostaddr, port).");
@@ -1971,7 +2118,7 @@ static PyTypeObject sock_type = {
 	0,					/* tp_hash */
 	0,					/* tp_call */
 	0,					/* tp_str */
-	0,	/* set below */			/* tp_getattro */
+	PyObject_GenericGetAttr,		/* tp_getattro */
 	0,					/* tp_setattro */
 	0,					/* tp_as_buffer */
 	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE, /* tp_flags */
@@ -1991,9 +2138,9 @@ static PyTypeObject sock_type = {
 	0,					/* tp_descr_set */
 	0,					/* tp_dictoffset */
 	sock_initobj,				/* tp_init */
-	0,	/* set below */			/* tp_alloc */
+	PyType_GenericAlloc,			/* tp_alloc */
 	sock_new,				/* tp_new */
-	0,	/* set below */			/* tp_free */
+	PyObject_Del,				/* tp_free */
 };
 
 
@@ -2033,7 +2180,7 @@ socket_gethostbyname(PyObject *self, PyObject *args)
 
 	if (!PyArg_ParseTuple(args, "s:gethostbyname", &name))
 		return NULL;
-	if (setipaddr(name, (struct sockaddr *)&addrbuf, AF_INET) < 0)
+	if (setipaddr(name, (struct sockaddr *)&addrbuf,  sizeof(addrbuf), AF_INET) < 0)
 		return NULL;
 	return makeipaddr((struct sockaddr *)&addrbuf,
 		sizeof(struct sockaddr_in));
@@ -2206,7 +2353,7 @@ socket_gethostbyname_ex(PyObject *self, PyObject *args)
 
 	if (!PyArg_ParseTuple(args, "s:gethostbyname_ex", &name))
 		return NULL;
-	if (setipaddr(name, (struct sockaddr *)&addr, PF_INET) < 0)
+	if (setipaddr(name, (struct sockaddr *)&addr, sizeof(addr), AF_INET) < 0)
 		return NULL;
 	Py_BEGIN_ALLOW_THREADS
 #ifdef HAVE_GETHOSTBYNAME_R
@@ -2281,8 +2428,8 @@ socket_gethostbyaddr(PyObject *self, PyObject *args)
 
 	if (!PyArg_ParseTuple(args, "s:gethostbyaddr", &ip_num))
 		return NULL;
-	af = PF_UNSPEC;
-	if (setipaddr(ip_num, sa, af) < 0)
+	af = AF_UNSPEC;
+	if (setipaddr(ip_num, sa, sizeof(addr), af) < 0)
 		return NULL;
 	af = sa->sa_family;
 	ap = NULL;
@@ -2456,15 +2603,38 @@ Convert a 16-bit integer from network to host byte order.");
 
 
 static PyObject *
-socket_ntohl(PyObject *self, PyObject *args)
+socket_ntohl(PyObject *self, PyObject *arg)
 {
-	int x1, x2;
+	unsigned long x;
 
-	if (!PyArg_ParseTuple(args, "i:ntohl", &x1)) {
-		return NULL;
+	if (PyInt_Check(arg)) {
+		x = PyInt_AS_LONG(arg);
+		if (x == (unsigned long) -1 && PyErr_Occurred())
+			return NULL;
 	}
-	x2 = ntohl(x1);
-	return PyInt_FromLong(x2);
+	else if (PyLong_Check(arg)) {
+		x = PyLong_AsUnsignedLong(arg);
+		if (x == (unsigned long) -1 && PyErr_Occurred())
+			return NULL;
+#if SIZEOF_LONG > 4
+		{
+			unsigned long y;
+			/* only want the trailing 32 bits */
+			y = x & 0xFFFFFFFFUL;
+			if (y ^ x)
+				return PyErr_Format(PyExc_OverflowError,
+					    "long int larger than 32 bits");
+			x = y;
+		}
+#endif
+	}
+	else
+		return PyErr_Format(PyExc_TypeError,
+				    "expected int/long, %s found",
+				    arg->ob_type->tp_name);
+	if (x == (unsigned long) -1 && PyErr_Occurred())
+		return NULL;
+	return PyInt_FromLong(ntohl(x));
 }
 
 PyDoc_STRVAR(ntohl_doc,
@@ -2476,7 +2646,7 @@ Convert a 32-bit integer from network to host byte order.");
 static PyObject *
 socket_htons(PyObject *self, PyObject *args)
 {
-	int x1, x2;
+	unsigned long x1, x2;
 
 	if (!PyArg_ParseTuple(args, "i:htons", &x1)) {
 		return NULL;
@@ -2492,15 +2662,36 @@ Convert a 16-bit integer from host to network byte order.");
 
 
 static PyObject *
-socket_htonl(PyObject *self, PyObject *args)
+socket_htonl(PyObject *self, PyObject *arg)
 {
-	int x1, x2;
+	unsigned long x;
 
-	if (!PyArg_ParseTuple(args, "i:htonl", &x1)) {
-		return NULL;
+	if (PyInt_Check(arg)) {
+		x = PyInt_AS_LONG(arg);
+		if (x == (unsigned long) -1 && PyErr_Occurred())
+			return NULL;
 	}
-	x2 = htonl(x1);
-	return PyInt_FromLong(x2);
+	else if (PyLong_Check(arg)) {
+		x = PyLong_AsUnsignedLong(arg);
+		if (x == (unsigned long) -1 && PyErr_Occurred())
+			return NULL;
+#if SIZEOF_LONG > 4
+		{
+			unsigned long y;
+			/* only want the trailing 32 bits */
+			y = x & 0xFFFFFFFFUL;
+			if (y ^ x)
+				return PyErr_Format(PyExc_OverflowError,
+					    "long int larger than 32 bits");
+			x = y;
+		}
+#endif
+	}
+	else
+		return PyErr_Format(PyExc_TypeError,
+				    "expected int/long, %s found",
+				    arg->ob_type->tp_name);
+	return PyInt_FromLong(htonl(x));
 }
 
 PyDoc_STRVAR(htonl_doc,
@@ -2522,14 +2713,30 @@ socket_inet_aton(PyObject *self, PyObject *args)
 #ifndef INADDR_NONE
 #define INADDR_NONE (-1)
 #endif
-
+#ifdef HAVE_INET_ATON
+	struct in_addr buf;
+#else
 	/* Have to use inet_addr() instead */
-	char *ip_addr;
 	unsigned long packed_addr;
+#endif
+	char *ip_addr;
 
-	if (!PyArg_ParseTuple(args, "s:inet_aton", &ip_addr)) {
+	if (!PyArg_ParseTuple(args, "s:inet_aton", &ip_addr))
 		return NULL;
-	}
+
+
+#ifdef HAVE_INET_ATON
+	if (inet_aton(ip_addr, &buf))
+		return PyString_FromStringAndSize((char *)(&buf),
+						  sizeof(buf));
+
+	PyErr_SetString(socket_error,
+			"illegal IP address string passed to inet_aton");
+	return NULL;
+
+#else /* ! HAVE_INET_ATON */
+	/* XXX Problem here: inet_aton('255.255.255.255') raises
+	   an exception while it should be a valid address. */
 	packed_addr = inet_addr(ip_addr);
 
 	if (packed_addr == INADDR_NONE) {	/* invalid address */
@@ -2537,9 +2744,9 @@ socket_inet_aton(PyObject *self, PyObject *args)
 			"illegal IP address string passed to inet_aton");
 		return NULL;
 	}
-
 	return PyString_FromStringAndSize((char *) &packed_addr,
 					  sizeof(packed_addr));
+#endif
 }
 
 PyDoc_STRVAR(inet_ntoa_doc,
@@ -2577,6 +2784,7 @@ socket_getaddrinfo(PyObject *self, PyObject *args)
 {
 	struct addrinfo hints, *res;
 	struct addrinfo *res0 = NULL;
+	PyObject *hobj = NULL;
 	PyObject *pobj = (PyObject *)NULL;
 	char pbuf[30];
 	char *hptr, *pptr;
@@ -2584,12 +2792,27 @@ socket_getaddrinfo(PyObject *self, PyObject *args)
 	int error;
 	PyObject *all = (PyObject *)NULL;
 	PyObject *single = (PyObject *)NULL;
+	PyObject *idna = NULL;
 
 	family = socktype = protocol = flags = 0;
-	family = PF_UNSPEC;
-	if (!PyArg_ParseTuple(args, "zO|iiii:getaddrinfo",
-	    &hptr, &pobj, &family, &socktype,
-			&protocol, &flags)) {
+	family = AF_UNSPEC;
+	if (!PyArg_ParseTuple(args, "OO|iiii:getaddrinfo",
+			      &hobj, &pobj, &family, &socktype,
+			      &protocol, &flags)) {
+		return NULL;
+	}
+	if (hobj == Py_None) {
+		hptr = NULL;
+	} else if (PyUnicode_Check(hobj)) {
+		idna = PyObject_CallMethod(hobj, "encode", "s", "idna");
+		if (!idna)
+			return NULL;
+		hptr = PyString_AsString(idna);
+	} else if (PyString_Check(hobj)) {
+		hptr = PyString_AsString(hobj);
+	} else {
+		PyErr_SetString(PyExc_TypeError, 
+				"getaddrinfo() argument 1 must be string or None");
 		return NULL;
 	}
 	if (PyInt_Check(pobj)) {
@@ -2633,18 +2856,22 @@ socket_getaddrinfo(PyObject *self, PyObject *args)
 			goto err;
 		Py_XDECREF(single);
 	}
+	Py_XDECREF(idna);
+	if (res0)
+		freeaddrinfo(res0);
 	return all;
  err:
 	Py_XDECREF(single);
 	Py_XDECREF(all);
+	Py_XDECREF(idna);
 	if (res0)
 		freeaddrinfo(res0);
 	return (PyObject *)NULL;
 }
 
 PyDoc_STRVAR(getaddrinfo_doc,
-"socket.getaddrinfo(host, port [, family, socktype, proto, flags])\n\
-	--> List of (family, socktype, proto, canonname, sockaddr)\n\
+"getaddrinfo(host, port [, family, socktype, proto, flags])\n\
+    -> list of (family, socktype, proto, canonname, sockaddr)\n\
 \n\
 Resolve host and port into addrinfo struct.");
 
@@ -2671,7 +2898,7 @@ socket_getnameinfo(PyObject *self, PyObject *args)
 		return NULL;
 	PyOS_snprintf(pbuf, sizeof(pbuf), "%d", port);
 	memset(&hints, 0, sizeof(hints));
-	hints.ai_family = PF_UNSPEC;
+	hints.ai_family = AF_UNSPEC;
 	hints.ai_socktype = SOCK_DGRAM;	/* make numeric port happy */
 	error = getaddrinfo(hostp, pbuf, &hints, &res);
 	if (error) {
@@ -2721,9 +2948,61 @@ fail:
 }
 
 PyDoc_STRVAR(getnameinfo_doc,
-"socket.getnameinfo(sockaddr, flags) --> (host, port)\n\
+"getnameinfo(sockaddr, flags) --> (host, port)\n\
 \n\
 Get host and port for a sockaddr.");
+
+
+/* Python API to getting and setting the default timeout value. */
+
+static PyObject *
+socket_getdefaulttimeout(PyObject *self)
+{
+	if (defaulttimeout < 0.0) {
+		Py_INCREF(Py_None);
+		return Py_None;
+	}
+	else
+		return PyFloat_FromDouble(defaulttimeout);
+}
+
+PyDoc_STRVAR(getdefaulttimeout_doc,
+"getdefaulttimeout() -> timeout\n\
+\n\
+Returns the default timeout in floating seconds for new socket objects.\n\
+A value of None indicates that new socket objects have no timeout.\n\
+When the socket module is first imported, the default is None.");
+
+static PyObject *
+socket_setdefaulttimeout(PyObject *self, PyObject *arg)
+{
+	double timeout;
+
+	if (arg == Py_None)
+		timeout = -1.0;
+	else {
+		timeout = PyFloat_AsDouble(arg);
+		if (timeout < 0.0) {
+			if (!PyErr_Occurred())
+				PyErr_SetString(PyExc_ValueError,
+						"Timeout value out of range");
+			return NULL;
+		}
+	}
+
+	defaulttimeout = timeout;
+
+	Py_INCREF(Py_None);
+	return Py_None;
+}
+
+PyDoc_STRVAR(setdefaulttimeout_doc,
+"setdefaulttimeout(timeout)\n\
+\n\
+Set the default timeout in floating seconds for new socket objects.\n\
+A value of None indicates that new socket objects have no timeout.\n\
+When the socket module is first imported, the default is None.");
+
 
 /* List of functions exported by this module. */
 
@@ -2747,11 +3026,11 @@ static PyMethodDef socket_methods[] = {
 	{"ntohs",		socket_ntohs,
 	 METH_VARARGS, ntohs_doc},
 	{"ntohl",		socket_ntohl,
-	 METH_VARARGS, ntohl_doc},
+	 METH_O, ntohl_doc},
 	{"htons",		socket_htons,
 	 METH_VARARGS, htons_doc},
 	{"htonl",		socket_htonl,
-	 METH_VARARGS, htonl_doc},
+	 METH_O, htonl_doc},
 	{"inet_aton",		socket_inet_aton,
 	 METH_VARARGS, inet_aton_doc},
 	{"inet_ntoa",		socket_inet_ntoa,
@@ -2760,6 +3039,10 @@ static PyMethodDef socket_methods[] = {
 	 METH_VARARGS, getaddrinfo_doc},
 	{"getnameinfo",		socket_getnameinfo,
 	 METH_VARARGS, getnameinfo_doc},
+	{"getdefaulttimeout",	(PyCFunction)socket_getdefaulttimeout,
+	 METH_NOARGS, getdefaulttimeout_doc},
+	{"setdefaulttimeout",	socket_setdefaulttimeout,
+	 METH_O, setdefaulttimeout_doc},
 	{NULL,			NULL}		 /* Sentinel */
 };
 
@@ -2888,10 +3171,11 @@ PySocketModule_APIObject PySocketModuleAPI =
 */
 
 PyDoc_STRVAR(socket_doc,
-"Implementation module for socket operations.  See the socket module\n\
-for documentation.");
+"Implementation module for socket operations.\n\
+\n\
+See the socket module for documentation.");
 
-DL_EXPORT(void)
+PyMODINIT_FUNC
 init_socket(void)
 {
 	PyObject *m;
@@ -2900,9 +3184,6 @@ init_socket(void)
 		return;
 
 	sock_type.ob_type = &PyType_Type;
-	sock_type.tp_getattro = PyObject_GenericGetAttr;
-	sock_type.tp_alloc = PyType_GenericAlloc;
-	sock_type.tp_free = PyObject_Del;
 	m = Py_InitModule3(PySocket_MODULE_NAME,
 			   socket_methods,
 			   socket_doc);
@@ -2947,7 +3228,7 @@ init_socket(void)
 #ifdef AF_INET6
 	PyModule_AddIntConstant(m, "AF_INET6", AF_INET6);
 #endif /* AF_INET6 */
-#ifdef AF_UNIX
+#if defined(AF_UNIX) && !defined(PYOS_OS2)
 	PyModule_AddIntConstant(m, "AF_UNIX", AF_UNIX);
 #endif /* AF_UNIX */
 #ifdef AF_AX25
@@ -3003,7 +3284,9 @@ init_socket(void)
 /* We have incomplete socket support. */
 	PyModule_AddIntConstant(m, "SOCK_RAW", SOCK_RAW);
 	PyModule_AddIntConstant(m, "SOCK_SEQPACKET", SOCK_SEQPACKET);
+#if defined(SOCK_RDM)
 	PyModule_AddIntConstant(m, "SOCK_RDM", SOCK_RDM);
+#endif
 #endif
 
 #ifdef	SO_DEBUG

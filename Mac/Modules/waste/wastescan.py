@@ -2,13 +2,14 @@
 
 import sys
 import os
-BGENDIR=os.path.join(sys.prefix, ':Tools:bgen:bgen')
+from bgenlocations import TOOLBOXDIR, BGENDIR
 sys.path.append(BGENDIR)
 from scantools import Scanner
-from bgenlocations import MWERKSDIR, TOOLBOXDIR
 
-#WASTEDIR=":::::Waste 1.3 Distribution:WASTE C/C++ Headers:"
-WASTEDIR=MWERKSDIR + 'MacOS Support:(Third Party Support):Waste 2.0 Distribution:C_C++ Headers:'
+WASTEDIR='/Volumes/Moes/Applications (Mac OS 9)/Metrowerks CodeWarrior 7.0/Metrowerks CodeWarrior/MacOS Support/(Third Party Support)/Waste 2.0 Distribution/C_C++ Headers/'
+		
+if not os.path.exists(WASTEDIR):
+	raise 'Error: not found: %s', WASTEDIR
 
 OBJECT = "TEHandle"
 SHORT = "waste"
@@ -18,11 +19,13 @@ OBJECT2 = "WEObjectReference"
 def main():
 	input = WASTEDIR + "WASTE.h"
 	output = SHORT + "gen.py"
-	defsoutput = TOOLBOXDIR + "WASTEconst.py"
+	defsoutput = os.path.join(os.path.split(TOOLBOXDIR)[0], "WASTEconst.py")
 	scanner = MyScanner(input, output, defsoutput)
 	scanner.scan()
 ##	scanner.gentypetest(SHORT+"typetest.py")
 	scanner.close()
+	print "=== Testing definitions output code ==="
+	execfile(defsoutput, {}, {})
 	print "=== Done scanning and generating, now importing the generated code... ==="
 	exec "import " + SHORT + "support"
 	print "=== Done.  It's up to you to compile it now! ==="

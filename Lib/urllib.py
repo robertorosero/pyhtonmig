@@ -196,7 +196,7 @@ class URLopener:
 
     # External interface
     def retrieve(self, url, filename=None, reporthook=None, data=None):
-        """retrieve(url) returns (filename, None) for a local object
+        """retrieve(url) returns (filename, headers) for a local object
         or (tempfilename, headers) for a remote object."""
         url = unwrap(toBytes(url))
         if self.tempcache and url in self.tempcache:
@@ -212,19 +212,21 @@ class URLopener:
                 pass
         fp = self.open(url, data)
         headers = fp.info()
-        if not filename:
+        if filename:
+            tfp = open(filename, 'wb')
+        else:
             import tempfile
             garbage, path = splittype(url)
             garbage, path = splithost(path or "")
             path, garbage = splitquery(path or "")
             path, garbage = splitattr(path or "")
             suffix = os.path.splitext(path)[1]
-            filename = tempfile.mktemp(suffix)
+            (fd, filename) = tempfile.mkstemp(suffix)
             self.__tempfiles.append(filename)
+            tfp = os.fdopen(fd, 'wb')
         result = filename, headers
         if self.tempcache is not None:
             self.tempcache[url] = result
-        tfp = open(filename, 'wb')
         bs = 1024*8
         size = -1
         blocknum = 1
@@ -291,7 +293,7 @@ class URLopener:
             h.putrequest('GET', selector)
         if auth: h.putheader('Authorization', 'Basic %s' % auth)
         if realhost: h.putheader('Host', realhost)
-        for args in self.addheaders: apply(h.putheader, args)
+        for args in self.addheaders: h.putheader(*args)
         h.endheaders()
         if data is not None:
             h.send(data)
@@ -369,7 +371,7 @@ class URLopener:
                 h.putrequest('GET', selector)
             if auth: h.putheader('Authorization: Basic %s' % auth)
             if realhost: h.putheader('Host', realhost)
-            for args in self.addheaders: apply(h.putheader, args)
+            for args in self.addheaders: h.putheader(*args)
             h.endheaders()
             if data is not None:
                 h.send(data)
@@ -402,7 +404,7 @@ class URLopener:
 
     def open_file(self, url):
         """Use local file or FTP depending on form of URL."""
-        if url[:2] == '//' and url[2:3] != '/':
+        if url[:2] == '//' and url[2:3] != '/' and url[2:12].lower() != 'localhost/':
             return self.open_ftp(url)
         else:
             return self.open_local_file(url)
@@ -539,7 +541,7 @@ class FancyURLopener(URLopener):
     """Derived class with handlers for errors we can handle (perhaps)."""
 
     def __init__(self, *args, **kwargs):
-        apply(URLopener.__init__, (self,) + args, kwargs)
+        URLopener.__init__(self, *args, **kwargs)
         self.auth_cache = {}
         self.tries = 0
         self.maxtries = 10
@@ -582,6 +584,10 @@ class FancyURLopener(URLopener):
 
     def http_error_301(self, url, fp, errcode, errmsg, headers, data=None):
         """Error 301 -- also relocated (permanently)."""
+        return self.http_error_302(url, fp, errcode, errmsg, headers, data)
+
+    def http_error_303(self, url, fp, errcode, errmsg, headers, data=None):
+        """Error 303 -- also relocated (essentially identical to 302)."""
         return self.http_error_302(url, fp, errcode, errmsg, headers, data)
 
     def http_error_401(self, url, fp, errcode, errmsg, headers, data=None):
@@ -778,6 +784,10 @@ class addbase:
         self.readline = self.fp.readline
         if hasattr(self.fp, "readlines"): self.readlines = self.fp.readlines
         if hasattr(self.fp, "fileno"): self.fileno = self.fp.fileno
+        if hasattr(self.fp, "__iter__"):
+            self.__iter__ = self.fp.__iter__
+            if hasattr(self.fp, "next"):
+                self.next = self.fp.next
 
     def __repr__(self):
         return '<%s at %s whose fp = %s>' % (self.__class__.__name__,
@@ -802,7 +812,7 @@ class addclosehook(addbase):
     def close(self):
         addbase.close(self)
         if self.closehook:
-            apply(self.closehook, self.hookargs)
+            self.closehook(*self.hookargs)
             self.closehook = None
             self.hookargs = None
 
@@ -966,7 +976,7 @@ def splituser(host):
     global _userprog
     if _userprog is None:
         import re
-        _userprog = re.compile('^([^@]*)@(.*)$')
+        _userprog = re.compile('^(.*)@(.*)$')
 
     match = _userprog.match(host)
     if match: return map(unquote, match.group(1, 2))

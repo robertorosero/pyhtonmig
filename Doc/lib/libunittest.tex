@@ -7,6 +7,7 @@
 \sectionauthor{Steve Purcell}{stephen\textunderscore{}purcell@yahoo.com}
 \sectionauthor{Fred L. Drake, Jr.}{fdrake@acm.org}
 
+\versionadded{2.1}
 
 The Python unit testing framework, often referred to as ``PyUnit,'' is
 a Python language version of JUnit, by Kent Beck and Erich Gamma.
@@ -50,7 +51,7 @@ indicate the results of executing the tests.
 
 The test case and test fixture concepts are supported through the
 \class{TestCase} and \class{FunctionTestCase} classes; the former
-should be used when creating new tests, and the later can be used when
+should be used when creating new tests, and the latter can be used when
 integrating existing test code with a PyUnit-driven framework.  When
 building test fixtures using \class{TestCase}, the \method{setUp()}
 and \method{tearDown()} methods can be overridden to provide
@@ -297,7 +298,7 @@ separate module, such as \file{widgettests.py}:
 \begin{itemize}
   \item The test module can be run standalone from the command line.
   \item The test code can more easily be separated from shipped code.
-  \item There is less temptation to change test code to fit the code.
+  \item There is less temptation to change test code to fit the code
         it tests without a good reason.
   \item Test code should be modified much less frequently than the
         code it tests.
@@ -498,6 +499,30 @@ report failures.
   \method{failUnless()} is that the default value for \var{msg} can be
   computed to include representations of both \var{first} and
   \var{second}.
+\end{methoddesc}
+
+\begin{methoddesc}[TestCase]{assertAlmostEqual}{first, second\optional{,
+						places\optional{, msg}}}
+\methodline{failUnlessAlmostEqual}{first, second\optional{,
+						places\optional{, msg}}}
+  Test that \var{first} and \var{second} are approximately equal
+  by computing the difference, rounding to the given number of \var{places},
+  and comparing to zero.  Note that comparing a given number of decimal places
+  is not the same as comparing a given number of significant digits.
+  If the values do not compare equal, the test will fail with the explanation
+  given by \var{msg}, or \code{None}.  
+\end{methoddesc}
+
+\begin{methoddesc}[TestCase]{assertNotAlmostEqual}{first, second\optional{,
+						places\optional{, msg}}}
+\methodline{failIfAlmostEqual}{first, second\optional{,
+						places\optional{, msg}}}
+  Test that \var{first} and \var{second} are not approximately equal
+  by computing the difference, rounding to the given number of \var{places},
+  and comparing to zero.  Note that comparing a given number of decimal places
+  is not the same as comparing a given number of significant digits.
+  If the values do not compare equal, the test will fail with the explanation
+  given by \var{msg}, or \code{None}.  
 \end{methoddesc}
 
 \begin{methoddesc}[TestCase]{assertRaises}{exception, callable, \moreargs}

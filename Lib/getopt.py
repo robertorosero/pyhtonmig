@@ -1,3 +1,4 @@
+# -*- coding: iso-8859-1 -*-
 """Parser for command line options.
 
 This module helps scripts to parse the command line arguments in
@@ -9,7 +10,7 @@ provides two functions and an exception:
 
 getopt() -- Parse command line options
 gnu_getopt() -- Like getopt(), but allow option and non-option arguments
-to be intermixed. 
+to be intermixed.
 GetoptError -- exception (class) raised with 'opt' attribute, which is the
 option involved with the exception.
 """
@@ -38,7 +39,7 @@ import os
 class GetoptError(Exception):
     opt = ''
     msg = ''
-    def __init__(self, msg, opt):
+    def __init__(self, msg, opt=''):
         self.msg = msg
         self.opt = opt
         Exception.__init__(self, msg, opt)
@@ -103,7 +104,7 @@ def gnu_getopt(args, shortopts, longopts = []):
     If the first character of the option string is `+', or if the
     environment variable POSIXLY_CORRECT is set, then option
     processing stops as soon as a non-option argument is encountered.
-    
+
     """
 
     opts = []
@@ -117,7 +118,7 @@ def gnu_getopt(args, shortopts, longopts = []):
     if shortopts.startswith('+'):
         shortopts = shortopts[1:]
         all_options_first = True
-    elif os.getenv("POSIXLY_CORRECT"):
+    elif os.environ.get("POSIXLY_CORRECT"):
         all_options_first = True
     else:
         all_options_first = False

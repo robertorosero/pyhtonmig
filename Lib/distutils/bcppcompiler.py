@@ -11,6 +11,8 @@ for the Borland C++ compiler.
 # someone should sit down and factor out the common code as
 # WindowsCCompiler!  --GPW
 
+# This module should be kept compatible with Python 1.5.2.
+
 __revision__ = "$Id$"
 
 
@@ -146,8 +148,7 @@ class BCPPCompiler(CCompiler) :
                            output_libname,
                            output_dir=None,
                            debug=0,
-                           extra_preargs=None,
-                           extra_postargs=None):
+                           target_lang=None):
 
         (objects, output_dir) = self._fix_object_args (objects, output_dir)
         output_filename = \
@@ -157,10 +158,6 @@ class BCPPCompiler(CCompiler) :
             lib_args = [output_filename, '/u'] + objects
             if debug:
                 pass                    # XXX what goes here?
-            if extra_preargs:
-                lib_args[:0] = extra_preargs
-            if extra_postargs:
-                lib_args.extend (extra_postargs)
             try:
                 self.spawn ([self.lib] + lib_args)
             except DistutilsExecError, msg:
@@ -183,7 +180,8 @@ class BCPPCompiler(CCompiler) :
               debug=0,
               extra_preargs=None,
               extra_postargs=None,
-              build_temp=None):
+              build_temp=None,
+              target_lang=None):
 
         # XXX this ignores 'build_temp'!  should follow the lead of
         # msvccompiler.py

@@ -10,6 +10,7 @@ import traceback
 import MacOS
 import MacPrefs
 from Carbon import Qd
+import EasyDialogs
 import PyInteractive
 
 if not hasattr(sys, 'ps1'):
@@ -84,14 +85,14 @@ class ConsoleTextWidget(W.EditText):
 				self._inputstart = selstart
 	
 	def domenu_save_as(self, *args):
-		import macfs
-		fss, ok = macfs.StandardPutFile('Save console text as:', 'console.txt')
-		if not ok:
+		filename = EasyDialogs.AskFileForSave(message='Save console text as:', 
+			savedFileName='console.txt')
+		if not filename:
 			return
-		f = open(fss.as_pathname(), 'wb')
+		f = open(filename, 'wb')
 		f.write(self.get())
 		f.close()
-		fss.SetCreatorType(W._signature, 'TEXT')
+		MacOS.SetCreatorAndType(filename, W._signature, 'TEXT')
 	
 	def write(self, text):
 		self._buf = self._buf + text
@@ -108,8 +109,8 @@ class ConsoleTextWidget(W.EditText):
 		self._buf = ""
 		self.ted.WEClearUndo()
 		self.updatescrollbars()
-		if Qd.QDIsPortBuffered(self._parentwindow.wid):
-			Qd.QDFlushPortBuffer(self._parentwindow.wid, None)
+		if self._parentwindow.wid.GetWindowPort().QDIsPortBuffered():
+			self._parentwindow.wid.GetWindowPort().QDFlushPortBuffer(None)
 	
 	def selection_ok(self):
 		selstart, selend = self.getselection()
@@ -240,15 +241,21 @@ class OutputTextWidget(W.EditText):
 	
 	def domenu_save_as(self, *args):
 		title = self._parentwindow.gettitle()
-		import macfs
-		fss, ok = macfs.StandardPutFile('Save %s text as:' % title, title + '.txt')
-		if not ok:
+		filename = EasyDialogs.AskFileForSave(message='Save %s text as:' % title, 
+			savedFileName=title + '.txt')
+		if not filename:
 			return
-		f = open(fss.as_pathname(), 'wb')
+		f = open(filename, 'wb')
 		f.write(self.get())
 		f.close()
-		fss.SetCreatorType(W._signature, 'TEXT')
+		MacOS.SetCreatorAndType(filename, W._signature, 'TEXT')
 	
+	def domenu_cut(self, *args):
+		self.domenu_copy(*args)
+	
+	def domenu_clear(self, *args):
+		self.set('')
+
 
 class PyOutput:
 	
@@ -300,8 +307,8 @@ class PyOutput:
 		self._buf = ""
 		self.w.outputtext.updatescrollbars()
 		self.w.outputtext.ted.WEFeatureFlag(WASTEconst.weFReadOnly, 1)
-		if Qd.QDIsPortBuffered(self.w.wid):
-			Qd.QDFlushPortBuffer(self.w.wid, None)
+		if self.w.wid.GetWindowPort().QDIsPortBuffered():
+			self.w.wid.GetWindowPort().QDFlushPortBuffer(None)
 	
 	def show(self):
 		if self.closed:

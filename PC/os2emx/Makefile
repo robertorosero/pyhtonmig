@@ -1,4 +1,4 @@
-#####################==================----------------·············
+#####################==================----------------
 #
 # Top-Level Makefile for Building Python 2.3 for OS/2 using GCC/EMX
 # Originally written by Andrew Zabolotny, <bit@eltech.ru> for Python 1.5.2
@@ -21,43 +21,54 @@
 #   make lx		(if you have lxlite)
 #   make test		(optional)
 #
-#####################==================----------------·············
+#####################==================----------------
 
 # === Compilation mode: debug or release ===
 MODE=		optimize
 #MODE=		debug
 # === Assert() enabled ===
-#ASSERTIONS=no
-ASSERTIONS=yes
+ASSERTIONS=no
+#ASSERTIONS=yes
+# === Hard-wire installation location ===
+FIXED_PYHOME=no
+#FIXED_PYHOME=yes
 
 # === Optional modules ===
 # Do you have the InfoZip compression library installed?
-ZLIB=		no
+HAVE_ZLIB=	no
 # Do you have the Ultra Fast Crypt (UFC) library installed?
-UFC=		no
+HAVE_UFC=	no
 # Do you have the Tcl/Tk library installed?
-TCLTK=		no
+HAVE_TCLTK=	no
 # Do you have the GNU multiprecision library installed?
-GMPZ=		no
+HAVE_GMPZ=	no
 # Do you have the GNU readline library installed?
 # NOTE: I'm using a modified version of Kai Uwe Rommel's port that 
 #       - is compiled with multithreading enabled
 #       - is linked statically
-#       I have had no success trying to use a DLL version, even with
-#       the multithreading switch.
-GREADLINE=	no
+#       I have had no success trying to use a DLL version, even when
+#       compiled with multithreading enabled.
+HAVE_GREADLINE=	no
 # Do you have the BSD DB library (v1.85) as included in the EMXBSD package?
 # NOTE: this library needs to be recompiled with a structure member
 #       renamed to avoid problems with the multithreaded errno support
 #       (there is a structure member called errno, used for shadowing the
 #       real errno, which conflicts with the errno redefinition of -Zmt)
-BSDDB=		no
+HAVE_BSDDB=	no
 # Do you have the ncurses library installed? EMX's BSD curses aren't enough! 
-CURSES=		no
-# Do you have the expat XML parsing library installed?
-EXPAT=		no
+HAVE_NCURSES=	no
 # Do you have the GDBM library installed?
-GDBM=		no
+HAVE_GDBM=	no
+# Do you have the BZ2 compression library installed?
+HAVE_BZ2=	no
+
+# === install locations ===
+# default value of PYTHONHOME
+LIB_DIR=C:/Python23
+# default is to have everything in or under PYTHONHOME
+EXE_DIR=$(LIB_DIR)
+DLL_DIR=$(EXE_DIR)
+
 
 # === The Tools ===
 CC=		gcc
@@ -71,6 +82,8 @@ LDFLAGS.A=	$(LDFLAGS) $(LIBS)
 ARFLAGS=	crs
 IMPLIB=		emximp
 EXPLIB=		emxexp
+EXEOPT=		emxbind
+
 
 # adjust C compiler settings based on build options
 ifeq ($(MODE),debug)
@@ -82,6 +95,9 @@ else
 endif
 ifeq ($(ASSERTIONS),no)
   CFLAGS+=	-DNDEBUG
+endif
+ifeq ($(FIXED_PYHOME),yes)
+  CFLAGS+=	-DPREFIX=$(DQUOTE)$(LIB_DIR)$(DQUOTE)
 endif
 
 # We're using the OMF format since EMX's ld has a obscure bug
@@ -111,6 +127,10 @@ else
   A=		.a
   AR=		ar
 endif
+
+# EMX's default number of file handles is 40, which is sometimes insufficient
+# (the tempfile regression test tries to create 100 temporary files)
+NFILES=250
 
 # Source file paths
 SRCPATH=.;../../Python;../../Parser;../../Objects;../../Include;../../Modules
@@ -230,20 +250,12 @@ DESCRIPTION.crypt$(MODULE.EXT)=		Python Extension DLL implementing the crypt$(BR
 DESCRIPTION._tkinter$(MODULE.EXT)=	Python Extension DLL for access to Tcl/Tk Environment
 DESCRIPTION.mpz$(MODULE.EXT)=		Python Extension DLL for access to GNU multi-precision library
 DESCRIPTION.readline$(MODULE.EXT)=	Python Extension DLL for access to GNU ReadLine library
-DESCRIPTION.bsddb$(MODULE.EXT)=		Python Extension DLL for access to BSD DB (v1.85) library
+DESCRIPTION.bsddb185$(MODULE.EXT)=	Python Extension DLL for access to BSD DB (v1.85) library
 DESCRIPTION._curses$(MODULE.EXT)=	Python Extension DLL for access to ncurses library
 DESCRIPTION.pyexpat$(MODULE.EXT)=	Python Extension DLL for access to expat library
+DESCRIPTION.bz2$(MODULE.EXT)=		Python Extension DLL for accessing the bz2 compression library
 
 # Source files
-SRC.PGEN=	$(addprefix ../../Parser/, \
-		pgenmain.c \
-		pgen.c \
-		printgrammar.c \
-		grammar.c \
-		bitset.c \
-		firstsets.c)
-OBJ.PGEN=	$(addprefix $(OUT),$(notdir $(SRC.PGEN:.c=$O)))
-
 SRC.OS2EMX=	config.c dlfcn.c getpathp.c
 SRC.MAIN=	$(addprefix $(TOP), \
 		Modules/getbuildinfo.c \
@@ -252,18 +264,57 @@ SRC.MODULES=	$(addprefix $(TOP), \
 		Modules/gcmodule.c \
 		Modules/signalmodule.c \
 		Modules/posixmodule.c \
-		Modules/threadmodule.c)
-SRC.PARSER=	$(addprefix $(TOP), \
+		Modules/threadmodule.c \
+		Modules/arraymodule.c \
+		Modules/binascii.c \
+		Modules/cmathmodule.c \
+		Modules/_codecsmodule.c \
+		Modules/cPickle.c \
+		Modules/cStringIO.c \
+		Modules/_csv.c \
+		Modules/datetimemodule.c \
+		Modules/dlmodule.c \
+		Modules/errnomodule.c \
+		Modules/fcntlmodule.c \
+		Modules/imageop.c \
+		Modules/itertoolsmodule.c \
+		Modules/_localemodule.c \
+		Modules/mathmodule.c \
+		Modules/md5c.c \
+		Modules/md5module.c \
+		Modules/operator.c \
+		Modules/pcremodule.c \
+		Modules/pypcre.c \
+		Modules/_randommodule.c \
+		Modules/regexmodule.c \
+		Modules/regexpr.c \
+		Modules/rgbimgmodule.c \
+		Modules/shamodule.c \
+		Modules/_sre.c \
+		Modules/stropmodule.c \
+		Modules/structmodule.c \
+		Modules/symtablemodule.c \
+		Modules/termios.c \
+		Modules/timemodule.c \
+		Modules/timingmodule.c \
+		Modules/_weakref.c \
+		Modules/xreadlinesmodule.c \
+		Modules/xxsubtype.c \
+		Modules/zipimport.c)
+SRC.PARSE1=	$(addprefix $(TOP), \
 		Parser/acceler.c \
 		Parser/grammar1.c \
 		Parser/listnode.c \
 		Parser/node.c \
 		Parser/parser.c \
 		Parser/parsetok.c \
-		Parser/tokenizer.c \
 		Parser/bitset.c \
-		Parser/metagrammar.c \
+		Parser/metagrammar.c)
+SRC.PARSE2=	$(addprefix $(TOP), \
+		Parser/tokenizer.c \
 		Parser/myreadline.c)
+SRC.PARSER=	$(SRC.PARSE1) \
+		$(SRC.PARSE2)
 SRC.PYTHON=	$(addprefix $(TOP), \
 		Python/bltinmodule.c \
 		Python/exceptions.c \
@@ -338,6 +389,21 @@ SRC.LIB=	$(SRC.OS2EMX) \
 		$(SRC.MODULES)
 OBJ.LIB=	$(addprefix $(OUT),$(notdir $(SRC.LIB:.c=$O)))
 
+SRC.PGEN=	$(SRC.PARSE1) \
+		$(addprefix $(TOP), \
+		Objects/obmalloc.c) \
+		$(addprefix $(TOP), \
+		Python/mysnprintf.c) \
+		$(addprefix $(TOP), \
+		Parser/tokenizer_pgen.c \
+		Parser/pgenmain.c \
+		Parser/pgen.c \
+		Parser/printgrammar.c \
+		Parser/grammar.c \
+		Parser/firstsets.c) \
+		
+OBJ.PGEN=	$(addprefix $(OUT),$(notdir $(SRC.PGEN:.c=$O)))
+
 SRC.EXE=	$(TOP)Modules/python.c
 SRC.PMEXE=	pythonpm.c
 
@@ -346,80 +412,63 @@ SRC.PMEXE=	pythonpm.c
 #   2) use the standard module naming convention
 #      (the 'module' in ?????module.c is assumed)
 # - these can be built with implicit rules
-EASYEXTMODULES=	array \
-		cmath \
-		_codecs \
-		dl \
-		errno \
-		fcntl \
-		fpectl \
+EASYEXTMODULES=	fpectl \
 		fpetest \
-		_locale \
-		math \
-		new \
 		parser \
 		pwd \
-		rgbimg \
 		rotor \
-		select \
-		sha \
-		strop \
-		struct \
-		time \
-		timing
+		select 
 
 # Python modules to be dynamically loaded that need explicit build rules
 #  (either multiple source files and/or non-standard module naming)
 #  (NOTE: use shortened names for modules affected by 8 char name limit)
-HARDEXTMODULES=	binascii \
-		cPickle \
-		cStringI \
-		_hotshot \
-		imageop \
-		md5 \
-		operator \
-		pcre \
-		regex \
+HARDEXTMODULES=	_hotshot \
 		_socket \
-		_sre \
-		termios \
 		_testcap \
-		unicoded \
-		_weakref \
-		xreadlin \
-		xxsubtyp
+		unicoded
 
 # Python external ($(MODULE.EXT)) modules - can be EASY or HARD
-ifeq ($(ZLIB),yes)
+ifeq ($(HAVE_ZLIB),yes)
   HARDEXTMODULES+=	zlib
 endif
-ifeq ($(UFC),yes)
+ifeq ($(HAVE_UFC),yes)
   HARDEXTMODULES+=	crypt
 endif
-ifeq ($(TCLTK),yes)
+ifeq ($(HAVE_TCLTK),yes)
   HARDEXTMODULES+=	_tkinter
   CFLAGS+=		-DHAS_DIRENT -I/TclTk80/include
   TK_LIBS+=		-L/TclTk80/lib -ltcl80 -ltk80
 endif
-ifeq ($(GMPZ),yes)
+ifeq ($(HAVE_GMPZ),yes)
   HARDEXTMODULES+=	mpz
 endif
-ifeq ($(GREADLINE),yes)
+ifeq ($(HAVE_GREADLINE),yes)
   HARDEXTMODULES+=	readline
 endif
-ifeq ($(BSDDB),yes)
-  HARDEXTMODULES+=	bsddb
+ifeq ($(HAVE_BSDDB),yes)
+  HARDEXTMODULES+=	bsddb185
 endif
-ifeq ($(CURSES),yes)
+ifeq ($(HAVE_NCURSES),yes)
   HARDEXTMODULES+=	_curses _curses_
 endif
-ifeq ($(EXPAT),yes)
-  HARDEXTMODULES+=	pyexpat
-endif
-ifeq ($(GDBM),yes)
+ifeq ($(HAVE_GDBM),yes)
   HARDEXTMODULES+=	gdbm dbm
 endif
+ifeq ($(HAVE_BZ2),yes)
+  HARDEXTMODULES+=	bz2
+endif
 
+# Expat is now distributed with the Python source
+HARDEXTMODULES+=	pyexpat
+EXPAT.INC=	-I../../Modules/expat
+EXPAT.DEF=	-DHAVE_EXPAT_H -DXML_NS=1 -DXML_DTD=1 -DXML_BYTE_ORDER=12 \
+		-DXML_CONTENT_BYTES=1024
+EXPAT.SRC=	$(addprefix ../../Modules/expat/, \
+		xmlparse.c \
+		xmlrole.c \
+		xmltok.c)
+
+# all the external modules
 EXTERNDLLS=	$(addsuffix $(MODULE.EXT),$(patsubst %module,%,$(EASYEXTMODULES)))
 EXTERNDLLS+=	$(addsuffix $(MODULE.EXT),$(patsubst %module,%,$(HARDEXTMODULES)))
 
@@ -471,60 +520,22 @@ $(PYTHON.DLL): $(OUT)dllentry$O $(PYTHON.LIB) $(PYTHON.DEF)
 
 $(PYTHON.EXE): $(SRC.EXE) $(PYTHON.EXEIMP) $(OUT)python.def
 	$(CC) -Zmt $(LDMODE.EXE) -Zcrtdll -Wall $(INCLUDE) -L. -lgcc -o $@ $(SRC.EXE) $(PYTHON.EXEIMP) $(LIBS) $(OUT)python.def
+	$(EXEOPT) -aq $(PYTHON.EXE) -h$(NFILES)
 
 $(PYTHONPM.EXE): $(SRC.PMEXE) $(PYTHON.EXEIMP) $(OUT)pythonpm.def
 	$(CC) -Zmt $(LDMODE.EXE) -Zcrtdll -Wall $(INCLUDE) -L. -lgcc -o $@ $(SRC.PMEXE) $(PYTHON.EXEIMP) $(LIBS) $(OUT)pythonpm.def
+	$(EXEOPT) -aq $(PYTHONPM.EXE) -h$(NFILES)
 
-$(PGEN.EXE): $(OBJ.PGEN) $(PYTHON.LIB) $(OUT)pgen.def
+$(PGEN.EXE): $(OBJ.PGEN) $(OUT)pgen.def
 
 # Explicit building instructions for those external modules that require 
 # awkward handling (due e.g. to non-std naming, or multiple source files)
 # - standard modules
-binascii$(MODULE.EXT): $(OUT)binascii$O $(OUT)binascii_m.def $(PYTHON.IMPLIB)
-	$(LD) $(LDFLAGS.DLL) -o $@ $(^^) $(L^) $(LIBS)
-
-cPickle$(MODULE.EXT): $(OUT)cPickle$O $(OUT)cPickle_m.def $(PYTHON.IMPLIB)
-	$(LD) $(LDFLAGS.DLL) -o $@ $(^^) $(L^) $(LIBS)
-
-# cStringIO needs to be renamed to be useful (8 char DLL name limit)
-cStringIO$(MODULE.EXT): $(OUT)cStringIO$O $(OUT)cStringIO_m.def $(PYTHON.IMPLIB)
-	$(LD) $(LDFLAGS.DLL) -o $@ $(^^) $(L^) $(LIBS)
-
-cStringI$(MODULE.EXT): cStringIO$(MODULE.EXT)
-	cp $^ $@
 
 _hotshot$(MODULE.EXT): $(OUT)_hotshot$O $(OUT)_hotshot_m.def $(PYTHON.IMPLIB)
 	$(LD) $(LDFLAGS.DLL) -o $@ $(^^) $(L^) $(LIBS)
 
-imageop$(MODULE.EXT): $(OUT)imageop$O $(OUT)imageop_m.def $(PYTHON.IMPLIB)
-	$(LD) $(LDFLAGS.DLL) -o $@ $(^^) $(L^) $(LIBS)
-
-md5$(MODULE.EXT): $(OUT)md5module$O $(OUT)md5c$O $(OUT)md5_m.def $(PYTHON.IMPLIB)
-	$(LD) $(LDFLAGS.DLL) -o $@ $(^^) $(L^) $(LIBS)
-
-operator$(MODULE.EXT): $(OUT)operator$O $(OUT)operator_m.def $(PYTHON.IMPLIB)
-	$(LD) $(LDFLAGS.DLL) -o $@ $(^^) $(L^) $(LIBS)
-
-pcre$(MODULE.EXT): $(OUT)pcremodule$O $(OUT)pypcre$O $(OUT)pcre_m.def $(PYTHON.IMPLIB)
-	$(LD) $(LDFLAGS.DLL) -o $@ $(^^) $(L^) $(LIBS)
-
-regex$(MODULE.EXT): $(OUT)regexmodule$O $(OUT)regexpr$O $(OUT)regex_m.def $(PYTHON.IMPLIB)
-	$(LD) $(LDFLAGS.DLL) -o $@ $(^^) $(L^) $(LIBS)
-
 _socket$(MODULE.EXT): $(OUT)socketmodule$O $(OUT)_socket_m.def $(PYTHON.IMPLIB)
-	$(LD) $(LDFLAGS.DLL) -o $@ $(^^) $(L^) $(LIBS)
-
-_sre$(MODULE.EXT): $(OUT)_sre$O $(OUT)_sre_m.def $(PYTHON.IMPLIB)
-	$(LD) $(LDFLAGS.DLL) -o $@ $(^^) $(L^) $(LIBS)
-
-# _symtable needs to be renamed to be useful
-_symtable$(MODULE.EXT): $(OUT)symtablemodule$O $(OUT)_symtable_m.def $(PYTHON.IMPLIB)
-	$(LD) $(LDFLAGS.DLL) -o $@ $(^^) $(L^) $(LIBS)
-
-_symtabl$(MODULE.EXT): _symtable$(MODULE.EXT)
-	cp $^ $@
-
-termios$(MODULE.EXT): $(OUT)termios$O $(OUT)termios_m.def $(PYTHON.IMPLIB)
 	$(LD) $(LDFLAGS.DLL) -o $@ $(^^) $(L^) $(LIBS)
 
 # _testcapi needs to be renamed to be useful
@@ -541,25 +552,8 @@ unicodedata$(MODULE.EXT): $(OUT)unicodedata$O $(OUT)unicodedata_m.def $(PYTHON.I
 unicoded$(MODULE.EXT): unicodedata$(MODULE.EXT)
 	cp $^ $@
 
-_weakref$(MODULE.EXT): $(OUT)_weakref$O $(OUT)_weakref_m.def $(PYTHON.IMPLIB)
-	$(LD) $(LDFLAGS.DLL) -o $@ $(^^) $(L^) $(LIBS)
-
-# xreadlines needs to be renamed to be useful
-xreadlines$(MODULE.EXT): $(OUT)xreadlinesmodule$O $(OUT)xreadlines_m.def $(PYTHON.IMPLIB)
-	$(LD) $(LDFLAGS.DLL) -o $@ $(^^) $(L^) $(LIBS)
-
-xreadlin$(MODULE.EXT): xreadlines$(MODULE.EXT)
-	cp $^ $@
-
-# xxsubtype needs to be renamed to be useful
-xxsubtype$(MODULE.EXT): $(OUT)xxsubtype$O $(OUT)xxsubtype_m.def $(PYTHON.IMPLIB)
-	$(LD) $(LDFLAGS.DLL) -o $@ $(^^) $(L^) $(LIBS)
-
-xxsubtyp$(MODULE.EXT): xxsubtype$(MODULE.EXT)
-	cp $^ $@
-
 # - optional modules (requiring other software to be installed)
-bsddb$(MODULE.EXT): $(OUT)bsddbmodule$O $(OUT)bsddb_m.def $(PYTHON.IMPLIB)
+bsddb185$(MODULE.EXT): $(OUT)bsddbmodule$O $(OUT)bsddb185_m.def $(PYTHON.IMPLIB)
 	$(LD) $(LDFLAGS.DLL) -o $@ $(^^) $(L^) -ldb $(LIBS)
 
 crypt$(MODULE.EXT): $(OUT)cryptmodule$O $(OUT)crypt_m.def $(PYTHON.IMPLIB)
@@ -615,8 +609,18 @@ gdbm$(MODULE.EXT): $(OUT)gdbmmodule$O $(OUT)gdbm_m.def $(PYTHON.IMPLIB)
 mpz$(MODULE.EXT): $(OUT)mpzmodule$O $(OUT)mpz_m.def $(PYTHON.IMPLIB)
 	$(LD) $(LDFLAGS.DLL) -o $@ $(^^) $(L^) $(LIBS) -lgmp
 
-pyexpat$(MODULE.EXT): $(OUT)pyexpat$O $(OUT)pyexpat_m.def $(PYTHON.IMPLIB)
-	$(LD) $(LDFLAGS.DLL) -o $@ $(^^) $(L^) $(LIBS) -lexpat
+# Expat is now distributed with Python, so use the included version
+$(OUT)pyexpat$O:	../../Modules/pyexpat.c
+	$(CC) $(CFLAGS) $(EXPAT.INC) -c -o $@ $^
+$(OUT)xmlparse$O:	../../Modules/expat/xmlparse.c
+	$(CC) $(CFLAGS) $(EXPAT.INC) $(EXPAT.DEF) -c -o $@ $^
+$(OUT)xmlrole$O:	../../Modules/expat/xmlrole.c
+	$(CC) $(CFLAGS) $(EXPAT.INC) $(EXPAT.DEF) -c -o $@ $^
+$(OUT)xmltok$O:	../../Modules/expat/xmltok.c
+	$(CC) $(CFLAGS) $(EXPAT.INC) $(EXPAT.DEF) -c -o $@ $^
+pyexpat$(MODULE.EXT): $(OUT)pyexpat$O $(OUT)xmlparse$O $(OUT)xmlrole$O \
+		$(OUT)xmltok$O $(OUT)pyexpat_m.def $(PYTHON.IMPLIB)
+	$(LD) $(LDFLAGS.DLL) -o $@ $(^^) $(L^) $(LIBS)
 
 readline$(MODULE.EXT): $(OUT)readline$O $(OUT)readline_m.def $(PYTHON.IMPLIB)
 	$(LD) $(LDFLAGS.DLL) -o $@ $(^^) $(L^) $(LIBS) -lreadline -lncurses
@@ -629,8 +633,13 @@ _tkinter$(MODULE.EXT): $(OUT)_tkinter$O $(OUT)tclNotify$O \
 zlib$(MODULE.EXT): $(OUT)zlibmodule$O $(OUT)zlib_m.def $(PYTHON.IMPLIB)
 	$(LD) $(LDFLAGS.DLL) -o $@ $(^^) $(L^) $(LIBS) -lz
 
+bz2$(MODULE.EXT): $(OUT)bz2module$O $(OUT)bz2_m.def $(PYTHON.IMPLIB)
+	$(LD) $(LDFLAGS.DLL) -o $@ $(^^) $(L^) $(LIBS) -lbz2
+
 # the test target
 test:
-	./python -tt ../../lib/test/regrtest.py -l -u "network"
+	-find ../../Lib -name "*.py[co]" -exec rm {} ";"
+	-./python -E -tt ../../lib/test/regrtest.py -l -u "network"
+	./python -E -tt ../../lib/test/regrtest.py -l -u "network"
 
 -include $(OUTBASE)python.dep

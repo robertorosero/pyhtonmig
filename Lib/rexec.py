@@ -29,7 +29,8 @@ __all__ = ["RExec"]
 class FileBase:
 
     ok_file_methods = ('fileno', 'flush', 'isatty', 'read', 'readline',
-            'readlines', 'seek', 'tell', 'write', 'writelines')
+            'readlines', 'seek', 'tell', 'write', 'writelines', 'xreadlines',
+            '__iter__')
 
 
 class FileWrapper(FileBase):
@@ -37,7 +38,6 @@ class FileWrapper(FileBase):
     # XXX This is just like a Bastion -- should use that!
 
     def __init__(self, f):
-        self.f = f
         for m in self.ok_file_methods:
             if not hasattr(self, m) and hasattr(f, m):
                 setattr(self, m, getattr(f, m))
@@ -48,7 +48,7 @@ class FileWrapper(FileBase):
 
 TEMPLATE = """
 def %s(self, *args):
-        return apply(getattr(self.mod, self.name).%s, args)
+        return getattr(self.mod, self.name).%s(*args)
 """
 
 class FileDelegate(FileBase):
@@ -137,14 +137,16 @@ class RExec(ihooks._Verbose):
                           'cmath', 'errno', 'imageop',
                           'marshal', 'math', 'md5', 'operator',
                           'parser', 'regex', 'pcre', 'rotor', 'select',
-                          'sha', '_sre', 'strop', 'struct', 'time')
+                          'sha', '_sre', 'strop', 'struct', 'time',
+                          'xreadlines', '_weakref')
 
     ok_posix_names = ('error', 'fstat', 'listdir', 'lstat', 'readlink',
                       'stat', 'times', 'uname', 'getpid', 'getppid',
                       'getcwd', 'getuid', 'getgid', 'geteuid', 'getegid')
 
-    ok_sys_names = ('ps1', 'ps2', 'copyright', 'version',
-                    'platform', 'exit', 'maxint')
+    ok_sys_names = ('byteorder', 'copyright', 'exit', 'getdefaultencoding',
+                    'getrefcount', 'hexversion', 'maxint', 'maxunicode',
+                    'platform', 'ps1', 'ps2', 'version', 'version_info')
 
     nok_builtin_names = ('open', 'file', 'reload', '__import__')
 
@@ -178,6 +180,9 @@ class RExec(ihooks._Verbose):
         sent to standard output.
 
         """
+
+        raise RuntimeError, "This code is not secure in Python 2.2 and 2.3"
+
         ihooks._Verbose.__init__(self, verbose)
         # XXX There's a circular reference here:
         self.hooks = hooks or RHooks(verbose)
@@ -288,9 +293,9 @@ class RExec(ihooks._Verbose):
     # Add a module -- return an existing module or create one
 
     def add_module(self, mname):
-        if mname in self.modules:
-            return self.modules[mname]
-        self.modules[mname] = m = self.hooks.new_module(mname)
+        m = self.modules.get(mname)
+        if m is None:
+            self.modules[mname] = m = self.hooks.new_module(mname)
         m.__builtins__ = self.modules['__builtin__']
         return m
 
@@ -402,14 +407,11 @@ class RExec(ihooks._Verbose):
         sys.stdout = self.save_stdout
         sys.stderr = self.save_stderr
 
-    def s_apply(self, func, args=(), kw=None):
+    def s_apply(self, func, args=(), kw={}):
         self.save_files()
         try:
             self.set_files()
-            if kw:
-                r = apply(func, args, kw)
-            else:
-                r = apply(func, args)
+            r = func(*args, **kw)
         finally:
             self.restore_files()
         return r
@@ -514,6 +516,7 @@ class RExec(ihooks._Verbose):
         used to change the policies enforced by a restricted environment.
 
         """
+        mode = str(mode)
         if mode not in ('r', 'rb'):
             raise IOError, "can't open files for writing in restricted mode"
         return open(file, mode, buf)
@@ -552,13 +555,17 @@ def test():
             print "%s: can't open file %s" % (sys.argv[0], `args[0]`)
             return 1
     if fp.isatty():
-        import code
         try:
-            code.interact(
-                "*** RESTRICTED *** Python %s on %s\n"
-                'Type "help", "copyright", "credits" or "license" '
-                "for more information." % (sys.version, sys.platform),
-                local=r.modules['__main__'].__dict__)
+            import readline
+        except ImportError:
+            pass
+        import code
+        class RestrictedConsole(code.InteractiveConsole):
+            def runcode(self, co):
+                self.locals['__builtins__'] = r.modules['__builtin__']
+                r.s_apply(code.InteractiveConsole.runcode, (self, co))
+        try:
+            RestrictedConsole(r.modules['__main__'].__dict__).interact()
         except SystemExit, n:
             return n
     else:

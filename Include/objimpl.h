@@ -94,20 +94,20 @@ PyObject_{New, NewVar, Del}.
    the object gets initialized via PyObject_{Init, InitVar} after obtaining
    the raw memory.
 */
-extern DL_IMPORT(void *) PyObject_Malloc(size_t);
-extern DL_IMPORT(void *) PyObject_Realloc(void *, size_t);
-extern DL_IMPORT(void) PyObject_Free(void *);
+PyAPI_FUNC(void *) PyObject_Malloc(size_t);
+PyAPI_FUNC(void *) PyObject_Realloc(void *, size_t);
+PyAPI_FUNC(void) PyObject_Free(void *);
 
 
 /* Macros */
 #ifdef WITH_PYMALLOC
 #ifdef PYMALLOC_DEBUG
-DL_IMPORT(void *) _PyObject_DebugMalloc(size_t nbytes);
-DL_IMPORT(void *) _PyObject_DebugRealloc(void *p, size_t nbytes);
-DL_IMPORT(void) _PyObject_DebugFree(void *p);
-DL_IMPORT(void) _PyObject_DebugDumpAddress(const void *p);
-DL_IMPORT(void) _PyObject_DebugCheckAddress(const void *p);
-DL_IMPORT(void) _PyObject_DebugMallocStats(void);
+PyAPI_FUNC(void *) _PyObject_DebugMalloc(size_t nbytes);
+PyAPI_FUNC(void *) _PyObject_DebugRealloc(void *p, size_t nbytes);
+PyAPI_FUNC(void) _PyObject_DebugFree(void *p);
+PyAPI_FUNC(void) _PyObject_DebugDumpAddress(const void *p);
+PyAPI_FUNC(void) _PyObject_DebugCheckAddress(const void *p);
+PyAPI_FUNC(void) _PyObject_DebugMallocStats(void);
 #define PyObject_MALLOC		_PyObject_DebugMalloc
 #define PyObject_Malloc		_PyObject_DebugMalloc
 #define PyObject_REALLOC	_PyObject_DebugRealloc
@@ -144,11 +144,11 @@ DL_IMPORT(void) _PyObject_DebugMallocStats(void);
  */
 
 /* Functions */
-extern DL_IMPORT(PyObject *) PyObject_Init(PyObject *, PyTypeObject *);
-extern DL_IMPORT(PyVarObject *) PyObject_InitVar(PyVarObject *,
+PyAPI_FUNC(PyObject *) PyObject_Init(PyObject *, PyTypeObject *);
+PyAPI_FUNC(PyVarObject *) PyObject_InitVar(PyVarObject *,
                                                  PyTypeObject *, int);
-extern DL_IMPORT(PyObject *) _PyObject_New(PyTypeObject *);
-extern DL_IMPORT(PyVarObject *) _PyObject_NewVar(PyTypeObject *, int);
+PyAPI_FUNC(PyObject *) _PyObject_New(PyTypeObject *);
+PyAPI_FUNC(PyVarObject *) _PyObject_NewVar(PyTypeObject *, int);
 
 #define PyObject_New(type, typeobj) \
 		( (type *) _PyObject_New(typeobj) )
@@ -226,11 +226,10 @@ extern DL_IMPORT(PyVarObject *) _PyObject_NewVar(PyTypeObject *, int);
 /*
  * Garbage Collection Support
  * ==========================
- *
- * Some of the functions and macros below are always defined; when
- * WITH_CYCLE_GC is undefined, they simply don't do anything different
- * than their non-GC counterparts.
  */
+
+/* C equivalent of gc.collect(). */
+long PyGC_Collect(void);
 
 /* Test if a type has a GC head */
 #define PyType_IS_GC(t) PyType_HasFeature((t), Py_TPFLAGS_HAVE_GC)
@@ -239,14 +238,12 @@ extern DL_IMPORT(PyVarObject *) _PyObject_NewVar(PyTypeObject *, int);
 #define PyObject_IS_GC(o) (PyType_IS_GC((o)->ob_type) && \
 	((o)->ob_type->tp_is_gc == NULL || (o)->ob_type->tp_is_gc(o)))
 
-extern DL_IMPORT(PyVarObject *) _PyObject_GC_Resize(PyVarObject *, int);
+PyAPI_FUNC(PyVarObject *) _PyObject_GC_Resize(PyVarObject *, int);
 #define PyObject_GC_Resize(type, op, n) \
 		( (type *) _PyObject_GC_Resize((PyVarObject *)(op), (n)) )
 
 /* for source compatibility with 2.2 */
 #define _PyObject_GC_Del PyObject_GC_Del
-
-#ifdef WITH_CYCLE_GC
 
 /* GC information is stored BEFORE the object structure. */
 typedef union _gc_head {
@@ -292,31 +289,18 @@ extern PyGC_Head *_PyGC_generation0;
 	g->gc.gc_next = NULL; \
     } while (0);
 
-extern DL_IMPORT(PyObject *) _PyObject_GC_Malloc(size_t);
-extern DL_IMPORT(PyObject *) _PyObject_GC_New(PyTypeObject *);
-extern DL_IMPORT(PyVarObject *) _PyObject_GC_NewVar(PyTypeObject *, int);
-extern DL_IMPORT(void) PyObject_GC_Track(void *);
-extern DL_IMPORT(void) PyObject_GC_UnTrack(void *);
-extern DL_IMPORT(void) PyObject_GC_Del(void *);
+PyAPI_FUNC(PyObject *) _PyObject_GC_Malloc(size_t);
+PyAPI_FUNC(PyObject *) _PyObject_GC_New(PyTypeObject *);
+PyAPI_FUNC(PyVarObject *) _PyObject_GC_NewVar(PyTypeObject *, int);
+PyAPI_FUNC(void) PyObject_GC_Track(void *);
+PyAPI_FUNC(void) PyObject_GC_UnTrack(void *);
+PyAPI_FUNC(void) PyObject_GC_Del(void *);
 
 #define PyObject_GC_New(type, typeobj) \
 		( (type *) _PyObject_GC_New(typeobj) )
 #define PyObject_GC_NewVar(type, typeobj, n) \
 		( (type *) _PyObject_GC_NewVar((typeobj), (n)) )
 
-
-#else /* !WITH_CYCLE_GC */
-
-#define _PyObject_GC_Malloc	PyObject_Malloc
-#define PyObject_GC_New		PyObject_New
-#define PyObject_GC_NewVar	PyObject_NewVar
-#define PyObject_GC_Del		PyObject_Del
-#define _PyObject_GC_TRACK(op)
-#define _PyObject_GC_UNTRACK(op)
-#define PyObject_GC_Track(op)
-#define PyObject_GC_UnTrack(op)
-
-#endif
 
 /* This is here for the sake of backwards compatibility.  Extensions that
  * use the old GC API will still compile but the objects will not be

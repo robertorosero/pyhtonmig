@@ -124,15 +124,24 @@ weakref_repr(PyWeakReference *self)
 {
     char buffer[256];
     if (PyWeakref_GET_OBJECT(self) == Py_None) {
-        PyOS_snprintf(buffer, sizeof(buffer), "<weakref at %lx; dead>",
-		      (long)(self));
+        PyOS_snprintf(buffer, sizeof(buffer), "<weakref at %p; dead>", self);
     }
     else {
+	char *name = NULL;
+	PyObject *nameobj = PyObject_GetAttrString(PyWeakref_GET_OBJECT(self),
+						   "__name__");
+	if (nameobj == NULL)
+		PyErr_Clear();
+	else if (PyString_Check(nameobj))
+		name = PyString_AS_STRING(nameobj);
         PyOS_snprintf(buffer, sizeof(buffer),
-		      "<weakref at %#lx; to '%.50s' at %#lx>",
-		      (long)(self),
+		      name ? "<weakref at %p; to '%.50s' at %p (%s)>"
+		           : "<weakref at %p; to '%.50s' at %p>",
+		      self,
 		      PyWeakref_GET_OBJECT(self)->ob_type->tp_name,
-		      (long)(PyWeakref_GET_OBJECT(self)));
+		      PyWeakref_GET_OBJECT(self),
+		      name);
+	Py_XDECREF(nameobj);
     }
     return PyString_FromString(buffer);
 }
@@ -268,7 +277,7 @@ proxy_repr(PyWeakReference *proxy)
 {
     char buf[160];
     PyOS_snprintf(buf, sizeof(buf),
-		  "<weakref at %p to %.100s at %p>", proxy,
+		  "<weakproxy at %p to %.100s at %p>", proxy,
 		  PyWeakref_GET_OBJECT(proxy)->ob_type->tp_name,
 		  PyWeakref_GET_OBJECT(proxy));
     return PyString_FromString(buf);
@@ -383,6 +392,24 @@ proxy_setitem(PyWeakReference *proxy, PyObject *key, PyObject *value)
     return PyObject_SetItem(PyWeakref_GET_OBJECT(proxy), key, value);
 }
 
+/* iterator slots */
+
+static PyObject *
+proxy_iter(PyWeakReference *proxy)
+{
+    if (!proxy_checkref(proxy))
+        return NULL;
+    return PyObject_GetIter(PyWeakref_GET_OBJECT(proxy));
+}
+
+static PyObject *
+proxy_iternext(PyWeakReference *proxy)
+{
+    if (!proxy_checkref(proxy))
+        return NULL;
+    return PyIter_Next(PyWeakref_GET_OBJECT(proxy));
+}
+
 
 static PyNumberMethods proxy_as_number = {
     (binaryfunc)proxy_add,      /*nb_add*/
@@ -447,26 +474,30 @@ _PyWeakref_ProxyType = {
     sizeof(PyWeakReference),
     0,
     /* methods */
-    (destructor)weakref_dealloc,/*tp_dealloc*/
-    (printfunc)proxy_print,     /*tp_print*/
-    0,				/*tp_getattr*/
-    0, 				/*tp_setattr*/
-    proxy_compare,		/*tp_compare*/
-    (unaryfunc)proxy_repr,	/*tp_repr*/
-    &proxy_as_number,		/*tp_as_number*/
-    &proxy_as_sequence,		/*tp_as_sequence*/
-    &proxy_as_mapping,		/*tp_as_mapping*/
-    0,	                        /*tp_hash*/
-    (ternaryfunc)0,	        /*tp_call*/
-    (unaryfunc)proxy_str,	/*tp_str*/
-    (getattrofunc)proxy_getattr,/*tp_getattro*/
-    (setattrofunc)proxy_setattr,/*tp_setattro*/
-    0,				/*tp_as_buffer*/
+    (destructor)weakref_dealloc,        /* tp_dealloc */
+    (printfunc)proxy_print,             /* tp_print */
+    0,				        /* tp_getattr */
+    0, 				        /* tp_setattr */
+    proxy_compare,		        /* tp_compare */
+    (unaryfunc)proxy_repr,	        /* tp_repr */
+    &proxy_as_number,		        /* tp_as_number */
+    &proxy_as_sequence,		        /* tp_as_sequence */
+    &proxy_as_mapping,		        /* tp_as_mapping */
+    0,	                                /* tp_hash */
+    (ternaryfunc)0,	                /* tp_call */
+    (unaryfunc)proxy_str,	        /* tp_str */
+    (getattrofunc)proxy_getattr,        /* tp_getattro */
+    (setattrofunc)proxy_setattr,        /* tp_setattro */
+    0,				        /* tp_as_buffer */
     Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC
-    |Py_TPFLAGS_CHECKTYPES,     /*tp_flags*/
-    0,                          /*tp_doc*/
-    (traverseproc)gc_traverse,  /*tp_traverse*/
-    (inquiry)gc_clear,          /*tp_clear*/
+    | Py_TPFLAGS_CHECKTYPES,            /* tp_flags */
+    0,                                  /* tp_doc */
+    (traverseproc)gc_traverse,          /* tp_traverse */
+    (inquiry)gc_clear,                  /* tp_clear */
+    0,                                  /* tp_richcompare */
+    0,                                  /* tp_weaklistoffset */
+    (getiterfunc)proxy_iter,            /* tp_iter */
+    (iternextfunc)proxy_iternext,       /* tp_iternext */
 };
 
 
@@ -478,26 +509,30 @@ _PyWeakref_CallableProxyType = {
     sizeof(PyWeakReference),
     0,
     /* methods */
-    (destructor)weakref_dealloc,/*tp_dealloc*/
-    (printfunc)proxy_print,     /*tp_print*/
-    0,				/*tp_getattr*/
-    0, 				/*tp_setattr*/
-    proxy_compare,		/*tp_compare*/
-    (unaryfunc)proxy_repr,	/*tp_repr*/
-    &proxy_as_number,		/*tp_as_number*/
-    &proxy_as_sequence,		/*tp_as_sequence*/
-    &proxy_as_mapping,		/*tp_as_mapping*/
-    0,	                        /*tp_hash*/
-    (ternaryfunc)proxy_call,	/*tp_call*/
-    (unaryfunc)proxy_str,	/*tp_str*/
-    (getattrofunc)proxy_getattr,/*tp_getattro*/
-    (setattrofunc)proxy_setattr,/*tp_setattro*/
-    0,				/*tp_as_buffer*/
+    (destructor)weakref_dealloc,        /* tp_dealloc */
+    (printfunc)proxy_print,             /* tp_print */
+    0,				        /* tp_getattr */
+    0, 				        /* tp_setattr */
+    proxy_compare,		        /* tp_compare */
+    (unaryfunc)proxy_repr,	        /* tp_repr */
+    &proxy_as_number,		        /* tp_as_number */
+    &proxy_as_sequence,		        /* tp_as_sequence */
+    &proxy_as_mapping,		        /* tp_as_mapping */
+    0,	                                /* tp_hash */
+    (ternaryfunc)proxy_call,	        /* tp_call */
+    (unaryfunc)proxy_str,	        /* tp_str */
+    (getattrofunc)proxy_getattr,        /* tp_getattro */
+    (setattrofunc)proxy_setattr,        /* tp_setattro */
+    0,				        /* tp_as_buffer */
     Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC
-    |Py_TPFLAGS_CHECKTYPES,     /*tp_flags*/
-    0,                          /*tp_doc*/
-    (traverseproc)gc_traverse,  /*tp_traverse*/
-    (inquiry)gc_clear,          /*tp_clear*/
+    | Py_TPFLAGS_CHECKTYPES,            /* tp_flags */
+    0,                                  /* tp_doc */
+    (traverseproc)gc_traverse,          /* tp_traverse */
+    (inquiry)gc_clear,                  /* tp_clear */
+    0,                                  /* tp_richcompare */
+    0,                                  /* tp_weaklistoffset */
+    (getiterfunc)proxy_iter,            /* tp_iter */
+    (iternextfunc)proxy_iternext,       /* tp_iternext */
 };
 
 

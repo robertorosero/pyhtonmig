@@ -62,7 +62,7 @@ Assert statements\stindex{assert} are a convenient way to insert
 debugging assertions\indexii{debugging}{assertions} into a program:
 
 \begin{productionlist}
-  \production{assert_statement}
+  \production{assert_stmt}
              {"assert" \token{expression} ["," \token{expression}]}
 \end{productionlist}
 
@@ -533,7 +533,7 @@ first two objects are used to determine the \emph{type} and
 \emph{value} of the exception.
 
 If the first object is an instance, the type of the exception is the
-class of the instance, the instance itself if the value, and the
+class of the instance, the instance itself is the value, and the
 second object must be \code{None}.
 
 If the first object is a class, it becomes the type of the exception.
@@ -559,6 +559,9 @@ re-raise an exception transparently in an except clause, but
 exception to be re-raised was the most recently active exception in
 the current scope.
 
+Additional information on exceptions can be found in
+section~\ref{exceptions}, and information about handling exceptions is
+in section~\ref{try}.
 
 
 \section{The \keyword{break} statement \label{break}}
@@ -635,9 +638,15 @@ identifier in the list.  The form with \keyword{from} performs step
 \indexii{importing}{module}
 \indexii{name}{binding}
 \kwindex{from}
-% XXX Need to define what ``initialize'' means here
 
-The system maintains a table of modules that have been initialized,
+In this context, to ``initialize'' a built-in or extension module means to
+call an initialization function that the module must provide for the purpose
+(in the reference implementation, the function's name is obtained by
+prepending string ``init'' to the module's name); to ``initialize'' a
+Python-coded module means to execute the module's body.
+  
+The system maintains a table of modules that have been or are being
+initialized,
 indexed by module name.  This table is
 accessible as \code{sys.modules}.  When a module name is found in
 this table, step (1) is finished.  If not, a search for a module
@@ -675,11 +684,7 @@ The first form of \keyword{import} statement binds the module name in
 the local namespace to the module object, and then goes on to import
 the next identifier, if any.  If the module name is followed by
 \keyword{as}, the name following \keyword{as} is used as the local
-name for the module. To avoid confusion, you cannot import modules
-with dotted names \keyword{as} a different local name. So \code{import
-module as m} is legal, but \code{import module.submod as s} is not.
-The latter should be written as \code{from module import submod as s};
-see below.
+name for the module. 
 
 The \keyword{from} form does not bind the module name: it goes through the
 list of identifiers, looks each one of them up in the module found in step
@@ -699,7 +704,11 @@ imported by that module.  The names given in \code{__all__} are all
 considered public and are required to exist.  If \code{__all__} is not
 defined, the set of public names includes all names found in the
 module's namespace which do not begin with an underscore character
-(\character{_}).
+(\character{_}).  \code{__all__} should contain the entire public API.
+It is intended to avoid accidentally exporting items that are not part
+of the API (such as library modules which were imported and used within
+the module).
+\withsubitem{(optional module attribute)}{\ttindex{__all__}}
 
 The \keyword{from} form with \samp{*} may only occur in a module
 scope.  If the wild card form of import --- \samp{import *} --- is

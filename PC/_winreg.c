@@ -258,7 +258,7 @@ PyDoc_STRVAR(SetValueEx_doc,
 "SetValueEx(key, value_name, reserved, type, value) - Stores data in the value field of an open registry key.\n"
 "\n"
 "key is an already open key, or any one of the predefined HKEY_* constants.\n"
-"sub_key is a string that names the subkey with which the value is associated.\n"
+"value_name is a string containing the name of the value to set, or None\n"
 "type is an integer that specifies the type of the data.  This should be one of:\n"
 "  REG_BINARY -- Binary data in any form.\n"
 "  REG_DWORD -- A 32-bit number.\n"
@@ -606,7 +606,7 @@ PyHKEY_FromHKEY(HKEY h)
 {
 	PyHKEYObject *op;
 
-	/* PyObject_New is inlined */
+	/* Inline PyObject_New */
 	op = (PyHKEYObject *) PyObject_MALLOC(sizeof(PyHKEYObject));
 	if (op == NULL)
 		return PyErr_NoMemory();
@@ -1315,7 +1315,7 @@ PySetValue(PyObject *self, PyObject *args)
 		return NULL;
 	if (typ != REG_SZ) {
 		PyErr_SetString(PyExc_TypeError,
-				"Type must be win32con.REG_SZ");
+				"Type must be _winreg.REG_SZ");
 		return NULL;
 	}
 	/* XXX - need Unicode support */
@@ -1423,7 +1423,7 @@ inskey(PyObject * d, char * name, HKEY key)
 
 #define ADD_KEY(val) inskey(d, #val, val)
 
-__declspec(dllexport) void init_winreg(void)
+PyMODINIT_FUNC init_winreg(void)
 {
 	PyObject *m, *d;
 	m = Py_InitModule3("_winreg", winreg_methods, module_doc);

@@ -23,6 +23,9 @@
 #include <WASTE.h>
 #include <WEObjectHandlers.h>
 #include <WETabs.h>
+#ifndef PyDoc_STR
+#define PyDoc_STR(x) (x)
+#endif
 
 /* Exported by Qdmodule.c: */
 extern PyObject *QdRGB_New(RGBColor *);
@@ -33,25 +36,22 @@ extern PyObject *AEDesc_New(AppleEvent *);
 extern int AEDesc_Convert(PyObject *, AppleEvent *);
 
 /* Forward declaration */
-staticforward PyObject *WEOObj_New(WEObjectReference);
-staticforward PyObject *ExistingwasteObj_New(WEReference);
+static PyObject *WEOObj_New(WEObjectReference);
+static PyObject *ExistingwasteObj_New(WEReference);
 
 /*
 ** Parse/generate TextStyle records
 */
-static
-PyObject *TextStyle_New(itself)
-	TextStylePtr itself;
+static PyObject *
+TextStyle_New(TextStylePtr itself)
 {
 
 	return Py_BuildValue("lllO&", (long)itself->tsFont, (long)itself->tsFace, (long)itself->tsSize, QdRGB_New,
 				&itself->tsColor);
 }
 
-static
-TextStyle_Convert(v, p_itself)
-	PyObject *v;
-	TextStylePtr p_itself;
+static int
+TextStyle_Convert(PyObject *v, TextStylePtr p_itself)
 {
 	long font, face, size;
 	
@@ -66,9 +66,8 @@ TextStyle_Convert(v, p_itself)
 /*
 ** Parse/generate RunInfo records
 */
-static
-PyObject *RunInfo_New(itself)
-	WERunInfo *itself;
+static PyObject *
+RunInfo_New(WERunInfo *itself)
 {
 
 	return Py_BuildValue("llhhO&O&", itself->runStart, itself->runEnd, itself->runHeight,
@@ -88,7 +87,7 @@ LongRect_New(LongRect *r)
 	return Py_BuildValue("(llll)", r->left, r->top, r->right, r->bottom);
 }
 
-
+int
 LongPt_Convert(PyObject *v, LongPt *p)
 {
 	return PyArg_Parse(v, "(ll)", &p->h, &p->v);
@@ -147,8 +146,12 @@ my_new_handler(Point *objectSize, WEObjectReference objref)
 		if (!PyMac_GetPoint(rv, objectSize) )
 			err = errAECoercionFail;
 	}
-	if ( args ) Py_DECREF(args);
-	if ( rv ) Py_DECREF(rv);
+	if ( args ) {
+		Py_DECREF(args);
+	}
+	if ( rv ) {
+		Py_DECREF(rv);
+	}
 	return err;
 }
 
@@ -160,8 +163,12 @@ my_dispose_handler(WEObjectReference objref)
 	
 	args=Py_BuildValue("(O&)", WEOObj_New, objref);
 	err = any_handler(weDisposeHandler, objref, args, &rv);
-	if ( args ) Py_DECREF(args);
-	if ( rv ) Py_DECREF(rv);
+	if ( args ) {
+		Py_DECREF(args);
+	}
+	if ( rv ) {
+		Py_DECREF(rv);
+	}
 	return err;
 }
 
@@ -173,8 +180,12 @@ my_draw_handler(const Rect *destRect, WEObjectReference objref)
 	
 	args=Py_BuildValue("O&O&", PyMac_BuildRect, destRect, WEOObj_New, objref);
 	err = any_handler(weDrawHandler, objref, args, &rv);
-	if ( args ) Py_DECREF(args);
-	if ( rv ) Py_DECREF(rv);
+	if ( args ) {
+		Py_DECREF(args);
+	}
+	if ( rv ) {
+		Py_DECREF(rv);
+	}
 	return err;
 }
 
@@ -193,8 +204,12 @@ my_click_handler(Point hitPt, EventModifiers modifiers,
 		retvalue = PyInt_AsLong(rv);
 	else
 		retvalue = 0;
-	if ( args ) Py_DECREF(args);
-	if ( rv ) Py_DECREF(rv);
+	if ( args ) {
+		Py_DECREF(args);
+	}
+	if ( rv ) {
+		Py_DECREF(rv);
+	}
 	return retvalue;
 }
 		
@@ -206,7 +221,7 @@ static PyObject *waste_Error;
 
 PyTypeObject WEO_Type;
 
-#define WEOObj_Check(x) ((x)->ob_type == &WEO_Type)
+#define WEOObj_Check(x) ((x)->ob_type == &WEO_Type || PyObject_TypeCheck((x), &WEO_Type))
 
 typedef struct WEOObject {
 	PyObject_HEAD
@@ -239,7 +254,7 @@ int WEOObj_Convert(PyObject *v, WEObjectReference *p_itself)
 static void WEOObj_dealloc(WEOObject *self)
 {
 	/* Cleanup of self->ob_itself goes here */
-	PyObject_Del(self);
+	self->ob_type->tp_free((PyObject *)self);
 }
 
 static PyObject *WEOObj_WEGetObjectType(WEOObject *_self, PyObject *_args)
@@ -361,40 +376,52 @@ static PyObject *WEOObj_WESetObjectRefCon(WEOObject *_self, PyObject *_args)
 
 static PyMethodDef WEOObj_methods[] = {
 	{"WEGetObjectType", (PyCFunction)WEOObj_WEGetObjectType, 1,
-	 "() -> (FlavorType _rv)"},
+	 PyDoc_STR("() -> (FlavorType _rv)")},
 	{"WEGetObjectDataHandle", (PyCFunction)WEOObj_WEGetObjectDataHandle, 1,
-	 "() -> (Handle _rv)"},
+	 PyDoc_STR("() -> (Handle _rv)")},
 	{"WEGetObjectOwner", (PyCFunction)WEOObj_WEGetObjectOwner, 1,
-	 "() -> (WEReference _rv)"},
+	 PyDoc_STR("() -> (WEReference _rv)")},
 	{"WEGetObjectOffset", (PyCFunction)WEOObj_WEGetObjectOffset, 1,
-	 "() -> (SInt32 _rv)"},
+	 PyDoc_STR("() -> (SInt32 _rv)")},
 	{"WEGetObjectSize", (PyCFunction)WEOObj_WEGetObjectSize, 1,
-	 "() -> (Point _rv)"},
+	 PyDoc_STR("() -> (Point _rv)")},
 	{"WESetObjectSize", (PyCFunction)WEOObj_WESetObjectSize, 1,
-	 "(Point inObjectSize) -> None"},
+	 PyDoc_STR("(Point inObjectSize) -> None")},
 	{"WEGetObjectFrame", (PyCFunction)WEOObj_WEGetObjectFrame, 1,
-	 "() -> (LongRect outObjectFrame)"},
+	 PyDoc_STR("() -> (LongRect outObjectFrame)")},
 	{"WEGetObjectRefCon", (PyCFunction)WEOObj_WEGetObjectRefCon, 1,
-	 "() -> (SInt32 _rv)"},
+	 PyDoc_STR("() -> (SInt32 _rv)")},
 	{"WESetObjectRefCon", (PyCFunction)WEOObj_WESetObjectRefCon, 1,
-	 "(SInt32 inRefCon) -> None"},
+	 PyDoc_STR("(SInt32 inRefCon) -> None")},
 	{NULL, NULL, 0}
 };
 
-PyMethodChain WEOObj_chain = { WEOObj_methods, NULL };
+#define WEOObj_getsetlist NULL
 
-static PyObject *WEOObj_getattr(WEOObject *self, char *name)
-{
-	return Py_FindMethodInChain(&WEOObj_chain, (PyObject *)self, name);
-}
-
-#define WEOObj_setattr NULL
 
 #define WEOObj_compare NULL
 
 #define WEOObj_repr NULL
 
 #define WEOObj_hash NULL
+#define WEOObj_tp_init 0
+
+#define WEOObj_tp_alloc PyType_GenericAlloc
+
+static PyObject *WEOObj_tp_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
+{
+	PyObject *self;
+	WEObjectReference itself;
+	char *kw[] = {"itself", 0};
+
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "O&", kw, WEOObj_Convert, &itself)) return NULL;
+	if ((self = type->tp_alloc(type, 0)) == NULL) return NULL;
+	((WEOObject *)self)->ob_itself = itself;
+	return self;
+}
+
+#define WEOObj_tp_free PyObject_Del
+
 
 PyTypeObject WEO_Type = {
 	PyObject_HEAD_INIT(NULL)
@@ -405,14 +432,39 @@ PyTypeObject WEO_Type = {
 	/* methods */
 	(destructor) WEOObj_dealloc, /*tp_dealloc*/
 	0, /*tp_print*/
-	(getattrfunc) WEOObj_getattr, /*tp_getattr*/
-	(setattrfunc) WEOObj_setattr, /*tp_setattr*/
+	(getattrfunc)0, /*tp_getattr*/
+	(setattrfunc)0, /*tp_setattr*/
 	(cmpfunc) WEOObj_compare, /*tp_compare*/
 	(reprfunc) WEOObj_repr, /*tp_repr*/
 	(PyNumberMethods *)0, /* tp_as_number */
 	(PySequenceMethods *)0, /* tp_as_sequence */
 	(PyMappingMethods *)0, /* tp_as_mapping */
 	(hashfunc) WEOObj_hash, /*tp_hash*/
+	0, /*tp_call*/
+	0, /*tp_str*/
+	PyObject_GenericGetAttr, /*tp_getattro*/
+	PyObject_GenericSetAttr, /*tp_setattro */
+	0, /*tp_as_buffer*/
+	Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE, /* tp_flags */
+	0, /*tp_doc*/
+	0, /*tp_traverse*/
+	0, /*tp_clear*/
+	0, /*tp_richcompare*/
+	0, /*tp_weaklistoffset*/
+	0, /*tp_iter*/
+	0, /*tp_iternext*/
+	WEOObj_methods, /* tp_methods */
+	0, /*tp_members*/
+	WEOObj_getsetlist, /*tp_getset*/
+	0, /*tp_base*/
+	0, /*tp_dict*/
+	0, /*tp_descr_get*/
+	0, /*tp_descr_set*/
+	0, /*tp_dictoffset*/
+	WEOObj_tp_init, /* tp_init */
+	WEOObj_tp_alloc, /* tp_alloc */
+	WEOObj_tp_new, /* tp_new */
+	WEOObj_tp_free, /* tp_free */
 };
 
 /* ---------------------- End object type WEO ----------------------- */
@@ -422,7 +474,7 @@ PyTypeObject WEO_Type = {
 
 PyTypeObject waste_Type;
 
-#define wasteObj_Check(x) ((x)->ob_type == &waste_Type)
+#define wasteObj_Check(x) ((x)->ob_type == &waste_Type || PyObject_TypeCheck((x), &waste_Type))
 
 typedef struct wasteObject {
 	PyObject_HEAD
@@ -456,7 +508,7 @@ int wasteObj_Convert(PyObject *v, WEReference *p_itself)
 static void wasteObj_dealloc(wasteObject *self)
 {
 	WEDispose(self->ob_itself);
-	PyObject_Del(self);
+	self->ob_type->tp_free((PyObject *)self);
 }
 
 static PyObject *wasteObj_WEGetText(wasteObject *_self, PyObject *_args)
@@ -1913,200 +1965,212 @@ static PyObject *wasteObj_WESetTabSize(wasteObject *_self, PyObject *_args)
 
 static PyMethodDef wasteObj_methods[] = {
 	{"WEGetText", (PyCFunction)wasteObj_WEGetText, 1,
-	 "() -> (Handle _rv)"},
+	 PyDoc_STR("() -> (Handle _rv)")},
 	{"WEGetChar", (PyCFunction)wasteObj_WEGetChar, 1,
-	 "(SInt32 inOffset) -> (SInt16 _rv)"},
+	 PyDoc_STR("(SInt32 inOffset) -> (SInt16 _rv)")},
 	{"WEGetTextLength", (PyCFunction)wasteObj_WEGetTextLength, 1,
-	 "() -> (SInt32 _rv)"},
+	 PyDoc_STR("() -> (SInt32 _rv)")},
 	{"WEGetSelection", (PyCFunction)wasteObj_WEGetSelection, 1,
-	 "() -> (SInt32 outSelStart, SInt32 outSelEnd)"},
+	 PyDoc_STR("() -> (SInt32 outSelStart, SInt32 outSelEnd)")},
 	{"WEGetDestRect", (PyCFunction)wasteObj_WEGetDestRect, 1,
-	 "() -> (LongRect outDestRect)"},
+	 PyDoc_STR("() -> (LongRect outDestRect)")},
 	{"WEGetViewRect", (PyCFunction)wasteObj_WEGetViewRect, 1,
-	 "() -> (LongRect outViewRect)"},
+	 PyDoc_STR("() -> (LongRect outViewRect)")},
 	{"WEIsActive", (PyCFunction)wasteObj_WEIsActive, 1,
-	 "() -> (Boolean _rv)"},
+	 PyDoc_STR("() -> (Boolean _rv)")},
 	{"WEGetClickCount", (PyCFunction)wasteObj_WEGetClickCount, 1,
-	 "() -> (UInt16 _rv)"},
+	 PyDoc_STR("() -> (UInt16 _rv)")},
 	{"WESetSelection", (PyCFunction)wasteObj_WESetSelection, 1,
-	 "(SInt32 inSelStart, SInt32 inSelEnd) -> None"},
+	 PyDoc_STR("(SInt32 inSelStart, SInt32 inSelEnd) -> None")},
 	{"WESetDestRect", (PyCFunction)wasteObj_WESetDestRect, 1,
-	 "(LongRect inDestRect) -> None"},
+	 PyDoc_STR("(LongRect inDestRect) -> None")},
 	{"WESetViewRect", (PyCFunction)wasteObj_WESetViewRect, 1,
-	 "(LongRect inViewRect) -> None"},
+	 PyDoc_STR("(LongRect inViewRect) -> None")},
 	{"WEContinuousStyle", (PyCFunction)wasteObj_WEContinuousStyle, 1,
-	 "(WEStyleMode ioMode) -> (Boolean _rv, WEStyleMode ioMode, TextStyle outTextStyle)"},
+	 PyDoc_STR("(WEStyleMode ioMode) -> (Boolean _rv, WEStyleMode ioMode, TextStyle outTextStyle)")},
 	{"WECountRuns", (PyCFunction)wasteObj_WECountRuns, 1,
-	 "() -> (SInt32 _rv)"},
+	 PyDoc_STR("() -> (SInt32 _rv)")},
 	{"WEOffsetToRun", (PyCFunction)wasteObj_WEOffsetToRun, 1,
-	 "(SInt32 inOffset) -> (SInt32 _rv)"},
+	 PyDoc_STR("(SInt32 inOffset) -> (SInt32 _rv)")},
 	{"WEGetRunRange", (PyCFunction)wasteObj_WEGetRunRange, 1,
-	 "(SInt32 inStyleRunIndex) -> (SInt32 outStyleRunStart, SInt32 outStyleRunEnd)"},
+	 PyDoc_STR("(SInt32 inStyleRunIndex) -> (SInt32 outStyleRunStart, SInt32 outStyleRunEnd)")},
 	{"WEGetRunInfo", (PyCFunction)wasteObj_WEGetRunInfo, 1,
-	 "(SInt32 inOffset) -> (WERunInfo outStyleRunInfo)"},
+	 PyDoc_STR("(SInt32 inOffset) -> (WERunInfo outStyleRunInfo)")},
 	{"WEGetIndRunInfo", (PyCFunction)wasteObj_WEGetIndRunInfo, 1,
-	 "(SInt32 inStyleRunIndex) -> (WERunInfo outStyleRunInfo)"},
+	 PyDoc_STR("(SInt32 inStyleRunIndex) -> (WERunInfo outStyleRunInfo)")},
 	{"WEGetRunDirection", (PyCFunction)wasteObj_WEGetRunDirection, 1,
-	 "(SInt32 inOffset) -> (Boolean _rv)"},
+	 PyDoc_STR("(SInt32 inOffset) -> (Boolean _rv)")},
 	{"WECountParaRuns", (PyCFunction)wasteObj_WECountParaRuns, 1,
-	 "() -> (SInt32 _rv)"},
+	 PyDoc_STR("() -> (SInt32 _rv)")},
 	{"WEOffsetToParaRun", (PyCFunction)wasteObj_WEOffsetToParaRun, 1,
-	 "(SInt32 inOffset) -> (SInt32 _rv)"},
+	 PyDoc_STR("(SInt32 inOffset) -> (SInt32 _rv)")},
 	{"WEGetParaRunRange", (PyCFunction)wasteObj_WEGetParaRunRange, 1,
-	 "(SInt32 inParagraphRunIndex) -> (SInt32 outParagraphRunStart, SInt32 outParagraphRunEnd)"},
+	 PyDoc_STR("(SInt32 inParagraphRunIndex) -> (SInt32 outParagraphRunStart, SInt32 outParagraphRunEnd)")},
 	{"WECountLines", (PyCFunction)wasteObj_WECountLines, 1,
-	 "() -> (SInt32 _rv)"},
+	 PyDoc_STR("() -> (SInt32 _rv)")},
 	{"WEOffsetToLine", (PyCFunction)wasteObj_WEOffsetToLine, 1,
-	 "(SInt32 inOffset) -> (SInt32 _rv)"},
+	 PyDoc_STR("(SInt32 inOffset) -> (SInt32 _rv)")},
 	{"WEGetLineRange", (PyCFunction)wasteObj_WEGetLineRange, 1,
-	 "(SInt32 inLineIndex) -> (SInt32 outLineStart, SInt32 outLineEnd)"},
+	 PyDoc_STR("(SInt32 inLineIndex) -> (SInt32 outLineStart, SInt32 outLineEnd)")},
 	{"WEGetHeight", (PyCFunction)wasteObj_WEGetHeight, 1,
-	 "(SInt32 inStartLineIndex, SInt32 inEndLineIndex) -> (SInt32 _rv)"},
+	 PyDoc_STR("(SInt32 inStartLineIndex, SInt32 inEndLineIndex) -> (SInt32 _rv)")},
 	{"WEGetOffset", (PyCFunction)wasteObj_WEGetOffset, 1,
-	 "(LongPt inPoint) -> (SInt32 _rv, WEEdge outEdge)"},
+	 PyDoc_STR("(LongPt inPoint) -> (SInt32 _rv, WEEdge outEdge)")},
 	{"WEGetPoint", (PyCFunction)wasteObj_WEGetPoint, 1,
-	 "(SInt32 inOffset, SInt16 inDirection) -> (LongPt outPoint, SInt16 outLineHeight)"},
+	 PyDoc_STR("(SInt32 inOffset, SInt16 inDirection) -> (LongPt outPoint, SInt16 outLineHeight)")},
 	{"WEFindWord", (PyCFunction)wasteObj_WEFindWord, 1,
-	 "(SInt32 inOffset, WEEdge inEdge) -> (SInt32 outWordStart, SInt32 outWordEnd)"},
+	 PyDoc_STR("(SInt32 inOffset, WEEdge inEdge) -> (SInt32 outWordStart, SInt32 outWordEnd)")},
 	{"WEFindLine", (PyCFunction)wasteObj_WEFindLine, 1,
-	 "(SInt32 inOffset, WEEdge inEdge) -> (SInt32 outLineStart, SInt32 outLineEnd)"},
+	 PyDoc_STR("(SInt32 inOffset, WEEdge inEdge) -> (SInt32 outLineStart, SInt32 outLineEnd)")},
 	{"WEFindParagraph", (PyCFunction)wasteObj_WEFindParagraph, 1,
-	 "(SInt32 inOffset, WEEdge inEdge) -> (SInt32 outParagraphStart, SInt32 outParagraphEnd)"},
+	 PyDoc_STR("(SInt32 inOffset, WEEdge inEdge) -> (SInt32 outParagraphStart, SInt32 outParagraphEnd)")},
 	{"WEFind", (PyCFunction)wasteObj_WEFind, 1,
-	 "(char* inKey, SInt32 inKeyLength, TextEncoding inKeyEncoding, OptionBits inMatchOptions, SInt32 inRangeStart, SInt32 inRangeEnd) -> (SInt32 outMatchStart, SInt32 outMatchEnd)"},
+	 PyDoc_STR("(char* inKey, SInt32 inKeyLength, TextEncoding inKeyEncoding, OptionBits inMatchOptions, SInt32 inRangeStart, SInt32 inRangeEnd) -> (SInt32 outMatchStart, SInt32 outMatchEnd)")},
 	{"WEStreamRange", (PyCFunction)wasteObj_WEStreamRange, 1,
-	 "(SInt32 inRangeStart, SInt32 inRangeEnd, FlavorType inRequestedType, OptionBits inStreamOptions, Handle outData) -> None"},
+	 PyDoc_STR("(SInt32 inRangeStart, SInt32 inRangeEnd, FlavorType inRequestedType, OptionBits inStreamOptions, Handle outData) -> None")},
 	{"WECopyRange", (PyCFunction)wasteObj_WECopyRange, 1,
-	 "(SInt32 inRangeStart, SInt32 inRangeEnd, Handle outText, StScrpHandle outStyles, WESoupHandle outSoup) -> None"},
+	 PyDoc_STR("(SInt32 inRangeStart, SInt32 inRangeEnd, Handle outText, StScrpHandle outStyles, WESoupHandle outSoup) -> None")},
 	{"WEGetTextRangeAsUnicode", (PyCFunction)wasteObj_WEGetTextRangeAsUnicode, 1,
-	 "(SInt32 inRangeStart, SInt32 inRangeEnd, Handle outUnicodeText, Handle ioCharFormat, Handle ioParaFormat, TextEncodingVariant inUnicodeVariant, TextEncodingFormat inTransformationFormat, OptionBits inGetOptions) -> None"},
+	 PyDoc_STR("(SInt32 inRangeStart, SInt32 inRangeEnd, Handle outUnicodeText, Handle ioCharFormat, Handle ioParaFormat, TextEncodingVariant inUnicodeVariant, TextEncodingFormat inTransformationFormat, OptionBits inGetOptions) -> None")},
 	{"WEGetAlignment", (PyCFunction)wasteObj_WEGetAlignment, 1,
-	 "() -> (WEAlignment _rv)"},
+	 PyDoc_STR("() -> (WEAlignment _rv)")},
 	{"WESetAlignment", (PyCFunction)wasteObj_WESetAlignment, 1,
-	 "(WEAlignment inAlignment) -> None"},
+	 PyDoc_STR("(WEAlignment inAlignment) -> None")},
 	{"WEGetDirection", (PyCFunction)wasteObj_WEGetDirection, 1,
-	 "() -> (WEDirection _rv)"},
+	 PyDoc_STR("() -> (WEDirection _rv)")},
 	{"WESetDirection", (PyCFunction)wasteObj_WESetDirection, 1,
-	 "(WEDirection inDirection) -> None"},
+	 PyDoc_STR("(WEDirection inDirection) -> None")},
 	{"WECalText", (PyCFunction)wasteObj_WECalText, 1,
-	 "() -> None"},
+	 PyDoc_STR("() -> None")},
 	{"WEUpdate", (PyCFunction)wasteObj_WEUpdate, 1,
-	 "(RgnHandle inUpdateRgn) -> None"},
+	 PyDoc_STR("(RgnHandle inUpdateRgn) -> None")},
 	{"WEScroll", (PyCFunction)wasteObj_WEScroll, 1,
-	 "(SInt32 inHorizontalOffset, SInt32 inVerticalOffset) -> None"},
+	 PyDoc_STR("(SInt32 inHorizontalOffset, SInt32 inVerticalOffset) -> None")},
 	{"WEPinScroll", (PyCFunction)wasteObj_WEPinScroll, 1,
-	 "(SInt32 inHorizontalOffset, SInt32 inVerticalOffset) -> None"},
+	 PyDoc_STR("(SInt32 inHorizontalOffset, SInt32 inVerticalOffset) -> None")},
 	{"WESelView", (PyCFunction)wasteObj_WESelView, 1,
-	 "() -> None"},
+	 PyDoc_STR("() -> None")},
 	{"WEActivate", (PyCFunction)wasteObj_WEActivate, 1,
-	 "() -> None"},
+	 PyDoc_STR("() -> None")},
 	{"WEDeactivate", (PyCFunction)wasteObj_WEDeactivate, 1,
-	 "() -> None"},
+	 PyDoc_STR("() -> None")},
 	{"WEKey", (PyCFunction)wasteObj_WEKey, 1,
-	 "(CharParameter inKey, EventModifiers inModifiers) -> None"},
+	 PyDoc_STR("(CharParameter inKey, EventModifiers inModifiers) -> None")},
 	{"WEClick", (PyCFunction)wasteObj_WEClick, 1,
-	 "(Point inHitPoint, EventModifiers inModifiers, UInt32 inClickTime) -> None"},
+	 PyDoc_STR("(Point inHitPoint, EventModifiers inModifiers, UInt32 inClickTime) -> None")},
 	{"WEAdjustCursor", (PyCFunction)wasteObj_WEAdjustCursor, 1,
-	 "(Point inMouseLoc, RgnHandle ioMouseRgn) -> (Boolean _rv)"},
+	 PyDoc_STR("(Point inMouseLoc, RgnHandle ioMouseRgn) -> (Boolean _rv)")},
 	{"WEIdle", (PyCFunction)wasteObj_WEIdle, 1,
-	 "() -> (UInt32 outMaxSleep)"},
+	 PyDoc_STR("() -> (UInt32 outMaxSleep)")},
 	{"WEInsert", (PyCFunction)wasteObj_WEInsert, 1,
-	 "(Buffer inTextPtr, StScrpHandle inStyles, WESoupHandle inSoup) -> None"},
+	 PyDoc_STR("(Buffer inTextPtr, StScrpHandle inStyles, WESoupHandle inSoup) -> None")},
 	{"WEInsertFormattedText", (PyCFunction)wasteObj_WEInsertFormattedText, 1,
-	 "(Buffer inTextPtr, StScrpHandle inStyles, WESoupHandle inSoup, Handle inParaFormat, Handle inRulerScrap) -> None"},
+	 PyDoc_STR("(Buffer inTextPtr, StScrpHandle inStyles, WESoupHandle inSoup, Handle inParaFormat, Handle inRulerScrap) -> None")},
 	{"WEDelete", (PyCFunction)wasteObj_WEDelete, 1,
-	 "() -> None"},
+	 PyDoc_STR("() -> None")},
 	{"WEUseText", (PyCFunction)wasteObj_WEUseText, 1,
-	 "(Handle inText) -> None"},
+	 PyDoc_STR("(Handle inText) -> None")},
 	{"WEChangeCase", (PyCFunction)wasteObj_WEChangeCase, 1,
-	 "(SInt16 inCase) -> None"},
+	 PyDoc_STR("(SInt16 inCase) -> None")},
 	{"WESetOneAttribute", (PyCFunction)wasteObj_WESetOneAttribute, 1,
-	 "(SInt32 inRangeStart, SInt32 inRangeEnd, WESelector inAttributeSelector, Buffer inAttributeValue) -> None"},
+	 PyDoc_STR("(SInt32 inRangeStart, SInt32 inRangeEnd, WESelector inAttributeSelector, Buffer inAttributeValue) -> None")},
 	{"WESetStyle", (PyCFunction)wasteObj_WESetStyle, 1,
-	 "(WEStyleMode inMode, TextStyle inTextStyle) -> None"},
+	 PyDoc_STR("(WEStyleMode inMode, TextStyle inTextStyle) -> None")},
 	{"WEUseStyleScrap", (PyCFunction)wasteObj_WEUseStyleScrap, 1,
-	 "(StScrpHandle inStyles) -> None"},
+	 PyDoc_STR("(StScrpHandle inStyles) -> None")},
 	{"WEUndo", (PyCFunction)wasteObj_WEUndo, 1,
-	 "() -> None"},
+	 PyDoc_STR("() -> None")},
 	{"WERedo", (PyCFunction)wasteObj_WERedo, 1,
-	 "() -> None"},
+	 PyDoc_STR("() -> None")},
 	{"WEClearUndo", (PyCFunction)wasteObj_WEClearUndo, 1,
-	 "() -> None"},
+	 PyDoc_STR("() -> None")},
 	{"WEGetUndoInfo", (PyCFunction)wasteObj_WEGetUndoInfo, 1,
-	 "() -> (WEActionKind _rv, Boolean outRedoFlag)"},
+	 PyDoc_STR("() -> (WEActionKind _rv, Boolean outRedoFlag)")},
 	{"WEGetIndUndoInfo", (PyCFunction)wasteObj_WEGetIndUndoInfo, 1,
-	 "(SInt32 inUndoLevel) -> (WEActionKind _rv)"},
+	 PyDoc_STR("(SInt32 inUndoLevel) -> (WEActionKind _rv)")},
 	{"WEIsTyping", (PyCFunction)wasteObj_WEIsTyping, 1,
-	 "() -> (Boolean _rv)"},
+	 PyDoc_STR("() -> (Boolean _rv)")},
 	{"WEBeginAction", (PyCFunction)wasteObj_WEBeginAction, 1,
-	 "() -> None"},
+	 PyDoc_STR("() -> None")},
 	{"WEEndAction", (PyCFunction)wasteObj_WEEndAction, 1,
-	 "(WEActionKind inActionKind) -> None"},
+	 PyDoc_STR("(WEActionKind inActionKind) -> None")},
 	{"WEGetModCount", (PyCFunction)wasteObj_WEGetModCount, 1,
-	 "() -> (UInt32 _rv)"},
+	 PyDoc_STR("() -> (UInt32 _rv)")},
 	{"WEResetModCount", (PyCFunction)wasteObj_WEResetModCount, 1,
-	 "() -> None"},
+	 PyDoc_STR("() -> None")},
 	{"WEInsertObject", (PyCFunction)wasteObj_WEInsertObject, 1,
-	 "(FlavorType inObjectType, Handle inObjectDataHandle, Point inObjectSize) -> None"},
+	 PyDoc_STR("(FlavorType inObjectType, Handle inObjectDataHandle, Point inObjectSize) -> None")},
 	{"WEGetSelectedObject", (PyCFunction)wasteObj_WEGetSelectedObject, 1,
-	 "() -> (WEObjectReference outObject)"},
+	 PyDoc_STR("() -> (WEObjectReference outObject)")},
 	{"WEGetObjectAtOffset", (PyCFunction)wasteObj_WEGetObjectAtOffset, 1,
-	 "(SInt32 inOffset) -> (WEObjectReference outObject)"},
+	 PyDoc_STR("(SInt32 inOffset) -> (WEObjectReference outObject)")},
 	{"WEFindNextObject", (PyCFunction)wasteObj_WEFindNextObject, 1,
-	 "(SInt32 inOffset) -> (SInt32 _rv, WEObjectReference outObject)"},
+	 PyDoc_STR("(SInt32 inOffset) -> (SInt32 _rv, WEObjectReference outObject)")},
 	{"WEUseSoup", (PyCFunction)wasteObj_WEUseSoup, 1,
-	 "(WESoupHandle inSoup) -> None"},
+	 PyDoc_STR("(WESoupHandle inSoup) -> None")},
 	{"WECut", (PyCFunction)wasteObj_WECut, 1,
-	 "() -> None"},
+	 PyDoc_STR("() -> None")},
 	{"WECopy", (PyCFunction)wasteObj_WECopy, 1,
-	 "() -> None"},
+	 PyDoc_STR("() -> None")},
 	{"WEPaste", (PyCFunction)wasteObj_WEPaste, 1,
-	 "() -> None"},
+	 PyDoc_STR("() -> None")},
 	{"WECanPaste", (PyCFunction)wasteObj_WECanPaste, 1,
-	 "() -> (Boolean _rv)"},
+	 PyDoc_STR("() -> (Boolean _rv)")},
 	{"WEGetHiliteRgn", (PyCFunction)wasteObj_WEGetHiliteRgn, 1,
-	 "(SInt32 inRangeStart, SInt32 inRangeEnd) -> (RgnHandle _rv)"},
+	 PyDoc_STR("(SInt32 inRangeStart, SInt32 inRangeEnd) -> (RgnHandle _rv)")},
 	{"WECharByte", (PyCFunction)wasteObj_WECharByte, 1,
-	 "(SInt32 inOffset) -> (SInt16 _rv)"},
+	 PyDoc_STR("(SInt32 inOffset) -> (SInt16 _rv)")},
 	{"WECharType", (PyCFunction)wasteObj_WECharType, 1,
-	 "(SInt32 inOffset) -> (SInt16 _rv)"},
+	 PyDoc_STR("(SInt32 inOffset) -> (SInt16 _rv)")},
 	{"WEStopInlineSession", (PyCFunction)wasteObj_WEStopInlineSession, 1,
-	 "() -> None"},
+	 PyDoc_STR("() -> None")},
 	{"WEFeatureFlag", (PyCFunction)wasteObj_WEFeatureFlag, 1,
-	 "(SInt16 inFeature, SInt16 inAction) -> (SInt16 _rv)"},
+	 PyDoc_STR("(SInt16 inFeature, SInt16 inAction) -> (SInt16 _rv)")},
 	{"WEGetUserInfo", (PyCFunction)wasteObj_WEGetUserInfo, 1,
-	 "(WESelector inUserTag) -> (SInt32 outUserInfo)"},
+	 PyDoc_STR("(WESelector inUserTag) -> (SInt32 outUserInfo)")},
 	{"WESetUserInfo", (PyCFunction)wasteObj_WESetUserInfo, 1,
-	 "(WESelector inUserTag, SInt32 inUserInfo) -> None"},
+	 PyDoc_STR("(WESelector inUserTag, SInt32 inUserInfo) -> None")},
 	{"WERemoveUserInfo", (PyCFunction)wasteObj_WERemoveUserInfo, 1,
-	 "(WESelector inUserTag) -> None"},
+	 PyDoc_STR("(WESelector inUserTag) -> None")},
 	{"WEInstallTabHooks", (PyCFunction)wasteObj_WEInstallTabHooks, 1,
-	 "() -> None"},
+	 PyDoc_STR("() -> None")},
 	{"WERemoveTabHooks", (PyCFunction)wasteObj_WERemoveTabHooks, 1,
-	 "() -> None"},
+	 PyDoc_STR("() -> None")},
 	{"WEIsTabHooks", (PyCFunction)wasteObj_WEIsTabHooks, 1,
-	 "() -> (Boolean _rv)"},
+	 PyDoc_STR("() -> (Boolean _rv)")},
 	{"WEGetTabSize", (PyCFunction)wasteObj_WEGetTabSize, 1,
-	 "() -> (SInt16 _rv)"},
+	 PyDoc_STR("() -> (SInt16 _rv)")},
 	{"WESetTabSize", (PyCFunction)wasteObj_WESetTabSize, 1,
-	 "(SInt16 tabWidth) -> None"},
+	 PyDoc_STR("(SInt16 tabWidth) -> None")},
 	{NULL, NULL, 0}
 };
 
-PyMethodChain wasteObj_chain = { wasteObj_methods, NULL };
+#define wasteObj_getsetlist NULL
 
-static PyObject *wasteObj_getattr(wasteObject *self, char *name)
-{
-	return Py_FindMethodInChain(&wasteObj_chain, (PyObject *)self, name);
-}
-
-#define wasteObj_setattr NULL
 
 #define wasteObj_compare NULL
 
 #define wasteObj_repr NULL
 
 #define wasteObj_hash NULL
+#define wasteObj_tp_init 0
+
+#define wasteObj_tp_alloc PyType_GenericAlloc
+
+static PyObject *wasteObj_tp_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
+{
+	PyObject *self;
+	WEReference itself;
+	char *kw[] = {"itself", 0};
+
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "O&", kw, wasteObj_Convert, &itself)) return NULL;
+	if ((self = type->tp_alloc(type, 0)) == NULL) return NULL;
+	((wasteObject *)self)->ob_itself = itself;
+	return self;
+}
+
+#define wasteObj_tp_free PyObject_Del
+
 
 PyTypeObject waste_Type = {
 	PyObject_HEAD_INIT(NULL)
@@ -2117,14 +2181,39 @@ PyTypeObject waste_Type = {
 	/* methods */
 	(destructor) wasteObj_dealloc, /*tp_dealloc*/
 	0, /*tp_print*/
-	(getattrfunc) wasteObj_getattr, /*tp_getattr*/
-	(setattrfunc) wasteObj_setattr, /*tp_setattr*/
+	(getattrfunc)0, /*tp_getattr*/
+	(setattrfunc)0, /*tp_setattr*/
 	(cmpfunc) wasteObj_compare, /*tp_compare*/
 	(reprfunc) wasteObj_repr, /*tp_repr*/
 	(PyNumberMethods *)0, /* tp_as_number */
 	(PySequenceMethods *)0, /* tp_as_sequence */
 	(PyMappingMethods *)0, /* tp_as_mapping */
 	(hashfunc) wasteObj_hash, /*tp_hash*/
+	0, /*tp_call*/
+	0, /*tp_str*/
+	PyObject_GenericGetAttr, /*tp_getattro*/
+	PyObject_GenericSetAttr, /*tp_setattro */
+	0, /*tp_as_buffer*/
+	Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE, /* tp_flags */
+	0, /*tp_doc*/
+	0, /*tp_traverse*/
+	0, /*tp_clear*/
+	0, /*tp_richcompare*/
+	0, /*tp_weaklistoffset*/
+	0, /*tp_iter*/
+	0, /*tp_iternext*/
+	wasteObj_methods, /* tp_methods */
+	0, /*tp_members*/
+	wasteObj_getsetlist, /*tp_getset*/
+	0, /*tp_base*/
+	0, /*tp_dict*/
+	0, /*tp_descr_get*/
+	0, /*tp_descr_set*/
+	0, /*tp_dictoffset*/
+	wasteObj_tp_init, /* tp_init */
+	wasteObj_tp_alloc, /* tp_alloc */
+	wasteObj_tp_new, /* tp_new */
+	wasteObj_tp_free, /* tp_free */
 };
 
 /* --------------------- End object type waste ---------------------- */
@@ -2368,7 +2457,8 @@ static PyObject *waste_STDObjectHandlers(PyObject *_self, PyObject *_args)
 					(UniversalProcPtr) NewWEClickObjectProc(HandleClickSound), NULL)) != noErr)
 			goto cleanup;
 		Py_INCREF(Py_None);
-		return Py_None;
+		_res = Py_None;
+		return _res;
 		
 	cleanup:
 		return PyMac_Error(err);
@@ -2410,39 +2500,40 @@ static PyObject *waste_WEInstallObjectHandler(PyObject *_self, PyObject *_args)
 		err = WEInstallObjectHandler(objectType, selector, handler, we);
 		if ( err ) return PyMac_Error(err);
 		Py_INCREF(Py_None);
-		return Py_None;
+		_res = Py_None;
+		return _res;
 
 }
 
 static PyMethodDef waste_methods[] = {
 	{"WENew", (PyCFunction)waste_WENew, 1,
-	 "(LongRect inDestRect, LongRect inViewRect, OptionBits inOptions) -> (WEReference outWE)"},
+	 PyDoc_STR("(LongRect inDestRect, LongRect inViewRect, OptionBits inOptions) -> (WEReference outWE)")},
 	{"WEUpdateStyleScrap", (PyCFunction)waste_WEUpdateStyleScrap, 1,
-	 "(StScrpHandle ioStyles, WEFontTableHandle inFontTable) -> None"},
+	 PyDoc_STR("(StScrpHandle ioStyles, WEFontTableHandle inFontTable) -> None")},
 	{"WEInstallTSMHandlers", (PyCFunction)waste_WEInstallTSMHandlers, 1,
-	 "() -> None"},
+	 PyDoc_STR("() -> None")},
 	{"WERemoveTSMHandlers", (PyCFunction)waste_WERemoveTSMHandlers, 1,
-	 "() -> None"},
+	 PyDoc_STR("() -> None")},
 	{"WEHandleTSMEvent", (PyCFunction)waste_WEHandleTSMEvent, 1,
-	 "(AppleEvent inAppleEvent) -> (AppleEvent ioReply)"},
+	 PyDoc_STR("(AppleEvent inAppleEvent) -> (AppleEvent ioReply)")},
 	{"WELongPointToPoint", (PyCFunction)waste_WELongPointToPoint, 1,
-	 "(LongPt inLongPoint) -> (Point outPoint)"},
+	 PyDoc_STR("(LongPt inLongPoint) -> (Point outPoint)")},
 	{"WEPointToLongPoint", (PyCFunction)waste_WEPointToLongPoint, 1,
-	 "(Point inPoint) -> (LongPt outLongPoint)"},
+	 PyDoc_STR("(Point inPoint) -> (LongPt outLongPoint)")},
 	{"WESetLongRect", (PyCFunction)waste_WESetLongRect, 1,
-	 "(SInt32 inLeft, SInt32 inTop, SInt32 inRight, SInt32 inBottom) -> (LongRect outLongRect)"},
+	 PyDoc_STR("(SInt32 inLeft, SInt32 inTop, SInt32 inRight, SInt32 inBottom) -> (LongRect outLongRect)")},
 	{"WELongRectToRect", (PyCFunction)waste_WELongRectToRect, 1,
-	 "(LongRect inLongRect) -> (Rect outRect)"},
+	 PyDoc_STR("(LongRect inLongRect) -> (Rect outRect)")},
 	{"WERectToLongRect", (PyCFunction)waste_WERectToLongRect, 1,
-	 "(Rect inRect) -> (LongRect outLongRect)"},
+	 PyDoc_STR("(Rect inRect) -> (LongRect outLongRect)")},
 	{"WEOffsetLongRect", (PyCFunction)waste_WEOffsetLongRect, 1,
-	 "(SInt32 inHorizontalOffset, SInt32 inVerticalOffset) -> (LongRect ioLongRect)"},
+	 PyDoc_STR("(SInt32 inHorizontalOffset, SInt32 inVerticalOffset) -> (LongRect ioLongRect)")},
 	{"WELongPointInLongRect", (PyCFunction)waste_WELongPointInLongRect, 1,
-	 "(LongPt inLongPoint, LongRect inLongRect) -> (Boolean _rv)"},
+	 PyDoc_STR("(LongPt inLongPoint, LongRect inLongRect) -> (Boolean _rv)")},
 	{"STDObjectHandlers", (PyCFunction)waste_STDObjectHandlers, 1,
-	 NULL},
+	 PyDoc_STR(NULL)},
 	{"WEInstallObjectHandler", (PyCFunction)waste_WEInstallObjectHandler, 1,
-	 NULL},
+	 PyDoc_STR(NULL)},
 	{NULL, NULL, 0}
 };
 
@@ -2482,13 +2573,19 @@ void initwaste(void)
 	    PyDict_SetItemString(d, "Error", waste_Error) != 0)
 		return;
 	WEO_Type.ob_type = &PyType_Type;
+	if (PyType_Ready(&WEO_Type) < 0) return;
 	Py_INCREF(&WEO_Type);
-	if (PyDict_SetItemString(d, "WEOType", (PyObject *)&WEO_Type) != 0)
-		Py_FatalError("can't initialize WEOType");
+	PyModule_AddObject(m, "WEO", (PyObject *)&WEO_Type);
+	/* Backward-compatible name */
+	Py_INCREF(&WEO_Type);
+	PyModule_AddObject(m, "WEOType", (PyObject *)&WEO_Type);
 	waste_Type.ob_type = &PyType_Type;
+	if (PyType_Ready(&waste_Type) < 0) return;
 	Py_INCREF(&waste_Type);
-	if (PyDict_SetItemString(d, "wasteType", (PyObject *)&waste_Type) != 0)
-		Py_FatalError("can't initialize wasteType");
+	PyModule_AddObject(m, "waste", (PyObject *)&waste_Type);
+	/* Backward-compatible name */
+	Py_INCREF(&waste_Type);
+	PyModule_AddObject(m, "wasteType", (PyObject *)&waste_Type);
 
 		callbackdict = PyDict_New();
 		if (callbackdict == NULL || PyDict_SetItemString(d, "callbacks", callbackdict) != 0)
