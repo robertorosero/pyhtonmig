@@ -262,17 +262,11 @@ class Header:
                     assert False, 'utf-8 conversion failed'
         self._chunks.append((s, charset))
 
-    def _split(self, s, charset, firstline, splitchars):
+    def _split(self, s, charset, maxlinelen, splitchars):
         # Split up a header safely for use with encode_chunks.
         splittable = charset.to_splittable(s)
         encoded = charset.from_splittable(splittable, True)
         elen = charset.encoded_header_len(encoded)
-        # The maxlinelen depends on whether we're on the first line or not, to
-        # take account of any header field name.
-        if firstline:
-            maxlinelen = self._firstlinelen
-        else:
-            maxlinelen = self._maxlinelen
         # If the line's encoded length first, just return it
         if elen <= maxlinelen:
             return [(encoded, charset)]
@@ -296,7 +290,7 @@ class Header:
         # although it's possible that other charsets may also benefit from the
         # higher-level syntactic breaks.
         elif charset == 'us-ascii':
-            return self._split_ascii(s, charset, firstline, splitchars)
+            return self._split_ascii(s, charset, maxlinelen, splitchars)
         # BAW: should we use encoded?
         elif elen == len(s):
             # We can split on _maxlinelen boundaries because we know that the
@@ -307,21 +301,12 @@ class Header:
         else:
             # Binary search for split point
             first, last = _binsplit(splittable, charset, maxlinelen)
-            # Divide and conquer.
-##            halfway = _floordiv(len(splittable), 2)
-##            first = charset.from_splittable(splittable[:halfway], False)
-##            last = charset.from_splittable(splittable[halfway:], False)
         # Do the split
-        return self._split(first, charset, firstline, splitchars) + \
-               self._split(last, charset, False, splitchars)
+        return self._split(first, charset, maxlinelen, splitchars) + \
+               self._split(last, charset, self._maxlinelen, splitchars)
 
-    def _split_ascii(self, s, charset, firstline, splitchars):
-        if firstline:
-            firstlen = self._firstlinelen
-            restlen = self._maxlinelen
-        else:
-            firstlen = restlen = self._maxlinelen
-        line = _split_ascii(s, firstlen, restlen,
+    def _split_ascii(self, s, charset, firstlen, splitchars):
+        line = _split_ascii(s, firstlen, self._maxlinelen,
                             self._continuation_ws, splitchars)
         lines = line.splitlines()
         return zip(lines, [charset]*len(lines))
@@ -378,8 +363,19 @@ class Header:
         syntactic breaks'.  This doesn't affect RFC 2047 encoded lines.
         """
         newchunks = []
+        maxlinelen = self._firstlinelen
+        lastlen = 0
         for s, charset in self._chunks:
-            newchunks += self._split(s, charset, True, splitchars)
+            # The first bit of the next chunk should be just long enough to
+            # fill the next line.  Don't forget the space separating the
+            # encoded words.
+            targetlen = maxlinelen - lastlen - 1
+            if targetlen < charset.encoded_header_len(''):
+                # Stick it on the next line
+                targetlen = maxlinelen
+            newchunks += self._split(s, charset, targetlen, splitchars)
+            lastchunk, lastcharset = newchunks[-1]
+            lastlen = lastcharset.encoded_header_len(lastchunk)
         return self._encode_chunks(newchunks)
 
 
@@ -444,21 +440,29 @@ def _split_ascii(s, firstlen, restlen, continuation_ws, splitchars):
 
 
 def _binsplit(splittable, charset, maxlinelen):
-    i = lastm = 0
-    j = len(splittable) - 1
-    while True:
-        if j < i:
-            break
-        m = (i + j) / 2
+    i = 0
+    j = len(splittable)
+    while i < j:
+        # Invariants:
+        # 1. splittable[:k] fits for all k <= i (note that we *assume*,
+        #    at the start, that splittable[:0] fits).
+        # 2. splittable[:k] does not fit for any k > j (at the start,
+        #    this means we shouldn't look at any k > len(splittable)).
+        # 3. We don't know about splittable[:k] for k in i+1..j.
+        # 4. We want to set i to the largest k that fits, with i <= k <= j.
+        #
+        m = (i+j+1) >> 1  # ceiling((i+j)/2); i < m <= j
         chunk = charset.from_splittable(splittable[:m], True)
         chunklen = charset.encoded_header_len(chunk)
-        if chunklen < maxlinelen:
-            lastm = m
-            i = m + 1
-        elif chunklen > maxlinelen:
-            j = m - 1
+        if chunklen <= maxlinelen:
+            # m is acceptable, so is a new lower bound.
+            i = m
         else:
-            break
-    first = charset.from_splittable(splittable[:lastm], False)
-    last = charset.from_splittable(splittable[lastm:], False)
+            # m is not acceptable, so final i must be < j.
+            j = m - 1
+    # i == j.  Invariant #1 implies that splittable[:i] fits, and
+    # invariant #2 implies that splittable[:i+1] does not fit, so i
+    # is what we're looking for.
+    first = charset.from_splittable(splittable[:i], False)
+    last  = charset.from_splittable(splittable[i:], False)
     return first, last
