@@ -868,34 +868,56 @@ ast_for_call(const node *n, expr_ty func)
       argument: [test '='] test	# Really [keyword '='] test
     */
 
-    int i, nargs;
+    int i, nargs, nkeywords;
     asdl_seq *args = NULL;
+    asdl_seq *keywords = NULL;
 
     REQ(n, arglist);
 
     nargs = 0;
-    for (i = 0; i < NCH(n); i++)
-	if (TYPE(CHILD(n, i)) == argument)
-	    nargs++;
+    nkeywords = 0;
+    for (i = 0; i < NCH(n); i++) 
+	if (TYPE(CHILD(n, i)) == argument) {
+	    if (NCH(CHILD(n, i)) == 1)
+		nargs++;
+	    else
+		nkeywords++;
+	}
 
     args = asdl_seq_new(nargs);
     if (!args)
     	return NULL;
+    keywords = asdl_seq_new(nkeywords);
+    if (!keywords)
+	return NULL;
+    nargs = 0;
+    nkeywords = 0;
     for (i = 0; i < NCH(n); i++) {
 	node *ch = CHILD(n, i);
 	if (TYPE(ch) == argument) {
 	    expr_ty e;
-	    if (NCH(ch) == 1)
+	    if (NCH(ch) == 1) {
 		e = ast_for_expr(CHILD(ch, 0));
-	    else
-		e = NULL;
-	    asdl_seq_SET(args, i / 2, e);
+		asdl_seq_SET(args, nargs++, e);
+	    }  
+	    else {
+		keyword_ty kw;
+		identifier key;
+
+		/* CHILD(ch, 0) is test, but must be an identifier? */ 
+		e = ast_for_expr(CHILD(ch, 0));
+		assert(e->kind == Name_kind);
+		key = e->v.Name.id;
+		free(e);
+		e = ast_for_expr(CHILD(ch, 2));
+		kw = keyword(key, e);
+		asdl_seq_SET(keywords, nkeywords++, kw);
+	    }
 	}
     }
 
-
     /* XXX syntax error if more than 255 arguments */
-    return Call(func, args, NULL, NULL, NULL);
+    return Call(func, args, keywords, NULL, NULL);
 }
 
 static expr_ty
