@@ -161,6 +161,8 @@ class_getattr(register PyClassObject *op, PyObject *name)
 	register PyObject *v;
 	register char *sname = PyString_AsString(name);
 	PyClassObject *class;
+	descrgetfunc f;
+
 	if (sname[0] == '_' && sname[1] == '_') {
 		if (strcmp(sname, "__dict__") == 0) {
 			if (PyEval_GetRestricted()) {
@@ -191,13 +193,11 @@ class_getattr(register PyClassObject *op, PyObject *name)
 			     PyString_AS_STRING(op->cl_name), sname);
 		return NULL;
 	}
-	Py_INCREF(v);
-	if (PyFunction_Check(v)) {
-		PyObject *w = PyMethod_New(v, (PyObject *)NULL,
-						    (PyObject *)class);
-		Py_DECREF(v);
-		v = w;
-	}
+	f = v->ob_type->tp_descr_get;
+	if (f == NULL)
+		Py_INCREF(v);
+	else
+		v = f(v, (PyObject *)NULL, (PyObject *)op);
 	return v;
 }
 
@@ -647,6 +647,8 @@ instance_getattr2(register PyInstanceObject *inst, PyObject *name)
 {
 	register PyObject *v;
 	PyClassObject *class;
+	descrgetfunc f;
+
 	class = NULL;
 	v = PyDict_GetItem(inst->in_dict, name);
 	if (v == NULL) {
@@ -656,9 +658,10 @@ instance_getattr2(register PyInstanceObject *inst, PyObject *name)
 	}
 	Py_INCREF(v);
 	if (class != NULL) {
-		if (PyFunction_Check(v)) {
-			PyObject *w = PyMethod_New(v, (PyObject *)inst,
-						   (PyObject *)class);
+		f = v->ob_type->tp_descr_get;
+		if (f != NULL) {
+			PyObject *w = f(v, (PyObject *)inst,
+					(PyObject *)(inst->in_class));
 			Py_DECREF(v);
 			v = w;
 		}
@@ -2079,6 +2082,7 @@ instancemethod_repr(PyMethodObject *a)
 		sprintf(buffer, "<unbound method %.100s.%.100s>",
 			sklassname, sfuncname);
 	else {
+		/* XXX Shouldn't use repr() here! */
 		PyObject *selfrepr = PyObject_Repr(self);
 		if (selfrepr == NULL)
 			goto fail;
