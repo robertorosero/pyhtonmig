@@ -887,10 +887,16 @@ symtable_visit_arguments(struct symtable *st, arguments_ty a)
 	*/
 	if (a->args && !symtable_visit_params(st, a->args, 1))
 			return 0;
-	if (a->vararg && !symtable_add_def(st, a->vararg, DEF_PARAM))
+	if (a->vararg) {
+		if (!symtable_add_def(st, a->vararg, DEF_PARAM))
 			return 0;
-	if (a->kwarg && !symtable_add_def(st, a->kwarg, DEF_PARAM))
+		st->st_cur->ste_varargs = 1;
+	}
+	if (a->kwarg) {
+		if (!symtable_add_def(st, a->kwarg, DEF_PARAM))
 			return 0;
+		st->st_cur->ste_varkeywords = 1;
+	}
 	return 1;
 }
 
