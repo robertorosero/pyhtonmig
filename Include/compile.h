@@ -46,7 +46,9 @@ struct basicblock {
 	   0 can be reserved to mean no next block. */
 	int b_next;
 	/* b_seen is used to perform a DFS of basicblocks. */
-	int b_seen;
+	int b_seen : 1;
+	/* b_return is true if a RETURN_VALUE opcode is inserted. */
+	int b_return : 1;
 	struct instr b_instr[DEFAULT_BLOCK_SIZE];
 };
 
