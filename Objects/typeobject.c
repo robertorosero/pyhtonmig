@@ -14,30 +14,13 @@ struct memberlist type_members[] = {
 	{"__doc__", T_STRING, offsetof(PyTypeObject, tp_doc), READONLY},
 	{"__weaklistoffset__", T_LONG,
 	 offsetof(PyTypeObject, tp_weaklistoffset), READONLY},
+	{"__base__", T_OBJECT, offsetof(PyTypeObject, tp_base), READONLY},
 	{"__dictoffset__", T_LONG,
 	 offsetof(PyTypeObject, tp_dictoffset), READONLY},
+	{"__bases__", T_OBJECT, offsetof(PyTypeObject, tp_bases), READONLY},
+	{"__mro__", T_OBJECT, offsetof(PyTypeObject, tp_mro), READONLY},
 	{0}
 };
-
-static PyObject *
-type_bases(PyTypeObject *type, void *context)
-{
-	PyObject *bases;
-	PyTypeObject *base;
-
-	bases = type->tp_bases;
-	if (bases != NULL) {
-		Py_INCREF(bases);
-		return bases;
-	}
-	base = type->tp_base;
-	if (base == NULL) {
-		if (type == &PyBaseObject_Type)
-			return PyTuple_New(0);
-		base = &PyBaseObject_Type;
-	}
-	return Py_BuildValue("(O)", base);
-}
 
 static PyObject *
 type_module(PyTypeObject *type, void *context)
@@ -49,20 +32,26 @@ static PyObject *
 type_dict(PyTypeObject *type, void *context)
 {
 	if (type->tp_dict == NULL) {
-		if (PyType_InitDict(type) < 0)
-			return NULL;
-		if (type->tp_dict == NULL) {
-			Py_INCREF(Py_None);
-			return Py_None;
-		}
+		Py_INCREF(Py_None);
+		return Py_None;
 	}
 	return PyDictProxy_New(type->tp_dict);
 }
 
+static PyObject *
+type_introduced(PyTypeObject *type, void *context)
+{
+	if (type->tp_introduced == NULL) {
+		Py_INCREF(Py_None);
+		return Py_None;
+	}
+	return PyDictProxy_New(type->tp_introduced);
+}
+
 struct getsetlist type_getsets[] = {
-	{"__bases__", (getter)type_bases, NULL, NULL},
 	{"__module__", (getter)type_module, NULL, NULL},
 	{"__dict__",  (getter)type_dict,  NULL, NULL},
+	{"__introduced__",  (getter)type_introduced,  NULL, NULL},
 	{0}
 };
 
@@ -203,16 +192,138 @@ issubtype(PyTypeObject *a, PyTypeObject *b)
 	return 0;
 }
 
+/* Method resolution order algorithm from "Putting Metaclasses to Work"
+   by Forman and Danforth (Addison-Wesley 1999). */
+
+static int
+conservative_merge(PyObject *left, PyObject *right)
+{
+	int left_size;
+	int right_size;
+	int i, j, r;
+	PyObject *temp, *rr;
+
+	/* XXX add error checking */
+
+  again:
+	left_size = PyList_GET_SIZE(left);
+	right_size = PyList_GET_SIZE(right);
+	for (i = 0; i < left_size; i++) {
+		for (j = 0; j < right_size; j++) {
+			if (PyList_GET_ITEM(left, i) ==
+			    PyList_GET_ITEM(right, j)) {
+				/* found a merge point */
+				temp = PyList_New(0);
+				for (r = 0; r < j; r++) {
+					rr = PyList_GET_ITEM(right, r);
+					if (!PySequence_Contains(left, rr))
+						PyList_Append(temp, rr);
+				}
+				PyList_SetSlice(left, i, i, temp);
+				Py_DECREF(temp);
+				PyList_SetSlice(right, 0, j+1, NULL);
+				goto again;
+			}
+		}
+	}
+	return PyList_SetSlice(left, left_size, left_size, right);
+}
+
+static int
+serious_order_disagreements(PyObject *left, PyObject *right)
+{
+	return 0; /* XXX later -- for now, we cheat: "don't do that" */
+}
+
+static PyObject *
+method_resolution_order(PyTypeObject *type)
+{
+	int i, n;
+	PyObject *bases;
+	PyObject *result;
+
+	/* XXX add error checking */
+
+	if (type->tp_mro != NULL)
+		return PySequence_List(type->tp_mro);
+
+	bases = type->tp_bases;
+	if (bases == NULL || !PyTuple_Check(bases))
+		return NULL;
+	n = PyTuple_GET_SIZE(bases);
+	result = Py_BuildValue("[O]", type);
+	for (i = 0; i < n; i++) {
+		PyTypeObject *base = (PyTypeObject *)
+			PyTuple_GET_ITEM(bases, i);
+		PyObject *parentMRO = method_resolution_order(base);
+		if (parentMRO == NULL) {
+			Py_DECREF(result);
+			return NULL;
+		}
+		if (serious_order_disagreements(result, parentMRO)) {
+			Py_DECREF(result);
+			return NULL;
+		}
+		conservative_merge(result, parentMRO);
+		Py_DECREF(parentMRO);
+	}
+	if (result != NULL && type->tp_mro == NULL)
+		type->tp_mro = PySequence_Tuple(result);
+	return result;
+}
+
+/* Calculate the best base amongst multiple base classes.
+   This is the first one that's on the path to the "solid base". */
+
+static PyTypeObject *
+best_base(PyObject *bases)
+{
+	int i, n;
+	PyTypeObject *base, *winner, *candidate, *base_i;
+
+	assert(PyTuple_Check(bases));
+	n = PyTuple_GET_SIZE(bases);
+	assert(n > 0);
+	base = (PyTypeObject *)PyTuple_GET_ITEM(bases, 0);
+	winner = &PyBaseObject_Type;
+	for (i = 0; i < n; i++) {
+		base_i = (PyTypeObject *)PyTuple_GET_ITEM(bases, i);
+		if (!PyType_Check((PyObject *)base_i)) {
+			PyErr_SetString(
+				PyExc_TypeError,
+				"bases must be types");
+			return NULL;
+		}
+		candidate = solid_base(base_i);
+		if (issubtype(winner, candidate))
+			;
+		else if (issubtype(candidate, winner)) {
+			winner = candidate;
+			base = base_i;
+		}
+		else {
+			PyErr_SetString(
+				PyExc_TypeError,
+				"multiple bases have "
+				"instance lay-out conflict");
+			return NULL;
+		}
+	}
+	assert(base != NULL);
+	return base;
+}
+
 /* TypeType's initializer; called when a type is subclassed */
+
 static int
 type_init(PyObject *self, PyObject *args, PyObject *kwds)
 {
-	PyObject *name, *bases, *dict, *x, *slots;
+	PyObject *name, *bases, *dict, *slots;
 	PyTypeObject *type, *base;
 	static char *kwlist[] = {"name", "bases", "dict", 0};
 	etype *et;
 	struct memberlist *mp;
-	int i, n, nslots, slotoffset, allocsize;
+	int i, nbases, nslots, slotoffset, allocsize;
 
 	assert(PyType_Check(self));
 	type = (PyTypeObject *)self;
@@ -226,42 +337,32 @@ type_init(PyObject *self, PyObject *args, PyObject *kwds)
 				"usage: TypeType(name, bases, dict) ");
 		return -1;
 	}
-	n = PyTuple_GET_SIZE(bases);
-	if (n > 0) {
-		PyTypeObject *winner, *candidate, *base_i;
-		base = (PyTypeObject *)PyTuple_GET_ITEM(bases, 0);
-		winner = &PyBaseObject_Type;
-		for (i = 0; i < n; i++) {
-			base_i = (PyTypeObject *)PyTuple_GET_ITEM(bases, i);
-			if (!PyType_Check((PyObject *)base_i)) {
-				PyErr_SetString(
-					PyExc_TypeError,
-					"bases must be types");
-				return -1;
-			}
-			candidate = solid_base(base_i);
-			if (issubtype(winner, candidate))
-				;
-			else if (issubtype(candidate, winner)) {
-				winner = candidate;
-				base = base_i;
-			}
-			else {
-				PyErr_SetString(
-					PyExc_TypeError,
-					"multiple bases have "
-					"instance lay-out conflict");
-				return -1;
-			}
-		}
+
+	/* Adjust empty bases */
+	nbases = PyTuple_GET_SIZE(bases);
+	if (nbases == 0) {
+		bases = Py_BuildValue("(O)", &PyBaseObject_Type);
+		if (bases == NULL)
+			return -1;
+		nbases = 1;
 	}
 	else
-		base = &PyBaseObject_Type;
-	if (base->tp_new == NULL) {
+		Py_INCREF(bases);
+
+	/* Calculate best base */
+	base = best_base(bases);
+	if (base == NULL)
+		return -1;
+	if (base->tp_init == NULL) {
 		PyErr_SetString(PyExc_TypeError,
-				"base type must have a tp_new slot");
+				"base type must have a constructor slot");
 		return -1;
 	}
+
+	/* Set tp_base and tp_bases */
+	type->tp_bases = bases;
+	Py_INCREF(base);
+	type->tp_base = base;
 
 	/* Check for a __slots__ sequence variable in dict, and count it */
 	slots = PyDict_GetItemString(dict, "__slots__");
@@ -311,21 +412,6 @@ type_init(PyObject *self, PyObject *args, PyObject *kwds)
 	type->tp_name = PyString_AS_STRING(name);
 	type->tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HEAPTYPE;
 
-	/* Set tp_base and tp_bases properly */
-	if (PyTuple_GET_SIZE(bases) == 0)
-		bases = Py_BuildValue("(O)", &PyBaseObject_Type);
-	else
-		Py_INCREF(bases);
-	type->tp_bases = bases;
-	Py_INCREF(base);
-	type->tp_base = base;
-
-	/* Copy slots and dict from the base type */
-	if (PyType_InitDict(type) < 0) {
-		Py_DECREF(type);
-		return -1;
-	}
-
 	/* Override some slots with specific requirements */
 	if (type->tp_dealloc)
 		type->tp_dealloc = subtype_dealloc;
@@ -338,53 +424,42 @@ type_init(PyObject *self, PyObject *args, PyObject *kwds)
 		type->tp_setattr = NULL;
 	}
 
-	/* Add custom slots */
+	/* Initialize tp_introduced from passed-in dict */
+	type->tp_introduced = dict = PyDict_Copy(dict);
+	if (dict == NULL)
+		return -1;
+
+	/* Add descriptors for custom slots from __slots__, or for __dict__ */
 	mp = et->members;
-	slotoffset = type->tp_basicsize;
-	if (type->tp_flags & Py_TPFLAGS_GC)
+	slotoffset = base->tp_basicsize;
+	if (base->tp_flags & Py_TPFLAGS_GC)
 		slotoffset -= PyGC_HEAD_SIZE;
 	if (slots != NULL) {
 		for (i = 0; i < nslots; i++, mp++) {
 			mp->name = PyString_AS_STRING(
 				PyTuple_GET_ITEM(slots, i));
 			mp->type = T_OBJECT;
-			mp->offset = slotoffset + i*sizeof(PyObject *);
+			mp->offset = slotoffset;
+			slotoffset += i*sizeof(PyObject *);
 		}
-		type->tp_basicsize += nslots*sizeof(PyObject *);
 	}
 	else if (nslots) {
 		type->tp_dictoffset = slotoffset;
-		type->tp_basicsize += sizeof(PyObject *);
+		slotoffset += sizeof(PyObject *);
 		mp->name = "__dict__";
 		mp->type = T_OBJECT;
 		mp->offset = slotoffset;
 		mp->readonly = 1;
 	}
+	type->tp_basicsize = slotoffset;
 	add_members(type, et->members);
 
-	/* XXX This is close, but not quite right! */
-	if (n > 1) {
-		PyTypeObject *t;
-		for (i = n; --i >= 0; ) {
-			t = (PyTypeObject *) PyTuple_GET_ITEM(bases, i);
-			if (t->tp_dict == NULL)
-				continue;
-			x = PyObject_CallMethod(type->tp_dict,
-						"update", "O", t->tp_dict);
-			if (x == NULL) {
-				Py_DECREF(type);
-				return -1;
-			}
-		}
-	}
-
-	x = PyObject_CallMethod(type->tp_dict, "update", "O", dict);
-	if (x == NULL) {
-		Py_DECREF(type);
+	/* Initialize tp_bases, tp_dict, tp_introduced; inherit slots */
+	if (PyType_InitDict(type) < 0)
 		return -1;
-	}
-	Py_DECREF(x); /* throw away None */
-	override_slots(type, dict);
+
+	/* Override slots that deserve it */
+	override_slots(type, type->tp_dict);
 	return 0;
 }
 
@@ -484,6 +559,7 @@ type_dealloc(PyTypeObject *type)
 	Py_XDECREF(type->tp_dict);
 	Py_XDECREF(et->name);
 	Py_XDECREF(et->slots);
+	/* XXX more, e.g. bases, mro, introduced ... */
 	PyObject_DEL(type);
 }
 
@@ -542,6 +618,17 @@ object_dealloc(PyObject *self)
 	PyObject_Del(self);
 }
 
+static struct memberlist object_members[] = {
+	{"__class__", T_OBJECT, offsetof(PyObject, ob_type), READONLY},
+	{0}
+};
+
+static int
+object_init(PyObject *self, PyObject *args, PyObject *kwds)
+{
+	return 0;
+}
+
 PyTypeObject PyBaseObject_Type = {
 	PyObject_HEAD_INIT(&PyType_Type)
 	0,					/* ob_size */
@@ -572,14 +659,14 @@ PyTypeObject PyBaseObject_Type = {
 	0,					/* tp_iter */
 	0,					/* tp_iternext */
 	0,					/* tp_methods */
-	0,					/* tp_members */
+	object_members,				/* tp_members */
 	0,					/* tp_getset */
 	0,					/* tp_base */
 	0,					/* tp_dict */
 	0,					/* tp_descr_get */
 	0,					/* tp_descr_set */
 	0,					/* tp_dictoffset */
-	0,					/* tp_init */
+	object_init,				/* tp_init */
 	PyType_GenericAlloc,			/* tp_alloc */
 	PyType_GenericNew,			/* tp_new */
 };
@@ -587,26 +674,16 @@ PyTypeObject PyBaseObject_Type = {
 
 /* Initialize the __dict__ in a type object */
 
-static struct PyMethodDef intrinsic_methods[] = {
-	{0}
-};
-
-static struct memberlist intrinsic_members[] = {
-	{"__class__", T_OBJECT, offsetof(PyObject, ob_type), READONLY},
-	{0}
-};
-
-static struct getsetlist intrinsic_getsets[] = {
-	{0}
-};
-
 static int
 add_methods(PyTypeObject *type, PyMethodDef *meth)
 {
-	PyObject *dict = type->tp_dict;
+	PyObject *dict = type->tp_introduced;
 
 	for (; meth->ml_name != NULL; meth++) {
-		PyObject *descr = PyDescr_NewMethod(type, meth);
+		PyObject *descr;
+		if (PyDict_GetItemString(dict, meth->ml_name))
+			continue;
+		descr = PyDescr_NewMethod(type, meth);
 		if (descr == NULL)
 			return -1;
 		if (PyDict_SetItemString(dict,meth->ml_name,descr) < 0)
@@ -619,10 +696,13 @@ add_methods(PyTypeObject *type, PyMethodDef *meth)
 static int
 add_wrappers(PyTypeObject *type, struct wrapperbase *base, void *wrapped)
 {
-	PyObject *dict = type->tp_dict;
+	PyObject *dict = type->tp_introduced;
 
 	for (; base->name != NULL; base++) {
-		PyObject *descr = PyDescr_NewWrapper(type, base, wrapped);
+		PyObject *descr;
+		if (PyDict_GetItemString(dict, base->name))
+			continue;
+		descr = PyDescr_NewWrapper(type, base, wrapped);
 		if (descr == NULL)
 			return -1;
 		if (PyDict_SetItemString(dict, base->name, descr) < 0)
@@ -635,10 +715,13 @@ add_wrappers(PyTypeObject *type, struct wrapperbase *base, void *wrapped)
 static int
 add_members(PyTypeObject *type, struct memberlist *memb)
 {
-	PyObject *dict = type->tp_dict;
+	PyObject *dict = type->tp_introduced;
 
 	for (; memb->name != NULL; memb++) {
-		PyObject *descr = PyDescr_NewMember(type, memb);
+		PyObject *descr;
+		if (PyDict_GetItemString(dict, memb->name))
+			continue;
+		descr = PyDescr_NewMember(type, memb);
 		if (descr == NULL)
 			return -1;
 		if (PyDict_SetItemString(dict, memb->name, descr) < 0)
@@ -651,10 +734,13 @@ add_members(PyTypeObject *type, struct memberlist *memb)
 static int
 add_getset(PyTypeObject *type, struct getsetlist *gsp)
 {
-	PyObject *dict = type->tp_dict;
+	PyObject *dict = type->tp_introduced;
 
 	for (; gsp->name != NULL; gsp++) {
-		PyObject *descr = PyDescr_NewGetSet(type, gsp);
+		PyObject *descr;
+		if (PyDict_GetItemString(dict, gsp->name))
+			continue;
+		descr = PyDescr_NewGetSet(type, gsp);
 
 		if (descr == NULL)
 			return -1;
@@ -835,33 +921,48 @@ inherit_slots(PyTypeObject *type, PyTypeObject *base)
 int
 PyType_InitDict(PyTypeObject *type)
 {
-	PyObject *dict;
-	PyTypeObject *base = type->tp_base;
+	PyObject *dict, *bases, *x;
+	PyTypeObject *base;
+	int i, n;
 
 	if (type->tp_dict != NULL)
-		return 0;
+		return 0; /* Already initialized */
+
+	/* Initialize tp_base (defaults to BaseObject unless that's us) */
+	base = type->tp_base;
+	if (base == NULL && type != &PyBaseObject_Type)
+		base = type->tp_base = &PyBaseObject_Type;
+
+	/* Initialize tp_bases */
+	bases = type->tp_bases;
+	if (bases == NULL) {
+		if (base == NULL)
+			bases = PyTuple_New(0);
+		else
+			bases = Py_BuildValue("(O)", base);
+		if (bases == NULL)
+			return -1;
+		type->tp_bases = bases;
+	}
+
+	/* Initialize the base class */
 	if (base) {
 		if (PyType_InitDict(base) < 0)
 			return -1;
-		dict = PyDict_Copy(base->tp_dict);
 	}
-	else
-		dict = PyDict_New();
-	if (dict == NULL)
-		return -1;
-	type->tp_dict = dict;
 
-	/* Add intrinsics */
-	if (add_methods(type, intrinsic_methods) < 0)
-		return -1;
-	if (add_members(type, intrinsic_members) < 0)
-		return -1;
-	if (add_getset(type, intrinsic_getsets) < 0)
-		return -1;
+	/* Initialize tp_introduced */
+	dict = type->tp_introduced;
+	if (dict == NULL) {
+		dict = PyDict_New();
+		if (dict == NULL)
+			return -1;
+		type->tp_introduced = dict;
+	}
+
+	/* Add type-specific descriptors to tp_introduced */
 	if (add_operators(type) < 0)
 		return -1;
-
-	/* Add type-specific descriptors */
 	if (type->tp_methods != NULL) {
 		if (add_methods(type, type->tp_methods) < 0)
 			return -1;
@@ -875,11 +976,48 @@ PyType_InitDict(PyTypeObject *type)
 			return -1;
 	}
 
-	/* Inherit base class slots and methods */
+	/* Initialize tp_dict from tp_introduced */
+	type->tp_dict = PyDict_Copy(dict);
+	if (type->tp_dict == NULL)
+		return -1;
+
+	/* Inherit base class slots */
 	if (base) {
 		if (inherit_slots(type, base) < 0)
 			return -1;
 	}
+
+	/* Calculate method resolution order */
+	x = method_resolution_order(type);
+	if (x == NULL) {
+		if (!PyErr_Occurred())
+			PyErr_SetString(PyExc_TypeError,
+					"method resolution order failed");
+		return -1;
+	}
+	Py_DECREF(x);
+
+	/* Inherit methods, updating from last base backwards */
+	bases = type->tp_mro;
+	assert(bases != NULL);
+	assert(PyTuple_Check(bases));
+	n = PyTuple_GET_SIZE(bases);
+ 	for (i = n; --i >= 0; ) {
+		base = (PyTypeObject *)PyTuple_GET_ITEM(bases, i);
+		assert(PyType_Check(base));
+		x = base->tp_introduced;
+		if (x != NULL) {
+			x = PyObject_CallMethod(type->tp_dict, "update","O",x);
+			if (x == NULL)
+				return -1;
+			Py_DECREF(x); /* throw away None */
+		}
+	}
+
+	/* Inherit slots from direct base */
+	if (type->tp_base != NULL)
+		if (inherit_slots(type, type->tp_base) < 0)
+			return -1;
 
 	return 0;
 }
