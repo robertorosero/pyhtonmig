@@ -36,8 +36,11 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #include <string.h>
 #include <setjmp.h>
 #include <errno.h>
+
+#ifndef macintosh
 #include <sys/types.h>
 #include <sys/stat.h>
+#endif 
 
 #include "mytime.h"		/* For clock_t on some systems */
 
@@ -48,6 +51,10 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
 #else /* !HAVE_UNISTD_H */
+
+#ifdef macintosh
+#include "macdefs.h"
+#else
 extern int mkdir PROTO((const char *, mode_t));
 extern int chdir PROTO((const char *));
 extern int rmdir PROTO((const char *));
@@ -66,6 +73,7 @@ extern int symlink PROTO((const char *, const char *));
 #ifdef HAVE_LSTAT
 extern int lstat PROTO((const char *, struct stat *));
 #endif
+#endif /* macintosh */
 #endif /* !HAVE_UNISTD_H */
 
 #if 1

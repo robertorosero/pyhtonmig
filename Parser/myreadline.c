@@ -157,6 +157,14 @@ my_readline(prompt)
 		*p = '\0';
 		break;
 	}
+#ifdef MPW
+	/* Hack for MPW C where the prompt comes right back in the input */
+	/* XXX (Actually this would be rather nice on most systems...) */
+	n = strlen(prompt);
+	if (strncmp(p, prompt, n) == 0)
+		memmove (p, p + len, strlen(p) - n + 1);
+		/* Don't forget to copy the \0 */
+#endif
 	n = strlen(p);
 	while (n > 0 && p[n-1] != '\n') {
 		int incr = n+2;

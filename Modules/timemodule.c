@@ -31,7 +31,9 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #include <signal.h>
 #include <setjmp.h>
 
-#ifndef macintosh
+#ifdef macintosh
+#include <time.h>
+#else
 #include <sys/types.h>
 #endif
 
