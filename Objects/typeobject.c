@@ -148,11 +148,23 @@ subtype_dealloc(PyObject *self)
 	Py_DECREF(self->ob_type);
 }
 
+staticforward void override_slots(PyTypeObject *type, PyObject *dict);
+
+typedef struct {
+	PyTypeObject type;
+	PyNumberMethods as_number;
+	PySequenceMethods as_sequence;
+	PyMappingMethods as_mapping;
+	PyBufferProcs as_buffer;
+	char name[1];
+} etype;
+
 /* TypeType's constructor is called when a type is subclassed */
 static PyObject *
 type_construct(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
-	PyObject *name, *bases, *dict, *x;
+	char *name;
+	PyObject *bases, *dict, *x;
 	PyTypeObject *base;
 	char *dummy = NULL;
 
@@ -161,7 +173,7 @@ type_construct(PyTypeObject *type, PyObject *args, PyObject *kwds)
 				"can't construct a preallocated type");
 		return NULL;
 	}
-	if (!PyArg_ParseTupleAndKeywords(args, kwds, "SOO", &dummy,
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "sOO", &dummy,
 					 &name, &bases, &dict))
 		return NULL;
 	if (!PyTuple_Check(bases) || !PyDict_Check(dict)) {
@@ -185,12 +197,16 @@ type_construct(PyTypeObject *type, PyObject *args, PyObject *kwds)
 				"base type must be a type");
 		return NULL;
 	}
-	type = PyObject_New(PyTypeObject, &PyType_Type);
+	type = PyObject_MALLOC(sizeof(etype) + strlen(name));
 	if (type == NULL)
 		return NULL;
-	memset(((char *)type) + offsetof(PyTypeObject, tp_name), '\0',
-	       sizeof(PyTypeObject) - offsetof(PyTypeObject, tp_name));
-	type->tp_name = PyString_AS_STRING(name);
+	memset(type, '\0', sizeof(etype));
+	PyObject_INIT(type, &PyType_Type);
+	type->tp_as_number = & (((etype *)type)->as_number);
+	type->tp_as_sequence = & (((etype *)type)->as_sequence);
+	type->tp_as_mapping = & (((etype *)type)->as_mapping);
+	type->tp_as_buffer = & (((etype *)type)->as_buffer);
+	type->tp_name = strcpy(((etype *)type)->name, name);
 	type->tp_flags = Py_TPFLAGS_DEFAULT;
 	Py_INCREF(base);
 	type->tp_base = base;
@@ -208,7 +224,7 @@ type_construct(PyTypeObject *type, PyObject *args, PyObject *kwds)
 		return NULL;
 	}
 	Py_DECREF(x); /* throw away None */
-	PyDict_SetItemString(type->tp_dict, "__name__", name);
+	override_slots(type, dict);
 	return (PyObject *)type;
 }
 
@@ -1116,4 +1132,312 @@ add_operators(PyTypeObject *type)
 	ADD(type->tp_iternext, tab_next);
 
 	return 0;
+}
+
+/* Slot wrappers that call the corresponding __foo__ slot */
+
+#define SLOT0(SLOTNAME, OPNAME) \
+static PyObject * \
+slot_##SLOTNAME(PyObject *self) \
+{ \
+	return PyObject_CallMethod(self, "__" #OPNAME "__", ""); \
+}
+
+#define SLOT1(SLOTNAME, OPNAME, ARG1TYPE, ARGCODES) \
+static PyObject * \
+slot_##SLOTNAME(PyObject *self, ARG1TYPE arg1) \
+{ \
+	return PyObject_CallMethod(self, "__" #OPNAME "__", #ARGCODES, arg1); \
+}
+
+#define SLOT2(SLOTNAME, OPNAME, ARG1TYPE, ARG2TYPE, ARGCODES) \
+static PyObject * \
+slot_##SLOTNAME(PyObject *self, ARG1TYPE arg1, ARG2TYPE arg2) \
+{ \
+	return PyObject_CallMethod(self, "__" #OPNAME "__", \
+               #ARGCODES, arg1, arg2); \
+}
+
+static int
+slot_sq_length(PyObject *self)
+{
+	PyObject *res = PyObject_CallMethod(self, "__len__", "");
+
+	if (res == NULL)
+		return -1;
+	return (int)PyInt_AsLong(res);
+}
+
+SLOT1(sq_concat, add, PyObject *, O);
+SLOT1(sq_repeat, mul, int, i);
+SLOT1(sq_item, getitem, int, i);
+SLOT2(sq_slice, getslice, int, int, ii);
+
+static int
+slot_sq_ass_item(PyObject *self, int index, PyObject *value)
+{
+	PyObject *res = PyObject_CallMethod(self, "__setitem__",
+					    "iO", index, value);
+	if (res == NULL)
+		return -1;
+	Py_DECREF(res);
+	return 0;
+}
+
+static int
+slot_sq_ass_slice(PyObject *self, int i, int j, PyObject *value)
+{
+	PyObject *res = PyObject_CallMethod(self, "__setitem__",
+					    "iiO", i, j, value);
+	if (res == NULL)
+		return -1;
+	Py_DECREF(res);
+	return 0;
+}
+
+static int
+slot_sq_contains(PyObject *self, PyObject *value)
+{
+	PyObject *res = PyObject_CallMethod(self, "__contains__", "O", value);
+	int r;
+
+	if (res == NULL)
+		return -1;
+	r = PyInt_AsLong(res);
+	Py_DECREF(res);
+	return r;
+}
+
+SLOT1(sq_inplace_concat, iadd, PyObject *, O);
+SLOT1(sq_inplace_repeat, imul, int, i);
+
+#define slot_mp_length slot_sq_length
+
+SLOT1(mp_subscript, getitem, PyObject *, O);
+
+static int
+slot_mp_ass_subscript(PyObject *self, PyObject *key, PyObject *value)
+{
+	PyObject *res = PyObject_CallMethod(self, "__setitem__",
+					    "OO", key, value);
+	if (res == NULL)
+		return -1;
+	Py_DECREF(res);
+	return 0;
+}
+
+SLOT1(nb_add, add, PyObject *, O);
+SLOT1(nb_subtract, sub, PyObject *, O);
+SLOT1(nb_multiply, mul, PyObject *, O);
+SLOT1(nb_divide, div, PyObject *, O);
+SLOT1(nb_remainder, mod, PyObject *, O);
+SLOT1(nb_divmod, divmod, PyObject *, O);
+SLOT2(nb_power, pow, PyObject *, PyObject *, OO);
+SLOT0(nb_negative, neg);
+SLOT0(nb_positive, pos);
+SLOT0(nb_absolute, abs);
+
+static int
+slot_nb_nonzero(PyObject *self)
+{
+	PyObject *res = PyObject_CallMethod(self, "__nonzero__", "");
+
+	if (res == NULL)
+		return -1;
+	return (int)PyInt_AsLong(res);
+}
+
+SLOT0(nb_invert, invert);
+SLOT1(nb_lshift, lshift, PyObject *, O);
+SLOT1(nb_rshift, rshift, PyObject *, O);
+SLOT1(nb_and, and, PyObject *, O);
+SLOT1(nb_xor, xor, PyObject *, O);
+SLOT1(nb_or, or, PyObject *, O);
+/* Not coerce() */
+SLOT0(nb_int, int);
+SLOT0(nb_long, long);
+SLOT0(nb_float, float);
+SLOT0(nb_oct, oct);
+SLOT0(nb_hex, hex);
+SLOT1(nb_inplace_add, iadd, PyObject *, O);
+SLOT1(nb_inplace_subtract, isub, PyObject *, O);
+SLOT1(nb_inplace_multiply, imul, PyObject *, O);
+SLOT1(nb_inplace_divide, idiv, PyObject *, O);
+SLOT1(nb_inplace_remainder, imod, PyObject *, O);
+SLOT2(nb_inplace_power, ipow, PyObject *, PyObject *, OO);
+SLOT1(nb_inplace_lshift, ilshift, PyObject *, O);
+SLOT1(nb_inplace_rshift, irshift, PyObject *, O);
+SLOT1(nb_inplace_and, iand, PyObject *, O);
+SLOT1(nb_inplace_xor, ixor, PyObject *, O);
+SLOT1(nb_inplace_or, ior, PyObject *, O);
+
+static int
+slot_tp_compare(PyObject *self, PyObject *other)
+{
+	PyObject *res = PyObject_CallMethod(self, "__cmp__", "O", other);
+	long r;
+
+	if (res == NULL)
+		return -1;
+	r = PyInt_AsLong(res);
+	Py_DECREF(res);
+	return (int)r;
+}
+
+SLOT0(tp_repr, repr);
+
+static long
+slot_tp_hash(PyObject *self)
+{
+	PyObject *res = PyObject_CallMethod(self, "__hash__", "");
+	long h;
+
+	if (res == NULL)
+		return -1;
+	h = PyInt_AsLong(res);
+	if (h == -1 && !PyErr_Occurred())
+		h = -2;
+	return h;
+}
+
+static PyObject *
+slot_tp_call(PyObject *self, PyObject *args, PyObject *kwds)
+{
+	PyObject *meth = PyObject_GetAttrString(self, "__call__");
+	PyObject *res;
+
+	if (meth == NULL)
+		return NULL;
+	res = PyObject_Call(meth, args, kwds);
+	Py_DECREF(meth);
+	return res;
+}
+
+SLOT0(tp_str, str);
+
+/* Map rich comparison operators to their __xx__ namesakes */
+static char *name_op[] = {
+	"__lt__",
+	"__le__",
+	"__eq__",
+	"__ne__",
+	"__gt__",
+	"__ge__",
+};
+
+static PyObject *
+slot_tp_richcompare(PyObject *self, PyObject *other, int op)
+{
+	PyObject *meth = PyObject_GetAttrString(self, name_op[op]);
+	PyObject *res;
+
+	if (meth == NULL)
+		return NULL;
+	res = PyObject_CallFunction(meth, "O", other);
+	Py_DECREF(meth);
+	return res;
+}
+
+SLOT0(tp_iter, iter);
+
+static PyObject *
+slot_tp_iternext(PyObject *self)
+{
+	return PyObject_CallMethod(self, "next", "");
+}
+
+static void
+override_slots(PyTypeObject *type, PyObject *dict)
+{
+	PySequenceMethods *sq = type->tp_as_sequence;
+	PyMappingMethods *mp = type->tp_as_mapping;
+	PyNumberMethods *nb = type->tp_as_number;
+
+#define SQSLOT(OPNAME, SLOTNAME) \
+	if (PyDict_GetItemString(dict, "__" #OPNAME "__")) { \
+		sq->SLOTNAME = slot_##SLOTNAME; \
+	}
+
+#define MPSLOT(OPNAME, SLOTNAME) \
+	if (PyDict_GetItemString(dict, "__" #OPNAME "__")) { \
+		mp->SLOTNAME = slot_##SLOTNAME; \
+	}
+
+#define NBSLOT(OPNAME, SLOTNAME) \
+	if (PyDict_GetItemString(dict, "__" #OPNAME "__")) { \
+		nb->SLOTNAME = slot_##SLOTNAME; \
+	}
+
+#define TPSLOT(OPNAME, SLOTNAME) \
+	if (PyDict_GetItemString(dict, "__" #OPNAME "__")) { \
+		type->SLOTNAME = slot_##SLOTNAME; \
+	}
+
+	SQSLOT(len, sq_length);
+	SQSLOT(add, sq_concat);
+	SQSLOT(mul, sq_repeat);
+	SQSLOT(getitem, sq_item);
+	SQSLOT(getslice, sq_slice);
+	SQSLOT(setitem, sq_ass_item);
+	SQSLOT(setslice, sq_ass_slice);
+	SQSLOT(contains, sq_contains);
+	SQSLOT(iadd, sq_inplace_concat);
+	SQSLOT(imul, sq_inplace_repeat);
+
+	MPSLOT(len, mp_length);
+	MPSLOT(getitem, mp_subscript);
+	MPSLOT(setitem, mp_ass_subscript);
+
+	NBSLOT(add, nb_add);
+	NBSLOT(sub, nb_subtract);
+	NBSLOT(mul, nb_multiply);
+	NBSLOT(div, nb_divide);
+	NBSLOT(mod, nb_remainder);
+	NBSLOT(divmod, nb_divmod);
+	NBSLOT(pow, nb_power);
+	NBSLOT(neg, nb_negative);
+	NBSLOT(pos, nb_positive);
+	NBSLOT(abs, nb_absolute);
+	NBSLOT(nonzero, nb_nonzero);
+	NBSLOT(invert, nb_invert);
+	NBSLOT(lshift, nb_lshift);
+	NBSLOT(rshift, nb_rshift);
+	NBSLOT(and, nb_and);
+	NBSLOT(xor, nb_xor);
+	NBSLOT(or, nb_or);
+	/* Not coerce() */
+	NBSLOT(int, nb_int);
+	NBSLOT(long, nb_long);
+	NBSLOT(float, nb_float);
+	NBSLOT(oct, nb_oct);
+	NBSLOT(hex, nb_hex);
+	NBSLOT(iadd, nb_inplace_add);
+	NBSLOT(isub, nb_inplace_subtract);
+	NBSLOT(imul, nb_inplace_multiply);
+	NBSLOT(idiv, nb_inplace_divide);
+	NBSLOT(imod, nb_inplace_remainder);
+	NBSLOT(ipow, nb_inplace_power);
+	NBSLOT(ilshift, nb_inplace_lshift);
+	NBSLOT(irshift, nb_inplace_rshift);
+	NBSLOT(iand, nb_inplace_and);
+	NBSLOT(ixor, nb_inplace_xor);
+	NBSLOT(ior, nb_inplace_or);
+
+	if (PyDict_GetItemString(dict, "__str__") ||
+	    PyDict_GetItemString(dict, "__repr__"))
+		type->tp_print = NULL;
+	
+	TPSLOT(cmp, tp_compare);
+	TPSLOT(repr, tp_repr);
+	TPSLOT(hash, tp_hash);
+	TPSLOT(call, tp_call);
+	TPSLOT(str, tp_str);
+	TPSLOT(lt, tp_richcompare);
+	TPSLOT(le, tp_richcompare);
+	TPSLOT(eq, tp_richcompare);
+	TPSLOT(ne, tp_richcompare);
+	TPSLOT(gt, tp_richcompare);
+	TPSLOT(ge, tp_richcompare);
+	TPSLOT(iter, tp_iter);
+	TPSLOT(next, tp_iternext);
 }
