@@ -285,8 +285,8 @@ compiler_unit_check(struct compiler_unit *u)
     assert(u->u_nblocks <= u->u_nalloc);
     for (i = 0; i < u->u_nblocks; i++) {
 	assert(u->u_blocks[i]);
-	assert(u->u_blocks[i] != 0xcbcbcbcb);
-	assert(u->u_blocks[i] != 0xfbfbfbfb);
+	assert(u->u_blocks[i] != (void *)0xcbcbcbcb);
+	assert(u->u_blocks[i] != (void *)0xfbfbfbfb);
     }
 }
 
@@ -808,6 +808,35 @@ compiler_continue(struct compiler *c)
 }
 
 static int
+compiler_assert(struct compiler *c, stmt_ty s)
+{
+	static PyObject *assertion_error = NULL;
+	int end;
+
+	if (assertion_error == NULL) {
+		assertion_error = PyString_FromString("AssertionError");
+		if (assertion_error == NULL)
+			return 0;
+	}
+	VISIT(c, expr, s->v.Assert.test);
+	end = compiler_new_block(c);
+	if (end < 0)
+		return 0;
+	ADDOP_JREL(c, JUMP_IF_TRUE, end);
+	ADDOP_O(c, LOAD_GLOBAL, assertion_error, names);
+	if (s->v.Assert.msg) {
+		VISIT(c, expr, s->v.Assert.msg);
+		ADDOP_I(c, RAISE_VARARGS, 2);
+	}
+	else {
+		ADDOP_I(c, RAISE_VARARGS, 1);
+	}
+	compiler_use_block(c, end);
+	return 1;
+}
+
+
+static int
 compiler_visit_stmt(struct compiler *c, stmt_ty s)
 {
 	int i, n;
@@ -880,7 +909,7 @@ compiler_visit_stmt(struct compiler *c, stmt_ty s)
         case TryFinally_kind:
 		break;
         case Assert_kind:
-		break;
+		return compiler_assert(c, s);
         case Import_kind:
 		break;
         case ImportFrom_kind:
