@@ -1,14 +1,69 @@
-MAKE=		make
+########################################################################
+# Copyright 1991, 1992, 1993, 1994 by Stichting Mathematisch Centrum,
+# Amsterdam, The Netherlands.
+# 
+#                         All Rights Reserved
+# 
+# Permission to use, copy, modify, and distribute this software and its 
+# documentation for any purpose and without fee is hereby granted, 
+# provided that the above copyright notice appear in all copies and that
+# both that copyright notice and this permission notice appear in 
+# supporting documentation, and that the names of Stichting Mathematisch
+# Centrum or CWI not be used in advertising or publicity pertaining to
+# distribution of the software without specific, written prior permission.
+# 
+# STICHTING MATHEMATISCH CENTRUM DISCLAIMS ALL WARRANTIES WITH REGARD TO
+# THIS SOFTWARE, INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND
+# FITNESS, IN NO EVENT SHALL STICHTING MATHEMATISCH CENTRUM BE LIABLE
+# FOR ANY SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
+# OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+########################################################################
 
-SUBDIRS=	Parser Grammar Objects Python
-SUBDIRSTOO=	Include Extensions readline
-DISTFILES=	README Makefile configure configure.in
+# Toplevel Makefile
+
+MAKE=		make
+SHELL=		/bin/sh
+
+DESTDIR=	/usr/local
+
+SUBDIRS=	Parser Objects Python Modules
+SUBDIRSTOO=	Include Lib Doc Misc Demo readline Grammar Extensions Contrib
+DISTFILES=	README TODO Makefile configure configure.in
 DIST=		$(DISTFILES) $(SUBDIRS) $(SUBDIRSTOO)
 
-all:		config.status
+all:		Makefiles
 		for i in $(SUBDIRS); do \
 			(echo $$i; cd $$i; $(MAKE) all); \
 		done
+
+python:		all
+
+install:	all
+		cp python $(DESTDIR)/bin/python
+		-if test ! -d $(DESTDIR)/lib/python; \
+		then mkdir $(DDESTDIR)/lib/python; \
+		fi
+		cp Lib/*.py $(DESTDIR)/lib/python
+		@echo Please install sgi, sun4, x11, stdwin manually if needed
+
+Makefiles:	config.status
+		for i in $(SUBDIRS); do \
+			(echo $$i; cd $$i; $(MAKE) Makefile) \
+		done
+
+config.status:	configure
+		if test -f config.status; \
+		then $(SHELL) config.status --recheck; \
+		else $(SHELL) configure; \
+		fi
+
+recheck:
+		$(SHELL) config.status --recheck
+
+configure:	configure.in
+		autoconf
 
 tags:		ctags -t Parser/*.[ch] Objects/*.[ch] Python/*.[ch] Include/*.h
 
@@ -21,38 +76,37 @@ depend:
 
 localclean:
 		-rm -f core *~ [@,#]* *.old *.orig *.rej
-		-(cd Include; rm -f core *~ [@,#]* *.old *.orig *.rej)
+		-(cd Include; rm -f *~ [@,#]* *.old *.orig *.rej)
 
 clean:		localclean
-		-for i in $(SUBDIRS); do \
-			(echo $$i; cd $$i; $(MAKE) clean); \
+		-for i in $(SUBDIRS) $(SUBDIRSTOO); do \
+			(echo $$i; cd $$i; \
+			 if test -f Makefile; \
+			 then $(MAKE) clean; \
+			 else $(MAKE) -f Makefile.in clean; \
+			 fi); \
 		done
 
 localclobber:	localclean
 		-rm -f tags TAGS config.status
 
 clobber:	localclobber
-		-for i in $(SUBDIRS); do \
-			(echo $$i; cd $$i; $(MAKE) clobber); \
+		-for i in $(SUBDIRS) $(SUBDIRSTOO); do \
+			(echo $$i; cd $$i; \
+			 if test -f Makefile; \
+			 then $(MAKE) clobber; \
+			 else $(MAKE) -f Makefile.in clobber; \
+			 fi); \
 		done
 
 distclean:	clobber
-		-for i in $(SUBDIRS); do \
-			if test -f $$i/Makefile.in; then \
-				rm -f $$i/Makefile; \
-			fi; \
+		-rm -f Include/config.h
+		-for i in $(SUBDIRS) $(SUBDIRSTOO); do \
+			(echo $$i; cd $$i; \
+			 if test -f Makefile.in; \
+			 then rm -f Makefile; \
+			 fi); \
 		done
-
-Makefiles:	config.status
-		./config.status
-
-config.status:	configure
-		./configure
-
-configure:	configure.in
-		autoconf
  
-tar:		dist.tar.Z
-
-dist.tar.Z:	$(DIST)
+tar:
 		tar cf - $(DIST) | compress >dist.tar.Z

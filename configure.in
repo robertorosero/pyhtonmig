@@ -1,6 +1,10 @@
 dnl Process this file with autoconf to produce a configure script.
 
 AC_INIT(Include/object.h)
+AC_CONFIG_HEADER(Include/config.h)
+
+echo checking for --with-solaris
+AC_WITH(solaris, [AC_DEFINE(SOLARIS)])
 
 # checks for alternative programs
 AC_PROG_CC
@@ -15,11 +19,10 @@ AC_DYNIX_SEQ
 
 # checks for header files
 AC_STDC_HEADERS
-AC_HAVE_HEADERS(dlfcn.h signal.h stdarg.h unistd.h utime.h sys/param.h sys/select.h sys/times.h sys/utsname.h)
+AC_HAVE_HEADERS(dlfcn.h signal.h stdarg.h stdlib.h unistd.h utime.h sys/param.h sys/select.h sys/times.h sys/utsname.h)
 AC_DIR_HEADER
 
 # checks for typedefs
-AC_GETGROUPS_T
 AC_MODE_T
 AC_OFF_T
 AC_PID_T
@@ -29,24 +32,23 @@ AC_UID_T
 
 # checks for libraries
 AC_HAVE_LIBRARY(dl)
-LIBS="${LIBS} -L${READLINESRC-${PWD-${CWD-`pwd`}}/readline}"
-AC_HAVE_LIBRARY(readline)
-if test -n "${have_lib}"; then
-AC_HAVE_LIBRARY(termcap)
-fi
+AC_HAVE_LIBRARY(socket)
+AC_HAVE_LIBRARY(nsl)
 
-# Check for IRIX or SOLARIS thread interface
-AC_HAVE_LIBRARY(mpc)
-if test -n "${have_lib}"; then
-DEFS="${DEFS} -DUSE_THREAD"
-LIBOBJS="${LIBOBJS} thread.o"
-fi
+echo checking for --with-readline
+AC_WITH(readline, [AC_DEFINE(WITH_READLINE)
+if test "$withval" != 1; then LIBS="$LIBS -L$withval"; fi
+LIBS="$LIBS -lreadline -ltermcap"])
 
-AC_HAVE_LIBRARY(thread)
-if test -n "${have_lib}"; then
-DEFS="${DEFS} -DUSE_THREAD"
-LIBOBJS="${LIBOBJS} thread.o"
-fi
+echo checking for --with-thread
+AC_WITH(thread, [
+AC_HAVE_LIBRARY(mpc, [AC_DEFINE(USE_THREAD)
+LIBS="$LIBS -lmpc"
+LIBOBJS="$LIBOBJS thread.o"])
+AC_HAVE_LIBRARY(thread, [AC_DEFINE(USE_THREAD)
+LIBS="$LIBS -lthread"
+LIBOBJS="$LIBOBJS thread.o"])
+])
 
 # checks for library functions
 AC_HAVE_FUNCS(clock ftime gettimeofday getpgrp getwd lstat readlink readline select setsid setpgid setpgrp siginterrupt symlink tcgetpgrp tcsetpgrp times uname waitpid)
@@ -74,4 +76,4 @@ AC_IRIX_SUN
 AC_XENIX_DIR
 
 # generate output files
-AC_OUTPUT(Objects/Makefile Parser/Makefile Python/Makefile)
+AC_OUTPUT(Objects/Makefile Parser/Makefile Python/Makefile Modules/Makefile)
