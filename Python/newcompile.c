@@ -15,40 +15,34 @@ int Py_OptimizeFlag = 0;
 /*
    KNOWN BUGS:
 
-     1:
-       using coding statement, such as in getopt:
+   Seg Faults:
+     #: using coding statement, such as in getopt:
        		# -*- coding: iso-8859-1 -*-
-       needs to be implemented (see also Python/ast.c encoding_decl)
+        needs to be implemented (see also Python/ast.c encoding_decl)
+     #: exec 'from __future__ import division' seg faults
+        exec generally still has problems
+     #: test_errno fails because stackdepth() isn't implemented (assert'ed)
 
-     2:
-       Get this err msg: XXX rd_object called with exception set
-       From Python/marshal.c::PyMarshal_ReadLastObjectFromFile()
-       This looks like it may be related to #1.
+   Inappropriate Exceptions:
+     #: problem with cell objects (see test_builtins::test_map)
+     #: x = [1] ; x[0] += 1 
+        raises TypeError: object does not support item assignment
+     #: Get this err msg: XXX rd_object called with exception set
+        From Python/marshal.c::PyMarshal_ReadLastObjectFromFile()
+        This looks like it may be related to encoding not being implemented.
 
-     3:
-       LOAD_NAME is output instead of LOAD_GLOBAL
-
-     4:
-       line numbers are off a bit (may just need to add calls to set lineno)
-
-     5:
-       Modules/parsermodule.c:496: warning: implicit declaration 
-                                   of function `PyParser_SimpleParseString'
-
-     6:
-       compile.h::b_return is only set, never used
-
-     7:
-       compound arguments cause seg fault (def f5((compound, first), two):)
-
-     8:
-       exec ... in ... seg faults (exec w/o in works)
-
-     9:
-       vars() doesn't return local variables
-
-     10:
-       problem with cell objects (see test_builtins::test_map)
+   Invalid behaviour:
+     #: vars() doesn't return local variables
+     #: co_names doesn't contain any names
+     #: doc strings at class scope are POPed, not stored
+        In interactive mode, they are printed. :-)
+     #: ref leaks in interpreter when press return on empty line
+     #: yield or return outside a function don't raise a SyntaxError
+     #: LOAD_NAME is output instead of LOAD_GLOBAL
+     #: line numbers are off a bit (may just need to add calls to set lineno)
+     #: Modules/parsermodule.c:496: warning: implicit declaration 
+                                    of function `PyParser_SimpleParseString'
+     #: compile.h::b_return is only set, never used
 */
 
 /* fblockinfo tracks the current frame block.
@@ -745,7 +739,18 @@ compiler_function(struct compiler *c, stmt_ty s)
 		VISIT_SEQ(c, expr, args->defaults);
 	if (!compiler_enter_scope(c, s->v.FunctionDef.name, (void *)s))
 		return 0;
-	c->u->u_argcount = asdl_seq_LEN(s->v.FunctionDef.args->args);
+        /* unpack nested arguments */
+        for (i = 0; i < asdl_seq_LEN(args->args); i++) {
+            expr_ty arg = asdl_seq_GET(args->args, i);
+            if (arg->kind == Tuple_kind) {
+                PyObject *id = PyString_FromFormat(".%d", i);
+                if (id == NULL || !compiler_nameop(c, id, Load))
+                    return 0;
+                VISIT(c, expr, arg);
+            }
+        }
+
+	c->u->u_argcount = asdl_seq_LEN(args->args);
 	n = asdl_seq_LEN(s->v.FunctionDef.body);
 	for (i = 0; i < n; i++) {
 		stmt_ty s2 = asdl_seq_GET(s->v.FunctionDef.body, i);
@@ -773,6 +778,7 @@ compiler_class(struct compiler *c, stmt_ty s)
 {
 	int n;
 	PyCodeObject *co;
+        PyObject *str;
 	/* push class name on stack, needed by BUILD_CLASS */
 	ADDOP_O(c, LOAD_CONST, s->v.ClassDef.name, consts);
 	/* push the tuple of base classes on the stack */
@@ -782,6 +788,21 @@ compiler_class(struct compiler *c, stmt_ty s)
 	ADDOP_I(c, BUILD_TUPLE, n);
 	if (!compiler_enter_scope(c, s->v.ClassDef.name, (void *)s))
 		return 0;
+        str = PyString_InternFromString("__name__");
+	if (!str || !compiler_nameop(c, str, Load)) {
+		Py_XDECREF(str);
+		return 0;
+        }
+        
+        Py_DECREF(str);
+        str = PyString_InternFromString("__module__");
+	if (!str || !compiler_nameop(c, str, Store)) {
+		Py_XDECREF(str);
+		return 0;
+        }
+        Py_DECREF(str);
+
+        /* XXX: doc strings go POP_TOP, instead of STORE_NAME (__doc__) */
 	VISIT_SEQ(c, stmt, s->v.ClassDef.body);
 	ADDOP(c, LOAD_LOCALS);
 	ADDOP(c, RETURN_VALUE);
@@ -1536,7 +1557,7 @@ compiler_nameop(struct compiler *c, identifier name, expr_context_ty ctx)
 		case AugStore:
 			break;
 		case Param:
-			assert(0); /* impossible */
+                    assert(0); /* impossible */
 		}
 		ADDOP_O(c, op, name, varnames);
 		return 1;
@@ -1713,9 +1734,13 @@ compiler_listcomp_generator(struct compiler *c,
                             asdl_seq *generators, int gen_index, 
                             expr_ty elt)
 {
+        /* need to capture u_tmp here for nested list comps,
+           u_tmp is set to NULL in compiler_listcomp */
+        PyObject *u_tmp = c->u->u_tmp;
+
 	/* generate code for the iterator, then each of the ifs,
 	   and then write to the element */
-	
+
 	listcomp_ty l;
 	int start, anchor, skip, if_cleanup, i, n;
 
@@ -1751,7 +1776,7 @@ compiler_listcomp_generator(struct compiler *c,
 
         /* only append after the last for generator */
         if (gen_index >= asdl_seq_LEN(generators)) {
-            if (!compiler_nameop(c, c->u->u_tmp, Load))
+            if (!compiler_nameop(c, u_tmp, Load))
 		return 0;
             VISIT(c, expr, elt);
             ADDOP_I(c, CALL_FUNCTION, 1);
@@ -1769,7 +1794,7 @@ compiler_listcomp_generator(struct compiler *c,
 	compiler_use_next_block(c, anchor);
         /* delete the append method added to locals */
 	if (gen_index == 1)
-            if (!compiler_nameop(c, c->u->u_tmp, Del))
+            if (!compiler_nameop(c, u_tmp, Del))
 		return 0;
 	
 	return 1;
@@ -1789,8 +1814,7 @@ compiler_listcomp(struct compiler *c, expr_ty e)
 		if (!append)
 			return 0;
 	}
-	PyOS_snprintf(tmpname, sizeof(tmpname), "_[%d]",
-		      ++c->u->u_tmpname);
+	PyOS_snprintf(tmpname, sizeof(tmpname), "_[%d]", ++c->u->u_tmpname);
 	tmp = PyString_FromString(tmpname);
 	if (!tmp)
 		return 0;
@@ -2165,7 +2189,7 @@ static int
 stackdepth(struct compiler *c)
 {
 	/* XXX need to do this */
-	return 100;
+	return 1000;
 }
 
 static int
