@@ -8,6 +8,8 @@ AC_CONFIG_HEADER(config.h)dnl
 AC_PROG_CC
 AC_PROG_INSTALL
 AC_PROG_RANLIB
+AC_SUBST(AR)
+AC_PROGRAMS_CHECK(AR, ar aal, ar)
 
 # checks for UNIX variants that set C preprocessor variables
 AC_AIX
@@ -18,7 +20,7 @@ AC_DYNIX_SEQ
 
 # checks for header files
 AC_STDC_HEADERS
-AC_HAVE_HEADERS(dlfcn.h signal.h stdarg.h stdlib.h thread.h unistd.h utime.h sys/audioio.h sys/param.h sys/select.h sys/times.h sys/un.h sys/utsname.h)
+AC_HAVE_HEADERS(dlfcn.h signal.h stdarg.h stdlib.h thread.h unistd.h utime.h sys/audioio.h sys/param.h sys/select.h sys/time.h sys/times.h sys/un.h sys/utsname.h)
 AC_DIR_HEADER
 
 # checks for typedefs
@@ -85,7 +87,7 @@ DLINCLDIR=${dldir}
 LIBS="$LIBS -ldl -ldld"])
 
 # checks for library functions
-AC_HAVE_FUNCS(clock ftime gettimeofday getpeername getpgrp getpid getwd lstat readlink select setsid setpgid setpgrp siginterrupt symlink tcgetpgrp tcsetpgrp times uname waitpid)
+AC_HAVE_FUNCS(clock ftime gettimeofday getpeername getpgrp getpid getwd lstat nice readlink select setsid setpgid setpgrp siginterrupt symlink tcgetpgrp tcsetpgrp times uname waitpid)
 AC_REPLACE_FUNCS(dup2 getcwd strerror strtod memmove)
 AC_FUNC_CHECK(getpgrp, AC_COMPILE_CHECK([argument to getpgrp], [#include <unistd.h>], [getpgrp(0);], AC_DEFINE(GETPGRP_HAVE_ARG)))
 

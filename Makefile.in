@@ -51,6 +51,9 @@ SHELL=		/bin/sh
 # (see README for an explanation)
 WITH=		
 
+# Compiler options passed to subordinate makes
+OPT=		-O
+
 # Subdirectories where to run make recursively
 SUBDIRS=	Parser Objects Python Modules
 
@@ -69,7 +72,7 @@ all:		python
 # Build the interpreter
 python:		Makefiles
 		for i in $(SUBDIRS); do \
-			(echo $$i; cd $$i; $(MAKE) all); \
+			(echo $$i; cd $$i; $(MAKE) OPT="$(OPT)" all); \
 		done
 
 # Test the interpreter (twice, once without .pyc files, once with)
@@ -143,7 +146,7 @@ config.status:	$(srcdir)/configure
 		else $(SHELL) $(srcdir)/configure $(WITH); \
 		fi
 
-.PRECIOUS:	config.status
+.PRECIOUS:	config.status python
 
 # Rerun configure with the same options as it was run last time,
 # provided the config.status script exists

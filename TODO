@@ -1,4 +1,6 @@
+
 change notes in Setup about gmp
+fix FAQ
 AIX changes, notes file
 Add NEWS and HISTORY to Misc directory
 make freeze script working again (use Extensions/mkext.py as a base?)
