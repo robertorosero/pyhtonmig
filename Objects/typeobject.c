@@ -483,8 +483,10 @@ type_new(PyTypeObject *metatype, PyObject *args, PyObject *kwds)
 
 	/* Initialize tp_introduced from passed-in dict */
 	type->tp_introduced = dict = PyDict_Copy(dict);
-	if (dict == NULL)
+	if (dict == NULL) {
+		Py_DECREF(type);
 		return NULL;
+	}
 
 	/* Add descriptors for custom slots from __slots__, or for __dict__ */
 	mp = et->members;
@@ -497,7 +499,7 @@ type_new(PyTypeObject *metatype, PyObject *args, PyObject *kwds)
 				PyTuple_GET_ITEM(slots, i));
 			mp->type = T_OBJECT;
 			mp->offset = slotoffset;
-			slotoffset += i*sizeof(PyObject *);
+			slotoffset += sizeof(PyObject *);
 		}
 	}
 	else if (nslots) {
@@ -524,8 +526,10 @@ type_new(PyTypeObject *metatype, PyObject *args, PyObject *kwds)
 		type->tp_alloc = PyType_GenericAlloc;
 
 	/* Initialize the rest */
-	if (PyType_InitDict(type) < 0)
+	if (PyType_InitDict(type) < 0) {
+		Py_DECREF(type);
 		return NULL;
+	}
 
 	/* Override slots that deserve it */
 	override_slots(type, type->tp_dict);
@@ -643,7 +647,7 @@ PyTypeObject PyBaseObject_Type = {
 	0,					/* tp_call */
 	0,					/* tp_str */
 	PyObject_GenericGetAttr,		/* tp_getattro */
-	0,					/* tp_setattro */
+	PyObject_GenericSetAttr,		/* tp_setattro */
 	0,					/* tp_as_buffer */
 	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE, /* tp_flags */
 	"The most base type",			/* tp_doc */
