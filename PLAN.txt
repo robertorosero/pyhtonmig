@@ -15,7 +15,11 @@ base type that defines a comparison.
 Fix subtype_dealloc().  This currently searches through the list of
 base types until it finds a type whose tp_dealloc is not
 subtype_dealloc.  I think this is not safe.  I think the alloc/dealloc
-policy needs to be rethought.
+policy needs to be rethought.  *** There's an idea here that I haven't
+worked out yet: just as object creation now has separate API's tp_new,
+tp_alloc, and tp_init, destruction has tp_dealloc and tp_free.  (Maybe
+tp_fini should be added to correspond to tp_init?)  Something
+could/should be done with this. ***
 
 Clean up isinstance(), issubclass() and their C equivalents.  There
 are a bunch of different APIs here and not all of them do the right
