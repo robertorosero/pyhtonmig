@@ -642,6 +642,7 @@ symtable_visit_stmt(struct symtable *st, stmt_ty s)
 		break;
         case Yield_kind:
 		VISIT(st, expr, s->v.Yield.value);
+                st->st_cur->ste_generator = 1;
 		break;
         case Delete_kind:
 		VISIT_SEQ(st, expr, s->v.Delete.targets);

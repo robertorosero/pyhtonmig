@@ -2732,6 +2732,8 @@ compute_code_flags(struct compiler *c)
 		flags |= CO_VARARGS;
 	if (ste->ste_varkeywords)
 		flags |= CO_VARKEYWORDS;
+	if (ste->ste_generator)
+		flags |= CO_GENERATOR;
 	n = PyDict_Size(c->u->u_freevars);
 	if (n < 0)
 	    return -1;
