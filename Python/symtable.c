@@ -783,7 +783,7 @@ symtable_visit_expr(struct symtable *st, expr_ty e)
 		tmp = PyString_FromString(tmpname);
 		if (!symtable_add_def(st, tmp, DEF_LOCAL))
 			return 0;
-		VISIT(st, expr, e->v.ListComp.target);
+		VISIT(st, expr, e->v.ListComp.elt);
 		VISIT_SEQ(st, listcomp, e->v.ListComp.generators);
 		break;
 	}

@@ -168,8 +168,8 @@ mod_ty PyAST_FromNode(const node *n)
  error:
     if (stmts)
 	asdl_seq_free(stmts);
-    fprintf(stderr, "error in PyAST_FromNode() exc? %d\n",
-	    PyErr_Occurred());
+    fprintf(stderr, "error in PyAST_FromNode() exc?\n");
+    PyErr_Occurred();
     return NULL;
 }
 
@@ -492,7 +492,7 @@ ast_for_listcomp(const node *n)
        list_if: 'if' test [list_iter]
        testlist_safe: test [(',' test)+ [',']]
     */
-    expr_ty target;
+    expr_ty elt;
     asdl_seq *listcomps;
     int i, n_fors;
     node *ch;
@@ -500,10 +500,10 @@ ast_for_listcomp(const node *n)
     REQ(n, listmaker);
     assert(NCH(n) > 1);
 
-    target = ast_for_expr(CHILD(n, 0));
-    if (!target)
+    elt = ast_for_expr(CHILD(n, 0));
+    if (!elt)
 	    return NULL;
-    set_context(target, Store);
+    set_context(elt, Load);
 
     n_fors = count_list_fors(n);
     listcomps = asdl_seq_new(n_fors);
@@ -540,7 +540,7 @@ ast_for_listcomp(const node *n)
 	asdl_seq_APPEND(listcomps, c);
     }
 
-    return ListComp(target, listcomps);
+    return ListComp(elt, listcomps);
 }
 
 static expr_ty
