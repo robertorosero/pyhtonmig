@@ -813,6 +813,8 @@ compiler_assert(struct compiler *c, stmt_ty s)
 	static PyObject *assertion_error = NULL;
 	int end;
 
+	if (Py_OptimizeFlag)
+		return 0;
 	if (assertion_error == NULL) {
 		assertion_error = PyString_FromString("AssertionError");
 		if (assertion_error == NULL)
