@@ -79,13 +79,28 @@ type_call(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	PyObject_INIT(obj, type);
 
 	res = (type->tp_construct)(obj, args, kwds);
-	if (res != obj) {
+	if (res == NULL) {
 		Py_DECREF(obj);
-		if (res == NULL)
-			return NULL;
+		return NULL;
 	}
 	if (PyType_IS_GC(type))
 		PyObject_GC_Init(res);
+	if (type->tp_flags & Py_TPFLAGS_HEAPTYPE) {
+		PyObject *init, *dummy;
+
+		init = PyObject_GetAttrString(res, "__init__");
+		if (init == NULL) {
+			PyErr_Clear();
+			return res;
+		}
+		dummy = PyObject_Call(init, args, kwds);
+		Py_DECREF(init);
+		if (dummy == NULL) {
+			Py_DECREF(obj);
+			return NULL;
+		}
+		Py_DECREF(dummy);
+	}
 	return res;
 }
 
@@ -118,6 +133,9 @@ subtype_dealloc(PyObject *self)
 	int dictoffset = self->ob_type->tp_dictoffset;
 	PyTypeObject *base;
 	destructor f;
+
+	/* XXX Alternatively, we could call tp_clear to clear the object;
+	   but this is not guaranteed to delete all pointers, just likely. */
 
 	base = self->ob_type->tp_base;
 	while ((f = base->tp_dealloc) == subtype_dealloc)
@@ -158,11 +176,6 @@ type_construct(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	int i, nslots, slotoffset, allocsize;
 
 	/* Check arguments */
-	if (type != NULL) {
-		PyErr_SetString(PyExc_TypeError,
-				"can't construct a preallocated type");
-		return NULL;
-	}
 	if (!PyArg_ParseTupleAndKeywords(args, kwds, "SOO", &dummy,
 					 &name, &bases, &dict))
 		return NULL;
@@ -221,12 +234,26 @@ type_construct(PyTypeObject *type, PyObject *args, PyObject *kwds)
 
 	/* Allocate memory and construct a type object in it */
 	allocsize = sizeof(etype) + nslots*sizeof(struct memberlist);
-	et = PyObject_MALLOC(allocsize);
-	if (et == NULL)
-		return NULL;
-	memset(et, '\0', allocsize);
-	type = &et->type;
-	PyObject_INIT(type, &PyDynamicType_Type);
+	if (type == NULL) {
+		et = PyObject_MALLOC(allocsize);
+		if (et == NULL)
+			return NULL;
+		memset(et, '\0', allocsize);
+		type = &et->type;
+		PyObject_INIT(type, &PyType_Type);
+	}
+	else {
+		if (type->ob_type->tp_basicsize < allocsize) {
+			PyErr_Format(
+				PyExc_SystemError,
+				"insufficient allocated memory for subtype: "
+				"allocated %d, needed %d",
+				type->ob_type->tp_basicsize,
+				allocsize);
+			return NULL;
+		}
+		et = (etype *)type;
+	}
 	Py_INCREF(name);
 	et->name = name;
 	et->slots = slots;
@@ -235,7 +262,7 @@ type_construct(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	type->tp_as_mapping = &et->as_mapping;
 	type->tp_as_buffer = &et->as_buffer;
 	type->tp_name = PyString_AS_STRING(name);
-	type->tp_flags = Py_TPFLAGS_DEFAULT;
+	type->tp_flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HEAPTYPE;
 
 	/* Copy slots and dict from the base type */
 	Py_INCREF(base);
@@ -293,13 +320,29 @@ type_construct(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	return (PyObject *)type;
 }
 
+static void
+type_dealloc(PyTypeObject *type)
+{
+	etype *et;
+
+	/* Assert this is a heap-allocated type object, or uninitialized */
+	if (type->tp_flags != 0)
+		assert(type->tp_flags & Py_TPFLAGS_HEAPTYPE);
+	et = (etype *)type;
+	Py_XDECREF(type->tp_base);
+	Py_XDECREF(type->tp_dict);
+	Py_XDECREF(et->name);
+	Py_XDECREF(et->slots);
+	PyObject_DEL(type);
+}
+
 PyTypeObject PyType_Type = {
-	PyObject_HEAD_INIT(&PyTurtle_Type)
+	PyObject_HEAD_INIT(&PyType_Type)
 	0,			/* Number of items for varobject */
 	"type",			/* Name of this type */
-	sizeof(PyTypeObject),	/* Basic object size */
+	sizeof(etype) + sizeof(struct memberlist), /* Basic object size */
 	0,			/* Item size for varobject */
-	0,					/* tp_dealloc */
+	(destructor)type_dealloc,		/* tp_dealloc */
 	0,					/* tp_print */
 	0,			 		/* tp_getattr */
 	0,					/* tp_setattr */
@@ -330,153 +373,6 @@ PyTypeObject PyType_Type = {
 	0,					/* tp_descr_get */
 	0,					/* tp_descr_set */
 	(ternaryfunc)type_construct,		/* tp_construct */
-	offsetof(PyTypeObject, tp_dict),	/* tp_dictoffset */
-};
-
-/* Support for dynamic types, created by type_construct() above */
-
-static PyObject *
-dtype_call(PyTypeObject *type, PyObject *args, PyObject *kwds)
-{
-	PyObject *newobj, *init, *res;
-
-	newobj = type_call(type, args, kwds);
-	if (newobj == NULL)
-		return NULL;
-	init = PyObject_GetAttrString(newobj, "__init__");
-	if (init == NULL) {
-		PyErr_Clear();
-		return newobj;
-	}
-	res = PyObject_Call(init, args, kwds);
-	Py_DECREF(init);
-	if (res == NULL) {
-		Py_DECREF(newobj);
-		return NULL;
-	}
-	Py_DECREF(res);
-	return newobj;
-}
-
-static void
-dtype_dealloc(PyTypeObject *type)
-{
-	etype *et = (etype *)type;
-
-	Py_XDECREF(type->tp_base);
-	Py_XDECREF(type->tp_dict);
-	Py_XDECREF(et->name);
-	Py_XDECREF(et->slots);
-	PyObject_DEL(type);
-}
-
-PyTypeObject PyDynamicType_Type = {
-	PyObject_HEAD_INIT(&PyTurtle_Type)
-	0,			/* Number of items for varobject */
-	"dynamic-type",		/* Name of this type */
-	sizeof(PyTypeObject),	/* Basic object size */
-	0,			/* Item size for varobject */
-	(destructor)dtype_dealloc,		/* tp_dealloc */
-	0,					/* tp_print */
-	0,			 		/* tp_getattr */
-	0,					/* tp_setattr */
-	0,					/* tp_compare */
-	(reprfunc)type_repr,			/* tp_repr */
-	0,					/* tp_as_number */
-	0,					/* tp_as_sequence */
-	0,					/* tp_as_mapping */
-	0,					/* tp_hash */
-	(ternaryfunc)dtype_call,		/* tp_call */
-	0,					/* tp_str */
-	PyGeneric_GetAttr,			/* tp_getattro */
-	PyGeneric_SetAttr,			/* tp_setattro */
-	0,					/* tp_as_buffer */
-	Py_TPFLAGS_DEFAULT,			/* tp_flags */
-	"Define the behavior of a particular type of object.", /* tp_doc */
-	0,					/* tp_traverse */
-	0,					/* tp_clear */
-	0,					/* tp_richcompare */
-	0,					/* tp_weaklistoffset */
-	0,					/* tp_iter */
-	0,					/* tp_iternext */
-	0,					/* tp_methods */
-	type_members,				/* tp_members */
-	type_getsets,				/* tp_getset */
-	&PyType_Type,				/* tp_base */
-	0,					/* tp_dict */
-	0,					/* tp_descr_get */
-	0,					/* tp_descr_set */
-	(ternaryfunc)type_construct,		/* tp_construct */
-	offsetof(PyTypeObject, tp_dict),	/* tp_dictoffset */
-};
-
-
-/* The "turtle" type is named after the expression "turtles all the way down",
-   a reference to the fact that it is its own type.  We get the progression:
-   x                => {} # for example
-   type(x)          => DictType
-   type(DictType)   => TypeType
-   type(TypeType)   => TurtleType
-   type(TurtleType) => TurtleType
-   type(TurtleType) => TurtleType
-   type(TurtleType) => TurtleType
-   .
-   .
-   .
-   It's from an old story often told about Bertrand Russel, popularized most
-   recently by Stephen Hawking; do a Google search for the phrase to find out
-   more.  The oldest turtle reference in the Python archives seems to be:
-   http://mail.python.org/pipermail/types-sig/1998-November/000084.html */
-
-static PyObject *
-turtle_call(PyTypeObject *metatype, PyObject *args, PyObject *kwds)
-{
-	if (metatype->tp_construct == NULL) {
-		PyErr_Format(PyExc_TypeError,
-			     "can't subclass '.%100s' objects yet",
-			     metatype->tp_name);
-		return NULL;
-	}
-	return (*metatype->tp_construct)(NULL, args, kwds);
-}
-
-PyTypeObject PyTurtle_Type = {
-	PyObject_HEAD_INIT(&PyTurtle_Type)
-	0,			/* Number of items for varobject */
-	"turtle",		/* Name of this type */
-	sizeof(PyTypeObject),	/* Basic object size */
-	0,			/* Item size for varobject */
-	0,					/* tp_dealloc */
-	0,					/* tp_print */
-	0,			 		/* tp_getattr */
-	0,					/* tp_setattr */
-	0,					/* tp_compare */
-	(reprfunc)type_repr,			/* tp_repr */
-	0,					/* tp_as_number */
-	0,					/* tp_as_sequence */
-	0,					/* tp_as_mapping */
-	0,					/* tp_hash */
-	(ternaryfunc)turtle_call,		/* tp_call */
-	0,					/* tp_str */
-	PyGeneric_GetAttr,			/* tp_getattro */
-	0,					/* tp_setattro */
-	0,					/* tp_as_buffer */
-	Py_TPFLAGS_DEFAULT,			/* tp_flags */
-	"Define the behavior of a particular type of object.", /* tp_doc */
-	0,					/* tp_traverse */
-	0,					/* tp_clear */
-	0,					/* tp_richcompare */
-	0,					/* tp_weaklistoffset */
-	0,					/* tp_iter */
-	0,					/* tp_iternext */
-	0,					/* tp_methods */
-	type_members,				/* tp_members */
-	type_getsets,				/* tp_getset */
-	&PyType_Type,				/* tp_base */
-	0,					/* tp_dict */
-	0,					/* tp_descr_get */
-	0,					/* tp_descr_set */
-	0,					/* tp_construct */
 	offsetof(PyTypeObject, tp_dict),	/* tp_dictoffset */
 };
 
