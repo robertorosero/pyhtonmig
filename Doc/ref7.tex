@@ -266,7 +266,8 @@ section \ref{types}):
 
 \begin{verbatim}
 funcdef:        "def" funcname "(" [parameter_list] ")" ":" suite
-parameter_list: (parameter ",")* ("*" identifier | parameter [","])
+parameter_list: (defparameter ",")* ("*" identifier | defparameter [","])
+defparameter:   parameter ["=" condition]
 sublist:        parameter ("," parameter)* [","]
 parameter:      identifier | "(" sublist ")"
 funcname:       identifier
@@ -283,8 +284,21 @@ as the global name space to be used when the function is called.
 The function definition does not execute the function body; this gets
 executed only when the function is called.
 
+When one or more top-level parameters have the form {\em parameter =
+condition}, the function is said to have ``default parameter values''.
+Default parameter values are evaluated when the function definition is
+executed.  For a parameter with a default value, the correponding
+argument may be omitted from a call, in which case the parameter's
+default value is substituted.  If a parameter has a default value, all
+following parameters must also have a default value --- this is a
+syntactic restriction that is not expressed by the grammar.%
+\footnote{Currently this is not checked; instead,
+\verb@def f(a=1,b)@ is interpreted as \verb@def f(a=1,b=None)@.
+\indexiii{default}{parameter}{value}
+
 Function call semantics are described in section \ref{calls}.  When a
-user-defined function is called, the arguments (a.k.a. actual
+user-defined function is called, first missing arguments for which a
+default value exists are supplied; then the arguments (a.k.a. actual
 parameters) are bound to the (formal) parameters, as follows:
 \indexii{function}{call}
 \indexiii{user-defined}{function}{call}
@@ -292,11 +306,6 @@ parameters) are bound to the (formal) parameters, as follows:
 \index{argument}
 \indexii{parameter}{formal}
 \indexii{parameter}{actual}
-
-It is also possible to create anonymous functions (functions not bound
-to a name), for immediate use in expressions.  This uses lambda forms,
-described in section \ref{lambda}.
-\indexii{lambda}{form}
 
 \begin{itemize}
 
@@ -336,6 +345,11 @@ safety it offers (wrong-sized tuples aren't silently mistreated),
 variable length parameter lists are a sufficiently accepted practice
 in most programming languages that a compromise has been worked out.
 (And anyway, assignment has no equivalent for empty argument lists.)
+
+It is also possible to create anonymous functions (functions not bound
+to a name), for immediate use in expressions.  This uses lambda forms,
+described in section \ref{lambda}.
+\indexii{lambda}{form}
 
 \section{Class definitions} \label{class}
 \indexii{class}{definition}
