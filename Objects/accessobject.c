@@ -26,7 +26,7 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 /* XXX TO DO LIST
    - __init__ and __del__ (and all other similar methods)
-     should be usable even when private, not ignored (???)
+     should be usable even when private, not ignored
 */
 
 #include "allobjects.h"
