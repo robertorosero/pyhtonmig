@@ -1,4 +1,3 @@
-
 #!/bin/sh
 # Guess values for system-dependent variables and create Makefiles.
 # Generated automatically using autoconf.
@@ -987,7 +986,7 @@ fi
 rm -f conftest*
 done
 
-for func in dup2 getcwd strerror strtoul strtod memmove
+for func in dup2 getcwd strerror strtod memmove
 do
 echo checking for ${func}
 cat > conftest.c <<EOF
