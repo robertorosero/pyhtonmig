@@ -586,46 +586,77 @@ PyObject *
 _PyType_Lookup(PyTypeObject *type, PyObject *name)
 {
 	int i, n;
-	PyObject *mro = type->tp_mro, *res;
+	PyObject *mro, *res, *dict;
 
+	/* For static types, look in tp_dict */
+	if (!(type->tp_flags & Py_TPFLAGS_DYNAMICTYPE)) {
+		dict = type->tp_dict;
+		assert(dict && PyDict_Check(dict));
+		return PyDict_GetItem(dict, name);
+	}
+
+	/* For dynamic types, look in tp_defined of types in MRO */
+	mro = type->tp_mro;
 	assert(PyTuple_Check(mro));
 	n = PyTuple_GET_SIZE(mro);
 	for (i = 0; i < n; i++) {
 		type = (PyTypeObject *) PyTuple_GET_ITEM(mro, i);
 		assert(PyType_Check(type));
-		assert(type->tp_dict && PyDict_Check(type->tp_dict));
-		res = PyDict_GetItem(type->tp_dict, name);
+		dict = type->tp_defined;
+		assert(dict && PyDict_Check(dict));
+		res = PyDict_GetItem(dict, name);
 		if (res != NULL)
 			return res;
 	}
 	return NULL;
 }
 
+/* This is similar to PyObject_GenericGetAttr(),
+   but uses _PyType_Lookup() instead of just looking in type->tp_dict. */
 static PyObject *
 type_getattro(PyTypeObject *type, PyObject *name)
 {
+	PyTypeObject *metatype = type->ob_type;
 	PyObject *descr, *res;
 	descrgetfunc f;
 
+	/* Initialize this type (we'll assume the metatype is initialized) */
 	if (type->tp_dict == NULL) {
 		if (PyType_InitDict(type) < 0)
 			return NULL;
 	}
-	descr = PyObject_GenericGetAttr((PyObject *)type, name);
-	if (descr == NULL) {
-		descr = _PyType_Lookup(type, name);
-		if (descr == NULL)
-			return NULL;
-		PyErr_Clear();
-		Py_INCREF(descr);
+
+	/* Get a descriptor from the metatype */
+	descr = _PyType_Lookup(metatype, name);
+	f = NULL;
+	if (descr != NULL) {
+		f = descr->ob_type->tp_descr_get;
+		if (f != NULL && PyDescr_IsData(descr))
+			return f(descr, (PyObject *)type);
 	}
-	f = descr->ob_type->tp_descr_get;
-	if (f != NULL) {
-		res = f(descr, NULL);
-		Py_DECREF(descr);
+
+	/* Look in tp_defined of this type and its bases */
+	res = _PyType_Lookup(type, name);
+	if (res != NULL) {
+		Py_INCREF(res);
 		return res;
 	}
-	return descr;
+
+	/* Use the descriptor from the metatype */
+	if (f != NULL) {
+		res = f(descr, NULL);
+		return res;
+	}
+	if (descr != NULL) {
+		Py_INCREF(descr);
+		return descr;
+	}
+
+	/* Give up */
+	PyErr_Format(PyExc_AttributeError,
+		     "type object '%.50s' has no attribute '%.400s'",
+		     type->tp_name, PyString_AS_STRING(name));
+	return NULL;
 }
 
 static int

@@ -1122,7 +1122,7 @@ PyObject_GenericGetAttr(PyObject *obj, PyObject *name)
 			return NULL;
 	}
 
-	descr = PyDict_GetItem(tp->tp_dict, name);
+	descr = _PyType_Lookup(tp, name);
 	f = NULL;
 	if (descr != NULL) {
 		f = descr->ob_type->tp_descr_get;
@@ -1150,20 +1150,6 @@ PyObject_GenericGetAttr(PyObject *obj, PyObject *name)
 		return descr;
 	}
 
-	if (tp->tp_flags & Py_TPFLAGS_DYNAMICTYPE) {
-		/* Look through base classes tp_defined, in MRO */
-		descr = _PyType_Lookup(tp, name);
-		if (descr != NULL) {
-			f = descr->ob_type->tp_descr_get;
-			if (f != NULL)
-				return f(descr, obj);
-			else {
-				Py_INCREF(descr);
-				return descr;
-			}
-		}
-	}
-
 	PyErr_Format(PyExc_AttributeError,
 		     "'%.50s' object has no attribute '%.400s'",
 		     tp->tp_name, PyString_AS_STRING(name));
@@ -1182,7 +1168,8 @@ PyObject_GenericSetAttr(PyObject *obj, PyObject *name, PyObject *value)
 		if (PyType_InitDict(tp) < 0)
 			return -1;
 	}
-	descr = PyDict_GetItem(tp->tp_dict, name);
+
+	descr = _PyType_Lookup(tp, name);
 	f = NULL;
 	if (descr != NULL) {
 		f = descr->ob_type->tp_descr_set;
