@@ -3358,7 +3358,7 @@ os_init(void)
 	ret = WSAStartup(0x0101, &WSAData);
 	switch (ret) {
 	case 0:	/* No error */
-		Py_AtExit(os_cleanup);
+		atexit(os_cleanup);
 		return 1; /* Success */
 	case WSASYSNOTREADY:
 		PyErr_SetString(PyExc_ImportError,
