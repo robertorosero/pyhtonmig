@@ -56,10 +56,21 @@ type_defined(PyTypeObject *type, void *context)
 	return PyDictProxy_New(type->tp_defined);
 }
 
+static PyObject *
+type_dynamic(PyTypeObject *type, void *context)
+{
+	PyObject *res;
+
+	res = (type->tp_flags & Py_TPFLAGS_DYNAMICTYPE) ? Py_True : Py_False;
+	Py_INCREF(res);
+	return res;
+}
+
 struct getsetlist type_getsets[] = {
 	{"__module__", (getter)type_module, NULL, NULL},
 	{"__dict__",  (getter)type_dict,  NULL, NULL},
 	{"__defined__",  (getter)type_defined,  NULL, NULL},
+	{"__dynamic__", (getter)type_dynamic, NULL, NULL},
 	{0}
 };
 
@@ -458,11 +469,6 @@ type_new(PyTypeObject *metatype, PyObject *args, PyObject *kwds)
 				break;
 			}
 		}
-
-		/* Set the __dynamic__ attribute */
-		if (PyDict_SetItemString(dict, "__dynamic__",
-					 dynamic ? Py_True : Py_False) < 0)
-			return NULL;
 	}
 
 	/* Check for a __slots__ sequence variable in dict, and count it */
