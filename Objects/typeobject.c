@@ -218,7 +218,7 @@ type_init(PyObject *self, PyObject *args, PyObject *kwds)
 	type = (PyTypeObject *)self;
 
 	/* Check arguments */
-	if (!PyArg_ParseTupleAndKeywords(args, kwds, "SOO", kwlist,
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "SOO:type", kwlist,
 					 &name, &bases, &dict))
 		return -1;
 	if (!PyTuple_Check(bases) || !PyDict_Check(dict)) {
@@ -443,7 +443,7 @@ type_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	}
 
 	/* Check arguments (again?!?! yes, alas -- we need the bases!) */
-	if (!PyArg_ParseTupleAndKeywords(args, kwds, "SOO", kwlist,
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "SOO:type", kwlist,
 					 &name, &bases, &dict))
 		return NULL;
 	if (PyTuple_Check(bases)) {
@@ -485,6 +485,10 @@ type_dealloc(PyTypeObject *type)
 	PyObject_DEL(type);
 }
 
+static char type_doc[] =
+"type(object) -> the object's type\n"
+"type(name, bases, dict) -> a new type";
+
 PyTypeObject PyType_Type = {
 	PyObject_HEAD_INIT(&PyType_Type)
 	0,					/* ob_size */
@@ -507,7 +511,7 @@ PyTypeObject PyType_Type = {
 	0,					/* tp_setattro */
 	0,					/* tp_as_buffer */
 	Py_TPFLAGS_DEFAULT,			/* tp_flags */
-	"Define the behavior of a particular type of object.", /* tp_doc */
+	type_doc,				/* tp_doc */
 	0,					/* tp_traverse */
 	0,					/* tp_clear */
 	0,					/* tp_richcompare */
