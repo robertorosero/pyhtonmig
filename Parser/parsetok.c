@@ -14,7 +14,7 @@ int Py_TabcheckFlag;
 
 /* Forward */
 static node *parsetok(struct tok_state *, grammar *, int, perrdetail *, int);
-static void initerr(perrdetail *err_ret, char* filename);
+static void initerr(perrdetail *err_ret, const char* filename);
 
 /* Parse input coming from a string.  Return error code, print some errors. */
 node *
@@ -24,14 +24,15 @@ PyParser_ParseString(char *s, grammar *g, int start, perrdetail *err_ret)
 }
 
 node *
-PyParser_ParseStringFlags(char *s, grammar *g, int start,
+PyParser_ParseStringFlags(const char *s, grammar *g, int start,
 		          perrdetail *err_ret, int flags)
 {
 	struct tok_state *tok;
 
 	initerr(err_ret, NULL);
 
-	if ((tok = PyTokenizer_FromString(s)) == NULL) {
+	/* XXX Don't want to chase const into parser right now. */
+	if ((tok = PyTokenizer_FromString((char *)s)) == NULL) {
 		err_ret->error = E_NOMEM;
 		return NULL;
 	}
@@ -58,7 +59,7 @@ PyParser_ParseFile(FILE *fp, char *filename, grammar *g, int start,
 }
 
 node *
-PyParser_ParseFileFlags(FILE *fp, char *filename, grammar *g, int start,
+PyParser_ParseFileFlags(FILE *fp, const char *filename, grammar *g, int start,
 			char *ps1, char *ps2, perrdetail *err_ret, int flags)
 {
 	struct tok_state *tok;
@@ -184,7 +185,7 @@ parsetok(struct tok_state *tok, grammar *g, int start, perrdetail *err_ret,
 }
 
 static void
-initerr(perrdetail *err_ret, char* filename)
+initerr(perrdetail *err_ret, const char *filename)
 {
 	err_ret->error = E_OK;
 	err_ret->filename = filename;

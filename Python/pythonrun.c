@@ -1159,28 +1159,35 @@ Py_SymtableString(char *str, char *filename, int start)
 
 /* Preferred access to parser is through AST. */
 mod_ty
-PyParser_ASTFromString(char *s, char *filename, grammar *g, int start, 
-		       perrdetail *err_ret, int flags)
+PyParser_ASTFromString(const char *s, const char *filename, int start, 
+		       int flags)
 {
 	node *n;
-	n = PyParser_ParseStringFlags(s, g, start, err_ret, flags);
+	perrdetail err;
+	n = PyParser_ParseStringFlags(s, &_PyParser_Grammar, start, &err, 
+				      flags);
 	if (n)
 		return PyAST_FromNode(n);
-	else
+	else {
+		err_input(&err);
 		return NULL;
+	}
 }
 
 mod_ty
-PyParser_ASTFromFile(FILE *fp, char *filename, grammar *g, int start, 
-		     char *ps1, char *ps2, perrdetail *err_ret, int flags)
+PyParser_ASTFromFile(FILE *fp, const char *filename, int start, char *ps1, 
+		     char *ps2, int flags)
 {
 	node *n;
-	n = PyParser_ParseFileFlags(fp, filename, g, start, ps1, ps2,
-				    err_ret, flags);
+	perrdetail err;
+	n = PyParser_ParseFileFlags(fp, filename, &_PyParser_Grammar, start, 
+				    ps1, ps2, &err, flags);
 	if (n)
 		return PyAST_FromNode(n);
-	else
+	else {
+		err_input(&err);
 		return NULL;
+	}
 }
 
 /* Simplified interface to parsefile -- return node or set exception */
@@ -1194,6 +1201,7 @@ PyParser_SimpleParseFileFlags(FILE *fp, char *filename, int start, int flags)
 					(char *)0, (char *)0, &err, flags);
 	if (n == NULL)
 		err_input(&err);
+		
 	return n;
 }
 
@@ -1206,7 +1214,7 @@ PyParser_SimpleParseFile(FILE *fp, char *filename, int start)
 /* Simplified interface to parsestring -- return node or set exception */
 
 node *
-PyParser_SimpleParseStringFlags(char *str, int start, int flags)
+PyParser_SimpleParseStringFlags(const char *str, int start, int flags)
 {
 	node *n;
 	perrdetail err;

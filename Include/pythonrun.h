@@ -42,9 +42,15 @@ DL_IMPORT(int) PyRun_InteractiveOneFlags(FILE *, char *, PyCompilerFlags *);
 DL_IMPORT(int) PyRun_InteractiveLoop(FILE *, char *);
 DL_IMPORT(int) PyRun_InteractiveLoopFlags(FILE *, char *, PyCompilerFlags *);
 
+
+DL_IMPORT(struct _mod *) PyParser_ASTFromString(const char *, const char *, 
+						int, int);
+DL_IMPORT(struct _mod *) PyParser_ASTFromFile(FILE *, const char *, int, 
+					      char *, char *, int);
 DL_IMPORT(struct _node *) PyParser_SimpleParseString(char *, int);
 DL_IMPORT(struct _node *) PyParser_SimpleParseFile(FILE *, char *, int);
-DL_IMPORT(struct _node *) PyParser_SimpleParseStringFlags(char *, int, int);
+DL_IMPORT(struct _node *) PyParser_SimpleParseStringFlags(const char *, int, 
+							  int);
 DL_IMPORT(struct _node *) PyParser_SimpleParseFileFlags(FILE *, char *,
 							int, int);
 

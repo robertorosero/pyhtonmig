@@ -9,7 +9,7 @@ extern "C" {
 
 typedef struct {
     int error;
-    char *filename;
+    const char *filename;
     int lineno;
     int offset;
     char *text;
@@ -26,17 +26,12 @@ extern DL_IMPORT(node *) PyParser_ParseString(char *, grammar *, int,
 extern DL_IMPORT(node *) PyParser_ParseFile (FILE *, char *, grammar *, int,
                                              char *, char *, perrdetail *);
 
-extern DL_IMPORT(node *) PyParser_ParseStringFlags(char *, grammar *, int,
-                                              perrdetail *, int);
-extern DL_IMPORT(node *) PyParser_ParseFileFlags(FILE *, char *, grammar *,
+extern DL_IMPORT(node *) PyParser_ParseStringFlags(const char *, grammar *, 
+						   int, perrdetail *, int);
+extern DL_IMPORT(node *) PyParser_ParseFileFlags(FILE *, const char *, 
+						 grammar *,
 						 int, char *, char *,
 						 perrdetail *, int);
-
-extern DL_IMPORT(mod_ty) PyParser_ASTFromString(char *, char *, grammar *, 
-						int, perrdetail *, int);
-extern DL_IMPORT(mod_ty) PyParser_ASTFromFile(FILE *, char *, grammar *,
-					      int, char *, char *,
-					      perrdetail *, int);
 #ifdef __cplusplus
 }
 #endif
