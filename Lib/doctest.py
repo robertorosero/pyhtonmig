@@ -1580,20 +1580,52 @@ class DocTestFailure(Exception):
     def __str__(self):
         return str(self.test)
 
+class UnexpectedException(Exception):
+    """A DocTest example has encountered an unexpected exception
 
+    The exception instance has variables:
 
+    - test: the DocTest object being run
+
+    - excample: the Example object that failed
+
+    - exc_info: the exception info
+    """
+    def __init__(self, test, example, exc_info):
+        self.test = test
+        self.example = example
+        self.exc_info = exc_info
+
+    def __str__(self):
+        return str(self.test)
+    
 class DebugRunner(DocTestRunner):
     r"""Run doc tests but raise an exception as soon as there is a failure.
 
-       If an unexpected exception occurs, the exception is merely propagated
-       to the caller:
+       If an unexpected exception occurs, an UnexpectedException is raised.
+       It contains the test, the example, and the original exception:
 
          >>> runner = DebugRunner(verbose=False)
-         >>> test = DocTest('>>> raise KeyError', {}, 'foo', 'foo.py', 0)
-         >>> runner.run(test)
+         >>> test = DocTest('>>> raise KeyError\n42', {}, 'foo', 'foo.py', 0)
+         >>> try:
+         ...     runner.run(test)
+         ... except UnexpectedException, failure:
+         ...     pass
+
+         >>> failure.test is test
+         True
+
+         >>> failure.example.want
+         '42\n'
+
+         >>> exc_info = failure.exc_info
+         >>> raise exc_info[0], exc_info[1], exc_info[2]
          Traceback (most recent call last):
          ...
          KeyError
+
+       We wrap the original exception to give the calling application
+       access to the test and example information.
 
        If the output doesn't match, then a DocTestFailure is raised:
 
@@ -1637,8 +1669,8 @@ class DebugRunner(DocTestRunner):
          >>> runner.run(test)
          Traceback (most recent call last):
          ...
-         KeyError
-
+         UnexpectedException: <DocTest foo from foo.py:0 (2 examples)>
+         
          >>> del test.globs['__builtins__']
          >>> test.globs
          {'x': 2}
@@ -1655,7 +1687,6 @@ class DebugRunner(DocTestRunner):
          >>> test.globs
          {}
 
-
        """
 
     def run(self, test, compileflags=None, out=None, clear_globs=True):
@@ -1665,7 +1696,7 @@ class DebugRunner(DocTestRunner):
         return r
 
     def report_unexpected_exception(self, out, test, example, exc_info):
-        raise exc_info[0], exc_info[1], exc_info[2]
+        raise UnexpectedException(test, example, exc_info)
 
     def report_failure(self, out, test, example, got):
         raise DocTestFailure(test, example, got)
@@ -1952,11 +1983,31 @@ class DocTestCase(unittest.TestCase):
            The unit test framework includes a debug method on test cases
            and test suites to support post-mortem debugging.  The test code
            is run in such a way that errors are not caught.  This way a
-           caller can catch the errors and initiate post-mortem debugging:
+           caller can catch the errors and initiate post-mortem debugging.
 
-             >>> test = DocTest('>>> raise KeyError', {}, 'foo', 'foo.py', 0)
+           The DocTestCase provides a debug method that raises
+           UnexpectedException errors if there is an unexepcted
+           exception:
+
+             >>> test = DocTest('>>> raise KeyError\n42',
+             ...                {}, 'foo', 'foo.py', 0)
              >>> case = DocTestCase(test)
-             >>> case.debug()
+             >>> try:
+             ...     case.debug()
+             ... except UnexpectedException, failure:
+             ...     pass
+
+           The UnexpectedException contains the test, the example, and
+           the original exception:
+
+             >>> failure.test is test
+             True
+
+             >>> failure.example.want
+             '42\n'
+
+             >>> exc_info = failure.exc_info
+             >>> raise exc_info[0], exc_info[1], exc_info[2]
              Traceback (most recent call last):
              ...
              KeyError
