@@ -37,7 +37,6 @@ struct compiler_unit {
 	int u_nblocks;
 	int u_nalloc;
 	int u_curblock;
-	struct basicblock u_entry;
 	struct basicblock u_exit;
 	struct basicblock **u_blocks;
 
@@ -1060,6 +1059,42 @@ compiler_boolop(struct compiler *c, expr_ty e)
 	compiler_use_block(c, end);
 	return 1;
 }
+
+static int
+compiler_compare(struct compiler *c, expr_ty e)
+{
+	int i, n, cleanup;
+
+	VISIT(c, expr, e->v.Compare.left);
+	n = asdl_seq_LEN(e->v.Compare.ops);
+	if (n > 1)
+		cleanup = compiler_new_block(c);
+	for (i = 1; i < n; i++) {
+		ADDOP(c, DUP_TOP);
+		ADDOP(c, ROT_THREE);
+		ADDOP_I(c, COMPARE_OP, 
+			asdl_seq_GET(e->v.Compare.ops, i - 1));
+		ADDOP_JREL(c, JUMP_IF_FALSE, cleanup);
+		NEXT_BLOCK(c);
+		ADDOP(c, POP_TOP);
+	} 
+	if (n) {
+		VISIT(c, expr, asdl_seq_GET(e->v.Compare.comparators, n - 1));
+		ADDOP_I(c, COMPARE_OP,
+		       (cmpop_ty)asdl_seq_GET(e->v.Compare.ops, n - 1));
+	}
+	if (n > 1) {
+		int end = compiler_new_block(c);
+		ADDOP_JREL(c, JUMP_FORWARD, end);
+		compiler_use_block(c, cleanup);
+		ADDOP(c, ROT_TWO);
+		ADDOP(c, POP_TOP);
+		compiler_use_block(c, end);
+	}
+	return 1;
+}	
+
+
 	
 static int 
 compiler_visit_expr(struct compiler *c, expr_ty e)
@@ -1098,6 +1133,7 @@ compiler_visit_expr(struct compiler *c, expr_ty e)
         case ListComp_kind:
 		break;
         case Compare_kind:
+		return compiler_compare(c, e);
 		break;
         case Call_kind:
 		VISIT(c, expr, e->v.Call.func);
@@ -1626,4 +1662,5 @@ static char *opnames[] = {
 	"CALL_FUNCTION_KW",
 	"CALL_FUNCTION_VAR_KW",
 	"EXTENDED_ARG",
-};    
+};
+
