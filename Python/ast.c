@@ -2297,6 +2297,66 @@ decode_utf8(const char **sPtr, const char *end, char* encoding)
 #endif
 }
 
+static PyObject *
+decode_unicode(const char *s, size_t len, int rawmode, const char *encoding)
+{
+	PyObject *v, *u;
+	char *buf;
+	char *p;
+	const char *end;
+	if (encoding == NULL) {
+		u = NULL;
+	} else if (strcmp(encoding, "iso-8859-1") == 0) {
+		u = NULL;
+	} else {
+		/* "\XX" may become "\u005c\uHHLL" (12 bytes) */
+		u = PyString_FromStringAndSize((char *)NULL, len * 4);
+		if (u == NULL)
+			return NULL;
+		p = buf = PyString_AsString(u);
+		end = s + len;
+		while (s < end) {
+			if (*s == '\\') {
+				*p++ = *s++;
+				if (*s & 0x80) {
+					strcpy(p, "u005c");
+					p += 5;
+				}
+			}
+			if (*s & 0x80) { /* XXX inefficient */
+				PyObject *w;
+				char *r;
+				int rn, i;
+				w = decode_utf8(&s, end, "utf-16-be");
+				if (w == NULL) {
+					Py_DECREF(u);
+					return NULL;
+				}
+				r = PyString_AsString(w);
+				rn = PyString_Size(w);
+				assert(rn % 2 == 0);
+				for (i = 0; i < rn; i += 2) {
+					sprintf(p, "\\u%02x%02x",
+						r[i + 0] & 0xFF,
+						r[i + 1] & 0xFF);
+					p += 6;
+				}
+				Py_DECREF(w);
+			} else {
+				*p++ = *s++;
+			}
+		}
+		len = p - buf;
+		s = buf;
+	}
+	if (rawmode)
+		v = PyUnicode_DecodeRawUnicodeEscape(s, len, NULL);
+	else
+		v = PyUnicode_DecodeUnicodeEscape(s, len, NULL);
+	Py_XDECREF(u);
+	return v;
+}
+
 /* s is a Python string literal, including the bracketing quote characters,
  * and r &/or u prefixes (if any), and embedded escape sequences (if any).
  * parsestr parses it, and returns the decoded Python string object.
@@ -2346,69 +2406,15 @@ parsestr(const char *s, const char *encoding)
 	}
 #ifdef Py_USING_UNICODE
 	if (unicode || Py_UnicodeFlag) {
-		PyObject *u;
-		if (encoding == NULL) {
-			u = NULL;
-		} else if (strcmp(encoding, "iso-8859-1") == 0) {
-			u = NULL;
-		} else {
-#if 0 /* XXX still broken */
-			PyObject *w;
-			char *buf;
-			char *p;
-			const char *end;
-			/* "\XX" may become "\u005c\uHHLL" (12 bytes) */
-			u = PyString_FromStringAndSize((char *)NULL, len * 4);
-			if (u == NULL)
-				return NULL;
-			p = buf = PyString_AsString(u);
-			end = s + len;
-			while (s < end) {
-				if (*s == '\\') {
-					*p++ = *s++;
-					if (*s & 0x80) {
-						strcpy(p, "u005c");
-						p += 5;
-					}
-				}
-				if (*s & 0x80) { /* XXX inefficient */
-					char *r;
-					int rn, i;
-					w = decode_utf8(&s, end, "utf-16-be");
-					if (w == NULL) {
-						Py_DECREF(u);
-						return NULL;
-					}
-					r = PyString_AsString(w);
-					rn = PyString_Size(w);
-					assert(rn % 2 == 0);
-					for (i = 0; i < rn; i += 2) {
-						sprintf(p, "\\u%02x%02x",
-							r[i + 0] & 0xFF,
-							r[i + 1] & 0xFF);
-						p += 6;
-					}
-					Py_DECREF(w);
-				} else {
-					*p++ = *s++;
-				}
-			}
-			len = p - buf;
-			s = buf;
+#if 0
+		/* XXX currently broken */
+		return decode_unicode(s, len, rawmode, encoding);
 #else
-			u = NULL;
-			fprintf(stderr, "ignoring encoding = %s decl\n",
-				encoding);
-#endif /* XXX */
-		}
-
 		if (rawmode)
-			v = PyUnicode_DecodeRawUnicodeEscape(s, len, NULL);
+			return PyUnicode_DecodeRawUnicodeEscape(s, len, NULL);
 		else
-			v = PyUnicode_DecodeUnicodeEscape(s, len, NULL);
-		Py_XDECREF(u);
-		return v;
-			
+			return PyUnicode_DecodeUnicodeEscape(s, len, NULL);
+#endif
 	}
 #endif
 	need_encoding = (encoding != NULL &&
