@@ -355,6 +355,7 @@ def _init_posix():
 
         raise DistutilsPlatformError(my_msg)
 
+    print g
 
     # On AIX, there are wrong paths to the linker scripts in the Makefile
     # -- these paths are relative to the Python source, but when installed
