@@ -1624,7 +1624,7 @@ parsestr(const char *s)
 		case 'N':
 			if (unicode) {
 				Py_DECREF(v);
-				com_error(com, PyExc_ValueError,
+				PyErr_SetString(PyExc_ValueError,
 					  "Unicode escapes not legal "
 					  "when Unicode disabled");
 				return NULL;
