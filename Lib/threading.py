@@ -261,9 +261,15 @@ class _Semaphore(_Verbose):
         while self.__value == 0:
             if not blocking:
                 break
+            if __debug__:
+                self._note("%s.acquire(%s): blocked waiting, value=%s",
+                           self, blocking, self.__value)
             self.__cond.wait()
         else:
             self.__value = self.__value - 1
+            if __debug__:
+                self._note("%s.acquire: success, value=%s",
+                           self, self.__value)
             rc = 1
         self.__cond.release()
         return rc
@@ -271,8 +277,26 @@ class _Semaphore(_Verbose):
     def release(self):
         self.__cond.acquire()
         self.__value = self.__value + 1
+        if __debug__:
+            self._note("%s.release: success, value=%s",
+                       self, self.__value)
         self.__cond.notify()
         self.__cond.release()
+
+
+def BoundedSemaphore(*args, **kwargs):
+    return apply(_BoundedSemaphore, args, kwargs)
+
+class _BoundedSemaphore(_Semaphore):
+    """Semaphore that checks that # releases is <= # acquires"""
+    def __init__(self, value=1, verbose=None):
+        _Semaphore.__init__(self, value, verbose)
+        self._initial_value = value
+
+    def release(self):
+        if self._Semaphore__value >= self._initial_value:
+            raise ValueError, "Semaphore released too many times"
+        return _Semaphore.release(self)
 
 
 def Event(*args, **kwargs):

@@ -269,10 +269,6 @@ class PyBuildExt(build_ext):
         # (NIST's Secure Hash Algorithm.)
         exts.append( Extension('sha', ['shamodule.c']) )
 
-        # Tommy Burnette's 'new' module (creates new empty objects of certain
-        # kinds):
-        exts.append( Extension('new', ['newmodule.c']) )
-
         # Helper module for various ascii-encoders
         exts.append( Extension('binascii', ['binascii.c']) )
 
@@ -389,7 +385,13 @@ class PyBuildExt(build_ext):
         # BSD DB 3.x.)
 
         dblib = []
-        if self.compiler.find_library_file(lib_dirs, 'db'):
+        if self.compiler.find_library_file(lib_dirs, 'db-3.1'):
+            dblib = ['db-3.1']
+        elif self.compiler.find_library_file(lib_dirs, 'db2'):
+            dblib = ['db2']
+        elif self.compiler.find_library_file(lib_dirs, 'db1'):
+            dblib = ['db1']
+        elif self.compiler.find_library_file(lib_dirs, 'db'):
             dblib = ['db']
         
         db185_incs = find_file('db_185.h', inc_dirs,
