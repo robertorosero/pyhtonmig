@@ -26,13 +26,14 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 #ifdef _M_IX86
 #define NT
+/* NT may be defined externally as well.  If it is defined, the module is
+   actually called 'nt', not 'posix', and some functions don't exist. */
 #endif
 
 #include "allobjects.h"
 #include "modsupport.h"
 #include "ceval.h"
 
-#include <signal.h>
 #include <string.h>
 #include <setjmp.h>
 #include <errno.h>
@@ -130,6 +131,9 @@ extern int symlink();
 #define popen   _popen
 #endif /* NT */
 
+#ifdef OS2
+#include <io.h>
+#endif
 
 /* Return a dictionary corresponding to the POSIX environment table */
 
@@ -295,6 +299,7 @@ posix_chmod(self, args)
 	return posix_strint(args, chmod);
 }
 
+#ifdef HAVE_CHOWN
 static object *
 posix_chown(self, args)
 	object *self;
@@ -302,6 +307,7 @@ posix_chown(self, args)
 {
 	return posix_strintint(args, chown);
 }
+#endif
 
 static object *
 posix_getcwd(self, args)
@@ -320,6 +326,7 @@ posix_getcwd(self, args)
 	return newstringobject(buf);
 }
 
+#ifdef HAVE_LINK
 static object *
 posix_link(self, args)
 	object *self;
@@ -327,6 +334,7 @@ posix_link(self, args)
 {
 	return posix_2str(args, link);
 }
+#endif
 
 #ifdef NT
 static object *
@@ -876,6 +884,7 @@ posix_popen(self, args)
 	return newopenfileobject(fp, name, mode, fclose);
 }
 
+#ifdef HAVE_SETUID
 static object *
 posix_setuid(self, args)
 	object *self;
@@ -889,7 +898,9 @@ posix_setuid(self, args)
 	INCREF(None);
 	return None;
 }
+#endif
 
+#ifdef HAVE_SETGID
 static object *
 posix_setgid(self, args)
 	object *self;
@@ -903,6 +914,7 @@ posix_setgid(self, args)
 	INCREF(None);
 	return None;
 }
+#endif
 
 #ifdef HAVE_WAITPID
 static object *
@@ -1253,9 +1265,6 @@ posix_fdopen(self, args)
 		return posix_error();
 	/* From now on, ignore SIGPIPE and let the error checking
 	   do the work. */
-#ifndef NT
-	(void) signal(SIGPIPE, SIG_IGN);
-#endif /* ! NT */
 	return newopenfileobject(fp, "(fdopen)", mode, fclose);
 }
 
@@ -1279,11 +1288,13 @@ posix_pipe(self, args)
 static struct methodlist posix_methods[] = {
 	{"chdir",	posix_chdir},
 	{"chmod",	posix_chmod},
+#ifdef HAVE_CHOWN
 	{"chown",	posix_chown},
+#endif
 	{"getcwd",	posix_getcwd},
-#ifndef NT
+#ifdef HAVE_LINK
 	{"link",	posix_link},
-#endif /* ! NT */
+#endif 
 	{"listdir",	posix_listdir},
 	{"lstat",	posix_lstat},
 	{"mkdir",	posix_mkdir},
@@ -1330,12 +1341,16 @@ static struct methodlist posix_methods[] = {
 	{"kill",	posix_kill},
 #endif /* ! NT */
 	{"popen",	posix_popen},
-#ifndef NT
+#ifdef HAVE_SETUID
 	{"setuid",	posix_setuid},
+#endif
+#ifdef HAVE_SETGID
 	{"setgid",	posix_setgid},
+#endif
 #ifdef HAVE_SETPGRP
 	{"setpgrp",	posix_setpgrp},
 #endif
+#ifndef NT
 	{"wait",	posix_wait},
 #endif /* ! NT */
 #ifdef HAVE_WAITPID
