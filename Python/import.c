@@ -213,6 +213,7 @@ get_module(m, name, m_ret)
 		}
 		namebuf[len] = '\0';
 		n = parse_file(fp, namebuf, file_input);
+		fclose(fp);
 		if (n == NULL)
 			return NULL;
 		co = compile(n, namebuf);

@@ -167,6 +167,8 @@ PYTHONPATH   : colon-separated list of directories prefixed to the\n\
 			}
 		}
 		sts = run(fp, filename == NULL ? "<stdin>" : filename) != 0;
+		if (filename != NULL)
+			fclose(fp);
 	}
 
 	if (inspect && isatty((int)fileno(stdin)) &&
