@@ -1,4 +1,4 @@
-Python release 1.0.0 BETA 4
+Python release 1.0.0 BETA 5
 ===========================
 
 ==> This is still a BETA release.  I've been furiously hacking over
@@ -49,14 +49,15 @@ chdir into each subdirectory in turn and run make there manually
 
 EXCEPTIONS: on SVR4 derived systems, you need to pass the configure
 script the option --with-svr4.  See below for more options you can
-pass to the configure script.
-
-You can configure the interpreter to contain fewer or more built-in
-modules by editing the file Modules/Setup.  Read the comments in the
-Setup file for more information.  When you have edited this file,
-Modules/Makefile will automatically be rebuilt.  (There are some
-example Setup files which you may copy over the default Setup file for
-specific systems; have a look at Modules/Setup.*.)
+pass to the configure script.  You can configure the interpreter to
+contain fewer or more built-in modules by editing the file
+Modules/Setup.  This file is initially copied (by the Makefile) from
+Setup.in; if it does not exist yet, make a copy yourself.  Never edit
+Setup.in directly -- always edit Setup.  Read the comments in the file
+for more information.  When you have edited this file, Makefile and
+config.c in Modules will automatically be rebuilt.  (There are some
+example Setup files which you may copy to Setup for specific systems;
+have a look at Setup.*.)
 
 To test the interpreter that you have just built, type "make test".
 This runs the test set silently, twice (once with no compiled files,
@@ -126,8 +127,8 @@ if you don't use them.)
 
 - On SGI IRIX, there are modules that interface to many SGI specific
 system libraries, e.g. the GL library and the audio hardware.  To
-enable these modules, you must edit the Modules/Setup file (or use the
-Setup.sgi file instead).
+enable these modules, you must edit the Modules/Setup file (or copy the
+Setup.sgi file to it).
 
 You can also build an "extended" interpreter, using modules that are
 not contained in the Modules directory.  Extensions are distributed as
