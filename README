@@ -36,10 +36,11 @@ Build instructions
 To build python, you normally simply type "make" in this directory.
 The first time you do this, it will run the script "./configure",
 which figures out your system configuration and creates the Makefiles
-in most subdirectories.  It will then run "make" recursively in each
-of the subdirectories Parser, Objects, Python and Modules, creating a
-library file in each one.  The executable of the interpreter is built
-in the Modules subdirectory but moved up here when it is built.
+in most subdirectories.  (This will take a minute or two -- please be
+patient!)  It will then run "make" recursively in each of the
+subdirectories Parser, Objects, Python and Modules, creating a library
+file in each one.  The executable of the interpreter is built in the
+Modules subdirectory but moved up here when it is built.
 
 You can configure the interpreter to contain fewer or more built-in
 modules by cd'ing to the Modules subdirectory, editing the file Setup
@@ -47,6 +48,28 @@ there, and running "make Makefile" followed by "make" there.  Read the
 comments in the Setup file for more information.  You can also edit
 Modules/Setup before running make from the toplevel directory; this
 will automatically rebuild Modules/Makefile.
+
+To install the interpreter as /usr/local/bin/python, type "make
+install".  To install the library as /usr/local/lib/python, type "make
+libinstall".  To install the manual page as
+/usr/local/man/man1/python.1, type "make maninstall".  To install the
+Emacs editing mode for python, manually copy the file
+Misc/python-mode.el to your local Emacs lisp directory.  To change
+/usr/local into something else here, edit the definition for DESTDIR
+in the Makefile and in Modules/Setup.  (If its definition in the
+latter differs from that in the former, the interpreter will search
+for its standard library modules in the wrong place!)
+
+To print the documentation, cd into the Doc subdirectory, type "make"
+(let's hope you have LaTeX installed!), and send the four resulting
+PostScript files (tut.ps, lib.ps, ref.ps, and ext.ps) to the printer.
+See the README file there; you can also build a texinfo version of the
+library manual and from that construct an Emacs info version (the
+hypertext format used by the Emacs "info" command) and an HTML version
+(the hypertext format used by the World Wide Web distributed
+information initiative).  You don't need to have LaTeX installed for
+this.  Note that the Python archive sites also carry the resulting
+PostScript files, in case you have a PostScript printer but not LaTeX.
 
 You can also build an "extended" interpreter, using modules that are
 not contained in the Modules directory.  This is done in the
@@ -63,9 +86,19 @@ compiler is) in the environment.
 2) You can use the GNU readline library to improve the interactive
 user interface: this gives you line editing and command history when
 calling python interactively.  You need to build the GNU readline
-library before running the configure script.  Pass it the option
---with-readline=DIRECTORY where DIRECTORY is the absolute pathname of
-the directory where you've built the readline library.
+library before running the configure script.  Its sources are
+distributed with Python.  This may involve some editing of the
+Makefile there -- I'm sorry, but I don't feel responsible for making
+it more portable or adapting it to autoconf...  Pass the configure
+script the option --with-readline=DIRECTORY where DIRECTORY is the
+absolute pathname of the directory where you've built the readline
+library.  A known problem with the readline library is that it
+contains entry points which cause conflicts with the STDWIN and SGI GL
+libraries.  The stdwin conflict can be solved (and will be, in some
+future release of stdwin) by adding a line saying '#define werase
+w_erase' to the stdwin.h file (in the stdwin distribution,
+subdirectory H).  The GL conflict may be solvable by reordering the -l
+options on the final link command, but it appears unsafe...
 
 3) Certain modules need to know whether you are running Sun SOLARIS
 2.x.  I currently don't know a failsafe way to determine this, so you
@@ -76,6 +109,9 @@ module.)
 4) On SGI IRIX, and on Sun SOLARIS 2.x, you can use multiple threads.
 To enable this, pass --with-thread.  On SOLARIS 2.x, also pass
 --with-solaris.  In the Modules/Setup file, enable the thread module.
+(Threads aren't enabled automatically because there are run-time
+penalties when support for them is compiled in even if you don't use
+them.)
 
 5) On SGI IRIX, there are modules that interface to many SGI specific
 system libraries, e.g. the GL library and the audio hardware.  To
@@ -89,6 +125,7 @@ Distribution structure
 Most subdirectories have their own README file.  Most files have
 comments.
 
+ChangeLog	A raw list of changes since the first 1.0.0 BETA release
 Contrib/	Contributed code
 Demo/		Demonstration scripts, modules and programs
 Doc/		Documentation (in LaTeX)
@@ -119,9 +156,11 @@ ftp.cwi.nl (IP address 192.16.184.180), directory /pub/python, file
 python<version>.tar.Z.  You can also find PostScript of the main
 Python documentation there, Macintosh and PC binaries, and the latest
 STDWIN source distribution (in directory /pub/stdwin).  Mirror sites
-are gatekeeper.dec.com (/pub/plan/python/cwi) and ftp.uu.net
+are gatekeeper.dec.com (/pub/plan/python/cwi), ftp.wustl.edu
+(/graphics/graphics/sgi-stuff/python) and ftp.uu.net
 (/languages/python) -- try these sites first if you are on the US
-continent, or at least closer to it than to Europe.
+continent, or at least closer to it than to Europe.  These mirror
+sites are at most a day behind on the European archive!
 
 If you don't have ftp access, send mail containing only the word HELP
 to ftpmail@decwrl.dec.com or bitftp@pucc.princeton.edu, and the
