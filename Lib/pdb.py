@@ -86,9 +86,12 @@ class Pdb(bdb.Bdb, cmd.Cmd):
 		except:
 			# Try function name as the argument
 			import codehack
-			g_frame = self.curframe.f_globals
 			try:
-				code = eval(arg, g_frame).func_code 
+				func = eval(arg, self.curframe.f_globals,
+					    self.curframe.f_locals)
+				if hasattr(func, 'im_func'):
+					func = func.im_func
+				code = func.func_code
 			except:
 				print '*** Could not eval argument:', arg
 				return
@@ -170,10 +173,10 @@ class Pdb(bdb.Bdb, cmd.Cmd):
 	do_q = do_quit
 	
 	def do_args(self, arg):
-		if self.curframe.f_locals.has_key('__return__'):
-			print `self.curframe.f_locals['__return__']`
+		if self.curframe.f_locals.has_key('__args__'):
+			print `self.curframe.f_locals['__args__']`
 		else:
-			print '*** Not arguments?!'
+			print '*** No arguments?!'
 	do_a = do_args
 	
 	def do_retval(self, arg):
@@ -285,6 +288,137 @@ class Pdb(bdb.Bdb, cmd.Cmd):
 			print ' ',
 		print self.format_stack_entry(frame_lineno)
 
+
+	# Help methods (derived from pdb.doc)
+
+	def help_help(self):
+		self.help_h()
+
+	def help_h(self):
+		print """h(elp)
+	Without argument, print the list of available commands.
+	With a command name as argument, print help about that command
+	"help pdb" pipes the full documentation file to the $PAGER
+	"help exec" gives help on the ! command"""
+
+	def help_where(self):
+		self.help_w()
+
+	def help_w(self):
+		print """w(here)
+	Print a stack trace, with the most recent frame at the bottom.
+	An arrow indicates the "current frame", which determines the
+	context of most commands."""
+
+	def help_down(self):
+		self.help_d()
+
+	def help_d(self):
+		print """d(own)
+	Move the current frame one level down in the stack trace
+	(to an older frame)."""
+
+	def help_up(self):
+		self.help_u()
+
+	def help_u(self):
+		print """u(p)
+	Move the current frame one level up in the stack trace
+	(to a newer frame)."""
+
+	def help_break(self):
+		self.help_b()
+
+	def help_b(self):
+		print """b(reak) [lineno | function]
+	With a line number argument, set a break there in the current
+	file.  With a function name, set a break at the entry of that
+	function.  Without argument, list all breaks."""
+
+	def help_clear(self):
+		self.help_cl()
+
+	def help_cl(self):
+		print """cl(ear) [lineno]
+	With a line number argument, clear that break in the current file.
+	Without argument, clear all breaks (but first ask confirmation)."""
+
+	def help_step(self):
+		self.help_s()
+
+	def help_s(self):
+		print """s(tep)
+	Execute the current line, stop at the first possible occasion
+	(either in a function that is called or in the current function)."""
+
+	def help_next(self):
+		self.help_n()
+
+	def help_n(self):
+		print """n(ext)
+	Continue execution until the next line in the current function
+	is reached or it returns."""
+
+	def help_return(self):
+		self.help_r()
+
+	def help_r(self):
+		print """r(eturn)
+	Continue execution until the current function returns."""
+
+	def help_continue(self):
+		self.help_c()
+
+	def help_cont(self):
+		self.help_c()
+
+	def help_c(self):
+		print """c(ont(inue))
+	Continue execution, only stop when a breakpoint is encountered."""
+
+	def help_list(self):
+		self.help_l()
+
+	def help_l(self):
+		print """l(ist) [first [,last]]
+	List source code for the current file.
+	Without arguments, list 11 lines around the current line
+	or continue the previous listing.
+	With one argument, list 11 lines starting at that line.
+	With two arguments, list the given range;
+	if the second argument is less than the first, it is a count."""
+
+	def help_args(self):
+		self.help_a()
+
+	def help_a(self):
+		print """a(rgs)
+	Print the argument list of the current function."""
+
+	def help_p(self):
+		print """p expression
+	Print the value of the expression."""
+
+	def help_exec(self):
+		print """(!) statement
+	Execute the (one-line) statement in the context of
+	the current stack frame.
+	The exclamation point can be omitted unless the first word
+	of the statement resembles a debugger command.
+	To assign to a global variable you must always prefix the
+	command with a 'global' command, e.g.:
+	(Pdb) global list_options; list_options = ['-l']
+	(Pdb)"""
+
+	def help_quit(self):
+		self.help_q()
+
+	def help_q(self):
+		print """q(uit)	Quit from the debugger.
+	The program being executed is aborted."""
+
+	def help_pdb(self):
+		help()
 
 # Simplified interface
 

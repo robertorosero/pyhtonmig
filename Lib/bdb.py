@@ -247,7 +247,10 @@ class Bdb: # Basic Debugger
 		frame, lineno = frame_lineno
 		filename = frame.f_code.co_filename
 		s = filename + '(' + `lineno` + ')'
-		s = s + frame.f_code.co_name
+		if frame.f_code.co_name:
+		    s = s + frame.f_code.co_name
+		else:
+		    s = s + "<lambda>"
 		if frame.f_locals.has_key('__args__'):
 			args = frame.f_locals['__args__']
 			if args is not None:
