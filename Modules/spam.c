@@ -94,7 +94,7 @@ static PyTypeObject spamlist_type = {
 	0,					/* tp_dict */
 	0,					/* tp_descr_get */
 	0,					/* tp_descr_set */
-	spamlist_construct,			/* tp_construct */
+	(ternaryfunc)spamlist_construct,	/* tp_construct */
 };
 
 static PyObject *
@@ -197,7 +197,7 @@ static PyTypeObject spamdict_type = {
 	0,					/* tp_dict */
 	0,					/* tp_descr_get */
 	0,					/* tp_descr_set */
-	spamdict_construct,			/* tp_construct */
+	(ternaryfunc)spamdict_construct,	/* tp_construct */
 };
 
 static PyObject *
