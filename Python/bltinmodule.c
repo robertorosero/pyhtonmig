@@ -1104,6 +1104,27 @@ builtin_type(self, v)
 	return v;
 }
 
+static object *
+builtin_vars(self, v)
+	object *self;
+	object *v;
+{
+	object *d;
+	if (v == NULL) {
+		d = getlocals();
+		INCREF(d);
+	}
+	else {
+		d = getattr(v, "__dict__");
+		if (d == NULL) {
+			err_setstr(TypeError,
+				"dir() argument must have __dict__ attribute");
+			return NULL;
+		}
+	}
+	return d;
+}
+
 static struct methodlist builtin_methods[] = {
 	{"abs",		builtin_abs},
 	{"apply",	builtin_apply},
@@ -1142,6 +1163,7 @@ static struct methodlist builtin_methods[] = {
 	{"setattr",	builtin_setattr},
 	{"str",		builtin_str},
 	{"type",	builtin_type},
+	{"vars",	builtin_vars},
 	{"xrange",	builtin_xrange},
 	{NULL,		NULL},
 };
