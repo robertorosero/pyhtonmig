@@ -40,7 +40,9 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #include <string.h>
 #include <errno.h>
 
+#include "myproto.h"
 #include "mymalloc.h"
+#include "intrcheck.h"
 
 #ifdef WITH_READLINE
 
@@ -77,24 +79,19 @@ my_fgets(buf, len, fp)
 		if (p != NULL)
 			return 0; /* No error */
 		if (feof(fp)) {
-/*fprintf(stderr, "my_fgets: EOF\n");*/
 			return -1; /* EOF */
 		}
 #ifdef EINTR
 		if (errno == EINTR) {
 			if (intrcheck()) {
-/*fprintf(stderr, "my_fgets: EINTR with intrcheck()\n");*/
 				return 1; /* Interrupt */
 			}
-/*fprintf(stderr, "my_fgets: EINTR\n");*/
 			continue;
 		}
 #endif
 		if (intrcheck()) {
-/*fprintf(stderr, "my_fgets: intrcheck()\n");*/
 			return 1; /* Interrupt */
 		}
-/*fprintf(stderr, "my_fgets: error\n");*/
 		return -2; /* Error */
 	}
 	/* NOTREACHED */
@@ -162,8 +159,7 @@ my_readline(prompt)
 	/* XXX (Actually this would be rather nice on most systems...) */
 	n = strlen(prompt);
 	if (strncmp(p, prompt, n) == 0)
-		memmove (p, p + len, strlen(p) - n + 1);
-		/* Don't forget to copy the \0 */
+		memmove(p, p + n, strlen(p) - n + 1);
 #endif
 	n = strlen(p);
 	while (n > 0 && p[n-1] != '\n') {
