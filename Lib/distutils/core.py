@@ -110,6 +110,8 @@ def setup (**attrs):
                           "error: %s" % exc.strerror
             else:
                 raise SystemExit, "error: " + exc[-1]
+        except (DistutilsExecError, DistutilsFileError), msg:
+            raise SystemExit, "error: " + str (msg)
 
 # setup ()
 
