@@ -36,7 +36,7 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #define DELIM ' '
 #endif
 
-#ifdef MSDOS
+#if defined(MSDOS) || defined(NT)
 #define SEP '\\'
 #define MAXPATHLEN 256
 #define DELIM ';'
