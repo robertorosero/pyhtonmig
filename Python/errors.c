@@ -98,10 +98,11 @@ err_setstr(exception, string)
 	XDECREF(value);
 }
 
-int
+
+object *
 err_occurred()
 {
-	return last_exception != NULL;
+	return last_exception;
 }
 
 void
