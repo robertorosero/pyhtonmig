@@ -598,6 +598,27 @@ formatchar(v)
 	return buf;
 }
 
+/* XXX this could be moved to object.c */
+static object *
+get_mapping_item(mo, ko)
+	object *mo;
+	object *ko;
+{
+	mapping_methods *mm = mo->ob_type->tp_as_mapping;
+	object *val;
+
+	if (!mm || !mm->mp_subscript) {
+		err_setstr(TypeError, "subscript not implemented");
+		return NULL;
+	}
+
+	val = (*mm->mp_subscript)(mo, ko);
+	XDECREF(val);		/* still in mapping */
+
+	return val;
+}
+
+
 /* fmt%(v1,v2,...) is roughly equivalent to sprintf(fmt, v1, v2, ...) */
 
 object *
@@ -608,6 +629,7 @@ formatstring(format, args)
 	char *fmt, *res;
 	int fmtcnt, rescnt, reslen, arglen, argidx;
 	object *result;
+	object *dict = NULL;
 	if (format == NULL || !is_stringobject(format) || args == NULL) {
 		err_badcall();
 		return NULL;
@@ -627,6 +649,8 @@ formatstring(format, args)
 		arglen = -1;
 		argidx = -2;
 	}
+	if (args->ob_type->tp_as_mapping)
+		dict = args;
 	while (--fmtcnt >= 0) {
 		if (*fmt != '%') {
 			if (--rescnt < 0) {
@@ -651,6 +675,39 @@ formatstring(format, args)
 			char *buf;
 			int sign;
 			int len;
+			if (*fmt == '(') {
+				char *keystart;
+				int keylen;
+				object *key;
+
+				if (dict == NULL) {
+					err_setstr(TypeError,
+						 "format requires a mapping"); 
+					goto error;
+				}
+				++fmt;
+				--fmtcnt;
+				keystart = fmt;
+				while (--fmtcnt >= 0 && *fmt != ')')
+					fmt++;
+				keylen = fmt - keystart;
+				++fmt;
+				if (fmtcnt < 0) {
+					err_setstr(ValueError,
+						   "incomplete format key");
+					goto error;
+				}
+				key = newsizedstringobject(keystart, keylen);
+				if (key == NULL)
+					goto error;
+				args = get_mapping_item(dict, key);
+				DECREF(key);
+				if (args == NULL) {
+					goto error;
+				}
+				arglen = -1;
+				argidx = -2;
+			}
 			while (--fmtcnt >= 0) {
 				switch (c = *fmt++) {
 				case '-': flags |= F_LJUST; continue;
@@ -747,13 +804,12 @@ formatstring(format, args)
 				len = 1;
 				break;
 			case 's':
-				if (!is_stringobject(v)) {
-					err_setstr(TypeError,
-						   "%s wants string");
+				v = strobject(v);
+				if (v == NULL)
 					goto error;
-				}
 				buf = getstringvalue(v);
 				len = getstringsize(v);
+				DECREF(v);
 				if (prec >= 0 && len > prec)
 					len = prec;
 				break;
@@ -841,6 +897,11 @@ formatstring(format, args)
 				--rescnt;
 				*res++ = ' ';
 			}
+                        if (dict && (argidx < arglen)) {
+                                err_setstr(TypeError,
+                                           "not all arguments converted");
+                                goto error;
+                        }
 		} /* '%' */
 	} /* until end */
 	if (argidx < arglen) {
