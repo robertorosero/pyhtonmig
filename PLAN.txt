@@ -75,7 +75,7 @@ subclassable and define simple default methods for everything without
 having these inherited by built-in types that don't want these
 defaults?  *** Done, really. ***
 
-Add error checking to the MRO calculation.
+Add error checking to the MRO calculation.  *** Done. ***
 
 Make __new__ overridable through a Python class method (!).  Make more
 of the sub-algorithms of type construction available as methods.  ***
@@ -84,10 +84,10 @@ to make an upcall to Base.__new__() and have it create an instance of
 your class (rather than a Base instance), you can't use class methods
 -- you must use static methods.  So I've implemented those too.  I've
 hooked up __new__ in the right places, so the first part of this is
-now done (still to do the other construction methods -- unclear that
-we really need any though).  I expect that some warts will only be
-really debugged when we try to use this for some, eh, interesting
-types such as tuples. ***
+now done.  I've also exported the MRO calculation and made it
+overridable, as metamethod mro().  I believe that closes this topic
+for now.  I expect that some warts will only be really debugged when
+we try to use this for some, eh, interesting types such as tuples. ***
 
 More -- I'm sure new issues will crop up as we go.
 
