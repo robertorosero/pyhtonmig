@@ -28,6 +28,20 @@
 srcdir=		@srcdir@
 INSTALL=	@INSTALL@
 
+# Install prefixes are treated specially by the configure script:
+# it only changes these lines if it has received a --prefix=... or
+# --exec-prefix-... command line option, or if it has figured out
+# a value by searching for python in $PATH.  Note that $(prefix) is
+# also used when compiling config.c in Modules to set the default
+# module search path, so if you change it later be sure to change it
+# there too and rebuild.
+
+# Install prefix for architecture-independent files
+prefix=		/usr/local
+
+# Install prefix for architecture-dependent files
+exec_prefix=	$(prefix)
+
 # Programs
 SHELL=		/bin/sh
 
@@ -35,10 +49,6 @@ SHELL=		/bin/sh
 # e.g. --with-readline --with-svr5 --with-solaris --with-thread
 # (see README for an explanation)
 WITH=		
-
-# Installation directory
-# Watch out! this is also defined in Modules/Setup
-DESTDIR=	/usr/local
 
 # Subdirectories where to run make recursively
 SUBDIRS=	Parser Objects Python Modules
@@ -69,20 +79,46 @@ test:		python
 
 # Install the interpreter
 install:	python
-		$(INSTALL) python $(DESTDIR)/bin/python
+		$(INSTALL) python $(exec_prefix)/bin/python
 		@echo If this is your first time, consider make libinstall...
 
-# Install the library
+# Install the library.
+# If your system does not support "cp -r", try "copy -r" or perhaps
+# something like find Lib -print | cpio -pacvdmu $(DESTDIR)/lib/python
 libinstall:
-		-if test ! -d $(DESTDIR)/lib/python; \
-		then mkdir $(DDESTDIR)/lib/python; \
+		-if test ! -d $(prefix)/lib/python; \
+		then mkdir $(prefix)/lib/python; \
 		fi
-		cp -r Lib/* $(DESTDIR)/lib/python
+		cp -r Lib/* $(prefix)/lib/python
 		@echo Ideally, run something to compile all modules now...
 
 # install the manual page
 maninstall:
-		$(INSTALL) Misc/python.man $(DESTDIR)/man/man1/python.1
+		$(INSTALL) Misc/python.man $(prefix)/man/man1/python.1
+
+# install the include files
+inclinstall:
+		-if test ! -d $(prefix)/include/Py; \
+		then mkdir $(prefix)/include/Py; \
+		fi
+		cp $(srcdir)/Include/*.h $(prefix)/include/Py
+
+# install the lib*.a files
+LIBP=		$(exec_prefix)/lib/python
+LIBPL=		$(LIBP)/lib
+libainstall:	all
+		-if test ! -d $(LIBP); \
+		then mkdir $(LIBP); \
+		fi
+		-if test ! -d $(LIBPL); \
+		then mkdir $(LIBPL); \
+		fi
+		for i in $(SUBDIRS); do \
+			echo $$i; $(INSTALL) $$i/lib$$i.a $(LIBPL)/lib$$i.a; \
+		done
+		$(INSTALL) Modules/config.c $(LIBPL)/config.c
+		$(INSTALL) Modules/Makefile $(LIBPL)/Makefile
+		$(INSTALL) config.h $(LIBPL)/config.h
 
 # Build the sub-Makefiles
 Makefiles:	config.status
@@ -132,14 +168,13 @@ depend:
 
 localclean:
 		-rm -f core *~ [@,#]* *.old *.orig *.rej
-		-(cd Include; rm -f *~ [@,#]* *.old *.orig *.rej)
 
 clean:		localclean
 		-for i in $(SUBDIRS); do \
 			(echo $$i; cd $$i; \
 			 if test -f Makefile; \
 			 then $(MAKE) clean; \
-			 else $(MAKE) -f Makefile.in clean; \
+			 else $(MAKE) -f Makefile.*in clean; \
 			 fi); \
 		done
 

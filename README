@@ -1,8 +1,8 @@
-Python release 1.0.0 BETA 5
+Python release 1.0.0 BETA 6
 ===========================
 
 ==> This is still a BETA release.  I've been furiously hacking over
-    the past two weeks.  If you think I've goofed up, please mail me
+    the past few weeks.  If you think I've goofed up, please mail me
     an error report!
 
 ==> If you don't know yet what Python is: it's an interpreted,
@@ -49,15 +49,18 @@ chdir into each subdirectory in turn and run make there manually
 
 EXCEPTIONS: on SVR4 derived systems, you need to pass the configure
 script the option --with-svr4.  See below for more options you can
-pass to the configure script.  You can configure the interpreter to
-contain fewer or more built-in modules by editing the file
-Modules/Setup.  This file is initially copied (by the Makefile) from
-Setup.in; if it does not exist yet, make a copy yourself.  Never edit
-Setup.in directly -- always edit Setup.  Read the comments in the file
-for more information.  When you have edited this file, Makefile and
-config.c in Modules will automatically be rebuilt.  (There are some
-example Setup files which you may copy to Setup for specific systems;
-have a look at Setup.*.)
+pass to the configure script.
+
+You can configure the interpreter to contain fewer or more built-in
+modules by editing the file Modules/Setup.  This file is initially
+copied (when the toplevel Makefile makes Modules/Makefile for the
+first time) from Setup.in; if it does not exist yet, make a copy
+yourself.  Never edit Setup.in -- always edit Setup.  Read the
+comments in the file for information on what kind of edits you can
+make.  When you have edited Setup, Makefile and config.c in Modules
+will automatically be rebuilt the next time you run make in the
+toplevel directory.  (There are some example Setup files which you may
+copy to Setup for specific systems; have a look at Setup.*.)
 
 To test the interpreter that you have just built, type "make test".
 This runs the test set silently, twice (once with no compiled files,
@@ -71,11 +74,20 @@ install".  To install the library as /usr/local/lib/python, type "make
 libinstall".  To install the manual page as
 /usr/local/man/man1/python.1, type "make maninstall".  To install the
 Emacs editing mode for python, manually copy the file
-Misc/python-mode.el to your local Emacs lisp directory.  To change
-/usr/local into something else here, edit the definition for DESTDIR
-in the Makefile and in Modules/Setup.  (If its definition in the
-latter differs from that in the former, the interpreter will search
-for its standard library modules in the wrong place!)
+Misc/python-mode.el to your local Emacs lisp directory.  The directory
+/usr/local can be overridden at configuration time by passing
+--prefix=DIRECTORY to the configure script, or at make time by passing
+"prefix=DIRECTORY" to make.  See below for more information on --prefix.
+
+If you plan to do development of extension modules or to embed Python
+in another application and don't want to reference the original source
+tree, you can type "make inclinstall" and "make libainstall" to
+install the include files and lib*.a files, respectively, as
+/usr/local/include/Py/*.h and /usr/local/lib/python/lib/lib*.a.  The
+make libainstall target also installs copies of config.h,
+Modules/config.c and Modules/Makefile, for the benefit of the mkext.py
+script used by the Extensions subtree (distributed separately, see
+below).
 
 To print the documentation, cd into the Doc subdirectory, type "make"
 (let's hope you have LaTeX installed!), and send the four resulting
@@ -101,6 +113,19 @@ IRIX 5) you need to call the configure script with the option
 --with-svr4.  This is needed so the libraries -lnsl and -lsocket are
 found.  (On some other systems, e.g. IRIX 5, these libraries exist but
 are incompatible with other system libraries such as X11 and GL.)
+
+- If you want to install the binaries and the Python library somewhere
+else than in /usr/local/{bin,lib}, you can pass the option
+--prefix=DIRECTORY; the interpreter binary will be installed as
+DIRECTORY/bin/python and the library files as DIRECTORY/lib/python/*.
+If you pass --exec-prefix=DIRECTORY (as well) this overrides the
+installation prefix for architecture-dependent files (like the
+interpreter binary).  Note that --prefix=DIRECTORY also affects the
+default module search path (sys.path), when Modules/config.c is
+compiled.  Passing make the option prefix=DIRECTORY (and/or
+exec_prefix=DIRECTORY) overrides the prefix set at configuration time;
+this may be more convenient than re-running the configure script if
+you change your mind about the install prefix...
 
 - You can use the GNU readline library to improve the interactive
 user interface: this gives you line editing and command history when
@@ -128,7 +153,35 @@ if you don't use them.)
 - On SGI IRIX, there are modules that interface to many SGI specific
 system libraries, e.g. the GL library and the audio hardware.  To
 enable these modules, you must edit the Modules/Setup file (or copy the
-Setup.sgi file to it).
+Setup.irix4 file to it).
+
+- On SGI IRIX 4, dynamic loading of extension modules is supported by
+the "dl" library by Jack Jansen, which is ftp'able from
+ftp://ftp.cwi.nl/pub/dynload/dl-1.6.tar.Z.  This is enabled (after
+you've ftp'ed and compiled the dl library!) by passing
+--with-sgi-dl=DIRECTORY where DIRECTORY is the absolute pathname of
+the dl library.  (Don't bother on IRIX 5, it already has dynamic
+linking using SunOS style shared libraries.)
+
+- Dynamic loading of modules is rumoured to be supported on some other
+systems: VAX (Ultrix), Sun3 (SunOS 3.4), Sequent Symmetry (Dynix), and
+Atari ST.  This is done using a combination of the GNU dynamic loading
+package (ftp://ftp.cwi.nl/pub/dynload/dl-dld-1.1.tar.Z) and an
+emulation of the SGI dl library mentioned above (the emulation can be
+found at ftp://ftp.cwi.nl/pub/dynload/dld-3.2.3.tar.Z).  To enable
+this, ftp and compile both libraries, then call the configure passing
+it the option --with-dl-dld=D_LDIRECTORY,DLD_DIRECTORY where
+DL_DIRECTORY is the absolute pathname of the dl emulation library and
+DLD_DIRECTORY is the absolute pathname of the GNU dld library.  (Don't
+bother on SunOS 4 or 5, they already have dynamic linking using shared
+libraries.)
+
+- It is possible to specify alternative versions for the Math library
+(default -lm) and the C library (default the empty string) using the
+options --with-libm=STRING and --with-libc=STRING, respectively.  E.g.
+if your system requires that you pass -lc_s to the C compiler to use
+the shared C library, you can pass --with-libc=-lc_s.  These libraries
+are passed after all other libraries, the C library last.
 
 You can also build an "extended" interpreter, using modules that are
 not contained in the Modules directory.  Extensions are distributed as

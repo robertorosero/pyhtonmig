@@ -1,6 +1,7 @@
 dnl Process this file with autoconf to produce a configure script.
 AC_REVISION($Revision$)dnl
 AC_INIT(Include/object.h)
+AC_PREFIX(python)
 AC_CONFIG_HEADER(config.h)dnl
 
 # checks for alternative programs
@@ -37,7 +38,10 @@ AC_HAVE_LIBRARY(socket)])
 
 echo checking for --with-readline
 AC_WITH(readline, [AC_DEFINE(WITH_READLINE)
-if test "$withval" != 1; then LIBS="$LIBS -L$withval"; fi
+if test -d "$withval"
+then LIBS="$LIBS -L$withval"
+else echo proper usage is --with-readline=DIRECTORY; exit 1
+fi
 LIBS="$LIBS -lreadline -ltermcap"])
 
 echo checking for --with-thread
@@ -49,6 +53,31 @@ AC_HAVE_LIBRARY(thread, [AC_DEFINE(WITH_THREAD)
 LIBS="$LIBS -lthread"
 LIBOBJS="$LIBOBJS thread.o"])
 ])
+
+# -I${DLINCLDIR} is added to the compile rule for import.o
+AC_SUBST(DLINCLDIR)
+DLINCLDIR=/
+
+echo checking for --with-sgi-dl
+AC_WITH(sgi-dl, [AC_DEFINE(WITH_SGI_DL)
+dldir=$withval
+if test -d "$dldir"
+then LIBS="$LIBS -L$dldir"
+else echo proper usage is --with-sgi-dl=DIRECTORY; exit 1
+fi
+DLINCLDIR=${dldir}
+LIBS="$LIBS -ldl -lmld"])
+
+echo checking for --with-dl-dld
+AC_WITH(dl-dld, [AC_DEFINE(WITH_DL_DLD)
+dldir=`echo "$withval" | sed 's/,.*//'`
+dlddir=`echo "$withval" | sed 's/.*,//'`
+if test -d "$dldir" -a -d "$dlddir"
+then LIBS="$LIBS -L$dldir -L$dlddir"
+else echo proper usage is --with-dl-dld=DL_DIRECTORY,DLD_DIRECTORY; exit 1
+fi
+DLINCLDIR=${dldir}
+LIBS="$LIBS -ldl -ldld"])
 
 # checks for library functions
 AC_HAVE_FUNCS(clock ftime gettimeofday getpeername getpgrp getpid getwd lstat readlink readline select setsid setpgid setpgrp siginterrupt symlink tcgetpgrp tcsetpgrp times uname waitpid)
@@ -72,6 +101,14 @@ AC_TEST_PROGRAM([int foo(int x){return 0;} int main(){return foo(10);}], AC_DEFI
 if test "$have_prototypes"; then
 AC_COMPILE_CHECK(["bad exec* prototypes"], [#include <unistd.h>], [char *const*t;execve("@",t,t);], , AC_DEFINE(BAD_EXEC_PROTOTYPES))
 fi
+echo checking for bad static forward
+AC_TEST_PROGRAM([
+struct s { int a; int b; };
+static struct s foo;
+struct s *fooaddr() { return &foo; }
+static struct s foo = { 1, 2 };
+main() { if (fooaddr() != &foo) exit(1); else exit(0); }
+], , AC_DEFINE(BAD_STATIC_FORWARD))
 
 # checks for system services
 # (none yet)
@@ -79,6 +116,21 @@ fi
 # other checks for UNIX variants
 AC_IRIX_SUN
 AC_XENIX_DIR
+
+# check for --with-libm=...
+AC_SUBST(LIBM)
+LIBM=-lm
+AC_WITH(libm, [if test "$withval" != 1
+then LIBM=$withval
+else echo proper usage is --with-libm=STRING; exit 1
+fi])
+
+# check for --with-libc=...
+AC_SUBST(LIBC)
+AC_WITH(libc, [if test "$withval" != 1
+then LIBC=$withval
+else echo proper usage is --with-libc=STRING; exit 1
+fi])
 
 # generate output files
 AC_OUTPUT(Makefile Objects/Makefile Parser/Makefile Python/Makefile Modules/Makefile.pre)
