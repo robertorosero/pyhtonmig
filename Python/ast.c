@@ -1677,6 +1677,7 @@ ast_for_exec_stmt(const node *n)
         expr1 = ast_for_expr(CHILD(n, 1));
         if (!expr1)
             return NULL;
+        expr2 = ast_for_expr(CHILD(n, 3));
         if (!expr2)
             return NULL;
 
