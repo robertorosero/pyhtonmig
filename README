@@ -1,7 +1,7 @@
-This is Python version 2.4 alpha 3
-==================================
+This is Python version 2.4
+==========================
 
-Copyright (c) 2001, 2002, 2003, 2004 Python Software Foundation.
+Copyright (c) 2001, 2002, 2003, 2004, 2005 Python Software Foundation.
 All rights reserved.
 
 Copyright (c) 2000 BeOpen.com.
@@ -217,7 +217,7 @@ are probably experiencing compiler bugs, usually related to
 optimization.  This is a common problem with some versions of gcc, and
 some vendor-supplied compilers, which can sometimes be worked around
 by turning off optimization.  Consider switching to stable versions
-(gcc 2.95.2, or contact your vendor.)
+(gcc 2.95.2, gcc 3.x, or contact your vendor.)
 
 From Python 2.0 onward, all Python C code is ANSI C.  Compiling using
 old K&R-C-only compilers is no longer possible.  ANSI C compilers are
@@ -227,14 +227,14 @@ compilers from the vendor, or one of the free compilers (gcc).
 Unsupported systems
 -------------------
 
-A number of features are not supported in Python 2.3 anymore. Some
-support code is still present, but will be removed in Python 2.4.
-If you still need to use current Python versions on these systems,
-please send a message to python-dev@python.org indicating that you
-volunteer to support this system.
+A number of features have not been supported since Python 2.3, and
+the code to support them was removed in Python 2.4. If you still 
+need to use current Python versions on these systems, please send 
+a message to python-dev@python.org indicating that you volunteer 
+to support this system. There is more detail on this in PEP 11.
 
-More specifically, the following systems are not supported any
-longer:
+More specifically, the following systems are no longer supported:
+
 - SunOS 4
 - DYNIX
 - dgux
@@ -319,15 +319,19 @@ Linux:  A problem with threads and fork() was tracked down to a bug in
 	takes care of this automatically.
 
 Red Hat Linux: Red Hat 9 built Python2.2 in UCS-4 mode and hacked
-	Tcl to support it. To compile Python2.3 with Tkinter, you will
-	need to pass --enable-unicode=ucs4 flag to ./configure. 
+	Tcl to support it. To compile Python with Tkinter on these
+        systems, you will need to pass --enable-unicode=ucs4 flag 
+        to ./configure. This is no longer needed in Fedora Core.
 
-	There's an executable /usr/bin/python which is Python
-	1.5.2 on most older Red Hat installations; several key Red Hat tools
-	require this version.  Python 2.1.x may be installed as
-	/usr/bin/python2.  The Makefile installs Python as
-	/usr/local/bin/python, which may or may not take precedence
-	over /usr/bin/python, depending on how you have set up $PATH.
+        On older Red Hat releases, there's an executable 
+        /usr/bin/python which is Python 1.5.2 on most older Red Hat 
+        installations; several key Red Hat tools require this version.  
+        Python 2.1.x may be installed as /usr/bin/python2 (you can also
+        use "make altinstall" to install Python in a way that won't replace
+        the 'python' executable, but instead only create a "python2.4" 
+        binary).  The Makefile installs Python as /usr/local/bin/python, 
+        which may or may not take precedence over /usr/bin/python, depending 
+        on how you have set up $PATH.
 
 FreeBSD 3.x and probably platforms with NCurses that use libmytinfo or
 	similar: When using cursesmodule, the linking is not done in
@@ -1069,11 +1073,11 @@ however this assumes that you only need to add modules.)
 Building on non-UNIX systems
 ----------------------------
 
-For Windows (2000/NT/ME/98/95), assuming you have MS VC++ 6.0, the
+For Windows (2000/NT/ME/98/95), assuming you have MS VC++ 7.1, the
 project files are in PCbuild, the workspace is pcbuild.dsw.  See
 PCbuild\readme.txt for detailed instructions.
 
-For other non-Unix Windows compilers, in particular Windows 3.1 and
+For other non-Unix Windows compilers, in particular MS VC++ 6.0 and
 for OS/2, enter the directory "PC" and read the file "readme.txt".
 
 For the Mac, a separate source distribution will be made available,

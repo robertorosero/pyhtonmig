@@ -1,10 +1,11 @@
 # Python MSI Generator
 # (C) 2003 Martin v. Loewis
 # See "FOO" in comments refers to MSDN sections with the title FOO.
-import msilib, schema, sequence, os, glob, time
+import msilib, schema, sequence, os, glob, time, re
 from msilib import Feature, CAB, Directory, Dialog, Binary, add_data
 import uisample
 from win32com.client import constants
+from distutils.spawn import find_executable
 
 # Settings can be overridden in config.py below
 # 1 for Itanium build
@@ -80,6 +81,11 @@ product_codes = {
     '2.4.121': '{75508821-a8e9-40a8-95bd-dbe6033ddbea}', # 2.4c1
     '2.4.122': '{83a9118b-4bdd-473b-afc3-bcb142feca9e}', # 2.4c2
     '2.4.150': '{82d9302e-f209-4805-b548-52087047483a}', # 2.4.0
+    '2.4.1121':'{be027411-8e6b-4440-a29b-b07df0690230}', # 2.4.1c1
+    '2.4.1122':'{02818752-48bf-4074-a281-7a4114c4f1b1}', # 2.4.1c2
+    '2.4.1150':'{4d4f5346-7e4a-40b5-9387-fdb6181357fc}', # 2.4.1
+    '2.4.2121':'{5ef9d6b6-df78-45d2-ab09-14786a3c5a99}', # 2.4.2c1
+    '2.4.2150':'{b191e49c-ea23-43b2-b28a-14e0784069b8}', # 2.4.2
 }
 
 if snapshot:
@@ -115,6 +121,66 @@ if major+minor <= "23":
     'mmap.pyd',
     'parser.pyd',
     ])
+
+# Well-known component UUIDs
+# These are needed for SharedDLLs reference counter; if
+# a different UUID was used for each incarnation of, say,
+# python24.dll, an upgrade would set the reference counter
+# from 1 to 2 (due to what I consider a bug in MSI)
+# Using the same UUID is fine since these files are versioned,
+# so Installer will always keep the newest version.
+msvcr71_uuid = "{8666C8DD-D0B4-4B42-928E-A69E32FA5D4D}"
+pythondll_uuid = {
+    "24":"{9B81E618-2301-4035-AC77-75D9ABEB7301}",
+    "25":"{2e41b118-38bd-4c1b-a840-6977efd1b911}"
+    } [major+minor]
+    
+
+# Build the mingw import library, libpythonXY.a
+# This requires 'nm' and 'dlltool' executables on your PATH
+def build_mingw_lib(lib_file, def_file, dll_file, mingw_lib):
+    warning = "WARNING: %s - libpythonXX.a not built"
+    nm = find_executable('nm')
+    dlltool = find_executable('dlltool')
+
+    if not nm or not dlltool:
+        print warning % "nm and/or dlltool were not found"
+        return False
+
+    nm_command = '%s -Cs %s' % (nm, lib_file)
+    dlltool_command = "%s --dllname %s --def %s --output-lib %s" % \
+        (dlltool, dll_file, def_file, mingw_lib)
+    export_match = re.compile(r"^_imp__(.*) in python\d+\.dll").match
+
+    f = open(def_file,'w')
+    print >>f, "LIBRARY %s" % dll_file
+    print >>f, "EXPORTS"
+
+    nm_pipe = os.popen(nm_command)
+    for line in nm_pipe.readlines():
+        m = export_match(line)
+        if m:
+            print >>f, m.group(1)
+    f.close()
+    exit = nm_pipe.close()
+
+    if exit:
+        print warning % "nm did not run successfully"
+        return False
+
+    if os.system(dlltool_command) != 0:
+        print warning % "dlltool did not run successfully"
+        return False
+
+    return True
+
+# Target files (.def and .a) go in PCBuild directory
+lib_file = os.path.join(srcdir, "PCBuild", "python%s%s.lib" % (major, minor))
+def_file = os.path.join(srcdir, "PCBuild", "python%s%s.def" % (major, minor))
+dll_file = "python%s%s.dll" % (major, minor)
+mingw_lib = os.path.join(srcdir, "PCBuild", "libpython%s%s.a" % (major, minor))
+
+have_mingw = build_mingw_lib(lib_file, def_file, dll_file, mingw_lib)
 
 if testpackage:
     ext = 'px'
@@ -168,6 +234,7 @@ def build_database():
     # accordingly.
     add_data(db, "Property", [("UpgradeCode", uc),
                               ("WhichUsers", "ALL"),
+                              ("ProductLine", "Python%s%s" % (major, minor)),
                              ])
     db.Commit()
     return db
@@ -295,47 +362,21 @@ def add_ui(db):
     # UpdateEditIDLE sets the REGISTRY.tcl component into
     # the installed/uninstalled state according to both the
     # Extensions and TclTk features.
-    open("inst.vbs","w").write("""
-    Function CheckDir()
-      Set FSO = CreateObject("Scripting.FileSystemObject")
-      if FSO.FolderExists(Session.Property("TARGETDIR")) then
-        Session.Property("TargetExists") = "1"
-      else
-        Session.Property("TargetExists") = "0"
-      end if
-    End Function
-    Function UpdateEditIDLE()
-      Dim ext_new, tcl_new, regtcl_old
-      ext_new = Session.FeatureRequestState("Extensions")
-      tcl_new = Session.FeatureRequestState("TclTk")
-      if ext_new=-1 then
-         ext_new = Session.FeatureCurrentState("Extensions")
-      end if
-      if tcl_new=-1 then
-         tcl_new = Session.FeatureCurrentState("TclTk")
-      end if
-      regtcl_old = Session.ComponentCurrentState("REGISTRY.tcl")
-      if ext_new=3 and (tcl_new=3 or tcl_new=4) and regtcl_old<>3 then
-         Session.ComponentRequestState("REGISTRY.tcl")=3
-      end if
-      if (ext_new=2 or tcl_new=2) and regtcl_old<>2 then
-         Session.ComponentRequestState("REGISTRY.tcl")=2
-      end if
-    End Function
-    """)
-    # To add debug messages into scripts, the following fragment can be used
-    #     set objRec = Session.Installer.CreateRecord(1)
-    #     objRec.StringData(1) = "Debug message"
-    #     Session.message &H04000000, objRec
-    add_data(db, "Binary", [("Script", msilib.Binary("inst.vbs"))])
-    # See "Custom Action Type 6"
+    if os.system("nmake /nologo /c /f msisupport.mak") != 0:
+        raise "'nmake /f msisupport.mak' failed"
+    add_data(db, "Binary", [("Script", msilib.Binary("msisupport.dll"))])
+    # See "Custom Action Type 1"
+    if msilib.Win64:
+        CheckDir = "CheckDir"
+        UpdateEditIdle = "UpdateEditIDLE"
+    else:
+        CheckDir =  "_CheckDir@4"
+        UpdateEditIDLE = "_UpdateEditIDLE@4"
     add_data(db, "CustomAction",
-        [("CheckDir", 6, "Script", "CheckDir")])
+        [("CheckDir", 1, "Script", CheckDir)])
     if have_tcl:
         add_data(db, "CustomAction",
-        [("UpdateEditIDLE", 6, "Script", "UpdateEditIDLE")])
-    os.unlink("inst.vbs")
-
+        [("UpdateEditIDLE", 1, "Script", UpdateEditIDLE)])
 
     # UI customization properties
     add_data(db, "Property",
@@ -352,6 +393,7 @@ def add_ui(db):
              [("DlgFont8", "Tahoma", 9, None, 0),
               ("DlgFontBold8", "Tahoma", 8, None, 1), #bold
               ("VerdanaBold10", "Verdana", 10, None, 1),
+              ("VerdanaRed9", "Verdana", 9, 255, 0),
              ])
 
     compileargs = r"-Wi [TARGETDIR]Lib\compileall.py -f -x badsyntax [TARGETDIR]Lib"
@@ -540,6 +582,9 @@ def add_ui(db):
     seldlg = PyDialog(db, "SelectDirectoryDlg", x, y, w, h, modal, title,
                     "Next", "Next", "Cancel")
     seldlg.title("Select Destination Directory")
+    c = seldlg.text("Existing", 135, 25, 235, 30, 0x30003,
+                    "{\VerdanaRed9}This update will replace your existing [ProductLine] installation.")
+    c.condition("Hide", 'REMOVEOLDVERSION="" and REMOVEOLDSNAPSHOT=""')
     seldlg.text("Description", 135, 50, 220, 40, 0x30003,
                "Please select a directory for the [ProductName] files.")
 
@@ -839,7 +884,7 @@ def add_files(db):
     dlldir = PyDirectory(db, cab, root, srcdir, "DLLDIR", ".")
     pydll = "python%s%s.dll" % (major, minor)
     pydllsrc = srcdir + "/PCBuild/" + pydll
-    dlldir.start_component("DLLDIR", flags = 8, keyfile = pydll)
+    dlldir.start_component("DLLDIR", flags = 8, keyfile = pydll, uuid = pythondll_uuid)
     installer = msilib.MakeInstaller()
     pyversion = installer.FileVersion(pydllsrc, 0)
     if not snapshot:
@@ -851,7 +896,7 @@ def add_files(db):
                     language=installer.FileVersion(pydllsrc, 1))
     # XXX determine dependencies
     version, lang = extract_msvcr71()
-    dlldir.start_component("msvcr71", flags=8, keyfile="msvcr71.dll")
+    dlldir.start_component("msvcr71", flags=8, keyfile="msvcr71.dll", uuid=msvcr71_uuid)
     dlldir.add_file("msvcr71.dll", src=os.path.abspath("msvcr71.dll"),
                     version=version, language=lang)
     tmpfiles.append("msvcr71.dll")
@@ -867,7 +912,11 @@ def add_files(db):
             if not have_tcl:
                 continue
             tcltk.set_current()
-        elif dir in ['test', 'output']:
+        elif dir in ['test', 'tests', 'data', 'output']:
+            # test: Lib, Lib/email, Lib/bsddb
+            # tests: Lib/distutils
+            # data: Lib/email/test
+            # output: Lib/test
             testsuite.set_current()
         else:
             default_feature.set_current()
@@ -956,6 +1005,9 @@ def add_files(db):
     for f in dlls:
         lib.add_file(f.replace('pyd','lib'))
     lib.add_file('python%s%s.lib' % (major, minor))
+    # Add the mingw-format library
+    if have_mingw:
+        lib.add_file('libpython%s%s.a' % (major, minor))
     if have_tcl:
         # Add Tcl/Tk
         tcldirs = [(root, '../tcltk/lib', 'tcl')]
@@ -982,8 +1034,9 @@ def add_files(db):
         if f == "pynche":
             x = PyDirectory(db, cab, lib, "X", "X", "X|X")
             x.glob("*.txt")
-        if f == 'Scripts':
+        if os.path.exists(os.path.join(lib.absolute, "README")):
             lib.add_file("README.txt", src="README")
+        if f == 'Scripts':
             if have_tcl:
                 lib.start_component("pydocgui.pyw", tcltk, keyfile="pydocgui.pyw")
                 lib.add_file("pydocgui.pyw")
@@ -1013,6 +1066,8 @@ def add_registry(db):
              # msidbComponentAttributesRegistryKeyPath = 4
              [("REGISTRY", msilib.gen_uuid(), "TARGETDIR", 4, None,
                "InstallPath"),
+              ("REGISTRY.doc", msilib.gen_uuid(), "TARGETDIR", 4, None,
+               "Documentation"),
               ("REGISTRY.def", msilib.gen_uuid(), "TARGETDIR", 4,
                None, None)] + tcldata)
     # See "FeatureComponents Table".
@@ -1028,6 +1083,7 @@ def add_registry(db):
         tcldata = [(tcltk.id, "pythonw.exe")]
     add_data(db, "FeatureComponents",
              [(default_feature.id, "REGISTRY"),
+              (htmlfiles.id, "REGISTRY.doc"),
               (ext_feature.id, "REGISTRY.def")] +
               tcldata
               )
@@ -1096,7 +1152,7 @@ def add_registry(db):
               ("PythonPath", -1, prefix+r"\PythonPath", "",
                r"[TARGETDIR]Lib;[TARGETDIR]DLLs;[TARGETDIR]Lib\lib-tk", "REGISTRY"),
               ("Documentation", -1, prefix+r"\Help\Main Python Documentation", "",
-               r"[TARGETDIR]Doc\Python%s%s.chm" % (major, minor), "REGISTRY"),
+               r"[TARGETDIR]Doc\Python%s%s.chm" % (major, minor), "REGISTRY.doc"),
               ("Modules", -1, prefix+r"\Modules", "+", None, "REGISTRY"),
               ("AppPaths", -1, r"Software\Microsoft\Windows\CurrentVersion\App Paths\Python.exe",
                "", r"[TARGETDIR]Python.exe", "REGISTRY.def")
@@ -1111,18 +1167,23 @@ def add_registry(db):
     if have_tcl:
         tcltkshortcuts = [
               ("IDLE", "MenuDir", "IDLE|IDLE (Python GUI)", "pythonw.exe",
-               tcltk.id, r"[TARGETDIR]Lib\idlelib\idle.pyw", None, None, "python_icon.exe", 0, None, "TARGETDIR"),
+               tcltk.id, r'"[TARGETDIR]Lib\idlelib\idle.pyw"', None, None, "python_icon.exe", 0, None, "TARGETDIR"),
               ("PyDoc", "MenuDir", "MODDOCS|Module Docs", "pythonw.exe",
-               tcltk.id, r"[TARGETDIR]Tools\scripts\pydocgui.pyw", None, None, "python_icon.exe", 0, None, "TARGETDIR"),
+               tcltk.id, r'"[TARGETDIR]Tools\scripts\pydocgui.pyw"', None, None, "python_icon.exe", 0, None, "TARGETDIR"),
               ]
     add_data(db, "Shortcut",
              tcltkshortcuts +
              [# Advertised shortcuts: targets are features, not files
               ("Python", "MenuDir", "PYTHON|Python (command line)", "python.exe",
                default_feature.id, None, None, None, "python_icon.exe", 2, None, "TARGETDIR"),
-              ("Manual", "MenuDir", "MANUAL|Python Manuals", "documentation",
-               htmlfiles.id, None, None, None, None, None, None, None),
+              # Advertising the Manual breaks on (some?) Win98, and the shortcut lacks an
+              # icon first.
+              #("Manual", "MenuDir", "MANUAL|Python Manuals", "documentation",
+              # htmlfiles.id, None, None, None, None, None, None, None),
               ## Non-advertised shortcuts: must be associated with a registry component
+              ("Manual", "MenuDir", "MANUAL|Python Manuals", "REGISTRY.doc",
+               "[#Python%s%s.chm]" % (major,minor), None,
+               None, None, None, None, None, None),
               ("Uninstall", "MenuDir", "UNINST|Uninstall Python", "REGISTRY",
                SystemFolderName+"msiexec",  "/x%s" % product_code,
                None, None, None, None, None, None),

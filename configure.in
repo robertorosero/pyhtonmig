@@ -5,7 +5,7 @@ m4_define(PYTHON_VERSION, 2.4)
 
 AC_REVISION($Revision$)
 AC_PREREQ(2.53)
-AC_INIT(python, PYTHON_VERSION)
+AC_INIT(python, PYTHON_VERSION, http://www.python.org/python-bugs)
 AC_CONFIG_SRCDIR([Include/object.h])
 AC_CONFIG_HEADER(pyconfig.h)
 
@@ -974,7 +974,7 @@ AC_HEADER_DIRENT
 AC_HEADER_MAJOR
 
 # On Solaris, term.h requires curses.h
-AC_CHECK_HEADER(term.h,,,[
+AC_CHECK_HEADERS(term.h,,,[
 #ifdef HAVE_CURSES_H
 #include <curses.h>
 #endif
@@ -1304,8 +1304,8 @@ then
 		LDSHARED='$(CC) $(LDFLAGS) -bundle'
 		if test "$enable_framework" ; then
 			# Link against the framework. All externals should be defined.
-			BLDSHARED="$LDSHARED "'-Wl,-F. -framework $(PYTHONFRAMEWORK)'
-			LDSHARED="$LDSHARED "'-Wl,-F$(PYTHONFRAMEWORKPREFIX) -framework $(PYTHONFRAMEWORK)'
+			BLDSHARED="$LDSHARED "'$(PYTHONFRAMEWORKDIR)/Versions/$(VERSION)/$(PYTHONFRAMEWORK)'
+			LDSHARED="$LDSHARED "'$(PYTHONFRAMEWORKPREFIX)/$(PYTHONFRAMEWORKDIR)/Versions/$(VERSION)/$(PYTHONFRAMEWORK)'
 		else
 			# No framework. Ignore undefined symbols, assuming they come from Python
 			LDSHARED="$LDSHARED -undefined suppress"
@@ -1314,8 +1314,8 @@ then
 		LDSHARED='$(CC) $(LDFLAGS) -bundle'
 		if test "$enable_framework" ; then
 			# Link against the framework. All externals should be defined.
-			BLDSHARED="$LDSHARED "'-Wl,-F. -framework $(PYTHONFRAMEWORK)'
-			LDSHARED="$LDSHARED "'-Wl,-F$(PYTHONFRAMEWORKPREFIX) -framework $(PYTHONFRAMEWORK)'
+			BLDSHARED="$LDSHARED "'$(PYTHONFRAMEWORKDIR)/Versions/$(VERSION)/$(PYTHONFRAMEWORK)'
+			LDSHARED="$LDSHARED "'$(PYTHONFRAMEWORKPREFIX)/$(PYTHONFRAMEWORKDIR)/Versions/$(VERSION)/$(PYTHONFRAMEWORK)'
 		else
 			# No framework, use the Python app as bundle-loader
 			BLDSHARED="$LDSHARED "'-bundle_loader $(BUILDPYTHON)'
@@ -1324,17 +1324,18 @@ then
 	Darwin/*)
 		# Use -undefined dynamic_lookup whenever possible (10.3 and later).
 		# This allows an extension to be used in any Python
-		if test ${MACOSX_DEPLOYMENT_TARGET-10.1} '>' 10.2
+		cur_target=`sw_vers -productVersion | sed 's/\(10\.[[0-9]]*\).*/\1/'`
+		CONFIGURE_MACOSX_DEPLOYMENT_TARGET=${MACOSX_DEPLOYMENT_TARGET-${cur_target}}
+		if test ${MACOSX_DEPLOYMENT_TARGET-${cur_target}} '>' 10.2
 		then
 			LDSHARED='$(CC) $(LDFLAGS) -bundle -undefined dynamic_lookup'
 			BLDSHARED="$LDSHARED"
-			CONFIGURE_MACOSX_DEPLOYMENT_TARGET=$MACOSX_DEPLOYMENT_TARGET
 		else
 			LDSHARED='$(CC) $(LDFLAGS) -bundle'
 			if test "$enable_framework" ; then
 				# Link against the framework. All externals should be defined.
-				BLDSHARED="$LDSHARED "'-Wl,-F. -framework $(PYTHONFRAMEWORK)'
-				LDSHARED="$LDSHARED "'-Wl,-F$(PYTHONFRAMEWORKPREFIX) -framework $(PYTHONFRAMEWORK)'
+				BLDSHARED="$LDSHARED "'$(PYTHONFRAMEWORKDIR)/Versions/$(VERSION)/$(PYTHONFRAMEWORK)'
+				LDSHARED="$LDSHARED "'$(PYTHONFRAMEWORKPREFIX)/$(PYTHONFRAMEWORKDIR)/Versions/$(VERSION)/$(PYTHONFRAMEWORK)'
 			else
 				# No framework, use the Python app as bundle-loader
 				BLDSHARED="$LDSHARED "'-bundle_loader $(BUILDPYTHON)'
@@ -1426,7 +1427,7 @@ then
 		LINKFORSHARED="$extra_undefs"
 		if test "$enable_framework"
 		then
-			LINKFORSHARED="$LINKFORSHARED -Wl,-F. -framework "'$(PYTHONFRAMEWORK)'
+			LINKFORSHARED="$LINKFORSHARED "'$(PYTHONFRAMEWORKDIR)/Versions/$(VERSION)/$(PYTHONFRAMEWORK)'
 		fi
 		LINKFORSHARED="$LINKFORSHARED";;
 	OpenUNIX*|UnixWare*) LINKFORSHARED="-Wl,-Bexport";;
@@ -2760,7 +2761,7 @@ else
 
   # wchar_t is only usable if it maps to an unsigned type
   if test "$unicode_size" = "$ac_cv_sizeof_wchar_t" \
-          -a "$ac_cv_wchar_t_signed" == "no"
+          -a "$ac_cv_wchar_t_signed" = "no"
   then
     PY_UNICODE_TYPE="wchar_t"
     AC_DEFINE(HAVE_USABLE_WCHAR_T, 1,
@@ -2916,45 +2917,74 @@ then
       [Define if poll() sets errno on invalid file descriptors.])
 fi
 
+# Before we can test tzset, we need to check if struct tm has a tm_zone 
+# (which is not required by ISO C or UNIX spec) and/or if we support
+# tzname[]
+AC_STRUCT_TIMEZONE
 
-# tzset(3) exists and works like we expect it to
+# check tzset(3) exists and works like we expect it to
 AC_MSG_CHECKING(for working tzset())
 AC_CACHE_VAL(ac_cv_working_tzset, [
 AC_TRY_RUN([
 #include <stdlib.h>
 #include <time.h>
 #include <string.h>
+
+#if HAVE_TZNAME
+extern char *tzname[];
+#endif
+
 int main()
 {
 	/* Note that we need to ensure that not only does tzset(3)
 	   do 'something' with localtime, but it works as documented
 	   in the library reference and as expected by the test suite.
+	   This includes making sure that tzname is set properly if
+	   tm->tm_zone does not exist since it is the alternative way
+	   of getting timezone info.
 
 	   Red Hat 6.2 doesn't understand the southern hemisphere 
-	   after New Year's Day; it thinks swaps on that day.
+	   after New Year's Day.
 	*/
 
-	time_t groundhogday = 1044144000; /* GMT-based; well, it's a colony */
+	time_t groundhogday = 1044144000; /* GMT-based */
 	time_t midyear = groundhogday + (365 * 24 * 3600 / 2);
 
 	putenv("TZ=UTC+0");
 	tzset();
 	if (localtime(&groundhogday)->tm_hour != 0)
 	    exit(1);
+#if HAVE_TZNAME
+	/* For UTC, tzname[1] is sometimes "", sometimes "   " */
+	if (strcmp(tzname[0], "UTC") || 
+		(tzname[1][0] != 0 && tzname[1][0] != ' '))
+	    exit(1);
+#endif
 
 	putenv("TZ=EST+5EDT,M4.1.0,M10.5.0");
 	tzset();
 	if (localtime(&groundhogday)->tm_hour != 19)
 	    exit(1);
+#if HAVE_TZNAME
+	if (strcmp(tzname[0], "EST") || strcmp(tzname[1], "EDT"))
+	    exit(1);
+#endif
 
 	putenv("TZ=AEST-10AEDT-11,M10.5.0,M3.5.0");
 	tzset();
 	if (localtime(&groundhogday)->tm_hour != 11)
 	    exit(1);
+#if HAVE_TZNAME
+	if (strcmp(tzname[0], "AEST") || strcmp(tzname[1], "AEDT"))
+	    exit(1);
+#endif
+
+#if HAVE_STRUCT_TM_TM_ZONE
 	if (strcmp(localtime(&groundhogday)->tm_zone, "AEDT"))
 	    exit(1);
 	if (strcmp(localtime(&midyear)->tm_zone, "AEST"))
 	    exit(1);
+#endif
 
 	exit(0);
 }

@@ -432,7 +432,7 @@ def findsource(object):
         if not hasattr(object, 'co_firstlineno'):
             raise IOError('could not find function definition')
         lnum = object.co_firstlineno - 1
-        pat = re.compile(r'^(\s*def\s)|(.*\slambda(:|\s))|^(\s*@)')
+        pat = re.compile(r'^(\s*def\s)|(.*(?<!\w)lambda(:|\s))|^(\s*@)')
         while lnum > 0:
             if pat.match(lines[lnum]): break
             lnum = lnum - 1
@@ -503,17 +503,28 @@ class BlockFinder:
     """Provide a tokeneater() method to detect the end of a code block."""
     def __init__(self):
         self.indent = 0
-        self.started = 0
+        self.islambda = False
+        self.started = False
+        self.passline = False
         self.last = 0
 
     def tokeneater(self, type, token, (srow, scol), (erow, ecol), line):
         if not self.started:
-            if '@' in line: pass
-            elif type == tokenize.NAME: self.started = 1
+            if token in ("def", "class", "lambda"):
+                if token == "lambda":
+                    self.islambda = True
+                self.started = True
+            self.passline = True
         elif type == tokenize.NEWLINE:
+            self.passline = False
             self.last = srow
+        elif self.passline:
+            pass
+        elif self.islambda:
+            raise EndOfBlock, self.last
         elif type == tokenize.INDENT:
             self.indent = self.indent + 1
+            self.passline = True
         elif type == tokenize.DEDENT:
             self.indent = self.indent - 1
             if self.indent == 0:

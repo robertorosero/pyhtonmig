@@ -414,7 +414,7 @@ String literals are written in single or double quotes:
 \code{'xyzzy'}, \code{"frobozz"}.  See chapter 2 of the
 \citetitle[../ref/strings.html]{Python Reference Manual} for more about
 string literals.  Unicode strings are much like strings, but are
-specified in the syntax using a preceeding \character{u} character:
+specified in the syntax using a preceding \character{u} character:
 \code{u'abc'}, \code{u"def"}.  Lists are constructed with square brackets,
 separating items with commas: \code{[a, b, c]}.  Tuples are
 constructed by the comma operator (not within square brackets), with
@@ -546,7 +546,7 @@ for assignments of the form \code{\var{s}=\var{s}+\var{t}} or
 \code{\var{s}+=\var{t}}.  When applicable, this optimization makes
 quadratic run-time much less likely.  This optimization is both version
 and implementation dependent.  For performance sensitive code, it is
-preferrable to use the \method{str.join()} method which assures consistent
+preferable to use the \method{str.join()} method which assures consistent
 linear concatenation performance across versions and implementations.
 \versionchanged[Formerly, string concatenation never occurred in-place]{2.4}
 
@@ -738,7 +738,9 @@ The original string is returned if
 Return a list of the words in the string, using \var{sep} as the
 delimiter string.  If \var{maxsplit} is given, at most \var{maxsplit}
 splits are done, the \emph{rightmost} ones.  If \var{sep} is not specified
-or \code{None}, any whitespace string is a separator.
+or \code{None}, any whitespace string is a separator.  Except for splitting
+from the right, \method{rsplit()} behaves like \method{split()} which
+is described in detail below.
 \versionadded{2.4}
 \end{methoddesc}
 
@@ -755,7 +757,7 @@ string this method is called on.
 Return a list of the words in the string, using \var{sep} as the
 delimiter string.  If \var{maxsplit} is given, at most \var{maxsplit}
 splits are done. (thus, the list will have at most \code{\var{maxsplit}+1}
-elements).  If \var{maxsplit} is not specified or is zero, then there
+elements).  If \var{maxsplit} is not specified, then there
 is no limit on the number of splits (all possible splits are made).
 Consecutive delimiters are not grouped together and are
 deemed to delimit empty strings (for example, \samp{'1,,2'.split(',')}
@@ -765,11 +767,13 @@ multiple characters (for example, \samp{'1, 2, 3'.split(', ')} returns
 separator returns an empty list.
 
 If \var{sep} is not specified or is \code{None}, a different splitting
-algorithm is applied.  Words are separated by arbitrary length strings of
-whitespace characters (spaces, tabs, newlines, returns, and formfeeds).
-Consecutive whitespace delimiters are treated as a single delimiter
-(\samp{'1   2  3'.split()} returns \samp{['1', '2', '3']}).  Splitting an
-empty string returns \samp{['']}.
+algorithm is applied.  First, whitespace characters (spaces, tabs,
+newlines, returns, and formfeeds) are stripped from both ends.  Then,
+words are separated by arbitrary length strings of whitespace
+characters. Consecutive whitespace delimiters are treated as a single
+delimiter (\samp{'1  2  3'.split()} returns \samp{['1', '2', '3']}).
+Splitting an empty string or a string consisting of just whitespace
+will return \samp{['']}.
 \end{methoddesc}
 
 \begin{methoddesc}[string]{splitlines}{\optional{keepends}}
@@ -932,8 +936,8 @@ The conversion types are:
   \lineiii{i}{Signed integer decimal.}{}
   \lineiii{o}{Unsigned octal.}{(1)}
   \lineiii{u}{Unsigned decimal.}{}
-  \lineiii{x}{Unsigned hexidecimal (lowercase).}{(2)}
-  \lineiii{X}{Unsigned hexidecimal (uppercase).}{(2)}
+  \lineiii{x}{Unsigned hexadecimal (lowercase).}{(2)}
+  \lineiii{X}{Unsigned hexadecimal (uppercase).}{(2)}
   \lineiii{e}{Floating point exponential format (lowercase).}{}
   \lineiii{E}{Floating point exponential format (uppercase).}{}
   \lineiii{f}{Floating point decimal format.}{}
@@ -1071,7 +1075,7 @@ Notes:
   no longer works in Python 2.0.  Use of this misfeature has been
   deprecated since Python 1.4.
 
-\item[(3)] Raises an exception when \var{x} is not a list object.
+\item[(3)] \var{x} can be any iterable object.
 
 \item[(4)] Raises \exception{ValueError} when \var{x} is not found in
   \var{s}. When a negative index is passed as the second or third parameter
@@ -1107,7 +1111,7 @@ Notes:
      
   \var{key} specifies a function of one argument that is used to
      extract a comparison key from each list element:
-     \samp{\var{cmp}=\function{str.lower}}
+     \samp{\var{key}=\function{str.lower}}
 
   \var{reverse} is a boolean value.  If set to \code{True}, then the
      list elements are sorted as if each comparison were reversed.
@@ -1202,7 +1206,7 @@ subset of the second set (is a subset, but is not equal).
 A set is greater than another set if and only if the first set is a proper
 superset of the second set (is a superset, but is not equal).
 
-Instanceas of \class{set} are compared to instances of \class{frozenset} based
+Instances of \class{set} are compared to instances of \class{frozenset} based
 on their members.  For example, \samp{set('abc') == frozenset('abc')} returns
 \code{True}.     
 

@@ -169,7 +169,7 @@ class C:
   argument is it -- the future statements in effect around the call to
   compile are ignored.
 
-  Future statemants are specified by bits which can be bitwise or-ed
+  Future statements are specified by bits which can be bitwise or-ed
   together to specify multiple statements.  The bitfield required to
   specify a given feature can be found as the \member{compiler_flag}
   attribute on the \class{_Feature} instance in the
@@ -416,9 +416,12 @@ class C:
     after any I/O has been performed, and there's no reliable way to
     determine whether this is the case.}
 
-  The \function{file()} constructor is new in Python 2.2.  The previous
-  spelling, \function{open()}, is retained for compatibility, and is an
-  alias for \function{file()}.
+  The \function{file()} constructor is new in Python 2.2 and is an
+  alias for \function{open()}.  Both spellings are equivalent.  The
+  intent is for \function{open()} to continue to be preferred for use
+  as a factory function which returns a new \class{file} object.  The
+  spelling, \class{file} is more suited to type testing (for example,
+  writing \samp{isinstance(f, file)}).
 \end{funcdesc}
 
 \begin{funcdesc}{filter}{function, list}

@@ -88,6 +88,11 @@
 #include <stdarg.h>
 #include <string.h>
 #include <time.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <malloc.h>
+#include <io.h>
+#include <fcntl.h>
 
 #include "archive.h"
 
@@ -612,11 +617,20 @@ static HINSTANCE LoadPythonDll(char *fname)
 {
 	char fullpath[_MAX_PATH];
 	LONG size = sizeof(fullpath);
-	HINSTANCE h = LoadLibrary(fname);
+	char subkey_name[80];
+	char buffer[260 + 12];
+	HINSTANCE h;
+
+	/* make sure PYTHONHOME is set, to that sys.path is initialized correctly */
+	wsprintf(buffer, "PYTHONHOME=%s", python_dir);
+	_putenv(buffer);
+	h = LoadLibrary(fname);
 	if (h)
 		return h;
-	if (ERROR_SUCCESS != RegQueryValue(HKEY_CURRENT_USER,
-					   "SOFTWARE\\Python\\PythonCore\\2.3\\InstallPath",
+	wsprintf(subkey_name,
+		 "SOFTWARE\\Python\\PythonCore\\%d.%d\\InstallPath",
+		 py_major, py_minor);
+	if (ERROR_SUCCESS != RegQueryValue(HKEY_CURRENT_USER, subkey_name,
 					   fullpath, &size))
 		return NULL;
 	strcat(fullpath, "\\");
@@ -662,7 +676,7 @@ static int prepare_script_environment(HINSTANCE hPython)
  * 1 if the Python-dll does not export the functions we need
  * 2 if no install-script is specified in pathname
  * 3 if the install-script file could not be opened
- * the return value of PyRun_SimpleFile() otherwise,
+ * the return value of PyRun_SimpleString() otherwise,
  * which is 0 if everything is ok, -1 if an exception had occurred
  * in the install-script.
  */
@@ -672,7 +686,7 @@ run_installscript(HINSTANCE hPython, char *pathname, int argc, char **argv)
 {
 	DECLPROC(hPython, void, Py_Initialize, (void));
 	DECLPROC(hPython, int, PySys_SetArgv, (int, char **));
-	DECLPROC(hPython, int, PyRun_SimpleFile, (FILE *, char *));
+	DECLPROC(hPython, int, PyRun_SimpleString, (char *));
 	DECLPROC(hPython, void, Py_Finalize, (void));
 	DECLPROC(hPython, PyObject *, Py_BuildValue, (char *, ...));
 	DECLPROC(hPython, PyObject *, PyCFunction_New,
@@ -681,10 +695,10 @@ run_installscript(HINSTANCE hPython, char *pathname, int argc, char **argv)
 	DECLPROC(hPython, PyObject *, PyErr_Format, (PyObject *, char *));
 
 	int result = 0;
-	FILE *fp;
+	int fh;
 
 	if (!Py_Initialize || !PySys_SetArgv
-	    || !PyRun_SimpleFile || !Py_Finalize)
+	    || !PyRun_SimpleString || !Py_Finalize)
 		return 1;
 	
 	if (!Py_BuildValue || !PyArg_ParseTuple || !PyErr_Format)
@@ -696,8 +710,8 @@ run_installscript(HINSTANCE hPython, char *pathname, int argc, char **argv)
 	if (pathname == NULL || pathname[0] == '\0')
 		return 2;
 
-	fp = fopen(pathname, "r");
-	if (!fp) {
+	fh = open(pathname, _O_RDONLY);
+	if (-1 == fh) {
 		fprintf(stderr, "Could not open postinstall-script %s\n",
 			pathname);
 		return 3;
@@ -709,10 +723,22 @@ run_installscript(HINSTANCE hPython, char *pathname, int argc, char **argv)
 
 	prepare_script_environment(hPython);
 	PySys_SetArgv(argc, argv);
-	result = PyRun_SimpleFile(fp, pathname);
+	result = 3;
+	{
+		struct _stat statbuf;
+		if(0 == _fstat(fh, &statbuf)) {
+			char *script = alloca(statbuf.st_size + 5);
+			int n = read(fh, script, statbuf.st_size);
+			if (n > 0) {
+				script[n] = '\n';
+				script[n+1] = 0;
+				result = PyRun_SimpleString(script);
+			}
+		}
+	}
 	Py_Finalize();
 
-	fclose(fp);
+	close(fh);
 
 	return result;
 }
@@ -757,7 +783,9 @@ static int run_simple_script(char *script)
 	rc = do_run_simple_script(hPython, script);
 	FreeLibrary(hPython);
 	fflush(stderr);
+	fclose(stderr);
 	fflush(stdout);
+	fclose(stdout);
 	/* We only care about the output when we fail.  If the script works
 	   OK, then we discard it
 	*/
@@ -1793,7 +1821,7 @@ InstallFilesDlgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 			/* Strip the trailing backslash again */
 			python_dir[strlen(python_dir)-1] = '\0';
             
-            CheckRootKey(hwnd);
+			CheckRootKey(hwnd);
 	    
 			if (!OpenLogfile(python_dir))
 				break;
@@ -1948,7 +1976,9 @@ FinishedDlgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 				fprintf(stderr, "*** Could not load Python ***");
 			}
 			fflush(stderr);
+			fclose(stderr);
 			fflush(stdout);
+			fclose(stdout);
 	    
 			fp = fopen(tempname, "rb");
 			n = fread(buffer, 1, sizeof(buffer), fp);
@@ -2296,7 +2326,9 @@ BOOL Run_RemoveScript(char *line)
 		}
 	
 		fflush(stderr);
+		fclose(stderr);
 		fflush(stdout);
+		fclose(stdout);
 	
 		fp = fopen(tempname, "rb");
 		n = fread(buffer, 1, sizeof(buffer), fp);
