@@ -25,6 +25,20 @@ else:
         return os.path.normpath(path)
 
 
+# More backwards compatability hacks
+def extend (list, new_list):
+    """Appends the list 'new_list' to 'list', just like the 'extend()'
+       list method does in Python 1.5.2 -- but this works on earlier
+       versions of Python too."""
+
+    if hasattr (list, 'extend'):
+        list.extend (new_list)
+    else:
+        list[len(list):] = new_list
+
+# extend ()
+
+
 # cache for by mkpath() -- in addition to cheapening redundant calls,
 # eliminates redundant "creating /foo/bar/baz" messages in dry-run mode
 PATH_CREATED = {}
@@ -362,10 +376,10 @@ def copy_tree (src, dst,
             outputs.append (dst_name)
             
         elif os.path.isdir (src_name):
-            outputs.extend (
-                copy_tree (src_name, dst_name,
-                           preserve_mode, preserve_times, preserve_symlinks,
-                           update, verbose, dry_run))
+            extend (outputs, 
+                    copy_tree (src_name, dst_name,
+                               preserve_mode,preserve_times,preserve_symlinks,
+                               update, verbose, dry_run))
         else:
             if (copy_file (src_name, dst_name,
                            preserve_mode, preserve_times,

@@ -12,6 +12,7 @@ from types import *
 from glob import glob
 from shutil import rmtree
 from distutils.core import Command
+from distutils.util import extend
 from distutils.text_file import TextFile
 from distutils.errors import DistutilsExecError
 
@@ -243,17 +244,17 @@ class Dist (Command):
         for pattern in optional:
             files = filter (os.path.isfile, glob (pattern))
             if files:
-                self.files.extend (files)
+                extend (self.files, files)
 
         if self.distribution.packages or self.distribution.py_modules:
             build_py = self.find_peer ('build_py')
             build_py.ensure_ready ()
-            self.files.extend (build_py.get_source_files ())
+            extend (self.files, build_py.get_source_files ())
 
         if self.distribution.ext_modules:
             build_ext = self.find_peer ('build_ext')
             build_ext.ensure_ready ()
-            self.files.extend (build_ext.get_source_files ())
+            extend (self.files, build_ext.get_source_files ())
 
 
 
@@ -360,7 +361,7 @@ class Dist (Command):
                     continue
 
                 dir_files = self.search_dir (words[0], words[1:])
-                self.files.extend (dir_files)
+                extend (self.files, dir_files)
 
             # Multiple words in pattern: that's a no-no unless the first
             # word is a directory name
@@ -373,7 +374,7 @@ class Dist (Command):
             elif not exclude:
                 matches = filter (os.path.isfile, glob (pattern))
                 if matches:
-                    self.files.extend (matches)
+                    extend (self.files, matches)
                 else:
                     manifest.warn ("no matches for '%s' found" % pattern)
 

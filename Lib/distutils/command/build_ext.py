@@ -11,6 +11,7 @@ __rcsid__ = "$Id$"
 import sys, os, string, re
 from types import *
 from distutils.core import Command
+from distutils.util import extend
 from distutils.errors import *
 
 
@@ -186,7 +187,7 @@ class BuildExt (Command):
         for (extension_name, build_info) in self.extensions:
             sources = build_info.get ('sources')
             if type (sources) in (ListType, TupleType):
-                filenames.extend (sources)
+                extend (filenames, sources)
 
         return filenames
 
@@ -218,7 +219,7 @@ class BuildExt (Command):
             objects = self.compiler.object_filenames (sources)
             extra_objects = build_info.get ('extra_objects')
             if extra_objects:
-                objects.extend (extra_objects)
+                extend (objects, extra_objects)
             libraries = build_info.get ('libraries')
             library_dirs = build_info.get ('library_dirs')
             extra_args = build_info.get ('extra_link_args') or []

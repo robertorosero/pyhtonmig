@@ -11,6 +11,7 @@ __rcsid__ = "$Id$"
 import os
 import sys
 from distutils.errors import *
+from distutils.util import extend
 from distutils.ccompiler import \
      CCompiler, gen_preprocess_options, gen_lib_options
 
@@ -98,7 +99,7 @@ class MSVCCompiler (CCompiler) :
             if extra_preargs:
                 cc_args[:0] = extra_preargs
             if extra_postargs:
-                cc_args.extend (extra_postargs)
+                extend (cc_args, extra_postargs)
 
             self.spawn ([self.cc] + cc_args)
             objectFiles.append( objFile )
@@ -131,7 +132,7 @@ class MSVCCompiler (CCompiler) :
         if extra_preargs:
             ld_args[:0] = extra_preargs
         if extra_postargs:
-            ld_args.extend (extra_postargs)
+            extend (ld_args, extra_postargs)
 
         self.spawn ( [ self.link ] + ld_args )
     
@@ -175,7 +176,7 @@ class MSVCCompiler (CCompiler) :
         if extra_preargs:
             ld_args[:0] = extra_preargs
         if extra_postargs:
-            ld_args.extend (extra_postargs)
+            extend (ld_args, extra_postargs)
 
         self.spawn ( [ self.link ] + ld_args )
 

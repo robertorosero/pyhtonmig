@@ -11,7 +11,7 @@ from types import *
 from glob import glob
 
 from distutils.core import Command
-from distutils.util import abspath
+from distutils.util import abspath, extend
 from distutils.errors import *
 
 
@@ -239,7 +239,7 @@ class BuildPy (Command):
             for package in self.packages:
                 package_dir = self.get_package_dir (package)
                 m = self.find_package_modules (package, package_dir)
-                modules.extend (m)
+                extend (modules, m)
 
         # Both find_modules() and find_package_modules() return a list of
         # tuples where the last element of each tuple is the filename --
