@@ -11,7 +11,7 @@
 
 /* XXX TO DO
    re-indent this file
-   internal error checking
+   internal error checking (such as function return values, etc.)
    syntax errors
 */
 
@@ -22,7 +22,7 @@ static asdl_seq *ast_for_suite(const node *);
 static asdl_seq *ast_for_exprlist(const node *, int);
 static expr_ty ast_for_testlist(const node *);
 
-/* Note different signature for call */
+/* Note different signature for ast_for_call */
 static expr_ty ast_for_call(const node *, expr_ty);
 
 static PyObject *parsenumber(const char *);
@@ -378,10 +378,10 @@ ast_for_arguments(const node *n)
 	if (TYPE(ch) == EQUAL)
 	    n_defaults++;
     }
-    args = n_args ? asdl_seq_new(n_args) : NULL;
+    args = (n_args ? asdl_seq_new(n_args) : NULL);
     if (!args && n_args)
     	return NULL;
-    defaults = n_defaults? asdl_seq_new(n_defaults) : NULL;
+    defaults = (n_defaults ? asdl_seq_new(n_defaults) : NULL);
     if (!defaults && n_defaults) {
 	if (args) asdl_seq_free(args);
     	return NULL;
