@@ -128,7 +128,7 @@ show_counts(void)
 
 /* Set PyDictObject* mp to empty but w/ PyDict_MINSIZE slots, using
    ma_smalltable. */
-#define empty_to_minsize(mp) do { 					\
+#define EMPTY_TO_MINSIZE(mp) do { 					\
 	memset((mp)->ma_smalltable, 0, sizeof((mp)->ma_smalltable));	\
 	(mp)->ma_table = (mp)->ma_smalltable;				\
 	(mp)->ma_mask = PyDict_MINSIZE - 1;				\
@@ -150,7 +150,7 @@ PyDict_New(void)
 	mp = PyObject_NEW(dictobject, &PyDict_Type);
 	if (mp == NULL)
 		return NULL;
-	empty_to_minsize(mp);
+	EMPTY_TO_MINSIZE(mp);
 	mp->ma_lookup = lookdict_string;
 #ifdef SHOW_CONVERSION_COUNTS
 	++created;
@@ -608,7 +608,7 @@ PyDict_Clear(PyObject *op)
 	 */
 	fill = mp->ma_fill;
 	if (table_is_malloced)
-		empty_to_minsize(mp);
+		EMPTY_TO_MINSIZE(mp);
 
 	else if (fill > 0) {
 		/* It's a small table with something that needs to be cleared.
@@ -617,7 +617,7 @@ PyDict_Clear(PyObject *op)
 		 */
 		memcpy(small_copy, table, sizeof(small_copy));
 		table = small_copy;
-		empty_to_minsize(mp);
+		EMPTY_TO_MINSIZE(mp);
 	}
 	/* else it's a small table that's already empty */
 
@@ -1671,64 +1671,20 @@ static PySequenceMethods dict_as_sequence = {
 	0,					/* sq_inplace_repeat */
 };
 
-static int
-dict_init(PyDictObject *self, PyObject *args, PyObject *kw)
-{
-	empty_to_minsize(self);
-	self->ma_lookup = lookdict_string;
-#ifdef SHOW_CONVERSION_COUNTS
-	++created;
-#endif
-	return 0;
-}
-
-/* XXX This is wrong, but if I knew *how* it was wrong I would fix
- * XXX it instead of typing this comment <0.5 wink>.
- */
 static PyObject *
 dict_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
 	PyObject *self;
 
-	/* XXX Is it legit to insist these all be non-NULL? */
-	if (!(type && type->tp_alloc && type->tp_init)) {
-		PyErr_BadInternalCall();
-		return NULL;
-	}
-
-	/* XXX I'm not sure what the 2nd tp_alloc arg is for, and wholly
-	 * unsure what to pass if 0 isn't appropriate in this specific case.
-	 * XXX Will tp_alloc set up GC correctly for dict objects?
-	 * If not, how to tell?  If so, how to verify?  Dare not add the
-	 * object *twice* to the GC list.
-	 */
 	self = type->tp_alloc(type, 0);
-	if (self == NULL)
-		return NULL;
-	/* XXX Safe to assume Py_DECREF(self) is OK hereafter? */
-
-	/* XXX This appears to be necessary (core dumps without it).  But I
-	 * would have guessed that, if type is a subclass, it's part of
-	 * type->tp_init()'s job to call all base class tp_init slots, "bottom
-	 * up".  Apparently not(?).
-	 */
-	if (dict_init((PyDictObject *)self, args, kwds) < 0) {
-		Py_DECREF(self);
-		return NULL;
+	if (self != NULL) {
+		PyDictObject *d = (PyDictObject *)self;
+		EMPTY_TO_MINSIZE(d);
+		d->ma_lookup = lookdict_string;
+#ifdef SHOW_CONVERSION_COUNTS
+		++created;
+#endif
 	}
-
-	/* XXX If type is PyDictObject, we end up calling dict_init twice.
-	 * Should that be special-cased?  It's a little inefficient, and
-	 * "created* will get incremented twice.  But if type is a subclass,
-	 * and calls dict_init directly (see last blob of confusions), that's
-	 * going to happen anyway.
-	 */
-	if (type->tp_init(self, args, kwds) < 0) {
-		Py_DECREF(self);
-		return NULL;
-	}
-
-	/* This line I feel confident about <wink>. */
 	return self;
 }
 
@@ -1776,7 +1732,7 @@ PyTypeObject PyDict_Type = {
 	0,					/* tp_descr_get */
 	0,					/* tp_descr_set */
 	0,					/* tp_dictoffset */
-	(initproc)dict_init,			/* tp_init */
+	0,					/* tp_init */
 	PyType_GenericAlloc,			/* tp_alloc */
 	dict_new,				/* tp_new */
 };
