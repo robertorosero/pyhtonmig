@@ -77,7 +77,7 @@ static PyObject *warnings_module = NULL;
    If the module is returned, it is guaranteed to have been obtained
    without acquiring the import lock
 */
-PyObject *PyModule_GetWarningsModule()
+PyObject *PyModule_GetWarningsModule(void)
 {
 	PyObject *typ, *val, *tb;
 	PyObject *all_modules;
@@ -142,6 +142,11 @@ Py_Initialize(void)
 	PyThreadState *tstate;
 	PyObject *bimod, *sysmod;
 	char *p;
+#if defined(Py_USING_UNICODE) && defined(HAVE_LANGINFO_H) && defined(CODESET)
+	char *codeset;
+	char *saved_locale;
+	PyObject *sys_stream, *sys_isatty;
+#endif
 	extern void _Py_ReadyTypes(void);
 
 	if (initialized)
@@ -227,21 +232,51 @@ Py_Initialize(void)
 	/* On Unix, set the file system encoding according to the
 	   user's preference, if the CODESET names a well-known
 	   Python codec, and Py_FileSystemDefaultEncoding isn't
-	   initialized by other means.  */
-	if (!Py_FileSystemDefaultEncoding) {
-		char *saved_locale = setlocale(LC_CTYPE, NULL);
-		char *codeset;
-		setlocale(LC_CTYPE, "");
-		codeset = nl_langinfo(CODESET);
-		if (*codeset) {
-			PyObject *enc = PyCodec_Encoder(codeset);
-			if (enc) {
-				Py_FileSystemDefaultEncoding = strdup(codeset);
-				Py_DECREF(enc);
-			} else
-				PyErr_Clear();
+	   initialized by other means. Also set the encoding of
+	   stdin and stdout if these are terminals.  */
+
+	saved_locale = strdup(setlocale(LC_CTYPE, NULL));
+	setlocale(LC_CTYPE, "");
+	codeset = nl_langinfo(CODESET);
+	if (codeset && *codeset) {
+		PyObject *enc = PyCodec_Encoder(codeset);
+		if (enc) {
+			codeset = strdup(codeset);
+			Py_DECREF(enc);
+		} else {
+			codeset = NULL;
+			PyErr_Clear();
 		}
-		setlocale(LC_CTYPE, saved_locale);
+	} else
+		codeset = NULL;
+	setlocale(LC_CTYPE, saved_locale);
+	free(saved_locale);
+
+	if (codeset) {
+		sys_stream = PySys_GetObject("stdin");
+		sys_isatty = PyObject_CallMethod(sys_stream, "isatty", "");
+		if (!sys_isatty)
+			PyErr_Clear();
+		if(sys_isatty && PyObject_IsTrue(sys_isatty)) {
+			if (!PyFile_SetEncoding(sys_stream, codeset))
+				Py_FatalError("Cannot set codeset of stdin");
+		}
+		Py_XDECREF(sys_isatty);
+
+		sys_stream = PySys_GetObject("stdout");
+		sys_isatty = PyObject_CallMethod(sys_stream, "isatty", "");
+		if (!sys_isatty)
+			PyErr_Clear();
+		if(sys_isatty && PyObject_IsTrue(sys_isatty)) {
+			if (!PyFile_SetEncoding(sys_stream, codeset))
+				Py_FatalError("Cannot set codeset of stdout");
+		}
+		Py_XDECREF(sys_isatty);
+
+		if (!Py_FileSystemDefaultEncoding)
+			Py_FileSystemDefaultEncoding = codeset;
+		else
+			free(codeset);
 	}
 #endif
 }
@@ -297,15 +332,40 @@ Py_Finalize(void)
 	warnings_module = NULL;
 
 	/* Collect garbage.  This may call finalizers; it's nice to call these
-	   before all modules are destroyed. */
+	 * before all modules are destroyed.
+	 * XXX If a __del__ or weakref callback is triggered here, and tries to
+	 * XXX import a module, bad things can happen, because Python no
+	 * XXX longer believes it's initialized.
+	 * XXX     Fatal Python error: Interpreter not initialized (version mismatch?)
+	 * XXX is easy to provoke that way.  I've also seen, e.g.,
+	 * XXX     Exception exceptions.ImportError: 'No module named sha'
+	 * XXX         in <function callback at 0x008F5718> ignored
+	 * XXX but I'm unclear on exactly how that one happens.  In any case,
+	 * XXX I haven't seen a real-life report of either of these.
+         */
 	PyGC_Collect();
 
 	/* Destroy all modules */
 	PyImport_Cleanup();
 
 	/* Collect final garbage.  This disposes of cycles created by
-	   new-style class definitions, for example. */
+	 * new-style class definitions, for example.
+	 * XXX This is disabled because it caused too many problems.  If
+	 * XXX a __del__ or weakref callback triggers here, Python code has
+	 * XXX a hard time running, because even the sys module has been
+	 * XXX cleared out (sys.stdout is gone, sys.excepthook is gone, etc).
+	 * XXX One symptom is a sequence of information-free messages
+	 * XXX coming from threads (if a __del__ or callback is invoked,
+	 * XXX other threads can execute too, and any exception they encounter
+	 * XXX triggers a comedy of errors as subsystem after subsystem
+	 * XXX fails to find what it *expects* to find in sys to help report
+	 * XXX the exception and consequent unexpected failures).  I've also
+	 * XXX seen segfaults then, after adding print statements to the
+	 * XXX Python code getting called.
+	 */
+#if 0
 	PyGC_Collect();
+#endif
 
 	/* Destroy the database used by _PyImport_{Fixup,Find}Extension */
 	_PyImport_Fini();

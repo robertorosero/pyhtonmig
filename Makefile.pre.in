@@ -609,6 +609,9 @@ altbininstall:	$(BUILDPYTHON)
 			$(INSTALL_SHARED) libpython$(VERSION)$(SO) $(DESTDIR)$(BINDIR); \
 		else \
 			$(INSTALL_SHARED) libpython$(VERSION)$(SO) $(DESTDIR)$(LIBDIR)/$(INSTSONAME); \
+			if test libpython$(VERSION)$(SO) != $(INSTSONAME); then \
+				(cd $(DESTDIR)$(LIBDIR); $(LN) -sf $(INSTSONAME) libpython$(VERSION)$(SO)); \
+			fi \
 		fi; \
 	else	true; \
 	fi
@@ -866,13 +869,13 @@ frameworkinstallmaclib:
 frameworkinstallapps:
 	$(MAKE) -f $(srcdir)/Mac/OSX/Makefile installapps \
 		$(RUNSHARED) BUILDPYTHON=./$(BUILDPYTHON) DIRMODE=$(DIRMODE) FILEMODE=$(FILEMODE) \
-		srcdir=$(srcdir) builddir=. DESTDIR=$(DESTDIR)
+		srcdir=$(srcdir) builddir=. DESTDIR=$(DESTDIR) prefix=$(prefix)
 
 # This install the unix python and pythonw tools in /usr/local/bin
 frameworkinstallunixtools:
 	$(MAKE) -f $(srcdir)/Mac/OSX/Makefile installunixtools \
 		DIRMODE=$(DIRMODE) FILEMODE=$(FILEMODE) \
-		srcdir=$(srcdir) builddir=. DESTDIR=$(DESTDIR)
+		srcdir=$(srcdir) builddir=. DESTDIR=$(DESTDIR) prefix=$(prefix)
 
 # This installs the Demos and Tools into the applications directory.
 # It is not part of a normal frameworkinstall

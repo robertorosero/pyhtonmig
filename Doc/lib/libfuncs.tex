@@ -68,7 +68,7 @@ def my_import(name):
   is the length of the tuple.
   If the optional \var{keywords} argument is present, it must be a
   dictionary whose keys are strings.  It specifies keyword arguments
-  to be added to the end of the the argument list.
+  to be added to the end of the argument list.
   Calling \function{apply()} is different from just calling
   \code{\var{function}(\var{args})}, since in that case there is always
   exactly one argument.  The use of \function{apply()} is equivalent
@@ -78,6 +78,15 @@ def my_import(name):
 
   \deprecated{2.3}{Use the extended call syntax instead, as described
                    above.}
+\end{funcdesc}
+
+\begin{funcdesc}{basestring}{}
+  This abstract type is the superclass for \class{str} and \class{unicode}.
+  It cannot be called or instantiated, but it can be used to test whether
+  an object is an instance of \class{str} or \class{unicode}.
+  \code{isinstance(obj, basestring)} is equivalent to
+  \code{isinstance(obj, (str, unicode))}.
+  \versionadded{2.3}
 \end{funcdesc}
 
 \begin{funcdesc}{bool}{\optional{x}}
@@ -422,7 +431,7 @@ class C:
   file's desired buffer size: 0 means unbuffered, 1 means line
   buffered, any other positive value means use a buffer of
   (approximately) that size.  A negative \var{bufsize} means to use
-  the system default, which is usually line buffered for for tty
+  the system default, which is usually line buffered for tty
   devices and fully buffered for other files.  If omitted, the system
   default is used.\footnote{
     Specifying a buffer size currently has no effect on systems that
@@ -707,7 +716,7 @@ class C:
 \begin{funcdesc}{ord}{c}
   Return the \ASCII{} value of a string of one character or a Unicode
   character.  E.g., \code{ord('a')} returns the integer \code{97},
-  \code{ord(u'\\u2020')} returns \code{8224}.  This is the inverse of
+  \code{ord(u'\e u2020')} returns \code{8224}.  This is the inverse of
   \function{chr()} for strings and of \function{unichr()} for Unicode
   characters.
 \end{funcdesc}
@@ -807,7 +816,9 @@ class C(object):
   Apply \var{function} of two arguments cumulatively to the items of
   \var{sequence}, from left to right, so as to reduce the sequence to
   a single value.  For example, \code{reduce(lambda x, y: x+y, [1, 2,
-  3, 4, 5])} calculates \code{((((1+2)+3)+4)+5)}.  If the optional
+  3, 4, 5])} calculates \code{((((1+2)+3)+4)+5)}.  The left argument,
+  \var{x}, is the accumulated value and the right argument, \var{y},
+  is the update value from the \var{sequence}.  If the optional
   \var{initializer} is present, it is placed before the items of the
   sequence in the calculation, and serves as a default when the
   sequence is empty.  If \var{initializer} is not given and
@@ -933,7 +944,7 @@ class C:
   \versionadded{2.3}
 \end{funcdesc}
 
-\begin{funcdesc}{super}{type\optional{object-or-type}}
+\begin{funcdesc}{super}{type\optional{, object-or-type}}
   Return the superclass of \var{type}.  If the second argument is omitted
   the super object returned is unbound.  If the second argument is an
   object, \code{isinstance(\var{obj}, \var{type})} must be true.  If
@@ -966,7 +977,7 @@ class C(B):
   container that supports iteration, or an iterator object.
   If \var{sequence} is already a tuple, it
   is returned unchanged.  For instance, \code{tuple('abc')} returns
-  returns \code{('a', 'b', 'c')} and \code{tuple([1, 2, 3])} returns
+  \code{('a', 'b', 'c')} and \code{tuple([1, 2, 3])} returns
   \code{(1, 2, 3)}.  If no argument is given, returns a new empty
   tuple, \code{()}.
 \end{funcdesc}

@@ -104,6 +104,8 @@ code_new(PyTypeObject *type, PyObject *args, PyObject *kw)
 	int nlocals;
 	int stacksize;
 	int flags;
+	PyObject *co;
+	PyObject *empty = NULL;
 	PyObject *code;
 	PyObject *consts;
 	PyObject *names;
@@ -127,31 +129,28 @@ code_new(PyTypeObject *type, PyObject *args, PyObject *kw)
 			      &PyTuple_Type, &cellvars))
 		return NULL;
 
-	if (freevars == NULL || cellvars == NULL) {
-		PyObject *empty = PyTuple_New(0);
-		if (empty == NULL)
-		    return NULL;
-		if (freevars == NULL) {
-		    freevars = empty;
-		    Py_INCREF(freevars);
-		}
-		if (cellvars == NULL) {
-		    cellvars = empty;
-		    Py_INCREF(cellvars);
-		}
-		Py_DECREF(empty);
-	}
-
 	if (!PyObject_CheckReadBuffer(code)) {
 		PyErr_SetString(PyExc_TypeError,
 		  "bytecode object must be a single-segment read-only buffer");
 		return NULL;
 	}
 
-	return (PyObject *)PyCode_New(argcount, nlocals, stacksize, flags,
+	if (freevars == NULL || cellvars == NULL) {
+		empty = PyTuple_New(0);
+		if (empty == NULL)
+			return NULL;
+		if (freevars == NULL)
+			freevars = empty;
+		if (cellvars == NULL)
+			cellvars = empty;
+	}
+
+	co = (PyObject *) PyCode_New(argcount, nlocals, stacksize, flags,
 				      code, consts, names, varnames,
 				      freevars, cellvars, filename, name,
-				      firstlineno, lnotab); 
+				      firstlineno, lnotab);
+	Py_XDECREF(empty);
+	return co;
 }
 
 static void
@@ -4771,6 +4770,16 @@ symtable_update_flags(struct compiling *c, PySymtableEntryObject *ste,
 }
 
 static int
+symtable_error(struct symtable *st, int lineno)
+{
+	if (lineno == 0)
+		lineno = st->st_cur->ste_lineno;
+	PyErr_SyntaxLocation(st->st_filename, lineno);
+	st->st_errors++;
+	return -1;
+}
+
+static int
 symtable_load_symbols(struct compiling *c)
 {
 	struct symtable *st = c->c_symtable;
@@ -4828,9 +4837,7 @@ symtable_load_symbols(struct compiling *c)
 			if (flags & DEF_PARAM) {
 				PyErr_Format(PyExc_SyntaxError, LOCAL_GLOBAL,
 					     PyString_AS_STRING(name));
-				PyErr_SyntaxLocation(st->st_filename, 
-						   ste->ste_lineno);
-				st->st_errors++;
+				symtable_error(st, 0);
 				goto fail;
 			}
 			if (PyDict_SetItem(c->c_globals, name, Py_None) < 0)
@@ -5183,9 +5190,7 @@ symtable_add_def_o(struct symtable *st, PyObject *dict,
 	    if ((flag & DEF_PARAM) && (val & DEF_PARAM)) {
 		    PyErr_Format(PyExc_SyntaxError, DUPLICATE_ARGUMENT,
 				 PyString_AsString(name));
-		    PyErr_SyntaxLocation(st->st_filename,
-				       st->st_cur->ste_lineno);
-		    return -1;
+		    return symtable_error(st, 0);
 	    }
 	    val |= flag;
 	} else
@@ -5582,9 +5587,7 @@ symtable_global(struct symtable *st, node *n)
 				PyErr_Format(PyExc_SyntaxError,
 				     "name '%.400s' is local and global",
 					     name);
-				PyErr_SyntaxLocation(st->st_filename,
-						   st->st_cur->ste_lineno);
-				st->st_errors++;
+				symtable_error(st, 0);
 				return;
 			}
 			else {
@@ -5644,9 +5647,7 @@ symtable_import(struct symtable *st, node *n)
 			if (n->n_lineno >= st->st_future->ff_last_lineno) {
 				PyErr_SetString(PyExc_SyntaxError,
 						LATE_FUTURE);
- 				PyErr_SyntaxLocation(st->st_filename,
-						   n->n_lineno);
-				st->st_errors++;
+				symtable_error(st, n->n_lineno);
 				return;
 			}
 		}
@@ -5740,9 +5741,8 @@ symtable_assign(struct symtable *st, node *n, int def_flag)
 			if (strcmp(STR(tmp), "__debug__") == 0) {
 				PyErr_SetString(PyExc_SyntaxError, 
 						ASSIGN_DEBUG);
-				PyErr_SyntaxLocation(st->st_filename,
-						     n->n_lineno);
-				st->st_errors++;
+				symtable_error(st, n->n_lineno);
+				return;
 			}
 			symtable_add_def(st, STR(tmp), DEF_LOCAL | def_flag);
 		}

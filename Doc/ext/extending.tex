@@ -1,4 +1,4 @@
-\chapter{Extending Python with C or \Cpp \label{intro}}
+\chapter{Extending Python with \C{} or \Cpp{} \label{intro}}
 
 
 It is quite easy to add new built-in modules to Python, if you know
@@ -349,7 +349,7 @@ initspam(void)
 
 Note that PyMODINIT_FUNC declares the function as \code{void} return type, 
 declares any special linkage declarations required by the platform, and for 
-\Cpp declares the function as \code{extern "C"}.
+\Cpp{} declares the function as \code{extern "C"}.
 
 When the Python program imports module \module{spam} for the first
 time, \cfunction{initspam()} is called. (See below for comments about
@@ -819,7 +819,7 @@ dynamic allocation and deallocation of memory on the heap.  In C,
 this is done using the functions \cfunction{malloc()} and
 \cfunction{free()}.  In \Cpp, the operators \keyword{new} and
 \keyword{delete} are used with essentially the same meaning and
-we'll restrict the following discussion to the latter.
+we'll restrict the following discussion to the C case.
 
 Every block of memory allocated with \cfunction{malloc()} should
 eventually be returned to the pool of available memory by exactly one

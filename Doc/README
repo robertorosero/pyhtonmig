@@ -32,7 +32,7 @@ parameters.
 
 There's a Makefile to call LaTeX and the other utilities in the right
 order and the right number of times.  By default, it will build the
-HTML version of the documnetation, but DVI, PDF, and PostScript can
+HTML version of the documentation, but DVI, PDF, and PostScript can
 also be made.  To view the generated HTML, point your favorite browser
 at the top-level index (html/index.html) after running "make".
 
@@ -66,18 +66,9 @@ databases at:
 Other suggestions or questions should be sent to the Python
 Documentation Team:
 
-	python-docs@python.org
+	docs@python.org
 
 Thanks!
-
-
-What happened to the Macintosh chapter of the Python Library Reference?
------------------------------------------------------------------------
-
-The directory mac/ contains the LaTeX sources for the "Macintosh
-Library Modules" manual; this is built using the standard build
-targets, so check the proper output directory for your chosen format
-and paper size.
 
 
 What tools do I need?
@@ -226,6 +217,6 @@ All rights reserved.
 Copyright (c) 1991-1995 Stichting Mathematisch Centrum.
 All rights reserved.
 
-See the file "texinputs/license.tex" for information on usage and
+See the file "commontex/license.tex" for information on usage and
 redistribution of this file, and for a DISCLAIMER OF ALL WARRANTIES.
 ----------------------------------------------------------------------
