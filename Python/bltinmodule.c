@@ -785,10 +785,18 @@ builtin_open(self, args)
 	object *self;
 	object *args;
 {
-	char *name, *mode;
-	if (!getargs(args, "(ss)", &name, &mode))
+	char *name;
+	char *mode = "r";
+	int bufsize = -1;
+	object *f;
+	if (!getargs(args, "s", &name) &&
+	    (err_clear(), !getargs(args, "(ss)", &name, &mode)) &&
+	    (err_clear(), !getargs(args, "(ssi)", &name, &mode, &bufsize)))
 		return NULL;
-	return newfileobject(name, mode);
+	f = newfileobject(name, mode);
+	if (f != NULL)
+		setfilebufsize(f, bufsize);
+	return f;
 }
 
 static object *

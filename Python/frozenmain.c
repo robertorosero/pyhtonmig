@@ -33,7 +33,6 @@ extern char *getcopyright();
 
 extern int debugging;
 extern int verbose;
-extern int killprint;
 
 static char *argv0;
 
@@ -44,6 +43,7 @@ main(argc, argv)
 	char *p;
 	int n, sts;
 	int inspect = 0;
+	int unbuffered = 0;
 
 	argv0 = argv[0];
 
@@ -53,8 +53,13 @@ main(argc, argv)
 		verbose = 1;
 	if ((p = getenv("PYTHONINSPECT")) && *p != '\0')
 		inspect = 1;
-	if ((p = getenv("PYTHONKILLPRINT")) && *p != '\0')
-		killprint = 1;
+	if ((p = getenv("PYTHONUNBUFFERED")) && *p != '\0')
+		unbuffered = 1;
+
+	if (unbuffered) {
+		setbuf(stdout, (char *)NULL);
+		setbuf(stderr, (char *)NULL);
+	}
 
 	if (verbose)
 		fprintf(stderr, "Python %s\n%s\n",
