@@ -375,14 +375,18 @@ compiler_next_instr(struct compiler *c, int block)
 static int
 compiler_addop(struct compiler *c, int opcode)
 {
+	struct basicblock *b;
 	struct instr *i;
 	int off;
 	off = compiler_next_instr(c, c->u->u_curblock);
 	if (off < 0)
 		return 0;
-	i = &c->u->u_blocks[c->u->u_curblock]->b_instr[off];
+	b = c->u->u_blocks[c->u->u_curblock];
+	i = &b->b_instr[off];
 	i->i_opcode = opcode;
 	i->i_hasarg = 0;
+	if (opcode == RETURN_VALUE)
+		b->b_return = 1;
 	return 1;
 }
 
@@ -546,7 +550,6 @@ static int
 compiler_function(struct compiler *c, stmt_ty s)
 {
 	PyCodeObject *co;
-	int ndefs = 0;
 	arguments_ty args = s->v.FunctionDef.args;
 	assert(s->kind == FunctionDef_kind);
 
@@ -557,7 +560,7 @@ compiler_function(struct compiler *c, stmt_ty s)
 		VISIT_SEQ(c, expr, args->defaults);
 	if (!compiler_enter_scope(c, s->v.FunctionDef.name, (void *)s))
 		return 0;
-	c->u->u_argcount = ndefs;
+	c->u->u_argcount = asdl_seq_LEN(s->v.FunctionDef.args->args);
 	VISIT_SEQ(c, stmt, s->v.FunctionDef.body);
 	co = assemble(c);
 	if (co == NULL)
@@ -566,7 +569,7 @@ compiler_function(struct compiler *c, stmt_ty s)
 
 	/* XXX closure */
 	ADDOP_O(c, LOAD_CONST, (PyObject *)co, consts);
-	ADDOP_I(c, MAKE_FUNCTION, ndefs);
+	ADDOP_I(c, MAKE_FUNCTION, c->u->u_argcount);
 	if (!compiler_nameop(c, s->v.FunctionDef.name, Store))
 		return 0;
 		
@@ -944,6 +947,8 @@ compiler_nameop(struct compiler *c, identifier name, expr_context_ty ctx)
 	case GLOBAL_EXPLICIT:
 		optype = OP_GLOBAL;
 		break;
+	default:
+		assert(0);
 	}
 
 	switch (optype) {
@@ -957,6 +962,7 @@ compiler_nameop(struct compiler *c, identifier name, expr_context_ty ctx)
 		case Param:
 			assert(0); /* impossible */
 		}
+		break;
 	case OP_FAST:
 		switch (ctx) {
 		case Load: op = LOAD_FAST; break;
@@ -967,6 +973,7 @@ compiler_nameop(struct compiler *c, identifier name, expr_context_ty ctx)
 		case Param:
 			assert(0); /* impossible */
 		}
+		break;
 	case OP_GLOBAL:
 		switch (ctx) {
 		case Load: op = LOAD_GLOBAL; break;
@@ -977,6 +984,7 @@ compiler_nameop(struct compiler *c, identifier name, expr_context_ty ctx)
 		case Param:
 			assert(0); /* impossible */
 		}
+		break;
 	case OP_NAME:
 		switch (ctx) {
 		case Load: op = LOAD_NAME; break;
@@ -987,6 +995,7 @@ compiler_nameop(struct compiler *c, identifier name, expr_context_ty ctx)
 		case Param:
 			assert(0); /* impossible */
 		}
+		break;
 	}
 	
 	assert(op);
@@ -1370,6 +1379,7 @@ makecode(struct compiler *c, struct assembler *a)
 	PyObject *filename = NULL;
 	PyObject *name = NULL;
 	PyObject *nil = PyTuple_New(0);
+	int nlocals;
 
 	consts = dict_keys_inorder(c->u->u_consts, 0);
 	if (!consts)
@@ -1384,7 +1394,8 @@ makecode(struct compiler *c, struct assembler *a)
 	if (!filename)
 		goto error;
 	
-	co = PyCode_New(c->u->u_argcount, 0, stackdepth(c), 0,
+	nlocals = PyList_GET_SIZE(c->u->u_ste->ste_varnames);
+	co = PyCode_New(c->u->u_argcount, nlocals, stackdepth(c), 0,
 			a->a_bytecode, consts, names, varnames,
 			nil, nil,
 			filename, c->u->u_name,
