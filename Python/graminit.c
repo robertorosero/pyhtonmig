@@ -617,8 +617,9 @@ static arc arcs_29_6[1] = {
 static arc arcs_29_7[1] = {
 	{15, 9},
 };
-static arc arcs_29_8[2] = {
+static arc arcs_29_8[3] = {
 	{67, 4},
+	{63, 5},
 	{0, 8},
 };
 static arc arcs_29_9[1] = {
@@ -633,7 +634,7 @@ static state states_29[10] = {
 	{1, arcs_29_5},
 	{1, arcs_29_6},
 	{1, arcs_29_7},
-	{2, arcs_29_8},
+	{3, arcs_29_8},
 	{1, arcs_29_9},
 };
 static arc arcs_30_0[1] = {

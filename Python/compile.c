@@ -1653,25 +1653,7 @@ com_for_stmt(c, n)
 	com_backpatch(c, break_anchor);
 }
 
-/* Although 'execpt' and 'finally' clauses can be combined
-   syntactically, they are compiled separately.  In fact,
-	try: S
-	except E1: S1
-	except E2: S2
-	...
-	finally: Sf
-   is equivalent to
-	try:
-	    try: S
-	    except E1: S1
-	    except E2: S2
-	    ...
-	finally: Sf
-   meaning that the 'finally' clause is entered even if things
-   go wrong again in an exception handler.  Note that this is
-   not the case for exception handlers: at most one is entered.
-   
-   Code generated for "try: S finally: Sf" is as follows:
+/* Code generated for "try: S finally: Sf" is as follows:
    
 		SETUP_FINALLY	L
 		<code for S>
@@ -1738,86 +1720,97 @@ com_for_stmt(c, n)
 */
 
 static void
-com_try_stmt(c, n)
+com_try_except(c, n)
+	struct compiling *c;
+	node *n;
+{
+	int except_anchor = 0;
+	int end_anchor = 0;
+	int else_anchor = 0;
+	int i;
+	node *ch;
+
+	com_addfwref(c, SETUP_EXCEPT, &except_anchor);
+	block_push(c, SETUP_EXCEPT);
+	com_node(c, CHILD(n, 2));
+	com_addbyte(c, POP_BLOCK);
+	block_pop(c, SETUP_EXCEPT);
+	com_addfwref(c, JUMP_FORWARD, &else_anchor);
+	com_backpatch(c, except_anchor);
+	for (i = 3;
+	     i < NCH(n) && TYPE(ch = CHILD(n, i)) == except_clause;
+	     i += 3) {
+		/* except_clause: 'except' [expr [',' expr]] */
+		if (except_anchor == 0) {
+			err_setstr(SyntaxError,
+				"default 'except:' must be last");
+			c->c_errors++;
+			break;
+		}
+		except_anchor = 0;
+		com_addoparg(c, SET_LINENO, ch->n_lineno);
+		if (NCH(ch) > 1) {
+			com_addbyte(c, DUP_TOP);
+			com_node(c, CHILD(ch, 1));
+			com_addoparg(c, COMPARE_OP, EXC_MATCH);
+			com_addfwref(c, JUMP_IF_FALSE, &except_anchor);
+			com_addbyte(c, POP_TOP);
+		}
+		com_addbyte(c, POP_TOP);
+		if (NCH(ch) > 3)
+			com_assign(c, CHILD(ch, 3), 1/*assigning*/);
+		else
+			com_addbyte(c, POP_TOP);
+		com_addbyte(c, POP_TOP);
+		com_node(c, CHILD(n, i+2));
+		com_addfwref(c, JUMP_FORWARD, &end_anchor);
+		if (except_anchor) {
+			com_backpatch(c, except_anchor);
+			com_addbyte(c, POP_TOP);
+		}
+	}
+	com_addbyte(c, END_FINALLY);
+	com_backpatch(c, else_anchor);
+	if (i < NCH(n))
+		com_node(c, CHILD(n, i+2));
+	com_backpatch(c, end_anchor);
+}
+
+static void
+com_try_finally(c, n)
 	struct compiling *c;
 	node *n;
 {
 	int finally_anchor = 0;
-	int except_anchor = 0;
-	REQ(n, try_stmt);
-	/* 'try' ':' suite (except_clause ':' suite)*
-	 | 'try' ':' 'finally' ':' suite */
+	node *ch;
 
-	/* XXX This can be simplified because except and finally can
-	   no longer be mixed in a single try statement */
-	
-	if (NCH(n) > 3 && TYPE(CHILD(n, NCH(n)-3)) != except_clause) {
-		/* Have a 'finally' clause */
-		com_addfwref(c, SETUP_FINALLY, &finally_anchor);
-		block_push(c, SETUP_FINALLY);
-	}
-	if (NCH(n) > 3 && TYPE(CHILD(n, 3)) == except_clause) {
-		/* Have an 'except' clause */
-		com_addfwref(c, SETUP_EXCEPT, &except_anchor);
-		block_push(c, SETUP_EXCEPT);
-	}
+	com_addfwref(c, SETUP_FINALLY, &finally_anchor);
+	block_push(c, SETUP_FINALLY);
 	com_node(c, CHILD(n, 2));
-	if (except_anchor) {
-		int end_anchor = 0;
-		int i;
-		node *ch;
-		com_addbyte(c, POP_BLOCK);
-		block_pop(c, SETUP_EXCEPT);
-		com_addfwref(c, JUMP_FORWARD, &end_anchor);
-		com_backpatch(c, except_anchor);
-		for (i = 3;
-			i < NCH(n) && TYPE(ch = CHILD(n, i)) == except_clause;
-								i += 3) {
-			/* except_clause: 'except' [expr [',' expr]] */
-			if (except_anchor == 0) {
-				err_setstr(SyntaxError,
-					"default 'except:' must be last");
-				c->c_errors++;
-				break;
-			}
-			except_anchor = 0;
-			com_addoparg(c, SET_LINENO, ch->n_lineno);
-			if (NCH(ch) > 1) {
-				com_addbyte(c, DUP_TOP);
-				com_node(c, CHILD(ch, 1));
-				com_addoparg(c, COMPARE_OP, EXC_MATCH);
-				com_addfwref(c, JUMP_IF_FALSE, &except_anchor);
-				com_addbyte(c, POP_TOP);
-			}
-			com_addbyte(c, POP_TOP);
-			if (NCH(ch) > 3)
-				com_assign(c, CHILD(ch, 3), 1/*assigning*/);
-			else
-				com_addbyte(c, POP_TOP);
-			com_addbyte(c, POP_TOP);
-			com_node(c, CHILD(n, i+2));
-			com_addfwref(c, JUMP_FORWARD, &end_anchor);
-			if (except_anchor) {
-				com_backpatch(c, except_anchor);
-				com_addbyte(c, POP_TOP);
-			}
-		}
-		com_addbyte(c, END_FINALLY);
-		com_backpatch(c, end_anchor);
-	}
-	if (finally_anchor) {
-		node *ch;
-		com_addbyte(c, POP_BLOCK);
-		block_pop(c, SETUP_FINALLY);
-		block_push(c, END_FINALLY);
-		com_addoparg(c, LOAD_CONST, com_addconst(c, None));
-		com_backpatch(c, finally_anchor);
-		ch = CHILD(n, NCH(n)-1);
-		com_addoparg(c, SET_LINENO, ch->n_lineno);
-		com_node(c, ch);
-		com_addbyte(c, END_FINALLY);
-		block_pop(c, END_FINALLY);
-	}
+	com_addbyte(c, POP_BLOCK);
+	block_pop(c, SETUP_FINALLY);
+	block_push(c, END_FINALLY);
+	com_addoparg(c, LOAD_CONST, com_addconst(c, None));
+	com_backpatch(c, finally_anchor);
+	ch = CHILD(n, NCH(n)-1);
+	com_addoparg(c, SET_LINENO, ch->n_lineno);
+	com_node(c, ch);
+	com_addbyte(c, END_FINALLY);
+	block_pop(c, END_FINALLY);
+}
+
+static void
+com_try_stmt(c, n)
+	struct compiling *c;
+	node *n;
+{
+	REQ(n, try_stmt);
+	/* 'try' ':' suite (except_clause ':' suite)+ ['else' ':' suite]
+	 | 'try' ':' suite 'finally' ':' suite */
+	if (TYPE(CHILD(n, 3)) != except_clause)
+		com_try_finally(c, n);
+	else
+		com_try_except(c, n);
 }
 
 static void
