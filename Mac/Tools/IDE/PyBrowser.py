@@ -13,7 +13,7 @@ opensolidid = struct.pack('h', 471)
 
 arrows = (nullid, closedid, openid, closedsolidid, opensolidid)
 
-has_ctlcharsRE = re.compile('[\000-\037\177-\377]')
+has_ctlcharsRE = re.compile(r'[\000-\037\177-\377]')
 def ctlcharsREsearch(str):
 	if has_ctlcharsRE.search(str) is None:
 		return -1
@@ -38,7 +38,7 @@ def double_repr(key, value, truncvalue = 0,
 			value = _repr(value)
 			'' + value	# test to see if it is a string, in case a __repr__ method is buggy
 		except:
-			value = '€€€ exception in repr()'
+			value = '\xa5\xa5\xa5 exception in repr()'
 	if truncvalue:
 		return key + '\t' + value[:255]
 	return key + '\t' + value
@@ -360,7 +360,7 @@ INDEXING_TYPES = (
 def unpack_object(object, indent = 0):
 	tp = type(object)
 	if tp in SIMPLE_TYPES and tp is not types.NoneType:
-		raise TypeError, 'can¹t browse simple type: %s' % tp.__name__
+		raise TypeError, "can't browse simple type: %s" % tp.__name__
 	elif tp == types.DictionaryType:
 		return unpack_dict(object, indent)
 	elif tp in (types.TupleType, types.ListType):

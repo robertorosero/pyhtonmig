@@ -31,7 +31,21 @@ StringPtr = Str255
 EventMask = Type("EventMask", "H")
 
 includestuff = includestuff + """
+#ifdef WITHOUT_FRAMEWORKS
 #include <Dialogs.h>
+#else
+#include <Carbon/Carbon.h>
+#endif
+
+#ifdef USE_TOOLBOX_OBJECT_GLUE
+extern PyObject *_DlgObj_New(DialogRef);
+extern PyObject *_DlgObj_WhichDialog(DialogRef);
+extern int _DlgObj_Convert(PyObject *, DialogRef *);
+
+#define DlgObj_New _DlgObj_New
+#define DlgObj_WhichDialog _DlgObj_WhichDialog
+#define DlgObj_Convert _DlgObj_Convert
+#endif
 
 #if !ACCESSOR_CALLS_ARE_FUNCTIONS
 #define GetDialogTextEditHandle(dlg) (((DialogPeek)(dlg))->textH)
@@ -139,20 +153,19 @@ extern PyMethodChain WinObj_chain;
 
 finalstuff = finalstuff + """
 /* Return the WindowPtr corresponding to a DialogObject */
-
+#if 0
 WindowPtr
-DlgObj_ConvertToWindow(self)
-	PyObject *self;
+DlgObj_ConvertToWindow(PyObject *self)
 {
 	if ( DlgObj_Check(self) )
 		return GetDialogWindow(((DialogObject *)self)->ob_itself);
 	return NULL;
 }
+#endif
 /* Return the object corresponding to the dialog, or None */
 
 PyObject *
-DlgObj_WhichDialog(d)
-	DialogPtr d;
+DlgObj_WhichDialog(DialogPtr d)
 {
 	PyObject *it;
 	
@@ -180,6 +193,12 @@ DlgObj_WhichDialog(d)
 }
 """
 
+initstuff = initstuff + """
+	PyMac_INIT_TOOLBOX_OBJECT_NEW(DialogPtr, DlgObj_New);
+	PyMac_INIT_TOOLBOX_OBJECT_NEW(DialogPtr, DlgObj_WhichDialog);
+	PyMac_INIT_TOOLBOX_OBJECT_CONVERT(DialogPtr, DlgObj_Convert);
+"""
+
 
 # Define a class which specializes our object definition
 class MyObjectDefinition(GlobalObjectDefinition):
@@ -203,10 +222,7 @@ class MyObjectDefinition(GlobalObjectDefinition):
 
 	def outputCompare(self):
 		Output()
-		Output("static int %s_compare(self, other)", self.prefix)
-		IndentLevel()
-		Output("%s *self, *other;", self.objecttype)
-		DedentLevel()
+		Output("static int %s_compare(%s *self, %s *other)", self.prefix, self.objecttype, self.objecttype)
 		OutLbrace()
 		Output("if ( self->ob_itself > other->ob_itself ) return 1;")
 		Output("if ( self->ob_itself < other->ob_itself ) return -1;")
@@ -215,10 +231,7 @@ class MyObjectDefinition(GlobalObjectDefinition):
 		
 	def outputHash(self):
 		Output()
-		Output("static int %s_hash(self)", self.prefix)
-		IndentLevel()
-		Output("%s *self;", self.objecttype)
-		DedentLevel()
+		Output("static int %s_hash(%s *self)", self.prefix, self.objecttype)
 		OutLbrace()
 		Output("return (int)self->ob_itself;")
 		OutRbrace()
@@ -277,7 +290,7 @@ setuseritembody = """
 		Py_INCREF(Py_None);
 	} else {
 		Py_INCREF(new);
-		_res = Py_BuildValue("O&", ResObj_New, (Handle)NewUserItemProc(Dlg_UnivUserItemProc));
+		_res = Py_BuildValue("O&", ResObj_New, (Handle)NewUserItemUPP(Dlg_UnivUserItemProc));
 	}
 	
 	Dlg_UserItemProc_callback = new;

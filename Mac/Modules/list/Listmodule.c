@@ -8,7 +8,19 @@
 #include "macglue.h"
 #include "pymactoolbox.h"
 
+#ifdef WITHOUT_FRAMEWORKS
 #include <Lists.h>
+#else
+#include <Carbon/Carbon.h>
+#endif
+
+#ifdef USE_TOOLBOX_OBJECT_GLUE
+extern PyObject *_ListObj_New(ListHandle);
+extern int _ListObj_Convert(PyObject *, ListHandle *);
+
+#define ListObj_New _ListObj_New
+#define ListObj_Convert _ListObj_Convert
+#endif
 
 #if !ACCESSOR_CALLS_ARE_FUNCTIONS
 #define GetListPort(list) ((CGrafPtr)(*(list))->port)
@@ -52,8 +64,7 @@ typedef struct ListObject {
 	int ob_must_be_disposed;
 } ListObject;
 
-PyObject *ListObj_New(itself)
-	ListHandle itself;
+PyObject *ListObj_New(ListHandle itself)
 {
 	ListObject *it;
 	if (itself == NULL) {
@@ -66,9 +77,7 @@ PyObject *ListObj_New(itself)
 	it->ob_must_be_disposed = 1;
 	return (PyObject *)it;
 }
-ListObj_Convert(v, p_itself)
-	PyObject *v;
-	ListHandle *p_itself;
+ListObj_Convert(PyObject *v, ListHandle *p_itself)
 {
 	if (!ListObj_Check(v))
 	{
@@ -79,16 +88,13 @@ ListObj_Convert(v, p_itself)
 	return 1;
 }
 
-static void ListObj_dealloc(self)
-	ListObject *self;
+static void ListObj_dealloc(ListObject *self)
 {
 	if (self->ob_must_be_disposed && self->ob_itself) LDispose(self->ob_itself);
 	PyMem_DEL(self);
 }
 
-static PyObject *ListObj_LAddColumn(_self, _args)
-	ListObject *_self;
-	PyObject *_args;
+static PyObject *ListObj_LAddColumn(ListObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
 	short _rv;
@@ -106,9 +112,7 @@ static PyObject *ListObj_LAddColumn(_self, _args)
 	return _res;
 }
 
-static PyObject *ListObj_LAddRow(_self, _args)
-	ListObject *_self;
-	PyObject *_args;
+static PyObject *ListObj_LAddRow(ListObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
 	short _rv;
@@ -126,9 +130,7 @@ static PyObject *ListObj_LAddRow(_self, _args)
 	return _res;
 }
 
-static PyObject *ListObj_LDelColumn(_self, _args)
-	ListObject *_self;
-	PyObject *_args;
+static PyObject *ListObj_LDelColumn(ListObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
 	short count;
@@ -145,9 +147,7 @@ static PyObject *ListObj_LDelColumn(_self, _args)
 	return _res;
 }
 
-static PyObject *ListObj_LDelRow(_self, _args)
-	ListObject *_self;
-	PyObject *_args;
+static PyObject *ListObj_LDelRow(ListObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
 	short count;
@@ -164,9 +164,7 @@ static PyObject *ListObj_LDelRow(_self, _args)
 	return _res;
 }
 
-static PyObject *ListObj_LGetSelect(_self, _args)
-	ListObject *_self;
-	PyObject *_args;
+static PyObject *ListObj_LGetSelect(ListObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
 	Boolean _rv;
@@ -185,9 +183,7 @@ static PyObject *ListObj_LGetSelect(_self, _args)
 	return _res;
 }
 
-static PyObject *ListObj_LLastClick(_self, _args)
-	ListObject *_self;
-	PyObject *_args;
+static PyObject *ListObj_LLastClick(ListObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
 	Point _rv;
@@ -199,9 +195,7 @@ static PyObject *ListObj_LLastClick(_self, _args)
 	return _res;
 }
 
-static PyObject *ListObj_LNextCell(_self, _args)
-	ListObject *_self;
-	PyObject *_args;
+static PyObject *ListObj_LNextCell(ListObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
 	Boolean _rv;
@@ -223,9 +217,7 @@ static PyObject *ListObj_LNextCell(_self, _args)
 	return _res;
 }
 
-static PyObject *ListObj_LSize(_self, _args)
-	ListObject *_self;
-	PyObject *_args;
+static PyObject *ListObj_LSize(ListObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
 	short listWidth;
@@ -242,9 +234,7 @@ static PyObject *ListObj_LSize(_self, _args)
 	return _res;
 }
 
-static PyObject *ListObj_LSetDrawingMode(_self, _args)
-	ListObject *_self;
-	PyObject *_args;
+static PyObject *ListObj_LSetDrawingMode(ListObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
 	Boolean drawIt;
@@ -258,9 +248,7 @@ static PyObject *ListObj_LSetDrawingMode(_self, _args)
 	return _res;
 }
 
-static PyObject *ListObj_LScroll(_self, _args)
-	ListObject *_self;
-	PyObject *_args;
+static PyObject *ListObj_LScroll(ListObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
 	short dCols;
@@ -277,9 +265,7 @@ static PyObject *ListObj_LScroll(_self, _args)
 	return _res;
 }
 
-static PyObject *ListObj_LAutoScroll(_self, _args)
-	ListObject *_self;
-	PyObject *_args;
+static PyObject *ListObj_LAutoScroll(ListObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
 	if (!PyArg_ParseTuple(_args, ""))
@@ -290,9 +276,7 @@ static PyObject *ListObj_LAutoScroll(_self, _args)
 	return _res;
 }
 
-static PyObject *ListObj_LUpdate(_self, _args)
-	ListObject *_self;
-	PyObject *_args;
+static PyObject *ListObj_LUpdate(ListObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
 	RgnHandle theRgn;
@@ -306,9 +290,7 @@ static PyObject *ListObj_LUpdate(_self, _args)
 	return _res;
 }
 
-static PyObject *ListObj_LActivate(_self, _args)
-	ListObject *_self;
-	PyObject *_args;
+static PyObject *ListObj_LActivate(ListObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
 	Boolean act;
@@ -322,9 +304,7 @@ static PyObject *ListObj_LActivate(_self, _args)
 	return _res;
 }
 
-static PyObject *ListObj_LCellSize(_self, _args)
-	ListObject *_self;
-	PyObject *_args;
+static PyObject *ListObj_LCellSize(ListObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
 	Point cSize;
@@ -338,9 +318,7 @@ static PyObject *ListObj_LCellSize(_self, _args)
 	return _res;
 }
 
-static PyObject *ListObj_LClick(_self, _args)
-	ListObject *_self;
-	PyObject *_args;
+static PyObject *ListObj_LClick(ListObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
 	Boolean _rv;
@@ -358,9 +336,7 @@ static PyObject *ListObj_LClick(_self, _args)
 	return _res;
 }
 
-static PyObject *ListObj_LAddToCell(_self, _args)
-	ListObject *_self;
-	PyObject *_args;
+static PyObject *ListObj_LAddToCell(ListObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
 	char *dataPtr__in__;
@@ -381,9 +357,7 @@ static PyObject *ListObj_LAddToCell(_self, _args)
 	return _res;
 }
 
-static PyObject *ListObj_LClrCell(_self, _args)
-	ListObject *_self;
-	PyObject *_args;
+static PyObject *ListObj_LClrCell(ListObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
 	Point theCell;
@@ -397,9 +371,7 @@ static PyObject *ListObj_LClrCell(_self, _args)
 	return _res;
 }
 
-static PyObject *ListObj_LGetCell(_self, _args)
-	ListObject *_self;
-	PyObject *_args;
+static PyObject *ListObj_LGetCell(ListObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
 	char *dataPtr__out__;
@@ -426,9 +398,7 @@ static PyObject *ListObj_LGetCell(_self, _args)
 	return _res;
 }
 
-static PyObject *ListObj_LRect(_self, _args)
-	ListObject *_self;
-	PyObject *_args;
+static PyObject *ListObj_LRect(ListObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
 	Rect cellRect;
@@ -444,9 +414,7 @@ static PyObject *ListObj_LRect(_self, _args)
 	return _res;
 }
 
-static PyObject *ListObj_LSetCell(_self, _args)
-	ListObject *_self;
-	PyObject *_args;
+static PyObject *ListObj_LSetCell(ListObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
 	char *dataPtr__in__;
@@ -467,9 +435,7 @@ static PyObject *ListObj_LSetCell(_self, _args)
 	return _res;
 }
 
-static PyObject *ListObj_LSetSelect(_self, _args)
-	ListObject *_self;
-	PyObject *_args;
+static PyObject *ListObj_LSetSelect(ListObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
 	Boolean setIt;
@@ -486,9 +452,7 @@ static PyObject *ListObj_LSetSelect(_self, _args)
 	return _res;
 }
 
-static PyObject *ListObj_LDraw(_self, _args)
-	ListObject *_self;
-	PyObject *_args;
+static PyObject *ListObj_LDraw(ListObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
 	Point theCell;
@@ -502,9 +466,7 @@ static PyObject *ListObj_LDraw(_self, _args)
 	return _res;
 }
 
-static PyObject *ListObj_as_Resource(_self, _args)
-	ListObject *_self;
-	PyObject *_args;
+static PyObject *ListObj_as_Resource(ListObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
 	Handle _rv;
@@ -568,9 +530,7 @@ static PyMethodDef ListObj_methods[] = {
 
 PyMethodChain ListObj_chain = { ListObj_methods, NULL };
 
-static PyObject *ListObj_getattr(self, name)
-	ListObject *self;
-	char *name;
+static PyObject *ListObj_getattr(ListObject *self, char *name)
 {
 	{
 		/* XXXX Should we HLock() here?? */
@@ -583,10 +543,7 @@ static PyObject *ListObj_getattr(self, name)
 }
 
 static int
-ListObj_setattr(self, name, value)
-	ListObject *self;
-	char *name;
-	PyObject *value;
+ListObj_setattr(ListObject *self, char *name, PyObject *value)
 {
 	long intval;
 		
@@ -634,9 +591,7 @@ PyTypeObject List_Type = {
 /* ---------------------- End object type List ---------------------- */
 
 
-static PyObject *List_LNew(_self, _args)
-	PyObject *_self;
-	PyObject *_args;
+static PyObject *List_LNew(PyObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
 	ListHandle _rv;
@@ -674,9 +629,7 @@ static PyObject *List_LNew(_self, _args)
 	return _res;
 }
 
-static PyObject *List_GetListPort(_self, _args)
-	PyObject *_self;
-	PyObject *_args;
+static PyObject *List_GetListPort(PyObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
 	CGrafPtr _rv;
@@ -690,9 +643,7 @@ static PyObject *List_GetListPort(_self, _args)
 	return _res;
 }
 
-static PyObject *List_GetListVerticalScrollBar(_self, _args)
-	PyObject *_self;
-	PyObject *_args;
+static PyObject *List_GetListVerticalScrollBar(PyObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
 	ControlHandle _rv;
@@ -706,9 +657,7 @@ static PyObject *List_GetListVerticalScrollBar(_self, _args)
 	return _res;
 }
 
-static PyObject *List_GetListHorizontalScrollBar(_self, _args)
-	PyObject *_self;
-	PyObject *_args;
+static PyObject *List_GetListHorizontalScrollBar(PyObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
 	ControlHandle _rv;
@@ -722,9 +671,7 @@ static PyObject *List_GetListHorizontalScrollBar(_self, _args)
 	return _res;
 }
 
-static PyObject *List_GetListActive(_self, _args)
-	PyObject *_self;
-	PyObject *_args;
+static PyObject *List_GetListActive(PyObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
 	Boolean _rv;
@@ -738,9 +685,7 @@ static PyObject *List_GetListActive(_self, _args)
 	return _res;
 }
 
-static PyObject *List_GetListClickTime(_self, _args)
-	PyObject *_self;
-	PyObject *_args;
+static PyObject *List_GetListClickTime(PyObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
 	SInt32 _rv;
@@ -754,9 +699,7 @@ static PyObject *List_GetListClickTime(_self, _args)
 	return _res;
 }
 
-static PyObject *List_GetListRefCon(_self, _args)
-	PyObject *_self;
-	PyObject *_args;
+static PyObject *List_GetListRefCon(PyObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
 	SInt32 _rv;
@@ -770,9 +713,7 @@ static PyObject *List_GetListRefCon(_self, _args)
 	return _res;
 }
 
-static PyObject *List_GetListDefinition(_self, _args)
-	PyObject *_self;
-	PyObject *_args;
+static PyObject *List_GetListDefinition(PyObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
 	Handle _rv;
@@ -786,9 +727,7 @@ static PyObject *List_GetListDefinition(_self, _args)
 	return _res;
 }
 
-static PyObject *List_GetListUserHandle(_self, _args)
-	PyObject *_self;
-	PyObject *_args;
+static PyObject *List_GetListUserHandle(PyObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
 	Handle _rv;
@@ -802,9 +741,7 @@ static PyObject *List_GetListUserHandle(_self, _args)
 	return _res;
 }
 
-static PyObject *List_GetListDataHandle(_self, _args)
-	PyObject *_self;
-	PyObject *_args;
+static PyObject *List_GetListDataHandle(PyObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
 	DataHandle _rv;
@@ -818,9 +755,7 @@ static PyObject *List_GetListDataHandle(_self, _args)
 	return _res;
 }
 
-static PyObject *List_GetListFlags(_self, _args)
-	PyObject *_self;
-	PyObject *_args;
+static PyObject *List_GetListFlags(PyObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
 	OptionBits _rv;
@@ -834,9 +769,7 @@ static PyObject *List_GetListFlags(_self, _args)
 	return _res;
 }
 
-static PyObject *List_GetListSelectionFlags(_self, _args)
-	PyObject *_self;
-	PyObject *_args;
+static PyObject *List_GetListSelectionFlags(PyObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
 	OptionBits _rv;
@@ -850,9 +783,7 @@ static PyObject *List_GetListSelectionFlags(_self, _args)
 	return _res;
 }
 
-static PyObject *List_SetListViewBounds(_self, _args)
-	PyObject *_self;
-	PyObject *_args;
+static PyObject *List_SetListViewBounds(PyObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
 	ListHandle list;
@@ -868,9 +799,7 @@ static PyObject *List_SetListViewBounds(_self, _args)
 	return _res;
 }
 
-static PyObject *List_SetListPort(_self, _args)
-	PyObject *_self;
-	PyObject *_args;
+static PyObject *List_SetListPort(PyObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
 	ListHandle list;
@@ -886,9 +815,7 @@ static PyObject *List_SetListPort(_self, _args)
 	return _res;
 }
 
-static PyObject *List_SetListCellIndent(_self, _args)
-	PyObject *_self;
-	PyObject *_args;
+static PyObject *List_SetListCellIndent(PyObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
 	ListHandle list;
@@ -904,9 +831,7 @@ static PyObject *List_SetListCellIndent(_self, _args)
 	return _res;
 }
 
-static PyObject *List_SetListClickTime(_self, _args)
-	PyObject *_self;
-	PyObject *_args;
+static PyObject *List_SetListClickTime(PyObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
 	ListHandle list;
@@ -922,9 +847,7 @@ static PyObject *List_SetListClickTime(_self, _args)
 	return _res;
 }
 
-static PyObject *List_SetListRefCon(_self, _args)
-	PyObject *_self;
-	PyObject *_args;
+static PyObject *List_SetListRefCon(PyObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
 	ListHandle list;
@@ -940,9 +863,7 @@ static PyObject *List_SetListRefCon(_self, _args)
 	return _res;
 }
 
-static PyObject *List_SetListUserHandle(_self, _args)
-	PyObject *_self;
-	PyObject *_args;
+static PyObject *List_SetListUserHandle(PyObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
 	ListHandle list;
@@ -958,9 +879,7 @@ static PyObject *List_SetListUserHandle(_self, _args)
 	return _res;
 }
 
-static PyObject *List_SetListFlags(_self, _args)
-	PyObject *_self;
-	PyObject *_args;
+static PyObject *List_SetListFlags(PyObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
 	ListHandle list;
@@ -976,9 +895,7 @@ static PyObject *List_SetListFlags(_self, _args)
 	return _res;
 }
 
-static PyObject *List_SetListSelectionFlags(_self, _args)
-	PyObject *_self;
-	PyObject *_args;
+static PyObject *List_SetListSelectionFlags(PyObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
 	ListHandle list;
@@ -994,9 +911,7 @@ static PyObject *List_SetListSelectionFlags(_self, _args)
 	return _res;
 }
 
-static PyObject *List_as_List(_self, _args)
-	PyObject *_self;
-	PyObject *_args;
+static PyObject *List_as_List(PyObject *_self, PyObject *_args)
 {
 	PyObject *_res = NULL;
 
@@ -1059,12 +974,15 @@ static PyMethodDef List_methods[] = {
 
 
 
-void initList()
+void initList(void)
 {
 	PyObject *m;
 	PyObject *d;
 
 
+
+		PyMac_INIT_TOOLBOX_OBJECT_NEW(ListHandle, ListObj_New);
+		PyMac_INIT_TOOLBOX_OBJECT_CONVERT(ListHandle, ListObj_Convert);
 
 
 	m = Py_InitModule("List", List_methods);

@@ -166,6 +166,13 @@ Return the current process' user id.
 Availability: \UNIX{}.
 \end{funcdesc}
 
+\begin{funcdesc}{getenv}{varname\optional{, value}}
+Return the value of the environment variable \var{varname} if it
+exists, or \var{value} if it doesn't.  \var{value} defaults to
+\code{None}.
+Availability: most flavors of \UNIX{}, Windows.
+\end{funcdesc}
+
 \begin{funcdesc}{putenv}{varname, value}
 \index{environment variables!setting}
 Set the environment variable named \var{varname} to the string
@@ -307,21 +314,24 @@ specified, it specifies the buffer size for the I/O pipes.
 objects should be opened in binary or text mode.  The default value
 for \var{mode} is \code{'t'}.
 
-\begin{funcdesc}{popen2}{cmd\optional{, bufsize\optional{, mode}}}
+\begin{funcdesc}{popen2}{cmd\optional{, mode\optional{, bufsize}}}
 Executes \var{cmd} as a sub-process.  Returns the file objects
 \code{(\var{child_stdin}, \var{child_stdout})}.
+Availability: \UNIX{}, Windows.
 \versionadded{2.0}
 \end{funcdesc}
 
-\begin{funcdesc}{popen3}{cmd\optional{, bufsize\optional{, mode}}}
+\begin{funcdesc}{popen3}{cmd\optional{, mode\optional{, bufsize}}}
 Executes \var{cmd} as a sub-process.  Returns the file objects
 \code{(\var{child_stdin}, \var{child_stdout}, \var{child_stderr})}.
+Availability: \UNIX{}, Windows.
 \versionadded{2.0}
 \end{funcdesc}
 
-\begin{funcdesc}{popen4}{cmd\optional{, bufsize\optional{, mode}}}
+\begin{funcdesc}{popen4}{cmd\optional{, mode\optional{, bufsize}}}
 Executes \var{cmd} as a sub-process.  Returns the file objects
 \code{(\var{child_stdin}, \var{child_stdout_and_stderr})}.
+Availability: \UNIX{}, Windows.
 \versionadded{2.0}
 \end{funcdesc}
 
@@ -650,14 +660,20 @@ Availability: \UNIX.
 
 \begin{funcdesc}{readlink}{path}
 Return a string representing the path to which the symbolic link
-points.
+points.  The result may be either an absolute or relative pathname; if
+it is relative, it may be converted to an absolute pathname using
+\code{os.path.join(os.path.dirname(\var{path}), \var{result})}.
 Availability: \UNIX{}.
 \end{funcdesc}
 
 \begin{funcdesc}{remove}{path}
-Remove the file \var{path}.  See \function{rmdir()} below to remove a
-directory.  This is identical to the \function{unlink()} function
-documented below.
+Remove the file \var{path}.  If \var{path} is a directory,
+\exception{OSError} is raised; see \function{rmdir()} below to remove
+a directory.  This is identical to the \function{unlink()} function
+documented below.  On Windows, attempting to remove a file that is in
+use causes an exception to be raised; on \UNIX, the directory entry is
+removed but the storage allocated to the file is not made available
+until the original file is no longer in use.
 Availability: Macintosh, \UNIX{}, Windows.
 \end{funcdesc}
 
@@ -674,7 +690,16 @@ exception if the leaf directory could not be successfully removed.
 \end{funcdesc}
 
 \begin{funcdesc}{rename}{src, dst}
-Rename the file or directory \var{src} to \var{dst}.
+Rename the file or directory \var{src} to \var{dst}.  If \var{dst} is
+a directory, \exception{OSError} will be raised.  On \UNIX, if
+\var{dst} exists and is a file, it will be removed silently if the
+user has permission.  The operation may fail on some \UNIX{} flavors
+if \var{src} and \var{dst} are on different filesystems.  If
+successful, the renaming will be an atomic operation (this is a
+\POSIX{} requirement).  On Windows, if \var{dst} already exists,
+\exception{OSError} will be raised even if it is a file; there may be
+no way to implement an atomic rename when \var{dst} names an existing
+file.
 Availability: Macintosh, \UNIX{}, Windows.
 \end{funcdesc}
 
@@ -756,6 +781,7 @@ files if \var{dir} is omitted or \code{None}.  If given and not
 filename.  Applications are responsible for properly creating and
 managing files created using paths returned by \function{tempnam()};
 no automatic cleanup is provided.
+Availability: \UNIX.
 \end{funcdesc}
 
 \begin{funcdesc}{tmpnam}{}
@@ -765,11 +791,13 @@ entry in a common location for temporary files.  Applications are
 responsible for properly creating and managing files created using
 paths returned by \function{tmpnam()}; no automatic cleanup is
 provided.
+Availability: \UNIX.
 \end{funcdesc}
 
 \begin{datadesc}{TMP_MAX}
 The maximum number of unique names that \function{tmpnam()} will
 generate before reusing names.
+Availability: \UNIX, Windows.
 \end{datadesc}
 
 \begin{funcdesc}{unlink}{path}
@@ -906,6 +934,14 @@ Lock program segments into memory.  The value of \var{op}
 Availability: \UNIX{}.
 \end{funcdesc}
 
+\begin{funcdescni}{popen}{\unspecified}
+\funclineni{popen2}{\unspecified}
+\funclineni{popen3}{\unspecified}
+\funclineni{popen4}{\unspecified}
+Run child processes, returning opened pipes for communications.  These
+functions are described in section \ref{os-newstreams}.
+\end{funcdescni}
+
 \begin{funcdesc}{spawnv}{mode, path, args}
 Execute the program \var{path} in a new process, passing the arguments 
 specified in \var{args} as command-line parameters.  \var{args} may be 
@@ -914,7 +950,7 @@ the Visual \Cpp{} Runtime Library documentation for further
 information; the constants are exposed to the Python programmer as
 listed below.
 Availability: \UNIX{}, Windows.
-\versionadded{1.5.2}
+\versionadded{1.6}
 \end{funcdesc}
 
 \begin{funcdesc}{spawnve}{mode, path, args, env}
@@ -925,7 +961,7 @@ a tuple.  \var{mode} is a magic operational constant.  See the Visual
 \Cpp{} Runtime Library documentation for further information; the
 constants are exposed to the Python programmer as listed below.
 Availability: \UNIX{}, Windows.
-\versionadded{1.5.2}
+\versionadded{1.6}
 \end{funcdesc}
 
 \begin{datadesc}{P_WAIT}
@@ -934,7 +970,7 @@ Availability: \UNIX{}, Windows.
 Possible values for the \var{mode} parameter to \function{spawnv()}
 and \function{spawnve()}.
 Availability: \UNIX{}, Windows.
-\versionadded{1.5.2}
+\versionadded{1.6}
 \end{datadesc}
 
 \begin{datadesc}{P_OVERLAY}
@@ -943,7 +979,7 @@ Possible values for the \var{mode} parameter to \function{spawnv()}
 and \function{spawnve()}.  These are less portable than those listed
 above.
 Availability: Windows.
-\versionadded{1.5.2}
+\versionadded{1.6}
 \end{datadesc}
 
 \begin{funcdesc}{startfile}{path}

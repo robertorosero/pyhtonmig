@@ -67,7 +67,7 @@ class Editor(W.Window):
 			else:
 				sourceOS = 'UNIX'
 				searchString = '\n'
-			change = EasyDialogs.AskYesNoCancel('≥%s≤ contains %s-style line feeds. '
+			change = EasyDialogs.AskYesNoCancel('"%s" contains %s-style line feeds. '
 					'Change them to MacOS carriage returns?' % (self.title, sourceOS), 1)
 			# bug: Cancel is treated as No
 			if change > 0:
@@ -224,14 +224,14 @@ class Editor(W.Window):
 		self.linefield.bind("<click>", self.clicklinefield)
 	
 	def makeoptionsmenu(self):
-		menuitems = [('Font settingsä', self.domenu_fontsettings), 
-				("Save optionsä", self.domenu_options),
+		menuitems = [('Font settings\xc9', self.domenu_fontsettings), 
+				("Save options\xc9", self.domenu_options),
 				'-',
 				('\0' + chr(self.run_as_main) + 'Run as __main__', self.domenu_toggle_run_as_main), 
 				#('\0' + chr(self.run_with_interpreter) + 'Run with Interpreter', self.domenu_toggle_run_with_interpreter), 
 				#'-',
 				('Modularize', self.domenu_modularize),
-				('Browse namespaceä', self.domenu_browsenamespace), 
+				('Browse namespace\xc9', self.domenu_browsenamespace), 
 				'-']
 		if self.profiling:
 			menuitems = menuitems + [('Disable profiler', self.domenu_toggleprofiler)]
@@ -240,7 +240,7 @@ class Editor(W.Window):
 		if self.editgroup.editor._debugger:
 			menuitems = menuitems + [('Disable debugger', self.domenu_toggledebugger),
 				('Clear breakpoints', self.domenu_clearbreakpoints),
-				('Edit breakpointsä', self.domenu_editbreakpoints)]
+				('Edit breakpoints\xc9', self.domenu_editbreakpoints)]
 		else:
 			menuitems = menuitems + [('Enable debugger', self.domenu_toggledebugger)]
 		self.editgroup.optionsmenu.set(menuitems)
@@ -285,7 +285,7 @@ class Editor(W.Window):
 	def domenu_modularize(self, *args):
 		modname = _filename_as_modname(self.title)
 		if not modname:
-			raise W.AlertError, 'Canπt modularize ≥%s≤' % self.title
+			raise W.AlertError, "Can't modularize \"%s\"" % self.title
 		run_as_main = self.run_as_main
 		self.run_as_main = 0
 		self.run()
@@ -359,14 +359,15 @@ class Editor(W.Window):
 		if self.editgroup.editor.changed:
 			import EasyDialogs
 			import Qd
-			Qd.InitCursor() # XXX should be done by dialog
-			save = EasyDialogs.AskYesNoCancel('Save window ≥%s≤ before closing?' % self.title, 1)
+			Qd.InitCursor()
+			save = EasyDialogs.AskYesNoCancel('Save window "%s" before closing?' % self.title,
+					default=1, no="Don\xd5t save")
 			if save > 0:
 				if self.domenu_save():
 					return 1
 			elif save < 0:
 				return 1
-		self.globals = None	    # XXX doesn't help... all globals leak :-(
+		self.globals = None
 		W.Window.close(self)
 	
 	def domenu_close(self, *args):
@@ -416,11 +417,7 @@ class Editor(W.Window):
 				W.getapplication().makescriptsmenu()
 	
 	def domenu_save_as_applet(self, *args):
-		try:
-			import buildtools
-		except ImportError:
-			# only have buildtools in Python >= 1.5.2
-			raise W.AlertError, "≥Save as Applet≤ is only supported in\rPython 1.5.2 and up."
+		import buildtools
 		
 		buildtools.DEBUG = 0	# ouch.
 		
@@ -504,7 +501,7 @@ class Editor(W.Window):
 			if self.editgroup.editor.changed:
 				import EasyDialogs
 				import Qd; Qd.InitCursor()
-				save = EasyDialogs.AskYesNoCancel('Save ≥%s≤ before running?' % self.title, 1)
+				save = EasyDialogs.AskYesNoCancel('Save "%s" before running?' % self.title, 1)
 				if save > 0:
 					if self.domenu_save():
 						return
@@ -560,28 +557,31 @@ class Editor(W.Window):
 					classname = string.split(string.strip(line[6:]))[0]
 					classend = identifieRE_match(classname)
 					if classend < 1:
-						raise W.AlertError, 'Canπt find a class.'
+						raise W.AlertError, "Can't find a class."
 					classname = classname[:classend]
 					break
 				elif line and line[0] not in '\t#':
-					raise W.AlertError, 'Canπt find a class.'
+					raise W.AlertError, "Can't find a class."
 			else:
-				raise W.AlertError, 'Canπt find a class.'
+				raise W.AlertError, "Can't find a class."
 			if globals.has_key(classname):
-				locals = globals[classname].__dict__
+				klass = globals[classname]
 			else:
-				raise W.AlertError, 'Canπt find class ≥%s≤.' % classname
-			# dedent to top level
-			for i in range(len(lines)):
-				lines[i] = lines[i][1:]
-			pytext = string.join(lines, '\r')
+				raise W.AlertError, "Can't find class \"%s\"." % classname
+			# add class def
+			pytext = ("class %s:\n" % classname) + pytext
+			selfirstline = selfirstline - 1
 		elif indent > 0:
-			raise W.AlertError, 'Canπt run indented code.'
+			raise W.AlertError, "Can't run indented code."
 		
 		# add "newlines" to fool compile/exec: 
 		# now a traceback will give the right line number
 		pytext = selfirstline * '\r' + pytext
 		self.execstring(pytext, globals, locals, file, modname)
+		if indent == 1 and globals[classname] is not klass:
+			# update the class in place
+			klass.__dict__.update(globals[classname].__dict__)
+			globals[classname] = klass
 	
 	def setthreadstate(self, state):
 		oldstate = self._threadstate
@@ -790,7 +790,7 @@ def _escape(where, what) :
 
 def _makewholewordpattern(word):
 	# first, escape special regex chars
-	for esc in "\\[].*^+$?":
+	for esc in "\\[]()|.*^+$?":
 		word = _escape(word, esc)
 	notwordcharspat = '[^' + _wordchars + ']'
 	pattern = '(' + word + ')'
@@ -839,7 +839,7 @@ class SearchEngine:
 		self.buttons = [	("Find",		"cmdf",	 self.find), 
 					("Replace",	     "cmdr",	 self.replace), 
 					("Replace all",	 None,   self.replaceall), 
-					("Donπt find",  "cmdd",	 self.dont), 
+					("Don't find",  "cmdd",	 self.dont), 
 					("Cancel",	      "cmd.",	 self.cancel)
 				]
 		for i in range(len(self.buttons)):
@@ -848,7 +848,7 @@ class SearchEngine:
 			self.w[title] = W.Button(bounds, title, callback)
 			if shortcut:
 				self.w.bind(shortcut, self.w[title].push)
-		self.w.setdefaultbutton(self.w["Donπt find"])
+		self.w.setdefaultbutton(self.w["Don't find"])
 		self.w.find.edit.bind("<key>", self.key)
 		self.w.bind("<activate>", self.activate)
 		self.w.bind("<close>", self.close)
@@ -881,11 +881,11 @@ class SearchEngine:
 			else:
 				for title, cmd, call in self.buttons[:-2]:
 					self.w[title].enable(0)
-				self.w.setdefaultbutton(self.w["Donπt find"])
+				self.w.setdefaultbutton(self.w["Don't find"])
 		else:
 			for title, cmd, call in self.buttons[:-2]:
 				self.w[title].enable(0)
-			self.w.setdefaultbutton(self.w["Donπt find"])
+			self.w.setdefaultbutton(self.w["Don't find"])
 	
 	def find(self):
 		self.getparmsfromwindow()
@@ -1166,7 +1166,7 @@ def execstring(pytext, globals, locals, filename="<string>", debugging=0,
 		PyDebugger.stop()
 
 
-_identifieRE = re.compile("[A-Za-z_][A-Za-z_0-9]*")
+_identifieRE = re.compile(r"[A-Za-z_][A-Za-z_0-9]*")
 
 def identifieRE_match(str):
 	match = _identifieRE.match(str)
@@ -1204,7 +1204,7 @@ class _EditorDefaultSettings:
 		self.template = "%s, %d point"
 		self.fontsettings, self.tabsettings, self.windowsize = geteditorprefs()
 		self.w = W.Dialog((328, 120), "Editor default settings")
-		self.w.setfontbutton = W.Button((8, 8, 80, 16), "Set fontä", self.dofont)
+		self.w.setfontbutton = W.Button((8, 8, 80, 16), "Set font\xc9", self.dofont)
 		self.w.fonttext = W.TextBox((98, 10, -8, 14), self.template % (self.fontsettings[0], self.fontsettings[2]))
 		
 		self.w.picksizebutton = W.Button((8, 50, 80, 16), "Front window", self.picksize)

@@ -61,7 +61,27 @@ PenState = StructOutputBufferType('PenState')
 PenState_ptr = StructInputBufferType('PenState')
 
 includestuff = includestuff + """
-#include <%s>""" % MACHEADERFILE + """
+#ifdef WITHOUT_FRAMEWORKS
+#include <QuickDraw.h>
+#else
+#include <Carbon/Carbon.h>
+#endif
+
+#ifdef USE_TOOLBOX_OBJECT_GLUE
+extern PyObject *_GrafObj_New(GrafPtr);
+extern int _GrafObj_Convert(PyObject *, GrafPtr *);
+extern PyObject *_BMObj_New(BitMapPtr);
+extern int _BMObj_Convert(PyObject *, BitMapPtr *);
+extern PyObject *_QdRGB_New(RGBColorPtr);
+extern int _QdRGB_Convert(PyObject *, RGBColorPtr);
+
+#define GrafObj_New _GrafObj_New
+#define GrafObj_Convert _GrafObj_Convert
+#define BMObj_New _BMObj_New
+#define BMObj_Convert _BMObj_Convert
+#define QdRGB_New _QdRGB_New
+#define QdRGB_Convert _QdRGB_Convert
+#endif
 
 #if !ACCESSOR_CALLS_ARE_FUNCTIONS
 #define GetPortBitMapForCopyBits(port) ((const struct BitMap *)&((GrafPort *)(port))->portBits)
@@ -137,16 +157,13 @@ staticforward PyObject *BMObj_NewCopied(BitMapPtr);
 /*
 ** Parse/generate RGB records
 */
-PyObject *QdRGB_New(itself)
-	RGBColorPtr itself;
+PyObject *QdRGB_New(RGBColorPtr itself)
 {
 
 	return Py_BuildValue("lll", (long)itself->red, (long)itself->green, (long)itself->blue);
 }
 
-QdRGB_Convert(v, p_itself)
-	PyObject *v;
-	RGBColorPtr p_itself;
+QdRGB_Convert(PyObject *v, RGBColorPtr p_itself)
 {
 	long red, green, blue;
 	
@@ -162,8 +179,7 @@ QdRGB_Convert(v, p_itself)
 ** Generate FontInfo records
 */
 static
-PyObject *QdFI_New(itself)
-	FontInfo *itself;
+PyObject *QdFI_New(FontInfo *itself)
 {
 
 	return Py_BuildValue("hhhh", itself->ascent, itself->descent,
@@ -175,8 +191,7 @@ finalstuff = finalstuff + """
 /* Like BMObj_New, but the original bitmap data structure is copied (and
 ** released when the object is released)
 */
-PyObject *BMObj_NewCopied(itself)
-	BitMapPtr itself;
+PyObject *BMObj_NewCopied(BitMapPtr itself)
 {
 	BitMapObject *it;
 	BitMapPtr itself_copy;
@@ -201,6 +216,15 @@ variablestuff = """
 }
 """
 
+initstuff = initstuff + """
+	PyMac_INIT_TOOLBOX_OBJECT_NEW(BitMapPtr, BMObj_New);
+	PyMac_INIT_TOOLBOX_OBJECT_CONVERT(BitMapPtr, BMObj_Convert);
+	PyMac_INIT_TOOLBOX_OBJECT_NEW(GrafPtr, GrafObj_New);
+	PyMac_INIT_TOOLBOX_OBJECT_CONVERT(GrafPtr, GrafObj_Convert);
+	PyMac_INIT_TOOLBOX_OBJECT_NEW(RGBColorPtr, QdRGB_New);
+	PyMac_INIT_TOOLBOX_OBJECT_CONVERT(RGBColor, QdRGB_Convert);
+"""
+
 ## not yet...
 ##
 ##class Region_ObjectDefinition(GlobalObjectDefinition):
@@ -219,6 +243,16 @@ class MyGRObjectDefinition(GlobalObjectDefinition):
 	def outputCheckNewArg(self):
 		Output("if (itself == NULL) return PyMac_Error(resNotFound);")
 	def outputCheckConvertArg(self):
+		Output("#if 1")
+		OutLbrace()
+		Output("WindowRef win;")
+		OutLbrace("if (WinObj_Convert(v, &win) && v)")
+		Output("*p_itself = (GrafPtr)GetWindowPort(win);")
+		Output("return 1;")
+		OutRbrace()
+		Output("PyErr_Clear();")
+		OutRbrace()
+		Output("#else")
 		OutLbrace("if (DlgObj_Check(v))")
 		Output("DialogRef dlg = (DialogRef)((GrafPortObject *)v)->ob_itself;")
 		Output("*p_itself = (GrafPtr)GetWindowPort(GetDialogWindow(dlg));")
@@ -229,6 +263,7 @@ class MyGRObjectDefinition(GlobalObjectDefinition):
 		Output("*p_itself = (GrafPtr)GetWindowPort(win);")
 		Output("return 1;")
 		OutRbrace()
+		Output("#endif")
 	def outputGetattrHook(self):
 		Output("#if !ACCESSOR_CALLS_ARE_FUNCTIONS")
 		Output("""
@@ -415,7 +450,7 @@ class QDGlobalsAccessObjectDefinition(ObjectDefinition):
 		pass
 	def outputNew(self):
 		Output()
-		Output("%sPyObject *%s_New()", self.static, self.prefix)
+		Output("%sPyObject *%s_New(void)", self.static, self.prefix)
 		OutLbrace()
 		Output("%s *it;", self.objecttype)
 		Output("it = PyObject_NEW(%s, &%s);", self.objecttype, self.typename)

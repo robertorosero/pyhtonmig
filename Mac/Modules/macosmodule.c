@@ -28,11 +28,15 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #include "macglue.h"
 #include "pythonresources.h"
 
+#ifdef WITHOUT_FRAMEWORKS
 #include <Windows.h>
 #include <Files.h>
 #include <LowMem.h>
 #include <Sound.h>
 #include <Events.h>
+#else
+#include <Carbon/Carbon.h>
+#endif
 
 static PyObject *MacOS_Error; /* Exception MacOS.Error */
 
@@ -354,13 +358,13 @@ MacOS_SetCreatorAndType(PyObject *self, PyObject *args)
 	return Py_None;
 }
 
+#if TARGET_API_MAC_OS8
 /*----------------------------------------------------------------------*/
 /* STDWIN High Level Event interface */
 
 #include <EPPC.h>
 #include <Events.h>
 
-#if !TARGET_API_MAC_CARBON
 static char accepthle_doc[] = "Get arguments of pending high-level event";
 
 static PyObject *
@@ -396,6 +400,8 @@ MacOS_AcceptHighLevelEvent(self, args)
 	return res;
 }
 #endif
+
+#if !TARGET_API_MAC_OSX
 static char schedparams_doc[] = "Set/return mainloop interrupt check flag, etc";
 
 /*
@@ -484,6 +490,7 @@ MacOS_HandleEvent(PyObject *self, PyObject *args)
 	Py_INCREF(Py_None);
 	return Py_None;
 }
+#endif /* !TARGET_API_MAC_OSX */
 
 static char geterr_doc[] = "Convert OSErr number to string";
 
@@ -637,6 +644,7 @@ MacOS_openrf(PyObject *self, PyObject *args)
 	return (PyObject *)fp;
 }
 
+#if !TARGET_API_MAC_OSX
 static char FreeMem_doc[] = "Return the total amount of free space in the heap";
 
 static PyObject *
@@ -702,28 +710,33 @@ MacOS_OutputSeen(PyObject *self, PyObject *args)
 	Py_INCREF(Py_None);
 	return Py_None;
 }
+#endif /* !TARGET_API_MAC_OSX */
 
 static PyMethodDef MacOS_Methods[] = {
-#if !TARGET_API_MAC_CARBON
+#if TARGET_API_MAC_OS8
 	{"AcceptHighLevelEvent",	MacOS_AcceptHighLevelEvent, 1,	accepthle_doc},
 #endif
 	{"GetCreatorAndType",		MacOS_GetCreatorAndType, 1,	getcrtp_doc},
 	{"SetCreatorAndType",		MacOS_SetCreatorAndType, 1,	setcrtp_doc},
+#if !TARGET_API_MAC_OSX
 	{"SchedParams",			MacOS_SchedParams,	1,	schedparams_doc},
 	{"EnableAppswitch",		MacOS_EnableAppswitch,	1,	appswitch_doc},
 	{"SetEventHandler",		MacOS_SetEventHandler,	1,	setevh_doc},
 	{"HandleEvent",			MacOS_HandleEvent,	1,	handleev_doc},
+#endif
 	{"GetErrorString",		MacOS_GetErrorString,	1,	geterr_doc},
 	{"openrf",			MacOS_openrf, 		1, 	openrf_doc},
 	{"splash",			MacOS_splash,		1, 	splash_doc},
 	{"DebugStr",			MacOS_DebugStr,		1,	DebugStr_doc},
 	{"GetTicks",			MacOS_GetTicks,		1,	GetTicks_doc},
 	{"SysBeep",			MacOS_SysBeep,		1,	SysBeep_doc},
+#if !TARGET_API_MAC_OSX
 	{"FreeMem",			MacOS_FreeMem,		1,	FreeMem_doc},
 	{"MaxBlock",		MacOS_MaxBlock,		1,	MaxBlock_doc},
 	{"CompactMem",		MacOS_CompactMem,	1,	CompactMem_doc},
 	{"KeepConsole",		MacOS_KeepConsole,	1,	KeepConsole_doc},
 	{"OutputSeen",		MacOS_OutputSeen,	1,	OutputSeen_doc},
+#endif
 	{NULL,				NULL}		 /* Sentinel */
 };
 
@@ -759,11 +772,14 @@ initMacOS()
 	if (PyDict_SetItemString(d, "AppearanceCompliant", 
 				Py_BuildValue("i", PyMac_AppearanceCompliant)) != 0)
 		return;
-#if TARGET_API_MAC_CARBON
-/* Will need a different name for MachO-carbon later (macho?) */
+#if TARGET_API_MAC_OSX
+#define PY_RUNTIMEMODEL "macho"
+#elif TARGET_API_MAC_OS8
+#define PY_RUNTIMEMODEL "ppc"
+#elif TARGET_API_MAC_CARBON
 #define PY_RUNTIMEMODEL "carbon"
 #else
-#define PY_RUNTIMEMODEL "ppc"
+#error "None of the TARGET_API_MAC_XXX I know about is set"
 #endif
 	if (PyDict_SetItemString(d, "runtimemodel", 
 				Py_BuildValue("s", PY_RUNTIMEMODEL)) != 0)

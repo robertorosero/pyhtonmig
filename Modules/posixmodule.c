@@ -63,12 +63,6 @@ corresponding Unix manual entries for more information on calls.";
 #ifdef __BORLANDC__		/* Borland compiler */
 #define HAVE_EXECV      1
 #define HAVE_GETCWD     1
-#define HAVE_GETEGID    1
-#define HAVE_GETEUID    1
-#define HAVE_GETGID     1
-#define HAVE_GETPPID    1
-#define HAVE_GETUID     1
-#define HAVE_KILL       1
 #define HAVE_OPENDIR    1
 #define HAVE_PIPE       1
 #define HAVE_POPEN      1
@@ -152,7 +146,11 @@ extern int rmdir(char *);
 extern int chdir(const char *);
 extern int rmdir(const char *);
 #endif
+#ifdef __BORLANDC__
+extern int chmod(const char *, int);
+#else
 extern int chmod(const char *, mode_t);
+#endif
 extern int chown(const char *, uid_t, gid_t);
 extern char *getcwd(char *, int);
 extern char *strerror(int);
@@ -1069,6 +1067,12 @@ posix_mkdir(PyObject *self, PyObject *args)
 
 
 #ifdef HAVE_NICE
+#if defined(HAVE_BROKEN_NICE) && defined(HAVE_SYS_RESOURCE_H)
+#if defined(HAVE_GETPRIORITY) && !defined(PRIO_PROCESS)
+#include <sys/resource.h>
+#endif
+#endif
+
 static char posix_nice__doc__[] =
 "nice(inc) -> new_priority\n\
 Decrease the priority of process and return new priority.";
@@ -1080,8 +1084,25 @@ posix_nice(PyObject *self, PyObject *args)
 
 	if (!PyArg_ParseTuple(args, "i:nice", &increment))
 		return NULL;
+
+	/* There are two flavours of 'nice': one that returns the new
+	   priority (as required by almost all standards out there) and the
+	   Linux/FreeBSD/BSDI one, which returns '0' on success and advices
+	   the use of getpriority() to get the new priority.
+	   
+	   If we are of the nice family that returns the new priority, we
+	   need to clear errno before the call, and check if errno is filled
+	   before calling posix_error() on a returnvalue of -1, because the
+	   -1 may be the actual new priority! */
+
+	errno = 0;
 	value = nice(increment);
-	if (value == -1)
+#if defined(HAVE_BROKEN_NICE) && defined(HAVE_GETPRIORITY)
+	if (value == 0)
+		value = getpriority(PRIO_PROCESS, 0);
+#endif
+	if (value == -1 && errno != 0)
+		/* either nice() or getpriority() returned an error */
 		return posix_error();
 	return PyInt_FromLong((long) value);
 }
@@ -5617,17 +5638,17 @@ all_ins(PyObject *d)
 }
 
 
-#if ( defined(_MSC_VER) || defined(__WATCOMC__) ) && !defined(__QNX__)
+#if (defined(_MSC_VER) || defined(__WATCOMC__) || defined(__BORLANDC__)) && !defined(__QNX__) 
 #define INITFUNC initnt
 #define MODNAME "nt"
-#else
-#if defined(PYOS_OS2)
+
+#elif defined(PYOS_OS2)
 #define INITFUNC initos2
 #define MODNAME "os2"
+
 #else
 #define INITFUNC initposix
 #define MODNAME "posix"
-#endif
 #endif
 
 DL_EXPORT(void)

@@ -211,13 +211,18 @@ there is no header matching \var{name}, or it is unparsable, return
 \code{None}. 
 \end{methoddesc}
 
-\class{Message} instances also support a read-only mapping interface.
+\class{Message} instances also support a limited mapping interface.
 In particular: \code{\var{m}[name]} is like
 \code{\var{m}.getheader(name)} but raises \exception{KeyError} if
 there is no matching header; and \code{len(\var{m})},
 \code{\var{m}.has_key(name)}, \code{\var{m}.keys()},
 \code{\var{m}.values()} and \code{\var{m}.items()} act as expected
-(and consistently).
+(and consistently).  \class{Message} instances also support the
+mapping writable interface \code{\var{m}[name] = value} and \code{del
+\var{m}[name]}.  \class{Message} objects do not support the
+\method{clear()}, \method{copy()}, \method{get()}, \method{popitem()},
+\method{setdefault()}, or \method{update()} methods of the mapping
+interface.
 
 Finally, \class{Message} instances have two public instance variables:
 

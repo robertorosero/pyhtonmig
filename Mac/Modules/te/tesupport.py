@@ -32,7 +32,19 @@ TextStyle = OpaqueType("TextStyle", "TextStyle")
 TextStyle_ptr = TextStyle
 
 includestuff = includestuff + """
-#include <%s>""" % MACHEADERFILE + """
+#ifdef WITHOUT_FRAMEWORKS
+#include <TextEdit.h>
+#else
+#include <Carbon/Carbon.h>
+#endif
+
+#ifdef USE_TOOLBOX_OBJECT_GLUE
+extern PyObject *_TEObj_New(TEHandle);
+extern int _TEObj_Convert(PyObject *, TEHandle *);
+
+#define TEObj_New _TEObj_New
+#define TEObj_Convert _TEObj_Convert
+#endif
 
 #define as_TE(h) ((TEHandle)h)
 #define as_Resource(teh) ((Handle)teh)
@@ -41,8 +53,7 @@ includestuff = includestuff + """
 ** Parse/generate TextStyle records
 */
 static PyObject *
-TextStyle_New(itself)
-	TextStylePtr itself;
+TextStyle_New(TextStylePtr itself)
 {
 
 	return Py_BuildValue("lllO&", (long)itself->tsFont, (long)itself->tsFace, (long)itself->tsSize, QdRGB_New,
@@ -50,9 +61,7 @@ TextStyle_New(itself)
 }
 
 static int
-TextStyle_Convert(v, p_itself)
-	PyObject *v;
-	TextStylePtr p_itself;
+TextStyle_Convert(PyObject *v, TextStylePtr p_itself)
 {
 	long font, face, size;
 	
@@ -63,6 +72,11 @@ TextStyle_Convert(v, p_itself)
 	p_itself->tsSize = (short)size;
 	return 1;
 }
+"""
+
+initstuff = initstuff + """
+	PyMac_INIT_TOOLBOX_OBJECT_NEW(TEHandle, TEObj_New);
+	PyMac_INIT_TOOLBOX_OBJECT_CONVERT(TEHandle, TEObj_Convert);
 """
 
 class TEMethodGenerator(OSErrMethodGenerator):

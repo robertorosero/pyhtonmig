@@ -163,16 +163,13 @@ static PyObject *
 mmap_read_byte_method(mmap_object *self,
 		      PyObject *args)
 {
-	char value;
-	char *where;
 	CHECK_VALID(NULL);
         if (!PyArg_ParseTuple(args, ":read_byte"))
 		return NULL;
 	if (self->pos < self->size) {
-	        where = self->data + self->pos;
-		value = (char) *(where);
+	        char value = self->data[self->pos];
 		self->pos += 1;
-		return Py_BuildValue("c", (char) *(where));
+		return Py_BuildValue("c", value);
 	} else {
 		PyErr_SetString (PyExc_ValueError, "read byte out of range");
 		return NULL;
@@ -227,16 +224,25 @@ static PyObject *
 mmap_find_method(mmap_object *self,
 		 PyObject *args)
 {
-	int start = self->pos;
+	long start = self->pos;
 	char *needle;
 	int len;
 
 	CHECK_VALID(NULL);
-	if (!PyArg_ParseTuple (args, "s#|i:find", &needle, &len, &start)) {
+	if (!PyArg_ParseTuple (args, "s#|l:find", &needle, &len, &start)) {
 		return NULL;
 	} else {
-		char *p = self->data+self->pos;
-		char *e = self->data+self->size;
+		char *p;
+		char *e = self->data + self->size;
+
+                if (start < 0)
+                    start += self->size;
+                if (start < 0)
+                    start = 0;
+                else if ((size_t)start > self->size)
+                    start = self->size;
+                p = self->data + start;
+
 		while (p < e) {
 			char *s = p;
 			char *n = needle;
@@ -245,8 +251,8 @@ mmap_find_method(mmap_object *self,
 			}
 			if (!*n) {
 				return Py_BuildValue (
-					"i",
-					(int) (p - (self->data + start)));
+					"l",
+					(long) (p - self->data));
 			}
 			p++;
 		}
@@ -657,6 +663,11 @@ mmap_ass_slice(mmap_object *self, int ilow, int ihigh, PyObject *v)
 	else if ((size_t)ihigh > self->size)
 		ihigh = self->size;
     
+	if (v == NULL) {
+		PyErr_SetString(PyExc_TypeError,
+			"mmap object doesn't support slice deletion");
+		return -1;
+	}
 	if (! (PyString_Check(v)) ) {
 		PyErr_SetString(PyExc_IndexError, 
 				"mmap slice assignment must be a string");
@@ -680,6 +691,11 @@ mmap_ass_item(mmap_object *self, int i, PyObject *v)
 	CHECK_VALID(-1);
 	if (i < 0 || (size_t)i >= self->size) {
 		PyErr_SetString(PyExc_IndexError, "mmap index out of range");
+		return -1;
+	}
+	if (v == NULL) {
+		PyErr_SetString(PyExc_TypeError,
+			"mmap object doesn't support item deletion");
 		return -1;
 	}
 	if (! (PyString_Check(v) && PyString_Size(v)==1) ) {
@@ -818,7 +834,7 @@ new_mmap_object(PyObject *self, PyObject *args, PyObject *kwdict)
 	m_obj->data = mmap(NULL, map_size, 
 			   prot, flags,
 			   fd, 0);
-	if (m_obj->data == (void *)-1)
+	if (m_obj->data == (char *)-1)
 	{
 		Py_DECREF(m_obj);
 		PyErr_SetFromErrno(mmap_module_error);

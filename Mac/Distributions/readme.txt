@@ -12,7 +12,9 @@ distribution when I'm fed up with it. They were last updated for 2.1b2.
 - Update Relnotes, readme's, Demo:build.html
 - Make sure tkresources.rsrc is up-to-date
 - fullbuild everything with increase-buildno
+- Update Numeric and build/install it both with Classic and with Carbon python
 - Run configurepython
+- Recompile OSAm and possibly other Contrib stuff
 - mkdistr binary.include
 - mkdistr dev.include
 - make distribution archive with Installer Vise
@@ -35,5 +37,7 @@ distribution when I'm fed up with it. They were last updated for 2.1b2.
    python-dev@python.org
    python-announce@python.org
    archivist@info-mac.org
+   adcnews@apple.com
+   http://www.macupdate.com
    http://guide.apple.com/usindex.html
    http://www.versiontracker.com/ Jack.Jansen@oratrix.com

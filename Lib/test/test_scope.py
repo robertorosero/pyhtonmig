@@ -436,3 +436,34 @@ verify(d.has_key('h'))
 del d['h']
 verify(d == {'x': 2, 'y': 7, 'w': 6})
 
+print "19. var is bound and free in class"
+
+def f(x):
+    class C:
+        def m(self):
+            return x
+        a = x
+    return C
+
+inst = f(3)()
+verify(inst.a == inst.m())
+
+print "20. interaction with trace function"
+
+import sys
+def tracer(a,b,c):
+    return tracer
+
+def adaptgetter(name, klass, getter):
+    kind, des = getter
+    if kind == 1:       # AV happens when stepping from this line to next
+        if des == "":
+            des = "_%s__%s" % (klass.__name__, name)
+        return lambda obj: getattr(obj, des)
+
+class TestClass:
+    pass
+
+sys.settrace(tracer)
+adaptgetter("foo", TestClass, (1, ""))
+sys.settrace(None)

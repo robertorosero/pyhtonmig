@@ -22,24 +22,6 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 ******************************************************************/
 
-#ifdef __CFM68K__
-/* cfm68k InterfaceLib exports GetEventQueue, but Events.h doesn't know this
-** and defines it as GetEvQHdr (which is correct for PPC). This fix is for
-** CW9, check that the workaround is still needed for the next release.
-*/
-#define GetEvQHdr GetEventQueue
-#endif /* __CFM68K__ */
-
-#include <Events.h>
-
-#if TARGET_API_MAC_CARBON
-/* Unfortunately this call is probably slower... */
-#define LMGetTicks() TickCount()
-#endif
-
-#ifdef __CFM68K__
-#undef GetEventQueue
-#endif /* __CFM68K__ */
 
 #include "Python.h"
 
@@ -47,9 +29,11 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #include "marshal.h"
 #include "import.h"
 #include "importdl.h"
+#include "pymactoolbox.h"
 
 #include "pythonresources.h"
 
+#ifdef WITHOUT_FRAMEWORKS
 #include <OSUtils.h> /* for Set(Current)A5 */
 #include <Files.h>
 #include <StandardFile.h>
@@ -61,6 +45,29 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #include <Fonts.h>
 #include <Menus.h>
 #include <TextUtils.h>
+#include <LowMem.h>
+#ifdef __CFM68K__
+/* cfm68k InterfaceLib exports GetEventQueue, but Events.h doesn't know this
+** and defines it as GetEvQHdr (which is correct for PPC). This fix is for
+** CW9, check that the workaround is still needed for the next release.
+*/
+#define GetEvQHdr GetEventQueue
+#endif /* __CFM68K__ */
+
+#include <Events.h>
+
+#ifdef __CFM68K__
+#undef GetEventQueue
+#endif /* __CFM68K__ */
+#else
+#include <Carbon/Carbon.h>
+#endif
+
+#if !TARGET_API_MAC_OS8
+/* Unfortunately this call is probably slower... */
+#define LMGetTicks() TickCount()
+#endif
+
 #ifdef __MWERKS__
 #include <SIOUX.h>
 extern void SIOUXSetupMenus(void);
@@ -80,7 +87,6 @@ extern pascal unsigned char *PLstrrchr(unsigned char *, unsigned char);
 #include <TFileSpec.h> /* For Path2FSSpec */
 #include <GUSI.h>
 #endif
-#include <LowMem.h>
 
 /* The ID of the Sioux apple menu */
 #define SIOUX_APPLEID	32000
@@ -124,15 +130,13 @@ extern pascal unsigned char *PLstrrchr(unsigned char *, unsigned char);
 ** with the python errors.h. */
 #define fnfErr -43
 
-/* Declared in macfsmodule.c: */
-extern FSSpec *mfs_GetFSSpecFSSpec(PyObject *);
-extern PyObject *newmfssobject(FSSpec *);
-
 /* Interrupt code variables: */
 static int interrupted;			/* Set to true when cmd-. seen */
 static RETSIGTYPE intcatcher(int);
 
+#if !TARGET_API_MAC_OSX
 static int PyMac_Yield(void);
+#endif
 
 /*
 ** These are the real scheduling parameters that control what we check
@@ -171,7 +175,7 @@ struct hook_args {
 	int selectcur_hit;		/* Set to true when "select current" selected */
 	char *prompt;			/* The prompt */
 };
-#if TARGET_API_MAC_CARBON
+#if !TARGET_API_MAC_OS8
 /* The StandardFile hooks don't exist in Carbon. This breaks GetDirectory,
 ** but the macfsn code will replace it by a NavServices version anyway.
 */
@@ -213,17 +217,80 @@ char *PyMac_getscript()
         else
             return "mac-roman";
         break;
+#if 0
+    /* We don't have a codec for this, so don't return it */
     case smJapanese:
         return "mac-japan";
+#endif
     case smGreek:
         return "mac-greek";
     case smCyrillic:
         return "mac-cyrillic";
     default:
-        return "mac-roman"; /* better than nothing */
+        return "ascii"; /* better than nothing */
     }
 }
 
+/* Given an FSSpec, return the FSSpec of the parent folder */
+
+static OSErr
+get_folder_parent (FSSpec * fss, FSSpec * parent)
+{
+	CInfoPBRec rec;
+	short err;
+
+        * parent = * fss;
+        rec.hFileInfo.ioNamePtr = parent->name;
+        rec.hFileInfo.ioVRefNum = parent->vRefNum;
+        rec.hFileInfo.ioDirID = parent->parID;
+		rec.hFileInfo.ioFDirIndex = -1;
+        rec.hFileInfo.ioFVersNum = 0;
+        if (err = PBGetCatInfoSync (& rec))
+        	return err;
+        parent->parID = rec.dirInfo.ioDrParID;
+/*	parent->name[0] = 0; */
+        return 0;
+}
+
+/* Given an FSSpec return a full, colon-separated pathname */
+
+OSErr
+PyMac_GetFullPath (FSSpec *fss, char *buf)
+{
+	short err;
+	FSSpec fss_parent, fss_current;
+	char tmpbuf[1024];
+	int plen;
+
+	fss_current = *fss;
+	plen = fss_current.name[0];
+	memcpy(buf, &fss_current.name[1], plen);
+	buf[plen] = 0;
+	/* Special case for disk names */
+	if ( fss_current.parID <= 1 ) {
+		buf[plen++] = ':';
+		buf[plen] = 0;
+		return 0;
+	}
+	while (fss_current.parID > 1) {
+    		/* Get parent folder name */
+                if (err = get_folder_parent(&fss_current, &fss_parent))
+             		return err;
+                fss_current = fss_parent;
+                /* Prepend path component just found to buf */
+    			plen = fss_current.name[0];
+    			if (strlen(buf) + plen + 1 > 1024) {
+    				/* Oops... Not enough space (shouldn't happen) */
+    				*buf = 0;
+    				return -1;
+    			}
+    			memcpy(tmpbuf, &fss_current.name[1], plen);
+    			tmpbuf[plen] = ':';
+    			strcpy(&tmpbuf[plen+1], buf);
+    			strcpy(buf, tmpbuf);
+        }
+        return 0;
+}
 
 #ifdef USE_GUSI1
 /*
@@ -297,7 +364,7 @@ PyMac_StopGUSISpin() {
 	PyMac_ConsoleIsDead = 1;
 }
 
-#if !TARGET_API_MAC_CARBON
+#if TARGET_API_MAC_OS8
 /*
 ** Replacement routines for the PLstr... functions so we don't need
 ** StdCLib.
@@ -338,7 +405,7 @@ PLstrrchr(unsigned char *str, unsigned char chr)
 	return ptr;
 }
 	
-#endif /* !TARGET_API_MAC_CARBON */
+#endif /* TARGET_API_MAC_OS8 */
 #endif /* USE_GUSI */
 
 
@@ -357,7 +424,7 @@ Pstring(char *str)
 	return buf;
 }
 
-#if !TARGET_API_MAC_CARBON
+#if TARGET_API_MAC_OS8
 void
 c2pstrcpy(unsigned char *dst, const char *src)
 {
@@ -368,7 +435,7 @@ c2pstrcpy(unsigned char *dst, const char *src)
 	strncpy((char *)dst+1, src, len);
 	dst[0] = len;
 }
-#endif /* !TARGET_API_MAC_CARBON */
+#endif /* TARGET_API_MAC_OS8 */
 
 /* Like strerror() but for Mac OS error numbers */
 char *PyMac_StrError(int err)
@@ -399,7 +466,7 @@ PyObject *
 PyMac_GetOSErrException()
 {
 	if (PyMac_OSErrException == NULL)
-		PyMac_OSErrException = PyString_FromString("Mac OS Error");
+		PyMac_OSErrException = PyString_FromString("MacOS.Error");
 	return PyMac_OSErrException;
 }
 
@@ -466,6 +533,7 @@ PyOS_CheckStack()
 }
 #endif /* USE_STACKCHECK */
 
+#if !TARGET_API_MAC_OSX
 /* The catcher routine (which may not be used for all compilers) */
 static RETSIGTYPE
 intcatcher(sig)
@@ -498,7 +566,7 @@ static void
 scan_event_queue(flush)
 	int flush;
 {
-#if TARGET_API_MAC_CARBON
+#if !TARGET_API_MAC_OS8
 	if ( CheckEventQueueForUserCancel() )
 		interrupted = 1;
 #else
@@ -539,31 +607,13 @@ PyErr_CheckSignals()
 	return 0;
 }
 
-#if 0
-/*
-** This routine is called if we know that an external library yielded
-** to background tasks, so we shouldn't count that time in our computation
-** of how much CPU we used.
-** This happens with SIOUX, and the routine is called from our modified
-** GUSISIOUX.
-*/
-void
-PyMac_LibraryDidYield(int howlong)
-{
-	unsigned long maxnextcheck = (unsigned long)LMGetTicks() + schedparams.check_interval;
-	
-	schedparams.next_check = schedparams.next_check + howlong;
-	if (schedparams.next_check > maxnextcheck )
-		schedparams.next_check = maxnextcheck;
-}
-#endif
-
 int
 PyOS_InterruptOccurred()
 {
 	scan_event_queue(1);
 	return interrupted;
 }
+
 /* Check whether we are in the foreground */
 static int
 PyMac_InForeground(void)
@@ -582,8 +632,8 @@ PyMac_InForeground(void)
 	else if ( SameProcess(&ours, &curfg, &eq) < 0 )
 		eq = 1;
 	return (int)eq;
-
 }
+#endif
 
 int
 PyMac_SetEventHandler(PyObject *evh)
@@ -608,7 +658,7 @@ void
 PyMac_HandleEventIntern(evp)
 	EventRecord *evp;
 {
-#if !TARGET_API_MAC_CARBON
+#if TARGET_API_MAC_OS8
 	if ( evp->what == mouseDown ) {
 		WindowPtr wp;
 		
@@ -655,6 +705,7 @@ PyMac_HandleEvent(evp)
 	return 0;
 }
 
+#if !TARGET_API_MAC_OSX
 /*
 ** Yield the CPU to other tasks without processing events.
 */
@@ -685,11 +736,13 @@ PyMac_DoYield(int maxsleep, int maycallpython)
 	*/
 	if( in_here > 1 || !schedparams.process_events || 
 	    (python_event_handler && !maycallpython) ) {
-#if !TARGET_API_MAC_CARBON
 		if ( maxsleep >= 0 ) {
+#if TARGET_API_MAC_OS8
 			SystemTask();
-		}
+#else
+			int xxx = 0;
 #endif
+		}
 	} else {
 		latest_time_ready = LMGetTicks() + maxsleep;
 		do {
@@ -768,6 +821,7 @@ PyMac_InitMenuBar()
 {
 	MenuHandle applemenu;
 	
+	if ( sioux_mbar ) return;
 	if ( (sioux_mbar=GetMenuBar()) == NULL )  {
 		/* Sioux menu not installed yet. Do so */
 		SIOUXSetupMenus();
@@ -784,7 +838,7 @@ PyMac_InitMenuBar()
 void
 PyMac_RestoreMenuBar()
 {
-#if 0
+#if 1
 	/* This doesn't seem to work anymore? Or only for Carbon? */
 	MenuBarHandle curmenubar;
 	
@@ -799,6 +853,19 @@ PyMac_RestoreMenuBar()
 #endif
 }
 
+void
+PyMac_RaiseConsoleWindow()
+{
+	/* Note: this is a hack. SIOUXTextWindow is SIOUX's internal structure
+	** and we happen to know that the first entry is the window pointer.
+	*/
+	extern WindowRef *SIOUXTextWindow;
+
+	if ( SIOUXTextWindow == NULL || *SIOUXTextWindow == NULL )
+		return;
+	if ( FrontWindow() != *SIOUXTextWindow )
+		BringToFront(*SIOUXTextWindow);
+}
 
 /*
 ** Our replacement about box
@@ -829,18 +896,9 @@ SIOUXDoAboutBox(void)
 	DisposeDialog(theDialog);
 }
 
-#if 0
-int
-PyMac_FileExists(char *name)
-{
-	FSSpec fss;
-	
-	if ( FSMakeFSSpec(0, 0, Pstring(name), &fss) == noErr )
-		return 1;
-	return 0;
-}
-#endif
+#endif /* !TARGET_API_MAC_OSX */
 
+#if TARGET_API_MAC_OS8
 /*
 ** Helper routine for GetDirectory
 */
@@ -862,7 +920,7 @@ myhook_proc(short item, DialogPtr theDialog, struct hook_args *dataptr)
 	}
 	return item;
 }	
-#if !TARGET_API_MAC_CARBON
+
 /*
 ** Ask the user for a directory. I still can't understand
 ** why Apple doesn't provide a standard solution for this...
@@ -915,7 +973,7 @@ void PyMac_PromptGetFile(short numTypes, ConstSFTypeListPtr typeList,
 	CustomGetFile((FileFilterYDUPP)0, numTypes, typeList, reply, GETFILEPROMPT_ID, where,
 				myhook_upp, NULL, NULL, NULL, (void *)&hook_args);
 }
-#endif /* TARGET_API_MAC_CARBON */
+#endif /* TARGET_API_MAC_OS8 */
 
 /* Convert a 4-char string object argument to an OSType value */
 int
@@ -982,55 +1040,6 @@ PyMac_BuildOptStr255(Str255 s)
 }
 
 
-/*
-** Convert a Python object to an FSSpec.
-** The object may either be a full pathname or a triple
-** (vrefnum, dirid, path).
-** NOTE: This routine will fail on pre-sys7 machines. 
-** The caller is responsible for not calling this routine
-** in those cases (which is fine, since everyone calling
-** this is probably sys7 dependent anyway).
-*/
-int
-PyMac_GetFSSpec(PyObject *v, FSSpec *fs)
-{
-	Str255 path;
-	short refnum;
-	long parid;
-	OSErr err;
-	FSSpec *fs2;
-
-	/* first check whether it already is an FSSpec */
-	fs2 = mfs_GetFSSpecFSSpec(v);
-	if ( fs2 ) {
-		(void)FSMakeFSSpec(fs2->vRefNum, fs2->parID, fs2->name, fs);
-		return 1;
-	}
-	if ( PyString_Check(v) ) {
-		/* It's a pathname */
-		if( !PyArg_Parse(v, "O&", PyMac_GetStr255, &path) )
-			return 0;
-		refnum = 0; /* XXXX Should get CurWD here?? */
-		parid = 0;
-	} else {
-		if( !PyArg_Parse(v, "(hlO&); FSSpec should be fullpath or (vrefnum,dirid,path)",
-							&refnum, &parid, PyMac_GetStr255, &path)) {
-			return 0;
-		}
-	}
-	err = FSMakeFSSpec(refnum, parid, path, fs);
-	if ( err && err != fnfErr ) {
-		PyMac_Error(err);
-		return 0;
-	}
-	return 1;
-}
-
-/* Convert FSSpec to PyObject */
-PyObject *PyMac_BuildFSSpec(FSSpec *v)
-{
-	return newmfssobject(v);
-}
 
 /* Convert a Python object to a Rect.
    The object must be a (left, top, right, bottom) tuple.
@@ -1073,7 +1082,7 @@ PyMac_BuildPoint(Point p)
 int
 PyMac_GetEventRecord(PyObject *v, EventRecord *e)
 {
-	return PyArg_Parse(v, "(hll(hh)h)",
+	return PyArg_Parse(v, "(Hll(hh)H)",
 	                   &e->what,
 	                   &e->message,
 	                   &e->when,
@@ -1141,3 +1150,108 @@ PyMac_Buildwide(wide *w)
 		return PyInt_FromLong(w->lo);
 	return Py_BuildValue("(ll)", w->hi, w->lo);
 }
+
+#ifdef USE_TOOLBOX_OBJECT_GLUE
+/*
+** Glue together the toolbox objects.
+**
+** Because toolbox modules interdepend on each other, they use each others
+** object types, on MacOSX/MachO this leads to the situation that they
+** cannot be dynamically loaded (or they would all have to be lumped into
+** a single .so, but this would be bad for extensibility).
+**
+** This file defines wrappers for all the _New and _Convert functions,
+** which are the Py_BuildValue and PyArg_ParseTuple helpers. The wrappers
+** check an indirection function pointer, and if it isn't filled in yet
+** they import the appropriate module, whose init routine should fill in
+** the pointer.
+*/
+
+#define GLUE_NEW(object, routinename, module) \
+PyObject *(*PyMacGluePtr_##routinename)(object); \
+\
+PyObject *routinename(object cobj) { \
+    if (!PyMacGluePtr_##routinename) { \
+       if (!PyImport_ImportModule(module)) return NULL; \
+       if (!PyMacGluePtr_##routinename) { \
+           PyErr_SetString(PyExc_ImportError, "Module did not provide routine: " module ": " #routinename); \
+           return NULL; \
+       } \
+    } \
+    return (*PyMacGluePtr_##routinename)(cobj); \
+}
+
+#define GLUE_CONVERT(object, routinename, module) \
+int (*PyMacGluePtr_##routinename)(PyObject *, object *); \
+\
+int routinename(PyObject *pyobj, object *cobj) { \
+    if (!PyMacGluePtr_##routinename) { \
+       if (!PyImport_ImportModule(module)) return NULL; \
+       if (!PyMacGluePtr_##routinename) { \
+           PyErr_SetString(PyExc_ImportError, "Module did not provide routine: " module ": " #routinename); \
+           return NULL; \
+       } \
+    } \
+    return (*PyMacGluePtr_##routinename)(pyobj, cobj); \
+}
+
+GLUE_NEW(AppleEvent *, AEDesc_New, "AE") /* XXXX Why by address? */
+GLUE_CONVERT(AppleEvent, AEDesc_Convert, "AE")
+
+GLUE_NEW(Component, CmpObj_New, "Cm")
+GLUE_CONVERT(Component, CmpObj_Convert, "Cm")
+GLUE_NEW(ComponentInstance, CmpInstObj_New, "Cm")
+GLUE_CONVERT(ComponentInstance, CmpInstObj_Convert, "Cm")
+
+GLUE_NEW(ControlHandle, CtlObj_New, "Ctl")
+GLUE_CONVERT(ControlHandle, CtlObj_Convert, "Ctl")
+
+GLUE_NEW(DialogPtr, DlgObj_New, "Dlg")
+GLUE_CONVERT(DialogPtr, DlgObj_Convert, "Dlg")
+GLUE_NEW(DialogPtr, DlgObj_WhichDialog, "Dlg")
+
+GLUE_NEW(DragReference, DragObj_New, "Drag")
+GLUE_CONVERT(DragReference, DragObj_Convert, "Drag")
+
+GLUE_NEW(ListHandle, ListObj_New, "List")
+GLUE_CONVERT(ListHandle, ListObj_Convert, "List")
+
+GLUE_NEW(MenuHandle, MenuObj_New, "Menu")
+GLUE_CONVERT(MenuHandle, MenuObj_Convert, "Menu")
+
+GLUE_NEW(GrafPtr, GrafObj_New, "Qd")
+GLUE_CONVERT(GrafPtr, GrafObj_Convert, "Qd")
+GLUE_NEW(BitMapPtr, BMObj_New, "Qd")
+GLUE_CONVERT(BitMapPtr, BMObj_Convert, "Qd")
+GLUE_NEW(RGBColor *, QdRGB_New, "Qd") /* XXXX Why? */
+GLUE_CONVERT(RGBColor, QdRGB_Convert, "Qd")
+
+GLUE_NEW(GWorldPtr, GWorldObj_New, "Qdoffs")
+GLUE_CONVERT(GWorldPtr, GWorldObj_Convert, "Qdoffs")
+
+GLUE_NEW(Track, TrackObj_New, "Qt")
+GLUE_CONVERT(Track, TrackObj_Convert, "Qt")
+GLUE_NEW(Movie, MovieObj_New, "Qt")
+GLUE_CONVERT(Movie, MovieObj_Convert, "Qt")
+GLUE_NEW(MovieController, MovieCtlObj_New, "Qt")
+GLUE_CONVERT(MovieController, MovieCtlObj_Convert, "Qt")
+GLUE_NEW(TimeBase, TimeBaseObj_New, "Qt")
+GLUE_CONVERT(TimeBase, TimeBaseObj_Convert, "Qt")
+GLUE_NEW(UserData, UserDataObj_New, "Qt")
+GLUE_CONVERT(UserData, UserDataObj_Convert, "Qt")
+GLUE_NEW(Media, MediaObj_New, "Qt")
+GLUE_CONVERT(Media, MediaObj_Convert, "Qt")
+
+GLUE_NEW(Handle, ResObj_New, "Res")
+GLUE_CONVERT(Handle, ResObj_Convert, "Res")
+GLUE_NEW(Handle, OptResObj_New, "Res")
+GLUE_CONVERT(Handle, OptResObj_Convert, "Res")
+
+GLUE_NEW(TEHandle, TEObj_New, "TE")
+GLUE_CONVERT(TEHandle, TEObj_Convert, "TE")
+
+GLUE_NEW(WindowPtr, WinObj_New, "Win")
+GLUE_CONVERT(WindowPtr, WinObj_Convert, "Win")
+GLUE_NEW(WindowPtr, WinObj_WhichWindow, "Win")
+
+#endif /* USE_TOOLBOX_OBJECT_GLUE */

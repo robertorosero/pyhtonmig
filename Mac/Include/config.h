@@ -135,6 +135,9 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 /* Define to `long' if <time.h> doesn't define.  */
 #undef clock_t
 
+/* Defined on Solaris to see additional function prototypes. */
+#undef __EXTENSIONS__
+
 /* Define if getpgrp() must be called as getpgrp(0). */
 #undef GETPGRP_HAVE_ARG
 
@@ -195,6 +198,15 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 /* Define if the compiler provides a wchar.h header file. */
 #define HAVE_WCHAR_H 1
+
+/* Define if you want to have a Unicode type. */
+#define Py_USING_UNICODE 1
+
+/* Define as the integral type used for Unicode representation. */
+#define PY_UNICODE_TYPE wchar_t
+
+/* Define as the size of the unicode type. */
+#define Py_UNICODE_SIZE 2
 
 /* Define if malloc(0) returns a NULL pointer */
 #ifdef USE_MSL_MALLOC
@@ -275,11 +287,8 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
    linker (rld). Dyld is necessary to support frameworks. */
 #undef WITH_DYLD
 
-/* Define if you want to use BSD db. */
-#undef WITH_LIBDB
-
-/* Define if you want to use ndbm. */
-#undef WITH_LIBNDBM
+/* Define if you want to compile in Python-specific mallocs */
+#undef WITH_PYMALLOC
 
 /* Define if you want to produce an OpenStep/Rhapsody framework
    (shared library plus accessory files). */
@@ -415,7 +424,7 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #define HAVE_GETPEERNAME
 #endif
 
-/* Define if you have getpgrp.  */
+/* Define if you have the getpgrp function.  */
 #undef HAVE_GETPGRP
 
 /* Define if you have the getpid function.  */
@@ -480,7 +489,6 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #undef HAVE_POLL
 
 /* Define if you have the pthread_init function.  */
-/* XXXX GUSI threads* */
 #undef HAVE_PTHREAD_INIT
 
 /* Define if you have the putenv function.  */
@@ -666,6 +674,9 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 /* Define if you have the <sys/lock.h> header file.  */
 #undef HAVE_SYS_LOCK_H
 
+/* Define if you have the <sys/modem.h> header file.  */
+#undef HAVE_SYS_MODEM_H
+
 /* Define if you have the <sys/ndir.h> header file.  */
 #undef HAVE_SYS_NDIR_H
 
@@ -717,6 +728,7 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 /* Define if you have the ieee library (-lieee).  */
 #undef HAVE_LIBIEEE
+
 #ifdef __CYGWIN__
 #ifdef USE_DL_IMPORT
 #define DL_IMPORT(RTYPE) __declspec(dllimport) RTYPE
