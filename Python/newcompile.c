@@ -931,7 +931,7 @@ compiler_continue(struct compiler *c)
 	return 1;
 }
 
-/* Code generated for "try: S finally: Sf" is as follows:
+/* Code generated for "try: <body> finally: <finalbody>" is as follows:
    
 		SETUP_FINALLY	L
 		<code for body>
@@ -989,6 +989,97 @@ compiler_try_finally(struct compiler *c, stmt_ty s)
 	ADDOP(c, END_FINALLY);
 	compiler_pop_fblock(c, FINALLY_END, end);
 
+	return 1;
+}
+
+/*
+   Code generated for "try: S except E1, V1: S1 except E2, V2: S2 ...":
+   (The contents of the value stack is shown in [], with the top
+   at the right; 'tb' is trace-back info, 'val' the exception's
+   associated value, and 'exc' the exception.)
+   
+   Value stack		Label	Instruction	Argument
+   []				SETUP_EXCEPT	L1
+   []				<code for S>
+   []				POP_BLOCK
+   []				JUMP_FORWARD	L0
+   
+   [tb, val, exc]	L1:	DUP				)
+   [tb, val, exc, exc]		<evaluate E1>			)
+   [tb, val, exc, exc, E1]	COMPARE_OP	EXC_MATCH	) only if E1
+   [tb, val, exc, 1-or-0]	JUMP_IF_FALSE	L2		)
+   [tb, val, exc, 1]		POP				)
+   [tb, val, exc]		POP
+   [tb, val]			<assign to V1>	(or POP if no V1)
+   [tb]				POP
+   []				<code for S1>
+   				JUMP_FORWARD	L0
+   
+   [tb, val, exc, 0]	L2:	POP
+   [tb, val, exc]		DUP
+   .............................etc.......................
+
+   [tb, val, exc, 0]	Ln+1:	POP
+   [tb, val, exc]	   	END_FINALLY	# re-raise exception
+   
+   []			L0:	<next statement>
+   
+   Of course, parts are not generated if Vi or Ei is not present.
+*/
+static int
+compiler_try_except(struct compiler *c, stmt_ty s)
+{
+	int i, n, body, orelse, except, end;
+
+	body = compiler_new_block(c);
+	except = compiler_new_block(c);
+	orelse = compiler_new_block(c);
+	end = compiler_new_block(c);
+	if (body < 0 || except < 0 || orelse < 0 || end < 0)
+		return 0;
+	ADDOP_JREL(c, SETUP_EXCEPT, except);
+	compiler_use_next_block(c, body);
+	if (!compiler_push_fblock(c, EXCEPT, body))
+		return 0;
+	VISIT_SEQ(c, stmt, s->v.TryExcept.body);
+	ADDOP(c, POP_BLOCK);
+	compiler_pop_fblock(c, EXCEPT, body);
+	ADDOP_JREL(c, JUMP_FORWARD, orelse);
+	n = asdl_seq_LEN(s->v.TryExcept.handlers);
+	compiler_use_next_block(c, except);
+	for (i = 0; i < n; i++) {
+		excepthandler_ty handler = asdl_seq_GET(
+						s->v.TryExcept.handlers, i);
+		if (!handler->type && i < n-1)
+		    return compiler_error(c, "default 'except:' must be last");
+		except = compiler_new_block(c);
+		if (except < 0)
+			return 0;
+		if (handler->type) {
+			ADDOP(c, DUP_TOP);
+			VISIT(c, expr, handler->type);
+			ADDOP_I(c, COMPARE_OP, PyCmp_EXC_MATCH);
+			ADDOP_JREL(c, JUMP_IF_FALSE, except);
+			ADDOP(c, POP_TOP);
+		}
+		ADDOP(c, POP_TOP);
+		if (handler->name) {
+			VISIT(c, expr, handler->name);
+		}
+		else {
+			ADDOP(c, POP_TOP);
+		}
+		ADDOP(c, POP_TOP);
+		VISIT_SEQ(c, stmt, handler->body);
+		ADDOP_JREL(c, JUMP_FORWARD, end);
+		compiler_use_next_block(c, except);
+		if (handler->type)
+			ADDOP(c, POP_TOP);
+	}
+	ADDOP(c, END_FINALLY);
+	compiler_use_next_block(c, orelse);
+	VISIT_SEQ(c, stmt, s->v.TryExcept.orelse);
+	compiler_use_next_block(c, end);
 	return 1;
 }
 
@@ -1151,12 +1242,8 @@ compiler_visit_stmt(struct compiler *c, stmt_ty s)
 		}
 		ADDOP_I(c, RAISE_VARARGS, n);
 		break;
-	/* just visit body of try/except and try/finally.
-	   this isn't at all correct, but visits more code.
-	*/
         case TryExcept_kind:
-		VISIT_SEQ(c, stmt, s->v.TryExcept.body);
-		break;
+		return compiler_try_except(c, s);
         case TryFinally_kind:
 		return compiler_try_finally(c, s);
         case Assert_kind:
