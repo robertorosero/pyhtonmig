@@ -508,23 +508,23 @@ if test $enable_shared = "yes"; then
     SunOS*)
 	  LDLIBRARY='libpython$(VERSION).so'
 	  BLDLIBRARY='-Wl,-R,$(LIBDIR) -L. -lpython$(VERSION)'
-	  RUNSHARED=LD_LIBRARY_PATH=`pwd`:$LD_LIBRARY_PATH
+	  RUNSHARED=LD_LIBRARY_PATH=`pwd`:${LD_LIBRARY_PATH}
           ;;
     Linux*|GNU*|NetBSD*)
 	  LDLIBRARY='libpython$(VERSION).so'
 	  BLDLIBRARY='-L. -lpython$(VERSION)'
-	  RUNSHARED=LD_LIBRARY_PATH=`pwd`:$LD_LIBRARY_PATH
+	  RUNSHARED=LD_LIBRARY_PATH=`pwd`:${LD_LIBRARY_PATH}
 	  INSTSONAME="$LDLIBRARY".$SOVERSION
 	  ;;
     hp*|HP*)
 	  LDLIBRARY='libpython$(VERSION).sl'
 	  BLDLIBRARY='-Wl,+b,$(LIBDIR) -L. -lpython$(VERSION)'
-	  RUNSHARED=SHLIB_PATH=`pwd`:$SHLIB_PATH
+	  RUNSHARED=SHLIB_PATH=`pwd`:${SHLIB_PATH}
 	  ;;
     OSF*)
 	  LDLIBRARY='libpython$(VERSION).so'
          BLDLIBRARY='-rpath $(LIBDIR) -L. -lpython$(VERSION)'
-	  RUNSHARED=LD_LIBRARY_PATH=`pwd`:$LD_LIBRARY_PATH
+	  RUNSHARED=LD_LIBRARY_PATH=`pwd`:${LD_LIBRARY_PATH}
 	  ;;
     atheos*)
 	  LDLIBRARY='libpython$(VERSION).so'
@@ -868,7 +868,7 @@ ac_save_cxx="$CXX"
 
 if test "$ac_cv_kpthread" = "yes"
 then
-  CXX="$CXX -Kpthread"
+  CXX="$CXX -Kpthread"  
   ac_cv_cxx_thread=yes
 elif test "$ac_cv_kthread" = "yes"
 then
@@ -890,13 +890,11 @@ then
     ac_cv_cxx_thread=yes
   else
     ac_cv_cxx_thread=no
-    CXX="$ac_save_cxx"
   fi
   rm -fr conftest*
-else
- CXX="$ac_save_cxx"
 fi
 fi
+CXX="$ac_save_cxx"
 AC_MSG_RESULT($ac_cv_cxx_thread)
 
 dnl # check for ANSI or K&R ("traditional") preprocessor
@@ -1410,9 +1408,14 @@ AC_MSG_RESULT($SHLIBS)
 # checks for libraries
 AC_CHECK_LIB(dl, dlopen)	# Dynamic linking for SunOS/Solaris and SYSV
 AC_CHECK_LIB(dld, shl_load)	# Dynamic linking for HP-UX
-AC_SEARCH_LIBS(sem_init, pthread rt posix4) # 'Real Time' functions on Solaris
-					    # posix4 on Solaris 2.6
-					    # pthread (first!) on Linux
+
+# only check for sem_ini if thread support is requested
+if test "$with_threads" = "yes" -o -z "$with_threads"; then
+    AC_SEARCH_LIBS(sem_init, pthread rt posix4) # 'Real Time' functions on Solaris
+						# posix4 on Solaris 2.6
+						# pthread (first!) on Linux
+fi
+
 # check if we need libintl for locale functions
 AC_CHECK_LIB(intl, textdomain,
 	AC_DEFINE(WITH_LIBINTL, 1,
@@ -1530,18 +1533,27 @@ then
 elif test "$ac_cv_kpthread" = "yes"
 then
     CC="$CC -Kpthread"
+    if test "$ac_cv_cxx_thread" = "yes"; then
+        CXX="$CXX -Kpthread"
+    fi
     AC_DEFINE(WITH_THREAD)
     posix_threads=yes
     THREADOBJ="Python/thread.o"
 elif test "$ac_cv_kthread" = "yes"
 then
     CC="$CC -Kthread"
+    if test "$ac_cv_cxx_thread" = "yes"; then
+        CXX="$CXX -Kthread"
+    fi
     AC_DEFINE(WITH_THREAD)
     posix_threads=yes
     THREADOBJ="Python/thread.o"
 elif test "$ac_cv_pthread" = "yes"
 then
     CC="$CC -pthread"
+    if test "$ac_cv_cxx_thread" = "yes"; then
+        CXX="$CXX -pthread"
+    fi
     AC_DEFINE(WITH_THREAD)
     posix_threads=yes
     THREADOBJ="Python/thread.o"
@@ -2041,7 +2053,7 @@ AC_MSG_RESULT(MACHDEP_OBJS)
 
 # checks for library functions
 AC_CHECK_FUNCS(alarm chown clock confstr ctermid execv \
- fchdir fork fsync fdatasync fpathconf ftime ftruncate \
+ fork fpathconf ftime ftruncate \
  gai_strerror getgroups getlogin getloadavg getpeername getpgid getpid \
  getpriority getpwent getwd \
  kill killpg lchown lstat mkfifo mknod mktime \
@@ -2070,6 +2082,24 @@ AC_TRY_COMPILE([#include <unistd.h>], void *x=link,
 AC_MSG_CHECKING(for symlink)
 AC_TRY_COMPILE([#include <unistd.h>], void *x=symlink,
   AC_DEFINE(HAVE_SYMLINK, 1, Define if you have the 'symlink' function.)
+  AC_MSG_RESULT(yes),
+  AC_MSG_RESULT(no)
+)
+AC_MSG_CHECKING(for fchdir)
+AC_TRY_COMPILE([#include <unistd.h>], void *x=fchdir,
+  AC_DEFINE(HAVE_FCHDIR, 1, Define if you have the 'fchdir' function.)
+  AC_MSG_RESULT(yes),
+  AC_MSG_RESULT(no)
+)
+AC_MSG_CHECKING(for fsync)
+AC_TRY_COMPILE([#include <unistd.h>], void *x=fsync,
+  AC_DEFINE(HAVE_FSYNC, 1, Define if you have the 'fsync' function.)
+  AC_MSG_RESULT(yes),
+  AC_MSG_RESULT(no)
+)
+AC_MSG_CHECKING(for fdatasync)
+AC_TRY_COMPILE([#include <unistd.h>], void *x=fdatasync,
+  AC_DEFINE(HAVE_FDATASYNC, 1, Define if you have the 'fdatasync' function.)
   AC_MSG_RESULT(yes),
   AC_MSG_RESULT(no)
 )
@@ -2635,6 +2665,18 @@ then
   AC_CHECK_SIZEOF(wchar_t, 4, [#include <wchar.h>])
 fi
 
+AC_MSG_CHECKING(for UCS-4 tcl)
+have_ucs4_tcl=no
+AC_TRY_COMPILE([
+#include <tcl.h>
+#if TCL_UTF_MAX != 6
+# error "NOT UCS4_TCL"
+#endif], [], [
+  AC_DEFINE(HAVE_UCS4_TCL, 1, [Define this if you have tcl and TCL_UTF_MAX==6])
+  have_ucs4_tcl=yes
+])
+AC_MSG_RESULT($have_ucs4_tcl)
+
 AC_MSG_CHECKING(what type to use for unicode)
 dnl quadrigraphs "@<:@" and "@:>@" produce "[" and "]" in the output
 AC_ARG_ENABLE(unicode, 
@@ -2645,7 +2687,12 @@ AC_ARG_ENABLE(unicode,
 if test $enable_unicode = yes
 then
   # Without any arguments, Py_UNICODE defaults to two-byte mode
-  enable_unicode="ucs2"
+  case "$have_ucs4_tcl" in
+  yes) enable_unicode="ucs4"
+       ;;
+  *)   enable_unicode="ucs2"
+       ;;
+  esac
 fi
 
 AH_TEMPLATE(Py_UNICODE_SIZE,
@@ -2781,20 +2828,39 @@ AC_CACHE_VAL(ac_cv_working_tzset, [
 AC_TRY_RUN([
 #include <stdlib.h>
 #include <time.h>
+#include <string.h>
 int main()
 {
-	int gmt_hour;
-	int eastern_hour;
-	time_t now;
-	now = time((time_t*)NULL);
+	/* Note that we need to ensure that not only does tzset(3)
+	   do 'something' with localtime, but it works as documented
+	   in the library reference and as expected by the test suite.
+
+	   Linux 6.2 doesn't understand the southern hemisphere 
+	   after New Year's Day.
+	*/
+
+	time_t groundhogday = 1044144000; /* GMT-based, well, it's a colony */
+	time_t midyear = groundhogday + (365 * 24 * 3600 / 2);
+
 	putenv("TZ=UTC+0");
 	tzset();
-	gmt_hour = localtime(&now)->tm_hour;
+	if (localtime(&groundhogday)->tm_hour != 0)
+	    exit(1);
+
 	putenv("TZ=EST+5EDT,M4.1.0,M10.5.0");
 	tzset();
-	eastern_hour = localtime(&now)->tm_hour;
-	if (eastern_hour == gmt_hour)
+	if (localtime(&groundhogday)->tm_hour != 19)
 	    exit(1);
+
+	putenv("TZ=AEST-10AEDT-11,M10.5.0,M3.5.0");
+	tzset();
+	if (localtime(&groundhogday)->tm_hour != 11)
+	    exit(1);
+	if (strcmp(localtime(&groundhogday)->tm_zone, "AEDT"))
+	    exit(1);
+	if (strcmp(localtime(&midyear)->tm_zone, "AEST"))
+	    exit(1);
+
 	exit(0);
 }
 ],

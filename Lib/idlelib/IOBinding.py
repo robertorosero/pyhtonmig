@@ -29,7 +29,7 @@ except ImportError:
 try:
     import locale
     locale.setlocale(locale.LC_CTYPE, "")
-except ImportError:
+except (ImportError, locale.error):
     pass
 
 encoding = "ascii"
@@ -252,6 +252,9 @@ class IOBinding:
         firsteol = self.eol_re.search(chars)
         if firsteol:
             self.eol_convention = firsteol.group(0)
+            if isinstance(self.eol_convention, unicode):
+                # Make sure it is an ASCII string
+                self.eol_convention = self.eol_convention.encode("ascii")
             chars = self.eol_re.sub(r"\n", chars)
 
         self.text.delete("1.0", "end")

@@ -122,7 +122,7 @@ written in Python are typically much shorter than equivalent C or
 the high-level data types allow you to express complex operations in a
 single statement;
 \item
-statement grouping is done by indentation instead of begin/end
+statement grouping is done by indentation instead of beginning and ending
 brackets;
 \item
 no variable or argument declarations are necessary.
@@ -199,7 +199,7 @@ commands interactively; when called with a file name argument or with
 a file as standard input, it reads and executes a \emph{script} from
 that file. 
 
-A third way of starting the interpreter is
+A second way of starting the interpreter is
 \samp{\program{python} \programopt{-c} \var{command} [arg] ...}, which
 executes the statement(s) in \var{command}, analogous to the shell's
 \programopt{-c} option.  Since Python statements often contain spaces
@@ -517,7 +517,7 @@ magnitude (as a float) or \code{z.real} to get its real part.
 >>> float(a)
 Traceback (most recent call last):
   File "<stdin>", line 1, in ?
-TypeError: can't convert complex to float; use e.g. abs(z)
+TypeError: can't convert complex to float; use abs(z)
 >>> a.real
 3.0
 >>> a.imag
@@ -1234,11 +1234,11 @@ which searches for prime numbers:
 >>> for n in range(2, 10):
 ...     for x in range(2, n):
 ...         if n % x == 0:
-...            print n, 'equals', x, '*', n/x
-...            break
+...             print n, 'equals', x, '*', n/x
+...             break
 ...     else:
-...          # loop fell through without finding a factor
-...          print n, 'is a prime number'
+...         # loop fell through without finding a factor
+...         print n, 'is a prime number'
 ... 
 2 is a prime number
 3 is a prime number
@@ -1577,6 +1577,24 @@ def fprintf(file, format, *args):
 \end{verbatim}
 
 
+\subsection{Unpacking Argument Lists \label{unpacking-arguments}}
+
+The reverse situation occurs when the arguments are already in a list
+or tuple but need to be unpacked for a function call requiring separate
+positional arguments.  For instance, the built-in \function{range()}
+function expects separate \var{start} and \var{stop} arguments.  If they
+are not available separately, write the function call with the 
+\code{*}-operator to unpack the arguments out of a list or tuple:
+
+\begin{verbatim}
+>>> range(3, 6)             # normal call with separate arguments
+[3, 4, 5]
+>>> args = [3, 6]
+>>> range(*args)            # call with arguments unpacked from a list
+[3, 4, 5]
+\end{verbatim}
+
+
 \subsection{Lambda Forms \label{lambda}}
 
 By popular demand, a few features commonly found in functional
@@ -1910,6 +1928,14 @@ SyntaxError: invalid syntax
 [6, 5, -7, 8, 7, -5, 10, 9, -3]
 >>> [vec1[i]*vec2[i] for i in range(len(vec1))]
 [8, 12, -54]
+\end{verbatim}
+
+List comprehensions are much more flexible than \function{map()} and can be
+applied to functions with more than one argument and to nested functions:
+
+\begin{verbatim}
+>>> [str(round(355/113.0, i)) for i in range(1,6)]
+['3.1', '3.14', '3.142', '3.1416', '3.14159']
 \end{verbatim}
 
 To make list comprehensions match the behavior of \keyword{for}
@@ -4467,7 +4493,7 @@ This binds the \kbd{Tab} key to the completion function, so hitting
 the \kbd{Tab} key twice suggests completions; it looks at Python
 statement names, the current local variables, and the available module
 names.  For dotted expressions such as \code{string.a}, it will
-evaluate the the expression up to the final \character{.} and then
+evaluate the expression up to the final \character{.} and then
 suggest completions from the attributes of the resulting object.  Note
 that this may execute application-defined code if an object with a
 \method{__getattr__()} method is part of the expression.

@@ -87,7 +87,7 @@ class TestBasicOps(unittest.TestCase):
         self.assertEqual(list(izip('abcdef', range(3))), zip('abcdef', range(3)))
         self.assertEqual(take(3,izip('abcdef', count())), zip('abcdef', range(3)))
         self.assertEqual(list(izip('abcdef')), zip('abcdef'))
-        self.assertRaises(TypeError, izip)
+        self.assertEqual(list(izip()), [])
         self.assertRaises(TypeError, izip, 3)
         self.assertRaises(TypeError, izip, range(3), 3)
         # Check tuple re-use (implementation detail)
@@ -199,6 +199,8 @@ class TestBasicOps(unittest.TestCase):
         self.assertRaises(ValueError, dropwhile(errfunc, [(4,5)]).next)
 
     def test_StopIteration(self):
+        self.assertRaises(StopIteration, izip().next)
+
         for f in (chain, cycle, izip):
             self.assertRaises(StopIteration, f([]).next)
             self.assertRaises(StopIteration, f(StopNow()).next)
@@ -425,6 +427,36 @@ class TestVariousIteratorArgs(unittest.TestCase):
             self.assertRaises(TypeError, list, dropwhile(isOdd, N(s)))
             self.assertRaises(ZeroDivisionError, list, dropwhile(isOdd, E(s)))
 
+class RegressionTests(unittest.TestCase):
+
+    def test_sf_793826(self):
+        # Fix Armin Rigo's successful efforts to wreak havoc
+
+        def mutatingtuple(tuple1, f, tuple2):
+            # this builds a tuple t which is a copy of tuple1,
+            # then calls f(t), then mutates t to be equal to tuple2
+            # (needs len(tuple1) == len(tuple2)).
+            def g(value, first=[1]):
+                if first:
+                    del first[:]
+                    f(z.next())
+                return value
+            items = list(tuple2)
+            items[1:1] = list(tuple1)
+            gen = imap(g, items)
+            z = izip(*[gen]*len(tuple1))
+            z.next()
+
+        def f(t):
+            global T
+            T = t
+            first[:] = list(T)
+
+        first = []
+        mutatingtuple((1,2,3), f, (4,5,6))
+        second = list(T)
+        self.assertEqual(first, second)
+
 
 libreftest = """ Doctest for examples in the library reference: libitertools.tex
 
@@ -471,15 +503,19 @@ Samuele
 
 >>> def all(pred, seq):
 ...     "Returns True if pred(x) is True for every element in the iterable"
-...     return not nth(ifilterfalse(pred, seq), 0)
+...     return False not in imap(pred, seq)
 
 >>> def some(pred, seq):
 ...     "Returns True if pred(x) is True for at least one element in the iterable"
-...     return bool(nth(ifilter(pred, seq), 0))
+...     return True in imap(pred, seq)
 
 >>> def no(pred, seq):
 ...     "Returns True if pred(x) is False for every element in the iterable"
-...     return not nth(ifilter(pred, seq), 0)
+...     return True not in imap(pred, seq)
+
+>>> def quantify(pred, seq):
+...     "Count how many times the predicate is True in the sequence"
+...     return sum(imap(pred, seq))
 
 >>> def padnone(seq):
 ...     "Returns the sequence elements and then returns None indefinitely"
@@ -536,6 +572,9 @@ True
 >>> no(lambda x: x%2==0, [1, 2, 5, 9])
 False
 
+>>> quantify(lambda x: x%2==0, xrange(99))
+50
+
 >>> list(window('abc'))
 [('a', 'b'), ('b', 'c')]
 
@@ -559,7 +598,8 @@ False
 __test__ = {'libreftest' : libreftest}
 
 def test_main(verbose=None):
-    test_classes = (TestBasicOps, TestVariousIteratorArgs, TestGC)
+    test_classes = (TestBasicOps, TestVariousIteratorArgs, TestGC,
+                    RegressionTests)
     test_support.run_unittest(*test_classes)
 
     # verify reference counting
