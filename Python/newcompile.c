@@ -841,14 +841,6 @@ compiler_assert(struct compiler *c, stmt_ty s)
 }
 
 static int
-compiler_augassign(struct compiler *c, stmt_ty s)
-{
-	/* XXX unfinished */
-	return 0;
-}
-
-
-static int
 compiler_visit_stmt(struct compiler *c, stmt_ty s)
 {
 	int i, n;
@@ -1089,6 +1081,7 @@ compiler_nameop(struct compiler *c, identifier name, expr_context_ty ctx)
 		switch (ctx) {
 		case Load: op = LOAD_DEREF; break;
 		case Store: op = STORE_DEREF; break;
+		case AugLoad:
 		case AugStore:
 			break;
 		case Del:
@@ -1101,6 +1094,7 @@ compiler_nameop(struct compiler *c, identifier name, expr_context_ty ctx)
 		case Load: op = LOAD_FAST; break;
 		case Store: op = STORE_FAST; break;
 		case Del: op = DELETE_FAST; break;
+		case AugLoad:
 		case AugStore:
 			break;
 		case Param:
@@ -1114,6 +1108,7 @@ compiler_nameop(struct compiler *c, identifier name, expr_context_ty ctx)
 		case Load: op = LOAD_GLOBAL; break;
 		case Store: op = STORE_GLOBAL; break;
 		case Del: op = DELETE_GLOBAL; break;
+		case AugLoad:
 		case AugStore:
 			break;
 		case Param:
@@ -1125,6 +1120,7 @@ compiler_nameop(struct compiler *c, identifier name, expr_context_ty ctx)
 		case Load: op = LOAD_NAME; break;
 		case Store: op = STORE_NAME; break;
 		case Del: op = DELETE_NAME; break;
+		case AugLoad:
 		case AugStore:
 			break;
 		case Param:
