@@ -144,50 +144,102 @@ descr_call(PyDescrObject *descr, PyObject *args, PyObject *kwds)
 }
 
 static PyObject *
-descr_getattr(PyDescrObject *descr, char *name)
+descr_get(PyObject *descr, PyObject *args)
 {
-	char *s;
+	PyObject *obj;
 
-	if (strcmp(name, "__name__") == 0) {
-		s = NULL;
+	if (!PyArg_ParseTuple(args, "O:get", &obj))
+		return NULL;
+	return PyDescr_Get(descr, obj);
+}
 
-		switch (descr->d_flavor) {
-		case DF_METHOD:
-			s = descr->d_union.d_method->ml_name;
-			break;
-		case DF_MEMBER:
-			s = descr->d_union.d_member->name;
-			break;
-		case DF_GETSET:
-			s = descr->d_union.d_getset->name;
-			break;
-		}
-		if (s != NULL)
-			return PyString_FromString(s);
-	}
-	if (strcmp(name, "__doc__") == 0) {
-		if (descr->d_flavor == DF_METHOD) {
-			s = descr->d_union.d_method->ml_doc;
+static PyObject *
+descr_set(PyObject *descr, PyObject *args)
+{
+	PyObject *obj, *val;
 
-			if (s == NULL) {
-				Py_INCREF(Py_None);
-				return Py_None;
-			}
-			else {
-				return PyString_FromString(s);
-			}
-		}
-	}
+	if (!PyArg_ParseTuple(args, "OO:set", &obj, &val))
+		return NULL;
+	if (PyDescr_Set(descr, obj, val) < 0)
+		return NULL;
+	Py_INCREF(Py_None);
+	return Py_None;
+}
 
-	s = descr_name(descr);
-	if (s == NULL)
-		s = "?";
-	PyErr_Format(PyExc_AttributeError,
-		     "descriptor '%.100s' of '%.100s' objects has no "
-		     "'%.100s' attribute",
-		     s, descr->d_type->tp_name, name);
+static PyMethodDef descr_methods[] = {
+	{"get",		descr_get,	METH_VARARGS},
+	{"set",		descr_set,	METH_VARARGS},
+	{"call",	descr_call,	METH_VARARGS|METH_KEYWORDS},
+	{"bind",	descr_get,	METH_VARARGS},
+	{0}
+};
+
+static PyObject *
+descr_get_name(PyDescrObject *descr)
+{
+	char *s = descr_name(descr);
+
+	if (s != NULL)
+		return PyString_FromString(s);
+	PyErr_SetString(PyExc_AttributeError, "unnamed descriptor");
 	return NULL;
 }
+
+static PyObject *
+descr_get_doc(PyDescrObject *descr) {
+	char *s = NULL;
+
+	if (descr->d_flavor == DF_METHOD)
+		s = descr->d_union.d_method->ml_doc;
+
+	if (s != NULL)
+		return PyString_FromString(s);
+
+	Py_INCREF(Py_None);
+	return Py_None;
+}
+
+static PyObject *
+descr_get_kind(PyDescrObject *descr) {
+	char *s = "data";
+
+	if (descr->d_flavor == DF_METHOD)
+		s = "method";
+	return PyString_FromString(s);
+}
+
+static PyObject *
+descr_get_readonly(PyDescrObject *descr) {
+	int readonly = 1;
+
+	switch (descr->d_flavor) {
+	case DF_MEMBER:
+		readonly = descr->d_union.d_member->readonly;
+		break;
+	case DF_GETSET:
+		readonly = descr->d_union.d_getset->set == NULL;
+		break;
+	}
+	return PyInt_FromLong(readonly);
+}
+
+static struct getsetlist descr_getsets[] = {
+	{"name",	descr_get_name},
+	{"__name__",	descr_get_name},
+	{"doc",		descr_get_doc},
+	{"__doc__",	descr_get_doc},
+	{"kind",	descr_get_kind},
+	{"readonly",	descr_get_readonly},
+	{0}
+};
+
+static struct memberlist descr_members[] = {
+	{"objclass",	T_OBJECT, offsetof(struct PyDescrObject, d_type),
+			READONLY},
+	{"_flavor",	T_INT, offsetof(struct PyDescrObject, d_flavor),
+			READONLY},
+	{0}
+};
 
 PyTypeObject PyDescr_Type = {
 	PyObject_HEAD_INIT(&PyType_Type)
@@ -197,7 +249,7 @@ PyTypeObject PyDescr_Type = {
 	0,
 	(destructor)descr_dealloc,		/* tp_dealloc */
 	0,					/* tp_print */
-	(getattrfunc)descr_getattr,		/* tp_getattr */
+	0,					/* tp_getattr */
 	0,					/* tp_setattr */
 	0,					/* tp_compare */
 	(reprfunc)descr_repr,			/* tp_repr */
@@ -218,9 +270,9 @@ PyTypeObject PyDescr_Type = {
 	0,					/* tp_weaklistoffset */
 	0,					/* tp_iter */
 	0,					/* tp_iternext */
-	0,					/* tp_methods */
-	0,					/* tp_members */
-	0,					/* tp_getset */
+	descr_methods,				/* tp_methods */
+	descr_members,				/* tp_members */
+	descr_getsets,				/* tp_getset */
 	0,					/* tp_base */
 	0,					/* tp_dict */
 };
