@@ -158,6 +158,7 @@ def addpackage(sitedir, name):
         _dirs_in_sys_path = None
 
 prefixes = [sys.prefix]
+sitedir = None # make sure sitedir is initialized because of later 'del'
 if sys.exec_prefix != sys.prefix:
     prefixes.append(sys.exec_prefix)
 for prefix in prefixes:
