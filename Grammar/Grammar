@@ -2,6 +2,9 @@
 
 # Change log:
 
+# 13-Apr-94:
+#	Added default values for function/lambda argument lists
+
 # 30-Nov-93:
 #	Removed lambda_input, added lambdef
 
@@ -89,7 +92,7 @@ eval_input: testlist NEWLINE* ENDMARKER
 
 funcdef: 'def' NAME parameters ':' suite
 parameters: '(' [varargslist] ')'
-varargslist: (fpdef ',')* '*' NAME | fpdef (',' fpdef)* [',']
+varargslist: (fpdef ['=' test] ',')* '*' NAME | fpdef ['=' test] (',' fpdef ['=' test])* [',']
 fpdef: NAME | '(' fplist ')'
 fplist: fpdef (',' fpdef)* [',']
 
