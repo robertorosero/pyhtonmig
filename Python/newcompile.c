@@ -8,6 +8,13 @@
 
 int Py_OptimizeFlag = 0;
 
+/*
+   KNOWN BUGS:
+       using coding statement, such as in getopt:
+       		# -*- coding: iso-8859-1 -*-
+       generates:  SystemError
+*/
+
 /* fblockinfo tracks the current frame block.
 
    A frame block is used to handle loops, try/except, and try/finally.
@@ -94,6 +101,7 @@ static int compiler_nameop(struct compiler *, identifier, expr_context_ty);
 
 static PyCodeObject *compiler_mod(struct compiler *, mod_ty);
 static int compiler_visit_stmt(struct compiler *, stmt_ty);
+static int compiler_visit_keyword(struct compiler *, keyword_ty);
 static int compiler_visit_expr(struct compiler *, expr_ty);
 static int compiler_augassign(struct compiler *, stmt_ty);
 static int compiler_visit_slice(struct compiler *, slice_ty,
@@ -779,7 +787,7 @@ compiler_lambda(struct compiler *c, expr_ty e)
 
 	/* XXX closure */
 	ADDOP_O(c, LOAD_CONST, (PyObject *)co, consts);
-	ADDOP_I(c, MAKE_FUNCTION, c->u->u_argcount);
+	ADDOP_I(c, MAKE_FUNCTION, asdl_seq_LEN(args->defaults));
 
 	Py_DECREF(name);
 
@@ -881,7 +889,7 @@ compiler_for(struct compiler *c, stmt_ty s)
 	VISIT(c, expr, s->v.For.target);
 	VISIT_SEQ(c, stmt, s->v.For.body);
 	ADDOP_JABS(c, JUMP_ABSOLUTE, start);
-	compiler_use_block(c, cleanup);
+	compiler_use_next_block(c, cleanup);
 	ADDOP(c, POP_BLOCK);
 	compiler_pop_fblock(c, LOOP, start);
 	VISIT_SEQ(c, stmt, s->v.For.orelse);
@@ -918,10 +926,6 @@ compiler_while(struct compiler *c, stmt_ty s)
 	/* XXX should the two POP instructions be in a separate block
 	   if there is no else clause ?
 	*/
-	if (orelse == -1)
-		compiler_use_block(c, end);
-	else
-		compiler_use_block(c, orelse);
 	ADDOP(c, POP_TOP);
 	ADDOP(c, POP_BLOCK);
 	compiler_pop_fblock(c, LOOP, loop);
@@ -1590,11 +1594,14 @@ compiler_compare(struct compiler *c, expr_ty e)
 {
 	int i, n, cleanup = -1;
 
+	/* XXX the logic can be cleaned up for 1 or multiple comparisons */
 	VISIT(c, expr, e->v.Compare.left);
 	n = asdl_seq_LEN(e->v.Compare.ops);
 	assert(n > 0);
-	if (n > 1)
+	if (n > 1) {
 		cleanup = compiler_new_block(c);
+		VISIT(c, expr, asdl_seq_GET(e->v.Compare.comparators, 0));
+	}
 	for (i = 1; i < n; i++) {
 		ADDOP(c, DUP_TOP);
 		ADDOP(c, ROT_THREE);
@@ -1604,6 +1611,8 @@ compiler_compare(struct compiler *c, expr_ty e)
 		ADDOP_JREL(c, JUMP_IF_FALSE, cleanup);
 		NEXT_BLOCK(c);
 		ADDOP(c, POP_TOP);
+		if (i < (n - 1))
+		    VISIT(c, expr, asdl_seq_GET(e->v.Compare.comparators, i));
 	}
 	VISIT(c, expr, asdl_seq_GET(e->v.Compare.comparators, n - 1));
 	ADDOP_I(c, COMPARE_OP,
@@ -1627,6 +1636,10 @@ compiler_call(struct compiler *c, expr_ty e)
 
 	VISIT(c, expr, e->v.Call.func);
 	n = asdl_seq_LEN(e->v.Call.args);
+	if (e->v.Call.keywords) {
+		VISIT_SEQ(c, keyword, e->v.Call.keywords);
+		n |= asdl_seq_LEN(e->v.Call.keywords) << 8;
+	}
 	if (e->v.Call.starargs) {
 		VISIT(c, expr, e->v.Call.starargs);
 		code |= 1;
@@ -1730,6 +1743,14 @@ compiler_listcomp(struct compiler *c, expr_ty e)
 			return 0;
 	}
 	c->u->u_tmp = NULL;
+	return 1;
+}
+
+static int
+compiler_visit_keyword(struct compiler *c, keyword_ty k)
+{
+	ADDOP_O(c, LOAD_CONST, k->arg, consts);
+	VISIT(c, expr, k->value);
 	return 1;
 }
 
