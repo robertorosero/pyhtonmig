@@ -60,8 +60,11 @@ clobber:	clean
 Makefile:	Makefile.in $(TOP)/config.status
 		CONFIG_FILES=Makefile $(SHELL) $(TOP)/config.status
 
-depend:		$(SRCS)
-		$(MKDEP) $(CFLAGS) $(SRCS) $(PGENSRCS)
+depend:
+		$(MKDEP) $(CFLAGS) \
+			`echo $(OBJS) | tr ' ' '\012' | sed 's/\.o/.c/'`
+
+.PRECIOUS:	Makefile
 
 # DO NOT DELETE THIS LINE -- mkdep uses it.
 # DO NOT PUT ANYTHING AFTER THIS LINE, IT WILL GO AWAY.
