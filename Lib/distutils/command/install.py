@@ -202,7 +202,7 @@ class Install (Command):
             # local form
             if string.find (extra_dirs, '/') and os.name != "posix":
                 extra_dirs = string.split (extra_dirs, '/')
-                extra_dirs = apply (os.path.join, extra_dirs)
+                extra_dirs = apply (os.path.join, tuple (extra_dirs))
         else:
             path_file = None
             extra_dirs = ''

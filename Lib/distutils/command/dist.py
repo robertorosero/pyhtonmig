@@ -10,8 +10,8 @@ import sys, os, string, re
 import fnmatch
 from types import *
 from glob import glob
-from shutil import rmtree
 from distutils.core import Command
+from distutils.util import extend
 from distutils.text_file import TextFile
 from distutils.errors import DistutilsExecError
 
@@ -219,28 +219,41 @@ class Dist (Command):
 
     def find_defaults (self):
 
-        standards = ['README', 'setup.py']
+        standards = [('README', 'README.txt'), 'setup.py']
         for fn in standards:
-            if os.path.exists (fn):
-                self.files.append (fn)
+            if type (fn) is TupleType:
+                alts = fn
+                got_it = 0
+                for fn in alts:
+                    if os.path.exists (fn):
+                        got_it = 1
+                        self.files.append (fn)
+                        break
+
+                if not got_it:
+                    self.warn ("standard file not found: should have one of " +
+                               string.join (alts, ', '))
             else:
-                self.warn ("standard file %s not found" % fn)
+                if os.path.exists (fn):
+                    self.files.append (fn)
+                else:
+                    self.warn ("standard file %s not found" % fn)
 
         optional = ['test/test*.py']
         for pattern in optional:
             files = filter (os.path.isfile, glob (pattern))
             if files:
-                self.files.extend (files)
+                extend (self.files, files)
 
         if self.distribution.packages or self.distribution.py_modules:
             build_py = self.find_peer ('build_py')
             build_py.ensure_ready ()
-            self.files.extend (build_py.get_source_files ())
+            extend (self.files, build_py.get_source_files ())
 
         if self.distribution.ext_modules:
             build_ext = self.find_peer ('build_ext')
             build_ext.ensure_ready ()
-            self.files.extend (build_ext.get_source_files ())
+            extend (self.files, build_ext.get_source_files ())
 
 
 
@@ -334,7 +347,8 @@ class Dist (Command):
             words = string.split (pattern)
             assert words                # must have something!
             if os.name != 'posix':
-                words[0] = apply (os.path.join, string.split (words[0], '/'))
+                words[0] = apply (os.path.join,
+                                  tuple (string.split (words[0], '/')))
 
             # First word is a directory, possibly with include/exclude
             # patterns making up the rest of the line: it's a recursive
@@ -346,7 +360,7 @@ class Dist (Command):
                     continue
 
                 dir_files = self.search_dir (words[0], words[1:])
-                self.files.extend (dir_files)
+                extend (self.files, dir_files)
 
             # Multiple words in pattern: that's a no-no unless the first
             # word is a directory name
@@ -359,7 +373,7 @@ class Dist (Command):
             elif not exclude:
                 matches = filter (os.path.isfile, glob (pattern))
                 if matches:
-                    self.files.extend (matches)
+                    extend (self.files, matches)
                 else:
                     manifest.warn ("no matches for '%s' found" % pattern)
 
@@ -422,12 +436,12 @@ class Dist (Command):
         try:
             self.execute (rmtree, (base_dir,),
                           "removing %s" % base_dir)
-        except (IOError, OSError), exc:
-            if exc.filename:
+        except (IOError, os.error), exc:
+            if hasattr(exc,'filename'):
                 msg = "error removing %s: %s (%s)" % \
                        (base_dir, exc.strerror, exc.filename)
             else:
-                msg = "error removing %s: %s" % (base_dir, exc.strerror)
+                msg = "error removing %s: %s" % (base_dir, exc[-1])
             self.warn (msg)
 
 
@@ -529,11 +543,10 @@ def findall (dir = os.curdir):
 
     list = []
     stack = [dir]
-    pop = stack.pop
     push = stack.append
 
     while stack:
-        dir = pop()
+        dir = stack[-1] ; del stack[-1]
         names = os.listdir (dir)
 
         for name in names:
@@ -544,3 +557,23 @@ def findall (dir = os.curdir):
 
     list.sort()
     return list
+
+
+# Stolen from shutil.py and simplified: needed to copy it here because
+# the Python 1.5.1 version of shutil.py doesn't "import sys".  ;-(
+def rmtree (path):
+    """Recursively delete a directory tree."""
+    cmdtuples = []
+    _build_cmdtuple(path, cmdtuples)
+    for cmd in cmdtuples:
+        apply(cmd[0], (cmd[1],))
+
+# Helper for rmtree()
+def _build_cmdtuple(path, cmdtuples):
+    for f in os.listdir(path):
+        real_f = os.path.join(path,f)
+        if os.path.isdir(real_f) and not os.path.islink(real_f):
+            _build_cmdtuple(real_f, cmdtuples)
+        else:
+            cmdtuples.append((os.remove, real_f))
+    cmdtuples.append((os.rmdir, path))

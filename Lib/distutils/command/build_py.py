@@ -11,6 +11,7 @@ from types import *
 from glob import glob
 
 from distutils.core import Command
+from distutils.util import abspath, extend
 from distutils.errors import *
 
 
@@ -102,17 +103,18 @@ class BuildPy (Command):
 
         if type (package) is StringType:
             path = string.split (package, '.')
-        elif type (package) in (TupleType, ListType):
-            path = list (package)
-        else:
+        elif type (package) not in (TupleType, ListType):
             raise TypeError, "'package' must be a string, list, or tuple"
 
         if not self.package_dir:
             if path:
-                return apply (os.path.join, path)
+                return apply (os.path.join, tuple (path))
             else:
                 return ''
         else:
+            if type (path) is not ListType: # must be mutable!
+                path = list (path) 
+
             tail = []
             while path:
                 try:
@@ -122,12 +124,12 @@ class BuildPy (Command):
                     del path[-1]
                 else:
                     tail.insert (0, pdir)
-                    return apply (os.path.join, tail)
+                    return apply (os.path.join, tuple (tail))
             else:
                 # arg! everything failed, we might as well have not even
                 # looked in package_dir -- oh well
                 if tail:
-                    return apply (os.path.join, tail)
+                    return apply (os.path.join, tuple (tail))
                 else:
                     return ''
 
@@ -172,10 +174,10 @@ class BuildPy (Command):
     def find_package_modules (self, package, package_dir):
         module_files = glob (os.path.join (package_dir, "*.py"))
         module_pairs = []
-        setup_script = os.path.abspath (sys.argv[0])
+        setup_script = abspath (sys.argv[0])
 
         for f in module_files:
-            abs_f = os.path.abspath (f)
+            abs_f = abspath (f)
             if abs_f != setup_script:
                 module = os.path.splitext (os.path.basename (f))[0]
                 module_pairs.append ((module, f))
@@ -237,7 +239,7 @@ class BuildPy (Command):
             for package in self.packages:
                 package_dir = self.get_package_dir (package)
                 m = self.find_package_modules (package, package_dir)
-                modules.extend (m)
+                extend (modules, m)
 
         # Both find_modules() and find_package_modules() return a list of
         # tuples where the last element of each tuple is the filename --
@@ -263,7 +265,7 @@ class BuildPy (Command):
         outfile_path = list (package)
         outfile_path.append (module + ".py")
         outfile_path.insert (0, self.build_dir)
-        outfile = apply (os.path.join, outfile_path)
+        outfile = apply (os.path.join, tuple (outfile_path))
 
         dir = os.path.dirname (outfile)
         self.mkpath (dir)

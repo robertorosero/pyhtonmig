@@ -15,6 +15,30 @@ import os
 from distutils.errors import *
 
 
+# Need to define 'abspath()', because it was new with Python 1.5.2
+if hasattr (os.path, 'abspath'):
+    abspath = os.path.abspath
+else:
+    def abspath(path):
+        if not os.path.isabs(path):
+            path = os.path.join(os.getcwd(), path)
+        return os.path.normpath(path)
+
+
+# More backwards compatability hacks
+def extend (list, new_list):
+    """Appends the list 'new_list' to 'list', just like the 'extend()'
+       list method does in Python 1.5.2 -- but this works on earlier
+       versions of Python too."""
+
+    if hasattr (list, 'extend'):
+        list.extend (new_list)
+    else:
+        list[len(list):] = new_list
+
+# extend ()
+
+
 # cache for by mkpath() -- in addition to cheapening redundant calls,
 # eliminates redundant "creating /foo/bar/baz" messages in dry-run mode
 PATH_CREATED = {}
@@ -125,7 +149,7 @@ def newer_group (sources, target, missing='error'):
        file listed in 'sources'.  In other words, if 'target' exists and
        is newer than every file in 'sources', return false; otherwise
        return true.  'missing' controls what we do when a source file is
-       missing; the default ("error") is to blow up with an OSError from
+       missing; the default ("error") is to blow up with an os.error from
        inside 'stat()'; if it is "ignore", we silently drop any missing
        source files; if it is "newer", any missing source files make us
        assume that 'target' is out-of-date (this is handy in "dry-run"
@@ -169,6 +193,9 @@ def make_file (src, dst, func, args,
     """Makes 'dst' from 'src' (both filenames) by calling 'func' with
        'args', but only if it needs to: i.e. if 'dst' does not exist or
        'src' is newer than 'dst'."""
+
+    if type (args) is not TupleType:
+        raise TypeError, "'args' must be a tuple of command arguments"
 
     if newer (src, dst):
         if verbose and update_message:
@@ -349,10 +376,10 @@ def copy_tree (src, dst,
             outputs.append (dst_name)
             
         elif os.path.isdir (src_name):
-            outputs[-1:] = \
-                copy_tree (src_name, dst_name,
-                           preserve_mode, preserve_times, preserve_symlinks,
-                           update, verbose, dry_run)
+            extend (outputs, 
+                    copy_tree (src_name, dst_name,
+                               preserve_mode,preserve_times,preserve_symlinks,
+                               update, verbose, dry_run))
         else:
             if (copy_file (src_name, dst_name,
                            preserve_mode, preserve_times,
