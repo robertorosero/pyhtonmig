@@ -1300,11 +1300,9 @@ err_input(perrdetail *err)
 		break;
 	case E_INTR:
 		PyErr_SetNone(PyExc_KeyboardInterrupt);
-		Py_XDECREF(v);
 		return;
 	case E_NOMEM:
 		PyErr_NoMemory();
-		Py_XDECREF(v);
 		return;
 	case E_EOF:
 		msg = "unexpected EOF while parsing";
@@ -1346,7 +1344,9 @@ err_input(perrdetail *err)
 		PyMem_DEL(err->text);
 		err->text = NULL;
 	}
-	w = Py_BuildValue("(sO)", msg, v);
+	w = NULL;
+	if (v != NULL)
+		w = Py_BuildValue("(sO)", msg, v);
 	Py_XDECREF(u);
 	Py_XDECREF(v);
 	PyErr_SetObject(errtype, w);
