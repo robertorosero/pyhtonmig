@@ -38,16 +38,18 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 Table of primes suitable as keys, in ascending order.
 The first line are the largest primes less than some powers of two,
 the second line is the largest prime less than 6000,
-and the third line is a selection from Knuth, Vol. 3, Sec. 6.1, Table 1.
-The final value is a sentinel and should cause the memory allocation
-of that many entries to fail (if none of the earlier values cause such
-failure already).
+the third line is a selection from Knuth, Vol. 3, Sec. 6.1, Table 1,
+and the next three lines were suggested by Steve Kirsch.
+The final value is a sentinel.
 */
-static unsigned int primes[] = {
+static long primes[] = {
 	3, 7, 13, 31, 61, 127, 251, 509, 1021, 2017, 4093,
 	5987,
 	9551, 15683, 19609, 31397,
-	0xffffffff /* All bits set -- truncation OK */
+        65521L, 131071L, 262139L, 524287L, 1048573L, 2097143L,
+        4194301L, 8388593L, 16777213L, 33554393L, 67108859L,
+        134217689L, 268435399L, 536870909L, 1073741789L,
+	0
 };
 
 /* Object used as dummy key to fill deleted entries */
@@ -207,8 +209,18 @@ mappingresize(mp)
 	register int i;
 	newsize = mp->ma_size;
 	for (i = 0; ; i++) {
+		if (primes[i] <= 0) {
+			/* Ran out of primes */
+			err_nomem();
+			return -1;
+		}
 		if (primes[i] > mp->ma_used*2) {
 			newsize = primes[i];
+			if (newsize != primes[i]) {
+				/* Integer truncation */
+				err_nomem();
+				return -1;
+			}
 			break;
 		}
 	}
