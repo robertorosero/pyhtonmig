@@ -4,6 +4,13 @@ Release date: 14-Dec-2001
 
 Type/class unification and new-style classes
 
+- Guido's tutorial introduction to the new type/class features has
+  been extensively updated.  See
+
+      http://www.python.org/2.2/descrintro.html
+
+  That remains the primary documentation in this area.
+
 - Fixed a leak: instance variables declared with __slots__ were never
   deleted!
 
