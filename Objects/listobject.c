@@ -1254,41 +1254,41 @@ PyList_Sort(v)
 }
 
 static PyObject *
-listreverse(self, args)
-	PyListObject *self;
-	PyObject *args;
+_listreverse(PyListObject *self)
 {
 	register PyObject **p, **q;
 	register PyObject *tmp;
 	
-	if (!PyArg_ParseTuple(args, ":reverse"))
-		return NULL;
-
 	if (self->ob_size > 1) {
 		for (p = self->ob_item, q = self->ob_item + self->ob_size - 1;
-						p < q; p++, q--) {
+		     p < q;
+		     p++, q--)
+		{
 			tmp = *p;
 			*p = *q;
 			*q = tmp;
 		}
 	}
-	
+}
+
+static PyObject *
+listreverse(PyListObject *self, PyObject *args)
+{
+	if (!PyArg_ParseTuple(args, ":reverse"))
+		return NULL;
+	_listreverse(self);
 	Py_INCREF(Py_None);
 	return Py_None;
 }
 
 int
-PyList_Reverse(v)
-	PyObject *v;
+PyList_Reverse(PyObject *v)
 {
 	if (v == NULL || !PyList_Check(v)) {
 		PyErr_BadInternalCall();
 		return -1;
 	}
-	v = listreverse((PyListObject *)v, (PyObject *)NULL);
-	if (v == NULL)
-		return -1;
-	Py_DECREF(v);
+	_listreverse((PyListObject *)v);
 	return 0;
 }
 
