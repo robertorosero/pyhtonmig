@@ -52,7 +52,7 @@ module Python
 	     | BinOp(expr left, operator op, expr right)
 	     | UnaryOp(unaryop op, expr operand)
 	     | Lambda(arguments args, expr body)
-	     | Dict(expr* keys, expr *values)
+	     | Dict(expr* keys, expr* values)
 	     | ListComp(expr elt, comprehension* generators)
 	     | GeneratorComp(expr elt, comprehension* generators)
 	     -- need sequences for compare to distinguish between
