@@ -1157,6 +1157,8 @@ parsenumber(struct compiling *co, char *s)
 		return PyLong_FromString(s, (char **)0, 0);
 	if (s[0] == '0')
 		x = (long) PyOS_strtoul(s, &end, 0);
+		if (x < 0 && errno == 0)
+			return PyLong_FromString(s, (char **)0, 0);
 	else
 		x = PyOS_strtol(s, &end, 0);
 	if (*end == '\0') {

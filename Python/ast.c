@@ -986,95 +986,270 @@ ast_for_listcomp(struct compiling *c, const node *n)
     return ListComp(elt, listcomps);
 }
 
+/*
+   Count the number of 'for' loops in a generator expression.
+
+   Helper for ast_for_genexp().
+*/
+
+static int
+count_gen_fors(const node *n)
+{
+	int n_fors = 0;
+	node *ch = CHILD(n, 1);
+
+ count_gen_for:
+	n_fors++;
+	REQ(ch, gen_for);
+	if (NCH(ch) == 5)
+		ch = CHILD(ch, 4);
+	else
+		return n_fors;
+ count_gen_iter:
+	REQ(ch, gen_iter);
+	ch = CHILD(ch, 0);
+	if (TYPE(ch) == gen_for)
+		goto count_gen_for;
+	else if (TYPE(ch) == gen_if) {
+		if (NCH(ch) == 3) {
+			ch = CHILD(ch, 2);
+			goto count_gen_iter;
+		}
+		else
+		    return n_fors;
+	}
+	else {
+		/* Should never be reached */
+		PyErr_SetString(PyExc_Exception, "logic error in count_gen_fors");
+		return -1;
+	}
+}
+
+/* Count the number of 'if' statements in a generator expression.
+
+   Helper for ast_for_genexp().
+*/
+
+static int
+count_gen_ifs(const node *n)
+{
+	int n_ifs = 0;
+
+	while (1) {
+		REQ(n, gen_iter);
+		if (TYPE(CHILD(n, 0)) == gen_for)
+			return n_ifs;
+		n = CHILD(n, 0);
+		REQ(n, gen_if);
+		n_ifs++;
+		if (NCH(n) == 2)
+			return n_ifs;
+		n = CHILD(n, 2);
+	}
+}
+
+static expr_ty
+ast_for_genexp(struct compiling *c, const node *n)
+{
+	/* testlist_gexp: test ( gen_for | (',' test)* [','] )
+           argument: [test '='] test [gen_for]	 # Really [keyword '='] test */
+	expr_ty elt;
+	asdl_seq *genexps;
+	int i, n_fors;
+	node *ch;
+	
+	assert(TYPE(n) == (testlist_gexp) || TYPE(n) == (argument));
+	assert(NCH(n) > 1);
+	
+	elt = ast_for_expr(c, CHILD(n, 0));
+	if (!elt)
+		return NULL;
+	
+	n_fors = count_gen_fors(n);
+	if (n_fors == -1)
+		return NULL;
+	
+	genexps = asdl_seq_new(n_fors);
+	if (!genexps) {
+		/* XXX free(elt); */
+		return NULL;
+	}
+	
+	ch = CHILD(n, 1);
+	for (i = 0; i < n_fors; i++) {
+		comprehension_ty ge;
+		asdl_seq *t;
+		expr_ty expression;
+		
+		REQ(ch, gen_for);
+		
+		t = ast_for_exprlist(c, CHILD(ch, 1), Store);
+		if (!t) {
+			asdl_seq_free(genexps);
+			/* XXX free(elt); */
+			return NULL;
+		}
+		expression = ast_for_testlist(c, CHILD(ch, 3));
+		if (!expression) {
+			asdl_seq_free(genexps);
+			/* XXX free(elt); */
+			return NULL;
+		}
+		
+		if (asdl_seq_LEN(t) == 1)
+			ge = comprehension(asdl_seq_GET(t, 0), expression, NULL);
+		else
+			ge = comprehension(Tuple(t, Store), expression, NULL);
+		
+		if (!ge) {
+			asdl_seq_free(genexps);
+			/* XXX free(elt); */
+			return NULL;
+		}
+		
+		if (NCH(ch) == 5) {
+			int j, n_ifs;
+			asdl_seq *ifs;
+		
+			ch = CHILD(ch, 4);
+			n_ifs = count_gen_ifs(ch);
+			if (n_ifs == -1) {
+				asdl_seq_free(genexps);
+				/* XXX free(elt); */
+				return NULL;
+			}
+		
+			ifs = asdl_seq_new(n_ifs);
+			if (!ifs) {
+				asdl_seq_free(genexps);
+				/* XXX free(elt); */
+				return NULL;
+			}
+		
+			for (j = 0; j < n_ifs; j++) {
+				REQ(ch, gen_iter);
+			
+				ch = CHILD(ch, 0);
+				REQ(ch, gen_if);
+			
+				asdl_seq_APPEND(ifs, ast_for_expr(c, CHILD(ch, 1)));
+				if (NCH(ch) == 3)
+					ch = CHILD(ch, 2);
+			}
+			/* on exit, must guarantee that ch is a gen_for */
+			if (TYPE(ch) == gen_iter)
+				ch = CHILD(ch, 0);
+			ge->ifs = ifs;
+		}
+		asdl_seq_APPEND(genexps, ge);
+	}
+	
+	return GeneratorExp(elt, genexps);
+}
+
 static expr_ty
 ast_for_atom(struct compiling *c, const node *n)
 {
-    /* atom: '(' [testlist] ')' | '[' [listmaker] ']'
-           | '{' [dictmaker] '}' | '`' testlist '`' | NAME | NUMBER | STRING+
-    */
-    node *ch = CHILD(n, 0);
+	/* atom: '(' [testlist_gexp] ')' | '[' [listmaker] ']'
+	   | '{' [dictmaker] '}' | '`' testlist '`' | NAME | NUMBER | STRING+
+	*/
+	node *ch = CHILD(n, 0);
 
-    switch (TYPE(ch)) {
-        case NAME:
-            /* All names start in Load context, but may later be changed. */
-            return Name(NEW_IDENTIFIER(ch), Load);
-        case STRING: {
-            PyObject *str = parsestrplus(c, n);
+	switch (TYPE(ch)) {
+		case NAME:
+			/* All names start in Load context, but may later be
+			   changed. */
+			return Name(NEW_IDENTIFIER(ch), Load);
+		case STRING: {
+			PyObject *str = parsestrplus(c, n);
 
-            if (!str)
-                return NULL;
+			if (!str)
+				return NULL;
 
-            return Str(str);
-        }
-        case NUMBER: {
-            PyObject *pynum = parsenumber(STR(ch));
+			return Str(str);
+		}
+		case NUMBER: {
+			PyObject *pynum = parsenumber(STR(ch));
 
-            if (!pynum)
-                return NULL;
+			if (!pynum)
+				return NULL;
                 
-            return Num(pynum);
-        }
-        case LPAR: /* some parenthesized expressions */
-            return ast_for_testlist(c, CHILD(n, 1));
-        case LSQB: /* list (or list comprehension) */
-            ch = CHILD(n, 1);
-            if (TYPE(ch) == RSQB)
-                    return List(NULL, Load);
-            REQ(ch, listmaker);
-            if (NCH(ch) == 1 || TYPE(CHILD(ch, 1)) == COMMA) {
-                asdl_seq *elts = seq_for_testlist(c, ch);
+			return Num(pynum);
+		}
+		case LPAR: /* some parenthesized expressions */
+			ch = CHILD(n, 1);
 
-                if (!elts)
-                    return NULL;
+			if (TYPE(ch) == RPAR)
+				return Tuple(NULL, Load);
 
-                return List(elts, Load);
-            }
-            else
-                return ast_for_listcomp(c, ch);
-        case LBRACE: {
-            /* dictmaker: test ':' test (',' test ':' test)* [','] */
-            int i, size;
-            asdl_seq *keys, *values;
+			if ((NCH(ch) > 1) && (TYPE(CHILD(ch, 1)) == gen_for))
+				return ast_for_genexp(c, ch);
 
-            ch = CHILD(n, 1);
-            size = (NCH(ch) + 1) / 4; /* plus one in case no trailing comma */
-            keys = asdl_seq_new(size);
-            if (!keys)
-                    return NULL;
-            values = asdl_seq_new(size);
-            if (!values) {
-                    asdl_seq_free(keys);
-                    return NULL;
-            }
-            for (i = 0; i < NCH(ch); i += 4) {
-                expr_ty expression;
+			return ast_for_testlist(c, ch);
+		case LSQB: /* list (or list comprehension) */
+			ch = CHILD(n, 1);
 
-                expression = ast_for_expr(c, CHILD(ch, i));
-                if (!expression)
-                    return NULL;
-                    
-                asdl_seq_SET(keys, i / 4, expression);
+			if (TYPE(ch) == RSQB)
+				return List(NULL, Load);
 
-                expression = ast_for_expr(c, CHILD(ch, i + 2));
-                if (!expression)
-                    return NULL;
-                    
-                asdl_seq_SET(values, i / 4, expression);
-            }
-            return Dict(keys, values);
-        }
-        case BACKQUOTE: { /* repr */
-            expr_ty expression = ast_for_testlist(c, CHILD(n, 1));
+			REQ(ch, listmaker);
+			if (NCH(ch) == 1 || TYPE(CHILD(ch, 1)) == COMMA) {
+				asdl_seq *elts = seq_for_testlist(c, ch);
 
-            if (!expression)
-                return NULL;
+				if (!elts)
+					return NULL;
 
-            return Repr(expression);
-        }
-        default:
-            PyErr_Format(PyExc_Exception, "unhandled atom %d", TYPE(ch));
-            return NULL;
-    }
+				return List(elts, Load);
+			}
+			else
+				return ast_for_listcomp(c, ch);
+		case LBRACE: {
+			/* dictmaker: test ':' test (',' test ':' test)* [','] */
+			int i, size;
+			asdl_seq *keys, *values;
+
+			ch = CHILD(n, 1);
+			size = (NCH(ch) + 1) / 4; /* +1 in case no trailing comma */
+			keys = asdl_seq_new(size);
+			if (!keys)
+				return NULL;
+
+			values = asdl_seq_new(size);
+			if (!values) {
+				asdl_seq_free(keys);
+				return NULL;
+			}
+
+			for (i = 0; i < NCH(ch); i += 4) {
+				expr_ty expression;
+
+				expression = ast_for_expr(c, CHILD(ch, i));
+				if (!expression)
+					return NULL;
+
+				asdl_seq_SET(keys, i / 4, expression);
+
+				expression = ast_for_expr(c, CHILD(ch, i + 2));
+				if (!expression)
+					return NULL;
+
+				asdl_seq_SET(values, i / 4, expression);
+			}
+			return Dict(keys, values);
+		}
+		case BACKQUOTE: { /* repr */
+			expr_ty expression = ast_for_testlist(c, CHILD(n, 1));
+
+			if (!expression)
+				return NULL;
+
+			return Repr(expression);
+		}
+		default:
+			PyErr_Format(PyExc_Exception, "unhandled atom %d",
+					TYPE(ch));
+			return NULL;
+	}
 }
 
 static slice_ty
@@ -1451,17 +1626,22 @@ ast_for_call(struct compiling *c, const node *n, expr_ty func)
     nargs = 0;
     nkeywords = 0;
     ngens = 0;
-    for (i = 0; i < NCH(n); i++) 
-	if (TYPE(CHILD(n, i)) == argument) {
-	    if (NCH(CHILD(n, i)) == 1)
+    for (i = 0; i < NCH(n); i++) {
+	node *ch = CHILD(n, i);
+	if (TYPE(ch) == argument) {
+	    if (NCH(ch) == 1)
 		nargs++;
-	    else if (TYPE(CHILD(CHILD(n, i), 1)) == gen_for)
+	    else if (TYPE(CHILD(ch, 1)) == gen_for)
 		ngens++;
             else
 		nkeywords++;
 	}
-    
-    args = asdl_seq_new(nargs);
+    }
+    if (ngens > 1 || (ngens && (nargs || nkeywords))) {
+        ast_error(n, "Generator expression must be parenthesised if not sole argument");
+	return NULL;
+    }
+    args = asdl_seq_new(nargs + ngens);
     if (!args)
         goto error;
     keywords = asdl_seq_new(nkeywords);
@@ -1479,8 +1659,11 @@ ast_for_call(struct compiling *c, const node *n, expr_ty func)
                     goto error;
 		asdl_seq_SET(args, nargs++, e);
 	    }  
-	    else if (TYPE(CHILD(CHILD(n, 0), 1)) == gen_for) {
-                /* XXX handle generator comp */
+	    else if (TYPE(CHILD(ch, 1)) == gen_for) {
+        	e = ast_for_genexp(c, ch);
+                if (!e)
+                    goto error;
+		asdl_seq_SET(args, nargs++, e);
             }
 	    else {
 		keyword_ty kw;

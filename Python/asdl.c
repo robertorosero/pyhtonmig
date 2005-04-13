@@ -4,21 +4,24 @@
 asdl_seq *
 asdl_seq_new(int size)
 {
-    asdl_seq *seq = (asdl_seq *)PyObject_Malloc(sizeof(asdl_seq)
-					     + sizeof(void *) * (size - 1));
-    if (!seq) {
-	PyErr_SetString(PyExc_MemoryError, "no memory");
-	return NULL;
-    }
-    seq->size = size;
-    seq->offset = 0;
-    return seq;
+	asdl_seq *seq = NULL;
+
+	seq = (asdl_seq *)PyObject_Malloc(sizeof(asdl_seq)
+				+ (size ? (sizeof(void *) * (size - 1)) : 0));
+
+	if (!seq) {
+		PyErr_SetString(PyExc_MemoryError, "no memory");
+		return NULL;
+	}
+	seq->size = size;
+	seq->offset = 0;
+	return seq;
 }
 
 void
 asdl_seq_free(asdl_seq *seq)
 {
-    PyObject_Free(seq);
+	PyObject_Free(seq);
 }
 
 #define CHECKSIZE(BUF, OFF, MIN) { \

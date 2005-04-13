@@ -165,6 +165,7 @@ static int symtable_visit_keyword(struct symtable *st, keyword_ty);
 static int symtable_visit_slice(struct symtable *st, slice_ty);
 static int symtable_visit_params(struct symtable *st, asdl_seq *args, int top);
 static int symtable_visit_params_nested(struct symtable *st, asdl_seq *args);
+static int symtable_implicit_arg(struct symtable *st, int pos);
 
 
 static identifier top = NULL, lambda = NULL;
@@ -946,8 +947,7 @@ symtable_visit_expr(struct symtable *st, expr_ty e)
 		VISIT_SEQ(st, comprehension, e->v.ListComp.generators);
 		break;
 	}
-        case GeneratorComp_kind: {
-		char tmpname[256];
+        case GeneratorExp_kind: {
 		identifier tmp;
 
                 /* XXX this is correct/complete */
@@ -955,8 +955,11 @@ symtable_visit_expr(struct symtable *st, expr_ty e)
 		if (!symtable_enter_block(st, tmp, FunctionBlock, 
                                           (void *)e, 0))
 			return 0;
-		VISIT(st, expr, e->v.GeneratorComp.elt);
-		VISIT_SEQ(st, comprehension, e->v.GeneratorComp.generators);
+		if (!symtable_implicit_arg(st, 0))
+			return 0;
+		VISIT(st, expr, e->v.GeneratorExp.elt);
+		VISIT_SEQ(st, comprehension, e->v.GeneratorExp.generators);
+                st->st_cur->ste_generator = 1;
 		symtable_exit_block(st, (void *)e);
 		break;
 	}

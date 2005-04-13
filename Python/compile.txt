@@ -447,11 +447,7 @@ ToDo
 
 + Grammar support (Parser/Python.asdl, Parser/asdl_c.py)
     - empty base class list (``class Class(): pass``)
-+ parse tree->AST support (Python/ast.c)
-    - generator expressions
-+ AST->bytecode support (Python/newcompile.c)
-    - generator expressions
-+ Stdlib support
+ Stdlib support
     - AST->Python access?
     - rewrite compiler package to mirror AST structure?
 + Documentation
@@ -459,8 +455,6 @@ ToDo
 	* byte stream output
 	* explanation of how symbol table pass works
 + Universal
-    - remove "generator comprehension" mentions and change to "generator
-      expression"
     - make sure entire test suite passes
     - fix memory leaks
     - make sure return types are properly checked for errors

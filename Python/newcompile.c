@@ -1388,8 +1388,13 @@ compiler_function(struct compiler *c, stmt_ty s)
 	asdl_seq* decos = s->v.FunctionDef.decorators;
         stmt_ty st;
 	int i, n, docstring;
+	int was_interactive = c->c_interactive;
+
 	assert(s->kind == FunctionDef_kind);
 
+	/* turn off interim results from within function calls while in
+	   interactive mode */
+	c->c_interactive = 0;
 	if (!compiler_decorators(c, decos))
 		return 0;
 	if (args->defaults)
@@ -1443,6 +1448,9 @@ compiler_function(struct compiler *c, stmt_ty s)
 		ADDOP_I(c, CALL_FUNCTION, 1);
 	}
 
+	/* turn flag back on if was interactive */
+	c->c_interactive = was_interactive;
+	
 	return compiler_nameop(c, s->v.FunctionDef.name, Store);
 }
 
@@ -2558,10 +2566,114 @@ compiler_listcomp(struct compiler *c, expr_ty e)
 }
 
 static int
-compiler_generatorcomp(struct compiler *c, expr_ty e)
+compiler_genexp_generator(struct compiler *c,
+                          asdl_seq *generators, int gen_index, 
+                          expr_ty elt)
 {
-    /* XXX handle */
+	/* generate code for the iterator, then each of the ifs,
+	   and then write to the element */
+
+	comprehension_ty ge;
+	basicblock *start, *anchor, *skip, *if_cleanup, *end;
+        int i, n;
+
+	start = compiler_new_block(c);
+	skip = compiler_new_block(c);
+	if_cleanup = compiler_new_block(c);
+	anchor = compiler_new_block(c);
+	end = compiler_new_block(c);
+
+        if (start == NULL || skip == NULL || if_cleanup == NULL ||
+	    anchor == NULL || end == NULL)
+		return 0;
+
+	ge = asdl_seq_GET(generators, gen_index);
+	ADDOP_JREL(c, SETUP_LOOP, end);
+	if (!compiler_push_fblock(c, LOOP, start))
+		return 0;
+
+	if (gen_index == 0) {
+		/* Receive outermost iter as an implicit argument */
+		c->u->u_argcount = 1;
+		ADDOP_I(c, LOAD_FAST, 0);
+	}
+	else {
+		/* Sub-iter - calculate on the fly */
+		VISIT(c, expr, ge->iter);
+		ADDOP(c, GET_ITER);
+	}
+	compiler_use_next_block(c, start);
+	ADDOP_JREL(c, FOR_ITER, anchor);
+	NEXT_BLOCK(c);
+	VISIT(c, expr, ge->target);
+
+        /* XXX this needs to be cleaned up...a lot! */
+	n = asdl_seq_LEN(ge->ifs);
+	for (i = 0; i < n; i++) {
+		expr_ty e = asdl_seq_GET(ge->ifs, i);
+		VISIT(c, expr, e);
+		ADDOP_JREL(c, JUMP_IF_FALSE, if_cleanup);
+		NEXT_BLOCK(c);
+		ADDOP(c, POP_TOP);
+	} 
+
+        if (++gen_index < asdl_seq_LEN(generators))
+		if (!compiler_genexp_generator(c, generators, gen_index, elt))
+			return 0;
+
+        /* only append after the last 'for' generator */
+        if (gen_index >= asdl_seq_LEN(generators)) {
+		VISIT(c, expr, elt);
+		ADDOP(c, YIELD_VALUE);
+
+		compiler_use_next_block(c, skip);
+        }
+	for (i = 0; i < n; i++) {
+		ADDOP_I(c, JUMP_FORWARD, 1);
+                if (i == 0)
+			compiler_use_next_block(c, if_cleanup);
+
+		ADDOP(c, POP_TOP);
+	} 
+	ADDOP_JABS(c, JUMP_ABSOLUTE, start);
+	compiler_use_next_block(c, anchor);
+	ADDOP(c, POP_BLOCK);
+	compiler_pop_fblock(c, LOOP, start);
+	compiler_use_next_block(c, end);
+
+	return 1;
+}
+
+static int
+compiler_genexp(struct compiler *c, expr_ty e)
+{
+	PyObject *name;
+	PyCodeObject *co;
+	expr_ty outermost_iter = ((comprehension_ty)
+				 (asdl_seq_GET(e->v.GeneratorExp.generators,
+					       0)))->iter;
+
+	name = PyString_FromString("<generator expression>");
+	if (!name)
     return 0;
+
+	if (!compiler_enter_scope(c, name, (void *)e, c->u->u_lineno))
+		return 0;
+	compiler_genexp_generator(c, e->v.GeneratorExp.generators, 0,
+					e->v.GeneratorExp.elt);
+	co = assemble(c, 1);
+	if (co == NULL)
+		return 0;
+	compiler_exit_scope(c);
+
+        compiler_make_closure(c, co, 0);
+	VISIT(c, expr, outermost_iter);
+	ADDOP(c, GET_ITER);
+	ADDOP_I(c, CALL_FUNCTION, 1);
+	Py_DECREF(name);
+	Py_DECREF(co);
+
+	return 1;
 }
 
 static int
@@ -2626,8 +2738,8 @@ compiler_visit_expr(struct compiler *c, expr_ty e)
 		break;
         case ListComp_kind:
 		return compiler_listcomp(c, e);
-        case GeneratorComp_kind:
-		return compiler_generatorcomp(c, e);
+        case GeneratorExp_kind:
+		return compiler_genexp(c, e);
         case Compare_kind:
 		return compiler_compare(c, e);
         case Call_kind:
