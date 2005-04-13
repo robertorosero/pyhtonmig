@@ -54,7 +54,7 @@ module Python
 	     | Lambda(arguments args, expr body)
 	     | Dict(expr* keys, expr* values)
 	     | ListComp(expr elt, comprehension* generators)
-	     | GeneratorComp(expr elt, comprehension* generators)
+	     | GeneratorExp(expr elt, comprehension* generators)
 	     -- need sequences for compare to distinguish between
 	     -- x < 4 < 3 and (x < 4) < 3
 	     | Compare(expr left, cmpop* ops, expr* comparators)
