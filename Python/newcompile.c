@@ -1388,13 +1388,9 @@ compiler_function(struct compiler *c, stmt_ty s)
 	asdl_seq* decos = s->v.FunctionDef.decorators;
         stmt_ty st;
 	int i, n, docstring;
-	int was_interactive = c->c_interactive;
 
 	assert(s->kind == FunctionDef_kind);
 
-	/* turn off interim results from within function calls while in
-	   interactive mode */
-	c->c_interactive = 0;
 	if (!compiler_decorators(c, decos))
 		return 0;
 	if (args->defaults)
@@ -1448,9 +1444,6 @@ compiler_function(struct compiler *c, stmt_ty s)
 		ADDOP_I(c, CALL_FUNCTION, 1);
 	}
 
-	/* turn flag back on if was interactive */
-	c->c_interactive = was_interactive;
-	
 	return compiler_nameop(c, s->v.FunctionDef.name, Store);
 }
 
@@ -2092,7 +2085,7 @@ compiler_visit_stmt(struct compiler *c, stmt_ty s)
 		break;
         case Expr_kind:
 		VISIT(c, expr, s->v.Expr.value);
-		if (c->c_interactive) {
+		if (c->c_interactive && c->c_nestlevel <= 1) {
 			ADDOP(c, PRINT_EXPR);
 		}
 		else {
