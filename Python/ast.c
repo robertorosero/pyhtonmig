@@ -2576,6 +2576,13 @@ ast_for_classdef(struct compiling *c, const node *n)
             return NULL;
 	return ClassDef(NEW_IDENTIFIER(CHILD(n, 1)), NULL, s, LINENO(n));
     }
+	/* check for empty base list */
+	if (TYPE(CHILD(n,3)) == RPAR) {
+		s = ast_for_suite(c, CHILD(n,5));
+		if (!s)
+			return NULL;
+		return ClassDef(NEW_IDENTIFIER(CHILD(n, 1)),NULL,s,LINENO(n));
+	}
     /* else handle the base class list */
     _bases = ast_for_testlist(c, CHILD(n, 3));
     if (!_bases)
