@@ -5,16 +5,16 @@ asdl_seq *
 asdl_seq_new(int size)
 {
 	asdl_seq *seq = NULL;
+	size_t n = sizeof(asdl_seq) +
+			(size ? (sizeof(void *) * (size - 1)) : 0);
 
-	seq = (asdl_seq *)PyObject_Malloc(sizeof(asdl_seq)
-				+ (size ? (sizeof(void *) * (size - 1)) : 0));
-
+	seq = (asdl_seq *)PyObject_Malloc(n);
 	if (!seq) {
 		PyErr_SetString(PyExc_MemoryError, "no memory");
 		return NULL;
 	}
+	memset(seq, 0, n);
 	seq->size = size;
-	seq->offset = 0;
 	return seq;
 }
 
