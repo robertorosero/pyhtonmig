@@ -176,6 +176,10 @@ this case) a stmt_ty struct with the appropriate initialization.  The
 FunctionDef() constructor function sets 'kind' to FunctionDef_kind and
 initializes the 'name', 'args', 'body', and 'attributes' fields.
 
+*** NOTE: if you make a change here that can affect the output of bytecode that
+is already in existence, make sure to delete your old .py(c|o) files!  Running
+``find . -name '*.py[co]' -exec rm -f {} ';'`` should do the trick.
+
 
 Parse Tree to AST
 -----------------
@@ -379,6 +383,10 @@ handled by calling::
 
   PyCodeObject * assemble(struct compiler *, int);
 
+*** NOTE: if you make a change here that can affect the output of bytecode that
+is already in existence, make sure to delete your old .py(c|o) files!  Running
+``find . -name '*.py[co]' -exec rm -f {} ';'`` should do the trick.
+
 
 Code Objects
 ------------
@@ -445,9 +453,7 @@ Modified Files
 ToDo
 ----
 
-+ Grammar support (Parser/Python.asdl, Parser/asdl_c.py)
-    - empty base class list (``class Class(): pass``)
- Stdlib support
++ Stdlib support
     - AST->Python access?
     - rewrite compiler package to mirror AST structure?
 + Documentation
