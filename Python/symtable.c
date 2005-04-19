@@ -510,7 +510,7 @@ analyze_block(PySTEntryObject *ste, PyObject *bound, PyObject *free,
 	      PyObject *global)
 {
 	PyObject *name, *v, *local = NULL, *scope = NULL, *newbound = NULL;
-	PyObject *newglobal = NULL;
+	PyObject *newglobal = NULL, *newfree = NULL;
 	int i, flags, pos = 0, success = 0;
 
 	local = PyDict_New();
@@ -521,6 +521,9 @@ analyze_block(PySTEntryObject *ste, PyObject *bound, PyObject *free,
 		goto error;
 	newglobal = PyDict_New();
 	if (!newglobal)
+		goto error;
+	newfree = PyDict_New();
+	if (!newfree)
 		goto error;
 	newbound = PyDict_New();
 	if (!newbound)
@@ -563,15 +566,18 @@ analyze_block(PySTEntryObject *ste, PyObject *bound, PyObject *free,
 	for (i = 0; i < PyList_GET_SIZE(ste->ste_children); ++i) {
 		PyObject *c = PyList_GET_ITEM(ste->ste_children, i);
 		assert(c && PySTEntry_Check(c));
-		if (!analyze_block((PySTEntryObject *)c, newbound, free,
+		if (!analyze_block((PySTEntryObject *)c, newbound, newfree,
 				   newglobal))
 			goto error;
 	}
 
-	if (ste->ste_type == FunctionBlock && !analyze_cells(scope, free))
+	if (ste->ste_type == FunctionBlock && !analyze_cells(scope, newfree))
 		goto error;
-	if (!update_symbols(ste->ste_symbols, scope, bound, free,
+	if (!update_symbols(ste->ste_symbols, scope, bound, newfree,
 			    ste->ste_type == ClassBlock))
+		goto error;
+
+	if (PyDict_Update(free, newfree) < 0)
 		goto error;
 	success = 1;
  error:
@@ -579,6 +585,7 @@ analyze_block(PySTEntryObject *ste, PyObject *bound, PyObject *free,
 	Py_XDECREF(scope);
 	Py_XDECREF(newbound);
 	Py_XDECREF(newglobal);
+	Py_XDECREF(newfree);
 	if (!success)
 		assert(PyErr_Occurred());
 	return success;
