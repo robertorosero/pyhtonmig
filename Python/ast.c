@@ -101,6 +101,9 @@ ast_error_finish(const char *filename)
     int lineno;
 
     assert(PyErr_Occurred());
+    if (!PyErr_ExceptionMatches(PyExc_SyntaxError))
+	return;
+
     PyErr_Fetch(&type, &value, &tback);
     errstr = PyTuple_GetItem(value, 0);
     if (!errstr)
@@ -1512,7 +1515,8 @@ ast_for_expr(struct compiling *c, const node *n)
         }
         case power: {
             expr_ty e = ast_for_atom(c, CHILD(n, 0));
-            assert(e);
+	    if (!e)
+		return NULL;
             if (NCH(n) == 1)
                 return e;
             /* power: atom trailer* ('**' factor)*
