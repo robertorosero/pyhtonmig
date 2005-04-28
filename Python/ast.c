@@ -338,23 +338,6 @@ get_operator(const node *n)
    If e is a sequential type, items in sequence will also have their context
    set.
 
-   XXX: Exception got thrown when called with context 8 (Call_kind) while
-   running ``make``:
-
-       Traceback (most recent call last):
-         File "./setup.py", line 4, in <module>
-             __version__ = "$Revision$"
-             Exception: can't set context for 8
-
-    Another exception from running regrtest.py:
-
-        code Lib/test/regrtest.py
-        XXX undetected error
-        Traceback (most recent call last):
-          File "Lib/test/regrtest.py", line 71, in <module>
-              import sys
-              SyntaxError: can't set context for 8
-   
 */
 
 static int
@@ -364,12 +347,20 @@ set_context(expr_ty e, expr_context_ty ctx, const node *n)
 
     switch (e->kind) {
         case Attribute_kind:
+	    if (ctx == Store &&
+		!strcmp(PyString_AS_STRING(e->v.Attribute.attr), "None")) {
+		    return ast_error(n, "assignment to None");
+	    }
 	    e->v.Attribute.ctx = ctx;
 	    break;
         case Subscript_kind:
 	    e->v.Subscript.ctx = ctx;
 	    break;
         case Name_kind:
+	    if (ctx == Store &&
+		!strcmp(PyString_AS_STRING(e->v.Name.id), "None")) {
+		    return ast_error(n, "assignment to None");
+	    }
 	    e->v.Name.ctx = ctx;
 	    break;
         case List_kind:
@@ -532,8 +523,13 @@ compiler_complex_args(const node *n)
     for (i = 0; i < len; i++) {
         const node *child = CHILD(CHILD(n, 2*i), 0);
         expr_ty arg;
-        if (TYPE(child) == NAME)
+        if (TYPE(child) == NAME) {
+		if (!strcmp(STR(child), "None")) {
+			ast_error(child, "assignment to None");
+			return NULL;
+		}
             arg = Name(NEW_IDENTIFIER(child), Store);
+	}
         else
             arg = compiler_complex_args(CHILD(CHILD(n, 2*i), 1));
 	set_context(arg, Store, n);
@@ -614,6 +610,10 @@ ast_for_arguments(struct compiling *c, const node *n)
                                     compiler_complex_args(CHILD(ch, 1))); 
 		}
                 else if (TYPE(CHILD(ch, 0)) == NAME) {
+		    if (!strcmp(STR(CHILD(ch, 0)), "None")) {
+			    ast_error(CHILD(ch, 0), "assignment to None");
+			    goto error;
+		    }
                     /* XXX check return value of Name call */
                     asdl_seq_APPEND(args, Name(NEW_IDENTIFIER(CHILD(ch, 0)),
                                                Param));
@@ -621,10 +621,18 @@ ast_for_arguments(struct compiling *c, const node *n)
                 i += 2; /* the name and the comma */
                 break;
             case STAR:
+		if (!strcmp(STR(CHILD(n, i+1)), "None")) {
+			ast_error(CHILD(n, i+1), "assignment to None");
+			goto error;
+		}
                 vararg = NEW_IDENTIFIER(CHILD(n, i+1));
                 i += 3;
                 break;
             case DOUBLESTAR:
+		if (!strcmp(STR(CHILD(n, i+1)), "None")) {
+			ast_error(CHILD(n, i+1), "assignment to None");
+			goto error;
+		}
                 kwarg = NEW_IDENTIFIER(CHILD(n, i+1));
                 i += 3;
                 break;
@@ -779,6 +787,10 @@ ast_for_funcdef(struct compiling *c, const node *n)
     name = NEW_IDENTIFIER(CHILD(n, name_i));
     if (!name)
 	goto error;
+    else if (!strcmp(STR(CHILD(n, name_i)), "None")) {
+	    ast_error(CHILD(n, name_i), "assignment to None");
+	    goto error;
+    }
     args = ast_for_arguments(c, CHILD(n, name_i + 1));
     if (!args)
 	goto error;
@@ -1752,6 +1764,13 @@ ast_for_expr_stmt(struct compiling *c, const node *n)
         expr1 = ast_for_testlist(c, CHILD(n, 0));
         if (!expr1)
             return NULL;
+	if (expr1->kind == Name_kind) {
+		char *var_name = PyString_AS_STRING(expr1->v.Name.id);
+		if (var_name[0] == 'N' && !strcmp(var_name, "None")) {
+			ast_error(CHILD(n, 0), "assignment to None");
+			return NULL;
+		}
+	}
 
         expr2 = ast_for_testlist(c, CHILD(n, 2));
         if (!expr2)
@@ -1775,6 +1794,7 @@ ast_for_expr_stmt(struct compiling *c, const node *n)
 	    return NULL;
 	for (i = 0; i < NCH(n) - 2; i += 2) {
 	    expr_ty e = ast_for_testlist(c, CHILD(n, i));
+
 	    /* set context to assign */
 	    if (!e) {
 		asdl_seq_free(targets);
@@ -2574,6 +2594,11 @@ ast_for_classdef(struct compiling *c, const node *n)
     
     REQ(n, classdef);
 
+    if (!strcmp(STR(CHILD(n, 1)), "None")) {
+	    ast_error(n, "assignment to None");
+	    return NULL;
+    }
+
     if (NCH(n) == 4) {
         s = ast_for_suite(c, CHILD(n, 3));
         if (!s)
@@ -2740,7 +2765,7 @@ decode_utf8(const char **sPtr, const char *end, char* encoding)
 #else
 	PyObject *u, *v;
 	char *s, *t;
-	t = s = *sPtr;
+	t = s = (char *)*sPtr;
 	/* while (s < end && *s != '\\') s++; */ /* inefficient for u".." */
 	while (s < end && (*s & 0x80)) s++;
 	*sPtr = s;
@@ -2761,10 +2786,10 @@ decode_unicode(const char *s, size_t len, int rawmode, const char *encoding)
 	char *p;
 	const char *end;
 	if (encoding == NULL) {
-	     	buf = s;
+	     	buf = (char *)s;
 		u = NULL;
 	} else if (strcmp(encoding, "iso-8859-1") == 0) {
-	     	buf = s;
+	     	buf = (char *)s;
 		u = NULL;
 	} else {
 		/* "\XX" may become "\u005c\uHHLL" (12 bytes) */
