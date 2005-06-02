@@ -2079,8 +2079,18 @@ ast_for_import_stmt(struct compiling *c, const node *n)
         /* XXX this needs to be cleaned up */
 
         from_modules = STR(CHILD(n, 3));
-        if (!from_modules || from_modules[0] == '*')
+        if (!from_modules) {
             n = CHILD(n, 3);                  /* from ... import x, y, z */
+            if (NCH(n) % 2 == 0) {
+                /* it ends with a comma, not valid but the parser allows it */
+                ast_error(n, "trailing comma not allowed without"
+                             " surrounding parentheses");
+                return NULL;
+            }
+        }
+        else if (from_modules[0] == '*') {
+            n = CHILD(n,3); /* from ... import * */
+        }
         else if (from_modules[0] == '(')
             n = CHILD(n, 4);                  /* from ... import (x, y, z) */
         else
