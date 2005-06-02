@@ -1992,8 +1992,8 @@ compiler_visit_stmt(struct compiler *c, stmt_ty s)
         case ClassDef_kind:
 		return compiler_class(c, s);
         case Return_kind:
-                if (c->c_nestlevel <= 1)
-                        return compiler_error(c, "'return' outside function");
+		if (c->u->u_ste->ste_type != FunctionBlock)
+			return compiler_error(c, "'return' outside function");
 		if (s->v.Return.value) {
 			if (c->u->u_ste->ste_generator) {
 				return compiler_error(c,
@@ -2006,7 +2006,7 @@ compiler_visit_stmt(struct compiler *c, stmt_ty s)
 		ADDOP(c, RETURN_VALUE);
 		break;
         case Yield_kind:
-                if (c->c_nestlevel <= 1)
+		if (c->u->u_ste->ste_type != FunctionBlock)
                         return compiler_error(c, "'yield' outside function");
 		for (i = 0; i < c->u->u_nfblocks; i++) {
 			if (c->u->u_fblock[i].fb_type == FINALLY_TRY)

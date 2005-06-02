@@ -413,6 +413,10 @@ def g1(): return
 def g2(): return 1
 g1()
 x = g2()
+check_syntax("class foo:return 1")
+
+print 'yield_stmt'
+check_syntax("class foo:yield 1")
 
 print 'raise_stmt' # 'raise' test [',' test]
 try: raise RuntimeError, 'just testing'
