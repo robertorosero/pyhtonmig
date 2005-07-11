@@ -157,6 +157,7 @@ static int symtable_enter_block(struct symtable *st, identifier name,
 static int symtable_exit_block(struct symtable *st, void *ast);
 static int symtable_visit_stmt(struct symtable *st, stmt_ty s);
 static int symtable_visit_expr(struct symtable *st, expr_ty s);
+static int symtable_visit_genexp(struct symtable *st, expr_ty s);
 static int symtable_visit_arguments(struct symtable *st, arguments_ty);
 static int symtable_visit_excepthandler(struct symtable *st, excepthandler_ty);
 static int symtable_visit_alias(struct symtable *st, alias_ty);
@@ -236,7 +237,8 @@ PySymtable_Build(mod_ty mod, const char *filename, PyFutureFeatures *future)
 				"this compiler does not handle Suites");
 		return NULL;
 	}
-	symtable_exit_block(st, (void *)mod);
+	if (!symtable_exit_block(st, (void *)mod))
+		return NULL;
 	if (symtable_analyze(st))
 		return st;
  error:
@@ -737,8 +739,12 @@ symtable_add_def(struct symtable *st, PyObject *name, int flag)
 	return 1;
 }
 
-/* VISIT and VISIT_SEQ takes an ASDL type as their second argument.  They use
-   the ASDL name to synthesize the name of the C type and the visit function. 
+/* VISIT, VISIT_SEQ and VIST_SEQ_TAIL take an ASDL type as their second argument.
+   They use the ASDL name to synthesize the name of the C type and the visit
+   function. 
+   
+   VISIT_SEQ_TAIL permits the start of an ASDL sequence to be skipped, which is
+   useful if the first node in the sequence requires special treatment.
 */
 
 #define VISIT(ST, TYPE, V) \
@@ -749,6 +755,16 @@ symtable_add_def(struct symtable *st, PyObject *name, int flag)
 	int i; \
 	asdl_seq *seq = (SEQ); /* avoid variable capture */ \
 	for (i = 0; i < asdl_seq_LEN(seq); i++) { \
+		TYPE ## _ty elt = asdl_seq_GET(seq, i); \
+		if (!symtable_visit_ ## TYPE((ST), elt)) \
+			return 0; \
+	} \
+}
+						    
+#define VISIT_SEQ_TAIL(ST, TYPE, SEQ, START) { \
+	int i; \
+	asdl_seq *seq = (SEQ); /* avoid variable capture */ \
+	for (i = (START); i < asdl_seq_LEN(seq); i++) { \
 		TYPE ## _ty elt = asdl_seq_GET(seq, i); \
 		if (!symtable_visit_ ## TYPE((ST), elt)) \
 			return 0; \
@@ -934,7 +950,8 @@ symtable_visit_expr(struct symtable *st, expr_ty e)
 			return 0;
 		VISIT(st, arguments, e->v.Lambda.args);
 		VISIT(st, expr, e->v.Lambda.body);
-		symtable_exit_block(st, (void *)e);
+		if (!symtable_exit_block(st, (void *)e))
+			return 0;
 		break;
 	}
         case Dict_kind:
@@ -955,19 +972,9 @@ symtable_visit_expr(struct symtable *st, expr_ty e)
 		break;
 	}
         case GeneratorExp_kind: {
-		identifier tmp;
-
-                /* XXX this is correct/complete */
-		tmp = PyString_FromString("<genexpr>");
-		if (!symtable_enter_block(st, tmp, FunctionBlock, 
-                                          (void *)e, 0))
+		if (!symtable_visit_genexp(st, e)) {
 			return 0;
-		if (!symtable_implicit_arg(st, 0))
-			return 0;
-		VISIT(st, expr, e->v.GeneratorExp.elt);
-		VISIT_SEQ(st, comprehension, e->v.GeneratorExp.generators);
-                st->st_cur->ste_generator = 1;
-		symtable_exit_block(st, (void *)e);
+		}
 		break;
 	}
         case Compare_kind:
@@ -1170,3 +1177,29 @@ symtable_visit_slice(struct symtable *st, slice_ty s)
 	return 1;
 }
 
+static int 
+symtable_visit_genexp(struct symtable *st, expr_ty e)
+{
+	identifier tmp;
+	comprehension_ty outermost = ((comprehension_ty)
+			 (asdl_seq_GET(e->v.GeneratorExp.generators, 0)));
+	/* Outermost iterator is evaluated in current scope */
+	VISIT(st, expr, outermost->iter);
+	/* Create generator scope for the rest */
+	tmp = PyString_FromString("<genexpr>");
+	if (!symtable_enter_block(st, tmp, FunctionBlock, (void *)e, 0)) {
+		return 0;
+	}
+	st->st_cur->ste_generator = 1;
+	/* Outermost iter is received as an argument */
+	if (!symtable_implicit_arg(st, 0)) {
+		return 0;
+	}
+	VISIT(st, expr, outermost->target);
+	VISIT_SEQ(st, expr, outermost->ifs);
+	VISIT_SEQ_TAIL(st, comprehension, e->v.GeneratorExp.generators, 1);
+	VISIT(st, expr, e->v.GeneratorExp.elt);
+	if (!symtable_exit_block(st, (void *)e))
+		return 0;
+	return 1;
+}
