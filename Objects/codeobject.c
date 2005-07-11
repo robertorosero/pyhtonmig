@@ -234,13 +234,13 @@ code_compare(PyCodeObject *co, PyCodeObject *cp)
 	cmp = PyObject_Compare(co->co_name, cp->co_name);
 	if (cmp) return cmp;
 	cmp = co->co_argcount - cp->co_argcount;
-	if (cmp) return cmp;
+	if (cmp) goto normalize;
 	cmp = co->co_nlocals - cp->co_nlocals;
-	if (cmp) return cmp;
+	if (cmp) goto normalize;
 	cmp = co->co_flags - cp->co_flags;
-	if (cmp) return cmp;
+	if (cmp) goto normalize;
 	cmp = co->co_firstlineno - cp->co_firstlineno;
-	if (cmp) return cmp;
+	if (cmp) goto normalize;
 	cmp = PyObject_Compare(co->co_code, cp->co_code);
 	if (cmp) return cmp;
 	cmp = PyObject_Compare(co->co_consts, cp->co_consts);
@@ -253,6 +253,14 @@ code_compare(PyCodeObject *co, PyCodeObject *cp)
 	if (cmp) return cmp;
 	cmp = PyObject_Compare(co->co_cellvars, cp->co_cellvars);
 	return cmp;
+
+ normalize:
+	if (cmp > 0)
+		return 1;
+	else if (cmp < 0)
+		return -1;
+	else
+		return 0;
 }
 
 static long
