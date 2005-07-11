@@ -271,13 +271,12 @@ With the AST created, the next step is to create the CFG. The first step
 is to convert the AST to Python bytecode without having jump targets
 resolved to specific offsets (this is calculated when the CFG goes to
 final bytecode). Essentially, this transforms the AST into Python
-bytecode, but with control flow represented by the edges of the CFG.
+bytecode with control flow represented by the edges of the CFG.
 
 Conversion is done in two passes.  The first creates the namespace
 (variables can be classified as local, free/cell for closures, or
-global) creates CFG with the namespace info.  With that done the second
-pass is done which essentially flattens the CFG into a list and
-calculates jump offsets for final output of bytecode.
+global).  With that done, the second pass essentially flattens the CFG
+into a list and calculates jump offsets for final output of bytecode.
 
 The conversion process is initiated by a call to the function in
 Python/newcompile.c::
@@ -436,6 +435,10 @@ Modified Files
     - newcompile.c
         New version of compile.c that handles the emitting of bytecode.
 
+    - symtable.c
+	Generates symbol table from AST.
+	
+
 + Include/
 
     - Python-ast.h
@@ -449,9 +452,27 @@ Modified Files
     - ast.h
         Declares PyAST_FromNode() external (from ../Python/ast.c).
 
+    - code.h
+	Header file for ../Objects/codeobject.c; contains definition of
+	PyCodeObject.
+
+    - symtable.h
+	Header for ../Python/symtable.c .  struct symtable and
+	PySTEntryObject are defined here.
+
++ Objects/
+
+    - codeobject.c
+	Contains PyCodeObject-related code (originally in
+	../Python/compile.c).
+
 
 ToDo
 ----
+*** NOTE: all bugs and patches should be filed on SF under the group
+	    "AST" for easy searching.  It also does not hurt to put
+	    "[AST]" at the beginning of the subject line of the tracker
+	    item.
 
 + Stdlib support
     - AST->Python access?
@@ -459,7 +480,8 @@ ToDo
 + Documentation
     - flesh out this doc
 	* byte stream output
-	* explanation of how symbol table pass works
+	* explanation of how the symbol table pass works
+	* code object (PyCodeObject)
 + Universal
     - make sure entire test suite passes
     - fix memory leaks
