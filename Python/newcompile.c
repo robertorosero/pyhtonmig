@@ -1380,6 +1380,30 @@ compiler_decorators(struct compiler *c, asdl_seq* decos)
 }
 
 static int
+compiler_arguments(struct compiler *c, arguments_ty args)
+{
+	int i;
+	int n = asdl_seq_LEN(args->args);
+	/* Correctly handle nested argument lists */
+	for (i = 0; i < n; i++) {
+		expr_ty arg = asdl_seq_GET(args->args, i);
+		if (arg->kind == Tuple_kind) {
+			PyObject *id = PyString_FromFormat(".%d", i);
+			if (id == NULL) {
+				return 0;
+			}
+			if (!compiler_nameop(c, id, Load)) {
+				Py_DECREF(id);
+				return 0;
+			}
+			Py_DECREF(id);
+                	VISIT(c, expr, arg);
+		}
+	}
+	return 1;
+}
+
+static int
 compiler_function(struct compiler *c, stmt_ty s)
 {
 	PyCodeObject *co;
@@ -1407,21 +1431,7 @@ compiler_function(struct compiler *c, stmt_ty s)
             return 0;
 
         /* unpack nested arguments */
-	n = asdl_seq_LEN(args->args);
-        for (i = 0; i < n; i++) {
-            expr_ty arg = asdl_seq_GET(args->args, i);
-            if (arg->kind == Tuple_kind) {
-                PyObject *id = PyString_FromFormat(".%d", i);
-                if (id == NULL)
-			return 0;
-		if (!compiler_nameop(c, id, Load)) {
-			Py_DECREF(id);
-			return 0;
-		}
-		Py_DECREF(id);
-                VISIT(c, expr, arg);
-            }
-        }
+	compiler_arguments(c, args);
 
 	c->u->u_argcount = asdl_seq_LEN(args->args);
 	n = asdl_seq_LEN(s->v.FunctionDef.body);
@@ -1513,6 +1523,10 @@ compiler_lambda(struct compiler *c, expr_ty e)
 		VISIT_SEQ(c, expr, args->defaults);
 	if (!compiler_enter_scope(c, name, (void *)e, c->u->u_lineno))
 		return 0;
+		
+        /* unpack nested arguments */
+	compiler_arguments(c, args);
+	
 	c->u->u_argcount = asdl_seq_LEN(args->args);
 	VISIT(c, expr, e->v.Lambda.body);
 	ADDOP(c, RETURN_VALUE);
