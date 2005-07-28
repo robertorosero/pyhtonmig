@@ -3339,16 +3339,21 @@ assemble_lnotab(struct assembler *a, struct instr *i)
 		a->a_lnotab_off += ncodes * 2;
 	}
 
-	if (d_bytecode)	{
-		len = PyString_GET_SIZE(a->a_lnotab);
-		if (a->a_lnotab_off + 2 >= len) {
-			if (_PyString_Resize(&a->a_lnotab, len * 2) < 0)
-				return 0;
-		}
-		lnotab = PyString_AS_STRING(a->a_lnotab) + a->a_lnotab_off;
-		a->a_lnotab_off += 2;
+	len = PyString_GET_SIZE(a->a_lnotab);
+	if (a->a_lnotab_off + 2 >= len) {
+		if (_PyString_Resize(&a->a_lnotab, len * 2) < 0)
+			return 0;
+	}
+	lnotab = PyString_AS_STRING(a->a_lnotab) + a->a_lnotab_off;
+
+	a->a_lnotab_off += 2;
+	if (d_bytecode) {
 		*lnotab++ = d_bytecode;
 		*lnotab++ = d_lineno;
+	}
+	else {  /* First line of a block; def stmt, etc. */
+		*lnotab++ = 0;
+		*lnotab++ = 1;
 	}
 	a->a_lineno = i->i_lineno;
 	a->a_lineno_off = a->a_offset;
