@@ -1,3 +1,8 @@
+/*
+ * This file includes functions to transform a concrete syntax tree (CST) to
+ * an abstract syntax tree (AST).  The main function is PyAST_FromNode().
+ *
+ */
 #include "Python.h"
 #include "Python-ast.h"
 #include "grammar.h"
