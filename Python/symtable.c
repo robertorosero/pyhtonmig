@@ -903,7 +903,8 @@ symtable_visit_stmt(struct symtable *st, stmt_ty s)
 					PyOS_snprintf(buf, sizeof(buf),
 						      GLOBAL_AFTER_USE,
 						      c_name);
-				symtable_warn(st, buf);
+				if (!symtable_warn(st, buf))
+                                    return 0;
 			}
 			if (!symtable_add_def(st, name, DEF_GLOBAL))
 				return 0;
@@ -1128,6 +1129,11 @@ symtable_visit_alias(struct symtable *st, alias_ty a)
 	if (strcmp(PyString_AS_STRING(name), "*"))
 	    return symtable_add_def(st, name, DEF_IMPORT);
 	else {
+            if (st->st_cur->ste_type != ModuleBlock) {
+                if (!symtable_warn(st,
+                                   "import * only allowed at module level"))
+                    return 0;
+            }
 	    st->st_cur->ste_optimized = 0;
 	    return 1;
 	}
