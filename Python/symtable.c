@@ -904,7 +904,6 @@ symtable_visit_stmt(struct symtable *st, stmt_ty s)
 						      GLOBAL_AFTER_USE,
 						      c_name);
 				symtable_warn(st, buf);
-				return 0;
 			}
 			if (!symtable_add_def(st, name, DEF_GLOBAL))
 				return 0;
