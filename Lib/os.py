@@ -435,6 +435,22 @@ else:
                 return key.upper() in self.data
             def get(self, key, failobj=None):
                 return self.data.get(key.upper(), failobj)
+            def update(self, dict=None, **kwargs):
+                if dict:
+                    try:
+                        keys = dict.keys()
+                    except AttributeError:
+                        # List of (key, value)
+                        for k, v in dict:
+                            self[k] = v
+                    else:
+                        # got keys
+                        # cannot use items(), since mappings
+                        # may not have them.
+                        for k in keys:
+                            self[k] = dict[k]
+                if kwargs:
+                    self.update(kwargs)
             def copy(self):
                 return dict(self)
 
@@ -446,6 +462,22 @@ else:
             def __setitem__(self, key, item):
                 putenv(key, item)
                 self.data[key] = item
+            def update(self,  dict=None, **kwargs):
+                if dict:
+                    try:
+                        keys = dict.keys()
+                    except AttributeError:
+                        # List of (key, value)
+                        for k, v in dict:
+                            self[k] = v
+                    else:
+                        # got keys
+                        # cannot use items(), since mappings
+                        # may not have them.
+                        for k in keys:
+                            self[k] = dict[k]
+                if kwargs:
+                    self.update(kwargs)
             try:
                 unsetenv
             except NameError:
@@ -676,22 +708,18 @@ except NameError: # statvfs_result may not exist
     pass
 
 if not _exists("urandom"):
-    _urandomfd = None
     def urandom(n):
         """urandom(n) -> str
 
         Return a string of n random bytes suitable for cryptographic use.
 
         """
-        global _urandomfd
-        if _urandomfd is None:
-            try:
-                _urandomfd = open("/dev/urandom", O_RDONLY)
-            except:
-                _urandomfd = NotImplementedError
-        if _urandomfd is NotImplementedError:
+        try:
+            _urandomfd = open("/dev/urandom", O_RDONLY)
+        except:
             raise NotImplementedError("/dev/urandom (or equivalent) not found")
         bytes = ""
         while len(bytes) < n:
             bytes += read(_urandomfd, n - len(bytes))
+        close(_urandomfd)
         return bytes

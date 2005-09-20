@@ -1132,17 +1132,16 @@ class TarFile(object):
 
         # Fill the TarInfo object with all
         # information we can get.
-        tarinfo.name  = arcname
-        tarinfo.mode  = stmd
-        tarinfo.uid   = statres.st_uid
-        tarinfo.gid   = statres.st_gid
-        if stat.S_ISDIR(stmd):
-            # For a directory, the size must be 0
-            tarinfo.size  = 0
-        else:
+        tarinfo.name = arcname
+        tarinfo.mode = stmd
+        tarinfo.uid = statres.st_uid
+        tarinfo.gid = statres.st_gid
+        if stat.S_ISREG(stmd):
             tarinfo.size = statres.st_size
+        else:
+            tarinfo.size = 0L
         tarinfo.mtime = statres.st_mtime
-        tarinfo.type  = type
+        tarinfo.type = type
         tarinfo.linkname = linkname
         if pwd:
             try:
@@ -1233,15 +1232,14 @@ class TarFile(object):
             self.addfile(tarinfo, f)
             f.close()
 
-        if tarinfo.type in (LNKTYPE, SYMTYPE, FIFOTYPE, CHRTYPE, BLKTYPE):
-            tarinfo.size = 0L
-            self.addfile(tarinfo)
-
-        if tarinfo.isdir():
+        elif tarinfo.isdir():
             self.addfile(tarinfo)
             if recursive:
                 for f in os.listdir(name):
                     self.add(os.path.join(name, f), os.path.join(arcname, f))
+
+        else:
+            self.addfile(tarinfo)
 
     def addfile(self, tarinfo, fileobj=None):
         """Add the TarInfo object `tarinfo' to the archive. If `fileobj' is
@@ -1374,7 +1372,7 @@ class TarFile(object):
                 # stream of tar blocks.
                 raise StreamError, "cannot extract (sym)link as file object"
             else:
-                # A (sym)link's file object is it's target's file object.
+                # A (sym)link's file object is its target's file object.
                 return self.extractfile(self._getmember(tarinfo.linkname,
                                                         tarinfo))
         else:
@@ -1840,6 +1838,7 @@ class TarIter:
         """Construct a TarIter object.
         """
         self.tarfile = tarfile
+        self.index = 0
     def __iter__(self):
         """Return iterator object.
         """
@@ -1848,10 +1847,20 @@ class TarIter:
         """Return the next item using TarFile's next() method.
            When all members have been read, set TarFile as _loaded.
         """
-        tarinfo = self.tarfile.next()
-        if not tarinfo:
-            self.tarfile._loaded = True
-            raise StopIteration
+        # Fix for SF #1100429: Under rare circumstances it can
+        # happen that getmembers() is called during iteration,
+        # which will cause TarIter to stop prematurely.
+        if not self.tarfile._loaded:
+            tarinfo = self.tarfile.next()
+            if not tarinfo:
+                self.tarfile._loaded = True
+                raise StopIteration
+        else:
+            try:
+                tarinfo = self.tarfile.members[self.index]
+            except IndexError:
+                raise StopIteration
+        self.index += 1
         return tarinfo
 
 # Helper classes for sparse file support

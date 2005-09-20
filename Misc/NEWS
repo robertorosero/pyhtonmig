@@ -4,10 +4,429 @@ Python News
 
 (editors: check NEWS.help for information about editing NEWS using ReST.)
 
-What's New in Python 2.4 release candidate 2
-=====================================================
+What's New in Python 2.4.2c1
+============================
 
-*Release date: XX-NOV-2004*
+*Release date: 21-SEP-2005*
+
+Core and builtins
+-----------------
+
+- On 64-bit platforms, when __len__() returns a value that cannot be
+  represented as a C int, raise OverflowError.
+
+- SF bug #893549: parsing keyword arguments was broken with a few format
+  codes.
+
+- Changes donated by Elemental Security to make it work on AIX 5.3
+  with IBM's 64-bit compiler (SF patch #1284289).  This also closes SF
+  bug #105470: test_pwd fails on 64bit system (Opteron).
+
+- Changes donated by Elemental Security to make it work on HP-UX 11 on
+  Itanium2 with HP's 64-bit compiler (SF patch #1225212).
+
+- Disallow keyword arguments for type constructors that don't use them
+  (fixes bug #1119418).
+
+- Forward UnicodeDecodeError into SyntaxError for source encoding errors.
+
+- SF bug #900092: When tracing (e.g. for hotshot), restore 'return' events for
+  exceptions that cause a function to exit.
+
+- SF bug #1257731:  set.discard() and set.remove() did not correctly
+  handle keys that both inherited from set and defined their own
+  __hash__() function.  Also, changed set.__contains__() to have
+  identical logic.
+
+- The set() builtin can now properly compute s-=s as an empty set.
+
+- SF bug #1238681:  freed pointer is used in longobject.c:long_pow().
+
+- SF bug #1185883:  Python's small-object memory allocator took over
+  a block managed by the platform C library whenever a realloc specified
+  a small new size.  However, there's no portable way to know then how
+  much of the address space following the pointer is valid, so no
+  portable way to copy data from the C-managed block into Python's
+  small-object space without risking a memory fault.  Python's small-object
+  realloc now leaves such blocks under the control of the platform C
+  realloc.
+
+- Fix garbage collection for set and frozenset objects.  SF patch #1200018.
+
+- It is now safe to call PyGILState_Release() before
+  PyEval_InitThreads() (note that if there is reason to believe there
+  are multiple threads around you still must call PyEval_InitThreads()
+  before using the Python API; this fix is for extension modules that
+  have no way of knowing if Python is multi-threaded yet).
+
+- Typing Ctrl-C whilst raw_input() was waiting in a build with threads
+  disabled caused a crash.
+
+- Bug #1165306: instancemethod_new allowed the creation of a method
+  with im_class == im_self == NULL, which caused a crash when called.
+
+Extension Modules
+-----------------
+
+- Fix memory leak in posix.access().
+
+- Patch #1213831: Fix typo in unicodedata._getcode.
+
+- Bug #1007046: os.startfile() did not accept unicode strings encoded in
+  the file system encoding.
+
+- Patch #756021: Special-case socket.inet_aton('255.255.255.255') for
+  platforms that don't have inet_aton().
+
+- Bug #1215928: Fix bz2.BZ2File.seek() for 64-bit file offsets.
+
+- Bug #1191043: Fix bz2.BZ2File.(x)readlines() for files containing one line
+  without newlines.
+
+- Bug #728515: mmap.resize() now resizes the file on Unix as it did
+  on Windows.
+
+- Bug #1234979: For the argument of thread.Lock.acquire, the Windows 
+  implemented treated all integer values except 1 as false.
+
+- Bug #1194181: bz2.BZ2File didn't handle mode 'U' correctly.
+
+- Bug #1166660: The readline module could segfault if hook functions
+  were set in a different thread than that which called readline.
+
+- weakref proxy has incorrect __nonzero__ behavior.  SF bug #1770766.
+
+Library
+-------
+
+- Patch #1166948: locale.py: Prefer LC_ALL, LC_CTYPE and LANG over LANGUAGE
+  to get the correct encoding.
+
+- Patch #1166938: locale.py: Parse LANGUAGE as a colon separated list of
+  languages.
+
+- Patch #1268314: Cache lines in StreamReader.readlines for performance.
+
+- Bug #1290505: time.strptime() was not invalidating its regex cache when the
+  locale changed.
+
+- Fix a misuse of str.find() in detection of use of %U or %W in datetime
+  format.
+
+- Bug #1167128: Fix size of a symlink in a tarfile to be 0.
+
+- Patch #810023: Fix off-by-one bug in urllib.urlretrieve reporthook
+  functionality.
+
+- Bug #1163178: Make IDNA return an empty string when the input is empty.
+
+- Bug #1121494: distutils.dir_utils.mkpath now accepts Unicode strings.
+
+- Bug #1178484: Return complete lines from codec stream readers
+  even if there is an exception in later lines, resulting in
+  correct line numbers for decoding errors in source code. 
+
+- Bug #1266283: "lexists" is now in os.path.__all__.
+
+- The sets module can now properly compute s-=s and s^=s as an empty set.
+
+- Bug #1192315: Disallow negative arguments to clear() in pdb.
+
+- Patch #827386: Support absolute source paths in msvccompiler.py.
+
+- Fix a problem in Tkinter introduced by SF patch #869468: delete bogus
+  __hasattr__ and __delattr__ methods on class Tk that were breaking
+  Tkdnd.
+
+- Bug #1015140: disambiguated the term "article id" in nntplib docs and
+  docstrings to either "article number" or "message id".
+
+- Bug #1177468: Don't cache the /dev/urandom file descriptor for os.urandom,
+  as this can cause problems with apps closing all file descriptors.
+
+- Bug #839151: Fix an attempt to access sys.argv in the warnings module
+  though this can be missing in embedded interpreters
+
+- Bug #1155638: Fix a bug which affected HTTP 0.9 responses in httplib.
+
+- Bug #1100201: Cross-site scripting was possible on BaseHTTPServer via
+  error messages.
+
+- Bug #1224621: tokenize module does not detect inconsistent dedents
+
+- Bug #1196315: fix weakref.WeakValueDictionary constructor.
+
+- Bug #1213894: os.path.realpath didn't resolve symlinks that were the first
+  component of the path.
+
+- distutils.commands.register now encodes the data as UTF-8 before posting
+  them to PyPI.
+
+- Partial fixes for SF bugs #1163244 and #1175396: If a chunk read by
+  ``codecs.StreamReader.readline()`` has a trailing "\r", read one more
+  character even if the user has passed a size parameter to get a proper
+  line ending. Remove the special handling of a "\r\n" that has been split
+  between two lines.
+
+- Bug #1251300: On UCS-4 builds the "unicode-internal" codec will now complain
+  about illegal code points. The codec now supports PEP 293 style error
+  handlers.
+
+- Bug #1235646: ``codecs.StreamRecoder.next()`` now reencodes the data it reads
+  from the input stream, so that the output is a byte string in the correct
+  encoding instead of a unicode string.
+
+- Bug #1202493: Fixing SRE parser to handle '{}' as perl does, rather than
+  considering it exactly like a '*'.
+
+
+Build
+-----
+
+- Patch #1160164: Build zlib.pyd for Itanium.
+
+- Bug #1189330: configure did not correctly determine the necessary
+  value of LINKCC if python was built with GCC 4.0.
+
+- Upgrade Windows build to zlib 1.2.3 which eliminates a potential security
+  vulnerability in zlib 1.2.1 and 1.2.2.
+
+
+Documentation
+-------------
+
+- Bug #1274828: Document os.path.splitunc().
+
+- Bug #1190204: Clarify which directories are searched by site.py.
+
+- Bug #1193849: Clarify os.path.expanduser() documentation.
+
+- Bug #1243192: re.UNICODE and re.LOCALE affect \d, \D, \s and \S.
+
+- Bug #755617: Document the effects of os.chown() on Windows.
+
+- Patch #1180012: The documentation for modulefinder is now in the library reference.
+
+- Patch #1213031: Document that os.chown() accepts argument values of -1.
+
+- Bug #1190563: Document os.waitpid() return value with WNOHANG flag.
+
+- Bug #1175022: Correct the example code for property().
+
+Tools/Demos
+-----------
+
+- Bug #1072853: pindent.py used an uninitialized variable.
+
+
+What's New in Python 2.4.1 final?
+=================================
+
+*Release date: 30-MAR-2005*
+
+Core and builtins
+-----------------
+
+- Move exception finalisation later in the shutdown process - this 
+  fixes the crash seen in bug #1165761
+
+Tests
+-----
+
+- SF patch 1167316: doctest.py fails self-test if run directly.
+
+Build
+-----
+
+- SF patch 1171767: Darwin 8's headers are anal about POSIX compliance, 
+  and linking has changed (prebinding is now deprecated, and libcc_dynamic 
+  no longer exists). This configure patch makes things right.
+
+
+What's New in Python 2.4.1c2?
+=============================
+
+*Release date: 17-MAR-2005*
+
+Library
+-------
+
+- Fixed decimal operator and comparison methods to return NotImplemented
+  instead of raising a TypeError when interacting with other types. 
+  Allows other classes to successfully implement __radd__ style methods.
+
+- Bug #1163325:  Decimal infinities failed to hash.  Attempting to
+  hash a NaN raised an InvalidOperation instead of a TypeError.
+
+- Bug #1160802: can't build Zope on Windows with 2.4.1c1.  The
+  ``MSVCCompiler`` class in distutils forgot to record that it was
+  initialized, and continued adding redundant entries to the system
+  ``PATH`` environment variable until ``putenv()`` complained about the
+  size.  This only affected building projects with many C extensions,
+  and only on Windows using Microsoft's compiler.  This wasn't visible
+  before because a bugfix first included in 2.4.1c1 provoked it (bug
+  #1110478: revert os.environ.update to do putenv again).
+
+- Bug #1156259: Seeking in codecs.reader was broken, now fixed.
+
+Tests
+-----
+
+- Fix the test for socket.getfqdn() in test_socket to also consider the host
+  name returned by socket.gethostname() a valid return value for getfqdn().
+  Also clarified the wording of docs and docstring that this is the case.
+
+Extensions Modules
+------------------
+
+- os.access now supports Unicode path names on non-Win32 systems.
+
+
+What's New in Python 2.4.1c1?
+=============================
+
+*Release date: 10-MAR-2005*
+
+Core and builtins
+-----------------
+
+- Bug #1155938: new style classes did not verify that __init__()
+  returns None.
+
+- Bug #723201: Raise a TypeError for passing bad objects to 'L' format.
+
+- Bug #1124295: the __name__ attribute of file objects was
+  inadvertently made inaccessible in restricted mode.
+
+- Bug #1074011: closing sys.std{out,err} now causes a flush() and
+  an ferror() call.
+
+- Bug #1085744:  Add missing overflow check to PySequence_Tuple().
+  Make resize schedule linear (amortized).
+
+- marshal.dumps() no longer crashes when the optional argument ``version``
+  is provided.
+
+
+Extension Modules
+-----------------
+
+- Patches #925152, #1118602: Avoid reading after the end of the buffer
+  in pyexpat.GetInputContext.
+
+- Patch #1093585: raise a ValueError for negative history items in readline.
+  {remove_history,replace_history}
+
+
+Library
+-------
+
+- Patch #1075887: Don't require MSVC in distutils if there is nothing
+  to build.
+
+- Patch #1103407: Properly deal with tarfile iterators when untarring
+  symbolic links on Windows.
+
+- Patch #1117454: Remove code to special-case cookies without values
+  in LWPCookieJar.
+
+- Patch #1117339: Add cookielib special name tests.
+
+- Patch #1112812: Make bsddb/__init__.py more friendly for modulefinder.
+
+- Patch #1121234: Properly cleanup _exit and tkerror commands.
+
+- Applied a security fix to SimpleXMLRPCserver (PSF-2005-001).  This
+  disables recursive traversal through instance attributes, which can
+  be exploited in various ways.
+
+- Bug #1110478: Revert os.environ.update to do putenv again.
+
+- Bug #1103844: fix distutils.install.dump_dirs() with negated options.
+
+- Bug #1067732: wininst --install-script doesn't leave residual files anymore.
+
+- StringIO.truncate() now correctly adjusts the size attribute.
+  (Bug #951915).
+
+- The decimal module wouldn't run on builds without threads (Bug #1083645).
+
+- Bug #1086555:  Fix leak in syslog module.
+
+- atexit.register no longer references the sys module before importing it.
+  (Bug #1083202).
+
+- unittest.TestCase.run() and unittest.TestSuite.run() can now be successfully
+  extended or overridden by subclasses.  Formerly, the subclassed method would
+  be ignored by the rest of the module.  (Bug #1078905).
+
+- Bug #1076985: ``codecs.StreamReader.readline()`` now calls ``read()`` only
+  once when a size argument is given. This prevents a buffer overflow in the
+  tokenizer with very long source lines.
+
+- Bug #1083110: ``zlib.decompress.flush()`` would segfault if called immediately
+  after creating the object, without any intervening ``.decompress()`` calls.
+
+- Bug #1149508: ``textwrap`` now handles hyphenated numbers (eg. "2004-03-05")
+  correctly.
+
+
+Build
+-----
+
+- Bug #1158607: Build with --disable-unicode again.
+
+- term.h is now properly detected again.
+
+- Check for tzset no longer dependent on tm->tm_zone to exist in the struct
+  (not required by either ISO C nor the UNIX 2 spec).
+  Tests for sanity in tzname when HAVE_TZNAME defined were also defined.
+  Closes bug #1096244.  Thanks Gregory Bond.
+
+
+Windows
+-------
+
+- Bug #1076861: The IDLE shortcut is now correct even if the target
+  directory contains a space.
+
+- Bug #1085208 and similar: The installer does not fail anymore if
+  VBScript is not available on the target machine, not installed
+  properly, or outdated; the MSI package now does not rely on VB
+  anymore.
+
+Macintosh
+---------
+
+- Bug #1091468: make frameworkinstall now works with DESTROOT builds
+
+- On 10.3 and later extensions are built with -undefined dynamic_lookup.
+  This ensures that extensions can be built in older versions of Python after
+  a newer framework has been installed. In addition, an extension will not
+  accidentally pull in another copy of the Python interpreter.
+
+  On 10.2 and earlier (or if MACOSX_DEPLOYMENT_TARGET is set to a value <= 10.2)
+  extensions are linked directly to the dylib in the framework, in stead
+  of against the framework itself. This ensures that extensions can be built
+  in older versions of Python after a newer framework has been installed.
+
+- PackageManager and the underlying pimp.py module have been updated to
+  version 0.5, which greatly simplifies maintainance of the package
+  databases.
+
+
+Documentation
+-------------
+
+- Remove all latent references for "Macintosh" that referred to semantics for
+  Mac OS 9 and change to reflect the state for OS X.
+  Closes patch #1095802.  Thanks Jack Jansen.
+
+
+What's New in Python 2.4 final?
+===============================
+
+*Release date: 30-NOV-2004*
 
 Core and builtins
 -----------------
@@ -17,8 +436,8 @@ Core and builtins
   things_to_do is not cleared by Py_MakePendingCalls().
 
 
-What's New in Python 2.4 (release candidate 1|beta 3)
-=====================================================
+What's New in Python 2.4 (release candidate 1)
+==============================================
 
 *Release date: 18-NOV-2004*
 
@@ -29,11 +448,6 @@ Core and builtins
   the years-old thread shutdown race bug 225673.  Numeric history lesson
   aside, all bugs in all three reports are fixed now.
 
-
-Extension Modules
------------------
-
-...
 
 Library
 -------
@@ -69,37 +483,6 @@ C API
 -----
 
 - The PyRange_New() function is deprecated.
-
-
-Documentation
--------------
-
-...
-
-Tests
------
-
-...
-
-Windows
--------
-
-...
-
-Mac
----
-
-...
-
-New platforms
--------------
-
-...
-
-Tools/Demos
------------
-
-...
 
 
 What's New in Python 2.4 beta 2?
@@ -493,7 +876,7 @@ Library
 - The decimal package's Context.copy() method now returns deep copies.
 
 - Deprecated sys.exitfunc in favor of the atexit module.  The sys.exitfunc
-  attribute will be kept around for backwards compatability and atexit
+  attribute will be kept around for backwards compatibility and atexit
   will just become the one preferred way to do it.
 
 - patch #675551: Add get_history_item and replace_history_item functions
@@ -960,7 +1343,7 @@ Core and builtins
 
 - Optimized list resize operations to make fewer calls to the system
   realloc().  Significantly speeds up list appends, list pops,
-  list comprehensions, and the list contructor (when the input iterable
+  list comprehensions, and the list constructor (when the input iterable
   length is not known).
 
 - Changed the internal list over-allocation scheme.  For larger lists,

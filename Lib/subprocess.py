@@ -229,7 +229,7 @@ Replacing shell pipe line
 output=`dmesg | grep hda`
 ==>
 p1 = Popen(["dmesg"], stdout=PIPE)
-p2 = Popen(["grep", "hda"], stdin=p1.stdout)
+p2 = Popen(["grep", "hda"], stdin=p1.stdout, stdout=PIPE)
 output = p2.communicate()[0]
 
 
@@ -490,6 +490,7 @@ def list2cmdline(seq):
             result.extend(bs_buf)
 
         if needquote:
+            result.extend(bs_buf)
             result.append('"')
 
     return ''.join(result)
@@ -503,6 +504,9 @@ class Popen(object):
                  startupinfo=None, creationflags=0):
         """Create new Popen instance."""
         _cleanup()
+
+        if not isinstance(bufsize, (int, long)):
+            raise TypeError("bufsize must be an integer")
 
         if mswindows:
             if preexec_fn is not None:
@@ -982,6 +986,7 @@ class Popen(object):
             data = os.read(errpipe_read, 1048576) # Exceptions limited to 1 MB
             os.close(errpipe_read)
             if data != "":
+                os.waitpid(self.pid, 0)
                 child_exception = pickle.loads(data)
                 raise child_exception
 

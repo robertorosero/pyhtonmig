@@ -33,7 +33,7 @@ on most platforms.
 
 The Python interpreter and the extensive standard library are freely
 available in source or binary form for all major platforms from the
-Python Web site, \url{http://www.python.org/}, and can be freely
+Python Web site, \url{http://www.python.org/}, and may be freely
 distributed.  The same site also contains distributions of and
 pointers to many free third party Python modules, programs and tools,
 and additional documentation.
@@ -84,7 +84,7 @@ sufficiently familiar with C.
 
 Another situation: perhaps you have to work with several C libraries,
 and the usual C write/compile/test/re-compile cycle is too slow.  You
-need to develop software more quickly.  Possibly perhaps you've
+need to develop software more quickly.  Possibly you've
 written a program that could use an extension language, and you don't
 want to design a language, write and debug an interpreter for it, then
 tie it into your application.
@@ -100,11 +100,11 @@ types Python is applicable to a much larger problem domain than
 \emph{Awk} or even \emph{Perl}, yet many things are at least as easy
 in Python as in those languages.
 
-Python allows you to split up your program in modules that can be
+Python allows you to split your program in modules that can be
 reused in other Python programs.  It comes with a large collection of
 standard modules that you can use as the basis of your programs --- or
-as examples to start learning to program in Python.  There are also
-built-in modules that provide things like file I/O, system calls,
+as examples to start learning to program in Python.  Some of these
+modules provide things like file I/O, system calls,
 sockets, and even interfaces to graphical user interface toolkits like Tk.  
 
 Python is an interpreted language, which can save you considerable time
@@ -114,7 +114,7 @@ easy to experiment with features of the language, to write throw-away
 programs, or to test functions during bottom-up program development.
 It is also a handy desk calculator.
 
-Python allows writing very compact and readable programs.  Programs
+Python enables programs to written compactly and readably.  Programs
 written in Python are typically much shorter than equivalent C or
 \Cpp{} programs, for several reasons:
 \begin{itemize}
@@ -145,7 +145,7 @@ it is encouraged!
 
 Now that you are all excited about Python, you'll want to examine it
 in some more detail.  Since the best way to learn a language is
-using it, you are invited here to do so.
+to use it, you are invited to do so with this tutorial.
 
 In the next chapter, the mechanics of using the interpreter are
 explained.  This is rather mundane information, but essential for
@@ -283,7 +283,7 @@ the stack trace.  (Exceptions handled by an \keyword{except} clause in a
 unconditionally fatal and cause an exit with a nonzero exit; this
 applies to internal inconsistencies and some cases of running out of
 memory.  All error messages are written to the standard error stream;
-normal output from the executed commands is written to standard
+normal output from executed commands is written to standard
 output.
 
 Typing the interrupt character (usually Control-C or DEL) to the
@@ -603,7 +603,7 @@ several lines of text just as you would do in C.\n\
 print hello
 \end{verbatim}
 
-Note that newlines would still need to be embedded in the string using
+Note that newlines still need to be embedded in the string using
 \code{\e n}; the newline following the trailing backslash is
 discarded.  This example would print the following:
 
@@ -847,7 +847,7 @@ The built-in function \function{len()} returns the length of a string:
 Starting with Python 2.0 a new data type for storing text data is
 available to the programmer: the Unicode object. It can be used to
 store and manipulate Unicode data (see \url{http://www.unicode.org/})
-and integrates well with the existing string objects providing
+and integrates well with the existing string objects, providing
 auto-conversions where necessary.
 
 Unicode has the advantage of providing one ordinal for every character
@@ -978,8 +978,8 @@ concatenated and so on:
 ['eggs', 100]
 >>> a[:2] + ['bacon', 2*2]
 ['spam', 'eggs', 'bacon', 4]
->>> 3*a[:3] + ['Boe!']
-['spam', 'eggs', 100, 'spam', 'eggs', 100, 'spam', 'eggs', 100, 'Boe!']
+>>> 3*a[:3] + ['Boo!']
+['spam', 'eggs', 100, 'spam', 'eggs', 100, 'spam', 'eggs', 100, 'Boo!']
 \end{verbatim}
 
 Unlike strings, which are \emph{immutable}, it is possible to change
@@ -1217,7 +1217,7 @@ containing arithmetic progressions:
 \end{verbatim}
 
 The given end point is never part of the generated list;
-\code{range(10)} generates a list of 10 values, exactly the legal
+\code{range(10)} generates a list of 10 values, the legal
 indices for items of a sequence of length 10.  It is possible to let
 the range start at another number, or to specify a different increment
 (even negative; sometimes this is called the `step'):
@@ -1416,7 +1416,7 @@ define different methods.  Methods of different types may have the
 same name without causing ambiguity.  (It is possible to define your
 own object types and methods, using \emph{classes}, as discussed later
 in this tutorial.)
-The method \method{append()} shown in the example, is defined for
+The method \method{append()} shown in the example is defined for
 list objects; it adds a new element at the end of the list.  In this
 example it is equivalent to \samp{result = result + [b]}, but more
 efficient.
@@ -1511,7 +1511,7 @@ instance, the following function:
 \begin{verbatim}
 def parrot(voltage, state='a stiff', action='voom', type='Norwegian Blue'):
     print "-- This parrot wouldn't", action,
-    print "if you put", voltage, "Volts through it."
+    print "if you put", voltage, "volts through it."
     print "-- Lovely plumage, the", type
     print "-- It's", state, "!"
 \end{verbatim}
@@ -1553,8 +1553,9 @@ TypeError: function() got multiple values for keyword argument 'a'
 \end{verbatim}
 
 When a final formal parameter of the form \code{**\var{name}} is
-present, it receives a \ulink{dictionary}{../lib/typesmapping.html} containing all keyword arguments
-whose keyword doesn't correspond to a formal parameter.  This may be
+present, it receives a \ulink{dictionary}{../lib/typesmapping.html}
+containing all keyword arguments except for those corresponding to
+a formal parameter.  This may be
 combined with a formal parameter of the form
 \code{*\var{name}} (described in the next subsection) which receives a
 tuple containing the positional arguments beyond the formal parameter
@@ -1635,7 +1636,7 @@ are not available separately, write the function call with the
 \subsection{Lambda Forms \label{lambda}}
 
 By popular demand, a few features commonly found in functional
-programming languages and Lisp have been added to Python.  With the
+programming languages like Lisp have been added to Python.  With the
 \keyword{lambda} keyword, small anonymous functions can be created.
 Here's a function that returns the sum of its two arguments:
 \samp{lambda a, b: a+b}.  Lambda forms can be used wherever function
@@ -1742,8 +1743,8 @@ It is an error if there is no such item.
 
 \begin{methoddesc}[list]{pop}{\optional{i}}
 Remove the item at the given position in the list, and return it.  If
-no index is specified, \code{a.pop()} returns the last item in the
-list.  The item is also removed from the list.  (The square brackets
+no index is specified, \code{a.pop()} removes and returns the last item
+in the list.  The item is also removed from the list.  (The square brackets
 around the \var{i} in the method signature denote that the parameter
 is optional, not that you should type square brackets at that
 position.  You will see this notation frequently in the
@@ -1846,10 +1847,12 @@ use \method{pop()} with \code{0} as the index.  For example:
 There are three built-in functions that are very useful when used with
 lists: \function{filter()}, \function{map()}, and \function{reduce()}.
 
-\samp{filter(\var{function}, \var{sequence})} returns a sequence (of
-the same type, if possible) consisting of those items from the
-sequence for which \code{\var{function}(\var{item})} is true.  For
-example, to compute some primes:
+\samp{filter(\var{function}, \var{sequence})} returns a sequence
+consisting of those items from the
+sequence for which \code{\var{function}(\var{item})} is true.
+If \var{sequence} is a \class{string} or \class{tuple}, the result will
+be of the same type; otherwise, it is always a \class{list}.
+For example, to compute some primes:
 
 \begin{verbatim}
 >>> def f(x): return x % 2 != 0 and x % 3 != 0
@@ -1883,8 +1886,8 @@ is shorter than another).  For example:
 [0, 2, 4, 6, 8, 10, 12, 14]
 \end{verbatim}
 
-\samp{reduce(\var{func}, \var{sequence})} returns a single value
-constructed by calling the binary function \var{func} on the first two
+\samp{reduce(\var{function}, \var{sequence})} returns a single value
+constructed by calling the binary function \var{function} on the first two
 items of the sequence, then on the result and the next item, and so
 on.  For example, to compute the sum of the numbers 1 through 10:
 
@@ -1963,7 +1966,7 @@ SyntaxError: invalid syntax
 \end{verbatim}
 
 List comprehensions are much more flexible than \function{map()} and can be
-applied to functions with more than one argument and to nested functions:
+applied to complex expressions and nested functions:
 
 \begin{verbatim}
 >>> [str(round(355/113.0, i)) for i in range(1,6)]
@@ -1974,7 +1977,9 @@ applied to functions with more than one argument and to nested functions:
 \section{The \keyword{del} statement \label{del}}
 
 There is a way to remove an item from a list given its index instead
-of its value: the \keyword{del} statement.  This can also be used to
+of its value: the \keyword{del} statement.  Unlike the \method{pop()})
+method which returns a value, the \keyword{del} keyword is a statement 
+and can also be used to
 remove slices from a list (which we did earlier by assignment of an
 empty list to the slice).  For example:
 
@@ -2023,7 +2028,7 @@ instance:
 ((12345, 54321, 'hello!'), (1, 2, 3, 4, 5))
 \end{verbatim}
 
-As you see, on output tuples are alway enclosed in parentheses, so
+As you see, on output tuples are always enclosed in parentheses, so
 that nested tuples are interpreted correctly; they may be input with
 or without surrounding parentheses, although often parentheses are
 necessary anyway (if the tuple is part of a larger expression).
@@ -2063,7 +2068,7 @@ is also possible:
 \end{verbatim}
 
 This is called, appropriately enough, \emph{sequence unpacking}.
-Sequence unpacking requires that the list of variables on the left
+Sequence unpacking requires the list of variables on the left to
 have the same number of elements as the length of the sequence.  Note
 that multiple assignment is really just a combination of tuple packing
 and sequence unpacking!
@@ -2086,12 +2091,12 @@ Here is a brief demonstration:
 
 \begin{verbatim}
 >>> basket = ['apple', 'orange', 'apple', 'pear', 'orange', 'banana']
->>> fruits = set(basket)               # create a set without duplicates
->>> fruits
+>>> fruit = set(basket)               # create a set without duplicates
+>>> fruit
 set(['orange', 'pear', 'apple', 'banana'])
->>> 'orange' in fruits                 # fast membership testing
+>>> 'orange' in fruit                 # fast membership testing
 True
->>> 'crabgrass' in fruits
+>>> 'crabgrass' in fruit
 False
 
 >>> # Demonstrate set operations on unique letters from two words
@@ -2122,8 +2127,8 @@ which can be any immutable type; strings and numbers can always be
 keys.  Tuples can be used as keys if they contain only strings,
 numbers, or tuples; if a tuple contains any mutable object either
 directly or indirectly, it cannot be used as a key.  You can't use
-lists as keys, since lists can be modified in place using their
-\method{append()} and \method{extend()} methods, as well as slice and
+lists as keys, since lists can be modified in place using methods like
+\method{append()} and \method{extend()} or modified with slice and
 indexed assignments.
 
 It is best to think of a dictionary as an unordered set of
@@ -2145,8 +2150,8 @@ value using a non-existent key.
 The \method{keys()} method of a dictionary object returns a list of all
 the keys used in the dictionary, in arbitrary order (if you want it
 sorted, just apply the \method{sort()} method to the list of keys).  To
-check whether a single key is in the dictionary, use the
-\method{has_key()} method of the dictionary.
+check whether a single key is in the dictionary, either use the dictionary's
+\method{has_key()} method or the \keyword{in} keyword.
 
 Here is a small example using a dictionary:
 
@@ -2165,6 +2170,8 @@ Here is a small example using a dictionary:
 ['guido', 'irv', 'jack']
 >>> tel.has_key('guido')
 True
+>>> 'guido' in tel
+True
 \end{verbatim}
 
 The \function{dict()} constructor builds dictionaries directly from
@@ -2174,8 +2181,20 @@ pattern, list comprehensions can compactly specify the key-value list.
 \begin{verbatim}
 >>> dict([('sape', 4139), ('guido', 4127), ('jack', 4098)])
 {'sape': 4139, 'jack': 4098, 'guido': 4127}
->>> dict([(x, x**2) for x in vec])     # use a list comprehension
+>>> dict([(x, x**2) for x in (2, 4, 6)])     # use a list comprehension
 {2: 4, 4: 16, 6: 36}
+\end{verbatim}
+
+Later in the tutorial, we will learn about Generator Expressions
+which are even better suited for the task of supplying key-values pairs to
+the \function{dict()} constructor.
+
+When the keys are simple strings, it is sometimes easier to specify
+pairs using keyword arguments:
+
+\begin{verbatim}
+>>> dict(sape=4139, guido=4127, jack=4098)
+{'sape': 4139, 'jack': 4098, 'guido': 4127}
 \end{verbatim}
 
 
@@ -2266,7 +2285,7 @@ Comparisons can be chained.  For example, \code{a < b == c} tests
 whether \code{a} is less than \code{b} and moreover \code{b} equals
 \code{c}.
 
-Comparisons may be combined by the Boolean operators \code{and} and
+Comparisons may be combined using the Boolean operators \code{and} and
 \code{or}, and the outcome of a comparison (or of any other Boolean
 expression) may be negated with \code{not}.  These have lower
 priorities than comparison operators; between them, \code{not} has
@@ -2279,9 +2298,9 @@ The Boolean operators \code{and} and \code{or} are so-called
 left to right, and evaluation stops as soon as the outcome is
 determined.  For example, if \code{A} and \code{C} are true but
 \code{B} is false, \code{A and B and C} does not evaluate the
-expression \code{C}.  In general, the return value of a short-circuit
-operator, when used as a general value and not as a Boolean, is the
-last evaluated argument.
+expression \code{C}.  When used as a general value and not as a
+Boolean, the return value of a short-circuit operator is the last
+evaluated argument.
 
 It is possible to assign the result of a comparison or other Boolean
 expression to a variable.  For example,
@@ -2312,8 +2331,8 @@ items of two sequences compare equal, the sequences are considered
 equal.  If one sequence is an initial sub-sequence of the other, the
 shorter sequence is the smaller (lesser) one.  Lexicographical
 ordering for strings uses the \ASCII{} ordering for individual
-characters.  Some examples of comparisons between sequences with the
-same types:
+characters.  Some examples of comparisons between sequences of the
+same type:
 
 \begin{verbatim}
 (1, 2, 3)              < (1, 2, 4)
@@ -2594,7 +2613,7 @@ C>
 These two variables are only defined if the interpreter is in
 interactive mode.
 
-The variable \code{sys.path} is a list of strings that determine the
+The variable \code{sys.path} is a list of strings that determines the
 interpreter's search path for modules. It is initialized to a default
 path taken from the environment variable \envvar{PYTHONPATH}, or from
 a built-in default if \envvar{PYTHONPATH} is not set.  You can modify
@@ -2632,10 +2651,10 @@ currently:
 
 \begin{verbatim}
 >>> a = [1, 2, 3, 4, 5]
->>> import fibo, sys
+>>> import fibo
 >>> fib = fibo.fib
 >>> dir()
-['__name__', 'a', 'fib', 'fibo', 'sys']
+['__builtins__', '__doc__', '__file__', '__name__', 'a', 'fib', 'fibo', 'sys']
 \end{verbatim}
 
 Note that it lists all types of names: variables, modules, functions, etc.
@@ -2647,27 +2666,29 @@ standard module \module{__builtin__}\refbimodindex{__builtin__}:
 \begin{verbatim}
 >>> import __builtin__
 >>> dir(__builtin__)
-['ArithmeticError', 'AssertionError', 'AttributeError',
- 'DeprecationWarning', 'EOFError', 'Ellipsis', 'EnvironmentError',
- 'Exception', 'False', 'FloatingPointError', 'IOError', 'ImportError',
+['ArithmeticError', 'AssertionError', 'AttributeError', 'DeprecationWarning',
+ 'EOFError', 'Ellipsis', 'EnvironmentError', 'Exception', 'False',
+ 'FloatingPointError', 'FutureWarning', 'IOError', 'ImportError',
  'IndentationError', 'IndexError', 'KeyError', 'KeyboardInterrupt',
  'LookupError', 'MemoryError', 'NameError', 'None', 'NotImplemented',
  'NotImplementedError', 'OSError', 'OverflowError', 'OverflowWarning',
- 'PendingDeprecationWarning', 'ReferenceError',
- 'RuntimeError', 'RuntimeWarning', 'StandardError', 'StopIteration',
- 'SyntaxError', 'SyntaxWarning', 'SystemError', 'SystemExit', 'TabError',
- 'True', 'TypeError', 'UnboundLocalError', 'UnicodeError', 'UserWarning',
- 'ValueError', 'Warning', 'ZeroDivisionError', '__debug__', '__doc__',
- '__import__', '__name__', 'abs', 'apply', 'bool', 'buffer',
- 'callable', 'chr', 'classmethod', 'cmp', 'coerce', 'compile', 'complex',
- 'copyright', 'credits', 'delattr', 'dict', 'dir', 'divmod',
+ 'PendingDeprecationWarning', 'ReferenceError', 'RuntimeError',
+ 'RuntimeWarning', 'StandardError', 'StopIteration', 'SyntaxError',
+ 'SyntaxWarning', 'SystemError', 'SystemExit', 'TabError', 'True',
+ 'TypeError', 'UnboundLocalError', 'UnicodeDecodeError',
+ 'UnicodeEncodeError', 'UnicodeError', 'UnicodeTranslateError',
+ 'UserWarning', 'ValueError', 'Warning', 'WindowsError',
+ 'ZeroDivisionError', '_', '__debug__', '__doc__', '__import__',
+ '__name__', 'abs', 'apply', 'basestring', 'bool', 'buffer',
+ 'callable', 'chr', 'classmethod', 'cmp', 'coerce', 'compile',
+ 'complex', 'copyright', 'credits', 'delattr', 'dict', 'dir', 'divmod',
  'enumerate', 'eval', 'execfile', 'exit', 'file', 'filter', 'float',
- 'getattr', 'globals', 'hasattr', 'hash', 'help', 'hex', 'id',
- 'input', 'int', 'intern', 'isinstance', 'issubclass', 'iter',
+ 'frozenset', 'getattr', 'globals', 'hasattr', 'hash', 'help', 'hex',
+ 'id', 'input', 'int', 'intern', 'isinstance', 'issubclass', 'iter',
  'len', 'license', 'list', 'locals', 'long', 'map', 'max', 'min',
- 'object', 'oct', 'open', 'ord', 'pow', 'property', 'quit',
- 'range', 'raw_input', 'reduce', 'reload', 'repr', 'round',
- 'setattr', 'slice', 'staticmethod', 'str', 'string', 'sum', 'super',
+ 'object', 'oct', 'open', 'ord', 'pow', 'property', 'quit', 'range',
+ 'raw_input', 'reduce', 'reload', 'repr', 'reversed', 'round', 'set',
+ 'setattr', 'slice', 'sorted', 'staticmethod', 'str', 'sum', 'super',
  'tuple', 'type', 'unichr', 'unicode', 'vars', 'xrange', 'zip']
 \end{verbatim}
 
@@ -2824,8 +2845,8 @@ import the three named submodules of the \module{Sound} package.
 If \code{__all__} is not defined, the statement \code{from Sound.Effects
 import *} does \emph{not} import all submodules from the package
 \module{Sound.Effects} into the current namespace; it only ensures that the
-package \module{Sound.Effects} has been imported (possibly running its
-initialization code, \file{__init__.py}) and then imports whatever names are
+package \module{Sound.Effects} has been imported (possibly running any
+initialization code in \file{__init__.py}) and then imports whatever names are
 defined in the package.  This includes any names defined (and
 submodules explicitly loaded) by \file{__init__.py}.  It also includes any
 submodules of the package that were explicitly loaded by previous
@@ -2907,7 +2928,7 @@ Often you'll want more control over the formatting of your output than
 simply printing space-separated values.  There are two ways to format
 your output; the first way is to do all the string handling yourself;
 using string slicing and concatenation operations you can create any
-lay-out you can imagine.  The standard module
+layout you can imagine.  The standard module
 \module{string}\refstmodindex{string} contains some useful operations
 for padding strings to a given column width; these will be discussed
 shortly.  The second way is to use the \code{\%} operator with a
@@ -2919,8 +2940,9 @@ resulting from this formatting operation.
 One question remains, of course: how do you convert values to strings?
 Luckily, Python has ways to convert any value to a string: pass it to
 the \function{repr()}  or \function{str()} functions.  Reverse quotes
-(\code{``}) are equivalent to \function{repr()}, but their use is
-discouraged.
+(\code{``}) are equivalent to \function{repr()}, but they are no
+longer used in modern Python code and will likely not be in future
+versions of the language.
 
 The \function{str()} function is meant to return representations of
 values which are fairly human-readable, while \function{repr()} is
@@ -3008,7 +3030,7 @@ the input string is too long, they don't truncate it, but return it
 unchanged; this will mess up your column lay-out but that's usually
 better than the alternative, which would be lying about a value.  (If
 you really want truncation you can always add a slice operation, as in
-\samp{x.ljust(~n)[:n]}.)
+\samp{x.ljust(n)[:n]}.)
 
 There is another method, \method{zfill()}, which pads a
 numeric string on the left with zeros.  It understands about plus and
@@ -3096,10 +3118,9 @@ mode opens the file in binary mode, so there are also modes like
 distinction between text and binary files; the end-of-line characters
 in text files are automatically altered slightly when data is read or
 written.  This behind-the-scenes modification to file data is fine for
-\ASCII{} text files, but it'll corrupt binary data like that in JPEGs or
-\file{.EXE} files.  Be very careful to use binary mode when reading and
-writing such files.  (Note that the precise semantics of text mode on
-the Macintosh depends on the underlying C library being used.)
+\ASCII{} text files, but it'll corrupt binary data like that in \file{JPEG} or
+\file{EXE} files.  Be very careful to use binary mode when reading and
+writing such files.
 
 \subsection{Methods of File Objects \label{fileMethods}}
 
@@ -3149,6 +3170,21 @@ entire file in memory.  Only complete lines will be returned.
 >>> f.readlines()
 ['This is the first line of the file.\n', 'Second line of the file\n']
 \end{verbatim}
+
+An alternate approach to reading lines is to loop over the file object.
+This is memory efficient, fast, and leads to simpler code:
+
+\begin{verbatim}
+>>> for line in f:
+        print line,
+        
+This is the first line of the file.
+Second line of the file
+\end{verbatim}
+
+The alternative approach is simpler but does not provide as fine-grained
+control.  Since the two approaches manage line buffering differently,
+they should not be mixed.
 
 \code{f.write(\var{string})} writes the contents of \var{string} to
 the file, returning \code{None}.  
@@ -3322,12 +3358,12 @@ it is a useful convention).
 Standard exception names are built-in identifiers (not reserved
 keywords).
 
-The rest of the line is a detail whose interpretation depends on the
-exception type; its meaning is dependent on the exception type.
+The rest of the line provides detail based on the type of exception
+and what caused it.
 
 The preceding part of the error message shows the context where the
-exception happened, in the form of a stack backtrace.
-In general it contains a stack backtrace listing source lines; however,
+exception happened, in the form of a stack traceback.
+In general it contains a stack traceback listing source lines; however,
 it will not display lines read from standard input.
 
 The \citetitle[../lib/module-exceptions.html]{Python Library
@@ -3349,7 +3385,7 @@ raising the \exception{KeyboardInterrupt} exception.
 ...         x = int(raw_input("Please enter a number: "))
 ...         break
 ...     except ValueError:
-...         print "Oops! That was no valid number.  Try again..."
+...         print "Oops!  That was no valid number.  Try again..."
 ...     
 \end{verbatim}
 
@@ -3367,9 +3403,8 @@ execution of the \keyword{try} statement is finished.
 \item
 If an exception occurs during execution of the try clause, the rest of
 the clause is skipped.  Then if its type matches the exception named
-after the \keyword{except} keyword, the rest of the try clause is
-skipped, the except clause is executed, and then execution continues
-after the \keyword{try} statement.
+after the \keyword{except} keyword, the except clause is executed, and
+then execution continues after the \keyword{try} statement.
 
 \item
 If an exception occurs which does not match the exception named in the
@@ -3384,7 +3419,7 @@ specify handlers for different exceptions.  At most one handler will
 be executed.  Handlers only handle exceptions that occur in the
 corresponding try clause, not in other handlers of the same
 \keyword{try} statement.  An except clause may name multiple exceptions
-as a parenthesized list, for example:
+as a parenthesized tuple, for example:
 
 \begin{verbatim}
 ... except (RuntimeError, TypeError, NameError):
@@ -3439,7 +3474,7 @@ When an exception occurs, it may have an associated value, also known as
 the exception's \emph{argument}.
 The presence and type of the argument depend on the exception type.
 
-The except clause may specify a variable after the exception name (or list).
+The except clause may specify a variable after the exception name (or tuple).
 The variable is bound to an exception instance with the arguments stored
 in \code{instance.args}.  For convenience, the exception instance
 defines \method{__getitem__} and \method{__str__} so the arguments can
@@ -3480,7 +3515,7 @@ For example:
 ... except ZeroDivisionError, detail:
 ...     print 'Handling run-time error:', detail
 ... 
-Handling run-time error: integer division or modulo
+Handling run-time error: integer division or modulo by zero
 \end{verbatim}
 
 
@@ -3499,7 +3534,9 @@ NameError: HiThere
 
 The first argument to \keyword{raise} names the exception to be
 raised.  The optional second argument specifies the exception's
-argument.
+argument.  Alternatively, the above could be written as
+\code{raise NameError('HiThere')}.  Either form works fine, but there
+seems to be a growing stylistic preference for the latter.
 
 If you need to determine whether an exception was raised but don't
 intend to handle it, a simpler form of the \keyword{raise} statement
@@ -3545,10 +3582,15 @@ Traceback (most recent call last):
 __main__.MyError: 'oops!'
 \end{verbatim}
 
+In this example, the default \method{__init__} of \class{Exception}
+has been overridden.  The new behavior simply creates the \var{value}
+attribute.  This replaces the default behavior of creating the
+\var{args} attribute.
+
 Exception classes can be defined which do anything any other class can
 do, but are usually kept simple, often only offering a number of
 attributes that allow information about the error to be extracted by
-handlers for the exception.  When creating a module which can raise
+handlers for the exception.  When creating a module that can raise
 several distinct errors, a common practice is to create a base class
 for exceptions defined by that module, and subclass that to create
 specific exception classes for different error conditions:
@@ -3620,10 +3662,11 @@ left via a \keyword{break} or \keyword{return} statement.
 
 The code in the finally clause is useful for releasing external
 resources (such as files or network connections), regardless of
-whether or not the use of the resource was successful.
+whether the use of the resource was successful.
 
 A \keyword{try} statement must either have one or more except clauses
-or one finally clause, but not both.
+or one finally clause, but not both (because it would be unclear which
+clause should be executed first).
 
 
 \chapter{Classes \label{classes}}
@@ -3636,7 +3679,7 @@ rely on the politeness of the user not to ``break into the
 definition.''  The most important features of classes are retained
 with full power, however: the class inheritance mechanism allows
 multiple base classes, a derived class can override any methods of its
-base class or classes, a method can call the method of a base class with the
+base class or classes, and a method can call the method of a base class with the
 same name.  Objects can contain an arbitrary amount of private data.
 
 In \Cpp{} terminology, all class members (including the data members) are
@@ -3758,10 +3801,13 @@ names.
 
 If a name is declared global, then all references and assignments go
 directly to the middle scope containing the module's global names.
-Otherwise, all variables found outside of the innermost scope are read-only.
+Otherwise, all variables found outside of the innermost scope are read-only
+(an attempt to write to such a variable will simply create a \emph{new}
+local variable in the innermost scope, leaving the identically named
+outer variable unchanged).
 
 Usually, the local scope references the local names of the (textually)
-current function.  Outside of functions, the local scope references
+current function.  Outside functions, the local scope references
 the same namespace as the global scope: the module's namespace.
 Class definitions place yet another namespace in the local scope.
 
@@ -3825,7 +3871,7 @@ When a class definition is left normally (via the end), a \emph{class
 object} is created.  This is basically a wrapper around the contents
 of the namespace created by the class definition; we'll learn more
 about class objects in the next section.  The original local scope
-(the one in effect just before the class definitions was entered) is
+(the one in effect just before the class definition was entered) is
 reinstated, and the class object is bound here to the class name given
 in the class definition header (\class{ClassName} in the example).
 
@@ -3850,7 +3896,7 @@ class MyClass:
 \end{verbatim}
 
 then \code{MyClass.i} and \code{MyClass.f} are valid attribute
-references, returning an integer and a method object, respectively.
+references, returning an integer and a function object, respectively.
 Class attributes can also be assigned to, so you can change the value
 of \code{MyClass.i} by assignment.  \member{__doc__} is also a valid
 attribute, returning the docstring belonging to the class: \code{"A
@@ -3868,8 +3914,9 @@ creates a new \emph{instance} of the class and assigns this object to
 the local variable \code{x}.
 
 The instantiation operation (``calling'' a class object) creates an
-empty object.  Many classes like to create objects in a known initial
-state.  Therefore a class may define a special method named
+empty object.  Many classes like to create objects with instances
+customized to a specific initial state.
+Therefore a class may define a special method named
 \method{__init__()}, like this:
 
 \begin{verbatim}
@@ -3907,9 +3954,9 @@ example,
 
 Now what can we do with instance objects?  The only operations
 understood by instance objects are attribute references.  There are
-two kinds of valid attribute names.
+two kinds of valid attribute names, data attributes and methods.
 
-The first I'll call \emph{data attributes}.  These correspond to
+\emph{data attributes} correspond to
 ``instance variables'' in Smalltalk, and to ``data members'' in
 \Cpp.  Data attributes need not be declared; like local variables,
 they spring into existence when they are first assigned to.  For
@@ -3925,16 +3972,16 @@ print x.counter
 del x.counter
 \end{verbatim}
 
-The second kind of attribute references understood by instance objects
-are \emph{methods}.  A method is a function that ``belongs to'' an
+The other kind of instance attribute reference is a \emph{method}.
+A method is a function that ``belongs to'' an
 object.  (In Python, the term method is not unique to class instances:
 other object types can have methods as well.  For example, list objects have
 methods called append, insert, remove, sort, and so on.  However,
-below, we'll use the term method exclusively to mean methods of class
-instance objects, unless explicitly stated otherwise.)
+in the following discussion, we'll use the term method exclusively to mean
+methods of class instance objects, unless explicitly stated otherwise.)
 
 Valid method names of an instance object depend on its class.  By
-definition, all attributes of a class that are (user-defined) function 
+definition, all attributes of a class that are function 
 objects define corresponding methods of its instances.  So in our
 example, \code{x.f} is a valid method reference, since
 \code{MyClass.f} is a function, but \code{x.i} is not, since
@@ -3945,13 +3992,13 @@ a function object.
 
 \subsection{Method Objects \label{methodObjects}}
 
-Usually, a method is called immediately:
+Usually, a method is called right after it is bound:
 
 \begin{verbatim}
 x.f()
 \end{verbatim}
 
-In our example, this will return the string \code{'hello world'}.
+In the \class{MyClass} example, this will return the string \code{'hello world'}.
 However, it is not necessary to call a method right away:
 \code{x.f} is a method object, and can be stored away and called at a
 later time.  For example:
@@ -4029,12 +4076,12 @@ the readability of methods: there is no chance of confusing local
 variables and instance variables when glancing through a method.
 
 
-Conventionally, the first argument of methods is often called
+Often, the first argument of a method is called
 \code{self}.  This is nothing more than a convention: the name
 \code{self} has absolutely no special meaning to Python.  (Note,
 however, that by not following the convention your code may be less
-readable by other Python programmers, and it is also conceivable that
-a \emph{class browser} program be written which relies upon such a
+readable to other Python programmers, and it is also conceivable that
+a \emph{class browser} program might be written that relies upon such a
 convention.)
 
 
@@ -4093,7 +4140,7 @@ reasons why a method would want to reference its own class!
 
 Of course, a language feature would not be worthy of the name ``class''
 without supporting inheritance.  The syntax for a derived class
-definition looks as follows:
+definition looks like this:
 
 \begin{verbatim}
 class DerivedClassName(BaseClassName):
@@ -4105,9 +4152,9 @@ class DerivedClassName(BaseClassName):
 \end{verbatim}
 
 The name \class{BaseClassName} must be defined in a scope containing
-the derived class definition.  Instead of a base class name, an
-expression is also allowed.  This is useful when the base class is
-defined in another module,
+the derived class definition.  In place of a base class name, other
+arbitrary expressions are also allowed.  This can be useful, for
+example, when the base class is defined in another module:
 
 \begin{verbatim}
 class DerivedClassName(modname.BaseClassName):
@@ -4116,7 +4163,7 @@ class DerivedClassName(modname.BaseClassName):
 Execution of a derived class definition proceeds the same as for a
 base class.  When the class object is constructed, the base class is
 remembered.  This is used for resolving attribute references: if a
-requested attribute is not found in the class, it is searched in the
+requested attribute is not found in the class, the search proceeds to look in the
 base class.  This rule is applied recursively if the base class itself
 is derived from some other class.
 
@@ -4129,7 +4176,7 @@ and the method reference is valid if this yields a function object.
 Derived classes may override methods of their base classes.  Because
 methods have no special privileges when calling other methods of the
 same object, a method of a base class that calls another method
-defined in the same base class, may in fact end up calling a method of
+defined in the same base class may end up calling a method of
 a derived class that overrides it.  (For \Cpp{} programmers: all methods
 in Python are effectively \keyword{virtual}.)
 
@@ -4144,7 +4191,7 @@ the base class is defined or imported directly in the global scope.)
 \subsection{Multiple Inheritance \label{multiple}}
 
 Python supports a limited form of multiple inheritance as well.  A
-class definition with multiple base classes looks as follows:
+class definition with multiple base classes looks like this:
 
 \begin{verbatim}
 class DerivedClassName(Base1, Base2, Base3):
@@ -4180,6 +4227,7 @@ in this case (the instance will have a single copy of ``instance
 variables'' or data attributes used by the common base class), it is
 not clear that these semantics are in any way useful.
 
+%% XXX Add rules for new-style MRO?
 
 \section{Private Variables \label{private}}
 
@@ -4188,9 +4236,9 @@ identifiers.  Any identifier of the form \code{__spam} (at least two
 leading underscores, at most one trailing underscore) is textually
 replaced with \code{_classname__spam}, where \code{classname} is the
 current class name with leading underscore(s) stripped.  This mangling
-is done without regard of the syntactic position of the identifier, so
+is done without regard to the syntactic position of the identifier, so
 it can be used to define class-private instance and class variables,
-methods, as well as globals, and even to store instance variables
+methods, variables stored in globals, and even variables stored in instances.
 private to this class on instances of \emph{other} classes.  Truncation
 may occur when the mangled name would be longer than 255 characters.
 Outside classes, or when the class name consists of only underscores,
@@ -4219,7 +4267,7 @@ when referencing \code{__dict__} directly.
 \section{Odds and Ends \label{odds}}
 
 Sometimes it is useful to have a data type similar to the Pascal
-``record'' or C ``struct'', bundling together a couple of named data
+``record'' or C ``struct'', bundling together a few named data
 items.  An empty class definition will do nicely:
 
 \begin{verbatim}
@@ -4238,7 +4286,7 @@ A piece of Python code that expects a particular abstract data type
 can often be passed a class that emulates the methods of that data
 type instead.  For instance, if you have a function that formats some
 data from a file object, you can define a class with methods
-\method{read()} and \method{readline()} that gets the data from a string
+\method{read()} and \method{readline()} that get the data from a string
 buffer instead, and pass it as an argument.%  (Unfortunately, this
 %technique has its limitations: a class can't define operations that
 %are accessed by special syntax such as sequence subscripting or
@@ -4248,7 +4296,7 @@ buffer instead, and pass it as an argument.%  (Unfortunately, this
 
 
 Instance method objects have attributes, too: \code{m.im_self} is the
-object of which the method is an instance, and \code{m.im_func} is the
+instance object with the method \method{m}, and \code{m.im_func} is the
 function object corresponding to the method.
 
 
@@ -4302,15 +4350,15 @@ Note that if the except clauses were reversed (with
 \samp{except B} first), it would have printed B, B, B --- the first
 matching except clause is triggered.
 
-When an error message is printed for an unhandled exception which is a
-class, the class name is printed, then a colon and a space, and
+When an error message is printed for an unhandled exception, the
+exception's class name is printed, then a colon and a space, and
 finally the instance converted to a string using the built-in function
 \function{str()}.
 
 
 \section{Iterators\label{iterators}}
 
-By now, you've probably noticed that most container objects can be looped
+By now you have probably noticed that most container objects can be looped
 over using a \keyword{for} statement:
 
 \begin{verbatim}
@@ -4349,7 +4397,7 @@ to terminate.  This example shows how it all works:
 >>> it.next()
 
 Traceback (most recent call last):
-  File "<pyshell#6>", line 1, in -toplevel-
+  File "<stdin>", line 1, in ?
     it.next()
 StopIteration
 \end{verbatim}
@@ -4413,7 +4461,7 @@ created automatically.
 
 Another key feature is that the local variables and execution state
 are automatically saved between calls.  This made the function easier to write
-and much more clear than an approach using class variables like
+and much more clear than an approach using instance variables like
 \code{self.index} and \code{self.data}.
 
 In addition to automatic method creation and saving program state, when
@@ -4517,7 +4565,7 @@ wildcard searches:
 
 \section{Command Line Arguments\label{command-line-arguments}}
 
-Common utility scripts often invoke processing command line arguments.
+Common utility scripts often need to process command line arguments.
 These arguments are stored in the
 \ulink{\module{sys}}{../lib/module-sys.html}\ module's \var{argv}
 attribute as a list.  For instance the following output results from
@@ -4544,7 +4592,7 @@ module also has attributes for \var{stdin}, \var{stdout}, and
 messages to make them visible even when \var{stdout} has been redirected:
 
 \begin{verbatim}
->>> sys.stderr.write('Warning, log file not found starting a new one')
+>>> sys.stderr.write('Warning, log file not found starting a new one\n')
 Warning, log file not found starting a new one
 \end{verbatim}
 
@@ -4622,8 +4670,8 @@ for sending mail:
 
 >>> import smtplib
 >>> server = smtplib.SMTP('localhost')
->>> server.sendmail('soothsayer@example.org', 'jceasar@example.org',
-"""To: jceasar@example.org
+>>> server.sendmail('soothsayer@example.org', 'jcaesar@example.org',
+"""To: jcaesar@example.org
 From: soothsayer@example.org
 
 Beware the Ides of March.
@@ -4647,8 +4695,8 @@ that are time zone aware.
 >>> now = date.today()
 >>> now
 datetime.date(2003, 12, 2)
->>> now.strftime("%m-%d-%y or %d%b %Y is a %A on the %d day of %B")
-'12-02-03 or 02Dec 2003 is a Tuesday on the 02 day of December'
+>>> now.strftime("%m-%d-%y. %d %b %Y is a %A on the %d day of %B.")
+'12-02-03. 02 Dec 2003 is a Tuesday on the 02 day of December.'
 
 # dates support calendar arithmetic
 >>> birthday = date(1964, 7, 31)
@@ -4678,15 +4726,15 @@ by modules including:
 37
 >>> zlib.decompress(t)
 'witch which has which witches wrist watch'
->>> zlib.crc32(t)
--1438085031
+>>> zlib.crc32(s)
+226805979
 \end{verbatim}
 
 
 \section{Performance Measurement\label{performance-measurement}}
 
 Some Python users develop a deep interest in knowing the relative
-performance between different approaches to the same problem.
+performance of different approaches to the same problem.
 Python provides a measurement tool that answers those questions
 immediately.
 
@@ -4766,7 +4814,7 @@ packages. For example:
   Despite the names, no direct knowledge or handling of XML is needed.
 \item The \ulink{\module{email}}{../lib/module-email.html} package is a library
   for managing email messages, including MIME and other RFC 2822-based message
-  documents. Unlike \module{smptlib} and \module{poplib} which actually send
+  documents. Unlike \module{smtplib} and \module{poplib} which actually send
   and receive messages, the email package has a complete toolset for building
   or decoding complex message structures (including attachments) and for
   implementing internet encoding and header protocols.
@@ -4850,7 +4898,7 @@ with group separators:
     >>> locale.format("%d", x, grouping=True)
     '1,234,567'
     >>> locale.format("%s%.*f", (conv['currency_symbol'],
-    ...	      conv['int_frac_digits'], x), grouping=True)
+    ...	      conv['frac_digits'], x), grouping=True)
     '$1,234,567.80'
 \end{verbatim}
 
@@ -4917,8 +4965,8 @@ img_1077.jpg --> Ashley_2.jpg
 \end{verbatim}
 
 Another application for templating is separating program logic from the
-details of multiple output formats.  The makes it possible to substitute
-custom templates for XML files, plain text reports, and HMTL web reports.
+details of multiple output formats.  This makes it possible to substitute
+custom templates for XML files, plain text reports, and HTML web reports.
 
 
 \section{Working with Binary Data Record Layouts\label{binary-formats}}
@@ -4938,7 +4986,7 @@ numbers respectively):
     for i in range(3):                      # show the first 3 file headers
         start += 14
         fields = struct.unpack('LLLHH', data[start:start+16])
-        crc32, comp_size, uncomp_size, filenamesize, extra_size =  fields
+        crc32, comp_size, uncomp_size, filenamesize, extra_size = fields
 
         start += 16
         filename = data[start:start+filenamesize]
@@ -4992,7 +5040,7 @@ events, condition variables, and semaphores.
 While those tools are powerful, minor design errors can result in
 problems that are difficult to reproduce.  So, the preferred approach
 to task coordination is to concentrate all access to a resource
-in a single thread and then using the
+in a single thread and then use the
 \ulink{\module{Queue}}{../lib/module-Queue.html} module to feed that
 thread with requests from other threads.  Applications using
 \class{Queue} objects for inter-thread communication and coordination
@@ -5172,7 +5220,7 @@ Decimal("0.7350")
 \end{verbatim}
 
 The \class{Decimal} result keeps a trailing zero, automatically inferring four
-place significance from the two digit multiplicands.  Decimal reproduces
+place significance from multiplicands with two place significance.  Decimal reproduces
 mathematics as done by hand and avoids issues that can arise when binary
 floating point cannot exactly represent decimal quantities.
 
@@ -5206,7 +5254,7 @@ Decimal("0.142857142857142857142857142857142857")
 \chapter{What Now? \label{whatNow}}
 
 Reading this tutorial has probably reinforced your interest in using
-Python --- you should be eager to apply Python to solve your
+Python --- you should be eager to apply Python to solving your
 real-world problems.  Now what should you do?
 
 You should read, or at least page through, the
@@ -5260,7 +5308,7 @@ the Korn shell and the GNU Bash shell.  This is implemented using the
 editing.  This library has its own documentation which I won't
 duplicate here; however, the basics are easily explained.  The
 interactive editing and history described here are optionally
-available in the \UNIX{} and CygWin versions of the interpreter.
+available in the \UNIX{} and Cygwin versions of the interpreter.
 
 This chapter does \emph{not} document the editing facilities of Mark
 Hammond's PythonWin package or the Tk-based environment, IDLE,
@@ -5369,7 +5417,7 @@ A more capable startup file might look like this example.  Note that
 this deletes the names it creates once they are no longer needed; this
 is done since the startup file is executed in the same namespace as
 the interactive commands, and removing the names avoids creating side
-effects in the interactive environments.  You may find it convenient
+effects in the interactive environment.  You may find it convenient
 to keep some of the imported modules, such as
 \ulink{\module{os}}{../lib/module-os.html}, which turn
 out to be needed in most sessions with the interpreter.
@@ -5461,7 +5509,7 @@ or, better,
 
 and so on.  No matter how many digits you're willing to write down, the
 result will never be exactly 1/3, but will be an increasingly better
-approximation to 1/3.
+approximation of 1/3.
 
 In the same way, no matter how many base 2 digits you're willing to
 use, the decimal value 0.1 cannot be represented exactly as a base 2
@@ -5492,7 +5540,7 @@ the binary approximation stored for 0.1, it would have to display
 0.1000000000000000055511151231257827021181583404541015625
 \end{verbatim}
 
-instead!  The Python prompt (implicitly) uses the builtin
+instead!  The Python prompt uses the builtin
 \function{repr()} function to obtain a string version of everything it
 displays.  For floats, \code{repr(\var{float})} rounds the true
 decimal value to 17 significant digits, giving
@@ -5507,7 +5555,7 @@ turns out that's enough (on most machines) so that
 \var{x}, but rounding to 16 digits is not enough to make that true.
 
 Note that this is in the very nature of binary floating-point: this is
-not a bug in Python, it is not a bug in your code either, and you'll
+not a bug in Python, and it is not a bug in your code either.  You'll
 see the same kind of thing in all languages that support your
 hardware's floating-point arithmetic (although some languages may
 not \emph{display} the difference by default, or in all output modes).
@@ -5546,8 +5594,8 @@ was already the best possible binary approximation to 1/10, so trying
 to round it again can't make it better:  it was already as good as it
 gets.
 
-Another consequence is that since 0.1 is not exactly 1/10, adding 0.1
-to itself 10 times may not yield exactly 1.0, either:
+Another consequence is that since 0.1 is not exactly 1/10,
+summing ten values of 0.1 may not yield exactly 1.0, either:
 
 \begin{verbatim}
 >>> sum = 0.0
@@ -5588,7 +5636,7 @@ This section explains the ``0.1'' example in detail, and shows how
 you can perform an exact analysis of cases like this yourself.  Basic
 familiarity with binary floating-point representation is assumed.
 
-\dfn{Representation error} refers to that some (most, actually)
+\dfn{Representation error} refers to fact that some (most, actually)
 decimal fractions cannot be represented exactly as binary (base 2)
 fractions.  This is the chief reason why Python (or Perl, C, \Cpp,
 Java, Fortran, and many others) often won't display the exact decimal
@@ -5621,11 +5669,11 @@ and recalling that \var{J} has exactly 53 bits (is \code{>= 2**52} but
 \code{< 2**53}), the best value for \var{N} is 56:
 
 \begin{verbatim}
->>> 2L**52
+>>> 2**52
 4503599627370496L
->>> 2L**53
+>>> 2**53
 9007199254740992L
->>> 2L**56/10
+>>> 2**56/10
 7205759403792793L
 \end{verbatim}
 
@@ -5634,7 +5682,7 @@ exactly 53 bits.  The best possible value for \var{J} is then that
 quotient rounded:
 
 \begin{verbatim}
->>> q, r = divmod(2L**56, 10)
+>>> q, r = divmod(2**56, 10)
 >>> r
 6L
 \end{verbatim}
@@ -5662,7 +5710,7 @@ So the computer never ``sees'' 1/10:  what it sees is the exact
 fraction given above, the best 754 double approximation it can get:
 
 \begin{verbatim}
->>> .1 * 2L**56
+>>> .1 * 2**56
 7205759403792794.0
 \end{verbatim}
 
@@ -5670,7 +5718,7 @@ If we multiply that fraction by 10**30, we can see the (truncated)
 value of its 30 most significant decimal digits:
 
 \begin{verbatim}
->>> 7205759403792794L * 10L**30 / 2L**56
+>>> 7205759403792794 * 10**30 / 2**56
 100000000000000005551115123125L
 \end{verbatim}
 

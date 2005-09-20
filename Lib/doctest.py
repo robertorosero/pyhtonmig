@@ -2071,24 +2071,24 @@ def set_unittest_reportflags(flags):
     The old flag is returned so that a runner could restore the old
     value if it wished to:
 
-      >>> old = _unittest_reportflags
-      >>> set_unittest_reportflags(REPORT_NDIFF |
+      >>> import doctest
+      >>> old = doctest._unittest_reportflags
+      >>> doctest.set_unittest_reportflags(REPORT_NDIFF |
       ...                          REPORT_ONLY_FIRST_FAILURE) == old
       True
 
-      >>> import doctest
       >>> doctest._unittest_reportflags == (REPORT_NDIFF |
       ...                                   REPORT_ONLY_FIRST_FAILURE)
       True
 
     Only reporting flags can be set:
 
-      >>> set_unittest_reportflags(ELLIPSIS)
+      >>> doctest.set_unittest_reportflags(ELLIPSIS)
       Traceback (most recent call last):
       ...
       ValueError: ('Only reporting flags allowed', 8)
 
-      >>> set_unittest_reportflags(old) == (REPORT_NDIFF |
+      >>> doctest.set_unittest_reportflags(old) == (REPORT_NDIFF |
       ...                                   REPORT_ONLY_FIRST_FAILURE)
       True
     """
@@ -2472,6 +2472,7 @@ def script_from_examples(s):
           blah
        #
        #     Ho hum
+       <BLANKLINE>
        """
     output = []
     for piece in DocTestParser().parse(s):
@@ -2494,7 +2495,8 @@ def script_from_examples(s):
     while output and output[0] == '#':
         output.pop(0)
     # Combine the output, and return it.
-    return '\n'.join(output)
+    # Add a courtesy newline to prevent exec from choking (see bug #1172785)
+    return '\n'.join(output) + '\n'
 
 def testsource(module, name):
     """Extract the test sources from a doctest docstring as a script.

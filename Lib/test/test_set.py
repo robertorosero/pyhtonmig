@@ -202,6 +202,29 @@ class TestJointOps(unittest.TestCase):
         self.assertNotEqual(id(t), id(newt))
         self.assertEqual(t.value + 1, newt.value)
 
+    def test_gc(self):
+        # Create a nest of cycles to exercise overall ref count check
+        class A:
+            pass
+        s = set(A() for i in xrange(1000))
+        for elem in s:
+            elem.cycle = s
+            elem.sub = elem
+            elem.set = set([elem])
+
+    def test_subclass_with_custom_hash(self):
+        # Bug #1257731
+        class H(self.thetype):
+            def __hash__(self):
+                return id(self)
+        s=H()
+        f=set()
+        f.add(s)
+        self.assert_(s in f)
+        f.remove(s)
+        f.add(s)
+        f.discard(s)
+
 class TestSet(TestJointOps):
     thetype = set
 
@@ -358,6 +381,18 @@ class TestSet(TestJointOps):
                 self.assert_(c in self.s)
             else:
                 self.assert_(c not in self.s)
+
+    def test_inplace_on_self(self):
+        t = self.s.copy()
+        t |= t
+        self.assertEqual(t, self.s)
+        t &= t
+        self.assertEqual(t, self.s)
+        t -= t
+        self.assertEqual(t, self.thetype())
+        t = self.s.copy()
+        t ^= t
+        self.assertEqual(t, self.thetype())
 
     def test_weakref(self):
         s = self.thetype('gallahad')

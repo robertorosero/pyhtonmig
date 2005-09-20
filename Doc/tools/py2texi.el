@@ -238,7 +238,7 @@ Both BEGIN and END are evaled.  Moreover, you can reference arguments through
     ("dataline" 1 (progn (setq findex t) "@item \\1\n@findex \\1\n"))
     ("date" 1 "\\1")
     ("declaremodule" 2 (progn (setq cindex t) "@label{\\2}@cindex{\\2}"))
-    ("deprecated" 2 "@emph{This is deprecated in Python \\1.  \\2}")
+    ("deprecated" 2 "@emph{This is deprecated in Python \\1.  \\2}\n\n")
     ("dfn" 1 "@dfn{\\1}")
     ("documentclass" 1 py2texi-magic)
     ("e" 0 "@backslash{}")
@@ -260,6 +260,7 @@ Both BEGIN and END are evaled.  Moreover, you can reference arguments through
     ("funclineni" 2 "@item \\1 \\2")
     ("function" 1 "@code{\\1}")
     ("grammartoken" 1 "@code{\\1}")
+    ("guilabel" 1 "@strong{\\1}")
     ("hline" 0 "")
     ("ifhtml" 0 (concat "@" (setq last-if "ifinfo")))
     ("iftexi" 0 (concat "@" (setq last-if "ifinfo")))
@@ -278,6 +279,7 @@ Both BEGIN and END are evaled.  Moreover, you can reference arguments through
     ("large" 0 "")
     ("ldots" 0 "@dots{}")
     ("leftline" 1 "\\1")
+    ("leq" 0 "<=")
     ("lineii" 2 "@item \\1 @tab \\2")
     ("lineiii" 3 "@item \\1 @tab \\2 @tab \\3")
     ("lineiv" 4 "@item \\1 @tab \\2 @tab \\3 @tab \\4")
@@ -353,6 +355,7 @@ Both BEGIN and END are evaled.  Moreover, you can reference arguments through
 			  (py2texi-backslash-quote (match-string 2 str)))
 		       "@node \\1\n@section \\1\n"))))
     ("sectionauthor" 2 "")
+    ("seelink" 3 "\n@table @url\n@item @strong{\\1}\n(\\2)\n\\3\n@end table\n")
     ("seemodule" 2 "@ref{\\1} \\2")
     ("seepep" 3 "\n@table @strong\n@item PEP\\1 \\2\n\\3\n@end table\n")
     ("seerfc" 3 "\n@table @strong\n@item RFC\\1 \\2\n\\3\n@end table\n")
@@ -378,7 +381,15 @@ Both BEGIN and END are evaled.  Moreover, you can reference arguments through
     ("textasciitilde" 0 "~")
     ("textasciicircum" 0 "^")
     ("textbackslash" 0 "@backslash{}")
+    ("textbar" 0 "|")
+    ; Some common versions of Texinfo don't support @euro yet:
+    ; ("texteuro" 0 "@euro{}")
+    ; Unfortunately, this alternate spelling doesn't actually apply to
+    ; the usage found in Python Tutorial, which actually requires a
+    ; Euro symbol to make sense, so this is commented out as well.
+    ; ("texteuro" 0 "Euro ")
     ("textgreater" 0 ">")
+    ("textit" 1 "@i{\\1}")
     ("textless" 0 "<")
     ("textrm" 1 "\\1")
     ("texttt" 1 "@code{\\1}")

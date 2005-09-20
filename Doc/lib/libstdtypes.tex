@@ -72,7 +72,9 @@ return one of their operands.)
 \index{False}
 \index{True}
 
-\subsection{Boolean Operations \label{boolean}}
+\subsection{Boolean Operations ---
+	    \keyword{and}, \keyword{or}, \keyword{not}
+	    \label{boolean}}
 
 These are the Boolean operations, ordered by ascending priority:
 \indexii{Boolean}{operations}
@@ -173,7 +175,9 @@ Two more operations with the same syntactic priority,
 only by sequence types (below).
 
 
-\subsection{Numeric Types \label{typesnumeric}}
+\subsection{Numeric Types ---
+	    \class{int}, \class{float}, \class{long}, \class{complex}
+	    \label{typesnumeric}}
 
 There are four distinct numeric types: \dfn{plain integers},
 \dfn{long integers}, 
@@ -256,7 +260,7 @@ comparison operations):
   \lineiii{float(\var{x})}{\var{x} converted to floating point}{}
   \lineiii{complex(\var{re},\var{im})}{a complex number with real part \var{re}, imaginary part \var{im}.  \var{im} defaults to zero.}{}
   \lineiii{\var{c}.conjugate()}{conjugate of the complex number \var{c}}{}
-  \lineiii{divmod(\var{x}, \var{y})}{the pair \code{(\var{x} / \var{y}, \var{x} \%{} \var{y})}}{(3)(4)}
+  \lineiii{divmod(\var{x}, \var{y})}{the pair \code{(\var{x} // \var{y}, \var{x} \%{} \var{y})}}{(3)(4)}
   \lineiii{pow(\var{x}, \var{y})}{\var{x} to the power \var{y}}{}
   \lineiii{\var{x} ** \var{y}}{\var{x} to the power \var{y}}{}
 \end{tableiii}
@@ -405,7 +409,10 @@ return an iterator object (technically, a generator object)
 supplying the \method{__iter__()} and \method{next()} methods.
 
 
-\subsection{Sequence Types \label{typesseq}}
+\subsection{Sequence Types ---
+	    \class{str}, \class{unicode}, \class{list},
+	    \class{tuple}, \class{buffer}, \class{xrange}
+	    \label{typesseq}}
 
 There are six sequence types: strings, Unicode strings, lists,
 tuples, buffers, and xrange objects.
@@ -414,7 +421,7 @@ String literals are written in single or double quotes:
 \code{'xyzzy'}, \code{"frobozz"}.  See chapter 2 of the
 \citetitle[../ref/strings.html]{Python Reference Manual} for more about
 string literals.  Unicode strings are much like strings, but are
-specified in the syntax using a preceeding \character{u} character:
+specified in the syntax using a preceding \character{u} character:
 \code{u'abc'}, \code{u"def"}.  Lists are constructed with square brackets,
 separating items with commas: \code{[a, b, c]}.  Tuples are
 constructed by the comma operator (not within square brackets), with
@@ -546,7 +553,7 @@ for assignments of the form \code{\var{s}=\var{s}+\var{t}} or
 \code{\var{s}+=\var{t}}.  When applicable, this optimization makes
 quadratic run-time much less likely.  This optimization is both version
 and implementation dependent.  For performance sensitive code, it is
-preferrable to use the \method{str.join()} method which assures consistent
+preferable to use the \method{str.join()} method which assures consistent
 linear concatenation performance across versions and implementations.
 \versionchanged[Formerly, string concatenation never occurred in-place]{2.4}
 
@@ -699,11 +706,17 @@ For 8-bit strings, this method is locale-dependent.
 \end{methoddesc}
 
 \begin{methoddesc}[string]{lstrip}{\optional{chars}}
-Return a copy of the string with leading characters removed.  If
-\var{chars} is omitted or \code{None}, whitespace characters are
-removed.  If given and not \code{None}, \var{chars} must be a string;
-the characters in the string will be stripped from the beginning of
-the string this method is called on.
+Return a copy of the string with leading characters removed.  The
+\var{chars} argument is a string specifying the set of characters
+to be removed.  If omitted or \code{None}, the \var{chars} argument
+defaults to removing whitespace.  The \var{chars} argument is not
+a prefix; rather, all combinations of its values are stripped:
+\begin{verbatim}
+    >>> '   spacious   '.lstrip()
+    'spacious   '
+    >>> 'www.example.com'.lstrip('cmowz.')
+    'example.com'
+\end{verbatim}
 \versionchanged[Support for the \var{chars} argument]{2.2.2}
 \end{methoddesc}
 
@@ -738,16 +751,24 @@ The original string is returned if
 Return a list of the words in the string, using \var{sep} as the
 delimiter string.  If \var{maxsplit} is given, at most \var{maxsplit}
 splits are done, the \emph{rightmost} ones.  If \var{sep} is not specified
-or \code{None}, any whitespace string is a separator.
+or \code{None}, any whitespace string is a separator.  Except for splitting
+from the right, \method{rsplit()} behaves like \method{split()} which
+is described in detail below.
 \versionadded{2.4}
 \end{methoddesc}
 
 \begin{methoddesc}[string]{rstrip}{\optional{chars}}
-Return a copy of the string with trailing characters removed.  If
-\var{chars} is omitted or \code{None}, whitespace characters are
-removed.  If given and not \code{None}, \var{chars} must be a string;
-the characters in the string will be stripped from the end of the
-string this method is called on.
+Return a copy of the string with trailing characters removed.  The
+\var{chars} argument is a string specifying the set of characters
+to be removed.  If omitted or \code{None}, the \var{chars} argument
+defaults to removing whitespace.  The \var{chars} argument is not
+a suffix; rather, all combinations of its values are stripped:
+\begin{verbatim}
+    >>> '   spacious   '.rstrip()
+    '   spacious'
+    >>> 'mississippi'.rstrip('ipz')
+    'mississ'
+\end{verbatim}
 \versionchanged[Support for the \var{chars} argument]{2.2.2}
 \end{methoddesc}
 
@@ -755,21 +776,23 @@ string this method is called on.
 Return a list of the words in the string, using \var{sep} as the
 delimiter string.  If \var{maxsplit} is given, at most \var{maxsplit}
 splits are done. (thus, the list will have at most \code{\var{maxsplit}+1}
-elements).  If \var{maxsplit} is not specified or is zero, then there
+elements).  If \var{maxsplit} is not specified, then there
 is no limit on the number of splits (all possible splits are made).
 Consecutive delimiters are not grouped together and are
 deemed to delimit empty strings (for example, \samp{'1,,2'.split(',')}
 returns \samp{['1', '', '2']}).  The \var{sep} argument may consist of
 multiple characters (for example, \samp{'1, 2, 3'.split(', ')} returns
 \samp{['1', '2', '3']}).  Splitting an empty string with a specified
-separator returns an empty list.
+separator returns \samp{['']}.
 
 If \var{sep} is not specified or is \code{None}, a different splitting
-algorithm is applied.  Words are separated by arbitrary length strings of
-whitespace characters (spaces, tabs, newlines, returns, and formfeeds).
-Consecutive whitespace delimiters are treated as a single delimiter
-(\samp{'1   2  3'.split()} returns \samp{['1', '2', '3']}).  Splitting an
-empty string returns \samp{['']}.
+algorithm is applied.  First, whitespace characters (spaces, tabs,
+newlines, returns, and formfeeds) are stripped from both ends.  Then,
+words are separated by arbitrary length strings of whitespace
+characters. Consecutive whitespace delimiters are treated as a single
+delimiter (\samp{'1  2  3'.split()} returns \samp{['1', '2', '3']}).
+Splitting an empty string or a string consisting of just whitespace
+returns an empty list.
 \end{methoddesc}
 
 \begin{methoddesc}[string]{splitlines}{\optional{keepends}}
@@ -787,11 +810,17 @@ position.
 \end{methoddesc}
 
 \begin{methoddesc}[string]{strip}{\optional{chars}}
-Return a copy of the string with leading and trailing characters
-removed.  If \var{chars} is omitted or \code{None}, whitespace
-characters are removed.  If given and not \code{None}, \var{chars}
-must be a string; the characters in the string will be stripped from
-the both ends of the string this method is called on.
+Return a copy of the string with the leading and trailing characters
+removed.  The \var{chars} argument is a string specifying the set of
+characters to be removed.  If omitted or \code{None}, the \var{chars}
+argument defaults to removing whitespace.  The \var{chars} argument is not
+a prefix or suffix; rather, all combinations of its values are stripped:
+\begin{verbatim}
+    >>> '   spacious   '.strip()
+    'spacious'
+    >>> 'www.example.com'.strip('cmowz.')
+    'example'
+\end{verbatim}
 \versionchanged[Support for the \var{chars} argument]{2.2.2}
 \end{methoddesc}
 
@@ -932,8 +961,8 @@ The conversion types are:
   \lineiii{i}{Signed integer decimal.}{}
   \lineiii{o}{Unsigned octal.}{(1)}
   \lineiii{u}{Unsigned decimal.}{}
-  \lineiii{x}{Unsigned hexidecimal (lowercase).}{(2)}
-  \lineiii{X}{Unsigned hexidecimal (uppercase).}{(2)}
+  \lineiii{x}{Unsigned hexadecimal (lowercase).}{(2)}
+  \lineiii{X}{Unsigned hexadecimal (uppercase).}{(2)}
   \lineiii{e}{Floating point exponential format (lowercase).}{}
   \lineiii{E}{Floating point exponential format (uppercase).}{}
   \lineiii{f}{Floating point decimal format.}{}
@@ -1071,7 +1100,7 @@ Notes:
   no longer works in Python 2.0.  Use of this misfeature has been
   deprecated since Python 1.4.
 
-\item[(3)] Raises an exception when \var{x} is not a list object.
+\item[(3)] \var{x} can be any iterable object.
 
 \item[(4)] Raises \exception{ValueError} when \var{x} is not found in
   \var{s}. When a negative index is passed as the second or third parameter
@@ -1107,7 +1136,7 @@ Notes:
      
   \var{key} specifies a function of one argument that is used to
      extract a comparison key from each list element:
-     \samp{\var{cmp}=\function{str.lower}}
+     \samp{\var{key}=\function{str.lower}}
 
   \var{reverse} is a boolean value.  If set to \code{True}, then the
      list elements are sorted as if each comparison were reversed.
@@ -1135,7 +1164,9 @@ Notes:
   that the list has been mutated during a sort.
 \end{description}
 
-\subsection{Set Types \label{types-set}}
+\subsection{Set Types ---
+	    \class{set}, \class{frozenset}
+	    \label{types-set}}
 \obindex{set}
 
 A \dfn{set} object is an unordered collection of immutable values.
@@ -1202,7 +1233,7 @@ subset of the second set (is a subset, but is not equal).
 A set is greater than another set if and only if the first set is a proper
 superset of the second set (is a superset, but is not equal).
 
-Instanceas of \class{set} are compared to instances of \class{frozenset} based
+Instances of \class{set} are compared to instances of \class{frozenset} based
 on their members.  For example, \samp{set('abc') == frozenset('abc')} returns
 \code{True}.     
 
@@ -1215,6 +1246,9 @@ Accordingly, sets do not implement the \method{__cmp__} method.
 
 Since sets only define partial ordering (subset relationships), the output
 of the \method{list.sort()} method is undefined for lists of sets.
+
+Set elements are like dictionary keys; they need to define both
+\method{__hash__} and \method{__eq__} methods.
 
 Binary operations that mix \class{set} instances with \class{frozenset}
 return the type of the first operand.  For example:
@@ -1257,8 +1291,16 @@ Note, the non-operator versions of the \method{update()},
 \method{symmetric_difference_update()} methods will accept any iterable
 as an argument.
 
+The design of the set types was based on lessons learned from the
+\module{sets} module.
+     
+\begin{seealso}     
+  \seemodule[comparison-to-builtin-set]{sets}{Differences between
+     the \module{sets} module and the built-in set types.}					      
+\end{seealso}
+     
 
-\subsection{Mapping Types \label{typesmapping}}
+\subsection{Mapping Types --- class{dict} \label{typesmapping}}
 \obindex{mapping}
 \obindex{dictionary}
 
@@ -1391,7 +1433,8 @@ that if \var{k} is missing, \var{x} is both returned and inserted into
 the dictionary as the value of \var{k}. \var{x} defaults to \var{None}.
 
 \item[(6)] \function{popitem()} is useful to destructively iterate
-over a dictionary, as often used in set algorithms.
+over a dictionary, as often used in set algorithms.  If the dictionary
+is empty, calling \function{popitem()} raises a \exception{KeyError}.
 
 \item[(7)] \function{fromkeys()} is a class method that returns a
 new dictionary. \var{value} defaults to \code{None}.  \versionadded{2.3}

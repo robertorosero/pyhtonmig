@@ -1,7 +1,7 @@
 from test import test_support
 import unittest
 import codecs
-import StringIO
+import sys, StringIO
 
 class Queue(object):
     """
@@ -23,16 +23,27 @@ class Queue(object):
             self._buffer = self._buffer[size:]
             return s
 
-class PartialReadTest(unittest.TestCase):
-    def check_partial(self, encoding, input, partialresults):
+class ReadTest(unittest.TestCase):
+    def test_seek(self):
+        # all codecs should be able to encode these
+        s = u"%s\n%s\n" % (100*u"abc123", 100*u"def456")
+        encoding = self.encoding
+        reader = codecs.getreader(encoding)(StringIO.StringIO(s.encode(encoding)))
+        for t in xrange(5):
+            # Test that calling seek resets the internal codec state and buffers
+            reader.seek(0, 0)
+            line = reader.readline()
+            self.assertEqual(s[:len(line)], line)
+
+    def check_partial(self, input, partialresults):
         # get a StreamReader for the encoding and feed the bytestring version
         # of input to the reader byte by byte. Read every available from
         # the StreamReader and check that the results equal the appropriate
         # entries from partialresults.
         q = Queue()
-        r = codecs.getreader(encoding)(q)
+        r = codecs.getreader(self.encoding)(q)
         result = u""
-        for (c, partialresult) in zip(input.encode(encoding), partialresults):
+        for (c, partialresult) in zip(input.encode(self.encoding), partialresults):
             q.write(c)
             result += r.read()
             self.assertEqual(result, partialresult)
@@ -41,13 +52,186 @@ class PartialReadTest(unittest.TestCase):
         self.assertEqual(r.bytebuffer, "")
         self.assertEqual(r.charbuffer, u"")
 
-class UTF16Test(PartialReadTest):
+    def test_readline(self):
+        def getreader(input):
+            stream = StringIO.StringIO(input.encode(self.encoding))
+            return codecs.getreader(self.encoding)(stream)
+
+        def readalllines(input, keepends=True):
+            reader = getreader(input)
+            lines = []
+            while True:
+                line = reader.readline(keepends=keepends)
+                if not line:
+                    break
+                lines.append(line)
+            return "".join(lines)
+
+        s = u"foo\nbar\r\nbaz\rspam\u2028eggs"
+        self.assertEqual(readalllines(s, True), s)
+        self.assertEqual(readalllines(s, False), u"foobarbazspameggs")
+
+        # Test long lines (multiple calls to read() in readline())
+        vw = []
+        vwo = []
+        for (i, lineend) in enumerate(u"\n \r\n \r \u2028".split()):
+            vw.append((i*200)*u"\3042" + lineend)
+            vwo.append((i*200)*u"\3042")
+        self.assertEqual(readalllines("".join(vw), True), "".join(vw))
+        self.assertEqual(readalllines("".join(vw), False),"".join(vwo))
+
+        # Test lines where the first read might end with \r, so the
+        # reader has to look ahead whether this is a lone \r or a \r\n
+        for size in xrange(80):
+            for lineend in u"\n \r\n \r \u2028".split():
+                s = 10*(size*u"a" + lineend + u"xxx\n")
+                reader = getreader(s)
+                for i in xrange(10):
+                    self.assertEqual(
+                        reader.readline(keepends=True),
+                        size*u"a" + lineend,
+                    )
+                reader = getreader(s)
+                for i in xrange(10):
+                    self.assertEqual(
+                        reader.readline(keepends=False),
+                        size*u"a",
+                    )
+
+    def test_bug1175396(self):
+        s = [
+            '<%!--===================================================\r\n',
+            '    BLOG index page: show recent articles,\r\n',
+            '    today\'s articles, or articles of a specific date.\r\n',
+            '========================================================--%>\r\n',
+            '<%@inputencoding="ISO-8859-1"%>\r\n',
+            '<%@pagetemplate=TEMPLATE.y%>\r\n',
+            '<%@import=import frog.util, frog%>\r\n',
+            '<%@import=import frog.objects%>\r\n',
+            '<%@import=from frog.storageerrors import StorageError%>\r\n',
+            '<%\r\n',
+            '\r\n',
+            'import logging\r\n',
+            'log=logging.getLogger("Snakelets.logger")\r\n',
+            '\r\n',
+            '\r\n',
+            'user=self.SessionCtx.user\r\n',
+            'storageEngine=self.SessionCtx.storageEngine\r\n',
+            '\r\n',
+            '\r\n',
+            'def readArticlesFromDate(date, count=None):\r\n',
+            '    entryids=storageEngine.listBlogEntries(date)\r\n',
+            '    entryids.reverse() # descending\r\n',
+            '    if count:\r\n',
+            '        entryids=entryids[:count]\r\n',
+            '    try:\r\n',
+            '        return [ frog.objects.BlogEntry.load(storageEngine, date, Id) for Id in entryids ]\r\n',
+            '    except StorageError,x:\r\n',
+            '        log.error("Error loading articles: "+str(x))\r\n',
+            '        self.abort("cannot load articles")\r\n',
+            '\r\n',
+            'showdate=None\r\n',
+            '\r\n',
+            'arg=self.Request.getArg()\r\n',
+            'if arg=="today":\r\n',
+            '    #-------------------- TODAY\'S ARTICLES\r\n',
+            '    self.write("<h2>Today\'s articles</h2>")\r\n',
+            '    showdate = frog.util.isodatestr() \r\n',
+            '    entries = readArticlesFromDate(showdate)\r\n',
+            'elif arg=="active":\r\n',
+            '    #-------------------- ACTIVE ARTICLES redirect\r\n',
+            '    self.Yredirect("active.y")\r\n',
+            'elif arg=="login":\r\n',
+            '    #-------------------- LOGIN PAGE redirect\r\n',
+            '    self.Yredirect("login.y")\r\n',
+            'elif arg=="date":\r\n',
+            '    #-------------------- ARTICLES OF A SPECIFIC DATE\r\n',
+            '    showdate = self.Request.getParameter("date")\r\n',
+            '    self.write("<h2>Articles written on %s</h2>"% frog.util.mediumdatestr(showdate))\r\n',
+            '    entries = readArticlesFromDate(showdate)\r\n',
+            'else:\r\n',
+            '    #-------------------- RECENT ARTICLES\r\n',
+            '    self.write("<h2>Recent articles</h2>")\r\n',
+            '    dates=storageEngine.listBlogEntryDates()\r\n',
+            '    if dates:\r\n',
+            '        entries=[]\r\n',
+            '        SHOWAMOUNT=10\r\n',
+            '        for showdate in dates:\r\n',
+            '            entries.extend( readArticlesFromDate(showdate, SHOWAMOUNT-len(entries)) )\r\n',
+            '            if len(entries)>=SHOWAMOUNT:\r\n',
+            '                break\r\n',
+            '                \r\n',
+        ]
+        stream = StringIO.StringIO("".join(s).encode(self.encoding))
+        reader = codecs.getreader(self.encoding)(stream)
+        for (i, line) in enumerate(reader):
+            self.assertEqual(line, s[i])
+
+    def test_readlinequeue(self):
+        q = Queue()
+        writer = codecs.getwriter(self.encoding)(q)
+        reader = codecs.getreader(self.encoding)(q)
+
+        # No lineends
+        writer.write(u"foo\r")
+        self.assertEqual(reader.readline(keepends=False), u"foo")
+        writer.write(u"\nbar\r")
+        self.assertEqual(reader.readline(keepends=False), u"")
+        self.assertEqual(reader.readline(keepends=False), u"bar")
+        writer.write(u"baz")
+        self.assertEqual(reader.readline(keepends=False), u"baz")
+        self.assertEqual(reader.readline(keepends=False), u"")
+
+        # Lineends
+        writer.write(u"foo\r")
+        self.assertEqual(reader.readline(keepends=True), u"foo\r")
+        writer.write(u"\nbar\r")
+        self.assertEqual(reader.readline(keepends=True), u"\n")
+        self.assertEqual(reader.readline(keepends=True), u"bar\r")
+        writer.write(u"baz")
+        self.assertEqual(reader.readline(keepends=True), u"baz")
+        self.assertEqual(reader.readline(keepends=True), u"")
+        writer.write(u"foo\r\n")
+        self.assertEqual(reader.readline(keepends=True), u"foo\r\n")
+
+    def test_bug1098990_a(self):
+        s1 = u"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy\r\n"
+        s2 = u"offending line: ladfj askldfj klasdj fskla dfzaskdj fasklfj laskd fjasklfzzzzaa%whereisthis!!!\r\n"
+        s3 = u"next line.\r\n"
+
+        s = (s1+s2+s3).encode(self.encoding)
+        stream = StringIO.StringIO(s)
+        reader = codecs.getreader(self.encoding)(stream)
+        self.assertEqual(reader.readline(), s1)
+        self.assertEqual(reader.readline(), s2)
+        self.assertEqual(reader.readline(), s3)
+        self.assertEqual(reader.readline(), u"")
+
+    def test_bug1098990_b(self):
+        s1 = u"aaaaaaaaaaaaaaaaaaaaaaaa\r\n"
+        s2 = u"bbbbbbbbbbbbbbbbbbbbbbbb\r\n"
+        s3 = u"stillokay:bbbbxx\r\n"
+        s4 = u"broken!!!!badbad\r\n"
+        s5 = u"againokay.\r\n"
+
+        s = (s1+s2+s3+s4+s5).encode(self.encoding)
+        stream = StringIO.StringIO(s)
+        reader = codecs.getreader(self.encoding)(stream)
+        self.assertEqual(reader.readline(), s1)
+        self.assertEqual(reader.readline(), s2)
+        self.assertEqual(reader.readline(), s3)
+        self.assertEqual(reader.readline(), s4)
+        self.assertEqual(reader.readline(), s5)
+        self.assertEqual(reader.readline(), u"")
+
+class UTF16Test(ReadTest):
+    encoding = "utf-16"
 
     spamle = '\xff\xfes\x00p\x00a\x00m\x00s\x00p\x00a\x00m\x00'
     spambe = '\xfe\xff\x00s\x00p\x00a\x00m\x00s\x00p\x00a\x00m'
 
     def test_only_one_bom(self):
-        _,_,reader,writer = codecs.lookup("utf-16")
+        _,_,reader,writer = codecs.lookup(self.encoding)
         # encode some stream
         s = StringIO.StringIO()
         f = writer(s)
@@ -63,7 +247,6 @@ class UTF16Test(PartialReadTest):
 
     def test_partial(self):
         self.check_partial(
-            "utf-16",
             u"\x00\xff\u0100\uffff",
             [
                 u"", # first byte of BOM read
@@ -79,11 +262,11 @@ class UTF16Test(PartialReadTest):
             ]
         )
 
-class UTF16LETest(PartialReadTest):
+class UTF16LETest(ReadTest):
+    encoding = "utf-16-le"
 
     def test_partial(self):
         self.check_partial(
-            "utf-16-le",
             u"\x00\xff\u0100\uffff",
             [
                 u"",
@@ -97,11 +280,11 @@ class UTF16LETest(PartialReadTest):
             ]
         )
 
-class UTF16BETest(PartialReadTest):
+class UTF16BETest(ReadTest):
+    encoding = "utf-16-be"
 
     def test_partial(self):
         self.check_partial(
-            "utf-16-be",
             u"\x00\xff\u0100\uffff",
             [
                 u"",
@@ -115,11 +298,11 @@ class UTF16BETest(PartialReadTest):
             ]
         )
 
-class UTF8Test(PartialReadTest):
+class UTF8Test(ReadTest):
+    encoding = "utf-8"
 
     def test_partial(self):
         self.check_partial(
-            "utf-8",
             u"\x00\xff\u07ff\u0800\uffff",
             [
                 u"\x00",
@@ -271,6 +454,54 @@ class PunycodeTest(unittest.TestCase):
     def test_decode(self):
         for uni, puny in punycode_testcases:
             self.assertEquals(uni, puny.decode("punycode"))
+
+class UnicodeInternalTest(unittest.TestCase):
+    def test_bug1251300(self):
+        # Decoding with unicode_internal used to not correctly handle "code
+        # points" above 0x10ffff on UCS-4 builds.
+        if sys.maxunicode > 0xffff:
+            ok = [
+                ("\x00\x10\xff\xff", u"\U0010ffff"),
+                ("\x00\x00\x01\x01", u"\U00000101"),
+                ("", u""),
+            ]
+            not_ok = [
+                "\x7f\xff\xff\xff",
+                "\x80\x00\x00\x00",
+                "\x81\x00\x00\x00",
+                "\x00",
+                "\x00\x00\x00\x00\x00",
+            ]
+            for internal, uni in ok:
+                if sys.byteorder == "little":
+                    internal = "".join(reversed(internal))
+                self.assertEquals(uni, internal.decode("unicode_internal"))
+            for internal in not_ok:
+                if sys.byteorder == "little":
+                    internal = "".join(reversed(internal))
+                self.assertRaises(UnicodeDecodeError, internal.decode,
+                    "unicode_internal")
+
+    def test_decode_error_attributes(self):
+        if sys.maxunicode > 0xffff:
+            try:
+                "\x00\x00\x00\x00\x00\x11\x11\x00".decode("unicode_internal")
+            except UnicodeDecodeError, ex:
+                self.assertEquals("unicode_internal", ex.encoding)
+                self.assertEquals("\x00\x00\x00\x00\x00\x11\x11\x00", ex.object)
+                self.assertEquals(4, ex.start)
+                self.assertEquals(8, ex.end)
+            else:
+                self.fail()
+
+    def test_decode_callback(self):
+        if sys.maxunicode > 0xffff:
+            codecs.register_error("UnicodeInternalTest", codecs.ignore_errors)
+            decoder = codecs.getdecoder("unicode_internal")
+            ab = u"ab".encode("unicode_internal")
+            ignored = decoder("%s\x22\x22\x22\x22%s" % (ab[:4], ab[4:]),
+                "UnicodeInternalTest")
+            self.assertEquals((u"ab", 12), ignored)
 
 # From http://www.gnu.org/software/libidn/draft-josefsson-idn-test-vectors.html
 nameprep_tests = [
@@ -449,6 +680,12 @@ class CodecTest(unittest.TestCase):
     def test_builtin(self):
         self.assertEquals(unicode("python.org", "idna"), u"python.org")
 
+    def test_stream(self):
+        import StringIO
+        r = codecs.getreader("idna")(StringIO.StringIO("abc"))
+        r.read(3)
+        self.assertEquals(r.read(), u"")
+
 class CodecsModuleTest(unittest.TestCase):
 
     def test_decode(self):
@@ -482,6 +719,22 @@ class StreamReaderTest(unittest.TestCase):
         f = self.reader(self.stream)
         self.assertEquals(f.readlines(), [u'\ud55c\n', u'\uae00'])
 
+class Str2StrTest(unittest.TestCase):
+
+    def test_read(self):
+        sin = "\x80".encode("base64_codec")
+        reader = codecs.getreader("base64_codec")(StringIO.StringIO(sin))
+        sout = reader.read()
+        self.assertEqual(sout, "\x80")
+        self.assert_(isinstance(sout, str))
+
+    def test_readline(self):
+        sin = "\x80".encode("base64_codec")
+        reader = codecs.getreader("base64_codec")(StringIO.StringIO(sin))
+        sout = reader.readline()
+        self.assertEqual(sout, "\x80")
+        self.assert_(isinstance(sout, str))
+
 def test_main():
     test_support.run_unittest(
         UTF16Test,
@@ -491,10 +744,12 @@ def test_main():
         EscapeDecodeTest,
         RecodingTest,
         PunycodeTest,
+        UnicodeInternalTest,
         NameprepTest,
         CodecTest,
         CodecsModuleTest,
-        StreamReaderTest
+        StreamReaderTest,
+        Str2StrTest
     )
 
 

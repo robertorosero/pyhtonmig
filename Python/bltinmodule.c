@@ -147,22 +147,26 @@ builtin_filter(PyObject *self, PyObject *args)
 	if (PyTuple_Check(seq))
 		return filtertuple(func, seq);
 
+	/* Pre-allocate argument list tuple. */
+	arg = PyTuple_New(1);
+	if (arg == NULL)
+		return NULL;
+
 	/* Get iterator. */
 	it = PyObject_GetIter(seq);
 	if (it == NULL)
-		return NULL;
+		goto Fail_arg;
 
 	/* Guess a result list size. */
 	len = PyObject_Size(seq);
 	if (len < 0) {
+		if (!PyErr_ExceptionMatches(PyExc_TypeError)  &&
+		    !PyErr_ExceptionMatches(PyExc_AttributeError)) {
+			goto Fail_it;
+		}
 		PyErr_Clear();
 		len = 8;	/* arbitrary */
 	}
-
-	/* Pre-allocate argument list tuple. */
-	arg = PyTuple_New(1);
-	if (arg == NULL)
-		goto Fail_arg;
 
 	/* Get a result list. */
 	if (PyList_Check(seq) && seq->ob_refcnt == 1) {
@@ -474,6 +478,13 @@ builtin_eval(PyObject *self, PyObject *args)
 	}
 	else if (locals == Py_None)
 		locals = globals;
+
+	if (globals == NULL || locals == NULL) {
+		PyErr_SetString(PyExc_TypeError, 
+			"eval must be given globals and locals "
+			"when called without a frame");
+		return NULL;
+	}
 
 	if (PyDict_GetItemString(globals, "__builtins__") == NULL) {
 		if (PyDict_SetItemString(globals, "__builtins__",
@@ -801,6 +812,10 @@ builtin_map(PyObject *self, PyObject *args)
 		/* Update len. */
 		curlen = PyObject_Size(curseq);
 		if (curlen < 0) {
+			if (!PyErr_ExceptionMatches(PyExc_TypeError)  &&
+			    !PyErr_ExceptionMatches(PyExc_AttributeError)) {
+				goto Fail_2;
+			}
 			PyErr_Clear();
 			curlen = 8;  /* arbitrary */
 		}
@@ -2002,6 +2017,10 @@ builtin_zip(PyObject *self, PyObject *args)
 		PyObject *item = PyTuple_GET_ITEM(args, i);
 		int thislen = PyObject_Size(item);
 		if (thislen < 0) {
+			if (!PyErr_ExceptionMatches(PyExc_TypeError)  &&
+			    !PyErr_ExceptionMatches(PyExc_AttributeError)) {
+				return NULL;
+			}
 			PyErr_Clear();
 			len = -1;
 			break;

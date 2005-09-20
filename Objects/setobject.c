@@ -81,6 +81,9 @@ frozenset_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
 	PyObject *iterable = NULL;
 
+	if (!_PyArg_NoKeywords("frozenset()", kwds))
+		return NULL;
+
 	if (!PyArg_UnpackTuple(args, type->tp_name, 0, 1, &iterable))
 		return NULL;
 	if (iterable != NULL && PyFrozenSet_CheckExact(iterable)) {
@@ -93,6 +96,9 @@ frozenset_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 static PyObject *
 set_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
+	if (!_PyArg_NoKeywords("set()", kwds))
+		return NULL;
+	
 	return make_new_set(type, NULL);
 }
 
@@ -114,10 +120,19 @@ frozenset_dict_wrapper(PyObject *d)
 static void
 set_dealloc(PySetObject *so)
 {
+	PyObject_GC_UnTrack(so);
 	if (so->weakreflist != NULL)
 		PyObject_ClearWeakRefs((PyObject *) so);
 	Py_XDECREF(so->data);
 	so->ob_type->tp_free(so);
+}
+
+static int
+set_traverse(PySetObject *so, visitproc visit, void *arg)
+{
+	if (so->data)
+		return visit(so->data, arg);
+	return 0;
 }
 
 static PyObject *
@@ -136,18 +151,20 @@ static int
 set_contains(PySetObject *so, PyObject *key)
 {
 	PyObject *tmp;
-	int result;
+	int rv;
 
-	result = PyDict_Contains(so->data, key);
-	if (result == -1 && PyAnySet_Check(key)) {
+	rv = PyDict_Contains(so->data, key);
+	if (rv == -1) {
+		if (!PyAnySet_Check(key) || !PyErr_ExceptionMatches(PyExc_TypeError))
+			return -1;
 		PyErr_Clear();
 		tmp = frozenset_dict_wrapper(((PySetObject *)(key))->data);
 		if (tmp == NULL)
 			return -1;
-		result = PyDict_Contains(so->data, tmp);
+		rv = PyDict_Contains(so->data, tmp);
 		Py_DECREF(tmp);
 	}
-	return result;
+	return rv;
 }
 
 static PyObject *
@@ -180,6 +197,16 @@ frozenset_copy(PySetObject *so)
 }
 
 PyDoc_STRVAR(copy_doc, "Return a shallow copy of a set.");
+
+static PyObject *
+set_clear(PySetObject *so)
+{
+	PyDict_Clear(so->data);
+	so->hash = -1;
+	Py_RETURN_NONE;
+}
+
+PyDoc_STRVAR(clear_doc, "Remove all elements from this set.");
 
 static PyObject *
 set_union(PySetObject *so, PyObject *other)
@@ -368,6 +395,9 @@ static PyObject *
 set_difference_update(PySetObject *so, PyObject *other)
 {
 	PyObject *item, *tgtdata, *it;
+
+	if ((PyObject *)so == other)
+		return set_clear(so);
 	
 	it = PyObject_GetIter(other);
 	if (it == NULL)
@@ -747,15 +777,13 @@ set_tp_print(PySetObject *so, FILE *fp, int flags)
 	return 0;
 }
 
-static PyObject *
-set_clear(PySetObject *so)
+static int
+set_tp_clear(PySetObject *so)
 {
 	PyDict_Clear(so->data);
 	so->hash = -1;
-	Py_RETURN_NONE;
+	return 0;
 }
-
-PyDoc_STRVAR(clear_doc, "Remove all elements from this set.");
 
 static PyObject *
 set_add(PySetObject *so, PyObject *item)
@@ -774,19 +802,20 @@ static PyObject *
 set_remove(PySetObject *so, PyObject *item)
 {
 	PyObject *tmp, *result;
+	int rv;
 
-	if (PyType_IsSubtype(item->ob_type, &PySet_Type)) {
-		tmp = frozenset_dict_wrapper(((PySetObject *)(item))->data);
-		if (tmp == NULL)
-			return NULL;
-		result = set_remove(so, tmp);
-		Py_DECREF(tmp);
-		return result;
-	}
-
-	if (PyDict_DelItem(so->data, item) == -1) 
+	rv = PyDict_DelItem(so->data, item);
+	if (rv == 0) 
+		Py_RETURN_NONE;
+	if (!PyAnySet_Check(item) || !PyErr_ExceptionMatches(PyExc_TypeError))
 		return NULL;
-	Py_RETURN_NONE;
+	PyErr_Clear();
+	tmp = frozenset_dict_wrapper(((PySetObject *)(item))->data);
+	if (tmp == NULL)
+		return NULL;
+	result = set_remove(so, tmp);
+	Py_DECREF(tmp);
+	return result;
 }
 
 PyDoc_STRVAR(remove_doc,
@@ -798,22 +827,24 @@ static PyObject *
 set_discard(PySetObject *so, PyObject *item)
 {
 	PyObject *tmp, *result;
+	int rv;
 
-	if (PyType_IsSubtype(item->ob_type, &PySet_Type)) {
-		tmp = frozenset_dict_wrapper(((PySetObject *)(item))->data);
-		if (tmp == NULL)
-			return NULL;
-		result = set_discard(so, tmp);
-		Py_DECREF(tmp);
-		return result;
-	}
-
-	if (PyDict_DelItem(so->data, item) == -1) {
-		if (!PyErr_ExceptionMatches(PyExc_KeyError))
-			return NULL;
+	rv = PyDict_DelItem(so->data, item);
+	if (rv == 0) 
+		Py_RETURN_NONE;	
+	if (PyErr_ExceptionMatches(PyExc_KeyError)) {
 		PyErr_Clear();
+		Py_RETURN_NONE;
 	}
-	Py_RETURN_NONE;
+	if (!PyAnySet_Check(item) || !PyErr_ExceptionMatches(PyExc_TypeError))
+		return NULL;
+	PyErr_Clear();
+	tmp = frozenset_dict_wrapper(((PySetObject *)(item))->data);
+	if (tmp == NULL)
+		return NULL;
+	result = set_discard(so, tmp);
+	Py_DECREF(tmp);
+	return result;
 }
 
 PyDoc_STRVAR(discard_doc,
@@ -824,18 +855,18 @@ If the element is not a member, do nothing.");
 static PyObject *
 set_pop(PySetObject *so)
 {
-	PyObject *key, *value;
-	int pos = 0;
+	PyObject *item, *key;
 
-	if (!PyDict_Next(so->data, &pos, &key, &value)) {
+	if (set_len(so) == 0) {
 		PyErr_SetString(PyExc_KeyError, "pop from an empty set");
 		return NULL;
 	}
-	Py_INCREF(key);
-	if (PyDict_DelItem(so->data, key) == -1) {
-		Py_DECREF(key);
+	item = PyObject_CallMethod(so->data, "popitem", NULL);
+	if (item == NULL)
 		return NULL;
-	}
+	key = PyTuple_GET_ITEM(item, 0);
+	Py_INCREF(key);
+	Py_DECREF(item);
 	return key;
 }
 
@@ -1007,11 +1038,11 @@ PyTypeObject PySet_Type = {
 	PyObject_GenericGetAttr,	/* tp_getattro */
 	0,				/* tp_setattro */
 	0,				/* tp_as_buffer */
-	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_CHECKTYPES |
+	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_CHECKTYPES |
 		Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_WEAKREFS,	/* tp_flags */
 	set_doc,			/* tp_doc */
-	0,				/* tp_traverse */
-	0,				/* tp_clear */
+	(traverseproc)set_traverse,	/* tp_traverse */
+	(inquiry)set_tp_clear,		/* tp_clear */
 	(richcmpfunc)set_richcompare,	/* tp_richcompare */
 	offsetof(PySetObject, weakreflist),	/* tp_weaklistoffset */
 	(getiterfunc)set_iter,		/* tp_iter */
@@ -1027,7 +1058,7 @@ PyTypeObject PySet_Type = {
 	(initproc)set_init,		/* tp_init */
 	PyType_GenericAlloc,		/* tp_alloc */
 	set_new,			/* tp_new */
-	PyObject_Del,			/* tp_free */
+	PyObject_GC_Del,		/* tp_free */
 };
 
 /* frozenset object ********************************************************/
@@ -1102,10 +1133,10 @@ PyTypeObject PyFrozenSet_Type = {
 	PyObject_GenericGetAttr,	/* tp_getattro */
 	0,				/* tp_setattro */
 	0,				/* tp_as_buffer */
-	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_CHECKTYPES |
+	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC | Py_TPFLAGS_CHECKTYPES |
 		Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_WEAKREFS,	/* tp_flags */
 	frozenset_doc,			/* tp_doc */
-	0,				/* tp_traverse */
+	(traverseproc)set_traverse,	/* tp_traverse */
 	0,				/* tp_clear */
 	(richcmpfunc)set_richcompare,	/* tp_richcompare */
 	offsetof(PySetObject, weakreflist),	/* tp_weaklistoffset */
@@ -1122,5 +1153,5 @@ PyTypeObject PyFrozenSet_Type = {
 	0,				/* tp_init */
 	PyType_GenericAlloc,		/* tp_alloc */
 	frozenset_new,			/* tp_new */
-	PyObject_Del,			/* tp_free */
+	PyObject_GC_Del,		/* tp_free */
 };

@@ -14,7 +14,7 @@ compound objects (objects that contain other objects, like lists or
 class instances).
 
 - A shallow copy constructs a new compound object and then (to the
-  extent possible) inserts *the same objects* into in that the
+  extent possible) inserts *the same objects* into it that the
   original contains.
 
 - A deep copy constructs a new compound object and then, recursively,
@@ -62,6 +62,16 @@ except ImportError:
 
 __all__ = ["Error", "copy", "deepcopy"]
 
+import inspect
+def _getspecial(cls, name):
+    for basecls in inspect.getmro(cls):
+        try:
+            return basecls.__dict__[name]
+        except:
+            pass
+    else:
+        return None
+
 def copy(x):
     """Shallow copy operation on arbitrary Python objects.
 
@@ -74,7 +84,7 @@ def copy(x):
     if copier:
         return copier(x)
 
-    copier = getattr(cls, "__copy__", None)
+    copier = _getspecial(cls, "__copy__")
     if copier:
         return copier(x)
 
@@ -90,6 +100,9 @@ def copy(x):
             if reductor:
                 rv = reductor()
             else:
+                copier = getattr(x, "__copy__", None)
+                if copier:
+                    return copier()
                 raise Error("un(shallow)copyable object of type %s" % cls)
 
     return _reconstruct(x, rv, 0)
@@ -167,9 +180,9 @@ def deepcopy(x, memo=None, _nil=[]):
         if issc:
             y = _deepcopy_atomic(x, memo)
         else:
-            copier = getattr(x, "__deepcopy__", None)
+            copier = _getspecial(cls, "__deepcopy__")
             if copier:
-                y = copier(memo)
+                y = copier(x, memo)
             else:
                 reductor = dispatch_table.get(cls)
                 if reductor:
@@ -183,6 +196,9 @@ def deepcopy(x, memo=None, _nil=[]):
                         if reductor:
                             rv = reductor()
                         else:
+                            copier = getattr(x, "__deepcopy__", None)
+                            if copier:
+                                return copier(memo)
                             raise Error(
                                 "un(deep)copyable object of type %s" % cls)
                 y = _reconstruct(x, rv, 1, memo)

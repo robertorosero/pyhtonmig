@@ -204,7 +204,7 @@ text contributions are more than welcome as well.
     For ``central processing unit.''  Many style guides say this
     should be spelled out on the first use (and if you must use it,
     do so!).  For the Python documentation, this abbreviation should
-    be avoided since there's no reasonable way to predict which occurance
+    be avoided since there's no reasonable way to predict which occurrence
     will be the first seen by the reader.  It is better to use the
     word ``processor'' instead.
 
@@ -471,7 +471,7 @@ This \UNIX\ is also followed by a space.
 
     \LaTeX{} provides a variety of environments even without the
     additional markup provided by the Python-specific document classes
-    introducted in the next section.  The following environments are
+    introduced in the next section.  The following environments are
     provided as part of standard \LaTeX{} and are being used in the
     standard Python documentation; descriptions will be added here as
     time allows.
@@ -651,7 +651,7 @@ verbatim
     \end{envdesc}
 
     \begin{envdesc}{excclassdesc}{\p{name}\p{constructor parameters}}
-      Descibe an exception defined by a class.  \var{constructor
+      Describe an exception defined by a class.  \var{constructor
       parameters} should not include the \var{self} parameter or
       the parentheses used in the call syntax.  To describe an
       exception class without describing the parameters to its
@@ -830,7 +830,7 @@ verbatim
       with release \var{version}.  The text given as \var{what to do}
       should recommend something to use instead.  It should be
       complete sentences.  The entire deprecation notice will be
-      presented as a separate paragraph; it should either preceed or
+      presented as a separate paragraph; it should either precede or
       succeed the description of the deprecated feature.
     \end{macrodesc}
 
@@ -1122,7 +1122,7 @@ verbatim
 
   \begin{envdesc}{notice}{\op{type}}
     Label some paragraphs as being worthy of additional attention from
-    the reader.  What sort of attention is warrented can be indicated
+    the reader.  What sort of attention is warranted can be indicated
     by specifying the \var{type} of the notice.  The only values
     defined for \var{type} are \code{note} and \code{warning}; these
     are equivalent in intent to the inline markup of the same name.
@@ -1134,9 +1134,9 @@ verbatim
   \subsection{Module-specific Markup \label{module-markup}}
 
   The markup described in this section is used to provide information
-  about a module being documented.  A typical use of this markup
-  appears at the top of the section used to document a module.  A
-  typical example might look like this:
+  about a module being documented.  Each module should be documented
+  in its own \macro{section}.  A typical use of this markup
+  appears at the top of that section and might look like this:
 
 \begin{verbatim}
 \section{\module{spam} ---
@@ -1660,7 +1660,7 @@ verbatim
     \begin{envdesc}{productionlist}{\op{language}}
       This environment is used to enclose a group of productions.  The
       two macros are only defined within this environment.  If a
-      document descibes more than one language, the optional parameter
+      document describes more than one language, the optional parameter
       \var{language} should be used to distinguish productions between
       languages.  The value of the parameter should be a short name
       that can be used as part of a filename; colons or other
@@ -1731,7 +1731,7 @@ verbatim
     a complete sequence of menu selections, including selecting
     submenus and choosing a specific operation, or any subsequence of
     such a sequence.  The names of individual selections should be
-    separated by occurances of \macro{sub}.
+    separated by occurrences of \macro{sub}.
 
     For example, to mark the selection ``\menuselection{Start \sub
     Programs}'', use this markup:
@@ -1878,31 +1878,42 @@ verbatim
   \subsection{Working on Cygwin \label{cygwin}}
 
     Installing the required tools under Cygwin under Cygwin can be a
-    little tedious, if only because many packages are more difficult
-    to install under Cygwin.
+    little tedious.  Most of the required packages can be installed
+    using Cygwin's graphical installer, while netpbm and \LaTeX2HTML
+    must be installed from source. 
+
+    Start with a reasonably modern version of Cygwin.  If you haven't
+    upgraded for a few years, now would be a good time.
 
     Using the Cygwin installer, make sure your Cygwin installation
     includes Perl, Python, and the \TeX{} packages.  Perl and Python
-    are located under \menuselection{Interpreters} in the installer.
-    The \TeX{} packages are located in the \menuselection{Text}
-    section; installing the \code{tetex-beta}, \code{texmf},
-    \code{texmf-base}, and \code{texmf-extra} ensures that all the
-    required packages are available.  (There may be a more minimal
-    set, but I've not spent time trying to minimize the installation.)
+    are located under the \menuselection{Interpreters} heading.  The
+    \TeX{} packages are located under the \menuselection{Text}
+    heading, and are named \code{tetex-*}.  To ensure that all
+    required packages are available, install every \code{tetex}
+    package, except \code{tetex-x11}.  (There may be a more minimal
+    set, but I've not spent time trying to minimize the installation.) 
 
     The netpbm package is used by \LaTeX2HTML, and \emph{must} be
     installed before \LaTeX2HTML can be successfully installed, even
-    though they will never be used for most Python documentation.
-    References to download locations are located in the \ulink{netpbm
-    README}{http://netpbm.sourceforge.net/README}.  Install according
-    to the instructions.
+    though its features will not be used for most Python
+    documentation.  References to download locations are located in
+    the \ulink{netpbm README}{http://netpbm.sourceforge.net/README}.
+    Install from the latest stable source distribution according to
+    the instructions.  (Note that binary packages of netpbm are
+    sometimes available, but these may not work correctly with
+    \LaTeX2HTML.)
 
     \LaTeX2HTML can be installed from the source archive, but only
-    after munging one of the files in the distribution.  Edit the file
-    \file{L2hos.pm} in the top level of the unpacked distribution;
-    near the bottom of the file, change the text
-    \code{\$\textasciicircum{}O} with the text \code{'unix'}.  Proceed
-    using this command to build and install the software:
+    after munging one of the files in the distribution.  Download the
+    source archive from the \LaTeX2HTML website
+    \url{http://www.latex2html.org/} (or one of the many alternate
+    sites) and unpack it to a build directory. In the top level of
+    this build directory there will be a file named \file{L2hos.pm}.
+    Open \file{L2hos.pm} in an editor, and near the bottom of the file
+    replace the text \code{\$\textasciicircum{}O} with the text
+    \code{'unix'}.  Proceed using this command to build and install
+    the software:
 
 \begin{verbatim}
 % ./configure && make install
@@ -2080,7 +2091,7 @@ mydoc.ps:   mydoc.tex mygraphic.eps
     fairly rough.
 
     The timeframe for the conversion is not clear since there doesn't
-    seem to be much time available to work on this, but the appearant
+    seem to be much time available to work on this, but the apparent
     benefits are growing more substantial at a moderately rapid pace.
 
 

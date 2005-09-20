@@ -148,10 +148,10 @@ class LocaleTime(object):
                 if old:
                     current_format = current_format.replace(old, new)
             time_tuple = time.struct_time((1999,1,3,1,1,1,6,3,0))
-            if time.strftime(directive, time_tuple).find('00'):
-                U_W = '%U'
-            else:
+            if '00' in time.strftime(directive, time_tuple):
                 U_W = '%W'
+            else:
+                U_W = '%U'
             date_time[offset] = current_format.replace('11', U_W)
         self.LC_date_time = date_time[0]
         self.LC_date = date_time[1]
@@ -272,13 +272,14 @@ _regex_cache = {}
 
 def strptime(data_string, format="%a %b %d %H:%M:%S %Y"):
     """Return a time struct based on the input string and the format string."""
-    global _TimeRE_cache
+    global _TimeRE_cache, _regex_cache
     _cache_lock.acquire()
     try:
         time_re = _TimeRE_cache
         locale_time = time_re.locale_time
         if _getlang() != locale_time.lang:
             _TimeRE_cache = TimeRE()
+            _regex_cache = {}
         if len(_regex_cache) > _CACHE_MAX_SIZE:
             _regex_cache.clear()
         format_regex = _regex_cache.get(format)
