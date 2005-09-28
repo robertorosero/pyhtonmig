@@ -93,6 +93,8 @@ resources to test.  Currently only the following are defined:
                 in the standard library and test suite.  This takes
                 a long time.
 
+    subprocess  Run all tests for the subprocess module.
+
 To enable all resources except one, use '-uall,-<resource>'.  For
 example, to run all the tests except for the bsddb tests, give the
 option '-uall,-bsddb'.
@@ -136,7 +138,7 @@ if sys.platform == 'darwin':
 from test import test_support
 
 RESOURCE_NAMES = ('audio', 'curses', 'largefile', 'network', 'bsddb',
-                  'decimal', 'compiler')
+                  'decimal', 'compiler', 'subprocess')
 
 
 def usage(code, msg=''):
@@ -1063,6 +1065,34 @@ _expectations = {
         test_urllibnet
         test_winreg
         test_winsound
+        """,
+    'aix5':
+        """
+        test_aepack
+        test_al
+        test_applesingle
+        test_bsddb
+        test_bsddb185
+        test_bsddb3
+        test_bz2
+        test_cd
+        test_cl
+        test_dl
+        test_gdbm
+        test_gl
+        test_gzip
+        test_imgfile
+        test_linuxaudiodev
+        test_macfs
+        test_macostools
+        test_nis
+        test_ossaudiodev
+        test_sunaudiodev
+        test_tcl
+        test_winreg
+        test_winsound
+        test_zipimport
+        test_zlib
         """,
 }
 _expectations['freebsd5'] = _expectations['freebsd4']

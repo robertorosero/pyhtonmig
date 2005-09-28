@@ -60,7 +60,7 @@ compileall=$(srcdir)/Lib/compileall.py
 bundlebuilder=$(srcdir)/Lib/plat-mac/bundlebuilder.py
 
 installapps: install_PythonLauncher install_Python install_BuildApplet install_IDE \
-	install_IDLE install_PackageManager
+	install_IDLE install_PackageManager checkapplepython
 
 install_PythonLauncher:
 	cd $(srcdir)/Mac/OSX/PythonLauncher/PythonLauncher.pbproj ; \
@@ -120,10 +120,12 @@ install_IDE:
 		echo See Mac/OSX/README for details; \
 	else \
 		echo $(BUILDPYTHON) $(srcdir)/Mac/scripts/BuildApplet.py \
+		    --destroot "$(DESTDIR)" \
 			--python $(INSTALLED_PYTHONW) \
 			--output $(DESTDIR)$(PYTHONAPPSDIR)/PythonIDE.app --noargv \
 			$(srcdir)/Mac/Tools/IDE/PythonIDE.py ; \
 		$(BUILDPYTHON) $(srcdir)/Mac/scripts/BuildApplet.py \
+		    --destroot "$(DESTDIR)" \
 			--python $(INSTALLED_PYTHONW) \
 			--output $(DESTDIR)$(PYTHONAPPSDIR)/PythonIDE.app --noargv \
 			$(srcdir)/Mac/Tools/IDE/PythonIDE.py; \
@@ -136,6 +138,7 @@ install_PackageManager:
 	else \
 		echo $(BUILDPYTHON) $(bundlebuilder) \
 			--builddir $(DESTDIR)$(PYTHONAPPSDIR)/ \
+		    --destroot "$(DESTDIR)" \
 			--python $(INSTALLED_PYTHONW) \
 			--resource $(srcdir)/Mac/Tools/IDE/PythonIDE.rsrc \
 			--mainprogram $(srcdir)/Mac/Tools/IDE/PackageManager.py \
@@ -143,6 +146,7 @@ install_PackageManager:
 			--creator Pimp build; \
 		$(BUILDPYTHON) $(bundlebuilder) \
 			--builddir $(DESTDIR)$(PYTHONAPPSDIR)/ \
+		    --destroot "$(DESTDIR)" \
 			--python $(INSTALLED_PYTHONW) \
 			--resource $(srcdir)/Mac/Tools/IDE/PythonIDE.rsrc \
 			--mainprogram $(srcdir)/Mac/Tools/IDE/PackageManager.py \
@@ -157,11 +161,13 @@ install_IDLE:
 	else \
 		echo $(BUILDPYTHON) $(srcdir)/Mac/scripts/BuildApplet.py \
 			--python $(INSTALLED_PYTHONW) \
+		    --destroot "$(DESTDIR)" \
 			--output $(DESTDIR)$(PYTHONAPPSDIR)/IDLE.app \
 			--extra $(srcdir)/Lib/idlelib \
 			$(srcdir)/Tools/scripts/idle ; \
 		$(BUILDPYTHON) $(srcdir)/Mac/scripts/BuildApplet.py \
 			--python $(INSTALLED_PYTHONW) \
+		    --destroot "$(DESTDIR)" \
 			--output $(DESTDIR)$(PYTHONAPPSDIR)/IDLE.app \
 			--extra $(srcdir)/Lib/idlelib:Contents/Resources/idlelib \
 			$(srcdir)/Tools/scripts/idle ; \
@@ -170,6 +176,7 @@ install_IDLE:
 
 install_BuildApplet:
 	$(BUILDPYTHON) $(srcdir)/Mac/scripts/BuildApplet.py \
+		--destroot "$(DESTDIR)" \
 		--python $(INSTALLED_PYTHONW) \
 		--output $(DESTDIR)$(PYTHONAPPSDIR)/BuildApplet.app \
 		$(srcdir)/Mac/scripts/BuildApplet.py
@@ -257,3 +264,10 @@ installextras:
 		$(DESTDIR)$(PYTHONAPPSDIR)/Extras/Demo
 	$(BUILDPYTHON) $(srcdir)/Mac/OSX/Extras.install.py $(srcdir)/Tools \
 		$(DESTDIR)$(PYTHONAPPSDIR)/Extras/Tools
+
+checkapplepython:
+	@if ! $(BUILDPYTHON) $(srcdir)/Mac/OSX/fixapplepython23.py -n; then \
+		echo "* WARNING: Apple-installed Python 2.3 will have trouble building extensions from now on."; \
+		echo "* WARNING: Run $(srcdir)/Mac/OSX/fixapplepython23.py with \"sudo\" to fix this."; \
+	fi
+    

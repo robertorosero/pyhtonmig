@@ -87,7 +87,7 @@ DVIPS=	   dvips -N0 -t $(PAPER)
 # (e.g. OpenBSD needs package gmake installed; use gmake instead of make)
 PWD=$(shell pwd)
 
-# (The trailing colon in the value is needed; TeX places it's default
+# (The trailing colon in the value is needed; TeX places its default
 # set of paths at the location of the empty string in the path list.)
 TEXINPUTS=$(PWD)/commontex:
 
@@ -691,7 +691,7 @@ distlatex:	bziplatex ziplatex
 # The small amount of additional work is a small price to pay for not
 # having to remember which order to do it in. ;)
 paperdist:	distpdf distps pkglist
-edist:		disthtml distinfo zipisilo pkglist
+edist:		disthtml distinfo pkglist #zipisilo 
 
 # The pkglist.html file is used as part of the download.html page on
 # python.org; it is not used as intermediate input here or as part of

@@ -783,9 +783,30 @@ PyLong_AsLongLong(PyObject *vv)
 		return -1;
 	}
 	if (!PyLong_Check(vv)) {
+		PyNumberMethods *nb;
+		PyObject *io;
 		if (PyInt_Check(vv))
 			return (PY_LONG_LONG)PyInt_AsLong(vv);
-		PyErr_BadInternalCall();
+		if ((nb = vv->ob_type->tp_as_number) == NULL ||
+		    nb->nb_int == NULL) {
+			PyErr_SetString(PyExc_TypeError, "an integer is required");
+			return -1;
+		}
+		io = (*nb->nb_int) (vv);
+		if (io == NULL)
+			return -1;
+		if (PyInt_Check(io)) {
+			bytes = PyInt_AsLong(io);
+			Py_DECREF(io);
+			return bytes;
+		}
+		if (PyLong_Check(io)) {
+			bytes = PyLong_AsLongLong(io);
+			Py_DECREF(io);
+			return bytes;
+		}
+		Py_DECREF(io);
+		PyErr_SetString(PyExc_TypeError, "integer conversion failed");
 		return -1;
 	}
 
@@ -2339,8 +2360,11 @@ long_pow(PyObject *v, PyObject *w, PyObject *x)
 		c = (PyLongObject *)x;
 		Py_INCREF(x);
 	}
-	else if (PyInt_Check(x))
+	else if (PyInt_Check(x)) {
 		c = (PyLongObject *)PyLong_FromLong(PyInt_AS_LONG(x));
+		if (c == NULL)
+			goto Error;
+	}
 	else if (x == Py_None)
 		c = NULL;
 	else {
@@ -2490,14 +2514,14 @@ long_pow(PyObject *v, PyObject *w, PyObject *x)
  	}
 	/* fall through */
  Done:
-	Py_XDECREF(a);
-	Py_XDECREF(b);
-	Py_XDECREF(c);
-	Py_XDECREF(temp);
 	if (b->ob_size > FIVEARY_CUTOFF) {
 		for (i = 0; i < 32; ++i)
 			Py_XDECREF(table[i]);
 	}
+	Py_DECREF(a);
+	Py_DECREF(b);
+	Py_XDECREF(c);
+	Py_XDECREF(temp);
 	return (PyObject *)z;
 }
 

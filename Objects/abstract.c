@@ -1411,6 +1411,11 @@ PySequence_Tuple(PyObject *v)
 	/* Guess result size and allocate space. */
 	n = PyObject_Size(v);
 	if (n < 0) {
+		if (!PyErr_ExceptionMatches(PyExc_TypeError)  &&
+		    !PyErr_ExceptionMatches(PyExc_AttributeError)) {
+			Py_DECREF(it);
+			return NULL;
+		}
 		PyErr_Clear();
 		n = 10;  /* arbitrary */
 	}
@@ -1427,10 +1432,15 @@ PySequence_Tuple(PyObject *v)
 			break;
 		}
 		if (j >= n) {
-			if (n < 500)
-				n += 10;
-			else
-				n += 100;
+			int oldn = n;
+			n += 10;
+			n += n >> 2;
+			if (n < oldn) {
+				/* Check for overflow */
+				PyErr_NoMemory();
+				Py_DECREF(item);
+				goto Fail; 
+			}
 			if (_PyTuple_Resize(&result, n) != 0) {
 				Py_DECREF(item);
 				goto Fail;

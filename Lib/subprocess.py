@@ -2,28 +2,12 @@
 #
 # For more information about this module, see PEP 324.
 #
-# Copyright (c) 2003-2004 by Peter Astrand <astrand@lysator.liu.se>
+# This module should remain compatible with Python 2.2, see PEP 291.
 #
-# By obtaining, using, and/or copying this software and/or its
-# associated documentation, you agree that you have read, understood,
-# and will comply with the following terms and conditions:
+# Copyright (c) 2003-2005 by Peter Astrand <astrand@lysator.liu.se>
 #
-# Permission to use, copy, modify, and distribute this software and
-# its associated documentation for any purpose and without fee is
-# hereby granted, provided that the above copyright notice appears in
-# all copies, and that both that copyright notice and this permission
-# notice appear in supporting documentation, and that the name of the
-# author not be used in advertising or publicity pertaining to
-# distribution of the software without specific, written prior
-# permission.
-#
-# THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE,
-# INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS.
-# IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, INDIRECT OR
-# CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS
-# OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT,
-# NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION
-# WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+# Licensed to PSF under a Contributor Agreement.
+# See http://www.python.org/2.4/license for licensing details.
 
 r"""subprocess - Subprocesses with accessible I/O streams
 
@@ -229,7 +213,7 @@ Replacing shell pipe line
 output=`dmesg | grep hda`
 ==>
 p1 = Popen(["dmesg"], stdout=PIPE)
-p2 = Popen(["grep", "hda"], stdin=p1.stdout)
+p2 = Popen(["grep", "hda"], stdin=p1.stdout, stdout=PIPE)
 output = p2.communicate()[0]
 
 
@@ -490,6 +474,7 @@ def list2cmdline(seq):
             result.extend(bs_buf)
 
         if needquote:
+            result.extend(bs_buf)
             result.append('"')
 
     return ''.join(result)
@@ -503,6 +488,9 @@ class Popen(object):
                  startupinfo=None, creationflags=0):
         """Create new Popen instance."""
         _cleanup()
+
+        if not isinstance(bufsize, (int, long)):
+            raise TypeError("bufsize must be an integer")
 
         if mswindows:
             if preexec_fn is not None:
@@ -982,6 +970,7 @@ class Popen(object):
             data = os.read(errpipe_read, 1048576) # Exceptions limited to 1 MB
             os.close(errpipe_read)
             if data != "":
+                os.waitpid(self.pid, 0)
                 child_exception = pickle.loads(data)
                 raise child_exception
 

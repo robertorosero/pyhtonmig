@@ -259,6 +259,18 @@ unlock_import(void)
 	return 1;
 }
 
+/* This function is called from PyOS_AfterFork to ensure that newly
+   created child processes do not share locks with the parent. */
+
+void
+_PyImport_ReInitLock(void)
+{
+#ifdef _AIX
+	if (import_lock != NULL)
+		import_lock = PyThread_allocate_lock();
+#endif
+}
+
 #else
 
 #define lock_import()
@@ -2298,13 +2310,14 @@ PyImport_ReloadModule(PyObject *m)
 		if (parentname == NULL)
 			return NULL;
 		parent = PyDict_GetItem(modules, parentname);
-		Py_DECREF(parentname);
 		if (parent == NULL) {
 			PyErr_Format(PyExc_ImportError,
 			    "reload(): parent %.200s not in sys.modules",
-			    name);
+			    PyString_AS_STRING(parentname));
+			Py_DECREF(parentname);
 			return NULL;
 		}
+		Py_DECREF(parentname);
 		subname++;
 		path = PyObject_GetAttrString(parent, "__path__");
 		if (path == NULL)
