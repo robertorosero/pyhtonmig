@@ -1694,7 +1694,18 @@ ast_for_call(struct compiling *c, const node *n, expr_ty func)
 		e = ast_for_expr(c, CHILD(ch, 0));
                 if (!e)
                     goto error;
-		assert(e->kind == Name_kind);
+                /* f(lambda x: x[0] = 3) ends up getting parsed with
+                 * LHS test = lambda x: x[0], and RHS test = 3.
+                 * SF bug 132313 points out that complaining about a keyword
+                 * then is very confusing.
+                 */
+                if (e->kind == Lambda_kind) {
+                  ast_error(CHILD(ch, 0), "lambda cannot contain assignment");
+                  goto error;
+                } else if (e->kind != Name_kind) {
+                  ast_error(CHILD(ch, 0), "keyword can't be an expression");
+                  goto error;
+                }
 		key = e->v.Name.id;
 		free(e);
 		e = ast_for_expr(c, CHILD(ch, 2));
@@ -1769,6 +1780,11 @@ ast_for_expr_stmt(struct compiling *c, const node *n)
         expr1 = ast_for_testlist(c, CHILD(n, 0));
         if (!expr1)
             return NULL;
+        if (expr1->kind == GeneratorExp_kind) {
+          ast_error(CHILD(n, 0), "augmented assignment to generator "
+                                 "expression not possible");
+          return NULL;
+        }
 	if (expr1->kind == Name_kind) {
 		char *var_name = PyString_AS_STRING(expr1->v.Name.id);
 		if (var_name[0] == 'N' && !strcmp(var_name, "None")) {
@@ -1799,6 +1815,13 @@ ast_for_expr_stmt(struct compiling *c, const node *n)
 	    return NULL;
 	for (i = 0; i < NCH(n) - 2; i += 2) {
 	    expr_ty e = ast_for_testlist(c, CHILD(n, i));
+
+            if (e->kind == GeneratorExp_kind) {
+              ast_error(CHILD(n, i),
+                        "assignment to generator expression not possible");
+              asdl_seq_free(targets);
+              return NULL;
+            }
 
 	    /* set context to assign */
 	    if (!e) {
