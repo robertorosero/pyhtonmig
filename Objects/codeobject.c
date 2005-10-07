@@ -25,29 +25,27 @@ all_name_chars(unsigned char *s)
 	return 1;
 }
 
-static int
+static void
 intern_strings(PyObject *tuple)
 {
 	int i;
 
 	for (i = PyTuple_GET_SIZE(tuple); --i >= 0; ) {
 		PyObject *v = PyTuple_GET_ITEM(tuple, i);
-		if (v == NULL || !PyString_Check(v)) {
+		if (v == NULL || !PyString_CheckExact(v)) {
 			Py_FatalError("non-string found in code slot");
-			PyErr_BadInternalCall();
-			return -1;
 		}
 		PyString_InternInPlace(&PyTuple_GET_ITEM(tuple, i));
 	}
-	return 0;
 }
+
 
 PyCodeObject *
 PyCode_New(int argcount, int nlocals, int stacksize, int flags,
 	   PyObject *code, PyObject *consts, PyObject *names,
 	   PyObject *varnames, PyObject *freevars, PyObject *cellvars,
 	   PyObject *filename, PyObject *name, int firstlineno,
-	   PyObject *lnotab) 
+	   PyObject *lnotab)
 {
 	PyCodeObject *co;
 	int i;
@@ -129,6 +127,50 @@ static PyMemberDef code_memberlist[] = {
 	{NULL}	/* Sentinel */
 };
 
+/* Helper for code_new: return a shallow copy of a tuple that is
+   guaranteed to contain exact strings, by converting string subclasses
+   to exact strings and complaining if a non-string is found. */
+static PyObject*
+validate_and_copy_tuple(PyObject *tup)
+{
+	PyObject *newtuple;
+	PyObject *item;
+	int i, len;
+
+	len = PyTuple_GET_SIZE(tup);
+	newtuple = PyTuple_New(len);
+	if (newtuple == NULL)
+		return NULL;
+
+	for (i = 0; i < len; i++) {
+		item = PyTuple_GET_ITEM(tup, i);
+		if (PyString_CheckExact(item)) {
+			Py_INCREF(item);
+		}
+		else if (!PyString_Check(item)) {
+			PyErr_Format(
+				PyExc_TypeError,
+				"name tuples must contain only "
+				"strings, not '%.500s'",
+				item->ob_type->tp_name);
+			Py_DECREF(newtuple);
+			return NULL;
+		}
+		else {
+			item = PyString_FromStringAndSize(
+				PyString_AS_STRING(item),
+				PyString_GET_SIZE(item));
+			if (item == NULL) {
+				Py_DECREF(newtuple);
+				return NULL;
+			}
+		}
+		PyTuple_SET_ITEM(newtuple, i, item);
+	}
+
+	return newtuple;
+}
+
 PyDoc_STRVAR(code_doc,
 "code(argcount, nlocals, stacksize, flags, codestring, constants, names,\n\
       varnames, filename, name, firstlineno, lnotab[, freevars[, cellvars]])\n\
@@ -142,12 +184,13 @@ code_new(PyTypeObject *type, PyObject *args, PyObject *kw)
 	int nlocals;
 	int stacksize;
 	int flags;
+	PyObject *co = NULL;
 	PyObject *code;
 	PyObject *consts;
-	PyObject *names;
-	PyObject *varnames;
-	PyObject *freevars = NULL;
-	PyObject *cellvars = NULL;
+	PyObject *names, *ournames = NULL;
+	PyObject *varnames, *ourvarnames = NULL;
+	PyObject *freevars = NULL, *ourfreevars = NULL;
+	PyObject *cellvars = NULL, *ourcellvars = NULL;
 	PyObject *filename;
 	PyObject *name;
 	int firstlineno;
@@ -165,31 +208,49 @@ code_new(PyTypeObject *type, PyObject *args, PyObject *kw)
 			      &PyTuple_Type, &cellvars))
 		return NULL;
 
-	if (freevars == NULL || cellvars == NULL) {
-		PyObject *empty = PyTuple_New(0);
-		if (empty == NULL)
-		    return NULL;
-		if (freevars == NULL) {
-		    freevars = empty;
-		    Py_INCREF(freevars);
-		}
-		if (cellvars == NULL) {
-		    cellvars = empty;
-		    Py_INCREF(cellvars);
-		}
-		Py_DECREF(empty);
+	if (argcount < 0) {
+		PyErr_SetString(
+			PyExc_ValueError,
+			"code: argcount must not be negative");
+		goto cleanup;
 	}
 
-	if (!PyObject_CheckReadBuffer(code)) {
-		PyErr_SetString(PyExc_TypeError,
-		  "bytecode object must be a single-segment read-only buffer");
-		return NULL;
+	if (nlocals < 0) {
+		PyErr_SetString(
+			PyExc_ValueError,
+			"code: nlocals must not be negative");
+		goto cleanup;
 	}
 
-	return (PyObject *)PyCode_New(argcount, nlocals, stacksize, flags,
-				      code, consts, names, varnames,
-				      freevars, cellvars, filename, name,
-				      firstlineno, lnotab); 
+	ournames = validate_and_copy_tuple(names);
+	if (ournames == NULL)
+		goto cleanup;
+	ourvarnames = validate_and_copy_tuple(varnames);
+	if (ourvarnames == NULL)
+		goto cleanup;
+	if (freevars)
+		ourfreevars = validate_and_copy_tuple(freevars);
+	else
+		ourfreevars = PyTuple_New(0);
+	if (ourfreevars == NULL)
+		goto cleanup;
+	if (cellvars)
+		ourcellvars = validate_and_copy_tuple(cellvars);
+	else
+		ourcellvars = PyTuple_New(0);
+	if (ourcellvars == NULL)
+		goto cleanup;
+
+	co = (PyObject *)PyCode_New(argcount, nlocals, stacksize, flags,
+				    code, consts, ournames, ourvarnames,
+				    ourfreevars, ourcellvars, filename,
+				    name, firstlineno, lnotab);
+  cleanup:
+	Py_XDECREF(ournames);
+	Py_XDECREF(ourvarnames);
+	Py_XDECREF(ourfreevars);
+	Py_XDECREF(ourcellvars);
+	return co;
 }
 
 static void
