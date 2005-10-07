@@ -1,3 +1,19 @@
+/*
+ * This file compiles an abstract syntax tree (AST) into Python bytecode.
+ *
+ * The primary entry point is PyAST_Compile(), which returns a
+ * PyCodeObject.  The compiler makes several passes to build the code
+ * object:
+ *   1. Checks for future statements.  See future.c
+ *   2. Builds a symbol table.  See symtable.c.
+ *   3. Generate code for basic blocks.  See compiler_mod() in this file.
+ *   4. Assemble the basic blocks into final code.  See assemble() in
+ *   this file.  
+ *
+ * Note that compiler_mod() suggests module, but the module ast type
+ * (mod_ty) has cases for expressions and interactive statements.
+ */
+
 #include "Python.h"
 
 #include "Python-ast.h"
@@ -134,6 +150,13 @@ struct compiler_unit {
 			      has been generated with current lineno */
 };
 
+/* This struct captures the global state of a compilation.  
+
+   The u pointer points to the current compilation unit, while units
+   for enclosing blocks are stored in c_stack.  The u and c_stack are
+   managed by compiler_enter_scope() and compiler_exit_scope().
+*/
+
 struct compiler {
 	const char *c_filename;
 	struct symtable *c_st;
@@ -143,9 +166,9 @@ struct compiler {
 	int c_interactive;
         int c_nestlevel;
 
-	struct compiler_unit *u;
-	PyObject *c_stack;
-	char *c_encoding;	/* source encoding (a borrowed reference) */
+        struct compiler_unit *u; /* compiler state for current block */
+	PyObject *c_stack;       /* Python list holding compiler_unit ptrs */
+	char *c_encoding;	 /* source encoding (a borrowed reference) */
 };
 
 struct assembler {
@@ -3559,10 +3582,12 @@ assemble(struct compiler *c, int addNone)
 	   XXX NEXT_BLOCK() isn't quite right, because if the last
 	   block ends with a jump or return b_next shouldn't set.
 	 */
-	NEXT_BLOCK(c);
-        if (addNone)
-            ADDOP_O(c, LOAD_CONST, Py_None, consts);
-	ADDOP(c, RETURN_VALUE);
+	if (!c->u->u_curblock->b_return) {
+		NEXT_BLOCK(c);
+		if (addNone)
+			ADDOP_O(c, LOAD_CONST, Py_None, consts);
+		ADDOP(c, RETURN_VALUE);
+	}
 
 	nblocks = 0;
 	entryblock = NULL;
