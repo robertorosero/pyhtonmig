@@ -41,10 +41,10 @@ PyAPI_FUNC(struct _mod *) PyParser_ASTFromString(const char *, const char *,
 PyAPI_FUNC(struct _mod *) PyParser_ASTFromFile(FILE *, const char *, int, 
 					       char *, char *,
                                                PyCompilerFlags *, int *);
-#define PyParser_SimpleParserString(S, B) \
-        PyParser_SimplerParserStringFlags(S, B, 0)
-#define PyParser_SimpleParserFile(FP, S, B) \
-        PyParser_SimplerParserFileFlags(FP, S, B, 0)
+#define PyParser_SimpleParseString(S, B) \
+        PyParser_SimpleParseStringFlags(S, B, 0)
+#define PyParser_SimpleParseFile(FP, S, B) \
+        PyParser_SimpleParseFileFlags(FP, S, B, 0)
 PyAPI_FUNC(struct _node *) PyParser_SimpleParseStringFlags(const char *, int, 
 							  int);
 PyAPI_FUNC(struct _node *) PyParser_SimpleParseFileFlags(FILE *, const char *,

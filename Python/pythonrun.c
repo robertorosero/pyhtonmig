@@ -1312,12 +1312,6 @@ PyParser_SimpleParseFileFlags(FILE *fp, const char *filename, int start, int fla
 	return n;
 }
 
-node *
-PyParser_SimpleParseFile(FILE *fp, const char *filename, int start)
-{
-	return PyParser_SimpleParseFileFlags(fp, filename, start, 0);
-}
-
 /* Simplified interface to parsestring -- return node or set exception */
 
 node *
@@ -1330,12 +1324,6 @@ PyParser_SimpleParseStringFlags(const char *str, int start, int flags)
 	if (n == NULL)
 		err_input(&err);
 	return n;
-}
-
-node *
-PyParser_SimpleParseString(const char *str, int start)
-{
-	return PyParser_SimpleParseStringFlags(str, start, 0);
 }
 
 node *
@@ -1642,3 +1630,21 @@ PyOS_setsig(int sig, PyOS_sighandler_t handler)
 	return oldhandler;
 #endif
 }
+
+/* Deprecated C API functions still provided for binary compatiblity */
+
+#undef PyParser_SimpleParseFile
+#undef PyParser_SimpleParseString
+
+node *
+PyParser_SimpleParseFile(FILE *fp, const char *filename, int start)
+{
+	return PyParser_SimpleParseFileFlags(fp, filename, start, 0);
+}
+
+node *
+PyParser_SimpleParseString(const char *str, int start)
+{
+	return PyParser_SimpleParseStringFlags(str, start, 0);
+}
+
