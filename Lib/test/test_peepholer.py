@@ -109,7 +109,6 @@ class TestTranforms(unittest.TestCase):
             ('a="abc" + "def"', "('abcdef')"),      # check string ops
             ('a = 3**4', '(81)'),                   # binary power
             ('a = 3*4', '(12)'),                    # binary multiply
-            ('a = 13/4.0', '(3.25)'),               # binary divide
             ('a = 13//4', '(3)'),                   # binary floor divide
             ('a = 14%4', '(2)'),                    # binary modulo
             ('a = 2+3', '(5)'),                     # binary add
@@ -129,6 +128,29 @@ class TestTranforms(unittest.TestCase):
         asm = dis_single('a=2+"b"')
         self.assert_('(2)' in asm)
         self.assert_("('b')" in asm)
+
+        # Verify that large sequences do not result from folding
+        asm = dis_single('a="x"*1000')
+        self.assert_('(1000)' in asm)
+
+    def test_folding_of_unaryops_on_constants(self):
+        for line, elem in (
+            ('`1`', "('1')"),                       # unary convert
+            ('-0.5', '(-0.5)'),                     # unary negative
+            ('~-2', '(1)'),                         # unary invert
+        ):
+            asm = dis_single(line)
+            self.assert_(elem in asm, asm)
+            self.assert_('UNARY_' not in asm)
+
+        # Verify that unfoldables are skipped
+        for line, elem in (
+            ('-"abc"', "('abc')"),                  # unary negative
+            ('~"abc"', "('abc')"),                  # unary invert
+        ):
+            asm = dis_single(line)
+            self.assert_(elem in asm, asm)
+            self.assert_('UNARY_' in asm)
 
     def test_elim_extra_return(self):
         # RETURN LOAD_CONST None RETURN  -->  RETURN
