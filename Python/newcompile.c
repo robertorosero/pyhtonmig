@@ -474,6 +474,18 @@ PyAST_Compile(mod_ty mod, const char *filename, PyCompilerFlags *flags)
 	return co;
 }
 
+PyCodeObject *
+PyNode_Compile(struct _node *n, const char *filename)
+{
+	PyCodeObject *co;
+	mod_ty mod = PyAST_FromNode(n, NULL, filename);
+	if (!mod)
+		return NULL;
+	co = PyAST_Compile(mod, filename, NULL);
+	free_mod(mod);
+	return co;
+}
+
 static void
 compiler_free(struct compiler *c)
 {
