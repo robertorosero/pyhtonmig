@@ -47,14 +47,15 @@ PySTEntry_New(struct symtable *st, identifier name, block_ty block,
 	ste->ste_children = v;
 
 	ste->ste_type = block;
-	ste->ste_optimized = block == FunctionBlock;
+	ste->ste_unoptimized = 0;
+	ste->ste_nested = 0;
+	ste->ste_free = 0;
 	ste->ste_varargs = 0;
 	ste->ste_varkeywords = 0;
 	ste->ste_opt_lineno = 0;
 	ste->ste_tmpname = 0;
 	ste->ste_lineno = lineno;
 
-	ste->ste_nested = 0;
 	if (st->st_cur != NULL &&
 	    (st->st_cur->ste_nested ||
 	     st->st_cur->ste_type == FunctionBlock))
@@ -214,6 +215,7 @@ PySymtable_Build(mod_ty mod, const char *filename, PyFutureFeatures *future)
 	symtable_enter_block(st, GET_IDENTIFIER(top), ModuleBlock, 
 			     (void *)mod, 0);
 	st->st_top = st->st_cur;
+	st->st_cur->ste_unoptimized = OPT_TOPLEVEL;
 	/* Any other top-level initialization? */
 	switch (mod->kind) {
 	case Module_kind:
@@ -222,7 +224,7 @@ PySymtable_Build(mod_ty mod, const char *filename, PyFutureFeatures *future)
 			if (!symtable_visit_stmt(st, asdl_seq_GET(seq, i)))
 				goto error;
 		break;
-	case Expression_kind: 
+	case Expression_kind:
 		if (!symtable_visit_expr(st, mod->v.Expression.body))
 			goto error;
 		break;
@@ -335,11 +337,13 @@ PyST_GetScope(PySTEntryObject *ste, PyObject *name)
 /* Decide on scope of name, given flags.
 
    The dicts passed in as arguments are modified as necessary.
+   ste is passed so that flags can be updated.
 */
 
 static int 
-analyze_name(PyObject *dict, PyObject *name, int flags, PyObject *bound,
-	     PyObject *local, PyObject *free, PyObject *global, int nested)
+analyze_name(PySTEntryObject *ste, PyObject *dict, PyObject *name, int flags,
+	     PyObject *bound, PyObject *local, PyObject *free, 
+	     PyObject *global)
 {
 	if (flags & DEF_GLOBAL) {
 		if (flags & DEF_PARAM) {
@@ -374,6 +378,7 @@ analyze_name(PyObject *dict, PyObject *name, int flags, PyObject *bound,
 	*/
 	if (bound && PyDict_GetItem(bound, name)) {
 		SET_SCOPE(dict, name, FREE);
+		ste->ste_free = 1;
 		if (PyDict_SetItem(free, name, Py_None) < 0)
 			return 0;
 		return 1;
@@ -386,6 +391,8 @@ analyze_name(PyObject *dict, PyObject *name, int flags, PyObject *bound,
 		return 1;
 	}
 	else {
+		if (ste->ste_nested)
+			ste->ste_free = 1;
 		SET_SCOPE(dict, name, GLOBAL_IMPLICIT);
 		return 1;
 	}
@@ -433,7 +440,53 @@ analyze_cells(PyObject *scope, PyObject *free)
 	return success;
 }
 
-/* Enter the final scope information into the st_symbols dict. */
+/* Check for illegal statements in unoptimized namespaces */
+static int
+check_unoptimized(const PySTEntryObject* ste) {
+	char buf[300];
+
+	if (ste->ste_type == ModuleBlock || !ste->ste_unoptimized
+	    || !(ste->ste_free || ste->ste_child_free))
+		return 1;
+
+	const char* trailer = (ste->ste_child_free ? 
+		       "contains a nested function with free variables" :
+			       "is a nested function");
+
+	switch (ste->ste_unoptimized) {
+	case OPT_TOPLEVEL: /* exec / import * at top-level is fine */
+	case OPT_EXEC: /* qualified exec is fine */
+		return 1;
+	case OPT_IMPORT_STAR:
+		PyOS_snprintf(buf, sizeof(buf), 
+			      "import * is not allowed in function '%.100s' "
+			      "because it is %s",
+			      PyString_AS_STRING(ste->ste_name), trailer);
+		break;
+	case OPT_BARE_EXEC:
+		PyOS_snprintf(buf, sizeof(buf),
+			      "unqualified exec is not allowed in function "
+			      "'%.100s' it %s",
+			      PyString_AS_STRING(ste->ste_name), trailer);
+		break;
+	default:
+		PyOS_snprintf(buf, sizeof(buf), 
+			      "function '%.100s' uses import * and bare exec, "
+			      "which are illegal because it %s",
+			      PyString_AS_STRING(ste->ste_name), trailer);
+		break;
+	}
+
+	PyErr_SetString(PyExc_SyntaxError, buf);
+	PyErr_SyntaxLocation(ste->ste_table->st_filename, 
+			     ste->ste_opt_lineno);
+	return 0;
+}
+
+/* Enter the final scope information into the st_symbols dict. 
+ * 
+ * All arguments are dicts.  Modifies symbols, others are read-only.
+*/
 static int
 update_symbols(PyObject *symbols, PyObject *scope, 
                PyObject *bound, PyObject *free, int class)
@@ -501,11 +554,11 @@ update_symbols(PyObject *symbols, PyObject *scope,
 
 /* Make final symbol table decisions for block of ste.
    Arguments:
+   ste -- current symtable entry (input/output)
    bound -- set of variables bound in enclosing scopes (input)
    free -- set of free variables in enclosed scopes (output)
    globals -- set of declared global variables in enclosing scopes (input)
 */
-   
 
 static int
 analyze_block(PySTEntryObject *ste, PyObject *bound, PyObject *free, 
@@ -547,8 +600,8 @@ analyze_block(PySTEntryObject *ste, PyObject *bound, PyObject *free,
 	assert(PyDict_Check(ste->ste_symbols));
 	while (PyDict_Next(ste->ste_symbols, &pos, &name, &v)) {
 		flags = PyInt_AS_LONG(v);
-		if (!analyze_name(scope, name, flags, bound, local, free,
-				  global, ste->ste_nested))
+		if (!analyze_name(ste, scope, name, flags, bound, local, free,
+				  global))
 			goto error;
 	}
 
@@ -565,18 +618,23 @@ analyze_block(PySTEntryObject *ste, PyObject *bound, PyObject *free,
 			goto error;
 	}
 
+	/* Recursively call analyze_block() on each child block */
 	for (i = 0; i < PyList_GET_SIZE(ste->ste_children); ++i) {
 		PyObject *c = PyList_GET_ITEM(ste->ste_children, i);
 		assert(c && PySTEntry_Check(c));
-		if (!analyze_block((PySTEntryObject *)c, newbound, newfree,
-				   newglobal))
+		PySTEntryObject* entry = (PySTEntryObject*)c;
+		if (!analyze_block(entry, newbound, newfree, newglobal))
 			goto error;
+		if (entry->ste_free || entry->ste_child_free)
+			ste->ste_child_free = 1;
 	}
 
 	if (ste->ste_type == FunctionBlock && !analyze_cells(scope, newfree))
 		goto error;
 	if (!update_symbols(ste->ste_symbols, scope, bound, newfree,
 			    ste->ste_type == ClassBlock))
+		goto error;
+	if (!check_unoptimized(ste))
 		goto error;
 
 	if (PyDict_Update(free, newfree) < 0)
@@ -871,17 +929,29 @@ symtable_visit_stmt(struct symtable *st, stmt_ty s)
 		break;
         case Import_kind:
 		VISIT_SEQ(st, alias, s->v.Import.names);
+		/* XXX Don't have the lineno available inside
+		   visit_alias */
+		if (st->st_cur->ste_unoptimized && !st->st_cur->ste_opt_lineno)
+			st->st_cur->ste_opt_lineno = s->lineno;
 		break;
         case ImportFrom_kind:
 		VISIT_SEQ(st, alias, s->v.ImportFrom.names);
+		/* XXX Don't have the lineno available inside
+		   visit_alias */
+		if (st->st_cur->ste_unoptimized && !st->st_cur->ste_opt_lineno)
+			st->st_cur->ste_opt_lineno = s->lineno;
 		break;
         case Exec_kind:
 		VISIT(st, expr, s->v.Exec.body);
-		st->st_cur->ste_optimized = 0;
+		if (!st->st_cur->ste_opt_lineno)
+			st->st_cur->ste_opt_lineno = s->lineno;
 		if (s->v.Exec.globals) {
+			st->st_cur->ste_unoptimized |= OPT_EXEC;
 			VISIT(st, expr, s->v.Exec.globals);
 			if (s->v.Exec.locals) 
 				VISIT(st, expr, s->v.Exec.locals);
+		} else {
+			st->st_cur->ste_unoptimized |= OPT_BARE_EXEC;
 		}
 		break;
         case Global_kind: {
@@ -1134,7 +1204,7 @@ symtable_visit_alias(struct symtable *st, alias_ty a)
                                    "import * only allowed at module level"))
                     return 0;
             }
-	    st->st_cur->ste_optimized = 0;
+	    st->st_cur->ste_unoptimized |= OPT_IMPORT_STAR;
 	    return 1;
 	}
 }

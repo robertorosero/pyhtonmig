@@ -2289,7 +2289,7 @@ compiler_nameop(struct compiler *c, identifier name, expr_context_ty ctx)
 			optype = OP_FAST;
 		break;
 	case GLOBAL_IMPLICIT:
-		if (c->u->u_ste->ste_optimized)
+		if (!c->u->u_ste->ste_unoptimized)
 			optype = OP_GLOBAL;
 		break;
 	case GLOBAL_EXPLICIT:
@@ -3490,7 +3490,7 @@ compute_code_flags(struct compiler *c)
 	if (ste->ste_type != ModuleBlock)
 		flags |= CO_NEWLOCALS;
 	if (ste->ste_type == FunctionBlock) {
-		if (ste->ste_optimized)
+		if (!ste->ste_unoptimized)
 			flags |= CO_OPTIMIZED;
 		if (ste->ste_nested)
 			flags |= CO_NESTED;
