@@ -3344,6 +3344,11 @@ compiler_visit_expr(struct compiler *c, expr_ty e)
 {
 	int i, n;
 
+	fprintf(stderr, "compile expr %d lineno %d %d\n", e->kind, e->lineno);
+	if (e->lineno > c->u->u_lineno) {
+		c->u->u_lineno = e->lineno;
+		c->u->u_lineno_set = false;
+	}
 	switch (e->kind) {
         case BoolOp_kind:
 		return compiler_boolop(c, e);
