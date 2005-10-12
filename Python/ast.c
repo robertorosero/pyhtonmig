@@ -338,7 +338,8 @@ get_operator(const node *n)
 /* Set the context ctx for expr_ty e returning 0 on success, -1 on error.
 
    Only sets context for expr kinds that "can appear in assignment context"
-   (according to ../Parser/Python.asdl)
+   (according to ../Parser/Python.asdl).  For other expr kinds, it sets
+   an appropriate syntax error and returns false.
 
    If e is a sequential type, items in sequence will also have their context
    set.
@@ -373,6 +374,8 @@ set_context(expr_ty e, expr_context_ty ctx, const node *n)
 	    s = e->v.List.elts;
 	    break;
         case Tuple_kind:
+            if (asdl_seq_LEN(e->v.Tuple.elts) == 0) 
+                return ast_error(n, "can't assign to ()");
 	    e->v.Tuple.ctx = ctx;
 	    s = e->v.Tuple.elts;
 	    break;
@@ -384,6 +387,11 @@ set_context(expr_ty e, expr_context_ty ctx, const node *n)
 	    else
 		return ast_error(n, "unexpected operation on function call");
 	    break;
+        case BinOp_kind:
+            return ast_error(n, "can't assign to operator");
+        case GeneratorExp_kind:
+            return ast_error(n, "assignment to generator expression "
+                             "not possible");
         default:
 	    return ast_error(n, "unexpected node in assignment");
 	    break;
@@ -533,7 +541,7 @@ compiler_complex_args(const node *n)
 			ast_error(child, "assignment to None");
 			return NULL;
 		}
-            arg = Name(NEW_IDENTIFIER(child), Store);
+            arg = Name(NEW_IDENTIFIER(child), Store, LINENO(child));
 	}
         else
             arg = compiler_complex_args(CHILD(CHILD(n, 2*i), 1));
@@ -541,7 +549,7 @@ compiler_complex_args(const node *n)
         asdl_seq_SET(args, i, arg);
     }
 
-    result = Tuple(args, Store);
+    result = Tuple(args, Store, LINENO(n));
     set_context(result, Store, n);
     return result;
 }
@@ -620,8 +628,9 @@ ast_for_arguments(struct compiling *c, const node *n)
 			    goto error;
 		    }
                     /* XXX check return value of Name call */
-                    asdl_seq_APPEND(args, Name(NEW_IDENTIFIER(CHILD(ch, 0)),
-                                               Param));
+                    asdl_seq_APPEND(args, 
+				    Name(NEW_IDENTIFIER(CHILD(ch, 0)),
+					 Param, LINENO(ch)));
 		}
                 i += 2; /* the name and the comma */
                 break;
@@ -672,7 +681,7 @@ ast_for_dotted_name(struct compiling *c, const node *n)
     id = NEW_IDENTIFIER(CHILD(n, 0));
     if (!id)
         goto error;
-    e = Name(id, Load);
+    e = Name(id, Load, LINENO(n));
     if (!e)
 	goto error;
     id = NULL;
@@ -681,7 +690,7 @@ ast_for_dotted_name(struct compiling *c, const node *n)
         id = NEW_IDENTIFIER(CHILD(n, i));
 	if (!id)
 	    goto error;
-	attrib = Attribute(e, id, Load);
+	attrib = Attribute(e, id, Load, LINENO(CHILD(n, i)));
 	if (!attrib)
 	    goto error;
 	e = attrib;
@@ -720,7 +729,7 @@ ast_for_decorator(struct compiling *c, const node *n)
 	name_expr = NULL;
     }
     else if (NCH(n) == 5) { /* Call with no arguments */
-	d = Call(name_expr, NULL, NULL, NULL, NULL);
+	d = Call(name_expr, NULL, NULL, NULL, NULL, LINENO(n));
 	if (!d)
 	    goto error;
 	name_expr = NULL;
@@ -827,8 +836,6 @@ ast_for_lambdef(struct compiling *c, const node *n)
         expression = ast_for_expr(c, CHILD(n, 2));
         if (!expression)
             return NULL;
-
-	return Lambda(args, expression);
     }
     else {
         args = ast_for_arguments(c, CHILD(n, 1));
@@ -837,9 +844,9 @@ ast_for_lambdef(struct compiling *c, const node *n)
         expression = ast_for_expr(c, CHILD(n, 3));
         if (!expression)
             return NULL;
-            
-	return Lambda(args, expression);
     }
+
+    return Lambda(args, expression, LINENO(n));
 }
 
 /* Count the number of 'for' loop in a list comprehension.
@@ -958,7 +965,7 @@ ast_for_listcomp(struct compiling *c, const node *n)
 	if (asdl_seq_LEN(t) == 1)
 	    lc = comprehension(asdl_seq_GET(t, 0), expression, NULL);
 	else
-	    lc = comprehension(Tuple(t, Store), expression, NULL);
+	    lc = comprehension(Tuple(t, Store, LINENO(ch)), expression, NULL);
 
         if (!lc) {
             asdl_seq_free(listcomps);
@@ -1003,7 +1010,7 @@ ast_for_listcomp(struct compiling *c, const node *n)
 	asdl_seq_APPEND(listcomps, lc);
     }
 
-    return ListComp(elt, listcomps);
+    return ListComp(elt, listcomps, LINENO(n));
 }
 
 /*
@@ -1117,9 +1124,11 @@ ast_for_genexp(struct compiling *c, const node *n)
 		}
 		
 		if (asdl_seq_LEN(t) == 1)
-			ge = comprehension(asdl_seq_GET(t, 0), expression, NULL);
+			ge = comprehension(asdl_seq_GET(t, 0), expression,
+					   NULL);
 		else
-			ge = comprehension(Tuple(t, Store), expression, NULL);
+			ge = comprehension(Tuple(t, Store, LINENO(ch)),
+					   expression, NULL);
 		
 		if (!ge) {
 			asdl_seq_free(genexps);
@@ -1148,11 +1157,11 @@ ast_for_genexp(struct compiling *c, const node *n)
 		
 			for (j = 0; j < n_ifs; j++) {
 				REQ(ch, gen_iter);
-			
 				ch = CHILD(ch, 0);
 				REQ(ch, gen_if);
 			
-				asdl_seq_APPEND(ifs, ast_for_expr(c, CHILD(ch, 1)));
+				asdl_seq_APPEND(ifs, 
+						ast_for_expr(c, CHILD(ch, 1)));
 				if (NCH(ch) == 3)
 					ch = CHILD(ch, 2);
 			}
@@ -1164,7 +1173,7 @@ ast_for_genexp(struct compiling *c, const node *n)
 		asdl_seq_APPEND(genexps, ge);
 	}
 	
-	return GeneratorExp(elt, genexps);
+	return GeneratorExp(elt, genexps, LINENO(n));
 }
 
 static expr_ty
@@ -1179,14 +1188,14 @@ ast_for_atom(struct compiling *c, const node *n)
 		case NAME:
 			/* All names start in Load context, but may later be
 			   changed. */
-			return Name(NEW_IDENTIFIER(ch), Load);
+			return Name(NEW_IDENTIFIER(ch), Load, LINENO(n));
 		case STRING: {
 			PyObject *str = parsestrplus(c, n);
 
 			if (!str)
 				return NULL;
 
-			return Str(str);
+			return Str(str, LINENO(n));
 		}
 		case NUMBER: {
 			PyObject *pynum = parsenumber(STR(ch));
@@ -1194,13 +1203,13 @@ ast_for_atom(struct compiling *c, const node *n)
 			if (!pynum)
 				return NULL;
                 
-			return Num(pynum);
+			return Num(pynum, LINENO(n));
 		}
 		case LPAR: /* some parenthesized expressions */
 			ch = CHILD(n, 1);
 
 			if (TYPE(ch) == RPAR)
-				return Tuple(NULL, Load);
+				return Tuple(NULL, Load, LINENO(n));
 
 			if ((NCH(ch) > 1) && (TYPE(CHILD(ch, 1)) == gen_for))
 				return ast_for_genexp(c, ch);
@@ -1210,7 +1219,7 @@ ast_for_atom(struct compiling *c, const node *n)
 			ch = CHILD(n, 1);
 
 			if (TYPE(ch) == RSQB)
-				return List(NULL, Load);
+				return List(NULL, Load, LINENO(n));
 
 			REQ(ch, listmaker);
 			if (NCH(ch) == 1 || TYPE(CHILD(ch, 1)) == COMMA) {
@@ -1219,7 +1228,7 @@ ast_for_atom(struct compiling *c, const node *n)
 				if (!elts)
 					return NULL;
 
-				return List(elts, Load);
+				return List(elts, Load, LINENO(n));
 			}
 			else
 				return ast_for_listcomp(c, ch);
@@ -1255,7 +1264,7 @@ ast_for_atom(struct compiling *c, const node *n)
 
 				asdl_seq_SET(values, i / 4, expression);
 			}
-			return Dict(keys, values);
+			return Dict(keys, values, LINENO(n));
 		}
 		case BACKQUOTE: { /* repr */
 			expr_ty expression = ast_for_testlist(c, CHILD(n, 1));
@@ -1263,7 +1272,7 @@ ast_for_atom(struct compiling *c, const node *n)
 			if (!expression)
 				return NULL;
 
-			return Repr(expression);
+			return Repr(expression, LINENO(n));
 		}
 		default:
 			PyErr_Format(PyExc_Exception, "unhandled atom %d",
@@ -1367,15 +1376,16 @@ ast_for_binop(struct compiling *c, const node *n)
         if (!operator)
             return NULL;
 
-	result = BinOp(expr1, operator, expr2);
+	result = BinOp(expr1, operator, expr2, LINENO(n));
 	if (!result)
             return NULL;
 
 	nops = (NCH(n) - 1) / 2;
 	for (i = 1; i < nops; i++) {
 		expr_ty tmp_result, tmp;
+		const node* next_oper = CHILD(n, i * 2 + 1);
 
-                operator = get_operator(CHILD(n, i * 2 + 1));
+		operator = get_operator(next_oper);
                 if (!operator)
                     return NULL;
 
@@ -1383,7 +1393,8 @@ ast_for_binop(struct compiling *c, const node *n)
                 if (!tmp)
                     return NULL;
 
-                tmp_result = BinOp(result, operator, tmp);
+                tmp_result = BinOp(result, operator, tmp, 
+				   LINENO(next_oper));
 		if (!tmp) 
 			return NULL;
 		result = tmp_result;
@@ -1436,10 +1447,10 @@ ast_for_expr(struct compiling *c, const node *n)
                 asdl_seq_SET(seq, i / 2, e);
             }
             if (!strcmp(STR(CHILD(n, 1)), "and"))
-                return BoolOp(And, seq);
+                return BoolOp(And, seq, LINENO(n));
             else {
                 assert(!strcmp(STR(CHILD(n, 1)), "or"));
-                return BoolOp(Or, seq);
+                return BoolOp(Or, seq, LINENO(n));
             }
             break;
         case not_test:
@@ -1452,7 +1463,7 @@ ast_for_expr(struct compiling *c, const node *n)
                 if (!expression)
                     return NULL;
 
-                return UnaryOp(Not, expression);
+                return UnaryOp(Not, expression, LINENO(n));
             }
         case comparison:
             if (NCH(n) == 1) {
@@ -1489,7 +1500,7 @@ ast_for_expr(struct compiling *c, const node *n)
                 if (!expression)
                     return NULL;
                     
-                return Compare(expression, ops, cmps);
+                return Compare(expression, ops, cmps, LINENO(n));
             }
             break;
 
@@ -1522,11 +1533,11 @@ ast_for_expr(struct compiling *c, const node *n)
 
             switch (TYPE(CHILD(n, 0))) {
                 case PLUS:
-                    return UnaryOp(UAdd, expression);
+                    return UnaryOp(UAdd, expression, LINENO(n));
                 case MINUS:
-                    return UnaryOp(USub, expression);
+                    return UnaryOp(USub, expression, LINENO(n));
                 case TILDE:
-                    return UnaryOp(Invert, expression);
+                    return UnaryOp(Invert, expression, LINENO(n));
             }
             break;
         }
@@ -1548,7 +1559,7 @@ ast_for_expr(struct compiling *c, const node *n)
                     break;
                 if (TYPE(CHILD(ch, 0)) == LPAR) {
                     if (NCH(ch) == 2)
-                        new = Call(new, NULL, NULL, NULL, NULL);
+                        new = Call(new, NULL, NULL, NULL, NULL, LINENO(ch));
                     else
                         new = ast_for_call(c, CHILD(ch, 1), new);
 
@@ -1567,7 +1578,7 @@ ast_for_expr(struct compiling *c, const node *n)
                             return NULL;
 			}
 
-                        new = Subscript(e, slc, Load);
+                        new = Subscript(e, slc, Load, LINENO(ch));
                         if (!new) {
 		            /* XXX free(e); */
 		            /* XXX free(slc); */
@@ -1592,7 +1603,7 @@ ast_for_expr(struct compiling *c, const node *n)
 			    }
                             asdl_seq_SET(slices, j / 2, slc);
                         }
-                        new = Subscript(e, ExtSlice(slices), Load);
+                        new = Subscript(e, ExtSlice(slices), Load, LINENO(ch));
                         if (!new) {
 		            /* XXX free(e); */
 		            asdl_seq_free(slices);
@@ -1602,7 +1613,8 @@ ast_for_expr(struct compiling *c, const node *n)
                 }
                 else {
                     assert(TYPE(CHILD(ch, 0)) == DOT);
-                    new = Attribute(e, NEW_IDENTIFIER(CHILD(ch, 1)), Load);
+                    new = Attribute(e, NEW_IDENTIFIER(CHILD(ch, 1)), Load,
+				    LINENO(ch));
                     if (!new) {
 		        /* XXX free(e); */
                         return NULL;
@@ -1616,7 +1628,7 @@ ast_for_expr(struct compiling *c, const node *n)
 		    /* XXX free(e); */
                     return NULL;
 		}
-                return BinOp(e, Pow, f);
+                return BinOp(e, Pow, f, LINENO(n));
             }
             return e;
         }
@@ -1659,9 +1671,16 @@ ast_for_call(struct compiling *c, const node *n, expr_ty func)
 	}
     }
     if (ngens > 1 || (ngens && (nargs || nkeywords))) {
-        ast_error(n, "Generator expression must be parenthesised if not sole argument");
+        ast_error(n, "Generator expression must be parenthesised "
+		  "if not sole argument");
 	return NULL;
     }
+
+    if (nargs + nkeywords + ngens > 255) {
+      ast_error(n, "more than 255 arguments");
+      return NULL;
+    }
+
     args = asdl_seq_new(nargs + ngens);
     if (!args)
         goto error;
@@ -1727,8 +1746,7 @@ ast_for_call(struct compiling *c, const node *n, expr_ty func)
 	}
     }
 
-    /* XXX syntax error if more than 255 arguments */
-    return Call(func, args, keywords, vararg, kwarg);
+    return Call(func, args, keywords, vararg, kwarg, LINENO(n));
 
  error:
     if (args)
@@ -1751,7 +1769,7 @@ ast_for_testlist(struct compiling *c, const node *n)
         if (!tmp)
             return NULL;
 
-	return Tuple(tmp, Load);
+	return Tuple(tmp, Load, LINENO(n));
     }
 }
 
@@ -1816,26 +1834,20 @@ ast_for_expr_stmt(struct compiling *c, const node *n)
 	for (i = 0; i < NCH(n) - 2; i += 2) {
 	    expr_ty e = ast_for_testlist(c, CHILD(n, i));
 
-            if (e->kind == GeneratorExp_kind) {
-              ast_error(CHILD(n, i),
-                        "assignment to generator expression not possible");
-              asdl_seq_free(targets);
-              return NULL;
-            }
-
 	    /* set context to assign */
-	    if (!e) {
-		asdl_seq_free(targets);
-		return NULL;
-	    }
-	    if (!set_context(e, Store, CHILD(n, i))) {
-                asdl_seq_free(targets);
-                return NULL;
-            }
+	    if (!e) 
+	      goto error;
+
+	    if (!set_context(e, Store, CHILD(n, i))) 
+	      goto error;
+
 	    asdl_seq_SET(targets, i / 2, e);
 	}
         expression = ast_for_testlist(c, CHILD(n, NCH(n) - 1));
 	return Assign(targets, expression, LINENO(n));
+    error:
+        asdl_seq_free(targets);
+        return NULL;
     }
     return NULL;
 }
@@ -2499,7 +2511,7 @@ ast_for_for_stmt(struct compiling *c, const node *n)
 	asdl_seq_free(_target);
     }
     else
-	target = Tuple(_target, Store);
+	target = Tuple(_target, Store, LINENO(n));
 
     expression = ast_for_testlist(c, CHILD(n, 3));
     if (!expression)
