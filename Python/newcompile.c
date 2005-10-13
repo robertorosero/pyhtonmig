@@ -1414,10 +1414,6 @@ compiler_next_instr(struct compiler *c, basicblock *b)
 	return b->b_iused++;
 }
 
-/* Add an opcode with no argument.
-   Returns 0 on failure, 1 on success.
-*/
-
 static void
 compiler_set_lineno(struct compiler *c, int off)
 {
@@ -1645,6 +1641,10 @@ opcode_stack_effect(int opcode, int oparg)
 	}
 	return 0; /* not reachable */
 }
+
+/* Add an opcode with no argument.
+   Returns 0 on failure, 1 on success.
+*/
 
 static int
 compiler_addop(struct compiler *c, int opcode)
@@ -3344,7 +3344,7 @@ compiler_visit_expr(struct compiler *c, expr_ty e)
 {
 	int i, n;
 
-	fprintf(stderr, "compile expr %d lineno %d %d\n", e->kind, e->lineno);
+	fprintf(stderr, "compile expr %d lineno %d\n", e->kind, e->lineno);
 	if (e->lineno > c->u->u_lineno) {
 		c->u->u_lineno = e->lineno;
 		c->u->u_lineno_set = false;
