@@ -392,10 +392,20 @@ set_context(expr_ty e, expr_context_ty ctx, const node *n)
         case GeneratorExp_kind:
             return ast_error(n, "assignment to generator expression "
                              "not possible");
-        default:
-	    return ast_error(n, "unexpected node in assignment");
-	    break;
+        case Num_kind:
+        case Str_kind:
+	    return ast_error(n, "can't assign to literal");
+       default: {
+	   char buf[300];
+	   PyOS_snprintf(buf, sizeof(buf), 
+			 "unexpected expression in assignment %d (line %d)", 
+			 e->kind, e->lineno);
+	   return ast_error(n, buf);
+       }
     }
+    /* If the LHS is a list or tuple, we need to set the assignment
+       context for all the tuple elements.  
+    */
     if (s) {
 	int i;
 
@@ -2112,6 +2122,7 @@ ast_for_import_stmt(struct compiling *c, const node *n)
 	stmt_ty import;
         int n_children;
         const char *from_modules;
+	int lineno = LINENO(n);
 	alias_ty mod = alias_for_import_name(CHILD(n, 1));
 	if (!mod)
             return NULL;
@@ -2129,7 +2140,7 @@ ast_for_import_stmt(struct compiling *c, const node *n)
             }
         }
         else if (from_modules[0] == '*') {
-            n = CHILD(n,3); /* from ... import * */
+            n = CHILD(n, 3); /* from ... import * */
         }
         else if (from_modules[0] == '(')
             n = CHILD(n, 4);                  /* from ... import (x, y, z) */
@@ -2166,7 +2177,7 @@ ast_for_import_stmt(struct compiling *c, const node *n)
             }
 	    asdl_seq_APPEND(aliases, import_alias);
         }
-	import = ImportFrom(mod->name, aliases, LINENO(n));
+	import = ImportFrom(mod->name, aliases, lineno);
 	free(mod);
 	return import;
     }
