@@ -2150,7 +2150,7 @@ compiler_lambda(struct compiler *c, expr_ty e)
 
 	if (args->defaults)
 		VISIT_SEQ(c, expr, args->defaults);
-	if (!compiler_enter_scope(c, name, (void *)e, c->u->u_lineno))
+	if (!compiler_enter_scope(c, name, (void *)e, e->lineno))
 		return 0;
 		
         /* unpack nested arguments */
@@ -3293,7 +3293,7 @@ compiler_genexp(struct compiler *c, expr_ty e)
 	if (!name)
     return 0;
 
-	if (!compiler_enter_scope(c, name, (void *)e, c->u->u_lineno))
+	if (!compiler_enter_scope(c, name, (void *)e, e->lineno))
 		return 0;
 	compiler_genexp_generator(c, e->v.GeneratorExp.generators, 0,
 					e->v.GeneratorExp.elt);
@@ -3797,10 +3797,10 @@ stackdepth(struct compiler *c)
 }
 
 static int
-assemble_init(struct assembler *a, int nblocks)
+assemble_init(struct assembler *a, int nblocks, int firstlineno)
 {
 	memset(a, 0, sizeof(struct assembler));
-	a->a_lineno = 1;
+	a->a_lineno = firstlineno;
 	a->a_bytecode = PyString_FromStringAndSize(NULL, DEFAULT_CODE_SIZE);
 	if (!a->a_bytecode)
 		return 0;
@@ -3987,7 +3987,7 @@ assemble_lnotab(struct assembler *a, struct instr *i)
 	}
 	else {  /* First line of a block; def stmt, etc. */
 		*lnotab++ = 0;
-		*lnotab++ = 1;
+		*lnotab++ = d_lineno;
 	}
 	a->a_lineno = i->i_lineno;
 	a->a_lineno_off = a->a_offset;
@@ -4226,7 +4226,7 @@ assemble(struct compiler *c, int addNone)
 		entryblock = b; 
 	}
 
-	if (!assemble_init(&a, nblocks))
+	if (!assemble_init(&a, nblocks, c->u->u_firstlineno))
 		goto error;
 	dfs(c, entryblock, &a);
 
