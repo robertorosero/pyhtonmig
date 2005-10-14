@@ -761,8 +761,10 @@ parse_source_module(const char *pathname, FILE *fp)
 
 	mod = PyParser_ASTFromFile(fp, pathname, Py_file_input, 0, 0, 0, 
 				   NULL);
-	if (mod)
+	if (mod) {
 		co = PyAST_Compile(mod, pathname, NULL);
+		free_mod(mod);
+	}
 	return co;
 }
 

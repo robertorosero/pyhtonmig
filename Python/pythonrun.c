@@ -1150,8 +1150,11 @@ PyObject *
 PyRun_StringFlags(const char *str, int start, PyObject *globals, 
 		  PyObject *locals, PyCompilerFlags *flags)
 {
+	PyObject *ret;
 	mod_ty mod = PyParser_ASTFromString(str, "<string>", start, flags);
-	return run_err_mod(mod, "<string>", globals, locals, flags);
+	ret = run_err_mod(mod, "<string>", globals, locals, flags);
+	free_mod(mod);
+	return ret;
 }
 
 PyObject *
