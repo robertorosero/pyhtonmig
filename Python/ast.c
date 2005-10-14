@@ -2666,28 +2666,45 @@ ast_for_classdef(struct compiling *c, const node *n)
             return NULL;
 	return ClassDef(NEW_IDENTIFIER(CHILD(n, 1)), NULL, s, LINENO(n));
     }
-	/* check for empty base list */
-	if (TYPE(CHILD(n,3)) == RPAR) {
-		s = ast_for_suite(c, CHILD(n,5));
-		if (!s)
-			return NULL;
-		return ClassDef(NEW_IDENTIFIER(CHILD(n, 1)),NULL,s,LINENO(n));
-	}
+    /* check for empty base list */
+    if (TYPE(CHILD(n,3)) == RPAR) {
+	s = ast_for_suite(c, CHILD(n,5));
+	if (!s)
+		return NULL;
+	return ClassDef(NEW_IDENTIFIER(CHILD(n, 1)),NULL,s,LINENO(n));
+    }
+
     /* else handle the base class list */
     _bases = ast_for_testlist(c, CHILD(n, 3));
     if (!_bases)
         return NULL;
+    /* XXX: I don't think we can set to diff types here, how to free???
+
+	Here's the allocation chain:
+    		Tuple (Python-ast.c:907)
+    		ast_for_testlist (ast.c:1782)
+    		ast_for_classdef (ast.c:2677)
+     */
     if (_bases->kind == Tuple_kind)
 	bases = _bases->v.Tuple.elts;
     else {
 	bases = asdl_seq_new(1);
-	if (!bases)
+	if (!bases) {
+	    /* XXX: free _bases */
             return NULL;
+	}
 	asdl_seq_SET(bases, 0, _bases);
     }
+
     s = ast_for_suite(c, CHILD(n, 6));
     if (!s) {
-        asdl_seq_free(bases);   /* XXX is this right for Tuples??? */
+	/* XXX: I think this free is correct, but needs to change see above */
+        if (_bases->kind == Tuple_kind)
+		free_expr(_bases);
+	else {
+		free_expr(_bases);
+        	asdl_seq_free(bases);
+	}
         return NULL;
     }
     return ClassDef(NEW_IDENTIFIER(CHILD(n, 1)), bases, s, LINENO(n));
