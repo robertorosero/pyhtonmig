@@ -1195,9 +1195,25 @@ symtable_visit_excepthandler(struct symtable *st, excepthandler_ty eh)
 static int 
 symtable_visit_alias(struct symtable *st, alias_ty a)
 {
+	/* Compute store_name, the name actually bound by the import
+	   operation.  It is diferent than a->name when a->name is a
+	   dotted package name (e.g. spam.eggs) 
+	*/
+	PyObject *store_name;
 	PyObject *name = (a->asname == NULL) ? a->name : a->asname;
-	if (strcmp(PyString_AS_STRING(name), "*"))
-	    return symtable_add_def(st, name, DEF_IMPORT);
+	const char *base = PyString_AS_STRING(name);
+	char *dot = strchr(base, '.');
+	if (dot)
+		store_name = PyString_FromStringAndSize(base, dot - base);
+	else {
+		store_name = name;
+		Py_INCREF(store_name);
+	}
+	if (strcmp(PyString_AS_STRING(name), "*")) {
+		int r = symtable_add_def(st, store_name, DEF_IMPORT); 
+		Py_DECREF(store_name);
+		return r;
+	}
 	else {
             if (st->st_cur->ste_type != ModuleBlock) {
                 if (!symtable_warn(st,

@@ -54,9 +54,6 @@ int Py_OptimizeFlag = 0;
      #: line numbers are off a bit (may just need to add calls to set lineno)
         In some cases, the line numbers for generated code aren't strictly
         increasing.  This breaks the lnotab.
-     #: Modules/parsermodule.c:496: warning: implicit declaration 
-                                    of function `PyParser_SimpleParseString'
-     #: compile.h::b_return is only set, never used
 
     ISSUES:
 
@@ -2507,37 +2504,67 @@ compiler_try_except(struct compiler *c, stmt_ty s)
 }
 
 static int
+compiler_import_as(struct compiler *c, identifier name, identifier asname)
+{
+	/* The IMPORT_NAME opcode was already generated.  This function
+	   merely needs to bind the result to a name.
+
+	   If there is a dot in name, we need to split it and emit a 
+	   LOAD_ATTR for each name.
+	*/
+	const char *src = PyString_AS_STRING(name);
+	const char *dot = strchr(src, '.');
+	if (dot) {
+		/* Consume the base module name to get the first attribute */
+		src = dot + 1;
+		while (dot) {
+			/* NB src is only defined when dot != NULL */
+			dot = strchr(src, '.');
+			PyObject *attr = PyString_FromStringAndSize(src, 
+					    dot ? dot - src : strlen(src));
+			ADDOP_O(c, LOAD_ATTR, attr, names);
+			src = dot + 1;
+		}
+	}
+	return compiler_nameop(c, asname, Store);
+}
+
+static int
 compiler_import(struct compiler *c, stmt_ty s)
 {
+	/* The Import node stores a module name like a.b.c as a single
+	   string.  This is convenient for all cases except
+	     import a.b.c as d
+	   where we need to parse that string to extract the individual
+	   module names.  
+	   XXX Perhaps change the representation to make this case simpler?
+	 */
 	int i, n = asdl_seq_LEN(s->v.Import.names);
 	for (i = 0; i < n; i++) {
 		alias_ty alias = asdl_seq_GET(s->v.Import.names, i);
-		identifier store_name;
+		int r;
+
 		ADDOP_O(c, LOAD_CONST, Py_None, consts);
 		ADDOP_NAME(c, IMPORT_NAME, alias->name, names);
 
-                /* XXX: handling of store_name should be cleaned up */
 		if (alias->asname) {
-			store_name = alias->asname;
-                        Py_INCREF(store_name);
+			return compiler_import_as(c, 
+						  alias->name, alias->asname);
                 }
                 else {
-                    const char *base = PyString_AS_STRING(alias->name);
-                    char *dot = strchr(base, '.');
-                    if (dot)
-                        store_name = PyString_FromStringAndSize(base,
-                                                                dot - base);
-                    else {
-                        store_name = alias->name;
-                        Py_INCREF(store_name);
-                    }
-                }
-
-		if (!compiler_nameop(c, store_name, Store)) {
-                    Py_DECREF(store_name);
-                    return 0;
-                }
-                Py_DECREF(store_name);
+			identifier tmp = alias->name;
+			const char *base = PyString_AS_STRING(alias->name);
+			char *dot = strchr(base, '.');
+			if (dot)
+				tmp = PyString_FromStringAndSize(base, 
+								 dot - base);
+			r = compiler_nameop(c, tmp, Store);
+			if (dot) {
+				Py_DECREF(tmp);
+			}
+			if (!r)
+				return r;
+		}
 	}
 	return 1;
 }
@@ -2912,6 +2939,14 @@ compiler_nameop(struct compiler *c, identifier name, expr_context_ty ctx)
 		optype = OP_GLOBAL;
 		break;
 	}
+
+	fprintf(stderr, 
+		"block=%s name=%s opt=%d scope=%d optype=%d\n", 
+		PyString_AS_STRING(c->u->u_ste->ste_name),
+		PyString_AS_STRING(name), 
+		c->u->u_ste->ste_unoptimized, scope, optype);
+	/* XXX Leave assert here, but handle __doc__ and the like better */
+	assert(scope || PyString_AS_STRING(name)[0] == '_');
 
 	switch (optype) {
 	case OP_DEREF:
@@ -3301,7 +3336,7 @@ compiler_genexp(struct compiler *c, expr_ty e)
 
 	name = PyString_FromString("<generator expression>");
 	if (!name)
-    return 0;
+	  return 0;
 
 	if (!compiler_enter_scope(c, name, (void *)e, e->lineno))
 		return 0;
