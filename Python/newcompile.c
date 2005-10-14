@@ -1205,6 +1205,7 @@ compiler_enter_scope(struct compiler *c, identifier name, void *key,
 	u->u_argcount = 0;
 	u->u_ste = PySymtable_Lookup(c->c_st, key);
 	if (!u->u_ste) {
+		PyObject_Free(u);
 		return 0;
 	}
 	Py_INCREF(name);
@@ -1221,11 +1222,17 @@ compiler_enter_scope(struct compiler *c, identifier name, void *key,
 	u->u_lineno = 0;
 	u->u_lineno_set = false;
 	u->u_consts = PyDict_New();
-	if (!u->u_consts)
+	if (!u->u_consts) {
+		/* XXX: free_u->u_ste); */
+		PyObject_Free(u);
 		return 0;
+	}
 	u->u_names = PyDict_New();
-	if (!u->u_names)
+	if (!u->u_names) {
+		/* XXX: free_u->u_ste); */
+		PyObject_Free(u);
 		return 0;
+	}
 
         u->u_private = NULL;
 
@@ -1235,8 +1242,11 @@ compiler_enter_scope(struct compiler *c, identifier name, void *key,
 	/* Push the old compiler_unit on the stack. */
 	if (c->u) {
 		PyObject *wrapper = PyCObject_FromVoidPtr(c->u, NULL);
-		if (PyList_Append(c->c_stack, wrapper) < 0)
+		if (PyList_Append(c->c_stack, wrapper) < 0) {
+			/* XXX: free_u->u_ste); */
+			PyObject_Free(u);
 			return 0;
+		}
 		Py_DECREF(wrapper);
 		fprintf(stderr, "stack = %s\n", PyObject_REPR(c->c_stack));
                 u->u_private = c->u->u_private;
