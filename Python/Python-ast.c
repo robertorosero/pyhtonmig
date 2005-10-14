@@ -515,7 +515,7 @@ Continue(int lineno)
 }
 
 expr_ty
-BoolOp(boolop_ty op, asdl_seq * values)
+BoolOp(boolop_ty op, asdl_seq * values, int lineno)
 {
         expr_ty p;
         if (!op) {
@@ -531,11 +531,12 @@ BoolOp(boolop_ty op, asdl_seq * values)
         p->kind = BoolOp_kind;
         p->v.BoolOp.op = op;
         p->v.BoolOp.values = values;
+        p->lineno = lineno;
         return p;
 }
 
 expr_ty
-BinOp(expr_ty left, operator_ty op, expr_ty right)
+BinOp(expr_ty left, operator_ty op, expr_ty right, int lineno)
 {
         expr_ty p;
         if (!left) {
@@ -562,11 +563,12 @@ BinOp(expr_ty left, operator_ty op, expr_ty right)
         p->v.BinOp.left = left;
         p->v.BinOp.op = op;
         p->v.BinOp.right = right;
+        p->lineno = lineno;
         return p;
 }
 
 expr_ty
-UnaryOp(unaryop_ty op, expr_ty operand)
+UnaryOp(unaryop_ty op, expr_ty operand, int lineno)
 {
         expr_ty p;
         if (!op) {
@@ -587,11 +589,12 @@ UnaryOp(unaryop_ty op, expr_ty operand)
         p->kind = UnaryOp_kind;
         p->v.UnaryOp.op = op;
         p->v.UnaryOp.operand = operand;
+        p->lineno = lineno;
         return p;
 }
 
 expr_ty
-Lambda(arguments_ty args, expr_ty body)
+Lambda(arguments_ty args, expr_ty body, int lineno)
 {
         expr_ty p;
         if (!args) {
@@ -612,11 +615,12 @@ Lambda(arguments_ty args, expr_ty body)
         p->kind = Lambda_kind;
         p->v.Lambda.args = args;
         p->v.Lambda.body = body;
+        p->lineno = lineno;
         return p;
 }
 
 expr_ty
-Dict(asdl_seq * keys, asdl_seq * values)
+Dict(asdl_seq * keys, asdl_seq * values, int lineno)
 {
         expr_ty p;
         p = (expr_ty)malloc(sizeof(*p));
@@ -627,11 +631,12 @@ Dict(asdl_seq * keys, asdl_seq * values)
         p->kind = Dict_kind;
         p->v.Dict.keys = keys;
         p->v.Dict.values = values;
+        p->lineno = lineno;
         return p;
 }
 
 expr_ty
-ListComp(expr_ty elt, asdl_seq * generators)
+ListComp(expr_ty elt, asdl_seq * generators, int lineno)
 {
         expr_ty p;
         if (!elt) {
@@ -647,11 +652,12 @@ ListComp(expr_ty elt, asdl_seq * generators)
         p->kind = ListComp_kind;
         p->v.ListComp.elt = elt;
         p->v.ListComp.generators = generators;
+        p->lineno = lineno;
         return p;
 }
 
 expr_ty
-GeneratorExp(expr_ty elt, asdl_seq * generators)
+GeneratorExp(expr_ty elt, asdl_seq * generators, int lineno)
 {
         expr_ty p;
         if (!elt) {
@@ -667,11 +673,12 @@ GeneratorExp(expr_ty elt, asdl_seq * generators)
         p->kind = GeneratorExp_kind;
         p->v.GeneratorExp.elt = elt;
         p->v.GeneratorExp.generators = generators;
+        p->lineno = lineno;
         return p;
 }
 
 expr_ty
-Compare(expr_ty left, asdl_seq * ops, asdl_seq * comparators)
+Compare(expr_ty left, asdl_seq * ops, asdl_seq * comparators, int lineno)
 {
         expr_ty p;
         if (!left) {
@@ -688,12 +695,13 @@ Compare(expr_ty left, asdl_seq * ops, asdl_seq * comparators)
         p->v.Compare.left = left;
         p->v.Compare.ops = ops;
         p->v.Compare.comparators = comparators;
+        p->lineno = lineno;
         return p;
 }
 
 expr_ty
 Call(expr_ty func, asdl_seq * args, asdl_seq * keywords, expr_ty starargs,
-     expr_ty kwargs)
+     expr_ty kwargs, int lineno)
 {
         expr_ty p;
         if (!func) {
@@ -712,11 +720,12 @@ Call(expr_ty func, asdl_seq * args, asdl_seq * keywords, expr_ty starargs,
         p->v.Call.keywords = keywords;
         p->v.Call.starargs = starargs;
         p->v.Call.kwargs = kwargs;
+        p->lineno = lineno;
         return p;
 }
 
 expr_ty
-Repr(expr_ty value)
+Repr(expr_ty value, int lineno)
 {
         expr_ty p;
         if (!value) {
@@ -731,11 +740,12 @@ Repr(expr_ty value)
         }
         p->kind = Repr_kind;
         p->v.Repr.value = value;
+        p->lineno = lineno;
         return p;
 }
 
 expr_ty
-Num(object n)
+Num(object n, int lineno)
 {
         expr_ty p;
         if (!n) {
@@ -750,11 +760,12 @@ Num(object n)
         }
         p->kind = Num_kind;
         p->v.Num.n = n;
+        p->lineno = lineno;
         return p;
 }
 
 expr_ty
-Str(string s)
+Str(string s, int lineno)
 {
         expr_ty p;
         if (!s) {
@@ -769,11 +780,12 @@ Str(string s)
         }
         p->kind = Str_kind;
         p->v.Str.s = s;
+        p->lineno = lineno;
         return p;
 }
 
 expr_ty
-Attribute(expr_ty value, identifier attr, expr_context_ty ctx)
+Attribute(expr_ty value, identifier attr, expr_context_ty ctx, int lineno)
 {
         expr_ty p;
         if (!value) {
@@ -800,11 +812,12 @@ Attribute(expr_ty value, identifier attr, expr_context_ty ctx)
         p->v.Attribute.value = value;
         p->v.Attribute.attr = attr;
         p->v.Attribute.ctx = ctx;
+        p->lineno = lineno;
         return p;
 }
 
 expr_ty
-Subscript(expr_ty value, slice_ty slice, expr_context_ty ctx)
+Subscript(expr_ty value, slice_ty slice, expr_context_ty ctx, int lineno)
 {
         expr_ty p;
         if (!value) {
@@ -831,11 +844,12 @@ Subscript(expr_ty value, slice_ty slice, expr_context_ty ctx)
         p->v.Subscript.value = value;
         p->v.Subscript.slice = slice;
         p->v.Subscript.ctx = ctx;
+        p->lineno = lineno;
         return p;
 }
 
 expr_ty
-Name(identifier id, expr_context_ty ctx)
+Name(identifier id, expr_context_ty ctx, int lineno)
 {
         expr_ty p;
         if (!id) {
@@ -856,11 +870,12 @@ Name(identifier id, expr_context_ty ctx)
         p->kind = Name_kind;
         p->v.Name.id = id;
         p->v.Name.ctx = ctx;
+        p->lineno = lineno;
         return p;
 }
 
 expr_ty
-List(asdl_seq * elts, expr_context_ty ctx)
+List(asdl_seq * elts, expr_context_ty ctx, int lineno)
 {
         expr_ty p;
         if (!ctx) {
@@ -876,11 +891,12 @@ List(asdl_seq * elts, expr_context_ty ctx)
         p->kind = List_kind;
         p->v.List.elts = elts;
         p->v.List.ctx = ctx;
+        p->lineno = lineno;
         return p;
 }
 
 expr_ty
-Tuple(asdl_seq * elts, expr_context_ty ctx)
+Tuple(asdl_seq * elts, expr_context_ty ctx, int lineno)
 {
         expr_ty p;
         if (!ctx) {
@@ -896,6 +912,7 @@ Tuple(asdl_seq * elts, expr_context_ty ctx)
         p->kind = Tuple_kind;
         p->v.Tuple.elts = elts;
         p->v.Tuple.ctx = ctx;
+        p->lineno = lineno;
         return p;
 }
 
@@ -1061,38 +1078,48 @@ alias(identifier name, identifier asname)
         return p;
 }
 
+static void
+free_seq_exprs(asdl_seq *seq)
+{
+        int i, n;
+        n = asdl_seq_LEN(seq);
+        for (i = 0; i < n; i++)
+                free_expr((expr_ty)asdl_seq_GET(seq, i));
+	asdl_seq_free(seq);
+}
+
+static void
+free_seq_stmts(asdl_seq *seq)
+{
+        int i, n;
+        n = asdl_seq_LEN(seq);
+        for (i = 0; i < n; i++)
+                free_stmt((stmt_ty)asdl_seq_GET(seq, i));
+	asdl_seq_free(seq);
+}
+
 void
 free_mod(mod_ty o)
 {
-        int i, n;
-        asdl_seq *seq;
-
         if (!o)
                 return;
 
         switch (o->kind) {
         case Module_kind:
-                seq = o->v.Module.body;
-                n = asdl_seq_LEN(seq);
-                for (i = 0; i < n; i++)
-                        free_stmt((stmt_ty)asdl_seq_GET(seq, i));
+                free_seq_stmts(o->v.Module.body);
                 break;
         case Interactive_kind:
-                seq = o->v.Interactive.body;
-                n = asdl_seq_LEN(seq);
-                for (i = 0; i < n; i++)
-                        free_stmt((stmt_ty)asdl_seq_GET(seq, i));
+                free_seq_stmts(o->v.Interactive.body);
                 break;
         case Expression_kind:
                 free_expr((expr_ty)o->v.Expression.body);
                 break;
         case Suite_kind:
-                seq = o->v.Suite.body;
-                n = asdl_seq_LEN(seq);
-                for (i = 0; i < n; i++)
-                        free_stmt((stmt_ty)asdl_seq_GET(seq, i));
+                free_seq_stmts(o->v.Suite.body);
                 break;
         }
+
+	free(o);
 }
 
 void
@@ -1108,135 +1135,85 @@ free_stmt(stmt_ty o)
         case FunctionDef_kind:
                 Py_DECREF((identifier)o->v.FunctionDef.name);
                 free_arguments((arguments_ty)o->v.FunctionDef.args);
-                seq = o->v.FunctionDef.body;
-                n = asdl_seq_LEN(seq);
-                for (i = 0; i < n; i++)
-                        free_stmt((stmt_ty)asdl_seq_GET(seq, i));
-                seq = o->v.FunctionDef.decorators;
-                n = asdl_seq_LEN(seq);
-                for (i = 0; i < n; i++)
-                        free_expr((expr_ty)asdl_seq_GET(seq, i));
+                free_seq_stmts(o->v.FunctionDef.body);
+                free_seq_exprs(o->v.FunctionDef.decorators);
                 break;
         case ClassDef_kind:
                 Py_DECREF((identifier)o->v.ClassDef.name);
-                seq = o->v.ClassDef.bases;
-                n = asdl_seq_LEN(seq);
-                for (i = 0; i < n; i++)
-                        free_expr((expr_ty)asdl_seq_GET(seq, i));
-                seq = o->v.ClassDef.body;
-                n = asdl_seq_LEN(seq);
-                for (i = 0; i < n; i++)
-                        free_stmt((stmt_ty)asdl_seq_GET(seq, i));
+                free_seq_exprs(o->v.ClassDef.bases);
+                free_seq_stmts(o->v.ClassDef.body);
                 break;
         case Return_kind:
                 if (o->v.Return.value) {
-                        free_expr((expr_ty)o->v.Return.value);
+                        free_expr(o->v.Return.value);
                 }
                 break;
         case Yield_kind:
-                free_expr((expr_ty)o->v.Yield.value);
+                free_expr(o->v.Yield.value);
                 break;
         case Delete_kind:
-                seq = o->v.Delete.targets;
-                n = asdl_seq_LEN(seq);
-                for (i = 0; i < n; i++)
-                        free_expr((expr_ty)asdl_seq_GET(seq, i));
+                free_seq_exprs(o->v.Delete.targets);
                 break;
         case Assign_kind:
-                seq = o->v.Assign.targets;
-                n = asdl_seq_LEN(seq);
-                for (i = 0; i < n; i++)
-                        free_expr((expr_ty)asdl_seq_GET(seq, i));
-                free_expr((expr_ty)o->v.Assign.value);
+                free_seq_exprs(o->v.Assign.targets);
+                free_expr(o->v.Assign.value);
                 break;
         case AugAssign_kind:
-                free_expr((expr_ty)o->v.AugAssign.target);
-                free_operator((operator_ty)o->v.AugAssign.op);
-                free_expr((expr_ty)o->v.AugAssign.value);
+                free_expr(o->v.AugAssign.target);
+                free_operator(o->v.AugAssign.op);
+                free_expr(o->v.AugAssign.value);
                 break;
         case Print_kind:
                 if (o->v.Print.dest) {
                         free_expr((expr_ty)o->v.Print.dest);
                 }
-                seq = o->v.Print.values;
-                n = asdl_seq_LEN(seq);
-                for (i = 0; i < n; i++)
-                        free_expr((expr_ty)asdl_seq_GET(seq, i));
+                free_seq_exprs(o->v.Print.values);
                 break;
         case For_kind:
-                free_expr((expr_ty)o->v.For.target);
-                free_expr((expr_ty)o->v.For.iter);
-                seq = o->v.For.body;
-                n = asdl_seq_LEN(seq);
-                for (i = 0; i < n; i++)
-                        free_stmt((stmt_ty)asdl_seq_GET(seq, i));
-                seq = o->v.For.orelse;
-                n = asdl_seq_LEN(seq);
-                for (i = 0; i < n; i++)
-                        free_stmt((stmt_ty)asdl_seq_GET(seq, i));
+                free_expr(o->v.For.target);
+                free_expr(o->v.For.iter);
+                free_seq_stmts(o->v.For.body);
+                free_seq_stmts(o->v.For.orelse);
                 break;
         case While_kind:
-                free_expr((expr_ty)o->v.While.test);
-                seq = o->v.While.body;
-                n = asdl_seq_LEN(seq);
-                for (i = 0; i < n; i++)
-                        free_stmt((stmt_ty)asdl_seq_GET(seq, i));
-                seq = o->v.While.orelse;
-                n = asdl_seq_LEN(seq);
-                for (i = 0; i < n; i++)
-                        free_stmt((stmt_ty)asdl_seq_GET(seq, i));
+                free_expr(o->v.While.test);
+                free_seq_stmts(o->v.While.body);
+                free_seq_stmts(o->v.While.orelse);
                 break;
         case If_kind:
-                free_expr((expr_ty)o->v.If.test);
-                seq = o->v.If.body;
-                n = asdl_seq_LEN(seq);
-                for (i = 0; i < n; i++)
-                        free_stmt((stmt_ty)asdl_seq_GET(seq, i));
-                seq = o->v.If.orelse;
-                n = asdl_seq_LEN(seq);
-                for (i = 0; i < n; i++)
-                        free_stmt((stmt_ty)asdl_seq_GET(seq, i));
+                free_expr(o->v.If.test);
+                free_seq_stmts(o->v.If.body);
+                free_seq_stmts(o->v.If.orelse);
                 break;
         case Raise_kind:
                 if (o->v.Raise.type) {
-                        free_expr((expr_ty)o->v.Raise.type);
+                        free_expr(o->v.Raise.type);
                 }
                 if (o->v.Raise.inst) {
-                        free_expr((expr_ty)o->v.Raise.inst);
+                        free_expr(o->v.Raise.inst);
                 }
                 if (o->v.Raise.tback) {
-                        free_expr((expr_ty)o->v.Raise.tback);
+                        free_expr(o->v.Raise.tback);
                 }
                 break;
         case TryExcept_kind:
-                seq = o->v.TryExcept.body;
-                n = asdl_seq_LEN(seq);
-                for (i = 0; i < n; i++)
-                        free_stmt((stmt_ty)asdl_seq_GET(seq, i));
+                free_seq_stmts(o->v.TryExcept.body);
                 seq = o->v.TryExcept.handlers;
                 n = asdl_seq_LEN(seq);
                 for (i = 0; i < n; i++)
                         free_excepthandler((excepthandler_ty)asdl_seq_GET(seq,
                                            i));
-                seq = o->v.TryExcept.orelse;
-                n = asdl_seq_LEN(seq);
-                for (i = 0; i < n; i++)
-                        free_stmt((stmt_ty)asdl_seq_GET(seq, i));
+		asdl_seq_free(seq);
+                free_seq_stmts(o->v.TryExcept.orelse);
                 break;
         case TryFinally_kind:
-                seq = o->v.TryFinally.body;
-                n = asdl_seq_LEN(seq);
-                for (i = 0; i < n; i++)
-                        free_stmt((stmt_ty)asdl_seq_GET(seq, i));
-                seq = o->v.TryFinally.finalbody;
-                n = asdl_seq_LEN(seq);
-                for (i = 0; i < n; i++)
-                        free_stmt((stmt_ty)asdl_seq_GET(seq, i));
+                free_seq_stmts(o->v.TryFinally.body);
+                free_seq_stmts(o->v.TryFinally.finalbody);
                 break;
         case Assert_kind:
-                free_expr((expr_ty)o->v.Assert.test);
+                free_expr(o->v.Assert.test);
                 if (o->v.Assert.msg) {
-                        free_expr((expr_ty)o->v.Assert.msg);
+                        free_expr(o->v.Assert.msg);
                 }
                 break;
         case Import_kind:
@@ -1244,21 +1221,23 @@ free_stmt(stmt_ty o)
                 n = asdl_seq_LEN(seq);
                 for (i = 0; i < n; i++)
                         free_alias((alias_ty)asdl_seq_GET(seq, i));
+		asdl_seq_free(seq);
                 break;
         case ImportFrom_kind:
-                Py_DECREF((identifier)o->v.ImportFrom.module);
+                Py_DECREF(o->v.ImportFrom.module);
                 seq = o->v.ImportFrom.names;
                 n = asdl_seq_LEN(seq);
                 for (i = 0; i < n; i++)
                         free_alias((alias_ty)asdl_seq_GET(seq, i));
+		asdl_seq_free(seq);
                 break;
         case Exec_kind:
-                free_expr((expr_ty)o->v.Exec.body);
+                free_expr(o->v.Exec.body);
                 if (o->v.Exec.globals) {
-                        free_expr((expr_ty)o->v.Exec.globals);
+                        free_expr(o->v.Exec.globals);
                 }
                 if (o->v.Exec.locals) {
-                        free_expr((expr_ty)o->v.Exec.locals);
+                        free_expr(o->v.Exec.locals);
                 }
                 break;
         case Global_kind:
@@ -1266,9 +1245,10 @@ free_stmt(stmt_ty o)
                 n = asdl_seq_LEN(seq);
                 for (i = 0; i < n; i++)
                         Py_DECREF((identifier)asdl_seq_GET(seq, i));
+		asdl_seq_free(seq);
                 break;
         case Expr_kind:
-                free_expr((expr_ty)o->v.Expr.value);
+                free_expr(o->v.Expr.value);
                 break;
         case Pass_kind:
                 break;
@@ -1277,6 +1257,8 @@ free_stmt(stmt_ty o)
         case Continue_kind:
                 break;
         }
+
+	free(o);
 }
 
 void
@@ -1290,81 +1272,70 @@ free_expr(expr_ty o)
 
         switch (o->kind) {
         case BoolOp_kind:
-                free_boolop((boolop_ty)o->v.BoolOp.op);
-                seq = o->v.BoolOp.values;
-                n = asdl_seq_LEN(seq);
-                for (i = 0; i < n; i++)
-                        free_expr((expr_ty)asdl_seq_GET(seq, i));
+                free_boolop(o->v.BoolOp.op);
+                free_seq_exprs(o->v.BoolOp.values);
                 break;
         case BinOp_kind:
-                free_expr((expr_ty)o->v.BinOp.left);
-                free_operator((operator_ty)o->v.BinOp.op);
-                free_expr((expr_ty)o->v.BinOp.right);
+                free_expr(o->v.BinOp.left);
+                free_operator(o->v.BinOp.op);
+                free_expr(o->v.BinOp.right);
                 break;
         case UnaryOp_kind:
-                free_unaryop((unaryop_ty)o->v.UnaryOp.op);
-                free_expr((expr_ty)o->v.UnaryOp.operand);
+                free_unaryop(o->v.UnaryOp.op);
+                free_expr(o->v.UnaryOp.operand);
                 break;
         case Lambda_kind:
-                free_arguments((arguments_ty)o->v.Lambda.args);
-                free_expr((expr_ty)o->v.Lambda.body);
+                free_arguments(o->v.Lambda.args);
+                free_expr(o->v.Lambda.body);
                 break;
         case Dict_kind:
-                seq = o->v.Dict.keys;
-                n = asdl_seq_LEN(seq);
-                for (i = 0; i < n; i++)
-                        free_expr((expr_ty)asdl_seq_GET(seq, i));
-                seq = o->v.Dict.values;
-                n = asdl_seq_LEN(seq);
-                for (i = 0; i < n; i++)
-                        free_expr((expr_ty)asdl_seq_GET(seq, i));
+                free_seq_exprs(o->v.Dict.keys);
+                free_seq_exprs(o->v.Dict.values);
                 break;
         case ListComp_kind:
-                free_expr((expr_ty)o->v.ListComp.elt);
+                free_expr(o->v.ListComp.elt);
                 seq = o->v.ListComp.generators;
                 n = asdl_seq_LEN(seq);
                 for (i = 0; i < n; i++)
                         free_comprehension((comprehension_ty)asdl_seq_GET(seq,
                                            i));
+		asdl_seq_free(seq);
                 break;
         case GeneratorExp_kind:
-                free_expr((expr_ty)o->v.GeneratorExp.elt);
+                free_expr(o->v.GeneratorExp.elt);
                 seq = o->v.GeneratorExp.generators;
                 n = asdl_seq_LEN(seq);
                 for (i = 0; i < n; i++)
                         free_comprehension((comprehension_ty)asdl_seq_GET(seq,
                                            i));
+		asdl_seq_free(seq);
                 break;
         case Compare_kind:
-                free_expr((expr_ty)o->v.Compare.left);
+                free_expr(o->v.Compare.left);
                 seq = o->v.Compare.ops;
                 n = asdl_seq_LEN(seq);
                 for (i = 0; i < n; i++)
                         free_cmpop((cmpop_ty)asdl_seq_GET(seq, i));
-                seq = o->v.Compare.comparators;
-                n = asdl_seq_LEN(seq);
-                for (i = 0; i < n; i++)
-                        free_expr((expr_ty)asdl_seq_GET(seq, i));
+		asdl_seq_free(seq);
+                free_seq_exprs(o->v.Compare.comparators);
                 break;
         case Call_kind:
-                free_expr((expr_ty)o->v.Call.func);
-                seq = o->v.Call.args;
-                n = asdl_seq_LEN(seq);
-                for (i = 0; i < n; i++)
-                        free_expr((expr_ty)asdl_seq_GET(seq, i));
+                free_expr(o->v.Call.func);
+                free_seq_exprs(o->v.Call.args);
                 seq = o->v.Call.keywords;
                 n = asdl_seq_LEN(seq);
                 for (i = 0; i < n; i++)
                         free_keyword((keyword_ty)asdl_seq_GET(seq, i));
+		asdl_seq_free(seq);
                 if (o->v.Call.starargs) {
-                        free_expr((expr_ty)o->v.Call.starargs);
+                        free_expr(o->v.Call.starargs);
                 }
                 if (o->v.Call.kwargs) {
-                        free_expr((expr_ty)o->v.Call.kwargs);
+                        free_expr(o->v.Call.kwargs);
                 }
                 break;
         case Repr_kind:
-                free_expr((expr_ty)o->v.Repr.value);
+                free_expr(o->v.Repr.value);
                 break;
         case Num_kind:
                 Py_DECREF((object)o->v.Num.n);
@@ -1373,43 +1344,37 @@ free_expr(expr_ty o)
                 Py_DECREF((string)o->v.Str.s);
                 break;
         case Attribute_kind:
-                free_expr((expr_ty)o->v.Attribute.value);
+                free_expr(o->v.Attribute.value);
                 Py_DECREF((identifier)o->v.Attribute.attr);
-                free_expr_context((expr_context_ty)o->v.Attribute.ctx);
+                free_expr_context(o->v.Attribute.ctx);
                 break;
         case Subscript_kind:
-                free_expr((expr_ty)o->v.Subscript.value);
-                free_slice((slice_ty)o->v.Subscript.slice);
-                free_expr_context((expr_context_ty)o->v.Subscript.ctx);
+                free_expr(o->v.Subscript.value);
+                free_slice(o->v.Subscript.slice);
+                free_expr_context(o->v.Subscript.ctx);
                 break;
         case Name_kind:
                 Py_DECREF((identifier)o->v.Name.id);
-                free_expr_context((expr_context_ty)o->v.Name.ctx);
+                free_expr_context(o->v.Name.ctx);
                 break;
         case List_kind:
-                seq = o->v.List.elts;
-                n = asdl_seq_LEN(seq);
-                for (i = 0; i < n; i++)
-                        free_expr((expr_ty)asdl_seq_GET(seq, i));
-                free_expr_context((expr_context_ty)o->v.List.ctx);
+                free_seq_exprs(o->v.List.elts);
+                free_expr_context(o->v.List.ctx);
                 break;
         case Tuple_kind:
-                seq = o->v.Tuple.elts;
-                n = asdl_seq_LEN(seq);
-                for (i = 0; i < n; i++)
-                        free_expr((expr_ty)asdl_seq_GET(seq, i));
-                free_expr_context((expr_context_ty)o->v.Tuple.ctx);
+                free_seq_exprs(o->v.Tuple.elts);
+                free_expr_context(o->v.Tuple.ctx);
                 break;
         }
+
+	free(o);
 }
 
 void
 free_expr_context(expr_context_ty o)
 {
-
         if (!o)
                 return;
-
 }
 
 void
@@ -1440,134 +1405,115 @@ free_slice(slice_ty o)
                 n = asdl_seq_LEN(seq);
                 for (i = 0; i < n; i++)
                         free_slice((slice_ty)asdl_seq_GET(seq, i));
+		asdl_seq_free(seq);
                 break;
         case Index_kind:
                 free_expr((expr_ty)o->v.Index.value);
                 break;
         }
+
+	free(o);
 }
 
 void
 free_boolop(boolop_ty o)
 {
-
         if (!o)
                 return;
-
+	/* XXX: nothing to free, remove??? */
 }
 
 void
 free_operator(operator_ty o)
 {
-
         if (!o)
                 return;
-
+	/* XXX: nothing to free, remove??? */
 }
 
 void
 free_unaryop(unaryop_ty o)
 {
-
         if (!o)
                 return;
-
+	/* XXX: nothing to free, remove??? */
 }
 
 void
 free_cmpop(cmpop_ty o)
 {
-
         if (!o)
                 return;
-
+	/* XXX: nothing to free, remove??? */
 }
 
 void
 free_comprehension(comprehension_ty o)
 {
-        int i, n;
-        asdl_seq *seq;
-
         if (!o)
                 return;
 
-        free_expr((expr_ty)o->target);
-        free_expr((expr_ty)o->iter);
-        seq = o->ifs;
-        n = asdl_seq_LEN(seq);
-        for (i = 0; i < n; i++)
-                free_expr((expr_ty)asdl_seq_GET(seq, i));
+        free_expr(o->target);
+        free_expr(o->iter);
+        free_seq_exprs(o->ifs);
+	free(o);
 }
 
 void
 free_excepthandler(excepthandler_ty o)
 {
-        int i, n;
-        asdl_seq *seq;
-
         if (!o)
                 return;
 
         if (o->type) {
-                free_expr((expr_ty)o->type);
+                free_expr(o->type);
         }
         if (o->name) {
-                free_expr((expr_ty)o->name);
+                free_expr(o->name);
         }
-        seq = o->body;
-        n = asdl_seq_LEN(seq);
-        for (i = 0; i < n; i++)
-                free_stmt((stmt_ty)asdl_seq_GET(seq, i));
+        free_seq_stmts(o->body);
+	free(o);
 }
 
 void
 free_arguments(arguments_ty o)
 {
-        int i, n;
-        asdl_seq *seq;
-
         if (!o)
                 return;
 
-        seq = o->args;
-        n = asdl_seq_LEN(seq);
-        for (i = 0; i < n; i++)
-                free_expr((expr_ty)asdl_seq_GET(seq, i));
+        free_seq_exprs(o->args);
         if (o->vararg) {
                 Py_DECREF((identifier)o->vararg);
         }
         if (o->kwarg) {
                 Py_DECREF((identifier)o->kwarg);
         }
-        seq = o->defaults;
-        n = asdl_seq_LEN(seq);
-        for (i = 0; i < n; i++)
-                free_expr((expr_ty)asdl_seq_GET(seq, i));
+        free_seq_exprs(o->defaults);
+	free(o);
 }
 
 void
 free_keyword(keyword_ty o)
 {
-
         if (!o)
                 return;
 
-        Py_DECREF((identifier)o->arg);
-        free_expr((expr_ty)o->value);
+        Py_DECREF(o->arg);
+        free_expr(o->value);
+	free(o);
 }
 
 void
 free_alias(alias_ty o)
 {
-
         if (!o)
                 return;
 
-        Py_DECREF((identifier)o->name);
+        Py_DECREF(o->name);
         if (o->asname) {
-                Py_DECREF((identifier)o->asname);
+                Py_DECREF(o->asname);
         }
+	free(o);
 }
 
 int
