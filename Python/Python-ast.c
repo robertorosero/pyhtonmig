@@ -1085,7 +1085,7 @@ free_seq_exprs(asdl_seq *seq)
         n = asdl_seq_LEN(seq);
         for (i = 0; i < n; i++)
                 free_expr((expr_ty)asdl_seq_GET(seq, i));
-	asdl_seq_free(seq);
+        asdl_seq_free(seq);
 }
 
 static void
@@ -1095,7 +1095,7 @@ free_seq_stmts(asdl_seq *seq)
         n = asdl_seq_LEN(seq);
         for (i = 0; i < n; i++)
                 free_stmt((stmt_ty)asdl_seq_GET(seq, i));
-	asdl_seq_free(seq);
+        asdl_seq_free(seq);
 }
 
 void
@@ -1119,7 +1119,7 @@ free_mod(mod_ty o)
                 break;
         }
 
-	free(o);
+        free(o);
 }
 
 void
@@ -1145,23 +1145,23 @@ free_stmt(stmt_ty o)
                 break;
         case Return_kind:
                 if (o->v.Return.value) {
-                        free_expr(o->v.Return.value);
+                        free_expr((expr_ty)o->v.Return.value);
                 }
                 break;
         case Yield_kind:
-                free_expr(o->v.Yield.value);
+                free_expr((expr_ty)o->v.Yield.value);
                 break;
         case Delete_kind:
                 free_seq_exprs(o->v.Delete.targets);
                 break;
         case Assign_kind:
                 free_seq_exprs(o->v.Assign.targets);
-                free_expr(o->v.Assign.value);
+                free_expr((expr_ty)o->v.Assign.value);
                 break;
         case AugAssign_kind:
-                free_expr(o->v.AugAssign.target);
-                free_operator(o->v.AugAssign.op);
-                free_expr(o->v.AugAssign.value);
+                free_expr((expr_ty)o->v.AugAssign.target);
+                free_operator((operator_ty)o->v.AugAssign.op);
+                free_expr((expr_ty)o->v.AugAssign.value);
                 break;
         case Print_kind:
                 if (o->v.Print.dest) {
@@ -1170,30 +1170,30 @@ free_stmt(stmt_ty o)
                 free_seq_exprs(o->v.Print.values);
                 break;
         case For_kind:
-                free_expr(o->v.For.target);
-                free_expr(o->v.For.iter);
+                free_expr((expr_ty)o->v.For.target);
+                free_expr((expr_ty)o->v.For.iter);
                 free_seq_stmts(o->v.For.body);
                 free_seq_stmts(o->v.For.orelse);
                 break;
         case While_kind:
-                free_expr(o->v.While.test);
+                free_expr((expr_ty)o->v.While.test);
                 free_seq_stmts(o->v.While.body);
                 free_seq_stmts(o->v.While.orelse);
                 break;
         case If_kind:
-                free_expr(o->v.If.test);
+                free_expr((expr_ty)o->v.If.test);
                 free_seq_stmts(o->v.If.body);
                 free_seq_stmts(o->v.If.orelse);
                 break;
         case Raise_kind:
                 if (o->v.Raise.type) {
-                        free_expr(o->v.Raise.type);
+                        free_expr((expr_ty)o->v.Raise.type);
                 }
                 if (o->v.Raise.inst) {
-                        free_expr(o->v.Raise.inst);
+                        free_expr((expr_ty)o->v.Raise.inst);
                 }
                 if (o->v.Raise.tback) {
-                        free_expr(o->v.Raise.tback);
+                        free_expr((expr_ty)o->v.Raise.tback);
                 }
                 break;
         case TryExcept_kind:
@@ -1203,7 +1203,7 @@ free_stmt(stmt_ty o)
                 for (i = 0; i < n; i++)
                         free_excepthandler((excepthandler_ty)asdl_seq_GET(seq,
                                            i));
-		asdl_seq_free(seq);
+                asdl_seq_free(seq);
                 free_seq_stmts(o->v.TryExcept.orelse);
                 break;
         case TryFinally_kind:
@@ -1211,9 +1211,9 @@ free_stmt(stmt_ty o)
                 free_seq_stmts(o->v.TryFinally.finalbody);
                 break;
         case Assert_kind:
-                free_expr(o->v.Assert.test);
+                free_expr((expr_ty)o->v.Assert.test);
                 if (o->v.Assert.msg) {
-                        free_expr(o->v.Assert.msg);
+                        free_expr((expr_ty)o->v.Assert.msg);
                 }
                 break;
         case Import_kind:
@@ -1221,23 +1221,23 @@ free_stmt(stmt_ty o)
                 n = asdl_seq_LEN(seq);
                 for (i = 0; i < n; i++)
                         free_alias((alias_ty)asdl_seq_GET(seq, i));
-		asdl_seq_free(seq);
+                asdl_seq_free(seq);
                 break;
         case ImportFrom_kind:
-                Py_DECREF(o->v.ImportFrom.module);
+                Py_DECREF((identifier)o->v.ImportFrom.module);
                 seq = o->v.ImportFrom.names;
                 n = asdl_seq_LEN(seq);
                 for (i = 0; i < n; i++)
                         free_alias((alias_ty)asdl_seq_GET(seq, i));
-		asdl_seq_free(seq);
+                asdl_seq_free(seq);
                 break;
         case Exec_kind:
-                free_expr(o->v.Exec.body);
+                free_expr((expr_ty)o->v.Exec.body);
                 if (o->v.Exec.globals) {
-                        free_expr(o->v.Exec.globals);
+                        free_expr((expr_ty)o->v.Exec.globals);
                 }
                 if (o->v.Exec.locals) {
-                        free_expr(o->v.Exec.locals);
+                        free_expr((expr_ty)o->v.Exec.locals);
                 }
                 break;
         case Global_kind:
@@ -1245,10 +1245,10 @@ free_stmt(stmt_ty o)
                 n = asdl_seq_LEN(seq);
                 for (i = 0; i < n; i++)
                         Py_DECREF((identifier)asdl_seq_GET(seq, i));
-		asdl_seq_free(seq);
+                asdl_seq_free(seq);
                 break;
         case Expr_kind:
-                free_expr(o->v.Expr.value);
+                free_expr((expr_ty)o->v.Expr.value);
                 break;
         case Pass_kind:
                 break;
@@ -1258,7 +1258,7 @@ free_stmt(stmt_ty o)
                 break;
         }
 
-	free(o);
+        free(o);
 }
 
 void
@@ -1272,70 +1272,70 @@ free_expr(expr_ty o)
 
         switch (o->kind) {
         case BoolOp_kind:
-                free_boolop(o->v.BoolOp.op);
+                free_boolop((boolop_ty)o->v.BoolOp.op);
                 free_seq_exprs(o->v.BoolOp.values);
                 break;
         case BinOp_kind:
-                free_expr(o->v.BinOp.left);
-                free_operator(o->v.BinOp.op);
-                free_expr(o->v.BinOp.right);
+                free_expr((expr_ty)o->v.BinOp.left);
+                free_operator((operator_ty)o->v.BinOp.op);
+                free_expr((expr_ty)o->v.BinOp.right);
                 break;
         case UnaryOp_kind:
-                free_unaryop(o->v.UnaryOp.op);
-                free_expr(o->v.UnaryOp.operand);
+                free_unaryop((unaryop_ty)o->v.UnaryOp.op);
+                free_expr((expr_ty)o->v.UnaryOp.operand);
                 break;
         case Lambda_kind:
-                free_arguments(o->v.Lambda.args);
-                free_expr(o->v.Lambda.body);
+                free_arguments((arguments_ty)o->v.Lambda.args);
+                free_expr((expr_ty)o->v.Lambda.body);
                 break;
         case Dict_kind:
                 free_seq_exprs(o->v.Dict.keys);
                 free_seq_exprs(o->v.Dict.values);
                 break;
         case ListComp_kind:
-                free_expr(o->v.ListComp.elt);
+                free_expr((expr_ty)o->v.ListComp.elt);
                 seq = o->v.ListComp.generators;
                 n = asdl_seq_LEN(seq);
                 for (i = 0; i < n; i++)
                         free_comprehension((comprehension_ty)asdl_seq_GET(seq,
                                            i));
-		asdl_seq_free(seq);
+                asdl_seq_free(seq);
                 break;
         case GeneratorExp_kind:
-                free_expr(o->v.GeneratorExp.elt);
+                free_expr((expr_ty)o->v.GeneratorExp.elt);
                 seq = o->v.GeneratorExp.generators;
                 n = asdl_seq_LEN(seq);
                 for (i = 0; i < n; i++)
                         free_comprehension((comprehension_ty)asdl_seq_GET(seq,
                                            i));
-		asdl_seq_free(seq);
+                asdl_seq_free(seq);
                 break;
         case Compare_kind:
-                free_expr(o->v.Compare.left);
+                free_expr((expr_ty)o->v.Compare.left);
                 seq = o->v.Compare.ops;
                 n = asdl_seq_LEN(seq);
                 for (i = 0; i < n; i++)
                         free_cmpop((cmpop_ty)asdl_seq_GET(seq, i));
-		asdl_seq_free(seq);
+                asdl_seq_free(seq);
                 free_seq_exprs(o->v.Compare.comparators);
                 break;
         case Call_kind:
-                free_expr(o->v.Call.func);
+                free_expr((expr_ty)o->v.Call.func);
                 free_seq_exprs(o->v.Call.args);
                 seq = o->v.Call.keywords;
                 n = asdl_seq_LEN(seq);
                 for (i = 0; i < n; i++)
                         free_keyword((keyword_ty)asdl_seq_GET(seq, i));
-		asdl_seq_free(seq);
+                asdl_seq_free(seq);
                 if (o->v.Call.starargs) {
-                        free_expr(o->v.Call.starargs);
+                        free_expr((expr_ty)o->v.Call.starargs);
                 }
                 if (o->v.Call.kwargs) {
-                        free_expr(o->v.Call.kwargs);
+                        free_expr((expr_ty)o->v.Call.kwargs);
                 }
                 break;
         case Repr_kind:
-                free_expr(o->v.Repr.value);
+                free_expr((expr_ty)o->v.Repr.value);
                 break;
         case Num_kind:
                 Py_DECREF((object)o->v.Num.n);
@@ -1344,30 +1344,30 @@ free_expr(expr_ty o)
                 Py_DECREF((string)o->v.Str.s);
                 break;
         case Attribute_kind:
-                free_expr(o->v.Attribute.value);
+                free_expr((expr_ty)o->v.Attribute.value);
                 Py_DECREF((identifier)o->v.Attribute.attr);
-                free_expr_context(o->v.Attribute.ctx);
+                free_expr_context((expr_context_ty)o->v.Attribute.ctx);
                 break;
         case Subscript_kind:
-                free_expr(o->v.Subscript.value);
-                free_slice(o->v.Subscript.slice);
-                free_expr_context(o->v.Subscript.ctx);
+                free_expr((expr_ty)o->v.Subscript.value);
+                free_slice((slice_ty)o->v.Subscript.slice);
+                free_expr_context((expr_context_ty)o->v.Subscript.ctx);
                 break;
         case Name_kind:
                 Py_DECREF((identifier)o->v.Name.id);
-                free_expr_context(o->v.Name.ctx);
+                free_expr_context((expr_context_ty)o->v.Name.ctx);
                 break;
         case List_kind:
                 free_seq_exprs(o->v.List.elts);
-                free_expr_context(o->v.List.ctx);
+                free_expr_context((expr_context_ty)o->v.List.ctx);
                 break;
         case Tuple_kind:
                 free_seq_exprs(o->v.Tuple.elts);
-                free_expr_context(o->v.Tuple.ctx);
+                free_expr_context((expr_context_ty)o->v.Tuple.ctx);
                 break;
         }
 
-	free(o);
+        free(o);
 }
 
 void
@@ -1375,6 +1375,7 @@ free_expr_context(expr_context_ty o)
 {
         if (!o)
                 return;
+
 }
 
 void
@@ -1405,14 +1406,14 @@ free_slice(slice_ty o)
                 n = asdl_seq_LEN(seq);
                 for (i = 0; i < n; i++)
                         free_slice((slice_ty)asdl_seq_GET(seq, i));
-		asdl_seq_free(seq);
+                asdl_seq_free(seq);
                 break;
         case Index_kind:
                 free_expr((expr_ty)o->v.Index.value);
                 break;
         }
 
-	free(o);
+        free(o);
 }
 
 void
@@ -1420,7 +1421,7 @@ free_boolop(boolop_ty o)
 {
         if (!o)
                 return;
-	/* XXX: nothing to free, remove??? */
+
 }
 
 void
@@ -1428,7 +1429,7 @@ free_operator(operator_ty o)
 {
         if (!o)
                 return;
-	/* XXX: nothing to free, remove??? */
+
 }
 
 void
@@ -1436,7 +1437,7 @@ free_unaryop(unaryop_ty o)
 {
         if (!o)
                 return;
-	/* XXX: nothing to free, remove??? */
+
 }
 
 void
@@ -1444,7 +1445,7 @@ free_cmpop(cmpop_ty o)
 {
         if (!o)
                 return;
-	/* XXX: nothing to free, remove??? */
+
 }
 
 void
@@ -1453,10 +1454,11 @@ free_comprehension(comprehension_ty o)
         if (!o)
                 return;
 
-        free_expr(o->target);
-        free_expr(o->iter);
+        free_expr((expr_ty)o->target);
+        free_expr((expr_ty)o->iter);
         free_seq_exprs(o->ifs);
-	free(o);
+
+        free(o);
 }
 
 void
@@ -1466,13 +1468,14 @@ free_excepthandler(excepthandler_ty o)
                 return;
 
         if (o->type) {
-                free_expr(o->type);
+                free_expr((expr_ty)o->type);
         }
         if (o->name) {
-                free_expr(o->name);
+                free_expr((expr_ty)o->name);
         }
         free_seq_stmts(o->body);
-	free(o);
+
+        free(o);
 }
 
 void
@@ -1489,7 +1492,8 @@ free_arguments(arguments_ty o)
                 Py_DECREF((identifier)o->kwarg);
         }
         free_seq_exprs(o->defaults);
-	free(o);
+
+        free(o);
 }
 
 void
@@ -1498,9 +1502,10 @@ free_keyword(keyword_ty o)
         if (!o)
                 return;
 
-        Py_DECREF(o->arg);
-        free_expr(o->value);
-	free(o);
+        Py_DECREF((identifier)o->arg);
+        free_expr((expr_ty)o->value);
+
+        free(o);
 }
 
 void
@@ -1509,11 +1514,12 @@ free_alias(alias_ty o)
         if (!o)
                 return;
 
-        Py_DECREF(o->name);
+        Py_DECREF((identifier)o->name);
         if (o->asname) {
-                Py_DECREF(o->asname);
+                Py_DECREF((identifier)o->asname);
         }
-	free(o);
+
+        free(o);
 }
 
 int
@@ -1983,6 +1989,7 @@ marshal_write_expr(PyObject **buf, int *off, expr_ty o)
 int
 marshal_write_expr_context(PyObject **buf, int *off, expr_context_ty o)
 {
+        int i;
         switch (o) {
         case Load:
                 marshal_write_int(buf, off, 1);
@@ -2057,6 +2064,7 @@ marshal_write_slice(PyObject **buf, int *off, slice_ty o)
 int
 marshal_write_boolop(PyObject **buf, int *off, boolop_ty o)
 {
+        int i;
         switch (o) {
         case And:
                 marshal_write_int(buf, off, 1);
@@ -2071,6 +2079,7 @@ marshal_write_boolop(PyObject **buf, int *off, boolop_ty o)
 int
 marshal_write_operator(PyObject **buf, int *off, operator_ty o)
 {
+        int i;
         switch (o) {
         case Add:
                 marshal_write_int(buf, off, 1);
@@ -2115,6 +2124,7 @@ marshal_write_operator(PyObject **buf, int *off, operator_ty o)
 int
 marshal_write_unaryop(PyObject **buf, int *off, unaryop_ty o)
 {
+        int i;
         switch (o) {
         case Invert:
                 marshal_write_int(buf, off, 1);
@@ -2135,6 +2145,7 @@ marshal_write_unaryop(PyObject **buf, int *off, unaryop_ty o)
 int
 marshal_write_cmpop(PyObject **buf, int *off, cmpop_ty o)
 {
+        int i;
         switch (o) {
         case Eq:
                 marshal_write_int(buf, off, 1);
@@ -2244,6 +2255,7 @@ marshal_write_arguments(PyObject **buf, int *off, arguments_ty o)
 int
 marshal_write_keyword(PyObject **buf, int *off, keyword_ty o)
 {
+        int i;
         marshal_write_identifier(buf, off, o->arg);
         marshal_write_expr(buf, off, o->value);
         return 1;
@@ -2252,6 +2264,7 @@ marshal_write_keyword(PyObject **buf, int *off, keyword_ty o)
 int
 marshal_write_alias(PyObject **buf, int *off, alias_ty o)
 {
+        int i;
         marshal_write_identifier(buf, off, o->name);
         if (o->asname) {
                 marshal_write_int(buf, off, 1);

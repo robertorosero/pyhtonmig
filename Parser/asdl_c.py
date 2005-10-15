@@ -68,17 +68,16 @@ def reflow_lines(s, depth):
     return lines
 
 def is_simple(sum):
-    """Return true if a sum is a simple.
+    """Return True if a sum is a simple.
 
     A sum is simple if its types have no fields, e.g.
     unaryop = Invert | Not | UAdd | USub
     """
-    simple = True
+
     for t in sum.types:
         if t.fields:
-            simple = False
-            break
-    return simple
+            return False
+    return True
 
 class EmitVisitor(asdl.VisitorBase):
     """Visit that emits lines"""
@@ -348,18 +347,52 @@ class FreePrototypeVisitor(PickleVisitor):
 
     visitProduct = visitSum = prototype
 
-def find_sequence(fields):
+_SPECIALIZED_SEQUENCES = ('stmt', 'expr')
+
+def find_sequence(fields, doing_specialization):
     """Return True if any field uses a sequence."""
     for f in fields:
         if f.seq:
+            if not doing_specialization:
+                return True
+            if str(f.type) not in _SPECIALIZED_SEQUENCES:
+                return True
+    return False
+
+def has_sequence(types, doing_specialization):
+    for t in types:
+        if find_sequence(t.fields, doing_specialization):
             return True
     return False
 
-def has_sequence(types):
-    for t in types:
-        if find_sequence(t.fields):
-            return True
-    return False
+
+class StaticVisitor(PickleVisitor):
+    '''Very simple, always emit this static code'''
+
+    CODE = '''static void
+free_seq_exprs(asdl_seq *seq)
+{
+        int i, n;
+        n = asdl_seq_LEN(seq);
+        for (i = 0; i < n; i++)
+                free_expr((expr_ty)asdl_seq_GET(seq, i));
+        asdl_seq_free(seq);
+}
+
+static void
+free_seq_stmts(asdl_seq *seq)
+{
+        int i, n;
+        n = asdl_seq_LEN(seq);
+        for (i = 0; i < n; i++)
+                free_stmt((stmt_ty)asdl_seq_GET(seq, i));
+        asdl_seq_free(seq);
+}
+'''
+
+    def visit(self, object):
+        self.emit(self.CODE, 0, reflow=False)
+
 
 class FreeVisitor(PickleVisitor):
 
@@ -371,7 +404,7 @@ class FreeVisitor(PickleVisitor):
         if has_seq:
             self.emit("int i, n;", 1)
             self.emit("asdl_seq *seq;", 1)
-        self.emit('', 0)
+            self.emit('', 0)
         self.emit('if (!o)', 1)
         self.emit('return;', 2)
         self.emit('', 0)
@@ -381,7 +414,7 @@ class FreeVisitor(PickleVisitor):
         self.emit("", 0)
 
     def visitSum(self, sum, name):
-        has_seq = has_sequence(sum.types)
+        has_seq = has_sequence(sum.types, True)
         self.func_begin(name, has_seq)
         if not is_simple(sum):
             self.emit("switch (o->kind) {", 1)
@@ -389,12 +422,16 @@ class FreeVisitor(PickleVisitor):
                 t = sum.types[i]
                 self.visitConstructor(t, i + 1, name)
             self.emit("}", 1)
+            self.emit("", 0)
+            self.emit("free(o);", 1)
         self.func_end()
 
     def visitProduct(self, prod, name):
-        self.func_begin(name, find_sequence(prod.fields))
+        self.func_begin(name, find_sequence(prod.fields, True))
         for field in prod.fields:
             self.visitField(field, name, 1, True)
+        self.emit("", 0)
+        self.emit("free(o);", 1)
         self.func_end()
         
     def visitConstructor(self, cons, enum, name):
@@ -411,10 +448,7 @@ class FreeVisitor(PickleVisitor):
         else:
             value = "o->v.%s.%s" % (name, field.name)
         if field.seq:
-            emit("seq = %s;" % value, 0)
-            emit("n = asdl_seq_LEN(seq);", 0)
-            emit("for (i = 0; i < n; i++)", 0)
-            self.free(field, "asdl_seq_GET(seq, i)", depth + 1)
+            self.emitSeq(field, value, depth, emit)
 
         # XXX need to know the simple types in advance, so that we
         # don't call free_TYPE() for them.
@@ -426,6 +460,18 @@ class FreeVisitor(PickleVisitor):
         else:
             self.free(field, value, depth)
 
+    def emitSeq(self, field, value, depth, emit):
+        # specialize for freeing sequences of statements and expressions
+        if str(field.type) in _SPECIALIZED_SEQUENCES:
+            c_code = "free_seq_%ss(%s);" % (field.type, value)
+            emit(c_code, 0)
+        else:
+            emit("seq = %s;" % value, 0)
+            emit("n = asdl_seq_LEN(seq);", 0)
+            emit("for (i = 0; i < n; i++)", 0)
+            self.free(field, "asdl_seq_GET(seq, i)", depth + 1)
+            emit("asdl_seq_free(seq);", 0)
+
     def free(self, field, value, depth):
         if str(field.type) in ("identifier", "string", "object"):
             ctype = get_c_type(field.type)
@@ -433,7 +479,6 @@ class FreeVisitor(PickleVisitor):
         elif str(field.type) == "bool":
             return
         else:
-            print >> sys.stderr, field.type
             ctype = get_c_type(field.type)
             self.emit("free_%s((%s)%s);" % (field.type, ctype, value), depth)
         
@@ -446,7 +491,8 @@ class MarshalFunctionVisitor(PickleVisitor):
         self.emit("marshal_write_%s(PyObject **buf, int *off, %s o)" %
                   (name, ctype), 0)
         self.emit("{", 0)
-        if has_seq:
+        # XXX: add declaration of "int i;" properly
+        if has_seq or True:
             self.emit("int i;", 1) # XXX only need it for sequences
 
     def func_end(self):
@@ -455,7 +501,7 @@ class MarshalFunctionVisitor(PickleVisitor):
         self.emit("", 0)
     
     def visitSum(self, sum, name):
-        has_seq = has_sequence(sum.types)
+        has_seq = has_sequence(sum.types, False)
         self.func_begin(name, has_seq)
         simple = is_simple(sum)
         if simple:
@@ -469,7 +515,7 @@ class MarshalFunctionVisitor(PickleVisitor):
         self.func_end()
 
     def visitProduct(self, prod, name):
-        self.func_begin(name, find_sequence(prod.fields))
+        self.func_begin(name, find_sequence(prod.fields, True))
         for field in prod.fields:
             self.visitField(field, name, 1, 1)
         self.func_end()
@@ -551,6 +597,7 @@ def main(srcfile):
     print >> f, '#include "%s-ast.h"' % mod.name
     print >> f
     v = ChainOfVisitors(FunctionVisitor(f),
+                        StaticVisitor(f),
                         FreeVisitor(f),
                         MarshalFunctionVisitor(f),
                         )
