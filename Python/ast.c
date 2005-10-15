@@ -395,7 +395,7 @@ set_context(expr_ty e, expr_context_ty ctx, const node *n)
         case Num_kind:
         case Str_kind:
 	    return ast_error(n, "can't assign to literal");
-       default: {
+        default: {
 	   char buf[300];
 	   PyOS_snprintf(buf, sizeof(buf), 
 			 "unexpected expression in assignment %d (line %d)", 
@@ -844,16 +844,20 @@ ast_for_lambdef(struct compiling *c, const node *n)
         if (!args)
             return NULL;
         expression = ast_for_expr(c, CHILD(n, 2));
-        if (!expression)
+        if (!expression) {
+            free_arguments(args);
             return NULL;
+        }
     }
     else {
         args = ast_for_arguments(c, CHILD(n, 1));
         if (!args)
             return NULL;
         expression = ast_for_expr(c, CHILD(n, 3));
-        if (!expression)
+        if (!expression) {
+            free_arguments(args);
             return NULL;
+        }
     }
 
     return Lambda(args, expression, LINENO(n));
@@ -1574,7 +1578,7 @@ ast_for_expr(struct compiling *c, const node *n)
                         new = ast_for_call(c, CHILD(ch, 1), new);
 
                     if (!new) {
-		        /* XXX free(e); */
+		        free_expr(e);
                         return NULL;
 		    }
                 }
@@ -1584,13 +1588,13 @@ ast_for_expr(struct compiling *c, const node *n)
                     if (NCH(ch) <= 2) {
                         slice_ty slc = ast_for_slice(c, CHILD(ch, 0));
                         if (!slc) {
-		            /* XXX free(e); */
+		            free_expr(e);
                             return NULL;
 			}
 
                         new = Subscript(e, slc, Load, LINENO(ch));
                         if (!new) {
-		            /* XXX free(e); */
+		            free_expr(e);
 		            /* XXX free(slc); */
                             return NULL;
 			}
@@ -1600,14 +1604,14 @@ ast_for_expr(struct compiling *c, const node *n)
                         slice_ty slc;
                         asdl_seq *slices = asdl_seq_new((NCH(ch) + 1) / 2);
                         if (!slices) {
-		            /* XXX free(e); */
+		            free_expr(e);
                             return NULL;
 			}
 
                         for (j = 0; j < NCH(ch); j += 2) {
                             slc = ast_for_slice(c, CHILD(ch, j));
                             if (!slc) {
-		                /* XXX free(e); */
+		                free_expr(e);
 		                asdl_seq_free(slices);
                                 return NULL;
 			    }
@@ -1615,7 +1619,7 @@ ast_for_expr(struct compiling *c, const node *n)
                         }
                         new = Subscript(e, ExtSlice(slices), Load, LINENO(ch));
                         if (!new) {
-		            /* XXX free(e); */
+		            free_expr(e);
 		            asdl_seq_free(slices);
                             return NULL;
 			}
@@ -1626,7 +1630,7 @@ ast_for_expr(struct compiling *c, const node *n)
                     new = Attribute(e, NEW_IDENTIFIER(CHILD(ch, 1)), Load,
 				    LINENO(ch));
                     if (!new) {
-		        /* XXX free(e); */
+		        free_expr(e);
                         return NULL;
 		    }
                 }
@@ -1635,7 +1639,7 @@ ast_for_expr(struct compiling *c, const node *n)
             if (TYPE(CHILD(n, NCH(n) - 1)) == factor) {
                 expr_ty f = ast_for_expr(c, CHILD(n, NCH(n) - 1));
                 if (!f) {
-		    /* XXX free(e); */
+		    free_expr(e);
                     return NULL;
 		}
                 return BinOp(e, Pow, f, LINENO(n));
@@ -1848,14 +1852,18 @@ ast_for_expr_stmt(struct compiling *c, const node *n)
 	    if (!e) 
 	      goto error;
 
-	    if (!set_context(e, Store, CHILD(n, i))) 
+	    if (!set_context(e, Store, CHILD(n, i))) {
+              free_expr(e);
 	      goto error;
+            }
 
 	    asdl_seq_SET(targets, i / 2, e);
 	}
         expression = ast_for_testlist(c, CHILD(n, NCH(n) - 1));
 	return Assign(targets, expression, LINENO(n));
     error:
+        for (i = i / 2; i >= 0; i--)
+            free_expr((expr_ty)asdl_seq_GET(targets, i));
         asdl_seq_free(targets);
         return NULL;
     }
