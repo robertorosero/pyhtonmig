@@ -2270,7 +2270,7 @@ compiler_for(struct compiler *c, stmt_ty s)
 static int
 compiler_while(struct compiler *c, stmt_ty s)
 {
-	basicblock *loop, *orelse, *end, *anchor;
+	basicblock *loop, *orelse, *end, *anchor = NULL;
 	int constant = expr_constant(s->v.While.test);
 
 	if (constant == 0)
@@ -2684,18 +2684,6 @@ compiler_visit_stmt(struct compiler *c, stmt_ty s)
 		else
 			ADDOP_O(c, LOAD_CONST, Py_None, consts);
 		ADDOP(c, RETURN_VALUE);
-		break;
-        case Yield_kind:
-		if (c->u->u_ste->ste_type != FunctionBlock)
-                        return compiler_error(c, "'yield' outside function");
-		for (i = 0; i < c->u->u_nfblocks; i++) {
-			if (c->u->u_fblock[i].fb_type == FINALLY_TRY)
-				return compiler_error(
-					c, "'yield' not allowed in a 'try' "
-					"block with a 'finally' clause");
-		}
-		VISIT(c, expr, s->v.Yield.value);
-		ADDOP(c, YIELD_VALUE);
 		break;
         case Delete_kind:
 		VISIT_SEQ(c, expr, s->v.Delete.targets)
@@ -3306,6 +3294,7 @@ compiler_genexp_generator(struct compiler *c,
         if (gen_index >= asdl_seq_LEN(generators)) {
 		VISIT(c, expr, elt);
 		ADDOP(c, YIELD_VALUE);
+		ADDOP(c, POP_TOP);
 
 		compiler_use_next_block(c, skip);
         }
@@ -3336,12 +3325,12 @@ compiler_genexp(struct compiler *c, expr_ty e)
 
 	name = PyString_FromString("<generator expression>");
 	if (!name)
-	  return 0;
+		return 0;
 
 	if (!compiler_enter_scope(c, name, (void *)e, e->lineno))
 		return 0;
 	compiler_genexp_generator(c, e->v.GeneratorExp.generators, 0,
-					e->v.GeneratorExp.elt);
+				  e->v.GeneratorExp.elt);
 	co = assemble(c, 1);
 	if (co == NULL)
 		return 0;
@@ -3426,6 +3415,25 @@ compiler_visit_expr(struct compiler *c, expr_ty e)
 		return compiler_listcomp(c, e);
         case GeneratorExp_kind:
 		return compiler_genexp(c, e);
+	case Yield_kind:
+		if (c->u->u_ste->ste_type != FunctionBlock)
+                        return compiler_error(c, "'yield' outside function");
+		/*
+		for (i = 0; i < c->u->u_nfblocks; i++) {
+			if (c->u->u_fblock[i].fb_type == FINALLY_TRY)
+				return compiler_error(
+					c, "'yield' not allowed in a 'try' "
+					"block with a 'finally' clause");
+		}
+		*/
+		if (e->v.Yield.value) {
+			VISIT(c, expr, e->v.Yield.value);
+		}
+		else {
+			ADDOP_O(c, LOAD_CONST, Py_None, consts);
+		}
+		ADDOP(c, YIELD_VALUE);
+		break;
         case Compare_kind:
 		return compiler_compare(c, e);
         case Call_kind:
@@ -3602,7 +3610,7 @@ compiler_error(struct compiler *c, const char *errstr)
 static int
 compiler_handle_subscr(struct compiler *c, const char *kind, 
                        expr_context_ty ctx) {
-    int op;
+    int op = 0;
 
     /* XXX this code is duplicated */
     switch (ctx) {
@@ -3658,7 +3666,7 @@ compiler_slice(struct compiler *c, slice_ty s, expr_context_ty ctx)
 static int
 compiler_simple_slice(struct compiler *c, slice_ty s, expr_context_ty ctx)
 {
-	int op, slice_offset = 0, stack_count = 0;
+	int op = 0, slice_offset = 0, stack_count = 0;
 
 	assert(s->v.Slice.step == NULL);
 	if (s->v.Slice.lower) {

@@ -512,6 +512,7 @@ static asdl_seq *
 seq_for_testlist(struct compiling *c, const node *n)
 {
     /* testlist: test (',' test)* [','] */
+    REQ(n, testlist);
     asdl_seq *seq;
     expr_ty expression;
     int i;
@@ -521,12 +522,15 @@ seq_for_testlist(struct compiling *c, const node *n)
         return NULL;
 
     for (i = 0; i < NCH(n); i += 2) {
+        REQ(CHILD(n, i), test);
+
         expression = ast_for_expr(c, CHILD(n, i));
         if (!expression) {
             asdl_seq_free(seq);
             return NULL;
         }
-        
+
+        assert(i / 2 < seq->size);
         asdl_seq_SET(seq, i / 2, expression);
     }
     return seq;
@@ -1193,7 +1197,8 @@ ast_for_genexp(struct compiling *c, const node *n)
 static expr_ty
 ast_for_atom(struct compiling *c, const node *n)
 {
-	/* atom: '(' [testlist_gexp] ')' | '[' [listmaker] ']'
+    /* XXX yield_expr */
+	/* atom: '(' [yield_expr|testlist_gexp] ')' | '[' [listmaker] ']'
 	   | '{' [dictmaker] '}' | '`' testlist '`' | NAME | NUMBER | STRING+
 	*/
 	node *ch = CHILD(n, 0);
@@ -1224,6 +1229,9 @@ ast_for_atom(struct compiling *c, const node *n)
 
 			if (TYPE(ch) == RPAR)
 				return Tuple(NULL, Load, LINENO(n));
+
+			if (TYPE(ch) == yield_expr)
+				return ast_for_expr(c, ch);
 
 			if ((NCH(ch) > 1) && (TYPE(CHILD(ch, 1)) == gen_for))
 				return ast_for_genexp(c, ch);
@@ -1533,6 +1541,15 @@ ast_for_expr(struct compiling *c, const node *n)
                 goto loop;
             }
             return ast_for_binop(c, n);
+        case yield_expr: {
+	    expr_ty exp = NULL;
+	    if (NCH(n) == 2) {
+		exp = ast_for_testlist(c, CHILD(n, 1));
+		if (!exp)
+		    return NULL;
+	    }
+	    return Yield(exp, LINENO(n));
+	}
         case factor: {
             expr_ty expression;
             
@@ -1647,6 +1664,7 @@ ast_for_expr(struct compiling *c, const node *n)
             return e;
         }
         default:
+	    abort();
             PyErr_Format(PyExc_Exception, "unhandled expr: %d", TYPE(n));
             return NULL;
     }
@@ -1791,6 +1809,7 @@ static stmt_ty
 ast_for_expr_stmt(struct compiling *c, const node *n)
 {
     REQ(n, expr_stmt);
+    /* XXX yield_expr */
     /* expr_stmt: testlist (augassign testlist | ('=' testlist)*)
        testlist: test (',' test)* [',']
        augassign: '+=' | '-=' | '*=' | '/=' | '%=' | '&=' | '|=' | '^='
@@ -1808,24 +1827,33 @@ ast_for_expr_stmt(struct compiling *c, const node *n)
     else if (TYPE(CHILD(n, 1)) == augassign) {
         expr_ty expr1, expr2;
         operator_ty operator;
+	node *ch = CHILD(n, 0);
 
-        expr1 = ast_for_testlist(c, CHILD(n, 0));
+	if (TYPE(ch) == testlist)
+	    expr1 = ast_for_testlist(c, ch);
+	else
+	    expr1 = Yield(ast_for_expr(c, CHILD(ch, 0)), LINENO(ch));
+
         if (!expr1)
             return NULL;
         if (expr1->kind == GeneratorExp_kind) {
-          ast_error(CHILD(n, 0), "augmented assignment to generator "
-                                 "expression not possible");
-          return NULL;
+	    ast_error(ch, "augmented assignment to generator "
+		      "expression not possible");
+	    return NULL;
         }
 	if (expr1->kind == Name_kind) {
 		char *var_name = PyString_AS_STRING(expr1->v.Name.id);
 		if (var_name[0] == 'N' && !strcmp(var_name, "None")) {
-			ast_error(CHILD(n, 0), "assignment to None");
+			ast_error(ch, "assignment to None");
 			return NULL;
 		}
 	}
 
-        expr2 = ast_for_testlist(c, CHILD(n, 2));
+	ch = CHILD(n, 2);
+	if (TYPE(ch) == testlist)
+	    expr2 = ast_for_testlist(c, ch);
+	else
+	    expr2 = Yield(ast_for_expr(c, ch), LINENO(ch));
         if (!expr2)
             return NULL;
 
@@ -1838,6 +1866,7 @@ ast_for_expr_stmt(struct compiling *c, const node *n)
     else {
 	int i;
 	asdl_seq *targets;
+	node *value;
         expr_ty expression;
 
 	/* a normal assignment */
@@ -1846,7 +1875,12 @@ ast_for_expr_stmt(struct compiling *c, const node *n)
 	if (!targets)
 	    return NULL;
 	for (i = 0; i < NCH(n) - 2; i += 2) {
-	    expr_ty e = ast_for_testlist(c, CHILD(n, i));
+	    node *ch = CHILD(n, i);
+	    if (TYPE(ch) == yield_expr) {
+		ast_error(ch, "assignment to yield expression not possible");
+		goto error;
+	    }
+	    expr_ty e = ast_for_testlist(c, ch);
 
 	    /* set context to assign */
 	    if (!e) 
@@ -1859,7 +1893,13 @@ ast_for_expr_stmt(struct compiling *c, const node *n)
 
 	    asdl_seq_SET(targets, i / 2, e);
 	}
-        expression = ast_for_testlist(c, CHILD(n, NCH(n) - 1));
+	value = CHILD(n, NCH(n) - 1);
+	if (TYPE(value) == testlist)
+	    expression = ast_for_testlist(c, value);
+	else
+	    expression = ast_for_expr(c, value);
+	if (!expression)
+	    return NULL;
 	return Assign(targets, expression, LINENO(n));
     error:
         for (i = i / 2; i >= 0; i--)
@@ -1954,7 +1994,8 @@ ast_for_flow_stmt(struct compiling *c, const node *n)
       break_stmt: 'break'
       continue_stmt: 'continue'
       return_stmt: 'return' [testlist]
-      yield_stmt: 'yield' testlist
+      yield_stmt: yield_expr
+      yield_expr: 'yield' testlist
       raise_stmt: 'raise' [test [',' test [',' test]]]
     */
     node *ch;
@@ -1966,11 +2007,11 @@ ast_for_flow_stmt(struct compiling *c, const node *n)
             return Break(LINENO(n));
         case continue_stmt:
             return Continue(LINENO(n));
-        case yield_stmt: {
-            expr_ty expression = ast_for_testlist(c, CHILD(ch, 1));
-            if (!expression)
-                return NULL;
-            return Yield(expression, LINENO(n));
+        case yield_stmt: { /* will reduce to yield_expr */
+	    expr_ty exp = ast_for_expr(c, CHILD(ch, 0));
+	    if (!exp)
+		return NULL;
+            return Expr(exp, LINENO(n));
         }
         case return_stmt:
             if (NCH(ch) == 1)
@@ -2679,7 +2720,7 @@ ast_for_classdef(struct compiling *c, const node *n)
 	s = ast_for_suite(c, CHILD(n,5));
 	if (!s)
 		return NULL;
-	return ClassDef(NEW_IDENTIFIER(CHILD(n, 1)),NULL,s,LINENO(n));
+	return ClassDef(NEW_IDENTIFIER(CHILD(n, 1)), NULL, s, LINENO(n));
     }
 
     /* else handle the base class list */

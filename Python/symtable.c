@@ -863,10 +863,6 @@ symtable_visit_stmt(struct symtable *st, stmt_ty s)
 		if (s->v.Return.value)
 			VISIT(st, expr, s->v.Return.value);
 		break;
-        case Yield_kind:
-		VISIT(st, expr, s->v.Yield.value);
-                st->st_cur->ste_generator = 1;
-		break;
         case Delete_kind:
 		VISIT_SEQ(st, expr, s->v.Delete.targets);
 		break;
@@ -1047,6 +1043,11 @@ symtable_visit_expr(struct symtable *st, expr_ty e)
 		}
 		break;
 	}
+        case Yield_kind:
+		if (e->v.Yield.value)
+			VISIT(st, expr, e->v.Yield.value);
+                st->st_cur->ste_generator = 1;
+		break;
         case Compare_kind:
 		VISIT(st, expr, e->v.Compare.left);
 		VISIT_SEQ(st, expr, e->v.Compare.comparators);
