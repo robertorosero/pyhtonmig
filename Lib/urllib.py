@@ -86,6 +86,11 @@ def urlcleanup():
     if _urlopener:
         _urlopener.cleanup()
 
+# exception raised when downloaded size does not match content-length
+class ContentTooShortError(IOError):
+    def __init__(self, message, content):
+        IOError.__init__(self, message)
+        self.content = content
 
 ftpcache = {}
 class URLopener:
@@ -228,24 +233,31 @@ class URLopener:
             self.tempcache[url] = result
         bs = 1024*8
         size = -1
-        blocknum = 1
+        read = 0
+        blocknum = 0
         if reporthook:
             if "content-length" in headers:
                 size = int(headers["Content-Length"])
-            reporthook(0, bs, size)
-        block = fp.read(bs)
-        if reporthook:
-            reporthook(1, bs, size)
-        while block:
-            tfp.write(block)
+            reporthook(blocknum, bs, size)
+        while 1:
             block = fp.read(bs)
-            blocknum = blocknum + 1
+            if block == "":
+                break
+            read += len(block)
+            tfp.write(block)
+            blocknum += 1
             if reporthook:
                 reporthook(blocknum, bs, size)
         fp.close()
         tfp.close()
         del fp
         del tfp
+
+        # raise exception if actual size does not match content-length header
+        if size >= 0 and read < size:
+            raise ContentTooShortError("retrieval incomplete: got only %i out "
+                                       "of %i bytes" % (read, size), result)
+
         return result
 
     # Each method named open_<type> knows how to open that type of URL
@@ -1037,23 +1049,18 @@ def splitgophertype(selector):
         return selector[1], selector[2:]
     return None, selector
 
+_hextochr = dict(('%02x' % i, chr(i)) for i in range(256))
+_hextochr.update(('%02X' % i, chr(i)) for i in range(256))
+
 def unquote(s):
     """unquote('abc%20def') -> 'abc def'."""
-    mychr = chr
-    myatoi = int
-    list = s.split('%')
-    res = [list[0]]
-    myappend = res.append
-    del list[0]
-    for item in list:
-        if item[1:2]:
-            try:
-                myappend(mychr(myatoi(item[:2], 16))
-                     + item[2:])
-            except ValueError:
-                myappend('%' + item)
-        else:
-            myappend('%' + item)
+    res = s.split('%')
+    for i in xrange(1, len(res)):
+        item = res[i]
+        try:
+            res[i] = _hextochr[item[:2]] + item[2:]
+        except KeyError:
+            res[i] = '%' + item
     return "".join(res)
 
 def unquote_plus(s):
@@ -1064,22 +1071,7 @@ def unquote_plus(s):
 always_safe = ('ABCDEFGHIJKLMNOPQRSTUVWXYZ'
                'abcdefghijklmnopqrstuvwxyz'
                '0123456789' '_.-')
-
-_fast_safe_test = always_safe + '/'
-_fast_safe = None
-
-def _fast_quote(s):
-    global _fast_safe
-    if _fast_safe is None:
-        _fast_safe = {}
-        for c in _fast_safe_test:
-            _fast_safe[c] = c
-    res = list(s)
-    for i in range(len(res)):
-        c = res[i]
-        if not c in _fast_safe:
-            res[i] = '%%%02X' % ord(c)
-    return ''.join(res)
+_safemaps = {}
 
 def quote(s, safe = '/'):
     """quote('abc def') -> 'abc%20def'
@@ -1102,25 +1094,25 @@ def quote(s, safe = '/'):
     called on a path where the existing slash characters are used as
     reserved characters.
     """
-    safe = always_safe + safe
-    if _fast_safe_test == safe:
-        return _fast_quote(s)
-    res = list(s)
-    for i in range(len(res)):
-        c = res[i]
-        if c not in safe:
-            res[i] = '%%%02X' % ord(c)
+    cachekey = (safe, always_safe)
+    try:
+        safe_map = _safemaps[cachekey]
+    except KeyError:
+        safe += always_safe
+        safe_map = {}
+        for i in range(256):
+            c = chr(i)
+            safe_map[c] = (c in safe) and c or ('%%%02X' % i)
+        _safemaps[cachekey] = safe_map
+    res = map(safe_map.__getitem__, s)
     return ''.join(res)
 
 def quote_plus(s, safe = ''):
     """Quote the query fragment of a URL; replacing ' ' with '+'"""
     if ' ' in s:
-        l = s.split(' ')
-        for i in range(len(l)):
-            l[i] = quote(l[i], safe)
-        return '+'.join(l)
-    else:
-        return quote(s, safe)
+        s = quote(s, safe + ' ')
+        return s.replace(' ', '+')
+    return quote(s, safe)
 
 def urlencode(query,doseq=0):
     """Encode a sequence of two-element tuples or dictionary into a URL query string.

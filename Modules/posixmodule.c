@@ -674,8 +674,8 @@ This object may be accessed either as a tuple of\n\
   (mode, ino, dev, nlink, uid, gid, size, atime, mtime, ctime)\n\
 or via the attributes st_mode, st_ino, st_dev, st_nlink, st_uid, and so on.\n\
 \n\
-Posix/windows: If your platform supports st_blksize, st_blocks, or st_rdev,\n\
-they are available as attributes only.\n\
+Posix/windows: If your platform supports st_blksize, st_blocks, st_rdev,\n\
+or st_flags, they are available as attributes only.\n\
 \n\
 See os.stat for more information.");
 
@@ -703,6 +703,15 @@ static PyStructSequence_Field stat_result_fields[] = {
 #ifdef HAVE_STRUCT_STAT_ST_RDEV
 	{"st_rdev",    "device type (if inode device)"},
 #endif
+#ifdef HAVE_STRUCT_STAT_ST_FLAGS
+	{"st_flags",   "user defined flags for file"},
+#endif
+#ifdef HAVE_STRUCT_STAT_ST_GEN
+	{"st_gen",    "generation number"},
+#endif
+#ifdef HAVE_STRUCT_STAT_ST_BIRTHTIME
+	{"st_birthtime",   "time of creation"},
+#endif
 	{0}
 };
 
@@ -722,6 +731,24 @@ static PyStructSequence_Field stat_result_fields[] = {
 #define ST_RDEV_IDX (ST_BLOCKS_IDX+1)
 #else
 #define ST_RDEV_IDX ST_BLOCKS_IDX
+#endif
+
+#ifdef HAVE_STRUCT_STAT_ST_FLAGS
+#define ST_FLAGS_IDX (ST_RDEV_IDX+1)
+#else
+#define ST_FLAGS_IDX ST_RDEV_IDX
+#endif
+
+#ifdef HAVE_STRUCT_STAT_ST_GEN
+#define ST_GEN_IDX (ST_FLAGS_IDX+1)
+#else
+#define ST_GEN_IDX ST_FLAGS_IDX
+#endif
+
+#ifdef HAVE_STRUCT_STAT_ST_BIRTHTIME
+#define ST_BIRTHTIME_IDX (ST_GEN_IDX+1)
+#else
+#define ST_BIRTHTIME_IDX ST_GEN_IDX
 #endif
 
 static PyStructSequence_Desc stat_result_desc = {
@@ -789,7 +816,7 @@ statresult_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 
 
 /* If true, st_?time is float. */
-static int _stat_float_times = 0;
+static int _stat_float_times = 1;
 
 PyDoc_STRVAR(stat_float_times__doc__,
 "stat_float_times([newval]) -> oldval\n\n\
@@ -869,7 +896,13 @@ _pystat_fromstructstat(STRUCT_STAT st)
 	mnsec = st.st_mtim.tv_nsec;
 	cnsec = st.st_ctim.tv_nsec;
 #else
+#ifdef HAVE_STAT_TV_NSEC2
+	ansec = st.st_atimespec.tv_nsec;
+	mnsec = st.st_mtimespec.tv_nsec;
+	cnsec = st.st_ctimespec.tv_nsec;
+#else
 	ansec = mnsec = cnsec = 0;
+#endif
 #endif
 	fill_time(v, 7, st.st_atime, ansec);
 	fill_time(v, 8, st.st_mtime, mnsec);
@@ -886,6 +919,33 @@ _pystat_fromstructstat(STRUCT_STAT st)
 #ifdef HAVE_STRUCT_STAT_ST_RDEV
 	PyStructSequence_SET_ITEM(v, ST_RDEV_IDX,
 			 PyInt_FromLong((long)st.st_rdev));
+#endif
+#ifdef HAVE_STRUCT_STAT_ST_GEN
+	PyStructSequence_SET_ITEM(v, ST_GEN_IDX,
+			 PyInt_FromLong((long)st.st_gen));
+#endif
+#ifdef HAVE_STRUCT_STAT_ST_BIRTHTIME
+	{
+	  PyObject *val;
+	  unsigned long bsec,bnsec;
+	  bsec = (long)st.st_birthtime;
+#ifdef HAVE_STAT_TV_NSEC2
+	  bnsec = st.st_birthtimespec.tv_nsec;
+#else
+	  bnsec = 0;
+#endif
+	  if (_stat_float_times) {
+	    val = PyFloat_FromDouble(bsec + 1e-9*bnsec);
+	  } else {
+	    val = PyInt_FromLong((long)bsec);
+	  }
+	  PyStructSequence_SET_ITEM(v, ST_BIRTHTIME_IDX,
+				    val);
+	}
+#endif
+#ifdef HAVE_STRUCT_STAT_ST_FLAGS
+	PyStructSequence_SET_ITEM(v, ST_FLAGS_IDX,
+			 PyInt_FromLong((long)st.st_flags));
 #endif
 
 	if (PyErr_Occurred()) {
@@ -1106,19 +1166,21 @@ posix_access(PyObject *self, PyObject *args)
 			   it is a simple dereference. */
 			res = _waccess(PyUnicode_AS_UNICODE(po), mode);
 			Py_END_ALLOW_THREADS
-			return(PyBool_FromLong(res == 0));
+			return PyBool_FromLong(res == 0);
 		}
 		/* Drop the argument parsing error as narrow strings
 		   are also valid. */
 		PyErr_Clear();
 	}
 #endif
-	if (!PyArg_ParseTuple(args, "si:access", &path, &mode))
+	if (!PyArg_ParseTuple(args, "eti:access", 
+			      Py_FileSystemDefaultEncoding, &path, &mode))
 		return NULL;
 	Py_BEGIN_ALLOW_THREADS
 	res = access(path, mode);
 	Py_END_ALLOW_THREADS
-	return(PyBool_FromLong(res == 0));
+	PyMem_Free(path);
+	return PyBool_FromLong(res == 0);
 }
 
 #ifndef F_OK
@@ -1160,8 +1222,8 @@ posix_ttyname(PyObject *self, PyObject *args)
 	ret = ttyname(id);
 #endif
 	if (ret == NULL)
-		return(posix_error());
-	return(PyString_FromString(ret));
+		return posix_error();
+	return PyString_FromString(ret);
 }
 #endif
 
@@ -1182,8 +1244,8 @@ posix_ctermid(PyObject *self, PyObject *noargs)
         ret = ctermid(buffer);
 #endif
 	if (ret == NULL)
-		return(posix_error());
-	return(PyString_FromString(buffer));
+		return posix_error();
+	return PyString_FromString(buffer);
 }
 #endif
 
@@ -1977,6 +2039,8 @@ extract_time(PyObject *t, long* sec, long* usec)
 			return -1;
 		intval = PyInt_AsLong(intobj);
 		Py_DECREF(intobj);
+		if (intval == -1 && PyErr_Occurred())
+			return -1;
 		*sec = intval;
 		*usec = (long)((tval - intval) * 1e6); /* can't exceed 1000000 */
 		if (*usec < 0)
@@ -2949,7 +3013,7 @@ To both, return fd of newly opened pseudo-terminal.\n");
 static PyObject *
 posix_forkpty(PyObject *self, PyObject *noargs)
 {
-	int master_fd, pid;
+	int master_fd = -1, pid;
 
 	pid = forkpty(&master_fd, NULL, NULL, NULL);
 	if (pid == -1)
@@ -5349,6 +5413,10 @@ posix_read(PyObject *self, PyObject *args)
 	PyObject *buffer;
 	if (!PyArg_ParseTuple(args, "ii:read", &fd, &size))
 		return NULL;
+	if (size < 0) {
+		errno = EINVAL;
+		return posix_error();
+	}
 	buffer = PyString_FromStringAndSize((char *)NULL, size);
 	if (buffer == NULL)
 		return NULL;
@@ -7181,13 +7249,18 @@ win32_startfile(PyObject *self, PyObject *args)
 {
 	char *filepath;
 	HINSTANCE rc;
-	if (!PyArg_ParseTuple(args, "s:startfile", &filepath))
+	if (!PyArg_ParseTuple(args, "et:startfile", 
+				Py_FileSystemDefaultEncoding, &filepath))
 		return NULL;
 	Py_BEGIN_ALLOW_THREADS
 	rc = ShellExecute((HWND)0, NULL, filepath, NULL, NULL, SW_SHOWNORMAL);
 	Py_END_ALLOW_THREADS
-	if (rc <= (HINSTANCE)32)
-		return win32_error("startfile", filepath);
+	if (rc <= (HINSTANCE)32) {
+		PyObject *errval = win32_error("startfile", filepath);
+		PyMem_Free(filepath);
+		return errval;
+	}
+	PyMem_Free(filepath);
 	Py_INCREF(Py_None);
 	return Py_None;
 }
@@ -7712,6 +7785,12 @@ all_ins(PyObject *d)
 #endif
 #ifdef O_LARGEFILE
         if (ins(d, "O_LARGEFILE", (long)O_LARGEFILE)) return -1;
+#endif
+#ifdef O_SHLOCK
+        if (ins(d, "O_SHLOCK", (long)O_SHLOCK)) return -1;
+#endif
+#ifdef O_EXLOCK
+        if (ins(d, "O_EXLOCK", (long)O_EXLOCK)) return -1;
 #endif
 
 /* MS Windows */

@@ -5,6 +5,8 @@ import operator
 import copy
 import pickle
 import os
+from random import randrange, shuffle
+import sys
 
 class PassThru(Exception):
     pass
@@ -12,6 +14,12 @@ class PassThru(Exception):
 def check_pass_thru():
     raise PassThru
     yield 1
+
+class BadCmp:
+    def __hash__(self):
+        return 1
+    def __cmp__(self, other):
+        raise RuntimeError
 
 class TestJointOps(unittest.TestCase):
     # Tests common to both set and frozenset
@@ -202,6 +210,40 @@ class TestJointOps(unittest.TestCase):
         self.assertNotEqual(id(t), id(newt))
         self.assertEqual(t.value + 1, newt.value)
 
+    def test_gc(self):
+        # Create a nest of cycles to exercise overall ref count check
+        class A:
+            pass
+        s = set(A() for i in xrange(1000))
+        for elem in s:
+            elem.cycle = s
+            elem.sub = elem
+            elem.set = set([elem])
+
+    def test_subclass_with_custom_hash(self):
+        # Bug #1257731
+        class H(self.thetype):
+            def __hash__(self):
+                return id(self)
+        s=H()
+        f=set()
+        f.add(s)
+        self.assert_(s in f)
+        f.remove(s)
+        f.add(s)
+        f.discard(s)
+
+    def test_badcmp(self):
+        s = self.thetype([BadCmp()])
+        # Detect comparison errors during insertion and lookup
+        self.assertRaises(RuntimeError, self.thetype, [BadCmp(), BadCmp()])
+        self.assertRaises(RuntimeError, s.__contains__, BadCmp())
+        # Detect errors during mutating operations
+        if hasattr(s, 'add'):
+            self.assertRaises(RuntimeError, s.add, BadCmp())
+            self.assertRaises(RuntimeError, s.discard, BadCmp())
+            self.assertRaises(RuntimeError, s.remove, BadCmp())
+
 class TestSet(TestJointOps):
     thetype = set
 
@@ -359,12 +401,29 @@ class TestSet(TestJointOps):
             else:
                 self.assert_(c not in self.s)
 
+    def test_inplace_on_self(self):
+        t = self.s.copy()
+        t |= t
+        self.assertEqual(t, self.s)
+        t &= t
+        self.assertEqual(t, self.s)
+        t -= t
+        self.assertEqual(t, self.thetype())
+        t = self.s.copy()
+        t ^= t
+        self.assertEqual(t, self.thetype())
+
     def test_weakref(self):
         s = self.thetype('gallahad')
         p = proxy(s)
         self.assertEqual(str(p), str(s))
         s = None
         self.assertRaises(ReferenceError, str, p)
+
+    # C API test only available in a debug build
+    if hasattr(sys, "gettotalrefcount"):
+        def test_c_api(self):
+            self.assertEqual(set('abc').test_c_api(), True)
 
 class SetSubclass(set):
     pass
@@ -380,6 +439,15 @@ class TestFrozenSet(TestJointOps):
         s.__init__(self.otherword)
         self.assertEqual(s, set(self.word))
 
+    def test_singleton_empty_frozenset(self):
+        f = frozenset()
+        efs = [frozenset(), frozenset([]), frozenset(()), frozenset(''),
+               frozenset(), frozenset([]), frozenset(()), frozenset(''),
+               frozenset(xrange(0)), frozenset(frozenset()),
+               frozenset(f), f]
+        # All of the empty frozensets should have just one id()
+        self.assertEqual(len(set(map(id, efs))), 1)
+
     def test_constructor_identity(self):
         s = self.thetype(range(3))
         t = self.thetype(s)
@@ -388,6 +456,15 @@ class TestFrozenSet(TestJointOps):
     def test_hash(self):
         self.assertEqual(hash(self.thetype('abcdeb')),
                          hash(self.thetype('ebecda')))
+
+        # make sure that all permutations give the same hash value
+        n = 100
+        seq = [randrange(n) for i in xrange(n)]
+        results = set()
+        for i in xrange(200):
+            shuffle(seq)
+            results.add(hash(self.thetype(seq)))
+        self.assertEqual(len(results), 1)
 
     def test_copy(self):
         dup = self.s.copy()
@@ -435,6 +512,17 @@ class TestFrozenSetSubclass(TestFrozenSet):
         s = self.thetype()
         t = self.thetype(s)
         self.assertEqual(s, t)
+
+    def test_singleton_empty_frozenset(self):
+        Frozenset = self.thetype
+        f = frozenset()
+        F = Frozenset()
+        efs = [Frozenset(), Frozenset([]), Frozenset(()), Frozenset(''),
+               Frozenset(), Frozenset([]), Frozenset(()), Frozenset(''),
+               Frozenset(xrange(0)), Frozenset(Frozenset()),
+               Frozenset(frozenset()), f, F, Frozenset(f), Frozenset(F)]
+        # All empty frozenset subclass instances should have different ids
+        self.assertEqual(len(set(map(id, efs))), len(efs))
 
 # Tests taken from test_sets.py =============================================
 
@@ -1307,7 +1395,6 @@ class TestVariousIteratorArgs(unittest.TestCase):
 #==============================================================================
 
 def test_main(verbose=None):
-    import sys
     from test import test_sets
     test_classes = (
         TestSet,

@@ -140,9 +140,14 @@ shutdown(how) -- shut down traffic in one or both directions\n\
 # define USE_GETHOSTBYNAME_LOCK
 #endif
 
+/* To use __FreeBSD_version */
+#ifdef HAVE_SYS_PARAM_H
+#include <sys/param.h>
+#endif
 /* On systems on which getaddrinfo() is believed to not be thread-safe,
    (this includes the getaddrinfo emulation) protect access with a lock. */
-#if defined(WITH_THREAD) && (defined(__APPLE__) || defined(__FreeBSD__) || \
+#if defined(WITH_THREAD) && (defined(__APPLE__) || \
+    (defined(__FreeBSD__) && __FreeBSD_version+0 < 503000) || \
     defined(__OpenBSD__) || defined(__NetBSD__) || !defined(HAVE_GETADDRINFO))
 #define USE_GETADDRINFO_LOCK
 #endif
@@ -1344,7 +1349,7 @@ getsockaddrlen(PySocketSockObject *s, socklen_t *len_ret)
 static PyObject *
 sock_accept(PySocketSockObject *s)
 {
-	char addrbuf[256];
+	sock_addr_t addrbuf;
 	SOCKET_T newfd;
 	socklen_t addrlen;
 	PyObject *sock = NULL;
@@ -1354,7 +1359,7 @@ sock_accept(PySocketSockObject *s)
 
 	if (!getsockaddrlen(s, &addrlen))
 		return NULL;
-	memset(addrbuf, 0, addrlen);
+	memset(&addrbuf, 0, addrlen);
 
 #ifdef MS_WINDOWS
 	newfd = INVALID_SOCKET;
@@ -1365,7 +1370,7 @@ sock_accept(PySocketSockObject *s)
 	Py_BEGIN_ALLOW_THREADS
 	timeout = internal_select(s, 0);
 	if (!timeout)
-		newfd = accept(s->sock_fd, (struct sockaddr *) addrbuf,
+		newfd = accept(s->sock_fd, (struct sockaddr *) &addrbuf,
 			       &addrlen);
 	Py_END_ALLOW_THREADS
 
@@ -1392,7 +1397,7 @@ sock_accept(PySocketSockObject *s)
 		SOCKETCLOSE(newfd);
 		goto finally;
 	}
-	addr = makesockaddr(s->sock_fd, (struct sockaddr *)addrbuf,
+	addr = makesockaddr(s->sock_fd, (struct sockaddr *) &addrbuf,
 			    addrlen, s->sock_proto);
 	if (addr == NULL)
 		goto finally;
@@ -1865,19 +1870,19 @@ Return a new socket object connected to the same system resource.");
 static PyObject *
 sock_getsockname(PySocketSockObject *s)
 {
-	char addrbuf[256];
+	sock_addr_t addrbuf;
 	int res;
 	socklen_t addrlen;
 
 	if (!getsockaddrlen(s, &addrlen))
 		return NULL;
-	memset(addrbuf, 0, addrlen);
+	memset(&addrbuf, 0, addrlen);
 	Py_BEGIN_ALLOW_THREADS
-	res = getsockname(s->sock_fd, (struct sockaddr *) addrbuf, &addrlen);
+	res = getsockname(s->sock_fd, (struct sockaddr *) &addrbuf, &addrlen);
 	Py_END_ALLOW_THREADS
 	if (res < 0)
 		return s->errorhandler();
-	return makesockaddr(s->sock_fd, (struct sockaddr *) addrbuf, addrlen,
+	return makesockaddr(s->sock_fd, (struct sockaddr *) &addrbuf, addrlen,
 			    s->sock_proto);
 }
 
@@ -1894,19 +1899,19 @@ info is a pair (hostaddr, port).");
 static PyObject *
 sock_getpeername(PySocketSockObject *s)
 {
-	char addrbuf[256];
+	sock_addr_t addrbuf;
 	int res;
 	socklen_t addrlen;
 
 	if (!getsockaddrlen(s, &addrlen))
 		return NULL;
-	memset(addrbuf, 0, addrlen);
+	memset(&addrbuf, 0, addrlen);
 	Py_BEGIN_ALLOW_THREADS
-	res = getpeername(s->sock_fd, (struct sockaddr *) addrbuf, &addrlen);
+	res = getpeername(s->sock_fd, (struct sockaddr *) &addrbuf, &addrlen);
 	Py_END_ALLOW_THREADS
 	if (res < 0)
 		return s->errorhandler();
-	return makesockaddr(s->sock_fd, (struct sockaddr *) addrbuf, addrlen,
+	return makesockaddr(s->sock_fd, (struct sockaddr *) &addrbuf, addrlen,
 			    s->sock_proto);
 }
 
@@ -2115,7 +2120,7 @@ the remote end is closed and all data is read, return the empty string.");
 static PyObject *
 sock_recvfrom(PySocketSockObject *s, PyObject *args)
 {
-	char addrbuf[256];
+	sock_addr_t addrbuf;
 	PyObject *buf = NULL;
 	PyObject *addr = NULL;
 	PyObject *ret = NULL;
@@ -2132,18 +2137,18 @@ sock_recvfrom(PySocketSockObject *s, PyObject *args)
 		return NULL;
 
 	Py_BEGIN_ALLOW_THREADS
-	memset(addrbuf, 0, addrlen);
+	memset(&addrbuf, 0, addrlen);
 	timeout = internal_select(s, 0);
 	if (!timeout)
 		n = recvfrom(s->sock_fd, PyString_AS_STRING(buf), len, flags,
 #ifndef MS_WINDOWS
 #if defined(PYOS_OS2) && !defined(PYCC_GCC)
-			     (struct sockaddr *)addrbuf, &addrlen
+			     (struct sockaddr *) &addrbuf, &addrlen
 #else
-			     (void *)addrbuf, &addrlen
+			     (void *) &addrbuf, &addrlen
 #endif
 #else
-			     (struct sockaddr *)addrbuf, &addrlen
+			     (struct sockaddr *) &addrbuf, &addrlen
 #endif
 			);
 	Py_END_ALLOW_THREADS
@@ -2161,7 +2166,7 @@ sock_recvfrom(PySocketSockObject *s, PyObject *args)
 	if (n != len && _PyString_Resize(&buf, n) < 0)
 		return NULL;
 
-	if (!(addr = makesockaddr(s->sock_fd, (struct sockaddr *)addrbuf,
+	if (!(addr = makesockaddr(s->sock_fd, (struct sockaddr *) &addrbuf,
 				  addrlen, s->sock_proto)))
 		goto finally;
 
@@ -2589,11 +2594,7 @@ static PyObject *
 socket_gethostbyname(PyObject *self, PyObject *args)
 {
 	char *name;
-#ifdef ENABLE_IPV6
-	struct sockaddr_storage addrbuf;
-#else
-        struct sockaddr_in addrbuf;
-#endif
+	sock_addr_t addrbuf;
 
 	if (!PyArg_ParseTuple(args, "s:gethostbyname", &name))
 		return NULL;
@@ -3238,14 +3239,19 @@ socket_inet_aton(PyObject *self, PyObject *args)
 	return NULL;
 
 #else /* ! HAVE_INET_ATON */
-	/* XXX Problem here: inet_aton('255.255.255.255') raises
-	   an exception while it should be a valid address. */
-	packed_addr = inet_addr(ip_addr);
+	/* special-case this address as inet_addr might return INADDR_NONE
+	 * for this */
+	if (strcmp(ip_addr, "255.255.255.255") == 0) {
+		packed_addr = 0xFFFFFFFF;
+	} else {
+	
+		packed_addr = inet_addr(ip_addr);
 
-	if (packed_addr == INADDR_NONE) {	/* invalid address */
-		PyErr_SetString(socket_error,
-			"illegal IP address string passed to inet_aton");
-		return NULL;
+		if (packed_addr == INADDR_NONE) {	/* invalid address */
+			PyErr_SetString(socket_error,
+				"illegal IP address string passed to inet_aton");
+			return NULL;
+		}
 	}
 	return PyString_FromStringAndSize((char *) &packed_addr,
 					  sizeof(packed_addr));

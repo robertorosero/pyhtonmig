@@ -68,6 +68,69 @@ PyDoc_STRVAR(abs_doc,
 \n\
 Return the absolute value of the argument.");
 
+static PyObject *
+builtin_all(PyObject *self, PyObject *v)
+{
+	PyObject *it, *item;
+
+	it = PyObject_GetIter(v);
+	if (it == NULL)
+		return NULL;
+
+	while ((item = PyIter_Next(it)) != NULL) {
+		int cmp = PyObject_IsTrue(item);
+		Py_DECREF(item);
+		if (cmp < 0) {
+			Py_DECREF(it);
+			return NULL;
+		}
+		if (cmp == 0) {
+			Py_DECREF(it);
+			Py_RETURN_FALSE;
+		}
+	}
+	Py_DECREF(it);
+	if (PyErr_Occurred())
+		return NULL;
+	Py_RETURN_TRUE;
+}
+
+PyDoc_STRVAR(all_doc,
+"all(iterable) -> bool\n\
+\n\
+Return True if bool(x) is True for all values x in the iterable.");
+
+static PyObject *
+builtin_any(PyObject *self, PyObject *v)
+{
+	PyObject *it, *item;
+
+	it = PyObject_GetIter(v);
+	if (it == NULL)
+		return NULL;
+
+	while ((item = PyIter_Next(it)) != NULL) {
+		int cmp = PyObject_IsTrue(item);
+		Py_DECREF(item);
+		if (cmp < 0) {
+			Py_DECREF(it);
+			return NULL;
+		}
+		if (cmp == 1) {
+			Py_DECREF(it);
+			Py_RETURN_TRUE;
+		}
+	}
+	Py_DECREF(it);
+	if (PyErr_Occurred())
+		return NULL;
+	Py_RETURN_FALSE;
+}
+
+PyDoc_STRVAR(any_doc,
+"any(iterable) -> bool\n\
+\n\
+Return True if bool(x) is True for any x in the iterable.");
 
 static PyObject *
 builtin_apply(PyObject *self, PyObject *args)
@@ -147,22 +210,26 @@ builtin_filter(PyObject *self, PyObject *args)
 	if (PyTuple_Check(seq))
 		return filtertuple(func, seq);
 
-	/* Get iterator. */
-	it = PyObject_GetIter(seq);
-	if (it == NULL)
-		return NULL;
-
-	/* Guess a result list size. */
-	len = PyObject_Size(seq);
-	if (len < 0) {
-		PyErr_Clear();
-		len = 8;	/* arbitrary */
-	}
-
 	/* Pre-allocate argument list tuple. */
 	arg = PyTuple_New(1);
 	if (arg == NULL)
+		return NULL;
+
+	/* Get iterator. */
+	it = PyObject_GetIter(seq);
+	if (it == NULL)
 		goto Fail_arg;
+
+	/* Guess a result list size. */
+	len = _PyObject_LengthCue(seq);
+	if (len < 0) {
+		if (!PyErr_ExceptionMatches(PyExc_TypeError)  &&
+		    !PyErr_ExceptionMatches(PyExc_AttributeError)) {
+			goto Fail_it;
+		}
+		PyErr_Clear();
+		len = 8;	/* arbitrary */
+	}
 
 	/* Get a result list. */
 	if (PyList_Check(seq) && seq->ob_refcnt == 1) {
@@ -462,7 +529,7 @@ builtin_eval(PyObject *self, PyObject *args)
 		return NULL;
 	}
 	if (globals != Py_None && !PyDict_Check(globals)) {
-		PyErr_SetString(PyExc_TypeError, PyMapping_Check(globals) ? 
+		PyErr_SetString(PyExc_TypeError, PyMapping_Check(globals) ?
 			"globals must be a real dict; try eval(expr, {}, mapping)"
 			: "globals must be a dict");
 		return NULL;
@@ -474,6 +541,13 @@ builtin_eval(PyObject *self, PyObject *args)
 	}
 	else if (locals == Py_None)
 		locals = globals;
+
+	if (globals == NULL || locals == NULL) {
+		PyErr_SetString(PyExc_TypeError, 
+			"eval must be given globals and locals "
+			"when called without a frame");
+		return NULL;
+	}
 
 	if (PyDict_GetItemString(globals, "__builtins__") == NULL) {
 		if (PyDict_SetItemString(globals, "__builtins__",
@@ -799,8 +873,12 @@ builtin_map(PyObject *self, PyObject *args)
 		}
 
 		/* Update len. */
-		curlen = PyObject_Size(curseq);
+		curlen = _PyObject_LengthCue(curseq);
 		if (curlen < 0) {
+			if (!PyErr_ExceptionMatches(PyExc_TypeError)  &&
+			    !PyErr_ExceptionMatches(PyExc_AttributeError)) {
+				goto Fail_2;
+			}
 			PyErr_Clear();
 			curlen = 8;  /* arbitrary */
 		}
@@ -1127,11 +1205,11 @@ min_max(PyObject *args, PyObject *kwds, int op)
 	if (kwds != NULL && PyDict_Check(kwds) && PyDict_Size(kwds)) {
 		keyfunc = PyDict_GetItemString(kwds, "key");
 		if (PyDict_Size(kwds)!=1  ||  keyfunc == NULL) {
-			PyErr_Format(PyExc_TypeError, 
+			PyErr_Format(PyExc_TypeError,
 				"%s() got an unexpected keyword argument", name);
 			return NULL;
 		}
-	} 
+	}
 
 	it = PyObject_GetIter(v);
 	if (it == NULL)
@@ -1830,11 +1908,9 @@ builtin_sorted(PyObject *self, PyObject *args, PyObject *kwds)
 	static char *kwlist[] = {"iterable", "cmp", "key", "reverse", 0};
 	long reverse;
 
-	if (args != NULL) {
-		if (!PyArg_ParseTupleAndKeywords(args, kwds, "O|OOi:sorted",
-			kwlist, &seq, &compare, &keyfunc, &reverse))
-			return NULL;
-	}
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "O|OOi:sorted",
+		kwlist, &seq, &compare, &keyfunc, &reverse))
+		return NULL;
 
 	newlist = PySequence_List(seq);
 	if (newlist == NULL)
@@ -1845,7 +1921,7 @@ builtin_sorted(PyObject *self, PyObject *args, PyObject *kwds)
 		Py_DECREF(newlist);
 		return NULL;
 	}
-	
+
 	newargs = PyTuple_GetSlice(args, 1, 4);
 	if (newargs == NULL) {
 		Py_DECREF(newlist);
@@ -2032,8 +2108,12 @@ builtin_zip(PyObject *self, PyObject *args)
 	len = -1;	/* unknown */
 	for (i = 0; i < itemsize; ++i) {
 		PyObject *item = PyTuple_GET_ITEM(args, i);
-		int thislen = PyObject_Size(item);
+		int thislen = _PyObject_LengthCue(item);
 		if (thislen < 0) {
+			if (!PyErr_ExceptionMatches(PyExc_TypeError)  &&
+			    !PyErr_ExceptionMatches(PyExc_AttributeError)) {
+				return NULL;
+			}
 			PyErr_Clear();
 			len = -1;
 			break;
@@ -2125,6 +2205,8 @@ in length to the length of the shortest argument sequence.");
 static PyMethodDef builtin_methods[] = {
  	{"__import__",	builtin___import__, METH_VARARGS, import_doc},
  	{"abs",		builtin_abs,        METH_O, abs_doc},
+ 	{"all",		builtin_all,        METH_O, all_doc},
+ 	{"any",		builtin_any,        METH_O, any_doc},
  	{"apply",	builtin_apply,      METH_VARARGS, apply_doc},
  	{"callable",	builtin_callable,   METH_O, callable_doc},
  	{"chr",		builtin_chr,        METH_VARARGS, chr_doc},
@@ -2471,21 +2553,21 @@ filterunicode(PyObject *func, PyObject *strobj)
 		if (ok) {
 			int reslen;
 			if (!PyUnicode_Check(item)) {
-				PyErr_SetString(PyExc_TypeError, 
+				PyErr_SetString(PyExc_TypeError,
 				"can't filter unicode to unicode:"
 				" __getitem__ returned different type");
 				Py_DECREF(item);
 				goto Fail_1;
 			}
 			reslen = PyUnicode_GET_SIZE(item);
-			if (reslen == 1) 
+			if (reslen == 1)
 				PyUnicode_AS_UNICODE(result)[j++] =
 					PyUnicode_AS_UNICODE(item)[0];
 			else {
 				/* do we need more space? */
 				int need = j + reslen + len - i - 1;
 				if (need > outlen) {
-					/* overallocate, 
+					/* overallocate,
 					   to avoid reallocations */
 					if (need < 2 * outlen)
 						need = 2 * outlen;

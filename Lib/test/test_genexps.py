@@ -133,8 +133,6 @@ Verify that syntax error's are raised for genexps used as lvalues
     SyntaxError: augmented assignment to generator expression not possible (<doctest test.test_genexps.__test__.doctests[39]>, line 1)
 
 
-
-
 ########### Tests borrowed from or inspired by test_generators.py ############
 
 Make a generator that acts like range()

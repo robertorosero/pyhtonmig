@@ -149,6 +149,11 @@ except NameError:
     unicode = None # unicode support not available
 
 try:
+    import datetime
+except ImportError:
+    datetime = None
+
+try:
     _bool_is_builtin = False.__class__.__name__ == "bool"
 except NameError:
     _bool_is_builtin = 0
@@ -168,7 +173,7 @@ if unicode:
     def _stringify(string):
         # convert to 7-bit ascii if possible
         try:
-            return str(string)
+            return string.encode("ascii")
         except UnicodeError:
             return string
 else:
@@ -349,6 +354,16 @@ class DateTime:
 
     def __init__(self, value=0):
         if not isinstance(value, StringType):
+            if datetime and isinstance(value, datetime.datetime):
+                self.value = value.strftime("%Y%m%dT%H:%M:%S")
+                return
+            if datetime and isinstance(value, datetime.date):
+                self.value = value.strftime("%Y%m%dT%H:%M:%S")
+                return
+            if datetime and isinstance(value, datetime.time):
+                today = datetime.datetime.now().strftime("%Y%m%d")
+                self.value = value.strftime(today+"T%H:%M:%S")
+                return
             if not isinstance(value, (TupleType, time.struct_time)):
                 if value == 0:
                     value = time.time()
@@ -385,6 +400,10 @@ def _datetime(data):
     value = DateTime()
     value.decode(data)
     return value
+
+def _datetime_type(data):
+    t = time.strptime(data, "%Y%m%dT%H:%M:%S")
+    return datetime.datetime(*tuple(t)[:6])
 
 ##
 # Wrapper for binary data.  This can be used to transport any kind
@@ -699,6 +718,26 @@ class Marshaller:
         del self.memo[i]
     dispatch[DictType] = dump_struct
 
+    if datetime:
+        def dump_datetime(self, value, write):
+            write("<value><dateTime.iso8601>")
+            write(value.strftime("%Y%m%dT%H:%M:%S"))
+            write("</dateTime.iso8601></value>\n")
+        dispatch[datetime.datetime] = dump_datetime
+
+        def dump_date(self, value, write):
+            write("<value><dateTime.iso8601>")
+            write(value.strftime("%Y%m%dT00:00:00"))
+            write("</dateTime.iso8601></value>\n")
+        dispatch[datetime.date] = dump_date
+
+        def dump_time(self, value, write):
+            write("<value><dateTime.iso8601>")
+            write(datetime.datetime.now().date().strftime("%Y%m%dT"))
+            write(value.strftime("%H:%M:%S"))
+            write("</dateTime.iso8601></value>\n")
+        dispatch[datetime.time] = dump_time
+
     def dump_instance(self, value, write):
         # check for special wrappers
         if value.__class__ in WRAPPERS:
@@ -727,7 +766,7 @@ class Unmarshaller:
     # and again, if you don't understand what's going on in here,
     # that's perfectly ok.
 
-    def __init__(self):
+    def __init__(self, use_datetime=0):
         self._type = None
         self._stack = []
         self._marks = []
@@ -735,6 +774,9 @@ class Unmarshaller:
         self._methodname = None
         self._encoding = "utf-8"
         self.append = self._stack.append
+        self._use_datetime = use_datetime
+        if use_datetime and not datetime:
+            raise ValueError, "the datetime module is not available"
 
     def close(self):
         # return response tuple and target method
@@ -852,6 +894,8 @@ class Unmarshaller:
     def end_dateTime(self, data):
         value = DateTime()
         value.decode(data)
+        if self._use_datetime:
+            value = _datetime_type(data)
         self.append(value)
     dispatch["dateTime.iso8601"] = end_dateTime
 
@@ -953,17 +997,23 @@ class MultiCall:
 #
 # return A (parser, unmarshaller) tuple.
 
-def getparser():
+def getparser(use_datetime=0):
     """getparser() -> parser, unmarshaller
 
     Create an instance of the fastest available parser, and attach it
     to an unmarshalling object.  Return both objects.
     """
+    if use_datetime and not datetime:
+        raise ValueError, "the datetime module is not available"
     if FastParser and FastUnmarshaller:
-        target = FastUnmarshaller(True, False, _binary, _datetime, Fault)
+        if use_datetime:
+            mkdatetime = _datetime_type
+        else:
+            mkdatetime = _datetime
+        target = FastUnmarshaller(True, False, _binary, mkdatetime, Fault)
         parser = FastParser(target)
     else:
-        target = Unmarshaller()
+        target = Unmarshaller(use_datetime=use_datetime)
         if FastParser:
             parser = FastParser(target)
         elif SgmlopParser:
@@ -1066,7 +1116,7 @@ def dumps(params, methodname=None, methodresponse=None, encoding=None,
 #     (None if not present).
 # @see Fault
 
-def loads(data):
+def loads(data, use_datetime=0):
     """data -> unmarshalled data, method name
 
     Convert an XML-RPC packet to unmarshalled data plus a method
@@ -1075,7 +1125,7 @@ def loads(data):
     If the XML-RPC packet represents a fault condition, this function
     raises a Fault exception.
     """
-    p, u = getparser()
+    p, u = getparser(use_datetime=use_datetime)
     p.feed(data)
     p.close()
     return u.close(), u.getmethodname()
@@ -1106,6 +1156,9 @@ class Transport:
 
     # client identifier (may be overridden)
     user_agent = "xmlrpclib.py/%s (by www.pythonware.com)" % __version__
+
+    def __init__(self, use_datetime=0):
+        self._use_datetime = use_datetime
 
     ##
     # Send a complete request, and parse the response.
@@ -1153,7 +1206,7 @@ class Transport:
 
     def getparser(self):
         # get parser and unmarshaller
-        return getparser()
+        return getparser(use_datetime=self._use_datetime)
 
     ##
     # Get authorization info from host parameter
@@ -1347,7 +1400,7 @@ class ServerProxy:
     """
 
     def __init__(self, uri, transport=None, encoding=None, verbose=0,
-                 allow_none=0):
+                 allow_none=0, use_datetime=0):
         # establish a "logical" server connection
 
         # get the url
@@ -1361,9 +1414,9 @@ class ServerProxy:
 
         if transport is None:
             if type == "https":
-                transport = SafeTransport()
+                transport = SafeTransport(use_datetime=use_datetime)
             else:
-                transport = Transport()
+                transport = Transport(use_datetime=use_datetime)
         self.__transport = transport
 
         self.__encoding = encoding

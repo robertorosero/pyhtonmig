@@ -161,6 +161,18 @@ class SysModuleTest(unittest.TestCase):
         else:
             self.fail("no exception")
 
+        # test that the exit machinery handles SystemExits properly
+        import subprocess
+        # both unnormalized...
+        rc = subprocess.call([sys.executable, "-c",
+                              "raise SystemExit, 46"])
+        self.assertEqual(rc, 46)
+        # ... and normalized
+        rc = subprocess.call([sys.executable, "-c",
+                              "raise SystemExit(47)"])
+        self.assertEqual(rc, 47)
+
+
     def test_getdefaultencoding(self):
         if test.test_support.have_unicode:
             self.assertRaises(TypeError, sys.getdefaultencoding, 42)
@@ -235,7 +247,8 @@ class SysModuleTest(unittest.TestCase):
         self.assert_(isinstance(sys.executable, basestring))
         self.assert_(isinstance(sys.hexversion, int))
         self.assert_(isinstance(sys.maxint, int))
-        self.assert_(isinstance(sys.maxunicode, int))
+        if test.test_support.have_unicode:
+            self.assert_(isinstance(sys.maxunicode, int))
         self.assert_(isinstance(sys.platform, basestring))
         self.assert_(isinstance(sys.prefix, basestring))
         self.assert_(isinstance(sys.version, basestring))

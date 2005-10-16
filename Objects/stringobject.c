@@ -52,6 +52,7 @@ PyObject *
 PyString_FromStringAndSize(const char *str, int size)
 {
 	register PyStringObject *op;
+	assert(size >= 0);
 	if (size == 0 && (op = nullstring) != NULL) {
 #ifdef COUNT_ALLOCS
 		null_strings++;
@@ -1001,8 +1002,12 @@ string_slice(register PyStringObject *a, register int i, register int j)
 static int
 string_contains(PyObject *a, PyObject *el)
 {
-	const char *lhs, *rhs, *end;
-	int size;
+	char *s = PyString_AS_STRING(a);
+	const char *sub = PyString_AS_STRING(el);
+	char *last;
+	int len_sub = PyString_GET_SIZE(el);
+	int shortsub;
+	char firstchar, lastchar;
 
 	if (!PyString_CheckExact(el)) {
 #ifdef Py_USING_UNICODE
@@ -1015,20 +1020,29 @@ string_contains(PyObject *a, PyObject *el)
 			return -1;
 		}
 	}
-	size = PyString_GET_SIZE(el);
-	rhs = PyString_AS_STRING(el);
-	lhs = PyString_AS_STRING(a);
 
-	/* optimize for a single character */
-	if (size == 1)
-		return memchr(lhs, *rhs, PyString_GET_SIZE(a)) != NULL;
-
-	end = lhs + (PyString_GET_SIZE(a) - size);
-	while (lhs <= end) {
-		if (memcmp(lhs++, rhs, size) == 0)
+	if (len_sub == 0)
+		return 1;
+	/* last points to one char beyond the start of the rightmost 
+	   substring.  When s<last, there is still room for a possible match
+	   and s[0] through s[len_sub-1] will be in bounds.
+	   shortsub is len_sub minus the last character which is checked
+	   separately just before the memcmp().  That check helps prevent
+	   false starts and saves the setup time for memcmp().
+	*/
+	firstchar = sub[0];
+	shortsub = len_sub - 1;
+	lastchar = sub[shortsub];
+	last = s + PyString_GET_SIZE(a) - len_sub + 1;
+	while (s < last) {
+		s = memchr(s, firstchar, last-s);
+		if (s == NULL)
+			return 0;
+		assert(s < last);
+		if (s[shortsub] == lastchar && memcmp(s, sub, shortsub) == 0)
 			return 1;
+		s++;
 	}
-
 	return 0;
 }
 
@@ -2131,7 +2145,7 @@ interpreted as in slice notation.");
 static PyObject *
 string_count(PyStringObject *self, PyObject *args)
 {
-	const char *s = PyString_AS_STRING(self), *sub;
+	const char *s = PyString_AS_STRING(self), *sub, *t;
 	int len = PyString_GET_SIZE(self), n;
 	int i = 0, last = INT_MAX;
 	int m, r;
@@ -2172,10 +2186,15 @@ string_count(PyStringObject *self, PyObject *args)
 		} else {
 			i++;
 		}
+		if (i >= m)
+			break;
+		t = memchr(s+i, sub[0], m-i);
+		if (t == NULL)
+			break;
+		i = t - s;
 	}
 	return PyInt_FromLong((long) r);
 }
-
 
 PyDoc_STRVAR(swapcase__doc__,
 "S.swapcase() -> string\n\
@@ -3734,18 +3753,12 @@ _PyString_FormatLong(PyObject *val, int flags, int prec, int type,
 	}
 
 	/* Fix up case for hex conversions. */
-	switch (type) {
-	case 'x':
-		/* Need to convert all upper case letters to lower case. */
+	if (type == 'X') {
+		/* Need to convert all lower case letters to upper case.
+		   and need to convert 0x to 0X (and -0x to -0X). */
 		for (i = 0; i < len; i++)
-			if (buf[i] >= 'A' && buf[i] <= 'F')
-				buf[i] += 'a'-'A';
-		break;
-	case 'X':
-		/* Need to convert 0x to 0X (and -0x to -0X). */
-		if (buf[sign + 1] == 'x')
-			buf[sign + 1] = 'X';
-		break;
+			if (buf[i] >= 'a' && buf[i] <= 'x')
+				buf[i] -= 'a'-'A';
 	}
 	*pbuf = buf;
 	*plen = len;
@@ -3839,7 +3852,6 @@ formatchar(char *buf, size_t buflen, PyObject *v)
 	buf[1] = '\0';
 	return 1;
 }
-
 
 /* fmt%(v1,v2,...) is roughly equivalent to sprintf(fmt, v1, v2, ...)
 
@@ -4072,18 +4084,22 @@ PyString_Format(PyObject *format, PyObject *args)
 					goto unicode;
 				}
 #endif
+				temp = _PyObject_Str(v);
+#ifdef Py_USING_UNICODE
+				if (temp != NULL && PyUnicode_Check(temp)) {
+					Py_DECREF(temp);
+					fmt = fmt_start;
+					argidx = argidx_start;
+					goto unicode;
+				}
+#endif
 				/* Fall through */
 			case 'r':
-				if (c == 's')
-					temp = PyObject_Str(v);
-				else
+				if (c == 'r')
 					temp = PyObject_Repr(v);
 				if (temp == NULL)
 					goto error;
 				if (!PyString_Check(temp)) {
-					/* XXX Note: this should never happen,
-					   since PyObject_Repr() and
-					   PyObject_Str() assure this */
 					PyErr_SetString(PyExc_TypeError,
 					  "%s argument has non-string str()");
 					Py_DECREF(temp);

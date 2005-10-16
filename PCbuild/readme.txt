@@ -12,7 +12,7 @@ the "Standard" toolbar"), and build the projects.
 The proper order to build subprojects:
 
 1) pythoncore (this builds the main Python DLL and library files,
-               python21.{dll, lib} in Release mode)
+               python25.{dll, lib} in Release mode)
               NOTE:  in previous releases, this subproject was
               named after the release number, e.g. python20.
 
@@ -25,7 +25,7 @@ The proper order to build subprojects:
    to the subsystems they implement; see SUBPROJECTS below)
 
 When using the Debug setting, the output files have a _d added to
-their name:  python24_d.dll, python_d.exe, parser_d.pyd, and so on.
+their name:  python25_d.dll, python_d.exe, parser_d.pyd, and so on.
 
 SUBPROJECTS
 -----------
@@ -114,7 +114,7 @@ _tkinter
         all.tcl:        Total   8420    Passed  6826    Skipped 1581    Failed  13
         Sourced 91 Test Files.
         Files with failing tests: canvImg.test scrollbar.test textWind.test winWm.test
-        
+
    Built Tix
    ---------
    Download from http://prdownloads.sourceforge.net/tix/tix-8.1.4.tar.gz
@@ -126,15 +126,18 @@ _tkinter
 
 zlib
     Python wrapper for the zlib compression library.  Get the source code
-    for version 1.2.1 from a convenient mirror at:
+    for version 1.2.3 from a convenient mirror at:
         http://www.gzip.org/zlib/
-    Unpack into dist\zlib-1.2.1.
+    Unpack into dist\zlib-1.2.3.
     A custom pre-link step in the zlib project settings should manage to
-    build zlib-1.2.1\zlib.lib by magic before zlib.pyd (or zlib_d.pyd) is
+    build zlib-1.2.3\zlib.lib by magic before zlib.pyd (or zlib_d.pyd) is
     linked in PCbuild\.
     However, the zlib project is not smart enough to remove anything under
-    zlib-1.2.1\ when you do a clean, so if you want to rebuild zlib.lib
-    you need to clean up zlib-1.2.1\ by hand.
+    zlib-1.2.3\ when you do a clean, so if you want to rebuild zlib.lib
+    you need to clean up zlib-1.2.3\ by hand.
+    When building zlib.pyd for Itanium, the pre-link build step won't work,
+    so you will need to invoke nmake manually, using an IA64 build 
+    environment.
 
 bz2
     Python wrapper for the libbz2 compression library.  Homepage
@@ -238,17 +241,6 @@ __bsddb - 0 error(s), 5 warning(s)
     XXX doesn't cause a test to fail when it happens (exceptions in
     XXX threads are invisible to unittest).
 
-    XXX 11-Apr-2004 tim
-    XXX On WinXP Pro, I got one failure from test_bsddb3:
-    XXX
-    XXX ERROR: test04_n_flag (bsddb.test.test_compat.CompatibilityTestCase)
-    XXX Traceback (most recent call last):
-    XXX  File "C:\Code\python\lib\bsddb\test\test_compat.py", line 86, in test04_n_flag
-    XXX    f = hashopen(self.filename, 'n')
-    XXX File "C:\Code\python\lib\bsddb\__init__.py", line 293, in hashopen
-    XXX    d.open(file, db.DB_HASH, flags, mode)
-    XXX DBInvalidArgError: (22, 'Invalid argument -- DB_TRUNCATE illegal with locking specified')
-
 _ssl
     Python wrapper for the secure sockets library.
 
@@ -260,6 +252,7 @@ _ssl
     not
         openssl-engine-0.9.7d.tar.gz
 
+    (see #1233049 for using 0.9.8).
     Unpack into the "dist" directory, retaining the folder name from
     the archive - for example, the latest stable OpenSSL will install as
         dist/openssl-0.9.7d

@@ -1,4 +1,5 @@
 import compiler
+from compiler.ast import flatten
 import os
 import test.test_support
 import unittest
@@ -33,6 +34,9 @@ class CompilerTest(unittest.TestCase):
                 else:
                     compiler.compile(buf, basename, "exec")
 
+    def testNewClassSyntax(self):
+        compiler.compile("class foo():pass\n\n","<string>","exec")
+
     def testLineNo(self):
         # Test that all nodes except Module have a correct lineno attribute.
         filename = __file__
@@ -56,6 +60,10 @@ class CompilerTest(unittest.TestCase):
                 "lineno=%s on %s" % (node.lineno, node.__class__))
         for child in node.getChildNodes():
             self.check_lineno(child)
+
+    def testFlatten(self):
+        self.assertEquals(flatten([1, [2]]), [1, 2])
+        self.assertEquals(flatten((1, (2,))), [1, 2])
 
 NOLINENO = (compiler.ast.Module, compiler.ast.Stmt, compiler.ast.Discard)
 

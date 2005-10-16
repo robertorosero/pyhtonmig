@@ -309,6 +309,26 @@ class CommonTest(seq_tests.CommonTest):
         a = self.type2test([0, 1, 2, 3])
         self.assertRaises(BadExc, a.remove, BadCmp())
 
+        class BadCmp2:
+            def __eq__(self, other):
+                raise BadExc()
+
+        d = self.type2test('abcdefghcij')
+        d.remove('c')
+        self.assertEqual(d, self.type2test('abdefghcij'))
+        d.remove('c')
+        self.assertEqual(d, self.type2test('abdefghij'))
+        self.assertRaises(ValueError, d.remove, 'c')
+        self.assertEqual(d, self.type2test('abdefghij'))
+
+        # Handle comparison errors
+        d = self.type2test(['a', 'b', BadCmp2(), 'c'])
+        e = self.type2test(d)
+        self.assertRaises(BadExc, d.remove, 'c')
+        for x, y in zip(d, e):
+            # verify that original order and values are retained.
+            self.assert_(x is y)
+
     def test_count(self):
         a = self.type2test([0, 1, 2])*3
         self.assertEqual(a.count(0), 3)
@@ -494,3 +514,12 @@ class CommonTest(seq_tests.CommonTest):
         a = self.type2test(range(10))
         a[::2] = tuple(range(5))
         self.assertEqual(a, self.type2test([0, 1, 1, 3, 2, 5, 3, 7, 4, 9]))
+
+    def test_constructor_exception_handling(self):
+        # Bug #1242657
+        class F(object):
+            def __iter__(self):
+                yield 23
+            def __len__(self):
+                raise KeyboardInterrupt
+        self.assertRaises(KeyboardInterrupt, list, F())

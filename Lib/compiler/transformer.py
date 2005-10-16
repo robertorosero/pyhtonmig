@@ -89,7 +89,7 @@ def Node(*args):
             print nodes[kind], len(args), args
             raise
     else:
-        raise WalkerEror, "Can't find appropriate Node type: %s" % str(args)
+        raise WalkerError, "Can't find appropriate Node type: %s" % str(args)
         #return apply(ast.Node, args)
 
 class Transformer:
@@ -165,7 +165,7 @@ class Transformer:
         if n == symbol.classdef:
             return self.classdef(node[1:])
 
-        raise WalkerEror, ('unexpected node type', n)
+        raise WalkerError, ('unexpected node type', n)
 
     def single_input(self, node):
         ### do we want to do anything about being "interactive" ?
@@ -280,11 +280,13 @@ class Transformer:
         return Lambda(names, defaults, flags, code, lineno=nodelist[1][2])
 
     def classdef(self, nodelist):
-        # classdef: 'class' NAME ['(' testlist ')'] ':' suite
+        # classdef: 'class' NAME ['(' [testlist] ')'] ':' suite
 
         name = nodelist[1][1]
         doc = self.get_docstring(nodelist[-1])
         if nodelist[2][0] == token.COLON:
+            bases = []
+        elif nodelist[3][0] == token.RPAR:
             bases = []
         else:
             bases = self.com_bases(nodelist[3])
@@ -314,31 +316,31 @@ class Transformer:
         return Stmt(stmts)
 
     def parameters(self, nodelist):
-        raise WalkerEror
+        raise WalkerError
 
     def varargslist(self, nodelist):
-        raise WalkerEror
+        raise WalkerError
 
     def fpdef(self, nodelist):
-        raise WalkerEror
+        raise WalkerError
 
     def fplist(self, nodelist):
-        raise WalkerEror
+        raise WalkerError
 
     def dotted_name(self, nodelist):
-        raise WalkerEror
+        raise WalkerError
 
     def comp_op(self, nodelist):
-        raise WalkerEror
+        raise WalkerError
 
     def trailer(self, nodelist):
-        raise WalkerEror
+        raise WalkerError
 
     def sliceop(self, nodelist):
-        raise WalkerEror
+        raise WalkerError
 
     def argument(self, nodelist):
-        raise WalkerEror
+        raise WalkerError
 
     # --------------------------------------------------------------
     #
@@ -401,7 +403,15 @@ class Transformer:
         return Return(self.com_node(nodelist[1]), lineno=nodelist[0][2])
 
     def yield_stmt(self, nodelist):
-        return Yield(self.com_node(nodelist[1]), lineno=nodelist[0][2])
+        expr = self.com_node(nodelist[0])
+        return Discard(expr, lineno=expr.lineno)
+
+    def yield_expr(self, nodelist):
+        if len(nodelist)>1:
+            value = nodelist[1]
+        else:
+            value = Const(None)
+        return Yield(self.com_node(value), lineno=nodelist[0][2])
 
     def raise_stmt(self, nodelist):
         # raise: [test [',' test [',' test]]]
@@ -1400,6 +1410,8 @@ _legal_node_types = [
 
 if hasattr(symbol, 'yield_stmt'):
     _legal_node_types.append(symbol.yield_stmt)
+if hasattr(symbol, 'yield_expr'):
+    _legal_node_types.append(symbol.yield_expr)
 
 _assign_types = [
     symbol.test,

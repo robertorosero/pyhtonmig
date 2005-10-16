@@ -15,6 +15,7 @@ from distutils.debug import DEBUG
 from distutils.util import get_platform
 from distutils.file_util import write_file
 from distutils.errors import *
+from distutils.sysconfig import get_python_version
 from distutils import log
 
 class bdist_rpm (Command):
@@ -297,12 +298,14 @@ class bdist_rpm (Command):
 
         # Make a source distribution and copy to SOURCES directory with
         # optional icon.
+        saved_dist_files = self.distribution.dist_files[:]
         sdist = self.reinitialize_command('sdist')
         if self.use_bzip2:
             sdist.formats = ['bztar']
         else:
             sdist.formats = ['gztar']
         self.run_command('sdist')
+        self.distribution.dist_files = saved_dist_files
 
         source = sdist.get_archive_files()[0]
         source_dir = rpm_dir['SOURCES']
@@ -344,21 +347,31 @@ class bdist_rpm (Command):
                 srpms = glob.glob(os.path.join(rpm_dir['SRPMS'], "*.rpm"))
                 assert len(srpms) == 1, \
                        "unexpected number of SRPM files found: %s" % srpms
+                dist_file = ('bdist_rpm', 'any',
+                             self._dist_path(srpms[0]))
+                self.distribution.dist_files.append(dist_file)
                 self.move_file(srpms[0], self.dist_dir)
 
             if not self.source_only:
                 rpms = glob.glob(os.path.join(rpm_dir['RPMS'], "*/*.rpm"))
-                debuginfo = glob.glob(os.path.join(rpm_dir['RPMS'], \
+                debuginfo = glob.glob(os.path.join(rpm_dir['RPMS'],
                                                    "*/*debuginfo*.rpm"))
                 if debuginfo:
                     rpms.remove(debuginfo[0])
                 assert len(rpms) == 1, \
                        "unexpected number of RPM files found: %s" % rpms
+                dist_file = ('bdist_rpm', get_python_version(),
+                             self._dist_path(rpms[0]))
+                self.distribution.dist_files.append(dist_file)
                 self.move_file(rpms[0], self.dist_dir)
                 if debuginfo:
+                    dist_file = ('bdist_rpm', get_python_version(),
+                                 self._dist_path(debuginfo[0]))
                     self.move_file(debuginfo[0], self.dist_dir)
     # run()
 
+    def _dist_path(self, path):
+        return os.path.join(self.dist_dir, os.path.basename(path))
 
     def _make_spec_file(self):
         """Generate the text of an RPM spec file and return it as a

@@ -267,7 +267,7 @@ class GeneralModuleTests(unittest.TestCase):
         except socket.error:
             # Probably a similar problem as above; skip this test
             return
-        all_host_names = [hname] + aliases
+        all_host_names = [hostname, hname] + aliases
         fqhn = socket.getfqdn()
         if not fqhn in all_host_names:
             self.fail("Error testing host resolution mechanisms.")
@@ -312,7 +312,7 @@ class GeneralModuleTests(unittest.TestCase):
         # I've ordered this by protocols that have both a tcp and udp
         # protocol, at least for modern Linuxes.
         if sys.platform in ('linux2', 'freebsd4', 'freebsd5', 'freebsd6',
-                            'darwin'):
+                            'freebsd7', 'darwin'):
             # avoid the 'echo' service on this platform, as there is an
             # assumption breaking non-standard port/protocol entry
             services = ('daytime', 'qotd', 'domain')
@@ -380,10 +380,12 @@ class GeneralModuleTests(unittest.TestCase):
         self.assertEquals('\xff\x00\xff\x00', f('255.0.255.0'))
         self.assertEquals('\xaa\xaa\xaa\xaa', f('170.170.170.170'))
         self.assertEquals('\x01\x02\x03\x04', f('1.2.3.4'))
+        self.assertEquals('\xff\xff\xff\xff', f('255.255.255.255'))
 
         self.assertEquals('\x00\x00\x00\x00', g('0.0.0.0'))
         self.assertEquals('\xff\x00\xff\x00', g('255.0.255.0'))
         self.assertEquals('\xaa\xaa\xaa\xaa', g('170.170.170.170'))
+        self.assertEquals('\xff\xff\xff\xff', g('255.255.255.255'))
 
     def testIPv6toString(self):
         if not hasattr(socket, 'inet_pton'):

@@ -91,6 +91,16 @@ class ReadTest(BaseTest):
             self.assert_(lines1 == lines2,
                          "_FileObject.readline() does not work correctly")
 
+    def test_iter(self):
+        # Test iteration over ExFileObject.
+        if self.sep != "|":
+            filename = "0-REGTYPE-TEXT"
+            self.tar.extract(filename, dirname())
+            lines1 = file(os.path.join(dirname(), filename), "rU").readlines()
+            lines2 = [line for line in self.tar.extractfile(filename)]
+            self.assert_(lines1 == lines2,
+                         "ExFileObject iteration does not work correctly")
+
     def test_seek(self):
         """Test seek() method of _FileObject, incl. random reading.
         """
@@ -171,6 +181,18 @@ class ReadStreamTest(ReadTest):
 
         stream.close()
 
+class ReadAsteriskTest(ReadTest):
+
+    def setUp(self):
+        mode = self.mode + self.sep + "*"
+        self.tar = tarfile.open(tarname(self.comp), mode)
+
+class ReadStreamAsteriskTest(ReadStreamTest):
+
+    def setUp(self):
+        mode = self.mode + self.sep + "*"
+        self.tar = tarfile.open(tarname(self.comp), mode)
+
 class WriteTest(BaseTest):
     mode = 'w'
 
@@ -207,6 +229,40 @@ class WriteTest(BaseTest):
                                  tarinfo, f)
             else:
                 self.dst.addfile(tarinfo, f)
+
+class WriteSize0Test(BaseTest):
+    mode = 'w'
+
+    def setUp(self):
+        self.tmpdir = dirname()
+        self.dstname = tmpname()
+        self.dst = tarfile.open(self.dstname, "w")
+
+    def tearDown(self):
+        self.dst.close()
+
+    def test_file(self):
+        path = os.path.join(self.tmpdir, "file")
+        file(path, "w")
+        tarinfo = self.dst.gettarinfo(path)
+        self.assertEqual(tarinfo.size, 0)
+        file(path, "w").write("aaa")
+        tarinfo = self.dst.gettarinfo(path)
+        self.assertEqual(tarinfo.size, 3)
+
+    def test_directory(self):
+        path = os.path.join(self.tmpdir, "directory")
+        os.mkdir(path)
+        tarinfo = self.dst.gettarinfo(path)
+        self.assertEqual(tarinfo.size, 0)
+
+    def test_symlink(self):
+        if hasattr(os, "symlink"):
+            path = os.path.join(self.tmpdir, "symlink")
+            os.symlink("link_target", path)
+            tarinfo = self.dst.gettarinfo(path)
+            self.assertEqual(tarinfo.size, 0)
+
 
 class WriteStreamTest(WriteTest):
     sep = '|'
@@ -326,6 +382,11 @@ class WriteTestGzip(WriteTest):
     comp = "gz"
 class WriteStreamTestGzip(WriteStreamTest):
     comp = "gz"
+class ReadAsteriskTestGzip(ReadAsteriskTest):
+    comp = "gz"
+class ReadStreamAsteriskTestGzip(ReadStreamAsteriskTest):
+    comp = "gz"
+
 
 # Filemode test cases
 
@@ -344,6 +405,10 @@ if bz2:
     class WriteTestBzip2(WriteTest):
         comp = "bz2"
     class WriteStreamTestBzip2(WriteStreamTestGzip):
+        comp = "bz2"
+    class ReadAsteriskTestBzip2(ReadAsteriskTest):
+        comp = "bz2"
+    class ReadStreamAsteriskTestBzip2(ReadStreamAsteriskTest):
         comp = "bz2"
 
 # If importing gzip failed, discard the Gzip TestCases.
@@ -365,7 +430,10 @@ def test_main():
         FileModeTest,
         ReadTest,
         ReadStreamTest,
+        ReadAsteriskTest,
+        ReadStreamAsteriskTest,
         WriteTest,
+        WriteSize0Test,
         WriteStreamTest,
         WriteGNULongTest,
     ]
@@ -376,13 +444,15 @@ def test_main():
     if gzip:
         tests.extend([
             ReadTestGzip, ReadStreamTestGzip,
-            WriteTestGzip, WriteStreamTestGzip
+            WriteTestGzip, WriteStreamTestGzip,
+            ReadAsteriskTestGzip, ReadStreamAsteriskTestGzip
         ])
 
     if bz2:
         tests.extend([
             ReadTestBzip2, ReadStreamTestBzip2,
-            WriteTestBzip2, WriteStreamTestBzip2
+            WriteTestBzip2, WriteStreamTestBzip2,
+            ReadAsteriskTestBzip2, ReadStreamAsteriskTestBzip2
         ])
     try:
         test_support.run_unittest(*tests)

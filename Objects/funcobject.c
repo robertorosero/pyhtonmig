@@ -264,8 +264,6 @@ func_set_code(PyFunctionObject *op, PyObject *value)
 static PyObject *
 func_get_name(PyFunctionObject *op)
 {
-	if (restricted())
-		return NULL;
 	Py_INCREF(op->func_name);
 	return op->func_name;
 }

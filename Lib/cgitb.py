@@ -22,6 +22,7 @@ The default handler displays output as HTML.
 """
 
 __author__ = 'Ka-Ping Yee'
+
 __version__ = '$Revision$'
 
 import sys
@@ -112,8 +113,11 @@ function calls leading up to the error, in the order they occurred.</p>'''
     frames = []
     records = inspect.getinnerframes(etb, context)
     for frame, file, lnum, func, lines, index in records:
-        file = file and os.path.abspath(file) or '?'
-        link = '<a href="file://%s">%s</a>' % (file, pydoc.html.escape(file))
+        if file:
+            file = os.path.abspath(file)
+            link = '<a href="file://%s">%s</a>' % (file, pydoc.html.escape(file))
+        else:
+            file = link = '?'
         args, varargs, varkw, locals = inspect.getargvalues(frame)
         call = ''
         if func != '?':
@@ -146,7 +150,7 @@ function calls leading up to the error, in the order they occurred.</p>'''
             if name in done: continue
             done[name] = 1
             if value is not __UNDEF__:
-                if where in ['global', 'builtin']:
+                if where in ('global', 'builtin'):
                     name = ('<em>%s</em> ' % where) + strong(name)
                 elif where == 'local':
                     name = strong(name)

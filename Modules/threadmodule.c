@@ -63,12 +63,7 @@ lock_PyThread_acquire_lock(lockobject *self, PyObject *args)
 	i = PyThread_acquire_lock(self->lock_lock, i);
 	Py_END_ALLOW_THREADS
 
-	if (args == NULL) {
-		Py_INCREF(Py_None);
-		return Py_None;
-	}
-	else
-		return PyBool_FromLong((long)i);
+	return PyBool_FromLong((long)i);
 }
 
 PyDoc_STRVAR(acquire_doc,
@@ -163,11 +158,11 @@ static PyTypeObject Locktype = {
 #include "structmember.h"
 
 typedef struct {
-    PyObject_HEAD
-    PyObject *key;
-    PyObject *args;
-    PyObject *kw;
-    PyObject *dict;
+	PyObject_HEAD
+	PyObject *key;
+	PyObject *args;
+	PyObject *kw;
+	PyObject *dict;
 } localobject;
 
 static PyTypeObject localtype;
@@ -175,91 +170,87 @@ static PyTypeObject localtype;
 static PyObject *
 local_new(PyTypeObject *type, PyObject *args, PyObject *kw)
 {
-    	localobject *self;
-        PyObject *tdict;
+	localobject *self;
+	PyObject *tdict;
 
-        if (type->tp_init == PyBaseObject_Type.tp_init
-            && ((args && PyObject_IsTrue(args))
-                ||
-                (kw && PyObject_IsTrue(kw))
-                )
-            ) {
-          	PyErr_SetString(PyExc_TypeError,
-                          "Initialization arguments are not supported");
-                return NULL;
-        }
+	if (type->tp_init == PyBaseObject_Type.tp_init
+	    && ((args && PyObject_IsTrue(args))
+		|| (kw && PyObject_IsTrue(kw)))) {
+		PyErr_SetString(PyExc_TypeError,
+			  "Initialization arguments are not supported");
+		return NULL;
+	}
 
-    	self = (localobject *)type->tp_alloc(type, 0);
-        if (self == NULL)
-          return NULL;
+	self = (localobject *)type->tp_alloc(type, 0);
+	if (self == NULL)
+		return NULL;
 
-        Py_XINCREF(args);
-        self->args = args;
-        Py_XINCREF(kw);
-        self->kw = kw;
-        self->dict = NULL;      /* making sure */
-        self->key = PyString_FromFormat("thread.local.%p", self);
-        if (self->key == NULL) 
-                goto err;
+	Py_XINCREF(args);
+	self->args = args;
+	Py_XINCREF(kw);
+	self->kw = kw;
+	self->dict = NULL;	/* making sure */
+	self->key = PyString_FromFormat("thread.local.%p", self);
+	if (self->key == NULL) 
+		goto err;
 
-        self->dict = PyDict_New();
-        if (self->dict == NULL)
-                goto err;
+	self->dict = PyDict_New();
+	if (self->dict == NULL)
+		goto err;
 
-        tdict = PyThreadState_GetDict();
-        if (tdict == NULL) {
-                PyErr_SetString(PyExc_SystemError,
-                                "Couldn't get thread-state dictionary");
-                goto err;
-        }
+	tdict = PyThreadState_GetDict();
+	if (tdict == NULL) {
+		PyErr_SetString(PyExc_SystemError,
+				"Couldn't get thread-state dictionary");
+		goto err;
+	}
 
-        if (PyDict_SetItem(tdict, self->key, self->dict) < 0)
-                goto err;
-       
-    	return (PyObject *)self;
+	if (PyDict_SetItem(tdict, self->key, self->dict) < 0)
+		goto err;
 
- err:
-        Py_DECREF(self);
-        return NULL;
+	return (PyObject *)self;
+
+  err:
+	Py_DECREF(self);
+	return NULL;
 }
 
 static int
 local_traverse(localobject *self, visitproc visit, void *arg)
 {
-        Py_VISIT(self->args);
-        Py_VISIT(self->kw);
-        Py_VISIT(self->dict);
+	Py_VISIT(self->args);
+	Py_VISIT(self->kw);
+	Py_VISIT(self->dict);
 	return 0;
 }
 
 static int
 local_clear(localobject *self)
 {
-  	Py_CLEAR(self->key);
-        Py_CLEAR(self->args);
-        Py_CLEAR(self->kw);
-        Py_CLEAR(self->dict);
-        return 0;
+	Py_CLEAR(self->key);
+	Py_CLEAR(self->args);
+	Py_CLEAR(self->kw);
+	Py_CLEAR(self->dict);
+	return 0;
 }
 
 static void
 local_dealloc(localobject *self)
 {
-        PyThreadState *tstate;
-        if (self->key
-            && (tstate = PyThreadState_Get())
-            && tstate->interp) {
-                for(tstate = PyInterpreterState_ThreadHead(tstate->interp);
-                    tstate;
-                    tstate = PyThreadState_Next(tstate)
-                    ) 
-                        if (tstate->dict &&
-                            PyDict_GetItem(tstate->dict, self->key))
-                                PyDict_DelItem(tstate->dict, self->key);
-        }
+	PyThreadState *tstate;
+	if (self->key
+	    && (tstate = PyThreadState_Get())
+	    && tstate->interp) {
+		for(tstate = PyInterpreterState_ThreadHead(tstate->interp);
+		    tstate;
+		    tstate = PyThreadState_Next(tstate)) 
+			if (tstate->dict &&
+			    PyDict_GetItem(tstate->dict, self->key))
+				PyDict_DelItem(tstate->dict, self->key);
+	}
 
-  	local_clear(self);
-        self->ob_type->tp_free((PyObject*)self);
+	local_clear(self);
+	self->ob_type->tp_free((PyObject*)self);
 }
 
 static PyObject *
@@ -268,48 +259,47 @@ _ldict(localobject *self)
 	PyObject *tdict, *ldict;
 
 	tdict = PyThreadState_GetDict();
-        if (tdict == NULL) {
-        	PyErr_SetString(PyExc_SystemError,
-                                "Couldn't get thread-state dictionary");
-                return NULL;
-        }
+	if (tdict == NULL) {
+		PyErr_SetString(PyExc_SystemError,
+				"Couldn't get thread-state dictionary");
+		return NULL;
+	}
 
-        ldict = PyDict_GetItem(tdict, self->key);
-        if (ldict == NULL) {
-        	ldict = PyDict_New(); /* we own ldict */
+	ldict = PyDict_GetItem(tdict, self->key);
+	if (ldict == NULL) {
+		ldict = PyDict_New(); /* we own ldict */
 
-                if (ldict == NULL)
-                	return NULL;
-                else {
-                        int i = PyDict_SetItem(tdict, self->key, ldict);
-                        Py_DECREF(ldict); /* now ldict is borowed */
-                        if (i < 0) 
-                                return NULL;
-                }
+		if (ldict == NULL)
+			return NULL;
+		else {
+			int i = PyDict_SetItem(tdict, self->key, ldict);
+			Py_DECREF(ldict); /* now ldict is borowed */
+			if (i < 0) 
+				return NULL;
+		}
 
-                Py_CLEAR(self->dict);
-                Py_INCREF(ldict);
-                self->dict = ldict; /* still borrowed */
+		Py_CLEAR(self->dict);
+		Py_INCREF(ldict);
+		self->dict = ldict; /* still borrowed */
 
-                if (self->ob_type->tp_init != PyBaseObject_Type.tp_init &&
-                    self->ob_type->tp_init((PyObject*)self, 
-                                           self->args, self->kw) < 0
-                    ) {
-                        /* we need to get rid of ldict from thread so
-                           we create a new one the next time we do an attr
-                           acces */
-                        PyDict_DelItem(tdict, self->key);
-                        return NULL;
-                }
-                
-        }
-        else if (self->dict != ldict) {
-                Py_CLEAR(self->dict);
-                Py_INCREF(ldict);
-                self->dict = ldict;
-        }
+		if (self->ob_type->tp_init != PyBaseObject_Type.tp_init &&
+		    self->ob_type->tp_init((PyObject*)self, 
+					   self->args, self->kw) < 0) {
+			/* we need to get rid of ldict from thread so
+			   we create a new one the next time we do an attr
+			   acces */
+			PyDict_DelItem(tdict, self->key);
+			return NULL;
+		}
+		
+	}
+	else if (self->dict != ldict) {
+		Py_CLEAR(self->dict);
+		Py_INCREF(ldict);
+		self->dict = ldict;
+	}
 
-  return ldict;
+	return ldict;
 }
 
 static PyObject *
@@ -317,54 +307,52 @@ local_getattro(localobject *self, PyObject *name)
 {
 	PyObject *ldict, *value;
 
-        ldict = _ldict(self);
-        if (ldict == NULL) 
-        	return NULL;
+	ldict = _ldict(self);
+	if (ldict == NULL) 
+		return NULL;
 
-        if (self->ob_type != &localtype)
-                /* use generic lookup for subtypes */
-                return PyObject_GenericGetAttr((PyObject *)self, name);
+	if (self->ob_type != &localtype)
+		/* use generic lookup for subtypes */
+		return PyObject_GenericGetAttr((PyObject *)self, name);
 
-        /* Optimization: just look in dict ourselves */
-        value = PyDict_GetItem(ldict, name);
-        if (value == NULL) 
-                /* Fall back on generic to get __class__ and __dict__ */
-                return PyObject_GenericGetAttr((PyObject *)self, name);
+	/* Optimization: just look in dict ourselves */
+	value = PyDict_GetItem(ldict, name);
+	if (value == NULL) 
+		/* Fall back on generic to get __class__ and __dict__ */
+		return PyObject_GenericGetAttr((PyObject *)self, name);
 
-        Py_INCREF(value);
-        return value;
+	Py_INCREF(value);
+	return value;
 }
 
 static int
 local_setattro(localobject *self, PyObject *name, PyObject *v)
 {
 	PyObject *ldict;
-        
-        ldict = _ldict(self);
-        if (ldict == NULL) 
-          	return -1;
+	
+	ldict = _ldict(self);
+	if (ldict == NULL) 
+		return -1;
 
-        return PyObject_GenericSetAttr((PyObject *)self, name, v);
+	return PyObject_GenericSetAttr((PyObject *)self, name, v);
 }
 
 static PyObject *
 local_getdict(localobject *self, void *closure)
 {
-        if (self->dict == NULL) {
-                PyErr_SetString(PyExc_AttributeError, "__dict__");
-                return NULL;
-        }
+	if (self->dict == NULL) {
+		PyErr_SetString(PyExc_AttributeError, "__dict__");
+		return NULL;
+	}
 
-    	Py_INCREF(self->dict);
-        return self->dict;
+	Py_INCREF(self->dict);
+	return self->dict;
 }
 
 static PyGetSetDef local_getset[] = {
-    {"__dict__", 
-     (getter)local_getdict, (setter)0,
-     "Local-data dictionary",
-     NULL},
-    {NULL}  /* Sentinel */
+	{"__dict__", (getter)local_getdict, (setter)NULL,
+	 "Local-data dictionary", NULL},
+	{NULL}  /* Sentinel */
 };
 
 static PyTypeObject localtype = {
@@ -385,28 +373,28 @@ static PyTypeObject localtype = {
 	/* tp_hash           */ (hashfunc)0,
 	/* tp_call           */ (ternaryfunc)0,
 	/* tp_str            */ (reprfunc)0,
-        /* tp_getattro       */ (getattrofunc)local_getattro,
-        /* tp_setattro       */ (setattrofunc)local_setattro,
-        /* tp_as_buffer      */ 0,
-        /* tp_flags          */ Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
+	/* tp_getattro       */ (getattrofunc)local_getattro,
+	/* tp_setattro       */ (setattrofunc)local_setattro,
+	/* tp_as_buffer      */ 0,
+	/* tp_flags          */ Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
 	/* tp_doc            */ "Thread-local data",
-        /* tp_traverse       */ (traverseproc)local_traverse,
-        /* tp_clear          */ (inquiry)local_clear,
-        /* tp_richcompare    */ (richcmpfunc)0,
-        /* tp_weaklistoffset */ (long)0,
-        /* tp_iter           */ (getiterfunc)0,
-        /* tp_iternext       */ (iternextfunc)0,
-        /* tp_methods        */ 0,
-        /* tp_members        */ 0,
-        /* tp_getset         */ local_getset,
-        /* tp_base           */ 0,
-        /* tp_dict           */ 0, /* internal use */
-        /* tp_descr_get      */ (descrgetfunc)0,
-        /* tp_descr_set      */ (descrsetfunc)0,
-        /* tp_dictoffset     */ offsetof(localobject, dict),
-        /* tp_init           */ (initproc)0,
-        /* tp_alloc          */ (allocfunc)0,
-        /* tp_new            */ (newfunc)local_new,
+	/* tp_traverse       */ (traverseproc)local_traverse,
+	/* tp_clear          */ (inquiry)local_clear,
+	/* tp_richcompare    */ (richcmpfunc)0,
+	/* tp_weaklistoffset */ (long)0,
+	/* tp_iter           */ (getiterfunc)0,
+	/* tp_iternext       */ (iternextfunc)0,
+	/* tp_methods        */ 0,
+	/* tp_members        */ 0,
+	/* tp_getset         */ local_getset,
+	/* tp_base           */ 0,
+	/* tp_dict           */ 0, /* internal use */
+	/* tp_descr_get      */ (descrgetfunc)0,
+	/* tp_descr_set      */ (descrsetfunc)0,
+	/* tp_dictoffset     */ offsetof(localobject, dict),
+	/* tp_init           */ (initproc)0,
+	/* tp_alloc          */ (allocfunc)0,
+	/* tp_new            */ (newfunc)local_new,
 	/* tp_free           */ 0, /* Low-level free-mem routine */
 	/* tp_is_gc          */ (inquiry)0, /* For PyObject_IS_GC */
 };
@@ -425,10 +413,12 @@ static void
 t_bootstrap(void *boot_raw)
 {
 	struct bootstate *boot = (struct bootstate *) boot_raw;
-	PyGILState_STATE gstate;
+	PyThreadState *tstate;
 	PyObject *res;
 
-	gstate = PyGILState_Ensure();
+	tstate = PyThreadState_New(boot->interp);
+
+	PyEval_AcquireThread(tstate);
 	res = PyEval_CallObjectWithKeywords(
 		boot->func, boot->args, boot->keyw);
 	if (res == NULL) {
@@ -453,7 +443,8 @@ t_bootstrap(void *boot_raw)
 	Py_DECREF(boot->args);
 	Py_XDECREF(boot->keyw);
 	PyMem_DEL(boot_raw);
-	PyGILState_Release(gstate);
+	PyThreadState_Clear(tstate);
+	PyThreadState_DeleteCurrent();
 	PyThread_exit_thread();
 }
 
@@ -494,7 +485,7 @@ thread_PyThread_start_new_thread(PyObject *self, PyObject *fargs)
 	PyEval_InitThreads(); /* Start the interpreter's thread-awareness */
 	ident = PyThread_start_new_thread(t_bootstrap, (void*) boot);
 	if (ident == -1) {
-		PyErr_SetString(ThreadError, "can't start new thread\n");
+		PyErr_SetString(ThreadError, "can't start new thread");
 		Py_DECREF(func);
 		Py_DECREF(args);
 		Py_XDECREF(keyw);
@@ -640,10 +631,10 @@ PyMODINIT_FUNC
 initthread(void)
 {
 	PyObject *m, *d;
-        
-        /* Initialize types: */
-        if (PyType_Ready(&localtype) < 0)
-        	return;
+	
+	/* Initialize types: */
+	if (PyType_Ready(&localtype) < 0)
+		return;
 
 	/* Create the module and add the functions */
 	m = Py_InitModule3("thread", thread_methods, thread_doc);
@@ -656,8 +647,9 @@ initthread(void)
 	Py_INCREF(&Locktype);
 	PyDict_SetItemString(d, "LockType", (PyObject *)&Locktype);
 
-        if (PyModule_AddObject(m, "_local", (PyObject *)&localtype) < 0)
-        	return;
+	Py_INCREF(&localtype);
+	if (PyModule_AddObject(m, "_local", (PyObject *)&localtype) < 0)
+		return;
 
 	/* Initialize the C thread library */
 	PyThread_init_thread();

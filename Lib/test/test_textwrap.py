@@ -165,6 +165,24 @@ What a mess!
                         ["this-is-a-useful-feature-for-reformatting-",
                          "posts-from-tim-peters'ly"])
 
+    def test_hyphenated_numbers(self):
+        # Test that hyphenated numbers (eg. dates) are not broken like words.
+        text = ("Python 1.0.0 was released on 1994-01-26.  Python 1.0.1 was\n"
+                "released on 1994-02-15.")
+
+        self.check_wrap(text, 30, ['Python 1.0.0 was released on',
+                                   '1994-01-26.  Python 1.0.1 was',
+                                   'released on 1994-02-15.'])
+        self.check_wrap(text, 40, ['Python 1.0.0 was released on 1994-01-26.',
+                                   'Python 1.0.1 was released on 1994-02-15.'])
+
+        text = "I do all my shopping at 7-11."
+        self.check_wrap(text, 25, ["I do all my shopping at",
+                                   "7-11."])
+        self.check_wrap(text, 27, ["I do all my shopping at",
+                                   "7-11."])
+        self.check_wrap(text, 29, ["I do all my shopping at 7-11."])
+
     def test_em_dash(self):
         # Test text with em-dashes
         text = "Em-dashes should be written -- thus."
@@ -310,17 +328,18 @@ What a mess!
         self.check_wrap(text, 30,
                         [" This is a sentence with", "leading whitespace."])
 
-    def test_unicode(self):
-        # *Very* simple test of wrapping Unicode strings.  I'm sure
-        # there's more to it than this, but let's at least make
-        # sure textwrap doesn't crash on Unicode input!
-        text = u"Hello there, how are you today?"
-        self.check_wrap(text, 50, [u"Hello there, how are you today?"])
-        self.check_wrap(text, 20, [u"Hello there, how are", "you today?"])
-        olines = self.wrapper.wrap(text)
-        assert isinstance(olines, list) and isinstance(olines[0], unicode)
-        otext = self.wrapper.fill(text)
-        assert isinstance(otext, unicode)
+    if test_support.have_unicode:
+        def test_unicode(self):
+            # *Very* simple test of wrapping Unicode strings.  I'm sure
+            # there's more to it than this, but let's at least make
+            # sure textwrap doesn't crash on Unicode input!
+            text = u"Hello there, how are you today?"
+            self.check_wrap(text, 50, [u"Hello there, how are you today?"])
+            self.check_wrap(text, 20, [u"Hello there, how are", "you today?"])
+            olines = self.wrapper.wrap(text)
+            assert isinstance(olines, list) and isinstance(olines[0], unicode)
+            otext = self.wrapper.fill(text)
+            assert isinstance(otext, unicode)
 
     def test_split(self):
         # Ensure that the standard _split() method works as advertised

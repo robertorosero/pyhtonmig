@@ -102,7 +102,7 @@ class _RLock(_Verbose):
             self.__owner = me
             self.__count = 1
             if __debug__:
-                self._note("%s.acquire(%s): initial succes", self, blocking)
+                self._note("%s.acquire(%s): initial success", self, blocking)
         else:
             if __debug__:
                 self._note("%s.acquire(%s): failure", self, blocking)
@@ -358,7 +358,7 @@ def _newname(template="Thread-%d"):
 
 # Active thread administration
 _active_limbo_lock = _allocate_lock()
-_active = {}
+_active = {}    # maps thread id to Thread object
 _limbo = {}
 
 
@@ -374,9 +374,11 @@ class Thread(_Verbose):
     __exc_info = _sys.exc_info
 
     def __init__(self, group=None, target=None, name=None,
-                 args=(), kwargs={}, verbose=None):
+                 args=(), kwargs=None, verbose=None):
         assert group is None, "group argument must be None for now"
         _Verbose.__init__(self, verbose)
+        if kwargs is None:
+            kwargs = {}
         self.__target = target
         self.__name = str(name or _newname())
         self.__args = args
@@ -643,8 +645,9 @@ def _pickSomeNonDaemonThread():
 
 
 # Dummy thread class to represent threads not started here.
-# These aren't garbage collected when they die,
-# nor can they be waited for.
+# These aren't garbage collected when they die, nor can they be waited for.
+# If they invoke anything in threading.py that calls currentThread(), they
+# leave an entry in the _active dict forever after.
 # Their purpose is to return *something* from currentThread().
 # They are marked as daemon threads so we won't wait for them
 # when we exit (conform previous semantics).
@@ -653,6 +656,12 @@ class _DummyThread(Thread):
 
     def __init__(self):
         Thread.__init__(self, name=_newname("Dummy-%d"))
+
+        # Thread.__block consumes an OS-level locking primitive, which
+        # can never be used by a _DummyThread.  Since a _DummyThread
+        # instance is immortal, that's bad, so release this resource.
+        del self._Thread__block
+
         self._Thread__started = True
         _active_limbo_lock.acquire()
         _active[_get_ident()] = self

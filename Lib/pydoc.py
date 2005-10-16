@@ -36,6 +36,7 @@ Reference Manual pages.
 
 __author__ = "Ka-Ping Yee <ping@lfw.org>"
 __date__ = "26 February 2001"
+
 __version__ = "$Revision$"
 __credits__ = """Guido van Rossum, for an excellent programming language.
 Tommy Burnette, the original creator of manpy.
@@ -153,8 +154,8 @@ def _split_list(s, predicate):
 def visiblename(name, all=None):
     """Decide whether to show documentation on a variable."""
     # Certain special names are redundant.
-    if name in ['__builtins__', '__doc__', '__file__', '__path__',
-                '__module__', '__name__']: return 0
+    if name in ('__builtins__', '__doc__', '__file__', '__path__',
+                '__module__', '__name__', '__slots__'): return 0
     # Private names are hidden, but special names are displayed.
     if name.startswith('__') and name.endswith('__'): return 1
     if all is not None:
@@ -163,12 +164,20 @@ def visiblename(name, all=None):
     else:
         return not name.startswith('_')
 
+def classify_class_attrs(object):
+    """Wrap inspect.classify_class_attrs, with fixup for data descriptors."""
+    def fixup((name, kind, cls, value)):
+        if inspect.isdatadescriptor(value):
+            kind = 'data descriptor'
+        return name, kind, cls, value
+    return map(fixup, inspect.classify_class_attrs(object))
+
 # ----------------------------------------------------- module manipulation
 
 def ispackage(path):
     """Guess whether a path refers to a package directory."""
     if os.path.isdir(path):
-        for ext in ['.py', '.pyc', '.pyo']:
+        for ext in ('.py', '.pyc', '.pyo'):
             if os.path.isfile(os.path.join(path, '__init__' + ext)):
                 return True
     return False
@@ -718,13 +727,13 @@ class HTMLDoc(Doc):
                     push('\n')
             return attrs
 
-        def spillproperties(msg, attrs, predicate):
+        def spilldescriptors(msg, attrs, predicate):
             ok, attrs = _split_list(attrs, predicate)
             if ok:
                 hr.maybe()
                 push(msg)
                 for name, kind, homecls, value in ok:
-                    push(self._docproperty(name, value, mod))
+                    push(self._docdescriptor(name, value, mod))
             return attrs
 
         def spilldata(msg, attrs, predicate):
@@ -749,7 +758,7 @@ class HTMLDoc(Doc):
             return attrs
 
         attrs = filter(lambda (name, kind, cls, value): visiblename(name),
-                       inspect.classify_class_attrs(object))
+                       classify_class_attrs(object))
         mdict = {}
         for key, kind, homecls, value in attrs:
             mdict[key] = anchor = '#' + name + '-' + key
@@ -788,8 +797,8 @@ class HTMLDoc(Doc):
                           lambda t: t[1] == 'class method')
             attrs = spill('Static methods %s' % tag, attrs,
                           lambda t: t[1] == 'static method')
-            attrs = spillproperties('Properties %s' % tag, attrs,
-                                    lambda t: t[1] == 'property')
+            attrs = spilldescriptors('Data descriptors %s' % tag, attrs,
+                                     lambda t: t[1] == 'data descriptor')
             attrs = spilldata('Data and other attributes %s' % tag, attrs,
                               lambda t: t[1] == 'data')
             assert attrs == []
@@ -871,29 +880,22 @@ class HTMLDoc(Doc):
             doc = doc and '<dd><tt>%s</tt></dd>' % doc
             return '<dl><dt>%s</dt>%s</dl>\n' % (decl, doc)
 
-    def _docproperty(self, name, value, mod):
+    def _docdescriptor(self, name, value, mod):
         results = []
         push = results.append
 
         if name:
             push('<dl><dt><strong>%s</strong></dt>\n' % name)
         if value.__doc__ is not None:
-            doc = self.markup(value.__doc__, self.preformat)
+            doc = self.markup(getdoc(value), self.preformat)
             push('<dd><tt>%s</tt></dd>\n' % doc)
-        for attr, tag in [('fget', '<em>get</em>'),
-                          ('fset', '<em>set</em>'),
-                          ('fdel', '<em>delete</em>')]:
-            func = getattr(value, attr)
-            if func is not None:
-                base = self.document(func, tag, mod)
-                push('<dd>%s</dd>\n' % base)
         push('</dl>\n')
 
         return ''.join(results)
 
     def docproperty(self, object, name=None, mod=None, cl=None):
         """Produce html documentation for a property."""
-        return self._docproperty(name, object, mod)
+        return self._docdescriptor(name, object, mod)
 
     def docother(self, object, name=None, mod=None, *ignored):
         """Produce HTML documentation for a data object."""
@@ -1078,7 +1080,7 @@ class TextDoc(Doc):
         if data:
             contents = []
             for key, value in data:
-                contents.append(self.docother(value, key, name, 70))
+                contents.append(self.docother(value, key, name, maxlen=70))
             result = result + self.section('DATA', join(contents, '\n'))
 
         if hasattr(object, '__version__'):
@@ -1143,13 +1145,13 @@ class TextDoc(Doc):
                                        name, mod, object))
             return attrs
 
-        def spillproperties(msg, attrs, predicate):
+        def spilldescriptors(msg, attrs, predicate):
             ok, attrs = _split_list(attrs, predicate)
             if ok:
                 hr.maybe()
                 push(msg)
                 for name, kind, homecls, value in ok:
-                    push(self._docproperty(name, value, mod))
+                    push(self._docdescriptor(name, value, mod))
             return attrs
 
         def spilldata(msg, attrs, predicate):
@@ -1159,15 +1161,15 @@ class TextDoc(Doc):
                 push(msg)
                 for name, kind, homecls, value in ok:
                     if callable(value) or inspect.isdatadescriptor(value):
-                        doc = getattr(value, "__doc__", None)
+                        doc = getdoc(value)
                     else:
                         doc = None
                     push(self.docother(getattr(object, name),
-                                       name, mod, 70, doc) + '\n')
+                                       name, mod, maxlen=70, doc=doc) + '\n')
             return attrs
 
         attrs = filter(lambda (name, kind, cls, value): visiblename(name),
-                       inspect.classify_class_attrs(object))
+                       classify_class_attrs(object))
         while attrs:
             if mro:
                 thisclass = mro.popleft()
@@ -1195,8 +1197,8 @@ class TextDoc(Doc):
                           lambda t: t[1] == 'class method')
             attrs = spill("Static methods %s:\n" % tag, attrs,
                           lambda t: t[1] == 'static method')
-            attrs = spillproperties("Properties %s:\n" % tag, attrs,
-                                    lambda t: t[1] == 'property')
+            attrs = spilldescriptors("Data descriptors %s:\n" % tag, attrs,
+                                     lambda t: t[1] == 'data descriptor')
             attrs = spilldata("Data and other attributes %s:\n" % tag, attrs,
                               lambda t: t[1] == 'data')
             assert attrs == []
@@ -1254,35 +1256,24 @@ class TextDoc(Doc):
             doc = getdoc(object) or ''
             return decl + '\n' + (doc and rstrip(self.indent(doc)) + '\n')
 
-    def _docproperty(self, name, value, mod):
+    def _docdescriptor(self, name, value, mod):
         results = []
         push = results.append
 
         if name:
-            push(name)
-        need_blank_after_doc = 0
+            push(self.bold(name))
+            push('\n')
         doc = getdoc(value) or ''
         if doc:
             push(self.indent(doc))
-            need_blank_after_doc = 1
-        for attr, tag in [('fget', '<get>'),
-                          ('fset', '<set>'),
-                          ('fdel', '<delete>')]:
-            func = getattr(value, attr)
-            if func is not None:
-                if need_blank_after_doc:
-                    push('')
-                    need_blank_after_doc = 0
-                base = self.document(func, tag, mod)
-                push(self.indent(base))
-
-        return '\n'.join(results)
+            push('\n')
+        return ''.join(results)
 
     def docproperty(self, object, name=None, mod=None, cl=None):
         """Produce text documentation for a property."""
-        return self._docproperty(name, object, mod)
+        return self._docdescriptor(name, object, mod)
 
-    def docother(self, object, name=None, mod=None, maxlen=None, doc=None):
+    def docother(self, object, name=None, mod=None, parent=None, maxlen=None, doc=None):
         """Produce text documentation for a data object."""
         repr = self.repr(object)
         if maxlen:
@@ -1308,12 +1299,12 @@ def getpager():
         return plainpager
     if not sys.stdin.isatty() or not sys.stdout.isatty():
         return plainpager
-    if os.environ.get('TERM') in ['dumb', 'emacs']:
+    if os.environ.get('TERM') in ('dumb', 'emacs'):
         return plainpager
     if 'PAGER' in os.environ:
         if sys.platform == 'win32': # pipes completely broken in Windows
             return lambda text: tempfilepager(plain(text), os.environ['PAGER'])
-        elif os.environ.get('TERM') in ['dumb', 'emacs']:
+        elif os.environ.get('TERM') in ('dumb', 'emacs'):
             return lambda text: pipepager(plain(text), os.environ['PAGER'])
         else:
             return lambda text: pipepager(text, os.environ['PAGER'])
@@ -1379,14 +1370,14 @@ def ttypager(text):
             sys.stdout.flush()
             c = getchar()
 
-            if c in ['q', 'Q']:
+            if c in ('q', 'Q'):
                 sys.stdout.write('\r          \r')
                 break
-            elif c in ['\r', '\n']:
+            elif c in ('\r', '\n'):
                 sys.stdout.write('\r          \r' + lines[r] + '\n')
                 r = r + 1
                 continue
-            if c in ['b', 'B', '\x1b']:
+            if c in ('b', 'B', '\x1b'):
                 r = r - inc - inc
                 if r < 0: r = 0
             sys.stdout.write('\n' + join(lines[r:r+inc], '\n') + '\n')
@@ -1464,6 +1455,14 @@ def doc(thing, title='Python Library Documentation: %s', forceload=0):
             desc += ' in ' + name[:name.rfind('.')]
         elif module and module is not object:
             desc += ' in module ' + module.__name__
+        if not (inspect.ismodule(object) or
+                inspect.isclass(object) or
+                inspect.isroutine(object) or
+                isinstance(object, property)):
+            # If the passed object is a piece of data or an instance,
+            # document its available methods instead of its value.
+            object = type(object)
+            desc += ' object'
         pager(title % desc + '\n\n' + text.document(object, name))
     except (ImportError, ErrorDuringImport), value:
         print value
@@ -1656,7 +1655,7 @@ has the same effect as typing a particular string at the help> prompt.
             except (KeyboardInterrupt, EOFError):
                 break
             request = strip(replace(request, '"', '', "'", ''))
-            if lower(request) in ['q', 'quit']: break
+            if lower(request) in ('q', 'quit'): break
             self.help(request)
 
     def getline(self, prompt):

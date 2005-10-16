@@ -92,7 +92,7 @@ streams (file-like objects).
 \item \class{FileHandler} instances send error messages to disk
 files.
 
-\item \class{BaseRotatingHandler} is tha base class for handlers that
+\item \class{BaseRotatingHandler} is the base class for handlers that
 rotate log files at a certain point. It is not meant to be  instantiated
 directly. Instead, use \class{RotatingFileHandler} or
 \class{TimedRotatingFileHandler}.
@@ -258,13 +258,32 @@ defined by \var{attrdict}. This function is useful for taking a pickled
 it as a \class{LogRecord} instance at the receiving end.
 \end{funcdesc}
 
-\begin{funcdesc}{basicConfig}{}
+\begin{funcdesc}{basicConfig}{\optional{**kwargs}}
 Does basic configuration for the logging system by creating a
 \class{StreamHandler} with a default \class{Formatter} and adding it to
 the root logger. The functions \function{debug()}, \function{info()},
 \function{warning()}, \function{error()} and \function{critical()} will call
 \function{basicConfig()} automatically if no handlers are defined for the
 root logger.
+
+\versionchanged[Formerly, \function{basicConfig} did not take any keyword
+arguments]{2.4}
+
+The following keyword arguments are supported.
+
+\begin{tableii}{l|l}{code}{Format}{Description}
+\lineii{filename}{Specifies that a FileHandler be created, using the
+specified filename, rather than a StreamHandler.}
+\lineii{filemode}{Specifies the mode to open the file, if filename is
+specified (if filemode is unspecified, it defaults to 'a').}
+\lineii{format}{Use the specified format string for the handler.}
+\lineii{datefmt}{Use the specified date/time format.}
+\lineii{level}{Set the root logger level to the specified level.}
+\lineii{stream}{Use the specified stream to initialize the StreamHandler.
+Note that this argument is incompatible with 'filename' - if both
+are present, 'stream' is ignored.}
+\end{tableii}
+
 \end{funcdesc}
 
 \begin{funcdesc}{shutdown}{}
@@ -315,6 +334,20 @@ created, the level is set to \constant{NOTSET} (which causes all messages
 to be processed when the logger is the root logger, or delegation to the
 parent when the logger is a non-root logger). Note that the root logger
 is created with level \constant{WARNING}.
+
+The term "delegation to the parent" means that if a logger has a level
+of NOTSET, its chain of ancestor loggers is traversed until either an
+ancestor with a level other than NOTSET is found, or the root is
+reached.
+
+If an ancestor is found with a level other than NOTSET, then that
+ancestor's level is treated as the effective level of the logger where
+the ancestor search began, and is used to determine how a logging
+event is handled.
+
+If the root is reached, and it has a level of NOTSET, then all
+messages will be processed. Otherwise, the root's level will be used
+as the effective level.
 \end{methoddesc}
 
 \begin{methoddesc}{isEnabledFor}{lvl}
@@ -414,6 +447,9 @@ specialized \class{LogRecord} instances.
 \end{methoddesc}
 
 \subsection{Basic example \label{minimal-example}}
+
+\versionchanged[formerly \function{basicConfig} did not take any keyword
+arguments]{2.4}
 
 The \module{logging} package provides a lot of flexibility, and its
 configuration can appear daunting.  This section demonstrates that simple
@@ -1133,8 +1169,7 @@ address via SMTP.
 \begin{classdesc}{SMTPHandler}{mailhost, fromaddr, toaddrs, subject}
 Returns a new instance of the \class{SMTPHandler} class. The
 instance is initialized with the from and to addresses and subject
-line of the email. The \var{toaddrs} should be a list of strings without
-domain names (That's what the \var{mailhost} is for). To specify a
+line of the email. The \var{toaddrs} should be a list of strings. To specify a
 non-standard SMTP port, use the (host, port) tuple format for the
 \var{mailhost} argument. If you use a string, the standard SMTP port
 is used.
@@ -1269,6 +1304,7 @@ Currently, the useful mapping keys in a \class{LogRecord} are:
 \lineii{\%(msecs)d}    {Millisecond portion of the time when the
                         \class{LogRecord} was created.}
 \lineii{\%(thread)d}   {Thread ID (if available).}
+\lineii{\%(threadName)s}   {Thread name (if available).}
 \lineii{\%(process)d}  {Process ID (if available).}
 \lineii{\%(message)s}  {The logged message, computed as \code{msg \% args}.}
 \end{tableii}
@@ -1396,7 +1432,10 @@ configurations. If no port is specified, the module's default
 will be sent as a file suitable for processing by \function{fileConfig()}.
 Returns a \class{Thread} instance on which you can call \method{start()}
 to start the server, and which you can \method{join()} when appropriate.
-To stop the server, call \function{stopListening()}.
+To stop the server, call \function{stopListening()}. To send a configuration
+to the socket, read in the configuration file and send it to the socket
+as a string of bytes preceded by a four-byte length packed in binary using
+struct.\code{pack(">L", n)}.
 \end{funcdesc}
 
 \begin{funcdesc}{stopListening}{}

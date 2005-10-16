@@ -248,6 +248,31 @@ class ProcessTestCase(unittest.TestCase):
                          env=newenv)
         self.assertEqual(p.stdout.read(), "orange")
 
+    def test_communicate_stdin(self):
+        p = subprocess.Popen([sys.executable, "-c",
+                              'import sys; sys.exit(sys.stdin.read() == "pear")'],
+                             stdin=subprocess.PIPE)
+        p.communicate("pear")
+        self.assertEqual(p.returncode, 1)
+
+    def test_communicate_stdout(self):
+        p = subprocess.Popen([sys.executable, "-c",
+                              'import sys; sys.stdout.write("pineapple")'],
+                             stdout=subprocess.PIPE)
+        (stdout, stderr) = p.communicate()
+        self.assertEqual(stdout, "pineapple")
+        self.assertEqual(stderr, None)
+
+    def test_communicate_stderr(self):
+        p = subprocess.Popen([sys.executable, "-c",
+                              'import sys; sys.stderr.write("pineapple")'],
+                             stderr=subprocess.PIPE)
+        (stdout, stderr) = p.communicate()
+        self.assertEqual(stdout, None)
+        # When running with a pydebug build, the # of references is outputted
+        # to stderr, so just check if stderr at least started with "pinapple"
+        self.assert_(stderr.startswith("pineapple"))
+
     def test_communicate(self):
         p = subprocess.Popen([sys.executable, "-c",
                           'import sys,os;' \
@@ -359,9 +384,10 @@ class ProcessTestCase(unittest.TestCase):
 
     def test_no_leaking(self):
         # Make sure we leak no resources
-        max_handles = 1026 # too much for most UNIX systems
-        if mswindows:
-            max_handles = 65 # a full test is too slow on Windows
+        if test_support.is_resource_enabled("subprocess") and not mswindows:
+            max_handles = 1026 # too much for most UNIX systems
+        else:
+            max_handles = 65
         for i in range(max_handles):
             p = subprocess.Popen([sys.executable, "-c",
                     "import sys;sys.stdout.write(sys.stdin.read())"],

@@ -95,6 +95,9 @@ deque_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	dequeobject *deque;
 	block *b;
 
+	if (!_PyArg_NoKeywords("deque()", kwds))
+		return NULL;
+
 	/* create dequeobject structure */
 	deque = (dequeobject *)type->tp_alloc(type, 0);
 	if (deque == NULL)
@@ -367,6 +370,41 @@ deque_len(dequeobject *deque)
 {
 	return deque->len;
 }
+
+static PyObject *
+deque_remove(dequeobject *deque, PyObject *value)
+{
+	int i, n=deque->len;
+
+	for (i=0 ; i<n ; i++) {
+		PyObject *item = deque->leftblock->data[deque->leftindex];
+		int cmp = PyObject_RichCompareBool(item, value, Py_EQ);
+
+		if (deque->len != n) {
+			PyErr_SetString(PyExc_IndexError, 
+				"deque mutated during remove().");
+			return NULL;
+		}
+		if (cmp > 0) {
+			PyObject *tgt = deque_popleft(deque, NULL);
+			assert (tgt != NULL);
+			Py_DECREF(tgt);
+			if (_deque_rotate(deque, i) == -1)
+				return NULL;
+			Py_RETURN_NONE;
+		}
+		else if (cmp < 0) {
+			_deque_rotate(deque, i);
+			return NULL;
+		}
+		_deque_rotate(deque, -1);
+	}
+	PyErr_SetString(PyExc_ValueError, "deque.remove(x): x not in deque");
+	return NULL;
+}
+
+PyDoc_STRVAR(remove_doc,
+"D.remove(value) -- remove first occurrence of value.");
 
 static int
 deque_clear(dequeobject *deque)
@@ -764,7 +802,7 @@ static PyMethodDef deque_methods[] = {
 		METH_NOARGS,	 copy_doc},
 	{"extend",		(PyCFunction)deque_extend,
 		METH_O,		 extend_doc},
-	{"extendleft",	(PyCFunction)deque_extendleft,
+	{"extendleft",		(PyCFunction)deque_extendleft,
 		METH_O,		 extendleft_doc},
 	{"pop",			(PyCFunction)deque_pop,
 		METH_NOARGS,	 pop_doc},
@@ -772,6 +810,8 @@ static PyMethodDef deque_methods[] = {
 		METH_NOARGS,	 popleft_doc},
 	{"__reduce__",	(PyCFunction)deque_reduce,
 		METH_NOARGS,	 reduce_doc},
+	{"remove",		(PyCFunction)deque_remove,
+		METH_O,		 remove_doc},
 	{"__reversed__",	(PyCFunction)deque_reviter,
 		METH_NOARGS,	 reversed_doc},
 	{"rotate",		(PyCFunction)deque_rotate,
@@ -895,15 +935,17 @@ dequeiter_next(dequeiterobject *it)
 	return item;
 }
 
-static int
+static PyObject *
 dequeiter_len(dequeiterobject *it)
 {
-	return it->counter;
+	return PyInt_FromLong(it->counter);
 }
 
-static PySequenceMethods dequeiter_as_sequence = {
-	(inquiry)dequeiter_len,		/* sq_length */
-	0,				/* sq_concat */
+PyDoc_STRVAR(length_cue_doc, "Private method returning an estimate of len(list(it)).");
+
+static PyMethodDef dequeiter_methods[] = {
+	{"_length_cue", (PyCFunction)dequeiter_len, METH_NOARGS, length_cue_doc},
+ 	{NULL,		NULL}		/* sentinel */
 };
 
 PyTypeObject dequeiter_type = {
@@ -920,7 +962,7 @@ PyTypeObject dequeiter_type = {
 	0,					/* tp_compare */
 	0,					/* tp_repr */
 	0,					/* tp_as_number */
-	&dequeiter_as_sequence,			/* tp_as_sequence */
+	0,					/* tp_as_sequence */
 	0,					/* tp_as_mapping */
 	0,					/* tp_hash */
 	0,					/* tp_call */
@@ -936,6 +978,7 @@ PyTypeObject dequeiter_type = {
 	0,					/* tp_weaklistoffset */
 	PyObject_SelfIter,			/* tp_iter */
 	(iternextfunc)dequeiter_next,		/* tp_iternext */
+	dequeiter_methods,			/* tp_methods */
 	0,
 };
 
@@ -1002,7 +1045,7 @@ PyTypeObject dequereviter_type = {
 	0,					/* tp_compare */
 	0,					/* tp_repr */
 	0,					/* tp_as_number */
-	&dequeiter_as_sequence,			/* tp_as_sequence */
+	0,					/* tp_as_sequence */
 	0,					/* tp_as_mapping */
 	0,					/* tp_hash */
 	0,					/* tp_call */
@@ -1018,6 +1061,7 @@ PyTypeObject dequereviter_type = {
 	0,					/* tp_weaklistoffset */
 	PyObject_SelfIter,			/* tp_iter */
 	(iternextfunc)dequereviter_next,	/* tp_iternext */
+	dequeiter_methods,			/* tp_methods */
 	0,
 };
 

@@ -41,7 +41,7 @@ General notes on the underlying Mersenne Twister core generator:
 
 from warnings import warn as _warn
 from types import MethodType as _MethodType, BuiltinMethodType as _BuiltinMethodType
-from math import log as _log, exp as _exp, pi as _pi, e as _e
+from math import log as _log, exp as _exp, pi as _pi, e as _e, ceil as _ceil
 from math import sqrt as _sqrt, acos as _acos, cos as _cos, sin as _sin
 from os import urandom as _urandom
 from binascii import hexlify as _hexlify
@@ -286,15 +286,14 @@ class Random(_random.Random):
         """
 
         # Sampling without replacement entails tracking either potential
-        # selections (the pool) in a list or previous selections in a
-        # dictionary.
+        # selections (the pool) in a list or previous selections in a set.
 
         # When the number of selections is small compared to the
         # population, then tracking selections is efficient, requiring
-        # only a small dictionary and an occasional reselection.  For
+        # only a small set and an occasional reselection.  For
         # a larger number of selections, the pool tracking method is
         # preferred since the list takes less space than the
-        # dictionary and it doesn't suffer from frequent reselections.
+        # set and it doesn't suffer from frequent reselections.
 
         n = len(population)
         if not 0 <= k <= n:
@@ -302,7 +301,10 @@ class Random(_random.Random):
         random = self.random
         _int = int
         result = [None] * k
-        if n < 6 * k:     # if n len list takes less space than a k len dict
+        setsize = 21        # size of a small set minus size of an empty list
+        if k > 5:
+            setsize += 4 ** _ceil(_log(k * 3, 4)) # table size for big sets
+        if n <= setsize:    # is an n-length list smaller than a k-length set
             pool = list(population)
             for i in xrange(k):         # invariant:  non-selected at [0,n-i)
                 j = _int(random() * (n-i))
@@ -311,14 +313,16 @@ class Random(_random.Random):
         else:
             try:
                 n > 0 and (population[0], population[n//2], population[n-1])
-            except (TypeError, KeyError):   # handle sets and dictionaries
+            except (TypeError, KeyError):   # handle non-sequence iterables
                 population = tuple(population)
-            selected = {}
+            selected = set()
+            selected_add = selected.add
             for i in xrange(k):
                 j = _int(random() * n)
                 while j in selected:
                     j = _int(random() * n)
-                result[i] = selected[j] = population[j]
+                selected_add(j)
+                result[i] = population[j]
         return result
 
 ## -------------------- real-valued distributions  -------------------
@@ -345,7 +349,7 @@ class Random(_random.Random):
         # Math Software, 3, (1977), pp257-260.
 
         random = self.random
-        while True:
+        while 1:
             u1 = random()
             u2 = 1.0 - random()
             z = NV_MAGICCONST*(u1-0.5)/u2
@@ -415,7 +419,7 @@ class Random(_random.Random):
         b = (a - _sqrt(2.0 * a))/(2.0 * kappa)
         r = (1.0 + b * b)/(2.0 * b)
 
-        while True:
+        while 1:
             u1 = random()
 
             z = _cos(_pi * u1)
@@ -424,7 +428,7 @@ class Random(_random.Random):
 
             u2 = random()
 
-            if not (u2 >= c * (2.0 - c) and u2 > c * _exp(1.0 - c)):
+            if u2 < c * (2.0 - c) or u2 <= c * _exp(1.0 - c):
                 break
 
         u3 = random()
@@ -462,7 +466,7 @@ class Random(_random.Random):
             bbb = alpha - LOG4
             ccc = alpha + ainv
 
-            while True:
+            while 1:
                 u1 = random()
                 if not 1e-7 < u1 < .9999999:
                     continue
@@ -485,18 +489,19 @@ class Random(_random.Random):
 
             # Uses ALGORITHM GS of Statistical Computing - Kennedy & Gentle
 
-            while True:
+            while 1:
                 u = random()
                 b = (_e + alpha)/_e
                 p = b*u
                 if p <= 1.0:
-                    x = pow(p, 1.0/alpha)
+                    x = p ** (1.0/alpha)
                 else:
-                    # p > 1
                     x = -_log((b-p)/alpha)
                 u1 = random()
-                if not (((p <= 1.0) and (u1 > _exp(-x))) or
-                          ((p > 1)  and  (u1 > pow(x, alpha - 1.0)))):
+                if p > 1.0:
+                    if u1 <= x ** (alpha - 1.0):
+                        break
+                elif u1 <= _exp(-x):
                     break
             return x * beta
 

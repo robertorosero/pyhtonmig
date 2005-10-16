@@ -2516,7 +2516,7 @@ slotnames(PyObject *cls)
 
 	clsdict = ((PyTypeObject *)cls)->tp_dict;
 	slotnames = PyDict_GetItemString(clsdict, "__slotnames__");
-	if (slotnames != NULL) {
+	if (slotnames != NULL && PyList_Check(slotnames)) {
 		Py_INCREF(slotnames);
 		return slotnames;
 	}
@@ -4065,14 +4065,24 @@ slot_sq_length(PyObject *self)
 {
 	static PyObject *len_str;
 	PyObject *res = call_method(self, "__len__", &len_str, "()");
+	long temp;
 	int len;
 
 	if (res == NULL)
 		return -1;
-	len = (int)PyInt_AsLong(res);
+	temp = PyInt_AsLong(res);
+	len = (int)temp;
 	Py_DECREF(res);
 	if (len == -1 && PyErr_Occurred())
 		return -1;
+#if SIZEOF_INT < SIZEOF_LONG
+	/* Overflow check -- range of PyInt is more than C int */
+	if (len != temp) {
+		PyErr_SetString(PyExc_OverflowError,
+			"__len__() should return 0 <= outcome < 2**31");
+		return -1;
+	}
+#endif
 	if (len < 0) {
 		PyErr_SetString(PyExc_ValueError,
 				"__len__() should return >= 0");
@@ -4747,6 +4757,12 @@ slot_tp_init(PyObject *self, PyObject *args, PyObject *kwds)
 	Py_DECREF(meth);
 	if (res == NULL)
 		return -1;
+	if (res != Py_None) {
+		PyErr_SetString(PyExc_TypeError,
+			   "__init__() should return None");
+		Py_DECREF(res);
+		return -1;
+	}
 	Py_DECREF(res);
 	return 0;
 }
@@ -4896,6 +4912,12 @@ typedef struct wrapperbase slotdef;
 #define RBINSLOT(NAME, SLOT, FUNCTION, DOC) \
 	ETSLOT(NAME, as_number.SLOT, FUNCTION, wrap_binaryfunc_r, \
 	       "x." NAME "(y) <==> y" DOC "x")
+#define BINSLOTNOTINFIX(NAME, SLOT, FUNCTION, DOC) \
+	ETSLOT(NAME, as_number.SLOT, FUNCTION, wrap_binaryfunc_l, \
+	       "x." NAME "(y) <==> " DOC)
+#define RBINSLOTNOTINFIX(NAME, SLOT, FUNCTION, DOC) \
+	ETSLOT(NAME, as_number.SLOT, FUNCTION, wrap_binaryfunc_r, \
+	       "x." NAME "(y) <==> " DOC)
 
 static slotdef slotdefs[] = {
 	SQSLOT("__len__", sq_length, slot_sq_length, wrap_inquiry,
@@ -4964,9 +4986,9 @@ static slotdef slotdefs[] = {
 		"%"),
 	RBINSLOT("__rmod__", nb_remainder, slot_nb_remainder,
 		 "%"),
-	BINSLOT("__divmod__", nb_divmod, slot_nb_divmod,
+	BINSLOTNOTINFIX("__divmod__", nb_divmod, slot_nb_divmod,
 		"divmod(x, y)"),
-	RBINSLOT("__rdivmod__", nb_divmod, slot_nb_divmod,
+	RBINSLOTNOTINFIX("__rdivmod__", nb_divmod, slot_nb_divmod,
 		 "divmod(y, x)"),
 	NBSLOT("__pow__", nb_power, slot_nb_power, wrap_ternaryfunc,
 	       "x.__pow__(y[, z]) <==> pow(x, y[, z])"),
@@ -5636,7 +5658,7 @@ super_descr_get(PyObject *self, PyObject *obj, PyObject *type)
 		return self;
 	}
 	if (su->ob_type != &PySuper_Type)
-		/* If su is not an instance of a subclass of super,
+		/* If su is an instance of a (strict) subclass of super,
 		   call its type */
 		return PyObject_CallFunction((PyObject *)su->ob_type,
 					     "OO", su->type, obj);

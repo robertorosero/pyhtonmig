@@ -325,6 +325,598 @@ intern_strings(PyObject *tuple)
 	return 0;
 }
 
+/* Begin: Peephole optimizations ----------------------------------------- */
+
+#define GETARG(arr, i) ((int)((arr[i+2]<<8) + arr[i+1]))
+#define UNCONDITIONAL_JUMP(op)  (op==JUMP_ABSOLUTE || op==JUMP_FORWARD)
+#define ABSOLUTE_JUMP(op) (op==JUMP_ABSOLUTE || op==CONTINUE_LOOP)
+#define GETJUMPTGT(arr, i) (GETARG(arr,i) + (ABSOLUTE_JUMP(arr[i]) ? 0 : i+3))
+#define SETARG(arr, i, val) arr[i+2] = val>>8; arr[i+1] = val & 255
+#define CODESIZE(op)  (HAS_ARG(op) ? 3 : 1)
+#define ISBASICBLOCK(blocks, start, bytes) (blocks[start]==blocks[start+bytes-1])
+
+/* Replace LOAD_CONST c1. LOAD_CONST c2 ... LOAD_CONST cn BUILD_TUPLE n
+   with    LOAD_CONST (c1, c2, ... cn).
+   The consts table must still be in list form so that the
+       new constant (c1, c2, ... cn) can be appended.
+   Called with codestr pointing to the first LOAD_CONST.
+   Bails out with no change if one or more of the LOAD_CONSTs is missing. 
+   Also works for BUILD_LIST when followed by an "in" or "not in" test.
+*/
+static int
+tuple_of_constants(unsigned char *codestr, int n, PyObject *consts)
+{
+	PyObject *newconst, *constant;
+	int i, arg, len_consts;
+
+	/* Pre-conditions */
+	assert(PyList_CheckExact(consts));
+	assert(codestr[n*3] == BUILD_TUPLE || codestr[n*3] == BUILD_LIST);
+	assert(GETARG(codestr, (n*3)) == n);
+	for (i=0 ; i<n ; i++)
+		assert(codestr[i*3] == LOAD_CONST);
+
+	/* Buildup new tuple of constants */
+	newconst = PyTuple_New(n);
+	if (newconst == NULL)
+		return 0;
+	len_consts = PyList_GET_SIZE(consts);
+	for (i=0 ; i<n ; i++) {
+		arg = GETARG(codestr, (i*3));
+		assert(arg < len_consts);
+		constant = PyList_GET_ITEM(consts, arg);
+		Py_INCREF(constant);
+		PyTuple_SET_ITEM(newconst, i, constant);
+	}
+
+	/* Append folded constant onto consts */
+	if (PyList_Append(consts, newconst)) {
+		Py_DECREF(newconst);
+		return 0;
+	}
+	Py_DECREF(newconst);
+
+	/* Write NOPs over old LOAD_CONSTS and
+	   add a new LOAD_CONST newconst on top of the BUILD_TUPLE n */
+	memset(codestr, NOP, n*3);
+	codestr[n*3] = LOAD_CONST;
+	SETARG(codestr, (n*3), len_consts);
+	return 1;
+}
+
+/* Replace LOAD_CONST c1. LOAD_CONST c2 BINOP
+   with    LOAD_CONST binop(c1,c2)
+   The consts table must still be in list form so that the
+       new constant can be appended.
+   Called with codestr pointing to the first LOAD_CONST. 
+   Abandons the transformation if the folding fails (i.e.  1+'a').  
+   If the new constant is a sequence, only folds when the size
+	is below a threshold value.  That keeps pyc files from
+	becoming large in the presence of code like:  (None,)*1000.
+*/
+static int
+fold_binops_on_constants(unsigned char *codestr, PyObject *consts)
+{
+	PyObject *newconst, *v, *w;
+	int len_consts, opcode, size;
+
+	/* Pre-conditions */
+	assert(PyList_CheckExact(consts));
+	assert(codestr[0] == LOAD_CONST);
+	assert(codestr[3] == LOAD_CONST);
+
+	/* Create new constant */
+	v = PyList_GET_ITEM(consts, GETARG(codestr, 0));
+	w = PyList_GET_ITEM(consts, GETARG(codestr, 3));
+	opcode = codestr[6];
+	switch (opcode) {
+	case BINARY_POWER:
+		newconst = PyNumber_Power(v, w, Py_None);
+		break;
+	case BINARY_MULTIPLY:
+		newconst = PyNumber_Multiply(v, w);
+		break;
+	case BINARY_DIVIDE:
+		/* Cannot fold this operation statically since
+		the result can depend on the run-time presence of the -Qnew flag */
+		return 0;
+	case BINARY_TRUE_DIVIDE:
+		newconst = PyNumber_TrueDivide(v, w);
+		break;
+	case BINARY_FLOOR_DIVIDE:
+		newconst = PyNumber_FloorDivide(v, w);
+		break;
+	case BINARY_MODULO:
+		newconst = PyNumber_Remainder(v, w);
+		break;
+	case BINARY_ADD:
+		newconst = PyNumber_Add(v, w);
+		break;
+	case BINARY_SUBTRACT:
+		newconst = PyNumber_Subtract(v, w);
+		break;
+	case BINARY_SUBSCR:
+		newconst = PyObject_GetItem(v, w);
+		break;
+	case BINARY_LSHIFT:
+		newconst = PyNumber_Lshift(v, w);
+		break;
+	case BINARY_RSHIFT:
+		newconst = PyNumber_Rshift(v, w);
+		break;
+	case BINARY_AND:
+		newconst = PyNumber_And(v, w);
+		break;
+	case BINARY_XOR:
+		newconst = PyNumber_Xor(v, w);
+		break;
+	case BINARY_OR:
+		newconst = PyNumber_Or(v, w);
+		break;
+	default:
+		/* Called with an unknown opcode */
+		assert(0);
+		return 0;
+	}
+	if (newconst == NULL) {
+		PyErr_Clear();
+		return 0;
+	}
+	size = PyObject_Size(newconst);
+	if (size == -1)
+		PyErr_Clear();
+	else if (size > 20) {
+		Py_DECREF(newconst);
+		return 0;
+	}
+
+	/* Append folded constant into consts table */
+	len_consts = PyList_GET_SIZE(consts);
+	if (PyList_Append(consts, newconst)) {
+		Py_DECREF(newconst);
+		return 0;
+	}
+	Py_DECREF(newconst);
+
+	/* Write NOP NOP NOP NOP LOAD_CONST newconst */
+	memset(codestr, NOP, 4);
+	codestr[4] = LOAD_CONST;
+	SETARG(codestr, 4, len_consts);
+	return 1;
+}
+
+static int
+fold_unaryops_on_constants(unsigned char *codestr, PyObject *consts)
+{
+	PyObject *newconst=NULL, *v;
+	int len_consts, opcode;
+
+	/* Pre-conditions */
+	assert(PyList_CheckExact(consts));
+	assert(codestr[0] == LOAD_CONST);
+
+	/* Create new constant */
+	v = PyList_GET_ITEM(consts, GETARG(codestr, 0));
+	opcode = codestr[3];
+	switch (opcode) {
+	case UNARY_NEGATIVE:
+		/* Preserve the sign of -0.0 */
+		if (PyObject_IsTrue(v) == 1)
+			newconst = PyNumber_Negative(v);
+		break;
+	case UNARY_CONVERT:
+		newconst = PyObject_Repr(v);
+		break;
+	case UNARY_INVERT:
+		newconst = PyNumber_Invert(v);
+		break;
+	default:
+		/* Called with an unknown opcode */
+		assert(0);
+		return 0;
+	}
+	if (newconst == NULL) {
+		PyErr_Clear();
+		return 0;
+	}
+
+	/* Append folded constant into consts table */
+	len_consts = PyList_GET_SIZE(consts);
+	if (PyList_Append(consts, newconst)) {
+		Py_DECREF(newconst);
+		return 0;
+	}
+	Py_DECREF(newconst);
+
+	/* Write NOP LOAD_CONST newconst */
+	codestr[0] = NOP;
+	codestr[1] = LOAD_CONST;
+	SETARG(codestr, 1, len_consts);
+	return 1;
+}
+
+static unsigned int *
+markblocks(unsigned char *code, int len)
+{
+	unsigned int *blocks = PyMem_Malloc(len*sizeof(int));
+	int i,j, opcode, blockcnt = 0;
+
+	if (blocks == NULL)
+		return NULL;
+	memset(blocks, 0, len*sizeof(int));
+
+	/* Mark labels in the first pass */
+	for (i=0 ; i<len ; i+=CODESIZE(opcode)) {
+		opcode = code[i];
+		switch (opcode) {
+			case FOR_ITER:
+			case JUMP_FORWARD:
+			case JUMP_IF_FALSE:
+			case JUMP_IF_TRUE:
+			case JUMP_ABSOLUTE:
+			case CONTINUE_LOOP:
+			case SETUP_LOOP:
+			case SETUP_EXCEPT:
+			case SETUP_FINALLY:
+				j = GETJUMPTGT(code, i);
+				blocks[j] = 1;
+			break;
+		}
+	}
+	/* Build block numbers in the second pass */
+	for (i=0 ; i<len ; i++) {
+		blockcnt += blocks[i];  /* increment blockcnt over labels */
+		blocks[i] = blockcnt;
+	}
+	return blocks;
+}
+
+/* Perform basic peephole optimizations to components of a code object.
+   The consts object should still be in list form to allow new constants 
+   to be appended.
+
+   To keep the optimizer simple, it bails out (does nothing) for code
+   containing extended arguments or that has a length over 32,700.  That 
+   allows us to avoid overflow and sign issues.  Likewise, it bails when
+   the lineno table has complex encoding for gaps >= 255.
+
+   Optimizations are restricted to simple transformations occuring within a
+   single basic block.  All transformations keep the code size the same or 
+   smaller.  For those that reduce size, the gaps are initially filled with 
+   NOPs.  Later those NOPs are removed and the jump addresses retargeted in 
+   a single pass.  Line numbering is adjusted accordingly. */
+
+static PyObject *
+optimize_code(PyObject *code, PyObject* consts, PyObject *names, PyObject *lineno_obj)
+{
+	int i, j, codelen, nops, h, adj;
+	int tgt, tgttgt, opcode;
+	unsigned char *codestr = NULL;
+	unsigned char *lineno;
+	int *addrmap = NULL;
+	int new_line, cum_orig_line, last_line, tabsiz;
+	int cumlc=0, lastlc=0;	/* Count runs of consecutive LOAD_CONST codes */
+	unsigned int *blocks = NULL;
+	char *name;
+
+	/* Bail out if an exception is set */
+	if (PyErr_Occurred())
+		goto exitUnchanged;
+
+	/* Bypass optimization when the lineno table is too complex */
+	assert(PyString_Check(lineno_obj));
+	lineno = (unsigned char*)PyString_AS_STRING(lineno_obj);
+	tabsiz = PyString_GET_SIZE(lineno_obj);
+	if (memchr(lineno, 255, tabsiz) != NULL)
+		goto exitUnchanged;
+
+	/* Avoid situations where jump retargeting could overflow */
+	assert(PyString_Check(code));
+	codelen = PyString_Size(code);
+	if (codelen > 32700)
+		goto exitUnchanged;
+
+	/* Make a modifiable copy of the code string */
+	codestr = PyMem_Malloc(codelen);
+	if (codestr == NULL)
+		goto exitUnchanged;
+	codestr = memcpy(codestr, PyString_AS_STRING(code), codelen);
+
+	/* Verify that RETURN_VALUE terminates the codestring.  This allows
+	   the various transformation patterns to look ahead several
+	   instructions without additional checks to make sure they are not
+	   looking beyond the end of the code string.
+	*/
+	if (codestr[codelen-1] != RETURN_VALUE)
+		goto exitUnchanged;
+
+	/* Mapping to new jump targets after NOPs are removed */
+	addrmap = PyMem_Malloc(codelen * sizeof(int));
+	if (addrmap == NULL)
+		goto exitUnchanged;
+
+	blocks = markblocks(codestr, codelen);
+	if (blocks == NULL)
+		goto exitUnchanged;
+	assert(PyList_Check(consts));
+
+	for (i=0 ; i<codelen ; i += CODESIZE(codestr[i])) {
+		opcode = codestr[i];
+
+		lastlc = cumlc;
+		cumlc = 0;
+
+		switch (opcode) {
+
+		/* Replace UNARY_NOT JUMP_IF_FALSE POP_TOP with 
+		   with    JUMP_IF_TRUE POP_TOP */
+		case UNARY_NOT:
+			if (codestr[i+1] != JUMP_IF_FALSE  ||
+			    codestr[i+4] != POP_TOP  ||
+			    !ISBASICBLOCK(blocks,i,5))
+				continue;
+			tgt = GETJUMPTGT(codestr, (i+1));
+			if (codestr[tgt] != POP_TOP)
+				continue;
+			j = GETARG(codestr, i+1) + 1;
+			codestr[i] = JUMP_IF_TRUE;
+			SETARG(codestr, i, j);
+			codestr[i+3] = POP_TOP;
+			codestr[i+4] = NOP;
+			break;
+
+		/* not a is b -->  a is not b
+		   not a in b -->  a not in b
+		   not a is not b -->  a is b
+		   not a not in b -->  a in b
+		*/
+		case COMPARE_OP:
+			j = GETARG(codestr, i);
+			if (j < 6  ||  j > 9  ||
+			    codestr[i+3] != UNARY_NOT  || 
+			    !ISBASICBLOCK(blocks,i,4))
+				continue;
+			SETARG(codestr, i, (j^1));
+			codestr[i+3] = NOP;
+			break;
+
+		/* Replace LOAD_GLOBAL/LOAD_NAME None with LOAD_CONST None */
+		case LOAD_NAME:
+		case LOAD_GLOBAL:
+			j = GETARG(codestr, i);
+			name = PyString_AsString(PyTuple_GET_ITEM(names, j));
+			if (name == NULL  ||  strcmp(name, "None") != 0)
+				continue;
+			for (j=0 ; j < PyList_GET_SIZE(consts) ; j++) {
+				if (PyList_GET_ITEM(consts, j) == Py_None) {
+					codestr[i] = LOAD_CONST;
+					SETARG(codestr, i, j);
+					cumlc = lastlc + 1;
+					break;
+				}
+			}
+			break;
+
+		/* Skip over LOAD_CONST trueconst  JUMP_IF_FALSE xx  POP_TOP */
+		case LOAD_CONST:
+			cumlc = lastlc + 1;
+			j = GETARG(codestr, i);
+			if (codestr[i+3] != JUMP_IF_FALSE  ||
+			    codestr[i+6] != POP_TOP  ||
+			    !ISBASICBLOCK(blocks,i,7)  ||
+			    !PyObject_IsTrue(PyList_GET_ITEM(consts, j)))
+				continue;
+			memset(codestr+i, NOP, 7);
+			cumlc = 0;
+			break;
+
+		/* Try to fold tuples of constants (includes a case for lists
+		      which are only used for "in" and "not in" tests).
+		   Skip over BUILD_SEQN 1 UNPACK_SEQN 1.
+		   Replace BUILD_SEQN 2 UNPACK_SEQN 2 with ROT2.
+		   Replace BUILD_SEQN 3 UNPACK_SEQN 3 with ROT3 ROT2. */
+		case BUILD_TUPLE:
+		case BUILD_LIST:
+			j = GETARG(codestr, i);
+			h = i - 3 * j;
+			if (h >= 0  &&
+			    j <= lastlc  &&
+			    ((opcode == BUILD_TUPLE && 
+			     ISBASICBLOCK(blocks, h, 3*(j+1))) ||
+			     (opcode == BUILD_LIST && 
+			     codestr[i+3]==COMPARE_OP && 
+			     ISBASICBLOCK(blocks, h, 3*(j+2)) &&
+			     (GETARG(codestr,i+3)==6 ||
+				      GETARG(codestr,i+3)==7))) &&
+			     tuple_of_constants(&codestr[h], j, consts)) {
+				assert(codestr[i] == LOAD_CONST);
+				cumlc = 1;
+				break;
+			}
+			if (codestr[i+3] != UNPACK_SEQUENCE  ||
+			    !ISBASICBLOCK(blocks,i,6) ||
+			    j != GETARG(codestr, i+3))
+				continue;
+			if (j == 1) {
+				memset(codestr+i, NOP, 6);
+			} else if (j == 2) {
+				codestr[i] = ROT_TWO;
+				memset(codestr+i+1, NOP, 5);
+			} else if (j == 3) {
+				codestr[i] = ROT_THREE;
+				codestr[i+1] = ROT_TWO;
+				memset(codestr+i+2, NOP, 4);
+			}
+			break;
+
+		/* Fold binary ops on constants.
+		   LOAD_CONST c1 LOAD_CONST c2 BINOP -->  LOAD_CONST binop(c1,c2) */
+		case BINARY_POWER:
+		case BINARY_MULTIPLY:
+		case BINARY_TRUE_DIVIDE:
+		case BINARY_FLOOR_DIVIDE:
+		case BINARY_MODULO:
+		case BINARY_ADD:
+		case BINARY_SUBTRACT:
+		case BINARY_SUBSCR:
+		case BINARY_LSHIFT:
+		case BINARY_RSHIFT:
+		case BINARY_AND:
+		case BINARY_XOR:
+		case BINARY_OR:
+			if (lastlc >= 2  &&
+			    ISBASICBLOCK(blocks, i-6, 7)  &&
+			    fold_binops_on_constants(&codestr[i-6], consts)) {
+				i -= 2;
+				assert(codestr[i] == LOAD_CONST);
+				cumlc = 1;
+			}
+			break;
+
+		/* Fold unary ops on constants.
+		   LOAD_CONST c1  UNARY_OP -->  LOAD_CONST unary_op(c) */
+		case UNARY_NEGATIVE:
+		case UNARY_CONVERT:
+		case UNARY_INVERT:
+			if (lastlc >= 1  &&
+			    ISBASICBLOCK(blocks, i-3, 4)  &&
+			    fold_unaryops_on_constants(&codestr[i-3], consts))  {
+				i -= 2;
+				assert(codestr[i] == LOAD_CONST);
+				cumlc = 1;
+			}
+			break;
+
+		/* Simplify conditional jump to conditional jump where the
+		   result of the first test implies the success of a similar
+		   test or the failure of the opposite test.
+		   Arises in code like:
+		        "if a and b:"
+			"if a or b:"
+		        "a and b or c"
+			"(a and b) and c"
+		   x:JUMP_IF_FALSE y   y:JUMP_IF_FALSE z  -->  x:JUMP_IF_FALSE z
+		   x:JUMP_IF_FALSE y   y:JUMP_IF_TRUE z  -->  x:JUMP_IF_FALSE y+3
+			where y+3 is the instruction following the second test.
+		*/
+		case JUMP_IF_FALSE:
+		case JUMP_IF_TRUE:
+			tgt = GETJUMPTGT(codestr, i);
+			j = codestr[tgt];
+			if (j == JUMP_IF_FALSE  ||  j == JUMP_IF_TRUE) {
+				if (j == opcode) {
+					tgttgt = GETJUMPTGT(codestr, tgt) - i - 3;
+					SETARG(codestr, i, tgttgt);
+				} else {
+					tgt -= i;
+					SETARG(codestr, i, tgt);
+				}
+				break;
+			}
+			/* Intentional fallthrough */  
+
+		/* Replace jumps to unconditional jumps */
+		case FOR_ITER:
+		case JUMP_FORWARD:
+		case JUMP_ABSOLUTE:
+		case CONTINUE_LOOP:
+		case SETUP_LOOP:
+		case SETUP_EXCEPT:
+		case SETUP_FINALLY:
+			tgt = GETJUMPTGT(codestr, i);
+			if (!UNCONDITIONAL_JUMP(codestr[tgt]))
+				continue;
+			tgttgt = GETJUMPTGT(codestr, tgt);
+			if (opcode == JUMP_FORWARD) /* JMP_ABS can go backwards */
+				opcode = JUMP_ABSOLUTE;
+			if (!ABSOLUTE_JUMP(opcode))
+				tgttgt -= i + 3;     /* Calc relative jump addr */
+			if (tgttgt < 0)           /* No backward relative jumps */
+				 continue;
+			codestr[i] = opcode;
+			SETARG(codestr, i, tgttgt);
+			break;
+
+		case EXTENDED_ARG:
+			goto exitUnchanged;
+
+		/* Replace RETURN LOAD_CONST None RETURN with just RETURN */
+		case RETURN_VALUE:
+			if (i+4 >= codelen  ||
+			   codestr[i+4] != RETURN_VALUE  ||
+			   !ISBASICBLOCK(blocks,i,5))
+			       continue;
+			memset(codestr+i+1, NOP, 4);
+			break;
+		}
+	}
+
+	/* Fixup linenotab */
+	for (i=0, nops=0 ; i<codelen ; i += CODESIZE(codestr[i])) {
+		addrmap[i] = i - nops;
+		if (codestr[i] == NOP)
+			nops++;
+	}
+	cum_orig_line = 0;
+	last_line = 0;
+	for (i=0 ; i < tabsiz ; i+=2) {
+		cum_orig_line += lineno[i];
+		new_line = addrmap[cum_orig_line];
+		assert (new_line - last_line < 255);
+		lineno[i] =((unsigned char)(new_line - last_line));
+		last_line = new_line;
+	}
+
+	/* Remove NOPs and fixup jump targets */
+	for (i=0, h=0 ; i<codelen ; ) {
+		opcode = codestr[i];
+		switch (opcode) {
+			case NOP:
+				i++;
+				continue;
+
+			case JUMP_ABSOLUTE:
+			case CONTINUE_LOOP:
+				j = addrmap[GETARG(codestr, i)];
+				SETARG(codestr, i, j);
+				break;
+
+			case FOR_ITER:
+			case JUMP_FORWARD:
+			case JUMP_IF_FALSE:
+			case JUMP_IF_TRUE:
+			case SETUP_LOOP:
+			case SETUP_EXCEPT:
+			case SETUP_FINALLY:
+				j = addrmap[GETARG(codestr, i) + i + 3] - addrmap[i] - 3;
+				SETARG(codestr, i, j);
+				break;
+		}
+		adj = CODESIZE(opcode);
+		while (adj--)
+			codestr[h++] = codestr[i++];
+	}
+	assert(h + nops == codelen);
+
+	code = PyString_FromStringAndSize((char *)codestr, h);
+	PyMem_Free(addrmap);
+	PyMem_Free(codestr);
+	PyMem_Free(blocks);
+	return code;
+
+exitUnchanged:
+	if (blocks != NULL)
+		PyMem_Free(blocks);
+	if (addrmap != NULL)
+		PyMem_Free(addrmap);
+	if (codestr != NULL)
+		PyMem_Free(codestr);
+	Py_INCREF(code);
+	return code;
+}
+
+/* End: Peephole optimizations ----------------------------------------- */
+
 PyCodeObject *
 PyCode_New(int argcount, int nlocals, int stacksize, int flags,
 	   PyObject *code, PyObject *consts, PyObject *names,
@@ -1394,6 +1986,53 @@ com_list_for(struct compiling *c, node *n, node *e, char *t)
 }  
 
 static void
+com_gen_for(struct compiling *c, node *n, node *t, int is_outmost)
+{
+	int break_anchor = 0;
+	int anchor = 0;
+	int save_begin = c->c_begin;
+
+	REQ(n, gen_for);
+	/* gen_for: for v in test [gen_iter] */
+
+	com_addfwref(c, SETUP_LOOP, &break_anchor);
+	block_push(c, SETUP_LOOP);
+
+	if (is_outmost) {
+		com_addop_varname(c, VAR_LOAD, "[outmost-iterable]");
+		com_push(c, 1);
+	}
+	else {
+		com_node(c, CHILD(n, 3));
+		com_addbyte(c, GET_ITER); 
+	}
+
+	c->c_begin = c->c_nexti;
+	com_set_lineno(c, c->c_last_line);
+	com_addfwref(c, FOR_ITER, &anchor);
+	com_push(c, 1);
+	com_assign(c, CHILD(n, 1), OP_ASSIGN, NULL);
+
+	if (NCH(n) == 5) 
+		com_gen_iter(c, CHILD(n, 4), t);
+	else {
+		com_test(c, t);
+		com_addbyte(c, YIELD_VALUE);
+		com_addbyte(c, POP_TOP);
+		com_pop(c, 1);
+	}
+
+	com_addoparg(c, JUMP_ABSOLUTE, c->c_begin);
+	c->c_begin = save_begin;
+
+	com_backpatch(c, anchor);
+	com_pop(c, 1); /* FOR_ITER has popped this */
+	com_addbyte(c, POP_BLOCK);
+	block_pop(c, SETUP_LOOP);
+	com_backpatch(c, break_anchor);
+}
+
+static void
 com_list_if(struct compiling *c, node *n, node *e, char *t)
 {
 	int anchor = 0;
@@ -1405,6 +2044,33 @@ com_list_if(struct compiling *c, node *n, node *e, char *t)
 	com_addbyte(c, POP_TOP);
 	com_pop(c, 1);
 	com_list_iter(c, n, e, t);
+	com_addfwref(c, JUMP_FORWARD, &anchor);
+	com_backpatch(c, a);
+	/* We jump here with an extra entry which we now pop */
+	com_addbyte(c, POP_TOP);
+	com_backpatch(c, anchor);
+}
+
+static void
+com_gen_if(struct compiling *c, node *n, node *t)
+{
+	/* gen_if: 'if' test [gen_iter] */
+	int anchor = 0;
+	int a=0;
+
+	com_node(c, CHILD(n, 1));
+	com_addfwref(c, JUMP_IF_FALSE, &a);
+	com_addbyte(c, POP_TOP);
+	com_pop(c, 1);
+
+	if (NCH(n) == 3)
+		com_gen_iter(c, CHILD(n, 2), t);
+	else {
+		com_test(c, t);
+		com_addbyte(c, YIELD_VALUE);
+		com_addbyte(c, POP_TOP);
+		com_pop(c, 1);
+	}
 	com_addfwref(c, JUMP_FORWARD, &anchor);
 	com_backpatch(c, a);
 	/* We jump here with an extra entry which we now pop */
@@ -1495,6 +2161,10 @@ com_dictmaker(struct compiling *c, node *n)
 	}
 }
 
+
+/* forward reference */
+static void com_yield_expr(struct compiling *c, node *n);
+
 static void
 com_atom(struct compiling *c, node *n)
 {
@@ -1510,7 +2180,10 @@ com_atom(struct compiling *c, node *n)
 			com_push(c, 1);
 		}
 		else
-			com_node(c, CHILD(n, 1));
+			if (TYPE(CHILD(n, 1)) == yield_expr)
+				com_yield_expr(c, CHILD(n, 1));
+			else
+				com_testlist_gexp(c, CHILD(n, 1));
 		break;
 	case LSQB: /* '[' [listmaker] ']' */
 		if (TYPE(CHILD(n, 1)) == RSQB) {
@@ -2562,7 +3235,11 @@ com_assign(struct compiling *c, node *n, int assigning, node *augn)
 			}
 			n = CHILD(n, 0);
 			break;
-		
+		case yield_expr:
+			com_error(c, PyExc_SyntaxError,
+			  "assignment to yield expression not possible");
+			return;
+					
 		case test:
 		case and_test:
 		case not_test:
@@ -2619,7 +3296,7 @@ com_assign(struct compiling *c, node *n, int assigning, node *augn)
 				}
 				if (assigning > OP_APPLY) {
 					com_error(c, PyExc_SyntaxError,
-				  "augmented assign to tuple not possible");
+				  "augmented assign to tuple literal, yield, or generator expression not possible");
 					return;
 				}
 				break;
@@ -2855,26 +3532,40 @@ com_return_stmt(struct compiling *c, node *n)
 }
 
 static void
-com_yield_stmt(struct compiling *c, node *n)
+com_yield_expr(struct compiling *c, node *n)
 {
-	int i;
-	REQ(n, yield_stmt); /* 'yield' testlist */
+	REQ(n, yield_expr); /* 'yield' testlist */
 	if (!c->c_infunction) {
 		com_error(c, PyExc_SyntaxError, "'yield' outside function");
 	}
 	
-	for (i = 0; i < c->c_nblocks; ++i) {
+	/* for (i = 0; i < c->c_nblocks; ++i) {
 		if (c->c_block[i] == SETUP_FINALLY) {
 			com_error(c, PyExc_SyntaxError,
 				  "'yield' not allowed in a 'try' block "
 				  "with a 'finally' clause");
 			return;
 		}
+	} */
+
+	if (NCH(n) < 2) {
+		com_addoparg(c, LOAD_CONST, com_addconst(c, Py_None));
+		com_push(c, 1);
 	}
-	com_node(c, CHILD(n, 1));
+	else
+		com_node(c, CHILD(n, 1));
 	com_addbyte(c, YIELD_VALUE);
+}
+
+static void
+com_yield_stmt(struct compiling *c, node *n)
+{
+	REQ(n, yield_stmt); /* yield_expr */
+	com_node(c, CHILD(n, 0));
+	com_addbyte(c, POP_TOP);
 	com_pop(c, 1);
 }
+
 
 static void
 com_raise_stmt(struct compiling *c, node *n)
@@ -3639,7 +4330,7 @@ com_classdef(struct compiling *c, node *n)
 	char *name;
 
 	REQ(n, classdef);
-	/* classdef: class NAME ['(' testlist ')'] ':' suite */
+	/* classdef: class NAME ['(' [testlist] ')'] ':' suite */
 	if ((v = PyString_InternFromString(STR(CHILD(n, 1)))) == NULL) {
 		c->c_errors++;
 		return;
@@ -3650,7 +4341,8 @@ com_classdef(struct compiling *c, node *n)
 	com_push(c, 1);
 	Py_DECREF(v);
 	/* Push the tuple of base classes on the stack */
-	if (TYPE(CHILD(n, 2)) != LPAR) {
+	if (TYPE(CHILD(n, 2)) != LPAR ||
+			TYPE(CHILD(n, 3)) == RPAR) {
 		com_addoparg(c, BUILD_TUPLE, 0);
 		com_push(c, 1);
 	}
@@ -3782,6 +4474,10 @@ com_node(struct compiling *c, node *n)
 	
 	/* Expression nodes */
 	
+	case yield_expr:
+		com_yield_expr(c, n);
+		break;
+
 	case testlist:
 	case testlist1:
 	case testlist_safe:
@@ -4023,6 +4719,25 @@ compile_classdef(struct compiling *c, node *n)
 		(void) com_addconst(c, Py_None);
 	com_node(c, ch);
 	com_addbyte(c, LOAD_LOCALS);
+	com_push(c, 1);
+	com_addbyte(c, RETURN_VALUE);
+	com_pop(c, 1);
+}
+
+static void
+compile_generator_expression(struct compiling *c, node *n)
+{
+	/* testlist_gexp: test gen_for */
+	/* argument: test gen_for */
+	REQ(CHILD(n, 0), test); 
+	REQ(CHILD(n, 1), gen_for); 
+
+	c->c_name = "<generator expression>";
+	c->c_infunction = 1;
+	com_gen_for(c, CHILD(n, 1), CHILD(n, 0), 1);
+	c->c_infunction = 0;
+
+	com_addoparg(c, LOAD_CONST, com_addconst(c, Py_None));
 	com_push(c, 1);
 	com_addbyte(c, RETURN_VALUE);
 	com_pop(c, 1);
@@ -4979,7 +5694,7 @@ symtable_add_def_o(struct symtable *st, PyObject *dict,
 
 #define symtable_add_use(ST, NAME) symtable_add_def((ST), (NAME), USE)
 
-/* Look for a yield stmt under n.  Return 1 if found, else 0.
+/* Look for a yield stmt or expr under n.  Return 1 if found, else 0.
    This hack is used to look inside "if 0:" blocks (which are normally
    ignored) in case those are the only places a yield occurs (so that this
    function is a generator). */
@@ -5001,7 +5716,8 @@ look_for_yield(node *n)
 			return 0;
 
 		case yield_stmt:
-			return 1;
+		case yield_expr:
+			return GENERATOR;
 
 		default:
 			if (look_for_yield(kid))
@@ -5108,8 +5824,10 @@ symtable_node(struct symtable *st, node *n)
 	case del_stmt:
 		symtable_assign(st, CHILD(n, 1), 0);
 		break;
-	case yield_stmt:
+	case yield_expr:
 		st->st_cur->ste_generator = 1;
+		if (NCH(n)==1) 
+			break;
 		n = CHILD(n, 1);
 		goto loop;
 	case expr_stmt:
@@ -5170,9 +5888,15 @@ symtable_node(struct symtable *st, node *n)
 		}
 		/* fall through */
 	case atom:
-		if (TYPE(n) == atom && TYPE(CHILD(n, 0)) == NAME) {
-			symtable_add_use(st, STR(CHILD(n, 0)));
-			break;
+		if (TYPE(n) == atom) {
+			if (TYPE(CHILD(n, 0)) == NAME) {
+				symtable_add_use(st, STR(CHILD(n, 0)));
+				break;
+			}
+			else if (TYPE(CHILD(n,0)) == LPAR) {
+				n = CHILD(n,1);
+				goto loop;
+			}
 		}
 		/* fall through */
 	default:
@@ -5492,6 +6216,15 @@ symtable_assign(struct symtable *st, node *n, int def_flag)
 			symtable_add_def(st, STR(tmp), DEF_LOCAL | def_flag);
 		}
 		return;
+
+	case yield_expr:
+		st->st_cur->ste_generator = 1;
+		if (NCH(n)==2) {
+			n = CHILD(n, 1);
+			goto loop;
+		}
+		return;
+
 	case dotted_as_name:
 		if (NCH(n) == 3)
 			symtable_add_def(st, STR(CHILD(n, 2)),

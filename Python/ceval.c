@@ -17,8 +17,10 @@
 #include <ctype.h>
 
 #ifndef WITH_TSC 
-#define rdtscll(var)
-#else /*WITH_TSC defined*/
+
+#define READ_TIMESTAMP(var)
+
+#else
 
 typedef unsigned long long uint64;
 
@@ -26,7 +28,7 @@ typedef unsigned long long uint64;
 			   section should work for GCC on any PowerPC platform,
 			   irrespective of OS.  POWER?  Who knows :-) */
 
-#define rdtscll(var) ppc_getcounter(&var)
+#define READ_TIMESTAMP(var) ppc_getcounter(&var)
 
 static void
 ppc_getcounter(uint64 *v)
@@ -45,9 +47,10 @@ ppc_getcounter(uint64 *v)
 	((long*)(v))[1] = tb;
 }
 
-#else /* this section is for linux/x86 */
+#else /* this is for linux/x86 (and probably any other GCC/x86 combo) */
 
-#include <asm/msr.h>
+#define READ_TIMESTAMP(val) \
+     __asm__ __volatile__("rdtsc" : "=A" (val))
 
 #endif
 
@@ -99,7 +102,7 @@ static int prtrace(PyObject *, char *);
 static int call_trace(Py_tracefunc, PyObject *, PyFrameObject *,
 		      int, PyObject *);
 static void call_trace_protected(Py_tracefunc, PyObject *,
-				 PyFrameObject *, int);
+				 PyFrameObject *, int, PyObject *);
 static void call_exc_trace(Py_tracefunc, PyObject *, PyFrameObject *);
 static int maybe_call_line_trace(Py_tracefunc, PyObject *,
 				  PyFrameObject *, int *, int *, int *);
@@ -414,8 +417,11 @@ Py_MakePendingCalls(void)
 
 /* The interpreter's recursion limit */
 
-static int recursion_limit = 1000;
-int _Py_CheckRecursionLimit = 1000;
+#ifndef Py_DEFAULT_RECURSION_LIMIT
+#define Py_DEFAULT_RECURSION_LIMIT 1000
+#endif
+static int recursion_limit = Py_DEFAULT_RECURSION_LIMIT;
+int _Py_CheckRecursionLimit = Py_DEFAULT_RECURSION_LIMIT;
 
 int
 Py_GetRecursionLimit(void)
@@ -493,7 +499,14 @@ PyEval_EvalCode(PyCodeObject *co, PyObject *globals, PyObject *locals)
 /* Interpreter main loop */
 
 PyObject *
-PyEval_EvalFrame(PyFrameObject *f)
+PyEval_EvalFrame(PyFrameObject *f) {
+	/* This is for backward compatibility with extension modules that
+           used this API; core interpreter code should call PyEval_EvalFrameEx() */
+	return PyEval_EvalFrameEx(f, 0);
+}
+
+PyObject *
+PyEval_EvalFrameEx(PyFrameObject *f, int throw)
 {
 #ifdef DXPAIRS
 	int lastopcode = 0;
@@ -575,10 +588,10 @@ PyEval_EvalFrame(PyFrameObject *f)
 	uint64 inst0, inst1, loop0, loop1, intr0 = 0, intr1 = 0;
 	int ticked = 0;
 
-	rdtscll(inst0);
-	rdtscll(inst1);
-	rdtscll(loop0);
-	rdtscll(loop1);
+	READ_TIMESTAMP(inst0);
+	READ_TIMESTAMP(inst1);
+	READ_TIMESTAMP(loop0);
+	READ_TIMESTAMP(loop1);
 
 	/* shut up the compiler */
 	opcode = 0;
@@ -715,7 +728,7 @@ PyEval_EvalFrame(PyFrameObject *f)
 	consts = co->co_consts;
 	fastlocals = f->f_localsplus;
 	freevars = f->f_localsplus + f->f_nlocals;
-	first_instr = PyString_AS_STRING(co->co_code);
+	first_instr = (unsigned char*) PyString_AS_STRING(co->co_code);
 	/* An explanation is in order for the next line.
 
 	   f->f_lasti now refers to the index of the last instruction
@@ -741,6 +754,11 @@ PyEval_EvalFrame(PyFrameObject *f)
 	x = Py_None;	/* Not a reference, just anything non-NULL */
 	w = NULL;
 
+	if (throw) { /* support for generator.throw() */
+		why = WHY_EXCEPTION;
+		goto on_error;
+	}
+		
 	for (;;) {
 #ifdef WITH_TSC
 		if (inst1 == 0) {
@@ -748,7 +766,7 @@ PyEval_EvalFrame(PyFrameObject *f)
 			   or a continue, preventing inst1 from being set
 			   on the way out of the loop.
 			*/
-			rdtscll(inst1);
+			READ_TIMESTAMP(inst1);
 			loop1 = inst1;
 		}
 		dump_tsc(opcode, ticked, inst0, inst1, loop0, loop1,
@@ -757,7 +775,7 @@ PyEval_EvalFrame(PyFrameObject *f)
 		inst1 = 0;
 		intr0 = 0;
 		intr1 = 0;
-		rdtscll(loop0);
+		READ_TIMESTAMP(loop0);
 #endif
 		assert(stack_pointer >= f->f_valuestack); /* else underflow */
 		assert(STACK_LEVEL() <= f->f_stacksize);  /* else overflow */
@@ -883,7 +901,7 @@ PyEval_EvalFrame(PyFrameObject *f)
 #endif
 
 		/* Main switch on opcode */
-		rdtscll(inst0);
+		READ_TIMESTAMP(inst0);
 
 		switch (opcode) {
 
@@ -1642,9 +1660,9 @@ PyEval_EvalFrame(PyFrameObject *f)
 			v = SECOND();
 			u = THIRD();
 			STACKADJ(-3);
-			rdtscll(intr0);
+			READ_TIMESTAMP(intr0);
 			err = exec_statement(f, u, v, w);
-			rdtscll(intr1);
+			READ_TIMESTAMP(intr1);
 			Py_DECREF(u);
 			Py_DECREF(v);
 			Py_DECREF(w);
@@ -2020,9 +2038,9 @@ PyEval_EvalFrame(PyFrameObject *f)
 				x = NULL;
 				break;
 			}
-			rdtscll(intr0);
+			READ_TIMESTAMP(intr0);
 			x = PyEval_CallObject(x, w);
-			rdtscll(intr1);
+			READ_TIMESTAMP(intr1);
 			Py_DECREF(w);
 			SET_TOP(x);
 			if (x != NULL) continue;
@@ -2036,9 +2054,9 @@ PyEval_EvalFrame(PyFrameObject *f)
 					"no locals found during 'import *'");
 				break;
 			}
-			rdtscll(intr0);
+			READ_TIMESTAMP(intr0);
 			err = import_all_from(x, v);
-			rdtscll(intr1);
+			READ_TIMESTAMP(intr1);
 			PyFrame_LocalsToFast(f, 0);
 			Py_DECREF(v);
 			if (err == 0) continue;
@@ -2047,9 +2065,9 @@ PyEval_EvalFrame(PyFrameObject *f)
 		case IMPORT_FROM:
 			w = GETITEM(names, oparg);
 			v = TOP();
-			rdtscll(intr0);
+			READ_TIMESTAMP(intr0);
 			x = import_from(v, w);
-			rdtscll(intr1);
+			READ_TIMESTAMP(intr1);
 			PUSH(x);
 			if (x != NULL) continue;
 			break;
@@ -2203,9 +2221,9 @@ PyEval_EvalFrame(PyFrameObject *f)
 		    } else
 			    Py_INCREF(func);
 		    sp = stack_pointer;
-		    rdtscll(intr0);
+		    READ_TIMESTAMP(intr0);
 		    x = ext_do_call(func, &sp, flags, na, nk);
-		    rdtscll(intr1);
+		    READ_TIMESTAMP(intr1);
 		    stack_pointer = sp;
 		    Py_DECREF(func);
 
@@ -2306,7 +2324,7 @@ PyEval_EvalFrame(PyFrameObject *f)
 
 	    on_error:
 
-		rdtscll(inst1);
+		READ_TIMESTAMP(inst1);
 
 		/* Quickly continue if no error occurred */
 
@@ -2319,7 +2337,7 @@ PyEval_EvalFrame(PyFrameObject *f)
 						"XXX undetected error\n");
 				else {
 #endif
-					rdtscll(loop1);
+					READ_TIMESTAMP(loop1);
 					continue; /* Normal, fast path */
 #ifdef CHECKEXC
 				}
@@ -2438,7 +2456,7 @@ fast_block_end:
 
 		if (why != WHY_NOT)
 			break;
-		rdtscll(loop1);
+		READ_TIMESTAMP(loop1);
 
 	} /* main loop */
 
@@ -2454,21 +2472,27 @@ fast_block_end:
 
 fast_yield:
 	if (tstate->use_tracing) {
-		if (tstate->c_tracefunc
-		    && (why == WHY_RETURN || why == WHY_YIELD)) {
-			if (call_trace(tstate->c_tracefunc,
-				       tstate->c_traceobj, f,
-				       PyTrace_RETURN, retval)) {
-				Py_XDECREF(retval);
-				retval = NULL;
-				why = WHY_EXCEPTION;
+		if (tstate->c_tracefunc) {
+			if (why == WHY_RETURN || why == WHY_YIELD) {
+				if (call_trace(tstate->c_tracefunc,
+					       tstate->c_traceobj, f,
+					       PyTrace_RETURN, retval)) {
+					Py_XDECREF(retval);
+					retval = NULL;
+					why = WHY_EXCEPTION;
+				}
+			}
+			else if (why == WHY_EXCEPTION) {
+				call_trace_protected(tstate->c_tracefunc,
+						     tstate->c_traceobj, f,
+						     PyTrace_RETURN, NULL);
 			}
 		}
 		if (tstate->c_profilefunc) {
 			if (why == WHY_EXCEPTION)
 				call_trace_protected(tstate->c_profilefunc,
 						     tstate->c_profileobj, f,
-						     PyTrace_RETURN);
+						     PyTrace_RETURN, NULL);
 			else if (call_trace(tstate->c_profilefunc,
 					    tstate->c_profileobj, f,
 					    PyTrace_RETURN, retval)) {
@@ -2491,7 +2515,7 @@ fast_yield:
 
 /* this is gonna seem *real weird*, but if you put some other code between
    PyEval_EvalFrame() and PyEval_EvalCodeEx() you will need to adjust
-	the test in the if statement in Misc/gdbinit:ppystack */
+	the test in the if statement in Misc/gdbinit:pystack* */
 
 PyObject *
 PyEval_EvalCodeEx(PyCodeObject *co, PyObject *globals, PyObject *locals,
@@ -2716,7 +2740,7 @@ PyEval_EvalCodeEx(PyCodeObject *co, PyObject *globals, PyObject *locals,
 		return PyGen_New(f);
 	}
 
-        retval = PyEval_EvalFrame(f);
+        retval = PyEval_EvalFrameEx(f,0);
 
   fail: /* Jump here from prelude on failure */
 
@@ -3073,12 +3097,12 @@ call_exc_trace(Py_tracefunc func, PyObject *self, PyFrameObject *f)
 
 static void
 call_trace_protected(Py_tracefunc func, PyObject *obj, PyFrameObject *frame,
-		     int what)
+		     int what, PyObject *arg)
 {
 	PyObject *type, *value, *traceback;
 	int err;
 	PyErr_Fetch(&type, &value, &traceback);
-	err = call_trace(func, obj, frame, what, NULL);
+	err = call_trace(func, obj, frame, what, arg);
 	if (err == 0)
 		PyErr_Restore(type, value, traceback);
 	else {
@@ -3267,10 +3291,12 @@ PyEval_SetProfile(Py_tracefunc func, PyObject *arg)
 	Py_XINCREF(arg);
 	tstate->c_profilefunc = NULL;
 	tstate->c_profileobj = NULL;
+	/* Must make sure that tracing is not ignored if 'temp' is freed */
 	tstate->use_tracing = tstate->c_tracefunc != NULL;
 	Py_XDECREF(temp);
 	tstate->c_profilefunc = func;
 	tstate->c_profileobj = arg;
+	/* Flag that tracing or profiling is turned on */
 	tstate->use_tracing = (func != NULL) || (tstate->c_tracefunc != NULL);
 }
 
@@ -3282,10 +3308,12 @@ PyEval_SetTrace(Py_tracefunc func, PyObject *arg)
 	Py_XINCREF(arg);
 	tstate->c_tracefunc = NULL;
 	tstate->c_traceobj = NULL;
+	/* Must make sure that profiling is not ignored if 'temp' is freed */
 	tstate->use_tracing = tstate->c_profilefunc != NULL;
 	Py_XDECREF(temp);
 	tstate->c_tracefunc = func;
 	tstate->c_traceobj = arg;
+	/* Flag that tracing or profiling is turned on */
 	tstate->use_tracing = ((func != NULL)
 			       || (tstate->c_profilefunc != NULL));
 }
@@ -3464,31 +3492,36 @@ err_args(PyObject *func, int flags, int nargs)
 			     nargs);
 }
 
-#define C_TRACE(call) \
+#define C_TRACE(x, call) \
 if (tstate->use_tracing && tstate->c_profilefunc) { \
 	if (call_trace(tstate->c_profilefunc, \
 		tstate->c_profileobj, \
 		tstate->frame, PyTrace_C_CALL, \
-		func)) \
-		{ return NULL; } \
-	call; \
-	if (tstate->c_profilefunc != NULL) { \
-		if (x == NULL) { \
-			if (call_trace (tstate->c_profilefunc, \
-				tstate->c_profileobj, \
-				tstate->frame, PyTrace_C_EXCEPTION, \
-				func)) \
-				{ return NULL; } \
-		} else { \
-			if (call_trace(tstate->c_profilefunc, \
-				tstate->c_profileobj, \
-				tstate->frame, PyTrace_C_RETURN, \
-				func)) \
-				{ return NULL; } \
+		func)) { \
+		x = NULL; \
+	} \
+	else { \
+		x = call; \
+		if (tstate->c_profilefunc != NULL) { \
+			if (x == NULL) { \
+				call_trace_protected(tstate->c_profilefunc, \
+					tstate->c_profileobj, \
+					tstate->frame, PyTrace_C_EXCEPTION, \
+					func); \
+				/* XXX should pass (type, value, tb) */ \
+			} else { \
+				if (call_trace(tstate->c_profilefunc, \
+					tstate->c_profileobj, \
+					tstate->frame, PyTrace_C_RETURN, \
+					func)) { \
+					Py_DECREF(x); \
+					x = NULL; \
+				} \
+			} \
 		} \
 	} \
 } else { \
-	call; \
+	x = call; \
 	}
 
 static PyObject *
@@ -3517,11 +3550,11 @@ call_function(PyObject ***pp_stack, int oparg
 			PyCFunction meth = PyCFunction_GET_FUNCTION(func);
 			PyObject *self = PyCFunction_GET_SELF(func);
 			if (flags & METH_NOARGS && na == 0) {
-				C_TRACE(x=(*meth)(self,NULL));
+				C_TRACE(x, (*meth)(self,NULL));
 			}
 			else if (flags & METH_O && na == 1) {
 				PyObject *arg = EXT_POP(*pp_stack);
-				C_TRACE(x=(*meth)(self,arg));
+				C_TRACE(x, (*meth)(self,arg));
 				Py_DECREF(arg);
 			}
 			else {
@@ -3532,9 +3565,9 @@ call_function(PyObject ***pp_stack, int oparg
 		else {
 			PyObject *callargs;
 			callargs = load_args(pp_stack, na);
-			rdtscll(*pintr0);
-			C_TRACE(x=PyCFunction_Call(func,callargs,NULL));
-			rdtscll(*pintr1);
+			READ_TIMESTAMP(*pintr0);
+			C_TRACE(x, PyCFunction_Call(func,callargs,NULL));
+			READ_TIMESTAMP(*pintr1);
 			Py_XDECREF(callargs);
 		}
 	} else {
@@ -3552,12 +3585,12 @@ call_function(PyObject ***pp_stack, int oparg
 			n++;
 		} else
 			Py_INCREF(func);
-		rdtscll(*pintr0);
+		READ_TIMESTAMP(*pintr0);
 		if (PyFunction_Check(func))
 			x = fast_function(func, pp_stack, n, na, nk);
 		else
 			x = do_call(func, pp_stack, na, nk);
-		rdtscll(*pintr1);
+		READ_TIMESTAMP(*pintr1);
 		Py_DECREF(func);
 	}
 
@@ -3615,7 +3648,7 @@ fast_function(PyObject *func, PyObject ***pp_stack, int n, int na, int nk)
 			Py_INCREF(*stack);
 			fastlocals[i] = *stack++;
 		}
-		retval = PyEval_EvalFrame(f);
+		retval = PyEval_EvalFrameEx(f,0);
 		assert(tstate != NULL);
 		++tstate->recursion_depth;
 		Py_DECREF(f);

@@ -131,6 +131,12 @@
   objects may affect the wrong (sub-)interpreter's dictionary of
   loaded modules.  (XXX This is a hard-to-fix bug that will be
   addressed in a future release.)
+
+  Also note that the use of this functionality is incompatible with
+  extension modules such as PyObjC and ctypes that use the
+  \cfunction{PyGILState_*} APIs (and this is inherent in the way the
+  \cfunction{PyGILState_*} functions work).  Simple things may work,
+  but confusing behavior will always be near.
 \end{cfuncdesc}
 
 \begin{cfuncdesc}{void}{Py_EndInterpreter}{PyThreadState *tstate}
@@ -239,9 +245,8 @@
   program name (set by \cfunction{Py_SetProgramName()} above) and some
   environment variables.  The returned string consists of a series of
   directory names separated by a platform dependent delimiter
-  character.  The delimiter character is \character{:} on \UNIX,
-  \character{;} on Windows, and \character{\e n} (the \ASCII{}
-  newline character) on Macintosh.  The returned string points into
+  character.  The delimiter character is \character{:} on \UNIX and Mac OS X,
+  \character{;} on Windows.  The returned string points into
   static storage; the caller should not modify its value.  The value
   is available to Python code as the list
   \code{sys.path}\withsubitem{(in module sys)}{\ttindex{path}}, which
@@ -272,7 +277,7 @@
   this is formed from the ``official'' name of the operating system,
   converted to lower case, followed by the major revision number;
   e.g., for Solaris 2.x, which is also known as SunOS 5.x, the value
-  is \code{'sunos5'}.  On Macintosh, it is \code{'mac'}.  On Windows,
+  is \code{'sunos5'}.  On Mac OS X, it is \code{'darwin'}.  On Windows,
   it is \code{'win'}.  The returned string points into static storage;
   the caller should not modify its value.  The value is available to
   Python code as \code{sys.platform}.
@@ -455,19 +460,10 @@ Python/C API.  When they are done, they should reset the thread state
 pointer, release the lock, and finally free their thread state data
 structure.
 
-When creating a thread data structure, you need to provide an
-interpreter state data structure.  The interpreter state data
-structure holds global data that is shared by all threads in an
-interpreter, for example the module administration
-(\code{sys.modules}).  Depending on your needs, you can either create
-a new interpreter state data structure, or share the interpreter state
-data structure used by the Python main thread (to access the latter,
-you must obtain the thread state and access its \member{interp} member;
-this must be done by a thread that is created by Python or by the main
-thread after Python is initialized).
-
-Assuming you have access to an interpreter object, the typical idiom
-for calling into Python from a C thread is
+Beginning with version 2.3, threads can now take advantage of the 
+\cfunction{PyGILState_*()} functions to do all of the above
+automatically.  The typical idiom for calling into Python from a C
+thread is now:
 
 \begin{verbatim}
     PyGILState_STATE gstate;
@@ -480,6 +476,13 @@ for calling into Python from a C thread is
     /* Release the thread. No Python API allowed beyond this point. */
     PyGILState_Release(gstate);
 \end{verbatim}
+
+Note that the \cfunction{PyGILState_*()} functions assume there is
+only one global interpreter (created automatically by
+\cfunction{Py_Initialize()}).  Python still supports the creation of
+additional interpreters (using \cfunction{Py_NewInterpreter()}), but
+mixing multiple interpreters and the \cfunction{PyGILState_*()} API is
+unsupported.
 
 \begin{ctypedesc}{PyInterpreterState}
   This data structure represents the state shared by a number of
@@ -700,16 +703,16 @@ interpreter lock has been created.
 \end{cfuncdesc}
 
 \begin{cfuncdesc}{PyGILState_STATE}{PyGILState_Ensure}{}
-Ensure that the current thread is ready to call the Python
-C API regardless of the current state of Python, or of its
-thread lock.  This may be called as many times as desired
-by a thread as long as each call is matched with a call to 
-\cfunction{PyGILState_Release()}.  
-In general, other thread-related APIs may 
-be used between \cfunction{PyGILState_Ensure()} and \cfunction{PyGILState_Release()} calls as long as the 
-thread state is restored to its previous state before the Release().
-For example, normal usage of the \csimplemacro{Py_BEGIN_ALLOW_THREADS}
-and \csimplemacro{Py_END_ALLOW_THREADS} macros is acceptable.
+Ensure that the current thread is ready to call the Python C API
+regardless of the current state of Python, or of its thread lock.
+This may be called as many times as desired by a thread as long as
+each call is matched with a call to \cfunction{PyGILState_Release()}.
+In general, other thread-related APIs may be used between
+\cfunction{PyGILState_Ensure()} and \cfunction{PyGILState_Release()}
+calls as long as the thread state is restored to its previous state
+before the Release().  For example, normal usage of the
+\csimplemacro{Py_BEGIN_ALLOW_THREADS} and
+\csimplemacro{Py_END_ALLOW_THREADS} macros is acceptable.
     
 The return value is an opaque "handle" to the thread state when
 \cfunction{PyGILState_Acquire()} was called, and must be passed to

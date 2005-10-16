@@ -13,6 +13,7 @@ from distutils.core import Command
 from distutils.util import get_platform
 from distutils.dir_util import create_tree, remove_tree, ensure_relative
 from distutils.errors import *
+from distutils.sysconfig import get_python_version
 from distutils import log
 
 class bdist_dumb (Command):
@@ -117,8 +118,14 @@ class bdist_dumb (Command):
                                    ensure_relative(install.install_base))
 
         # Make the archive
-        self.make_archive(pseudoinstall_root,
-                          self.format, root_dir=archive_root)
+        filename = self.make_archive(pseudoinstall_root,
+                                     self.format, root_dir=archive_root)
+        if self.distribution.has_ext_modules():
+            pyversion = get_python_version()
+        else:
+            pyversion = 'any'
+        self.distribution.dist_files.append(('bdist_dumb', pyversion,
+                                             filename))
 
         if not self.keep_temp:
             remove_tree(self.bdist_dir, dry_run=self.dry_run)

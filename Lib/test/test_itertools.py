@@ -265,6 +265,11 @@ class TestBasicOps(unittest.TestCase):
         self.assertEqual(list(islice(xrange(10), 2, None)), range(2, 10))
         self.assertEqual(list(islice(xrange(10), 1, None, 2)), range(1, 10, 2))
 
+        # Test number of items consumed     SF #1171417
+        it = iter(range(10))
+        self.assertEqual(list(islice(it, 3)), range(3))
+        self.assertEqual(list(it), range(3, 10))
+
         # Test invalid arguments
         self.assertRaises(TypeError, islice, xrange(10))
         self.assertRaises(TypeError, islice, xrange(10), 1, 2, 3, 4)
@@ -665,6 +670,7 @@ class TestVariousIteratorArgs(unittest.TestCase):
 class LengthTransparency(unittest.TestCase):
 
     def test_repeat(self):
+        from test.test_iterlen import len
         self.assertEqual(len(repeat(None, 50)), 50)
         self.assertRaises(TypeError, len, repeat(None))
 
@@ -799,26 +805,26 @@ Samuele
 ...     "Returns the nth item"
 ...     return list(islice(iterable, n, n+1))
 
->>> def all(seq, pred=bool):
-...     "Returns True if pred(x) is True for every element in the iterable"
+>>> def all(seq, pred=None):
+...     "Returns True if pred(x) is true for every element in the iterable"
 ...     for elem in ifilterfalse(pred, seq):
 ...         return False
 ...     return True
 
->>> def any(seq, pred=bool):
-...     "Returns True if pred(x) is True for at least one element in the iterable"
+>>> def any(seq, pred=None):
+...     "Returns True if pred(x) is true for at least one element in the iterable"
 ...     for elem in ifilter(pred, seq):
 ...         return True
 ...     return False
 
->>> def no(seq, pred=bool):
-...     "Returns True if pred(x) is False for every element in the iterable"
+>>> def no(seq, pred=None):
+...     "Returns True if pred(x) is false for every element in the iterable"
 ...     for elem in ifilter(pred, seq):
 ...         return False
 ...     return True
 
->>> def quantify(seq, pred=bool):
-...     "Count how many times the predicate is True in the sequence"
+>>> def quantify(seq, pred=None):
+...     "Count how many times the predicate is true in the sequence"
 ...     return sum(imap(pred, seq))
 
 >>> def padnone(seq):

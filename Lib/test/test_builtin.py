@@ -92,6 +92,14 @@ if have_unicode:
         (unichr(0x200), ValueError),
 ]
 
+class TestFailingBool:
+    def __nonzero__(self):
+        raise RuntimeError
+
+class TestFailingIter:
+    def __iter__(self):
+        raise RuntimeError
+
 class BuiltinTest(unittest.TestCase):
 
     def test_import(self):
@@ -116,6 +124,34 @@ class BuiltinTest(unittest.TestCase):
         self.assertEqual(abs(-1234L), 1234L)
         # str
         self.assertRaises(TypeError, abs, 'a')
+
+    def test_all(self):
+        self.assertEqual(all([2, 4, 6]), True)
+        self.assertEqual(all([2, None, 6]), False)
+        self.assertRaises(RuntimeError, all, [2, TestFailingBool(), 6])
+        self.assertRaises(RuntimeError, all, TestFailingIter())
+        self.assertRaises(TypeError, all, 10)               # Non-iterable
+        self.assertRaises(TypeError, all)                   # No args
+        self.assertRaises(TypeError, all, [2, 4, 6], [])    # Too many args
+        self.assertEqual(all([]), True)                     # Empty iterator
+        S = [50, 60]
+        self.assertEqual(all(x > 42 for x in S), True)
+        S = [50, 40, 60]
+        self.assertEqual(all(x > 42 for x in S), False)
+
+    def test_any(self):
+        self.assertEqual(any([None, None, None]), False)
+        self.assertEqual(any([None, 4, None]), True)
+        self.assertRaises(RuntimeError, any, [None, TestFailingBool(), 6])
+        self.assertRaises(RuntimeError, all, TestFailingIter())
+        self.assertRaises(TypeError, any, 10)               # Non-iterable
+        self.assertRaises(TypeError, any)                   # No args
+        self.assertRaises(TypeError, any, [2, 4, 6], [])    # Too many args
+        self.assertEqual(any([]), False)                    # Empty iterator
+        S = [40, 60, 30]
+        self.assertEqual(any(x > 42 for x in S), True)
+        S = [10, 20, 30]
+        self.assertEqual(any(x > 42 for x in S), False)
 
     def test_apply(self):
         def f0(*args):
@@ -509,20 +545,53 @@ class BuiltinTest(unittest.TestCase):
             self.assertEqual(float(unicode("  3.14  ")), 3.14)
             self.assertEqual(float(unicode("  \u0663.\u0661\u0664  ",'raw-unicode-escape')), 3.14)
 
+    def test_floatconversion(self):
+        # Make sure that calls to __float__() work properly
+        class Foo0:
+            def __float__(self):
+                return 42.
+
+        class Foo1(object):
+            def __float__(self):
+                return 42.
+
+        class Foo2(float):
+            def __float__(self):
+                return 42.
+
+        class Foo3(float):
+            def __new__(cls, value=0.):
+                return float.__new__(cls, 2*value)
+
+            def __float__(self):
+                return self
+
+        class Foo4(float):
+            def __float__(self):
+                return 42
+
+        self.assertAlmostEqual(float(Foo0()), 42.)
+        self.assertAlmostEqual(float(Foo1()), 42.)
+        self.assertAlmostEqual(float(Foo2()), 42.)
+        self.assertAlmostEqual(float(Foo3(21)), 42.)
+        self.assertRaises(TypeError, float, Foo4(42))
+
     def test_getattr(self):
         import sys
         self.assert_(getattr(sys, 'stdout') is sys.stdout)
         self.assertRaises(TypeError, getattr, sys, 1)
         self.assertRaises(TypeError, getattr, sys, 1, "foo")
         self.assertRaises(TypeError, getattr)
-        self.assertRaises(UnicodeError, getattr, sys, unichr(sys.maxunicode))
+        if have_unicode:
+            self.assertRaises(UnicodeError, getattr, sys, unichr(sys.maxunicode))
 
     def test_hasattr(self):
         import sys
         self.assert_(hasattr(sys, 'stdout'))
         self.assertRaises(TypeError, hasattr, sys, 1)
         self.assertRaises(TypeError, hasattr)
-        self.assertRaises(UnicodeError, hasattr, sys, unichr(sys.maxunicode))
+        if have_unicode:
+            self.assertRaises(UnicodeError, hasattr, sys, unichr(sys.maxunicode))
 
     def test_hash(self):
         hash(None)
@@ -613,6 +682,39 @@ class BuiltinTest(unittest.TestCase):
         self.assertRaises(TypeError, int, 1, 12)
 
         self.assertEqual(int('0123', 0), 83)
+
+    def test_intconversion(self):
+        # Test __int__()
+        class Foo0:
+            def __int__(self):
+                return 42
+
+        class Foo1(object):
+            def __int__(self):
+                return 42
+
+        class Foo2(int):
+            def __int__(self):
+                return 42
+
+        class Foo3(int):
+            def __int__(self):
+                return self
+
+        class Foo4(int):
+            def __int__(self):
+                return 42L
+
+        class Foo5(int):
+            def __int__(self):
+                return 42.
+
+        self.assertEqual(int(Foo0()), 42)
+        self.assertEqual(int(Foo1()), 42)
+        self.assertEqual(int(Foo2()), 42)
+        self.assertEqual(int(Foo3()), 0)
+        self.assertEqual(int(Foo4()), 42L)
+        self.assertRaises(TypeError, int, Foo5())
 
     def test_intern(self):
         self.assertRaises(TypeError, intern)
@@ -773,6 +875,39 @@ class BuiltinTest(unittest.TestCase):
         self.assertRaises(ValueError, long, '123\0')
         self.assertRaises(ValueError, long, '53', 40)
         self.assertRaises(TypeError, long, 1, 12)
+
+    def test_longconversion(self):
+        # Test __long__()
+        class Foo0:
+            def __long__(self):
+                return 42L
+
+        class Foo1(object):
+            def __long__(self):
+                return 42L
+
+        class Foo2(long):
+            def __long__(self):
+                return 42L
+
+        class Foo3(long):
+            def __long__(self):
+                return self
+
+        class Foo4(long):
+            def __long__(self):
+                return 42
+
+        class Foo5(long):
+            def __long__(self):
+                return 42.
+
+        self.assertEqual(long(Foo0()), 42L)
+        self.assertEqual(long(Foo1()), 42L)
+        self.assertEqual(long(Foo2()), 42L)
+        self.assertEqual(long(Foo3()), 0)
+        self.assertEqual(long(Foo4()), 42)
+        self.assertRaises(TypeError, long, Foo5())
 
     def test_map(self):
         self.assertEqual(
@@ -968,7 +1103,8 @@ class BuiltinTest(unittest.TestCase):
         if have_unicode:
             self.assertEqual(ord(unichr(sys.maxunicode)), sys.maxunicode)
         self.assertRaises(TypeError, ord, 42)
-        self.assertRaises(TypeError, ord, unicode("12"))
+        if have_unicode:
+            self.assertRaises(TypeError, ord, unicode("12"))
 
     def test_pow(self):
         self.assertEqual(pow(0,0), 1)
@@ -1274,17 +1410,18 @@ class BuiltinTest(unittest.TestCase):
             self.assertRaises(ValueError, unichr, sys.maxunicode+1)
             self.assertRaises(TypeError, unichr)
 
+    # We don't want self in vars(), so these are static methods
+
+    @staticmethod
     def get_vars_f0():
         return vars()
-    # we don't want self in vars(), so use staticmethod
-    get_vars_f0 = staticmethod(get_vars_f0)
 
+    @staticmethod
     def get_vars_f2():
         BuiltinTest.get_vars_f0()
         a = 1
         b = 2
         return vars()
-    get_vars_f2 = staticmethod(get_vars_f2)
 
     def test_vars(self):
         self.assertEqual(set(vars()), set(dir()))
@@ -1360,11 +1497,17 @@ class TestSorted(unittest.TestCase):
 
     def test_inputtypes(self):
         s = 'abracadabra'
-        for T in [unicode, list, tuple]:
+        types = [list, tuple]
+        if have_unicode:
+            types.insert(0, unicode)
+        for T in types:
             self.assertEqual(sorted(s), sorted(T(s)))
 
         s = ''.join(dict.fromkeys(s).keys())  # unique letters only
-        for T in [unicode, set, frozenset, list, tuple, dict.fromkeys]:
+        types = [set, frozenset, list, tuple, dict.fromkeys]
+        if have_unicode:
+            types.insert(0, unicode)
+        for T in types:
             self.assertEqual(sorted(s), sorted(T(s)))
 
     def test_baddecorator(self):

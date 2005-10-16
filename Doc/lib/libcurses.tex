@@ -161,7 +161,7 @@ The \function{filter()} routine, if used, must be called before
 calls, LINES is set to 1; the capabilities clear, cup, cud, cud1,
 cuu1, cuu, vpa are disabled; and the home string is set to the value of cr.
 The effect is that the cursor is confined to the current line, and so
-are screen updates.  This may be used for enabling cgaracter-at-a-time 
+are screen updates.  This may be used for enabling character-at-a-time 
 line editing without touching the rest of the screen.
 \end{funcdesc}
 
@@ -391,7 +391,7 @@ Leave raw mode. Return to normal ``cooked'' mode with line buffering.
 \begin{funcdesc}{pair_content}{pair_number}
 Returns a tuple \code{(\var{fg}, \var{bg})} containing the colors for
 the requested color pair.  The value of \var{pair_number} must be
-between \code{0} and \code{\constant{COLOR_PAIRS} - 1}.
+between \code{1} and \code{\constant{COLOR_PAIRS} - 1}.
 \end{funcdesc}
 
 \begin{funcdesc}{pair_number}{attr}
@@ -635,8 +635,8 @@ can \emph{not} be used.  The defaults are listed in this table:}
   \lineiii{bs}{Bottom}{\constant{ACS_HLINE}}
   \lineiii{tl}{Upper-left corner}{\constant{ACS_ULCORNER}}
   \lineiii{tr}{Upper-right corner}{\constant{ACS_URCORNER}}
-  \lineiii{bl}{Bottom-left corner}{\constant{ACS_BLCORNER}}
-  \lineiii{br}{Bottom-right corner}{\constant{ACS_BRCORNER}}
+  \lineiii{bl}{Bottom-left corner}{\constant{ACS_LLCORNER}}
+  \lineiii{br}{Bottom-right corner}{\constant{ACS_LRCORNER}}
 \end{tableiii}
 \end{methoddesc}
 

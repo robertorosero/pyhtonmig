@@ -43,7 +43,7 @@ Example:
 
 import socket
 import re
-import rfc822
+import email.Utils
 import base64
 import hmac
 from email.base64MIME import encode as encode_base64
@@ -171,7 +171,7 @@ def quoteaddr(addr):
     """
     m = (None, None)
     try:
-        m=rfc822.parseaddr(addr)[1]
+        m = email.Utils.parseaddr(addr)[1]
     except AttributeError:
         pass
     if m == (None, None): # Indicates parse failure or AttributeError
@@ -290,10 +290,10 @@ class SMTP:
             af, socktype, proto, canonname, sa = res
             try:
                 self.sock = socket.socket(af, socktype, proto)
-                if self.debuglevel > 0: print>>stderr, 'connect:', (host, port)
+                if self.debuglevel > 0: print>>stderr, 'connect:', sa
                 self.sock.connect(sa)
             except socket.error, msg:
-                if self.debuglevel > 0: print>>stderr, 'connect fail:', (host, port)
+                if self.debuglevel > 0: print>>stderr, 'connect fail:', msg
                 if self.sock:
                     self.sock.close()
                 self.sock = None
@@ -439,7 +439,7 @@ class SMTP:
         """SMTP 'help' command.
         Returns help text from server."""
         self.putcmd("help", args)
-        return self.getreply()
+        return self.getreply()[1]
 
     def rset(self):
         """SMTP 'rset' command -- resets session."""
@@ -578,7 +578,7 @@ class SMTP:
             (code, resp) = self.docmd(encode_base64(password, eol=""))
         elif authmethod is None:
             raise SMTPException("No suitable authentication method found.")
-        if code not in [235, 503]:
+        if code not in (235, 503):
             # 235 == 'Authentication successful'
             # 503 == 'Error: already authenticated'
             raise SMTPAuthenticationError(code, resp)

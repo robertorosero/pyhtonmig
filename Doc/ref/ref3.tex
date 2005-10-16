@@ -165,7 +165,8 @@ complex numbers:
 
 \begin{description}
 \item[Integers]
-These represent elements from the mathematical set of whole numbers.
+These represent elements from the mathematical set of integers
+(positive and negative).
 \obindex{integer}
 
 There are three types of integers:
@@ -325,7 +326,7 @@ separate items.  The built-in functions
 \function{ord()}\bifuncindex{ord} convert between code units and
 nonnegative integers representing the Unicode ordinals as defined in
 the Unicode Standard 3.0. Conversion from and to other encodings are
-possible through the Unicode method \method{encode} and the built-in
+possible through the Unicode method \method{encode()} and the built-in
 function \function{unicode()}.\bifuncindex{unicode}
 \obindex{unicode}
 \index{character}
@@ -450,7 +451,7 @@ Special attributes:
   \lineiii{__module__}{The name of the module the function was defined
     in, or \code{None} if unavailable.}{Writable}
 
-  \lineiii{func_defaults}{Atuple containing default argument values
+  \lineiii{func_defaults}{A tuple containing default argument values
     for those arguments that have defaults, or \code{None} if no
     arguments have a default value}{Writable}
 
@@ -604,7 +605,7 @@ cause the function to execute until it provides a value using the
 have reached the end of the set of values to be returned.
 
 \item[Built-in functions]
-A built-in function object is a wrapper around a \C{} function.  Examples
+A built-in function object is a wrapper around a C function.  Examples
 of built-in functions are \function{len()} and \function{math.sin()}
 (\module{math} is a standard built-in module).
 The number and type of the arguments are
@@ -917,14 +918,16 @@ the code object).
   \ttindex{f_builtins}
   \ttindex{f_restricted}}
 
-Special writable attributes: \member{f_trace}, if not \code{None}, is a
-function called at the start of each source code line (this is used by
-the debugger); \member{f_exc_type}, \member{f_exc_value},
-\member{f_exc_traceback} represent the most recent exception caught in
-this frame; \member{f_lineno} is the current line number of the frame
---- writing to this from within a trace function jumps to the given line
-(only for the bottom-most frame).  A debugger can implement a Jump
-command (aka Set Next Statement) by writing to f_lineno.
+Special writable attributes: \member{f_trace}, if not \code{None}, is
+a function called at the start of each source code line (this is used
+by the debugger); \member{f_exc_type}, \member{f_exc_value},
+\member{f_exc_traceback} represent the last exception raised in the
+parent frame provided another exception was ever raised in the current
+frame (in all other cases they are None); \member{f_lineno} is the
+current line number of the frame --- writing to this from within a
+trace function jumps to the given line (only for the bottom-most
+frame).  A debugger can implement a Jump command (aka Set Next
+Statement) by writing to f_lineno.
 \withsubitem{(frame attribute)}{
   \ttindex{f_trace}
   \ttindex{f_exc_type}
@@ -1052,6 +1055,35 @@ extracting a slice may not make sense.  (One example of this is the
 
 \subsection{Basic customization\label{customization}}
 
+\begin{methoddesc}[object]{__new__}{cls\optional{, \moreargs}}
+Called to create a new instance of class \var{cls}.  \method{__new__()}
+is a static method (special-cased so you need not declare it as such)
+that takes the class of which an instance was requested as its first
+argument.  The remaining arguments are those passed to the object
+constructor expression (the call to the class).  The return value of
+\method{__new__()} should be the new object instance (usually an
+instance of \var{cls}).
+
+Typical implementations create a new instance of the class by invoking
+the superclass's \method{__new__()} method using
+\samp{super(\var{currentclass}, \var{cls}).__new__(\var{cls}[, ...])}
+with appropriate arguments and then modifying the newly-created instance
+as necessary before returning it.
+
+If \method{__new__()} returns an instance of \var{cls}, then the new
+instance's \method{__init__()} method will be invoked like
+\samp{__init__(\var{self}[, ...])}, where \var{self} is the new instance
+and the remaining arguments are the same as were passed to
+\method{__new__()}.
+
+If \method{__new__()} does not return an instance of \var{cls}, then the
+new instance's \method{__init__()} method will not be invoked.
+
+\method{__new__()} is intended mainly to allow subclasses of
+immutable types (like int, str, or tuple) to customize instance
+creation.
+\end{methoddesc}
+
 \begin{methoddesc}[object]{__init__}{self\optional{, \moreargs}}
 Called\indexii{class}{constructor} when the instance is created.  The
 arguments are those passed to the class constructor expression.  If a
@@ -1176,8 +1208,8 @@ By convention, \code{False} is used for false and \code{True} for true.
 
 There are no implied relationships among the comparison operators.
 The truth of \code{\var{x}==\var{y}} does not imply that \code{\var{x}!=\var{y}}
-is false.  Accordingly, when defining \method{__eq__}, one should also
-define \method{__ne__} so that the operators will behave as expected.
+is false.  Accordingly, when defining \method{__eq__()}, one should also
+define \method{__ne__()} so that the operators will behave as expected.
 
 There are no reflected (swapped-argument) versions of these methods
 (to be used when the left argument does not support the operation but
@@ -1306,8 +1338,9 @@ The following methods only apply to new-style classes.
 
 \begin{methoddesc}[object]{__getattribute__}{self, name}
 Called unconditionally to implement attribute accesses for instances
-of the class. If the class also defines \method{__getattr__}, it will
-never be called (unless called explicitly).
+of the class. If the class also defines \method{__getattr__()}, the latter 
+will not be called unless \method{__getattribute__()} either calls it 
+explicitly or raises an \exception{AttributeError}.
 This method should return the (computed) attribute
 value or raise an \exception{AttributeError} exception.
 In order to avoid infinite recursion in this method, its
@@ -1626,6 +1659,8 @@ If \var{key} is of an inappropriate type, \exception{TypeError} may be
 raised; if of a value outside the set of indexes for the sequence
 (after any special interpretation of negative values),
 \exception{IndexError} should be raised.
+For mapping types, if \var{key} is missing (not in the container),
+\exception{KeyError} should be raised.                     
 \note{\keyword{for} loops expect that an
 \exception{IndexError} will be raised for illegal indexes to allow
 proper detection of the end of the sequence.}
@@ -1870,7 +1905,7 @@ methods.  For instance, to evaluate the expression
 \var{x}\code{+=}\var{y}, where \var{x} is an instance of a class that
 has an \method{__iadd__()} method, \code{\var{x}.__iadd__(\var{y})} is
 called.  If \var{x} is an instance of a class that does not define a
-\method{__iadd()} method, \code{\var{x}.__add__(\var{y})} and
+\method{__iadd__()} method, \code{\var{x}.__add__(\var{y})} and
 \code{\var{y}.__radd__(\var{x})} are considered, as with the
 evaluation of \var{x}\code{+}\var{y}.
 \end{methoddesc}
@@ -1953,10 +1988,10 @@ implemented at all.
 
 Below, \method{__op__()} and \method{__rop__()} are used to signify
 the generic method names corresponding to an operator;
-\method{__iop__} is used for the corresponding in-place operator.  For
+\method{__iop__()} is used for the corresponding in-place operator.  For
 example, for the operator `\code{+}', \method{__add__()} and
 \method{__radd__()} are used for the left and right variant of the
-binary operator, and \method{__iadd__} for the in-place variant.
+binary operator, and \method{__iadd__()} for the in-place variant.
 
 \item
 

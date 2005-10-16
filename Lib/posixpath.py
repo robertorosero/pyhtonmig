@@ -15,8 +15,8 @@ import stat
 
 __all__ = ["normcase","isabs","join","splitdrive","split","splitext",
            "basename","dirname","commonprefix","getsize","getmtime",
-           "getatime","getctime","islink","exists","isdir","isfile","ismount",
-           "walk","expanduser","expandvars","normpath","abspath",
+           "getatime","getctime","islink","exists","lexists","isdir","isfile",
+           "ismount","walk","expanduser","expandvars","normpath","abspath",
            "samefile","sameopenfile","samestat",
            "curdir","pardir","sep","pathsep","defpath","altsep","extsep",
            "devnull","realpath","supports_unicode_filenames"]
@@ -414,7 +414,7 @@ symbolic links encountered in the path."""
     if isabs(filename):
         bits = ['/'] + filename.split('/')[1:]
     else:
-        bits = filename.split('/')
+        bits = [''] + filename.split('/')
 
     for i in range(2, len(bits)+1):
         component = join(*bits[0:i])

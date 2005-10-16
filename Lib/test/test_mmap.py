@@ -120,6 +120,14 @@ def test_both():
             else:
                 verify(0, 'Could seek beyond the new size')
 
+            # Check that the underlying file is truncated too
+            # (bug #728515)
+            f = open(TESTFN)
+            f.seek(0, 2)
+            verify(f.tell() == 512, 'Underlying file not truncated')
+            f.close()
+            verify(m.size() == 512, 'New size not reflected in file')
+
         m.close()
 
     finally:
@@ -311,6 +319,42 @@ def test_both():
     finally:
         os.unlink(TESTFN)
 
+    # test mapping of entire file by passing 0 for map length
+    if hasattr(os, "stat"):
+        print "  Ensuring that passing 0 as map length sets map size to current file size."
+        f = open(TESTFN, "w+")
+
+        try:
+            f.write(2**16 * 'm') # Arbitrary character
+            f.close()
+
+            f = open(TESTFN, "rb+")
+            mf = mmap.mmap(f.fileno(), 0)
+            verify(len(mf) == 2**16, "Map size should equal file size.")
+            vereq(mf.read(2**16), 2**16 * "m")
+            mf.close()
+            f.close()
+
+        finally:
+            os.unlink(TESTFN)
+
+    # test mapping of entire file by passing 0 for map length
+    if hasattr(os, "stat"):
+        print "  Ensuring that passing 0 as map length sets map size to current file size."
+        f = open(TESTFN, "w+")
+        try:
+            f.write(2**16 * 'm') # Arbitrary character
+            f.close()
+
+            f = open(TESTFN, "rb+")
+            mf = mmap.mmap(f.fileno(), 0)
+            verify(len(mf) == 2**16, "Map size should equal file size.")
+            vereq(mf.read(2**16), 2**16 * "m")
+            mf.close()
+            f.close()
+
+        finally:
+            os.unlink(TESTFN)
 
     print ' Test passed'
 

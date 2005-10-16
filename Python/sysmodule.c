@@ -927,6 +927,13 @@ settrace() -- set the global debug tracing function\n\
 )
 /* end of sys_doc */ ;
 
+static int
+_check_and_flush (FILE *stream)
+{
+  int prev_fail = ferror (stream);
+  return fflush (stream) || prev_fail ? EOF : 0;
+}
+
 PyObject *
 _PySys_Init(void)
 {
@@ -940,9 +947,27 @@ _PySys_Init(void)
 	m = Py_InitModule3("sys", sys_methods, sys_doc);
 	sysdict = PyModule_GetDict(m);
 
+	{
+		/* XXX: does this work on Win/Win64? (see posix_fstat) */
+		struct stat sb;
+		if (fstat(fileno(stdin), &sb) == 0 &&
+		    S_ISDIR(sb.st_mode)) {
+			Py_FatalError("<stdin> is a directory");
+		}
+	}
+
+	/* Closing the standard FILE* if sys.std* goes aways causes problems
+	 * for embedded Python usages. Closing them when somebody explicitly
+	 * invokes .close() might be possible, but the FAQ promises they get
+	 * never closed. However, we still need to get write errors when
+	 * writing fails (e.g. because stdout is redirected), so we flush the
+	 * streams and check for errors before the file objects are deleted.
+	 * On OS X, fflush()ing stdin causes an error, so we exempt stdin
+	 * from that procedure.
+	 */
 	sysin = PyFile_FromFile(stdin, "<stdin>", "r", NULL);
-	sysout = PyFile_FromFile(stdout, "<stdout>", "w", NULL);
-	syserr = PyFile_FromFile(stderr, "<stderr>", "w", NULL);
+	sysout = PyFile_FromFile(stdout, "<stdout>", "w", _check_and_flush);
+	syserr = PyFile_FromFile(stderr, "<stderr>", "w", _check_and_flush);
 	if (PyErr_Occurred())
 		return NULL;
 #ifdef MS_WINDOWS
@@ -1172,7 +1197,7 @@ PySys_SetArgv(int argc, char **argv)
 		char link[MAXPATHLEN+1];
 		char argv0copy[2*MAXPATHLEN+1];
 		int nr = 0;
-		if (argc > 0 && argv0 != NULL)
+		if (argc > 0 && argv0 != NULL && strcmp(argv0, "-c") != 0)
 			nr = readlink(argv0, link, MAXPATHLEN);
 		if (nr > 0) {
 			/* It's a symlink */
@@ -1197,7 +1222,7 @@ PySys_SetArgv(int argc, char **argv)
 		}
 #endif /* HAVE_READLINK */
 #if SEP == '\\' /* Special case for MS filename syntax */
-		if (argc > 0 && argv0 != NULL) {
+		if (argc > 0 && argv0 != NULL && strcmp(argv0, "-c") != 0) {
 			char *q;
 #ifdef MS_WINDOWS
 			char *ptemp;
@@ -1220,7 +1245,7 @@ PySys_SetArgv(int argc, char **argv)
 			}
 		}
 #else /* All other filename syntaxes */
-		if (argc > 0 && argv0 != NULL) {
+		if (argc > 0 && argv0 != NULL && strcmp(argv0, "-c") != 0) {
 #if defined(HAVE_REALPATH)
 			if (realpath(argv0, fullpath)) {
 				argv0 = fullpath;

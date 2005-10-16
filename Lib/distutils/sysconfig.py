@@ -34,7 +34,7 @@ python_build = os.path.isfile(landmark)
 del argv0_path, landmark
 
 
-def get_python_version ():
+def get_python_version():
     """Return a string containing the major and minor Python version,
     leaving off the patchlevel.  Sample return values could be '1.5'
     or '2.2'.
@@ -65,7 +65,7 @@ def get_python_inc(plat_specific=0, prefix=None):
                 if not os.path.exists(inc_dir):
                     inc_dir = os.path.join(os.path.dirname(base), "Include")
             return inc_dir
-        return os.path.join(prefix, "include", "python" + sys.version[:3])
+        return os.path.join(prefix, "include", "python" + get_python_version())
     elif os.name == "nt":
         return os.path.join(prefix, "include")
     elif os.name == "mac":
@@ -110,7 +110,7 @@ def get_python_lib(plat_specific=0, standard_lib=0, prefix=None):
         if standard_lib:
             return os.path.join(prefix, "Lib")
         else:
-            if sys.version < "2.2":
+            if get_python_version() < "2.2":
                 return prefix
             else:
                 return os.path.join(PREFIX, "Lib", "site-packages")
@@ -146,8 +146,9 @@ def customize_compiler(compiler):
     varies across Unices and is stored in Python's Makefile.
     """
     if compiler.compiler_type == "unix":
-        (cc, cxx, opt, basecflags, ccshared, ldshared, so_ext) = \
-            get_config_vars('CC', 'CXX', 'OPT', 'BASECFLAGS', 'CCSHARED', 'LDSHARED', 'SO')
+        (cc, cxx, opt, cflags, ccshared, ldshared, so_ext) = \
+            get_config_vars('CC', 'CXX', 'OPT', 'CFLAGS',
+                            'CCSHARED', 'LDSHARED', 'SO')
 
         if os.environ.has_key('CC'):
             cc = os.environ['CC']
@@ -161,17 +162,15 @@ def customize_compiler(compiler):
             cpp = cc + " -E"           # not always
         if os.environ.has_key('LDFLAGS'):
             ldshared = ldshared + ' ' + os.environ['LDFLAGS']
-        if basecflags:
-            opt = basecflags + ' ' + opt
         if os.environ.has_key('CFLAGS'):
-            opt = opt + ' ' + os.environ['CFLAGS']
+            cflags = opt + ' ' + os.environ['CFLAGS']
             ldshared = ldshared + ' ' + os.environ['CFLAGS']
         if os.environ.has_key('CPPFLAGS'):
             cpp = cpp + ' ' + os.environ['CPPFLAGS']
-            opt = opt + ' ' + os.environ['CPPFLAGS']
+            cflags = cflags + ' ' + os.environ['CPPFLAGS']
             ldshared = ldshared + ' ' + os.environ['CPPFLAGS']
 
-        cc_cmd = cc + ' ' + opt
+        cc_cmd = cc + ' ' + cflags
         compiler.set_executables(
             preprocessor=cpp,
             compiler=cc_cmd,
@@ -189,7 +188,7 @@ def get_config_h_filename():
         inc_dir = os.curdir
     else:
         inc_dir = get_python_inc(plat_specific=1)
-    if sys.version < '2.2':
+    if get_python_version() < '2.2':
         config_h = 'config.h'
     else:
         # The name of the config.h file changed in 2.2
@@ -277,25 +276,20 @@ def parse_makefile(fn, g=None):
             m = _findvar1_rx.search(value) or _findvar2_rx.search(value)
             if m:
                 n = m.group(1)
+                found = True
                 if done.has_key(n):
-                    after = value[m.end():]
-                    value = value[:m.start()] + str(done[n]) + after
-                    if "$" in after:
-                        notdone[name] = value
-                    else:
-                        try: value = int(value)
-                        except ValueError:
-                            done[name] = string.strip(value)
-                        else:
-                            done[name] = value
-                        del notdone[name]
+                    item = str(done[n])
                 elif notdone.has_key(n):
                     # get it on a subsequent round
-                    pass
+                    found = False
+                elif os.environ.has_key(n):
+                    # do it like make: fall back to environment
+                    item = os.environ[n]
                 else:
-                    done[n] = ""
+                    done[n] = item = ""
+                if found:
                     after = value[m.end():]
-                    value = value[:m.start()] + after
+                    value = value[:m.start()] + item + after
                     if "$" in after:
                         notdone[name] = value
                     else:
@@ -378,7 +372,7 @@ def _init_posix():
     if python_build:
         g['LDSHARED'] = g['BLDSHARED']
 
-    elif sys.version < '2.1':
+    elif get_python_version() < '2.1':
         # The following two branches are for 1.5.2 compatibility.
         if sys.platform == 'aix4':          # what about AIX 3.x ?
             # Linker script is in the config directory, not in Modules as the
@@ -405,7 +399,7 @@ def _init_posix():
             # it's taken care of for them by the 'build_ext.get_libraries()'
             # method.)
             g['LDSHARED'] = ("%s -L%s/lib -lpython%s" %
-                             (linkerscript, PREFIX, sys.version[0:3]))
+                             (linkerscript, PREFIX, get_python_version()))
 
     global _config_vars
     _config_vars = g

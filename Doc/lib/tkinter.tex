@@ -258,8 +258,10 @@ class Application(Frame):
         self.pack()
         self.createWidgets()
 
-app = Application()
+root = Tk()
+app = Application(master=root)
 app.mainloop()
+root.destroy()
 \end{verbatim}
 
 
@@ -621,7 +623,6 @@ class App(Frame):
         self.entrythingy = Entry()
         self.entrythingy.pack()
         
-        self.button.pack()
         # here is the application variable
         self.contents = StringVar()
         # set it to some value
@@ -732,7 +733,7 @@ Ousterhout's book.
 Screen distances can be specified in either pixels or absolute
 distances.  Pixels are given as numbers and absolute distances as
 strings, with the trailing character denoting units: \code{c}
-for centimeters, \code{i} for inches, \code{m} for millimeters,
+for centimetres, \code{i} for inches, \code{m} for millimetres,
 \code{p} for printer's points.  For example, 3.5 inches is expressed
 as \code{"3.5i"}.
 
@@ -1354,7 +1355,7 @@ create color images from XPM files.
 
 \item
 \ulink{Compound}
-{http://tix.sourceforge.net/dist/current/man/html/TixCmd/compound.html}
+{http://tix.sourceforge.net/dist/current/man/html/TixCmd/compound.htm}
 image types can be used to create images that consists of multiple
 horizontal lines; each line is composed of a series of items (texts,
 bitmaps, images or spaces) arranged from left to right. For example, a

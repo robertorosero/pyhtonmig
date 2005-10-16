@@ -7,7 +7,8 @@
 
 This module provides access to the BSD \emph{socket} interface.
 It is available on all modern \UNIX{} systems, Windows, MacOS, BeOS,
-OS/2, and probably additional platforms.
+OS/2, and probably additional platforms.  \note{Some behavior may be
+platform dependent, since calls are made to the operating system socket APIs.}
 
 For an introduction to socket programming (in C), see the following
 papers: \citetitle{An Introductory 4.3BSD Interprocess Communication
@@ -202,8 +203,8 @@ If \var{name} is omitted or empty, it is interpreted as the local
 host.  To find the fully qualified name, the hostname returned by
 \function{gethostbyaddr()} is checked, then aliases for the host, if
 available.  The first name which includes a period is selected.  In
-case no fully qualified domain name is available, the hostname is
-returned.
+case no fully qualified domain name is available, the hostname as
+returned by \function{gethostname()} is returned.
 \versionadded{2.0}
 \end{funcdesc}
 

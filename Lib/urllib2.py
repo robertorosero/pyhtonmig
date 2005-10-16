@@ -277,8 +277,8 @@ class Request:
 
 class OpenerDirector:
     def __init__(self):
-        server_version = "Python-urllib/%s" % __version__
-        self.addheaders = [('User-agent', server_version)]
+        client_version = "Python-urllib/%s" % __version__
+        self.addheaders = [('User-agent', client_version)]
         # manage the individual handlers
         self.handlers = []
         self.handle_open = {}
@@ -304,10 +304,13 @@ class OpenerDirector:
                 self.handle_error[protocol] = lookup
             elif condition == "open":
                 kind = protocol
-                lookup = getattr(self, "handle_"+condition)
-            elif condition in ["response", "request"]:
+                lookup = self.handle_open
+            elif condition == "response":
                 kind = protocol
-                lookup = getattr(self, "process_"+condition)
+                lookup = self.process_response
+            elif condition == "request":
+                kind = protocol
+                lookup = self.process_request
             else:
                 continue
 
@@ -381,7 +384,7 @@ class OpenerDirector:
                                 'unknown_open', req)
 
     def error(self, proto, *args):
-        if proto in ['http', 'https']:
+        if proto in ('http', 'https'):
             # XXX http[s] protocols are special-cased
             dict = self.handle_error['http'] # https is not different than http
             proto = args[2]  # YUCK!
@@ -582,7 +585,7 @@ class ProxyHandler(BaseHandler):
             if ':' in user_pass:
                 user, password = user_pass.split(':', 1)
                 user_pass = base64.encodestring('%s:%s' % (unquote(user),
-                                                           unquote(password)))
+                                                unquote(password))).strip()
                 req.add_header('Proxy-authorization', 'Basic ' + user_pass)
         host = unquote(host)
         req.set_proxy(host, type)
@@ -859,7 +862,7 @@ class AbstractDigestAuthHandler:
             entdig = None
 
         A1 = "%s:%s:%s" % (user, realm, pw)
-        A2 = "%s:%s" % (req.has_data() and 'POST' or 'GET',
+        A2 = "%s:%s" % (req.get_method(),
                         # XXX selector: what about proxies and full urls
                         req.get_selector())
         if qop == 'auth':
@@ -1069,46 +1072,43 @@ def parse_http_list(s):
 
     In particular, parse comma-separated lists where the elements of
     the list may include quoted-strings.  A quoted-string could
-    contain a comma.
+    contain a comma.  A non-quoted string could have quotes in the
+    middle.  Neither commas nor quotes count if they are escaped.
+    Only double-quotes count, not single-quotes.
     """
-    # XXX this function could probably use more testing
+    res = []
+    part = ''
 
-    list = []
-    end = len(s)
-    i = 0
-    inquote = 0
-    start = 0
-    while i < end:
-        cur = s[i:]
-        c = cur.find(',')
-        q = cur.find('"')
-        if c == -1:
-            list.append(s[start:])
-            break
-        if q == -1:
-            if inquote:
-                raise ValueError, "unbalanced quotes"
-            else:
-                list.append(s[start:i+c])
-                i = i + c + 1
+    escape = quote = False
+    for cur in s:
+        if escape:
+            part += cur
+            escape = False
+            continue
+        if quote:
+            if cur == '\\':
+                escape = True
                 continue
-        if inquote:
-            if q < c:
-                list.append(s[start:i+c])
-                i = i + c + 1
-                start = i
-                inquote = 0
-            else:
-                i = i + q
-        else:
-            if c < q:
-                list.append(s[start:i+c])
-                i = i + c + 1
-                start = i
-            else:
-                inquote = 1
-                i = i + q + 1
-    return map(lambda x: x.strip(), list)
+            elif cur == '"':
+                quote = False
+            part += cur
+            continue
+
+        if cur == ',':
+            res.append(part)
+            part = ''
+            continue
+
+        if cur == '"':
+            quote = True
+
+        part += cur
+
+    # append last part
+    if part:
+        res.append(part)
+
+    return [part.strip() for part in res]
 
 class FileHandler(BaseHandler):
     # Use local file or FTP depending on form of URL
@@ -1290,3 +1290,52 @@ class OpenerFactory:
             if inspect.isclass(ph):
                 ph = ph()
             opener.add_handler(ph)
+
+# Mapping status codes to official W3C names
+httpresponses = {
+    100: 'Continue',
+    101: 'Switching Protocols',
+
+    200: 'OK',
+    201: 'Created',
+    202: 'Accepted',
+    203: 'Non-Authoritative Information',
+    204: 'No Content',
+    205: 'Reset Content',
+    206: 'Partial Content',
+
+    300: 'Multiple Choices',
+    301: 'Moved Permanently',
+    302: 'Found',
+    303: 'See Other',
+    304: 'Not Modified',
+    305: 'Use Proxy',
+    306: '(Unused)',
+    307: 'Temporary Redirect',
+
+    400: 'Bad Request',
+    401: 'Unauthorized',
+    402: 'Payment Required',
+    403: 'Forbidden',
+    404: 'Not Found',
+    405: 'Method Not Allowed',
+    406: 'Not Acceptable',
+    407: 'Proxy Authentication Required',
+    408: 'Request Timeout',
+    409: 'Conflict',
+    410: 'Gone',
+    411: 'Length Required',
+    412: 'Precondition Failed',
+    413: 'Request Entity Too Large',
+    414: 'Request-URI Too Long',
+    415: 'Unsupported Media Type',
+    416: 'Requested Range Not Satisfiable',
+    417: 'Expectation Failed',
+
+    500: 'Internal Server Error',
+    501: 'Not Implemented',
+    502: 'Bad Gateway',
+    503: 'Service Unavailable',
+    504: 'Gateway Timeout',
+    505: 'HTTP Version Not Supported',
+}

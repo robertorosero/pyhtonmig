@@ -175,6 +175,8 @@ Py_InitializeEx(int install_sigs)
 	if (!_PyInt_Init())
 		Py_FatalError("Py_Initialize: can't init ints");
 
+	_PyFloat_Init();
+
 	interp->modules = PyDict_New();
 	if (interp->modules == NULL)
 		Py_FatalError("Py_Initialize: can't make modules dictionary");
@@ -395,13 +397,6 @@ Py_Finalize(void)
 		_Py_PrintReferences(stderr);
 #endif /* Py_TRACE_REFS */
 
-	/* Now we decref the exception classes.  After this point nothing
-	   can raise an exception.  That's okay, because each Fini() method
-	   below has been checked to make sure no exceptions are ever
-	   raised.
-	*/
-	_PyExc_Fini();
-
 	/* Cleanup auto-thread-state */
 #ifdef WITH_THREAD
 	_PyGILState_Fini();
@@ -409,6 +404,14 @@ Py_Finalize(void)
 
 	/* Clear interpreter state */
 	PyInterpreterState_Clear(interp);
+
+	/* Now we decref the exception classes.  After this point nothing
+	   can raise an exception.  That's okay, because each Fini() method
+	   below has been checked to make sure no exceptions are ever
+	   raised.
+	*/
+
+	_PyExc_Fini();
 
 	/* Delete current thread */
 	PyThreadState_Swap(NULL);
@@ -420,6 +423,7 @@ Py_Finalize(void)
 	PyCFunction_Fini();
 	PyTuple_Fini();
 	PyList_Fini();
+	PySet_Fini();
 	PyString_Fini();
 	PyInt_Fini();
 	PyFloat_Fini();
@@ -1417,20 +1421,25 @@ err_input(perrdetail *err)
 		errtype = PyExc_IndentationError;
 		msg = "too many levels of indentation";
 		break;
-	case E_DECODE: {	/* XXX */
-		PyThreadState* tstate = PyThreadState_GET();
-		PyObject* value = tstate->curexc_value;
+	case E_DECODE: {
+		PyObject *type, *value, *tb;
+		PyErr_Fetch(&type, &value, &tb);
 		if (value != NULL) {
-			u = PyObject_Repr(value);
+			u = PyObject_Str(value);
 			if (u != NULL) {
 				msg = PyString_AsString(u);
-				break;
 			}
 		}
 		if (msg == NULL)
 			msg = "unknown decode error";
+		Py_DECREF(type);
+		Py_DECREF(value);
+		Py_XDECREF(tb);
 		break;
 	}
+	case E_LINECONT:
+		msg = "unexpected character after line continuation character";
+		break;
 	default:
 		fprintf(stderr, "error=%d\n", err->error);
 		msg = "unknown parsing error";

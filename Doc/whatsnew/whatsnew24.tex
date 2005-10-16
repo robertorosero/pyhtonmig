@@ -18,8 +18,8 @@
 \maketitle
 \tableofcontents
 
-This article explains the new features in Python 2.4, released on
-November~30, 2004.
+This article explains the new features in Python 2.4.1, released on
+March~30, 2005.
 
 Python 2.4 is a medium-sized release.  It doesn't introduce as many
 changes as the radical Python 2.2, but introduces more features than
@@ -379,9 +379,11 @@ function that's constructed and returned.
 by Kevin D. Smith, Jim Jewett, and Skip Montanaro.  Several people
 wrote patches implementing function decorators, but the one that was
 actually checked in was patch \#979728, written by Mark Russell.}
-\end{seealso}
 
-% XXX add link to decorators module in Wiki
+\seeurl{http://www.python.org/moin/PythonDecoratorLibrary}
+{This Wiki page contains several examples of decorators.}
+
+\end{seealso}
 
 
 %======================================================================
@@ -1039,7 +1041,7 @@ the name \samp{None} is now a syntax error.
 
 \item The inner loops for list and tuple slicing
  were optimized and now run about one-third faster.  The inner loops
- for dictionaries were also optimized , resulting in performance boosts for
+ for dictionaries were also optimized, resulting in performance boosts for
  \method{keys()}, \method{values()}, \method{items()},
  \method{iterkeys()}, \method{itervalues()}, and \method{iteritems()}.
  (Contributed by Raymond Hettinger.)
@@ -1426,6 +1428,12 @@ sidestep the checking and if you were unlucky Python could segfault.
 Python 2.4's regular expression engine can match this pattern without
 problems.
 
+\item The \module{signal} module now performs tighter error-checking
+on the parameters to the \function{signal.signal()} function.  For
+example, you can't set a handler on the \constant{SIGKILL} signal;
+previous versions of Python would quietly accept this, but 2.4 will
+raise a \exception{RuntimeError} exception.
+
 \item Two new functions were added to the \module{socket} module.
 \function{socketpair()} returns a pair of connected sockets and
 \function{getservbyport(\var{port})} looks up the service name for a
@@ -1705,6 +1713,11 @@ The \exception{OverflowWarning} warning will disappear in Python 2.5.
   now return  an empty list instead of raising a \exception{TypeError}
   exception if called with no arguments.
 
+\item You can no longer compare the \class{date} and \class{datetime}
+  instances provided by the \module{datetime} module.  Two 
+  instances of different classes will now always be unequal, and 
+  relative comparisons (\code{<}, \code{>}) will raise a \exception{TypeError}.
+
 \item \function{dircache.listdir()} now passes exceptions to the caller
       instead of returning empty lists.
 
@@ -1724,8 +1737,10 @@ a partially-initialized module object in \code{sys.modules}.
 \item \constant{None} is now a constant; code that binds a new value to 
 the name \samp{None} is now a syntax error.
 
-% signal module now raises a RuntimeError on insane calls - e.g. setting a 
-% handler on SIGKILL
+\item The \function{signals.signal()} function now raises a
+\exception{RuntimeError} exception for certain illegal values;
+previously these errors would pass silently.  For example, you can no
+longer set a handler on the \constant{SIGKILL} signal.
 
 \end{itemize}
 
@@ -1735,7 +1750,8 @@ the name \samp{None} is now a syntax error.
 
 The author would like to thank the following people for offering
 suggestions, corrections and assistance with various drafts of this
-article: Koray Can, Hye-Shik Chang, Michael Dyck, Raymond Hettinger, 
-Brian Hurt, Hamish Lawson, Fredrik Lundh, Sean Reifschneider.
+article: Koray Can, Hye-Shik Chang, Michael Dyck, Raymond Hettinger,
+Brian Hurt, Hamish Lawson, Fredrik Lundh, Sean Reifschneider,
+Sadruddin Rejeb.
 
 \end{document}

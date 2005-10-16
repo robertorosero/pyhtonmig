@@ -106,9 +106,15 @@ the mapping is modified.
 \code{environ} may cause memory leaks.  Refer to the system documentation
 for \cfunction{putenv()}.}
 
-If \function{putenv()} is not provided, this mapping may be passed to
-the appropriate process-creation functions to cause child processes to
-use a modified environment.
+If \function{putenv()} is not provided, a modified copy of this mapping 
+may be passed to the appropriate process-creation functions to cause 
+child processes to use a modified environment.
+
+If the platform supports the \function{unsetenv()} function, you can 
+delete items in this mapping to unset environment variables.
+\function{unsetenv()} will be called automatically when an item is
+deleted from \code{os.environ}.
+
 \end{datadesc}
 
 \begin{funcdescni}{chdir}{path}
@@ -307,7 +313,19 @@ or even
 Availability: recent flavors of \UNIX.
 \end{funcdesc}
 
+\begin{funcdesc}{unsetenv}{varname}
+\index{environment variables!deleting}
+Unset (delete) the environment variable named \var{varname}. Such
+changes to the environment affect subprocesses started with
+\function{os.system()}, \function{popen()} or \function{fork()} and
+\function{execv()}. Availability: most flavors of \UNIX, Windows.
 
+When \function{unsetenv()} is
+supported, deletion of items in \code{os.environ} is automatically
+translated into a corresponding call to \function{unsetenv()}; however,
+calls to \function{unsetenv()} don't update \code{os.environ}, so it is
+actually preferable to delete items of \code{os.environ}.
+\end{funcdesc}
 
 \subsection{File Object Creation \label{os-newstreams}}
 
@@ -337,7 +355,7 @@ the command (encoded in the format specified for \function{wait()}) is
 available as the return value of the \method{close()} method of the file
 object, except that when the exit status is zero (termination without
 errors), \code{None} is returned.
-Availability: \UNIX, Windows.
+Availability: Macintosh, \UNIX, Windows.
 
 \versionchanged[This function worked unreliably under Windows in
   earlier versions of Python.  This was due to the use of the
@@ -350,11 +368,11 @@ Availability: \UNIX, Windows.
 Return a new file object opened in update mode (\samp{w+b}).  The file
 has no directory entries associated with it and will be automatically
 deleted once there are no file descriptors for the file.
-Availability: \UNIX, Windows.
+Availability: Macintosh, \UNIX, Windows.
 \end{funcdesc}
 
 
-For each of these \function{popen()} variants, if \var{bufsize} is
+For each of the following \function{popen()} variants, if \var{bufsize} is
 specified, it specifies the buffer size for the I/O pipes.
 \var{mode}, if provided, should be the string \code{'b'} or
 \code{'t'}; on Windows this is needed to determine whether the file
@@ -366,7 +384,7 @@ which case arguments will be passed directly to the program without shell
 intervention (as with \function{os.spawnv()}). If \var{cmd} is a string it will
 be passed to the shell (as with \function{os.system()}).
 
-These methods do not make it possible to retrieve the return code from
+These methods do not make it possible to retrieve the exit status from
 the child processes.  The only way to control the input and output
 streams and also retrieve the return codes is to use the
 \class{Popen3} and \class{Popen4} classes from the \refmodule{popen2}
@@ -380,21 +398,21 @@ Issues}{popen2-flow-control.html}''
 \begin{funcdesc}{popen2}{cmd\optional{, mode\optional{, bufsize}}}
 Executes \var{cmd} as a sub-process.  Returns the file objects
 \code{(\var{child_stdin}, \var{child_stdout})}.
-Availability: \UNIX, Windows.
+Availability: Macintosh, \UNIX, Windows.
 \versionadded{2.0}
 \end{funcdesc}
 
 \begin{funcdesc}{popen3}{cmd\optional{, mode\optional{, bufsize}}}
 Executes \var{cmd} as a sub-process.  Returns the file objects
 \code{(\var{child_stdin}, \var{child_stdout}, \var{child_stderr})}.
-Availability: \UNIX, Windows.
+Availability: Macintosh, \UNIX, Windows.
 \versionadded{2.0}
 \end{funcdesc}
 
 \begin{funcdesc}{popen4}{cmd\optional{, mode\optional{, bufsize}}}
 Executes \var{cmd} as a sub-process.  Returns the file objects
 \code{(\var{child_stdin}, \var{child_stdout_and_stderr})}.
-Availability: \UNIX, Windows.
+Availability: Macintosh, \UNIX, Windows.
 \versionadded{2.0}
 \end{funcdesc}
 
@@ -409,8 +427,15 @@ functions have a different order.
 
 \subsection{File Descriptor Operations \label{os-fd-ops}}
 
-These functions operate on I/O streams referred to
-using file descriptors.
+These functions operate on I/O streams referenced using file
+descriptors.  
+
+File descriptors are small integers corresponding to a file that has
+been opened by the current process.  For example, standard input is
+usually file descriptor 0, standard output is 1, and standard error is
+2.  Further files opened by a process will then be assigned 3, 4, 5,
+and so forth.  The name ``file descriptor'' is slightly deceptive; on
+{\UNIX} platforms, sockets and pipes are also referenced by file descriptors.
 
 
 \begin{funcdesc}{close}{fd}
@@ -434,7 +459,7 @@ Availability: Macintosh, \UNIX, Windows.
 \begin{funcdesc}{dup2}{fd, fd2}
 Duplicate file descriptor \var{fd} to \var{fd2}, closing the latter
 first if necessary.
-Availability: \UNIX, Windows.
+Availability: Macintosh, \UNIX, Windows.
 \end{funcdesc}
 
 \begin{funcdesc}{fdatasync}{fd}
@@ -453,7 +478,7 @@ known to the host operating system are given in the
 \code{pathconf_names} dictionary.  For configuration variables not
 included in that mapping, passing an integer for \var{name} is also
 accepted.
-Availability: \UNIX.
+Availability: Macintosh, \UNIX.
 
 If \var{name} is a string and is not known, \exception{ValueError} is
 raised.  If a specific value for \var{name} is not supported by the
@@ -464,7 +489,7 @@ error number.
 
 \begin{funcdesc}{fstat}{fd}
 Return status for file descriptor \var{fd}, like \function{stat()}.
-Availability: \UNIX, Windows.
+Availability: Macintosh, \UNIX, Windows.
 \end{funcdesc}
 
 \begin{funcdesc}{fstatvfs}{fd}
@@ -482,19 +507,19 @@ If you're starting with a Python file object \var{f}, first do
 \code{\var{f}.flush()}, and then do \code{os.fsync(\var{f}.fileno())},
 to ensure that all internal buffers associated with \var{f} are written
 to disk.
-Availability: \UNIX, and Windows starting in 2.2.3.
+Availability: Macintosh, \UNIX, and Windows starting in 2.2.3.
 \end{funcdesc}
 
 \begin{funcdesc}{ftruncate}{fd, length}
 Truncate the file corresponding to file descriptor \var{fd},
 so that it is at most \var{length} bytes in size.
-Availability: \UNIX.
+Availability: Macintosh, \UNIX.
 \end{funcdesc}
 
 \begin{funcdesc}{isatty}{fd}
 Return \code{True} if the file descriptor \var{fd} is open and
 connected to a tty(-like) device, else \code{False}.
-Availability: \UNIX.
+Availability: Macintosh, \UNIX.
 \end{funcdesc}
 
 \begin{funcdesc}{lseek}{fd, pos, how}
@@ -531,13 +556,13 @@ Open a new pseudo-terminal pair. Return a pair of file descriptors
 \code{(\var{master}, \var{slave})} for the pty and the tty,
 respectively. For a (slightly) more portable approach, use the
 \refmodule{pty}\refstmodindex{pty} module.
-Availability: Some flavors of \UNIX.
+Availability: Macintosh, Some flavors of \UNIX.
 \end{funcdesc}
 
 \begin{funcdesc}{pipe}{}
 Create a pipe.  Return a pair of file descriptors \code{(\var{r},
 \var{w})} usable for reading and writing, respectively.
-Availability: \UNIX, Windows.
+Availability: Macintosh, \UNIX, Windows.
 \end{funcdesc}
 
 \begin{funcdesc}{read}{fd, n}
@@ -560,21 +585,21 @@ built-in function \function{open()} or by \function{popen()} or
 \begin{funcdesc}{tcgetpgrp}{fd}
 Return the process group associated with the terminal given by
 \var{fd} (an open file descriptor as returned by \function{open()}).
-Availability: \UNIX.
+Availability: Macintosh, \UNIX.
 \end{funcdesc}
 
 \begin{funcdesc}{tcsetpgrp}{fd, pg}
 Set the process group associated with the terminal given by
 \var{fd} (an open file descriptor as returned by \function{open()})
 to \var{pg}.
-Availability: \UNIX.
+Availability: Macintosh, \UNIX.
 \end{funcdesc}
 
 \begin{funcdesc}{ttyname}{fd}
 Return a string which specifies the terminal device associated with
 file-descriptor \var{fd}.  If \var{fd} is not associated with a terminal
 device, an exception is raised.
-Availability: \UNIX.
+Availability:Macintosh,  \UNIX.
 \end{funcdesc}
 
 \begin{funcdesc}{write}{fd, str}
@@ -594,7 +619,9 @@ its \method{write()} method.
 
 
 The following data items are available for use in constructing the
-\var{flags} parameter to the \function{open()} function.
+\var{flags} parameter to the \function{open()} function.  Some items will
+not be available on all platforms.  For descriptions of their availability
+and use, consult \manpage{open}{2}.
 
 \begin{datadesc}{O_RDONLY}
 \dataline{O_WRONLY}
@@ -614,6 +641,8 @@ Availability: Macintosh, \UNIX, Windows.
 \dataline{O_NDELAY}
 \dataline{O_NONBLOCK}
 \dataline{O_NOCTTY}
+\dataline{O_SHLOCK}
+\dataline{O_EXLOCK}
 More options for the \var{flag} argument to the \function{open()} function.
 Availability: Macintosh, \UNIX.
 \end{datadesc}
@@ -621,7 +650,7 @@ Availability: Macintosh, \UNIX.
 \begin{datadesc}{O_BINARY}
 Option for the \var{flag} argument to the \function{open()} function.
 This can be bit-wise OR'd together with those listed above.
-Availability: Macintosh, Windows.
+Availability: Windows.
 % XXX need to check on the availability of this one.
 \end{datadesc}
 
@@ -636,6 +665,15 @@ These can be bit-wise OR'd together.
 Availability: Windows.
 \end{datadesc}
 
+\begin{datadesc}{SEEK_SET}
+\dataline{SEEK_CUR}
+\dataline{SEEK_END}
+Parameters to the \function{lseek()} function.
+Their values are 0, 1, and 2, respectively.
+Availability: Windows, Macintosh, \UNIX.
+\versionadded{2.5}
+\end{datadesc}
+
 \subsection{Files and Directories \label{os-file-dir}}
 
 \begin{funcdesc}{access}{path, mode}
@@ -648,7 +686,17 @@ one or more of \constant{R_OK}, \constant{W_OK}, and \constant{X_OK} to
 test permissions.  Return \constant{True} if access is allowed,
 \constant{False} if not.
 See the \UNIX{} man page \manpage{access}{2} for more information.
-Availability: \UNIX, Windows.
+Availability: Macintosh, \UNIX, Windows.
+
+\note{Using \function{access()} to check if a user is authorized to e.g.
+open a file before actually doing so using \function{open()} creates a 
+security hole, because the user might exploit the short time interval 
+between checking and opening the file to manipulate it.}
+
+\note{I/O operations may fail even when \function{access()}
+indicates that they would succeed, particularly for operations
+on network filesystems which may have permissions semantics
+beyond the usual \POSIX{} permission-bit model.}
 \end{funcdesc}
 
 \begin{datadesc}{F_OK}
@@ -692,13 +740,13 @@ Availability: Macintosh, \UNIX, Windows.
 
 \begin{funcdesc}{getcwdu}{}
 Return a Unicode object representing the current working directory.
-Availability: \UNIX, Windows.
+Availability: Macintosh, \UNIX, Windows.
 \versionadded{2.3}
 \end{funcdesc}
 
 \begin{funcdesc}{chroot}{path}
 Change the root directory of the current process to \var{path}.
-Availability: \UNIX.
+Availability: Macintosh, \UNIX.
 \versionadded{2.2}
 \end{funcdesc}
 
@@ -727,25 +775,30 @@ Change the mode of \var{path} to the numeric \var{mode}.
   \item \code{S_IWOTH}
   \item \code{S_IXOTH}
 \end{itemize}
-Availability: \UNIX, Windows.
+Availability: Macintosh, \UNIX, Windows.
+
+\note{Although Windows supports \function{chmod()}, you can only 
+set the file's read-only flag with it (via the \code{S_IWRITE} 
+and \code{S_IREAD} constants or a corresponding integer value). 
+All other bits are ignored.}
 \end{funcdesc}
 
 \begin{funcdesc}{chown}{path, uid, gid}
 Change the owner and group id of \var{path} to the numeric \var{uid}
-and \var{gid}.
-Availability: \UNIX.
+and \var{gid}. To leave one of the ids unchanged, set it to -1.
+Availability: Macintosh, \UNIX.
 \end{funcdesc}
 
 \begin{funcdesc}{lchown}{path, uid, gid}
 Change the owner and group id of \var{path} to the numeric \var{uid}
 and gid. This function will not follow symbolic links.
-Availability: \UNIX.
+Availability: Macintosh, \UNIX.
 \versionadded{2.3}
 \end{funcdesc}
 
 \begin{funcdesc}{link}{src, dst}
 Create a hard link pointing to \var{src} named \var{dst}.
-Availability: \UNIX.
+Availability: Macintosh, \UNIX.
 \end{funcdesc}
 
 \begin{funcdesc}{listdir}{path}
@@ -755,20 +808,20 @@ entries \code{'.'} and \code{'..'} even if they are present in the
 directory.
 Availability: Macintosh, \UNIX, Windows.
 
-\versionchanged[On Windows NT/2k/XP and Unix, if \var{path} is a Unicode
+\versionchanged[On Windows NT/2k/XP and \UNIX, if \var{path} is a Unicode
 object, the result will be a list of Unicode objects.]{2.3}
 \end{funcdesc}
 
 \begin{funcdesc}{lstat}{path}
 Like \function{stat()}, but do not follow symbolic links.
-Availability: \UNIX.
+Availability: Macintosh, \UNIX.
 \end{funcdesc}
 
 \begin{funcdesc}{mkfifo}{path\optional{, mode}}
 Create a FIFO (a named pipe) named \var{path} with numeric mode
 \var{mode}.  The default \var{mode} is \code{0666} (octal).  The current
 umask value is first masked out from the mode.
-Availability: \UNIX.
+Availability: Macintosh, \UNIX.
 
 FIFOs are pipes that can be accessed like regular files.  FIFOs exist
 until they are deleted (for example with \function{os.unlink()}).
@@ -790,12 +843,14 @@ defines the newly created device special file (probably using
 \end{funcdesc}
 
 \begin{funcdesc}{major}{device}
-Extracts a device major number from a raw device number.
+Extracts the device major number from a raw device number (usually
+the \member{st_dev} or \member{st_rdev} field from \ctype{stat}).
 \versionadded{2.3}
 \end{funcdesc}
 
 \begin{funcdesc}{minor}{device}
-Extracts a device minor number from a raw device number.
+Extracts the device minor number from a raw device number (usually
+the \member{st_dev} or \member{st_rdev} field from \ctype{stat}).
 \versionadded{2.3}
 \end{funcdesc}
 
@@ -835,7 +890,7 @@ known to the host operating system are given in the
 \code{pathconf_names} dictionary.  For configuration variables not
 included in that mapping, passing an integer for \var{name} is also
 accepted.
-Availability: \UNIX.
+Availability: Macintosh, \UNIX.
 
 If \var{name} is a string and is not known, \exception{ValueError} is
 raised.  If a specific value for \var{name} is not supported by the
@@ -849,7 +904,7 @@ Dictionary mapping names accepted by \function{pathconf()} and
 \function{fpathconf()} to the integer values defined for those names
 by the host operating system.  This can be used to determine the set
 of names known to the system.
-Availability: \UNIX.
+Availability: Macintosh, \UNIX.
 \end{datadesc}
 
 \begin{funcdesc}{readlink}{path}
@@ -857,7 +912,7 @@ Return a string representing the path to which the symbolic link
 points.  The result may be either an absolute or relative pathname; if
 it is relative, it may be converted to an absolute pathname using
 \code{os.path.join(os.path.dirname(\var{path}), \var{result})}.
-Availability: \UNIX.
+Availability: Macintosh, \UNIX.
 \end{funcdesc}
 
 \begin{funcdesc}{remove}{path}
@@ -931,18 +986,35 @@ the \ctype{stat} structure, namely:
 \member{st_mtime} (time of most recent content modification),
 \member{st_ctime}
 (platform dependent; time of most recent metadata change on \UNIX, or
-the time of creation on Windows).
+the time of creation on Windows):
+
+\begin{verbatim}
+>>> import os
+>>> statinfo = os.stat('somefile.txt')
+>>> statinfo
+(33188, 422511L, 769L, 1, 1032, 100, 926L, 1105022698,1105022732, 1105022732)
+>>> statinfo.st_size
+926L
+>>>
+\end{verbatim}
 
 \versionchanged [If \function{stat_float_times} returns true, the time
 values are floats, measuring seconds. Fractions of a second may be
 reported if the system supports that. On Mac OS, the times are always
 floats. See \function{stat_float_times} for further discussion. ]{2.3}
 
-On some Unix systems (such as Linux), the following attributes may
+On some \UNIX{} systems (such as Linux), the following attributes may
 also be available:
 \member{st_blocks} (number of blocks allocated for file),
 \member{st_blksize} (filesystem blocksize),
 \member{st_rdev} (type of device if an inode device).
+\member{st_flags} (user defined flags for file).
+
+On other \UNIX{} systems (such as FreeBSD), the following attributes
+may be available (but may be only filled out of root tries to
+use them:
+\member{st_gen} (file generation number),
+\member{st_birthtime} (time of file creation).
 
 On Mac OS systems, the following attributes may also be available:
 \member{st_rsize},
@@ -985,6 +1057,7 @@ Availability: Macintosh, \UNIX, Windows.
 
 \versionchanged
 [Added access to values as attributes of the returned object]{2.2}
+\versionchanged[Added st_gen, st_birthtime]{2.5}
 \end{funcdesc}
 
 \begin{funcdesc}{stat_float_times}{\optional{newvalue}}
@@ -994,16 +1067,15 @@ it is False, future calls return ints.  If newval is omitted, return
 the current setting.
 
 For compatibility with older Python versions, accessing
-\class{stat_result} as a tuple always returns integers. For
-compatibility with Python 2.2, accessing the time stamps by field name
-also returns integers. Applications that want to determine the
-fractions of a second in a time stamp can use this function to have
-time stamps represented as floats. Whether they will actually observe
-non-zero fractions depends on the system.
+\class{stat_result} as a tuple always returns integers.
 
-Future Python releases will change the default of this setting;
-applications that cannot deal with floating point time stamps can then
-use this function to turn the feature off.
+\versionchanged[Python now returns float values by default. Applications
+which do not work correctly with floating point time stamps can use
+this function to restore the old behaviour]{2.5}
+
+The resolution of the timestamps (i.e. the smallest possible fraction)
+depends on the system. Some systems only support second resolution;
+on these systems, the fraction will always be zero.
 
 It is recommended that this setting is only changed at program startup
 time in the \var{__main__} module; libraries should never change this
@@ -1060,8 +1132,8 @@ On \UNIX, the environment variable \envvar{TMPDIR} overrides
 behavior of this function depends on the C library implementation;
 some aspects are underspecified in system documentation.
 \warning{Use of \function{tempnam()} is vulnerable to symlink attacks;
-consider using \function{tmpfile()} instead.}
-Availability: \UNIX, Windows.
+consider using \function{tmpfile()} (section \ref{os-newstreams})
+instead.}  Availability: Macintosh, \UNIX, Windows.
 \end{funcdesc}
 
 \begin{funcdesc}{tmpnam}{}
@@ -1072,12 +1144,13 @@ responsible for properly creating and managing files created using
 paths returned by \function{tmpnam()}; no automatic cleanup is
 provided.
 \warning{Use of \function{tmpnam()} is vulnerable to symlink attacks;
-consider using \function{tmpfile()} instead.}
-Availability: \UNIX, Windows.  This function probably shouldn't be used
-on Windows, though:  Microsoft's implementation of \function{tmpnam()}
-always creates a name in the root directory of the current drive, and
-that's generally a poor location for a temp file (depending on
-privileges, you may not even be able to open a file using this name).
+consider using \function{tmpfile()} (section \ref{os-newstreams})
+instead.}  Availability: \UNIX, Windows.  This function probably
+shouldn't be used on Windows, though: Microsoft's implementation of
+\function{tmpnam()} always creates a name in the root directory of the
+current drive, and that's generally a poor location for a temp file
+(depending on privileges, you may not even be able to open a file
+using this name).
 \end{funcdesc}
 
 \begin{datadesc}{TMP_MAX}
@@ -1220,7 +1293,7 @@ Generate a \constant{SIGABRT} signal to the current process.  On
 process immediately returns an exit code of \code{3}.  Be aware that
 programs which use \function{signal.signal()} to register a handler
 for \constant{SIGABRT} will behave differently.
-Availability: \UNIX, Windows.
+Availability: Macintosh, \UNIX, Windows.
 \end{funcdesc}
 
 \begin{funcdesc}{execl}{path, arg0, arg1, \moreargs}
@@ -1266,13 +1339,13 @@ environment variables for the new process; the \function{execl()},
 \function{execlp()}, \function{execv()}, and \function{execvp()}
 all cause the new process to inherit the environment of the current
 process.
-Availability: \UNIX, Windows.
+Availability: Macintosh, \UNIX, Windows.
 \end{funcdesc}
 
 \begin{funcdesc}{_exit}{n}
 Exit to the system with status \var{n}, without calling cleanup
 handlers, flushing stdio buffers, etc.
-Availability: \UNIX, Windows.
+Availability: Macintosh, \UNIX, Windows.
 
 \begin{notice}
 The standard way to exit is \code{sys.exit(\var{n})}.
@@ -1285,79 +1358,82 @@ The following exit codes are a defined, and can be used with
 \function{_exit()}, although they are not required.  These are
 typically used for system programs written in Python, such as a
 mail server's external command delivery program.
+\note{Some of these may not be available on all \UNIX{} platforms,
+since there is some variation.  These constants are defined where they
+are defined by the underlying platform.}
 
 \begin{datadesc}{EX_OK}
 Exit code that means no error occurred.
-Availability: \UNIX.
+Availability: Macintosh, \UNIX.
 \versionadded{2.3}
 \end{datadesc}
 
 \begin{datadesc}{EX_USAGE}
 Exit code that means the command was used incorrectly, such as when
 the wrong number of arguments are given.
-Availability: \UNIX.
+Availability: Macintosh, \UNIX.
 \versionadded{2.3}
 \end{datadesc}
 
 \begin{datadesc}{EX_DATAERR}
 Exit code that means the input data was incorrect.
-Availability: \UNIX.
+Availability: Macintosh, \UNIX.
 \versionadded{2.3}
 \end{datadesc}
 
 \begin{datadesc}{EX_NOINPUT}
 Exit code that means an input file did not exist or was not readable.
-Availability: \UNIX.
+Availability: Macintosh, \UNIX.
 \versionadded{2.3}
 \end{datadesc}
 
 \begin{datadesc}{EX_NOUSER}
 Exit code that means a specified user did not exist.
-Availability: \UNIX.
+Availability: Macintosh, \UNIX.
 \versionadded{2.3}
 \end{datadesc}
 
 \begin{datadesc}{EX_NOHOST}
 Exit code that means a specified host did not exist.
-Availability: \UNIX.
+Availability: Macintosh, \UNIX.
 \versionadded{2.3}
 \end{datadesc}
 
 \begin{datadesc}{EX_UNAVAILABLE}
 Exit code that means that a required service is unavailable.
-Availability: \UNIX.
+Availability: Macintosh, \UNIX.
 \versionadded{2.3}
 \end{datadesc}
 
 \begin{datadesc}{EX_SOFTWARE}
 Exit code that means an internal software error was detected.
-Availability: \UNIX.
+Availability: Macintosh, \UNIX.
 \versionadded{2.3}
 \end{datadesc}
 
 \begin{datadesc}{EX_OSERR}
 Exit code that means an operating system error was detected, such as
 the inability to fork or create a pipe.
-Availability: \UNIX.
+Availability: Macintosh, \UNIX.
 \versionadded{2.3}
 \end{datadesc}
 
 \begin{datadesc}{EX_OSFILE}
 Exit code that means some system file did not exist, could not be
 opened, or had some other kind of error.
-Availability: \UNIX.
+Availability: Macintosh, \UNIX.
 \versionadded{2.3}
 \end{datadesc}
 
 \begin{datadesc}{EX_CANTCREAT}
 Exit code that means a user specified output file could not be created.
-Availability: \UNIX.
+Availability: Macintosh, \UNIX.
 \versionadded{2.3}
 \end{datadesc}
 
 \begin{datadesc}{EX_IOERR}
 Exit code that means that an error occurred while doing I/O on some file.
-Availability: \UNIX.
+Availability: Macintosh, \UNIX.
 \versionadded{2.3}
 \end{datadesc}
 
@@ -1365,40 +1441,40 @@ Availability: \UNIX.
 Exit code that means a temporary failure occurred.  This indicates
 something that may not really be an error, such as a network
 connection that couldn't be made during a retryable operation.
-Availability: \UNIX.
+Availability: Macintosh, \UNIX.
 \versionadded{2.3}
 \end{datadesc}
 
 \begin{datadesc}{EX_PROTOCOL}
 Exit code that means that a protocol exchange was illegal, invalid, or
 not understood.
-Availability: \UNIX.
+Availability: Macintosh, \UNIX.
 \versionadded{2.3}
 \end{datadesc}
 
 \begin{datadesc}{EX_NOPERM}
 Exit code that means that there were insufficient permissions to
 perform the operation (but not intended for file system problems).
-Availability: \UNIX.
+Availability: Macintosh, \UNIX.
 \versionadded{2.3}
 \end{datadesc}
 
 \begin{datadesc}{EX_CONFIG}
 Exit code that means that some kind of configuration error occurred.
-Availability: \UNIX.
+Availability: Macintosh, \UNIX.
 \versionadded{2.3}
 \end{datadesc}
 
 \begin{datadesc}{EX_NOTFOUND}
 Exit code that means something like ``an entry was not found''.
-Availability: \UNIX.
+Availability: Macintosh, \UNIX.
 \versionadded{2.3}
 \end{datadesc}
 
 \begin{funcdesc}{fork}{}
 Fork a child process.  Return \code{0} in the child, the child's
 process id in the parent.
-Availability: \UNIX.
+Availability: Macintosh, \UNIX.
 \end{funcdesc}
 
 \begin{funcdesc}{forkpty}{}
@@ -1408,7 +1484,7 @@ where \var{pid} is \code{0} in the child, the new child's process id
 in the parent, and \var{fd} is the file descriptor of the master end
 of the pseudo-terminal.  For a more portable approach, use the
 \refmodule{pty} module.
-Availability: Some flavors of \UNIX.
+Availability: Macintosh, Some flavors of \UNIX.
 \end{funcdesc}
 
 \begin{funcdesc}{kill}{pid, sig}
@@ -1417,27 +1493,27 @@ Availability: Some flavors of \UNIX.
 Kill the process \var{pid} with signal \var{sig}.  Constants for the
 specific signals available on the host platform are defined in the
 \refmodule{signal} module.
-Availability: \UNIX.
+Availability: Macintosh, \UNIX.
 \end{funcdesc}
 
 \begin{funcdesc}{killpg}{pgid, sig}
 \index{process!killing}
 \index{process!signalling}
 Kill the process group \var{pgid} with the signal \var{sig}.
-Availability: \UNIX.
+Availability: Macintosh, \UNIX.
 \versionadded{2.3}
 \end{funcdesc}
 
 \begin{funcdesc}{nice}{increment}
 Add \var{increment} to the process's ``niceness''.  Return the new
 niceness.
-Availability: \UNIX.
+Availability: Macintosh, \UNIX.
 \end{funcdesc}
 
 \begin{funcdesc}{plock}{op}
 Lock program segments into memory.  The value of \var{op}
 (defined in \code{<sys/lock.h>}) determines which segments are locked.
-Availability: \UNIX.
+Availability: Macintosh, \UNIX.
 \end{funcdesc}
 
 \begin{funcdescni}{popen}{\unspecified}
@@ -1518,7 +1594,7 @@ Possible values for the \var{mode} parameter to the \function{spawn*()}
 family of functions.  If either of these values is given, the
 \function{spawn*()} functions will return as soon as the new process
 has been created, with the process ID as the return value.
-Availability: \UNIX, Windows.
+Availability: Macintosh, \UNIX, Windows.
 \versionadded{1.6}
 \end{datadesc}
 
@@ -1529,7 +1605,7 @@ family of functions.  If this is given as \var{mode}, the
 has run to completion and will return the exit code of the process the
 run is successful, or \code{-\var{signal}} if a signal kills the
 process.
-Availability: \UNIX, Windows.
+Availability: Macintosh, \UNIX, Windows.
 \versionadded{1.6}
 \end{datadesc}
 
@@ -1583,7 +1659,7 @@ this is always \code{0}; on \program{cmd.exe} systems (Windows NT, 2000
 and XP) this is the exit status of the command run; on systems using
 a non-native shell, consult your shell documentation.
 
-Availability: \UNIX, Windows.
+Availability: Macintosh, \UNIX, Windows.
 \end{funcdesc}
 
 \begin{funcdesc}{times}{}
@@ -1594,7 +1670,7 @@ user time, children's system time, and elapsed real time since a fixed
 point in the past, in that order.  See the \UNIX{} manual page
 \manpage{times}{2} or the corresponding Windows Platform API
 documentation.
-Availability: \UNIX, Windows.
+Availability: Macintosh, \UNIX, Windows.
 \end{funcdesc}
 
 \begin{funcdesc}{wait}{}
@@ -1603,7 +1679,7 @@ its pid and exit status indication: a 16-bit number, whose low byte is
 the signal number that killed the process, and whose high byte is the
 exit status (if the signal number is zero); the high bit of the low
 byte is set if a core file was produced.
-Availability: \UNIX.
+Availability: Macintosh, \UNIX.
 \end{funcdesc}
 
 \begin{funcdesc}{waitpid}{pid, options}
@@ -1639,9 +1715,10 @@ return suitable process handles.
 \end{funcdesc}
 
 \begin{datadesc}{WNOHANG}
-The option for \function{waitpid()} to avoid hanging if no child
-process status is available immediately.
-Availability: \UNIX.
+The option for \function{waitpid()} to return immediately if no child
+process status is available immediately. The function returns
+\code{(0, 0)} in this case.
+Availability: Macintosh, \UNIX.
 \end{datadesc}
 
 \begin{datadesc}{WCONTINUED}
@@ -1656,7 +1733,7 @@ Availability: Some \UNIX{} systems.
 This option causes child processes to be reported if they have been
 stopped but their current state has not been reported since they were
 stopped.
-Availability: \UNIX.
+Availability: Macintosh, \UNIX.
 \versionadded{2.3}
 \end{datadesc}
 
@@ -1668,7 +1745,7 @@ process.
 \begin{funcdesc}{WCOREDUMP}{status}
 Returns \code{True} if a core dump was generated for the process,
 otherwise it returns \code{False}.
-Availability: \UNIX.
+Availability: Macintosh, \UNIX.
 \versionadded{2.3}
 \end{funcdesc}
 
@@ -1688,30 +1765,30 @@ Availability: \UNIX.
 \begin{funcdesc}{WIFSIGNALED}{status}
 Returns \code{True} if the process exited due to a signal, otherwise
 it returns \code{False}.
-Availability: \UNIX.
+Availability: Macintosh, \UNIX.
 \end{funcdesc}
 
 \begin{funcdesc}{WIFEXITED}{status}
 Returns \code{True} if the process exited using the \manpage{exit}{2}
 system call, otherwise it returns \code{False}.
-Availability: \UNIX.
+Availability: Macintosh, \UNIX.
 \end{funcdesc}
 
 \begin{funcdesc}{WEXITSTATUS}{status}
 If \code{WIFEXITED(\var{status})} is true, return the integer
 parameter to the \manpage{exit}{2} system call.  Otherwise, the return
 value is meaningless.
-Availability: \UNIX.
+Availability: Macintosh, \UNIX.
 \end{funcdesc}
 
 \begin{funcdesc}{WSTOPSIG}{status}
 Return the signal which caused the process to stop.
-Availability: \UNIX.
+Availability: Macintosh, \UNIX.
 \end{funcdesc}
 
 \begin{funcdesc}{WTERMSIG}{status}
 Return the signal which caused the process to exit.
-Availability: \UNIX.
+Availability: Macintosh, \UNIX.
 \end{funcdesc}
 
 
@@ -1728,7 +1805,7 @@ known to the host operating system are given in the
 \code{confstr_names} dictionary.  For configuration variables not
 included in that mapping, passing an integer for \var{name} is also
 accepted.
-Availability: \UNIX.
+Availability: Macintosh, \UNIX.
 
 If the configuration value specified by \var{name} isn't defined, the
 empty string is returned.
@@ -1744,7 +1821,7 @@ error number.
 Dictionary mapping names accepted by \function{confstr()} to the
 integer values defined for those names by the host operating system.
 This can be used to determine the set of names known to the system.
-Availability: \UNIX.
+Availability: Macintosh, \UNIX.
 \end{datadesc}
 
 \begin{funcdesc}{getloadavg}{}
@@ -1762,14 +1839,14 @@ If the configuration value specified by \var{name} isn't defined,
 parameter for \function{confstr()} apply here as well; the dictionary
 that provides information on the known names is given by
 \code{sysconf_names}.
-Availability: \UNIX.
+Availability: Macintosh, \UNIX.
 \end{funcdesc}
 
 \begin{datadesc}{sysconf_names}
 Dictionary mapping names accepted by \function{sysconf()} to the
 integer values defined for those names by the host operating system.
 This can be used to determine the set of names known to the system.
-Availability: \UNIX.
+Availability: Macintosh, \UNIX.
 \end{datadesc}
 
 
@@ -1783,21 +1860,21 @@ Higher-level operations on pathnames are defined in the
 \begin{datadesc}{curdir}
 The constant string used by the operating system to refer to the current
 directory.
-For example: \code{'.'} for \POSIX{} or \code{':'} for the Macintosh.
+For example: \code{'.'} for \POSIX{} or \code{':'} for Mac OS 9.
 Also available via \module{os.path}.
 \end{datadesc}
 
 \begin{datadesc}{pardir}
 The constant string used by the operating system to refer to the parent
 directory.
-For example: \code{'..'} for \POSIX{} or \code{'::'} for the Macintosh.
+For example: \code{'..'} for \POSIX{} or \code{'::'} for Mac OS 9.
 Also available via \module{os.path}.
 \end{datadesc}
 
 \begin{datadesc}{sep}
 The character used by the operating system to separate pathname components,
-for example, \character{/} for \POSIX{} or \character{:} for the
-Macintosh.  Note that knowing this is not sufficient to be able to
+for example, \character{/} for \POSIX{} or \character{:} for
+Mac OS 9.  Note that knowing this is not sufficient to be able to
 parse or concatenate pathnames --- use \function{os.path.split()} and
 \function{os.path.join()} --- but it is occasionally useful.
 Also available via \module{os.path}.
@@ -1841,8 +1918,8 @@ for example, \code{'\e r\e n'} for Windows.
 
 \begin{datadesc}{devnull}
 The file path of the null device.
-For example: \code{'/dev/null'} for \POSIX{} or \code{'Dev:Nul'} for the
-Macintosh.
+For example: \code{'/dev/null'} for \POSIX{} or \code{'Dev:Nul'} for
+Mac OS 9.
 Also available via \module{os.path}.
 \versionadded{2.4}
 \end{datadesc}

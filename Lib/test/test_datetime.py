@@ -446,9 +446,9 @@ class TestTimeDelta(HarmlessMixedComparison):
     def test_subclass_timedelta(self):
 
         class T(timedelta):
+            @staticmethod
             def from_td(td):
                 return T(td.days, td.seconds, td.microseconds)
-            from_td = staticmethod(from_td)
 
             def as_hours(self):
                 sum = (self.days * 24 +
@@ -1420,6 +1420,15 @@ class TestDateTime(TestDate):
                 break
             # Else try again a few times.
         self.failUnless(abs(from_timestamp - from_now) <= tolerance)
+
+    def test_strptime(self):
+        import time
+
+        string = '2004-12-01 13:02:47'
+        format = '%Y-%m-%d %H:%M:%S'
+        expected = self.theclass(*(time.strptime(string, format)[0:6]))
+        got = self.theclass.strptime(string, format)
+        self.assertEqual(expected, got)
 
     def test_more_timetuple(self):
         # This tests fields beyond those tested by the TestDate.test_timetuple.

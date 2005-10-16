@@ -2,28 +2,12 @@
 #
 # For more information about this module, see PEP 324.
 #
-# Copyright (c) 2003-2004 by Peter Astrand <astrand@lysator.liu.se>
+# This module should remain compatible with Python 2.2, see PEP 291.
 #
-# By obtaining, using, and/or copying this software and/or its
-# associated documentation, you agree that you have read, understood,
-# and will comply with the following terms and conditions:
+# Copyright (c) 2003-2005 by Peter Astrand <astrand@lysator.liu.se>
 #
-# Permission to use, copy, modify, and distribute this software and
-# its associated documentation for any purpose and without fee is
-# hereby granted, provided that the above copyright notice appears in
-# all copies, and that both that copyright notice and this permission
-# notice appear in supporting documentation, and that the name of the
-# author not be used in advertising or publicity pertaining to
-# distribution of the software without specific, written prior
-# permission.
-#
-# THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE,
-# INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS.
-# IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, INDIRECT OR
-# CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS
-# OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT,
-# NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION
-# WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+# Licensed to PSF under a Contributor Agreement.
+# See http://www.python.org/2.4/license for licensing details.
 
 r"""subprocess - Subprocesses with accessible I/O streams
 
@@ -528,6 +512,7 @@ def list2cmdline(seq):
             result.extend(bs_buf)
 
         if needquote:
+            result.extend(bs_buf)
             result.append('"')
 
     return ''.join(result)
@@ -615,6 +600,33 @@ class Popen(object):
         data = data.replace("\r", "\n")
         return data
 
+    def communicate(self, input=None):
+        """Interact with process: Send data to stdin.  Read data from
+        stdout and stderr, until end-of-file is reached.  Wait for
+        process to terminate.  The optional input argument should be a
+        string to be sent to the child process, or None, if no data
+        should be sent to the child.
+
+        communicate() returns a tuple (stdout, stderr)."""
+
+        # Optimization: If we are only using one pipe, or no pipe at
+        # all, using select() or threads is unnecessary.
+        if [self.stdin, self.stdout, self.stderr].count(None) >= 2:
+            stdout = None
+            stderr = None
+            if self.stdin:
+                if input:
+                    self.stdin.write(input)
+                self.stdin.close()
+            elif self.stdout:
+                stdout = self.stdout.read()
+            elif self.stderr:
+                stderr = self.stderr.read()
+            self.wait()
+            return (stdout, stderr)
+
+        return self._communicate(input)
+
 
     if mswindows:
         #
@@ -624,42 +636,42 @@ class Popen(object):
             """Construct and return tupel with IO objects:
             p2cread, p2cwrite, c2pread, c2pwrite, errread, errwrite
             """
-            if stdin == None and stdout == None and stderr == None:
+            if stdin is None and stdout is None and stderr is None:
                 return (None, None, None, None, None, None)
 
             p2cread, p2cwrite = None, None
             c2pread, c2pwrite = None, None
             errread, errwrite = None, None
 
-            if stdin == None:
+            if stdin is None:
                 p2cread = GetStdHandle(STD_INPUT_HANDLE)
             elif stdin == PIPE:
                 p2cread, p2cwrite = CreatePipe(None, 0)
                 # Detach and turn into fd
                 p2cwrite = p2cwrite.Detach()
                 p2cwrite = msvcrt.open_osfhandle(p2cwrite, 0)
-            elif type(stdin) == types.IntType:
+            elif isinstance(stdin, int):
                 p2cread = msvcrt.get_osfhandle(stdin)
             else:
                 # Assuming file-like object
                 p2cread = msvcrt.get_osfhandle(stdin.fileno())
             p2cread = self._make_inheritable(p2cread)
 
-            if stdout == None:
+            if stdout is None:
                 c2pwrite = GetStdHandle(STD_OUTPUT_HANDLE)
             elif stdout == PIPE:
                 c2pread, c2pwrite = CreatePipe(None, 0)
                 # Detach and turn into fd
                 c2pread = c2pread.Detach()
                 c2pread = msvcrt.open_osfhandle(c2pread, 0)
-            elif type(stdout) == types.IntType:
+            elif isinstance(stdout, int):
                 c2pwrite = msvcrt.get_osfhandle(stdout)
             else:
                 # Assuming file-like object
                 c2pwrite = msvcrt.get_osfhandle(stdout.fileno())
             c2pwrite = self._make_inheritable(c2pwrite)
 
-            if stderr == None:
+            if stderr is None:
                 errwrite = GetStdHandle(STD_ERROR_HANDLE)
             elif stderr == PIPE:
                 errread, errwrite = CreatePipe(None, 0)
@@ -668,7 +680,7 @@ class Popen(object):
                 errread = msvcrt.open_osfhandle(errread, 0)
             elif stderr == STDOUT:
                 errwrite = c2pwrite
-            elif type(stderr) == types.IntType:
+            elif isinstance(stderr, int):
                 errwrite = msvcrt.get_osfhandle(stderr)
             else:
                 # Assuming file-like object
@@ -716,7 +728,7 @@ class Popen(object):
 
             # Process startup details
             default_startupinfo = STARTUPINFO()
-            if startupinfo == None:
+            if startupinfo is None:
                 startupinfo = default_startupinfo
             if not None in (p2cread, c2pwrite, errwrite):
                 startupinfo.dwFlags |= STARTF_USESTDHANDLES
@@ -775,18 +787,18 @@ class Popen(object):
             # output pipe are maintained in this process or else the
             # pipe will not close when the child process exits and the
             # ReadFile will hang.
-            if p2cread != None:
+            if p2cread is not None:
                 p2cread.Close()
-            if c2pwrite != None:
+            if c2pwrite is not None:
                 c2pwrite.Close()
-            if errwrite != None:
+            if errwrite is not None:
                 errwrite.Close()
 
 
         def poll(self):
             """Check if child process has terminated.  Returns returncode
             attribute."""
-            if self.returncode == None:
+            if self.returncode is None:
                 if WaitForSingleObject(self._handle, 0) == WAIT_OBJECT_0:
                     self.returncode = GetExitCodeProcess(self._handle)
                     _active.remove(self)
@@ -796,7 +808,7 @@ class Popen(object):
         def wait(self):
             """Wait for child process to terminate.  Returns returncode
             attribute."""
-            if self.returncode == None:
+            if self.returncode is None:
                 obj = WaitForSingleObject(self._handle, INFINITE)
                 self.returncode = GetExitCodeProcess(self._handle)
                 _active.remove(self)
@@ -807,14 +819,7 @@ class Popen(object):
             buffer.append(fh.read())
 
 
-        def communicate(self, input=None):
-            """Interact with process: Send data to stdin.  Read data from
-            stdout and stderr, until end-of-file is reached.  Wait for
-            process to terminate.  The optional input argument should be a
-            string to be sent to the child process, or None, if no data
-            should be sent to the child.
-
-            communicate() returns a tuple (stdout, stderr)."""
+        def _communicate(self, input):
             stdout = None # Return
             stderr = None # Return
 
@@ -832,7 +837,7 @@ class Popen(object):
                 stderr_thread.start()
 
             if self.stdin:
-                if input != None:
+                if input is not None:
                     self.stdin.write(input)
                 self.stdin.close()
 
@@ -842,9 +847,9 @@ class Popen(object):
                 stderr_thread.join()
 
             # All data exchanged.  Translate lists into strings.
-            if stdout != None:
+            if stdout is not None:
                 stdout = stdout[0]
-            if stderr != None:
+            if stderr is not None:
                 stderr = stderr[0]
 
             # Translate newlines, if requested.  We cannot let the file
@@ -872,33 +877,33 @@ class Popen(object):
             c2pread, c2pwrite = None, None
             errread, errwrite = None, None
 
-            if stdin == None:
+            if stdin is None:
                 pass
             elif stdin == PIPE:
                 p2cread, p2cwrite = os.pipe()
-            elif type(stdin) == types.IntType:
+            elif isinstance(stdin, int):
                 p2cread = stdin
             else:
                 # Assuming file-like object
                 p2cread = stdin.fileno()
 
-            if stdout == None:
+            if stdout is None:
                 pass
             elif stdout == PIPE:
                 c2pread, c2pwrite = os.pipe()
-            elif type(stdout) == types.IntType:
+            elif isinstance(stdout, int):
                 c2pwrite = stdout
             else:
                 # Assuming file-like object
                 c2pwrite = stdout.fileno()
 
-            if stderr == None:
+            if stderr is None:
                 pass
             elif stderr == PIPE:
                 errread, errwrite = os.pipe()
             elif stderr == STDOUT:
                 errwrite = c2pwrite
-            elif type(stderr) == types.IntType:
+            elif isinstance(stderr, int):
                 errwrite = stderr
             else:
                 # Assuming file-like object
@@ -943,7 +948,7 @@ class Popen(object):
             if shell:
                 args = ["/bin/sh", "-c"] + args
 
-            if executable == None:
+            if executable is None:
                 executable = args[0]
 
             # For transferring possible exec failure from child to parent
@@ -986,13 +991,13 @@ class Popen(object):
                     if close_fds:
                         self._close_fds(but=errpipe_write)
 
-                    if cwd != None:
+                    if cwd is not None:
                         os.chdir(cwd)
 
                     if preexec_fn:
                         apply(preexec_fn)
 
-                    if env == None:
+                    if env is None:
                         os.execvp(executable, args)
                     else:
                         os.execvpe(executable, args, env)
@@ -1043,7 +1048,7 @@ class Popen(object):
         def poll(self):
             """Check if child process has terminated.  Returns returncode
             attribute."""
-            if self.returncode == None:
+            if self.returncode is None:
                 try:
                     pid, sts = os.waitpid(self.pid, os.WNOHANG)
                     if pid == self.pid:
@@ -1056,20 +1061,13 @@ class Popen(object):
         def wait(self):
             """Wait for child process to terminate.  Returns returncode
             attribute."""
-            if self.returncode == None:
+            if self.returncode is None:
                 pid, sts = os.waitpid(self.pid, 0)
                 self._handle_exitstatus(sts)
             return self.returncode
 
 
-        def communicate(self, input=None):
-            """Interact with process: Send data to stdin.  Read data from
-            stdout and stderr, until end-of-file is reached.  Wait for
-            process to terminate.  The optional input argument should be a
-            string to be sent to the child process, or None, if no data
-            should be sent to the child.
-
-            communicate() returns a tuple (stdout, stderr)."""
+        def _communicate(self, input):
             read_set = []
             write_set = []
             stdout = None # Return
@@ -1118,9 +1116,9 @@ class Popen(object):
                     stderr.append(data)
 
             # All data exchanged.  Translate lists into strings.
-            if stdout != None:
+            if stdout is not None:
                 stdout = ''.join(stdout)
-            if stderr != None:
+            if stderr is not None:
                 stderr = ''.join(stderr)
 
             # Translate newlines, if requested.  We cannot let the file

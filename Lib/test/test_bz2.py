@@ -37,7 +37,7 @@ class BaseTest(unittest.TestCase):
             return bz2.decompress(data)
 
 class BZ2FileTest(BaseTest):
-    "Test MCRYPT type miscelaneous methods."
+    "Test BZ2File type miscellaneous methods."
 
     def setUp(self):
         self.filename = TESTFN
@@ -234,6 +234,32 @@ class BZ2FileTest(BaseTest):
     def testOpenNonexistent(self):
         # "Test opening a nonexistent file"
         self.assertRaises(IOError, BZ2File, "/non/existent")
+
+    def testModeU(self):
+        # Bug #1194181: bz2.BZ2File opened for write with mode "U"
+        self.createTempFile()
+        bz2f = BZ2File(self.filename, "U")
+        bz2f.close()
+        f = file(self.filename)
+        f.seek(0, 2)
+        self.assertEqual(f.tell(), len(self.DATA))
+        f.close()
+
+    def testBug1191043(self):
+        # readlines() for files containing no newline
+        data = 'BZh91AY&SY\xd9b\x89]\x00\x00\x00\x03\x80\x04\x00\x02\x00\x0c\x00 \x00!\x9ah3M\x13<]\xc9\x14\xe1BCe\x8a%t'
+        f = open(self.filename, "wb")
+        f.write(data)
+        f.close()
+        bz2f = BZ2File(self.filename)
+        lines = bz2f.readlines()
+        bz2f.close()
+        self.assertEqual(lines, ['Test'])
+        bz2f = BZ2File(self.filename)
+        xlines = list(bz2f.xreadlines())
+        bz2f.close()
+        self.assertEqual(lines, ['Test'])
+
 
 class BZ2CompressorTest(BaseTest):
     def testCompress(self):

@@ -2,35 +2,7 @@ import unittest
 from test.test_support import run_unittest, TESTFN
 import glob
 import os
-
-def mkdirs(fname):
-    if os.path.exists(fname) or fname == '':
-        return
-    base, file = os.path.split(fname)
-    mkdirs(base)
-    os.mkdir(fname)
-
-def touchfile(fname):
-    base, file = os.path.split(fname)
-    mkdirs(base)
-    f = open(fname, 'w')
-    f.close()
-
-def deltree(fname):
-    for f in os.listdir(fname):
-        fullname = os.path.join(fname, f)
-        if os.path.isdir(fullname):
-            deltree(fullname)
-        else:
-            try:
-                os.unlink(fullname)
-            except:
-                pass
-    try:
-        os.rmdir(fname)
-    except:
-        pass
-
+import shutil
 
 class GlobTests(unittest.TestCase):
 
@@ -38,7 +10,12 @@ class GlobTests(unittest.TestCase):
         return os.path.normpath(os.path.join(self.tempdir, *parts))
 
     def mktemp(self, *parts):
-        touchfile(self.norm(*parts))
+        filename = self.norm(*parts)
+        base, file = os.path.split(filename)
+        if not os.path.exists(base):
+            os.makedirs(base)
+        f = open(filename, 'w')
+        f.close()
 
     def setUp(self):
         self.tempdir = TESTFN+"_dir"
@@ -53,7 +30,7 @@ class GlobTests(unittest.TestCase):
             os.symlink(self.norm('broken'), self.norm('sym2'))
 
     def tearDown(self):
-        deltree(self.tempdir)
+        shutil.rmtree(self.tempdir)
 
     def glob(self, *parts):
         if len(parts) == 1:
@@ -61,7 +38,9 @@ class GlobTests(unittest.TestCase):
         else:
             pattern = os.path.join(*parts)
         p = os.path.join(self.tempdir, pattern)
-        return glob.glob(p)
+        res = glob.glob(p)
+        self.assertEqual(list(glob.iglob(p)), res)
+        return res
 
     def assertSequencesEqual_noorder(self, l1, l2):
         self.assertEqual(set(l1), set(l2))

@@ -34,11 +34,21 @@ f.softspace = softspace    # merely shouldn't blow up
 for attr in 'name', 'mode', 'closed':
     try:
         setattr(f, attr, 'oops')
-    except TypeError:
+    except (AttributeError, TypeError):
         pass
     else:
-        raise TestFailed('expected TypeError setting file attr %r' % attr)
+        raise TestFailed('expected exception setting file attr %r' % attr)
 f.close()
+
+# check invalid mode strings
+for mode in ("", "aU", "wU+"):
+    try:
+        f = file(TESTFN, mode)
+    except ValueError:
+        pass
+    else:
+        f.close()
+        raise TestFailed('%r is an invalid file mode' % mode)
 
 # verify writelines with instance sequence
 l = UserList(['1', '2'])

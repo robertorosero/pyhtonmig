@@ -36,6 +36,12 @@ static PyThread_type_lock head_mutex = NULL; /* Protects interp->tstate_head */
 #define HEAD_INIT() (void)(head_mutex || (head_mutex = PyThread_allocate_lock()))
 #define HEAD_LOCK() PyThread_acquire_lock(head_mutex, WAIT_LOCK)
 #define HEAD_UNLOCK() PyThread_release_lock(head_mutex)
+
+/* The single PyInterpreterState used by this process'
+   GILState implementation
+*/
+static PyInterpreterState *autoInterpreterState = NULL;
+static int autoTLSkey = 0;
 #else
 #define HEAD_INIT() /* Nothing */
 #define HEAD_LOCK() /* Nothing */
@@ -46,6 +52,10 @@ static PyInterpreterState *interp_head = NULL;
 
 PyThreadState *_PyThreadState_Current = NULL;
 PyThreadFrameGetter _PyThreadState_GetFrame = NULL;
+
+#ifdef WITH_THREAD
+static void _PyGILState_NoteThreadState(PyThreadState* tstate);
+#endif
 
 
 PyInterpreterState *
@@ -180,6 +190,10 @@ PyThreadState_New(PyInterpreterState *interp)
 		tstate->c_profileobj = NULL;
 		tstate->c_traceobj = NULL;
 
+#ifdef WITH_THREAD
+		_PyGILState_NoteThreadState(tstate);
+#endif
+
 		HEAD_LOCK();
 		tstate->next = interp->tstate_head;
 		interp->tstate_head = tstate;
@@ -261,6 +275,8 @@ PyThreadState_DeleteCurrent()
 			"PyThreadState_DeleteCurrent: no current tstate");
 	_PyThreadState_Current = NULL;
 	tstate_delete_common(tstate);
+	if (autoTLSkey && PyThread_get_key_value(autoTLSkey) == tstate)
+		PyThread_delete_key_value(autoTLSkey);
 	PyEval_ReleaseLock();
 }
 #endif /* WITH_THREAD */
@@ -289,7 +305,7 @@ PyThreadState_Swap(PyThreadState *new)
 #if defined(Py_DEBUG) && defined(WITH_THREAD)
 	if (new) {
 		PyThreadState *check = PyGILState_GetThisThreadState();
-		if (check && check != new)
+		if (check && check->interp == new->interp && check != new)
 			Py_FatalError("Invalid thread state for this thread");
 	}
 #endif
@@ -320,7 +336,7 @@ PyThreadState_GetDict(void)
 
 /* Asynchronously raise an exception in a thread.
    Requested by Just van Rossum and Alex Martelli.
-   To prevent naive misuse, you must write your own exception
+   To prevent naive misuse, you must write your own extension
    to call this.  Must be called with the GIL held.
    Returns the number of tstates modified; if it returns a number
    greater than one, you're in trouble, and you should call it again
@@ -332,6 +348,7 @@ PyThreadState_SetAsyncExc(long id, PyObject *exc) {
 	PyInterpreterState *interp = tstate->interp;
 	PyThreadState *p;
 	int count = 0;
+	HEAD_LOCK();
 	for (p = interp->tstate_head; p != NULL; p = p->next) {
 		if (p->thread_id != id)
 			continue;
@@ -340,6 +357,7 @@ PyThreadState_SetAsyncExc(long id, PyObject *exc) {
 		p->async_exc = exc;
 		count += 1;
 	}
+	HEAD_UNLOCK();
 	return count;
 }
 
@@ -391,12 +409,6 @@ PyThreadState_IsCurrent(PyThreadState *tstate)
 	return tstate == _PyThreadState_Current;
 }
 
-/* The single PyInterpreterState used by this process'
-   GILState implementation
-*/
-static PyInterpreterState *autoInterpreterState = NULL;
-static int autoTLSkey = 0;
-
 /* Internal initialization/finalization functions called by
    Py_Initialize/Py_Finalize
 */
@@ -406,12 +418,10 @@ _PyGILState_Init(PyInterpreterState *i, PyThreadState *t)
 	assert(i && t); /* must init with valid states */
 	autoTLSkey = PyThread_create_key();
 	autoInterpreterState = i;
-	/* Now stash the thread state for this thread in TLS */
 	assert(PyThread_get_key_value(autoTLSkey) == NULL);
-	if (PyThread_set_key_value(autoTLSkey, (void *)t) < 0)
-		Py_FatalError("Couldn't create autoTLSkey mapping");
-	assert(t->gilstate_counter == 0); /* must be a new thread state */
-	t->gilstate_counter = 1;
+	assert(t->gilstate_counter == 0);
+
+	_PyGILState_NoteThreadState(t);
 }
 
 void
@@ -420,6 +430,41 @@ _PyGILState_Fini(void)
 	PyThread_delete_key(autoTLSkey);
 	autoTLSkey = 0;
 	autoInterpreterState = NULL;;
+}
+
+/* When a thread state is created for a thread by some mechanism other than
+   PyGILState_Ensure, it's important that the GILState machinery knows about
+   it so it doesn't try to create another thread state for the thread (this is
+   a better fix for SF bug #1010677 than the first one attempted).
+*/
+void
+_PyGILState_NoteThreadState(PyThreadState* tstate)
+{
+	/* If autoTLSkey is 0, this must be the very first threadstate created
+	   in Py_Initialize().  Don't do anything for now (we'll be back here
+	   when _PyGILState_Init is called). */
+	if (!autoTLSkey) 
+		return;
+	
+	/* Stick the thread state for this thread in thread local storage.
+
+	   The only situation where you can legitimately have more than one
+	   thread state for an OS level thread is when there are multiple
+	   interpreters, when:
+	       
+	       a) You shouldn't really be using the PyGILState_ APIs anyway,
+	          and:
+
+	       b) The slightly odd way PyThread_set_key_value works (see
+	          comments by its implementation) means that the first thread
+	          state created for that given OS level thread will "win",
+	          which seems reasonable behaviour.
+	*/
+	if (PyThread_set_key_value(autoTLSkey, (void *)tstate) < 0)
+		Py_FatalError("Couldn't create autoTLSkey mapping");
+
+	/* PyGILState_Release must not try to delete this thread state. */
+	tstate->gilstate_counter = 1;
 }
 
 /* The public functions */
@@ -448,8 +493,9 @@ PyGILState_Ensure(void)
 		tcur = PyThreadState_New(autoInterpreterState);
 		if (tcur == NULL)
 			Py_FatalError("Couldn't create thread-state for new thread");
-		if (PyThread_set_key_value(autoTLSkey, (void *)tcur) < 0)
-			Py_FatalError("Couldn't create autoTLSkey mapping");
+		/* This is our thread state!  We'll need to delete it in the
+		   matching call to PyGILState_Release(). */
+		tcur->gilstate_counter = 0;
 		current = 0; /* new thread state is never current */
 	}
 	else
@@ -496,11 +542,9 @@ PyGILState_Release(PyGILState_STATE oldstate)
 		 * habit of coming back).
 		 */
 		PyThreadState_DeleteCurrent();
-		/* Delete this thread from our TLS. */
-		PyThread_delete_key_value(autoTLSkey);
 	}
 	/* Release the lock if necessary */
 	else if (oldstate == PyGILState_UNLOCKED)
-		PyEval_ReleaseThread(tcur);
+		PyEval_SaveThread();
 }
 #endif /* WITH_THREAD */

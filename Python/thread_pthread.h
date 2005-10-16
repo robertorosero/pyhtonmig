@@ -16,8 +16,14 @@
    family of functions must indicate this by defining
    _POSIX_SEMAPHORES. */   
 #ifdef _POSIX_SEMAPHORES
+/* On FreeBSD 4.x, _POSIX_SEMAPHORES is defined empty, so 
+   we need to add 0 to make it work there as well. */
+#if (_POSIX_SEMAPHORES+0) == -1
+#define HAVE_BROKEN_POSIX_SEMAPHORES
+#else
 #include <semaphore.h>
 #include <errno.h>
+#endif
 #endif
 
 #if !defined(pthread_attr_default)
@@ -349,8 +355,8 @@ PyThread_allocate_lock(void)
 		PyThread_init_thread();
 
 	lock = (pthread_lock *) malloc(sizeof(pthread_lock));
-	memset((void *)lock, '\0', sizeof(pthread_lock));
 	if (lock) {
+		memset((void *)lock, '\0', sizeof(pthread_lock));
 		lock->locked = 0;
 
 		status = pthread_mutex_init(&lock->mut,

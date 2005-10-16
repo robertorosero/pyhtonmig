@@ -171,8 +171,8 @@ class PyBuildExt(build_ext):
         # unfortunately, distutils doesn't let us provide separate C and C++
         # compilers
         if compiler is not None:
-            (ccshared,opt,base) = sysconfig.get_config_vars('CCSHARED','OPT','BASECFLAGS')
-            args['compiler_so'] = compiler + ' ' + opt + ' ' + ccshared + ' ' + base
+            (ccshared,cflags) = sysconfig.get_config_vars('CCSHARED','CFLAGS')
+            args['compiler_so'] = compiler + ' ' + ccshared + ' ' + cflags
         self.compiler.set_executables(**args)
 
         build_ext.build_extensions(self)
@@ -295,6 +295,9 @@ class PyBuildExt(build_ext):
         inc_dirs = self.compiler.include_dirs + ['/usr/include']
         exts = []
 
+        config_h = sysconfig.get_config_h_filename()
+        config_h_vars = sysconfig.parse_config_h(open(config_h))
+
         platform = self.get_platform()
         (srcdir,) = sysconfig.get_config_vars('srcdir')
 
@@ -355,6 +358,8 @@ class PyBuildExt(build_ext):
         exts.append( Extension("_heapq", ["_heapqmodule.c"]) )
         # operator.add() and similar goodies
         exts.append( Extension('operator', ['operator.c']) )
+        # functional
+        exts.append( Extension("functional", ["functionalmodule.c"]) )
         # Python C API test module
         exts.append( Extension('_testcapi', ['_testcapimodule.c']) )
         # static Unicode character database
@@ -384,21 +389,16 @@ class PyBuildExt(build_ext):
         # fcntl(2) and ioctl(2)
         exts.append( Extension('fcntl', ['fcntlmodule.c']) )
         if platform not in ['mac']:
-                # pwd(3)
+            # pwd(3)
             exts.append( Extension('pwd', ['pwdmodule.c']) )
             # grp(3)
             exts.append( Extension('grp', ['grpmodule.c']) )
+            # spwd, shadow passwords
+            if (config_h_vars.get('HAVE_GETSPNAM', False) or
+                    config_h_vars.get('HAVE_GETSPENT', False)):
+                exts.append( Extension('spwd', ['spwdmodule.c']) )
         # select(2); not on ancient System V
         exts.append( Extension('select', ['selectmodule.c']) )
-
-        # The md5 module implements the RSA Data Security, Inc. MD5
-        # Message-Digest Algorithm, described in RFC 1321.  The
-        # necessary files md5c.c and md5.h are included here.
-        exts.append( Extension('md5', ['md5module.c', 'md5c.c']) )
-
-        # The sha module implements the SHA checksum algorithm.
-        # (NIST's Secure Hash Algorithm.)
-        exts.append( Extension('sha', ['shamodule.c']) )
 
         # Helper module for various ascii-encoders
         exts.append( Extension('binascii', ['binascii.c']) )
@@ -474,10 +474,12 @@ class PyBuildExt(build_ext):
         exts.append( Extension('_socket', ['socketmodule.c'],
                                depends = ['socketmodule.h']) )
         # Detect SSL support for the socket module (via _ssl)
-        ssl_incs = find_file('openssl/ssl.h', inc_dirs,
-                             ['/usr/local/ssl/include',
+        search_for_ssl_incs_in = [
+                              '/usr/local/ssl/include',
                               '/usr/contrib/ssl/include/'
                              ]
+        ssl_incs = find_file('openssl/ssl.h', inc_dirs,
+                             search_for_ssl_incs_in
                              )
         if ssl_incs is not None:
             krb5_h = find_file('krb5.h', inc_dirs,
@@ -496,6 +498,52 @@ class PyBuildExt(build_ext):
                                    library_dirs = ssl_libs,
                                    libraries = ['ssl', 'crypto'],
                                    depends = ['socketmodule.h']), )
+
+        # find out which version of OpenSSL we have
+        openssl_ver = 0
+        openssl_ver_re = re.compile(
+            '^\s*#\s*define\s+OPENSSL_VERSION_NUMBER\s+(0x[0-9a-fA-F]+)' )
+        for ssl_inc_dir in inc_dirs + search_for_ssl_incs_in:
+            name = os.path.join(ssl_inc_dir, 'openssl', 'opensslv.h')
+            if os.path.isfile(name):
+                try:
+                    incfile = open(name, 'r')
+                    for line in incfile:
+                        m = openssl_ver_re.match(line)
+                        if m:
+                            openssl_ver = eval(m.group(1))
+                            break
+                except IOError:
+                    pass
+
+            # first version found is what we'll use (as the compiler should)
+            if openssl_ver:
+                break
+
+        #print 'openssl_ver = 0x%08x' % openssl_ver
+
+        if (ssl_incs is not None and
+            ssl_libs is not None and
+            openssl_ver >= 0x00907000):
+            # The _hashlib module wraps optimized implementations
+            # of hash functions from the OpenSSL library.
+            exts.append( Extension('_hashlib', ['_hashopenssl.c'],
+                                   include_dirs = ssl_incs,
+                                   library_dirs = ssl_libs,
+                                   libraries = ['ssl', 'crypto']) )
+        else:
+            # The _sha module implements the SHA1 hash algorithm.
+            exts.append( Extension('_sha', ['shamodule.c']) )
+            # The _md5 module implements the RSA Data Security, Inc. MD5
+            # Message-Digest Algorithm, described in RFC 1321.  The
+            # necessary files md5c.c and md5.h are included here.
+            exts.append( Extension('_md5', ['md5module.c', 'md5c.c']) )
+
+        if (openssl_ver < 0x00908000):
+            # OpenSSL doesn't do these until 0.9.8 so we'll bring our own hash
+            exts.append( Extension('_sha256', ['sha256module.c']) )
+            exts.append( Extension('_sha512', ['sha512module.c']) )
+
 
         # Modules that provide persistent dictionary-like semantics.  You will
         # probably want to arrange for at least one of them to be available on
@@ -592,7 +640,9 @@ class PyBuildExt(build_ext):
                 # XXX should we -ever- look for a dbX name?  Do any
                 # systems really not name their library by version and
                 # symlink to more general names?
-                for dblib in (('db-%d.%d' % db_ver), ('db%d' % db_ver[0])):
+                for dblib in (('db-%d.%d' % db_ver),
+                              ('db%d%d' % db_ver),
+                              ('db%d' % db_ver[0])):
                     dblib_file = self.compiler.find_library_file(
                                     db_dirs_to_check + lib_dirs, dblib )
                     if dblib_file:
@@ -777,8 +827,6 @@ class PyBuildExt(build_ext):
             ('BYTEORDER', xmlbo),
             ('XML_CONTEXT_BYTES','1024'),
             ]
-        config_h = sysconfig.get_config_h_filename()
-        config_h_vars = sysconfig.parse_config_h(open(config_h))
         for feature_macro in ['HAVE_MEMMOVE', 'HAVE_BCOPY']:
             if config_h_vars.has_key(feature_macro):
                 define_macros.append((feature_macro, '1'))
@@ -793,11 +841,12 @@ class PyBuildExt(build_ext):
                               ))
 
         # Hye-Shik Chang's CJKCodecs modules.
-        exts.append(Extension('_multibytecodec',
-                              ['cjkcodecs/multibytecodec.c']))
-        for loc in ('kr', 'jp', 'cn', 'tw', 'hk', 'iso2022'):
-            exts.append(Extension('_codecs_' + loc,
-                                  ['cjkcodecs/_codecs_%s.c' % loc]))
+        if have_unicode:
+            exts.append(Extension('_multibytecodec',
+                                  ['cjkcodecs/multibytecodec.c']))
+            for loc in ('kr', 'jp', 'cn', 'tw', 'hk', 'iso2022'):
+                exts.append(Extension('_codecs_' + loc,
+                                      ['cjkcodecs/_codecs_%s.c' % loc]))
 
         # Dynamic loading module
         if sys.maxint == 0x7fffffff:
@@ -811,7 +860,8 @@ class PyBuildExt(build_ext):
             # Linux-specific modules
             exts.append( Extension('linuxaudiodev', ['linuxaudiodev.c']) )
 
-        if platform in ('linux2', 'freebsd4', 'freebsd5', 'freebsd6'):
+        if platform in ('linux2', 'freebsd4', 'freebsd5', 'freebsd6',
+                        'freebsd7'):
             exts.append( Extension('ossaudiodev', ['ossaudiodev.c']) )
 
         if platform == 'sunos5':

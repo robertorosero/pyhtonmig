@@ -60,6 +60,32 @@ def my_import(name):
   complex number, its magnitude is returned.
 \end{funcdesc}
 
+\begin{funcdesc}{all}{iterable}
+  Return True if all elements of the \var{iterable} are true.
+  Equivalent to:
+  \begin{verbatim}
+     def all(iterable):
+         for element in iterable:
+             if not element:
+                 return False
+         return True
+  \end{verbatim}
+  \versionadded{2.5}
+\end{funcdesc}
+
+\begin{funcdesc}{any}{iterable}
+  Return True if any element of the \var{iterable} is true.
+  Equivalent to:
+  \begin{verbatim}
+     def any(iterable):
+         for element in iterable:
+             if element:
+                 return True
+         return False
+  \end{verbatim}
+  \versionadded{2.5}
+\end{funcdesc}
+
 \begin{funcdesc}{basestring}{}
   This abstract type is the superclass for \class{str} and \class{unicode}.
   It cannot be called or instantiated, but it can be used to test whether
@@ -271,7 +297,7 @@ class C:
   consisting of their quotient and remainder when using long division.  With
   mixed operand types, the rules for binary arithmetic operators apply.  For
   plain and long integers, the result is the same as
-  \code{(\var{a} / \var{b}, \var{a} \%{} \var{b})}.
+  \code{(\var{a} // \var{b}, \var{a} \%{} \var{b})}.
   For floating point numbers the result is \code{(\var{q}, \var{a} \%{}
   \var{b})}, where \var{q} is usually \code{math.floor(\var{a} /
   \var{b})} but may be 1 less than that.  In any case \code{\var{q} *
@@ -416,9 +442,12 @@ class C:
     after any I/O has been performed, and there's no reliable way to
     determine whether this is the case.}
 
-  The \function{file()} constructor is new in Python 2.2.  The previous
-  spelling, \function{open()}, is retained for compatibility, and is an
-  alias for \function{file()}.
+  The \function{file()} constructor is new in Python 2.2 and is an
+  alias for \function{open()}.  Both spellings are equivalent.  The
+  intent is for \function{open()} to continue to be preferred for use
+  as a factory function which returns a new \class{file} object.  The
+  spelling, \class{file} is more suited to type testing (for example,
+  writing \samp{isinstance(f, file)}).
 \end{funcdesc}
 
 \begin{funcdesc}{filter}{function, list}
@@ -654,7 +683,7 @@ class C:
   \versionchanged[Added support for the optional \var{key} argument]{2.5}
 \end{funcdesc}
 
-\begin{funcdesc}{min}{s\optional{, args...}}
+\begin{funcdesc}{min}{s\optional{, args...}\optional{key}}
   With a single argument \var{s}, return the smallest item of a
   non-empty sequence (such as a string, tuple or list).  With more
   than one argument, return the smallest of the arguments.
@@ -687,11 +716,16 @@ class C:
 \end{funcdesc}
 
 \begin{funcdesc}{ord}{c}
-  Return the \ASCII{} value of a string of one character or a Unicode
-  character.  E.g., \code{ord('a')} returns the integer \code{97},
+  Given a string of length one, return an integer representing the
+  Unicode code point of the character when the argument is a unicode object,
+  or the value of the byte when the argument is an 8-bit string.
+  For example, \code{ord('a')} returns the integer \code{97},
   \code{ord(u'\e u2020')} returns \code{8224}.  This is the inverse of
-  \function{chr()} for strings and of \function{unichr()} for Unicode
-  characters.
+  \function{chr()} for 8-bit strings and of \function{unichr()} for unicode
+  objects.  If a unicode argument is given and Python was built with
+  UCS2 Unicode, then the character's code point must be in the range
+  [0..65535] inclusive; otherwise the string length is two, and a
+  \exception{TypeError} will be raised.
 \end{funcdesc}
 
 \begin{funcdesc}{pow}{x, y\optional{, z}}
@@ -726,6 +760,7 @@ class C:
 
 \begin{verbatim}
 class C(object):
+    def __init__(self): self.__x = None
     def getx(self): return self.__x
     def setx(self, value): self.__x = value
     def delx(self): del self.__x
@@ -745,7 +780,7 @@ class C(object):
   \var{start} + 2 * \var{step}, \ldots]}.  If \var{step} is positive,
   the last element is the largest \code{\var{start} + \var{i} *
   \var{step}} less than \var{stop}; if \var{step} is negative, the last
-  element is the largest \code{\var{start} + \var{i} * \var{step}}
+  element is the smallest \code{\var{start} + \var{i} * \var{step}}
   greater than \var{stop}.  \var{step} must not be zero (or else
   \exception{ValueError} is raised).  Example:
 
@@ -1022,33 +1057,38 @@ class C(B):
 
 \begin{funcdesc}{type}{object}
   Return the type of an \var{object}.  The return value is a
-  type\obindex{type} object.  The standard module
-  \module{types}\refstmodindex{types} defines names for all built-in
-  types that don't already have built-in names.
-  For instance:
+  type\obindex{type} object.  The \function{isinstance()} built-in
+  function is recommended for testing the type of an object.
+
+  With three arguments, \function{type} functions as a constructor
+  as detailed below.
+\end{funcdesc}
+
+\begin{funcdesc}{type}{name, bases, dict}
+  Return a new type object.  This is essentially a dynamic form of the
+  \keyword{class} statement. The \var{name} string is the class name
+  and becomes the \member{__name__} attribute; the \var{bases} tuple
+  itemizes the base classes and becomes the \member{__bases__}
+  attribute; and the \var{dict} dictionary is the namespace containing
+  definitions for class body and becomes the \member{__dict__}
+  attribute.  For example, the following two statements create
+  identical \class{type} objects:
 
 \begin{verbatim}
->>> import types
->>> x = 'abc'
->>> if type(x) is str: print "It's a string"
-...
-It's a string
->>> def f(): pass
-...
->>> if type(f) is types.FunctionType: print "It's a function"
-...
-It's a function
+  >>> class X(object):
+  ...     a = 1
+  ...     
+  >>> X = type('X', (object,), dict(a=1))
 \end{verbatim}
-
-  The \function{isinstance()} built-in function is recommended for
-  testing the type of an object.
+\versionadded{2.2}          
 \end{funcdesc}
 
 \begin{funcdesc}{unichr}{i}
   Return the Unicode string of one character whose Unicode code is the
   integer \var{i}.  For example, \code{unichr(97)} returns the string
   \code{u'a'}.  This is the inverse of \function{ord()} for Unicode
-  strings.  The argument must be in the range [0..65535], inclusive.
+  strings.  The valid range for the argument depends how Python was
+  configured -- it may be either UCS2 [0..0xFFFF] or UCS4 [0..0x10FFFF].
   \exception{ValueError} is raised otherwise.
   \versionadded{2.0}
 \end{funcdesc}
@@ -1118,12 +1158,12 @@ It's a function
         that the number of elements fit in a native C long.}
 \end{funcdesc}
 
-\begin{funcdesc}{zip}{\optional{seq1, \moreargs}}
+\begin{funcdesc}{zip}{\optional{iterable, \moreargs}}
   This function returns a list of tuples, where the \var{i}-th tuple contains
-  the \var{i}-th element from each of the argument sequences.
+  the \var{i}-th element from each of the argument sequences or iterables.
   The returned list is truncated in length to the length of
-  the shortest argument sequence.  When there are multiple argument
-  sequences which are all of the same length, \function{zip()} is
+  the shortest argument sequence.  When there are multiple arguments
+  which are all of the same length, \function{zip()} is
   similar to \function{map()} with an initial argument of \code{None}.
   With a single sequence argument, it returns a list of 1-tuples.
   With no arguments, it returns an empty list.
@@ -1142,7 +1182,7 @@ It's a function
 
 There are several built-in functions that are no longer essential to learn,
 know or use in modern Python programming.  They have been kept here to
-maintain backwards compatability with programs written for older versions
+maintain backwards compatibility with programs written for older versions
 of Python.
 
 Python programmers, trainers, students and bookwriters should feel free to

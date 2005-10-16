@@ -50,7 +50,7 @@ stream server is the address family, which is simply repeated in both
 unix server classes.
 
 Forking and threading versions of each type of server can be created
-using the ForkingServer and ThreadingServer mix-in classes.  For
+using the ForkingMixIn and ThreadingMixIn mix-in classes.  For
 instance, a threading UDP server class is created as follows:
 
         class ThreadingUDPServer(ThreadingMixIn, UDPServer): pass
@@ -65,8 +65,8 @@ various versions of the service by combining one of the server classes
 with your request handler class.
 
 The request handler class must be different for datagram or stream
-services.  This can be hidden by using the mix-in request handler
-classes StreamRequestHandler or DatagramRequestHandler.
+services.  This can be hidden by using the request handler
+subclasses StreamRequestHandler or DatagramRequestHandler.
 
 Of course, you still have to use your head!
 

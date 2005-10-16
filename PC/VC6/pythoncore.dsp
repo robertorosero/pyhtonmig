@@ -301,6 +301,10 @@ SOURCE=..\..\Objects\funcobject.c
 # End Source File
 # Begin Source File
 
+SOURCE=..\..\Modules\functionalmodule.c
+# End Source File
+# Begin Source File
+
 SOURCE=..\..\Python\future.c
 # End Source File
 # Begin Source File
@@ -532,6 +536,14 @@ SOURCE=..\..\Objects\setobject.c
 # Begin Source File
 
 SOURCE=..\..\Modules\shamodule.c
+# End Source File
+# Begin Source File
+
+SOURCE=..\..\Modules\sha256module.c
+# End Source File
+# Begin Source File
+
+SOURCE=..\..\Modules\sha512module.c
 # End Source File
 # Begin Source File
 
