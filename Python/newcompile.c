@@ -1544,7 +1544,7 @@ opcode_stack_effect(int opcode, int oparg)
 		case EXEC_STMT:
 			return -3;
 		case YIELD_VALUE:
-			return -1;
+			return 0;
 
 		case POP_BLOCK:
 			return 0;
