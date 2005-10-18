@@ -235,7 +235,7 @@ PYTHON_OBJS=	\
 		Python/bltinmodule.o \
 		Python/exceptions.o \
 		Python/ceval.o \
-		Python/newcompile.o \
+		Python/compile.o \
 		Python/codecs.o \
 		Python/errors.o \
 		Python/frozen.o \

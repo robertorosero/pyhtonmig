@@ -2291,7 +2291,7 @@
 			</FileConfiguration>
 		</File>
 		<File
-			RelativePath="..\Python\newcompile.c">
+			RelativePath="..\Python\compile.c">
 		</File>
 		<File
 			RelativePath="..\Parser\node.c">
