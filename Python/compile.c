@@ -1060,6 +1060,9 @@ compiler_enter_scope(struct compiler *c, identifier name, void *key,
 	struct compiler_unit *u;
 
 	u = PyObject_Malloc(sizeof(struct compiler_unit));
+	if (!u)
+		return 0;
+
         memset(u, 0, sizeof(struct compiler_unit));
 	u->u_argcount = 0;
 	u->u_ste = PySymtable_Lookup(c->c_st, key);
@@ -1070,9 +1073,21 @@ compiler_enter_scope(struct compiler *c, identifier name, void *key,
 	Py_INCREF(name);
 	u->u_name = name;
 	u->u_varnames = list2dict(u->u_ste->ste_varnames);
+	if (!u->u_varnames) {
+                compiler_unit_free(u);
+		return 0;
+	}
 	u->u_cellvars = dictbytype(u->u_ste->ste_symbols, CELL, 0, 0);
+	if (!u->u_cellvars) {
+                compiler_unit_free(u);
+		return 0;
+	}
 	u->u_freevars = dictbytype(u->u_ste->ste_symbols, FREE, DEF_FREE_CLASS,
                                    PyDict_Size(u->u_cellvars));
+	if (!u->u_freevars) {
+                compiler_unit_free(u);
+		return 0;
+	}
 
 	u->u_blocks = NULL;
 	u->u_tmpname = 0;
