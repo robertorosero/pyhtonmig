@@ -53,11 +53,11 @@ class CallTip:
         self.text = text
         if self.tipwindow or not self.text:
             return
-        
+
         self.widget.mark_set(MARK_RIGHT, parenright)
         self.parenline, self.parencol = map(
             int, self.widget.index(parenleft).split("."))
-                             
+
         self.tipwindow = tw = Toplevel(self.widget)
         self.position_window()
         # XXX 12 Dec 2002 KBK The following command has two effects: It removes

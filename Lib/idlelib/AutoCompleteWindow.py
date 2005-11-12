@@ -102,7 +102,7 @@ class AutoCompleteWindow:
               self.completions[first][i] == self.completions[last][i]:
             i += 1
         return self.completions[first][:i]
-        
+
     def _selection_changed(self):
         """Should be called when the selection of the Listbox has changed.
         Updates the Listbox display and calls _change_start."""
@@ -160,7 +160,7 @@ class AutoCompleteWindow:
                 return
         self.userwantswindow = userWantsWin
         self.lasttypedstart = self.start
-        
+
         # Put widgets in place
         self.autocompletewindow = acw = Toplevel(self.widget)
         # Put it in a position so that it is not seen.
@@ -171,7 +171,7 @@ class AutoCompleteWindow:
             # This command is only needed and available on Tk >= 8.4.0 for OSX
             # Without it, call tips intrude on the typing process by grabbing
             # the focus.
-            acw.tk.call("::tk::unsupported::MacWindowStyle", "style", acw._w, 
+            acw.tk.call("::tk::unsupported::MacWindowStyle", "style", acw._w,
                         "help", "noActivates")
         except TclError:
             pass
@@ -185,7 +185,7 @@ class AutoCompleteWindow:
         scrollbar.config(command=listbox.yview)
         scrollbar.pack(side=RIGHT, fill=Y)
         listbox.pack(side=LEFT, fill=BOTH, expand=True)
-        
+
         # Initialize the listbox selection
         self.listbox.select_set(self._binary_search(self.start))
         self._selection_changed()
@@ -218,7 +218,7 @@ class AutoCompleteWindow:
         acw.wm_geometry("+%d+%d" % (x + self.widget.winfo_rootx(),
                                     y + self.widget.winfo_rooty() \
                                     -acw.winfo_height()))
-        
+
 
     def hide_event(self, event):
         if not self.is_active():
@@ -236,7 +236,7 @@ class AutoCompleteWindow:
         cursel = int(self.listbox.curselection()[0])
         self._change_start(self.completions[cursel])
         self.hide_window()
-        
+
     def keypress_event(self, event):
         if not self.is_active():
             return
@@ -245,7 +245,7 @@ class AutoCompleteWindow:
             state = event.mc_state
         else:
             state = 0
-            
+
         if (len(keysym) == 1 or keysym in ("underscore", "BackSpace")
             or (self.mode==AutoComplete.COMPLETE_FILES and keysym in
                 ("period", "minus"))) \
@@ -270,7 +270,7 @@ class AutoCompleteWindow:
             self.listbox.select_set(self._binary_search(self.start))
             self._selection_changed()
             return "break"
-        
+
         elif keysym == "Return" and not state:
             # If start is a prefix of the selection, or there was an indication
             # that the user used the completion window, put the selected
@@ -391,5 +391,3 @@ class AutoCompleteWindow:
         self.listbox = None
         self.autocompletewindow.destroy()
         self.autocompletewindow = None
-        
-    

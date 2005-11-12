@@ -18,16 +18,16 @@ class HyperParser:
         """Initialize the HyperParser to analyze the surroundings of the given
         index.
         """
-        
+
         self.editwin = editwin
         self.text = text = editwin.text
 
         parser = PyParse.Parser(editwin.indentwidth, editwin.tabwidth)
-        
+
         def index2line(index):
             return int(float(index))
         lno = index2line(text.index(index))
-        
+
         if not editwin.context_use_ps1:
             for context in editwin.num_context_lines:
                 startat = max(lno - context, 1)
@@ -145,7 +145,7 @@ class HyperParser:
     _id_chars = string.ascii_letters + string.digits + "_"
     # This string includes all chars that may be the first char of an identifier
     _id_first_chars = string.ascii_letters + "_"
-    
+
     # Given a string and pos, return the number of chars in the identifier
     # which ends at pos, or 0 if there is no such one. Saved words are not
     # identifiers.
@@ -157,7 +157,7 @@ class HyperParser:
                         keyword.iskeyword(str[i:pos])):
             i = pos
         return pos - i
-    
+
     def get_expression(self):
         """Return a string with the Python expression which ends at the given
         index, which is empty if there is no real one.
@@ -165,17 +165,17 @@ class HyperParser:
         if not self.is_in_code():
             raise ValueError("get_expression should only be called if index "\
                              "is inside a code.")
-        
+
         rawtext = self.rawtext
         bracketing = self.bracketing
-        
+
         brck_index = self.indexbracket
         brck_limit = bracketing[brck_index][0]
         pos = self.indexinrawtext
 
         last_identifier_pos = pos
         postdot_phase = True
-        
+
         while 1:
             # Eat whitespaces, comments, and if postdot_phase is False - one dot
             while 1:
@@ -212,7 +212,7 @@ class HyperParser:
                 # Now, in order to continue the search, we must find a dot.
                 postdot_phase = False
                 # (the loop continues now)
-            
+
             elif pos == brck_limit:
                 # We are at a bracketing limit. If it is a closing bracket,
                 # eat the bracket, otherwise, stop the search.
@@ -237,6 +237,5 @@ class HyperParser:
             else:
                 # We've found an operator or something.
                 break
-            
-        return rawtext[last_identifier_pos:self.indexinrawtext]
 
+        return rawtext[last_identifier_pos:self.indexinrawtext]

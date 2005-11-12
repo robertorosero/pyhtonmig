@@ -1112,7 +1112,7 @@ class ConfigDialog(Toplevel):
         winInstances=self.parent.instance_dict.keys()
         for instance in winInstances:
             instance.RemoveKeybindings()
-    
+
     def ActivateConfigChanges(self):
         "Dynamically apply configuration changes"
         winInstances=self.parent.instance_dict.keys()

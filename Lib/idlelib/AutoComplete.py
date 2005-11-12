@@ -116,7 +116,7 @@ class AutoComplete:
         if self._delayed_completion_id is not None:
             self.text.after_cancel(self._delayed_completion_id)
             self._delayed_completion_id = None
-            
+
         hp = HyperParser(self.editwin, "insert")
         curline = self.text.get("insert linestart", "insert")
         i = j = len(curline)
@@ -159,11 +159,11 @@ class AutoComplete:
                                             mode,
                                             userWantsWin)
         return True
-        
+
     def fetch_completions(self, what, mode):
         """Return a pair of lists of completions for something. The first list
         is a sublist of the second. Both are sorted.
-        
+
         If there is a Python subprocess, get the comp. list there.  Otherwise,
         either fetch_completions() is running in the subprocess itself or it
         was called in an IDLE EditorWindow before any script had been run.
@@ -171,7 +171,7 @@ class AutoComplete:
         The subprocess environment is that of the most recently run script.  If
         two unrelated modules are being edited some calltips in the current
         module may be inoperative if the module was not the last to run.
-        """  
+        """
         try:
             rpcclt = self.editwin.flist.pyshell.interp.rpcclt
         except:
@@ -203,7 +203,7 @@ class AutoComplete:
                             smalll = filter(lambda s: s[:1] != '_', bigl)
                     except:
                         return [], []
-            
+
             elif mode == COMPLETE_FILES:
                 if what == "":
                     what = "."

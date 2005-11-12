@@ -1105,7 +1105,7 @@ class EditorWindow(object):
                 rawtext = text.get(startatindex, "insert")
                 y.set_str(rawtext)
                 y.set_lo(0)
-                
+
             c = y.get_continuation_type()
             if c != PyParse.C_NONE:
                 # The current stmt hasn't ended yet.

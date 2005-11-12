@@ -160,7 +160,7 @@ class _ComplexBinder:
             if r:
                 return r
         return handler
-        
+
     def __init__(self, type, widget, widgetinst):
         self.type = type
         self.typename = _types[type][0]
@@ -231,7 +231,7 @@ _binder_classes = (_ComplexBinder,) * 4 + (_SimpleBinder,) * (len(_types)-4)
 _type_names = dict([(name, number)
                      for number in range(len(_types))
                      for name in _types[number]])
-            
+
 _keysym_re = re.compile(r"^\w+$")
 _button_re = re.compile(r"^[1-5]$")
 def _parse_sequence(sequence):
@@ -266,7 +266,7 @@ def _parse_sequence(sequence):
             type_re = _keysym_re
         else:
             type_re = _button_re
-            
+
         if not words:
             detail = None
         elif len(words) == 1 and type_re.match(words[0]):
@@ -336,7 +336,7 @@ def MultiCallCreator(widget):
             #print "event_add(%s,%s) was called"%(repr(virtual),repr(sequences))
             if virtual not in self.__eventinfo:
                 self.__eventinfo[virtual] = [None, []]
-        
+
             func, triplets = self.__eventinfo[virtual]
             for seq in sequences:
                 triplet = _parse_sequence(seq)
@@ -374,7 +374,7 @@ def MultiCallCreator(widget):
                 if func:
                     for triplet in triplets:
                         self.__binders[triplet[1]].unbind(triplet, func)
-                    
+
 
     _multicall_dict[widget] = MultiCall
     return MultiCall

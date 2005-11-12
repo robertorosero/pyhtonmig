@@ -73,7 +73,7 @@ class ParenMatch:
             for seq in self.RESTORE_SEQUENCES:
                 self.text.event_add(self.RESTORE_VIRTUAL_EVENT_NAME, seq)
             self.is_restore_active = True
-        
+
     def deactivate_restore(self):
         if self.is_restore_active:
             for seq in self.RESTORE_SEQUENCES:
@@ -169,4 +169,3 @@ class ParenMatch:
         self.editwin.text_frame.after(self.FLASH_DELAY,
                                       lambda self=self, c=self.counter: \
                                       self.handle_restore_timer(c))
-
