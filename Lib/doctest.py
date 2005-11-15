@@ -1960,7 +1960,9 @@ def testfile(filename, module_relative=True, name=None, package=None,
 
     # Read the file, convert it to a test, and run it.
     s = open(filename).read()
-    if encoding:
+    if encoding is None:
+        encoding = pep263_encoding(s)
+    if encoding is not None:
         s = s.decode(encoding)
     test = parser.get_doctest(s, globs, name, filename, 0)
     runner.run(test)
@@ -1974,6 +1976,17 @@ def testfile(filename, module_relative=True, name=None, package=None,
         master.merge(runner)
 
     return runner.failures, runner.tries
+
+pep263_re_search = re.compile("coding[:=]\s*([-\w.]+)").search
+def pep263_encoding(s):
+    """Try to find the encoding of a string by looking for a pep263 coding.
+    """
+    for line in s.split('\n')[:2]:
+        r = pep263_re_search(line)
+        if r:
+            return r.group(1)
+
+    
 
 def run_docstring_examples(f, globs, verbose=False, name="NoName",
                            compileflags=None, optionflags=0):
@@ -2354,7 +2367,9 @@ def DocFileTest(path, module_relative=True, package=None,
     doc = open(path).read()
 
     # If an encoding is specified, use it to convert the file to unicode
-    if encoding:
+    if encoding is None:
+        encoding = pep263_encoding(doc)
+    if encoding is not None:
         doc = doc.decode(encoding)
 
     # Convert it to a test, and wrap it in a DocFileCase.

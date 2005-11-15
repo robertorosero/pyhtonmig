@@ -2037,6 +2037,26 @@ def test_DocFileSuite():
          >>> suite.run(unittest.TestResult())
          <unittest.TestResult run=3 errors=0 failures=2>
 
+       Encoding can also be specified in the test file itself,
+       following the same rules as defined by PEP 263,
+       http://www.python.org/peps/pep-0263.html.
+
+         >>> suite = doctest.DocFileSuite('test_doctest5.txt')
+         >>> suite.run(unittest.TestResult())
+         <unittest.TestResult run=1 errors=0 failures=0>
+
+         >>> suite = doctest.DocFileSuite('test_doctest6.txt')
+         >>> suite.run(unittest.TestResult())
+         <unittest.TestResult run=1 errors=0 failures=0>
+
+       The 2 examples above illustrate some valid PEP 263 encoding
+       examples. The example below failes because the coding is in the
+       last line:
+
+         >>> suite = doctest.DocFileSuite('test_doctest7.txt')
+         >>> suite.run(unittest.TestResult())
+         <unittest.TestResult run=1 errors=0 failures=1>
+
        """
 
 def test_trailing_space_in_test():
@@ -2269,6 +2289,31 @@ using the optional keyword argument `encoding`:
     >>> doctest.testfile('test_doctest4.txt', encoding='utf-8')
     (0, 4)
     >>> doctest.master = None  # Reset master.
+
+Encoding can also be specified in the test file itself, following the
+same rules as defined by PEP 263, http://www.python.org/peps/pep-0263.html.
+
+    >>> doctest.testfile('test_doctest5.txt')
+    (0, 4)
+
+    >>> doctest.testfile('test_doctest6.txt')
+    (0, 4)
+
+The 2 examples above illustrate some valid PEP 263 encoding
+examples. The example below failes because the coding is in the last
+line:
+
+    >>> doctest.testfile('test_doctest7.txt') # doctest: +ELLIPSIS
+    **********************************************************************
+    File "...test_doctest7.txt", line 11, in test_doctest7.txt
+    Failed example:
+    ...
+    **********************************************************************
+    1 items had failures:
+       2 of   4 in test_doctest7.txt
+    ***Test Failed*** 2 failures.
+    (2, 4)
+
 """
 
 # old_test1, ... used to live in doctest.py, but cluttered it.  Note
