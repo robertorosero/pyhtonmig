@@ -54,6 +54,7 @@ Py_Module_New(PyObject* body)
         struct _Module *result = PyObject_New(struct _Module, &Py_Module_Type);
         if (result == NULL)
                 return NULL;
+        Py_INCREF(body);
         result->body = body;
         return (PyObject*)result;
 }
@@ -116,6 +117,7 @@ Py_Interactive_New(PyObject* body)
         struct _Interactive *result = PyObject_New(struct _Interactive, &Py_Interactive_Type);
         if (result == NULL)
                 return NULL;
+        Py_INCREF(body);
         result->body = body;
         return (PyObject*)result;
 }
@@ -178,6 +180,7 @@ Py_Expression_New(PyObject* body)
         struct _Expression *result = PyObject_New(struct _Expression, &Py_Expression_Type);
         if (result == NULL)
                 return NULL;
+        Py_INCREF(body);
         result->body = body;
         return (PyObject*)result;
 }
@@ -240,6 +243,7 @@ Py_Suite_New(PyObject* body)
         struct _Suite *result = PyObject_New(struct _Suite, &Py_Suite_Type);
         if (result == NULL)
                 return NULL;
+        Py_INCREF(body);
         result->body = body;
         return (PyObject*)result;
 }
@@ -348,9 +352,13 @@ Py_FunctionDef_New(PyObject* name, PyObject* args, PyObject* body, PyObject*
         struct _FunctionDef *result = PyObject_New(struct _FunctionDef, &Py_FunctionDef_Type);
         if (result == NULL)
                 return NULL;
+        Py_INCREF(name);
         result->name = name;
+        Py_INCREF(args);
         result->args = args;
+        Py_INCREF(body);
         result->body = body;
+        Py_INCREF(decorators);
         result->decorators = decorators;
         result->_base.lineno = lineno;
         return (PyObject*)result;
@@ -417,8 +425,11 @@ Py_ClassDef_New(PyObject* name, PyObject* bases, PyObject* body, int lineno)
         struct _ClassDef *result = PyObject_New(struct _ClassDef, &Py_ClassDef_Type);
         if (result == NULL)
                 return NULL;
+        Py_INCREF(name);
         result->name = name;
+        Py_INCREF(bases);
         result->bases = bases;
+        Py_INCREF(body);
         result->body = body;
         result->_base.lineno = lineno;
         return (PyObject*)result;
@@ -484,6 +495,7 @@ Py_Return_New(PyObject* value, int lineno)
         struct _Return *result = PyObject_New(struct _Return, &Py_Return_Type);
         if (result == NULL)
                 return NULL;
+        Py_INCREF(value);
         result->value = value;
         result->_base.lineno = lineno;
         return (PyObject*)result;
@@ -547,6 +559,7 @@ Py_Delete_New(PyObject* targets, int lineno)
         struct _Delete *result = PyObject_New(struct _Delete, &Py_Delete_Type);
         if (result == NULL)
                 return NULL;
+        Py_INCREF(targets);
         result->targets = targets;
         result->_base.lineno = lineno;
         return (PyObject*)result;
@@ -610,7 +623,9 @@ Py_Assign_New(PyObject* targets, PyObject* value, int lineno)
         struct _Assign *result = PyObject_New(struct _Assign, &Py_Assign_Type);
         if (result == NULL)
                 return NULL;
+        Py_INCREF(targets);
         result->targets = targets;
+        Py_INCREF(value);
         result->value = value;
         result->_base.lineno = lineno;
         return (PyObject*)result;
@@ -675,8 +690,11 @@ Py_AugAssign_New(PyObject* target, PyObject* op, PyObject* value, int lineno)
         struct _AugAssign *result = PyObject_New(struct _AugAssign, &Py_AugAssign_Type);
         if (result == NULL)
                 return NULL;
+        Py_INCREF(target);
         result->target = target;
+        Py_INCREF(op);
         result->op = op;
+        Py_INCREF(value);
         result->value = value;
         result->_base.lineno = lineno;
         return (PyObject*)result;
@@ -742,8 +760,11 @@ Py_Print_New(PyObject* dest, PyObject* values, PyObject* nl, int lineno)
         struct _Print *result = PyObject_New(struct _Print, &Py_Print_Type);
         if (result == NULL)
                 return NULL;
+        Py_INCREF(dest);
         result->dest = dest;
+        Py_INCREF(values);
         result->values = values;
+        Py_INCREF(nl);
         result->nl = nl;
         result->_base.lineno = lineno;
         return (PyObject*)result;
@@ -810,9 +831,13 @@ Py_For_New(PyObject* target, PyObject* iter, PyObject* body, PyObject* orelse,
         struct _For *result = PyObject_New(struct _For, &Py_For_Type);
         if (result == NULL)
                 return NULL;
+        Py_INCREF(target);
         result->target = target;
+        Py_INCREF(iter);
         result->iter = iter;
+        Py_INCREF(body);
         result->body = body;
+        Py_INCREF(orelse);
         result->orelse = orelse;
         result->_base.lineno = lineno;
         return (PyObject*)result;
@@ -879,8 +904,11 @@ Py_While_New(PyObject* test, PyObject* body, PyObject* orelse, int lineno)
         struct _While *result = PyObject_New(struct _While, &Py_While_Type);
         if (result == NULL)
                 return NULL;
+        Py_INCREF(test);
         result->test = test;
+        Py_INCREF(body);
         result->body = body;
+        Py_INCREF(orelse);
         result->orelse = orelse;
         result->_base.lineno = lineno;
         return (PyObject*)result;
@@ -946,8 +974,11 @@ Py_If_New(PyObject* test, PyObject* body, PyObject* orelse, int lineno)
         struct _If *result = PyObject_New(struct _If, &Py_If_Type);
         if (result == NULL)
                 return NULL;
+        Py_INCREF(test);
         result->test = test;
+        Py_INCREF(body);
         result->body = body;
+        Py_INCREF(orelse);
         result->orelse = orelse;
         result->_base.lineno = lineno;
         return (PyObject*)result;
@@ -1013,8 +1044,11 @@ Py_Raise_New(PyObject* type, PyObject* inst, PyObject* tback, int lineno)
         struct _Raise *result = PyObject_New(struct _Raise, &Py_Raise_Type);
         if (result == NULL)
                 return NULL;
+        Py_INCREF(type);
         result->type = type;
+        Py_INCREF(inst);
         result->inst = inst;
+        Py_INCREF(tback);
         result->tback = tback;
         result->_base.lineno = lineno;
         return (PyObject*)result;
@@ -1081,8 +1115,11 @@ Py_TryExcept_New(PyObject* body, PyObject* handlers, PyObject* orelse, int
         struct _TryExcept *result = PyObject_New(struct _TryExcept, &Py_TryExcept_Type);
         if (result == NULL)
                 return NULL;
+        Py_INCREF(body);
         result->body = body;
+        Py_INCREF(handlers);
         result->handlers = handlers;
+        Py_INCREF(orelse);
         result->orelse = orelse;
         result->_base.lineno = lineno;
         return (PyObject*)result;
@@ -1148,7 +1185,9 @@ Py_TryFinally_New(PyObject* body, PyObject* finalbody, int lineno)
         struct _TryFinally *result = PyObject_New(struct _TryFinally, &Py_TryFinally_Type);
         if (result == NULL)
                 return NULL;
+        Py_INCREF(body);
         result->body = body;
+        Py_INCREF(finalbody);
         result->finalbody = finalbody;
         result->_base.lineno = lineno;
         return (PyObject*)result;
@@ -1213,7 +1252,9 @@ Py_Assert_New(PyObject* test, PyObject* msg, int lineno)
         struct _Assert *result = PyObject_New(struct _Assert, &Py_Assert_Type);
         if (result == NULL)
                 return NULL;
+        Py_INCREF(test);
         result->test = test;
+        Py_INCREF(msg);
         result->msg = msg;
         result->_base.lineno = lineno;
         return (PyObject*)result;
@@ -1278,6 +1319,7 @@ Py_Import_New(PyObject* names, int lineno)
         struct _Import *result = PyObject_New(struct _Import, &Py_Import_Type);
         if (result == NULL)
                 return NULL;
+        Py_INCREF(names);
         result->names = names;
         result->_base.lineno = lineno;
         return (PyObject*)result;
@@ -1341,7 +1383,9 @@ Py_ImportFrom_New(PyObject* module, PyObject* names, int lineno)
         struct _ImportFrom *result = PyObject_New(struct _ImportFrom, &Py_ImportFrom_Type);
         if (result == NULL)
                 return NULL;
+        Py_INCREF(module);
         result->module = module;
+        Py_INCREF(names);
         result->names = names;
         result->_base.lineno = lineno;
         return (PyObject*)result;
@@ -1406,8 +1450,11 @@ Py_Exec_New(PyObject* body, PyObject* globals, PyObject* locals, int lineno)
         struct _Exec *result = PyObject_New(struct _Exec, &Py_Exec_Type);
         if (result == NULL)
                 return NULL;
+        Py_INCREF(body);
         result->body = body;
+        Py_INCREF(globals);
         result->globals = globals;
+        Py_INCREF(locals);
         result->locals = locals;
         result->_base.lineno = lineno;
         return (PyObject*)result;
@@ -1473,6 +1520,7 @@ Py_Global_New(PyObject* names, int lineno)
         struct _Global *result = PyObject_New(struct _Global, &Py_Global_Type);
         if (result == NULL)
                 return NULL;
+        Py_INCREF(names);
         result->names = names;
         result->_base.lineno = lineno;
         return (PyObject*)result;
@@ -1536,6 +1584,7 @@ Py_Expr_New(PyObject* value, int lineno)
         struct _Expr *result = PyObject_New(struct _Expr, &Py_Expr_Type);
         if (result == NULL)
                 return NULL;
+        Py_INCREF(value);
         result->value = value;
         result->_base.lineno = lineno;
         return (PyObject*)result;
@@ -1827,7 +1876,9 @@ Py_BoolOp_New(PyObject* op, PyObject* values, int lineno)
         struct _BoolOp *result = PyObject_New(struct _BoolOp, &Py_BoolOp_Type);
         if (result == NULL)
                 return NULL;
+        Py_INCREF(op);
         result->op = op;
+        Py_INCREF(values);
         result->values = values;
         result->_base.lineno = lineno;
         return (PyObject*)result;
@@ -1892,8 +1943,11 @@ Py_BinOp_New(PyObject* left, PyObject* op, PyObject* right, int lineno)
         struct _BinOp *result = PyObject_New(struct _BinOp, &Py_BinOp_Type);
         if (result == NULL)
                 return NULL;
+        Py_INCREF(left);
         result->left = left;
+        Py_INCREF(op);
         result->op = op;
+        Py_INCREF(right);
         result->right = right;
         result->_base.lineno = lineno;
         return (PyObject*)result;
@@ -1959,7 +2013,9 @@ Py_UnaryOp_New(PyObject* op, PyObject* operand, int lineno)
         struct _UnaryOp *result = PyObject_New(struct _UnaryOp, &Py_UnaryOp_Type);
         if (result == NULL)
                 return NULL;
+        Py_INCREF(op);
         result->op = op;
+        Py_INCREF(operand);
         result->operand = operand;
         result->_base.lineno = lineno;
         return (PyObject*)result;
@@ -2024,7 +2080,9 @@ Py_Lambda_New(PyObject* args, PyObject* body, int lineno)
         struct _Lambda *result = PyObject_New(struct _Lambda, &Py_Lambda_Type);
         if (result == NULL)
                 return NULL;
+        Py_INCREF(args);
         result->args = args;
+        Py_INCREF(body);
         result->body = body;
         result->_base.lineno = lineno;
         return (PyObject*)result;
@@ -2089,7 +2147,9 @@ Py_Dict_New(PyObject* keys, PyObject* values, int lineno)
         struct _Dict *result = PyObject_New(struct _Dict, &Py_Dict_Type);
         if (result == NULL)
                 return NULL;
+        Py_INCREF(keys);
         result->keys = keys;
+        Py_INCREF(values);
         result->values = values;
         result->_base.lineno = lineno;
         return (PyObject*)result;
@@ -2154,7 +2214,9 @@ Py_ListComp_New(PyObject* elt, PyObject* generators, int lineno)
         struct _ListComp *result = PyObject_New(struct _ListComp, &Py_ListComp_Type);
         if (result == NULL)
                 return NULL;
+        Py_INCREF(elt);
         result->elt = elt;
+        Py_INCREF(generators);
         result->generators = generators;
         result->_base.lineno = lineno;
         return (PyObject*)result;
@@ -2219,7 +2281,9 @@ Py_GeneratorExp_New(PyObject* elt, PyObject* generators, int lineno)
         struct _GeneratorExp *result = PyObject_New(struct _GeneratorExp, &Py_GeneratorExp_Type);
         if (result == NULL)
                 return NULL;
+        Py_INCREF(elt);
         result->elt = elt;
+        Py_INCREF(generators);
         result->generators = generators;
         result->_base.lineno = lineno;
         return (PyObject*)result;
@@ -2284,6 +2348,7 @@ Py_Yield_New(PyObject* value, int lineno)
         struct _Yield *result = PyObject_New(struct _Yield, &Py_Yield_Type);
         if (result == NULL)
                 return NULL;
+        Py_INCREF(value);
         result->value = value;
         result->_base.lineno = lineno;
         return (PyObject*)result;
@@ -2347,8 +2412,11 @@ Py_Compare_New(PyObject* left, PyObject* ops, PyObject* comparators, int lineno)
         struct _Compare *result = PyObject_New(struct _Compare, &Py_Compare_Type);
         if (result == NULL)
                 return NULL;
+        Py_INCREF(left);
         result->left = left;
+        Py_INCREF(ops);
         result->ops = ops;
+        Py_INCREF(comparators);
         result->comparators = comparators;
         result->_base.lineno = lineno;
         return (PyObject*)result;
@@ -2415,10 +2483,15 @@ Py_Call_New(PyObject* func, PyObject* args, PyObject* keywords, PyObject*
         struct _Call *result = PyObject_New(struct _Call, &Py_Call_Type);
         if (result == NULL)
                 return NULL;
+        Py_INCREF(func);
         result->func = func;
+        Py_INCREF(args);
         result->args = args;
+        Py_INCREF(keywords);
         result->keywords = keywords;
+        Py_INCREF(starargs);
         result->starargs = starargs;
+        Py_INCREF(kwargs);
         result->kwargs = kwargs;
         result->_base.lineno = lineno;
         return (PyObject*)result;
@@ -2486,6 +2559,7 @@ Py_Repr_New(PyObject* value, int lineno)
         struct _Repr *result = PyObject_New(struct _Repr, &Py_Repr_Type);
         if (result == NULL)
                 return NULL;
+        Py_INCREF(value);
         result->value = value;
         result->_base.lineno = lineno;
         return (PyObject*)result;
@@ -2549,6 +2623,7 @@ Py_Num_New(PyObject* n, int lineno)
         struct _Num *result = PyObject_New(struct _Num, &Py_Num_Type);
         if (result == NULL)
                 return NULL;
+        Py_INCREF(n);
         result->n = n;
         result->_base.lineno = lineno;
         return (PyObject*)result;
@@ -2612,6 +2687,7 @@ Py_Str_New(PyObject* s, int lineno)
         struct _Str *result = PyObject_New(struct _Str, &Py_Str_Type);
         if (result == NULL)
                 return NULL;
+        Py_INCREF(s);
         result->s = s;
         result->_base.lineno = lineno;
         return (PyObject*)result;
@@ -2675,8 +2751,11 @@ Py_Attribute_New(PyObject* value, PyObject* attr, PyObject* ctx, int lineno)
         struct _Attribute *result = PyObject_New(struct _Attribute, &Py_Attribute_Type);
         if (result == NULL)
                 return NULL;
+        Py_INCREF(value);
         result->value = value;
+        Py_INCREF(attr);
         result->attr = attr;
+        Py_INCREF(ctx);
         result->ctx = ctx;
         result->_base.lineno = lineno;
         return (PyObject*)result;
@@ -2742,8 +2821,11 @@ Py_Subscript_New(PyObject* value, PyObject* slice, PyObject* ctx, int lineno)
         struct _Subscript *result = PyObject_New(struct _Subscript, &Py_Subscript_Type);
         if (result == NULL)
                 return NULL;
+        Py_INCREF(value);
         result->value = value;
+        Py_INCREF(slice);
         result->slice = slice;
+        Py_INCREF(ctx);
         result->ctx = ctx;
         result->_base.lineno = lineno;
         return (PyObject*)result;
@@ -2809,7 +2891,9 @@ Py_Name_New(PyObject* id, PyObject* ctx, int lineno)
         struct _Name *result = PyObject_New(struct _Name, &Py_Name_Type);
         if (result == NULL)
                 return NULL;
+        Py_INCREF(id);
         result->id = id;
+        Py_INCREF(ctx);
         result->ctx = ctx;
         result->_base.lineno = lineno;
         return (PyObject*)result;
@@ -2874,7 +2958,9 @@ Py_List_New(PyObject* elts, PyObject* ctx, int lineno)
         struct _List *result = PyObject_New(struct _List, &Py_List_Type);
         if (result == NULL)
                 return NULL;
+        Py_INCREF(elts);
         result->elts = elts;
+        Py_INCREF(ctx);
         result->ctx = ctx;
         result->_base.lineno = lineno;
         return (PyObject*)result;
@@ -2939,7 +3025,9 @@ Py_Tuple_New(PyObject* elts, PyObject* ctx, int lineno)
         struct _Tuple *result = PyObject_New(struct _Tuple, &Py_Tuple_Type);
         if (result == NULL)
                 return NULL;
+        Py_INCREF(elts);
         result->elts = elts;
+        Py_INCREF(ctx);
         result->ctx = ctx;
         result->_base.lineno = lineno;
         return (PyObject*)result;
@@ -3109,8 +3197,11 @@ Py_Slice_New(PyObject* lower, PyObject* upper, PyObject* step)
         struct _Slice *result = PyObject_New(struct _Slice, &Py_Slice_Type);
         if (result == NULL)
                 return NULL;
+        Py_INCREF(lower);
         result->lower = lower;
+        Py_INCREF(upper);
         result->upper = upper;
+        Py_INCREF(step);
         result->step = step;
         return (PyObject*)result;
 }
@@ -3175,6 +3266,7 @@ Py_ExtSlice_New(PyObject* dims)
         struct _ExtSlice *result = PyObject_New(struct _ExtSlice, &Py_ExtSlice_Type);
         if (result == NULL)
                 return NULL;
+        Py_INCREF(dims);
         result->dims = dims;
         return (PyObject*)result;
 }
@@ -3237,6 +3329,7 @@ Py_Index_New(PyObject* value)
         struct _Index *result = PyObject_New(struct _Index, &Py_Index_Type);
         if (result == NULL)
                 return NULL;
+        Py_INCREF(value);
         result->value = value;
         return (PyObject*)result;
 }
@@ -3299,8 +3392,11 @@ Py_comprehension_New(PyObject* target, PyObject* iter, PyObject* ifs)
         struct _comprehension *result = PyObject_New(struct _comprehension, &Py_comprehension_Type);
         if (result == NULL)
                 return NULL;
+        Py_INCREF(target);
         result->target = target;
+        Py_INCREF(iter);
         result->iter = iter;
+        Py_INCREF(ifs);
         result->ifs = ifs;
         return (PyObject*)result;
 }
@@ -3365,8 +3461,11 @@ Py_excepthandler_New(PyObject* type, PyObject* name, PyObject* body)
         struct _excepthandler *result = PyObject_New(struct _excepthandler, &Py_excepthandler_Type);
         if (result == NULL)
                 return NULL;
+        Py_INCREF(type);
         result->type = type;
+        Py_INCREF(name);
         result->name = name;
+        Py_INCREF(body);
         result->body = body;
         return (PyObject*)result;
 }
@@ -3432,9 +3531,13 @@ Py_arguments_New(PyObject* args, PyObject* vararg, PyObject* kwarg, PyObject*
         struct _arguments *result = PyObject_New(struct _arguments, &Py_arguments_Type);
         if (result == NULL)
                 return NULL;
+        Py_INCREF(args);
         result->args = args;
+        Py_INCREF(vararg);
         result->vararg = vararg;
+        Py_INCREF(kwarg);
         result->kwarg = kwarg;
+        Py_INCREF(defaults);
         result->defaults = defaults;
         return (PyObject*)result;
 }
@@ -3500,7 +3603,9 @@ Py_keyword_New(PyObject* arg, PyObject* value)
         struct _keyword *result = PyObject_New(struct _keyword, &Py_keyword_Type);
         if (result == NULL)
                 return NULL;
+        Py_INCREF(arg);
         result->arg = arg;
+        Py_INCREF(value);
         result->value = value;
         return (PyObject*)result;
 }
@@ -3564,7 +3669,9 @@ Py_alias_New(PyObject* name, PyObject* asname)
         struct _alias *result = PyObject_New(struct _alias, &Py_alias_Type);
         if (result == NULL)
                 return NULL;
+        Py_INCREF(name);
         result->name = name;
+        Py_INCREF(asname);
         result->asname = asname;
         return (PyObject*)result;
 }

@@ -213,8 +213,12 @@ class FunctionVisitor(TraversalVisitor):
         emit("if (result == NULL)", 1)
         emit("return NULL;", 2)
         for argtype, argname, opt in args:
+            if argtype == "PyObject*":
+                emit("Py_INCREF(%s);" % argname, 1)
             emit("result->%s = %s;" % (argname, argname), 1)
         for argtype, argname, opt in attrs:
+            if argtype == "PyObject*":
+                emit("Py_INCREF(%s);" % argname, 1)
             emit("result->_base.%s = %s;" % (argname, argname), 1)
         emit("return (PyObject*)result;", 1)
         emit("}")
