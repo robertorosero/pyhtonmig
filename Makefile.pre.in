@@ -230,7 +230,6 @@ ASDLGEN=	$(srcdir)/Parser/asdl_c.py -h $(srcdir)/Include -c $(srcdir)/Python
 # Python
 PYTHON_OBJS=	\
 		Python/Python-ast.o \
-		Python/asdl.o \
 		Python/ast.o \
 		Python/bltinmodule.o \
 		Python/exceptions.o \
@@ -490,7 +489,6 @@ Objects/unicodectype.o:	$(srcdir)/Objects/unicodectype.c \
 PYTHON_HEADERS= \
 		Include/Python.h \
 		Include/Python-ast.h \
-		Include/asdl.h \
 		Include/abstract.h \
 		Include/boolobject.h \
 		Include/bufferobject.h \

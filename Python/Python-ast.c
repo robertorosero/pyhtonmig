@@ -3,2360 +3,3795 @@
 #include "Python.h"
 #include "Python-ast.h"
 
-static int marshal_write_mod(PyObject **, int *, mod_ty);
-static int marshal_write_stmt(PyObject **, int *, stmt_ty);
-static int marshal_write_expr(PyObject **, int *, expr_ty);
-static int marshal_write_expr_context(PyObject **, int *, expr_context_ty);
-static int marshal_write_slice(PyObject **, int *, slice_ty);
-static int marshal_write_boolop(PyObject **, int *, boolop_ty);
-static int marshal_write_operator(PyObject **, int *, operator_ty);
-static int marshal_write_unaryop(PyObject **, int *, unaryop_ty);
-static int marshal_write_cmpop(PyObject **, int *, cmpop_ty);
-static int marshal_write_comprehension(PyObject **, int *, comprehension_ty);
-static int marshal_write_excepthandler(PyObject **, int *, excepthandler_ty);
-static int marshal_write_arguments(PyObject **, int *, arguments_ty);
-static int marshal_write_keyword(PyObject **, int *, keyword_ty);
-static int marshal_write_alias(PyObject **, int *, alias_ty);
-
-mod_ty
-Module(asdl_seq * body)
+#define mod_dealloc 0
+PyTypeObject Py_mod_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "mod",		/*tp_name*/
+        sizeof(struct Py_mod),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        mod_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+        };
+        
+PyObject*
+Py_mod_Module_New(PyObject* body)
 {
-        mod_ty p;
-        p = (mod_ty)malloc(sizeof(*p));
-        if (!p) {
-                PyErr_NoMemory();
-                return NULL;
-        }
-        p->kind = Module_kind;
-        p->v.Module.body = body;
-        return p;
-}
-
-mod_ty
-Interactive(asdl_seq * body)
-{
-        mod_ty p;
-        p = (mod_ty)malloc(sizeof(*p));
-        if (!p) {
-                PyErr_NoMemory();
-                return NULL;
-        }
-        p->kind = Interactive_kind;
-        p->v.Interactive.body = body;
-        return p;
-}
-
-mod_ty
-Expression(expr_ty body)
-{
-        mod_ty p;
-        if (!body) {
-                PyErr_SetString(PyExc_ValueError,
-                                "field body is required for Expression");
-                return NULL;
-        }
-        p = (mod_ty)malloc(sizeof(*p));
-        if (!p) {
-                PyErr_NoMemory();
-                return NULL;
-        }
-        p->kind = Expression_kind;
-        p->v.Expression.body = body;
-        return p;
-}
-
-mod_ty
-Suite(asdl_seq * body)
-{
-        mod_ty p;
-        p = (mod_ty)malloc(sizeof(*p));
-        if (!p) {
-                PyErr_NoMemory();
-                return NULL;
-        }
-        p->kind = Suite_kind;
-        p->v.Suite.body = body;
-        return p;
-}
-
-stmt_ty
-FunctionDef(identifier name, arguments_ty args, asdl_seq * body, asdl_seq *
-            decorators, int lineno)
-{
-        stmt_ty p;
-        if (!name) {
-                PyErr_SetString(PyExc_ValueError,
-                                "field name is required for FunctionDef");
-                return NULL;
-        }
-        if (!args) {
-                PyErr_SetString(PyExc_ValueError,
-                                "field args is required for FunctionDef");
-                return NULL;
-        }
-        p = (stmt_ty)malloc(sizeof(*p));
-        if (!p) {
-                PyErr_NoMemory();
-                return NULL;
-        }
-        p->kind = FunctionDef_kind;
-        p->v.FunctionDef.name = name;
-        p->v.FunctionDef.args = args;
-        p->v.FunctionDef.body = body;
-        p->v.FunctionDef.decorators = decorators;
-        p->lineno = lineno;
-        return p;
-}
-
-stmt_ty
-ClassDef(identifier name, asdl_seq * bases, asdl_seq * body, int lineno)
-{
-        stmt_ty p;
-        if (!name) {
-                PyErr_SetString(PyExc_ValueError,
-                                "field name is required for ClassDef");
-                return NULL;
-        }
-        p = (stmt_ty)malloc(sizeof(*p));
-        if (!p) {
-                PyErr_NoMemory();
-                return NULL;
-        }
-        p->kind = ClassDef_kind;
-        p->v.ClassDef.name = name;
-        p->v.ClassDef.bases = bases;
-        p->v.ClassDef.body = body;
-        p->lineno = lineno;
-        return p;
-}
-
-stmt_ty
-Return(expr_ty value, int lineno)
-{
-        stmt_ty p;
-        p = (stmt_ty)malloc(sizeof(*p));
-        if (!p) {
-                PyErr_NoMemory();
-                return NULL;
-        }
-        p->kind = Return_kind;
-        p->v.Return.value = value;
-        p->lineno = lineno;
-        return p;
-}
-
-stmt_ty
-Delete(asdl_seq * targets, int lineno)
-{
-        stmt_ty p;
-        p = (stmt_ty)malloc(sizeof(*p));
-        if (!p) {
-                PyErr_NoMemory();
-                return NULL;
-        }
-        p->kind = Delete_kind;
-        p->v.Delete.targets = targets;
-        p->lineno = lineno;
-        return p;
-}
-
-stmt_ty
-Assign(asdl_seq * targets, expr_ty value, int lineno)
-{
-        stmt_ty p;
-        if (!value) {
-                PyErr_SetString(PyExc_ValueError,
-                                "field value is required for Assign");
-                return NULL;
-        }
-        p = (stmt_ty)malloc(sizeof(*p));
-        if (!p) {
-                PyErr_NoMemory();
-                return NULL;
-        }
-        p->kind = Assign_kind;
-        p->v.Assign.targets = targets;
-        p->v.Assign.value = value;
-        p->lineno = lineno;
-        return p;
-}
-
-stmt_ty
-AugAssign(expr_ty target, operator_ty op, expr_ty value, int lineno)
-{
-        stmt_ty p;
-        if (!target) {
-                PyErr_SetString(PyExc_ValueError,
-                                "field target is required for AugAssign");
-                return NULL;
-        }
-        if (!op) {
-                PyErr_SetString(PyExc_ValueError,
-                                "field op is required for AugAssign");
-                return NULL;
-        }
-        if (!value) {
-                PyErr_SetString(PyExc_ValueError,
-                                "field value is required for AugAssign");
-                return NULL;
-        }
-        p = (stmt_ty)malloc(sizeof(*p));
-        if (!p) {
-                PyErr_NoMemory();
-                return NULL;
-        }
-        p->kind = AugAssign_kind;
-        p->v.AugAssign.target = target;
-        p->v.AugAssign.op = op;
-        p->v.AugAssign.value = value;
-        p->lineno = lineno;
-        return p;
-}
-
-stmt_ty
-Print(expr_ty dest, asdl_seq * values, bool nl, int lineno)
-{
-        stmt_ty p;
-        p = (stmt_ty)malloc(sizeof(*p));
-        if (!p) {
-                PyErr_NoMemory();
-                return NULL;
-        }
-        p->kind = Print_kind;
-        p->v.Print.dest = dest;
-        p->v.Print.values = values;
-        p->v.Print.nl = nl;
-        p->lineno = lineno;
-        return p;
-}
-
-stmt_ty
-For(expr_ty target, expr_ty iter, asdl_seq * body, asdl_seq * orelse, int
-    lineno)
-{
-        stmt_ty p;
-        if (!target) {
-                PyErr_SetString(PyExc_ValueError,
-                                "field target is required for For");
-                return NULL;
-        }
-        if (!iter) {
-                PyErr_SetString(PyExc_ValueError,
-                                "field iter is required for For");
-                return NULL;
-        }
-        p = (stmt_ty)malloc(sizeof(*p));
-        if (!p) {
-                PyErr_NoMemory();
-                return NULL;
-        }
-        p->kind = For_kind;
-        p->v.For.target = target;
-        p->v.For.iter = iter;
-        p->v.For.body = body;
-        p->v.For.orelse = orelse;
-        p->lineno = lineno;
-        return p;
-}
-
-stmt_ty
-While(expr_ty test, asdl_seq * body, asdl_seq * orelse, int lineno)
-{
-        stmt_ty p;
-        if (!test) {
-                PyErr_SetString(PyExc_ValueError,
-                                "field test is required for While");
-                return NULL;
-        }
-        p = (stmt_ty)malloc(sizeof(*p));
-        if (!p) {
-                PyErr_NoMemory();
-                return NULL;
-        }
-        p->kind = While_kind;
-        p->v.While.test = test;
-        p->v.While.body = body;
-        p->v.While.orelse = orelse;
-        p->lineno = lineno;
-        return p;
-}
-
-stmt_ty
-If(expr_ty test, asdl_seq * body, asdl_seq * orelse, int lineno)
-{
-        stmt_ty p;
-        if (!test) {
-                PyErr_SetString(PyExc_ValueError,
-                                "field test is required for If");
-                return NULL;
-        }
-        p = (stmt_ty)malloc(sizeof(*p));
-        if (!p) {
-                PyErr_NoMemory();
-                return NULL;
-        }
-        p->kind = If_kind;
-        p->v.If.test = test;
-        p->v.If.body = body;
-        p->v.If.orelse = orelse;
-        p->lineno = lineno;
-        return p;
-}
-
-stmt_ty
-Raise(expr_ty type, expr_ty inst, expr_ty tback, int lineno)
-{
-        stmt_ty p;
-        p = (stmt_ty)malloc(sizeof(*p));
-        if (!p) {
-                PyErr_NoMemory();
-                return NULL;
-        }
-        p->kind = Raise_kind;
-        p->v.Raise.type = type;
-        p->v.Raise.inst = inst;
-        p->v.Raise.tback = tback;
-        p->lineno = lineno;
-        return p;
-}
-
-stmt_ty
-TryExcept(asdl_seq * body, asdl_seq * handlers, asdl_seq * orelse, int lineno)
-{
-        stmt_ty p;
-        p = (stmt_ty)malloc(sizeof(*p));
-        if (!p) {
-                PyErr_NoMemory();
-                return NULL;
-        }
-        p->kind = TryExcept_kind;
-        p->v.TryExcept.body = body;
-        p->v.TryExcept.handlers = handlers;
-        p->v.TryExcept.orelse = orelse;
-        p->lineno = lineno;
-        return p;
-}
-
-stmt_ty
-TryFinally(asdl_seq * body, asdl_seq * finalbody, int lineno)
-{
-        stmt_ty p;
-        p = (stmt_ty)malloc(sizeof(*p));
-        if (!p) {
-                PyErr_NoMemory();
-                return NULL;
-        }
-        p->kind = TryFinally_kind;
-        p->v.TryFinally.body = body;
-        p->v.TryFinally.finalbody = finalbody;
-        p->lineno = lineno;
-        return p;
-}
-
-stmt_ty
-Assert(expr_ty test, expr_ty msg, int lineno)
-{
-        stmt_ty p;
-        if (!test) {
-                PyErr_SetString(PyExc_ValueError,
-                                "field test is required for Assert");
-                return NULL;
-        }
-        p = (stmt_ty)malloc(sizeof(*p));
-        if (!p) {
-                PyErr_NoMemory();
-                return NULL;
-        }
-        p->kind = Assert_kind;
-        p->v.Assert.test = test;
-        p->v.Assert.msg = msg;
-        p->lineno = lineno;
-        return p;
-}
-
-stmt_ty
-Import(asdl_seq * names, int lineno)
-{
-        stmt_ty p;
-        p = (stmt_ty)malloc(sizeof(*p));
-        if (!p) {
-                PyErr_NoMemory();
-                return NULL;
-        }
-        p->kind = Import_kind;
-        p->v.Import.names = names;
-        p->lineno = lineno;
-        return p;
-}
-
-stmt_ty
-ImportFrom(identifier module, asdl_seq * names, int lineno)
-{
-        stmt_ty p;
-        if (!module) {
-                PyErr_SetString(PyExc_ValueError,
-                                "field module is required for ImportFrom");
-                return NULL;
-        }
-        p = (stmt_ty)malloc(sizeof(*p));
-        if (!p) {
-                PyErr_NoMemory();
-                return NULL;
-        }
-        p->kind = ImportFrom_kind;
-        p->v.ImportFrom.module = module;
-        p->v.ImportFrom.names = names;
-        p->lineno = lineno;
-        return p;
-}
-
-stmt_ty
-Exec(expr_ty body, expr_ty globals, expr_ty locals, int lineno)
-{
-        stmt_ty p;
-        if (!body) {
-                PyErr_SetString(PyExc_ValueError,
-                                "field body is required for Exec");
-                return NULL;
-        }
-        p = (stmt_ty)malloc(sizeof(*p));
-        if (!p) {
-                PyErr_NoMemory();
-                return NULL;
-        }
-        p->kind = Exec_kind;
-        p->v.Exec.body = body;
-        p->v.Exec.globals = globals;
-        p->v.Exec.locals = locals;
-        p->lineno = lineno;
-        return p;
-}
-
-stmt_ty
-Global(asdl_seq * names, int lineno)
-{
-        stmt_ty p;
-        p = (stmt_ty)malloc(sizeof(*p));
-        if (!p) {
-                PyErr_NoMemory();
-                return NULL;
-        }
-        p->kind = Global_kind;
-        p->v.Global.names = names;
-        p->lineno = lineno;
-        return p;
-}
-
-stmt_ty
-Expr(expr_ty value, int lineno)
-{
-        stmt_ty p;
-        if (!value) {
-                PyErr_SetString(PyExc_ValueError,
-                                "field value is required for Expr");
-                return NULL;
-        }
-        p = (stmt_ty)malloc(sizeof(*p));
-        if (!p) {
-                PyErr_NoMemory();
-                return NULL;
-        }
-        p->kind = Expr_kind;
-        p->v.Expr.value = value;
-        p->lineno = lineno;
-        return p;
-}
-
-stmt_ty
-Pass(int lineno)
-{
-        stmt_ty p;
-        p = (stmt_ty)malloc(sizeof(*p));
-        if (!p) {
-                PyErr_NoMemory();
-                return NULL;
-        }
-        p->kind = Pass_kind;
-        p->lineno = lineno;
-        return p;
-}
-
-stmt_ty
-Break(int lineno)
-{
-        stmt_ty p;
-        p = (stmt_ty)malloc(sizeof(*p));
-        if (!p) {
-                PyErr_NoMemory();
-                return NULL;
-        }
-        p->kind = Break_kind;
-        p->lineno = lineno;
-        return p;
-}
-
-stmt_ty
-Continue(int lineno)
-{
-        stmt_ty p;
-        p = (stmt_ty)malloc(sizeof(*p));
-        if (!p) {
-                PyErr_NoMemory();
-                return NULL;
-        }
-        p->kind = Continue_kind;
-        p->lineno = lineno;
-        return p;
-}
-
-expr_ty
-BoolOp(boolop_ty op, asdl_seq * values, int lineno)
-{
-        expr_ty p;
-        if (!op) {
-                PyErr_SetString(PyExc_ValueError,
-                                "field op is required for BoolOp");
-                return NULL;
-        }
-        p = (expr_ty)malloc(sizeof(*p));
-        if (!p) {
-                PyErr_NoMemory();
-                return NULL;
-        }
-        p->kind = BoolOp_kind;
-        p->v.BoolOp.op = op;
-        p->v.BoolOp.values = values;
-        p->lineno = lineno;
-        return p;
-}
-
-expr_ty
-BinOp(expr_ty left, operator_ty op, expr_ty right, int lineno)
-{
-        expr_ty p;
-        if (!left) {
-                PyErr_SetString(PyExc_ValueError,
-                                "field left is required for BinOp");
-                return NULL;
-        }
-        if (!op) {
-                PyErr_SetString(PyExc_ValueError,
-                                "field op is required for BinOp");
-                return NULL;
-        }
-        if (!right) {
-                PyErr_SetString(PyExc_ValueError,
-                                "field right is required for BinOp");
-                return NULL;
-        }
-        p = (expr_ty)malloc(sizeof(*p));
-        if (!p) {
-                PyErr_NoMemory();
-                return NULL;
-        }
-        p->kind = BinOp_kind;
-        p->v.BinOp.left = left;
-        p->v.BinOp.op = op;
-        p->v.BinOp.right = right;
-        p->lineno = lineno;
-        return p;
-}
-
-expr_ty
-UnaryOp(unaryop_ty op, expr_ty operand, int lineno)
-{
-        expr_ty p;
-        if (!op) {
-                PyErr_SetString(PyExc_ValueError,
-                                "field op is required for UnaryOp");
-                return NULL;
-        }
-        if (!operand) {
-                PyErr_SetString(PyExc_ValueError,
-                                "field operand is required for UnaryOp");
-                return NULL;
-        }
-        p = (expr_ty)malloc(sizeof(*p));
-        if (!p) {
-                PyErr_NoMemory();
-                return NULL;
-        }
-        p->kind = UnaryOp_kind;
-        p->v.UnaryOp.op = op;
-        p->v.UnaryOp.operand = operand;
-        p->lineno = lineno;
-        return p;
-}
-
-expr_ty
-Lambda(arguments_ty args, expr_ty body, int lineno)
-{
-        expr_ty p;
-        if (!args) {
-                PyErr_SetString(PyExc_ValueError,
-                                "field args is required for Lambda");
-                return NULL;
-        }
-        if (!body) {
-                PyErr_SetString(PyExc_ValueError,
-                                "field body is required for Lambda");
-                return NULL;
-        }
-        p = (expr_ty)malloc(sizeof(*p));
-        if (!p) {
-                PyErr_NoMemory();
-                return NULL;
-        }
-        p->kind = Lambda_kind;
-        p->v.Lambda.args = args;
-        p->v.Lambda.body = body;
-        p->lineno = lineno;
-        return p;
-}
-
-expr_ty
-Dict(asdl_seq * keys, asdl_seq * values, int lineno)
-{
-        expr_ty p;
-        p = (expr_ty)malloc(sizeof(*p));
-        if (!p) {
-                PyErr_NoMemory();
-                return NULL;
-        }
-        p->kind = Dict_kind;
-        p->v.Dict.keys = keys;
-        p->v.Dict.values = values;
-        p->lineno = lineno;
-        return p;
-}
-
-expr_ty
-ListComp(expr_ty elt, asdl_seq * generators, int lineno)
-{
-        expr_ty p;
-        if (!elt) {
-                PyErr_SetString(PyExc_ValueError,
-                                "field elt is required for ListComp");
-                return NULL;
-        }
-        p = (expr_ty)malloc(sizeof(*p));
-        if (!p) {
-                PyErr_NoMemory();
-                return NULL;
-        }
-        p->kind = ListComp_kind;
-        p->v.ListComp.elt = elt;
-        p->v.ListComp.generators = generators;
-        p->lineno = lineno;
-        return p;
-}
-
-expr_ty
-GeneratorExp(expr_ty elt, asdl_seq * generators, int lineno)
-{
-        expr_ty p;
-        if (!elt) {
-                PyErr_SetString(PyExc_ValueError,
-                                "field elt is required for GeneratorExp");
-                return NULL;
-        }
-        p = (expr_ty)malloc(sizeof(*p));
-        if (!p) {
-                PyErr_NoMemory();
-                return NULL;
-        }
-        p->kind = GeneratorExp_kind;
-        p->v.GeneratorExp.elt = elt;
-        p->v.GeneratorExp.generators = generators;
-        p->lineno = lineno;
-        return p;
-}
-
-expr_ty
-Yield(expr_ty value, int lineno)
-{
-        expr_ty p;
-        p = (expr_ty)malloc(sizeof(*p));
-        if (!p) {
-                PyErr_NoMemory();
-                return NULL;
-        }
-        p->kind = Yield_kind;
-        p->v.Yield.value = value;
-        p->lineno = lineno;
-        return p;
-}
-
-expr_ty
-Compare(expr_ty left, asdl_seq * ops, asdl_seq * comparators, int lineno)
-{
-        expr_ty p;
-        if (!left) {
-                PyErr_SetString(PyExc_ValueError,
-                                "field left is required for Compare");
-                return NULL;
-        }
-        p = (expr_ty)malloc(sizeof(*p));
-        if (!p) {
-                PyErr_NoMemory();
-                return NULL;
-        }
-        p->kind = Compare_kind;
-        p->v.Compare.left = left;
-        p->v.Compare.ops = ops;
-        p->v.Compare.comparators = comparators;
-        p->lineno = lineno;
-        return p;
-}
-
-expr_ty
-Call(expr_ty func, asdl_seq * args, asdl_seq * keywords, expr_ty starargs,
-     expr_ty kwargs, int lineno)
-{
-        expr_ty p;
-        if (!func) {
-                PyErr_SetString(PyExc_ValueError,
-                                "field func is required for Call");
-                return NULL;
-        }
-        p = (expr_ty)malloc(sizeof(*p));
-        if (!p) {
-                PyErr_NoMemory();
-                return NULL;
-        }
-        p->kind = Call_kind;
-        p->v.Call.func = func;
-        p->v.Call.args = args;
-        p->v.Call.keywords = keywords;
-        p->v.Call.starargs = starargs;
-        p->v.Call.kwargs = kwargs;
-        p->lineno = lineno;
-        return p;
-}
-
-expr_ty
-Repr(expr_ty value, int lineno)
-{
-        expr_ty p;
-        if (!value) {
-                PyErr_SetString(PyExc_ValueError,
-                                "field value is required for Repr");
-                return NULL;
-        }
-        p = (expr_ty)malloc(sizeof(*p));
-        if (!p) {
-                PyErr_NoMemory();
-                return NULL;
-        }
-        p->kind = Repr_kind;
-        p->v.Repr.value = value;
-        p->lineno = lineno;
-        return p;
-}
-
-expr_ty
-Num(object n, int lineno)
-{
-        expr_ty p;
-        if (!n) {
-                PyErr_SetString(PyExc_ValueError,
-                                "field n is required for Num");
-                return NULL;
-        }
-        p = (expr_ty)malloc(sizeof(*p));
-        if (!p) {
-                PyErr_NoMemory();
-                return NULL;
-        }
-        p->kind = Num_kind;
-        p->v.Num.n = n;
-        p->lineno = lineno;
-        return p;
-}
-
-expr_ty
-Str(string s, int lineno)
-{
-        expr_ty p;
-        if (!s) {
-                PyErr_SetString(PyExc_ValueError,
-                                "field s is required for Str");
-                return NULL;
-        }
-        p = (expr_ty)malloc(sizeof(*p));
-        if (!p) {
-                PyErr_NoMemory();
-                return NULL;
-        }
-        p->kind = Str_kind;
-        p->v.Str.s = s;
-        p->lineno = lineno;
-        return p;
-}
-
-expr_ty
-Attribute(expr_ty value, identifier attr, expr_context_ty ctx, int lineno)
-{
-        expr_ty p;
-        if (!value) {
-                PyErr_SetString(PyExc_ValueError,
-                                "field value is required for Attribute");
-                return NULL;
-        }
-        if (!attr) {
-                PyErr_SetString(PyExc_ValueError,
-                                "field attr is required for Attribute");
-                return NULL;
-        }
-        if (!ctx) {
-                PyErr_SetString(PyExc_ValueError,
-                                "field ctx is required for Attribute");
-                return NULL;
-        }
-        p = (expr_ty)malloc(sizeof(*p));
-        if (!p) {
-                PyErr_NoMemory();
-                return NULL;
-        }
-        p->kind = Attribute_kind;
-        p->v.Attribute.value = value;
-        p->v.Attribute.attr = attr;
-        p->v.Attribute.ctx = ctx;
-        p->lineno = lineno;
-        return p;
-}
-
-expr_ty
-Subscript(expr_ty value, slice_ty slice, expr_context_ty ctx, int lineno)
-{
-        expr_ty p;
-        if (!value) {
-                PyErr_SetString(PyExc_ValueError,
-                                "field value is required for Subscript");
-                return NULL;
-        }
-        if (!slice) {
-                PyErr_SetString(PyExc_ValueError,
-                                "field slice is required for Subscript");
-                return NULL;
-        }
-        if (!ctx) {
-                PyErr_SetString(PyExc_ValueError,
-                                "field ctx is required for Subscript");
-                return NULL;
-        }
-        p = (expr_ty)malloc(sizeof(*p));
-        if (!p) {
-                PyErr_NoMemory();
-                return NULL;
-        }
-        p->kind = Subscript_kind;
-        p->v.Subscript.value = value;
-        p->v.Subscript.slice = slice;
-        p->v.Subscript.ctx = ctx;
-        p->lineno = lineno;
-        return p;
-}
-
-expr_ty
-Name(identifier id, expr_context_ty ctx, int lineno)
-{
-        expr_ty p;
-        if (!id) {
-                PyErr_SetString(PyExc_ValueError,
-                                "field id is required for Name");
-                return NULL;
-        }
-        if (!ctx) {
-                PyErr_SetString(PyExc_ValueError,
-                                "field ctx is required for Name");
-                return NULL;
-        }
-        p = (expr_ty)malloc(sizeof(*p));
-        if (!p) {
-                PyErr_NoMemory();
-                return NULL;
-        }
-        p->kind = Name_kind;
-        p->v.Name.id = id;
-        p->v.Name.ctx = ctx;
-        p->lineno = lineno;
-        return p;
-}
-
-expr_ty
-List(asdl_seq * elts, expr_context_ty ctx, int lineno)
-{
-        expr_ty p;
-        if (!ctx) {
-                PyErr_SetString(PyExc_ValueError,
-                                "field ctx is required for List");
-                return NULL;
-        }
-        p = (expr_ty)malloc(sizeof(*p));
-        if (!p) {
-                PyErr_NoMemory();
-                return NULL;
-        }
-        p->kind = List_kind;
-        p->v.List.elts = elts;
-        p->v.List.ctx = ctx;
-        p->lineno = lineno;
-        return p;
-}
-
-expr_ty
-Tuple(asdl_seq * elts, expr_context_ty ctx, int lineno)
-{
-        expr_ty p;
-        if (!ctx) {
-                PyErr_SetString(PyExc_ValueError,
-                                "field ctx is required for Tuple");
-                return NULL;
-        }
-        p = (expr_ty)malloc(sizeof(*p));
-        if (!p) {
-                PyErr_NoMemory();
-                return NULL;
-        }
-        p->kind = Tuple_kind;
-        p->v.Tuple.elts = elts;
-        p->v.Tuple.ctx = ctx;
-        p->lineno = lineno;
-        return p;
-}
-
-slice_ty
-Ellipsis()
-{
-        slice_ty p;
-        p = (slice_ty)malloc(sizeof(*p));
-        if (!p) {
-                PyErr_NoMemory();
-                return NULL;
-        }
-        p->kind = Ellipsis_kind;
-        return p;
-}
-
-slice_ty
-Slice(expr_ty lower, expr_ty upper, expr_ty step)
-{
-        slice_ty p;
-        p = (slice_ty)malloc(sizeof(*p));
-        if (!p) {
-                PyErr_NoMemory();
-                return NULL;
-        }
-        p->kind = Slice_kind;
-        p->v.Slice.lower = lower;
-        p->v.Slice.upper = upper;
-        p->v.Slice.step = step;
-        return p;
-}
-
-slice_ty
-ExtSlice(asdl_seq * dims)
-{
-        slice_ty p;
-        p = (slice_ty)malloc(sizeof(*p));
-        if (!p) {
-                PyErr_NoMemory();
-                return NULL;
-        }
-        p->kind = ExtSlice_kind;
-        p->v.ExtSlice.dims = dims;
-        return p;
-}
-
-slice_ty
-Index(expr_ty value)
-{
-        slice_ty p;
-        if (!value) {
-                PyErr_SetString(PyExc_ValueError,
-                                "field value is required for Index");
-                return NULL;
-        }
-        p = (slice_ty)malloc(sizeof(*p));
-        if (!p) {
-                PyErr_NoMemory();
-                return NULL;
-        }
-        p->kind = Index_kind;
-        p->v.Index.value = value;
-        return p;
-}
-
-comprehension_ty
-comprehension(expr_ty target, expr_ty iter, asdl_seq * ifs)
-{
-        comprehension_ty p;
-        if (!target) {
-                PyErr_SetString(PyExc_ValueError,
-                                "field target is required for comprehension");
-                return NULL;
-        }
-        if (!iter) {
-                PyErr_SetString(PyExc_ValueError,
-                                "field iter is required for comprehension");
-                return NULL;
-        }
-        p = (comprehension_ty)malloc(sizeof(*p));
-        if (!p) {
-                PyErr_NoMemory();
-                return NULL;
-        }
-        p->target = target;
-        p->iter = iter;
-        p->ifs = ifs;
-        return p;
-}
-
-excepthandler_ty
-excepthandler(expr_ty type, expr_ty name, asdl_seq * body)
-{
-        excepthandler_ty p;
-        p = (excepthandler_ty)malloc(sizeof(*p));
-        if (!p) {
-                PyErr_NoMemory();
-                return NULL;
-        }
-        p->type = type;
-        p->name = name;
-        p->body = body;
-        return p;
-}
-
-arguments_ty
-arguments(asdl_seq * args, identifier vararg, identifier kwarg, asdl_seq *
-          defaults)
-{
-        arguments_ty p;
-        p = (arguments_ty)malloc(sizeof(*p));
-        if (!p) {
-                PyErr_NoMemory();
-                return NULL;
-        }
-        p->args = args;
-        p->vararg = vararg;
-        p->kwarg = kwarg;
-        p->defaults = defaults;
-        return p;
-}
-
-keyword_ty
-keyword(identifier arg, expr_ty value)
-{
-        keyword_ty p;
-        if (!arg) {
-                PyErr_SetString(PyExc_ValueError,
-                                "field arg is required for keyword");
-                return NULL;
-        }
-        if (!value) {
-                PyErr_SetString(PyExc_ValueError,
-                                "field value is required for keyword");
-                return NULL;
-        }
-        p = (keyword_ty)malloc(sizeof(*p));
-        if (!p) {
-                PyErr_NoMemory();
-                return NULL;
-        }
-        p->arg = arg;
-        p->value = value;
-        return p;
-}
-
-alias_ty
-alias(identifier name, identifier asname)
-{
-        alias_ty p;
-        if (!name) {
-                PyErr_SetString(PyExc_ValueError,
-                                "field name is required for alias");
-                return NULL;
-        }
-        p = (alias_ty)malloc(sizeof(*p));
-        if (!p) {
-                PyErr_NoMemory();
-                return NULL;
-        }
-        p->name = name;
-        p->asname = asname;
-        return p;
-}
-
-
-static void
-free_seq_exprs(asdl_seq *seq)
-{
-        int i, n;
-        n = asdl_seq_LEN(seq);
-        for (i = 0; i < n; i++)
-                free_expr((expr_ty)asdl_seq_GET(seq, i));
-        asdl_seq_free(seq);
+        struct Py_mod_Module *result = PyObject_New(struct Py_mod_Module, &Py_mod_Module_Type);
+        if (result == NULL)
+                return NULL;
+        result->body = body;
+        return (PyObject*)result;
 }
 
 static void
-free_seq_stmts(asdl_seq *seq)
+mod_Module_dealloc(PyObject* _self)
 {
-        int i, n;
-        n = asdl_seq_LEN(seq);
-        for (i = 0; i < n; i++)
-                free_stmt((stmt_ty)asdl_seq_GET(seq, i));
-        asdl_seq_free(seq);
+        struct Py_mod_Module *self = (struct Py_mod_Module*)_self;
+        Py_DECREF(self->body);
+        PyObject_Del(self);
 }
 
-
-void
-free_mod(mod_ty o)
+PyTypeObject Py_mod_Module_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "mod_Module",		/*tp_name*/
+        sizeof(struct Py_mod_Module),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        mod_Module_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+        };
+        
+PyObject*
+Py_mod_Interactive_New(PyObject* body)
 {
-        if (!o)
+        struct Py_mod_Interactive *result = PyObject_New(struct Py_mod_Interactive, &Py_mod_Interactive_Type);
+        if (result == NULL)
+                return NULL;
+        result->body = body;
+        return (PyObject*)result;
+}
+
+static void
+mod_Interactive_dealloc(PyObject* _self)
+{
+        struct Py_mod_Interactive *self = (struct Py_mod_Interactive*)_self;
+        Py_DECREF(self->body);
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_mod_Interactive_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "mod_Interactive",		/*tp_name*/
+        sizeof(struct Py_mod_Interactive),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        mod_Interactive_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+        };
+        
+PyObject*
+Py_mod_Expression_New(PyObject* body)
+{
+        struct Py_mod_Expression *result = PyObject_New(struct Py_mod_Expression, &Py_mod_Expression_Type);
+        if (result == NULL)
+                return NULL;
+        result->body = body;
+        return (PyObject*)result;
+}
+
+static void
+mod_Expression_dealloc(PyObject* _self)
+{
+        struct Py_mod_Expression *self = (struct Py_mod_Expression*)_self;
+        Py_DECREF(self->body);
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_mod_Expression_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "mod_Expression",		/*tp_name*/
+        sizeof(struct Py_mod_Expression),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        mod_Expression_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+        };
+        
+PyObject*
+Py_mod_Suite_New(PyObject* body)
+{
+        struct Py_mod_Suite *result = PyObject_New(struct Py_mod_Suite, &Py_mod_Suite_Type);
+        if (result == NULL)
+                return NULL;
+        result->body = body;
+        return (PyObject*)result;
+}
+
+static void
+mod_Suite_dealloc(PyObject* _self)
+{
+        struct Py_mod_Suite *self = (struct Py_mod_Suite*)_self;
+        Py_DECREF(self->body);
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_mod_Suite_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "mod_Suite",		/*tp_name*/
+        sizeof(struct Py_mod_Suite),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        mod_Suite_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+        };
+        
+#define stmt_dealloc 0
+PyTypeObject Py_stmt_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "stmt",		/*tp_name*/
+        sizeof(struct Py_stmt),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        stmt_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+        };
+        
+PyObject*
+Py_stmt_FunctionDef_New(PyObject* name, PyObject* args, PyObject* body,
+                        PyObject* decorators, int lineno)
+{
+        struct Py_stmt_FunctionDef *result = PyObject_New(struct Py_stmt_FunctionDef, &Py_stmt_FunctionDef_Type);
+        if (result == NULL)
+                return NULL;
+        result->name = name;
+        result->args = args;
+        result->body = body;
+        result->decorators = decorators;
+        result->_base.lineno = lineno;
+        return (PyObject*)result;
+}
+
+static void
+stmt_FunctionDef_dealloc(PyObject* _self)
+{
+        struct Py_stmt_FunctionDef *self = (struct Py_stmt_FunctionDef*)_self;
+        Py_DECREF(self->name);
+        Py_DECREF(self->args);
+        Py_DECREF(self->body);
+        Py_DECREF(self->decorators);
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_stmt_FunctionDef_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "stmt_FunctionDef",		/*tp_name*/
+        sizeof(struct Py_stmt_FunctionDef),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        stmt_FunctionDef_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+        };
+        
+PyObject*
+Py_stmt_ClassDef_New(PyObject* name, PyObject* bases, PyObject* body, int
+                     lineno)
+{
+        struct Py_stmt_ClassDef *result = PyObject_New(struct Py_stmt_ClassDef, &Py_stmt_ClassDef_Type);
+        if (result == NULL)
+                return NULL;
+        result->name = name;
+        result->bases = bases;
+        result->body = body;
+        result->_base.lineno = lineno;
+        return (PyObject*)result;
+}
+
+static void
+stmt_ClassDef_dealloc(PyObject* _self)
+{
+        struct Py_stmt_ClassDef *self = (struct Py_stmt_ClassDef*)_self;
+        Py_DECREF(self->name);
+        Py_DECREF(self->bases);
+        Py_DECREF(self->body);
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_stmt_ClassDef_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "stmt_ClassDef",		/*tp_name*/
+        sizeof(struct Py_stmt_ClassDef),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        stmt_ClassDef_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+        };
+        
+PyObject*
+Py_stmt_Return_New(PyObject* value, int lineno)
+{
+        struct Py_stmt_Return *result = PyObject_New(struct Py_stmt_Return, &Py_stmt_Return_Type);
+        if (result == NULL)
+                return NULL;
+        result->value = value;
+        result->_base.lineno = lineno;
+        return (PyObject*)result;
+}
+
+static void
+stmt_Return_dealloc(PyObject* _self)
+{
+        struct Py_stmt_Return *self = (struct Py_stmt_Return*)_self;
+        Py_DECREF(self->value);
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_stmt_Return_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "stmt_Return",		/*tp_name*/
+        sizeof(struct Py_stmt_Return),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        stmt_Return_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+        };
+        
+PyObject*
+Py_stmt_Delete_New(PyObject* targets, int lineno)
+{
+        struct Py_stmt_Delete *result = PyObject_New(struct Py_stmt_Delete, &Py_stmt_Delete_Type);
+        if (result == NULL)
+                return NULL;
+        result->targets = targets;
+        result->_base.lineno = lineno;
+        return (PyObject*)result;
+}
+
+static void
+stmt_Delete_dealloc(PyObject* _self)
+{
+        struct Py_stmt_Delete *self = (struct Py_stmt_Delete*)_self;
+        Py_DECREF(self->targets);
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_stmt_Delete_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "stmt_Delete",		/*tp_name*/
+        sizeof(struct Py_stmt_Delete),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        stmt_Delete_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+        };
+        
+PyObject*
+Py_stmt_Assign_New(PyObject* targets, PyObject* value, int lineno)
+{
+        struct Py_stmt_Assign *result = PyObject_New(struct Py_stmt_Assign, &Py_stmt_Assign_Type);
+        if (result == NULL)
+                return NULL;
+        result->targets = targets;
+        result->value = value;
+        result->_base.lineno = lineno;
+        return (PyObject*)result;
+}
+
+static void
+stmt_Assign_dealloc(PyObject* _self)
+{
+        struct Py_stmt_Assign *self = (struct Py_stmt_Assign*)_self;
+        Py_DECREF(self->targets);
+        Py_DECREF(self->value);
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_stmt_Assign_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "stmt_Assign",		/*tp_name*/
+        sizeof(struct Py_stmt_Assign),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        stmt_Assign_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+        };
+        
+PyObject*
+Py_stmt_AugAssign_New(PyObject* target, PyObject* op, PyObject* value, int
+                      lineno)
+{
+        struct Py_stmt_AugAssign *result = PyObject_New(struct Py_stmt_AugAssign, &Py_stmt_AugAssign_Type);
+        if (result == NULL)
+                return NULL;
+        result->target = target;
+        result->op = op;
+        result->value = value;
+        result->_base.lineno = lineno;
+        return (PyObject*)result;
+}
+
+static void
+stmt_AugAssign_dealloc(PyObject* _self)
+{
+        struct Py_stmt_AugAssign *self = (struct Py_stmt_AugAssign*)_self;
+        Py_DECREF(self->target);
+        Py_DECREF(self->op);
+        Py_DECREF(self->value);
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_stmt_AugAssign_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "stmt_AugAssign",		/*tp_name*/
+        sizeof(struct Py_stmt_AugAssign),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        stmt_AugAssign_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+        };
+        
+PyObject*
+Py_stmt_Print_New(PyObject* dest, PyObject* values, PyObject* nl, int lineno)
+{
+        struct Py_stmt_Print *result = PyObject_New(struct Py_stmt_Print, &Py_stmt_Print_Type);
+        if (result == NULL)
+                return NULL;
+        result->dest = dest;
+        result->values = values;
+        result->nl = nl;
+        result->_base.lineno = lineno;
+        return (PyObject*)result;
+}
+
+static void
+stmt_Print_dealloc(PyObject* _self)
+{
+        struct Py_stmt_Print *self = (struct Py_stmt_Print*)_self;
+        Py_DECREF(self->dest);
+        Py_DECREF(self->values);
+        Py_DECREF(self->nl);
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_stmt_Print_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "stmt_Print",		/*tp_name*/
+        sizeof(struct Py_stmt_Print),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        stmt_Print_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+        };
+        
+PyObject*
+Py_stmt_For_New(PyObject* target, PyObject* iter, PyObject* body, PyObject*
+                orelse, int lineno)
+{
+        struct Py_stmt_For *result = PyObject_New(struct Py_stmt_For, &Py_stmt_For_Type);
+        if (result == NULL)
+                return NULL;
+        result->target = target;
+        result->iter = iter;
+        result->body = body;
+        result->orelse = orelse;
+        result->_base.lineno = lineno;
+        return (PyObject*)result;
+}
+
+static void
+stmt_For_dealloc(PyObject* _self)
+{
+        struct Py_stmt_For *self = (struct Py_stmt_For*)_self;
+        Py_DECREF(self->target);
+        Py_DECREF(self->iter);
+        Py_DECREF(self->body);
+        Py_DECREF(self->orelse);
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_stmt_For_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "stmt_For",		/*tp_name*/
+        sizeof(struct Py_stmt_For),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        stmt_For_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+        };
+        
+PyObject*
+Py_stmt_While_New(PyObject* test, PyObject* body, PyObject* orelse, int lineno)
+{
+        struct Py_stmt_While *result = PyObject_New(struct Py_stmt_While, &Py_stmt_While_Type);
+        if (result == NULL)
+                return NULL;
+        result->test = test;
+        result->body = body;
+        result->orelse = orelse;
+        result->_base.lineno = lineno;
+        return (PyObject*)result;
+}
+
+static void
+stmt_While_dealloc(PyObject* _self)
+{
+        struct Py_stmt_While *self = (struct Py_stmt_While*)_self;
+        Py_DECREF(self->test);
+        Py_DECREF(self->body);
+        Py_DECREF(self->orelse);
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_stmt_While_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "stmt_While",		/*tp_name*/
+        sizeof(struct Py_stmt_While),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        stmt_While_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+        };
+        
+PyObject*
+Py_stmt_If_New(PyObject* test, PyObject* body, PyObject* orelse, int lineno)
+{
+        struct Py_stmt_If *result = PyObject_New(struct Py_stmt_If, &Py_stmt_If_Type);
+        if (result == NULL)
+                return NULL;
+        result->test = test;
+        result->body = body;
+        result->orelse = orelse;
+        result->_base.lineno = lineno;
+        return (PyObject*)result;
+}
+
+static void
+stmt_If_dealloc(PyObject* _self)
+{
+        struct Py_stmt_If *self = (struct Py_stmt_If*)_self;
+        Py_DECREF(self->test);
+        Py_DECREF(self->body);
+        Py_DECREF(self->orelse);
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_stmt_If_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "stmt_If",		/*tp_name*/
+        sizeof(struct Py_stmt_If),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        stmt_If_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+        };
+        
+PyObject*
+Py_stmt_Raise_New(PyObject* type, PyObject* inst, PyObject* tback, int lineno)
+{
+        struct Py_stmt_Raise *result = PyObject_New(struct Py_stmt_Raise, &Py_stmt_Raise_Type);
+        if (result == NULL)
+                return NULL;
+        result->type = type;
+        result->inst = inst;
+        result->tback = tback;
+        result->_base.lineno = lineno;
+        return (PyObject*)result;
+}
+
+static void
+stmt_Raise_dealloc(PyObject* _self)
+{
+        struct Py_stmt_Raise *self = (struct Py_stmt_Raise*)_self;
+        Py_DECREF(self->type);
+        Py_DECREF(self->inst);
+        Py_DECREF(self->tback);
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_stmt_Raise_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "stmt_Raise",		/*tp_name*/
+        sizeof(struct Py_stmt_Raise),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        stmt_Raise_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+        };
+        
+PyObject*
+Py_stmt_TryExcept_New(PyObject* body, PyObject* handlers, PyObject* orelse, int
+                      lineno)
+{
+        struct Py_stmt_TryExcept *result = PyObject_New(struct Py_stmt_TryExcept, &Py_stmt_TryExcept_Type);
+        if (result == NULL)
+                return NULL;
+        result->body = body;
+        result->handlers = handlers;
+        result->orelse = orelse;
+        result->_base.lineno = lineno;
+        return (PyObject*)result;
+}
+
+static void
+stmt_TryExcept_dealloc(PyObject* _self)
+{
+        struct Py_stmt_TryExcept *self = (struct Py_stmt_TryExcept*)_self;
+        Py_DECREF(self->body);
+        Py_DECREF(self->handlers);
+        Py_DECREF(self->orelse);
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_stmt_TryExcept_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "stmt_TryExcept",		/*tp_name*/
+        sizeof(struct Py_stmt_TryExcept),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        stmt_TryExcept_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+        };
+        
+PyObject*
+Py_stmt_TryFinally_New(PyObject* body, PyObject* finalbody, int lineno)
+{
+        struct Py_stmt_TryFinally *result = PyObject_New(struct Py_stmt_TryFinally, &Py_stmt_TryFinally_Type);
+        if (result == NULL)
+                return NULL;
+        result->body = body;
+        result->finalbody = finalbody;
+        result->_base.lineno = lineno;
+        return (PyObject*)result;
+}
+
+static void
+stmt_TryFinally_dealloc(PyObject* _self)
+{
+        struct Py_stmt_TryFinally *self = (struct Py_stmt_TryFinally*)_self;
+        Py_DECREF(self->body);
+        Py_DECREF(self->finalbody);
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_stmt_TryFinally_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "stmt_TryFinally",		/*tp_name*/
+        sizeof(struct Py_stmt_TryFinally),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        stmt_TryFinally_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+        };
+        
+PyObject*
+Py_stmt_Assert_New(PyObject* test, PyObject* msg, int lineno)
+{
+        struct Py_stmt_Assert *result = PyObject_New(struct Py_stmt_Assert, &Py_stmt_Assert_Type);
+        if (result == NULL)
+                return NULL;
+        result->test = test;
+        result->msg = msg;
+        result->_base.lineno = lineno;
+        return (PyObject*)result;
+}
+
+static void
+stmt_Assert_dealloc(PyObject* _self)
+{
+        struct Py_stmt_Assert *self = (struct Py_stmt_Assert*)_self;
+        Py_DECREF(self->test);
+        Py_DECREF(self->msg);
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_stmt_Assert_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "stmt_Assert",		/*tp_name*/
+        sizeof(struct Py_stmt_Assert),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        stmt_Assert_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+        };
+        
+PyObject*
+Py_stmt_Import_New(PyObject* names, int lineno)
+{
+        struct Py_stmt_Import *result = PyObject_New(struct Py_stmt_Import, &Py_stmt_Import_Type);
+        if (result == NULL)
+                return NULL;
+        result->names = names;
+        result->_base.lineno = lineno;
+        return (PyObject*)result;
+}
+
+static void
+stmt_Import_dealloc(PyObject* _self)
+{
+        struct Py_stmt_Import *self = (struct Py_stmt_Import*)_self;
+        Py_DECREF(self->names);
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_stmt_Import_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "stmt_Import",		/*tp_name*/
+        sizeof(struct Py_stmt_Import),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        stmt_Import_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+        };
+        
+PyObject*
+Py_stmt_ImportFrom_New(PyObject* module, PyObject* names, int lineno)
+{
+        struct Py_stmt_ImportFrom *result = PyObject_New(struct Py_stmt_ImportFrom, &Py_stmt_ImportFrom_Type);
+        if (result == NULL)
+                return NULL;
+        result->module = module;
+        result->names = names;
+        result->_base.lineno = lineno;
+        return (PyObject*)result;
+}
+
+static void
+stmt_ImportFrom_dealloc(PyObject* _self)
+{
+        struct Py_stmt_ImportFrom *self = (struct Py_stmt_ImportFrom*)_self;
+        Py_DECREF(self->module);
+        Py_DECREF(self->names);
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_stmt_ImportFrom_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "stmt_ImportFrom",		/*tp_name*/
+        sizeof(struct Py_stmt_ImportFrom),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        stmt_ImportFrom_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+        };
+        
+PyObject*
+Py_stmt_Exec_New(PyObject* body, PyObject* globals, PyObject* locals, int
+                 lineno)
+{
+        struct Py_stmt_Exec *result = PyObject_New(struct Py_stmt_Exec, &Py_stmt_Exec_Type);
+        if (result == NULL)
+                return NULL;
+        result->body = body;
+        result->globals = globals;
+        result->locals = locals;
+        result->_base.lineno = lineno;
+        return (PyObject*)result;
+}
+
+static void
+stmt_Exec_dealloc(PyObject* _self)
+{
+        struct Py_stmt_Exec *self = (struct Py_stmt_Exec*)_self;
+        Py_DECREF(self->body);
+        Py_DECREF(self->globals);
+        Py_DECREF(self->locals);
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_stmt_Exec_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "stmt_Exec",		/*tp_name*/
+        sizeof(struct Py_stmt_Exec),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        stmt_Exec_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+        };
+        
+PyObject*
+Py_stmt_Global_New(PyObject* names, int lineno)
+{
+        struct Py_stmt_Global *result = PyObject_New(struct Py_stmt_Global, &Py_stmt_Global_Type);
+        if (result == NULL)
+                return NULL;
+        result->names = names;
+        result->_base.lineno = lineno;
+        return (PyObject*)result;
+}
+
+static void
+stmt_Global_dealloc(PyObject* _self)
+{
+        struct Py_stmt_Global *self = (struct Py_stmt_Global*)_self;
+        Py_DECREF(self->names);
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_stmt_Global_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "stmt_Global",		/*tp_name*/
+        sizeof(struct Py_stmt_Global),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        stmt_Global_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+        };
+        
+PyObject*
+Py_stmt_Expr_New(PyObject* value, int lineno)
+{
+        struct Py_stmt_Expr *result = PyObject_New(struct Py_stmt_Expr, &Py_stmt_Expr_Type);
+        if (result == NULL)
+                return NULL;
+        result->value = value;
+        result->_base.lineno = lineno;
+        return (PyObject*)result;
+}
+
+static void
+stmt_Expr_dealloc(PyObject* _self)
+{
+        struct Py_stmt_Expr *self = (struct Py_stmt_Expr*)_self;
+        Py_DECREF(self->value);
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_stmt_Expr_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "stmt_Expr",		/*tp_name*/
+        sizeof(struct Py_stmt_Expr),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        stmt_Expr_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+        };
+        
+PyObject*
+Py_stmt_Pass_New(int lineno)
+{
+        struct Py_stmt_Pass *result = PyObject_New(struct Py_stmt_Pass, &Py_stmt_Pass_Type);
+        if (result == NULL)
+                return NULL;
+        result->_base.lineno = lineno;
+        return (PyObject*)result;
+}
+
+static void
+stmt_Pass_dealloc(PyObject* _self)
+{
+        struct Py_stmt_Pass *self = (struct Py_stmt_Pass*)_self;
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_stmt_Pass_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "stmt_Pass",		/*tp_name*/
+        sizeof(struct Py_stmt_Pass),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        stmt_Pass_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+        };
+        
+PyObject*
+Py_stmt_Break_New(int lineno)
+{
+        struct Py_stmt_Break *result = PyObject_New(struct Py_stmt_Break, &Py_stmt_Break_Type);
+        if (result == NULL)
+                return NULL;
+        result->_base.lineno = lineno;
+        return (PyObject*)result;
+}
+
+static void
+stmt_Break_dealloc(PyObject* _self)
+{
+        struct Py_stmt_Break *self = (struct Py_stmt_Break*)_self;
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_stmt_Break_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "stmt_Break",		/*tp_name*/
+        sizeof(struct Py_stmt_Break),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        stmt_Break_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+        };
+        
+PyObject*
+Py_stmt_Continue_New(int lineno)
+{
+        struct Py_stmt_Continue *result = PyObject_New(struct Py_stmt_Continue, &Py_stmt_Continue_Type);
+        if (result == NULL)
+                return NULL;
+        result->_base.lineno = lineno;
+        return (PyObject*)result;
+}
+
+static void
+stmt_Continue_dealloc(PyObject* _self)
+{
+        struct Py_stmt_Continue *self = (struct Py_stmt_Continue*)_self;
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_stmt_Continue_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "stmt_Continue",		/*tp_name*/
+        sizeof(struct Py_stmt_Continue),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        stmt_Continue_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+        };
+        
+#define expr_dealloc 0
+PyTypeObject Py_expr_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "expr",		/*tp_name*/
+        sizeof(struct Py_expr),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        expr_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+        };
+        
+PyObject*
+Py_expr_BoolOp_New(PyObject* op, PyObject* values, int lineno)
+{
+        struct Py_expr_BoolOp *result = PyObject_New(struct Py_expr_BoolOp, &Py_expr_BoolOp_Type);
+        if (result == NULL)
+                return NULL;
+        result->op = op;
+        result->values = values;
+        result->_base.lineno = lineno;
+        return (PyObject*)result;
+}
+
+static void
+expr_BoolOp_dealloc(PyObject* _self)
+{
+        struct Py_expr_BoolOp *self = (struct Py_expr_BoolOp*)_self;
+        Py_DECREF(self->op);
+        Py_DECREF(self->values);
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_expr_BoolOp_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "expr_BoolOp",		/*tp_name*/
+        sizeof(struct Py_expr_BoolOp),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        expr_BoolOp_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+        };
+        
+PyObject*
+Py_expr_BinOp_New(PyObject* left, PyObject* op, PyObject* right, int lineno)
+{
+        struct Py_expr_BinOp *result = PyObject_New(struct Py_expr_BinOp, &Py_expr_BinOp_Type);
+        if (result == NULL)
+                return NULL;
+        result->left = left;
+        result->op = op;
+        result->right = right;
+        result->_base.lineno = lineno;
+        return (PyObject*)result;
+}
+
+static void
+expr_BinOp_dealloc(PyObject* _self)
+{
+        struct Py_expr_BinOp *self = (struct Py_expr_BinOp*)_self;
+        Py_DECREF(self->left);
+        Py_DECREF(self->op);
+        Py_DECREF(self->right);
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_expr_BinOp_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "expr_BinOp",		/*tp_name*/
+        sizeof(struct Py_expr_BinOp),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        expr_BinOp_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+        };
+        
+PyObject*
+Py_expr_UnaryOp_New(PyObject* op, PyObject* operand, int lineno)
+{
+        struct Py_expr_UnaryOp *result = PyObject_New(struct Py_expr_UnaryOp, &Py_expr_UnaryOp_Type);
+        if (result == NULL)
+                return NULL;
+        result->op = op;
+        result->operand = operand;
+        result->_base.lineno = lineno;
+        return (PyObject*)result;
+}
+
+static void
+expr_UnaryOp_dealloc(PyObject* _self)
+{
+        struct Py_expr_UnaryOp *self = (struct Py_expr_UnaryOp*)_self;
+        Py_DECREF(self->op);
+        Py_DECREF(self->operand);
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_expr_UnaryOp_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "expr_UnaryOp",		/*tp_name*/
+        sizeof(struct Py_expr_UnaryOp),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        expr_UnaryOp_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+        };
+        
+PyObject*
+Py_expr_Lambda_New(PyObject* args, PyObject* body, int lineno)
+{
+        struct Py_expr_Lambda *result = PyObject_New(struct Py_expr_Lambda, &Py_expr_Lambda_Type);
+        if (result == NULL)
+                return NULL;
+        result->args = args;
+        result->body = body;
+        result->_base.lineno = lineno;
+        return (PyObject*)result;
+}
+
+static void
+expr_Lambda_dealloc(PyObject* _self)
+{
+        struct Py_expr_Lambda *self = (struct Py_expr_Lambda*)_self;
+        Py_DECREF(self->args);
+        Py_DECREF(self->body);
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_expr_Lambda_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "expr_Lambda",		/*tp_name*/
+        sizeof(struct Py_expr_Lambda),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        expr_Lambda_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+        };
+        
+PyObject*
+Py_expr_Dict_New(PyObject* keys, PyObject* values, int lineno)
+{
+        struct Py_expr_Dict *result = PyObject_New(struct Py_expr_Dict, &Py_expr_Dict_Type);
+        if (result == NULL)
+                return NULL;
+        result->keys = keys;
+        result->values = values;
+        result->_base.lineno = lineno;
+        return (PyObject*)result;
+}
+
+static void
+expr_Dict_dealloc(PyObject* _self)
+{
+        struct Py_expr_Dict *self = (struct Py_expr_Dict*)_self;
+        Py_DECREF(self->keys);
+        Py_DECREF(self->values);
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_expr_Dict_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "expr_Dict",		/*tp_name*/
+        sizeof(struct Py_expr_Dict),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        expr_Dict_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+        };
+        
+PyObject*
+Py_expr_ListComp_New(PyObject* elt, PyObject* generators, int lineno)
+{
+        struct Py_expr_ListComp *result = PyObject_New(struct Py_expr_ListComp, &Py_expr_ListComp_Type);
+        if (result == NULL)
+                return NULL;
+        result->elt = elt;
+        result->generators = generators;
+        result->_base.lineno = lineno;
+        return (PyObject*)result;
+}
+
+static void
+expr_ListComp_dealloc(PyObject* _self)
+{
+        struct Py_expr_ListComp *self = (struct Py_expr_ListComp*)_self;
+        Py_DECREF(self->elt);
+        Py_DECREF(self->generators);
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_expr_ListComp_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "expr_ListComp",		/*tp_name*/
+        sizeof(struct Py_expr_ListComp),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        expr_ListComp_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+        };
+        
+PyObject*
+Py_expr_GeneratorExp_New(PyObject* elt, PyObject* generators, int lineno)
+{
+        struct Py_expr_GeneratorExp *result = PyObject_New(struct Py_expr_GeneratorExp, &Py_expr_GeneratorExp_Type);
+        if (result == NULL)
+                return NULL;
+        result->elt = elt;
+        result->generators = generators;
+        result->_base.lineno = lineno;
+        return (PyObject*)result;
+}
+
+static void
+expr_GeneratorExp_dealloc(PyObject* _self)
+{
+        struct Py_expr_GeneratorExp *self = (struct Py_expr_GeneratorExp*)_self;
+        Py_DECREF(self->elt);
+        Py_DECREF(self->generators);
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_expr_GeneratorExp_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "expr_GeneratorExp",		/*tp_name*/
+        sizeof(struct Py_expr_GeneratorExp),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        expr_GeneratorExp_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+        };
+        
+PyObject*
+Py_expr_Yield_New(PyObject* value, int lineno)
+{
+        struct Py_expr_Yield *result = PyObject_New(struct Py_expr_Yield, &Py_expr_Yield_Type);
+        if (result == NULL)
+                return NULL;
+        result->value = value;
+        result->_base.lineno = lineno;
+        return (PyObject*)result;
+}
+
+static void
+expr_Yield_dealloc(PyObject* _self)
+{
+        struct Py_expr_Yield *self = (struct Py_expr_Yield*)_self;
+        Py_DECREF(self->value);
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_expr_Yield_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "expr_Yield",		/*tp_name*/
+        sizeof(struct Py_expr_Yield),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        expr_Yield_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+        };
+        
+PyObject*
+Py_expr_Compare_New(PyObject* left, PyObject* ops, PyObject* comparators, int
+                    lineno)
+{
+        struct Py_expr_Compare *result = PyObject_New(struct Py_expr_Compare, &Py_expr_Compare_Type);
+        if (result == NULL)
+                return NULL;
+        result->left = left;
+        result->ops = ops;
+        result->comparators = comparators;
+        result->_base.lineno = lineno;
+        return (PyObject*)result;
+}
+
+static void
+expr_Compare_dealloc(PyObject* _self)
+{
+        struct Py_expr_Compare *self = (struct Py_expr_Compare*)_self;
+        Py_DECREF(self->left);
+        Py_DECREF(self->ops);
+        Py_DECREF(self->comparators);
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_expr_Compare_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "expr_Compare",		/*tp_name*/
+        sizeof(struct Py_expr_Compare),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        expr_Compare_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+        };
+        
+PyObject*
+Py_expr_Call_New(PyObject* func, PyObject* args, PyObject* keywords, PyObject*
+                 starargs, PyObject* kwargs, int lineno)
+{
+        struct Py_expr_Call *result = PyObject_New(struct Py_expr_Call, &Py_expr_Call_Type);
+        if (result == NULL)
+                return NULL;
+        result->func = func;
+        result->args = args;
+        result->keywords = keywords;
+        result->starargs = starargs;
+        result->kwargs = kwargs;
+        result->_base.lineno = lineno;
+        return (PyObject*)result;
+}
+
+static void
+expr_Call_dealloc(PyObject* _self)
+{
+        struct Py_expr_Call *self = (struct Py_expr_Call*)_self;
+        Py_DECREF(self->func);
+        Py_DECREF(self->args);
+        Py_DECREF(self->keywords);
+        Py_DECREF(self->starargs);
+        Py_DECREF(self->kwargs);
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_expr_Call_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "expr_Call",		/*tp_name*/
+        sizeof(struct Py_expr_Call),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        expr_Call_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+        };
+        
+PyObject*
+Py_expr_Repr_New(PyObject* value, int lineno)
+{
+        struct Py_expr_Repr *result = PyObject_New(struct Py_expr_Repr, &Py_expr_Repr_Type);
+        if (result == NULL)
+                return NULL;
+        result->value = value;
+        result->_base.lineno = lineno;
+        return (PyObject*)result;
+}
+
+static void
+expr_Repr_dealloc(PyObject* _self)
+{
+        struct Py_expr_Repr *self = (struct Py_expr_Repr*)_self;
+        Py_DECREF(self->value);
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_expr_Repr_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "expr_Repr",		/*tp_name*/
+        sizeof(struct Py_expr_Repr),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        expr_Repr_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+        };
+        
+PyObject*
+Py_expr_Num_New(PyObject* n, int lineno)
+{
+        struct Py_expr_Num *result = PyObject_New(struct Py_expr_Num, &Py_expr_Num_Type);
+        if (result == NULL)
+                return NULL;
+        result->n = n;
+        result->_base.lineno = lineno;
+        return (PyObject*)result;
+}
+
+static void
+expr_Num_dealloc(PyObject* _self)
+{
+        struct Py_expr_Num *self = (struct Py_expr_Num*)_self;
+        Py_DECREF(self->n);
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_expr_Num_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "expr_Num",		/*tp_name*/
+        sizeof(struct Py_expr_Num),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        expr_Num_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+        };
+        
+PyObject*
+Py_expr_Str_New(PyObject* s, int lineno)
+{
+        struct Py_expr_Str *result = PyObject_New(struct Py_expr_Str, &Py_expr_Str_Type);
+        if (result == NULL)
+                return NULL;
+        result->s = s;
+        result->_base.lineno = lineno;
+        return (PyObject*)result;
+}
+
+static void
+expr_Str_dealloc(PyObject* _self)
+{
+        struct Py_expr_Str *self = (struct Py_expr_Str*)_self;
+        Py_DECREF(self->s);
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_expr_Str_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "expr_Str",		/*tp_name*/
+        sizeof(struct Py_expr_Str),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        expr_Str_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+        };
+        
+PyObject*
+Py_expr_Attribute_New(PyObject* value, PyObject* attr, PyObject* ctx, int
+                      lineno)
+{
+        struct Py_expr_Attribute *result = PyObject_New(struct Py_expr_Attribute, &Py_expr_Attribute_Type);
+        if (result == NULL)
+                return NULL;
+        result->value = value;
+        result->attr = attr;
+        result->ctx = ctx;
+        result->_base.lineno = lineno;
+        return (PyObject*)result;
+}
+
+static void
+expr_Attribute_dealloc(PyObject* _self)
+{
+        struct Py_expr_Attribute *self = (struct Py_expr_Attribute*)_self;
+        Py_DECREF(self->value);
+        Py_DECREF(self->attr);
+        Py_DECREF(self->ctx);
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_expr_Attribute_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "expr_Attribute",		/*tp_name*/
+        sizeof(struct Py_expr_Attribute),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        expr_Attribute_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+        };
+        
+PyObject*
+Py_expr_Subscript_New(PyObject* value, PyObject* slice, PyObject* ctx, int
+                      lineno)
+{
+        struct Py_expr_Subscript *result = PyObject_New(struct Py_expr_Subscript, &Py_expr_Subscript_Type);
+        if (result == NULL)
+                return NULL;
+        result->value = value;
+        result->slice = slice;
+        result->ctx = ctx;
+        result->_base.lineno = lineno;
+        return (PyObject*)result;
+}
+
+static void
+expr_Subscript_dealloc(PyObject* _self)
+{
+        struct Py_expr_Subscript *self = (struct Py_expr_Subscript*)_self;
+        Py_DECREF(self->value);
+        Py_DECREF(self->slice);
+        Py_DECREF(self->ctx);
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_expr_Subscript_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "expr_Subscript",		/*tp_name*/
+        sizeof(struct Py_expr_Subscript),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        expr_Subscript_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+        };
+        
+PyObject*
+Py_expr_Name_New(PyObject* id, PyObject* ctx, int lineno)
+{
+        struct Py_expr_Name *result = PyObject_New(struct Py_expr_Name, &Py_expr_Name_Type);
+        if (result == NULL)
+                return NULL;
+        result->id = id;
+        result->ctx = ctx;
+        result->_base.lineno = lineno;
+        return (PyObject*)result;
+}
+
+static void
+expr_Name_dealloc(PyObject* _self)
+{
+        struct Py_expr_Name *self = (struct Py_expr_Name*)_self;
+        Py_DECREF(self->id);
+        Py_DECREF(self->ctx);
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_expr_Name_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "expr_Name",		/*tp_name*/
+        sizeof(struct Py_expr_Name),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        expr_Name_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+        };
+        
+PyObject*
+Py_expr_List_New(PyObject* elts, PyObject* ctx, int lineno)
+{
+        struct Py_expr_List *result = PyObject_New(struct Py_expr_List, &Py_expr_List_Type);
+        if (result == NULL)
+                return NULL;
+        result->elts = elts;
+        result->ctx = ctx;
+        result->_base.lineno = lineno;
+        return (PyObject*)result;
+}
+
+static void
+expr_List_dealloc(PyObject* _self)
+{
+        struct Py_expr_List *self = (struct Py_expr_List*)_self;
+        Py_DECREF(self->elts);
+        Py_DECREF(self->ctx);
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_expr_List_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "expr_List",		/*tp_name*/
+        sizeof(struct Py_expr_List),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        expr_List_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+        };
+        
+PyObject*
+Py_expr_Tuple_New(PyObject* elts, PyObject* ctx, int lineno)
+{
+        struct Py_expr_Tuple *result = PyObject_New(struct Py_expr_Tuple, &Py_expr_Tuple_Type);
+        if (result == NULL)
+                return NULL;
+        result->elts = elts;
+        result->ctx = ctx;
+        result->_base.lineno = lineno;
+        return (PyObject*)result;
+}
+
+static void
+expr_Tuple_dealloc(PyObject* _self)
+{
+        struct Py_expr_Tuple *self = (struct Py_expr_Tuple*)_self;
+        Py_DECREF(self->elts);
+        Py_DECREF(self->ctx);
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_expr_Tuple_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "expr_Tuple",		/*tp_name*/
+        sizeof(struct Py_expr_Tuple),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        expr_Tuple_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+        };
+        
+#define slice_dealloc 0
+PyTypeObject Py_slice_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "slice",		/*tp_name*/
+        sizeof(struct Py_slice),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        slice_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+        };
+        
+PyObject*
+Py_slice_Ellipsis_New()
+{
+        struct Py_slice_Ellipsis *result = PyObject_New(struct Py_slice_Ellipsis, &Py_slice_Ellipsis_Type);
+        if (result == NULL)
+                return NULL;
+        return (PyObject*)result;
+}
+
+static void
+slice_Ellipsis_dealloc(PyObject* _self)
+{
+        struct Py_slice_Ellipsis *self = (struct Py_slice_Ellipsis*)_self;
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_slice_Ellipsis_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "slice_Ellipsis",		/*tp_name*/
+        sizeof(struct Py_slice_Ellipsis),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        slice_Ellipsis_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+        };
+        
+PyObject*
+Py_slice_Slice_New(PyObject* lower, PyObject* upper, PyObject* step)
+{
+        struct Py_slice_Slice *result = PyObject_New(struct Py_slice_Slice, &Py_slice_Slice_Type);
+        if (result == NULL)
+                return NULL;
+        result->lower = lower;
+        result->upper = upper;
+        result->step = step;
+        return (PyObject*)result;
+}
+
+static void
+slice_Slice_dealloc(PyObject* _self)
+{
+        struct Py_slice_Slice *self = (struct Py_slice_Slice*)_self;
+        Py_DECREF(self->lower);
+        Py_DECREF(self->upper);
+        Py_DECREF(self->step);
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_slice_Slice_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "slice_Slice",		/*tp_name*/
+        sizeof(struct Py_slice_Slice),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        slice_Slice_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+        };
+        
+PyObject*
+Py_slice_ExtSlice_New(PyObject* dims)
+{
+        struct Py_slice_ExtSlice *result = PyObject_New(struct Py_slice_ExtSlice, &Py_slice_ExtSlice_Type);
+        if (result == NULL)
+                return NULL;
+        result->dims = dims;
+        return (PyObject*)result;
+}
+
+static void
+slice_ExtSlice_dealloc(PyObject* _self)
+{
+        struct Py_slice_ExtSlice *self = (struct Py_slice_ExtSlice*)_self;
+        Py_DECREF(self->dims);
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_slice_ExtSlice_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "slice_ExtSlice",		/*tp_name*/
+        sizeof(struct Py_slice_ExtSlice),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        slice_ExtSlice_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+        };
+        
+PyObject*
+Py_slice_Index_New(PyObject* value)
+{
+        struct Py_slice_Index *result = PyObject_New(struct Py_slice_Index, &Py_slice_Index_Type);
+        if (result == NULL)
+                return NULL;
+        result->value = value;
+        return (PyObject*)result;
+}
+
+static void
+slice_Index_dealloc(PyObject* _self)
+{
+        struct Py_slice_Index *self = (struct Py_slice_Index*)_self;
+        Py_DECREF(self->value);
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_slice_Index_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "slice_Index",		/*tp_name*/
+        sizeof(struct Py_slice_Index),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        slice_Index_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+        };
+        
+PyObject*
+Py_comprehension_New(PyObject* target, PyObject* iter, PyObject* ifs)
+{
+        struct Py_comprehension *result = PyObject_New(struct Py_comprehension, &Py_comprehension_Type);
+        if (result == NULL)
+                return NULL;
+        result->target = target;
+        result->iter = iter;
+        result->ifs = ifs;
+        return (PyObject*)result;
+}
+
+static void
+comprehension_dealloc(PyObject* _self)
+{
+        struct Py_comprehension *self = (struct Py_comprehension*)_self;
+        Py_DECREF(self->target);
+        Py_DECREF(self->iter);
+        Py_DECREF(self->ifs);
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_comprehension_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "comprehension",		/*tp_name*/
+        sizeof(struct Py_comprehension),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        comprehension_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+        };
+        
+PyObject*
+Py_excepthandler_New(PyObject* type, PyObject* name, PyObject* body)
+{
+        struct Py_excepthandler *result = PyObject_New(struct Py_excepthandler, &Py_excepthandler_Type);
+        if (result == NULL)
+                return NULL;
+        result->type = type;
+        result->name = name;
+        result->body = body;
+        return (PyObject*)result;
+}
+
+static void
+excepthandler_dealloc(PyObject* _self)
+{
+        struct Py_excepthandler *self = (struct Py_excepthandler*)_self;
+        Py_DECREF(self->type);
+        Py_DECREF(self->name);
+        Py_DECREF(self->body);
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_excepthandler_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "excepthandler",		/*tp_name*/
+        sizeof(struct Py_excepthandler),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        excepthandler_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+        };
+        
+PyObject*
+Py_arguments_New(PyObject* args, PyObject* vararg, PyObject* kwarg, PyObject*
+                 defaults)
+{
+        struct Py_arguments *result = PyObject_New(struct Py_arguments, &Py_arguments_Type);
+        if (result == NULL)
+                return NULL;
+        result->args = args;
+        result->vararg = vararg;
+        result->kwarg = kwarg;
+        result->defaults = defaults;
+        return (PyObject*)result;
+}
+
+static void
+arguments_dealloc(PyObject* _self)
+{
+        struct Py_arguments *self = (struct Py_arguments*)_self;
+        Py_DECREF(self->args);
+        Py_DECREF(self->vararg);
+        Py_DECREF(self->kwarg);
+        Py_DECREF(self->defaults);
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_arguments_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "arguments",		/*tp_name*/
+        sizeof(struct Py_arguments),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        arguments_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+        };
+        
+PyObject*
+Py_keyword_New(PyObject* arg, PyObject* value)
+{
+        struct Py_keyword *result = PyObject_New(struct Py_keyword, &Py_keyword_Type);
+        if (result == NULL)
+                return NULL;
+        result->arg = arg;
+        result->value = value;
+        return (PyObject*)result;
+}
+
+static void
+keyword_dealloc(PyObject* _self)
+{
+        struct Py_keyword *self = (struct Py_keyword*)_self;
+        Py_DECREF(self->arg);
+        Py_DECREF(self->value);
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_keyword_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "keyword",		/*tp_name*/
+        sizeof(struct Py_keyword),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        keyword_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+        };
+        
+PyObject*
+Py_alias_New(PyObject* name, PyObject* asname)
+{
+        struct Py_alias *result = PyObject_New(struct Py_alias, &Py_alias_Type);
+        if (result == NULL)
+                return NULL;
+        result->name = name;
+        result->asname = asname;
+        return (PyObject*)result;
+}
+
+static void
+alias_dealloc(PyObject* _self)
+{
+        struct Py_alias *self = (struct Py_alias*)_self;
+        Py_DECREF(self->name);
+        Py_DECREF(self->asname);
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_alias_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "alias",		/*tp_name*/
+        sizeof(struct Py_alias),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        alias_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+        };
+        
+
+void init_ast(void)
+{
+        if (PyType_Ready(&Py_mod_Type) < 0)
                 return;
-
-        switch (o->kind) {
-        case Module_kind:
-                free_seq_stmts(o->v.Module.body);
-                break;
-        case Interactive_kind:
-                free_seq_stmts(o->v.Interactive.body);
-                break;
-        case Expression_kind:
-                free_expr((expr_ty)o->v.Expression.body);
-                break;
-        case Suite_kind:
-                free_seq_stmts(o->v.Suite.body);
-                break;
-        }
-
-        free(o);
-}
-
-void
-free_stmt(stmt_ty o)
-{
-        int i, n;
-        asdl_seq *seq;
-
-        if (!o)
+        Py_mod_Module_Type.tp_base = &Py_mod_Type;
+        if (PyType_Ready(&Py_mod_Module_Type) < 0)
                 return;
-
-        switch (o->kind) {
-        case FunctionDef_kind:
-                Py_DECREF((identifier)o->v.FunctionDef.name);
-                free_arguments((arguments_ty)o->v.FunctionDef.args);
-                free_seq_stmts(o->v.FunctionDef.body);
-                free_seq_exprs(o->v.FunctionDef.decorators);
-                break;
-        case ClassDef_kind:
-                Py_DECREF((identifier)o->v.ClassDef.name);
-                free_seq_exprs(o->v.ClassDef.bases);
-                free_seq_stmts(o->v.ClassDef.body);
-                break;
-        case Return_kind:
-                if (o->v.Return.value) {
-                        free_expr((expr_ty)o->v.Return.value);
-                }
-                break;
-        case Delete_kind:
-                free_seq_exprs(o->v.Delete.targets);
-                break;
-        case Assign_kind:
-                free_seq_exprs(o->v.Assign.targets);
-                free_expr((expr_ty)o->v.Assign.value);
-                break;
-        case AugAssign_kind:
-                free_expr((expr_ty)o->v.AugAssign.target);
-                free_operator((operator_ty)o->v.AugAssign.op);
-                free_expr((expr_ty)o->v.AugAssign.value);
-                break;
-        case Print_kind:
-                if (o->v.Print.dest) {
-                        free_expr((expr_ty)o->v.Print.dest);
-                }
-                free_seq_exprs(o->v.Print.values);
-                break;
-        case For_kind:
-                free_expr((expr_ty)o->v.For.target);
-                free_expr((expr_ty)o->v.For.iter);
-                free_seq_stmts(o->v.For.body);
-                free_seq_stmts(o->v.For.orelse);
-                break;
-        case While_kind:
-                free_expr((expr_ty)o->v.While.test);
-                free_seq_stmts(o->v.While.body);
-                free_seq_stmts(o->v.While.orelse);
-                break;
-        case If_kind:
-                free_expr((expr_ty)o->v.If.test);
-                free_seq_stmts(o->v.If.body);
-                free_seq_stmts(o->v.If.orelse);
-                break;
-        case Raise_kind:
-                if (o->v.Raise.type) {
-                        free_expr((expr_ty)o->v.Raise.type);
-                }
-                if (o->v.Raise.inst) {
-                        free_expr((expr_ty)o->v.Raise.inst);
-                }
-                if (o->v.Raise.tback) {
-                        free_expr((expr_ty)o->v.Raise.tback);
-                }
-                break;
-        case TryExcept_kind:
-                free_seq_stmts(o->v.TryExcept.body);
-                seq = o->v.TryExcept.handlers;
-                n = asdl_seq_LEN(seq);
-                for (i = 0; i < n; i++)
-                        free_excepthandler((excepthandler_ty)asdl_seq_GET(seq,
-                                           i));
-                asdl_seq_free(seq);
-                free_seq_stmts(o->v.TryExcept.orelse);
-                break;
-        case TryFinally_kind:
-                free_seq_stmts(o->v.TryFinally.body);
-                free_seq_stmts(o->v.TryFinally.finalbody);
-                break;
-        case Assert_kind:
-                free_expr((expr_ty)o->v.Assert.test);
-                if (o->v.Assert.msg) {
-                        free_expr((expr_ty)o->v.Assert.msg);
-                }
-                break;
-        case Import_kind:
-                seq = o->v.Import.names;
-                n = asdl_seq_LEN(seq);
-                for (i = 0; i < n; i++)
-                        free_alias((alias_ty)asdl_seq_GET(seq, i));
-                asdl_seq_free(seq);
-                break;
-        case ImportFrom_kind:
-                Py_DECREF((identifier)o->v.ImportFrom.module);
-                seq = o->v.ImportFrom.names;
-                n = asdl_seq_LEN(seq);
-                for (i = 0; i < n; i++)
-                        free_alias((alias_ty)asdl_seq_GET(seq, i));
-                asdl_seq_free(seq);
-                break;
-        case Exec_kind:
-                free_expr((expr_ty)o->v.Exec.body);
-                if (o->v.Exec.globals) {
-                        free_expr((expr_ty)o->v.Exec.globals);
-                }
-                if (o->v.Exec.locals) {
-                        free_expr((expr_ty)o->v.Exec.locals);
-                }
-                break;
-        case Global_kind:
-                seq = o->v.Global.names;
-                n = asdl_seq_LEN(seq);
-                for (i = 0; i < n; i++)
-                        Py_DECREF((identifier)asdl_seq_GET(seq, i));
-                asdl_seq_free(seq);
-                break;
-        case Expr_kind:
-                free_expr((expr_ty)o->v.Expr.value);
-                break;
-        case Pass_kind:
-                break;
-        case Break_kind:
-                break;
-        case Continue_kind:
-                break;
-        }
-
-        free(o);
-}
-
-void
-free_expr(expr_ty o)
-{
-        int i, n;
-        asdl_seq *seq;
-
-        if (!o)
+        Py_mod_Interactive_Type.tp_base = &Py_mod_Type;
+        if (PyType_Ready(&Py_mod_Interactive_Type) < 0)
                 return;
-
-        switch (o->kind) {
-        case BoolOp_kind:
-                free_boolop((boolop_ty)o->v.BoolOp.op);
-                free_seq_exprs(o->v.BoolOp.values);
-                break;
-        case BinOp_kind:
-                free_expr((expr_ty)o->v.BinOp.left);
-                free_operator((operator_ty)o->v.BinOp.op);
-                free_expr((expr_ty)o->v.BinOp.right);
-                break;
-        case UnaryOp_kind:
-                free_unaryop((unaryop_ty)o->v.UnaryOp.op);
-                free_expr((expr_ty)o->v.UnaryOp.operand);
-                break;
-        case Lambda_kind:
-                free_arguments((arguments_ty)o->v.Lambda.args);
-                free_expr((expr_ty)o->v.Lambda.body);
-                break;
-        case Dict_kind:
-                free_seq_exprs(o->v.Dict.keys);
-                free_seq_exprs(o->v.Dict.values);
-                break;
-        case ListComp_kind:
-                free_expr((expr_ty)o->v.ListComp.elt);
-                seq = o->v.ListComp.generators;
-                n = asdl_seq_LEN(seq);
-                for (i = 0; i < n; i++)
-                        free_comprehension((comprehension_ty)asdl_seq_GET(seq,
-                                           i));
-                asdl_seq_free(seq);
-                break;
-        case GeneratorExp_kind:
-                free_expr((expr_ty)o->v.GeneratorExp.elt);
-                seq = o->v.GeneratorExp.generators;
-                n = asdl_seq_LEN(seq);
-                for (i = 0; i < n; i++)
-                        free_comprehension((comprehension_ty)asdl_seq_GET(seq,
-                                           i));
-                asdl_seq_free(seq);
-                break;
-        case Yield_kind:
-                if (o->v.Yield.value) {
-                        free_expr((expr_ty)o->v.Yield.value);
-                }
-                break;
-        case Compare_kind:
-                free_expr((expr_ty)o->v.Compare.left);
-                seq = o->v.Compare.ops;
-                n = asdl_seq_LEN(seq);
-                for (i = 0; i < n; i++)
-                        free_cmpop((cmpop_ty)asdl_seq_GET(seq, i));
-                asdl_seq_free(seq);
-                free_seq_exprs(o->v.Compare.comparators);
-                break;
-        case Call_kind:
-                free_expr((expr_ty)o->v.Call.func);
-                free_seq_exprs(o->v.Call.args);
-                seq = o->v.Call.keywords;
-                n = asdl_seq_LEN(seq);
-                for (i = 0; i < n; i++)
-                        free_keyword((keyword_ty)asdl_seq_GET(seq, i));
-                asdl_seq_free(seq);
-                if (o->v.Call.starargs) {
-                        free_expr((expr_ty)o->v.Call.starargs);
-                }
-                if (o->v.Call.kwargs) {
-                        free_expr((expr_ty)o->v.Call.kwargs);
-                }
-                break;
-        case Repr_kind:
-                free_expr((expr_ty)o->v.Repr.value);
-                break;
-        case Num_kind:
-                Py_DECREF((object)o->v.Num.n);
-                break;
-        case Str_kind:
-                Py_DECREF((string)o->v.Str.s);
-                break;
-        case Attribute_kind:
-                free_expr((expr_ty)o->v.Attribute.value);
-                Py_DECREF((identifier)o->v.Attribute.attr);
-                free_expr_context((expr_context_ty)o->v.Attribute.ctx);
-                break;
-        case Subscript_kind:
-                free_expr((expr_ty)o->v.Subscript.value);
-                free_slice((slice_ty)o->v.Subscript.slice);
-                free_expr_context((expr_context_ty)o->v.Subscript.ctx);
-                break;
-        case Name_kind:
-                Py_DECREF((identifier)o->v.Name.id);
-                free_expr_context((expr_context_ty)o->v.Name.ctx);
-                break;
-        case List_kind:
-                free_seq_exprs(o->v.List.elts);
-                free_expr_context((expr_context_ty)o->v.List.ctx);
-                break;
-        case Tuple_kind:
-                free_seq_exprs(o->v.Tuple.elts);
-                free_expr_context((expr_context_ty)o->v.Tuple.ctx);
-                break;
-        }
-
-        free(o);
-}
-
-void
-free_expr_context(expr_context_ty o)
-{
-        if (!o)
+        Py_mod_Expression_Type.tp_base = &Py_mod_Type;
+        if (PyType_Ready(&Py_mod_Expression_Type) < 0)
                 return;
-
-}
-
-void
-free_slice(slice_ty o)
-{
-        int i, n;
-        asdl_seq *seq;
-
-        if (!o)
+        Py_mod_Suite_Type.tp_base = &Py_mod_Type;
+        if (PyType_Ready(&Py_mod_Suite_Type) < 0)
                 return;
-
-        switch (o->kind) {
-        case Ellipsis_kind:
-                break;
-        case Slice_kind:
-                if (o->v.Slice.lower) {
-                        free_expr((expr_ty)o->v.Slice.lower);
-                }
-                if (o->v.Slice.upper) {
-                        free_expr((expr_ty)o->v.Slice.upper);
-                }
-                if (o->v.Slice.step) {
-                        free_expr((expr_ty)o->v.Slice.step);
-                }
-                break;
-        case ExtSlice_kind:
-                seq = o->v.ExtSlice.dims;
-                n = asdl_seq_LEN(seq);
-                for (i = 0; i < n; i++)
-                        free_slice((slice_ty)asdl_seq_GET(seq, i));
-                asdl_seq_free(seq);
-                break;
-        case Index_kind:
-                free_expr((expr_ty)o->v.Index.value);
-                break;
-        }
-
-        free(o);
-}
-
-void
-free_boolop(boolop_ty o)
-{
-        if (!o)
+        if (PyType_Ready(&Py_stmt_Type) < 0)
                 return;
-
-}
-
-void
-free_operator(operator_ty o)
-{
-        if (!o)
+        Py_stmt_FunctionDef_Type.tp_base = &Py_stmt_Type;
+        if (PyType_Ready(&Py_stmt_FunctionDef_Type) < 0)
                 return;
-
-}
-
-void
-free_unaryop(unaryop_ty o)
-{
-        if (!o)
+        Py_stmt_ClassDef_Type.tp_base = &Py_stmt_Type;
+        if (PyType_Ready(&Py_stmt_ClassDef_Type) < 0)
                 return;
-
-}
-
-void
-free_cmpop(cmpop_ty o)
-{
-        if (!o)
+        Py_stmt_Return_Type.tp_base = &Py_stmt_Type;
+        if (PyType_Ready(&Py_stmt_Return_Type) < 0)
                 return;
-
-}
-
-void
-free_comprehension(comprehension_ty o)
-{
-        if (!o)
+        Py_stmt_Delete_Type.tp_base = &Py_stmt_Type;
+        if (PyType_Ready(&Py_stmt_Delete_Type) < 0)
                 return;
-
-        free_expr((expr_ty)o->target);
-        free_expr((expr_ty)o->iter);
-        free_seq_exprs(o->ifs);
-
-        free(o);
-}
-
-void
-free_excepthandler(excepthandler_ty o)
-{
-        if (!o)
+        Py_stmt_Assign_Type.tp_base = &Py_stmt_Type;
+        if (PyType_Ready(&Py_stmt_Assign_Type) < 0)
                 return;
-
-        if (o->type) {
-                free_expr((expr_ty)o->type);
-        }
-        if (o->name) {
-                free_expr((expr_ty)o->name);
-        }
-        free_seq_stmts(o->body);
-
-        free(o);
-}
-
-void
-free_arguments(arguments_ty o)
-{
-        if (!o)
+        Py_stmt_AugAssign_Type.tp_base = &Py_stmt_Type;
+        if (PyType_Ready(&Py_stmt_AugAssign_Type) < 0)
                 return;
-
-        free_seq_exprs(o->args);
-        if (o->vararg) {
-                Py_DECREF((identifier)o->vararg);
-        }
-        if (o->kwarg) {
-                Py_DECREF((identifier)o->kwarg);
-        }
-        free_seq_exprs(o->defaults);
-
-        free(o);
-}
-
-void
-free_keyword(keyword_ty o)
-{
-        if (!o)
+        Py_stmt_Print_Type.tp_base = &Py_stmt_Type;
+        if (PyType_Ready(&Py_stmt_Print_Type) < 0)
                 return;
-
-        Py_DECREF((identifier)o->arg);
-        free_expr((expr_ty)o->value);
-
-        free(o);
-}
-
-void
-free_alias(alias_ty o)
-{
-        if (!o)
+        Py_stmt_For_Type.tp_base = &Py_stmt_Type;
+        if (PyType_Ready(&Py_stmt_For_Type) < 0)
                 return;
-
-        Py_DECREF((identifier)o->name);
-        if (o->asname) {
-                Py_DECREF((identifier)o->asname);
-        }
-
-        free(o);
+        Py_stmt_While_Type.tp_base = &Py_stmt_Type;
+        if (PyType_Ready(&Py_stmt_While_Type) < 0)
+                return;
+        Py_stmt_If_Type.tp_base = &Py_stmt_Type;
+        if (PyType_Ready(&Py_stmt_If_Type) < 0)
+                return;
+        Py_stmt_Raise_Type.tp_base = &Py_stmt_Type;
+        if (PyType_Ready(&Py_stmt_Raise_Type) < 0)
+                return;
+        Py_stmt_TryExcept_Type.tp_base = &Py_stmt_Type;
+        if (PyType_Ready(&Py_stmt_TryExcept_Type) < 0)
+                return;
+        Py_stmt_TryFinally_Type.tp_base = &Py_stmt_Type;
+        if (PyType_Ready(&Py_stmt_TryFinally_Type) < 0)
+                return;
+        Py_stmt_Assert_Type.tp_base = &Py_stmt_Type;
+        if (PyType_Ready(&Py_stmt_Assert_Type) < 0)
+                return;
+        Py_stmt_Import_Type.tp_base = &Py_stmt_Type;
+        if (PyType_Ready(&Py_stmt_Import_Type) < 0)
+                return;
+        Py_stmt_ImportFrom_Type.tp_base = &Py_stmt_Type;
+        if (PyType_Ready(&Py_stmt_ImportFrom_Type) < 0)
+                return;
+        Py_stmt_Exec_Type.tp_base = &Py_stmt_Type;
+        if (PyType_Ready(&Py_stmt_Exec_Type) < 0)
+                return;
+        Py_stmt_Global_Type.tp_base = &Py_stmt_Type;
+        if (PyType_Ready(&Py_stmt_Global_Type) < 0)
+                return;
+        Py_stmt_Expr_Type.tp_base = &Py_stmt_Type;
+        if (PyType_Ready(&Py_stmt_Expr_Type) < 0)
+                return;
+        Py_stmt_Pass_Type.tp_base = &Py_stmt_Type;
+        if (PyType_Ready(&Py_stmt_Pass_Type) < 0)
+                return;
+        Py_stmt_Break_Type.tp_base = &Py_stmt_Type;
+        if (PyType_Ready(&Py_stmt_Break_Type) < 0)
+                return;
+        Py_stmt_Continue_Type.tp_base = &Py_stmt_Type;
+        if (PyType_Ready(&Py_stmt_Continue_Type) < 0)
+                return;
+        if (PyType_Ready(&Py_expr_Type) < 0)
+                return;
+        Py_expr_BoolOp_Type.tp_base = &Py_expr_Type;
+        if (PyType_Ready(&Py_expr_BoolOp_Type) < 0)
+                return;
+        Py_expr_BinOp_Type.tp_base = &Py_expr_Type;
+        if (PyType_Ready(&Py_expr_BinOp_Type) < 0)
+                return;
+        Py_expr_UnaryOp_Type.tp_base = &Py_expr_Type;
+        if (PyType_Ready(&Py_expr_UnaryOp_Type) < 0)
+                return;
+        Py_expr_Lambda_Type.tp_base = &Py_expr_Type;
+        if (PyType_Ready(&Py_expr_Lambda_Type) < 0)
+                return;
+        Py_expr_Dict_Type.tp_base = &Py_expr_Type;
+        if (PyType_Ready(&Py_expr_Dict_Type) < 0)
+                return;
+        Py_expr_ListComp_Type.tp_base = &Py_expr_Type;
+        if (PyType_Ready(&Py_expr_ListComp_Type) < 0)
+                return;
+        Py_expr_GeneratorExp_Type.tp_base = &Py_expr_Type;
+        if (PyType_Ready(&Py_expr_GeneratorExp_Type) < 0)
+                return;
+        Py_expr_Yield_Type.tp_base = &Py_expr_Type;
+        if (PyType_Ready(&Py_expr_Yield_Type) < 0)
+                return;
+        Py_expr_Compare_Type.tp_base = &Py_expr_Type;
+        if (PyType_Ready(&Py_expr_Compare_Type) < 0)
+                return;
+        Py_expr_Call_Type.tp_base = &Py_expr_Type;
+        if (PyType_Ready(&Py_expr_Call_Type) < 0)
+                return;
+        Py_expr_Repr_Type.tp_base = &Py_expr_Type;
+        if (PyType_Ready(&Py_expr_Repr_Type) < 0)
+                return;
+        Py_expr_Num_Type.tp_base = &Py_expr_Type;
+        if (PyType_Ready(&Py_expr_Num_Type) < 0)
+                return;
+        Py_expr_Str_Type.tp_base = &Py_expr_Type;
+        if (PyType_Ready(&Py_expr_Str_Type) < 0)
+                return;
+        Py_expr_Attribute_Type.tp_base = &Py_expr_Type;
+        if (PyType_Ready(&Py_expr_Attribute_Type) < 0)
+                return;
+        Py_expr_Subscript_Type.tp_base = &Py_expr_Type;
+        if (PyType_Ready(&Py_expr_Subscript_Type) < 0)
+                return;
+        Py_expr_Name_Type.tp_base = &Py_expr_Type;
+        if (PyType_Ready(&Py_expr_Name_Type) < 0)
+                return;
+        Py_expr_List_Type.tp_base = &Py_expr_Type;
+        if (PyType_Ready(&Py_expr_List_Type) < 0)
+                return;
+        Py_expr_Tuple_Type.tp_base = &Py_expr_Type;
+        if (PyType_Ready(&Py_expr_Tuple_Type) < 0)
+                return;
+        if (PyType_Ready(&Py_slice_Type) < 0)
+                return;
+        Py_slice_Ellipsis_Type.tp_base = &Py_slice_Type;
+        if (PyType_Ready(&Py_slice_Ellipsis_Type) < 0)
+                return;
+        Py_slice_Slice_Type.tp_base = &Py_slice_Type;
+        if (PyType_Ready(&Py_slice_Slice_Type) < 0)
+                return;
+        Py_slice_ExtSlice_Type.tp_base = &Py_slice_Type;
+        if (PyType_Ready(&Py_slice_ExtSlice_Type) < 0)
+                return;
+        Py_slice_Index_Type.tp_base = &Py_slice_Type;
+        if (PyType_Ready(&Py_slice_Index_Type) < 0)
+                return;
+        if (PyType_Ready(&Py_comprehension_Type) < 0)
+                return;
+        if (PyType_Ready(&Py_excepthandler_Type) < 0)
+                return;
+        if (PyType_Ready(&Py_arguments_Type) < 0)
+                return;
+        if (PyType_Ready(&Py_keyword_Type) < 0)
+                return;
+        if (PyType_Ready(&Py_alias_Type) < 0)
+                return;
 }
-
-
-
-#define CHECKSIZE(BUF, OFF, MIN) { \
-	int need = *(OFF) + MIN; \
-	if (need >= PyString_GET_SIZE(*(BUF))) { \
-		int newsize = PyString_GET_SIZE(*(BUF)) * 2; \
-		if (newsize < need) \
-			newsize = need; \
-		if (_PyString_Resize((BUF), newsize) < 0) \
-			return 0; \
-	} \
-} 
-
-static int 
-marshal_write_int(PyObject **buf, int *offset, int x)
-{
-	char *s;
-
-	CHECKSIZE(buf, offset, 4)
-	s = PyString_AS_STRING(*buf) + (*offset);
-	s[0] = (x & 0xff);
-	s[1] = (x >> 8) & 0xff;
-	s[2] = (x >> 16) & 0xff;
-	s[3] = (x >> 24) & 0xff;
-	*offset += 4;
-	return 1;
-}
-
-static int 
-marshal_write_bool(PyObject **buf, int *offset, bool b)
-{
-	if (b)
-		marshal_write_int(buf, offset, 1);
-	else
-		marshal_write_int(buf, offset, 0);
-	return 1;
-}
-
-static int 
-marshal_write_identifier(PyObject **buf, int *offset, identifier id)
-{
-	int l = PyString_GET_SIZE(id);
-	marshal_write_int(buf, offset, l);
-	CHECKSIZE(buf, offset, l);
-	memcpy(PyString_AS_STRING(*buf) + *offset,
-	       PyString_AS_STRING(id), l);
-	*offset += l;
-	return 1;
-}
-
-static int 
-marshal_write_string(PyObject **buf, int *offset, string s)
-{
-	int len = PyString_GET_SIZE(s);
-	marshal_write_int(buf, offset, len);
-	CHECKSIZE(buf, offset, len);
-	memcpy(PyString_AS_STRING(*buf) + *offset,
-	       PyString_AS_STRING(s), len);
-	*offset += len;
-	return 1;
-}
-
-static int 
-marshal_write_object(PyObject **buf, int *offset, object s)
-{
-	/* XXX */
-	return 0;
-}
-
-
-static int
-marshal_write_mod(PyObject **buf, int *off, mod_ty o)
-{
-        int i;
-        switch (o->kind) {
-        case Module_kind:
-                marshal_write_int(buf, off, 1);
-                marshal_write_int(buf, off, asdl_seq_LEN(o->v.Module.body));
-                for (i = 0; i < asdl_seq_LEN(o->v.Module.body); i++) {
-                        void *elt = asdl_seq_GET(o->v.Module.body, i);
-                        marshal_write_stmt(buf, off, (stmt_ty)elt);
-                }
-                break;
-        case Interactive_kind:
-                marshal_write_int(buf, off, 2);
-                marshal_write_int(buf, off,
-                                  asdl_seq_LEN(o->v.Interactive.body));
-                for (i = 0; i < asdl_seq_LEN(o->v.Interactive.body); i++) {
-                        void *elt = asdl_seq_GET(o->v.Interactive.body, i);
-                        marshal_write_stmt(buf, off, (stmt_ty)elt);
-                }
-                break;
-        case Expression_kind:
-                marshal_write_int(buf, off, 3);
-                marshal_write_expr(buf, off, o->v.Expression.body);
-                break;
-        case Suite_kind:
-                marshal_write_int(buf, off, 4);
-                marshal_write_int(buf, off, asdl_seq_LEN(o->v.Suite.body));
-                for (i = 0; i < asdl_seq_LEN(o->v.Suite.body); i++) {
-                        void *elt = asdl_seq_GET(o->v.Suite.body, i);
-                        marshal_write_stmt(buf, off, (stmt_ty)elt);
-                }
-                break;
-        }
-        return 1;
-}
-
-static int
-marshal_write_stmt(PyObject **buf, int *off, stmt_ty o)
-{
-        int i;
-        switch (o->kind) {
-        case FunctionDef_kind:
-                marshal_write_int(buf, off, 1);
-                marshal_write_identifier(buf, off, o->v.FunctionDef.name);
-                marshal_write_arguments(buf, off, o->v.FunctionDef.args);
-                marshal_write_int(buf, off,
-                                  asdl_seq_LEN(o->v.FunctionDef.body));
-                for (i = 0; i < asdl_seq_LEN(o->v.FunctionDef.body); i++) {
-                        void *elt = asdl_seq_GET(o->v.FunctionDef.body, i);
-                        marshal_write_stmt(buf, off, (stmt_ty)elt);
-                }
-                marshal_write_int(buf, off,
-                                  asdl_seq_LEN(o->v.FunctionDef.decorators));
-                for (i = 0; i < asdl_seq_LEN(o->v.FunctionDef.decorators); i++)
-                     {
-                        void *elt = asdl_seq_GET(o->v.FunctionDef.decorators,
-                                                 i);
-                        marshal_write_expr(buf, off, (expr_ty)elt);
-                }
-                break;
-        case ClassDef_kind:
-                marshal_write_int(buf, off, 2);
-                marshal_write_identifier(buf, off, o->v.ClassDef.name);
-                marshal_write_int(buf, off, asdl_seq_LEN(o->v.ClassDef.bases));
-                for (i = 0; i < asdl_seq_LEN(o->v.ClassDef.bases); i++) {
-                        void *elt = asdl_seq_GET(o->v.ClassDef.bases, i);
-                        marshal_write_expr(buf, off, (expr_ty)elt);
-                }
-                marshal_write_int(buf, off, asdl_seq_LEN(o->v.ClassDef.body));
-                for (i = 0; i < asdl_seq_LEN(o->v.ClassDef.body); i++) {
-                        void *elt = asdl_seq_GET(o->v.ClassDef.body, i);
-                        marshal_write_stmt(buf, off, (stmt_ty)elt);
-                }
-                break;
-        case Return_kind:
-                marshal_write_int(buf, off, 3);
-                if (o->v.Return.value) {
-                        marshal_write_int(buf, off, 1);
-                        marshal_write_expr(buf, off, o->v.Return.value);
-                }
-                else {
-                        marshal_write_int(buf, off, 0);
-                }
-                break;
-        case Delete_kind:
-                marshal_write_int(buf, off, 4);
-                marshal_write_int(buf, off, asdl_seq_LEN(o->v.Delete.targets));
-                for (i = 0; i < asdl_seq_LEN(o->v.Delete.targets); i++) {
-                        void *elt = asdl_seq_GET(o->v.Delete.targets, i);
-                        marshal_write_expr(buf, off, (expr_ty)elt);
-                }
-                break;
-        case Assign_kind:
-                marshal_write_int(buf, off, 5);
-                marshal_write_int(buf, off, asdl_seq_LEN(o->v.Assign.targets));
-                for (i = 0; i < asdl_seq_LEN(o->v.Assign.targets); i++) {
-                        void *elt = asdl_seq_GET(o->v.Assign.targets, i);
-                        marshal_write_expr(buf, off, (expr_ty)elt);
-                }
-                marshal_write_expr(buf, off, o->v.Assign.value);
-                break;
-        case AugAssign_kind:
-                marshal_write_int(buf, off, 6);
-                marshal_write_expr(buf, off, o->v.AugAssign.target);
-                marshal_write_operator(buf, off, o->v.AugAssign.op);
-                marshal_write_expr(buf, off, o->v.AugAssign.value);
-                break;
-        case Print_kind:
-                marshal_write_int(buf, off, 7);
-                if (o->v.Print.dest) {
-                        marshal_write_int(buf, off, 1);
-                        marshal_write_expr(buf, off, o->v.Print.dest);
-                }
-                else {
-                        marshal_write_int(buf, off, 0);
-                }
-                marshal_write_int(buf, off, asdl_seq_LEN(o->v.Print.values));
-                for (i = 0; i < asdl_seq_LEN(o->v.Print.values); i++) {
-                        void *elt = asdl_seq_GET(o->v.Print.values, i);
-                        marshal_write_expr(buf, off, (expr_ty)elt);
-                }
-                marshal_write_bool(buf, off, o->v.Print.nl);
-                break;
-        case For_kind:
-                marshal_write_int(buf, off, 8);
-                marshal_write_expr(buf, off, o->v.For.target);
-                marshal_write_expr(buf, off, o->v.For.iter);
-                marshal_write_int(buf, off, asdl_seq_LEN(o->v.For.body));
-                for (i = 0; i < asdl_seq_LEN(o->v.For.body); i++) {
-                        void *elt = asdl_seq_GET(o->v.For.body, i);
-                        marshal_write_stmt(buf, off, (stmt_ty)elt);
-                }
-                marshal_write_int(buf, off, asdl_seq_LEN(o->v.For.orelse));
-                for (i = 0; i < asdl_seq_LEN(o->v.For.orelse); i++) {
-                        void *elt = asdl_seq_GET(o->v.For.orelse, i);
-                        marshal_write_stmt(buf, off, (stmt_ty)elt);
-                }
-                break;
-        case While_kind:
-                marshal_write_int(buf, off, 9);
-                marshal_write_expr(buf, off, o->v.While.test);
-                marshal_write_int(buf, off, asdl_seq_LEN(o->v.While.body));
-                for (i = 0; i < asdl_seq_LEN(o->v.While.body); i++) {
-                        void *elt = asdl_seq_GET(o->v.While.body, i);
-                        marshal_write_stmt(buf, off, (stmt_ty)elt);
-                }
-                marshal_write_int(buf, off, asdl_seq_LEN(o->v.While.orelse));
-                for (i = 0; i < asdl_seq_LEN(o->v.While.orelse); i++) {
-                        void *elt = asdl_seq_GET(o->v.While.orelse, i);
-                        marshal_write_stmt(buf, off, (stmt_ty)elt);
-                }
-                break;
-        case If_kind:
-                marshal_write_int(buf, off, 10);
-                marshal_write_expr(buf, off, o->v.If.test);
-                marshal_write_int(buf, off, asdl_seq_LEN(o->v.If.body));
-                for (i = 0; i < asdl_seq_LEN(o->v.If.body); i++) {
-                        void *elt = asdl_seq_GET(o->v.If.body, i);
-                        marshal_write_stmt(buf, off, (stmt_ty)elt);
-                }
-                marshal_write_int(buf, off, asdl_seq_LEN(o->v.If.orelse));
-                for (i = 0; i < asdl_seq_LEN(o->v.If.orelse); i++) {
-                        void *elt = asdl_seq_GET(o->v.If.orelse, i);
-                        marshal_write_stmt(buf, off, (stmt_ty)elt);
-                }
-                break;
-        case Raise_kind:
-                marshal_write_int(buf, off, 11);
-                if (o->v.Raise.type) {
-                        marshal_write_int(buf, off, 1);
-                        marshal_write_expr(buf, off, o->v.Raise.type);
-                }
-                else {
-                        marshal_write_int(buf, off, 0);
-                }
-                if (o->v.Raise.inst) {
-                        marshal_write_int(buf, off, 1);
-                        marshal_write_expr(buf, off, o->v.Raise.inst);
-                }
-                else {
-                        marshal_write_int(buf, off, 0);
-                }
-                if (o->v.Raise.tback) {
-                        marshal_write_int(buf, off, 1);
-                        marshal_write_expr(buf, off, o->v.Raise.tback);
-                }
-                else {
-                        marshal_write_int(buf, off, 0);
-                }
-                break;
-        case TryExcept_kind:
-                marshal_write_int(buf, off, 12);
-                marshal_write_int(buf, off, asdl_seq_LEN(o->v.TryExcept.body));
-                for (i = 0; i < asdl_seq_LEN(o->v.TryExcept.body); i++) {
-                        void *elt = asdl_seq_GET(o->v.TryExcept.body, i);
-                        marshal_write_stmt(buf, off, (stmt_ty)elt);
-                }
-                marshal_write_int(buf, off,
-                                  asdl_seq_LEN(o->v.TryExcept.handlers));
-                for (i = 0; i < asdl_seq_LEN(o->v.TryExcept.handlers); i++) {
-                        void *elt = asdl_seq_GET(o->v.TryExcept.handlers, i);
-                        marshal_write_excepthandler(buf, off,
-                                                    (excepthandler_ty)elt);
-                }
-                marshal_write_int(buf, off,
-                                  asdl_seq_LEN(o->v.TryExcept.orelse));
-                for (i = 0; i < asdl_seq_LEN(o->v.TryExcept.orelse); i++) {
-                        void *elt = asdl_seq_GET(o->v.TryExcept.orelse, i);
-                        marshal_write_stmt(buf, off, (stmt_ty)elt);
-                }
-                break;
-        case TryFinally_kind:
-                marshal_write_int(buf, off, 13);
-                marshal_write_int(buf, off, asdl_seq_LEN(o->v.TryFinally.body));
-                for (i = 0; i < asdl_seq_LEN(o->v.TryFinally.body); i++) {
-                        void *elt = asdl_seq_GET(o->v.TryFinally.body, i);
-                        marshal_write_stmt(buf, off, (stmt_ty)elt);
-                }
-                marshal_write_int(buf, off,
-                                  asdl_seq_LEN(o->v.TryFinally.finalbody));
-                for (i = 0; i < asdl_seq_LEN(o->v.TryFinally.finalbody); i++) {
-                        void *elt = asdl_seq_GET(o->v.TryFinally.finalbody, i);
-                        marshal_write_stmt(buf, off, (stmt_ty)elt);
-                }
-                break;
-        case Assert_kind:
-                marshal_write_int(buf, off, 14);
-                marshal_write_expr(buf, off, o->v.Assert.test);
-                if (o->v.Assert.msg) {
-                        marshal_write_int(buf, off, 1);
-                        marshal_write_expr(buf, off, o->v.Assert.msg);
-                }
-                else {
-                        marshal_write_int(buf, off, 0);
-                }
-                break;
-        case Import_kind:
-                marshal_write_int(buf, off, 15);
-                marshal_write_int(buf, off, asdl_seq_LEN(o->v.Import.names));
-                for (i = 0; i < asdl_seq_LEN(o->v.Import.names); i++) {
-                        void *elt = asdl_seq_GET(o->v.Import.names, i);
-                        marshal_write_alias(buf, off, (alias_ty)elt);
-                }
-                break;
-        case ImportFrom_kind:
-                marshal_write_int(buf, off, 16);
-                marshal_write_identifier(buf, off, o->v.ImportFrom.module);
-                marshal_write_int(buf, off,
-                                  asdl_seq_LEN(o->v.ImportFrom.names));
-                for (i = 0; i < asdl_seq_LEN(o->v.ImportFrom.names); i++) {
-                        void *elt = asdl_seq_GET(o->v.ImportFrom.names, i);
-                        marshal_write_alias(buf, off, (alias_ty)elt);
-                }
-                break;
-        case Exec_kind:
-                marshal_write_int(buf, off, 17);
-                marshal_write_expr(buf, off, o->v.Exec.body);
-                if (o->v.Exec.globals) {
-                        marshal_write_int(buf, off, 1);
-                        marshal_write_expr(buf, off, o->v.Exec.globals);
-                }
-                else {
-                        marshal_write_int(buf, off, 0);
-                }
-                if (o->v.Exec.locals) {
-                        marshal_write_int(buf, off, 1);
-                        marshal_write_expr(buf, off, o->v.Exec.locals);
-                }
-                else {
-                        marshal_write_int(buf, off, 0);
-                }
-                break;
-        case Global_kind:
-                marshal_write_int(buf, off, 18);
-                marshal_write_int(buf, off, asdl_seq_LEN(o->v.Global.names));
-                for (i = 0; i < asdl_seq_LEN(o->v.Global.names); i++) {
-                        void *elt = asdl_seq_GET(o->v.Global.names, i);
-                        marshal_write_identifier(buf, off, (identifier)elt);
-                }
-                break;
-        case Expr_kind:
-                marshal_write_int(buf, off, 19);
-                marshal_write_expr(buf, off, o->v.Expr.value);
-                break;
-        case Pass_kind:
-                marshal_write_int(buf, off, 20);
-                break;
-        case Break_kind:
-                marshal_write_int(buf, off, 21);
-                break;
-        case Continue_kind:
-                marshal_write_int(buf, off, 22);
-                break;
-        }
-        return 1;
-}
-
-static int
-marshal_write_expr(PyObject **buf, int *off, expr_ty o)
-{
-        int i;
-        switch (o->kind) {
-        case BoolOp_kind:
-                marshal_write_int(buf, off, 1);
-                marshal_write_boolop(buf, off, o->v.BoolOp.op);
-                marshal_write_int(buf, off, asdl_seq_LEN(o->v.BoolOp.values));
-                for (i = 0; i < asdl_seq_LEN(o->v.BoolOp.values); i++) {
-                        void *elt = asdl_seq_GET(o->v.BoolOp.values, i);
-                        marshal_write_expr(buf, off, (expr_ty)elt);
-                }
-                break;
-        case BinOp_kind:
-                marshal_write_int(buf, off, 2);
-                marshal_write_expr(buf, off, o->v.BinOp.left);
-                marshal_write_operator(buf, off, o->v.BinOp.op);
-                marshal_write_expr(buf, off, o->v.BinOp.right);
-                break;
-        case UnaryOp_kind:
-                marshal_write_int(buf, off, 3);
-                marshal_write_unaryop(buf, off, o->v.UnaryOp.op);
-                marshal_write_expr(buf, off, o->v.UnaryOp.operand);
-                break;
-        case Lambda_kind:
-                marshal_write_int(buf, off, 4);
-                marshal_write_arguments(buf, off, o->v.Lambda.args);
-                marshal_write_expr(buf, off, o->v.Lambda.body);
-                break;
-        case Dict_kind:
-                marshal_write_int(buf, off, 5);
-                marshal_write_int(buf, off, asdl_seq_LEN(o->v.Dict.keys));
-                for (i = 0; i < asdl_seq_LEN(o->v.Dict.keys); i++) {
-                        void *elt = asdl_seq_GET(o->v.Dict.keys, i);
-                        marshal_write_expr(buf, off, (expr_ty)elt);
-                }
-                marshal_write_int(buf, off, asdl_seq_LEN(o->v.Dict.values));
-                for (i = 0; i < asdl_seq_LEN(o->v.Dict.values); i++) {
-                        void *elt = asdl_seq_GET(o->v.Dict.values, i);
-                        marshal_write_expr(buf, off, (expr_ty)elt);
-                }
-                break;
-        case ListComp_kind:
-                marshal_write_int(buf, off, 6);
-                marshal_write_expr(buf, off, o->v.ListComp.elt);
-                marshal_write_int(buf, off,
-                                  asdl_seq_LEN(o->v.ListComp.generators));
-                for (i = 0; i < asdl_seq_LEN(o->v.ListComp.generators); i++) {
-                        void *elt = asdl_seq_GET(o->v.ListComp.generators, i);
-                        marshal_write_comprehension(buf, off,
-                                                    (comprehension_ty)elt);
-                }
-                break;
-        case GeneratorExp_kind:
-                marshal_write_int(buf, off, 7);
-                marshal_write_expr(buf, off, o->v.GeneratorExp.elt);
-                marshal_write_int(buf, off,
-                                  asdl_seq_LEN(o->v.GeneratorExp.generators));
-                for (i = 0; i < asdl_seq_LEN(o->v.GeneratorExp.generators);
-                     i++) {
-                        void *elt = asdl_seq_GET(o->v.GeneratorExp.generators,
-                                                 i);
-                        marshal_write_comprehension(buf, off,
-                                                    (comprehension_ty)elt);
-                }
-                break;
-        case Yield_kind:
-                marshal_write_int(buf, off, 8);
-                if (o->v.Yield.value) {
-                        marshal_write_int(buf, off, 1);
-                        marshal_write_expr(buf, off, o->v.Yield.value);
-                }
-                else {
-                        marshal_write_int(buf, off, 0);
-                }
-                break;
-        case Compare_kind:
-                marshal_write_int(buf, off, 9);
-                marshal_write_expr(buf, off, o->v.Compare.left);
-                marshal_write_int(buf, off, asdl_seq_LEN(o->v.Compare.ops));
-                for (i = 0; i < asdl_seq_LEN(o->v.Compare.ops); i++) {
-                        void *elt = asdl_seq_GET(o->v.Compare.ops, i);
-                        marshal_write_cmpop(buf, off, (cmpop_ty)elt);
-                }
-                marshal_write_int(buf, off,
-                                  asdl_seq_LEN(o->v.Compare.comparators));
-                for (i = 0; i < asdl_seq_LEN(o->v.Compare.comparators); i++) {
-                        void *elt = asdl_seq_GET(o->v.Compare.comparators, i);
-                        marshal_write_expr(buf, off, (expr_ty)elt);
-                }
-                break;
-        case Call_kind:
-                marshal_write_int(buf, off, 10);
-                marshal_write_expr(buf, off, o->v.Call.func);
-                marshal_write_int(buf, off, asdl_seq_LEN(o->v.Call.args));
-                for (i = 0; i < asdl_seq_LEN(o->v.Call.args); i++) {
-                        void *elt = asdl_seq_GET(o->v.Call.args, i);
-                        marshal_write_expr(buf, off, (expr_ty)elt);
-                }
-                marshal_write_int(buf, off, asdl_seq_LEN(o->v.Call.keywords));
-                for (i = 0; i < asdl_seq_LEN(o->v.Call.keywords); i++) {
-                        void *elt = asdl_seq_GET(o->v.Call.keywords, i);
-                        marshal_write_keyword(buf, off, (keyword_ty)elt);
-                }
-                if (o->v.Call.starargs) {
-                        marshal_write_int(buf, off, 1);
-                        marshal_write_expr(buf, off, o->v.Call.starargs);
-                }
-                else {
-                        marshal_write_int(buf, off, 0);
-                }
-                if (o->v.Call.kwargs) {
-                        marshal_write_int(buf, off, 1);
-                        marshal_write_expr(buf, off, o->v.Call.kwargs);
-                }
-                else {
-                        marshal_write_int(buf, off, 0);
-                }
-                break;
-        case Repr_kind:
-                marshal_write_int(buf, off, 11);
-                marshal_write_expr(buf, off, o->v.Repr.value);
-                break;
-        case Num_kind:
-                marshal_write_int(buf, off, 12);
-                marshal_write_object(buf, off, o->v.Num.n);
-                break;
-        case Str_kind:
-                marshal_write_int(buf, off, 13);
-                marshal_write_string(buf, off, o->v.Str.s);
-                break;
-        case Attribute_kind:
-                marshal_write_int(buf, off, 14);
-                marshal_write_expr(buf, off, o->v.Attribute.value);
-                marshal_write_identifier(buf, off, o->v.Attribute.attr);
-                marshal_write_expr_context(buf, off, o->v.Attribute.ctx);
-                break;
-        case Subscript_kind:
-                marshal_write_int(buf, off, 15);
-                marshal_write_expr(buf, off, o->v.Subscript.value);
-                marshal_write_slice(buf, off, o->v.Subscript.slice);
-                marshal_write_expr_context(buf, off, o->v.Subscript.ctx);
-                break;
-        case Name_kind:
-                marshal_write_int(buf, off, 16);
-                marshal_write_identifier(buf, off, o->v.Name.id);
-                marshal_write_expr_context(buf, off, o->v.Name.ctx);
-                break;
-        case List_kind:
-                marshal_write_int(buf, off, 17);
-                marshal_write_int(buf, off, asdl_seq_LEN(o->v.List.elts));
-                for (i = 0; i < asdl_seq_LEN(o->v.List.elts); i++) {
-                        void *elt = asdl_seq_GET(o->v.List.elts, i);
-                        marshal_write_expr(buf, off, (expr_ty)elt);
-                }
-                marshal_write_expr_context(buf, off, o->v.List.ctx);
-                break;
-        case Tuple_kind:
-                marshal_write_int(buf, off, 18);
-                marshal_write_int(buf, off, asdl_seq_LEN(o->v.Tuple.elts));
-                for (i = 0; i < asdl_seq_LEN(o->v.Tuple.elts); i++) {
-                        void *elt = asdl_seq_GET(o->v.Tuple.elts, i);
-                        marshal_write_expr(buf, off, (expr_ty)elt);
-                }
-                marshal_write_expr_context(buf, off, o->v.Tuple.ctx);
-                break;
-        }
-        return 1;
-}
-
-static int
-marshal_write_expr_context(PyObject **buf, int *off, expr_context_ty o)
-{
-        switch (o) {
-        case Load:
-                marshal_write_int(buf, off, 1);
-                break;
-        case Store:
-                marshal_write_int(buf, off, 2);
-                break;
-        case Del:
-                marshal_write_int(buf, off, 3);
-                break;
-        case AugLoad:
-                marshal_write_int(buf, off, 4);
-                break;
-        case AugStore:
-                marshal_write_int(buf, off, 5);
-                break;
-        case Param:
-                marshal_write_int(buf, off, 6);
-                break;
-        }
-        return 1;
-}
-
-static int
-marshal_write_slice(PyObject **buf, int *off, slice_ty o)
-{
-        int i;
-        switch (o->kind) {
-        case Ellipsis_kind:
-                marshal_write_int(buf, off, 1);
-                break;
-        case Slice_kind:
-                marshal_write_int(buf, off, 2);
-                if (o->v.Slice.lower) {
-                        marshal_write_int(buf, off, 1);
-                        marshal_write_expr(buf, off, o->v.Slice.lower);
-                }
-                else {
-                        marshal_write_int(buf, off, 0);
-                }
-                if (o->v.Slice.upper) {
-                        marshal_write_int(buf, off, 1);
-                        marshal_write_expr(buf, off, o->v.Slice.upper);
-                }
-                else {
-                        marshal_write_int(buf, off, 0);
-                }
-                if (o->v.Slice.step) {
-                        marshal_write_int(buf, off, 1);
-                        marshal_write_expr(buf, off, o->v.Slice.step);
-                }
-                else {
-                        marshal_write_int(buf, off, 0);
-                }
-                break;
-        case ExtSlice_kind:
-                marshal_write_int(buf, off, 3);
-                marshal_write_int(buf, off, asdl_seq_LEN(o->v.ExtSlice.dims));
-                for (i = 0; i < asdl_seq_LEN(o->v.ExtSlice.dims); i++) {
-                        void *elt = asdl_seq_GET(o->v.ExtSlice.dims, i);
-                        marshal_write_slice(buf, off, (slice_ty)elt);
-                }
-                break;
-        case Index_kind:
-                marshal_write_int(buf, off, 4);
-                marshal_write_expr(buf, off, o->v.Index.value);
-                break;
-        }
-        return 1;
-}
-
-static int
-marshal_write_boolop(PyObject **buf, int *off, boolop_ty o)
-{
-        switch (o) {
-        case And:
-                marshal_write_int(buf, off, 1);
-                break;
-        case Or:
-                marshal_write_int(buf, off, 2);
-                break;
-        }
-        return 1;
-}
-
-static int
-marshal_write_operator(PyObject **buf, int *off, operator_ty o)
-{
-        switch (o) {
-        case Add:
-                marshal_write_int(buf, off, 1);
-                break;
-        case Sub:
-                marshal_write_int(buf, off, 2);
-                break;
-        case Mult:
-                marshal_write_int(buf, off, 3);
-                break;
-        case Div:
-                marshal_write_int(buf, off, 4);
-                break;
-        case Mod:
-                marshal_write_int(buf, off, 5);
-                break;
-        case Pow:
-                marshal_write_int(buf, off, 6);
-                break;
-        case LShift:
-                marshal_write_int(buf, off, 7);
-                break;
-        case RShift:
-                marshal_write_int(buf, off, 8);
-                break;
-        case BitOr:
-                marshal_write_int(buf, off, 9);
-                break;
-        case BitXor:
-                marshal_write_int(buf, off, 10);
-                break;
-        case BitAnd:
-                marshal_write_int(buf, off, 11);
-                break;
-        case FloorDiv:
-                marshal_write_int(buf, off, 12);
-                break;
-        }
-        return 1;
-}
-
-static int
-marshal_write_unaryop(PyObject **buf, int *off, unaryop_ty o)
-{
-        switch (o) {
-        case Invert:
-                marshal_write_int(buf, off, 1);
-                break;
-        case Not:
-                marshal_write_int(buf, off, 2);
-                break;
-        case UAdd:
-                marshal_write_int(buf, off, 3);
-                break;
-        case USub:
-                marshal_write_int(buf, off, 4);
-                break;
-        }
-        return 1;
-}
-
-static int
-marshal_write_cmpop(PyObject **buf, int *off, cmpop_ty o)
-{
-        switch (o) {
-        case Eq:
-                marshal_write_int(buf, off, 1);
-                break;
-        case NotEq:
-                marshal_write_int(buf, off, 2);
-                break;
-        case Lt:
-                marshal_write_int(buf, off, 3);
-                break;
-        case LtE:
-                marshal_write_int(buf, off, 4);
-                break;
-        case Gt:
-                marshal_write_int(buf, off, 5);
-                break;
-        case GtE:
-                marshal_write_int(buf, off, 6);
-                break;
-        case Is:
-                marshal_write_int(buf, off, 7);
-                break;
-        case IsNot:
-                marshal_write_int(buf, off, 8);
-                break;
-        case In:
-                marshal_write_int(buf, off, 9);
-                break;
-        case NotIn:
-                marshal_write_int(buf, off, 10);
-                break;
-        }
-        return 1;
-}
-
-static int
-marshal_write_comprehension(PyObject **buf, int *off, comprehension_ty o)
-{
-        int i;
-        marshal_write_expr(buf, off, o->target);
-        marshal_write_expr(buf, off, o->iter);
-        marshal_write_int(buf, off, asdl_seq_LEN(o->ifs));
-        for (i = 0; i < asdl_seq_LEN(o->ifs); i++) {
-                void *elt = asdl_seq_GET(o->ifs, i);
-                marshal_write_expr(buf, off, (expr_ty)elt);
-        }
-        return 1;
-}
-
-static int
-marshal_write_excepthandler(PyObject **buf, int *off, excepthandler_ty o)
-{
-        int i;
-        if (o->type) {
-                marshal_write_int(buf, off, 1);
-                marshal_write_expr(buf, off, o->type);
-        }
-        else {
-                marshal_write_int(buf, off, 0);
-        }
-        if (o->name) {
-                marshal_write_int(buf, off, 1);
-                marshal_write_expr(buf, off, o->name);
-        }
-        else {
-                marshal_write_int(buf, off, 0);
-        }
-        marshal_write_int(buf, off, asdl_seq_LEN(o->body));
-        for (i = 0; i < asdl_seq_LEN(o->body); i++) {
-                void *elt = asdl_seq_GET(o->body, i);
-                marshal_write_stmt(buf, off, (stmt_ty)elt);
-        }
-        return 1;
-}
-
-static int
-marshal_write_arguments(PyObject **buf, int *off, arguments_ty o)
-{
-        int i;
-        marshal_write_int(buf, off, asdl_seq_LEN(o->args));
-        for (i = 0; i < asdl_seq_LEN(o->args); i++) {
-                void *elt = asdl_seq_GET(o->args, i);
-                marshal_write_expr(buf, off, (expr_ty)elt);
-        }
-        if (o->vararg) {
-                marshal_write_int(buf, off, 1);
-                marshal_write_identifier(buf, off, o->vararg);
-        }
-        else {
-                marshal_write_int(buf, off, 0);
-        }
-        if (o->kwarg) {
-                marshal_write_int(buf, off, 1);
-                marshal_write_identifier(buf, off, o->kwarg);
-        }
-        else {
-                marshal_write_int(buf, off, 0);
-        }
-        marshal_write_int(buf, off, asdl_seq_LEN(o->defaults));
-        for (i = 0; i < asdl_seq_LEN(o->defaults); i++) {
-                void *elt = asdl_seq_GET(o->defaults, i);
-                marshal_write_expr(buf, off, (expr_ty)elt);
-        }
-        return 1;
-}
-
-static int
-marshal_write_keyword(PyObject **buf, int *off, keyword_ty o)
-{
-        marshal_write_identifier(buf, off, o->arg);
-        marshal_write_expr(buf, off, o->value);
-        return 1;
-}
-
-static int
-marshal_write_alias(PyObject **buf, int *off, alias_ty o)
-{
-        marshal_write_identifier(buf, off, o->name);
-        if (o->asname) {
-                marshal_write_int(buf, off, 1);
-                marshal_write_identifier(buf, off, o->asname);
-        }
-        else {
-                marshal_write_int(buf, off, 0);
-        }
-        return 1;
-}
-
 
