@@ -132,7 +132,7 @@ class HeaderVisitor(EmitVisitor):
 
     def emit_check(self, t, depth):
         self.emit("PyAPI_DATA(PyTypeObject) Py_%s_Type;" % t, depth)
-        self.emit("#define Py_%s_Check(op) PyObject_TypeCheck(op, &Py_%s_Type)" % (t, t), 
+        self.emit("#define %s_Check(op) PyObject_TypeCheck(op, &Py_%s_Type)" % (t, t), 
                 depth, reflow=False)
         self.emit("",depth)
 
@@ -151,8 +151,10 @@ class HeaderVisitor(EmitVisitor):
         def emit(s, depth=depth):
             self.emit(s % sys._getframe(1).f_locals, depth)
         self.emit_check(name, depth)
-        emit("struct Py_%s{" % name)
+        emit("struct _%s{" % name)
         emit("PyObject_HEAD", depth + 1)
+        names = [t.name.value+"_kind" for t in sum.types]
+        emit("enum {%s} _kind;" % ", ".join(names), depth+1)
         for field in sum.attributes:
             type = str(field.type)
             assert type in asdl.builtin_types, type
@@ -163,18 +165,20 @@ class HeaderVisitor(EmitVisitor):
             self.visitConstructor(name, t, sum.attributes, depth)
 
     def visitConstructor(self, name, cons, attrs, depth):
-        self.emit_check("%s_%s" % (name, cons.name), depth)
-        self.emit("struct Py_%s_%s{" % (name, cons.name), depth)
-        self.emit("struct Py_%s _base;" % name, depth+1)
+        self.emit_check(cons.name, depth)
+        self.emit("struct _%s{" % cons.name, depth)
+        self.emit("struct _%s _base;" % name, depth+1)
         field_types = []
         for f in cons.fields:
             field_types.append(get_c_type(f.type))
             self.visit(f, depth + 1)
         for f in attrs:
             field_types.append(get_c_type(f.type))
-        self.emit("};" % cons.name, depth)
+        self.emit("};", depth)
         args = ", ".join(field_types) or "void"
-        self.emit("PyObject *Py_%s_%s_New(%s);" % (name, cons.name, args), depth)
+        self.emit("PyObject *Py_%s_New(%s);" % (cons.name, args), depth)
+        # for convenience
+        self.emit("#define %s Py_%s_New" % (cons.name, cons.name), depth)
         self.emit("", depth)
 
     def visitField(self, field, depth):
@@ -183,7 +187,7 @@ class HeaderVisitor(EmitVisitor):
 
     def visitProduct(self, product, name, depth):
         self.emit_check(str(name), depth)
-        self.emit("struct Py_%(name)s {" % locals(), depth)
+        self.emit("struct _%(name)s {" % locals(), depth)
         self.emit("PyObject_HEAD", depth+1)
         field_types = []
         for f in product.fields:
@@ -205,7 +209,7 @@ class FunctionVisitor(TraversalVisitor):
         emit("PyObject*")
         emit("Py_%s_New(%s)" % (name, argstr))
         emit("{")
-        emit("struct Py_%s *result = PyObject_New(struct Py_%s, &Py_%s_Type);" % (name, name, name), 1, 0)
+        emit("struct _%s *result = PyObject_New(struct _%s, &Py_%s_Type);" % (name, name, name), 1, 0)
         emit("if (result == NULL)", 1)
         emit("return NULL;", 2)
         for argtype, argname, opt in args:
@@ -222,7 +226,7 @@ class FunctionVisitor(TraversalVisitor):
         emit("static void")
         emit("%s_dealloc(PyObject* _self)" % name)
         emit("{")
-        emit("struct Py_%s *self = (struct Py_%s*)_self;" % (name, name), 1)
+        emit("struct _%s *self = (struct _%s*)_self;" % (name, name), 1)
         for argtype, argname, opt in fields:
             if argtype == "PyObject*":
                 emit("Py_DECREF(self->%s);" % argname, 1)
@@ -244,7 +248,7 @@ class FunctionVisitor(TraversalVisitor):
 	emit("PyObject_HEAD_INIT(NULL)")
 	emit("0,\t\t/*ob_size*/")
         emit('"%s",\t\t/*tp_name*/' % name)
-	emit("sizeof(struct Py_%s),\t/*tp_basicsize*/" % name)
+	emit("sizeof(struct _%s),\t/*tp_basicsize*/" % name)
         null("itemsize")
 	emit("%s_dealloc,\t\t/*tp_dealloc*/" % name)
         null("print")
@@ -262,6 +266,7 @@ class FunctionVisitor(TraversalVisitor):
                   "dict", "descr_get", "descr_set", "dictoffset",
                   "init", "alloc", "new", "free", "is_gc"):
             null(m)
+        depth = 0
         emit("};")
         emit("")
 
@@ -281,12 +286,11 @@ class FunctionVisitor(TraversalVisitor):
         self.emit_type(str(name))
 
     def visitConstructor(self, cons, name, attrs):
-        name = "%s_%s" % (name, cons.name)
         args = self.get_args(cons.fields)
         attrs = self.get_args(attrs)
-        self.emit_ctor(name, args, attrs)
-        self.emit_dealloc(name, args, attrs)
-        self.emit_type(name)
+        self.emit_ctor(cons.name, args, attrs)
+        self.emit_dealloc(cons.name, args, attrs)
+        self.emit_type(cons.name)
 
 class InitVisitor(TraversalVisitor):
     def visitModule(self, mod):
@@ -308,7 +312,7 @@ class InitVisitor(TraversalVisitor):
         self.emit_init(name)
 
     def visitConstructor(self, cons, name, attrs):
-        self.emit_init("%s_%s" % (name, cons.name), name)
+        self.emit_init(cons.name, name)
 
     def emit_init(self, name, base = None):
         if base:
@@ -336,6 +340,10 @@ def main(srcfile):
         p = "%s-ast.h" % mod.name
     f = open(p, "wb")
     print >> f, auto_gen_msg
+    print >> f, "/* For convenience, this header provides several"
+    print >> f, "   macro, type and constant names which are not Py_-prefixed."
+    print >> f, "   Therefore, the file should not be included in Python.h;"
+    print >> f, "   all symbols relevant to linkage are Py_-prefixed. */"
     c = HeaderVisitor(f)
     c.visit(mod)
     f.close()

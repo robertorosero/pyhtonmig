@@ -8,7 +8,7 @@ PyTypeObject Py_mod_Type = {
         PyObject_HEAD_INIT(NULL)
         0,		/*ob_size*/
         "mod",		/*tp_name*/
-        sizeof(struct Py_mod),	/*tp_basicsize*/
+        sizeof(struct _mod),	/*tp_basicsize*/
         0,		/* tp_itemsize */
         mod_dealloc,		/*tp_dealloc*/
         0,		/* tp_print */
@@ -46,12 +46,12 @@ PyTypeObject Py_mod_Type = {
         0,		/* tp_new */
         0,		/* tp_free */
         0,		/* tp_is_gc */
-        };
-        
+};
+
 PyObject*
-Py_mod_Module_New(PyObject* body)
+Py_Module_New(PyObject* body)
 {
-        struct Py_mod_Module *result = PyObject_New(struct Py_mod_Module, &Py_mod_Module_Type);
+        struct _Module *result = PyObject_New(struct _Module, &Py_Module_Type);
         if (result == NULL)
                 return NULL;
         result->body = body;
@@ -59,20 +59,20 @@ Py_mod_Module_New(PyObject* body)
 }
 
 static void
-mod_Module_dealloc(PyObject* _self)
+Module_dealloc(PyObject* _self)
 {
-        struct Py_mod_Module *self = (struct Py_mod_Module*)_self;
+        struct _Module *self = (struct _Module*)_self;
         Py_DECREF(self->body);
         PyObject_Del(self);
 }
 
-PyTypeObject Py_mod_Module_Type = {
+PyTypeObject Py_Module_Type = {
         PyObject_HEAD_INIT(NULL)
         0,		/*ob_size*/
-        "mod_Module",		/*tp_name*/
-        sizeof(struct Py_mod_Module),	/*tp_basicsize*/
+        "Module",		/*tp_name*/
+        sizeof(struct _Module),	/*tp_basicsize*/
         0,		/* tp_itemsize */
-        mod_Module_dealloc,		/*tp_dealloc*/
+        Module_dealloc,		/*tp_dealloc*/
         0,		/* tp_print */
         0,		/* tp_getattr */
         0,		/* tp_setattr */
@@ -108,12 +108,12 @@ PyTypeObject Py_mod_Module_Type = {
         0,		/* tp_new */
         0,		/* tp_free */
         0,		/* tp_is_gc */
-        };
-        
+};
+
 PyObject*
-Py_mod_Interactive_New(PyObject* body)
+Py_Interactive_New(PyObject* body)
 {
-        struct Py_mod_Interactive *result = PyObject_New(struct Py_mod_Interactive, &Py_mod_Interactive_Type);
+        struct _Interactive *result = PyObject_New(struct _Interactive, &Py_Interactive_Type);
         if (result == NULL)
                 return NULL;
         result->body = body;
@@ -121,20 +121,20 @@ Py_mod_Interactive_New(PyObject* body)
 }
 
 static void
-mod_Interactive_dealloc(PyObject* _self)
+Interactive_dealloc(PyObject* _self)
 {
-        struct Py_mod_Interactive *self = (struct Py_mod_Interactive*)_self;
+        struct _Interactive *self = (struct _Interactive*)_self;
         Py_DECREF(self->body);
         PyObject_Del(self);
 }
 
-PyTypeObject Py_mod_Interactive_Type = {
+PyTypeObject Py_Interactive_Type = {
         PyObject_HEAD_INIT(NULL)
         0,		/*ob_size*/
-        "mod_Interactive",		/*tp_name*/
-        sizeof(struct Py_mod_Interactive),	/*tp_basicsize*/
+        "Interactive",		/*tp_name*/
+        sizeof(struct _Interactive),	/*tp_basicsize*/
         0,		/* tp_itemsize */
-        mod_Interactive_dealloc,		/*tp_dealloc*/
+        Interactive_dealloc,		/*tp_dealloc*/
         0,		/* tp_print */
         0,		/* tp_getattr */
         0,		/* tp_setattr */
@@ -170,12 +170,12 @@ PyTypeObject Py_mod_Interactive_Type = {
         0,		/* tp_new */
         0,		/* tp_free */
         0,		/* tp_is_gc */
-        };
-        
+};
+
 PyObject*
-Py_mod_Expression_New(PyObject* body)
+Py_Expression_New(PyObject* body)
 {
-        struct Py_mod_Expression *result = PyObject_New(struct Py_mod_Expression, &Py_mod_Expression_Type);
+        struct _Expression *result = PyObject_New(struct _Expression, &Py_Expression_Type);
         if (result == NULL)
                 return NULL;
         result->body = body;
@@ -183,20 +183,20 @@ Py_mod_Expression_New(PyObject* body)
 }
 
 static void
-mod_Expression_dealloc(PyObject* _self)
+Expression_dealloc(PyObject* _self)
 {
-        struct Py_mod_Expression *self = (struct Py_mod_Expression*)_self;
+        struct _Expression *self = (struct _Expression*)_self;
         Py_DECREF(self->body);
         PyObject_Del(self);
 }
 
-PyTypeObject Py_mod_Expression_Type = {
+PyTypeObject Py_Expression_Type = {
         PyObject_HEAD_INIT(NULL)
         0,		/*ob_size*/
-        "mod_Expression",		/*tp_name*/
-        sizeof(struct Py_mod_Expression),	/*tp_basicsize*/
+        "Expression",		/*tp_name*/
+        sizeof(struct _Expression),	/*tp_basicsize*/
         0,		/* tp_itemsize */
-        mod_Expression_dealloc,		/*tp_dealloc*/
+        Expression_dealloc,		/*tp_dealloc*/
         0,		/* tp_print */
         0,		/* tp_getattr */
         0,		/* tp_setattr */
@@ -232,12 +232,12 @@ PyTypeObject Py_mod_Expression_Type = {
         0,		/* tp_new */
         0,		/* tp_free */
         0,		/* tp_is_gc */
-        };
-        
+};
+
 PyObject*
-Py_mod_Suite_New(PyObject* body)
+Py_Suite_New(PyObject* body)
 {
-        struct Py_mod_Suite *result = PyObject_New(struct Py_mod_Suite, &Py_mod_Suite_Type);
+        struct _Suite *result = PyObject_New(struct _Suite, &Py_Suite_Type);
         if (result == NULL)
                 return NULL;
         result->body = body;
@@ -245,20 +245,20 @@ Py_mod_Suite_New(PyObject* body)
 }
 
 static void
-mod_Suite_dealloc(PyObject* _self)
+Suite_dealloc(PyObject* _self)
 {
-        struct Py_mod_Suite *self = (struct Py_mod_Suite*)_self;
+        struct _Suite *self = (struct _Suite*)_self;
         Py_DECREF(self->body);
         PyObject_Del(self);
 }
 
-PyTypeObject Py_mod_Suite_Type = {
+PyTypeObject Py_Suite_Type = {
         PyObject_HEAD_INIT(NULL)
         0,		/*ob_size*/
-        "mod_Suite",		/*tp_name*/
-        sizeof(struct Py_mod_Suite),	/*tp_basicsize*/
+        "Suite",		/*tp_name*/
+        sizeof(struct _Suite),	/*tp_basicsize*/
         0,		/* tp_itemsize */
-        mod_Suite_dealloc,		/*tp_dealloc*/
+        Suite_dealloc,		/*tp_dealloc*/
         0,		/* tp_print */
         0,		/* tp_getattr */
         0,		/* tp_setattr */
@@ -294,14 +294,14 @@ PyTypeObject Py_mod_Suite_Type = {
         0,		/* tp_new */
         0,		/* tp_free */
         0,		/* tp_is_gc */
-        };
-        
+};
+
 #define stmt_dealloc 0
 PyTypeObject Py_stmt_Type = {
         PyObject_HEAD_INIT(NULL)
         0,		/*ob_size*/
         "stmt",		/*tp_name*/
-        sizeof(struct Py_stmt),	/*tp_basicsize*/
+        sizeof(struct _stmt),	/*tp_basicsize*/
         0,		/* tp_itemsize */
         stmt_dealloc,		/*tp_dealloc*/
         0,		/* tp_print */
@@ -339,13 +339,13 @@ PyTypeObject Py_stmt_Type = {
         0,		/* tp_new */
         0,		/* tp_free */
         0,		/* tp_is_gc */
-        };
-        
+};
+
 PyObject*
-Py_stmt_FunctionDef_New(PyObject* name, PyObject* args, PyObject* body,
-                        PyObject* decorators, int lineno)
+Py_FunctionDef_New(PyObject* name, PyObject* args, PyObject* body, PyObject*
+                   decorators, int lineno)
 {
-        struct Py_stmt_FunctionDef *result = PyObject_New(struct Py_stmt_FunctionDef, &Py_stmt_FunctionDef_Type);
+        struct _FunctionDef *result = PyObject_New(struct _FunctionDef, &Py_FunctionDef_Type);
         if (result == NULL)
                 return NULL;
         result->name = name;
@@ -357,9 +357,9 @@ Py_stmt_FunctionDef_New(PyObject* name, PyObject* args, PyObject* body,
 }
 
 static void
-stmt_FunctionDef_dealloc(PyObject* _self)
+FunctionDef_dealloc(PyObject* _self)
 {
-        struct Py_stmt_FunctionDef *self = (struct Py_stmt_FunctionDef*)_self;
+        struct _FunctionDef *self = (struct _FunctionDef*)_self;
         Py_DECREF(self->name);
         Py_DECREF(self->args);
         Py_DECREF(self->body);
@@ -367,13 +367,13 @@ stmt_FunctionDef_dealloc(PyObject* _self)
         PyObject_Del(self);
 }
 
-PyTypeObject Py_stmt_FunctionDef_Type = {
+PyTypeObject Py_FunctionDef_Type = {
         PyObject_HEAD_INIT(NULL)
         0,		/*ob_size*/
-        "stmt_FunctionDef",		/*tp_name*/
-        sizeof(struct Py_stmt_FunctionDef),	/*tp_basicsize*/
+        "FunctionDef",		/*tp_name*/
+        sizeof(struct _FunctionDef),	/*tp_basicsize*/
         0,		/* tp_itemsize */
-        stmt_FunctionDef_dealloc,		/*tp_dealloc*/
+        FunctionDef_dealloc,		/*tp_dealloc*/
         0,		/* tp_print */
         0,		/* tp_getattr */
         0,		/* tp_setattr */
@@ -409,13 +409,12 @@ PyTypeObject Py_stmt_FunctionDef_Type = {
         0,		/* tp_new */
         0,		/* tp_free */
         0,		/* tp_is_gc */
-        };
-        
+};
+
 PyObject*
-Py_stmt_ClassDef_New(PyObject* name, PyObject* bases, PyObject* body, int
-                     lineno)
+Py_ClassDef_New(PyObject* name, PyObject* bases, PyObject* body, int lineno)
 {
-        struct Py_stmt_ClassDef *result = PyObject_New(struct Py_stmt_ClassDef, &Py_stmt_ClassDef_Type);
+        struct _ClassDef *result = PyObject_New(struct _ClassDef, &Py_ClassDef_Type);
         if (result == NULL)
                 return NULL;
         result->name = name;
@@ -426,22 +425,22 @@ Py_stmt_ClassDef_New(PyObject* name, PyObject* bases, PyObject* body, int
 }
 
 static void
-stmt_ClassDef_dealloc(PyObject* _self)
+ClassDef_dealloc(PyObject* _self)
 {
-        struct Py_stmt_ClassDef *self = (struct Py_stmt_ClassDef*)_self;
+        struct _ClassDef *self = (struct _ClassDef*)_self;
         Py_DECREF(self->name);
         Py_DECREF(self->bases);
         Py_DECREF(self->body);
         PyObject_Del(self);
 }
 
-PyTypeObject Py_stmt_ClassDef_Type = {
+PyTypeObject Py_ClassDef_Type = {
         PyObject_HEAD_INIT(NULL)
         0,		/*ob_size*/
-        "stmt_ClassDef",		/*tp_name*/
-        sizeof(struct Py_stmt_ClassDef),	/*tp_basicsize*/
+        "ClassDef",		/*tp_name*/
+        sizeof(struct _ClassDef),	/*tp_basicsize*/
         0,		/* tp_itemsize */
-        stmt_ClassDef_dealloc,		/*tp_dealloc*/
+        ClassDef_dealloc,		/*tp_dealloc*/
         0,		/* tp_print */
         0,		/* tp_getattr */
         0,		/* tp_setattr */
@@ -477,12 +476,12 @@ PyTypeObject Py_stmt_ClassDef_Type = {
         0,		/* tp_new */
         0,		/* tp_free */
         0,		/* tp_is_gc */
-        };
-        
+};
+
 PyObject*
-Py_stmt_Return_New(PyObject* value, int lineno)
+Py_Return_New(PyObject* value, int lineno)
 {
-        struct Py_stmt_Return *result = PyObject_New(struct Py_stmt_Return, &Py_stmt_Return_Type);
+        struct _Return *result = PyObject_New(struct _Return, &Py_Return_Type);
         if (result == NULL)
                 return NULL;
         result->value = value;
@@ -491,20 +490,20 @@ Py_stmt_Return_New(PyObject* value, int lineno)
 }
 
 static void
-stmt_Return_dealloc(PyObject* _self)
+Return_dealloc(PyObject* _self)
 {
-        struct Py_stmt_Return *self = (struct Py_stmt_Return*)_self;
+        struct _Return *self = (struct _Return*)_self;
         Py_DECREF(self->value);
         PyObject_Del(self);
 }
 
-PyTypeObject Py_stmt_Return_Type = {
+PyTypeObject Py_Return_Type = {
         PyObject_HEAD_INIT(NULL)
         0,		/*ob_size*/
-        "stmt_Return",		/*tp_name*/
-        sizeof(struct Py_stmt_Return),	/*tp_basicsize*/
+        "Return",		/*tp_name*/
+        sizeof(struct _Return),	/*tp_basicsize*/
         0,		/* tp_itemsize */
-        stmt_Return_dealloc,		/*tp_dealloc*/
+        Return_dealloc,		/*tp_dealloc*/
         0,		/* tp_print */
         0,		/* tp_getattr */
         0,		/* tp_setattr */
@@ -540,12 +539,12 @@ PyTypeObject Py_stmt_Return_Type = {
         0,		/* tp_new */
         0,		/* tp_free */
         0,		/* tp_is_gc */
-        };
-        
+};
+
 PyObject*
-Py_stmt_Delete_New(PyObject* targets, int lineno)
+Py_Delete_New(PyObject* targets, int lineno)
 {
-        struct Py_stmt_Delete *result = PyObject_New(struct Py_stmt_Delete, &Py_stmt_Delete_Type);
+        struct _Delete *result = PyObject_New(struct _Delete, &Py_Delete_Type);
         if (result == NULL)
                 return NULL;
         result->targets = targets;
@@ -554,20 +553,20 @@ Py_stmt_Delete_New(PyObject* targets, int lineno)
 }
 
 static void
-stmt_Delete_dealloc(PyObject* _self)
+Delete_dealloc(PyObject* _self)
 {
-        struct Py_stmt_Delete *self = (struct Py_stmt_Delete*)_self;
+        struct _Delete *self = (struct _Delete*)_self;
         Py_DECREF(self->targets);
         PyObject_Del(self);
 }
 
-PyTypeObject Py_stmt_Delete_Type = {
+PyTypeObject Py_Delete_Type = {
         PyObject_HEAD_INIT(NULL)
         0,		/*ob_size*/
-        "stmt_Delete",		/*tp_name*/
-        sizeof(struct Py_stmt_Delete),	/*tp_basicsize*/
+        "Delete",		/*tp_name*/
+        sizeof(struct _Delete),	/*tp_basicsize*/
         0,		/* tp_itemsize */
-        stmt_Delete_dealloc,		/*tp_dealloc*/
+        Delete_dealloc,		/*tp_dealloc*/
         0,		/* tp_print */
         0,		/* tp_getattr */
         0,		/* tp_setattr */
@@ -603,12 +602,12 @@ PyTypeObject Py_stmt_Delete_Type = {
         0,		/* tp_new */
         0,		/* tp_free */
         0,		/* tp_is_gc */
-        };
-        
+};
+
 PyObject*
-Py_stmt_Assign_New(PyObject* targets, PyObject* value, int lineno)
+Py_Assign_New(PyObject* targets, PyObject* value, int lineno)
 {
-        struct Py_stmt_Assign *result = PyObject_New(struct Py_stmt_Assign, &Py_stmt_Assign_Type);
+        struct _Assign *result = PyObject_New(struct _Assign, &Py_Assign_Type);
         if (result == NULL)
                 return NULL;
         result->targets = targets;
@@ -618,21 +617,21 @@ Py_stmt_Assign_New(PyObject* targets, PyObject* value, int lineno)
 }
 
 static void
-stmt_Assign_dealloc(PyObject* _self)
+Assign_dealloc(PyObject* _self)
 {
-        struct Py_stmt_Assign *self = (struct Py_stmt_Assign*)_self;
+        struct _Assign *self = (struct _Assign*)_self;
         Py_DECREF(self->targets);
         Py_DECREF(self->value);
         PyObject_Del(self);
 }
 
-PyTypeObject Py_stmt_Assign_Type = {
+PyTypeObject Py_Assign_Type = {
         PyObject_HEAD_INIT(NULL)
         0,		/*ob_size*/
-        "stmt_Assign",		/*tp_name*/
-        sizeof(struct Py_stmt_Assign),	/*tp_basicsize*/
+        "Assign",		/*tp_name*/
+        sizeof(struct _Assign),	/*tp_basicsize*/
         0,		/* tp_itemsize */
-        stmt_Assign_dealloc,		/*tp_dealloc*/
+        Assign_dealloc,		/*tp_dealloc*/
         0,		/* tp_print */
         0,		/* tp_getattr */
         0,		/* tp_setattr */
@@ -668,13 +667,12 @@ PyTypeObject Py_stmt_Assign_Type = {
         0,		/* tp_new */
         0,		/* tp_free */
         0,		/* tp_is_gc */
-        };
-        
+};
+
 PyObject*
-Py_stmt_AugAssign_New(PyObject* target, PyObject* op, PyObject* value, int
-                      lineno)
+Py_AugAssign_New(PyObject* target, PyObject* op, PyObject* value, int lineno)
 {
-        struct Py_stmt_AugAssign *result = PyObject_New(struct Py_stmt_AugAssign, &Py_stmt_AugAssign_Type);
+        struct _AugAssign *result = PyObject_New(struct _AugAssign, &Py_AugAssign_Type);
         if (result == NULL)
                 return NULL;
         result->target = target;
@@ -685,22 +683,22 @@ Py_stmt_AugAssign_New(PyObject* target, PyObject* op, PyObject* value, int
 }
 
 static void
-stmt_AugAssign_dealloc(PyObject* _self)
+AugAssign_dealloc(PyObject* _self)
 {
-        struct Py_stmt_AugAssign *self = (struct Py_stmt_AugAssign*)_self;
+        struct _AugAssign *self = (struct _AugAssign*)_self;
         Py_DECREF(self->target);
         Py_DECREF(self->op);
         Py_DECREF(self->value);
         PyObject_Del(self);
 }
 
-PyTypeObject Py_stmt_AugAssign_Type = {
+PyTypeObject Py_AugAssign_Type = {
         PyObject_HEAD_INIT(NULL)
         0,		/*ob_size*/
-        "stmt_AugAssign",		/*tp_name*/
-        sizeof(struct Py_stmt_AugAssign),	/*tp_basicsize*/
+        "AugAssign",		/*tp_name*/
+        sizeof(struct _AugAssign),	/*tp_basicsize*/
         0,		/* tp_itemsize */
-        stmt_AugAssign_dealloc,		/*tp_dealloc*/
+        AugAssign_dealloc,		/*tp_dealloc*/
         0,		/* tp_print */
         0,		/* tp_getattr */
         0,		/* tp_setattr */
@@ -736,12 +734,12 @@ PyTypeObject Py_stmt_AugAssign_Type = {
         0,		/* tp_new */
         0,		/* tp_free */
         0,		/* tp_is_gc */
-        };
-        
+};
+
 PyObject*
-Py_stmt_Print_New(PyObject* dest, PyObject* values, PyObject* nl, int lineno)
+Py_Print_New(PyObject* dest, PyObject* values, PyObject* nl, int lineno)
 {
-        struct Py_stmt_Print *result = PyObject_New(struct Py_stmt_Print, &Py_stmt_Print_Type);
+        struct _Print *result = PyObject_New(struct _Print, &Py_Print_Type);
         if (result == NULL)
                 return NULL;
         result->dest = dest;
@@ -752,22 +750,22 @@ Py_stmt_Print_New(PyObject* dest, PyObject* values, PyObject* nl, int lineno)
 }
 
 static void
-stmt_Print_dealloc(PyObject* _self)
+Print_dealloc(PyObject* _self)
 {
-        struct Py_stmt_Print *self = (struct Py_stmt_Print*)_self;
+        struct _Print *self = (struct _Print*)_self;
         Py_DECREF(self->dest);
         Py_DECREF(self->values);
         Py_DECREF(self->nl);
         PyObject_Del(self);
 }
 
-PyTypeObject Py_stmt_Print_Type = {
+PyTypeObject Py_Print_Type = {
         PyObject_HEAD_INIT(NULL)
         0,		/*ob_size*/
-        "stmt_Print",		/*tp_name*/
-        sizeof(struct Py_stmt_Print),	/*tp_basicsize*/
+        "Print",		/*tp_name*/
+        sizeof(struct _Print),	/*tp_basicsize*/
         0,		/* tp_itemsize */
-        stmt_Print_dealloc,		/*tp_dealloc*/
+        Print_dealloc,		/*tp_dealloc*/
         0,		/* tp_print */
         0,		/* tp_getattr */
         0,		/* tp_setattr */
@@ -803,13 +801,13 @@ PyTypeObject Py_stmt_Print_Type = {
         0,		/* tp_new */
         0,		/* tp_free */
         0,		/* tp_is_gc */
-        };
-        
+};
+
 PyObject*
-Py_stmt_For_New(PyObject* target, PyObject* iter, PyObject* body, PyObject*
-                orelse, int lineno)
+Py_For_New(PyObject* target, PyObject* iter, PyObject* body, PyObject* orelse,
+           int lineno)
 {
-        struct Py_stmt_For *result = PyObject_New(struct Py_stmt_For, &Py_stmt_For_Type);
+        struct _For *result = PyObject_New(struct _For, &Py_For_Type);
         if (result == NULL)
                 return NULL;
         result->target = target;
@@ -821,9 +819,9 @@ Py_stmt_For_New(PyObject* target, PyObject* iter, PyObject* body, PyObject*
 }
 
 static void
-stmt_For_dealloc(PyObject* _self)
+For_dealloc(PyObject* _self)
 {
-        struct Py_stmt_For *self = (struct Py_stmt_For*)_self;
+        struct _For *self = (struct _For*)_self;
         Py_DECREF(self->target);
         Py_DECREF(self->iter);
         Py_DECREF(self->body);
@@ -831,13 +829,13 @@ stmt_For_dealloc(PyObject* _self)
         PyObject_Del(self);
 }
 
-PyTypeObject Py_stmt_For_Type = {
+PyTypeObject Py_For_Type = {
         PyObject_HEAD_INIT(NULL)
         0,		/*ob_size*/
-        "stmt_For",		/*tp_name*/
-        sizeof(struct Py_stmt_For),	/*tp_basicsize*/
+        "For",		/*tp_name*/
+        sizeof(struct _For),	/*tp_basicsize*/
         0,		/* tp_itemsize */
-        stmt_For_dealloc,		/*tp_dealloc*/
+        For_dealloc,		/*tp_dealloc*/
         0,		/* tp_print */
         0,		/* tp_getattr */
         0,		/* tp_setattr */
@@ -873,12 +871,12 @@ PyTypeObject Py_stmt_For_Type = {
         0,		/* tp_new */
         0,		/* tp_free */
         0,		/* tp_is_gc */
-        };
-        
+};
+
 PyObject*
-Py_stmt_While_New(PyObject* test, PyObject* body, PyObject* orelse, int lineno)
+Py_While_New(PyObject* test, PyObject* body, PyObject* orelse, int lineno)
 {
-        struct Py_stmt_While *result = PyObject_New(struct Py_stmt_While, &Py_stmt_While_Type);
+        struct _While *result = PyObject_New(struct _While, &Py_While_Type);
         if (result == NULL)
                 return NULL;
         result->test = test;
@@ -889,22 +887,22 @@ Py_stmt_While_New(PyObject* test, PyObject* body, PyObject* orelse, int lineno)
 }
 
 static void
-stmt_While_dealloc(PyObject* _self)
+While_dealloc(PyObject* _self)
 {
-        struct Py_stmt_While *self = (struct Py_stmt_While*)_self;
+        struct _While *self = (struct _While*)_self;
         Py_DECREF(self->test);
         Py_DECREF(self->body);
         Py_DECREF(self->orelse);
         PyObject_Del(self);
 }
 
-PyTypeObject Py_stmt_While_Type = {
+PyTypeObject Py_While_Type = {
         PyObject_HEAD_INIT(NULL)
         0,		/*ob_size*/
-        "stmt_While",		/*tp_name*/
-        sizeof(struct Py_stmt_While),	/*tp_basicsize*/
+        "While",		/*tp_name*/
+        sizeof(struct _While),	/*tp_basicsize*/
         0,		/* tp_itemsize */
-        stmt_While_dealloc,		/*tp_dealloc*/
+        While_dealloc,		/*tp_dealloc*/
         0,		/* tp_print */
         0,		/* tp_getattr */
         0,		/* tp_setattr */
@@ -940,12 +938,12 @@ PyTypeObject Py_stmt_While_Type = {
         0,		/* tp_new */
         0,		/* tp_free */
         0,		/* tp_is_gc */
-        };
-        
+};
+
 PyObject*
-Py_stmt_If_New(PyObject* test, PyObject* body, PyObject* orelse, int lineno)
+Py_If_New(PyObject* test, PyObject* body, PyObject* orelse, int lineno)
 {
-        struct Py_stmt_If *result = PyObject_New(struct Py_stmt_If, &Py_stmt_If_Type);
+        struct _If *result = PyObject_New(struct _If, &Py_If_Type);
         if (result == NULL)
                 return NULL;
         result->test = test;
@@ -956,22 +954,22 @@ Py_stmt_If_New(PyObject* test, PyObject* body, PyObject* orelse, int lineno)
 }
 
 static void
-stmt_If_dealloc(PyObject* _self)
+If_dealloc(PyObject* _self)
 {
-        struct Py_stmt_If *self = (struct Py_stmt_If*)_self;
+        struct _If *self = (struct _If*)_self;
         Py_DECREF(self->test);
         Py_DECREF(self->body);
         Py_DECREF(self->orelse);
         PyObject_Del(self);
 }
 
-PyTypeObject Py_stmt_If_Type = {
+PyTypeObject Py_If_Type = {
         PyObject_HEAD_INIT(NULL)
         0,		/*ob_size*/
-        "stmt_If",		/*tp_name*/
-        sizeof(struct Py_stmt_If),	/*tp_basicsize*/
+        "If",		/*tp_name*/
+        sizeof(struct _If),	/*tp_basicsize*/
         0,		/* tp_itemsize */
-        stmt_If_dealloc,		/*tp_dealloc*/
+        If_dealloc,		/*tp_dealloc*/
         0,		/* tp_print */
         0,		/* tp_getattr */
         0,		/* tp_setattr */
@@ -1007,12 +1005,12 @@ PyTypeObject Py_stmt_If_Type = {
         0,		/* tp_new */
         0,		/* tp_free */
         0,		/* tp_is_gc */
-        };
-        
+};
+
 PyObject*
-Py_stmt_Raise_New(PyObject* type, PyObject* inst, PyObject* tback, int lineno)
+Py_Raise_New(PyObject* type, PyObject* inst, PyObject* tback, int lineno)
 {
-        struct Py_stmt_Raise *result = PyObject_New(struct Py_stmt_Raise, &Py_stmt_Raise_Type);
+        struct _Raise *result = PyObject_New(struct _Raise, &Py_Raise_Type);
         if (result == NULL)
                 return NULL;
         result->type = type;
@@ -1023,22 +1021,22 @@ Py_stmt_Raise_New(PyObject* type, PyObject* inst, PyObject* tback, int lineno)
 }
 
 static void
-stmt_Raise_dealloc(PyObject* _self)
+Raise_dealloc(PyObject* _self)
 {
-        struct Py_stmt_Raise *self = (struct Py_stmt_Raise*)_self;
+        struct _Raise *self = (struct _Raise*)_self;
         Py_DECREF(self->type);
         Py_DECREF(self->inst);
         Py_DECREF(self->tback);
         PyObject_Del(self);
 }
 
-PyTypeObject Py_stmt_Raise_Type = {
+PyTypeObject Py_Raise_Type = {
         PyObject_HEAD_INIT(NULL)
         0,		/*ob_size*/
-        "stmt_Raise",		/*tp_name*/
-        sizeof(struct Py_stmt_Raise),	/*tp_basicsize*/
+        "Raise",		/*tp_name*/
+        sizeof(struct _Raise),	/*tp_basicsize*/
         0,		/* tp_itemsize */
-        stmt_Raise_dealloc,		/*tp_dealloc*/
+        Raise_dealloc,		/*tp_dealloc*/
         0,		/* tp_print */
         0,		/* tp_getattr */
         0,		/* tp_setattr */
@@ -1074,13 +1072,13 @@ PyTypeObject Py_stmt_Raise_Type = {
         0,		/* tp_new */
         0,		/* tp_free */
         0,		/* tp_is_gc */
-        };
-        
+};
+
 PyObject*
-Py_stmt_TryExcept_New(PyObject* body, PyObject* handlers, PyObject* orelse, int
-                      lineno)
+Py_TryExcept_New(PyObject* body, PyObject* handlers, PyObject* orelse, int
+                 lineno)
 {
-        struct Py_stmt_TryExcept *result = PyObject_New(struct Py_stmt_TryExcept, &Py_stmt_TryExcept_Type);
+        struct _TryExcept *result = PyObject_New(struct _TryExcept, &Py_TryExcept_Type);
         if (result == NULL)
                 return NULL;
         result->body = body;
@@ -1091,22 +1089,22 @@ Py_stmt_TryExcept_New(PyObject* body, PyObject* handlers, PyObject* orelse, int
 }
 
 static void
-stmt_TryExcept_dealloc(PyObject* _self)
+TryExcept_dealloc(PyObject* _self)
 {
-        struct Py_stmt_TryExcept *self = (struct Py_stmt_TryExcept*)_self;
+        struct _TryExcept *self = (struct _TryExcept*)_self;
         Py_DECREF(self->body);
         Py_DECREF(self->handlers);
         Py_DECREF(self->orelse);
         PyObject_Del(self);
 }
 
-PyTypeObject Py_stmt_TryExcept_Type = {
+PyTypeObject Py_TryExcept_Type = {
         PyObject_HEAD_INIT(NULL)
         0,		/*ob_size*/
-        "stmt_TryExcept",		/*tp_name*/
-        sizeof(struct Py_stmt_TryExcept),	/*tp_basicsize*/
+        "TryExcept",		/*tp_name*/
+        sizeof(struct _TryExcept),	/*tp_basicsize*/
         0,		/* tp_itemsize */
-        stmt_TryExcept_dealloc,		/*tp_dealloc*/
+        TryExcept_dealloc,		/*tp_dealloc*/
         0,		/* tp_print */
         0,		/* tp_getattr */
         0,		/* tp_setattr */
@@ -1142,12 +1140,12 @@ PyTypeObject Py_stmt_TryExcept_Type = {
         0,		/* tp_new */
         0,		/* tp_free */
         0,		/* tp_is_gc */
-        };
-        
+};
+
 PyObject*
-Py_stmt_TryFinally_New(PyObject* body, PyObject* finalbody, int lineno)
+Py_TryFinally_New(PyObject* body, PyObject* finalbody, int lineno)
 {
-        struct Py_stmt_TryFinally *result = PyObject_New(struct Py_stmt_TryFinally, &Py_stmt_TryFinally_Type);
+        struct _TryFinally *result = PyObject_New(struct _TryFinally, &Py_TryFinally_Type);
         if (result == NULL)
                 return NULL;
         result->body = body;
@@ -1157,21 +1155,21 @@ Py_stmt_TryFinally_New(PyObject* body, PyObject* finalbody, int lineno)
 }
 
 static void
-stmt_TryFinally_dealloc(PyObject* _self)
+TryFinally_dealloc(PyObject* _self)
 {
-        struct Py_stmt_TryFinally *self = (struct Py_stmt_TryFinally*)_self;
+        struct _TryFinally *self = (struct _TryFinally*)_self;
         Py_DECREF(self->body);
         Py_DECREF(self->finalbody);
         PyObject_Del(self);
 }
 
-PyTypeObject Py_stmt_TryFinally_Type = {
+PyTypeObject Py_TryFinally_Type = {
         PyObject_HEAD_INIT(NULL)
         0,		/*ob_size*/
-        "stmt_TryFinally",		/*tp_name*/
-        sizeof(struct Py_stmt_TryFinally),	/*tp_basicsize*/
+        "TryFinally",		/*tp_name*/
+        sizeof(struct _TryFinally),	/*tp_basicsize*/
         0,		/* tp_itemsize */
-        stmt_TryFinally_dealloc,		/*tp_dealloc*/
+        TryFinally_dealloc,		/*tp_dealloc*/
         0,		/* tp_print */
         0,		/* tp_getattr */
         0,		/* tp_setattr */
@@ -1207,12 +1205,12 @@ PyTypeObject Py_stmt_TryFinally_Type = {
         0,		/* tp_new */
         0,		/* tp_free */
         0,		/* tp_is_gc */
-        };
-        
+};
+
 PyObject*
-Py_stmt_Assert_New(PyObject* test, PyObject* msg, int lineno)
+Py_Assert_New(PyObject* test, PyObject* msg, int lineno)
 {
-        struct Py_stmt_Assert *result = PyObject_New(struct Py_stmt_Assert, &Py_stmt_Assert_Type);
+        struct _Assert *result = PyObject_New(struct _Assert, &Py_Assert_Type);
         if (result == NULL)
                 return NULL;
         result->test = test;
@@ -1222,21 +1220,21 @@ Py_stmt_Assert_New(PyObject* test, PyObject* msg, int lineno)
 }
 
 static void
-stmt_Assert_dealloc(PyObject* _self)
+Assert_dealloc(PyObject* _self)
 {
-        struct Py_stmt_Assert *self = (struct Py_stmt_Assert*)_self;
+        struct _Assert *self = (struct _Assert*)_self;
         Py_DECREF(self->test);
         Py_DECREF(self->msg);
         PyObject_Del(self);
 }
 
-PyTypeObject Py_stmt_Assert_Type = {
+PyTypeObject Py_Assert_Type = {
         PyObject_HEAD_INIT(NULL)
         0,		/*ob_size*/
-        "stmt_Assert",		/*tp_name*/
-        sizeof(struct Py_stmt_Assert),	/*tp_basicsize*/
+        "Assert",		/*tp_name*/
+        sizeof(struct _Assert),	/*tp_basicsize*/
         0,		/* tp_itemsize */
-        stmt_Assert_dealloc,		/*tp_dealloc*/
+        Assert_dealloc,		/*tp_dealloc*/
         0,		/* tp_print */
         0,		/* tp_getattr */
         0,		/* tp_setattr */
@@ -1272,12 +1270,12 @@ PyTypeObject Py_stmt_Assert_Type = {
         0,		/* tp_new */
         0,		/* tp_free */
         0,		/* tp_is_gc */
-        };
-        
+};
+
 PyObject*
-Py_stmt_Import_New(PyObject* names, int lineno)
+Py_Import_New(PyObject* names, int lineno)
 {
-        struct Py_stmt_Import *result = PyObject_New(struct Py_stmt_Import, &Py_stmt_Import_Type);
+        struct _Import *result = PyObject_New(struct _Import, &Py_Import_Type);
         if (result == NULL)
                 return NULL;
         result->names = names;
@@ -1286,20 +1284,20 @@ Py_stmt_Import_New(PyObject* names, int lineno)
 }
 
 static void
-stmt_Import_dealloc(PyObject* _self)
+Import_dealloc(PyObject* _self)
 {
-        struct Py_stmt_Import *self = (struct Py_stmt_Import*)_self;
+        struct _Import *self = (struct _Import*)_self;
         Py_DECREF(self->names);
         PyObject_Del(self);
 }
 
-PyTypeObject Py_stmt_Import_Type = {
+PyTypeObject Py_Import_Type = {
         PyObject_HEAD_INIT(NULL)
         0,		/*ob_size*/
-        "stmt_Import",		/*tp_name*/
-        sizeof(struct Py_stmt_Import),	/*tp_basicsize*/
+        "Import",		/*tp_name*/
+        sizeof(struct _Import),	/*tp_basicsize*/
         0,		/* tp_itemsize */
-        stmt_Import_dealloc,		/*tp_dealloc*/
+        Import_dealloc,		/*tp_dealloc*/
         0,		/* tp_print */
         0,		/* tp_getattr */
         0,		/* tp_setattr */
@@ -1335,12 +1333,12 @@ PyTypeObject Py_stmt_Import_Type = {
         0,		/* tp_new */
         0,		/* tp_free */
         0,		/* tp_is_gc */
-        };
-        
+};
+
 PyObject*
-Py_stmt_ImportFrom_New(PyObject* module, PyObject* names, int lineno)
+Py_ImportFrom_New(PyObject* module, PyObject* names, int lineno)
 {
-        struct Py_stmt_ImportFrom *result = PyObject_New(struct Py_stmt_ImportFrom, &Py_stmt_ImportFrom_Type);
+        struct _ImportFrom *result = PyObject_New(struct _ImportFrom, &Py_ImportFrom_Type);
         if (result == NULL)
                 return NULL;
         result->module = module;
@@ -1350,21 +1348,21 @@ Py_stmt_ImportFrom_New(PyObject* module, PyObject* names, int lineno)
 }
 
 static void
-stmt_ImportFrom_dealloc(PyObject* _self)
+ImportFrom_dealloc(PyObject* _self)
 {
-        struct Py_stmt_ImportFrom *self = (struct Py_stmt_ImportFrom*)_self;
+        struct _ImportFrom *self = (struct _ImportFrom*)_self;
         Py_DECREF(self->module);
         Py_DECREF(self->names);
         PyObject_Del(self);
 }
 
-PyTypeObject Py_stmt_ImportFrom_Type = {
+PyTypeObject Py_ImportFrom_Type = {
         PyObject_HEAD_INIT(NULL)
         0,		/*ob_size*/
-        "stmt_ImportFrom",		/*tp_name*/
-        sizeof(struct Py_stmt_ImportFrom),	/*tp_basicsize*/
+        "ImportFrom",		/*tp_name*/
+        sizeof(struct _ImportFrom),	/*tp_basicsize*/
         0,		/* tp_itemsize */
-        stmt_ImportFrom_dealloc,		/*tp_dealloc*/
+        ImportFrom_dealloc,		/*tp_dealloc*/
         0,		/* tp_print */
         0,		/* tp_getattr */
         0,		/* tp_setattr */
@@ -1400,13 +1398,12 @@ PyTypeObject Py_stmt_ImportFrom_Type = {
         0,		/* tp_new */
         0,		/* tp_free */
         0,		/* tp_is_gc */
-        };
-        
+};
+
 PyObject*
-Py_stmt_Exec_New(PyObject* body, PyObject* globals, PyObject* locals, int
-                 lineno)
+Py_Exec_New(PyObject* body, PyObject* globals, PyObject* locals, int lineno)
 {
-        struct Py_stmt_Exec *result = PyObject_New(struct Py_stmt_Exec, &Py_stmt_Exec_Type);
+        struct _Exec *result = PyObject_New(struct _Exec, &Py_Exec_Type);
         if (result == NULL)
                 return NULL;
         result->body = body;
@@ -1417,22 +1414,22 @@ Py_stmt_Exec_New(PyObject* body, PyObject* globals, PyObject* locals, int
 }
 
 static void
-stmt_Exec_dealloc(PyObject* _self)
+Exec_dealloc(PyObject* _self)
 {
-        struct Py_stmt_Exec *self = (struct Py_stmt_Exec*)_self;
+        struct _Exec *self = (struct _Exec*)_self;
         Py_DECREF(self->body);
         Py_DECREF(self->globals);
         Py_DECREF(self->locals);
         PyObject_Del(self);
 }
 
-PyTypeObject Py_stmt_Exec_Type = {
+PyTypeObject Py_Exec_Type = {
         PyObject_HEAD_INIT(NULL)
         0,		/*ob_size*/
-        "stmt_Exec",		/*tp_name*/
-        sizeof(struct Py_stmt_Exec),	/*tp_basicsize*/
+        "Exec",		/*tp_name*/
+        sizeof(struct _Exec),	/*tp_basicsize*/
         0,		/* tp_itemsize */
-        stmt_Exec_dealloc,		/*tp_dealloc*/
+        Exec_dealloc,		/*tp_dealloc*/
         0,		/* tp_print */
         0,		/* tp_getattr */
         0,		/* tp_setattr */
@@ -1468,12 +1465,12 @@ PyTypeObject Py_stmt_Exec_Type = {
         0,		/* tp_new */
         0,		/* tp_free */
         0,		/* tp_is_gc */
-        };
-        
+};
+
 PyObject*
-Py_stmt_Global_New(PyObject* names, int lineno)
+Py_Global_New(PyObject* names, int lineno)
 {
-        struct Py_stmt_Global *result = PyObject_New(struct Py_stmt_Global, &Py_stmt_Global_Type);
+        struct _Global *result = PyObject_New(struct _Global, &Py_Global_Type);
         if (result == NULL)
                 return NULL;
         result->names = names;
@@ -1482,20 +1479,20 @@ Py_stmt_Global_New(PyObject* names, int lineno)
 }
 
 static void
-stmt_Global_dealloc(PyObject* _self)
+Global_dealloc(PyObject* _self)
 {
-        struct Py_stmt_Global *self = (struct Py_stmt_Global*)_self;
+        struct _Global *self = (struct _Global*)_self;
         Py_DECREF(self->names);
         PyObject_Del(self);
 }
 
-PyTypeObject Py_stmt_Global_Type = {
+PyTypeObject Py_Global_Type = {
         PyObject_HEAD_INIT(NULL)
         0,		/*ob_size*/
-        "stmt_Global",		/*tp_name*/
-        sizeof(struct Py_stmt_Global),	/*tp_basicsize*/
+        "Global",		/*tp_name*/
+        sizeof(struct _Global),	/*tp_basicsize*/
         0,		/* tp_itemsize */
-        stmt_Global_dealloc,		/*tp_dealloc*/
+        Global_dealloc,		/*tp_dealloc*/
         0,		/* tp_print */
         0,		/* tp_getattr */
         0,		/* tp_setattr */
@@ -1531,12 +1528,12 @@ PyTypeObject Py_stmt_Global_Type = {
         0,		/* tp_new */
         0,		/* tp_free */
         0,		/* tp_is_gc */
-        };
-        
+};
+
 PyObject*
-Py_stmt_Expr_New(PyObject* value, int lineno)
+Py_Expr_New(PyObject* value, int lineno)
 {
-        struct Py_stmt_Expr *result = PyObject_New(struct Py_stmt_Expr, &Py_stmt_Expr_Type);
+        struct _Expr *result = PyObject_New(struct _Expr, &Py_Expr_Type);
         if (result == NULL)
                 return NULL;
         result->value = value;
@@ -1545,20 +1542,20 @@ Py_stmt_Expr_New(PyObject* value, int lineno)
 }
 
 static void
-stmt_Expr_dealloc(PyObject* _self)
+Expr_dealloc(PyObject* _self)
 {
-        struct Py_stmt_Expr *self = (struct Py_stmt_Expr*)_self;
+        struct _Expr *self = (struct _Expr*)_self;
         Py_DECREF(self->value);
         PyObject_Del(self);
 }
 
-PyTypeObject Py_stmt_Expr_Type = {
+PyTypeObject Py_Expr_Type = {
         PyObject_HEAD_INIT(NULL)
         0,		/*ob_size*/
-        "stmt_Expr",		/*tp_name*/
-        sizeof(struct Py_stmt_Expr),	/*tp_basicsize*/
+        "Expr",		/*tp_name*/
+        sizeof(struct _Expr),	/*tp_basicsize*/
         0,		/* tp_itemsize */
-        stmt_Expr_dealloc,		/*tp_dealloc*/
+        Expr_dealloc,		/*tp_dealloc*/
         0,		/* tp_print */
         0,		/* tp_getattr */
         0,		/* tp_setattr */
@@ -1594,12 +1591,12 @@ PyTypeObject Py_stmt_Expr_Type = {
         0,		/* tp_new */
         0,		/* tp_free */
         0,		/* tp_is_gc */
-        };
-        
+};
+
 PyObject*
-Py_stmt_Pass_New(int lineno)
+Py_Pass_New(int lineno)
 {
-        struct Py_stmt_Pass *result = PyObject_New(struct Py_stmt_Pass, &Py_stmt_Pass_Type);
+        struct _Pass *result = PyObject_New(struct _Pass, &Py_Pass_Type);
         if (result == NULL)
                 return NULL;
         result->_base.lineno = lineno;
@@ -1607,19 +1604,19 @@ Py_stmt_Pass_New(int lineno)
 }
 
 static void
-stmt_Pass_dealloc(PyObject* _self)
+Pass_dealloc(PyObject* _self)
 {
-        struct Py_stmt_Pass *self = (struct Py_stmt_Pass*)_self;
+        struct _Pass *self = (struct _Pass*)_self;
         PyObject_Del(self);
 }
 
-PyTypeObject Py_stmt_Pass_Type = {
+PyTypeObject Py_Pass_Type = {
         PyObject_HEAD_INIT(NULL)
         0,		/*ob_size*/
-        "stmt_Pass",		/*tp_name*/
-        sizeof(struct Py_stmt_Pass),	/*tp_basicsize*/
+        "Pass",		/*tp_name*/
+        sizeof(struct _Pass),	/*tp_basicsize*/
         0,		/* tp_itemsize */
-        stmt_Pass_dealloc,		/*tp_dealloc*/
+        Pass_dealloc,		/*tp_dealloc*/
         0,		/* tp_print */
         0,		/* tp_getattr */
         0,		/* tp_setattr */
@@ -1655,12 +1652,12 @@ PyTypeObject Py_stmt_Pass_Type = {
         0,		/* tp_new */
         0,		/* tp_free */
         0,		/* tp_is_gc */
-        };
-        
+};
+
 PyObject*
-Py_stmt_Break_New(int lineno)
+Py_Break_New(int lineno)
 {
-        struct Py_stmt_Break *result = PyObject_New(struct Py_stmt_Break, &Py_stmt_Break_Type);
+        struct _Break *result = PyObject_New(struct _Break, &Py_Break_Type);
         if (result == NULL)
                 return NULL;
         result->_base.lineno = lineno;
@@ -1668,19 +1665,19 @@ Py_stmt_Break_New(int lineno)
 }
 
 static void
-stmt_Break_dealloc(PyObject* _self)
+Break_dealloc(PyObject* _self)
 {
-        struct Py_stmt_Break *self = (struct Py_stmt_Break*)_self;
+        struct _Break *self = (struct _Break*)_self;
         PyObject_Del(self);
 }
 
-PyTypeObject Py_stmt_Break_Type = {
+PyTypeObject Py_Break_Type = {
         PyObject_HEAD_INIT(NULL)
         0,		/*ob_size*/
-        "stmt_Break",		/*tp_name*/
-        sizeof(struct Py_stmt_Break),	/*tp_basicsize*/
+        "Break",		/*tp_name*/
+        sizeof(struct _Break),	/*tp_basicsize*/
         0,		/* tp_itemsize */
-        stmt_Break_dealloc,		/*tp_dealloc*/
+        Break_dealloc,		/*tp_dealloc*/
         0,		/* tp_print */
         0,		/* tp_getattr */
         0,		/* tp_setattr */
@@ -1716,12 +1713,12 @@ PyTypeObject Py_stmt_Break_Type = {
         0,		/* tp_new */
         0,		/* tp_free */
         0,		/* tp_is_gc */
-        };
-        
+};
+
 PyObject*
-Py_stmt_Continue_New(int lineno)
+Py_Continue_New(int lineno)
 {
-        struct Py_stmt_Continue *result = PyObject_New(struct Py_stmt_Continue, &Py_stmt_Continue_Type);
+        struct _Continue *result = PyObject_New(struct _Continue, &Py_Continue_Type);
         if (result == NULL)
                 return NULL;
         result->_base.lineno = lineno;
@@ -1729,19 +1726,19 @@ Py_stmt_Continue_New(int lineno)
 }
 
 static void
-stmt_Continue_dealloc(PyObject* _self)
+Continue_dealloc(PyObject* _self)
 {
-        struct Py_stmt_Continue *self = (struct Py_stmt_Continue*)_self;
+        struct _Continue *self = (struct _Continue*)_self;
         PyObject_Del(self);
 }
 
-PyTypeObject Py_stmt_Continue_Type = {
+PyTypeObject Py_Continue_Type = {
         PyObject_HEAD_INIT(NULL)
         0,		/*ob_size*/
-        "stmt_Continue",		/*tp_name*/
-        sizeof(struct Py_stmt_Continue),	/*tp_basicsize*/
+        "Continue",		/*tp_name*/
+        sizeof(struct _Continue),	/*tp_basicsize*/
         0,		/* tp_itemsize */
-        stmt_Continue_dealloc,		/*tp_dealloc*/
+        Continue_dealloc,		/*tp_dealloc*/
         0,		/* tp_print */
         0,		/* tp_getattr */
         0,		/* tp_setattr */
@@ -1777,14 +1774,14 @@ PyTypeObject Py_stmt_Continue_Type = {
         0,		/* tp_new */
         0,		/* tp_free */
         0,		/* tp_is_gc */
-        };
-        
+};
+
 #define expr_dealloc 0
 PyTypeObject Py_expr_Type = {
         PyObject_HEAD_INIT(NULL)
         0,		/*ob_size*/
         "expr",		/*tp_name*/
-        sizeof(struct Py_expr),	/*tp_basicsize*/
+        sizeof(struct _expr),	/*tp_basicsize*/
         0,		/* tp_itemsize */
         expr_dealloc,		/*tp_dealloc*/
         0,		/* tp_print */
@@ -1822,12 +1819,12 @@ PyTypeObject Py_expr_Type = {
         0,		/* tp_new */
         0,		/* tp_free */
         0,		/* tp_is_gc */
-        };
-        
+};
+
 PyObject*
-Py_expr_BoolOp_New(PyObject* op, PyObject* values, int lineno)
+Py_BoolOp_New(PyObject* op, PyObject* values, int lineno)
 {
-        struct Py_expr_BoolOp *result = PyObject_New(struct Py_expr_BoolOp, &Py_expr_BoolOp_Type);
+        struct _BoolOp *result = PyObject_New(struct _BoolOp, &Py_BoolOp_Type);
         if (result == NULL)
                 return NULL;
         result->op = op;
@@ -1837,21 +1834,21 @@ Py_expr_BoolOp_New(PyObject* op, PyObject* values, int lineno)
 }
 
 static void
-expr_BoolOp_dealloc(PyObject* _self)
+BoolOp_dealloc(PyObject* _self)
 {
-        struct Py_expr_BoolOp *self = (struct Py_expr_BoolOp*)_self;
+        struct _BoolOp *self = (struct _BoolOp*)_self;
         Py_DECREF(self->op);
         Py_DECREF(self->values);
         PyObject_Del(self);
 }
 
-PyTypeObject Py_expr_BoolOp_Type = {
+PyTypeObject Py_BoolOp_Type = {
         PyObject_HEAD_INIT(NULL)
         0,		/*ob_size*/
-        "expr_BoolOp",		/*tp_name*/
-        sizeof(struct Py_expr_BoolOp),	/*tp_basicsize*/
+        "BoolOp",		/*tp_name*/
+        sizeof(struct _BoolOp),	/*tp_basicsize*/
         0,		/* tp_itemsize */
-        expr_BoolOp_dealloc,		/*tp_dealloc*/
+        BoolOp_dealloc,		/*tp_dealloc*/
         0,		/* tp_print */
         0,		/* tp_getattr */
         0,		/* tp_setattr */
@@ -1887,12 +1884,12 @@ PyTypeObject Py_expr_BoolOp_Type = {
         0,		/* tp_new */
         0,		/* tp_free */
         0,		/* tp_is_gc */
-        };
-        
+};
+
 PyObject*
-Py_expr_BinOp_New(PyObject* left, PyObject* op, PyObject* right, int lineno)
+Py_BinOp_New(PyObject* left, PyObject* op, PyObject* right, int lineno)
 {
-        struct Py_expr_BinOp *result = PyObject_New(struct Py_expr_BinOp, &Py_expr_BinOp_Type);
+        struct _BinOp *result = PyObject_New(struct _BinOp, &Py_BinOp_Type);
         if (result == NULL)
                 return NULL;
         result->left = left;
@@ -1903,22 +1900,22 @@ Py_expr_BinOp_New(PyObject* left, PyObject* op, PyObject* right, int lineno)
 }
 
 static void
-expr_BinOp_dealloc(PyObject* _self)
+BinOp_dealloc(PyObject* _self)
 {
-        struct Py_expr_BinOp *self = (struct Py_expr_BinOp*)_self;
+        struct _BinOp *self = (struct _BinOp*)_self;
         Py_DECREF(self->left);
         Py_DECREF(self->op);
         Py_DECREF(self->right);
         PyObject_Del(self);
 }
 
-PyTypeObject Py_expr_BinOp_Type = {
+PyTypeObject Py_BinOp_Type = {
         PyObject_HEAD_INIT(NULL)
         0,		/*ob_size*/
-        "expr_BinOp",		/*tp_name*/
-        sizeof(struct Py_expr_BinOp),	/*tp_basicsize*/
+        "BinOp",		/*tp_name*/
+        sizeof(struct _BinOp),	/*tp_basicsize*/
         0,		/* tp_itemsize */
-        expr_BinOp_dealloc,		/*tp_dealloc*/
+        BinOp_dealloc,		/*tp_dealloc*/
         0,		/* tp_print */
         0,		/* tp_getattr */
         0,		/* tp_setattr */
@@ -1954,12 +1951,12 @@ PyTypeObject Py_expr_BinOp_Type = {
         0,		/* tp_new */
         0,		/* tp_free */
         0,		/* tp_is_gc */
-        };
-        
+};
+
 PyObject*
-Py_expr_UnaryOp_New(PyObject* op, PyObject* operand, int lineno)
+Py_UnaryOp_New(PyObject* op, PyObject* operand, int lineno)
 {
-        struct Py_expr_UnaryOp *result = PyObject_New(struct Py_expr_UnaryOp, &Py_expr_UnaryOp_Type);
+        struct _UnaryOp *result = PyObject_New(struct _UnaryOp, &Py_UnaryOp_Type);
         if (result == NULL)
                 return NULL;
         result->op = op;
@@ -1969,21 +1966,21 @@ Py_expr_UnaryOp_New(PyObject* op, PyObject* operand, int lineno)
 }
 
 static void
-expr_UnaryOp_dealloc(PyObject* _self)
+UnaryOp_dealloc(PyObject* _self)
 {
-        struct Py_expr_UnaryOp *self = (struct Py_expr_UnaryOp*)_self;
+        struct _UnaryOp *self = (struct _UnaryOp*)_self;
         Py_DECREF(self->op);
         Py_DECREF(self->operand);
         PyObject_Del(self);
 }
 
-PyTypeObject Py_expr_UnaryOp_Type = {
+PyTypeObject Py_UnaryOp_Type = {
         PyObject_HEAD_INIT(NULL)
         0,		/*ob_size*/
-        "expr_UnaryOp",		/*tp_name*/
-        sizeof(struct Py_expr_UnaryOp),	/*tp_basicsize*/
+        "UnaryOp",		/*tp_name*/
+        sizeof(struct _UnaryOp),	/*tp_basicsize*/
         0,		/* tp_itemsize */
-        expr_UnaryOp_dealloc,		/*tp_dealloc*/
+        UnaryOp_dealloc,		/*tp_dealloc*/
         0,		/* tp_print */
         0,		/* tp_getattr */
         0,		/* tp_setattr */
@@ -2019,12 +2016,12 @@ PyTypeObject Py_expr_UnaryOp_Type = {
         0,		/* tp_new */
         0,		/* tp_free */
         0,		/* tp_is_gc */
-        };
-        
+};
+
 PyObject*
-Py_expr_Lambda_New(PyObject* args, PyObject* body, int lineno)
+Py_Lambda_New(PyObject* args, PyObject* body, int lineno)
 {
-        struct Py_expr_Lambda *result = PyObject_New(struct Py_expr_Lambda, &Py_expr_Lambda_Type);
+        struct _Lambda *result = PyObject_New(struct _Lambda, &Py_Lambda_Type);
         if (result == NULL)
                 return NULL;
         result->args = args;
@@ -2034,21 +2031,21 @@ Py_expr_Lambda_New(PyObject* args, PyObject* body, int lineno)
 }
 
 static void
-expr_Lambda_dealloc(PyObject* _self)
+Lambda_dealloc(PyObject* _self)
 {
-        struct Py_expr_Lambda *self = (struct Py_expr_Lambda*)_self;
+        struct _Lambda *self = (struct _Lambda*)_self;
         Py_DECREF(self->args);
         Py_DECREF(self->body);
         PyObject_Del(self);
 }
 
-PyTypeObject Py_expr_Lambda_Type = {
+PyTypeObject Py_Lambda_Type = {
         PyObject_HEAD_INIT(NULL)
         0,		/*ob_size*/
-        "expr_Lambda",		/*tp_name*/
-        sizeof(struct Py_expr_Lambda),	/*tp_basicsize*/
+        "Lambda",		/*tp_name*/
+        sizeof(struct _Lambda),	/*tp_basicsize*/
         0,		/* tp_itemsize */
-        expr_Lambda_dealloc,		/*tp_dealloc*/
+        Lambda_dealloc,		/*tp_dealloc*/
         0,		/* tp_print */
         0,		/* tp_getattr */
         0,		/* tp_setattr */
@@ -2084,12 +2081,12 @@ PyTypeObject Py_expr_Lambda_Type = {
         0,		/* tp_new */
         0,		/* tp_free */
         0,		/* tp_is_gc */
-        };
-        
+};
+
 PyObject*
-Py_expr_Dict_New(PyObject* keys, PyObject* values, int lineno)
+Py_Dict_New(PyObject* keys, PyObject* values, int lineno)
 {
-        struct Py_expr_Dict *result = PyObject_New(struct Py_expr_Dict, &Py_expr_Dict_Type);
+        struct _Dict *result = PyObject_New(struct _Dict, &Py_Dict_Type);
         if (result == NULL)
                 return NULL;
         result->keys = keys;
@@ -2099,21 +2096,21 @@ Py_expr_Dict_New(PyObject* keys, PyObject* values, int lineno)
 }
 
 static void
-expr_Dict_dealloc(PyObject* _self)
+Dict_dealloc(PyObject* _self)
 {
-        struct Py_expr_Dict *self = (struct Py_expr_Dict*)_self;
+        struct _Dict *self = (struct _Dict*)_self;
         Py_DECREF(self->keys);
         Py_DECREF(self->values);
         PyObject_Del(self);
 }
 
-PyTypeObject Py_expr_Dict_Type = {
+PyTypeObject Py_Dict_Type = {
         PyObject_HEAD_INIT(NULL)
         0,		/*ob_size*/
-        "expr_Dict",		/*tp_name*/
-        sizeof(struct Py_expr_Dict),	/*tp_basicsize*/
+        "Dict",		/*tp_name*/
+        sizeof(struct _Dict),	/*tp_basicsize*/
         0,		/* tp_itemsize */
-        expr_Dict_dealloc,		/*tp_dealloc*/
+        Dict_dealloc,		/*tp_dealloc*/
         0,		/* tp_print */
         0,		/* tp_getattr */
         0,		/* tp_setattr */
@@ -2149,12 +2146,12 @@ PyTypeObject Py_expr_Dict_Type = {
         0,		/* tp_new */
         0,		/* tp_free */
         0,		/* tp_is_gc */
-        };
-        
+};
+
 PyObject*
-Py_expr_ListComp_New(PyObject* elt, PyObject* generators, int lineno)
+Py_ListComp_New(PyObject* elt, PyObject* generators, int lineno)
 {
-        struct Py_expr_ListComp *result = PyObject_New(struct Py_expr_ListComp, &Py_expr_ListComp_Type);
+        struct _ListComp *result = PyObject_New(struct _ListComp, &Py_ListComp_Type);
         if (result == NULL)
                 return NULL;
         result->elt = elt;
@@ -2164,21 +2161,21 @@ Py_expr_ListComp_New(PyObject* elt, PyObject* generators, int lineno)
 }
 
 static void
-expr_ListComp_dealloc(PyObject* _self)
+ListComp_dealloc(PyObject* _self)
 {
-        struct Py_expr_ListComp *self = (struct Py_expr_ListComp*)_self;
+        struct _ListComp *self = (struct _ListComp*)_self;
         Py_DECREF(self->elt);
         Py_DECREF(self->generators);
         PyObject_Del(self);
 }
 
-PyTypeObject Py_expr_ListComp_Type = {
+PyTypeObject Py_ListComp_Type = {
         PyObject_HEAD_INIT(NULL)
         0,		/*ob_size*/
-        "expr_ListComp",		/*tp_name*/
-        sizeof(struct Py_expr_ListComp),	/*tp_basicsize*/
+        "ListComp",		/*tp_name*/
+        sizeof(struct _ListComp),	/*tp_basicsize*/
         0,		/* tp_itemsize */
-        expr_ListComp_dealloc,		/*tp_dealloc*/
+        ListComp_dealloc,		/*tp_dealloc*/
         0,		/* tp_print */
         0,		/* tp_getattr */
         0,		/* tp_setattr */
@@ -2214,12 +2211,12 @@ PyTypeObject Py_expr_ListComp_Type = {
         0,		/* tp_new */
         0,		/* tp_free */
         0,		/* tp_is_gc */
-        };
-        
+};
+
 PyObject*
-Py_expr_GeneratorExp_New(PyObject* elt, PyObject* generators, int lineno)
+Py_GeneratorExp_New(PyObject* elt, PyObject* generators, int lineno)
 {
-        struct Py_expr_GeneratorExp *result = PyObject_New(struct Py_expr_GeneratorExp, &Py_expr_GeneratorExp_Type);
+        struct _GeneratorExp *result = PyObject_New(struct _GeneratorExp, &Py_GeneratorExp_Type);
         if (result == NULL)
                 return NULL;
         result->elt = elt;
@@ -2229,21 +2226,21 @@ Py_expr_GeneratorExp_New(PyObject* elt, PyObject* generators, int lineno)
 }
 
 static void
-expr_GeneratorExp_dealloc(PyObject* _self)
+GeneratorExp_dealloc(PyObject* _self)
 {
-        struct Py_expr_GeneratorExp *self = (struct Py_expr_GeneratorExp*)_self;
+        struct _GeneratorExp *self = (struct _GeneratorExp*)_self;
         Py_DECREF(self->elt);
         Py_DECREF(self->generators);
         PyObject_Del(self);
 }
 
-PyTypeObject Py_expr_GeneratorExp_Type = {
+PyTypeObject Py_GeneratorExp_Type = {
         PyObject_HEAD_INIT(NULL)
         0,		/*ob_size*/
-        "expr_GeneratorExp",		/*tp_name*/
-        sizeof(struct Py_expr_GeneratorExp),	/*tp_basicsize*/
+        "GeneratorExp",		/*tp_name*/
+        sizeof(struct _GeneratorExp),	/*tp_basicsize*/
         0,		/* tp_itemsize */
-        expr_GeneratorExp_dealloc,		/*tp_dealloc*/
+        GeneratorExp_dealloc,		/*tp_dealloc*/
         0,		/* tp_print */
         0,		/* tp_getattr */
         0,		/* tp_setattr */
@@ -2279,12 +2276,12 @@ PyTypeObject Py_expr_GeneratorExp_Type = {
         0,		/* tp_new */
         0,		/* tp_free */
         0,		/* tp_is_gc */
-        };
-        
+};
+
 PyObject*
-Py_expr_Yield_New(PyObject* value, int lineno)
+Py_Yield_New(PyObject* value, int lineno)
 {
-        struct Py_expr_Yield *result = PyObject_New(struct Py_expr_Yield, &Py_expr_Yield_Type);
+        struct _Yield *result = PyObject_New(struct _Yield, &Py_Yield_Type);
         if (result == NULL)
                 return NULL;
         result->value = value;
@@ -2293,20 +2290,20 @@ Py_expr_Yield_New(PyObject* value, int lineno)
 }
 
 static void
-expr_Yield_dealloc(PyObject* _self)
+Yield_dealloc(PyObject* _self)
 {
-        struct Py_expr_Yield *self = (struct Py_expr_Yield*)_self;
+        struct _Yield *self = (struct _Yield*)_self;
         Py_DECREF(self->value);
         PyObject_Del(self);
 }
 
-PyTypeObject Py_expr_Yield_Type = {
+PyTypeObject Py_Yield_Type = {
         PyObject_HEAD_INIT(NULL)
         0,		/*ob_size*/
-        "expr_Yield",		/*tp_name*/
-        sizeof(struct Py_expr_Yield),	/*tp_basicsize*/
+        "Yield",		/*tp_name*/
+        sizeof(struct _Yield),	/*tp_basicsize*/
         0,		/* tp_itemsize */
-        expr_Yield_dealloc,		/*tp_dealloc*/
+        Yield_dealloc,		/*tp_dealloc*/
         0,		/* tp_print */
         0,		/* tp_getattr */
         0,		/* tp_setattr */
@@ -2342,13 +2339,12 @@ PyTypeObject Py_expr_Yield_Type = {
         0,		/* tp_new */
         0,		/* tp_free */
         0,		/* tp_is_gc */
-        };
-        
+};
+
 PyObject*
-Py_expr_Compare_New(PyObject* left, PyObject* ops, PyObject* comparators, int
-                    lineno)
+Py_Compare_New(PyObject* left, PyObject* ops, PyObject* comparators, int lineno)
 {
-        struct Py_expr_Compare *result = PyObject_New(struct Py_expr_Compare, &Py_expr_Compare_Type);
+        struct _Compare *result = PyObject_New(struct _Compare, &Py_Compare_Type);
         if (result == NULL)
                 return NULL;
         result->left = left;
@@ -2359,22 +2355,22 @@ Py_expr_Compare_New(PyObject* left, PyObject* ops, PyObject* comparators, int
 }
 
 static void
-expr_Compare_dealloc(PyObject* _self)
+Compare_dealloc(PyObject* _self)
 {
-        struct Py_expr_Compare *self = (struct Py_expr_Compare*)_self;
+        struct _Compare *self = (struct _Compare*)_self;
         Py_DECREF(self->left);
         Py_DECREF(self->ops);
         Py_DECREF(self->comparators);
         PyObject_Del(self);
 }
 
-PyTypeObject Py_expr_Compare_Type = {
+PyTypeObject Py_Compare_Type = {
         PyObject_HEAD_INIT(NULL)
         0,		/*ob_size*/
-        "expr_Compare",		/*tp_name*/
-        sizeof(struct Py_expr_Compare),	/*tp_basicsize*/
+        "Compare",		/*tp_name*/
+        sizeof(struct _Compare),	/*tp_basicsize*/
         0,		/* tp_itemsize */
-        expr_Compare_dealloc,		/*tp_dealloc*/
+        Compare_dealloc,		/*tp_dealloc*/
         0,		/* tp_print */
         0,		/* tp_getattr */
         0,		/* tp_setattr */
@@ -2410,13 +2406,13 @@ PyTypeObject Py_expr_Compare_Type = {
         0,		/* tp_new */
         0,		/* tp_free */
         0,		/* tp_is_gc */
-        };
-        
+};
+
 PyObject*
-Py_expr_Call_New(PyObject* func, PyObject* args, PyObject* keywords, PyObject*
-                 starargs, PyObject* kwargs, int lineno)
+Py_Call_New(PyObject* func, PyObject* args, PyObject* keywords, PyObject*
+            starargs, PyObject* kwargs, int lineno)
 {
-        struct Py_expr_Call *result = PyObject_New(struct Py_expr_Call, &Py_expr_Call_Type);
+        struct _Call *result = PyObject_New(struct _Call, &Py_Call_Type);
         if (result == NULL)
                 return NULL;
         result->func = func;
@@ -2429,9 +2425,9 @@ Py_expr_Call_New(PyObject* func, PyObject* args, PyObject* keywords, PyObject*
 }
 
 static void
-expr_Call_dealloc(PyObject* _self)
+Call_dealloc(PyObject* _self)
 {
-        struct Py_expr_Call *self = (struct Py_expr_Call*)_self;
+        struct _Call *self = (struct _Call*)_self;
         Py_DECREF(self->func);
         Py_DECREF(self->args);
         Py_DECREF(self->keywords);
@@ -2440,13 +2436,13 @@ expr_Call_dealloc(PyObject* _self)
         PyObject_Del(self);
 }
 
-PyTypeObject Py_expr_Call_Type = {
+PyTypeObject Py_Call_Type = {
         PyObject_HEAD_INIT(NULL)
         0,		/*ob_size*/
-        "expr_Call",		/*tp_name*/
-        sizeof(struct Py_expr_Call),	/*tp_basicsize*/
+        "Call",		/*tp_name*/
+        sizeof(struct _Call),	/*tp_basicsize*/
         0,		/* tp_itemsize */
-        expr_Call_dealloc,		/*tp_dealloc*/
+        Call_dealloc,		/*tp_dealloc*/
         0,		/* tp_print */
         0,		/* tp_getattr */
         0,		/* tp_setattr */
@@ -2482,12 +2478,12 @@ PyTypeObject Py_expr_Call_Type = {
         0,		/* tp_new */
         0,		/* tp_free */
         0,		/* tp_is_gc */
-        };
-        
+};
+
 PyObject*
-Py_expr_Repr_New(PyObject* value, int lineno)
+Py_Repr_New(PyObject* value, int lineno)
 {
-        struct Py_expr_Repr *result = PyObject_New(struct Py_expr_Repr, &Py_expr_Repr_Type);
+        struct _Repr *result = PyObject_New(struct _Repr, &Py_Repr_Type);
         if (result == NULL)
                 return NULL;
         result->value = value;
@@ -2496,20 +2492,20 @@ Py_expr_Repr_New(PyObject* value, int lineno)
 }
 
 static void
-expr_Repr_dealloc(PyObject* _self)
+Repr_dealloc(PyObject* _self)
 {
-        struct Py_expr_Repr *self = (struct Py_expr_Repr*)_self;
+        struct _Repr *self = (struct _Repr*)_self;
         Py_DECREF(self->value);
         PyObject_Del(self);
 }
 
-PyTypeObject Py_expr_Repr_Type = {
+PyTypeObject Py_Repr_Type = {
         PyObject_HEAD_INIT(NULL)
         0,		/*ob_size*/
-        "expr_Repr",		/*tp_name*/
-        sizeof(struct Py_expr_Repr),	/*tp_basicsize*/
+        "Repr",		/*tp_name*/
+        sizeof(struct _Repr),	/*tp_basicsize*/
         0,		/* tp_itemsize */
-        expr_Repr_dealloc,		/*tp_dealloc*/
+        Repr_dealloc,		/*tp_dealloc*/
         0,		/* tp_print */
         0,		/* tp_getattr */
         0,		/* tp_setattr */
@@ -2545,12 +2541,12 @@ PyTypeObject Py_expr_Repr_Type = {
         0,		/* tp_new */
         0,		/* tp_free */
         0,		/* tp_is_gc */
-        };
-        
+};
+
 PyObject*
-Py_expr_Num_New(PyObject* n, int lineno)
+Py_Num_New(PyObject* n, int lineno)
 {
-        struct Py_expr_Num *result = PyObject_New(struct Py_expr_Num, &Py_expr_Num_Type);
+        struct _Num *result = PyObject_New(struct _Num, &Py_Num_Type);
         if (result == NULL)
                 return NULL;
         result->n = n;
@@ -2559,20 +2555,20 @@ Py_expr_Num_New(PyObject* n, int lineno)
 }
 
 static void
-expr_Num_dealloc(PyObject* _self)
+Num_dealloc(PyObject* _self)
 {
-        struct Py_expr_Num *self = (struct Py_expr_Num*)_self;
+        struct _Num *self = (struct _Num*)_self;
         Py_DECREF(self->n);
         PyObject_Del(self);
 }
 
-PyTypeObject Py_expr_Num_Type = {
+PyTypeObject Py_Num_Type = {
         PyObject_HEAD_INIT(NULL)
         0,		/*ob_size*/
-        "expr_Num",		/*tp_name*/
-        sizeof(struct Py_expr_Num),	/*tp_basicsize*/
+        "Num",		/*tp_name*/
+        sizeof(struct _Num),	/*tp_basicsize*/
         0,		/* tp_itemsize */
-        expr_Num_dealloc,		/*tp_dealloc*/
+        Num_dealloc,		/*tp_dealloc*/
         0,		/* tp_print */
         0,		/* tp_getattr */
         0,		/* tp_setattr */
@@ -2608,12 +2604,12 @@ PyTypeObject Py_expr_Num_Type = {
         0,		/* tp_new */
         0,		/* tp_free */
         0,		/* tp_is_gc */
-        };
-        
+};
+
 PyObject*
-Py_expr_Str_New(PyObject* s, int lineno)
+Py_Str_New(PyObject* s, int lineno)
 {
-        struct Py_expr_Str *result = PyObject_New(struct Py_expr_Str, &Py_expr_Str_Type);
+        struct _Str *result = PyObject_New(struct _Str, &Py_Str_Type);
         if (result == NULL)
                 return NULL;
         result->s = s;
@@ -2622,20 +2618,20 @@ Py_expr_Str_New(PyObject* s, int lineno)
 }
 
 static void
-expr_Str_dealloc(PyObject* _self)
+Str_dealloc(PyObject* _self)
 {
-        struct Py_expr_Str *self = (struct Py_expr_Str*)_self;
+        struct _Str *self = (struct _Str*)_self;
         Py_DECREF(self->s);
         PyObject_Del(self);
 }
 
-PyTypeObject Py_expr_Str_Type = {
+PyTypeObject Py_Str_Type = {
         PyObject_HEAD_INIT(NULL)
         0,		/*ob_size*/
-        "expr_Str",		/*tp_name*/
-        sizeof(struct Py_expr_Str),	/*tp_basicsize*/
+        "Str",		/*tp_name*/
+        sizeof(struct _Str),	/*tp_basicsize*/
         0,		/* tp_itemsize */
-        expr_Str_dealloc,		/*tp_dealloc*/
+        Str_dealloc,		/*tp_dealloc*/
         0,		/* tp_print */
         0,		/* tp_getattr */
         0,		/* tp_setattr */
@@ -2671,13 +2667,12 @@ PyTypeObject Py_expr_Str_Type = {
         0,		/* tp_new */
         0,		/* tp_free */
         0,		/* tp_is_gc */
-        };
-        
+};
+
 PyObject*
-Py_expr_Attribute_New(PyObject* value, PyObject* attr, PyObject* ctx, int
-                      lineno)
+Py_Attribute_New(PyObject* value, PyObject* attr, PyObject* ctx, int lineno)
 {
-        struct Py_expr_Attribute *result = PyObject_New(struct Py_expr_Attribute, &Py_expr_Attribute_Type);
+        struct _Attribute *result = PyObject_New(struct _Attribute, &Py_Attribute_Type);
         if (result == NULL)
                 return NULL;
         result->value = value;
@@ -2688,22 +2683,22 @@ Py_expr_Attribute_New(PyObject* value, PyObject* attr, PyObject* ctx, int
 }
 
 static void
-expr_Attribute_dealloc(PyObject* _self)
+Attribute_dealloc(PyObject* _self)
 {
-        struct Py_expr_Attribute *self = (struct Py_expr_Attribute*)_self;
+        struct _Attribute *self = (struct _Attribute*)_self;
         Py_DECREF(self->value);
         Py_DECREF(self->attr);
         Py_DECREF(self->ctx);
         PyObject_Del(self);
 }
 
-PyTypeObject Py_expr_Attribute_Type = {
+PyTypeObject Py_Attribute_Type = {
         PyObject_HEAD_INIT(NULL)
         0,		/*ob_size*/
-        "expr_Attribute",		/*tp_name*/
-        sizeof(struct Py_expr_Attribute),	/*tp_basicsize*/
+        "Attribute",		/*tp_name*/
+        sizeof(struct _Attribute),	/*tp_basicsize*/
         0,		/* tp_itemsize */
-        expr_Attribute_dealloc,		/*tp_dealloc*/
+        Attribute_dealloc,		/*tp_dealloc*/
         0,		/* tp_print */
         0,		/* tp_getattr */
         0,		/* tp_setattr */
@@ -2739,13 +2734,12 @@ PyTypeObject Py_expr_Attribute_Type = {
         0,		/* tp_new */
         0,		/* tp_free */
         0,		/* tp_is_gc */
-        };
-        
+};
+
 PyObject*
-Py_expr_Subscript_New(PyObject* value, PyObject* slice, PyObject* ctx, int
-                      lineno)
+Py_Subscript_New(PyObject* value, PyObject* slice, PyObject* ctx, int lineno)
 {
-        struct Py_expr_Subscript *result = PyObject_New(struct Py_expr_Subscript, &Py_expr_Subscript_Type);
+        struct _Subscript *result = PyObject_New(struct _Subscript, &Py_Subscript_Type);
         if (result == NULL)
                 return NULL;
         result->value = value;
@@ -2756,22 +2750,22 @@ Py_expr_Subscript_New(PyObject* value, PyObject* slice, PyObject* ctx, int
 }
 
 static void
-expr_Subscript_dealloc(PyObject* _self)
+Subscript_dealloc(PyObject* _self)
 {
-        struct Py_expr_Subscript *self = (struct Py_expr_Subscript*)_self;
+        struct _Subscript *self = (struct _Subscript*)_self;
         Py_DECREF(self->value);
         Py_DECREF(self->slice);
         Py_DECREF(self->ctx);
         PyObject_Del(self);
 }
 
-PyTypeObject Py_expr_Subscript_Type = {
+PyTypeObject Py_Subscript_Type = {
         PyObject_HEAD_INIT(NULL)
         0,		/*ob_size*/
-        "expr_Subscript",		/*tp_name*/
-        sizeof(struct Py_expr_Subscript),	/*tp_basicsize*/
+        "Subscript",		/*tp_name*/
+        sizeof(struct _Subscript),	/*tp_basicsize*/
         0,		/* tp_itemsize */
-        expr_Subscript_dealloc,		/*tp_dealloc*/
+        Subscript_dealloc,		/*tp_dealloc*/
         0,		/* tp_print */
         0,		/* tp_getattr */
         0,		/* tp_setattr */
@@ -2807,12 +2801,12 @@ PyTypeObject Py_expr_Subscript_Type = {
         0,		/* tp_new */
         0,		/* tp_free */
         0,		/* tp_is_gc */
-        };
-        
+};
+
 PyObject*
-Py_expr_Name_New(PyObject* id, PyObject* ctx, int lineno)
+Py_Name_New(PyObject* id, PyObject* ctx, int lineno)
 {
-        struct Py_expr_Name *result = PyObject_New(struct Py_expr_Name, &Py_expr_Name_Type);
+        struct _Name *result = PyObject_New(struct _Name, &Py_Name_Type);
         if (result == NULL)
                 return NULL;
         result->id = id;
@@ -2822,21 +2816,21 @@ Py_expr_Name_New(PyObject* id, PyObject* ctx, int lineno)
 }
 
 static void
-expr_Name_dealloc(PyObject* _self)
+Name_dealloc(PyObject* _self)
 {
-        struct Py_expr_Name *self = (struct Py_expr_Name*)_self;
+        struct _Name *self = (struct _Name*)_self;
         Py_DECREF(self->id);
         Py_DECREF(self->ctx);
         PyObject_Del(self);
 }
 
-PyTypeObject Py_expr_Name_Type = {
+PyTypeObject Py_Name_Type = {
         PyObject_HEAD_INIT(NULL)
         0,		/*ob_size*/
-        "expr_Name",		/*tp_name*/
-        sizeof(struct Py_expr_Name),	/*tp_basicsize*/
+        "Name",		/*tp_name*/
+        sizeof(struct _Name),	/*tp_basicsize*/
         0,		/* tp_itemsize */
-        expr_Name_dealloc,		/*tp_dealloc*/
+        Name_dealloc,		/*tp_dealloc*/
         0,		/* tp_print */
         0,		/* tp_getattr */
         0,		/* tp_setattr */
@@ -2872,12 +2866,12 @@ PyTypeObject Py_expr_Name_Type = {
         0,		/* tp_new */
         0,		/* tp_free */
         0,		/* tp_is_gc */
-        };
-        
+};
+
 PyObject*
-Py_expr_List_New(PyObject* elts, PyObject* ctx, int lineno)
+Py_List_New(PyObject* elts, PyObject* ctx, int lineno)
 {
-        struct Py_expr_List *result = PyObject_New(struct Py_expr_List, &Py_expr_List_Type);
+        struct _List *result = PyObject_New(struct _List, &Py_List_Type);
         if (result == NULL)
                 return NULL;
         result->elts = elts;
@@ -2887,21 +2881,21 @@ Py_expr_List_New(PyObject* elts, PyObject* ctx, int lineno)
 }
 
 static void
-expr_List_dealloc(PyObject* _self)
+List_dealloc(PyObject* _self)
 {
-        struct Py_expr_List *self = (struct Py_expr_List*)_self;
+        struct _List *self = (struct _List*)_self;
         Py_DECREF(self->elts);
         Py_DECREF(self->ctx);
         PyObject_Del(self);
 }
 
-PyTypeObject Py_expr_List_Type = {
+PyTypeObject Py_List_Type = {
         PyObject_HEAD_INIT(NULL)
         0,		/*ob_size*/
-        "expr_List",		/*tp_name*/
-        sizeof(struct Py_expr_List),	/*tp_basicsize*/
+        "List",		/*tp_name*/
+        sizeof(struct _List),	/*tp_basicsize*/
         0,		/* tp_itemsize */
-        expr_List_dealloc,		/*tp_dealloc*/
+        List_dealloc,		/*tp_dealloc*/
         0,		/* tp_print */
         0,		/* tp_getattr */
         0,		/* tp_setattr */
@@ -2937,12 +2931,12 @@ PyTypeObject Py_expr_List_Type = {
         0,		/* tp_new */
         0,		/* tp_free */
         0,		/* tp_is_gc */
-        };
-        
+};
+
 PyObject*
-Py_expr_Tuple_New(PyObject* elts, PyObject* ctx, int lineno)
+Py_Tuple_New(PyObject* elts, PyObject* ctx, int lineno)
 {
-        struct Py_expr_Tuple *result = PyObject_New(struct Py_expr_Tuple, &Py_expr_Tuple_Type);
+        struct _Tuple *result = PyObject_New(struct _Tuple, &Py_Tuple_Type);
         if (result == NULL)
                 return NULL;
         result->elts = elts;
@@ -2952,21 +2946,21 @@ Py_expr_Tuple_New(PyObject* elts, PyObject* ctx, int lineno)
 }
 
 static void
-expr_Tuple_dealloc(PyObject* _self)
+Tuple_dealloc(PyObject* _self)
 {
-        struct Py_expr_Tuple *self = (struct Py_expr_Tuple*)_self;
+        struct _Tuple *self = (struct _Tuple*)_self;
         Py_DECREF(self->elts);
         Py_DECREF(self->ctx);
         PyObject_Del(self);
 }
 
-PyTypeObject Py_expr_Tuple_Type = {
+PyTypeObject Py_Tuple_Type = {
         PyObject_HEAD_INIT(NULL)
         0,		/*ob_size*/
-        "expr_Tuple",		/*tp_name*/
-        sizeof(struct Py_expr_Tuple),	/*tp_basicsize*/
+        "Tuple",		/*tp_name*/
+        sizeof(struct _Tuple),	/*tp_basicsize*/
         0,		/* tp_itemsize */
-        expr_Tuple_dealloc,		/*tp_dealloc*/
+        Tuple_dealloc,		/*tp_dealloc*/
         0,		/* tp_print */
         0,		/* tp_getattr */
         0,		/* tp_setattr */
@@ -3002,14 +2996,14 @@ PyTypeObject Py_expr_Tuple_Type = {
         0,		/* tp_new */
         0,		/* tp_free */
         0,		/* tp_is_gc */
-        };
-        
+};
+
 #define slice_dealloc 0
 PyTypeObject Py_slice_Type = {
         PyObject_HEAD_INIT(NULL)
         0,		/*ob_size*/
         "slice",		/*tp_name*/
-        sizeof(struct Py_slice),	/*tp_basicsize*/
+        sizeof(struct _slice),	/*tp_basicsize*/
         0,		/* tp_itemsize */
         slice_dealloc,		/*tp_dealloc*/
         0,		/* tp_print */
@@ -3047,31 +3041,31 @@ PyTypeObject Py_slice_Type = {
         0,		/* tp_new */
         0,		/* tp_free */
         0,		/* tp_is_gc */
-        };
-        
+};
+
 PyObject*
-Py_slice_Ellipsis_New()
+Py_Ellipsis_New()
 {
-        struct Py_slice_Ellipsis *result = PyObject_New(struct Py_slice_Ellipsis, &Py_slice_Ellipsis_Type);
+        struct _Ellipsis *result = PyObject_New(struct _Ellipsis, &Py_Ellipsis_Type);
         if (result == NULL)
                 return NULL;
         return (PyObject*)result;
 }
 
 static void
-slice_Ellipsis_dealloc(PyObject* _self)
+Ellipsis_dealloc(PyObject* _self)
 {
-        struct Py_slice_Ellipsis *self = (struct Py_slice_Ellipsis*)_self;
+        struct _Ellipsis *self = (struct _Ellipsis*)_self;
         PyObject_Del(self);
 }
 
-PyTypeObject Py_slice_Ellipsis_Type = {
+PyTypeObject Py_Ellipsis_Type = {
         PyObject_HEAD_INIT(NULL)
         0,		/*ob_size*/
-        "slice_Ellipsis",		/*tp_name*/
-        sizeof(struct Py_slice_Ellipsis),	/*tp_basicsize*/
+        "Ellipsis",		/*tp_name*/
+        sizeof(struct _Ellipsis),	/*tp_basicsize*/
         0,		/* tp_itemsize */
-        slice_Ellipsis_dealloc,		/*tp_dealloc*/
+        Ellipsis_dealloc,		/*tp_dealloc*/
         0,		/* tp_print */
         0,		/* tp_getattr */
         0,		/* tp_setattr */
@@ -3107,12 +3101,12 @@ PyTypeObject Py_slice_Ellipsis_Type = {
         0,		/* tp_new */
         0,		/* tp_free */
         0,		/* tp_is_gc */
-        };
-        
+};
+
 PyObject*
-Py_slice_Slice_New(PyObject* lower, PyObject* upper, PyObject* step)
+Py_Slice_New(PyObject* lower, PyObject* upper, PyObject* step)
 {
-        struct Py_slice_Slice *result = PyObject_New(struct Py_slice_Slice, &Py_slice_Slice_Type);
+        struct _Slice *result = PyObject_New(struct _Slice, &Py_Slice_Type);
         if (result == NULL)
                 return NULL;
         result->lower = lower;
@@ -3122,22 +3116,22 @@ Py_slice_Slice_New(PyObject* lower, PyObject* upper, PyObject* step)
 }
 
 static void
-slice_Slice_dealloc(PyObject* _self)
+Slice_dealloc(PyObject* _self)
 {
-        struct Py_slice_Slice *self = (struct Py_slice_Slice*)_self;
+        struct _Slice *self = (struct _Slice*)_self;
         Py_DECREF(self->lower);
         Py_DECREF(self->upper);
         Py_DECREF(self->step);
         PyObject_Del(self);
 }
 
-PyTypeObject Py_slice_Slice_Type = {
+PyTypeObject Py_Slice_Type = {
         PyObject_HEAD_INIT(NULL)
         0,		/*ob_size*/
-        "slice_Slice",		/*tp_name*/
-        sizeof(struct Py_slice_Slice),	/*tp_basicsize*/
+        "Slice",		/*tp_name*/
+        sizeof(struct _Slice),	/*tp_basicsize*/
         0,		/* tp_itemsize */
-        slice_Slice_dealloc,		/*tp_dealloc*/
+        Slice_dealloc,		/*tp_dealloc*/
         0,		/* tp_print */
         0,		/* tp_getattr */
         0,		/* tp_setattr */
@@ -3173,12 +3167,12 @@ PyTypeObject Py_slice_Slice_Type = {
         0,		/* tp_new */
         0,		/* tp_free */
         0,		/* tp_is_gc */
-        };
-        
+};
+
 PyObject*
-Py_slice_ExtSlice_New(PyObject* dims)
+Py_ExtSlice_New(PyObject* dims)
 {
-        struct Py_slice_ExtSlice *result = PyObject_New(struct Py_slice_ExtSlice, &Py_slice_ExtSlice_Type);
+        struct _ExtSlice *result = PyObject_New(struct _ExtSlice, &Py_ExtSlice_Type);
         if (result == NULL)
                 return NULL;
         result->dims = dims;
@@ -3186,20 +3180,20 @@ Py_slice_ExtSlice_New(PyObject* dims)
 }
 
 static void
-slice_ExtSlice_dealloc(PyObject* _self)
+ExtSlice_dealloc(PyObject* _self)
 {
-        struct Py_slice_ExtSlice *self = (struct Py_slice_ExtSlice*)_self;
+        struct _ExtSlice *self = (struct _ExtSlice*)_self;
         Py_DECREF(self->dims);
         PyObject_Del(self);
 }
 
-PyTypeObject Py_slice_ExtSlice_Type = {
+PyTypeObject Py_ExtSlice_Type = {
         PyObject_HEAD_INIT(NULL)
         0,		/*ob_size*/
-        "slice_ExtSlice",		/*tp_name*/
-        sizeof(struct Py_slice_ExtSlice),	/*tp_basicsize*/
+        "ExtSlice",		/*tp_name*/
+        sizeof(struct _ExtSlice),	/*tp_basicsize*/
         0,		/* tp_itemsize */
-        slice_ExtSlice_dealloc,		/*tp_dealloc*/
+        ExtSlice_dealloc,		/*tp_dealloc*/
         0,		/* tp_print */
         0,		/* tp_getattr */
         0,		/* tp_setattr */
@@ -3235,12 +3229,12 @@ PyTypeObject Py_slice_ExtSlice_Type = {
         0,		/* tp_new */
         0,		/* tp_free */
         0,		/* tp_is_gc */
-        };
-        
+};
+
 PyObject*
-Py_slice_Index_New(PyObject* value)
+Py_Index_New(PyObject* value)
 {
-        struct Py_slice_Index *result = PyObject_New(struct Py_slice_Index, &Py_slice_Index_Type);
+        struct _Index *result = PyObject_New(struct _Index, &Py_Index_Type);
         if (result == NULL)
                 return NULL;
         result->value = value;
@@ -3248,20 +3242,20 @@ Py_slice_Index_New(PyObject* value)
 }
 
 static void
-slice_Index_dealloc(PyObject* _self)
+Index_dealloc(PyObject* _self)
 {
-        struct Py_slice_Index *self = (struct Py_slice_Index*)_self;
+        struct _Index *self = (struct _Index*)_self;
         Py_DECREF(self->value);
         PyObject_Del(self);
 }
 
-PyTypeObject Py_slice_Index_Type = {
+PyTypeObject Py_Index_Type = {
         PyObject_HEAD_INIT(NULL)
         0,		/*ob_size*/
-        "slice_Index",		/*tp_name*/
-        sizeof(struct Py_slice_Index),	/*tp_basicsize*/
+        "Index",		/*tp_name*/
+        sizeof(struct _Index),	/*tp_basicsize*/
         0,		/* tp_itemsize */
-        slice_Index_dealloc,		/*tp_dealloc*/
+        Index_dealloc,		/*tp_dealloc*/
         0,		/* tp_print */
         0,		/* tp_getattr */
         0,		/* tp_setattr */
@@ -3297,12 +3291,12 @@ PyTypeObject Py_slice_Index_Type = {
         0,		/* tp_new */
         0,		/* tp_free */
         0,		/* tp_is_gc */
-        };
-        
+};
+
 PyObject*
 Py_comprehension_New(PyObject* target, PyObject* iter, PyObject* ifs)
 {
-        struct Py_comprehension *result = PyObject_New(struct Py_comprehension, &Py_comprehension_Type);
+        struct _comprehension *result = PyObject_New(struct _comprehension, &Py_comprehension_Type);
         if (result == NULL)
                 return NULL;
         result->target = target;
@@ -3314,7 +3308,7 @@ Py_comprehension_New(PyObject* target, PyObject* iter, PyObject* ifs)
 static void
 comprehension_dealloc(PyObject* _self)
 {
-        struct Py_comprehension *self = (struct Py_comprehension*)_self;
+        struct _comprehension *self = (struct _comprehension*)_self;
         Py_DECREF(self->target);
         Py_DECREF(self->iter);
         Py_DECREF(self->ifs);
@@ -3325,7 +3319,7 @@ PyTypeObject Py_comprehension_Type = {
         PyObject_HEAD_INIT(NULL)
         0,		/*ob_size*/
         "comprehension",		/*tp_name*/
-        sizeof(struct Py_comprehension),	/*tp_basicsize*/
+        sizeof(struct _comprehension),	/*tp_basicsize*/
         0,		/* tp_itemsize */
         comprehension_dealloc,		/*tp_dealloc*/
         0,		/* tp_print */
@@ -3363,12 +3357,12 @@ PyTypeObject Py_comprehension_Type = {
         0,		/* tp_new */
         0,		/* tp_free */
         0,		/* tp_is_gc */
-        };
-        
+};
+
 PyObject*
 Py_excepthandler_New(PyObject* type, PyObject* name, PyObject* body)
 {
-        struct Py_excepthandler *result = PyObject_New(struct Py_excepthandler, &Py_excepthandler_Type);
+        struct _excepthandler *result = PyObject_New(struct _excepthandler, &Py_excepthandler_Type);
         if (result == NULL)
                 return NULL;
         result->type = type;
@@ -3380,7 +3374,7 @@ Py_excepthandler_New(PyObject* type, PyObject* name, PyObject* body)
 static void
 excepthandler_dealloc(PyObject* _self)
 {
-        struct Py_excepthandler *self = (struct Py_excepthandler*)_self;
+        struct _excepthandler *self = (struct _excepthandler*)_self;
         Py_DECREF(self->type);
         Py_DECREF(self->name);
         Py_DECREF(self->body);
@@ -3391,7 +3385,7 @@ PyTypeObject Py_excepthandler_Type = {
         PyObject_HEAD_INIT(NULL)
         0,		/*ob_size*/
         "excepthandler",		/*tp_name*/
-        sizeof(struct Py_excepthandler),	/*tp_basicsize*/
+        sizeof(struct _excepthandler),	/*tp_basicsize*/
         0,		/* tp_itemsize */
         excepthandler_dealloc,		/*tp_dealloc*/
         0,		/* tp_print */
@@ -3429,13 +3423,13 @@ PyTypeObject Py_excepthandler_Type = {
         0,		/* tp_new */
         0,		/* tp_free */
         0,		/* tp_is_gc */
-        };
-        
+};
+
 PyObject*
 Py_arguments_New(PyObject* args, PyObject* vararg, PyObject* kwarg, PyObject*
                  defaults)
 {
-        struct Py_arguments *result = PyObject_New(struct Py_arguments, &Py_arguments_Type);
+        struct _arguments *result = PyObject_New(struct _arguments, &Py_arguments_Type);
         if (result == NULL)
                 return NULL;
         result->args = args;
@@ -3448,7 +3442,7 @@ Py_arguments_New(PyObject* args, PyObject* vararg, PyObject* kwarg, PyObject*
 static void
 arguments_dealloc(PyObject* _self)
 {
-        struct Py_arguments *self = (struct Py_arguments*)_self;
+        struct _arguments *self = (struct _arguments*)_self;
         Py_DECREF(self->args);
         Py_DECREF(self->vararg);
         Py_DECREF(self->kwarg);
@@ -3460,7 +3454,7 @@ PyTypeObject Py_arguments_Type = {
         PyObject_HEAD_INIT(NULL)
         0,		/*ob_size*/
         "arguments",		/*tp_name*/
-        sizeof(struct Py_arguments),	/*tp_basicsize*/
+        sizeof(struct _arguments),	/*tp_basicsize*/
         0,		/* tp_itemsize */
         arguments_dealloc,		/*tp_dealloc*/
         0,		/* tp_print */
@@ -3498,12 +3492,12 @@ PyTypeObject Py_arguments_Type = {
         0,		/* tp_new */
         0,		/* tp_free */
         0,		/* tp_is_gc */
-        };
-        
+};
+
 PyObject*
 Py_keyword_New(PyObject* arg, PyObject* value)
 {
-        struct Py_keyword *result = PyObject_New(struct Py_keyword, &Py_keyword_Type);
+        struct _keyword *result = PyObject_New(struct _keyword, &Py_keyword_Type);
         if (result == NULL)
                 return NULL;
         result->arg = arg;
@@ -3514,7 +3508,7 @@ Py_keyword_New(PyObject* arg, PyObject* value)
 static void
 keyword_dealloc(PyObject* _self)
 {
-        struct Py_keyword *self = (struct Py_keyword*)_self;
+        struct _keyword *self = (struct _keyword*)_self;
         Py_DECREF(self->arg);
         Py_DECREF(self->value);
         PyObject_Del(self);
@@ -3524,7 +3518,7 @@ PyTypeObject Py_keyword_Type = {
         PyObject_HEAD_INIT(NULL)
         0,		/*ob_size*/
         "keyword",		/*tp_name*/
-        sizeof(struct Py_keyword),	/*tp_basicsize*/
+        sizeof(struct _keyword),	/*tp_basicsize*/
         0,		/* tp_itemsize */
         keyword_dealloc,		/*tp_dealloc*/
         0,		/* tp_print */
@@ -3562,12 +3556,12 @@ PyTypeObject Py_keyword_Type = {
         0,		/* tp_new */
         0,		/* tp_free */
         0,		/* tp_is_gc */
-        };
-        
+};
+
 PyObject*
 Py_alias_New(PyObject* name, PyObject* asname)
 {
-        struct Py_alias *result = PyObject_New(struct Py_alias, &Py_alias_Type);
+        struct _alias *result = PyObject_New(struct _alias, &Py_alias_Type);
         if (result == NULL)
                 return NULL;
         result->name = name;
@@ -3578,7 +3572,7 @@ Py_alias_New(PyObject* name, PyObject* asname)
 static void
 alias_dealloc(PyObject* _self)
 {
-        struct Py_alias *self = (struct Py_alias*)_self;
+        struct _alias *self = (struct _alias*)_self;
         Py_DECREF(self->name);
         Py_DECREF(self->asname);
         PyObject_Del(self);
@@ -3588,7 +3582,7 @@ PyTypeObject Py_alias_Type = {
         PyObject_HEAD_INIT(NULL)
         0,		/*ob_size*/
         "alias",		/*tp_name*/
-        sizeof(struct Py_alias),	/*tp_basicsize*/
+        sizeof(struct _alias),	/*tp_basicsize*/
         0,		/* tp_itemsize */
         alias_dealloc,		/*tp_dealloc*/
         0,		/* tp_print */
@@ -3626,162 +3620,162 @@ PyTypeObject Py_alias_Type = {
         0,		/* tp_new */
         0,		/* tp_free */
         0,		/* tp_is_gc */
-        };
-        
+};
+
 
 void init_ast(void)
 {
         if (PyType_Ready(&Py_mod_Type) < 0)
                 return;
-        Py_mod_Module_Type.tp_base = &Py_mod_Type;
-        if (PyType_Ready(&Py_mod_Module_Type) < 0)
+        Py_Module_Type.tp_base = &Py_mod_Type;
+        if (PyType_Ready(&Py_Module_Type) < 0)
                 return;
-        Py_mod_Interactive_Type.tp_base = &Py_mod_Type;
-        if (PyType_Ready(&Py_mod_Interactive_Type) < 0)
+        Py_Interactive_Type.tp_base = &Py_mod_Type;
+        if (PyType_Ready(&Py_Interactive_Type) < 0)
                 return;
-        Py_mod_Expression_Type.tp_base = &Py_mod_Type;
-        if (PyType_Ready(&Py_mod_Expression_Type) < 0)
+        Py_Expression_Type.tp_base = &Py_mod_Type;
+        if (PyType_Ready(&Py_Expression_Type) < 0)
                 return;
-        Py_mod_Suite_Type.tp_base = &Py_mod_Type;
-        if (PyType_Ready(&Py_mod_Suite_Type) < 0)
+        Py_Suite_Type.tp_base = &Py_mod_Type;
+        if (PyType_Ready(&Py_Suite_Type) < 0)
                 return;
         if (PyType_Ready(&Py_stmt_Type) < 0)
                 return;
-        Py_stmt_FunctionDef_Type.tp_base = &Py_stmt_Type;
-        if (PyType_Ready(&Py_stmt_FunctionDef_Type) < 0)
+        Py_FunctionDef_Type.tp_base = &Py_stmt_Type;
+        if (PyType_Ready(&Py_FunctionDef_Type) < 0)
                 return;
-        Py_stmt_ClassDef_Type.tp_base = &Py_stmt_Type;
-        if (PyType_Ready(&Py_stmt_ClassDef_Type) < 0)
+        Py_ClassDef_Type.tp_base = &Py_stmt_Type;
+        if (PyType_Ready(&Py_ClassDef_Type) < 0)
                 return;
-        Py_stmt_Return_Type.tp_base = &Py_stmt_Type;
-        if (PyType_Ready(&Py_stmt_Return_Type) < 0)
+        Py_Return_Type.tp_base = &Py_stmt_Type;
+        if (PyType_Ready(&Py_Return_Type) < 0)
                 return;
-        Py_stmt_Delete_Type.tp_base = &Py_stmt_Type;
-        if (PyType_Ready(&Py_stmt_Delete_Type) < 0)
+        Py_Delete_Type.tp_base = &Py_stmt_Type;
+        if (PyType_Ready(&Py_Delete_Type) < 0)
                 return;
-        Py_stmt_Assign_Type.tp_base = &Py_stmt_Type;
-        if (PyType_Ready(&Py_stmt_Assign_Type) < 0)
+        Py_Assign_Type.tp_base = &Py_stmt_Type;
+        if (PyType_Ready(&Py_Assign_Type) < 0)
                 return;
-        Py_stmt_AugAssign_Type.tp_base = &Py_stmt_Type;
-        if (PyType_Ready(&Py_stmt_AugAssign_Type) < 0)
+        Py_AugAssign_Type.tp_base = &Py_stmt_Type;
+        if (PyType_Ready(&Py_AugAssign_Type) < 0)
                 return;
-        Py_stmt_Print_Type.tp_base = &Py_stmt_Type;
-        if (PyType_Ready(&Py_stmt_Print_Type) < 0)
+        Py_Print_Type.tp_base = &Py_stmt_Type;
+        if (PyType_Ready(&Py_Print_Type) < 0)
                 return;
-        Py_stmt_For_Type.tp_base = &Py_stmt_Type;
-        if (PyType_Ready(&Py_stmt_For_Type) < 0)
+        Py_For_Type.tp_base = &Py_stmt_Type;
+        if (PyType_Ready(&Py_For_Type) < 0)
                 return;
-        Py_stmt_While_Type.tp_base = &Py_stmt_Type;
-        if (PyType_Ready(&Py_stmt_While_Type) < 0)
+        Py_While_Type.tp_base = &Py_stmt_Type;
+        if (PyType_Ready(&Py_While_Type) < 0)
                 return;
-        Py_stmt_If_Type.tp_base = &Py_stmt_Type;
-        if (PyType_Ready(&Py_stmt_If_Type) < 0)
+        Py_If_Type.tp_base = &Py_stmt_Type;
+        if (PyType_Ready(&Py_If_Type) < 0)
                 return;
-        Py_stmt_Raise_Type.tp_base = &Py_stmt_Type;
-        if (PyType_Ready(&Py_stmt_Raise_Type) < 0)
+        Py_Raise_Type.tp_base = &Py_stmt_Type;
+        if (PyType_Ready(&Py_Raise_Type) < 0)
                 return;
-        Py_stmt_TryExcept_Type.tp_base = &Py_stmt_Type;
-        if (PyType_Ready(&Py_stmt_TryExcept_Type) < 0)
+        Py_TryExcept_Type.tp_base = &Py_stmt_Type;
+        if (PyType_Ready(&Py_TryExcept_Type) < 0)
                 return;
-        Py_stmt_TryFinally_Type.tp_base = &Py_stmt_Type;
-        if (PyType_Ready(&Py_stmt_TryFinally_Type) < 0)
+        Py_TryFinally_Type.tp_base = &Py_stmt_Type;
+        if (PyType_Ready(&Py_TryFinally_Type) < 0)
                 return;
-        Py_stmt_Assert_Type.tp_base = &Py_stmt_Type;
-        if (PyType_Ready(&Py_stmt_Assert_Type) < 0)
+        Py_Assert_Type.tp_base = &Py_stmt_Type;
+        if (PyType_Ready(&Py_Assert_Type) < 0)
                 return;
-        Py_stmt_Import_Type.tp_base = &Py_stmt_Type;
-        if (PyType_Ready(&Py_stmt_Import_Type) < 0)
+        Py_Import_Type.tp_base = &Py_stmt_Type;
+        if (PyType_Ready(&Py_Import_Type) < 0)
                 return;
-        Py_stmt_ImportFrom_Type.tp_base = &Py_stmt_Type;
-        if (PyType_Ready(&Py_stmt_ImportFrom_Type) < 0)
+        Py_ImportFrom_Type.tp_base = &Py_stmt_Type;
+        if (PyType_Ready(&Py_ImportFrom_Type) < 0)
                 return;
-        Py_stmt_Exec_Type.tp_base = &Py_stmt_Type;
-        if (PyType_Ready(&Py_stmt_Exec_Type) < 0)
+        Py_Exec_Type.tp_base = &Py_stmt_Type;
+        if (PyType_Ready(&Py_Exec_Type) < 0)
                 return;
-        Py_stmt_Global_Type.tp_base = &Py_stmt_Type;
-        if (PyType_Ready(&Py_stmt_Global_Type) < 0)
+        Py_Global_Type.tp_base = &Py_stmt_Type;
+        if (PyType_Ready(&Py_Global_Type) < 0)
                 return;
-        Py_stmt_Expr_Type.tp_base = &Py_stmt_Type;
-        if (PyType_Ready(&Py_stmt_Expr_Type) < 0)
+        Py_Expr_Type.tp_base = &Py_stmt_Type;
+        if (PyType_Ready(&Py_Expr_Type) < 0)
                 return;
-        Py_stmt_Pass_Type.tp_base = &Py_stmt_Type;
-        if (PyType_Ready(&Py_stmt_Pass_Type) < 0)
+        Py_Pass_Type.tp_base = &Py_stmt_Type;
+        if (PyType_Ready(&Py_Pass_Type) < 0)
                 return;
-        Py_stmt_Break_Type.tp_base = &Py_stmt_Type;
-        if (PyType_Ready(&Py_stmt_Break_Type) < 0)
+        Py_Break_Type.tp_base = &Py_stmt_Type;
+        if (PyType_Ready(&Py_Break_Type) < 0)
                 return;
-        Py_stmt_Continue_Type.tp_base = &Py_stmt_Type;
-        if (PyType_Ready(&Py_stmt_Continue_Type) < 0)
+        Py_Continue_Type.tp_base = &Py_stmt_Type;
+        if (PyType_Ready(&Py_Continue_Type) < 0)
                 return;
         if (PyType_Ready(&Py_expr_Type) < 0)
                 return;
-        Py_expr_BoolOp_Type.tp_base = &Py_expr_Type;
-        if (PyType_Ready(&Py_expr_BoolOp_Type) < 0)
+        Py_BoolOp_Type.tp_base = &Py_expr_Type;
+        if (PyType_Ready(&Py_BoolOp_Type) < 0)
                 return;
-        Py_expr_BinOp_Type.tp_base = &Py_expr_Type;
-        if (PyType_Ready(&Py_expr_BinOp_Type) < 0)
+        Py_BinOp_Type.tp_base = &Py_expr_Type;
+        if (PyType_Ready(&Py_BinOp_Type) < 0)
                 return;
-        Py_expr_UnaryOp_Type.tp_base = &Py_expr_Type;
-        if (PyType_Ready(&Py_expr_UnaryOp_Type) < 0)
+        Py_UnaryOp_Type.tp_base = &Py_expr_Type;
+        if (PyType_Ready(&Py_UnaryOp_Type) < 0)
                 return;
-        Py_expr_Lambda_Type.tp_base = &Py_expr_Type;
-        if (PyType_Ready(&Py_expr_Lambda_Type) < 0)
+        Py_Lambda_Type.tp_base = &Py_expr_Type;
+        if (PyType_Ready(&Py_Lambda_Type) < 0)
                 return;
-        Py_expr_Dict_Type.tp_base = &Py_expr_Type;
-        if (PyType_Ready(&Py_expr_Dict_Type) < 0)
+        Py_Dict_Type.tp_base = &Py_expr_Type;
+        if (PyType_Ready(&Py_Dict_Type) < 0)
                 return;
-        Py_expr_ListComp_Type.tp_base = &Py_expr_Type;
-        if (PyType_Ready(&Py_expr_ListComp_Type) < 0)
+        Py_ListComp_Type.tp_base = &Py_expr_Type;
+        if (PyType_Ready(&Py_ListComp_Type) < 0)
                 return;
-        Py_expr_GeneratorExp_Type.tp_base = &Py_expr_Type;
-        if (PyType_Ready(&Py_expr_GeneratorExp_Type) < 0)
+        Py_GeneratorExp_Type.tp_base = &Py_expr_Type;
+        if (PyType_Ready(&Py_GeneratorExp_Type) < 0)
                 return;
-        Py_expr_Yield_Type.tp_base = &Py_expr_Type;
-        if (PyType_Ready(&Py_expr_Yield_Type) < 0)
+        Py_Yield_Type.tp_base = &Py_expr_Type;
+        if (PyType_Ready(&Py_Yield_Type) < 0)
                 return;
-        Py_expr_Compare_Type.tp_base = &Py_expr_Type;
-        if (PyType_Ready(&Py_expr_Compare_Type) < 0)
+        Py_Compare_Type.tp_base = &Py_expr_Type;
+        if (PyType_Ready(&Py_Compare_Type) < 0)
                 return;
-        Py_expr_Call_Type.tp_base = &Py_expr_Type;
-        if (PyType_Ready(&Py_expr_Call_Type) < 0)
+        Py_Call_Type.tp_base = &Py_expr_Type;
+        if (PyType_Ready(&Py_Call_Type) < 0)
                 return;
-        Py_expr_Repr_Type.tp_base = &Py_expr_Type;
-        if (PyType_Ready(&Py_expr_Repr_Type) < 0)
+        Py_Repr_Type.tp_base = &Py_expr_Type;
+        if (PyType_Ready(&Py_Repr_Type) < 0)
                 return;
-        Py_expr_Num_Type.tp_base = &Py_expr_Type;
-        if (PyType_Ready(&Py_expr_Num_Type) < 0)
+        Py_Num_Type.tp_base = &Py_expr_Type;
+        if (PyType_Ready(&Py_Num_Type) < 0)
                 return;
-        Py_expr_Str_Type.tp_base = &Py_expr_Type;
-        if (PyType_Ready(&Py_expr_Str_Type) < 0)
+        Py_Str_Type.tp_base = &Py_expr_Type;
+        if (PyType_Ready(&Py_Str_Type) < 0)
                 return;
-        Py_expr_Attribute_Type.tp_base = &Py_expr_Type;
-        if (PyType_Ready(&Py_expr_Attribute_Type) < 0)
+        Py_Attribute_Type.tp_base = &Py_expr_Type;
+        if (PyType_Ready(&Py_Attribute_Type) < 0)
                 return;
-        Py_expr_Subscript_Type.tp_base = &Py_expr_Type;
-        if (PyType_Ready(&Py_expr_Subscript_Type) < 0)
+        Py_Subscript_Type.tp_base = &Py_expr_Type;
+        if (PyType_Ready(&Py_Subscript_Type) < 0)
                 return;
-        Py_expr_Name_Type.tp_base = &Py_expr_Type;
-        if (PyType_Ready(&Py_expr_Name_Type) < 0)
+        Py_Name_Type.tp_base = &Py_expr_Type;
+        if (PyType_Ready(&Py_Name_Type) < 0)
                 return;
-        Py_expr_List_Type.tp_base = &Py_expr_Type;
-        if (PyType_Ready(&Py_expr_List_Type) < 0)
+        Py_List_Type.tp_base = &Py_expr_Type;
+        if (PyType_Ready(&Py_List_Type) < 0)
                 return;
-        Py_expr_Tuple_Type.tp_base = &Py_expr_Type;
-        if (PyType_Ready(&Py_expr_Tuple_Type) < 0)
+        Py_Tuple_Type.tp_base = &Py_expr_Type;
+        if (PyType_Ready(&Py_Tuple_Type) < 0)
                 return;
         if (PyType_Ready(&Py_slice_Type) < 0)
                 return;
-        Py_slice_Ellipsis_Type.tp_base = &Py_slice_Type;
-        if (PyType_Ready(&Py_slice_Ellipsis_Type) < 0)
+        Py_Ellipsis_Type.tp_base = &Py_slice_Type;
+        if (PyType_Ready(&Py_Ellipsis_Type) < 0)
                 return;
-        Py_slice_Slice_Type.tp_base = &Py_slice_Type;
-        if (PyType_Ready(&Py_slice_Slice_Type) < 0)
+        Py_Slice_Type.tp_base = &Py_slice_Type;
+        if (PyType_Ready(&Py_Slice_Type) < 0)
                 return;
-        Py_slice_ExtSlice_Type.tp_base = &Py_slice_Type;
-        if (PyType_Ready(&Py_slice_ExtSlice_Type) < 0)
+        Py_ExtSlice_Type.tp_base = &Py_slice_Type;
+        if (PyType_Ready(&Py_ExtSlice_Type) < 0)
                 return;
-        Py_slice_Index_Type.tp_base = &Py_slice_Type;
-        if (PyType_Ready(&Py_slice_Index_Type) < 0)
+        Py_Index_Type.tp_base = &Py_slice_Type;
+        if (PyType_Ready(&Py_Index_Type) < 0)
                 return;
         if (PyType_Ready(&Py_comprehension_Type) < 0)
                 return;
