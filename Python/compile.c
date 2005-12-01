@@ -125,7 +125,7 @@ struct compiler_unit {
 
 	int u_firstlineno; /* the first lineno of the block */
 	int u_lineno;      /* the lineno for the current stmt */
-	bool u_lineno_set; /* boolean to indicate whether instr
+	int u_lineno_set; /* boolean to indicate whether instr
 			      has been generated with current lineno */
 };
 
@@ -1089,7 +1089,7 @@ compiler_enter_scope(struct compiler *c, identifier name, void *key,
 	u->u_nfblocks = 0;
 	u->u_firstlineno = lineno;
 	u->u_lineno = 0;
-	u->u_lineno_set = false;
+	u->u_lineno_set = 0;
 	u->u_consts = PyDict_New();
 	if (!u->u_consts) {
                 compiler_unit_free(u);
@@ -1247,7 +1247,7 @@ compiler_set_lineno(struct compiler *c, int off)
 	basicblock *b;
 	if (c->u->u_lineno_set)
 		return;
-	c->u->u_lineno_set = true;
+	c->u->u_lineno_set = 1;
 	b = c->u->u_curblock;
  	b->b_instr[off].i_lineno = c->u->u_lineno;
 }
@@ -2043,14 +2043,14 @@ static int
 compiler_print(struct compiler *c, stmt_ty s)
 {
 	int i, n;
-	bool dest;
+	int dest;
 
 	assert(s->kind == Print_kind);
 	n = asdl_seq_LEN(s->v.Print.values);
-	dest = false;
+	dest = 0;
 	if (s->v.Print.dest) {
 		VISIT(c, expr, s->v.Print.dest);
-		dest = true;
+		dest = 1;
 	}
 	for (i = 0; i < n; i++) {
 		expr_ty e = (expr_ty)asdl_seq_GET(s->v.Print.values, i);
@@ -2532,7 +2532,7 @@ compiler_visit_stmt(struct compiler *c, stmt_ty s)
 	int i, n;
 
 	c->u->u_lineno = s->lineno;
-	c->u->u_lineno_set = false;
+	c->u->u_lineno_set = 0;
 	switch (s->kind) {
         case FunctionDef_kind:
 		return compiler_function(c, s);
@@ -3265,7 +3265,7 @@ compiler_visit_expr(struct compiler *c, expr_ty e)
 
 	if (e->lineno > c->u->u_lineno) {
 		c->u->u_lineno = e->lineno;
-		c->u->u_lineno_set = false;
+		c->u->u_lineno_set = 0;
 	}
 	switch (e->kind) {
         case BoolOp_kind:

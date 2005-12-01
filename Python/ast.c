@@ -2099,7 +2099,7 @@ ast_for_print_stmt(struct compiling *c, const node *n)
      */
     expr_ty dest = NULL, expression;
     asdl_seq *seq;
-    bool nl;
+    int nl;
     int i, start = 1;
 
     REQ(n, print_stmt);
