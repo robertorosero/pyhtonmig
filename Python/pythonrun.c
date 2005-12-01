@@ -35,9 +35,9 @@ extern grammar _PyParser_Grammar; /* From graminit.c */
 /* Forward */
 static void initmain(void);
 static void initsite(void);
-static PyObject *run_err_mod(mod_ty, const char *, PyObject *, PyObject *,
+static PyObject *run_err_mod(PyTypeObject*, const char *, PyObject *, PyObject *,
 			      PyCompilerFlags *);
-static PyObject *run_mod(mod_ty, const char *, PyObject *, PyObject *,
+static PyObject *run_mod(PyTypeObject*, const char *, PyObject *, PyObject *,
 			  PyCompilerFlags *);
 static PyObject *run_pyc_file(FILE *, const char *, PyObject *, PyObject *,
 			      PyCompilerFlags *);
@@ -696,7 +696,7 @@ int
 PyRun_InteractiveOneFlags(FILE *fp, const char *filename, PyCompilerFlags *flags)
 {
 	PyObject *m, *d, *v, *w;
-	mod_ty mod;
+	PyTypeObject *mod;
 	char *ps1 = "", *ps2 = "";
 	int errcode = 0;
 
@@ -734,7 +734,7 @@ PyRun_InteractiveOneFlags(FILE *fp, const char *filename, PyCompilerFlags *flags
 		return -1;
 	d = PyModule_GetDict(m);
 	v = run_mod(mod, filename, d, d, flags);
-	free_mod(mod);
+	Py_DECREF(mod);
 	if (v == NULL) {
 		PyErr_Print();
 		return -1;
@@ -1155,9 +1155,9 @@ PyRun_StringFlags(const char *str, int start, PyObject *globals,
 		  PyObject *locals, PyCompilerFlags *flags)
 {
 	PyObject *ret;
-	mod_ty mod = PyParser_ASTFromString(str, "<string>", start, flags);
+	PyTypeObject *mod = PyParser_ASTFromString(str, "<string>", start, flags);
 	ret = run_err_mod(mod, "<string>", globals, locals, flags);
-	free_mod(mod);
+	Py_DECREF(mod);
 	return ret;
 }
 
@@ -1166,19 +1166,19 @@ PyRun_FileExFlags(FILE *fp, const char *filename, int start, PyObject *globals,
 		  PyObject *locals, int closeit, PyCompilerFlags *flags)
 {
 	PyObject *ret;
-	mod_ty mod = PyParser_ASTFromFile(fp, filename, start, 0, 0,
+	PyTypeObject *mod = PyParser_ASTFromFile(fp, filename, start, 0, 0,
 					  flags, NULL);
 	if (mod == NULL)
 		return NULL;
 	if (closeit)
 		fclose(fp);
 	ret = run_err_mod(mod, filename, globals, locals, flags);
-	free_mod(mod);
+	Py_DECREF(mod);
 	return ret;
 }
 
 static PyObject *
-run_err_mod(mod_ty mod, const char *filename, PyObject *globals, 
+run_err_mod(PyTypeObject *mod, const char *filename, PyObject *globals, 
 	    PyObject *locals, PyCompilerFlags *flags)
 {
 	if (mod == NULL)
@@ -1187,7 +1187,7 @@ run_err_mod(mod_ty mod, const char *filename, PyObject *globals,
 }
 
 static PyObject *
-run_mod(mod_ty mod, const char *filename, PyObject *globals, PyObject *locals,
+run_mod(PyTypeObject *mod, const char *filename, PyObject *globals, PyObject *locals,
 	 PyCompilerFlags *flags)
 {
 	PyCodeObject *co;
@@ -1236,37 +1236,37 @@ PyObject *
 Py_CompileStringFlags(const char *str, const char *filename, int start,
 		      PyCompilerFlags *flags)
 {
-	mod_ty mod;
+	PyTypeObject *mod;
 	PyCodeObject *co;
 	mod = PyParser_ASTFromString(str, filename, start, flags);
 	if (mod == NULL)
 		return NULL;
 	co = PyAST_Compile(mod, filename, flags);
-	free_mod(mod);
+	Py_DECREF(mod);
 	return (PyObject *)co;
 }
 
 struct symtable *
 Py_SymtableString(const char *str, const char *filename, int start)
 {
-	mod_ty mod;
+	PyTypeObject *mod;
 	struct symtable *st;
 
 	mod = PyParser_ASTFromString(str, filename, start, NULL);
 	if (mod == NULL)
 		return NULL;
 	st = PySymtable_Build(mod, filename, 0);
-	free_mod(mod);
+	Py_DECREF(mod);
 	return st;
 }
 
 /* Preferred access to parser is through AST. */
-mod_ty
+PyTypeObject *
 PyParser_ASTFromString(const char *s, const char *filename, int start, 
 		       PyCompilerFlags *flags)
 {
 	node *n;
-	mod_ty mod;
+	PyTypeObject *mod;
 	perrdetail err;
 	n = PyParser_ParseStringFlagsFilename(s, filename, &_PyParser_Grammar,
 					      start, &err, 
@@ -1282,12 +1282,12 @@ PyParser_ASTFromString(const char *s, const char *filename, int start,
 	}
 }
 
-mod_ty
+PyTypeObject *
 PyParser_ASTFromFile(FILE *fp, const char *filename, int start, char *ps1, 
 		     char *ps2, PyCompilerFlags *flags, int *errcode)
 {
 	node *n;
-	mod_ty mod;
+	PyTypeObject *mod;
 	perrdetail err;
 	n = PyParser_ParseFileFlags(fp, filename, &_PyParser_Grammar, start, 
 				    ps1, ps2, &err, PARSER_FLAGS(flags));

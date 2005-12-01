@@ -12,7 +12,7 @@
 "name '%.400s' is used prior to global declaration"
 
 PySTEntryObject *
-PySTEntry_New(struct symtable *st, identifier name, _Py_block_ty block,
+PySTEntry_New(struct symtable *st, PyObject *name, _Py_block_ty block,
 	      void *key, int lineno)
 {
 	PySTEntryObject *ste = NULL;
@@ -204,7 +204,7 @@ symtable_new(void)
 }
 
 struct symtable *
-PySymtable_Build(mod_ty mod, const char *filename, PyFutureFeatures *future)
+PySymtable_Build(PyTypeObject *mod, const char *filename, PyFutureFeatures *future)
 {
 	struct symtable *st = symtable_new();
 	asdl_seq *seq;

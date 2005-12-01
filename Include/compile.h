@@ -23,10 +23,9 @@ typedef struct {
 #define FUTURE_GENERATORS "generators"
 #define FUTURE_DIVISION "division"
 
-struct _mod; /* Declare the existence of this type */
-PyAPI_FUNC(PyCodeObject *) PyAST_Compile(struct _mod *, const char *,
+PyAPI_FUNC(PyCodeObject *) PyAST_Compile(PyTypeObject *, const char *,
 					PyCompilerFlags *);
-PyAPI_FUNC(PyFutureFeatures *) PyFuture_FromAST(struct _mod *, const char *);
+PyAPI_FUNC(PyFutureFeatures *) PyFuture_FromAST(PyTypeObject *, const char *);
 
 #define ERR_LATE_FUTURE \
 "from __future__ imports must occur at the beginning of the file"

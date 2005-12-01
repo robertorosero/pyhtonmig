@@ -49,10 +49,10 @@ PyAPI_DATA(PyTypeObject) PySTEntry_Type;
 #define PySTEntry_Check(op) ((op)->ob_type == &PySTEntry_Type)
 
 PyAPI_FUNC(PySTEntryObject *) \
-	PySTEntry_New(struct symtable *, identifier, _Py_block_ty, void *, int);
+	PySTEntry_New(struct symtable *, PyObject *name, _Py_block_ty, void *, int);
 PyAPI_FUNC(int) PyST_GetScope(PySTEntryObject *, PyObject *);
 
-PyAPI_FUNC(struct symtable *) PySymtable_Build(mod_ty, const char *, 
+PyAPI_FUNC(struct symtable *) PySymtable_Build(PyTypeObject *, const char *, 
 					      PyFutureFeatures *);
 PyAPI_FUNC(PySTEntryObject *) PySymtable_Lookup(struct symtable *, void *);
 
