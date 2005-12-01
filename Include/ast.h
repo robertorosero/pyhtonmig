@@ -4,7 +4,7 @@
 extern "C" {
 #endif
 
-PyAPI_FUNC(PyTypeObject*) PyAST_FromNode(const node *, PyCompilerFlags *flags,
+PyAPI_FUNC(PyObject*) PyAST_FromNode(const node *, PyCompilerFlags *flags,
 				  const char *);
 
 #ifdef __cplusplus

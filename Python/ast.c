@@ -67,16 +67,16 @@ struct compiling {
 	char *c_encoding; /* source encoding */
 };
 
-static asdl_seq *seq_for_testlist(struct compiling *, const node *);
-static expr_ty ast_for_expr(struct compiling *, const node *);
-static stmt_ty ast_for_stmt(struct compiling *, const node *);
-static asdl_seq *ast_for_suite(struct compiling *, const node *);
-static asdl_seq *ast_for_exprlist(struct compiling *, const node *, int);
-static expr_ty ast_for_testlist(struct compiling *, const node *);
-static expr_ty ast_for_testlist_gexp(struct compiling *, const node *);
+static PyObject *seq_for_testlist(struct compiling *, const node *);
+static PyObject *ast_for_expr(struct compiling *, const node *);
+static PyObject *ast_for_stmt(struct compiling *, const node *);
+static PyObject *ast_for_suite(struct compiling *, const node *);
+static PyObject *ast_for_exprlist(struct compiling *, const node *, int);
+static PyObject *ast_for_testlist(struct compiling *, const node *);
+static PyObject *ast_for_testlist_gexp(struct compiling *, const node *);
 
 /* Note different signature for ast_for_call */
-static expr_ty ast_for_call(struct compiling *, const node *, expr_ty);
+static PyObject *ast_for_call(struct compiling *, const node *, PyObject*);
 
 static PyObject *parsenumber(const char *);
 static PyObject *parsestr(const char *s, const char *encoding);
@@ -89,62 +89,6 @@ extern grammar _PyParser_Grammar; /* From graminit.c */
 #endif
 
 #define NEW_IDENTIFIER(n) PyString_InternFromString(STR(n))
-
-static void
-asdl_stmt_seq_free(asdl_seq* seq)
-{
-    int n, i;
-
-    if (!seq)
-	return;
-
-    n = asdl_seq_LEN(seq);
-    for (i = 0; i < n; i++)
-	free_stmt(asdl_seq_GET(seq, i));
-    asdl_seq_free(seq); /* ok */
-}
-
-static void
-asdl_expr_seq_free(asdl_seq* seq)
-{
-    int n, i;
-
-    if (!seq)
-	return;
-
-    n = asdl_seq_LEN(seq);
-    for (i = 0; i < n; i++)
-	free_expr(asdl_seq_GET(seq, i));
-    asdl_seq_free(seq); /* ok */
-}
-
-static void
-asdl_alias_seq_free(asdl_seq* seq)
-{
-    int n, i;
-
-    if (!seq)
-	return;
-
-    n = asdl_seq_LEN(seq);
-    for (i = 0; i < n; i++)
-	free_alias(asdl_seq_GET(seq, i));
-    asdl_seq_free(seq); /* ok */
-}
-
-static void
-asdl_comprehension_seq_free(asdl_seq* seq)
-{
-    int n, i;
-
-    if (!seq)
-	return;
-
-    n = asdl_seq_LEN(seq);
-    for (i = 0; i < n; i++)
-	free_comprehension(asdl_seq_GET(seq, i));
-    asdl_seq_free(seq); /* ok */
-}
 
 /* This routine provides an invalid object for the syntax error.
    The outermost routine must unpack this error and create the
@@ -266,12 +210,14 @@ num_stmts(const node *n)
 /* Transform the CST rooted at node * to the appropriate AST
 */
 
-mod_ty
+PyObject*
 PyAST_FromNode(const node *n, PyCompilerFlags *flags, const char *filename)
 {
-    int i, j, num;
-    asdl_seq *stmts = NULL;
-    stmt_ty s;
+    PyObject *result = NULL;
+    int i, j, num, pos;
+    PyObject *stmts = NULL;
+    PyObject *s = NULL;
+    PyObject *testlist_ast = NULL;
     node *ch;
     struct compiling c;
 
@@ -286,9 +232,10 @@ PyAST_FromNode(const node *n, PyCompilerFlags *flags, const char *filename)
 
     switch (TYPE(n)) {
         case file_input:
-            stmts = asdl_seq_new(num_stmts(n));
+            stmts = PyList_New(num_stmts(n));
+	    pos = 0;
             if (!stmts)
-                    return NULL;
+		goto error;
             for (i = 0; i < NCH(n) - 1; i++) {
                 ch = CHILD(n, i);
                 if (TYPE(ch) == NEWLINE)
@@ -299,7 +246,7 @@ PyAST_FromNode(const node *n, PyCompilerFlags *flags, const char *filename)
                     s = ast_for_stmt(&c, ch);
                     if (!s)
                         goto error;
-                    asdl_seq_APPEND(stmts, s);
+                    PyList_SET_ITEM(stmts, pos++, s);
                 }
                 else {
                     ch = CHILD(ch, 0);
@@ -308,62 +255,76 @@ PyAST_FromNode(const node *n, PyCompilerFlags *flags, const char *filename)
                         s = ast_for_stmt(&c, CHILD(ch, j * 2));
                         if (!s)
                             goto error;
-                        asdl_seq_APPEND(stmts, s);
+                        PyList_SET_ITEM(stmts, pos++, s);
                     }
                 }
             }
-            return Module(stmts);
+	    assert(pos==PyList_GET_SIZE(stmts));
+            result = Module(stmts);
+	    goto success;
         case eval_input: {
-            expr_ty testlist_ast;
-
             /* XXX Why not gen_for here? */
             testlist_ast = ast_for_testlist(&c, CHILD(n, 0));
             if (!testlist_ast)
                 goto error;
-            return Expression(testlist_ast);
+            result = Expression(testlist_ast);
+	    goto success;
         }
         case single_input:
             if (TYPE(CHILD(n, 0)) == NEWLINE) {
-                stmts = asdl_seq_new(1);
+                stmts = PyList_New(1);
                 if (!stmts)
 		    goto error;
-                asdl_seq_SET(stmts, 0, Pass(n->n_lineno));
-                return Interactive(stmts);
+		s = Pass(n->n_lineno);
+		if (!s)
+		    goto error;
+		Py_INCREF(s); /* set_item will steal the ref */
+                PyList_SET_ITEM(stmts, 0, s);
+		result = Interactive(stmts);
+		goto success;
             }
             else {
                 n = CHILD(n, 0);
                 num = num_stmts(n);
-                stmts = asdl_seq_new(num);
+                stmts = PyList_New(num);
                 if (!stmts)
 		    goto error;
                 if (num == 1) {
-		    stmt_ty s = ast_for_stmt(&c, n);
+		    s = ast_for_stmt(&c, n);
 		    if (!s)
 			goto error;
-                    asdl_seq_SET(stmts, 0, s);
+		    Py_INCREF(s);
+                    PyList_SET_ITEM(stmts, 0, s);
                 }
                 else {
                     /* Only a simple_stmt can contain multiple statements. */
                     REQ(n, simple_stmt);
                     for (i = 0; i < NCH(n); i += 2) {
-                        stmt_ty s;
                         if (TYPE(CHILD(n, i)) == NEWLINE)
                             break;
                         s = ast_for_stmt(&c, CHILD(n, i));
                         if (!s)
                             goto error;
-                        asdl_seq_SET(stmts, i / 2, s);
+			Py_INCREF(s);
+                        PyList_SET_ITEM(stmts, i / 2, s);
                     }
                 }
 
-                return Interactive(stmts);
+		result = Interactive(stmts);
+		goto success;
             }
         default:
             goto error;
     }
- error:
-    if (stmts)
-	asdl_stmt_seq_free(stmts);
+  success:
+    Py_XDECREF(stmts);
+    Py_XDECREF(s);
+    Py_XDECREF(testlist_ast);
+    return result;
+  error:
+    Py_XDECREF(stmts);
+    Py_XDECREF(s);
+    Py_XDECREF(testlist_ast);
     ast_error_finish(filename);
     return NULL;
 }
@@ -574,12 +535,13 @@ ast_for_comp_op(const node *n)
     return 0;
 }
 
-static asdl_seq *
+static PyObject *
 seq_for_testlist(struct compiling *c, const node *n)
 {
     /* testlist: test (',' test)* [','] */
-    asdl_seq *seq;
-    expr_ty expression;
+    PyObject *result = NULL;
+    PyObject *seq = NULL;
+    PyObject *expression;
     int i;
     assert(TYPE(n) == testlist
 	   || TYPE(n) == listmaker
@@ -587,7 +549,7 @@ seq_for_testlist(struct compiling *c, const node *n)
 	   || TYPE(n) == testlist_safe
 	   );
 
-    seq = asdl_seq_new((NCH(n) + 1) / 2);
+    seq = PyList_New((NCH(n) + 1) / 2);
     if (!seq)
         return NULL;
 
@@ -596,14 +558,18 @@ seq_for_testlist(struct compiling *c, const node *n)
 
         expression = ast_for_expr(c, CHILD(n, i));
         if (!expression) {
-            asdl_expr_seq_free(seq);
-            return NULL;
+	    goto error;
         }
 
         assert(i / 2 < seq->size);
-        asdl_seq_SET(seq, i / 2, expression);
+        PyList_SET_ITEM(seq, i / 2, expression);
     }
-    return seq;
+    result = seq;
+    Py_INCREF(result);
+    /* fall through */
+ error:
+    Py_XDECREF(seq);
+    return result;
 }
 
 static expr_ty
