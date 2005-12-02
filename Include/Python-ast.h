@@ -523,6 +523,69 @@ struct _Tuple{
 PyObject *Py_Tuple_New(PyObject*, PyObject*, int);
 #define Tuple Py_Tuple_New
 
+PyAPI_DATA(PyTypeObject) Py_expr_context_Type;
+#define expr_context_Check(op) PyObject_TypeCheck(op, &Py_expr_context_Type)
+
+struct _expr_context{
+        PyObject_HEAD
+        enum {Load_kind, Store_kind, Del_kind, AugLoad_kind, AugStore_kind,
+               Param_kind} _kind;
+};
+
+PyAPI_DATA(PyTypeObject) Py_Load_Type;
+#define Load_Check(op) PyObject_TypeCheck(op, &Py_Load_Type)
+
+struct _Load{
+        struct _expr_context _base;
+};
+PyObject *Py_Load_New(void);
+#define Load Py_Load_New
+
+PyAPI_DATA(PyTypeObject) Py_Store_Type;
+#define Store_Check(op) PyObject_TypeCheck(op, &Py_Store_Type)
+
+struct _Store{
+        struct _expr_context _base;
+};
+PyObject *Py_Store_New(void);
+#define Store Py_Store_New
+
+PyAPI_DATA(PyTypeObject) Py_Del_Type;
+#define Del_Check(op) PyObject_TypeCheck(op, &Py_Del_Type)
+
+struct _Del{
+        struct _expr_context _base;
+};
+PyObject *Py_Del_New(void);
+#define Del Py_Del_New
+
+PyAPI_DATA(PyTypeObject) Py_AugLoad_Type;
+#define AugLoad_Check(op) PyObject_TypeCheck(op, &Py_AugLoad_Type)
+
+struct _AugLoad{
+        struct _expr_context _base;
+};
+PyObject *Py_AugLoad_New(void);
+#define AugLoad Py_AugLoad_New
+
+PyAPI_DATA(PyTypeObject) Py_AugStore_Type;
+#define AugStore_Check(op) PyObject_TypeCheck(op, &Py_AugStore_Type)
+
+struct _AugStore{
+        struct _expr_context _base;
+};
+PyObject *Py_AugStore_New(void);
+#define AugStore Py_AugStore_New
+
+PyAPI_DATA(PyTypeObject) Py_Param_Type;
+#define Param_Check(op) PyObject_TypeCheck(op, &Py_Param_Type)
+
+struct _Param{
+        struct _expr_context _base;
+};
+PyObject *Py_Param_New(void);
+#define Param Py_Param_New
+
 PyAPI_DATA(PyTypeObject) Py_slice_Type;
 #define slice_Check(op) PyObject_TypeCheck(op, &Py_slice_Type)
 
@@ -571,6 +634,293 @@ struct _Index{
 };
 PyObject *Py_Index_New(PyObject*);
 #define Index Py_Index_New
+
+PyAPI_DATA(PyTypeObject) Py_boolop_Type;
+#define boolop_Check(op) PyObject_TypeCheck(op, &Py_boolop_Type)
+
+struct _boolop{
+        PyObject_HEAD
+        enum {And_kind, Or_kind} _kind;
+};
+
+PyAPI_DATA(PyTypeObject) Py_And_Type;
+#define And_Check(op) PyObject_TypeCheck(op, &Py_And_Type)
+
+struct _And{
+        struct _boolop _base;
+};
+PyObject *Py_And_New(void);
+#define And Py_And_New
+
+PyAPI_DATA(PyTypeObject) Py_Or_Type;
+#define Or_Check(op) PyObject_TypeCheck(op, &Py_Or_Type)
+
+struct _Or{
+        struct _boolop _base;
+};
+PyObject *Py_Or_New(void);
+#define Or Py_Or_New
+
+PyAPI_DATA(PyTypeObject) Py_operator_Type;
+#define operator_Check(op) PyObject_TypeCheck(op, &Py_operator_Type)
+
+struct _operator{
+        PyObject_HEAD
+        enum {Add_kind, Sub_kind, Mult_kind, Div_kind, Mod_kind, Pow_kind,
+               LShift_kind, RShift_kind, BitOr_kind, BitXor_kind, BitAnd_kind,
+               FloorDiv_kind} _kind;
+};
+
+PyAPI_DATA(PyTypeObject) Py_Add_Type;
+#define Add_Check(op) PyObject_TypeCheck(op, &Py_Add_Type)
+
+struct _Add{
+        struct _operator _base;
+};
+PyObject *Py_Add_New(void);
+#define Add Py_Add_New
+
+PyAPI_DATA(PyTypeObject) Py_Sub_Type;
+#define Sub_Check(op) PyObject_TypeCheck(op, &Py_Sub_Type)
+
+struct _Sub{
+        struct _operator _base;
+};
+PyObject *Py_Sub_New(void);
+#define Sub Py_Sub_New
+
+PyAPI_DATA(PyTypeObject) Py_Mult_Type;
+#define Mult_Check(op) PyObject_TypeCheck(op, &Py_Mult_Type)
+
+struct _Mult{
+        struct _operator _base;
+};
+PyObject *Py_Mult_New(void);
+#define Mult Py_Mult_New
+
+PyAPI_DATA(PyTypeObject) Py_Div_Type;
+#define Div_Check(op) PyObject_TypeCheck(op, &Py_Div_Type)
+
+struct _Div{
+        struct _operator _base;
+};
+PyObject *Py_Div_New(void);
+#define Div Py_Div_New
+
+PyAPI_DATA(PyTypeObject) Py_Mod_Type;
+#define Mod_Check(op) PyObject_TypeCheck(op, &Py_Mod_Type)
+
+struct _Mod{
+        struct _operator _base;
+};
+PyObject *Py_Mod_New(void);
+#define Mod Py_Mod_New
+
+PyAPI_DATA(PyTypeObject) Py_Pow_Type;
+#define Pow_Check(op) PyObject_TypeCheck(op, &Py_Pow_Type)
+
+struct _Pow{
+        struct _operator _base;
+};
+PyObject *Py_Pow_New(void);
+#define Pow Py_Pow_New
+
+PyAPI_DATA(PyTypeObject) Py_LShift_Type;
+#define LShift_Check(op) PyObject_TypeCheck(op, &Py_LShift_Type)
+
+struct _LShift{
+        struct _operator _base;
+};
+PyObject *Py_LShift_New(void);
+#define LShift Py_LShift_New
+
+PyAPI_DATA(PyTypeObject) Py_RShift_Type;
+#define RShift_Check(op) PyObject_TypeCheck(op, &Py_RShift_Type)
+
+struct _RShift{
+        struct _operator _base;
+};
+PyObject *Py_RShift_New(void);
+#define RShift Py_RShift_New
+
+PyAPI_DATA(PyTypeObject) Py_BitOr_Type;
+#define BitOr_Check(op) PyObject_TypeCheck(op, &Py_BitOr_Type)
+
+struct _BitOr{
+        struct _operator _base;
+};
+PyObject *Py_BitOr_New(void);
+#define BitOr Py_BitOr_New
+
+PyAPI_DATA(PyTypeObject) Py_BitXor_Type;
+#define BitXor_Check(op) PyObject_TypeCheck(op, &Py_BitXor_Type)
+
+struct _BitXor{
+        struct _operator _base;
+};
+PyObject *Py_BitXor_New(void);
+#define BitXor Py_BitXor_New
+
+PyAPI_DATA(PyTypeObject) Py_BitAnd_Type;
+#define BitAnd_Check(op) PyObject_TypeCheck(op, &Py_BitAnd_Type)
+
+struct _BitAnd{
+        struct _operator _base;
+};
+PyObject *Py_BitAnd_New(void);
+#define BitAnd Py_BitAnd_New
+
+PyAPI_DATA(PyTypeObject) Py_FloorDiv_Type;
+#define FloorDiv_Check(op) PyObject_TypeCheck(op, &Py_FloorDiv_Type)
+
+struct _FloorDiv{
+        struct _operator _base;
+};
+PyObject *Py_FloorDiv_New(void);
+#define FloorDiv Py_FloorDiv_New
+
+PyAPI_DATA(PyTypeObject) Py_unaryop_Type;
+#define unaryop_Check(op) PyObject_TypeCheck(op, &Py_unaryop_Type)
+
+struct _unaryop{
+        PyObject_HEAD
+        enum {Invert_kind, Not_kind, UAdd_kind, USub_kind} _kind;
+};
+
+PyAPI_DATA(PyTypeObject) Py_Invert_Type;
+#define Invert_Check(op) PyObject_TypeCheck(op, &Py_Invert_Type)
+
+struct _Invert{
+        struct _unaryop _base;
+};
+PyObject *Py_Invert_New(void);
+#define Invert Py_Invert_New
+
+PyAPI_DATA(PyTypeObject) Py_Not_Type;
+#define Not_Check(op) PyObject_TypeCheck(op, &Py_Not_Type)
+
+struct _Not{
+        struct _unaryop _base;
+};
+PyObject *Py_Not_New(void);
+#define Not Py_Not_New
+
+PyAPI_DATA(PyTypeObject) Py_UAdd_Type;
+#define UAdd_Check(op) PyObject_TypeCheck(op, &Py_UAdd_Type)
+
+struct _UAdd{
+        struct _unaryop _base;
+};
+PyObject *Py_UAdd_New(void);
+#define UAdd Py_UAdd_New
+
+PyAPI_DATA(PyTypeObject) Py_USub_Type;
+#define USub_Check(op) PyObject_TypeCheck(op, &Py_USub_Type)
+
+struct _USub{
+        struct _unaryop _base;
+};
+PyObject *Py_USub_New(void);
+#define USub Py_USub_New
+
+PyAPI_DATA(PyTypeObject) Py_cmpop_Type;
+#define cmpop_Check(op) PyObject_TypeCheck(op, &Py_cmpop_Type)
+
+struct _cmpop{
+        PyObject_HEAD
+        enum {Eq_kind, NotEq_kind, Lt_kind, LtE_kind, Gt_kind, GtE_kind,
+               Is_kind, IsNot_kind, In_kind, NotIn_kind} _kind;
+};
+
+PyAPI_DATA(PyTypeObject) Py_Eq_Type;
+#define Eq_Check(op) PyObject_TypeCheck(op, &Py_Eq_Type)
+
+struct _Eq{
+        struct _cmpop _base;
+};
+PyObject *Py_Eq_New(void);
+#define Eq Py_Eq_New
+
+PyAPI_DATA(PyTypeObject) Py_NotEq_Type;
+#define NotEq_Check(op) PyObject_TypeCheck(op, &Py_NotEq_Type)
+
+struct _NotEq{
+        struct _cmpop _base;
+};
+PyObject *Py_NotEq_New(void);
+#define NotEq Py_NotEq_New
+
+PyAPI_DATA(PyTypeObject) Py_Lt_Type;
+#define Lt_Check(op) PyObject_TypeCheck(op, &Py_Lt_Type)
+
+struct _Lt{
+        struct _cmpop _base;
+};
+PyObject *Py_Lt_New(void);
+#define Lt Py_Lt_New
+
+PyAPI_DATA(PyTypeObject) Py_LtE_Type;
+#define LtE_Check(op) PyObject_TypeCheck(op, &Py_LtE_Type)
+
+struct _LtE{
+        struct _cmpop _base;
+};
+PyObject *Py_LtE_New(void);
+#define LtE Py_LtE_New
+
+PyAPI_DATA(PyTypeObject) Py_Gt_Type;
+#define Gt_Check(op) PyObject_TypeCheck(op, &Py_Gt_Type)
+
+struct _Gt{
+        struct _cmpop _base;
+};
+PyObject *Py_Gt_New(void);
+#define Gt Py_Gt_New
+
+PyAPI_DATA(PyTypeObject) Py_GtE_Type;
+#define GtE_Check(op) PyObject_TypeCheck(op, &Py_GtE_Type)
+
+struct _GtE{
+        struct _cmpop _base;
+};
+PyObject *Py_GtE_New(void);
+#define GtE Py_GtE_New
+
+PyAPI_DATA(PyTypeObject) Py_Is_Type;
+#define Is_Check(op) PyObject_TypeCheck(op, &Py_Is_Type)
+
+struct _Is{
+        struct _cmpop _base;
+};
+PyObject *Py_Is_New(void);
+#define Is Py_Is_New
+
+PyAPI_DATA(PyTypeObject) Py_IsNot_Type;
+#define IsNot_Check(op) PyObject_TypeCheck(op, &Py_IsNot_Type)
+
+struct _IsNot{
+        struct _cmpop _base;
+};
+PyObject *Py_IsNot_New(void);
+#define IsNot Py_IsNot_New
+
+PyAPI_DATA(PyTypeObject) Py_In_Type;
+#define In_Check(op) PyObject_TypeCheck(op, &Py_In_Type)
+
+struct _In{
+        struct _cmpop _base;
+};
+PyObject *Py_In_New(void);
+#define In Py_In_New
+
+PyAPI_DATA(PyTypeObject) Py_NotIn_Type;
+#define NotIn_Check(op) PyObject_TypeCheck(op, &Py_NotIn_Type)
+
+struct _NotIn{
+        struct _cmpop _base;
+};
+PyObject *Py_NotIn_New(void);
+#define NotIn Py_NotIn_New
 
 PyAPI_DATA(PyTypeObject) Py_comprehension_Type;
 #define comprehension_Check(op) PyObject_TypeCheck(op, &Py_comprehension_Type)

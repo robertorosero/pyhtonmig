@@ -4,7 +4,7 @@
 # TO DO
 # handle fields that have a type but no name
 
-import os, sys, traceback
+import os, sys, traceback, operator
 
 import asdl
 
@@ -104,11 +104,8 @@ class TraversalVisitor(EmitVisitor):
         self.visit(type.value, type.name)
 
     def visitSum(self, sum, name):
-        if is_simple(sum):
-            pass # XXX
-        else:
-            for t in sum.types:
-                self.visit(t, name, sum.attributes)
+        for t in sum.types:
+            self.visit(t, name, sum.attributes)
 
     def get_args(self, fields):
         """Return list of C argument into, one for each field.
@@ -144,8 +141,7 @@ class HeaderVisitor(EmitVisitor):
         self.visit(type.value, type.name, depth)
 
     def visitSum(self, sum, name, depth):
-        if not is_simple(sum):
-            self.sum_with_constructors(sum, name, depth)
+        self.sum_with_constructors(sum, name, depth)
 
     def sum_with_constructors(self, sum, name, depth):
         def emit(s, depth=depth):
@@ -197,8 +193,33 @@ class HeaderVisitor(EmitVisitor):
         self.emit("PyObject *Py_%s_New(%s);" % (name, ", ".join(field_types)), depth)
         self.emit("", depth)
 
+class ForwardVisitor(TraversalVisitor):
+    def emit_validate(self, name):
+        self.emit("static int %s_validate(PyObject*);" % name, 0)
+        
+    def visitSum(self, sum, name):
+        self.emit_validate(name)
+        for t in sum.types:
+            self.visit(t, name, sum.attributes)    
+        
+    def visitProduct(self, prod, name):
+        self.emit_validate(name)
+
+    def visitConstructor(self, cons, name, attrs):
+        self.emit_validate(cons.name)
+    
+
 class FunctionVisitor(TraversalVisitor):
     """Visitor to generate constructor functions for AST."""
+
+    def check(self, t):
+        t = t.value
+        if t in ("identifier", "string"):
+            return "PyString_Check"
+        elif t == "bool":
+            return "PyBool_Check"
+        else:
+            return t+"_Check"
 
     def emit_ctor(self, name, args, attrs):
         def emit(s, depth=0, reflow=1):
@@ -241,9 +262,116 @@ class FunctionVisitor(TraversalVisitor):
         emit("}")
         emit("")
 
+    def emit_seq_check(self, f):
+        depth = 1
+        def emit(s):
+            self.emit(s, depth)
+        emit("if (!PyList_Check(obj->%s)) {" % f.name)
+        emit('   failed_check("%s", "list", obj->%s);' % (f.name, f.name))
+        emit('   return -1;')
+        emit("}")
+        emit("for(i = 0; i < PyList_Size(obj->%s); i++) {" % f.name)
+        depth = 2
+        check = self.check(f.type)
+        emit("if (!%s(PyList_GET_ITEM(obj->%s, i))) {" % (check, f.name))
+        emit('    failed_check("%s", "%s", PyList_GET_ITEM(obj->%s, i));' % (f.name, f.type, f.name))
+        emit('    return -1;')
+        emit("}")
+        if f.type.value not in ('identifier',):
+            emit("if (%s_validate(PyList_GET_ITEM(obj->%s, i)) < 0)" % (f.type, f.name))
+            emit("    return -1;")
+        depth = 1
+        emit("}")
+
+    def emit_opt_check(self, f):
+        depth = 1
+        def emit(s):
+            self.emit(s, depth)
+        emit("if (obj->%s != Py_None) /* empty */;" % f.name)
+        check = self.check(f.type)
+        emit("else if (!%s(obj->%s)) {" % (check, f.name))
+        emit('    failed_check("%s", "%s", obj->%s);' % (f.name, f.type, f.name))
+        emit('    return -1;')
+        emit("}")
+        if f.type.value not in ('identifier',):
+            emit("else if (%s_validate(obj->%s) < 0)" % (f.type, f.name))
+            emit("    return -1;")
+
+    def emit_field_check(self, f, inbase):
+        depth = 1
+        def emit(s):
+            self.emit(s, depth)
+        base = ""
+        if inbase:
+            base = "_base."
+            type = f[0]
+            name = f[1]
+        else:
+            type = f.type
+            name = f.name
+        if type == "int":
+            return
+        check = self.check(type)
+        emit("if (!%s(obj->%s%s)) {" % (check, base, name))
+        emit('    failed_check("%s", "%s", obj->%s%s);' %
+             (name, type, base, name))
+        emit('    return -1;')
+        emit("}")
+
+    def emit_validate(self, name, fields, attrs):
+        depth = 0
+        def emit(s):
+            self.emit(s, depth)
+        has_seq = reduce(operator.or_, ([f.seq for f in fields]), False)
+        emit("static int")
+        emit("%s_validate(PyObject *_obj)" % name)
+        emit("{")
+        depth = 1
+        if fields:
+            emit("struct _%s *obj = (struct _%s*)_obj;" % (name,name))
+        if has_seq:
+            emit("int i;")
+        for  f in fields:
+            if f.seq:
+                self.emit_seq_check(f)
+            elif f.opt:
+                self.emit_opt_check(f)
+            else:
+                self.emit_field_check(f, False)
+        for f in attrs:
+            self.emit_field_check(f, True)
+        emit("return 0;")
+        depth = 0
+        emit("}")
+        emit("")
+
+    def emit_sumvalidate(self, sum, name):
+        depth = 0
+        def emit(s):
+            self.emit(s, depth)
+        emit("int")
+        emit("%s_validate(PyObject* _obj)" % name)
+        emit("{")
+        depth = 1
+        emit("struct _%s *obj = (struct _%s*)_obj;" % (name,name))
+        # caller should have verified that this is the correct type
+        emit("assert(%s_Check(_obj));" % (name))
+        emit("switch(obj->_kind) {")
+        depth = 2
+        for t in sum.types:
+            emit("case %s_kind:" % t.name)
+            emit("    return %s_validate(_obj);" % t.name)
+        depth = 1
+        emit("}")
+        emit('PyErr_SetString(PyExc_TypeError, "invalid _kind in %s");' % name)
+        emit('return -1;')
+        depth = 0
+        emit("}")
+        
+
     def emit_type(self, name):
         depth = 0
-        def emit(s=1):
+        def emit(s):
             self.emit(s, depth)
         def null(thing):
             emit("0,\t\t/* tp_%s */" % thing)
@@ -275,19 +403,18 @@ class FunctionVisitor(TraversalVisitor):
         emit("")
 
     def visitSum(self, sum, name):
-        if is_simple(sum):
-            pass # XXX
-        else:
-            self.emit("#define %s_dealloc 0" % name, 0)
-            self.emit_type(name)
-            for t in sum.types:
-                self.visit(t, name, sum.attributes)    
+        self.emit("#define %s_dealloc 0" % name, 0)
+        self.emit_type(name)
+        self.emit_sumvalidate(sum, name)
+        for t in sum.types:
+            self.visit(t, name, sum.attributes)    
         
     def visitProduct(self, prod, name):
         args = self.get_args(prod.fields)
         self.emit_ctor(str(name), args, [])
         self.emit_dealloc(str(name), args, [])
         self.emit_type(str(name))
+        self.emit_validate(str(name), prod.fields, [])
 
     def visitConstructor(self, cons, name, attrs):
         args = self.get_args(cons.fields)
@@ -295,6 +422,22 @@ class FunctionVisitor(TraversalVisitor):
         self.emit_ctor(cons.name, args, attrs)
         self.emit_dealloc(cons.name, args, attrs)
         self.emit_type(cons.name)
+        self.emit_validate(cons.name, cons.fields, attrs)
+
+class PyAST_Validate(TraversalVisitor):
+    def visitModule(self, mod):
+        self.emit("int PyAST_Validate(PyObject *obj)", 0)
+        self.emit("{", 0)
+        for dfn in mod.dfns:
+            self.visit(dfn)
+        self.emit('PyErr_Format(PyExc_TypeError, "Not an AST node: %s", obj->ob_type->tp_name);', 1)
+        self.emit("return -1;", 1)
+        self.emit("}", 0)
+        self.emit("", 0)
+
+    def visitType(self, t):
+        self.emit("if (%s_Check(obj))" % t.name, 1)
+        self.emit("return %s_validate(obj);" % t.name, 2)
 
 class InitVisitor(TraversalVisitor):
     def visitModule(self, mod):
@@ -305,12 +448,9 @@ class InitVisitor(TraversalVisitor):
         self.emit("}", 0)
 
     def visitSum(self, sum, name):
-        if is_simple(sum):
-            pass # XXX
-        else:
-            self.emit_init(name)
-            for t in sum.types:
-                self.visit(t, name, sum.attributes)    
+        self.emit_init(name)
+        for t in sum.types:
+            self.visit(t, name, sum.attributes)    
 
     def visitProduct(self, prod, name):
         self.emit_init(name)
@@ -332,6 +472,17 @@ class ChainOfVisitors:
         for v in self.visitors:
             v.visit(object)
             v.emit("", 0)
+
+static_code = """
+static void failed_check(const char* field, const char* expected,
+                         PyObject *real)
+{
+    PyErr_Format(PyExc_TypeError, "invalid %s: excpected %s, found %s",
+                 field, expected, real->ob_type->tp_name);
+}
+/* Convenience macro to simplify asdl_c.py */
+#define object_Check(x) 1
+"""
 
 def main(srcfile):
     auto_gen_msg = '/* File automatically generated by %s */\n' % sys.argv[0]
@@ -361,9 +512,13 @@ def main(srcfile):
     print >> f, '#include "Python.h"'
     print >> f, '#include "%s-ast.h"' % mod.name
     print >> f
-    v = ChainOfVisitors(FunctionVisitor(f),
-                        InitVisitor(f),
-                        )
+    print >> f, static_code
+    v = ChainOfVisitors(
+        ForwardVisitor(f),
+        FunctionVisitor(f),
+        PyAST_Validate(f),
+        InitVisitor(f),
+        )
     v.visit(mod)
     f.close()
 

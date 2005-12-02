@@ -3,6 +3,113 @@
 #include "Python.h"
 #include "Python-ast.h"
 
+
+static void failed_check(const char* field, const char* expected,
+                         PyObject *real)
+{
+    PyErr_Format(PyExc_TypeError, "invalid %s: excpected %s, found %s",
+                 field, expected, real->ob_type->tp_name);
+}
+/* Convenience macro to simplify asdl_c.py */
+#define object_Check(x) 1
+
+static int mod_validate(PyObject*);
+static int Module_validate(PyObject*);
+static int Interactive_validate(PyObject*);
+static int Expression_validate(PyObject*);
+static int Suite_validate(PyObject*);
+static int stmt_validate(PyObject*);
+static int FunctionDef_validate(PyObject*);
+static int ClassDef_validate(PyObject*);
+static int Return_validate(PyObject*);
+static int Delete_validate(PyObject*);
+static int Assign_validate(PyObject*);
+static int AugAssign_validate(PyObject*);
+static int Print_validate(PyObject*);
+static int For_validate(PyObject*);
+static int While_validate(PyObject*);
+static int If_validate(PyObject*);
+static int Raise_validate(PyObject*);
+static int TryExcept_validate(PyObject*);
+static int TryFinally_validate(PyObject*);
+static int Assert_validate(PyObject*);
+static int Import_validate(PyObject*);
+static int ImportFrom_validate(PyObject*);
+static int Exec_validate(PyObject*);
+static int Global_validate(PyObject*);
+static int Expr_validate(PyObject*);
+static int Pass_validate(PyObject*);
+static int Break_validate(PyObject*);
+static int Continue_validate(PyObject*);
+static int expr_validate(PyObject*);
+static int BoolOp_validate(PyObject*);
+static int BinOp_validate(PyObject*);
+static int UnaryOp_validate(PyObject*);
+static int Lambda_validate(PyObject*);
+static int Dict_validate(PyObject*);
+static int ListComp_validate(PyObject*);
+static int GeneratorExp_validate(PyObject*);
+static int Yield_validate(PyObject*);
+static int Compare_validate(PyObject*);
+static int Call_validate(PyObject*);
+static int Repr_validate(PyObject*);
+static int Num_validate(PyObject*);
+static int Str_validate(PyObject*);
+static int Attribute_validate(PyObject*);
+static int Subscript_validate(PyObject*);
+static int Name_validate(PyObject*);
+static int List_validate(PyObject*);
+static int Tuple_validate(PyObject*);
+static int expr_context_validate(PyObject*);
+static int Load_validate(PyObject*);
+static int Store_validate(PyObject*);
+static int Del_validate(PyObject*);
+static int AugLoad_validate(PyObject*);
+static int AugStore_validate(PyObject*);
+static int Param_validate(PyObject*);
+static int slice_validate(PyObject*);
+static int Ellipsis_validate(PyObject*);
+static int Slice_validate(PyObject*);
+static int ExtSlice_validate(PyObject*);
+static int Index_validate(PyObject*);
+static int boolop_validate(PyObject*);
+static int And_validate(PyObject*);
+static int Or_validate(PyObject*);
+static int operator_validate(PyObject*);
+static int Add_validate(PyObject*);
+static int Sub_validate(PyObject*);
+static int Mult_validate(PyObject*);
+static int Div_validate(PyObject*);
+static int Mod_validate(PyObject*);
+static int Pow_validate(PyObject*);
+static int LShift_validate(PyObject*);
+static int RShift_validate(PyObject*);
+static int BitOr_validate(PyObject*);
+static int BitXor_validate(PyObject*);
+static int BitAnd_validate(PyObject*);
+static int FloorDiv_validate(PyObject*);
+static int unaryop_validate(PyObject*);
+static int Invert_validate(PyObject*);
+static int Not_validate(PyObject*);
+static int UAdd_validate(PyObject*);
+static int USub_validate(PyObject*);
+static int cmpop_validate(PyObject*);
+static int Eq_validate(PyObject*);
+static int NotEq_validate(PyObject*);
+static int Lt_validate(PyObject*);
+static int LtE_validate(PyObject*);
+static int Gt_validate(PyObject*);
+static int GtE_validate(PyObject*);
+static int Is_validate(PyObject*);
+static int IsNot_validate(PyObject*);
+static int In_validate(PyObject*);
+static int NotIn_validate(PyObject*);
+static int comprehension_validate(PyObject*);
+static int excepthandler_validate(PyObject*);
+static int arguments_validate(PyObject*);
+static int keyword_validate(PyObject*);
+static int alias_validate(PyObject*);
+
 #define mod_dealloc 0
 PyTypeObject Py_mod_Type = {
         PyObject_HEAD_INIT(NULL)
@@ -48,6 +155,24 @@ PyTypeObject Py_mod_Type = {
         0,		/* tp_is_gc */
 };
 
+int
+mod_validate(PyObject* _obj)
+{
+        struct _mod *obj = (struct _mod*)_obj;
+        assert(mod_Check(_obj));
+        switch(obj->_kind) {
+                case Module_kind:
+                    return Module_validate(_obj);
+                case Interactive_kind:
+                    return Interactive_validate(_obj);
+                case Expression_kind:
+                    return Expression_validate(_obj);
+                case Suite_kind:
+                    return Suite_validate(_obj);
+        }
+        PyErr_SetString(PyExc_TypeError, "invalid _kind in mod");
+        return -1;
+}
 PyObject*
 Py_Module_New(PyObject* body)
 {
@@ -110,6 +235,26 @@ PyTypeObject Py_Module_Type = {
         0,		/* tp_free */
         0,		/* tp_is_gc */
 };
+
+static int
+Module_validate(PyObject *_obj)
+{
+        struct _Module *obj = (struct _Module*)_obj;
+        int i;
+        if (!PyList_Check(obj->body)) {
+           failed_check("body", "list", obj->body);
+           return -1;
+        }
+        for(i = 0; i < PyList_Size(obj->body); i++) {
+                if (!stmt_Check(PyList_GET_ITEM(obj->body, i))) {
+                    failed_check("body", "stmt", PyList_GET_ITEM(obj->body, i));
+                    return -1;
+                }
+                if (stmt_validate(PyList_GET_ITEM(obj->body, i)) < 0)
+                    return -1;
+        }
+        return 0;
+}
 
 PyObject*
 Py_Interactive_New(PyObject* body)
@@ -174,6 +319,26 @@ PyTypeObject Py_Interactive_Type = {
         0,		/* tp_is_gc */
 };
 
+static int
+Interactive_validate(PyObject *_obj)
+{
+        struct _Interactive *obj = (struct _Interactive*)_obj;
+        int i;
+        if (!PyList_Check(obj->body)) {
+           failed_check("body", "list", obj->body);
+           return -1;
+        }
+        for(i = 0; i < PyList_Size(obj->body); i++) {
+                if (!stmt_Check(PyList_GET_ITEM(obj->body, i))) {
+                    failed_check("body", "stmt", PyList_GET_ITEM(obj->body, i));
+                    return -1;
+                }
+                if (stmt_validate(PyList_GET_ITEM(obj->body, i)) < 0)
+                    return -1;
+        }
+        return 0;
+}
+
 PyObject*
 Py_Expression_New(PyObject* body)
 {
@@ -236,6 +401,17 @@ PyTypeObject Py_Expression_Type = {
         0,		/* tp_free */
         0,		/* tp_is_gc */
 };
+
+static int
+Expression_validate(PyObject *_obj)
+{
+        struct _Expression *obj = (struct _Expression*)_obj;
+        if (!expr_Check(obj->body)) {
+            failed_check("body", "expr", obj->body);
+            return -1;
+        }
+        return 0;
+}
 
 PyObject*
 Py_Suite_New(PyObject* body)
@@ -300,6 +476,26 @@ PyTypeObject Py_Suite_Type = {
         0,		/* tp_is_gc */
 };
 
+static int
+Suite_validate(PyObject *_obj)
+{
+        struct _Suite *obj = (struct _Suite*)_obj;
+        int i;
+        if (!PyList_Check(obj->body)) {
+           failed_check("body", "list", obj->body);
+           return -1;
+        }
+        for(i = 0; i < PyList_Size(obj->body); i++) {
+                if (!stmt_Check(PyList_GET_ITEM(obj->body, i))) {
+                    failed_check("body", "stmt", PyList_GET_ITEM(obj->body, i));
+                    return -1;
+                }
+                if (stmt_validate(PyList_GET_ITEM(obj->body, i)) < 0)
+                    return -1;
+        }
+        return 0;
+}
+
 #define stmt_dealloc 0
 PyTypeObject Py_stmt_Type = {
         PyObject_HEAD_INIT(NULL)
@@ -345,6 +541,60 @@ PyTypeObject Py_stmt_Type = {
         0,		/* tp_is_gc */
 };
 
+int
+stmt_validate(PyObject* _obj)
+{
+        struct _stmt *obj = (struct _stmt*)_obj;
+        assert(stmt_Check(_obj));
+        switch(obj->_kind) {
+                case FunctionDef_kind:
+                    return FunctionDef_validate(_obj);
+                case ClassDef_kind:
+                    return ClassDef_validate(_obj);
+                case Return_kind:
+                    return Return_validate(_obj);
+                case Delete_kind:
+                    return Delete_validate(_obj);
+                case Assign_kind:
+                    return Assign_validate(_obj);
+                case AugAssign_kind:
+                    return AugAssign_validate(_obj);
+                case Print_kind:
+                    return Print_validate(_obj);
+                case For_kind:
+                    return For_validate(_obj);
+                case While_kind:
+                    return While_validate(_obj);
+                case If_kind:
+                    return If_validate(_obj);
+                case Raise_kind:
+                    return Raise_validate(_obj);
+                case TryExcept_kind:
+                    return TryExcept_validate(_obj);
+                case TryFinally_kind:
+                    return TryFinally_validate(_obj);
+                case Assert_kind:
+                    return Assert_validate(_obj);
+                case Import_kind:
+                    return Import_validate(_obj);
+                case ImportFrom_kind:
+                    return ImportFrom_validate(_obj);
+                case Exec_kind:
+                    return Exec_validate(_obj);
+                case Global_kind:
+                    return Global_validate(_obj);
+                case Expr_kind:
+                    return Expr_validate(_obj);
+                case Pass_kind:
+                    return Pass_validate(_obj);
+                case Break_kind:
+                    return Break_validate(_obj);
+                case Continue_kind:
+                    return Continue_validate(_obj);
+        }
+        PyErr_SetString(PyExc_TypeError, "invalid _kind in stmt");
+        return -1;
+}
 PyObject*
 Py_FunctionDef_New(PyObject* name, PyObject* args, PyObject* body, PyObject*
                    decorators, int lineno)
@@ -419,6 +669,47 @@ PyTypeObject Py_FunctionDef_Type = {
         0,		/* tp_is_gc */
 };
 
+static int
+FunctionDef_validate(PyObject *_obj)
+{
+        struct _FunctionDef *obj = (struct _FunctionDef*)_obj;
+        int i;
+        if (!PyString_Check(obj->name)) {
+            failed_check("name", "identifier", obj->name);
+            return -1;
+        }
+        if (!arguments_Check(obj->args)) {
+            failed_check("args", "arguments", obj->args);
+            return -1;
+        }
+        if (!PyList_Check(obj->body)) {
+           failed_check("body", "list", obj->body);
+           return -1;
+        }
+        for(i = 0; i < PyList_Size(obj->body); i++) {
+                if (!stmt_Check(PyList_GET_ITEM(obj->body, i))) {
+                    failed_check("body", "stmt", PyList_GET_ITEM(obj->body, i));
+                    return -1;
+                }
+                if (stmt_validate(PyList_GET_ITEM(obj->body, i)) < 0)
+                    return -1;
+        }
+        if (!PyList_Check(obj->decorators)) {
+           failed_check("decorators", "list", obj->decorators);
+           return -1;
+        }
+        for(i = 0; i < PyList_Size(obj->decorators); i++) {
+                if (!expr_Check(PyList_GET_ITEM(obj->decorators, i))) {
+                    failed_check("decorators", "expr",
+                                 PyList_GET_ITEM(obj->decorators, i));
+                    return -1;
+                }
+                if (expr_validate(PyList_GET_ITEM(obj->decorators, i)) < 0)
+                    return -1;
+        }
+        return 0;
+}
+
 PyObject*
 Py_ClassDef_New(PyObject* name, PyObject* bases, PyObject* body, int lineno)
 {
@@ -489,6 +780,43 @@ PyTypeObject Py_ClassDef_Type = {
         0,		/* tp_is_gc */
 };
 
+static int
+ClassDef_validate(PyObject *_obj)
+{
+        struct _ClassDef *obj = (struct _ClassDef*)_obj;
+        int i;
+        if (!PyString_Check(obj->name)) {
+            failed_check("name", "identifier", obj->name);
+            return -1;
+        }
+        if (!PyList_Check(obj->bases)) {
+           failed_check("bases", "list", obj->bases);
+           return -1;
+        }
+        for(i = 0; i < PyList_Size(obj->bases); i++) {
+                if (!expr_Check(PyList_GET_ITEM(obj->bases, i))) {
+                    failed_check("bases", "expr", PyList_GET_ITEM(obj->bases,
+                                 i));
+                    return -1;
+                }
+                if (expr_validate(PyList_GET_ITEM(obj->bases, i)) < 0)
+                    return -1;
+        }
+        if (!PyList_Check(obj->body)) {
+           failed_check("body", "list", obj->body);
+           return -1;
+        }
+        for(i = 0; i < PyList_Size(obj->body); i++) {
+                if (!stmt_Check(PyList_GET_ITEM(obj->body, i))) {
+                    failed_check("body", "stmt", PyList_GET_ITEM(obj->body, i));
+                    return -1;
+                }
+                if (stmt_validate(PyList_GET_ITEM(obj->body, i)) < 0)
+                    return -1;
+        }
+        return 0;
+}
+
 PyObject*
 Py_Return_New(PyObject* value, int lineno)
 {
@@ -553,6 +881,20 @@ PyTypeObject Py_Return_Type = {
         0,		/* tp_is_gc */
 };
 
+static int
+Return_validate(PyObject *_obj)
+{
+        struct _Return *obj = (struct _Return*)_obj;
+        if (obj->value != Py_None) /* empty */;
+        else if (!expr_Check(obj->value)) {
+            failed_check("value", "expr", obj->value);
+            return -1;
+        }
+        else if (expr_validate(obj->value) < 0)
+            return -1;
+        return 0;
+}
+
 PyObject*
 Py_Delete_New(PyObject* targets, int lineno)
 {
@@ -616,6 +958,27 @@ PyTypeObject Py_Delete_Type = {
         0,		/* tp_free */
         0,		/* tp_is_gc */
 };
+
+static int
+Delete_validate(PyObject *_obj)
+{
+        struct _Delete *obj = (struct _Delete*)_obj;
+        int i;
+        if (!PyList_Check(obj->targets)) {
+           failed_check("targets", "list", obj->targets);
+           return -1;
+        }
+        for(i = 0; i < PyList_Size(obj->targets); i++) {
+                if (!expr_Check(PyList_GET_ITEM(obj->targets, i))) {
+                    failed_check("targets", "expr",
+                                 PyList_GET_ITEM(obj->targets, i));
+                    return -1;
+                }
+                if (expr_validate(PyList_GET_ITEM(obj->targets, i)) < 0)
+                    return -1;
+        }
+        return 0;
+}
 
 PyObject*
 Py_Assign_New(PyObject* targets, PyObject* value, int lineno)
@@ -683,6 +1046,31 @@ PyTypeObject Py_Assign_Type = {
         0,		/* tp_free */
         0,		/* tp_is_gc */
 };
+
+static int
+Assign_validate(PyObject *_obj)
+{
+        struct _Assign *obj = (struct _Assign*)_obj;
+        int i;
+        if (!PyList_Check(obj->targets)) {
+           failed_check("targets", "list", obj->targets);
+           return -1;
+        }
+        for(i = 0; i < PyList_Size(obj->targets); i++) {
+                if (!expr_Check(PyList_GET_ITEM(obj->targets, i))) {
+                    failed_check("targets", "expr",
+                                 PyList_GET_ITEM(obj->targets, i));
+                    return -1;
+                }
+                if (expr_validate(PyList_GET_ITEM(obj->targets, i)) < 0)
+                    return -1;
+        }
+        if (!expr_Check(obj->value)) {
+            failed_check("value", "expr", obj->value);
+            return -1;
+        }
+        return 0;
+}
 
 PyObject*
 Py_AugAssign_New(PyObject* target, PyObject* op, PyObject* value, int lineno)
@@ -754,6 +1142,25 @@ PyTypeObject Py_AugAssign_Type = {
         0,		/* tp_is_gc */
 };
 
+static int
+AugAssign_validate(PyObject *_obj)
+{
+        struct _AugAssign *obj = (struct _AugAssign*)_obj;
+        if (!expr_Check(obj->target)) {
+            failed_check("target", "expr", obj->target);
+            return -1;
+        }
+        if (!operator_Check(obj->op)) {
+            failed_check("op", "operator", obj->op);
+            return -1;
+        }
+        if (!expr_Check(obj->value)) {
+            failed_check("value", "expr", obj->value);
+            return -1;
+        }
+        return 0;
+}
+
 PyObject*
 Py_Print_New(PyObject* dest, PyObject* values, PyObject* nl, int lineno)
 {
@@ -823,6 +1230,38 @@ PyTypeObject Py_Print_Type = {
         0,		/* tp_free */
         0,		/* tp_is_gc */
 };
+
+static int
+Print_validate(PyObject *_obj)
+{
+        struct _Print *obj = (struct _Print*)_obj;
+        int i;
+        if (obj->dest != Py_None) /* empty */;
+        else if (!expr_Check(obj->dest)) {
+            failed_check("dest", "expr", obj->dest);
+            return -1;
+        }
+        else if (expr_validate(obj->dest) < 0)
+            return -1;
+        if (!PyList_Check(obj->values)) {
+           failed_check("values", "list", obj->values);
+           return -1;
+        }
+        for(i = 0; i < PyList_Size(obj->values); i++) {
+                if (!expr_Check(PyList_GET_ITEM(obj->values, i))) {
+                    failed_check("values", "expr", PyList_GET_ITEM(obj->values,
+                                 i));
+                    return -1;
+                }
+                if (expr_validate(PyList_GET_ITEM(obj->values, i)) < 0)
+                    return -1;
+        }
+        if (!PyBool_Check(obj->nl)) {
+            failed_check("nl", "bool", obj->nl);
+            return -1;
+        }
+        return 0;
+}
 
 PyObject*
 Py_For_New(PyObject* target, PyObject* iter, PyObject* body, PyObject* orelse,
@@ -898,6 +1337,47 @@ PyTypeObject Py_For_Type = {
         0,		/* tp_is_gc */
 };
 
+static int
+For_validate(PyObject *_obj)
+{
+        struct _For *obj = (struct _For*)_obj;
+        int i;
+        if (!expr_Check(obj->target)) {
+            failed_check("target", "expr", obj->target);
+            return -1;
+        }
+        if (!expr_Check(obj->iter)) {
+            failed_check("iter", "expr", obj->iter);
+            return -1;
+        }
+        if (!PyList_Check(obj->body)) {
+           failed_check("body", "list", obj->body);
+           return -1;
+        }
+        for(i = 0; i < PyList_Size(obj->body); i++) {
+                if (!stmt_Check(PyList_GET_ITEM(obj->body, i))) {
+                    failed_check("body", "stmt", PyList_GET_ITEM(obj->body, i));
+                    return -1;
+                }
+                if (stmt_validate(PyList_GET_ITEM(obj->body, i)) < 0)
+                    return -1;
+        }
+        if (!PyList_Check(obj->orelse)) {
+           failed_check("orelse", "list", obj->orelse);
+           return -1;
+        }
+        for(i = 0; i < PyList_Size(obj->orelse); i++) {
+                if (!stmt_Check(PyList_GET_ITEM(obj->orelse, i))) {
+                    failed_check("orelse", "stmt", PyList_GET_ITEM(obj->orelse,
+                                 i));
+                    return -1;
+                }
+                if (stmt_validate(PyList_GET_ITEM(obj->orelse, i)) < 0)
+                    return -1;
+        }
+        return 0;
+}
+
 PyObject*
 Py_While_New(PyObject* test, PyObject* body, PyObject* orelse, int lineno)
 {
@@ -967,6 +1447,43 @@ PyTypeObject Py_While_Type = {
         0,		/* tp_free */
         0,		/* tp_is_gc */
 };
+
+static int
+While_validate(PyObject *_obj)
+{
+        struct _While *obj = (struct _While*)_obj;
+        int i;
+        if (!expr_Check(obj->test)) {
+            failed_check("test", "expr", obj->test);
+            return -1;
+        }
+        if (!PyList_Check(obj->body)) {
+           failed_check("body", "list", obj->body);
+           return -1;
+        }
+        for(i = 0; i < PyList_Size(obj->body); i++) {
+                if (!stmt_Check(PyList_GET_ITEM(obj->body, i))) {
+                    failed_check("body", "stmt", PyList_GET_ITEM(obj->body, i));
+                    return -1;
+                }
+                if (stmt_validate(PyList_GET_ITEM(obj->body, i)) < 0)
+                    return -1;
+        }
+        if (!PyList_Check(obj->orelse)) {
+           failed_check("orelse", "list", obj->orelse);
+           return -1;
+        }
+        for(i = 0; i < PyList_Size(obj->orelse); i++) {
+                if (!stmt_Check(PyList_GET_ITEM(obj->orelse, i))) {
+                    failed_check("orelse", "stmt", PyList_GET_ITEM(obj->orelse,
+                                 i));
+                    return -1;
+                }
+                if (stmt_validate(PyList_GET_ITEM(obj->orelse, i)) < 0)
+                    return -1;
+        }
+        return 0;
+}
 
 PyObject*
 Py_If_New(PyObject* test, PyObject* body, PyObject* orelse, int lineno)
@@ -1038,6 +1555,43 @@ PyTypeObject Py_If_Type = {
         0,		/* tp_is_gc */
 };
 
+static int
+If_validate(PyObject *_obj)
+{
+        struct _If *obj = (struct _If*)_obj;
+        int i;
+        if (!expr_Check(obj->test)) {
+            failed_check("test", "expr", obj->test);
+            return -1;
+        }
+        if (!PyList_Check(obj->body)) {
+           failed_check("body", "list", obj->body);
+           return -1;
+        }
+        for(i = 0; i < PyList_Size(obj->body); i++) {
+                if (!stmt_Check(PyList_GET_ITEM(obj->body, i))) {
+                    failed_check("body", "stmt", PyList_GET_ITEM(obj->body, i));
+                    return -1;
+                }
+                if (stmt_validate(PyList_GET_ITEM(obj->body, i)) < 0)
+                    return -1;
+        }
+        if (!PyList_Check(obj->orelse)) {
+           failed_check("orelse", "list", obj->orelse);
+           return -1;
+        }
+        for(i = 0; i < PyList_Size(obj->orelse); i++) {
+                if (!stmt_Check(PyList_GET_ITEM(obj->orelse, i))) {
+                    failed_check("orelse", "stmt", PyList_GET_ITEM(obj->orelse,
+                                 i));
+                    return -1;
+                }
+                if (stmt_validate(PyList_GET_ITEM(obj->orelse, i)) < 0)
+                    return -1;
+        }
+        return 0;
+}
+
 PyObject*
 Py_Raise_New(PyObject* type, PyObject* inst, PyObject* tback, int lineno)
 {
@@ -1107,6 +1661,34 @@ PyTypeObject Py_Raise_Type = {
         0,		/* tp_free */
         0,		/* tp_is_gc */
 };
+
+static int
+Raise_validate(PyObject *_obj)
+{
+        struct _Raise *obj = (struct _Raise*)_obj;
+        if (obj->type != Py_None) /* empty */;
+        else if (!expr_Check(obj->type)) {
+            failed_check("type", "expr", obj->type);
+            return -1;
+        }
+        else if (expr_validate(obj->type) < 0)
+            return -1;
+        if (obj->inst != Py_None) /* empty */;
+        else if (!expr_Check(obj->inst)) {
+            failed_check("inst", "expr", obj->inst);
+            return -1;
+        }
+        else if (expr_validate(obj->inst) < 0)
+            return -1;
+        if (obj->tback != Py_None) /* empty */;
+        else if (!expr_Check(obj->tback)) {
+            failed_check("tback", "expr", obj->tback);
+            return -1;
+        }
+        else if (expr_validate(obj->tback) < 0)
+            return -1;
+        return 0;
+}
 
 PyObject*
 Py_TryExcept_New(PyObject* body, PyObject* handlers, PyObject* orelse, int
@@ -1179,6 +1761,53 @@ PyTypeObject Py_TryExcept_Type = {
         0,		/* tp_is_gc */
 };
 
+static int
+TryExcept_validate(PyObject *_obj)
+{
+        struct _TryExcept *obj = (struct _TryExcept*)_obj;
+        int i;
+        if (!PyList_Check(obj->body)) {
+           failed_check("body", "list", obj->body);
+           return -1;
+        }
+        for(i = 0; i < PyList_Size(obj->body); i++) {
+                if (!stmt_Check(PyList_GET_ITEM(obj->body, i))) {
+                    failed_check("body", "stmt", PyList_GET_ITEM(obj->body, i));
+                    return -1;
+                }
+                if (stmt_validate(PyList_GET_ITEM(obj->body, i)) < 0)
+                    return -1;
+        }
+        if (!PyList_Check(obj->handlers)) {
+           failed_check("handlers", "list", obj->handlers);
+           return -1;
+        }
+        for(i = 0; i < PyList_Size(obj->handlers); i++) {
+                if (!excepthandler_Check(PyList_GET_ITEM(obj->handlers, i))) {
+                    failed_check("handlers", "excepthandler",
+                                 PyList_GET_ITEM(obj->handlers, i));
+                    return -1;
+                }
+                if (excepthandler_validate(PyList_GET_ITEM(obj->handlers, i)) <
+                    0)
+                    return -1;
+        }
+        if (!PyList_Check(obj->orelse)) {
+           failed_check("orelse", "list", obj->orelse);
+           return -1;
+        }
+        for(i = 0; i < PyList_Size(obj->orelse); i++) {
+                if (!stmt_Check(PyList_GET_ITEM(obj->orelse, i))) {
+                    failed_check("orelse", "stmt", PyList_GET_ITEM(obj->orelse,
+                                 i));
+                    return -1;
+                }
+                if (stmt_validate(PyList_GET_ITEM(obj->orelse, i)) < 0)
+                    return -1;
+        }
+        return 0;
+}
+
 PyObject*
 Py_TryFinally_New(PyObject* body, PyObject* finalbody, int lineno)
 {
@@ -1245,6 +1874,39 @@ PyTypeObject Py_TryFinally_Type = {
         0,		/* tp_free */
         0,		/* tp_is_gc */
 };
+
+static int
+TryFinally_validate(PyObject *_obj)
+{
+        struct _TryFinally *obj = (struct _TryFinally*)_obj;
+        int i;
+        if (!PyList_Check(obj->body)) {
+           failed_check("body", "list", obj->body);
+           return -1;
+        }
+        for(i = 0; i < PyList_Size(obj->body); i++) {
+                if (!stmt_Check(PyList_GET_ITEM(obj->body, i))) {
+                    failed_check("body", "stmt", PyList_GET_ITEM(obj->body, i));
+                    return -1;
+                }
+                if (stmt_validate(PyList_GET_ITEM(obj->body, i)) < 0)
+                    return -1;
+        }
+        if (!PyList_Check(obj->finalbody)) {
+           failed_check("finalbody", "list", obj->finalbody);
+           return -1;
+        }
+        for(i = 0; i < PyList_Size(obj->finalbody); i++) {
+                if (!stmt_Check(PyList_GET_ITEM(obj->finalbody, i))) {
+                    failed_check("finalbody", "stmt",
+                                 PyList_GET_ITEM(obj->finalbody, i));
+                    return -1;
+                }
+                if (stmt_validate(PyList_GET_ITEM(obj->finalbody, i)) < 0)
+                    return -1;
+        }
+        return 0;
+}
 
 PyObject*
 Py_Assert_New(PyObject* test, PyObject* msg, int lineno)
@@ -1313,6 +1975,24 @@ PyTypeObject Py_Assert_Type = {
         0,		/* tp_is_gc */
 };
 
+static int
+Assert_validate(PyObject *_obj)
+{
+        struct _Assert *obj = (struct _Assert*)_obj;
+        if (!expr_Check(obj->test)) {
+            failed_check("test", "expr", obj->test);
+            return -1;
+        }
+        if (obj->msg != Py_None) /* empty */;
+        else if (!expr_Check(obj->msg)) {
+            failed_check("msg", "expr", obj->msg);
+            return -1;
+        }
+        else if (expr_validate(obj->msg) < 0)
+            return -1;
+        return 0;
+}
+
 PyObject*
 Py_Import_New(PyObject* names, int lineno)
 {
@@ -1376,6 +2056,27 @@ PyTypeObject Py_Import_Type = {
         0,		/* tp_free */
         0,		/* tp_is_gc */
 };
+
+static int
+Import_validate(PyObject *_obj)
+{
+        struct _Import *obj = (struct _Import*)_obj;
+        int i;
+        if (!PyList_Check(obj->names)) {
+           failed_check("names", "list", obj->names);
+           return -1;
+        }
+        for(i = 0; i < PyList_Size(obj->names); i++) {
+                if (!alias_Check(PyList_GET_ITEM(obj->names, i))) {
+                    failed_check("names", "alias", PyList_GET_ITEM(obj->names,
+                                 i));
+                    return -1;
+                }
+                if (alias_validate(PyList_GET_ITEM(obj->names, i)) < 0)
+                    return -1;
+        }
+        return 0;
+}
 
 PyObject*
 Py_ImportFrom_New(PyObject* module, PyObject* names, int lineno)
@@ -1443,6 +2144,31 @@ PyTypeObject Py_ImportFrom_Type = {
         0,		/* tp_free */
         0,		/* tp_is_gc */
 };
+
+static int
+ImportFrom_validate(PyObject *_obj)
+{
+        struct _ImportFrom *obj = (struct _ImportFrom*)_obj;
+        int i;
+        if (!PyString_Check(obj->module)) {
+            failed_check("module", "identifier", obj->module);
+            return -1;
+        }
+        if (!PyList_Check(obj->names)) {
+           failed_check("names", "list", obj->names);
+           return -1;
+        }
+        for(i = 0; i < PyList_Size(obj->names); i++) {
+                if (!alias_Check(PyList_GET_ITEM(obj->names, i))) {
+                    failed_check("names", "alias", PyList_GET_ITEM(obj->names,
+                                 i));
+                    return -1;
+                }
+                if (alias_validate(PyList_GET_ITEM(obj->names, i)) < 0)
+                    return -1;
+        }
+        return 0;
+}
 
 PyObject*
 Py_Exec_New(PyObject* body, PyObject* globals, PyObject* locals, int lineno)
@@ -1514,6 +2240,31 @@ PyTypeObject Py_Exec_Type = {
         0,		/* tp_is_gc */
 };
 
+static int
+Exec_validate(PyObject *_obj)
+{
+        struct _Exec *obj = (struct _Exec*)_obj;
+        if (!expr_Check(obj->body)) {
+            failed_check("body", "expr", obj->body);
+            return -1;
+        }
+        if (obj->globals != Py_None) /* empty */;
+        else if (!expr_Check(obj->globals)) {
+            failed_check("globals", "expr", obj->globals);
+            return -1;
+        }
+        else if (expr_validate(obj->globals) < 0)
+            return -1;
+        if (obj->locals != Py_None) /* empty */;
+        else if (!expr_Check(obj->locals)) {
+            failed_check("locals", "expr", obj->locals);
+            return -1;
+        }
+        else if (expr_validate(obj->locals) < 0)
+            return -1;
+        return 0;
+}
+
 PyObject*
 Py_Global_New(PyObject* names, int lineno)
 {
@@ -1577,6 +2328,25 @@ PyTypeObject Py_Global_Type = {
         0,		/* tp_free */
         0,		/* tp_is_gc */
 };
+
+static int
+Global_validate(PyObject *_obj)
+{
+        struct _Global *obj = (struct _Global*)_obj;
+        int i;
+        if (!PyList_Check(obj->names)) {
+           failed_check("names", "list", obj->names);
+           return -1;
+        }
+        for(i = 0; i < PyList_Size(obj->names); i++) {
+                if (!PyString_Check(PyList_GET_ITEM(obj->names, i))) {
+                    failed_check("names", "identifier",
+                                 PyList_GET_ITEM(obj->names, i));
+                    return -1;
+                }
+        }
+        return 0;
+}
 
 PyObject*
 Py_Expr_New(PyObject* value, int lineno)
@@ -1642,6 +2412,17 @@ PyTypeObject Py_Expr_Type = {
         0,		/* tp_is_gc */
 };
 
+static int
+Expr_validate(PyObject *_obj)
+{
+        struct _Expr *obj = (struct _Expr*)_obj;
+        if (!expr_Check(obj->value)) {
+            failed_check("value", "expr", obj->value);
+            return -1;
+        }
+        return 0;
+}
+
 PyObject*
 Py_Pass_New(int lineno)
 {
@@ -1702,6 +2483,12 @@ PyTypeObject Py_Pass_Type = {
         0,		/* tp_free */
         0,		/* tp_is_gc */
 };
+
+static int
+Pass_validate(PyObject *_obj)
+{
+        return 0;
+}
 
 PyObject*
 Py_Break_New(int lineno)
@@ -1764,6 +2551,12 @@ PyTypeObject Py_Break_Type = {
         0,		/* tp_is_gc */
 };
 
+static int
+Break_validate(PyObject *_obj)
+{
+        return 0;
+}
+
 PyObject*
 Py_Continue_New(int lineno)
 {
@@ -1825,6 +2618,12 @@ PyTypeObject Py_Continue_Type = {
         0,		/* tp_is_gc */
 };
 
+static int
+Continue_validate(PyObject *_obj)
+{
+        return 0;
+}
+
 #define expr_dealloc 0
 PyTypeObject Py_expr_Type = {
         PyObject_HEAD_INIT(NULL)
@@ -1870,6 +2669,52 @@ PyTypeObject Py_expr_Type = {
         0,		/* tp_is_gc */
 };
 
+int
+expr_validate(PyObject* _obj)
+{
+        struct _expr *obj = (struct _expr*)_obj;
+        assert(expr_Check(_obj));
+        switch(obj->_kind) {
+                case BoolOp_kind:
+                    return BoolOp_validate(_obj);
+                case BinOp_kind:
+                    return BinOp_validate(_obj);
+                case UnaryOp_kind:
+                    return UnaryOp_validate(_obj);
+                case Lambda_kind:
+                    return Lambda_validate(_obj);
+                case Dict_kind:
+                    return Dict_validate(_obj);
+                case ListComp_kind:
+                    return ListComp_validate(_obj);
+                case GeneratorExp_kind:
+                    return GeneratorExp_validate(_obj);
+                case Yield_kind:
+                    return Yield_validate(_obj);
+                case Compare_kind:
+                    return Compare_validate(_obj);
+                case Call_kind:
+                    return Call_validate(_obj);
+                case Repr_kind:
+                    return Repr_validate(_obj);
+                case Num_kind:
+                    return Num_validate(_obj);
+                case Str_kind:
+                    return Str_validate(_obj);
+                case Attribute_kind:
+                    return Attribute_validate(_obj);
+                case Subscript_kind:
+                    return Subscript_validate(_obj);
+                case Name_kind:
+                    return Name_validate(_obj);
+                case List_kind:
+                    return List_validate(_obj);
+                case Tuple_kind:
+                    return Tuple_validate(_obj);
+        }
+        PyErr_SetString(PyExc_TypeError, "invalid _kind in expr");
+        return -1;
+}
 PyObject*
 Py_BoolOp_New(PyObject* op, PyObject* values, int lineno)
 {
@@ -1936,6 +2781,31 @@ PyTypeObject Py_BoolOp_Type = {
         0,		/* tp_free */
         0,		/* tp_is_gc */
 };
+
+static int
+BoolOp_validate(PyObject *_obj)
+{
+        struct _BoolOp *obj = (struct _BoolOp*)_obj;
+        int i;
+        if (!boolop_Check(obj->op)) {
+            failed_check("op", "boolop", obj->op);
+            return -1;
+        }
+        if (!PyList_Check(obj->values)) {
+           failed_check("values", "list", obj->values);
+           return -1;
+        }
+        for(i = 0; i < PyList_Size(obj->values); i++) {
+                if (!expr_Check(PyList_GET_ITEM(obj->values, i))) {
+                    failed_check("values", "expr", PyList_GET_ITEM(obj->values,
+                                 i));
+                    return -1;
+                }
+                if (expr_validate(PyList_GET_ITEM(obj->values, i)) < 0)
+                    return -1;
+        }
+        return 0;
+}
 
 PyObject*
 Py_BinOp_New(PyObject* left, PyObject* op, PyObject* right, int lineno)
@@ -2007,6 +2877,25 @@ PyTypeObject Py_BinOp_Type = {
         0,		/* tp_is_gc */
 };
 
+static int
+BinOp_validate(PyObject *_obj)
+{
+        struct _BinOp *obj = (struct _BinOp*)_obj;
+        if (!expr_Check(obj->left)) {
+            failed_check("left", "expr", obj->left);
+            return -1;
+        }
+        if (!operator_Check(obj->op)) {
+            failed_check("op", "operator", obj->op);
+            return -1;
+        }
+        if (!expr_Check(obj->right)) {
+            failed_check("right", "expr", obj->right);
+            return -1;
+        }
+        return 0;
+}
+
 PyObject*
 Py_UnaryOp_New(PyObject* op, PyObject* operand, int lineno)
 {
@@ -2073,6 +2962,21 @@ PyTypeObject Py_UnaryOp_Type = {
         0,		/* tp_free */
         0,		/* tp_is_gc */
 };
+
+static int
+UnaryOp_validate(PyObject *_obj)
+{
+        struct _UnaryOp *obj = (struct _UnaryOp*)_obj;
+        if (!unaryop_Check(obj->op)) {
+            failed_check("op", "unaryop", obj->op);
+            return -1;
+        }
+        if (!expr_Check(obj->operand)) {
+            failed_check("operand", "expr", obj->operand);
+            return -1;
+        }
+        return 0;
+}
 
 PyObject*
 Py_Lambda_New(PyObject* args, PyObject* body, int lineno)
@@ -2141,6 +3045,21 @@ PyTypeObject Py_Lambda_Type = {
         0,		/* tp_is_gc */
 };
 
+static int
+Lambda_validate(PyObject *_obj)
+{
+        struct _Lambda *obj = (struct _Lambda*)_obj;
+        if (!arguments_Check(obj->args)) {
+            failed_check("args", "arguments", obj->args);
+            return -1;
+        }
+        if (!expr_Check(obj->body)) {
+            failed_check("body", "expr", obj->body);
+            return -1;
+        }
+        return 0;
+}
+
 PyObject*
 Py_Dict_New(PyObject* keys, PyObject* values, int lineno)
 {
@@ -2207,6 +3126,39 @@ PyTypeObject Py_Dict_Type = {
         0,		/* tp_free */
         0,		/* tp_is_gc */
 };
+
+static int
+Dict_validate(PyObject *_obj)
+{
+        struct _Dict *obj = (struct _Dict*)_obj;
+        int i;
+        if (!PyList_Check(obj->keys)) {
+           failed_check("keys", "list", obj->keys);
+           return -1;
+        }
+        for(i = 0; i < PyList_Size(obj->keys); i++) {
+                if (!expr_Check(PyList_GET_ITEM(obj->keys, i))) {
+                    failed_check("keys", "expr", PyList_GET_ITEM(obj->keys, i));
+                    return -1;
+                }
+                if (expr_validate(PyList_GET_ITEM(obj->keys, i)) < 0)
+                    return -1;
+        }
+        if (!PyList_Check(obj->values)) {
+           failed_check("values", "list", obj->values);
+           return -1;
+        }
+        for(i = 0; i < PyList_Size(obj->values); i++) {
+                if (!expr_Check(PyList_GET_ITEM(obj->values, i))) {
+                    failed_check("values", "expr", PyList_GET_ITEM(obj->values,
+                                 i));
+                    return -1;
+                }
+                if (expr_validate(PyList_GET_ITEM(obj->values, i)) < 0)
+                    return -1;
+        }
+        return 0;
+}
 
 PyObject*
 Py_ListComp_New(PyObject* elt, PyObject* generators, int lineno)
@@ -2275,6 +3227,32 @@ PyTypeObject Py_ListComp_Type = {
         0,		/* tp_is_gc */
 };
 
+static int
+ListComp_validate(PyObject *_obj)
+{
+        struct _ListComp *obj = (struct _ListComp*)_obj;
+        int i;
+        if (!expr_Check(obj->elt)) {
+            failed_check("elt", "expr", obj->elt);
+            return -1;
+        }
+        if (!PyList_Check(obj->generators)) {
+           failed_check("generators", "list", obj->generators);
+           return -1;
+        }
+        for(i = 0; i < PyList_Size(obj->generators); i++) {
+                if (!comprehension_Check(PyList_GET_ITEM(obj->generators, i))) {
+                    failed_check("generators", "comprehension",
+                                 PyList_GET_ITEM(obj->generators, i));
+                    return -1;
+                }
+                if (comprehension_validate(PyList_GET_ITEM(obj->generators, i))
+                    < 0)
+                    return -1;
+        }
+        return 0;
+}
+
 PyObject*
 Py_GeneratorExp_New(PyObject* elt, PyObject* generators, int lineno)
 {
@@ -2342,6 +3320,32 @@ PyTypeObject Py_GeneratorExp_Type = {
         0,		/* tp_is_gc */
 };
 
+static int
+GeneratorExp_validate(PyObject *_obj)
+{
+        struct _GeneratorExp *obj = (struct _GeneratorExp*)_obj;
+        int i;
+        if (!expr_Check(obj->elt)) {
+            failed_check("elt", "expr", obj->elt);
+            return -1;
+        }
+        if (!PyList_Check(obj->generators)) {
+           failed_check("generators", "list", obj->generators);
+           return -1;
+        }
+        for(i = 0; i < PyList_Size(obj->generators); i++) {
+                if (!comprehension_Check(PyList_GET_ITEM(obj->generators, i))) {
+                    failed_check("generators", "comprehension",
+                                 PyList_GET_ITEM(obj->generators, i));
+                    return -1;
+                }
+                if (comprehension_validate(PyList_GET_ITEM(obj->generators, i))
+                    < 0)
+                    return -1;
+        }
+        return 0;
+}
+
 PyObject*
 Py_Yield_New(PyObject* value, int lineno)
 {
@@ -2405,6 +3409,20 @@ PyTypeObject Py_Yield_Type = {
         0,		/* tp_free */
         0,		/* tp_is_gc */
 };
+
+static int
+Yield_validate(PyObject *_obj)
+{
+        struct _Yield *obj = (struct _Yield*)_obj;
+        if (obj->value != Py_None) /* empty */;
+        else if (!expr_Check(obj->value)) {
+            failed_check("value", "expr", obj->value);
+            return -1;
+        }
+        else if (expr_validate(obj->value) < 0)
+            return -1;
+        return 0;
+}
 
 PyObject*
 Py_Compare_New(PyObject* left, PyObject* ops, PyObject* comparators, int lineno)
@@ -2475,6 +3493,43 @@ PyTypeObject Py_Compare_Type = {
         0,		/* tp_free */
         0,		/* tp_is_gc */
 };
+
+static int
+Compare_validate(PyObject *_obj)
+{
+        struct _Compare *obj = (struct _Compare*)_obj;
+        int i;
+        if (!expr_Check(obj->left)) {
+            failed_check("left", "expr", obj->left);
+            return -1;
+        }
+        if (!PyList_Check(obj->ops)) {
+           failed_check("ops", "list", obj->ops);
+           return -1;
+        }
+        for(i = 0; i < PyList_Size(obj->ops); i++) {
+                if (!cmpop_Check(PyList_GET_ITEM(obj->ops, i))) {
+                    failed_check("ops", "cmpop", PyList_GET_ITEM(obj->ops, i));
+                    return -1;
+                }
+                if (cmpop_validate(PyList_GET_ITEM(obj->ops, i)) < 0)
+                    return -1;
+        }
+        if (!PyList_Check(obj->comparators)) {
+           failed_check("comparators", "list", obj->comparators);
+           return -1;
+        }
+        for(i = 0; i < PyList_Size(obj->comparators); i++) {
+                if (!expr_Check(PyList_GET_ITEM(obj->comparators, i))) {
+                    failed_check("comparators", "expr",
+                                 PyList_GET_ITEM(obj->comparators, i));
+                    return -1;
+                }
+                if (expr_validate(PyList_GET_ITEM(obj->comparators, i)) < 0)
+                    return -1;
+        }
+        return 0;
+}
 
 PyObject*
 Py_Call_New(PyObject* func, PyObject* args, PyObject* keywords, PyObject*
@@ -2553,6 +3608,57 @@ PyTypeObject Py_Call_Type = {
         0,		/* tp_is_gc */
 };
 
+static int
+Call_validate(PyObject *_obj)
+{
+        struct _Call *obj = (struct _Call*)_obj;
+        int i;
+        if (!expr_Check(obj->func)) {
+            failed_check("func", "expr", obj->func);
+            return -1;
+        }
+        if (!PyList_Check(obj->args)) {
+           failed_check("args", "list", obj->args);
+           return -1;
+        }
+        for(i = 0; i < PyList_Size(obj->args); i++) {
+                if (!expr_Check(PyList_GET_ITEM(obj->args, i))) {
+                    failed_check("args", "expr", PyList_GET_ITEM(obj->args, i));
+                    return -1;
+                }
+                if (expr_validate(PyList_GET_ITEM(obj->args, i)) < 0)
+                    return -1;
+        }
+        if (!PyList_Check(obj->keywords)) {
+           failed_check("keywords", "list", obj->keywords);
+           return -1;
+        }
+        for(i = 0; i < PyList_Size(obj->keywords); i++) {
+                if (!keyword_Check(PyList_GET_ITEM(obj->keywords, i))) {
+                    failed_check("keywords", "keyword",
+                                 PyList_GET_ITEM(obj->keywords, i));
+                    return -1;
+                }
+                if (keyword_validate(PyList_GET_ITEM(obj->keywords, i)) < 0)
+                    return -1;
+        }
+        if (obj->starargs != Py_None) /* empty */;
+        else if (!expr_Check(obj->starargs)) {
+            failed_check("starargs", "expr", obj->starargs);
+            return -1;
+        }
+        else if (expr_validate(obj->starargs) < 0)
+            return -1;
+        if (obj->kwargs != Py_None) /* empty */;
+        else if (!expr_Check(obj->kwargs)) {
+            failed_check("kwargs", "expr", obj->kwargs);
+            return -1;
+        }
+        else if (expr_validate(obj->kwargs) < 0)
+            return -1;
+        return 0;
+}
+
 PyObject*
 Py_Repr_New(PyObject* value, int lineno)
 {
@@ -2616,6 +3722,17 @@ PyTypeObject Py_Repr_Type = {
         0,		/* tp_free */
         0,		/* tp_is_gc */
 };
+
+static int
+Repr_validate(PyObject *_obj)
+{
+        struct _Repr *obj = (struct _Repr*)_obj;
+        if (!expr_Check(obj->value)) {
+            failed_check("value", "expr", obj->value);
+            return -1;
+        }
+        return 0;
+}
 
 PyObject*
 Py_Num_New(PyObject* n, int lineno)
@@ -2681,6 +3798,17 @@ PyTypeObject Py_Num_Type = {
         0,		/* tp_is_gc */
 };
 
+static int
+Num_validate(PyObject *_obj)
+{
+        struct _Num *obj = (struct _Num*)_obj;
+        if (!object_Check(obj->n)) {
+            failed_check("n", "object", obj->n);
+            return -1;
+        }
+        return 0;
+}
+
 PyObject*
 Py_Str_New(PyObject* s, int lineno)
 {
@@ -2744,6 +3872,17 @@ PyTypeObject Py_Str_Type = {
         0,		/* tp_free */
         0,		/* tp_is_gc */
 };
+
+static int
+Str_validate(PyObject *_obj)
+{
+        struct _Str *obj = (struct _Str*)_obj;
+        if (!PyString_Check(obj->s)) {
+            failed_check("s", "string", obj->s);
+            return -1;
+        }
+        return 0;
+}
 
 PyObject*
 Py_Attribute_New(PyObject* value, PyObject* attr, PyObject* ctx, int lineno)
@@ -2815,6 +3954,25 @@ PyTypeObject Py_Attribute_Type = {
         0,		/* tp_is_gc */
 };
 
+static int
+Attribute_validate(PyObject *_obj)
+{
+        struct _Attribute *obj = (struct _Attribute*)_obj;
+        if (!expr_Check(obj->value)) {
+            failed_check("value", "expr", obj->value);
+            return -1;
+        }
+        if (!PyString_Check(obj->attr)) {
+            failed_check("attr", "identifier", obj->attr);
+            return -1;
+        }
+        if (!expr_context_Check(obj->ctx)) {
+            failed_check("ctx", "expr_context", obj->ctx);
+            return -1;
+        }
+        return 0;
+}
+
 PyObject*
 Py_Subscript_New(PyObject* value, PyObject* slice, PyObject* ctx, int lineno)
 {
@@ -2885,6 +4043,25 @@ PyTypeObject Py_Subscript_Type = {
         0,		/* tp_is_gc */
 };
 
+static int
+Subscript_validate(PyObject *_obj)
+{
+        struct _Subscript *obj = (struct _Subscript*)_obj;
+        if (!expr_Check(obj->value)) {
+            failed_check("value", "expr", obj->value);
+            return -1;
+        }
+        if (!slice_Check(obj->slice)) {
+            failed_check("slice", "slice", obj->slice);
+            return -1;
+        }
+        if (!expr_context_Check(obj->ctx)) {
+            failed_check("ctx", "expr_context", obj->ctx);
+            return -1;
+        }
+        return 0;
+}
+
 PyObject*
 Py_Name_New(PyObject* id, PyObject* ctx, int lineno)
 {
@@ -2951,6 +4128,21 @@ PyTypeObject Py_Name_Type = {
         0,		/* tp_free */
         0,		/* tp_is_gc */
 };
+
+static int
+Name_validate(PyObject *_obj)
+{
+        struct _Name *obj = (struct _Name*)_obj;
+        if (!PyString_Check(obj->id)) {
+            failed_check("id", "identifier", obj->id);
+            return -1;
+        }
+        if (!expr_context_Check(obj->ctx)) {
+            failed_check("ctx", "expr_context", obj->ctx);
+            return -1;
+        }
+        return 0;
+}
 
 PyObject*
 Py_List_New(PyObject* elts, PyObject* ctx, int lineno)
@@ -3019,6 +4211,30 @@ PyTypeObject Py_List_Type = {
         0,		/* tp_is_gc */
 };
 
+static int
+List_validate(PyObject *_obj)
+{
+        struct _List *obj = (struct _List*)_obj;
+        int i;
+        if (!PyList_Check(obj->elts)) {
+           failed_check("elts", "list", obj->elts);
+           return -1;
+        }
+        for(i = 0; i < PyList_Size(obj->elts); i++) {
+                if (!expr_Check(PyList_GET_ITEM(obj->elts, i))) {
+                    failed_check("elts", "expr", PyList_GET_ITEM(obj->elts, i));
+                    return -1;
+                }
+                if (expr_validate(PyList_GET_ITEM(obj->elts, i)) < 0)
+                    return -1;
+        }
+        if (!expr_context_Check(obj->ctx)) {
+            failed_check("ctx", "expr_context", obj->ctx);
+            return -1;
+        }
+        return 0;
+}
+
 PyObject*
 Py_Tuple_New(PyObject* elts, PyObject* ctx, int lineno)
 {
@@ -3086,6 +4302,493 @@ PyTypeObject Py_Tuple_Type = {
         0,		/* tp_is_gc */
 };
 
+static int
+Tuple_validate(PyObject *_obj)
+{
+        struct _Tuple *obj = (struct _Tuple*)_obj;
+        int i;
+        if (!PyList_Check(obj->elts)) {
+           failed_check("elts", "list", obj->elts);
+           return -1;
+        }
+        for(i = 0; i < PyList_Size(obj->elts); i++) {
+                if (!expr_Check(PyList_GET_ITEM(obj->elts, i))) {
+                    failed_check("elts", "expr", PyList_GET_ITEM(obj->elts, i));
+                    return -1;
+                }
+                if (expr_validate(PyList_GET_ITEM(obj->elts, i)) < 0)
+                    return -1;
+        }
+        if (!expr_context_Check(obj->ctx)) {
+            failed_check("ctx", "expr_context", obj->ctx);
+            return -1;
+        }
+        return 0;
+}
+
+#define expr_context_dealloc 0
+PyTypeObject Py_expr_context_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "expr_context",		/*tp_name*/
+        sizeof(struct _expr_context),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        expr_context_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+};
+
+int
+expr_context_validate(PyObject* _obj)
+{
+        struct _expr_context *obj = (struct _expr_context*)_obj;
+        assert(expr_context_Check(_obj));
+        switch(obj->_kind) {
+                case Load_kind:
+                    return Load_validate(_obj);
+                case Store_kind:
+                    return Store_validate(_obj);
+                case Del_kind:
+                    return Del_validate(_obj);
+                case AugLoad_kind:
+                    return AugLoad_validate(_obj);
+                case AugStore_kind:
+                    return AugStore_validate(_obj);
+                case Param_kind:
+                    return Param_validate(_obj);
+        }
+        PyErr_SetString(PyExc_TypeError, "invalid _kind in expr_context");
+        return -1;
+}
+PyObject*
+Py_Load_New()
+{
+        struct _Load *result = PyObject_New(struct _Load, &Py_Load_Type);
+        if (result == NULL)
+                return NULL;
+        return (PyObject*)result;
+}
+
+static void
+Load_dealloc(PyObject* _self)
+{
+        struct _Load *self = (struct _Load*)_self;
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_Load_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "Load",		/*tp_name*/
+        sizeof(struct _Load),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        Load_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+};
+
+static int
+Load_validate(PyObject *_obj)
+{
+        return 0;
+}
+
+PyObject*
+Py_Store_New()
+{
+        struct _Store *result = PyObject_New(struct _Store, &Py_Store_Type);
+        if (result == NULL)
+                return NULL;
+        return (PyObject*)result;
+}
+
+static void
+Store_dealloc(PyObject* _self)
+{
+        struct _Store *self = (struct _Store*)_self;
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_Store_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "Store",		/*tp_name*/
+        sizeof(struct _Store),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        Store_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+};
+
+static int
+Store_validate(PyObject *_obj)
+{
+        return 0;
+}
+
+PyObject*
+Py_Del_New()
+{
+        struct _Del *result = PyObject_New(struct _Del, &Py_Del_Type);
+        if (result == NULL)
+                return NULL;
+        return (PyObject*)result;
+}
+
+static void
+Del_dealloc(PyObject* _self)
+{
+        struct _Del *self = (struct _Del*)_self;
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_Del_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "Del",		/*tp_name*/
+        sizeof(struct _Del),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        Del_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+};
+
+static int
+Del_validate(PyObject *_obj)
+{
+        return 0;
+}
+
+PyObject*
+Py_AugLoad_New()
+{
+        struct _AugLoad *result = PyObject_New(struct _AugLoad, &Py_AugLoad_Type);
+        if (result == NULL)
+                return NULL;
+        return (PyObject*)result;
+}
+
+static void
+AugLoad_dealloc(PyObject* _self)
+{
+        struct _AugLoad *self = (struct _AugLoad*)_self;
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_AugLoad_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "AugLoad",		/*tp_name*/
+        sizeof(struct _AugLoad),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        AugLoad_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+};
+
+static int
+AugLoad_validate(PyObject *_obj)
+{
+        return 0;
+}
+
+PyObject*
+Py_AugStore_New()
+{
+        struct _AugStore *result = PyObject_New(struct _AugStore, &Py_AugStore_Type);
+        if (result == NULL)
+                return NULL;
+        return (PyObject*)result;
+}
+
+static void
+AugStore_dealloc(PyObject* _self)
+{
+        struct _AugStore *self = (struct _AugStore*)_self;
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_AugStore_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "AugStore",		/*tp_name*/
+        sizeof(struct _AugStore),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        AugStore_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+};
+
+static int
+AugStore_validate(PyObject *_obj)
+{
+        return 0;
+}
+
+PyObject*
+Py_Param_New()
+{
+        struct _Param *result = PyObject_New(struct _Param, &Py_Param_Type);
+        if (result == NULL)
+                return NULL;
+        return (PyObject*)result;
+}
+
+static void
+Param_dealloc(PyObject* _self)
+{
+        struct _Param *self = (struct _Param*)_self;
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_Param_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "Param",		/*tp_name*/
+        sizeof(struct _Param),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        Param_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+};
+
+static int
+Param_validate(PyObject *_obj)
+{
+        return 0;
+}
+
 #define slice_dealloc 0
 PyTypeObject Py_slice_Type = {
         PyObject_HEAD_INIT(NULL)
@@ -3131,6 +4834,24 @@ PyTypeObject Py_slice_Type = {
         0,		/* tp_is_gc */
 };
 
+int
+slice_validate(PyObject* _obj)
+{
+        struct _slice *obj = (struct _slice*)_obj;
+        assert(slice_Check(_obj));
+        switch(obj->_kind) {
+                case Ellipsis_kind:
+                    return Ellipsis_validate(_obj);
+                case Slice_kind:
+                    return Slice_validate(_obj);
+                case ExtSlice_kind:
+                    return ExtSlice_validate(_obj);
+                case Index_kind:
+                    return Index_validate(_obj);
+        }
+        PyErr_SetString(PyExc_TypeError, "invalid _kind in slice");
+        return -1;
+}
 PyObject*
 Py_Ellipsis_New()
 {
@@ -3190,6 +4911,12 @@ PyTypeObject Py_Ellipsis_Type = {
         0,		/* tp_free */
         0,		/* tp_is_gc */
 };
+
+static int
+Ellipsis_validate(PyObject *_obj)
+{
+        return 0;
+}
 
 PyObject*
 Py_Slice_New(PyObject* lower, PyObject* upper, PyObject* step)
@@ -3260,6 +4987,34 @@ PyTypeObject Py_Slice_Type = {
         0,		/* tp_is_gc */
 };
 
+static int
+Slice_validate(PyObject *_obj)
+{
+        struct _Slice *obj = (struct _Slice*)_obj;
+        if (obj->lower != Py_None) /* empty */;
+        else if (!expr_Check(obj->lower)) {
+            failed_check("lower", "expr", obj->lower);
+            return -1;
+        }
+        else if (expr_validate(obj->lower) < 0)
+            return -1;
+        if (obj->upper != Py_None) /* empty */;
+        else if (!expr_Check(obj->upper)) {
+            failed_check("upper", "expr", obj->upper);
+            return -1;
+        }
+        else if (expr_validate(obj->upper) < 0)
+            return -1;
+        if (obj->step != Py_None) /* empty */;
+        else if (!expr_Check(obj->step)) {
+            failed_check("step", "expr", obj->step);
+            return -1;
+        }
+        else if (expr_validate(obj->step) < 0)
+            return -1;
+        return 0;
+}
+
 PyObject*
 Py_ExtSlice_New(PyObject* dims)
 {
@@ -3323,6 +5078,27 @@ PyTypeObject Py_ExtSlice_Type = {
         0,		/* tp_is_gc */
 };
 
+static int
+ExtSlice_validate(PyObject *_obj)
+{
+        struct _ExtSlice *obj = (struct _ExtSlice*)_obj;
+        int i;
+        if (!PyList_Check(obj->dims)) {
+           failed_check("dims", "list", obj->dims);
+           return -1;
+        }
+        for(i = 0; i < PyList_Size(obj->dims); i++) {
+                if (!slice_Check(PyList_GET_ITEM(obj->dims, i))) {
+                    failed_check("dims", "slice", PyList_GET_ITEM(obj->dims,
+                                 i));
+                    return -1;
+                }
+                if (slice_validate(PyList_GET_ITEM(obj->dims, i)) < 0)
+                    return -1;
+        }
+        return 0;
+}
+
 PyObject*
 Py_Index_New(PyObject* value)
 {
@@ -3385,6 +5161,2141 @@ PyTypeObject Py_Index_Type = {
         0,		/* tp_free */
         0,		/* tp_is_gc */
 };
+
+static int
+Index_validate(PyObject *_obj)
+{
+        struct _Index *obj = (struct _Index*)_obj;
+        if (!expr_Check(obj->value)) {
+            failed_check("value", "expr", obj->value);
+            return -1;
+        }
+        return 0;
+}
+
+#define boolop_dealloc 0
+PyTypeObject Py_boolop_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "boolop",		/*tp_name*/
+        sizeof(struct _boolop),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        boolop_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+};
+
+int
+boolop_validate(PyObject* _obj)
+{
+        struct _boolop *obj = (struct _boolop*)_obj;
+        assert(boolop_Check(_obj));
+        switch(obj->_kind) {
+                case And_kind:
+                    return And_validate(_obj);
+                case Or_kind:
+                    return Or_validate(_obj);
+        }
+        PyErr_SetString(PyExc_TypeError, "invalid _kind in boolop");
+        return -1;
+}
+PyObject*
+Py_And_New()
+{
+        struct _And *result = PyObject_New(struct _And, &Py_And_Type);
+        if (result == NULL)
+                return NULL;
+        return (PyObject*)result;
+}
+
+static void
+And_dealloc(PyObject* _self)
+{
+        struct _And *self = (struct _And*)_self;
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_And_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "And",		/*tp_name*/
+        sizeof(struct _And),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        And_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+};
+
+static int
+And_validate(PyObject *_obj)
+{
+        return 0;
+}
+
+PyObject*
+Py_Or_New()
+{
+        struct _Or *result = PyObject_New(struct _Or, &Py_Or_Type);
+        if (result == NULL)
+                return NULL;
+        return (PyObject*)result;
+}
+
+static void
+Or_dealloc(PyObject* _self)
+{
+        struct _Or *self = (struct _Or*)_self;
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_Or_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "Or",		/*tp_name*/
+        sizeof(struct _Or),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        Or_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+};
+
+static int
+Or_validate(PyObject *_obj)
+{
+        return 0;
+}
+
+#define operator_dealloc 0
+PyTypeObject Py_operator_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "operator",		/*tp_name*/
+        sizeof(struct _operator),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        operator_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+};
+
+int
+operator_validate(PyObject* _obj)
+{
+        struct _operator *obj = (struct _operator*)_obj;
+        assert(operator_Check(_obj));
+        switch(obj->_kind) {
+                case Add_kind:
+                    return Add_validate(_obj);
+                case Sub_kind:
+                    return Sub_validate(_obj);
+                case Mult_kind:
+                    return Mult_validate(_obj);
+                case Div_kind:
+                    return Div_validate(_obj);
+                case Mod_kind:
+                    return Mod_validate(_obj);
+                case Pow_kind:
+                    return Pow_validate(_obj);
+                case LShift_kind:
+                    return LShift_validate(_obj);
+                case RShift_kind:
+                    return RShift_validate(_obj);
+                case BitOr_kind:
+                    return BitOr_validate(_obj);
+                case BitXor_kind:
+                    return BitXor_validate(_obj);
+                case BitAnd_kind:
+                    return BitAnd_validate(_obj);
+                case FloorDiv_kind:
+                    return FloorDiv_validate(_obj);
+        }
+        PyErr_SetString(PyExc_TypeError, "invalid _kind in operator");
+        return -1;
+}
+PyObject*
+Py_Add_New()
+{
+        struct _Add *result = PyObject_New(struct _Add, &Py_Add_Type);
+        if (result == NULL)
+                return NULL;
+        return (PyObject*)result;
+}
+
+static void
+Add_dealloc(PyObject* _self)
+{
+        struct _Add *self = (struct _Add*)_self;
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_Add_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "Add",		/*tp_name*/
+        sizeof(struct _Add),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        Add_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+};
+
+static int
+Add_validate(PyObject *_obj)
+{
+        return 0;
+}
+
+PyObject*
+Py_Sub_New()
+{
+        struct _Sub *result = PyObject_New(struct _Sub, &Py_Sub_Type);
+        if (result == NULL)
+                return NULL;
+        return (PyObject*)result;
+}
+
+static void
+Sub_dealloc(PyObject* _self)
+{
+        struct _Sub *self = (struct _Sub*)_self;
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_Sub_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "Sub",		/*tp_name*/
+        sizeof(struct _Sub),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        Sub_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+};
+
+static int
+Sub_validate(PyObject *_obj)
+{
+        return 0;
+}
+
+PyObject*
+Py_Mult_New()
+{
+        struct _Mult *result = PyObject_New(struct _Mult, &Py_Mult_Type);
+        if (result == NULL)
+                return NULL;
+        return (PyObject*)result;
+}
+
+static void
+Mult_dealloc(PyObject* _self)
+{
+        struct _Mult *self = (struct _Mult*)_self;
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_Mult_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "Mult",		/*tp_name*/
+        sizeof(struct _Mult),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        Mult_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+};
+
+static int
+Mult_validate(PyObject *_obj)
+{
+        return 0;
+}
+
+PyObject*
+Py_Div_New()
+{
+        struct _Div *result = PyObject_New(struct _Div, &Py_Div_Type);
+        if (result == NULL)
+                return NULL;
+        return (PyObject*)result;
+}
+
+static void
+Div_dealloc(PyObject* _self)
+{
+        struct _Div *self = (struct _Div*)_self;
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_Div_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "Div",		/*tp_name*/
+        sizeof(struct _Div),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        Div_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+};
+
+static int
+Div_validate(PyObject *_obj)
+{
+        return 0;
+}
+
+PyObject*
+Py_Mod_New()
+{
+        struct _Mod *result = PyObject_New(struct _Mod, &Py_Mod_Type);
+        if (result == NULL)
+                return NULL;
+        return (PyObject*)result;
+}
+
+static void
+Mod_dealloc(PyObject* _self)
+{
+        struct _Mod *self = (struct _Mod*)_self;
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_Mod_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "Mod",		/*tp_name*/
+        sizeof(struct _Mod),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        Mod_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+};
+
+static int
+Mod_validate(PyObject *_obj)
+{
+        return 0;
+}
+
+PyObject*
+Py_Pow_New()
+{
+        struct _Pow *result = PyObject_New(struct _Pow, &Py_Pow_Type);
+        if (result == NULL)
+                return NULL;
+        return (PyObject*)result;
+}
+
+static void
+Pow_dealloc(PyObject* _self)
+{
+        struct _Pow *self = (struct _Pow*)_self;
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_Pow_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "Pow",		/*tp_name*/
+        sizeof(struct _Pow),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        Pow_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+};
+
+static int
+Pow_validate(PyObject *_obj)
+{
+        return 0;
+}
+
+PyObject*
+Py_LShift_New()
+{
+        struct _LShift *result = PyObject_New(struct _LShift, &Py_LShift_Type);
+        if (result == NULL)
+                return NULL;
+        return (PyObject*)result;
+}
+
+static void
+LShift_dealloc(PyObject* _self)
+{
+        struct _LShift *self = (struct _LShift*)_self;
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_LShift_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "LShift",		/*tp_name*/
+        sizeof(struct _LShift),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        LShift_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+};
+
+static int
+LShift_validate(PyObject *_obj)
+{
+        return 0;
+}
+
+PyObject*
+Py_RShift_New()
+{
+        struct _RShift *result = PyObject_New(struct _RShift, &Py_RShift_Type);
+        if (result == NULL)
+                return NULL;
+        return (PyObject*)result;
+}
+
+static void
+RShift_dealloc(PyObject* _self)
+{
+        struct _RShift *self = (struct _RShift*)_self;
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_RShift_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "RShift",		/*tp_name*/
+        sizeof(struct _RShift),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        RShift_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+};
+
+static int
+RShift_validate(PyObject *_obj)
+{
+        return 0;
+}
+
+PyObject*
+Py_BitOr_New()
+{
+        struct _BitOr *result = PyObject_New(struct _BitOr, &Py_BitOr_Type);
+        if (result == NULL)
+                return NULL;
+        return (PyObject*)result;
+}
+
+static void
+BitOr_dealloc(PyObject* _self)
+{
+        struct _BitOr *self = (struct _BitOr*)_self;
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_BitOr_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "BitOr",		/*tp_name*/
+        sizeof(struct _BitOr),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        BitOr_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+};
+
+static int
+BitOr_validate(PyObject *_obj)
+{
+        return 0;
+}
+
+PyObject*
+Py_BitXor_New()
+{
+        struct _BitXor *result = PyObject_New(struct _BitXor, &Py_BitXor_Type);
+        if (result == NULL)
+                return NULL;
+        return (PyObject*)result;
+}
+
+static void
+BitXor_dealloc(PyObject* _self)
+{
+        struct _BitXor *self = (struct _BitXor*)_self;
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_BitXor_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "BitXor",		/*tp_name*/
+        sizeof(struct _BitXor),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        BitXor_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+};
+
+static int
+BitXor_validate(PyObject *_obj)
+{
+        return 0;
+}
+
+PyObject*
+Py_BitAnd_New()
+{
+        struct _BitAnd *result = PyObject_New(struct _BitAnd, &Py_BitAnd_Type);
+        if (result == NULL)
+                return NULL;
+        return (PyObject*)result;
+}
+
+static void
+BitAnd_dealloc(PyObject* _self)
+{
+        struct _BitAnd *self = (struct _BitAnd*)_self;
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_BitAnd_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "BitAnd",		/*tp_name*/
+        sizeof(struct _BitAnd),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        BitAnd_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+};
+
+static int
+BitAnd_validate(PyObject *_obj)
+{
+        return 0;
+}
+
+PyObject*
+Py_FloorDiv_New()
+{
+        struct _FloorDiv *result = PyObject_New(struct _FloorDiv, &Py_FloorDiv_Type);
+        if (result == NULL)
+                return NULL;
+        return (PyObject*)result;
+}
+
+static void
+FloorDiv_dealloc(PyObject* _self)
+{
+        struct _FloorDiv *self = (struct _FloorDiv*)_self;
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_FloorDiv_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "FloorDiv",		/*tp_name*/
+        sizeof(struct _FloorDiv),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        FloorDiv_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+};
+
+static int
+FloorDiv_validate(PyObject *_obj)
+{
+        return 0;
+}
+
+#define unaryop_dealloc 0
+PyTypeObject Py_unaryop_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "unaryop",		/*tp_name*/
+        sizeof(struct _unaryop),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        unaryop_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+};
+
+int
+unaryop_validate(PyObject* _obj)
+{
+        struct _unaryop *obj = (struct _unaryop*)_obj;
+        assert(unaryop_Check(_obj));
+        switch(obj->_kind) {
+                case Invert_kind:
+                    return Invert_validate(_obj);
+                case Not_kind:
+                    return Not_validate(_obj);
+                case UAdd_kind:
+                    return UAdd_validate(_obj);
+                case USub_kind:
+                    return USub_validate(_obj);
+        }
+        PyErr_SetString(PyExc_TypeError, "invalid _kind in unaryop");
+        return -1;
+}
+PyObject*
+Py_Invert_New()
+{
+        struct _Invert *result = PyObject_New(struct _Invert, &Py_Invert_Type);
+        if (result == NULL)
+                return NULL;
+        return (PyObject*)result;
+}
+
+static void
+Invert_dealloc(PyObject* _self)
+{
+        struct _Invert *self = (struct _Invert*)_self;
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_Invert_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "Invert",		/*tp_name*/
+        sizeof(struct _Invert),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        Invert_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+};
+
+static int
+Invert_validate(PyObject *_obj)
+{
+        return 0;
+}
+
+PyObject*
+Py_Not_New()
+{
+        struct _Not *result = PyObject_New(struct _Not, &Py_Not_Type);
+        if (result == NULL)
+                return NULL;
+        return (PyObject*)result;
+}
+
+static void
+Not_dealloc(PyObject* _self)
+{
+        struct _Not *self = (struct _Not*)_self;
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_Not_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "Not",		/*tp_name*/
+        sizeof(struct _Not),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        Not_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+};
+
+static int
+Not_validate(PyObject *_obj)
+{
+        return 0;
+}
+
+PyObject*
+Py_UAdd_New()
+{
+        struct _UAdd *result = PyObject_New(struct _UAdd, &Py_UAdd_Type);
+        if (result == NULL)
+                return NULL;
+        return (PyObject*)result;
+}
+
+static void
+UAdd_dealloc(PyObject* _self)
+{
+        struct _UAdd *self = (struct _UAdd*)_self;
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_UAdd_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "UAdd",		/*tp_name*/
+        sizeof(struct _UAdd),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        UAdd_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+};
+
+static int
+UAdd_validate(PyObject *_obj)
+{
+        return 0;
+}
+
+PyObject*
+Py_USub_New()
+{
+        struct _USub *result = PyObject_New(struct _USub, &Py_USub_Type);
+        if (result == NULL)
+                return NULL;
+        return (PyObject*)result;
+}
+
+static void
+USub_dealloc(PyObject* _self)
+{
+        struct _USub *self = (struct _USub*)_self;
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_USub_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "USub",		/*tp_name*/
+        sizeof(struct _USub),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        USub_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+};
+
+static int
+USub_validate(PyObject *_obj)
+{
+        return 0;
+}
+
+#define cmpop_dealloc 0
+PyTypeObject Py_cmpop_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "cmpop",		/*tp_name*/
+        sizeof(struct _cmpop),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        cmpop_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+};
+
+int
+cmpop_validate(PyObject* _obj)
+{
+        struct _cmpop *obj = (struct _cmpop*)_obj;
+        assert(cmpop_Check(_obj));
+        switch(obj->_kind) {
+                case Eq_kind:
+                    return Eq_validate(_obj);
+                case NotEq_kind:
+                    return NotEq_validate(_obj);
+                case Lt_kind:
+                    return Lt_validate(_obj);
+                case LtE_kind:
+                    return LtE_validate(_obj);
+                case Gt_kind:
+                    return Gt_validate(_obj);
+                case GtE_kind:
+                    return GtE_validate(_obj);
+                case Is_kind:
+                    return Is_validate(_obj);
+                case IsNot_kind:
+                    return IsNot_validate(_obj);
+                case In_kind:
+                    return In_validate(_obj);
+                case NotIn_kind:
+                    return NotIn_validate(_obj);
+        }
+        PyErr_SetString(PyExc_TypeError, "invalid _kind in cmpop");
+        return -1;
+}
+PyObject*
+Py_Eq_New()
+{
+        struct _Eq *result = PyObject_New(struct _Eq, &Py_Eq_Type);
+        if (result == NULL)
+                return NULL;
+        return (PyObject*)result;
+}
+
+static void
+Eq_dealloc(PyObject* _self)
+{
+        struct _Eq *self = (struct _Eq*)_self;
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_Eq_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "Eq",		/*tp_name*/
+        sizeof(struct _Eq),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        Eq_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+};
+
+static int
+Eq_validate(PyObject *_obj)
+{
+        return 0;
+}
+
+PyObject*
+Py_NotEq_New()
+{
+        struct _NotEq *result = PyObject_New(struct _NotEq, &Py_NotEq_Type);
+        if (result == NULL)
+                return NULL;
+        return (PyObject*)result;
+}
+
+static void
+NotEq_dealloc(PyObject* _self)
+{
+        struct _NotEq *self = (struct _NotEq*)_self;
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_NotEq_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "NotEq",		/*tp_name*/
+        sizeof(struct _NotEq),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        NotEq_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+};
+
+static int
+NotEq_validate(PyObject *_obj)
+{
+        return 0;
+}
+
+PyObject*
+Py_Lt_New()
+{
+        struct _Lt *result = PyObject_New(struct _Lt, &Py_Lt_Type);
+        if (result == NULL)
+                return NULL;
+        return (PyObject*)result;
+}
+
+static void
+Lt_dealloc(PyObject* _self)
+{
+        struct _Lt *self = (struct _Lt*)_self;
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_Lt_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "Lt",		/*tp_name*/
+        sizeof(struct _Lt),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        Lt_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+};
+
+static int
+Lt_validate(PyObject *_obj)
+{
+        return 0;
+}
+
+PyObject*
+Py_LtE_New()
+{
+        struct _LtE *result = PyObject_New(struct _LtE, &Py_LtE_Type);
+        if (result == NULL)
+                return NULL;
+        return (PyObject*)result;
+}
+
+static void
+LtE_dealloc(PyObject* _self)
+{
+        struct _LtE *self = (struct _LtE*)_self;
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_LtE_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "LtE",		/*tp_name*/
+        sizeof(struct _LtE),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        LtE_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+};
+
+static int
+LtE_validate(PyObject *_obj)
+{
+        return 0;
+}
+
+PyObject*
+Py_Gt_New()
+{
+        struct _Gt *result = PyObject_New(struct _Gt, &Py_Gt_Type);
+        if (result == NULL)
+                return NULL;
+        return (PyObject*)result;
+}
+
+static void
+Gt_dealloc(PyObject* _self)
+{
+        struct _Gt *self = (struct _Gt*)_self;
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_Gt_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "Gt",		/*tp_name*/
+        sizeof(struct _Gt),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        Gt_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+};
+
+static int
+Gt_validate(PyObject *_obj)
+{
+        return 0;
+}
+
+PyObject*
+Py_GtE_New()
+{
+        struct _GtE *result = PyObject_New(struct _GtE, &Py_GtE_Type);
+        if (result == NULL)
+                return NULL;
+        return (PyObject*)result;
+}
+
+static void
+GtE_dealloc(PyObject* _self)
+{
+        struct _GtE *self = (struct _GtE*)_self;
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_GtE_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "GtE",		/*tp_name*/
+        sizeof(struct _GtE),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        GtE_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+};
+
+static int
+GtE_validate(PyObject *_obj)
+{
+        return 0;
+}
+
+PyObject*
+Py_Is_New()
+{
+        struct _Is *result = PyObject_New(struct _Is, &Py_Is_Type);
+        if (result == NULL)
+                return NULL;
+        return (PyObject*)result;
+}
+
+static void
+Is_dealloc(PyObject* _self)
+{
+        struct _Is *self = (struct _Is*)_self;
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_Is_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "Is",		/*tp_name*/
+        sizeof(struct _Is),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        Is_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+};
+
+static int
+Is_validate(PyObject *_obj)
+{
+        return 0;
+}
+
+PyObject*
+Py_IsNot_New()
+{
+        struct _IsNot *result = PyObject_New(struct _IsNot, &Py_IsNot_Type);
+        if (result == NULL)
+                return NULL;
+        return (PyObject*)result;
+}
+
+static void
+IsNot_dealloc(PyObject* _self)
+{
+        struct _IsNot *self = (struct _IsNot*)_self;
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_IsNot_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "IsNot",		/*tp_name*/
+        sizeof(struct _IsNot),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        IsNot_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+};
+
+static int
+IsNot_validate(PyObject *_obj)
+{
+        return 0;
+}
+
+PyObject*
+Py_In_New()
+{
+        struct _In *result = PyObject_New(struct _In, &Py_In_Type);
+        if (result == NULL)
+                return NULL;
+        return (PyObject*)result;
+}
+
+static void
+In_dealloc(PyObject* _self)
+{
+        struct _In *self = (struct _In*)_self;
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_In_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "In",		/*tp_name*/
+        sizeof(struct _In),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        In_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+};
+
+static int
+In_validate(PyObject *_obj)
+{
+        return 0;
+}
+
+PyObject*
+Py_NotIn_New()
+{
+        struct _NotIn *result = PyObject_New(struct _NotIn, &Py_NotIn_Type);
+        if (result == NULL)
+                return NULL;
+        return (PyObject*)result;
+}
+
+static void
+NotIn_dealloc(PyObject* _self)
+{
+        struct _NotIn *self = (struct _NotIn*)_self;
+        PyObject_Del(self);
+}
+
+PyTypeObject Py_NotIn_Type = {
+        PyObject_HEAD_INIT(NULL)
+        0,		/*ob_size*/
+        "NotIn",		/*tp_name*/
+        sizeof(struct _NotIn),	/*tp_basicsize*/
+        0,		/* tp_itemsize */
+        NotIn_dealloc,		/*tp_dealloc*/
+        0,		/* tp_print */
+        0,		/* tp_getattr */
+        0,		/* tp_setattr */
+        0,		/* tp_compare */
+        0,		/* tp_repr */
+        0,		/* tp_as_number */
+        0,		/* tp_as_sequence */
+        0,		/* tp_as_mapping */
+        0,		/* tp_hash */
+        0,		/* tp_call */
+        0,		/* tp_str */
+        0,		/* tp_getattro */
+        0,		/* tp_setattro */
+        0,		/* tp_as_buffer */
+        Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,		/*tp_flags*/
+        0,		/* tp_doc */
+        0,		/* tp_traverse */
+        0,		/* tp_clear */
+        0,		/* tp_richcompare */
+        0,		/* tp_weaklistoffset */
+        0,		/* tp_iter */
+        0,		/* tp_iternext */
+        0,		/* tp_methods */
+        0,		/* tp_members */
+        0,		/* tp_getset */
+        0,		/* tp_base */
+        0,		/* tp_dict */
+        0,		/* tp_descr_get */
+        0,		/* tp_descr_set */
+        0,		/* tp_dictoffset */
+        0,		/* tp_init */
+        0,		/* tp_alloc */
+        0,		/* tp_new */
+        0,		/* tp_free */
+        0,		/* tp_is_gc */
+};
+
+static int
+NotIn_validate(PyObject *_obj)
+{
+        return 0;
+}
 
 PyObject*
 Py_comprehension_New(PyObject* target, PyObject* iter, PyObject* ifs)
@@ -3455,6 +7366,34 @@ PyTypeObject Py_comprehension_Type = {
         0,		/* tp_is_gc */
 };
 
+static int
+comprehension_validate(PyObject *_obj)
+{
+        struct _comprehension *obj = (struct _comprehension*)_obj;
+        int i;
+        if (!expr_Check(obj->target)) {
+            failed_check("target", "expr", obj->target);
+            return -1;
+        }
+        if (!expr_Check(obj->iter)) {
+            failed_check("iter", "expr", obj->iter);
+            return -1;
+        }
+        if (!PyList_Check(obj->ifs)) {
+           failed_check("ifs", "list", obj->ifs);
+           return -1;
+        }
+        for(i = 0; i < PyList_Size(obj->ifs); i++) {
+                if (!expr_Check(PyList_GET_ITEM(obj->ifs, i))) {
+                    failed_check("ifs", "expr", PyList_GET_ITEM(obj->ifs, i));
+                    return -1;
+                }
+                if (expr_validate(PyList_GET_ITEM(obj->ifs, i)) < 0)
+                    return -1;
+        }
+        return 0;
+}
+
 PyObject*
 Py_excepthandler_New(PyObject* type, PyObject* name, PyObject* body)
 {
@@ -3523,6 +7462,40 @@ PyTypeObject Py_excepthandler_Type = {
         0,		/* tp_free */
         0,		/* tp_is_gc */
 };
+
+static int
+excepthandler_validate(PyObject *_obj)
+{
+        struct _excepthandler *obj = (struct _excepthandler*)_obj;
+        int i;
+        if (obj->type != Py_None) /* empty */;
+        else if (!expr_Check(obj->type)) {
+            failed_check("type", "expr", obj->type);
+            return -1;
+        }
+        else if (expr_validate(obj->type) < 0)
+            return -1;
+        if (obj->name != Py_None) /* empty */;
+        else if (!expr_Check(obj->name)) {
+            failed_check("name", "expr", obj->name);
+            return -1;
+        }
+        else if (expr_validate(obj->name) < 0)
+            return -1;
+        if (!PyList_Check(obj->body)) {
+           failed_check("body", "list", obj->body);
+           return -1;
+        }
+        for(i = 0; i < PyList_Size(obj->body); i++) {
+                if (!stmt_Check(PyList_GET_ITEM(obj->body, i))) {
+                    failed_check("body", "stmt", PyList_GET_ITEM(obj->body, i));
+                    return -1;
+                }
+                if (stmt_validate(PyList_GET_ITEM(obj->body, i)) < 0)
+                    return -1;
+        }
+        return 0;
+}
 
 PyObject*
 Py_arguments_New(PyObject* args, PyObject* vararg, PyObject* kwarg, PyObject*
@@ -3597,6 +7570,49 @@ PyTypeObject Py_arguments_Type = {
         0,		/* tp_is_gc */
 };
 
+static int
+arguments_validate(PyObject *_obj)
+{
+        struct _arguments *obj = (struct _arguments*)_obj;
+        int i;
+        if (!PyList_Check(obj->args)) {
+           failed_check("args", "list", obj->args);
+           return -1;
+        }
+        for(i = 0; i < PyList_Size(obj->args); i++) {
+                if (!expr_Check(PyList_GET_ITEM(obj->args, i))) {
+                    failed_check("args", "expr", PyList_GET_ITEM(obj->args, i));
+                    return -1;
+                }
+                if (expr_validate(PyList_GET_ITEM(obj->args, i)) < 0)
+                    return -1;
+        }
+        if (obj->vararg != Py_None) /* empty */;
+        else if (!PyString_Check(obj->vararg)) {
+            failed_check("vararg", "identifier", obj->vararg);
+            return -1;
+        }
+        if (obj->kwarg != Py_None) /* empty */;
+        else if (!PyString_Check(obj->kwarg)) {
+            failed_check("kwarg", "identifier", obj->kwarg);
+            return -1;
+        }
+        if (!PyList_Check(obj->defaults)) {
+           failed_check("defaults", "list", obj->defaults);
+           return -1;
+        }
+        for(i = 0; i < PyList_Size(obj->defaults); i++) {
+                if (!expr_Check(PyList_GET_ITEM(obj->defaults, i))) {
+                    failed_check("defaults", "expr",
+                                 PyList_GET_ITEM(obj->defaults, i));
+                    return -1;
+                }
+                if (expr_validate(PyList_GET_ITEM(obj->defaults, i)) < 0)
+                    return -1;
+        }
+        return 0;
+}
+
 PyObject*
 Py_keyword_New(PyObject* arg, PyObject* value)
 {
@@ -3663,6 +7679,21 @@ PyTypeObject Py_keyword_Type = {
         0,		/* tp_is_gc */
 };
 
+static int
+keyword_validate(PyObject *_obj)
+{
+        struct _keyword *obj = (struct _keyword*)_obj;
+        if (!PyString_Check(obj->arg)) {
+            failed_check("arg", "identifier", obj->arg);
+            return -1;
+        }
+        if (!expr_Check(obj->value)) {
+            failed_check("value", "expr", obj->value);
+            return -1;
+        }
+        return 0;
+}
+
 PyObject*
 Py_alias_New(PyObject* name, PyObject* asname)
 {
@@ -3728,6 +7759,58 @@ PyTypeObject Py_alias_Type = {
         0,		/* tp_free */
         0,		/* tp_is_gc */
 };
+
+static int
+alias_validate(PyObject *_obj)
+{
+        struct _alias *obj = (struct _alias*)_obj;
+        if (!PyString_Check(obj->name)) {
+            failed_check("name", "identifier", obj->name);
+            return -1;
+        }
+        if (obj->asname != Py_None) /* empty */;
+        else if (!PyString_Check(obj->asname)) {
+            failed_check("asname", "identifier", obj->asname);
+            return -1;
+        }
+        return 0;
+}
+
+
+int PyAST_Validate(PyObject *obj)
+{
+        if (mod_Check(obj))
+                return mod_validate(obj);
+        if (stmt_Check(obj))
+                return stmt_validate(obj);
+        if (expr_Check(obj))
+                return expr_validate(obj);
+        if (expr_context_Check(obj))
+                return expr_context_validate(obj);
+        if (slice_Check(obj))
+                return slice_validate(obj);
+        if (boolop_Check(obj))
+                return boolop_validate(obj);
+        if (operator_Check(obj))
+                return operator_validate(obj);
+        if (unaryop_Check(obj))
+                return unaryop_validate(obj);
+        if (cmpop_Check(obj))
+                return cmpop_validate(obj);
+        if (comprehension_Check(obj))
+                return comprehension_validate(obj);
+        if (excepthandler_Check(obj))
+                return excepthandler_validate(obj);
+        if (arguments_Check(obj))
+                return arguments_validate(obj);
+        if (keyword_Check(obj))
+                return keyword_validate(obj);
+        if (alias_Check(obj))
+                return alias_validate(obj);
+        PyErr_Format(PyExc_TypeError, "Not an AST node: %s",
+                     obj->ob_type->tp_name);
+        return -1;
+}
 
 
 void init_ast(void)
@@ -3870,6 +7953,26 @@ void init_ast(void)
         Py_Tuple_Type.tp_base = &Py_expr_Type;
         if (PyType_Ready(&Py_Tuple_Type) < 0)
                 return;
+        if (PyType_Ready(&Py_expr_context_Type) < 0)
+                return;
+        Py_Load_Type.tp_base = &Py_expr_context_Type;
+        if (PyType_Ready(&Py_Load_Type) < 0)
+                return;
+        Py_Store_Type.tp_base = &Py_expr_context_Type;
+        if (PyType_Ready(&Py_Store_Type) < 0)
+                return;
+        Py_Del_Type.tp_base = &Py_expr_context_Type;
+        if (PyType_Ready(&Py_Del_Type) < 0)
+                return;
+        Py_AugLoad_Type.tp_base = &Py_expr_context_Type;
+        if (PyType_Ready(&Py_AugLoad_Type) < 0)
+                return;
+        Py_AugStore_Type.tp_base = &Py_expr_context_Type;
+        if (PyType_Ready(&Py_AugStore_Type) < 0)
+                return;
+        Py_Param_Type.tp_base = &Py_expr_context_Type;
+        if (PyType_Ready(&Py_Param_Type) < 0)
+                return;
         if (PyType_Ready(&Py_slice_Type) < 0)
                 return;
         Py_Ellipsis_Type.tp_base = &Py_slice_Type;
@@ -3883,6 +7986,98 @@ void init_ast(void)
                 return;
         Py_Index_Type.tp_base = &Py_slice_Type;
         if (PyType_Ready(&Py_Index_Type) < 0)
+                return;
+        if (PyType_Ready(&Py_boolop_Type) < 0)
+                return;
+        Py_And_Type.tp_base = &Py_boolop_Type;
+        if (PyType_Ready(&Py_And_Type) < 0)
+                return;
+        Py_Or_Type.tp_base = &Py_boolop_Type;
+        if (PyType_Ready(&Py_Or_Type) < 0)
+                return;
+        if (PyType_Ready(&Py_operator_Type) < 0)
+                return;
+        Py_Add_Type.tp_base = &Py_operator_Type;
+        if (PyType_Ready(&Py_Add_Type) < 0)
+                return;
+        Py_Sub_Type.tp_base = &Py_operator_Type;
+        if (PyType_Ready(&Py_Sub_Type) < 0)
+                return;
+        Py_Mult_Type.tp_base = &Py_operator_Type;
+        if (PyType_Ready(&Py_Mult_Type) < 0)
+                return;
+        Py_Div_Type.tp_base = &Py_operator_Type;
+        if (PyType_Ready(&Py_Div_Type) < 0)
+                return;
+        Py_Mod_Type.tp_base = &Py_operator_Type;
+        if (PyType_Ready(&Py_Mod_Type) < 0)
+                return;
+        Py_Pow_Type.tp_base = &Py_operator_Type;
+        if (PyType_Ready(&Py_Pow_Type) < 0)
+                return;
+        Py_LShift_Type.tp_base = &Py_operator_Type;
+        if (PyType_Ready(&Py_LShift_Type) < 0)
+                return;
+        Py_RShift_Type.tp_base = &Py_operator_Type;
+        if (PyType_Ready(&Py_RShift_Type) < 0)
+                return;
+        Py_BitOr_Type.tp_base = &Py_operator_Type;
+        if (PyType_Ready(&Py_BitOr_Type) < 0)
+                return;
+        Py_BitXor_Type.tp_base = &Py_operator_Type;
+        if (PyType_Ready(&Py_BitXor_Type) < 0)
+                return;
+        Py_BitAnd_Type.tp_base = &Py_operator_Type;
+        if (PyType_Ready(&Py_BitAnd_Type) < 0)
+                return;
+        Py_FloorDiv_Type.tp_base = &Py_operator_Type;
+        if (PyType_Ready(&Py_FloorDiv_Type) < 0)
+                return;
+        if (PyType_Ready(&Py_unaryop_Type) < 0)
+                return;
+        Py_Invert_Type.tp_base = &Py_unaryop_Type;
+        if (PyType_Ready(&Py_Invert_Type) < 0)
+                return;
+        Py_Not_Type.tp_base = &Py_unaryop_Type;
+        if (PyType_Ready(&Py_Not_Type) < 0)
+                return;
+        Py_UAdd_Type.tp_base = &Py_unaryop_Type;
+        if (PyType_Ready(&Py_UAdd_Type) < 0)
+                return;
+        Py_USub_Type.tp_base = &Py_unaryop_Type;
+        if (PyType_Ready(&Py_USub_Type) < 0)
+                return;
+        if (PyType_Ready(&Py_cmpop_Type) < 0)
+                return;
+        Py_Eq_Type.tp_base = &Py_cmpop_Type;
+        if (PyType_Ready(&Py_Eq_Type) < 0)
+                return;
+        Py_NotEq_Type.tp_base = &Py_cmpop_Type;
+        if (PyType_Ready(&Py_NotEq_Type) < 0)
+                return;
+        Py_Lt_Type.tp_base = &Py_cmpop_Type;
+        if (PyType_Ready(&Py_Lt_Type) < 0)
+                return;
+        Py_LtE_Type.tp_base = &Py_cmpop_Type;
+        if (PyType_Ready(&Py_LtE_Type) < 0)
+                return;
+        Py_Gt_Type.tp_base = &Py_cmpop_Type;
+        if (PyType_Ready(&Py_Gt_Type) < 0)
+                return;
+        Py_GtE_Type.tp_base = &Py_cmpop_Type;
+        if (PyType_Ready(&Py_GtE_Type) < 0)
+                return;
+        Py_Is_Type.tp_base = &Py_cmpop_Type;
+        if (PyType_Ready(&Py_Is_Type) < 0)
+                return;
+        Py_IsNot_Type.tp_base = &Py_cmpop_Type;
+        if (PyType_Ready(&Py_IsNot_Type) < 0)
+                return;
+        Py_In_Type.tp_base = &Py_cmpop_Type;
+        if (PyType_Ready(&Py_In_Type) < 0)
+                return;
+        Py_NotIn_Type.tp_base = &Py_cmpop_Type;
+        if (PyType_Ready(&Py_NotIn_Type) < 0)
                 return;
         if (PyType_Ready(&Py_comprehension_Type) < 0)
                 return;
