@@ -11,6 +11,7 @@ struct _mod{
         PyObject_HEAD
         enum {Module_kind, Interactive_kind, Expression_kind, Suite_kind} _kind;
 };
+#define mod_kind(o) (((struct _mod*)o)->_kind)
 
 PyAPI_DATA(PyTypeObject) Py_Module_Type;
 #define Module_Check(op) PyObject_TypeCheck(op, &Py_Module_Type)
@@ -21,6 +22,7 @@ struct _Module{
 };
 PyObject *Py_Module_New(PyObject*);
 #define Module Py_Module_New
+#define Module_body(o) (((struct _Module*)o)->body)
 
 PyAPI_DATA(PyTypeObject) Py_Interactive_Type;
 #define Interactive_Check(op) PyObject_TypeCheck(op, &Py_Interactive_Type)
@@ -31,6 +33,7 @@ struct _Interactive{
 };
 PyObject *Py_Interactive_New(PyObject*);
 #define Interactive Py_Interactive_New
+#define Interactive_body(o) (((struct _Interactive*)o)->body)
 
 PyAPI_DATA(PyTypeObject) Py_Expression_Type;
 #define Expression_Check(op) PyObject_TypeCheck(op, &Py_Expression_Type)
@@ -41,6 +44,7 @@ struct _Expression{
 };
 PyObject *Py_Expression_New(PyObject*);
 #define Expression Py_Expression_New
+#define Expression_body(o) (((struct _Expression*)o)->body)
 
 PyAPI_DATA(PyTypeObject) Py_Suite_Type;
 #define Suite_Check(op) PyObject_TypeCheck(op, &Py_Suite_Type)
@@ -51,6 +55,7 @@ struct _Suite{
 };
 PyObject *Py_Suite_New(PyObject*);
 #define Suite Py_Suite_New
+#define Suite_body(o) (((struct _Suite*)o)->body)
 
 PyAPI_DATA(PyTypeObject) Py_stmt_Type;
 #define stmt_Check(op) PyObject_TypeCheck(op, &Py_stmt_Type)
@@ -65,6 +70,7 @@ struct _stmt{
                _kind;
         int lineno;
 };
+#define stmt_kind(o) (((struct _stmt*)o)->_kind)
 
 PyAPI_DATA(PyTypeObject) Py_FunctionDef_Type;
 #define FunctionDef_Check(op) PyObject_TypeCheck(op, &Py_FunctionDef_Type)
@@ -78,6 +84,10 @@ struct _FunctionDef{
 };
 PyObject *Py_FunctionDef_New(PyObject*, PyObject*, PyObject*, PyObject*, int);
 #define FunctionDef Py_FunctionDef_New
+#define FunctionDef_name(o) (((struct _FunctionDef*)o)->name)
+#define FunctionDef_args(o) (((struct _FunctionDef*)o)->args)
+#define FunctionDef_body(o) (((struct _FunctionDef*)o)->body)
+#define FunctionDef_decorators(o) (((struct _FunctionDef*)o)->decorators)
 
 PyAPI_DATA(PyTypeObject) Py_ClassDef_Type;
 #define ClassDef_Check(op) PyObject_TypeCheck(op, &Py_ClassDef_Type)
@@ -90,6 +100,9 @@ struct _ClassDef{
 };
 PyObject *Py_ClassDef_New(PyObject*, PyObject*, PyObject*, int);
 #define ClassDef Py_ClassDef_New
+#define ClassDef_name(o) (((struct _ClassDef*)o)->name)
+#define ClassDef_bases(o) (((struct _ClassDef*)o)->bases)
+#define ClassDef_body(o) (((struct _ClassDef*)o)->body)
 
 PyAPI_DATA(PyTypeObject) Py_Return_Type;
 #define Return_Check(op) PyObject_TypeCheck(op, &Py_Return_Type)
@@ -100,6 +113,7 @@ struct _Return{
 };
 PyObject *Py_Return_New(PyObject*, int);
 #define Return Py_Return_New
+#define Return_value(o) (((struct _Return*)o)->value)
 
 PyAPI_DATA(PyTypeObject) Py_Delete_Type;
 #define Delete_Check(op) PyObject_TypeCheck(op, &Py_Delete_Type)
@@ -110,6 +124,7 @@ struct _Delete{
 };
 PyObject *Py_Delete_New(PyObject*, int);
 #define Delete Py_Delete_New
+#define Delete_targets(o) (((struct _Delete*)o)->targets)
 
 PyAPI_DATA(PyTypeObject) Py_Assign_Type;
 #define Assign_Check(op) PyObject_TypeCheck(op, &Py_Assign_Type)
@@ -121,6 +136,8 @@ struct _Assign{
 };
 PyObject *Py_Assign_New(PyObject*, PyObject*, int);
 #define Assign Py_Assign_New
+#define Assign_targets(o) (((struct _Assign*)o)->targets)
+#define Assign_value(o) (((struct _Assign*)o)->value)
 
 PyAPI_DATA(PyTypeObject) Py_AugAssign_Type;
 #define AugAssign_Check(op) PyObject_TypeCheck(op, &Py_AugAssign_Type)
@@ -133,6 +150,9 @@ struct _AugAssign{
 };
 PyObject *Py_AugAssign_New(PyObject*, PyObject*, PyObject*, int);
 #define AugAssign Py_AugAssign_New
+#define AugAssign_target(o) (((struct _AugAssign*)o)->target)
+#define AugAssign_op(o) (((struct _AugAssign*)o)->op)
+#define AugAssign_value(o) (((struct _AugAssign*)o)->value)
 
 PyAPI_DATA(PyTypeObject) Py_Print_Type;
 #define Print_Check(op) PyObject_TypeCheck(op, &Py_Print_Type)
@@ -145,6 +165,9 @@ struct _Print{
 };
 PyObject *Py_Print_New(PyObject*, PyObject*, PyObject*, int);
 #define Print Py_Print_New
+#define Print_dest(o) (((struct _Print*)o)->dest)
+#define Print_values(o) (((struct _Print*)o)->values)
+#define Print_nl(o) (((struct _Print*)o)->nl)
 
 PyAPI_DATA(PyTypeObject) Py_For_Type;
 #define For_Check(op) PyObject_TypeCheck(op, &Py_For_Type)
@@ -158,6 +181,10 @@ struct _For{
 };
 PyObject *Py_For_New(PyObject*, PyObject*, PyObject*, PyObject*, int);
 #define For Py_For_New
+#define For_target(o) (((struct _For*)o)->target)
+#define For_iter(o) (((struct _For*)o)->iter)
+#define For_body(o) (((struct _For*)o)->body)
+#define For_orelse(o) (((struct _For*)o)->orelse)
 
 PyAPI_DATA(PyTypeObject) Py_While_Type;
 #define While_Check(op) PyObject_TypeCheck(op, &Py_While_Type)
@@ -170,6 +197,9 @@ struct _While{
 };
 PyObject *Py_While_New(PyObject*, PyObject*, PyObject*, int);
 #define While Py_While_New
+#define While_test(o) (((struct _While*)o)->test)
+#define While_body(o) (((struct _While*)o)->body)
+#define While_orelse(o) (((struct _While*)o)->orelse)
 
 PyAPI_DATA(PyTypeObject) Py_If_Type;
 #define If_Check(op) PyObject_TypeCheck(op, &Py_If_Type)
@@ -182,6 +212,9 @@ struct _If{
 };
 PyObject *Py_If_New(PyObject*, PyObject*, PyObject*, int);
 #define If Py_If_New
+#define If_test(o) (((struct _If*)o)->test)
+#define If_body(o) (((struct _If*)o)->body)
+#define If_orelse(o) (((struct _If*)o)->orelse)
 
 PyAPI_DATA(PyTypeObject) Py_Raise_Type;
 #define Raise_Check(op) PyObject_TypeCheck(op, &Py_Raise_Type)
@@ -194,6 +227,9 @@ struct _Raise{
 };
 PyObject *Py_Raise_New(PyObject*, PyObject*, PyObject*, int);
 #define Raise Py_Raise_New
+#define Raise_type(o) (((struct _Raise*)o)->type)
+#define Raise_inst(o) (((struct _Raise*)o)->inst)
+#define Raise_tback(o) (((struct _Raise*)o)->tback)
 
 PyAPI_DATA(PyTypeObject) Py_TryExcept_Type;
 #define TryExcept_Check(op) PyObject_TypeCheck(op, &Py_TryExcept_Type)
@@ -206,6 +242,9 @@ struct _TryExcept{
 };
 PyObject *Py_TryExcept_New(PyObject*, PyObject*, PyObject*, int);
 #define TryExcept Py_TryExcept_New
+#define TryExcept_body(o) (((struct _TryExcept*)o)->body)
+#define TryExcept_handlers(o) (((struct _TryExcept*)o)->handlers)
+#define TryExcept_orelse(o) (((struct _TryExcept*)o)->orelse)
 
 PyAPI_DATA(PyTypeObject) Py_TryFinally_Type;
 #define TryFinally_Check(op) PyObject_TypeCheck(op, &Py_TryFinally_Type)
@@ -217,6 +256,8 @@ struct _TryFinally{
 };
 PyObject *Py_TryFinally_New(PyObject*, PyObject*, int);
 #define TryFinally Py_TryFinally_New
+#define TryFinally_body(o) (((struct _TryFinally*)o)->body)
+#define TryFinally_finalbody(o) (((struct _TryFinally*)o)->finalbody)
 
 PyAPI_DATA(PyTypeObject) Py_Assert_Type;
 #define Assert_Check(op) PyObject_TypeCheck(op, &Py_Assert_Type)
@@ -228,6 +269,8 @@ struct _Assert{
 };
 PyObject *Py_Assert_New(PyObject*, PyObject*, int);
 #define Assert Py_Assert_New
+#define Assert_test(o) (((struct _Assert*)o)->test)
+#define Assert_msg(o) (((struct _Assert*)o)->msg)
 
 PyAPI_DATA(PyTypeObject) Py_Import_Type;
 #define Import_Check(op) PyObject_TypeCheck(op, &Py_Import_Type)
@@ -238,6 +281,7 @@ struct _Import{
 };
 PyObject *Py_Import_New(PyObject*, int);
 #define Import Py_Import_New
+#define Import_names(o) (((struct _Import*)o)->names)
 
 PyAPI_DATA(PyTypeObject) Py_ImportFrom_Type;
 #define ImportFrom_Check(op) PyObject_TypeCheck(op, &Py_ImportFrom_Type)
@@ -249,6 +293,8 @@ struct _ImportFrom{
 };
 PyObject *Py_ImportFrom_New(PyObject*, PyObject*, int);
 #define ImportFrom Py_ImportFrom_New
+#define ImportFrom_module(o) (((struct _ImportFrom*)o)->module)
+#define ImportFrom_names(o) (((struct _ImportFrom*)o)->names)
 
 PyAPI_DATA(PyTypeObject) Py_Exec_Type;
 #define Exec_Check(op) PyObject_TypeCheck(op, &Py_Exec_Type)
@@ -261,6 +307,9 @@ struct _Exec{
 };
 PyObject *Py_Exec_New(PyObject*, PyObject*, PyObject*, int);
 #define Exec Py_Exec_New
+#define Exec_body(o) (((struct _Exec*)o)->body)
+#define Exec_globals(o) (((struct _Exec*)o)->globals)
+#define Exec_locals(o) (((struct _Exec*)o)->locals)
 
 PyAPI_DATA(PyTypeObject) Py_Global_Type;
 #define Global_Check(op) PyObject_TypeCheck(op, &Py_Global_Type)
@@ -271,6 +320,7 @@ struct _Global{
 };
 PyObject *Py_Global_New(PyObject*, int);
 #define Global Py_Global_New
+#define Global_names(o) (((struct _Global*)o)->names)
 
 PyAPI_DATA(PyTypeObject) Py_Expr_Type;
 #define Expr_Check(op) PyObject_TypeCheck(op, &Py_Expr_Type)
@@ -281,6 +331,7 @@ struct _Expr{
 };
 PyObject *Py_Expr_New(PyObject*, int);
 #define Expr Py_Expr_New
+#define Expr_value(o) (((struct _Expr*)o)->value)
 
 PyAPI_DATA(PyTypeObject) Py_Pass_Type;
 #define Pass_Check(op) PyObject_TypeCheck(op, &Py_Pass_Type)
@@ -320,6 +371,7 @@ struct _expr{
                Subscript_kind, Name_kind, List_kind, Tuple_kind} _kind;
         int lineno;
 };
+#define expr_kind(o) (((struct _expr*)o)->_kind)
 
 PyAPI_DATA(PyTypeObject) Py_BoolOp_Type;
 #define BoolOp_Check(op) PyObject_TypeCheck(op, &Py_BoolOp_Type)
@@ -331,6 +383,8 @@ struct _BoolOp{
 };
 PyObject *Py_BoolOp_New(PyObject*, PyObject*, int);
 #define BoolOp Py_BoolOp_New
+#define BoolOp_op(o) (((struct _BoolOp*)o)->op)
+#define BoolOp_values(o) (((struct _BoolOp*)o)->values)
 
 PyAPI_DATA(PyTypeObject) Py_BinOp_Type;
 #define BinOp_Check(op) PyObject_TypeCheck(op, &Py_BinOp_Type)
@@ -343,6 +397,9 @@ struct _BinOp{
 };
 PyObject *Py_BinOp_New(PyObject*, PyObject*, PyObject*, int);
 #define BinOp Py_BinOp_New
+#define BinOp_left(o) (((struct _BinOp*)o)->left)
+#define BinOp_op(o) (((struct _BinOp*)o)->op)
+#define BinOp_right(o) (((struct _BinOp*)o)->right)
 
 PyAPI_DATA(PyTypeObject) Py_UnaryOp_Type;
 #define UnaryOp_Check(op) PyObject_TypeCheck(op, &Py_UnaryOp_Type)
@@ -354,6 +411,8 @@ struct _UnaryOp{
 };
 PyObject *Py_UnaryOp_New(PyObject*, PyObject*, int);
 #define UnaryOp Py_UnaryOp_New
+#define UnaryOp_op(o) (((struct _UnaryOp*)o)->op)
+#define UnaryOp_operand(o) (((struct _UnaryOp*)o)->operand)
 
 PyAPI_DATA(PyTypeObject) Py_Lambda_Type;
 #define Lambda_Check(op) PyObject_TypeCheck(op, &Py_Lambda_Type)
@@ -365,6 +424,8 @@ struct _Lambda{
 };
 PyObject *Py_Lambda_New(PyObject*, PyObject*, int);
 #define Lambda Py_Lambda_New
+#define Lambda_args(o) (((struct _Lambda*)o)->args)
+#define Lambda_body(o) (((struct _Lambda*)o)->body)
 
 PyAPI_DATA(PyTypeObject) Py_Dict_Type;
 #define Dict_Check(op) PyObject_TypeCheck(op, &Py_Dict_Type)
@@ -376,6 +437,8 @@ struct _Dict{
 };
 PyObject *Py_Dict_New(PyObject*, PyObject*, int);
 #define Dict Py_Dict_New
+#define Dict_keys(o) (((struct _Dict*)o)->keys)
+#define Dict_values(o) (((struct _Dict*)o)->values)
 
 PyAPI_DATA(PyTypeObject) Py_ListComp_Type;
 #define ListComp_Check(op) PyObject_TypeCheck(op, &Py_ListComp_Type)
@@ -387,6 +450,8 @@ struct _ListComp{
 };
 PyObject *Py_ListComp_New(PyObject*, PyObject*, int);
 #define ListComp Py_ListComp_New
+#define ListComp_elt(o) (((struct _ListComp*)o)->elt)
+#define ListComp_generators(o) (((struct _ListComp*)o)->generators)
 
 PyAPI_DATA(PyTypeObject) Py_GeneratorExp_Type;
 #define GeneratorExp_Check(op) PyObject_TypeCheck(op, &Py_GeneratorExp_Type)
@@ -398,6 +463,8 @@ struct _GeneratorExp{
 };
 PyObject *Py_GeneratorExp_New(PyObject*, PyObject*, int);
 #define GeneratorExp Py_GeneratorExp_New
+#define GeneratorExp_elt(o) (((struct _GeneratorExp*)o)->elt)
+#define GeneratorExp_generators(o) (((struct _GeneratorExp*)o)->generators)
 
 PyAPI_DATA(PyTypeObject) Py_Yield_Type;
 #define Yield_Check(op) PyObject_TypeCheck(op, &Py_Yield_Type)
@@ -408,6 +475,7 @@ struct _Yield{
 };
 PyObject *Py_Yield_New(PyObject*, int);
 #define Yield Py_Yield_New
+#define Yield_value(o) (((struct _Yield*)o)->value)
 
 PyAPI_DATA(PyTypeObject) Py_Compare_Type;
 #define Compare_Check(op) PyObject_TypeCheck(op, &Py_Compare_Type)
@@ -420,6 +488,9 @@ struct _Compare{
 };
 PyObject *Py_Compare_New(PyObject*, PyObject*, PyObject*, int);
 #define Compare Py_Compare_New
+#define Compare_left(o) (((struct _Compare*)o)->left)
+#define Compare_ops(o) (((struct _Compare*)o)->ops)
+#define Compare_comparators(o) (((struct _Compare*)o)->comparators)
 
 PyAPI_DATA(PyTypeObject) Py_Call_Type;
 #define Call_Check(op) PyObject_TypeCheck(op, &Py_Call_Type)
@@ -435,6 +506,11 @@ struct _Call{
 PyObject *Py_Call_New(PyObject*, PyObject*, PyObject*, PyObject*, PyObject*,
                       int);
 #define Call Py_Call_New
+#define Call_func(o) (((struct _Call*)o)->func)
+#define Call_args(o) (((struct _Call*)o)->args)
+#define Call_keywords(o) (((struct _Call*)o)->keywords)
+#define Call_starargs(o) (((struct _Call*)o)->starargs)
+#define Call_kwargs(o) (((struct _Call*)o)->kwargs)
 
 PyAPI_DATA(PyTypeObject) Py_Repr_Type;
 #define Repr_Check(op) PyObject_TypeCheck(op, &Py_Repr_Type)
@@ -445,6 +521,7 @@ struct _Repr{
 };
 PyObject *Py_Repr_New(PyObject*, int);
 #define Repr Py_Repr_New
+#define Repr_value(o) (((struct _Repr*)o)->value)
 
 PyAPI_DATA(PyTypeObject) Py_Num_Type;
 #define Num_Check(op) PyObject_TypeCheck(op, &Py_Num_Type)
@@ -455,6 +532,7 @@ struct _Num{
 };
 PyObject *Py_Num_New(PyObject*, int);
 #define Num Py_Num_New
+#define Num_n(o) (((struct _Num*)o)->n)
 
 PyAPI_DATA(PyTypeObject) Py_Str_Type;
 #define Str_Check(op) PyObject_TypeCheck(op, &Py_Str_Type)
@@ -465,6 +543,7 @@ struct _Str{
 };
 PyObject *Py_Str_New(PyObject*, int);
 #define Str Py_Str_New
+#define Str_s(o) (((struct _Str*)o)->s)
 
 PyAPI_DATA(PyTypeObject) Py_Attribute_Type;
 #define Attribute_Check(op) PyObject_TypeCheck(op, &Py_Attribute_Type)
@@ -477,6 +556,9 @@ struct _Attribute{
 };
 PyObject *Py_Attribute_New(PyObject*, PyObject*, PyObject*, int);
 #define Attribute Py_Attribute_New
+#define Attribute_value(o) (((struct _Attribute*)o)->value)
+#define Attribute_attr(o) (((struct _Attribute*)o)->attr)
+#define Attribute_ctx(o) (((struct _Attribute*)o)->ctx)
 
 PyAPI_DATA(PyTypeObject) Py_Subscript_Type;
 #define Subscript_Check(op) PyObject_TypeCheck(op, &Py_Subscript_Type)
@@ -489,6 +571,9 @@ struct _Subscript{
 };
 PyObject *Py_Subscript_New(PyObject*, PyObject*, PyObject*, int);
 #define Subscript Py_Subscript_New
+#define Subscript_value(o) (((struct _Subscript*)o)->value)
+#define Subscript_slice(o) (((struct _Subscript*)o)->slice)
+#define Subscript_ctx(o) (((struct _Subscript*)o)->ctx)
 
 PyAPI_DATA(PyTypeObject) Py_Name_Type;
 #define Name_Check(op) PyObject_TypeCheck(op, &Py_Name_Type)
@@ -500,6 +585,8 @@ struct _Name{
 };
 PyObject *Py_Name_New(PyObject*, PyObject*, int);
 #define Name Py_Name_New
+#define Name_id(o) (((struct _Name*)o)->id)
+#define Name_ctx(o) (((struct _Name*)o)->ctx)
 
 PyAPI_DATA(PyTypeObject) Py_List_Type;
 #define List_Check(op) PyObject_TypeCheck(op, &Py_List_Type)
@@ -511,6 +598,8 @@ struct _List{
 };
 PyObject *Py_List_New(PyObject*, PyObject*, int);
 #define List Py_List_New
+#define List_elts(o) (((struct _List*)o)->elts)
+#define List_ctx(o) (((struct _List*)o)->ctx)
 
 PyAPI_DATA(PyTypeObject) Py_Tuple_Type;
 #define Tuple_Check(op) PyObject_TypeCheck(op, &Py_Tuple_Type)
@@ -522,6 +611,8 @@ struct _Tuple{
 };
 PyObject *Py_Tuple_New(PyObject*, PyObject*, int);
 #define Tuple Py_Tuple_New
+#define Tuple_elts(o) (((struct _Tuple*)o)->elts)
+#define Tuple_ctx(o) (((struct _Tuple*)o)->ctx)
 
 PyAPI_DATA(PyTypeObject) Py_expr_context_Type;
 #define expr_context_Check(op) PyObject_TypeCheck(op, &Py_expr_context_Type)
@@ -531,6 +622,7 @@ struct _expr_context{
         enum {Load_kind, Store_kind, Del_kind, AugLoad_kind, AugStore_kind,
                Param_kind} _kind;
 };
+#define expr_context_kind(o) (((struct _expr_context*)o)->_kind)
 
 PyAPI_DATA(PyTypeObject) Py_Load_Type;
 #define Load_Check(op) PyObject_TypeCheck(op, &Py_Load_Type)
@@ -593,6 +685,7 @@ struct _slice{
         PyObject_HEAD
         enum {Ellipsis_kind, Slice_kind, ExtSlice_kind, Index_kind} _kind;
 };
+#define slice_kind(o) (((struct _slice*)o)->_kind)
 
 PyAPI_DATA(PyTypeObject) Py_Ellipsis_Type;
 #define Ellipsis_Check(op) PyObject_TypeCheck(op, &Py_Ellipsis_Type)
@@ -614,6 +707,9 @@ struct _Slice{
 };
 PyObject *Py_Slice_New(PyObject*, PyObject*, PyObject*);
 #define Slice Py_Slice_New
+#define Slice_lower(o) (((struct _Slice*)o)->lower)
+#define Slice_upper(o) (((struct _Slice*)o)->upper)
+#define Slice_step(o) (((struct _Slice*)o)->step)
 
 PyAPI_DATA(PyTypeObject) Py_ExtSlice_Type;
 #define ExtSlice_Check(op) PyObject_TypeCheck(op, &Py_ExtSlice_Type)
@@ -624,6 +720,7 @@ struct _ExtSlice{
 };
 PyObject *Py_ExtSlice_New(PyObject*);
 #define ExtSlice Py_ExtSlice_New
+#define ExtSlice_dims(o) (((struct _ExtSlice*)o)->dims)
 
 PyAPI_DATA(PyTypeObject) Py_Index_Type;
 #define Index_Check(op) PyObject_TypeCheck(op, &Py_Index_Type)
@@ -634,6 +731,7 @@ struct _Index{
 };
 PyObject *Py_Index_New(PyObject*);
 #define Index Py_Index_New
+#define Index_value(o) (((struct _Index*)o)->value)
 
 PyAPI_DATA(PyTypeObject) Py_boolop_Type;
 #define boolop_Check(op) PyObject_TypeCheck(op, &Py_boolop_Type)
@@ -642,6 +740,7 @@ struct _boolop{
         PyObject_HEAD
         enum {And_kind, Or_kind} _kind;
 };
+#define boolop_kind(o) (((struct _boolop*)o)->_kind)
 
 PyAPI_DATA(PyTypeObject) Py_And_Type;
 #define And_Check(op) PyObject_TypeCheck(op, &Py_And_Type)
@@ -670,6 +769,7 @@ struct _operator{
                LShift_kind, RShift_kind, BitOr_kind, BitXor_kind, BitAnd_kind,
                FloorDiv_kind} _kind;
 };
+#define operator_kind(o) (((struct _operator*)o)->_kind)
 
 PyAPI_DATA(PyTypeObject) Py_Add_Type;
 #define Add_Check(op) PyObject_TypeCheck(op, &Py_Add_Type)
@@ -786,6 +886,7 @@ struct _unaryop{
         PyObject_HEAD
         enum {Invert_kind, Not_kind, UAdd_kind, USub_kind} _kind;
 };
+#define unaryop_kind(o) (((struct _unaryop*)o)->_kind)
 
 PyAPI_DATA(PyTypeObject) Py_Invert_Type;
 #define Invert_Check(op) PyObject_TypeCheck(op, &Py_Invert_Type)
@@ -831,6 +932,7 @@ struct _cmpop{
         enum {Eq_kind, NotEq_kind, Lt_kind, LtE_kind, Gt_kind, GtE_kind,
                Is_kind, IsNot_kind, In_kind, NotIn_kind} _kind;
 };
+#define cmpop_kind(o) (((struct _cmpop*)o)->_kind)
 
 PyAPI_DATA(PyTypeObject) Py_Eq_Type;
 #define Eq_Check(op) PyObject_TypeCheck(op, &Py_Eq_Type)
@@ -932,6 +1034,7 @@ struct _comprehension {
         PyObject* ifs; /* expr */
 };
 PyObject *Py_comprehension_New(PyObject*, PyObject*, PyObject*);
+#define comprehension Py_comprehension_New
 
 PyAPI_DATA(PyTypeObject) Py_excepthandler_Type;
 #define excepthandler_Check(op) PyObject_TypeCheck(op, &Py_excepthandler_Type)
@@ -943,6 +1046,7 @@ struct _excepthandler {
         PyObject* body; /* stmt */
 };
 PyObject *Py_excepthandler_New(PyObject*, PyObject*, PyObject*);
+#define excepthandler Py_excepthandler_New
 
 PyAPI_DATA(PyTypeObject) Py_arguments_Type;
 #define arguments_Check(op) PyObject_TypeCheck(op, &Py_arguments_Type)
@@ -955,6 +1059,7 @@ struct _arguments {
         PyObject* defaults; /* expr */
 };
 PyObject *Py_arguments_New(PyObject*, PyObject*, PyObject*, PyObject*);
+#define arguments Py_arguments_New
 
 PyAPI_DATA(PyTypeObject) Py_keyword_Type;
 #define keyword_Check(op) PyObject_TypeCheck(op, &Py_keyword_Type)
@@ -965,6 +1070,7 @@ struct _keyword {
         PyObject* value; /* expr */
 };
 PyObject *Py_keyword_New(PyObject*, PyObject*);
+#define keyword Py_keyword_New
 
 PyAPI_DATA(PyTypeObject) Py_alias_Type;
 #define alias_Check(op) PyObject_TypeCheck(op, &Py_alias_Type)
@@ -975,4 +1081,5 @@ struct _alias {
         PyObject* asname; /* identifier */
 };
 PyObject *Py_alias_New(PyObject*, PyObject*);
+#define alias Py_alias_New
 

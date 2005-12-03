@@ -133,6 +133,12 @@ class HeaderVisitor(EmitVisitor):
                 depth, reflow=False)
         self.emit("",depth)
 
+
+    def emit_field_access(self, name, fields):
+        for f in fields:
+            self.emit("#define %s_%s(o) (((struct _%s*)o)->%s)" %
+                      (name, f.name, name, f.name), 0)
+
     def visitModule(self, mod):
         for dfn in mod.dfns:
             self.visit(dfn)
@@ -156,6 +162,7 @@ class HeaderVisitor(EmitVisitor):
             assert type in asdl.builtin_types, type
             emit("%s %s;" % (type, field.name), depth + 1)
         emit("};")
+        emit("#define %s_kind(o) (((struct _%s*)o)->_kind)" % (name, name))
         emit("")
         for t in sum.types:
             self.visitConstructor(name, t, sum.attributes, depth)
@@ -175,6 +182,7 @@ class HeaderVisitor(EmitVisitor):
         self.emit("PyObject *Py_%s_New(%s);" % (cons.name, args), depth)
         # for convenience
         self.emit("#define %s Py_%s_New" % (cons.name, cons.name), depth)
+        self.emit_field_access(cons.name, cons.fields)
         self.emit("", depth)
 
     def visitField(self, field, depth):
@@ -191,6 +199,7 @@ class HeaderVisitor(EmitVisitor):
             self.visit(f, depth + 1)
         self.emit("};", depth)
         self.emit("PyObject *Py_%s_New(%s);" % (name, ", ".join(field_types)), depth)
+        self.emit("#define %s Py_%s_New" % (name, name), depth)
         self.emit("", depth)
 
 class ForwardVisitor(TraversalVisitor):
@@ -224,8 +233,10 @@ class FunctionVisitor(TraversalVisitor):
     def emit_ctor(self, name, args, attrs):
         def emit(s, depth=0, reflow=1):
             self.emit(s, depth, reflow)
-        argstr = ", ".join(["%s %s" % (atype, aname)
-                            for atype, aname, opt in args + attrs])
+        argstr = ["%s %s" % (f.type, f.name) for f in args]
+        argstr += ["%s %s" % (argtype, argname)
+                   for argtype, argname, opt in attrs]
+        argstr = ", ".join(argstr)
         
         emit("PyObject*")
         emit("Py_%s_New(%s)" % (name, argstr))
@@ -233,10 +244,19 @@ class FunctionVisitor(TraversalVisitor):
         emit("struct _%s *result = PyObject_New(struct _%s, &Py_%s_Type);" % (name, name, name), 1, 0)
         emit("if (result == NULL)", 1)
         emit("return NULL;", 2)
-        for argtype, argname, opt in args:
+        for f in args:
+            argtype = get_c_type(f.type)
             if argtype == "PyObject*":
-                emit("Py_INCREF(%s);" % argname, 1)
-            emit("result->%s = %s;" % (argname, argname), 1)
+                if f.opt:
+                    emit("if (%s == NULL) {" % f.name, 1)
+                    emit("Py_INCREF(Py_None);", 2)
+                    emit("%s = Py_None;" % f.name, 2)
+                    emit("}", 1)
+                elif f.seq:
+                    emit("if (%s == NULL)" % f.name, 1)
+                    emit("%s = Py_List_New(0);" % f.name, 2)
+                emit("Py_INCREF(%s);" % f.name, 1)
+            emit("result->%s = %s;" % (f.name, f.name), 1)
         for argtype, argname, opt in attrs:
             if argtype == "PyObject*":
                 emit("Py_INCREF(%s);" % argname, 1)
@@ -411,7 +431,7 @@ class FunctionVisitor(TraversalVisitor):
         
     def visitProduct(self, prod, name):
         args = self.get_args(prod.fields)
-        self.emit_ctor(str(name), args, [])
+        self.emit_ctor(str(name), prod.fields, [])
         self.emit_dealloc(str(name), args, [])
         self.emit_type(str(name))
         self.emit_validate(str(name), prod.fields, [])
@@ -419,7 +439,7 @@ class FunctionVisitor(TraversalVisitor):
     def visitConstructor(self, cons, name, attrs):
         args = self.get_args(cons.fields)
         attrs = self.get_args(attrs)
-        self.emit_ctor(cons.name, args, attrs)
+        self.emit_ctor(cons.name, cons.fields, attrs)
         self.emit_dealloc(cons.name, args, attrs)
         self.emit_type(cons.name)
         self.emit_validate(cons.name, cons.fields, attrs)
