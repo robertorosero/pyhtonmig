@@ -753,12 +753,14 @@ ast_for_arguments(struct compiling *c, const node *n)
     return result;
 }
 
-static expr_ty
+static PyObject*
 ast_for_dotted_name(struct compiling *c, const node *n)
 {
-    expr_ty e = NULL;
-    expr_ty attrib = NULL;
-    identifier id = NULL;
+    PyObject *result = NULL;
+    PyObject *e = NULL;
+    PyObject *attrib = NULL;
+    PyObject *id = NULL;
+    PyObject *load = NULL;
     int i;
 
     REQ(n, dotted_name);
@@ -766,8 +768,11 @@ ast_for_dotted_name(struct compiling *c, const node *n)
     id = NEW_IDENTIFIER(CHILD(n, 0));
     if (!id)
         goto error;
-    e = Name(id, Load, LINENO(n));
-    if (!e)
+    load = Load();
+    if (!load)
+	goto error;
+    e = Name(id, load, LINENO(n));
+    if (!result)
 	goto error;
     id = NULL;
 
@@ -775,27 +780,30 @@ ast_for_dotted_name(struct compiling *c, const node *n)
         id = NEW_IDENTIFIER(CHILD(n, i));
 	if (!id)
 	    goto error;
-	attrib = Attribute(e, id, Load, LINENO(CHILD(n, i)));
+	attrib = Attribute(e, id, load, LINENO(CHILD(n, i)));
 	if (!attrib)
 	    goto error;
 	e = attrib;
 	attrib = NULL;
     }
-
-    return e;
+    result = e;
+    e = NULL;
     
   error:
     Py_XDECREF(id);
-    free_expr(e);
+    Py_XDECREF(e);
+    Py_XDECREF(attrib);
+    Py_XDECREF(load);
     return NULL;
 }
 
-static expr_ty
+static PyObject*
 ast_for_decorator(struct compiling *c, const node *n)
 {
     /* decorator: '@' dotted_name [ '(' [arglist] ')' ] NEWLINE */
-    expr_ty d = NULL;
-    expr_ty name_expr = NULL;
+    PyObject *result = NULL;
+    PyObject *d = NULL;
+    PyObject *name_expr = NULL;
     
     REQ(n, decorator);
     
@@ -817,56 +825,59 @@ ast_for_decorator(struct compiling *c, const node *n)
 	d = Call(name_expr, NULL, NULL, NULL, NULL, LINENO(n));
 	if (!d)
 	    goto error;
-	name_expr = NULL;
     }
     else {
 	d = ast_for_call(c, CHILD(n, 3), name_expr);
 	if (!d)
 	    goto error;
-	name_expr = NULL;
     }
 
-    return d;
+    result = d;
+    d = NULL;
     
   error:
-    free_expr(name_expr);
-    free_expr(d);
-    return NULL;
+    Py_XDECREF(name_expr);
+    Py_XDECREF(d);
+    return result;
 }
 
-static asdl_seq*
+static PyObject*
 ast_for_decorators(struct compiling *c, const node *n)
 {
-    asdl_seq* decorator_seq = NULL;
-    expr_ty d;
+    PyObject *result = NULL;
+    PyObject *decorator_seq = NULL;
+    PyObject *d = NULL;
     int i;
     
     REQ(n, decorators);
 
-    decorator_seq = asdl_seq_new(NCH(n));
+    decorator_seq = PyList_New(NCH(n));
     if (!decorator_seq)
-        return NULL;
+        goto error;
 	
     for (i = 0; i < NCH(n); i++) {
 	d = ast_for_decorator(c, CHILD(n, i));
 	if (!d)
 	    goto error;
-	asdl_seq_APPEND(decorator_seq, d);
+	STEAL_ITEM(decorator_seq, i, d);
     }
-    return decorator_seq;
+    result = decorator_seq;
+    decorator_seq = NULL;
   error:
-    asdl_expr_seq_free(decorator_seq);
-    return NULL;
+    Py_XDECREF(decorator_seq);
+    Py_XDECREF(d);
+    return result;
 }
 
-static stmt_ty
+static PyObject*
 ast_for_funcdef(struct compiling *c, const node *n)
 {
     /* funcdef: 'def' [decorators] NAME parameters ':' suite */
-    identifier name = NULL;
-    arguments_ty args = NULL;
-    asdl_seq *body = NULL;
-    asdl_seq *decorator_seq = NULL;
+    PyObject *result = NULL;
+    PyObject *name = NULL;
+    PyObject *args = NULL;
+    PyObject *body = NULL;
+    PyObject *decorator_seq = NULL;
     int name_i;
 
     REQ(n, funcdef);
@@ -895,14 +906,14 @@ ast_for_funcdef(struct compiling *c, const node *n)
     if (!body)
 	goto error;
 
-    return FunctionDef(name, args, body, decorator_seq, LINENO(n));
+    result = FunctionDef(name, args, body, decorator_seq, LINENO(n));
 
 error:
-    asdl_stmt_seq_free(body);
-    asdl_expr_seq_free(decorator_seq);
-    free_arguments(args);
+    Py_XDECREF(body);
+    Py_XDECREF(decorator_seq);
+    Py_XDECREF(args);
     Py_XDECREF(name);
-    return NULL;
+    return result;
 }
 
 static expr_ty
