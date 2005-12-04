@@ -162,7 +162,6 @@ class HeaderVisitor(EmitVisitor):
             assert type in asdl.builtin_types, type
             emit("%s %s;" % (type, field.name), depth + 1)
         emit("};")
-        emit("typedef PyObject * %s;" % name)
         emit("#define %s_kind(o) (((struct _%s*)o)->_kind)" % (name, name))
         emit("")
         for t in sum.types:
@@ -234,7 +233,7 @@ class FunctionVisitor(TraversalVisitor):
     def emit_ctor(self, name, args, attrs):
         def emit(s, depth=0, reflow=1):
             self.emit(s, depth, reflow)
-        argstr = ["%s %s" % (f.type, f.name) for f in args]
+        argstr = ["%s %s" % (get_c_type(f.type), f.name) for f in args]
         argstr += ["%s %s" % (argtype, argname)
                    for argtype, argname, opt in attrs]
         argstr = ", ".join(argstr)
@@ -255,7 +254,7 @@ class FunctionVisitor(TraversalVisitor):
                     emit("}", 1)
                 elif f.seq:
                     emit("if (%s == NULL)" % f.name, 1)
-                    emit("%s = Py_List_New(0);" % f.name, 2)
+                    emit("%s = PyList_New(0);" % f.name, 2)
                 emit("Py_INCREF(%s);" % f.name, 1)
             emit("result->%s = %s;" % (f.name, f.name), 1)
         for argtype, argname, opt in attrs:
@@ -520,12 +519,6 @@ def main(srcfile):
     print >> f, "   macro, type and constant names which are not Py_-prefixed."
     print >> f, "   Therefore, the file should not be included in Python.h;"
     print >> f, "   all symbols relevant to linkage are Py_-prefixed. */"
-    print >> f, "\n"
-    print >> f, "/* typedefs of ASDL's builtin types */"
-    print >> f, "typedef PyObject * identifier;"
-    print >> f, "typedef PyObject * string;"
-    print >> f, "typedef PyObject * bool;"
-    print >> f, "typedef PyObject * object;"
     print >> f, "\n"
     c = HeaderVisitor(f)
     c.visit(mod)

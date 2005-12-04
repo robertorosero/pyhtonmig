@@ -4,6 +4,8 @@
    macro, type and constant names which are not Py_-prefixed.
    Therefore, the file should not be included in Python.h;
    all symbols relevant to linkage are Py_-prefixed. */
+
+
 PyAPI_DATA(PyTypeObject) Py_mod_Type;
 #define mod_Check(op) PyObject_TypeCheck(op, &Py_mod_Type)
 

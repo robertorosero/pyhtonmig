@@ -90,6 +90,9 @@ extern grammar _PyParser_Grammar; /* From graminit.c */
 
 #define NEW_IDENTIFIER(n) PyString_InternFromString(STR(n))
 
+#define Py_RELEASE(var)   do{Py_DECREF(var);var=NULL;}while(0);
+#define STEAL_ITEM(l,i,o) do{PyList_SET_ITEM(l,i,o);o=NULL;}while(0);
+
 /* This routine provides an invalid object for the syntax error.
    The outermost routine must unpack this error and create the
    proper object.  We do this so that we don't have to pass
@@ -278,8 +281,7 @@ PyAST_FromNode(const node *n, PyCompilerFlags *flags, const char *filename)
 		s = Pass(n->n_lineno);
 		if (!s)
 		    goto error;
-		Py_INCREF(s); /* set_item will steal the ref */
-                PyList_SET_ITEM(stmts, 0, s);
+		STEAL_ITEM(stmts, 0, s);
 		result = Interactive(stmts);
 		goto success;
             }
@@ -293,8 +295,7 @@ PyAST_FromNode(const node *n, PyCompilerFlags *flags, const char *filename)
 		    s = ast_for_stmt(&c, n);
 		    if (!s)
 			goto error;
-		    Py_INCREF(s);
-                    PyList_SET_ITEM(stmts, 0, s);
+                    STEAL_ITEM(stmts, 0, s);
                 }
                 else {
                     /* Only a simple_stmt can contain multiple statements. */
@@ -305,8 +306,7 @@ PyAST_FromNode(const node *n, PyCompilerFlags *flags, const char *filename)
                         s = ast_for_stmt(&c, CHILD(n, i));
                         if (!s)
                             goto error;
-			Py_INCREF(s);
-                        PyList_SET_ITEM(stmts, i / 2, s);
+                        STEAL_ITEM(stmts, i / 2, s);
                     }
                 }
 
@@ -332,34 +332,35 @@ PyAST_FromNode(const node *n, PyCompilerFlags *flags, const char *filename)
 /* Return the AST repr. of the operator represented as syntax (|, ^, etc.)
 */
 
-static operator_ty
+static PyObject*
 get_operator(const node *n)
 {
     switch (TYPE(n)) {
         case VBAR:
-            return BitOr;
+            return BitOr();
         case CIRCUMFLEX:
-            return BitXor;
+            return BitXor();
         case AMPER:
-            return BitAnd;
+            return BitAnd();
         case LEFTSHIFT:
-            return LShift;
+            return LShift();
         case RIGHTSHIFT:
-            return RShift;
+            return RShift();
         case PLUS:
-            return Add;
+            return Add();
         case MINUS:
-            return Sub;
+            return Sub();
         case STAR:
-            return Mult;
+            return Mult();
         case SLASH:
-            return Div;
+            return Div();
         case DOUBLESLASH:
-            return FloorDiv;
+            return FloorDiv();
         case PERCENT:
-            return Mod;
+            return Mod();
         default:
-            return 0;
+	    PyErr_BadInternalCall();
+            return NULL;
     }
 }
 
@@ -375,42 +376,44 @@ get_operator(const node *n)
 */
 
 static int
-set_context(expr_ty e, expr_context_ty ctx, const node *n)
+set_context(PyObject* _e, PyObject* ctx, const node *n)
 {
-    asdl_seq *s = NULL;
+    struct _expr *e = (struct _expr*)_e;
+    PyObject *s = NULL;
 
-    switch (e->kind) {
+#define SET_CTX(x) Py_DECREF(x); Py_INCREF(ctx); x = ctx
+    switch (e->_kind) {
         case Attribute_kind:
-	    if (ctx == Store &&
-		!strcmp(PyString_AS_STRING(e->v.Attribute.attr), "None")) {
+	    if (Store_Check(ctx) &&
+		!strcmp(PyString_AS_STRING(Attribute_attr(e)), "None")) {
 		    return ast_error(n, "assignment to None");
 	    }
-	    e->v.Attribute.ctx = ctx;
+	    SET_CTX(Attribute_ctx(e));
 	    break;
         case Subscript_kind:
-	    e->v.Subscript.ctx = ctx;
+	    SET_CTX(Subscript_ctx(e));
 	    break;
         case Name_kind:
-	    if (ctx == Store &&
-		!strcmp(PyString_AS_STRING(e->v.Name.id), "None")) {
+	    if (Store_Check(ctx) &&
+		!strcmp(PyString_AS_STRING(Name_id(e)), "None")) {
 		    return ast_error(n, "assignment to None");
 	    }
-	    e->v.Name.ctx = ctx;
+	    SET_CTX(Name_ctx(e));
 	    break;
         case List_kind:
-	    e->v.List.ctx = ctx;
-	    s = e->v.List.elts;
+	    SET_CTX(List_ctx(e));
+	    s = List_elts(e);
 	    break;
         case Tuple_kind:
-            if (asdl_seq_LEN(e->v.Tuple.elts) == 0) 
+            if (PyList_GET_SIZE(Tuple_elts(e)) == 0) 
                 return ast_error(n, "can't assign to ()");
-	    e->v.Tuple.ctx = ctx;
-	    s = e->v.Tuple.elts;
+	    SET_CTX(Tuple_ctx(e));
+	    s = Tuple_elts(e);
 	    break;
         case Call_kind:
-	    if (ctx == Store)
+	    if (Store_Check(ctx))
 		return ast_error(n, "can't assign to function call");
-	    else if (ctx == Del)
+	    else if (Del_Check(ctx))
 		return ast_error(n, "can't delete function call");
 	    else
 		return ast_error(n, "unexpected operation on function call");
@@ -427,7 +430,7 @@ set_context(expr_ty e, expr_context_ty ctx, const node *n)
 	   char buf[300];
 	   PyOS_snprintf(buf, sizeof(buf), 
 			 "unexpected expression in assignment %d (line %d)", 
-			 e->kind, e->lineno);
+			 e->_kind, e->lineno);
 	   return ast_error(n, buf);
        }
     }
@@ -437,53 +440,54 @@ set_context(expr_ty e, expr_context_ty ctx, const node *n)
     if (s) {
 	int i;
 
-	for (i = 0; i < asdl_seq_LEN(s); i++) {
-	    if (!set_context(asdl_seq_GET(s, i), ctx, n))
+	for (i = 0; i < PyList_GET_SIZE(s); i++) {
+	    if (!set_context(PyList_GET_ITEM(s, i), ctx, n))
 		return 0;
 	}
     }
     return 1;
+#undef SET_CTX
 }
 
-static operator_ty
+static PyObject*
 ast_for_augassign(const node *n)
 {
     REQ(n, augassign);
     n = CHILD(n, 0);
     switch (STR(n)[0]) {
         case '+':
-            return Add;
+            return Add();
         case '-':
-            return Sub;
+            return Sub();
         case '/':
             if (STR(n)[1] == '/')
-                return FloorDiv;
+                return FloorDiv();
             else
-                return Div;
+                return Div();
         case '%':
-            return Mod;
+            return Mod();
         case '<':
-            return LShift;
+            return LShift();
         case '>':
-            return RShift;
+            return RShift();
         case '&':
-            return BitAnd;
+            return BitAnd();
         case '^':
-            return BitXor;
+            return BitXor();
         case '|':
-            return BitOr;
+            return BitOr();
         case '*':
             if (STR(n)[1] == '*')
-                return Pow;
+                return Pow();
             else
-                return Mult;
+                return Mult();
         default:
             PyErr_Format(PyExc_SystemError, "invalid augassign: %s", STR(n));
             return 0;
     }
 }
 
-static cmpop_ty
+static PyObject*
 ast_for_comp_op(const node *n)
 {
     /* comp_op: '<'|'>'|'=='|'>='|'<='|'<>'|'!='|'in'|'not' 'in'|'is'
@@ -494,22 +498,22 @@ ast_for_comp_op(const node *n)
 	n = CHILD(n, 0);
 	switch (TYPE(n)) {
             case LESS:
-                return Lt;
+                return Lt();
             case GREATER:
-                return Gt;
+                return Gt();
             case EQEQUAL:			/* == */
-                return Eq;
+                return Eq();
             case LESSEQUAL:
-                return LtE;
+                return LtE();
             case GREATEREQUAL:
-                return GtE;
+                return GtE();
             case NOTEQUAL:
-                return NotEq;
+                return NotEq();
             case NAME:
                 if (strcmp(STR(n), "in") == 0)
-                    return In;
+                    return In();
                 if (strcmp(STR(n), "is") == 0)
-                    return Is;
+                    return Is();
             default:
                 PyErr_Format(PyExc_SystemError, "invalid comp_op: %s",
                              STR(n));
@@ -521,9 +525,9 @@ ast_for_comp_op(const node *n)
 	switch (TYPE(CHILD(n, 0))) {
             case NAME:
                 if (strcmp(STR(CHILD(n, 1)), "in") == 0)
-                    return NotIn;
+                    return NotIn();
                 if (strcmp(STR(CHILD(n, 0)), "is") == 0)
-                    return IsNot;
+                    return IsNot();
             default:
                 PyErr_Format(PyExc_SystemError, "invalid comp_op: %s %s",
                              STR(CHILD(n, 0)), STR(CHILD(n, 1)));
@@ -572,35 +576,44 @@ seq_for_testlist(struct compiling *c, const node *n)
     return result;
 }
 
-static expr_ty
+static PyObject*
 compiler_complex_args(const node *n)
 {
     int i, len = (NCH(n) + 1) / 2;
-    expr_ty result;
-    asdl_seq *args = asdl_seq_new(len);
+    PyObject *result = NULL;
+    PyObject *args = PyList_New(len);
+    PyObject *store = NULL;
+    PyObject *arg = NULL;
     if (!args)
-        return NULL;
+	goto error;
+    store = Store();
+    if (!store)
+	goto error;
 
     REQ(n, fplist);
 
     for (i = 0; i < len; i++) {
         const node *child = CHILD(CHILD(n, 2*i), 0);
-        expr_ty arg;
         if (TYPE(child) == NAME) {
-		if (!strcmp(STR(child), "None")) {
-			ast_error(child, "assignment to None");
-			return NULL;
-		}
-            arg = Name(NEW_IDENTIFIER(child), Store, LINENO(child));
+	    if (!strcmp(STR(child), "None")) {
+		ast_error(child, "assignment to None");
+		goto error;
+	    }
+            arg = Name(NEW_IDENTIFIER(child), store, LINENO(child));
 	}
         else
             arg = compiler_complex_args(CHILD(CHILD(n, 2*i), 1));
-	set_context(arg, Store, n);
-        asdl_seq_SET(args, i, arg);
+	if (!set_context(arg, store, n))
+	    goto error;
+        PyList_SET_ITEM(args, i, arg);
     }
 
-    result = Tuple(args, Store, LINENO(n));
-    set_context(result, Store, n);
+    result = Tuple(args, store, LINENO(n));
+    set_context(result, store, n);
+ error:
+    Py_XDECREF(args);
+    Py_XDECREF(arg);
+    Py_XDECREF(store);
     return result;
 }
 
@@ -610,7 +623,7 @@ compiler_complex_args(const node *n)
        - check for invalid argument lists like normal after default
 */
 
-static arguments_ty
+static PyObject*
 ast_for_arguments(struct compiling *c, const node *n)
 {
     /* parameters: '(' [varargslist] ')'
@@ -618,8 +631,15 @@ ast_for_arguments(struct compiling *c, const node *n)
             | '**' NAME) | fpdef ['=' test] (',' fpdef ['=' test])* [',']
     */
     int i, n_args = 0, n_defaults = 0, found_default = 0;
-    asdl_seq *args, *defaults;
-    identifier vararg = NULL, kwarg = NULL;
+    int defno = 0, argno = 0;
+    PyObject *result = NULL;
+    PyObject *args = NULL;
+    PyObject *defaults = NULL;
+    PyObject *vararg = NULL;
+    PyObject *kwarg = NULL;
+    PyObject *e = NULL;
+    PyObject *id = NULL;
+    PyObject *param = NULL;
     node *ch;
 
     if (TYPE(n) == parameters) {
@@ -638,10 +658,10 @@ ast_for_arguments(struct compiling *c, const node *n)
 	if (TYPE(ch) == EQUAL)
 	    n_defaults++;
     }
-    args = (n_args ? asdl_seq_new(n_args) : NULL);
+    args = (n_args ? PyList_New(n_args) : NULL);
     if (!args && n_args)
-    	return NULL; /* Don't need to go to NULL; nothing allocated */
-    defaults = (n_defaults ? asdl_seq_new(n_defaults) : NULL);
+    	goto error;
+    defaults = (n_defaults ? PyList_New(n_defaults) : NULL);
     if (!defaults && n_defaults)
         goto error;
 
@@ -657,8 +677,10 @@ ast_for_arguments(struct compiling *c, const node *n)
                    anything other than EQUAL or a comma? */
                 /* XXX Should NCH(n) check be made a separate check? */
                 if (i + 1 < NCH(n) && TYPE(CHILD(n, i + 1)) == EQUAL) {
-                    asdl_seq_APPEND(defaults, 
-				    ast_for_expr(c, CHILD(n, i + 2)));
+		    e = ast_for_expr(c, CHILD(n, i + 2));
+		    if (!e)
+			goto error;
+                    STEAL_ITEM(defaults, defno++, e);
                     i += 2;
 		    found_default = 1;
                 }
@@ -669,20 +691,24 @@ ast_for_arguments(struct compiling *c, const node *n)
 		}
 
                 if (NCH(ch) == 3) {
-                    asdl_seq_APPEND(args, 
-                                    compiler_complex_args(CHILD(ch, 1))); 
+		    e = compiler_complex_args(CHILD(ch, 1));
+		    if (!e)
+			goto error;
+                    STEAL_ITEM(args, argno++, e);
 		}
                 else if (TYPE(CHILD(ch, 0)) == NAME) {
-		    expr_ty name;
 		    if (!strcmp(STR(CHILD(ch, 0)), "None")) {
 			    ast_error(CHILD(ch, 0), "assignment to None");
 			    goto error;
 		    }
-                    name = Name(NEW_IDENTIFIER(CHILD(ch, 0)),
-                                Param, LINENO(ch));
-                    if (!name)
+		    id = NEW_IDENTIFIER(CHILD(ch, 0));
+		    if (!id) goto error;
+		    if (!param) param = Param();
+		    if (!param) goto error;
+                    e = Name(id, param, LINENO(ch));
+                    if (!e)
                         goto error;
-                    asdl_seq_APPEND(args, name);
+                    STEAL_ITEM(args, argno++, e);
 					 
 		}
                 i += 2; /* the name and the comma */
@@ -693,6 +719,8 @@ ast_for_arguments(struct compiling *c, const node *n)
 			goto error;
 		}
                 vararg = NEW_IDENTIFIER(CHILD(n, i+1));
+		if (!vararg)
+		    goto error;
                 i += 3;
                 break;
             case DOUBLESTAR:
@@ -701,6 +729,8 @@ ast_for_arguments(struct compiling *c, const node *n)
 			goto error;
 		}
                 kwarg = NEW_IDENTIFIER(CHILD(n, i+1));
+		if (!kwarg)
+		    goto error;
                 i += 3;
                 break;
             default:
@@ -711,16 +741,16 @@ ast_for_arguments(struct compiling *c, const node *n)
 	}
     }
 
-    return arguments(args, vararg, kwarg, defaults);
-
+    result = arguments(args, vararg, kwarg, defaults);
  error:
     Py_XDECREF(vararg);
     Py_XDECREF(kwarg);
-    if (args)
-        asdl_expr_seq_free(args);
-    if (defaults)
-        asdl_expr_seq_free(defaults);
-    return NULL;
+    Py_XDECREF(args);
+    Py_XDECREF(defaults);
+    Py_XDECREF(e);
+    Py_XDECREF(id);
+    Py_XDECREF(param);
+    return result;
 }
 
 static expr_ty
@@ -1846,7 +1876,7 @@ ast_for_call(struct compiling *c, const node *n, expr_ty func)
                   ast_error(CHILD(ch, 0), "keyword can't be an expression");
                   goto error;
                 }
-		key = e->v.Name.id;
+		key = Name_id(e);
 		free(e); /* XXX: is free correct here? */
 		e = ast_for_expr(c, CHILD(ch, 2));
                 if (!e)
