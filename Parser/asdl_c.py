@@ -200,6 +200,7 @@ class HeaderVisitor(EmitVisitor):
         self.emit("};", depth)
         self.emit("PyObject *Py_%s_New(%s);" % (name, ", ".join(field_types)), depth)
         self.emit("#define %s Py_%s_New" % (name, name), depth)
+        self.emit_field_access(name, product.fields)
         self.emit("", depth)
 
 class ForwardVisitor(TraversalVisitor):

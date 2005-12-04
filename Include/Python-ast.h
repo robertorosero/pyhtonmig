@@ -1037,6 +1037,9 @@ struct _comprehension {
 };
 PyObject *Py_comprehension_New(PyObject*, PyObject*, PyObject*);
 #define comprehension Py_comprehension_New
+#define comprehension_target(o) (((struct _comprehension*)o)->target)
+#define comprehension_iter(o) (((struct _comprehension*)o)->iter)
+#define comprehension_ifs(o) (((struct _comprehension*)o)->ifs)
 
 PyAPI_DATA(PyTypeObject) Py_excepthandler_Type;
 #define excepthandler_Check(op) PyObject_TypeCheck(op, &Py_excepthandler_Type)
@@ -1049,6 +1052,9 @@ struct _excepthandler {
 };
 PyObject *Py_excepthandler_New(PyObject*, PyObject*, PyObject*);
 #define excepthandler Py_excepthandler_New
+#define excepthandler_type(o) (((struct _excepthandler*)o)->type)
+#define excepthandler_name(o) (((struct _excepthandler*)o)->name)
+#define excepthandler_body(o) (((struct _excepthandler*)o)->body)
 
 PyAPI_DATA(PyTypeObject) Py_arguments_Type;
 #define arguments_Check(op) PyObject_TypeCheck(op, &Py_arguments_Type)
@@ -1062,6 +1068,10 @@ struct _arguments {
 };
 PyObject *Py_arguments_New(PyObject*, PyObject*, PyObject*, PyObject*);
 #define arguments Py_arguments_New
+#define arguments_args(o) (((struct _arguments*)o)->args)
+#define arguments_vararg(o) (((struct _arguments*)o)->vararg)
+#define arguments_kwarg(o) (((struct _arguments*)o)->kwarg)
+#define arguments_defaults(o) (((struct _arguments*)o)->defaults)
 
 PyAPI_DATA(PyTypeObject) Py_keyword_Type;
 #define keyword_Check(op) PyObject_TypeCheck(op, &Py_keyword_Type)
@@ -1073,6 +1083,8 @@ struct _keyword {
 };
 PyObject *Py_keyword_New(PyObject*, PyObject*);
 #define keyword Py_keyword_New
+#define keyword_arg(o) (((struct _keyword*)o)->arg)
+#define keyword_value(o) (((struct _keyword*)o)->value)
 
 PyAPI_DATA(PyTypeObject) Py_alias_Type;
 #define alias_Check(op) PyObject_TypeCheck(op, &Py_alias_Type)
@@ -1084,4 +1096,6 @@ struct _alias {
 };
 PyObject *Py_alias_New(PyObject*, PyObject*);
 #define alias Py_alias_New
+#define alias_name(o) (((struct _alias*)o)->name)
+#define alias_asname(o) (((struct _alias*)o)->asname)
 

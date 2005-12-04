@@ -71,7 +71,7 @@ static PyObject *seq_for_testlist(struct compiling *, const node *);
 static PyObject *ast_for_expr(struct compiling *, const node *);
 static PyObject *ast_for_stmt(struct compiling *, const node *);
 static PyObject *ast_for_suite(struct compiling *, const node *);
-static PyObject *ast_for_exprlist(struct compiling *, const node *, int);
+static PyObject *ast_for_exprlist(struct compiling *, const node *, PyObject*);
 static PyObject *ast_for_testlist(struct compiling *, const node *);
 static PyObject *ast_for_testlist_gexp(struct compiling *, const node *);
 
@@ -927,25 +927,25 @@ ast_for_lambdef(struct compiling *c, const node *n)
     if (NCH(n) == 3) {
         args = arguments(NULL, NULL, NULL, NULL);
         if (!args)
-            return NULL;
+            goto error;
         expression = ast_for_expr(c, CHILD(n, 2));
-        if (!expression) {
-            free_arguments(args);
-            return NULL;
-        }
+        if (!expression)
+            goto error;
     }
     else {
         args = ast_for_arguments(c, CHILD(n, 1));
         if (!args)
-            return NULL;
+            goto error;
         expression = ast_for_expr(c, CHILD(n, 3));
-        if (!expression) {
-            free_arguments(args);
-            return NULL;
-        }
+        if (!expression)
+            goto error;
     }
 
-    return Lambda(args, expression, LINENO(n));
+    result = Lambda(args, expression, LINENO(n));
+ error:
+    Py_XDECREF(args);
+    Py_XDECREF(expression);
+    return result;
 }
 
 /* Count the number of 'for' loop in a list comprehension.
@@ -1018,8 +1018,14 @@ ast_for_listcomp(struct compiling *c, const node *n)
        list_if: 'if' test [list_iter]
        testlist_safe: test [(',' test)+ [',']]
     */
+    PyObject *result;
     PyObject *elt = NULL;
     PyObject *listcomps = NULL;
+    PyObject *t = NULL;
+    PyObject *expression = NULL;
+    PyObject *lc = NULL;
+    PyObject *store = NULL;
+    PyObject *ifs = NULL;
     int i, n_fors;
     node *ch;
 
@@ -1028,77 +1034,62 @@ ast_for_listcomp(struct compiling *c, const node *n)
 
     elt = ast_for_expr(c, CHILD(n, 0));
     if (!elt)
-        return NULL;
+        goto error;
 
     n_fors = count_list_fors(n);
     if (n_fors == -1)
-        return NULL;
+        goto error;
 
-    listcomps = asdl_seq_new(n_fors);
-    if (!listcomps) {
-        free_expr(elt);
-    	return NULL;
-    }
+    listcomps = PyList_New(n_fors);
+    if (!listcomps)
+    	goto error;
     
     ch = CHILD(n, 1);
     for (i = 0; i < n_fors; i++) {
-	comprehension_ty lc;
-	PyObject *t = NULL;
-        PyObject *expression = NULL;
+	/* each variable should be NULL each round */
+	assert(lc == NULL);
+	assert(t == NULL);
+	assert(expression == NULL);
+	assert(ifs == NULL);
 
 	REQ(ch, list_for);
 
-	t = ast_for_exprlist(c, CHILD(ch, 1), Store);
-        if (!t) {
-            asdl_comprehension_seq_free(listcomps);
-            free_expr(elt);
-            return NULL;
-        }
+	if (!store) store = Store();
+	if (!store) goto error;
+	t = ast_for_exprlist(c, CHILD(ch, 1), store);
+        if (!t)
+	    goto error;
         expression = ast_for_testlist(c, CHILD(ch, 3));
-        if (!expression) {
-            asdl_expr_seq_free(t);
-            asdl_comprehension_seq_free(listcomps);
-            free_expr(elt);
-            return NULL;
-        }
+        if (!expression)
+	    goto error;
 
-	if (asdl_seq_LEN(t) == 1) {
-	    lc = comprehension(asdl_seq_GET(t, 0), expression, NULL);
-	    /* only free the sequence since we grabbed element 0 above */
-	    if (lc)
-	        asdl_seq_free(t); /* ok */
+	if (PyList_GET_SIZE(t) == 1) {
+	    lc = comprehension(PyList_GET_ITEM(t, 0), expression, NULL);
+	    if (!lc)
+		goto error;
 	}
-	else
-	    lc = comprehension(Tuple(t, Store, LINENO(ch)), expression, NULL);
-
-        if (!lc) {
-            asdl_expr_seq_free(t);
-            asdl_comprehension_seq_free(listcomps);
-            free_expr(expression);
-            free_expr(elt);
-            return NULL;
-        }
+	else {
+	    t = Tuple(t, store, LINENO(ch));
+	    if (!t)
+		goto error;
+	    lc = comprehension(t, expression, NULL);
+	    if (!lc)
+		goto error;
+	}
+	Py_RELEASE(t);
+	Py_RELEASE(expression);
 
 	if (NCH(ch) == 5) {
 	    int j, n_ifs;
-	    PyObject *ifs = NULL;
 
 	    ch = CHILD(ch, 4);
 	    n_ifs = count_list_ifs(ch);
-            if (n_ifs == -1) {
-                free_comprehension(lc);
-                asdl_comprehension_seq_free(listcomps);
-                free_expr(elt);
-                return NULL;
-            }
+            if (n_ifs == -1)
+		goto error;
 
-	    ifs = asdl_seq_new(n_ifs);
-	    if (!ifs) {
-                free_comprehension(lc);
-		asdl_comprehension_seq_free(listcomps);
-                free_expr(elt);
-		return NULL;
-	    }
+	    ifs = PyList_New(n_ifs);
+	    if (!ifs)
+		goto error;
 
 	    for (j = 0; j < n_ifs; j++) {
 		REQ(ch, list_iter);
@@ -1106,19 +1097,33 @@ ast_for_listcomp(struct compiling *c, const node *n)
 		ch = CHILD(ch, 0);
 		REQ(ch, list_if);
 
-		asdl_seq_APPEND(ifs, ast_for_expr(c, CHILD(ch, 1)));
+		t = ast_for_expr(c, CHILD(ch, 1));
+		if (!t)
+		    goto error;
+		STEAL_ITEM(ifs, j, t);
 		if (NCH(ch) == 3)
 		    ch = CHILD(ch, 2);
 	    }
 	    /* on exit, must guarantee that ch is a list_for */
 	    if (TYPE(ch) == list_iter)
 		ch = CHILD(ch, 0);
-            lc->ifs = ifs;
+	    Py_DECREF(comprehension_ifs(lc));
+	    comprehension_ifs(lc) = ifs;
+	    ifs = NULL;
 	}
-	asdl_seq_APPEND(listcomps, lc);
+	STEAL_ITEM(listcomps, i, lc);
     }
 
-    return ListComp(elt, listcomps, LINENO(n));
+    result = ListComp(elt, listcomps, LINENO(n));
+ error:
+    Py_XDECREF(elt);
+    Py_XDECREF(listcomps);
+    Py_XDECREF(t);
+    Py_XDECREF(expression);
+    Py_XDECREF(lc);
+    Py_XDECREF(store);
+    Py_XDECREF(ifs);
+    return result;
 }
 
 /*
@@ -2148,7 +2153,7 @@ ast_for_print_stmt(struct compiling *c, const node *n)
 }
 
 static asdl_seq *
-ast_for_exprlist(struct compiling *c, const node *n, int context)
+ast_for_exprlist(struct compiling *c, const node *n, PyObject* context)
 {
     PyObject *seq = NULL;
     int i;
