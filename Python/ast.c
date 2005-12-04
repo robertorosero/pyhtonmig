@@ -916,12 +916,13 @@ error:
     return result;
 }
 
-static expr_ty
+static PyObject*
 ast_for_lambdef(struct compiling *c, const node *n)
 {
     /* lambdef: 'lambda' [varargslist] ':' test */
-    arguments_ty args;
-    expr_ty expression;
+    PyObject *result = NULL;
+    PyObject *args = NULL;
+    PyObject *expression = NULL;
 
     if (NCH(n) == 3) {
         args = arguments(NULL, NULL, NULL, NULL);
@@ -1008,7 +1009,7 @@ count_list_ifs(const node *n)
     goto count_list_iter;
 }
 
-static expr_ty
+static PyObject*
 ast_for_listcomp(struct compiling *c, const node *n)
 {
     /* listmaker: test ( list_for | (',' test)* [','] )
@@ -1017,8 +1018,8 @@ ast_for_listcomp(struct compiling *c, const node *n)
        list_if: 'if' test [list_iter]
        testlist_safe: test [(',' test)+ [',']]
     */
-    expr_ty elt;
-    asdl_seq *listcomps;
+    PyObject *elt = NULL;
+    PyObject *listcomps = NULL;
     int i, n_fors;
     node *ch;
 
@@ -1042,8 +1043,8 @@ ast_for_listcomp(struct compiling *c, const node *n)
     ch = CHILD(n, 1);
     for (i = 0; i < n_fors; i++) {
 	comprehension_ty lc;
-	asdl_seq *t;
-        expr_ty expression;
+	PyObject *t = NULL;
+        PyObject *expression = NULL;
 
 	REQ(ch, list_for);
 
@@ -1080,7 +1081,7 @@ ast_for_listcomp(struct compiling *c, const node *n)
 
 	if (NCH(ch) == 5) {
 	    int j, n_ifs;
-	    asdl_seq *ifs;
+	    PyObject *ifs = NULL;
 
 	    ch = CHILD(ch, 4);
 	    n_ifs = count_list_ifs(ch);
@@ -1183,13 +1184,14 @@ count_gen_ifs(const node *n)
 	}
 }
 
-static expr_ty
+static PyObject*
 ast_for_genexp(struct compiling *c, const node *n)
 {
     /* testlist_gexp: test ( gen_for | (',' test)* [','] )
        argument: [test '='] test [gen_for]	 # Really [keyword '='] test */
-    expr_ty elt;
-    asdl_seq *genexps;
+    PyObject *result = NULL;
+    PyObject *elt = NULL;
+    PyObject *genexps = NULL;
     int i, n_fors;
     node *ch;
     
@@ -1213,8 +1215,8 @@ ast_for_genexp(struct compiling *c, const node *n)
     ch = CHILD(n, 1);
     for (i = 0; i < n_fors; i++) {
         comprehension_ty ge;
-        asdl_seq *t;
-        expr_ty expression;
+        PyObject *t = NULL;
+        PyObject *expression = NULL;
         
         REQ(ch, gen_for);
         
@@ -1253,7 +1255,7 @@ ast_for_genexp(struct compiling *c, const node *n)
         
         if (NCH(ch) == 5) {
             int j, n_ifs;
-            asdl_seq *ifs;
+            PyObject *ifs = NULL;
             
             ch = CHILD(ch, 4);
             n_ifs = count_gen_ifs(ch);
@@ -1273,7 +1275,7 @@ ast_for_genexp(struct compiling *c, const node *n)
             }
             
             for (j = 0; j < n_ifs; j++) {
-                expr_ty expression;
+                PyObject *expression = NULL;
                 REQ(ch, gen_iter);
                 ch = CHILD(ch, 0);
                 REQ(ch, gen_if);
@@ -1301,12 +1303,13 @@ ast_for_genexp(struct compiling *c, const node *n)
     return GeneratorExp(elt, genexps, LINENO(n));
 }
 
-static expr_ty
+static PyObject*
 ast_for_atom(struct compiling *c, const node *n)
 {
     /* atom: '(' [yield_expr|testlist_gexp] ')' | '[' [listmaker] ']'
        | '{' [dictmaker] '}' | '`' testlist '`' | NAME | NUMBER | STRING+
     */
+    PyObject *result = NULL;
     node *ch = CHILD(n, 0);
     
     switch (TYPE(ch)) {
@@ -1363,7 +1366,7 @@ ast_for_atom(struct compiling *c, const node *n)
     case LBRACE: {
 	/* dictmaker: test ':' test (',' test ':' test)* [','] */
 	int i, size;
-	asdl_seq *keys, *values;
+	PyObject *keys = NULL; PyObject *values = NULL;
 	
 	ch = CHILD(n, 1);
 	size = (NCH(ch) + 1) / 4; /* +1 in case no trailing comma */
@@ -1378,7 +1381,7 @@ ast_for_atom(struct compiling *c, const node *n)
 	}
 	
 	for (i = 0; i < NCH(ch); i += 4) {
-	    expr_ty expression;
+	    PyObject *expression = NULL;
 	    
 	    expression = ast_for_expr(c, CHILD(ch, i));
 	    if (!expression) {
@@ -1414,9 +1417,10 @@ ast_for_atom(struct compiling *c, const node *n)
     }
 }
 
-static slice_ty
+static PyObject*
 ast_for_slice(struct compiling *c, const node *n)
 {
+    PyObject *result = NULL;
     node *ch;
     expr_ty lower = NULL, upper = NULL, step = NULL;
 
@@ -1485,7 +1489,7 @@ ast_for_slice(struct compiling *c, const node *n)
     return Slice(lower, upper, step);
 }
 
-static expr_ty
+static PyObject*
 ast_for_binop(struct compiling *c, const node *n)
 {
 	/* Must account for a sequence of expressions.
@@ -1493,8 +1497,9 @@ ast_for_binop(struct compiling *c, const node *n)
 	   BinOp(BinOp(A, op, B), op, C).
 	*/
 
+	PyObject *result = NULL;
 	int i, nops;
-	expr_ty expr1, expr2, result;
+	PyObject *expr1 = NULL; PyObject *expr2 = NULL; PyObject *result = NULL;
         operator_ty operator;
 
         expr1 = ast_for_expr(c, CHILD(n, 0));
@@ -1515,7 +1520,7 @@ ast_for_binop(struct compiling *c, const node *n)
 
 	nops = (NCH(n) - 1) / 2;
 	for (i = 1; i < nops; i++) {
-		expr_ty tmp_result, tmp;
+		PyObject *tmp_result = NULL; PyObject *tmp = NULL;
 		const node* next_oper = CHILD(n, i * 2 + 1);
 
 		operator = get_operator(next_oper);
@@ -1535,11 +1540,12 @@ ast_for_binop(struct compiling *c, const node *n)
 	return result;
 }
 
-static expr_ty
+static PyObject*
 ast_for_trailer(struct compiling *c, const node *n, expr_ty left_expr)
 {
     /* trailer: '(' [arglist] ')' | '[' subscriptlist ']' | '.' NAME */
-    expr_ty e;
+    PyObject *result = NULL;
+    PyObject *e = NULL;
     REQ(n, trailer);
     if (TYPE(CHILD(n, 0)) == LPAR) {
         if (NCH(n) == 2)
@@ -1592,13 +1598,14 @@ ast_for_trailer(struct compiling *c, const node *n, expr_ty left_expr)
     return e;
 }
 
-static expr_ty
+static PyObject*
 ast_for_power(struct compiling *c, const node *n)
 {
     /* power: atom trailer* ('**' factor)*
      */
+    PyObject *result = NULL;
     int i;
-    expr_ty e, tmp;
+    PyObject *e = NULL; PyObject *tmp = NULL;
     REQ(n, power);
     e = ast_for_atom(c, CHILD(n, 0));
     if (!e)
@@ -1636,7 +1643,7 @@ ast_for_power(struct compiling *c, const node *n)
 /* Do not name a variable 'expr'!  Will cause a compile error.
 */
 
-static expr_ty
+static PyObject*
 ast_for_expr(struct compiling *c, const node *n)
 {
     /* handle the full range of simple expressions
@@ -1654,7 +1661,8 @@ ast_for_expr(struct compiling *c, const node *n)
        power: atom trailer* ('**' factor)*
     */
 
-    asdl_seq *seq;
+    PyObject *result = NULL;
+    PyObject *seq = NULL;
     int i;
 
  loop:
@@ -1702,8 +1710,8 @@ ast_for_expr(struct compiling *c, const node *n)
                 goto loop;
             }
             else {
-                expr_ty expression;
-                asdl_seq *ops, *cmps;
+                PyObject *expression = NULL;
+                PyObject *ops = NULL; PyObject *cmps = NULL;
                 ops = asdl_seq_new(NCH(n) / 2);
                 if (!ops)
                     return NULL;
@@ -1769,7 +1777,7 @@ ast_for_expr(struct compiling *c, const node *n)
 	    return Yield(exp, LINENO(n));
 	}
         case factor: {
-            expr_ty expression;
+            PyObject *expression = NULL;
             
             if (NCH(n) == 1) {
                 n = CHILD(n, 0);
@@ -1802,7 +1810,7 @@ ast_for_expr(struct compiling *c, const node *n)
     return NULL;
 }
 
-static expr_ty
+static PyObject*
 ast_for_call(struct compiling *c, const node *n, expr_ty func)
 {
     /*
@@ -1811,6 +1819,7 @@ ast_for_call(struct compiling *c, const node *n, expr_ty func)
       argument: [test '='] test [gen_for]	 # Really [keyword '='] test
     */
 
+    PyObject *result = NULL;
     int i, nargs, nkeywords, ngens;
     asdl_seq *args = NULL;
     asdl_seq *keywords = NULL;
@@ -1854,7 +1863,7 @@ ast_for_call(struct compiling *c, const node *n, expr_ty func)
     for (i = 0; i < NCH(n); i++) {
 	node *ch = CHILD(n, i);
 	if (TYPE(ch) == argument) {
-	    expr_ty e;
+	    PyObject *e = NULL;
 	    if (NCH(ch) == 1) {
 		e = ast_for_expr(c, CHILD(ch, 0));
                 if (!e)
@@ -1923,13 +1932,14 @@ ast_for_call(struct compiling *c, const node *n, expr_ty func)
     return NULL;
 }
 
-static expr_ty
+static PyObject*
 ast_for_testlist(struct compiling *c, const node* n)
 {
     /* testlist_gexp: test (',' test)* [','] */
     /* testlist: test (',' test)* [','] */
     /* testlist_safe: test (',' test)+ [','] */
     /* testlist1: test (',' test)* */
+    PyObject *result = NULL;
     assert(NCH(n) > 0);
     if (TYPE(n) == testlist_gexp) {
         if (NCH(n) > 1)
@@ -1950,11 +1960,12 @@ ast_for_testlist(struct compiling *c, const node* n)
     }
 }
 
-static expr_ty
+static PyObject*
 ast_for_testlist_gexp(struct compiling *c, const node* n)
 {
     /* testlist_gexp: test ( gen_for | (',' test)* [','] ) */
     /* argument: test [ gen_for ] */
+    PyObject *result = NULL;
     assert(TYPE(n) == testlist_gexp || TYPE(n) == argument);
     if (NCH(n) > 1 && TYPE(CHILD(n, 1)) == gen_for) {
 	return ast_for_genexp(c, n);
@@ -1968,10 +1979,11 @@ static asdl_seq*
 ast_for_class_bases(struct compiling *c, const node* n)
 {
     /* testlist: test (',' test)* [','] */
+    PyObject *result = NULL;
     assert(NCH(n) > 0);
     REQ(n, testlist);
     if (NCH(n) == 1) {
-        expr_ty base;
+        PyObject *base = NULL;
         asdl_seq *bases = asdl_seq_new(1);
         if (!bases)
             return NULL;
@@ -1988,9 +2000,10 @@ ast_for_class_bases(struct compiling *c, const node* n)
     }
 }
 
-static stmt_ty
+static PyObject*
 ast_for_expr_stmt(struct compiling *c, const node *n)
 {
+    PyObject *result = NULL;
     REQ(n, expr_stmt);
     /* expr_stmt: testlist (augassign (yield_expr|testlist) 
                 | ('=' (yield_expr|testlist))*)
@@ -2008,7 +2021,7 @@ ast_for_expr_stmt(struct compiling *c, const node *n)
 	return Expr(e, LINENO(n));
     }
     else if (TYPE(CHILD(n, 1)) == augassign) {
-        expr_ty expr1, expr2;
+        PyObject *expr1 = NULL; PyObject *expr2 = NULL;
         operator_ty operator;
 	node *ch = CHILD(n, 0);
 
@@ -2055,9 +2068,9 @@ ast_for_expr_stmt(struct compiling *c, const node *n)
     }
     else {
 	int i;
-	asdl_seq *targets;
+	PyObject *targets = NULL;
 	node *value;
-        expr_ty expression;
+        PyObject *expression = NULL;
 
 	/* a normal assignment */
 	REQ(CHILD(n, 1), EQUAL);
@@ -2065,7 +2078,7 @@ ast_for_expr_stmt(struct compiling *c, const node *n)
 	if (!targets)
 	    return NULL;
 	for (i = 0; i < NCH(n) - 2; i += 2) {
-	    expr_ty e;
+	    PyObject *e = NULL;
 	    node *ch = CHILD(n, i);
 	    if (TYPE(ch) == yield_expr) {
 		ast_error(ch, "assignment to yield expression not possible");
@@ -2098,14 +2111,15 @@ ast_for_expr_stmt(struct compiling *c, const node *n)
     return NULL;
 }
 
-static stmt_ty
+static PyObject*
 ast_for_print_stmt(struct compiling *c, const node *n)
 {
     /* print_stmt: 'print' ( [ test (',' test)* [','] ]
                              | '>>' test [ (',' test)+ [','] ] )
      */
+    PyObject *result = NULL;
     expr_ty dest = NULL, expression;
-    asdl_seq *seq;
+    PyObject *seq = NULL;
     int nl;
     int i, start = 1;
 
@@ -2136,9 +2150,9 @@ ast_for_print_stmt(struct compiling *c, const node *n)
 static asdl_seq *
 ast_for_exprlist(struct compiling *c, const node *n, int context)
 {
-    asdl_seq *seq;
+    PyObject *seq = NULL;
     int i;
-    expr_ty e;
+    PyObject *e = NULL;
 
     REQ(n, exprlist);
 
@@ -2162,10 +2176,11 @@ error:
     return NULL;
 }
 
-static stmt_ty
+static PyObject*
 ast_for_del_stmt(struct compiling *c, const node *n)
 {
-    asdl_seq *expr_list;
+    PyObject *result = NULL;
+    PyObject *expr_list = NULL;
     
     /* del_stmt: 'del' exprlist */
     REQ(n, del_stmt);
@@ -2176,7 +2191,7 @@ ast_for_del_stmt(struct compiling *c, const node *n)
     return Delete(expr_list, LINENO(n));
 }
 
-static stmt_ty
+static PyObject*
 ast_for_flow_stmt(struct compiling *c, const node *n)
 {
     /*
@@ -2189,6 +2204,7 @@ ast_for_flow_stmt(struct compiling *c, const node *n)
       yield_expr: 'yield' testlist
       raise_stmt: 'raise' [test [',' test [',' test]]]
     */
+    PyObject *result = NULL;
     node *ch;
 
     REQ(n, flow_stmt);
@@ -2223,7 +2239,7 @@ ast_for_flow_stmt(struct compiling *c, const node *n)
                 return Raise(expression, NULL, NULL, LINENO(n));
             }
             else if (NCH(ch) == 4) {
-                expr_ty expr1, expr2;
+                PyObject *expr1 = NULL; PyObject *expr2 = NULL;
 
                 expr1 = ast_for_expr(c, CHILD(ch, 1));
                 if (!expr1)
@@ -2235,7 +2251,7 @@ ast_for_flow_stmt(struct compiling *c, const node *n)
                 return Raise(expr1, expr2, NULL, LINENO(n));
             }
             else if (NCH(ch) == 6) {
-                expr_ty expr1, expr2, expr3;
+                PyObject *expr1 = NULL; PyObject *expr2 = NULL; PyObject *expr3 = NULL;
 
                 expr1 = ast_for_expr(c, CHILD(ch, 1));
                 if (!expr1)
@@ -2256,7 +2272,7 @@ ast_for_flow_stmt(struct compiling *c, const node *n)
     }
 }
 
-static alias_ty
+static PyObject*
 alias_for_import_name(const node *n)
 {
     /*
@@ -2264,6 +2280,7 @@ alias_for_import_name(const node *n)
       dotted_as_name: dotted_name [NAME NAME]
       dotted_name: NAME ('.' NAME)*
     */
+    PyObject *result = NULL;
  loop:
     switch (TYPE(n)) {
         case import_as_name:
@@ -2328,7 +2345,7 @@ alias_for_import_name(const node *n)
     return NULL;
 }
 
-static stmt_ty
+static PyObject*
 ast_for_import_stmt(struct compiling *c, const node *n)
 {
     /*
@@ -2338,8 +2355,9 @@ ast_for_import_stmt(struct compiling *c, const node *n)
                                                 '(' import_as_names ')' | 
                                                 import_as_names)
     */
+    PyObject *result = NULL;
     int i;
-    asdl_seq *aliases;
+    PyObject *aliases = NULL;
 
     REQ(n, import_stmt);
     n = CHILD(n, 0);
@@ -2433,12 +2451,13 @@ ast_for_import_stmt(struct compiling *c, const node *n)
     return NULL;
 }
 
-static stmt_ty
+static PyObject*
 ast_for_global_stmt(struct compiling *c, const node *n)
 {
     /* global_stmt: 'global' NAME (',' NAME)* */
+    PyObject *result = NULL;
     identifier name;
-    asdl_seq *s;
+    PyObject *s = NULL;
     int i;
 
     REQ(n, global_stmt);
@@ -2458,7 +2477,7 @@ ast_for_global_stmt(struct compiling *c, const node *n)
     return Global(s, LINENO(n));
 }
 
-static stmt_ty
+static PyObject*
 ast_for_exec_stmt(struct compiling *c, const node *n)
 {
     expr_ty expr1, globals = NULL, locals = NULL;
@@ -2489,10 +2508,11 @@ ast_for_exec_stmt(struct compiling *c, const node *n)
     return Exec(expr1, globals, locals, LINENO(n));
 }
 
-static stmt_ty
+static PyObject*
 ast_for_assert_stmt(struct compiling *c, const node *n)
 {
     /* assert_stmt: 'assert' test [',' test] */
+    PyObject *result = NULL;
     REQ(n, assert_stmt);
     if (NCH(n) == 2) {
         expr_ty expression = ast_for_expr(c, CHILD(n, 1));
@@ -2501,7 +2521,7 @@ ast_for_assert_stmt(struct compiling *c, const node *n)
 	return Assert(expression, NULL, LINENO(n));
     }
     else if (NCH(n) == 4) {
-        expr_ty expr1, expr2;
+        PyObject *expr1 = NULL; PyObject *expr2 = NULL;
 
         expr1 = ast_for_expr(c, CHILD(n, 1));
         if (!expr1)
@@ -2583,19 +2603,20 @@ ast_for_suite(struct compiling *c, const node *n)
     return NULL;
 }
 
-static stmt_ty
+static PyObject*
 ast_for_if_stmt(struct compiling *c, const node *n)
 {
     /* if_stmt: 'if' test ':' suite ('elif' test ':' suite)*
        ['else' ':' suite]
     */
+    PyObject *result = NULL;
     char *s;
 
     REQ(n, if_stmt);
 
     if (NCH(n) == 4) {
-        expr_ty expression;
-        asdl_seq *suite_seq;
+        PyObject *expression = NULL;
+        PyObject *suite_seq = NULL;
 
         expression = ast_for_expr(c, CHILD(n, 1));
         if (!expression)
@@ -2614,8 +2635,8 @@ ast_for_if_stmt(struct compiling *c, const node *n)
        'i' for el_i_f
     */
     if (s[2] == 's') {
-        expr_ty expression;
-        asdl_seq *seq1, *seq2;
+        PyObject *expression = NULL;
+        PyObject *seq1 = NULL; PyObject *seq2 = NULL;
 
         expression = ast_for_expr(c, CHILD(n, 1));
         if (!expression)
@@ -2648,8 +2669,8 @@ ast_for_if_stmt(struct compiling *c, const node *n)
 	n_elif /= 4;
 
 	if (has_else) {
-            expr_ty expression;
-            asdl_seq *seq1, *seq2;
+            PyObject *expression = NULL;
+            PyObject *seq1 = NULL; PyObject *seq2 = NULL;
 
 	    orelse = asdl_seq_new(1);
 	    if (!orelse)
@@ -2683,8 +2704,8 @@ ast_for_if_stmt(struct compiling *c, const node *n)
 
 	for (i = 0; i < n_elif; i++) {
 	    int off = 5 + (n_elif - i - 1) * 4;
-            expr_ty expression;
-            asdl_seq *suite_seq;
+            PyObject *expression = NULL;
+            PyObject *suite_seq = NULL;
 	    asdl_seq *new = asdl_seq_new(1);
 	    if (!new) {
 		asdl_stmt_seq_free(orelse);
@@ -2720,15 +2741,16 @@ ast_for_if_stmt(struct compiling *c, const node *n)
     }
 }
 
-static stmt_ty
+static PyObject*
 ast_for_while_stmt(struct compiling *c, const node *n)
 {
     /* while_stmt: 'while' test ':' suite ['else' ':' suite] */
+    PyObject *result = NULL;
     REQ(n, while_stmt);
 
     if (NCH(n) == 4) {
-        expr_ty expression;
-        asdl_seq *suite_seq;
+        PyObject *expression = NULL;
+        PyObject *suite_seq = NULL;
 
         expression = ast_for_expr(c, CHILD(n, 1));
         if (!expression)
@@ -2741,8 +2763,8 @@ ast_for_while_stmt(struct compiling *c, const node *n)
 	return While(expression, suite_seq, NULL, LINENO(n));
     }
     else if (NCH(n) == 7) {
-        expr_ty expression;
-        asdl_seq *seq1, *seq2;
+        PyObject *expression = NULL;
+        PyObject *seq1 = NULL; PyObject *seq2 = NULL;
 
         expression = ast_for_expr(c, CHILD(n, 1));
         if (!expression)
@@ -2769,12 +2791,13 @@ ast_for_while_stmt(struct compiling *c, const node *n)
     }
 }
 
-static stmt_ty
+static PyObject*
 ast_for_for_stmt(struct compiling *c, const node *n)
 {
+    PyObject *result = NULL;
     asdl_seq *_target = NULL, *seq = NULL, *suite_seq = NULL;
-    expr_ty expression;
-    expr_ty target;
+    PyObject *expression = NULL;
+    PyObject *target = NULL;
     /* for_stmt: 'for' exprlist 'in' testlist ':' suite ['else' ':' suite] */
     REQ(n, for_stmt);
 
@@ -2813,10 +2836,11 @@ ast_for_for_stmt(struct compiling *c, const node *n)
     return For(target, expression, suite_seq, seq, LINENO(n));
 }
 
-static excepthandler_ty
+static PyObject*
 ast_for_except_clause(struct compiling *c, const node *exc, node *body)
 {
     /* except_clause: 'except' [test [',' test]] */
+    PyObject *result = NULL;
     REQ(exc, except_clause);
     REQ(body, suite);
 
@@ -2828,8 +2852,8 @@ ast_for_except_clause(struct compiling *c, const node *exc, node *body)
 	return excepthandler(NULL, NULL, suite_seq);
     }
     else if (NCH(exc) == 2) {
-        expr_ty expression;
-        asdl_seq *suite_seq;
+        PyObject *expression = NULL;
+        PyObject *suite_seq = NULL;
 
         expression = ast_for_expr(c, CHILD(exc, 1));
         if (!expression)
@@ -2843,8 +2867,8 @@ ast_for_except_clause(struct compiling *c, const node *exc, node *body)
 	return excepthandler(expression, NULL, suite_seq);
     }
     else if (NCH(exc) == 4) {
-        asdl_seq *suite_seq;
-        expr_ty expression;
+        PyObject *suite_seq = NULL;
+        PyObject *expression = NULL;
 	expr_ty e = ast_for_expr(c, CHILD(exc, 3));
 	if (!e)
             return NULL;
@@ -2874,14 +2898,15 @@ ast_for_except_clause(struct compiling *c, const node *exc, node *body)
     }
 }
 
-static stmt_ty
+static PyObject*
 ast_for_try_stmt(struct compiling *c, const node *n)
 {
+    PyObject *result = NULL;
     REQ(n, try_stmt);
 
     if (TYPE(CHILD(n, 3)) == NAME) {/* must be 'finally' */
 	/* try_stmt: 'try' ':' suite 'finally' ':' suite) */
-        asdl_seq *s1, *s2;
+        PyObject *s1 = NULL; PyObject *s2 = NULL;
         s1 = ast_for_suite(c, CHILD(n, 2));
         if (!s1)
             return NULL;
@@ -2897,8 +2922,8 @@ ast_for_try_stmt(struct compiling *c, const node *n)
 	/* try_stmt: ('try' ':' suite (except_clause ':' suite)+
            ['else' ':' suite]
 	*/
-        asdl_seq *suite_seq1, *suite_seq2;
-	asdl_seq *handlers;
+        PyObject *suite_seq1 = NULL; PyObject *suite_seq2 = NULL;
+	PyObject *handlers = NULL;
 	int i, has_else = 0, n_except = NCH(n) - 3;
 	if (TYPE(CHILD(n, NCH(n) - 3)) == NAME) {
 	    has_else = 1;
@@ -2949,11 +2974,12 @@ ast_for_try_stmt(struct compiling *c, const node *n)
     }
 }
 
-static stmt_ty
+static PyObject*
 ast_for_classdef(struct compiling *c, const node *n)
 {
     /* classdef: 'class' NAME ['(' testlist ')'] ':' suite */
-    asdl_seq *bases, *s;
+    PyObject *result = NULL;
+    PyObject *bases = NULL; PyObject *s = NULL;
     
     REQ(n, classdef);
 
@@ -2989,9 +3015,10 @@ ast_for_classdef(struct compiling *c, const node *n)
     return ClassDef(NEW_IDENTIFIER(CHILD(n, 1)), bases, s, LINENO(n));
 }
 
-static stmt_ty
+static PyObject*
 ast_for_stmt(struct compiling *c, const node *n)
 {
+    PyObject *result = NULL;
     if (TYPE(n) == stmt) {
 	assert(NCH(n) == 1);
 	n = CHILD(n, 0);
@@ -3064,6 +3091,7 @@ ast_for_stmt(struct compiling *c, const node *n)
 static PyObject *
 parsenumber(const char *s)
 {
+	PyObject *result = NULL;
 	const char *end;
 	long x;
 	double dx;
@@ -3116,6 +3144,7 @@ parsenumber(const char *s)
 static PyObject *
 decode_utf8(const char **sPtr, const char *end, char* encoding)
 {
+	PyObject *result = NULL;
 #ifndef Py_USING_UNICODE
 	Py_FatalError("decode_utf8 should not be called in this build.");
         return NULL;
@@ -3138,6 +3167,7 @@ decode_utf8(const char **sPtr, const char *end, char* encoding)
 static PyObject *
 decode_unicode(const char *s, size_t len, int rawmode, const char *encoding)
 {
+	PyObject *result = NULL;
 	PyObject *v, *u;
 	char *buf;
 	char *p;
@@ -3204,6 +3234,7 @@ decode_unicode(const char *s, size_t len, int rawmode, const char *encoding)
 static PyObject *
 parsestr(const char *s, const char *encoding)
 {
+	PyObject *result = NULL;
 	PyObject *v;
 	size_t len;
 	int quote = *s;
@@ -3283,6 +3314,7 @@ parsestr(const char *s, const char *encoding)
 static PyObject *
 parsestrplus(struct compiling *c, const node *n)
 {
+	PyObject *result = NULL;
 	PyObject *v;
 	int i;
 	REQ(CHILD(n, 0), STRING);
