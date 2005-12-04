@@ -162,6 +162,7 @@ class HeaderVisitor(EmitVisitor):
             assert type in asdl.builtin_types, type
             emit("%s %s;" % (type, field.name), depth + 1)
         emit("};")
+        emit("typedef PyObject * %s;" % name)
         emit("#define %s_kind(o) (((struct _%s*)o)->_kind)" % (name, name))
         emit("")
         for t in sum.types:
@@ -519,6 +520,13 @@ def main(srcfile):
     print >> f, "   macro, type and constant names which are not Py_-prefixed."
     print >> f, "   Therefore, the file should not be included in Python.h;"
     print >> f, "   all symbols relevant to linkage are Py_-prefixed. */"
+    print >> f, "\n"
+    print >> f, "/* typedefs of ASDL's builtin types */"
+    print >> f, "typedef PyObject * identifier;"
+    print >> f, "typedef PyObject * string;"
+    print >> f, "typedef PyObject * bool;"
+    print >> f, "typedef PyObject * object;"
+    print >> f, "\n"
     c = HeaderVisitor(f)
     c.visit(mod)
     f.close()
