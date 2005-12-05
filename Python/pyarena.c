@@ -29,6 +29,9 @@ static PyArenaList*
 PyArenaList_New(void) 
 {
   PyArenaList *alist = (PyArenaList *)malloc(sizeof(PyArenaList));
+  if (!alist)
+    return NULL;
+
   alist->al_next = NULL;
   alist->al_pointer = NULL;
   return alist;
@@ -45,8 +48,11 @@ PyArenaList_Add(PyArenaList *alist)
 static void
 PyArenaList_FreeObject(PyArenaList *alist) 
 {
-  PyArenaList *prev;
+  if (!alist)
+    return;
+
   while (alist) {
+    PyArenaList *prev;
     Py_XDECREF((PyObject *)alist->al_pointer);
     alist->al_pointer = NULL;
     prev = alist;
@@ -58,8 +64,11 @@ PyArenaList_FreeObject(PyArenaList *alist)
 static void
 PyArenaList_FreeMalloc(PyArenaList *alist)
 {
-  PyArenaList *prev;
+  if (!alist)
+    return;
+
   while (alist) {
+    PyArenaList *prev;
     if (alist->al_pointer) {
       free(alist->al_pointer);
     }
@@ -71,10 +80,13 @@ PyArenaList_FreeMalloc(PyArenaList *alist)
 }
 
 
-PyAPI_FUNC(PyArena *)
+PyArena *
 PyArena_New()
 {
   PyArena* arena = (PyArena *)malloc(sizeof(PyArena));
+  if (!arena)
+    return NULL;
+
   arena->a_object_head = PyArenaList_New();
   arena->a_object_tail = arena->a_object_head;
   arena->a_malloc_head = PyArenaList_New();
@@ -82,7 +94,7 @@ PyArena_New()
   return arena;
 }
 
-PyAPI_FUNC(void)
+void
 PyArena_Free(PyArena *arena)
 {
   assert(arena);
@@ -91,7 +103,7 @@ PyArena_Free(PyArena *arena)
   free(arena);
 }
 
-PyAPI_FUNC(void *)
+void *
 PyArena_Malloc(PyArena *arena, size_t size) 
 {
   /* A better implementation might actually use an arena.  The current
@@ -105,7 +117,7 @@ PyArena_Malloc(PyArena *arena, size_t size)
   return p;
 }
 
-PyAPI_FUNC(int)
+int
 PyArena_AddMallocPointer(PyArena *arena, void *pointer) 
 {
   assert(pointer);
@@ -117,7 +129,7 @@ PyArena_AddMallocPointer(PyArena *arena, void *pointer)
   return 1;
 }
 
-PyAPI_FUNC(int)
+int
 PyArena_AddPyObject(PyArena *arena, PyObject *pointer) 
 {
   assert(pointer);
