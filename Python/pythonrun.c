@@ -725,6 +725,7 @@ PyRun_InteractiveOneFlags(FILE *fp, const char *filename, PyCompilerFlags *flags
 	Py_XDECREF(v);
 	Py_XDECREF(w);
 	if (mod == NULL) {
+        	PyArena_Free(arena);
 		if (errcode == E_EOF) {
 			PyErr_Clear();
 			return E_EOF;
@@ -733,8 +734,10 @@ PyRun_InteractiveOneFlags(FILE *fp, const char *filename, PyCompilerFlags *flags
 		return -1;
 	}
 	m = PyImport_AddModule("__main__");
-	if (m == NULL)
+	if (m == NULL) {
+        	PyArena_Free(arena);
 		return -1;
+	}
 	d = PyModule_GetDict(m);
 	v = run_mod(mod, filename, d, d, flags, arena);
         PyArena_Free(arena);
