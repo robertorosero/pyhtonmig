@@ -15,7 +15,7 @@ extern "C" {
      to allocate memory.  Once it is freed, all the memory it allocated
      is freed and none of its pointers are valid.
 
-     Py_ArenaNew() returns an arena pointer.  On error, it
+     PyArena_New() returns an arena pointer.  On error, it
      returns a negative number and sets an exception.
   */
   PyAPI_FUNC(PyArena *) PyArena_New(void);
