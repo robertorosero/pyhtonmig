@@ -296,13 +296,12 @@ PyAST_Compile(mod_ty mod, const char *filename, PyCompilerFlags *flags,
 PyCodeObject *
 PyNode_Compile(struct _node *n, const char *filename)
 {
-	PyCodeObject *co;
+	PyCodeObject *co = NULL;
         PyArena *arena;
         arena = PyArena_New();
 	mod_ty mod = PyAST_FromNode(n, NULL, filename, arena);
-	if (!mod)
-		return NULL;
-	co = PyAST_Compile(mod, filename, NULL, arena);
+	if (mod)
+		co = PyAST_Compile(mod, filename, NULL, arena);
         PyArena_Free(arena);
 	return co;
 }
