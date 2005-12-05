@@ -1167,6 +1167,7 @@ ast_for_atom(struct compiling *c, const node *n)
 	if (!str)
 	    return NULL;
 	
+	PyArena_AddPyObject(c->c_arena, str);
 	return Str(str, LINENO(n), c->c_arena);
     }
     case NUMBER: {
@@ -1175,6 +1176,7 @@ ast_for_atom(struct compiling *c, const node *n)
 	if (!pynum)
 	    return NULL;
 	
+	PyArena_AddPyObject(c->c_arena, pynum);
 	return Num(pynum, LINENO(n), c->c_arena);
     }
     case LPAR: /* some parenthesized expressions */
