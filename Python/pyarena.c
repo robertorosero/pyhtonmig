@@ -37,14 +37,6 @@ PyArenaList_New(void)
   return alist;
 }
 
-static PyArenaList*
-PyArenaList_Add(PyArenaList *alist) 
-{
-  assert(alist->al_next == NULL);
-  alist->al_next = PyArenaList_New();
-  return alist->al_next;
-}
-
 static void
 PyArenaList_FreeObject(PyArenaList *alist) 
 {
