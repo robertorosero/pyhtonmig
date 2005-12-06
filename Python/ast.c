@@ -674,27 +674,24 @@ ast_for_dotted_name(struct compiling *c, const node *n)
     
     id = NEW_IDENTIFIER(CHILD(n, 0));
     if (!id)
-        goto error;
+        return NULL;
     e = Name(id, Load, LINENO(n), c->c_arena);
     if (!e)
-	goto error;
+	return NULL;
     id = NULL;
 
     for (i = 2; i < NCH(n); i+=2) {
         id = NEW_IDENTIFIER(CHILD(n, i));
 	if (!id)
-	    goto error;
+	    return NULL;
 	attrib = Attribute(e, id, Load, LINENO(CHILD(n, i)), c->c_arena);
 	if (!attrib)
-	    goto error;
+	    return NULL;
 	e = attrib;
 	attrib = NULL;
     }
 
     return e;
-    
-  error:
-    return NULL;
 }
 
 static expr_ty
@@ -709,12 +706,12 @@ ast_for_decorator(struct compiling *c, const node *n)
     if ((NCH(n) < 3 && NCH(n) != 5 && NCH(n) != 6)
 	|| TYPE(CHILD(n, 0)) != AT || TYPE(RCHILD(n, -1)) != NEWLINE) {
 	ast_error(n, "Invalid decorator node");
-	goto error;
+	return NULL;
     }
     
     name_expr = ast_for_dotted_name(c, CHILD(n, 1));
     if (!name_expr)
-	goto error;
+	return NULL;
 	
     if (NCH(n) == 3) { /* No arguments */
 	d = name_expr;
@@ -723,20 +720,17 @@ ast_for_decorator(struct compiling *c, const node *n)
     else if (NCH(n) == 5) { /* Call with no arguments */
 	d = Call(name_expr, NULL, NULL, NULL, NULL, LINENO(n), c->c_arena);
 	if (!d)
-	    goto error;
+	    return NULL;
 	name_expr = NULL;
     }
     else {
 	d = ast_for_call(c, CHILD(n, 3), name_expr);
 	if (!d)
-	    goto error;
+	    return NULL;
 	name_expr = NULL;
     }
 
     return d;
-    
-  error:
-    return NULL;
 }
 
 static asdl_seq*
@@ -755,12 +749,10 @@ ast_for_decorators(struct compiling *c, const node *n)
     for (i = 0; i < NCH(n); i++) {
 	d = ast_for_decorator(c, CHILD(n, i));
 	if (!d)
-	    goto error;
+	    return NULL;
 	asdl_seq_APPEND(decorator_seq, d);
     }
     return decorator_seq;
-  error:
-    return NULL;
 }
 
 static stmt_ty
@@ -778,7 +770,7 @@ ast_for_funcdef(struct compiling *c, const node *n)
     if (NCH(n) == 6) { /* decorators are present */
 	decorator_seq = ast_for_decorators(c, CHILD(n, 0));
 	if (!decorator_seq)
-	    goto error;
+	    return NULL;
 	name_i = 2;
     }
     else {
@@ -787,22 +779,19 @@ ast_for_funcdef(struct compiling *c, const node *n)
 
     name = NEW_IDENTIFIER(CHILD(n, name_i));
     if (!name)
-	goto error;
+	return NULL;
     else if (!strcmp(STR(CHILD(n, name_i)), "None")) {
 	ast_error(CHILD(n, name_i), "assignment to None");
-	goto error;
+	return NULL;
     }
     args = ast_for_arguments(c, CHILD(n, name_i + 1));
     if (!args)
-	goto error;
+	return NULL;
     body = ast_for_suite(c, CHILD(n, name_i + 3));
     if (!body)
-	goto error;
+	return NULL;
 
     return FunctionDef(name, args, body, decorator_seq, LINENO(n), c->c_arena);
-
-error:
-    return NULL;
 }
 
 static expr_ty
@@ -1673,10 +1662,10 @@ ast_for_call(struct compiling *c, const node *n, expr_ty func)
 
     args = asdl_seq_new(nargs + ngens, c->c_arena);
     if (!args)
-        goto error;
+        return NULL;
     keywords = asdl_seq_new(nkeywords, c->c_arena);
     if (!keywords)
-        goto error;
+        return NULL;
     nargs = 0;
     nkeywords = 0;
     for (i = 0; i < NCH(n); i++) {
@@ -1686,13 +1675,13 @@ ast_for_call(struct compiling *c, const node *n, expr_ty func)
 	    if (NCH(ch) == 1) {
 		e = ast_for_expr(c, CHILD(ch, 0));
                 if (!e)
-                    goto error;
+                    return NULL;
 		asdl_seq_SET(args, nargs++, e);
 	    }  
 	    else if (TYPE(CHILD(ch, 1)) == gen_for) {
         	e = ast_for_genexp(c, ch);
                 if (!e)
-                    goto error;
+                    return NULL;
 		asdl_seq_SET(args, nargs++, e);
             }
 	    else {
@@ -1702,7 +1691,7 @@ ast_for_call(struct compiling *c, const node *n, expr_ty func)
 		/* CHILD(ch, 0) is test, but must be an identifier? */ 
 		e = ast_for_expr(c, CHILD(ch, 0));
                 if (!e)
-                    goto error;
+                    return NULL;
                 /* f(lambda x: x[0] = 3) ends up getting parsed with
                  * LHS test = lambda x: x[0], and RHS test = 3.
                  * SF bug 132313 points out that complaining about a keyword
@@ -1710,18 +1699,18 @@ ast_for_call(struct compiling *c, const node *n, expr_ty func)
                  */
                 if (e->kind == Lambda_kind) {
                   ast_error(CHILD(ch, 0), "lambda cannot contain assignment");
-                  goto error;
+                  return NULL;
                 } else if (e->kind != Name_kind) {
                   ast_error(CHILD(ch, 0), "keyword can't be an expression");
-                  goto error;
+                  return NULL;
                 }
 		key = e->v.Name.id;
 		e = ast_for_expr(c, CHILD(ch, 2));
                 if (!e)
-                    goto error;
+                    return NULL;
 		kw = keyword(key, e, c->c_arena);
                 if (!kw)
-                    goto error;
+                    return NULL;
 		asdl_seq_SET(keywords, nkeywords++, kw);
 	    }
 	}
@@ -1736,9 +1725,6 @@ ast_for_call(struct compiling *c, const node *n, expr_ty func)
     }
 
     return Call(func, args, keywords, vararg, kwarg, LINENO(n), c->c_arena);
-
- error:
-    return NULL;
 }
 
 static expr_ty
@@ -1882,16 +1868,16 @@ ast_for_expr_stmt(struct compiling *c, const node *n)
 	    node *ch = CHILD(n, i);
 	    if (TYPE(ch) == yield_expr) {
 		ast_error(ch, "assignment to yield expression not possible");
-		goto error;
+		return NULL;
 	    }
 	    e = ast_for_testlist(c, ch);
 
 	    /* set context to assign */
 	    if (!e) 
-	      goto error;
+	      return NULL;
 
 	    if (!set_context(e, Store, CHILD(n, i))) {
-	      goto error;
+	      return NULL;
             }
 
 	    asdl_seq_SET(targets, i / 2, e);
@@ -1902,12 +1888,9 @@ ast_for_expr_stmt(struct compiling *c, const node *n)
 	else
 	    expression = ast_for_expr(c, value);
 	if (!expression)
-	    goto error;
+	    return NULL;
 	return Assign(targets, expression, LINENO(n), c->c_arena);
-    error:
-        (void)1;
     }
-    return NULL;
 }
 
 static stmt_ty
@@ -1958,17 +1941,14 @@ ast_for_exprlist(struct compiling *c, const node *n, int context)
     for (i = 0; i < NCH(n); i += 2) {
 	e = ast_for_expr(c, CHILD(n, i));
 	if (!e)
-	    goto error;
+	    return NULL;
 	asdl_seq_SET(seq, i / 2, e);
 	if (context) {
 	    if (!set_context(e, context, CHILD(n, i)))
-	    	goto error;
+	    	return NULL;
         }
     }
     return seq;
-
-error:
-    return NULL;
 }
 
 static stmt_ty
@@ -2073,6 +2053,8 @@ alias_for_import_name(struct compiling *c, const node *n)
       dotted_as_name: dotted_name [NAME NAME]
       dotted_name: NAME ('.' NAME)*
     */
+    PyObject *str;
+
  loop:
     switch (TYPE(n)) {
         case import_as_name:
@@ -2101,7 +2083,6 @@ alias_for_import_name(struct compiling *c, const node *n)
             else {
                 /* Create a string of the form "a.b.c" */
                 int i, len;
-                PyObject *str;
                 char *s;
 
                 len = 0;
@@ -2124,11 +2105,14 @@ alias_for_import_name(struct compiling *c, const node *n)
                 --s;
                 *s = '\0';
                 PyString_InternInPlace(&str);
+		PyArena_AddPyObject(c->c_arena, str);
                 return alias(str, NULL, c->c_arena);
             }
             break;
         case STAR:
-            return alias(PyString_InternFromString("*"), NULL, c->c_arena);
+	    str = PyString_InternFromString("*");
+	    PyArena_AddPyObject(c->c_arena, str);
+            return alias(str, NULL, c->c_arena);
         default:
             PyErr_Format(PyExc_SystemError,
                          "unexpected import name: %d", TYPE(n));
@@ -2168,7 +2152,6 @@ ast_for_import_stmt(struct compiling *c, const node *n)
 	return Import(aliases, LINENO(n), c->c_arena);
     }
     else if (STR(CHILD(n, 0))[0] == 'f') { /* from */
-	stmt_ty import;
         int n_children;
         const char *from_modules;
 	int lineno = LINENO(n);
@@ -2223,9 +2206,7 @@ ast_for_import_stmt(struct compiling *c, const node *n)
             }
 	    asdl_seq_APPEND(aliases, import_alias);
         }
-        Py_INCREF(mod->name);
-	import = ImportFrom(mod->name, aliases, lineno, c->c_arena);
-	return import;
+	return ImportFrom(mod->name, aliases, lineno, c->c_arena);
     }
     PyErr_Format(PyExc_SystemError,
                  "unknown import statement: starts with command '%s'",
@@ -2343,7 +2324,7 @@ ast_for_suite(struct compiling *c, const node *n)
 	    ch = CHILD(n, i);
 	    s = ast_for_stmt(c, ch);
 	    if (!s)
-		goto error;
+		return NULL;
 	    asdl_seq_SET(seq, pos++, s);
 	}
     }
@@ -2356,7 +2337,7 @@ ast_for_suite(struct compiling *c, const node *n)
 		/* small_stmt or compound_stmt with only one child */
 		s = ast_for_stmt(c, ch);
 		if (!s)
-		    goto error;
+		    return NULL;
 		asdl_seq_SET(seq, pos++, s);
 	    }
 	    else {
@@ -2366,7 +2347,7 @@ ast_for_suite(struct compiling *c, const node *n)
 		for (j = 0; j < NCH(ch); j += 2) {
 		    s = ast_for_stmt(c, CHILD(ch, j));
 		    if (!s)
-			goto error;
+			return NULL;
 		    asdl_seq_SET(seq, pos++, s);
 		}
 	    }
@@ -2374,8 +2355,6 @@ ast_for_suite(struct compiling *c, const node *n)
     }
     assert(pos == seq->size);
     return seq;
- error:
-    return NULL;
 }
 
 static stmt_ty
