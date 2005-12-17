@@ -57,9 +57,10 @@ typedef struct {
 typedef struct { /* Subtype of IOobject */
   PyObject_HEAD
   char *buf;
-  int pos, string_size;
+  Py_ssize_t pos, string_size;
 
-  int buf_size, softspace;
+  Py_ssize_t buf_size;
+  int softspace;
 } Oobject;
 
 /* Declarations for objects of type StringI */
@@ -186,7 +187,7 @@ PyDoc_STRVAR(IO_readline__doc__, "readline() -- Read one line");
 static int
 IO_creadline(PyObject *self, char **output) {
         char *n, *s;
-        int l;
+        Py_ssize_t l;
 
         UNLESS (IO__opencheck(IOOOBJECT(self))) return -1;
 
@@ -197,8 +198,9 @@ IO_creadline(PyObject *self, char **output) {
 
         *output=((IOobject*)self)->buf + ((IOobject*)self)->pos;
         l = n - ((IOobject*)self)->buf - ((IOobject*)self)->pos;
-        ((IOobject*)self)->pos += l;
-        return l;
+	assert(((IOobject*)self)->pos + l < INT_MAX);
+        ((IOobject*)self)->pos += (int)l;
+        return (int)l;
 }
 
 static PyObject *
@@ -324,11 +326,14 @@ PyDoc_STRVAR(O_seek__doc__,
 
 static PyObject *
 O_seek(Oobject *self, PyObject *args) {
-        int position, mode = 0;
+        int i_position;
+	Py_ssize_t position;
+	int mode = 0;
 
         UNLESS (IO__opencheck(IOOOBJECT(self))) return NULL;
-        UNLESS (PyArg_ParseTuple(args, "i|i:seek", &position, &mode)) 
+        UNLESS (PyArg_ParseTuple(args, "i|i:seek", &i_position, &mode)) 
                 return NULL;
+	position = i_position;
 
         if (mode == 2) {
                 position += self->string_size;
@@ -362,8 +367,8 @@ PyDoc_STRVAR(O_write__doc__,
 
 
 static int
-O_cwrite(PyObject *self, const char *c, int  l) {
-        int newl;
+O_cwrite(PyObject *self, const char *c, Py_ssize_t  l) {
+        Py_ssize_t newl;
         Oobject *oself;
 
         UNLESS (IO__opencheck(IOOOBJECT(self))) return -1;
@@ -372,8 +377,10 @@ O_cwrite(PyObject *self, const char *c, int  l) {
         newl = oself->pos+l;
         if (newl >= oself->buf_size) {
             oself->buf_size *= 2;
-            if (oself->buf_size <= newl) 
-                    oself->buf_size = newl+1;
+            if (oself->buf_size <= newl) {
+		    assert(newl + 1 < INT_MAX);
+                    oself->buf_size = (int)(newl+1);
+	    }
             UNLESS (oself->buf = 
                     (char*)realloc(oself->buf, oself->buf_size)) {
                     PyErr_SetString(PyExc_MemoryError,"out of memory");
@@ -384,13 +391,14 @@ O_cwrite(PyObject *self, const char *c, int  l) {
 
         memcpy(oself->buf+oself->pos,c,l);
 
-        oself->pos += l;
+	assert(oself->pos + l < INT_MAX);
+        oself->pos += (int)l;
 
         if (oself->string_size < oself->pos) {
             oself->string_size = oself->pos;
         }
 
-        return l;
+        return (int)l;
 }
 
 static PyObject *

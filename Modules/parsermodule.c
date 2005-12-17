@@ -55,9 +55,9 @@ PyDoc_STRVAR(parser_doc_string,
 static char parser_version_string[] = "0.5";
 
 
-typedef PyObject* (*SeqMaker) (int length);
+typedef PyObject* (*SeqMaker) (Py_ssize_t length);
 typedef int (*SeqInserter) (PyObject* sequence,
-                            int index,
+                            Py_ssize_t index,
                             PyObject* element);
 
 /*  The function below is copyrighted by Stichting Mathematisch Centrum.  The

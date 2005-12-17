@@ -816,7 +816,7 @@ PyObject_Realloc(void *p, size_t nbytes)
 {
 	void *bp;
 	poolp pool;
-	uint size;
+	size_t size;
 
 	if (p == NULL)
 		return PyObject_Malloc(nbytes);
@@ -1018,7 +1018,7 @@ _PyObject_DebugMalloc(size_t nbytes)
 	if (p == NULL)
 		return NULL;
 
-	write4(p, nbytes);
+	write4(p, (ulong)nbytes);
 	p[4] = p[5] = p[6] = p[7] = FORBIDDENBYTE;
 
 	if (nbytes > 0)
@@ -1081,7 +1081,7 @@ _PyObject_DebugRealloc(void *p, size_t nbytes)
 	if (q == NULL)
 		return NULL;
 
-	write4(q, nbytes);
+	write4(q, (ulong)nbytes);
 	assert(q[4] == FORBIDDENBYTE &&
 	       q[5] == FORBIDDENBYTE &&
 	       q[6] == FORBIDDENBYTE &&

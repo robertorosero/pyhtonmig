@@ -62,7 +62,7 @@ static int
 zipimporter_init(ZipImporter *self, PyObject *args, PyObject *kwds)
 {
 	char *path, *p, *prefix, buf[MAXPATHLEN+2];
-	int len;
+	Py_ssize_t len;
 
 	if (!_PyArg_NoKeywords("zipimporter()", kwds))
 		return -1;
@@ -231,7 +231,7 @@ get_subname(char *fullname)
 static int
 make_filename(char *prefix, char *name, char *path)
 {
-	int len;
+	Py_ssize_t len;
 	char *p;
 
 	len = strlen(prefix);
@@ -249,7 +249,8 @@ make_filename(char *prefix, char *name, char *path)
 			*p = SEP;
 	}
 	len += strlen(name);
-	return len;
+	assert(len < INT_MAX);
+	return (int)len;
 }
 
 enum zi_module_info {
@@ -807,7 +808,8 @@ get_data(char *archive, PyObject *toc_entry)
 	PyObject *raw_data, *data = NULL, *decompress;
 	char *buf;
 	FILE *fp;
-	int err, bytes_read = 0;
+	int err;
+	Py_ssize_t bytes_read = 0;
 	long l;
 	char *datapath;
 	long compress, data_size, file_size, file_offset;
@@ -1023,7 +1025,7 @@ get_mtime_of_source(ZipImporter *self, char *path)
 {
 	PyObject *toc_entry;
 	time_t mtime = 0;
-	int lastchar = strlen(path) - 1;
+	Py_ssize_t lastchar = strlen(path) - 1;
 	char savechar = path[lastchar];
 	path[lastchar] = '\0';  /* strip 'c' or 'o' from *.py[co] */
 	toc_entry = PyDict_GetItemString(self->files, path);

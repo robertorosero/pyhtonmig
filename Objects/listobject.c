@@ -22,7 +22,7 @@
  * than ob_size on entry.
  */
 static int
-list_resize(PyListObject *self, int newsize)
+list_resize(PyListObject *self, Py_ssize_t newsize)
 {
 	PyObject **items;
 	size_t new_allocated;
@@ -82,7 +82,7 @@ PyList_Fini(void)
 }
 
 PyObject *
-PyList_New(int size)
+PyList_New(Py_ssize_t size)
 {
 	PyListObject *op;
 	size_t nbytes;
@@ -118,7 +118,7 @@ PyList_New(int size)
 	return (PyObject *) op;
 }
 
-int
+Py_ssize_t
 PyList_Size(PyObject *op)
 {
 	if (!PyList_Check(op)) {
@@ -132,13 +132,13 @@ PyList_Size(PyObject *op)
 static PyObject *indexerr = NULL;
 
 PyObject *
-PyList_GetItem(PyObject *op, int i)
+PyList_GetItem(PyObject *op, Py_ssize_t i)
 {
 	if (!PyList_Check(op)) {
 		PyErr_BadInternalCall();
 		return NULL;
 	}
-	if (i < 0 || i >= ((PyListObject *)op) -> ob_size) {
+	if (i >= ((PyListObject *)op) -> ob_size) {
 		if (indexerr == NULL)
 			indexerr = PyString_FromString(
 				"list index out of range");
@@ -149,7 +149,7 @@ PyList_GetItem(PyObject *op, int i)
 }
 
 int
-PyList_SetItem(register PyObject *op, register int i,
+PyList_SetItem(register PyObject *op, register Py_ssize_t i,
                register PyObject *newitem)
 {
 	register PyObject *olditem;
@@ -159,7 +159,7 @@ PyList_SetItem(register PyObject *op, register int i,
 		PyErr_BadInternalCall();
 		return -1;
 	}
-	if (i < 0 || i >= ((PyListObject *)op) -> ob_size) {
+	if (i >= ((PyListObject *)op) -> ob_size) {
 		Py_XDECREF(newitem);
 		PyErr_SetString(PyExc_IndexError,
 				"list assignment index out of range");
@@ -173,7 +173,7 @@ PyList_SetItem(register PyObject *op, register int i,
 }
 
 static int
-ins1(PyListObject *self, int where, PyObject *v)
+ins1(PyListObject *self, Py_ssize_t where, PyObject *v)
 {
 	int i, n = self->ob_size;
 	PyObject **items;
@@ -206,7 +206,7 @@ ins1(PyListObject *self, int where, PyObject *v)
 }
 
 int
-PyList_Insert(PyObject *op, int where, PyObject *newitem)
+PyList_Insert(PyObject *op, Py_ssize_t where, PyObject *newitem)
 {
 	if (!PyList_Check(op)) {
 		PyErr_BadInternalCall();
@@ -381,7 +381,7 @@ list_contains(PyListObject *a, PyObject *el)
 }
 
 static PyObject *
-list_item(PyListObject *a, int i)
+list_item(PyListObject *a, Py_ssize_t i)
 {
 	if (i < 0 || i >= a->ob_size) {
 		if (indexerr == NULL)
@@ -395,7 +395,7 @@ list_item(PyListObject *a, int i)
 }
 
 static PyObject *
-list_slice(PyListObject *a, int ilow, int ihigh)
+list_slice(PyListObject *a, Py_ssize_t ilow, Py_ssize_t ihigh)
 {
 	PyListObject *np;
 	PyObject **src, **dest;
@@ -424,7 +424,7 @@ list_slice(PyListObject *a, int ilow, int ihigh)
 }
 
 PyObject *
-PyList_GetSlice(PyObject *a, int ilow, int ihigh)
+PyList_GetSlice(PyObject *a, Py_ssize_t ilow, Py_ssize_t ihigh)
 {
 	if (!PyList_Check(a)) {
 		PyErr_BadInternalCall();
@@ -473,7 +473,7 @@ list_concat(PyListObject *a, PyObject *bb)
 }
 
 static PyObject *
-list_repeat(PyListObject *a, int n)
+list_repeat(PyListObject *a, Py_ssize_t n)
 {
 	int i, j;
 	int size;
@@ -542,7 +542,7 @@ list_clear(PyListObject *a)
  * guaranteed the call cannot fail.
  */
 static int
-list_ass_slice(PyListObject *a, int ilow, int ihigh, PyObject *v)
+list_ass_slice(PyListObject *a, Py_ssize_t ilow, Py_ssize_t ihigh, PyObject *v)
 {
 	/* Because [X]DECREF can recursively invoke list operations on
 	   this list, we must postpone all [X]DECREF activity until
@@ -640,7 +640,7 @@ list_ass_slice(PyListObject *a, int ilow, int ihigh, PyObject *v)
 }
 
 int
-PyList_SetSlice(PyObject *a, int ilow, int ihigh, PyObject *v)
+PyList_SetSlice(PyObject *a, Py_ssize_t ilow, Py_ssize_t ihigh, PyObject *v)
 {
 	if (!PyList_Check(a)) {
 		PyErr_BadInternalCall();
@@ -650,7 +650,7 @@ PyList_SetSlice(PyObject *a, int ilow, int ihigh, PyObject *v)
 }
 
 static PyObject *
-list_inplace_repeat(PyListObject *self, int n)
+list_inplace_repeat(PyListObject *self, Py_ssize_t n)
 {
 	PyObject **items;
 	int size, i, j, p;
@@ -685,7 +685,7 @@ list_inplace_repeat(PyListObject *self, int n)
 }
 
 static int
-list_ass_item(PyListObject *a, int i, PyObject *v)
+list_ass_item(PyListObject *a, Py_ssize_t i, PyObject *v)
 {
 	PyObject *old_value;
 	if (i < 0 || i >= a->ob_size) {
@@ -2435,11 +2435,11 @@ static PyMethodDef list_methods[] = {
 static PySequenceMethods list_as_sequence = {
 	(inquiry)list_length,			/* sq_length */
 	(binaryfunc)list_concat,		/* sq_concat */
-	(intargfunc)list_repeat,		/* sq_repeat */
-	(intargfunc)list_item,			/* sq_item */
-	(intintargfunc)list_slice,		/* sq_slice */
-	(intobjargproc)list_ass_item,		/* sq_ass_item */
-	(intintobjargproc)list_ass_slice,	/* sq_ass_slice */
+	(ssizeargfunc)list_repeat,		/* sq_repeat */
+	(ssizeargfunc)list_item,		/* sq_item */
+	(ssizessizeargfunc)list_slice,		/* sq_slice */
+	(sizeobjargproc)list_ass_item,		/* sq_ass_item */
+	(ssizessizeobjargproc)list_ass_slice,	/* sq_ass_slice */
 	(objobjproc)list_contains,		/* sq_contains */
 	(binaryfunc)list_inplace_concat,	/* sq_inplace_concat */
 	(intargfunc)list_inplace_repeat,	/* sq_inplace_repeat */
@@ -2459,7 +2459,7 @@ list_subscript(PyListObject* self, PyObject* item)
 		return list_item(self, i);
 	}
 	else if (PyLong_Check(item)) {
-		long i = PyLong_AsLong(item);
+		Py_ssize_t i = PyLong_AsSsize_t(item);
 		if (i == -1 && PyErr_Occurred())
 			return NULL;
 		if (i < 0)
@@ -2467,7 +2467,7 @@ list_subscript(PyListObject* self, PyObject* item)
 		return list_item(self, i);
 	}
 	else if (PySlice_Check(item)) {
-		int start, stop, step, slicelength, cur, i;
+		Py_ssize_t start, stop, step, slicelength, cur, i;
 		PyObject* result;
 		PyObject* it;
 		PyObject **src, **dest;
@@ -2521,7 +2521,7 @@ list_ass_subscript(PyListObject* self, PyObject* item, PyObject* value)
 		return list_ass_item(self, i, value);
 	}
 	else if (PySlice_Check(item)) {
-		int start, stop, step, slicelength;
+		Py_ssize_t start, stop, step, slicelength;
 
 		if (PySlice_GetIndicesEx((PySliceObject*)item, self->ob_size,
 				 &start, &stop, &step, &slicelength) < 0) {
@@ -2601,9 +2601,10 @@ list_ass_subscript(PyListObject* self, PyObject* item, PyObject* value)
 			}
 
 			if (PySequence_Fast_GET_SIZE(seq) != slicelength) {
+				/* XXX can we use %zd here? */
 				PyErr_Format(PyExc_ValueError,
             "attempt to assign sequence of size %d to extended slice of size %d",
-					     PySequence_Fast_GET_SIZE(seq),
+					     (int)PySequence_Fast_GET_SIZE(seq),
 					     slicelength);
 				Py_DECREF(seq);
 				return -1;

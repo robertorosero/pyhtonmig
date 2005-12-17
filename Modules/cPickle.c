@@ -339,7 +339,7 @@ typedef struct Picklerobject {
 
 	int fast; /* Fast mode doesn't save in memo, don't use if circ ref */
         int nesting;
-	int (*write_func)(struct Picklerobject *, const char *, int);
+	int (*write_func)(struct Picklerobject *, const char *, Py_ssize_t);
 	char *write_buf;
 	int buf_size;
 	PyObject *dispatch_table;
@@ -417,12 +417,17 @@ cPickle_ErrFormat(PyObject *ErrType, char *stringformat, char *format, ...)
 }
 
 static int
-write_file(Picklerobject *self, const char *s, int  n)
+write_file(Picklerobject *self, const char *s, Py_ssize_t  n)
 {
 	size_t nbyteswritten;
 
 	if (s == NULL) {
 		return 0;
+	}
+
+	if (n > INT_MAX) {
+		/* String too large */
+		return -1;
 	}
 
 	Py_BEGIN_ALLOW_THREADS
@@ -433,11 +438,11 @@ write_file(Picklerobject *self, const char *s, int  n)
 		return -1;
 	}
 
-	return n;
+	return (int)n;
 }
 
 static int
-write_cStringIO(Picklerobject *self, const char *s, int  n)
+write_cStringIO(Picklerobject *self, const char *s, Py_ssize_t  n)
 {
 	if (s == NULL) {
 		return 0;
@@ -447,21 +452,26 @@ write_cStringIO(Picklerobject *self, const char *s, int  n)
 		return -1;
 	}
 
-	return n;
+	return (int)n;
 }
 
 static int
-write_none(Picklerobject *self, const char *s, int  n)
+write_none(Picklerobject *self, const char *s, Py_ssize_t  n)
 {
 	if (s == NULL) return 0;
-	return n;
+	if (n > INT_MAX) return -1;
+	return (int)n;
 }
 
 static int
-write_other(Picklerobject *self, const char *s, int  n)
+write_other(Picklerobject *self, const char *s, Py_ssize_t  _n)
 {
 	PyObject *py_str = 0, *junk = 0;
+	int n;
 
+	if (_n > INT_MAX)
+		return -1;
+	n = (int)_n;
 	if (s == NULL) {
 		if (!( self->buf_size ))  return 0;
 		py_str = PyString_FromStringAndSize(self->write_buf,

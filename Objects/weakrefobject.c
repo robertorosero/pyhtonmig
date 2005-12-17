@@ -520,7 +520,7 @@ proxy_dealloc(PyWeakReference *self)
 /* sequence slots */
 
 static PyObject *
-proxy_slice(PyWeakReference *proxy, int i, int j)
+proxy_slice(PyWeakReference *proxy, Py_ssize_t i, Py_ssize_t j)
 {
     if (!proxy_checkref(proxy))
         return NULL;
@@ -528,7 +528,7 @@ proxy_slice(PyWeakReference *proxy, int i, int j)
 }
 
 static int
-proxy_ass_slice(PyWeakReference *proxy, int i, int j, PyObject *value)
+proxy_ass_slice(PyWeakReference *proxy, Py_ssize_t i, Py_ssize_t j, PyObject *value)
 {
     if (!proxy_checkref(proxy))
         return -1;
@@ -629,9 +629,9 @@ static PySequenceMethods proxy_as_sequence = {
     0,                          /*sq_concat*/
     0,                          /*sq_repeat*/
     0,                          /*sq_item*/
-    (intintargfunc)proxy_slice, /*sq_slice*/
+    (ssizessizeargfunc)proxy_slice, /*sq_slice*/
     0,                          /*sq_ass_item*/
-    (intintobjargproc)proxy_ass_slice, /*sq_ass_slice*/
+    (ssizessizeobjargproc)proxy_ass_slice, /*sq_ass_slice*/
     (objobjproc)proxy_contains, /* sq_contains */
 };
 

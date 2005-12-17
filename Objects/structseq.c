@@ -56,7 +56,7 @@ structseq_length(PyStructSequence *obj)
 }
 
 static PyObject*
-structseq_item(PyStructSequence *obj, int i)
+structseq_item(PyStructSequence *obj, Py_ssize_t i)
 {
 	if (i < 0 || i >= VISIBLE_SIZE(obj)) {
 		PyErr_SetString(PyExc_IndexError, "tuple index out of range");
@@ -67,7 +67,7 @@ structseq_item(PyStructSequence *obj, int i)
 }
 
 static PyObject*
-structseq_slice(PyStructSequence *obj, int low, int high)
+structseq_slice(PyStructSequence *obj, Py_ssize_t low, Py_ssize_t high)
 {
 	PyTupleObject *np;
 	int i;
@@ -200,7 +200,7 @@ structseq_concat(PyStructSequence *obj, PyObject *b)
 }
 
 static PyObject *
-structseq_repeat(PyStructSequence *obj, int n)
+structseq_repeat(PyStructSequence *obj, Py_ssize_t n)
 {
 	PyObject *tup, *result;
 	tup = make_tuple(obj);
@@ -286,9 +286,9 @@ structseq_reduce(PyStructSequence* self)
 static PySequenceMethods structseq_as_sequence = {
 	(inquiry)structseq_length,
 	(binaryfunc)structseq_concat,           /* sq_concat */
-	(intargfunc)structseq_repeat,         	/* sq_repeat */
-	(intargfunc)structseq_item,		/* sq_item */
-	(intintargfunc)structseq_slice,		/* sq_slice */
+	(ssizeargfunc)structseq_repeat,         /* sq_repeat */
+	(ssizeargfunc)structseq_item,		/* sq_item */
+	(ssizessizeargfunc)structseq_slice,	/* sq_slice */
 	0,					/* sq_ass_item */
 	0,					/* sq_ass_slice */
 	(objobjproc)structseq_contains,	        /* sq_contains */

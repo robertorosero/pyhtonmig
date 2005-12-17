@@ -92,7 +92,8 @@ whose size is determined when the object is allocated.
  */
 #define PyObject_VAR_HEAD		\
 	PyObject_HEAD			\
-	int ob_size; /* Number of items in variable part */
+	Py_ssize_t ob_size; /* Number of items in variable part */
+#define Py_INVALID_SIZE (Py_ssize_t)-1
 
 /* Nothing is actually declared to be a PyObject, but every pointer to
  * a Python object can be cast to a PyObject*.  This is inheritance built
@@ -130,11 +131,15 @@ typedef int (*inquiry)(PyObject *);
 typedef int (*coercion)(PyObject **, PyObject **);
 typedef PyObject *(*intargfunc)(PyObject *, int);
 typedef PyObject *(*intintargfunc)(PyObject *, int, int);
+typedef PyObject *(*ssizeargfunc)(PyObject *, Py_ssize_t);
+typedef PyObject *(*ssizessizeargfunc)(PyObject *, Py_ssize_t, Py_ssize_t);
 typedef int(*intobjargproc)(PyObject *, int, PyObject *);
 typedef int(*intintobjargproc)(PyObject *, int, int, PyObject *);
+typedef int(*sizeobjargproc)(PyObject *, size_t, PyObject *);
+typedef int(*ssizessizeobjargproc)(PyObject *, Py_ssize_t, Py_ssize_t, PyObject *);
 typedef int(*objobjargproc)(PyObject *, PyObject *, PyObject *);
-typedef int (*getreadbufferproc)(PyObject *, int, void **);
-typedef int (*getwritebufferproc)(PyObject *, int, void **);
+typedef Py_ssize_t (*getreadbufferproc)(PyObject *, int, void **);
+typedef Py_ssize_t (*getwritebufferproc)(PyObject *, int, void **);
 typedef int (*getsegcountproc)(PyObject *, int *);
 typedef int (*getcharbufferproc)(PyObject *, int, const char **);
 typedef int (*objobjproc)(PyObject *, PyObject *);
@@ -197,15 +202,15 @@ typedef struct {
 typedef struct {
 	inquiry sq_length;
 	binaryfunc sq_concat;
-	intargfunc sq_repeat;
-	intargfunc sq_item;
-	intintargfunc sq_slice;
-	intobjargproc sq_ass_item;
-	intintobjargproc sq_ass_slice;
+	ssizeargfunc sq_repeat;
+	ssizeargfunc sq_item;
+	ssizessizeargfunc sq_slice;
+	sizeobjargproc sq_ass_item;
+	ssizessizeobjargproc sq_ass_slice;
 	objobjproc sq_contains;
 	/* Added in release 2.0 */
 	binaryfunc sq_inplace_concat;
-	intargfunc sq_inplace_repeat;
+	ssizeargfunc sq_inplace_repeat;
 } PySequenceMethods;
 
 typedef struct {
@@ -239,7 +244,7 @@ typedef PyObject *(*descrgetfunc) (PyObject *, PyObject *, PyObject *);
 typedef int (*descrsetfunc) (PyObject *, PyObject *, PyObject *);
 typedef int (*initproc)(PyObject *, PyObject *, PyObject *);
 typedef PyObject *(*newfunc)(struct _typeobject *, PyObject *, PyObject *);
-typedef PyObject *(*allocfunc)(struct _typeobject *, int);
+typedef PyObject *(*allocfunc)(struct _typeobject *, Py_ssize_t);
 
 typedef struct _typeobject {
 	PyObject_VAR_HEAD
@@ -362,7 +367,7 @@ PyAPI_DATA(PyTypeObject) PySuper_Type; /* built-in 'super' */
 #define PyType_CheckExact(op) ((op)->ob_type == &PyType_Type)
 
 PyAPI_FUNC(int) PyType_Ready(PyTypeObject *);
-PyAPI_FUNC(PyObject *) PyType_GenericAlloc(PyTypeObject *, int);
+PyAPI_FUNC(PyObject *) PyType_GenericAlloc(PyTypeObject *, Py_ssize_t);
 PyAPI_FUNC(PyObject *) PyType_GenericNew(PyTypeObject *,
 					       PyObject *, PyObject *);
 PyAPI_FUNC(PyObject *) _PyType_Lookup(PyTypeObject *, PyObject *);

@@ -599,7 +599,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throw)
 
 /* Code access macros */
 
-#define INSTR_OFFSET()	(next_instr - first_instr)
+#define INSTR_OFFSET()	((int)(next_instr - first_instr))
 #define NEXTOP()	(*next_instr++)
 #define NEXTARG()	(next_instr += 2, (next_instr[-1]<<8) + next_instr[-2])
 #define PEEKARG()	((next_instr[2]<<8) + next_instr[1])
@@ -637,7 +637,9 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throw)
 
 /* Stack manipulation macros */
 
-#define STACK_LEVEL()	(stack_pointer - f->f_valuestack)
+/* The stack can grow at most MAXINT deep, as co_nlocals and
+   co_stacksize are ints. */
+#define STACK_LEVEL()	((int)(stack_pointer - f->f_valuestack))
 #define EMPTY()		(STACK_LEVEL() == 0)
 #define TOP()		(stack_pointer[-1])
 #define SECOND()	(stack_pointer[-2])
@@ -3856,7 +3858,7 @@ ext_do_call(PyObject *func, PyObject ***pp_stack, int flags, int na, int nk)
    called by the SLICE opcode with v and/or w equal to NULL.
 */
 int
-_PyEval_SliceIndex(PyObject *v, int *pi)
+_PyEval_SliceIndex(PyObject *v, Py_ssize_t *pi)
 {
 	if (v != NULL) {
 		long x;
@@ -3905,6 +3907,7 @@ _PyEval_SliceIndex(PyObject *v, int *pi)
 			return 0;
 		}
 		/* Truncate -- very long indices are truncated anyway */
+		/* XXX truncate by ssize maximum */
 		if (x > INT_MAX)
 			x = INT_MAX;
 		else if (x < -INT_MAX)

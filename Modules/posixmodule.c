@@ -1033,7 +1033,7 @@ posix_do_stat(PyObject *self, PyObject *args,
 	int res;
 
 #ifdef MS_WINDOWS
-	int pathlen;
+	Py_ssize_t pathlen;
 	char pathcopy[MAX_PATH];
 #endif /* MS_WINDOWS */
 
@@ -1518,7 +1518,7 @@ posix_listdir(PyObject *self, PyObject *args)
 	/* MAX_PATH characters could mean a bigger encoded string */
 	char namebuf[MAX_PATH*2+5];
 	char *bufptr = namebuf;
-	int len = sizeof(namebuf)/sizeof(namebuf[0]);
+	Py_ssize_t len = sizeof(namebuf)/sizeof(namebuf[0]);
 
 #ifdef Py_WIN_WIDE_FILENAMES
 	/* If on wide-character-capable OS see if argument
@@ -2216,7 +2216,7 @@ posix_execv(PyObject *self, PyObject *args)
 	PyObject *argv;
 	char **argvlist;
 	int i, argc;
-	PyObject *(*getitem)(PyObject *, int);
+	PyObject *(*getitem)(PyObject *, Py_ssize_t);
 
 	/* execv has two arguments: (path, argv), where
 	   argv is a list or tuple of strings. */
@@ -2285,7 +2285,7 @@ posix_execve(PyObject *self, PyObject *args)
 	char **envlist;
 	PyObject *key, *val, *keys=NULL, *vals=NULL;
 	int i, pos, argc, envc;
-	PyObject *(*getitem)(PyObject *, int);
+	PyObject *(*getitem)(PyObject *, Py_ssize_t);
 	int lastarg = 0;
 
 	/* execve has three arguments: (path, argv, env), where
@@ -2429,7 +2429,7 @@ posix_spawnv(PyObject *self, PyObject *args)
 	char **argvlist;
 	int mode, i, argc;
 	Py_intptr_t spawnval;
-	PyObject *(*getitem)(PyObject *, int);
+	PyObject *(*getitem)(PyObject *, Py_ssize_t);
 
 	/* spawnv has three arguments: (mode, path, argv), where
 	   argv is a list or tuple of strings. */
@@ -2518,7 +2518,7 @@ posix_spawnve(PyObject *self, PyObject *args)
 	PyObject *key, *val, *keys=NULL, *vals=NULL, *res=NULL;
 	int mode, i, pos, argc, envc;
 	Py_intptr_t spawnval;
-	PyObject *(*getitem)(PyObject *, int);
+	PyObject *(*getitem)(PyObject *, Py_ssize_t);
 	int lastarg = 0;
 
 	/* spawnve has four arguments: (mode, path, argv, env), where
@@ -2670,7 +2670,7 @@ posix_spawnvp(PyObject *self, PyObject *args)
 	char **argvlist;
 	int mode, i, argc;
 	Py_intptr_t spawnval;
-	PyObject *(*getitem)(PyObject *, int);
+	PyObject *(*getitem)(PyObject *, Py_ssize_t);
 
 	/* spawnvp has three arguments: (mode, path, argv), where
 	   argv is a list or tuple of strings. */
@@ -2751,7 +2751,7 @@ posix_spawnvpe(PyObject *self, PyObject *args)
 	PyObject *key, *val, *keys=NULL, *vals=NULL, *res=NULL;
 	int mode, i, pos, argc, envc;
 	Py_intptr_t spawnval;
-	PyObject *(*getitem)(PyObject *, int);
+	PyObject *(*getitem)(PyObject *, Py_ssize_t);
 	int lastarg = 0;
 
 	/* spawnvpe has four arguments: (mode, path, argv, env), where
@@ -4186,14 +4186,15 @@ _PyPopenCreateProcess(char *cmdstring,
 	char *s1,*s2, *s3 = " /c ";
 	const char *szConsoleSpawn = "w9xpopen.exe";
 	int i;
-	int x;
+	Py_ssize_t x;
 
 	if (i = GetEnvironmentVariable("COMSPEC",NULL,0)) {
 		char *comshell;
 
 		s1 = (char *)alloca(i);
 		if (!(x = GetEnvironmentVariable("COMSPEC", s1, i)))
-			return x;
+			/* x < i, so x fits into an integer */
+			return (int)x;
 
 		/* Explicitly check if we are using COMMAND.COM.  If we are
 		 * then use the w9xpopen hack.
@@ -4219,7 +4220,7 @@ _PyPopenCreateProcess(char *cmdstring,
 			char modulepath[_MAX_PATH];
 			struct stat statinfo;
 			GetModuleFileName(NULL, modulepath, sizeof(modulepath));
-			for (i = x = 0; modulepath[i]; i++)
+			for (x = i = 0; modulepath[i]; i++)
 				if (modulepath[i] == SEP)
 					x = i+1;
 			modulepath[x] = '\0';
@@ -4396,7 +4397,7 @@ _PyPopen(char *cmdstring, int mode, int n)
 		 switch (mode & (_O_RDONLY | _O_TEXT | _O_BINARY | _O_WRONLY)) {
 		 case _O_WRONLY | _O_TEXT:
 			 /* Case for writing to child Stdin in text mode. */
-			 fd1 = _open_osfhandle((long)hChildStdinWrDup, mode);
+			 fd1 = _open_osfhandle((intptr_t)hChildStdinWrDup, mode);
 			 f1 = _fdopen(fd1, "w");
 			 f = PyFile_FromFile(f1, cmdstring, "w", _PyPclose);
 			 PyFile_SetBufSize(f, 0);
@@ -4407,7 +4408,7 @@ _PyPopen(char *cmdstring, int mode, int n)
 
 		 case _O_RDONLY | _O_TEXT:
 			 /* Case for reading from child Stdout in text mode. */
-			 fd1 = _open_osfhandle((long)hChildStdoutRdDup, mode);
+			 fd1 = _open_osfhandle((intptr_t)hChildStdoutRdDup, mode);
 			 f1 = _fdopen(fd1, "r");
 			 f = PyFile_FromFile(f1, cmdstring, "r", _PyPclose);
 			 PyFile_SetBufSize(f, 0);
@@ -4418,7 +4419,7 @@ _PyPopen(char *cmdstring, int mode, int n)
 
 		 case _O_RDONLY | _O_BINARY:
 			 /* Case for readinig from child Stdout in binary mode. */
-			 fd1 = _open_osfhandle((long)hChildStdoutRdDup, mode);
+			 fd1 = _open_osfhandle((intptr_t)hChildStdoutRdDup, mode);
 			 f1 = _fdopen(fd1, "rb");
 			 f = PyFile_FromFile(f1, cmdstring, "rb", _PyPclose);
 			 PyFile_SetBufSize(f, 0);
@@ -4429,7 +4430,7 @@ _PyPopen(char *cmdstring, int mode, int n)
 
 		 case _O_WRONLY | _O_BINARY:
 			 /* Case for writing to child Stdin in binary mode. */
-			 fd1 = _open_osfhandle((long)hChildStdinWrDup, mode);
+			 fd1 = _open_osfhandle((intptr_t)hChildStdinWrDup, mode);
 			 f1 = _fdopen(fd1, "wb");
 			 f = PyFile_FromFile(f1, cmdstring, "wb", _PyPclose);
 			 PyFile_SetBufSize(f, 0);
@@ -4455,9 +4456,9 @@ _PyPopen(char *cmdstring, int mode, int n)
 			 m2 = "wb";
 		 }
 
-		 fd1 = _open_osfhandle((long)hChildStdinWrDup, mode);
+		 fd1 = _open_osfhandle((intptr_t)hChildStdinWrDup, mode);
 		 f1 = _fdopen(fd1, m2);
-		 fd2 = _open_osfhandle((long)hChildStdoutRdDup, mode);
+		 fd2 = _open_osfhandle((intptr_t)hChildStdoutRdDup, mode);
 		 f2 = _fdopen(fd2, m1);
 		 p1 = PyFile_FromFile(f1, cmdstring, m2, _PyPclose);
 		 PyFile_SetBufSize(p1, 0);
@@ -4487,11 +4488,11 @@ _PyPopen(char *cmdstring, int mode, int n)
 			 m2 = "wb";
 		 }
 
-		 fd1 = _open_osfhandle((long)hChildStdinWrDup, mode);
+		 fd1 = _open_osfhandle((intptr_t)hChildStdinWrDup, mode);
 		 f1 = _fdopen(fd1, m2);
-		 fd2 = _open_osfhandle((long)hChildStdoutRdDup, mode);
+		 fd2 = _open_osfhandle((intptr_t)hChildStdoutRdDup, mode);
 		 f2 = _fdopen(fd2, m1);
-		 fd3 = _open_osfhandle((long)hChildStderrRdDup, mode);
+		 fd3 = _open_osfhandle((intptr_t)hChildStderrRdDup, mode);
 		 f3 = _fdopen(fd3, m1);
 		 p1 = PyFile_FromFile(f1, cmdstring, m2, _PyPclose);
 		 p2 = PyFile_FromFile(f2, cmdstring, m1, _PyPclose);
@@ -4993,8 +4994,8 @@ PyDoc_STRVAR(posix_waitpid__doc__,
 static PyObject *
 posix_waitpid(PyObject *self, PyObject *args)
 {
-	int pid, options;
-	int status;
+	intptr_t pid;
+	int status, options;
 
 	if (!PyArg_ParseTuple(args, "ii:waitpid", &pid, &options))
 		return NULL;

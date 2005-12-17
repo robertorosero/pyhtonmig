@@ -91,7 +91,7 @@ generates the numbers in the range on demand.  For looping, this is \n\
 slightly faster than range() and more memory efficient.");
 
 static PyObject *
-range_item(rangeobject *r, int i)
+range_item(rangeobject *r, Py_ssize_t i)
 {
 	if (i < 0 || i >= r->len) {
 		PyErr_SetString(PyExc_IndexError,
@@ -140,7 +140,7 @@ static PySequenceMethods range_as_sequence = {
 	(inquiry)range_length,	/* sq_length */
 	0,			/* sq_concat */
 	0,			/* sq_repeat */
-	(intargfunc)range_item, /* sq_item */
+	(ssizeargfunc)range_item, /* sq_item */
 	0,			/* sq_slice */
 };
 

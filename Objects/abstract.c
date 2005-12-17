@@ -648,7 +648,7 @@ PyNumber_Add(PyObject *v, PyObject *w)
 }
 
 static PyObject *
-sequence_repeat(intargfunc repeatfunc, PyObject *seq, PyObject *n)
+sequence_repeat(ssizeargfunc repeatfunc, PyObject *seq, PyObject *n)
 {
 	long count;
 	if (PyInt_Check(n)) {
@@ -842,7 +842,7 @@ PyNumber_InPlaceMultiply(PyObject *v, PyObject *w)
 	PyObject *result = binary_iop1(v, w, NB_SLOT(nb_inplace_multiply),
 				       NB_SLOT(nb_multiply));
 	if (result == Py_NotImplemented) {
-		intargfunc f = NULL;
+		ssizeargfunc f = NULL;
 		PySequenceMethods *mv = v->ob_type->tp_as_sequence;
 		PySequenceMethods *mw = w->ob_type->tp_as_sequence;
 		Py_DECREF(result);
@@ -1148,7 +1148,7 @@ PySequence_Concat(PyObject *s, PyObject *o)
 }
 
 PyObject *
-PySequence_Repeat(PyObject *o, int count)
+PySequence_Repeat(PyObject *o, Py_ssize_t count)
 {
 	PySequenceMethods *m;
 
@@ -1180,7 +1180,7 @@ PySequence_InPlaceConcat(PyObject *s, PyObject *o)
 }
 
 PyObject *
-PySequence_InPlaceRepeat(PyObject *o, int count)
+PySequence_InPlaceRepeat(PyObject *o, Py_ssize_t count)
 {
 	PySequenceMethods *m;
 
@@ -1197,7 +1197,7 @@ PySequence_InPlaceRepeat(PyObject *o, int count)
 }
 
 PyObject *
-PySequence_GetItem(PyObject *s, int i)
+PySequence_GetItem(PyObject *s, Py_ssize_t i) /* XXX negative values */
 {
 	PySequenceMethods *m;
 
@@ -1239,7 +1239,7 @@ sliceobj_from_intint(int i, int j)
 }
 
 PyObject *
-PySequence_GetSlice(PyObject *s, int i1, int i2)
+PySequence_GetSlice(PyObject *s, Py_ssize_t i1, Py_ssize_t i2)
 {
 	PySequenceMethods *m;
 	PyMappingMethods *mp;
@@ -1274,7 +1274,7 @@ PySequence_GetSlice(PyObject *s, int i1, int i2)
 }
 
 int
-PySequence_SetItem(PyObject *s, int i, PyObject *o)
+PySequence_SetItem(PyObject *s, Py_ssize_t i, PyObject *o)
 {
 	PySequenceMethods *m;
 
@@ -1301,7 +1301,7 @@ PySequence_SetItem(PyObject *s, int i, PyObject *o)
 }
 
 int
-PySequence_DelItem(PyObject *s, int i)
+PySequence_DelItem(PyObject *s, Py_ssize_t i)
 {
 	PySequenceMethods *m;
 
@@ -1328,7 +1328,7 @@ PySequence_DelItem(PyObject *s, int i)
 }
 
 int
-PySequence_SetSlice(PyObject *s, int i1, int i2, PyObject *o)
+PySequence_SetSlice(PyObject *s, Py_ssize_t i1, Py_ssize_t i2, PyObject *o)
 {
 	PySequenceMethods *m;
 	PyMappingMethods *mp;
@@ -1367,7 +1367,7 @@ PySequence_SetSlice(PyObject *s, int i1, int i2, PyObject *o)
 }
 
 int
-PySequence_DelSlice(PyObject *s, int i1, int i2)
+PySequence_DelSlice(PyObject *s, Py_ssize_t i1, Py_ssize_t i2)
 {
 	PySequenceMethods *m;
 

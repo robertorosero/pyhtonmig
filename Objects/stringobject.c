@@ -49,7 +49,7 @@ static PyObject *interned;
    parameter (for PyString_FromString()).
 */
 PyObject *
-PyString_FromStringAndSize(const char *str, int size)
+PyString_FromStringAndSize(const char *str, Py_ssize_t size)
 {
 	register PyStringObject *op;
 	assert(size >= 0);
@@ -154,7 +154,7 @@ PyObject *
 PyString_FromFormatV(const char *format, va_list vargs)
 {
 	va_list count;
-	int n = 0;
+	Py_ssize_t n = 0;
 	const char* f;
 	char *s;
 	PyObject* string;
@@ -235,7 +235,8 @@ PyString_FromFormatV(const char *format, va_list vargs)
 	for (f = format; *f; f++) {
 		if (*f == '%') {
 			const char* p = f++;
-			int i, longflag = 0;
+			Py_ssize_t i;
+			int longflag = 0;
 			/* parse the width.precision part (we're only
 			   interested in the precision value, if any) */
 			n = 0;
@@ -519,16 +520,16 @@ string_dealloc(PyObject *op)
    specified encoding.  */
 
 PyObject *PyString_DecodeEscape(const char *s,
-				int len,
+				Py_ssize_t len,
 				const char *errors,
-				int unicode,
+				Py_ssize_t unicode,
 				const char *recode_encoding)
 {
 	int c;
 	char *p, *buf;
 	const char *end;
 	PyObject *v;
-	int newlen = recode_encoding ? 4*len:len;
+	Py_ssize_t newlen = recode_encoding ? 4*len:len;
 	v = PyString_FromStringAndSize((char *)NULL, newlen);
 	if (v == NULL)
 		return NULL;
@@ -885,7 +886,7 @@ string_length(PyStringObject *a)
 static PyObject *
 string_concat(register PyStringObject *a, register PyObject *bb)
 {
-	register unsigned int size;
+	register size_t size;
 	register PyStringObject *op;
 	if (!PyString_Check(bb)) {
 #ifdef Py_USING_UNICODE
@@ -909,6 +910,7 @@ string_concat(register PyStringObject *a, register PyObject *bb)
 		return (PyObject *)a;
 	}
 	size = a->ob_size + b->ob_size;
+	/* XXX check overflow */
 	/* Inline PyObject_NewVar */
 	op = (PyStringObject *)PyObject_MALLOC(sizeof(PyStringObject) + size);
 	if (op == NULL)
@@ -924,11 +926,11 @@ string_concat(register PyStringObject *a, register PyObject *bb)
 }
 
 static PyObject *
-string_repeat(register PyStringObject *a, register int n)
+string_repeat(register PyStringObject *a, register Py_ssize_t n)
 {
 	register int i;
 	register int j;
-	register int size;
+	register Py_ssize_t size;
 	register PyStringObject *op;
 	size_t nbytes;
 	if (n < 0)
@@ -980,7 +982,8 @@ string_repeat(register PyStringObject *a, register int n)
 /* String slice a[i:j] consists of characters a[i] ... a[j-1] */
 
 static PyObject *
-string_slice(register PyStringObject *a, register int i, register int j)
+string_slice(register PyStringObject *a, register Py_ssize_t i, 
+	     register Py_ssize_t j)
      /* j -- may be negative! */
 {
 	if (i < 0)
@@ -1047,7 +1050,7 @@ string_contains(PyObject *a, PyObject *el)
 }
 
 static PyObject *
-string_item(PyStringObject *a, register int i)
+string_item(PyStringObject *a, register Py_ssize_t i)
 {
 	PyObject *v;
 	char *pchar;
@@ -1173,7 +1176,7 @@ string_subscript(PyStringObject* self, PyObject* item)
 		return string_item(self,i);
 	}
 	else if (PyLong_Check(item)) {
-		long i = PyLong_AsLong(item);
+		Py_ssize_t i = PyLong_AsSsize_t(item);
 		if (i == -1 && PyErr_Occurred())
 			return NULL;
 		if (i < 0)
@@ -1181,7 +1184,7 @@ string_subscript(PyStringObject* self, PyObject* item)
 		return string_item(self,i);
 	}
 	else if (PySlice_Check(item)) {
-		int start, stop, step, slicelength, cur, i;
+		Py_ssize_t start, stop, step, slicelength, cur, i;
 		char* source_buf;
 		char* result_buf;
 		PyObject* result;
@@ -1262,9 +1265,9 @@ string_buffer_getcharbuf(PyStringObject *self, int index, const char **ptr)
 static PySequenceMethods string_as_sequence = {
 	(inquiry)string_length, /*sq_length*/
 	(binaryfunc)string_concat, /*sq_concat*/
-	(intargfunc)string_repeat, /*sq_repeat*/
-	(intargfunc)string_item, /*sq_item*/
-	(intintargfunc)string_slice, /*sq_slice*/
+	(ssizeargfunc)string_repeat, /*sq_repeat*/
+	(ssizeargfunc)string_item, /*sq_item*/
+	(ssizessizeargfunc)string_slice, /*sq_slice*/
 	0,		/*sq_ass_item*/
 	0,		/*sq_ass_slice*/
 	(objobjproc)string_contains /*sq_contains*/
@@ -1734,6 +1737,7 @@ string_find_internal(PyStringObject *self, PyObject *args, int dir)
 	int n, i = 0, last = INT_MAX;
 	PyObject *subobj;
 
+	/* XXX ssize_t i */
 	if (!PyArg_ParseTuple(args, "O|O&O&:find/rfind/index/rindex",
 		&subobj, _PyEval_SliceIndex, &i, _PyEval_SliceIndex, &last))
 		return -2;
@@ -3521,7 +3525,7 @@ PyString_ConcatAndDel(register PyObject **pv, register PyObject *w)
 */
 
 int
-_PyString_Resize(PyObject **pv, int newsize)
+_PyString_Resize(PyObject **pv, Py_ssize_t newsize)
 {
 	register PyObject *v;
 	register PyStringObject *sv;
@@ -3625,7 +3629,7 @@ formatfloat(char *buf, size_t buflen, int flags,
 		      (flags&F_ALT) ? "#" : "",
 		      prec, type);
         PyOS_ascii_formatd(buf, buflen, fmt, x);
-	return strlen(buf);
+	return (int)strlen(buf);
 }
 
 /* _PyString_FormatLong emulates the format codes d, u, o, x and X, and
@@ -3832,7 +3836,7 @@ formatint(char *buf, size_t buflen, int flags,
 		PyOS_snprintf(buf, buflen, fmt, -x);
 	else
 		PyOS_snprintf(buf, buflen, fmt, x);
-	return strlen(buf);
+	return (int)strlen(buf);
 }
 
 static int
@@ -3865,7 +3869,8 @@ PyObject *
 PyString_Format(PyObject *format, PyObject *args)
 {
 	char *fmt, *res;
-	int fmtcnt, rescnt, reslen, arglen, argidx;
+	int arglen, argidx;
+	Py_ssize_t reslen, rescnt, fmtcnt;
 	int args_owned = 0;
 	PyObject *result, *orig_args;
 #ifdef Py_USING_UNICODE
@@ -3895,23 +3900,23 @@ PyString_Format(PyObject *format, PyObject *args)
 	if (args->ob_type->tp_as_mapping && !PyTuple_Check(args) &&
 	    !PyObject_TypeCheck(args, &PyBaseString_Type))
 		dict = args;
-	while (--fmtcnt >= 0) {
+	while (fmtcnt-- != 0) {
 		if (*fmt != '%') {
-			if (--rescnt < 0) {
+			if (rescnt == 0) {
 				rescnt = fmtcnt + 100;
 				reslen += rescnt;
 				if (_PyString_Resize(&result, reslen) < 0)
 					return NULL;
 				res = PyString_AS_STRING(result)
 					+ reslen - rescnt;
-				--rescnt;
 			}
+			rescnt--;
 			*res++ = *fmt++;
 		}
 		else {
 			/* Got a format specifier */
 			int flags = 0;
-			int width = -1;
+			Py_ssize_t width = -1;
 			int prec = -1;
 			int c = '\0';
 			int fill;
@@ -3930,7 +3935,7 @@ PyString_Format(PyObject *format, PyObject *args)
 			fmt++;
 			if (*fmt == '(') {
 				char *keystart;
-				int keylen;
+				Py_ssize_t keylen;
 				PyObject *key;
 				int pcount = 1;
 
@@ -4187,7 +4192,7 @@ PyString_Format(PyObject *format, PyObject *args)
 			}
 			if (width < len)
 				width = len;
-			if (rescnt - (sign != 0) < width) {
+			if ((rescnt - (sign != 0)) < width) {
 				reslen -= rescnt;
 				rescnt = width + fmtcnt + 100;
 				reslen += rescnt;

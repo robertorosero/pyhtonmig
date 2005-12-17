@@ -35,6 +35,7 @@ Copyright (c) Corporation for National Research Initiatives.
 
    ------------------------------------------------------------------------ */
 
+#define PY_SIZE_T_CLEAN
 #include "Python.h"
 
 /* --- Registry ----------------------------------------------------------- */
@@ -196,7 +197,7 @@ escape_decode(PyObject *self,
 {
     const char *errors = NULL;
     const char *data;
-    int size;
+    Py_ssize_t size;
 
     if (!PyArg_ParseTuple(args, "s#|z:escape_decode",
 			  &data, &size, &errors))
@@ -284,12 +285,16 @@ utf_8_decode(PyObject *self,
     int size;
     const char *errors = NULL;
     int final = 0;
-    int consumed;
+    Py_ssize_t consumed;
     PyObject *decoded = NULL;
 
     if (!PyArg_ParseTuple(args, "t#|zi:utf_8_decode",
 			  &data, &size, &errors, &final))
 	return NULL;
+    if (size < 0) {
+	    PyErr_SetString(PyExc_ValueError, "negative argument");
+	    return 0;
+    }
     consumed = size;
 	
     decoded = PyUnicode_DecodeUTF8Stateful(data, size, errors,
@@ -308,12 +313,17 @@ utf_16_decode(PyObject *self,
     const char *errors = NULL;
     int byteorder = 0;
     int final = 0;
-    int consumed;
+    Py_ssize_t consumed;
     PyObject *decoded;
 
     if (!PyArg_ParseTuple(args, "t#|zi:utf_16_decode",
 			  &data, &size, &errors, &final))
 	return NULL;
+    /* XXX Why is consumed initialized to size? mvl */
+    if (size < 0) {
+	    PyErr_SetString(PyExc_ValueError, "negative argument");
+	    return 0;
+    }
     consumed = size;
     decoded = PyUnicode_DecodeUTF16Stateful(data, size, errors, &byteorder,
 					    final ? NULL : &consumed);
@@ -331,12 +341,18 @@ utf_16_le_decode(PyObject *self,
     const char *errors = NULL;
     int byteorder = -1;
     int final = 0;
-    int consumed;
+    Py_ssize_t consumed;
     PyObject *decoded = NULL;
 
     if (!PyArg_ParseTuple(args, "t#|zi:utf_16_le_decode",
 			  &data, &size, &errors, &final))
 	return NULL;
+
+    /* XXX Why is consumed initialized to size? mvl */
+    if (size < 0) {
+          PyErr_SetString(PyExc_ValueError, "negative argument");
+          return 0;
+    }
     consumed = size;
     decoded = PyUnicode_DecodeUTF16Stateful(data, size, errors,
 	&byteorder, final ? NULL : &consumed);
@@ -355,12 +371,17 @@ utf_16_be_decode(PyObject *self,
     const char *errors = NULL;
     int byteorder = 1;
     int final = 0;
-    int consumed;
+    Py_ssize_t consumed;
     PyObject *decoded = NULL;
 
     if (!PyArg_ParseTuple(args, "t#|zi:utf_16_be_decode",
 			  &data, &size, &errors, &final))
 	return NULL;
+    /* XXX Why is consumed initialized to size? mvl */
+    if (size < 0) {
+          PyErr_SetString(PyExc_ValueError, "negative argument");
+          return 0;
+    }
     consumed = size;
     decoded = PyUnicode_DecodeUTF16Stateful(data, size, errors,
 	&byteorder, final ? NULL : &consumed);
@@ -387,12 +408,16 @@ utf_16_ex_decode(PyObject *self,
     int byteorder = 0;
     PyObject *unicode, *tuple;
     int final = 0;
-    int consumed;
+    Py_ssize_t consumed;
 
     if (!PyArg_ParseTuple(args, "t#|zii:utf_16_ex_decode",
 			  &data, &size, &errors, &byteorder, &final))
 	return NULL;
-
+    /* XXX Why is consumed initialized to size? mvl */
+    if (size < 0) {
+	    PyErr_SetString(PyExc_ValueError, "negative argument");
+	    return 0;
+    }
     consumed = size;
     unicode = PyUnicode_DecodeUTF16Stateful(data, size, errors, &byteorder,
 					    final ? NULL : &consumed);
@@ -513,7 +538,7 @@ readbuffer_encode(PyObject *self,
 		  PyObject *args)
 {
     const char *data;
-    int size;
+    Py_ssize_t size;
     const char *errors = NULL;
 
     if (!PyArg_ParseTuple(args, "s#|z:readbuffer_encode",

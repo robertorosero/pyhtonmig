@@ -58,7 +58,7 @@ PyAPI_DATA(PyTypeObject) PyString_Type;
 #define PyString_Check(op) PyObject_TypeCheck(op, &PyString_Type)
 #define PyString_CheckExact(op) ((op)->ob_type == &PyString_Type)
 
-PyAPI_FUNC(PyObject *) PyString_FromStringAndSize(const char *, int);
+PyAPI_FUNC(PyObject *) PyString_FromStringAndSize(const char *, Py_ssize_t);
 PyAPI_FUNC(PyObject *) PyString_FromString(const char *);
 PyAPI_FUNC(PyObject *) PyString_FromFormatV(const char*, va_list)
 				Py_GCC_ATTRIBUTE((format(printf, 1, 0)));
@@ -69,13 +69,13 @@ PyAPI_FUNC(char *) PyString_AsString(PyObject *);
 PyAPI_FUNC(PyObject *) PyString_Repr(PyObject *, int);
 PyAPI_FUNC(void) PyString_Concat(PyObject **, PyObject *);
 PyAPI_FUNC(void) PyString_ConcatAndDel(PyObject **, PyObject *);
-PyAPI_FUNC(int) _PyString_Resize(PyObject **, int);
+PyAPI_FUNC(int) _PyString_Resize(PyObject **, Py_ssize_t);
 PyAPI_FUNC(int) _PyString_Eq(PyObject *, PyObject*);
 PyAPI_FUNC(PyObject *) PyString_Format(PyObject *, PyObject *);
 PyAPI_FUNC(PyObject *) _PyString_FormatLong(PyObject*, int, int,
 						  int, char**, int*);
-PyAPI_FUNC(PyObject *) PyString_DecodeEscape(const char *, int, 
-						   const char *, int,
+PyAPI_FUNC(PyObject *) PyString_DecodeEscape(const char *, Py_ssize_t, 
+						   const char *, Py_ssize_t,
 						   const char *);
 
 PyAPI_FUNC(void) PyString_InternInPlace(PyObject **);

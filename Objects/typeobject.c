@@ -443,7 +443,7 @@ type_call(PyTypeObject *type, PyObject *args, PyObject *kwds)
 }
 
 PyObject *
-PyType_GenericAlloc(PyTypeObject *type, int nitems)
+PyType_GenericAlloc(PyTypeObject *type, Py_ssize_t nitems)
 {
 	PyObject *obj;
 	const size_t size = _PyObject_VAR_SIZE(type, nitems+1);
@@ -1529,7 +1529,7 @@ _unicode_to_string(PyObject *slots, int nslots)
 	PyObject *tmp = slots;
 	PyObject *o, *o1;
 	int i;
-	intintargfunc copy = slots->ob_type->tp_as_sequence->sq_slice;
+	ssizessizeargfunc copy = slots->ob_type->tp_as_sequence->sq_slice;
 	for (i = 0; i < nslots; i++) {
 		if (PyUnicode_Check(o = PyTuple_GET_ITEM(tmp, i))) {
 			if (tmp == slots) {
@@ -3335,9 +3335,10 @@ check_num_args(PyObject *ob, int n)
 	}
 	if (n == PyTuple_GET_SIZE(ob))
 		return 1;
+	/* XXX %zd? */
 	PyErr_Format(
 	    PyExc_TypeError, 
-	    "expected %d arguments, got %d", n, PyTuple_GET_SIZE(ob));
+	    "expected %d arguments, got %d", n, (int)PyTuple_GET_SIZE(ob));
 	return 0;
 }
 
@@ -5286,7 +5287,9 @@ slotdef_cmp(const void *aa, const void *bb)
 	if (c != 0)
 		return c;
 	else
-		return a - b;
+		/* Cannot use a-b, as this gives off_t, 
+		   which may lose precision when converted to int. */
+		return (a > b) ? 1 : (a < b) ? -1 : 0;
 }
 
 /* Initialize the slotdefs table by adding interned string objects for the

@@ -56,7 +56,7 @@ get_buf(PyBufferObject *self, void **ptr, int *size)
 
 
 static PyObject *
-buffer_from_memory(PyObject *base, int size, int offset, void *ptr,
+buffer_from_memory(PyObject *base, Py_ssize_t size, int offset, void *ptr,
 		   int readonly)
 {
 	PyBufferObject * b;
@@ -113,7 +113,7 @@ buffer_from_object(PyObject *base, int size, int offset, int readonly)
 
 
 PyObject *
-PyBuffer_FromObject(PyObject *base, int offset, int size)
+PyBuffer_FromObject(PyObject *base, int offset, Py_ssize_t size)
 {
 	PyBufferProcs *pb = base->ob_type->tp_as_buffer;
 
@@ -129,7 +129,7 @@ PyBuffer_FromObject(PyObject *base, int offset, int size)
 }
 
 PyObject *
-PyBuffer_FromReadWriteObject(PyObject *base, int offset, int size)
+PyBuffer_FromReadWriteObject(PyObject *base, int offset, Py_ssize_t size)
 {
 	PyBufferProcs *pb = base->ob_type->tp_as_buffer;
 
@@ -145,13 +145,13 @@ PyBuffer_FromReadWriteObject(PyObject *base, int offset, int size)
 }
 
 PyObject *
-PyBuffer_FromMemory(void *ptr, int size)
+PyBuffer_FromMemory(void *ptr, Py_ssize_t size)
 {
 	return buffer_from_memory(NULL, size, 0, ptr, 1);
 }
 
 PyObject *
-PyBuffer_FromReadWriteMemory(void *ptr, int size)
+PyBuffer_FromReadWriteMemory(void *ptr, Py_ssize_t size)
 {
 	return buffer_from_memory(NULL, size, 0, ptr, 0);
 }
@@ -367,7 +367,7 @@ buffer_concat(PyBufferObject *self, PyObject *other)
 }
 
 static PyObject *
-buffer_repeat(PyBufferObject *self, int count)
+buffer_repeat(PyBufferObject *self, Py_ssize_t count)
 {
 	PyObject *ob;
 	register char *p;
@@ -396,13 +396,13 @@ buffer_repeat(PyBufferObject *self, int count)
 }
 
 static PyObject *
-buffer_item(PyBufferObject *self, int idx)
+buffer_item(PyBufferObject *self, Py_ssize_t idx)
 {
 	void *ptr;
 	int size;
 	if (!get_buf(self, &ptr, &size))
 		return NULL;
-	if ( idx < 0 || idx >= size ) {
+	if (idx < 0 || idx >= size ) {
 		PyErr_SetString(PyExc_IndexError, "buffer index out of range");
 		return NULL;
 	}
@@ -410,7 +410,7 @@ buffer_item(PyBufferObject *self, int idx)
 }
 
 static PyObject *
-buffer_slice(PyBufferObject *self, int left, int right)
+buffer_slice(PyBufferObject *self, Py_ssize_t left, Py_ssize_t right)
 {
 	void *ptr;
 	int size;
@@ -429,7 +429,7 @@ buffer_slice(PyBufferObject *self, int left, int right)
 }
 
 static int
-buffer_ass_item(PyBufferObject *self, int idx, PyObject *other)
+buffer_ass_item(PyBufferObject *self, Py_ssize_t idx, PyObject *other)
 {
 	PyBufferProcs *pb;
 	void *ptr1, *ptr2;
@@ -445,7 +445,7 @@ buffer_ass_item(PyBufferObject *self, int idx, PyObject *other)
 	if (!get_buf(self, &ptr1, &size))
 		return -1;
 
-	if (idx < 0 || idx >= size) {
+	if (idx >= size) {
 		PyErr_SetString(PyExc_IndexError,
 				"buffer assignment index out of range");
 		return -1;
@@ -480,7 +480,7 @@ buffer_ass_item(PyBufferObject *self, int idx, PyObject *other)
 }
 
 static int
-buffer_ass_slice(PyBufferObject *self, int left, int right, PyObject *other)
+buffer_ass_slice(PyBufferObject *self, Py_ssize_t left, Py_ssize_t right, PyObject *other)
 {
 	PyBufferProcs *pb;
 	void *ptr1, *ptr2;
@@ -596,11 +596,11 @@ buffer_getcharbuf(PyBufferObject *self, int idx, const char **pp)
 static PySequenceMethods buffer_as_sequence = {
 	(inquiry)buffer_length, /*sq_length*/
 	(binaryfunc)buffer_concat, /*sq_concat*/
-	(intargfunc)buffer_repeat, /*sq_repeat*/
-	(intargfunc)buffer_item, /*sq_item*/
-	(intintargfunc)buffer_slice, /*sq_slice*/
-	(intobjargproc)buffer_ass_item, /*sq_ass_item*/
-	(intintobjargproc)buffer_ass_slice, /*sq_ass_slice*/
+	(ssizeargfunc)buffer_repeat, /*sq_repeat*/
+	(ssizeargfunc)buffer_item, /*sq_item*/
+	(ssizessizeargfunc)buffer_slice, /*sq_slice*/
+	(sizeobjargproc)buffer_ass_item, /*sq_ass_item*/
+	(ssizessizeobjargproc)buffer_ass_slice, /*sq_ass_slice*/
 };
 
 static PyBufferProcs buffer_as_buffer = {

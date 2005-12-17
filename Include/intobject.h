@@ -35,7 +35,10 @@ PyAPI_FUNC(PyObject *) PyInt_FromString(char*, char**, int);
 PyAPI_FUNC(PyObject *) PyInt_FromUnicode(Py_UNICODE*, int, int);
 #endif
 PyAPI_FUNC(PyObject *) PyInt_FromLong(long);
+PyAPI_FUNC(PyObject *) PyInt_FromSize_t(size_t);
+PyAPI_FUNC(PyObject *) PyInt_FromSsize_t(Py_ssize_t);
 PyAPI_FUNC(long) PyInt_AsLong(PyObject *);
+PyAPI_FUNC(Py_ssize_t) PyInt_AsSsize_t(PyObject *);
 PyAPI_FUNC(unsigned long) PyInt_AsUnsignedLongMask(PyObject *);
 #ifdef HAVE_LONG_LONG
 PyAPI_FUNC(unsigned PY_LONG_LONG) PyInt_AsUnsignedLongLongMask(PyObject *);

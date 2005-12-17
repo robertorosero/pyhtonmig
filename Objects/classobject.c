@@ -1103,7 +1103,7 @@ static PyMappingMethods instance_as_mapping = {
 };
 
 static PyObject *
-instance_item(PyInstanceObject *inst, int i)
+instance_item(PyInstanceObject *inst, Py_ssize_t i)
 {
 	PyObject *func, *arg, *res;
 
@@ -1112,7 +1112,7 @@ instance_item(PyInstanceObject *inst, int i)
 	func = instance_getattr(inst, getitemstr);
 	if (func == NULL)
 		return NULL;
-	arg = Py_BuildValue("(i)", i);
+	arg = Py_BuildValue("(n)", i);
 	if (arg == NULL) {
 		Py_DECREF(func);
 		return NULL;
@@ -1325,10 +1325,10 @@ instance_as_sequence = {
 	(inquiry)instance_length,		/* sq_length */
 	0,					/* sq_concat */
 	0,					/* sq_repeat */
-	(intargfunc)instance_item,		/* sq_item */
-	(intintargfunc)instance_slice,		/* sq_slice */
-	(intobjargproc)instance_ass_item,	/* sq_ass_item */
-	(intintobjargproc)instance_ass_slice,	/* sq_ass_slice */
+	(ssizeargfunc)instance_item,		/* sq_item */
+	(ssizessizeargfunc)instance_slice,	/* sq_slice */
+	(sizeobjargproc)instance_ass_item,	/* sq_ass_item */
+	(ssizessizeobjargproc)instance_ass_slice,/* sq_ass_slice */
 	(objobjproc)instance_contains,		/* sq_contains */
 };
 
