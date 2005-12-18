@@ -1024,6 +1024,7 @@ ast_for_listcomp(struct compiling *c, const node *n)
     PyObject *lc = NULL;
     PyObject *store = NULL;
     PyObject *ifs = NULL;
+    PyObject *tmp = NULL;
     int i, n_fors;
     node *ch;
 
@@ -1067,12 +1068,13 @@ ast_for_listcomp(struct compiling *c, const node *n)
 		goto error;
 	}
 	else {
-	    t = Tuple(t, store, LINENO(ch));
+	    tmp = Tuple(t, store, LINENO(ch));
 	    if (!t)
 		goto error;
-	    lc = comprehension(t, expression, NULL);
+	    lc = comprehension(tmp, expression, NULL);
 	    if (!lc)
 		goto error;
+	    Py_RELEASE(tmp);
 	}
 	Py_RELEASE(t);
 	Py_RELEASE(expression);
@@ -1121,6 +1123,7 @@ ast_for_listcomp(struct compiling *c, const node *n)
     Py_XDECREF(lc);
     Py_XDECREF(store);
     Py_XDECREF(ifs);
+    Py_XDECREF(tmp);
     return result;
 }
 
@@ -1195,6 +1198,11 @@ ast_for_genexp(struct compiling *c, const node *n)
     PyObject *result = NULL;
     PyObject *elt = NULL;
     PyObject *genexps = NULL;
+    PyObject *ge = NULL;
+    PyObject *t = NULL;
+    PyObject *expression = NULL;
+    PyObject *store = NULL;
+    PyObject *tmp = NULL;
     int i, n_fors;
     node *ch;
     
@@ -1203,58 +1211,53 @@ ast_for_genexp(struct compiling *c, const node *n)
     
     elt = ast_for_expr(c, CHILD(n, 0));
     if (!elt)
-        return NULL;
+	goto error;
     
     n_fors = count_gen_fors(n);
     if (n_fors == -1)
-        return NULL;
+        goto error;
     
-    genexps = asdl_seq_new(n_fors);
-    if (!genexps) {
-        free_expr(elt);
-        return NULL;
-    }
+    genexps = PyList_New(n_fors);
+    if (!genexps)
+	goto error;
+
+    store = Store();
+    if (!store)
+	goto error;
     
     ch = CHILD(n, 1);
     for (i = 0; i < n_fors; i++) {
-        comprehension_ty ge;
-        PyObject *t = NULL;
-        PyObject *expression = NULL;
+        assert(ge == NULL);
+	assert(t == NULL);
+	assert(expression == NULL);
         
         REQ(ch, gen_for);
         
-        t = ast_for_exprlist(c, CHILD(ch, 1), Store);
-        if (!t) {
-            asdl_comprehension_seq_free(genexps);
-	    asdl_expr_seq_free(t);
-            free_expr(elt);
-            return NULL;
-        }
+        t = ast_for_exprlist(c, CHILD(ch, 1), store);
+        if (!t)
+	    goto error;
         expression = ast_for_expr(c, CHILD(ch, 3));
-        if (!expression) {
-            asdl_comprehension_seq_free(genexps);
-	    asdl_expr_seq_free(t);
-            free_expr(elt);
-            return NULL;
-        }
+        if (!expression) 
+	    goto error;
         
-        if (asdl_seq_LEN(t) == 1) {
-            ge = comprehension(asdl_seq_GET(t, 0), expression,
+        if (PyList_GET_SIZE(t) == 1) {
+            ge = comprehension(PyList_GET_ITEM(t, 0), expression,
                                NULL);
-	    /* only free the sequence since we grabbed element 0 above */
-	    if (ge)
-	        asdl_seq_free(t); /* ok */
 	}
-        else
-            ge = comprehension(Tuple(t, Store, LINENO(ch)),
-                               expression, NULL);
-        
-        if (!ge) {
-            asdl_comprehension_seq_free(genexps);
-	    asdl_expr_seq_free(t);
-            free_expr(elt);
-            return NULL;
-        }
+        else {
+	    tmp = Tuple(t, store, LINENO(ch));
+	    if (!tmp)
+		goto error;
+            ge = comprehension(tmp, expression, NULL);
+	    if (!ge)
+		goto error;
+	    Py_RELEASE(tmp);
+	}
+
+	if (!ge)
+	    goto error;
+	Py_RELEASE(t);
+	Py_RELEASE(expression);
         
         if (NCH(ch) == 5) {
             int j, n_ifs;
@@ -1262,48 +1265,43 @@ ast_for_genexp(struct compiling *c, const node *n)
             
             ch = CHILD(ch, 4);
             n_ifs = count_gen_ifs(ch);
-            if (n_ifs == -1) {
-                asdl_comprehension_seq_free(genexps);
-		free_comprehension(ge);
-                free_expr(elt);
-                return NULL;
-            }
+            if (n_ifs == -1)
+		goto error;
             
-            ifs = asdl_seq_new(n_ifs);
-            if (!ifs) {
-                asdl_comprehension_seq_free(genexps);
-		free_comprehension(ge);
-                free_expr(elt);
-                return NULL;
-            }
+            ifs = PyList_New(n_ifs);
+            if (!ifs)
+		goto error;
             
             for (j = 0; j < n_ifs; j++) {
-                PyObject *expression = NULL;
                 REQ(ch, gen_iter);
                 ch = CHILD(ch, 0);
                 REQ(ch, gen_if);
                 
                 expression = ast_for_expr(c, CHILD(ch, 1));
-                if (!expression) {
-		    asdl_expr_seq_free(ifs);
-                    asdl_comprehension_seq_free(genexps);
-		    free_comprehension(ge);
-                    free_expr(elt);
-                    return NULL;
-                }
-                asdl_seq_APPEND(ifs, expression);
+                if (!expression)
+		    goto error;
+                STEAL_ITEM(ifs, j, expression);
                 if (NCH(ch) == 3)
                     ch = CHILD(ch, 2);
             }
             /* on exit, must guarantee that ch is a gen_for */
             if (TYPE(ch) == gen_iter)
                 ch = CHILD(ch, 0);
-            ge->ifs = ifs;
+	    Py_DECREF(comprehension_ifs(ge));
+	    Py_INCREF(ifs);
+	    comprehension_ifs(ge) = ifs;
         }
-        asdl_seq_APPEND(genexps, ge);
+        STEAL_ITEM(genexps, i, ge);
     }
     
-    return GeneratorExp(elt, genexps, LINENO(n));
+    result = GeneratorExp(elt, genexps, LINENO(n));
+ error:
+    Py_XDECREF(elt);
+    Py_XDECREF(genexps);
+    Py_XDECREF(ge);
+    Py_XDECREF(t);
+    Py_XDECREF(expression);
+    return result;
 }
 
 static PyObject*
@@ -1312,112 +1310,129 @@ ast_for_atom(struct compiling *c, const node *n)
     /* atom: '(' [yield_expr|testlist_gexp] ')' | '[' [listmaker] ']'
        | '{' [dictmaker] '}' | '`' testlist '`' | NAME | NUMBER | STRING+
     */
+    PyObject *tmp = NULL;
+    PyObject *elts = NULL; 
     PyObject *result = NULL;
+    PyObject *keys = NULL; 
+    PyObject *values = NULL;
     node *ch = CHILD(n, 0);
     
     switch (TYPE(ch)) {
-    case NAME:
+    case NAME: {
 	/* All names start in Load context, but may later be
 	   changed. */
-	return Name(NEW_IDENTIFIER(ch), Load, LINENO(n));
+	PyObject *tmp = Load();
+	if (!tmp)
+	    goto error;
+	result = Name(NEW_IDENTIFIER(ch), tmp, LINENO(n));
+	break;
+    }
     case STRING: {
 	PyObject *str = parsestrplus(c, n);
 	
 	if (!str)
-	    return NULL;
+	    goto error;
 	
-	return Str(str, LINENO(n));
+	result = Str(str, LINENO(n));
+	break;
     }
     case NUMBER: {
-	PyObject *pynum = parsenumber(STR(ch));
+	tmp = parsenumber(STR(ch));
 	
-	if (!pynum)
-	    return NULL;
+	if (!tmp)
+	    goto error;
 	
-	return Num(pynum, LINENO(n));
+	result = Num(tmp, LINENO(n));
+	break;
     }
-    case LPAR: /* some parenthesized expressions */
+    case LPAR: {/* some parenthesized expressions */
 	ch = CHILD(n, 1);
 	
-	if (TYPE(ch) == RPAR)
-	    return Tuple(NULL, Load, LINENO(n));
-	
-	if (TYPE(ch) == yield_expr)
-	    return ast_for_expr(c, ch);
-	
-	if ((NCH(ch) > 1) && (TYPE(CHILD(ch, 1)) == gen_for))
-	    return ast_for_genexp(c, ch);
-	
-	return ast_for_testlist_gexp(c, ch);
+	if (TYPE(ch) == RPAR) {
+	    tmp = Load();
+	    if (!tmp)
+		goto error;
+	    result = Tuple(NULL, tmp, LINENO(n));
+	} 
+	else if (TYPE(ch) == yield_expr)
+	    result = ast_for_expr(c, ch);
+	else if ((NCH(ch) > 1) && (TYPE(CHILD(ch, 1)) == gen_for))
+	    result = ast_for_genexp(c, ch);
+	else
+	    result = ast_for_testlist_gexp(c, ch);
+	break;
+    }
     case LSQB: /* list (or list comprehension) */
+	tmp = Load();
+	if (!tmp)
+	    goto error;
 	ch = CHILD(n, 1);
 	
 	if (TYPE(ch) == RSQB)
-	    return List(NULL, Load, LINENO(n));
-	
-	REQ(ch, listmaker);
-	if (NCH(ch) == 1 || TYPE(CHILD(ch, 1)) == COMMA) {
-	    asdl_seq *elts = seq_for_testlist(c, ch);
+	    result = List(NULL, tmp, LINENO(n));
+	else {
+	    REQ(ch, listmaker);
+	    if (NCH(ch) == 1 || TYPE(CHILD(ch, 1)) == COMMA) {
+		elts = seq_for_testlist(c, ch);
+		
+		if (!elts)
+		    return NULL;
 	    
-	    if (!elts)
-		return NULL;
-	    
-	    return List(elts, Load, LINENO(n));
+		result = List(elts, tmp, LINENO(n));
+	    }
+	    else
+		result = ast_for_listcomp(c, ch);
 	}
-	else
-	    return ast_for_listcomp(c, ch);
+	break;
     case LBRACE: {
 	/* dictmaker: test ':' test (',' test ':' test)* [','] */
 	int i, size;
-	PyObject *keys = NULL; PyObject *values = NULL;
 	
 	ch = CHILD(n, 1);
 	size = (NCH(ch) + 1) / 4; /* +1 in case no trailing comma */
-	keys = asdl_seq_new(size);
+	keys = PyList_New(size);
 	if (!keys)
-	    return NULL;
+	    goto error;
 	
-	values = asdl_seq_new(size);
-	if (!values) {
-	    asdl_seq_free(keys); /* ok */
-	    return NULL;
-	}
+	values = PyList_New(size);
+	if (!values)
+	    goto error;
 	
 	for (i = 0; i < NCH(ch); i += 4) {
-	    PyObject *expression = NULL;
 	    
-	    expression = ast_for_expr(c, CHILD(ch, i));
-	    if (!expression) {
-		asdl_expr_seq_free(keys);
-		asdl_expr_seq_free(values);
-		return NULL;
-	    }
+	    tmp = ast_for_expr(c, CHILD(ch, i));
+	    if (!tmp)
+		goto error;
 	    
-	    asdl_seq_SET(keys, i / 4, expression);
+	    STEAL_ITEM(keys, i / 4, tmp);
 	    
-	    expression = ast_for_expr(c, CHILD(ch, i + 2));
-	    if (!expression) {
-		asdl_expr_seq_free(keys);
-		asdl_expr_seq_free(values);
-		return NULL;
-	    }
+	    tmp = ast_for_expr(c, CHILD(ch, i + 2));
+	    if (!tmp)
+		goto error;
 
-	    asdl_seq_SET(values, i / 4, expression);
+	    STEAL_ITEM(values, i / 4, tmp);
 	}
-	return Dict(keys, values, LINENO(n));
+	result = Dict(keys, values, LINENO(n));
+	break;
     }
     case BACKQUOTE: { /* repr */
-	expr_ty expression = ast_for_testlist(c, CHILD(n, 1));
+	tmp = ast_for_testlist(c, CHILD(n, 1));
 	
-	if (!expression)
-	    return NULL;
+	if (!tmp)
+	    goto error;
 	
-	return Repr(expression, LINENO(n));
+	result = Repr(tmp, LINENO(n));
+	break;
     }
     default:
 	PyErr_Format(PyExc_SystemError, "unhandled atom %d", TYPE(ch));
-	return NULL;
     }
+ error:
+    Py_XDECREF(tmp);
+    Py_XDECREF(elts);
+    Py_XDECREF(keys);
+    Py_XDECREF(values);
+    return result;
 }
 
 static PyObject*
@@ -1425,7 +1440,9 @@ ast_for_slice(struct compiling *c, const node *n)
 {
     PyObject *result = NULL;
     node *ch;
-    expr_ty lower = NULL, upper = NULL, step = NULL;
+    PyObject *lower = NULL;
+    PyObject *upper = NULL;
+    PyObject *step = NULL;
 
     REQ(n, subscript);
 
@@ -1442,15 +1459,16 @@ ast_for_slice(struct compiling *c, const node *n)
            other vars */
         step = ast_for_expr(c, ch); 
         if (!step)
-            return NULL;
+            goto error;
             
-	return Index(step);
+	result = Index(step);
+	goto success;
     }
 
     if (TYPE(ch) == test) {
 	lower = ast_for_expr(c, ch);
         if (!lower)
-            return NULL;
+            goto error;
     }
 
     /* If there's an upper bound it's in the second or third position. */
@@ -1461,7 +1479,7 @@ ast_for_slice(struct compiling *c, const node *n)
 	    if (TYPE(n2) == test) {
 		upper = ast_for_expr(c, n2);
                 if (!upper)
-                    return NULL;
+                    goto error;
             }
 	}
     } else if (NCH(n) > 2) {
@@ -1470,7 +1488,7 @@ ast_for_slice(struct compiling *c, const node *n)
 	if (TYPE(n2) == test) {
 	    upper = ast_for_expr(c, n2);
             if (!upper)
-                return NULL;
+                goto error;
         }
     }
 
@@ -1485,11 +1503,17 @@ ast_for_slice(struct compiling *c, const node *n)
 	if (TYPE(ch) == test) {
 	    step = ast_for_expr(c, ch);
             if (!step)
-                return NULL;
+                goto error;
         }
     }
 
-    return Slice(lower, upper, step);
+    result = Slice(lower, upper, step);
+ success:
+ error:
+    Py_XDECREF(lower);
+    Py_XDECREF(upper);
+    Py_XDECREF(step);
+    return result;
 }
 
 static PyObject*
@@ -1502,8 +1526,12 @@ ast_for_binop(struct compiling *c, const node *n)
 
 	PyObject *result = NULL;
 	int i, nops;
-	PyObject *expr1 = NULL; PyObject *expr2 = NULL; PyObject *result = NULL;
-        operator_ty operator;
+	PyObject *expr1 = NULL; 
+	PyObject *expr2 = NULL; 
+	PyObject *tmp_result = NULL;
+	PyObject *tmp1 = NULL;
+	PyObject *tmp2 = NULL;
+        PyObject *operator = NULL;
 
         expr1 = ast_for_expr(c, CHILD(n, 0));
         if (!expr1)
@@ -1517,30 +1545,40 @@ ast_for_binop(struct compiling *c, const node *n)
         if (!operator)
             return NULL;
 
-	result = BinOp(expr1, operator, expr2, LINENO(n));
-	if (!result)
+	tmp_result = BinOp(expr1, operator, expr2, LINENO(n));
+	if (!tmp_result)
             return NULL;
 
 	nops = (NCH(n) - 1) / 2;
 	for (i = 1; i < nops; i++) {
-		PyObject *tmp_result = NULL; PyObject *tmp = NULL;
 		const node* next_oper = CHILD(n, i * 2 + 1);
 
 		operator = get_operator(next_oper);
                 if (!operator)
-                    return NULL;
+                    goto error;
 
-                tmp = ast_for_expr(c, CHILD(n, i * 2 + 2));
-                if (!tmp)
-                    return NULL;
+                tmp1 = ast_for_expr(c, CHILD(n, i * 2 + 2));
+                if (!tmp1)
+                    goto error;
 
-                tmp_result = BinOp(result, operator, tmp, 
-				   LINENO(next_oper));
-		if (!tmp) 
-			return NULL;
-		result = tmp_result;
+                tmp2 = BinOp(tmp_result, operator, tmp1, 
+			     LINENO(next_oper));
+		if (!tmp_result) 
+		    goto error;
+		tmp_result = tmp2;
+		tmp2 = NULL;
+		Py_RELEASE(tmp1);
 	}
-	return result;
+	result = tmp_result;
+	tmp_result = NULL;
+ error:
+	Py_XDECREF(expr1);
+	Py_XDECREF(expr2);
+	Py_XDECREF(operator);
+	Py_XDECREF(tmp_result);
+	Py_XDECREF(tmp1);
+	Py_XDECREF(tmp2);
+	return NULL;
 }
 
 static PyObject*
