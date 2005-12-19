@@ -2442,7 +2442,7 @@ static PySequenceMethods list_as_sequence = {
 	(ssizessizeobjargproc)list_ass_slice,	/* sq_ass_slice */
 	(objobjproc)list_contains,		/* sq_contains */
 	(binaryfunc)list_inplace_concat,	/* sq_inplace_concat */
-	(intargfunc)list_inplace_repeat,	/* sq_inplace_repeat */
+	(ssizeargfunc)list_inplace_repeat,	/* sq_inplace_repeat */
 };
 
 PyDoc_STRVAR(list_doc,
@@ -2603,7 +2603,7 @@ list_ass_subscript(PyListObject* self, PyObject* item, PyObject* value)
 			if (PySequence_Fast_GET_SIZE(seq) != slicelength) {
 				/* XXX can we use %zd here? */
 				PyErr_Format(PyExc_ValueError,
-            "attempt to assign sequence of size %d to extended slice of size %d",
+            "attempt to assign sequence of size %d to extended slice of size %ld",
 					     (int)PySequence_Fast_GET_SIZE(seq),
 					     slicelength);
 				Py_DECREF(seq);

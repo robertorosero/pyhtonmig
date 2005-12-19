@@ -170,7 +170,7 @@ strop_joinfields(PyObject *self, PyObject *args)
 	int i, reslen = 0, slen = 0, sz = 100;
 	PyObject *res = NULL;
 	char* p = NULL;
-	intargfunc getitemfunc;
+	ssizeargfunc getitemfunc;
 
 	WARN;
 	if (!PyArg_ParseTuple(args, "O|t#:join", &seq, &sep, &seplen))

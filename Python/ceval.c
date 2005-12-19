@@ -3927,7 +3927,7 @@ apply_slice(PyObject *u, PyObject *v, PyObject *w) /* return u[v:w] */
 	PySequenceMethods *sq = tp->tp_as_sequence;
 
 	if (sq && sq->sq_slice && ISINT(v) && ISINT(w)) {
-		int ilow = 0, ihigh = INT_MAX;
+		Py_ssize_t ilow = 0, ihigh = INT_MAX;
 		if (!_PyEval_SliceIndex(v, &ilow))
 			return NULL;
 		if (!_PyEval_SliceIndex(w, &ihigh))
@@ -3954,7 +3954,7 @@ assign_slice(PyObject *u, PyObject *v, PyObject *w, PyObject *x)
 	PySequenceMethods *sq = tp->tp_as_sequence;
 
 	if (sq && sq->sq_slice && ISINT(v) && ISINT(w)) {
-		int ilow = 0, ihigh = INT_MAX;
+		Py_ssize_t ilow = 0, ihigh = INT_MAX;
 		if (!_PyEval_SliceIndex(v, &ilow))
 			return -1;
 		if (!_PyEval_SliceIndex(w, &ihigh))

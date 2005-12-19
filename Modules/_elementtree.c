@@ -1228,7 +1228,7 @@ element_setslice(ElementObject* self, int start, int end, PyObject* item)
 }
 
 static int
-element_setitem(ElementObject* self, int index, PyObject* item)
+element_setitem(ElementObject* self, size_t index, PyObject* item)
 {
     int i;
     PyObject* old;
@@ -1371,10 +1371,10 @@ static PySequenceMethods element_as_sequence = {
     (inquiry) element_length,
     0, /* sq_concat */
     0, /* sq_repeat */
-    (intargfunc) element_getitem,
-    (intintargfunc) element_getslice,
-    (intobjargproc) element_setitem,
-    (intintobjargproc) element_setslice,
+    (ssizeargfunc) element_getitem,
+    (ssizessizeargfunc) element_getslice,
+    (sizeobjargproc) element_setitem,
+    (ssizessizeobjargproc) element_setslice,
 };
 
 statichere PyTypeObject Element_Type = {

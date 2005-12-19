@@ -779,9 +779,9 @@ static PySequenceMethods deque_as_sequence = {
 	(inquiry)deque_len,		/* sq_length */
 	0,				/* sq_concat */
 	0,				/* sq_repeat */
-	(intargfunc)deque_item,		/* sq_item */
+	(ssizeargfunc)deque_item,	/* sq_item */
 	0,				/* sq_slice */
-	(intobjargproc)deque_ass_item,	/* sq_ass_item */
+	(sizeobjargproc)deque_ass_item,	/* sq_ass_item */
 };
 
 /* deque object ********************************************************/

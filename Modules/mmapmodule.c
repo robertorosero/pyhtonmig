@@ -756,11 +756,11 @@ mmap_ass_item(mmap_object *self, int i, PyObject *v)
 static PySequenceMethods mmap_as_sequence = {
 	(inquiry)mmap_length,		       /*sq_length*/
 	(binaryfunc)mmap_concat,	       /*sq_concat*/
-	(intargfunc)mmap_repeat,	       /*sq_repeat*/
-	(intargfunc)mmap_item,		       /*sq_item*/
-	(intintargfunc)mmap_slice,	       /*sq_slice*/
-	(intobjargproc)mmap_ass_item,	       /*sq_ass_item*/
-	(intintobjargproc)mmap_ass_slice,      /*sq_ass_slice*/
+	(ssizeargfunc)mmap_repeat,	       /*sq_repeat*/
+	(ssizeargfunc)mmap_item,	       /*sq_item*/
+	(ssizessizeargfunc)mmap_slice,	       /*sq_slice*/
+	(sizeobjargproc)mmap_ass_item,	       /*sq_ass_item*/
+	(ssizessizeobjargproc)mmap_ass_slice,  /*sq_ass_slice*/
 };
 
 static PyBufferProcs mmap_as_buffer = {

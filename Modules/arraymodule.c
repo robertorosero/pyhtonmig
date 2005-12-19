@@ -1706,7 +1706,7 @@ array_ass_subscr(arrayobject* self, PyObject* item, PyObject* value)
 
 			if (av->ob_size != slicelength) {
 				PyErr_Format(PyExc_ValueError,
-            "attempt to assign array of size %d to extended slice of size %d",
+            "attempt to assign array of size %ld to extended slice of size %ld",
 					     av->ob_size, slicelength);
 				return -1;
 			}
