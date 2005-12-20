@@ -101,7 +101,7 @@ PyAPI_FUNC(PyObject *) _PyString_Join(PyObject *sep, PyObject *x);
 
 PyAPI_FUNC(PyObject*) PyString_Decode(
     const char *s,              /* encoded string */
-    int size,                   /* size of buffer */
+    Py_ssize_t size,            /* size of buffer */
     const char *encoding,       /* encoding */
     const char *errors          /* error handling */
     );
@@ -111,7 +111,7 @@ PyAPI_FUNC(PyObject*) PyString_Decode(
 
 PyAPI_FUNC(PyObject*) PyString_Encode(
     const char *s,              /* string char buffer */
-    int size,                   /* number of chars to encode */
+    Py_ssize_t size,            /* number of chars to encode */
     const char *encoding,       /* encoding */
     const char *errors          /* error handling */
     );
@@ -171,7 +171,7 @@ PyAPI_FUNC(PyObject*) PyString_AsDecodedString(
 PyAPI_FUNC(int) PyString_AsStringAndSize(
     register PyObject *obj,	/* string or Unicode object */
     register char **s,		/* pointer to buffer variable */
-    register int *len		/* pointer to length variable or NULL
+    register Py_ssize_t *len	/* pointer to length variable or NULL
 				   (only possible for 0-terminated
 				   strings) */
     );
