@@ -266,7 +266,7 @@ utf_7_decode(PyObject *self,
 	    PyObject *args)
 {
     const char *data;
-    int size;
+    Py_ssize_t size;
     const char *errors = NULL;
 
     if (!PyArg_ParseTuple(args, "t#|z:utf_7_decode",
@@ -282,7 +282,7 @@ utf_8_decode(PyObject *self,
 	    PyObject *args)
 {
     const char *data;
-    int size;
+    Py_ssize_t size;
     const char *errors = NULL;
     int final = 0;
     Py_ssize_t consumed;
@@ -309,7 +309,7 @@ utf_16_decode(PyObject *self,
 	    PyObject *args)
 {
     const char *data;
-    int size;
+    Py_ssize_t size;
     const char *errors = NULL;
     int byteorder = 0;
     int final = 0;
@@ -337,7 +337,7 @@ utf_16_le_decode(PyObject *self,
 		 PyObject *args)
 {
     const char *data;
-    int size;
+    Py_ssize_t size;
     const char *errors = NULL;
     int byteorder = -1;
     int final = 0;
@@ -367,7 +367,7 @@ utf_16_be_decode(PyObject *self,
 		 PyObject *args)
 {
     const char *data;
-    int size;
+    Py_ssize_t size;
     const char *errors = NULL;
     int byteorder = 1;
     int final = 0;
@@ -403,7 +403,7 @@ utf_16_ex_decode(PyObject *self,
 		 PyObject *args)
 {
     const char *data;
-    int size;
+    Py_ssize_t size;
     const char *errors = NULL;
     int byteorder = 0;
     PyObject *unicode, *tuple;
@@ -433,7 +433,7 @@ unicode_escape_decode(PyObject *self,
 		     PyObject *args)
 {
     const char *data;
-    int size;
+    Py_ssize_t size;
     const char *errors = NULL;
 
     if (!PyArg_ParseTuple(args, "t#|z:unicode_escape_decode",
@@ -449,7 +449,7 @@ raw_unicode_escape_decode(PyObject *self,
 			PyObject *args)
 {
     const char *data;
-    int size;
+    Py_ssize_t size;
     const char *errors = NULL;
 
     if (!PyArg_ParseTuple(args, "t#|z:raw_unicode_escape_decode",
@@ -465,7 +465,7 @@ latin_1_decode(PyObject *self,
 	       PyObject *args)
 {
     const char *data;
-    int size;
+    Py_ssize_t size;
     const char *errors = NULL;
 
     if (!PyArg_ParseTuple(args, "t#|z:latin_1_decode",
@@ -481,7 +481,7 @@ ascii_decode(PyObject *self,
 	     PyObject *args)
 {
     const char *data;
-    int size;
+    Py_ssize_t size;
     const char *errors = NULL;
 
     if (!PyArg_ParseTuple(args, "t#|z:ascii_decode",
@@ -497,7 +497,7 @@ charmap_decode(PyObject *self,
 	       PyObject *args)
 {
     const char *data;
-    int size;
+    Py_ssize_t size;
     const char *errors = NULL;
     PyObject *mapping = NULL;
 
@@ -518,7 +518,7 @@ mbcs_decode(PyObject *self,
 	    PyObject *args)
 {
     const char *data;
-    int size;
+    Py_ssize_t size;
     const char *errors = NULL;
 
     if (!PyArg_ParseTuple(args, "t#|z:mbcs_decode",
@@ -554,7 +554,7 @@ charbuffer_encode(PyObject *self,
 		  PyObject *args)
 {
     const char *data;
-    int size;
+    Py_ssize_t size;
     const char *errors = NULL;
 
     if (!PyArg_ParseTuple(args, "t#|z:charbuffer_encode",
