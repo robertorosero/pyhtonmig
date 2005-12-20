@@ -405,7 +405,7 @@ builtin_compile(PyObject *self, PyObject *args)
 	int supplied_flags = 0;
 	PyCompilerFlags cf;
 	PyObject *result = NULL, *cmd, *tmp = NULL;
-	int length;
+	Py_ssize_t length;
 
 	if (!PyArg_ParseTuple(args, "Oss|ii:compile", &cmd, &filename,
 			      &startstr, &supplied_flags, &dont_inherit))

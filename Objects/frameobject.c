@@ -71,9 +71,9 @@ frame_setlineno(PyFrameObject *f, PyObject* p_new_lineno)
 	int new_lasti = 0;		/* The new value of f_lasti */
 	int new_iblock = 0;		/* The new value of f_iblock */
 	char *code = NULL;		/* The bytecode for the frame... */
-	int code_len = 0;		/* ...and its length */
+	Py_ssize_t code_len = 0;	/* ...and its length */
 	char *lnotab = NULL;		/* Iterating over co_lnotab */
-	int lnotab_len = 0;		/* (ditto) */
+	Py_ssize_t lnotab_len = 0;	/* (ditto) */
 	int offset = 0;			/* (ditto) */
 	int line = 0;			/* (ditto) */
 	int addr = 0;			/* (ditto) */

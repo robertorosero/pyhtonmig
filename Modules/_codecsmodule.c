@@ -242,7 +242,7 @@ unicode_internal_decode(PyObject *self,
     PyObject *obj;
     const char *errors = NULL;
     const char *data;
-    int size;
+    Py_ssize_t size;
 
     if (!PyArg_ParseTuple(args, "O|z:unicode_internal_decode",
 			  &obj, &errors))
@@ -572,7 +572,7 @@ unicode_internal_encode(PyObject *self,
     PyObject *obj;
     const char *errors = NULL;
     const char *data;
-    int size;
+    Py_ssize_t size;
 
     if (!PyArg_ParseTuple(args, "O|z:unicode_internal_encode",
 			  &obj, &errors))

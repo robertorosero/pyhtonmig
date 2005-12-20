@@ -1519,7 +1519,7 @@ file_writelines(PyFileObject *f, PyObject *seq)
 			PyObject *v = PyList_GET_ITEM(list, i);
 			if (!PyString_Check(v)) {
 			    	const char *buffer;
-			    	int len;
+			    	Py_ssize_t len;
 				if (((f->f_binary &&
 				      PyObject_AsReadBuffer(v,
 					      (const void**)&buffer,

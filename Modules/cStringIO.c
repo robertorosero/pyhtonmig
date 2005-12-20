@@ -440,7 +440,7 @@ O_writelines(Oobject *self, PyObject *args) {
 	if (it == NULL)
 		return NULL;
 	while ((s = PyIter_Next(it)) != NULL) {
-		int n;
+		Py_ssize_t n;
 		char *c;
 		if (PyString_AsStringAndSize(s, &c, &n) == -1) {
 			Py_DECREF(it);
@@ -656,7 +656,7 @@ static PyObject *
 newIobject(PyObject *s) {
   Iobject *self;
   char *buf;
-  int size;
+  Py_ssize_t size;
 
   if (PyObject_AsReadBuffer(s, (const void **)&buf, &size)) {
       PyErr_Format(PyExc_TypeError, "expected read buffer, %.200s found",

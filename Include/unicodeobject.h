@@ -1056,11 +1056,11 @@ PyAPI_FUNC(PyObject*) PyUnicode_Join(
 /* Return 1 if substr matches str[start:end] at the given tail end, 0
    otherwise. */
 
-PyAPI_FUNC(int) PyUnicode_Tailmatch(
+PyAPI_FUNC(Py_ssize_t) PyUnicode_Tailmatch(
     PyObject *str,		/* String */ 
     PyObject *substr,		/* Prefix or Suffix string */
-    int start,			/* Start index */
-    int end,			/* Stop index */
+    Py_ssize_t start,		/* Start index */
+    Py_ssize_t end,		/* Stop index */
     int direction		/* Tail end: -1 prefix, +1 suffix */
     );
 
@@ -1068,21 +1068,21 @@ PyAPI_FUNC(int) PyUnicode_Tailmatch(
    given search direction or -1 if not found. -2 is returned in case
    an error occurred and an exception is set. */
 
-PyAPI_FUNC(int) PyUnicode_Find(
+PyAPI_FUNC(Py_ssize_t) PyUnicode_Find(
     PyObject *str,		/* String */ 
     PyObject *substr,		/* Substring to find */
-    int start,			/* Start index */
-    int end,			/* Stop index */
+    Py_ssize_t start,		/* Start index */
+    Py_ssize_t end,		/* Stop index */
     int direction		/* Find direction: +1 forward, -1 backward */
     );
 
 /* Count the number of occurrences of substr in str[start:end]. */
 
-PyAPI_FUNC(int) PyUnicode_Count(
+PyAPI_FUNC(Py_ssize_t) PyUnicode_Count(
     PyObject *str,		/* String */ 
     PyObject *substr,		/* Substring to count */
-    int start,			/* Start index */
-    int end			/* Stop index */
+    Py_ssize_t start,		/* Start index */
+    Py_ssize_t end		/* Stop index */
     );
 
 /* Replace at most maxcount occurrences of substr in str with replstr

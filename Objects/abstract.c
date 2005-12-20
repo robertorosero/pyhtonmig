@@ -218,11 +218,11 @@ PyObject_DelItemString(PyObject *o, char *key)
 
 int PyObject_AsCharBuffer(PyObject *obj,
 			  const char **buffer,
-			  int *buffer_len)
+			  Py_ssize_t *buffer_len)
 {
 	PyBufferProcs *pb;
 	const char *pp;
-	int len;
+	Py_ssize_t len;
 
 	if (obj == NULL || buffer == NULL || buffer_len == NULL) {
 		null_error();
@@ -264,11 +264,11 @@ PyObject_CheckReadBuffer(PyObject *obj)
 
 int PyObject_AsReadBuffer(PyObject *obj,
 			  const void **buffer,
-			  int *buffer_len)
+			  Py_ssize_t *buffer_len)
 {
 	PyBufferProcs *pb;
 	void *pp;
-	int len;
+	Py_ssize_t len;
 
 	if (obj == NULL || buffer == NULL || buffer_len == NULL) {
 		null_error();
@@ -946,7 +946,7 @@ PyNumber_Absolute(PyObject *o)
 
 /* Add a check for embedded NULL-bytes in the argument. */
 static PyObject *
-int_from_string(const char *s, int len)
+int_from_string(const char *s, Py_ssize_t len)
 {
 	char *end;
 	PyObject *x;
@@ -968,7 +968,7 @@ PyNumber_Int(PyObject *o)
 {
 	PyNumberMethods *m;
 	const char *buffer;
-	int buffer_len;
+	Py_ssize_t buffer_len;
 
 	if (o == NULL)
 		return null_error();
@@ -1009,7 +1009,7 @@ PyNumber_Int(PyObject *o)
 
 /* Add a check for embedded NULL-bytes in the argument. */
 static PyObject *
-long_from_string(const char *s, int len)
+long_from_string(const char *s, Py_ssize_t len)
 {
 	char *end;
 	PyObject *x;
@@ -1031,7 +1031,7 @@ PyNumber_Long(PyObject *o)
 {
 	PyNumberMethods *m;
 	const char *buffer;
-	int buffer_len;
+	Py_ssize_t buffer_len;
 
 	if (o == NULL)
 		return null_error();

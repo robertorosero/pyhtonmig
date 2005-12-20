@@ -457,7 +457,7 @@ PyObject *PyUnicode_FromEncodedObject(register PyObject *obj,
 				      const char *errors)
 {
     const char *s = NULL;
-    int len;
+    Py_ssize_t len;
     PyObject *v;
 
     if (obj == NULL) {
@@ -3829,12 +3829,12 @@ int count(PyUnicodeObject *self,
     return count;
 }
 
-int PyUnicode_Count(PyObject *str,
+Py_ssize_t PyUnicode_Count(PyObject *str,
 		    PyObject *substr,
-		    int start,
-		    int end)
+		    Py_ssize_t start,
+		    Py_ssize_t end)
 {
-    int result;
+    Py_ssize_t result;
 
     str = PyUnicode_FromObject(str);
     if (str == NULL)
@@ -3855,10 +3855,10 @@ int PyUnicode_Count(PyObject *str,
 }
 
 static
-int findstring(PyUnicodeObject *self,
+Py_ssize_t findstring(PyUnicodeObject *self,
 	       PyUnicodeObject *substring,
-	       int start,
-	       int end,
+	       Py_ssize_t start,
+	       Py_ssize_t end,
 	       int direction)
 {
     if (start < 0)
@@ -3891,13 +3891,13 @@ int findstring(PyUnicodeObject *self,
     return -1;
 }
 
-int PyUnicode_Find(PyObject *str,
+Py_ssize_t PyUnicode_Find(PyObject *str,
 		   PyObject *substr,
-		   int start,
-		   int end,
+		   Py_ssize_t start,
+		   Py_ssize_t end,
 		   int direction)
 {
-    int result;
+    Py_ssize_t result;
 
     str = PyUnicode_FromObject(str);
     if (str == NULL)
@@ -3917,10 +3917,10 @@ int PyUnicode_Find(PyObject *str,
 }
 
 static
-int tailmatch(PyUnicodeObject *self,
+Py_ssize_t tailmatch(PyUnicodeObject *self,
 	      PyUnicodeObject *substring,
-	      int start,
-	      int end,
+	      Py_ssize_t start,
+	      Py_ssize_t end,
 	      int direction)
 {
     if (start < 0)
@@ -3953,13 +3953,13 @@ int tailmatch(PyUnicodeObject *self,
     return 0;
 }
 
-int PyUnicode_Tailmatch(PyObject *str,
+Py_ssize_t PyUnicode_Tailmatch(PyObject *str,
 			PyObject *substr,
-			int start,
-			int end,
+			Py_ssize_t start,
+			Py_ssize_t end,
 			int direction)
 {
-    int result;
+    Py_ssize_t result;
 
     str = PyUnicode_FromObject(str);
     if (str == NULL)
@@ -5089,8 +5089,8 @@ static PyObject *
 unicode_count(PyUnicodeObject *self, PyObject *args)
 {
     PyUnicodeObject *substring;
-    int start = 0;
-    int end = INT_MAX;
+    Py_ssize_t start = 0;
+    Py_ssize_t end = INT_MAX;
     PyObject *result;
 
     if (!PyArg_ParseTuple(args, "O|O&O&:count", &substring,
@@ -5266,8 +5266,8 @@ static PyObject *
 unicode_find(PyUnicodeObject *self, PyObject *args)
 {
     PyUnicodeObject *substring;
-    int start = 0;
-    int end = INT_MAX;
+    Py_ssize_t start = 0;
+    Py_ssize_t end = INT_MAX;
     PyObject *result;
 
     if (!PyArg_ParseTuple(args, "O|O&O&:find", &substring,
@@ -5330,10 +5330,10 @@ Like S.find() but raise ValueError when the substring is not found.");
 static PyObject *
 unicode_index(PyUnicodeObject *self, PyObject *args)
 {
-    int result;
+    Py_ssize_t result;
     PyUnicodeObject *substring;
-    int start = 0;
-    int end = INT_MAX;
+    Py_ssize_t start = 0;
+    Py_ssize_t end = INT_MAX;
 
     if (!PyArg_ParseTuple(args, "O|O&O&:index", &substring,
 		_PyEval_SliceIndex, &start, _PyEval_SliceIndex, &end))
@@ -5351,7 +5351,7 @@ unicode_index(PyUnicodeObject *self, PyObject *args)
         PyErr_SetString(PyExc_ValueError, "substring not found");
         return NULL;
     }
-    return PyInt_FromLong(result);
+    return PyInt_FromSsize_t(result);
 }
 
 PyDoc_STRVAR(islower__doc__,
@@ -5997,8 +5997,8 @@ static PyObject *
 unicode_rfind(PyUnicodeObject *self, PyObject *args)
 {
     PyUnicodeObject *substring;
-    int start = 0;
-    int end = INT_MAX;
+    Py_ssize_t start = 0;
+    Py_ssize_t end = INT_MAX;
     PyObject *result;
 
     if (!PyArg_ParseTuple(args, "O|O&O&:rfind", &substring,
@@ -6023,10 +6023,10 @@ Like S.rfind() but raise ValueError when the substring is not found.");
 static PyObject *
 unicode_rindex(PyUnicodeObject *self, PyObject *args)
 {
-    int result;
+    Py_ssize_t result;
     PyUnicodeObject *substring;
-    int start = 0;
-    int end = INT_MAX;
+    Py_ssize_t start = 0;
+    Py_ssize_t end = INT_MAX;
 
     if (!PyArg_ParseTuple(args, "O|O&O&:rindex", &substring,
 		_PyEval_SliceIndex, &start, _PyEval_SliceIndex, &end))
@@ -6043,7 +6043,7 @@ unicode_rindex(PyUnicodeObject *self, PyObject *args)
         PyErr_SetString(PyExc_ValueError, "substring not found");
         return NULL;
     }
-    return PyInt_FromLong(result);
+    return PyInt_FromSsize_t(result);
 }
 
 PyDoc_STRVAR(rjust__doc__,
@@ -6319,8 +6319,8 @@ unicode_startswith(PyUnicodeObject *self,
 		   PyObject *args)
 {
     PyUnicodeObject *substring;
-    int start = 0;
-    int end = INT_MAX;
+    Py_ssize_t start = 0;
+    Py_ssize_t end = INT_MAX;
     PyObject *result;
 
     if (!PyArg_ParseTuple(args, "O|O&O&:startswith", &substring,
@@ -6350,8 +6350,8 @@ unicode_endswith(PyUnicodeObject *self,
 		 PyObject *args)
 {
     PyUnicodeObject *substring;
-    int start = 0;
-    int end = INT_MAX;
+    Py_ssize_t start = 0;
+    Py_ssize_t end = INT_MAX;
     PyObject *result;
 
     if (!PyArg_ParseTuple(args, "O|O&O&:endswith", &substring,

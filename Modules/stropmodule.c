@@ -364,7 +364,7 @@ static PyObject *
 do_strip(PyObject *args, int striptype)
 {
 	char *s;
-	int len, i, j;
+	Py_ssize_t len, i, j;
 
 
 	if (PyString_AsStringAndSize(args, &s, &len))
@@ -443,7 +443,7 @@ static PyObject *
 strop_lower(PyObject *self, PyObject *args)
 {
 	char *s, *s_new;
-	int i, n;
+	Py_ssize_t i, n;
 	PyObject *new;
 	int changed;
 
@@ -482,7 +482,7 @@ static PyObject *
 strop_upper(PyObject *self, PyObject *args)
 {
 	char *s, *s_new;
-	int i, n;
+	Py_ssize_t i, n;
 	PyObject *new;
 	int changed;
 
@@ -522,7 +522,7 @@ static PyObject *
 strop_capitalize(PyObject *self, PyObject *args)
 {
 	char *s, *s_new;
-	int i, n;
+	Py_ssize_t i, n;
 	PyObject *new;
 	int changed;
 
@@ -688,7 +688,7 @@ static PyObject *
 strop_swapcase(PyObject *self, PyObject *args)
 {
 	char *s, *s_new;
-	int i, n;
+	Py_ssize_t i, n;
 	PyObject *new;
 	int changed;
 

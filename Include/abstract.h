@@ -472,7 +472,7 @@ xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx*/
 
      PyAPI_FUNC(int) PyObject_AsCharBuffer(PyObject *obj,
 					  const char **buffer,
-					  int *buffer_len);
+					  Py_ssize_t *buffer_len);
 
        /* 
 	  Takes an arbitrary object which must support the (character,
@@ -497,7 +497,7 @@ xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx*/
 
      PyAPI_FUNC(int) PyObject_AsReadBuffer(PyObject *obj,
 					  const void **buffer,
-					  int *buffer_len);
+					  Py_ssize_t *buffer_len);
 
        /* 
 	  Same as PyObject_AsCharBuffer() except that this API expects
