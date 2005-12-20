@@ -1228,7 +1228,7 @@ element_setslice(ElementObject* self, Py_ssize_t start, Py_ssize_t end, PyObject
 }
 
 static int
-element_setitem(ElementObject* self, size_t index, PyObject* item)
+element_setitem(ElementObject* self, Py_ssize_t index, PyObject* item)
 {
     int i;
     PyObject* old;
@@ -1373,7 +1373,7 @@ static PySequenceMethods element_as_sequence = {
     0, /* sq_repeat */
     (ssizeargfunc) element_getitem,
     (ssizessizeargfunc) element_getslice,
-    (sizeobjargproc) element_setitem,
+    (ssizeobjargproc) element_setitem,
     (ssizessizeobjargproc) element_setslice,
 };
 
