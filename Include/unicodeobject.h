@@ -372,7 +372,7 @@ extern "C" {
 
 typedef struct {
     PyObject_HEAD
-    int length;			/* Length of raw Unicode data in buffer */
+    Py_ssize_t length;		/* Length of raw Unicode data in buffer */
     Py_UNICODE *str;		/* Raw Unicode buffer */
     long hash;			/* Hash value; -1 if not set */
     PyObject *defenc;		/* (Default) Encoded version as Python
