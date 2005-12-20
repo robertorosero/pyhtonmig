@@ -641,7 +641,7 @@ mmap_length(mmap_object *self)
 }
 
 static PyObject *
-mmap_item(mmap_object *self, int i)
+mmap_item(mmap_object *self, Py_ssize_t i)
 {
 	CHECK_VALID(NULL);
 	if (i < 0 || (size_t)i >= self->size) {
@@ -652,7 +652,7 @@ mmap_item(mmap_object *self, int i)
 }
 
 static PyObject *
-mmap_slice(mmap_object *self, int ilow, int ihigh)
+mmap_slice(mmap_object *self, Py_ssize_t ilow, Py_ssize_t ihigh)
 {
 	CHECK_VALID(NULL);
 	if (ilow < 0)
@@ -679,7 +679,7 @@ mmap_concat(mmap_object *self, PyObject *bb)
 }
 
 static PyObject *
-mmap_repeat(mmap_object *self, int n)
+mmap_repeat(mmap_object *self, Py_ssize_t n)
 {
 	CHECK_VALID(NULL);
 	PyErr_SetString(PyExc_SystemError,
@@ -688,7 +688,7 @@ mmap_repeat(mmap_object *self, int n)
 }
 
 static int
-mmap_ass_slice(mmap_object *self, int ilow, int ihigh, PyObject *v)
+mmap_ass_slice(mmap_object *self, Py_ssize_t ilow, Py_ssize_t ihigh, PyObject *v)
 {
 	const char *buf;
 
@@ -727,7 +727,7 @@ mmap_ass_slice(mmap_object *self, int ilow, int ihigh, PyObject *v)
 }
 
 static int
-mmap_ass_item(mmap_object *self, int i, PyObject *v)
+mmap_ass_item(mmap_object *self, Py_ssize_t i, PyObject *v)
 {
 	const char *buf;
  
@@ -757,10 +757,10 @@ static PySequenceMethods mmap_as_sequence = {
 	(inquiry)mmap_length,		       /*sq_length*/
 	(binaryfunc)mmap_concat,	       /*sq_concat*/
 	(ssizeargfunc)mmap_repeat,	       /*sq_repeat*/
-	(ssizeargfunc)mmap_item,	       /*sq_item*/
+	(ssizeargfunc)mmap_item,		       /*sq_item*/
 	(ssizessizeargfunc)mmap_slice,	       /*sq_slice*/
-	(sizeobjargproc)mmap_ass_item,	       /*sq_ass_item*/
-	(ssizessizeobjargproc)mmap_ass_slice,  /*sq_ass_slice*/
+	(ssizeobjargproc)mmap_ass_item,	       /*sq_ass_item*/
+	(ssizessizeobjargproc)mmap_ass_slice,      /*sq_ass_slice*/
 };
 
 static PyBufferProcs mmap_as_buffer = {

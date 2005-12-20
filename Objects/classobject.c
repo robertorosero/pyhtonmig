@@ -1145,7 +1145,7 @@ sliceobj_from_intint(int i, int j)
 
 
 static PyObject *
-instance_slice(PyInstanceObject *inst, int i, int j)
+instance_slice(PyInstanceObject *inst, Py_ssize_t i, Py_ssize_t j)
 {
 	PyObject *func, *arg, *res;
 	static PyObject *getslicestr;
@@ -1179,7 +1179,7 @@ instance_slice(PyInstanceObject *inst, int i, int j)
 }
 
 static int
-instance_ass_item(PyInstanceObject *inst, int i, PyObject *item)
+instance_ass_item(PyInstanceObject *inst, Py_ssize_t i, PyObject *item)
 {
 	PyObject *func, *arg, *res;
 
@@ -1213,7 +1213,7 @@ instance_ass_item(PyInstanceObject *inst, int i, PyObject *item)
 }
 
 static int
-instance_ass_slice(PyInstanceObject *inst, int i, int j, PyObject *value)
+instance_ass_slice(PyInstanceObject *inst, Py_ssize_t i, Py_ssize_t j, PyObject *value)
 {
 	PyObject *func, *arg, *res;
 	static PyObject *setslicestr, *delslicestr;
@@ -1327,7 +1327,7 @@ instance_as_sequence = {
 	0,					/* sq_repeat */
 	(ssizeargfunc)instance_item,		/* sq_item */
 	(ssizessizeargfunc)instance_slice,	/* sq_slice */
-	(sizeobjargproc)instance_ass_item,	/* sq_ass_item */
+	(ssizeobjargproc)instance_ass_item,	/* sq_ass_item */
 	(ssizessizeobjargproc)instance_ass_slice,/* sq_ass_slice */
 	(objobjproc)instance_contains,		/* sq_contains */
 };

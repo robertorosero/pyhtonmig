@@ -445,7 +445,7 @@ buffer_ass_item(PyBufferObject *self, Py_ssize_t idx, PyObject *other)
 	if (!get_buf(self, &ptr1, &size))
 		return -1;
 
-	if (idx >= size) {
+	if (idx < 0 || idx >= size) {
 		PyErr_SetString(PyExc_IndexError,
 				"buffer assignment index out of range");
 		return -1;
@@ -599,7 +599,7 @@ static PySequenceMethods buffer_as_sequence = {
 	(ssizeargfunc)buffer_repeat, /*sq_repeat*/
 	(ssizeargfunc)buffer_item, /*sq_item*/
 	(ssizessizeargfunc)buffer_slice, /*sq_slice*/
-	(sizeobjargproc)buffer_ass_item, /*sq_ass_item*/
+	(ssizeobjargproc)buffer_ass_item, /*sq_ass_item*/
 	(ssizessizeobjargproc)buffer_ass_slice, /*sq_ass_slice*/
 };
 

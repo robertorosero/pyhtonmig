@@ -652,7 +652,7 @@ convertsimple(PyObject *arg, const char **p_format, va_list *p_va, int flags,
 		break;
 	}
 #endif
-	/* Fall through from 'L' to 'l' if Py_ssize_t is int */
+	/* Fall through from 'n' to 'l' if Py_ssize_t is int */
 	case 'l': {/* long int */
 		long *p = va_arg(*p_va, long *);
 		long ival;

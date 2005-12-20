@@ -135,7 +135,7 @@ typedef PyObject *(*ssizeargfunc)(PyObject *, Py_ssize_t);
 typedef PyObject *(*ssizessizeargfunc)(PyObject *, Py_ssize_t, Py_ssize_t);
 typedef int(*intobjargproc)(PyObject *, int, PyObject *);
 typedef int(*intintobjargproc)(PyObject *, int, int, PyObject *);
-typedef int(*sizeobjargproc)(PyObject *, size_t, PyObject *);
+typedef int(*ssizeobjargproc)(PyObject *, Py_ssize_t, PyObject *);
 typedef int(*ssizessizeobjargproc)(PyObject *, Py_ssize_t, Py_ssize_t, PyObject *);
 typedef int(*objobjargproc)(PyObject *, PyObject *, PyObject *);
 typedef Py_ssize_t (*getreadbufferproc)(PyObject *, int, void **);
@@ -205,7 +205,7 @@ typedef struct {
 	ssizeargfunc sq_repeat;
 	ssizeargfunc sq_item;
 	ssizessizeargfunc sq_slice;
-	sizeobjargproc sq_ass_item;
+	ssizeobjargproc sq_ass_item;
 	ssizessizeobjargproc sq_ass_slice;
 	objobjproc sq_contains;
 	/* Added in release 2.0 */

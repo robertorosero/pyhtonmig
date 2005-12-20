@@ -760,9 +760,8 @@ array_ass_slice(arrayobject *a, int ilow, int ihigh, PyObject *v)
 #undef b
 }
 
-/* XXX should be ssize_t */
 static int
-array_ass_item(arrayobject *a, size_t i, PyObject *v)
+array_ass_item(arrayobject *a, Py_ssize_t i, PyObject *v)
 {
 	if (i < 0 || i >= a->ob_size) {
 		PyErr_SetString(PyExc_IndexError,
@@ -1707,7 +1706,7 @@ array_ass_subscr(arrayobject* self, PyObject* item, PyObject* value)
 			if (av->ob_size != slicelength) {
 				PyErr_Format(PyExc_ValueError,
             "attempt to assign array of size %ld to extended slice of size %ld",
-					     av->ob_size, slicelength);
+					     /*XXX*/(long)av->ob_size, /*XXX*/(long)slicelength);
 				return -1;
 			}
 
@@ -1786,7 +1785,7 @@ static PySequenceMethods array_as_sequence = {
 	(ssizeargfunc)array_repeat,		/*sq_repeat*/
 	(ssizeargfunc)array_item,		        /*sq_item*/
 	(ssizessizeargfunc)array_slice,		/*sq_slice*/
-	(sizeobjargproc)array_ass_item,		/*sq_ass_item*/
+	(ssizeobjargproc)array_ass_item,		/*sq_ass_item*/
 	(ssizessizeobjargproc)array_ass_slice,	/*sq_ass_slice*/
 	(objobjproc)array_contains,		/*sq_contains*/
 	(binaryfunc)array_inplace_concat,	/*sq_inplace_concat*/

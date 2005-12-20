@@ -4102,7 +4102,7 @@ SLOT1(slot_sq_repeat, "__mul__", int, "i")
 /* Super-optimized version of slot_sq_item.
    Other slots could do the same... */
 static PyObject *
-slot_sq_item(PyObject *self, int i)
+slot_sq_item(PyObject *self, Py_ssize_t i)
 {
 	static PyObject *getitem_str;
 	PyObject *func, *args = NULL, *ival = NULL, *retval = NULL;
@@ -4144,10 +4144,10 @@ slot_sq_item(PyObject *self, int i)
 	return NULL;
 }
 
-SLOT2(slot_sq_slice, "__getslice__", int, int, "ii")
+SLOT2(slot_sq_slice, "__getslice__", Py_ssize_t, Py_ssize_t, "nn")
 
 static int
-slot_sq_ass_item(PyObject *self, int index, PyObject *value)
+slot_sq_ass_item(PyObject *self, Py_ssize_t index, PyObject *value)
 {
 	PyObject *res;
 	static PyObject *delitem_str, *setitem_str;
@@ -4165,7 +4165,7 @@ slot_sq_ass_item(PyObject *self, int index, PyObject *value)
 }
 
 static int
-slot_sq_ass_slice(PyObject *self, int i, int j, PyObject *value)
+slot_sq_ass_slice(PyObject *self, Py_ssize_t i, Py_ssize_t j, PyObject *value)
 {
 	PyObject *res;
 	static PyObject *delslice_str, *setslice_str;

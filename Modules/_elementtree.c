@@ -916,7 +916,7 @@ element_getiterator(ElementObject* self, PyObject* args)
 }
 
 static PyObject*
-element_getitem(ElementObject* self, int index)
+element_getitem(ElementObject* self, Py_ssize_t index)
 {
     if (!self->extra || index < 0 || index >= self->extra->length) {
         PyErr_SetString(
@@ -931,9 +931,9 @@ element_getitem(ElementObject* self, int index)
 }
 
 static PyObject*
-element_getslice(ElementObject* self, int start, int end)
+element_getslice(ElementObject* self, Py_ssize_t start, Py_ssize_t end)
 {
-    int i;
+    Py_ssize_t i;
     PyObject* list;
 
     if (!self->extra)
@@ -1158,7 +1158,7 @@ element_set(ElementObject* self, PyObject* args)
 }
 
 static int
-element_setslice(ElementObject* self, int start, int end, PyObject* item)
+element_setslice(ElementObject* self, Py_ssize_t start, Py_ssize_t end, PyObject* item)
 {
     int i, new, old;
     PyObject* recycle = NULL;
@@ -2142,7 +2142,7 @@ expat_unknown_encoding_handler(XMLParserObject *self, const XML_Char *name,
     for (i = 0; i < 256; i++)
         s[i] = i;
     
-    u = PyUnicode_Decode(s, 256, name, "replace");
+    u = PyUnicode_Decode((char*)s, 256, name, "replace");
     if (!u)
         return XML_STATUS_ERROR;
 
