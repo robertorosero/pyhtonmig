@@ -402,7 +402,7 @@ buffer_item(PyBufferObject *self, Py_ssize_t idx)
 	int size;
 	if (!get_buf(self, &ptr, &size))
 		return NULL;
-	if (idx < 0 || idx >= size ) {
+	if ( idx < 0 || idx >= size ) {
 		PyErr_SetString(PyExc_IndexError, "buffer index out of range");
 		return NULL;
 	}

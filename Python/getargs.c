@@ -1144,7 +1144,6 @@ convertsimple(PyObject *arg, const char **p_format, va_list *p_va, int flags,
 		const char **p = va_arg(*p_va, const char **);
 		PyBufferProcs *pb = arg->ob_type->tp_as_buffer;
 		int count;
-		FETCH_SIZE;
 		
 		if (*format++ != '#')
 			return converterr(
@@ -1166,7 +1165,10 @@ convertsimple(PyObject *arg, const char **p_format, va_list *p_va, int flags,
 		count = pb->bf_getcharbuffer(arg, 0, p);
 		if (count < 0)
 			return converterr("(unspecified)", arg, msgbuf, bufsize);
-		STORE_SIZE(count);
+		{
+			FETCH_SIZE;
+			STORE_SIZE(count);
+		}
 		break;
 	}
 

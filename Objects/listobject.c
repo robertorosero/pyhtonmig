@@ -138,7 +138,7 @@ PyList_GetItem(PyObject *op, Py_ssize_t i)
 		PyErr_BadInternalCall();
 		return NULL;
 	}
-	if (i >= ((PyListObject *)op) -> ob_size) {
+	if (i < 0 || i >= ((PyListObject *)op) -> ob_size) {
 		if (indexerr == NULL)
 			indexerr = PyString_FromString(
 				"list index out of range");
@@ -159,7 +159,7 @@ PyList_SetItem(register PyObject *op, register Py_ssize_t i,
 		PyErr_BadInternalCall();
 		return -1;
 	}
-	if (i >= ((PyListObject *)op) -> ob_size) {
+	if (i < 0 || i >= ((PyListObject *)op) -> ob_size) {
 		Py_XDECREF(newitem);
 		PyErr_SetString(PyExc_IndexError,
 				"list assignment index out of range");

@@ -3900,17 +3900,17 @@ PyString_Format(PyObject *format, PyObject *args)
 	if (args->ob_type->tp_as_mapping && !PyTuple_Check(args) &&
 	    !PyObject_TypeCheck(args, &PyBaseString_Type))
 		dict = args;
-	while (fmtcnt-- != 0) {
+	while (--fmtcnt >= 0) {
 		if (*fmt != '%') {
-			if (rescnt == 0) {
+			if (--rescnt < 0) {
 				rescnt = fmtcnt + 100;
 				reslen += rescnt;
 				if (_PyString_Resize(&result, reslen) < 0)
 					return NULL;
 				res = PyString_AS_STRING(result)
 					+ reslen - rescnt;
+				--rescnt;
 			}
-			rescnt--;
 			*res++ = *fmt++;
 		}
 		else {
@@ -4192,7 +4192,7 @@ PyString_Format(PyObject *format, PyObject *args)
 			}
 			if (width < len)
 				width = len;
-			if ((rescnt - (sign != 0)) < width) {
+			if (rescnt - (sign != 0) < width) {
 				reslen -= rescnt;
 				rescnt = width + fmtcnt + 100;
 				reslen += rescnt;

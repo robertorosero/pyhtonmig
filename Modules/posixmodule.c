@@ -4220,7 +4220,7 @@ _PyPopenCreateProcess(char *cmdstring,
 			char modulepath[_MAX_PATH];
 			struct stat statinfo;
 			GetModuleFileName(NULL, modulepath, sizeof(modulepath));
-			for (x = i = 0; modulepath[i]; i++)
+			for (i = x = 0; modulepath[i]; i++)
 				if (modulepath[i] == SEP)
 					x = i+1;
 			modulepath[x] = '\0';
