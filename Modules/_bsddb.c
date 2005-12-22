@@ -1097,7 +1097,7 @@ _db_associateCallback(DB* db, const DBT* priKey, const DBT* priData,
         }
         else if (PyString_Check(result)) {
             char* data;
-            int   size;
+            Py_ssize_t size;
 
             CLEAR_DBT(*secKey);
 #if PYTHON_API_VERSION <= 1007
