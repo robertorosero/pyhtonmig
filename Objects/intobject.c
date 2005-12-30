@@ -188,6 +188,8 @@ PyInt_AsLong(register PyObject *op)
 Py_ssize_t
 PyInt_AsSsize_t(register PyObject *op)
 {
+	if (op && !PyInt_CheckExact(op) && PyLong_Check(op))
+		return _PyLong_AsSsize_t(op);
 #if SIZEOF_SIZE_T==SIZEOF_LONG
 	return PyInt_AsLong(op);
 #else

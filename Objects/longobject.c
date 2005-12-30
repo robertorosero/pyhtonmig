@@ -245,7 +245,7 @@ PyLong_AsLong(PyObject *vv)
    Returns -1 and sets an error condition if overflow occurs. */
 
 Py_ssize_t
-PyLong_AsSsize_t(PyObject *vv)
+_PyLong_AsSsize_t(PyObject *vv)
 {
 	register PyLongObject *v;
 	size_t x, prev;
@@ -253,8 +253,6 @@ PyLong_AsSsize_t(PyObject *vv)
 	int sign;
 
 	if (vv == NULL || !PyLong_Check(vv)) {
-		if (vv != NULL && PyInt_Check(vv))
-			return PyInt_AsSsize_t(vv);
 		PyErr_BadInternalCall();
 		return -1;
 	}

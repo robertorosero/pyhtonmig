@@ -1169,14 +1169,8 @@ string_hash(PyStringObject *a)
 static PyObject*
 string_subscript(PyStringObject* self, PyObject* item)
 {
-	if (PyInt_Check(item)) {
-		long i = PyInt_AS_LONG(item);
-		if (i < 0)
-			i += PyString_GET_SIZE(self);
-		return string_item(self,i);
-	}
-	else if (PyLong_Check(item)) {
-		Py_ssize_t i = PyLong_AsSsize_t(item);
+	if (PyInt_Check(item) || PyLong_Check(item)) {
+		Py_ssize_t i = PyInt_AsSsize_t(item);
 		if (i == -1 && PyErr_Occurred())
 			return NULL;
 		if (i < 0)
