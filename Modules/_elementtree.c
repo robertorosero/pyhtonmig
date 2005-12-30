@@ -92,6 +92,9 @@ do { memory -= size; printf("%8d - %s\n", memory, comment); } while (0)
 #endif
 
 /* compatibility macros */
+#if (PY_VERSION_HEX < 0x02050000)
+typedef int Py_ssize_t;
+#endif
 #if (PY_VERSION_HEX < 0x02040000)
 #define PyDict_CheckExact PyDict_Check
 #if (PY_VERSION_HEX < 0x02020000)
@@ -916,8 +919,9 @@ element_getiterator(ElementObject* self, PyObject* args)
 }
 
 static PyObject*
-element_getitem(ElementObject* self, Py_ssize_t index)
+element_getitem(PyObject* _self, Py_ssize_t index)
 {
+    ElementObject* self = (ElementObject*)_self;
     if (!self->extra || index < 0 || index >= self->extra->length) {
         PyErr_SetString(
             PyExc_IndexError,
@@ -931,8 +935,9 @@ element_getitem(ElementObject* self, Py_ssize_t index)
 }
 
 static PyObject*
-element_getslice(ElementObject* self, Py_ssize_t start, Py_ssize_t end)
+element_getslice(PyObject* _self, Py_ssize_t start, Py_ssize_t end)
 {
+    ElementObject* self = (ElementObject*)_self;
     Py_ssize_t i;
     PyObject* list;
 
@@ -1158,8 +1163,9 @@ element_set(ElementObject* self, PyObject* args)
 }
 
 static int
-element_setslice(ElementObject* self, Py_ssize_t start, Py_ssize_t end, PyObject* item)
+element_setslice(PyObject* _self, Py_ssize_t start, Py_ssize_t end, PyObject* item)
 {
+    ElementObject* self = (ElementObject*)_self;
     int i, new, old;
     PyObject* recycle = NULL;
 
@@ -1228,8 +1234,9 @@ element_setslice(ElementObject* self, Py_ssize_t start, Py_ssize_t end, PyObject
 }
 
 static int
-element_setitem(ElementObject* self, Py_ssize_t index, PyObject* item)
+element_setitem(PyObject* _self, Py_ssize_t index, PyObject* item)
 {
+    ElementObject* self = (ElementObject*)_self;
     int i;
     PyObject* old;
 
@@ -1371,10 +1378,10 @@ static PySequenceMethods element_as_sequence = {
     (inquiry) element_length,
     0, /* sq_concat */
     0, /* sq_repeat */
-    (ssizeargfunc) element_getitem,
-    (ssizessizeargfunc) element_getslice,
-    (ssizeobjargproc) element_setitem,
-    (ssizessizeobjargproc) element_setslice,
+    element_getitem,
+    element_getslice,
+    element_setitem,
+    element_setslice,
 };
 
 statichere PyTypeObject Element_Type = {
