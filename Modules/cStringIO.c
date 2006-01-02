@@ -47,7 +47,7 @@ PyDoc_STRVAR(cStringIO_module_documentation,
 typedef struct {
   PyObject_HEAD
   char *buf;
-  int pos, string_size;
+  Py_ssize_t pos, string_size;
 } IOobject;
 
 #define IOOOBJECT(O) ((IOobject*)(O))
@@ -68,7 +68,7 @@ typedef struct { /* Subtype of IOobject */
 typedef struct { /* Subtype of IOobject */
   PyObject_HEAD
   char *buf;
-  int pos, string_size;
+  Py_ssize_t pos, string_size;
   /* We store a reference to the object here in order to keep
      the buffer alive during the lifetime of the Iobject. */
   PyObject *pbuf;
@@ -155,7 +155,7 @@ PyDoc_STRVAR(IO_read__doc__,
 "read([s]) -- Read s characters, or the rest of the string");
 
 static int
-IO_cread(PyObject *self, char **output, int  n) {
+IO_cread(PyObject *self, char **output, Py_ssize_t  n) {
         int l;
 
         UNLESS (IO__opencheck(IOOOBJECT(self))) return -1;
@@ -172,10 +172,10 @@ IO_cread(PyObject *self, char **output, int  n) {
 
 static PyObject *
 IO_read(IOobject *self, PyObject *args) {
-        int n = -1;
+        Py_ssize_t n = -1;
         char *output;
 
-        UNLESS (PyArg_ParseTuple(args, "|i:read", &n)) return NULL;
+        UNLESS (PyArg_ParseTuple(args, "|n:read", &n)) return NULL;
 
         if ( (n=IO_cread((PyObject*)self,&output,n)) < 0) return NULL;
 
@@ -287,10 +287,10 @@ PyDoc_STRVAR(IO_truncate__doc__,
 
 static PyObject *
 IO_truncate(IOobject *self, PyObject *args) {
-        int pos = -1;
+        Py_ssize_t pos = -1;
 	
         UNLESS (IO__opencheck(self)) return NULL;
-        UNLESS (PyArg_ParseTuple(args, "|i:truncate", &pos)) return NULL;
+        UNLESS (PyArg_ParseTuple(args, "|n:truncate", &pos)) return NULL;
         if (pos < 0) pos = self->pos;
 
         if (self->string_size > pos) self->string_size = pos;
@@ -326,14 +326,14 @@ PyDoc_STRVAR(O_seek__doc__,
 
 static PyObject *
 O_seek(Oobject *self, PyObject *args) {
-        int i_position;
 	Py_ssize_t position;
 	int mode = 0;
 
         UNLESS (IO__opencheck(IOOOBJECT(self))) return NULL;
-        UNLESS (PyArg_ParseTuple(args, "i|i:seek", &i_position, &mode)) 
+        UNLESS (PyArg_ParseTuple(args, "n|i:seek", &position, &mode)) 
                 return NULL;
-	position = i_position;
+
+	printf("Seeking to %d\n",(int)position);
 
         if (mode == 2) {
                 position += self->string_size;
@@ -572,10 +572,11 @@ I_close(Iobject *self, PyObject *unused) {
 
 static PyObject *
 I_seek(Iobject *self, PyObject *args) {
-        int position, mode = 0;
+        Py_ssize_t position;
+	int mode = 0;
 
         UNLESS (IO__opencheck(IOOOBJECT(self))) return NULL;
-        UNLESS (PyArg_ParseTuple(args, "i|i:seek", &position, &mode)) 
+        UNLESS (PyArg_ParseTuple(args, "n|i:seek", &position, &mode)) 
                 return NULL;
 
         if (mode == 2) position += self->string_size;
