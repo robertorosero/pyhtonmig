@@ -836,7 +836,6 @@ Stonecutters Seafood and Chop House, Lemont, IL, 12/19/02, Week Back
 'Tommy''s Place':'Blue Island':'IL':'12/28/02':'Blue Sunday/White Crow'
 'Stonecutters Seafood and Chop House':'Lemont':'IL':'12/19/02':'Week Back'
 """
-
     header = '''\
 "venue","city","state","date","performers"
 '''
@@ -851,6 +850,10 @@ Stonecutters Seafood and Chop House, Lemont, IL, 12/19/02, Week Back
 147483648;43.0e2;17;abc;def
 47483648;43.0;170;abc;def
 '''
+
+    sample5 = "aaa\tbbb\r\nAAA\t\r\nBBB\t\r\n"
+    sample6 = "a|b|c\r\nd|e|f\r\n"
+    sample7 = "'a'|'b'|'c'\r\n'd'|e|f\r\n"
 
     def test_has_header(self):
         sniffer = csv.Sniffer()
@@ -879,6 +882,13 @@ Stonecutters Seafood and Chop House, Lemont, IL, 12/19/02, Week Back
         self.assertEqual(dialect.delimiter, "/")
         dialect = sniffer.sniff(self.sample4)
         self.assertEqual(dialect.delimiter, ";")
+        dialect = sniffer.sniff(self.sample5)
+        self.assertEqual(dialect.delimiter, "\t")
+        dialect = sniffer.sniff(self.sample6)
+        self.assertEqual(dialect.delimiter, "|")
+        dialect = sniffer.sniff(self.sample7)
+        self.assertEqual(dialect.delimiter, "|")
+        self.assertEqual(dialect.quotechar, "'")
 
 if not hasattr(sys, "gettotalrefcount"):
     if test_support.verbose: print "*** skipping leakage tests ***"

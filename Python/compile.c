@@ -23,6 +23,7 @@
 
 #include "Python-ast.h"
 #include "node.h"
+#include "pyarena.h"
 #include "ast.h"
 #include "code.h"
 #include "compile.h"
@@ -148,6 +149,7 @@ struct compiler {
         struct compiler_unit *u; /* compiler state for current block */
 	PyObject *c_stack;       /* Python list holding compiler_unit ptrs */
 	char *c_encoding;	 /* source encoding (a borrowed reference) */
+        PyArena *c_arena;        /* pointer to memory allocation arena */
 };
 
 struct assembler {
@@ -169,7 +171,6 @@ static int compiler_addop(struct compiler *, int);
 static int compiler_addop_o(struct compiler *, int, PyObject *, PyObject *);
 static int compiler_addop_i(struct compiler *, int, int);
 static int compiler_addop_j(struct compiler *, int, basicblock *, int);
-static void compiler_use_block(struct compiler *, basicblock *);
 static basicblock *compiler_use_new_block(struct compiler *);
 static int compiler_error(struct compiler *, const char *);
 static int compiler_nameop(struct compiler *, identifier, expr_context_ty);
@@ -243,7 +244,8 @@ compiler_init(struct compiler *c)
 }
 
 PyCodeObject *
-PyAST_Compile(mod_ty mod, const char *filename, PyCompilerFlags *flags)
+PyAST_Compile(mod_ty mod, const char *filename, PyCompilerFlags *flags,
+              PyArena *arena)
 {
 	struct compiler c;
 	PyCodeObject *co = NULL;
@@ -259,6 +261,7 @@ PyAST_Compile(mod_ty mod, const char *filename, PyCompilerFlags *flags)
 	if (!compiler_init(&c))
 		goto error;
 	c.c_filename = filename;
+        c.c_arena = arena;
 	c.c_future = PyFuture_FromAST(mod, filename);
 	if (c.c_future == NULL)
 		goto error;
@@ -292,12 +295,12 @@ PyAST_Compile(mod_ty mod, const char *filename, PyCompilerFlags *flags)
 PyCodeObject *
 PyNode_Compile(struct _node *n, const char *filename)
 {
-	PyCodeObject *co;
-	mod_ty mod = PyAST_FromNode(n, NULL, filename);
-	if (!mod)
-		return NULL;
-	co = PyAST_Compile(mod, filename, NULL);
-	free_mod(mod);
+	PyCodeObject *co = NULL;
+        PyArena *arena = PyArena_New();
+	mod_ty mod = PyAST_FromNode(n, NULL, filename, arena);
+	if (mod)
+		co = PyAST_Compile(mod, filename, NULL, arena);
+        PyArena_Free(arena);
 	return co;
 }
 
@@ -1070,12 +1073,16 @@ compiler_enter_scope(struct compiler *c, identifier name, void *key,
 	struct compiler_unit *u;
 
 	u = PyObject_Malloc(sizeof(struct compiler_unit));
+	if (!u) {
+                PyErr_NoMemory();
+                return 0;
+	}
         memset(u, 0, sizeof(struct compiler_unit));
 	u->u_argcount = 0;
 	u->u_ste = PySymtable_Lookup(c->c_st, key);
 	if (!u->u_ste) {
                 compiler_unit_free(u);
-		return 0;
+                return 0;
 	}
 	Py_INCREF(name);
 	u->u_name = name;
@@ -1158,20 +1165,15 @@ compiler_new_block(struct compiler *c)
 
 	u = c->u;
 	b = (basicblock *)PyObject_Malloc(sizeof(basicblock));
-	if (b == NULL)
+	if (b == NULL) {
+		PyErr_NoMemory();
 		return NULL;
+	}
 	memset((void *)b, 0, sizeof(basicblock));
 	assert (b->b_next == NULL);
 	b->b_list = u->u_blocks;
 	u->u_blocks = b;
 	return b;
-}
-
-static void
-compiler_use_block(struct compiler *c, basicblock *block)
-{
-        assert (block != NULL);
-	c->u->u_curblock = block;
 }
 
 static basicblock *
@@ -2518,7 +2520,7 @@ compiler_assert(struct compiler *c, stmt_ty s)
 	else {
 		ADDOP_I(c, RAISE_VARARGS, 1);
 	}
-	compiler_use_block(c, end);
+	compiler_use_next_block(c, end);
 	ADDOP(c, POP_TOP);
 	return 1;
 }
@@ -2749,8 +2751,7 @@ inplace_binop(struct compiler *c, operator_ty op)
 		return INPLACE_FLOOR_DIVIDE;
 	}
 	PyErr_Format(PyExc_SystemError,
-		     "inplace binary op %d should not be possible",
-		     op);
+		     "inplace binary op %d should not be possible", op);
 	return 0;
 }
 
@@ -2798,6 +2799,9 @@ compiler_nameop(struct compiler *c, identifier name, expr_context_ty ctx)
 	case GLOBAL_EXPLICIT:
 		optype = OP_GLOBAL;
 		break;
+	default:
+		/* scope can be 0 */
+		break;
 	}
 
 	/* XXX Leave assert here, but handle __doc__ and the like better */
@@ -2819,6 +2823,7 @@ compiler_nameop(struct compiler *c, identifier name, expr_context_ty ctx)
 			Py_DECREF(mangled);
 			return 0;
 		case Param:
+		default:
 			PyErr_SetString(PyExc_SystemError,
 					"param invalid for deref variable");
 			return 0;
@@ -2833,6 +2838,7 @@ compiler_nameop(struct compiler *c, identifier name, expr_context_ty ctx)
 		case AugStore:
 			break;
 		case Param:
+		default:
 			PyErr_SetString(PyExc_SystemError,
 					"param invalid for local variable");
 			return 0;
@@ -2849,6 +2855,7 @@ compiler_nameop(struct compiler *c, identifier name, expr_context_ty ctx)
 		case AugStore:
 			break;
 		case Param:
+		default:
 			PyErr_SetString(PyExc_SystemError,
 					"param invalid for global variable");
 			return 0;
@@ -2863,6 +2870,7 @@ compiler_nameop(struct compiler *c, identifier name, expr_context_ty ctx)
 		case AugStore:
 			break;
 		case Param:
+		default:
 			PyErr_SetString(PyExc_SystemError,
 					"param invalid for name variable");
 			return 0;
@@ -3350,6 +3358,7 @@ compiler_visit_expr(struct compiler *c, expr_ty e)
 			ADDOP_NAME(c, DELETE_ATTR, e->v.Attribute.attr, names);
 			break;
 		case Param:
+		default:
 			PyErr_SetString(PyExc_SystemError,
 					"param invalid in attribute expression");
 			return 0;
@@ -3377,6 +3386,7 @@ compiler_visit_expr(struct compiler *c, expr_ty e)
 			VISIT_SLICE(c, e->v.Subscript.slice, Del);
 			break;
 		case Param:
+		default:
 			PyErr_SetString(PyExc_SystemError,
 					"param invalid in subscript expression");
 			return 0;
@@ -3404,7 +3414,7 @@ compiler_augassign(struct compiler *c, stmt_ty s)
 	switch (e->kind) {
                 case Attribute_kind:
 		auge = Attribute(e->v.Attribute.value, e->v.Attribute.attr,
-				 AugLoad, e->lineno);
+				 AugLoad, e->lineno, c->c_arena);
                 if (auge == NULL)
                     return 0;
 		VISIT(c, expr, auge);
@@ -3412,11 +3422,10 @@ compiler_augassign(struct compiler *c, stmt_ty s)
 		ADDOP(c, inplace_binop(c, s->v.AugAssign.op));
 		auge->v.Attribute.ctx = AugStore;
 		VISIT(c, expr, auge);
-		free(auge);
 		break;
 	case Subscript_kind:
 		auge = Subscript(e->v.Subscript.value, e->v.Subscript.slice,
-				 AugLoad, e->lineno);
+				 AugLoad, e->lineno, c->c_arena);
                 if (auge == NULL)
                     return 0;
 		VISIT(c, expr, auge);
@@ -3424,7 +3433,6 @@ compiler_augassign(struct compiler *c, stmt_ty s)
 		ADDOP(c, inplace_binop(c, s->v.AugAssign.op));
                 auge->v.Subscript.ctx = AugStore;
 		VISIT(c, expr, auge);
-		free(auge);
                 break;
 	case Name_kind:
 		VISIT(c, expr, s->v.AugAssign.target);
@@ -3432,8 +3440,9 @@ compiler_augassign(struct compiler *c, stmt_ty s)
 		ADDOP(c, inplace_binop(c, s->v.AugAssign.op));
 		return compiler_nameop(c, e->v.Name.id, Store);
 	default:
-                fprintf(stderr, 
-                        "invalid node type for augmented assignment\n");
+		PyErr_Format(PyExc_SystemError, 
+			"invalid node type (%d) for augmented assignment",
+			e->kind);
                 return 0;
 	}
 	return 1;
@@ -3505,9 +3514,9 @@ compiler_handle_subscr(struct compiler *c, const char *kind,
                 case Store:   op = STORE_SUBSCR; break;
                 case Del:     op = DELETE_SUBSCR; break;
                 case Param:
-                        fprintf(stderr, 
-                                "invalid %s kind %d in subscript\n", 
-                                kind, ctx);
+                        PyErr_Format(PyExc_SystemError, 
+				     "invalid %s kind %d in subscript\n", 
+				     kind, ctx);
                         return 0;
         }
         if (ctx == AugLoad) {
@@ -3590,6 +3599,7 @@ compiler_simple_slice(struct compiler *c, slice_ty s, expr_context_ty ctx)
 	case Store: op = STORE_SLICE; break;
 	case Del: op = DELETE_SLICE; break;
 	case Param:
+	default:
 		PyErr_SetString(PyExc_SystemError,
 				"param invalid in simple slice");
 		return 0;
@@ -3609,11 +3619,11 @@ compiler_visit_nested_slice(struct compiler *c, slice_ty s,
 		break;
 	case Slice_kind:
 		return compiler_slice(c, s, ctx);
-		break;
 	case Index_kind:
 		VISIT(c, expr, s->v.Index.value);
 		break;
 	case ExtSlice_kind:
+	default:
 		PyErr_SetString(PyExc_SystemError,
 				"extended slice invalid in nested slice");
 		return 0;
@@ -3655,6 +3665,10 @@ compiler_visit_slice(struct compiler *c, slice_ty s, expr_context_ty ctx)
                 if (ctx != AugStore)
 			VISIT(c, expr, s->v.Index.value);
                 return compiler_handle_subscr(c, "index", ctx);
+	default:
+		PyErr_Format(PyExc_SystemError,
+			     "invalid slice %d", s->kind);
+		return 0;
 	}
 	return 1;
 }
@@ -3744,8 +3758,10 @@ assemble_init(struct assembler *a, int nblocks, int firstlineno)
 		return 0;
 	a->a_postorder = (basicblock **)PyObject_Malloc(
                                             sizeof(basicblock *) * nblocks);
-	if (!a->a_postorder)
+	if (!a->a_postorder) {
+		PyErr_NoMemory();
 		return 0;
+	}
 	return 1;
 }
 

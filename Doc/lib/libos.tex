@@ -875,7 +875,10 @@ Like \function{mkdir()},
 but makes all intermediate-level directories needed to contain the
 leaf directory.  Throws an \exception{error} exception if the leaf
 directory already exists or cannot be created.  The default \var{mode}
-is \code{0777} (octal).
+is \code{0777} (octal).  On some systems, \var{mode} is ignored.
+Where it is used, the current umask value is first masked out.
+\note{\function{makedirs()} will become confused if the path elements
+to create include \var{os.pardir}.}
 \versionadded{1.5.2}
 \versionchanged[This function now handles UNC paths correctly]{2.3}
 \end{funcdesc}
@@ -930,11 +933,15 @@ Availability: Macintosh, \UNIX, Windows.
 \index{directory!deleting}
 Removes directories recursively.  Works like
 \function{rmdir()} except that, if the leaf directory is
-successfully removed, directories corresponding to rightmost path
-segments will be pruned way until either the whole path is consumed or
-an error is raised (which is ignored, because it generally means that
-a parent directory is not empty).  Throws an \exception{error}
-exception if the leaf directory could not be successfully removed.
+successfully removed, \function{removedirs()} 
+tries to successively remove every parent directory mentioned in 
+\var{path} until an error is raised (which is ignored, because
+it generally means that a parent directory is not empty).
+For example, \samp{os.removedirs('foo/bar/baz')} will first remove
+the directory \samp{'foo/bar/baz'}, and then remove \samp{'foo/bar'}
+and \samp{'foo'} if they are empty.
+Raises \exception{OSError} if the leaf directory could not be 
+successfully removed.
 \versionadded{1.5.2}
 \end{funcdesc}
 

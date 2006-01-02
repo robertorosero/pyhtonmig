@@ -12,6 +12,26 @@ What's New in Python 2.5 alpha 1?
 Core and builtins
 -----------------
 
+- Bug #959576: The pwd module is now builtin. This allows Python to be
+  built on UNIX platforms without $HOME set.
+
+- Bug #1072182, fix some potential problems if characters are signed.
+
+- Bug #889500, fix line number on SyntaxWarning for global declarations.
+
+- Bug #1378022, UTF-8 files with a leading BOM crashed the interpreter.
+
+- Support for converting hex strings to floats no longer works.
+  This was not portable.  float('0x3') now raises a ValueError.
+
+- Patch #1382163: Expose Subversion revision number to Python.  New C API
+  function Py_GetBuildNumber().  New attribute sys.build_number.  Build number
+  is now displayed in interactive prompt banner.
+
+- Implementation of PEP 341 - Unification of try/except and try/finally.
+  "except" clauses can now be written together with a "finally" clause in
+  one try statement instead of two nested ones.  Patch #1355913.
+
 - Bug #1379994: Builtin unicode_escape and raw_unicode_escape codec
   now encodes backslash correctly.
 
@@ -189,6 +209,8 @@ Core and builtins
 Extension Modules
 -----------------
 
+- Patch #1365916: fix some unsafe 64-bit mmap methods.
+
 - Bug #1290333: Added a workaround for cjkcodecs' _codecs_cn build
   problem on AIX.
 
@@ -294,6 +316,12 @@ Extension Modules
 
 Library
 -------
+
+- Patch #1157027: cookielib mishandles RFC 2109 cookies in Netscape mode
+
+- Patch #1117398: cookielib.LWPCookieJar and .MozillaCookieJar now raise
+  LoadError as documented, instead of IOError.  For compatibility,
+  LoadError subclasses IOError.
 
 - Added the hashlib module.  It provides secure hash functions for MD5 and
   SHA1, 224, 256, 384, and 512.  Note that recent developments make the
@@ -565,8 +593,9 @@ Library
   once when a size argument is given. This prevents a buffer overflow in the
   tokenizer with very long source lines.
 
-- Bug #1083110: ``zlib.decompress.flush()`` would segfault if called immediately
-  after creating the object, without any intervening ``.decompress()`` calls.
+- Bug #1083110: ``zlib.decompress.flush()`` would segfault if called
+  immediately after creating the object, without any intervening
+  ``.decompress()`` calls.
 
 - The reconvert.quote function can now emit triple-quoted strings.  The
   reconvert module now has some simple documentation.
@@ -601,6 +630,8 @@ Library
 
 Build
 -----
+
+- Use -xcode=pic32 for CCSHARED on Solaris with SunPro.
 
 - Bug #1189330: configure did not correctly determine the necessary
   value of LINKCC if python was built with GCC 4.0.
@@ -709,6 +740,8 @@ Tools/Demos
 
 - Patch #1177597: Correct Complex.__init__.
 
+- Fixed a display glitch in Pynche, which could cause the right arrow to
+  wiggle over by a pixel.
 
 What's New in Python 2.4 final?
 ===============================

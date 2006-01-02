@@ -229,7 +229,7 @@ get_coding_spec(const char *s, Py_ssize_t size)
 			} while (t[0] == '\x20' || t[0] == '\t');
 
 			begin = t;
-			while (isalnum((int)t[0]) ||
+			while (isalnum(Py_CHARMASK(t[0])) ||
 			       t[0] == '-' || t[0] == '_' || t[0] == '.')
 				t++;
 
@@ -291,6 +291,12 @@ check_coding_spec(const char* line, Py_ssize_t size, struct tok_state *tok,
 			r = (strcmp(tok->encoding, cs) == 0);
 			PyMem_DEL(cs);
 		}
+	}
+	if (!r) {
+		cs = tok->encoding;
+		if (!cs)
+			cs = "with BOM";
+		PyErr_Format(PyExc_SyntaxError, "encoding problem: %s", cs);
 	}
 	return r;
 }

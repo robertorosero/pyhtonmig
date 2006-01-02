@@ -952,8 +952,8 @@ The conversion flag characters are:
              precede the conversion (overrides a "space" flag).}
 \end{tableii}
 
-The length modifier may be \code{h}, \code{l}, and \code{L} may be
-present, but are ignored as they are not necessary for Python.
+A length modifier (\code{h}, \code{l}, or \code{L}) may be
+present, but is ignored as it is not necessary for Python.
 
 The conversion types are:
 
@@ -1261,17 +1261,17 @@ that do not apply to immutable instances of \class{frozenset}:
 \begin{tableiii}{c|c|l}{code}{Operation}{Equivalent}{Result}
   \lineiii{\var{s}.update(\var{t})}
          {\var{s} |= \var{t}}
-         {return set \var{s} with elements added from \var{t}}
+         {update set \var{s}, adding elements from \var{t}}
   \lineiii{\var{s}.intersection_update(\var{t})}
          {\var{s} \&= \var{t}}
-         {return set \var{s} keeping only elements also found in \var{t}}
+         {update set \var{s}, keeping only elements found in both \var{s} and \var{t}}
   \lineiii{\var{s}.difference_update(\var{t})}
          {\var{s} -= \var{t}}
-         {return set \var{s} after removing elements found in \var{t}}
+         {update set \var{s}, removing elements found in \var{t}}
   \lineiii{\var{s}.symmetric_difference_update(\var{t})}
          {\var{s} \textasciicircum= \var{t}}
-         {return set \var{s} with elements from \var{s} or \var{t}
-          but not both}
+         {update set \var{s}, keeping only elements found in either \var{s} or \var{t}
+          but not in both}
 
   \hline
   \lineiii{\var{s}.add(\var{x})}{}
@@ -1606,7 +1606,7 @@ flush the read-ahead buffer.
   defaults to the current position.  The current file position is
   not changed.  Note that if a specified size exceeds the file's
   current size, the result is platform-dependent:  possibilities
-  include that file may remain unchanged, increase to the specified
+  include that the file may remain unchanged, increase to the specified
   size as if zero-filled, or increase to the specified size with
   undefined new content.
   Availability:  Windows, many \UNIX{} variants.

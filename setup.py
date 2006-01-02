@@ -148,16 +148,17 @@ class PyBuildExt(build_ext):
                 self.extensions.remove(ext)
 
         if platform != 'mac':
-            # Parse Modules/Setup to figure out which modules are turned
-            # on in the file.
-            input = text_file.TextFile('Modules/Setup', join_lines=1)
+            # Parse Modules/Setup and Modules/Setup.local to figure out which
+            # modules are turned on in the file.
             remove_modules = []
-            while 1:
-                line = input.readline()
-                if not line: break
-                line = line.split()
-                remove_modules.append( line[0] )
-            input.close()
+            for filename in ('Modules/Setup', 'Modules/Setup.local'):
+                input = text_file.TextFile(filename, join_lines=1)
+                while 1:
+                    line = input.readline()
+                    if not line: break
+                    line = line.split()
+                    remove_modules.append(line[0])
+                input.close()
 
             for ext in self.extensions[:]:
                 if ext.name in remove_modules:
@@ -999,7 +1000,7 @@ class PyBuildExt(build_ext):
             join(os.getenv('HOME'), '/Library/Frameworks')
         ]
 
-        # Find the directory that contains the Tcl.framwork and Tk.framework
+        # Find the directory that contains the Tcl.framework and Tk.framework
         # bundles.
         # XXX distutils should support -F!
         for F in framework_dirs:
@@ -1050,8 +1051,8 @@ class PyBuildExt(build_ext):
         # AquaTk is a separate method. Only one Tkinter will be built on
         # Darwin - either AquaTk, if it is found, or X11 based Tk.
         platform = self.get_platform()
-        if platform == 'darwin' and \
-           self.detect_tkinter_darwin(inc_dirs, lib_dirs):
+        if (platform == 'darwin' and
+            self.detect_tkinter_darwin(inc_dirs, lib_dirs)):
             return
 
         # Assume we haven't found any of the libraries or include files

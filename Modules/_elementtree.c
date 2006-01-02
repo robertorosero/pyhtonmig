@@ -1508,10 +1508,12 @@ treebuilder_handle_start(TreeBuilderObject* self, PyObject* tag,
 
     if (self->data) {
         if (self->this == self->last) {
+            Py_DECREF(self->last->text);
             self->last->text = JOIN_SET(
                 self->data, PyList_CheckExact(self->data)
                 );
         } else {
+            Py_DECREF(self->last->tail);
             self->last->tail = JOIN_SET(
                 self->data, PyList_CheckExact(self->data)
                 );
@@ -1613,10 +1615,12 @@ treebuilder_handle_end(TreeBuilderObject* self, PyObject* tag)
 
     if (self->data) {
         if (self->this == self->last) {
+            Py_DECREF(self->last->text);
             self->last->text = JOIN_SET(
                 self->data, PyList_CheckExact(self->data)
                 );
         } else {
+            Py_DECREF(self->last->tail);
             self->last->tail = JOIN_SET(
                 self->data, PyList_CheckExact(self->data)
                 );
@@ -2149,7 +2153,7 @@ expat_unknown_encoding_handler(XMLParserObject *self, const XML_Char *name,
     for (i = 0; i < 256; i++)
         s[i] = i;
     
-    u = PyUnicode_Decode((char*)s, 256, name, "replace");
+    u = PyUnicode_Decode((char*) s, 256, name, "replace");
     if (!u)
         return XML_STATUS_ERROR;
 
