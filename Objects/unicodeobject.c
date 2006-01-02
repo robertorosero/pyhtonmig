@@ -747,13 +747,12 @@ int unicode_decode_call_errorhandler(const char *errors, PyObject **errorHandler
                  const char *input, Py_ssize_t insize, Py_ssize_t *startinpos, Py_ssize_t *endinpos, PyObject **exceptionObject, const char **inptr,
                  PyObject **output, Py_ssize_t *outpos, Py_UNICODE **outptr)
 {
-    static char *argparse = "O!i;decoding error handler must return (unicode, int) tuple";
+    static char *argparse = "O!n;decoding error handler must return (unicode, int) tuple";
 
     PyObject *restuple = NULL;
     PyObject *repunicode = NULL;
     Py_ssize_t outsize = PyUnicode_GET_SIZE(*output);
     Py_ssize_t requiredsize;
-    int inewpos;
     Py_ssize_t newpos;
     Py_UNICODE *repptr;
     int repsize;
@@ -787,12 +786,10 @@ int unicode_decode_call_errorhandler(const char *errors, PyObject **errorHandler
 	PyErr_Format(PyExc_TypeError, &argparse[4]);
 	goto onError;
     }
-    if (!PyArg_ParseTuple(restuple, argparse, &PyUnicode_Type, &repunicode, &inewpos))
+    if (!PyArg_ParseTuple(restuple, argparse, &PyUnicode_Type, &repunicode, &newpos))
 	goto onError;
-    if (inewpos<0)
-	newpos = insize+inewpos;
-    else
-        newpos = inewpos;
+    if (newpos<0)
+	newpos = insize+newpos;
     if (newpos<0 || newpos>insize) {
 	/* XXX %zd? */
 	PyErr_Format(PyExc_IndexError, "position %d from error handler out of bounds", (int)newpos);
@@ -2441,7 +2438,7 @@ static PyObject *unicode_encode_call_errorhandler(const char *errors,
     Py_ssize_t startpos, Py_ssize_t endpos,
     Py_ssize_t *newpos)
 {
-    static char *argparse = "O!i;encoding error handler must return (unicode, int) tuple";
+    static char *argparse = "O!n;encoding error handler must return (unicode, int) tuple";
 
     PyObject *restuple;
     PyObject *resunicode;

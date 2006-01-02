@@ -919,7 +919,11 @@ int get_int(PyObject *exc, const char *name, Py_ssize_t *value)
     if (PyInt_Check(attr)) {
         *value = PyInt_AS_LONG(attr);
     } else if (PyLong_Check(attr)) {
-	*value = (size_t)PyLong_AsLongLong(attr); /* XXX overflow?*/
+	*value = (size_t)PyLong_AsLongLong(attr);
+	if (*value == -1) {
+		Py_DECREF(attr);
+		return -1;
+	}
     } else {
 	PyErr_Format(PyExc_TypeError, "%.200s attribute must be int", name);
 	Py_DECREF(attr);
@@ -1301,7 +1305,7 @@ PyObject * PyUnicodeEncodeError_Create(
 	const char *encoding, const Py_UNICODE *object, Py_ssize_t length,
 	Py_ssize_t start, Py_ssize_t end, const char *reason)
 {
-    return PyObject_CallFunction(PyExc_UnicodeEncodeError, "su#iis",
+    return PyObject_CallFunction(PyExc_UnicodeEncodeError, "su#nns",
 	encoding, object, length, start, end, reason);
 }
 

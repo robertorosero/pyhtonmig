@@ -478,7 +478,7 @@ PyObject *PyCodec_IgnoreErrors(PyObject *exc)
 	return NULL;
     }
     /* ouch: passing NULL, 0, pos gives None instead of u'' */
-    return Py_BuildValue("(u#i)", &end, 0, end);
+    return Py_BuildValue("(u#n)", &end, 0, end);
 }
 
 
@@ -502,7 +502,7 @@ PyObject *PyCodec_ReplaceErrors(PyObject *exc)
 	for (p = PyUnicode_AS_UNICODE(res), i = start;
 	    i<end; ++p, ++i)
 	    *p = '?';
-	restuple = Py_BuildValue("(Oi)", res, end);
+	restuple = Py_BuildValue("(On)", res, end);
 	Py_DECREF(res);
 	return restuple;
     }
@@ -510,7 +510,7 @@ PyObject *PyCodec_ReplaceErrors(PyObject *exc)
 	Py_UNICODE res = Py_UNICODE_REPLACEMENT_CHARACTER;
 	if (PyUnicodeDecodeError_GetEnd(exc, &end))
 	    return NULL;
-	return Py_BuildValue("(u#i)", &res, 1, end);
+	return Py_BuildValue("(u#n)", &res, 1, end);
     }
     else if (PyObject_IsInstance(exc, PyExc_UnicodeTranslateError)) {
 	PyObject *res;
@@ -525,7 +525,7 @@ PyObject *PyCodec_ReplaceErrors(PyObject *exc)
 	for (p = PyUnicode_AS_UNICODE(res), i = start;
 	    i<end; ++p, ++i)
 	    *p = Py_UNICODE_REPLACEMENT_CHARACTER;
-	restuple = Py_BuildValue("(Oi)", res, end);
+	restuple = Py_BuildValue("(On)", res, end);
 	Py_DECREF(res);
 	return restuple;
     }
@@ -631,7 +631,7 @@ PyObject *PyCodec_XMLCharRefReplaceErrors(PyObject *exc)
 	    }
 	    *outp++ = ';';
 	}
-	restuple = Py_BuildValue("(Oi)", res, end);
+	restuple = Py_BuildValue("(On)", res, end);
 	Py_DECREF(res);
 	Py_DECREF(object);
 	return restuple;
@@ -708,7 +708,7 @@ PyObject *PyCodec_BackslashReplaceErrors(PyObject *exc)
 	    *outp++ = hexdigits[c&0xf];
 	}
 
-	restuple = Py_BuildValue("(Oi)", res, end);
+	restuple = Py_BuildValue("(On)", res, end);
 	Py_DECREF(res);
 	Py_DECREF(object);
 	return restuple;
