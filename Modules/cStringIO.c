@@ -333,8 +333,6 @@ O_seek(Oobject *self, PyObject *args) {
         UNLESS (PyArg_ParseTuple(args, "n|i:seek", &position, &mode)) 
                 return NULL;
 
-	printf("Seeking to %d\n",(int)position);
-
         if (mode == 2) {
                 position += self->string_size;
         }
