@@ -854,7 +854,7 @@ static PyObject *
 file_readinto(PyFileObject *f, PyObject *args)
 {
 	char *ptr;
-	int ntodo;
+	Py_ssize_t ntodo;
 	Py_ssize_t ndone, nnow;
 
 	if (f->f_fp == NULL)
