@@ -708,7 +708,7 @@ listinsert(PyListObject *self, PyObject *args)
 {
 	Py_ssize_t i;
 	PyObject *v;
-	if (!PyArg_ParseTuple(args, "iO:insert", &i, &v))
+	if (!PyArg_ParseTuple(args, "nO:insert", &i, &v))
 		return NULL;
 	if (ins1(self, i, v) == 0)
 		Py_RETURN_NONE;
@@ -868,7 +868,7 @@ listpop(PyListObject *self, PyObject *args)
 	if (arg != NULL) {
 		if (PyInt_Check(arg))
 			i = PyInt_AS_LONG((PyIntObject*) arg);
-		else if (!PyArg_ParseTuple(args, "|i:pop", &i))
+		else if (!PyArg_ParseTuple(args, "|n:pop", &i))
    			return NULL;
 	}
 	if (self->ob_size == 0) {
