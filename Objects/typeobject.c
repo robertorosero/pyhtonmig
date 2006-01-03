@@ -3529,19 +3529,19 @@ static PyObject *
 wrap_ssizeargfunc(PyObject *self, PyObject *args, void *wrapped)
 {
 	ssizeargfunc func = (ssizeargfunc)wrapped;
-	int i;
+	Py_ssize_t i;
 
-	if (!PyArg_ParseTuple(args, "i", &i))
+	if (!PyArg_ParseTuple(args, "n", &i))
 		return NULL;
 	return (*func)(self, i);
 }
 
-static int
+static Py_ssize_t
 getindex(PyObject *self, PyObject *arg)
 {
-	int i;
+	Py_ssize_t i;
 
-	i = PyInt_AsLong(arg);
+	i = PyInt_AsSsize_t(arg);
 	if (i == -1 && PyErr_Occurred())
 		return -1;
 	if (i < 0) {
@@ -3579,9 +3579,9 @@ static PyObject *
 wrap_ssizessizeargfunc(PyObject *self, PyObject *args, void *wrapped)
 {
 	ssizessizeargfunc func = (ssizessizeargfunc)wrapped;
-	int i, j;
+	Py_ssize_t i, j;
 
-	if (!PyArg_ParseTuple(args, "ii", &i, &j))
+	if (!PyArg_ParseTuple(args, "nn", &i, &j))
 		return NULL;
 	return (*func)(self, i, j);
 }
@@ -3589,8 +3589,9 @@ wrap_ssizessizeargfunc(PyObject *self, PyObject *args, void *wrapped)
 static PyObject *
 wrap_sq_setitem(PyObject *self, PyObject *args, void *wrapped)
 {
-	intobjargproc func = (intobjargproc)wrapped;
-	int i, res;
+	ssizeobjargproc func = (ssizeobjargproc)wrapped;
+	Py_ssize_t i;
+	int res;
 	PyObject *arg, *value;
 
 	if (!PyArg_UnpackTuple(args, "", 2, 2, &arg, &value))
@@ -3608,8 +3609,9 @@ wrap_sq_setitem(PyObject *self, PyObject *args, void *wrapped)
 static PyObject *
 wrap_sq_delitem(PyObject *self, PyObject *args, void *wrapped)
 {
-	intobjargproc func = (intobjargproc)wrapped;
-	int i, res;
+	ssizeobjargproc func = (ssizeobjargproc)wrapped;
+	Py_ssize_t i;
+	int res;
 	PyObject *arg;
 
 	if (!check_num_args(args, 1))
@@ -3626,13 +3628,14 @@ wrap_sq_delitem(PyObject *self, PyObject *args, void *wrapped)
 }
 
 static PyObject *
-wrap_intintobjargproc(PyObject *self, PyObject *args, void *wrapped)
+wrap_ssizessizeobjargproc(PyObject *self, PyObject *args, void *wrapped)
 {
-	intintobjargproc func = (intintobjargproc)wrapped;
-	int i, j, res;
+	ssizessizeobjargproc func = (ssizessizeobjargproc)wrapped;
+	Py_ssize_t i, j;
+	int res;
 	PyObject *value;
 
-	if (!PyArg_ParseTuple(args, "iiO", &i, &j, &value))
+	if (!PyArg_ParseTuple(args, "nnO", &i, &j, &value))
 		return NULL;
 	res = (*func)(self, i, j, value);
 	if (res == -1 && PyErr_Occurred())
@@ -3644,10 +3647,11 @@ wrap_intintobjargproc(PyObject *self, PyObject *args, void *wrapped)
 static PyObject *
 wrap_delslice(PyObject *self, PyObject *args, void *wrapped)
 {
-	intintobjargproc func = (intintobjargproc)wrapped;
-	int i, j, res;
+	ssizessizeobjargproc func = (ssizessizeobjargproc)wrapped;
+	Py_ssize_t i, j;
+	int res;
 
-	if (!PyArg_ParseTuple(args, "ii", &i, &j))
+	if (!PyArg_ParseTuple(args, "nn", &i, &j))
 		return NULL;
 	res = (*func)(self, i, j, NULL);
 	if (res == -1 && PyErr_Occurred())
@@ -4978,7 +4982,7 @@ static slotdef slotdefs[] = {
 	SQSLOT("__delitem__", sq_ass_item, slot_sq_ass_item, wrap_sq_delitem,
 	       "x.__delitem__(y) <==> del x[y]"),
 	SQSLOT("__setslice__", sq_ass_slice, slot_sq_ass_slice,
-	       wrap_intintobjargproc,
+	       wrap_ssizessizeobjargproc,
 	       "x.__setslice__(i, j, y) <==> x[i:j]=y\n\
                \n\
                Use  of negative indices is not supported."),
