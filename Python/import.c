@@ -351,7 +351,7 @@ static char* sys_files[] = {
 void
 PyImport_Cleanup(void)
 {
-	int pos, ndone;
+	Py_ssize_t pos, ndone;
 	char *name;
 	PyObject *key, *value, *dict;
 	PyInterpreterState *interp = PyThreadState_GET()->interp;

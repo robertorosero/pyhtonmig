@@ -1101,7 +1101,7 @@ check_duplicates(PyObject *list)
 static void
 set_mro_error(PyObject *to_merge, int *remain)
 {
-	int i, n, off, to_merge_size;
+	Py_ssize_t i, n, off, to_merge_size;
 	char buf[1000];
 	PyObject *k, *v;
 	PyObject *set = PyDict_New();

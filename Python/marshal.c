@@ -59,7 +59,7 @@ typedef struct {
 static void
 w_more(int c, WFILE *p)
 {
-	int size, newsize;
+	Py_ssize_t size, newsize;
 	if (p->str == NULL)
 		return; /* An error already occurred */
 	size = PyString_Size(p->str);
@@ -117,7 +117,7 @@ w_long64(long x, WFILE *p)
 static void
 w_object(PyObject *v, WFILE *p)
 {
-	int i, n;
+	Py_ssize_t i, n;
 
 	p->depth++;
 
@@ -236,7 +236,7 @@ w_object(PyObject *v, WFILE *p)
 				goto exit;
 			}
 			else {
-				o = PyInt_FromLong(PyDict_Size(p->strings));
+				o = PyInt_FromSsize_t(PyDict_Size(p->strings));
 				PyDict_SetItem(p->strings, v, o);
 				Py_DECREF(o);
 				w_byte(TYPE_INTERNED, p);
@@ -282,7 +282,7 @@ w_object(PyObject *v, WFILE *p)
 		}
 	}
 	else if (PyDict_Check(v)) {
-		int pos;
+		Py_ssize_t pos;
 		PyObject *key, *value;
 		w_byte(TYPE_DICT, p);
 		/* This one is NULL object terminated! */

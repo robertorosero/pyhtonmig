@@ -74,7 +74,7 @@ PyObject_Size(PyObject *o)
 }
 
 #undef PyObject_Length
-int
+Py_ssize_t
 PyObject_Length(PyObject *o)
 {
 	return PyObject_Size(o);
@@ -84,7 +84,7 @@ PyObject_Length(PyObject *o)
 int
 _PyObject_LengthCue(PyObject *o)
 {
-	int rv = PyObject_Size(o);
+	Py_ssize_t rv = PyObject_Size(o);
 	if (rv != -1)
 		return rv;
 	if (PyErr_ExceptionMatches(PyExc_TypeError) ||
@@ -1103,7 +1103,7 @@ PySequence_Check(PyObject *s)
 		s->ob_type->tp_as_sequence->sq_item != NULL;
 }
 
-int
+Py_ssize_t
 PySequence_Size(PyObject *s)
 {
 	PySequenceMethods *m;
@@ -1122,7 +1122,7 @@ PySequence_Size(PyObject *s)
 }
 
 #undef PySequence_Length
-int
+Py_ssize_t
 PySequence_Length(PyObject *s)
 {
 	return PySequence_Size(s);

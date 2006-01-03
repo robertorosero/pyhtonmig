@@ -1505,7 +1505,7 @@ vgetargskeywords(PyObject *args, PyObject *keywords, const char *format,
 	/* make sure there are no extraneous keyword arguments */
 	if (nkeywords > 0) {
 		PyObject *key, *value;
-		int pos = 0;
+		Py_ssize_t pos = 0;
 		while (PyDict_Next(keywords, &pos, &key, &value)) {
 			int match = 0;
 			char *ks;

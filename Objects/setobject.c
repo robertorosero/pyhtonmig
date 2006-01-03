@@ -468,9 +468,10 @@ set_clear_internal(PySetObject *so)
  * mutates the table.  
  */
 static int
-set_next(PySetObject *so, int *pos_ptr, setentry **entry_ptr)
+set_next(PySetObject *so, Py_ssize_t *pos_ptr, setentry **entry_ptr)
 {
-	register int i, mask;
+	Py_ssize_t i;
+	int mask;
 	register setentry *table;
 
 	assert (PyAnySet_Check(so));
@@ -517,7 +518,7 @@ static int
 set_tp_print(PySetObject *so, FILE *fp, int flags)
 {
 	setentry *entry;
-	int pos=0;
+	Py_ssize_t pos=0;
 	char *emit = "";	/* No separator emitted on first pass */
 	char *separator = ", ";
 
@@ -673,7 +674,7 @@ PyDoc_STRVAR(pop_doc, "Remove and return an arbitrary set element.");
 static int
 set_traverse(PySetObject *so, visitproc visit, void *arg)
 {
-	int pos = 0;
+	Py_ssize_t pos = 0;
 	setentry *entry;
 
 	while (set_next(so, &pos, &entry))
@@ -687,7 +688,7 @@ frozenset_hash(PyObject *self)
 	PySetObject *so = (PySetObject *)self;
 	long h, hash = 1927868237L;
 	setentry *entry;
-	int pos = 0;
+	Py_ssize_t pos = 0;
 
 	if (so->hash != -1)
 		return so->hash;
@@ -847,7 +848,7 @@ set_update_internal(PySetObject *so, PyObject *other)
 
 	if (PyDict_Check(other)) {
 		PyObject *key, *value;
-		int pos = 0;
+		Py_ssize_t pos = 0;
 		while (PyDict_Next(other, &pos, &key, &value)) {
 			if (set_add_key(so, key) == -1)
 				return -1;
@@ -1121,7 +1122,7 @@ set_intersection(PySetObject *so, PyObject *other)
 		return NULL;
 
 	if (PyAnySet_Check(other)) {		
-		int pos = 0;
+		Py_ssize_t pos = 0;
 		setentry *entry;
 
 		if (PySet_GET_SIZE(other) > PySet_GET_SIZE(so)) {
@@ -1222,7 +1223,7 @@ set_difference_update_internal(PySetObject *so, PyObject *other)
 	
 	if (PyAnySet_Check(other)) {
 		setentry *entry;
-		int pos = 0;
+		Py_ssize_t pos = 0;
 
 		while (set_next((PySetObject *)other, &pos, &entry))
 			set_discard_entry(so, entry);
@@ -1266,7 +1267,7 @@ set_difference(PySetObject *so, PyObject *other)
 {
 	PyObject *result;
 	setentry *entry;
-	int pos = 0;
+	Py_ssize_t pos = 0;
 
 	if (!PyAnySet_Check(other)  && !PyDict_Check(other)) {
 		result = set_copy(so);
@@ -1340,7 +1341,7 @@ set_symmetric_difference_update(PySetObject *so, PyObject *other)
 {
 	PySetObject *otherset;
 	PyObject *key;
-	int pos = 0;
+	Py_ssize_t pos = 0;
 	setentry *entry;
 
 	if ((PyObject *)so == other)
@@ -1442,7 +1443,7 @@ static PyObject *
 set_issubset(PySetObject *so, PyObject *other)
 {
 	setentry *entry;
-	int pos = 0;
+	Py_ssize_t pos = 0;
 
 	if (!PyAnySet_Check(other)) {
 		PyObject *tmp, *result;

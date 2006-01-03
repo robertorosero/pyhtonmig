@@ -690,7 +690,7 @@ PyDict_Clear(PyObject *op)
  * delete keys), via PyDict_SetItem().
  */
 int
-PyDict_Next(PyObject *op, int *ppos, PyObject **pkey, PyObject **pvalue)
+PyDict_Next(PyObject *op, Py_ssize_t *ppos, PyObject **pkey, PyObject **pvalue)
 {
 	register int i, mask;
 	register dictentry *ep;
@@ -786,7 +786,7 @@ dict_print(register dictobject *mp, register FILE *fp, register int flags)
 static PyObject *
 dict_repr(dictobject *mp)
 {
-	int i;
+	Py_ssize_t i;
 	PyObject *s, *temp, *colon = NULL;
 	PyObject *pieces = NULL, *result = NULL;
 	PyObject *key, *value;
@@ -1300,7 +1300,7 @@ PyDict_Copy(PyObject *o)
 	return NULL;
 }
 
-int
+Py_ssize_t
 PyDict_Size(PyObject *mp)
 {
 	if (mp == NULL || !PyDict_Check(mp)) {
@@ -1708,7 +1708,8 @@ dict_popitem(dictobject *mp)
 static int
 dict_traverse(PyObject *op, visitproc visit, void *arg)
 {
-	int i = 0, err;
+	Py_ssize_t i = 0;
+	int err;
 	PyObject *pk;
 	PyObject *pv;
 

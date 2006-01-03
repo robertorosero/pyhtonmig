@@ -529,7 +529,7 @@ function_call(PyObject *func, PyObject *arg, PyObject *kw)
 	}
 
 	if (kw != NULL && PyDict_Check(kw)) {
-		int pos, i;
+		Py_ssize_t pos, i;
 		nk = PyDict_Size(kw);
 		k = PyMem_NEW(PyObject *, 2*nk);
 		if (k == NULL) {
