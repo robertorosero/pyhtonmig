@@ -1005,6 +1005,8 @@ _PyObject_DebugMalloc(size_t nbytes)
 
 	bumpserialno();
 	total = nbytes + 16;
+#if SIZEOF_SIZE_T < 8
+	/* XXX do this check only on 32-bit machines */
 	if (total < nbytes || (total >> 31) > 1) {
 		/* overflow, or we can't represent it in 4 bytes */
 		/* Obscure:  can't do (total >> 32) != 0 instead, because
@@ -1013,6 +1015,7 @@ _PyObject_DebugMalloc(size_t nbytes)
 		   size_t is an unsigned type. */
 		return NULL;
 	}
+#endif
 
 	p = (uchar *)PyObject_Malloc(total);
 	if (p == NULL)
