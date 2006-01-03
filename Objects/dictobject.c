@@ -862,7 +862,7 @@ Done:
 	return result;
 }
 
-static int
+static Py_ssize_t
 dict_length(dictobject *mp)
 {
 	return mp->ma_used;
@@ -898,7 +898,7 @@ dict_ass_sub(dictobject *mp, PyObject *v, PyObject *w)
 }
 
 static PyMappingMethods dict_as_mapping = {
-	(inquiry)dict_length, /*mp_length*/
+	(lenfunc)dict_length, /*mp_length*/
 	(binaryfunc)dict_subscript, /*mp_subscript*/
 	(objobjargproc)dict_ass_sub, /*mp_ass_subscript*/
 };

@@ -669,7 +669,7 @@ typedef struct {
 	PyObject *dict;
 } proxyobject;
 
-static int
+static Py_ssize_t
 proxy_len(proxyobject *pp)
 {
 	return PyObject_Size(pp->dict);
@@ -682,7 +682,7 @@ proxy_getitem(proxyobject *pp, PyObject *key)
 }
 
 static PyMappingMethods proxy_as_mapping = {
-	(inquiry)proxy_len,			/* mp_length */
+	(lenfunc)proxy_len,			/* mp_length */
 	(binaryfunc)proxy_getitem,		/* mp_subscript */
 	0,					/* mp_ass_subscript */
 };

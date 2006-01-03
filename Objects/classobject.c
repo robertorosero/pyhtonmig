@@ -996,12 +996,12 @@ instance_traverse(PyInstanceObject *o, visitproc visit, void *arg)
 static PyObject *getitemstr, *setitemstr, *delitemstr, *lenstr;
 static PyObject *iterstr, *nextstr;
 
-static int
+static Py_ssize_t
 instance_length(PyInstanceObject *inst)
 {
 	PyObject *func;
 	PyObject *res;
-	int outcome;
+	Py_ssize_t outcome;
 
 	if (lenstr == NULL)
 		lenstr = PyString_InternFromString("__len__");
@@ -1013,9 +1013,13 @@ instance_length(PyInstanceObject *inst)
 	if (res == NULL)
 		return -1;
 	if (PyInt_Check(res)) {
-		long temp = PyInt_AsLong(res);
-		outcome = (int)temp;
-#if SIZEOF_INT < SIZEOF_LONG
+		Py_ssize_t temp = PyInt_AsSsize_t(res);
+		if (temp == -1 && PyErr_Occurred()) {
+			Py_DECREF(res);
+			return -1;
+		}
+		outcome = (Py_ssize_t)temp;
+#if SIZEOF_SIZE_T < SIZEOF_LONG
 		/* Overflow check -- range of PyInt is more than C int */
 		if (outcome != temp) {
 			PyErr_SetString(PyExc_OverflowError,
@@ -1097,7 +1101,7 @@ instance_ass_subscript(PyInstanceObject *inst, PyObject *key, PyObject *value)
 }
 
 static PyMappingMethods instance_as_mapping = {
-	(inquiry)instance_length,		/* mp_length */
+	(lenfunc)instance_length,		/* mp_length */
 	(binaryfunc)instance_subscript,		/* mp_subscript */
 	(objobjargproc)instance_ass_subscript,	/* mp_ass_subscript */
 };
@@ -1322,7 +1326,7 @@ instance_contains(PyInstanceObject *inst, PyObject *member)
 
 static PySequenceMethods
 instance_as_sequence = {
-	(inquiry)instance_length,		/* sq_length */
+	(lenfunc)instance_length,		/* sq_length */
 	0,					/* sq_concat */
 	0,					/* sq_repeat */
 	(ssizeargfunc)instance_item,		/* sq_item */

@@ -546,7 +546,7 @@ proxy_contains(PyWeakReference *proxy, PyObject *value)
 
 /* mapping slots */
 
-static int
+static Py_ssize_t
 proxy_length(PyWeakReference *proxy)
 {
     if (!proxy_checkref(proxy))
@@ -625,7 +625,7 @@ static PyNumberMethods proxy_as_number = {
 };
 
 static PySequenceMethods proxy_as_sequence = {
-    (inquiry)proxy_length,      /*sq_length*/
+    (lenfunc)proxy_length,      /*sq_length*/
     0,                          /*sq_concat*/
     0,                          /*sq_repeat*/
     0,                          /*sq_item*/
@@ -636,7 +636,7 @@ static PySequenceMethods proxy_as_sequence = {
 };
 
 static PyMappingMethods proxy_as_mapping = {
-    (inquiry)proxy_length,      /*mp_length*/
+    (lenfunc)proxy_length,      /*mp_length*/
     (binaryfunc)proxy_getitem,  /*mp_subscript*/
     (objobjargproc)proxy_setitem, /*mp_ass_subscript*/
 };

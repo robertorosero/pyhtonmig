@@ -633,7 +633,7 @@ mmap_object_getattr(mmap_object *self, char *name)
 	return Py_FindMethod (mmap_object_methods, (PyObject *)self, name);
 }
 
-static int
+static Py_ssize_t
 mmap_length(mmap_object *self)
 {
 	CHECK_VALID(-1);
@@ -754,7 +754,7 @@ mmap_ass_item(mmap_object *self, Py_ssize_t i, PyObject *v)
 }
 
 static PySequenceMethods mmap_as_sequence = {
-	(inquiry)mmap_length,		       /*sq_length*/
+	(lenfunc)mmap_length,		       /*sq_length*/
 	(binaryfunc)mmap_concat,	       /*sq_concat*/
 	(ssizeargfunc)mmap_repeat,	       /*sq_repeat*/
 	(ssizeargfunc)mmap_item,		       /*sq_item*/

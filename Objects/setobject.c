@@ -551,7 +551,7 @@ set_repr(PySetObject *so)
 	return result;
 }
 
-static int
+static Py_ssize_t
 set_len(PyObject *so)
 {
 	return ((PySetObject *)so)->used;
@@ -1687,7 +1687,7 @@ set_init(PySetObject *self, PyObject *args, PyObject *kwds)
 }
 
 static PySequenceMethods set_as_sequence = {
-	(inquiry)set_len,		/* sq_length */
+	(lenfunc)set_len,		/* sq_length */
 	0,				/* sq_concat */
 	0,				/* sq_repeat */
 	0,				/* sq_item */

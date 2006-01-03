@@ -3386,10 +3386,10 @@ check_num_args(PyObject *ob, int n)
    entries, one regular and one with reversed arguments. */
 
 static PyObject *
-wrap_inquiry(PyObject *self, PyObject *args, void *wrapped)
+wrap_lenfunc(PyObject *self, PyObject *args, void *wrapped)
 {
-	inquiry func = (inquiry)wrapped;
-	int res;
+	lenfunc func = (lenfunc)wrapped;
+	Py_ssize_t res;
 
 	if (!check_num_args(args, 0))
 		return NULL;
@@ -4104,23 +4104,23 @@ FUNCNAME(PyObject *self, ARG1TYPE arg1, ARG2TYPE arg2) \
 			   "(" ARGCODES ")", arg1, arg2); \
 }
 
-static int
+static Py_ssize_t
 slot_sq_length(PyObject *self)
 {
 	static PyObject *len_str;
 	PyObject *res = call_method(self, "__len__", &len_str, "()");
-	long temp;
-	int len;
+	Py_ssize_t temp;
+	Py_ssize_t len;
 
 	if (res == NULL)
 		return -1;
-	temp = PyInt_AsLong(res);
+	temp = PyInt_AsSsize_t(res);
 	len = (int)temp;
 	Py_DECREF(res);
 	if (len == -1 && PyErr_Occurred())
 		return -1;
-#if SIZEOF_INT < SIZEOF_LONG
-	/* Overflow check -- range of PyInt is more than C int */
+#if SIZEOF_SIZE_T < SIZEOF_LONG
+	/* Overflow check -- range of PyInt is more than C ssize_t */
 	if (len != temp) {
 		PyErr_SetString(PyExc_OverflowError,
 			"__len__() should return 0 <= outcome < 2**31");
@@ -4958,7 +4958,7 @@ typedef struct wrapperbase slotdef;
 	       "x." NAME "(y) <==> " DOC)
 
 static slotdef slotdefs[] = {
-	SQSLOT("__len__", sq_length, slot_sq_length, wrap_inquiry,
+	SQSLOT("__len__", sq_length, slot_sq_length, wrap_lenfunc,
 	       "x.__len__() <==> len(x)"),
 	/* Heap types defining __add__/__mul__ have sq_concat/sq_repeat == NULL.
 	   The logic in abstract.c always falls back to nb_add/nb_multiply in
@@ -4997,7 +4997,7 @@ static slotdef slotdefs[] = {
 	SQSLOT("__imul__", sq_inplace_repeat, NULL,
           wrap_ssizeargfunc, "x.__imul__(y) <==> x*=y"),
 
-	MPSLOT("__len__", mp_length, slot_mp_length, wrap_inquiry,
+	MPSLOT("__len__", mp_length, slot_mp_length, wrap_lenfunc,
 	       "x.__len__() <==> len(x)"),
 	MPSLOT("__getitem__", mp_subscript, slot_mp_subscript,
 	       wrap_binaryfunc,

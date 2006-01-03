@@ -1742,7 +1742,7 @@ array_ass_subscr(arrayobject* self, PyObject* item, PyObject* value)
 }
 
 static PyMappingMethods array_as_mapping = {
-	(inquiry)array_length,
+	(lenfunc)array_length,
 	(binaryfunc)array_subscr,
 	(objobjargproc)array_ass_subscr
 };
@@ -1780,7 +1780,7 @@ array_buffer_getsegcount(arrayobject *self, Py_ssize_t *lenp)
 }
 
 static PySequenceMethods array_as_sequence = {
-	(inquiry)array_length,		        /*sq_length*/
+	(lenfunc)array_length,		        /*sq_length*/
 	(binaryfunc)array_concat,               /*sq_concat*/
 	(ssizeargfunc)array_repeat,		/*sq_repeat*/
 	(ssizeargfunc)array_item,		        /*sq_item*/

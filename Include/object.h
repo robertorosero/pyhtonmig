@@ -128,6 +128,7 @@ typedef PyObject * (*unaryfunc)(PyObject *);
 typedef PyObject * (*binaryfunc)(PyObject *, PyObject *);
 typedef PyObject * (*ternaryfunc)(PyObject *, PyObject *, PyObject *);
 typedef int (*inquiry)(PyObject *);
+typedef Py_ssize_t (*lenfunc)(PyObject *);
 typedef int (*coercion)(PyObject **, PyObject **);
 typedef PyObject *(*intargfunc)(PyObject *, int) Py_DEPRECATED(2.5);
 typedef PyObject *(*intintargfunc)(PyObject *, int, int) Py_DEPRECATED(2.5);
@@ -200,7 +201,7 @@ typedef struct {
 } PyNumberMethods;
 
 typedef struct {
-	inquiry sq_length;
+	lenfunc sq_length;
 	binaryfunc sq_concat;
 	ssizeargfunc sq_repeat;
 	ssizeargfunc sq_item;
@@ -214,7 +215,7 @@ typedef struct {
 } PySequenceMethods;
 
 typedef struct {
-	inquiry mp_length;
+	lenfunc mp_length;
 	binaryfunc mp_subscript;
 	objobjargproc mp_ass_subscript;
 } PyMappingMethods;

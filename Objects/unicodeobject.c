@@ -5653,7 +5653,7 @@ unicode_join(PyObject *self, PyObject *data)
     return PyUnicode_Join(self, data);
 }
 
-static int
+static Py_ssize_t
 unicode_length(PyUnicodeObject *self)
 {
     return self->length;
@@ -6449,7 +6449,7 @@ static PyNumberMethods unicode_as_number = {
 };
 
 static PySequenceMethods unicode_as_sequence = {
-    (inquiry) unicode_length, 		/* sq_length */
+    (lenfunc) unicode_length, 		/* sq_length */
     (binaryfunc) PyUnicode_Concat, 	/* sq_concat */
     (ssizeargfunc) unicode_repeat, 	/* sq_repeat */
     (ssizeargfunc) unicode_getitem, 	/* sq_item */
@@ -6501,7 +6501,7 @@ unicode_subscript(PyUnicodeObject* self, PyObject* item)
 }
 
 static PyMappingMethods unicode_as_mapping = {
-    (inquiry)unicode_length,		/* mp_length */
+    (lenfunc)unicode_length,		/* mp_length */
     (binaryfunc)unicode_subscript,	/* mp_subscript */
     (objobjargproc)0,			/* mp_ass_subscript */
 };

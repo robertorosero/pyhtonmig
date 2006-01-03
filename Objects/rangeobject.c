@@ -101,17 +101,17 @@ range_item(rangeobject *r, Py_ssize_t i)
 	return PyInt_FromLong(r->start + (i % r->len) * r->step);
 }
 
-static int
+static Py_ssize_t
 range_length(rangeobject *r)
 {
-#if LONG_MAX != INT_MAX
+#if LONG_MAX != INT_MAX /* XXX ssize_t_max */
 	if (r->len > INT_MAX) {
 		PyErr_SetString(PyExc_ValueError,
 				"xrange object size cannot be reported");
 		return -1;
 	}
 #endif
-	return (int)(r->len);
+	return (Py_ssize_t)(r->len);
 }
 
 static PyObject *
@@ -137,7 +137,7 @@ range_repr(rangeobject *r)
 }
 
 static PySequenceMethods range_as_sequence = {
-	(inquiry)range_length,	/* sq_length */
+	(lenfunc)range_length,	/* sq_length */
 	0,			/* sq_concat */
 	0,			/* sq_repeat */
 	(ssizeargfunc)range_item, /* sq_item */

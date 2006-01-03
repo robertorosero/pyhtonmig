@@ -572,7 +572,7 @@ PyDoc_STRVAR(tuple_doc,
 "If the argument is a tuple, the return value is the same object.");
 
 static PySequenceMethods tuple_as_sequence = {
-	(inquiry)tuplelength,			/* sq_length */
+	(lenfunc)tuplelength,			/* sq_length */
 	(binaryfunc)tupleconcat,		/* sq_concat */
 	(ssizeargfunc)tuplerepeat,		/* sq_repeat */
 	(ssizeargfunc)tupleitem,		/* sq_item */
@@ -643,7 +643,7 @@ static PyMethodDef tuple_methods[] = {
 };
 
 static PyMappingMethods tuple_as_mapping = {
-	(inquiry)tuplelength,
+	(lenfunc)tuplelength,
 	(binaryfunc)tuplesubscript,
 	0
 };

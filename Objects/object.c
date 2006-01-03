@@ -1414,7 +1414,7 @@ PyObject_GenericSetAttr(PyObject *obj, PyObject *name, PyObject *value)
 int
 PyObject_IsTrue(PyObject *v)
 {
-	int res;
+	Py_ssize_t res;
 	if (v == Py_True)
 		return 1;
 	if (v == Py_False)

@@ -407,7 +407,7 @@ xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx*/
 	 equivalent to the Python expression: type(o).
        */
 
-     PyAPI_FUNC(int) PyObject_Size(PyObject *o);
+     PyAPI_FUNC(Py_ssize_t) PyObject_Size(PyObject *o);
 
        /*
          Return the size of object o.  If the object, o, provides
@@ -419,7 +419,7 @@ xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx*/
 
        /* For DLL compatibility */
 #undef PyObject_Length
-     PyAPI_FUNC(int) PyObject_Length(PyObject *o);
+     PyAPI_FUNC(Py_ssize_t) PyObject_Length(PyObject *o);
 #define PyObject_Length PyObject_Size
 
      PyAPI_FUNC(int) _PyObject_LengthCue(PyObject *o);
@@ -906,7 +906,7 @@ xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx*/
 
        */
 
-     PyAPI_FUNC(int) PySequence_Size(PyObject *o);
+     PyAPI_FUNC(Py_ssize_t) PySequence_Size(PyObject *o);
 
        /*
          Return the size of sequence object o, or -1 on failure.
@@ -915,7 +915,7 @@ xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx*/
 
        /* For DLL compatibility */
 #undef PySequence_Length
-     PyAPI_FUNC(int) PySequence_Length(PyObject *o);
+     PyAPI_FUNC(Py_ssize_t) PySequence_Length(PyObject *o);
 #define PySequence_Length PySequence_Size
 
 
@@ -1120,7 +1120,7 @@ xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx*/
 	 This function always succeeds.
        */
 
-     PyAPI_FUNC(int) PyMapping_Size(PyObject *o);
+     PyAPI_FUNC(Py_ssize_t) PyMapping_Size(PyObject *o);
 
        /*
          Returns the number of keys in object o on success, and -1 on
@@ -1130,7 +1130,7 @@ xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx*/
 
        /* For DLL compatibility */
 #undef PyMapping_Length
-     PyAPI_FUNC(int) PyMapping_Length(PyObject *o);
+     PyAPI_FUNC(Py_ssize_t) PyMapping_Length(PyObject *o);
 #define PyMapping_Length PyMapping_Size
 
 

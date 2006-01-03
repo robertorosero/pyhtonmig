@@ -56,7 +56,7 @@ PyObject_Type(PyObject *o)
 	return v;
 }
 
-int
+Py_ssize_t
 PyObject_Size(PyObject *o)
 {
 	PySequenceMethods *m;
@@ -1236,7 +1236,7 @@ PySequence_InPlaceRepeat(PyObject *o, Py_ssize_t count)
 }
 
 PyObject *
-PySequence_GetItem(PyObject *s, Py_ssize_t i) /* XXX negative values */
+PySequence_GetItem(PyObject *s, Py_ssize_t i)
 {
 	PySequenceMethods *m;
 
@@ -1247,7 +1247,7 @@ PySequence_GetItem(PyObject *s, Py_ssize_t i) /* XXX negative values */
 	if (m && m->sq_item) {
 		if (i < 0) {
 			if (m->sq_length) {
-				int l = (*m->sq_length)(s);
+				Py_ssize_t l = (*m->sq_length)(s);
 				if (l < 0)
 					return NULL;
 				i += l;
@@ -1289,7 +1289,7 @@ PySequence_GetSlice(PyObject *s, Py_ssize_t i1, Py_ssize_t i2)
 	if (m && m->sq_slice) {
 		if (i1 < 0 || i2 < 0) {
 			if (m->sq_length) {
-				int l = (*m->sq_length)(s);
+				Py_ssize_t l = (*m->sq_length)(s);
 				if (l < 0)
 					return NULL;
 				if (i1 < 0)
@@ -1326,7 +1326,7 @@ PySequence_SetItem(PyObject *s, Py_ssize_t i, PyObject *o)
 	if (m && m->sq_ass_item) {
 		if (i < 0) {
 			if (m->sq_length) {
-				int l = (*m->sq_length)(s);
+				Py_ssize_t l = (*m->sq_length)(s);
 				if (l < 0)
 					return -1;
 				i += l;
@@ -1353,7 +1353,7 @@ PySequence_DelItem(PyObject *s, Py_ssize_t i)
 	if (m && m->sq_ass_item) {
 		if (i < 0) {
 			if (m->sq_length) {
-				int l = (*m->sq_length)(s);
+				Py_ssize_t l = (*m->sq_length)(s);
 				if (l < 0)
 					return -1;
 				i += l;
@@ -1381,7 +1381,7 @@ PySequence_SetSlice(PyObject *s, Py_ssize_t i1, Py_ssize_t i2, PyObject *o)
 	if (m && m->sq_ass_slice) {
 		if (i1 < 0 || i2 < 0) {
 			if (m->sq_length) {
-				int l = (*m->sq_length)(s);
+				Py_ssize_t l = (*m->sq_length)(s);
 				if (l < 0)
 					return -1;
 				if (i1 < 0)
@@ -1419,7 +1419,7 @@ PySequence_DelSlice(PyObject *s, Py_ssize_t i1, Py_ssize_t i2)
 	if (m && m->sq_ass_slice) {
 		if (i1 < 0 || i2 < 0) {
 			if (m->sq_length) {
-				int l = (*m->sq_length)(s);
+				Py_ssize_t l = (*m->sq_length)(s);
 				if (l < 0)
 					return -1;
 				if (i1 < 0)
@@ -1708,7 +1708,7 @@ PyMapping_Check(PyObject *o)
 		  o->ob_type->tp_as_sequence->sq_slice);
 }
 
-int
+Py_ssize_t
 PyMapping_Size(PyObject *o)
 {
 	PyMappingMethods *m;
@@ -1727,7 +1727,7 @@ PyMapping_Size(PyObject *o)
 }
 
 #undef PyMapping_Length
-int
+Py_ssize_t
 PyMapping_Length(PyObject *o)
 {
 	return PyMapping_Size(o);

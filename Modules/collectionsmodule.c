@@ -365,7 +365,7 @@ deque_rotate(dequeobject *deque, PyObject *args)
 PyDoc_STRVAR(rotate_doc,
 "Rotate the deque n steps to the right (default n=1).  If n is negative, rotates left.");
 
-static int
+static Py_ssize_t
 deque_len(dequeobject *deque)
 {
 	return deque->len;
@@ -776,7 +776,7 @@ deque_init(dequeobject *deque, PyObject *args, PyObject *kwds)
 }
 
 static PySequenceMethods deque_as_sequence = {
-	(inquiry)deque_len,		/* sq_length */
+	(lenfunc)deque_len,		/* sq_length */
 	0,				/* sq_concat */
 	0,				/* sq_repeat */
 	(ssizeargfunc)deque_item,	/* sq_item */

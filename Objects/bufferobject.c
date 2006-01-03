@@ -308,7 +308,7 @@ buffer_str(PyBufferObject *self)
 
 /* Sequence methods */
 
-static int
+static Py_ssize_t
 buffer_length(PyBufferObject *self)
 {
 	void *ptr;
@@ -596,7 +596,7 @@ buffer_getcharbuf(PyBufferObject *self, int idx, const char **pp)
 
 
 static PySequenceMethods buffer_as_sequence = {
-	(inquiry)buffer_length, /*sq_length*/
+	(lenfunc)buffer_length, /*sq_length*/
 	(binaryfunc)buffer_concat, /*sq_concat*/
 	(ssizeargfunc)buffer_repeat, /*sq_repeat*/
 	(ssizeargfunc)buffer_item, /*sq_item*/

@@ -877,7 +877,7 @@ string_str(PyObject *s)
 	}
 }
 
-static int
+static Py_ssize_t
 string_length(PyStringObject *a)
 {
 	return a->ob_size;
@@ -1257,7 +1257,7 @@ string_buffer_getcharbuf(PyStringObject *self, int index, const char **ptr)
 }
 
 static PySequenceMethods string_as_sequence = {
-	(inquiry)string_length, /*sq_length*/
+	(lenfunc)string_length, /*sq_length*/
 	(binaryfunc)string_concat, /*sq_concat*/
 	(ssizeargfunc)string_repeat, /*sq_repeat*/
 	(ssizeargfunc)string_item, /*sq_item*/
@@ -1268,7 +1268,7 @@ static PySequenceMethods string_as_sequence = {
 };
 
 static PyMappingMethods string_as_mapping = {
-	(inquiry)string_length,
+	(lenfunc)string_length,
 	(binaryfunc)string_subscript,
 	0,
 };
