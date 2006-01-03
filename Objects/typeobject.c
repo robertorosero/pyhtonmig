@@ -3526,9 +3526,9 @@ wrap_unaryfunc(PyObject *self, PyObject *args, void *wrapped)
 }
 
 static PyObject *
-wrap_intargfunc(PyObject *self, PyObject *args, void *wrapped)
+wrap_ssizeargfunc(PyObject *self, PyObject *args, void *wrapped)
 {
-	intargfunc func = (intargfunc)wrapped;
+	ssizeargfunc func = (ssizeargfunc)wrapped;
 	int i;
 
 	if (!PyArg_ParseTuple(args, "i", &i))
@@ -3559,7 +3559,7 @@ getindex(PyObject *self, PyObject *arg)
 static PyObject *
 wrap_sq_item(PyObject *self, PyObject *args, void *wrapped)
 {
-	intargfunc func = (intargfunc)wrapped;
+	ssizeargfunc func = (ssizeargfunc)wrapped;
 	PyObject *arg;
 	int i;
 
@@ -3576,9 +3576,9 @@ wrap_sq_item(PyObject *self, PyObject *args, void *wrapped)
 }
 
 static PyObject *
-wrap_intintargfunc(PyObject *self, PyObject *args, void *wrapped)
+wrap_ssizessizeargfunc(PyObject *self, PyObject *args, void *wrapped)
 {
-	intintargfunc func = (intintargfunc)wrapped;
+	ssizessizeargfunc func = (ssizessizeargfunc)wrapped;
 	int i, j;
 
 	if (!PyArg_ParseTuple(args, "ii", &i, &j))
@@ -4963,13 +4963,13 @@ static slotdef slotdefs[] = {
 	   test_descr.notimplemented() */
 	SQSLOT("__add__", sq_concat, NULL, wrap_binaryfunc,
           "x.__add__(y) <==> x+y"),
-	SQSLOT("__mul__", sq_repeat, NULL, wrap_intargfunc,
+	SQSLOT("__mul__", sq_repeat, NULL, wrap_ssizeargfunc,
           "x.__mul__(n) <==> x*n"),
-	SQSLOT("__rmul__", sq_repeat, NULL, wrap_intargfunc,
+	SQSLOT("__rmul__", sq_repeat, NULL, wrap_ssizeargfunc,
           "x.__rmul__(n) <==> n*x"),
 	SQSLOT("__getitem__", sq_item, slot_sq_item, wrap_sq_item,
 	       "x.__getitem__(y) <==> x[y]"),
-	SQSLOT("__getslice__", sq_slice, slot_sq_slice, wrap_intintargfunc,
+	SQSLOT("__getslice__", sq_slice, slot_sq_slice, wrap_ssizessizeargfunc,
 	       "x.__getslice__(i, j) <==> x[i:j]\n\
                \n\
                Use of negative indices is not supported."),
@@ -4991,7 +4991,7 @@ static slotdef slotdefs[] = {
 	SQSLOT("__iadd__", sq_inplace_concat, NULL,
           wrap_binaryfunc, "x.__iadd__(y) <==> x+=y"),
 	SQSLOT("__imul__", sq_inplace_repeat, NULL,
-          wrap_intargfunc, "x.__imul__(y) <==> x*=y"),
+          wrap_ssizeargfunc, "x.__imul__(y) <==> x*=y"),
 
 	MPSLOT("__len__", mp_length, slot_mp_length, wrap_inquiry,
 	       "x.__len__() <==> len(x)"),
