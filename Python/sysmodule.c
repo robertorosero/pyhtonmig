@@ -457,16 +457,16 @@ sys_settscdump(PyObject *self, PyObject *args)
 		tstate->interp->tscdump = 0;
 	Py_INCREF(Py_None);
 	return Py_None;
-	
+
 }
 
-PyDoc_STRVAR(settscdump_doc, 
+PyDoc_STRVAR(settscdump_doc,
 "settscdump(bool)\n\
 \n\
 If true, tell the Python interpreter to dump VM measurements to\n\
 stderr.  If false, turn off dump.  The measurements are based on the\n\
 processor's time-stamp counter."
-); 
+);
 #endif /* TSC */
 
 static PyObject *
@@ -476,8 +476,8 @@ sys_setrecursionlimit(PyObject *self, PyObject *args)
 	if (!PyArg_ParseTuple(args, "i:setrecursionlimit", &new_limit))
 		return NULL;
 	if (new_limit <= 0) {
-		PyErr_SetString(PyExc_ValueError, 
-				"recursion limit must be positive");  
+		PyErr_SetString(PyExc_ValueError,
+				"recursion limit must be positive");
 		return NULL;
 	}
 	Py_SetRecursionLimit(new_limit);
@@ -713,7 +713,7 @@ extern PyObject *_Py_GetDXProfile(PyObject *,  PyObject *);
 
 static PyMethodDef sys_methods[] = {
 	/* Might as well keep this in alphabetic order */
-	{"callstats", (PyCFunction)PyEval_GetCallStats, METH_NOARGS, 
+	{"callstats", (PyCFunction)PyEval_GetCallStats, METH_NOARGS,
 	 callstats_doc},
 	{"displayhook",	sys_displayhook, METH_O, displayhook_doc},
 	{"exc_info",	sys_exc_info, METH_NOARGS, exc_info_doc},
@@ -721,11 +721,11 @@ static PyMethodDef sys_methods[] = {
 	{"excepthook",	sys_excepthook, METH_VARARGS, excepthook_doc},
 	{"exit",	sys_exit, METH_VARARGS, exit_doc},
 #ifdef Py_USING_UNICODE
-	{"getdefaultencoding", (PyCFunction)sys_getdefaultencoding, 
-	 METH_NOARGS, getdefaultencoding_doc}, 
+	{"getdefaultencoding", (PyCFunction)sys_getdefaultencoding,
+	 METH_NOARGS, getdefaultencoding_doc},
 #endif
 #ifdef HAVE_DLOPEN
-	{"getdlopenflags", (PyCFunction)sys_getdlopenflags, METH_NOARGS, 
+	{"getdlopenflags", (PyCFunction)sys_getdlopenflags, METH_NOARGS,
 	 getdlopenflags_doc},
 #endif
 #ifdef COUNT_ALLOCS
@@ -736,7 +736,7 @@ static PyMethodDef sys_methods[] = {
 #endif
 #ifdef Py_USING_UNICODE
 	{"getfilesystemencoding", (PyCFunction)sys_getfilesystemencoding,
-	 METH_NOARGS, getfilesystemencoding_doc}, 
+	 METH_NOARGS, getfilesystemencoding_doc},
 #endif
 #ifdef Py_TRACE_REFS
 	{"getobjects",	_Py_GetObjects, METH_VARARGS},
@@ -757,14 +757,14 @@ static PyMethodDef sys_methods[] = {
 #endif
 #ifdef Py_USING_UNICODE
 	{"setdefaultencoding", sys_setdefaultencoding, METH_VARARGS,
-	 setdefaultencoding_doc}, 
+	 setdefaultencoding_doc},
 #endif
 	{"setcheckinterval",	sys_setcheckinterval, METH_VARARGS,
-	 setcheckinterval_doc}, 
+	 setcheckinterval_doc},
 	{"getcheckinterval",	sys_getcheckinterval, METH_NOARGS,
-	 getcheckinterval_doc}, 
+	 getcheckinterval_doc},
 #ifdef HAVE_DLOPEN
-	{"setdlopenflags", sys_setdlopenflags, METH_VARARGS, 
+	{"setdlopenflags", sys_setdlopenflags, METH_VARARGS,
 	 setdlopenflags_doc},
 #endif
 	{"setprofile",	sys_setprofile, METH_O, setprofile_doc},
@@ -934,6 +934,88 @@ _check_and_flush (FILE *stream)
   return fflush (stream) || prev_fail ? EOF : 0;
 }
 
+/* Subversion branch and revision management */
+static const char _patchlevel_revision[] = PY_PATCHLEVEL_REVISION;
+static const char headurl[] = "$HeadURL$";
+static int svn_initialized;
+static char patchlevel_revision[50]; /* Just the number */
+static char branch[50];
+static char shortbranch[50];
+static const char *svn_revision;
+
+static void
+svnversion_init(void)
+{
+	const char *python, *br_start, *br_end, *br_end2, *svnversion;
+	int len, istag;
+
+	if (svn_initialized)
+		return;
+
+	python = strstr(headurl, "/python/");
+	if (!python)
+		Py_FatalError("subversion keywords missing");
+
+	br_start = python + 8;
+	br_end = strchr(br_start, '/');
+	/* Works even for trunk,
+	   as we are in trunk/Python/sysmodule.c */
+	br_end2 = strchr(br_end+1, '/');
+
+	istag = strncmp(br_start, "tags", 4) == 0;
+	if (strncmp(br_start, "trunk", 5) == 0) {
+		strcpy(branch, "trunk");
+		strcpy(shortbranch, "trunk");
+
+	}
+	else if (istag || strncmp(br_start, "branches", 8) == 0) {
+		len = br_end2 - br_start;
+		strncpy(branch, br_start, len);
+		branch[len] = '\0';
+
+		len = br_end2 - (br_end + 1);
+		strncpy(shortbranch, br_end + 1, len);
+		shortbranch[len] = '\0';
+	}
+	else {
+		Py_FatalError("bad HeadURL");
+		return;
+	}
+
+
+	svnversion = _Py_svnversion();
+	if (strcmp(svnversion, "exported") != 0)
+		svn_revision = svnversion;
+	else if (istag) {
+		len = strlen(_patchlevel_revision);
+		strncpy(patchlevel_revision, _patchlevel_revision + 11,
+			len - 13);
+		patchlevel_revision[len - 13] = '\0';
+		svn_revision = patchlevel_revision;
+	}
+	else
+		svn_revision = "";
+
+	svn_initialized = 1;
+}
+
+/* Return svnversion output if available.
+   Else return Revision of patchlevel.h if on branch.
+   Else return empty string */
+const char*
+Py_SubversionRevision()
+{
+	svnversion_init();
+	return svn_revision;
+}
+
+const char*
+Py_SubversionShortBranch()
+{
+	svnversion_init();
+	return shortbranch;
+}
+
 PyObject *
 _PySys_Init(void)
 {
@@ -1003,8 +1085,9 @@ _PySys_Init(void)
 	PyDict_SetItemString(sysdict, "hexversion",
 			     v = PyInt_FromLong(PY_VERSION_HEX));
 	Py_XDECREF(v);
-	PyDict_SetItemString(sysdict, "build_number",
-			     v = PyString_FromString(Py_GetBuildNumber()));
+	svnversion_init();
+	v = Py_BuildValue("(ssz)", "CPython", branch, svn_revision);
+	PyDict_SetItemString(sysdict, "subversion", v);
 	Py_XDECREF(v);
 	/*
 	 * These release level checks are mutually exclusive and cover
@@ -1086,7 +1169,7 @@ _PySys_Init(void)
 	if (warnoptions != NULL) {
 		PyDict_SetItemString(sysdict, "warnoptions", warnoptions);
 	}
-	
+
 	if (PyErr_Occurred())
 		return NULL;
 	return m;
@@ -1098,7 +1181,7 @@ makepathobject(char *path, int delim)
 	int i, n;
 	char *p;
 	PyObject *v, *w;
-	
+
 	n = 1;
 	p = path;
 	while ((p = strchr(p, delim)) != NULL) {

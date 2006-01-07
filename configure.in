@@ -618,6 +618,15 @@ AC_PROG_RANLIB
 AC_SUBST(AR)
 AC_CHECK_PROGS(AR, ar aal, ar)
 
+AC_SUBST(SVNVERSION)
+AC_CHECK_PROG(SVNVERSION, svnversion, found)
+if test $SVNVERSION = found
+then
+	SVNVERSION="svnversion \$(srcdir)"
+else
+	SVNVERSION="echo exported"
+fi
+
 case $MACHDEP in
 bsdos*|hp*|HP*)
 	# install -d does not work on BSDI or HP-UX

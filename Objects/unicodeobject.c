@@ -5369,7 +5369,7 @@ unicode_islower(PyUnicodeObject *self)
 	return PyBool_FromLong(Py_UNICODE_ISLOWER(*p));
 
     /* Special case for empty strings */
-    if (PyString_GET_SIZE(self) == 0)
+    if (PyUnicode_GET_SIZE(self) == 0)
 	return PyBool_FromLong(0);
 
     e = p + PyUnicode_GET_SIZE(self);
@@ -5403,7 +5403,7 @@ unicode_isupper(PyUnicodeObject *self)
 	return PyBool_FromLong(Py_UNICODE_ISUPPER(*p) != 0);
 
     /* Special case for empty strings */
-    if (PyString_GET_SIZE(self) == 0)
+    if (PyUnicode_GET_SIZE(self) == 0)
 	return PyBool_FromLong(0);
 
     e = p + PyUnicode_GET_SIZE(self);
@@ -5440,7 +5440,7 @@ unicode_istitle(PyUnicodeObject *self)
 			       (Py_UNICODE_ISUPPER(*p) != 0));
 
     /* Special case for empty strings */
-    if (PyString_GET_SIZE(self) == 0)
+    if (PyUnicode_GET_SIZE(self) == 0)
 	return PyBool_FromLong(0);
 
     e = p + PyUnicode_GET_SIZE(self);
@@ -5485,7 +5485,7 @@ unicode_isspace(PyUnicodeObject *self)
 	return PyBool_FromLong(1);
 
     /* Special case for empty strings */
-    if (PyString_GET_SIZE(self) == 0)
+    if (PyUnicode_GET_SIZE(self) == 0)
 	return PyBool_FromLong(0);
 
     e = p + PyUnicode_GET_SIZE(self);
@@ -5514,7 +5514,7 @@ unicode_isalpha(PyUnicodeObject *self)
 	return PyBool_FromLong(1);
 
     /* Special case for empty strings */
-    if (PyString_GET_SIZE(self) == 0)
+    if (PyUnicode_GET_SIZE(self) == 0)
 	return PyBool_FromLong(0);
 
     e = p + PyUnicode_GET_SIZE(self);
@@ -5543,7 +5543,7 @@ unicode_isalnum(PyUnicodeObject *self)
 	return PyBool_FromLong(1);
 
     /* Special case for empty strings */
-    if (PyString_GET_SIZE(self) == 0)
+    if (PyUnicode_GET_SIZE(self) == 0)
 	return PyBool_FromLong(0);
 
     e = p + PyUnicode_GET_SIZE(self);
@@ -5572,7 +5572,7 @@ unicode_isdecimal(PyUnicodeObject *self)
 	return PyBool_FromLong(1);
 
     /* Special case for empty strings */
-    if (PyString_GET_SIZE(self) == 0)
+    if (PyUnicode_GET_SIZE(self) == 0)
 	return PyBool_FromLong(0);
 
     e = p + PyUnicode_GET_SIZE(self);
@@ -5601,7 +5601,7 @@ unicode_isdigit(PyUnicodeObject *self)
 	return PyBool_FromLong(1);
 
     /* Special case for empty strings */
-    if (PyString_GET_SIZE(self) == 0)
+    if (PyUnicode_GET_SIZE(self) == 0)
 	return PyBool_FromLong(0);
 
     e = p + PyUnicode_GET_SIZE(self);
@@ -5630,7 +5630,7 @@ unicode_isnumeric(PyUnicodeObject *self)
 	return PyBool_FromLong(1);
 
     /* Special case for empty strings */
-    if (PyString_GET_SIZE(self) == 0)
+    if (PyUnicode_GET_SIZE(self) == 0)
 	return PyBool_FromLong(0);
 
     e = p + PyUnicode_GET_SIZE(self);
@@ -6467,7 +6467,7 @@ unicode_subscript(PyUnicodeObject* self, PyObject* item)
         if (i == -1 && PyErr_Occurred())
             return NULL;
         if (i < 0)
-            i += PyString_GET_SIZE(self);
+            i += PyUnicode_GET_SIZE(self);
         return unicode_getitem(self, i);
     } else if (PySlice_Check(item)) {
         Py_ssize_t start, stop, step, slicelength, cur, i;
@@ -6475,7 +6475,7 @@ unicode_subscript(PyUnicodeObject* self, PyObject* item)
         Py_UNICODE* result_buf;
         PyObject* result;
 
-        if (PySlice_GetIndicesEx((PySliceObject*)item, PyString_GET_SIZE(self),
+        if (PySlice_GetIndicesEx((PySliceObject*)item, PyUnicode_GET_SIZE(self),
 				 &start, &stop, &step, &slicelength) < 0) {
             return NULL;
         }
@@ -6485,6 +6485,9 @@ unicode_subscript(PyUnicodeObject* self, PyObject* item)
         } else {
             source_buf = PyUnicode_AS_UNICODE((PyObject*)self);
             result_buf = PyMem_MALLOC(slicelength*sizeof(Py_UNICODE));
+	    
+	    if (result_buf == NULL)
+		    return PyErr_NoMemory();
 
             for (cur = start, i = 0; i < slicelength; cur += step, i++) {
                 result_buf[i] = source_buf[cur];

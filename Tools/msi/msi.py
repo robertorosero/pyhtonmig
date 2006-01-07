@@ -103,7 +103,6 @@ extensions = [
     'select.pyd',
     'unicodedata.pyd',
     'winsound.pyd',
-    'zlib.pyd',
     '_elementtree.pyd',
     '_bsddb.pyd',
     '_socket.pyd',
@@ -112,15 +111,9 @@ extensions = [
     '_tkinter.pyd',
 ]
 
-if major+minor <= "23":
+if major+minor <= "24":
     extensions.extend([
-    '_csv.pyd',
-    '_sre.pyd',
-    '_symtable.pyd',
-    '_winreg.pyd',
-    'datetime.pyd'
-    'mmap.pyd',
-    'parser.pyd',
+    'zlib.pyd',
     ])
 
 # Well-known component UUIDs
@@ -907,7 +900,7 @@ def add_files(db):
     pydirs = [(root,"Lib")]
     while pydirs:
         parent, dir = pydirs.pop()
-        if dir == "CVS" or dir.startswith("plat-"):
+        if dir == ".svn" or dir.startswith("plat-"):
             continue
         elif dir in ["lib-tk", "idlelib", "Icons"]:
             if not have_tcl:
@@ -957,9 +950,9 @@ def add_files(db):
             lib.add_file("wininst-6.exe")
             lib.add_file("wininst-7.1.exe")
         if dir=="data" and parent.physical=="test" and parent.basedir.physical=="email":
-            # This should contain all non-CVS files listed in CVS
+            # This should contain all non-.svn files listed in subversion
             for f in os.listdir(lib.absolute):
-                if f.endswith(".txt") or f=="CVS":continue
+                if f.endswith(".txt") or f==".svn":continue
                 if f.endswith(".au") or f.endswith(".gif"):
                     lib.add_file(f)
                 else:

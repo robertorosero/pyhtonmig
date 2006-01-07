@@ -20,21 +20,25 @@
 #endif
 #endif
 
-#ifndef BUILD
-#define BUILD "0"
-#endif
-
 const char *
 Py_GetBuildInfo(void)
 {
 	static char buildinfo[50];
+	const char *revision = Py_SubversionRevision();
+	const char *sep = *revision ? ":" : "";
+	const char *branch = Py_SubversionShortBranch();
 	PyOS_snprintf(buildinfo, sizeof(buildinfo),
-		      "%s, %.20s, %.9s", BUILD, DATE, TIME);
+		      "%s%s%s, %.20s, %.9s", branch, sep, revision, 
+		      DATE, TIME);
 	return buildinfo;
 }
 
 const char *
-Py_GetBuildNumber(void)
+_Py_svnversion(void)
 {
-	return BUILD;
+#ifdef SVNVERSION
+	return SVNVERSION;
+#else
+	return "exported";
+#endif
 }
