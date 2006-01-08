@@ -49,7 +49,7 @@ structseq_dealloc(PyStructSequence *obj)
 	PyObject_Del(obj);
 }
 
-static int
+static Py_ssize_t
 structseq_length(PyStructSequence *obj)
 {
 	return VISIBLE_SIZE(obj);
@@ -284,7 +284,7 @@ structseq_reduce(PyStructSequence* self)
 }
 
 static PySequenceMethods structseq_as_sequence = {
-	(inquiry)structseq_length,
+	(lenfunc)structseq_length,
 	(binaryfunc)structseq_concat,           /* sq_concat */
 	(ssizeargfunc)structseq_repeat,         /* sq_repeat */
 	(ssizeargfunc)structseq_item,		/* sq_item */

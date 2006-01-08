@@ -1024,7 +1024,7 @@ element_keys(ElementObject* self, PyObject* args)
     return PyDict_Keys(self->extra->attrib);
 }
 
-static int
+static Py_ssize_t
 element_length(ElementObject* self)
 {
     if (!self->extra)
@@ -1375,7 +1375,7 @@ element_setattr(ElementObject* self, const char* name, PyObject* value)
 }
 
 static PySequenceMethods element_as_sequence = {
-    (inquiry) element_length,
+    (lenfunc) element_length,
     0, /* sq_concat */
     0, /* sq_repeat */
     element_getitem,
