@@ -248,8 +248,8 @@ func_set_code(PyFunctionObject *op, PyObject *value)
 		    PyTuple_GET_SIZE(op->func_closure));
 	if (nclosure != nfree) {
 		PyErr_Format(PyExc_ValueError,
-			     "%s() requires a code object with %d free vars,"
-			     " not %d",
+			     "%s() requires a code object with %ld free vars,"
+			     " not %ld",
 			     PyString_AsString(op->func_name),
 			     nclosure, nfree);
 		return -1;
@@ -401,7 +401,7 @@ func_new(PyTypeObject* type, PyObject* args, PyObject* kw)
 	nclosure = closure == Py_None ? 0 : PyTuple_GET_SIZE(closure);
 	if (nfree != nclosure)
 		return PyErr_Format(PyExc_ValueError,
-				    "%s requires closure of length %d, not %d",
+				    "%s requires closure of length %ld, not %ld",
 				    PyString_AS_STRING(code->co_name),
 				    nfree, nclosure);
 	if (nclosure) {
