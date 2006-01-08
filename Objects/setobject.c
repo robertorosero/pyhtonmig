@@ -51,8 +51,8 @@ NULL if the rich comparison returns an error.
 static setentry *
 set_lookkey(PySetObject *so, PyObject *key, register long hash)
 {
-	register int i;
-	register unsigned int perturb;
+	register Py_ssize_t i;
+	register size_t perturb;
 	register setentry *freeslot;
 	register unsigned int mask = so->mask;
 	setentry *table = so->table;
@@ -129,8 +129,8 @@ set_lookkey(PySetObject *so, PyObject *key, register long hash)
 static setentry *
 set_lookkey_string(PySetObject *so, PyObject *key, register long hash)
 {
-	register int i;
-	register unsigned int perturb;
+	register Py_ssize_t i;
+	register size_t perturb;
 	register setentry *freeslot;
 	register unsigned int mask = so->mask;
 	setentry *table = so->table;
@@ -753,7 +753,7 @@ setiter_dealloc(setiterobject *si)
 static PyObject *
 setiter_len(setiterobject *si)
 {
-	int len = 0;
+	long len = 0;
 	if (si->si_set != NULL && si->si_used == si->si_set->used)
 		len = si->len;
 	return PyInt_FromLong(len);
@@ -847,7 +847,7 @@ set_update_internal(PySetObject *so, PyObject *other)
 		return set_merge(so, other);
 
 	if (PyDict_Check(other)) {
-		PyObject *key, *value;
+		PyObject *value;
 		Py_ssize_t pos = 0;
 		while (PyDict_Next(other, &pos, &key, &value)) {
 			if (set_add_key(so, key) == -1)

@@ -137,7 +137,7 @@ fill_file_fields(PyFileObject *f, FILE *fp, PyObject *name, char *mode,
 static int
 check_the_mode(char *mode)
 {
-	unsigned int len = strlen(mode);
+	size_t len = strlen(mode);
 
 	switch (len) {
 	case 0:
@@ -1247,7 +1247,7 @@ PyFile_GetLine(PyObject *f, int n)
 
 	if (n < 0 && result != NULL && PyString_Check(result)) {
 		char *s = PyString_AS_STRING(result);
-		int len = PyString_GET_SIZE(result);
+		Py_ssize_t len = PyString_GET_SIZE(result);
 		if (len == 0) {
 			Py_DECREF(result);
 			result = NULL;
@@ -1268,7 +1268,7 @@ PyFile_GetLine(PyObject *f, int n)
 #ifdef Py_USING_UNICODE
 	if (n < 0 && result != NULL && PyUnicode_Check(result)) {
 		Py_UNICODE *s = PyUnicode_AS_UNICODE(result);
-		int len = PyUnicode_GET_SIZE(result);
+		Py_ssize_t len = PyUnicode_GET_SIZE(result);
 		if (len == 0) {
 			Py_DECREF(result);
 			result = NULL;
@@ -1460,8 +1460,8 @@ file_writelines(PyFileObject *f, PyObject *seq)
 	PyObject *list, *line;
 	PyObject *it;	/* iter(seq) */
 	PyObject *result;
-	int i, j, index, len, islist;
-	Py_ssize_t nwritten;
+	int index, islist;
+	Py_ssize_t i, j, nwritten, len;
 
 	assert(seq != NULL);
 	if (f->f_fp == NULL)
@@ -1519,7 +1519,6 @@ file_writelines(PyFileObject *f, PyObject *seq)
 			PyObject *v = PyList_GET_ITEM(list, i);
 			if (!PyString_Check(v)) {
 			    	const char *buffer;
-			    	Py_ssize_t len;
 				if (((f->f_binary &&
 				      PyObject_AsReadBuffer(v,
 					      (const void**)&buffer,
@@ -2029,7 +2028,7 @@ PyTypeObject PyFile_Type = {
 int
 PyFile_SoftSpace(PyObject *f, int newflag)
 {
-	int oldflag = 0;
+	long oldflag = 0;
 	if (f == NULL) {
 		/* Do nothing */
 	}
@@ -2045,6 +2044,7 @@ PyFile_SoftSpace(PyObject *f, int newflag)
 		else {
 			if (PyInt_Check(v))
 				oldflag = PyInt_AsLong(v);
+			assert(oldflag < INT_MAX);
 			Py_DECREF(v);
 		}
 		v = PyInt_FromLong((long)newflag);
@@ -2056,7 +2056,7 @@ PyFile_SoftSpace(PyObject *f, int newflag)
 			Py_DECREF(v);
 		}
 	}
-	return oldflag;
+	return (int)oldflag;
 }
 
 /* Interfaces to write objects/strings to file-like objects */

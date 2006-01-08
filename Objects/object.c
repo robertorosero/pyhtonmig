@@ -1175,7 +1175,7 @@ _PyObject_GetDictPtr(PyObject *obj)
 	if (dictoffset == 0)
 		return NULL;
 	if (dictoffset < 0) {
-		int tsize;
+		Py_ssize_t tsize;
 		size_t size;
 
 		tsize = ((PyVarObject *)obj)->ob_size;
@@ -1237,7 +1237,7 @@ PyObject_GenericGetAttr(PyObject *obj, PyObject *name)
 
 	/* Inline _PyType_Lookup */
 	{
-		int i, n;
+		Py_ssize_t i, n;
 		PyObject *mro, *base, *dict;
 
 		/* Look in tp_dict of types in MRO */
@@ -1278,7 +1278,7 @@ PyObject_GenericGetAttr(PyObject *obj, PyObject *name)
 	if (dictoffset != 0) {
 		PyObject *dict;
 		if (dictoffset < 0) {
-			int tsize;
+			Py_ssize_t tsize;
 			size_t size;
 
 			tsize = ((PyVarObject *)obj)->ob_size;
@@ -1432,7 +1432,7 @@ PyObject_IsTrue(PyObject *v)
 		res = (*v->ob_type->tp_as_sequence->sq_length)(v);
 	else
 		return 1;
-	return (res > 0) ? 1 : res;
+	return (res > 0) ? 1 : (int)res;
 }
 
 /* equivalent of 'not v'
@@ -1556,7 +1556,7 @@ merge_class_dict(PyObject* dict, PyObject* aclass)
 		PyErr_Clear();
 	else {
 		/* We have no guarantee that bases is a real tuple */
-		int i, n;
+		Py_ssize_t i, n;
 		n = PySequence_Size(bases); /* This better be right */
 		if (n < 0)
 			PyErr_Clear();
@@ -1992,7 +1992,7 @@ Py_ReprEnter(PyObject *obj)
 {
 	PyObject *dict;
 	PyObject *list;
-	int i;
+	Py_ssize_t i;
 
 	dict = PyThreadState_GetDict();
 	if (dict == NULL)
@@ -2020,7 +2020,7 @@ Py_ReprLeave(PyObject *obj)
 {
 	PyObject *dict;
 	PyObject *list;
-	int i;
+	Py_ssize_t i;
 
 	dict = PyThreadState_GetDict();
 	if (dict == NULL)

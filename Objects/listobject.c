@@ -273,12 +273,13 @@ list_dealloc(PyListObject *op)
 static int
 list_print(PyListObject *op, FILE *fp, int flags)
 {
+	int rc;
 	Py_ssize_t i;
 
-	i = Py_ReprEnter((PyObject*)op);
-	if (i != 0) {
-		if (i < 0)
-			return i;
+	rc = Py_ReprEnter((PyObject*)op);
+	if (rc != 0) {
+		if (rc < 0)
+			return rc;
 		fprintf(fp, "[...]");
 		return 0;
 	}
@@ -1051,7 +1052,7 @@ elements to get out of order).
 
 Returns -1 in case of error.
 */
-static int
+static Py_ssize_t
 count_run(PyObject **lo, PyObject **hi, PyObject *compare, int *descending)
 {
 	Py_ssize_t k;
@@ -1387,14 +1388,15 @@ merge_getmem(MergeState *ms, Py_ssize_t need)
  * merge, and should have na <= nb.  See listsort.txt for more info.
  * Return 0 if successful, -1 if error.
  */
-static int
-merge_lo(MergeState *ms, PyObject **pa, int na, PyObject **pb, int nb)
+static Py_ssize_t
+merge_lo(MergeState *ms, PyObject **pa, Py_ssize_t na,
+                         PyObject **pb, Py_ssize_t nb)
 {
 	Py_ssize_t k;
 	PyObject *compare;
 	PyObject **dest;
 	int result = -1;	/* guilty until proved innocent */
-	int min_gallop = ms->min_gallop;
+	Py_ssize_t min_gallop = ms->min_gallop;
 
 	assert(ms && pa && pb && na > 0 && nb > 0 && pa + na == pb);
 	if (MERGE_GETMEM(ms, na) < 0)
@@ -1518,7 +1520,7 @@ CopyB:
  * merge, and should have na >= nb.  See listsort.txt for more info.
  * Return 0 if successful, -1 if error.
  */
-static int
+static Py_ssize_t
 merge_hi(MergeState *ms, PyObject **pa, Py_ssize_t na, PyObject **pb, Py_ssize_t nb)
 {
 	Py_ssize_t k;
@@ -1655,7 +1657,7 @@ CopyA:
 /* Merge the two runs at stack indices i and i+1.
  * Returns 0 on success, -1 on error.
  */
-static int
+static Py_ssize_t
 merge_at(MergeState *ms, Py_ssize_t i)
 {
 	PyObject **pa, **pb;
@@ -1806,7 +1808,7 @@ typedef struct {
 static PyTypeObject sortwrapper_type;
 
 static PyObject *
-sortwrapper_richcompare(sortwrapperobject *a, sortwrapperobject *b, Py_ssize_t op)
+sortwrapper_richcompare(sortwrapperobject *a, sortwrapperobject *b, int op)
 {
 	if (!PyObject_TypeCheck(b, &sortwrapper_type)) {
 		PyErr_SetString(PyExc_TypeError,
@@ -2268,13 +2270,13 @@ listremove(PyListObject *self, PyObject *v)
 static int
 list_traverse(PyListObject *o, visitproc visit, void *arg)
 {
-	Py_ssize_t i, err;
+	Py_ssize_t i;
 	PyObject *x;
 
 	for (i = o->ob_size; --i >= 0; ) {
 		x = o->ob_item[i];
 		if (x != NULL) {
-			err = visit(x, arg);
+			int err = visit(x, arg);
 			if (err)
 				return err;
 		}
@@ -2598,8 +2600,8 @@ list_ass_subscript(PyListObject* self, PyObject* item, PyObject* value)
 			if (PySequence_Fast_GET_SIZE(seq) != slicelength) {
 				/* XXX can we use %zd here? */
 				PyErr_Format(PyExc_ValueError,
-            "attempt to assign sequence of size %d to extended slice of size %ld",
-					     (int)PySequence_Fast_GET_SIZE(seq),
+            "attempt to assign sequence of size %ld to extended slice of size %ld",
+					     PySequence_Fast_GET_SIZE(seq),
 					     slicelength);
 				Py_DECREF(seq);
 				return -1;

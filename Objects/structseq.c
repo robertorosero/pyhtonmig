@@ -40,7 +40,7 @@ PyStructSequence_New(PyTypeObject *type)
 static void
 structseq_dealloc(PyStructSequence *obj)
 {
-	int i, size;
+	Py_ssize_t i, size;
 
 	size = REAL_SIZE(obj);
 	for (i = 0; i < size; ++i) {
@@ -70,7 +70,7 @@ static PyObject*
 structseq_slice(PyStructSequence *obj, Py_ssize_t low, Py_ssize_t high)
 {
 	PyTupleObject *np;
-	int i;
+	Py_ssize_t i;
 
 	if (low < 0)
 		low = 0;
@@ -96,7 +96,7 @@ structseq_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	PyObject *dict = NULL;
 	PyObject *ob;
 	PyStructSequence *res = NULL;
-	int len, min_len, max_len, i, n_unnamed_fields;
+	Py_ssize_t len, min_len, max_len, i, n_unnamed_fields;
 	static const char *kwlist[] = {"sequence", "dict", 0};
 
 	if (!PyArg_ParseTupleAndKeywords(args, kwds, "O|O:structseq", 
@@ -125,7 +125,7 @@ structseq_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	if (min_len != max_len) {
 		if (len < min_len) {
 			PyErr_Format(PyExc_TypeError, 
-	       "%.500s() takes an at least %d-sequence (%d-sequence given)",
+	       "%.500s() takes an at least %ld-sequence (%ld-sequence given)",
 				     type->tp_name, min_len, len);
 			Py_DECREF(arg);
 			return NULL;
@@ -133,7 +133,7 @@ structseq_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 
 		if (len > max_len) {
 			PyErr_Format(PyExc_TypeError, 
-	       "%.500s() takes an at most %d-sequence (%d-sequence given)",
+	       "%.500s() takes an at most %ld-sequence (%ld-sequence given)",
 				     type->tp_name, max_len, len);
 			Py_DECREF(arg);
 			return NULL;
@@ -142,7 +142,7 @@ structseq_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	else {
 		if (len != min_len) {
 			PyErr_Format(PyExc_TypeError, 
-	       "%.500s() takes a %d-sequence (%d-sequence given)",
+	       "%.500s() takes a %ld-sequence (%ld-sequence given)",
 				     type->tp_name, min_len, len);
 			Py_DECREF(arg);
 			return NULL;

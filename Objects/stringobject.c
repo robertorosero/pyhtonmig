@@ -666,7 +666,7 @@ PyObject *PyString_DecodeEscape(const char *s,
 	return NULL;
 }
 
-static int
+static Py_ssize_t
 string_getsize(register PyObject *op)
 {
     	char *s;
@@ -686,7 +686,7 @@ string_getbuffer(register PyObject *op)
 	return s;
 }
 
-int
+Py_ssize_t
 PyString_Size(register PyObject *op)
 {
 	if (!PyString_Check(op))
@@ -1216,7 +1216,7 @@ string_subscript(PyStringObject* self, PyObject* item)
 	}
 }
 
-static int
+static Py_ssize_t
 string_buffer_getreadbuf(PyStringObject *self, /*XXX*/int index, const void **ptr)
 {
 	if ( index != 0 ) {
@@ -1237,15 +1237,15 @@ string_buffer_getwritebuf(PyStringObject *self, int index, const void **ptr)
 }
 
 static int
-string_buffer_getsegcount(PyStringObject *self, int *lenp)
+string_buffer_getsegcount(PyStringObject *self, Py_ssize_t *lenp)
 {
 	if ( lenp )
 		*lenp = self->ob_size;
 	return 1;
 }
 
-static int
-string_buffer_getcharbuf(PyStringObject *self, int index, const char **ptr)
+static Py_ssize_t
+string_buffer_getcharbuf(PyStringObject *self, Py_ssize_t index, const char **ptr)
 {
 	if ( index != 0 ) {
 		PyErr_SetString(PyExc_SystemError,
@@ -2894,11 +2894,11 @@ PyDoc_STRVAR(center__doc__,
 static PyObject *
 string_center(PyStringObject *self, PyObject *args)
 {
-    int marg, left;
-    int width;
+    Py_ssize_t marg, left;
+    long width;
     char fillchar = ' ';
 
-    if (!PyArg_ParseTuple(args, "i|c:center", &width, &fillchar))
+    if (!PyArg_ParseTuple(args, "l|c:center", &width, &fillchar))
         return NULL;
 
     if (PyString_GET_SIZE(self) >= width && PyString_CheckExact(self)) {
@@ -2921,12 +2921,12 @@ PyDoc_STRVAR(zfill__doc__,
 static PyObject *
 string_zfill(PyStringObject *self, PyObject *args)
 {
-    int fill;
+    long fill;
     PyObject *s;
     char *p;
 
     int width;
-    if (!PyArg_ParseTuple(args, "i:zfill", &width))
+    if (!PyArg_ParseTuple(args, "l:zfill", &width))
         return NULL;
 
     if (PyString_GET_SIZE(self) >= width) {
@@ -3228,7 +3228,7 @@ string_splitlines(PyStringObject *self, PyObject *args)
         goto onError;
 
     for (i = j = 0; i < len; ) {
-	int eol;
+	Py_ssize_t eol;
 
 	/* Find a line and append it */
 	while (i < len && data[i] != '\n' && data[i] != '\r')
@@ -4394,7 +4394,7 @@ void _Py_ReleaseInternedStrings(void)
 {
 	PyObject *keys;
 	PyStringObject *s;
-	int i, n;
+	Py_ssize_t i, n;
 
 	if (interned == NULL || !PyDict_Check(interned))
 		return;

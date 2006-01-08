@@ -422,7 +422,7 @@ xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx*/
      PyAPI_FUNC(Py_ssize_t) PyObject_Length(PyObject *o);
 #define PyObject_Length PyObject_Size
 
-     PyAPI_FUNC(int) _PyObject_LengthCue(PyObject *o);
+     PyAPI_FUNC(Py_ssize_t) _PyObject_LengthCue(PyObject *o);
 
        /*
          Return the size of object o.  If the object, o, provides
@@ -513,7 +513,7 @@ xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx*/
 
      PyAPI_FUNC(int) PyObject_AsWriteBuffer(PyObject *obj,
 					   void **buffer,
-					   int *buffer_len);
+					   Py_ssize_t *buffer_len);
 
        /* 
 	  Takes an arbitrary object which must support the (writeable,

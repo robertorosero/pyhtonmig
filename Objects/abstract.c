@@ -81,7 +81,7 @@ PyObject_Length(PyObject *o)
 }
 #define PyObject_Length PyObject_Size
 
-int
+Py_ssize_t
 _PyObject_LengthCue(PyObject *o)
 {
 	Py_ssize_t rv = PyObject_Size(o);
@@ -94,7 +94,7 @@ _PyObject_LengthCue(PyObject *o)
 		PyErr_Fetch(&err_type, &err_value, &err_tb);
 		ro = PyObject_CallMethod(o, "_length_cue", NULL);
 		if (ro != NULL) {
-			rv = (int)PyInt_AsLong(ro);
+			rv = PyInt_AsLong(ro);
 			Py_DECREF(ro);
 			Py_XDECREF(err_type);
 			Py_XDECREF(err_value);
@@ -297,11 +297,11 @@ int PyObject_AsReadBuffer(PyObject *obj,
 
 int PyObject_AsWriteBuffer(PyObject *obj,
 			   void **buffer,
-			   int *buffer_len)
+			   Py_ssize_t *buffer_len)
 {
 	PyBufferProcs *pb;
 	void*pp;
-	int len;
+	Py_ssize_t len;
 
 	if (obj == NULL || buffer == NULL || buffer_len == NULL) {
 		null_error();
@@ -415,7 +415,7 @@ binary_op1(PyObject *v, PyObject *w, const int op_slot)
 				binaryfunc slot;
 				slot = NB_BINOP(mv, op_slot);
 				if (slot) {
-					PyObject *x = slot(v, w);
+					x = slot(v, w);
 					Py_DECREF(v);
 					Py_DECREF(w);
 					return x;
@@ -1260,7 +1260,7 @@ PySequence_GetItem(PyObject *s, Py_ssize_t i)
 }
 
 static PyObject *
-sliceobj_from_intint(int i, int j)
+sliceobj_from_intint(Py_ssize_t i, Py_ssize_t j)
 {
 	PyObject *start, *end, *slice;
 	start = PyInt_FromLong((long)i);
@@ -1438,9 +1438,9 @@ PyObject *
 PySequence_Tuple(PyObject *v)
 {
 	PyObject *it;  /* iter(v) */
-	int n;         /* guess for result tuple size */
+	Py_ssize_t n;         /* guess for result tuple size */
 	PyObject *result;
-	int j;
+	Py_ssize_t j;
 
 	if (v == NULL)
 		return null_error();
@@ -1486,7 +1486,7 @@ PySequence_Tuple(PyObject *v)
 			break;
 		}
 		if (j >= n) {
-			int oldn = n;
+			Py_ssize_t oldn = n;
 			/* The over-allocation strategy can grow a bit faster
 			   than for lists because unlike lists the 
 			   over-allocation isn't permanent -- we reclaim
@@ -2053,7 +2053,7 @@ static int
 abstract_issubclass(PyObject *derived, PyObject *cls)
 {
 	PyObject *bases;
-	int i, n;
+	Py_ssize_t i, n;
 	int r = 0;
 
 
@@ -2137,7 +2137,7 @@ recursive_isinstance(PyObject *inst, PyObject *cls, int recursion_depth)
 		}
 	}
 	else if (PyTuple_Check(cls)) {
-		int i, n;
+		Py_ssize_t i, n;
 
                 if (!recursion_depth) {
                     PyErr_SetString(PyExc_RuntimeError,
@@ -2191,8 +2191,8 @@ recursive_issubclass(PyObject *derived, PyObject *cls, int recursion_depth)
 			return -1;
 
 		if (PyTuple_Check(cls)) {
-			int i;
-			int n = PyTuple_GET_SIZE(cls);
+			Py_ssize_t i;
+			Py_ssize_t n = PyTuple_GET_SIZE(cls);
 
                         if (!recursion_depth) {
                             PyErr_SetString(PyExc_RuntimeError,

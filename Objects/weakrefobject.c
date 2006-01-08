@@ -886,7 +886,7 @@ PyObject_ClearWeakRefs(PyObject *object)
     }
     if (*list != NULL) {
         PyWeakReference *current = *list;
-        int count = _PyWeakref_GetWeakrefCount(current);
+        Py_ssize_t count = _PyWeakref_GetWeakrefCount(current);
         int restore_error = PyErr_Occurred() ? 1 : 0;
         PyObject *err_type, *err_value, *err_tb;
 
@@ -904,7 +904,7 @@ PyObject_ClearWeakRefs(PyObject *object)
         }
         else {
             PyObject *tuple = PyTuple_New(count * 2);
-            int i = 0;
+            Py_ssize_t i = 0;
 
             for (i = 0; i < count; ++i) {
                 PyWeakReference *next = current->wr_next;
@@ -920,8 +920,8 @@ PyObject_ClearWeakRefs(PyObject *object)
                 PyObject *callback = PyTuple_GET_ITEM(tuple, i * 2 + 1);
 
                 if (callback != NULL) {
-                    PyObject *current = PyTuple_GET_ITEM(tuple, i * 2);
-                    handle_callback((PyWeakReference *)current, callback);
+                    PyObject *item = PyTuple_GET_ITEM(tuple, i * 2);
+                    handle_callback((PyWeakReference *)item, callback);
                 }
             }
             Py_DECREF(tuple);

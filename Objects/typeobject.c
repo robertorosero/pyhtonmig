@@ -145,7 +145,7 @@ mro_subclasses(PyTypeObject *type, PyObject* temp)
 {
 	PyTypeObject *subclass;
 	PyObject *ref, *subclasses, *old_mro;
-	int i, n;
+	Py_ssize_t i, n;
 
 	subclasses = type->tp_subclasses;
 	if (subclasses == NULL)
@@ -184,7 +184,8 @@ mro_subclasses(PyTypeObject *type, PyObject* temp)
 static int
 type_set_bases(PyTypeObject *type, PyObject *value, void *context)
 {
-	int i, r = 0;
+	Py_ssize_t i;
+	int r = 0;
 	PyObject *ob, *temp;
 	PyTypeObject *new_base, *old_base;
 	PyObject *old_bases, *old_mro;
@@ -483,7 +484,7 @@ PyType_GenericNew(PyTypeObject *type, PyObject *args, PyObject *kwds)
 static int
 traverse_slots(PyTypeObject *type, PyObject *self, visitproc visit, void *arg)
 {
-	int i, n;
+	Py_ssize_t i, n;
 	PyMemberDef *mp;
 
 	n = type->ob_size;
@@ -548,7 +549,7 @@ subtype_traverse(PyObject *self, visitproc visit, void *arg)
 static void
 clear_slots(PyTypeObject *type, PyObject *self)
 {
-	int i, n;
+	Py_ssize_t i, n;
 	PyMemberDef *mp;
 
 	n = type->ob_size;
@@ -825,7 +826,7 @@ PyType_IsSubtype(PyTypeObject *a, PyTypeObject *b)
 	if (mro != NULL) {
 		/* Deal with multiple inheritance without recursion
 		   by walking the MRO tuple */
-		int i, n;
+		Py_ssize_t i, n;
 		assert(PyTuple_Check(mro));
 		n = PyTuple_GET_SIZE(mro);
 		for (i = 0; i < n; i++) {
@@ -970,7 +971,7 @@ static int
 fill_classic_mro(PyObject *mro, PyObject *cls)
 {
 	PyObject *bases, *base;
-	int i, n;
+	Py_ssize_t i, n;
 
 	assert(PyList_Check(mro));
 	assert(PyClass_Check(cls));
@@ -1037,7 +1038,7 @@ classic_mro(PyObject *cls)
 
 static int
 tail_contains(PyObject *list, int whence, PyObject *o) {
-	int j, size;
+	Py_ssize_t j, size;
 	size = PyList_GET_SIZE(list);
 
 	for (j = whence+1; j < size; j++) {
@@ -1068,7 +1069,7 @@ class_name(PyObject *cls)
 static int
 check_duplicates(PyObject *list)
 {
-	int i, j, n;
+	Py_ssize_t i, j, n;
 	/* Let's use a quadratic time algorithm,
 	   assuming that the bases lists is short.
 	*/
@@ -1136,9 +1137,9 @@ consistent method resolution\norder (MRO) for bases");
 
 static int
 pmerge(PyObject *acc, PyObject* to_merge) {
-	int i, j, to_merge_size;
+	Py_ssize_t i, j, to_merge_size, empty_cnt;
 	int *remain;
-	int ok, empty_cnt;
+	int ok;
 
 	to_merge_size = PyList_GET_SIZE(to_merge);
 
@@ -1206,7 +1207,8 @@ pmerge(PyObject *acc, PyObject* to_merge) {
 static PyObject *
 mro_implementation(PyTypeObject *type)
 {
-	int i, n, ok;
+	Py_ssize_t i, n;
+	int ok;
 	PyObject *bases, *result;
 	PyObject *to_merge, *bases_aslist;
 
@@ -1309,7 +1311,7 @@ mro_internal(PyTypeObject *type)
 	if (tuple == NULL)
 		return -1;
 	if (checkit) {
-		int i, len;
+		Py_ssize_t i, len;
 		PyObject *cls;
 		PyTypeObject *solid;
 
@@ -1350,7 +1352,7 @@ mro_internal(PyTypeObject *type)
 static PyTypeObject *
 best_base(PyObject *bases)
 {
-	int i, n;
+	Py_ssize_t i, n;
 	PyTypeObject *base, *winner, *candidate, *base_i;
 	PyObject *base_proto;
 
@@ -1532,7 +1534,7 @@ static int
 valid_identifier(PyObject *s)
 {
 	unsigned char *p;
-	int i, n;
+	Py_ssize_t i, n;
 
 	if (!PyString_Check(s)) {
 		PyErr_SetString(PyExc_TypeError,
@@ -1596,7 +1598,7 @@ type_new(PyTypeObject *metatype, PyObject *args, PyObject *kwds)
 	PyTypeObject *type, *base, *tmptype, *winner;
 	PyHeapTypeObject *et;
 	PyMemberDef *mp;
-	int i, nbases, nslots, slotoffset, add_dict, add_weak;
+	Py_ssize_t i, nbases, nslots, slotoffset, add_dict, add_weak;
 	int j, may_add_dict, may_add_weak;
 
 	assert(args != NULL && PyTuple_Check(args));
@@ -1604,8 +1606,8 @@ type_new(PyTypeObject *metatype, PyObject *args, PyObject *kwds)
 
 	/* Special case: type(x) should return x->ob_type */
 	{
-		const int nargs = PyTuple_GET_SIZE(args);
-		const int nkwds = kwds == NULL ? 0 : PyDict_Size(kwds);
+		const Py_ssize_t nargs = PyTuple_GET_SIZE(args);
+		const Py_ssize_t nkwds = kwds == NULL ? 0 : PyDict_Size(kwds);
 
 		if (PyType_CheckExact(metatype) && nargs == 1 && nkwds == 0) {
 			PyObject *x = PyTuple_GET_ITEM(args, 0);
@@ -1999,7 +2001,7 @@ type_new(PyTypeObject *metatype, PyObject *args, PyObject *kwds)
 PyObject *
 _PyType_Lookup(PyTypeObject *type, PyObject *name)
 {
-	int i, n;
+	Py_ssize_t i, n;
 	PyObject *mro, *res, *base, *dict;
 
 	/* Look in tp_dict of types in MRO */
@@ -2154,7 +2156,7 @@ static PyObject *
 type_subclasses(PyTypeObject *type, PyObject *args_ignored)
 {
 	PyObject *list, *raw, *ref;
-	int i, n;
+	Py_ssize_t i, n;
 
 	list = PyList_New(0);
 	if (list == NULL)
@@ -2587,7 +2589,7 @@ reduce_2(PyObject *obj)
 	PyObject *getstate = NULL, *state = NULL, *names = NULL;
 	PyObject *slots = NULL, *listitems = NULL, *dictitems = NULL;
 	PyObject *copy_reg = NULL, *newobj = NULL, *res = NULL;
-	int i, n;
+	Py_ssize_t i, n;
 
 	cls = PyObject_GetAttrString(obj, "__class__");
 	if (cls == NULL)
@@ -3155,7 +3157,7 @@ PyType_Ready(PyTypeObject *type)
 {
 	PyObject *dict, *bases;
 	PyTypeObject *base;
-	int i, n;
+	Py_ssize_t i, n;
 
 	if (type->tp_flags & Py_TPFLAGS_READY) {
 		assert(type->tp_dict != NULL);
@@ -3340,7 +3342,7 @@ add_subclass(PyTypeObject *base, PyTypeObject *type)
 static void
 remove_subclass(PyTypeObject *base, PyTypeObject *type)
 {
-	int i;
+	Py_ssize_t i;
 	PyObject *list, *ref;
 
 	list = base->tp_subclasses;
@@ -3547,7 +3549,7 @@ getindex(PyObject *self, PyObject *arg)
 	if (i < 0) {
 		PySequenceMethods *sq = self->ob_type->tp_as_sequence;
 		if (sq && sq->sq_length) {
-			int n = (*sq->sq_length)(self);
+			Py_ssize_t n = (*sq->sq_length)(self);
 			if (n < 0)
 				return -1;
 			i += n;
@@ -3561,7 +3563,7 @@ wrap_sq_item(PyObject *self, PyObject *args, void *wrapped)
 {
 	ssizeargfunc func = (ssizeargfunc)wrapped;
 	PyObject *arg;
-	int i;
+	Py_ssize_t i;
 
 	if (PyTuple_GET_SIZE(args) == 1) {
 		arg = PyTuple_GET_ITEM(args, 0);
@@ -4433,7 +4435,7 @@ half_compare(PyObject *self, PyObject *other)
 {
 	PyObject *func, *args, *res;
 	static PyObject *cmp_str;
-	int c;
+	Py_ssize_t c;
 
 	func = lookup_method(self, "__cmp__", &cmp_str);
 	if (func == NULL) {
@@ -4811,7 +4813,7 @@ slot_tp_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	static PyObject *new_str;
 	PyObject *func;
 	PyObject *newargs, *x;
-	int i, n;
+	Py_ssize_t i, n;
 
 	if (new_str == NULL) {
 		new_str = PyString_InternFromString("__new__");
@@ -5157,9 +5159,10 @@ static slotdef slotdefs[] = {
    proper indirection pointer (as_buffer, etc.); it returns NULL if the
    indirection pointer is NULL. */
 static void **
-slotptr(PyTypeObject *type, int offset)
+slotptr(PyTypeObject *type, int ioffset)
 {
 	char *ptr;
+	long offset = ioffset;
 
 	/* Note: this depends on the order of the members of PyHeapTypeObject! */
 	assert(offset >= 0);
@@ -5424,7 +5427,7 @@ recurse_down_subclasses(PyTypeObject *type, PyObject *name,
 {
 	PyTypeObject *subclass;
 	PyObject *ref, *subclasses, *dict;
-	int i, n;
+	Py_ssize_t i, n;
 
 	subclasses = type->tp_subclasses;
 	if (subclasses == NULL)
@@ -5577,7 +5580,7 @@ super_getattro(PyObject *self, PyObject *name)
 		PyObject *mro, *res, *tmp, *dict;
 		PyTypeObject *starttype;
 		descrgetfunc f;
-		int i, n;
+		Py_ssize_t i, n;
 
 		starttype = su->obj_type;
 		mro = starttype->tp_mro;

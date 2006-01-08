@@ -35,7 +35,7 @@ typedef struct {
      * Items must normally not be NULL, except during construction when
      * the list is not yet visible outside the function that builds it.
      */
-    int allocated;
+    Py_ssize_t allocated;
 } PyListObject;
 
 PyAPI_DATA(PyTypeObject) PyList_Type;

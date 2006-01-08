@@ -232,7 +232,7 @@ static int
 func_set_code(PyFunctionObject *op, PyObject *value)
 {
 	PyObject *tmp;
-	int nfree, nclosure;
+	Py_ssize_t nfree, nclosure;
 
 	if (restricted())
 		return -1;
@@ -363,7 +363,7 @@ func_new(PyTypeObject* type, PyObject* args, PyObject* kw)
 	PyObject *defaults = Py_None;
 	PyObject *closure = Py_None;
 	PyFunctionObject *newfunc;
-	int nfree, nclosure;
+	Py_ssize_t nfree, nclosure;
 	static const char *kwlist[] = {"code", "globals", "name",
 				 "argdefs", "closure", 0};
 
@@ -405,7 +405,7 @@ func_new(PyTypeObject* type, PyObject* args, PyObject* kw)
 				    PyString_AS_STRING(code->co_name),
 				    nfree, nclosure);
 	if (nclosure) {
-		int i;
+		Py_ssize_t i;
 		for (i = 0; i < nclosure; i++) {
 			PyObject *o = PyTuple_GET_ITEM(closure, i);
 			if (!PyCell_Check(o)) {
@@ -516,7 +516,7 @@ function_call(PyObject *func, PyObject *arg, PyObject *kw)
 	PyObject *result;
 	PyObject *argdefs;
 	PyObject **d, **k;
-	int nk, nd;
+	Py_ssize_t nk, nd;
 
 	argdefs = PyFunction_GET_DEFAULTS(func);
 	if (argdefs != NULL && PyTuple_Check(argdefs)) {

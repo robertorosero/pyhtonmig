@@ -27,7 +27,7 @@ PyObject *
 PyTuple_New(register Py_ssize_t size)
 {
 	register PyTupleObject *op;
-	int i;
+	Py_ssize_t i;
 	if (size < 0) {
 		PyErr_BadInternalCall();
 		return NULL;
@@ -57,7 +57,7 @@ PyTuple_New(register Py_ssize_t size)
 	else
 #endif
 	{
-		int nbytes = size * sizeof(PyObject *);
+		Py_ssize_t nbytes = size * sizeof(PyObject *);
 		/* Check for overflow */
 		if (nbytes / sizeof(PyObject *) != (size_t)size ||
 		    (nbytes += sizeof(PyTupleObject) - sizeof(PyObject *))
@@ -131,9 +131,9 @@ PyTuple_SetItem(register PyObject *op, register Py_ssize_t i, PyObject *newitem)
 }
 
 PyObject *
-PyTuple_Pack(int n, ...)
+PyTuple_Pack(Py_ssize_t n, ...)
 {
-	int i;
+	Py_ssize_t i;
 	PyObject *o;
 	PyObject *result;
 	PyObject **items;
@@ -159,8 +159,8 @@ PyTuple_Pack(int n, ...)
 static void
 tupledealloc(register PyTupleObject *op)
 {
-	register int i;
-	register int len =  op->ob_size;
+	register Py_ssize_t i;
+	register Py_ssize_t len =  op->ob_size;
 	PyObject_GC_UnTrack(op);
 	Py_TRASHCAN_SAFE_BEGIN(op)
 	if (len > 0) {
@@ -187,7 +187,7 @@ done:
 static int
 tupleprint(PyTupleObject *op, FILE *fp, int flags)
 {
-	int i;
+	Py_ssize_t i;
 	fprintf(fp, "(");
 	for (i = 0; i < op->ob_size; i++) {
 		if (i > 0)
@@ -204,7 +204,7 @@ tupleprint(PyTupleObject *op, FILE *fp, int flags)
 static PyObject *
 tuplerepr(PyTupleObject *v)
 {
-	int i, n;
+	Py_ssize_t i, n;
 	PyObject *s, *temp;
 	PyObject *pieces, *result = NULL;
 
@@ -268,7 +268,7 @@ static long
 tuplehash(PyTupleObject *v)
 {
 	register long x, y;
-	register int len = v->ob_size;
+	register Py_ssize_t len = v->ob_size;
 	register PyObject **p;
 	long mult = 1000003L;
 	x = 0x345678L;
@@ -295,7 +295,8 @@ tuplelength(PyTupleObject *a)
 static int
 tuplecontains(PyTupleObject *a, PyObject *el)
 {
-	int i, cmp;
+	Py_ssize_t i;
+	int cmp;
 
 	for (i = 0, cmp = 0 ; cmp == 0 && i < a->ob_size; ++i)
 		cmp = PyObject_RichCompareBool(el, PyTuple_GET_ITEM(a, i),
@@ -320,8 +321,8 @@ tupleslice(register PyTupleObject *a, register Py_ssize_t ilow,
 {
 	register PyTupleObject *np;
 	PyObject **src, **dest;
-	register int i;
-	int len;
+	register Py_ssize_t i;
+	Py_ssize_t len;
 	if (ilow < 0)
 		ilow = 0;
 	if (ihigh > a->ob_size)
@@ -359,8 +360,8 @@ PyTuple_GetSlice(PyObject *op, Py_ssize_t i, Py_ssize_t j)
 static PyObject *
 tupleconcat(register PyTupleObject *a, register PyObject *bb)
 {
-	register int size;
-	register int i;
+	register Py_ssize_t size;
+	register Py_ssize_t i;
 	PyObject **src, **dest;
 	PyTupleObject *np;
 	if (!PyTuple_Check(bb)) {
@@ -398,8 +399,8 @@ tupleconcat(register PyTupleObject *a, register PyObject *bb)
 static PyObject *
 tuplerepeat(PyTupleObject *a, Py_ssize_t n)
 {
-	int i, j;
-	int size;
+	Py_ssize_t i, j;
+	Py_ssize_t size;
 	PyTupleObject *np;
 	PyObject **p, **items;
 	if (n < 0)
@@ -435,13 +436,13 @@ tuplerepeat(PyTupleObject *a, Py_ssize_t n)
 static int
 tupletraverse(PyTupleObject *o, visitproc visit, void *arg)
 {
-	int i, err;
+	Py_ssize_t i;
 	PyObject *x;
 
 	for (i = o->ob_size; --i >= 0; ) {
 		x = o->ob_item[i];
 		if (x != NULL) {
-			err = visit(x, arg);
+			int err = visit(x, arg);
 			if (err)
 				return err;
 		}
@@ -453,8 +454,8 @@ static PyObject *
 tuplerichcompare(PyObject *v, PyObject *w, int op)
 {
 	PyTupleObject *vt, *wt;
-	int i;
-	int vlen, wlen;
+	Py_ssize_t i;
+	Py_ssize_t vlen, wlen;
 
 	if (!PyTuple_Check(v) || !PyTuple_Check(w)) {
 		Py_INCREF(Py_NotImplemented);
@@ -546,7 +547,7 @@ static PyObject *
 tuple_subtype_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
 	PyObject *tmp, *new, *item;
-	int i, n;
+	Py_ssize_t i, n;
 
 	assert(PyType_IsSubtype(type, &PyTuple_Type));
 	tmp = tuple_new(&PyTuple_Type, args, kwds);
@@ -702,12 +703,12 @@ PyTypeObject PyTuple_Type = {
    known to some other part of the code. */
 
 int
-_PyTuple_Resize(PyObject **pv, int newsize)
+_PyTuple_Resize(PyObject **pv, Py_ssize_t newsize)
 {
 	register PyTupleObject *v;
 	register PyTupleObject *sv;
-	int i;
-	int oldsize;
+	Py_ssize_t i;
+	Py_ssize_t oldsize;
 
 	v = (PyTupleObject *) *pv;
 	if (v == NULL || v->ob_type != &PyTuple_Type ||
@@ -849,7 +850,7 @@ tupleiter_next(tupleiterobject *it)
 static PyObject *
 tupleiter_len(tupleiterobject *it)
 {
-	int len = 0;
+	long len = 0;
 	if (it->it_seq)
 		len = PyTuple_GET_SIZE(it->it_seq) - it->it_index;
 	return PyInt_FromLong(len);

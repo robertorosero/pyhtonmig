@@ -217,8 +217,8 @@ reported by this function, and outstanding exceptions are maintained.
 static dictentry *
 lookdict(dictobject *mp, PyObject *key, register long hash)
 {
-	register int i;
-	register unsigned int perturb;
+	register Py_ssize_t i;
+	register size_t perturb;
 	register dictentry *freeslot;
 	register unsigned int mask = mp->ma_mask;
 	dictentry *ep0 = mp->ma_table;
@@ -328,8 +328,8 @@ Done:
 static dictentry *
 lookdict_string(dictobject *mp, PyObject *key, register long hash)
 {
-	register int i;
-	register unsigned int perturb;
+	register Py_ssize_t i;
+	register size_t perturb;
 	register dictentry *freeslot;
 	register unsigned int mask = mp->ma_mask;
 	dictentry *ep0 = mp->ma_table;
@@ -692,7 +692,8 @@ PyDict_Clear(PyObject *op)
 int
 PyDict_Next(PyObject *op, Py_ssize_t *ppos, PyObject **pkey, PyObject **pvalue)
 {
-	register int i, mask;
+	register Py_ssize_t i;
+	register int mask;
 	register dictentry *ep;
 
 	if (!PyDict_Check(op))
@@ -1109,7 +1110,7 @@ int
 PyDict_MergeFromSeq2(PyObject *d, PyObject *seq2, int override)
 {
 	PyObject *it;	/* iter(seq2) */
-	int i;		/* index into seq2 of current element */
+	int i;	/* index into seq2 of current element */
 	PyObject *item;	/* seq2[i] */
 	PyObject *fast;	/* item as a 2-tuple or 2-list */
 
@@ -1123,7 +1124,7 @@ PyDict_MergeFromSeq2(PyObject *d, PyObject *seq2, int override)
 
 	for (i = 0; ; ++i) {
 		PyObject *key, *value;
-		int n;
+		Py_ssize_t n;
 
 		fast = NULL;
 		item = PyIter_Next(it);
@@ -1147,7 +1148,7 @@ PyDict_MergeFromSeq2(PyObject *d, PyObject *seq2, int override)
 		if (n != 2) {
 			PyErr_Format(PyExc_ValueError,
 				     "dictionary update sequence element #%d "
-				     "has length %d; 2 is required",
+				     "has length %ld; 2 is required",
 				     i, n);
 			goto Fail;
 		}
@@ -2058,7 +2059,7 @@ dictiter_dealloc(dictiterobject *di)
 static PyObject *
 dictiter_len(dictiterobject *di)
 {
-	int len = 0;
+	long len = 0;
 	if (di->di_dict != NULL && di->di_used == di->di_dict->ma_used)
 		len = di->len;
 	return PyInt_FromLong(len);

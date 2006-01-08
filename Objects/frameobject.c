@@ -540,7 +540,7 @@ PyFrame_New(PyThreadState *tstate, PyCodeObject *code, PyObject *globals,
 	PyFrameObject *back = tstate->frame;
 	PyFrameObject *f;
 	PyObject *builtins;
-	int extras, ncells, nfrees, i;
+	Py_ssize_t extras, ncells, nfrees, i;
 
 #ifdef Py_DEBUG
 	if (code == NULL || globals == NULL || !PyDict_Check(globals) ||
@@ -678,10 +678,10 @@ PyFrame_BlockPop(PyFrameObject *f)
 /* Convert between "fast" version of locals and dictionary version */
 
 static void
-map_to_dict(PyObject *map, int nmap, PyObject *dict, PyObject **values,
-	    int deref)
+map_to_dict(PyObject *map, Py_ssize_t nmap, PyObject *dict, PyObject **values,
+	    Py_ssize_t deref)
 {
-	int j;
+	Py_ssize_t j;
 	for (j = nmap; --j >= 0; ) {
 		PyObject *key = PyTuple_GET_ITEM(map, j);
 		PyObject *value = values[j];
@@ -699,10 +699,10 @@ map_to_dict(PyObject *map, int nmap, PyObject *dict, PyObject **values,
 }
 
 static void
-dict_to_map(PyObject *map, int nmap, PyObject *dict, PyObject **values,
-	    int deref, int clear)
+dict_to_map(PyObject *map, Py_ssize_t nmap, PyObject *dict, PyObject **values,
+	    Py_ssize_t deref, int clear)
 {
-	int j;
+	Py_ssize_t j;
 	for (j = nmap; --j >= 0; ) {
 		PyObject *key = PyTuple_GET_ITEM(map, j);
 		PyObject *value = PyObject_GetItem(dict, key);
@@ -733,7 +733,7 @@ PyFrame_FastToLocals(PyFrameObject *f)
 	PyObject *locals, *map;
 	PyObject **fast;
 	PyObject *error_type, *error_value, *error_traceback;
-	int j;
+	Py_ssize_t j;
 	if (f == NULL)
 		return;
 	locals = f->f_locals;
@@ -776,7 +776,7 @@ PyFrame_LocalsToFast(PyFrameObject *f, int clear)
 	PyObject *locals, *map;
 	PyObject **fast;
 	PyObject *error_type, *error_value, *error_traceback;
-	int j;
+	Py_ssize_t j;
 	if (f == NULL)
 		return;
 	locals = f->f_locals;

@@ -68,7 +68,7 @@ PyClass_New(PyObject *bases, PyObject *dict, PyObject *name)
 			return NULL;
 	}
 	else {
-		int i, n;
+		Py_ssize_t i, n;
 		PyObject *base;
 		if (!PyTuple_Check(bases)) {
 			PyErr_SetString(PyExc_TypeError,
@@ -185,7 +185,7 @@ class_dealloc(PyClassObject *op)
 static PyObject *
 class_lookup(PyClassObject *cp, PyObject *name, PyClassObject **pclass)
 {
-	int i, n;
+	Py_ssize_t i, n;
 	PyObject *value = PyDict_GetItem(cp->cl_dict, name);
 	if (value != NULL) {
 		*pclass = cp;
@@ -281,7 +281,7 @@ set_dict(PyClassObject *c, PyObject *v)
 static char *
 set_bases(PyClassObject *c, PyObject *v)
 {
-	int i, n;
+	Py_ssize_t i, n;
 
 	if (v == NULL || !PyTuple_Check(v))
 		return "__bases__ must be a tuple object";
@@ -483,7 +483,7 @@ PyTypeObject PyClass_Type = {
 int
 PyClass_IsSubclass(PyObject *class, PyObject *base)
 {
-	int i, n;
+	Py_ssize_t i, n;
 	PyClassObject *cp;
 	if (class == base)
 		return 1;
@@ -1128,7 +1128,7 @@ instance_item(PyInstanceObject *inst, Py_ssize_t i)
 }
 
 static PyObject *
-sliceobj_from_intint(int i, int j)
+sliceobj_from_intint(Py_ssize_t i, Py_ssize_t j)
 {
 	PyObject *start, *end, *res;
 
@@ -2434,7 +2434,7 @@ instancemethod_call(PyObject *func, PyObject *arg, PyObject *kw)
 		Py_INCREF(arg);
 	}
 	else {
-		int argcount = PyTuple_Size(arg);
+		Py_ssize_t argcount = PyTuple_Size(arg);
 		PyObject *newarg = PyTuple_New(argcount + 1);
 		int i;
 		if (newarg == NULL)
