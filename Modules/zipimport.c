@@ -660,7 +660,8 @@ read_directory(char *archive)
 	FILE *fp;
 	long compress, crc, data_size, file_size, file_offset, date, time;
 	long header_offset, name_size, header_size, header_position;
-	long i, l, length, count;
+	long i, l, count;
+	size_t length;
 	char path[MAXPATHLEN + 5];
 	char name[MAXPATHLEN + 5];
 	char *p, endof_central_dir[22];

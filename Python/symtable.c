@@ -354,7 +354,7 @@ PyST_GetScope(PySTEntryObject *ste, PyObject *name)
 */
 
 static int 
-analyze_name(PySTEntryObject *ste, PyObject *dict, PyObject *name, int flags,
+analyze_name(PySTEntryObject *ste, PyObject *dict, PyObject *name, long flags,
 	     PyObject *bound, PyObject *local, PyObject *free, 
 	     PyObject *global)
 {
@@ -426,7 +426,7 @@ static int
 analyze_cells(PyObject *scope, PyObject *free)
 {
         PyObject *name, *v, *w;
-	int flags, success = 0;
+	int success = 0;
 	Py_ssize_t pos = 0;
 
 	w = PyInt_FromLong(CELL);
@@ -434,7 +434,7 @@ analyze_cells(PyObject *scope, PyObject *free)
 		return 0;
 	while (PyDict_Next(scope, &pos, &name, &v)) {
 		assert(PyInt_Check(v));
-		flags = PyInt_AS_LONG(v);
+		long flags = PyInt_AS_LONG(v);
 		if (flags != LOCAL)
 			continue;
 		if (!PyDict_GetItem(free, name))
@@ -507,10 +507,10 @@ update_symbols(PyObject *symbols, PyObject *scope,
                PyObject *bound, PyObject *free, int class)
 {
 	PyObject *name, *v, *u, *w, *free_value = NULL;
-	int i, flags;
 	Py_ssize_t pos = 0;
 
 	while (PyDict_Next(symbols, &pos, &name, &v)) {
+		long i, flags;
 		assert(PyInt_Check(v));
 		flags = PyInt_AS_LONG(v);
 		w = PyDict_GetItem(scope, name);
@@ -541,7 +541,7 @@ update_symbols(PyObject *symbols, PyObject *scope,
 			*/
 			if  (class && 
 			     PyInt_AS_LONG(o) & (DEF_BOUND | DEF_GLOBAL)) {
-				int i = PyInt_AS_LONG(o) | DEF_FREE_CLASS;
+				long i = PyInt_AS_LONG(o) | DEF_FREE_CLASS;
 				o = PyInt_FromLong(i);
 				if (!o) {
 					Py_DECREF(free_value);
@@ -583,7 +583,7 @@ analyze_block(PySTEntryObject *ste, PyObject *bound, PyObject *free,
 {
 	PyObject *name, *v, *local = NULL, *scope = NULL, *newbound = NULL;
 	PyObject *newglobal = NULL, *newfree = NULL;
-	int i, flags, success = 0;
+	int i, success = 0;
 	Py_ssize_t pos = 0;
 
 	local = PyDict_New();
@@ -617,7 +617,7 @@ analyze_block(PySTEntryObject *ste, PyObject *bound, PyObject *free,
 	assert(PySTEntry_Check(ste));
 	assert(PyDict_Check(ste->ste_symbols));
 	while (PyDict_Next(ste->ste_symbols, &pos, &name, &v)) {
-		flags = PyInt_AS_LONG(v);
+		long flags = PyInt_AS_LONG(v);
 		if (!analyze_name(ste, scope, name, flags, bound, local, free,
 				  global))
 			goto error;
@@ -753,7 +753,7 @@ symtable_enter_block(struct symtable *st, identifier name, _Py_block_ty block,
 	return 1;
 }
 
-static int
+static long
 symtable_lookup(struct symtable *st, PyObject *name)
 {
 	PyObject *o;
@@ -772,7 +772,7 @@ symtable_add_def(struct symtable *st, PyObject *name, int flag)
 {
 	PyObject *o;
 	PyObject *dict;
-	int val;
+	long val;
 	PyObject *mangled = _Py_Mangle(st->st_private, name);
 
 	if (!mangled)
@@ -1021,7 +1021,7 @@ symtable_visit_stmt(struct symtable *st, stmt_ty s)
 		for (i = 0; i < asdl_seq_LEN(seq); i++) {
 			identifier name = asdl_seq_GET(seq, i);
 			char *c_name = PyString_AS_STRING(name);
-			int cur = symtable_lookup(st, name);
+			long cur = symtable_lookup(st, name);
 			if (cur < 0)
 				return 0;
 			if (cur & (DEF_LOCAL | USE)) {
@@ -1173,7 +1173,7 @@ symtable_implicit_arg(struct symtable *st, int pos)
 static int 
 symtable_visit_params(struct symtable *st, asdl_seq *args, int toplevel)
 {
-	int i, complex = 0;
+	int i;
 	
         /* go through all the toplevel arguments first */
 	for (i = 0; i < asdl_seq_LEN(args); i++) {
@@ -1186,7 +1186,6 @@ symtable_visit_params(struct symtable *st, asdl_seq *args, int toplevel)
 		}
 		else if (arg->kind == Tuple_kind) {
 			assert(arg->v.Tuple.ctx == Store);
-                        complex = 1;
 			if (toplevel) {
 				if (!symtable_implicit_arg(st, i))
 					return 0;

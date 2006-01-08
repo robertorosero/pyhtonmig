@@ -78,7 +78,7 @@ static void
 ast_error_finish(const char *filename)
 {
     PyObject *type, *value, *tback, *errstr, *loc, *tmp;
-    int lineno;
+    long lineno;
 
     assert(PyErr_Occurred());
     if (!PyErr_ExceptionMatches(PyExc_SyntaxError))
@@ -101,7 +101,7 @@ ast_error_finish(const char *filename)
 	Py_INCREF(Py_None);
 	loc = Py_None;
     }
-    tmp = Py_BuildValue("(ziOO)", filename, lineno, Py_None, loc);
+    tmp = Py_BuildValue("(zlOO)", filename, lineno, Py_None, loc);
     Py_DECREF(loc);
     if (!tmp) {
 	Py_DECREF(errstr);
@@ -252,7 +252,7 @@ PyAST_FromNode(const node *n, PyCompilerFlags *flags, const char *filename,
                 if (!stmts)
 		    goto error;
                 if (num == 1) {
-		    stmt_ty s = ast_for_stmt(&c, n);
+		    s = ast_for_stmt(&c, n);
 		    if (!s)
 			goto error;
                     asdl_seq_SET(stmts, 0, s);
@@ -261,7 +261,6 @@ PyAST_FromNode(const node *n, PyCompilerFlags *flags, const char *filename,
                     /* Only a simple_stmt can contain multiple statements. */
                     REQ(n, simple_stmt);
                     for (i = 0; i < NCH(n); i += 2) {
-                        stmt_ty s;
                         if (TYPE(CHILD(n, i)) == NEWLINE)
                             break;
                         s = ast_for_stmt(&c, CHILD(n, i));
@@ -1092,7 +1091,6 @@ ast_for_genexp(struct compiling *c, const node *n)
                 return NULL;
 
             for (j = 0; j < n_ifs; j++) {
-                expr_ty expression;
                 REQ(ch, gen_iter);
                 ch = CHILD(ch, 0);
                 REQ(ch, gen_if);
@@ -1511,7 +1509,7 @@ ast_for_expr(struct compiling *c, const node *n)
                         return NULL;
 		    }
                         
-                    asdl_seq_SET(ops, i / 2, (void *)operator);
+                    asdl_seq_SET(ops, i / 2, (void *)(Py_uintptr_t)operator);
                     asdl_seq_SET(cmps, i / 2, expression);
                 }
                 expression = ast_for_expr(c, CHILD(n, 0));
@@ -2032,7 +2030,7 @@ alias_for_import_name(struct compiling *c, const node *n)
                 return alias(NEW_IDENTIFIER(CHILD(n, 0)), NULL, c->c_arena);
             else {
                 /* Create a string of the form "a.b.c" */
-                int i, len;
+                size_t i, len;
                 char *s;
 
                 len = 0;

@@ -2294,7 +2294,6 @@ PyObject *_PyUnicode_DecodeUnicodeInternal(const char *s,
     Py_ssize_t startinpos;
     Py_ssize_t endinpos;
     Py_ssize_t outpos;
-    Py_UNICODE unimax;
     PyUnicodeObject *v;
     Py_UNICODE *p;
     const char *end;
@@ -2302,7 +2301,10 @@ PyObject *_PyUnicode_DecodeUnicodeInternal(const char *s,
     PyObject *errorHandler = NULL;
     PyObject *exc = NULL;
 
-    unimax = PyUnicode_GetMax();
+#ifdef Py_UNICODE_WIDE
+    Py_UNICODE unimax = PyUnicode_GetMax();
+#endif
+
     v = _PyUnicode_New((size+Py_UNICODE_SIZE-1)/ Py_UNICODE_SIZE);
     if (v == NULL)
 	goto onError;
