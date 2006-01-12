@@ -32,7 +32,7 @@ PyAPI_DATA(PyTypeObject) PyInt_Type;
 
 PyAPI_FUNC(PyObject *) PyInt_FromString(char*, char**, int);
 #ifdef Py_USING_UNICODE
-PyAPI_FUNC(PyObject *) PyInt_FromUnicode(Py_UNICODE*, int, int);
+PyAPI_FUNC(PyObject *) PyInt_FromUnicode(Py_UNICODE*, Py_ssize_t, int);
 #endif
 PyAPI_FUNC(PyObject *) PyInt_FromLong(long);
 PyAPI_FUNC(PyObject *) PyInt_FromSize_t(size_t);

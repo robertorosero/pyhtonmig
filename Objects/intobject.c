@@ -188,14 +188,14 @@ PyInt_AsLong(register PyObject *op)
 Py_ssize_t
 PyInt_AsSsize_t(register PyObject *op)
 {
+	PyNumberMethods *nb;
+	PyIntObject *io;
+	Py_ssize_t val;
 	if (op && !PyInt_CheckExact(op) && PyLong_Check(op))
 		return _PyLong_AsSsize_t(op);
 #if SIZEOF_SIZE_T==SIZEOF_LONG
 	return PyInt_AsLong(op);
 #else
-	PyNumberMethods *nb;
-	PyIntObject *io;
-	Py_ssize_t val;
 
 	if (op && PyInt_Check(op))
 		return PyInt_AS_LONG((PyIntObject*) op);
@@ -216,7 +216,7 @@ PyInt_AsSsize_t(register PyObject *op)
 	if (!PyInt_Check(io)) {
 		if (PyLong_Check(io)) {
 			/* got a long? => retry int conversion */
-			val = PyLong_AsSsize_t((PyObject *)io);
+			val = _PyLong_AsSsize_t((PyObject *)io);
 			Py_DECREF(io);
 			if ((val == -1) && PyErr_Occurred())
 				return -1;
@@ -371,7 +371,7 @@ PyInt_FromString(char *s, char **pend, int base)
 
 #ifdef Py_USING_UNICODE
 PyObject *
-PyInt_FromUnicode(Py_UNICODE *s, int length, int base)
+PyInt_FromUnicode(Py_UNICODE *s, Py_ssize_t length, int base)
 {
 	PyObject *result;
 	char *buffer = PyMem_MALLOC(length+1);
