@@ -51,7 +51,7 @@ static PyLongObject *
 long_normalize(register PyLongObject *v)
 {
 	Py_ssize_t j = ABS(v->ob_size);
-	register int i = j;
+	Py_ssize_t i = j;
 
 	while (i > 0 && v->ob_digit[i-1] == 0)
 		--i;
@@ -78,7 +78,7 @@ PyObject *
 _PyLong_Copy(PyLongObject *src)
 {
 	PyLongObject *result;
-	int i;
+	Py_ssize_t i;
 
 	assert(src != NULL);
 	i = src->ob_size;
@@ -994,7 +994,7 @@ convert_binop(PyObject *v, PyObject *w, PyLongObject **a, PyLongObject **b) {
  * x[m-1], and the remaining carry (0 or 1) is returned.
  */
 static digit
-v_iadd(digit *x, int m, digit *y, int n)
+v_iadd(digit *x, Py_ssize_t m, digit *y, Py_ssize_t n)
 {
 	int i;
 	digit carry = 0;
@@ -1020,7 +1020,7 @@ v_iadd(digit *x, int m, digit *y, int n)
  * far as x[m-1], and the remaining borrow (0 or 1) is returned.
  */
 static digit
-v_isub(digit *x, int m, digit *y, int n)
+v_isub(digit *x, Py_ssize_t m, digit *y, Py_ssize_t n)
 {
 	int i;
 	digit borrow = 0;
@@ -1077,7 +1077,7 @@ muladd1(PyLongObject *a, wdigit n, wdigit extra)
    immutable. */
 
 static digit
-inplace_divrem1(digit *pout, digit *pin, int size, digit n)
+inplace_divrem1(digit *pout, digit *pin, Py_ssize_t size, digit n)
 {
 	twodigits rem = 0;
 
@@ -1430,7 +1430,7 @@ PyLong_FromString(char *str, char **pend, int base)
 
 #ifdef Py_USING_UNICODE
 PyObject *
-PyLong_FromUnicode(Py_UNICODE *u, int length, int base)
+PyLong_FromUnicode(Py_UNICODE *u, Py_ssize_t length, int base)
 {
 	PyObject *result;
 	char *buffer = PyMem_MALLOC(length+1);
@@ -1624,7 +1624,7 @@ long_str(PyObject *v)
 static int
 long_compare(PyLongObject *a, PyLongObject *b)
 {
-	int sign;
+	Py_ssize_t sign;
 
 	if (a->ob_size != b->ob_size) {
 		if (ABS(a->ob_size) == 0 && ABS(b->ob_size) == 0)
@@ -1633,7 +1633,7 @@ long_compare(PyLongObject *a, PyLongObject *b)
 			sign = a->ob_size - b->ob_size;
 	}
 	else {
-		int i = ABS(a->ob_size);
+		Py_ssize_t i = ABS(a->ob_size);
 		while (--i >= 0 && a->ob_digit[i] == b->ob_digit[i])
 			;
 		if (i < 0)
@@ -1651,7 +1651,8 @@ static long
 long_hash(PyLongObject *v)
 {
 	long x;
-	int i, sign;
+	Py_ssize_t i;
+	int sign;
 
 	/* This is designed so that Python ints and longs with the
 	   same value hash to the same value, otherwise comparisons
@@ -1690,7 +1691,7 @@ x_add(PyLongObject *a, PyLongObject *b)
 	/* Ensure a is the larger of the two: */
 	if (size_a < size_b) {
 		{ PyLongObject *temp = a; a = b; b = temp; }
-		{ int size_temp = size_a;
+		{ Py_ssize_t size_temp = size_a;
 		  size_a = size_b;
 		  size_b = size_temp; }
 	}
@@ -1718,7 +1719,7 @@ x_sub(PyLongObject *a, PyLongObject *b)
 {
 	Py_ssize_t size_a = ABS(a->ob_size), size_b = ABS(b->ob_size);
 	PyLongObject *z;
-	int i;
+	Py_ssize_t i;
 	int sign = 1;
 	digit borrow = 0;
 
@@ -1726,7 +1727,7 @@ x_sub(PyLongObject *a, PyLongObject *b)
 	if (size_a < size_b) {
 		sign = -1;
 		{ PyLongObject *temp = a; a = b; b = temp; }
-		{ int size_temp = size_a;
+		{ Py_ssize_t size_temp = size_a;
 		  size_a = size_b;
 		  size_b = size_temp; }
 	}
@@ -1914,7 +1915,7 @@ x_mul(PyLongObject *a, PyLongObject *b)
    Returns 0 on success, -1 on failure.
 */
 static int
-kmul_split(PyLongObject *n, int size, PyLongObject **high, PyLongObject **low)
+kmul_split(PyLongObject *n, Py_ssize_t size, PyLongObject **high, PyLongObject **low)
 {
 	PyLongObject *hi, *lo;
 	Py_ssize_t size_lo, size_hi;
@@ -1955,7 +1956,7 @@ k_mul(PyLongObject *a, PyLongObject *b)
 	PyLongObject *bl = NULL;
 	PyLongObject *ret = NULL;
 	PyLongObject *t1, *t2, *t3;
-	int shift;	/* the number of digits we split off */
+	Py_ssize_t shift;	/* the number of digits we split off */
 	Py_ssize_t i;
 
 	/* (ah*X+al)(bh*X+bl) = ah*bh*X*X + (ah*bl + al*bh)*X + al*bl
@@ -2191,7 +2192,7 @@ k_lopsided_mul(PyLongObject *a, PyLongObject *b)
 	nbdone = 0;
 	while (bsize > 0) {
 		PyLongObject *product;
-		const int nbtouse = MIN(bsize, asize);
+		const Py_ssize_t nbtouse = MIN(bsize, asize);
 
 		/* Multiply the next slice of b by a. */
 		memcpy(bslice->ob_digit, b->ob_digit + nbdone,
