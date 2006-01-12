@@ -432,7 +432,7 @@ PyAPI_FUNC(Py_UNICODE *) PyUnicode_AsUnicode(
 
 /* Get the length of the Unicode object. */
 
-PyAPI_FUNC(int) PyUnicode_GetSize(
+PyAPI_FUNC(Py_ssize_t) PyUnicode_GetSize(
     PyObject *unicode	 	/* Unicode object */
     );
 
@@ -524,10 +524,10 @@ PyAPI_FUNC(PyObject*) PyUnicode_FromWideChar(
    possibly trailing 0-termination character) or -1 in case of an
    error. */
 
-PyAPI_FUNC(int) PyUnicode_AsWideChar(
+PyAPI_FUNC(Py_ssize_t) PyUnicode_AsWideChar(
     PyUnicodeObject *unicode,   /* Unicode object */
     register wchar_t *w,        /* wchar_t buffer */
-    int size                    /* size of buffer */
+    Py_ssize_t size             /* size of buffer */
     );
 
 #endif
@@ -995,7 +995,7 @@ PyAPI_FUNC(PyObject*) PyUnicode_Concat(
 PyAPI_FUNC(PyObject*) PyUnicode_Split(
     PyObject *s,		/* String to split */
     PyObject *sep,		/* String separator */
-    int maxsplit		/* Maxsplit count */
+    Py_ssize_t maxsplit		/* Maxsplit count */
     );		
 
 /* Dito, but split at line breaks.
@@ -1024,7 +1024,7 @@ PyAPI_FUNC(PyObject*) PyUnicode_Splitlines(
 PyAPI_FUNC(PyObject*) PyUnicode_RSplit(
     PyObject *s,		/* String to split */
     PyObject *sep,		/* String separator */
-    int maxsplit		/* Maxsplit count */
+    Py_ssize_t maxsplit		/* Maxsplit count */
     );		
 
 /* Translate a string by applying a character mapping table to it and
@@ -1092,7 +1092,7 @@ PyAPI_FUNC(PyObject *) PyUnicode_Replace(
     PyObject *str,		/* String */ 
     PyObject *substr,		/* Substring to find */
     PyObject *replstr,		/* Substring to replace */
-    int maxcount		/* Max. number of replacements to apply;
+    Py_ssize_t maxcount		/* Max. number of replacements to apply;
 				   -1 = all */
     );
 
