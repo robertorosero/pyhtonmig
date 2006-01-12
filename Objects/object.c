@@ -1432,7 +1432,8 @@ PyObject_IsTrue(PyObject *v)
 		res = (*v->ob_type->tp_as_sequence->sq_length)(v);
 	else
 		return 1;
-	return (res > 0) ? 1 : (int)res;
+	/* if it is negative, it should be either -1 or -2 */
+	return (res > 0) ? 1 : Py_SAFE_DOWNCAST(res, Py_ssize_t, int);
 }
 
 /* equivalent of 'not v'
