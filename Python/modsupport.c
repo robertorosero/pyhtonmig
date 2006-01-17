@@ -376,7 +376,7 @@ do_mkvalue(const char **p_format, va_list *p_va)
 		case 'c':
 		{
 			char p[1];
-			p[0] = va_arg(*p_va, int);
+			p[0] = (char)va_arg(*p_va, int);
 			return PyString_FromStringAndSize(p, 1);
 		}
 
