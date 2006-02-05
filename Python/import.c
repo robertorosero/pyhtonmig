@@ -772,7 +772,7 @@ static PyCodeObject *
 parse_source_module(const char *pathname, FILE *fp)
 {
 	PyCodeObject *co = NULL;
-	PyTypeObject *mod;
+	PyObject *mod;
 
 	mod = PyParser_ASTFromFile(fp, pathname, Py_file_input, 0, 0, 0, 
 				   NULL);

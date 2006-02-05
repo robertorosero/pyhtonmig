@@ -258,6 +258,8 @@ class FunctionVisitor(TraversalVisitor):
                     emit("%s = PyList_New(0);" % f.name, 2)
                 emit("Py_INCREF(%s);" % f.name, 1)
             emit("result->%s = %s;" % (f.name, f.name), 1)
+        if str(name)[0].isupper(): # HACK !
+            emit("result->_base._kind = %s_kind;" % name, 1)
         for argtype, argname, opt in attrs:
             if argtype == "PyObject*":
                 emit("Py_INCREF(%s);" % argname, 1)
@@ -308,7 +310,7 @@ class FunctionVisitor(TraversalVisitor):
         depth = 1
         def emit(s):
             self.emit(s, depth)
-        emit("if (obj->%s != Py_None) /* empty */;" % f.name)
+        emit("if (obj->%s == Py_None) /* empty */;" % f.name)
         check = self.check(f.type)
         emit("else if (!%s(obj->%s)) {" % (check, f.name))
         emit('    failed_check("%s", "%s", obj->%s);' % (f.name, f.type, f.name))

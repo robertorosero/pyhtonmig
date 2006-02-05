@@ -161,7 +161,7 @@ struct assembler {
 	int a_lineno_off;      /* bytecode offset of last lineno */
 };
 
-static int compiler_enter_scope(struct compiler *, identifier, void *, int);
+static int compiler_enter_scope(struct compiler *, PyObject *, void *, int);
 static void compiler_free(struct compiler *);
 static basicblock *compiler_new_block(struct compiler *);
 static int compiler_next_instr(struct compiler *, basicblock *);
@@ -172,23 +172,22 @@ static int compiler_addop_j(struct compiler *, int, basicblock *, int);
 static void compiler_use_block(struct compiler *, basicblock *);
 static basicblock *compiler_use_new_block(struct compiler *);
 static int compiler_error(struct compiler *, const char *);
-static int compiler_nameop(struct compiler *, identifier, expr_context_ty);
+static int compiler_nameop(struct compiler *, PyObject *, PyObject *);
 
-static PyCodeObject *compiler_mod(struct compiler *, mod_ty);
-static int compiler_visit_stmt(struct compiler *, stmt_ty);
-static int compiler_visit_keyword(struct compiler *, keyword_ty);
-static int compiler_visit_expr(struct compiler *, expr_ty);
-static int compiler_augassign(struct compiler *, stmt_ty);
-static int compiler_visit_slice(struct compiler *, slice_ty,
-				expr_context_ty);
+static PyCodeObject *compiler_mod(struct compiler *, PyObject *);
+static int compiler_visit_stmt(struct compiler *, PyObject *);
+static int compiler_visit_keyword(struct compiler *, PyObject *);
+static int compiler_visit_expr(struct compiler *, PyObject *);
+static int compiler_augassign(struct compiler *, PyObject *);
+static int compiler_visit_slice(struct compiler *, PyObject *, PyObject *);
 
 static int compiler_push_fblock(struct compiler *, enum fblocktype,
 				basicblock *);
 static void compiler_pop_fblock(struct compiler *, enum fblocktype,
 				basicblock *);
 
-static int inplace_binop(struct compiler *, operator_ty);
-static int expr_constant(expr_ty e);
+static int inplace_binop(struct compiler *, PyObject *);
+static int expr_constant(PyObject * e);
 
 static PyCodeObject *assemble(struct compiler *, int addNone);
 static PyObject *__doc__;
@@ -243,7 +242,7 @@ compiler_init(struct compiler *c)
 }
 
 PyCodeObject *
-PyAST_Compile(mod_ty mod, const char *filename, PyCompilerFlags *flags)
+PyAST_Compile(PyObject *mod, const char *filename, PyCompilerFlags *flags)
 {
 	struct compiler c;
 	PyCodeObject *co = NULL;
@@ -293,11 +292,10 @@ PyCodeObject *
 PyNode_Compile(struct _node *n, const char *filename)
 {
 	PyCodeObject *co;
-	mod_ty mod = PyAST_FromNode(n, NULL, filename);
+	PyObject *mod = PyAST_FromNode(n, NULL, filename);
 	if (!mod)
 		return NULL;
 	co = PyAST_Compile(mod, filename, NULL);
-	free_mod(mod);
 	return co;
 }
 
@@ -547,7 +545,7 @@ fold_binops_on_constants(unsigned char *codestr, PyObject *consts)
 static int
 fold_unaryops_on_constants(unsigned char *codestr, PyObject *consts)
 {
-	PyObject *newconst=NULL, *v;
+	PyObject *newconst = NULL, *v;
 	int len_consts, opcode;
 
 	/* Pre-conditions */
@@ -787,8 +785,8 @@ optimize_code(PyObject *code, PyObject* consts, PyObject *names, PyObject *linen
 			     (opcode == BUILD_LIST && 
 			     codestr[i+3]==COMPARE_OP && 
 			     ISBASICBLOCK(blocks, h, 3*(j+2)) &&
-			     (GETARG(codestr,i+3)==6 ||
-				      GETARG(codestr,i+3)==7))) &&
+			     (GETARG(codestr,i+3) == 6 ||
+				      GETARG(codestr,i+3) == 7))) &&
 			     tuple_of_constants(&codestr[h], j, consts)) {
 				assert(codestr[i] == LOAD_CONST);
 				cumlc = 1;
@@ -1064,7 +1062,7 @@ compiler_unit_free(struct compiler_unit *u)
 }
 
 static int
-compiler_enter_scope(struct compiler *c, identifier name, void *key,
+compiler_enter_scope(struct compiler *c, PyObject *name, void *key,
 		     int lineno)
 {
 	struct compiler_unit *u;
@@ -1672,9 +1670,9 @@ compiler_addop_j(struct compiler *c, int opcode, basicblock *b, int absolute)
 
 #define VISIT_SEQ(C, TYPE, SEQ) { \
 	int i; \
-	asdl_seq *seq = (SEQ); /* avoid variable capture */ \
-	for (i = 0; i < asdl_seq_LEN(seq); i++) { \
-		TYPE ## _ty elt = asdl_seq_GET(seq, i); \
+	PyObject *seq = (SEQ); /* avoid variable capture */ \
+	for (i = 0; i < PyList_GET_SIZE(seq); i++) { \
+		/*TYPE ## _ty*/ PyObject *elt = PyList_GET_ITEM(seq, i); \
 		if (!compiler_visit_ ## TYPE((C), elt)) \
 			return 0; \
 	} \
@@ -1682,9 +1680,9 @@ compiler_addop_j(struct compiler *c, int opcode, basicblock *b, int absolute)
 
 #define VISIT_SEQ_IN_SCOPE(C, TYPE, SEQ) { \
 	int i; \
-	asdl_seq *seq = (SEQ); /* avoid variable capture */ \
-	for (i = 0; i < asdl_seq_LEN(seq); i++) { \
-		TYPE ## _ty elt = asdl_seq_GET(seq, i); \
+	PyObject *seq = (SEQ); /* avoid variable capture */ \
+	for (i = 0; i < PyList_GET_SIZE(seq); i++) { \
+		/*TYPE ## _ty*/PyObject *elt = PyList_GET_ITEM(seq, i); \
 		if (!compiler_visit_ ## TYPE((C), elt)) { \
 			compiler_exit_scope(c); \
 			return 0; \
@@ -1693,37 +1691,37 @@ compiler_addop_j(struct compiler *c, int opcode, basicblock *b, int absolute)
 }
 
 static int
-compiler_isdocstring(stmt_ty s)
+compiler_isdocstring(PyObject *s)
 {
-    if (s->kind != Expr_kind)
+    if (stmt_kind(s) != Expr_kind)
         return 0;
-    return s->v.Expr.value->kind == Str_kind;
+    return expr_kind(Expr_value(s)) == Str_kind;
 }
 
 /* Compile a sequence of statements, checking for a docstring. */
 
 static int
-compiler_body(struct compiler *c, asdl_seq *stmts)
+compiler_body(struct compiler *c, PyObject *stmts)
 {
 	int i = 0;
-	stmt_ty st;
+	PyObject *st;
 
-	if (!asdl_seq_LEN(stmts))
+	if (!PyList_GET_SIZE(stmts))
 		return 1;
-	st = asdl_seq_GET(stmts, 0);
+	st = PyList_GET_ITEM(stmts, 0);
 	if (compiler_isdocstring(st)) {
 		i = 1;
-		VISIT(c, expr, st->v.Expr.value);
-		if (!compiler_nameop(c, __doc__, Store))
+		VISIT(c, expr, Expr_value(st));
+		if (!compiler_nameop(c, __doc__, Store()))
 			return 0;
 	}
-        for (; i < asdl_seq_LEN(stmts); i++)
-            VISIT(c, stmt, asdl_seq_GET(stmts, i));
+        for (; i < PyList_GET_SIZE(stmts); i++)
+            VISIT(c, stmt, PyList_GET_ITEM(stmts, i));
 	return 1;
 }
 
 static PyCodeObject *
-compiler_mod(struct compiler *c, mod_ty mod)
+compiler_mod(struct compiler *c, PyObject *mod)
 {
 	PyCodeObject *co;
         int addNone = 1;
@@ -1735,19 +1733,19 @@ compiler_mod(struct compiler *c, mod_ty mod)
 	}
 	if (!compiler_enter_scope(c, module, mod, 1))
 		return NULL;
-	switch (mod->kind) {
+	switch (mod_kind(mod)) {
 	case Module_kind: 
-		if (!compiler_body(c, mod->v.Module.body)) {
+		if (!compiler_body(c, Module_body(mod))) {
 			compiler_exit_scope(c);
 			return 0;
 		}
 		break;
 	case Interactive_kind:
 		c->c_interactive = 1;
-		VISIT_SEQ_IN_SCOPE(c, stmt, mod->v.Interactive.body);
+		VISIT_SEQ_IN_SCOPE(c, stmt, Interactive_body(mod));
 		break;
 	case Expression_kind:
-		VISIT_IN_SCOPE(c, expr, mod->v.Expression.body);
+		VISIT_IN_SCOPE(c, expr, Expression_body(mod));
                 addNone = 0;
 		break;
 	case Suite_kind:
@@ -1757,7 +1755,7 @@ compiler_mod(struct compiler *c, mod_ty mod)
         default:
 		PyErr_Format(PyExc_SystemError,
 			     "module kind %d should not be possible",
-			     mod->kind);
+			     mod_kind(mod));
 		return 0;
 	}
 	co = assemble(c, addNone);
@@ -1853,33 +1851,33 @@ compiler_make_closure(struct compiler *c, PyCodeObject *co, int args)
 }
 
 static int
-compiler_decorators(struct compiler *c, asdl_seq* decos)
+compiler_decorators(struct compiler *c, PyObject* decos)
 {
 	int i;
 
 	if (!decos)
 		return 1;
 
-	for (i = 0; i < asdl_seq_LEN(decos); i++) {
-		VISIT(c, expr, asdl_seq_GET(decos, i));
+	for (i = 0; i < PyList_GET_SIZE(decos); i++) {
+		VISIT(c, expr, PyList_GET_ITEM(decos, i));
 	}
 	return 1;
 }
 
 static int
-compiler_arguments(struct compiler *c, arguments_ty args)
+compiler_arguments(struct compiler *c, PyObject *args)
 {
 	int i;
-	int n = asdl_seq_LEN(args->args);
+	int n = PyList_GET_SIZE(arguments_args(args));
 	/* Correctly handle nested argument lists */
 	for (i = 0; i < n; i++) {
-		expr_ty arg = asdl_seq_GET(args->args, i);
-		if (arg->kind == Tuple_kind) {
+		PyObject *arg = PyList_GET_ITEM(arguments_args(args), i);
+		if (expr_kind(arg) == Tuple_kind) {
 			PyObject *id = PyString_FromFormat(".%d", i);
 			if (id == NULL) {
 				return 0;
 			}
-			if (!compiler_nameop(c, id, Load)) {
+			if (!compiler_nameop(c, id, Load())) {
 				Py_DECREF(id);
 				return 0;
 			}
@@ -1891,29 +1889,30 @@ compiler_arguments(struct compiler *c, arguments_ty args)
 }
 
 static int
-compiler_function(struct compiler *c, stmt_ty s)
+compiler_function(struct compiler *c, PyObject *s)
 {
 	PyCodeObject *co;
         PyObject *first_const = Py_None;
-	arguments_ty args = s->v.FunctionDef.args;
-	asdl_seq* decos = s->v.FunctionDef.decorators;
-        stmt_ty st;
+	PyObject *args = FunctionDef_args(s);
+	PyObject *decos = FunctionDef_decorators(s);
+        PyObject *st;
 	int i, n, docstring;
 
-	assert(s->kind == FunctionDef_kind);
+	assert(stmt_kind(s) == FunctionDef_kind);
 
 	if (!compiler_decorators(c, decos))
 		return 0;
-	if (args->defaults)
-		VISIT_SEQ(c, expr, args->defaults);
-	if (!compiler_enter_scope(c, s->v.FunctionDef.name, (void *)s,
-				  s->lineno))
+	/* if (arguments_defaults(args)) */
+	VISIT_SEQ(c, expr, arguments_defaults(args));
+				  /* s->lineno)) */
+	if (!compiler_enter_scope(c, FunctionDef_name(s), (void *)s,
+				  ((struct _stmt*)s)->lineno ))
 		return 0;
 
-        st = asdl_seq_GET(s->v.FunctionDef.body, 0);
+        st = PyList_GET_ITEM(FunctionDef_body(s), 0);
         docstring = compiler_isdocstring(st);
         if (docstring)
-            first_const = st->v.Expr.value->v.Str.s;
+            first_const = Str_s(Expr_value(st));
         if (compiler_add_o(c, c->u->u_consts, first_const) < 0)  {
 	    compiler_exit_scope(c);
             return 0;
@@ -1922,13 +1921,13 @@ compiler_function(struct compiler *c, stmt_ty s)
         /* unpack nested arguments */
 	compiler_arguments(c, args);
 
-	c->u->u_argcount = asdl_seq_LEN(args->args);
-	n = asdl_seq_LEN(s->v.FunctionDef.body);
+	c->u->u_argcount = PyList_GET_SIZE(arguments_args(args));
+	n = PyList_GET_SIZE(FunctionDef_body(s));
         /* if there was a docstring, we need to skip the first statement */
 	for (i = docstring; i < n; i++) {
-		stmt_ty s2 = asdl_seq_GET(s->v.FunctionDef.body, i);
-		if (i == 0 && s2->kind == Expr_kind &&
-		    s2->v.Expr.value->kind == Str_kind)
+		PyObject *s2 = PyList_GET_ITEM(FunctionDef_body(s), i);
+		if (i == 0 && stmt_kind(s2) == Expr_kind &&
+		    expr_kind(Expr_value(s2)) == Str_kind)
 			continue;
 		VISIT_IN_SCOPE(c, stmt, s2);
 	}
@@ -1937,36 +1936,36 @@ compiler_function(struct compiler *c, stmt_ty s)
 	if (co == NULL)
 		return 0;
 
-        compiler_make_closure(c, co, asdl_seq_LEN(args->defaults));
+        compiler_make_closure(c, co, PyList_GET_SIZE(arguments_defaults(args)));
 	Py_DECREF(co);
 
-	for (i = 0; i < asdl_seq_LEN(decos); i++) {
+	for (i = 0; i < PyList_GET_SIZE(decos); i++) {
 		ADDOP_I(c, CALL_FUNCTION, 1);
 	}
 
-	return compiler_nameop(c, s->v.FunctionDef.name, Store);
+	return compiler_nameop(c, FunctionDef_name(s), Store());
 }
 
 static int
-compiler_class(struct compiler *c, stmt_ty s)
+compiler_class(struct compiler *c, PyObject *s)
 {
 	int n;
 	PyCodeObject *co;
         PyObject *str;
 	/* push class name on stack, needed by BUILD_CLASS */
-	ADDOP_O(c, LOAD_CONST, s->v.ClassDef.name, consts);
+	ADDOP_O(c, LOAD_CONST, ClassDef_name(s), consts);
 	/* push the tuple of base classes on the stack */
-	n = asdl_seq_LEN(s->v.ClassDef.bases);
+	n = PyList_GET_SIZE(ClassDef_bases(s));
 	if (n > 0)
-		VISIT_SEQ(c, expr, s->v.ClassDef.bases);
+		VISIT_SEQ(c, expr, ClassDef_bases(s));
 	ADDOP_I(c, BUILD_TUPLE, n);
-	if (!compiler_enter_scope(c, s->v.ClassDef.name, (void *)s,
-				  s->lineno))
+	if (!compiler_enter_scope(c, ClassDef_name(s), (void *)s,
+				  ((struct _stmt*)s)->lineno))
 		return 0;
-        c->u->u_private = s->v.ClassDef.name;
+        c->u->u_private = ClassDef_name(s);
         Py_INCREF(c->u->u_private);
         str = PyString_InternFromString("__name__");
-	if (!str || !compiler_nameop(c, str, Load)) {
+	if (!str || !compiler_nameop(c, str, Load())) {
 		Py_XDECREF(str);
 		compiler_exit_scope(c);
 		return 0;
@@ -1974,14 +1973,14 @@ compiler_class(struct compiler *c, stmt_ty s)
         
         Py_DECREF(str);
         str = PyString_InternFromString("__module__");
-	if (!str || !compiler_nameop(c, str, Store)) {
+	if (!str || !compiler_nameop(c, str, Store())) {
 		Py_XDECREF(str);
 		compiler_exit_scope(c);
 		return 0;
         }
         Py_DECREF(str);
 
-	if (!compiler_body(c, s->v.ClassDef.body)) {
+	if (!compiler_body(c, ClassDef_body(s))) {
 		compiler_exit_scope(c);
 		return 0;
 	}
@@ -1998,18 +1997,18 @@ compiler_class(struct compiler *c, stmt_ty s)
 
 	ADDOP_I(c, CALL_FUNCTION, 0);
 	ADDOP(c, BUILD_CLASS);
-	if (!compiler_nameop(c, s->v.ClassDef.name, Store))
+	if (!compiler_nameop(c, ClassDef_name(s), Store()))
 		return 0;
 	return 1;
 }
 
 static int
-compiler_lambda(struct compiler *c, expr_ty e)
+compiler_lambda(struct compiler *c, PyObject *e)
 {
 	PyCodeObject *co;
-	static identifier name;
-	arguments_ty args = e->v.Lambda.args;
-	assert(e->kind == Lambda_kind);
+	static PyObject *name;
+	PyObject *args = Lambda_args(e);
+	assert(expr_kind(e) == Lambda_kind);
 
 	if (!name) {
 		name = PyString_InternFromString("<lambda>");
@@ -2017,43 +2016,43 @@ compiler_lambda(struct compiler *c, expr_ty e)
 			return 0;
 	}
 
-	if (args->defaults)
-		VISIT_SEQ(c, expr, args->defaults);
-	if (!compiler_enter_scope(c, name, (void *)e, e->lineno))
+	if (arguments_defaults(args))
+		VISIT_SEQ(c, expr, arguments_defaults(args));
+	if (!compiler_enter_scope(c, name, (void *)e, ((struct _expr*)e)->lineno))
 		return 0;
 
         /* unpack nested arguments */
 	compiler_arguments(c, args);
 	
-	c->u->u_argcount = asdl_seq_LEN(args->args);
-	VISIT_IN_SCOPE(c, expr, e->v.Lambda.body);
+	c->u->u_argcount = PyList_GET_SIZE(arguments_args(args));
+	VISIT_IN_SCOPE(c, expr, Lambda_body(e));
 	ADDOP_IN_SCOPE(c, RETURN_VALUE);
 	co = assemble(c, 1);
 	compiler_exit_scope(c);
 	if (co == NULL)
 		return 0;
 
-        compiler_make_closure(c, co, asdl_seq_LEN(args->defaults));
+        compiler_make_closure(c, co, PyList_GET_SIZE(arguments_defaults(args)));
 	Py_DECREF(co);
 
 	return 1;
 }
 
 static int
-compiler_print(struct compiler *c, stmt_ty s)
+compiler_print(struct compiler *c, PyObject *s)
 {
 	int i, n;
 	int dest;
 
-	assert(s->kind == Print_kind);
-	n = asdl_seq_LEN(s->v.Print.values);
+	assert(stmt_kind(s) == Print_kind);
+	n = PyList_GET_SIZE(Print_values(s));
 	dest = 0;
-	if (s->v.Print.dest) {
-		VISIT(c, expr, s->v.Print.dest);
+	if (Print_dest(s) != Py_None) {
+		VISIT(c, expr, Print_dest(s));
 		dest = 1;
 	}
 	for (i = 0; i < n; i++) {
-		expr_ty e = (expr_ty)asdl_seq_GET(s->v.Print.values, i);
+		PyObject *e = PyList_GET_ITEM(Print_values(s), i);
 		if (dest) {
 			ADDOP(c, DUP_TOP);
 			VISIT(c, expr, e);
@@ -2065,7 +2064,7 @@ compiler_print(struct compiler *c, stmt_ty s)
 			ADDOP(c, PRINT_ITEM);
 		}
 	}
-	if (s->v.Print.nl) {
+	if (Print_nl(s) == Py_True) {
 		if (dest)
 			ADDOP(c, PRINT_NEWLINE_TO)
 		else
@@ -2077,32 +2076,32 @@ compiler_print(struct compiler *c, stmt_ty s)
 }
 
 static int
-compiler_if(struct compiler *c, stmt_ty s)
+compiler_if(struct compiler *c, PyObject *s)
 {
 	basicblock *end, *next;
 
-	assert(s->kind == If_kind);
+	assert(stmt_kind(s) == If_kind);
 	end = compiler_new_block(c);
 	if (end == NULL)
 		return 0;
         next = compiler_new_block(c);
         if (next == NULL)
             return 0;
-        VISIT(c, expr, s->v.If.test);
+        VISIT(c, expr, If_test(s));
         ADDOP_JREL(c, JUMP_IF_FALSE, next);
         ADDOP(c, POP_TOP);
-        VISIT_SEQ(c, stmt, s->v.If.body);
+        VISIT_SEQ(c, stmt, If_body(s));
         ADDOP_JREL(c, JUMP_FORWARD, end);
         compiler_use_next_block(c, next);
         ADDOP(c, POP_TOP);
-        if (s->v.If.orelse)
-            VISIT_SEQ(c, stmt, s->v.If.orelse);
+        /* if (If_orelse(s)) */
+        VISIT_SEQ(c, stmt, If_orelse(s));
 	compiler_use_next_block(c, end);
 	return 1;
 }
 
 static int
-compiler_for(struct compiler *c, stmt_ty s)
+compiler_for(struct compiler *c, PyObject *s)
 {
 	basicblock *start, *cleanup, *end;
 
@@ -2114,26 +2113,26 @@ compiler_for(struct compiler *c, stmt_ty s)
 	ADDOP_JREL(c, SETUP_LOOP, end);
 	if (!compiler_push_fblock(c, LOOP, start))
 		return 0;
-	VISIT(c, expr, s->v.For.iter);
+	VISIT(c, expr, For_iter(s));
 	ADDOP(c, GET_ITER);
 	compiler_use_next_block(c, start);
 	ADDOP_JREL(c, FOR_ITER, cleanup);
-	VISIT(c, expr, s->v.For.target);
-	VISIT_SEQ(c, stmt, s->v.For.body);
+	VISIT(c, expr, For_target(s));
+	VISIT_SEQ(c, stmt, For_body(s));
 	ADDOP_JABS(c, JUMP_ABSOLUTE, start);
 	compiler_use_next_block(c, cleanup);
 	ADDOP(c, POP_BLOCK);
 	compiler_pop_fblock(c, LOOP, start);
-	VISIT_SEQ(c, stmt, s->v.For.orelse);
+	VISIT_SEQ(c, stmt, For_orelse(s));
 	compiler_use_next_block(c, end);
 	return 1;
 }
 
 static int
-compiler_while(struct compiler *c, stmt_ty s)
+compiler_while(struct compiler *c, PyObject *s)
 {
 	basicblock *loop, *orelse, *end, *anchor = NULL;
-	int constant = expr_constant(s->v.While.test);
+	int constant = expr_constant(While_test(s));
 
 	if (constant == 0)
 		return 1;
@@ -2146,24 +2145,20 @@ compiler_while(struct compiler *c, stmt_ty s)
 	}
 	if (loop == NULL || end == NULL)
 		return 0;
-	if (s->v.While.orelse) {
-		orelse = compiler_new_block(c);
-		if (orelse == NULL)
-			return 0;
-	}
-	else
-		orelse = NULL;
+	orelse = compiler_new_block(c);
+	if (orelse == NULL)
+		return 0;
 
 	ADDOP_JREL(c, SETUP_LOOP, end);
 	compiler_use_next_block(c, loop);
 	if (!compiler_push_fblock(c, LOOP, loop))
 		return 0;
 	if (constant == -1) {
-		VISIT(c, expr, s->v.While.test);
+		VISIT(c, expr, While_test(s));
 		ADDOP_JREL(c, JUMP_IF_FALSE, anchor);
 		ADDOP(c, POP_TOP);
 	}
-	VISIT_SEQ(c, stmt, s->v.While.body);
+	VISIT_SEQ(c, stmt, While_body(s));
 	ADDOP_JABS(c, JUMP_ABSOLUTE, loop);
 
 	/* XXX should the two POP instructions be in a separate block
@@ -2177,7 +2172,7 @@ compiler_while(struct compiler *c, stmt_ty s)
 	}
 	compiler_pop_fblock(c, LOOP, loop);
 	if (orelse != NULL)
-		VISIT_SEQ(c, stmt, s->v.While.orelse);
+		VISIT_SEQ(c, stmt, While_orelse(s));
 	compiler_use_next_block(c, end);
 
 	return 1;
@@ -2246,7 +2241,7 @@ compiler_continue(struct compiler *c)
 */
 
 static int
-compiler_try_finally(struct compiler *c, stmt_ty s)
+compiler_try_finally(struct compiler *c, PyObject *s)
 {
 	basicblock *body, *end;
 	body = compiler_new_block(c);
@@ -2258,7 +2253,7 @@ compiler_try_finally(struct compiler *c, stmt_ty s)
 	compiler_use_next_block(c, body);
 	if (!compiler_push_fblock(c, FINALLY_TRY, body))
 		return 0;
-	VISIT_SEQ(c, stmt, s->v.TryFinally.body);
+	VISIT_SEQ(c, stmt, TryFinally_body(s));
 	ADDOP(c, POP_BLOCK);
 	compiler_pop_fblock(c, FINALLY_TRY, body);
 
@@ -2266,7 +2261,7 @@ compiler_try_finally(struct compiler *c, stmt_ty s)
 	compiler_use_next_block(c, end);
 	if (!compiler_push_fblock(c, FINALLY_END, end))
 		return 0;
-	VISIT_SEQ(c, stmt, s->v.TryFinally.finalbody);
+	VISIT_SEQ(c, stmt, TryFinally_finalbody(s));
 	ADDOP(c, END_FINALLY);
 	compiler_pop_fblock(c, FINALLY_END, end);
 
@@ -2308,7 +2303,7 @@ compiler_try_finally(struct compiler *c, stmt_ty s)
    Of course, parts are not generated if Vi or Ei is not present.
 */
 static int
-compiler_try_except(struct compiler *c, stmt_ty s)
+compiler_try_except(struct compiler *c, PyObject *s)
 {
         basicblock *body, *orelse, *except, *end;
 	int i, n;
@@ -2323,50 +2318,50 @@ compiler_try_except(struct compiler *c, stmt_ty s)
 	compiler_use_next_block(c, body);
 	if (!compiler_push_fblock(c, EXCEPT, body))
 		return 0;
-	VISIT_SEQ(c, stmt, s->v.TryExcept.body);
+	VISIT_SEQ(c, stmt, TryExcept_body(s));
 	ADDOP(c, POP_BLOCK);
 	compiler_pop_fblock(c, EXCEPT, body);
 	ADDOP_JREL(c, JUMP_FORWARD, orelse);
-	n = asdl_seq_LEN(s->v.TryExcept.handlers);
+	n = PyList_GET_SIZE(TryExcept_handlers(s));
 	compiler_use_next_block(c, except);
 	for (i = 0; i < n; i++) {
-		excepthandler_ty handler = asdl_seq_GET(
-						s->v.TryExcept.handlers, i);
-		if (!handler->type && i < n-1)
+		PyObject *handler = PyList_GET_ITEM(
+						TryExcept_handlers(s), i);
+		if (!excepthandler_type(handler)&& i < n-1)
 		    return compiler_error(c, "default 'except:' must be last");
 		except = compiler_new_block(c);
 		if (except == NULL)
 			return 0;
-		if (handler->type) {
+		if (excepthandler_type(handler)) {
 			ADDOP(c, DUP_TOP);
-			VISIT(c, expr, handler->type);
+			VISIT(c, expr, excepthandler_type(handler));
 			ADDOP_I(c, COMPARE_OP, PyCmp_EXC_MATCH);
 			ADDOP_JREL(c, JUMP_IF_FALSE, except);
 			ADDOP(c, POP_TOP);
 		}
 		ADDOP(c, POP_TOP);
-		if (handler->name) {
-			VISIT(c, expr, handler->name);
+		if (excepthandler_name(handler)) {
+			VISIT(c, expr, excepthandler_name(handler));
 		}
 		else {
 			ADDOP(c, POP_TOP);
 		}
 		ADDOP(c, POP_TOP);
-		VISIT_SEQ(c, stmt, handler->body);
+		VISIT_SEQ(c, stmt, excepthandler_body(handler));
 		ADDOP_JREL(c, JUMP_FORWARD, end);
 		compiler_use_next_block(c, except);
-		if (handler->type)
+		if (excepthandler_type(handler))
 			ADDOP(c, POP_TOP);
 	}
 	ADDOP(c, END_FINALLY);
 	compiler_use_next_block(c, orelse);
-	VISIT_SEQ(c, stmt, s->v.TryExcept.orelse);
+	VISIT_SEQ(c, stmt, TryExcept_orelse(s));
 	compiler_use_next_block(c, end);
 	return 1;
 }
 
 static int
-compiler_import_as(struct compiler *c, identifier name, identifier asname)
+compiler_import_as(struct compiler *c, PyObject *name, PyObject *asname)
 {
 	/* The IMPORT_NAME opcode was already generated.  This function
 	   merely needs to bind the result to a name.
@@ -2392,11 +2387,11 @@ compiler_import_as(struct compiler *c, identifier name, identifier asname)
 			src = dot + 1;
 		}
 	}
-	return compiler_nameop(c, asname, Store);
+	return compiler_nameop(c, asname, Store());
 }
 
 static int
-compiler_import(struct compiler *c, stmt_ty s)
+compiler_import(struct compiler *c, PyObject *s)
 {
 	/* The Import node stores a module name like a.b.c as a single
 	   string.  This is convenient for all cases except
@@ -2405,27 +2400,27 @@ compiler_import(struct compiler *c, stmt_ty s)
 	   module names.  
 	   XXX Perhaps change the representation to make this case simpler?
 	 */
-	int i, n = asdl_seq_LEN(s->v.Import.names);
+	int i, n = PyList_GET_SIZE(Import_names(s));
 	for (i = 0; i < n; i++) {
-		alias_ty alias = asdl_seq_GET(s->v.Import.names, i);
+		PyObject *alias = PyList_GET_ITEM(Import_names(s), i);
 		int r;
 
 		ADDOP_O(c, LOAD_CONST, Py_None, consts);
-		ADDOP_NAME(c, IMPORT_NAME, alias->name, names);
+		ADDOP_NAME(c, IMPORT_NAME, alias_name(alias), names);
 
-		if (alias->asname) {
-			r = compiler_import_as(c, alias->name, alias->asname);
+		if (alias_asname(alias) != Py_None) {
+			r = compiler_import_as(c, alias_name(alias), alias_asname(alias));
                         if (!r)
                             return r;
                 }
                 else {
-			identifier tmp = alias->name;
-			const char *base = PyString_AS_STRING(alias->name);
+			PyObject *tmp = alias_name(alias);
+			const char *base = PyString_AS_STRING(alias_name(alias));
 			char *dot = strchr(base, '.');
 			if (dot)
 				tmp = PyString_FromStringAndSize(base, 
 								 dot - base);
-			r = compiler_nameop(c, tmp, Store);
+			r = compiler_nameop(c, tmp, Store());
 			if (dot) {
 				Py_DECREF(tmp);
 			}
@@ -2437,9 +2432,9 @@ compiler_import(struct compiler *c, stmt_ty s)
 }
 
 static int
-compiler_from_import(struct compiler *c, stmt_ty s)
+compiler_from_import(struct compiler *c, PyObject *s)
 {
-	int i, n = asdl_seq_LEN(s->v.ImportFrom.names);
+	int i, n = PyList_GET_SIZE(ImportFrom_names(s));
 
 	PyObject *names = PyTuple_New(n);
 	if (!names)
@@ -2447,13 +2442,13 @@ compiler_from_import(struct compiler *c, stmt_ty s)
 
 	/* build up the names */
 	for (i = 0; i < n; i++) {
-		alias_ty alias = asdl_seq_GET(s->v.ImportFrom.names, i);
-		Py_INCREF(alias->name);
-		PyTuple_SET_ITEM(names, i, alias->name);
+		PyObject *alias = PyList_GET_ITEM(ImportFrom_names(s), i);
+		Py_INCREF(alias_name(alias));
+		PyTuple_SET_ITEM(names, i, alias_name(alias));
 	}
 
-	if (s->lineno > c->c_future->ff_lineno) {
-		if (!strcmp(PyString_AS_STRING(s->v.ImportFrom.module),
+	if (((struct _stmt*)s)->lineno > c->c_future->ff_lineno) {
+		if (!strcmp(PyString_AS_STRING(ImportFrom_module(s)),
 			    "__future__")) {
 			Py_DECREF(names);
 			return compiler_error(c, 
@@ -2465,23 +2460,23 @@ compiler_from_import(struct compiler *c, stmt_ty s)
 
 	ADDOP_O(c, LOAD_CONST, names, consts);
 	Py_DECREF(names);
-	ADDOP_NAME(c, IMPORT_NAME, s->v.ImportFrom.module, names);
+	ADDOP_NAME(c, IMPORT_NAME, ImportFrom_module(s), names);
 	for (i = 0; i < n; i++) {
-		alias_ty alias = asdl_seq_GET(s->v.ImportFrom.names, i);
-		identifier store_name;
+		PyObject *alias = PyList_GET_ITEM(ImportFrom_names(s), i);
+		PyObject *store_name;
 
-		if (i == 0 && *PyString_AS_STRING(alias->name) == '*') {
+		if (i == 0 && *PyString_AS_STRING(alias_name(alias)) == '*') {
 			assert(n == 1);
 			ADDOP(c, IMPORT_STAR);
 			return 1;
 		}
 		    
-		ADDOP_NAME(c, IMPORT_FROM, alias->name, names);
-		store_name = alias->name;
-		if (alias->asname)
-			store_name = alias->asname;
+		ADDOP_NAME(c, IMPORT_FROM, alias_name(alias), names);
+		store_name = alias_name(alias);
+		if (alias_asname(alias) != Py_None)
+			store_name = alias_asname(alias);
 
-		if (!compiler_nameop(c, store_name, Store)) {
+		if (!compiler_nameop(c, store_name, Store())) {
 			Py_DECREF(names);
 			return 0;
 		}
@@ -2492,7 +2487,7 @@ compiler_from_import(struct compiler *c, stmt_ty s)
 }
 
 static int
-compiler_assert(struct compiler *c, stmt_ty s)
+compiler_assert(struct compiler *c, PyObject *s)
 {
 	static PyObject *assertion_error = NULL;
 	basicblock *end;
@@ -2504,15 +2499,15 @@ compiler_assert(struct compiler *c, stmt_ty s)
 		if (assertion_error == NULL)
 			return 0;
 	}
-	VISIT(c, expr, s->v.Assert.test);
+	VISIT(c, expr, Assert_test(s));
 	end = compiler_new_block(c);
 	if (end == NULL)
 		return 0;
 	ADDOP_JREL(c, JUMP_IF_TRUE, end);
 	ADDOP(c, POP_TOP);
 	ADDOP_O(c, LOAD_GLOBAL, assertion_error, names);
-	if (s->v.Assert.msg) {
-		VISIT(c, expr, s->v.Assert.msg);
+	if (Assert_msg(s) != Py_None) {
+		VISIT(c, expr, Assert_msg(s));
 		ADDOP_I(c, RAISE_VARARGS, 2);
 	}
 	else {
@@ -2524,13 +2519,13 @@ compiler_assert(struct compiler *c, stmt_ty s)
 }
 
 static int
-compiler_visit_stmt(struct compiler *c, stmt_ty s)
+compiler_visit_stmt(struct compiler *c, PyObject *s)
 {
 	int i, n;
 
-	c->u->u_lineno = s->lineno;
+	c->u->u_lineno = ((struct _stmt*)s)->lineno;
 	c->u->u_lineno_set = 0;
-	switch (s->kind) {
+	switch (stmt_kind(s)) {
         case FunctionDef_kind:
 		return compiler_function(c, s);
         case ClassDef_kind:
@@ -2538,28 +2533,28 @@ compiler_visit_stmt(struct compiler *c, stmt_ty s)
         case Return_kind:
 		if (c->u->u_ste->ste_type != FunctionBlock)
 			return compiler_error(c, "'return' outside function");
-		if (s->v.Return.value) {
+		if (Return_value(s) != Py_None) {
 			if (c->u->u_ste->ste_generator) {
 				return compiler_error(c,
 				    "'return' with argument inside generator");
 			}
-			VISIT(c, expr, s->v.Return.value);
+			VISIT(c, expr, Return_value(s));
 		}
 		else
 			ADDOP_O(c, LOAD_CONST, Py_None, consts);
 		ADDOP(c, RETURN_VALUE);
 		break;
         case Delete_kind:
-		VISIT_SEQ(c, expr, s->v.Delete.targets)
+		VISIT_SEQ(c, expr, Delete_targets(s))
 		break;
         case Assign_kind:
-		n = asdl_seq_LEN(s->v.Assign.targets);
-		VISIT(c, expr, s->v.Assign.value);
+		n = PyList_GET_SIZE(Assign_targets(s));
+		VISIT(c, expr, Assign_value(s));
 		for (i = 0; i < n; i++) {
 			if (i < n - 1)
 				ADDOP(c, DUP_TOP);
 			VISIT(c, expr,
-			      (expr_ty)asdl_seq_GET(s->v.Assign.targets, i));
+			      PyList_GET_ITEM(Assign_targets(s), i));
 		}
 		break;
         case AugAssign_kind:
@@ -2574,14 +2569,14 @@ compiler_visit_stmt(struct compiler *c, stmt_ty s)
 		return compiler_if(c, s);
         case Raise_kind:
 		n = 0;
-		if (s->v.Raise.type) {
-			VISIT(c, expr, s->v.Raise.type);
+		if (Raise_type(s) != Py_None) {
+			VISIT(c, expr, Raise_type(s));
 			n++;
-			if (s->v.Raise.inst) {
-				VISIT(c, expr, s->v.Raise.inst);
+			if (Raise_inst(s) != Py_None) {
+				VISIT(c, expr, Raise_inst(s));
 				n++;
-				if (s->v.Raise.tback) {
-					VISIT(c, expr, s->v.Raise.tback);
+				if (Raise_tback(s) != Py_None) {
+					VISIT(c, expr, Raise_tback(s));
 					n++;
 				}
 			}
@@ -2599,11 +2594,11 @@ compiler_visit_stmt(struct compiler *c, stmt_ty s)
         case ImportFrom_kind:
 		return compiler_from_import(c, s);
         case Exec_kind:
-		VISIT(c, expr, s->v.Exec.body);
-		if (s->v.Exec.globals) {
-			VISIT(c, expr, s->v.Exec.globals);
-			if (s->v.Exec.locals) {
-				VISIT(c, expr, s->v.Exec.locals);
+		VISIT(c, expr, Exec_body(s));
+		if (Exec_globals(s) != Py_None) {
+			VISIT(c, expr, Exec_globals(s));
+			if (Exec_locals(s) != Py_None) {
+				VISIT(c, expr, Exec_locals(s));
 			} else {
 				ADDOP(c, DUP_TOP);
 			}
@@ -2616,7 +2611,7 @@ compiler_visit_stmt(struct compiler *c, stmt_ty s)
         case Global_kind:
 		break;
         case Expr_kind:
-		VISIT(c, expr, s->v.Expr.value);
+		VISIT(c, expr, Expr_value(s));
 		if (c->c_interactive && c->c_nestlevel <= 1) {
 			ADDOP(c, PRINT_EXPR);
 		}
@@ -2638,124 +2633,124 @@ compiler_visit_stmt(struct compiler *c, stmt_ty s)
 }
 
 static int
-unaryop(unaryop_ty op)
+unaryop(PyObject *op)
 {
-	switch (op) {
-	case Invert:
+	switch (unaryop_kind(op)) {
+	case Invert_kind:
 		return UNARY_INVERT;
-	case Not:
+	case Not_kind:
 		return UNARY_NOT;
-	case UAdd:
+	case UAdd_kind:
 		return UNARY_POSITIVE;
-	case USub:
+	case USub_kind:
 		return UNARY_NEGATIVE;
 	}
 	return 0;
 }
 
 static int
-binop(struct compiler *c, operator_ty op)
+binop(struct compiler *c, PyObject *op)
 {
-	switch (op) {
-	case Add:
+	switch (operator_kind(op)) {
+	case Add_kind:
 		return BINARY_ADD;
-	case Sub:
+	case Sub_kind:
 		return BINARY_SUBTRACT;
-	case Mult:
+	case Mult_kind:
 		return BINARY_MULTIPLY;
-	case Div:
+	case Div_kind:
 		if (c->c_flags && c->c_flags->cf_flags & CO_FUTURE_DIVISION)
 			return BINARY_TRUE_DIVIDE;
 		else
 			return BINARY_DIVIDE;
-	case Mod:
+	case Mod_kind:
 		return BINARY_MODULO;
-	case Pow:
+	case Pow_kind:
 		return BINARY_POWER;
-	case LShift:
+	case LShift_kind:
 		return BINARY_LSHIFT;
-	case RShift:
+	case RShift_kind:
 		return BINARY_RSHIFT;
-	case BitOr:
+	case BitOr_kind:
 		return BINARY_OR;
-	case BitXor:
+	case BitXor_kind:
 		return BINARY_XOR;
-	case BitAnd:
+	case BitAnd_kind:
 		return BINARY_AND;
-	case FloorDiv:
+	case FloorDiv_kind:
 		return BINARY_FLOOR_DIVIDE;
 	}
 	return 0;
 }
 
 static int
-cmpop(cmpop_ty op)
+cmpop(PyObject *op)
 {
-	switch (op) {
-	case Eq:
+	switch (cmpop_kind(op)) {
+	case Eq_kind:
 		return PyCmp_EQ;
-	case NotEq:
+	case NotEq_kind:
 		return PyCmp_NE;
-	case Lt:
+	case Lt_kind:
 		return PyCmp_LT;
-	case LtE:
+	case LtE_kind:
 		return PyCmp_LE;
-	case Gt:
+	case Gt_kind:
 		return PyCmp_GT;
-	case GtE:
+	case GtE_kind:
 		return PyCmp_GE;
-	case Is:
+	case Is_kind:
 		return PyCmp_IS;
-	case IsNot:
+	case IsNot_kind:
 		return PyCmp_IS_NOT;
-	case In:
+	case In_kind:
 		return PyCmp_IN;
-	case NotIn:
+	case NotIn_kind:
 		return PyCmp_NOT_IN;
 	}
 	return PyCmp_BAD;
 }
 
 static int
-inplace_binop(struct compiler *c, operator_ty op)
+inplace_binop(struct compiler *c, PyObject *op)
 {
-	switch (op) {
-	case Add:
+	switch (operator_kind(op)) {
+	case Add_kind:
 		return INPLACE_ADD;
-	case Sub:
+	case Sub_kind:
 		return INPLACE_SUBTRACT;
-	case Mult:
+	case Mult_kind:
 		return INPLACE_MULTIPLY;
-	case Div:
+	case Div_kind:
 		if (c->c_flags && c->c_flags->cf_flags & CO_FUTURE_DIVISION)
 			return INPLACE_TRUE_DIVIDE;
 		else
 			return INPLACE_DIVIDE;
-	case Mod:
+	case Mod_kind:
 		return INPLACE_MODULO;
-	case Pow:
+	case Pow_kind:
 		return INPLACE_POWER;
-	case LShift:
+	case LShift_kind:
 		return INPLACE_LSHIFT;
-	case RShift:
+	case RShift_kind:
 		return INPLACE_RSHIFT;
-	case BitOr:
+	case BitOr_kind:
 		return INPLACE_OR;
-	case BitXor:
+	case BitXor_kind:
 		return INPLACE_XOR;
-	case BitAnd:
+	case BitAnd_kind:
 		return INPLACE_AND;
-	case FloorDiv:
+	case FloorDiv_kind:
 		return INPLACE_FLOOR_DIVIDE;
 	}
 	PyErr_Format(PyExc_SystemError,
 		     "inplace binary op %d should not be possible",
-		     op);
+		     operator_kind(op));
 	return 0;
 }
 
 static int
-compiler_nameop(struct compiler *c, identifier name, expr_context_ty ctx)
+compiler_nameop(struct compiler *c, PyObject *name, PyObject *ctx)
 {
 	int op, scope, arg;
 	enum { OP_FAST, OP_GLOBAL, OP_DEREF, OP_NAME } optype;
@@ -2765,7 +2760,9 @@ compiler_nameop(struct compiler *c, identifier name, expr_context_ty ctx)
 	/* XXX AugStore isn't used anywhere! */
 
 	/* First check for assignment to __debug__. Param? */
-	if ((ctx == Store || ctx == AugStore || ctx == Del)
+	if ((expr_context_kind(ctx) == Store_kind
+             || expr_context_kind(ctx) == AugStore_kind 
+             || expr_context_kind(ctx) == Del_kind)
 	    && !strcmp(PyString_AS_STRING(name), "__debug__")) {
 		return compiler_error(c, "can not assign to __debug__");
 	}
@@ -2805,34 +2802,34 @@ compiler_nameop(struct compiler *c, identifier name, expr_context_ty ctx)
 
 	switch (optype) {
 	case OP_DEREF:
-		switch (ctx) {
-		case Load: op = LOAD_DEREF; break;
-		case Store: op = STORE_DEREF; break;
-		case AugLoad:
-		case AugStore:
+		switch (expr_context_kind(ctx)) {
+		case Load_kind: op = LOAD_DEREF; break;
+		case Store_kind: op = STORE_DEREF; break;
+		case AugLoad_kind:
+		case AugStore_kind:
 			break;
-		case Del:
+		case Del_kind:
 			PyErr_Format(PyExc_SyntaxError,
 				     "can not delete variable '%s' referenced "
 				     "in nested scope",
 				     PyString_AS_STRING(name));
 			Py_DECREF(mangled);
 			return 0;
-		case Param:
+		case Param_kind:
 			PyErr_SetString(PyExc_SystemError,
 					"param invalid for deref variable");
 			return 0;
 		}
 		break;
 	case OP_FAST:
-		switch (ctx) {
-		case Load: op = LOAD_FAST; break;
-		case Store: op = STORE_FAST; break;
-		case Del: op = DELETE_FAST; break;
-		case AugLoad:
-		case AugStore:
+		switch (expr_context_kind(ctx)) {
+		case Load_kind: op = LOAD_FAST; break;
+		case Store_kind: op = STORE_FAST; break;
+		case Del_kind: op = DELETE_FAST; break;
+		case AugLoad_kind:
+		case AugStore_kind:
 			break;
-		case Param:
+		case Param_kind:
 			PyErr_SetString(PyExc_SystemError,
 					"param invalid for local variable");
 			return 0;
@@ -2841,28 +2838,28 @@ compiler_nameop(struct compiler *c, identifier name, expr_context_ty ctx)
 		Py_DECREF(mangled);
 		return 1;
 	case OP_GLOBAL:
-		switch (ctx) {
-		case Load: op = LOAD_GLOBAL; break;
-		case Store: op = STORE_GLOBAL; break;
-		case Del: op = DELETE_GLOBAL; break;
-		case AugLoad:
-		case AugStore:
+		switch (expr_context_kind(ctx)) {
+		case Load_kind: op = LOAD_GLOBAL; break;
+		case Store_kind: op = STORE_GLOBAL; break;
+		case Del_kind: op = DELETE_GLOBAL; break;
+		case AugLoad_kind:
+		case AugStore_kind:
 			break;
-		case Param:
+		case Param_kind:
 			PyErr_SetString(PyExc_SystemError,
 					"param invalid for global variable");
 			return 0;
 		}
 		break;
 	case OP_NAME:
-		switch (ctx) {
-		case Load: op = LOAD_NAME; break;
-		case Store: op = STORE_NAME; break;
-		case Del: op = DELETE_NAME; break;
-		case AugLoad:
-		case AugStore:
+		switch (expr_context_kind(ctx)) {
+		case Load_kind: op = LOAD_NAME; break;
+		case Store_kind: op = STORE_NAME; break;
+		case Del_kind: op = DELETE_NAME; break;
+		case AugLoad_kind:
+		case AugStore_kind:
 			break;
-		case Param:
+		case Param_kind:
 			PyErr_SetString(PyExc_SystemError,
 					"param invalid for name variable");
 			return 0;
@@ -2879,92 +2876,92 @@ compiler_nameop(struct compiler *c, identifier name, expr_context_ty ctx)
 }
 
 static int
-compiler_boolop(struct compiler *c, expr_ty e)
+compiler_boolop(struct compiler *c, PyObject *e)
 {
 	basicblock *end;
 	int jumpi, i, n;
-	asdl_seq *s;
+	PyObject *s;
 
-	assert(e->kind == BoolOp_kind);
-	if (e->v.BoolOp.op == And)
+	assert(expr_kind(e) == BoolOp_kind);
+	if (boolop_kind(BoolOp_op(e)) == And_kind)
 		jumpi = JUMP_IF_FALSE;
 	else
 		jumpi = JUMP_IF_TRUE;
 	end = compiler_new_block(c);
 	if (end < 0)
 		return 0;
-	s = e->v.BoolOp.values;
-	n = asdl_seq_LEN(s) - 1;
+	s = BoolOp_values(e);
+	n = PyList_GET_SIZE(s) - 1;
 	for (i = 0; i < n; ++i) {
-		VISIT(c, expr, asdl_seq_GET(s, i));
+		VISIT(c, expr, PyList_GET_ITEM(s, i));
 		ADDOP_JREL(c, jumpi, end);
 		ADDOP(c, POP_TOP)
 	}
-	VISIT(c, expr, asdl_seq_GET(s, n));
+	VISIT(c, expr, PyList_GET_ITEM(s, n));
 	compiler_use_next_block(c, end);
 	return 1;
 }
 
 static int
-compiler_list(struct compiler *c, expr_ty e)
+compiler_list(struct compiler *c, PyObject *e)
 {
-	int n = asdl_seq_LEN(e->v.List.elts);
-	if (e->v.List.ctx == Store) {
+	int n = PyList_GET_SIZE(List_elts(e));
+	if (expr_context_kind(List_ctx(e)) == Store_kind) {
 		ADDOP_I(c, UNPACK_SEQUENCE, n);
 	}
-	VISIT_SEQ(c, expr, e->v.List.elts);
-	if (e->v.List.ctx == Load) {
+	VISIT_SEQ(c, expr, List_elts(e));
+	if (expr_context_kind(List_ctx(e)) == Load_kind) {
 		ADDOP_I(c, BUILD_LIST, n);
 	}
 	return 1;
 }
 
 static int
-compiler_tuple(struct compiler *c, expr_ty e)
+compiler_tuple(struct compiler *c, PyObject *e)
 {
-	int n = asdl_seq_LEN(e->v.Tuple.elts);
-	if (e->v.Tuple.ctx == Store) {
+	int n = PyList_GET_SIZE(Tuple_elts(e));
+	if (expr_context_kind(Tuple_ctx(e)) == Store_kind) {
 		ADDOP_I(c, UNPACK_SEQUENCE, n);
 	}
-	VISIT_SEQ(c, expr, e->v.Tuple.elts);
-	if (e->v.Tuple.ctx == Load) {
+	VISIT_SEQ(c, expr, Tuple_elts(e));
+	if (expr_context_kind(Tuple_ctx(e)) == Load_kind) {
 		ADDOP_I(c, BUILD_TUPLE, n);
 	}
 	return 1;
 }
 
 static int
-compiler_compare(struct compiler *c, expr_ty e)
+compiler_compare(struct compiler *c, PyObject *e)
 {
 	int i, n;
         basicblock *cleanup = NULL;
 
 	/* XXX the logic can be cleaned up for 1 or multiple comparisons */
-	VISIT(c, expr, e->v.Compare.left);
-	n = asdl_seq_LEN(e->v.Compare.ops);
+	VISIT(c, expr, Compare_left(e));
+	n = PyList_GET_SIZE(Compare_ops(e));
 	assert(n > 0);
 	if (n > 1) {
 		cleanup = compiler_new_block(c);
                 if (cleanup == NULL)
                     return 0;
-		VISIT(c, expr, asdl_seq_GET(e->v.Compare.comparators, 0));
+		VISIT(c, expr, PyList_GET_ITEM(Compare_comparators(e), 0));
 	}
 	for (i = 1; i < n; i++) {
 		ADDOP(c, DUP_TOP);
 		ADDOP(c, ROT_THREE);
 		/* XXX We're casting a void* to cmpop_ty in the next stmt. */
 		ADDOP_I(c, COMPARE_OP,
-			cmpop((cmpop_ty)asdl_seq_GET(e->v.Compare.ops, i - 1)));
+			cmpop(PyList_GET_ITEM(Compare_ops(e), i - 1)));
 		ADDOP_JREL(c, JUMP_IF_FALSE, cleanup);
 		NEXT_BLOCK(c);
 		ADDOP(c, POP_TOP);
 		if (i < (n - 1))
-		    VISIT(c, expr, asdl_seq_GET(e->v.Compare.comparators, i));
+		    VISIT(c, expr, PyList_GET_ITEM(Compare_comparators(e), i));
 	}
-	VISIT(c, expr, asdl_seq_GET(e->v.Compare.comparators, n - 1));
+	VISIT(c, expr, PyList_GET_ITEM(Compare_comparators(e), n - 1));
 	ADDOP_I(c, COMPARE_OP,
 		/* XXX We're casting a void* to cmpop_ty in the next stmt. */
-	       cmpop((cmpop_ty)asdl_seq_GET(e->v.Compare.ops, n - 1)));
+	       cmpop(PyList_GET_ITEM(Compare_ops(e), n - 1)));
 	if (n > 1) {
 		basicblock *end = compiler_new_block(c);
                 if (end == NULL)
@@ -2979,23 +2976,21 @@ compiler_compare(struct compiler *c, expr_ty e)
 }
 
 static int
-compiler_call(struct compiler *c, expr_ty e)
+compiler_call(struct compiler *c, PyObject *e)
 {
 	int n, code = 0;
 
-	VISIT(c, expr, e->v.Call.func);
-	n = asdl_seq_LEN(e->v.Call.args);
-	VISIT_SEQ(c, expr, e->v.Call.args);
-	if (e->v.Call.keywords) {
-		VISIT_SEQ(c, keyword, e->v.Call.keywords);
-		n |= asdl_seq_LEN(e->v.Call.keywords) << 8;
-	}
-	if (e->v.Call.starargs) {
-		VISIT(c, expr, e->v.Call.starargs);
+	VISIT(c, expr, Call_func(e));
+	n = PyList_GET_SIZE(Call_args(e));
+	VISIT_SEQ(c, expr, Call_args(e));
+	VISIT_SEQ(c, keyword, Call_keywords(e));
+	n |= PyList_GET_SIZE(Call_keywords(e)) << 8;
+	if (Call_starargs(e) != Py_None) {
+		VISIT(c, expr, Call_starargs(e));
 		code |= 1;
 	}
-	if (e->v.Call.kwargs) {
-		VISIT(c, expr, e->v.Call.kwargs);
+	if (Call_kwargs(e) != Py_None) {
+		VISIT(c, expr, Call_kwargs(e));
 		code |= 2;
 	}
 	switch (code) {
@@ -3017,13 +3012,13 @@ compiler_call(struct compiler *c, expr_ty e)
 
 static int
 compiler_listcomp_generator(struct compiler *c, PyObject *tmpname,
-                            asdl_seq *generators, int gen_index, 
-                            expr_ty elt)
+                            PyObject *generators, int gen_index, 
+                            PyObject *elt)
 {
 	/* generate code for the iterator, then each of the ifs,
 	   and then write to the element */
 
-	comprehension_ty l;
+	PyObject *l;
 	basicblock *start, *anchor, *skip, *if_cleanup;
         int i, n;
 
@@ -3036,32 +3031,32 @@ compiler_listcomp_generator(struct compiler *c, PyObject *tmpname,
                 anchor == NULL)
             return 0;
 
-	l = asdl_seq_GET(generators, gen_index);
-	VISIT(c, expr, l->iter);
+	l = PyList_GET_ITEM(generators, gen_index);
+	VISIT(c, expr, comprehension_iter(l));
 	ADDOP(c, GET_ITER);
 	compiler_use_next_block(c, start);
 	ADDOP_JREL(c, FOR_ITER, anchor);
 	NEXT_BLOCK(c);
-	VISIT(c, expr, l->target);
+	VISIT(c, expr, comprehension_target(l));
 
         /* XXX this needs to be cleaned up...a lot! */
-	n = asdl_seq_LEN(l->ifs);
+	n = PyList_GET_SIZE(comprehension_ifs(l));
 	for (i = 0; i < n; i++) {
-		expr_ty e = asdl_seq_GET(l->ifs, i);
+		PyObject *e = PyList_GET_ITEM(comprehension_ifs(l), i);
 		VISIT(c, expr, e);
 		ADDOP_JREL(c, JUMP_IF_FALSE, if_cleanup);
 		NEXT_BLOCK(c);
 		ADDOP(c, POP_TOP);
 	} 
 
-        if (++gen_index < asdl_seq_LEN(generators))
+        if (++gen_index < PyList_GET_SIZE(generators))
             if (!compiler_listcomp_generator(c, tmpname, 
                                              generators, gen_index, elt))
                 return 0;
 
         /* only append after the last for generator */
-        if (gen_index >= asdl_seq_LEN(generators)) {
-            if (!compiler_nameop(c, tmpname, Load))
+        if (gen_index >= PyList_GET_SIZE(generators)) {
+            if (!compiler_nameop(c, tmpname, Load()))
 		return 0;
             VISIT(c, expr, elt);
             ADDOP_I(c, CALL_FUNCTION, 1);
@@ -3079,22 +3074,22 @@ compiler_listcomp_generator(struct compiler *c, PyObject *tmpname,
 	compiler_use_next_block(c, anchor);
         /* delete the append method added to locals */
 	if (gen_index == 1)
-            if (!compiler_nameop(c, tmpname, Del))
+            if (!compiler_nameop(c, tmpname, Del()))
 		return 0;
 	
 	return 1;
 }
 
 static int
-compiler_listcomp(struct compiler *c, expr_ty e)
+compiler_listcomp(struct compiler *c, PyObject *e)
 {
 	char tmpname[256];
-	identifier tmp;
+	PyObject *tmp;
         int rc = 0;
-	static identifier append;
-	asdl_seq *generators = e->v.ListComp.generators;
+	static PyObject *append;
+	PyObject *generators = ListComp_generators(e);
 
-	assert(e->kind == ListComp_kind);
+	assert(expr_kind(e) == ListComp_kind);
 	if (!append) {
 		append = PyString_InternFromString("append");
 		if (!append)
@@ -3107,22 +3102,22 @@ compiler_listcomp(struct compiler *c, expr_ty e)
 	ADDOP_I(c, BUILD_LIST, 0);
 	ADDOP(c, DUP_TOP);
 	ADDOP_O(c, LOAD_ATTR, append, names);
-	if (compiler_nameop(c, tmp, Store))
+	if (compiler_nameop(c, tmp, Store()))
             rc = compiler_listcomp_generator(c, tmp, generators, 0, 
-                                             e->v.ListComp.elt);
+                                             ListComp_elt(e));
         Py_DECREF(tmp);
 	return rc;
 }
 
 static int
 compiler_genexp_generator(struct compiler *c,
-                          asdl_seq *generators, int gen_index, 
-                          expr_ty elt)
+                          PyObject *generators, int gen_index, 
+                          PyObject *elt)
 {
 	/* generate code for the iterator, then each of the ifs,
 	   and then write to the element */
 
-	comprehension_ty ge;
+	PyObject *ge;
 	basicblock *start, *anchor, *skip, *if_cleanup, *end;
         int i, n;
 
@@ -3136,7 +3131,7 @@ compiler_genexp_generator(struct compiler *c,
 	    anchor == NULL || end == NULL)
 		return 0;
 
-	ge = asdl_seq_GET(generators, gen_index);
+	ge = PyList_GET_ITEM(generators, gen_index);
 	ADDOP_JREL(c, SETUP_LOOP, end);
 	if (!compiler_push_fblock(c, LOOP, start))
 		return 0;
@@ -3148,30 +3143,30 @@ compiler_genexp_generator(struct compiler *c,
 	}
 	else {
 		/* Sub-iter - calculate on the fly */
-		VISIT(c, expr, ge->iter);
+		VISIT(c, expr, comprehension_iter(ge));
 		ADDOP(c, GET_ITER);
 	}
 	compiler_use_next_block(c, start);
 	ADDOP_JREL(c, FOR_ITER, anchor);
 	NEXT_BLOCK(c);
-	VISIT(c, expr, ge->target);
+	VISIT(c, expr, comprehension_target(ge));
 
         /* XXX this needs to be cleaned up...a lot! */
-	n = asdl_seq_LEN(ge->ifs);
+	n = PyList_GET_SIZE(comprehension_ifs(ge));
 	for (i = 0; i < n; i++) {
-		expr_ty e = asdl_seq_GET(ge->ifs, i);
+		PyObject *e = PyList_GET_ITEM(comprehension_ifs(ge), i);
 		VISIT(c, expr, e);
 		ADDOP_JREL(c, JUMP_IF_FALSE, if_cleanup);
 		NEXT_BLOCK(c);
 		ADDOP(c, POP_TOP);
 	} 
 
-        if (++gen_index < asdl_seq_LEN(generators))
+        if (++gen_index < PyList_GET_SIZE(generators))
 		if (!compiler_genexp_generator(c, generators, gen_index, elt))
 			return 0;
 
         /* only append after the last 'for' generator */
-        if (gen_index >= asdl_seq_LEN(generators)) {
+        if (gen_index >= PyList_GET_SIZE(generators)) {
 		VISIT(c, expr, elt);
 		ADDOP(c, YIELD_VALUE);
 		ADDOP(c, POP_TOP);
@@ -3195,13 +3190,11 @@ compiler_genexp_generator(struct compiler *c,
 }
 
 static int
-compiler_genexp(struct compiler *c, expr_ty e)
+compiler_genexp(struct compiler *c, PyObject *e)
 {
-	static identifier name;
+	static PyObject *name;
 	PyCodeObject *co;
-	expr_ty outermost_iter = ((comprehension_ty)
-				 (asdl_seq_GET(e->v.GeneratorExp.generators,
-					       0)))->iter;
+	PyObject *outermost_iter = comprehension_iter(PyList_GET_ITEM(GeneratorExp_generators(e), 0));
 
 	if (!name) {
 		name = PyString_FromString("<genexpr>");
@@ -3209,10 +3202,10 @@ compiler_genexp(struct compiler *c, expr_ty e)
 			return 0;
 	}
 
-	if (!compiler_enter_scope(c, name, (void *)e, e->lineno))
+	if (!compiler_enter_scope(c, name, (void *)e, ((struct _expr*)e)->lineno))
 		return 0;
-	compiler_genexp_generator(c, e->v.GeneratorExp.generators, 0,
-				  e->v.GeneratorExp.elt);
+	compiler_genexp_generator(c, GeneratorExp_generators(e), 0,
+				  GeneratorExp_elt(e));
 	co = assemble(c, 1);
 	compiler_exit_scope(c);
 	if (co == NULL)
@@ -3229,10 +3222,10 @@ compiler_genexp(struct compiler *c, expr_ty e)
 }
 
 static int
-compiler_visit_keyword(struct compiler *c, keyword_ty k)
+compiler_visit_keyword(struct compiler *c, PyObject *k)
 {
-	ADDOP_O(c, LOAD_CONST, k->arg, consts);
-	VISIT(c, expr, k->value);
+	ADDOP_O(c, LOAD_CONST, keyword_arg(k), consts);
+	VISIT(c, expr, keyword_value(k));
 	return 1;
 }
 
@@ -3243,52 +3236,52 @@ compiler_visit_keyword(struct compiler *c, keyword_ty k)
  */
 
 static int
-expr_constant(expr_ty e)
+expr_constant(PyObject *e)
 {
-	switch (e->kind) {
+	switch (expr_kind(e)) {
 	case Num_kind:
-		return PyObject_IsTrue(e->v.Num.n);
+		return PyObject_IsTrue(Num_n(e));
 	case Str_kind:
-		return PyObject_IsTrue(e->v.Str.s);
+		return PyObject_IsTrue(Str_s(e));
 	default:
 		return -1;
 	}
 }
 
 static int
-compiler_visit_expr(struct compiler *c, expr_ty e)
+compiler_visit_expr(struct compiler *c, PyObject *e)
 {
 	int i, n;
 
-	if (e->lineno > c->u->u_lineno) {
-		c->u->u_lineno = e->lineno;
+	if (((struct _expr*)e)->lineno > c->u->u_lineno) {
+		c->u->u_lineno = ((struct _expr*)e)->lineno;
 		c->u->u_lineno_set = 0;
 	}
-	switch (e->kind) {
+	switch (expr_kind(e)) {
         case BoolOp_kind:
 		return compiler_boolop(c, e);
         case BinOp_kind:
-		VISIT(c, expr, e->v.BinOp.left);
-		VISIT(c, expr, e->v.BinOp.right);
-		ADDOP(c, binop(c, e->v.BinOp.op));
+		VISIT(c, expr, BinOp_left(e));
+		VISIT(c, expr, BinOp_right(e));
+		ADDOP(c, binop(c, BinOp_op(e)));
 		break;
         case UnaryOp_kind:
-		VISIT(c, expr, e->v.UnaryOp.operand);
-		ADDOP(c, unaryop(e->v.UnaryOp.op));
+		VISIT(c, expr, UnaryOp_operand(e));
+		ADDOP(c, unaryop(UnaryOp_op(e)));
 		break;
         case Lambda_kind:
 		return compiler_lambda(c, e);
         case Dict_kind:
 		/* XXX get rid of arg? */
 		ADDOP_I(c, BUILD_MAP, 0);
-		n = asdl_seq_LEN(e->v.Dict.values);
+		n = PyList_GET_SIZE(Dict_values(e));
 		/* We must arrange things just right for STORE_SUBSCR.
 		   It wants the stack to look like (value) (dict) (key) */
 		for (i = 0; i < n; i++) {
 			ADDOP(c, DUP_TOP);
-			VISIT(c, expr, asdl_seq_GET(e->v.Dict.values, i));
+			VISIT(c, expr, PyList_GET_ITEM(Dict_values(e), i));
 			ADDOP(c, ROT_TWO);
-			VISIT(c, expr, asdl_seq_GET(e->v.Dict.keys, i));
+			VISIT(c, expr, PyList_GET_ITEM(Dict_keys(e), i));
 			ADDOP(c, STORE_SUBSCR);
 		}
 		break;
@@ -3307,8 +3300,8 @@ compiler_visit_expr(struct compiler *c, expr_ty e)
 					"block with a 'finally' clause");
 		}
 		*/
-		if (e->v.Yield.value) {
-			VISIT(c, expr, e->v.Yield.value);
+		if (Yield_value(e) != Py_None) {
+			VISIT(c, expr, Yield_value(e));
 		}
 		else {
 			ADDOP_O(c, LOAD_CONST, Py_None, consts);
@@ -3320,70 +3313,70 @@ compiler_visit_expr(struct compiler *c, expr_ty e)
         case Call_kind:
 		return compiler_call(c, e);
         case Repr_kind:
-		VISIT(c, expr, e->v.Repr.value);
+		VISIT(c, expr, Repr_value(e));
 		ADDOP(c, UNARY_CONVERT);
 		break;
         case Num_kind:
-		ADDOP_O(c, LOAD_CONST, e->v.Num.n, consts);
+		ADDOP_O(c, LOAD_CONST, Num_n(e), consts);
 		break;
         case Str_kind:
-		ADDOP_O(c, LOAD_CONST, e->v.Str.s, consts);
+		ADDOP_O(c, LOAD_CONST, Str_s(e), consts);
 		break;
 	/* The following exprs can be assignment targets. */
         case Attribute_kind:
-		if (e->v.Attribute.ctx != AugStore)
-			VISIT(c, expr, e->v.Attribute.value);
-		switch (e->v.Attribute.ctx) {
-		case AugLoad:
+		if (expr_context_kind(Attribute_ctx(e)) != AugStore_kind)
+			VISIT(c, expr, Attribute_value(e));
+		switch (expr_context_kind(Attribute_ctx(e))) {
+		case AugLoad_kind:
 			ADDOP(c, DUP_TOP);
 			/* Fall through to load */
-		case Load:
-			ADDOP_NAME(c, LOAD_ATTR, e->v.Attribute.attr, names);
+		case Load_kind:
+			ADDOP_NAME(c, LOAD_ATTR, Attribute_attr(e), names);
 			break;
-		case AugStore:
+		case AugStore_kind:
 			ADDOP(c, ROT_TWO);
 			/* Fall through to save */
-		case Store:
-			ADDOP_NAME(c, STORE_ATTR, e->v.Attribute.attr, names);
+		case Store_kind:
+			ADDOP_NAME(c, STORE_ATTR, Attribute_attr(e), names);
 			break;
-		case Del:
-			ADDOP_NAME(c, DELETE_ATTR, e->v.Attribute.attr, names);
+		case Del_kind:
+			ADDOP_NAME(c, DELETE_ATTR, Attribute_attr(e), names);
 			break;
-		case Param:
+		case Param_kind:
 			PyErr_SetString(PyExc_SystemError,
 					"param invalid in attribute expression");
 			return 0;
 		}
 		break;
         case Subscript_kind:
-		switch (e->v.Subscript.ctx) {
-		case AugLoad:
-			VISIT(c, expr, e->v.Subscript.value);
-			VISIT_SLICE(c, e->v.Subscript.slice, AugLoad);
+		switch (expr_context_kind(Subscript_ctx(e))) {
+		case AugLoad_kind:
+			VISIT(c, expr, Subscript_value(e));
+			VISIT_SLICE(c, Subscript_slice(e), AugLoad()); /* make a PyObject ?? */
 			break;
-		case Load:
-			VISIT(c, expr, e->v.Subscript.value);
-			VISIT_SLICE(c, e->v.Subscript.slice, Load);
+		case Load_kind:
+			VISIT(c, expr, Subscript_value(e));
+			VISIT_SLICE(c, Subscript_slice(e), Load());
 			break;
-		case AugStore:
-			VISIT_SLICE(c, e->v.Subscript.slice, AugStore);
+		case AugStore_kind:
+			VISIT_SLICE(c, Subscript_slice(e), AugStore());
 			break;
-		case Store:
-			VISIT(c, expr, e->v.Subscript.value);
-			VISIT_SLICE(c, e->v.Subscript.slice, Store);
+		case Store_kind:
+			VISIT(c, expr, Subscript_value(e));
+			VISIT_SLICE(c, Subscript_slice(e), Store());
 			break;
-		case Del:
-			VISIT(c, expr, e->v.Subscript.value);
-			VISIT_SLICE(c, e->v.Subscript.slice, Del);
+		case Del_kind:
+			VISIT(c, expr, Subscript_value(e));
+			VISIT_SLICE(c, Subscript_slice(e), Del());
 			break;
-		case Param:
+		case Param_kind:
 			PyErr_SetString(PyExc_SystemError,
 					"param invalid in subscript expression");
 			return 0;
 		}
 		break;
         case Name_kind:
-		return compiler_nameop(c, e->v.Name.id, e->v.Name.ctx);
+		return compiler_nameop(c, Name_id(e), Name_ctx(e));
 	/* child nodes of List and Tuple will have expr_context set */
         case List_kind:
 		return compiler_list(c, e);
@@ -3394,43 +3387,41 @@ compiler_visit_expr(struct compiler *c, expr_ty e)
 }
 
 static int
-compiler_augassign(struct compiler *c, stmt_ty s)
+compiler_augassign(struct compiler *c, PyObject *s)
 {
-	expr_ty e = s->v.AugAssign.target;
-	expr_ty auge;
+	PyObject *e = AugAssign_target(s);
+	PyObject *auge;
 
-	assert(s->kind == AugAssign_kind);
+	assert(stmt_kind(s) == AugAssign_kind);
 
-	switch (e->kind) {
+	switch (expr_kind(e)) {
                 case Attribute_kind:
-		auge = Attribute(e->v.Attribute.value, e->v.Attribute.attr,
-				 AugLoad, e->lineno);
+		auge = Attribute(Attribute_value(e), Attribute_attr(e),
+				 AugLoad(), ((struct _expr*)e)->lineno);
                 if (auge == NULL)
                     return 0;
 		VISIT(c, expr, auge);
-		VISIT(c, expr, s->v.AugAssign.value);
-		ADDOP(c, inplace_binop(c, s->v.AugAssign.op));
-		auge->v.Attribute.ctx = AugStore;
+		VISIT(c, expr, AugAssign_value(s));
+		ADDOP(c, inplace_binop(c, AugAssign_op(s)));
+		Attribute_ctx (auge)= AugStore();
 		VISIT(c, expr, auge);
-		free(auge);
 		break;
 	case Subscript_kind:
-		auge = Subscript(e->v.Subscript.value, e->v.Subscript.slice,
-				 AugLoad, e->lineno);
+		auge = Subscript(Subscript_value(e), Subscript_slice(e),
+				 AugLoad(), ((struct _expr*)e)->lineno);
                 if (auge == NULL)
                     return 0;
 		VISIT(c, expr, auge);
-		VISIT(c, expr, s->v.AugAssign.value);
-		ADDOP(c, inplace_binop(c, s->v.AugAssign.op));
-                auge->v.Subscript.ctx = AugStore;
+		VISIT(c, expr, AugAssign_value(s));
+		ADDOP(c, inplace_binop(c, AugAssign_op(s)));
+                Subscript_ctx (auge)= AugStore();
 		VISIT(c, expr, auge);
-		free(auge);
                 break;
 	case Name_kind:
-		VISIT(c, expr, s->v.AugAssign.target);
-		VISIT(c, expr, s->v.AugAssign.value);
-		ADDOP(c, inplace_binop(c, s->v.AugAssign.op));
-		return compiler_nameop(c, e->v.Name.id, Store);
+		VISIT(c, expr, AugAssign_target(s));
+		VISIT(c, expr, AugAssign_value(s));
+		ADDOP(c, inplace_binop(c, AugAssign_op(s)));
+		return compiler_nameop(c, Name_id(e), Store());
 	default:
                 fprintf(stderr, 
                         "invalid node type for augmented assignment\n");
@@ -3493,27 +3484,27 @@ compiler_error(struct compiler *c, const char *errstr)
 
 static int
 compiler_handle_subscr(struct compiler *c, const char *kind, 
-                       expr_context_ty ctx) 
+                       PyObject *ctx) 
 {
         int op = 0;
 
         /* XXX this code is duplicated */
-        switch (ctx) {
-                case AugLoad: /* fall through to Load */
-                case Load:    op = BINARY_SUBSCR; break;
-                case AugStore:/* fall through to Store */
-                case Store:   op = STORE_SUBSCR; break;
-                case Del:     op = DELETE_SUBSCR; break;
-                case Param:
+        switch (expr_context_kind(ctx)) {
+                case AugLoad_kind: /* fall through to Load */
+                case Load_kind:    op = BINARY_SUBSCR; break;
+                case AugStore_kind:/* fall through to Store */
+                case Store_kind:   op = STORE_SUBSCR; break;
+                case Del_kind:     op = DELETE_SUBSCR; break;
+                case Param_kind:
                         fprintf(stderr, 
                                 "invalid %s kind %d in subscript\n", 
-                                kind, ctx);
+                                kind, expr_context_kind(ctx));
                         return 0;
         }
-        if (ctx == AugLoad) {
+        if (expr_context_kind(ctx) == AugLoad_kind) {
                 ADDOP_I(c, DUP_TOPX, 2);
         }
-        else if (ctx == AugStore) {
+        else if (expr_context_kind(ctx) == AugStore_kind) {
                 ADDOP(c, ROT_THREE);
         }
         ADDOP(c, op);
@@ -3521,61 +3512,61 @@ compiler_handle_subscr(struct compiler *c, const char *kind,
 }
 
 static int
-compiler_slice(struct compiler *c, slice_ty s, expr_context_ty ctx)
+compiler_slice(struct compiler *c, PyObject *s, PyObject *ctx)
 {
 	int n = 2;
-	assert(s->kind == Slice_kind);
+	assert(slice_kind(s) == Slice_kind);
 
 	/* only handles the cases where BUILD_SLICE is emitted */
-	if (s->v.Slice.lower) {
-                VISIT(c, expr, s->v.Slice.lower);
+	if (Slice_lower(s) != Py_None) {
+                VISIT(c, expr, Slice_lower(s));
 	}
 	else {
                 ADDOP_O(c, LOAD_CONST, Py_None, consts);
 	}
                 
-	if (s->v.Slice.upper) {
-                VISIT(c, expr, s->v.Slice.upper);
+	if (Slice_upper(s) != Py_None) {
+                VISIT(c, expr, Slice_upper(s));
 	}
 	else {
                 ADDOP_O(c, LOAD_CONST, Py_None, consts);
 	}
 
-	if (s->v.Slice.step) {
+	if (Slice_step(s) != Py_None) {
 		n++;
-		VISIT(c, expr, s->v.Slice.step);
+		VISIT(c, expr, Slice_step(s));
 	}
 	ADDOP_I(c, BUILD_SLICE, n);
 	return 1;
 }
 
 static int
-compiler_simple_slice(struct compiler *c, slice_ty s, expr_context_ty ctx)
+compiler_simple_slice(struct compiler *c, PyObject *s, PyObject *ctx)
 {
 	int op = 0, slice_offset = 0, stack_count = 0;
 
-	assert(s->v.Slice.step == NULL);
-	if (s->v.Slice.lower) {
+	assert(Slice_step(s) == NULL);
+	if (Slice_lower(s) != Py_None) {
 		slice_offset++;
 		stack_count++;
-		if (ctx != AugStore) 
-			VISIT(c, expr, s->v.Slice.lower);
+		if (expr_context_kind(ctx) != AugStore_kind) 
+			VISIT(c, expr, Slice_lower(s));
 	}
-	if (s->v.Slice.upper) {
+	if (Slice_upper(s) != Py_None) {
 		slice_offset += 2;
 		stack_count++;
-		if (ctx != AugStore) 
-			VISIT(c, expr, s->v.Slice.upper);
+		if (expr_context_kind(ctx) != AugStore_kind) 
+			VISIT(c, expr, Slice_upper(s));
 	}
 
- 	if (ctx == AugLoad) {
+ 	if (expr_context_kind(ctx) == AugLoad_kind) {
  		switch (stack_count) {
  		case 0: ADDOP(c, DUP_TOP); break;
  		case 1: ADDOP_I(c, DUP_TOPX, 2); break;
  		case 2: ADDOP_I(c, DUP_TOPX, 3); break;
  		}
   	}
- 	else if (ctx == AugStore) {
+ 	else if (expr_context_kind(ctx) == AugStore_kind) {
  		switch (stack_count) {
  		case 0: ADDOP(c, ROT_TWO); break;
  		case 1: ADDOP(c, ROT_THREE); break;
@@ -3583,13 +3574,13 @@ compiler_simple_slice(struct compiler *c, slice_ty s, expr_context_ty ctx)
   		}
   	}
 
-	switch (ctx) {
-	case AugLoad: /* fall through to Load */
-	case Load: op = SLICE; break;
-	case AugStore:/* fall through to Store */
-	case Store: op = STORE_SLICE; break;
-	case Del: op = DELETE_SLICE; break;
-	case Param:
+	switch (expr_context_kind(ctx)) {
+	case AugLoad_kind: /* fall through to Load */
+	case Load_kind: op = SLICE; break;
+	case AugStore_kind:/* fall through to Store */
+	case Store_kind: op = STORE_SLICE; break;
+	case Del_kind: op = DELETE_SLICE; break;
+	case Param_kind:
 		PyErr_SetString(PyExc_SystemError,
 				"param invalid in simple slice");
 		return 0;
@@ -3600,10 +3591,10 @@ compiler_simple_slice(struct compiler *c, slice_ty s, expr_context_ty ctx)
 }
 
 static int
-compiler_visit_nested_slice(struct compiler *c, slice_ty s, 
-			    expr_context_ty ctx)
+compiler_visit_nested_slice(struct compiler *c, PyObject *s, 
+			    PyObject *ctx)
 {
-	switch (s->kind) {
+	switch (slice_kind(s)) {
 	case Ellipsis_kind:
 		ADDOP_O(c, LOAD_CONST, Py_Ellipsis, consts);
 		break;
@@ -3611,7 +3602,7 @@ compiler_visit_nested_slice(struct compiler *c, slice_ty s,
 		return compiler_slice(c, s, ctx);
 		break;
 	case Index_kind:
-		VISIT(c, expr, s->v.Index.value);
+		VISIT(c, expr, Index_value(s));
 		break;
 	case ExtSlice_kind:
 		PyErr_SetString(PyExc_SystemError,
@@ -3623,28 +3614,28 @@ compiler_visit_nested_slice(struct compiler *c, slice_ty s,
 
 
 static int
-compiler_visit_slice(struct compiler *c, slice_ty s, expr_context_ty ctx)
+compiler_visit_slice(struct compiler *c, PyObject *s, PyObject *ctx)
 {
-	switch (s->kind) {
+	switch (slice_kind(s)) {
 	case Ellipsis_kind:
 		ADDOP_O(c, LOAD_CONST, Py_Ellipsis, consts);
 		break;
 	case Slice_kind:
-		if (!s->v.Slice.step) 
+		if (Slice_step(s) == Py_None) 
 			return compiler_simple_slice(c, s, ctx);
                 if (!compiler_slice(c, s, ctx))
 			return 0;
-		if (ctx == AugLoad) {
+		if (expr_context_kind(ctx) == AugLoad_kind) {
 			ADDOP_I(c, DUP_TOPX, 2);
 		}
-		else if (ctx == AugStore) {
+		else if (expr_context_kind(ctx) == AugStore_kind) {
 			ADDOP(c, ROT_THREE);
 		}
 		return compiler_handle_subscr(c, "slice", ctx);
 	case ExtSlice_kind: {
-		int i, n = asdl_seq_LEN(s->v.ExtSlice.dims);
+		int i, n = PyList_GET_SIZE(ExtSlice_dims(s));
 		for (i = 0; i < n; i++) {
-			slice_ty sub = asdl_seq_GET(s->v.ExtSlice.dims, i);
+			PyObject *sub = PyList_GET_ITEM(ExtSlice_dims(s), i);
 			if (!compiler_visit_nested_slice(c, sub, ctx))
 				return 0;
 		}
@@ -3652,8 +3643,8 @@ compiler_visit_slice(struct compiler *c, slice_ty s, expr_context_ty ctx)
                 return compiler_handle_subscr(c, "extended slice", ctx);
 	}
 	case Index_kind:
-                if (ctx != AugStore)
-			VISIT(c, expr, s->v.Index.value);
+                if (expr_context_kind(ctx) != AugStore_kind)
+			VISIT(c, expr, Index_value(s));
                 return compiler_handle_subscr(c, "index", ctx);
 	}
 	return 1;

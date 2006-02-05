@@ -35,9 +35,9 @@ extern grammar _PyParser_Grammar; /* From graminit.c */
 /* Forward */
 static void initmain(void);
 static void initsite(void);
-static PyObject *run_err_mod(PyTypeObject*, const char *, PyObject *, PyObject *,
+static PyObject *run_err_mod(PyObject*, const char *, PyObject *, PyObject *,
 			      PyCompilerFlags *);
-static PyObject *run_mod(PyTypeObject*, const char *, PyObject *, PyObject *,
+static PyObject *run_mod(PyObject*, const char *, PyObject *, PyObject *,
 			  PyCompilerFlags *);
 static PyObject *run_pyc_file(FILE *, const char *, PyObject *, PyObject *,
 			      PyCompilerFlags *);
@@ -213,6 +213,8 @@ Py_InitializeEx(int install_sigs)
 
 	_PyImportHooks_Init();
 
+	init_ast();
+
 	if (install_sigs)
 		initsigs(); /* Signal handling stuff, including initintr() */
 
@@ -225,9 +227,9 @@ Py_InitializeEx(int install_sigs)
 	_PyGILState_Init(interp, tstate);
 #endif /* WITH_THREAD */
 
-	warnings_module = PyImport_ImportModule("warnings");
-	if (!warnings_module)
-		PyErr_Clear();
+	warnings_module = PyImport_ImportModule("warnings"); 
+	if (!warnings_module) 
+		PyErr_Clear(); 
 
 #if defined(Py_USING_UNICODE) && defined(HAVE_LANGINFO_H) && defined(CODESET)
 	/* On Unix, set the file system encoding according to the
@@ -240,7 +242,7 @@ Py_InitializeEx(int install_sigs)
 	setlocale(LC_CTYPE, "");
 	codeset = nl_langinfo(CODESET);
 	if (codeset && *codeset) {
-		PyObject *enc = PyCodec_Encoder(codeset);
+		PyObject *enc = PyCodec_Encoder(codeset); 
 		if (enc) {
 			codeset = strdup(codeset);
 			Py_DECREF(enc);
@@ -696,7 +698,7 @@ int
 PyRun_InteractiveOneFlags(FILE *fp, const char *filename, PyCompilerFlags *flags)
 {
 	PyObject *m, *d, *v, *w;
-	PyTypeObject *mod;
+	PyObject *mod;
 	char *ps1 = "", *ps2 = "";
 	int errcode = 0;
 
@@ -1155,7 +1157,7 @@ PyRun_StringFlags(const char *str, int start, PyObject *globals,
 		  PyObject *locals, PyCompilerFlags *flags)
 {
 	PyObject *ret;
-	PyTypeObject *mod = PyParser_ASTFromString(str, "<string>", start, flags);
+	PyObject *mod = PyParser_ASTFromString(str, "<string>", start, flags);
 	ret = run_err_mod(mod, "<string>", globals, locals, flags);
 	Py_DECREF(mod);
 	return ret;
@@ -1166,7 +1168,7 @@ PyRun_FileExFlags(FILE *fp, const char *filename, int start, PyObject *globals,
 		  PyObject *locals, int closeit, PyCompilerFlags *flags)
 {
 	PyObject *ret;
-	PyTypeObject *mod = PyParser_ASTFromFile(fp, filename, start, 0, 0,
+	PyObject *mod = PyParser_ASTFromFile(fp, filename, start, 0, 0,
 					  flags, NULL);
 	if (mod == NULL)
 		return NULL;
@@ -1178,7 +1180,7 @@ PyRun_FileExFlags(FILE *fp, const char *filename, int start, PyObject *globals,
 }
 
 static PyObject *
-run_err_mod(PyTypeObject *mod, const char *filename, PyObject *globals, 
+run_err_mod(PyObject *mod, const char *filename, PyObject *globals, 
 	    PyObject *locals, PyCompilerFlags *flags)
 {
 	if (mod == NULL)
@@ -1187,8 +1189,8 @@ run_err_mod(PyTypeObject *mod, const char *filename, PyObject *globals,
 }
 
 static PyObject *
-run_mod(PyTypeObject *mod, const char *filename, PyObject *globals, PyObject *locals,
-	 PyCompilerFlags *flags)
+run_mod(PyObject *mod, const char *filename, PyObject *globals, PyObject *locals,
+	PyCompilerFlags *flags)
 {
 	PyCodeObject *co;
 	PyObject *v;
@@ -1236,7 +1238,7 @@ PyObject *
 Py_CompileStringFlags(const char *str, const char *filename, int start,
 		      PyCompilerFlags *flags)
 {
-	PyTypeObject *mod;
+	PyObject *mod;
 	PyCodeObject *co;
 	mod = PyParser_ASTFromString(str, filename, start, flags);
 	if (mod == NULL)
@@ -1249,7 +1251,7 @@ Py_CompileStringFlags(const char *str, const char *filename, int start,
 struct symtable *
 Py_SymtableString(const char *str, const char *filename, int start)
 {
-	PyTypeObject *mod;
+	PyObject *mod;
 	struct symtable *st;
 
 	mod = PyParser_ASTFromString(str, filename, start, NULL);
@@ -1261,12 +1263,12 @@ Py_SymtableString(const char *str, const char *filename, int start)
 }
 
 /* Preferred access to parser is through AST. */
-PyTypeObject *
+PyObject *
 PyParser_ASTFromString(const char *s, const char *filename, int start, 
 		       PyCompilerFlags *flags)
 {
 	node *n;
-	PyTypeObject *mod;
+	PyObject *mod;
 	perrdetail err;
 	n = PyParser_ParseStringFlagsFilename(s, filename, &_PyParser_Grammar,
 					      start, &err, 
@@ -1282,12 +1284,12 @@ PyParser_ASTFromString(const char *s, const char *filename, int start,
 	}
 }
 
-PyTypeObject *
+PyObject *
 PyParser_ASTFromFile(FILE *fp, const char *filename, int start, char *ps1, 
 		     char *ps2, PyCompilerFlags *flags, int *errcode)
 {
 	node *n;
-	PyTypeObject *mod;
+	PyObject *mod;
 	perrdetail err;
 	n = PyParser_ParseFileFlags(fp, filename, &_PyParser_Grammar, start, 
 				    ps1, ps2, &err, PARSER_FLAGS(flags));

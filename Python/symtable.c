@@ -153,24 +153,24 @@ PyTypeObject PySTEntry_Type = {
 
 static int symtable_analyze(struct symtable *st);
 static int symtable_warn(struct symtable *st, char *msg);
-static int symtable_enter_block(struct symtable *st, identifier name, 
+static int symtable_enter_block(struct symtable *st, PyObject *name, 
 				_Py_block_ty block, void *ast, int lineno);
 static int symtable_exit_block(struct symtable *st, void *ast);
-static int symtable_visit_stmt(struct symtable *st, stmt_ty s);
-static int symtable_visit_expr(struct symtable *st, expr_ty s);
-static int symtable_visit_genexp(struct symtable *st, expr_ty s);
-static int symtable_visit_arguments(struct symtable *st, arguments_ty);
-static int symtable_visit_excepthandler(struct symtable *st, excepthandler_ty);
-static int symtable_visit_alias(struct symtable *st, alias_ty);
-static int symtable_visit_comprehension(struct symtable *st, comprehension_ty);
-static int symtable_visit_keyword(struct symtable *st, keyword_ty);
-static int symtable_visit_slice(struct symtable *st, slice_ty);
-static int symtable_visit_params(struct symtable *st, asdl_seq *args, int top);
-static int symtable_visit_params_nested(struct symtable *st, asdl_seq *args);
+static int symtable_visit_stmt(struct symtable *st, PyObject *s);
+static int symtable_visit_expr(struct symtable *st, PyObject *s);
+static int symtable_visit_genexp(struct symtable *st, PyObject *s);
+static int symtable_visit_arguments(struct symtable *st, PyObject *);
+static int symtable_visit_excepthandler(struct symtable *st, PyObject *);
+static int symtable_visit_alias(struct symtable *st, PyObject *);
+static int symtable_visit_comprehension(struct symtable *st, PyObject *);
+static int symtable_visit_keyword(struct symtable *st, PyObject *);
+static int symtable_visit_slice(struct symtable *st, PyObject *);
+static int symtable_visit_params(struct symtable *st, PyObject *args, int top);
+static int symtable_visit_params_nested(struct symtable *st, PyObject *args);
 static int symtable_implicit_arg(struct symtable *st, int pos);
 
 
-static identifier top = NULL, lambda = NULL, genexpr = NULL;
+static PyObject *top = NULL, *lambda = NULL, *genexpr = NULL;
 
 #define GET_IDENTIFIER(VAR) \
 	((VAR) ? (VAR) : ((VAR) = PyString_InternFromString(# VAR)))
@@ -204,10 +204,10 @@ symtable_new(void)
 }
 
 struct symtable *
-PySymtable_Build(PyTypeObject *mod, const char *filename, PyFutureFeatures *future)
+PySymtable_Build(PyObject *mod, const char *filename, PyFutureFeatures *future)
 {
 	struct symtable *st = symtable_new();
-	asdl_seq *seq;
+	PyObject *seq;
 	int i;
 
 	if (st == NULL)
@@ -219,21 +219,21 @@ PySymtable_Build(PyTypeObject *mod, const char *filename, PyFutureFeatures *futu
 	st->st_top = st->st_cur;
 	st->st_cur->ste_unoptimized = OPT_TOPLEVEL;
 	/* Any other top-level initialization? */
-	switch (mod->kind) {
+	switch (mod_kind(mod)) {
 	case Module_kind:
-		seq = mod->v.Module.body;
-		for (i = 0; i < asdl_seq_LEN(seq); i++)
-			if (!symtable_visit_stmt(st, asdl_seq_GET(seq, i)))
+		seq = Module_body(mod);
+		for (i = 0; i < PyList_GET_SIZE(seq); i++)
+			if (!symtable_visit_stmt(st, PyList_GET_ITEM(seq, i)))
 				goto error;
 		break;
 	case Expression_kind:
-		if (!symtable_visit_expr(st, mod->v.Expression.body))
+		if (!symtable_visit_expr(st, Expression_body(mod)))
 			goto error;
 		break;
 	case Interactive_kind:
-		seq = mod->v.Interactive.body;
-		for (i = 0; i < asdl_seq_LEN(seq); i++)
-			if (!symtable_visit_stmt(st, asdl_seq_GET(seq, i)))
+		seq = Interactive_body(mod);
+		for (i = 0; i < PyList_GET_SIZE(seq); i++)
+			if (!symtable_visit_stmt(st, PyList_GET_ITEM(seq, i)))
 				goto error;
 		break;
 	case Suite_kind:
@@ -723,7 +723,7 @@ symtable_exit_block(struct symtable *st, void *ast)
 }
 
 static int
-symtable_enter_block(struct symtable *st, identifier name, _Py_block_ty block, 
+symtable_enter_block(struct symtable *st, PyObject *name, _Py_block_ty block, 
 		     void *ast, int lineno)
 {
 	PySTEntryObject *prev = NULL;
@@ -829,21 +829,23 @@ error:
    useful if the first node in the sequence requires special treatment.
 */
 
-#define VISIT(ST, TYPE, V) \
+#define VISIT(ST, TYPE, V) {\
 	if (!symtable_visit_ ## TYPE((ST), (V))) \
-		return 0; 
+		return 0;\
+}
 
-#define VISIT_IN_BLOCK(ST, TYPE, V, S) \
+#define VISIT_IN_BLOCK(ST, TYPE, V, S) {\
 	if (!symtable_visit_ ## TYPE((ST), (V))) { \
 		symtable_exit_block((ST), (S)); \
 		return 0; \
-	}
+	}\
+}
 
 #define VISIT_SEQ(ST, TYPE, SEQ) { \
 	int i; \
-	asdl_seq *seq = (SEQ); /* avoid variable capture */ \
-	for (i = 0; i < asdl_seq_LEN(seq); i++) { \
-		TYPE ## _ty elt = asdl_seq_GET(seq, i); \
+	PyObject *seq = (SEQ); /* avoid variable capture */ \
+	for (i = 0; i < PyList_GET_SIZE(seq); i++) { \
+		PyObject *elt = PyList_GET_ITEM(seq, i); \
 		if (!symtable_visit_ ## TYPE((ST), elt)) \
 			return 0; \
 	} \
@@ -851,9 +853,9 @@ error:
 
 #define VISIT_SEQ_IN_BLOCK(ST, TYPE, SEQ, S) { \
 	int i; \
-	asdl_seq *seq = (SEQ); /* avoid variable capture */ \
-	for (i = 0; i < asdl_seq_LEN(seq); i++) { \
-		TYPE ## _ty elt = asdl_seq_GET(seq, i); \
+	PyObject *seq = (SEQ); /* avoid variable capture */ \
+	for (i = 0; i < PyList_GET_SIZE(seq); i++) { \
+		PyObject *elt = PyList_GET_ITEM(seq, i); \
 		if (!symtable_visit_ ## TYPE((ST), elt)) { \
 			symtable_exit_block((ST), (S)); \
 			return 0; \
@@ -863,9 +865,9 @@ error:
 
 #define VISIT_SEQ_TAIL(ST, TYPE, SEQ, START) { \
 	int i; \
-	asdl_seq *seq = (SEQ); /* avoid variable capture */ \
-	for (i = (START); i < asdl_seq_LEN(seq); i++) { \
-		TYPE ## _ty elt = asdl_seq_GET(seq, i); \
+	PyObject *seq = (SEQ); /* avoid variable capture */ \
+	for (i = (START); i < PyList_GET_SIZE(seq); i++) { \
+		PyObject *elt = PyList_GET_ITEM(seq, i); \
 		if (!symtable_visit_ ## TYPE((ST), elt)) \
 			return 0; \
 	} \
@@ -873,9 +875,9 @@ error:
 
 #define VISIT_SEQ_TAIL_IN_BLOCK(ST, TYPE, SEQ, START, S) { \
 	int i; \
-	asdl_seq *seq = (SEQ); /* avoid variable capture */ \
-	for (i = (START); i < asdl_seq_LEN(seq); i++) { \
-		TYPE ## _ty elt = asdl_seq_GET(seq, i); \
+	PyObject *seq = (SEQ); /* avoid variable capture */ \
+	for (i = (START); i < PyList_GET_SIZE(seq); i++) { \
+		PyObject *elt = PyList_GET_ITEM(seq, i); \
 		if (!symtable_visit_ ## TYPE((ST), elt)) { \
 			symtable_exit_block((ST), (S)); \
 			return 0; \
@@ -884,136 +886,136 @@ error:
 }
 
 static int
-symtable_visit_stmt(struct symtable *st, stmt_ty s)
+symtable_visit_stmt(struct symtable *st, PyObject *s)
 {
-	switch (s->kind) {
+	switch (stmt_kind(s)) {
         case FunctionDef_kind:
-		if (!symtable_add_def(st, s->v.FunctionDef.name, DEF_LOCAL))
+		if (!symtable_add_def(st, FunctionDef_name(s), DEF_LOCAL))
 			return 0;
-		if (s->v.FunctionDef.args->defaults)
-			VISIT_SEQ(st, expr, s->v.FunctionDef.args->defaults);
-		if (s->v.FunctionDef.decorators)
-			VISIT_SEQ(st, expr, s->v.FunctionDef.decorators);
-		if (!symtable_enter_block(st, s->v.FunctionDef.name, 
-					  FunctionBlock, (void *)s, s->lineno))
+		if (arguments_defaults(FunctionDef_args(s)))
+			VISIT_SEQ(st, expr, arguments_defaults(FunctionDef_args(s)));
+		if (FunctionDef_decorators(s))
+			VISIT_SEQ(st, expr, FunctionDef_decorators(s));
+		if (!symtable_enter_block(st, FunctionDef_name(s), 
+					  FunctionBlock, (void *)s, ((struct _stmt*)s)->lineno))
 			return 0;
-		VISIT_IN_BLOCK(st, arguments, s->v.FunctionDef.args, s);
-		VISIT_SEQ_IN_BLOCK(st, stmt, s->v.FunctionDef.body, s);
+		VISIT_IN_BLOCK(st, arguments, FunctionDef_args(s), s);
+		VISIT_SEQ_IN_BLOCK(st, stmt, FunctionDef_body(s), s);
 		if (!symtable_exit_block(st, s))
 			return 0;
 		break;
         case ClassDef_kind: {
 		PyObject *tmp;
-		if (!symtable_add_def(st, s->v.ClassDef.name, DEF_LOCAL))
+		if (!symtable_add_def(st, ClassDef_name(s), DEF_LOCAL))
 			return 0;
-		VISIT_SEQ(st, expr, s->v.ClassDef.bases);
-		if (!symtable_enter_block(st, s->v.ClassDef.name, ClassBlock, 
-					  (void *)s, s->lineno))
+		VISIT_SEQ(st, expr, ClassDef_bases(s));
+		if (!symtable_enter_block(st, ClassDef_name(s), ClassBlock, 
+					  (void *)s, ((struct _stmt*)s)->lineno))
 			return 0;
 		tmp = st->st_private;
-		st->st_private = s->v.ClassDef.name;
-		VISIT_SEQ_IN_BLOCK(st, stmt, s->v.ClassDef.body, s);
+		st->st_private = ClassDef_name(s);
+		VISIT_SEQ_IN_BLOCK(st, stmt, ClassDef_body(s), s);
 		st->st_private = tmp;
 		if (!symtable_exit_block(st, s))
 			return 0;
 		break;
 	}
         case Return_kind:
-		if (s->v.Return.value)
-			VISIT(st, expr, s->v.Return.value);
+		if (Return_value(s) != Py_None)
+			VISIT(st, expr, Return_value(s));
 		break;
         case Delete_kind:
-		VISIT_SEQ(st, expr, s->v.Delete.targets);
+		VISIT_SEQ(st, expr, Delete_targets(s));
 		break;
         case Assign_kind:
-		VISIT_SEQ(st, expr, s->v.Assign.targets);
-		VISIT(st, expr, s->v.Assign.value);
+		VISIT_SEQ(st, expr, Assign_targets(s));
+		VISIT(st, expr, Assign_value(s));
 		break;
         case AugAssign_kind:
-		VISIT(st, expr, s->v.AugAssign.target);
-		VISIT(st, expr, s->v.AugAssign.value);
+		VISIT(st, expr, AugAssign_target(s));
+		VISIT(st, expr, AugAssign_value(s));
 		break;
         case Print_kind:
-		if (s->v.Print.dest)
-			VISIT(st, expr, s->v.Print.dest);
-		VISIT_SEQ(st, expr, s->v.Print.values);
+		if (Print_dest(s) != Py_None)
+			VISIT(st, expr, Print_dest(s));
+		VISIT_SEQ(st, expr, Print_values(s));
 		break;
         case For_kind:
-		VISIT(st, expr, s->v.For.target);
-		VISIT(st, expr, s->v.For.iter);
-		VISIT_SEQ(st, stmt, s->v.For.body);
-		if (s->v.For.orelse)
-			VISIT_SEQ(st, stmt, s->v.For.orelse);
+		VISIT(st, expr, For_target(s));
+		VISIT(st, expr, For_iter(s));
+		VISIT_SEQ(st, stmt, For_body(s));
+		/* if (For_orelse(s)) */
+		VISIT_SEQ(st, stmt, For_orelse(s));
 		break;
         case While_kind:
-		VISIT(st, expr, s->v.While.test);
-		VISIT_SEQ(st, stmt, s->v.While.body);
-		if (s->v.While.orelse)
-			VISIT_SEQ(st, stmt, s->v.While.orelse);
+		VISIT(st, expr, While_test(s));
+		VISIT_SEQ(st, stmt, While_body(s));
+		/* if (While_orelse(s)) */
+		VISIT_SEQ(st, stmt, While_orelse(s));
 		break;
         case If_kind:
 		/* XXX if 0: and lookup_yield() hacks */
-		VISIT(st, expr, s->v.If.test);
-		VISIT_SEQ(st, stmt, s->v.If.body);
-		if (s->v.If.orelse)
-			VISIT_SEQ(st, stmt, s->v.If.orelse);
+		VISIT(st, expr, If_test(s));
+		VISIT_SEQ(st, stmt, If_body(s));
+		/* if (If_orelse(s)) */
+		VISIT_SEQ(st, stmt, If_orelse(s));
 		break;
         case Raise_kind:
-		if (s->v.Raise.type) {
-			VISIT(st, expr, s->v.Raise.type);
-			if (s->v.Raise.inst) {
-				VISIT(st, expr, s->v.Raise.inst);
-				if (s->v.Raise.tback)
-					VISIT(st, expr, s->v.Raise.tback);
+		if (Raise_type(s) != Py_None) {
+			VISIT(st, expr, Raise_type(s));
+			if (Raise_inst(s) != Py_None) {
+				VISIT(st, expr, Raise_inst(s));
+				if (Raise_tback(s) != Py_None)
+					VISIT(st, expr, Raise_tback(s));
 			}
 		}
 		break;
         case TryExcept_kind:
-		VISIT_SEQ(st, stmt, s->v.TryExcept.body);
-		VISIT_SEQ(st, stmt, s->v.TryExcept.orelse);
-		VISIT_SEQ(st, excepthandler, s->v.TryExcept.handlers);
+		VISIT_SEQ(st, stmt, TryExcept_body(s));
+		VISIT_SEQ(st, stmt, TryExcept_orelse(s));
+		VISIT_SEQ(st, excepthandler, TryExcept_handlers(s));
 		break;
         case TryFinally_kind:
-		VISIT_SEQ(st, stmt, s->v.TryFinally.body);
-		VISIT_SEQ(st, stmt, s->v.TryFinally.finalbody);
+		VISIT_SEQ(st, stmt, TryFinally_body(s));
+		VISIT_SEQ(st, stmt, TryFinally_finalbody(s));
 		break;
         case Assert_kind:
-		VISIT(st, expr, s->v.Assert.test);
-		if (s->v.Assert.msg)
-			VISIT(st, expr, s->v.Assert.msg);
+		VISIT(st, expr, Assert_test(s));
+		if (Assert_msg(s) != Py_None)
+			VISIT(st, expr, Assert_msg(s));
 		break;
         case Import_kind:
-		VISIT_SEQ(st, alias, s->v.Import.names);
+		VISIT_SEQ(st, alias, Import_names(s));
 		/* XXX Don't have the lineno available inside
 		   visit_alias */
 		if (st->st_cur->ste_unoptimized && !st->st_cur->ste_opt_lineno)
-			st->st_cur->ste_opt_lineno = s->lineno;
+			st->st_cur->ste_opt_lineno = ((struct _stmt*)s)->lineno;
 		break;
         case ImportFrom_kind:
-		VISIT_SEQ(st, alias, s->v.ImportFrom.names);
+		VISIT_SEQ(st, alias, ImportFrom_names(s));
 		/* XXX Don't have the lineno available inside
 		   visit_alias */
 		if (st->st_cur->ste_unoptimized && !st->st_cur->ste_opt_lineno)
-			st->st_cur->ste_opt_lineno = s->lineno;
+			st->st_cur->ste_opt_lineno = ((struct _stmt*)s)->lineno;
 		break;
         case Exec_kind:
-		VISIT(st, expr, s->v.Exec.body);
+		VISIT(st, expr, Exec_body(s));
 		if (!st->st_cur->ste_opt_lineno)
-			st->st_cur->ste_opt_lineno = s->lineno;
-		if (s->v.Exec.globals) {
+			st->st_cur->ste_opt_lineno = ((struct _stmt*)s)->lineno;
+		if (Exec_globals(s) != Py_None) {
 			st->st_cur->ste_unoptimized |= OPT_EXEC;
-			VISIT(st, expr, s->v.Exec.globals);
-			if (s->v.Exec.locals) 
-				VISIT(st, expr, s->v.Exec.locals);
+			VISIT(st, expr, Exec_globals(s));
+			if (Exec_locals(s) != Py_None) 
+				VISIT(st, expr, Exec_locals(s));
 		} else {
 			st->st_cur->ste_unoptimized |= OPT_BARE_EXEC;
 		}
 		break;
         case Global_kind: {
 		int i;
-		asdl_seq *seq = s->v.Global.names;
-		for (i = 0; i < asdl_seq_LEN(seq); i++) {
-			identifier name = asdl_seq_GET(seq, i);
+		PyObject *seq = Global_names(s);
+		for (i = 0; i < PyList_GET_SIZE(seq); i++) {
+			PyObject *name = PyList_GET_ITEM(seq, i);
 			char *c_name = PyString_AS_STRING(name);
 			int cur = symtable_lookup(st, name);
 			if (cur < 0)
@@ -1037,7 +1039,7 @@ symtable_visit_stmt(struct symtable *st, stmt_ty s)
 		break;
 	}
         case Expr_kind:
-		VISIT(st, expr, s->v.Expr.value);
+		VISIT(st, expr, Expr_value(s));
 		break;
         case Pass_kind:
         case Break_kind:
@@ -1049,41 +1051,41 @@ symtable_visit_stmt(struct symtable *st, stmt_ty s)
 }
 
 static int 
-symtable_visit_expr(struct symtable *st, expr_ty e)
+symtable_visit_expr(struct symtable *st, PyObject *e)
 {
-	switch (e->kind) {
+	switch (expr_kind(e)) {
         case BoolOp_kind:
-		VISIT_SEQ(st, expr, e->v.BoolOp.values);
+		VISIT_SEQ(st, expr, BoolOp_values(e));
 		break;
         case BinOp_kind:
-		VISIT(st, expr, e->v.BinOp.left);
-		VISIT(st, expr, e->v.BinOp.right);
+		VISIT(st, expr, BinOp_left(e));
+		VISIT(st, expr, BinOp_right(e));
 		break;
         case UnaryOp_kind:
-		VISIT(st, expr, e->v.UnaryOp.operand);
+		VISIT(st, expr, UnaryOp_operand(e));
 		break;
         case Lambda_kind: {
 		if (!symtable_add_def(st, GET_IDENTIFIER(lambda), DEF_LOCAL))
 			return 0;
-		if (e->v.Lambda.args->defaults)
-			VISIT_SEQ(st, expr, e->v.Lambda.args->defaults);
+		if (arguments_defaults(Lambda_args(e)))
+			VISIT_SEQ(st, expr, arguments_defaults(Lambda_args(e)));
 		/* XXX how to get line numbers for expressions */
 		if (!symtable_enter_block(st, GET_IDENTIFIER(lambda),
                                           FunctionBlock, (void *)e, 0))
 			return 0;
-		VISIT_IN_BLOCK(st, arguments, e->v.Lambda.args, (void*)e);
-		VISIT_IN_BLOCK(st, expr, e->v.Lambda.body, (void*)e);
+		VISIT_IN_BLOCK(st, arguments, Lambda_args(e), (void*)e);
+		VISIT_IN_BLOCK(st, expr, Lambda_body(e), (void*)e);
 		if (!symtable_exit_block(st, (void *)e))
 			return 0;
 		break;
 	}
         case Dict_kind:
-		VISIT_SEQ(st, expr, e->v.Dict.keys);
-		VISIT_SEQ(st, expr, e->v.Dict.values);
+		VISIT_SEQ(st, expr, Dict_keys(e));
+		VISIT_SEQ(st, expr, Dict_values(e));
 		break;
         case ListComp_kind: {
 		char tmpname[256];
-		identifier tmp;
+		PyObject *tmp;
 
 		PyOS_snprintf(tmpname, sizeof(tmpname), "_[%d]",
 			      ++st->st_cur->ste_tmpname);
@@ -1091,8 +1093,8 @@ symtable_visit_expr(struct symtable *st, expr_ty e)
 		if (!symtable_add_def(st, tmp, DEF_LOCAL))
 			return 0;
 		Py_DECREF(tmp);
-		VISIT(st, expr, e->v.ListComp.elt);
-		VISIT_SEQ(st, comprehension, e->v.ListComp.generators);
+		VISIT(st, expr, ListComp_elt(e));
+		VISIT_SEQ(st, comprehension, ListComp_generators(e));
 		break;
 	}
         case GeneratorExp_kind: {
@@ -1102,25 +1104,25 @@ symtable_visit_expr(struct symtable *st, expr_ty e)
 		break;
 	}
         case Yield_kind:
-		if (e->v.Yield.value)
-			VISIT(st, expr, e->v.Yield.value);
+		if (Yield_value(e) != Py_None)
+			VISIT(st, expr, Yield_value(e));
                 st->st_cur->ste_generator = 1;
 		break;
         case Compare_kind:
-		VISIT(st, expr, e->v.Compare.left);
-		VISIT_SEQ(st, expr, e->v.Compare.comparators);
+		VISIT(st, expr, Compare_left(e));
+		VISIT_SEQ(st, expr, Compare_comparators(e));
 		break;
         case Call_kind:
-		VISIT(st, expr, e->v.Call.func);
-		VISIT_SEQ(st, expr, e->v.Call.args);
-		VISIT_SEQ(st, keyword, e->v.Call.keywords);
-		if (e->v.Call.starargs)
-			VISIT(st, expr, e->v.Call.starargs);
-		if (e->v.Call.kwargs)
-			VISIT(st, expr, e->v.Call.kwargs);
+		VISIT(st, expr, Call_func(e));
+		VISIT_SEQ(st, expr, Call_args(e));
+		VISIT_SEQ(st, keyword, Call_keywords(e));
+		if (Call_starargs(e) != Py_None)
+			VISIT(st, expr, Call_starargs(e));
+		if (Call_kwargs(e) != Py_None)
+			VISIT(st, expr, Call_kwargs(e));
 		break;
         case Repr_kind:
-		VISIT(st, expr, e->v.Repr.value);
+		VISIT(st, expr, Repr_value(e));
 		break;
         case Num_kind:
         case Str_kind:
@@ -1128,23 +1130,23 @@ symtable_visit_expr(struct symtable *st, expr_ty e)
 		break;
 	/* The following exprs can be assignment targets. */
         case Attribute_kind:
-		VISIT(st, expr, e->v.Attribute.value);
+		VISIT(st, expr, Attribute_value(e));
 		break;
         case Subscript_kind:
-		VISIT(st, expr, e->v.Subscript.value);
-		VISIT(st, slice, e->v.Subscript.slice);
+		VISIT(st, expr, Subscript_value(e));
+		VISIT(st, slice, Subscript_slice(e));
 		break;
         case Name_kind:
-		if (!symtable_add_def(st, e->v.Name.id, 
-				      e->v.Name.ctx == Load ? USE : DEF_LOCAL))
+		if (!symtable_add_def(st, Name_id(e), 
+				      expr_context_kind(Name_ctx(e)) == Load_kind ? USE : DEF_LOCAL))
 			return 0;
 		break;
 	/* child nodes of List and Tuple will have expr_context set */
         case List_kind:
-		VISIT_SEQ(st, expr, e->v.List.elts);
+		VISIT_SEQ(st, expr, List_elts(e));
 		break;
         case Tuple_kind:
-		VISIT_SEQ(st, expr, e->v.Tuple.elts);
+		VISIT_SEQ(st, expr, Tuple_elts(e));
 		break;
 	}
 	return 1;
@@ -1165,21 +1167,21 @@ symtable_implicit_arg(struct symtable *st, int pos)
 }
 
 static int 
-symtable_visit_params(struct symtable *st, asdl_seq *args, int toplevel)
+symtable_visit_params(struct symtable *st, PyObject *args, int toplevel)
 {
 	int i, complex = 0;
 	
         /* go through all the toplevel arguments first */
-	for (i = 0; i < asdl_seq_LEN(args); i++) {
-		expr_ty arg = asdl_seq_GET(args, i);
-		if (arg->kind == Name_kind) {
-			assert(arg->v.Name.ctx == Param ||
-                               (arg->v.Name.ctx == Store && !toplevel));
-			if (!symtable_add_def(st, arg->v.Name.id, DEF_PARAM))
+	for (i = 0; i < PyList_GET_SIZE(args); i++) {
+		PyObject *arg = PyList_GET_ITEM(args, i);
+		if (expr_kind(arg) == Name_kind) {
+			assert(Name_ctx(arg) == Param ||
+                               (Name_ctx(arg) == Store && !toplevel));
+			if (!symtable_add_def(st, Name_id(arg), DEF_PARAM))
 				return 0;
 		}
-		else if (arg->kind == Tuple_kind) {
-			assert(arg->v.Tuple.ctx == Store);
+		else if (expr_kind(arg) == Tuple_kind) {
+			assert(Tuple_ctx(arg) == Store);
                         complex = 1;
 			if (toplevel) {
 				if (!symtable_implicit_arg(st, i))
@@ -1204,13 +1206,13 @@ symtable_visit_params(struct symtable *st, asdl_seq *args, int toplevel)
 }
 
 static int
-symtable_visit_params_nested(struct symtable *st, asdl_seq *args)
+symtable_visit_params_nested(struct symtable *st, PyObject *args)
 {
 	int i;
-	for (i = 0; i < asdl_seq_LEN(args); i++) {
-		expr_ty arg = asdl_seq_GET(args, i);
-		if (arg->kind == Tuple_kind &&
-		    !symtable_visit_params(st, arg->v.Tuple.elts, 0))
+	for (i = 0; i < PyList_GET_SIZE(args); i++) {
+		PyObject *arg = PyList_GET_ITEM(args, i);
+		if (expr_kind(arg) == Tuple_kind &&
+		    !symtable_visit_params(st, Tuple_elts(arg), 0))
 			return 0;
 	}
 	
@@ -1218,50 +1220,52 @@ symtable_visit_params_nested(struct symtable *st, asdl_seq *args)
 }
 
 static int 
-symtable_visit_arguments(struct symtable *st, arguments_ty a)
+symtable_visit_arguments(struct symtable *st, PyObject *a)
 {
 	/* skip default arguments inside function block
 	   XXX should ast be different?
 	*/
-	if (a->args && !symtable_visit_params(st, a->args, 1))
+	/* if (arguments_args(a) && !symtable_visit_params(st, arguments_args(a), 1)) */
+	if (!symtable_visit_params(st, arguments_args(a), 1))
 		return 0;
-	if (a->vararg) {
-		if (!symtable_add_def(st, a->vararg, DEF_PARAM))
+	if (arguments_vararg(a) != Py_None) {
+		if (!symtable_add_def(st, arguments_vararg(a), DEF_PARAM))
 			return 0;
 		st->st_cur->ste_varargs = 1;
 	}
-	if (a->kwarg) {
-		if (!symtable_add_def(st, a->kwarg, DEF_PARAM))
+	if (arguments_kwarg(a) != Py_None) {
+		if (!symtable_add_def(st, arguments_kwarg(a), DEF_PARAM))
 			return 0;
 		st->st_cur->ste_varkeywords = 1;
 	}
-	if (a->args && !symtable_visit_params_nested(st, a->args))
+	/* if (arguments_args(a) && !symtable_visit_params_nested(st, arguments_args(a))) */
+	if (!symtable_visit_params_nested(st, arguments_args(a)))
 		return 0;
 	return 1;
 }
 
 
 static int 
-symtable_visit_excepthandler(struct symtable *st, excepthandler_ty eh)
+symtable_visit_excepthandler(struct symtable *st, PyObject *eh)
 {
-	if (eh->type)
-		VISIT(st, expr, eh->type);
-	if (eh->name)
-		VISIT(st, expr, eh->name);
-	VISIT_SEQ(st, stmt, eh->body);
+	if (excepthandler_type(eh) != Py_None)
+		VISIT(st, expr, excepthandler_type(eh));
+	if (excepthandler_name(eh) != Py_None)
+		VISIT(st, expr, excepthandler_name(eh));
+	VISIT_SEQ(st, stmt, excepthandler_body(eh));
 	return 1;
 }
 
 
 static int 
-symtable_visit_alias(struct symtable *st, alias_ty a)
+symtable_visit_alias(struct symtable *st, PyObject *a)
 {
 	/* Compute store_name, the name actually bound by the import
-	   operation.  It is diferent than a->name when a->name is a
+	   operation.  It is diferent than alias_name(a) when alias_name(a) is a
 	   dotted package name (e.g. spam.eggs) 
 	*/
 	PyObject *store_name;
-	PyObject *name = (a->asname == NULL) ? a->name : a->asname;
+	PyObject *name = (alias_asname(a) == NULL) ? alias_name(a) : alias_asname(a);
 	const char *base = PyString_AS_STRING(name);
 	char *dot = strchr(base, '.');
 	if (dot)
@@ -1291,40 +1295,40 @@ symtable_visit_alias(struct symtable *st, alias_ty a)
 
 
 static int 
-symtable_visit_comprehension(struct symtable *st, comprehension_ty lc)
+symtable_visit_comprehension(struct symtable *st, PyObject *lc)
 {
-	VISIT(st, expr, lc->target);
-	VISIT(st, expr, lc->iter);
-	VISIT_SEQ(st, expr, lc->ifs);
+	VISIT(st, expr, comprehension_target(lc));
+	VISIT(st, expr, comprehension_iter(lc));
+	VISIT_SEQ(st, expr, comprehension_ifs(lc));
 	return 1;
 }
 
 
 static int 
-symtable_visit_keyword(struct symtable *st, keyword_ty k)
+symtable_visit_keyword(struct symtable *st, PyObject *k)
 {
-	VISIT(st, expr, k->value);
+	VISIT(st, expr, keyword_value(k));
 	return 1;
 }
 
 
 static int 
-symtable_visit_slice(struct symtable *st, slice_ty s)
+symtable_visit_slice(struct symtable *st, PyObject *s)
 {
-	switch (s->kind) {
+	switch (slice_kind(s)) {
 	case Slice_kind:
-		if (s->v.Slice.lower)
-			VISIT(st, expr, s->v.Slice.lower)
-		if (s->v.Slice.upper)
-			VISIT(st, expr, s->v.Slice.upper)
-		if (s->v.Slice.step)
-			VISIT(st, expr, s->v.Slice.step)
+		if (Slice_lower(s) != Py_None)
+			VISIT(st, expr, Slice_lower(s))
+		if (Slice_upper(s) != Py_None)
+			VISIT(st, expr, Slice_upper(s))
+		if (Slice_step(s) != Py_None)
+			VISIT(st, expr, Slice_step(s))
 		break;
 	case ExtSlice_kind:
-		VISIT_SEQ(st, slice, s->v.ExtSlice.dims)
+		VISIT_SEQ(st, slice, ExtSlice_dims(s))
 		break;
 	case Index_kind:
-		VISIT(st, expr, s->v.Index.value)
+		VISIT(st, expr, Index_value(s))
 		break;
 	case Ellipsis_kind:
 		break;
@@ -1333,12 +1337,12 @@ symtable_visit_slice(struct symtable *st, slice_ty s)
 }
 
 static int 
-symtable_visit_genexp(struct symtable *st, expr_ty e)
+symtable_visit_genexp(struct symtable *st, PyObject *e)
 {
-	comprehension_ty outermost = ((comprehension_ty)
-			 (asdl_seq_GET(e->v.GeneratorExp.generators, 0)));
+	PyObject *outermost = ((PyObject *)
+			 (PyList_GET_ITEM(GeneratorExp_generators(e), 0)));
 	/* Outermost iterator is evaluated in current scope */
-	VISIT(st, expr, outermost->iter);
+	VISIT(st, expr, comprehension_iter(outermost));
 	/* Create generator scope for the rest */
 	if (!symtable_enter_block(st, GET_IDENTIFIER(genexpr),
 				  FunctionBlock, (void *)e, 0)) {
@@ -1350,11 +1354,11 @@ symtable_visit_genexp(struct symtable *st, expr_ty e)
 		symtable_exit_block(st, (void *)e);
 		return 0;
 	}
-	VISIT_IN_BLOCK(st, expr, outermost->target, (void*)e);
-	VISIT_SEQ_IN_BLOCK(st, expr, outermost->ifs, (void*)e);
+	VISIT_IN_BLOCK(st, expr, comprehension_target(outermost), (void*)e);
+	VISIT_SEQ_IN_BLOCK(st, expr, comprehension_ifs(outermost), (void*)e);
 	VISIT_SEQ_TAIL_IN_BLOCK(st, comprehension,
-				e->v.GeneratorExp.generators, 1, (void*)e);
-	VISIT_IN_BLOCK(st, expr, e->v.GeneratorExp.elt, (void*)e);
+				GeneratorExp_generators(e), 1, (void*)e);
+	VISIT_IN_BLOCK(st, expr, GeneratorExp_elt(e), (void*)e);
 	if (!symtable_exit_block(st, (void *)e))
 		return 0;
 	return 1;

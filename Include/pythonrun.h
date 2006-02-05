@@ -36,9 +36,9 @@ PyAPI_FUNC(int) PyRun_SimpleFileExFlags(FILE *, const char *, int, PyCompilerFla
 PyAPI_FUNC(int) PyRun_InteractiveOneFlags(FILE *, const char *, PyCompilerFlags *);
 PyAPI_FUNC(int) PyRun_InteractiveLoopFlags(FILE *, const char *, PyCompilerFlags *);
 
-PyAPI_FUNC(PyTypeObject *) PyParser_ASTFromString(const char *, const char *, 
+PyAPI_FUNC(PyObject *) PyParser_ASTFromString(const char *, const char *, 
 						 int, PyCompilerFlags *flags);
-PyAPI_FUNC(PyTypeObject *) PyParser_ASTFromFile(FILE *, const char *, int, 
+PyAPI_FUNC(PyObject *) PyParser_ASTFromFile(FILE *, const char *, int, 
 					       char *, char *,
                                                PyCompilerFlags *, int *);
 #define PyParser_SimpleParseString(S, B) \

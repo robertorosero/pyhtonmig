@@ -183,6 +183,7 @@ Py_Module_New(PyObject* body)
                 body = PyList_New(0);
         Py_INCREF(body);
         result->body = body;
+        result->_base._kind = Module_kind;
         return (PyObject*)result;
 }
 
@@ -268,6 +269,7 @@ Py_Interactive_New(PyObject* body)
                 body = PyList_New(0);
         Py_INCREF(body);
         result->body = body;
+        result->_base._kind = Interactive_kind;
         return (PyObject*)result;
 }
 
@@ -351,6 +353,7 @@ Py_Expression_New(PyObject* body)
                 return NULL;
         Py_INCREF(body);
         result->body = body;
+        result->_base._kind = Expression_kind;
         return (PyObject*)result;
 }
 
@@ -427,6 +430,7 @@ Py_Suite_New(PyObject* body)
                 body = PyList_New(0);
         Py_INCREF(body);
         result->body = body;
+        result->_base._kind = Suite_kind;
         return (PyObject*)result;
 }
 
@@ -620,6 +624,7 @@ Py_FunctionDef_New(PyObject* name, PyObject* args, PyObject* body, PyObject*
                 decorators = PyList_New(0);
         Py_INCREF(decorators);
         result->decorators = decorators;
+        result->_base._kind = FunctionDef_kind;
         result->_base.lineno = lineno;
         return (PyObject*)result;
 }
@@ -736,6 +741,7 @@ Py_ClassDef_New(PyObject* name, PyObject* bases, PyObject* body, int lineno)
                 body = PyList_New(0);
         Py_INCREF(body);
         result->body = body;
+        result->_base._kind = ClassDef_kind;
         result->_base.lineno = lineno;
         return (PyObject*)result;
 }
@@ -843,6 +849,7 @@ Py_Return_New(PyObject* value, int lineno)
         }
         Py_INCREF(value);
         result->value = value;
+        result->_base._kind = Return_kind;
         result->_base.lineno = lineno;
         return (PyObject*)result;
 }
@@ -903,7 +910,7 @@ static int
 Return_validate(PyObject *_obj)
 {
         struct _Return *obj = (struct _Return*)_obj;
-        if (obj->value != Py_None) /* empty */;
+        if (obj->value == Py_None) /* empty */;
         else if (!expr_Check(obj->value)) {
             failed_check("value", "expr", obj->value);
             return -1;
@@ -923,6 +930,7 @@ Py_Delete_New(PyObject* targets, int lineno)
                 targets = PyList_New(0);
         Py_INCREF(targets);
         result->targets = targets;
+        result->_base._kind = Delete_kind;
         result->_base.lineno = lineno;
         return (PyObject*)result;
 }
@@ -1012,6 +1020,7 @@ Py_Assign_New(PyObject* targets, PyObject* value, int lineno)
         result->targets = targets;
         Py_INCREF(value);
         result->value = value;
+        result->_base._kind = Assign_kind;
         result->_base.lineno = lineno;
         return (PyObject*)result;
 }
@@ -1106,6 +1115,7 @@ Py_AugAssign_New(PyObject* target, PyObject* op, PyObject* value, int lineno)
         result->op = op;
         Py_INCREF(value);
         result->value = value;
+        result->_base._kind = AugAssign_kind;
         result->_base.lineno = lineno;
         return (PyObject*)result;
 }
@@ -1201,6 +1211,7 @@ Py_Print_New(PyObject* dest, PyObject* values, PyObject* nl, int lineno)
         result->values = values;
         Py_INCREF(nl);
         result->nl = nl;
+        result->_base._kind = Print_kind;
         result->_base.lineno = lineno;
         return (PyObject*)result;
 }
@@ -1264,7 +1275,7 @@ Print_validate(PyObject *_obj)
 {
         struct _Print *obj = (struct _Print*)_obj;
         int i;
-        if (obj->dest != Py_None) /* empty */;
+        if (obj->dest == Py_None) /* empty */;
         else if (!expr_Check(obj->dest)) {
             failed_check("dest", "expr", obj->dest);
             return -1;
@@ -1310,6 +1321,7 @@ Py_For_New(PyObject* target, PyObject* iter, PyObject* body, PyObject* orelse,
                 orelse = PyList_New(0);
         Py_INCREF(orelse);
         result->orelse = orelse;
+        result->_base._kind = For_kind;
         result->_base.lineno = lineno;
         return (PyObject*)result;
 }
@@ -1426,6 +1438,7 @@ Py_While_New(PyObject* test, PyObject* body, PyObject* orelse, int lineno)
                 orelse = PyList_New(0);
         Py_INCREF(orelse);
         result->orelse = orelse;
+        result->_base._kind = While_kind;
         result->_base.lineno = lineno;
         return (PyObject*)result;
 }
@@ -1537,6 +1550,7 @@ Py_If_New(PyObject* test, PyObject* body, PyObject* orelse, int lineno)
                 orelse = PyList_New(0);
         Py_INCREF(orelse);
         result->orelse = orelse;
+        result->_base._kind = If_kind;
         result->_base.lineno = lineno;
         return (PyObject*)result;
 }
@@ -1656,6 +1670,7 @@ Py_Raise_New(PyObject* type, PyObject* inst, PyObject* tback, int lineno)
         }
         Py_INCREF(tback);
         result->tback = tback;
+        result->_base._kind = Raise_kind;
         result->_base.lineno = lineno;
         return (PyObject*)result;
 }
@@ -1718,21 +1733,21 @@ static int
 Raise_validate(PyObject *_obj)
 {
         struct _Raise *obj = (struct _Raise*)_obj;
-        if (obj->type != Py_None) /* empty */;
+        if (obj->type == Py_None) /* empty */;
         else if (!expr_Check(obj->type)) {
             failed_check("type", "expr", obj->type);
             return -1;
         }
         else if (expr_validate(obj->type) < 0)
             return -1;
-        if (obj->inst != Py_None) /* empty */;
+        if (obj->inst == Py_None) /* empty */;
         else if (!expr_Check(obj->inst)) {
             failed_check("inst", "expr", obj->inst);
             return -1;
         }
         else if (expr_validate(obj->inst) < 0)
             return -1;
-        if (obj->tback != Py_None) /* empty */;
+        if (obj->tback == Py_None) /* empty */;
         else if (!expr_Check(obj->tback)) {
             failed_check("tback", "expr", obj->tback);
             return -1;
@@ -1761,6 +1776,7 @@ Py_TryExcept_New(PyObject* body, PyObject* handlers, PyObject* orelse, int
                 orelse = PyList_New(0);
         Py_INCREF(orelse);
         result->orelse = orelse;
+        result->_base._kind = TryExcept_kind;
         result->_base.lineno = lineno;
         return (PyObject*)result;
 }
@@ -1880,6 +1896,7 @@ Py_TryFinally_New(PyObject* body, PyObject* finalbody, int lineno)
                 finalbody = PyList_New(0);
         Py_INCREF(finalbody);
         result->finalbody = finalbody;
+        result->_base._kind = TryFinally_kind;
         result->_base.lineno = lineno;
         return (PyObject*)result;
 }
@@ -1984,6 +2001,7 @@ Py_Assert_New(PyObject* test, PyObject* msg, int lineno)
         }
         Py_INCREF(msg);
         result->msg = msg;
+        result->_base._kind = Assert_kind;
         result->_base.lineno = lineno;
         return (PyObject*)result;
 }
@@ -2049,7 +2067,7 @@ Assert_validate(PyObject *_obj)
             failed_check("test", "expr", obj->test);
             return -1;
         }
-        if (obj->msg != Py_None) /* empty */;
+        if (obj->msg == Py_None) /* empty */;
         else if (!expr_Check(obj->msg)) {
             failed_check("msg", "expr", obj->msg);
             return -1;
@@ -2069,6 +2087,7 @@ Py_Import_New(PyObject* names, int lineno)
                 names = PyList_New(0);
         Py_INCREF(names);
         result->names = names;
+        result->_base._kind = Import_kind;
         result->_base.lineno = lineno;
         return (PyObject*)result;
 }
@@ -2158,6 +2177,7 @@ Py_ImportFrom_New(PyObject* module, PyObject* names, int lineno)
                 names = PyList_New(0);
         Py_INCREF(names);
         result->names = names;
+        result->_base._kind = ImportFrom_kind;
         result->_base.lineno = lineno;
         return (PyObject*)result;
 }
@@ -2260,6 +2280,7 @@ Py_Exec_New(PyObject* body, PyObject* globals, PyObject* locals, int lineno)
         }
         Py_INCREF(locals);
         result->locals = locals;
+        result->_base._kind = Exec_kind;
         result->_base.lineno = lineno;
         return (PyObject*)result;
 }
@@ -2326,14 +2347,14 @@ Exec_validate(PyObject *_obj)
             failed_check("body", "expr", obj->body);
             return -1;
         }
-        if (obj->globals != Py_None) /* empty */;
+        if (obj->globals == Py_None) /* empty */;
         else if (!expr_Check(obj->globals)) {
             failed_check("globals", "expr", obj->globals);
             return -1;
         }
         else if (expr_validate(obj->globals) < 0)
             return -1;
-        if (obj->locals != Py_None) /* empty */;
+        if (obj->locals == Py_None) /* empty */;
         else if (!expr_Check(obj->locals)) {
             failed_check("locals", "expr", obj->locals);
             return -1;
@@ -2353,6 +2374,7 @@ Py_Global_New(PyObject* names, int lineno)
                 names = PyList_New(0);
         Py_INCREF(names);
         result->names = names;
+        result->_base._kind = Global_kind;
         result->_base.lineno = lineno;
         return (PyObject*)result;
 }
@@ -2436,6 +2458,7 @@ Py_Expr_New(PyObject* value, int lineno)
                 return NULL;
         Py_INCREF(value);
         result->value = value;
+        result->_base._kind = Expr_kind;
         result->_base.lineno = lineno;
         return (PyObject*)result;
 }
@@ -2509,6 +2532,7 @@ Py_Pass_New(int lineno)
         struct _Pass *result = PyObject_New(struct _Pass, &Py_Pass_Type);
         if (result == NULL)
                 return NULL;
+        result->_base._kind = Pass_kind;
         result->_base.lineno = lineno;
         return (PyObject*)result;
 }
@@ -2576,6 +2600,7 @@ Py_Break_New(int lineno)
         struct _Break *result = PyObject_New(struct _Break, &Py_Break_Type);
         if (result == NULL)
                 return NULL;
+        result->_base._kind = Break_kind;
         result->_base.lineno = lineno;
         return (PyObject*)result;
 }
@@ -2643,6 +2668,7 @@ Py_Continue_New(int lineno)
         struct _Continue *result = PyObject_New(struct _Continue, &Py_Continue_Type);
         if (result == NULL)
                 return NULL;
+        result->_base._kind = Continue_kind;
         result->_base.lineno = lineno;
         return (PyObject*)result;
 }
@@ -2807,6 +2833,7 @@ Py_BoolOp_New(PyObject* op, PyObject* values, int lineno)
                 values = PyList_New(0);
         Py_INCREF(values);
         result->values = values;
+        result->_base._kind = BoolOp_kind;
         result->_base.lineno = lineno;
         return (PyObject*)result;
 }
@@ -2901,6 +2928,7 @@ Py_BinOp_New(PyObject* left, PyObject* op, PyObject* right, int lineno)
         result->op = op;
         Py_INCREF(right);
         result->right = right;
+        result->_base._kind = BinOp_kind;
         result->_base.lineno = lineno;
         return (PyObject*)result;
 }
@@ -2988,6 +3016,7 @@ Py_UnaryOp_New(PyObject* op, PyObject* operand, int lineno)
         result->op = op;
         Py_INCREF(operand);
         result->operand = operand;
+        result->_base._kind = UnaryOp_kind;
         result->_base.lineno = lineno;
         return (PyObject*)result;
 }
@@ -3070,6 +3099,7 @@ Py_Lambda_New(PyObject* args, PyObject* body, int lineno)
         result->args = args;
         Py_INCREF(body);
         result->body = body;
+        result->_base._kind = Lambda_kind;
         result->_base.lineno = lineno;
         return (PyObject*)result;
 }
@@ -3156,6 +3186,7 @@ Py_Dict_New(PyObject* keys, PyObject* values, int lineno)
                 values = PyList_New(0);
         Py_INCREF(values);
         result->values = values;
+        result->_base._kind = Dict_kind;
         result->_base.lineno = lineno;
         return (PyObject*)result;
 }
@@ -3258,6 +3289,7 @@ Py_ListComp_New(PyObject* elt, PyObject* generators, int lineno)
                 generators = PyList_New(0);
         Py_INCREF(generators);
         result->generators = generators;
+        result->_base._kind = ListComp_kind;
         result->_base.lineno = lineno;
         return (PyObject*)result;
 }
@@ -3353,6 +3385,7 @@ Py_GeneratorExp_New(PyObject* elt, PyObject* generators, int lineno)
                 generators = PyList_New(0);
         Py_INCREF(generators);
         result->generators = generators;
+        result->_base._kind = GeneratorExp_kind;
         result->_base.lineno = lineno;
         return (PyObject*)result;
 }
@@ -3448,6 +3481,7 @@ Py_Yield_New(PyObject* value, int lineno)
         }
         Py_INCREF(value);
         result->value = value;
+        result->_base._kind = Yield_kind;
         result->_base.lineno = lineno;
         return (PyObject*)result;
 }
@@ -3508,7 +3542,7 @@ static int
 Yield_validate(PyObject *_obj)
 {
         struct _Yield *obj = (struct _Yield*)_obj;
-        if (obj->value != Py_None) /* empty */;
+        if (obj->value == Py_None) /* empty */;
         else if (!expr_Check(obj->value)) {
             failed_check("value", "expr", obj->value);
             return -1;
@@ -3534,6 +3568,7 @@ Py_Compare_New(PyObject* left, PyObject* ops, PyObject* comparators, int lineno)
                 comparators = PyList_New(0);
         Py_INCREF(comparators);
         result->comparators = comparators;
+        result->_base._kind = Compare_kind;
         result->_base.lineno = lineno;
         return (PyObject*)result;
 }
@@ -3658,6 +3693,7 @@ Py_Call_New(PyObject* func, PyObject* args, PyObject* keywords, PyObject*
         }
         Py_INCREF(kwargs);
         result->kwargs = kwargs;
+        result->_base._kind = Call_kind;
         result->_base.lineno = lineno;
         return (PyObject*)result;
 }
@@ -3752,14 +3788,14 @@ Call_validate(PyObject *_obj)
                 if (keyword_validate(PyList_GET_ITEM(obj->keywords, i)) < 0)
                     return -1;
         }
-        if (obj->starargs != Py_None) /* empty */;
+        if (obj->starargs == Py_None) /* empty */;
         else if (!expr_Check(obj->starargs)) {
             failed_check("starargs", "expr", obj->starargs);
             return -1;
         }
         else if (expr_validate(obj->starargs) < 0)
             return -1;
-        if (obj->kwargs != Py_None) /* empty */;
+        if (obj->kwargs == Py_None) /* empty */;
         else if (!expr_Check(obj->kwargs)) {
             failed_check("kwargs", "expr", obj->kwargs);
             return -1;
@@ -3777,6 +3813,7 @@ Py_Repr_New(PyObject* value, int lineno)
                 return NULL;
         Py_INCREF(value);
         result->value = value;
+        result->_base._kind = Repr_kind;
         result->_base.lineno = lineno;
         return (PyObject*)result;
 }
@@ -3852,6 +3889,7 @@ Py_Num_New(PyObject* n, int lineno)
                 return NULL;
         Py_INCREF(n);
         result->n = n;
+        result->_base._kind = Num_kind;
         result->_base.lineno = lineno;
         return (PyObject*)result;
 }
@@ -3927,6 +3965,7 @@ Py_Str_New(PyObject* s, int lineno)
                 return NULL;
         Py_INCREF(s);
         result->s = s;
+        result->_base._kind = Str_kind;
         result->_base.lineno = lineno;
         return (PyObject*)result;
 }
@@ -4006,6 +4045,7 @@ Py_Attribute_New(PyObject* value, PyObject* attr, PyObject* ctx, int lineno)
         result->attr = attr;
         Py_INCREF(ctx);
         result->ctx = ctx;
+        result->_base._kind = Attribute_kind;
         result->_base.lineno = lineno;
         return (PyObject*)result;
 }
@@ -4095,6 +4135,7 @@ Py_Subscript_New(PyObject* value, PyObject* slice, PyObject* ctx, int lineno)
         result->slice = slice;
         Py_INCREF(ctx);
         result->ctx = ctx;
+        result->_base._kind = Subscript_kind;
         result->_base.lineno = lineno;
         return (PyObject*)result;
 }
@@ -4182,6 +4223,7 @@ Py_Name_New(PyObject* id, PyObject* ctx, int lineno)
         result->id = id;
         Py_INCREF(ctx);
         result->ctx = ctx;
+        result->_base._kind = Name_kind;
         result->_base.lineno = lineno;
         return (PyObject*)result;
 }
@@ -4266,6 +4308,7 @@ Py_List_New(PyObject* elts, PyObject* ctx, int lineno)
         result->elts = elts;
         Py_INCREF(ctx);
         result->ctx = ctx;
+        result->_base._kind = List_kind;
         result->_base.lineno = lineno;
         return (PyObject*)result;
 }
@@ -4359,6 +4402,7 @@ Py_Tuple_New(PyObject* elts, PyObject* ctx, int lineno)
         result->elts = elts;
         Py_INCREF(ctx);
         result->ctx = ctx;
+        result->_base._kind = Tuple_kind;
         result->_base.lineno = lineno;
         return (PyObject*)result;
 }
@@ -4513,6 +4557,7 @@ Py_Load_New()
         struct _Load *result = PyObject_New(struct _Load, &Py_Load_Type);
         if (result == NULL)
                 return NULL;
+        result->_base._kind = Load_kind;
         return (PyObject*)result;
 }
 
@@ -4579,6 +4624,7 @@ Py_Store_New()
         struct _Store *result = PyObject_New(struct _Store, &Py_Store_Type);
         if (result == NULL)
                 return NULL;
+        result->_base._kind = Store_kind;
         return (PyObject*)result;
 }
 
@@ -4645,6 +4691,7 @@ Py_Del_New()
         struct _Del *result = PyObject_New(struct _Del, &Py_Del_Type);
         if (result == NULL)
                 return NULL;
+        result->_base._kind = Del_kind;
         return (PyObject*)result;
 }
 
@@ -4711,6 +4758,7 @@ Py_AugLoad_New()
         struct _AugLoad *result = PyObject_New(struct _AugLoad, &Py_AugLoad_Type);
         if (result == NULL)
                 return NULL;
+        result->_base._kind = AugLoad_kind;
         return (PyObject*)result;
 }
 
@@ -4777,6 +4825,7 @@ Py_AugStore_New()
         struct _AugStore *result = PyObject_New(struct _AugStore, &Py_AugStore_Type);
         if (result == NULL)
                 return NULL;
+        result->_base._kind = AugStore_kind;
         return (PyObject*)result;
 }
 
@@ -4843,6 +4892,7 @@ Py_Param_New()
         struct _Param *result = PyObject_New(struct _Param, &Py_Param_Type);
         if (result == NULL)
                 return NULL;
+        result->_base._kind = Param_kind;
         return (PyObject*)result;
 }
 
@@ -4972,6 +5022,7 @@ Py_Ellipsis_New()
         struct _Ellipsis *result = PyObject_New(struct _Ellipsis, &Py_Ellipsis_Type);
         if (result == NULL)
                 return NULL;
+        result->_base._kind = Ellipsis_kind;
         return (PyObject*)result;
 }
 
@@ -5056,6 +5107,7 @@ Py_Slice_New(PyObject* lower, PyObject* upper, PyObject* step)
         }
         Py_INCREF(step);
         result->step = step;
+        result->_base._kind = Slice_kind;
         return (PyObject*)result;
 }
 
@@ -5117,21 +5169,21 @@ static int
 Slice_validate(PyObject *_obj)
 {
         struct _Slice *obj = (struct _Slice*)_obj;
-        if (obj->lower != Py_None) /* empty */;
+        if (obj->lower == Py_None) /* empty */;
         else if (!expr_Check(obj->lower)) {
             failed_check("lower", "expr", obj->lower);
             return -1;
         }
         else if (expr_validate(obj->lower) < 0)
             return -1;
-        if (obj->upper != Py_None) /* empty */;
+        if (obj->upper == Py_None) /* empty */;
         else if (!expr_Check(obj->upper)) {
             failed_check("upper", "expr", obj->upper);
             return -1;
         }
         else if (expr_validate(obj->upper) < 0)
             return -1;
-        if (obj->step != Py_None) /* empty */;
+        if (obj->step == Py_None) /* empty */;
         else if (!expr_Check(obj->step)) {
             failed_check("step", "expr", obj->step);
             return -1;
@@ -5151,6 +5203,7 @@ Py_ExtSlice_New(PyObject* dims)
                 dims = PyList_New(0);
         Py_INCREF(dims);
         result->dims = dims;
+        result->_base._kind = ExtSlice_kind;
         return (PyObject*)result;
 }
 
@@ -5235,6 +5288,7 @@ Py_Index_New(PyObject* value)
                 return NULL;
         Py_INCREF(value);
         result->value = value;
+        result->_base._kind = Index_kind;
         return (PyObject*)result;
 }
 
@@ -5366,6 +5420,7 @@ Py_And_New()
         struct _And *result = PyObject_New(struct _And, &Py_And_Type);
         if (result == NULL)
                 return NULL;
+        result->_base._kind = And_kind;
         return (PyObject*)result;
 }
 
@@ -5432,6 +5487,7 @@ Py_Or_New()
         struct _Or *result = PyObject_New(struct _Or, &Py_Or_Type);
         if (result == NULL)
                 return NULL;
+        result->_base._kind = Or_kind;
         return (PyObject*)result;
 }
 
@@ -5577,6 +5633,7 @@ Py_Add_New()
         struct _Add *result = PyObject_New(struct _Add, &Py_Add_Type);
         if (result == NULL)
                 return NULL;
+        result->_base._kind = Add_kind;
         return (PyObject*)result;
 }
 
@@ -5643,6 +5700,7 @@ Py_Sub_New()
         struct _Sub *result = PyObject_New(struct _Sub, &Py_Sub_Type);
         if (result == NULL)
                 return NULL;
+        result->_base._kind = Sub_kind;
         return (PyObject*)result;
 }
 
@@ -5709,6 +5767,7 @@ Py_Mult_New()
         struct _Mult *result = PyObject_New(struct _Mult, &Py_Mult_Type);
         if (result == NULL)
                 return NULL;
+        result->_base._kind = Mult_kind;
         return (PyObject*)result;
 }
 
@@ -5775,6 +5834,7 @@ Py_Div_New()
         struct _Div *result = PyObject_New(struct _Div, &Py_Div_Type);
         if (result == NULL)
                 return NULL;
+        result->_base._kind = Div_kind;
         return (PyObject*)result;
 }
 
@@ -5841,6 +5901,7 @@ Py_Mod_New()
         struct _Mod *result = PyObject_New(struct _Mod, &Py_Mod_Type);
         if (result == NULL)
                 return NULL;
+        result->_base._kind = Mod_kind;
         return (PyObject*)result;
 }
 
@@ -5907,6 +5968,7 @@ Py_Pow_New()
         struct _Pow *result = PyObject_New(struct _Pow, &Py_Pow_Type);
         if (result == NULL)
                 return NULL;
+        result->_base._kind = Pow_kind;
         return (PyObject*)result;
 }
 
@@ -5973,6 +6035,7 @@ Py_LShift_New()
         struct _LShift *result = PyObject_New(struct _LShift, &Py_LShift_Type);
         if (result == NULL)
                 return NULL;
+        result->_base._kind = LShift_kind;
         return (PyObject*)result;
 }
 
@@ -6039,6 +6102,7 @@ Py_RShift_New()
         struct _RShift *result = PyObject_New(struct _RShift, &Py_RShift_Type);
         if (result == NULL)
                 return NULL;
+        result->_base._kind = RShift_kind;
         return (PyObject*)result;
 }
 
@@ -6105,6 +6169,7 @@ Py_BitOr_New()
         struct _BitOr *result = PyObject_New(struct _BitOr, &Py_BitOr_Type);
         if (result == NULL)
                 return NULL;
+        result->_base._kind = BitOr_kind;
         return (PyObject*)result;
 }
 
@@ -6171,6 +6236,7 @@ Py_BitXor_New()
         struct _BitXor *result = PyObject_New(struct _BitXor, &Py_BitXor_Type);
         if (result == NULL)
                 return NULL;
+        result->_base._kind = BitXor_kind;
         return (PyObject*)result;
 }
 
@@ -6237,6 +6303,7 @@ Py_BitAnd_New()
         struct _BitAnd *result = PyObject_New(struct _BitAnd, &Py_BitAnd_Type);
         if (result == NULL)
                 return NULL;
+        result->_base._kind = BitAnd_kind;
         return (PyObject*)result;
 }
 
@@ -6303,6 +6370,7 @@ Py_FloorDiv_New()
         struct _FloorDiv *result = PyObject_New(struct _FloorDiv, &Py_FloorDiv_Type);
         if (result == NULL)
                 return NULL;
+        result->_base._kind = FloorDiv_kind;
         return (PyObject*)result;
 }
 
@@ -6432,6 +6500,7 @@ Py_Invert_New()
         struct _Invert *result = PyObject_New(struct _Invert, &Py_Invert_Type);
         if (result == NULL)
                 return NULL;
+        result->_base._kind = Invert_kind;
         return (PyObject*)result;
 }
 
@@ -6498,6 +6567,7 @@ Py_Not_New()
         struct _Not *result = PyObject_New(struct _Not, &Py_Not_Type);
         if (result == NULL)
                 return NULL;
+        result->_base._kind = Not_kind;
         return (PyObject*)result;
 }
 
@@ -6564,6 +6634,7 @@ Py_UAdd_New()
         struct _UAdd *result = PyObject_New(struct _UAdd, &Py_UAdd_Type);
         if (result == NULL)
                 return NULL;
+        result->_base._kind = UAdd_kind;
         return (PyObject*)result;
 }
 
@@ -6630,6 +6701,7 @@ Py_USub_New()
         struct _USub *result = PyObject_New(struct _USub, &Py_USub_Type);
         if (result == NULL)
                 return NULL;
+        result->_base._kind = USub_kind;
         return (PyObject*)result;
 }
 
@@ -6771,6 +6843,7 @@ Py_Eq_New()
         struct _Eq *result = PyObject_New(struct _Eq, &Py_Eq_Type);
         if (result == NULL)
                 return NULL;
+        result->_base._kind = Eq_kind;
         return (PyObject*)result;
 }
 
@@ -6837,6 +6910,7 @@ Py_NotEq_New()
         struct _NotEq *result = PyObject_New(struct _NotEq, &Py_NotEq_Type);
         if (result == NULL)
                 return NULL;
+        result->_base._kind = NotEq_kind;
         return (PyObject*)result;
 }
 
@@ -6903,6 +6977,7 @@ Py_Lt_New()
         struct _Lt *result = PyObject_New(struct _Lt, &Py_Lt_Type);
         if (result == NULL)
                 return NULL;
+        result->_base._kind = Lt_kind;
         return (PyObject*)result;
 }
 
@@ -6969,6 +7044,7 @@ Py_LtE_New()
         struct _LtE *result = PyObject_New(struct _LtE, &Py_LtE_Type);
         if (result == NULL)
                 return NULL;
+        result->_base._kind = LtE_kind;
         return (PyObject*)result;
 }
 
@@ -7035,6 +7111,7 @@ Py_Gt_New()
         struct _Gt *result = PyObject_New(struct _Gt, &Py_Gt_Type);
         if (result == NULL)
                 return NULL;
+        result->_base._kind = Gt_kind;
         return (PyObject*)result;
 }
 
@@ -7101,6 +7178,7 @@ Py_GtE_New()
         struct _GtE *result = PyObject_New(struct _GtE, &Py_GtE_Type);
         if (result == NULL)
                 return NULL;
+        result->_base._kind = GtE_kind;
         return (PyObject*)result;
 }
 
@@ -7167,6 +7245,7 @@ Py_Is_New()
         struct _Is *result = PyObject_New(struct _Is, &Py_Is_Type);
         if (result == NULL)
                 return NULL;
+        result->_base._kind = Is_kind;
         return (PyObject*)result;
 }
 
@@ -7233,6 +7312,7 @@ Py_IsNot_New()
         struct _IsNot *result = PyObject_New(struct _IsNot, &Py_IsNot_Type);
         if (result == NULL)
                 return NULL;
+        result->_base._kind = IsNot_kind;
         return (PyObject*)result;
 }
 
@@ -7299,6 +7379,7 @@ Py_In_New()
         struct _In *result = PyObject_New(struct _In, &Py_In_Type);
         if (result == NULL)
                 return NULL;
+        result->_base._kind = In_kind;
         return (PyObject*)result;
 }
 
@@ -7365,6 +7446,7 @@ Py_NotIn_New()
         struct _NotIn *result = PyObject_New(struct _NotIn, &Py_NotIn_Type);
         if (result == NULL)
                 return NULL;
+        result->_base._kind = NotIn_kind;
         return (PyObject*)result;
 }
 
@@ -7608,14 +7690,14 @@ excepthandler_validate(PyObject *_obj)
 {
         struct _excepthandler *obj = (struct _excepthandler*)_obj;
         int i;
-        if (obj->type != Py_None) /* empty */;
+        if (obj->type == Py_None) /* empty */;
         else if (!expr_Check(obj->type)) {
             failed_check("type", "expr", obj->type);
             return -1;
         }
         else if (expr_validate(obj->type) < 0)
             return -1;
-        if (obj->name != Py_None) /* empty */;
+        if (obj->name == Py_None) /* empty */;
         else if (!expr_Check(obj->name)) {
             failed_check("name", "expr", obj->name);
             return -1;
@@ -7739,12 +7821,12 @@ arguments_validate(PyObject *_obj)
                 if (expr_validate(PyList_GET_ITEM(obj->args, i)) < 0)
                     return -1;
         }
-        if (obj->vararg != Py_None) /* empty */;
+        if (obj->vararg == Py_None) /* empty */;
         else if (!PyString_Check(obj->vararg)) {
             failed_check("vararg", "identifier", obj->vararg);
             return -1;
         }
-        if (obj->kwarg != Py_None) /* empty */;
+        if (obj->kwarg == Py_None) /* empty */;
         else if (!PyString_Check(obj->kwarg)) {
             failed_check("kwarg", "identifier", obj->kwarg);
             return -1;
@@ -7924,7 +8006,7 @@ alias_validate(PyObject *_obj)
             failed_check("name", "identifier", obj->name);
             return -1;
         }
-        if (obj->asname != Py_None) /* empty */;
+        if (obj->asname == Py_None) /* empty */;
         else if (!PyString_Check(obj->asname)) {
             failed_check("asname", "identifier", obj->asname);
             return -1;
