@@ -9,9 +9,9 @@ extern "C" {
 
 #include <stdarg.h>
 
-/* If PY_SIZE_T_CLEAN is defined, each functions treats #-specifier
+/* If PY_SSIZE_T_CLEAN is defined, each functions treats #-specifier
    to mean Py_ssize_t */
-#ifdef PY_SIZE_T_CLEAN
+#ifdef PY_SSIZE_T_CLEAN
 #define PyArg_Parse			_PyArg_Parse_SizeT
 #define PyArg_ParseTuple		_PyArg_ParseTuple_SizeT
 #define PyArg_ParseTupleAndKeywords	_PyArg_ParseTupleAndKeywords_SizeT

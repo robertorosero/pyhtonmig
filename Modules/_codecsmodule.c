@@ -35,7 +35,7 @@ Copyright (c) Corporation for National Research Initiatives.
 
    ------------------------------------------------------------------------ */
 
-#define PY_SIZE_T_CLEAN
+#define PY_SSIZE_T_CLEAN
 #include "Python.h"
 
 /* --- Registry ----------------------------------------------------------- */

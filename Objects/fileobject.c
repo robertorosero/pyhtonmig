@@ -1,6 +1,6 @@
 /* File object implementation */
 
-#define PY_SIZE_T_CLEAN
+#define PY_SSIZE_T_CLEAN
 #include "Python.h"
 #include "structmember.h"
 
