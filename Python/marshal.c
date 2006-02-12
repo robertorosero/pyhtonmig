@@ -1111,5 +1111,7 @@ PyMODINIT_FUNC
 PyMarshal_Init(void)
 {
 	PyObject *mod = Py_InitModule("marshal", marshal_methods);
+	if (mod == NULL)
+		return;
 	PyModule_AddIntConstant(mod, "version", Py_MARSHAL_VERSION);
 }

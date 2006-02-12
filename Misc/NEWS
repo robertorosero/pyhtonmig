@@ -12,6 +12,13 @@ What's New in Python 2.5 alpha 1?
 Core and builtins
 -----------------
 
+- Patch #1400181, fix unicode string formatting to not use the locale.
+  This is how string objects work.  u'%f' could use , instead of .
+  for the decimal point.  Now both strings and unicode always use periods.
+
+- Bug #1244610, #1392915, fix build problem on OpenBSD 3.7 and 3.8.
+  configure would break checking curses.h.
+
 - Bug #959576: The pwd module is now builtin. This allows Python to be
   built on UNIX platforms without $HOME set.
 
@@ -209,6 +216,36 @@ Core and builtins
 Extension Modules
 -----------------
 
+- Bug #876637, prevent stack corruption when socket descriptor
+  is larger than FD_SETSIZE.
+
+- Patch #1407135, bug #1424041: harmonize mmap behavior of anonymous memory.
+  mmap.mmap(-1, size) now returns anonymous memory in both Unix and Windows.
+  mmap.mmap(0, size) should not be used on Windows for anonymous memory.
+
+- Patch #1422385: The nis module now supports access to domains other
+  than the system default domain.
+
+- Use Win32 API to implement os.stat/fstat. As a result, subsecond timestamps
+  are reported, the limit on path name lengths is removed, and stat reports
+  WindowsError now (instead of OSError).
+
+- Add bsddb.db.DBEnv.set_tx_timestamp allowing time based database recovery.
+
+- Bug #1413192, fix seg fault in bsddb if a transaction was deleted
+  before the env.
+
+- Patch #1103116: Basic AF_NETLINK support.
+
+- Bug #1402308, (possible) segfault when using mmap.mmap(-1, ...)
+
+- Bug #1400822, _curses over{lay,write} doesn't work when passing 6 ints.
+  Also fix ungetmouse() which did not accept arguments properly.
+  The code now conforms to the documented signature.
+
+- Bug #1400115, Fix segfault when calling curses.panel.userptr()
+  without prior setting of the userptr.
+
 - Fix 64-bit problems in bsddb.
 
 - Patch #1365916: fix some unsafe 64-bit mmap methods.
@@ -225,7 +262,12 @@ Extension Modules
 - Patch #1338314, Bug #1336623: fix tarfile so it can extract
   REGTYPE directories from tarfiles written by old programs.
 
-- Get bsddb module to build with BSD DB version 3.2
+- Patch #1407992, fixes broken bsddb module db associate when using
+  BerkeleyDB 3.3, 4.0 or 4.1.
+
+- Get bsddb module to build with BerkeleyDB version 4.4
+
+- Get bsddb module to build with BerkeleyDB version 3.2
 
 - Patch #1309009, Fix segfault in pyexpat when the XML document is in latin_1,
   but Python incorrectly assumes it is in UTF-8 format
@@ -318,6 +360,27 @@ Extension Modules
 
 Library
 -------
+
+- Patch #1412872: zipfile now sets the creator system to 3 (Unix)
+  unless the system is Win32.
+
+- Patch #1349118: urllib now supports user:pass@ style proxy 
+  specifications, raises IOErrors when proxies for unsupported protocols
+  are defined, and uses the https proxy on https redirections.
+
+- Bug #902075: urllib2 now supports 'host:port' style proxy specifications.
+
+- Bug #1407902: Add support for sftp:// URIs to urlparse.
+
+- Bug #1371247: Update Windows locale identifiers in locale.py.
+
+- Bug #1394565: SimpleHTTPServer now doesn't choke on query parameters
+  any more.
+
+- Bug #1403410: The warnings module now doesn't get confused
+  when it can't find out the module name it generates a warning for.
+
+- Patch #1177307: Added a new codec utf_8_sig for UTF-8 with a BOM signature.
 
 - Patch #1157027: cookielib mishandles RFC 2109 cookies in Netscape mode
 
@@ -630,8 +693,15 @@ Library
 
 - ` uu.encode()`` and ``uu.decode()`` now support unicode filenames.
 
+- Patch #1413711: Certain patterns of differences were making difflib
+  touch the recursion limit.
+
 Build
 -----
+
+- Patch #1428494: Prefer linking against ncursesw over ncurses library.
+
+- Patch #881820: look for openpty and forkpty also in libbsd.
 
 - The sources of zlib are now part of the Python distribution (zlib 1.2.3).
   The zlib module is now builtin on Windows.
@@ -672,7 +742,6 @@ Build
   Tests for sanity in tzname when HAVE_TZNAME defined were also defined.
   Closes bug #1096244.  Thanks Gregory Bond.
 
-
 C API
 -----
 
@@ -697,6 +766,11 @@ Tests
 
 Documentation
 -------------
+
+- Bug #1402224: Add warning to dl docs about crashes.
+
+- Bug #1396471: Document that Windows' ftell() can return invalid
+  values for text files with UNIX-style line endings.
 
 - Bug #1274828: Document os.path.splitunc().
 
@@ -1946,6 +2020,11 @@ Extension modules
 
 Library
 -------
+
+- Added a new module: cProfile, a C profiler with the same interface as the
+  profile module.  cProfile avoids some of the drawbacks of the hotshot
+  profiler and provides a bit more information than the other two profilers.
+  Based on "lsprof" (patch #1212837).
 
 - Bug #1266283: The new function "lexists" is now in os.path.__all__.
 

@@ -54,7 +54,7 @@ typedef fpos_t Py_off_t;
 	(((PY_LONG_LONG)bzs->total_out_hi32 << 32) + bzs->total_out_lo32)
 #else
 #define BZS_TOTAL_OUT(bzs) \
-	bzs->total_out_lo32;
+	bzs->total_out_lo32
 #endif
 
 #else /* ! BZ_CONFIG_ERROR */
@@ -2192,6 +2192,8 @@ initbz2(void)
 	BZ2Decomp_Type.ob_type = &PyType_Type;
 
 	m = Py_InitModule3("bz2", bz2_methods, bz2__doc__);
+	if (m == NULL)
+		return;
 
 	PyModule_AddObject(m, "__author__", PyString_FromString(__author__));
 

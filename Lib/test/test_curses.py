@@ -5,10 +5,12 @@
 # does call every method and function.
 #
 # Functions not tested: {def,reset}_{shell,prog}_mode, getch(), getstr(),
-# getmouse(), ungetmouse(), init_color()
+# init_color()
+# Only called, not tested: getmouse(), ungetmouse()
 #
 
 import curses, sys, tempfile, os
+import curses.panel
 
 # Optionally test curses module.  This currently requires that the
 # 'curses' resource be given on the regrtest command line using the -u
@@ -105,6 +107,8 @@ def window_funcs(stdscr):
     stdscr.notimeout(1)
     win2.overlay(win)
     win2.overwrite(win)
+    win2.overlay(win, 1, 2, 3, 3, 2, 1)
+    win2.overwrite(win, 1, 2, 3, 3, 2, 1)
     stdscr.redrawln(1,2)
 
     stdscr.scrollok(1)
@@ -169,7 +173,6 @@ def module_funcs(stdscr):
     curses.qiflush()
     curses.raw() ; curses.raw(1)
     curses.setsyx(5,5)
-    curses.setupterm(fd=sys.__stdout__.fileno())
     curses.tigetflag('hc')
     curses.tigetnum('co')
     curses.tigetstr('cr')
@@ -200,6 +203,9 @@ def module_funcs(stdscr):
     if hasattr(curses, 'getmouse'):
         curses.mousemask(curses.BUTTON1_PRESSED)
         curses.mouseinterval(10)
+        # just verify these don't cause errors
+        m = curses.getmouse()
+        curses.ungetmouse(*m)
 
 def unit_tests():
     from curses import ascii
@@ -213,21 +219,33 @@ def unit_tests():
             print 'curses.unctrl fails on character', repr(ch)
 
 
+def test_userptr_without_set(stdscr):
+    w = curses.newwin(10, 10)
+    p = curses.panel.new_panel(w)
+    # try to access userptr() before calling set_userptr() -- segfaults
+    try:
+        p.userptr()
+        raise RuntimeError, 'userptr should fail since not set'
+    except curses.panel.error:
+        pass
 
 def main(stdscr):
     curses.savetty()
     try:
         module_funcs(stdscr)
         window_funcs(stdscr)
+        test_userptr_without_set(stdscr)
     finally:
         curses.resetty()
-
 
 if __name__ == '__main__':
     curses.wrapper(main)
     unit_tests()
 else:
     try:
+        # testing setupterm() inside initscr/endwin
+        # causes terminal breakage
+        curses.setupterm(fd=sys.__stdout__.fileno())
         stdscr = curses.initscr()
         main(stdscr)
     finally:

@@ -281,6 +281,14 @@ def test_both():
         except OSError:
             pass
 
+    print '  Try opening a bad file descriptor...'
+    try:
+        mmap.mmap(-2, 4096)
+    except mmap.error:
+        pass
+    else:
+        verify(0, 'expected a mmap.error but did not get it')
+
     # Do a tougher .find() test.  SF bug 515943 pointed out that, in 2.2,
     # searching for data with embedded \0 bytes didn't work.
     f = open(TESTFN, 'w+')
@@ -372,6 +380,16 @@ def test_both():
     finally:
         os.unlink(TESTFN)
 
-    print ' Test passed'
+def test_anon():
+    print "  anonymous mmap.mmap(-1, PAGESIZE)..."
+    m = mmap.mmap(-1, PAGESIZE)
+    for x in xrange(PAGESIZE):
+        verify(m[x] == '\0', "anonymously mmap'ed contents should be zero")
+
+    for x in xrange(PAGESIZE):
+        m[x] = ch = chr(x & 255)
+        vereq(m[x], ch)
 
 test_both()
+test_anon()
+print ' Test passed'

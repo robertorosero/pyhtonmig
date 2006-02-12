@@ -2346,10 +2346,10 @@ repeat_len(repeatobject *ro)
         return PyInt_FromLong(ro->cnt);
 }
 
-PyDoc_STRVAR(length_cue_doc, "Private method returning an estimate of len(list(it)).");
+PyDoc_STRVAR(length_hint_doc, "Private method returning an estimate of len(list(it)).");
 
 static PyMethodDef repeat_methods[] = {
-	{"_length_cue", (PyCFunction)repeat_len, METH_NOARGS, length_cue_doc},
+	{"__length_hint__", (PyCFunction)repeat_len, METH_NOARGS, length_hint_doc},
  	{NULL,		NULL}		/* sentinel */
 };
 
@@ -2460,6 +2460,8 @@ inititertools(void)
 
 	teedataobject_type.ob_type = &PyType_Type;
 	m = Py_InitModule3("itertools", module_methods, module_doc);
+	if (m == NULL)
+		return;
 
 	for (i=0 ; typelist[i] != NULL ; i++) {
 		if (PyType_Ready(typelist[i]) < 0)

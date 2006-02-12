@@ -74,6 +74,7 @@ typedef enum {
 	SOCKET_IS_BLOCKING,
 	SOCKET_HAS_TIMED_OUT,
 	SOCKET_HAS_BEEN_CLOSED,
+	SOCKET_INVALID,
 	SOCKET_OPERATION_OK
 } timeout_state;
 
@@ -266,11 +267,14 @@ newPySSLObject(PySocketSockObject *Sock, char *key_file, char *cert_file)
 		} else {
 			sockstate = SOCKET_OPERATION_OK;
 		}
-	    if (sockstate == SOCKET_HAS_TIMED_OUT) {
+	        if (sockstate == SOCKET_HAS_TIMED_OUT) {
 			PyErr_SetString(PySSLErrorObject, "The connect operation timed out");
 			goto fail;
 		} else if (sockstate == SOCKET_HAS_BEEN_CLOSED) {
 			PyErr_SetString(PySSLErrorObject, "Underlying socket has been closed.");
+			goto fail;
+		} else if (sockstate == SOCKET_INVALID) {
+			PyErr_SetString(PySSLErrorObject, "Underlying socket too large for select().");
 			goto fail;
 		} else if (sockstate == SOCKET_IS_NONBLOCKING) {
 			break;
@@ -372,6 +376,12 @@ check_socket_and_wait_for_timeout(PySocketSockObject *s, int writing)
 	if (s->sock_fd < 0)
 		return SOCKET_HAS_BEEN_CLOSED;
 
+	/* Guard against socket too large for select*/
+#ifndef Py_SOCKET_FD_CAN_BE_GE_FD_SETSIZE
+	if (s->sock_fd >= FD_SETSIZE)
+		return SOCKET_INVALID;
+#endif
+
 	/* Construct the arguments to select */
 	tv.tv_sec = (int)s->sock_timeout;
 	tv.tv_usec = (int)((s->sock_timeout - tv.tv_sec) * 1e6);
@@ -409,6 +419,9 @@ static PyObject *PySSL_SSLwrite(PySSLObject *self, PyObject *args)
 	} else if (sockstate == SOCKET_HAS_BEEN_CLOSED) {
 		PyErr_SetString(PySSLErrorObject, "Underlying socket has been closed.");
 		return NULL;
+	} else if (sockstate == SOCKET_INVALID) {
+		PyErr_SetString(PySSLErrorObject, "Underlying socket too large for select().");
+		return NULL;
 	}
 	do {
 		err = 0;
@@ -426,7 +439,7 @@ static PyObject *PySSL_SSLwrite(PySSLObject *self, PyObject *args)
 		} else {
 			sockstate = SOCKET_OPERATION_OK;
 		}
-	    if (sockstate == SOCKET_HAS_TIMED_OUT) {
+	        if (sockstate == SOCKET_HAS_TIMED_OUT) {
 			PyErr_SetString(PySSLErrorObject, "The write operation timed out");
 			return NULL;
 		} else if (sockstate == SOCKET_HAS_BEEN_CLOSED) {
@@ -467,6 +480,9 @@ static PyObject *PySSL_SSLread(PySSLObject *self, PyObject *args)
 		PyErr_SetString(PySSLErrorObject, "The read operation timed out");
 		Py_DECREF(buf);
 		return NULL;
+	} else if (sockstate == SOCKET_INVALID) {
+		PyErr_SetString(PySSLErrorObject, "Underlying socket too large for select().");
+		return NULL;
 	}
 	do {
 		err = 0;
@@ -485,7 +501,7 @@ static PyObject *PySSL_SSLread(PySSLObject *self, PyObject *args)
 		} else {
 			sockstate = SOCKET_OPERATION_OK;
 		}
-	    if (sockstate == SOCKET_HAS_TIMED_OUT) {
+	        if (sockstate == SOCKET_HAS_TIMED_OUT) {
 			PyErr_SetString(PySSLErrorObject, "The read operation timed out");
 			Py_DECREF(buf);
 			return NULL;
@@ -634,6 +650,8 @@ init_ssl(void)
 	PySSL_Type.ob_type = &PyType_Type;
 
 	m = Py_InitModule3("_ssl", PySSL_methods, module_doc);
+	if (m == NULL)
+		return;
 	d = PyModule_GetDict(m);
 
 	/* Load _socket module and its C API */

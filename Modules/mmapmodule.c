@@ -54,6 +54,11 @@ my_getpagesize(void)
 #include <string.h>
 #include <sys/types.h>
 
+/* maybe define MAP_ANON in terms of MAP_ANONYMOUS */
+#if !defined(MAP_ANONYMOUS) && defined(MAP_ANON)
+#  define MAP_ANONYMOUS MAP_ANON
+#endif
+
 static PyObject *mmap_module_error;
 
 typedef enum
@@ -863,6 +868,7 @@ new_mmap_object(PyObject *self, PyObject *args, PyObject *kwdict)
 	PyObject *map_size_obj = NULL;
 	int map_size;
 	int fd, flags = MAP_SHARED, prot = PROT_WRITE | PROT_READ;
+	int devzero = -1;
 	int access = (int)ACCESS_DEFAULT;
 	static const char *keywords[] = {"fileno", "length", 
                                          "flags", "prot", 
@@ -877,10 +883,10 @@ new_mmap_object(PyObject *self, PyObject *args, PyObject *kwdict)
 		return NULL;
 
 	if ((access != (int)ACCESS_DEFAULT) && 
-	    ((flags != MAP_SHARED) || ( prot != (PROT_WRITE | PROT_READ))))
+	    ((flags != MAP_SHARED) || (prot != (PROT_WRITE | PROT_READ))))
 		return PyErr_Format(PyExc_ValueError, 
 				    "mmap can't specify both access and flags, prot.");
-	switch((access_mode)access) {
+	switch ((access_mode)access) {
 	case ACCESS_READ:
 		flags = MAP_SHARED;
 		prot = PROT_READ;
@@ -918,17 +924,44 @@ new_mmap_object(PyObject *self, PyObject *args, PyObject *kwdict)
 #endif
 	m_obj = PyObject_New (mmap_object, &mmap_object_type);
 	if (m_obj == NULL) {return NULL;}
+	m_obj->data = NULL;
 	m_obj->size = (size_t) map_size;
 	m_obj->pos = (size_t) 0;
-	m_obj->fd = dup(fd);
-	if (m_obj->fd == -1) {
-		Py_DECREF(m_obj);
-		PyErr_SetFromErrno(mmap_module_error);
-		return NULL;
+	if (fd == -1) {
+		m_obj->fd = -1;
+		/* Assume the caller wants to map anonymous memory.
+		   This is the same behaviour as Windows.  mmap.mmap(-1, size)
+		   on both Windows and Unix map anonymous memory.
+		*/
+#ifdef MAP_ANONYMOUS
+		/* BSD way to map anonymous memory */
+		flags |= MAP_ANONYMOUS;
+#else
+		/* SVR4 method to map anonymous memory is to open /dev/zero */
+		fd = devzero = open("/dev/zero", O_RDWR);
+		if (devzero == -1) {
+			Py_DECREF(m_obj);
+			PyErr_SetFromErrno(mmap_module_error);
+			return NULL;
+		}
+#endif
+	} else {
+		m_obj->fd = dup(fd);
+		if (m_obj->fd == -1) {
+			Py_DECREF(m_obj);
+			PyErr_SetFromErrno(mmap_module_error);
+			return NULL;
+		}
 	}
+
 	m_obj->data = mmap(NULL, map_size, 
 			   prot, flags,
 			   fd, 0);
+
+	if (devzero != -1) {
+		close(devzero);
+	}
+
 	if (m_obj->data == (char *)-1) {
 	        m_obj->data = NULL;
 		Py_DECREF(m_obj);
@@ -985,8 +1018,15 @@ new_mmap_object(PyObject *self, PyObject *args, PyObject *kwdict)
 	if (map_size < 0)
 		return NULL;
 	
-	/* if an actual filename has been specified */
-	if (fileno != 0) {
+	/* assume -1 and 0 both mean invalid filedescriptor
+	   to 'anonymously' map memory.
+	   XXX: fileno == 0 is a valid fd, but was accepted prior to 2.5.
+	   XXX: Should this code be added?
+	   if (fileno == 0)
+	   	PyErr_Warn(PyExc_DeprecationWarning,
+			   "don't use 0 for anonymous memory");
+	 */
+	if (fileno != -1 && fileno != 0) {
 		fh = (HANDLE)_get_osfhandle(fileno);
 		if (fh==(HANDLE)-1) {
 			PyErr_SetFromErrno(mmap_module_error);
@@ -1091,6 +1131,8 @@ PyMODINIT_FUNC
 	mmap_object_type.ob_type = &PyType_Type;
 
 	module = Py_InitModule ("mmap", mmap_functions);
+	if (module == NULL)
+		return;
 	dict = PyModule_GetDict (module);
 	mmap_module_error = PyExc_EnvironmentError;
 	Py_INCREF(mmap_module_error);
@@ -1120,10 +1162,10 @@ PyMODINIT_FUNC
 	PyDict_SetItemString (dict, "MAP_EXECUTABLE",
 			      PyInt_FromLong(MAP_EXECUTABLE) );
 #endif
-#ifdef MAP_ANON
-	PyDict_SetItemString (dict, "MAP_ANON", PyInt_FromLong(MAP_ANON) );
+#ifdef MAP_ANONYMOUS
+	PyDict_SetItemString (dict, "MAP_ANON", PyInt_FromLong(MAP_ANONYMOUS) );
 	PyDict_SetItemString (dict, "MAP_ANONYMOUS",
-			      PyInt_FromLong(MAP_ANON) );
+			      PyInt_FromLong(MAP_ANONYMOUS) );
 #endif
 
 	PyDict_SetItemString (dict, "PAGESIZE",

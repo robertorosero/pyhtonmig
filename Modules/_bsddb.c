@@ -97,7 +97,7 @@
 #error "eek! DBVER can't handle minor versions > 9"
 #endif
 
-#define PY_BSDDB_VERSION "4.3.3"
+#define PY_BSDDB_VERSION "4.4.2"
 static char *rcs_id = "$Id$";
 
 
@@ -266,6 +266,7 @@ typedef struct {
 typedef struct {
     PyObject_HEAD
     DB_TXN*         txn;
+    PyObject        *env;
 #ifdef HAVE_WEAKREF
     PyObject        *in_weakreflist; /* List of weak references */
 #endif
@@ -912,7 +913,7 @@ DBEnv_dealloc(DBEnvObject* self)
     }
 #endif
 
-    if (self->db_env) {
+    if (self->db_env && !self->closed) {
         MYDB_BEGIN_ALLOW_THREADS;
         self->db_env->close(self->db_env, 0);
         MYDB_END_ALLOW_THREADS;
@@ -928,6 +929,8 @@ newDBTxnObject(DBEnvObject* myenv, DB_TXN *parent, int flags)
     DBTxnObject* self = PyObject_New(DBTxnObject, &DBTxn_Type);
     if (self == NULL)
         return NULL;
+    Py_INCREF(myenv);
+    self->env = (PyObject*)myenv;
 #ifdef HAVE_WEAKREF
     self->in_weakreflist = NULL;
 #endif
@@ -938,11 +941,10 @@ newDBTxnObject(DBEnvObject* myenv, DB_TXN *parent, int flags)
 #else
     err = txn_begin(myenv->db_env, parent, &(self->txn), flags);
 #endif
-    /* TODO add a weakref(self) to the self->myenvobj->open_child_weakrefs
-     * list so that a DBEnv can refuse to close without aborting any open
-     * open DBTxns and closing any open DBs first. */
     MYDB_END_ALLOW_THREADS;
     if (makeDBError(err)) {
+        Py_DECREF(self->env);
+        PyObject_Del(self);
         self = NULL;
     }
     return self;
@@ -973,6 +975,7 @@ DBTxn_dealloc(DBTxnObject* self)
     }
 #endif
 
+    Py_DECREF(self->env);
     PyObject_Del(self);
 }
 
@@ -1534,11 +1537,19 @@ DB_pget(DBObject* self, PyObject* args, PyObject* kwargs)
                 keyObj = PyInt_FromLong(*(int *)key.data);
             else
                 keyObj = PyString_FromStringAndSize(key.data, key.size);
+#if (PY_VERSION_HEX >= 0x02040000)
+            retval = PyTuple_Pack(3, keyObj, pkeyObj, dataObj);
+#else
             retval = Py_BuildValue("OOO", keyObj, pkeyObj, dataObj);
+#endif
         }
         else /* return just the pkey and data */
         {
+#if (PY_VERSION_HEX >= 0x02040000)
+            retval = PyTuple_Pack(2, pkeyObj, dataObj);
+#else
             retval = Py_BuildValue("OO", pkeyObj, dataObj);
+#endif
         }
 	FREE_DBT(pkey);
         FREE_DBT(data);
@@ -3176,7 +3187,7 @@ DBC_pget(DBCursorObject* self, PyObject* args, PyObject *kwargs)
         else
             pkeyObj = PyString_FromStringAndSize(pkey.data, pkey.size);
 
-        if (flags & DB_SET_RECNO) /* return key, pkey and data */
+        if (key.data && key.size) /* return key, pkey and data */
         {
             PyObject *keyObj;
             int type = _DB_get_type(self->mydb);
@@ -3184,12 +3195,20 @@ DBC_pget(DBCursorObject* self, PyObject* args, PyObject *kwargs)
                 keyObj = PyInt_FromLong(*(int *)key.data);
             else
                 keyObj = PyString_FromStringAndSize(key.data, key.size);
+#if (PY_VERSION_HEX >= 0x02040000)
+            retval = PyTuple_Pack(3, keyObj, pkeyObj, dataObj);
+#else
             retval = Py_BuildValue("OOO", keyObj, pkeyObj, dataObj);
+#endif
             FREE_DBT(key);
         }
         else /* return just the pkey and data */
         {
+#if (PY_VERSION_HEX >= 0x02040000)
+            retval = PyTuple_Pack(2, pkeyObj, dataObj);
+#else
             retval = Py_BuildValue("OO", pkeyObj, dataObj);
+#endif
         }
         FREE_DBT(pkey);
         FREE_DBT(data);
@@ -4161,9 +4180,23 @@ DBEnv_set_tx_max(DBEnvObject* self, PyObject* args)
         return NULL;
     CHECK_ENV_NOT_CLOSED(self);
 
-    MYDB_BEGIN_ALLOW_THREADS;
     err = self->db_env->set_tx_max(self->db_env, max);
-    MYDB_END_ALLOW_THREADS;
+    RETURN_IF_ERR();
+    RETURN_NONE();
+}
+
+
+static PyObject*
+DBEnv_set_tx_timestamp(DBEnvObject* self, PyObject* args)
+{
+    int err;
+    time_t stamp;
+
+    if (!PyArg_ParseTuple(args, "i:set_tx_timestamp", &stamp))
+        return NULL;
+    CHECK_ENV_NOT_CLOSED(self);
+
+    err = self->db_env->set_tx_timestamp(self->db_env, &stamp);
     RETURN_IF_ERR();
     RETURN_NONE();
 }
@@ -4308,8 +4341,13 @@ DBEnv_lock_stat(DBEnvObject* self, PyObject* args)
 #endif
     MAKE_ENTRY(nrequests);
     MAKE_ENTRY(nreleases);
-    MAKE_ENTRY(nnowaits);
+#if (DBVER < 44)
+    MAKE_ENTRY(nnowaits);       /* these were renamed in 4.4 */
     MAKE_ENTRY(nconflicts);
+#else
+    MAKE_ENTRY(lock_nowait);
+    MAKE_ENTRY(lock_wait);
+#endif
     MAKE_ENTRY(ndeadlocks);
     MAKE_ENTRY(regsize);
     MAKE_ENTRY(region_wait);
@@ -4715,6 +4753,7 @@ static PyMethodDef DBEnv_methods[] = {
     {"txn_checkpoint",  (PyCFunction)DBEnv_txn_checkpoint,   METH_VARARGS},
     {"txn_stat",        (PyCFunction)DBEnv_txn_stat,         METH_VARARGS},
     {"set_tx_max",      (PyCFunction)DBEnv_set_tx_max,       METH_VARARGS},
+    {"set_tx_timestamp", (PyCFunction)DBEnv_set_tx_timestamp, METH_VARARGS},
     {"lock_detect",     (PyCFunction)DBEnv_lock_detect,      METH_VARARGS},
     {"lock_get",        (PyCFunction)DBEnv_lock_get,         METH_VARARGS},
     {"lock_id",         (PyCFunction)DBEnv_lock_id,          METH_VARARGS},
@@ -5034,6 +5073,8 @@ DL_EXPORT(void) init_bsddb(void)
 
     /* Create the module and add the functions */
     m = Py_InitModule(_bsddbModuleName, bsddb_methods);
+    if (m == NULL)
+    	return;
 
     /* Add some symbolic constants to the module */
     d = PyModule_GetDict(m);
@@ -5151,7 +5192,11 @@ DL_EXPORT(void) init_bsddb(void)
     ADD_INT(d, DB_LOCK_IREAD);
     ADD_INT(d, DB_LOCK_IWR);
 #if (DBVER >= 33)
+#if (DBVER < 44)
     ADD_INT(d, DB_LOCK_DIRTY);
+#else
+    ADD_INT(d, DB_LOCK_READ_UNCOMMITTED);  /* renamed in 4.4 */
+#endif
     ADD_INT(d, DB_LOCK_WWRITE);
 #endif
 
@@ -5251,6 +5296,11 @@ DL_EXPORT(void) init_bsddb(void)
     ADD_INT(d, DB_DIRTY_READ);
     ADD_INT(d, DB_MULTIPLE);
     ADD_INT(d, DB_MULTIPLE_KEY);
+#endif
+
+#if (DBVER >= 44)
+    ADD_INT(d, DB_READ_UNCOMMITTED);    /* replaces DB_DIRTY_READ in 4.4 */
+    ADD_INT(d, DB_READ_COMMITTED);
 #endif
 
 #if (DBVER >= 33)

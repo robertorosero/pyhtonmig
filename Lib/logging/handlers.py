@@ -126,7 +126,12 @@ class RotatingFileHandler(BaseRotatingHandler):
             dfn = self.baseFilename + ".1"
             if os.path.exists(dfn):
                 os.remove(dfn)
-            os.rename(self.baseFilename, dfn)
+            try:
+                os.rename(self.baseFilename, dfn)
+            except (KeyboardInterrupt, SystemExit):
+                raise
+            except:
+                self.handleError(record)
             #print "%s -> %s" % (self.baseFilename, dfn)
         if self.encoding:
             self.stream = codecs.open(self.baseFilename, 'w', self.encoding)
@@ -212,9 +217,12 @@ class TimedRotatingFileHandler(BaseRotatingHandler):
             currentMinute = t[4]
             currentSecond = t[5]
             # r is the number of seconds left between now and midnight
-            r = (24 - currentHour) * 60 * 60 # number of hours in seconds
-            r = r + (59 - currentMinute) * 60 # plus the number of minutes (in secs)
-            r = r + (59 - currentSecond) # plus the number of seconds
+            if (currentMinute == 0) and (currentSecond == 0):
+                r = (24 - currentHour) * 60 * 60 # number of hours in seconds
+            else:
+                r = (23 - currentHour) * 60 * 60
+                r = r + (59 - currentMinute) * 60 # plus the number of minutes (in secs)
+                r = r + (60 - currentSecond) # plus the number of seconds
             self.rolloverAt = currentTime + r
             # If we are rolling over on a certain day, add in the number of days until
             # the next rollover, but offset by 1 since we just calculated the time
@@ -267,7 +275,12 @@ class TimedRotatingFileHandler(BaseRotatingHandler):
         dfn = self.baseFilename + "." + time.strftime(self.suffix, timeTuple)
         if os.path.exists(dfn):
             os.remove(dfn)
-        os.rename(self.baseFilename, dfn)
+        try:
+            os.rename(self.baseFilename, dfn)
+        except (KeyboardInterrupt, SystemExit):
+            raise
+        except:
+            self.handleError(record)
         if self.backupCount > 0:
             # find the oldest log file and delete it
             s = glob.glob(self.baseFilename + ".20*")
@@ -279,7 +292,7 @@ class TimedRotatingFileHandler(BaseRotatingHandler):
             self.stream = codecs.open(self.baseFilename, 'w', self.encoding)
         else:
             self.stream = open(self.baseFilename, 'w')
-        self.rolloverAt = int(time.time()) + self.interval
+        self.rolloverAt = self.rolloverAt + self.interval
 
 class SocketHandler(logging.Handler):
     """

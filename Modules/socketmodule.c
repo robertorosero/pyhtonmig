@@ -7,7 +7,7 @@ This module provides an interface to Berkeley socket IPC.
 Limitations:
 
 - Only AF_INET, AF_INET6 and AF_UNIX address families are supported in a
-  portable manner, though AF_PACKET is supported under Linux.
+  portable manner, though AF_PACKET and AF_NETLINK are supported under Linux.
 - No read/write operations (use sendall/recv or makefile instead).
 - Additional restrictions apply on some non-Unix platforms (compensated
   for by socket.py).
@@ -394,6 +394,23 @@ static int taskwindow;
    some of which call new_sockobject(), which uses sock_type, so
    there has to be a circular reference. */
 static PyTypeObject sock_type;
+
+/* Can we call select() with this socket without a buffer overrun? */
+#ifdef Py_SOCKET_FD_CAN_BE_GE_FD_SETSIZE
+/* Platform can select file descriptors beyond FD_SETSIZE */
+#define IS_SELECTABLE(s) 1
+#else
+/* POSIX says selecting file descriptors beyond FD_SETSIZE
+   has undefined behaviour. */
+#define IS_SELECTABLE(s) ((s)->sock_fd < FD_SETSIZE)
+#endif
+
+static PyObject*
+select_error(void)
+{
+	PyErr_SetString(socket_error, "unable to select on socket");
+	return NULL;
+}
 
 /* Convenience function to raise an error according to errno
    and return a NULL pointer from a function. */
@@ -954,6 +971,14 @@ makesockaddr(int sockfd, struct sockaddr *addr, int addrlen, int proto)
 	}
 #endif /* AF_UNIX */
 
+#if defined(AF_NETLINK)
+       case AF_NETLINK:
+       {
+               struct sockaddr_nl *a = (struct sockaddr_nl *) addr;
+               return Py_BuildValue("II", a->nl_pid, a->nl_groups);
+       }
+#endif /* AF_NETLINK */
+
 #ifdef ENABLE_IPV6
 	case AF_INET6:
 	{
@@ -1089,6 +1114,31 @@ getsockaddrarg(PySocketSockObject *s, PyObject *args,
 		return 1;
 	}
 #endif /* AF_UNIX */
+
+#if defined(AF_NETLINK)
+	case AF_NETLINK:
+	{
+		struct sockaddr_nl* addr;
+		int pid, groups;
+		addr = (struct sockaddr_nl *)&(s->sock_addr).nl;
+		if (!PyTuple_Check(args)) {
+			PyErr_Format(
+				PyExc_TypeError,
+				"getsockaddrarg: "
+				"AF_NETLINK address must be tuple, not %.500s",
+				args->ob_type->tp_name);
+			return 0;
+		}
+		if (!PyArg_ParseTuple(args, "II:getsockaddrarg", &pid, &groups))
+			return 0;
+		addr->nl_family = AF_NETLINK;
+		addr->nl_pid = pid;
+		addr->nl_groups = groups;
+		*addr_ret = (struct sockaddr *) addr;
+		*len_ret = sizeof(*addr);
+		return 1;
+	}
+#endif
 
 	case AF_INET:
 	{
@@ -1286,6 +1336,13 @@ getsockaddrlen(PySocketSockObject *s, socklen_t *len_ret)
 		return 1;
 	}
 #endif /* AF_UNIX */
+#if defined(AF_NETLINK)
+       case AF_NETLINK:
+       {
+               *len_ret = sizeof (struct sockaddr_nl);
+               return 1;
+       }
+#endif
 
 	case AF_INET:
 	{
@@ -1367,6 +1424,9 @@ sock_accept(PySocketSockObject *s)
 #else
 	newfd = -1;
 #endif
+
+	if (!IS_SELECTABLE(s))
+		return select_error();
 
 	Py_BEGIN_ALLOW_THREADS
 	timeout = internal_select(s, 0);
@@ -1696,7 +1756,8 @@ internal_connect(PySocketSockObject *s, struct sockaddr *addr, int addrlen,
 #ifdef MS_WINDOWS
 
 	if (s->sock_timeout > 0.0) {
-		if (res < 0 && WSAGetLastError() == WSAEWOULDBLOCK) {
+		if (res < 0 && WSAGetLastError() == WSAEWOULDBLOCK &&
+		    IS_SELECTABLE(s)) {
 			/* This is a mess.  Best solution: trust select */
 			fd_set fds;
 			fd_set fds_exc;
@@ -1741,7 +1802,7 @@ internal_connect(PySocketSockObject *s, struct sockaddr *addr, int addrlen,
 #else
 
 	if (s->sock_timeout > 0.0) {
-		if (res < 0 && errno == EINPROGRESS) {
+		if (res < 0 && errno == EINPROGRESS && IS_SELECTABLE(s)) {
 			timeout = internal_select(s, 1);
 			res = connect(s->sock_fd, addr, addrlen);
 			if (res < 0 && errno == EISCONN)
@@ -2044,6 +2105,9 @@ sock_recv(PySocketSockObject *s, PyObject *args)
 	if (buf == NULL)
 		return NULL;
 
+	if (!IS_SELECTABLE(s))
+		return select_error();
+
 #ifndef __VMS
 	Py_BEGIN_ALLOW_THREADS
 	timeout = internal_select(s, 0);
@@ -2137,6 +2201,9 @@ sock_recvfrom(PySocketSockObject *s, PyObject *args)
 	if (buf == NULL)
 		return NULL;
 
+	if (!IS_SELECTABLE(s))
+		return select_error();
+
 	Py_BEGIN_ALLOW_THREADS
 	memset(&addrbuf, 0, addrlen);
 	timeout = internal_select(s, 0);
@@ -2197,6 +2264,9 @@ sock_send(PySocketSockObject *s, PyObject *args)
 
 	if (!PyArg_ParseTuple(args, "s#|i:send", &buf, &len, &flags))
 		return NULL;
+
+	if (!IS_SELECTABLE(s))
+		return select_error();
 
 #ifndef __VMS
 	Py_BEGIN_ALLOW_THREADS
@@ -2263,6 +2333,9 @@ sock_sendall(PySocketSockObject *s, PyObject *args)
 	if (!PyArg_ParseTuple(args, "s#|i:sendall", &buf, &len, &flags))
 		return NULL;
 
+	if (!IS_SELECTABLE(s))
+		return select_error();
+
 	Py_BEGIN_ALLOW_THREADS
 	do {
 		timeout = internal_select(s, 1);
@@ -2316,6 +2389,9 @@ sock_sendto(PySocketSockObject *s, PyObject *args)
 
 	if (!getsockaddrarg(s, addro, &addr, &addrlen))
 		return NULL;
+
+	if (!IS_SELECTABLE(s))
+		return select_error();
 
 	Py_BEGIN_ALLOW_THREADS
 	timeout = internal_select(s, 1);
@@ -3831,6 +3907,8 @@ init_socket(void)
 	m = Py_InitModule3(PySocket_MODULE_NAME,
 			   socket_methods,
 			   socket_doc);
+	if (m == NULL)
+		return;
 
 	socket_error = PyErr_NewException("socket.error", NULL, NULL);
 	if (socket_error == NULL)
@@ -3947,6 +4025,20 @@ init_socket(void)
 #ifdef AF_NETLINK
 	/*  */
 	PyModule_AddIntConstant(m, "AF_NETLINK", AF_NETLINK);
+	PyModule_AddIntConstant(m, "NETLINK_ROUTE", NETLINK_ROUTE);
+	PyModule_AddIntConstant(m, "NETLINK_SKIP", NETLINK_SKIP);
+	PyModule_AddIntConstant(m, "NETLINK_USERSOCK", NETLINK_USERSOCK);
+	PyModule_AddIntConstant(m, "NETLINK_FIREWALL", NETLINK_FIREWALL);
+	PyModule_AddIntConstant(m, "NETLINK_TCPDIAG", NETLINK_TCPDIAG);
+	PyModule_AddIntConstant(m, "NETLINK_NFLOG", NETLINK_NFLOG);
+#ifdef NETLINK_XFRM
+	PyModule_AddIntConstant(m, "NETLINK_XFRM", NETLINK_XFRM);
+#endif
+	PyModule_AddIntConstant(m, "NETLINK_ARPD", NETLINK_ARPD);
+	PyModule_AddIntConstant(m, "NETLINK_ROUTE6", NETLINK_ROUTE6);
+	PyModule_AddIntConstant(m, "NETLINK_IP6_FW", NETLINK_IP6_FW);
+	PyModule_AddIntConstant(m, "NETLINK_DNRTMSG", NETLINK_DNRTMSG);
+	PyModule_AddIntConstant(m, "NETLINK_TAPBASE", NETLINK_TAPBASE);
 #endif
 #ifdef AF_ROUTE
 	/* Alias to emulate 4.4BSD */

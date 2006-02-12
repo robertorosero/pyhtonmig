@@ -1,4 +1,4 @@
-# Copyright (C) 2001-2004 Python Software Foundation
+# Copyright (C) 2001-2006 Python Software Foundation
 # Contact: email-sig@python.org
 # email package unit tests
 
@@ -146,6 +146,13 @@ class TestMessageAPI(TestEmailBase):
         msg = self._msgobj('msg_07.txt')
         subpart = msg.get_payload(1)
         eq(subpart.get_filename(), 'dingusfish.gif')
+
+    def test_get_filename_with_name_parameter(self):
+        eq = self.assertEqual
+
+        msg = self._msgobj('msg_44.txt')
+        filenames = [p.get_filename() for p in msg.get_payload()]
+        eq(filenames, ['msg.txt', 'msg.txt'])
 
     def test_get_boundary(self):
         eq = self.assertEqual
@@ -2097,6 +2104,17 @@ class TestMiscellaneous(TestEmailBase):
         eq(Utils.parsedate_tz('5 Feb 2003 13:47:26 -0800'),
            (2003, 2, 5, 13, 47, 26, 0, 1, 0, -28800))
 
+    def test_parsedate_acceptable_to_time_functions(self):
+        eq = self.assertEqual
+        timetup = Utils.parsedate('5 Feb 2003 13:47:26 -0800')
+        t = int(time.mktime(timetup))
+        eq(time.localtime(t)[:6], timetup[:6])
+        eq(int(time.strftime('%Y', timetup)), 2003)
+        timetup = Utils.parsedate_tz('5 Feb 2003 13:47:26 -0800')
+        t = int(time.mktime(timetup[:9]))
+        eq(time.localtime(t)[:6], timetup[:6])
+        eq(int(time.strftime('%Y', timetup[:9])), 2003)
+
     def test_parseaddr_empty(self):
         self.assertEqual(Utils.parseaddr('<>'), ('', ''))
         self.assertEqual(Utils.formataddr(Utils.parseaddr('<>')), '')
@@ -2203,7 +2221,8 @@ class TestMiscellaneous(TestEmailBase):
         charset = Charset(charsets[0])
         eq(charset.get_body_encoding(), 'base64')
         msg.set_payload('hello world', charset=charset)
-        eq(msg.get_payload(), 'hello world')
+        eq(msg.get_payload(), 'aGVsbG8gd29ybGQ=\n')
+        eq(msg.get_payload(decode=True), 'hello world')
         eq(msg['content-transfer-encoding'], 'base64')
         # Try another one
         msg = Message()
@@ -2459,6 +2478,15 @@ Here's the message body
         m = '>From foo@example.com 11:25:53\nFrom: bar\n!"#QUX;~: zoo\n\nbody'
         msg = email.message_from_string(m)
         eq(len(msg.keys()), 0)
+
+    def test_rfc2822_one_character_header(self):
+        eq = self.assertEqual
+        m = 'A: first header\nB: second header\nCC: third header\n\nbody'
+        msg = email.message_from_string(m)
+        headers = msg.keys()
+        headers.sort()
+        eq(headers, ['A', 'B', 'CC'])
+        eq(msg.get_payload(), 'body')
 
 
 

@@ -328,7 +328,6 @@ class PyBuildExt(build_ext):
         # Some modules that are normally always on:
         exts.append( Extension('regex', ['regexmodule.c', 'regexpr.c']) )
 
-        exts.append( Extension('_hotshot', ['_hotshot.c']) )
         exts.append( Extension('_weakref', ['_weakref.c']) )
 
         # array objects
@@ -363,6 +362,9 @@ class PyBuildExt(build_ext):
         exts.append( Extension("functional", ["functionalmodule.c"]) )
         # Python C API test module
         exts.append( Extension('_testcapi', ['_testcapimodule.c']) )
+        # profilers (_lsprof is for cProfile.py)
+        exts.append( Extension('_hotshot', ['_hotshot.c']) )
+        exts.append( Extension('_lsprof', ['_lsprof.c', 'rotatingtree.c']) )
         # static Unicode character database
         if have_unicode:
             exts.append( Extension('unicodedata', ['unicodedata.c']) )
@@ -448,6 +450,9 @@ class PyBuildExt(build_ext):
         if self.compiler.find_library_file(lib_dirs, 'readline'):
             readline_libs = ['readline']
             if self.compiler.find_library_file(lib_dirs,
+                                                 'ncursesw'):
+                readline_libs.append('ncursesw')
+            elif self.compiler.find_library_file(lib_dirs,
                                                  'ncurses'):
                 readline_libs.append('ncurses')
             elif self.compiler.find_library_file(lib_dirs, 'curses'):
@@ -556,12 +561,12 @@ class PyBuildExt(build_ext):
         # Sleepycat Berkeley DB interface.  http://www.sleepycat.com
         #
         # This requires the Sleepycat DB code. The earliest supported version
-        # of that library is 3.2, the latest supported version is 4.3.  A list
+        # of that library is 3.2, the latest supported version is 4.4.  A list
         # of available releases can be found at
         #
         # http://www.sleepycat.com/update/index.html
 
-        max_db_ver = (4, 3)
+        max_db_ver = (4, 4)
         min_db_ver = (3, 2)
         db_setup_debug = False   # verbose debug prints from this script?
 
@@ -578,18 +583,20 @@ class PyBuildExt(build_ext):
             '/sw/include/db3',
         ]
         # 4.x minor number specific paths
-        for x in (0,1,2,3):
+        for x in (0,1,2,3,4):
             db_inc_paths.append('/usr/include/db4%d' % x)
             db_inc_paths.append('/usr/include/db4.%d' % x)
             db_inc_paths.append('/usr/local/BerkeleyDB.4.%d/include' % x)
             db_inc_paths.append('/usr/local/include/db4%d' % x)
             db_inc_paths.append('/pkg/db-4.%d/include' % x)
+            db_inc_paths.append('/opt/db-4.%d/include' % x)
         # 3.x minor number specific paths
         for x in (2,3):
             db_inc_paths.append('/usr/include/db3%d' % x)
             db_inc_paths.append('/usr/local/BerkeleyDB.3.%d/include' % x)
             db_inc_paths.append('/usr/local/include/db3%d' % x)
             db_inc_paths.append('/pkg/db-3.%d/include' % x)
+            db_inc_paths.append('/opt/db-3.%d/include' % x)
 
         db_ver_inc_map = {}
 
@@ -747,7 +754,11 @@ class PyBuildExt(build_ext):
 
         # Curses support, requiring the System V version of curses, often
         # provided by the ncurses library.
-        if (self.compiler.find_library_file(lib_dirs, 'ncurses')):
+        if (self.compiler.find_library_file(lib_dirs, 'ncursesw')):
+            curses_libs = ['ncursesw']
+            exts.append( Extension('_curses', ['_cursesmodule.c'],
+                                   libraries = curses_libs) )
+        elif (self.compiler.find_library_file(lib_dirs, 'ncurses')):
             curses_libs = ['ncurses']
             exts.append( Extension('_curses', ['_cursesmodule.c'],
                                    libraries = curses_libs) )
