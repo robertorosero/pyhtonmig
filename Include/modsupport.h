@@ -97,6 +97,12 @@ PyAPI_FUNC(int) PyModule_AddStringConstant(PyObject *, const char *, const char 
 #define Py_InitModule4 Py_InitModule4TraceRefs
 #endif
 
+#if SIZEOF_SIZE_T != SIZEOF_INT
+/* On a 64-bit system, rename the Py_InitModule4 so that 2.4
+   modules cannot get loaded into a 2.5 interpreter */
+#define Py_InitModule4 Py_InitModule4_64
+#endif
+
 PyAPI_FUNC(PyObject *) Py_InitModule4(const char *name, PyMethodDef *methods,
                                       const char *doc, PyObject *self,
                                       int apiver);
