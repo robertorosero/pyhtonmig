@@ -6514,7 +6514,7 @@ static PyMappingMethods unicode_as_mapping = {
 
 static Py_ssize_t
 unicode_buffer_getreadbuf(PyUnicodeObject *self,
-			  int index,
+			  Py_ssize_t index,
 			  const void **ptr)
 {
     if (index != 0) {
@@ -7242,10 +7242,10 @@ PyObject *PyUnicode_Format(PyObject *format,
 }
 
 static PyBufferProcs unicode_as_buffer = {
-    (getreadbufferproc) unicode_buffer_getreadbuf,
-    (getwritebufferproc) unicode_buffer_getwritebuf,
-    (getsegcountproc) unicode_buffer_getsegcount,
-    (getcharbufferproc) unicode_buffer_getcharbuf,
+    (readbufferproc) unicode_buffer_getreadbuf,
+    (writebufferproc) unicode_buffer_getwritebuf,
+    (segcountproc) unicode_buffer_getsegcount,
+    (charbufferproc) unicode_buffer_getcharbuf,
 };
 
 static PyObject *

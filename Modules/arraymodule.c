@@ -1747,7 +1747,7 @@ static PyMappingMethods array_as_mapping = {
 	(objobjargproc)array_ass_subscr
 };
 
-static int
+static Py_ssize_t
 array_buffer_getreadbuf(arrayobject *self, Py_ssize_t index, const void **ptr)
 {
 	if ( index != 0 ) {
@@ -1759,7 +1759,7 @@ array_buffer_getreadbuf(arrayobject *self, Py_ssize_t index, const void **ptr)
 	return self->ob_size*self->ob_descr->itemsize;
 }
 
-static int
+static Py_ssize_t
 array_buffer_getwritebuf(arrayobject *self, Py_ssize_t index, const void **ptr)
 {
 	if ( index != 0 ) {
@@ -1771,7 +1771,7 @@ array_buffer_getwritebuf(arrayobject *self, Py_ssize_t index, const void **ptr)
 	return self->ob_size*self->ob_descr->itemsize;
 }
 
-static int
+static Py_ssize_t
 array_buffer_getsegcount(arrayobject *self, Py_ssize_t *lenp)
 {
 	if ( lenp )
@@ -1793,9 +1793,9 @@ static PySequenceMethods array_as_sequence = {
 };
 
 static PyBufferProcs array_as_buffer = {
-	(getreadbufferproc)array_buffer_getreadbuf,
-	(getwritebufferproc)array_buffer_getwritebuf,
-	(getsegcountproc)array_buffer_getsegcount,
+	(readbufferproc)array_buffer_getreadbuf,
+	(writebufferproc)array_buffer_getwritebuf,
+	(segcountproc)array_buffer_getsegcount,
 };
 
 static PyObject *

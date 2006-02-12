@@ -139,10 +139,18 @@ typedef int(*intintobjargproc)(PyObject *, int, int, PyObject *);
 typedef int(*ssizeobjargproc)(PyObject *, Py_ssize_t, PyObject *);
 typedef int(*ssizessizeobjargproc)(PyObject *, Py_ssize_t, Py_ssize_t, PyObject *);
 typedef int(*objobjargproc)(PyObject *, PyObject *, PyObject *);
-typedef Py_ssize_t (*getreadbufferproc)(PyObject *, int, void **);
-typedef Py_ssize_t (*getwritebufferproc)(PyObject *, int, void **);
+
+/* int-based buffer interface */
+typedef int (*getreadbufferproc)(PyObject *, int, void **);
+typedef int (*getwritebufferproc)(PyObject *, int, void **);
 typedef int (*getsegcountproc)(PyObject *, int *);
 typedef int (*getcharbufferproc)(PyObject *, int, const char **);
+/* ssize_t-based buffer interface */
+typedef Py_ssize_t (*readbufferproc)(PyObject *, Py_ssize_t, void **);
+typedef Py_ssize_t (*writebufferproc)(PyObject *, Py_ssize_t, void **);
+typedef Py_ssize_t (*segcountproc)(PyObject *, Py_ssize_t *);
+typedef Py_ssize_t (*charbufferproc)(PyObject *, Py_ssize_t, const char **);
+
 typedef int (*objobjproc)(PyObject *, PyObject *);
 typedef int (*visitproc)(PyObject *, void *);
 typedef int (*traverseproc)(PyObject *, visitproc, void *);
@@ -221,10 +229,10 @@ typedef struct {
 } PyMappingMethods;
 
 typedef struct {
-	getreadbufferproc bf_getreadbuffer;
-	getwritebufferproc bf_getwritebuffer;
-	getsegcountproc bf_getsegcount;
-	getcharbufferproc bf_getcharbuffer;
+	readbufferproc bf_getreadbuffer;
+	writebufferproc bf_getwritebuffer;
+	segcountproc bf_getsegcount;
+	charbufferproc bf_getcharbuffer;
 } PyBufferProcs;
 
 

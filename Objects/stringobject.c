@@ -1217,7 +1217,7 @@ string_subscript(PyStringObject* self, PyObject* item)
 }
 
 static Py_ssize_t
-string_buffer_getreadbuf(PyStringObject *self, /*XXX*/int index, const void **ptr)
+string_buffer_getreadbuf(PyStringObject *self, Py_ssize_t index, const void **ptr)
 {
 	if ( index != 0 ) {
 		PyErr_SetString(PyExc_SystemError,
@@ -1228,15 +1228,15 @@ string_buffer_getreadbuf(PyStringObject *self, /*XXX*/int index, const void **pt
 	return self->ob_size;
 }
 
-static int
-string_buffer_getwritebuf(PyStringObject *self, int index, const void **ptr)
+static Py_ssize_t
+string_buffer_getwritebuf(PyStringObject *self, Py_ssize_t index, const void **ptr)
 {
 	PyErr_SetString(PyExc_TypeError,
 			"Cannot use string as modifiable buffer");
 	return -1;
 }
 
-static int
+static Py_ssize_t
 string_buffer_getsegcount(PyStringObject *self, Py_ssize_t *lenp)
 {
 	if ( lenp )
@@ -1274,10 +1274,10 @@ static PyMappingMethods string_as_mapping = {
 };
 
 static PyBufferProcs string_as_buffer = {
-	(getreadbufferproc)string_buffer_getreadbuf,
-	(getwritebufferproc)string_buffer_getwritebuf,
-	(getsegcountproc)string_buffer_getsegcount,
-	(getcharbufferproc)string_buffer_getcharbuf,
+	(readbufferproc)string_buffer_getreadbuf,
+	(writebufferproc)string_buffer_getwritebuf,
+	(segcountproc)string_buffer_getsegcount,
+	(charbufferproc)string_buffer_getcharbuf,
 };
 
 
