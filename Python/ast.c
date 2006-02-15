@@ -750,7 +750,7 @@ ast_for_dotted_name(struct compiling *c, const node *n)
     if (!load)
         goto error;
     e = Name(id, load, LINENO(n));
-    if (!result)
+    if (!e)
         goto error;
     id = NULL;
 
@@ -1712,8 +1712,10 @@ ast_for_expr(struct compiling *c, const node *n)
  loop:
     switch (TYPE(n)) {
         case test:
-            if (TYPE(CHILD(n, 0)) == lambdef)
+            if (TYPE(CHILD(n, 0)) == lambdef) {
                 result = ast_for_lambdef(c, CHILD(n, 0));
+                break;
+            }
             /* Fall through to and_test */
         case and_test:
             if (NCH(n) == 1) {
@@ -1832,9 +1834,10 @@ ast_for_expr(struct compiling *c, const node *n)
                 case TILDE:
                     result = UnaryOp(Invert(), expression, LINENO(n));
                     break;
+                default:
+                    PyErr_Format(PyExc_SystemError, "unhandled factor: %d",
+                                 TYPE(CHILD(n, 0)));
             }
-            PyErr_Format(PyExc_SystemError, "unhandled factor: %d",
-                             TYPE(CHILD(n, 0)));
             break;
         }
         case power:
@@ -2352,7 +2355,7 @@ alias_for_import_name(const node *n)
             }
             else {
                 a = alias_for_import_name(CHILD(n, 0));
-                assert(!alias_asname(a));
+                assert(alias_asname(a) == Py_None);
                 alias_asname(a) = NEW_IDENTIFIER(CHILD(n, 2));
                 result = a;
             }

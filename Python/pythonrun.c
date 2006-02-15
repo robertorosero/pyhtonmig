@@ -1159,7 +1159,7 @@ PyRun_StringFlags(const char *str, int start, PyObject *globals,
 	PyObject *ret;
 	PyObject *mod = PyParser_ASTFromString(str, "<string>", start, flags);
 	ret = run_err_mod(mod, "<string>", globals, locals, flags);
-	Py_DECREF(mod);
+	Py_XDECREF(mod);
 	return ret;
 }
 

@@ -1672,7 +1672,7 @@ compiler_addop_j(struct compiler *c, int opcode, basicblock *b, int absolute)
 	int i; \
 	PyObject *seq = (SEQ); /* avoid variable capture */ \
 	for (i = 0; i < PyList_GET_SIZE(seq); i++) { \
-		/*TYPE ## _ty*/ PyObject *elt = PyList_GET_ITEM(seq, i); \
+		PyObject *elt = PyList_GET_ITEM(seq, i); \
 		if (!compiler_visit_ ## TYPE((C), elt)) \
 			return 0; \
 	} \
@@ -1682,7 +1682,7 @@ compiler_addop_j(struct compiler *c, int opcode, basicblock *b, int absolute)
 	int i; \
 	PyObject *seq = (SEQ); /* avoid variable capture */ \
 	for (i = 0; i < PyList_GET_SIZE(seq); i++) { \
-		/*TYPE ## _ty*/PyObject *elt = PyList_GET_ITEM(seq, i); \
+		PyObject *elt = PyList_GET_ITEM(seq, i); \
 		if (!compiler_visit_ ## TYPE((C), elt)) { \
 			compiler_exit_scope(c); \
 			return 0; \
@@ -2016,8 +2016,7 @@ compiler_lambda(struct compiler *c, PyObject *e)
 			return 0;
 	}
 
-	if (arguments_defaults(args))
-		VISIT_SEQ(c, expr, arguments_defaults(args));
+	VISIT_SEQ(c, expr, arguments_defaults(args));
 	if (!compiler_enter_scope(c, name, (void *)e, ((struct _expr*)e)->lineno))
 		return 0;
 
@@ -2332,7 +2331,7 @@ compiler_try_except(struct compiler *c, PyObject *s)
 		except = compiler_new_block(c);
 		if (except == NULL)
 			return 0;
-		if (excepthandler_type(handler)) {
+		if (excepthandler_type(handler) != Py_None) {
 			ADDOP(c, DUP_TOP);
 			VISIT(c, expr, excepthandler_type(handler));
 			ADDOP_I(c, COMPARE_OP, PyCmp_EXC_MATCH);
@@ -2340,7 +2339,7 @@ compiler_try_except(struct compiler *c, PyObject *s)
 			ADDOP(c, POP_TOP);
 		}
 		ADDOP(c, POP_TOP);
-		if (excepthandler_name(handler)) {
+		if (excepthandler_name(handler) != Py_None) {
 			VISIT(c, expr, excepthandler_name(handler));
 		}
 		else {
@@ -2350,7 +2349,7 @@ compiler_try_except(struct compiler *c, PyObject *s)
 		VISIT_SEQ(c, stmt, excepthandler_body(handler));
 		ADDOP_JREL(c, JUMP_FORWARD, end);
 		compiler_use_next_block(c, except);
-		if (excepthandler_type(handler))
+		if (excepthandler_type(handler) != Py_None)
 			ADDOP(c, POP_TOP);
 	}
 	ADDOP(c, END_FINALLY);
@@ -2628,6 +2627,8 @@ compiler_visit_stmt(struct compiler *c, PyObject *s)
 		break;
         case Continue_kind:
 		return compiler_continue(c);
+        default:
+		assert(0);
 	}
 	return 1;
 }
@@ -2644,6 +2645,8 @@ unaryop(PyObject *op)
 		return UNARY_POSITIVE;
 	case USub_kind:
 		return UNARY_NEGATIVE;
+        default:
+		assert(0);
 	}
 	return 0;
 }
@@ -2679,6 +2682,8 @@ binop(struct compiler *c, PyObject *op)
 		return BINARY_AND;
 	case FloorDiv_kind:
 		return BINARY_FLOOR_DIVIDE;
+        default:
+		assert(0);
 	}
 	return 0;
 }
@@ -2707,6 +2712,8 @@ cmpop(PyObject *op)
 		return PyCmp_IN;
 	case NotIn_kind:
 		return PyCmp_NOT_IN;
+        default:
+		assert(0);
 	}
 	return PyCmp_BAD;
 }
@@ -2742,6 +2749,8 @@ inplace_binop(struct compiler *c, PyObject *op)
 		return INPLACE_AND;
 	case FloorDiv_kind:
 		return INPLACE_FLOOR_DIVIDE;
+        default:
+		assert(0);
 	}
 	PyErr_Format(PyExc_SystemError,
 		     "inplace binary op %d should not be possible",
@@ -2819,6 +2828,8 @@ compiler_nameop(struct compiler *c, PyObject *name, PyObject *ctx)
 			PyErr_SetString(PyExc_SystemError,
 					"param invalid for deref variable");
 			return 0;
+		default:
+			assert(0);
 		}
 		break;
 	case OP_FAST:
@@ -2833,6 +2844,8 @@ compiler_nameop(struct compiler *c, PyObject *name, PyObject *ctx)
 			PyErr_SetString(PyExc_SystemError,
 					"param invalid for local variable");
 			return 0;
+		default:
+			assert(0);
 		}
 		ADDOP_O(c, op, mangled, varnames);
 		Py_DECREF(mangled);
@@ -2849,6 +2862,8 @@ compiler_nameop(struct compiler *c, PyObject *name, PyObject *ctx)
 			PyErr_SetString(PyExc_SystemError,
 					"param invalid for global variable");
 			return 0;
+		default:
+			assert(0);
 		}
 		break;
 	case OP_NAME:
@@ -2863,6 +2878,8 @@ compiler_nameop(struct compiler *c, PyObject *name, PyObject *ctx)
 			PyErr_SetString(PyExc_SystemError,
 					"param invalid for name variable");
 			return 0;
+		default:
+			assert(0);
 		}
 		break;
 	}
@@ -3346,6 +3363,8 @@ compiler_visit_expr(struct compiler *c, PyObject *e)
 			PyErr_SetString(PyExc_SystemError,
 					"param invalid in attribute expression");
 			return 0;
+		default:
+			assert(0);
 		}
 		break;
         case Subscript_kind:
@@ -3373,6 +3392,8 @@ compiler_visit_expr(struct compiler *c, PyObject *e)
 			PyErr_SetString(PyExc_SystemError,
 					"param invalid in subscript expression");
 			return 0;
+		default:
+			assert(0);
 		}
 		break;
         case Name_kind:
@@ -3382,6 +3403,8 @@ compiler_visit_expr(struct compiler *c, PyObject *e)
 		return compiler_list(c, e);
         case Tuple_kind:
 		return compiler_tuple(c, e);
+	default:
+		assert(0);
 	}
 	return 1;
 }
@@ -3395,7 +3418,7 @@ compiler_augassign(struct compiler *c, PyObject *s)
 	assert(stmt_kind(s) == AugAssign_kind);
 
 	switch (expr_kind(e)) {
-                case Attribute_kind:
+	case Attribute_kind:
 		auge = Attribute(Attribute_value(e), Attribute_attr(e),
 				 AugLoad(), ((struct _expr*)e)->lineno);
                 if (auge == NULL)
@@ -3500,6 +3523,8 @@ compiler_handle_subscr(struct compiler *c, const char *kind,
                                 "invalid %s kind %d in subscript\n", 
                                 kind, expr_context_kind(ctx));
                         return 0;
+		default:
+			assert(0);
         }
         if (expr_context_kind(ctx) == AugLoad_kind) {
                 ADDOP_I(c, DUP_TOPX, 2);
@@ -3545,7 +3570,7 @@ compiler_simple_slice(struct compiler *c, PyObject *s, PyObject *ctx)
 {
 	int op = 0, slice_offset = 0, stack_count = 0;
 
-	assert(Slice_step(s) == NULL);
+	assert(Slice_step(s) == Py_None);
 	if (Slice_lower(s) != Py_None) {
 		slice_offset++;
 		stack_count++;
@@ -3584,6 +3609,8 @@ compiler_simple_slice(struct compiler *c, PyObject *s, PyObject *ctx)
 		PyErr_SetString(PyExc_SystemError,
 				"param invalid in simple slice");
 		return 0;
+	default:
+		assert(0);
 	}
 
 	ADDOP(c, op + slice_offset);
@@ -3608,6 +3635,8 @@ compiler_visit_nested_slice(struct compiler *c, PyObject *s,
 		PyErr_SetString(PyExc_SystemError,
 				"extended slice invalid in nested slice");
 		return 0;
+	default:
+		assert(0);
 	}
 	return 1;
 }
@@ -3646,6 +3675,8 @@ compiler_visit_slice(struct compiler *c, PyObject *s, PyObject *ctx)
                 if (expr_context_kind(ctx) != AugStore_kind)
 			VISIT(c, expr, Index_value(s));
                 return compiler_handle_subscr(c, "index", ctx);
+	default:
+		assert(0);
 	}
 	return 1;
 }

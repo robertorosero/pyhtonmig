@@ -240,6 +240,8 @@ PySymtable_Build(PyObject *mod, const char *filename, PyFutureFeatures *future)
 		PyErr_SetString(PyExc_RuntimeError,
 				"this compiler does not handle Suites");
 		goto error;
+	default:
+		assert(0);
 	}
 	if (!symtable_exit_block(st, (void *)mod)) {
 		PySymtable_Free(st);
@@ -1046,6 +1048,8 @@ symtable_visit_stmt(struct symtable *st, PyObject *s)
         case Continue_kind:
 		/* nothing to do here */
 		break;
+	default:
+		assert(0);
 	}
 	return 1;
 }
@@ -1148,6 +1152,8 @@ symtable_visit_expr(struct symtable *st, PyObject *e)
         case Tuple_kind:
 		VISIT_SEQ(st, expr, Tuple_elts(e));
 		break;
+	default:
+		assert(0);
 	}
 	return 1;
 }
@@ -1265,7 +1271,7 @@ symtable_visit_alias(struct symtable *st, PyObject *a)
 	   dotted package name (e.g. spam.eggs) 
 	*/
 	PyObject *store_name;
-	PyObject *name = (alias_asname(a) == NULL) ? alias_name(a) : alias_asname(a);
+	PyObject *name = (alias_asname(a) == Py_None) ? alias_name(a) : alias_asname(a);
 	const char *base = PyString_AS_STRING(name);
 	char *dot = strchr(base, '.');
 	if (dot)
@@ -1332,6 +1338,8 @@ symtable_visit_slice(struct symtable *st, PyObject *s)
 		break;
 	case Ellipsis_kind:
 		break;
+	default:
+		assert(0);
 	}
 	return 1;
 }

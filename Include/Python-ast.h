@@ -11,7 +11,8 @@ PyAPI_DATA(PyTypeObject) Py_mod_Type;
 
 struct _mod{
         PyObject_HEAD
-        enum {Module_kind, Interactive_kind, Expression_kind, Suite_kind} _kind;
+        enum {mod_Dummy_kind, Module_kind, Interactive_kind, Expression_kind,
+               Suite_kind} _kind;
 };
 #define mod_kind(o) (((struct _mod*)o)->_kind)
 
@@ -64,12 +65,12 @@ PyAPI_DATA(PyTypeObject) Py_stmt_Type;
 
 struct _stmt{
         PyObject_HEAD
-        enum {FunctionDef_kind, ClassDef_kind, Return_kind, Delete_kind,
-               Assign_kind, AugAssign_kind, Print_kind, For_kind, While_kind,
-               If_kind, Raise_kind, TryExcept_kind, TryFinally_kind,
-               Assert_kind, Import_kind, ImportFrom_kind, Exec_kind,
-               Global_kind, Expr_kind, Pass_kind, Break_kind, Continue_kind}
-               _kind;
+        enum {stmt_Dummy_kind, FunctionDef_kind, ClassDef_kind, Return_kind,
+               Delete_kind, Assign_kind, AugAssign_kind, Print_kind, For_kind,
+               While_kind, If_kind, Raise_kind, TryExcept_kind,
+               TryFinally_kind, Assert_kind, Import_kind, ImportFrom_kind,
+               Exec_kind, Global_kind, Expr_kind, Pass_kind, Break_kind,
+               Continue_kind} _kind;
         int lineno;
 };
 #define stmt_kind(o) (((struct _stmt*)o)->_kind)
@@ -367,10 +368,11 @@ PyAPI_DATA(PyTypeObject) Py_expr_Type;
 
 struct _expr{
         PyObject_HEAD
-        enum {BoolOp_kind, BinOp_kind, UnaryOp_kind, Lambda_kind, Dict_kind,
-               ListComp_kind, GeneratorExp_kind, Yield_kind, Compare_kind,
-               Call_kind, Repr_kind, Num_kind, Str_kind, Attribute_kind,
-               Subscript_kind, Name_kind, List_kind, Tuple_kind} _kind;
+        enum {expr_Dummy_kind, BoolOp_kind, BinOp_kind, UnaryOp_kind,
+               Lambda_kind, Dict_kind, ListComp_kind, GeneratorExp_kind,
+               Yield_kind, Compare_kind, Call_kind, Repr_kind, Num_kind,
+               Str_kind, Attribute_kind, Subscript_kind, Name_kind, List_kind,
+               Tuple_kind} _kind;
         int lineno;
 };
 #define expr_kind(o) (((struct _expr*)o)->_kind)
@@ -621,8 +623,8 @@ PyAPI_DATA(PyTypeObject) Py_expr_context_Type;
 
 struct _expr_context{
         PyObject_HEAD
-        enum {Load_kind, Store_kind, Del_kind, AugLoad_kind, AugStore_kind,
-               Param_kind} _kind;
+        enum {expr_context_Dummy_kind, Load_kind, Store_kind, Del_kind,
+               AugLoad_kind, AugStore_kind, Param_kind} _kind;
 };
 #define expr_context_kind(o) (((struct _expr_context*)o)->_kind)
 
@@ -685,7 +687,8 @@ PyAPI_DATA(PyTypeObject) Py_slice_Type;
 
 struct _slice{
         PyObject_HEAD
-        enum {Ellipsis_kind, Slice_kind, ExtSlice_kind, Index_kind} _kind;
+        enum {slice_Dummy_kind, Ellipsis_kind, Slice_kind, ExtSlice_kind,
+               Index_kind} _kind;
 };
 #define slice_kind(o) (((struct _slice*)o)->_kind)
 
@@ -740,7 +743,7 @@ PyAPI_DATA(PyTypeObject) Py_boolop_Type;
 
 struct _boolop{
         PyObject_HEAD
-        enum {And_kind, Or_kind} _kind;
+        enum {boolop_Dummy_kind, And_kind, Or_kind} _kind;
 };
 #define boolop_kind(o) (((struct _boolop*)o)->_kind)
 
@@ -767,9 +770,9 @@ PyAPI_DATA(PyTypeObject) Py_operator_Type;
 
 struct _operator{
         PyObject_HEAD
-        enum {Add_kind, Sub_kind, Mult_kind, Div_kind, Mod_kind, Pow_kind,
-               LShift_kind, RShift_kind, BitOr_kind, BitXor_kind, BitAnd_kind,
-               FloorDiv_kind} _kind;
+        enum {operator_Dummy_kind, Add_kind, Sub_kind, Mult_kind, Div_kind,
+               Mod_kind, Pow_kind, LShift_kind, RShift_kind, BitOr_kind,
+               BitXor_kind, BitAnd_kind, FloorDiv_kind} _kind;
 };
 #define operator_kind(o) (((struct _operator*)o)->_kind)
 
@@ -886,7 +889,8 @@ PyAPI_DATA(PyTypeObject) Py_unaryop_Type;
 
 struct _unaryop{
         PyObject_HEAD
-        enum {Invert_kind, Not_kind, UAdd_kind, USub_kind} _kind;
+        enum {unaryop_Dummy_kind, Invert_kind, Not_kind, UAdd_kind, USub_kind}
+               _kind;
 };
 #define unaryop_kind(o) (((struct _unaryop*)o)->_kind)
 
@@ -931,8 +935,9 @@ PyAPI_DATA(PyTypeObject) Py_cmpop_Type;
 
 struct _cmpop{
         PyObject_HEAD
-        enum {Eq_kind, NotEq_kind, Lt_kind, LtE_kind, Gt_kind, GtE_kind,
-               Is_kind, IsNot_kind, In_kind, NotIn_kind} _kind;
+        enum {cmpop_Dummy_kind, Eq_kind, NotEq_kind, Lt_kind, LtE_kind,
+               Gt_kind, GtE_kind, Is_kind, IsNot_kind, In_kind, NotIn_kind}
+               _kind;
 };
 #define cmpop_kind(o) (((struct _cmpop*)o)->_kind)
 

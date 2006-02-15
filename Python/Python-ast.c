@@ -7,11 +7,12 @@
 static void failed_check(const char* field, const char* expected,
                          PyObject *real)
 {
-    PyErr_Format(PyExc_TypeError, "invalid %s: excpected %s, found %s",
+    PyErr_Format(PyExc_TypeError, "invalid %s: expected %s, found %s",
                  field, expected, real->ob_type->tp_name);
 }
 /* Convenience macro to simplify asdl_c.py */
 #define object_Check(x) 1
+#define string_Check(x) (PyString_Check(x)||PyUnicode_Check(x))
 
 static int mod_validate(PyObject*);
 static int Module_validate(PyObject*);
@@ -169,6 +170,8 @@ mod_validate(PyObject* _obj)
                     return Expression_validate(_obj);
                 case Suite_kind:
                     return Suite_validate(_obj);
+                default:
+                    break;
         }
         PyErr_SetString(PyExc_TypeError, "invalid _kind in mod");
         return -1;
@@ -601,6 +604,8 @@ stmt_validate(PyObject* _obj)
                     return Break_validate(_obj);
                 case Continue_kind:
                     return Continue_validate(_obj);
+                default:
+                    break;
         }
         PyErr_SetString(PyExc_TypeError, "invalid _kind in stmt");
         return -1;
@@ -689,7 +694,7 @@ FunctionDef_validate(PyObject *_obj)
 {
         struct _FunctionDef *obj = (struct _FunctionDef*)_obj;
         int i;
-        if (!PyString_Check(obj->name)) {
+        if (!string_Check(obj->name)) {
             failed_check("name", "identifier", obj->name);
             return -1;
         }
@@ -805,7 +810,7 @@ ClassDef_validate(PyObject *_obj)
 {
         struct _ClassDef *obj = (struct _ClassDef*)_obj;
         int i;
-        if (!PyString_Check(obj->name)) {
+        if (!string_Check(obj->name)) {
             failed_check("name", "identifier", obj->name);
             return -1;
         }
@@ -2240,7 +2245,7 @@ ImportFrom_validate(PyObject *_obj)
 {
         struct _ImportFrom *obj = (struct _ImportFrom*)_obj;
         int i;
-        if (!PyString_Check(obj->module)) {
+        if (!string_Check(obj->module)) {
             failed_check("module", "identifier", obj->module);
             return -1;
         }
@@ -2441,7 +2446,7 @@ Global_validate(PyObject *_obj)
            return -1;
         }
         for(i = 0; i < PyList_Size(obj->names); i++) {
-                if (!PyString_Check(PyList_GET_ITEM(obj->names, i))) {
+                if (!string_Check(PyList_GET_ITEM(obj->names, i))) {
                     failed_check("names", "identifier",
                                  PyList_GET_ITEM(obj->names, i));
                     return -1;
@@ -2817,6 +2822,8 @@ expr_validate(PyObject* _obj)
                     return List_validate(_obj);
                 case Tuple_kind:
                     return Tuple_validate(_obj);
+                default:
+                    break;
         }
         PyErr_SetString(PyExc_TypeError, "invalid _kind in expr");
         return -1;
@@ -4026,7 +4033,7 @@ static int
 Str_validate(PyObject *_obj)
 {
         struct _Str *obj = (struct _Str*)_obj;
-        if (!PyString_Check(obj->s)) {
+        if (!string_Check(obj->s)) {
             failed_check("s", "string", obj->s);
             return -1;
         }
@@ -4112,7 +4119,7 @@ Attribute_validate(PyObject *_obj)
             failed_check("value", "expr", obj->value);
             return -1;
         }
-        if (!PyString_Check(obj->attr)) {
+        if (!string_Check(obj->attr)) {
             failed_check("attr", "identifier", obj->attr);
             return -1;
         }
@@ -4285,7 +4292,7 @@ static int
 Name_validate(PyObject *_obj)
 {
         struct _Name *obj = (struct _Name*)_obj;
-        if (!PyString_Check(obj->id)) {
+        if (!string_Check(obj->id)) {
             failed_check("id", "identifier", obj->id);
             return -1;
         }
@@ -4547,6 +4554,8 @@ expr_context_validate(PyObject* _obj)
                     return AugStore_validate(_obj);
                 case Param_kind:
                     return Param_validate(_obj);
+                default:
+                    break;
         }
         PyErr_SetString(PyExc_TypeError, "invalid _kind in expr_context");
         return -1;
@@ -5012,6 +5021,8 @@ slice_validate(PyObject* _obj)
                     return ExtSlice_validate(_obj);
                 case Index_kind:
                     return Index_validate(_obj);
+                default:
+                    break;
         }
         PyErr_SetString(PyExc_TypeError, "invalid _kind in slice");
         return -1;
@@ -5410,6 +5421,8 @@ boolop_validate(PyObject* _obj)
                     return And_validate(_obj);
                 case Or_kind:
                     return Or_validate(_obj);
+                default:
+                    break;
         }
         PyErr_SetString(PyExc_TypeError, "invalid _kind in boolop");
         return -1;
@@ -5623,6 +5636,8 @@ operator_validate(PyObject* _obj)
                     return BitAnd_validate(_obj);
                 case FloorDiv_kind:
                     return FloorDiv_validate(_obj);
+                default:
+                    break;
         }
         PyErr_SetString(PyExc_TypeError, "invalid _kind in operator");
         return -1;
@@ -6490,6 +6505,8 @@ unaryop_validate(PyObject* _obj)
                     return UAdd_validate(_obj);
                 case USub_kind:
                     return USub_validate(_obj);
+                default:
+                    break;
         }
         PyErr_SetString(PyExc_TypeError, "invalid _kind in unaryop");
         return -1;
@@ -6833,6 +6850,8 @@ cmpop_validate(PyObject* _obj)
                     return In_validate(_obj);
                 case NotIn_kind:
                     return NotIn_validate(_obj);
+                default:
+                    break;
         }
         PyErr_SetString(PyExc_TypeError, "invalid _kind in cmpop");
         return -1;
@@ -7822,12 +7841,12 @@ arguments_validate(PyObject *_obj)
                     return -1;
         }
         if (obj->vararg == Py_None) /* empty */;
-        else if (!PyString_Check(obj->vararg)) {
+        else if (!string_Check(obj->vararg)) {
             failed_check("vararg", "identifier", obj->vararg);
             return -1;
         }
         if (obj->kwarg == Py_None) /* empty */;
-        else if (!PyString_Check(obj->kwarg)) {
+        else if (!string_Check(obj->kwarg)) {
             failed_check("kwarg", "identifier", obj->kwarg);
             return -1;
         }
@@ -7917,7 +7936,7 @@ static int
 keyword_validate(PyObject *_obj)
 {
         struct _keyword *obj = (struct _keyword*)_obj;
-        if (!PyString_Check(obj->arg)) {
+        if (!string_Check(obj->arg)) {
             failed_check("arg", "identifier", obj->arg);
             return -1;
         }
@@ -8002,12 +8021,12 @@ static int
 alias_validate(PyObject *_obj)
 {
         struct _alias *obj = (struct _alias*)_obj;
-        if (!PyString_Check(obj->name)) {
+        if (!string_Check(obj->name)) {
             failed_check("name", "identifier", obj->name);
             return -1;
         }
         if (obj->asname == Py_None) /* empty */;
-        else if (!PyString_Check(obj->asname)) {
+        else if (!string_Check(obj->asname)) {
             failed_check("asname", "identifier", obj->asname);
             return -1;
         }

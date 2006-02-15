@@ -155,7 +155,8 @@ class HeaderVisitor(EmitVisitor):
         self.emit_check(name, depth)
         emit("struct _%s{" % name)
         emit("PyObject_HEAD", depth + 1)
-        names = [t.name.value+"_kind" for t in sum.types]
+        names = ["%s_Dummy_kind"%name]
+        names += [t.name.value+"_kind" for t in sum.types]
         emit("enum {%s} _kind;" % ", ".join(names), depth+1)
         for field in sum.attributes:
             type = str(field.type)
@@ -225,7 +226,7 @@ class FunctionVisitor(TraversalVisitor):
     def check(self, t):
         t = t.value
         if t in ("identifier", "string"):
-            return "PyString_Check"
+            return "string_Check"
         elif t == "bool":
             return "PyBool_Check"
         else:
@@ -354,7 +355,7 @@ class FunctionVisitor(TraversalVisitor):
             emit("struct _%s *obj = (struct _%s*)_obj;" % (name,name))
         if has_seq:
             emit("int i;")
-        for  f in fields:
+        for f in fields:
             if f.seq:
                 self.emit_seq_check(f)
             elif f.opt:
@@ -384,6 +385,8 @@ class FunctionVisitor(TraversalVisitor):
         for t in sum.types:
             emit("case %s_kind:" % t.name)
             emit("    return %s_validate(_obj);" % t.name)
+        emit("default:")
+        emit("    break;")
         depth = 1
         emit("}")
         emit('PyErr_SetString(PyExc_TypeError, "invalid _kind in %s");' % name)
@@ -500,11 +503,12 @@ static_code = """
 static void failed_check(const char* field, const char* expected,
                          PyObject *real)
 {
-    PyErr_Format(PyExc_TypeError, "invalid %s: excpected %s, found %s",
+    PyErr_Format(PyExc_TypeError, "invalid %s: expected %s, found %s",
                  field, expected, real->ob_type->tp_name);
 }
 /* Convenience macro to simplify asdl_c.py */
 #define object_Check(x) 1
+#define string_Check(x) (PyString_Check(x)||PyUnicode_Check(x))
 """
 
 def main(srcfile):
