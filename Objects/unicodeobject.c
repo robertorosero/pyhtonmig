@@ -6535,7 +6535,7 @@ unicode_buffer_getwritebuf(PyUnicodeObject *self, Py_ssize_t index,
     return -1;
 }
 
-static Py_ssize_t
+static int
 unicode_buffer_getsegcount(PyUnicodeObject *self,
 			   Py_ssize_t *lenp)
 {
@@ -6544,7 +6544,7 @@ unicode_buffer_getsegcount(PyUnicodeObject *self,
     return 1;
 }
 
-static Py_ssize_t
+static int
 unicode_buffer_getcharbuf(PyUnicodeObject *self,
 			  Py_ssize_t index,
 			  const void **ptr)
