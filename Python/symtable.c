@@ -1175,13 +1175,13 @@ symtable_visit_params(struct symtable *st, PyObject *args, int toplevel)
 	for (i = 0; i < PyList_GET_SIZE(args); i++) {
 		PyObject *arg = PyList_GET_ITEM(args, i);
 		if (expr_kind(arg) == Name_kind) {
-			assert(Name_ctx(arg) == Param ||
-                               (Name_ctx(arg) == Store && !toplevel));
+			assert(expr_context_kind(Name_ctx(arg)) == Param_kind ||
+                               (expr_context_kind(Name_ctx(arg)) == Store_kind && !toplevel));
 			if (!symtable_add_def(st, Name_id(arg), DEF_PARAM))
 				return 0;
 		}
 		else if (expr_kind(arg) == Tuple_kind) {
-			assert(Tuple_ctx(arg) == Store);
+			assert(expr_context_kind(Tuple_ctx(arg)) == Store_kind);
                         complex = 1;
 			if (toplevel) {
 				if (!symtable_implicit_arg(st, i))

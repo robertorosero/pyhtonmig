@@ -224,7 +224,7 @@ PyAST_FromNode(const node *n, PyCompilerFlags *flags, const char *filename)
                     s = ast_for_stmt(&c, ch);
                     if (!s)
                         goto error;
-                    PyList_SET_ITEM(stmts, pos++, s);
+                    STEAL_ITEM(stmts, pos++, s);
                 }
                 else {
                     ch = CHILD(ch, 0);
@@ -233,7 +233,7 @@ PyAST_FromNode(const node *n, PyCompilerFlags *flags, const char *filename)
                         s = ast_for_stmt(&c, CHILD(ch, j * 2));
                         if (!s)
                             goto error;
-                        PyList_SET_ITEM(stmts, pos++, s);
+                        STEAL_ITEM(stmts, pos++, s);
                     }
                 }
             }
@@ -542,7 +542,7 @@ seq_for_testlist(struct compiling *c, const node *n)
         }
 
         /* assert(i / 2 < seq->size); */ // ??
-        PyList_SET_ITEM(seq, i / 2, expression);
+        STEAL_ITEM(seq, i / 2, expression);
     }
     result = seq;
     Py_INCREF(result);
@@ -581,7 +581,7 @@ compiler_complex_args(const node *n)
             arg = compiler_complex_args(CHILD(CHILD(n, 2*i), 1));
         if (!set_context(arg, store, n))
             goto error;
-        PyList_SET_ITEM(args, i, arg);
+        STEAL_ITEM(args, i, arg);
     }
 
     result = Tuple(args, store, LINENO(n));
@@ -2206,11 +2206,12 @@ ast_for_exprlist(struct compiling *c, const node *n, PyObject* context)
         e = ast_for_expr(c, CHILD(n, i));
         if (!e)
             goto error;
-        PyList_SET_ITEM(seq,i/2,e); // e=NULL; // ???
+        PyList_SET_ITEM(seq,i/2,e);
         if (context) {
             if (!set_context(e, context, CHILD(n, i)))
                     goto error;
         }
+        e = NULL;
     }
     result = seq;
 
@@ -2481,7 +2482,7 @@ ast_for_import_stmt(struct compiling *c, const node *n)
             if (!import_alias) {
                 goto error;
             }
-            PyList_SET_ITEM(aliases, pos++, import_alias);
+            STEAL_ITEM(aliases, pos++, import_alias);
         }
 
         for (i = 0; i < NCH(n); i += 2) {
@@ -2489,7 +2490,7 @@ ast_for_import_stmt(struct compiling *c, const node *n)
             if (!import_alias) {
                 goto error;
             }
-            PyList_SET_ITEM(aliases, pos++, import_alias);
+            STEAL_ITEM(aliases, pos++, import_alias);
         }
         assert(pos == PyList_GET_SIZE(aliases));
         Py_INCREF(alias_name(mod));
