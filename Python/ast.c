@@ -1286,6 +1286,8 @@ ast_for_genexp(struct compiling *c, const node *n)
     Py_XDECREF(ge);
     Py_XDECREF(t);
     Py_XDECREF(expression);
+    /* Py_XDECREF(store); */
+    /* Py_XDECREF(tmp); */
     if (result && PyAST_Validate(result) == -1) return NULL;
     return result;
 }
@@ -1639,11 +1641,12 @@ ast_for_power(struct compiling *c, const node *n)
     PyObject *e = NULL;
     int i;
     REQ(n, power);
+
     e = ast_for_atom(c, CHILD(n, 0));
     if (!e)
         goto error;
     if (NCH(n) == 1)
-        return e; // BAD BAD
+        return e;
     for (i = 1; i < NCH(n); i++) {
         node *ch = CHILD(n, i);
         if (TYPE(ch) != trailer)
@@ -1652,7 +1655,7 @@ ast_for_power(struct compiling *c, const node *n)
         if (!tmp) {
             goto error;
         }
-        // Py_XDECREF(e); // UNCOMMENT
+        Py_XDECREF(e);
         e = tmp;
         tmp = NULL;
     }
@@ -1665,6 +1668,7 @@ ast_for_power(struct compiling *c, const node *n)
         if (!tmp) {
             goto error;
         }
+        Py_XDECREF(e);
         e = tmp;
         tmp = NULL;
     }
@@ -1968,6 +1972,13 @@ ast_for_call(struct compiling *c, const node *n, PyObject *func)
     result = Call(func, args, keywords, vararg, kwarg, LINENO(n));
 
  error:
+    Py_XDECREF(args);
+    Py_XDECREF(keywords);
+    Py_XDECREF(vararg);
+    Py_XDECREF(kwarg);
+    Py_XDECREF(e);
+    Py_XDECREF(kw);
+    Py_XDECREF(key);
     if (result && PyAST_Validate(result) == -1) return NULL;
     return result;
 }
@@ -2039,11 +2050,14 @@ ast_for_class_bases(struct compiling *c, const node* n)
         }
         STEAL_ITEM(bases, 0, base);
         result = bases;
+        Py_INCREF(result);
     }
     else {
         result = seq_for_testlist(c, n);
     }
  error:
+    Py_XDECREF(base);
+    Py_XDECREF(bases);
     return result;
 }
 
@@ -2131,10 +2145,10 @@ ast_for_expr_stmt(struct compiling *c, const node *n)
 
             /* set context to assign */
             if (!e) 
-              goto error;
+                goto error;
 
             if (!set_context(e, Store(), CHILD(n, i))) {
-              goto error;
+                goto error;
             }
 
             STEAL_ITEM(targets, i / 2, e);
@@ -2149,6 +2163,12 @@ ast_for_expr_stmt(struct compiling *c, const node *n)
         result = Assign(targets, expression, LINENO(n));
     }
  error:
+    Py_XDECREF(e); 
+    Py_XDECREF(expr1); 
+    Py_XDECREF(expr2); 
+    Py_XDECREF(operator); 
+    Py_XDECREF(targets); 
+    Py_XDECREF(expression); 
     if (result && PyAST_Validate(result) == -1) return NULL;
     return result;
 }
@@ -2160,7 +2180,8 @@ ast_for_print_stmt(struct compiling *c, const node *n)
                              | '>>' test [ (',' test)+ [','] ] )
      */
     PyObject *result = NULL;
-    PyObject *dest = NULL, *expression;
+    PyObject *dest = NULL;
+    PyObject *expression = NULL;
     PyObject *seq = NULL;
     PyObject *nl = NULL;
     int i, start = 1;
@@ -2186,8 +2207,13 @@ ast_for_print_stmt(struct compiling *c, const node *n)
     }
     assert(pos==PyList_GET_SIZE(seq));
     nl = (TYPE(CHILD(n, NCH(n) - 1)) == COMMA) ? Py_False : Py_True;
+    Py_INCREF(nl);
     result = Print(dest, seq, nl, LINENO(n));
  error:
+    Py_XDECREF(dest);
+    Py_XDECREF(expression);
+    Py_XDECREF(seq);
+    Py_XDECREF(nl);
     if (result && PyAST_Validate(result) == -1) return NULL;
     return result;
 }
@@ -2196,8 +2222,8 @@ static PyObject *
 ast_for_exprlist(struct compiling *c, const node *n, PyObject* context)
 {
     PyObject *result = NULL;
-    PyObject *seq = NULL;
     int i;
+    PyObject *seq = NULL;
     PyObject *e = NULL;
 
     REQ(n, exprlist);
@@ -2211,14 +2237,18 @@ ast_for_exprlist(struct compiling *c, const node *n, PyObject* context)
             goto error;
         PyList_SET_ITEM(seq,i/2,e);
         if (context) {
-            if (!set_context(e, context, CHILD(n, i)))
+            if (!set_context(e, context, CHILD(n, i))) {
+                    e = NULL;
                     goto error;
+            }
         }
         e = NULL;
     }
     result = seq;
-
+    seq = NULL;
 error:
+    Py_XDECREF(seq);
+    Py_XDECREF(e);
     return result;
 }
 
@@ -2326,6 +2356,11 @@ ast_for_flow_stmt(struct compiling *c, const node *n)
             goto error;
     }
  error:
+    Py_XDECREF(exp);
+    Py_XDECREF(expression);
+    Py_XDECREF(expr1);
+    Py_XDECREF(expr2);
+    Py_XDECREF(expr3);
     if (result && PyAST_Validate(result) == -1) return NULL;
     return result;
 }
@@ -2401,6 +2436,7 @@ alias_for_import_name(const node *n)
             goto error;
     }
  error:
+    /* Py_XDECREF(a); */
     if (result && PyAST_Validate(result) == -1) return NULL;
     return result;
 }
@@ -2499,6 +2535,7 @@ ast_for_import_stmt(struct compiling *c, const node *n)
         Py_INCREF(alias_name(mod));
         import = ImportFrom(alias_name(mod), aliases, lineno);
         result = import;
+        Py_INCREF(result);
     }
     else
         PyErr_Format(PyExc_SystemError,
@@ -2506,6 +2543,10 @@ ast_for_import_stmt(struct compiling *c, const node *n)
                      STR(CHILD(n, 0)));
  error:
     if (result && PyAST_Validate(result) == -1) return NULL;
+    Py_XDECREF(aliases);
+    Py_XDECREF(mod);
+    Py_XDECREF(import);
+    Py_XDECREF(import_alias);
     return result;
 }
 
@@ -2531,6 +2572,8 @@ ast_for_global_stmt(struct compiling *c, const node *n)
     }
     result = Global(s, LINENO(n));
  error:
+    Py_XDECREF(name);
+    Py_XDECREF(s);
     if (result && PyAST_Validate(result) == -1) return NULL;
     return result;
 }
@@ -2539,8 +2582,11 @@ static PyObject*
 ast_for_exec_stmt(struct compiling *c, const node *n)
 {
     PyObject *result = NULL;
-    PyObject *expr1 = NULL, *globals = NULL, *locals = NULL;
+    PyObject *expr1 = NULL;
+    PyObject *globals = NULL;
+    PyObject *locals = NULL;
     int n_children = NCH(n);
+
     if (n_children != 2 && n_children != 4 && n_children != 6) {
         PyErr_Format(PyExc_SystemError,
                      "poorly formed 'exec' statement: %d parts to statement",
@@ -2566,6 +2612,9 @@ ast_for_exec_stmt(struct compiling *c, const node *n)
 
     result = Exec(expr1, globals, locals, LINENO(n));
  error:
+    Py_XDECREF(expr1);
+    Py_XDECREF(globals);
+    Py_XDECREF(locals);
     if (result && PyAST_Validate(result) == -1) return NULL;
     return result;
 }
@@ -2600,6 +2649,9 @@ ast_for_assert_stmt(struct compiling *c, const node *n)
                      "improper number of parts to 'assert' statement: %d",
                      NCH(n));
  error:
+    Py_XDECREF(expression);
+    Py_XDECREF(expr1);
+    Py_XDECREF(expr2);
     if (result && PyAST_Validate(result) == -1) return NULL;
     return result;
 }
@@ -2664,7 +2716,10 @@ ast_for_suite(struct compiling *c, const node *n)
     }
     assert(pos == PyList_GET_SIZE(seq));
     result = seq;
+    seq = NULL;
  error:
+    Py_XDECREF(seq);
+    Py_XDECREF(s);
     return result;
 }
 
@@ -2771,6 +2826,7 @@ ast_for_if_stmt(struct compiling *c, const node *n)
     
                 PyList_SET_ITEM(new, 0, If(expression, suite_seq, orelse, LINENO(CHILD(n, off))));
                 orelse = new;
+                new = NULL;
             }
             result = If(ast_for_expr(c, CHILD(n, 1)),
                       ast_for_suite(c, CHILD(n, 3)),
@@ -2783,6 +2839,12 @@ ast_for_if_stmt(struct compiling *c, const node *n)
         }
     }
  error:
+    Py_XDECREF(expression);
+    Py_XDECREF(suite_seq);
+    Py_XDECREF(seq1);
+    Py_XDECREF(seq2);
+    Py_XDECREF(orelse);
+    Py_XDECREF(new);
     if (result && PyAST_Validate(result) == -1) return NULL;
     return result;
 }
@@ -2832,6 +2894,10 @@ ast_for_while_stmt(struct compiling *c, const node *n)
         goto error;
     }
  error:
+    Py_XDECREF(expression);
+    Py_XDECREF(suite_seq);
+    Py_XDECREF(seq1);
+    Py_XDECREF(seq2);
     if (result && PyAST_Validate(result) == -1) return NULL;
     return result;
 }
@@ -2839,13 +2905,13 @@ ast_for_while_stmt(struct compiling *c, const node *n)
 static PyObject*
 ast_for_for_stmt(struct compiling *c, const node *n)
 {
+    /* for_stmt: 'for' exprlist 'in' testlist ':' suite ['else' ':' suite] */
     PyObject *result = NULL;
     PyObject *_target = NULL;
     PyObject *seq = NULL;
     PyObject *suite_seq = NULL;
     PyObject *expression = NULL;
     PyObject *target = NULL;
-    /* for_stmt: 'for' exprlist 'in' testlist ':' suite ['else' ':' suite] */
     REQ(n, for_stmt);
 
     if (NCH(n) == 9) {
@@ -2860,6 +2926,7 @@ ast_for_for_stmt(struct compiling *c, const node *n)
     }
     if (PyList_GET_SIZE(_target) == 1) {
         target = PyList_GET_ITEM(_target, 0);
+        Py_INCREF(target);
     }
     else
         target = Tuple(_target, Store(), LINENO(n));
@@ -2875,6 +2942,11 @@ ast_for_for_stmt(struct compiling *c, const node *n)
 
     result = For(target, expression, suite_seq, seq, LINENO(n));
  error:
+    Py_XDECREF(_target);
+    Py_XDECREF(seq);
+    Py_XDECREF(suite_seq);
+    Py_XDECREF(expression);
+    Py_XDECREF(target);
     if (result && PyAST_Validate(result) == -1) return NULL;
     return result;
 }
@@ -2934,6 +3006,9 @@ ast_for_except_clause(struct compiling *c, const node *exc, node *body)
         goto error;
     }
  error:
+    Py_XDECREF(suite_seq);
+    Py_XDECREF(expression);
+    Py_XDECREF(e);
     if (result && PyAST_Validate(result) == -1) return NULL;
     return result;
 }
@@ -2941,13 +3016,13 @@ ast_for_except_clause(struct compiling *c, const node *exc, node *body)
 static PyObject*
 ast_for_try_stmt(struct compiling *c, const node *n)
 {
+    PyObject *result = NULL;
     PyObject *e = NULL;
     PyObject *s1 = NULL;
     PyObject *s2 = NULL;
     PyObject *suite_seq1 = NULL;
     PyObject *suite_seq2 = NULL;
     PyObject *handlers = NULL;
-    PyObject *result = NULL;
     REQ(n, try_stmt);
 
     if (TYPE(CHILD(n, 3)) == NAME) {/* must be 'finally' */
@@ -3003,6 +3078,12 @@ ast_for_try_stmt(struct compiling *c, const node *n)
         goto error;
     }
  error:
+    Py_XDECREF(e);
+    Py_XDECREF(s1);
+    Py_XDECREF(s2);
+    Py_XDECREF(suite_seq1);
+    Py_XDECREF(suite_seq2);
+    Py_XDECREF(handlers);
     if (result && PyAST_Validate(result) == -1) return NULL;
     return result;
 }
@@ -3012,7 +3093,8 @@ ast_for_classdef(struct compiling *c, const node *n)
 {
     /* classdef: 'class' NAME ['(' testlist ')'] ':' suite */
     PyObject *result = NULL;
-    PyObject *bases = NULL; PyObject *s = NULL;
+    PyObject *bases = NULL;
+    PyObject *s = NULL;
     
     REQ(n, classdef);
 
@@ -3047,6 +3129,8 @@ ast_for_classdef(struct compiling *c, const node *n)
         result = ClassDef(NEW_IDENTIFIER(CHILD(n, 1)), bases, s, LINENO(n));
     }
  error:
+    Py_XDECREF(bases);
+    Py_XDECREF(s);
     if (result && PyAST_Validate(result) == -1) return NULL;
     return result;
 }
@@ -3405,3 +3489,4 @@ parsestrplus(struct compiling *c, const node *n)
         Py_XDECREF(v);
         return NULL;
 }
+
