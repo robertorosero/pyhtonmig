@@ -296,6 +296,7 @@ PyNode_Compile(struct _node *n, const char *filename)
 	if (!mod)
 		return NULL;
 	co = PyAST_Compile(mod, filename, NULL);
+	Py_DECREF(mod);
 	return co;
 }
 
@@ -1712,7 +1713,7 @@ compiler_body(struct compiler *c, PyObject *stmts)
 	if (compiler_isdocstring(st)) {
 		i = 1;
 		VISIT(c, expr, Expr_value(st));
-		if (!compiler_nameop(c, __doc__, Store()))
+		if (!compiler_nameop(c, __doc__, _PyAST_Store))
 			return 0;
 	}
         for (; i < PyList_GET_SIZE(stmts); i++)
@@ -1877,7 +1878,7 @@ compiler_arguments(struct compiler *c, PyObject *args)
 			if (id == NULL) {
 				return 0;
 			}
-			if (!compiler_nameop(c, id, Load())) {
+			if (!compiler_nameop(c, id, _PyAST_Load)) {
 				Py_DECREF(id);
 				return 0;
 			}
@@ -1943,7 +1944,7 @@ compiler_function(struct compiler *c, PyObject *s)
 		ADDOP_I(c, CALL_FUNCTION, 1);
 	}
 
-	return compiler_nameop(c, FunctionDef_name(s), Store());
+	return compiler_nameop(c, FunctionDef_name(s), _PyAST_Store);
 }
 
 static int
@@ -1965,7 +1966,7 @@ compiler_class(struct compiler *c, PyObject *s)
         c->u->u_private = ClassDef_name(s);
         Py_INCREF(c->u->u_private);
         str = PyString_InternFromString("__name__");
-	if (!str || !compiler_nameop(c, str, Load())) {
+	if (!str || !compiler_nameop(c, str, _PyAST_Load)) {
 		Py_XDECREF(str);
 		compiler_exit_scope(c);
 		return 0;
@@ -1973,7 +1974,7 @@ compiler_class(struct compiler *c, PyObject *s)
         
         Py_DECREF(str);
         str = PyString_InternFromString("__module__");
-	if (!str || !compiler_nameop(c, str, Store())) {
+	if (!str || !compiler_nameop(c, str, _PyAST_Store)) {
 		Py_XDECREF(str);
 		compiler_exit_scope(c);
 		return 0;
@@ -1997,7 +1998,7 @@ compiler_class(struct compiler *c, PyObject *s)
 
 	ADDOP_I(c, CALL_FUNCTION, 0);
 	ADDOP(c, BUILD_CLASS);
-	if (!compiler_nameop(c, ClassDef_name(s), Store()))
+	if (!compiler_nameop(c, ClassDef_name(s), _PyAST_Store))
 		return 0;
 	return 1;
 }
@@ -2386,7 +2387,7 @@ compiler_import_as(struct compiler *c, PyObject *name, PyObject *asname)
 			src = dot + 1;
 		}
 	}
-	return compiler_nameop(c, asname, Store());
+	return compiler_nameop(c, asname, _PyAST_Store);
 }
 
 static int
@@ -2419,7 +2420,7 @@ compiler_import(struct compiler *c, PyObject *s)
 			if (dot)
 				tmp = PyString_FromStringAndSize(base, 
 								 dot - base);
-			r = compiler_nameop(c, tmp, Store());
+			r = compiler_nameop(c, tmp, _PyAST_Store);
 			if (dot) {
 				Py_DECREF(tmp);
 			}
@@ -2475,7 +2476,7 @@ compiler_from_import(struct compiler *c, PyObject *s)
 		if (alias_asname(alias) != Py_None)
 			store_name = alias_asname(alias);
 
-		if (!compiler_nameop(c, store_name, Store())) {
+		if (!compiler_nameop(c, store_name, _PyAST_Store)) {
 			Py_DECREF(names);
 			return 0;
 		}
@@ -3073,7 +3074,7 @@ compiler_listcomp_generator(struct compiler *c, PyObject *tmpname,
 
         /* only append after the last for generator */
         if (gen_index >= PyList_GET_SIZE(generators)) {
-            if (!compiler_nameop(c, tmpname, Load()))
+            if (!compiler_nameop(c, tmpname, _PyAST_Load))
 		return 0;
             VISIT(c, expr, elt);
             ADDOP_I(c, CALL_FUNCTION, 1);
@@ -3091,7 +3092,7 @@ compiler_listcomp_generator(struct compiler *c, PyObject *tmpname,
 	compiler_use_next_block(c, anchor);
         /* delete the append method added to locals */
 	if (gen_index == 1)
-            if (!compiler_nameop(c, tmpname, Del()))
+            if (!compiler_nameop(c, tmpname, _PyAST_Del))
 		return 0;
 	
 	return 1;
@@ -3119,7 +3120,7 @@ compiler_listcomp(struct compiler *c, PyObject *e)
 	ADDOP_I(c, BUILD_LIST, 0);
 	ADDOP(c, DUP_TOP);
 	ADDOP_O(c, LOAD_ATTR, append, names);
-	if (compiler_nameop(c, tmp, Store()))
+	if (compiler_nameop(c, tmp, _PyAST_Store))
             rc = compiler_listcomp_generator(c, tmp, generators, 0, 
                                              ListComp_elt(e));
         Py_DECREF(tmp);
@@ -3371,22 +3372,22 @@ compiler_visit_expr(struct compiler *c, PyObject *e)
 		switch (expr_context_kind(Subscript_ctx(e))) {
 		case AugLoad_kind:
 			VISIT(c, expr, Subscript_value(e));
-			VISIT_SLICE(c, Subscript_slice(e), AugLoad()); /* make a PyObject ?? */
+			VISIT_SLICE(c, Subscript_slice(e), _PyAST_AugLoad); /* make a PyObject ?? */
 			break;
 		case Load_kind:
 			VISIT(c, expr, Subscript_value(e));
-			VISIT_SLICE(c, Subscript_slice(e), Load());
+			VISIT_SLICE(c, Subscript_slice(e), _PyAST_Load);
 			break;
 		case AugStore_kind:
-			VISIT_SLICE(c, Subscript_slice(e), AugStore());
+			VISIT_SLICE(c, Subscript_slice(e), _PyAST_AugLoad);
 			break;
 		case Store_kind:
 			VISIT(c, expr, Subscript_value(e));
-			VISIT_SLICE(c, Subscript_slice(e), Store());
+			VISIT_SLICE(c, Subscript_slice(e), _PyAST_Store);
 			break;
 		case Del_kind:
 			VISIT(c, expr, Subscript_value(e));
-			VISIT_SLICE(c, Subscript_slice(e), Del());
+			VISIT_SLICE(c, Subscript_slice(e), _PyAST_Del);
 			break;
 		case Param_kind:
 			PyErr_SetString(PyExc_SystemError,
@@ -3420,31 +3421,35 @@ compiler_augassign(struct compiler *c, PyObject *s)
 	switch (expr_kind(e)) {
 	case Attribute_kind:
 		auge = Attribute(Attribute_value(e), Attribute_attr(e),
-				 AugLoad(), ((struct _expr*)e)->lineno);
+				 _PyAST_AugLoad, ((struct _expr*)e)->lineno);
                 if (auge == NULL)
                     return 0;
 		VISIT(c, expr, auge);
 		VISIT(c, expr, AugAssign_value(s));
 		ADDOP(c, inplace_binop(c, AugAssign_op(s)));
-		Attribute_ctx (auge)= AugStore();
+		Py_DECREF(Attribute_ctx(auge));
+		Attribute_ctx(auge) = _PyAST_AugStore;
+		Py_INCREF(_PyAST_AugStore);
 		VISIT(c, expr, auge);
 		break;
 	case Subscript_kind:
 		auge = Subscript(Subscript_value(e), Subscript_slice(e),
-				 AugLoad(), ((struct _expr*)e)->lineno);
+				 _PyAST_AugLoad, ((struct _expr*)e)->lineno);
                 if (auge == NULL)
                     return 0;
 		VISIT(c, expr, auge);
 		VISIT(c, expr, AugAssign_value(s));
 		ADDOP(c, inplace_binop(c, AugAssign_op(s)));
-                Subscript_ctx (auge)= AugStore();
+		Py_DECREF(Attribute_ctx(auge));
+                Subscript_ctx(auge) = _PyAST_AugStore;
+		Py_INCREF(_PyAST_AugStore);
 		VISIT(c, expr, auge);
                 break;
 	case Name_kind:
 		VISIT(c, expr, AugAssign_target(s));
 		VISIT(c, expr, AugAssign_value(s));
 		ADDOP(c, inplace_binop(c, AugAssign_op(s)));
-		return compiler_nameop(c, Name_id(e), Store());
+		return compiler_nameop(c, Name_id(e), _PyAST_Store);
 	default:
                 fprintf(stderr, 
                         "invalid node type for augmented assignment\n");

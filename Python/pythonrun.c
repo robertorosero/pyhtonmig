@@ -175,6 +175,9 @@ Py_InitializeEx(int install_sigs)
 	if (!_PyInt_Init())
 		Py_FatalError("Py_Initialize: can't init ints");
 
+	if (!_PyAST_Init())
+		Py_FatalError("Py_Initialize: can't init AST");
+
 	_PyFloat_Init();
 
 	interp->modules = PyDict_New();

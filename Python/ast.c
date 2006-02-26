@@ -44,6 +44,9 @@ struct compiling {
         char *c_encoding; /* source encoding */
 };
 
+PyObject *_PyAST_Load, *_PyAST_Store, *_PyAST_Del,
+         *_PyAST_AugLoad, *_PyAST_AugStore, *_PyAST_Param;
+
 static PyObject *seq_for_testlist(struct compiling *, const node *);
 static PyObject *ast_for_expr(struct compiling *, const node *);
 static PyObject *ast_for_stmt(struct compiling *, const node *);
@@ -558,12 +561,8 @@ compiler_complex_args(const node *n)
     int i, len = (NCH(n) + 1) / 2;
     PyObject *result = NULL;
     PyObject *args = PyList_New(len);
-    PyObject *store = NULL;
     PyObject *arg = NULL;
     if (!args)
-        goto error;
-    store = Store();
-    if (!store)
         goto error;
 
     REQ(n, fplist);
@@ -575,21 +574,20 @@ compiler_complex_args(const node *n)
                 ast_error(child, "assignment to None");
                 goto error;
             }
-            arg = Name(NEW_IDENTIFIER(child), store, LINENO(child));
+            arg = Name(NEW_IDENTIFIER(child), _PyAST_Store, LINENO(child));
         }
         else
             arg = compiler_complex_args(CHILD(CHILD(n, 2*i), 1));
-        if (!set_context(arg, store, n))
+        if (!set_context(arg, _PyAST_Store, n))
             goto error;
         STEAL_ITEM(args, i, arg);
     }
 
-    result = Tuple(args, store, LINENO(n));
-    set_context(result, store, n);
+    result = Tuple(args, _PyAST_Store, LINENO(n));
+    set_context(result, _PyAST_Store, n);
  error:
     Py_XDECREF(args);
     Py_XDECREF(arg);
-    Py_XDECREF(store);
     if (result && PyAST_Validate(result) == -1) return NULL;
     return result;
 }
@@ -680,9 +678,7 @@ ast_for_arguments(struct compiling *c, const node *n)
                     }
                     id = NEW_IDENTIFIER(CHILD(ch, 0));
                     if (!id) goto error;
-                    if (!param) param = Param();
-                    if (!param) goto error;
-                    e = Name(id, param, LINENO(ch));
+                    e = Name(id, _PyAST_Param, LINENO(ch));
                     if (!e)
                         goto error;
                     STEAL_ITEM(args, argno++, e);
@@ -726,7 +722,6 @@ ast_for_arguments(struct compiling *c, const node *n)
     Py_XDECREF(defaults);
     Py_XDECREF(e);
     Py_XDECREF(id);
-    Py_XDECREF(param);
     if (result && PyAST_Validate(result) == -1) return NULL;
     return result;
 }
@@ -738,7 +733,6 @@ ast_for_dotted_name(struct compiling *c, const node *n)
     PyObject *e = NULL;
     PyObject *attrib = NULL;
     PyObject *id = NULL;
-    PyObject *load = NULL;
     int i;
 
     REQ(n, dotted_name);
@@ -746,10 +740,7 @@ ast_for_dotted_name(struct compiling *c, const node *n)
     id = NEW_IDENTIFIER(CHILD(n, 0));
     if (!id)
         goto error;
-    load = Load();
-    if (!load)
-        goto error;
-    e = Name(id, load, LINENO(n));
+    e = Name(id, _PyAST_Load, LINENO(n));
     if (!e)
         goto error;
     id = NULL;
@@ -758,7 +749,7 @@ ast_for_dotted_name(struct compiling *c, const node *n)
         id = NEW_IDENTIFIER(CHILD(n, i));
         if (!id)
             goto error;
-        attrib = Attribute(e, id, load, LINENO(CHILD(n, i)));
+        attrib = Attribute(e, id, _PyAST_Load, LINENO(CHILD(n, i)));
         if (!attrib)
             goto error;
         e = attrib;
@@ -771,7 +762,6 @@ ast_for_dotted_name(struct compiling *c, const node *n)
     Py_XDECREF(id);
     Py_XDECREF(e);
     Py_XDECREF(attrib);
-    Py_XDECREF(load);
     if (result && PyAST_Validate(result) == -1) return NULL;
     return result;
 }
@@ -1006,7 +996,6 @@ ast_for_listcomp(struct compiling *c, const node *n)
     PyObject *t = NULL;
     PyObject *expression = NULL;
     PyObject *lc = NULL;
-    PyObject *store = NULL;
     PyObject *ifs = NULL;
     PyObject *tmp = NULL;
     int i, n_fors;
@@ -1037,9 +1026,7 @@ ast_for_listcomp(struct compiling *c, const node *n)
 
         REQ(ch, list_for);
 
-        if (!store) store = Store();
-        if (!store) goto error;
-        t = ast_for_exprlist(c, CHILD(ch, 1), store);
+        t = ast_for_exprlist(c, CHILD(ch, 1), _PyAST_Store);
         if (!t)
             goto error;
         expression = ast_for_testlist(c, CHILD(ch, 3));
@@ -1052,7 +1039,7 @@ ast_for_listcomp(struct compiling *c, const node *n)
                 goto error;
         }
         else {
-            tmp = Tuple(t, store, LINENO(ch));
+            tmp = Tuple(t, _PyAST_Store, LINENO(ch));
             if (!t)
                 goto error;
             lc = comprehension(tmp, expression, NULL);
@@ -1105,7 +1092,6 @@ ast_for_listcomp(struct compiling *c, const node *n)
     Py_XDECREF(t);
     Py_XDECREF(expression);
     Py_XDECREF(lc);
-    Py_XDECREF(store);
     Py_XDECREF(ifs);
     Py_XDECREF(tmp);
     if (result && PyAST_Validate(result) == -1) return NULL;
@@ -1186,7 +1172,6 @@ ast_for_genexp(struct compiling *c, const node *n)
     PyObject *ge = NULL;
     PyObject *t = NULL;
     PyObject *expression = NULL;
-    PyObject *store = NULL;
     PyObject *tmp = NULL;
     int i, n_fors;
     node *ch;
@@ -1206,10 +1191,6 @@ ast_for_genexp(struct compiling *c, const node *n)
     if (!genexps)
         goto error;
 
-    store = Store();
-    if (!store)
-        goto error;
-    
     ch = CHILD(n, 1);
     for (i = 0; i < n_fors; i++) {
         assert(ge == NULL);
@@ -1218,7 +1199,7 @@ ast_for_genexp(struct compiling *c, const node *n)
         
         REQ(ch, gen_for);
         
-        t = ast_for_exprlist(c, CHILD(ch, 1), store);
+        t = ast_for_exprlist(c, CHILD(ch, 1), _PyAST_Store);
         if (!t)
             goto error;
         expression = ast_for_expr(c, CHILD(ch, 3));
@@ -1230,7 +1211,7 @@ ast_for_genexp(struct compiling *c, const node *n)
                                NULL);
         }
         else {
-            tmp = Tuple(t, store, LINENO(ch));
+            tmp = Tuple(t, _PyAST_Store, LINENO(ch));
             if (!tmp)
                 goto error;
             ge = comprehension(tmp, expression, NULL);
@@ -1286,7 +1267,6 @@ ast_for_genexp(struct compiling *c, const node *n)
     Py_XDECREF(ge);
     Py_XDECREF(t);
     Py_XDECREF(expression);
-    /* Py_XDECREF(store); */
     /* Py_XDECREF(tmp); */
     if (result && PyAST_Validate(result) == -1) return NULL;
     return result;
@@ -2147,7 +2127,7 @@ ast_for_expr_stmt(struct compiling *c, const node *n)
             if (!e) 
                 goto error;
 
-            if (!set_context(e, Store(), CHILD(n, i))) {
+            if (!set_context(e, _PyAST_Store, CHILD(n, i))) {
                 goto error;
             }
 
@@ -2261,7 +2241,7 @@ ast_for_del_stmt(struct compiling *c, const node *n)
     /* del_stmt: 'del' exprlist */
     REQ(n, del_stmt);
 
-    expr_list = ast_for_exprlist(c, CHILD(n, 1), Del());
+    expr_list = ast_for_exprlist(c, CHILD(n, 1), _PyAST_Del);
     if (!expr_list)
         goto error;
     result = Delete(expr_list, LINENO(n));
@@ -2920,7 +2900,7 @@ ast_for_for_stmt(struct compiling *c, const node *n)
             goto error;
     }
 
-    _target = ast_for_exprlist(c, CHILD(n, 1), Store());
+    _target = ast_for_exprlist(c, CHILD(n, 1), _PyAST_Store);
     if (!_target) {
         goto error;
     }
@@ -2929,7 +2909,7 @@ ast_for_for_stmt(struct compiling *c, const node *n)
         Py_INCREF(target);
     }
     else
-        target = Tuple(_target, Store(), LINENO(n));
+        target = Tuple(_target, _PyAST_Store, LINENO(n));
 
     expression = ast_for_testlist(c, CHILD(n, 3));
     if (!expression) {
@@ -2985,7 +2965,7 @@ ast_for_except_clause(struct compiling *c, const node *exc, node *body)
         e = ast_for_expr(c, CHILD(exc, 3));
         if (!e)
             goto error;
-        if (!set_context(e, Store(), CHILD(exc, 3))) {
+        if (!set_context(e, _PyAST_Store, CHILD(exc, 3))) {
             goto error;
         }
         expression = ast_for_expr(c, CHILD(exc, 1));
@@ -3490,3 +3470,15 @@ parsestrplus(struct compiling *c, const node *n)
         return NULL;
 }
 
+int _PyAST_Init()
+{
+#define mk(context) _PyAST_##context = context(); if (!_PyAST_##context) return 0;
+	mk(Load);
+	mk(Store);
+	mk(Del);
+	mk(AugLoad);
+	mk(AugStore);
+	mk(Param);
+#undef mk
+	return 1;
+}
