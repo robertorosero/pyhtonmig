@@ -259,7 +259,7 @@ struct arena_object {
 	 */
 	uint nfreepools;
 
-	/* The total number of pools available in the arena. */
+	/* The total number of pools in the arena, whether or not available. */
 	uint ntotalpools;
 
 	/* Singly-linked list of available pools. */
@@ -437,7 +437,7 @@ static poolp usedpools[2 * ((NB_SMALL_SIZE_CLASSES + 7) / 8) * 8] = {
  *
  * This is a doubly linked list of arena_objects which have pools available.
  * These pools are either waiting to be reused, or else have not been used
- * before. This list is sorted to have the most allocated arenas first
+ * before.  This list is sorted to have the most allocated arenas first
  * (ascending order based on the nfreepools field).  This means that the next
  * allocation will come from a heavily used arena, which gives the nearly empty
  * arenas a chance to be returned to the system.  In my unscientific tests
@@ -477,13 +477,10 @@ new_arena(void)
 		uint numarenas;
 
 		/* Double the number of arena objects on each allocation. */
-		if (maxarenas == 0)
-			numarenas = INITIAL_ARENA_OBJECTS;
-		else
-			numarenas = maxarenas << 1;
+		numarenas = maxarenas ? maxarenas << 1 : INITIAL_ARENA_OBJECTS;
 
 		/* Resize the new arenas vector. */
-		arenaobj = realloc(arenas, numarenas*sizeof(*arenas));
+		arenaobj = realloc(arenas, numarenas * sizeof(*arenas));
 		/* Return NULL on allocation failure. */
 		if (arenaobj == NULL)
 			return NULL;
@@ -683,13 +680,15 @@ PyObject_Malloc(size_t nbytes)
 			} */
 #endif
 			partially_allocated_arenas = new_arena();
-			assert(partially_allocated_arenas->address != (uptr) NULL);
 			if (partially_allocated_arenas == NULL) {
 				UNLOCK();
 				goto redirect;
 			}
+			assert(partially_allocated_arenas->address !=
+			       (uptr)NULL);
 			/* This is the beginning of a new list, and is
-			initialized in new_arena */
+			 * initialized in new_arena.
+			 */
 			assert(partially_allocated_arenas->nextarena == NULL
 				&& partially_allocated_arenas->prevarena == NULL);
 		}
@@ -867,7 +866,7 @@ PyObject_Free(void *p)
 			prev->nextpool = next;
 
 			/* Link the pool to freepools.  This is a singly-linked
-			 * list,and pool->prevpool isn't used there.
+			 * list, and pool->prevpool isn't used there.
 			 */
 			arenaobj = &arenas[pool->arenaindex];
 			pool->nextpool = arenaobj->freepools;
@@ -882,10 +881,10 @@ PyObject_Free(void *p)
 				 */
 				assert(arenaobj->prevarena == NULL ||
 				       arenaobj->prevarena->address !=
-				       	(uptr)NULL );
+				       (uptr)NULL);
 				assert(arenaobj->nextarena == NULL ||
 				       arenaobj->nextarena->address !=
-				       	(uptr)NULL );
+				       (uptr)NULL);
 
 				/* Fix the pointer in the prevarena, or the
 				 * partially_allocated_arenas pointer
@@ -896,7 +895,7 @@ PyObject_Free(void *p)
 					assert(partially_allocated_arenas ==
 					       NULL ||
 					       partially_allocated_arenas->address
-					       != (uptr) NULL);
+					       != (uptr)NULL);
 				}
 				else {
 					assert(arenaobj->prevarena->nextarena ==
