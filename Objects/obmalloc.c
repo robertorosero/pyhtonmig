@@ -434,7 +434,7 @@ static poolp usedpools[2 * ((NB_SMALL_SIZE_CLASSES + 7) / 8) * 8] = {
 };
 
 /*==========================================================================
-/* Arena management.
+Arena management.
 
 `arenas` is a vector of arena_objects.  It contains maxarenas entries, some of
 which may not be currently used (== they're arena_objects that aren't
@@ -475,7 +475,7 @@ static struct arena_object* available_arenas = NULL;
 /* The head of the doubly-linked list of arenas with pools available. */
 static struct arena_object* partially_allocated_arenas = NULL;
 
-/* How many arena objects_do we initially allocate?
+/* How many arena_objects do we initially allocate?
  * 16 = can allocate 16 arenas = 16 * ARENA_SIZE = 4MB before growing the
  * `arenas` vector.
  */
