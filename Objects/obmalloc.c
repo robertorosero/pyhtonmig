@@ -248,7 +248,11 @@ typedef struct pool_header *poolp;
 
 /* Record keeping for arenas. */
 struct arena_object {
-	/* The address of the arena, as returned by malloc. */
+	/* The address of the arena, as returned by malloc.  Note that 0
+	 * will never be returned by a successful malloc, and is used
+	 * here to mark an arena_object that doesn't correspond to an
+	 * allocated arena.
+	 */
 	uptr address;
 
 	/* Pool-aligned pointer to the next pool to be carved off. */
@@ -265,9 +269,19 @@ struct arena_object {
 	/* Singly-linked list of available pools. */
 	struct pool_header* freepools;
 
-	/* Doubly-linked list of arena objects.
-	 * Used to locate arenas with pools available, and to locate unused
-	 * arena objects.
+	/* Whenever this arena_object is not associated with an allocated
+	 * arena, the nextarena member is used to link all unassociated
+	 * arena_objects in the singly-linked `available_arenas` list.
+	 * The prevarena member is unused in this case.
+	 *
+	 * When this arena_object is associated with an allocated arena
+	 * with at least one available pool, both members are used in the
+	 * doubly-linked `partially_allocated_arenas` list, which is
+	 * maintained in increasing order of `nfreepools` values.
+	 *
+	 * Else this arena_object is associated with an allocated arena
+	 * all of whose pools are in use.  `nextarena` and `prevarena`
+	 * are both meaningless in this case.
 	 */
 	struct arena_object* nextarena;
 	struct arena_object* prevarena;
@@ -419,41 +433,49 @@ static poolp usedpools[2 * ((NB_SMALL_SIZE_CLASSES + 7) / 8) * 8] = {
 #endif /* NB_SMALL_SIZE_CLASSES >  8 */
 };
 
-/*==========================================================================*/
-/* Arena management. */
+/*==========================================================================
+/* Arena management.
 
-/* arenas is a vector of arena objects. It contains maxarenas entries, some
- * of which may not currently be used.
- *
- * available_arenas
- *
- * This is a singly linked list of arena_objects contained in the arenas array
- * which are currently not being used.  Objects are taken off the head of the
- * list in new_arena(), and are pushed on the head of the list in
- * PyObject_Free() when the arena is empty.
- *
- * partially_allocated_arenas
- *
- * This is a doubly linked list of arena_objects which have pools available.
- * These pools are either waiting to be reused, or else have not been used
- * before.  This list is sorted to have the most allocated arenas first
- * (ascending order based on the nfreepools field).  This means that the next
- * allocation will come from a heavily used arena, which gives the nearly empty
- * arenas a chance to be returned to the system.  In my unscientific tests
- * this dramatically improved the number of arenas that could be freed.
- */
+`arenas` is a vector of arena_objects.  It contains maxarenas entries, some of
+which may not be currently used (== they're arena_objects that aren't
+currently associated with an allocated arena).  Note that arenas proper are
+separately malloc'ed.
+
+Prior to Python 2.5, arenas were never free()'ed.  Starting with Python 2.5,
+we do try to free() arenas, and use some mild heuristic strategies to increase
+the likelihood that arenas eventually can be freed.
+
+available_arenas
+
+    This is a singly-linked list of the arena_objects that are currently not
+    being used (no arena is associated with them).  Objects are taken off the
+    head of the list in new_arena(), and are pushed on the head of the list in
+    PyObject_Free() when the arena is empty.
+
+partially_allocated_arenas
+
+    This is a doubly-linked list of the arena_objects associated with arenas
+    that have pools available.  These pools are either waiting to be reused,
+    or else have not been used before.  The list is sorted to have the
+    most-allocated arenas first (ascending order based on the nfreepools
+    member).  This means that the next allocation will come from a heavily
+    used arena, which gives the nearly empty arenas a chance to be returned to
+    the system.  In my unscientific tests this dramatically improved the
+    number of arenas that could be freed.
+*/
 
 /* Array of objects used to track chunks of memory (arenas). */
 static struct arena_object* arenas = NULL;
-/* Number of slots allocated in the `arenas` vector. */
+/* Number of slots currently allocated in the `arenas` vector. */
 static uint maxarenas = 0;
 
-/* Singly linked list of available arena objects. */
+/* The head of the singly-linked list of available arena objects. */
 static struct arena_object* available_arenas = NULL;
-/* The head of the doubly linked list of arenas with pages available. */
+
+/* The head of the doubly-linked list of arenas with pools available. */
 static struct arena_object* partially_allocated_arenas = NULL;
 
-/* How many arena objects do we initially allocate?
+/* How many arena objects_do we initially allocate?
  * 16 = can allocate 16 arenas = 16 * ARENA_SIZE = 4MB before growing the
  * `arenas` vector.
  */
