@@ -557,6 +557,10 @@ new_arena(void)
 	return arenaobj;
 }
 
+/* XXX The comments following don't match the code anymore, but this
+ * XXX wasn't introduced in the branch (the trunk has the same problem).
+ * XXX Repair.
+ */
 /* Return true if and only if P is an address that was allocated by
  * pymalloc.  I must be the index into arenas that the address claims
  * to come from.
