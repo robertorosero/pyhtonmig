@@ -587,8 +587,8 @@ new_arena(void)
  * Obscure:  A PyMem "free memory" function can call the pymalloc free or
  * realloc before the first arena has been allocated.  arenas is still
  * NULL in that case.  We're relying on that maxarenas is also 0 in that case,
- * so that (POOL)->arenaindex must be false, saving us from trying to index
- * into a NULL arenas.
+ * so that (POOL)->arenaindex < maxarenas  must be false, saving us from
+ * trying to index into a NULL arenas.
  */
 #define Py_ADDRESS_IN_RANGE(P, POOL)	\
 	((POOL)->arenaindex < maxarenas &&		\
