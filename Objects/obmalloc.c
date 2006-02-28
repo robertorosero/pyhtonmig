@@ -481,6 +481,15 @@ static struct arena_object* partially_allocated_arenas = NULL;
  */
 #define INITIAL_ARENA_OBJECTS 16
 
+/* Number of arenas allocated that haven't been free()'d. */
+static ulong narenas_currently_allocated = 0;
+
+#ifdef PYMALLOC_DEBUG
+/* Total number of times malloc() called to allocate an arena. */
+/* XXX Teach the debug malloc output about this. */
+static ulong ntimes_arena_allocated = 0;
+#endif
+
 /* Allocate a new arena.  If we run out of memory, return NULL.  Else
  * allocate a new arena, and return the address of an arena_object
  * descriptor describing the new arena.  The `prevarena` and `freepools`
@@ -564,6 +573,10 @@ new_arena(void)
 		return NULL;
 	}
 
+	++narenas_currently_allocated;
+#ifdef PYMALLOC_DEBUG
+	++ntimes_arena_allocated;
+#endif
 	/* base_address <- first pool-aligned address in the arena
 	   nfreepools <- number of whole pools that fit after alignment */
 	arenaobj->base_address = (block*)arenaobj->address;
@@ -721,13 +734,10 @@ PyObject_Malloc(size_t nbytes)
 			 * Allocate new arena
 			 */
 #ifdef WITH_MEMORY_LIMITS
-			/* XXX: Re-enable or remove this feature
-			To enable it, we will need to maintain a count of the
-			currently allocated arenas
-			if (!(narenas < MAX_ARENAS)) {
+			if (narenas_currently_allocated >= MAX_ARENAS) {
 				UNLOCK();
 				goto redirect;
-			} */
+			}
 #endif
 			partially_allocated_arenas = new_arena();
 			if (partially_allocated_arenas == NULL) {
@@ -978,6 +988,7 @@ PyObject_Free(void *p)
 				address = (void *)arenaobj->address;
 				arenaobj->address = (uptr)NULL;
 				free(address);
+				--narenas_currently_allocated;
 
 			}
 			else if (arenaobj->nfreepools == 1) {
