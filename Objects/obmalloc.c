@@ -557,26 +557,38 @@ new_arena(void)
 	return arenaobj;
 }
 
-/* XXX The comments following don't match the code anymore, but this
- * XXX wasn't introduced in the branch (the trunk has the same problem).
- * XXX Repair.
- */
 /* Return true if and only if P is an address that was allocated by
- * pymalloc.  I must be the index into arenas that the address claims
- * to come from.
+ * pymalloc.  POOL must be the pool address associated with P, i.e.,
+ * POOL = POOL_ADDR(P) (the caller is asked to compute this because
+ * the macro expands POOL more than once, and for efficiency it's best
+ * for the caller to assign POOL_ADDR(P) to a variable and pass the
+ * latter to the macro; because Py_ADDRESS_IN_RANGE is called on every
+ * alloc/realloc/free, micro-efficiency is important here).
  *
- * Tricky:  Letting B be the arena base address in arenas[I], P belongs to the
- * arena if and only if
+ * Tricky:  Let B be the arena base address associated with the pool,
+ * B = arenas[(POOL)->arenaindex].address.  Then P belongs to the arena if
+ * and only if
  *	B <= P < B + ARENA_SIZE
  * Subtracting B throughout, this is true iff
  *	0 <= P-B < ARENA_SIZE
  * By using unsigned arithmetic, the "0 <=" half of the test can be skipped.
  *
+ * XXX This is broken.  The arena-management patch sets B to 0 when an
+ * XXX arena_object isn't associated with storage obmalloc controls.
+ * XXX But if P is "small enough" (< ARENA_SIZE), P is not an address
+ * XXX controlled by obmalloc, and arenas[POOL_ADDR(P)->arenaindex] doesn't
+ * XXX correspond to an allocated arena,
+ * XXX (uptr)(P) - arenas[(POOL)->arenaindex].address will equal
+ * XXX (uptr)P - 0 = (uptr)P, and Py_ADDRESS_IN_RANGE will falsely claim
+ * XXX that P _is_ controlled by obmalloc (P < ARENA_SIZE by case assumption).
+ * XXX This is a disaster ... complicate+slow the macro to verify that
+ * XXX .address != 0 too?
+ *
  * Obscure:  A PyMem "free memory" function can call the pymalloc free or
  * realloc before the first arena has been allocated.  arenas is still
- * NULL in that case.  We're relying on that narenas is also 0 in that case,
- * so the (I) < maxarenas must be false, saving us from trying to index into
- * a NULL arenas.
+ * NULL in that case.  We're relying on that maxarenas is also 0 in that case,
+ * so that (POOL)->arenaindex must be false, saving us from trying to index
+ * into a NULL arenas.
  */
 #define Py_ADDRESS_IN_RANGE(P, POOL)	\
 	((POOL)->arenaindex < maxarenas &&		\
