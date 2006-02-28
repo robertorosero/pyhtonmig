@@ -469,7 +469,7 @@ static struct arena_object* partially_allocated_arenas = NULL;
 static struct arena_object*
 new_arena(void)
 {
-	struct arena_object* arenaobj = NULL;
+	struct arena_object* arenaobj;
 	uint excess;	/* number of bytes above pool alignment */
 
 #ifdef PYMALLOC_DEBUG
