@@ -644,7 +644,7 @@ PyObject_Malloc(size_t nbytes)
 		/*
 		 * Most frequent paths first
 		 */
-		size = (uint )(nbytes - 1) >> ALIGNMENT_SHIFT;
+		size = (uint)(nbytes - 1) >> ALIGNMENT_SHIFT;
 		pool = usedpools[size + size];
 		if (pool != pool->nextpool) {
 			/*
@@ -687,7 +687,7 @@ PyObject_Malloc(size_t nbytes)
 			 * Allocate new arena
 			 */
 #ifdef WITH_MEMORY_LIMITS
-			/* TODO: Re-enable or remove this feature
+			/* XXX: Re-enable or remove this feature
 			To enable it, we will need to maintain a count of the
 			currently allocated arenas
 			if (!(narenas < MAX_ARENAS)) {
@@ -721,6 +721,8 @@ PyObject_Malloc(size_t nbytes)
 
 			/* This moves the arena *towards* the head of the list
 			but it is already at the head of the list: do nothing */
+			/* XXX what did that mean? */
+			/* XXX reformat very long lines below */
 			partially_allocated_arenas->nfreepools --;
 			if (partially_allocated_arenas->nfreepools == 0) {
 				assert(partially_allocated_arenas->freepools == NULL);
@@ -781,6 +783,10 @@ PyObject_Malloc(size_t nbytes)
 		assert(partially_allocated_arenas->nfreepools > 0);
 		if (partially_allocated_arenas->nfreepools) {
 			/* Verify that the arenabase address is in range. */
+			/* XXX This assert appears to be equivalent to
+			   assert(POOL_SIZE <= ARENA_SIZE); what's it
+			   _trying_ to check?
+			*/
 			assert(partially_allocated_arenas->base_address <=
 			       partially_allocated_arenas->base_address +
 			       ARENA_SIZE - POOL_SIZE);
