@@ -494,10 +494,8 @@ static ulong narenas_highwater = 0;
 
 /* Allocate a new arena.  If we run out of memory, return NULL.  Else
  * allocate a new arena, and return the address of an arena_object
- * descriptor describing the new arena.  The `prevarena` and `freepools`
- * members of the arena_object are left as uninitialized trash.  XXX
- * That last sentence isn't true right now (it's all zero filled, but don't
- * know yet why we bother to do that).
+ * descriptor describing the new arena.  It's expected that the caller will
+ * set `usable_arenas` to the return value.
  */
 static struct arena_object*
 new_arena(void)
@@ -509,7 +507,6 @@ new_arena(void)
 	if (Py_GETENV("PYTHONMALLOCSTATS"))
 		_PyObject_DebugMallocStats();
 #endif
-
 	if (available_arenas == NULL) {
 		uint i;
 		uint numarenas;
@@ -538,16 +535,12 @@ new_arena(void)
 		assert(usable_arenas == NULL);
 		assert(available_arenas == NULL);
 
-		/* Zero fill the new section of the array. */
-		/* XXX Why? */
-		memset(&(arenas[maxarenas]), 0,
-		       sizeof(*arenas) * (numarenas - maxarenas));
-
 		/* Put the new arenas on the available_arenas list. */
-		for (i = maxarenas; i < numarenas-1; ++i)
-			arenas[i].nextarena = &arenas[i+1];
-		/* The last new arenaobj still points to NULL. */
-		assert(arenas[numarenas-1].nextarena == NULL);
+		for (i = maxarenas; i < numarenas; ++i) {
+			arenas[i].address = 0;	/* mark as unassociated */
+			arenas[i].nextarena = i < numarenas - 1 ?
+					       &arenas[i+1] : NULL;
+		}
 
 		/* Update globals. */
 		available_arenas = &arenas[maxarenas];
@@ -557,16 +550,10 @@ new_arena(void)
 	/* Take the next available arena object off the head of the list. */
 	assert(available_arenas != NULL);
 	arenaobj = available_arenas;
-	available_arenas = available_arenas->nextarena;
-
-	assert(arenaobj->address == (uptr)NULL);
-
-	/* Fill the newly allocated or reused arena object with zeros. */
-	/* XXX Why? */
-	memset(arenaobj, 0, sizeof(*arenaobj));
-
+	available_arenas = arenaobj->nextarena;
+	assert(arenaobj->address == 0);
 	arenaobj->address = (uptr)malloc(ARENA_SIZE);
-	if (arenaobj->address == (uptr)NULL) {
+	if (arenaobj->address == 0) {
 		/* The allocation failed: return NULL after putting the
 		 * arenaobj back.
 		 */
@@ -581,12 +568,13 @@ new_arena(void)
 	if (narenas_currently_allocated > narenas_highwater)
 		narenas_highwater = narenas_currently_allocated;
 #endif
+	arenaobj->freepools = NULL;
 	/* pool_address <- first pool-aligned address in the arena
 	   nfreepools <- number of whole pools that fit after alignment */
 	arenaobj->pool_address = (block*)arenaobj->address;
 	arenaobj->nfreepools = ARENA_SIZE / POOL_SIZE;
 	assert(POOL_SIZE * arenaobj->nfreepools == ARENA_SIZE);
-	excess = (uint)((Py_uintptr_t)arenaobj->address & POOL_SIZE_MASK);
+	excess = (uint)(arenaobj->address & POOL_SIZE_MASK);
 	if (excess != 0) {
 		--arenaobj->nfreepools;
 		arenaobj->pool_address += POOL_SIZE - excess;
@@ -746,6 +734,8 @@ PyObject_Malloc(size_t nbytes)
 				UNLOCK();
 				goto redirect;
 			}
+			usable_arenas->nextarena =
+				usable_arenas->prevarena = NULL;
 		}
 		assert(usable_arenas->address != 0);
 
@@ -888,7 +878,8 @@ PyObject_Free(void *p)
 		*(block **)p = lastfree = pool->freeblock;
 		pool->freeblock = (block *)p;
 		if (lastfree) {
-			struct arena_object* arenaobj;
+			struct arena_object* ao;
+			uint nf;  /* ao->nfreepools */
 
 			/* freeblock wasn't NULL, so the pool wasn't full,
 			 * and the pool is in a usedpools[] list.
@@ -911,72 +902,65 @@ PyObject_Free(void *p)
 			/* Link the pool to freepools.  This is a singly-linked
 			 * list, and pool->prevpool isn't used there.
 			 */
-			arenaobj = &arenas[pool->arenaindex];
-			pool->nextpool = arenaobj->freepools;
-			arenaobj->freepools = pool;
-			++arenaobj->nfreepools;
+			ao = &arenas[pool->arenaindex];
+			pool->nextpool = ao->freepools;
+			ao->freepools = pool;
+			nf = ++ao->nfreepools;
 
-			if (arenaobj->nfreepools == arenaobj->ntotalpools) {
-				void* address;
+			if (nf == ao->ntotalpools) {
 				/* This arena is completely deallocated.
 				 * Unlink it from the partially allocated
 				 * arenas.
 				 */
-				assert(arenaobj->prevarena == NULL ||
-				       arenaobj->prevarena->address !=
-				       (uptr)NULL);
-				assert(arenaobj->nextarena == NULL ||
-				       arenaobj->nextarena->address !=
-				       (uptr)NULL);
+				assert(ao->prevarena == NULL ||
+				       ao->prevarena->address != 0);
+				assert(ao ->nextarena == NULL ||
+				       ao->nextarena->address != 0);
 
 				/* Fix the pointer in the prevarena, or the
-				 * usable_arenas pointer
+				 * usable_arenas pointer.
 				 */
-				if (arenaobj->prevarena == NULL) {
-					usable_arenas = arenaobj->nextarena;
+				if (ao->prevarena == NULL) {
+					usable_arenas = ao->nextarena;
 					assert(usable_arenas == NULL ||
 					       usable_arenas->address != 0);
 				}
 				else {
-					assert(arenaobj->prevarena->nextarena ==
-					       arenaobj);
-					arenaobj->prevarena->nextarena =
-						arenaobj->nextarena;
+					assert(ao->prevarena->nextarena == ao);
+					ao->prevarena->nextarena =
+						ao->nextarena;
 				}
 
 				/* Fix the pointer in the nextarena. */
-				if (arenaobj->nextarena != NULL) {
-					assert(arenaobj->nextarena->prevarena ==
-						arenaobj);
-					arenaobj->nextarena->prevarena =
-						arenaobj->prevarena;
+				if (ao->nextarena != NULL) {
+					assert(ao->nextarena->prevarena == ao);
+					ao->nextarena->prevarena =
+						ao->prevarena;
 				}
 
-				/* Record that this arena slot is available to
-				 * be reused.
+				/* Record that this arena_object slot is
+				 * available to be reused.
 				 */
-				arenaobj->nextarena = available_arenas;
-				available_arenas = arenaobj;
+				ao->nextarena = available_arenas;
+				available_arenas = ao;
 
 				/* Free the entire arena. */
-				address = (void *)arenaobj->address;
-				arenaobj->address = (uptr)NULL;
-				free(address);
+				free((void *)ao->address);
+				ao->address = 0;
 				--narenas_currently_allocated;
-
 			}
-			else if (arenaobj->nfreepools == 1) {
+			else if (nf == 1) {
 				/* If this arena was completely allocated,
 				 * go link it to the head of the partially
 				 * allocated list.
 				 */
-				arenaobj->nextarena = usable_arenas;
-				arenaobj->prevarena = NULL;
-				usable_arenas = arenaobj;
+				ao->nextarena = usable_arenas;
+				ao->prevarena = NULL;
+				usable_arenas = ao;
 
 				/* Fix the pointer in the nextarena. */
-				if (arenaobj->nextarena != NULL)
-					arenaobj->nextarena->prevarena = arenaobj;
+				if (ao->nextarena != NULL)
+					ao->nextarena->prevarena = ao;
 
 				assert(usable_arenas->address != 0);
 			}
@@ -987,60 +971,56 @@ PyObject_Free(void *p)
 			 * a few un-scientific tests, it seems like this
 			 * approach allowed a lot more memory to be freed.
 			 */
-			else if (arenaobj->nextarena != NULL &&
-				 arenaobj->nfreepools >
-				 arenaobj->nextarena->nfreepools) {
+			else if (ao->nextarena != NULL &&
+				     nf > ao->nextarena->nfreepools) {
 				/* We have to move the arena towards the end
 				 * of the list.
 				 */
 				struct arena_object** lastPointer;
-				if (arenaobj->prevarena != NULL)
-					lastPointer = &arenaobj->prevarena->nextarena;
+				if (ao->prevarena != NULL)
+					lastPointer =
+						&ao->prevarena->nextarena;
 				else
 					lastPointer = &usable_arenas;
-				assert(*lastPointer == arenaobj);
+				assert(*lastPointer == ao);
 
 				/* Step one: unlink the arena from the list. */
-				*lastPointer = arenaobj->nextarena;
-				arenaobj->nextarena->prevarena = arenaobj->prevarena;
+				*lastPointer = ao->nextarena;
+				ao->nextarena->prevarena = ao->prevarena;
 
 				/* Step two: Locate the new insertion point by
 				 * iterating over the list, using our nextarena
 				 * pointer.
 				 */
-				while (arenaobj->nextarena != NULL &&
-					  arenaobj->nfreepools >
-					  arenaobj->nextarena->nfreepools) {
-					arenaobj->prevarena = arenaobj->nextarena;
-					arenaobj->nextarena = arenaobj->nextarena->nextarena;
+				while (ao->nextarena != NULL &&
+					 nf > ao->nextarena->nfreepools) {
+					ao->prevarena = ao->nextarena;
+					ao->nextarena =
+						ao->nextarena->nextarena;
 				}
 
 				/* Step three: insert the arena at this point. */
-				assert(arenaobj->nextarena == NULL ||
-					arenaobj->prevarena ==
-					arenaobj->nextarena->prevarena);
-				assert(arenaobj->prevarena->nextarena ==
-					arenaobj->nextarena);
+				assert(ao->nextarena == NULL ||
+					ao->prevarena ==
+					    ao->nextarena->prevarena);
+				assert(ao->prevarena->nextarena ==
+					ao->nextarena);
 
-				arenaobj->prevarena->nextarena = arenaobj;
-				if (arenaobj->nextarena != NULL) {
-					arenaobj->nextarena->prevarena = arenaobj;
+				ao->prevarena->nextarena = ao;
+				if (ao->nextarena != NULL) {
+					ao->nextarena->prevarena = ao;
 				}
 
 				/* Verify that the swaps worked. */
-				assert(arenaobj->nextarena == NULL ||
-					arenaobj->nfreepools <=
-					arenaobj->nextarena->nfreepools);
-				assert(arenaobj->prevarena == NULL ||
-					arenaobj->nfreepools >
-					arenaobj->prevarena->nfreepools);
-				assert(arenaobj->nextarena == NULL ||
-					arenaobj->nextarena->prevarena ==
-					arenaobj);
-				assert((usable_arenas == arenaobj &&
-					arenaobj->prevarena == NULL) ||
-					arenaobj->prevarena->nextarena ==
-					arenaobj);
+				assert(ao->nextarena == NULL ||
+					  nf <= ao->nextarena->nfreepools);
+				assert(ao->prevarena == NULL ||
+					  nf > ao->prevarena->nfreepools);
+				assert(ao->nextarena == NULL ||
+					ao->nextarena->prevarena == ao);
+				assert((usable_arenas == ao &&
+					ao->prevarena == NULL) ||
+					ao->prevarena->nextarena == ao);
 			}
 
 			UNLOCK();
