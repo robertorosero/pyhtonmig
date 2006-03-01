@@ -487,8 +487,9 @@ static ulong narenas_currently_allocated = 0;
 
 #ifdef PYMALLOC_DEBUG
 /* Total number of times malloc() called to allocate an arena. */
-/* XXX Teach the debug malloc output about this. */
 static ulong ntimes_arena_allocated = 0;
+/* High water mark (max value ever seen) for narenas_currently_allocated. */
+static ulong narenas_highwater = 0;
 #endif
 
 /* Allocate a new arena.  If we run out of memory, return NULL.  Else
@@ -577,6 +578,8 @@ new_arena(void)
 	++narenas_currently_allocated;
 #ifdef PYMALLOC_DEBUG
 	++ntimes_arena_allocated;
+	if (narenas_currently_allocated > narenas_highwater)
+		narenas_highwater = narenas_currently_allocated;
 #endif
 	/* pool_address <- first pool-aligned address in the arena
 	   nfreepools <- number of whole pools that fit after alignment */
@@ -875,8 +878,7 @@ PyObject_Free(void *p)
 	if (Py_ADDRESS_IN_RANGE(p, pool)) {
 		/* We allocated this address. */
 		LOCK();
-		/*
-		 * Link p to the start of the pool's freeblock list.  Since
+		/* Link p to the start of the pool's freeblock list.  Since
 		 * the pool had at least the p block outstanding, the pool
 		 * wasn't empty (so it's already in a usedpools[] list, or
 		 * was full and is in no list -- it's not in the freeblocks
@@ -888,8 +890,7 @@ PyObject_Free(void *p)
 		if (lastfree) {
 			struct arena_object* arenaobj;
 
-			/*
-			 * freeblock wasn't NULL, so the pool wasn't full,
+			/* freeblock wasn't NULL, so the pool wasn't full,
 			 * and the pool is in a usedpools[] list.
 			 */
 			if (--pool->ref.count != 0) {
@@ -897,8 +898,7 @@ PyObject_Free(void *p)
 				UNLOCK();
 				return;
 			}
-			/*
-			 * Pool is now empty:  unlink from usedpools, and
+			/* Pool is now empty:  unlink from usedpools, and
 			 * link to the front of freepools.  This ensures that
 			 * previously freed pools will be allocated later
 			 * (being not referenced, they are perhaps paged out).
@@ -914,7 +914,7 @@ PyObject_Free(void *p)
 			arenaobj = &arenas[pool->arenaindex];
 			pool->nextpool = arenaobj->freepools;
 			arenaobj->freepools = pool;
-			arenaobj->nfreepools ++;
+			++arenaobj->nfreepools;
 
 			if (arenaobj->nfreepools == arenaobj->ntotalpools) {
 				void* address;
@@ -975,9 +975,8 @@ PyObject_Free(void *p)
 				usable_arenas = arenaobj;
 
 				/* Fix the pointer in the nextarena. */
-				if (arenaobj->nextarena != NULL) {
+				if (arenaobj->nextarena != NULL)
 					arenaobj->nextarena->prevarena = arenaobj;
-				}
 
 				assert(usable_arenas->address != 0);
 			}
@@ -1047,8 +1046,7 @@ PyObject_Free(void *p)
 			UNLOCK();
 			return;
 		}
-		/*
-		 * Pool was full, so doesn't currently live in any list:
+		/* Pool was full, so doesn't currently live in any list:
 		 * link it to the front of the appropriate usedpools[] list.
 		 * This mimics LRU pool usage for new allocations and
 		 * targets optimal filling when several pools contain
@@ -1570,7 +1568,7 @@ _PyObject_DebugMallocStats(void)
 	 */
 	ulong quantization = 0;
 	/* # of arenas actually allocated. */
-	uint narenas = 0;
+	ulong narenas = 0;
 	/* running total -- should equal narenas * ARENA_SIZE */
 	ulong total;
 	char buf[128];
@@ -1629,6 +1627,7 @@ _PyObject_DebugMallocStats(void)
 #endif
 		}
 	}
+	assert(narenas == narenas_currently_allocated);
 
 	fputc('\n', stderr);
 	fputs("class   size   num pools   blocks in use  avail blocks\n"
@@ -1654,9 +1653,14 @@ _PyObject_DebugMallocStats(void)
 	fputc('\n', stderr);
 	(void)printone("# times object malloc called", serialno);
 
+	(void)printone("# arenas allocated total", ntimes_arena_allocated);
+	(void)printone("# arenas reclaimed", ntimes_arena_allocated - narenas);
+	(void)printone("# arenas highwater mark", narenas_highwater);
+	(void)printone("# arenas allocated current", narenas);
+
 	PyOS_snprintf(buf, sizeof(buf),
-		"%u arenas * %d bytes/arena", narenas, ARENA_SIZE);
-	(void)printone(buf, (ulong)narenas * ARENA_SIZE);
+		"%lu arenas * %d bytes/arena", narenas, ARENA_SIZE);
+	(void)printone(buf, narenas * ARENA_SIZE);
 
 	fputc('\n', stderr);
 
