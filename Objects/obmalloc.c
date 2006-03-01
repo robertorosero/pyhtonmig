@@ -318,8 +318,9 @@ all partially used pools holding small blocks with "size class idx" i. So
 usedpools[0] corresponds to blocks of size 8, usedpools[2] to blocks of size
 16, and so on:  index 2*i <-> blocks of size (i+1)<<ALIGNMENT_SHIFT.
 
-Pools are carved off the current arena highwater mark (file static arenabase)
-as needed.  Once carved off, a pool is in one of three states forever after:
+Pools are carved off an arena's highwater mark (an arena_object's pool_address
+member) as needed.  Once carved off, a pool is in one of three states forever
+after:
 
 used == partially used, neither empty nor full
     At least one block in the pool is currently allocated, and at least one
@@ -344,7 +345,7 @@ full == all the pool's blocks are currently allocated
 
 empty == all the pool's blocks are currently available for allocation
     On transition to empty, a pool is unlinked from its usedpools[] list,
-    and linked to the front of the (file static) singly-linked freepools list,
+    and linked to the front of its arena_object's singly-linked freepools list,
     via its nextpool member.  The prevpool member has no meaning in this case.
     Empty pools have no inherent size class:  the next time a malloc finds
     an empty list in usedpools[], it takes the first pool off of freepools.
@@ -706,22 +707,18 @@ PyObject_Malloc(size_t nbytes)
 				return (void *)bp;
 			}
 			/*
-			 * Reached the end of the free list, try to extend it
+			 * Reached the end of the free list, try to extend it.
 			 */
 			if (pool->nextoffset <= pool->maxnextoffset) {
-				/*
-				 * There is room for another block
-				 */
-				pool->freeblock = (block *)pool +
+				/* There is room for another block. */
+				pool->freeblock = (block*)pool +
 						  pool->nextoffset;
 				pool->nextoffset += INDEX2SIZE(size);
 				*(block **)(pool->freeblock) = NULL;
 				UNLOCK();
 				return (void *)bp;
 			}
-			/*
-			 * Pool is full, unlink from used pools
-			 */
+			/* Pool is full, unlink from used pools. */
 			next = pool->nextpool;
 			pool = pool->prevpool;
 			next->prevpool = pool;
@@ -731,7 +728,7 @@ PyObject_Malloc(size_t nbytes)
 		}
 
 		/* There isn't a pool of the right size class immediately
-		 * available:  use a free pool from an arena.
+		 * available:  use a free pool.
 		 */
 		if (usable_arenas == NULL) {
 			/* No arena has a free pool:  allocate a new arena. */
@@ -775,15 +772,18 @@ PyObject_Malloc(size_t nbytes)
 				}
 			}
 			else {
+				/* nfreepools > 0:  it must be that freepools
+				 * isn't NULL, or that we haven't yet carved
+				 * off all the arena's pools for the first
+				 * time.
+				 */
 				assert(usable_arenas->freepools != NULL ||
 				       usable_arenas->pool_address <=
-				           ((block*) usable_arenas->address) +
+				           (block*)usable_arenas->address +
 				               ARENA_SIZE - POOL_SIZE);
 			}
 		init_pool:
-			/*
-			 * Frontlink to used pools
-			 */
+			/* Frontlink to used pools. */
 			next = usedpools[size + size]; /* == prev */
 			pool->nextpool = next;
 			pool->prevpool = next;
@@ -791,8 +791,7 @@ PyObject_Malloc(size_t nbytes)
 			next->prevpool = pool;
 			pool->ref.count = 1;
 			if (pool->szidx == size) {
-				/*
-				 * Luckily, this pool last contained blocks
+				/* Luckily, this pool last contained blocks
 				 * of the same size class, so its header
 				 * and free list are already initialized.
 				 */
@@ -816,24 +815,18 @@ PyObject_Malloc(size_t nbytes)
 			UNLOCK();
 			return (void *)bp;
 		}
-		/* Allocate new pool. */
-		assert(usable_arenas->nfreepools > 0);
-		/* Verify that the arenabase address is in range. */
-		/* XXX This assert appears to be equivalent to
-		   assert(POOL_SIZE <= ARENA_SIZE); what's it
-		   _trying_ to check?
-		*/
-		assert(usable_arenas->pool_address <=
-		       usable_arenas->pool_address +
-		       ARENA_SIZE - POOL_SIZE);
-		pool = (poolp)usable_arenas->pool_address;
-		pool->arenaindex = usable_arenas - arenas;
-		assert(&arenas[pool->arenaindex] ==
-		       usable_arenas);
-		pool->szidx = DUMMY_SIZE_IDX;
 
-		--usable_arenas->nfreepools;
+		/* Carve off a new pool. */
+		assert(usable_arenas->nfreepools > 0);
+		assert(usable_arenas->freepools == NULL);
+		pool = (poolp)usable_arenas->pool_address;
+		assert((block*)pool <= (block*)usable_arenas->address +
+		                       ARENA_SIZE - POOL_SIZE);
+		pool->arenaindex = usable_arenas - arenas;
+		assert(&arenas[pool->arenaindex] == usable_arenas);
+		pool->szidx = DUMMY_SIZE_IDX;
 		usable_arenas->pool_address += POOL_SIZE;
+		--usable_arenas->nfreepools;
 
 		if (usable_arenas->nfreepools == 0) {
 			assert(usable_arenas->nextarena == NULL ||
