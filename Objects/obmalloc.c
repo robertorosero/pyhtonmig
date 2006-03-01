@@ -577,7 +577,7 @@ new_arena(void)
 #ifdef PYMALLOC_DEBUG
 	++ntimes_arena_allocated;
 #endif
-	/* base_address <- first pool-aligned address in the arena
+	/* pool_address <- first pool-aligned address in the arena
 	   nfreepools <- number of whole pools that fit after alignment */
 	arenaobj->pool_address = (block*)arenaobj->address;
 	arenaobj->nfreepools = ARENA_SIZE / POOL_SIZE;
