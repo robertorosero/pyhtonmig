@@ -747,7 +747,6 @@ PyObject_Malloc(size_t nbytes)
 
 			/* This moves the arena *towards* the head of the list
 			but it is already at the head of the list: do nothing */
-			/* XXX what did that mean? */
 			--usable_arenas->nfreepools;
 			if (usable_arenas->nfreepools == 0) {
 				/* Unlink the arena: it's completely
@@ -907,10 +906,20 @@ PyObject_Free(void *p)
 			ao->freepools = pool;
 			nf = ++ao->nfreepools;
 
+			/* All the rest is arena management.  We just freed
+			 * a pool, and there are 4 cases for arena mgmt:
+			 * 1. If all the pools are free, return the arena to
+			 *    the system free().
+			 * 2. If this is the only free pool in the arena,
+			 *    add the arena back to the `usable_arenas` list.
+			 * 3. If the "next" arena has a smaller count of
+			 *    of free pulls, we have to "push this arena right"
+			 *    to restore that `usable_arenas` is sorted in
+			 *    order of nfreepools.
+			 * 4. Else there's nothing more to do.
+			 */
 			if (nf == ao->ntotalpools) {
-				/* This arena is completely deallocated.
-				 * Unlink it from the partially allocated
-				 * arenas.
+				/* Case 1.  First unlink ao from usable_arenas.
 				 */
 				assert(ao->prevarena == NULL ||
 				       ao->prevarena->address != 0);
@@ -930,14 +939,12 @@ PyObject_Free(void *p)
 					ao->prevarena->nextarena =
 						ao->nextarena;
 				}
-
 				/* Fix the pointer in the nextarena. */
 				if (ao->nextarena != NULL) {
 					assert(ao->nextarena->prevarena == ao);
 					ao->nextarena->prevarena =
 						ao->prevarena;
 				}
-
 				/* Record that this arena_object slot is
 				 * available to be reused.
 				 */
@@ -946,23 +953,28 @@ PyObject_Free(void *p)
 
 				/* Free the entire arena. */
 				free((void *)ao->address);
-				ao->address = 0;
+				ao->address = 0;	/* mark unassociated */
 				--narenas_currently_allocated;
+
+				UNLOCK();
+				return;
 			}
-			else if (nf == 1) {
-				/* If this arena was completely allocated,
-				 * go link it to the head of the partially
-				 * allocated list.
+
+			if (nf == 1) {
+				/* Case 2.  Put ao at the head of
+				 * usable_arenas.  Note that because
+				 * ao->nfreepools was 0 before, ao isn't
+				 * currently on the usable_arenas list.
 				 */
 				ao->nextarena = usable_arenas;
 				ao->prevarena = NULL;
+				if (usable_arenas)
+					usable_arenas->prevarena = ao;
 				usable_arenas = ao;
-
-				/* Fix the pointer in the nextarena. */
-				if (ao->nextarena != NULL)
-					ao->nextarena->prevarena = ao;
-
 				assert(usable_arenas->address != 0);
+
+				UNLOCK();
+				return;
 			}
 			/* If this arena is now out of order, we need to keep
 			 * the list sorted.  The list is kept sorted so that
@@ -971,57 +983,58 @@ PyObject_Free(void *p)
 			 * a few un-scientific tests, it seems like this
 			 * approach allowed a lot more memory to be freed.
 			 */
-			else if (ao->nextarena != NULL &&
-				     nf > ao->nextarena->nfreepools) {
-				/* We have to move the arena towards the end
-				 * of the list.
-				 */
-				struct arena_object** lastPointer;
-				if (ao->prevarena != NULL)
-					lastPointer =
-						&ao->prevarena->nextarena;
-				else
-					lastPointer = &usable_arenas;
-				assert(*lastPointer == ao);
-
-				/* Step one: unlink the arena from the list. */
-				*lastPointer = ao->nextarena;
-				ao->nextarena->prevarena = ao->prevarena;
-
-				/* Step two: Locate the new insertion point by
-				 * iterating over the list, using our nextarena
-				 * pointer.
-				 */
-				while (ao->nextarena != NULL &&
-					 nf > ao->nextarena->nfreepools) {
-					ao->prevarena = ao->nextarena;
-					ao->nextarena =
-						ao->nextarena->nextarena;
-				}
-
-				/* Step three: insert the arena at this point. */
-				assert(ao->nextarena == NULL ||
-					ao->prevarena ==
-					    ao->nextarena->prevarena);
-				assert(ao->prevarena->nextarena ==
-					ao->nextarena);
-
-				ao->prevarena->nextarena = ao;
-				if (ao->nextarena != NULL) {
-					ao->nextarena->prevarena = ao;
-				}
-
-				/* Verify that the swaps worked. */
-				assert(ao->nextarena == NULL ||
-					  nf <= ao->nextarena->nfreepools);
-				assert(ao->prevarena == NULL ||
-					  nf > ao->prevarena->nfreepools);
-				assert(ao->nextarena == NULL ||
-					ao->nextarena->prevarena == ao);
-				assert((usable_arenas == ao &&
-					ao->prevarena == NULL) ||
-					ao->prevarena->nextarena == ao);
+			if (ao->nextarena == NULL ||
+				     nf <= ao->nextarena->nfreepools) {
+				/* Case 4.  Nothing to do. */
+				UNLOCK();
+				return;
 			}
+
+			/* Case 3:  We have to move the arena towards the end
+			 * of the list, because it has more free pools than
+			 * the arena to its right.
+			 * First unlink ao from usable_arenas.
+			 */
+			if (ao->prevarena != NULL) {
+				/* ao isn't at the head of the list */
+				assert(ao->prevarena->nextarena == ao);
+				ao->prevarena->nextarena = ao->nextarena;
+			}
+			else {
+				/* ao is at the head of the list */
+				assert(usable_arenas == ao);
+				usable_arenas = ao->nextarena;
+			}
+			ao->nextarena->prevarena = ao->prevarena;
+
+			/* Locate the new insertion point by iterating over
+			 * the list, using our nextarena pointer.
+			 */
+			while (ao->nextarena != NULL &&
+					nf > ao->nextarena->nfreepools) {
+				ao->prevarena = ao->nextarena;
+				ao->nextarena = ao->nextarena->nextarena;
+			}
+
+			/* Insert ao at this point. */
+			assert(ao->nextarena == NULL ||
+				ao->prevarena == ao->nextarena->prevarena);
+			assert(ao->prevarena->nextarena == ao->nextarena);
+
+			ao->prevarena->nextarena = ao;
+			if (ao->nextarena != NULL)
+				ao->nextarena->prevarena = ao;
+
+			/* Verify that the swaps worked. */
+			assert(ao->nextarena == NULL ||
+				  nf <= ao->nextarena->nfreepools);
+			assert(ao->prevarena == NULL ||
+				  nf > ao->prevarena->nfreepools);
+			assert(ao->nextarena == NULL ||
+				ao->nextarena->prevarena == ao);
+			assert((usable_arenas == ao &&
+				ao->prevarena == NULL) ||
+				ao->prevarena->nextarena == ao);
 
 			UNLOCK();
 			return;
