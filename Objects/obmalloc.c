@@ -912,10 +912,10 @@ PyObject_Free(void *p)
 			 *    the system free().
 			 * 2. If this is the only free pool in the arena,
 			 *    add the arena back to the `usable_arenas` list.
-			 * 3. If the "next" arena has a smaller count of
-			 *    of free pools, we have to "push this arena right"
-			 *    to restore that `usable_arenas` is sorted in
-			 *    order of nfreepools.
+			 * 3. If the "next" arena has a smaller count of free
+			 *    pools, we have to "push this arena right" to
+			 *    restore that `usable_arenas` is sorted in order
+			 *    of nfreepools.
 			 * 4. Else there's nothing more to do.
 			 */
 			if (nf == ao->ntotalpools) {
