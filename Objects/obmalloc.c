@@ -256,7 +256,7 @@ struct arena_object {
 	uptr address;
 
 	/* Pool-aligned pointer to the next pool to be carved off. */
-	block* base_address;
+	block* pool_address;
 
 	/* The number of available pools in the arena:  free pools + never-
 	 * allocated pools.
@@ -579,13 +579,13 @@ new_arena(void)
 #endif
 	/* base_address <- first pool-aligned address in the arena
 	   nfreepools <- number of whole pools that fit after alignment */
-	arenaobj->base_address = (block*)arenaobj->address;
+	arenaobj->pool_address = (block*)arenaobj->address;
 	arenaobj->nfreepools = ARENA_SIZE / POOL_SIZE;
 	assert(POOL_SIZE * arenaobj->nfreepools == ARENA_SIZE);
 	excess = (uint)((Py_uintptr_t)arenaobj->address & POOL_SIZE_MASK);
 	if (excess != 0) {
 		--arenaobj->nfreepools;
-		arenaobj->base_address += POOL_SIZE - excess;
+		arenaobj->pool_address += POOL_SIZE - excess;
 	}
 	arenaobj->ntotalpools = arenaobj->nfreepools;
 
@@ -758,24 +758,27 @@ PyObject_Malloc(size_t nbytes)
 			/* This moves the arena *towards* the head of the list
 			but it is already at the head of the list: do nothing */
 			/* XXX what did that mean? */
-			/* XXX reformat very long lines below */
-			usable_arenas->nfreepools --;
+			--usable_arenas->nfreepools;
 			if (usable_arenas->nfreepools == 0) {
+				/* Unlink the arena: it's completely
+				 * allocated.
+				 */
 				assert(usable_arenas->freepools == NULL);
-				assert(usable_arenas->nextarena == NULL
-					|| usable_arenas->nextarena->prevarena == usable_arenas);
+				assert(usable_arenas->nextarena == NULL ||
+				       usable_arenas->nextarena->prevarena ==
+					   usable_arenas);
 
-				/* Unlink the arena: it is completely
-				allocated. This is a dequeue from the
-				head operation. */
 				usable_arenas = usable_arenas->nextarena;
-				if (usable_arenas != NULL)
+				if (usable_arenas != NULL) {
 					usable_arenas->prevarena = NULL;
-				assert(usable_arenas == NULL || usable_arenas->address != (uptr) NULL);
+					assert(usable_arenas->address != 0);
+				}
 			}
 			else {
-				assert(usable_arenas->freepools != NULL
-					|| usable_arenas->base_address <= ((block*) usable_arenas->address) + ARENA_SIZE - POOL_SIZE);
+				assert(usable_arenas->freepools != NULL ||
+				       usable_arenas->pool_address <=
+				           ((block*) usable_arenas->address) +
+				               ARENA_SIZE - POOL_SIZE);
 			}
 		init_pool:
 			/*
@@ -813,46 +816,38 @@ PyObject_Malloc(size_t nbytes)
 			UNLOCK();
 			return (void *)bp;
 		}
-		/*
-		 * Allocate new pool
-		 */
+		/* Allocate new pool. */
 		assert(usable_arenas->nfreepools > 0);
-		if (usable_arenas->nfreepools) {
-			/* Verify that the arenabase address is in range. */
-			/* XXX This assert appears to be equivalent to
-			   assert(POOL_SIZE <= ARENA_SIZE); what's it
-			   _trying_ to check?
-			*/
-			assert(usable_arenas->base_address <=
-			       usable_arenas->base_address +
-			       ARENA_SIZE - POOL_SIZE);
-			pool = (poolp)usable_arenas->base_address;
-			pool->arenaindex = usable_arenas - arenas;
-			assert(&arenas[pool->arenaindex] ==
-			       usable_arenas);
-			pool->szidx = DUMMY_SIZE_IDX;
+		/* Verify that the arenabase address is in range. */
+		/* XXX This assert appears to be equivalent to
+		   assert(POOL_SIZE <= ARENA_SIZE); what's it
+		   _trying_ to check?
+		*/
+		assert(usable_arenas->pool_address <=
+		       usable_arenas->pool_address +
+		       ARENA_SIZE - POOL_SIZE);
+		pool = (poolp)usable_arenas->pool_address;
+		pool->arenaindex = usable_arenas - arenas;
+		assert(&arenas[pool->arenaindex] ==
+		       usable_arenas);
+		pool->szidx = DUMMY_SIZE_IDX;
 
-			--usable_arenas->nfreepools;
-			usable_arenas->base_address += POOL_SIZE;
+		--usable_arenas->nfreepools;
+		usable_arenas->pool_address += POOL_SIZE;
 
-			if (usable_arenas->nfreepools == 0) {
-				assert(usable_arenas->nextarena ==
-				       NULL ||
-				       usable_arenas->nextarena->prevarena ==
-				       usable_arenas);
-
-				/* Unlink the arena: it is completely
-				 * allocated.
-				 */
-				usable_arenas = usable_arenas->nextarena;
-				if (usable_arenas != NULL)
-					usable_arenas->prevarena = NULL;
-				assert(usable_arenas == NULL ||
-				       usable_arenas->address != 0);
+		if (usable_arenas->nfreepools == 0) {
+			assert(usable_arenas->nextarena == NULL ||
+			       usable_arenas->nextarena->prevarena ==
+			       	   usable_arenas);
+			/* Unlink the arena:  it is completely allocated. */
+			usable_arenas = usable_arenas->nextarena;
+			if (usable_arenas != NULL) {
+				usable_arenas->prevarena = NULL;
+				assert(usable_arenas->address != 0);
 			}
-
-			goto init_pool;
 		}
+
+		goto init_pool;
 	}
 
         /* The small block allocator ends here. */
@@ -1618,9 +1613,9 @@ _PyObject_DebugMallocStats(void)
 		}
 
 		/* visit every pool in the arena */
-		assert(base <= (uptr) arenas[i].base_address);
+		assert(base <= (uptr) arenas[i].pool_address);
 		for (j = 0;
-			    base < (uptr) arenas[i].base_address;
+			    base < (uptr) arenas[i].pool_address;
 			    ++j, base += POOL_SIZE) {
 			poolp p = (poolp)base;
 			const uint sz = p->szidx;
