@@ -618,8 +618,9 @@ new_arena(void)
  * AO = arenas[(POOL)->arenaindex].  Suppose obmalloc controls P.  Then
  * (barring wild stores, etc), POOL is the correct address of P's pool,
  * AO.address is the correct base address of the pool's arena, and P must be
- * within ARENA_SIZE of AO.address.  Therefore Py_ADDRESS_IN_RANGE correctly
- * reports that obmalloc controls P.
+ * within ARENA_SIZE of AO.address.  In addition, AO.address is not 0 (no
+ * arena can start at address 0 (NULL)).  Therefore Py_ADDRESS_IN_RANGE
+ * correctly reports that obmalloc controls P.
  *
  * Now suppose obmalloc does not control P (e.g., P was obtained via a
  * direct call to the system malloc() or free()).  (POOL)->arenaindex may
@@ -628,27 +629,29 @@ new_arena(void)
  * that obmalloc doesn't control P.
  *
  * Else arenaindex is < maxarena, and AO is read up.  If AO corresponds
- * to an unassociated arena, AO.address is 0 and the macro correctly
- * concludes that obmalloc doesn't control P.  Note:  This clause was added
- * in Python 2.5.  Before 2.5, arenas were never free()'ed, and an
- * arenaindex < maxarena always corresponded to a currently-allocated
- * arena.  Why this matters is explained later.
+ * to an allocated arena, obmalloc controls all the memory in slice
+ * AO.address:AO.address+ARENA_SIZE.  By case assumption, P is not controlled
+ * by obmalloc, so P doesn't lie in that slice, so the macro correctly reports
+ * that P is not controlled by obmalloc.
  *
- * Else AO corresponds to an allocated arena, with base address AO.address.
- * AO.address can't be 0 in this case, since no allocated memory can start
- * at address 0 (NULL).  Since it is an allocated arena, obmalloc controls
- * all the memory in slice AO.address:AO.address+ARENA_SIZE.  By case
- * assumption, P is not controlled by obmalloc, so it doesn't lie in that
- * slice, so the macro again correctly reports that P is not controlled by
- * obmalloc.
+ * Finally, if P is not controlled by obmalloc and AO corresponds to an
+ * unused arena_object (one not currently associated with an allocated arena),
+ * AO.address is 0, and the second test in the macro reduces to:
  *
- * Why the test for AO.address != 0 is necessary:  suppose some address P
- * has integer value < ARENA_SIZE, P is not controlled by obmalloc, and
- * the trash arenaindex corresponding to P's POOL gives an AO for a currently
- * unassociated arena.  Then AO.address is 0, and P - AO.address = P - 0 =
- * P < ARENA_SIZE.  Without the AO.address != 0 check, the macro would
- * _incorrectly_ conclude that obmalloc does control P.  While that's very
- * unlikely, it's not impossible, and it would be a disaster if it occurred.
+ *    P < ARENA_SIZE
+ *
+ * If P >= ARENA_SIZE (extremely likely), the macro again correctly concludes
+ * that P is not controlled by obmalloc.  However, if P <= ARENA_SIZE, this
+ * part of the test still passes, and the third clause (AO.address != 0) is
+ * necessary to get the correct result:  AO.address is 0 in this case, so the
+ * macro correctly reports that P is not controlled by obmalloc (despite that
+ * P lies in slice AO.address : AO.address + ARENA_SIZE).
+ *
+ * Note:  The third (AO.address != 0) clause was added in Python 2.5.  Before
+ * 2.5, arenas were never free()'ed, and an arenaindex < maxarena always
+ * corresponded to a currently-allocated arena, so the "P is not controlled by
+ * obmalloc, AO corresponds to an unused arena_object, and P <= ARENA_SIZE"
+ * case was impossible.
  *
  * Note that the logic is excruciating, and reading up possibly uninitialized
  * memory when P is not controlled by obmalloc (to get at (POOL)->arenaindex)
@@ -660,8 +663,8 @@ new_arena(void)
  */
 #define Py_ADDRESS_IN_RANGE(P, POOL)			\
 	((POOL)->arenaindex < maxarenas &&		\
-	 arenas[(POOL)->arenaindex].address != 0 &&	\
-	 (uptr)(P) - arenas[(POOL)->arenaindex].address < (uptr)ARENA_SIZE)
+	 (uptr)(P) - arenas[(POOL)->arenaindex].address < (uptr)ARENA_SIZE && \
+	 arenas[(POOL)->arenaindex].address != 0)
 
 
 /* This is only useful when running memory debuggers such as
@@ -1722,7 +1725,7 @@ int
 Py_ADDRESS_IN_RANGE(void *P, poolp pool)
 {
 	return pool->arenaindex < maxarenas &&
-		arenas[pool->arenaindex].address != 0 &&
-		(uptr)P - arenas[pool->arenaindex].address < (uptr)ARENA_SIZE;
+	       (uptr)P - arenas[pool->arenaindex].address < (uptr)ARENA_SIZE &&
+	       arenas[pool->arenaindex].address != 0;
 }
 #endif
