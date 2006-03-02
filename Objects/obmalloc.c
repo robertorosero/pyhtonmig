@@ -470,10 +470,14 @@ static struct arena_object* arenas = NULL;
 /* Number of slots currently allocated in the `arenas` vector. */
 static uint maxarenas = 0;
 
-/* The head of the singly-linked list of available arena objects. */
+/* The head of the singly-linked, NULL-terminated list of available
+ * arena_objects.
+ */
 static struct arena_object* available_arenas = NULL;
 
-/* The head of the doubly-linked list of arenas with pools available. */
+/* The head of the doubly-linked, NULL-terminated at each end, list of
+ * arena_objects associated with arenas that have pools available.
+ */
 static struct arena_object* usable_arenas = NULL;
 
 /* How many arena_objects do we initially allocate?
@@ -494,8 +498,8 @@ static ulong narenas_highwater = 0;
 
 /* Allocate a new arena.  If we run out of memory, return NULL.  Else
  * allocate a new arena, and return the address of an arena_object
- * descriptor describing the new arena.  It's expected that the caller will
- * set `usable_arenas` to the return value.
+ * describing the new arena.  It's expected that the caller will set
+ * `usable_arenas` to the return value.
  */
 static struct arena_object*
 new_arena(void)
@@ -600,25 +604,59 @@ new_arena(void)
  *	0 <= P-B < ARENA_SIZE
  * By using unsigned arithmetic, the "0 <=" half of the test can be skipped.
  *
- * XXX This is broken.  The arena-management patch sets B to 0 when an
- * XXX arena_object isn't associated with storage obmalloc controls.
- * XXX But if P is "small enough" (< ARENA_SIZE), P is not an address
- * XXX controlled by obmalloc, and arenas[POOL_ADDR(P)->arenaindex] doesn't
- * XXX correspond to an allocated arena,
- * XXX (uptr)(P) - arenas[(POOL)->arenaindex].address will equal
- * XXX (uptr)P - 0 = (uptr)P, and Py_ADDRESS_IN_RANGE will falsely claim
- * XXX that P _is_ controlled by obmalloc (P < ARENA_SIZE by case assumption).
- * XXX This is a disaster ... complicate+slow the macro to verify that
- * XXX .address != 0 too?
- *
  * Obscure:  A PyMem "free memory" function can call the pymalloc free or
- * realloc before the first arena has been allocated.  arenas is still
+ * realloc before the first arena has been allocated.  `arenas` is still
  * NULL in that case.  We're relying on that maxarenas is also 0 in that case,
  * so that (POOL)->arenaindex < maxarenas  must be false, saving us from
  * trying to index into a NULL arenas.
+ *
+ * Details:  given P and POOL, the arena_object corresponding to P is
+ * AO = arenas[(POOL)->arenaindex].  Suppose obmalloc controls P.  Then
+ * (barring wild stores, etc), POOL is the correct address of P's pool,
+ * AO.address is the correct base address of the pool's arena, and P must be
+ * within ARENA_SIZE of AO.address.  Therefore Py_ADDRESS_IN_RANGE correctly
+ * reports that obmalloc controls P.
+ *
+ * Now suppose obmalloc does not control P (e.g., P was obtained via a
+ * direct call to the system malloc() or free()).  (POOL)->arenaindex may
+ * be anything in this case -- it may even be uninitialized trash.  If the
+ * trash arenaindex is >= maxarenas, the macro correctly concludes at once
+ * that obmalloc doesn't control P.
+ *
+ * Else arenaindex is < maxarena, and AO is read up.  If AO corresponds
+ * to an unassociated arena, AO.address is 0 and the macro correctly
+ * concludes that obmalloc doesn't control P.  Note:  This clause was added
+ * in Python 2.5.  Before 2.5, arenas were never free()'ed, and an
+ * arenaindex < maxarena always corresponded to a currently-allocated
+ * arena.  Why this matters is explained later.
+ *
+ * Else AO corresponds to an allocated arena, with base address AO.address.
+ * AO.address can't be 0 in this case, since no allocated memory can start
+ * at address 0 (NULL).  Since it is an allocated arena, obmalloc controls
+ * all the memory in slice AO.address:AO.address+ARENA_SIZE.  By case
+ * assumption, P is not controlled by obmalloc, so it doesn't lie in that
+ * slice, so the macro again correctly reports that P is not controlled by
+ * obmalloc.
+ *
+ * Why the test for AO.address != 0 is necessary:  suppose some address P
+ * has integer value < ARENA_SIZE, P is not controlled by obmalloc, and
+ * the trash arenaindex corresponding to P's POOL gives an AO for a currently
+ * unassociated arena.  Then AO.address is 0, and P - AO.address = P - 0 =
+ * P < ARENA_SIZE.  Without the AO.address != 0 check, the macro would
+ * _incorrectly_ conclude that obmalloc does control P.  While that's very
+ * unlikely, it's not impossible, and it would be a disaster if it occurred.
+ *
+ * Note that the logic is excruciating, and reading up possibly uninitialized
+ * memory when P is not controlled by obmalloc (to get at (POOL)->arenaindex)
+ * creates problems for some memory debuggers.  The overwhelming advantage is
+ * that this test determines whether an arbitrary address is controlled by
+ * obmalloc in a small constant time, independent of the number of arenas
+ * obmalloc controls.  Since this test is needed at every entry point, it's
+ * extremely desirable that it be this fast.
  */
-#define Py_ADDRESS_IN_RANGE(P, POOL)	\
+#define Py_ADDRESS_IN_RANGE(P, POOL)			\
 	((POOL)->arenaindex < maxarenas &&		\
+	 arenas[(POOL)->arenaindex].address != 0 &&	\
 	 (uptr)(P) - arenas[(POOL)->arenaindex].address < (uptr)ARENA_SIZE)
 
 
@@ -1673,12 +1711,15 @@ _PyObject_DebugMallocStats(void)
 #endif	/* PYMALLOC_DEBUG */
 
 #ifdef Py_USING_MEMORY_DEBUGGER
-/* Make this function last so gcc won't inline it
-   since the definition is after the reference. */
+/* Make this function last so gcc won't inline it since the definition is
+ * after the reference.
+ */
 int
 Py_ADDRESS_IN_RANGE(void *P, poolp pool)
 {
-	return ((pool->arenaindex) < maxarenas &&
-		(uptr)(P) - arenas[pool->arenaindex].address < (uptr)ARENA_SIZE);
+	const uptr address = arenas[pool->arenaindex].address;
+	return pool->arenaindex < maxarenas &&
+		address != 0 &&
+		(uptr)P - address  < (uptr)ARENA_SIZE;
 }
 #endif
