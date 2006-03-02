@@ -1717,9 +1717,8 @@ _PyObject_DebugMallocStats(void)
 int
 Py_ADDRESS_IN_RANGE(void *P, poolp pool)
 {
-	const uptr address = arenas[pool->arenaindex].address;
 	return pool->arenaindex < maxarenas &&
-		address != 0 &&
-		(uptr)P - address  < (uptr)ARENA_SIZE;
+		arenas[pool->arenaindex].address != 0 &&
+		(uptr)P - arenas[pool->arenaindex].address < (uptr)ARENA_SIZE;
 }
 #endif
