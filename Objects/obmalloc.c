@@ -271,7 +271,7 @@ struct arena_object {
 
 	/* Whenever this arena_object is not associated with an allocated
 	 * arena, the nextarena member is used to link all unassociated
-	 * arena_objects in the singly-linked `available_arenas` list.
+	 * arena_objects in the singly-linked `unused_arena_objects` list.
 	 * The prevarena member is unused in this case.
 	 *
 	 * When this arena_object is associated with an allocated arena
@@ -446,12 +446,13 @@ Prior to Python 2.5, arenas were never free()'ed.  Starting with Python 2.5,
 we do try to free() arenas, and use some mild heuristic strategies to increase
 the likelihood that arenas eventually can be freed.
 
-available_arenas
+unused_arena_objects
 
     This is a singly-linked list of the arena_objects that are currently not
     being used (no arena is associated with them).  Objects are taken off the
     head of the list in new_arena(), and are pushed on the head of the list in
-    PyObject_Free() when the arena is empty.
+    PyObject_Free() when the arena is empty.  Key invariant:  an arena_object
+    is on this list if and only if its .address member is 0.
 
 usable_arenas
 
@@ -463,6 +464,9 @@ usable_arenas
     used arena, which gives the nearly empty arenas a chance to be returned to
     the system.  In my unscientific tests this dramatically improved the
     number of arenas that could be freed.
+
+Note that an arena_object associated with an arena all of whose pools are
+currently in use isn't on either list.
 */
 
 /* Array of objects used to track chunks of memory (arenas). */
@@ -473,7 +477,7 @@ static uint maxarenas = 0;
 /* The head of the singly-linked, NULL-terminated list of available
  * arena_objects.
  */
-static struct arena_object* available_arenas = NULL;
+static struct arena_object* unused_arena_objects = NULL;
 
 /* The head of the doubly-linked, NULL-terminated at each end, list of
  * arena_objects associated with arenas that have pools available.
@@ -511,7 +515,7 @@ new_arena(void)
 	if (Py_GETENV("PYTHONMALLOCSTATS"))
 		_PyObject_DebugMallocStats();
 #endif
-	if (available_arenas == NULL) {
+	if (unused_arena_objects == NULL) {
 		uint i;
 		uint numarenas;
 		size_t nbytes;
@@ -537,9 +541,9 @@ new_arena(void)
 		 * invalid pointers.  Just to be sure, some asserts:
 		 */
 		assert(usable_arenas == NULL);
-		assert(available_arenas == NULL);
+		assert(unused_arena_objects == NULL);
 
-		/* Put the new arenas on the available_arenas list. */
+		/* Put the new arenas on the unused_arena_objects list. */
 		for (i = maxarenas; i < numarenas; ++i) {
 			arenas[i].address = 0;	/* mark as unassociated */
 			arenas[i].nextarena = i < numarenas - 1 ?
@@ -547,22 +551,22 @@ new_arena(void)
 		}
 
 		/* Update globals. */
-		available_arenas = &arenas[maxarenas];
+		unused_arena_objects = &arenas[maxarenas];
 		maxarenas = numarenas;
 	}
 
 	/* Take the next available arena object off the head of the list. */
-	assert(available_arenas != NULL);
-	arenaobj = available_arenas;
-	available_arenas = arenaobj->nextarena;
+	assert(unused_arena_objects != NULL);
+	arenaobj = unused_arena_objects;
+	unused_arena_objects = arenaobj->nextarena;
 	assert(arenaobj->address == 0);
 	arenaobj->address = (uptr)malloc(ARENA_SIZE);
 	if (arenaobj->address == 0) {
 		/* The allocation failed: return NULL after putting the
 		 * arenaobj back.
 		 */
-		arenaobj->nextarena = available_arenas;
-		available_arenas = arenaobj;
+		arenaobj->nextarena = unused_arena_objects;
+		unused_arena_objects = arenaobj;
 		return NULL;
 	}
 
@@ -986,8 +990,8 @@ PyObject_Free(void *p)
 				/* Record that this arena_object slot is
 				 * available to be reused.
 				 */
-				ao->nextarena = available_arenas;
-				available_arenas = ao;
+				ao->nextarena = unused_arena_objects;
+				unused_arena_objects = ao;
 
 				/* Free the entire arena. */
 				free((void *)ao->address);
