@@ -105,6 +105,10 @@ bytes(cdata)
 #include <ffi.h>
 #ifdef MS_WIN32
 #include <windows.h>
+#include <malloc.h>
+#ifndef IS_INTRESOURCE
+#define IS_INTRESOURCE(x) (((size_t)(x) >> 16) == 0)
+#endif
 # ifdef _WIN32_WCE
 /* Unlike desktop Windows, WinCE has both W and A variants of
    GetProcAddress, but the default W version is not what we want */
@@ -1878,8 +1882,9 @@ static PyMemberDef CData_members[] = {
 	{ NULL },
 };
 
-static Py_ssize_t CData_GetBuffer(CDataObject *self, Py_ssize_t seg, void **pptr)
+static Py_ssize_t CData_GetBuffer(PyObject *_self, Py_ssize_t seg, void **pptr)
 {
+	CDataObject *self = (CDataObject *)_self;
 	if (seg != 0) {
 		/* Hm. Must this set an exception? */
 		return -1;
@@ -1888,7 +1893,7 @@ static Py_ssize_t CData_GetBuffer(CDataObject *self, Py_ssize_t seg, void **pptr
 	return self->b_size;
 }
 
-static Py_ssize_t CData_GetSegcount(CDataObject *self, Py_ssize_t *lenp)
+static Py_ssize_t CData_GetSegcount(PyObject *_self, Py_ssize_t *lenp)
 {
 	if (lenp)
 		*lenp = 1;
@@ -1896,10 +1901,10 @@ static Py_ssize_t CData_GetSegcount(CDataObject *self, Py_ssize_t *lenp)
 }
 
 static PyBufferProcs CData_as_buffer = {
-	(readbufferproc)CData_GetBuffer,
-	(writebufferproc)CData_GetBuffer,
-	(segcountproc)CData_GetSegcount,
-	(charbufferproc)NULL,
+	CData_GetBuffer,
+	CData_GetBuffer,
+	CData_GetSegcount,
+	NULL,
 };
 
 /*
@@ -2401,7 +2406,7 @@ static PPROC FindAddress(void *handle, char *name, PyObject *type)
 	   funcname -> _funcname@<n>
 	   where n is 0, 4, 8, 12, ..., 128
 	 */
-	mangled_name = _alloca(strlen(name) + 1 + 1 + 1 + 3); /* \0 _ @ %d */
+	mangled_name = alloca(strlen(name) + 1 + 1 + 1 + 3); /* \0 _ @ %d */
 	for (i = 0; i < 32; ++i) {
 		sprintf(mangled_name, "_%s@%d", name, i*4);
 		address = (PPROC)GetProcAddress(handle, mangled_name);
@@ -2512,7 +2517,7 @@ _get_name(PyObject *obj, char **pname)
 #endif
 	if (PyString_Check(obj) || PyUnicode_Check(obj)) {
 		*pname = PyString_AsString(obj);
-		return pname ? 1 : 0;
+		return *pname ? 1 : 0;
 	}
 	PyErr_SetString(PyExc_TypeError,
 			"function name must be string or integer");
@@ -2556,14 +2561,14 @@ CFuncPtr_FromDll(PyTypeObject *type, PyObject *args, PyObject *kwds)
 #ifdef MS_WIN32
 	address = FindAddress(handle, name, (PyObject *)type);
 	if (!address) {
-		if ((size_t)name & ~0xFFFF)
+		if (!IS_INTRESOURCE(name))
 			PyErr_Format(PyExc_AttributeError,
 				     "function '%s' not found",
 				     name);
 		else
 			PyErr_Format(PyExc_AttributeError,
 				     "function ordinal %d not found",
-				     name);
+				     (WORD)(size_t)name);
 		return NULL;
 	}
 #else
@@ -2650,7 +2655,7 @@ CFuncPtr_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	CFuncPtrObject *self;
 	PyObject *callable;
 	StgDictObject *dict;
-	THUNK thunk;
+	ffi_info *thunk;
 
 	if (PyTuple_GET_SIZE(args) == 0)
 		return GenericCData_new(type, args, kwds);
@@ -3190,9 +3195,11 @@ CFuncPtr_clear(CFuncPtrObject *self)
 	Py_CLEAR(self->converters);
 	Py_CLEAR(self->paramflags);
 
-	if (self->thunk)
-		FreeCallback(self->thunk);
-	self->thunk = NULL;
+	if (self->thunk) {
+		FreeClosure(self->thunk->pcl);
+		PyMem_Free(self->thunk);
+		self->thunk = NULL;
+	}
 
 	return CData_clear((CDataObject *)self);
 }
@@ -3492,8 +3499,9 @@ Array_init(CDataObject *self, PyObject *args, PyObject *kw)
 }
 
 static PyObject *
-Array_item(CDataObject *self, int index)
+Array_item(PyObject *_self, Py_ssize_t index)
 {
+	CDataObject *self = (CDataObject *)_self;
 	int offset, size;
 	StgDictObject *stgdict;
 
@@ -3516,8 +3524,9 @@ Array_item(CDataObject *self, int index)
 }
 
 static PyObject *
-Array_slice(CDataObject *self, Py_ssize_t ilow, Py_ssize_t ihigh)
+Array_slice(PyObject *_self, Py_ssize_t ilow, Py_ssize_t ihigh)
 {
+	CDataObject *self = (CDataObject *)_self;
 	StgDictObject *stgdict, *itemdict;
 	PyObject *proto;
 	PyListObject *np;
@@ -3551,15 +3560,16 @@ Array_slice(CDataObject *self, Py_ssize_t ilow, Py_ssize_t ihigh)
 		return NULL;
 
 	for (i = 0; i < len; i++) {
-		PyObject *v = Array_item(self, i+ilow);
+		PyObject *v = Array_item(_self, i+ilow);
 		PyList_SET_ITEM(np, i, v);
 	}
 	return (PyObject *)np;
 }
 
 static int
-Array_ass_item(CDataObject *self, int index, PyObject *value)
+Array_ass_item(PyObject *_self, Py_ssize_t index, PyObject *value)
 {
+	CDataObject *self = (CDataObject *)_self;
 	int size, offset;
 	StgDictObject *stgdict;
 	char *ptr;
@@ -3585,8 +3595,9 @@ Array_ass_item(CDataObject *self, int index, PyObject *value)
 }
 
 static int
-Array_ass_slice(CDataObject *self, int ilow, int ihigh, PyObject *value)
+Array_ass_slice(PyObject *_self, Py_ssize_t ilow, Py_ssize_t ihigh, PyObject *value)
 {
+	CDataObject *self = (CDataObject *)_self;
 	int i, len;
 
 	if (value == NULL) {
@@ -3617,7 +3628,7 @@ Array_ass_slice(CDataObject *self, int ilow, int ihigh, PyObject *value)
 		int result;
 		if (item == NULL)
 			return -1;
-		result = Array_ass_item(self, i+ilow, item);
+		result = Array_ass_item(_self, i+ilow, item);
 		Py_DECREF(item);
 		if (result == -1)
 			return -1;
@@ -3625,20 +3636,21 @@ Array_ass_slice(CDataObject *self, int ilow, int ihigh, PyObject *value)
 	return 0;
 }
 
-static int
-Array_length(CDataObject *self)
+static Py_ssize_t
+Array_length(PyObject *_self)
 {
+	CDataObject *self = (CDataObject *)_self;
 	return self->b_length;
 }
 
 static PySequenceMethods Array_as_sequence = {
-	(lenfunc)Array_length,			/* sq_length; */
+	Array_length,				/* sq_length; */
 	0,					/* sq_concat; */
 	0,					/* sq_repeat; */
-	(ssizeargfunc)Array_item,		/* sq_item; */
-	(ssizessizeargfunc)Array_slice,		/* sq_slice; */
-	(ssizeobjargproc)Array_ass_item,	/* sq_ass_item; */
-	(ssizessizeobjargproc)Array_ass_slice,	/* sq_ass_slice; */
+	Array_item,				/* sq_item; */
+	Array_slice,				/* sq_slice; */
+	Array_ass_item,				/* sq_ass_item; */
+	Array_ass_slice,			/* sq_ass_slice; */
 	0,					/* sq_contains; */
 	
 	0,					/* sq_inplace_concat; */
@@ -3990,8 +4002,9 @@ static PyTypeObject Simple_Type = {
   Pointer_Type
 */
 static PyObject *
-Pointer_item(CDataObject *self, int index)
+Pointer_item(PyObject *_self, Py_ssize_t index)
 {
+	CDataObject *self = (CDataObject *)_self;
 	int size, offset;
 	StgDictObject *stgdict, *itemdict;
 	PyObject *proto;
@@ -4017,8 +4030,9 @@ Pointer_item(CDataObject *self, int index)
 }
 
 static int
-Pointer_ass_item(CDataObject *self, int index, PyObject *value)
+Pointer_ass_item(PyObject *_self, Py_ssize_t index, PyObject *value)
 {
+	CDataObject *self = (CDataObject *)_self;
 	int size;
 	StgDictObject *stgdict;
 
@@ -4159,8 +4173,9 @@ Pointer_new(PyTypeObject *type, PyObject *args, PyObject *kw)
 }
 
 static PyObject *
-Pointer_slice(CDataObject *self, Py_ssize_t ilow, Py_ssize_t ihigh)
+Pointer_slice(PyObject *_self, Py_ssize_t ilow, Py_ssize_t ihigh)
 {
+	CDataObject *self = (CDataObject *)_self;
 	PyListObject *np;
 	StgDictObject *stgdict, *itemdict;
 	PyObject *proto;
@@ -4190,7 +4205,7 @@ Pointer_slice(CDataObject *self, Py_ssize_t ilow, Py_ssize_t ihigh)
 		return NULL;
 
 	for (i = 0; i < len; i++) {
-		PyObject *v = Pointer_item(self, i+ilow);
+		PyObject *v = Pointer_item(_self, i+ilow);
 		PyList_SET_ITEM(np, i, v);
 	}
 	return (PyObject *)np;
@@ -4200,9 +4215,9 @@ static PySequenceMethods Pointer_as_sequence = {
 	0,					/* inquiry sq_length; */
 	0,					/* binaryfunc sq_concat; */
 	0,					/* intargfunc sq_repeat; */
-	(ssizeargfunc)Pointer_item,		/* intargfunc sq_item; */
-	(ssizessizeargfunc)Pointer_slice,	/* intintargfunc sq_slice; */
-	(ssizeobjargproc)Pointer_ass_item,	/* intobjargproc sq_ass_item; */
+	Pointer_item,				/* intargfunc sq_item; */
+	Pointer_slice,				/* intintargfunc sq_slice; */
+	Pointer_ass_item,			/* intobjargproc sq_ass_item; */
 	0,					/* intintobjargproc sq_ass_slice; */
 	0,					/* objobjproc sq_contains; */
 	/* Added in release 2.0 */

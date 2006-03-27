@@ -406,7 +406,8 @@ extern "C" {
  *    typedef int T1 Py_DEPRECATED(2.4);
  *    extern int x() Py_DEPRECATED(2.5);
  */
-#if defined(__GNUC__) && (__GNUC__ == 3) && (__GNUC_MINOR__ >= 1)
+#if defined(__GNUC__) && ((__GNUC__ >= 4) || \
+			  (__GNUC__ == 3) && (__GNUC_MINOR__ >= 1))
 #define Py_DEPRECATED(VERSION_UNUSED) __attribute__((__deprecated__))
 #else
 #define Py_DEPRECATED(VERSION_UNUSED)
@@ -475,14 +476,12 @@ extern double hypot(double, double);
 #endif
 
 
-/*******************************************************************
-On 4.4BSD-descendants, ctype functions serves the whole range of
-wchar_t character set rather than single byte code points only.
-This characteristic can break some operations of string object
-including str.upper() and str.split() on UTF-8 locales.  This
-workaround was provided by Tim Robbins of FreeBSD project.  He said
-the incompatibility will be fixed in FreeBSD 6.
-********************************************************************/
+/* On 4.4BSD-descendants, ctype functions serves the whole range of
+ * wchar_t character set rather than single byte code points only.
+ * This characteristic can break some operations of string object
+ * including str.upper() and str.split() on UTF-8 locales.  This
+ * workaround was provided by Tim Robbins of FreeBSD project.
+ */
 
 #ifdef __FreeBSD__
 #include <osreldate.h>

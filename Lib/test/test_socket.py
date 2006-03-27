@@ -270,7 +270,7 @@ class GeneralModuleTests(unittest.TestCase):
         all_host_names = [hostname, hname] + aliases
         fqhn = socket.getfqdn()
         if not fqhn in all_host_names:
-            self.fail("Error testing host resolution mechanisms.")
+            self.fail("Error testing host resolution mechanisms. (fqdn: %s, all: %s)" % (fqhn, repr(all_host_names)))
 
     def testRefCountGetNameInfo(self):
         # Testing reference count for getnameinfo
@@ -469,12 +469,12 @@ class GeneralModuleTests(unittest.TestCase):
         sock.close()
         self.assertRaises(socket.error, sock.send, "spam")
 
-    def testNewGetMethods(self):
-        # testing getfamily(), gettype() and getprotocol()
+    def testNewAttributes(self):
+        # testing .family, .type and .protocol
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.assertEqual(sock.getfamily(), socket.AF_INET)
-        self.assertEqual(sock.gettype(), socket.SOCK_STREAM)
-        self.assertEqual(sock.getproto(), 0)
+        self.assertEqual(sock.family, socket.AF_INET)
+        self.assertEqual(sock.type, socket.SOCK_STREAM)
+        self.assertEqual(sock.proto, 0)
         sock.close()
 
 class BasicTCPTest(SocketConnectedTest):

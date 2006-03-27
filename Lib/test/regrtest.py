@@ -744,6 +744,8 @@ _expectations = {
         test_sunaudiodev
         test_threadsignals
         test_timing
+        test_wait3
+        test_wait4
         """,
     'linux2':
         """
@@ -1119,6 +1121,36 @@ _expectations = {
         test_winsound
         test_zipimport
         test_zlib
+        """,
+    'openbsd3':
+        """
+        test_aepack
+        test_al
+        test_applesingle
+        test_bsddb
+        test_bsddb3
+        test_cd
+        test_cl
+        test_ctypes
+        test_dl
+        test_gdbm
+        test_gl
+        test_imgfile
+        test_linuxaudiodev
+        test_locale
+        test_macfs
+        test_macostools
+        test_nis
+        test_normalization
+        test_ossaudiodev
+        test_pep277
+        test_plistlib
+        test_scriptpackages
+        test_tcl
+        test_sunaudiodev
+        test_unicode_file
+        test_winreg
+        test_winsound
         """,
 }
 _expectations['freebsd5'] = _expectations['freebsd4']
