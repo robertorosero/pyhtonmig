@@ -2128,6 +2128,7 @@ class TestMiscellaneous(TestEmailBase):
         eq(int(time.strftime('%Y', timetup)), 2003)
         timetup = Utils.parsedate_tz('5 Feb 2003 13:47:26 -0800')
         t = int(time.mktime(timetup[:9]))
+        print time.localtime(t), timetup, time.gmtime(t)
         eq(time.localtime(t)[:6], timetup[:6])
         eq(int(time.strftime('%Y', timetup[:9])), 2003)
 

@@ -689,6 +689,38 @@ class PyBuildExt(build_ext):
             dblibs = []
             dblib_dir = None
 
+        # The sqlite interface
+
+        sqlite_srcs = ['_sqlite/adapters.c',
+            '_sqlite/cache.c',
+            '_sqlite/connection.c',
+            '_sqlite/converters.c',
+            '_sqlite/cursor.c',
+            '_sqlite/microprotocols.c',
+            '_sqlite/module.c',
+            '_sqlite/prepare_protocol.c',
+            '_sqlite/row.c',
+            '_sqlite/statement.c',
+            '_sqlite/util.c', ]
+
+        PYSQLITE_VERSION = "2.1.3"
+        sqlite_defines = []
+        if sys.platform != "win32":
+            sqlite_defines.append(('PYSQLITE_VERSION', '"%s"' % PYSQLITE_VERSION))
+        else:
+            sqlite_defines.append(('PYSQLITE_VERSION', '\\"'+PYSQLITE_VERSION+'\\"'))
+        sqlite_defines.append(('PY_MAJOR_VERSION', str(sys.version_info[0])))
+        sqlite_defines.append(('PY_MINOR_VERSION', str(sys.version_info[1])))
+
+        sqlitelib_dir = ['/usr/local/lib',]
+        exts.append(Extension('_sqlite', sqlite_srcs,
+                              define_macros=sqlite_defines,
+                              include_dirs=["Modules/_sqlite",],
+                              library_dirs=sqlitelib_dir,
+                              runtime_library_dirs=sqlitelib_dir,
+                              libraries=["sqlite3",]))
+
+
 
         # Look for Berkeley db 1.85.   Note that it is built as a different
         # module name so it can be included even when later versions are
