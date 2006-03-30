@@ -29,7 +29,7 @@ threadsafety = 1
 
 apilevel = "2.0"
 
-from pysqlite2._sqlite import *
+from _sqlite import *
 
 import datetime, time
 
