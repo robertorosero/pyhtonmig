@@ -1,4 +1,9 @@
 import unittest
+try:
+    import _sqlite
+except ImportError:
+    from test.test_support import TestSkipped
+    raise TestSkipped('no sqlite available')
 from db.sqlite.test import (dbapi, types, userfunctions, 
                                 factory, transactions)
 
