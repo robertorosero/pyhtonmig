@@ -156,7 +156,7 @@ There is no \cfunction{PyNone_Check()} function for the same reason.
   Create a new integer object with a value of \var{ival}.
 
   The current implementation keeps an array of integer objects for all
-  integers between \code{-1} and \code{100}, when you create an int in
+  integers between \code{-5} and \code{256}, when you create an int in
   that range you actually just get back a reference to the existing
   object. So it should be possible to change the value of \code{1}.  I
   suspect the behaviour of Python in this case is undefined. :-)
@@ -2264,8 +2264,8 @@ There are a few functions specific to Python functions.
 \begin{cfuncdesc}{PyObject*}{PyFunction_New}{PyObject *code,
                                              PyObject *globals}
   Return a new function object associated with the code object
-  \var{code}. \var{globals} must be a dictionary with the the global
-  varaibles accessible to the function.
+  \var{code}. \var{globals} must be a dictionary with the global
+  variables accessible to the function.
 
   The function's docstring, name and \var{__module__} are retrieved
   from the code object, the argument defaults and closure are set to
@@ -2811,6 +2811,7 @@ rather than explicitly calling \cfunction{PyGen_New}.
 
 \begin{cfuncdesc}{PyObject*}{PyGen_New}{PyFrameObject *frame}
   Create and return a new generator object based on the \var{frame} object.
+  A reference to \var{frame} is stolen by this function.
   The parameter must not be \NULL{}.
 \end{cfuncdesc}
 
@@ -3026,8 +3027,6 @@ or the abstract number protocol (including
 \cfunction{PyNumber_InPlaceAdd()}, \cfunction{PyNumber_InPlaceSubtract()},
 \cfunction{PyNumber_InPlaceOr()}, and \cfunction{PyNumber_InPlaceXor()}).
 
-For example, to clear a set, write:  \code{PyObject_CallMethod(s, "clear", NULL)}
-                      
 \begin{ctypedesc}{PySetObject}
   This subtype of \ctype{PyObject} is used to hold the internal data for
   both \class{set} and \class{frozenset} objects.  It is like a
@@ -3111,7 +3110,6 @@ The following functions and macros are available for instances of
   \class{frozenset}, or an instance of a subtype.                         
 \end{cfuncdesc}
 
-
 The following functions are available for instances of \class{set} or
 its subtypes but not for instances of \class{frozenset} or its subtypes.
 
@@ -3142,4 +3140,6 @@ its subtypes but not for instances of \class{frozenset} or its subtypes.
   of \class{set} or its subtype.                        
 \end{cfuncdesc}
 
-
+\begin{cfuncdesc}{int}{PySet_Clear}{PyObject *set}
+  Empty an existing set of all elements.
+\end{cfuncdesc}

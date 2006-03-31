@@ -12,6 +12,8 @@ What's New in Python 2.5 alpha 1?
 Core and builtins
 -----------------
 
+- Fixed bug #1459029 - unicode reprs were double-escaped.
+
 - Patch #1396919: The system scope threads are reenabled on FreeBSD
   5.4 and later versions.
 
@@ -483,6 +485,9 @@ Extension Modules
 Library
 -------
 
+- patch #1457316: "setup.py upload" now supports --identity to select the
+  key to be used for signing the uploaded code.
+
 - Queue.Queue objects now support .task_done() and .join() methods
   to make it easier to monitor when daemon threads have completed
   processing all enqueued tasks.  Patch #1455676.
@@ -892,6 +897,9 @@ Library
 
 Build
 -----
+
+- Fix test_float, test_long, and test_struct failures on Tru64 with gcc
+  by using -mieee gcc option.
 
 - Patch #1432345: Make python compile on DragonFly.
 

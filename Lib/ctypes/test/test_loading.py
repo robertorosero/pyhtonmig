@@ -17,12 +17,15 @@ class LoaderTest(unittest.TestCase):
             name = "libc.so"
         elif sys.platform == "sunos5":
             name = "libc.so"
-        elif sys.platform.startswith("netbsd"):
+        elif sys.platform.startswith("netbsd") or sys.platform.startswith("openbsd"):
             name = "libc.so"
         else:
             name = "libc.so.6"
 ##        print (sys.platform, os.name)
-        cdll.load(name)
+        try:
+            cdll.load(name)
+        except Exception, details:
+            self.fail((str(details), name, (os.name, sys.platform)))
         self.assertRaises(OSError, cdll.load, self.unknowndll)
 
     def test_load_version(self):
