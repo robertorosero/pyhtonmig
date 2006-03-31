@@ -22,7 +22,7 @@
 # 3. This notice may not be removed or altered from any source distribution.
 
 import unittest
-from db import sqlite
+import sqlite3 as sqlite
 
 class MyConnection(sqlite.Connection):
     def __init__(self, *args, **kwargs):

@@ -23,7 +23,7 @@
 
 import unittest
 import threading
-from db import sqlite
+import sqlite3 as sqlite
 
 class ModuleTests(unittest.TestCase):
     def CheckAPILevel(self):

@@ -23,7 +23,7 @@
 
 import datetime
 import unittest
-from db import sqlite
+import sqlite3 as sqlite
 
 class SqliteTypeTests(unittest.TestCase):
     def setUp(self):

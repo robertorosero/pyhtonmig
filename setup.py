@@ -757,7 +757,7 @@ class PyBuildExt(build_ext):
             sqlite_defines.append(('PY_MINOR_VERSION', 
                                         str(sys.version_info[1])))
 
-            exts.append(Extension('_sqlite', sqlite_srcs,
+            exts.append(Extension('_sqlite3', sqlite_srcs,
                                   define_macros=sqlite_defines,
                                   include_dirs=["Modules/_sqlite", 
                                                 sqlite_incdir],

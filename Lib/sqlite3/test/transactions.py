@@ -22,7 +22,7 @@
 # 3. This notice may not be removed or altered from any source distribution.
 
 import os, unittest
-from db import sqlite
+import sqlite3 as sqlite
 
 def get_db_path():
     return "testdb"

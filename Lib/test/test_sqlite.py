@@ -1,20 +1,16 @@
+from test.test_support import run_unittest, TestSkipped
 import unittest
+
 try:
-    import _sqlite
+    import _sqlite3
 except ImportError:
-    from test.test_support import TestSkipped
     raise TestSkipped('no sqlite available')
-from db.sqlite.test import (dbapi, types, userfunctions,
+from sqlite3.test import (dbapi, types, userfunctions,
                                 factory, transactions)
 
-def suite():
-    return unittest.TestSuite(
-        (dbapi.suite(), types.suite(), userfunctions.suite(),
-         factory.suite(), transactions.suite()))
-
-def test():
-    runner = unittest.TextTestRunner()
-    runner.run(suite())
+def test_main():
+    run_unittest(dbapi.suite(), types.suite(), userfunctions.suite(),
+                 factory.suite(), transactions.suite())
 
 if __name__ == "__main__":
-    test()
+    test_main()
