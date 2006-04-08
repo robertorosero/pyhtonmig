@@ -134,7 +134,7 @@ class DecimalTest(unittest.TestCase):
         if skip_expected:
             raise TestSkipped
             return
-        for line in open(file).xreadlines():
+        for line in open(file):
             line = line.replace('\r\n', '').replace('\n', '')
             #print line
             try:
@@ -505,22 +505,15 @@ class DecimalImplicitConstructionTest(unittest.TestCase):
         self.assertEqual(eval('Decimal(10) != E()'), 'ne 10')
 
         # insert operator methods and then exercise them
-        oplist = [
-            ('+', '__add__', '__radd__'),
-            ('-', '__sub__', '__rsub__'),
-            ('*', '__mul__', '__rmul__'),
-            ('%', '__mod__', '__rmod__'),
-            ('//', '__floordiv__', '__rfloordiv__'),
-            ('**', '__pow__', '__rpow__')
-        ]
-        if 1/2 == 0:
-            # testing with classic division, so add __div__
-            oplist.append(('/', '__div__', '__rdiv__'))
-        else:
-            # testing with -Qnew, so add __truediv__
-            oplist.append(('/', '__truediv__', '__rtruediv__'))
-
-        for sym, lop, rop in oplist:
+        for sym, lop, rop in (
+                ('+', '__add__', '__radd__'),
+                ('-', '__sub__', '__rsub__'),
+                ('*', '__mul__', '__rmul__'),
+                ('/', '__truediv__', '__rtruediv__'),
+                ('%', '__mod__', '__rmod__'),
+                ('//', '__floordiv__', '__rfloordiv__'),
+                ('**', '__pow__', '__rpow__'),
+            ):
             setattr(E, lop, lambda self, other: 'str' + lop + str(other))
             setattr(E, rop, lambda self, other: str(other) + rop + 'str')
             self.assertEqual(eval('E()' + sym + 'Decimal(10)'),
@@ -983,7 +976,6 @@ class DecimalUsabilityTest(unittest.TestCase):
 
         checkSameDec("__abs__")
         checkSameDec("__add__", True)
-        checkSameDec("__div__", True)
         checkSameDec("__divmod__", True)
         checkSameDec("__cmp__", True)
         checkSameDec("__float__")
@@ -998,7 +990,6 @@ class DecimalUsabilityTest(unittest.TestCase):
         checkSameDec("__pos__")
         checkSameDec("__pow__", True)
         checkSameDec("__radd__", True)
-        checkSameDec("__rdiv__", True)
         checkSameDec("__rdivmod__", True)
         checkSameDec("__repr__")
         checkSameDec("__rfloordiv__", True)

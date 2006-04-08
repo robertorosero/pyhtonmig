@@ -484,11 +484,6 @@ fold_binops_on_constants(unsigned char *codestr, PyObject *consts)
 		case BINARY_MULTIPLY:
 			newconst = PyNumber_Multiply(v, w);
 			break;
-		case BINARY_DIVIDE:
-			/* Cannot fold this operation statically since
-                           the result can depend on the run-time presence
-                           of the -Qnew flag */
-			return 0;
 		case BINARY_TRUE_DIVIDE:
 			newconst = PyNumber_TrueDivide(v, w);
 			break;
@@ -1314,7 +1309,6 @@ opcode_stack_effect(int opcode, int oparg)
 
 		case BINARY_POWER:
 		case BINARY_MULTIPLY:
-		case BINARY_DIVIDE:
 		case BINARY_MODULO:
 		case BINARY_ADD:
 		case BINARY_SUBTRACT:
@@ -1356,7 +1350,6 @@ opcode_stack_effect(int opcode, int oparg)
 		case INPLACE_ADD:
 		case INPLACE_SUBTRACT:
 		case INPLACE_MULTIPLY:
-		case INPLACE_DIVIDE:
 		case INPLACE_MODULO:
 			return -1;
 		case STORE_SUBSCR:
@@ -2525,12 +2518,16 @@ compiler_from_import(struct compiler *c, stmt_ty s)
 	if (!names)
 		return 0;
 
+<<<<<<< .working
 	if (s->v.ImportFrom.level == 0 && c->c_flags &&
 	    !(c->c_flags->cf_flags & CO_FUTURE_ABSOLUTE_IMPORT))
 		level = PyInt_FromLong(-1);
 	else
 		level = PyInt_FromLong(s->v.ImportFrom.level);
 
+=======
+        level = PyInt_FromLong(s->v.ImportFrom.level);
+>>>>>>> .merge-rechts.r43737
 	if (!level) {
 		Py_DECREF(names);
 		return 0;
@@ -2762,10 +2759,7 @@ binop(struct compiler *c, operator_ty op)
 	case Mult:
 		return BINARY_MULTIPLY;
 	case Div:
-		if (c->c_flags && c->c_flags->cf_flags & CO_FUTURE_DIVISION)
-			return BINARY_TRUE_DIVIDE;
-		else
-			return BINARY_DIVIDE;
+		return BINARY_TRUE_DIVIDE;
 	case Mod:
 		return BINARY_MODULO;
 	case Pow:
@@ -2825,10 +2819,7 @@ inplace_binop(struct compiler *c, operator_ty op)
 	case Mult:
 		return INPLACE_MULTIPLY;
 	case Div:
-		if (c->c_flags && c->c_flags->cf_flags & CO_FUTURE_DIVISION)
-			return INPLACE_TRUE_DIVIDE;
-		else
-			return INPLACE_DIVIDE;
+		return INPLACE_TRUE_DIVIDE;
 	case Mod:
 		return INPLACE_MODULO;
 	case Pow:

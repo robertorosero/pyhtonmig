@@ -233,7 +233,7 @@ class TalkTo:
         """Send 'activate' command"""
         self.send('misc', 'actv')
 
-    def _get(self, _object, as=None, _attributes={}):
+    def _get(self, _object, asfile=None, _attributes={}):
         """_get: get data from an object
         Required argument: the object
         Keyword argument _attributes: AppleEvent attribute dictionary
@@ -243,8 +243,8 @@ class TalkTo:
         _subcode = 'getd'
 
         _arguments = {'----':_object}
-        if as:
-            _arguments['rtyp'] = mktype(as)
+        if asfile:
+            _arguments['rtyp'] = mktype(asfile)
 
         _reply, _arguments, _attributes = self.send(_code, _subcode,
                 _arguments, _attributes)
@@ -253,8 +253,8 @@ class TalkTo:
 
         if _arguments.has_key('----'):
             return _arguments['----']
-            if as:
-                item.__class__ = as
+            if asfile:
+                item.__class__ = asfile
             return item
 
     get = _get
@@ -342,6 +342,11 @@ _application_file._elemdict = {
 # XXXX Should test more, really...
 
 def test():
+    def raw_input(prompt):
+        sys.stdout.write(prompt)
+        sys.stdout.flush()
+        return sys.stdin.readline()
+
     target = AE.AECreateDesc('sign', 'quil')
     ae = AE.AECreateAppleEvent('aevt', 'oapp', target, -1, 0)
     print unpackevent(ae)

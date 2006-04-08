@@ -596,7 +596,7 @@ PointerType_set_type(PyTypeObject *self, PyObject *type)
 	return Py_None;
 }
 
-staticforward PyObject *_byref(PyObject *);
+static PyObject *_byref(PyObject *);
 
 static PyObject *
 PointerType_from_param(PyObject *type, PyObject *value)
@@ -3880,7 +3880,6 @@ static PyNumberMethods Simple_as_number = {
 	0, /* nb_add */
 	0, /* nb_subtract */
 	0, /* nb_multiply */
-	0, /* nb_divide */
 	0, /* nb_remainder */
 	0, /* nb_divmod */
 	0, /* nb_power */
@@ -4236,7 +4235,6 @@ static PyNumberMethods Pointer_as_number = {
 	0, /* nb_add */
 	0, /* nb_subtract */
 	0, /* nb_multiply */
-	0, /* nb_divide */
 	0, /* nb_remainder */
 	0, /* nb_divmod */
 	0, /* nb_power */

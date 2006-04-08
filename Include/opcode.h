@@ -26,7 +26,7 @@ extern "C" {
 #define BINARY_POWER	19
 
 #define BINARY_MULTIPLY	20
-#define BINARY_DIVIDE	21
+
 #define BINARY_MODULO	22
 #define BINARY_ADD	23
 #define BINARY_SUBTRACT	24
@@ -48,7 +48,7 @@ extern "C" {
 #define INPLACE_ADD	55
 #define INPLACE_SUBTRACT	56
 #define INPLACE_MULTIPLY	57
-#define INPLACE_DIVIDE	58
+
 #define INPLACE_MODULO	59
 #define STORE_SUBSCR	60
 #define DELETE_SUBSCR	61

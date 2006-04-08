@@ -130,21 +130,12 @@ typedef PyObject * (*ternaryfunc)(PyObject *, PyObject *, PyObject *);
 typedef int (*inquiry)(PyObject *);
 typedef Py_ssize_t (*lenfunc)(PyObject *);
 typedef int (*coercion)(PyObject **, PyObject **);
-typedef PyObject *(*intargfunc)(PyObject *, int) Py_DEPRECATED(2.5);
-typedef PyObject *(*intintargfunc)(PyObject *, int, int) Py_DEPRECATED(2.5);
 typedef PyObject *(*ssizeargfunc)(PyObject *, Py_ssize_t);
 typedef PyObject *(*ssizessizeargfunc)(PyObject *, Py_ssize_t, Py_ssize_t);
-typedef int(*intobjargproc)(PyObject *, int, PyObject *);
-typedef int(*intintobjargproc)(PyObject *, int, int, PyObject *);
 typedef int(*ssizeobjargproc)(PyObject *, Py_ssize_t, PyObject *);
 typedef int(*ssizessizeobjargproc)(PyObject *, Py_ssize_t, Py_ssize_t, PyObject *);
 typedef int(*objobjargproc)(PyObject *, PyObject *, PyObject *);
 
-/* int-based buffer interface */
-typedef int (*getreadbufferproc)(PyObject *, int, void **);
-typedef int (*getwritebufferproc)(PyObject *, int, void **);
-typedef int (*getsegcountproc)(PyObject *, int *);
-typedef int (*getcharbufferproc)(PyObject *, int, char **);
 /* ssize_t-based buffer interface */
 typedef Py_ssize_t (*readbufferproc)(PyObject *, Py_ssize_t, void **);
 typedef Py_ssize_t (*writebufferproc)(PyObject *, Py_ssize_t, void **);
@@ -167,7 +158,6 @@ typedef struct {
 	binaryfunc nb_add;
 	binaryfunc nb_subtract;
 	binaryfunc nb_multiply;
-	binaryfunc nb_divide;
 	binaryfunc nb_remainder;
 	binaryfunc nb_divmod;
 	ternaryfunc nb_power;
@@ -191,7 +181,6 @@ typedef struct {
 	binaryfunc nb_inplace_add;
 	binaryfunc nb_inplace_subtract;
 	binaryfunc nb_inplace_multiply;
-	binaryfunc nb_inplace_divide;
 	binaryfunc nb_inplace_remainder;
 	ternaryfunc nb_inplace_power;
 	binaryfunc nb_inplace_lshift;
@@ -201,7 +190,6 @@ typedef struct {
 	binaryfunc nb_inplace_or;
 
 	/* Added in release 2.2 */
-	/* The following require the Py_TPFLAGS_HAVE_CLASS flag */
 	binaryfunc nb_floor_divide;
 	binaryfunc nb_true_divide;
 	binaryfunc nb_inplace_floor_divide;
@@ -693,21 +681,6 @@ PyAPI_DATA(PyObject) _Py_NotImplementedStruct; /* Don't use this directly */
  * Defined in object.c.
  */
 PyAPI_DATA(int) _Py_SwappedOp[];
-
-/*
-Define staticforward and statichere for source compatibility with old
-C extensions.
-
-The staticforward define was needed to support certain broken C
-compilers (notably SCO ODT 3.0, perhaps early AIX as well) botched the
-static keyword when it was used with a forward declaration of a static
-initialized structure.  Standard C allows the forward declaration with
-static, and we've decided to stop catering to broken C compilers.
-(In fact, we expect that the compilers are all fixed eight years later.)
-*/
-
-#define staticforward static
-#define statichere static
 
 
 /*

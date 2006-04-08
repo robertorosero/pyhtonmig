@@ -642,25 +642,6 @@ float_div(PyObject *v, PyObject *w)
 }
 
 static PyObject *
-float_classic_div(PyObject *v, PyObject *w)
-{
-	double a,b;
-	CONVERT_TO_DOUBLE(v, a);
-	CONVERT_TO_DOUBLE(w, b);
-	if (Py_DivisionWarningFlag >= 2 &&
-	    PyErr_Warn(PyExc_DeprecationWarning, "classic float division") < 0)
-		return NULL;
-	if (b == 0.0) {
-		PyErr_SetString(PyExc_ZeroDivisionError, "float division");
-		return NULL;
-	}
-	PyFPE_START_PROTECT("divide", return 0)
-	a = a / b;
-	PyFPE_END_PROTECT(a)
-	return PyFloat_FromDouble(a);
-}
-
-static PyObject *
 float_rem(PyObject *v, PyObject *w)
 {
 	double vx, wx;
@@ -1125,13 +1106,12 @@ Convert a string or number to a floating point number, if possible.");
 
 
 static PyNumberMethods float_as_number = {
-	float_add, 	/*nb_add*/
-	float_sub, 	/*nb_subtract*/
-	float_mul, 	/*nb_multiply*/
-	float_classic_div, /*nb_divide*/
-	float_rem, 	/*nb_remainder*/
-	float_divmod, 	/*nb_divmod*/
-	float_pow, 	/*nb_power*/
+	float_add, /*nb_add*/
+	float_sub, /*nb_subtract*/
+	float_mul, /*nb_multiply*/
+	float_rem, /*nb_remainder*/
+	float_divmod, /*nb_divmod*/
+	float_pow, /*nb_power*/
 	(unaryfunc)float_neg, /*nb_negative*/
 	(unaryfunc)float_pos, /*nb_positive*/
 	(unaryfunc)float_abs, /*nb_absolute*/
@@ -1151,7 +1131,6 @@ static PyNumberMethods float_as_number = {
 	0,		/* nb_inplace_add */
 	0,		/* nb_inplace_subtract */
 	0,		/* nb_inplace_multiply */
-	0,		/* nb_inplace_divide */
 	0,		/* nb_inplace_remainder */
 	0, 		/* nb_inplace_power */
 	0,		/* nb_inplace_lshift */

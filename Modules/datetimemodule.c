@@ -2085,7 +2085,6 @@ static PyNumberMethods delta_as_number = {
 	delta_add,				/* nb_add */
 	delta_subtract,				/* nb_subtract */
 	delta_multiply,				/* nb_multiply */
-	delta_divide,				/* nb_divide */
 	0,					/* nb_remainder */
 	0,					/* nb_divmod */
 	0,					/* nb_power */
@@ -2108,7 +2107,6 @@ static PyNumberMethods delta_as_number = {
 	0,					/*nb_inplace_add*/
 	0,					/*nb_inplace_subtract*/
 	0,					/*nb_inplace_multiply*/
-	0,					/*nb_inplace_divide*/
 	0,					/*nb_inplace_remainder*/
 	0,					/*nb_inplace_power*/
 	0,					/*nb_inplace_lshift*/
@@ -2670,7 +2668,6 @@ static PyNumberMethods date_as_number = {
 	date_add,					/* nb_add */
 	date_subtract,					/* nb_subtract */
 	0,						/* nb_multiply */
-	0,						/* nb_divide */
 	0,						/* nb_remainder */
 	0,						/* nb_divmod */
 	0,						/* nb_power */
@@ -2936,7 +2933,7 @@ static PyMethodDef tzinfo_methods[] = {
 static char tzinfo_doc[] =
 PyDoc_STR("Abstract base class for time zone info objects.");
 
-statichere PyTypeObject PyDateTime_TZInfoType = {
+static PyTypeObject PyDateTime_TZInfoType = {
 	PyObject_HEAD_INIT(NULL)
 	0,					/* ob_size */
 	"datetime.tzinfo",			/* tp_name */
@@ -3446,7 +3443,6 @@ static PyNumberMethods time_as_number = {
 	0,					/* nb_add */
 	0,					/* nb_subtract */
 	0,					/* nb_multiply */
-	0,					/* nb_divide */
 	0,					/* nb_remainder */
 	0,					/* nb_divmod */
 	0,					/* nb_power */
@@ -3456,7 +3452,7 @@ static PyNumberMethods time_as_number = {
 	(inquiry)time_nonzero,			/* nb_nonzero */
 };
 
-statichere PyTypeObject PyDateTime_TimeType = {
+static PyTypeObject PyDateTime_TimeType = {
 	PyObject_HEAD_INIT(NULL)
 	0,					/* ob_size */
 	"datetime.time",			/* tp_name */
@@ -4531,7 +4527,6 @@ static PyNumberMethods datetime_as_number = {
 	datetime_add,				/* nb_add */
 	datetime_subtract,			/* nb_subtract */
 	0,					/* nb_multiply */
-	0,					/* nb_divide */
 	0,					/* nb_remainder */
 	0,					/* nb_divmod */
 	0,					/* nb_power */
@@ -4541,7 +4536,7 @@ static PyNumberMethods datetime_as_number = {
 	0,					/* nb_nonzero */
 };
 
-statichere PyTypeObject PyDateTime_DateTimeType = {
+static PyTypeObject PyDateTime_DateTimeType = {
 	PyObject_HEAD_INIT(NULL)
 	0,					/* ob_size */
 	"datetime.datetime",			/* tp_name */

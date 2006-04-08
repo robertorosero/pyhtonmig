@@ -154,32 +154,6 @@ class BuiltinTest(unittest.TestCase):
         S = [10, 20, 30]
         self.assertEqual(any(x > 42 for x in S), False)
 
-    def test_apply(self):
-        def f0(*args):
-            self.assertEqual(args, ())
-        def f1(a1):
-            self.assertEqual(a1, 1)
-        def f2(a1, a2):
-            self.assertEqual(a1, 1)
-            self.assertEqual(a2, 2)
-        def f3(a1, a2, a3):
-            self.assertEqual(a1, 1)
-            self.assertEqual(a2, 2)
-            self.assertEqual(a3, 3)
-        apply(f0, ())
-        apply(f1, (1,))
-        apply(f2, (1, 2))
-        apply(f3, (1, 2, 3))
-
-        # A PyCFunction that takes only positional parameters should allow an
-        # empty keyword dictionary to pass without a complaint, but raise a
-        # TypeError if the dictionary is non-empty.
-        apply(id, (1,), {})
-        self.assertRaises(TypeError, apply, id, (1,), {"foo": 1})
-        self.assertRaises(TypeError, apply)
-        self.assertRaises(TypeError, apply, id, 42)
-        self.assertRaises(TypeError, apply, id, (42,), 42)
-
     def test_callable(self):
         self.assert_(callable(len))
         def f(): pass
@@ -659,8 +633,6 @@ class BuiltinTest(unittest.TestCase):
         id([0,1,2,3])
         id({'spam': 1, 'eggs': 2, 'ham': 3})
 
-    # Test input() later, together with raw_input
-
     def test_int(self):
         self.assertEqual(int(314), 314)
         self.assertEqual(int(3.14), 3)
@@ -1109,7 +1081,6 @@ class BuiltinTest(unittest.TestCase):
         self.assertRaises(TypeError, oct, ())
 
     def write_testfile(self):
-        # NB the first 4 lines are also used to test input and raw_input, below
         fp = open(TESTFN, 'w')
         try:
             fp.write('1+1\n')
@@ -1267,55 +1238,6 @@ class BuiltinTest(unittest.TestCase):
 
         self.assertRaises(OverflowError, range, -sys.maxint, sys.maxint)
         self.assertRaises(OverflowError, range, 0, 2*sys.maxint)
-
-    def test_input_and_raw_input(self):
-        self.write_testfile()
-        fp = open(TESTFN, 'r')
-        savestdin = sys.stdin
-        savestdout = sys.stdout # Eats the echo
-        try:
-            sys.stdin = fp
-            sys.stdout = BitBucket()
-            self.assertEqual(input(), 2)
-            self.assertEqual(input('testing\n'), 2)
-            self.assertEqual(raw_input(), 'The quick brown fox jumps over the lazy dog.')
-            self.assertEqual(raw_input('testing\n'), 'Dear John')
-            sys.stdin = cStringIO.StringIO("NULL\0")
-            self.assertRaises(TypeError, input, 42, 42)
-            sys.stdin = cStringIO.StringIO("    'whitespace'")
-            self.assertEqual(input(), 'whitespace')
-            sys.stdin = cStringIO.StringIO()
-            self.assertRaises(EOFError, input)
-
-            # SF 876178: make sure input() respect future options.
-            sys.stdin = cStringIO.StringIO('1/2')
-            sys.stdout = cStringIO.StringIO()
-            exec compile('print input()', 'test_builtin_tmp', 'exec')
-            sys.stdin.seek(0, 0)
-            exec compile('from __future__ import division;print input()',
-                         'test_builtin_tmp', 'exec')
-            sys.stdin.seek(0, 0)
-            exec compile('print input()', 'test_builtin_tmp', 'exec')
-            # The result we expect depends on whether new division semantics
-            # are already in effect.
-            if 1/2 == 0:
-                # This test was compiled with old semantics.
-                expected = ['0', '0.5', '0']
-            else:
-                # This test was compiled with new semantics (e.g., -Qnew
-                # was given on the command line.
-                expected = ['0.5', '0.5', '0.5']
-            self.assertEqual(sys.stdout.getvalue().splitlines(), expected)
-
-            del sys.stdout
-            self.assertRaises(RuntimeError, input, 'prompt')
-            del sys.stdin
-            self.assertRaises(RuntimeError, input, 'prompt')
-        finally:
-            sys.stdin = savestdin
-            sys.stdout = savestdout
-            fp.close()
-            unlink(TESTFN)
 
     def test_reduce(self):
         self.assertEqual(reduce(lambda x, y: x+y, ['a', 'b', 'c'], ''), 'abc')

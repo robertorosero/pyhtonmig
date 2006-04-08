@@ -1,5 +1,5 @@
-This is Python version 2.5 alpha 1
-==================================
+This is Python 3000 -- unversioned (branched off 2.5 pre alpha 1)
+=================================================================
 
 Copyright (c) 2001, 2002, 2003, 2004, 2005, 2006 Python Software Foundation.
 All rights reserved.
@@ -502,11 +502,19 @@ Cray T3E: Mark Hadfield (m.hadfield@niwa.co.nz) writes:
            On NIWA's vanilla T3E system the following have also been
            included successfully:
 
+<<<<<<< .working
              _codecs, _locale, _socket, _symtable, _testcapi, _weakref
              array, binascii, cmath, cPickle, crypt, cStringIO, dbm
              errno, fcntl, grp, math, md5, operator, parser, pcre, pwd
              regex, rotor, select, struct, strop, syslog, termios
              time, timing, xreadlines
+=======
+	     _codecs, _locale, _socket, _symtable, _testcapi, _weakref
+	     array, binascii, cmath, cPickle, crypt, cStringIO, dbm
+	     errno, fcntl, grp, math, md5, operator, parser, pwd
+	     rotor, select, struct, strop, syslog, termios,
+	     time, timing
+>>>>>>> .merge-rechts.r43737
 
         4) Once the python executable and library have been built, make
            will execute setup.py, which will attempt to build remaining

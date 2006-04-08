@@ -420,6 +420,6 @@ if __name__ == '__main__':
 
     import sys
     if 1:
-        apply(convertdir,tuple(sys.argv[1:]))
+        convertdir(*sys.argv[1:])
     else:
-        apply(rewritepythondir,tuple(sys.argv[1:]))
+        rewritepythondir(*sys.argv[1:])

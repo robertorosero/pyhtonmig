@@ -1073,19 +1073,6 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throw)
 			if (x != NULL) continue;
 			break;
 
-		case BINARY_DIVIDE:
-			if (!_Py_QnewFlag) {
-				w = POP();
-				v = TOP();
-				x = PyNumber_Divide(v, w);
-				Py_DECREF(v);
-				Py_DECREF(w);
-				SET_TOP(x);
-				if (x != NULL) continue;
-				break;
-			}
-			/* -Qnew is in effect:	fall through to
-			   BINARY_TRUE_DIVIDE */
 		case BINARY_TRUE_DIVIDE:
 			w = POP();
 			v = TOP();
@@ -1275,19 +1262,6 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throw)
 			if (x != NULL) continue;
 			break;
 
-		case INPLACE_DIVIDE:
-			if (!_Py_QnewFlag) {
-				w = POP();
-				v = TOP();
-				x = PyNumber_InPlaceDivide(v, w);
-				Py_DECREF(v);
-				Py_DECREF(w);
-				SET_TOP(x);
-				if (x != NULL) continue;
-				break;
-			}
-			/* -Qnew is in effect:	fall through to
-			   INPLACE_TRUE_DIVIDE */
 		case INPLACE_TRUE_DIVIDE:
 			w = POP();
 			v = TOP();
@@ -3025,15 +2999,7 @@ do_raise(PyObject *type, PyObject *value, PyObject *tb)
 		Py_DECREF(tmp);
 	}
 
-	if (PyString_CheckExact(type)) {
-		/* Raising builtin string is deprecated but still allowed --
-		 * do nothing.  Raising an instance of a new-style str
-		 * subclass is right out. */
-		if (PyErr_Warn(PyExc_DeprecationWarning,
-			   "raising a string exception is deprecated"))
-			goto raise_error;
-	}
-	else if (PyExceptionClass_Check(type))
+	if (PyExceptionClass_Check(type))
 		PyErr_NormalizeException(&type, &value, &tb);
 
 	else if (PyExceptionInstance_Check(type)) {
@@ -3054,10 +3020,8 @@ do_raise(PyObject *type, PyObject *value, PyObject *tb)
 	else {
 		/* Not something you can raise.  You get an exception
 		   anyway, just not what you specified :-) */
-		PyErr_Format(PyExc_TypeError,
-			     "exceptions must be classes, instances, or "
-			     "strings (deprecated), not %s",
-			     type->ob_type->tp_name);
+		PyErr_SetString(PyExc_TypeError,
+                                "exceptions must derive from BaseException");
 		goto raise_error;
 	}
 	PyErr_Restore(type, value, tb);
@@ -4148,7 +4112,7 @@ build_class(PyObject *methods, PyObject *bases, PyObject *name)
 		if (g != NULL && PyDict_Check(g))
 			metaclass = PyDict_GetItemString(g, "__metaclass__");
 		if (metaclass == NULL)
-			metaclass = (PyObject *) &PyClass_Type;
+			metaclass = (PyObject *) &PyType_Type;
 		Py_INCREF(metaclass);
 	}
 	result = PyObject_CallFunction(metaclass, "OOO", name, bases, methods);

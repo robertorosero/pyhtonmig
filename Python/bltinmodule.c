@@ -138,50 +138,6 @@ PyDoc_STRVAR(any_doc,
 \n\
 Return True if bool(x) is True for any x in the iterable.");
 
-static PyObject *
-builtin_apply(PyObject *self, PyObject *args)
-{
-	PyObject *func, *alist = NULL, *kwdict = NULL;
-	PyObject *t = NULL, *retval = NULL;
-
-	if (!PyArg_UnpackTuple(args, "apply", 1, 3, &func, &alist, &kwdict))
-		return NULL;
-	if (alist != NULL) {
-		if (!PyTuple_Check(alist)) {
-			if (!PySequence_Check(alist)) {
-				PyErr_Format(PyExc_TypeError,
-				     "apply() arg 2 expected sequence, found %s",
-					     alist->ob_type->tp_name);
-				return NULL;
-			}
-			t = PySequence_Tuple(alist);
-			if (t == NULL)
-				return NULL;
-			alist = t;
-		}
-	}
-	if (kwdict != NULL && !PyDict_Check(kwdict)) {
-		PyErr_Format(PyExc_TypeError,
-			     "apply() arg 3 expected dictionary, found %s",
-			     kwdict->ob_type->tp_name);
-		goto finally;
-	}
-	retval = PyEval_CallObjectWithKeywords(func, alist, kwdict);
-  finally:
-	Py_XDECREF(t);
-	return retval;
-}
-
-PyDoc_STRVAR(apply_doc,
-"apply(object[, args[, kwargs]]) -> value\n\
-\n\
-Call a callable object with positional arguments taken from the tuple args,\n\
-and keyword arguments taken from the optional dictionary kwargs.\n\
-Note that classes are callable, as are instances with a __call__() method.\n\
-\n\
-Deprecated since release 2.3. Instead, use the extended call syntax:\n\
-    function(*args, **keywords).");
-
 
 static PyObject *
 builtin_callable(PyObject *self, PyObject *v)
@@ -1078,44 +1034,6 @@ PyDoc_STRVAR(hex_doc,
 Return the hexadecimal representation of an integer or long integer.");
 
 
-static PyObject *builtin_raw_input(PyObject *, PyObject *);
-
-static PyObject *
-builtin_input(PyObject *self, PyObject *args)
-{
-	PyObject *line;
-	char *str;
-	PyObject *res;
-	PyObject *globals, *locals;
-	PyCompilerFlags cf;
-
-	line = builtin_raw_input(self, args);
-	if (line == NULL)
-		return line;
-	if (!PyArg_Parse(line, "s;embedded '\\0' in input line", &str))
-		return NULL;
-	while (*str == ' ' || *str == '\t')
-			str++;
-	globals = PyEval_GetGlobals();
-	locals = PyEval_GetLocals();
-	if (PyDict_GetItemString(globals, "__builtins__") == NULL) {
-		if (PyDict_SetItemString(globals, "__builtins__",
-					 PyEval_GetBuiltins()) != 0)
-			return NULL;
-	}
-	cf.cf_flags = 0;
-	PyEval_MergeCompilerFlags(&cf);
-	res = PyRun_StringFlags(str, Py_eval_input, globals, locals, &cf);
-	Py_DECREF(line);
-	return res;
-}
-
-PyDoc_STRVAR(input_doc,
-"input([prompt]) -> value\n\
-\n\
-Equivalent to eval(raw_input(prompt)).");
-
-
 static PyObject *
 builtin_intern(PyObject *self, PyObject *args)
 {
@@ -1692,90 +1610,6 @@ These are exactly the valid indices for a list of 4 elements.");
 
 
 static PyObject *
-builtin_raw_input(PyObject *self, PyObject *args)
-{
-	PyObject *v = NULL;
-	PyObject *fin = PySys_GetObject("stdin");
-	PyObject *fout = PySys_GetObject("stdout");
-
-	if (!PyArg_UnpackTuple(args, "[raw_]input", 0, 1, &v))
-		return NULL;
-
-	if (fin == NULL) {
-		PyErr_SetString(PyExc_RuntimeError, "[raw_]input: lost sys.stdin");
-		return NULL;
-	}
-	if (fout == NULL) {
-		PyErr_SetString(PyExc_RuntimeError, "[raw_]input: lost sys.stdout");
-		return NULL;
-	}
-	if (PyFile_SoftSpace(fout, 0)) {
-		if (PyFile_WriteString(" ", fout) != 0)
-			return NULL;
-	}
-	if (PyFile_Check(fin) && PyFile_Check(fout)
-            && isatty(fileno(PyFile_AsFile(fin)))
-            && isatty(fileno(PyFile_AsFile(fout)))) {
-		PyObject *po;
-		char *prompt;
-		char *s;
-		PyObject *result;
-		if (v != NULL) {
-			po = PyObject_Str(v);
-			if (po == NULL)
-				return NULL;
-			prompt = PyString_AsString(po);
-			if (prompt == NULL)
-				return NULL;
-		}
-		else {
-			po = NULL;
-			prompt = "";
-		}
-		s = PyOS_Readline(PyFile_AsFile(fin), PyFile_AsFile(fout),
-                                  prompt);
-		Py_XDECREF(po);
-		if (s == NULL) {
-			if (!PyErr_Occurred())
-				PyErr_SetNone(PyExc_KeyboardInterrupt);
-			return NULL;
-		}
-		if (*s == '\0') {
-			PyErr_SetNone(PyExc_EOFError);
-			result = NULL;
-		}
-		else { /* strip trailing '\n' */
-			size_t len = strlen(s);
-			if (len > INT_MAX) {
-				PyErr_SetString(PyExc_OverflowError,
-						"[raw_]input: input too long");
-				result = NULL;
-			}
-			else {
-				result = PyString_FromStringAndSize(s,
-								(int)(len-1));
-			}
-		}
-		PyMem_FREE(s);
-		return result;
-	}
-	if (v != NULL) {
-		if (PyFile_WriteObject(v, fout, Py_PRINT_RAW) != 0)
-			return NULL;
-	}
-	return PyFile_GetLine(fin, -1);
-}
-
-PyDoc_STRVAR(raw_input_doc,
-"raw_input([prompt]) -> string\n\
-\n\
-Read a string from standard input.  The trailing newline is stripped.\n\
-If the user hits EOF (Unix: Ctl-D, Windows: Ctl-Z+Return), raise EOFError.\n\
-On Unix, GNU readline is used if enabled.  The prompt string, if given,\n\
-is printed without a trailing newline before reading.");
-
-
-static PyObject *
 builtin_reduce(PyObject *self, PyObject *args)
 {
 	PyObject *seq, *func, *result = NULL, *it;
@@ -2219,7 +2053,6 @@ static PyMethodDef builtin_methods[] = {
  	{"abs",		builtin_abs,        METH_O, abs_doc},
  	{"all",		builtin_all,        METH_O, all_doc},
  	{"any",		builtin_any,        METH_O, any_doc},
- 	{"apply",	builtin_apply,      METH_VARARGS, apply_doc},
  	{"callable",	builtin_callable,   METH_O, callable_doc},
  	{"chr",		builtin_chr,        METH_VARARGS, chr_doc},
  	{"cmp",		builtin_cmp,        METH_VARARGS, cmp_doc},
@@ -2237,7 +2070,6 @@ static PyMethodDef builtin_methods[] = {
  	{"hash",	builtin_hash,       METH_O, hash_doc},
  	{"hex",		builtin_hex,        METH_O, hex_doc},
  	{"id",		builtin_id,         METH_O, id_doc},
- 	{"input",	builtin_input,      METH_VARARGS, input_doc},
  	{"intern",	builtin_intern,     METH_VARARGS, intern_doc},
  	{"isinstance",  builtin_isinstance, METH_VARARGS, isinstance_doc},
  	{"issubclass",  builtin_issubclass, METH_VARARGS, issubclass_doc},
@@ -2251,7 +2083,6 @@ static PyMethodDef builtin_methods[] = {
  	{"ord",		builtin_ord,        METH_O, ord_doc},
  	{"pow",		builtin_pow,        METH_VARARGS, pow_doc},
  	{"range",	builtin_range,      METH_VARARGS, range_doc},
- 	{"raw_input",	builtin_raw_input,  METH_VARARGS, raw_input_doc},
  	{"reduce",	builtin_reduce,     METH_VARARGS, reduce_doc},
  	{"reload",	builtin_reload,     METH_O, reload_doc},
  	{"repr",	builtin_repr,       METH_O, repr_doc},
