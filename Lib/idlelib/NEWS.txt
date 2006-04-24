@@ -1,7 +1,20 @@
-What's New in IDLE 1.2a0?
-=======================
+What's New in IDLE 1.2a1?
+=========================
 
-*Release date: XX-XXX-2005*
+*Release date: 05-APR-2006*
+
+- Source file f.flush() after writing; trying to avoid lossage if user
+  kills GUI.
+
+- Options / Keys / Advanced dialog made functional.  Also, allow binding
+  of 'movement' keys.
+
+- 'syntax' patch adds improved calltips and a new class attribute listbox.
+  MultiCall module allows binding multiple actions to an event.
+  Patch 906702 Noam Raphael
+
+- Better indentation after first line of string continuation.
+  IDLEfork Patch 681992, Noam Raphael
 
 - Fixed CodeContext alignment problem, following suggestion from Tal Einat.
 
@@ -60,7 +73,7 @@ What's New in IDLE 1.2a0?
 
 - Improve error handling when .idlerc can't be created (warn and exit).
 
-- The GUI was hanging if the shell window was closed while a raw_input() 
+- The GUI was hanging if the shell window was closed while a raw_input()
   was pending.  Restored the quit() of the readline() mainloop().
   http://mail.python.org/pipermail/idle-dev/2004-December/002307.html
 
