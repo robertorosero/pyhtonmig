@@ -350,10 +350,31 @@ static PyGetSetDef frame_getsetlist[] = {
 };
 
 /* Stack frames are allocated and deallocated at a considerable rate.
-   In an attempt to improve the speed of function calls, we maintain a
-   separate free list of stack frames (just like integers are
-   allocated in a special way -- see intobject.c).  When a stack frame
-   is on the free list, only the following members have a meaning:
+   In an attempt to improve the speed of function calls, we:
+
+   1. Hold a single "zombie" frame on each code object. This retains
+   the allocated and initialised frame object from an invocation of
+   the code object. The zombie is reanimated the next time we need a
+   frame object for that code object. Doing this saves the malloc/
+   realloc required when using a free_list frame that isn't the
+   correct size. It also saves some field initialisation.
+
+   In zombie mode, no field of PyFrameObject holds a reference, but
+   the following fields are still valid:
+
+     * ob_type, ob_size, f_code, f_valuestack,
+       f_nlocals, f_ncells, f_nfreevars, f_stacksize;
+       
+     * f_locals, f_trace,
+       f_exc_type, f_exc_value, f_exc_traceback are NULL;
+
+     * f_localsplus does not require re-allocation and
+       the local variables in f_localsplus are NULL.
+
+   2. We also maintain a separate free list of stack frames (just like
+   integers are allocated in a special way -- see intobject.c).  When
+   a stack frame is on the free list, only the following members have
+   a meaning:
 	ob_type		== &Frametype
 	f_back		next item on free list, or NULL
 	f_nlocals	number of locals
