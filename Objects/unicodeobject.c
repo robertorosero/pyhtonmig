@@ -5078,8 +5078,8 @@ onError:
 PyDoc_STRVAR(count__doc__,
 "S.count(sub[, start[, end]]) -> int\n\
 \n\
-Return the number of occurrences of substring sub in Unicode string\n\
-S[start:end].  Optional arguments start and end are\n\
+Return the number of non-overlapping occurrences of substring sub in\n\
+Unicode string S[start:end].  Optional arguments start and end are\n\
 interpreted as in slice notation.");
 
 static PyObject *
@@ -5898,9 +5898,19 @@ unicode_repeat(PyUnicodeObject *str, Py_ssize_t len)
 
     p = u->str;
 
-    while (len-- > 0) {
-        Py_UNICODE_COPY(p, str->str, str->length);
-        p += str->length;
+    if (str->length == 1 && len > 0) {
+        Py_UNICODE_FILL(p, str->str[0], len);
+    } else {
+	int done = 0; /* number of characters copied this far */
+	if (done < nchars) {
+            Py_UNICODE_COPY(p, str->str, str->length);
+            done = str->length;
+	}
+	while (done < nchars) {
+            int n = (done <= nchars-done) ? done : nchars-done;
+            Py_UNICODE_COPY(p+done, p, n);
+            done += n;
+	}
     }
 
     return (PyObject*) u;
