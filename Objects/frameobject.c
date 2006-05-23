@@ -437,7 +437,7 @@ frame_dealloc(PyFrameObject *f)
 	else 
 		PyObject_GC_Del(f);
 
-        Py_DECREF(co);
+        Py_XDECREF(co);
 	Py_TRASHCAN_SAFE_END(f)
 }
 
