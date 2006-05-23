@@ -555,7 +555,6 @@ PyFrame_New(PyThreadState *tstate, PyCodeObject *code, PyObject *globals,
 	PyFrameObject *f;
 	PyObject *builtins;
 	Py_ssize_t i;
-	int frame_needs_init = 1;
 
 #ifdef Py_DEBUG
 	if (code == NULL || globals == NULL || !PyDict_Check(globals) ||
@@ -595,7 +594,6 @@ PyFrame_New(PyThreadState *tstate, PyCodeObject *code, PyObject *globals,
 		Py_INCREF(builtins);
 	}
 	if (code->co_zombieframe != NULL) {
-		frame_needs_init = 0;
                 f = code->co_zombieframe;
                 code->co_zombieframe = NULL;
                 _Py_NewReference((PyObject *)f);
@@ -605,9 +603,11 @@ PyFrame_New(PyThreadState *tstate, PyCodeObject *code, PyObject *globals,
                 Py_ssize_t extras, ncells, nfrees;
                 ncells = PyTuple_GET_SIZE(code->co_cellvars);
                 nfrees = PyTuple_GET_SIZE(code->co_freevars);
-                extras = code->co_stacksize + code->co_nlocals + ncells + nfrees;
+                extras = code->co_stacksize + code->co_nlocals + ncells +
+                    nfrees;
                 if (free_list == NULL) {
-                    f = PyObject_GC_NewVar(PyFrameObject, &PyFrame_Type, extras);
+                    f = PyObject_GC_NewVar(PyFrameObject, &PyFrame_Type,
+                        extras);
                     if (f == NULL) {
                             Py_DECREF(builtins);
                             return NULL;
@@ -629,7 +629,11 @@ PyFrame_New(PyThreadState *tstate, PyCodeObject *code, PyObject *globals,
                 }
 
 		f->f_code = code;
-		extras = f->f_code->co_nlocals + ncells + nfrees;
+		f->f_nlocals = code->co_nlocals;
+		f->f_stacksize = code->co_stacksize;
+		f->f_ncells = ncells;
+		f->f_nfreevars = nfrees;
+		extras = f->f_nlocals + ncells + nfrees;
 		f->f_valuestack = f->f_localsplus + extras;
 		for (i=0; i<extras; i++)
 			f->f_localsplus[i] = NULL;

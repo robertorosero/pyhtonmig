@@ -1120,6 +1120,13 @@ interpreter as they expect.  (Implemented by Georg Brandl.)
 %======================================================================
 \subsection{Optimizations\label{opts}}
 
+Several of the optimizations were developed at the NeedForSpeed
+sprint, an event held in Reykjavik, Iceland, from May 21--28 2006.
+The sprint focused on speed enhancements to the CPython implementation
+and was funded by EWT LLC with local support from CCP Games.  Those
+optimizations added at this sprint are specially marked in the
+following list.
+
 \begin{itemize}
 
 \item When they were introduced 
@@ -1129,14 +1136,24 @@ In 2.5 the internal data structure has been customized for implementing sets,
 and as a result sets will use a third less memory and are somewhat faster.
 (Implemented by Raymond Hettinger.)
 
-\item The performance of some Unicode operations, such as 
-character map decoding, has been improved.
+\item The speed of some Unicode operations, such as 
+finding substrings and character map decoding, has been improved.
+(Substring search improvements were added by Fredrik Lundh and Andrew
+Dalke at the NeedForSpeed sprint. Character map decoding was improved
+by Walter D\"orwald.)
 % Patch 1313939
 
 \item The code generator's peephole optimizer now performs
 simple constant folding in expressions.  If you write something like
 \code{a = 2+3}, the code generator will do the arithmetic and produce
 code corresponding to \code{a = 5}.
+
+\item Function calls are now faster because code objects now keep 
+the most recently finished frame (a ``zombie frame'') in an internal
+field of the code object, reusing it the next time the code object is
+invoked.  (Original patch by Michael Hudson, modified by Armin Rigo
+and Richard Jones; committed at the NeedForSpeed sprint.)
+% Patch 876206
 
 \end{itemize}
 
@@ -1411,7 +1428,7 @@ import hooks and now also works for packages stored in ZIP-format archives.
 included in the \file{Tools/pybench} directory.  The pybench suite is
 an improvement on the commonly used \file{pystone.py} program because
 pybench provides a more detailed measurement of the interpreter's
-performance.  It times particular operations such as function calls,
+speed.  It times particular operations such as function calls,
 tuple slicing, method lookups, and numeric operations, instead of
 performing many different operations and reducing the result to a
 single number as \file{pystone.py} does.
@@ -1934,6 +1951,10 @@ of the Python interpreter by calling the
 string of build information like this:
 \code{"trunk:45355:45356M, Apr 13 2006, 07:42:19"}.  
 (Contributed by Barry Warsaw.)
+
+\item \cfunction{PyErr_NewException(\var{name}, \var{base},
+\var{dict})} can now accept a tuple of base classes as its \var{base}
+argument.  (Contributed by Georg Brandl.)
 
 \item The CPython interpreter is still written in C, but 
 the code can now be compiled with a {\Cpp} compiler without errors.  
