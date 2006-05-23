@@ -1304,6 +1304,34 @@ long_format(PyObject *aa, int base, int addL)
 	return (PyObject *)str;
 }
 
+static twodigits _longdigitlookup[] = {
+	37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37,
+	37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37,
+	37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37,
+	37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37,
+	37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37,
+	37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37,
+	37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37,
+	37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37,
+	37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37,
+	37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37,
+	37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37,
+	0,  1,  2,  3,  4,  5,  6,  7,  8,  9,  37, 37, 37, 37, 37, 37,
+	37, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
+	25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 37, 37, 37, 37, 37,
+	37, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
+	25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 37, 37, 37, 37, 37,
+	37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37,
+	37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37,
+	37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37,
+	37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37,
+	37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37,
+	37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37,
+	37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37,
+	37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37
+};
+static twodigits* longdigitlookup = _longdigitlookup + 128;
+
 /* *str points to the first digit in a string of base base digits.  base
  * is a power of 2 (2, 4, 8, 16, or 32).  *str is set to point to the first
  * non-digit (which may be *str!).  A normalized long is returned.
@@ -1328,20 +1356,8 @@ long_from_binary_base(char **str, int base)
 		n >>= 1;
 	/* n <- total # of bits needed, while setting p to end-of-string */
 	n = 0;
-	for (;;) {
-		int k = -1;
-		char ch = *p;
-
-		if (ch <= '9')
-			k = ch - '0';
-		else if (ch >= 'a')
-			k = ch - 'a' + 10;
-		else if (ch >= 'A')
-			k = ch - 'A' + 10;
-		if (k < 0 || k >= base)
-			break;
+	while (longdigitlookup[(int) *p] < (twodigits) base)
 		++p;
-	}
 	*str = p;
 	n = (p - start) * bits_per_char;
 	if (n / bits_per_char != p - start) {
@@ -1361,17 +1377,7 @@ long_from_binary_base(char **str, int base)
 	bits_in_accum = 0;
 	pdigit = z->ob_digit;
 	while (--p >= start) {
-		int k;
-		char ch = *p;
-
-		if (ch <= '9')
-			k = ch - '0';
-		else if (ch >= 'a')
-			k = ch - 'a' + 10;
-		else {
-			assert(ch >= 'A');
-			k = ch - 'A' + 10;
-		}
+		int k = longdigitlookup[(int) *p];
 		assert(k >= 0 && k < base);
 		accum |= (twodigits)(k << bits_in_accum);
 		bits_in_accum += bits_per_char;
@@ -1394,13 +1400,38 @@ long_from_binary_base(char **str, int base)
 }
 
 PyObject *
-PyLong_FromString(char *str, char **pend, int base)
-{
+PyLong_FromString(char *str, char **pend, int base) {
+    Py_ssize_t len = strlen(str);
+    return PyLong_FromStringWithSlice(str, pend, base, len, 0, len);
+}
+
+PyObject *
+PyLong_FromStringWithSlice(char *str, char **pend, int base, Py_ssize_t len, Py_ssize_t startpos, Py_ssize_t endpos) {
 	int sign = 1;
-	char *start, *orig_str = str;
 	PyLongObject *z;
 	PyObject *strobj, *strrepr;
-	Py_ssize_t slen;
+	char *start, *orig_str = str;
+    char *end;
+
+    /* Validate the Offset */
+    if (startpos < 0)
+        startpos += len;
+    if (startpos >= len) {
+		PyErr_SetString(PyExc_ValueError,
+				"String index is out of range");
+		return NULL;
+    }
+    if (startpos < 0)
+        startpos = 0;
+
+    /* In the case of end=0, set end to length of string */
+    if (endpos <= 0) 
+        endpos += len;
+    if (endpos > len)
+        endpos = len;
+
+    end = str + endpos;
+    str = str + startpos;
 
 	if ((base != 0 && base < 2) || base > 36) {
 		PyErr_SetString(PyExc_ValueError,
@@ -1431,22 +1462,75 @@ PyLong_FromString(char *str, char **pend, int base)
 	if ((base & (base - 1)) == 0)
 		z = long_from_binary_base(&str, base);
 	else {
-		z = _PyLong_New(0);
-		for ( ; z != NULL; ++str) {
-			int k = -1;
-			PyLongObject *temp;
+		/* find length of the string of numeric characters */
+		register twodigits c;	 	/* current input character */
+		char* scan = str;
+		Py_ssize_t i, convwidth, size_z;
+		twodigits convmultmax, convmult;
+		digit *pz, *pzstop;
+		while ((c = longdigitlookup[(int) *scan]) < (twodigits) base && scan < end) {
+			scan++;
+		}
 
-			if (*str <= '9')
-				k = *str - '0';
-			else if (*str >= 'a')
-				k = *str - 'a' + 10;
-			else if (*str >= 'A')
-				k = *str - 'A' + 10;
-			if (k < 0 || k >= base)
-				break;
-			temp = muladd1(z, (digit)base, (digit)k);
-			Py_DECREF(z);
-			z = temp;
+		/* Create a long object that can contain the largest possible integer
+		that would fit in the string we've been given.  This long is
+		manipulated in-place to perform the string-to-long conversion. */
+		size_z = (int)((scan - str + 1) * log10(base) / log10(BASE)) + 1;
+
+		/* Take advantage of the fact that the long internal representation
+		uses a base much larger than that allowed for the input string, and
+		find the number of digits of the input string that can always fit in a
+		single long digit. */
+		convwidth = (int) (log10(BASE) / log10(base)) - 1;
+		convmultmax = base;
+		for (i = 1; i < convwidth; i ++)
+		  convmultmax *= base;
+
+		z = _PyLong_New(size_z);
+		z->ob_size = 0;
+		memset(z->ob_digit, 0, sizeof(*z->ob_digit)*size_z);
+
+		/* do the conversion over all numeric characters in the input string;
+		grab digits in groups of size convwidth, and for each group, perform
+		z = z*(base^convwidth) + ((c1*base + c2)*base + c3*base)... */
+		while (str < scan) {
+			pz = z->ob_digit;
+			pzstop = pz + z->ob_size;
+
+			/* grab up to 'convwidth' digits from the input string */
+			c = longdigitlookup[(int) *str++];
+			for (i = 1; i < convwidth && str != scan; i ++) {
+				c *= base;
+				c += longdigitlookup[(int) *str++];
+			}
+
+			/* only calculate the shift if we couldn't get convwidth digits */
+			convmult = convmultmax;
+			if (i != convwidth) {
+			  convmult = base;
+			  for (; i > 1; i --)
+				convmult *= base;
+			}
+
+			for (;pz != pzstop; ++pz) {
+				c += ((twodigits) *pz) * convmult;
+				/* the AND and shift are apparently expensive enough
+				(for decimal numbers) so that it's less costly to add a 
+				check for c != 0 before doing the AND+shift operation */
+				if (c) {
+					*pz = (digit) (c & MASK);
+					c >>= SHIFT;
+				}
+				else {
+					*pz = 0;
+				}
+			}
+			*pz = (digit) c;
+
+			/* update z size to indicate last updated digit */
+			size_z = pz - z->ob_digit;
+			if (c && size_z >= z->ob_size)
+				z->ob_size = size_z + 1;
 		}
 	}
 	if (z == NULL)
@@ -1455,20 +1539,25 @@ PyLong_FromString(char *str, char **pend, int base)
 		goto onError;
 	if (sign < 0 && z != NULL && z->ob_size != 0)
 		z->ob_size = -(z->ob_size);
-	if (*str == 'L' || *str == 'l')
+	if (*str == 'L' || *str == 'l') {
 		str++;
+    }
 	while (*str && isspace(Py_CHARMASK(*str)))
 		str++;
-	if (*str != '\0')
+	if (!(str == end || *str == '\0')) {
 		goto onError;
+    }
+    if (str != orig_str + endpos) {
+        goto onError;
+    }
 	if (pend)
 		*pend = str;
 	return (PyObject *) z;
 
  onError:
 	Py_XDECREF(z);
-	slen = strlen(orig_str) < 200 ? strlen(orig_str) : 200;
-	strobj = PyString_FromStringAndSize(orig_str, slen);
+	len = (endpos - startpos) < 200 ? (endpos - startpos) : 200;
+	strobj = PyString_FromStringAndSize(start, len);
 	if (strobj == NULL)
 		return NULL;
 	strrepr = PyObject_Repr(strobj);
@@ -3066,19 +3155,22 @@ long_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
 	PyObject *x = NULL;
 	int base = -909;		     /* unlikely! */
-	static char *kwlist[] = {"x", "base", 0};
+    Py_ssize_t start = 0;
+    Py_ssize_t end = 0;
+	static char *kwlist[] = {"x", "base", "start", "end", 0};
 
 	if (type != &PyLong_Type)
 		return long_subtype_new(type, args, kwds); /* Wimp out */
-	if (!PyArg_ParseTupleAndKeywords(args, kwds, "|Oi:long", kwlist,
-					 &x, &base))
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "|Oiii:long", kwlist,
+					 &x, &base, &start, &end))
 		return NULL;
 	if (x == NULL)
 		return PyLong_FromLong(0L);
 	if (base == -909)
-		return PyNumber_Long(x);
-	else if (PyString_Check(x))
-		return PyLong_FromString(PyString_AS_STRING(x), NULL, base);
+		return PyNumber_LongWithSlice(x, start, end);
+	else if (PyString_Check(x)) {
+		return PyLong_FromStringWithSlice(PyString_AS_STRING(x), NULL, base, PyString_GET_SIZE(x), start, end);
+    }
 #ifdef Py_USING_UNICODE
 	else if (PyUnicode_Check(x))
 		return PyLong_FromUnicode(PyUnicode_AS_UNICODE(x),

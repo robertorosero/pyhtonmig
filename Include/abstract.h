@@ -776,6 +776,7 @@ xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx*/
        */
 
      PyAPI_FUNC(PyObject *) PyNumber_Long(PyObject *o);
+     PyAPI_FUNC(PyObject *) PyNumber_LongWithSlice(PyObject *o, Py_ssize_t start, Py_ssize_t end);
 
        /*
 	 Returns the o converted to a long integer object on success,

@@ -47,6 +47,7 @@ PyAPI_FUNC(unsigned PY_LONG_LONG) PyLong_AsUnsignedLongLongMask(PyObject *);
 #endif /* HAVE_LONG_LONG */
 
 PyAPI_FUNC(PyObject *) PyLong_FromString(char *, char **, int);
+PyAPI_FUNC(PyObject *) PyLong_FromStringWithSlice(char *, char **, int, Py_ssize_t, Py_ssize_t, Py_ssize_t);
 #ifdef Py_USING_UNICODE
 PyAPI_FUNC(PyObject *) PyLong_FromUnicode(Py_UNICODE*, Py_ssize_t, int);
 #endif

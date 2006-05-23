@@ -994,27 +994,14 @@ PyNumber_Int(PyObject *o)
 	return type_error("int() argument must be a string or a number");
 }
 
-/* Add a check for embedded NULL-bytes in the argument. */
-static PyObject *
-long_from_string(const char *s, Py_ssize_t len)
+PyObject *
+PyNumber_Long(PyObject *o)
 {
-	char *end;
-	PyObject *x;
-
-	x = PyLong_FromString((char*)s, &end, 10);
-	if (x == NULL)
-		return NULL;
-	if (end != s + len) {
-		PyErr_SetString(PyExc_ValueError,
-				"null byte in argument for long()");
-		Py_DECREF(x);
-		return NULL;
-	}
-	return x;
+    return PyNumber_LongWithSlice(o, 0, -1);
 }
 
 PyObject *
-PyNumber_Long(PyObject *o)
+PyNumber_LongWithSlice(PyObject *o, Py_ssize_t start, Py_ssize_t end)
 {
 	PyNumberMethods *m;
 	const char *buffer;
@@ -1041,8 +1028,9 @@ PyNumber_Long(PyObject *o)
 		 * doesn't do.  In particular long('9.5') must raise an
 		 * exception, not truncate the float.
 		 */
-		return long_from_string(PyString_AS_STRING(o),
-					PyString_GET_SIZE(o));
+
+        return PyLong_FromStringWithSlice(PyString_AS_STRING(o), NULL, 
+                    10, PyString_GET_SIZE(o), start, end);
 #ifdef Py_USING_UNICODE
 	if (PyUnicode_Check(o))
 		/* The above check is done in PyLong_FromUnicode(). */
@@ -1051,7 +1039,8 @@ PyNumber_Long(PyObject *o)
 					  10);
 #endif
 	if (!PyObject_AsCharBuffer(o, &buffer, &buffer_len))
-		return long_from_string(buffer, buffer_len);
+        return PyLong_FromStringWithSlice(buffer, NULL, 
+                    10, buffer_len, start, end);
 
 	return type_error("long() argument must be a string or a number");
 }
