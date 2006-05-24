@@ -10,7 +10,7 @@ import thread, threading
 import Queue
 import sys
 import array
-import bytebuf
+import hotbuf
 from weakref import proxy
 
 PORT = 50007
@@ -875,17 +875,17 @@ class BufferIOTest(SocketConnectedTest):
         self.serv_conn.send(buf)
 
     def testRecv2(self):
-        # Receive into a bytebuf.
-        buf = bytebuf.bytebuf(1024)
+        # Receive into a hotbuf.
+        buf = hotbuf.hotbuf(1024)
         nbytes = self.cli_conn.recv_buf(buf)
         self.assertEqual(nbytes, len(MSG))
         msg = str(buf)[:len(MSG)]
         self.assertEqual(msg, MSG)
 
     def _testRecv2(self):
-        # Send using a bytebuf.
+        # Send using a hotbuf.
 ## FIXME: todo
-##         buf = bytebuf.bytebuf(MSG)
+##         buf = hotbuf.hotbuf(MSG)
         self.serv_conn.send(MSG)
 
 ##     def testOverFlowRecv(self):
@@ -912,16 +912,16 @@ class BufferIOTest(SocketConnectedTest):
 
     def testRecvFrom2(self):
         # Testing large recvfrom() over TCP
-        buf = bytebuf.bytebuf(1024)
+        buf = hotbuf.hotbuf(1024)
         nbytes, addr = self.cli_conn.recvfrom_buf(buf)
         self.assertEqual(nbytes, len(MSG))
         msg = str(buf)[:len(MSG)]
         self.assertEqual(msg, MSG)
 
     def _testRecvFrom2(self):
-        # Send using a bytebuf.
+        # Send using a hotbuf.
 ## FIXME: todo
-##         buf = bytebuf.bytebuf(MSG)
+##         buf = hotbuf.hotbuf(MSG)
         self.serv_conn.send(MSG)
 
 ##     def testOverFlowRecvFrom(self):

@@ -1,30 +1,30 @@
 /* ===========================================================================
- * Bytebuf object
+ * Hotbuf object
  */
 
 #include "Python.h"
 
 /* Note: the object's structure is private */
 
-#ifndef Py_BYTEBUFOBJECT_H
-#define Py_BYTEBUFOBJECT_H
+#ifndef Py_HOTBUFOBJECT_H
+#define Py_HOTBUFOBJECT_H
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 
-PyAPI_DATA(PyTypeObject) PyBytebuf_Type;
+PyAPI_DATA(PyTypeObject) PyHotbuf_Type;
 
-#define PyBytebuf_Check(op) ((op)->ob_type == &PyBytebuf_Type)
+#define PyHotbuf_Check(op) ((op)->ob_type == &PyHotbuf_Type)
 
-#define Py_END_OF_BYTEBUF       (-1)
+#define Py_END_OF_HOTBUF       (-1)
 
-PyAPI_FUNC(PyObject *) PyBytebuf_New(Py_ssize_t size);
+PyAPI_FUNC(PyObject *) PyHotbuf_New(Py_ssize_t size);
 
 #ifdef __cplusplus
 }
 #endif
-#endif /* !Py_BYTEBUFOBJECT_H */
+#endif /* !Py_HOTBUFOBJECT_H */
 
 
 /* ===========================================================================
@@ -33,7 +33,7 @@ PyAPI_FUNC(PyObject *) PyBytebuf_New(Py_ssize_t size);
 
 
 /*
- * bytebuf object structure declaration.
+ * hotbuf object structure declaration.
  */
 typedef struct {
     PyObject_HEAD
@@ -45,11 +45,11 @@ typedef struct {
        memory must be at least as large as this size. */
     Py_ssize_t b_size;
 
-} PyBytebufObject;
+} PyHotbufObject;
 
 
 /*
- * Given a bytebuf object, return the buffer memory (in 'ptr' and 'size') and
+ * Given a hotbuf object, return the buffer memory (in 'ptr' and 'size') and
  * true if there was no error.
  */
 
@@ -58,7 +58,7 @@ typedef struct {
    value. */
 
 static int
-get_buf(PyBytebufObject *self, void **ptr, Py_ssize_t *size)
+get_buf(PyHotbufObject *self, void **ptr, Py_ssize_t *size)
 {
     assert(ptr != NULL);
     *ptr = self->b_ptr;
@@ -67,13 +67,13 @@ get_buf(PyBytebufObject *self, void **ptr, Py_ssize_t *size)
 }
 
 /*
- * Create a new bytebuf where we allocate the memory ourselves.
+ * Create a new hotbuf where we allocate the memory ourselves.
  */
 PyObject *
-PyBytebuf_New(Py_ssize_t size)
+PyHotbuf_New(Py_ssize_t size)
 {
     PyObject *o;
-    PyBytebufObject * b;
+    PyHotbufObject * b;
 
     if (size < 0) {
         PyErr_SetString(PyExc_ValueError,
@@ -85,7 +85,7 @@ PyBytebuf_New(Py_ssize_t size)
     o = (PyObject *)PyObject_MALLOC(sizeof(*b) + size);
     if ( o == NULL )
         return PyErr_NoMemory();
-    b = (PyBytebufObject *) PyObject_INIT(o, &PyBytebuf_Type);
+    b = (PyHotbufObject *) PyObject_INIT(o, &PyHotbuf_Type);
 
     /* We setup the memory buffer to be right after the object itself. */
     b->b_ptr = (void *)(b + 1);
@@ -100,14 +100,14 @@ PyBytebuf_New(Py_ssize_t size)
  * Constructor.
  */
 static PyObject *
-bytebuf_new(PyTypeObject *type, PyObject *args, PyObject *kw)
+hotbuf_new(PyTypeObject *type, PyObject *args, PyObject *kw)
 {
     Py_ssize_t size = -1;
 
-    if (!_PyArg_NoKeywords("bytebuf()", kw))
+    if (!_PyArg_NoKeywords("hotbuf()", kw))
         return NULL;
  
-    if (!PyArg_ParseTuple(args, "n:bytebuf", &size))
+    if (!PyArg_ParseTuple(args, "n:hotbuf", &size))
         return NULL;
 
     if ( size <= 0 ) {
@@ -116,14 +116,14 @@ bytebuf_new(PyTypeObject *type, PyObject *args, PyObject *kw)
         return NULL;
     }
 
-    return PyBytebuf_New(size);
+    return PyHotbuf_New(size);
 }
 
 /*
  * Destructor.
  */
 static void
-bytebuf_dealloc(PyBytebufObject *self)
+hotbuf_dealloc(PyHotbufObject *self)
 {
     /* Note: by virtue of the memory buffer being allocated with the PyObject
        itself, this frees the buffer as well. */
@@ -134,7 +134,7 @@ bytebuf_dealloc(PyBytebufObject *self)
  * Comparison.
  */
 static int
-bytebuf_compare(PyBytebufObject *self, PyBytebufObject *other)
+hotbuf_compare(PyHotbufObject *self, PyHotbufObject *other)
 {
     void *p1, *p2;
     Py_ssize_t len_self, len_other, min_len;
@@ -158,9 +158,9 @@ bytebuf_compare(PyBytebufObject *self, PyBytebufObject *other)
  * Conversion to 'repr' string.
  */
 static PyObject *
-bytebuf_repr(PyBytebufObject *self)
+hotbuf_repr(PyHotbufObject *self)
 {
-    return PyString_FromFormat("<bytebuf ptr %p, size %zd at %p>",
+    return PyString_FromFormat("<hotbuf ptr %p, size %zd at %p>",
                                self->b_ptr,
                                self->b_size,
                                self);
@@ -170,7 +170,7 @@ bytebuf_repr(PyBytebufObject *self)
  * Conversion to string.
  */
 static PyObject *
-bytebuf_str(PyBytebufObject *self)
+hotbuf_str(PyHotbufObject *self)
 {
     void *ptr;
     Py_ssize_t size;
@@ -180,18 +180,18 @@ bytebuf_str(PyBytebufObject *self)
 }
 
 
-/* Bytebuf methods */
+/* Hotbuf methods */
 
 /*
  * Returns the buffer for reading or writing.
  */
 static Py_ssize_t
-bytebuf_getwritebuf(PyBytebufObject *self, Py_ssize_t idx, void **pp)
+hotbuf_getwritebuf(PyHotbufObject *self, Py_ssize_t idx, void **pp)
 {
     Py_ssize_t size;
     if ( idx != 0 ) {
         PyErr_SetString(PyExc_SystemError,
-                        "accessing non-existent bytebuf segment");
+                        "accessing non-existent hotbuf segment");
         return -1;
     }
     if (!get_buf(self, pp, &size))
@@ -200,7 +200,7 @@ bytebuf_getwritebuf(PyBytebufObject *self, Py_ssize_t idx, void **pp)
 }
 
 static Py_ssize_t
-bytebuf_getsegcount(PyBytebufObject *self, Py_ssize_t *lenp)
+hotbuf_getsegcount(PyHotbufObject *self, Py_ssize_t *lenp)
 {
     void *ptr;
     Py_ssize_t size;
@@ -212,13 +212,13 @@ bytebuf_getsegcount(PyBytebufObject *self, Py_ssize_t *lenp)
 }
 
 static Py_ssize_t
-bytebuf_getcharbuf(PyBytebufObject *self, Py_ssize_t idx, const char **pp)
+hotbuf_getcharbuf(PyHotbufObject *self, Py_ssize_t idx, const char **pp)
 {
     void *ptr;
     Py_ssize_t size;
     if ( idx != 0 ) {
         PyErr_SetString(PyExc_SystemError,
-                        "accessing non-existent bytebuf segment");
+                        "accessing non-existent hotbuf segment");
         return -1;
     }
     if (!get_buf(self, &ptr, &size))
@@ -232,7 +232,7 @@ bytebuf_getcharbuf(PyBytebufObject *self, Py_ssize_t idx, const char **pp)
  */
 
 static Py_ssize_t
-bytebuf_length(PyBytebufObject *self)
+hotbuf_length(PyHotbufObject *self)
 {
     void *ptr;
     Py_ssize_t size;
@@ -248,18 +248,18 @@ bytebuf_length(PyBytebufObject *self)
 
 /* FIXME: needs an update */
 
-/* PyDoc_STRVAR(bytebuf_doc, */
-/*              "bytebuf(object [, offset[, size]])\n\ */
+/* PyDoc_STRVAR(hotbuf_doc, */
+/*              "hotbuf(object [, offset[, size]])\n\ */
 /* \n\ */
-/* Create a new bytebuf object which references the given object.\n\ */
-/* The bytebuf will reference a slice of the target object from the\n\ */
+/* Create a new hotbuf object which references the given object.\n\ */
+/* The hotbuf will reference a slice of the target object from the\n\ */
 /* start of the object (or at the specified offset). The slice will\n\ */
 /* extend to the end of the target object (or with the specified size)."); */
 
-PyDoc_STRVAR(bytebuftype_doc,
-             "bytebuf(size) -> bytebuf\n\
+PyDoc_STRVAR(hotbuftype_doc,
+             "hotbuf(size) -> hotbuf\n\
 \n\
-Return a new bytebuf with a new buffer of fixed size 'size'.\n\
+Return a new hotbuf with a new buffer of fixed size 'size'.\n\
 \n\
 Methods:\n\
 \n\
@@ -268,46 +268,46 @@ Attributes:\n\
 ");
 
 
-static PySequenceMethods bytebuf_as_sequence = {
-        (lenfunc)bytebuf_length,                 /*sq_length*/
-        0 /* (binaryfunc)bytebuf_concat */,              /*sq_concat*/
-        0 /* (ssizeargfunc)bytebuf_repeat */,            /*sq_repeat*/
-        0 /* (ssizeargfunc)bytebuf_item */,              /*sq_item*/
-        0 /*(ssizessizeargfunc)bytebuf_slice*/,        /*sq_slice*/
-        0 /*(ssizeobjargproc)bytebuf_ass_item*/,       /*sq_ass_item*/
-        0 /*(ssizessizeobjargproc)bytebuf_ass_slice*/, /*sq_ass_slice*/
+static PySequenceMethods hotbuf_as_sequence = {
+        (lenfunc)hotbuf_length,                 /*sq_length*/
+        0 /* (binaryfunc)hotbuf_concat */,              /*sq_concat*/
+        0 /* (ssizeargfunc)hotbuf_repeat */,            /*sq_repeat*/
+        0 /* (ssizeargfunc)hotbuf_item */,              /*sq_item*/
+        0 /*(ssizessizeargfunc)hotbuf_slice*/,        /*sq_slice*/
+        0 /*(ssizeobjargproc)hotbuf_ass_item*/,       /*sq_ass_item*/
+        0 /*(ssizessizeobjargproc)hotbuf_ass_slice*/, /*sq_ass_slice*/
 };
 
-static PyBufferProcs bytebuf_as_buffer = {
-    (readbufferproc)bytebuf_getwritebuf,
-    (writebufferproc)bytebuf_getwritebuf,
-    (segcountproc)bytebuf_getsegcount,
-    (charbufferproc)bytebuf_getcharbuf,
+static PyBufferProcs hotbuf_as_buffer = {
+    (readbufferproc)hotbuf_getwritebuf,
+    (writebufferproc)hotbuf_getwritebuf,
+    (segcountproc)hotbuf_getsegcount,
+    (charbufferproc)hotbuf_getcharbuf,
 };
 
-PyTypeObject PyBytebuf_Type = {
+PyTypeObject PyHotbuf_Type = {
     PyObject_HEAD_INIT(&PyType_Type)
     0,
-    "bytebuf",
-    sizeof(PyBytebufObject),
+    "hotbuf",
+    sizeof(PyHotbufObject),
     0,
-    (destructor)bytebuf_dealloc,        /* tp_dealloc */
+    (destructor)hotbuf_dealloc,        /* tp_dealloc */
     0,                                  /* tp_print */
     0,                                  /* tp_getattr */
     0,                                  /* tp_setattr */
-    (cmpfunc)bytebuf_compare,           /* tp_compare */
-    (reprfunc)bytebuf_repr,             /* tp_repr */
+    (cmpfunc)hotbuf_compare,           /* tp_compare */
+    (reprfunc)hotbuf_repr,             /* tp_repr */
     0,                                  /* tp_as_number */
-    &bytebuf_as_sequence,               /* tp_as_sequence */
+    &hotbuf_as_sequence,               /* tp_as_sequence */
     0,                                  /* tp_as_mapping */
     0,                                  /* tp_hash */
     0,                                  /* tp_call */
-    (reprfunc)bytebuf_str,              /* tp_str */
+    (reprfunc)hotbuf_str,              /* tp_str */
     PyObject_GenericGetAttr,            /* tp_getattro */
     0,                                  /* tp_setattro */
-    &bytebuf_as_buffer,                 /* tp_as_buffer */
+    &hotbuf_as_buffer,                 /* tp_as_buffer */
     Py_TPFLAGS_DEFAULT,                 /* tp_flags */
-    bytebuftype_doc,                    /* tp_doc */
+    hotbuftype_doc,                    /* tp_doc */
     0,                                  /* tp_traverse */
     0,                                  /* tp_clear */
     0,                                  /* tp_richcompare */
@@ -324,7 +324,7 @@ PyTypeObject PyBytebuf_Type = {
     0,                                  /* tp_dictoffset */
     0,                                  /* tp_init */
     0,                                  /* tp_alloc */
-    bytebuf_new,                        /* tp_new */
+    hotbuf_new,                        /* tp_new */
 };
 
 
@@ -344,11 +344,11 @@ In addition, a byte buffer has two pointers within it, that delimit\n\
 an active slice, the current \"position\" and the \"limit\".  The\n\
 active region of a byte buffer is located within these boundaries.\n\
 \n\
-This class is heaviliy inspired from Java's NIO ByteBuffer class.\n\
+This class is heaviliy inspired from Java's NIO Hotbuffer class.\n\
 \n\
 The constructor is:\n\
 \n\
-bytebuf(nbytes) -- create a new bytebuf\n\
+hotbuf(nbytes) -- create a new hotbuf\n\
 ");
 
 
@@ -359,19 +359,19 @@ static PyMethodDef a_methods[] = {
 
 
 PyMODINIT_FUNC
-initbytebuf(void)
+inithotbuf(void)
 {
     PyObject *m;
 
-    PyBytebuf_Type.ob_type = &PyType_Type;
-    m = Py_InitModule3("bytebuf", a_methods, module_doc);
+    PyHotbuf_Type.ob_type = &PyType_Type;
+    m = Py_InitModule3("hotbuf", a_methods, module_doc);
     if (m == NULL)
         return;
 
-    Py_INCREF((PyObject *)&PyBytebuf_Type);
-    PyModule_AddObject(m, "BytebufType", (PyObject *)&PyBytebuf_Type);
-    Py_INCREF((PyObject *)&PyBytebuf_Type);
-    PyModule_AddObject(m, "bytebuf", (PyObject *)&PyBytebuf_Type);
+    Py_INCREF((PyObject *)&PyHotbuf_Type);
+    PyModule_AddObject(m, "HotbufType", (PyObject *)&PyHotbuf_Type);
+    Py_INCREF((PyObject *)&PyHotbuf_Type);
+    PyModule_AddObject(m, "hotbuf", (PyObject *)&PyHotbuf_Type);
     /* No need to check the error here, the caller will do that */
 }
 

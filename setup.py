@@ -336,7 +336,7 @@ class PyBuildExt(build_ext):
         exts.append( Extension('array', ['arraymodule.c']) )
 
         # array objects
-        exts.append( Extension('bytebuf', ['bytebufmodule.c']) )
+        exts.append( Extension('hotbuf', ['hotbufmodule.c']) )
 
         # complex math library functions
         exts.append( Extension('cmath', ['cmathmodule.c'],
