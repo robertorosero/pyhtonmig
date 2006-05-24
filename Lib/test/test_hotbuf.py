@@ -97,16 +97,10 @@ class HotbufTestCase(unittest.TestCase):
         b.flip()
         for x in xrange(256):
             nx = b.getbyte()
-            print nx
             assert nx == x
 
         # Test underflow.
         self.assertRaises(IndexError, b.putbyte, 42)
-
-
-
-
-
 
 
 def test_main():

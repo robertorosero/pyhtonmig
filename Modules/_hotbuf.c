@@ -651,23 +651,23 @@ ByteBuffer class.");
 
 static PyMethodDef
 hotbuf_methods[] = {
-	{"clear", (PyCFunction)hotbuf_clear, METH_NOARGS, clear__doc__},
-	{"capacity", (PyCFunction)hotbuf_capacity, METH_NOARGS, capacity__doc__},
-	{"position", (PyCFunction)hotbuf_position, METH_NOARGS, position__doc__},
-	{"setposition", (PyCFunction)hotbuf_setposition, METH_O, setposition__doc__},
-	{"limit", (PyCFunction)hotbuf_limit, METH_NOARGS, limit__doc__},
-	{"setlimit", (PyCFunction)hotbuf_setlimit, METH_O, setlimit__doc__},
-	{"mark", (PyCFunction)hotbuf_mark, METH_NOARGS, mark__doc__},
-	{"setmark", (PyCFunction)hotbuf_setmark, METH_NOARGS, setmark__doc__},
-	{"reset", (PyCFunction)hotbuf_reset, METH_NOARGS, reset__doc__},
-	{"flip", (PyCFunction)hotbuf_flip, METH_NOARGS, flip__doc__},
-	{"rewind", (PyCFunction)hotbuf_rewind, METH_NOARGS, rewind__doc__},
-	{"remaining", (PyCFunction)hotbuf_remaining, METH_NOARGS, remaining__doc__},
-	{"compact", (PyCFunction)hotbuf_compact, METH_NOARGS, compact__doc__},
+        {"clear", (PyCFunction)hotbuf_clear, METH_NOARGS, clear__doc__},
+        {"capacity", (PyCFunction)hotbuf_capacity, METH_NOARGS, capacity__doc__},
+        {"position", (PyCFunction)hotbuf_position, METH_NOARGS, position__doc__},
+        {"setposition", (PyCFunction)hotbuf_setposition, METH_O, setposition__doc__},
+        {"limit", (PyCFunction)hotbuf_limit, METH_NOARGS, limit__doc__},
+        {"setlimit", (PyCFunction)hotbuf_setlimit, METH_O, setlimit__doc__},
+        {"mark", (PyCFunction)hotbuf_mark, METH_NOARGS, mark__doc__},
+        {"setmark", (PyCFunction)hotbuf_setmark, METH_NOARGS, setmark__doc__},
+        {"reset", (PyCFunction)hotbuf_reset, METH_NOARGS, reset__doc__},
+        {"flip", (PyCFunction)hotbuf_flip, METH_NOARGS, flip__doc__},
+        {"rewind", (PyCFunction)hotbuf_rewind, METH_NOARGS, rewind__doc__},
+        {"remaining", (PyCFunction)hotbuf_remaining, METH_NOARGS, remaining__doc__},
+        {"compact", (PyCFunction)hotbuf_compact, METH_NOARGS, compact__doc__},
 
-	{"getbyte", (PyCFunction)hotbuf_getbyte, METH_NOARGS, relative_get__doc__},
-	{"putbyte", (PyCFunction)hotbuf_putbyte, METH_O, relative_put__doc__},
-	{NULL, NULL} /* sentinel */
+        {"getbyte", (PyCFunction)hotbuf_getbyte, METH_NOARGS, relative_get__doc__},
+        {"putbyte", (PyCFunction)hotbuf_putbyte, METH_O, relative_put__doc__},
+        {NULL, NULL} /* sentinel */
 };
 
 static PySequenceMethods hotbuf_as_sequence = {
@@ -687,46 +687,46 @@ static PyBufferProcs hotbuf_as_buffer = {
     (charbufferproc)hotbuf_getcharbuf,
 };
 
-PyTypeObject PyHotbuf_Type = {
+static PyTypeObject PyHotbuf_Type = {
     PyObject_HEAD_INIT(&PyType_Type)
     0,
-    "hotbuf",
+    "_hotbuf._hotbuf",
     sizeof(PyHotbufObject),
     0,
-    (destructor)hotbuf_dealloc,         /* tp_dealloc */
-    0,                                  /* tp_print */
-    0,                                  /* tp_getattr */
-    0,                                  /* tp_setattr */
-    (cmpfunc)hotbuf_compare,            /* tp_compare */
-    (reprfunc)hotbuf_repr,              /* tp_repr */
-    0,                                  /* tp_as_number */
-    &hotbuf_as_sequence,               /* tp_as_sequence */
-    0,                                  /* tp_as_mapping */
-    0,                                  /* tp_hash */
-    0,                                  /* tp_call */
-    (reprfunc)hotbuf_str,              /* tp_str */
-    PyObject_GenericGetAttr,            /* tp_getattro */
-    0,                                  /* tp_setattro */
-    &hotbuf_as_buffer,                 /* tp_as_buffer */
-    Py_TPFLAGS_DEFAULT,                 /* tp_flags */
-    hotbuf_doc,                         /* tp_doc */
-    0,                                  /* tp_traverse */
-    0,                                  /* tp_clear */
-    0,                                  /* tp_richcompare */
-    0,                                  /* tp_weaklistoffset */
-    0,                                  /* tp_iter */
-    0,                                  /* tp_iternext */
-    hotbuf_methods,                     /* tp_methods */
-    0,                                  /* tp_members */
-    0,                                  /* tp_getset */
-    0,                                  /* tp_base */
-    0,                                  /* tp_dict */
-    0,                                  /* tp_descr_get */
-    0,                                  /* tp_descr_set */
-    0,                                  /* tp_dictoffset */
-    0,                                  /* tp_init */
-    0,                                  /* tp_alloc */
-    hotbuf_new,                        /* tp_new */
+    (destructor)hotbuf_dealloc,                 /* tp_dealloc */
+    0,                                          /* tp_print */
+    0,                                          /* tp_getattr */
+    0,                                          /* tp_setattr */
+    (cmpfunc)hotbuf_compare,                    /* tp_compare */
+    (reprfunc)hotbuf_repr,                      /* tp_repr */
+    0,                                          /* tp_as_number */
+    &hotbuf_as_sequence,                        /* tp_as_sequence */
+    0,                                          /* tp_as_mapping */
+    0,                                          /* tp_hash */
+    0,                                          /* tp_call */
+    (reprfunc)hotbuf_str,                       /* tp_str */
+    PyObject_GenericGetAttr,                    /* tp_getattro */
+    0,                                          /* tp_setattro */
+    &hotbuf_as_buffer,                          /* tp_as_buffer */
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,   /* tp_flags */
+    hotbuf_doc,                                 /* tp_doc */
+    0,                                          /* tp_traverse */
+    0,                                          /* tp_clear */
+    0,                                          /* tp_richcompare */
+    0,                                          /* tp_weaklistoffset */
+    0,                                          /* tp_iter */
+    0,                                          /* tp_iternext */
+    hotbuf_methods,                             /* tp_methods */
+    0,                                          /* tp_members */
+    0,                                          /* tp_getset */
+    0,                                          /* tp_base */
+    0,                                          /* tp_dict */
+    0,                                          /* tp_descr_get */
+    0,                                          /* tp_descr_set */
+    0,                                          /* tp_dictoffset */
+    0,                                          /* tp_init */
+    0,                                          /* tp_alloc */
+    hotbuf_new,                                 /* tp_new */
 };
 
 
@@ -762,38 +762,18 @@ static PyMethodDef a_methods[] = {
 
 
 PyMODINIT_FUNC
-inithotbuf(void)
+init_hotbuf(void)
 {
     PyObject *m;
 
     PyHotbuf_Type.ob_type = &PyType_Type;
-    m = Py_InitModule3("hotbuf", a_methods, module_doc);
+    m = Py_InitModule3("_hotbuf", a_methods, module_doc);
     if (m == NULL)
         return;
 
     Py_INCREF((PyObject *)&PyHotbuf_Type);
     PyModule_AddObject(m, "HotbufType", (PyObject *)&PyHotbuf_Type);
     Py_INCREF((PyObject *)&PyHotbuf_Type);
-    PyModule_AddObject(m, "hotbuf", (PyObject *)&PyHotbuf_Type);
-    /* No need to check the error here, the caller will do that */
+    PyModule_AddObject(m, "_hotbuf", (PyObject *)&PyHotbuf_Type);
 }
-
-
-
-/*
-   TODO
-   ----
-   - Add hash function
-   - Add support for sequence methods.
-   - Perhaps implement returning the buffer object itself from some of
-     the methods in order to allow chaining of operations on a single line.
-   - Implement a resize function
-   - Maybe remove the API methods declared at the top.
-   - Add support for big vs. little endian
-
-   Pending Issues
-   --------------
-   - Should we support weakrefs?
-
-*/
 
