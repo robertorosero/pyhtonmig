@@ -2,7 +2,7 @@
 #
 # $Id$
 #
-#  Copyright (C) 2005   Gregory P. Smith (greg@electricrain.com)
+#  Copyright (C) 2006   Martin Blais <blais@furius.ca>
 #  Licensed to PSF under a Contributor Agreement.
 #
 
@@ -11,18 +11,18 @@ import unittest
 from test import test_support
 
 
+CAPACITY = 1024
+
 class HotbufTestCase(unittest.TestCase):
 
     def test_base( self ):
-        CAPACITY = 1024
-
         # Create a new hotbuf
         self.assertRaises(ValueError, hotbuf, -1)
         self.assertRaises(ValueError, hotbuf, 0)
         b = hotbuf(CAPACITY)
         self.assertEquals(len(b), CAPACITY)
         self.assertEquals(b.capacity(), CAPACITY)
-        
+
         # Play with the position
         assert b.position() == 0
         b.setposition(10)
@@ -39,7 +39,7 @@ class HotbufTestCase(unittest.TestCase):
 
         # Play with reset before the mark has been set.
         self.assertRaises(IndexError, b.setlimit, CAPACITY + 1)
-        
+
         # Play with the mark
         b.setposition(10)
         b.setlimit(100)
@@ -59,7 +59,7 @@ class HotbufTestCase(unittest.TestCase):
         b.flip()
         self.assertEquals((b.position(), b.limit(), b.mark()),
                           (0, 42, -1))
-        
+
         # Play with rewind.
         b.setposition(42)
         b.setlimit(104)
@@ -74,7 +74,6 @@ class HotbufTestCase(unittest.TestCase):
         self.assertEquals(b.remaining(), 94)
 
     def test_compact( self ):
-        CAPACITY = 1024
         b = hotbuf(CAPACITY)
 
         b.setposition(100)
@@ -84,11 +83,34 @@ class HotbufTestCase(unittest.TestCase):
         self.assertEquals((b.position(), b.limit(), b.mark()),
                           (100, CAPACITY, -1))
 
+    def test_byte( self ):
+        b = hotbuf(256)
 
-        
+        # Fill up the buffer with bytes.
+        for x in xrange(256):
+            b.putbyte(x)
+
+        # Test overflow.
+        self.assertRaises(IndexError, b.putbyte, 42)
+
+        # Read all data from the buffer.
+        b.flip()
+        for x in xrange(256):
+            nx = b.getbyte()
+            print nx
+            assert nx == x
+
+        # Test underflow.
+        self.assertRaises(IndexError, b.putbyte, 42)
+
+
+
+
+
+
+
 def test_main():
     test_support.run_unittest(HotbufTestCase)
-
 
 if __name__ == "__main__":
     test_main()
