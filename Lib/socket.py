@@ -140,7 +140,9 @@ class _socketobject(object):
 
     __doc__ = _realsocket.__doc__
 
-    __slots__ = ["_sock", "send", "recv", "recv_buf", "sendto", "recvfrom",
+    __slots__ = ["_sock",
+                 "recv", "recv_buf", "recvfrom_buf",
+                 "send", "sendto", "recvfrom",
                  "__weakref__"]
 
     def __init__(self, family=AF_INET, type=SOCK_STREAM, proto=0, _sock=None):
@@ -152,6 +154,7 @@ class _socketobject(object):
         self.recv_buf = self._sock.recv_buf
         self.sendto = self._sock.sendto
         self.recvfrom = self._sock.recvfrom
+        self.recvfrom_buf = self._sock.recvfrom_buf
 
     def close(self):
         self._sock = _closedsocket()

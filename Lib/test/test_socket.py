@@ -866,24 +866,25 @@ class BufferIOTest(SocketConnectedTest):
         buf = array.array('c', ' '*1024)
         nbytes = self.cli_conn.recv_buf(buf)
         self.assertEqual(nbytes, len(MSG))
-        trunc = buf.tostring()[:len(MSG)]
-        self.assertEqual(trunc, MSG)
+        msg = buf.tostring()[:len(MSG)]
+        self.assertEqual(msg, MSG)
 
     def _testRecv(self):
         # Send using a read-only buffer.
         buf = buffer(MSG)
         self.serv_conn.send(buf)
 
-    def testRecvBB(self):
-        # Receive into the buffer of an array class.
+    def testRecv2(self):
+        # Receive into a bytebuf.
         buf = bytebuf.bytebuf(1024)
         nbytes = self.cli_conn.recv_buf(buf)
         self.assertEqual(nbytes, len(MSG))
-        trunc = str(buf)[:len(MSG)]
-        self.assertEqual(trunc, MSG)
+        msg = str(buf)[:len(MSG)]
+        self.assertEqual(msg, MSG)
 
-    def _testRecvBB(self):
-        # Send using a read-only buffer.
+    def _testRecv2(self):
+        # Send using a bytebuf.
+## FIXME: todo
 ##         buf = bytebuf.bytebuf(MSG)
         self.serv_conn.send(MSG)
 
@@ -897,13 +898,31 @@ class BufferIOTest(SocketConnectedTest):
 ##     def _testOverFlowRecv(self):
 ##         self.serv_conn.send(MSG)
 
-##     def testRecvFrom(self):
-##         # Testing large recvfrom() over TCP
-##         msg, addr = self.cli_conn.recvfrom(1024)
-##         self.assertEqual(msg, MSG)
+    def testRecvFrom(self):
+        # Testing large recvfrom() over TCP
+        buf = array.array('c', ' '*1024)
+        nbytes, addr = self.cli_conn.recvfrom_buf(buf)
+        self.assertEqual(nbytes, len(MSG))
+        msg = buf.tostring()[:len(MSG)]
+        self.assertEqual(msg, MSG)
 
-##     def _testRecvFrom(self):
-##         self.serv_conn.send(MSG)
+    def _testRecvFrom(self):
+        buf = buffer(MSG)
+        self.serv_conn.send(buf)
+
+    def testRecvFrom2(self):
+        # Testing large recvfrom() over TCP
+        buf = bytebuf.bytebuf(1024)
+        nbytes, addr = self.cli_conn.recvfrom_buf(buf)
+        self.assertEqual(nbytes, len(MSG))
+        msg = str(buf)[:len(MSG)]
+        self.assertEqual(msg, MSG)
+
+    def _testRecvFrom2(self):
+        # Send using a bytebuf.
+## FIXME: todo
+##         buf = bytebuf.bytebuf(MSG)
+        self.serv_conn.send(MSG)
 
 ##     def testOverFlowRecvFrom(self):
 ##         # Testing recvfrom() in chunks over TCP
