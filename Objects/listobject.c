@@ -22,17 +22,20 @@
  * than ob_size on entry.
  */
 static int
-list_resize(PyListObject *self, Py_ssize_t newsize)
+list_resize(PyListObject *self, Py_ssize_t newsize, int allow_shrink)
 {
 	PyObject **items;
 	size_t new_allocated;
 	Py_ssize_t allocated = self->allocated;
 
 	/* Bypass realloc() when a previous overallocation is large enough
-	   to accommodate the newsize.  If the newsize falls lower than half
-	   the allocated size, then proceed with the realloc() to shrink the list.
+	   to accommodate the newsize.
+           If the newsize falls lower than half the allocated size and we
+           allow shrinking, then proceed with the realloc() to shrink the
+           list.
 	*/
-	if (allocated >= newsize && newsize >= (allocated >> 1)) {
+	if (allocated >= newsize && (newsize >= (allocated >> 1) ||
+                        !allow_shrink)) {
 		assert(self->ob_item != NULL || newsize == 0);
 		self->ob_size = newsize;
 		return 0;
@@ -187,7 +190,7 @@ ins1(PyListObject *self, Py_ssize_t where, PyObject *v)
 		return -1;
 	}
 
-	if (list_resize(self, n+1) == -1)
+	if (list_resize(self, n+1, 0) == -1)
 		return -1;
 
 	if (where < 0) {
@@ -227,7 +230,7 @@ app1(PyListObject *self, PyObject *v)
 		return -1;
 	}
 
-	if (list_resize(self, n+1) == -1)
+	if (list_resize(self, n+1, 0) == -1)
 		return -1;
 
 	Py_INCREF(v);
@@ -614,12 +617,12 @@ list_ass_slice(PyListObject *a, Py_ssize_t ilow, Py_ssize_t ihigh, PyObject *v)
 	if (d < 0) { /* Delete -d items */
 		memmove(&item[ihigh+d], &item[ihigh],
 			(a->ob_size - ihigh)*sizeof(PyObject *));
-		list_resize(a, a->ob_size + d);
+		list_resize(a, a->ob_size + d, 1);
 		item = a->ob_item;
 	}
 	else if (d > 0) { /* Insert d items */
 		k = a->ob_size;
-		if (list_resize(a, k+d) < 0)
+		if (list_resize(a, k+d, 0) < 0)
 			goto Error;
 		item = a->ob_item;
 		memmove(&item[ihigh+d], &item[ihigh],
@@ -670,7 +673,7 @@ list_inplace_repeat(PyListObject *self, Py_ssize_t n)
 		return (PyObject *)self;
 	}
 
-	if (list_resize(self, size*n) == -1)
+	if (list_resize(self, size*n, 0) == -1)
 		return NULL;
 
 	p = size;
@@ -750,7 +753,7 @@ listextend(PyListObject *self, PyObject *b)
 			Py_RETURN_NONE;
 		}
 		m = self->ob_size;
-		if (list_resize(self, m + n) == -1) {
+		if (list_resize(self, m + n, 0) == -1) {
 			Py_DECREF(b);
 			return NULL;
 		}
@@ -791,7 +794,7 @@ listextend(PyListObject *self, PyObject *b)
 	mn = m + n;
 	if (mn >= m) {
 		/* Make room. */
-		if (list_resize(self, mn) == -1)
+		if (list_resize(self, mn, 0) == -1)
 			goto error;
 		/* Make the list sane again. */
 		self->ob_size = m;
@@ -828,7 +831,7 @@ listextend(PyListObject *self, PyObject *b)
 
 	/* Cut back result list if initial guess was too large. */
 	if (self->ob_size < self->allocated)
-		list_resize(self, self->ob_size);  /* shrinking can't fail */
+		list_resize(self, self->ob_size, 1);  /* shrinking can't fail */
 
 	Py_DECREF(it);
 	Py_RETURN_NONE;
@@ -885,7 +888,7 @@ listpop(PyListObject *self, PyObject *args)
 	}
 	v = self->ob_item[i];
 	if (i == self->ob_size - 1) {
-		status = list_resize(self, self->ob_size - 1);
+		status = list_resize(self, self->ob_size - 1, 1);
 		assert(status >= 0);
 		return v; /* and v now owns the reference the list had */
 	}
@@ -2355,10 +2358,13 @@ list_richcompare(PyObject *v, PyObject *w, int op)
 static int
 list_init(PyListObject *self, PyObject *args, PyObject *kw)
 {
-	PyObject *arg = NULL;
-	static char *kwlist[] = {"sequence", 0};
+	PyObject *sequence = NULL;
+        Py_ssize_t size = 0;
+	static char *kwlist[] = {"sequence", "size", 0};
+	PyObject **items;
 
-	if (!PyArg_ParseTupleAndKeywords(args, kw, "|O:list", kwlist, &arg))
+	if (!PyArg_ParseTupleAndKeywords(args, kw, "|On:list", kwlist,
+                &sequence, &size))
 		return -1;
 
 	/* Verify list invariants established by PyType_GenericAlloc() */
@@ -2371,12 +2377,32 @@ list_init(PyListObject *self, PyObject *args, PyObject *kw)
 	if (self->ob_item != NULL) {
 		(void)list_clear(self);
 	}
-	if (arg != NULL) {
-		PyObject *rv = listextend(self, arg);
+	if (sequence != NULL) {
+		PyObject *rv = listextend(self, sequence);
 		if (rv == NULL)
 			return -1;
 		Py_DECREF(rv);
 	}
+
+        if (size != 0) {
+                if (size < PyList_GET_SIZE(self)) {
+                        PyErr_SetString(PyExc_ValueError, "size argument"
+                                " too small to contain supplied sequence");
+			return -1;
+                }
+                /* (p)re-allocate to the indicated size */
+                items = self->ob_item;
+                if (size <= ((~(size_t)0) / sizeof(PyObject *)))
+                        PyMem_RESIZE(items, PyObject *, size);
+                else
+                        items = NULL;
+                if (items == NULL) {
+                        PyErr_NoMemory();
+                        return -1;
+                }
+                self->ob_item = items;
+                self->allocated = size;
+        }
 	return 0;
 }
 
@@ -2565,7 +2591,7 @@ list_ass_subscript(PyListObject* self, PyObject* item, PyObject* value)
 			}
 
 			self->ob_size -= slicelength;
-			list_resize(self, self->ob_size);
+			list_resize(self, self->ob_size, 1);
 
 			for (i = 0; i < slicelength; i++) {
 				Py_DECREF(garbage[i]);
