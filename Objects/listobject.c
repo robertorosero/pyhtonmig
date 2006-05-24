@@ -2390,6 +2390,11 @@ list_init(PyListObject *self, PyObject *args, PyObject *kw)
                                 " too small to contain supplied sequence");
 			return -1;
                 }
+                if (size < 0) {
+                        PyErr_SetString(PyExc_ValueError, "size argument"
+                                " must be positive");
+                       return -1;
+                }
                 /* (p)re-allocate to the indicated size */
                 items = self->ob_item;
                 if (size <= ((~(size_t)0) / sizeof(PyObject *)))
