@@ -206,3 +206,58 @@ if not sys.platform.startswith('java'):
     test_capi2()
 
 unlink(TESTFN)
+
+#  test that exception attributes are happy.
+try: unicode('\xff')
+except Exception, e: sampleUnicodeError = e
+exceptionList = [
+        ( BaseException, (), { 'message' : '', 'args' : () }),
+        ( BaseException, (1, ), { 'message' : 1, 'args' : ( 1, ) }),
+        ( BaseException, ('foo', ), { 'message' : 'foo', 'args' : ( 'foo', ) }),
+        ( BaseException, ('foo', 1), { 'message' : '', 'args' : ( 'foo', 1 ) }),
+        ( SystemExit, ('foo',), { 'message' : 'foo', 'args' : ( 'foo', ),
+                'code' : 'foo' }),
+        ( EnvironmentError, ('errnoStr', 'strErrorStr', 'filenameStr'),
+                { 'message' : '', 'args' : ('errnoStr', 'strErrorStr'),
+                    'strerror' : 'strErrorStr',
+                    'errno' : 'errnoStr', 'filename' : 'filenameStr' }),
+        ( SyntaxError, ('msgStr', 'filenameStr', 'linenoStr', 'offsetStr',
+                    'textStr', 'print_file_and_lineStr'),
+                { 'message' : '', 'args' : ('msgStr', 'filenameStr',
+                        'linenoStr', 'offsetStr', 'textStr',
+                        'print_file_and_lineStr'),
+                    'print_file_and_line' : None, 'msg' : 'msgStr',
+                    'filename' : None, 'lineno' : None, 'offset' : None,
+                    'text' : None }),
+        ( sampleUnicodeError,
+                { 'message' : '', 'args' : ('ascii', '\xff', 0, 1,
+                        'ordinal not in range(128)'),
+                    'encoding' : 'ascii', 'object' : '\xff',
+                    'start' : 0, 'reason' : 'ordinal not in range(128)' }),
+        ( UnicodeTranslateError, (u"\u3042", 0, 1, "ouch"),
+                { 'message' : '', 'args' : (u'\u3042', 0, 1, 'ouch'),
+                    'object' : u'\u3042', 'reason' : 'ouch',
+                    'start' : 0, 'end' : 1 }),
+        ]
+try:
+    exceptionList.append(
+            ( WindowsError, ('errnoStr', 'strErrorStr', 'filenameStr'),
+                    { 'message' : '', 'args' : ('errnoStr', 'strErrorStr'),
+                        'strerror' : 'strErrorStr',
+                        'errno' : 'errnoStr', 'filename' : 'filenameStr',
+                        'winerror' : 'foo' }))
+except NameError: pass
+
+for args in exceptionList:
+    expected = args[-1]
+    try:
+        if len(args) == 2: raise args[0]
+        else: raise apply(args[0], args[1])
+    except BaseException, e:
+        for checkArgName in expected.keys():
+            if getattr(e, checkArgName) != expected[checkArgName]:
+                raise TestFailed('Checking exception arguments, exception '
+                        '"%s", attribute "%s" expected %s got %s.' %
+                        ( repr(e), checkArgName,
+                            repr(expected[checkArgName]),
+                            repr(getattr(e, checkArgName)) ))
