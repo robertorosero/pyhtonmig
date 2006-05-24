@@ -15,6 +15,7 @@ BaseException
       |    |    +-- IOError
       |    |    +-- OSError
       |    |         +-- WindowsError (Windows)
+      |    |         +-- VMSError (VMS)
       |    +-- EOFError
       |    +-- ImportError
       |    +-- LookupError
