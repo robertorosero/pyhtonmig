@@ -12,6 +12,19 @@ What's New in Python 2.5 alpha 3?
 Core and builtins
 -----------------
 
+- Bug #1334662: ``int(string, base)`` could deliver a wrong answer
+  when ``base`` was not 2, 4, 8, 10, 16 or 32, and ``string`` represented
+  an integer close to ``sys.maxint``.  This was repaired by patch
+  #1335972, which also gives a nice speedup.
+
+- Patch #1337051: reduced size of frame objects.
+
+- PyErr_NewException now accepts a tuple of base classes as its
+  "base" parameter.
+
+- Patch #876206: function call speedup by retaining allocated frame
+  objects.
+
 - Bug #1462152: file() now checks more thoroughly for invalid mode
   strings and removes a possible "U" before passing the mode to the
   C library function.
@@ -32,6 +45,8 @@ Core and builtins
 Extension Modules
 -----------------
 
+- Patch #1493701: performance enhancements for struct module.
+
 - Patch #1490224: time.altzone is now set correctly on Cygwin.
 
 - Patch #1435422: zlib's compress and decompress objects now have a
@@ -48,6 +63,8 @@ Extension Modules
 
 Library
 -------
+
+- Patch #1281707: speed up gzip.readline.
 
 - Patch #1180296: Two new functions were added to the locale module:
   format_string() to get the effect of  "format % items" but locale-aware,

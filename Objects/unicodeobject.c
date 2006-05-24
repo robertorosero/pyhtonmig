@@ -46,6 +46,18 @@ OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #include <windows.h>
 #endif
 
+#undef USE_INLINE /* XXX - set via configure? */
+
+#if defined(_MSC_VER) /* this is taken from _sre.c */
+#pragma warning(disable: 4710)
+/* fastest possible local call under MSVC */
+#define LOCAL(type) static __inline type __fastcall
+#elif defined(USE_INLINE)
+#define LOCAL(type) static inline type
+#else
+#define LOCAL(type) static type
+#endif
+
 /* Limit for the Unicode object free list */
 
 #define MAX_UNICODE_FREELIST_SIZE       1024
@@ -120,6 +132,51 @@ PyUnicode_GetMax(void)
 	return 0xFFFF;
 #endif
 }
+
+/* --- Bloom Filters ----------------------------------------------------- */
+
+/* stuff to implement simple "bloom filters" for Unicode characters.
+   to keep things simple, we use a single bitmask, using the least 5
+   bits from each unicode characters as the bit index. */
+
+/* the linebreak mask is set up by Unicode_Init below */
+
+#define BLOOM_MASK unsigned long
+
+static BLOOM_MASK bloom_linebreak;
+
+#define BLOOM(mask, ch) ((mask & (1 << ((ch) & 0x1F))))
+
+#define BLOOM_LINEBREAK(ch)\
+    (BLOOM(bloom_linebreak, (ch)) && Py_UNICODE_ISLINEBREAK((ch)))
+
+LOCAL(BLOOM_MASK) make_bloom_mask(Py_UNICODE* ptr, Py_ssize_t len)
+{
+    /* calculate simple bloom-style bitmask for a given unicode string */
+
+    long mask;
+    Py_ssize_t i;
+
+    mask = 0;
+    for (i = 0; i < len; i++)
+        mask |= (1 << (ptr[i] & 0x1F));
+
+    return mask;
+}
+
+LOCAL(int) unicode_member(Py_UNICODE chr, Py_UNICODE* set, Py_ssize_t setlen)
+{
+    Py_ssize_t i;
+
+    for (i = 0; i < setlen; i++)
+        if (set[i] == chr)
+            return 1;
+
+    return 0;
+}
+
+#define BLOOM_MEMBER(mask, chr, set, setlen)\
+    BLOOM(mask, chr) && unicode_member(chr, set, setlen)
 
 /* --- Unicode Object ----------------------------------------------------- */
 
@@ -1963,9 +2020,20 @@ onError:
 
 */
 
-static const Py_UNICODE *findchar(const Py_UNICODE *s,
-				  Py_ssize_t size,
-				  Py_UNICODE ch);
+LOCAL(const Py_UNICODE *) findchar(const Py_UNICODE *s,
+                                   Py_ssize_t size,
+                                   Py_UNICODE ch)
+{
+    /* like wcschr, but doesn't stop at NULL characters */
+
+    while (size-- > 0) {
+        if (*s == ch)
+            return s;
+        s++;
+    }
+
+    return NULL;
+}
 
 static
 PyObject *unicodeescape_string(const Py_UNICODE *s,
@@ -3791,8 +3859,98 @@ int PyUnicode_EncodeDecimal(Py_UNICODE *s,
 
 /* --- Helpers ------------------------------------------------------------ */
 
-static
-Py_ssize_t count(PyUnicodeObject *self,
+#define USE_FAST /* experimental fast search implementation */
+
+/* fast search/count implementation, based on a mix between boyer-
+   moore and horspool, with a few more bells and whistles on the top.
+   for some more background, see: http://effbot.org/stringlib */
+
+/* note: fastsearch may access s[n], which isn't a problem when using
+   Python's ordinary string types.  also, the count mode returns -1 if
+   there cannot possible be a match in the target string, and 0 if it
+   has actually checked for matches. */
+
+#define FAST_COUNT 0
+#define FAST_SEARCH 1
+
+LOCAL(Py_ssize_t)
+fastsearch(Py_UNICODE* s, Py_ssize_t n, Py_UNICODE* p, Py_ssize_t m, int mode)
+{
+    long mask;
+    int skip, count = 0;
+    Py_ssize_t i, j, mlast, w;
+
+    w = n - m;
+
+    if (w < 0)
+        return -1;
+
+    /* look for special cases */
+    if (m <= 1) {
+        if (m <= 0)
+            return -1;
+        /* use special case for 1-character strings */
+        if (mode == FAST_COUNT) {
+            for (i = 0; i < n; i++)
+                if (s[i] == p[0])
+                    count++;
+            return count;
+        } else {
+            for (i = 0; i < n; i++)
+                if (s[i] == p[0])
+                    return i;
+        }
+        return -1;
+    }
+
+    mlast = m - 1;
+
+    /* create compressed boyer-moore delta 1 table */
+    skip = mlast - 1;
+    /* process pattern[:-1] */
+    for (mask = i = 0; i < mlast; i++) {
+        mask |= (1 << (p[i] & 0x1F));
+        if (p[i] == p[mlast])
+            skip = mlast - i - 1;
+    }
+    /* process pattern[-1] outside the loop */
+    mask |= (1 << (p[mlast] & 0x1F));
+
+    for (i = 0; i <= w; i++) {
+        /* note: using mlast in the skip path slows things down on x86 */
+        if (s[i+m-1] == p[m-1]) {
+            /* candidate match */
+            for (j = 0; j < mlast; j++)
+                if (s[i+j] != p[j])
+                    break;
+            if (j == mlast) {
+                /* got a match! */
+                if (mode != FAST_COUNT)
+                    return i;
+                count++;
+                i = i + mlast;
+                continue;
+            }
+            /* miss: check if next character is part of pattern */
+            if (!(mask & (1 << (s[i+m] & 0x1F))))
+                i = i + m;
+            else {
+                i = i + skip;
+                continue;
+            }
+        } else {
+            /* skip: check if next character is part of pattern */
+            if (!(mask & (1 << (s[i+m] & 0x1F))))
+                i = i + m;
+        }
+    }
+
+    if (mode != FAST_COUNT)
+        return -1;
+    return count;
+}
+
+LOCAL(Py_ssize_t) count(PyUnicodeObject *self,
 		 Py_ssize_t start,
 		 Py_ssize_t end,
 		 PyUnicodeObject *substring)
@@ -3813,6 +3971,14 @@ Py_ssize_t count(PyUnicodeObject *self,
     if (substring->length == 0)
 	return (end - start + 1);
 
+#ifdef USE_FAST
+    count = fastsearch(
+        PyUnicode_AS_UNICODE(self) + start, end - start,
+        substring->str, substring->length, FAST_COUNT
+        );
+    if (count < 0)
+        count = 0; /* no match */
+#else    
     end -= substring->length;
 
     while (start <= end)
@@ -3821,6 +3987,7 @@ Py_ssize_t count(PyUnicodeObject *self,
             start += substring->length;
         } else
             start++;
+#endif
 
     return count;
 }
@@ -3850,8 +4017,7 @@ Py_ssize_t PyUnicode_Count(PyObject *str,
     return result;
 }
 
-static
-Py_ssize_t findstring(PyUnicodeObject *self,
+static Py_ssize_t findstring(PyUnicodeObject *self,
 	       PyUnicodeObject *substring,
 	       Py_ssize_t start,
 	       Py_ssize_t end,
@@ -3871,6 +4037,18 @@ Py_ssize_t findstring(PyUnicodeObject *self,
 
     if (substring->length == 0)
 	return (direction > 0) ? start : end;
+
+#ifdef USE_FAST
+    if (direction > 0) {
+        Py_ssize_t pos = fastsearch(
+            PyUnicode_AS_UNICODE(self) + start, end - start,
+            substring->str, substring->length, FAST_SEARCH
+            );
+        if (pos < 0)
+            return pos;
+        return pos + start;
+    }
+#endif
 
     end -= substring->length;
 
@@ -3972,22 +4150,6 @@ Py_ssize_t PyUnicode_Tailmatch(PyObject *str,
     Py_DECREF(str);
     Py_DECREF(substr);
     return result;
-}
-
-static
-const Py_UNICODE *findchar(const Py_UNICODE *s,
-		     Py_ssize_t size,
-		     Py_UNICODE ch)
-{
-    /* like wcschr, but doesn't stop at NULL characters */
-
-    while (size-- > 0) {
-        if (*s == ch)
-            return s;
-        s++;
-    }
-
-    return NULL;
 }
 
 /* Apply fixfct filter to the Unicode object self and return a
@@ -4332,17 +4494,6 @@ PyUnicodeObject *pad(PyUnicodeObject *self,
         else								\
             Py_DECREF(str);
 
-#define SPLIT_INSERT(data, left, right)					\
-	str = PyUnicode_FromUnicode((data) + (left), (right) - (left));	\
-	if (!str)							\
-	    goto onError;						\
-	if (PyList_Insert(list, 0, str)) {				\
-	    Py_DECREF(str);						\
-	    goto onError;						\
-	}								\
-        else								\
-            Py_DECREF(str);
-
 static
 PyObject *split_whitespace(PyUnicodeObject *self,
 			   PyObject *list,
@@ -4403,7 +4554,7 @@ PyObject *PyUnicode_Splitlines(PyObject *string,
 	Py_ssize_t eol;
 
 	/* Find a line and append it */
-	while (i < len && !Py_UNICODE_ISLINEBREAK(data[i]))
+	while (i < len && !BLOOM_LINEBREAK(data[i]))
 	    i++;
 
 	/* Skip the line break reading CRLF as one line break */
@@ -4514,15 +4665,17 @@ PyObject *rsplit_whitespace(PyUnicodeObject *self,
 	if (j > i) {
 	    if (maxcount-- <= 0)
 		break;
-	    SPLIT_INSERT(self->str, i + 1, j + 1);
+	    SPLIT_APPEND(self->str, i + 1, j + 1);
 	    while (i >= 0 && Py_UNICODE_ISSPACE(self->str[i]))
 		i--;
 	    j = i;
 	}
     }
     if (j >= 0) {
-	SPLIT_INSERT(self->str, 0, j + 1);
+	SPLIT_APPEND(self->str, 0, j + 1);
     }
+    if (PyList_Reverse(list) < 0)
+        goto onError;
     return list;
 
  onError:
@@ -4545,14 +4698,16 @@ PyObject *rsplit_char(PyUnicodeObject *self,
 	if (self->str[i] == ch) {
 	    if (maxcount-- <= 0)
 		break;
-	    SPLIT_INSERT(self->str, i + 1, j + 1);
+	    SPLIT_APPEND(self->str, i + 1, j + 1);
 	    j = i = i - 1;
 	} else
 	    i--;
     }
     if (j >= -1) {
-	SPLIT_INSERT(self->str, 0, j + 1);
+	SPLIT_APPEND(self->str, 0, j + 1);
     }
+    if (PyList_Reverse(list) < 0)
+        goto onError;
     return list;
 
  onError:
@@ -4576,15 +4731,17 @@ PyObject *rsplit_substring(PyUnicodeObject *self,
 	if (Py_UNICODE_MATCH(self, i, substring)) {
 	    if (maxcount-- <= 0)
 		break;
-	    SPLIT_INSERT(self->str, i + sublen, j);
+	    SPLIT_APPEND(self->str, i + sublen, j);
 	    j = i;
 	    i -= sublen;
 	} else
 	    i--;
     }
     if (j >= 0) {
-	SPLIT_INSERT(self->str, 0, j);
+	SPLIT_APPEND(self->str, 0, j);
     }
+    if (PyList_Reverse(list) < 0)
+        goto onError;
     return list;
 
  onError:
@@ -4593,7 +4750,6 @@ PyObject *rsplit_substring(PyUnicodeObject *self,
 }
 
 #undef SPLIT_APPEND
-#undef SPLIT_INSERT
 
 static
 PyObject *split(PyUnicodeObject *self,
@@ -4664,36 +4820,47 @@ PyObject *replace(PyUnicodeObject *self,
     if (maxcount < 0)
 	maxcount = PY_SSIZE_T_MAX;
 
-    if (str1->length == 1 && str2->length == 1) {
+    if (str1->length == str2->length) {
+        /* same length */
         Py_ssize_t i;
-
-        /* replace characters */
-        if (!findchar(self->str, self->length, str1->str[0]) &&
-            PyUnicode_CheckExact(self)) {
-            /* nothing to replace, return original string */
-            Py_INCREF(self);
-            u = self;
+        if (str1->length == 1) {
+            /* replace characters */
+            Py_UNICODE u1, u2;
+            if (!findchar(self->str, self->length, str1->str[0]))
+                goto nothing;
+            u = (PyUnicodeObject*) PyUnicode_FromUnicode(NULL, self->length);
+            if (!u)
+                return NULL;
+            Py_UNICODE_COPY(u->str, self->str, self->length);
+            u1 = str1->str[0];
+            u2 = str2->str[0];
+            for (i = 0; i < u->length; i++)
+                if (u->str[i] == u1) {
+                    if (--maxcount < 0)
+                        break;
+                    u->str[i] = u2;
+                }
         } else {
-	    Py_UNICODE u1 = str1->str[0];
-	    Py_UNICODE u2 = str2->str[0];
-
-            u = (PyUnicodeObject*) PyUnicode_FromUnicode(
-                NULL,
-                self->length
+            i = fastsearch(
+                self->str, self->length, str1->str, str1->length, FAST_SEARCH
                 );
-            if (u != NULL) {
-		Py_UNICODE_COPY(u->str, self->str,
-				self->length);
-                for (i = 0; i < u->length; i++)
-                    if (u->str[i] == u1) {
-                        if (--maxcount < 0)
-                            break;
-                        u->str[i] = u2;
-                    }
+            if (i < 0)
+                goto nothing;
+            u = (PyUnicodeObject*) PyUnicode_FromUnicode(NULL, self->length);
+            if (!u)
+                return NULL;
+            Py_UNICODE_COPY(u->str, self->str, self->length);
+            while (i <= self->length - str1->length)
+                if (Py_UNICODE_MATCH(self, i, str1)) {
+                    if (--maxcount < 0)
+                        break;
+                    Py_UNICODE_COPY(u->str+i, str2->str, str2->length);
+                    i += str1->length;
+                } else
+                    i++;
         }
-        }
-
     } else {
+
         Py_ssize_t n, i;
         Py_UNICODE *p;
 
@@ -4701,51 +4868,47 @@ PyObject *replace(PyUnicodeObject *self,
         n = count(self, 0, self->length, str1);
         if (n > maxcount)
             n = maxcount;
-        if (n == 0) {
-            /* nothing to replace, return original string */
-            if (PyUnicode_CheckExact(self)) {
-                Py_INCREF(self);
-                u = self;
-            }
-            else {
-                u = (PyUnicodeObject *)
-                    PyUnicode_FromUnicode(self->str, self->length);
-	    }
-        } else {
-            u = _PyUnicode_New(
-                self->length + n * (str2->length - str1->length));
-            if (u) {
-                i = 0;
-                p = u->str;
-                if (str1->length > 0) {
-                    while (i <= self->length - str1->length)
-                        if (Py_UNICODE_MATCH(self, i, str1)) {
-                            /* replace string segment */
-                            Py_UNICODE_COPY(p, str2->str, str2->length);
-                            p += str2->length;
-                            i += str1->length;
-                            if (--n <= 0) {
-                                /* copy remaining part */
-                                Py_UNICODE_COPY(p, self->str+i, self->length-i);
-                                break;
-                            }
-                        } else
-                            *p++ = self->str[i++];
-                } else {
-                    while (n > 0) {
-                        Py_UNICODE_COPY(p, str2->str, str2->length);
-                        p += str2->length;
-                        if (--n <= 0)
-                            break;
-                        *p++ = self->str[i++];
+        if (n == 0)
+            goto nothing;
+        u = _PyUnicode_New(self->length + n * (str2->length - str1->length));
+        if (!u)
+            return NULL;
+        i = 0;
+        p = u->str;
+        if (str1->length > 0) {
+            while (i <= self->length - str1->length)
+                if (Py_UNICODE_MATCH(self, i, str1)) {
+                    /* replace string segment */
+                    Py_UNICODE_COPY(p, str2->str, str2->length);
+                    p += str2->length;
+                    i += str1->length;
+                    if (--n <= 0) {
+                        /* copy remaining part */
+                        Py_UNICODE_COPY(p, self->str+i, self->length-i);
+                        break;
                     }
-                    Py_UNICODE_COPY(p, self->str+i, self->length-i);
-                }
+                } else
+                    *p++ = self->str[i++];
+        } else {
+            while (n > 0) {
+                Py_UNICODE_COPY(p, str2->str, str2->length);
+                p += str2->length;
+                if (--n <= 0)
+                    break;
+                *p++ = self->str[i++];
             }
+            Py_UNICODE_COPY(p, self->str+i, self->length-i);
         }
     }
-
     return (PyObject *) u;
+
+nothing:
+    /* nothing to replace; return original string (when possible) */
+    if (PyUnicode_CheckExact(self)) {
+        Py_INCREF(self);
+        return (PyObject *) self;
+    }
+    return PyUnicode_FromUnicode(self->str, self->length);
 }
 
 /* --- Unicode Object Methods --------------------------------------------- */
@@ -4982,54 +5145,67 @@ onError:
 int PyUnicode_Contains(PyObject *container,
 		       PyObject *element)
 {
-    PyUnicodeObject *u = NULL, *v = NULL;
+    PyUnicodeObject *u, *v;
     int result;
     Py_ssize_t size;
-    register const Py_UNICODE *lhs, *end, *rhs;
+#ifdef USE_FAST
+    Py_ssize_t pos;
+#endif
 
     /* Coerce the two arguments */
-    v = (PyUnicodeObject *)PyUnicode_FromObject(element);
-    if (v == NULL) {
+    v = (PyUnicodeObject *) PyUnicode_FromObject(element);
+    if (!v) {
 	PyErr_SetString(PyExc_TypeError,
 	    "'in <string>' requires string as left operand");
-	goto onError;
+        return -1;
     }
-    u = (PyUnicodeObject *)PyUnicode_FromObject(container);
-    if (u == NULL)
-	goto onError;
+
+    u = (PyUnicodeObject *) PyUnicode_FromObject(container);
+    if (!u) {
+        Py_DECREF(v);
+        return -1;
+    }
 
     size = PyUnicode_GET_SIZE(v);
-    rhs = PyUnicode_AS_UNICODE(v);
-    lhs = PyUnicode_AS_UNICODE(u);
+    if (!size) {
+        result = 1;
+        goto done;
+    }
 
+#ifdef USE_FAST
+    pos = fastsearch(
+        PyUnicode_AS_UNICODE(u), PyUnicode_GET_SIZE(u),
+        PyUnicode_AS_UNICODE(v), size, FAST_SEARCH
+        );
+    result = (pos != -1);
+#else    
     result = 0;
-    if (size == 1) {
-	end = lhs + PyUnicode_GET_SIZE(u);
-	while (lhs < end) {
-	    if (*lhs++ == *rhs) {
-		result = 1;
-		break;
-	    }
-	}
-    }
-    else {
-	end = lhs + (PyUnicode_GET_SIZE(u) - size);
-	while (lhs <= end) {
-	    if (memcmp(lhs++, rhs, size * sizeof(Py_UNICODE)) == 0) {
-		result = 1;
-		break;
-	    }
-	}
-    }
 
+    if (size == 1) {
+        Py_UNICODE chr = PyUnicode_AS_UNICODE(v)[0];
+        Py_UNICODE* ptr = PyUnicode_AS_UNICODE(u);
+	Py_UNICODE* end = ptr + PyUnicode_GET_SIZE(u);
+	for (; ptr < end; ptr++) {
+	    if (*ptr == chr) {
+		result = 1;
+		break;
+	    }
+	}
+    } else {
+        Py_ssize_t start = 0;
+        Py_ssize_t end = PyUnicode_GET_SIZE(u) - size;
+        for (; start <= end; start++)
+            if (Py_UNICODE_MATCH(u, start, v)) {
+                result = 1;
+                break;
+            }
+    }
+#endif
+
+done:
     Py_DECREF(u);
     Py_DECREF(v);
     return result;
-
-onError:
-    Py_XDECREF(u);
-    Py_XDECREF(v);
-    return -1;
 }
 
 /* Concat to string or Unicode object giving a new Unicode object. */
@@ -5701,16 +5877,6 @@ static const char *stripformat[] = {"|O:lstrip", "|O:rstrip", "|O:strip"};
 
 #define STRIPNAME(i) (stripformat[i]+3)
 
-static const Py_UNICODE *
-unicode_memchr(const Py_UNICODE *s, Py_UNICODE c, size_t n)
-{
-	size_t i;
-	for (i = 0; i < n; ++i)
-		if (s[i] == c)
-			return s+i;
-	return NULL;
-}
-
 /* externally visible for str.strip(unicode) */
 PyObject *
 _PyUnicode_XStrip(PyUnicodeObject *self, int striptype, PyObject *sepobj)
@@ -5721,27 +5887,29 @@ _PyUnicode_XStrip(PyUnicodeObject *self, int striptype, PyObject *sepobj)
 	Py_ssize_t seplen = PyUnicode_GET_SIZE(sepobj);
 	Py_ssize_t i, j;
 
+        BLOOM_MASK sepmask = make_bloom_mask(sep, seplen);
+
 	i = 0;
 	if (striptype != RIGHTSTRIP) {
-		while (i < len && unicode_memchr(sep, s[i], seplen)) {
-			i++;
-		}
+            while (i < len && BLOOM_MEMBER(sepmask, s[i], sep, seplen)) {
+                i++;
+            }
 	}
 
 	j = len;
 	if (striptype != LEFTSTRIP) {
-		do {
-			j--;
-		} while (j >= i && unicode_memchr(sep, s[j], seplen));
-		j++;
+            do {
+                j--;
+            } while (j >= i && BLOOM_MEMBER(sepmask, s[j], sep, seplen));
+            j++;
 	}
 
 	if (i == 0 && j == len && PyUnicode_CheckExact(self)) {
-		Py_INCREF(self);
-		return (PyObject*)self;
+            Py_INCREF(self);
+            return (PyObject*)self;
 	}
 	else
-		return PyUnicode_FromUnicode(s+i, j-i);
+            return PyUnicode_FromUnicode(s+i, j-i);
 }
 
 
@@ -7385,6 +7553,18 @@ void _PyUnicode_Init(void)
 {
     int i;
 
+    /* XXX - move this array to unicodectype.c ? */
+    Py_UNICODE linebreak[] = {
+        0x000A, /* LINE FEED */
+        0x000D, /* CARRIAGE RETURN */
+        0x001C, /* FILE SEPARATOR */
+        0x001D, /* GROUP SEPARATOR */
+        0x001E, /* RECORD SEPARATOR */
+        0x0085, /* NEXT LINE */
+        0x2028, /* LINE SEPARATOR */
+        0x2029, /* PARAGRAPH SEPARATOR */
+    };
+
     /* Init the implementation */
     unicode_freelist = NULL;
     unicode_freelist_size = 0;
@@ -7394,6 +7574,11 @@ void _PyUnicode_Init(void)
 	unicode_latin1[i] = NULL;
     if (PyType_Ready(&PyUnicode_Type) < 0)
 	Py_FatalError("Can't initialize 'unicode'");
+
+    /* initialize the linebreak bloom filter */
+    bloom_linebreak = make_bloom_mask(
+        linebreak, sizeof(linebreak) / sizeof(linebreak[0])
+        );
 }
 
 /* Finalize the Unicode implementation */
