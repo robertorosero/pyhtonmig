@@ -1,5 +1,6 @@
 /* ===========================================================================
- * Hotbuf object
+ * Hotbuf object: an equivalent to Java's NIO ByteBuffer class for fast
+ * network I/O.
  */
 
 #include "Python.h"
@@ -52,19 +53,6 @@ typedef struct {
  * Given a hotbuf object, return the buffer memory (in 'ptr' and 'size') and
  * true if there was no error.
  */
-
-
-/* FIXME remove get_buf() everywhere, at least the checks for the return
-   value. */
-
-static int
-get_buf(PyHotbufObject *self, void **ptr, Py_ssize_t *size)
-{
-    assert(ptr != NULL);
-    *ptr = self->b_ptr;
-    *size = self->b_size;
-    return 1;
-}
 
 /*
  * Create a new hotbuf where we allocate the memory ourselves.
@@ -136,21 +124,17 @@ hotbuf_dealloc(PyHotbufObject *self)
 static int
 hotbuf_compare(PyHotbufObject *self, PyHotbufObject *other)
 {
-    void *p1, *p2;
-    Py_ssize_t len_self, len_other, min_len;
+    Py_ssize_t min_len;
     int cmp;
 
-    if (!get_buf(self, &p1, &len_self))
-        return -1;
-    if (!get_buf(other, &p2, &len_other))
-        return -1;
-    min_len = (len_self < len_other) ? len_self : len_other;
+    min_len = (self->b_size < other->b_size) ? self->b_size : other->b_size;
     if (min_len > 0) {
-        cmp = memcmp(p1, p2, min_len);
+        cmp = memcmp(self->b_ptr, other->b_ptr, min_len);
         if (cmp != 0)
             return cmp;
     }
-    return (len_self < len_other) ? -1 : (len_self > len_other) ? 1 : 0;
+    return ((self->b_size < other->b_size) ? 
+            -1 : (self->b_size > other->b_size) ? 1 : 0);
 }
 
 
@@ -172,11 +156,7 @@ hotbuf_repr(PyHotbufObject *self)
 static PyObject *
 hotbuf_str(PyHotbufObject *self)
 {
-    void *ptr;
-    Py_ssize_t size;
-    if (!get_buf(self, &ptr, &size))
-        return NULL;
-    return PyString_FromStringAndSize((const char *)ptr, size);
+    return PyString_FromStringAndSize((const char *)self->b_ptr, self->b_size);
 }
 
 
@@ -188,43 +168,35 @@ hotbuf_str(PyHotbufObject *self)
 static Py_ssize_t
 hotbuf_getwritebuf(PyHotbufObject *self, Py_ssize_t idx, void **pp)
 {
-    Py_ssize_t size;
     if ( idx != 0 ) {
         PyErr_SetString(PyExc_SystemError,
                         "accessing non-existent hotbuf segment");
         return -1;
     }
-    if (!get_buf(self, pp, &size))
-        return -1;
-    return size;
+
+    *pp = self->b_ptr;
+    return self->b_size;
 }
 
 static Py_ssize_t
 hotbuf_getsegcount(PyHotbufObject *self, Py_ssize_t *lenp)
 {
-    void *ptr;
-    Py_ssize_t size;
-    if (!get_buf(self, &ptr, &size))
-        return -1;
     if (lenp)
-        *lenp = size;
+        *lenp = self->b_size;
     return 1;
 }
 
 static Py_ssize_t
 hotbuf_getcharbuf(PyHotbufObject *self, Py_ssize_t idx, const char **pp)
 {
-    void *ptr;
-    Py_ssize_t size;
     if ( idx != 0 ) {
         PyErr_SetString(PyExc_SystemError,
                         "accessing non-existent hotbuf segment");
         return -1;
     }
-    if (!get_buf(self, &ptr, &size))
-        return -1;
-    *pp = (const char *)ptr;
-    return size;
+
+    *pp = (const char *)self->b_ptr;
+    return self->b_size;
 }
 
 /* ===========================================================================
@@ -234,11 +206,7 @@ hotbuf_getcharbuf(PyHotbufObject *self, Py_ssize_t idx, const char **pp)
 static Py_ssize_t
 hotbuf_length(PyHotbufObject *self)
 {
-    void *ptr;
-    Py_ssize_t size;
-    if (!get_buf(self, &ptr, &size))
-        return -1;
-    return size;
+    return self->b_size;
 }
 
 
