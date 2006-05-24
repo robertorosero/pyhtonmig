@@ -70,6 +70,20 @@ class HotbufTestCase(unittest.TestCase):
 
         # Play with remaining.
         self.assertEquals(b.remaining(), 104)
+        b.setposition(10)
+        self.assertEquals(b.remaining(), 94)
+
+    def test_compact( self ):
+        CAPACITY = 1024
+        b = hotbuf(CAPACITY)
+
+        b.setposition(100)
+        b.setlimit(200)
+        b.mark()
+        b.compact()
+        self.assertEquals((b.position(), b.limit(), b.mark()),
+                          (100, CAPACITY, -1))
+
 
         
 def test_main():

@@ -4,15 +4,7 @@
  */
 
 #include "Python.h"
-
-/* Note: the object's structure is private */
-
-#ifndef Py_HOTBUFOBJECT_H
-#define Py_HOTBUFOBJECT_H
-#ifdef __cplusplus
-extern "C" {
-#endif
-
+#include <string.h> /* for memmove */
 
 PyAPI_DATA(PyTypeObject) PyHotbuf_Type;
 
@@ -21,11 +13,6 @@ PyAPI_DATA(PyTypeObject) PyHotbuf_Type;
 #define Py_END_OF_HOTBUF       (-1)
 
 PyAPI_FUNC(PyObject *) PyHotbuf_New(Py_ssize_t size);
-
-#ifdef __cplusplus
-}
-#endif
-#endif /* !Py_HOTBUFOBJECT_H */
 
 
 
@@ -73,7 +60,7 @@ typedef struct {
     /*
      * The "active window" is defined by the interval [position, limit[.
      */
-      
+
     /* The current position in the buffer. */
     int b_position;
 
@@ -178,7 +165,7 @@ hotbuf_compare(PyHotbufObject *self, PyHotbufObject *other)
 {
     Py_ssize_t min_len;
     int cmp;
-    
+
     min_len = ((self->b_capacity < other->b_capacity) ?
                self->b_capacity : other->b_capacity);
     if (min_len > 0) {
@@ -215,7 +202,7 @@ hotbuf_str(PyHotbufObject *self)
 
 
 /* ===========================================================================
- * Object Methods
+ * Object Methods (basic interface)
  */
 
 PyDoc_STRVAR(capacity__doc__,
@@ -269,7 +256,7 @@ hotbuf_setposition(PyHotbufObject *self, PyObject* arg)
     self->b_position = newposition;
 
     /* Discard the mark if it is beyond the new position */
-    if ( self->b_mark > self->b_position ) 
+    if ( self->b_mark > self->b_position )
         self->b_mark = -1;
 
     return Py_None;
@@ -319,7 +306,7 @@ hotbuf_setlimit(PyHotbufObject *self, PyObject* arg)
         self->b_position = newlimit;
 
     /* Discard the mark if it is beyond the new limit */
-    if ( self->b_mark > self->b_position ) 
+    if ( self->b_mark > self->b_position )
         self->b_mark = -1;
 
     return Py_None;
@@ -467,7 +454,728 @@ hotbuf_remaining(PyHotbufObject *self)
 
 
 /* ===========================================================================
- * Buffer protocol methods 
+ * Object Methods (byte buffer interface)
+ */
+
+PyDoc_STRVAR(compact__doc__,
+"B.compact()\n\
+\n\
+public abstract ByteBuffer compact()\n\
+\n\
+Compacts this buffer  (optional operation).\n\
+\n\
+The bytes between the buffer's current position and its limit, if\n\
+any, are copied to the beginning of the buffer. That is, the byte\n\
+at index p = position() is copied to index zero, the byte at index\n\
+p + 1 is copied to index one, and so forth until the byte at index\n\
+limit() - 1 is copied to index n = limit() - 1 - p. The buffer's\n\
+position is then set to n+1 and its limit is set to its\n\
+capacity. The mark, if defined, is discarded.\n\
+\n\
+The buffer's position is set to the number of bytes copied, rather\n\
+than to zero, so that an invocation of this method can be followed\n\
+immediately by an invocation of another relative put method.\n\
+\n\
+Invoke this method after writing data from a buffer in case the\n\
+write was incomplete. The following loop, for example, copies\n\
+bytes from one channel to another via the buffer buf:\n\
+\n\
+     buf.clear()          # Prepare buffer for use\n\
+     while 1:\n\
+         if in.read(buf) < 0 and buf.remaining() == 0:\n\
+             break        # No more bytes to transfer\n\
+         buf.flip()\n\
+         out.write(buf)\n\
+         buf.compact()    # In case of partial write\n\
+\n\
+");
+
+static PyObject*
+hotbuf_compact(PyHotbufObject *self)
+{
+    int length;
+
+    /* Calculate the number of bytes in the active window */
+    length = self->b_limit - self->b_position;
+
+    /* Move the memory from the active window to the beginning of the
+       allocated buffer (only if we need to). */
+    if ( length > 0 && self->b_position > 0 ) {
+        memmove(self->b_ptr, self->b_ptr + self->b_position, length);
+    }
+
+    self->b_position = length;
+    self->b_limit = self->b_capacity;
+    self->b_mark = -1;
+
+    return Py_None;
+}
+
+
+
+/*
+
+get
+
+public abstract byte get()
+
+    Relative get method. Reads the byte at this buffer's current position, and then increments the position.
+
+    Returns:
+        The byte at the buffer's current position 
+    Throws:
+        BufferUnderflowException - If the buffer's current position is not smaller than its limit
+
+put
+
+public abstract ByteBuffer put(byte b)
+
+    Relative put method  (optional operation).
+
+    Writes the given byte into this buffer at the current position, and then increments the position.
+
+    Parameters:
+        b - The byte to be written 
+    Returns:
+        This buffer 
+    Throws:
+        BufferOverflowException - If this buffer's current position is not smaller than its limit 
+        ReadOnlyBufferException - If this buffer is read-only
+
+get
+
+public abstract byte get(int index)
+
+    Absolute get method. Reads the byte at the given index.
+
+    Parameters:
+        index - The index from which the byte will be read 
+    Returns:
+        The byte at the given index 
+    Throws:
+        IndexOutOfBoundsException - If index is negative or not smaller than the buffer's limit
+
+put
+
+public abstract ByteBuffer put(int index,
+                               byte b)
+
+    Absolute put method  (optional operation).
+
+    Writes the given byte into this buffer at the given index.
+
+    Parameters:
+        index - The index at which the byte will be written
+        b - The byte value to be written 
+    Returns:
+        This buffer 
+    Throws:
+        IndexOutOfBoundsException - If index is negative or not smaller than the buffer's limit 
+        ReadOnlyBufferException - If this buffer is read-only
+
+get
+
+public ByteBuffer get(byte[] dst,
+                      int offset,
+                      int length)
+
+    Relative bulk get method.
+
+    This method transfers bytes from this buffer into the given destination array. If there are fewer bytes remaining in the buffer than are required to satisfy the request, that is, if length > remaining(), then no bytes are transferred and a BufferUnderflowException is thrown.
+
+    Otherwise, this method copies length bytes from this buffer into the given array, starting at the current position of this buffer and at the given offset in the array. The position of this buffer is then incremented by length.
+
+    In other words, an invocation of this method of the form src.get(dst, off, len) has exactly the same effect as the loop
+
+         for (int i = off; i < off + len; i++)
+             dst[i] = src.get(); 
+
+    except that it first checks that there are sufficient bytes in this buffer and it is potentially much more efficient.
+
+    Parameters:
+        dst - The array into which bytes are to be written
+        offset - The offset within the array of the first byte to be written; must be non-negative and no larger than dst.length
+        length - The maximum number of bytes to be written to the given array; must be non-negative and no larger than dst.length - offset 
+    Returns:
+        This buffer 
+    Throws:
+        BufferUnderflowException - If there are fewer than length bytes remaining in this buffer 
+        IndexOutOfBoundsException - If the preconditions on the offset and length parameters do not hold
+
+get
+
+public ByteBuffer get(byte[] dst)
+
+    Relative bulk get method.
+
+    This method transfers bytes from this buffer into the given destination array. An invocation of this method of the form src.get(a) behaves in exactly the same way as the invocation
+
+         src.get(a, 0, a.length) 
+
+    Returns:
+        This buffer 
+    Throws:
+        BufferUnderflowException - If there are fewer than length bytes remaining in this buffer
+
+put
+
+public ByteBuffer put(ByteBuffer src)
+
+    Relative bulk put method  (optional operation).
+
+    This method transfers the bytes remaining in the given source buffer into this buffer. If there are more bytes remaining in the source buffer than in this buffer, that is, if src.remaining() > remaining(), then no bytes are transferred and a BufferOverflowException is thrown.
+
+    Otherwise, this method copies n = src.remaining() bytes from the given buffer into this buffer, starting at each buffer's current position. The positions of both buffers are then incremented by n.
+
+    In other words, an invocation of this method of the form dst.put(src) has exactly the same effect as the loop
+
+         while (src.hasRemaining())
+             dst.put(src.get()); 
+
+    except that it first checks that there is sufficient space in this buffer and it is potentially much more efficient.
+
+    Parameters:
+        src - The source buffer from which bytes are to be read; must not be this buffer 
+    Returns:
+        This buffer 
+    Throws:
+        BufferOverflowException - If there is insufficient space in this buffer for the remaining bytes in the source buffer 
+        IllegalArgumentException - If the source buffer is this buffer 
+        ReadOnlyBufferException - If this buffer is read-only
+
+put
+
+public ByteBuffer put(byte[] src,
+                      int offset,
+                      int length)
+
+    Relative bulk put method  (optional operation).
+
+    This method transfers bytes into this buffer from the given source array. If there are more bytes to be copied from the array than remain in this buffer, that is, if length > remaining(), then no bytes are transferred and a BufferOverflowException is thrown.
+
+    Otherwise, this method copies length bytes from the given array into this buffer, starting at the given offset in the array and at the current position of this buffer. The position of this buffer is then incremented by length.
+
+    In other words, an invocation of this method of the form dst.put(src, off, len) has exactly the same effect as the loop
+
+         for (int i = off; i < off + len; i++)
+             dst.put(a[i]); 
+
+    except that it first checks that there is sufficient space in this buffer and it is potentially much more efficient.
+
+    Parameters:
+        src - The array from which bytes are to be read
+        offset - The offset within the array of the first byte to be read; must be non-negative and no larger than array.length
+        length - The number of bytes to be read from the given array; must be non-negative and no larger than array.length - offset 
+    Returns:
+        This buffer 
+    Throws:
+        BufferOverflowException - If there is insufficient space in this buffer 
+        IndexOutOfBoundsException - If the preconditions on the offset and length parameters do not hold 
+        ReadOnlyBufferException - If this buffer is read-only
+
+put
+
+public final ByteBuffer put(byte[] src)
+
+    Relative bulk put method  (optional operation).
+
+    This method transfers the entire content of the given source byte array into this buffer. An invocation of this method of the form dst.put(a) behaves in exactly the same way as the invocation
+
+         dst.put(a, 0, a.length) 
+
+    Returns:
+        This buffer 
+    Throws:
+        BufferOverflowException - If there is insufficient space in this buffer 
+        ReadOnlyBufferException - If this buffer is read-only
+
+getChar
+
+public abstract char getChar()
+
+    Relative get method for reading a char value.
+
+    Reads the next two bytes at this buffer's current position, composing them into a char value according to the current byte order, and then increments the position by two.
+
+    Returns:
+        The char value at the buffer's current position 
+    Throws:
+        BufferUnderflowException - If there are fewer than two bytes remaining in this buffer
+
+putChar
+
+public abstract ByteBuffer putChar(char value)
+
+    Relative put method for writing a char value  (optional operation).
+
+    Writes two bytes containing the given char value, in the current byte order, into this buffer at the current position, and then increments the position by two.
+
+    Parameters:
+        value - The char value to be written 
+    Returns:
+        This buffer 
+    Throws:
+        BufferOverflowException - If there are fewer than two bytes remaining in this buffer 
+        ReadOnlyBufferException - If this buffer is read-only
+
+getChar
+
+public abstract char getChar(int index)
+
+    Absolute get method for reading a char value.
+
+    Reads two bytes at the given index, composing them into a char value according to the current byte order.
+
+    Parameters:
+        index - The index from which the bytes will be read 
+    Returns:
+        The char value at the given index 
+    Throws:
+        IndexOutOfBoundsException - If index is negative or not smaller than the buffer's limit, minus one
+
+putChar
+
+public abstract ByteBuffer putChar(int index,
+                                   char value)
+
+    Absolute put method for writing a char value  (optional operation).
+
+    Writes two bytes containing the given char value, in the current byte order, into this buffer at the given index.
+
+    Parameters:
+        index - The index at which the bytes will be written
+        value - The char value to be written 
+    Returns:
+        This buffer 
+    Throws:
+        IndexOutOfBoundsException - If index is negative or not smaller than the buffer's limit, minus one 
+        ReadOnlyBufferException - If this buffer is read-only
+
+asCharBuffer
+
+public abstract CharBuffer asCharBuffer()
+
+    Creates a view of this byte buffer as a char buffer.
+
+    The content of the new buffer will start at this buffer's current position. Changes to this buffer's content will be visible in the new buffer, and vice versa; the two buffers' position, limit, and mark values will be independent.
+
+    The new buffer's position will be zero, its capacity and its limit will be the number of bytes remaining in this buffer divided by two, and its mark will be undefined. The new buffer will be direct if, and only if, this buffer is direct, and it will be read-only if, and only if, this buffer is read-only.
+
+    Returns:
+        A new char buffer
+
+getShort
+
+public abstract short getShort()
+
+    Relative get method for reading a short value.
+
+    Reads the next two bytes at this buffer's current position, composing them into a short value according to the current byte order, and then increments the position by two.
+
+    Returns:
+        The short value at the buffer's current position 
+    Throws:
+        BufferUnderflowException - If there are fewer than two bytes remaining in this buffer
+
+putShort
+
+public abstract ByteBuffer putShort(short value)
+
+    Relative put method for writing a short value  (optional operation).
+
+    Writes two bytes containing the given short value, in the current byte order, into this buffer at the current position, and then increments the position by two.
+
+    Parameters:
+        value - The short value to be written 
+    Returns:
+        This buffer 
+    Throws:
+        BufferOverflowException - If there are fewer than two bytes remaining in this buffer 
+        ReadOnlyBufferException - If this buffer is read-only
+
+getShort
+
+public abstract short getShort(int index)
+
+    Absolute get method for reading a short value.
+
+    Reads two bytes at the given index, composing them into a short value according to the current byte order.
+
+    Parameters:
+        index - The index from which the bytes will be read 
+    Returns:
+        The short value at the given index 
+    Throws:
+        IndexOutOfBoundsException - If index is negative or not smaller than the buffer's limit, minus one
+
+putShort
+
+public abstract ByteBuffer putShort(int index,
+                                    short value)
+
+    Absolute put method for writing a short value  (optional operation).
+
+    Writes two bytes containing the given short value, in the current byte order, into this buffer at the given index.
+
+    Parameters:
+        index - The index at which the bytes will be written
+        value - The short value to be written 
+    Returns:
+        This buffer 
+    Throws:
+        IndexOutOfBoundsException - If index is negative or not smaller than the buffer's limit, minus one 
+        ReadOnlyBufferException - If this buffer is read-only
+
+asShortBuffer
+
+public abstract ShortBuffer asShortBuffer()
+
+    Creates a view of this byte buffer as a short buffer.
+
+    The content of the new buffer will start at this buffer's current position. Changes to this buffer's content will be visible in the new buffer, and vice versa; the two buffers' position, limit, and mark values will be independent.
+
+    The new buffer's position will be zero, its capacity and its limit will be the number of bytes remaining in this buffer divided by two, and its mark will be undefined. The new buffer will be direct if, and only if, this buffer is direct, and it will be read-only if, and only if, this buffer is read-only.
+
+    Returns:
+        A new short buffer
+
+getInt
+
+public abstract int getInt()
+
+    Relative get method for reading an int value.
+
+    Reads the next four bytes at this buffer's current position, composing them into an int value according to the current byte order, and then increments the position by four.
+
+    Returns:
+        The int value at the buffer's current position 
+    Throws:
+        BufferUnderflowException - If there are fewer than four bytes remaining in this buffer
+
+putInt
+
+public abstract ByteBuffer putInt(int value)
+
+    Relative put method for writing an int value  (optional operation).
+
+    Writes four bytes containing the given int value, in the current byte order, into this buffer at the current position, and then increments the position by four.
+
+    Parameters:
+        value - The int value to be written 
+    Returns:
+        This buffer 
+    Throws:
+        BufferOverflowException - If there are fewer than four bytes remaining in this buffer 
+        ReadOnlyBufferException - If this buffer is read-only
+
+getInt
+
+public abstract int getInt(int index)
+
+    Absolute get method for reading an int value.
+
+    Reads four bytes at the given index, composing them into a int value according to the current byte order.
+
+    Parameters:
+        index - The index from which the bytes will be read 
+    Returns:
+        The int value at the given index 
+    Throws:
+        IndexOutOfBoundsException - If index is negative or not smaller than the buffer's limit, minus three
+
+putInt
+
+public abstract ByteBuffer putInt(int index,
+                                  int value)
+
+    Absolute put method for writing an int value  (optional operation).
+
+    Writes four bytes containing the given int value, in the current byte order, into this buffer at the given index.
+
+    Parameters:
+        index - The index at which the bytes will be written
+        value - The int value to be written 
+    Returns:
+        This buffer 
+    Throws:
+        IndexOutOfBoundsException - If index is negative or not smaller than the buffer's limit, minus three 
+        ReadOnlyBufferException - If this buffer is read-only
+
+asIntBuffer
+
+public abstract IntBuffer asIntBuffer()
+
+    Creates a view of this byte buffer as an int buffer.
+
+    The content of the new buffer will start at this buffer's current position. Changes to this buffer's content will be visible in the new buffer, and vice versa; the two buffers' position, limit, and mark values will be independent.
+
+    The new buffer's position will be zero, its capacity and its limit will be the number of bytes remaining in this buffer divided by four, and its mark will be undefined. The new buffer will be direct if, and only if, this buffer is direct, and it will be read-only if, and only if, this buffer is read-only.
+
+    Returns:
+        A new int buffer
+
+getLong
+
+public abstract long getLong()
+
+    Relative get method for reading a long value.
+
+    Reads the next eight bytes at this buffer's current position, composing them into a long value according to the current byte order, and then increments the position by eight.
+
+    Returns:
+        The long value at the buffer's current position 
+    Throws:
+        BufferUnderflowException - If there are fewer than eight bytes remaining in this buffer
+
+putLong
+
+public abstract ByteBuffer putLong(long value)
+
+    Relative put method for writing a long value  (optional operation).
+
+    Writes eight bytes containing the given long value, in the current byte order, into this buffer at the current position, and then increments the position by eight.
+
+    Parameters:
+        value - The long value to be written 
+    Returns:
+        This buffer 
+    Throws:
+        BufferOverflowException - If there are fewer than eight bytes remaining in this buffer 
+        ReadOnlyBufferException - If this buffer is read-only
+
+getLong
+
+public abstract long getLong(int index)
+
+    Absolute get method for reading a long value.
+
+    Reads eight bytes at the given index, composing them into a long value according to the current byte order.
+
+    Parameters:
+        index - The index from which the bytes will be read 
+    Returns:
+        The long value at the given index 
+    Throws:
+        IndexOutOfBoundsException - If index is negative or not smaller than the buffer's limit, minus seven
+
+putLong
+
+public abstract ByteBuffer putLong(int index,
+                                   long value)
+
+    Absolute put method for writing a long value  (optional operation).
+
+    Writes eight bytes containing the given long value, in the current byte order, into this buffer at the given index.
+
+    Parameters:
+        index - The index at which the bytes will be written
+        value - The long value to be written 
+    Returns:
+        This buffer 
+    Throws:
+        IndexOutOfBoundsException - If index is negative or not smaller than the buffer's limit, minus seven 
+        ReadOnlyBufferException - If this buffer is read-only
+
+asLongBuffer
+
+public abstract LongBuffer asLongBuffer()
+
+    Creates a view of this byte buffer as a long buffer.
+
+    The content of the new buffer will start at this buffer's current position. Changes to this buffer's content will be visible in the new buffer, and vice versa; the two buffers' position, limit, and mark values will be independent.
+
+    The new buffer's position will be zero, its capacity and its limit will be the number of bytes remaining in this buffer divided by eight, and its mark will be undefined. The new buffer will be direct if, and only if, this buffer is direct, and it will be read-only if, and only if, this buffer is read-only.
+
+    Returns:
+        A new long buffer
+
+getFloat
+
+public abstract float getFloat()
+
+    Relative get method for reading a float value.
+
+    Reads the next four bytes at this buffer's current position, composing them into a float value according to the current byte order, and then increments the position by four.
+
+    Returns:
+        The float value at the buffer's current position 
+    Throws:
+        BufferUnderflowException - If there are fewer than four bytes remaining in this buffer
+
+putFloat
+
+public abstract ByteBuffer putFloat(float value)
+
+    Relative put method for writing a float value  (optional operation).
+
+    Writes four bytes containing the given float value, in the current byte order, into this buffer at the current position, and then increments the position by four.
+
+    Parameters:
+        value - The float value to be written 
+    Returns:
+        This buffer 
+    Throws:
+        BufferOverflowException - If there are fewer than four bytes remaining in this buffer 
+        ReadOnlyBufferException - If this buffer is read-only
+
+getFloat
+
+public abstract float getFloat(int index)
+
+    Absolute get method for reading a float value.
+
+    Reads four bytes at the given index, composing them into a float value according to the current byte order.
+
+    Parameters:
+        index - The index from which the bytes will be read 
+    Returns:
+        The float value at the given index 
+    Throws:
+        IndexOutOfBoundsException - If index is negative or not smaller than the buffer's limit, minus three
+
+putFloat
+
+public abstract ByteBuffer putFloat(int index,
+                                    float value)
+
+    Absolute put method for writing a float value  (optional operation).
+
+    Writes four bytes containing the given float value, in the current byte order, into this buffer at the given index.
+
+    Parameters:
+        index - The index at which the bytes will be written
+        value - The float value to be written 
+    Returns:
+        This buffer 
+    Throws:
+        IndexOutOfBoundsException - If index is negative or not smaller than the buffer's limit, minus three 
+        ReadOnlyBufferException - If this buffer is read-only
+
+asFloatBuffer
+
+public abstract FloatBuffer asFloatBuffer()
+
+    Creates a view of this byte buffer as a float buffer.
+
+    The content of the new buffer will start at this buffer's current position. Changes to this buffer's content will be visible in the new buffer, and vice versa; the two buffers' position, limit, and mark values will be independent.
+
+    The new buffer's position will be zero, its capacity and its limit will be the number of bytes remaining in this buffer divided by four, and its mark will be undefined. The new buffer will be direct if, and only if, this buffer is direct, and it will be read-only if, and only if, this buffer is read-only.
+
+    Returns:
+        A new float buffer
+
+getDouble
+
+public abstract double getDouble()
+
+    Relative get method for reading a double value.
+
+    Reads the next eight bytes at this buffer's current position, composing them into a double value according to the current byte order, and then increments the position by eight.
+
+    Returns:
+        The double value at the buffer's current position 
+    Throws:
+        BufferUnderflowException - If there are fewer than eight bytes remaining in this buffer
+
+putDouble
+
+public abstract ByteBuffer putDouble(double value)
+
+    Relative put method for writing a double value  (optional operation).
+
+    Writes eight bytes containing the given double value, in the current byte order, into this buffer at the current position, and then increments the position by eight.
+
+    Parameters:
+        value - The double value to be written 
+    Returns:
+        This buffer 
+    Throws:
+        BufferOverflowException - If there are fewer than eight bytes remaining in this buffer 
+        ReadOnlyBufferException - If this buffer is read-only
+
+getDouble
+
+public abstract double getDouble(int index)
+
+    Absolute get method for reading a double value.
+
+    Reads eight bytes at the given index, composing them into a double value according to the current byte order.
+
+    Parameters:
+        index - The index from which the bytes will be read 
+    Returns:
+        The double value at the given index 
+    Throws:
+        IndexOutOfBoundsException - If index is negative or not smaller than the buffer's limit, minus seven
+
+putDouble
+
+public abstract ByteBuffer putDouble(int index,
+                                     double value)
+
+    Absolute put method for writing a double value  (optional operation).
+
+    Writes eight bytes containing the given double value, in the current byte order, into this buffer at the given index.
+
+    Parameters:
+        index - The index at which the bytes will be written
+        value - The double value to be written 
+    Returns:
+        This buffer 
+    Throws:
+        IndexOutOfBoundsException - If index is negative or not smaller than the buffer's limit, minus seven 
+        ReadOnlyBufferException - If this buffer is read-only
+
+asDoubleBuffer
+
+public abstract DoubleBuffer asDoubleBuffer()
+
+    Creates a view of this byte buffer as a double buffer.
+
+    The content of the new buffer will start at this buffer's current position. Changes to this buffer's content will be visible in the new buffer, and vice versa; the two buffers' position, limit, and mark values will be independent.
+
+    The new buffer's position will be zero, its capacity and its limit will be the number of bytes remaining in this buffer divided by eight, and its mark will be undefined. The new buffer will be direct if, and only if, this buffer is direct, and it will be read-only if, and only if, this buffer is read-only.
+
+    Returns:
+        A new double buffer
+
+*/
+
+
+
+/*
+
+order
+
+public final ByteOrder order()
+
+    Retrieves this buffer's byte order.
+
+    The byte order is used when reading or writing multibyte values,
+    and when creating buffers that are views of this byte buffer. The
+    order of a newly-created byte buffer is always BIG_ENDIAN.
+
+    Returns:
+        This buffer's byte order
+
+
+order
+
+public final ByteBuffer order(ByteOrder bo)
+
+    Modifies this buffer's byte order.
+
+    Parameters:
+        bo - The new byte order, either BIG_ENDIAN or LITTLE_ENDIAN 
+    Returns:
+        This buffer
+
+*/
+
+
+
+/* ===========================================================================
+ * Buffer protocol methods
  */
 
 /*
@@ -526,26 +1234,20 @@ hotbuf_length(PyHotbufObject *self)
  * Object interfaces declaration
  */
 
-/* FIXME: needs an update */
 
-/* PyDoc_STRVAR(hotbuf_doc, */
-/*              "hotbuf(object [, offset[, size]])\n\ */
-/* \n\ */
-/* Create a new hotbuf object which references the given object.\n\ */
-/* The hotbuf will reference a slice of the target object from the\n\ */
-/* start of the object (or at the specified offset). The slice will\n\ */
-/* extend to the end of the target object (or with the specified size)."); */
-
-PyDoc_STRVAR(hotbuftype_doc,
-             "hotbuf(size) -> hotbuf\n\
+PyDoc_STRVAR(hotbuf_doc,
+"hotbuf(capacity) -> hotbuf\n\
 \n\
-Return a new hotbuf with a new buffer of fixed size 'size'.\n\
+Return a new hotbuf with a buffer of fixed size 'capacity'.\n\
 \n\
-Methods:\n\
+hotbuf is a C encapsulation of a fixed-size buffer of bytes in memory.\n\
+One can read and write objects of different primitive types directly\n\
+into it, without having to convert from/to strings.  Also, this is\n\
+meant for the network I/O functions (recv, recvfrom, send, sendto) to\n\
+read/write directly into without having to create temporary strings.\n\
 \n\
-Attributes:\n\
-\n\
-");
+Note that hotbuf is a direct Python equivalent of Java's NIO\n\
+ByteBuffer class.");
 
 
 static PyMethodDef
@@ -562,6 +1264,7 @@ hotbuf_methods[] = {
 	{"flip", (PyCFunction)hotbuf_flip, METH_NOARGS, flip__doc__},
 	{"rewind", (PyCFunction)hotbuf_rewind, METH_NOARGS, rewind__doc__},
 	{"remaining", (PyCFunction)hotbuf_remaining, METH_NOARGS, remaining__doc__},
+	{"compact", (PyCFunction)hotbuf_compact, METH_NOARGS, compact__doc__},
 	{NULL, NULL} /* sentinel */
 };
 
@@ -604,7 +1307,7 @@ PyTypeObject PyHotbuf_Type = {
     0,                                  /* tp_setattro */
     &hotbuf_as_buffer,                 /* tp_as_buffer */
     Py_TPFLAGS_DEFAULT,                 /* tp_flags */
-    hotbuftype_doc,                    /* tp_doc */
+    hotbuf_doc,                         /* tp_doc */
     0,                                  /* tp_traverse */
     0,                                  /* tp_clear */
     0,                                  /* tp_richcompare */
@@ -678,11 +1381,13 @@ inithotbuf(void)
 /*
    TODO
    ----
-   - Update doc.
    - Add hash function
    - Add support for sequence methods.
    - Perhaps implement returning the buffer object itself from some of
      the methods in order to allow chaining of operations on a single line.
+   - Implement a resize function
+   - Maybe remove the API methods declared at the top.
+   - Add support for big vs. little endian
 
    Pending Issues
    --------------
