@@ -1,4 +1,6 @@
-/* Bytebuf object interface */
+/* ===========================================================================
+ * Bytebuf object
+ */
 
 #include "Python.h"
 
@@ -25,7 +27,10 @@ PyAPI_FUNC(PyObject *) PyBytebuf_New(Py_ssize_t size);
 #endif /* !Py_BYTEBUFOBJECT_H */
 
 
-/* Byte Buffer object implementation */
+/* ===========================================================================
+ * Byte Buffer object implementation 
+ */
+
 
 /*
  * bytebuf object structure declaration.
@@ -47,6 +52,11 @@ typedef struct {
  * Given a bytebuf object, return the buffer memory (in 'ptr' and 'size') and
  * true if there was no error.
  */
+
+
+/* FIXME remove get_buf() everywhere, at least the checks for the return
+   value. */
+
 static int
 get_buf(PyBytebufObject *self, void **ptr, Py_ssize_t *size)
 {
@@ -217,26 +227,24 @@ bytebuf_getcharbuf(PyBytebufObject *self, Py_ssize_t idx, const char **pp)
     return size;
 }
 
+/* ===========================================================================
+ * Sequence methods 
+ */
 
-PyDoc_STRVAR(module_doc,
-             "This module defines an object type which can represent a fixed size\n\
-buffer of bytes in momery, from which you can directly read and into\n\
-which you can directly write objects in various other types.  This is\n\
-used to avoid buffer copies in network I/O as much as possible.  For\n\
-example, socket recv() can directly fill a byte buffer's memory and\n\
-send() can read the data to be sent from one as well.\n\
-\n\
-In addition, a byte buffer has two pointers within it, that delimit\n\
-an active slice, the current \"position\" and the \"limit\".  The\n\
-active region of a byte buffer is located within these boundaries.\n\
-\n\
-This class is heaviliy inspired from Java's NIO ByteBuffer class.\n\
-\n\
-The constructor is:\n\
-\n\
-bytebuf(nbytes) -- create a new bytebuf\n\
-");
+static Py_ssize_t
+bytebuf_length(PyBytebufObject *self)
+{
+    void *ptr;
+    Py_ssize_t size;
+    if (!get_buf(self, &ptr, &size))
+        return -1;
+    return size;
+}
 
+
+/* ===========================================================================
+ * Object interfaces declaration 
+ */
 
 /* FIXME: needs an update */
 
@@ -260,6 +268,16 @@ Attributes:\n\
 ");
 
 
+static PySequenceMethods bytebuf_as_sequence = {
+        (lenfunc)bytebuf_length,                 /*sq_length*/
+        0 /* (binaryfunc)bytebuf_concat */,              /*sq_concat*/
+        0 /* (ssizeargfunc)bytebuf_repeat */,            /*sq_repeat*/
+        0 /* (ssizeargfunc)bytebuf_item */,              /*sq_item*/
+        0 /*(ssizessizeargfunc)bytebuf_slice*/,        /*sq_slice*/
+        0 /*(ssizeobjargproc)bytebuf_ass_item*/,       /*sq_ass_item*/
+        0 /*(ssizessizeobjargproc)bytebuf_ass_slice*/, /*sq_ass_slice*/
+};
+
 static PyBufferProcs bytebuf_as_buffer = {
     (readbufferproc)bytebuf_getwritebuf,
     (writebufferproc)bytebuf_getwritebuf,
@@ -273,18 +291,18 @@ PyTypeObject PyBytebuf_Type = {
     "bytebuf",
     sizeof(PyBytebufObject),
     0,
-    (destructor)bytebuf_dealloc,                /* tp_dealloc */
+    (destructor)bytebuf_dealloc,        /* tp_dealloc */
     0,                                  /* tp_print */
     0,                                  /* tp_getattr */
     0,                                  /* tp_setattr */
     (cmpfunc)bytebuf_compare,           /* tp_compare */
-    (reprfunc)bytebuf_repr,                     /* tp_repr */
+    (reprfunc)bytebuf_repr,             /* tp_repr */
     0,                                  /* tp_as_number */
-    0,                                  /* tp_as_sequence */
+    &bytebuf_as_sequence,               /* tp_as_sequence */
     0,                                  /* tp_as_mapping */
     0,                                  /* tp_hash */
     0,                                  /* tp_call */
-    (reprfunc)bytebuf_str,                      /* tp_str */
+    (reprfunc)bytebuf_str,              /* tp_str */
     PyObject_GenericGetAttr,            /* tp_getattro */
     0,                                  /* tp_setattro */
     &bytebuf_as_buffer,                 /* tp_as_buffer */
@@ -306,11 +324,33 @@ PyTypeObject PyBytebuf_Type = {
     0,                                  /* tp_dictoffset */
     0,                                  /* tp_init */
     0,                                  /* tp_alloc */
-    bytebuf_new,                                /* tp_new */
+    bytebuf_new,                        /* tp_new */
 };
 
 
-/*********************** Install Module **************************/
+/* ===========================================================================
+ * Install Module
+ */
+
+PyDoc_STRVAR(module_doc,
+             "This module defines an object type which can represent a fixed size\n\
+buffer of bytes in momery, from which you can directly read and into\n\
+which you can directly write objects in various other types.  This is\n\
+used to avoid buffer copies in network I/O as much as possible.  For\n\
+example, socket recv() can directly fill a byte buffer's memory and\n\
+send() can read the data to be sent from one as well.\n\
+\n\
+In addition, a byte buffer has two pointers within it, that delimit\n\
+an active slice, the current \"position\" and the \"limit\".  The\n\
+active region of a byte buffer is located within these boundaries.\n\
+\n\
+This class is heaviliy inspired from Java's NIO ByteBuffer class.\n\
+\n\
+The constructor is:\n\
+\n\
+bytebuf(nbytes) -- create a new bytebuf\n\
+");
+
 
 /* No functions in array module. */
 static PyMethodDef a_methods[] = {

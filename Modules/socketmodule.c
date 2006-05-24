@@ -2135,95 +2135,126 @@ The mode and buffersize arguments are as for the built-in open() function.");
 
 #endif /* NO_DUP */
 
+/*
+ * This is the guts of the recv() and recv_buf() methods, which reads into a
+ * char buffer.  If you have any inc/def ref to do to the objects that contain
+ * the buffer, do it in the caller.  This function returns the number of bytes
+ * succesfully read.  If there was an error, it returns -1.  Note that it is
+ * also possible that we return a number of bytes smaller than the request
+ * bytes.
+ */
+static int
+sock_recv_guts(PySocketSockObject *s, char* cbuf, int len, int flags)
+{
+        int timeout, outlen = 0;
+#ifdef __VMS
+	int remaining, nread;
+	char *read_buf;
+#endif
+
+	if (!IS_SELECTABLE(s)) {
+		select_error();
+		return -1;
+	}
+
+#ifndef __VMS
+	Py_BEGIN_ALLOW_THREADS
+	timeout = internal_select(s, 0);
+	if (!timeout)
+		outlen = recv(s->sock_fd, cbuf, len, flags);
+	Py_END_ALLOW_THREADS
+
+	if (timeout) {
+		PyErr_SetString(socket_timeout, "timed out");
+		return -1;
+	}
+	if (outlen < 0) {
+		/* Note: the call to errorhandler() ALWAYS indirectly returned
+		   NULL, so ignore its return value */
+		s->errorhandler();
+		return -1;
+	}
+#else
+	read_buf = cbuf;
+	remaining = len;
+	while (remaining != 0) {
+		unsigned int segment;
+
+		segment = remaining /SEGMENT_SIZE;
+		if (segment != 0) {
+			segment = SEGMENT_SIZE;
+		}
+		else {
+			segment = remaining;
+		}
+
+		Py_BEGIN_ALLOW_THREADS
+		timeout = internal_select(s, 0);
+		if (!timeout)
+			nread = recv(s->sock_fd, read_buf, segment, flags);
+		Py_END_ALLOW_THREADS
+
+		if (timeout) {
+			PyErr_SetString(socket_timeout, "timed out");
+			return -1;
+		}
+		if (nread < 0) {
+			s->errorhandler();
+			return -1;
+		}
+		if (nread != remaining) {
+			read_buf += nread;
+			break;
+		}
+
+		remaining -= segment;
+		read_buf += segment;
+	}
+	outlen = read_buf - cbuf;
+#endif /* !__VMS */
+
+	return outlen;
+}
+
 
 /* s.recv(nbytes [,flags]) method */
 
 static PyObject *
 sock_recv(PySocketSockObject *s, PyObject *args)
 {
-	int len, n = 0, flags = 0, timeout;
+	int recvlen, flags = 0, outlen;
 	PyObject *buf;
-#ifdef __VMS
-	int read_length;
-	char *read_buf;
-#endif
 
-	if (!PyArg_ParseTuple(args, "i|i:recv", &len, &flags))
+	if (!PyArg_ParseTuple(args, "i|i:recv", &recvlen, &flags))
 		return NULL;
 
-	if (len < 0) {
+	if (recvlen < 0) {
 		PyErr_SetString(PyExc_ValueError,
 				"negative buffersize in recv");
 		return NULL;
 	}
 
-	buf = PyString_FromStringAndSize((char *) 0, len);
+	/* Allocate a new string. */
+	buf = PyString_FromStringAndSize((char *) 0, recvlen);
 	if (buf == NULL)
 		return NULL;
 
-	if (!IS_SELECTABLE(s))
-		return select_error();
-
-#ifndef __VMS
-	Py_BEGIN_ALLOW_THREADS
-	timeout = internal_select(s, 0);
-	if (!timeout)
-		n = recv(s->sock_fd, PyString_AS_STRING(buf), len, flags);
-	Py_END_ALLOW_THREADS
-
-	if (timeout) {
+	/* Call the guts */
+	outlen = sock_recv_guts(s, PyString_AsString(buf), recvlen, flags);
+	if (outlen < 0) {
+		/* An error occured, release the string and return an
+		   error. */
 		Py_DECREF(buf);
-		PyErr_SetString(socket_timeout, "timed out");
 		return NULL;
 	}
-	if (n < 0) {
-		Py_DECREF(buf);
-		return s->errorhandler();
-	}
-	if (n != len)
-		_PyString_Resize(&buf, n);
-#else
-	read_buf = PyString_AsString(buf);
-	read_length = len;
-	while (read_length != 0) {
-		unsigned int segment;
-
-		segment = read_length /SEGMENT_SIZE;
-		if (segment != 0) {
-			segment = SEGMENT_SIZE;
-		}
-		else {
-			segment = read_length;
-		}
-
-		Py_BEGIN_ALLOW_THREADS
-		timeout = internal_select(s, 0);
-		if (!timeout)
-			n = recv(s->sock_fd, read_buf, segment, flags);
-		Py_END_ALLOW_THREADS
-
-		if (timeout) {
-			Py_DECREF(buf);
-			PyErr_SetString(socket_timeout, "timed out");
+	if (outlen != recvlen) {
+		/* We did not read as many bytes as we anticipated, resize the
+		   string if possible and be succesful. */
+		if (_PyString_Resize(&buf, outlen) < 0)
+			/* Oopsy, not so succesful after all. */
 			return NULL;
-		}
-		if (n < 0) {
-			Py_DECREF(buf);
-			return s->errorhandler();
-		}
-		if (n != read_length) {
-			read_buf += n;
-			break;
-		}
+	}
 
-		read_length -= segment;
-		read_buf += segment;
-	}
-	if (_PyString_Resize(&buf, (read_buf - PyString_AsString(buf))) < 0)
-	{
-	    return NULL;
-	}
-#endif /* !__VMS */
 	return buf;
 }
 
@@ -2234,6 +2265,62 @@ Receive up to buffersize bytes from the socket.  For the optional flags\n\
 argument, see the Unix manual.  When no data is available, block until\n\
 at least one byte is available or until the remote end is closed.  When\n\
 the remote end is closed and all data is read, return the empty string.");
+
+
+/* s.recv_buf(buffer, [nbytes [,flags]]) method */
+
+static PyObject*
+sock_recv_buf(PySocketSockObject *s, PyObject *args, PyObject *kwds)
+{
+	static char *kwlist[] = {"buffer", "nbytes", "flags", 0};
+
+	int recvlen = 0, flags = 0, readlen;
+	char *buf;
+	int buflen;
+
+	/* Get the buffer's memory */
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "s#|ii:recv", kwlist,
+					 &buf, &buflen, &recvlen, &flags))
+		return NULL;
+	assert(buf != 0 && buflen > 0);
+
+	if (recvlen < 0) {
+		PyErr_SetString(PyExc_ValueError,
+				"negative buffersize in recv");
+		return NULL;
+	}
+	if (recvlen == 0) {
+            /* If nbytes was not specified, use the buffer's length */
+            recvlen = buflen;
+	}
+
+	/* Check if the buffer is large enough */
+	if (buflen < recvlen) {
+		PyErr_SetString(PyExc_ValueError,
+				"buffer too small for requested bytes");
+		return NULL;
+	}
+
+	/* Call the guts */
+	readlen = sock_recv_guts(s, buf, recvlen, flags);
+	if (readlen < 0) {
+		/* Return an error. */
+		return NULL;
+	}
+
+	/* Return the number of bytes read.  Note that we do not do anything
+	   special here in the case that readlen < recvlen. */
+	return PyInt_FromLong(readlen);
+}
+
+PyDoc_STRVAR(recv_buf_doc,
+"recv_buf(buffer, [nbytes[, flags]]) -> nbytes_read\n\
+\n\
+A version of recv() that stores its data into a buffer rather than creating \n\
+a new string.  Receive up to buffersize bytes from the socket.  If buffersize \n\
+is not specified (or 0), receive up to the size available in the given buffer.\n\
+\n\
+See recv() for documentation about the flags.");
 
 
 /* s.recvfrom(nbytes [,flags]) method */
@@ -2535,6 +2622,8 @@ static PyMethodDef sock_methods[] = {
 #endif
 	{"recv",	(PyCFunction)sock_recv, METH_VARARGS,
 			recv_doc},
+	{"recv_buf",	(PyCFunction)sock_recv_buf, METH_VARARGS | METH_KEYWORDS,
+			recv_buf_doc},
 	{"recvfrom",	(PyCFunction)sock_recvfrom, METH_VARARGS,
 			recvfrom_doc},
 	{"send",	(PyCFunction)sock_send, METH_VARARGS,

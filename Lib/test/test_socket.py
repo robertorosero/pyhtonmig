@@ -9,6 +9,8 @@ import time
 import thread, threading
 import Queue
 import sys
+import array
+import bytebuf
 from weakref import proxy
 
 PORT = 50007
@@ -852,6 +854,103 @@ class TestLinuxAbstractNamespace(unittest.TestCase):
         self.assertRaises(socket.error, s.bind, address)
 
 
+class BufferIOTest(SocketConnectedTest):
+    """
+    Test the buffer versions of socket.recv() and socket.send().
+    """
+    def __init__(self, methodName='runTest'):
+        SocketConnectedTest.__init__(self, methodName=methodName)
+
+    def testRecv(self):
+        # Receive into the buffer of an array class.
+        buf = array.array('c', ' '*1024)
+        nbytes = self.cli_conn.recv_buf(buf)
+        self.assertEqual(nbytes, len(MSG))
+        trunc = buf.tostring()[:len(MSG)]
+        self.assertEqual(trunc, MSG)
+
+    def _testRecv(self):
+        # Send using a read-only buffer.
+        buf = buffer(MSG)
+        self.serv_conn.send(buf)
+
+    def testRecvBB(self):
+        # Receive into the buffer of an array class.
+        buf = bytebuf.bytebuf(1024)
+        nbytes = self.cli_conn.recv_buf(buf)
+        self.assertEqual(nbytes, len(MSG))
+        trunc = str(buf)[:len(MSG)]
+        self.assertEqual(trunc, MSG)
+
+    def _testRecvBB(self):
+        # Send using a read-only buffer.
+##         buf = bytebuf.bytebuf(MSG)
+        self.serv_conn.send(MSG)
+
+##     def testOverFlowRecv(self):
+##         # Testing receive in chunks over TCP
+##         seg1 = self.cli_conn.recv(len(MSG) - 3)
+##         seg2 = self.cli_conn.recv(1024)
+##         msg = seg1 + seg2
+##         self.assertEqual(msg, MSG)
+
+##     def _testOverFlowRecv(self):
+##         self.serv_conn.send(MSG)
+
+##     def testRecvFrom(self):
+##         # Testing large recvfrom() over TCP
+##         msg, addr = self.cli_conn.recvfrom(1024)
+##         self.assertEqual(msg, MSG)
+
+##     def _testRecvFrom(self):
+##         self.serv_conn.send(MSG)
+
+##     def testOverFlowRecvFrom(self):
+##         # Testing recvfrom() in chunks over TCP
+##         seg1, addr = self.cli_conn.recvfrom(len(MSG)-3)
+##         seg2, addr = self.cli_conn.recvfrom(1024)
+##         msg = seg1 + seg2
+##         self.assertEqual(msg, MSG)
+
+##     def _testOverFlowRecvFrom(self):
+##         self.serv_conn.send(MSG)
+
+##     def testSendAll(self):
+##         # Testing sendall() with a 2048 byte string over TCP
+##         msg = ''
+##         while 1:
+##             read = self.cli_conn.recv(1024)
+##             if not read:
+##                 break
+##             msg += read
+##         self.assertEqual(msg, 'f' * 2048)
+
+##     def _testSendAll(self):
+##         big_chunk = 'f' * 2048
+##         self.serv_conn.sendall(big_chunk)
+
+##     def testFromFd(self):
+##         # Testing fromfd()
+##         if not hasattr(socket, "fromfd"):
+##             return # On Windows, this doesn't exist
+##         fd = self.cli_conn.fileno()
+##         sock = socket.fromfd(fd, socket.AF_INET, socket.SOCK_STREAM)
+##         msg = sock.recv(1024)
+##         self.assertEqual(msg, MSG)
+
+##     def _testFromFd(self):
+##         self.serv_conn.send(MSG)
+
+##     def testShutdown(self):
+##         # Testing shutdown()
+##         msg = self.cli_conn.recv(1024)
+##         self.assertEqual(msg, MSG)
+
+##     def _testShutdown(self):
+##         self.serv_conn.send(MSG)
+##         self.serv_conn.shutdown(2)
+
+
 def test_main():
     tests = [GeneralModuleTests, BasicTCPTest, TCPTimeoutTest, TestExceptions]
     if sys.platform != 'mac':
@@ -870,5 +969,9 @@ def test_main():
         tests.append(TestLinuxAbstractNamespace)
     test_support.run_unittest(*tests)
 
+def test_main2():
+    tests = [BufferIOTest]
+    test_support.run_unittest(*tests)
+
 if __name__ == "__main__":
-    test_main()
+    test_main2()
