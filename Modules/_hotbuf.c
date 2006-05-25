@@ -188,10 +188,14 @@ hotbuf_compare(PyHotbufObject *self, PyHotbufObject *other)
 static PyObject *
 hotbuf_repr(PyHotbufObject *self)
 {
-    return PyString_FromFormat("<hotbuf ptr %p, size %zd at %p>",
-                               self->b_ptr,
-                               self->b_capacity,
-                               self);
+    return PyString_FromFormat(
+        "<hotbuf mark %zd, position %zd, limit %zd, capacity %zd, ptr %p, at %p>",
+        self->b_mark,
+        self->b_position,
+        self->b_limit, 
+        self->b_capacity,
+        self->b_ptr,
+        self);
 }
 
 /*
@@ -619,12 +623,12 @@ hotbuf_putstr(PyHotbufObject *self, PyObject* arg)
 
     /* Check and extract input string */
     if ( arg == NULL || !PyString_Check(arg) ) {
-        PyErr_SetString(PyExc_ValueError,
+        PyErr_SetString(PyExc_TypeError,
                         "incorrect input type, require string");
         return NULL;
     }
     instring = PyString_AsString(arg);
-    len = strlen(instring);
+    len = PyString_GET_SIZE(arg);
 
     CHECK_LIMIT_ERROR(len);
 

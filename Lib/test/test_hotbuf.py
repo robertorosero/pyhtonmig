@@ -7,13 +7,16 @@
 #
 
 from hotbuf import hotbuf
+from struct import Struct
 import unittest
 from test import test_support
 
 
 CAPACITY = 1024
 MSG = 'Martin Blais was here scribble scribble.'
-
+# Note: we don't use floats because comparisons will cause precision errors due
+# to the binary conversion.
+fmt = Struct('llci')
 
 class HotbufTestCase(unittest.TestCase):
 
@@ -74,6 +77,13 @@ class HotbufTestCase(unittest.TestCase):
         self.assertEquals(b.remaining(), 104)
         b.setposition(10)
         self.assertEquals(b.remaining(), 94)
+
+        # Play with advance.
+        self.assertEquals(b.position, 10)
+        b.advance(32)
+        self.assertEquals(b.position, 42)
+
+        self.assertRaises(IndexError, b.advance, CAPACITY)
 
     def test_compact( self ):
         b = hotbuf(CAPACITY)
@@ -137,9 +147,28 @@ class HotbufTestCase(unittest.TestCase):
     def test_compare( self ):
         b = hotbuf(CAPACITY)
 
-## FIXME we need a few methods to be able to write strings into and out of it
+    def test_pack( self ):
+        ARGS = 42, 16, '@', 3
+        # Pack to a string.
+        s = fmt.pack(*ARGS)
 
+        # Pack directly into the buffer and compare the strings.
+        b = hotbuf(CAPACITY)
+        fmt.pack_to(b, 0, *ARGS)
+        b.setlimit(len(s))
+        self.assertEquals(str(b), s)
 
+    def test_unpack( self ):
+        ARGS = 42, 16, '@', 3
+        b = hotbuf(CAPACITY)
+
+        # Pack normally and put that string in the buffer.
+        s = fmt.pack(*ARGS)
+        b.putstr(s)
+
+        # Unpack directly from the buffer and compare.
+        b.flip()
+        self.assertEquals(fmt.unpack_from(b), ARGS)
 
 
 def test_main():
