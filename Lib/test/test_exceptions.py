@@ -208,8 +208,10 @@ if not sys.platform.startswith('java'):
 unlink(TESTFN)
 
 #  test that exception attributes are happy.
+try: str(u'Hello \u00E1')
+except Exception, e: sampleUnicodeEncodeError = e
 try: unicode('\xff')
-except Exception, e: sampleUnicodeError = e
+except Exception, e: sampleUnicodeDecodeError = e
 exceptionList = [
         ( BaseException, (), { 'message' : '', 'args' : () }),
         ( BaseException, (1, ), { 'message' : 1, 'args' : ( 1, ) }),
@@ -245,7 +247,14 @@ exceptionList = [
                     'print_file_and_line' : None, 'msg' : 'msgStr',
                     'filename' : None, 'lineno' : None, 'offset' : None,
                     'text' : None }),
-        ( sampleUnicodeError,
+        ( UnicodeError, ( ),
+                { 'message' : '', 'args' : (), }),
+        ( sampleUnicodeEncodeError,
+                { 'message' : '', 'args' : ('ascii', u'Hello \xe1', 6, 7,
+                        'ordinal not in range(128)'),
+                    'encoding' : 'ascii', 'object' : u'Hello \xe1',
+                    'start' : 6, 'reason' : 'ordinal not in range(128)' }),
+        ( sampleUnicodeDecodeError,
                 { 'message' : '', 'args' : ('ascii', '\xff', 0, 1,
                         'ordinal not in range(128)'),
                     'encoding' : 'ascii', 'object' : '\xff',
@@ -271,7 +280,7 @@ for args in exceptionList:
         else: raise apply(args[0], args[1])
     except BaseException, e:
         for checkArgName in expected.keys():
-            if getattr(e, checkArgName) != expected[checkArgName]:
+            if repr(getattr(e, checkArgName)) != repr(expected[checkArgName]):
                 raise TestFailed('Checking exception arguments, exception '
                         '"%s", attribute "%s" expected %s got %s.' %
                         ( repr(e), checkArgName,
