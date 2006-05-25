@@ -4,6 +4,7 @@
  */
 
 #include "Python.h"
+#include "structmember.h"
 #include <string.h> /* for memmove */
 
 PyAPI_DATA(PyTypeObject) PyHotbuf_Type;
@@ -163,18 +164,21 @@ hotbuf_dealloc(PyHotbufObject *self)
 static int
 hotbuf_compare(PyHotbufObject *self, PyHotbufObject *other)
 {
-    Py_ssize_t min_len;
+    Py_ssize_t len_self, len_other, min_len;
     int cmp;
 
-    min_len = ((self->b_capacity < other->b_capacity) ?
-               self->b_capacity : other->b_capacity);
+    len_self = self->b_limit - self->b_position;
+    len_other = other->b_limit - other->b_position;
+
+    min_len = ((len_self < len_other) ? len_self : len_other);
     if (min_len > 0) {
-        cmp = memcmp(self->b_ptr, other->b_ptr, min_len);
+        cmp = memcmp(self->b_ptr + self->b_position, 
+                     other->b_ptr + other->b_position, min_len);
         if (cmp != 0)
             return cmp;
     }
-    return ((self->b_capacity < other->b_capacity) ?
-            -1 : (self->b_capacity > other->b_capacity) ? 1 : 0);
+
+    return ((len_self < len_other) ? -1 : (len_self > len_other) ? 1 : 0);
 }
 
 
@@ -196,7 +200,12 @@ hotbuf_repr(PyHotbufObject *self)
 static PyObject *
 hotbuf_str(PyHotbufObject *self)
 {
-    return PyString_FromStringAndSize((const char *)self->b_ptr, self->b_capacity);
+    if ( self->b_position == self->b_limit ) {
+        return Py_None;
+    }
+    return PyString_FromStringAndSize(
+        (const char *)(self->b_ptr + self->b_position), 
+        self->b_limit - self->b_position);
 }
 
 
@@ -204,31 +213,6 @@ hotbuf_str(PyHotbufObject *self)
 /* ===========================================================================
  * Object Methods (basic interface)
  */
-
-PyDoc_STRVAR(capacity__doc__,
-"B.capacity() -> int\n\
-\n\
-Returns this buffer's capacity. \n\
-(the entire size of the allocated buffer.)");
-
-static PyObject*
-hotbuf_capacity(PyHotbufObject *self)
-{
-    return PyInt_FromLong(self->b_capacity);
-}
-
-
-PyDoc_STRVAR(position__doc__,
-"B.position() -> int\n\
-\n\
-Returns this buffer's position.");
-
-static PyObject*
-hotbuf_position(PyHotbufObject *self)
-{
-    return PyInt_FromLong(self->b_position);
-}
-
 
 PyDoc_STRVAR(setposition__doc__,
 "B.setposition(int)\n\
@@ -260,18 +244,6 @@ hotbuf_setposition(PyHotbufObject *self, PyObject* arg)
         self->b_mark = -1;
 
     return Py_None;
-}
-
-
-PyDoc_STRVAR(limit__doc__,
-"B.limit() -> int\n\
-\n\
-Returns this buffer's limit.");
-
-static PyObject*
-hotbuf_limit(PyHotbufObject *self)
-{
-    return PyInt_FromLong(self->b_limit);
 }
 
 
@@ -310,19 +282,6 @@ hotbuf_setlimit(PyHotbufObject *self, PyObject* arg)
         self->b_mark = -1;
 
     return Py_None;
-}
-
-
-PyDoc_STRVAR(mark__doc__,
-"B.mark() -> int\n\
-\n\
-Returns this buffer's mark. \n\
-Return -1 if the mark is not set.");
-
-static PyObject*
-hotbuf_mark(PyHotbufObject *self)
-{
-    return PyInt_FromLong(self->b_mark);
 }
 
 
@@ -571,6 +530,57 @@ hotbuf_putbyte(PyHotbufObject *self, PyObject* arg)
 }
 
 
+static PyObject*
+hotbuf_getstring(PyHotbufObject *self, PyObject* arg)
+{
+    int len;
+    CHECK_LIMIT_ERROR(sizeof(byte));
+
+    len = PyInt_AsLong(arg);
+    if (len == -1 && PyErr_Occurred())
+        return NULL;
+
+    if (len > (self->b_limit - self->b_position)) {
+        PyErr_SetString(PyExc_IndexError,
+                        "cannot read beyond limit");
+        return NULL;
+    }
+
+FIXME continue here
+
+    return PyString_FromStringAndSize(
+        (const char *)(self->b_ptr + self->b_position), len);
+}
+
+FIXME continue here
+
+FIXME we need to find a way to automatically advance position without doing it in Python
+
+
+static PyObject*
+hotbuf_putstring(PyHotbufObject *self, PyObject* arg)
+{
+    int byte_i;
+    unsigned char byte;
+
+    byte_i = PyInt_AsLong(arg);
+    if (byte_i == -1 && PyErr_Occurred())
+        return NULL;
+
+    if ( byte_i > 255 ) {
+        PyErr_SetString(PyExc_ValueError,
+                        "overflow for byte");
+        return NULL;
+    }
+    byte = (unsigned char)byte_i;
+
+    CHECK_LIMIT_ERROR(sizeof(byte));
+    *(unsigned char*)(self->b_ptr + self->b_position) = byte;
+    self->b_position += sizeof(byte);
+    return Py_None;
+}
+
+
 
 
 /* ===========================================================================
@@ -649,35 +659,45 @@ Note that hotbuf is a direct Python equivalent of Java's NIO\n\
 ByteBuffer class.");
 
 
+
+#define OFF(x) offsetof(PyHotbufObject, x)
+
+static PyMemberDef hotbuf_members[] = {
+    {"capacity", T_INT, OFF(b_capacity), RO,
+     "buffer's capacity, it's total allocated size"},
+    {"position", T_INT, OFF(b_position), RO,
+     "buffer's position"},
+    {"limit", T_INT, OFF(b_limit), RO,
+     "buffer's limit"},
+    {"mark", T_INT, OFF(b_mark), RO,
+     "buffer's mark, -1 if not set"},
+    {NULL} /* Sentinel */
+};
+
 static PyMethodDef
 hotbuf_methods[] = {
-        {"clear", (PyCFunction)hotbuf_clear, METH_NOARGS, clear__doc__},
-        {"capacity", (PyCFunction)hotbuf_capacity, METH_NOARGS, capacity__doc__},
-        {"position", (PyCFunction)hotbuf_position, METH_NOARGS, position__doc__},
-        {"setposition", (PyCFunction)hotbuf_setposition, METH_O, setposition__doc__},
-        {"limit", (PyCFunction)hotbuf_limit, METH_NOARGS, limit__doc__},
-        {"setlimit", (PyCFunction)hotbuf_setlimit, METH_O, setlimit__doc__},
-        {"mark", (PyCFunction)hotbuf_mark, METH_NOARGS, mark__doc__},
-        {"setmark", (PyCFunction)hotbuf_setmark, METH_NOARGS, setmark__doc__},
-        {"reset", (PyCFunction)hotbuf_reset, METH_NOARGS, reset__doc__},
-        {"flip", (PyCFunction)hotbuf_flip, METH_NOARGS, flip__doc__},
-        {"rewind", (PyCFunction)hotbuf_rewind, METH_NOARGS, rewind__doc__},
-        {"remaining", (PyCFunction)hotbuf_remaining, METH_NOARGS, remaining__doc__},
-        {"compact", (PyCFunction)hotbuf_compact, METH_NOARGS, compact__doc__},
-
-        {"getbyte", (PyCFunction)hotbuf_getbyte, METH_NOARGS, relative_get__doc__},
-        {"putbyte", (PyCFunction)hotbuf_putbyte, METH_O, relative_put__doc__},
-        {NULL, NULL} /* sentinel */
+    {"clear", (PyCFunction)hotbuf_clear, METH_NOARGS, clear__doc__},
+    {"setposition", (PyCFunction)hotbuf_setposition, METH_O, setposition__doc__},
+    {"setlimit", (PyCFunction)hotbuf_setlimit, METH_O, setlimit__doc__},
+    {"setmark", (PyCFunction)hotbuf_setmark, METH_NOARGS, setmark__doc__},
+    {"reset", (PyCFunction)hotbuf_reset, METH_NOARGS, reset__doc__},
+    {"flip", (PyCFunction)hotbuf_flip, METH_NOARGS, flip__doc__},
+    {"rewind", (PyCFunction)hotbuf_rewind, METH_NOARGS, rewind__doc__},
+    {"remaining", (PyCFunction)hotbuf_remaining, METH_NOARGS, remaining__doc__},
+    {"compact", (PyCFunction)hotbuf_compact, METH_NOARGS, compact__doc__},
+    {"getbyte", (PyCFunction)hotbuf_getbyte, METH_NOARGS, relative_get__doc__},
+    {"putbyte", (PyCFunction)hotbuf_putbyte, METH_O, relative_put__doc__},
+    {NULL, NULL} /* sentinel */
 };
 
 static PySequenceMethods hotbuf_as_sequence = {
-        (lenfunc)hotbuf_length,                 /*sq_length*/
-        0 /* (binaryfunc)hotbuf_concat */,              /*sq_concat*/
-        0 /* (ssizeargfunc)hotbuf_repeat */,            /*sq_repeat*/
-        0 /* (ssizeargfunc)hotbuf_item */,              /*sq_item*/
-        0 /*(ssizessizeargfunc)hotbuf_slice*/,        /*sq_slice*/
-        0 /*(ssizeobjargproc)hotbuf_ass_item*/,       /*sq_ass_item*/
-        0 /*(ssizessizeobjargproc)hotbuf_ass_slice*/, /*sq_ass_slice*/
+    (lenfunc)hotbuf_length,                 /*sq_length*/
+    0 /* (binaryfunc)hotbuf_concat */,              /*sq_concat*/
+    0 /* (ssizeargfunc)hotbuf_repeat */,            /*sq_repeat*/
+    0 /* (ssizeargfunc)hotbuf_item */,              /*sq_item*/
+    0 /*(ssizessizeargfunc)hotbuf_slice*/,        /*sq_slice*/
+    0 /*(ssizeobjargproc)hotbuf_ass_item*/,       /*sq_ass_item*/
+    0 /*(ssizessizeobjargproc)hotbuf_ass_slice*/, /*sq_ass_slice*/
 };
 
 static PyBufferProcs hotbuf_as_buffer = {
@@ -717,7 +737,7 @@ static PyTypeObject PyHotbuf_Type = {
     0,                                          /* tp_iter */
     0,                                          /* tp_iternext */
     hotbuf_methods,                             /* tp_methods */
-    0,                                          /* tp_members */
+    hotbuf_members,                             /* tp_members */
     0,                                          /* tp_getset */
     0,                                          /* tp_base */
     0,                                          /* tp_dict */

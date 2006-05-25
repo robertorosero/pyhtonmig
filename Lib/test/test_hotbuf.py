@@ -21,21 +21,21 @@ class HotbufTestCase(unittest.TestCase):
         self.assertRaises(ValueError, hotbuf, 0)
         b = hotbuf(CAPACITY)
         self.assertEquals(len(b), CAPACITY)
-        self.assertEquals(b.capacity(), CAPACITY)
+        self.assertEquals(b.capacity, CAPACITY)
 
         # Play with the position
-        assert b.position() == 0
+        assert b.position == 0
         b.setposition(10)
-        self.assertEquals(b.position(), 10)
+        self.assertEquals(b.position, 10)
         self.assertRaises(IndexError, b.setposition, CAPACITY + 1)
 
         # Play with the limit
-        assert b.limit() == CAPACITY
+        assert b.limit == CAPACITY
         b.setlimit(CAPACITY - 10)
-        self.assertEquals(b.limit(), CAPACITY - 10)
+        self.assertEquals(b.limit, CAPACITY - 10)
         self.assertRaises(IndexError, b.setlimit, CAPACITY + 1)
-        b.setlimit(b.position() - 1)
-        self.assertEquals(b.position(), b.limit())
+        b.setlimit(b.position - 1)
+        self.assertEquals(b.position, b.limit)
 
         # Play with reset before the mark has been set.
         self.assertRaises(IndexError, b.setlimit, CAPACITY + 1)
@@ -45,11 +45,11 @@ class HotbufTestCase(unittest.TestCase):
         b.setlimit(100)
         b.setmark()
         b.setposition(15)
-        self.assertEquals(b.mark(), 10)
+        self.assertEquals(b.mark, 10)
 
         # Play with clear
         b.clear()
-        self.assertEquals((b.position(), b.limit(), b.mark()),
+        self.assertEquals((b.position, b.limit, b.mark),
                           (0, CAPACITY, -1))
 
         # Play with flip.
@@ -57,7 +57,7 @@ class HotbufTestCase(unittest.TestCase):
         b.setlimit(104)
         b.setmark()
         b.flip()
-        self.assertEquals((b.position(), b.limit(), b.mark()),
+        self.assertEquals((b.position, b.limit, b.mark),
                           (0, 42, -1))
 
         # Play with rewind.
@@ -65,7 +65,7 @@ class HotbufTestCase(unittest.TestCase):
         b.setlimit(104)
         b.setmark()
         b.rewind()
-        self.assertEquals((b.position(), b.limit(), b.mark()),
+        self.assertEquals((b.position, b.limit, b.mark),
                           (0, 104, -1))
 
         # Play with remaining.
@@ -78,9 +78,9 @@ class HotbufTestCase(unittest.TestCase):
 
         b.setposition(100)
         b.setlimit(200)
-        b.mark()
+        m = b.mark
         b.compact()
-        self.assertEquals((b.position(), b.limit(), b.mark()),
+        self.assertEquals((b.position, b.limit, b.mark),
                           (100, CAPACITY, -1))
 
     def test_byte( self ):
@@ -101,6 +101,26 @@ class HotbufTestCase(unittest.TestCase):
 
         # Test underflow.
         self.assertRaises(IndexError, b.putbyte, 42)
+
+    def test_conversion( self ):
+        b = hotbuf(CAPACITY)
+
+        b.setposition(100)
+        b.setlimit(132)
+
+        self.assertEquals(len(b), 32)
+        s = str(b)
+        self.assertEquals(len(s), 32)
+
+        r = repr(b)
+        self.assert_(r.startswith('<hotbuf '))
+        
+    def test_compare( self ):
+        b = hotbuf(CAPACITY)
+
+## FIXME we need a few methods to be able to write strings into and out of it
+
+
 
 
 def test_main():
