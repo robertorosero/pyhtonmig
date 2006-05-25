@@ -12,6 +12,8 @@ from test import test_support
 
 
 CAPACITY = 1024
+MSG = 'Martin Blais was here scribble scribble.'
+
 
 class HotbufTestCase(unittest.TestCase):
 
@@ -101,6 +103,23 @@ class HotbufTestCase(unittest.TestCase):
 
         # Test underflow.
         self.assertRaises(IndexError, b.putbyte, 42)
+
+    def test_str( self ):
+        b = hotbuf(256)
+
+        # Write into the buffer
+        b.putstr(MSG)
+        b.flip()
+
+        # Read back and assert message
+        self.assertEquals(b.getstr(len(MSG)), MSG)
+        
+        # Test overflow.
+        b.flip()
+        self.assertRaises(IndexError, b.putstr, ' ' * 1000)
+        
+        # Test underflow.
+        self.assertRaises(IndexError, b.getstr, 1000)
 
     def test_conversion( self ):
         b = hotbuf(CAPACITY)

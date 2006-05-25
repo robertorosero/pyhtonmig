@@ -172,7 +172,7 @@ hotbuf_compare(PyHotbufObject *self, PyHotbufObject *other)
 
     min_len = ((len_self < len_other) ? len_self : len_other);
     if (min_len > 0) {
-        cmp = memcmp(self->b_ptr + self->b_position, 
+        cmp = memcmp(self->b_ptr + self->b_position,
                      other->b_ptr + other->b_position, min_len);
         if (cmp != 0)
             return cmp;
@@ -204,7 +204,7 @@ hotbuf_str(PyHotbufObject *self)
         return Py_None;
     }
     return PyString_FromStringAndSize(
-        (const char *)(self->b_ptr + self->b_position), 
+        (const char *)(self->b_ptr + self->b_position),
         self->b_limit - self->b_position);
 }
 
@@ -245,6 +245,44 @@ hotbuf_setposition(PyHotbufObject *self, PyObject* arg)
 
     return Py_None;
 }
+
+
+PyDoc_STRVAR(advance__doc__,
+"B.advance(int)\n\
+\n\
+Advance this buffer's position by the given number of bytes. \n\
+If the mark is defined and larger than\n\
+the new position then it is discarded.  If the given position is\n\
+larger than the limit an exception is raised.");
+
+static PyObject*
+hotbuf_advance(PyHotbufObject *self, PyObject* arg)
+{
+    int nbytes;
+    int newposition;
+
+    nbytes = PyInt_AsLong(arg);
+    if (nbytes == -1 && PyErr_Occurred())
+        return NULL;
+
+    newposition = self->b_position + nbytes;
+    if ( newposition > self->b_capacity ) {
+        PyErr_SetString(PyExc_IndexError,
+                        "position must be smaller than capacity");
+        return NULL;
+    }
+
+    /* Set the new position */
+    self->b_position = newposition;
+
+    /* Discard the mark if it is beyond the new position */
+    if ( self->b_mark > self->b_position )
+        self->b_mark = -1;
+
+    return Py_None;
+}
+
+
 
 
 PyDoc_STRVAR(setlimit__doc__,
@@ -471,7 +509,7 @@ hotbuf_compact(PyHotbufObject *self)
  * Object Methods (get/put methods)
  */
 
-PyDoc_STRVAR(relative_get__doc__,
+PyDoc_STRVAR(get__doc__,
 "B.get*() -> data\n\
 \n\
 Relative get methods. \n\
@@ -479,7 +517,7 @@ Reads something at this buffer's current position, \n\
 and then increments the position.\n\
 An IndexError is raised if the position is at the end of the buffer.");
 
-PyDoc_STRVAR(relative_put__doc__,
+PyDoc_STRVAR(put__doc__,
 "B.put*(data)\n\
 \n\
 Relative put methods. \n\
@@ -530,53 +568,72 @@ hotbuf_putbyte(PyHotbufObject *self, PyObject* arg)
 }
 
 
+PyDoc_STRVAR(getstr__doc__,
+"B.getstr(nbytes) -> data\n\
+\n\
+Extract a string of 'nbytes' bytes from the buffer and advance the \n\
+position accordingly.\n\
+An IndexError is raised if the position is at the end of the buffer.");
+
 static PyObject*
-hotbuf_getstring(PyHotbufObject *self, PyObject* arg)
+hotbuf_getstr(PyHotbufObject *self, PyObject* arg)
 {
     int len;
-    CHECK_LIMIT_ERROR(sizeof(byte));
+    PyObject* s;
 
+    /* Extract the given number of bytes */
     len = PyInt_AsLong(arg);
     if (len == -1 && PyErr_Occurred())
         return NULL;
+    
+    CHECK_LIMIT_ERROR(len);
 
-    if (len > (self->b_limit - self->b_position)) {
-        PyErr_SetString(PyExc_IndexError,
-                        "cannot read beyond limit");
-        return NULL;
-    }
-
-FIXME continue here
-
-    return PyString_FromStringAndSize(
+    /* Extract the string object from the buffer */
+    s = PyString_FromStringAndSize(
         (const char *)(self->b_ptr + self->b_position), len);
+
+    /* Advance to the new position */
+    self->b_position += len;
+
+    /* Discard the mark if it is beyond the new position */
+    if ( self->b_mark > self->b_position )
+        self->b_mark = -1;
+
+    /* Return the new string */
+    return s;
 }
 
-FIXME continue here
 
-FIXME we need to find a way to automatically advance position without doing it in Python
-
+PyDoc_STRVAR(putstr__doc__,
+"B.putstr(str)\n\
+\n\
+Write a string of 'nbytes' bytes from the buffer and advance the \n\
+position accordingly.\n\
+An IndexError is raised if the position is at the end of the buffer.");
 
 static PyObject*
-hotbuf_putstring(PyHotbufObject *self, PyObject* arg)
+hotbuf_putstr(PyHotbufObject *self, PyObject* arg)
 {
-    int byte_i;
-    unsigned char byte;
+    char *instring;
+    int len;
 
-    byte_i = PyInt_AsLong(arg);
-    if (byte_i == -1 && PyErr_Occurred())
-        return NULL;
-
-    if ( byte_i > 255 ) {
+    /* Check and extract input string */
+    if ( arg == NULL || !PyString_Check(arg) ) {
         PyErr_SetString(PyExc_ValueError,
-                        "overflow for byte");
+                        "incorrect input type, require string");
         return NULL;
     }
-    byte = (unsigned char)byte_i;
+    instring = PyString_AsString(arg);
+    len = strlen(instring);
 
-    CHECK_LIMIT_ERROR(sizeof(byte));
-    *(unsigned char*)(self->b_ptr + self->b_position) = byte;
-    self->b_position += sizeof(byte);
+    CHECK_LIMIT_ERROR(len);
+
+    /* Copy the string into the buffer */
+    memcpy(self->b_ptr, instring, len);
+
+    /* Advance the position */
+    self->b_position += len;
+
     return Py_None;
 }
 
@@ -678,6 +735,7 @@ static PyMethodDef
 hotbuf_methods[] = {
     {"clear", (PyCFunction)hotbuf_clear, METH_NOARGS, clear__doc__},
     {"setposition", (PyCFunction)hotbuf_setposition, METH_O, setposition__doc__},
+    {"advance", (PyCFunction)hotbuf_advance, METH_O, advance__doc__},
     {"setlimit", (PyCFunction)hotbuf_setlimit, METH_O, setlimit__doc__},
     {"setmark", (PyCFunction)hotbuf_setmark, METH_NOARGS, setmark__doc__},
     {"reset", (PyCFunction)hotbuf_reset, METH_NOARGS, reset__doc__},
@@ -685,8 +743,10 @@ hotbuf_methods[] = {
     {"rewind", (PyCFunction)hotbuf_rewind, METH_NOARGS, rewind__doc__},
     {"remaining", (PyCFunction)hotbuf_remaining, METH_NOARGS, remaining__doc__},
     {"compact", (PyCFunction)hotbuf_compact, METH_NOARGS, compact__doc__},
-    {"getbyte", (PyCFunction)hotbuf_getbyte, METH_NOARGS, relative_get__doc__},
-    {"putbyte", (PyCFunction)hotbuf_putbyte, METH_O, relative_put__doc__},
+    {"getbyte", (PyCFunction)hotbuf_getbyte, METH_NOARGS, get__doc__},
+    {"putbyte", (PyCFunction)hotbuf_putbyte, METH_O, put__doc__},
+    {"getstr", (PyCFunction)hotbuf_getstr, METH_O, getstr__doc__},
+    {"putstr", (PyCFunction)hotbuf_putstr, METH_O, putstr__doc__},
     {NULL, NULL} /* sentinel */
 };
 
