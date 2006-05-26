@@ -759,9 +759,9 @@ WindowsError_traverse(PyWindowsErrorObject *self, visitproc visit, void *arg)
 static PyObject *
 WindowsError_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
-    PyObject *o_errcode = NULL;
+    PyObject *o_errcode;
     long errcode;
-    PyWindowsErrorObject *self = NULL;
+    PyWindowsErrorObject *self;
     long posix_errno;
 
     self = (PyWindowsErrorObject *)EnvironmentError_new(type, args, kwds);
