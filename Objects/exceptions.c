@@ -16,21 +16,10 @@ typedef struct {
         PyObject *message;
 } BaseExceptionObject;
 
-static PyTypeObject _PyExc_StopIteration;
-PyObject *PyExc_StopIterationInst;
-
 static PyObject *
 BaseException_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
     BaseExceptionObject *self;
-
-    /* Make StopIteration be a singleton as often as we can */
-    if ((args == NULL || PyTuple_GET_SIZE(args) == 0) &&
-            PyExc_StopIterationInst != NULL &&
-            type == &_PyExc_StopIteration) {
-        Py_INCREF(PyExc_StopIterationInst);
-        return PyExc_StopIterationInst;
-    }
 
     self = (BaseExceptionObject *)type->tp_alloc(type, 0);
     self->args = self->message = self->dict = NULL;
@@ -1969,9 +1958,6 @@ SimpleExtendsException(PyExc_Warning, ImportWarning, "Base class for warnings ab
  */
 PyObject *PyExc_MemoryErrorInst=NULL;
 
-/* Make StopIteration be a singleton as often as we can */
-PyObject *PyExc_StopIterationInst=NULL;
-
 /* module global functions */
 static PyMethodDef functions[] = {
     /* Sentinel */
@@ -2112,11 +2098,6 @@ _PyExc_Init(void)
     PyExc_MemoryErrorInst = BaseException_new(&_PyExc_MemoryError, NULL, NULL);
     if (!PyExc_MemoryErrorInst)
         Py_FatalError("Cannot pre-allocate MemoryError instance\n");
-
-    PyExc_StopIterationInst = BaseException_new(&_PyExc_StopIteration, NULL,
-        NULL);
-    if (!PyExc_StopIterationInst)
-        Py_FatalError("Cannot pre-allocate StopIteration instance\n");
 
     Py_DECREF(bdict);
     Py_DECREF(bltinmod);
