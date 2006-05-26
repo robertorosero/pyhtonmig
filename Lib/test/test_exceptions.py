@@ -269,7 +269,6 @@ except NameError: pass
 
 for args in exceptionList:
     expected = args[-1]
-    print args
     try:
         if len(args) == 2: raise args[0]
         else: raise apply(args[0], args[1])

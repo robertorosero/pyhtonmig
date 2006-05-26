@@ -8,6 +8,7 @@
  */
 typedef struct {
         PyObject_HEAD
+        PyObject *dict;
         PyObject *args;
         PyObject *message;
 } BaseExceptionObject;
@@ -53,6 +54,12 @@ BaseException_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 
     self->args = self->message = NULL;
 
+    self->dict = PyDict_New();
+    if (self->dict == NULL) {
+        Py_DECREF(self);
+        return NULL;
+    }
+
     if (_BaseException_init(self, args, kwds) == -1) {
         Py_DECREF(self);
         return NULL;
@@ -70,6 +77,7 @@ BaseException_init(BaseExceptionObject *self, PyObject *args, PyObject *kwds)
 static void
 BaseException_dealloc(BaseExceptionObject *self)
 {
+    Py_CLEAR(self->dict);
     Py_CLEAR(self->args);
     Py_CLEAR(self->message);
     self->ob_type->tp_free((PyObject *)self);
@@ -186,44 +194,44 @@ static PyMethodDef BaseException_methods[] = {
 
 static PyTypeObject _PyExc_BaseException = {
     PyObject_HEAD_INIT(NULL)
-    0,                         /*ob_size*/
-    "exceptions.BaseException",          /*tp_name*/
-    sizeof(BaseExceptionObject),      /*tp_basicsize*/
-    0,                         /*tp_itemsize*/
+    0,                          /*ob_size*/
+    "exceptions.BaseException", /*tp_name*/
+    sizeof(BaseExceptionObject),  /*tp_basicsize*/
+    0,                          /*tp_itemsize*/
     (destructor)BaseException_dealloc,     /*tp_dealloc*/
-    0,                         /*tp_print*/
-    0,                         /*tp_getattr*/
-    0,                         /*tp_setattr*/
-    0,                         /* tp_compare; */
+    0,                          /*tp_print*/
+    0,                          /*tp_getattr*/
+    0,                          /*tp_setattr*/
+    0,                          /* tp_compare; */
     (reprfunc)BaseException_repr,     /*tp_repr*/
-    0,                         /*tp_as_number*/
+    0,                          /*tp_as_number*/
     &BaseException_as_sequence, /*tp_as_sequence*/
-    0,                         /*tp_as_mapping*/
-    0,                         /*tp_hash */
-    0,                         /*tp_call*/
+    0,                          /*tp_as_mapping*/
+    0,                          /*tp_hash */
+    0,                          /*tp_call*/
     (reprfunc)BaseException_str,       /*tp_str*/
-    0,                         /*tp_getattro*/
-    0,                         /*tp_setattro*/
-    0,                         /*tp_as_buffer*/
+    PyObject_GenericGetAttr,    /*tp_getattro*/
+    PyObject_GenericSetAttr,    /*tp_setattro*/
+    0,                          /*tp_as_buffer*/
     Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,        /*tp_flags*/
     PyDoc_STR("Common base class for all exceptions"), /* tp_doc */
-    0,                       /* tp_traverse */
-    0,                       /* tp_clear */
-    0,                       /* tp_richcompare */
-    0,                       /* tp_weaklistoffset */
-    0,                       /* tp_iter */
-    0,                       /* tp_iternext */
-    BaseException_methods,            /* tp_methods */
-    BaseException_members,            /* tp_members */
-    0,                         /* tp_getset */
-    0,                         /* tp_base */
-    0,                         /* tp_dict */
-    0,                         /* tp_descr_get */
-    0,                         /* tp_descr_set */
-    0,                         /* tp_dictoffset */
-    0,                         /* tp_init */
-    0,                         /* tp_alloc */
-    BaseException_new,         /* tp_new */
+    0,                          /* tp_traverse */
+    0,                          /* tp_clear */
+    0,                          /* tp_richcompare */
+    0,                          /* tp_weaklistoffset */
+    0,                          /* tp_iter */
+    0,                          /* tp_iternext */
+    BaseException_methods,      /* tp_methods */
+    BaseException_members,      /* tp_members */
+    0,                          /* tp_getset */
+    0,                          /* tp_base */
+    0,                          /* tp_dict */
+    0,                          /* tp_descr_get */
+    0,                          /* tp_descr_set */
+    offsetof(BaseExceptionObject, dict),  /* tp_dictoffset */
+    0,                          /* tp_init */
+    0,                          /* tp_alloc */
+    BaseException_new,          /* tp_new */
 };
 /* the CPython API expects exceptions to be (PyObject *) - both a hold-over
 from the previous implmentation and also allowing Python objects to be used
@@ -240,7 +248,8 @@ static PyTypeObject _PyExc_ ## EXCNAME = { \
     Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE, \
     PyDoc_STR(EXCDOC), \
     0, 0, 0, 0, 0, 0, 0, 0, 0, &_ ## EXCBASE, \
-    0, 0, 0, 0, (initproc)BaseException_init, 0, BaseException_new,\
+    0, 0, 0, offsetof(BaseExceptionObject, dict), \
+    (initproc)BaseException_init, 0, BaseException_new,\
 }; \
 PyObject *PyExc_ ## EXCNAME = (PyObject *)&_PyExc_ ## EXCNAME;
 
@@ -254,7 +263,8 @@ static PyTypeObject _PyExc_ ## EXCNAME = { \
     Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE, \
     PyDoc_STR(EXCDOC), \
     0, 0, 0, 0, 0, 0, 0, 0, 0, &_ ## EXCBASE, \
-    0, 0, 0, 0, (initproc)EXCSTORE ## _init, 0, EXCSTORE ## _new,\
+    0, 0, 0, offsetof(EXCSTORE ## Object, dict), \
+    (initproc)EXCSTORE ## _init, 0, EXCSTORE ## _new,\
 }; \
 PyObject *PyExc_ ## EXCNAME = (PyObject *)&_PyExc_ ## EXCNAME;
 
@@ -269,7 +279,8 @@ static PyTypeObject _PyExc_ ## EXCNAME = { \
     Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE, \
     PyDoc_STR(EXCDOC), \
     0, 0, 0, 0, 0, 0, EXCMETHODS, EXCMEMBERS, 0, &_ ## EXCBASE, \
-    0, 0, 0, 0, (initproc)EXCSTORE ## _init, 0, EXCSTORE ## _new,\
+    0, 0, 0, offsetof(EXCSTORE ## Object, dict), \
+    (initproc)EXCSTORE ## _init, 0, EXCSTORE ## _new,\
 }; \
 PyObject *PyExc_ ## EXCNAME = (PyObject *)&_PyExc_ ## EXCNAME;
 
@@ -311,6 +322,7 @@ SimpleExtendsException(PyExc_Exception, GeneratorExit, "Request that a generator
  */
 typedef struct {
     PyObject_HEAD
+    PyObject *dict;
     PyObject *args;
     PyObject *message;
     PyObject *code;
@@ -354,6 +366,8 @@ SystemExit_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 static int
 SystemExit_init(SystemExitObject *self, PyObject *args, PyObject *kwds)
 {
+    if (_BaseException_init((BaseExceptionObject *)self, args, kwds) == -1)
+        return -1;
     return _SystemExit_init(self, args, kwds);
 }
 
@@ -393,6 +407,7 @@ SimpleExtendsException(PyExc_StandardError, ImportError, "Import can't find modu
  */
 typedef struct {
     PyObject_HEAD
+    PyObject *dict;
     PyObject *args;
     PyObject *message;
     PyObject *myerrno;
@@ -580,6 +595,7 @@ MiddlingExtendsException(PyExc_EnvironmentError, OSError, EnvironmentError, "OS 
 
 typedef struct {
     PyObject_HEAD
+    PyObject *dict;
     PyObject *args;
     PyObject *message;
     PyObject *myerrno;
@@ -769,6 +785,7 @@ SimpleExtendsException(PyExc_StandardError, AttributeError, "Attribute not found
  */
 typedef struct {
     PyObject_HEAD
+    PyObject *dict;
     PyObject *args;
     PyObject *message;
     PyObject *msg;
@@ -1014,6 +1031,7 @@ SimpleExtendsException(PyExc_ValueError, UnicodeError, "Unicode related error.")
 #ifdef Py_USING_UNICODE
 typedef struct {
     PyObject_HEAD
+    PyObject *dict;
     PyObject *args;
     PyObject *message;
     PyObject *encoding;
@@ -1428,7 +1446,8 @@ static PyTypeObject _PyExc_UnicodeEncodeError = {
     Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
     PyDoc_STR("Unicode encoding error."),
     0, 0, 0, 0, 0, 0, 0, UnicodeError_members, 0, &_PyExc_UnicodeError,
-    0, 0, 0, 0, (initproc)UnicodeEncodeError_init, 0, UnicodeEncodeError_new,
+    0, 0, 0, offsetof(UnicodeErrorObject, dict),
+    (initproc)UnicodeEncodeError_init, 0, UnicodeEncodeError_new,
 };
 PyObject *PyExc_UnicodeEncodeError = (PyObject *)&_PyExc_UnicodeEncodeError;
 
@@ -1502,7 +1521,8 @@ static PyTypeObject _PyExc_UnicodeDecodeError = {
     Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
     PyDoc_STR("Unicode decoding error."),
     0, 0, 0, 0, 0, 0, 0, UnicodeError_members, 0, &_PyExc_UnicodeError,
-    0, 0, 0, 0, (initproc)UnicodeDecodeError_init, 0, UnicodeDecodeError_new,
+    0, 0, 0, offsetof(UnicodeErrorObject, dict),
+    (initproc)UnicodeDecodeError_init, 0, UnicodeDecodeError_new,
 };
 PyObject *PyExc_UnicodeDecodeError = (PyObject *)&_PyExc_UnicodeDecodeError;
 
@@ -1634,7 +1654,8 @@ static PyTypeObject _PyExc_UnicodeTranslateError = {
     Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
     PyDoc_STR("Unicode decoding error."),
     0, 0, 0, 0, 0, 0, 0, UnicodeError_members, 0, &_PyExc_UnicodeError,
-    0, 0, 0, 0, (initproc)UnicodeTranslateError_init, 0, UnicodeTranslateError_new,
+    0, 0, 0, offsetof(UnicodeErrorObject, dict),
+    (initproc)UnicodeTranslateError_init, 0, UnicodeTranslateError_new,
 };
 PyObject *PyExc_UnicodeTranslateError = (PyObject *)&_PyExc_UnicodeTranslateError;
 
