@@ -124,7 +124,9 @@ for each thread.
 \begin{cfuncdesc}{void}{PyErr_SetObject}{PyObject *type, PyObject *value}
   This function is similar to \cfunction{PyErr_SetString()} but lets
   you specify an arbitrary Python object for the ``value'' of the
-  exception.
+  exception.  Passing \NULL{} for \var{value} is treated as
+  if \cdata{Py_None} were passed instead.
+  \versionchanged[Treating \NULL{} as \cdata{Py_None} was added]{2.5}
 \end{cfuncdesc}
 
 \begin{cfuncdesc}{PyObject*}{PyErr_Format}{PyObject *exception,

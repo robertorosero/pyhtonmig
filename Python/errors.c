@@ -52,8 +52,13 @@ PyErr_Restore(PyObject *type, PyObject *value, PyObject *traceback)
 void
 PyErr_SetObject(PyObject *exception, PyObject *value)
 {
+	/* ho ho ho!  blows up _while_ initializing exceptions
+	   assert(exception != NULL); */
+	if (value == NULL)
+		value = Py_None;
+	/* Py_INCREF(exception); */
 	Py_XINCREF(exception);
-	Py_XINCREF(value);
+	Py_INCREF(value);
 	PyErr_Restore(exception, value, (PyObject *)NULL);
 }
 
@@ -138,13 +143,11 @@ PyErr_NormalizeException(PyObject **exc, PyObject **val, PyObject **tb)
 		return;
 	}
 
-	/* If PyErr_SetNone() was used, the value will have been actually
-	   set to NULL.
+	assert(value != NULL);
+	assert(tb != NULL);
+	/* XXX this triggers
+	assert(*tb != NULL);
 	*/
-	if (!value) {
-		value = Py_None;
-		Py_INCREF(value);
-	}
 
 	if (PyExceptionInstance_Check(value))
 		inclass = PyExceptionInstance_Class(value);
