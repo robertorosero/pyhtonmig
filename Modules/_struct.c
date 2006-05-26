@@ -15,8 +15,6 @@ static PyTypeObject PyStructType;
 typedef int Py_ssize_t;
 #endif
 
-/* Forward declarations */
-static Py_ssize_t convertbuffer(PyObject *, void **p);
 
 /* PY_USE_INT_WHEN_POSSIBLE is an experimental flag that changes the 
    struct API to return int instead of long when possible. This is
@@ -1447,9 +1445,11 @@ s_pack_to(PyObject *self, PyObject *args)
 	}
 
 	/* Extract a writable memory buffer from the first argument */
-	buffer_len = convertbuffer(PyTuple_GET_ITEM(args, 0), (void**)&buffer);
-	if (buffer_len < 0) 
+        if ( PyObject_AsWriteBuffer(PyTuple_GET_ITEM(args, 0), 
+                                    (void**)&buffer, &buffer_len) == -1 ) { 
 		return NULL;
+        }
+        assert( buffer_len >= 0 );
 
 	/* Extract the offset from the first argument */
 	offset = PyInt_AsLong(PyTuple_GET_ITEM(args, 1));
@@ -1472,40 +1472,6 @@ s_pack_to(PyObject *self, PyObject *args)
 	}
 
 	return Py_None;
-}
-
-/* 
- * Important Note: this is a slightly modified copy of
- * getargs.c:convertbuffer().  All we want to achieve is to convert a PyObject
- * into a writeable buffer.  We should seriously consider adding this function
- * to the API somehow.
- */
-static Py_ssize_t
-convertbuffer(PyObject *arg, void **p)
-{
-	PyBufferProcs *pb = arg->ob_type->tp_as_buffer;
-	Py_ssize_t count;
-	if (pb == NULL ||
-	    pb->bf_getreadbuffer == NULL ||
-	    pb->bf_getsegcount == NULL) {
-
-		PyErr_SetString(StructError,
-				"string or read-only buffer");
-		return -1;
-	}
-
-	if ((*pb->bf_getsegcount)(arg, NULL) != 1) {
-
-		PyErr_SetString(StructError,
-				"string or single-segment read-only buffer");
-		return -1;
-	}
-
-	if ((count = (*pb->bf_getreadbuffer)(arg, 0, p)) < 0) {
-		PyErr_SetString(StructError, "(unspecified)");
-	}
-
-	return count;
 }
 
 
