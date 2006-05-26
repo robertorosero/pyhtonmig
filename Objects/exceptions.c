@@ -417,6 +417,10 @@ _EnvironmentError_init(EnvironmentErrorObject *self, PyObject *args,
 {
     PyObject *myerrno, *strerror, *filename;
     PyObject *subslice = NULL;
+
+    if (PySequence_Length(args) <= 1) {
+        return 0;
+    }
     
     if (!PyArg_ParseTuple(args, "OO|O", &myerrno, &strerror, &filename)) {
         return -1;
@@ -472,6 +476,7 @@ static int
 EnvironmentError_init(EnvironmentErrorObject *self, PyObject *args,
     PyObject *kwds)
 {
+    if (_BaseException_init(self, args, kwds) == -1) return -1;
     return _EnvironmentError_init(self, args, kwds);
 }
 
@@ -830,6 +835,7 @@ SyntaxError_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 static int
 SyntaxError_init(SyntaxErrorObject *self, PyObject *args, PyObject *kwds)
 {
+    if (_BaseException_init(self, args, kwds) == -1) return -1;
     return _SyntaxError_init(self, args, kwds);
 }
 
@@ -1006,14 +1012,14 @@ SimpleExtendsException(PyExc_ValueError, UnicodeError, "Unicode related error.")
 
 #ifdef Py_USING_UNICODE
 typedef struct {
-        PyObject_HEAD
-        PyObject *args;
-        PyObject *message;
-        PyObject *encoding;
-        PyObject *object;
-        PyObject *start;
-        PyObject *end;
-        PyObject *reason;
+    PyObject_HEAD
+    PyObject *args;
+    PyObject *message;
+    PyObject *encoding;
+    PyObject *object;
+    PyObject *start;
+    PyObject *end;
+    PyObject *reason;
 } UnicodeErrorObject;
 
 static
@@ -1368,6 +1374,7 @@ UnicodeEncodeError_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 static int
 UnicodeEncodeError_init(PyObject *self, PyObject *args, PyObject *kwds)
 {
+    if (_BaseException_init(self, args, kwds) == -1) return -1;
     return UnicodeError_init((UnicodeErrorObject *)self, args, kwds, &PyUnicode_Type);
 }
 
@@ -1444,6 +1451,7 @@ UnicodeDecodeError_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 static int
 UnicodeDecodeError_init(PyObject *self, PyObject *args, PyObject *kwds)
 {
+    if (_BaseException_init(self, args, kwds) == -1) return -1;
     return UnicodeError_init((UnicodeErrorObject *)self, args, kwds, &PyString_Type);
 }
 
@@ -1554,13 +1562,15 @@ UnicodeTranslateError_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 static int
 UnicodeTranslateError_init(UnicodeErrorObject *self, PyObject *args, PyObject *kwds)
 {
+    if (_BaseException_init(self, args, kwds) == -1) return -1;
+
     if (!PyArg_ParseTuple(args, "O!O!O!O!",
-    &PyUnicode_Type, &self->object,
-    &PyInt_Type, &self->start,
-    &PyInt_Type, &self->end,
-    &PyString_Type, &self->reason)) {
+        &PyUnicode_Type, &self->object,
+        &PyInt_Type, &self->start,
+        &PyInt_Type, &self->end,
+        &PyString_Type, &self->reason)) {
         self->object = self->start = self->end = self->reason = NULL;
-    return -1;
+        return -1;
     }
     
     self->encoding = Py_None;
