@@ -4,6 +4,72 @@
 extern "C" {
 #endif
 
+/* Error objects */
+
+typedef struct {
+    PyObject_HEAD
+    PyObject *dict;
+    PyObject *args;
+PyObject *message;
+} PyBaseExceptionObject;
+
+typedef struct {
+    PyObject_HEAD
+    PyObject *dict;
+    PyObject *args;
+    PyObject *message;
+    PyObject *msg;
+    PyObject *filename;
+    PyObject *lineno;
+    PyObject *offset;
+    PyObject *text;
+    PyObject *print_file_and_line;
+} PySyntaxErrorObject;
+
+#ifdef Py_USING_UNICODE
+typedef struct {
+    PyObject_HEAD
+    PyObject *dict;
+    PyObject *args;
+    PyObject *message;
+    PyObject *encoding;
+    PyObject *object;
+    PyObject *start;
+    PyObject *end;
+    PyObject *reason;
+} PyUnicodeErrorObject;
+#endif
+
+typedef struct {
+    PyObject_HEAD
+    PyObject *dict;
+    PyObject *args;
+    PyObject *message;
+    PyObject *code;
+} PySystemExitObject;
+
+typedef struct {
+    PyObject_HEAD
+    PyObject *dict;
+    PyObject *args;
+    PyObject *message;
+    PyObject *myerrno;
+    PyObject *strerror;
+    PyObject *filename;
+} PyEnvironmentErrorObject;
+
+#ifdef MS_WINDOWS
+typedef struct {
+    PyObject_HEAD
+    PyObject *dict;
+    PyObject *args;
+    PyObject *message;
+    PyObject *myerrno;
+    PyObject *strerror;
+    PyObject *filename;
+    PyObject *winerror;
+} PyWindowsErrorObject;
+#endif
 
 /* Error handling definitions */
 
