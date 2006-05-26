@@ -150,6 +150,18 @@ BaseException_repr(BaseExceptionObject *self)
 static PyObject *
 BaseException_unicode(BaseExceptionObject *self)
 {
+    if (PySequence_Length(self->args) == 0)
+        return PyUnicode_FromUnicode(NULL, 0);
+    if (PySequence_Length(self->args) == 1) {
+        PyObject *temp = PySequence_GetItem(self->args, 0);
+        PyObject *unicode_obj;
+        if (!temp) {
+            return NULL;
+        }
+        unicode_obj = PyObject_Unicode(temp);
+        Py_DECREF(temp);
+        return unicode_obj;
+    }
     return PyObject_Unicode(self->args);
 }
 #endif /* Py_USING_UNICODE */
