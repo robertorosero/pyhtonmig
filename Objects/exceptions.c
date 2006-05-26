@@ -12,6 +12,15 @@ typedef struct {
         PyObject *message;
 } BaseExceptionObject;
 
+/* GB: - PyTuple_* would be faster than PySequence_*
+       - should use PyDoc_STR() macros for docstrings
+       - I don't know, but it may be that the exceptions
+         have to be GC objects
+       - If you want to allow normal attribute access,
+         I think you can use PyObject_GenericGetAttr etc.
+         in the tp_getattr... slots.
+*/
+
 static PyObject *
 BaseException_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
@@ -30,12 +39,14 @@ BaseException_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     }
     else
         self->args = args;
+    /* GB: Isn't the tuple INCREFd twice? */
     Py_INCREF(self->args);
 
     if (PySequence_Length(self->args) == 1)
         self->message = PySequence_GetItem(self->args, 0);
     else
-	self->message = PyString_FromString("");
+        self->message = PyString_FromString("");
+    /* GB: error check */
 
     return (PyObject *)self;
 }
@@ -51,16 +62,17 @@ BaseException_init(BaseExceptionObject *self, PyObject *args, PyObject *kwds)
     }
     else
         self->args = args;
+    /* GB: tuple/INCREF */
     Py_INCREF(self->args);
 
     if (PySequence_Length(self->args) == 1)
         self->message = PySequence_GetItem(self->args, 0);
     else
-	self->message = PyString_FromString("");
-        if (!self->message) {
-            Py_DECREF(self->args);
-            return -1;
-        }
+        self->message = PyString_FromString("");
+    if (!self->message) {
+        Py_DECREF(self->args);
+        return -1;
+    }
 
     return 0;
 }
@@ -70,6 +82,7 @@ BaseException_dealloc(BaseExceptionObject *self)
 {
     Py_XDECREF(self->args);
     Py_XDECREF(self->message);
+    /* GB: call tp_free? */
 }
 
 
@@ -105,6 +118,7 @@ BaseException_str(BaseExceptionObject *self)
 }
 
 
+/* GB: does _unicode have/need an argument? */
 #ifdef Py_USING_UNICODE
 static PyObject *
 BaseException_unicode(BaseExceptionObject *self, PyObject *args)
@@ -330,7 +344,7 @@ SystemExit_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     if (PySequence_Length(args) == 1)
         self->code = PySequence_GetItem(args, 0);
     else {
-	self->code = Py_None;
+        self->code = Py_None;
         Py_INCREF(Py_None);
     }
 
@@ -353,6 +367,7 @@ SystemExit_init(SystemExitObject *self, PyObject *args, PyObject *kwds)
 static void
 SystemExit_dealloc(SystemExitObject *self)
 {
+    /* GB: shouldn't the decref come first? */
     BaseException_dealloc((BaseExceptionObject *)self);
     Py_DECREF(self->code);
 }
@@ -412,6 +427,8 @@ _EnvironmentError_init(EnvironmentErrorObject *self, PyObject *args,
 	self->myerrno = PySequence_GetItem(args, 0);
         if (!self->myerrno) return -1;
 	self->strerror = PySequence_GetItem(args, 1);
+    /* GB: in error cases, you're leaking refs to myerrno etc.
+       and perhaps you should be clearing self->... too on error */
         if (!self->strerror) return -1;
 	self->filename = PySequence_GetItem(args, 2);
         if (!self->filename) return -1;
@@ -420,6 +437,7 @@ _EnvironmentError_init(EnvironmentErrorObject *self, PyObject *args,
 	if (!subslice)
 	    return -1;
 
+    /* GB: can it be that self->args is NULL? */
         Py_DECREF(self->args);  /* replacing args */
         self->args = subslice;
 	return 0;
@@ -457,11 +475,13 @@ EnvironmentError_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     Py_INCREF(Py_None);
 
     if (_EnvironmentError_init(self, args, kwds) == -1) {
+        /* GB: why clear the error? */
         PyErr_Clear();
     }
     return (PyObject *)self;
 }
 
+/* GB: what's that function doing? */
 static int
 EnvironmentError_init(EnvironmentErrorObject *self, PyObject *args,
     PyObject *kwds)
@@ -494,7 +514,7 @@ EnvironmentError_str(EnvironmentErrorObject *self)
 	    Py_XDECREF(tuple);
 	    return NULL;
 	}
-
+/* GB: PyTuple_SET_ITEM steals references, so you may need to INCREF first */
 	PyTuple_SET_ITEM(tuple, 0, self->myerrno);
 	PyTuple_SET_ITEM(tuple, 1, self->strerror);
 	PyTuple_SET_ITEM(tuple, 2, repr);
@@ -513,7 +533,7 @@ EnvironmentError_str(EnvironmentErrorObject *self)
 	    Py_XDECREF(tuple);
 	    return NULL;
 	}
-
+/* GB: same here */
 	PyTuple_SET_ITEM(tuple, 0, self->myerrno);
 	PyTuple_SET_ITEM(tuple, 1, self->strerror);
 
@@ -581,11 +601,13 @@ WindowsError_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 
 	/* Set errno to the POSIX errno, and winerror to the Win32
 	   error code. */
+    /* GB: where is errcode declared? */
 	errcode = PyInt_AsLong(self->myerrno);
 	if (!errcode == -1 && PyErr_Occurred())
 		goto failed;
 	posix_errno = winerror_to_errno(errcode);
 
+    /* INCREF? */
 	self->winerror = self->myerrno;
 
 	o_errcode = PyInt_FromLong(posix_errno);
@@ -605,6 +627,7 @@ failed:
 static int
 WindowsError_init(WindowsErrorObject *self, PyObject *args, PyObject *kwds)
 {
+    /* GB: same: errcode */
 	if (EnvironmentError_init((EnvironmentErrorObject *)self, args,
                 kwds) == -1)
             return -1;
@@ -642,11 +665,12 @@ WindowsError_str(PyObject *self)
 	if (!fmt || !repr)
 	    goto finally;
 
-	tuple = PyTuple_Pack(3, sellf->myerrno, self->strerror, repr);
+	tuple = PyTuple_Pack(3, self->myerrno, self->strerror, repr);
 	if (!tuple)
 	    goto finally;
 
 	rtnval = PyString_Format(fmt, tuple);
+    /* GB: tuple must be DECREFd */
     }
     else if (PyObject_IsTrue(self->myerrno) && PyObject_IsTrue(self->strerror)) {
 	fmt = PyString_FromString("[Error %s] %s");
@@ -658,11 +682,13 @@ WindowsError_str(PyObject *self)
 	    goto finally;
 
 	rtnval = PyString_Format(fmt, tuple);
+    /* GB: tuple must be DECREFd */
     }
     else
 	rtnval = EnvironmentError_str(self);
 
   finally:
+    /* GB: where is filename, serrno and strerror declared? */
     Py_XDECREF(filename);
     Py_XDECREF(serrno);
     Py_XDECREF(strerror);
@@ -787,6 +813,7 @@ SyntaxError_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     self->print_file_and_line = Py_None;
     Py_INCREF(Py_None);
 
+    /* GB: why clear the error? some fields can still be NULL */
     if (_SyntaxError_init(self, args, kwds) == -1)
         PyErr_Clear();
 
@@ -844,44 +871,44 @@ SyntaxError_str(SyntaxErrorObject *self)
        lineno here */
 
     if (str != NULL && PyString_Check(str)) {
-	int have_filename = 0;
-	int have_lineno = 0;
-	char *buffer = NULL;
+        int have_filename = 0;
+        int have_lineno = 0;
+        char *buffer = NULL;
 
         have_filename = (self->filename != NULL) && 
             PyString_Check(self->filename);
         have_lineno = (self->lineno != NULL) && PyInt_Check(self->lineno);
 
-	if (have_filename || have_lineno) {
-	    Py_ssize_t bufsize = PyString_GET_SIZE(str) + 64;
-	    if (have_filename)
-		bufsize += PyString_GET_SIZE(self->filename);
+        if (have_filename || have_lineno) {
+            Py_ssize_t bufsize = PyString_GET_SIZE(str) + 64;
+            if (have_filename)
+                bufsize += PyString_GET_SIZE(self->filename);
 
-	    buffer = (char *)PyMem_MALLOC(bufsize);
-	    if (buffer != NULL) {
-		if (have_filename && have_lineno)
-		    PyOS_snprintf(buffer, bufsize, "%s (%s, line %ld)",
-                            PyString_AS_STRING(str),
-                            my_basename(PyString_AS_STRING(self->filename)),
-                            PyInt_AsLong(self->lineno));
-		else if (have_filename)
-		    PyOS_snprintf(buffer, bufsize, "%s (%s)",
-                            PyString_AS_STRING(str),
-                            my_basename(PyString_AS_STRING(self->filename)));
-		else if (have_lineno)
-		    PyOS_snprintf(buffer, bufsize, "%s (line %ld)",
-                            PyString_AS_STRING(str),
-                            PyInt_AsLong(self->lineno));
+            buffer = (char *)PyMem_MALLOC(bufsize);
+            if (buffer != NULL) {
+                if (have_filename && have_lineno)
+                    PyOS_snprintf(buffer, bufsize, "%s (%s, line %ld)",
+                                  PyString_AS_STRING(str),
+                                  my_basename(PyString_AS_STRING(self->filename)),
+                                  PyInt_AsLong(self->lineno));
+                else if (have_filename)
+                    PyOS_snprintf(buffer, bufsize, "%s (%s)",
+                                  PyString_AS_STRING(str),
+                                  my_basename(PyString_AS_STRING(self->filename)));
+                else if (have_lineno)
+                    PyOS_snprintf(buffer, bufsize, "%s (line %ld)",
+                                  PyString_AS_STRING(str),
+                                  PyInt_AsLong(self->lineno));
 
-		result = PyString_FromString(buffer);
-		PyMem_FREE(buffer);
+                result = PyString_FromString(buffer);
+                PyMem_FREE(buffer);
 
-		if (result == NULL)
-		    result = str;
-		else
-		    Py_DECREF(str);
-	    }
-	}
+                if (result == NULL)
+                    result = str;
+                else
+                    Py_DECREF(str);
+            }
+        }
     }
     return result;
 }
@@ -941,8 +968,8 @@ KeyError_str(BaseExceptionObject *self)
        If args is anything else, use the default BaseException__str__().
     */
     if (PyTuple_Check(self->args) && PyTuple_GET_SIZE(self->args) == 1) {
-	PyObject *key = PyTuple_GET_ITEM(self->args, 0);
-	return PyObject_Repr(key);
+        PyObject *key = PyTuple_GET_ITEM(self->args, 0);
+        return PyObject_Repr(key);
     }
     return BaseException_str(self);
 }
@@ -984,6 +1011,8 @@ int get_int(PyObject *attr, Py_ssize_t *value, const char *name)
     if (PyInt_Check(attr)) {
         *value = PyInt_AS_LONG(attr);
     } else if (PyLong_Check(attr)) {
+        /* GB: why not casting to Py_ssize_t? Can we be sure that LongLong
+               isn't larger than Py_ssize_t? */
 	*value = (size_t)PyLong_AsLongLong(attr);
 	if (*value == -1)
 		return -1;
@@ -1050,6 +1079,7 @@ PyObject *get_unicode(PyObject *attr, const char *name)
     return attr;
 }
 
+/* GB: Can't this be done more easily with a PyMemberDef? */
 PyObject * PyUnicodeEncodeError_GetEncoding(PyObject *exc)
 {
     return get_string(((UnicodeErrorObject *)exc)->encoding, "encoding");
