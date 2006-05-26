@@ -1139,12 +1139,12 @@ void PyErr_Display(PyObject *exception, PyObject *value, PyObject *tb)
 				err = PyFile_WriteString("<unknown>", f);
 			else {
 				char* modstr = PyString_AsString(moduleName);
-				Py_DECREF(moduleName);
-				if (modstr && strcmp(modstr, "exceptions"))
+				if (modstr && strcmp(modstr, "__builtin__"))
 				{
 					err = PyFile_WriteString(modstr, f);
 					err += PyFile_WriteString(".", f);
 				}
+				Py_DECREF(moduleName);
 			}
 			if (err == 0) {
 				if (className == NULL)
