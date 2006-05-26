@@ -1084,7 +1084,8 @@ PyErr_PrintEx(int set_sys_last_vars)
 	Py_XDECREF(tb);
 }
 
-void PyErr_Display(PyObject *exception, PyObject *value, PyObject *tb)
+void
+PyErr_Display(PyObject *exception, PyObject *value, PyObject *tb)
 {
 	int err = 0;
 	PyObject *f = PySys_GetObject("stderr");
@@ -1132,6 +1133,9 @@ void PyErr_Display(PyObject *exception, PyObject *value, PyObject *tb)
 		}
 		else if (PyExceptionClass_Check(exception)) {
 			char* className = PyExceptionClass_Name(exception);
+			char *dot = strrchr(className, '.');
+			if (dot != NULL)
+				className = dot+1;
 			PyObject* moduleName =
 			      PyObject_GetAttrString(exception, "__module__");
 
@@ -1139,7 +1143,7 @@ void PyErr_Display(PyObject *exception, PyObject *value, PyObject *tb)
 				err = PyFile_WriteString("<unknown>", f);
 			else {
 				char* modstr = PyString_AsString(moduleName);
-				if (modstr && strcmp(modstr, "__builtin__"))
+				if (modstr && strcmp(modstr, "exceptions"))
 				{
 					err = PyFile_WriteString(modstr, f);
 					err += PyFile_WriteString(".", f);

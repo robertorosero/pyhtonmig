@@ -557,9 +557,6 @@ PyErr_NewException(char *name, PyObject *base, PyObject *dict)
 		if (PyDict_SetItemString(dict, "__module__", modulename) != 0)
 			goto failure;
 	}
-	classname = PyString_FromString(dot+1);
-	if (classname == NULL)
-		goto failure;
 	if (PyTuple_Check(base)) {
 		bases = base;
 		/* INCREF as we create a new ref in the else branch */
@@ -569,7 +566,9 @@ PyErr_NewException(char *name, PyObject *base, PyObject *dict)
 		if (bases == NULL)
 			goto failure;
 	}
-	result = PyClass_New(bases, dict, classname);
+	/*result = PyClass_New(bases, dict, classname);*/
+	result = PyObject_CallFunction(&PyType_Type, "sOO",
+				       dot+1, bases, dict);
   failure:
 	Py_XDECREF(bases);
 	Py_XDECREF(mydict);
@@ -590,6 +589,9 @@ PyErr_WriteUnraisable(PyObject *obj)
 		PyFile_WriteString("Exception ", f);
 		if (t) {
 			char* className = PyExceptionClass_Name(t);
+			char *dot = strrchr(className, '.');
+			if (dot != NULL)
+				className = dot+1;
 			PyObject* moduleName =
 			      PyObject_GetAttrString(t, "__module__");
 
