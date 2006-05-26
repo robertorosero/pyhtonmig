@@ -759,7 +759,7 @@ WindowsError_traverse(PyWindowsErrorObject *self, visitproc visit, void *arg)
 static PyObject *
 WindowsError_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
-    PyObject *o_errcode;
+    PyObject *o_errcode = NULL;
     long errcode;
     PyWindowsErrorObject *self;
     long posix_errno;
@@ -771,8 +771,8 @@ WindowsError_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     /* Set errno to the POSIX errno, and winerror to the Win32
        error code. */
     errcode = PyInt_AsLong(self->myerrno);
-    if (!errcode == -1 && PyErr_Occurred())
-        return NULL;
+    if (errcode == -1 && PyErr_Occurred())
+        goto failed;
     posix_errno = winerror_to_errno(errcode);
 
     self->winerror = self->myerrno;
