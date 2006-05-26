@@ -415,7 +415,7 @@ static int
 _EnvironmentError_init(EnvironmentErrorObject *self, PyObject *args,
     PyObject *kwds)
 {
-    PyObject *myerrno, *strerror, *filename;
+    PyObject *myerrno = NULL, *strerror = NULL, *filename = NULL;
     PyObject *subslice = NULL;
 
     if (PySequence_Length(args) <= 1) {
@@ -425,7 +425,6 @@ _EnvironmentError_init(EnvironmentErrorObject *self, PyObject *args,
     if (!PyArg_ParseTuple(args, "OO|O", &myerrno, &strerror, &filename)) {
         return -1;
     }
-
     Py_DECREF(self->myerrno);       /* replacing */
     self->myerrno = myerrno;
     Py_INCREF(self->myerrno);
@@ -476,7 +475,8 @@ static int
 EnvironmentError_init(EnvironmentErrorObject *self, PyObject *args,
     PyObject *kwds)
 {
-    if (_BaseException_init(self, args, kwds) == -1) return -1;
+    if (_BaseException_init((BaseExceptionObject *)self, args, kwds) == -1)
+        return -1;
     return _EnvironmentError_init(self, args, kwds);
 }
 
@@ -835,7 +835,8 @@ SyntaxError_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 static int
 SyntaxError_init(SyntaxErrorObject *self, PyObject *args, PyObject *kwds)
 {
-    if (_BaseException_init(self, args, kwds) == -1) return -1;
+    if (_BaseException_init((BaseExceptionObject *)self, args, kwds) == -1)
+        return -1;
     return _SyntaxError_init(self, args, kwds);
 }
 
@@ -1374,7 +1375,8 @@ UnicodeEncodeError_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 static int
 UnicodeEncodeError_init(PyObject *self, PyObject *args, PyObject *kwds)
 {
-    if (_BaseException_init(self, args, kwds) == -1) return -1;
+    if (_BaseException_init((BaseExceptionObject *)self, args, kwds) == -1)
+        return -1;
     return UnicodeError_init((UnicodeErrorObject *)self, args, kwds, &PyUnicode_Type);
 }
 
@@ -1451,7 +1453,8 @@ UnicodeDecodeError_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 static int
 UnicodeDecodeError_init(PyObject *self, PyObject *args, PyObject *kwds)
 {
-    if (_BaseException_init(self, args, kwds) == -1) return -1;
+    if (_BaseException_init((BaseExceptionObject *)self, args, kwds) == -1)
+        return -1;
     return UnicodeError_init((UnicodeErrorObject *)self, args, kwds, &PyString_Type);
 }
 
@@ -1562,7 +1565,8 @@ UnicodeTranslateError_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 static int
 UnicodeTranslateError_init(UnicodeErrorObject *self, PyObject *args, PyObject *kwds)
 {
-    if (_BaseException_init(self, args, kwds) == -1) return -1;
+    if (_BaseException_init((BaseExceptionObject *)self, args, kwds) == -1)
+        return -1;
 
     if (!PyArg_ParseTuple(args, "O!O!O!O!",
         &PyUnicode_Type, &self->object,

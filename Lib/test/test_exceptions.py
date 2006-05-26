@@ -25,7 +25,7 @@ def test_raise_catch(exc):
         raise exc("spam")
     except exc, err:
         buf = str(err)
-    print buf
+#    print buf
 
 def r(thing):
     test_raise_catch(thing)
@@ -269,6 +269,7 @@ except NameError: pass
 
 for args in exceptionList:
     expected = args[-1]
+    print args
     try:
         if len(args) == 2: raise args[0]
         else: raise apply(args[0], args[1])
