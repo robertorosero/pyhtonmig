@@ -42,12 +42,9 @@ BaseException_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
         return NULL;
     }
 
-    self->dict = PyDict_New();
-    if (self->dict == NULL) {
-        Py_DECREF(self);
-        return NULL;
-    }
-
+    /* the dict is created on the fly in PyObject_GenericSetAttr */
+    self->dict = NULL;
+    
     return (PyObject *)self;
 }
 
@@ -208,24 +205,40 @@ static PyMemberDef BaseException_members[] = {
         PyDoc_STR("exception arguments")},
     {"message", T_OBJECT, offsetof(BaseExceptionObject, message), 0,
         PyDoc_STR("exception message")},
-    {"__dict__", T_OBJECT_EX, offsetof(BaseExceptionObject, dict), RO,
-        PyDoc_STR("instance dictionary")},
     {NULL}  /* Sentinel */
+};
+
+
+static PyObject *
+BaseException_get_dict(BaseExceptionObject *self)
+{
+    if (self->dict == NULL) {
+        self->dict = PyDict_New();
+        if (!self->dict)
+            return NULL;
+    }
+    Py_INCREF(self->dict);
+    return self->dict;
+}
+
+static PyGetSetDef BaseException_getset[] = {
+    {"__dict__", (getter)BaseException_get_dict, 0},
+    {NULL},
 };
 
 
 static PyTypeObject _PyExc_BaseException = {
     PyObject_HEAD_INIT(NULL)
     0,                          /*ob_size*/
-    "BaseException", /*tp_name*/
-    sizeof(BaseExceptionObject),  /*tp_basicsize*/
+    "BaseException",            /*tp_name*/
+    sizeof(BaseExceptionObject), /*tp_basicsize*/
     0,                          /*tp_itemsize*/
-    (destructor)BaseException_dealloc,     /*tp_dealloc*/
+    (destructor)BaseException_dealloc, /*tp_dealloc*/
     0,                          /*tp_print*/
     0,                          /*tp_getattr*/
     0,                          /*tp_setattr*/
     0,                          /* tp_compare; */
-    (reprfunc)BaseException_repr,     /*tp_repr*/
+    (reprfunc)BaseException_repr, /*tp_repr*/
     0,                          /*tp_as_number*/
     &BaseException_as_sequence, /*tp_as_sequence*/
     0,                          /*tp_as_mapping*/
@@ -245,12 +258,12 @@ static PyTypeObject _PyExc_BaseException = {
     0,                          /* tp_iternext */
     BaseException_methods,      /* tp_methods */
     BaseException_members,      /* tp_members */
-    0,                          /* tp_getset */
+    BaseException_getset,       /* tp_getset */
     0,                          /* tp_base */
     0,                          /* tp_dict */
     0,                          /* tp_descr_get */
     0,                          /* tp_descr_set */
-    offsetof(BaseExceptionObject, dict),  /* tp_dictoffset */
+    offsetof(BaseExceptionObject, dict), /* tp_dictoffset */
     (initproc)BaseException_init, /* tp_init */
     0,                          /* tp_alloc */
     BaseException_new,          /* tp_new */
