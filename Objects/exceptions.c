@@ -173,7 +173,7 @@ static PyMemberDef BaseException_members[] = {
 static PyTypeObject _PyExc_BaseException = {
     PyObject_HEAD_INIT(NULL)
     0,                          /*ob_size*/
-    "exceptions.BaseException", /*tp_name*/
+    "BaseException", /*tp_name*/
     sizeof(BaseExceptionObject),  /*tp_basicsize*/
     0,                          /*tp_itemsize*/
     (destructor)BaseException_dealloc,     /*tp_dealloc*/
@@ -220,7 +220,7 @@ PyObject *PyExc_BaseException = (PyObject *)&_PyExc_BaseException;
 static PyTypeObject _PyExc_ ## EXCNAME = { \
     PyObject_HEAD_INIT(NULL) \
     0, \
-    "exceptions." # EXCNAME, \
+    # EXCNAME, \
     sizeof(BaseExceptionObject), \
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, \
     Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE, \
@@ -235,7 +235,7 @@ PyObject *PyExc_ ## EXCNAME = (PyObject *)&_PyExc_ ## EXCNAME;
 static PyTypeObject _PyExc_ ## EXCNAME = { \
     PyObject_HEAD_INIT(NULL) \
     0, \
-    "exceptions." # EXCNAME, \
+    # EXCNAME, \
     sizeof(EXCSTORE ## Object), \
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, \
     Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE, \
@@ -250,7 +250,7 @@ PyObject *PyExc_ ## EXCNAME = (PyObject *)&_PyExc_ ## EXCNAME;
 static PyTypeObject _PyExc_ ## EXCNAME = { \
     PyObject_HEAD_INIT(NULL) \
     0, \
-    "exceptions." # EXCNAME, \
+    # EXCNAME, \
     sizeof(EXCSTORE ## Object), 0, \
     (destructor)EXCDEALLOC, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, \
     (reprfunc)EXCSTR, 0, 0, 0, \
@@ -1379,7 +1379,7 @@ UnicodeEncodeError_str(PyObject *self)
 static PyTypeObject _PyExc_UnicodeEncodeError = {
     PyObject_HEAD_INIT(NULL)
     0,
-    "exceptions.UnicodeEncodeError",
+    "UnicodeEncodeError",
     sizeof(UnicodeErrorObject), 0,
     (destructor)UnicodeError_dealloc, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     (reprfunc)UnicodeEncodeError_str, 0, 0, 0,
@@ -1454,7 +1454,7 @@ UnicodeDecodeError_str(PyObject *self)
 static PyTypeObject _PyExc_UnicodeDecodeError = {
     PyObject_HEAD_INIT(NULL)
     0,
-    "exceptions.UnicodeDecodeError",
+    "UnicodeDecodeError",
     sizeof(UnicodeErrorObject), 0,
     (destructor)UnicodeError_dealloc, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     (reprfunc)UnicodeDecodeError_str, 0, 0, 0,
@@ -1567,7 +1567,7 @@ UnicodeTranslateError_str(PyObject *self)
 static PyTypeObject _PyExc_UnicodeTranslateError = {
     PyObject_HEAD_INIT(NULL)
     0,
-    "exceptions.UnicodeTranslateError",
+    "UnicodeTranslateError",
     sizeof(UnicodeErrorObject), 0,
     (destructor)UnicodeError_dealloc, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     (reprfunc)UnicodeTranslateError_str, 0, 0, 0,
