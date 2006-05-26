@@ -94,6 +94,14 @@ class HotbufTestCase(unittest.TestCase):
         b.compact()
         self.assertEquals((b.position, b.limit, b.mark),
                           (100, CAPACITY, -1))
+        
+        # Compare the text that gets compacted.
+        b.clear()
+        b.setposition(100)
+        b.putstr(MSG)
+        b.setposition(100)
+        b.compact()
+        self.assertEquals(str(b), MSG)
 
     def test_byte( self ):
         b = hotbuf(256)
@@ -131,6 +139,13 @@ class HotbufTestCase(unittest.TestCase):
         # Test underflow.
         self.assertRaises(IndexError, b.getstr, 1000)
 
+        # Test getting the rest of the string.
+        b.clear()
+        b.putstr(MSG)
+        b.flip()
+        s = b.getstr()
+        self.assertEquals(s, MSG)
+        
     def test_conversion( self ):
         b = hotbuf(CAPACITY)
 
@@ -170,10 +185,17 @@ class HotbufTestCase(unittest.TestCase):
         b.flip()
         self.assertEquals(fmt.unpack_from(b), ARGS)
 
+    def test_zerolen( self ):
+        b = hotbuf(CAPACITY)
+        b.setlimit(0)
+        self.assertEquals(str(b), '')
+        self.assertEquals(b.getstr(), '')
+
 
 def test_main():
     test_support.run_unittest(HotbufTestCase)
 
 if __name__ == "__main__":
     test_main()
+
 

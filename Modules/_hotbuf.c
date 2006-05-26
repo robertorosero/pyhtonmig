@@ -9,11 +9,7 @@
 
 PyAPI_DATA(PyTypeObject) PyHotbuf_Type;
 
-#define PyHotbuf_Check(op) ((op)->ob_type == &PyHotbuf_Type)
-
-#define Py_END_OF_HOTBUF       (-1)
-
-PyAPI_FUNC(PyObject *) PyHotbuf_New(Py_ssize_t size);
+#define PyHotbuf_Check(op) PyObject_TypeCheck((op), &PyHotbuf_Type)
 
 
 
@@ -52,7 +48,7 @@ typedef struct {
     PyObject_HEAD
 
     /* Base pointer location */
-    void*      b_ptr;
+    void* b_ptr;
 
     /* Total size in bytes of the area that we can access.  The allocated
        memory must be at least as large as this size. */
@@ -63,10 +59,10 @@ typedef struct {
      */
 
     /* The current position in the buffer. */
-    int b_position;
+    Py_ssize_t b_position;
 
     /* The limit position in the buffer. */
-    int b_limit;
+    Py_ssize_t b_limit;
 
     /* The mark. From the Java Buffer docs:
 
@@ -80,7 +76,7 @@ typedef struct {
 
        The mark is set to -1 to indicate that the mark is unset.
     */
-    int b_mark;
+    Py_ssize_t b_mark;
 
 } PyHotbufObject;
 
@@ -90,72 +86,70 @@ typedef struct {
  * true if there was no error.
  */
 
-/*
- * Create a new hotbuf where we allocate the memory ourselves.
- */
-PyObject *
-PyHotbuf_New(Py_ssize_t capacity)
-{
-    PyObject *o;
-    PyHotbufObject * b;
-
-    if (capacity < 0) {
-        PyErr_SetString(PyExc_ValueError,
-                        "capacity must be zero or positive");
-        return NULL;
-    }
-
-    /* FIXME: check for overflow in multiply */
-    o = (PyObject *)PyObject_MALLOC(sizeof(*b) + capacity);
-    if ( o == NULL )
-        return PyErr_NoMemory();
-    b = (PyHotbufObject *) PyObject_INIT(o, &PyHotbuf_Type);
-
-    /* We setup the memory buffer to be right after the object itself. */
-    b->b_ptr = (void *)(b + 1);
-    b->b_position = 0;
-    b->b_mark = -1;
-    b->b_limit = capacity;
-    b->b_capacity = capacity;
-
-    return o;
-}
 
 /* Methods */
 
 /*
- * Constructor.
+ * Constructor.  Note that we allocate the memory ourselves, unlike
+ * the buffer object.
  */
 static PyObject *
 hotbuf_new(PyTypeObject *type, PyObject *args, PyObject *kw)
 {
-    Py_ssize_t size = -1;
+    Py_ssize_t capacity = -1;
+    PyObject *ptr;
+    PyHotbufObject *new;
 
     if (!_PyArg_NoKeywords("hotbuf()", kw))
         return NULL;
 
-    if (!PyArg_ParseTuple(args, "n:hotbuf", &size))
+    if (!PyArg_ParseTuple(args, "n:hotbuf", &capacity))
         return NULL;
 
-    if ( size <= 0 ) {
+    if ( capacity <= 0 ) {
         PyErr_SetString(PyExc_ValueError,
-                        "size must be greater than zero");
+                        "capacity must be greater than zero");
         return NULL;
     }
 
-    return PyHotbuf_New(size);
+    /* Allocate the buffer of data */
+    ptr = (void*) PyObject_MALLOC(capacity);
+    if ( ptr == NULL ) {
+        return PyErr_NoMemory();
+    }
+    
+    /* Allocate the Python object itself. */
+    new = (PyHotbufObject *) type->tp_alloc(type, 0);
+    if (new == NULL) {
+        PyObject_FREE(ptr);
+        return NULL;
+    }
+
+    /* Initialize the members */
+    new->b_ptr = ptr;
+    new->b_position = 0;
+    new->b_mark = -1;
+    new->b_limit = capacity;
+    new->b_capacity = capacity;
+
+    return (PyObject*)new;
 }
+
 
 /*
  * Destructor.
  */
+
 static void
 hotbuf_dealloc(PyHotbufObject *self)
 {
     /* Note: by virtue of the memory buffer being allocated with the PyObject
        itself, this frees the buffer as well. */
-    PyObject_DEL(self);
+    PyObject_FREE(self->b_ptr);
+    self->b_ptr = NULL;
+    self->ob_type->tp_free(self);
 }
+
 
 /*
  * Comparison.  We compare the active windows, not the entire allocated buffer
@@ -192,7 +186,7 @@ hotbuf_repr(PyHotbufObject *self)
         "<hotbuf mark %zd, position %zd, limit %zd, capacity %zd, ptr %p, at %p>",
         self->b_mark,
         self->b_position,
-        self->b_limit, 
+        self->b_limit,
         self->b_capacity,
         self->b_ptr,
         self);
@@ -204,9 +198,7 @@ hotbuf_repr(PyHotbufObject *self)
 static PyObject *
 hotbuf_str(PyHotbufObject *self)
 {
-    if ( self->b_position == self->b_limit ) {
-        return Py_None;
-    }
+    assert( self->b_position <= self->b_limit );
     return PyString_FromStringAndSize(
         (const char *)(self->b_ptr + self->b_position),
         self->b_limit - self->b_position);
@@ -228,7 +220,7 @@ larger than the limit an exception is raised.");
 static PyObject*
 hotbuf_setposition(PyHotbufObject *self, PyObject* arg)
 {
-    int newposition;
+    Py_ssize_t newposition;
 
     newposition = PyInt_AsLong(arg);
     if (newposition == -1 && PyErr_Occurred())
@@ -247,7 +239,7 @@ hotbuf_setposition(PyHotbufObject *self, PyObject* arg)
     if ( self->b_mark > self->b_position )
         self->b_mark = -1;
 
-    return Py_None;
+    Py_RETURN_NONE;
 }
 
 
@@ -262,17 +254,17 @@ larger than the limit an exception is raised.");
 static PyObject*
 hotbuf_advance(PyHotbufObject *self, PyObject* arg)
 {
-    int nbytes;
-    int newposition;
+    Py_ssize_t nbytes;
+    Py_ssize_t newposition;
 
     nbytes = PyInt_AsLong(arg);
     if (nbytes == -1 && PyErr_Occurred())
         return NULL;
 
     newposition = self->b_position + nbytes;
-    if ( newposition > self->b_capacity ) {
+    if ( newposition > self->b_limit ) {
         PyErr_SetString(PyExc_IndexError,
-                        "position must be smaller than capacity");
+                        "position must be smaller than limit");
         return NULL;
     }
 
@@ -283,7 +275,7 @@ hotbuf_advance(PyHotbufObject *self, PyObject* arg)
     if ( self->b_mark > self->b_position )
         self->b_mark = -1;
 
-    return Py_None;
+    Py_RETURN_NONE;
 }
 
 
@@ -299,7 +291,7 @@ than the new limit then it is discarded.");
 static PyObject*
 hotbuf_setlimit(PyHotbufObject *self, PyObject* arg)
 {
-    int newlimit;
+    Py_ssize_t newlimit;
 
     newlimit = PyInt_AsLong(arg);
     if (newlimit == -1 && PyErr_Occurred())
@@ -323,7 +315,7 @@ hotbuf_setlimit(PyHotbufObject *self, PyObject* arg)
     if ( self->b_mark > self->b_position )
         self->b_mark = -1;
 
-    return Py_None;
+    Py_RETURN_NONE;
 }
 
 
@@ -336,7 +328,7 @@ static PyObject*
 hotbuf_setmark(PyHotbufObject *self)
 {
     self->b_mark = self->b_position;
-    return Py_None;
+    Py_RETURN_NONE;
 }
 
 
@@ -384,7 +376,7 @@ hotbuf_clear(PyHotbufObject *self)
     self->b_position = 0;
     self->b_limit = self->b_capacity;
     self->b_mark = -1;
-    return Py_None;
+    Py_RETURN_NONE;
 }
 
 
@@ -413,7 +405,7 @@ hotbuf_flip(PyHotbufObject *self)
     self->b_limit = self->b_position;
     self->b_position = 0;
     self->b_mark = -1;
-    return Py_None;
+    Py_RETURN_NONE;
 }
 
 
@@ -437,7 +429,7 @@ hotbuf_rewind(PyHotbufObject *self)
 {
     self->b_position = 0;
     self->b_mark = -1;
-    return Py_None;
+    Py_RETURN_NONE;
 }
 
 
@@ -456,9 +448,7 @@ hotbuf_remaining(PyHotbufObject *self)
 PyDoc_STRVAR(compact__doc__,
 "B.compact()\n\
 \n\
-public abstract ByteBuffer compact()\n\
-\n\
-Compacts this buffer  (optional operation).\n\
+Compacts this buffer.\n\
 \n\
 The bytes between the buffer's current position and its limit, if\n\
 any, are copied to the beginning of the buffer. That is, the byte\n\
@@ -489,7 +479,7 @@ bytes from one channel to another via the buffer buf:\n\
 static PyObject*
 hotbuf_compact(PyHotbufObject *self)
 {
-    int length;
+    Py_ssize_t length;
 
     /* Calculate the number of bytes in the active window */
     length = self->b_limit - self->b_position;
@@ -504,7 +494,7 @@ hotbuf_compact(PyHotbufObject *self)
     self->b_limit = self->b_capacity;
     self->b_mark = -1;
 
-    return Py_None;
+    Py_RETURN_NONE;
 }
 
 
@@ -568,28 +558,39 @@ hotbuf_putbyte(PyHotbufObject *self, PyObject* arg)
     CHECK_LIMIT_ERROR(sizeof(byte));
     *(unsigned char*)(self->b_ptr + self->b_position) = byte;
     self->b_position += sizeof(byte);
-    return Py_None;
+    Py_RETURN_NONE;
 }
 
 
 PyDoc_STRVAR(getstr__doc__,
-"B.getstr(nbytes) -> data\n\
+"B.getstr([nbytes]) -> data\n\
 \n\
-Extract a string of 'nbytes' bytes from the buffer and advance the \n\
-position accordingly.\n\
+Extract a string of 'nbytes' bytes from the buffer and advance the\n\
+position accordingly.  If 'nbytes' is not specified, get the string\n\
+up to the limit.\n\
 An IndexError is raised if the position is at the end of the buffer.");
 
 static PyObject*
-hotbuf_getstr(PyHotbufObject *self, PyObject* arg)
+hotbuf_getstr(PyHotbufObject *self, PyObject* args)
 {
-    int len;
+    Py_ssize_t len = -1;
     PyObject* s;
 
     /* Extract the given number of bytes */
-    len = PyInt_AsLong(arg);
-    if (len == -1 && PyErr_Occurred())
+    if (!PyArg_ParseTuple(args, "|n:hotbuf", &len))
         return NULL;
-    
+
+    /* Validate positive */
+    if (len == -1) {
+        /* Using default value. */
+        len = self->b_limit - self->b_position;
+    }
+    else if (len < 0) {
+        PyErr_SetString(PyExc_ValueError,
+                        "length must be zero or positive");
+        return NULL;
+    }
+
     CHECK_LIMIT_ERROR(len);
 
     /* Extract the string object from the buffer */
@@ -619,7 +620,7 @@ static PyObject*
 hotbuf_putstr(PyHotbufObject *self, PyObject* arg)
 {
     char *instring;
-    int len;
+    Py_ssize_t len;
 
     /* Check and extract input string */
     if ( arg == NULL || !PyString_Check(arg) ) {
@@ -633,12 +634,12 @@ hotbuf_putstr(PyHotbufObject *self, PyObject* arg)
     CHECK_LIMIT_ERROR(len);
 
     /* Copy the string into the buffer */
-    memcpy(self->b_ptr, instring, len);
+    memcpy(self->b_ptr + self->b_position, instring, len);
 
     /* Advance the position */
     self->b_position += len;
 
-    return Py_None;
+    Py_RETURN_NONE;
 }
 
 
@@ -649,7 +650,8 @@ hotbuf_putstr(PyHotbufObject *self, PyObject* arg)
  */
 
 /*
- * Returns the buffer for reading or writing.
+ * Returns the buffer for reading or writing.  Important!  We only
+ * deliver the portion in the active window.
  */
 static Py_ssize_t
 hotbuf_getwritebuf(PyHotbufObject *self, Py_ssize_t idx, void **pp)
@@ -660,8 +662,8 @@ hotbuf_getwritebuf(PyHotbufObject *self, Py_ssize_t idx, void **pp)
         return -1;
     }
 
-    *pp = self->b_ptr;
-    return self->b_capacity;
+    *pp = self->b_ptr + self->b_position;
+    return self->b_limit - self->b_position;
 }
 
 static Py_ssize_t
@@ -675,14 +677,7 @@ hotbuf_getsegcount(PyHotbufObject *self, Py_ssize_t *lenp)
 static Py_ssize_t
 hotbuf_getcharbuf(PyHotbufObject *self, Py_ssize_t idx, const char **pp)
 {
-    if ( idx != 0 ) {
-        PyErr_SetString(PyExc_SystemError,
-                        "accessing non-existent hotbuf segment");
-        return -1;
-    }
-
-    *pp = (const char *)self->b_ptr;
-    return self->b_capacity;
+    return hotbuf_getwritebuf(self, idx, (void**)pp);
 }
 
 
@@ -694,6 +689,7 @@ hotbuf_getcharbuf(PyHotbufObject *self, Py_ssize_t idx, const char **pp)
 static Py_ssize_t
 hotbuf_length(PyHotbufObject *self)
 {
+    /* Note: this is the same as 'remaining'. */
     assert(self->b_position <= self->b_limit);
     return self->b_limit - self->b_position;
 }
@@ -749,7 +745,7 @@ hotbuf_methods[] = {
     {"compact", (PyCFunction)hotbuf_compact, METH_NOARGS, compact__doc__},
     {"getbyte", (PyCFunction)hotbuf_getbyte, METH_NOARGS, get__doc__},
     {"putbyte", (PyCFunction)hotbuf_putbyte, METH_O, put__doc__},
-    {"getstr", (PyCFunction)hotbuf_getstr, METH_O, getstr__doc__},
+    {"getstr", (PyCFunction)hotbuf_getstr, METH_VARARGS, getstr__doc__},
     {"putstr", (PyCFunction)hotbuf_putstr, METH_O, putstr__doc__},
     {NULL, NULL} /* sentinel */
 };
@@ -809,8 +805,9 @@ static PyTypeObject PyHotbuf_Type = {
     0,                                          /* tp_descr_set */
     0,                                          /* tp_dictoffset */
     0,                                          /* tp_init */
-    0,                                          /* tp_alloc */
+    PyType_GenericAlloc,                        /* tp_alloc */
     hotbuf_new,                                 /* tp_new */
+    PyObject_Del,                               /* tp_free */
 };
 
 

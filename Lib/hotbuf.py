@@ -10,5 +10,20 @@ from struct import Struct
 _long = Struct('l')
 
 class hotbuf(_hotbuf):
-    pass
+
+    def pack( self, structobj, *values ):
+        """
+        Pack using the given Struct object 'structobj', the remaining arguments.
+        """
+        structobj.pack_to(self, 0, *values)
+        self.advance(structobj.size)
+
+    def unpack( self, structobj ):
+        """
+        Pack using the given Struct object 'structobj', the remaining arguments.
+        """
+        values = structobj.unpack_from(self, 0)
+        self.advance(structobj.size)
+        return values
+
 
