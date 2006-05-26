@@ -555,15 +555,14 @@ class CommonTest(unittest.TestCase):
         self.checkraises(TypeError, 'hello', 'replace', 42, 'h')
         self.checkraises(TypeError, 'hello', 'replace', 'h', 42)
 
-### Commented out until the underlying libraries are fixed
-##    def test_replace_overflow(self):
-##        # Check for overflow checking on 32 bit machines
-##        if sys.maxint != 2147483647:
-##            return
-##        A2_16 = "A" * (2**16)
-##        self.checkraises(OverflowError, A2_16, "replace", "", A2_16)
-##        self.checkraises(OverflowError, A2_16, "replace", "A", A2_16)
-##        self.checkraises(OverflowError, A2_16, "replace", "AA", A2_16+A2_16)
+    def test_replace_overflow(self):
+        # Check for overflow checking on 32 bit machines
+        if sys.maxint != 2147483647:
+            return
+        A2_16 = "A" * (2**16)
+        self.checkraises(OverflowError, A2_16, "replace", "", A2_16)
+        self.checkraises(OverflowError, A2_16, "replace", "A", A2_16)
+        self.checkraises(OverflowError, A2_16, "replace", "AA", A2_16+A2_16)
 
     def test_zfill(self):
         self.checkequal('123', '123', 'zfill', 2)
@@ -881,6 +880,40 @@ class MixinStrUnicodeUserStringTest:
                     self.checkraises(OverflowError, format, "__mod__", value)
                 else:
                     self.checkcall(format, "__mod__", value)
+
+    def test_inplace_rewrites(self):
+        # Check that strings don't copy and modify cached single-character strings
+        self.checkequal('a', 'A', 'lower')
+        self.checkequal(True, 'A', 'isupper')
+        self.checkequal('A', 'a', 'upper')
+        self.checkequal(True, 'a', 'islower')
+
+        self.checkequal('a', 'A', 'replace', 'A', 'a')
+        self.checkequal(True, 'A', 'isupper')
+
+        self.checkequal('A', 'a', 'capitalize')
+        self.checkequal(True, 'a', 'islower')
+
+        self.checkequal('A', 'a', 'swapcase')
+        self.checkequal(True, 'a', 'islower')
+
+        self.checkequal('A', 'a', 'title')
+        self.checkequal(True, 'a', 'islower')
+
+    def test_partition(self):
+
+        self.checkequal(('this', ' is ', 'the partition method'),
+            'this is the partition method', 'partition', ' is ')
+
+        # from raymond's original specification
+        S = 'http://www.python.org'
+        self.checkequal(('http', '://', 'www.python.org'), S, 'partition', '://')
+        self.checkequal(('http://www.python.org', '', ''), S, 'partition', '?')
+        self.checkequal(('', 'http://', 'www.python.org'), S, 'partition', 'http://')
+        self.checkequal(('http://www.python.', 'org', ''), S, 'partition', 'org')
+
+        self.checkraises(ValueError, S, 'partition', '')
+        self.checkraises(TypeError, S, 'partition', None)
 
 
 class MixinStrStringUserStringTest:

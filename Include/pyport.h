@@ -295,6 +295,15 @@ extern "C" {
 #define Py_IS_INFINITY(X) ((X) && (X)*0.5 == (X))
 #endif
 
+/* Py_IS_FINITE(X)
+ * Return 1 if float or double arg is neither infinite nor NAN, else 0.
+ * Some compilers (e.g. VisualStudio) have intrisics for this, so a special
+ * macro for this particular test is useful
+ */
+#ifndef Py_IS_FINITE
+#define Py_IS_FINITE(X) (!Py_IS_INFINITY(X) && !Py_IS_NAN(X))
+#endif
+
 /* HUGE_VAL is supposed to expand to a positive double infinity.  Python
  * uses Py_HUGE_VAL instead because some platforms are broken in this
  * respect.  We used to embed code in pyport.h to try to worm around that,

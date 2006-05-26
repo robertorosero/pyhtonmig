@@ -18,6 +18,14 @@ typedef int Py_ssize_t;
 /* Forward declarations */
 static Py_ssize_t convertbuffer(PyObject *, void **p);
 
+/* PY_USE_INT_WHEN_POSSIBLE is an experimental flag that changes the 
+   struct API to return int instead of long when possible. This is
+   often a significant performance improvement. */
+/*
+#define PY_USE_INT_WHEN_POSSIBLE 1
+*/
+
+
 /* The translation function for each format character is table driven */
 typedef struct _formatdef {
 	char format;
@@ -284,6 +292,10 @@ nu_uint(const char *p, const formatdef *f)
 {
 	unsigned int x;
 	memcpy((char *)&x, p, sizeof x);
+#ifdef PY_USE_INT_WHEN_POSSIBLE
+	if (x <= LONG_MAX)
+		return PyInt_FromLong((long)x);
+#endif
 	return PyLong_FromUnsignedLong((unsigned long)x);
 }
 
@@ -300,6 +312,10 @@ nu_ulong(const char *p, const formatdef *f)
 {
 	unsigned long x;
 	memcpy((char *)&x, p, sizeof x);
+#ifdef PY_USE_INT_WHEN_POSSIBLE
+	if (x <= LONG_MAX)
+		return PyInt_FromLong((long)x);
+#endif
 	return PyLong_FromUnsignedLong(x);
 }
 
@@ -313,6 +329,10 @@ nu_longlong(const char *p, const formatdef *f)
 {
 	PY_LONG_LONG x;
 	memcpy((char *)&x, p, sizeof x);
+#ifdef PY_USE_INT_WHEN_POSSIBLE
+	if (x >= LONG_MIN && x <= LONG_MAX)
+		return PyInt_FromLong(Py_SAFE_DOWNCAST(x, PY_LONG_LONG, long));
+#endif
 	return PyLong_FromLongLong(x);
 }
 
@@ -321,6 +341,10 @@ nu_ulonglong(const char *p, const formatdef *f)
 {
 	unsigned PY_LONG_LONG x;
 	memcpy((char *)&x, p, sizeof x);
+#ifdef PY_USE_INT_WHEN_POSSIBLE
+	if (x <= LONG_MAX)
+		return PyInt_FromLong(Py_SAFE_DOWNCAST(x, unsigned PY_LONG_LONG, long));
+#endif
 	return PyLong_FromUnsignedLongLong(x);
 }
 
@@ -550,13 +574,13 @@ static formatdef native_table[] = {
 	{'I',	sizeof(int),	INT_ALIGN,	nu_uint,	np_uint},
 	{'l',	sizeof(long),	LONG_ALIGN,	nu_long,	np_long},
 	{'L',	sizeof(long),	LONG_ALIGN,	nu_ulong,	np_ulong},
-	{'f',	sizeof(float),	FLOAT_ALIGN,	nu_float,	np_float},
-	{'d',	sizeof(double),	DOUBLE_ALIGN,	nu_double,	np_double},
-	{'P',	sizeof(void *),	VOID_P_ALIGN,	nu_void_p,	np_void_p},
 #ifdef HAVE_LONG_LONG
 	{'q',	sizeof(PY_LONG_LONG), LONG_LONG_ALIGN, nu_longlong, np_longlong},
 	{'Q',	sizeof(PY_LONG_LONG), LONG_LONG_ALIGN, nu_ulonglong,np_ulonglong},
 #endif
+	{'f',	sizeof(float),	FLOAT_ALIGN,	nu_float,	np_float},
+	{'d',	sizeof(double),	DOUBLE_ALIGN,	nu_double,	np_double},
+	{'P',	sizeof(void *),	VOID_P_ALIGN,	nu_void_p,	np_void_p},
 	{0}
 };
 
@@ -584,28 +608,61 @@ bu_uint(const char *p, const formatdef *f)
 	do {
 		x = (x<<8) | (*p++ & 0xFF);
 	} while (--i > 0);
-	if (f->size >= 4)
-		return PyLong_FromUnsignedLong(x);
-	else
+#ifdef PY_USE_INT_WHEN_POSSIBLE
+	if (x <= LONG_MAX)
 		return PyInt_FromLong((long)x);
+#else
+	if (SIZEOF_LONG > f->size)
+		return PyInt_FromLong((long)x);
+#endif
+	return PyLong_FromUnsignedLong(x);
 }
 
 static PyObject *
 bu_longlong(const char *p, const formatdef *f)
 {
+#if HAVE_LONG_LONG
+	PY_LONG_LONG x = 0;
+	int i = f->size;
+	do {
+		x = (x<<8) | (*p++ & 0xFF);
+	} while (--i > 0);
+	/* Extend the sign bit. */
+	if (SIZEOF_LONG_LONG > f->size)
+		x |= -(x & (1L << (8 * f->size - 1)));
+#ifdef PY_USE_INT_WHEN_POSSIBLE
+	if (x >= LONG_MIN && x <= LONG_MAX)
+		return PyInt_FromLong(Py_SAFE_DOWNCAST(x, PY_LONG_LONG, long));
+#endif
+	return PyLong_FromLongLong(x);
+#else
 	return _PyLong_FromByteArray((const unsigned char *)p,
 				      8,
 				      0, /* little-endian */
 				      1  /* signed */);
+#endif
 }
 
 static PyObject *
 bu_ulonglong(const char *p, const formatdef *f)
 {
+#if HAVE_LONG_LONG
+	unsigned PY_LONG_LONG x = 0;
+	int i = f->size;
+	do {
+		x = (x<<8) | (*p++ & 0xFF);
+	} while (--i > 0);
+#ifdef PY_USE_INT_WHEN_POSSIBLE
+	if (x <= LONG_MAX)
+		return PyInt_FromLong(Py_SAFE_DOWNCAST(x, unsigned PY_LONG_LONG, long));
+#endif
+	return PyLong_FromUnsignedLongLong(x);
+#else
 	return _PyLong_FromByteArray((const unsigned char *)p,
 				      8,
 				      0, /* little-endian */
 				      0  /* signed */);
+#endif
 }
 
 static PyObject *
@@ -750,28 +807,61 @@ lu_uint(const char *p, const formatdef *f)
 	do {
 		x = (x<<8) | (p[--i] & 0xFF);
 	} while (i > 0);
-	if (f->size >= 4)
-		return PyLong_FromUnsignedLong(x);
-	else
+#ifdef PY_USE_INT_WHEN_POSSIBLE
+	if (x <= LONG_MAX)
 		return PyInt_FromLong((long)x);
+#else
+	if (SIZEOF_LONG > f->size)
+		return PyInt_FromLong((long)x);
+#endif
+	return PyLong_FromUnsignedLong((long)x);
 }
 
 static PyObject *
 lu_longlong(const char *p, const formatdef *f)
 {
+#if HAVE_LONG_LONG
+	PY_LONG_LONG x = 0;
+	int i = f->size;
+	do {
+		x = (x<<8) | (p[--i] & 0xFF);
+	} while (i > 0);
+	/* Extend the sign bit. */
+	if (SIZEOF_LONG_LONG > f->size)
+		x |= -(x & (1L << (8 * f->size - 1)));
+#ifdef PY_USE_INT_WHEN_POSSIBLE
+	if (x >= LONG_MIN && x <= LONG_MAX)
+		return PyInt_FromLong(Py_SAFE_DOWNCAST(x, PY_LONG_LONG, long));
+#endif
+	return PyLong_FromLongLong(x);
+#else
 	return _PyLong_FromByteArray((const unsigned char *)p,
 				      8,
 				      1, /* little-endian */
 				      1  /* signed */);
+#endif
 }
 
 static PyObject *
 lu_ulonglong(const char *p, const formatdef *f)
 {
+#if HAVE_LONG_LONG
+	unsigned PY_LONG_LONG x = 0;
+	int i = f->size;
+	do {
+		x = (x<<8) | (p[--i] & 0xFF);
+	} while (i > 0);
+#ifdef PY_USE_INT_WHEN_POSSIBLE
+	if (x <= LONG_MAX)
+		return PyInt_FromLong(Py_SAFE_DOWNCAST(x, unsigned PY_LONG_LONG, long));
+#endif
+	return PyLong_FromUnsignedLongLong(x);
+#else
 	return _PyLong_FromByteArray((const unsigned char *)p,
 				      8,
 				      1, /* little-endian */
 				      0  /* signed */);
+#endif
 }
 
 static PyObject *
@@ -1446,7 +1536,7 @@ static PyMemberDef s_memberlist[] = {
 
 static
 PyTypeObject PyStructType = {
-	PyObject_HEAD_INIT(&PyType_Type)
+	PyObject_HEAD_INIT(NULL)
 	0,
 	"Struct",
 	sizeof(PyStructObject),
@@ -1497,14 +1587,59 @@ init_struct(void)
 	if (m == NULL)
 		return;
 
+	PyStructType.ob_type = &PyType_Type;
+	if (PyType_Ready(&PyStructType) < 0)
+		return;
+
+	/* Check endian and swap in faster functions */
+	{
+		int one = 1;
+		formatdef *native = native_table;
+		formatdef *other, *ptr;
+		if ((int)*(unsigned char*)&one)
+			other = lilendian_table;
+		else
+			other = bigendian_table;
+		/* Scan through the native table, find a matching
+		   entry in the endian table and swap in the
+		   native implementations whenever possible
+		   (64-bit platforms may not have "standard" sizes) */
+		while (native->format != '\0' && other->format != '\0') {
+			ptr = other;
+			while (ptr->format != '\0') {
+				if (ptr->format == native->format) {
+					/* Match faster when formats are
+					   listed in the same order */
+					if (ptr == other)
+						other++;
+					/* Only use the trick if the 
+					   size matches */
+					if (ptr->size != native->size)
+						break;
+					/* Skip float and double, could be
+					   "unknown" float format */
+					if (ptr->format == 'd' || ptr->format == 'f')
+						break;
+					ptr->pack = native->pack;
+					ptr->unpack = native->unpack;
+					break;
+				}
+				ptr++;
+			}
+			native++;
+		}
+	}
+	
 	/* Add some symbolic constants to the module */
 	if (StructError == NULL) {
 		StructError = PyErr_NewException("struct.error", NULL, NULL);
 		if (StructError == NULL)
 			return;
 	}
+
 	Py_INCREF(StructError);
 	PyModule_AddObject(m, "error", StructError);
+
 	Py_INCREF((PyObject*)&PyStructType);
 	PyModule_AddObject(m, "Struct", (PyObject*)&PyStructType);
 }

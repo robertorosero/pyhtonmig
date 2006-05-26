@@ -40,7 +40,7 @@ static PyObject *long_format(PyObject *aa, int base, int addL);
 #define SIGCHECK(PyTryBlock) \
 	if (--_Py_Ticker < 0) { \
 		_Py_Ticker = _Py_CheckInterval; \
-		if (PyErr_CheckSignals()) { PyTryBlock; } \
+		if (PyErr_CheckSignals()) PyTryBlock \
 	}
 
 /* Normalize (remove leading zeros from) a long int object.
@@ -844,11 +844,36 @@ PyLong_AsVoidPtr(PyObject *vv)
 PyObject *
 PyLong_FromLongLong(PY_LONG_LONG ival)
 {
-	PY_LONG_LONG bytes = ival;
-	int one = 1;
-	return _PyLong_FromByteArray(
-			(unsigned char *)&bytes,
-			SIZEOF_LONG_LONG, IS_LITTLE_ENDIAN, 1);
+	PyLongObject *v;
+	unsigned PY_LONG_LONG t;  /* unsigned so >> doesn't propagate sign bit */
+	int ndigits = 0;
+	int negative = 0;
+
+	if (ival < 0) {
+		ival = -ival;
+		negative = 1;
+	}
+
+	/* Count the number of Python digits.
+	   We used to pick 5 ("big enough for anything"), but that's a
+	   waste of time and space given that 5*15 = 75 bits are rarely
+	   needed. */
+	t = (unsigned PY_LONG_LONG)ival;
+	while (t) {
+		++ndigits;
+		t >>= SHIFT;
+	}
+	v = _PyLong_New(ndigits);
+	if (v != NULL) {
+		digit *p = v->ob_digit;
+		v->ob_size = negative ? -ndigits : ndigits;
+		t = (unsigned PY_LONG_LONG)ival;
+		while (t) {
+			*p++ = (digit)(t & MASK);
+			t >>= SHIFT;
+		}
+	}
+	return (PyObject *)v;
 }
 
 /* Create a new long int object from a C unsigned PY_LONG_LONG int. */
@@ -856,11 +881,26 @@ PyLong_FromLongLong(PY_LONG_LONG ival)
 PyObject *
 PyLong_FromUnsignedLongLong(unsigned PY_LONG_LONG ival)
 {
-	unsigned PY_LONG_LONG bytes = ival;
-	int one = 1;
-	return _PyLong_FromByteArray(
-			(unsigned char *)&bytes,
-			SIZEOF_LONG_LONG, IS_LITTLE_ENDIAN, 0);
+	PyLongObject *v;
+	unsigned PY_LONG_LONG t;
+	int ndigits = 0;
+
+	/* Count the number of Python digits. */
+	t = (unsigned PY_LONG_LONG)ival;
+	while (t) {
+		++ndigits;
+		t >>= SHIFT;
+	}
+	v = _PyLong_New(ndigits);
+	if (v != NULL) {
+		digit *p = v->ob_digit;
+		v->ob_size = ndigits;
+		while (ival) {
+			*p++ = (digit)(ival & MASK);
+			ival >>= SHIFT;
+		}
+	}
+	return (PyObject *)v;
 }
 
 /* Create a new long int object from a C Py_ssize_t. */
@@ -1304,7 +1344,14 @@ long_format(PyObject *aa, int base, int addL)
 	return (PyObject *)str;
 }
 
-static int digval[] = {
+/* Table of digit values for 8-bit string -> integer conversion.
+ * '0' maps to 0, ..., '9' maps to 9.
+ * 'a' and 'A' map to 10, ..., 'z' and 'Z' map to 35.
+ * All other indices map to 37.
+ * Note that when converting a base B string, a char c is a legitimate
+ * base B digit iff _PyLong_DigitValue[Py_CHARMASK(c)] < B.
+ */
+int _PyLong_DigitValue[256] = {
 	37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37,
 	37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37,
 	37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37,
@@ -1321,14 +1368,6 @@ static int digval[] = {
 	37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37,
 	37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37,
 	37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37,
-	37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37,
-	37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37,
-	37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37,
-	37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37,
-	37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37,
-	37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37,
-	37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37,
-	37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37, 37
 };
 
 /* *str points to the first digit in a string of base `base` digits.  base
@@ -1355,7 +1394,7 @@ long_from_binary_base(char **str, int base)
 		n >>= 1;
 	/* n <- total # of bits needed, while setting p to end-of-string */
 	n = 0;
-	while (digval[Py_CHARMASK(*p)] < base)
+	while (_PyLong_DigitValue[Py_CHARMASK(*p)] < base)
 		++p;
 	*str = p;
 	n = (p - start) * bits_per_char;
@@ -1376,7 +1415,7 @@ long_from_binary_base(char **str, int base)
 	bits_in_accum = 0;
 	pdigit = z->ob_digit;
 	while (--p >= start) {
-		int k = digval[Py_CHARMASK(*p)];
+		int k = _PyLong_DigitValue[Py_CHARMASK(*p)];
 		assert(k >= 0 && k < base);
 		accum |= (twodigits)(k << bits_in_accum);
 		bits_in_accum += bits_per_char;
@@ -1503,7 +1542,7 @@ where B = convmultmax_base[base].
 
 		/* Find length of the string of numeric characters. */
 		scan = str;
-		while (digval[Py_CHARMASK(*scan)] < base)
+		while (_PyLong_DigitValue[Py_CHARMASK(*scan)] < base)
 			++scan;
 
 		/* Create a long object that can contain the largest possible
@@ -1527,10 +1566,10 @@ where B = convmultmax_base[base].
 		/* Work ;-) */
 		while (str < scan) {
 			/* grab up to convwidth digits from the input string */
-			c = (digit)digval[Py_CHARMASK(*str++)];
+			c = (digit)_PyLong_DigitValue[Py_CHARMASK(*str++)];
 			for (i = 1; i < convwidth && str != scan; ++i, ++str) {
 				c = (twodigits)(c *  base +
-					digval[Py_CHARMASK(*str)]);
+					_PyLong_DigitValue[Py_CHARMASK(*str)]);
 				assert(c < BASE);
 			}
 

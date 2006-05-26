@@ -63,11 +63,10 @@ static long main_thread;
 #endif /* MS_WINDOWS */
 #endif /* !__WATCOMC__ || __QNX__ */
 
-#if defined(MS_WINDOWS) && !defined(MS_WIN64) && !defined(__BORLANDC__)
-/* Win32 has better clock replacement
-   XXX Win64 does not yet, but might when the platform matures. */
-#undef HAVE_CLOCK /* We have our own version down below */
-#endif /* MS_WINDOWS && !MS_WIN64 */
+#if defined(MS_WINDOWS) && !defined(__BORLANDC__)
+/* Win32 has better clock replacement; we have our own version below. */
+#undef HAVE_CLOCK
+#endif /* MS_WINDOWS && !defined(__BORLANDC__) */
 
 #if defined(PYOS_OS2)
 #define INCL_DOS
@@ -162,7 +161,7 @@ time_clock(PyObject *self, PyObject *args)
 }
 #endif /* HAVE_CLOCK */
 
-#if defined(MS_WINDOWS) && !defined(MS_WIN64) && !defined(__BORLANDC__)
+#if defined(MS_WINDOWS) && !defined(__BORLANDC__)
 /* Due to Mark Hammond and Tim Peters */
 static PyObject *
 time_clock(PyObject *self, PyObject *args)
@@ -191,7 +190,7 @@ time_clock(PyObject *self, PyObject *args)
 }
 
 #define HAVE_CLOCK /* So it gets included in the methods */
-#endif /* MS_WINDOWS && !MS_WIN64 */
+#endif /* MS_WINDOWS && !defined(__BORLANDC__) */
 
 #ifdef HAVE_CLOCK
 PyDoc_STRVAR(clock_doc,
@@ -821,7 +820,7 @@ inittime(void)
 	SetConsoleCtrlHandler( PyCtrlHandler, TRUE);
 #endif /* MS_WINDOWS */
 	if (!initialized) {
-		PyStructSequence_InitType(&StructTimeType, 
+		PyStructSequence_InitType(&StructTimeType,
 					  &struct_time_type_desc);
 	}
 	Py_INCREF(&StructTimeType);
