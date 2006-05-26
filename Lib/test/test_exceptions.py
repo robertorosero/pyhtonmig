@@ -25,7 +25,7 @@ def test_raise_catch(exc):
         raise exc("spam")
     except exc, err:
         buf = str(err)
-#    print buf
+    print buf
 
 def r(thing):
     test_raise_catch(thing)
