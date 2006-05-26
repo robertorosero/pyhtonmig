@@ -855,7 +855,7 @@ WindowsError_str(PyWindowsErrorObject *self)
         Py_DECREF(tuple);
     }
     else
-    rtnval = EnvironmentError_str((EnvironmentErrorObject *)self);
+    rtnval = EnvironmentError_str((PyEnvironmentErrorObject *)self);
 
   finally:
     Py_XDECREF(repr);
@@ -1213,8 +1213,8 @@ get_int(PyObject *attr, Py_ssize_t *value, const char *name)
     if (PyInt_Check(attr)) {
         *value = PyInt_AS_LONG(attr);
     } else if (PyLong_Check(attr)) {
-        *value = PyLong_AsLongLong(attr);
-        if (*value == -1)
+        *value = _PyLong_AsSsize_t(attr);
+        if (*value == -1 && PyErr_Occurred())
             return -1;
     } else {
         PyErr_Format(PyExc_TypeError, "%.200s attribute must be int", name);
