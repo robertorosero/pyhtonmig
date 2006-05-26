@@ -16,17 +16,20 @@ typedef struct {
         PyObject *message;
 } BaseExceptionObject;
 
-/* GB: - I don't know, but it may be that the exceptions
-         have to be GC objects
-       - If you want to allow normal attribute access,
-         I think you can use PyObject_GenericGetAttr etc.
-         in the tp_getattr... slots.
-*/
+static PyTypeObject _PyExc_StopIteration;
+PyObject *PyExc_StopIterationInst;
 
 static PyObject *
 BaseException_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
     BaseExceptionObject *self;
+
+    /* Make StopIteration be a singleton as often as we can */
+    if ((args == NULL || PyTuple_GET_SIZE(args) == 0) &&
+            PyExc_StopIterationInst != NULL &&
+            type == &_PyExc_StopIteration) {
+        return PyExc_StopIterationInst;
+    }
 
     self = (BaseExceptionObject *)type->tp_alloc(type, 0);
     self->args = self->message = self->dict = NULL;
@@ -1965,6 +1968,9 @@ SimpleExtendsException(PyExc_Warning, ImportWarning, "Base class for warnings ab
  */
 PyObject *PyExc_MemoryErrorInst=NULL;
 
+/* Make StopIteration be a singleton as often as we can */
+PyObject *PyExc_StopIterationInst=NULL;
+
 /* module global functions */
 static PyMethodDef functions[] = {
     /* Sentinel */
@@ -1983,13 +1989,6 @@ PyMODINIT_FUNC
 _PyExc_Init(void) 
 {
     PyObject *m, *bltinmod, *bdict;
-
-    bltinmod = PyImport_ImportModule("__builtin__");
-    if (bltinmod == NULL)
-    Py_FatalError("exceptions bootstrapping error.");
-    bdict = PyModule_GetDict(bltinmod);
-    if (bdict == NULL)
-    Py_FatalError("exceptions bootstrapping error.");
 
     PRE_INIT(BaseException)
     PRE_INIT(Exception)
@@ -2048,6 +2047,13 @@ _PyExc_Init(void)
     m = Py_InitModule("exceptions", functions);
     if (m == NULL) return;
 
+    bltinmod = PyImport_ImportModule("__builtin__");
+    if (bltinmod == NULL)
+    Py_FatalError("exceptions bootstrapping error.");
+    bdict = PyModule_GetDict(bltinmod);
+    if (bdict == NULL)
+    Py_FatalError("exceptions bootstrapping error.");
+
     POST_INIT(BaseException)
     POST_INIT(Exception)
     POST_INIT(StandardError)
@@ -2105,6 +2111,11 @@ _PyExc_Init(void)
     PyExc_MemoryErrorInst = BaseException_new(&_PyExc_MemoryError, NULL, NULL);
     if (!PyExc_MemoryErrorInst)
         Py_FatalError("Cannot pre-allocate MemoryError instance\n");
+
+    PyExc_StopIterationInst = BaseException_new(&_PyExc_StopIteration, NULL,
+        NULL);
+    if (!PyExc_StopIterationInst)
+        Py_FatalError("Cannot pre-allocate StopIteration instance\n");
 
     Py_DECREF(bdict);
     Py_DECREF(bltinmod);
