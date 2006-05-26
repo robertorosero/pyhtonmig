@@ -28,6 +28,7 @@ BaseException_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     if ((args == NULL || PyTuple_GET_SIZE(args) == 0) &&
             PyExc_StopIterationInst != NULL &&
             type == &_PyExc_StopIteration) {
+        Py_INCREF(PyExc_StopIterationInst);
         return PyExc_StopIterationInst;
     }
 
