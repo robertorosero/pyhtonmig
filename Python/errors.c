@@ -589,11 +589,11 @@ PyErr_WriteUnraisable(PyObject *obj)
 		PyFile_WriteString("Exception ", f);
 		if (t) {
 			char* className = PyExceptionClass_Name(t);
+			PyObject* moduleName;
 			char *dot = strrchr(className, '.');
 			if (dot != NULL)
 				className = dot+1;
-			PyObject* moduleName =
-			      PyObject_GetAttrString(t, "__module__");
+			moduleName = PyObject_GetAttrString(t, "__module__");
 
 			if (moduleName == NULL)
 				PyFile_WriteString("<unknown>", f);

@@ -778,14 +778,14 @@ WindowsError_traverse(WindowsErrorObject *self, visitproc visit, void *arg)
     Py_VISIT(self->strerror);
     Py_VISIT(self->filename);
     Py_VISIT(self->winerror);
-    return BaseException_traverse((BaseExceptionObject *)self, visit, arg)
+    return BaseException_traverse((BaseExceptionObject *)self, visit, arg);
 }
 
 static PyObject *
 WindowsError_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
     PyObject *o_errcode = NULL;
-    PyObject *errcode = NULL;
+    long errcode;
     WindowsErrorObject *self = NULL;
     long posix_errno;
 
@@ -808,7 +808,7 @@ WindowsError_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 
     self->myerrno = o_errcode;
 
-    return self;
+    return (PyObject *)self;
 failed:
     /* Could not set errno. */
     Py_XDECREF(o_errcode);
@@ -820,7 +820,8 @@ static int
 WindowsError_init(WindowsErrorObject *self, PyObject *args, PyObject *kwds)
 {
     PyObject *o_errcode = NULL;
-    PyObject *errcode = NULL;
+    long errcode;
+	long posix_errno;
 
     if (EnvironmentError_init((EnvironmentErrorObject *)self, args, kwds) == -1)
         return -1;
@@ -835,20 +836,17 @@ WindowsError_init(WindowsErrorObject *self, PyObject *args, PyObject *kwds)
     self->winerror = self->myerrno;
 
     o_errcode = PyInt_FromLong(posix_errno);
-    if (!o_errcode) {
-        Py_DECREF(errcode);
+    if (!o_errcode)
         return -1;
-    }
 
     self->myerrno = o_errcode;
 
-    Py_DECREF(errcode);
     return 0;
 }
 
 
 static PyObject *
-WindowsError_str(PyObject *self)
+WindowsError_str(WindowsErrorObject *self)
 {
     PyObject *repr = NULL;
     PyObject *fmt = NULL;
@@ -882,13 +880,9 @@ WindowsError_str(PyObject *self)
         Py_DECREF(tuple);
     }
     else
-    rtnval = EnvironmentError_str(self);
+    rtnval = EnvironmentError_str((EnvironmentErrorObject *)self);
 
   finally:
-    /* GB: where is filename, serrno and strerror declared? */
-    Py_XDECREF(filename);
-    Py_XDECREF(serrno);
-    Py_XDECREF(strerror);
     Py_XDECREF(repr);
     Py_XDECREF(fmt);
     Py_XDECREF(tuple);
@@ -909,7 +903,14 @@ static PyMemberDef WindowsError_members[] = {
     {NULL}  /* Sentinel */
 };
 
-ComplexExtendsException(PyExc_OSError, WindowsError, WindowsError, EnvironmentError_dealloc, WindowsError_members, WindowsError_str, "MS-Windows OS system call failed.");
+ComplexExtendsException(PyExc_OSError,
+						WindowsError,
+						WindowsError,
+						WindowsError_dealloc,
+						WindowsError_members,
+						WindowsError_str,
+						"MS-Windows OS system call failed.",
+						1);
 
 #endif /* MS_WINDOWS */
 

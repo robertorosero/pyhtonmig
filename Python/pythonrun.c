@@ -1134,10 +1134,10 @@ PyErr_Display(PyObject *exception, PyObject *value, PyObject *tb)
 		else if (PyExceptionClass_Check(exception)) {
 			char* className = PyExceptionClass_Name(exception);
 			char *dot = strrchr(className, '.');
+			PyObject* moduleName;
 			if (dot != NULL)
 				className = dot+1;
-			PyObject* moduleName =
-			      PyObject_GetAttrString(exception, "__module__");
+			moduleName = PyObject_GetAttrString(exception, "__module__");
 
 			if (moduleName == NULL)
 				err = PyFile_WriteString("<unknown>", f);
