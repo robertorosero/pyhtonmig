@@ -583,18 +583,35 @@ static PyObject *
 EnvironmentError_reduce(EnvironmentErrorObject *self)
 {
     PyObject *args = self->args;
+    PyObject *res = NULL, *tmp;
     /* self->args is only the first two real arguments if there was a
      * file name given to EnvironmentError. */
-    if (!PyTuple_Check(args) || PyTuple_GET_SIZE(args) != 2)
-        if (self->filename != Py_None) {  
-            args = PyTuple_New(3);
-            if (!args) return NULL;
-            PyTuple_SET_ITEM(args, 0, PyTuple_GetItem(self->args, 0));
-            PyTuple_SET_ITEM(args, 1, PyTuple_GetItem(self->args, 1));
-            Py_INCREF(self->filename);
-            PyTuple_SET_ITEM(args, 2, self->filename);
-        }
-    return PyTuple_Pack(3, self->ob_type, args, self->dict);
+    if (PyTuple_Check(args) && 
+    	PyTuple_GET_SIZE(args) == 2 &&
+        self->filename != Py_None) {  
+
+        args = PyTuple_New(3);
+        if (!args) return NULL;
+        
+        tmp = PyTuple_GetItem(self->args, 0);
+        if (!tmp) goto finish;
+        Py_INCREF(tmp);
+        PyTuple_SET_ITEM(args, 0, tmp);
+        
+        tmp = PyTuple_GetItem(self->args, 1);
+        if (!tmp) goto finish;
+        Py_INCREF(tmp);
+        PyTuple_SET_ITEM(args, 1, tmp);
+
+        Py_INCREF(self->filename);
+        PyTuple_SET_ITEM(args, 2, self->filename);
+    } else {
+        Py_INCREF(args);
+    }
+    res = PyTuple_Pack(3, self->ob_type, args, self->dict);
+  finish:
+    Py_DECREF(args);
+    return res;
 }
 
 
