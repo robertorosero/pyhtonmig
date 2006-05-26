@@ -143,6 +143,14 @@ BaseException_repr(BaseExceptionObject *self)
     return repr;
 }
 
+/* Pickling support */
+static PyObject *
+BaseException_reduce(BaseExceptionObject *self)
+{
+    return PyTuple_Pack(3, self->ob_type, self->args, self->dict);
+}
+
+
 #ifdef Py_USING_UNICODE
 /* while this method generates fairly uninspired output, it a least
  * guarantees that we can display exceptions that have unicode attributes
@@ -167,6 +175,7 @@ BaseException_unicode(BaseExceptionObject *self)
 #endif /* Py_USING_UNICODE */
 
 static PyMethodDef BaseException_methods[] = {
+   {"__reduce__", (PyCFunction)BaseException_reduce, METH_NOARGS },
 #ifdef Py_USING_UNICODE
    {"__unicode__", (PyCFunction)BaseException_unicode, METH_NOARGS },
 #endif
@@ -195,12 +204,15 @@ static PySequenceMethods BaseException_as_sequence = {
 };
 
 static PyMemberDef BaseException_members[] = {
-    {"args", T_OBJECT, offsetof(BaseExceptionObject, args), 0,
+    {"args", T_OBJECT, offsetof(BaseExceptionObject, args), RO,
         PyDoc_STR("exception arguments")},
     {"message", T_OBJECT, offsetof(BaseExceptionObject, message), 0,
         PyDoc_STR("exception message")},
+    {"__dict__", T_OBJECT_EX, offsetof(BaseExceptionObject, dict), RO,
+        PyDoc_STR("instance dictionary")},
     {NULL}  /* Sentinel */
 };
+
 
 static PyTypeObject _PyExc_BaseException = {
     PyObject_HEAD_INIT(NULL)
@@ -278,7 +290,7 @@ static PyTypeObject _PyExc_ ## EXCNAME = { \
 }; \
 PyObject *PyExc_ ## EXCNAME = (PyObject *)&_PyExc_ ## EXCNAME;
 
-#define ComplexExtendsException(EXCBASE, EXCNAME, EXCSTORE, EXCDEALLOC, EXCMEMBERS, EXCSTR, EXCDOC) \
+#define ComplexExtendsException(EXCBASE, EXCNAME, EXCSTORE, EXCDEALLOC, EXCMETHODS, EXCMEMBERS, EXCSTR, EXCDOC) \
 static PyTypeObject _PyExc_ ## EXCNAME = { \
     PyObject_HEAD_INIT(NULL) \
     0, \
@@ -288,7 +300,7 @@ static PyTypeObject _PyExc_ ## EXCNAME = { \
     (reprfunc)EXCSTR, 0, 0, 0, \
     Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE, \
     PyDoc_STR(EXCDOC), \
-    0, 0, 0, 0, 0, 0, 0, EXCMEMBERS, 0, &_ ## EXCBASE, \
+    0, 0, 0, 0, 0, 0, EXCMETHODS, EXCMEMBERS, 0, &_ ## EXCBASE, \
     0, 0, 0, offsetof(EXCSTORE ## Object, dict), \
     (initproc)EXCSTORE ## _init, 0, EXCSTORE ## _new,\
 }; \
@@ -381,7 +393,7 @@ SystemExit_dealloc(SystemExitObject *self)
 }
 
 static PyMemberDef SystemExit_members[] = {
-    {"args", T_OBJECT, offsetof(SystemExitObject, args), 0,
+    {"args", T_OBJECT, offsetof(SystemExitObject, args), RO,
         PyDoc_STR("exception arguments")},
     {"message", T_OBJECT, offsetof(SystemExitObject, message), 0,
         PyDoc_STR("exception message")},
@@ -390,7 +402,7 @@ static PyMemberDef SystemExit_members[] = {
     {NULL}  /* Sentinel */
 };
 
-ComplexExtendsException(PyExc_BaseException, SystemExit, SystemExit, SystemExit_dealloc, SystemExit_members, 0, "Request to exit from the interpreter."); 
+ComplexExtendsException(PyExc_BaseException, SystemExit, SystemExit, SystemExit_dealloc, 0, SystemExit_members, 0, "Request to exit from the interpreter."); 
 
 /*
  *    KeyboardInterrupt extends BaseException
@@ -553,7 +565,7 @@ EnvironmentError_str(EnvironmentErrorObject *self)
 }
 
 static PyMemberDef EnvironmentError_members[] = {
-    {"args", T_OBJECT, offsetof(EnvironmentErrorObject, args), 0,
+    {"args", T_OBJECT, offsetof(EnvironmentErrorObject, args), RO,
         PyDoc_STR("exception arguments")},
     {"message", T_OBJECT, offsetof(EnvironmentErrorObject, message), 0,
         PyDoc_STR("exception message")},
@@ -566,7 +578,35 @@ static PyMemberDef EnvironmentError_members[] = {
     {NULL}  /* Sentinel */
 };
 
-ComplexExtendsException(PyExc_StandardError, EnvironmentError, EnvironmentError, EnvironmentError_dealloc, EnvironmentError_members, EnvironmentError_str, "Base class for I/O related errors.");
+
+static PyObject *
+EnvironmentError_reduce(EnvironmentErrorObject *self)
+{
+    PyObject *args = self->args;
+    /* self->args is only the first two real arguments if there was a
+     * file name given to EnvironmentError. */
+    if (!PyTuple_Check(args) || PyTuple_GET_SIZE(args) != 2)
+        if (self->filename != Py_None) {  
+            args = PyTuple_New(3);
+            if (!args) return NULL;
+            PyTuple_SET_ITEM(args, 0, PyTuple_GetItem(self->args, 0));
+            PyTuple_SET_ITEM(args, 1, PyTuple_GetItem(self->args, 1));
+            Py_INCREF(self->filename);
+            PyTuple_SET_ITEM(args, 2, self->filename);
+        }
+    return PyTuple_Pack(3, self->ob_type, args, self->dict);
+}
+
+
+static PyMethodDef EnvironmentError_methods[] = {
+    {"__reduce__", (PyCFunction)EnvironmentError_reduce, METH_NOARGS},
+    {NULL}
+};
+
+ComplexExtendsException(PyExc_StandardError, EnvironmentError, EnvironmentError, \
+                        EnvironmentError_dealloc, EnvironmentError_methods, \
+                        EnvironmentError_members, EnvironmentError_str, \
+                        "Base class for I/O related errors.");
 
 
 /*
@@ -713,7 +753,7 @@ WindowsError_str(PyObject *self)
 }
 
 static PyMemberDef WindowsError_members[] = {
-    {"args", T_OBJECT, offsetof(WindowsErrorObject, args), 0,
+    {"args", T_OBJECT, offsetof(WindowsErrorObject, args), RO,
         PyDoc_STR("exception arguments")},
     {"message", T_OBJECT, offsetof(WindowsErrorObject, message), 0,
         PyDoc_STR("exception message")},
@@ -941,7 +981,7 @@ SyntaxError_str(SyntaxErrorObject *self)
 }
 
 static PyMemberDef SyntaxError_members[] = {
-    {"args", T_OBJECT, offsetof(SyntaxErrorObject, args), 0,
+    {"args", T_OBJECT, offsetof(SyntaxErrorObject, args), RO,
         PyDoc_STR("exception arguments")},
     {"message", T_OBJECT, offsetof(SyntaxErrorObject, message), 0,
         PyDoc_STR("exception message")},
@@ -961,7 +1001,7 @@ static PyMemberDef SyntaxError_members[] = {
     {NULL}  /* Sentinel */
 };
 
-ComplexExtendsException(PyExc_StandardError, SyntaxError, SyntaxError, SyntaxError_dealloc, SyntaxError_members, SyntaxError_str, "Invalid syntax.");
+ComplexExtendsException(PyExc_StandardError, SyntaxError, SyntaxError, SyntaxError_dealloc, 0, SyntaxError_members, SyntaxError_str, "Invalid syntax.");
 
 
 /*
@@ -1010,7 +1050,7 @@ KeyError_str(BaseExceptionObject *self)
     return BaseException_str(self);
 }
 
-ComplexExtendsException(PyExc_LookupError, KeyError, BaseException, 0, 0, KeyError_str, "Mapping key not found.");
+ComplexExtendsException(PyExc_LookupError, KeyError, BaseException, 0, 0, 0, KeyError_str, "Mapping key not found.");
 
 
 /*
@@ -1335,7 +1375,7 @@ UnicodeError_dealloc(UnicodeErrorObject *self)
 }
 
 static PyMemberDef UnicodeError_members[] = {
-    {"args", T_OBJECT, offsetof(UnicodeErrorObject, args), 0,
+    {"args", T_OBJECT, offsetof(UnicodeErrorObject, args), RO,
         PyDoc_STR("exception arguments")},
     {"message", T_OBJECT, offsetof(UnicodeErrorObject, message), 0,
         PyDoc_STR("exception message")},
