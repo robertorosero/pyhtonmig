@@ -81,17 +81,6 @@ try: x = undefined_variable
 except NameError: pass
 
 r(OverflowError)
-# XXX
-# Obscure:  in 2.2 and 2.3, this test relied on changing OverflowWarning
-# into an error, in order to trigger OverflowError.  In 2.4, OverflowWarning
-# should no longer be generated, so the focus of the test shifts to showing
-# that OverflowError *isn't* generated.  OverflowWarning should be gone
-# in Python 2.5, and then the filterwarnings() call, and this comment,
-# should go away.
-warnings.filterwarnings("error", "", OverflowWarning, __name__)
-x = 1
-for dummy in range(128):
-    x += x  # this simply shouldn't blow up
 
 r(RuntimeError)
 print '(not used any more?)'
