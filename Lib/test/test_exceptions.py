@@ -81,6 +81,9 @@ try: x = undefined_variable
 except NameError: pass
 
 r(OverflowError)
+x = 1
+for dummy in range(128):
+    x += x  # this simply shouldn't blow up
 
 r(RuntimeError)
 print '(not used any more?)'
