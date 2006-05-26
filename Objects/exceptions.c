@@ -143,6 +143,26 @@ BaseException_repr(BaseExceptionObject *self)
     return repr;
 }
 
+#ifdef Py_USING_UNICODE
+/* while this method generates fairly uninspired output, it a least
+ * guarantees that we can display exceptions that have unicode attributes
+ */
+static PyObject *
+BaseException_unicode(BaseExceptionObject *self)
+{
+    return PyObject_Unicode(self->args);
+}
+#endif /* Py_USING_UNICODE */
+
+static PyMethodDef BaseException_methods[] = {
+#ifdef Py_USING_UNICODE
+   {"__unicode__", (PyCFunction)BaseException_unicode, METH_NOARGS },
+#endif
+   {NULL, NULL, 0, NULL},
+};
+
+
+
 static PyObject *
 BaseException_getitem(BaseExceptionObject *self, Py_ssize_t index)
 {
@@ -187,11 +207,11 @@ static PyTypeObject _PyExc_BaseException = {
     0,                          /*tp_as_mapping*/
     0,                          /*tp_hash */
     0,                          /*tp_call*/
-    (reprfunc)BaseException_str,       /*tp_str*/
+    (reprfunc)BaseException_str,  /*tp_str*/
     PyObject_GenericGetAttr,    /*tp_getattro*/
     PyObject_GenericSetAttr,    /*tp_setattro*/
     0,                          /*tp_as_buffer*/
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,        /*tp_flags*/
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,  /*tp_flags*/
     PyDoc_STR("Common base class for all exceptions"), /* tp_doc */
     0,                          /* tp_traverse */
     0,                          /* tp_clear */
@@ -199,7 +219,7 @@ static PyTypeObject _PyExc_BaseException = {
     0,                          /* tp_weaklistoffset */
     0,                          /* tp_iter */
     0,                          /* tp_iternext */
-    0,                          /* tp_methods */
+    BaseException_methods,      /* tp_methods */
     BaseException_members,      /* tp_members */
     0,                          /* tp_getset */
     0,                          /* tp_base */

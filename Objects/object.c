@@ -1076,7 +1076,6 @@ PyObject *
 PyObject_GetAttrString(PyObject *v, const char *name)
 {
 	PyObject *w, *res;
-
 	if (v->ob_type->tp_getattr != NULL)
 		return (*v->ob_type->tp_getattr)(v, (char*)name);
 	w = PyString_InternFromString(name);
