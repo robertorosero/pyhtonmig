@@ -187,7 +187,7 @@ static PyMemberDef BaseException_members[] = {
 
 static PyMethodDef BaseException_methods[] = {
 #ifdef Py_USING_UNICODE
-   {"__unicode__", (PyCFunction)BaseException_unicode, METH_O },
+   {"__unicode__", (PyCFunction)BaseException_unicode, METH_NOARGS },
 #endif
    {NULL, NULL, 0, NULL},
 };
