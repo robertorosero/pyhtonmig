@@ -12,6 +12,19 @@ What's New in Python 2.5 alpha 3?
 Core and builtins
 -----------------
 
+- Patch #1494554: Update unicodedata.numeric and unicode.isnumeric to
+  Unicode 4.1.
+
+- Patch #921466: sys.path_importer_cache is now used to cache valid and
+  invalid file paths for the built-in import machinery which leads to
+  fewer open calls on startup.
+
+- Patch #1442927: ``long(str, base)`` is now up to 6x faster for non-power-
+  of-2 bases.  The largest speedup is for inputs with about 1000 decimal
+  digits.  Conversion from non-power-of-2 bases remains quadratic-time in
+  the number of input digits (it was and remains linear-time for bases
+  2, 4, 8, 16 and 32).
+
 - Bug #1334662: ``int(string, base)`` could deliver a wrong answer
   when ``base`` was not 2, 4, 8, 10, 16 or 32, and ``string`` represented
   an integer close to ``sys.maxint``.  This was repaired by patch
@@ -57,6 +70,10 @@ Extension Modules
 
 - Use Win32 API to implement os.{access,chdir,chmod,mkdir,remove,rename,rmdir,utime}.
   As a result, these functions now raise WindowsError instead of OSError.
+
+- ``time.clock()`` on Win64 should use the high-performance Windows
+  ``QueryPerformanceCounter()`` now (as was already the case on 32-bit
+  Windows platforms).
 
 - Calling Tk_Init twice is refused if the first call failed as that
   may deadlock.

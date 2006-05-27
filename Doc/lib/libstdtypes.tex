@@ -727,6 +727,15 @@ a prefix; rather, all combinations of its values are stripped:
 \versionchanged[Support for the \var{chars} argument]{2.2.2}
 \end{methoddesc}
 
+\begin{methoddesc}[string]{partition}{sep}
+Split the string at the first occurrence of \var{sep}, and return
+a 3-tuple containing the part before the separator, the separator
+itself, and the part after the separator.  If the separator is not
+found, return a 3-tuple containing the string itself, followed by
+two empty strings.
+\versionadded{2.5}
+\end{methoddesc}
+
 \begin{methoddesc}[string]{replace}{old, new\optional{, count}}
 Return a copy of the string with all occurrences of substring
 \var{old} replaced by \var{new}.  If the optional argument
@@ -752,6 +761,15 @@ Padding is done using the specified \var{fillchar} (default is a space).
 The original string is returned if
 \var{width} is less than \code{len(\var{s})}.
 \versionchanged[Support for the \var{fillchar} argument]{2.4}
+\end{methoddesc}
+
+\begin{methoddesc}[string]{rpartition}{sep}
+Split the string at the last occurrence of \var{sep}, and return
+a 3-tuple containing the part before the separator, the separator
+itself, and the part after the separator.  If the separator is not
+found, return a 3-tuple containing the string itself, followed by
+two empty strings.
+\versionadded{2.5}
 \end{methoddesc}
 
 \begin{methoddesc}[string]{rsplit}{\optional{sep \optional{,maxsplit}}}

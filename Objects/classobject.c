@@ -81,12 +81,9 @@ PyClass_New(PyObject *bases, PyObject *dict, PyObject *name)
 			if (!PyClass_Check(base)) {
 				if (PyCallable_Check(
 					(PyObject *) base->ob_type))
-					return PyObject_CallFunction(
+					return PyObject_CallFunctionObjArgs(
 						(PyObject *) base->ob_type,
-						"OOO",
-						name,
-						bases,
-						dict);
+						name, bases, dict, NULL);
 				PyErr_SetString(PyExc_TypeError,
 					"PyClass_New: base must be a class");
 				return NULL;
@@ -1075,21 +1072,15 @@ static PyMappingMethods instance_as_mapping = {
 static PyObject *
 instance_item(PyInstanceObject *inst, Py_ssize_t i)
 {
-	PyObject *func, *arg, *res;
+	PyObject *func, *res;
 
 	if (getitemstr == NULL)
 		getitemstr = PyString_InternFromString("__getitem__");
 	func = instance_getattr(inst, getitemstr);
 	if (func == NULL)
 		return NULL;
-	arg = Py_BuildValue("(n)", i);
-	if (arg == NULL) {
-		Py_DECREF(func);
-		return NULL;
-	}
-	res = PyEval_CallObject(func, arg);
+	res = PyObject_CallFunction(func, "n", i);
 	Py_DECREF(func);
-	Py_DECREF(arg);
 	return res;
 }
 
