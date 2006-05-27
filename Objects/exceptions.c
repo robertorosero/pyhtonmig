@@ -768,6 +768,12 @@ WindowsError_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     if (!self)
         return NULL;
 
+    if (self->myerrno == Py_None) {
+        self->winerror = self->myerrno;
+        Py_INCREF(self->winerror);
+        return (PyObject *)self;
+    }
+
     /* Set errno to the POSIX errno, and winerror to the Win32
        error code. */
     errcode = PyInt_AsLong(self->myerrno);
@@ -798,16 +804,25 @@ WindowsError_init(PyWindowsErrorObject *self, PyObject *args, PyObject *kwds)
     long errcode;
     long posix_errno;
 
-    if (EnvironmentError_init((PyEnvironmentErrorObject *)self, args, kwds) == -1)
+    if (EnvironmentError_init((PyEnvironmentErrorObject *)self, args, kwds)
+            == -1)
         return -1;
+
+    if (self->myerrno == Py_None) {
+        Py_DECREF(self->winerror);
+        self->winerror = self->myerrno;
+        Py_INCREF(self->winerror);
+        return 0;
+    }
 
     /* Set errno to the POSIX errno, and winerror to the Win32
        error code. */
     errcode = PyInt_AsLong(self->myerrno);
-    if (!errcode == -1 && PyErr_Occurred())
+    if (errcode == -1 && PyErr_Occurred())
         return -1;
     posix_errno = winerror_to_errno(errcode);
 
+    Py_XDECREF(self->winerror);
     self->winerror = self->myerrno;
 
     o_errcode = PyInt_FromLong(posix_errno);
