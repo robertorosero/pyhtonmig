@@ -790,8 +790,7 @@ WindowsError_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     return (PyObject *)self;
 failed:
     /* Could not set errno. */
-    Py_XDECREF(o_errcode);
-    Py_XDECREF(self);
+    Py_DECREF(self);
     return NULL;
 }
 
@@ -820,7 +819,7 @@ WindowsError_init(PyWindowsErrorObject *self, PyObject *args, PyObject *kwds)
         return -1;
     posix_errno = winerror_to_errno(errcode);
 
-    Py_XDECREF(self->winerror);
+    Py_DECREF(self->winerror);
     self->winerror = self->myerrno;
 
     o_errcode = PyInt_FromLong(posix_errno);
@@ -2057,10 +2056,10 @@ _PyExc_Init(void)
 
     bltinmod = PyImport_ImportModule("__builtin__");
     if (bltinmod == NULL)
-    Py_FatalError("exceptions bootstrapping error.");
+        Py_FatalError("exceptions bootstrapping error.");
     bdict = PyModule_GetDict(bltinmod);
     if (bdict == NULL)
-    Py_FatalError("exceptions bootstrapping error.");
+        Py_FatalError("exceptions bootstrapping error.");
 
     POST_INIT(BaseException)
     POST_INIT(Exception)
