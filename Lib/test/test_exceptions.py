@@ -263,11 +263,11 @@ exceptionList = [
         ]
 try:
     exceptionList.append(
-            ( WindowsError, ('errnoStr', 'strErrorStr', 'filenameStr'),
-                    { 'message' : '', 'args' : ('errnoStr', 'strErrorStr'),
+            ( WindowsError, (1, 'strErrorStr', 'filenameStr'),
+                    { 'message' : '', 'args' : (1, 'strErrorStr'),
                         'strerror' : 'strErrorStr',
-                        'errno' : 'errnoStr', 'filename' : 'filenameStr',
-                        'winerror' : 'foo' }))
+                        'errno' : 22, 'filename' : 'filenameStr',
+                        'winerror' : 1 }))
 except NameError: pass
 
 for args in exceptionList:
