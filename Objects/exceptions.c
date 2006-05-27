@@ -15,7 +15,8 @@ BaseException_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     PyBaseExceptionObject *self;
 
     self = (PyBaseExceptionObject *)type->tp_alloc(type, 0);
-    self->args = self->message = self->dict = NULL;
+    /* the dict is created on the fly in PyObject_GenericSetAttr */
+    self->message = self->dict = NULL;
 
     self->args = PyTuple_New(0);
     if (!self->args) {
@@ -29,24 +30,20 @@ BaseException_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
         return NULL;
     }
 
-    /* the dict is created on the fly in PyObject_GenericSetAttr */
-    self->dict = NULL;
-    
     return (PyObject *)self;
 }
 
 static int
 BaseException_init(PyBaseExceptionObject *self, PyObject *args, PyObject *kwds)
 {
-    if (args) {
-        Py_DECREF(self->args);
-        self->args = args;
-        Py_INCREF(self->args);
-    }
+    Py_DECREF(self->args);
+    self->args = args;
+    Py_INCREF(self->args);
 
-    if (PySequence_Length(self->args) == 1) {
+    if (PyTuple_GET_SIZE(self->args) == 1) {
         Py_DECREF(self->message);
-        self->message = PySequence_GetItem(self->args, 0);
+        self->message = PyTuple_GET_ITEM(self->args, 0);
+	Py_INCREF(self->message);
     }
     return 0;
 }
@@ -420,8 +417,7 @@ SystemExit_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     if (!self)
         return NULL;
 
-    self->code = Py_None;
-    Py_INCREF(Py_None);
+    MAKE_IT_NONE(self->code);
 
     return (PyObject *)self;
 }
@@ -429,20 +425,17 @@ SystemExit_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 static int
 SystemExit_init(PySystemExitObject *self, PyObject *args, PyObject *kwds)
 {
-    Py_ssize_t size = PySequence_Length(args);
+    Py_ssize_t size = PyTuple_GET_SIZE(args);
 
     if (BaseException_init((PyBaseExceptionObject *)self, args, kwds) == -1)
         return -1;
 
-    if (size == 1) {
-        Py_DECREF(self->code);
-        self->code = PySequence_GetItem(args, 0);
-    }
-    else if (size > 1) {
-        Py_DECREF(self->code);
+    Py_DECREF(self->code);
+    if (size == 1)
+        self->code = PyTuple_GET_ITEM(args, 0);
+    else if (size > 1)
         self->code = args;
-        Py_INCREF(args);
-    }
+    Py_INCREF(self->code);
     return 0;
 }
 
@@ -537,11 +530,12 @@ EnvironmentError_init(PyEnvironmentErrorObject *self, PyObject *args,
     if (BaseException_init((PyBaseExceptionObject *)self, args, kwds) == -1)
         return -1;
 
-    if (PySequence_Length(args) <= 1) {
+    if (PyTuple_GET_SIZE(args) <= 1) {
         return 0;
     }
     
-    if (!PyArg_ParseTuple(args, "OO|O", &myerrno, &strerror, &filename)) {
+    if (!PyArg_UnpackTuple(args, "EnvironmentError", 2, 3, 
+                           &myerrno, &strerror, &filename)) {
         return -1;
     }
     Py_DECREF(self->myerrno);       /* replacing */
@@ -965,9 +959,6 @@ SyntaxError_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     if (!self)
         return NULL;
 
-    self->msg = self->filename = self->lineno = self->offset =
-        self->text = NULL;
-
     MAKE_IT_NONE(self->msg)
     MAKE_IT_NONE(self->filename)
     MAKE_IT_NONE(self->lineno)
@@ -985,36 +976,36 @@ static int
 SyntaxError_init(PySyntaxErrorObject *self, PyObject *args, PyObject *kwds)
 {
     PyObject *info = NULL;
-    Py_ssize_t lenargs = PySequence_Length(args);
+    Py_ssize_t lenargs = PyTuple_GET_SIZE(args);
 
     if (BaseException_init((PyBaseExceptionObject *)self, args, kwds) == -1)
         return -1;
 
     if (lenargs >= 1) {
-        PyObject *item0 = PySequence_GetItem(args, 0);
-        if (!item0) return -1;
         Py_DECREF(self->msg);
-        self->msg = item0;
+        self->msg = PyTuple_GET_ITEM(args, 0);
+        Py_INCREF(self->msg);
     }
     if (lenargs == 2) {
-        info = PySequence_GetItem(args, 1);
+        info = PyTuple_GET_ITEM(args, 1);
+        info = PySequence_Tuple(info);
         if (!info) return -1;
 
         Py_DECREF(self->filename);
-        self->filename = PySequence_GetItem(info, 0);
-        if (!self->filename) return -1;
+        self->filename = PyTuple_GET_ITEM(info, 0);
+        Py_INCREF(self->filename);
 
         Py_DECREF(self->lineno);
-        self->lineno = PySequence_GetItem(info, 1);
-        if (!self->lineno) return -1;
+        self->lineno = PyTuple_GET_ITEM(info, 1);
+        Py_INCREF(self->lineno);
 
         Py_DECREF(self->offset);
-        self->offset = PySequence_GetItem(info, 2);
-        if (!self->offset) return -1;
+        self->offset = PyTuple_GET_ITEM(info, 2);
+        Py_INCREF(self->offset);
 
         Py_DECREF(self->text);
-        self->text = PySequence_GetItem(info, 3);
-        if (!self->text) return -1;
+        self->text = PyTuple_GET_ITEM(info, 3);
+        Py_INCREF(self->text);
     }
     return 0;
 }

@@ -10,7 +10,7 @@ typedef struct {
     PyObject_HEAD
     PyObject *dict;
     PyObject *args;
-PyObject *message;
+    PyObject *message;
 } PyBaseExceptionObject;
 
 typedef struct {
