@@ -771,8 +771,12 @@ WindowsError_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     /* Set errno to the POSIX errno, and winerror to the Win32
        error code. */
     errcode = PyInt_AsLong(self->myerrno);
-    if (errcode == -1 && PyErr_Occurred())
+    if (errcode == -1 && PyErr_Occurred()) {
+        if (PyErr_ExceptionMatches(PyExc_TypeError)
+            /* give a clearer error message */
+            PyErr_SetString(PyExc_TypeError, "errno has to be an integer");
         goto failed;
+    }
     posix_errno = winerror_to_errno(errcode);
 
     self->winerror = self->myerrno;
