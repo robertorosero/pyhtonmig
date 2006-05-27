@@ -772,7 +772,7 @@ WindowsError_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
        error code. */
     errcode = PyInt_AsLong(self->myerrno);
     if (errcode == -1 && PyErr_Occurred()) {
-        if (PyErr_ExceptionMatches(PyExc_TypeError)
+        if (PyErr_ExceptionMatches(PyExc_TypeError))
             /* give a clearer error message */
             PyErr_SetString(PyExc_TypeError, "errno has to be an integer");
         goto failed;
