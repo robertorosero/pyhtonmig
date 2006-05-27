@@ -2120,7 +2120,6 @@ _PyExc_Init(void)
     if (!PyExc_MemoryErrorInst)
         Py_FatalError("Cannot pre-allocate MemoryError instance\n");
 
-    Py_DECREF(bdict);
     Py_DECREF(bltinmod);
 }
 
