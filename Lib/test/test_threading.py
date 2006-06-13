@@ -93,11 +93,11 @@ class ThreadTests(unittest.TestCase):
         self.test_various_ops()
         threading.stack_size(0)
 
-    # run with a large thread stack size (4MB)
+    # run with a large thread stack size (1MB)
     def test_various_ops_large_stack(self):
         if verbose:
-            print 'with 4MB thread stack size...'
-        threading.stack_size(0x400000)
+            print 'with 1MB thread stack size...'
+        threading.stack_size(0x100000)
         self.test_various_ops()
         threading.stack_size(0)
 
