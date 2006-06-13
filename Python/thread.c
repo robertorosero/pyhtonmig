@@ -99,26 +99,6 @@ void PyThread_init_thread(void)
    or the size specified by the THREAD_STACK_SIZE macro. */
 static size_t _pythread_stacksize = 0;
 
-size_t
-PyThread_get_stacksize(void)
-{
-	return _pythread_stacksize;
-}
-
-static int
-_pythread_unsupported_set_stacksize(size_t size)
-{
-	return PyErr_Warn(PyExc_RuntimeWarning,
-			  "setting thread stack size not supported on "
-                          "this platform");
-}
-
-/* Only platforms with THREAD_SET_STACKSIZE() defined in
-   pthread_<platform>.h, overriding this default definition,
-   will support changing the stack size.
-   Return 1 if an exception is pending, 0 otherwise. */
-#define THREAD_SET_STACKSIZE(x)	_pythread_unsupported_set_stacksize(x)
-
 #ifdef SGI_THREADS
 #include "thread_sgi.h"
 #endif
@@ -174,12 +154,26 @@ _pythread_unsupported_set_stacksize(size_t size)
 #endif
 */
 
-/* use appropriate thread stack size setting routine.
-   Return 1 if an exception is pending, 0 otherwise. */
+/* return the current thread stack size */
+size_t
+PyThread_get_stacksize(void)
+{
+	return _pythread_stacksize;
+}
+
+/* Only platforms defining a THREAD_SET_STACKSIZE() macro
+   in thread_<platform>.h support changing the stack size.
+   Return 0 if stack size is valid,
+          -1 if stack size value is invalid,
+          -2 if setting stack size is not supported. */
 int
 PyThread_set_stacksize(size_t size)
 {
+#if defined(THREAD_SET_STACKSIZE)
 	return THREAD_SET_STACKSIZE(size);
+#else
+	return -2;
+#endif
 }
 
 #ifndef Py_HAVE_NATIVE_TLS

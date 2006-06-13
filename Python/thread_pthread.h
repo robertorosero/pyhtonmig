@@ -20,10 +20,6 @@
 #endif
 /* for safety, ensure a viable minimum stacksize */
 #define	THREAD_STACK_MIN	0x8000	/* 32kB */
-#if THREAD_STACK_MIN < PTHREAD_STACK_MIN
-#undef THREAD_STACK_MIN
-#define	THREAD_STACK_MIN	PTHREAD_STACK_MIN
-#endif
 #else  /* !_POSIX_THREAD_ATTR_STACKSIZE */
 #ifdef THREAD_STACK_SIZE
 #error "THREAD_STACK_SIZE defined but _POSIX_THREAD_ATTR_STACKSIZE undefined"
@@ -165,7 +161,8 @@ PyThread_start_new_thread(void (*func)(void *), void *arg)
 		PyThread_init_thread();
 
 #if defined(THREAD_STACK_SIZE) || defined(PTHREAD_SYSTEM_SCHED_SUPPORTED)
-	pthread_attr_init(&attrs);
+	if (pthread_attr_init(&attrs) != 0)
+		return -1;
 #endif
 #if defined(THREAD_STACK_SIZE)
 	tss = (_pythread_stacksize != 0) ? _pythread_stacksize
@@ -491,31 +488,46 @@ PyThread_release_lock(PyThread_type_lock lock)
 #endif /* USE_SEMAPHORES */
 
 /* set the thread stack size.
- * Return 1 if an exception is pending, 0 otherwise.
+ * Return 0 if size is valid, -1 if size is invalid,
+ * -2 if setting stack size is not supported.
  */
 static int
 _pythread_pthread_set_stacksize(size_t size)
 {
+#if defined(THREAD_STACK_SIZE)
+	pthread_attr_t attrs;
+	size_t tss_min;
+	int rc = 0;
+#endif
+
 	/* set to default */
 	if (size == 0) {
 		_pythread_stacksize = 0;
 		return 0;
 	}
 
-	/* valid range? */
-	if (size >= THREAD_STACK_MIN) {
-		_pythread_stacksize = size;
-		return 0;
+#if defined(THREAD_STACK_SIZE)
+#if defined(PTHREAD_STACK_MIN)
+	tss_min = PTHREAD_STACK_MIN > THREAD_STACK_MIN ? PTHREAD_STACK_MIN
+						       : THREAD_STACK_MIN;
+#else
+	tss_min = THREAD_STACK_MIN;
+#endif
+	if (size >= tss_min) {
+		/* validate stack size by setting thread attribute */
+		if (pthread_attr_init(&attrs) == 0) {
+			rc = pthread_attr_setstacksize(&attrs, size);
+			pthread_attr_destroy(&attrs);
+			if (rc == 0) {
+				_pythread_stacksize = size;
+				return 0;
+			}
+		}
 	}
-	else {
-		char warning[128];
-		snprintf(warning,
-			 128,
-			 "thread stack size of %#x bytes not supported",
-			 size);
-		return PyErr_Warn(PyExc_RuntimeWarning, warning);
-	}
+	return -1;
+#else
+	return -2;
+#endif
 }
 
-#undef THREAD_SET_STACKSIZE
 #define THREAD_SET_STACKSIZE(x)	_pythread_pthread_set_stacksize(x)

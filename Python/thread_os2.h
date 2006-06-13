@@ -286,7 +286,7 @@ void PyThread_release_lock(PyThread_type_lock aLock)
 #define THREAD_MAX_STACKSIZE	0x2000000	/* 32MB */
 
 /* set the thread stack size.
- * Return 1 if an exception is pending, 0 otherwise.
+ * Return 0 if size is valid, -1 otherwise.
  */
 static int
 _pythread_os2_set_stacksize(size_t size)
@@ -302,15 +302,8 @@ _pythread_os2_set_stacksize(size_t size)
 		_pythread_stacksize = size;
 		return 0;
 	}
-	else {
-		char warning[128];
-		snprintf(warning,
-			 128,
-			 "thread stack size of %#x bytes not supported on OS/2",
-			 size);
-		return PyErr_Warn(PyExc_RuntimeWarning, warning);
-	}
+
+	return -1;
 }
 
-#undef THREAD_SET_STACKSIZE
 #define THREAD_SET_STACKSIZE(x)	_pythread_os2_set_stacksize(x)
