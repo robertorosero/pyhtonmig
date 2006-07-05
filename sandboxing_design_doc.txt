@@ -1,0 +1,998 @@
+Restricted Execution for Python
+#######################################
+
+About This Document
+=============================
+
+This document is meant to lay out the general design for re-introducing a
+restriced execution model for Python.  This document should provide one with
+enough information to understand the goals for restricted execution, what
+considerations were made for the design, and the actual design itself.  Design
+decisions should be clear and explain not only why they were chosen but
+possible drawbacks from taking that approach.
+
+
+Goal
+=============================
+
+A good restricted execution model provides enough protection to prevent
+malicious harm to come to the system, and no more.  Barriers should be
+minimized so as to allow most code that does not do anything that would be
+regarded as harmful to run unmodified.
+
+An important point to take into consideration when reading this document is to
+realize it is part of my (Brett Cannon's) Ph.D. dissertation.  This means it is
+heavily geared toward the restricted execution when the interpreter is working
+with Python code embedded in a web page.  While great strides have been taken
+to keep the design general enough so as to allow all previous uses of the
+'rexec' module [#rexec]_ to be able to use the new design, it is not the
+focused goal.  This means if a design decision must be made for the embedded
+use case compared to sandboxing Python code in a Python application, the former
+will win out.
+
+Throughout this document, the term "resource" is to represent anything that
+deserves possible protection.  This includes things that have a physical
+representation (e.g., memory) to things that are more abstract and specific to
+the interpreter (e.g., sys.path).
+
+When referring to the state of an interpreter, it is either "trusted" or
+"untrusted".  A trusted interpreter has no restrictions imposed upon any
+resource.  An untrusted interpreter has at least one, possibly more, resource
+with a restriction placed upon it.
+
+
+.. contents::
+
+
+Use Cases
+/////////////////////////////
+
+All use cases are based on how many untrusted or trusted interpreters are
+running in a single process.
+
+
+When the Interpreter Is Embedded
+================================
+
+Single Untrusted Interpreter
+----------------------------
+
+This use case is when an application embeds the interpreter and never has more
+than one interpreter running.
+
+The main security issue to watch out for is not having default abilities be
+provided to the interpreter by accident.  There must also be protection from
+leaking resources that the interpreter needs for general use underneath the
+covers into the untrusted interpreter.
+
+
+Multiple Untrusted Interpreters
+-------------------------------
+
+When multiple interpreters, all untrusted at varying levels, need to be running
+within a single application.  This is the key use case that this proposed
+design is targetted for.
+
+On top of the security issues from a single untrusted interpreter, there is one
+additional worry.  Resources cannot end up being leaked into other interpreters
+where they are given escalated rights.
+
+
+Stand-Alone Python
+==================
+
+When someone has written a Python program that wants to execute Python code in
+an untrusted interpreter(s).  This is the use case that 'rexec' attempted to
+fulfill.
+
+The added security issues for this use case (on top of the ones for the other
+use cases) is preventing something from the trusted interpreter leaking into an
+untrusted interpreter and having elevated permissions.  With the multiple
+untrusted interpreters one did not have to worry about preventing actions from
+occurring that are disallowed for all untrusted interpreters.  With this use
+case you do have to worry about the binary distinction between trusted and
+untrusted interpreters running in the same process.
+
+
+Resources to Protect
+/////////////////////////////
+
+XXX Threading?
+XXX CPU?
+
+Filesystem
+===================
+
+The most obvious facet of a filesystem to protect is reading from it.  One does
+not want what is stored in ``/etc/passwd`` to get out.  And one also does not
+want writing to the disk unless explicitly allowed for basically the same
+reason; if someone can write ``/etc/passwd`` then they can set the password for
+the root account.
+
+But one must also protect information about the filesystem.  This includes both
+the filesystem layout and permissions on files.  This means pathnames need to
+be properly hidden from an untrusted interpreter.
+
+
+Physical Resources
+===================
+
+Memory should be protected.  It is a limited resource on the system that can
+have an impact on other running programs if it is exhausted.  Being able to
+restrict the use of memory would help alleviate issues from denial-of-service
+(DoS) attacks.
+
+
+Networking
+===================
+
+Networking is somewhat like the filesystem in terms of wanting similar
+protections.  You do not want to let untrusted code make tons of socket
+connections or accept them to do possibly nefarious things (e.g., acting as a
+zombie).
+
+You also want to prevent finding out information about the network you are
+connected to.  This includes doing DNS resolution since that allows one to find
+out what addresses your intranet has or what subnets you use.
+
+
+Interpreter
+===================
+
+One must make sure that the interpreter is not harmed in any way.  There are
+several ways to possibly do this.  One is generating hostile bytecode.  Another
+is some buffer overflow.  In general any ability to crash the interpreter is
+unacceptable.
+
+There is also the issue of taking it over.  If one is able to gain control of
+the overall process through the interpreter then heightened abilities could be
+gained.
+
+
+Types of Security
+///////////////////////////////////////
+
+As with most things, there are multiple approaches one can take to tackle a
+problem.  Security is no exception.  In general there seem to be two approaches
+to protecting resources.
+
+
+Resource Hiding
+=============================
+
+By never giving code a chance to access a resource, you prevent it from be
+(ab)used.  This is the idea behind resource hiding.  This can help minimize
+security checks by only checking if someone should be given a resource.  By
+having possession of a resource be what determines if one should be allowed to
+use it you minimize the checks to only when a resource is handed out.
+
+This can be viewed as a passive system for security.  Once a resource has been
+given to code there are no more checks to make sure the security model is being
+violated.
+
+The most common implementation of resource hiding is capabilities.  In this
+type of system a resource's reference acts as a ticket that represents the right
+to use the resource.  Once code has a reference it is considered to have full
+use of that resource it represents and no further security checks are
+performed.
+
+To allow customizable restrictions one can pass references to wrappers of
+resources.  This allows one to provide custom security to resources instead of
+requiring an all-or-nothing approach.
+
+The problem with capabilities is that it requires a way to control access to
+references.  In languages such as Java that use a capability-based security
+system, namespaces provide the protection.  By having private attributes and
+compartmentalized namespaces, references cannot be reached without explicit
+permission.
+
+For instance, Java has a ClassLoader class that one can call to have return a
+reference that is desired.  The class does a security check to make sure the
+code should be allowed to access the resource, and then returns a reference as
+appropriate.  And with private attributes in objects and packages not providing
+global attributes you can effectively hide references to prevent security
+breaches.
+
+To use an analogy, imagine you are providing security for your home.  With
+capabilities, security came from not having any way to know where your house is
+without being told where it was; a reference to its location.  You might be
+able to ask a guard (e.g., Java's ClassLoader) for a map, but if they refuse
+there is no way for you to guess its location without being told.  But once you
+knew where it was, you had complete use of the house.
+
+And that complete access is an issue with a capability system.  If someone
+played a little loose with a reference for a resource then you run the risk of
+it getting out.  Once a reference leaves your hands it becomes difficult to
+revoke the right to use that resource.  A capability system can be designed to
+do a check every time a reference is handed to a new object, but that can be
+difficult to do properly when grafting a new way to handle resources on to an
+existing system such as Python since the check is no longer at a point for
+requesting a reference but also at plain assignment time.
+
+
+Resource Crippling
+=============================
+
+Another approach to security is to provide constant, proactive security
+checking of rights to use a resource.  One can have a resource perform a
+security check every time someone tries to use a method on that resource.  This
+pushes the security check to a lower level; from a reference level to the
+method level.
+
+By performing the security check every time a resource's method is called the
+worry of a resource's reference leaking out to insecure code is alleviated
+since the resource cannot be used without authorizing it regardless of whether
+even having the reference was granted.  This does add extra overhead, though,
+by having to do so many security checks.
+
+FreeBSD's jail system provides a system similar to this.  Various system calls
+allow for basic usage, but knowing of the system call is not enough to grant
+usage.  Every call of a system call requires checking that the proper rights
+have been granted to the use in order to allow for the system call to perform
+its action.
+
+An even better example in FreeBSD's jail system is its protection of sockets.
+One can only bind a single IP address to a jail.  Any attempt to do more or
+perform uses with the one IP address that is granted is prevented.  The check
+is performed at every call involving the one granted IP address.
+
+Using our home analogy, everyone in the world can know where your home is.  But
+to access any door in your home, you have to pass a security check.  The
+overhead is higher and slows down your movement in your home, but not caring if
+perfect strangers know where your home is prevents the worry of your address
+leaking out to the world.
+
+
+The 'rexec' Module
+///////////////////////////////////////
+
+The 'rexec' module [#rexec]_ was based on the design used by Safe-Tcl
+[#safe-tcl]_.  The design was essentially a capability system.  Safe-Tcl
+allowed you to launch a separate interpreter where its global functions were
+specified at creation time.  This prevented one from having any abilities that
+were not explicitly provided.
+
+For 'rexec', the Safe-Tcl model was tweaked to better match Python's situation.
+An RExec object represented a restricted environment.  Imports were checked
+against a whitelist of modules.  You could also restrict the type of modules to
+import based on whether they were Python source, bytecode, or C extensions.
+Built-ins were allowed except for a blacklist of built-ins to not provide.
+Several other protections were provided; see documentation for the complete
+list.
+
+With an RExec object created, one could pass in strings of code to be executed
+and have the result returned.  One could execute code based on whether stdin,
+stdout, and stderr were provided or not.
+
+The ultimate undoing of the 'rexec' module was how access to objects that in
+normal Python require no direct action to reach was handled.  Importing modules
+requires a direct action, and thus can be protected against directly in the
+import machinery.  But for built-ins, they are accessible by default and
+require no direct action to access in normal Python; you just use their name
+since they are provided in all namespaces.
+
+For instance, in a restricted interpreter, one only had to do
+``del __builtins__`` to gain access to the full set of built-ins.  Another way
+is through using the gc module:
+``gc.get_referrers(''.__class__.__bases__[0])[6]['file']``.  While both of
+these could be fixed (the former a bug in 'rexec' and the latter not allowing
+gc to be imported), they are examples of things that do not require proactive
+actions on the part of the programmer in normal Python to gain access to
+tends to leak out.  An unfortunate side-effect of having all of that wonderful
+reflection in Python.
+
+There is also the issue that 'rexec' was written in Python which provides its
+own problems.
+
+Much has been learned since 'rexec' was written about how Python tends to be
+used and where security issues tend to appear.  Essentially Python's dynamic
+nature does not lend itself very well to passive security measures since the
+reflection abilities in the language lend themselves to getting around
+non-proactive security checks.
+
+
+The Proposed Approach
+///////////////////////////////////////
+
+In light of where 'rexec' succeeded and failed along with what is known about
+the two main types of security and how Python tends to operate, the following
+is a proposal on how to secure Python for restricted execution.
+
+First, security will be provided at the C level.  By taking advantage of the
+language barrier of accessing C code from Python without explicit allowance
+(i.e., ignoring ctypes [#ctypes]_), direct manipulation of the various security
+checks can be substantially reduced and controlled.
+
+Second, all proactive actions that code can do to gain access to resources will
+be protected through resource hiding.  By having to go through Python to get to
+something (e.g., modules), a security check can be put in place to deny access
+as appropriate (this also ties into the separation between interpreters,
+discussed below).
+
+Third, any resource that is usually accessible by default will use resource
+crippling.  Instead of worrying about hiding a resource that is available by
+default (e.g., 'file' type), security checks within the resource will prevent
+misuse.  Crippling can also be used for resources where an object could be
+desired, but not at its full capacity (e.g., sockets).
+
+Performance should not be too much of an issue for resource crippling.  It's
+main use if for I/O types; files and sockets.  Since operations on these types
+are I/O bound and not CPU bound, the overhead for doing the security check
+should be a wash overall.
+
+Fourth, the restrictions separating multiple interpreters within a single
+process will be utilized.  This helps prevent the leaking of objects into
+different interpreters with escalated privileges.  Python source code
+modules are reloaded for each interpreter, preventing an object that does not
+have resource crippling from being leaked into another interpreter unless
+explicitly allowed.  C extension modules are shared by not reloading them
+between interpreters, but this is considered in the security design.
+
+Fifth, Python source code is always trusted.  Damage to a system is considered
+to be done from either hostile bytecode or at the C level.  Thus protecting the
+interpreter and extension modules is the great worry, not Python source code.
+Python bytecode files, on the other hand, are considered inherently unsafe and
+will never be imported directly.
+
+Attempts to perform an action that is not allowed by the security policy will
+raise an XXX exception (or subclass thereof) as appropriate.
+
+
+Implementation Details
+===============================
+
+XXX prefix/module name; Restrict, Secure, Sandbox?  Different tense?
+XXX C APIs use abstract names (e.g., string, integer) since have not decided if
+Python objects or C types (e.g., PyStringObject vs. char *) will be used
+
+Support for untrusted interpreters will be a compilation flag.  This allows the
+more common case of people not caring about protections to not have a
+performance hindrance when not desired.  And even when Python is compiled for
+untrusted interpreter restrictions, when the running interpreter *is* trusted,
+there will be no accidental triggers of protections.  This means that
+developers should be liberal with the security protections without worrying
+about there being issues for interpreters that do not need/want the protection.
+
+At the Python level, the __restricted__ built-in will be set based on whether
+the interpreter is untrusted or not.  This will be set for *all* interpreters,
+regardless of whether untrusted interpreter support was compiled in or not.
+
+For setting what is to be protected, the XXX<pointer to interpreter> for the
+untrusted interpreter must be passed in.  This makes the protection very
+explicit and helps make sure you set protections for the exact interpreter you
+mean to.
+
+The functions for checking for permissions are actually macros that take
+in at least an error return value for the function calling the macro.  This
+allows the macro to return for the caller if the check failed and cause the XXX
+exception to be propagated.  This helps eliminate any coding errors from
+incorrectly checking a return value on a rights-checking function call.  For
+the rare case where this functionality is disliked, just make the check in a
+utility function and check that function's return value (but this is strongly
+discouraged!).
+
+
+API
+--------------
+
+* interpreter PyXXX_NewInterpreter()
+    Return a new interpreter that is considered untrusted.  There is no
+    corresponding PyXXX_EndInterpreter() as Py_EndInterpreter() will be taught
+    how to handle untrusted interpreters.
+
+* PyXXX_Trusted(error_return)
+    Macro that has the caller return with 'error_return' if the interpreter is
+    not a trusted one.
+
+
+Memory
+=============================
+
+Protection
+--------------
+
+An memory cap will be allowed.
+
+Modification to pymalloc will be needed to properly keep track of the
+allocation and freeing of memory.  Same goes for the macros around the system
+malloc/free system calls.  This provides a platform-independent system for
+protection instead of relying on the operating system providing a service for
+capping memory usage of a process.  Also allows the protection to be at the
+interpreter level instead of at the process level.
+
+
+Why
+--------------
+
+Protecting excessive memory usage allows one to make sure that a DoS attack
+against the system's memory is prevented.
+
+
+Possible Security Flaws
+-----------------------
+
+If code makes direct calls to malloc/free instead of using the proper PyMem_*()
+macros then the security check will be circumvented.  But C code is *supposed*
+to use the proper macros or pymalloc and thus this issue is not with the
+security model but with code not following Python coding standards.
+
+
+API
+--------------
+
+* int PyXXX_SetMemoryCap(interpreter, integer)
+    Set the memory cap for an untrusted interpreter.  If the interpreter is not
+    running an untrusted interpreter, return NULL.
+
+* PyXXX_MemoryAlloc(integer, error_return)
+    Macro to increase the amount of memory that is reported that the running
+    untrusted interpreter is running.  If the increase puts the total count
+    passed the set limit, raise an XXX exception and cause the calling function
+    to return with the value of error_return.  For trusted interpreters or
+    untrusted interpreters where a cap has not been set, the macro does
+    nothing.
+
+* int PyXXX_MemoryFree(integer)
+    Decrease the current running interpreter's allocated memory.  If this puts
+    the memory returned to below 0, raise an XXX exception and return NULL.
+    For trusted interpreters or untrusted interpreters where there is no memory
+    cap, the macro does nothing.
+
+
+CPU
+=============================
+XXX Needed?  Difficult to get right for all platforms.  Would have to be very
+platform-specific.
+
+
+Reading/Writing Files
+=============================
+
+Protection
+--------------
+
+The 'file' type will be resource crippled.  The user may specify files or
+directories that are acceptable to be opened for reading/writing, or both.
+
+All operations that either read, write, or provide info on a file will require
+a security check to make sure that it is allowed for the file that the 'file'
+object represents.  This includes the 'file' type's constructor not raising an
+IOError stating a file does not exist but XXX instead so that information about
+the filesystem is not improperly provided.
+
+The security check will be done for all 'file' objects regardless of where the
+'file' object originated.  This prevents issues if the 'file' type or an
+instance of it was accidentally made available to an untrusted interpreter.
+
+
+Why
+--------------
+
+Allowing anyone to be able to arbitrarily read, write, or learn about the
+layout of your filesystem is extremely dangerous.  It can lead to loss of data
+or data being exposed to people whom should not have access.
+
+
+Possible Security Flaws
+-----------------------
+
+Assuming that the method-level checks are correct and control of what
+files/directories is not exposed, 'file' object protection is secure, even when
+a 'file' object is leaked from a trusted interpreter to an untrusted one.
+
+
+API
+--------------
+
+* int PyXXX_AllowFile(interpreter, path, mode)
+    Add a file that is allowed to be opened in 'mode' by the 'file' object.  If
+    the interpreter is not untrusted then return NULL.
+
+* int PyXXX_AllowDirectory(interpreter, path, mode)
+    Add a directory that is allowed to have files opened in 'mode' by the
+    'file' object.  This includes both pre-existing files and any new files
+    created by the 'file' object.
+    XXX allow for creating/reading subdirectories?
+
+* PyXXX_CheckPath(path, mode, error_return)
+    Macro that causes the caller to return with 'error_return' and XXX as the
+    exception if the specified path with 'mode' is not allowed.  For trusted
+    interpreters, the macro does nothing.
+
+
+Extension Module Importation
+============================
+
+Protection
+--------------
+
+A whitelist of extension modules that may be imported must be provided.  A
+default set is given for stdlib modules known to be safe.
+
+A check in the import machinery will check that a specified module name is
+allowed based on the type of module (Python source, Python bytecode, or
+extension module).  Python bytecode files are never directly imported because
+of the possibility of hostile bytecode being present.  Python source is always
+trusted based on the assumption that all resource harm is eventually done at
+the C level, thus Python code directly cannot cause harm.  Thus only C
+extension modules need to be checked against the whitelist.
+
+The requested extension module name is checked in order to make sure that it
+is on the whitelist if it is a C extension module.  If the name is not correct
+an XXX exception is raised.  Otherwise the import is allowed.
+
+Even if a Python source code module imports a C extension module in a trusted
+interpreter it is not a problem since the Python source code module is reloaded
+in the untrusted interpreter.  When that Python source module is freshly
+imported the normal import check will be triggered to prevent the C extension
+module from becoming available to the untrusted interpreter.
+
+For the 'os' module, a special restricted version will be used if the proper
+C extension module providing the correct abilities is not allowed.  This will
+default to '/' as the path separator and provide as much reasonable abilities
+as possible from a pure Python module.
+
+The 'sys' module is specially addressed in
+`Changing the Behaviour of the Interpreter`_.
+
+By default, the whitelisted modules are:
+
+* XXX work off of rexec whitelist?
+
+
+Why
+--------------
+
+Because C code is considered unsafe, its use should be regulated.  By using a
+whitelist it allows one to explicitly decide that a C extension module should
+be considered safe.
+
+
+Possible Security Flaws
+-----------------------
+
+If a trusted C extension module imports an untrusted C extension module and
+make it an attribute of the trust module there will be a breach in security.
+Luckily this a rarity in extension modules.
+
+There is also the issue of a C extension module calling the C API of an
+untrusted C extension module.
+
+Lastly, if a trusted C extension module is loaded in a trusted interpreter and
+then loaded into an untrusted interpreter then there is no possible checks
+during module initialization for possible security issues for resources opened
+during initialization of the module if such checks exist in the init*()
+function.
+
+All of these issues can be handled by never blindly whitelisting a C extension
+module.  Added support for dealing with C extension modules comes in the form
+of `Extension Module Crippling`_.  
+
+API
+--------------
+
+* int PyXXX_AllowModule(interpreter, module_name)
+    Allow the untrusted interpreter to import 'module_name'.  If the
+    interpreter is not untrusted, return NULL.
+    XXX sub-modules in packages allowed implicitly?  Or have to list all
+    modules explicitly?
+
+* int PyXXX_BlockModule(interpreter, module_name)
+    Remove the specified module from the whitelist.  Used to remove modules
+    that are allowed by default.  If called on a trusted interpreter, returns
+    NULL.
+
+* PyXXX_CheckModule(module_Name, error_return)
+    Macro that causes the caller to return with 'error_return' and sets the
+    exception XXX if the specified module cannot be imported.  For trusted
+    interpreters the macro does nothing.
+
+
+Extension Module Crippling
+==========================
+
+Protection
+--------------
+
+By providing a C API for checking for allowed abilities, modules that have some
+useful functionality  can do proper security checks for those functions that
+could provide insecure abilities while allowing safe code to be used (and thus
+not fully deny importation).
+
+
+Why
+--------------
+
+Consider a module that provides a string processing ability.  If that module
+provides a single convenience function that reads its input string from a file
+(with a specified path), the whole module should not be blocked from being
+used, just that convenience function.  By whitelisting the module but having a
+security check on the one problem function, the user can still gain access to
+the safe functions.  Even better, the unsafe function can be allowed if the
+security checks pass.
+
+
+Possible Security Flaws
+-----------------------
+
+If a C extension module developer incorrectly implements the security checks
+for the unsafe functions it could lead to undesired abilities.
+
+
+API
+--------------
+
+Use PyXXX_Trusted() to protect unsafe code from being executed.
+
+
+Hostile Bytecode
+=============================
+
+Protection
+--------------
+
+The code object's constructor is not callable from Python.  Importation of .pyc
+and .pyo files is also prohibited.
+
+
+Why
+--------------
+
+Without implementing a bytecode verification tool, there is no way of making
+sure that bytecode does not jump outside its bounds, thus possibly executing
+malicious code.  It also presents the possibility of crashing the interpreter.
+
+
+Possible Security Flaws
+-----------------------
+
+None known.
+
+
+API
+--------------
+
+None.
+
+
+Changing the Behaviour of the Interpreter
+=========================================
+
+Protection
+--------------
+
+Only a subset of the 'sys' module will be made available to untrusted
+interpreters.  Things to allow from the sys module:
+
+* byteorder
+* subversion
+* copyright
+* displayhook
+* excepthook
+* __displayhook__
+* __excepthook__
+* exc_info
+* exc_clear
+* exit
+* getdefaultencoding
+* _getframe
+* hexversion
+* last_type
+* last_value
+* last_traceback
+* maxint
+* maxunicode
+* modules
+* stdin  # See `Stdin, Stdout, and Stderr`_.
+* stdout
+* stderr
+* __stdin__  # See `Stdin, Stdout, and Stderr`_  XXX Perhaps not needed?
+* __stdout__
+* __stderr__
+* version
+* api_version
+
+
+Why
+--------------
+
+Filesystem information must be removed.  Any settings that could
+possibly lead to a DoS attack (e.g., sys.setrecursionlimit()) or risk crashing
+the interpreter must also be removed.
+
+
+Possible Security Flaws
+-----------------------
+
+Exposing something that could lead to future security problems (e.g., a way to
+crash the interpreter).
+
+
+API
+--------------
+
+None.
+
+
+Socket Usage
+=============================
+
+Protection
+--------------
+
+Allow sending and receiving data to/from specific IP addresses on specific
+ports.
+
+
+Why
+--------------
+
+Allowing arbitrary sending of data over sockets can lead to DoS attacks on the
+network and other machines.  Limiting accepting data prevents your machine from
+being attacked by accepting malicious network connections.  It also allows you
+to know exactly where communication is going to and coming from.
+
+
+Possible Security Flaws
+-----------------------
+
+If someone managed to influence the used DNS server to influence what IP
+addresses were used after a DNS lookup.
+
+
+API
+--------------
+
+* int PyXXX_AllowIPAddress(interpreter, IP, port)
+    Allow the untrusted interpreter to send/receive to the specified IP
+    address on the specified port.  If the interpreter is not untrusted,
+    return NULL.
+
+* PyXXX_CheckIPAddress(IP, port, error_return)
+    Macro to verify that the specified IP address on the specified port is
+    allowed to be communicated with.  If not, cause the caller to return with
+    'error_return' and XXX exception set.  If the interpreter is trusted then
+    do nothing.
+
+* PyXXX_AllowHost(interpreter, host, port)
+    Allow the untrusted interpreter to send/receive to the specified host on
+    the specified port.  If the interpreter is not untrusted, return NULL.
+    XXX resolve to IP at call time to prevent DNS man-in-the-middle attacks?
+
+* PyXXX_CheckHost(host, port, error_return)
+    Check that the specified host on the specified port is allowed to be
+    communicated with.  If not, set an XXX exception and cause the caller to
+    return 'error_return'.  If the interpreter is trusted then do nothing.
+
+
+Network Information
+=============================
+
+Protection
+--------------
+
+Limit what information can be gleaned about the network the system is running
+on.  This does not include restricting information on IP addresses and hosts
+that are have been explicitly allowed for the untrusted interpreter to
+communicate with.
+
+
+Why
+--------------
+
+With enough information from the network several things could occur.  One is
+that someone could possibly figure out where your machine is on the Internet.
+Another is that enough information about the network you are connected to could
+be used against it in an attack.
+
+
+Possible Security Flaws
+-----------------------
+
+As long as usage is restricted to only what is needed to work with allowed
+addresses, there are no security issues to speak of.
+
+
+API
+--------------
+
+* int PyXXX_AllowNetworkInfo(interpreter)
+    Allow the untrusted interpreter to get network information regardless of
+    whether the IP or host address is explicitly allowed.  If the interpreter
+    is not untrusted, return NULL.
+
+* PyXXX_CheckNetworkInfo(error_return)
+    Macro that will return 'error_return' for the caller and set XXX exception
+    if the untrusted interpreter does not allow checking for arbitrary network
+    information.  For a trusted interpreter this does nothing.
+
+
+Filesystem Information
+=============================
+
+Protection
+--------------
+
+Do not allow information about the filesystem layout from various parts of
+Python to be exposed.  This means blocking exposure at the Python level to:
+
+* __file__ attribute on modules
+* __path__ attribute on packages
+* co_filename attribute on code objects
+
+
+Why
+--------------
+
+Exposing information about the filesystem is not allowed.  You can figure out
+what operating system one is on which can lead to vulnerabilities specific to
+that operating system being exploited.
+
+
+Possible Security Flaws
+-----------------------
+
+Not finding every single place where a file path is exposed.
+
+
+API
+--------------
+
+* int PyXXX_AllowFilesystemInfo(interpreter)
+    Allow the untrusted interpreter to expose filesystem information.  If the
+    passed-in interpreter is not untrusted, return NULL.
+
+* PyXXX_CheckFilesystemInfo(error_return)
+    Macro that checks if exposing filesystem information is allowed.  If it is
+    not, cause the caller to return with the value of 'error_return' and raise
+    XXX.
+
+
+Threading
+=============================
+
+XXX  Needed?
+
+
+Stdin, Stdout, and Stderr
+=============================
+
+Protection
+--------------
+
+By default, sys.__stdin__, sys.__stdout__, and sys.__stderr__ will be set to
+instances of cStringIO.  Allowing use of the normal stdin, stdout, and stderr
+will be allowed.
+XXX Or perhaps __stdin__ and friends should just be blocked and all you get is
+sys.stdin and friends set to cStringIO.
+
+
+Why
+--------------
+
+Interference with stdin, stdout, or stderr should not be allowed unless
+desired.
+
+
+Possible Security Flaws
+-----------------------
+
+Unless cStringIO instances can be used maliciously, none to speak of.
+XXX Use StringIO instances instead for even better security?
+
+
+API
+--------------
+
+* int PyXXX_UseTrueStdin(interpreter)
+  int PyXXX_UseTrueStdout(interpreter)
+  int PyXXX_UseTrueStderr(interpreter)
+    Set the specific stream for the interpreter to the true version of the
+    stream and not to the default instance of cStringIO.  If the interpreter is
+    not untrusted, return NULL.
+
+
+Adding New Protections
+=============================
+
+Protection
+--------------
+
+Allow for extensibility in the security model by being able to add new types of
+checks.  This allows not only for Python to add new security protections in a
+backwards-compatible fashion, but to also have extension modules add their own
+as well.
+
+An extension module can introduce a group for its various values to check, with
+a type being a specific value within a group.  The "Python" group is
+specifically reserved for use by the Python core itself.
+
+
+Why
+--------------
+
+We are all human.  There is the possibility that a need for a new type of
+protection for the interpreter will present itself and thus need support.  By
+providing an extensible way to add new protections it helps to future-proof the
+system.
+
+It also allows extension modules to present their own set of security
+protections.  That way one extension module can use the protection scheme
+presented by another that it is dependent upon.
+
+
+Possible Security Flaws
+------------------------
+
+Poor definitions by extension module users of how their protections should be
+used would allow for possible exploitation.
+
+
+API
+--------------
+
+XXX Could also have PyXXXExtended prefix instead for the following functions
+
++ Bool
+    * int PyXXX_ExtendedSetTrue(interpreter, group, type)
+        Set a group-type to be true.  Expected use is for when a binary
+        possibility of something is needed and that the default is to not allow
+        use of the resource (e.g., network information).  Returns NULL if the
+        interpreter is not untrusted.
+
+    * PyXXX_ExtendedCheckTrue(group, type, error_return)
+        Macro that if the group-type is not set to true, cause the caller to
+        return with 'error_return' with XXX exception raised.  For trusted
+        interpreters the check does nothing.
+
++ Numeric Range
+    * int PyXXX_ExtendedValueCap(interpreter, group, type, cap)
+        Set a group-type to a capped value, with the initial value set to 0.
+        Expected use is when a resource has a capped amount of use (e.g.,
+        memory).  Returns NULL if the interpreter is not untrusted.
+
+    * PyXXX_ExtendedValueAlloc(increase, error_return)
+        Macro to raise the amount of a resource is used by 'increase'.  If the
+        increase pushes the resource allocation past the set cap, then return
+        'error_return' and set XXX as the exception.
+
+    * PyXXX_ExtendedValueFree(decrease, error_return)
+        Macro to lower the amount a resource is used by 'decrease'.  If the
+        decrease pushes the allotment to below 0 then have the caller return
+        'error_return' and set XXX as the exception.
+
+
++ Membership
+    * int PyXXX_ExtendedAddMembership(interpreter, group, type, string)
+        Add a string to be considered a member of a group-type (e.g., allowed
+        file paths).  If the interpreter is not an untrusted interpreter,
+        return NULL.
+
+    * PyXXX_ExtendedCheckMembership(group, type, string, error_return)
+        Macro that checks 'string' is a member of the values set for the
+        group-type.  If it is not, then have the caller return 'error_return'
+        and set an exception for XXX.  For trusted interpreters the call does
+        nothing.
+
++ Specific Value
+    * int PyXXX_ExtendedSetValue(interpreter, group, type, string)
+        Set a group-type to a specific string.  If the interpreter is not
+        untrusted, return NULL.
+
+    * PyXXX_ExtendedCheckValue(group, type, string, error_return)
+        Macro to check that the group-type is set to 'string'.  If it is not,
+        then have the caller return 'error_return' and set an exception for
+        XXX.  If the interpreter is trusted then nothing is done.
+
+
+References
+///////////////////////////////////////
+
+.. [#rexec] The 'rexec' module
+   (http://docs.python.org/lib/module-rexec.html)
+
+.. [#safe-tcl] The Safe-Tcl Security Model
+   (http://research.sun.com/technical-reports/1997/abstract-60.html)
+
+.. [#ctypes] 'ctypes' module
+   (http://docs.python.org/dev/lib/module-ctypes.html)
