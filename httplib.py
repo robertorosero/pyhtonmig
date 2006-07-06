@@ -70,7 +70,6 @@ import errno
 import mimetools
 import socket
 from urlparse import urlsplit
-
 import logging
 _log = logging.getLogger('py.httplib')
 
@@ -314,6 +313,7 @@ class HTTPMessage(mimetools.Message):
                 break
 
 class HTTPResponse:
+
     # strict: If true, raise BadStatusLine if the status line can't be
     # parsed as a valid HTTP/1.0 or 1.1 status line.  By default it is
     # false because it prevents clients from talking to HTTP/0.9
@@ -344,7 +344,7 @@ class HTTPResponse:
         # Initialize with Simple-Response defaults
         line = self.fp.readline()
         if self.debuglevel > 0:
-            print "reply:", repr(line)
+            _log.info("reply:", repr(line))
         if not line:
             # Presumably, the server closed the connection before
             # sending a valid response.
@@ -392,8 +392,11 @@ class HTTPResponse:
                 skip = self.fp.readline().strip()
                 if not skip:
                     break
-                if self.debuglevel > 0:
-                    print "header:", skip
+                if self.debuglevel > 0:			# TO DO:
+                    _log.info("header:", skip) 	# Log an error before raising an
+											   	# exception so users can see what
+												# what went wrong instead of just
+												# recovering the program
 
         self.status = status
         self.reason = reason.strip()
@@ -415,8 +418,11 @@ class HTTPResponse:
 
         self.msg = HTTPMessage(self.fp, 0)
         if self.debuglevel > 0:
-            for hdr in self.msg.headers:
-                _log.info( "header:", hdr,)
+            for hdr in self.msg.headers:	# TO DO:
+                _log.info("header:", skip) 	# Log an error before raising an
+										   	# exception so users can see what
+											# what went wrong instead of just
+											# recovering the program
 
         # don't let the msg keep an fp
         self.msg.fp = None
@@ -667,11 +673,11 @@ class HTTPConnection:
             try:
                 self.sock = socket.socket(af, socktype, proto)
                 if self.debuglevel > 0:
-                    print "connect: (%s, %s)" % (self.host, self.port)
+                    _log.info("connect: (%s, %s)" % (self.host, self.port)) # SoC
                 self.sock.connect(sa)
             except socket.error, msg:
                 if self.debuglevel > 0:
-                    print 'connect fail:', (self.host, self.port)
+                    _log('connect fail:', (self.host, self.port)) # SoC
                 if self.sock:
                     self.sock.close()
                 self.sock = None
@@ -704,7 +710,7 @@ class HTTPConnection:
         # NOTE: we DO propagate the error, though, because we cannot simply
         #       ignore the error... the caller will know if they can retry.
         if self.debuglevel > 0:
-            print "send:", repr(str)
+            _log("send:", repr(str)) # SoC
         try:
             self.sock.sendall(str)
         except socket.error, v:
@@ -798,11 +804,20 @@ class HTTPConnection:
                     nil, netloc, nil, nil, nil = urlsplit(url)
 
                 if netloc:
-                    self.putheader('Host', netloc.encode("idna"))
-                elif self.port == HTTP_PORT:
-                    self.putheader('Host', self.host.encode("idna"))
+                    try:
+                        netloc_enc = netloc.encode("ascii")
+                    except UnicodeEncodeError:
+                        netloc_enc = netloc.encode("idna")
+                    self.putheader('Host', netloc_enc)
                 else:
-                    self.putheader('Host', "%s:%s" % (self.host.encode("idna"), self.port))
+                    try:
+                        host_enc = self.host.encode("ascii")
+                    except UnicodeEncodeError:
+                        host_enc = self.host.encode("idna")
+                    if self.port == HTTP_PORT:
+                        self.putheader('Host', host_enc)
+                    else:
+                        self.putheader('Host', "%s:%s" % (host_enc, self.port))
 
             # note: we are assuming that clients will not attempt to set these
             #       headers since *this* library must deal with the
