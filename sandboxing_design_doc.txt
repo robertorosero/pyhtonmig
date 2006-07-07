@@ -34,6 +34,7 @@ XXX TO DO
 * decide on what type of objects (e.g., PyStringObject or const char *) are to
   be passed into PySandbox_*Extended*() functions
 * all built-ins properly protected?
+* exactly how to tell whether argument to open() is a path, IP, or host name.
 
 Goal
 =============================
@@ -423,10 +424,12 @@ exception to be propagated.  This helps eliminate any coding errors from
 incorrectly checking a return value on a rights-checking function call.  For
 the rare case where this functionality is disliked, just make the check in a
 utility function and check that function's return value (but this is strongly
-discouraged!).  Functions that check that an operation is allowed implicitly operate on the currently running interpreter as
+discouraged!).
+
+Functions that check that an operation is allowed implicitly operate on the currently running interpreter as
 returned by ``PyInterpreter_Get()`` and are to be used by any code (the
 interpreter, extension modules, etc.) that needs to check for permission to
-execute.
+execute.  They have the common prefix of ``PySandbox_Allowed*()``.
 
 
 API
@@ -503,8 +506,11 @@ XXX
 
 To open a file, one will have to use open().  This will make open() a factory
 function that controls reference access to the 'file' type in terms of creating
-new instances.  When an attempted file opening fails, SandboxError will be
-raised.
+new instances.  When an attempted file opening fails (either because the path
+does not exist or of security reasons), SandboxError will be
+raised.  The same exception must be raised to prevent filesystem information
+being gleaned from the type of exception returned (i.e., returning IOError if a
+path does not exist tells the user something about that file path).
 
 What open() may not specifically be an instance of 'file' but a proxy
 that provides the security measures needed.  While this might break code that
@@ -765,6 +771,15 @@ Protection
 Allow sending and receiving data to/from specific IP addresses on specific
 ports.
 
+open() is to be used as a factory function to open a network connection.  If
+the connection is not possible (either because of an invalid address or
+security reasons), SandboxError is raised.
+
+A socket object may not be returned by the call.  A proxy to handle security
+might be returned instead.
+
+XXX
+
 
 Why
 --------------
@@ -844,7 +859,7 @@ API
     whether the IP or host address is explicitly allowed.  If the interpreter
     is not sandboxed, return a false value.
 
-* PySandbox_CheckNetworkInfo(error_return)
+* PySandbox_AllowedNetworkInfo(error_return)
     Macro that will return 'error_return' for the caller and set a SandboxError exception
     if the sandboxed interpreter does not allow checking for arbitrary network
     information, otherwise do nothing.
@@ -979,7 +994,7 @@ API
         use of the resource (e.g., network information).  Returns a false value
         if used on an unprotected interpreter.
 
-    * PySandbox_ExtendedAllowedFlag(group, type, error_return)
+    * PySandbox_AllowedExtendedFlag(group, type, error_return)
         Macro that if the group-type is not set to true, cause the caller to
         return with 'error_return' with SandboxError exception raised.  For unprotected
         interpreters the check does nothing.
@@ -1004,12 +1019,12 @@ API
 
 
 + Membership
-    * int PySandbox_ExtendedSetMembership(PyThreadState *, group, type, string)
+    * int PySandbox_SetExtendedMembership(PyThreadState *, group, type, string)
         Add a string to be considered a member of a group-type (e.g., allowed
         file paths).  If the interpreter is not an sandboxed interpreter,
         return a false value.
 
-    * PySandbox_ExtendedCheckMembership(group, type, string, error_return)
+    * PySandbox_AllowedExtendedMembership(group, type, string, error_return)
         Macro that checks 'string' is a member of the values set for the
         group-type.  If it is not, then have the caller return 'error_return'
         and set an exception for SandboxError, otherwise does nothing.
