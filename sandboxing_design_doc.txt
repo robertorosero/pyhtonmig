@@ -19,7 +19,6 @@ document.
 XXX TO DO
 =============================
 
-* Use a callback for paths to create wrapper?
 * threading needs protection?
 * python-dev convince me that hiding 'file' possible?
     + based on that, handle code objects
@@ -29,8 +28,6 @@ XXX TO DO
 * what network inko functions are allowed by default?
 * does the object.__subclasses__() trick work across interpreters, or is it
   unique per interpreter?
-* in the "Threat Model", reference the section of the implementation that
-  addresses that concern
 * figure out default whitelist of extension modules
 * check default accessible objects for file path exposure
 * helper functions to get at StringIO instances for stdin, stdout, and friends?
