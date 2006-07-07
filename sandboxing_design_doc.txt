@@ -19,7 +19,7 @@ document.
 XXX TO DO
 =============================
 
-* Use a callback for paths?
+* Use a callback for paths to create wrapper?
 * threading needs protection?
 * python-dev convince me that hiding 'file' possible?
     + based on that, handle code objects
@@ -29,10 +29,8 @@ XXX TO DO
 * what network inko functions are allowed by default?
 * does the object.__subclasses__() trick work across interpreters, or is it
   unique per interpreter?
-* don't use abstract types in API spec
-* in the Threat Model, reference the section of the implementation that
-* addresses that concern
-* PySandbox_*Extended*()
+* in the "Threat Model", reference the section of the implementation that
+  addresses that concern
 * figure out default whitelist of extension modules
 * check default accessible objects for file path exposure
 * helper functions to get at StringIO instances for stdin, stdout, and friends?
@@ -357,6 +355,10 @@ of an interpreter means an interpreter that has not performed a single import
 of a module.  Also, all comments refer to a sandboxed interpreter unless
 otherwise explicitly stated.
 
+This list does not address specifics such as how 'file' will be protected or
+whether memory should be protected.  This list is meant to make clear at a more
+basic level what the security model is assuming is true.
+
 * The Python interpreter cannot be crashed by valid Python source code in a
   bare interpreter.
 * Python source code is always considered safe.
@@ -371,11 +373,7 @@ otherwise explicitly stated.
     + Sharing objects through C extension modules is possible.
 * When starting a sandboxed interpreter, it starts with a fresh built-in and
   global namespace that is not shared with the interpreter that started it.
-* I/O through stdin, stdout, and stderr is inherently not sent to the process'
-  own version of these file descriptors
-    + Should be aliased to safe replacements.
-    + Allowing use of the process' actual version should be possible.
-* Objects in the built-in namespace should be safe to use.
+ Objects in the built-in namespace should be safe to use.
     + Either hide the dangerous ones or cripple them so they can cause no harm.
 
 There are also some features that might be desirable, but are not being
