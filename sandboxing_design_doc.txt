@@ -9,7 +9,7 @@ sandboxing model for Python.  This document should provide one with
 enough information to understand the goals for sandboxing, what
 considerations were made for the design, and the actual design itself.  Design
 decisions should be clear and explain not only why they were chosen but
-possible drawbacks from taking that approach.
+possible drawbacks from taking a specific approach.
 
 If any of the above is found not to be true, please email me at
 brett@python.org and let me know what problems you are having with the
@@ -23,18 +23,25 @@ XXX TO DO
 * python-dev convince me that hiding 'file' possible?
     + based on that, handle code objects
     + also decide how to handle sockets
+    + perhaps go with crippling but try best effort on hiding reference and if
+      best effort holds up eventually shift over to capabilities system
 * resolve to IP at call time to prevent DNS man-in-the-middle attacks when
   allowing a specific host name?
-* what network inko functions are allowed by default?
+* what network info functions are allowed by default?
 * does the object.__subclasses__() trick work across interpreters, or is it
   unique per interpreter?
 * figure out default whitelist of extension modules
 * check default accessible objects for file path exposure
 * helper functions to get at StringIO instances for stdin, stdout, and friends?
 * decide on what type of objects (e.g., PyStringObject or const char *) are to
-  be passed into PySandbox_*Extended*() functions
+  be passed in
 * all built-ins properly protected?
-* exactly how to tell whether argument to open() is a path, IP, or host name.
+* exactly how to tell whether argument to open() is a path, IP, or host name
+  (third argument, 'n' prefix for networking, format of path, ...)
+* API at the Python level
+* for extension module protection, allow for wildcard allowance
+  (e.g., ``xml.*``)
+
 
 Goal
 =============================
@@ -61,15 +68,11 @@ deserves possible protection.  This includes things that have a physical
 representation (e.g., memory) to things that are more abstract and specific to
 the interpreter (e.g., sys.path).
 
-Throughout this document, the term "sandoxing" will be used.  It can also be
-substituted to mean "restricted execution" if one prefers.
-
 When referring to the state of an interpreter, it is either "unprotected" or
 "sandboxed".  A unprotected interpreter has no restrictions imposed upon any
-resource.  A sandboxed interpreter has at least one, possibly more, resources
+resource.  A sandboxed interpreter has at least one, possibly more, resource
 with restrictions placed upon it to prevent unsafe code  that is running
-within the interpreter to cause harm to the system (the interpreter
-itself is never considered unsafe).
+within the interpreter to cause harm to the system.
 
 
 .. contents::
@@ -79,8 +82,8 @@ Use Cases
 /////////////////////////////
 
 All use cases are based on how many sandboxed interpreters are
-running in a single process and whether an unprotected interpreter is also running
-or not.  They can be broken down into two categories: when the interpreter is
+running in a single process and whether an unprotected interpreter is also running.  The
+use cases can be broken down into two categories: when the interpreter is
 embedded and only using sandboxed interpreters, and when pure Python code is
 running in an unprotected interpreter and uses sandboxed interpreters.
 
@@ -100,7 +103,7 @@ Multiple Sandboxed Interpreters
 
 When multiple interpreters, all sandboxed at varying levels, need to be running
 within a single application.  This is the key use case that this proposed
-design is targetted for.
+design is targeted for.
 
 
 Stand-Alone Python
@@ -114,19 +117,17 @@ fulfill.
 Issues to Consider
 =============================
 
-Common to all use cases, resources that the interpreter requires at a level
-below user code to be used unhindered cannot be exposed to a sandboxed
+Common to all use cases, resources that the interpreter requires to function at a level
+below user code cannot be exposed to a sandboxed
 interpreter.  For instance, the interpreter might need to stat a file to see if
-it is possible to import.  If the abililty to stat a file is not allowed to a
+it is possible to import.  If the ability to stat a file is not allowed to a
 sandboxed interpreter, it should not be allowed to perform that action,
 regardless of whether the interpreter at a level below user code needs that
 ability.
 
 When multiple interpreters are involved (sandboxed or not), not allowing an interpreter
 to gain access to resources available in other interpreters without explicit
-permission must be enforced.  It would be a security violation, for instance,
-if a sandboxed interpreter manages to gain access to an unprotected instance of
-the 'file' object from an unprotected interpreter without being given that object.
+permission must be enforced.
 
 
 Resources to Protect
@@ -148,7 +149,7 @@ filesystem.  Disclosing information on the filesystem could allow one to infer
 what OS the interpreter is running on, for instance.
 
 
-Physical Resources
+Memory
 ===================
 
 Memory should be protected.  It is a limited resource on the system that can
@@ -176,8 +177,8 @@ is embedded in or the unprotected interpreter that started the sandbox interpret
 Executing hostile bytecode that might lead to undesirable effects is another
 possible issue.
 
-There is also the issue of taking it over.  If one is able to gain escalated
-privileges in any way without explicit permission is an issue.
+There is also the issue of taking it over.  One should not able to gain escalated
+privileges in any way without explicit permission.
 
 
 Types of Security
@@ -210,9 +211,9 @@ access to a temp file, you could have open() perform a check on the permissions
 of the current interpreter, and if it is allowed to, return a proxy object for
 the file that only allows reading from it.  The 'file' instance for the proxy
 would need to be properly hidden so that the reference was not reachable from
-outside so that 'file' access could stil be controlled.
+outside so that 'file' access could still be controlled.
 
-Python, as it stands now, unfortunately does not work well for a pure capabilities sytem.
+Python, as it stands now, unfortunately does not work well for a pure capabilities system.
 Capabilities require the prohibition of certain abilities, such as
 "direct access to another's private state" [#paradigm regained]_.  This
 obviously is not possible in Python since, at least at the Python level, there
@@ -224,7 +225,7 @@ struct for the instance of a type and not providing a function to access that
 attribute.
 
 Python's introspection abilities also do not help make implementing
-capabilities that much easier.  Consider accessing 'file' even when it is deleted from
+capabilities that much easier.  Consider how one could access 'file' even when it is deleted from
 __builtin__.  You can still get to the reference for 'file' through the sequence returned by
 ``object.__subclasses__()``.
 
@@ -240,8 +241,7 @@ pushes the security check to a lower level; from a reference level to the
 method level.
 
 By performing the security check every time a resource's method is called the
-worry of a specific resource's reference leaking out to insecure code is alleviated
-since the resource cannot be used without authorizing it upon every method call.  This does add extra overhead, though,
+worry of a specific resource's reference leaking out to insecure code is alleviated.  This does add extra overhead, though,
 by having to do so many security checks.  It also does not handle the situation
 where an unexpected exposure of a type occurs that has not been properly
 crippled.
@@ -295,7 +295,7 @@ go through the Python code base and find all types that should be crippled?
 The 'rexec' Module
 ///////////////////////////////////////
 
-The 'rexec' module [#rexec]_ was original attempt at providing a sandbox
+The 'rexec' module [#rexec]_ was the original attempt at providing a sandbox
 environment for Python code to run in.  It's design was based on Safe-Tcl which
 was essentially a capabilities system
 [#safe-tcl]_.  Safe-Tcl
@@ -308,12 +308,10 @@ An RExec object represented a sandboxed environment.  Imports were checked
 against a whitelist of modules.  You could also restrict the type of modules to
 import based on whether they were Python source, bytecode, or C extensions.
 Built-ins were allowed except for a blacklist of built-ins to not provide.
+One could restrict whether stdin,
+stdout, and stderr were provided or not on a per-RExec basis.
 Several other protections were provided; see documentation for the complete
 list.
-
-With an RExec object created, one could pass in strings of code to be executed
-and have the result returned.  One could restrict whether stdin,
-stdout, and stderr were provided or not on a per-RExec basis.
 
 The ultimate undoing of the 'rexec' module was how access to objects that in
 normal Python require no imports to reach was handled.  Importing modules
@@ -348,8 +346,8 @@ Threat Model
 
 Below is a list of what the security implementation assumes, along with what section of this document that addresses
 that part of the security model (if not already true in Python by default).
-The term "bare" when in terms
-of an interpreter means an interpreter that has not performed a single import
+The term "bare" when in regards to
+an interpreter means an interpreter that has not performed a single import
 of a module.  Also, all comments refer to a sandboxed interpreter unless
 otherwise explicitly stated.
 
@@ -357,6 +355,7 @@ This list does not address specifics such as how 'file' will be protected or
 whether memory should be protected.  This list is meant to make clear at a more
 basic level what the security model is assuming is true.
 
+* The Python interpreter itself is always trusted.
 * The Python interpreter cannot be crashed by valid Python source code in a
   bare interpreter.
 * Python source code is always considered safe.
@@ -374,15 +373,15 @@ basic level what the security model is assuming is true.
       technical need to share extension module instances between interpreters.
 * When starting a sandboxed interpreter, it starts with a fresh built-in and
   global namespace that is not shared with the interpreter that started it.
- Objects in the built-in namespace should be safe to use
- [`Reading/Writing Files`_, `Stdin, Stdout, and Stderr`_].
+* Objects in the default built-in namespace should be safe to use
+  [`Reading/Writing Files`_, `Stdin, Stdout, and Stderr`_].
     + Either hide the dangerous ones or cripple them so they can cause no harm.
 
 There are also some features that might be desirable, but are not being
 addressed by this security model.
 
-* Communication between an unprotected interpreter and a sandboxed interpreter
-  it created in any direction.
+* Communication in any direction between an unprotected interpreter and a sandboxed interpreter
+  it created.
 
 
 The Proposed Approach
@@ -396,7 +395,7 @@ is a proposal on how to secure Python for sandboxing.
 Implementation Details
 ===============================
 
-Support for sandboxed interpreters will be a compilation option.  This allows the
+Support for sandboxed interpreters will require a compilation flag.  This allows the
 more common case of people not caring about protections to not take a
 performance hit.  And even when Python is compiled for
 sandboxed interpreter restrictions, when the running interpreter *is*
@@ -414,13 +413,15 @@ sandboxed interpreter must be passed in.  This makes the protection very
 explicit and helps make sure you set protections for the exact interpreter you
 mean to.  All functions that set protections begin with the prefix
 ``PySandbox_Set*()``.  These functions are meant to only work with sandboxed interpreters
-that have not been used yet to execute any Python code.
+that have not been used yet to execute any Python code.  The calls must be made
+by the code creating and handling the sandboxed interpreter *before* the
+sandboxed interpreter is used to execute any Python code.
 
 The functions for checking for permissions are actually macros that take
 in at least an error return value for the function calling the macro.  This
-allows the macro to return for the caller if the check failed and cause the
+allows the macro to return on behalf of the caller if the check fails and cause the
 SandboxError
-exception to be propagated.  This helps eliminate any coding errors from
+exception to be propagated automatically.  This helps eliminate any coding errors from
 incorrectly checking a return value on a rights-checking function call.  For
 the rare case where this functionality is disliked, just make the check in a
 utility function and check that function's return value (but this is strongly
@@ -471,7 +472,8 @@ against the system's memory is prevented.
 Possible Security Flaws
 -----------------------
 
-If code makes direct calls to malloc/free instead of using the proper PyMem_*()
+If code makes direct calls to malloc/free instead of using the proper
+``PyMem_*()``
 macros then the security check will be circumvented.  But C code is *supposed*
 to use the proper macros or pymalloc and thus this issue is not with the
 security model but with code not following Python coding standards.
@@ -480,20 +482,20 @@ security model but with code not following Python coding standards.
 API
 --------------
 
-* int PySandbox_SetMemoryCap(PyThreadState *, Py_ssize_t)
+* int PySandbox_SetMemoryCap(PyThreadState *, integer)
     Set the memory cap for an sandboxed interpreter.  If the interpreter is not
     running an sandboxed interpreter, return a false value.
 
-* PySandbox_AllowedMemoryAlloc(Py_ssize_t, error_return)
+* PySandbox_AllowedMemoryAlloc(integer, error_return)
     Macro to increase the amount of memory that is reported that the running
     sandboxed interpreter is using.  If the increase puts the total count
     passed the set limit, raise an SandboxError exception and cause the calling function
-    to return with the value of error_return, otherwise do nothing.
+    to return with the value of 'error_return', otherwise do nothing.
 
-* PySandbox_AllowedMemoryFree(Py_ssize_t, error_return)
+* PySandbox_AllowedMemoryFree(integer, error_return)
     Macro to decrease the current running interpreter's allocated memory.  If this puts
     the memory used to below 0, raise a SandboxError exception and return
-    error_return, otherwise do nothing.
+    'error_return', otherwise do nothing.
 
 
 Reading/Writing Files
@@ -512,7 +514,7 @@ raised.  The same exception must be raised to prevent filesystem information
 being gleaned from the type of exception returned (i.e., returning IOError if a
 path does not exist tells the user something about that file path).
 
-What open() may not specifically be an instance of 'file' but a proxy
+What open() returns may not be an instance of 'file' but a proxy
 that provides the security measures needed.  While this might break code that
 uses type checking to make sure a 'file' object is used, taking a duck typing
 approach would be better.  This is not only more Pythonic but would also allow
@@ -542,11 +544,11 @@ XXX
 API
 --------------
 
-* int PySandbox_SetAllowedFile(PyThreadState *, const char *path, const char *mode)
+* int PySandbox_SetAllowedFile(PyThreadState *, string path, string mode)
     Add a file that is allowed to be opened in 'mode' by the 'file' object.  If
     the interpreter is not sandboxed then return a false value.
 
-* PySandbox_AllowedPath(path, mode, error_return)
+* PySandbox_AllowedPath(string path, string mode, error_return)
     Macro that causes the caller to return with 'error_return' and raise
     SandboxError as the
     exception if the specified path with 'mode' is not allowed, otherwise do
@@ -567,7 +569,8 @@ allowed based on the type of module (Python source, Python bytecode, or
 extension module).  Python bytecode files are never directly imported because
 of the possibility of hostile bytecode being present.  Python source is always
 considered safe based on the assumption that all resource harm is eventually done at
-the C level, thus Python code directly cannot cause harm.  Thus only C
+the C level, thus Python source code directly cannot cause harm without help of
+C extension modules.  Thus only C
 extension modules need to be checked against the whitelist.
 
 The requested extension module name is checked in order to make sure that it
@@ -624,17 +627,17 @@ of `Extension Module Crippling`_.
 API
 --------------
 
-* int PySandbox_SetModule(PyThreadState *, const char *module_name)
+* int PySandbox_SetModule(PyThreadState *, string module_name)
     Allow the sandboxed interpreter to import 'module_name'.  If the
     interpreter is not sandboxed, return a false value.  Absolute import paths must be
     specified.
 
-* int PySandbox_BlockModule(PyThreadState *, const char *module_name)
+* int PySandbox_BlockModule(PyThreadState *, string module_name)
     Remove the specified module from the whitelist.  Used to remove modules
     that are allowed by default.  Return a false value if called on an
     unprotected interpreter.
 
-* PySandbox_AllowedModule(const char *module_name, error_return)
+* PySandbox_AllowedModule(string module_name, error_return)
     Macro that causes the caller to return with 'error_return' and sets the
     exception SandboxError if the specified module cannot be imported,
     otherwise does nothing.
@@ -703,7 +706,7 @@ None known.
 API
 --------------
 
-None.
+N/A
 
 
 Changing the Behaviour of the Interpreter
@@ -715,9 +718,8 @@ Protection
 Only a subset of the 'sys' module will be made available to sandboxed
 interpreters.  Things to allow from the sys module:
 
-* byteorder
-* subversion
-* copyright
+* byteorder (?)
+* copyright 
 * displayhook
 * excepthook
 * __displayhook__
@@ -726,19 +728,18 @@ interpreters.  Things to allow from the sys module:
 * exc_clear
 * exit
 * getdefaultencoding
-* _getframe
+* _getframe (?)
 * hexversion
 * last_type
 * last_value
 * last_traceback
-* maxint
-* maxunicode
+* maxint (?)
+* maxunicode (?)
 * modules
 * stdin  # See `Stdin, Stdout, and Stderr`_.
 * stdout
 * stderr
 * version
-* api_version
 
 
 Why
@@ -800,23 +801,23 @@ addresses were used after a DNS lookup.
 API
 --------------
 
-* int PySandboxed_SetIPAddress(PyThreadState *, const char *IP, int port)
-    Allow the sandboxed interpreter to send/receive to the specified IP
-    address on the specified port.  If the interpreter is not sandboxed,
+* int PySandbox_SetIPAddress(PyThreadState *, string IP, integer port)
+    Allow the sandboxed interpreter to send/receive to the specified 'IP'
+    address on the specified 'port'.  If the interpreter is not sandboxed,
     return a false value.
 
-* PySandbox_AllowedIPAddress(const char *IP, int port, error_return)
-    Macro to verify that the specified IP address on the specified port is
+* PySandbox_AllowedIPAddress(string IP, integer port, error_return)
+    Macro to verify that the specified 'IP' address on the specified 'port' is
     allowed to be communicated with.  If not, cause the caller to return with
     'error_return' and SandboxError exception set, otherwise do nothing.
 
-* int PySandbox_SetHost(PyThreadState *, const  char *host, int port)
-    Allow the sandboxed interpreter to send/receive to the specified host on
-    the specified port.  If the interpreter is not sandboxed, return a false
+* int PySandbox_SetHost(PyThreadState *, string host, integer port)
+    Allow the sandboxed interpreter to send/receive to the specified 'host' on
+    the specified 'port'.  If the interpreter is not sandboxed, return a false
     value.
 
-* PySandbox_AllowedHost(const char *host, int port, error_return)
-    Check that the specified host on the specified port is allowed to be
+* PySandbox_AllowedHost(string host, integer port, error_return)
+    Check that the specified 'host' on the specified 'port' is allowed to be
     communicated with.  If not, set a SandboxError exception and cause the caller to
     return 'error_return', otherwise do nothing.
 
@@ -854,7 +855,7 @@ addresses, there are no security issues to speak of.
 API
 --------------
 
-* int PySandbox_SetNetworkInfo(interpreter)
+* int PySandbox_SetNetworkInfo(PyThreadState *)
     Allow the sandboxed interpreter to get network information regardless of
     whether the IP or host address is explicitly allowed.  If the interpreter
     is not sandboxed, return a false value.
@@ -914,7 +915,7 @@ Protection
 --------------
 
 By default, sys.__stdin__, sys.__stdout__, and sys.__stderr__ will be set to
-instances of cStringIO.  Explicit allowance of the process' stdin, stdout, and
+instances of StringIO.  Explicit allowance of the process' stdin, stdout, and
 stderr is possible.
 
 This will protect the 'print' statement, and the built-ins input() and
@@ -941,15 +942,15 @@ API
   int PySandbox_SetTrueStdout(PyThreadState *)
   int PySandbox_SetTrueStderr(PyThreadState *)
     Set the specific stream for the interpreter to the true version of the
-    stream and not to the default instance of cStringIO.  If the interpreter is
+    stream and not to the default instance of StringIO.  If the interpreter is
     not sandboxed, return a false value.
 
 
 Adding New Protections
 =============================
 
-This feature has the lowest priority and thus will be the last feature
-implemented (if ever).
+.. note:: This feature has the lowest priority and thus will be the last feature
+          implemented (if ever).
 
 Protection
 --------------
@@ -988,30 +989,31 @@ API
 --------------
 
 + Bool
-    * int PySandbox_SetExtendedFlag(PyThreadState *, group, type)
+    * int PySandbox_SetExtendedFlag(PyThreadState *, string group, string type)
         Set a group-type to be true.  Expected use is for when a binary
         possibility of something is needed and that the default is to not allow
         use of the resource (e.g., network information).  Returns a false value
         if used on an unprotected interpreter.
 
-    * PySandbox_AllowedExtendedFlag(group, type, error_return)
+    * PySandbox_AllowedExtendedFlag(string group, string type, error_return)
         Macro that if the group-type is not set to true, cause the caller to
         return with 'error_return' with SandboxError exception raised.  For unprotected
         interpreters the check does nothing.
 
 + Numeric Range
-    * int PySandbox_SetExtendedCap(PyThreadState *, group, type, cap)
-        Set a group-type to a capped value, with the initial value set to 0.
+    * int PySandbox_SetExtendedCap(PyThreadState *, string group, string type,
+                                    integer cap)
+        Set a group-type to a capped value, 'cap', with the initial allocated value set to 0.
         Expected use is when a resource has a capped amount of use (e.g.,
         memory).  Returns a false value if the interpreter is not sandboxed.
 
-    * PySandbox_AllowedExtendedAlloc(increase, error_return)
+    * PySandbox_AllowedExtendedAlloc(integer increase, error_return)
         Macro to raise the amount of a resource is used by 'increase'.  If the
         increase pushes the resource allocation past the set cap, then return
         'error_return' and set SandboxError as the exception, otherwise do
         nothing.
 
-    * PySandbox_AllowedExtendedFree(decrease, error_return)
+    * PySandbox_AllowedExtendedFree(integer decrease, error_return)
         Macro to lower the amount a resource is used by 'decrease'.  If the
         decrease pushes the allotment to below 0 then have the caller return
         'error_return' and set SandboxError as the exception, otherwise do
@@ -1019,25 +1021,44 @@ API
 
 
 + Membership
-    * int PySandbox_SetExtendedMembership(PyThreadState *, group, type, string)
-        Add a string to be considered a member of a group-type (e.g., allowed
+    * int PySandbox_SetExtendedMembership(PyThreadState *, string group,
+                                            string type, string member)
+        Add a string, 'member',  to be considered a member of a group-type (e.g., allowed
         file paths).  If the interpreter is not an sandboxed interpreter,
         return a false value.
 
-    * PySandbox_AllowedExtendedMembership(group, type, string, error_return)
-        Macro that checks 'string' is a member of the values set for the
+    * PySandbox_AllowedExtendedMembership(string group, string type,
+                                            string member, error_return)
+        Macro that checks 'member' is a member of the values set for the
         group-type.  If it is not, then have the caller return 'error_return'
         and set an exception for SandboxError, otherwise does nothing.
 
 + Specific Value
-    * int PySandbox_SetExtendedValue(PyThreadState *, group, type, string)
-        Set a group-type to a specific string.  If the interpreter is not
+    * int PySandbox_SetExtendedValue(PyThreadState *, string group,
+                                        string type, string value)
+        Set a group-type to 'value'.  If the interpreter is not
         sandboxed, return NULL.
 
-    * PySandbox_AllowedExtendedValue(group, type, string, error_return)
-        Macro to check that the group-type is set to 'string'.  If it is not,
+    * PySandbox_AllowedExtendedValue(string group, string type, string value, error_return)
+        Macro to check that the group-type is set to 'value'.  If it is not,
         then have the caller return 'error_return' and set an exception for
         SandboxError, otherwise do nothing.
+
+
+Python API
+=============================
+
+__sandboxed__
+--------------
+
+A built-in that flags whether the interpreter currently running is sandboxed or
+not.  Set to a 'bool' value that is read-only.  To mimic working of __debug__.
+
+
+sandbox module
+--------------
+
+XXX
 
 
 References
