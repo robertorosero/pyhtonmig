@@ -33,7 +33,7 @@ XXX TO DO
 * helper functions to get at StringIO instances for stdin, stdout, and friends?
 * decide on what type of objects (e.g., PyStringObject or const char *) are to
   be passed into PySandbox_*Extended*() functions
-
+* all built-ins properly protected?
 
 Goal
 =============================
@@ -345,8 +345,7 @@ not require a constant checking of permissions.
 Threat Model
 ///////////////////////////////////////
 
-Below is a list of what the security implementation
-should allow/prevent or assumes, along with what section of this document that addresses
+Below is a list of what the security implementation assumes, along with what section of this document that addresses
 that part of the security model (if not already true in Python by default).
 The term "bare" when in terms
 of an interpreter means an interpreter that has not performed a single import
@@ -375,7 +374,7 @@ basic level what the security model is assuming is true.
 * When starting a sandboxed interpreter, it starts with a fresh built-in and
   global namespace that is not shared with the interpreter that started it.
  Objects in the built-in namespace should be safe to use
- [``Reading/Writing Files`_].
+ [`Reading/Writing Files`_, `Stdin, Stdout, and Stderr`_].
     + Either hide the dangerous ones or cripple them so they can cause no harm.
 
 There are also some features that might be desirable, but are not being
@@ -903,12 +902,15 @@ By default, sys.__stdin__, sys.__stdout__, and sys.__stderr__ will be set to
 instances of cStringIO.  Explicit allowance of the process' stdin, stdout, and
 stderr is possible.
 
+This will protect the 'print' statement, and the built-ins input() and
+raw_input().
+
 
 Why
 --------------
 
 Interference with stdin, stdout, or stderr should not be allowed unless
-desired.
+desired.  No one wants uncontrolled output sent to their screen.
 
 
 Possible Security Flaws
