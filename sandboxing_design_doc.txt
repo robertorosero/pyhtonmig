@@ -350,7 +350,8 @@ Threat Model
 
 Below is a list of what the security implementation
 should allow/prevent or assumes, along with what section of this document that addresses
-that part of the security model (if applicable).  The term "bare" when in terms
+that part of the security model (if not already true in Python by default).
+The term "bare" when in terms
 of an interpreter means an interpreter that has not performed a single import
 of a module.  Also, all comments refer to a sandboxed interpreter unless
 otherwise explicitly stated.
@@ -362,18 +363,22 @@ basic level what the security model is assuming is true.
 * The Python interpreter cannot be crashed by valid Python source code in a
   bare interpreter.
 * Python source code is always considered safe.
-* Python bytecode is always considered dangerous.
-* C extension modules are inherently considered dangerous.
+* Python bytecode is always considered dangerous [`Hostile Bytecode`_].
+* C extension modules are inherently considered dangerous
+  [`Extension Module Importation`_].
     + Explicit trust of a C extension module is possible.
 * Sandboxed interpreters running in the same process inherently cannot communicate with
   each other.
-    + Communication through C extension modules is possible.
+    + Communication through C extension modules is possible because of the
+      technical need to share extension module instances between interpreters.
 * Sandboxed interpreters running in the same process inherently cannot share
   objects.
-    + Sharing objects through C extension modules is possible.
+    + Sharing objects through C extension modules is possible because of the
+      technical need to share extension module instances between interpreters.
 * When starting a sandboxed interpreter, it starts with a fresh built-in and
   global namespace that is not shared with the interpreter that started it.
- Objects in the built-in namespace should be safe to use.
+ Objects in the built-in namespace should be safe to use
+ [``Reading/Writing Files`_].
     + Either hide the dangerous ones or cripple them so they can cause no harm.
 
 There are also some features that might be desirable, but are not being
@@ -499,6 +504,24 @@ Protection
 --------------
 
 XXX
+
+To open a file, one will have to use open().  This will make open() a factory
+function that controls reference access to the 'file' type in terms of creating
+new instances.  When an attempted file opening fails, SandboxError will be
+raised.
+
+What open() may not specifically be an instance of 'file' but a proxy
+that provides the security measures needed.  While this might break code that
+uses type checking to make sure a 'file' object is used, taking a duck typing
+approach would be better.  This is not only more Pythonic but would also allow
+the code to use a StringIO instance.
+
+It has been suggested to allow for a passed-in callback to be called when a
+specific path is to be opened.  While this provides good flexibility in terms
+of allowing custom proxies with more fine-grained security (e.g., capping the
+amount of disk write), this has been deemed unneeded in the initial security
+model and thus is not being considered at this time.
+
 
 Why
 --------------
@@ -910,6 +933,9 @@ API
 
 Adding New Protections
 =============================
+
+This feature has the lowest priority and thus will be the last feature
+implemented (if ever).
 
 Protection
 --------------
