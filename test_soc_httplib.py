@@ -7,6 +7,7 @@ Test harness for the standard library logging module.
 
 import logging
 import httplib
+import socket
 from cStringIO import StringIO
 
 log=logging.getLogger("py.httplib")
@@ -22,6 +23,9 @@ handler.setFormatter(formatter)
 
 # add the handler to the logger
 log.addHandler(handler)
+
+# create socket
+sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
 httplib.HTTPResponse(sock).log("message 1")
 httplib.HTTPConnection().log("message 2")
