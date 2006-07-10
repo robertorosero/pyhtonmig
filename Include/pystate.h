@@ -32,6 +32,9 @@ typedef struct _is {
 #ifdef WITH_TSC
     int tscdump;
 #endif
+#ifdef PySandbox_SUPPORTED
+    PySandboxState *sandbox_state;
+#endif
 
 } PyInterpreterState;
 
