@@ -9,9 +9,16 @@ extern "C" {
 struct _sandbox_state;  /* Forward */
 
 typedef struct _sandbox_state {
+    PY_LONG_LONG mem_cap;
 
 } PySandboxState;
 
-#endif /* Py_SANDBOX_H */
+/* Return true if sandboxing is turn on for the current interpreter. */
+#define _PySandbox_Protected() (PyThreadState_GET()->interp->sandbox_state != NULL)
 
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* Py_SANDBOX_H */
 #endif /* PySandbox_SUPPORTED */
