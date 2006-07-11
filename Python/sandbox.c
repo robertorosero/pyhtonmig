@@ -31,18 +31,19 @@ _PySandbox_AllowedMemoryAlloc(Py_ssize_t allocate)
     PySandboxState *sandbox_state = _PySandbox_GET();
 
     if (_PySandbox_Check() && _PySandbox_IsMemCapped()) {
+	size_t orig_mem_usage = sandbox_state->mem_usage;
+
 	sandbox_state->mem_usage += allocate;
-	if (sandbox_state->mem_cap < sandbox_state->mem_usage) {
+	/* Watch out for integer overflow. */
+	if ((sandbox_state->mem_cap < sandbox_state->mem_usage) ||
+		(orig_mem_usage > sandbox_state->mem_usage)) {
 	    sandbox_state -= allocate;
 	    PyErr_SetString(PyExc_SandboxError, "memory allocation exceeded");
 	    return 0;
 	}
-	else
-	    return 1;
-	
     }
-    else
-	return 1;
+
+    return 1;
 }
 
 /*

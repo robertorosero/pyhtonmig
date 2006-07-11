@@ -10,8 +10,8 @@ struct _sandbox_state;  /* Forward */
 
 typedef struct _sandbox_state {
     /* The memory cap and current usage. */
-    Py_ssize_t mem_cap;
-    Py_ssize_t mem_usage;
+    size_t mem_cap;
+    size_t mem_usage;
 
 } PySandboxState;
 
