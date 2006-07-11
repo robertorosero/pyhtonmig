@@ -27,6 +27,7 @@ BaseException
       |    +-- ReferenceError
       |    +-- RuntimeError
       |    |    +-- NotImplementedError
+      |    +-- SandboxError
       |    +-- SyntaxError
       |    |    +-- IndentationError
       |    |         +-- TabError
