@@ -31,15 +31,15 @@ typedef struct _sandbox_state {
    Memory
 */
 
-PyAPI_FUNC(int) PySandbox_SetMemoryCap(PyThreadState *, Py_ssize_t);
+PyAPI_FUNC(int) PySandbox_SetMemoryCap(PyThreadState *, size_t);
 
-PyAPI_FUNC(int) _PySandbox_AllowedMemoryAlloc(Py_ssize_t);
+PyAPI_FUNC(int) _PySandbox_AllowedMemoryAlloc(size_t);
 /* Return for caller if memory allocation would exceed memory cap. */
 #define PySandbox_AllowedMemoryAlloc(alloc, err_return) \
     if (!_PySandbox_AllowedMemoryAlloc(alloc)) return err_return
 
 /* Lower memory usage. */
-PyAPI_FUNC(void) PySandbox_AllowedMemoryFree(Py_ssize_t);
+PyAPI_FUNC(void) PySandbox_AllowedMemoryFree(size_t);
 
 #ifdef __cplusplus
 }

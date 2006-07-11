@@ -10,7 +10,7 @@ extern "C" {
    Set the memory cap for a sandboxed interpreter.
 */
 int
-PySandbox_SetMemoryCap(PyThreadState *s_tstate, Py_ssize_t mem_cap)
+PySandbox_SetMemoryCap(PyThreadState *s_tstate, size_t mem_cap)
 {
     PySandboxState *sandbox_state = s_tstate->interp->sandbox_state;
 
@@ -26,7 +26,7 @@ PySandbox_SetMemoryCap(PyThreadState *s_tstate, Py_ssize_t mem_cap)
    Verify that memory allocation is allowed.
 */
 int
-_PySandbox_AllowedMemoryAlloc(Py_ssize_t allocate)
+_PySandbox_AllowedMemoryAlloc(size_t allocate)
 {
     PySandboxState *sandbox_state = NULL;
 
@@ -56,7 +56,7 @@ if (!(Py_IsInitialized() && PyEval_ThreadsInitialized()))
    Verify that freeing memory does not go past what was already used.
 */
 void
-PySandbox_AllowedMemoryFree(Py_ssize_t deallocate)
+PySandbox_AllowedMemoryFree(size_t deallocate)
 {
     PySandboxState *sandbox_state = NULL;
 
