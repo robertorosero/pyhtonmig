@@ -19,6 +19,9 @@ document.
 XXX TO DO
 =============================
 
+Design
+--------------
+
 * threading needs protection?
 * python-dev convince me that hiding 'file' possible?
     + based on that, handle code objects
@@ -41,6 +44,12 @@ XXX TO DO
 * API at the Python level
 * for extension module protection, allow for wildcard allowance
   (e.g., ``xml.*``)
+
+
+Implementation
+--------------
+
+* note in SpecialBuilds.txt
 
 
 Goal
@@ -518,11 +527,9 @@ API
     and cause the calling function to return with the value of
     'error_return', otherwise do nothing.
 
-* PySandbox_AllowedMemoryFree(integer, error_return)
-    Macro to decrease the current running interpreter's allocated
-    memory.  If this puts the memory used to below 0, raise a
-    SandboxError exception and return 'error_return', otherwise do
-    nothing.
+* void PySandbox_AllowedMemoryFree(integer, error_return)
+    Decrease the current running interpreter's allocated
+    memory.  If this puts the memory used to below 0, re-set it to 0.
 
 
 Reading/Writing Files
