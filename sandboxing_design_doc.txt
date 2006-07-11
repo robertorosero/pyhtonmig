@@ -527,7 +527,7 @@ API
     and cause the calling function to return with the value of
     'error_return', otherwise do nothing.
 
-* void PySandbox_AllowedMemoryFree(integer, error_return)
+* void PySandbox_AllowedMemoryFree(integer)
     Decrease the current running interpreter's allocated
     memory.  If this puts the memory used to below 0, re-set it to 0.
 
