@@ -28,7 +28,13 @@ PySandbox_SetMemoryCap(PyThreadState *s_tstate, Py_ssize_t mem_cap)
 int
 _PySandbox_AllowedMemoryAlloc(Py_ssize_t allocate)
 {
-    PySandboxState *sandbox_state = _PySandbox_GET();
+    PySandboxState *sandbox_state = NULL;
+
+    /* If can't track yet, just assume it worked. */
+if (!(Py_IsInitialized() && PyEval_ThreadsInitialized()))
+	return 1;
+    
+    sandbox_state = _PySandbox_GET();
 
     if (_PySandbox_Check() && _PySandbox_IsMemCapped()) {
 	size_t orig_mem_usage = sandbox_state->mem_usage;
@@ -52,8 +58,13 @@ _PySandbox_AllowedMemoryAlloc(Py_ssize_t allocate)
 void
 PySandbox_AllowedMemoryFree(Py_ssize_t deallocate)
 {
-    PySandboxState *sandbox_state = _PySandbox_GET();
+    PySandboxState *sandbox_state = NULL;
 
+    /* If interpreter not up yet, then don't worry about memory. */
+    if (!(Py_IsInitialized() && PyEval_ThreadsInitialized()))
+	return;
+
+    sandbox_state = _PySandbox_GET();
     if (_PySandbox_Check() && _PySandbox_IsMemCapped()) {
 	sandbox_state->mem_usage -= deallocate;
 	if (sandbox_state->mem_usage < 0)
