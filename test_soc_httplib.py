@@ -27,8 +27,9 @@ log.addHandler(handler)
 # create socket
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-httplib.HTTPResponse(sock).log("message 1")
-httplib.HTTPConnection().log("message 2")
+httplib.HTTPResponse(sock).log("message 1") # says there is no attribute for "log", wtf
+httplib.HTTPConnection(sock.connect).log("message 2")
+
 print stringLog.getvalue()  # For testing purposes
 
 if stringLog.getvalue() != "Error:  It worked":
