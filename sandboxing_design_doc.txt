@@ -54,25 +54,6 @@ Implementation
     + last merge on rev. 47248
 * remove bare malloc()/realloc()/free() uses
 * note in SpecialBuilds.txt
-* protect memory usage
-    - _PyObject_New
-    - _PyObject_NewVar
-    - _PyObject_Del
-    - PyObject_New
-    - PyObject_NewVar
-    - PyObject_Del
-    - PyMem_Malloc
-    - PyMem_Realloc
-    - PyMem_Free
-    - PyMem_New
-    - PyMem_Resize
-    - PyMem_Del
-    - PyMem_MALLOC
-    - PyMem_REALLOC
-    - PyMem_FREE
-    - PyMem_NEW
-    - PyMem_RESIZE
-    - PyMem_DEL
 
 
 Goal
@@ -400,6 +381,8 @@ make clear at a more basic level what the security model is assuming is
 true.
 
 * The Python interpreter itself is always trusted.
+    + Implemented by code that runs at the process level performing any
+      necessary security checks.
 * The Python interpreter cannot be crashed by valid Python source code
   in a bare interpreter.
 * Python source code is always considered safe.
