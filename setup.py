@@ -515,6 +515,10 @@ class PyBuildExt(build_ext):
         # CSV files
         exts.append( Extension('_csv', ['_csv.c']) )
 
+        # Sandboxing
+        if config_h_vars.get("PySandbox_SUPPORTED", False):
+            exts.append(Extension('sandbox', ['sandboxmodule.c']) )
+
         # socket(2)
         exts.append( Extension('_socket', ['socketmodule.c'],
                                depends = ['socketmodule.h']) )
