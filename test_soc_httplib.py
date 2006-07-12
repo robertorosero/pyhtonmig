@@ -17,9 +17,14 @@ stringLog = StringIO()
 handler = logging.StreamHandler(stringLog)
 log.setLevel(logging.INFO)
 
-# set a format for the output
-formatter = logging.Formatter('%(name)s:  %(levelname)s %(message)s')
-handler.setFormatter(formatter)
+# Set up module-level logger. Found on Google, don't know if this works yet
+# console = logging.StreamHandler()
+# console.setLevel(logging.DEBUG)
+# console.setFormatter(logging.Formatter('%(asctime)s : %(message)s',
+#                                       '%Y-%m-%d %H:%M:%S'))
+# loggerName = None
+# logging.getLogger(loggerName).addHandler(console)
+# del console
 
 # add the handler to the logger
 log.addHandler(handler)
@@ -27,8 +32,9 @@ log.addHandler(handler)
 # create socket
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-httplib.HTTPResponse(sock).log("message 1") # says there is no attribute for "log", wtf
-httplib.HTTPConnection(sock.connect).log("message 2")
+# httplib.HTTPResponse(sock).log("message 1") # says there is no attribute for "log"
+httplib._log.info("message 1")
+# httplib.HTTPConnection(sock.connect).log("message 2")
 
 print stringLog.getvalue()  # For testing purposes
 
