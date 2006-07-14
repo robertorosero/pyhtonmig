@@ -53,6 +53,7 @@ Implementation
 * merge from HEAD
     + last merge on rev. 47248
 * remove bare malloc()/realloc()/free() uses
+    + also watch out for PyObject_Malloc()/PyObject_MALLOC() calls
 * note in SpecialBuilds.txt
 
 
@@ -387,9 +388,11 @@ true.
   in a bare interpreter.
 * Python source code is always considered safe.
 * Python bytecode is always considered dangerous [`Hostile Bytecode`_].
-* C extension modules are inherently considered dangerous
+* C extension modules are inherently considered dangerous.
   [`Extension Module Importation`_].
     + Explicit trust of a C extension module is possible.
+* Built-in modules are considered dangerous.
+    + Explicit trust of a built-in module is possible.
 * Sandboxed interpreters running in the same process inherently cannot
   communicate with each other.
     + Communication through C extension modules is possible because of
@@ -520,22 +523,34 @@ Existing APIs to protect:
     protected directly
 - PyMem_New()
     implicitly protected by macro using PyMem_Malloc()
-- PyMem_Resize
+- PyMem_Resize()
     implicitly protected by macro using PyMem_Realloc()
-- PyMem_Del
+- PyMem_Del()
     implicitly protected by macro using PyMem_Free()
-- PyMem_MALLOC
+- PyMem_MALLOC()
     redefine macro to use PyMem_Malloc()
-- PyMem_REALLOC
+- PyMem_REALLOC()
     redefine macro to use PyMem_Realloc()
-- PyMem_FREE
+- PyMem_FREE()
     redefine macro to use PyMem_Free()
-- PyMem_NEW
+- PyMem_NEW()
     implicitly protected by macro using PyMem_MALLOC()
-- PyMem_RESIZE
+- PyMem_RESIZE()
     implicitly protected by macro using PyMem_REALLOC()
-- PyMem_DEL
+- PyMem_DEL()
     implicitly protected by macro using PyMem_FREE()
+- PyObject_Malloc()
+    XXX
+- PyObject_Realloc()
+    XXX
+- PyObject_Free()
+    XXX
+- PyObject_MALLOC()
+    XXX
+- PyObject_REALLOC()
+    XXX
+- PyObject_FREE()
+    XXX
 
 
 Why
