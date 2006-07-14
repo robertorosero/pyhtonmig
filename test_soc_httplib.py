@@ -17,14 +17,14 @@ stringLog = StringIO()
 handler = logging.StreamHandler(stringLog)
 log.setLevel(logging.INFO)
 
-# Set up module-level logger. Found on Google, don't know if this works yet
-# console = logging.StreamHandler()
-# console.setLevel(logging.DEBUG)
-# console.setFormatter(logging.Formatter('%(asctime)s : %(message)s',
-#                                       '%Y-%m-%d %H:%M:%S'))
-# loggerName = None
-# logging.getLogger(loggerName).addHandler(console)
-# del console
+# Set up module-level logger. Found on Google, don't know if this works for sure yet
+console = logging.StreamHandler()
+console.setLevel(logging.INFO)
+console.setFormatter(logging.Formatter('%(asctime)s : %(message)s',
+                                       '%Y-%m-%d %H:%M:%S'))
+loggerName = None
+logging.getLogger(loggerName).addHandler(console)
+del console
 
 # add the handler to the logger
 log.addHandler(handler)
