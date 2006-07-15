@@ -64,6 +64,48 @@ sandbox_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     return (PyObject *)self;
 }
 
+static PyObject *
+sandbox_run(PyObject *self, PyObject *arg)
+{
+    PySandboxObject *sandbox_self = (PySandboxObject *)self;
+    const char *str_arg = NULL;
+    PyThreadState* cur_tstate = NULL;
+    int result = 0;
+
+    if (!PyString_Check(arg)) {
+	PyErr_SetString(PyExc_TypeError, "argument must be a string");
+	return NULL;
+    }
+
+    str_arg = PyString_AsString(arg);
+    if (!str_arg)
+	return NULL;
+
+    cur_tstate = PyThreadState_Swap(sandbox_self->tstate);
+
+    result = PyRun_SimpleString(str_arg);
+    if (result < 0) {
+	PyErr_Clear();
+    }
+
+    PyThreadState_Swap(cur_tstate);
+
+    if (result < 0) {
+	PyErr_SetString(PyExc_SandboxError,
+			"exception during execution in sandbox");
+	return NULL;
+    }
+
+    Py_RETURN_NONE;
+}
+
+static PyMethodDef sandbox_methods[] = {
+    {"run", sandbox_run, METH_O,
+	"Run the passed-in string in the sandboxed interpreter"
+    },
+    {NULL}
+};
+
 
 PyDoc_STRVAR(sandbox_type_doc,
 "XXX\n\
@@ -100,7 +142,7 @@ PyTypeObject PySandbox_Type = {
 	0,                              	/* tp_weaklistoffset */
 	0,					/* tp_iter */
 	0,					/* tp_iternext */
-	0,      				/* tp_methods */
+	sandbox_methods,      			/* tp_methods */
 	0,	         			/* tp_members */
 	0,		          		/* tp_getset */
 	0,					/* tp_base */
