@@ -101,8 +101,54 @@ sandbox_run(PyObject *self, PyObject *arg)
 
 static PyMethodDef sandbox_methods[] = {
     {"run", sandbox_run, METH_O,
-	"Run the passed-in string in the sandboxed interpreter"
-    },
+	"Run the passed-in string in the sandboxed interpreter"},
+    {NULL}
+};
+
+
+static PyObject *
+sandbox_run_fxn(PyObject *self, PyObject *arg)
+{
+    PyThreadState *sandbox_tstate = NULL;
+    PyThreadState *cur_tstate = NULL;
+    int result = 0;
+    const char *arg_str = NULL;
+
+    if (!PyString_Check(arg)) {
+	PyErr_SetString(PyExc_TypeError, "argument must be a string");
+	return NULL;
+    }
+
+    arg_str = PyString_AsString(arg);
+    if (!arg_str)
+	return NULL;
+
+    cur_tstate = PyThreadState_GET();
+
+    sandbox_tstate = Py_NewInterpreter();
+    if (sandbox_tstate == NULL) {
+	PyErr_SetString(PyExc_SandboxError,
+			"could not instantiate a new sandboxed interpreter");
+	return NULL;
+    }
+
+    result = PyRun_SimpleString(arg_str);
+
+    Py_EndInterpreter(sandbox_tstate);
+    PyEval_RestoreThread(cur_tstate);
+
+    if (result < 0) {
+	PyErr_SetString(PyExc_SandboxError,
+		"exception raised in sandboxed interpreter");
+	return NULL;
+    }
+
+    Py_RETURN_NONE;
+}
+
+static PyMethodDef sandbox_fxns[] = {
+    {"run", sandbox_run_fxn, METH_O,
+	"Run the passed-in string in a new sandboxed interpreter"},
     {NULL}
 };
 
@@ -163,7 +209,7 @@ initsandbox(void)
 {
     PyObject *module;
 
-    module = Py_InitModule3("sandbox", NULL,
+    module = Py_InitModule3("sandbox", sandbox_fxns,
 	    "Provide a sandbox to safely execute Python code in.");
     if (module == NULL)
 	return;
