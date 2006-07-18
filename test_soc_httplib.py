@@ -32,9 +32,15 @@ log.addHandler(handler)
 # create socket
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-# httplib.HTTPResponse(sock).log("message 1") # says there is no attribute for "log"
-httplib._log.info("message 1")
-# httplib.HTTPConnection(sock.connect).log("message 2")
+httplib._log.info("message 1") # first stage of testing
+
+r = httplib.HTTPResponse(sock) # second stage of testing
+r.begin() # call the begin method
+
+"""self.msg == None
+self._read_status == "message 1" == CONTINUE
+skip != True
+self.debuglevel > 0"""
 
 print stringLog.getvalue()  # For testing purposes
 
