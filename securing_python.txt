@@ -29,6 +29,18 @@ supported types), ``object``, and the exceptions provided by the
 ``exceptions`` module are considered in the built-in namespace.  There
 have also been no imports executed in the interpreter.
 
+The "security domain" is the boundary at which security is cared
+about.  For this dicussion, it is the interpreter.  Anything that
+happens within a security domain is considered open and unprotected.
+But any action that tries to cross the boundary of the security domain
+is where the security model and protection comes in.
+
+The "powerbox" is the thing that possesses the ultimate power in the
+system.  In our case it is the Python process.  No interpreter can
+possess any ability that the overall process does not have.  This
+means that we care about interpreter<->interpreter interaction along
+with interpreter<->process interactions.
+
 
 Rationale
 ///////////////////////////////////////
@@ -116,7 +128,11 @@ security of accessing resources.  If you do not have a reference to a
 resource (or a reference to an object that can references a resource),
 you cannot access it, period.  You can provide conditional access by
 using a proxy between code and a resource, but that still requires a
-reference to the resource by the proxy.
+reference to the resource by the proxy.  This means that your security
+model can be viewed simply by using a whiteboard to draw out the
+interactions between your security domains where by any connection
+between domains is a possible security issue if you do not put in a
+proxy to mediate between the two domains.
 
 This leads to a much cleaner implementation of security.  By not
 having to change internal code in the interpreter to perform identity
@@ -160,7 +176,8 @@ to Python having a wonderful amount of introspection abilities.
 Unfortunately this makes the possibility of a private namespace
 non-existent.  This poses an issue for providing proxies for resources
 since there is no way in Python code to hide the reference to a
-resource.
+resource.  It also makes providing security at the object level using
+object-capabilities non-existent in pure Python code.
 
 Luckily, the Python virtual machine *does* provide a private namespace,
 albeit not for pure Python source code.  If you use the Python/C
@@ -194,8 +211,13 @@ Threat Model
 The threat that this security model is attempting to handle is the
 execution of arbitrary Python code in a sandboxed interpreter such
 that the code in that interpreter is not able to harm anything outside
-of itself.  This means that:
+of itself unless explicitly allowed to.  This means that:
 
+* An interpreter cannot gain abilties the Python process possesses
+  without explicitly being given those abilities.
+    + With the Python process being the powerbox, if an interpreter
+    could gain whatever abilities it wanted to then the security
+    domain would be completely breached.
 * An interpreter cannot influence another interpreter directly at the
   Python level without explicitly allowing it.
     + This includes preventing communicating with another interpreter.
@@ -210,10 +232,12 @@ of itself.  This means that:
   explicitly given those resources.
     + This includes importing modules since that requires the ability
       to use the resource of the filesystem.
+    + This is mediated by having to go through the process to gain the
+    abilities in the OS that the process possesses.
 
 In order to accomplish these goals, certain things must be made true.
 
-* The Python process is the "powerbox".
+* The Python process is the powerbox.
     + It controls the initial granting of abilties to interpreters.
 * A bare Python interpreter is always trusted.
     + Python source code that can be created in a bare interpreter is
@@ -255,7 +279,12 @@ have a per-interpreter setting that is checked (because access to the
 operating system's memory allocator is not supported at the program
 level), protecting files and imports should not such a per-interpreter
 protection at such a low level (because those can have extension
-module proxies to provide the security).
+module proxies to provide the security).  This means that security is
+based on possessing the authority to do something through a reference
+to an object that can perform the action.  And that object will most
+likely decide whether to carry out its action based on the arguments
+passed in (whether that is an opaque token, file path allowed to be
+opened, etc.).
 
 For common case security measures, the Python standard library
 (stdlib) should provide a simple way to provide those measures.  Most
@@ -336,7 +365,8 @@ be imported.  All .py files will be imported.
 
 XXX perhaps augment 'sys' so that you list the extension of files that
 can be used for importing?  Thought this was controlled somewhere
-already but can't find it.
+already but can't find it.  It is returned by ``imp.get_suffixes()``,
+but I can't find where to set it from Python code.
 
 It must be warned that importing any C extension module is dangerous.
 Not only are they able to circumvent security measures by executing C
@@ -348,6 +378,31 @@ mutate that object, return, and then if the creating interpreter
 accesses that mutated object it is essentially communicating and/or
 acting on behalf of the sandboxed interpreter.  This violates the
 perimeter defence.  No one should import extension modules blindly.
+
+Implementing Import in Python
++++++++++++++++++++++++++++++
+
+To help facilitate in the exposure of more of what importation
+requires (and thus make implementing a proxy easier), the import
+machinery should be rewritten in Python.  This will require some
+bootstrapping in order for the code to be loaded into the process
+without itself requiring importation, but that should be doable.  Plus
+some care must be taken to not lead to circular dependency on
+importing modules needed to handle importing (e.g. importing sys but
+having that import call the import call, etc.).
+
+Interaction with another interpreter that might provide an import
+function must also be dealt with.  One cannot expose the importation
+of a needed module for the import machinery as it might not be allowed
+by a proxy.  This can be handled by allowing the powerbox's import
+function to have modules directly injected into its global namespace.
+But there is also the issue of using the proper ``sys.modules`` for
+storing the modules already imported.  You do not want to inject the
+``sys`` module of the powerbox and have all imports end up in its
+``sys.modules`` but in the interpreter making the call.  This must be
+dealt with in some fashion (injecting per-call, having a factory
+function create a new import function based on an interpreter passed
+in, etc.).
 
 
 Sanitizing Built-In Types
@@ -458,10 +513,183 @@ creating interpreter or escalating privileges.  Those ways are:
 Making the ``sys`` Module Safe
 ------------------------------
 
-XXX
+The ``sys`` module is an odd mix of both information and settings for
+the interpreter.  Because of this dichotomy, some very useful, but
+innocuous information is stored in the module along with things that
+should not be exposed to sandboxed interpreters.
+
+This means that the ``sys`` module needs to have its safe information
+separated out from the unsafe settings.  This will allow an import
+proxy to let through safe information but block out the ability to set
+values.
+
+XXX separate modules, ``sys.settings`` and ``sys.info``, or strip
+``sys`` to settings and put info somewhere else?  Or provide a method
+that will create a faked sys module that has the safe values copied
+into it?
+
+The safe information values are:
+
+* builtin_module_names
+    Information about what might be blocked from importation.
+* byteorder
+    Needed for networking.
+* copyright 
+    Set to a string about the interpreter.
+* displayhook (?)
+* excepthook (?)
+* __displayhook__ (?)
+* __excepthook__ (?)
+* exc_info() (?)
+* exc_clear()
+* exit()
+* exitfunc
+* getcheckinterval()
+    Returns an int.
+* getdefaultencoding()
+    Returns a string about interpreter.
+* getrefcount()
+    Returns an int about the passed-in object.
+* getrecursionlimit()
+    Returns an int about the interpreter.
+* hexversion
+    Set to an int about the interpreter.
+* last_type
+* last_value
+* last_traceback (?)
+* maxint
+    Set to an int that exposes ambiguous information about the
+    computer.
+* maxunicode
+    Returns a string about the interpreter.
+* meta_path (?)
+* path_hooks (?)
+* path_importer_cache (?)
+* ps1
+* ps2
+* stdin
+* stdout
+* stderr
+* traceback (?)
+* version
+* api_version
+* version_info
+* warnoptions (?)
+
+The dangerous settings are:
+
+* argv
+* subversion
+* _current_frames()
+* dllhandle
+* exc_type
+    Deprecated since 1.5 .
+* exc_value
+    Deprecated since 1.5 .
+* exc_traceback
+    Deprecated since 1.5 .
+* exc_prefix
+    Exposes filesystem information.
+* executable
+    Exposes filesystem information.
+* _getframe()
+* getwindowsversion()
+    Exposes OS information.
+* modules
+* path
+* platform
+    Exposes OS information.
+* prefix
+    Exposes filesystem information.
+* setcheckinterval()
+* setdefaultencoding()
+* setdlopenflags()
+* setprofile()
+* setrecursionlimit()
+* settrace()
+* settcsdump()
+* __stdin__
+* __stdout__
+* __stderr__
+* winver
+    Exposes OS information.
+
+
+Protecting I/O
+++++++++++++++
+
+The ``print`` keyword and the built-ins ``raw_input()`` and
+``input()`` use the values stored in ``sys.stdout`` and ``sys.stdin``.
+By exposing these attributes to the creating interpreter, one can set
+them to safe objects, such as instances of ``StringIO``.
 
 
 Safe Networking
 ---------------
 
-XXX
+XXX proxy on socket module, modify open() to be the constructor, etc.
+
+
+Protecting Memory Usage
+-----------------------
+
+To protect memory, low-level hooks into the memory allocator for
+Python is needed.  By hooking into the C API for memory allocation and
+deallocation a very rough running count of used memory can kept.  This
+can be used to prevent sandboxed interpreters from using so much
+memory that it impacts the overall performance of the system.
+
+Because this has no direct connection with object-capabilities or has
+any form of exposure at the Python level, this feature can be safely
+implemented separately from the rest of the security model.
+
+Existing APIs to protect are:
+
+- _PyObject_New()
+    protected directly
+- _PyObject_NewVar()
+    protected directly
+- _PyObject_Del()
+    remove macro that uses PyObject_Free() and protect directly
+- PyObject_New()
+    implicitly by macro using _PyObject_New()
+- PyObject_NewVar()
+    implicitly by macro using _PyObject_NewVar()
+- PyObject_Del()
+    redefine macro to use _PyObject_Del() instead of PyObject_Free()
+- PyMem_Malloc()
+    protected directly
+- PyMem_Realloc()
+    protected directly
+- PyMem_Free()
+    protected directly
+- PyMem_New()
+    implicitly protected by macro using PyMem_Malloc()
+- PyMem_Resize()
+    implicitly protected by macro using PyMem_Realloc()
+- PyMem_Del()
+    implicitly protected by macro using PyMem_Free()
+- PyMem_MALLOC()
+    redefine macro to use PyMem_Malloc()
+- PyMem_REALLOC()
+    redefine macro to use PyMem_Realloc()
+- PyMem_FREE()
+    redefine macro to use PyMem_Free()
+- PyMem_NEW()
+    implicitly protected by macro using PyMem_MALLOC()
+- PyMem_RESIZE()
+    implicitly protected by macro using PyMem_REALLOC()
+- PyMem_DEL()
+    implicitly protected by macro using PyMem_FREE()
+- PyObject_Malloc()
+    XXX
+- PyObject_Realloc()
+    XXX
+- PyObject_Free()
+    XXX
+- PyObject_MALLOC()
+    XXX
+- PyObject_REALLOC()
+    XXX
+- PyObject_FREE()
+    XXX
