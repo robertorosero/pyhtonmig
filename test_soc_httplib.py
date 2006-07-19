@@ -30,17 +30,30 @@ del console
 log.addHandler(handler)
 
 # create socket
-sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+class FakeSocket:
+    def __init__(self, text, fileclass=StringIO.StringIO):
+        self.text = text
+        self.fileclass = fileclass
+
+    def makefile(self, mode, bufsize=None):
+        if mode != 'r' and mode != 'rb':
+            raise httplib.UnimplementedFileMode()
+        return self.fileclass(self.text)
+
+sock = FakeSocket("socket")
 
 httplib._log.info("message 1") # first stage of testing
 
 r = httplib.HTTPResponse(sock) # second stage of testing
 r.begin() # call the begin method
 
-"""self.msg == None
-self._read_status == "message 1" == CONTINUE
-skip != True
-self.debuglevel > 0"""
+# class test:
+#	def someTest:
+#		self.msg == None
+#		self._read_status == "message 1" == CONTINUE
+#		skip != True
+#		self.debuglevel > 0
+
 
 print stringLog.getvalue()  # For testing purposes
 
