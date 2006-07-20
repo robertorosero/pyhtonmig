@@ -86,15 +86,27 @@ What-I-Have Security
 ========================
 
 A contrast to who-I-am security, what-I-have security never requires
-knowing who is requesting a resource.  By never providing a function
-to access a resource or by creating a proxy that wraps the function to
-access a resource with argument checking, you can skip the need to
-know who is making a call.
+knowing who is requesting a resource.  If you know what resources are
+allowed or needed when you begin a security domain, you can just have
+the powerbox pass in those resources to begin with and not provide a
+function to retrieve them.  This alleviates the worry of providing a
+function that can wield more power than the security domain should
+ever have if security is breached on that function.
 
-Using our file example, the program trying to open a file is given a
-proxy that checks whether paths passed into the function match allowed
-based at the creation time of the proxy before using the full-featured
-open function to open the file.
+But if you don't know the exact resources needed ahead of time, you
+pass in a proxy to the resource that checks its arguments to make sure
+they are valid in terms of allowed usage of the protected resource.
+With this approach, you are only doing argument validation, where the
+validation happens to be related to security.  No identity check is
+needed at any point.
+
+Using our file example, the program trying to open a file is given the
+open file object directly at time of creation that it will need to
+work with.  A proxy to the full-powered open function can be used if
+you need more of a wildcard support for opening files.  But
+it works just as well, if not better, to pass in all needed file
+objects at the beginning when the allowed files to work with is known
+so as to not even risk exposing the file opening function.
 
 This illustrates a subtle, but key difference between who-I-am and
 what-I-have security.  For who-I-am, you must know who the caller is
@@ -105,7 +117,7 @@ what-I-have security, you only have to validate the arguments.
 Object-Capabilities
 ///////////////////////////////////////
 
-What-I-have security is more often called the object-capabilities
+What-I-have security is a super-set of the object-capabilities
 security model.  The belief here is in POLA (Principle Of Least
 Authority): you give a program exactly what it needs, and no more.  By
 providing a function that can open any file that relies on identity to
