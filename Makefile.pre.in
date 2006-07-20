@@ -262,7 +262,6 @@ PYTHON_OBJS=	\
 		Python/mysnprintf.o \
 		Python/pyarena.o \
 		Python/pyfpe.o \
-		Python/sandbox.o \
 		Python/pystate.o \
 		Python/pythonrun.o \
 		Python/structmember.o \
@@ -540,7 +539,6 @@ PYTHON_HEADERS= \
 		Include/pyfpe.h \
 		Include/pymem.h \
 		Include/pyport.h \
-		Include/sandbox.h \
 		Include/pystate.h \
 		Include/pythonrun.h \
 		Include/rangeobject.h \

@@ -80,6 +80,10 @@ PyInterpreterState_New(void)
 #ifdef WITH_TSC
 		interp->tscdump = 0;
 #endif
+#ifdef Py_MEMORY_CAP
+		interp->mem_cap = 0;
+		interp->mem_usage = 0;
+#endif
 
 		HEAD_LOCK();
 		interp->next = interp_head;
@@ -140,6 +144,75 @@ PyInterpreterState_Delete(PyInterpreterState *interp)
 	free(interp);
 }
 
+#ifdef Py_MEMORY_CAP
+/*
+   Get the interpreter state from a PyThreadState after checking to make sure
+   it is safe to do so based on initialization of the interpreter.
+*/
+PyInterpreterState *
+PyInterpreterState_SafeGet(void)
+{
+    PyThreadState *tstate = NULL;
+
+    if (!Py_IsInitialized() || !PyEval_ThreadsInitialized())
+	return NULL;
+
+    tstate = PyThreadState_GET();
+    if (!tstate)
+	return NULL;
+
+    return tstate->interp;
+}
+
+/*
+   Raise the current allocation of memory on the interpreter by 'increase'.
+   If it the allocation pushes the total memory usage past the memory cap,
+   return a false value.
+*/
+int
+PyInterpreterState_RaiseMemoryUsage(PyInterpreterState *interp, size_t increase)
+{
+    size_t original_mem_usage = 0;
+
+    if (increase < 0)
+	Py_FatalError("can only increase memory usage by a positive value");
+
+    if (!interp->mem_cap)
+	return 1;
+
+    /* Watch out for integer overflow. */
+    original_mem_usage = interp->mem_usage;
+    interp->mem_usage += increase;
+    if (interp->mem_usage < original_mem_usage) {
+	interp->mem_usage = original_mem_usage;
+	PyErr_SetString(PyExc_MemoryError, "integer overflow in memory usage");
+	return 0;
+    }
+    
+    if (interp->mem_usage > interp->mem_cap) {
+	interp->mem_usage = original_mem_usage;
+	PyErr_SetString(PyExc_MemoryError, "exceeded memory usage");
+	return 0;
+    }
+
+    return 1;
+}
+
+/*
+   Lower the current memory allocation.
+   If lowered to below zero, push back up to zero.
+*/
+void
+PyInterpreterState_LowerMemoryUsage(PyInterpreterState *interp, size_t decrease)
+{
+    if (decrease < 0)
+	Py_FatalError("must specify memory usage reduction by a positive number");
+
+    interp->mem_usage -= decrease;
+    if (interp->mem_usage < 0)
+	interp->mem_usage = 0;
+}
+#endif /* Py_MEMORY_CAP */
 
 /* Default implementation for _PyThreadState_GetFrame */
 static struct _frame *

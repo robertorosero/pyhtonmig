@@ -512,13 +512,6 @@ Py_NewInterpreter(void)
 	if (interp == NULL)
 		return NULL;
 
-#ifdef PySandbox_SUPPORTED
-	/* Must set sandbox_state to NULL to flag that the interpreter is
-	   unprotected.  It if is to be protected, the field is set by
-	   PySandbox_NewInterpreter(). */
-	interp->sandbox_state = NULL;
-#endif
-
 	tstate = PyThreadState_New(interp);
 	if (tstate == NULL) {
 		PyInterpreterState_Delete(interp);

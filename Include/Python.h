@@ -114,7 +114,6 @@
 #include "pyerrors.h"
 
 #include "pystate.h"
-#include "sandbox.h"
 
 #include "pyarena.h"
 #include "modsupport.h"

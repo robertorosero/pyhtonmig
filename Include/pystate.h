@@ -32,8 +32,9 @@ typedef struct _is {
 #ifdef WITH_TSC
     int tscdump;
 #endif
-#ifdef PySandbox_SUPPORTED
-    PySandboxState *sandbox_state;
+#ifdef Py_MEMORY_CAP
+    size_t mem_cap;
+    size_t mem_usage;
 #endif
 
 } PyInterpreterState;
@@ -105,6 +106,13 @@ typedef struct _ts {
 PyAPI_FUNC(PyInterpreterState *) PyInterpreterState_New(void);
 PyAPI_FUNC(void) PyInterpreterState_Clear(PyInterpreterState *);
 PyAPI_FUNC(void) PyInterpreterState_Delete(PyInterpreterState *);
+
+#ifdef Py_MEMORY_CAP
+#define PyInterpreterState_SET_MEMORY_CAP(interp, cap) (interp->mem_cap = cap)
+PyAPI_FUNC(PyInterpreterState *) PyInterpreterState_SafeGet(void);
+PyAPI_FUNC(int) PyInterpreterState_RaiseMemoryUsage(PyInterpreterState *, size_t);
+PyAPI_FUNC(void) PyInterpreterState_LowerMemoryUsage(PyInterpreterState *, size_t);
+#endif /* Py_MEMORY_CAP */
 
 PyAPI_FUNC(PyThreadState *) PyThreadState_New(PyInterpreterState *);
 PyAPI_FUNC(void) PyThreadState_Clear(PyThreadState *);

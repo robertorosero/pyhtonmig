@@ -725,18 +725,18 @@ else AC_MSG_RESULT(no); Py_DEBUG='false'
 fi],
 [AC_MSG_RESULT(no)])
 
-# Check for --with-sandboxing
-AC_MSG_CHECKING(for --with-sandboxing)
-AC_ARG_WITH(sandboxing, 
-            AC_HELP_STRING(--with-sandboxing, build with PySandbox_SUPPORTED defined),
+# Check for --with-memory-cap
+AC_MSG_CHECKING(for --with-memory-cap)
+AC_ARG_WITH(memory-cap, 
+            AC_HELP_STRING(--with-memory-cap, build with Py_MEMORY_CAP defined),
 [
 if test "$withval" != no
 then 
-  AC_DEFINE(PySandbox_SUPPORTED, 1, 
-  [Define if you want to build an interpreter with sandboxing support.]) 
+  AC_DEFINE(Py_MEMORY_CAP, 1, 
+  [Define if you want to build an interpreter that can cap memory usage.]) 
   AC_MSG_RESULT(yes); 
-  PySandbox_SUPPORTED='true'
-else AC_MSG_RESULT(no); PySandbox_SUPPORTED='false'
+  Py_MEMORY_CAP='true'
+else AC_MSG_RESULT(no); Py_MEMORY_CAP='false'
 fi],
 [AC_MSG_RESULT(no)])
 

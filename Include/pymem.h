@@ -55,11 +55,17 @@ PyAPI_FUNC(void) PyMem_Free(void *);
    no longer supported. They used to call PyErr_NoMemory() on failure. */
 
 /* Macros. */
-#ifdef PYMALLOC_DEBUG
+#if defined (PYMALLOC_DEBUG)
 /* Redirect all memory operations to Python's debugging allocator. */
 #define PyMem_MALLOC		PyObject_MALLOC
 #define PyMem_REALLOC		PyObject_REALLOC
 #define PyMem_FREE		PyObject_FREE
+
+#elif defined (Py_MEMORY_CAP)
+/* Redirect all memory allocations through memory tracking functions. */
+#define PyMem_MALLOC		PyMem_Malloc
+#define PyMem_REALLOC		PyMem_Realloc
+#define PyMem_FREE		PyMem_Free
 
 #else	/* ! PYMALLOC_DEBUG */
 

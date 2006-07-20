@@ -128,11 +128,15 @@ PyAPI_FUNC(void) _PyObject_DebugMallocStats(void);
 
 #endif	/* WITH_PYMALLOC */
 
+#ifndef Py_MEMORY_CAP
 #define PyObject_Del		PyObject_Free
-#define PyObject_DEL		PyObject_FREE
-
 /* for source compatibility with 2.2 */
 #define _PyObject_Del		PyObject_Free
+#else /* Py_MEMORY_CAP */
+PyAPI_FUNC(void) _PyObject_Del(void *);
+#define PyObject_Del            _PyObject_Del
+#endif /* !Py_MEMORY_CAP */
+#define PyObject_DEL		PyObject_FREE
 
 /*
  * Generic object allocator interface

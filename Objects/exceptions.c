@@ -944,12 +944,6 @@ SimpleExtendsException(PyExc_StandardError, RuntimeError,
                        "Unspecified run-time error.");
 
 /*
-   SandboxError extends StandardError
-*/
-SimpleExtendsException(PyExc_StandardError, SandboxError,
-			"Attempt to exceed privileges under sandboxing.");
-
-/*
  *    NotImplementedError extends RuntimeError
  */
 SimpleExtendsException(PyExc_RuntimeError, NotImplementedError,
@@ -2020,7 +2014,6 @@ _PyExc_Init(void)
 #endif
     PRE_INIT(EOFError)
     PRE_INIT(RuntimeError)
-    PRE_INIT(SandboxError)
     PRE_INIT(NotImplementedError)
     PRE_INIT(NameError)
     PRE_INIT(UnboundLocalError)
@@ -2086,7 +2079,6 @@ _PyExc_Init(void)
 #endif
     POST_INIT(EOFError)
     POST_INIT(RuntimeError)
-    POST_INIT(SandboxError)
     POST_INIT(NotImplementedError)
     POST_INIT(NameError)
     POST_INIT(UnboundLocalError)
