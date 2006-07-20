@@ -36,10 +36,13 @@ But any action that tries to cross the boundary of the security domain
 is where the security model and protection comes in.
 
 The "powerbox" is the thing that possesses the ultimate power in the
-system.  In our case it is the Python process.  No interpreter can
-possess any ability that the overall process does not have.  This
-means that we care about interpreter<->interpreter interaction along
-with interpreter<->process interactions.
+system for giving out abilities.  In our case it is the Python
+process.  No interpreter can possess any ability that the overall
+process does not have.  It is up to the Python process to initially
+hand out abilities to interpreters to use either for themselves or to
+give to interpreters they create themselves.  This means that we care
+about interpreter<->interpreter interaction along with
+interpreter<->process interactions.
 
 
 Rationale
@@ -214,7 +217,10 @@ interpreter is not safe for object-capabilities.
 To rectify the situation, some changes will be needed to some built-in
 objects in Python.  It should mostly consist of abstracting or
 refactoring certain abilities out to an extension module so that
-access can be protected using import guards.
+access can be protected using import guards.  For instance, as it
+stands now, ``object.__subclasses__()`` will return a tuple of all of
+its subclasses, regardless of what interpreter the subclass was
+defined in.
 
 
 Threat Model
@@ -309,13 +315,15 @@ inherently remove resources and abilities that existing code expects,
 it is not reasonable to expect existing code to work in a sandboxed
 interpreter.
 
-Keeping Python "pythonic" is required for all design decisions.  If
-removing an ability leads to something being unpythonic, it will not
-be done.  This does not mean existing pythonic code must continue to
-work, but the spirit of being pythonic will not be compromised in the
-name of the security model.  While this might lead to a weaker
-security model, this is a price that must be paid in order for Python
-to continue to be the language that it is.
+Keeping Python "pythonic" is required for all design decisions.  
+In general, being pythonic means that something fits the general
+design guidelines (run ``import this`` from a Python interpreter to
+see the basic ones).  If removing an ability leads to something being
+unpythonic, it will not be done.  This does not mean existing pythonic
+code must continue to work, but the spirit of being pythonic will not
+be compromised in the name of the security model.  While this might
+lead to a weaker security model, this is a price that must be paid in
+order for Python to continue to be the language that it is.
 
 Restricting what is in the built-in namespace and the safe-guarding
 the interpreter (which includes safe-guarding the built-in types) is
@@ -477,7 +485,7 @@ When running code in a sandboxed interpreter, POLA suggests that you
 do not want to expose information about your environment on top of
 protecting its use.  This means that filesystem paths typically should
 not be exposed.  Unfortunately, Python exposes file paths all over the
-place:
+place that will need to be hidden:
 
 * Modules
     + ``__file__`` attribute
@@ -487,7 +495,7 @@ place:
     + ``__path__`` attribute
 * XXX
 
-XXX how to expose safely?
+XXX how to expose safely?  ``path()`` built-in?
 
 
 Mutable Shared State
@@ -647,9 +655,10 @@ Protecting Memory Usage
 
 To protect memory, low-level hooks into the memory allocator for
 Python is needed.  By hooking into the C API for memory allocation and
-deallocation a very rough running count of used memory can kept.  This
-can be used to prevent sandboxed interpreters from using so much
-memory that it impacts the overall performance of the system.
+deallocation a *very* rough running count of used memory can be kept.
+This can be used to compare against the set memory cap to prevent
+sandboxed interpreters from using so much memory that it impacts the
+overall performance of the system.
 
 Because this has no direct connection with object-capabilities or has
 any form of exposure at the Python level, this feature can be safely
