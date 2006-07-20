@@ -266,6 +266,25 @@ class SysModuleTest(unittest.TestCase):
         # the test runs under regrtest.
         self.assert_(sys.__stdout__.encoding == sys.__stderr__.encoding)
 
+    def test_memorycap(self):
+        # Test both getmemorycap() and setmemorycap().
+        if not hasattr(sys, 'getmemorycap'):
+            return
+        original_cap = sys.getmemorycap()
+        self.failUnless(isinstance(original_cap, (int, long)))
+        new_cap = int(original_cap + 10000)
+        assert isinstance(new_cap, int)
+        sys.setmemorycap(new_cap)
+        try:  # Make sure don't mess up interpreter.
+            self.failUnlessEqual(new_cap, sys.getmemorycap())
+            sys.setmemorycap(long(new_cap))
+            self.failUnlessEqual(new_cap, sys.getmemorycap())
+        finally:
+            try:  # setmemorycap() could be broken.
+                sys.setmemorycap(original_cap)
+            except Exception:
+                pass
+
 def test_main():
     test.test_support.run_unittest(SysModuleTest)
 
