@@ -66,8 +66,7 @@ Approaches to Security
 ///////////////////////////////////////
 
 There are essentially two types of security: who-I-am
-(permissions-based) security and what-I-have (authority-based)
-security.
+security and what-I-have security.
 
 Who-I-Am Security
 ========================
