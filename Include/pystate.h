@@ -33,8 +33,8 @@ typedef struct _is {
     int tscdump;
 #endif
 #ifdef Py_MEMORY_CAP
-    size_t mem_cap;
-    size_t mem_usage;
+    PY_LONG_LONG mem_cap;
+    PY_LONG_LONG mem_usage;
 #endif
 
 } PyInterpreterState;
@@ -108,8 +108,8 @@ PyAPI_FUNC(void) PyInterpreterState_Clear(PyInterpreterState *);
 PyAPI_FUNC(void) PyInterpreterState_Delete(PyInterpreterState *);
 
 #ifdef Py_MEMORY_CAP
-#define PyInterpreterState_SET_MEMORY_CAP(interp, cap) (interp->mem_cap = cap)
 PyAPI_FUNC(PyInterpreterState *) PyInterpreterState_SafeGet(void);
+PyAPI_FUNC(int) PyInterpreterState_SetMemoryCap(PyInterpreterState *, PY_LONG_LONG);
 PyAPI_FUNC(int) PyInterpreterState_RaiseMemoryUsage(PyInterpreterState *, size_t);
 PyAPI_FUNC(void) PyInterpreterState_LowerMemoryUsage(PyInterpreterState *, size_t);
 #endif /* Py_MEMORY_CAP */

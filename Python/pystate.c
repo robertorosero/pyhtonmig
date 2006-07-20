@@ -154,7 +154,7 @@ PyInterpreterState_SafeGet(void)
 {
     PyThreadState *tstate = NULL;
 
-    if (!Py_IsInitialized() || !PyEval_ThreadsInitialized())
+    if (!Py_IsInitialized() || !_PyThreadState_Current)
 	return NULL;
 
     tstate = PyThreadState_GET();
@@ -162,6 +162,25 @@ PyInterpreterState_SafeGet(void)
 	return NULL;
 
     return tstate->interp;
+}
+
+int
+PyInterpreterState_SetMemoryCap(PyInterpreterState *interp, PY_LONG_LONG cap)
+{
+    if (cap < 0) {
+	PyErr_SetString(PyExc_ValueError, "memory cap must be >= 0");
+	return 0;
+    }
+
+    if (cap < interp->mem_usage) {
+	PyErr_SetString(PyExc_ValueError, "new memory cap too small for "
+					    "current memory usage");	
+	return 0;
+    }
+
+    interp->mem_cap = cap;
+
+    return 1;
 }
 
 /*
@@ -182,16 +201,16 @@ PyInterpreterState_RaiseMemoryUsage(PyInterpreterState *interp, size_t increase)
 
     /* Watch out for integer overflow. */
     original_mem_usage = interp->mem_usage;
-    interp->mem_usage += increase;
+    interp->mem_usage += (PY_LONG_LONG)increase;
     if (interp->mem_usage < original_mem_usage) {
 	interp->mem_usage = original_mem_usage;
-	PyErr_SetString(PyExc_MemoryError, "integer overflow in memory usage");
+	PyErr_NoMemory();
 	return 0;
     }
     
     if (interp->mem_usage > interp->mem_cap) {
 	interp->mem_usage = original_mem_usage;
-	PyErr_SetString(PyExc_MemoryError, "exceeded memory usage");
+	PyErr_NoMemory();
 	return 0;
     }
 
@@ -208,7 +227,7 @@ PyInterpreterState_LowerMemoryUsage(PyInterpreterState *interp, size_t decrease)
     if (decrease < 0)
 	Py_FatalError("must specify memory usage reduction by a positive number");
 
-    interp->mem_usage -= decrease;
+    interp->mem_usage -= (PY_LONG_LONG)decrease;
     if (interp->mem_usage < 0)
 	interp->mem_usage = 0;
 }
