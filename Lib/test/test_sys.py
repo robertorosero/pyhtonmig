@@ -272,13 +272,17 @@ class SysModuleTest(unittest.TestCase):
             return
         original_cap = sys.getmemorycap()
         self.failUnless(isinstance(original_cap, (int, long)))
-        new_cap = int(original_cap + 10000)
+        new_cap = int(1000 * 1000 * 1000)
         assert isinstance(new_cap, int)
         sys.setmemorycap(new_cap)
-        try:  # Make sure don't mess up interpreter.
+        try:  # Make sure don't mess up interpreter memory cap.
             self.failUnlessEqual(new_cap, sys.getmemorycap())
             sys.setmemorycap(long(new_cap))
             self.failUnlessEqual(new_cap, sys.getmemorycap())
+            current_usage = sys.getmemoryused()
+            used_memory = chr(ord('A')) + chr(ord('B'))
+            next_current_usage = sys.getmemoryused()
+            self.failUnlessEqual(next_current_usage, current_usage)
         finally:
             try:  # setmemorycap() could be broken.
                 sys.setmemorycap(original_cap)

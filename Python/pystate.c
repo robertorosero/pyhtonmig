@@ -183,17 +183,33 @@ PyInterpreterState_SetMemoryCap(PyInterpreterState *interp, PY_LONG_LONG cap)
     return 1;
 }
 
-/*
-   Raise the current allocation of memory on the interpreter by 'increase'.
-   If it the allocation pushes the total memory usage past the memory cap,
-   return a false value.
-*/
 int
-PyInterpreterState_RaiseMemoryUsage(PyInterpreterState *interp, size_t increase)
+PyInterpreterState_AddObjectMem(PyTypeObject *obj_type)
 {
-    size_t original_mem_usage = 0;
+    size_t total_mem = _PyObject_SIZE(obj_type);
 
-    if (increase < 0)
+    return PyInterpreterState_AddRawMem(obj_type->tp_name, total_mem);
+}
+
+int
+PyInterpreterState_AddVarObjectMem(PyTypeObject *obj_type, Py_ssize_t nitems)
+{
+    size_t total_mem = _PyObject_VAR_SIZE(obj_type, nitems);
+
+    return PyInterpreterState_AddRawMem(obj_type->tp_name, total_mem);
+}
+
+int
+PyInterpreterState_AddRawMem(const char *from, size_t new_mem)
+{
+    /* XXX SafeGet() needed if working right off of objects? */
+    PyInterpreterState *interp = PyInterpreterState_SafeGet();
+    PY_LONG_LONG original_mem_usage = 0;
+
+    if (!interp)
+	return 1;
+
+    if (new_mem < 0)
 	Py_FatalError("can only increase memory usage by a positive value");
 
     if (!interp->mem_cap)
@@ -201,35 +217,48 @@ PyInterpreterState_RaiseMemoryUsage(PyInterpreterState *interp, size_t increase)
 
     /* Watch out for integer overflow. */
     original_mem_usage = interp->mem_usage;
-    interp->mem_usage += (PY_LONG_LONG)increase;
+    interp->mem_usage += (PY_LONG_LONG)new_mem;
     if (interp->mem_usage < original_mem_usage) {
 	interp->mem_usage = original_mem_usage;
-	PyErr_NoMemory();
 	return 0;
     }
     
     if (interp->mem_usage > interp->mem_cap) {
 	interp->mem_usage = original_mem_usage;
-	PyErr_NoMemory();
 	return 0;
     }
 
+    printf("add: %d (%s)\n", new_mem, from ? from : "<unknown>");
     return 1;
 }
 
-/*
-   Lower the current memory allocation.
-   If lowered to below zero, push back up to zero.
-*/
 void
-PyInterpreterState_LowerMemoryUsage(PyInterpreterState *interp, size_t decrease)
+PyInterpreterState_RemoveObjectMem(PyObject *py_obj)
 {
-    if (decrease < 0)
-	Py_FatalError("must specify memory usage reduction by a positive number");
+    size_t total_mem = _PyObject_SIZE(py_obj->ob_type);
 
-    interp->mem_usage -= (PY_LONG_LONG)decrease;
-    if (interp->mem_usage < 0)
-	interp->mem_usage = 0;
+    if (py_obj->ob_type->tp_itemsize > 0)
+	total_mem += ((PyVarObject *)py_obj)->ob_size *
+			py_obj->ob_type->tp_itemsize;
+
+    PyInterpreterState_RemoveRawMem(py_obj->ob_type->tp_name, total_mem);
+}
+
+void
+PyInterpreterState_RemoveRawMem(const char *from, size_t old_mem)
+{
+    PyInterpreterState *interp = PyInterpreterState_SafeGet();
+
+    if (!interp)
+	return;
+
+    if (old_mem < 0)
+	Py_FatalError("amount to decrease amount of memory must be >= 0");
+
+    if (interp->mem_cap) {
+	    printf("remove %d (%s)\n", old_mem, from ? from : "<unknown>");
+	    interp->mem_usage -= (PY_LONG_LONG)old_mem;
+	}
 }
 #endif /* Py_MEMORY_CAP */
 

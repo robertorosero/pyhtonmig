@@ -234,14 +234,14 @@ PyObject *
 _PyObject_New(PyTypeObject *tp)
 {
 	PyObject *op;
+	size_t tp_size = _PyObject_SIZE(tp);
+
 #ifdef Py_MEMORY_CAP
-	PyInterpreterState *interp = PyInterpreterState_SafeGet();
-	if (interp) {
-	    if (!PyInterpreterState_RaiseMemoryUsage(interp, _PyObject_SIZE(tp)))
-		return NULL;
-	}
+	if (!PyInterpreterState_AddObjectMem(tp))
+	    return PyErr_NoMemory();
 #endif
-	op = (PyObject *) PyObject_MALLOC(_PyObject_SIZE(tp));
+
+	op = (PyObject *) PyObject_MALLOC(tp_size);
 	if (op == NULL)
 		return PyErr_NoMemory();
 	return PyObject_INIT(op, tp);
@@ -252,47 +252,28 @@ _PyObject_NewVar(PyTypeObject *tp, Py_ssize_t nitems)
 {
 	PyVarObject *op;
 	const size_t size = _PyObject_VAR_SIZE(tp, nitems);
+
 #ifdef Py_MEMORY_CAP
-	PyInterpreterState *interp = PyInterpreterState_SafeGet();
-	if (interp) {
-	    if (!PyInterpreterState_RaiseMemoryUsage(interp, size))
-		return NULL;
-	}
+	if (!PyInterpreterState_AddVarObjectMem(tp, nitems))
+	    return (PyVarObject *)PyErr_NoMemory();
 #endif
+
 	op = (PyVarObject *) PyObject_MALLOC(size);
 	if (op == NULL)
 		return (PyVarObject *)PyErr_NoMemory();
 	return PyObject_INIT_VAR(op, tp, nitems);
 }
 
-#ifdef Py_MEMORY_CAP
+/* for binary compatibility with 2.2. */
+#undef _PyObject_Del
 void
 _PyObject_Del(void *op)
 {
-    PyObject *obj = (PyObject *)op;
-    size_t to_free = obj->ob_type->tp_basicsize;
-    PyInterpreterState *interp = PyInterpreterState_SafeGet();
-
-    if (obj->ob_type->tp_itemsize) {
-	Py_ssize_t obj_size = ((PyVarObject *)obj)->ob_size;
-
-	if (obj_size > 0)
-	    to_free += obj_size * obj->ob_type->tp_itemsize;
-    }
-
-    if (interp)
-	PyInterpreterState_LowerMemoryUsage(interp, to_free);
-
-    PyObject_Free(op);
-}
-#else /* !Py_MEMORY_CAP */
-/* for binary compatibility with 2.2 and sandboxing. */
-void
-_PyObject_Del(PyObject *op)
-{
+#ifdef Py_MEMORY_CAP
+    PyInterpreterState_RemoveObjectMem((PyObject *)op);
+#endif
 	PyObject_FREE(op);
 }
-#endif /* Py_MEMORY_CAP */
 
 /* Implementation of PyObject_Print with recursion checking */
 static int
@@ -2054,41 +2035,18 @@ Py_ssize_t (*_Py_abstract_hack)(PyObject *) = PyObject_Size;
 void *
 PyMem_Malloc(size_t nbytes)
 {
-#ifdef Py_MEMORY_CAP
-	PyInterpreterState *interp = PyInterpreterState_SafeGet();
-
-	if (interp) {
-	    if (!PyInterpreterState_RaiseMemoryUsage(interp, nbytes))
-		return NULL;
-	}
-#endif
 	return PyMem_MALLOC(nbytes);
 }
 
 void *
 PyMem_Realloc(void *p, size_t nbytes)
 {
-#ifdef Py_MEMORY_CAP
-	size_t mem_diff = (p ? nbytes - sizeof(p) : nbytes);
-	PyInterpreterState *interp = PyInterpreterState_SafeGet();
-
-	if (interp) {
-	    if (!PyInterpreterState_RaiseMemoryUsage(interp, mem_diff))
-		return NULL;
-	}
-#endif
 	return PyMem_REALLOC(p, nbytes);
 }
 
 void
 PyMem_Free(void *p)
 {
-#ifdef Py_MEMORY_CAP
-	PyInterpreterState *interp = PyInterpreterState_SafeGet();
-
-	if (interp)
-	    PyInterpreterState_LowerMemoryUsage(interp, sizeof(p));
-#endif
 	PyMem_FREE(p);
 }
 

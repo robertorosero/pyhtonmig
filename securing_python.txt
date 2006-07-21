@@ -665,42 +665,21 @@ implemented separately from the rest of the security model.
 
 Existing APIs to protect are:
 
-- _PyObject_New()
-    protected directly
-- _PyObject_NewVar()
-    protected directly
+- _PyObject_New() : PyObject_New()
+- _PyObject_NewVar() : PyObject_NewVar()
 - _PyObject_Del()
     remove macro that uses PyObject_Free() and protect directly
-- PyObject_New()
-    implicitly by macro using _PyObject_New()
-- PyObject_NewVar()
-    implicitly by macro using _PyObject_NewVar()
 - PyObject_Del()
     redefine macro to use _PyObject_Del() instead of PyObject_Free()
-- PyMem_Malloc()
-    protected directly
-- PyMem_Realloc()
-    protected directly
-- PyMem_Free()
-    protected directly
-- PyMem_New()
-    implicitly protected by macro using PyMem_Malloc()
-- PyMem_Resize()
-    implicitly protected by macro using PyMem_Realloc()
-- PyMem_Del()
-    implicitly protected by macro using PyMem_Free()
-- PyMem_MALLOC()
+- PyMem_Malloc() : PyMem_New()
+- PyMem_Realloc() : PyMem_Resize()
+- PyMem_Free() : PyMem_Del()
+- PyMem_MALLOC() : PyMem_NEW()
     redefine macro to use PyMem_Malloc()
-- PyMem_REALLOC()
+- PyMem_REALLOC() : PyMem_RESIZE()
     redefine macro to use PyMem_Realloc()
-- PyMem_FREE()
+- PyMem_FREE() : PyMem_DEL()
     redefine macro to use PyMem_Free()
-- PyMem_NEW()
-    implicitly protected by macro using PyMem_MALLOC()
-- PyMem_RESIZE()
-    implicitly protected by macro using PyMem_REALLOC()
-- PyMem_DEL()
-    implicitly protected by macro using PyMem_FREE()
 - PyObject_Malloc()
     XXX
 - PyObject_Realloc()

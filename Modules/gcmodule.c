@@ -1317,8 +1317,9 @@ PyObject *
 _PyObject_GC_Malloc(size_t basicsize)
 {
 	PyObject *op;
-	PyGC_Head *g = (PyGC_Head *)PyObject_MALLOC(
-                sizeof(PyGC_Head) + basicsize);
+	PyGC_Head *g = NULL;
+
+	g  = (PyGC_Head *)PyObject_MALLOC(sizeof(PyGC_Head) + basicsize);
 	if (g == NULL)
 		return PyErr_NoMemory();
 	g->gc.gc_refs = GC_UNTRACKED;
@@ -1339,7 +1340,13 @@ _PyObject_GC_Malloc(size_t basicsize)
 PyObject *
 _PyObject_GC_New(PyTypeObject *tp)
 {
-	PyObject *op = _PyObject_GC_Malloc(_PyObject_SIZE(tp));
+	PyObject *op = NULL;
+
+#ifdef Py_MEMORY_CAP
+	if (!PyInterpreterState_AddObjectMem(tp))
+	    return NULL;
+#endif
+	op = _PyObject_GC_Malloc(_PyObject_SIZE(tp));
 	if (op != NULL)
 		op = PyObject_INIT(op, tp);
 	return op;
@@ -1349,7 +1356,13 @@ PyVarObject *
 _PyObject_GC_NewVar(PyTypeObject *tp, Py_ssize_t nitems)
 {
 	const size_t size = _PyObject_VAR_SIZE(tp, nitems);
-	PyVarObject *op = (PyVarObject *) _PyObject_GC_Malloc(size);
+	PyVarObject *op = NULL;
+
+#ifdef Py_MEMORY_CAP
+	if (!PyInterpreterState_AddVarObjectMem(tp, nitems))
+	    return NULL;
+#endif
+	op = (PyVarObject *) _PyObject_GC_Malloc(size);
 	if (op != NULL)
 		op = PyObject_INIT_VAR(op, tp, nitems);
 	return op;
@@ -1377,6 +1390,9 @@ PyObject_GC_Del(void *op)
 	if (generations[0].count > 0) {
 		generations[0].count--;
 	}
+#ifdef Py_MEMORY_CAP
+	PyInterpreterState_RemoveObjectMem((PyObject *)op);
+#endif
 	PyObject_FREE(g);
 }
 

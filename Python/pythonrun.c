@@ -35,8 +35,8 @@
 #define PRINT_TOTAL_REFS()
 #else /* Py_REF_DEBUG */
 #define PRINT_TOTAL_REFS() fprintf(stderr,				\
-				   "[%" PY_FORMAT_SIZE_T "d refs]\n",	\
-				   _Py_GetRefTotal())
+				   "[%" PY_FORMAT_SIZE_T "d refs, %lld memory]\n",	\
+				   _Py_GetRefTotal(), PyThreadState_Get()->interp->mem_usage)
 #endif
 
 #ifdef __cplusplus

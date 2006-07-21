@@ -200,6 +200,10 @@ PyComplex_FromCComplex(Py_complex cval)
 	register PyComplexObject *op;
 
 	/* Inline PyObject_New */
+#ifdef Py_MEMORY_CAP
+	if (!PyInterpreterState_AddRawMem("complex number", sizeof(PyComplexObject)))
+		return PyErr_NoMemory();
+#endif
 	op = (PyComplexObject *) PyObject_MALLOC(sizeof(PyComplexObject));
 	if (op == NULL)
 		return PyErr_NoMemory();

@@ -61,12 +61,6 @@ PyAPI_FUNC(void) PyMem_Free(void *);
 #define PyMem_REALLOC		PyObject_REALLOC
 #define PyMem_FREE		PyObject_FREE
 
-#elif defined (Py_MEMORY_CAP)
-/* Redirect all memory allocations through memory tracking functions. */
-#define PyMem_MALLOC		PyMem_Malloc
-#define PyMem_REALLOC		PyMem_Realloc
-#define PyMem_FREE		PyMem_Free
-
 #else	/* ! PYMALLOC_DEBUG */
 
 /* PyMem_MALLOC(0) means malloc(1). Some systems would return NULL

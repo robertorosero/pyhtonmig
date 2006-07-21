@@ -72,6 +72,10 @@ PyString_FromStringAndSize(const char *str, Py_ssize_t size)
 	}
 
 	/* Inline PyObject_NewVar */
+#ifdef Py_MEMORY_CAP
+	if (!PyInterpreterState_AddRawMem("str", sizeof(PyStringObject) + size))
+	    return PyErr_NoMemory();
+#endif
 	op = (PyStringObject *)PyObject_MALLOC(sizeof(PyStringObject) + size);
 	if (op == NULL)
 		return PyErr_NoMemory();
@@ -127,6 +131,10 @@ PyString_FromString(const char *str)
 	}
 
 	/* Inline PyObject_NewVar */
+#ifdef Py_MEMORY_CAP
+	 if (!PyInterpreterState_AddRawMem("str", sizeof(PyStringObject) + size))
+	     return PyErr_NoMemory();
+#endif
 	op = (PyStringObject *)PyObject_MALLOC(sizeof(PyStringObject) + size);
 	if (op == NULL)
 		return PyErr_NoMemory();
@@ -960,6 +968,10 @@ string_concat(register PyStringObject *a, register PyObject *bb)
 	}
 	  
 	/* Inline PyObject_NewVar */
+#ifdef Py_MEMORY_CAP
+	if (!PyInterpreterState_AddRawMem("str", sizeof(PyStringObject) + size))
+	    return PyErr_NoMemory();
+#endif
 	op = (PyStringObject *)PyObject_MALLOC(sizeof(PyStringObject) + size);
 	if (op == NULL)
 		return PyErr_NoMemory();
@@ -1002,6 +1014,10 @@ string_repeat(register PyStringObject *a, register Py_ssize_t n)
 			"repeated string is too long");
 		return NULL;
 	}
+#ifdef Py_MEMORY_CAP
+	if (!PyInterpreterState_AddRawMem("str", sizeof(PyStringObject) + nbytes))
+	    return PyErr_NoMemory();
+#endif
 	op = (PyStringObject *)
 		PyObject_MALLOC(sizeof(PyStringObject) + nbytes);
 	if (op == NULL)

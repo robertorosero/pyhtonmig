@@ -101,7 +101,7 @@ PyAPI_FUNC(void) PyObject_Free(void *);
 
 /* Macros */
 #ifdef WITH_PYMALLOC
-#ifdef PYMALLOC_DEBUG	/* WITH_PYMALLOC && PYMALLOC_DEBUG */
+#if defined(PYMALLOC_DEBUG)	/* WITH_PYMALLOC && PYMALLOC_DEBUG */
 PyAPI_FUNC(void *) _PyObject_DebugMalloc(size_t nbytes);
 PyAPI_FUNC(void *) _PyObject_DebugRealloc(void *p, size_t nbytes);
 PyAPI_FUNC(void) _PyObject_DebugFree(void *p);
@@ -119,7 +119,7 @@ PyAPI_FUNC(void) _PyObject_DebugMallocStats(void);
 #define PyObject_MALLOC		PyObject_Malloc
 #define PyObject_REALLOC	PyObject_Realloc
 #define PyObject_FREE		PyObject_Free
-#endif
+#endif /* PYMALLOC_DEBUG */
 
 #else	/* ! WITH_PYMALLOC */
 #define PyObject_MALLOC		PyMem_MALLOC
@@ -128,15 +128,16 @@ PyAPI_FUNC(void) _PyObject_DebugMallocStats(void);
 
 #endif	/* WITH_PYMALLOC */
 
-#ifndef Py_MEMORY_CAP
-#define PyObject_Del		PyObject_Free
-/* for source compatibility with 2.2 */
-#define _PyObject_Del		PyObject_Free
-#else /* Py_MEMORY_CAP */
+#ifdef Py_MEMORY_CAP
 PyAPI_FUNC(void) _PyObject_Del(void *);
-#define PyObject_Del            _PyObject_Del
-#endif /* !Py_MEMORY_CAP */
+#define PyObject_Del		_PyObject_Del
+#define PyObject_DEL		_PyObject_Del
+#else /* !Py_MEMORY_CAP */
+#define PyObject_Del		PyObject_Free
+#define _PyObject_Del		PyObject_Free
 #define PyObject_DEL		PyObject_FREE
+#endif  /* Py_MEMORY_CAP */
+/* for source compatibility with 2.2 */
 
 /*
  * Generic object allocator interface

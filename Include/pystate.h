@@ -110,8 +110,11 @@ PyAPI_FUNC(void) PyInterpreterState_Delete(PyInterpreterState *);
 #ifdef Py_MEMORY_CAP
 PyAPI_FUNC(PyInterpreterState *) PyInterpreterState_SafeGet(void);
 PyAPI_FUNC(int) PyInterpreterState_SetMemoryCap(PyInterpreterState *, PY_LONG_LONG);
-PyAPI_FUNC(int) PyInterpreterState_RaiseMemoryUsage(PyInterpreterState *, size_t);
-PyAPI_FUNC(void) PyInterpreterState_LowerMemoryUsage(PyInterpreterState *, size_t);
+PyAPI_FUNC(int) PyInterpreterState_AddObjectMem(PyTypeObject *);
+PyAPI_FUNC(int) PyInterpreterState_AddVarObjectMem(PyTypeObject *, Py_ssize_t);
+PyAPI_FUNC(int) PyInterpreterState_AddRawMem(const char *, size_t);
+PyAPI_FUNC(void) PyInterpreterState_RemoveObjectMem(PyObject *);
+PyAPI_FUNC(void) PyInterpreterState_RemoveRawMem(const char *, size_t);
 #endif /* Py_MEMORY_CAP */
 
 PyAPI_FUNC(PyThreadState *) PyThreadState_New(PyInterpreterState *);
