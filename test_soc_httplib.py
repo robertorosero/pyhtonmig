@@ -29,30 +29,33 @@ del console
 # add the handler to the logger
 log.addHandler(handler)
 
+myconn = httplib.HTTPConnection('www.google.com')
+myconn.set_debuglevel(43)
 # create socket
-class FakeSocket:
-    def __init__(self, text, fileclass=StringIO.StringIO):
-        self.text = text
-        self.fileclass = fileclass
+# class FakeSocket:
+#    def __init__(self, text, fileclass=StringIO.StringIO):
+#        self.text = text
+#        self.fileclass = fileclass
+#
+#    def makefile(self, mode, bufsize=None):
+#       if mode != 'r' and mode != 'rb':
+#            raise httplib.UnimplementedFileMode()
+#        return self.fileclass(self.text)
 
-    def makefile(self, mode, bufsize=None):
-        if mode != 'r' and mode != 'rb':
-            raise httplib.UnimplementedFileMode()
-        return self.fileclass(self.text)
-
-sock = FakeSocket("socket")
+#sock = FakeSocket("socket")
 
 httplib._log.info("message 1") # first stage of testing
 
-r = httplib.HTTPResponse(sock) # second stage of testing
-r.begin() # call the begin method
+#r = httplib.HTTPResponse(sock) # second stage of testing
+#r.begin() # call the begin method
 
 # class test:
 #	def someTest:
 #		self.msg == None
 #		self._read_status == "message 1" == CONTINUE
 #		skip != True
-#		self.debuglevel > 0
+if myconn.debuglevel > 0:
+	print "something"
 
 
 print stringLog.getvalue()  # For testing purposes
