@@ -290,8 +290,8 @@ an application that only uses sandboxed interpreters).
 
 All security measures should never have to ask who an interpreter is.
 This means that what abilities an interpreter has should not be stored
-at the interpreter level when the security can use a proxy to protect
-a resource.  This means that while supporting a memory cap can
+at the interpreter level when the security can be provided at the
+Python level.  This means that while supporting a memory cap can
 have a per-interpreter setting that is checked (because access to the
 operating system's memory allocator is not supported at the program
 level), protecting files and imports should not such a per-interpreter
@@ -316,23 +316,31 @@ interpreter.
 
 Keeping Python "pythonic" is required for all design decisions.  
 In general, being pythonic means that something fits the general
-design guidelines (run ``import this`` from a Python interpreter to
-see the basic ones).  If removing an ability leads to something being
-unpythonic, it will not be done.  This does not mean existing pythonic
-code must continue to work, but the spirit of being pythonic will not
-be compromised in the name of the security model.  While this might
-lead to a weaker security model, this is a price that must be paid in
-order for Python to continue to be the language that it is.
+design guidelines of the Python programming language (run
+``import this`` from a Python interpreter to see the basic ones).
+If removing an ability leads to something being unpythonic, it will not
+be done unless there is an extremely compelling reason to do so.
+This does not mean existing pythonic code must continue to work, but
+the spirit of being pythonic will not be compromised in the name of the
+security model.  While this might lead to a weaker security model, this
+is a price that must be paid in order for Python to continue to be the
+language that it is.
 
 Restricting what is in the built-in namespace and the safe-guarding
 the interpreter (which includes safe-guarding the built-in types) is
-where security will come from.  Imports and the ``file`` type are
-both part of the standard namespace and must be restricted in order
-for any security implementation to be effective.
+where the majority of security will come from.  Imports and the
+``file`` type are both part of the standard namespace and must be
+restricted in order for any security implementation to be effective.
 The built-in types which are needed for basic Python usage (e.g.,
 ``object`` code objects, etc.) must be made safe to use in a sandboxed
 interpreter since they are easily accessbile and yet required for
 Python to function.
+
+The rest of the security for Python will come in the form of
+protecting physical resources.  For those resources that can be denied
+in a Denial of Service (DoS) attack but protected in a
+platform-agnositc fashion, they should.  This means, for instance,
+that memory should be protected but CPU usage can't.
 
 
 Abilities of a Standard Sandboxed Interpreter
@@ -439,24 +447,23 @@ examined.
 Constructors
 ++++++++++++
 
-Almost all of Python's built-in types
-contain a constructor that allows code to create a new instance of a
-type as long as you have the type itself.  Unfortunately this does not
-work in an object-capabilities system without either providing a proxy
-to the constructor or just turning it off.
+Almost all of Python's built-in types contain a constructor that allows
+code to create a new instance of a type as long as you have the type
+itself.  Unfortunately this does not work well in an object-capabilities
+system without either providing a proxy to the constructor or just
+removing it when access to such a constructor should be controlled.
 
-The plan is to turn off the constructors that are currently supplied
-directly by the types that are dangerous.  Their constructors will
-then either be shifted over to factory functions that will be stored
-in a C extension module or to built-ins  that will be
-provided to use to create instances.  The former approach will allow
-for protections to be enforced by import proxy; just don't allow the
-extension module to be imported.  The latter approach would allow
-either a unique constructor per type, or more generic built-in(s) for
-construction (e.g., introducing a ``construct()`` function that takes
-in a type and any arguments desired to be passed in for constructing
-an instance of the type) and allowing using proxies to provide
-security.
+The plan is to remove select constructors of the types that are
+dangerous and either relocate them to an extension module as factory
+functions or create a new built-in that acts a generic factory
+function for all types, missing constructor or not.  The former approach
+will allow for protections to be enforced by import proxy; just don't
+allow the extension module to be imported.  The latter approach would
+allow either a unique constructor per type, or more generic built-in(s)
+for construction (e.g., introducing a ``construct()`` function that
+takes in a type and any arguments desired to be passed in for
+constructing an instance of the type) and allowing using proxies to
+provide security.
 
 Some might consider this unpythonic.  Python very rarely separates the
 constructor of an object from the class/type and require that you go
