@@ -3055,31 +3055,6 @@ then
   [Define this if you have flockfile(), getc_unlocked(), and funlockfile()])
 fi
 
-AC_MSG_CHECKING(for good malloc_usable_size())
-AC_CACHE_VAL(ac_cv_good_malloc_usable_size, [
-AC_TRY_RUN([
-#include <stdlib.h>
-#include <malloc.h>
-int
-main()
-{
-	void *p = malloc(8);
-	if (malloc_usable_size(p) <= 16)
-		exit(0);
-	exit(1);
-}
-],
-ac_cv_good_malloc_usable_size=yes,
-ac_cv_good_malloc_usable_size=no,
-ac_cv_good_malloc_usable_size=no)])
-AC_MSG_RESULT($ac_cv_good_malloc_usable_size)
-if test "$ac_cv_good_malloc_usable_size" = yes
-then
-  AC_DEFINE(HAVE_MALLOC_USABLE_SIZE, 1,
-  [Define if malloc_usable_size() exists and works.])
-fi
-
-
 # check where readline lives
 # save the value of LIBS so we don't actually link Python with readline
 LIBS_no_readline=$LIBS
