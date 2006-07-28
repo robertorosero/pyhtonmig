@@ -39,6 +39,12 @@
     For malloc(), we need to either use functions provided by the C library
     (for glibc, see
     http://www.gnu.org/software/libc/manual/html_node/Summary-of-Malloc.html).
+
+XXX:
++ convert over all APIs.
++ add proper Py_TRACK_MEMORY #ifdef protections.
++ Raise an error during compilation if required functionality (e.g. mallinfo())
+  not available for tracking memory, even if requested.
 */
 
 unsigned long Py_ProcessMemUsage = 0;
