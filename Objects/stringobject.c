@@ -127,7 +127,8 @@ PyString_FromString(const char *str)
 	}
 
 	/* Inline PyObject_NewVar */
-	op = (PyStringObject *)PyObject_T_MALLOC("str", sizeof(PyStringObject) + size);
+	op = (PyStringObject *)PyObject_T_MALLOC("str",
+				    sizeof(PyStringObject) + size);
 	if (op == NULL)
 		return PyErr_NoMemory();
 	PyObject_INIT_VAR(op, &PyString_Type, size);
