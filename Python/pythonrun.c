@@ -1493,7 +1493,7 @@ err_input(perrdetail *err)
 	v = Py_BuildValue("(ziiz)", err->filename,
 			  err->lineno, err->offset, err->text);
 	if (err->text != NULL) {
-		PyObject_Free(err->text);
+		PyObject_T_FREE("char", err->text);
 		err->text = NULL;
 	}
 	w = NULL;

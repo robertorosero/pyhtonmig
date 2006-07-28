@@ -120,14 +120,15 @@ PyFuture_FromAST(mod_ty mod, const char *filename)
 {
 	PyFutureFeatures *ff;
 
-	ff = (PyFutureFeatures *)PyObject_Malloc(sizeof(PyFutureFeatures));
+	ff = (PyFutureFeatures *)PyObject_T_MALLOC("compiler",
+						    sizeof(PyFutureFeatures));
 	if (ff == NULL)
 		return NULL;
 	ff->ff_features = 0;
 	ff->ff_lineno = -1;
 
 	if (!future_parse(ff, mod, filename)) {
-		PyObject_Free(ff);
+		PyObject_T_FREE("compiler", ff);
 		return NULL;
 	}
 	return ff;

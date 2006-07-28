@@ -453,7 +453,7 @@ PyType_GenericAlloc(PyTypeObject *type, Py_ssize_t nitems)
 	if (PyType_IS_GC(type))
 		obj = _PyObject_GC_TrackedMalloc(type->tp_name, size);
 	else
-		obj = (PyObject *)PyObject_Malloc(size);
+		obj = (PyObject *)PyObject_T_MALLOC(type->tp_name, size);
 
 	if (obj == NULL)
 		return PyErr_NoMemory();
@@ -1892,7 +1892,7 @@ type_new(PyTypeObject *metatype, PyObject *args, PyObject *kwds)
 		PyObject *doc = PyDict_GetItemString(dict, "__doc__");
 		if (doc != NULL && PyString_Check(doc)) {
 			const size_t n = (size_t)PyString_GET_SIZE(doc);
-                        char *tp_doc = (char *)PyObject_Malloc(n+1);
+                        char *tp_doc = (char *)PyObject_T_MALLOC("char", n+1);
 			if (tp_doc == NULL) {
 				Py_DECREF(type);
 				return NULL;
@@ -2145,7 +2145,7 @@ type_dealloc(PyTypeObject *type)
         /* A type's tp_doc is heap allocated, unlike the tp_doc slots
          * of most other objects.  It's okay to cast it to char *.
          */
-	PyObject_Free((char *)type->tp_doc);
+	PyObject_T_FREE("char", (char *)type->tp_doc);
 	Py_XDECREF(et->ht_name);
 	Py_XDECREF(et->ht_slots);
 	type->ob_type->tp_free((PyObject *)type);

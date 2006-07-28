@@ -701,7 +701,7 @@ build_node_children(PyObject *tuple, node *root, int *line_num)
                 }
             }
             len = PyString_GET_SIZE(temp) + 1;
-            strn = (char *)PyObject_Malloc(len);
+            strn = (char *)PyObject_T_MALLOC("char", len);
             if (strn != NULL)
                 (void) memcpy(strn, PyString_AS_STRING(temp), len);
             Py_DECREF(temp);
@@ -723,7 +723,7 @@ build_node_children(PyObject *tuple, node *root, int *line_num)
             return (node *) PyErr_NoMemory();
         }
         if (err == E_OVERFLOW) {
-            PyObject_Free(strn);
+            PyObject_T_FREE("char", strn);
             PyErr_SetString(PyExc_ValueError,
                             "unsupported number of child nodes");
             return NULL;
@@ -787,7 +787,7 @@ build_node_tree(PyObject *tuple)
             if (res && encoding) {
                 Py_ssize_t len;
                 len = PyString_GET_SIZE(encoding) + 1;
-                res->n_str = (char *)PyObject_Malloc(len);
+                res->n_str = (char *)PyObject_T_MALLOC("char", len);
                 if (res->n_str != NULL)
                     (void) memcpy(res->n_str, PyString_AS_STRING(encoding), len);
                 Py_DECREF(encoding);

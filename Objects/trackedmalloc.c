@@ -18,7 +18,7 @@
     * PyObject_MALLOC()/PyObject_REALLOC()/PyObject_FREE()
 	Change over to PyObject_T_*()
     * PyObject_Malloc()/PyObject_Realloc()/PyObject_Free()
-	XXX
+	Change over to PyObject_T_*()
     * PyObject_GC_New()/PyObject_GC_NewVar()/PyObject_GC_Del()
 	Uses _PyObject_GC_TrackedMalloc()
     * _PyObject_GC_Malloc()
@@ -26,9 +26,9 @@
     * PyObject_GC_Resize()
 	Uses PyObject_T_MALLOC()
     * PyMem_Malloc()/PyMem_Realloc()/PyMem_Free()
-	XXX
+	Uses PyMem_MALLOC(), etc.
     * PyMem_MALLOC()/PyMem_REALLOC()/PyMem_FREE()
-	XXX
+	Change to PyObject_T_*("", size)
     * malloc()/realloc()/free()
 	XXX
 
@@ -45,6 +45,7 @@ XXX:
 + add proper Py_TRACK_MEMORY #ifdef protections.
 + Raise an error during compilation if required functionality (e.g. mallinfo())
   not available for tracking memory, even if requested.
++ Completely convert ElementTree.
 */
 
 unsigned long Py_ProcessMemUsage = 0;

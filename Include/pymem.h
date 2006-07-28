@@ -61,6 +61,12 @@ PyAPI_FUNC(void) PyMem_Free(void *);
 #define PyMem_REALLOC		PyObject_REALLOC
 #define PyMem_FREE		PyObject_FREE
 
+#elif define (Py_TRACK_MEMORY)
+
+#define PyMem_MALLOC(size)	PyObject_T_MALLOC("", size)
+#define PyMem_REALLOC(size)	PyObject_T_REALLOC("", size)
+#define PyMem_FREE(size)	PyObject_T_FREE("", size)
+
 #else	/* ! PYMALLOC_DEBUG */
 
 /* PyMem_MALLOC(0) means malloc(1). Some systems would return NULL

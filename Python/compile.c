@@ -314,7 +314,7 @@ compiler_free(struct compiler *c)
 	if (c->c_st)
 		PySymtable_Free(c->c_st);
 	if (c->c_future)
-		PyObject_Free(c->c_future);
+		PyObject_T_FREE("compiler", c->c_future);
 	Py_DECREF(c->c_stack);
 }
 
@@ -1066,9 +1066,9 @@ compiler_unit_free(struct compiler_unit *u)
 	b = u->u_blocks;
 	while (b != NULL) {
 		if (b->b_instr)
-			PyObject_Free((void *)b->b_instr);
+			PyObject_T_FREE("compiler", (void *)b->b_instr);
 		next = b->b_list;
-		PyObject_Free((void *)b);
+		PyObject_T_FREE("compiler", (void *)b);
 		b = next;
 	}
 	Py_XDECREF(u->u_ste);
@@ -1079,7 +1079,7 @@ compiler_unit_free(struct compiler_unit *u)
 	Py_XDECREF(u->u_freevars);
 	Py_XDECREF(u->u_cellvars);
 	Py_XDECREF(u->u_private);
-	PyObject_Free(u);
+	PyObject_T_FREE("compiler", u);
 }
 
 static int
@@ -1088,7 +1088,7 @@ compiler_enter_scope(struct compiler *c, identifier name, void *key,
 {
 	struct compiler_unit *u;
 
-	u = (struct compiler_unit *)PyObject_Malloc(sizeof(
+	u = (struct compiler_unit *)PyObject_T_MALLOC("compiler", sizeof(
                                                 struct compiler_unit));
 	if (!u) {
 		PyErr_NoMemory();
@@ -1193,7 +1193,7 @@ compiler_new_block(struct compiler *c)
 	struct compiler_unit *u;
 
 	u = c->u;
-	b = (basicblock *)PyObject_Malloc(sizeof(basicblock));
+	b = (basicblock *)PyObject_T_MALLOC("compiler", sizeof(basicblock));
 	if (b == NULL) {
 		PyErr_NoMemory();
 		return NULL;
@@ -1245,7 +1245,7 @@ compiler_next_instr(struct compiler *c, basicblock *b)
 {
 	assert(b != NULL);
 	if (b->b_instr == NULL) {
-		b->b_instr = (struct instr *)PyObject_Malloc(
+		b->b_instr = (struct instr *)PyObject_T_MALLOC("compiler",
                                  sizeof(struct instr) * DEFAULT_BLOCK_SIZE);
 		if (b->b_instr == NULL) {
 			PyErr_NoMemory();
@@ -1264,7 +1264,7 @@ compiler_next_instr(struct compiler *c, basicblock *b)
 			return -1;
 		}
 		b->b_ialloc <<= 1;
-		b->b_instr = (struct instr *)PyObject_Realloc(
+		b->b_instr = (struct instr *)PyObject_T_REALLOC("compiler",
                                                 (void *)b->b_instr, newsize);
 		if (b->b_instr == NULL)
 			return -1;
@@ -4015,7 +4015,7 @@ assemble_init(struct assembler *a, int nblocks, int firstlineno)
 	a->a_lnotab = PyString_FromStringAndSize(NULL, DEFAULT_LNOTAB_SIZE);
 	if (!a->a_lnotab)
 		return 0;
-	a->a_postorder = (basicblock **)PyObject_Malloc(
+	a->a_postorder = (basicblock **)PyObject_T_MALLOC("compiler",
 					    sizeof(basicblock *) * nblocks);
 	if (!a->a_postorder) {
 		PyErr_NoMemory();
@@ -4030,7 +4030,7 @@ assemble_free(struct assembler *a)
 	Py_XDECREF(a->a_bytecode);
 	Py_XDECREF(a->a_lnotab);
 	if (a->a_postorder)
-		PyObject_Free(a->a_postorder);
+		PyObject_T_FREE("compiler", a->a_postorder);
 }
 
 /* Return the size of a basic block in bytes. */

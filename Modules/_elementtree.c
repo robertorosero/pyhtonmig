@@ -277,7 +277,7 @@ staticforward PyTypeObject Element_Type;
 LOCAL(int)
 element_new_extra(ElementObject* self, PyObject* attrib)
 {
-    self->extra = PyObject_Malloc(sizeof(ElementObjectExtra));
+    self->extra = PyObject_T_MALLOC("ElementTree", sizeof(ElementObjectExtra));
     if (!self->extra)
         return -1;
 
@@ -305,9 +305,9 @@ element_dealloc_extra(ElementObject* self)
         Py_DECREF(self->extra->children[i]);
 
     if (self->extra->children != self->extra->_children)
-        PyObject_Free(self->extra->children);
+        PyObject_T_FREE("ElementTree", self->extra->children);
 
-    PyObject_Free(self->extra);
+    PyObject_T_FREE("ElementTree", self->extra);
 }
 
 LOCAL(PyObject*)
@@ -370,12 +370,12 @@ element_resize(ElementObject* self, int extra)
         /* use Python 2.4's list growth strategy */
         size = (size >> 3) + (size < 9 ? 3 : 6) + size;
         if (self->extra->children != self->extra->_children) {
-            children = PyObject_Realloc(self->extra->children,
+            children = PyObject_T_REALLOC("ElementTree", self->extra->children,
                                         size * sizeof(PyObject*));
             if (!children)
                 goto nomemory;
         } else {
-            children = PyObject_Malloc(size * sizeof(PyObject*));
+            children = PyObject_T_MALLOC("ElementTree", size * sizeof(PyObject*));
             if (!children)
                 goto nomemory;
             /* copy existing children from static area to malloc buffer */
