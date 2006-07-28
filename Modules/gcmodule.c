@@ -1281,7 +1281,7 @@ _PyGC_Dump(PyGC_Head *g)
 #undef PyObject_GC_Track
 #undef PyObject_GC_UnTrack
 #undef PyObject_GC_Del
-#undef _PyObject_GC_Malloc
+#undef _PyObject_GC_TrackedMalloc
 
 void
 PyObject_GC_Track(void *op)
@@ -1314,12 +1314,12 @@ _PyObject_GC_UnTrack(PyObject *op)
 }
 
 PyObject *
-_PyObject_GC_Malloc(size_t basicsize)
+_PyObject_GC_TrackedMalloc(const char* what, size_t basicsize)
 {
 	PyObject *op;
 	PyGC_Head *g = NULL;
 
-	g  = (PyGC_Head *)PyObject_MALLOC(sizeof(PyGC_Head) + basicsize);
+	g  = (PyGC_Head *)PyObject_T_MALLOC(what, sizeof(PyGC_Head) + basicsize);
 	if (g == NULL)
 		return PyErr_NoMemory();
 	g->gc.gc_refs = GC_UNTRACKED;
@@ -1343,7 +1343,7 @@ _PyObject_GC_New(PyTypeObject *tp)
 	PyObject *op = NULL;
 	size_t obj_size  = _PyObject_SIZE(tp);
 
-	op = _PyObject_GC_Malloc(obj_size);
+	op = _PyObject_GC_TrackedMalloc(tp->tp_name, obj_size);
 	if (op != NULL)
 		op = PyObject_INIT(op, tp);
 	return op;
@@ -1355,7 +1355,7 @@ _PyObject_GC_NewVar(PyTypeObject *tp, Py_ssize_t nitems)
 	const size_t size = _PyObject_VAR_SIZE(tp, nitems);
 	PyVarObject *op = NULL;
 
-	op = (PyVarObject *) _PyObject_GC_Malloc(size);
+	op = (PyVarObject *) _PyObject_GC_TrackedMalloc(tp->tp_name, size);
 	if (op != NULL)
 		op = PyObject_INIT_VAR(op, tp, nitems);
 	return op;
@@ -1366,7 +1366,8 @@ _PyObject_GC_Resize(PyVarObject *op, Py_ssize_t nitems)
 {
 	const size_t basicsize = _PyObject_VAR_SIZE(op->ob_type, nitems);
 	PyGC_Head *g = AS_GC(op);
-	g = (PyGC_Head *)PyObject_REALLOC(g,  sizeof(PyGC_Head) + basicsize);
+	g = (PyGC_Head *)PyObject_T_REALLOC(((PyObject *)op)->ob_type->tp_name,
+					    g,  sizeof(PyGC_Head) + basicsize);
 	if (g == NULL)
 		return (PyVarObject *)PyErr_NoMemory();
 	op = (PyVarObject *) FROM_GC(g);
@@ -1383,7 +1384,7 @@ PyObject_GC_Del(void *op)
 	if (generations[0].count > 0) {
 		generations[0].count--;
 	}
-	PyObject_FREE(g);
+	PyObject_T_FREE(((PyObject *)op)->ob_type->tp_name, g);
 }
 
 /* for binary compatibility with 2.2 */

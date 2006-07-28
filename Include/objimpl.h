@@ -320,7 +320,7 @@ extern PyGC_Head *_PyGC_generation0;
 	g->gc.gc_next = NULL; \
     } while (0);
 
-PyAPI_FUNC(PyObject *) _PyObject_GC_Malloc(size_t);
+PyAPI_FUNC(PyObject *) _PyObject_GC_TrackedMalloc(const char *, size_t);
 PyAPI_FUNC(PyObject *) _PyObject_GC_New(PyTypeObject *);
 PyAPI_FUNC(PyVarObject *) _PyObject_GC_NewVar(PyTypeObject *, Py_ssize_t);
 PyAPI_FUNC(void) PyObject_GC_Track(void *);
