@@ -26,9 +26,9 @@
     * PyObject_GC_Resize()
 	Uses PyObject_T_MALLOC()
     * PyMem_Malloc()/PyMem_Realloc()/PyMem_Free()
-	Uses PyMem_MALLOC(), etc.
+	XXX
     * PyMem_MALLOC()/PyMem_REALLOC()/PyMem_FREE()
-	Change to PyObject_T_*("", size)
+	XXX
     * malloc()/realloc()/free()
 	XXX
 
@@ -52,6 +52,72 @@ unsigned long Py_ProcessMemUsage = 0;
 
 static const char *UNKNOWN_WHAT = "<unknown>";
 
+struct mem_item {
+    struct mem_item *next;
+    const char *type;
+    unsigned long using;
+};
+
+static struct mem_item mem_sentinel = {NULL, NULL, 0};
+static struct mem_item *mem_head  = &mem_sentinel;
+static Py_ssize_t mem_item_count = 0;
+
+
+PyObject *
+Py_MemoryUsage(PyObject *self, PyObject *ignore)
+{
+    struct mem_item *cur_mem = mem_head;
+    PyObject *mem_dict = PyDict_New();
+    Py_ssize_t x = 0;
+    int int_result = 0;
+
+    if (!mem_dict)
+	return NULL;
+
+    for (x=0; x < mem_item_count; x+=1) {
+	cur_mem = cur_mem->next;
+	PyObject *long_obj = PyLong_FromUnsignedLong(cur_mem->using);
+	if (!long_obj)
+	    return NULL;
+	int_result = PyDict_SetItemString(mem_dict, cur_mem->type, long_obj);
+	Py_DECREF(long_obj);
+	
+	if (int_result < 0)
+	    return NULL;
+    }
+
+    return mem_dict;
+}
+
+/* XXX remove entries where memory usage is zero? */
+static struct mem_item *
+find_mem_entry(const char *what)
+{
+    struct mem_item *cur_mem = mem_head;
+
+    what = what ? what : UNKNOWN_WHAT;
+
+    while (cur_mem->next) {
+	cur_mem = cur_mem->next;
+
+	if (strcmp(what, cur_mem->type) == 0)
+	    return cur_mem;
+    }
+
+    cur_mem->next = malloc(sizeof(struct mem_item));
+    cur_mem = cur_mem->next;
+
+    if (!cur_mem)
+	return NULL;
+
+    mem_item_count += 1;
+
+    cur_mem->next = NULL;
+    cur_mem->type = what;  /* XXX memcpy? */
+    cur_mem->using = 0;
+
+    return cur_mem;
+}
 
 /*
    Track an anonymous chunk of memory.
@@ -59,8 +125,13 @@ static const char *UNKNOWN_WHAT = "<unknown>";
 int
 PyObject_TrackMemory(const char *what, size_t nbytes)
 {
-    what = what ? what : UNKNOWN_WHAT;
+    struct mem_item *mem_entry = find_mem_entry(what);
 
+    if (!mem_entry)
+	return 0;
+
+    /* XXX check for overflow. */
+    mem_entry->using += nbytes;
     Py_ProcessMemUsage += nbytes;
 
     return 1;
@@ -72,8 +143,13 @@ PyObject_TrackMemory(const char *what, size_t nbytes)
 int
 PyObject_UntrackMemory(const char *what, size_t nbytes)
 {
-    what = what ? what : UNKNOWN_WHAT;
+    struct mem_item *mem_entry = find_mem_entry(what);
 
+    if (!mem_entry)
+	return 0;
+
+    /* XXX check for hitting < 0. */
+    mem_entry->using -= nbytes;
     Py_ProcessMemUsage -= nbytes;
 
     return 1;

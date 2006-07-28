@@ -95,6 +95,7 @@ PyObject_{New, NewVar, Del}.
    the raw memory.
 */
 PyAPI_DATA(unsigned long) Py_ProcessMemUsage;
+PyAPI_FUNC(PyObject *) Py_MemoryUsage(PyObject *, PyObject *);
 PyAPI_FUNC(int) PyMalloc_ManagesMemory(void *);
 PyAPI_FUNC(size_t) PyMalloc_AllocatedSize(void *);
 PyAPI_FUNC(void *) PyObject_Malloc(size_t);
