@@ -716,10 +716,7 @@ PyMalloc_ManagesMemory(void *ptr)
     
     pool = POOL_ADDR(ptr);
 
-    if (Py_ADDRESS_IN_RANGE(ptr, pool))
-	return 1;
-    else
-	return 0;
+    return Py_ADDRESS_IN_RANGE(ptr, pool);
 }
 
 size_t
