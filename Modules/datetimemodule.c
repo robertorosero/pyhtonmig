@@ -601,7 +601,7 @@ time_alloc(PyTypeObject *type, Py_ssize_t aware)
 	PyObject *self;
 
 	self = (PyObject *)
-		PyObject_MALLOC(aware ?
+		PyObject_T_MALLOC("datetime.time", aware ?
 				sizeof(PyDateTime_Time) :
 				sizeof(_PyDateTime_BaseTime));
 	if (self == NULL)
@@ -616,7 +616,7 @@ datetime_alloc(PyTypeObject *type, Py_ssize_t aware)
 	PyObject *self;
 
 	self = (PyObject *)
-		PyObject_MALLOC(aware ?
+		PyObject_T_MALLOC("datetime.datetime", aware ?
 				sizeof(PyDateTime_DateTime) :
 				sizeof(_PyDateTime_BaseDateTime));
 	if (self == NULL)

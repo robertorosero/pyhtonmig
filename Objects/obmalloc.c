@@ -702,6 +702,35 @@ int Py_ADDRESS_IN_RANGE(void *P, poolp pool) Py_NO_INLINE;
 #undef Py_NO_INLINE
 #endif
 
+/*
+   Return the amount of memory allocated for pointer if created by pymalloc,
+   else return 0.
+*/
+int
+PyMalloc_ManagesMemory(void *ptr)
+{
+    poolp pool = NULL;
+
+    if (!ptr)
+	return 0;
+    
+    pool = POOL_ADDR(ptr);
+
+    if (Py_ADDRESS_IN_RANGE(ptr, pool))
+	return 1;
+    else
+	return 0;
+}
+
+size_t
+PyMalloc_AllocatedSize(void *ptr)
+{
+    poolp pool = POOL_ADDR(ptr);
+
+    return INDEX2SIZE(pool->szidx);
+}
+
+
 /*==========================================================================*/
 
 /* malloc.  Note that nbytes==0 tries to return a non-NULL pointer, distinct

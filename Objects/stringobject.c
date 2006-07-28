@@ -72,11 +72,7 @@ PyString_FromStringAndSize(const char *str, Py_ssize_t size)
 	}
 
 	/* Inline PyObject_NewVar */
-#ifdef Py_MEMORY_CAP
-	if (!PyInterpreterState_AddRawMem("str", sizeof(PyStringObject) + size))
-	    return PyErr_NoMemory();
-#endif
-	op = (PyStringObject *)PyObject_MALLOC(sizeof(PyStringObject) + size);
+	op = (PyStringObject *)PyObject_T_MALLOC("str", sizeof(PyStringObject) + size);
 	if (op == NULL)
 		return PyErr_NoMemory();
 	PyObject_INIT_VAR(op, &PyString_Type, size);
@@ -131,11 +127,7 @@ PyString_FromString(const char *str)
 	}
 
 	/* Inline PyObject_NewVar */
-#ifdef Py_MEMORY_CAP
-	 if (!PyInterpreterState_AddRawMem("str", sizeof(PyStringObject) + size))
-	     return PyErr_NoMemory();
-#endif
-	op = (PyStringObject *)PyObject_MALLOC(sizeof(PyStringObject) + size);
+	op = (PyStringObject *)PyObject_T_MALLOC("str", sizeof(PyStringObject) + size);
 	if (op == NULL)
 		return PyErr_NoMemory();
 	PyObject_INIT_VAR(op, &PyString_Type, size);
@@ -968,11 +960,7 @@ string_concat(register PyStringObject *a, register PyObject *bb)
 	}
 	  
 	/* Inline PyObject_NewVar */
-#ifdef Py_MEMORY_CAP
-	if (!PyInterpreterState_AddRawMem("str", sizeof(PyStringObject) + size))
-	    return PyErr_NoMemory();
-#endif
-	op = (PyStringObject *)PyObject_MALLOC(sizeof(PyStringObject) + size);
+	op = (PyStringObject *)PyObject_T_MALLOC("str", sizeof(PyStringObject) + size);
 	if (op == NULL)
 		return PyErr_NoMemory();
 	PyObject_INIT_VAR(op, &PyString_Type, size);
@@ -1014,12 +1002,8 @@ string_repeat(register PyStringObject *a, register Py_ssize_t n)
 			"repeated string is too long");
 		return NULL;
 	}
-#ifdef Py_MEMORY_CAP
-	if (!PyInterpreterState_AddRawMem("str", sizeof(PyStringObject) + nbytes))
-	    return PyErr_NoMemory();
-#endif
 	op = (PyStringObject *)
-		PyObject_MALLOC(sizeof(PyStringObject) + nbytes);
+		PyObject_T_MALLOC("str", sizeof(PyStringObject) + nbytes);
 	if (op == NULL)
 		return PyErr_NoMemory();
 	PyObject_INIT_VAR(op, &PyString_Type, size);
@@ -4123,7 +4107,8 @@ _PyString_Resize(PyObject **pv, Py_ssize_t newsize)
 	_Py_DEC_REFTOTAL;
 	_Py_ForgetReference(v);
 	*pv = (PyObject *)
-		PyObject_REALLOC((char *)v, sizeof(PyStringObject) + newsize);
+		PyObject_T_REALLOC("str", (char *)v,
+				    sizeof(PyStringObject) + newsize);
 	if (*pv == NULL) {
 		PyObject_Del(v);
 		PyErr_NoMemory();

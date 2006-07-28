@@ -308,6 +308,7 @@ OBJECT_OBJS=	\
 		Objects/sliceobject.o \
 		Objects/stringobject.o \
 		Objects/structseq.o \
+		Objects/trackedmalloc.o \
 		Objects/tupleobject.o \
 		Objects/typeobject.o \
 		Objects/weakrefobject.o \

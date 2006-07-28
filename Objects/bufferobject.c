@@ -209,12 +209,7 @@ PyBuffer_New(Py_ssize_t size)
 	}
 	/* XXX: check for overflow in multiply */
 	/* Inline PyObject_New */
-#ifdef Py_MEMORY_CAP
-	if (!PyInterpreterState_AddRawMem("buffer",
-					    sizeof(*b) + size))
-	    return PyErr_NoMemory();
-#endif
-	o = (PyObject *)PyObject_MALLOC(sizeof(*b) + size);
+	o = (PyObject *)PyObject_T_MALLOC("buffer", sizeof(*b) + size);
 	if ( o == NULL )
 		return PyErr_NoMemory();
 	b = (PyBufferObject *) PyObject_INIT(o, &PyBuffer_Type);

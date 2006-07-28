@@ -3219,7 +3219,7 @@ static PyMethodDef encoding_map_methods[] = {
 static void
 encoding_map_dealloc(PyObject* o)
 {
-	PyObject_FREE(o);
+	PyObject_T_FREE("<internal unicode>", o);
 }
 
 static PyTypeObject EncodingMapType = {
@@ -3342,7 +3342,7 @@ PyUnicode_BuildEncodingMap(PyObject* string)
     }
 
     /* Create a three-level trie */
-    result = PyObject_MALLOC(sizeof(struct encoding_map) +
+    result = PyObject_T_MALLOC("<internal unicode>", sizeof(struct encoding_map) +
                              16*count2 + 128*count3 - 1);
     if (!result)
         return PyErr_NoMemory();

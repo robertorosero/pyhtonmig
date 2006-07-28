@@ -236,12 +236,7 @@ _PyObject_New(PyTypeObject *tp)
 	PyObject *op;
 	size_t tp_size = _PyObject_SIZE(tp);
 
-#ifdef Py_MEMORY_CAP
-	if (!PyInterpreterState_AddObjectMem(tp))
-	    return PyErr_NoMemory();
-#endif
-
-	op = (PyObject *) PyObject_MALLOC(tp_size);
+	op = (PyObject *) PyObject_T_MALLOC(tp->tp_name, tp_size);
 	if (op == NULL)
 		return PyErr_NoMemory();
 	return PyObject_INIT(op, tp);
@@ -253,12 +248,7 @@ _PyObject_NewVar(PyTypeObject *tp, Py_ssize_t nitems)
 	PyVarObject *op;
 	const size_t size = _PyObject_VAR_SIZE(tp, nitems);
 
-#ifdef Py_MEMORY_CAP
-	if (!PyInterpreterState_AddVarObjectMem(tp, nitems))
-	    return (PyVarObject *)PyErr_NoMemory();
-#endif
-
-	op = (PyVarObject *) PyObject_MALLOC(size);
+	op = (PyVarObject *) PyObject_T_MALLOC(tp->tp_name, size);
 	if (op == NULL)
 		return (PyVarObject *)PyErr_NoMemory();
 	return PyObject_INIT_VAR(op, tp, nitems);
@@ -266,13 +256,15 @@ _PyObject_NewVar(PyTypeObject *tp, Py_ssize_t nitems)
 
 /* for binary compatibility with 2.2. */
 #undef _PyObject_Del
+/*
+   Assume that argument is PyObject *!!!
+*/
 void
 _PyObject_Del(void *op)
 {
-#ifdef Py_MEMORY_CAP
-    PyInterpreterState_RemoveObjectMem((PyObject *)op);
-#endif
-	PyObject_FREE(op);
+    PyObject *obj_ptr = (PyObject *)op;
+
+    PyObject_T_FREE(obj_ptr->ob_type->tp_name, op);
 }
 
 /* Implementation of PyObject_Print with recursion checking */

@@ -35,9 +35,19 @@
 #define PRINT_TOTAL_REFS()
 #else /* Py_REF_DEBUG */
 #define PRINT_TOTAL_REFS() fprintf(stderr,				\
-				   "[%" PY_FORMAT_SIZE_T "d refs, %lld memory]\n",	\
-				   _Py_GetRefTotal(), PyThreadState_Get()->interp->mem_usage)
+				   "[%" PY_FORMAT_SIZE_T "d refs]\n",	\
+				   _Py_GetRefTotal())
 #endif
+
+#ifdef Py_TRACK_MEMORY
+#define PRINT_TOTAL_MEM() fprintf(stderr, \
+				  "[%lu bytes used]\n", \
+				  Py_ProcessMemUsage)
+#else
+#define PRINT_TOTAL_MEM()
+#endif /* Py_TRACK_MEMORY */
+
+#define PRINT_STATE_DATA() PRINT_TOTAL_REFS(); PRINT_TOTAL_MEM()
 
 #ifdef __cplusplus
 extern "C" {
@@ -413,7 +423,7 @@ Py_Finalize(void)
 	dump_counts(stdout);
 #endif
 
-	PRINT_TOTAL_REFS();
+	PRINT_STATE_DATA();
 
 #ifdef Py_TRACE_REFS
 	/* Display all objects still alive -- this can invoke arbitrary
@@ -703,7 +713,7 @@ PyRun_InteractiveLoopFlags(FILE *fp, const char *filename, PyCompilerFlags *flag
 	}
 	for (;;) {
 		ret = PyRun_InteractiveOneFlags(fp, filename, flags);
-		PRINT_TOTAL_REFS();
+		PRINT_STATE_DATA();
 		if (ret == E_EOF)
 			return 0;
 		/*
@@ -1483,7 +1493,7 @@ err_input(perrdetail *err)
 	v = Py_BuildValue("(ziiz)", err->filename,
 			  err->lineno, err->offset, err->text);
 	if (err->text != NULL) {
-		PyObject_FREE(err->text);
+		PyObject_Free(err->text);
 		err->text = NULL;
 	}
 	w = NULL;

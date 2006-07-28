@@ -94,9 +94,16 @@ PyObject_{New, NewVar, Del}.
    the object gets initialized via PyObject_{Init, InitVar} after obtaining
    the raw memory.
 */
+PyAPI_DATA(unsigned long) Py_ProcessMemUsage;
+PyAPI_FUNC(int) PyMalloc_ManagesMemory(void *);
+PyAPI_FUNC(size_t) PyMalloc_AllocatedSize(void *);
 PyAPI_FUNC(void *) PyObject_Malloc(size_t);
 PyAPI_FUNC(void *) PyObject_Realloc(void *, size_t);
 PyAPI_FUNC(void) PyObject_Free(void *);
+
+PyAPI_FUNC(void *) PyObject_TrackedMalloc(const char *, size_t);
+PyAPI_FUNC(void *) PyObject_TrackedRealloc(const char *, void *, size_t);
+PyAPI_FUNC(void) PyObject_TrackedFree(const char *, void *);
 
 
 /* Macros */
@@ -128,15 +135,22 @@ PyAPI_FUNC(void) _PyObject_DebugMallocStats(void);
 
 #endif	/* WITH_PYMALLOC */
 
-#ifdef Py_MEMORY_CAP
+#ifdef Py_TRACK_MEMORY
 PyAPI_FUNC(void) _PyObject_Del(void *);
 #define PyObject_Del		_PyObject_Del
 #define PyObject_DEL		_PyObject_Del
-#else /* !Py_MEMORY_CAP */
+#define PyObject_T_MALLOC	PyObject_TrackedMalloc
+#define PyObject_T_REALLOC	PyObject_TrackedRealloc
+#define PyObject_T_FREE		PyObject_TrackedFree
+#else /* !Py_TRACK_MEMORY */
 #define PyObject_Del		PyObject_Free
 #define _PyObject_Del		PyObject_Free
 #define PyObject_DEL		PyObject_FREE
-#endif  /* Py_MEMORY_CAP */
+#define PyObject_T_MALLOC(what, size)	PyObject_MALLOC(size)
+#define PyObject_T_REALLOC(what, who, size)	PyObject_REALLOC(who, size)
+#define PyObject_T_FREE(what, who)	PyObject_FREE(who)
+
+#endif  /* Py_TRACK_MEMORY */
 /* for source compatibility with 2.2 */
 
 /*
@@ -187,6 +201,21 @@ PyAPI_FUNC(PyVarObject *) _PyObject_NewVar(PyTypeObject *, Py_ssize_t);
 	  ) & ~(SIZEOF_VOID_P - 1)		\
 	)
 
+#ifdef Py_TRACK_MEMORY
+
+#define PyObject_NEW(type, typeobj) \
+( (type *) PyObject_Init( \
+	(PyObject *) PyObject_T_MALLOC((typeobj)->tp_name, \
+				       _PyObject_SIZE(typeobj) ), (typeobj)) )
+
+#define PyObject_NEW_VAR(type, typeobj, n) \
+( (type *) PyObject_InitVar( \
+      (PyVarObject *) PyObject_T_MALLOC((typeobj)->tp_name, \
+					_PyObject_VAR_SIZE((typeobj),(n)) ),\
+      (typeobj), (n)) )
+
+#else
+
 #define PyObject_NEW(type, typeobj) \
 ( (type *) PyObject_Init( \
 	(PyObject *) PyObject_MALLOC( _PyObject_SIZE(typeobj) ), (typeobj)) )
@@ -195,6 +224,7 @@ PyAPI_FUNC(PyVarObject *) _PyObject_NewVar(PyTypeObject *, Py_ssize_t);
 ( (type *) PyObject_InitVar( \
       (PyVarObject *) PyObject_MALLOC(_PyObject_VAR_SIZE((typeobj),(n)) ),\
       (typeobj), (n)) )
+#endif /* Py_TRACK_MEMORY */
 
 /* This example code implements an object constructor with a custom
    allocator, where PyObject_New is inlined, and shows the important

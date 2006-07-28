@@ -32,11 +32,6 @@ typedef struct _is {
 #ifdef WITH_TSC
     int tscdump;
 #endif
-#ifdef Py_MEMORY_CAP
-    PY_LONG_LONG mem_cap;
-    PY_LONG_LONG mem_usage;
-#endif
-
 } PyInterpreterState;
 
 

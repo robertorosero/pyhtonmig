@@ -700,64 +700,6 @@ a 11-tuple where the entries in the tuple are counts of:\n\
 10. Number of stack pops performed by call_function()"
 );
 
-#ifdef Py_MEMORY_CAP
-static PyObject *
-sys_setmemorycap(PyObject *self, PyObject *arg)
-{
-    PyInterpreterState *interp = PyInterpreterState_SafeGet();
-    PY_LONG_LONG new_memory_cap;
-    PyObject *arg_as_long = PyNumber_Long(arg);
-
-    if (!arg_as_long)
-	return NULL;
-
-    new_memory_cap = PyLong_AsLongLong(arg_as_long);
-    Py_DECREF(arg_as_long); /* DEAD: arg_as_long */
-
-    if (!interp)
-	Py_FatalError("interpreter not available");
-
-    if (!PyInterpreterState_SetMemoryCap(interp, new_memory_cap))
-	return NULL;
-
-    Py_RETURN_NONE;
-}
-
-PyDoc_STRVAR(setmemorycap_doc,
-"XXX"
-);
-
-static PyObject *
-sys_getmemorycap(PyObject *self, PyObject *ignore)
-{
-    PyInterpreterState *interp = PyInterpreterState_SafeGet();
-
-    if (!interp)
-	Py_FatalError("interpreter not available");
-
-    return PyLong_FromLongLong(interp->mem_cap);
-}
-
-PyDoc_STRVAR(getmemorycap_doc,
-"XXX"
-);
-
-static PyObject *
-sys_getmemoryused(PyObject *self, PyObject *ignore)
-{
-    PyInterpreterState *interp = PyInterpreterState_SafeGet();
-
-    if (!interp)
-	Py_FatalError("interpreter not available");
-
-    return PyLong_FromLongLong(interp->mem_usage);
-}
-
-PyDoc_STRVAR(getmemoryused_doc,
-"XXX"
-);
-#endif /* Py_MEMORY_CAP */
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -840,11 +782,6 @@ static PyMethodDef sys_methods[] = {
 #endif
 	{"settrace",	sys_settrace, METH_O, settrace_doc},
 	{"call_tracing", sys_call_tracing, METH_VARARGS, call_tracing_doc},
-#ifdef Py_MEMORY_CAP
-	{"setmemorycap", sys_setmemorycap, METH_O, setmemorycap_doc},
-	{"getmemorycap", sys_getmemorycap, METH_NOARGS, getmemorycap_doc},
-	{"getmemoryused", sys_getmemoryused, METH_NOARGS, getmemoryused_doc},
-#endif 
 	{NULL,		NULL}		/* sentinel */
 };
 

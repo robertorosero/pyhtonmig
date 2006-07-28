@@ -725,18 +725,18 @@ else AC_MSG_RESULT(no); Py_DEBUG='false'
 fi],
 [AC_MSG_RESULT(no)])
 
-# Check for --with-memory-cap
-AC_MSG_CHECKING(for --with-memory-cap)
-AC_ARG_WITH(memory-cap, 
-            AC_HELP_STRING(--with-memory-cap, build with Py_MEMORY_CAP defined),
+# Check for --with-memory-tracking
+AC_MSG_CHECKING(for --with-memory-tracking)
+AC_ARG_WITH(memory-tracking, 
+            AC_HELP_STRING(--with-memory-tracking, build with Py_TRACK_MEMORY defined),
 [
 if test "$withval" != no
 then 
-  AC_DEFINE(Py_MEMORY_CAP, 1, 
-  [Define if you want to build an interpreter that can cap memory usage.]) 
+  AC_DEFINE(Py_TRACK_MEMORY, 1, 
+  [Define if you want to build an interpreter that tracks memory usage.]) 
   AC_MSG_RESULT(yes); 
-  Py_MEMORY_CAP='true'
-else AC_MSG_RESULT(no); Py_MEMORY_CAP='false'
+  Py_TRACK_MEMORY='true'
+else AC_MSG_RESULT(no); Py_TRACK_MEMORY='false'
 fi],
 [AC_MSG_RESULT(no)])
 
@@ -3054,6 +3054,31 @@ then
   AC_DEFINE(HAVE_GETC_UNLOCKED, 1,
   [Define this if you have flockfile(), getc_unlocked(), and funlockfile()])
 fi
+
+AC_MSG_CHECKING(for good malloc_usable_size())
+AC_CACHE_VAL(ac_cv_good_malloc_usable_size, [
+AC_TRY_RUN([
+#include <stdlib.h>
+#include <malloc.h>
+int
+main()
+{
+	void *p = malloc(8);
+	if (malloc_usable_size(p) <= 16)
+		exit(0);
+	exit(1);
+}
+],
+ac_cv_good_malloc_usable_size=yes,
+ac_cv_good_malloc_usable_size=no,
+ac_cv_good_malloc_usable_size=no)])
+AC_MSG_RESULT($ac_cv_good_malloc_usable_size)
+if test "$ac_cv_good_malloc_usable_size" = yes
+then
+  AC_DEFINE(HAVE_MALLOC_USABLE_SIZE, 1,
+  [Define if malloc_usable_size() exists and works.])
+fi
+
 
 # check where readline lives
 # save the value of LIBS so we don't actually link Python with readline

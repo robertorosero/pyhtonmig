@@ -450,14 +450,10 @@ PyType_GenericAlloc(PyTypeObject *type, Py_ssize_t nitems)
 	const size_t size = _PyObject_VAR_SIZE(type, nitems+1);
 	/* note that we need to add one, for the sentinel */
 
-#ifdef Py_MEMORY_CAP
-	if (!PyInterpreterState_AddVarObjectMem(type, nitems))
-	    return PyErr_NoMemory();
-#endif
 	if (PyType_IS_GC(type))
 		obj = _PyObject_GC_Malloc(size);
 	else
-		obj = (PyObject *)PyObject_MALLOC(size);
+		obj = (PyObject *)PyObject_Malloc(size);
 
 	if (obj == NULL)
 		return PyErr_NoMemory();
@@ -1896,13 +1892,7 @@ type_new(PyTypeObject *metatype, PyObject *args, PyObject *kwds)
 		PyObject *doc = PyDict_GetItemString(dict, "__doc__");
 		if (doc != NULL && PyString_Check(doc)) {
 			const size_t n = (size_t)PyString_GET_SIZE(doc);
-#ifdef Py_MEMORY_CAP
-			if (!PyInterpreterState_AddRawMem("str", n)) {
-			    Py_DECREF(type);
-			    return NULL;
-			}
-#endif
-                        char *tp_doc = (char *)PyObject_MALLOC(n+1);
+                        char *tp_doc = (char *)PyObject_Malloc(n+1);
 			if (tp_doc == NULL) {
 				Py_DECREF(type);
 				return NULL;
@@ -2155,7 +2145,7 @@ type_dealloc(PyTypeObject *type)
         /* A type's tp_doc is heap allocated, unlike the tp_doc slots
          * of most other objects.  It's okay to cast it to char *.
          */
-	PyObject_FREE((char *)type->tp_doc);
+	PyObject_Free((char *)type->tp_doc);
 	Py_XDECREF(et->ht_name);
 	Py_XDECREF(et->ht_slots);
 	type->ob_type->tp_free((PyObject *)type);
