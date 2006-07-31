@@ -53,6 +53,7 @@ XXX:
 + Completely convert ElementTree.
 + Add an adjust function to compliment track/untrack for realloc usage (allows
   for future usage of tracking active object counts)
++ Try other ways of storing info to optimize lookup.
 */
 
 unsigned long Py_ProcessMemUsage = 0;
@@ -145,6 +146,19 @@ PyObject_TrackMemory(const char *what, size_t nbytes)
 }
 
 /*
+   Adjust the amount of memory used for a specific use.
+
+   In place for possible future use where tracking creation and deletion at the
+   object level is to be adjusted, and thus reallocs should not count towards
+   either.
+*/
+int
+PyObject_AdjustMemory(const char *what, size_t nbytes)
+{
+    return PyObject_TrackMemory(what, nbytes);
+}
+
+/*
    Stop tracking an anonymous chunk of memory.
 */
 int
@@ -225,7 +239,7 @@ PyObject_TrackedRealloc(const char *what, void *to_resize, size_t new_size)
 #endif
     }
 
-    PyObject_TrackMemory(what, size_delta);
+    PyObject_AdjustMemory(what, size_delta);
 
     return allocated;
 }
