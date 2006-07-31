@@ -48,7 +48,6 @@
 
 XXX:
 + convert over all APIs.
-+ add proper Py_TRACK_MEMORY #ifdef protections.
 + Raise an error during compilation if required functionality (e.g. mallinfo())
   not available for tracking memory, even if requested.
 + Completely convert ElementTree.
