@@ -740,6 +740,13 @@ else AC_MSG_RESULT(no); Py_TRACK_MEMORY='false'
 fi],
 [AC_MSG_RESULT(no)])
 
+AC_MSG_CHECKING(for mallinfo)
+AC_TRY_COMPILE([#include <malloc.h>], void *x=mallinfo,
+  AC_DEFINE(HAVE_MALLINFO, 1, Define if you have the 'mallinfo' function.)
+  AC_MSG_RESULT(yes),
+  AC_MSG_RESULT(no)
+)
+
 
 # XXX Shouldn't the code above that fiddles with BASECFLAGS and OPT be
 # merged with this chunk of code?
@@ -2171,7 +2178,6 @@ then
 fi
 AC_MSG_RESULT($with_doc_strings)
 
-# Check for Python-specific malloc support
 AC_MSG_CHECKING(for --with-tsc)
 AC_ARG_WITH(tsc,
 [  --with(out)-tsc         enable/disable timestamp counter profile], [

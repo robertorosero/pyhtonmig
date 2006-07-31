@@ -326,6 +326,9 @@
 /* Define this if you have the makedev macro. */
 #undef HAVE_MAKEDEV
 
+/* Define if you have the 'mallinfo' function. */
+#undef HAVE_MALLINFO
+
 /* Define to 1 if you have the `memmove' function. */
 #undef HAVE_MEMMOVE
 

@@ -1,5 +1,11 @@
 #include "Python.h"
+
+/* Must come after Python.h for pyconfig.h value to be set. */
+#ifdef Py_TRACK_MEMORY
+
+#ifdef HAVE_MALLINFO
 #include <malloc.h>
+#endif
 
 /*
     Add accountability to memory allocation.
@@ -46,6 +52,8 @@ XXX:
 + Raise an error during compilation if required functionality (e.g. mallinfo())
   not available for tracking memory, even if requested.
 + Completely convert ElementTree.
++ Add an adjust function to compliment track/untrack for realloc usage (allows
+  for future usage of tracking active object counts)
 */
 
 unsigned long Py_ProcessMemUsage = 0;
@@ -161,7 +169,9 @@ PyObject_UntrackMemory(const char *what, size_t nbytes)
 void *
 PyObject_TrackedMalloc(const char *what, size_t nbytes)
 {
+#ifdef HAVE_MALLINFO
     struct mallinfo before = mallinfo();
+#endif
     void *allocated = NULL;
     size_t used = 0;
 
@@ -174,7 +184,9 @@ PyObject_TrackedMalloc(const char *what, size_t nbytes)
 	used = PyMalloc_AllocatedSize(allocated);
     }
     else {
+#ifdef HAVE_MALLINFO
 	used = mallinfo().uordblks - before.uordblks;
+#endif
     }
 
     PyObject_TrackMemory(what, used);
@@ -190,7 +202,9 @@ PyObject_TrackedMalloc(const char *what, size_t nbytes)
 void *
 PyObject_TrackedRealloc(const char *what, void *to_resize, size_t new_size)
 {
+#ifdef HAVE_MALLINFO
     struct mallinfo before = mallinfo();
+#endif
     void *allocated = NULL;
     size_t size_delta = 0;
 
@@ -207,7 +221,9 @@ PyObject_TrackedRealloc(const char *what, void *to_resize, size_t new_size)
 	size_delta = PyMalloc_AllocatedSize(allocated) - size_delta;
     }
     else {
+#ifdef HAVE_MALLINFO
 	size_delta = mallinfo().uordblks - before.uordblks;
+#endif
     }
 
     PyObject_TrackMemory(what, size_delta);
@@ -221,7 +237,9 @@ PyObject_TrackedRealloc(const char *what, void *to_resize, size_t new_size)
 void
 PyObject_TrackedFree(const char *what, void *to_free)
 {
+#ifdef HAVE_MALLINFO
     struct mallinfo before = mallinfo();
+#endif
     size_t freed = 0;
 
     if (PyMalloc_ManagesMemory(to_free)) {
@@ -231,8 +249,12 @@ PyObject_TrackedFree(const char *what, void *to_free)
     PyObject_Free(to_free);
 
     if (!freed) {
+#ifdef HAVE_MALLINFO
 	freed = before.uordblks - mallinfo().uordblks;
+#endif
     }
 
     PyObject_UntrackMemory(what, freed);
 }
+
+#endif /* Py_TRACK_MEMORY */

@@ -782,7 +782,9 @@ static PyMethodDef sys_methods[] = {
 #endif
 	{"settrace",	sys_settrace, METH_O, settrace_doc},
 	{"call_tracing", sys_call_tracing, METH_VARARGS, call_tracing_doc},
+#ifdef Py_TRACK_MEMORY
 	{"memoryusage", Py_MemoryUsage, METH_NOARGS, "XXX"},
+#endif
 	{NULL,		NULL}		/* sentinel */
 };
 

@@ -73,6 +73,13 @@
 #if defined(PYMALLOC_DEBUG) && !defined(WITH_PYMALLOC)
 #error "PYMALLOC_DEBUG requires WITH_PYMALLOC"
 #endif
+
+#ifdef Py_TRACK_MEMORY
+#ifndef HAVE_MALLINFO
+#error "Py_TRACK_MEMORY required HAVE_MALLINFO"
+#endif /* !HAVE_MALLINFO */
+#endif /* Py_TRACK_MEMORY */
+
 #include "pymem.h"
 
 #include "object.h"
