@@ -262,9 +262,7 @@ _PyObject_NewVar(PyTypeObject *tp, Py_ssize_t nitems)
 void
 _PyObject_Del(void *op)
 {
-    PyObject *obj_ptr = (PyObject *)op;
-
-    PyObject_T_FREE(obj_ptr->ob_type->tp_name, op);
+    PyObject_T_FREE(((PyObject *)op)->ob_type->tp_name, op);
 }
 
 /* Implementation of PyObject_Print with recursion checking */
