@@ -1384,12 +1384,19 @@ SimpleType_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 		Py_DECREF(result);
 		return NULL;
 	}
+	fmt = getentry(PyString_AS_STRING(proto));
+	if (fmt == NULL) {
+		Py_DECREF(result);
+		PyErr_Format(PyExc_ValueError,
+			     "_type_ '%s' not supported",
+			     PyString_AS_STRING(proto));
+		return NULL;
+	}
+
 	stgdict = (StgDictObject *)PyObject_CallObject(
 		(PyObject *)&StgDict_Type, NULL);
 	if (!stgdict)
 		return NULL;
-
-	fmt = getentry(PyString_AS_STRING(proto));
 
 	stgdict->ffi_type_pointer = *fmt->pffi_type;
 	stgdict->align = fmt->pffi_type->alignment;
@@ -1633,9 +1640,8 @@ converters_from_argtypes(PyObject *ob)
 
 	for (i = 0; i < nArgs; ++i) {
 		PyObject *tp = PyTuple_GET_ITEM(ob, i);
-		StgDictObject *dict = PyType_stgdict(tp);
 		PyObject *cnv = PyObject_GetAttrString(tp, "from_param");
-		if (!dict || !cnv)
+		if (!cnv)
 			goto argtypes_error_1;
 		PyTuple_SET_ITEM(converters, i, cnv);
 	}
@@ -1646,7 +1652,7 @@ converters_from_argtypes(PyObject *ob)
 	Py_XDECREF(converters);
 	Py_DECREF(ob);
 	PyErr_Format(PyExc_TypeError,
-		     "item %d in _argtypes_ is not a valid C type", i+1);
+		     "item %d in _argtypes_ has no from_param method", i+1);
 	return NULL;
 }
 
@@ -2181,7 +2187,7 @@ _CData_set(CDataObject *dst, PyObject *type, SETFUNC setfunc, PyObject *value,
 			Py_DECREF(ob);
 			return result;
 		} else if (value == Py_None && PointerTypeObject_Check(type)) {
-			*(void **)dst->b_ptr = NULL;
+			*(void **)ptr = NULL;
 			Py_INCREF(Py_None);
 			return Py_None;
 		} else {
@@ -3567,7 +3573,8 @@ Array_item(PyObject *_self, Py_ssize_t index)
 	int offset, size;
 	StgDictObject *stgdict;
 
-	if (self->b_length == 0 || index < 0 || (self->b_length > 1 && index >= self->b_length)) {
+
+	if (index < 0 || index >= self->b_length) {
 		PyErr_SetString(PyExc_IndexError,
 				"invalid index");
 		return NULL;
@@ -3596,11 +3603,11 @@ Array_slice(PyObject *_self, Py_ssize_t ilow, Py_ssize_t ihigh)
 
 	if (ilow < 0)
 		ilow = 0;
-	else if (ilow > self->b_length && self->b_length != 1)
+	else if (ilow > self->b_length)
 		ilow = self->b_length;
 	if (ihigh < ilow)
 		ihigh = ilow;
-	else if (ihigh > self->b_length && self->b_length != 1)
+	else if (ihigh > self->b_length)
 		ihigh = self->b_length;
 	len = ihigh - ilow;
 
@@ -3643,8 +3650,7 @@ Array_ass_item(PyObject *_self, Py_ssize_t index, PyObject *value)
 	}
 	
 	stgdict = PyObject_stgdict((PyObject *)self);
-	if (self->b_length == 0 || index < 0
-	    || (self->b_length > 1 && index >= self->b_length)) {
+	if (index < 0 || index >= stgdict->length) {
 		PyErr_SetString(PyExc_IndexError,
 				"invalid index");
 		return -1;
@@ -3671,19 +3677,17 @@ Array_ass_slice(PyObject *_self, Py_ssize_t ilow, Py_ssize_t ihigh, PyObject *va
 
 	if (ilow < 0)
 		ilow = 0;
-	else if (ilow > self->b_length && self->b_length != 1)
+	else if (ilow > self->b_length)
 		ilow = self->b_length;
-
 	if (ihigh < 0)
 		ihigh = 0;
-
 	if (ihigh < ilow)
 		ihigh = ilow;
-	else if (ihigh > self->b_length && self->b_length != 1)
+	else if (ihigh > self->b_length)
 		ihigh = self->b_length;
 
 	len = PySequence_Length(value);
-	if (self->b_length != 1 && len != ihigh - ilow) {
+	if (len != ihigh - ilow) {
 		PyErr_SetString(PyExc_ValueError,
 				"Can only assign sequence of same size");
 		return -1;
@@ -4517,23 +4521,30 @@ cast(void *ptr, PyObject *src, PyObject *ctype)
 		if (obj->b_objects == Py_None) {
 			Py_DECREF(Py_None);
 			obj->b_objects = PyDict_New();
+			if (obj->b_objects == NULL)
+				goto failed;
 		}
-		Py_INCREF(obj->b_objects);
 		result->b_objects = obj->b_objects;
 		if (result->b_objects) {
-			PyObject *index = PyLong_FromVoidPtr((void *)src);
+			PyObject *index;
 			int rc;
+			Py_INCREF(obj->b_objects);
+			index = PyLong_FromVoidPtr((void *)src);
 			if (index == NULL)
-				return NULL;
+				goto failed;
 			rc = PyDict_SetItem(result->b_objects, index, src);
 			Py_DECREF(index);
 			if (rc == -1)
-				return NULL;
+				goto failed;
 		}
 	}
 	/* Should we assert that result is a pointer type? */
 	memcpy(result->b_ptr, &ptr, sizeof(void *));
 	return (PyObject *)result;
+
+  failed:
+	Py_DECREF(result);
+	return NULL;
 }
 
 #ifdef CTYPES_UNICODE
@@ -4555,7 +4566,7 @@ init_ctypes(void)
    ob_type is the metatype (the 'type'), defaults to PyType_Type,
    tp_base is the base type, defaults to 'object' aka PyBaseObject_Type.
 */
-#ifdef WITH_THREADS
+#ifdef WITH_THREAD
 	PyEval_InitThreads();
 #endif
 	m = Py_InitModule3("_ctypes", module_methods, module_docs);
@@ -4667,7 +4678,7 @@ init_ctypes(void)
 #endif
 	PyModule_AddObject(m, "FUNCFLAG_CDECL", PyInt_FromLong(FUNCFLAG_CDECL));
 	PyModule_AddObject(m, "FUNCFLAG_PYTHONAPI", PyInt_FromLong(FUNCFLAG_PYTHONAPI));
-	PyModule_AddStringConstant(m, "__version__", "0.9.9.7");
+	PyModule_AddStringConstant(m, "__version__", "1.0.0");
 
 	PyModule_AddObject(m, "_memmove_addr", PyLong_FromVoidPtr(memmove));
 	PyModule_AddObject(m, "_memset_addr", PyLong_FromVoidPtr(memset));
@@ -4705,13 +4716,14 @@ init_ctypes(void)
 }
 
 /*****************************************************************
- * replacements for broken Python api functions
+ * replacements for broken Python api functions (in Python 2.3).
+ * See #1047269 Buffer overwrite in PyUnicode_AsWideChar
  */
 
 #ifdef HAVE_WCHAR_H
 
 PyObject *My_PyUnicode_FromWideChar(register const wchar_t *w,
-				    int size)
+				    Py_ssize_t size)
 {
     PyUnicodeObject *unicode;
 
@@ -4743,7 +4755,7 @@ PyObject *My_PyUnicode_FromWideChar(register const wchar_t *w,
 
 int My_PyUnicode_AsWideChar(PyUnicodeObject *unicode,
 			    register wchar_t *w,
-			    int size)
+			    Py_ssize_t size)
 {
     if (unicode == NULL) {
 	PyErr_BadInternalCall();

@@ -617,7 +617,7 @@ static int _call_function_pointer(int flags,
 				  void *resmem,
 				  int argcount)
 {
-#ifdef WITH_THREADS
+#ifdef WITH_THREAD
 	PyThreadState *_save = NULL; /* For Py_BLOCK_THREADS and Py_UNBLOCK_THREADS */
 #endif
 	ffi_cif cif;
@@ -651,7 +651,7 @@ static int _call_function_pointer(int flags,
 		return -1;
 	}
 
-#ifdef WITH_THREADS
+#ifdef WITH_THREAD
 	if ((flags & FUNCFLAG_PYTHONAPI) == 0)
 		Py_UNBLOCK_THREADS
 #endif
@@ -671,7 +671,7 @@ static int _call_function_pointer(int flags,
 	}
 #endif
 #endif
-#ifdef WITH_THREADS
+#ifdef WITH_THREAD
 	if ((flags & FUNCFLAG_PYTHONAPI) == 0)
 		Py_BLOCK_THREADS
 #endif
@@ -818,7 +818,9 @@ GetComError(HRESULT errcode, GUID *riid, IUnknown *pIunk)
 	/* We absolutely have to release the GIL during COM method calls,
 	   otherwise we may get a deadlock!
 	*/
+#ifdef WITH_THREAD
 	Py_BEGIN_ALLOW_THREADS
+#endif
 
 	hr = pIunk->lpVtbl->QueryInterface(pIunk, &IID_ISupportErrorInfo, (void **)&psei);
 	if (FAILED(hr))
@@ -842,22 +844,24 @@ GetComError(HRESULT errcode, GUID *riid, IUnknown *pIunk)
 	pei->lpVtbl->Release(pei);
 
   failed:
+#ifdef WITH_THREAD
 	Py_END_ALLOW_THREADS
+#endif
 
 	progid = NULL;
 	ProgIDFromCLSID(&guid, &progid);
 
-/* XXX Is COMError derived from WindowsError or not? */
 	text = FormatError(errcode);
+	obj = Py_BuildValue(
 #ifdef _UNICODE
-	obj = Py_BuildValue("iu(uuuiu)",
+		"iu(uuuiu)",
 #else
-	obj = Py_BuildValue("is(uuuiu)",
+		"is(uuuiu)",
 #endif
-			    errcode,
-			    text,
-			    descr, source, helpfile, helpcontext,
-			    progid);
+		errcode,
+		text,
+		descr, source, helpfile, helpcontext,
+		progid);
 	if (obj) {
 		PyErr_SetObject(ComError, obj);
 		Py_DECREF(obj);
@@ -1156,7 +1160,7 @@ call_commethod(PyObject *self, PyObject *args)
 }
 
 static char copy_com_pointer_doc[] =
-"CopyComPointer(a, b) -> integer\n";
+"CopyComPointer(src, dst) -> HRESULT value\n";
 
 static PyObject *
 copy_com_pointer(PyObject *self, PyObject *args)
@@ -1526,21 +1530,7 @@ resize(PyObject *self, PyObject *args)
 	return Py_None;
 }
 
-static PyObject *
-uses_seh(PyObject *self, PyObject *args)
-{
-#if defined(DONT_USE_SEH) || !defined(MS_WIN32)
-	Py_INCREF(Py_False);
-	return Py_False;
-#else
-	Py_INCREF(Py_True);
-	return Py_True;
-#endif
-}
-
 PyMethodDef module_methods[] = {
-	{"uses_seh", uses_seh, METH_NOARGS,
-	 "Return whether ctypes uses Windows structured exception handling"},
 	{"resize", resize, METH_VARARGS, "Resize the memory buffer of a ctypes instance"},
 #ifdef CTYPES_UNICODE
 	{"set_conversion_mode", set_conversion_mode, METH_VARARGS, set_conversion_mode_doc},

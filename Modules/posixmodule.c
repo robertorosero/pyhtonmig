@@ -1862,6 +1862,15 @@ posix_listdir(PyObject *self, PyObject *args)
 				Py_BEGIN_ALLOW_THREADS
 				result = FindNextFileW(hFindFile, &wFileData);
 				Py_END_ALLOW_THREADS
+				/* FindNextFile sets error to ERROR_NO_MORE_FILES if
+				   it got to the end of the directory. */
+				if (!result && GetLastError() != ERROR_NO_MORE_FILES) {
+				    Py_DECREF(d);
+				    win32_error_unicode("FindNextFileW", wnamebuf);
+				    FindClose(hFindFile);
+				    free(wnamebuf);
+				    return NULL;
+				}
 			} while (result == TRUE);
 
 			if (FindClose(hFindFile) == FALSE) {
@@ -1921,6 +1930,14 @@ posix_listdir(PyObject *self, PyObject *args)
 		Py_BEGIN_ALLOW_THREADS
 		result = FindNextFile(hFindFile, &FileData);
 		Py_END_ALLOW_THREADS
+		/* FindNextFile sets error to ERROR_NO_MORE_FILES if
+		   it got to the end of the directory. */
+		if (!result && GetLastError() != ERROR_NO_MORE_FILES) {
+		    Py_DECREF(d);
+		    win32_error("FindNextFile", namebuf);
+		    FindClose(hFindFile);
+		    return NULL;
+		}
 	} while (result == TRUE);
 
 	if (FindClose(hFindFile) == FALSE) {
@@ -7882,6 +7899,42 @@ win32_urandom(PyObject *self, PyObject *args)
 }
 #endif
 
+#ifdef __VMS
+/* Use openssl random routine */
+#include <openssl/rand.h>
+PyDoc_STRVAR(vms_urandom__doc__,
+"urandom(n) -> str\n\n\
+Return a string of n random bytes suitable for cryptographic use.");
+
+static PyObject*
+vms_urandom(PyObject *self, PyObject *args)
+{
+	int howMany;
+	PyObject* result;
+
+	/* Read arguments */
+	if (! PyArg_ParseTuple(args, "i:urandom", &howMany))
+		return NULL;
+	if (howMany < 0)
+		return PyErr_Format(PyExc_ValueError,
+				    "negative argument not allowed");
+
+	/* Allocate bytes */
+	result = PyString_FromStringAndSize(NULL, howMany);
+	if (result != NULL) {
+		/* Get random data */
+		if (RAND_pseudo_bytes((unsigned char*)
+				      PyString_AS_STRING(result),
+				      howMany) < 0) {
+			Py_DECREF(result);
+			return PyErr_Format(PyExc_ValueError,
+					    "RAND_pseudo_bytes");
+		}
+	}
+	return result;
+}
+#endif
+
 static PyMethodDef posix_methods[] = {
 	{"access",	posix_access, METH_VARARGS, posix_access__doc__},
 #ifdef HAVE_TTYNAME
@@ -8174,6 +8227,9 @@ static PyMethodDef posix_methods[] = {
 #endif
  #ifdef MS_WINDOWS
  	{"urandom", win32_urandom, METH_VARARGS, win32_urandom__doc__},
+ #endif
+ #ifdef __VMS
+ 	{"urandom", vms_urandom, METH_VARARGS, vms_urandom__doc__},
  #endif
 	{NULL,		NULL}		 /* Sentinel */
 };

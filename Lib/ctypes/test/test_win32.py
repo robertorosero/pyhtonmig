@@ -1,6 +1,7 @@
 # Windows specific tests
 
 from ctypes import *
+from ctypes.test import is_resource_enabled
 import unittest, sys
 
 import _ctypes_test
@@ -30,8 +31,7 @@ if sys.platform == "win32":
             # or wrong calling convention
             self.assertRaises(ValueError, IsWindow, None)
 
-        import _ctypes
-        if _ctypes.uses_seh():
+        if is_resource_enabled("SEH"):
             def test_SEH(self):
                 # Call functions with invalid arguments, and make sure that access violations
                 # are trapped and raise an exception.
