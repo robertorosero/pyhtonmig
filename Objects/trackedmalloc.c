@@ -103,7 +103,8 @@ find_mem_entry(const char *what)
 {
     struct mem_item *cur_mem = mem_head;
 
-    what = what ? what : UNKNOWN_WHAT;
+    if (!what || (strcmp(what, "") == 0))
+	what = UNKNOWN_WHAT;
 
     while (cur_mem->next) {
 	cur_mem = cur_mem->next;

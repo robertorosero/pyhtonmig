@@ -44,7 +44,7 @@ PyGrammar_RemoveAccelerators(grammar *g)
 		s = d->d_state;
 		for (j = 0; j < d->d_nstates; j++, s++) {
 			if (s->s_accel)
-				PyObject_FREE(s->s_accel);
+				PyObject_Free(s->s_accel);
 			s->s_accel = NULL;
 		}
 	}
@@ -68,7 +68,7 @@ fixstate(grammar *g, state *s)
 	int *accel;
 	int nl = g->g_ll.ll_nlabels;
 	s->s_accept = 0;
-	accel = (int *) PyObject_MALLOC(nl * sizeof(int));
+	accel = (int *) PyObject_Malloc(nl * sizeof(int));
 	if (accel == NULL) {
 		fprintf(stderr, "no mem to build parser accelerators\n");
 		exit(1);
@@ -111,7 +111,7 @@ fixstate(grammar *g, state *s)
 		k++;
 	if (k < nl) {
 		int i;
-		s->s_accel = (int *) PyObject_MALLOC((nl-k) * sizeof(int));
+		s->s_accel = (int *) PyObject_Malloc((nl-k) * sizeof(int));
 		if (s->s_accel == NULL) {
 			fprintf(stderr, "no mem to add parser accelerators\n");
 			exit(1);
@@ -121,5 +121,5 @@ fixstate(grammar *g, state *s)
 		for (i = 0; k < nl; i++, k++)
 			s->s_accel[i] = accel[k];
 	}
-	PyObject_FREE(accel);
+	PyObject_Free(accel);
 }
