@@ -73,7 +73,7 @@ PyAPI_FUNC(void) PyMem_Free(void *);
 
 #endif	/* PYMALLOC_DEBUG */
 
-#ifdef PYMALLOC
+#ifdef WITH_PYMALLOC
 #define PyMem_RAW_MALLOC	PyObject_Malloc
 #define PyMem_RAW_REALLOC	PyObject_Realloc
 #define PyMem_RAW_FREE		PyObject_Free

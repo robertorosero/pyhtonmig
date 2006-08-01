@@ -104,7 +104,7 @@ getgrammar(char *filename)
 					putc(' ', stderr);
 			}
 			fprintf(stderr, "^\n");
-			PyObject_FREE(err.text);
+			PyObject_Free(err.text);
 		}
 		Py_Exit(1);
 	}
@@ -136,7 +136,7 @@ char *
 PyOS_Readline(FILE *sys_stdin, FILE *sys_stdout, char *prompt)
 {
 	size_t n = 1000;
-	char *p = (char *)PyMem_MALLOC(n);
+	char *p = (char *)PyMem_RAW_MALLOC(n);
 	char *q;
 	if (p == NULL)
 		return NULL;
@@ -149,7 +149,7 @@ PyOS_Readline(FILE *sys_stdin, FILE *sys_stdout, char *prompt)
 	n = strlen(p);
 	if (n > 0 && p[n-1] != '\n')
 		p[n-1] = '\n';
-	return (char *)PyMem_REALLOC(p, n+1);
+	return (char *)PyMem_RAW_REALLOC(p, n+1);
 }
 
 /* No-nonsense fgets */

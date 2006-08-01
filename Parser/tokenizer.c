@@ -105,7 +105,7 @@ char *_PyParser_TokenNames[] = {
 static struct tok_state *
 tok_new(void)
 {
-	struct tok_state *tok = (struct tok_state *)PyMem_MALLOC(
+	struct tok_state *tok = (struct tok_state *)PyMem_RAW_MALLOC(
                                                 sizeof(struct tok_state));
 	if (tok == NULL)
 		return NULL;
@@ -657,7 +657,7 @@ PyTokenizer_FromFile(FILE *fp, char *ps1, char *ps2)
 	struct tok_state *tok = tok_new();
 	if (tok == NULL)
 		return NULL;
-	if ((tok->buf = (char *)PyMem_MALLOC(BUFSIZ)) == NULL) {
+	if ((tok->buf = (char *)PyMem_RAW_MALLOC(BUFSIZ)) == NULL) {
 		PyTokenizer_Free(tok);
 		return NULL;
 	}
@@ -676,14 +676,14 @@ void
 PyTokenizer_Free(struct tok_state *tok)
 {
 	if (tok->encoding != NULL)
-		PyMem_FREE(tok->encoding);
+		PyMem_RAW_FREE(tok->encoding);
 #ifndef PGEN
 	Py_XDECREF(tok->decoding_readline);
 	Py_XDECREF(tok->decoding_buffer);
 #endif
 	if (tok->fp != NULL && tok->buf != NULL)
-		PyMem_FREE(tok->buf);
-	PyMem_FREE(tok);
+		PyMem_RAW_FREE(tok->buf);
+	PyMem_RAW_FREE(tok);
 }
 
 #if !defined(PGEN) && defined(Py_USING_UNICODE)
@@ -782,7 +782,7 @@ tok_nextc(register struct tok_state *tok)
 			if (newtok == NULL)
 				tok->done = E_INTR;
 			else if (*newtok == '\0') {
-				PyMem_FREE(newtok);
+				PyMem_RAW_FREE(newtok);
 				tok->done = E_EOF;
 			}
 #if !defined(PGEN) && defined(Py_USING_UNICODE)
@@ -794,12 +794,12 @@ tok_nextc(register struct tok_state *tok)
 				size_t oldlen = tok->cur - tok->buf;
 				size_t newlen = oldlen + strlen(newtok);
 				char *buf = tok->buf;
-				buf = (char *)PyMem_REALLOC(buf, newlen+1);
+				buf = (char *)PyMem_RAW_REALLOC(buf, newlen+1);
 				tok->lineno++;
 				if (buf == NULL) {
-					PyMem_FREE(tok->buf);
+					PyMem_RAW_FREE(tok->buf);
 					tok->buf = NULL;
-					PyMem_FREE(newtok);
+					PyMem_RAW_FREE(newtok);
 					tok->done = E_NOMEM;
 					return EOF;
 				}
@@ -807,7 +807,7 @@ tok_nextc(register struct tok_state *tok)
 				tok->cur = tok->buf + oldlen;
 				tok->line_start = tok->cur;
 				strcpy(tok->buf + oldlen, newtok);
-				PyMem_FREE(newtok);
+				PyMem_RAW_FREE(newtok);
 				tok->inp = tok->buf + newlen;
 				tok->end = tok->inp + 1;
 				tok->start = tok->buf + start;
@@ -815,7 +815,7 @@ tok_nextc(register struct tok_state *tok)
 			else {
 				tok->lineno++;
 				if (tok->buf != NULL)
-					PyMem_FREE(tok->buf);
+					PyMem_RAW_FREE(tok->buf);
 				tok->buf = newtok;
 				tok->line_start = tok->buf;
 				tok->cur = tok->buf;
@@ -831,7 +831,7 @@ tok_nextc(register struct tok_state *tok)
 			if (tok->start == NULL) {
 				if (tok->buf == NULL) {
 					tok->buf = (char *)
-						PyMem_MALLOC(BUFSIZ);
+						PyMem_RAW_MALLOC(BUFSIZ);
 					if (tok->buf == NULL) {
 						tok->done = E_NOMEM;
 						return EOF;
@@ -866,7 +866,7 @@ tok_nextc(register struct tok_state *tok)
 				Py_ssize_t curvalid = tok->inp - tok->buf;
 				Py_ssize_t newsize = curvalid + BUFSIZ;
 				char *newbuf = tok->buf;
-				newbuf = (char *)PyMem_REALLOC(newbuf,
+				newbuf = (char *)PyMem_RAW_REALLOC(newbuf,
 							       newsize);
 				if (newbuf == NULL) {
 					tok->done = E_NOMEM;
