@@ -1,0 +1,243 @@
+PEP: XXX
+Title: Support Tracking Low-Level Memory Usage in CPython
+Version: $Revision$
+Last-Modified: $Date$
+Author: Brett Cannon <brett@python.org>
+Status: Draft
+Type: Standards Track
+Content-Type: text/x-rst
+Created: XX-XXX-2006
+Post-History: 
+
+
+Abstract
+=========
+
+When running Python programs that involve C extension modules, it is
+not always apparent where one's memory usage is.  When debugging
+extension modules it would be helpful to know where the used memory is
+going to help find memory leaks along with simple memory profiling.
+At the moment there is no support for providing such information.
+
+This PEP proposes adding such support.  By tagging all memory
+allocations and deallocations with the purpose of the memory the basic
+usage of all memory in Python can be traced.  With this provided at
+the Python and C level one can then profile memory usage.  You could
+also keep an eye on long-running processes and its memory usage.
+
+
+Rationale
+==========
+
+Currently, at the Python level, you have no idea how much memory is
+being used by the Python process beyond what the operating system
+tells you.  Even worse, the number from the operating system is going
+to be a monolithic number that tells you nothing about the general
+usage of that memory.  This does not help in either profiling the
+memory usage of your program nor debugging C code that uses Python.
+
+One can find out what objects are still alive using
+``gc.get_objects()``, but that is not terribly helpful [#gc-module]_.
+It does not tell you anything about the actual memory usage of any of
+the objects it returns.  Plus it does not reveal any details about
+memory that is not tracked by the garbage collector.
+
+It would be far more useful to provide an overall memory usage count
+for the entire Python process along with a breakdown per type.  This
+would allow one to not only keep an eye on a long-running process'
+memory usage, but help find out what type(s) are using the most amount
+of memory for debugging purposes.
+
+
+New API
+========
+
+Support for this needs to be provided at the C level for tracking
+memory usage and then the proper exposure at the Python level of the
+collected data.  Specifying ``-with-memory-tracking`` when configuring
+Python will cause the ``Py_TRACK_MEMORY`` C macro to be defined to a
+true value.  All actions involving memory take a ``const char *``
+argument that specifies what the memory is meant for.
+
+For tracking memory usage, there are six new functions:
+
+* Py_TrackMemory(const char *, size_t)
+    Track ``size_t`` bytes of memory as specified by the
+    ``const char *`` type.
+* Py_AdjustTrackedMemory(const char *, size_t)
+    Adjust the amount of memory being tracked for ``const char *``
+    type by ``size_t``.
+* PY_UntrackMemory(const char *, size_t)
+    Stop tracking memory for ``const char *`` type by ``size_t``
+    amount.
+* PyObject_TrackedMalloc(const char *, size_t)
+    Allocate ``size_t`` bytes and track for the purposes of
+    ``const char *``.
+* PyObject_TrackedRealloc(const char *, void *, size_t)
+    Reallocate the memory used by the ``const char *`` type as pointed
+    to by ``void *`` to the new size of ``size_t``.
+* PyObject_TrackedFree(const char *, void *)
+    Free ``void *`` that was used for ``const char *``.
+
+To hide the direct usage of the API for when ``Py_TRACK_MEMORY`` is
+not defined, the following macros are defined and to be what user code
+calls directly:
+
+* PyObject_T_MALLOC(const char *, size_t)
+* PyObject_T_REALLOC(const char *, void *, size_t)
+* PyObject_T_FREE(const char *, void *)
+
+For those cases where compilation requires that there be no chance
+that the memory tracking API is called (e.g., the code for Python's
+parser since it cannot work with Python types), three new macros are
+provided:
+
+* PyObject_RAW_MALLOC(size_t)
+* PyObject_RAW_REALLOC(void *, size_t)
+* PyObject_RAW_FREE(void *)
+
+For exposure at the Python level, two new methods are provided in the
+``sys`` module [#sys-module]_:
+
+* total_memory_used()
+    Return the total memory used by the Python process.
+* type_memory_usage()
+    Return a dict with keys as the string names of the types being
+    tracked and values of the amount of memory being used by the type.
+
+There is also the requirement of being able to know how much memory is
+allocated by each allocation request.  If the memory is managed by
+Python's allocator directly, then this is easy to tell.  But when
+``malloc()`` is used, then it is not so easy.  Some C libraries
+provide a function or specification for finding out how much memory is
+being used (e.g., ``mallinfo()`` or ``malloc_usable_size()``).  For
+those platforms, accurate tracking can be provided.  But for those
+platforms that do not, the memory tracking is essentially worthless
+from a lack of knowledge, and thus should not be supported for memory
+tracking.  A compilation error will be raised if ``Py_TRACK_MEMORY``
+is specified but no way to know how much memory ``malloc()`` returned
+is provided.
+
+
+Transitioning Existing APIs
+============================
+
+Python's C API provides six different ways allocating memory if you
+ignore the C library's ``malloc()`` function:
+
+* PyObject_NEW()
+* PyObject_New()
+* Pyobject_GC_New()
+* PyObject_MALLOC()
+* PyObject_Malloc()
+* PyMem_MALLOC()
+* PyMem_Malloc()
+
+In order for the tracking to be effective, as much memory
+allocation/deallocation needs to be tracked, even if it is anonymous.
+To do this, the memory API needs to be funnelled through the memory
+tracking API transparently where possible.
+
+For ``PyObject_NEW()``, ``PyObject_New()``, and ``PyObject_GC_New()``,
+their implementation can be changed to called ``PyObject_T_MALLOC()``
+for memory, using their arguments ``tp_name`` field to specify the use
+of the memory.
+
+``PyObject_MALLOC()``, ``PyMem_MALLOC()``, and ``PyMem_Malloc()`` can
+be changed with a C macro that replaces them with a call to
+``Pyobject_T_MALLOC("", size_t)``, using a default, anonymous use type
+of the memory.  As time progresses these functions and macros can be
+replaced with direct uses of ``PyObject_T_MALLOC()`` with a proper use
+type specified.
+
+``PyObject_Malloc()`` will go untouched.  Being a performance-critical
+API along with having no external dependencies requires it to not
+require it be changed to track memory.
+
+Code internal to Python should be transitioned over to using
+``Pyobject_T_MALLOC()`` over time.  This will allow for much more
+specific memory tracking.  It will also possibly help lead to a
+pruning down of the overall public API for memory usage in the future.
+
+
+Implementation
+===============
+
+The ``bcannon-sandboxing`` branch in Python's code repository has a
+proof-of-concept implementation [#bcannon-sandboxing]_.  By no way
+perfect (pressing Enter at the interpreter prompt always adds 24 bytes
+of used memory) or optimized (usage is tracked in a linked list with
+no optimizations on searching for an entry), it does show that this
+tracking is possible and that the transitioning of the existing API is
+possible.
+
+Currently the function in the ``sys`` module for getting the dict of
+memory usage is bound to ``memoryusage()`` and the total memory usage
+has not been created yet.
+
+Here is a transcript of some basic usage of the memory tracking:
+
+>>> class Foo(object): pass
+...
+[27270 refs]
+[872312 bytes used]
+>>> a = [Foo() for x in xrange(1000)]
+[29275 refs]
+[917112 bytes used]
+>>> from sys import memoryusage
+[29277 refs]
+[917152 bytes used]
+>>> memoryusage()
+{'imp.NullImporter': 16L, 'code': 30800L, 'unicode': 64L, 'iterator':
+0L, 'CodecInfo': 56L, 'xrange': 0L, 'frame': 33752L, 'module': 1184L,
+'char': 3216L, '<unknown>': 259672L, 'set': 120L, 'file': 240L,
+'symtable entry': 0L, 'listiterator': 0L, 'Foo': 40000L,
+'member_descriptor': 3040L, 'method_descriptor': 6400L,
+'exceptions.NameError': 0L, 'generator': 0L, 'traceback': 0L,
+'exceptions.TypeError': 0L, 'long': 1120L, 'cell': 32L, 'instance':
+120L, 'dict': 35424L, 'type': 16056L, 'exceptions.ImportError': 0L,
+'function': 24128L, 'method-wrapper': 0L, 'zipimport.zipimporter': 0L,
+'tuple': 77176L, 'buffer': 0L, 'Quitter': 80L, 'PyCObject': 0L,
+'instancemethod': 720L, '_Printer': 120L, 'posix.stat_result': 0L,
+'super': 0L, 'compiler': 5376L, '_sre.SRE_Pattern': 280L,
+'getset_descriptor': 1520L, 'builtin_function_or_method': 12520L,
+'classobj': 1008L, 'classmethod': 32L, 'dictproxy': 0L,
+'classmethod_descriptor': 40L, 'list': 2880L, 'weakref': 4896L,
+'rangeiterator': 0L, 'exceptions.AttributeError': 0L, '_Helper': 40L,
+'staticmethod': 32L, 'str': 341656L, 'exceptions.MemoryError': 40L,
+'_TemplateMetaclass': 472L, 'tupleiterator': 0L, 'wrapper_descriptor':
+14448L, 'exceptions.OSError': 0L}
+[29468 refs]
+[921984 bytes used]
+>>>
+
+The key code changes can be found in Objects/trackedmalloc.c
+Include/objimpl.h, and Include/pymem.h .  Multiple places within the
+code has also been changed over to use the memory tracking API.
+
+
+Open Issues
+============
+
+XXX
+
+
+Future Considerations
+======================
+
+It might be reasonable to keep track of other stats about memory usage
+at a future point.  For instance, one could keep track of the maximum
+amount of memory used at any one point, or the number of active
+allocations (as calculated by raising the count on
+``Py_TrackMemory()`` calls and lowering it on ``Py_UntrackMemory()``
+calls).
+
+
+References
+===========
+
+.. [#gc-module] XXX
+
+.. [#sys-module] XXX
+
+.. [#bcannon-sandboxing] XXX
