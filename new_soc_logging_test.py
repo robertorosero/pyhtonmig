@@ -1,4 +1,5 @@
 import httplib
+reload(httplib)
 import fakesocket
 import logging
 from cStringIO import StringIO
@@ -26,7 +27,7 @@ if myconn.debuglevel > 0:
 	print "Debug level is > 0"
 
 myconn.connect()
-myconn.putrequest("GET", "/search?q=Jackilyn+Hoxworth")
+myconn.putrequest("GET", "/search?q=python")
 myconn.getresponse()
 
 print stringLog.getvalue()  # For testing purposes
