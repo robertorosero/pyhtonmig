@@ -5,3 +5,5 @@ Branch News
 Core and builtins
 -----------------
 
+* rev. 51392: Introduce objcap module to hold removed functions/methods.  Begin
+  with moving object.__subclasses__().
