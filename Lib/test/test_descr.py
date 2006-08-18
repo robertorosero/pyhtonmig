@@ -3595,7 +3595,6 @@ def test_mutable_bases():
     vereq(e.meth(), 1)
     vereq(d.a, 2)
     vereq(e.a, 2)
-    vereq(C2.__subclasses__(), [D])
 
     # stuff that shouldn't:
     class L(list):

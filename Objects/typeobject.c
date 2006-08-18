@@ -2151,39 +2151,10 @@ type_dealloc(PyTypeObject *type)
 	type->ob_type->tp_free((PyObject *)type);
 }
 
-static PyObject *
-type_subclasses(PyTypeObject *type, PyObject *args_ignored)
-{
-	PyObject *list, *raw, *ref;
-	Py_ssize_t i, n;
-
-	list = PyList_New(0);
-	if (list == NULL)
-		return NULL;
-	raw = type->tp_subclasses;
-	if (raw == NULL)
-		return list;
-	assert(PyList_Check(raw));
-	n = PyList_GET_SIZE(raw);
-	for (i = 0; i < n; i++) {
-		ref = PyList_GET_ITEM(raw, i);
-		assert(PyWeakref_CheckRef(ref));
-		ref = PyWeakref_GET_OBJECT(ref);
-		if (ref != Py_None) {
-			if (PyList_Append(list, ref) < 0) {
-				Py_DECREF(list);
-				return NULL;
-			}
-		}
-	}
-	return list;
-}
 
 static PyMethodDef type_methods[] = {
 	{"mro", (PyCFunction)mro_external, METH_NOARGS,
 	 PyDoc_STR("mro() -> list\nreturn a type's method resolution order")},
-	{"__subclasses__", (PyCFunction)type_subclasses, METH_NOARGS,
-	 PyDoc_STR("__subclasses__() -> list of immediate subclasses")},
 	{0}
 };
 
