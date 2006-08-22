@@ -1233,7 +1233,7 @@ get_int(PyObject *attr, Py_ssize_t *value, const char *name)
     if (PyInt_Check(attr)) {
         *value = PyInt_AS_LONG(attr);
     } else if (PyLong_Check(attr)) {
-        *value = _PyLong_AsSsize_t(attr);
+        *value = PyLong_AsSsize_t(attr);
         if (*value == -1 && PyErr_Occurred())
             return -1;
     } else {
@@ -1520,8 +1520,8 @@ UnicodeError_init(PyUnicodeErrorObject *self, PyObject *args, PyObject *kwds,
     if (!PyArg_ParseTuple(args, "O!O!O!O!O!",
         &PyString_Type, &self->encoding,
         objecttype, &self->object,
-        &PyInt_Type, &self->start,
-        &PyInt_Type, &self->end,
+        &PyLong_Type, &self->start,
+        &PyLong_Type, &self->end,
         &PyString_Type, &self->reason)) {
         self->encoding = self->object = self->start = self->end =
             self->reason = NULL;
@@ -1752,8 +1752,8 @@ UnicodeTranslateError_init(PyUnicodeErrorObject *self, PyObject *args,
 
     if (!PyArg_ParseTuple(args, "O!O!O!O!",
         &PyUnicode_Type, &self->object,
-        &PyInt_Type, &self->start,
-        &PyInt_Type, &self->end,
+        &PyLong_Type, &self->start,
+        &PyLong_Type, &self->end,
         &PyString_Type, &self->reason)) {
         self->object = self->start = self->end = self->reason = NULL;
         return -1;

@@ -915,10 +915,6 @@ PyNumber_Int(PyObject *o)
 		}
 		return res;
 	}
-	if (PyInt_Check(o)) { /* A int subclass without nb_int */
-		PyIntObject *io = (PyIntObject*)o;
-		return PyInt_FromLong(io->ob_ival);
-	}
 	if (PyString_Check(o))
 		return int_from_string(PyString_AS_STRING(o),
 				       PyString_GET_SIZE(o));

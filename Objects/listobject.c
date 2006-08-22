@@ -869,8 +869,8 @@ listpop(PyListObject *self, PyObject *args)
 	if (!PyArg_UnpackTuple(args, "pop", 0, 1, &arg))
 		return NULL;
 	if (arg != NULL) {
-		if (PyInt_Check(arg))
-			i = PyInt_AS_LONG((PyIntObject*) arg);
+		if (PyLong_Check(arg))
+			i = PyLong_AsLong(arg);
 		else if (!PyArg_ParseTuple(args, "|n:pop", &i))
    			return NULL;
 	}

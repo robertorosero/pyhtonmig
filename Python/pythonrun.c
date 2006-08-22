@@ -181,7 +181,7 @@ Py_InitializeEx(int install_sigs)
 	if (!_PyFrame_Init())
 		Py_FatalError("Py_Initialize: can't init frames");
 
-	if (!_PyInt_Init())
+	if (!_PyLong_Init())
 		Py_FatalError("Py_Initialize: can't init ints");
 
 	_PyFloat_Init();
@@ -453,7 +453,7 @@ Py_Finalize(void)
 	PyList_Fini();
 	PySet_Fini();
 	PyString_Fini();
-	PyInt_Fini();
+	PyLong_Fini();
 	PyFloat_Fini();
 
 #ifdef Py_USING_UNICODE

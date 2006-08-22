@@ -67,8 +67,10 @@ bool_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 static PyObject *
 bool_and(PyObject *a, PyObject *b)
 {
-	if (!PyBool_Check(a) || !PyBool_Check(b))
-		return PyInt_Type.tp_as_number->nb_and(a, b);
+	if (!PyBool_Check(a) || !PyBool_Check(b)) {
+		PyErr_BadInternalCall();
+		return NULL;
+	}
 	return PyBool_FromLong(
 		((PyBoolObject *)a)->ob_ival & ((PyBoolObject *)b)->ob_ival);
 }
@@ -76,8 +78,10 @@ bool_and(PyObject *a, PyObject *b)
 static PyObject *
 bool_or(PyObject *a, PyObject *b)
 {
-	if (!PyBool_Check(a) || !PyBool_Check(b))
-		return PyInt_Type.tp_as_number->nb_or(a, b);
+	if (!PyBool_Check(a) || !PyBool_Check(b)) {
+		PyErr_BadInternalCall();
+		return NULL;
+	}
 	return PyBool_FromLong(
 		((PyBoolObject *)a)->ob_ival | ((PyBoolObject *)b)->ob_ival);
 }
@@ -85,10 +89,18 @@ bool_or(PyObject *a, PyObject *b)
 static PyObject *
 bool_xor(PyObject *a, PyObject *b)
 {
-	if (!PyBool_Check(a) || !PyBool_Check(b))
-		return PyInt_Type.tp_as_number->nb_xor(a, b);
+	if (!PyBool_Check(a) || !PyBool_Check(b)) {
+		PyErr_BadInternalCall();
+		return NULL;
+	}
 	return PyBool_FromLong(
 		((PyBoolObject *)a)->ob_ival ^ ((PyBoolObject *)b)->ob_ival);
+}
+
+static PyObject *
+bool_index(PyObject *a)
+{
+	return PyInt_FromLong(((PyBoolObject *)a)->ob_ival);
 }
 
 /* Doc string */
@@ -139,6 +151,7 @@ static PyNumberMethods bool_as_number = {
 	0,			/* nb_true_divide */
 	0,			/* nb_inplace_floor_divide */
 	0,			/* nb_inplace_true_divide */
+	bool_index,		/* nb_index */
 };
 
 /* The type object for bool.  Note that this cannot be subclassed! */
@@ -147,7 +160,7 @@ PyTypeObject PyBool_Type = {
 	PyObject_HEAD_INIT(&PyType_Type)
 	0,
 	"bool",
-	sizeof(PyIntObject),
+	sizeof(PyBoolObject),
 	0,
 	0,					/* tp_dealloc */
 	(printfunc)bool_print,			/* tp_print */
@@ -175,7 +188,7 @@ PyTypeObject PyBool_Type = {
 	0,					/* tp_methods */
 	0,					/* tp_members */
 	0,					/* tp_getset */
-	&PyInt_Type,				/* tp_base */
+	0,					/* tp_base */
 	0,					/* tp_dict */
 	0,					/* tp_descr_get */
 	0,					/* tp_descr_set */
@@ -188,12 +201,12 @@ PyTypeObject PyBool_Type = {
 /* The objects representing bool values False and True */
 
 /* Named Zero for link-level compatibility */
-PyIntObject _Py_ZeroStruct = {
+PyBoolObject _Py_FalseStruct = {
 	PyObject_HEAD_INIT(&PyBool_Type)
 	0
 };
 
-PyIntObject _Py_TrueStruct = {
+PyBoolObject _Py_TrueStruct = {
 	PyObject_HEAD_INIT(&PyBool_Type)
 	1
 };
