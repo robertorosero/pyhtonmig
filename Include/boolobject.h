@@ -7,11 +7,6 @@ extern "C" {
 #endif
 
 
-typedef struct {
-    PyObject_HEAD
-    long ob_ival;
-} PyBoolObject;
-
 PyAPI_DATA(PyTypeObject) PyBool_Type;
 
 #define PyBool_Check(x) ((x)->ob_type == &PyBool_Type)
@@ -20,7 +15,7 @@ PyAPI_DATA(PyTypeObject) PyBool_Type;
 Don't forget to apply Py_INCREF() when returning either!!! */
 
 /* Don't use these directly */
-PyAPI_DATA(PyBoolObject) _Py_FalseStruct, _Py_TrueStruct;
+PyAPI_DATA(struct _longobject) _Py_FalseStruct, _Py_TrueStruct;
 
 /* Use these macros */
 #define Py_False ((PyObject *) &_Py_FalseStruct)
