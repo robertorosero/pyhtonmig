@@ -713,6 +713,83 @@ test_with_docstring(PyObject *self)
 	Py_RETURN_NONE;
 }
 
+#ifdef HAVE_GETTIMEOFDAY
+/* Profiling of integer performance */
+void print_delta(int test, struct timeval *s, struct timeval *e)
+{
+	e->tv_sec -= s->tv_sec;
+	e->tv_usec -= s->tv_usec;
+	if (e->tv_usec < 0) {
+		e->tv_sec -=1;
+		e->tv_usec += 1000000;
+	}
+	printf("Test %d: %d.%06ds\n", test, (int)e->tv_sec, e->tv_usec);
+}
+
+static PyObject *
+profile_int(PyObject *self, PyObject* args)
+{
+	int i, k;
+	struct timeval start, stop;
+	PyObject *single, **multiple;
+
+	/* Test 1: Allocate and immediately deallocate
+	   many small integers */
+	gettimeofday(&start, NULL);
+	for(k=0; k < 20000; k++)
+		for(i=0; i < 1000; i++) {
+			single = PyInt_FromLong(i);
+			Py_DECREF(single);
+		}
+	gettimeofday(&stop, NULL);
+	print_delta(1, &start, &stop);
+
+	/* Test 2: Allocate and immediately deallocate
+	   many large integers */
+	gettimeofday(&start, NULL);
+	for(k=0; k < 20000; k++)
+		for(i=0; i < 1000; i++) {
+			single = PyInt_FromLong(i+1000000);
+			Py_DECREF(single);
+		}
+	gettimeofday(&stop, NULL);
+	print_delta(2, &start, &stop);
+
+	/* Test 3: Allocate a few integers, then release
+	   them all simultaneously. */
+	multiple = malloc(sizeof(PyObject*) * 1000);
+	gettimeofday(&start, NULL);
+	for(k=0; k < 20000; k++) {
+		for(i=0; i < 1000; i++) {
+			multiple[i] = PyInt_FromLong(i+1000000);
+		}
+		for(i=0; i < 1000; i++) {
+			Py_DECREF(multiple[i]);
+		}
+	}
+	gettimeofday(&stop, NULL);
+	print_delta(3, &start, &stop);
+
+	/* Test 4: Allocate many integers, then release
+	   them all simultaneously. */
+	multiple = malloc(sizeof(PyObject*) * 1000000);
+	gettimeofday(&start, NULL);
+	for(k=0; k < 20; k++) {
+		for(i=0; i < 1000000; i++) {
+			multiple[i] = PyInt_FromLong(i+1000000);
+		}
+		for(i=0; i < 1000000; i++) {
+			Py_DECREF(multiple[i]);
+		}
+	}
+	gettimeofday(&stop, NULL);
+	print_delta(4, &start, &stop);
+
+	Py_INCREF(Py_None);
+	return Py_None;
+}
+#endif
+
 static PyMethodDef TestMethods[] = {
 	{"raise_exception",	raise_exception,		 METH_VARARGS},
 	{"test_config",		(PyCFunction)test_config,	 METH_NOARGS},
@@ -750,6 +827,9 @@ static PyMethodDef TestMethods[] = {
 #endif
 #ifdef WITH_THREAD
 	{"_test_thread_state",  test_thread_state, 		 METH_VARARGS},
+#endif
+#ifdef HAVE_GETTIMEOFDAY
+	{"profile_int",		profile_int,			METH_NOARGS},
 #endif
 	{NULL, NULL} /* sentinel */
 };
