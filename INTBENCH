@@ -1,0 +1,9 @@
+Measurements of _testcapi.profile_int, on an 800MHz G3, OSX 10.4.7
+best of three runs
+
+r51476 (original p3yk)
+Test 1: 1.601978s
+Test 2: 1.696623s
+Test 3: 1.900683s
+Test 4: 5.307155s
+
