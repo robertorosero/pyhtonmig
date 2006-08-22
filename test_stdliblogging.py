@@ -18,7 +18,7 @@ handler = logging.StreamHandler(stringLog)
 log.setLevel(logging.INFO)
 
 # set a format for the output
-formatter = logging.Formatter('%(name)-12s: %(levelname)-8s %(message)s')
+formatter = logging.Formatter('%(name)s:  %(levelname)s %(message)s')
 handler.setFormatter(formatter)
 
 # add the handler to the logger

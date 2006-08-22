@@ -1,0 +1,21 @@
+Modifications to the Original Proposal
+- the import is delayed until it's need
+
+Module Checklist
+BaseHTTPServer.py - done but no test case created
+SocketServer.py - done but no test case created
+asyncore.py - done
+gopherlib.py - done but no test case created
+httplib - done with a test case almost completed
+ihooks.py - done but no test case created
+imaplib.py - done but no test case created
+mhlib.py - done but no test case created
+nntplib.py - done but no test case created
+pipes.py - done but no test case created
+pkgutil.py  - done but no test case created
+robotparser.py - done but no test case created
+shlex.py - done but no test case created
+smtpd.py - done but no test case created
+threading.py - done but no test case created
+timeit.py - done but no test case created
+trace.py - done but no test case created

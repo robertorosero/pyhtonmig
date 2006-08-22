@@ -26,9 +26,10 @@ myconn.set_debuglevel(43)
 if myconn.debuglevel > 0:
 	print "Debug level is > 0"
 
-myconn.connect()
+#myconn.connect()
+httplib.HTTPConnection('MOCK')
 myconn.putrequest("GET", "/search?q=python")
-myconn.getresponse()
+#myconn.getresponse()
 
 print stringLog.getvalue()  # For testing purposes
 
