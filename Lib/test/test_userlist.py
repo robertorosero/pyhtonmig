@@ -7,16 +7,6 @@ from test import test_support, list_tests
 class UserListTest(list_tests.CommonTest):
     type2test = UserList
 
-    def test_getslice(self):
-        super(UserListTest, self).test_getslice()
-        l = [0, 1, 2, 3, 4]
-        u = self.type2test(l)
-        for i in range(-3, 6):
-            self.assertEqual(u[:i], l[:i])
-            self.assertEqual(u[i:], l[i:])
-            for j in xrange(-3, 6):
-                self.assertEqual(u[i:j], l[i:j])
-
     def test_add_specials(self):
         u = UserList("spam")
         u2 = u + "eggs"

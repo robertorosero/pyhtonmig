@@ -35,9 +35,6 @@ class UserString:
 
     def __len__(self): return len(self.data)
     def __getitem__(self, index): return self.__class__(self.data[index])
-    def __getslice__(self, start, end):
-        start = max(start, 0); end = max(end, 0)
-        return self.__class__(self.data[start:end])
 
     def __add__(self, other):
         if isinstance(other, UserString):
@@ -149,26 +146,31 @@ class MutableString(UserString):
     def __hash__(self):
         raise TypeError, "unhashable type (it is mutable)"
     def __setitem__(self, index, sub):
-        if index < 0:
-            index += len(self.data)
-        if index < 0 or index >= len(self.data): raise IndexError
-        self.data = self.data[:index] + sub + self.data[index+1:]
-    def __delitem__(self, index):
-        if index < 0:
-            index += len(self.data)
-        if index < 0 or index >= len(self.data): raise IndexError
-        self.data = self.data[:index] + self.data[index+1:]
-    def __setslice__(self, start, end, sub):
-        start = max(start, 0); end = max(end, 0)
-        if isinstance(sub, UserString):
-            self.data = self.data[:start]+sub.data+self.data[end:]
-        elif isinstance(sub, basestring):
-            self.data = self.data[:start]+sub+self.data[end:]
+        if isinstance(index, slice):
+            if isinstance(sub, UserString):
+               sub = sub.data
+            elif not isinstance(sub, basestring):
+               sub = str(sub)
+            start, stop, step = index.indices(len(self.data))
+            if step != 1:
+                raise TypeError, "invalid step in slicing assignment"
+            self.data = self.data[:start] + sub + self.data[stop:]
         else:
-            self.data =  self.data[:start]+str(sub)+self.data[end:]
-    def __delslice__(self, start, end):
-        start = max(start, 0); end = max(end, 0)
-        self.data = self.data[:start] + self.data[end:]
+            if index < 0:
+                index += len(self.data)
+            if index < 0 or index >= len(self.data): raise IndexError
+            self.data = self.data[:index] + sub + self.data[index+1:]
+    def __delitem__(self, index):
+        if isinstance(index, slice):
+            start, stop, step = index.indices(len(self.data))
+            if step != 1:
+                raise TypeError, "invalid step in slicing assignment"
+            self.data = self.data[:start] + self.data[stop:]
+        else:
+            if index < 0:
+                index += len(self.data)
+            if index < 0 or index >= len(self.data): raise IndexError
+            self.data = self.data[:index] + self.data[index+1:]
     def immutable(self):
         return UserString(self.data)
     def __iadd__(self, other):

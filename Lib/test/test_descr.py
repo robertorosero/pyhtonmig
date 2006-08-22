@@ -39,7 +39,7 @@ def testbinop(a, b, res, expr="a+b", meth="__add__"):
     bm = getattr(a, meth)
     vereq(bm(b), res)
 
-def testternop(a, b, c, res, expr="a[b:c]", meth="__getslice__"):
+def testternop(a, b, c, res, expr="a[b:c]", meth="__getitem__"):
     if verbose: print "checking", expr
     dict = {'a': a, 'b': b, 'c': c}
     vereq(eval(expr, dict), res)
@@ -48,9 +48,9 @@ def testternop(a, b, c, res, expr="a[b:c]", meth="__getslice__"):
     while meth not in t.__dict__:
         t = t.__bases__[0]
     vereq(m, t.__dict__[meth])
-    vereq(m(a, b, c), res)
+    vereq(m(a, slice(b, c, None)), res)
     bm = getattr(a, meth)
-    vereq(bm(b, c), res)
+    vereq(bm(slice(b, c, None)), res)
 
 def testsetop(a, b, res, stmt="a+=b", meth="__iadd__"):
     if verbose: print "checking", stmt
@@ -88,7 +88,7 @@ def testset2op(a, b, c, res, stmt="a[b]=c", meth="__setitem__"):
     bm(b, c)
     vereq(dict['a'], res)
 
-def testset3op(a, b, c, d, res, stmt="a[b:c]=d", meth="__setslice__"):
+def testset3op(a, b, c, d, res, stmt="a[b:c]=d", meth="__setitem__"):
     if verbose: print "checking", stmt
     dict = {'a': deepcopy(a), 'b': b, 'c': c, 'd': d}
     exec stmt in dict
@@ -99,11 +99,11 @@ def testset3op(a, b, c, d, res, stmt="a[b:c]=d", meth="__setslice__"):
     m = getattr(t, meth)
     vereq(m, t.__dict__[meth])
     dict['a'] = deepcopy(a)
-    m(dict['a'], b, c, d)
+    m(dict['a'], slice(b, c, None), d)
     vereq(dict['a'], res)
     dict['a'] = deepcopy(a)
     bm = getattr(dict['a'], meth)
-    bm(b, c, d)
+    bm(slice(b, c, None), d)
     vereq(dict['a'], res)
 
 def class_docstrings():
@@ -140,14 +140,14 @@ def lists():
     testbinop([1,2,3], 2, 1, "b in a", "__contains__")
     testbinop([1,2,3], 4, 0, "b in a", "__contains__")
     testbinop([1,2,3], 1, 2, "a[b]", "__getitem__")
-    testternop([1,2,3], 0, 2, [1,2], "a[b:c]", "__getslice__")
+    testternop([1,2,3], 0, 2, [1,2], "a[b:c]", "__getitem__")
     testsetop([1], [2], [1,2], "a+=b", "__iadd__")
     testsetop([1,2], 3, [1,2,1,2,1,2], "a*=b", "__imul__")
     testunop([1,2,3], 3, "len(a)", "__len__")
     testbinop([1,2], 3, [1,2,1,2,1,2], "a*b", "__mul__")
     testbinop([1,2], 3, [1,2,1,2,1,2], "b*a", "__rmul__")
     testset2op([1,2], 1, 3, [1,3], "a[b]=c", "__setitem__")
-    testset3op([1,2,3,4], 1, 3, [5,6], [1,5,6,4], "a[b:c]=d", "__setslice__")
+    testset3op([1,2,3,4], 1, 3, [5,6], [1,5,6,4], "a[b:c]=d", "__setitem__")
 
 def dicts():
     if verbose: print "Testing dict operations..."
@@ -490,7 +490,7 @@ def spamlists():
     testbinop(spamlist([1,2,3]), 4, 0, "b in a", "__contains__")
     testbinop(spamlist([1,2,3]), 1, 2, "a[b]", "__getitem__")
     testternop(spamlist([1,2,3]), 0, 2, spamlist([1,2]),
-               "a[b:c]", "__getslice__")
+               "a[b:c]", "__getitem__")
     testsetop(spamlist([1]), spamlist([2]), spamlist([1,2]),
               "a+=b", "__iadd__")
     testsetop(spamlist([1,2]), 3, spamlist([1,2,1,2,1,2]), "a*=b", "__imul__")
@@ -499,7 +499,7 @@ def spamlists():
     testbinop(spamlist([1,2]), 3, spamlist([1,2,1,2,1,2]), "b*a", "__rmul__")
     testset2op(spamlist([1,2]), 1, 3, spamlist([1,3]), "a[b]=c", "__setitem__")
     testset3op(spamlist([1,2,3,4]), 1, 3, spamlist([5,6]),
-               spamlist([1,5,6,4]), "a[b:c]=d", "__setslice__")
+               spamlist([1,5,6,4]), "a[b:c]=d", "__setitem__")
     # Test subclassing
     class C(spam.spamlist):
         def foo(self): return 1
@@ -613,9 +613,9 @@ def pylists():
     if verbose: print "Testing Python subclass of list..."
     class C(list):
         def __getitem__(self, i):
+            if isinstance(i, slice):
+                return i.start, i.stop
             return list.__getitem__(self, i) + 100
-        def __getslice__(self, i, j):
-            return (i, j)
     a = C()
     a.extend([0,1,2])
     vereq(a[0], 100)
@@ -1580,13 +1580,6 @@ def overloading():
         def __delitem__(self, key):
             self.delitem = key
 
-        def __getslice__(self, i, j):
-            return ("getslice", i, j)
-        def __setslice__(self, i, j, value):
-            self.setslice = (i, j, value)
-        def __delslice__(self, i, j):
-            self.delslice = (i, j)
-
     a = C()
     vereq(a.foo, ("getattr", "foo"))
     a.foo = 12
@@ -1600,11 +1593,11 @@ def overloading():
     del a[12]
     vereq(a.delitem, 12)
 
-    vereq(a[0:10], ("getslice", 0, 10))
+    vereq(a[0:10], ("getitem", slice(0, 10, None)))
     a[0:10] = "foo"
-    vereq(a.setslice, (0, 10, "foo"))
+    vereq(a.setitem, (slice(0, 10, None), "foo"))
     del a[0:10]
-    vereq(a.delslice, (0, 10))
+    vereq(a.delitem, slice(0, 10, None))
 
 def methods():
     if verbose: print "Testing methods..."

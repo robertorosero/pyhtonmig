@@ -188,12 +188,10 @@ class OverflowTestCase(unittest.TestCase):
                 return maxint
             def __getitem__(self, key):
                 return key
-            def __getslice__(self, i, j):
-                return i, j
         x = GetItem()
         self.assertEqual(x[self.pos], self.pos)
         self.assertEqual(x[self.neg], self.neg)
-        self.assertEqual(x[self.neg:self.pos], (-1, maxint))
+        self.assertEqual(x[self.neg:self.pos], slice(self.neg, self.pos, None))
         self.assertEqual(x[self.neg:self.pos:1].indices(maxint), (0, maxint, 1))
 
     def test_getitem(self):

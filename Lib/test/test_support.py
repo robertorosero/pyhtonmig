@@ -314,10 +314,7 @@ _1G = 1024 * _1M
 _2G = 2 * _1G
 
 # Hack to get at the maximum value an internal index can take.
-class _Dummy:
-    def __getslice__(self, i, j):
-        return j
-MAX_Py_ssize_t = _Dummy()[:]
+MAX_Py_ssize_t = 1<<63
 
 def set_memlimit(limit):
     import re
