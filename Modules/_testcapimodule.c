@@ -731,7 +731,7 @@ profile_int(PyObject *self, PyObject* args)
 {
 	int i, k;
 	struct timeval start, stop;
-	PyObject *single, **multiple;
+	PyObject *single, **multiple, *op1, *result;
 
 	/* Test 1: Allocate and immediately deallocate
 	   many small integers */
@@ -784,6 +784,42 @@ profile_int(PyObject *self, PyObject* args)
 	}
 	gettimeofday(&stop, NULL);
 	print_delta(4, &start, &stop);
+
+	/* Test 5: Allocate many integers < 32000 */
+	multiple = malloc(sizeof(PyObject*) * 1000000);
+	gettimeofday(&start, NULL);
+	for(k=0; k < 20; k++) {
+		for(i=0; i < 1000000; i++) {
+			multiple[i] = PyInt_FromLong(i+1000);
+		}
+		for(i=0; i < 1000000; i++) {
+			Py_DECREF(multiple[i]);
+		}
+	}
+	gettimeofday(&stop, NULL);
+	print_delta(5, &start, &stop);
+
+	/* Test 6: Perform small int addition */
+	op1 = PyInt_FromLong(1);
+	gettimeofday(&start, NULL);
+	for(i=0; i < 10000000; i++) {
+		result = PyNumber_Add(op1, op1);
+		Py_DECREF(result);
+	}
+	gettimeofday(&stop, NULL);
+	Py_DECREF(op1);
+	print_delta(6, &start, &stop);
+
+	/* Test 7: Perform medium int addition */
+	op1 = PyInt_FromLong(1000);
+	gettimeofday(&start, NULL);
+	for(i=0; i < 10000000; i++) {
+		result = PyNumber_Add(op1, op1);
+		Py_DECREF(result);
+	}
+	gettimeofday(&stop, NULL);
+	Py_DECREF(op1);
+	print_delta(7, &start, &stop);
 
 	Py_INCREF(Py_None);
 	return Py_None;

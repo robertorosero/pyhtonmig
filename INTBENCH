@@ -6,6 +6,8 @@ Test 1: 1.601978s
 Test 2: 1.696623s
 Test 3: 1.900683s
 Test 4: 5.307155s
+Test 6: 1.670252s
+Test 7: 1.910734s
 
 r51506 (int type dropped)
 Test 1: 4.134757s

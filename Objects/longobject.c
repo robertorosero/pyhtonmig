@@ -29,7 +29,7 @@ int quick_int_allocs, quick_neg_int_allocs;
 static inline PyObject *
 get_small_int(int ival)
 {
-	PyObject *v = small_ints + ival + NSMALLNEGINTS;
+	PyObject *v = (PyObject*)(small_ints + ival + NSMALLNEGINTS);
 	Py_INCREF(v);
 #ifdef COUNT_ALLOCS
 	if (ival >= 0)
@@ -37,7 +37,7 @@ get_small_int(int ival)
 	else
 		quick_neg_int_allocs++;
 #endif
-	return (PyObject *) v;
+	return v;
 }
 #define CHECK_SMALL_INT(ival) \
 	do if (-NSMALLNEGINTS <= ival && ival < NSMALLPOSINTS) { \
@@ -47,6 +47,7 @@ get_small_int(int ival)
 #else
 #define CHECK_SMALL_INT(ival)
 #endif
+
 /* For long multiplication, use the O(N**2) school algorithm unless
  * both operands contain more than KARATSUBA_CUTOFF digits (this
  * being an internal Python long digit, in base BASE).
@@ -152,6 +153,16 @@ PyLong_FromLong(long ival)
 		negative = 1;
 	}
 
+	if (ival < BASE) {
+		/* Fast path for single-digits ints */
+		v = PyObject_NEW_VAR(PyLongObject, &PyLong_Type, 1);
+		if (v) {
+			v->ob_size = negative ? -1 : 1;
+			v->ob_digit[0] = ival;
+		}
+		return (PyObject*)v;
+	}
+
 	/* Count the number of Python digits.
 	   We used to pick 5 ("big enough for anything"), but that's a
 	   waste of time and space given that 5*15 = 75 bits are rarely
@@ -183,7 +194,8 @@ PyLong_FromUnsignedLong(unsigned long ival)
 	unsigned long t;
 	int ndigits = 0;
 
-	CHECK_SMALL_INT(ival);
+	if (ival < BASE)
+		return PyLong_FromLong(ival);
 	/* Count the number of Python digits. */
 	t = (unsigned long)ival;
 	while (t) {
@@ -216,11 +228,11 @@ PyLong_FromDouble(double dval)
 			"cannot convert float infinity to long");
 		return NULL;
 	}
+	CHECK_SMALL_INT((int)dval);
 	if (dval < 0.0) {
 		neg = 1;
 		dval = -dval;
 	}
-	CHECK_SMALL_INT((int)dval);
 	frac = frexp(dval, &expo); /* dval = frac*2**expo; 0.0 <= frac < 1.0 */
 	if (expo <= 0)
 		return PyLong_FromLong(0L);
@@ -948,7 +960,8 @@ PyLong_FromUnsignedLongLong(unsigned PY_LONG_LONG ival)
 	unsigned PY_LONG_LONG t;
 	int ndigits = 0;
 
-	CHECK_SMALL_INT(ival);
+	if (ival < BASE)
+		return PyLong_FromLong(ival);
 	/* Count the number of Python digits. */
 	t = (unsigned PY_LONG_LONG)ival;
 	while (t) {
@@ -974,7 +987,8 @@ PyLong_FromSsize_t(Py_ssize_t ival)
 {
 	Py_ssize_t bytes = ival;
 	int one = 1;
-	CHECK_SMALL_INT(ival);
+	if (ival < BASE)
+		return PyLong_FromLong(ival);
 	return _PyLong_FromByteArray(
 			(unsigned char *)&bytes,
 			SIZEOF_SIZE_T, IS_LITTLE_ENDIAN, 1);
@@ -987,7 +1001,8 @@ PyLong_FromSize_t(size_t ival)
 {
 	size_t bytes = ival;
 	int one = 1;
-	CHECK_SMALL_INT(ival);
+	if (ival < BASE)
+		return PyLong_FromLong(ival);
 	return _PyLong_FromByteArray(
 			(unsigned char *)&bytes,
 			SIZEOF_SIZE_T, IS_LITTLE_ENDIAN, 0);
