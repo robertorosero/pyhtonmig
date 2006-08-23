@@ -7,3 +7,8 @@ Test 2: 1.696623s
 Test 3: 1.900683s
 Test 4: 5.307155s
 
+r51506 (int type dropped)
+Test 1: 4.134757s
+Test 2: 4.398235s
+Test 3: 4.611636s
+Test 4: 10.665429s
