@@ -12,3 +12,9 @@ Test 1: 4.134757s
 Test 2: 4.398235s
 Test 3: 4.611636s
 Test 4: 10.665429s
+
+r51509 (small int cache)
+Test 1: 3.457184s
+Test 2: 4.514800s
+Test 3: 4.999010s
+Test 4: 10.818277s
