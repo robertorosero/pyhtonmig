@@ -9,6 +9,44 @@
 
 #include <ctype.h>
 
+#ifndef NSMALLPOSINTS
+#define NSMALLPOSINTS		257
+#endif
+#ifndef NSMALLNEGINTS
+#define NSMALLNEGINTS		5
+#endif
+#if NSMALLNEGINTS + NSMALLPOSINTS > 0
+/* Small integers are preallocated in this array so that they
+   can be shared.
+   The integers that are preallocated are those in the range
+   -NSMALLNEGINTS (inclusive) to NSMALLPOSINTS (not inclusive).
+*/
+static PyLongObject small_ints[NSMALLNEGINTS + NSMALLPOSINTS];
+#ifdef COUNT_ALLOCS
+int quick_int_allocs, quick_neg_int_allocs;
+#endif
+
+static inline PyObject *
+get_small_int(int ival)
+{
+	PyObject *v = small_ints + ival + NSMALLNEGINTS;
+	Py_INCREF(v);
+#ifdef COUNT_ALLOCS
+	if (ival >= 0)
+		quick_int_allocs++;
+	else
+		quick_neg_int_allocs++;
+#endif
+	return (PyObject *) v;
+}
+#define CHECK_SMALL_INT(ival) \
+	do if (-NSMALLNEGINTS <= ival && ival < NSMALLPOSINTS) { \
+		return get_small_int(ival); \
+	} while(0)
+
+#else
+#define CHECK_SMALL_INT(ival)
+#endif
 /* For long multiplication, use the O(N**2) school algorithm unless
  * both operands contain more than KARATSUBA_CUTOFF digits (this
  * being an internal Python long digit, in base BASE).
@@ -83,6 +121,12 @@ _PyLong_Copy(PyLongObject *src)
 	i = src->ob_size;
 	if (i < 0)
 		i = -(i);
+	if (i < 2) {
+		int ival = src->ob_digit[0];
+		if (src->ob_size < 0)
+			ival = -ival;
+		CHECK_SMALL_INT(ival);
+	}
 	result = _PyLong_New(i);
 	if (result != NULL) {
 		result->ob_size = src->ob_size;
@@ -102,6 +146,7 @@ PyLong_FromLong(long ival)
 	int ndigits = 0;
 	int negative = 0;
 
+	CHECK_SMALL_INT(ival);
 	if (ival < 0) {
 		ival = -ival;
 		negative = 1;
@@ -138,6 +183,7 @@ PyLong_FromUnsignedLong(unsigned long ival)
 	unsigned long t;
 	int ndigits = 0;
 
+	CHECK_SMALL_INT(ival);
 	/* Count the number of Python digits. */
 	t = (unsigned long)ival;
 	while (t) {
@@ -174,6 +220,7 @@ PyLong_FromDouble(double dval)
 		neg = 1;
 		dval = -dval;
 	}
+	CHECK_SMALL_INT((int)dval);
 	frac = frexp(dval, &expo); /* dval = frac*2**expo; 0.0 <= frac < 1.0 */
 	if (expo <= 0)
 		return PyLong_FromLong(0L);
@@ -801,6 +848,9 @@ PyLong_FromVoidPtr(void *p)
 #if SIZEOF_LONG_LONG < SIZEOF_VOID_P
 #   error "PyLong_FromVoidPtr: sizeof(PY_LONG_LONG) < sizeof(void*)"
 #endif
+	/* special-case null pointer */
+	if (!p)
+		return PyInt_FromLong(0);
 	return PyLong_FromUnsignedLongLong((unsigned PY_LONG_LONG)p);
 
 }
@@ -861,6 +911,7 @@ PyLong_FromLongLong(PY_LONG_LONG ival)
 	int ndigits = 0;
 	int negative = 0;
 
+	CHECK_SMALL_INT(ival);
 	if (ival < 0) {
 		ival = -ival;
 		negative = 1;
@@ -897,6 +948,7 @@ PyLong_FromUnsignedLongLong(unsigned PY_LONG_LONG ival)
 	unsigned PY_LONG_LONG t;
 	int ndigits = 0;
 
+	CHECK_SMALL_INT(ival);
 	/* Count the number of Python digits. */
 	t = (unsigned PY_LONG_LONG)ival;
 	while (t) {
@@ -922,6 +974,7 @@ PyLong_FromSsize_t(Py_ssize_t ival)
 {
 	Py_ssize_t bytes = ival;
 	int one = 1;
+	CHECK_SMALL_INT(ival);
 	return _PyLong_FromByteArray(
 			(unsigned char *)&bytes,
 			SIZEOF_SIZE_T, IS_LITTLE_ENDIAN, 1);
@@ -934,6 +987,7 @@ PyLong_FromSize_t(size_t ival)
 {
 	size_t bytes = ival;
 	int one = 1;
+	CHECK_SMALL_INT(ival);
 	return _PyLong_FromByteArray(
 			(unsigned char *)&bytes,
 			SIZEOF_SIZE_T, IS_LITTLE_ENDIAN, 0);
@@ -3402,20 +3456,19 @@ PyTypeObject PyLong_Type = {
 int
 _PyLong_Init(void)
 {
-	int ival;
-#if 0
 #if NSMALLNEGINTS + NSMALLPOSINTS > 0
-	for (ival = -NSMALLNEGINTS; ival < NSMALLPOSINTS; ival++) {
-              if (!free_list && (free_list = fill_free_list()) == NULL)
-			return 0;
-		/* PyObject_New is inlined */
-		v = free_list;
-		free_list = (PyIntObject *)v->ob_type;
-		PyObject_INIT(v, &PyInt_Type);
-		v->ob_ival = ival;
-		small_ints[ival + NSMALLNEGINTS] = v;
+	int ival;
+	PyLongObject *v = small_ints;
+	for (ival = -NSMALLNEGINTS; ival < 0; ival++, v++) {
+		PyObject_INIT(v, &PyLong_Type);
+		v->ob_size = -1;
+		v->ob_digit[0] = -ival;
 	}
-#endif
+	for (; ival < NSMALLPOSINTS; ival++, v++) {
+		PyObject_INIT(v, &PyLong_Type);
+		v->ob_size = ival ? 1 : 0;
+		v->ob_digit[0] = ival;
+	}
 #endif
 	return 1;
 }
@@ -3423,8 +3476,10 @@ _PyLong_Init(void)
 void
 PyLong_Fini(void)
 {
-	int i;
 #if 0
+	int i;
+	/* This is currently not needed; the small integers
+	   are statically allocated */
 #if NSMALLNEGINTS + NSMALLPOSINTS > 0
         PyIntObject **q;
 
