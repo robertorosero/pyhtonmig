@@ -788,7 +788,7 @@ profile_int(PyObject *self, PyObject* args)
 	/* Test 5: Allocate many integers < 32000 */
 	multiple = malloc(sizeof(PyObject*) * 1000000);
 	gettimeofday(&start, NULL);
-	for(k=0; k < 20; k++) {
+	for(k=0; k < 10; k++) {
 		for(i=0; i < 1000000; i++) {
 			multiple[i] = PyInt_FromLong(i+1000);
 		}
