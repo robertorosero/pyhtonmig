@@ -204,11 +204,32 @@ PyLong_AsLong(PyObject *vv)
 	unsigned long x, prev;
 	Py_ssize_t i;
 	int sign;
+	int do_decref = 0; /* if nb_int was called */
 
-	if (vv == NULL || !PyLong_Check(vv)) {
+	if (vv == NULL) {
 		PyErr_BadInternalCall();
 		return -1;
 	}
+
+	if (!PyLong_Check(vv)) {
+		PyNumberMethods *nb;
+		if ((nb = vv->ob_type->tp_as_number) == NULL ||
+		    nb->nb_int == NULL) {
+			PyErr_SetString(PyExc_TypeError, "an integer is required");
+			return -1;
+		}
+		vv = (*nb->nb_int) (vv);
+		if (vv == NULL)
+			return -1;
+		do_decref = 1;
+		if (!PyLong_Check(vv)) {
+			Py_DECREF(vv);
+			PyErr_SetString(PyExc_TypeError,
+					"nb_int should return int object");
+			return -1;
+		}
+	}
+
 	v = (PyLongObject *)vv;
 	i = v->ob_size;
 	sign = 1;
@@ -230,9 +251,15 @@ PyLong_AsLong(PyObject *vv)
 	 */
 	if ((long)x < 0 && (sign > 0 || (x << 1) != 0))
 		goto overflow;
+	if (do_decref) {
+		Py_DECREF(vv);
+	}
 	return (long)x * sign;
 
  overflow:
+	if (do_decref) {
+		Py_DECREF(vv);
+	}
 	PyErr_SetString(PyExc_OverflowError,
 			"long int too large to convert to long");
 	return -1;
@@ -3178,8 +3205,7 @@ long_long(PyObject *v)
 static PyObject *
 long_int(PyObject *v)
 {
-	Py_INCREF(v);
-	return v;
+	return long_long(v);
 }
 
 static PyObject *
