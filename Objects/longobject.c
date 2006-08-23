@@ -241,12 +241,14 @@ PyLong_AsLong(PyObject *vv)
 int
 _PyLong_FitsInLong(PyObject *vv)
 {
+	int size;
 	if (!PyLong_CheckExact(vv)) {
 		PyErr_BadInternalCall();
 		return 0;
 	}
 	/* conservative estimate */
-	return ((PyLongObject*)vv)->ob_size <= 2;
+	size = ((PyLongObject*)vv)->ob_size;
+	return -2 <= size && size <= 2;
 }
 
 /* Get a Py_ssize_t from a long int object.

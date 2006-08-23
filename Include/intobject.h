@@ -40,7 +40,7 @@ PyAPI_DATA(PyTypeObject) PyInt_Type;
 #define PyInt_AsLong PyLong_AsLong
 #define PyInt_AsSsize_t PyLong_AsSsize_t
 #define PyInt_AsUnsignedLongMask PyLong_AsUnsignedLongMask
-#define PyInt_AsUnsignedLongLongMask PyInt_AsUnsignedLongM
+#define PyInt_AsUnsignedLongLongMask PyLong_AsUnsignedLongLongMask
 
 PyAPI_FUNC(long) PyInt_GetMax(void);
 
