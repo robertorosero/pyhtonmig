@@ -1631,7 +1631,7 @@ array_subscr(arrayobject* self, PyObject* item)
 	}
 	else {
 		PyErr_SetString(PyExc_TypeError, 
-				"list indices must be integers");
+				"array indices must be integers");
 		return NULL;
 	}
 }
