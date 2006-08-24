@@ -638,7 +638,6 @@ buffer_ass_subscript(PyBufferObject *self, PyObject *item, PyObject *value)
 	void *ptr1, *ptr2;
 	Py_ssize_t selfsize;
 	Py_ssize_t othersize;
-	Py_ssize_t start, stop, step, slicelength;
 
 	if ( self->b_readonly ) {
 		PyErr_SetString(PyExc_TypeError,
@@ -709,8 +708,6 @@ buffer_ass_subscript(PyBufferObject *self, PyObject *item, PyObject *value)
 		}
 		else {
 			Py_ssize_t cur, i;
-			char *resultbuf = (char *)ptr1;
-			char *sourcebuf = (char *)ptr2;
 			
 			for (cur = start, i = 0; i < slicelength;
 			     cur += step, i++) {
@@ -796,9 +793,9 @@ static PySequenceMethods buffer_as_sequence = {
 	(binaryfunc)buffer_concat, /*sq_concat*/
 	(ssizeargfunc)buffer_repeat, /*sq_repeat*/
 	(ssizeargfunc)buffer_item, /*sq_item*/
-	(ssizessizeargfunc)buffer_slice, /*sq_slice*/
+	0, /*sq_slice*/
 	(ssizeobjargproc)buffer_ass_item, /*sq_ass_item*/
-	(ssizessizeobjargproc)buffer_ass_slice, /*sq_ass_slice*/
+	0, /*sq_ass_slice*/
 };
 
 static PyMappingMethods buffer_as_mapping = {

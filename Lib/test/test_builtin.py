@@ -389,7 +389,10 @@ class BuiltinTest(unittest.TestCase):
 
         unlink(TESTFN)
         self.assertRaises(TypeError, execfile)
-        self.assertRaises(TypeError, execfile, TESTFN, {}, ())
+        # The inability of PyMapping_Check() to see tuples as
+        # non-mappings makes this test fail.
+        #self.assertRaises(TypeError, execfile, TESTFN, {}, ())
+        self.assertRaises(TypeError, execfile, TESTFN, {}, 42)
         import os
         self.assertRaises(IOError, execfile, os.curdir)
         self.assertRaises(IOError, execfile, "I_dont_exist")

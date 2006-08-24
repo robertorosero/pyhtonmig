@@ -459,7 +459,8 @@ bytes_ass_subscript(PyBytesObject *self, PyObject *item, PyObject *values)
             stop = i + 1;
             step = 1;
             slicelen = 1;
-        } else {
+        }
+        else {
             Py_ssize_t ival = PyNumber_AsSsize_t(values, PyExc_ValueError);
             if (ival == -1 && PyErr_Occurred())
                 return -1;
@@ -503,7 +504,10 @@ bytes_ass_subscript(PyBytesObject *self, PyObject *item, PyObject *values)
         bytes = ((PyBytesObject *)values)->ob_bytes;
         needed = ((PyBytesObject *)values)->ob_size;
     }
-
+    /* Make sure b[5:2] = ... inserts before 5, not before 2. */
+    if ((step < 0 && start < stop) ||
+        (step > 0 && start > stop))
+        stop = start;
     if (step == 1) {
         if (slicelen != needed) {
             if (slicelen > needed) {
@@ -548,7 +552,7 @@ bytes_ass_subscript(PyBytesObject *self, PyObject *item, PyObject *values)
             }
             for (cur = start, i = 0;
                  i < slicelen; cur += step, i++) {
-                Py_ssize_t lim = step;
+                Py_ssize_t lim = step - 1;
 
                 if (cur + step >= PyBytes_GET_SIZE(self))
                     lim = PyBytes_GET_SIZE(self) - cur - 1;
@@ -557,10 +561,12 @@ bytes_ass_subscript(PyBytesObject *self, PyObject *item, PyObject *values)
                         self->ob_bytes + cur + 1, lim);
             }
             /* Move the tail of the bytes, in one chunk */
-            cur = start + slicelen*step + 1;
-            memmove(self->ob_bytes + cur - slicelen,
-                    self->ob_bytes + cur,
-                    PyBytes_GET_SIZE(self) - cur);
+            cur = start + slicelen*step;
+            if (cur < PyBytes_GET_SIZE(self)) {
+                memmove(self->ob_bytes + cur - slicelen,
+                        self->ob_bytes + cur,
+                        PyBytes_GET_SIZE(self) - cur);
+            }
             if (PyBytes_Resize((PyObject *)self, 
                                PyBytes_GET_SIZE(self) - slicelen) < 0)
                 return -1;
@@ -981,9 +987,9 @@ static PySequenceMethods bytes_as_sequence = {
     (binaryfunc)bytes_concat,           /*sq_concat*/
     (ssizeargfunc)bytes_repeat,         /*sq_repeat*/
     (ssizeargfunc)bytes_getitem,        /*sq_item*/
-    (ssizessizeargfunc)bytes_getslice,  /*sq_slice*/
+    0,                                  /*sq_slice*/
     (ssizeobjargproc)bytes_setitem,     /*sq_ass_item*/
-    (ssizessizeobjargproc)bytes_setslice, /* sq_ass_slice */
+    0, 					/* sq_ass_slice */
     (objobjproc)bytes_contains,         /* sq_contains */
     (binaryfunc)bytes_iconcat,   /* sq_inplace_concat */
     (ssizeargfunc)bytes_irepeat, /* sq_inplace_repeat */

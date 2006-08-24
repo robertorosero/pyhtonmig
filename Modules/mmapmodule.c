@@ -913,9 +913,9 @@ static PySequenceMethods mmap_as_sequence = {
 	(binaryfunc)mmap_concat,	       /*sq_concat*/
 	(ssizeargfunc)mmap_repeat,	       /*sq_repeat*/
 	(ssizeargfunc)mmap_item,		       /*sq_item*/
-	(ssizessizeargfunc)mmap_slice,	       /*sq_slice*/
+	0,				      /*sq_slice*/
 	(ssizeobjargproc)mmap_ass_item,	       /*sq_ass_item*/
-	(ssizessizeobjargproc)mmap_ass_slice,      /*sq_ass_slice*/
+	0,				      /*sq_ass_slice*/
 };
 
 static PyMappingMethods mmap_as_mapping = {

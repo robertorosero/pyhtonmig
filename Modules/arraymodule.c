@@ -1582,7 +1582,12 @@ array_subscr(arrayobject* self, PyObject* item)
 		}
 		if (i < 0)
 			i += self->ob_size;
-		return array_item(self, i);
+		if (i < 0 || i >= self->ob_size) {
+			PyErr_SetString(PyExc_IndexError,
+				"array index out of range");
+			return NULL;
+		}
+		return getarrayitem((PyObject *)self, i);
 	}
 	else if (PySlice_Check(item)) {
 		Py_ssize_t start, stop, step, slicelength, cur, i;
@@ -1597,6 +1602,16 @@ array_subscr(arrayobject* self, PyObject* item)
 
 		if (slicelength <= 0) {
 			return newarrayobject(&Arraytype, 0, self->ob_descr);
+		}
+		else if (step == 1) {
+			PyObject *result = newarrayobject(&Arraytype,
+						slicelength, self->ob_descr);
+			if (result == NULL)
+				return NULL;
+			memcpy(((arrayobject *)result)->ob_item,
+			       self->ob_item + start * itemsize,
+			       slicelength * itemsize);
+			return result;
 		}
 		else {
 			result = newarrayobject(&Arraytype, slicelength, self->ob_descr);
@@ -1624,111 +1639,145 @@ array_subscr(arrayobject* self, PyObject* item)
 static int
 array_ass_subscr(arrayobject* self, PyObject* item, PyObject* value)
 {
+	Py_ssize_t start, stop, step, slicelength, needed;
+	arrayobject* other;
+	int itemsize;
+
 	if (PyIndex_Check(item)) {
 		Py_ssize_t i = PyNumber_AsSsize_t(item, PyExc_IndexError);
-		if (i==-1 && PyErr_Occurred()) 
+		
+		if (i == -1 && PyErr_Occurred())
 			return -1;
 		if (i < 0)
 			i += self->ob_size;
-		return array_ass_item(self, i, value);
-	}
-	else if (PySlice_Check(item)) {
-		Py_ssize_t start, stop, step, slicelength;
-		int itemsize = self->ob_descr->itemsize;
-
-		if (PySlice_GetIndicesEx((PySliceObject*)item, self->ob_size,
-				 &start, &stop, &step, &slicelength) < 0) {
+		if (i < 0 || i >= self->ob_size) {
+			PyErr_SetString(PyExc_IndexError,
+				"array assignment index out of range");
 			return -1;
 		}
-
-		/* treat A[slice(a,b)] = v _exactly_ like A[a:b] = v */
-		if (step == 1 && ((PySliceObject*)item)->step == Py_None)
-			return array_ass_slice(self, start, stop, value);
-
 		if (value == NULL) {
-			/* delete slice */
-			Py_ssize_t cur, i, extra;
-			
-			if (slicelength <= 0)
-				return 0;
-
-			if (step < 0) {
-				stop = start + 1;
-				start = stop + step*(slicelength - 1) - 1;
-				step = -step;
-			}
-
-			for (cur = start, i = 0; i < slicelength - 1;
-			     cur += step, i++) {
-				memmove(self->ob_item + (cur - i)*itemsize,
-					self->ob_item + (cur + 1)*itemsize,
-					(step - 1) * itemsize);
-			}
-			extra = self->ob_size - (cur + 1);
-			if (extra > 0) {
-				memmove(self->ob_item + (cur - i)*itemsize,
-					self->ob_item + (cur + 1)*itemsize,
-					extra*itemsize);
-			}
-
-			self->ob_size -= slicelength;
-			self->ob_item = (char *)PyMem_REALLOC(self->ob_item,
-							      itemsize*self->ob_size);
-			self->allocated = self->ob_size;
-
-			return 0;
+			/* Fall through to slice assignment */
+			start = i;
+			stop = i + 1;
+			step = 1;
+			slicelength = 1;
 		}
-		else {
-			/* assign slice */
-			Py_ssize_t cur, i;
-			arrayobject* av;
-
-			if (!array_Check(value)) {
-				PyErr_Format(PyExc_TypeError,
-			     "must assign array (not \"%.200s\") to slice",
-					     value->ob_type->tp_name);
-				return -1;
-			}
-
-			av = (arrayobject*)value;
-
-			if (av->ob_size != slicelength) {
-				PyErr_Format(PyExc_ValueError,
-            "attempt to assign array of size %ld to extended slice of size %ld",
-					     /*XXX*/(long)av->ob_size, /*XXX*/(long)slicelength);
-				return -1;
-			}
-
-			if (!slicelength)
-				return 0;
-
-			/* protect against a[::-1] = a */
-			if (self == av) { 
-				value = array_slice(av, 0, av->ob_size);
-				av = (arrayobject*)value;
-				if (!av)
-					return -1;
-			} 
-			else {
-				Py_INCREF(value);
-			}
-
-			for (cur = start, i = 0; i < slicelength; 
-			     cur += step, i++) {
-				memcpy(self->ob_item + cur*itemsize,
-				       av->ob_item + i*itemsize,
-				       itemsize);
-			}
-
-			Py_DECREF(value);
-			
-			return 0;
+		else
+			return (*self->ob_descr->setitem)(self, i, value);
+	}
+	else if (PySlice_Check(item)) {
+		if (PySlice_GetIndicesEx((PySliceObject *)item,
+					 self->ob_size, &start, &stop,
+					 &step, &slicelength) < 0) {
+			return -1;
 		}
-	} 
+	}
 	else {
-		PyErr_SetString(PyExc_TypeError, 
-				"list indices must be integers");
+		PyErr_SetString(PyExc_TypeError,
+				"array indices must be integer");
 		return -1;
+	}
+	if (value == NULL) {
+		other = NULL;
+		needed = 0;
+	}
+	else if (array_Check(value)) {
+		other = (arrayobject *)value;
+		needed = other->ob_size;
+		if (self == other) {
+			/* Special case "self[i:j] = self" -- copy self first */
+			int ret;
+			value = array_slice(other, 0, needed);
+			if (value == NULL)
+				return -1;
+			ret = array_ass_subscr(self, item, value);
+			Py_DECREF(value);
+			return ret;
+		}
+		if (other->ob_descr != self->ob_descr) {
+			PyErr_BadArgument();
+			return -1;
+		}
+	}
+	else {
+		PyErr_Format(PyExc_TypeError,
+	     "can only assign array (not \"%.200s\") to array slice",
+			     value->ob_type->tp_name);
+		return -1;
+	}
+	itemsize = self->ob_descr->itemsize;
+	/* for 'a[2:1] = ...', the insertion point is 'start', not 'stop' */
+	if ((step > 0 && stop < start) ||
+	    (step < 0 && stop > start))
+		stop = start;
+	if (step == 1) {
+		if (slicelength > needed) {
+			memmove(self->ob_item + (start + needed) * itemsize,
+				self->ob_item + stop * itemsize,
+				(self->ob_size - stop) * itemsize);
+			if (array_resize(self, self->ob_size +
+					 needed - slicelength) < 0)
+				return -1;
+		}
+		else if (slicelength < needed) {
+			if (array_resize(self, self->ob_size +
+					 needed - slicelength) < 0)
+				return -1;
+			memmove(self->ob_item + (start + needed) * itemsize,
+				self->ob_item + stop * itemsize,
+				(self->ob_size - start - needed) * itemsize);
+		}
+		if (needed > 0)
+			memcpy(self->ob_item + start * itemsize,
+			       other->ob_item, needed * itemsize);
+		return 0;
+	}
+	else if (needed == 0) {
+		/* Delete slice */
+		Py_ssize_t cur, i;
+		
+		if (step < 0) {
+			stop = start + 1;
+			start = stop + step * (slicelength - 1) - 1;
+			step = -step;
+		}
+		for (cur = start, i = 0; i < slicelength;
+		     cur += step, i++) {
+			Py_ssize_t lim = step - 1;
+
+			if (cur + step >= self->ob_size)
+				lim = self->ob_size - cur - 1;
+			memmove(self->ob_item + (cur - i) * itemsize,
+				self->ob_item + (cur + 1) * itemsize,
+				lim * itemsize);
+		}
+		cur = start + slicelength * step;
+		if (cur < self->ob_size) {
+			memmove(self->ob_item + (cur-slicelength) * itemsize,
+				self->ob_item + cur * itemsize,
+				(self->ob_size - cur) * itemsize);
+		}
+		if (array_resize(self, self->ob_size - slicelength) < 0)
+			return -1;
+		return 0;
+	}
+	else {
+		Py_ssize_t cur, i;
+
+		if (needed != slicelength) {
+			PyErr_Format(PyExc_ValueError,
+				"attempt to assign array of size %zd "
+				"to extended slice of size %zd",
+				needed, slicelength);
+			return -1;
+		}
+		for (cur = start, i = 0; i < slicelength;
+		     cur += step, i++) {
+			memcpy(self->ob_item + cur * itemsize,
+			       other->ob_item + i * itemsize,
+			       itemsize);
+		}
+		return 0;
 	}
 }
 
@@ -1775,9 +1824,9 @@ static PySequenceMethods array_as_sequence = {
 	(binaryfunc)array_concat,               /*sq_concat*/
 	(ssizeargfunc)array_repeat,		/*sq_repeat*/
 	(ssizeargfunc)array_item,		        /*sq_item*/
-	(ssizessizeargfunc)array_slice,		/*sq_slice*/
+	0,					/*sq_slice*/
 	(ssizeobjargproc)array_ass_item,		/*sq_ass_item*/
-	(ssizessizeobjargproc)array_ass_slice,	/*sq_ass_slice*/
+	0,					/*sq_ass_slice*/
 	(objobjproc)array_contains,		/*sq_contains*/
 	(binaryfunc)array_inplace_concat,	/*sq_inplace_concat*/
 	(ssizeargfunc)array_inplace_repeat	/*sq_inplace_repeat*/

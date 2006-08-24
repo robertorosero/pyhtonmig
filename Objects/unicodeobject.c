@@ -7054,7 +7054,7 @@ static PySequenceMethods unicode_as_sequence = {
     PyUnicode_Concat,		 	/* sq_concat */
     (ssizeargfunc) unicode_repeat, 	/* sq_repeat */
     (ssizeargfunc) unicode_getitem, 	/* sq_item */
-    (ssizessizeargfunc) unicode_slice, 	/* sq_slice */
+    0,				 	/* sq_slice */
     0, 					/* sq_ass_item */
     0, 					/* sq_ass_slice */
     PyUnicode_Contains, 		/* sq_contains */

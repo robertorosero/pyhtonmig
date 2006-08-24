@@ -525,14 +525,6 @@ proxy_slice(PyWeakReference *proxy, Py_ssize_t i, Py_ssize_t j)
 }
 
 static int
-proxy_ass_slice(PyWeakReference *proxy, Py_ssize_t i, Py_ssize_t j, PyObject *value)
-{
-    if (!proxy_checkref(proxy))
-        return -1;
-    return PySequence_SetSlice(PyWeakref_GET_OBJECT(proxy), i, j, value);
-}
-
-static int
 proxy_contains(PyWeakReference *proxy, PyObject *value)
 {
     if (!proxy_checkref(proxy))
@@ -624,9 +616,9 @@ static PySequenceMethods proxy_as_sequence = {
     0,                          /*sq_concat*/
     0,                          /*sq_repeat*/
     0,                          /*sq_item*/
-    (ssizessizeargfunc)proxy_slice, /*sq_slice*/
+    0,                          /*sq_slice*/
     0,                          /*sq_ass_item*/
-    (ssizessizeobjargproc)proxy_ass_slice, /*sq_ass_slice*/
+    0,				 /*sq_ass_slice*/
     (objobjproc)proxy_contains, /* sq_contains */
 };
 

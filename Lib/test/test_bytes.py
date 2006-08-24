@@ -163,6 +163,16 @@ class BytesTest(unittest.TestCase):
         self.assertEqual(b[-5:100], by("world"))
         self.assertEqual(b[-100:5], by("Hello"))
 
+    def test_extended_getslice(self):
+        L = range(20)
+        b = bytes(L)
+        indices = (None, 1, 5, 11, 19, 100, -1, -2, -5, -11, -19, -100)
+        for start in indices:
+            for stop in indices:
+                for step in indices:
+                    idx = slice(start, stop, step)
+                    self.assertEqual(b[idx], bytes(L[idx]))
+        
     def test_regexps(self):
         def by(s):
             return bytes(map(ord, s))
@@ -235,6 +245,35 @@ class BytesTest(unittest.TestCase):
 
         b[3:5] = [3, 4, 5, 6]
         self.assertEqual(b, bytes(range(10)))
+
+    def test_extended_set_del_slice(self):
+        indices = (None, 1, 5, 11, 19, 100, -1, -2, -5, -11, -19, -100)
+        for start in indices:
+            for step in indices:
+                for stop in indices:
+                    L = list(range(20))
+                    b = bytes(L)
+
+                    idx = slice(start, stop, step)
+                    start, stop, step = idx.indices(len(L))
+                    # This is taken from Pyslice_GetIndicesEx(),
+                    # and should probably be exposed to Python
+                    if ((step < 0 and start <= stop) or
+                        (step > 0 and start >= stop)):
+                        slicelen = 0
+                    elif step < 0:
+                        slicelen = (stop - start + 1) // step + 1
+                    else:
+                        slicelen = (stop - start - 1) // step + 1
+
+                    data = list(range(100, 100 + slicelen))
+                    L[idx] = data
+                    b[idx] = data
+                    self.assertEquals(b, bytes(L))
+                    
+                    del L[idx]
+                    del b[idx]
+                    self.assertEquals(b, bytes(L))
 
     def test_setslice_trap(self):
         # This test verifies that we correctly handle assigning self

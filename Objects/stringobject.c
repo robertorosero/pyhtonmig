@@ -1290,7 +1290,7 @@ static PySequenceMethods string_as_sequence = {
 	(binaryfunc)string_concat, /*sq_concat*/
 	(ssizeargfunc)string_repeat, /*sq_repeat*/
 	(ssizeargfunc)string_item, /*sq_item*/
-	(ssizessizeargfunc)string_slice, /*sq_slice*/
+	0,		/*sq_slice*/
 	0,		/*sq_ass_item*/
 	0,		/*sq_ass_slice*/
 	(objobjproc)string_contains /*sq_contains*/

@@ -4,12 +4,12 @@ TODO in slice removal:
  - Fix compiler-package to avoid SLICE opcodes
  - Add tests for the extended slicing abilities of:
     buffer
-    bytes
     mmap.mmap
     structseq
  - Add extended slicing (or at least slice-object support) to ctypes objects
+ - Make list's mp_[ass_]subscr not depend on list_[ass]slice
  - Remove slice API (or emulate it ontop of sliceobject API)
- - Remove slice/ass_slice PySequenceMethod hooks
+ - Further remove slice/ass_slice PySequenceMethod hooks
  - Figure out what to do with PyMapping_Check (it uses the presence of the
    classic slicing hook to tell sequences-with-extended-slicing from
    mappings.)

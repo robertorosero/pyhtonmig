@@ -2432,9 +2432,9 @@ static PySequenceMethods list_as_sequence = {
 	(binaryfunc)list_concat,		/* sq_concat */
 	(ssizeargfunc)list_repeat,		/* sq_repeat */
 	(ssizeargfunc)list_item,		/* sq_item */
-	(ssizessizeargfunc)list_slice,		/* sq_slice */
+	0,					/* sq_slice */
 	(ssizeobjargproc)list_ass_item,		/* sq_ass_item */
-	(ssizessizeobjargproc)list_ass_slice,	/* sq_ass_slice */
+	0,					/* sq_ass_slice */
 	(objobjproc)list_contains,		/* sq_contains */
 	(binaryfunc)list_inplace_concat,	/* sq_inplace_concat */
 	(ssizeargfunc)list_inplace_repeat,	/* sq_inplace_repeat */
@@ -2469,6 +2469,9 @@ list_subscript(PyListObject* self, PyObject* item)
 
 		if (slicelength <= 0) {
 			return PyList_New(0);
+		}
+		else if (step == 1) {
+			return list_slice(self, start, stop);
 		}
 		else {
 			result = PyList_New(slicelength);
@@ -2516,6 +2519,12 @@ list_ass_subscript(PyListObject* self, PyObject* item, PyObject* value)
 		if (step == 1 && ((PySliceObject*)item)->step == Py_None)
 			return list_ass_slice(self, start, stop, value);
 
+		/* Make sure s[5:2] = [..] inserts at the right place:
+		   before 5, not before 2. */
+		if ((step < 0 && start < stop) ||
+		    (step > 0 && start > stop))
+			stop = start;
+
 		if (value == NULL) {
 			/* delete slice */
 			PyObject **garbage;
@@ -2542,7 +2551,7 @@ list_ass_subscript(PyListObject* self, PyObject* item, PyObject* value)
 			for (cur = start, i = 0;
 			     cur < stop;
 			     cur += step, i++) {
-				Py_ssize_t lim = step;
+				Py_ssize_t lim = step - 1;
 
 				garbage[i] = PyList_GET_ITEM(self, cur);
 
@@ -2554,11 +2563,11 @@ list_ass_subscript(PyListObject* self, PyObject* item, PyObject* value)
 					self->ob_item + cur + 1,
 					lim * sizeof(PyObject *));
 			}
-
-			for (cur = start + slicelength*step + 1;
-			     cur < self->ob_size; cur++) {
-				PyList_SET_ITEM(self, cur - slicelength,
-						PyList_GET_ITEM(self, cur));
+			cur = start + slicelength*step;
+			if (cur < self->ob_size) {
+				memmove(self->ob_item + cur - slicelength,
+					self->ob_item + cur,
+					(self->ob_size - cur) * sizeof(PyObject *));
 			}
 
 			self->ob_size -= slicelength;
