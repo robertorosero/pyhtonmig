@@ -1019,23 +1019,6 @@ class CodeGenerator:
             self.emit('ROT_TWO')
             self.emit('STORE_ATTR', self.mangle(node.attrname))
 
-    def visitAugSlice(self, node, mode):
-        if mode == "load":
-            self.visitSlice(node, 1)
-        elif mode == "store":
-            slice = 0
-            if node.lower:
-                slice = slice | 1
-            if node.upper:
-                slice = slice | 2
-            if slice == 0:
-                self.emit('ROT_TWO')
-            elif slice == 3:
-                self.emit('ROT_FOUR')
-            else:
-                self.emit('ROT_THREE')
-            self.emit('STORE_SLICE+%d' % slice)
-
     def visitAugSubscript(self, node, mode):
         if mode == "load":
             self.visitSubscript(node, 1)
@@ -1108,34 +1091,7 @@ class CodeGenerator:
         self.visit(node.value)
         self.emit('YIELD_VALUE')
 
-    # slice and subscript stuff
-
-    def visitSlice(self, node, aug_flag=None):
-        # aug_flag is used by visitAugSlice
-        self.visit(node.expr)
-        slice = 0
-        if node.lower:
-            self.visit(node.lower)
-            slice = slice | 1
-        if node.upper:
-            self.visit(node.upper)
-            slice = slice | 2
-        if aug_flag:
-            if slice == 0:
-                self.emit('DUP_TOP')
-            elif slice == 3:
-                self.emit('DUP_TOPX', 3)
-            else:
-                self.emit('DUP_TOPX', 2)
-        if node.flags == 'OP_APPLY':
-            self.emit('SLICE+%d' % slice)
-        elif node.flags == 'OP_ASSIGN':
-            self.emit('STORE_SLICE+%d' % slice)
-        elif node.flags == 'OP_DELETE':
-            self.emit('DELETE_SLICE+%d' % slice)
-        else:
-            print "weird slice", node.flags
-            raise
+    # subscript stuff
 
     def visitSubscript(self, node, aug_flag=None):
         self.visit(node.expr)
@@ -1508,16 +1464,12 @@ class AugGetattr(Delegator):
 class AugName(Delegator):
     pass
 
-class AugSlice(Delegator):
-    pass
-
 class AugSubscript(Delegator):
     pass
 
 wrapper = {
     ast.Getattr: AugGetattr,
     ast.Name: AugName,
-    ast.Slice: AugSlice,
     ast.Subscript: AugSubscript,
     }
 

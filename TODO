@@ -1,7 +1,7 @@
 
 TODO in slice removal:
 
- - Fix compiler-package to avoid SLICE opcodes
+ - Clean up compilerpackage's code now that SLICE opcodes are gone
  - Add tests for the extended slicing abilities of:
     buffer
     mmap.mmap

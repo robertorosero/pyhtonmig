@@ -977,7 +977,7 @@ class Transformer:
         Names, slices, and attributes are the only allowable nodes.
         """
         l = self.com_node(node)
-        if l.__class__ in (Name, Slice, Subscript, Getattr):
+        if l.__class__ in (Name, Subscript, Getattr):
             return l
         raise SyntaxError, "can't assign to %s" % l.__class__.__name__
 
@@ -1272,14 +1272,6 @@ class Transformer:
         # extended_slicing: primary "[" slice_list "]"
         # slice_list:   slice_item ("," slice_item)* [","]
 
-        # backwards compat slice for '[i:j]'
-        if len(nodelist) == 2:
-            sub = nodelist[1]
-            if (sub[1][0] == token.COLON or \
-                            (len(sub) > 2 and sub[2][0] == token.COLON)) and \
-                            sub[-1][0] != symbol.sliceop:
-                return self.com_slice(primary, sub, assigning)
-
         subscripts = []
         for i in range(1, len(nodelist), 2):
             subscripts.append(self.com_subscript(nodelist[i]))
@@ -1331,20 +1323,6 @@ class Transformer:
             else:
                 items.append(self.com_node(ch[2]))
         return Sliceobj(items, lineno=extractLineNo(node))
-
-    def com_slice(self, primary, node, assigning):
-        # short_slice:  [lower_bound] ":" [upper_bound]
-        lower = upper = None
-        if len(node) == 3:
-            if node[1][0] == token.COLON:
-                upper = self.com_node(node[2])
-            else:
-                lower = self.com_node(node[1])
-        elif len(node) == 4:
-            lower = self.com_node(node[1])
-            upper = self.com_node(node[3])
-        return Slice(primary, assigning, lower, upper,
-                     lineno=extractLineNo(node))
 
     def get_docstring(self, node, n=None):
         if n is None:

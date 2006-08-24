@@ -124,7 +124,8 @@ class CompilerTest(unittest.TestCase):
         self.assertEquals(eval(c), [(0, 3), (1, 3), (2, 3)])
 
 
-NOLINENO = (compiler.ast.Module, compiler.ast.Stmt, compiler.ast.Discard)
+NOLINENO = (compiler.ast.Module, compiler.ast.Stmt, compiler.ast.Discard,
+            compiler.ast.Const)
 
 ###############################################################################
 # code below is just used to trigger some possible errors, for the benefit of
