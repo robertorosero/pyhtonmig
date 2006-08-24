@@ -4206,6 +4206,14 @@ _PyString_FormatLong(PyObject *val, int flags, int prec, int type,
 	int numdigits;	/* len == numnondigits + numdigits */
 	int numnondigits = 0;
 
+	/* Avoid exceeding SSIZE_T_MAX */
+	if (prec > PY_SSIZE_T_MAX-3) {
+		PyErr_SetString(PyExc_OverflowError,
+				"precision too large");
+		return NULL;
+	}
+
+
 	switch (type) {
 	case 'd':
 	case 'u':
