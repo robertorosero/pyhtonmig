@@ -3757,6 +3757,74 @@ Array_slice(PyObject *_self, Py_ssize_t ilow, Py_ssize_t ihigh)
 	return (PyObject *)np;
 }
 
+static PyObject *
+Array_subscript(PyObject *_self, PyObject *item)
+{
+	CDataObject *self = (CDataObject *)_self;
+
+	if (PyIndex_Check(item)) {
+		Py_ssize_t i = PyNumber_AsSsize_t(item, PyExc_IndexError);
+		
+		if (i == -1 && PyErr_Occurred())
+			return NULL;
+		if (i < 0)
+			i += self->b_length;
+		return Array_item(_self, i);
+	}
+	else if PySlice_Check(item) {
+		StgDictObject *stgdict, *itemdict;
+		PyObject *proto;
+		PyListObject *np;
+		Py_ssize_t start, stop, step, slicelen, i;
+		
+		if (PySlice_GetIndicesEx((PySliceObject *)item,
+					 self->b_length, &start, &stop,
+					 &step, &slicelen) < 0) {
+			return NULL;
+		}
+		if (step != 1) {
+			PyErr_Format(PyExc_TypeError, "slice-steps other "
+				"than 1 not supported (%zd given)", step);
+			return NULL;
+		}
+		
+		stgdict = PyObject_stgdict((PyObject *)self);
+		assert(stgdict); /* Cannot be NULL for array object instances */
+		proto = stgdict->proto;
+		itemdict = PyType_stgdict(proto);
+		assert(itemdict); /* proto is the item type of the array, a
+				     ctypes type, so this cannot be NULL */
+
+		if (itemdict->getfunc == getentry("c")->getfunc) {
+			char *ptr = (char *)self->b_ptr;
+			return PyString_FromStringAndSize(ptr + start,
+							  slicelen);
+#ifdef CTYPES_UNICODE
+		} else if (itemdict->getfunc == getentry("u")->getfunc) {
+			wchar_t *ptr = (wchar_t *)self->b_ptr;
+			return PyUnicode_FromWideChar(ptr + start,
+						      slicelen);
+#endif
+		}
+
+		np = (PyListObject *) PyList_New(slicelen);
+		if (np == NULL)
+			return NULL;
+
+		for (i = 0; i < slicelen; i++) {
+			PyObject *v = Array_item(_self, i+start);
+			PyList_SET_ITEM(np, i, v);
+		}
+		return (PyObject *)np;
+	}
+	else {
+		PyErr_SetString(PyExc_TypeError, 
+				"indices must be integers");
+		return NULL;
+	}
+
+}
+
 static int
 Array_ass_item(PyObject *_self, Py_ssize_t index, PyObject *value)
 {
@@ -3828,6 +3896,69 @@ Array_ass_slice(PyObject *_self, Py_ssize_t ilow, Py_ssize_t ihigh, PyObject *va
 	return 0;
 }
 
+static int
+Array_ass_subscript(PyObject *_self, PyObject *item, PyObject *value)
+{
+	CDataObject *self = (CDataObject *)_self;
+	
+	if (value == NULL) {
+		PyErr_SetString(PyExc_TypeError,
+				"Array does not support item deletion");
+		return -1;
+	}
+
+	if (PyIndex_Check(item)) {
+		Py_ssize_t i = PyNumber_AsSsize_t(item, PyExc_IndexError);
+		
+		if (i == -1 && PyErr_Occurred())
+			return -1;
+		if (i < 0)
+			i += self->b_length;
+		return Array_ass_item(_self, i, value);
+	}
+	else if (PySlice_Check(item)) {
+		Py_ssize_t start, stop, step, slicelen, otherlen, i;
+		
+		if (PySlice_GetIndicesEx((PySliceObject *)item,
+					 self->b_length, &start, &stop,
+					 &step, &slicelen) < 0) {
+			return -1;
+		}
+		/* XXX(twouters) fix this */
+		if (step != 1) {
+			PyErr_Format(PyExc_TypeError, "slice-steps other "
+				"than 1 not supported (%zd given)", step);
+			return -1;
+		}
+		if ((step < 0 && start < stop) ||
+		    (step > 0 && start > stop))
+			stop = start;
+
+		otherlen = PySequence_Length(value);
+		if (otherlen != slicelen) {
+			PyErr_SetString(PyExc_ValueError,
+				"Can only assign sequence of same size");
+			return -1;
+		}
+		for (i = 0; i < otherlen; i++) {
+			PyObject *item = PySequence_GetItem(value, i);
+			int result;
+			if (item == NULL)
+				return -1;
+			result = Array_ass_item(_self, i+start, item);
+			Py_DECREF(item);
+			if (result == -1)
+				return -1;
+		}
+		return 0;
+	}
+	else {
+		PyErr_SetString(PyExc_TypeError,
+				"indices must be integer");
+		return -1;
+	}
+}
+
 static Py_ssize_t
 Array_length(PyObject *_self)
 {
@@ -3849,6 +3980,12 @@ static PySequenceMethods Array_as_sequence = {
 	0,					/* sq_inplace_repeat; */
 };
 
+static PyMappingMethods Array_as_mapping = {
+	Array_length,
+	Array_subscript,
+	Array_ass_subscript,
+};
+
 PyTypeObject Array_Type = {
 	PyObject_HEAD_INIT(NULL)
 	0,
@@ -3863,7 +4000,7 @@ PyTypeObject Array_Type = {
 	0,					/* tp_repr */
 	0,					/* tp_as_number */
 	&Array_as_sequence,			/* tp_as_sequence */
-	0,					/* tp_as_mapping */
+	&Array_as_mapping,			/* tp_as_mapping */
 	0,					/* tp_hash */
 	0,					/* tp_call */
 	0,					/* tp_str */
@@ -4349,6 +4486,94 @@ Pointer_slice(PyObject *_self, Py_ssize_t ilow, Py_ssize_t ihigh)
 	return (PyObject *)np;
 }
 
+static PyObject *
+Pointer_subscript(PyObject *_self, PyObject *item)
+{
+	CDataObject *self = (CDataObject *)_self;
+	if (PyIndex_Check(item)) {
+		Py_ssize_t i = PyNumber_AsSsize_t(item, PyExc_IndexError);
+		if (i == -1 && PyErr_Occurred())
+			return NULL;
+		return Pointer_item(_self, i);
+	}
+	else if (PySlice_Check(item)) {
+		/* Since pointers have no length, we cannot use any
+		   of the PySlice API functions, and have to fiddle
+		   with the attributes directly */
+		PySliceObject *slice = (PySliceObject *)item;
+		Py_ssize_t start, stop;
+		PyListObject *np;
+		StgDictObject *stgdict, *itemdict;
+		PyObject *proto;
+		Py_ssize_t i, len;
+
+		if (slice->step != Py_None) {
+			Py_ssize_t step = PyNumber_AsSsize_t(slice->step,
+							PyExc_IndexError);
+			if (step == -1 && PyErr_Occurred())
+				return NULL;
+			if (step != 1) {
+				PyErr_Format(PyExc_TypeError,
+					     "unsupported step size %zd",
+					     step);
+				return NULL;
+			}
+		}
+		if (slice->start == Py_None)
+			start = 0;
+		else {
+			start = PyNumber_AsSsize_t(slice->start,
+						   PyExc_IndexError);
+			if (start == -1 && PyErr_Occurred())
+				return NULL;
+			if (start < 0)
+				start = 0;
+		}
+		if (slice->stop == Py_None)
+			stop = PY_SSIZE_T_MAX;
+		else {
+			stop = PyNumber_AsSsize_t(slice->stop,
+						  PyExc_IndexError);
+			if (stop == -1 && PyErr_Occurred())
+				return NULL;
+		}
+		if (stop < start)
+			stop = start;
+		len = stop - start;
+
+		stgdict = PyObject_stgdict((PyObject *)self);
+		assert(stgdict); /* Cannot be NULL fr pointer instances */
+		proto = stgdict->proto;
+		assert(proto);
+		itemdict = PyType_stgdict(proto);
+		assert(itemdict);
+		if (itemdict->getfunc == getentry("c")->getfunc) {
+			char *ptr = *(char **)self->b_ptr;
+			return PyString_FromStringAndSize(ptr + start, len);
+#ifdef CTYPES_UNICODE
+		} else if (itemdict->getfunc == getentry("u")->getfunc) {
+			wchar_t *ptr = *(wchar_t **)self->b_ptr;
+			return PyUnicode_FromWideChar(ptr + start, len);
+#endif
+		}
+
+		np = (PyListObject *) PyList_New(len);
+		if (np == NULL)
+			return NULL;
+
+		for (i = 0; i < len; i++) {
+			PyObject *v = Pointer_item(_self, i+start);
+			PyList_SET_ITEM(np, i, v);
+		}
+		return (PyObject *)np;
+	}
+	else {
+		PyErr_SetString(PyExc_TypeError,
+				"Pointer indices must be integer");
+		return NULL;
+	}
+}
+
 static PySequenceMethods Pointer_as_sequence = {
 	0,					/* inquiry sq_length; */
 	0,					/* binaryfunc sq_concat; */
@@ -4361,6 +4586,11 @@ static PySequenceMethods Pointer_as_sequence = {
 	/* Added in release 2.0 */
 	0,					/* binaryfunc sq_inplace_concat; */
 	0,					/* intargfunc sq_inplace_repeat; */
+};
+
+static PyMappingMethods Pointer_as_mapping = {
+	0,
+	Pointer_subscript,
 };
 
 static int
@@ -4396,7 +4626,7 @@ PyTypeObject Pointer_Type = {
 	0,					/* tp_repr */
 	&Pointer_as_number,			/* tp_as_number */
 	&Pointer_as_sequence,			/* tp_as_sequence */
-	0,					/* tp_as_mapping */
+	&Pointer_as_mapping,			/* tp_as_mapping */
 	0,					/* tp_hash */
 	0,					/* tp_call */
 	0,					/* tp_str */

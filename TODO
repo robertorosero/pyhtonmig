@@ -6,7 +6,7 @@ TODO in slice removal:
     buffer
     mmap.mmap
     structseq
- - Add extended slicing (or at least slice-object support) to ctypes objects
+ - Add actual *extended* slicing to ctypes objects
  - Make list's mp_[ass_]subscr not depend on list_[ass]slice
  - Remove slice API (or emulate it ontop of sliceobject API)
  - Further remove slice/ass_slice PySequenceMethod hooks
