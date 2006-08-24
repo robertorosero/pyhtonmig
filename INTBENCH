@@ -39,3 +39,12 @@ Test 4: 10.605721s
 Test 5: 5.233576s
 Test 6: 2.161525s
 Test 7: 3.421624s
+
+r51573 (speed up PyLong_FromLong)
+Test 1: 3.149116s
+Test 2: 3.948204s
+Test 3: 4.012080s
+Test 4: 8.589921s
+Test 5: 4.481723s
+Test 6: 2.259849s
+Test 7: 3.453212s
