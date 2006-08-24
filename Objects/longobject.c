@@ -114,12 +114,15 @@ PyLongObject *
 _PyLong_New(Py_ssize_t size)
 {
 	PyLongObject *result;
-	if (size > PY_SSIZE_T_MAX) {
-		PyErr_NoMemory();
-		return NULL;
-	}
-	result = PyObject_MALLOC(sizeof(PyLongObject) + 
-				 (size-1)*sizeof(digit));
+	/* Can't use sizeof(PyLongObject) here, since the
+	   compiler takes padding at the end into account.
+	   As the consequence, this would waste 2 bytes on
+	   a 32-bit system, and 6 bytes on a 64-bit system.
+	   This computation would be incorrect on systems
+	   which have padding before the digits; with 16-bit
+	   digits this should not happen. */
+	result = PyObject_MALLOC(sizeof(PyVarObject) + 
+				 size*sizeof(digit));
 	if (!result) {
 		PyErr_NoMemory();
 		return NULL;
@@ -160,28 +163,37 @@ PyLong_FromLong(long ival)
 	PyLongObject *v;
 	unsigned long t;  /* unsigned so >> doesn't propagate sign bit */
 	int ndigits = 0;
-	int negative = 0;
+	int sign = 1;
 
 	CHECK_SMALL_INT(ival);
+
 	if (ival < 0) {
 		ival = -ival;
-		negative = 1;
+		sign = -1;
 	}
 
-	if (ival < BASE) {
-		/* Fast path for single-digits ints */
+	/* Fast path for single-digits ints */
+	if (!(ival>>SHIFT)) {
 		v = _PyLong_New(1);
 		if (v) {
-			v->ob_size = negative ? -1 : 1;
+			v->ob_size = sign;
 			v->ob_digit[0] = ival;
 		}
 		return (PyObject*)v;
 	}
 
-	/* Count the number of Python digits.
-	   We used to pick 5 ("big enough for anything"), but that's a
-	   waste of time and space given that 5*15 = 75 bits are rarely
-	   needed. */
+	/* 2 digits */
+	if (!(ival >> 2*SHIFT)) {
+		v = _PyLong_New(2);
+		if (v) {
+			v->ob_size = 2*sign;
+			v->ob_digit[0] = (digit)ival & MASK;
+			v->ob_digit[1] = ival >> SHIFT;
+		}
+		return (PyObject*)v;
+	}
+
+	/* Larger numbers: loop to determine number of digits */
 	t = (unsigned long)ival;
 	while (t) {
 		++ndigits;
@@ -190,7 +202,7 @@ PyLong_FromLong(long ival)
 	v = _PyLong_New(ndigits);
 	if (v != NULL) {
 		digit *p = v->ob_digit;
-		v->ob_size = negative ? -ndigits : ndigits;
+		v->ob_size = ndigits*sign;
 		t = (unsigned long)ival;
 		while (t) {
 			*p++ = (digit)(t & MASK);
@@ -3496,7 +3508,9 @@ PyTypeObject PyLong_Type = {
 	PyObject_HEAD_INIT(&PyType_Type)
 	0,					/* ob_size */
 	"long",					/* tp_name */
-	sizeof(PyLongObject) - sizeof(digit),	/* tp_basicsize */
+	/* See _PyLong_New for why this isn't
+	   sizeof(PyLongObject) - sizeof(digit) */
+	sizeof(PyVarObject),			/* tp_basicsize */
 	sizeof(digit),				/* tp_itemsize */
 	long_dealloc,				/* tp_dealloc */
 	0,					/* tp_print */
