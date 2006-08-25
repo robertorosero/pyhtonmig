@@ -13,7 +13,7 @@ mhlib.py - done but no test case created
 nntplib.py - done but no test case created
 pipes.py - done but no test case created
 pkgutil.py  - done but no test case created
-robotparser.py - done but no test case created
+robotparser.py - done
 shlex.py - done but no test case created
 smtpd.py - done but no test case created
 threading.py - done but no test case created
