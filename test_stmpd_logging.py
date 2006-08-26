@@ -1,9 +1,9 @@
-import robotparser
+import smtpd
 import logging
 from cStringIO import StringIO
 
 # ... run the tests ...
-log=logging.getLogger("py.robotparser")
+log=logging.getLogger("py.smtpd")
 stringLog = StringIO()
 
 # define the handler and level
@@ -13,7 +13,7 @@ log.setLevel(logging.INFO)
 # add the handler to the logger
 log.addHandler(handler)
 
-robotparser._log.info("message 1")
+smtpd._log.info("message 1") 
 
 print stringLog.getvalue()  # For testing purposes
 

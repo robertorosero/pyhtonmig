@@ -235,7 +235,7 @@ class SMTPChannel(asynchat.async_chat):
         self.push('250 Ok')
 
     def smtp_RCPT(self, arg):
-        _log.debug(>> DEBUGSTREAM, '===> RCPT', arg)
+        _log.debug( DEBUGSTREAM, '===> RCPT', arg)
         if not self.__mailfrom:
             self.push('503 Error: need MAIL command')
             return
