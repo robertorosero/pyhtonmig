@@ -478,9 +478,6 @@ class ModifiedInterpreter(InteractiveInterpreter):
         import sys as _sys
         _sys.path = %r
         del _sys
-        _msg = 'Use File/Exit or your end-of-file key to quit IDLE'
-        __builtins__.quit = __builtins__.exit = _msg
-        del _msg
         \n""" % (sys.path,))
 
     active_seq = None
@@ -514,7 +511,10 @@ class ModifiedInterpreter(InteractiveInterpreter):
                 print >>sys.__stderr__, errmsg, what
                 print >>console, errmsg, what
             # we received a response to the currently active seq number:
-            self.tkconsole.endexecuting()
+            try:
+                self.tkconsole.endexecuting()
+            except AttributeError:  # shell may have closed
+                pass
         # Reschedule myself
         if not self.tkconsole.closing:
             self.tkconsole.text.after(self.tkconsole.pollinterval,
@@ -713,14 +713,17 @@ class ModifiedInterpreter(InteractiveInterpreter):
                 else:
                     exec code in self.locals
             except SystemExit:
-                if tkMessageBox.askyesno(
-                    "Exit?",
-                    "Do you want to exit altogether?",
-                    default="yes",
-                    master=self.tkconsole.text):
-                    raise
+                if not self.tkconsole.closing:
+                    if tkMessageBox.askyesno(
+                        "Exit?",
+                        "Do you want to exit altogether?",
+                        default="yes",
+                        master=self.tkconsole.text):
+                        raise
+                    else:
+                        self.showtraceback()
                 else:
-                    self.showtraceback()
+                    raise
             except:
                 if use_subprocess:
                     print >> self.tkconsole.stderr, \
@@ -730,7 +733,10 @@ class ModifiedInterpreter(InteractiveInterpreter):
                     self.tkconsole.endexecuting()
         finally:
             if not use_subprocess:
-                self.tkconsole.endexecuting()
+                try:
+                    self.tkconsole.endexecuting()
+                except AttributeError:  # shell may have closed
+                    pass
 
     def write(self, s):
         "Override base class method"
@@ -794,7 +800,7 @@ class PyShell(OutputWindow):
         if use_subprocess:
             ms = self.menu_specs
             if ms[2][0] != "shell":
-                ms.insert(2, ("shell", "_Shell"))
+                ms.insert(2, ("shell", "She_ll"))
         self.interp = ModifiedInterpreter(self)
         if flist is None:
             root = Tk()
@@ -803,9 +809,6 @@ class PyShell(OutputWindow):
             flist = PyShellFileList(root)
         #
         OutputWindow.__init__(self, flist, None, None)
-        #
-        import __builtin__
-        __builtin__.quit = __builtin__.exit = "To exit, type Ctrl-D."
         #
 ##        self.config(usetabs=1, indentwidth=8, context_use_ps1=1)
         self.usetabs = True

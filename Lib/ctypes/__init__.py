@@ -135,6 +135,11 @@ from _ctypes import _SimpleCData
 
 class py_object(_SimpleCData):
     _type_ = "O"
+    def __repr__(self):
+        try:
+            return super(py_object, self).__repr__()
+        except ValueError:
+            return "%s(<NULL>)" % type(self).__name__
 
 class c_short(_SimpleCData):
     _type_ = "h"
@@ -422,6 +427,8 @@ if sizeof(c_uint) == sizeof(c_void_p):
     c_size_t = c_uint
 elif sizeof(c_ulong) == sizeof(c_void_p):
     c_size_t = c_ulong
+elif sizeof(c_ulonglong) == sizeof(c_void_p):
+    c_size_t = c_ulonglong
 
 # functions
 

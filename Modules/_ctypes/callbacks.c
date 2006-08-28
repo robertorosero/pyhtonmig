@@ -205,7 +205,7 @@ if (x == NULL) _AddTraceback(what, __FILE__, __LINE__ - 1), PyErr_Print()
 
 	result = PyObject_CallObject(callable, arglist);
 	CHECK("'calling callback function'", result);
-	if ((restype != &ffi_type_void) && result && result != Py_None) {
+	if ((restype != &ffi_type_void) && result) {
 		PyObject *keep;
 		assert(setfunc);
 #ifdef WORDS_BIGENDIAN
@@ -300,7 +300,7 @@ ffi_info *AllocFunctionCallback(PyObject *callable,
 	}
 
 	cc = FFI_DEFAULT_ABI;
-#if defined(MS_WIN32) && !defined(_WIN32_WCE)
+#if defined(MS_WIN32) && !defined(_WIN32_WCE) && !defined(MS_WIN64)
 	if (is_cdecl == 0)
 		cc = FFI_STDCALL;
 #endif

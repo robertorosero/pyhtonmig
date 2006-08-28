@@ -4,17 +4,66 @@ Python News
 
 (editors: check NEWS.help for information about editing NEWS using ReST.)
 
+What's New in Python 2.6?
+=========================
+
+*Release date: XX-XXX-200X*
+
+Core and builtins
+-----------------
+
+- Patch #1542451: disallow continue anywhere under a finally.
+
+
+Library
+-------
+
+- Bug #1541863: uuid.uuid1 failed to generate unique identifiers
+  on systems with low clock resolution.
+
+
+Extension Modules
+-----------------
+
+
+Tests
+-----
+
+
+Documentation
+-------------
+
+- Bug #1541682: Fix example in the "Refcount details" API docs.
+  Additionally, remove a faulty example showing PySequence_SetItem applied
+  to a newly created list object and add notes that this isn't a good idea.
+
+
+Build
+-----
+
+
+C API
+-----
+
+- Bug #1542693: remove semi-colon at end of PyImport_ImportModuleEx macro
+  so it can be used as an expression.
+
+
+Mac
+---
+
+
 What's New in Python 2.5 release candidate 1?
 =============================================
 
-*Release date: 18-AUG-2006*
+*Release date: 17-AUG-2006*
 
 Core and builtins
 -----------------
 
 - Unicode objects will no longer raise an exception when being
-  compared equal or unequal to a string and causing a
-  UnicodeDecodeError exception, e.g. as result of a decoding failure.
+  compared equal or unequal to a string and a UnicodeDecodeError
+  exception occurs, e.g. as result of a decoding failure.
 
   Instead, the equal (==) and unequal (!=) comparison operators will
   now issue a UnicodeWarning and interpret the two objects as
@@ -64,6 +113,30 @@ Core and builtins
 Library
 -------
 
+- Fix a bug in the ``compiler`` package that caused invalid code to be
+  generated for generator expressions.
+
+- The distutils version has been changed to 2.5.0. The change to
+  keep it programmatically in sync with the Python version running
+  the code (introduced in 2.5b3) has been reverted. It will continue
+  to be maintained manually as static string literal.
+
+- If the Python part of a ctypes callback function returns None,
+  and this cannot be converted to the required C type, an exception is
+  printed with PyErr_WriteUnraisable.  Before this change, the C
+  callback returned arbitrary values to the calling code.
+
+- The __repr__ method of a NULL ctypes.py_object() no longer raises
+  an exception.
+
+- uuid.UUID now has a bytes_le attribute. This returns the UUID in 
+  little-endian byte order for Windows. In addition, uuid.py gained some
+  workarounds for clocks with low resolution, to stop the code yielding
+  duplicate UUIDs.
+
+- Patch #1540892: site.py Quitter() class attempts to close sys.stdin
+  before raising SystemExit, allowing IDLE to honor quit() and exit().
+
 - Bug #1224621: make tabnanny recognize IndentationErrors raised by tokenize.
 
 - Patch #1536071: trace.py should now find the full module name of a
@@ -72,7 +145,7 @@ Library
 - logging's atexit hook now runs even if the rest of the module has
   already been cleaned up.
 
-- Bug #1112549, DoS attack on cgi.FieldStorage.
+- Bug #1112549, fix DoS attack on cgi.FieldStorage.
 
 - Bug #1531405, format_exception no longer raises an exception if
   str(exception) raised an exception.
@@ -124,9 +197,12 @@ Documentation
 Build
 -----
 
+- Bug #1535502, build _hashlib on Windows, and use masm assembler
+  code in OpenSSL.
+
 - Bug #1534738, win32 debug version of _msi should be _msi_d.pyd.
 
-- Bug #1530448, ctypes buld failure on Solaris 10 was fixed.
+- Bug #1530448, ctypes build failure on Solaris 10 was fixed.
 
 
 C API
@@ -140,10 +216,6 @@ C API
   is always 1 (normal) or 0 (if the specified thread wasn't found).
 
 
-Mac
----
-
-
 What's New in Python 2.5 beta 3?
 ================================
 
@@ -152,7 +224,7 @@ What's New in Python 2.5 beta 3?
 Core and builtins
 -----------------
 
-- _PyWeakref_GetWeakrefCount() now returns a Py_ssize_t, it previously
+- _PyWeakref_GetWeakrefCount() now returns a Py_ssize_t; it previously
   returned a long (see PEP 353).
 
 - Bug #1515471: string.replace() accepts character buffers again.
@@ -194,7 +266,7 @@ Core and builtins
   This means that .pyc files generated before 2.5b3 will be regenerated.
 
 - Bug #1524317:  Compiling Python ``--without-threads`` failed.
-  The Python core compiles again then, and, in a build without threads, the
+  The Python core compiles again, and, in a build without threads, the
   new ``sys._current_frames()`` returns a dictionary with one entry,
   mapping the faux "thread id" 0 to the current frame.
 
@@ -216,8 +288,8 @@ Library
 - Bug #1002398: The documentation for os.path.sameopenfile now correctly
   refers to file descriptors, not file objects.
 
-- Rename of the xml package to xmlcore, and the import hackery done to
-  make it appear at both names, has been removed.  Bug #1511497,
+- The renaming of the xml package to xmlcore, and the import hackery done 
+  to make it appear at both names, has been removed.  Bug #1511497,
   #1513611, and probably others.
 
 - Bug #1441397: The compiler module now recognizes module and function
@@ -229,13 +301,13 @@ Library
   side effects from one test to the next affect outcomes.  ``DocTestFinder``
   has been changed to sort the list of tests it returns.
 
-- The distutils version has been changed to 2.5.0, and are now kept
+- The distutils version has been changed to 2.5.0, and is now kept
   in sync with sys.version_info[:3].
 
 - Bug #978833: Really close underlying socket in _socketobject.close.
 
-- Bug #1459963: urllib and urllib2 now normalize HTTP header names correctly
-  with title().
+- Bug #1459963: urllib and urllib2 now normalize HTTP header names with
+  title().
 
 - Patch #1525766: In pkgutil.walk_packages, correctly pass the onerror callback
   to recursive calls and call it with the failing package name.
