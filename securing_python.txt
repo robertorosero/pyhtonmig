@@ -1,0 +1,701 @@
+Securing Python
+#####################################################################
+
+Introduction
+///////////////////////////////////////
+
+As of Python 2.5, the Python does not support any form of security
+model for
+executing arbitrary Python code in some form of protected interpreter.
+While one can use such things as ``exec`` and ``eval`` to garner a
+very weak form of sandboxing, it does not provide any thorough
+protections from malicious code.
+
+This should be rectified.  This document attempts to lay out what
+would be needed to secure Python in such a way as to allow arbitrary
+Python code to execute in a sandboxed interpreter without worries of
+that interpreter providing access to any resource of the operating
+system without being given explicit authority to do so.
+
+Throughout this document several terms are going to be used.  A
+"sandboxed interpreter" is one where the built-in namespace is not the
+same as that of an interpreter whose built-ins were unaltered, which
+is called an "unprotected interpreter".
+
+A "bare interpreter" is one where the built-in namespace has been
+stripped down the bare minimum needed to run any form of basic Python
+program.  This means that all atomic types (i.e., syntactically
+supported types), ``object``, and the exceptions provided by the
+``exceptions`` module are considered in the built-in namespace.  There
+have also been no imports executed in the interpreter.
+
+The "security domain" is the boundary at which security is cared
+about.  For this dicussion, it is the interpreter.  Anything that
+happens within a security domain is considered open and unprotected.
+But any action that tries to cross the boundary of the security domain
+is where the security model and protection comes in.
+
+The "powerbox" is the thing that possesses the ultimate power in the
+system for giving out abilities.  In our case it is the Python
+process.  No interpreter can possess any ability that the overall
+process does not have.  It is up to the Python process to initially
+hand out abilities to interpreters to use either for themselves or to
+give to interpreters they create themselves.  This means that we care
+about interpreter<->interpreter interaction along with
+interpreter<->process interactions.
+
+
+Rationale
+///////////////////////////////////////
+
+Python is used extensively as an embedded language within existing
+programs.  These applications often times need to provide the
+functionality of allowing users to run Python code written by someone
+else where they can trust that no unintentional harm will come to
+their system regardless of their trust of the code they are executing.
+
+For instance, think of an application that supports a plug-in system
+with Python as the language used for writing plug-ins.  You do not
+want to have to examine every plug-in you download to make sure that
+it does not alter your filesystem if you can help it.  With a proper
+security model and implementation in place this hinderance of having
+to examine all code you execute should be alleviated.
+
+
+Approaches to Security
+///////////////////////////////////////
+
+There are essentially two types of security: who-I-am
+security and what-I-have security.
+
+Who-I-Am Security
+========================
+
+With who-I-am security (a.k.a., permissions-based security), the
+ability to use a resource requires providing who you are, validating
+you are allowed to access the resource you are requesting, and then
+performing the requested action on the resource.
+
+The ACL security system on most UNIX filesystems is who-I-am security.
+When you want to open a file, say ``/etc/passwd``, you make the
+function call to open the file.  Within that function, it fetchs
+the ACL for the file, finds out who the caller is, checks to see if
+the caller is on the ACL for opening the file, and then proceeds to
+either deny access or return an open file object.
+
+
+What-I-Have Security
+========================
+
+A contrast to who-I-am security, what-I-have security never requires
+knowing who is requesting a resource.  If you know what resources are
+allowed or needed when you begin a security domain, you can just have
+the powerbox pass in those resources to begin with and not provide a
+function to retrieve them.  This alleviates the worry of providing a
+function that can wield more power than the security domain should
+ever have if security is breached on that function.
+
+But if you don't know the exact resources needed ahead of time, you
+pass in a proxy to the resource that checks its arguments to make sure
+they are valid in terms of allowed usage of the protected resource.
+With this approach, you are only doing argument validation, where the
+validation happens to be related to security.  No identity check is
+needed at any point.
+
+Using our file example, the program trying to open a file is given the
+open file object directly at time of creation that it will need to
+work with.  A proxy to the full-powered open function can be used if
+you need more of a wildcard support for opening files.  But
+it works just as well, if not better, to pass in all needed file
+objects at the beginning when the allowed files to work with is known
+so as to not even risk exposing the file opening function.
+
+This illustrates a subtle, but key difference between who-I-am and
+what-I-have security.  For who-I-am, you must know who the caller is
+and check that the arguments are valid for the person calling.  For
+what-I-have security, you only have to validate the arguments.
+
+
+Object-Capabilities
+///////////////////////////////////////
+
+What-I-have security is a super-set of the object-capabilities
+security model.  The belief here is in POLA (Principle Of Least
+Authority): you give a program exactly what it needs, and no more.  By
+providing a function that can open any file that relies on identity to
+decide if to open something, you are still providing a fully capable
+function that just requires faking one's identity to circumvent
+security.  It also means that if you accidentally run code that
+performs actions that you did not expect (e.g., deleting all your
+files), there is no way to stop it since it operates with *your*
+permissions.
+
+Using POLA and object-capabilities, you only give access to resources
+to the extent that someone needs.  This means if a program only needs
+access to a single file, you only give them a function that can open
+that single file.  If you accidentally run code that tries to delete
+all of your files, it can only delete the one file you authorized the
+program to open.
+
+Object-capabilities use the reference graph of objects to provide the
+security of accessing resources.  If you do not have a reference to a
+resource (or a reference to an object that can references a resource),
+you cannot access it, period.  You can provide conditional access by
+using a proxy between code and a resource, but that still requires a
+reference to the resource by the proxy.  This means that your security
+model can be viewed simply by using a whiteboard to draw out the
+interactions between your security domains where by any connection
+between domains is a possible security issue if you do not put in a
+proxy to mediate between the two domains.
+
+This leads to a much cleaner implementation of security.  By not
+having to change internal code in the interpreter to perform identity
+checks, you can instead shift the burden of security to proxies
+which are much more flexible and have less of an adverse affect on the
+interpreter directly (assuming you have the basic requirements for
+object-capabilities met).
+
+
+Difficulties in Python for Object-Capabilities
+//////////////////////////////////////////////
+
+In order to provide the proper protection of references that
+object-capabilities require, you must set up a secure perimeter
+defense around your security domain.  The domain can be anthing:
+objects, interpreters, processes, etc.  The point is that the domain
+is where you draw the line for allowing arbitrary access to resources.
+This means that with the interpreter is the security domain, then
+anything within an interpreter can be expected to be freely shared,
+but beyond that, reference access is strictly controlled.
+
+Three key requirements for providing a proper perimeter defence is
+private namespaces, immutable shared state across domains, and
+unforgeable references.  Unfortunately Python only has one of the
+three requirements by default (you cannot forge a reference in Python
+code).
+
+
+Problem of No Private Namespace
+===============================
+
+Typically, in languages that are statically typed (like C++), you have
+public and private attributes on objects.  Those private attributes
+provide a private namespace for the class and instances that are not
+accessible by other objects.
+
+The Python language has no such thing as a private namespace.  The
+language has the philosophy that if exposing something to the
+programmer could provide some use, then it is exposed.  This has led
+to Python having a wonderful amount of introspection abilities.
+Unfortunately this makes the possibility of a private namespace
+non-existent.  This poses an issue for providing proxies for resources
+since there is no way in Python code to hide the reference to a
+resource.  It also makes providing security at the object level using
+object-capabilities non-existent in pure Python code.
+
+Luckily, the Python virtual machine *does* provide a private namespace,
+albeit not for pure Python source code.  If you use the Python/C
+language barrier in extension modules, you can provide a private
+namespace by using the struct allocated for each instance of an
+object.  This provides a way to create proxies, written in C, that can
+protect resources properly.  Throughout this document, when mentioning
+proxies, it is assumed they have been implemented in C.
+
+
+Problem of Mutable Shared State
+===============================
+
+Another problem that Python's introspection abilties cause is that of
+mutable shared state.  At the interpreter level, there has never been
+a concerted effort to isolate state shared between all interpreters
+running in the same Python process.  Sometimes this is for performance
+reasons, sometimes because it is just easier to implement this way.
+Regardless, sharing of state that can be influenced by another
+interpreter is not safe for object-capabilities.
+
+To rectify the situation, some changes will be needed to some built-in
+objects in Python.  It should mostly consist of abstracting or
+refactoring certain abilities out to an extension module so that
+access can be protected using import guards.  For instance, as it
+stands now, ``object.__subclasses__()`` will return a tuple of all of
+its subclasses, regardless of what interpreter the subclass was
+defined in.
+
+
+Threat Model
+///////////////////////////////////////
+
+The threat that this security model is attempting to handle is the
+execution of arbitrary Python code in a sandboxed interpreter such
+that the code in that interpreter is not able to harm anything outside
+of itself unless explicitly allowed to.  This means that:
+
+* An interpreter cannot gain abilties the Python process possesses
+  without explicitly being given those abilities.
+    + With the Python process being the powerbox, if an interpreter
+    could gain whatever abilities it wanted to then the security
+    domain would be completely breached.
+* An interpreter cannot influence another interpreter directly at the
+  Python level without explicitly allowing it.
+    + This includes preventing communicating with another interpreter.
+    + Mutable objects cannot be shared between interpreters without
+      explicit allowance for it.
+    + "Explicit allowance" includes the importation of C extension
+      modules because a technical detail requires that these modules
+      not be re-initialized per interpreter, meaning that all
+      interpreters in a single Python process share the same C
+      extension modules.
+* An interpreter cannot use operating system resources without being
+  explicitly given those resources.
+    + This includes importing modules since that requires the ability
+      to use the resource of the filesystem.
+    + This is mediated by having to go through the process to gain the
+    abilities in the OS that the process possesses.
+
+In order to accomplish these goals, certain things must be made true.
+
+* The Python process is the powerbox.
+    + It controls the initial granting of abilties to interpreters.
+* A bare Python interpreter is always trusted.
+    + Python source code that can be created in a bare interpreter is
+      always trusted.
+    + Python source code created within a bare interpreter cannot
+      crash the interpreter.
+* Python bytecode is always distrusted.
+    + Malicious bytecode can bring down an interpreter.
+* Pure Python source code is always safe on its own.
+    + Malicious abilities are derived from C extension modules,
+      built-in modules, and unsafe types implemented in C, not from
+      pure Python source.
+* A sub-interpreter started by another interpreter does not inherit
+  any state.
+    + The sub-interpreter starts out with a fresh global namespace and
+      whatever built-ins it was initially given.
+
+
+Implementation
+///////////////////////////////////////
+
+Guiding Principles
+========================
+
+To begin, the Python process garners all power as the powerbox.  It is
+up to the process to initially hand out access to resources and
+abilities to interpreters.  This might take the form of an interpreter
+with all abilities granted (i.e., a standard interpreter as launched
+when you execute Python), which then creates sub-interpreters with
+sandboxed abilities.  Another alternative is only creating
+interpreters with sandboxed abilities (i.e., Python being embedded in
+an application that only uses sandboxed interpreters).
+
+All security measures should never have to ask who an interpreter is.
+This means that what abilities an interpreter has should not be stored
+at the interpreter level when the security can be provided at the
+Python level.  This means that while supporting a memory cap can
+have a per-interpreter setting that is checked (because access to the
+operating system's memory allocator is not supported at the program
+level), protecting files and imports should not such a per-interpreter
+protection at such a low level (because those can have extension
+module proxies to provide the security).  This means that security is
+based on possessing the authority to do something through a reference
+to an object that can perform the action.  And that object will most
+likely decide whether to carry out its action based on the arguments
+passed in (whether that is an opaque token, file path allowed to be
+opened, etc.).
+
+For common case security measures, the Python standard library
+(stdlib) should provide a simple way to provide those measures.  Most
+commonly this will take the form of providing factory functions that
+create instances of proxies for providing protection of key resources.
+
+Backwards-compatibility will not be a hindrance upon the design or
+implementation of the security model.  Because the security model will
+inherently remove resources and abilities that existing code expects,
+it is not reasonable to expect existing code to work in a sandboxed
+interpreter.
+
+Keeping Python "pythonic" is required for all design decisions.  
+In general, being pythonic means that something fits the general
+design guidelines of the Python programming language (run
+``import this`` from a Python interpreter to see the basic ones).
+If removing an ability leads to something being unpythonic, it will not
+be done unless there is an extremely compelling reason to do so.
+This does not mean existing pythonic code must continue to work, but
+the spirit of being pythonic will not be compromised in the name of the
+security model.  While this might lead to a weaker security model, this
+is a price that must be paid in order for Python to continue to be the
+language that it is.
+
+Restricting what is in the built-in namespace and the safe-guarding
+the interpreter (which includes safe-guarding the built-in types) is
+where the majority of security will come from.  Imports and the
+``file`` type are both part of the standard namespace and must be
+restricted in order for any security implementation to be effective.
+The built-in types which are needed for basic Python usage (e.g.,
+``object`` code objects, etc.) must be made safe to use in a sandboxed
+interpreter since they are easily accessbile and yet required for
+Python to function.
+
+The rest of the security for Python will come in the form of
+protecting physical resources.  For those resources that can be denied
+in a Denial of Service (DoS) attack but protected in a
+platform-agnositc fashion, they should.  This means, for instance,
+that memory should be protected but CPU usage can't.
+
+
+Abilities of a Standard Sandboxed Interpreter
+=============================================
+
+In the end, a standard sandboxed interpreter should (not)
+allow certain things to be doable by code running within itself.
+Below is a list of abilities that will (not) be allowed in the default
+instance of a sandboxed interpreter comparative to an unprotected
+interpreter that has not imported any modules.  These protections can
+be tweaked by using proxies to allow for certain extended abilities to
+be accessible.
+
+* You cannot open any files directly.
+* Importation
+    + You can import any pure Python module.
+    + You cannot import any Python bytecode module.
+    + You cannot import any C extension module.
+    + You cannot import any built-in module.
+* You cannot find out any information about the operating system you
+  are running on.
+* Only safe built-ins are provided.
+
+
+Implementation Details
+========================
+
+An important point to keep in mind when reading about the
+implementation details for the security model is that these are
+general changes and are not special to any type of interpreter,
+sandboxed or otherwise.  That means if a change to a built-in type is
+suggested and it does not involve a proxy, that change is meant
+Python-wide for *all* interpreters.
+
+
+Imports
+-------
+
+A proxy for protecting imports will be provided.  This is done by
+setting the ``__import__()`` function in the built-in namespace of the
+sandboxed interpreter to a proxied version of the function.
+
+The planned proxy will take in a passed-in function to use for the
+import and a whitelist of C extension modules and built-in modules to
+allow importation of.  If an import would lead to loading an extension
+or built-in module, it is checked against the whitelist and allowed
+to be imported based on that list.  All .pyc and .pyo file will not
+be imported.  All .py files will be imported.
+
+XXX perhaps augment 'sys' so that you list the extension of files that
+can be used for importing?  Thought this was controlled somewhere
+already but can't find it.  It is returned by ``imp.get_suffixes()``,
+but I can't find where to set it from Python code.
+
+It must be warned that importing any C extension module is dangerous.
+Not only are they able to circumvent security measures by executing C
+code, but they share state across interpreters.  Because an extension
+module's init function is only called once for the Python *process*,
+its initial state is set only once.  This means that if some mutable
+object is exposed at the module level, a sandboxed interpreter could
+mutate that object, return, and then if the creating interpreter
+accesses that mutated object it is essentially communicating and/or
+acting on behalf of the sandboxed interpreter.  This violates the
+perimeter defence.  No one should import extension modules blindly.
+
+Implementing Import in Python
++++++++++++++++++++++++++++++
+
+To help facilitate in the exposure of more of what importation
+requires (and thus make implementing a proxy easier), the import
+machinery should be rewritten in Python.  This will require some
+bootstrapping in order for the code to be loaded into the process
+without itself requiring importation, but that should be doable.  Plus
+some care must be taken to not lead to circular dependency on
+importing modules needed to handle importing (e.g. importing sys but
+having that import call the import call, etc.).
+
+Interaction with another interpreter that might provide an import
+function must also be dealt with.  One cannot expose the importation
+of a needed module for the import machinery as it might not be allowed
+by a proxy.  This can be handled by allowing the powerbox's import
+function to have modules directly injected into its global namespace.
+But there is also the issue of using the proper ``sys.modules`` for
+storing the modules already imported.  You do not want to inject the
+``sys`` module of the powerbox and have all imports end up in its
+``sys.modules`` but in the interpreter making the call.  This must be
+dealt with in some fashion (injecting per-call, having a factory
+function create a new import function based on an interpreter passed
+in, etc.).
+
+
+Sanitizing Built-In Types
+-------------------------
+
+Python contains a wealth of bulit-in types.  These are used at a basic
+level so that they are easily accessible to any Python code.  They are
+also shared amongst all interpreters in a Python process.  This means
+all built-in types need to be made safe (e.g., immutable shared
+state) so that they can be used by any and all interpreters in a
+single Python process.  Several aspects of built-in types need to be
+examined.
+
+
+Constructors
+++++++++++++
+
+Almost all of Python's built-in types contain a constructor that allows
+code to create a new instance of a type as long as you have the type
+itself.  Unfortunately this does not work well in an object-capabilities
+system without either providing a proxy to the constructor or just
+removing it when access to such a constructor should be controlled.
+
+The plan is to remove select constructors of the types that are
+dangerous and either relocate them to an extension module as factory
+functions or create a new built-in that acts a generic factory
+function for all types, missing constructor or not.  The former approach
+will allow for protections to be enforced by import proxy; just don't
+allow the extension module to be imported.  The latter approach would
+allow either a unique constructor per type, or more generic built-in(s)
+for construction (e.g., introducing a ``construct()`` function that
+takes in a type and any arguments desired to be passed in for
+constructing an instance of the type) and allowing using proxies to
+provide security.
+
+Some might consider this unpythonic.  Python very rarely separates the
+constructor of an object from the class/type and require that you go
+through a function.  But there is some precedent for not using a
+type's constructor to get an instance of a type.  The ``file`` type,
+for instance, typically has its instances created through the
+``open()`` function.  This slight shift for certain types to have their
+(dangerous) constructor not on the type but in a function is
+considered an acceptable compromise.
+
+Types whose constructors are considered dangerous are:
+
+* ``file``
+    + Will definitely use the ``open()`` built-in.
+* code objects
+* XXX sockets?
+* XXX type?
+* XXX
+
+
+Filesystem Information
+++++++++++++++++++++++
+
+When running code in a sandboxed interpreter, POLA suggests that you
+do not want to expose information about your environment on top of
+protecting its use.  This means that filesystem paths typically should
+not be exposed.  Unfortunately, Python exposes file paths all over the
+place that will need to be hidden:
+
+* Modules
+    + ``__file__`` attribute
+* Code objects
+    + ``co_filename`` attribute
+* Packages
+    + ``__path__`` attribute
+* XXX
+
+XXX how to expose safely?  ``path()`` built-in?
+
+
+Mutable Shared State
+++++++++++++++++++++
+
+Because built-in types are shared between interpreters, they cannot
+expose any mutable shared state.  Unfortunately, as it stands, some
+do.  Below is a list of types that share some form of dangerous state,
+how they share it, and how to fix the problem:
+
+* ``object``
+    + ``__subclasses__()`` function
+        - Remove the function; never seen used in real-world code.
+* XXX
+
+
+Perimeter Defences Between a Created Interpreter and Its Creator
+----------------------------------------------------------------
+
+The plan is to allow interpreters to instantiate sandboxed
+interpreters safely.  By using the creating interpreter's abilities to
+provide abilities to the created interpreter, you make sure there is
+no escalation in abilities.
+
+But by creating a sandboxed interpreter and passing in any code into
+it, you open up the chance of possible ways of getting back to the
+creating interpreter or escalating privileges.  Those ways are:
+
+* ``__del__`` created in sandboxed interpreter but object is cleaned
+  up in unprotected interpreter.
+* Using frames to walk the frame stack back to another interpreter.
+* XXX
+
+
+Making the ``sys`` Module Safe
+------------------------------
+
+The ``sys`` module is an odd mix of both information and settings for
+the interpreter.  Because of this dichotomy, some very useful, but
+innocuous information is stored in the module along with things that
+should not be exposed to sandboxed interpreters.
+
+This means that the ``sys`` module needs to have its safe information
+separated out from the unsafe settings.  This will allow an import
+proxy to let through safe information but block out the ability to set
+values.
+
+XXX separate modules, ``sys.settings`` and ``sys.info``, or strip
+``sys`` to settings and put info somewhere else?  Or provide a method
+that will create a faked sys module that has the safe values copied
+into it?
+
+The safe information values are:
+
+* builtin_module_names
+    Information about what might be blocked from importation.
+* byteorder
+    Needed for networking.
+* copyright 
+    Set to a string about the interpreter.
+* displayhook (?)
+* excepthook (?)
+* __displayhook__ (?)
+* __excepthook__ (?)
+* exc_info() (?)
+* exc_clear()
+* exit()
+* exitfunc
+* getcheckinterval()
+    Returns an int.
+* getdefaultencoding()
+    Returns a string about interpreter.
+* getrefcount()
+    Returns an int about the passed-in object.
+* getrecursionlimit()
+    Returns an int about the interpreter.
+* hexversion
+    Set to an int about the interpreter.
+* last_type
+* last_value
+* last_traceback (?)
+* maxint
+    Set to an int that exposes ambiguous information about the
+    computer.
+* maxunicode
+    Returns a string about the interpreter.
+* meta_path (?)
+* path_hooks (?)
+* path_importer_cache (?)
+* ps1
+* ps2
+* stdin
+* stdout
+* stderr
+* traceback (?)
+* version
+* api_version
+* version_info
+* warnoptions (?)
+
+The dangerous settings are:
+
+* argv
+* subversion
+* _current_frames()
+* dllhandle
+* exc_type
+    Deprecated since 1.5 .
+* exc_value
+    Deprecated since 1.5 .
+* exc_traceback
+    Deprecated since 1.5 .
+* exc_prefix
+    Exposes filesystem information.
+* executable
+    Exposes filesystem information.
+* _getframe()
+* getwindowsversion()
+    Exposes OS information.
+* modules
+* path
+* platform
+    Exposes OS information.
+* prefix
+    Exposes filesystem information.
+* setcheckinterval()
+* setdefaultencoding()
+* setdlopenflags()
+* setprofile()
+* setrecursionlimit()
+* settrace()
+* settcsdump()
+* __stdin__
+* __stdout__
+* __stderr__
+* winver
+    Exposes OS information.
+
+
+Protecting I/O
+++++++++++++++
+
+The ``print`` keyword and the built-ins ``raw_input()`` and
+``input()`` use the values stored in ``sys.stdout`` and ``sys.stdin``.
+By exposing these attributes to the creating interpreter, one can set
+them to safe objects, such as instances of ``StringIO``.
+
+
+Safe Networking
+---------------
+
+XXX proxy on socket module, modify open() to be the constructor, etc.
+
+
+Protecting Memory Usage
+-----------------------
+
+To protect memory, low-level hooks into the memory allocator for
+Python is needed.  By hooking into the C API for memory allocation and
+deallocation a *very* rough running count of used memory can be kept.
+This can be used to compare against the set memory cap to prevent
+sandboxed interpreters from using so much memory that it impacts the
+overall performance of the system.
+
+Because this has no direct connection with object-capabilities or has
+any form of exposure at the Python level, this feature can be safely
+implemented separately from the rest of the security model.
+
+Existing APIs to protect are:
+
+- _PyObject_New() : PyObject_New()
+- _PyObject_NewVar() : PyObject_NewVar()
+- _PyObject_Del()
+    remove macro that uses PyObject_Free() and protect directly
+- PyObject_Del()
+    redefine macro to use _PyObject_Del() instead of PyObject_Free()
+- PyMem_Malloc() : PyMem_New()
+- PyMem_Realloc() : PyMem_Resize()
+- PyMem_Free() : PyMem_Del()
+- PyMem_MALLOC() : PyMem_NEW()
+    redefine macro to use PyMem_Malloc()
+- PyMem_REALLOC() : PyMem_RESIZE()
+    redefine macro to use PyMem_Realloc()
+- PyMem_FREE() : PyMem_DEL()
+    redefine macro to use PyMem_Free()
+- PyObject_Malloc()
+    XXX
+- PyObject_Realloc()
+    XXX
+- PyObject_Free()
+    XXX
+- PyObject_MALLOC()
+    XXX
+- PyObject_REALLOC()
+    XXX
+- PyObject_FREE()
+    XXX
