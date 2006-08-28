@@ -1,6 +1,26 @@
 Securing Python
 #####################################################################
 
+Status
+///////////////////////////////////////
+
++ Remove object.__subclasses__ [done]
++ Dangerous constructors
+    - file
+    - code
++ Sandboxed built-ins
+    - open()
+    - __import__() / PEP 302 importer
++ Filesystem path hiding
++ mini 'sys' module
++ Create sandboxed interpreters
+    - Be able to specify built-ins
+    - Set 'sys' module settings
+    - API
+        * Python
+        * C
+
+
 Introduction
 ///////////////////////////////////////
 
