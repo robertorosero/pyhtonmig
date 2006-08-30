@@ -430,9 +430,7 @@ to be imported based on that list.  All .pyc and .pyo file will not
 be imported.  All .py files will be imported.
 
 XXX perhaps augment 'sys' so that you list the extension of files that
-can be used for importing?  Thought this was controlled somewhere
-already but can't find it.  It is returned by ``imp.get_suffixes()``,
-but I can't find where to set it from Python code.
+can be used for importing?  It is returned by ``imp.get_suffixes()``.
 
 It must be warned that importing any C extension module is dangerous.
 Not only are they able to circumvent security measures by executing C
@@ -469,6 +467,9 @@ storing the modules already imported.  You do not want to inject the
 dealt with in some fashion (injecting per-call, having a factory
 function create a new import function based on an interpreter passed
 in, etc.).
+
+One can also implement a PEP 302 import object that takes the proper
+precautions of not exposing power needlessly.
 
 
 Sanitizing Built-In Types
