@@ -4,8 +4,8 @@ Securing Python
 Status
 ///////////////////////////////////////
 
-+ Remove object.__subclasses__ [done]
-+ Dangerous constructors
++ Remove object.__subclasses__ (`Mutable Shared State`_) [done]
++ Dangerous constructors (`Constructors`_)
     - file
         * Create PyFile_InsecureOpen()
         * Switch current C-level uses of 'file' constructor to
@@ -24,14 +24,15 @@ Status
               built-in objects.
     - code
     - ??? <go through Objects/*>
-+ Sandboxed versions of built-ins
++ Sandboxed versions of built-ins (`Sanitizing Built-In Types`_)
     - open()
-    - __import__() / PEP 302 importer
+    - __import__() / PEP 302 importer (`Imports`_)
     - ??? <go through built-ins>
-+ Filesystem path hiding
++ Filesystem path hiding (`Filesystem Information`_)
 + Tweaked stdlib modules
-    - mini 'sys' module
+    - mini 'sys' module (`Making the ``sys`` Module Safe`_)
     - genericpath module (for os.path when C modules blocked)
+    - socket (`Safe Networking`_)
 + Create sandboxed interpreter stdlib module
     - Be able to specify built-ins
     - Set 'sys' module settings
