@@ -709,32 +709,15 @@ Because this has no direct connection with object-capabilities or has
 any form of exposure at the Python level, this feature can be safely
 implemented separately from the rest of the security model.
 
-Existing APIs to protect are:
+Existing APIs to protect are (as declared in Include/pymem.h and
+Include/objimpl.h; both header files must be thoroughly checked for
+public API and macros):
 
-- _PyObject_New() : PyObject_New()
-- _PyObject_NewVar() : PyObject_NewVar()
-- _PyObject_Del()
-    remove macro that uses PyObject_Free() and protect directly
-- PyObject_Del()
-    redefine macro to use _PyObject_Del() instead of PyObject_Free()
-- PyMem_Malloc() : PyMem_New()
-- PyMem_Realloc() : PyMem_Resize()
-- PyMem_Free() : PyMem_Del()
-- PyMem_MALLOC() : PyMem_NEW()
-    redefine macro to use PyMem_Malloc()
-- PyMem_REALLOC() : PyMem_RESIZE()
-    redefine macro to use PyMem_Realloc()
-- PyMem_FREE() : PyMem_DEL()
-    redefine macro to use PyMem_Free()
-- PyObject_Malloc()
-    XXX
-- PyObject_Realloc()
-    XXX
-- PyObject_Free()
-    XXX
-- PyObject_MALLOC()
-    XXX
-- PyObject_REALLOC()
-    XXX
-- PyObject_FREE()
-    XXX
+* PyObject_Malloc(), macros, & friends
+* PyObject_New(), macros, & friends
+* _PyObject_New(), & friends
+* PyMem_Malloc(), macros, & friends
+* PyObject_GC_New(), & friends
+
+An implementation is in Python's svn repository under the
+bcannon-sandboxing branch.
