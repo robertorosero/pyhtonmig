@@ -7,13 +7,32 @@ Status
 + Remove object.__subclasses__ [done]
 + Dangerous constructors
     - file
+        * Create PyFile_InsecureOpen()
+        * Switch current C-level uses of 'file' constructor to
+          PyFile_InsecureOpen().
+            + built-in open()
+            + bz2 module
+        * Create PyFile_Safe*() version of C API that goes through
+          open() built-in.
+            + Convert C strings to Python objects and do a direct
+              call.
+            + Since I/O-bound anyway going from C->Python->C should
+              not be a large performance penalty.
+            + Function also not called in a tight loop which also
+              makes less of a performance-critical operation.
+            + Might need to add some C code for easily accessing
+              built-in objects.
     - code
-+ Sandboxed built-ins
+    - ??? <go through Objects/*>
++ Sandboxed versions of built-ins
     - open()
     - __import__() / PEP 302 importer
+    - ??? <go through built-ins>
 + Filesystem path hiding
-+ mini 'sys' module
-+ Create sandboxed interpreters
++ Tweaked stdlib modules
+    - mini 'sys' module
+    - genericpath module (for os.path when C modules blocked)
++ Create sandboxed interpreter stdlib module
     - Be able to specify built-ins
     - Set 'sys' module settings
     - API
