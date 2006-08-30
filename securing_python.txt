@@ -22,6 +22,7 @@ Status
               makes less of a performance-critical operation.
             + Might need to add some C code for easily accessing
               built-in objects.
+        * How to handle creating subclasses if open() only way?
     - code
     - ??? <go through Objects/*>
 + Sandboxed versions of built-ins (`Sanitizing Built-In Types`_)
