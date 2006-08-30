@@ -5,5 +5,17 @@ Branch News
 Core and builtins
 -----------------
 
+* rev. 51656: Remove initializer from 'file'.  By leaving tp_new alone you can
+  still subclass 'file' (although its usefulness as a subclass is doubtful when
+  its tp_init is empty and that is what actually opens the file descriptor).
+  Created a new function, PyFile_UnsafeOpen() which is what the built-in open()
+  function is now set to.  Also changed the bz2 module to use it.
+
+  Still need to decide how to handle subclasses of 'file' so they are not
+  totally useless (special function that calls the needed initializer on a
+  'file' object?).  Also need to come up with C API that opens files through
+  the built-in open() instead of doing it directly so as to not bypass
+  security.
+
 * rev. 51392: Introduce objcap module to hold removed functions/methods.  Begin
   with moving object.__subclasses__().

@@ -7,11 +7,11 @@ Status
 + Remove object.__subclasses__ (`Mutable Shared State`_) [done]
 + Dangerous constructors (`Constructors`_)
     - file
-        * Create PyFile_InsecureOpen()
+        * Create PyFile_UnsafeOpen() [done]
         * Switch current C-level uses of 'file' constructor to
-          PyFile_InsecureOpen().
-            + built-in open()
-            + bz2 module
+          PyFile_UnsafeOpen(). [done]
+            + built-in open() [done]
+            + bz2 module [done]
         * Create PyFile_Safe*() version of C API that goes through
           open() built-in.
             + Convert C strings to Python objects and do a direct
