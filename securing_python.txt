@@ -7,13 +7,13 @@ Status
 + Remove object.__subclasses__ (`Mutable Shared State`_) [done]
 + Dangerous constructors (`Constructors`_)
     - file
-        * Create PyFile_Init() from file_init()
+        * Create PyFile_Init() from file_init() [done]
         * Switch current C-level uses of 'file' constructor to
-          use PyFile_Type.tp_new() and PyFile_Init().
-            + built-in open()
-            + bz2 module
+          use PyFile_Type.tp_new() and PyFile_Init(). [done]
+            + built-in open() [done]
+            + bz2 module [done]
         * Expose PyFile_Init() in objcap module so that file
-          subclasses are actually worth something.
+          subclasses are actually worth something. [done]
         * Create PyFile_Safe*() version of C API that goes through
           open() built-in.
             + Convert C strings to Python objects and do a direct

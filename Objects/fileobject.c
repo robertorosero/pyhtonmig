@@ -1945,6 +1945,13 @@ file_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 
 	assert(type != NULL && type->tp_alloc != NULL);
 
+	if ((args && PyTuple_GET_SIZE(args)) ||
+		(kwds && PyDict_Check(kwds) && PyDict_Size(kwds))) {
+	    PyErr_SetString(PyExc_TypeError,
+			    "file type's __new__ takes no parameters");
+	    return NULL;
+	}
+
 	if (not_yet_string == NULL) {
 		not_yet_string = PyString_FromString("<uninitialized file>");
 		if (not_yet_string == NULL)
@@ -1966,8 +1973,12 @@ file_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	return self;
 }
 
-static int
-file_init(PyObject *self, PyObject *args, PyObject *kwds)
+/*
+   Initialize a 'file' instance based on the arguments that would normally be
+   passed to the open() built-in.
+*/
+int
+_PyFile_Init(PyObject *self, PyObject *args, PyObject *kwds)
 {
 	PyFileObject *foself = (PyFileObject *)self;
 	int ret = 0;
@@ -1977,7 +1988,11 @@ file_init(PyObject *self, PyObject *args, PyObject *kwds)
 	int bufsize = -1;
 	int wideargument = 0;
 
-	assert(PyFile_Check(self));
+	if (!PyFile_Check(self)) {
+	    PyErr_SetString(PyExc_TypeError,
+		    "can only initialize instances of the 'file' type");
+	    return -1;
+	}
 	if (foself->f_fp != NULL) {
 		/* Have to close the existing file first. */
 		PyObject *closeresult = file_close(foself);
@@ -2016,7 +2031,7 @@ file_init(PyObject *self, PyObject *args, PyObject *kwds)
                 if (!PyArg_ParseTupleAndKeywords(args, kwds, "O|si:file", 
                                                  kwlist, &o_name, &mode, 
                                                  &bufsize))
-                        return -1;
+                        goto Error;
 
 		if (fill_file_fields(foself, NULL, o_name, mode,
 				     fclose) == NULL)
@@ -2038,24 +2053,11 @@ Done:
 
 PyDoc_VAR(file_doc) =
 PyDoc_STR(
-"file(name[, mode[, buffering]]) -> file object\n"
+"file() -> uninitialized file object\n"
 "\n"
-"Open a file.  The mode can be 'r', 'w' or 'a' for reading (default),\n"
-"writing or appending.  The file will be created if it doesn't exist\n"
-"when opened for writing or appending; it will be truncated when\n"
-"opened for writing.  Add a 'b' to the mode for binary files.\n"
-"Add a '+' to the mode to allow simultaneous reading and writing.\n"
-"If the buffering argument is given, 0 means unbuffered, 1 means line\n"
-"buffered, and larger numbers specify the buffer size.\n"
-)
-PyDoc_STR(
-"Add a 'U' to mode to open the file for input with universal newline\n"
-"support.  Any line ending in the input file will be seen as a '\\n'\n"
-"in Python.  Also, a file so opened gains the attribute 'newlines';\n"
-"the value for this attribute is one of None (no newline read yet),\n"
-"'\\r', '\\n', '\\r\\n' or a tuple containing all the newline types seen.\n"
-"\n"
-"'U' cannot be combined with 'w' or '+' mode.\n"
+"To initialize a file object instance, pass it to\n\
+objcap.file_init() with the proper arguments.  Otherwise open a file\n\
+using the built-in open() function."
 );
 
 PyTypeObject PyFile_Type = {
@@ -2096,7 +2098,7 @@ PyTypeObject PyFile_Type = {
 	0,					/* tp_descr_get */
 	0,					/* tp_descr_set */
 	0,					/* tp_dictoffset */
-	file_init,				/* tp_init */
+	0,					/* tp_init */
 	PyType_GenericAlloc,			/* tp_alloc */
 	file_new,				/* tp_new */
 	PyObject_Del,                           /* tp_free */

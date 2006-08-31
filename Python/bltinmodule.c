@@ -1344,7 +1344,14 @@ Return the octal representation of an integer or long integer.");
 static PyObject *
 builtin_open(PyObject *self, PyObject *args, PyObject *kwds)
 {
-	return PyObject_Call((PyObject*)&PyFile_Type, args, kwds);
+    PyObject *file_ins = PyFile_Type.tp_new(&PyFile_Type, NULL, NULL);
+    if (!file_ins)
+	return NULL;
+
+    if (_PyFile_Init(file_ins, args, kwds) < 0)
+	return NULL;
+
+    return file_ins;
 }
 
 PyDoc_STRVAR(open_doc,

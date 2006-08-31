@@ -1298,6 +1298,7 @@ BZ2File_init(BZ2FileObject *self, PyObject *args, PyObject *kwargs)
 	int compresslevel = 9;
 	int bzerror;
 	int mode_char = 0;
+	PyObject *file_ins_args = NULL;
 
 	self->size = -1;
 
@@ -1353,10 +1354,22 @@ BZ2File_init(BZ2FileObject *self, PyObject *args, PyObject *kwargs)
 
 	mode = (mode_char == 'r') ? "rb" : "wb";
 
-	self->file = PyObject_CallFunction((PyObject*)&PyFile_Type, "(Osi)",
-					   name, mode, buffering);
-	if (self->file == NULL)
+	file_ins_args = Py_BuildValue("Osi", name, mode, buffering);
+	if (!file_ins_args)
+	    return -1;
+
+	self->file = PyFile_Type.tp_new(&PyFile_Type, NULL, NULL);
+	if (self->file == NULL) {
+		Py_DECREF(file_ins_args);
 		return -1;
+	}
+
+
+	if (_PyFile_Init(self->file, file_ins_args, NULL) < 0) {
+	    Py_DECREF(file_ins_args);
+	    return -1;
+	}
+	Py_DECREF(file_ins_args);
 
 	/* From now on, we have stuff to dealloc, so jump to error label
 	 * instead of returning */

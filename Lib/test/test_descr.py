@@ -3,6 +3,7 @@
 from test.test_support import verify, vereq, verbose, TestFailed, TESTFN, get_original_stdout
 from copy import deepcopy
 import warnings
+import objcap
 
 warnings.filterwarnings("ignore",
          r'complex divmod\(\), // and % are deprecated$',
@@ -2452,6 +2453,13 @@ def inherits():
 
         lineno = 0
         ateof = 0
+
+        def __new__(self, *args, **kwargs):
+            return file.__new__(self)
+
+        def __init__(self, *args, **kwargs):
+            objcap.file_init(self, *args, **kwargs)
+
         def readline(self):
             if self.ateof:
                 return ""
