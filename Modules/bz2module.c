@@ -1293,7 +1293,6 @@ BZ2File_init(BZ2FileObject *self, PyObject *args, PyObject *kwargs)
 	static char *kwlist[] = {"filename", "mode", "buffering",
                                        "compresslevel", 0};
 	PyObject *name;
-	PyObject *file_open_args;
 	char *mode = "r";
 	int buffering = -1;
 	int compresslevel = 9;
@@ -1354,10 +1353,8 @@ BZ2File_init(BZ2FileObject *self, PyObject *args, PyObject *kwargs)
 
 	mode = (mode_char == 'r') ? "rb" : "wb";
 
-	file_open_args = Py_BuildValue("Osi", name, mode, buffering);
-	if (!file_open_args)
-	    goto error;
-	self->file = PyFile_UnsafeOpen(NULL, file_open_args, NULL);
+	self->file = PyObject_CallFunction((PyObject*)&PyFile_Type, "(Osi)",
+					   name, mode, buffering);
 	if (self->file == NULL)
 		return -1;
 

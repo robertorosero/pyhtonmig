@@ -2452,14 +2452,10 @@ def inherits():
 
         lineno = 0
         ateof = 0
-
-        def __init__(self, path):
-            self.__file = open(path)
-
         def readline(self):
             if self.ateof:
                 return ""
-            s = file.readline(self.__file)
+            s = file.readline(self)
             # Next line works too.
             # s = super(CountedInput, self).readline()
             self.lineno += 1
@@ -2504,7 +2500,7 @@ def keywords():
     # note: as of Python 2.3, dict() no longer has an "items" keyword arg
 
     for constructor in (int, float, long, complex, str, unicode,
-                        tuple, list):
+                        tuple, list, file):
         try:
             constructor(bogus_keyword_arg=1)
         except TypeError:

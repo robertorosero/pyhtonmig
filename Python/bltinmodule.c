@@ -1341,29 +1341,16 @@ PyDoc_STRVAR(oct_doc,
 Return the octal representation of an integer or long integer.");
 
 
-/* PyFile_UnsafeOpen() used as open(). */
+static PyObject *
+builtin_open(PyObject *self, PyObject *args, PyObject *kwds)
+{
+	return PyObject_Call((PyObject*)&PyFile_Type, args, kwds);
+}
 
-PyDoc_VAR(open_doc) =
-PyDoc_STR(
-"file(name[, mode[, buffering]]) -> file object\n"
-"\n"
-"Open a file.  The mode can be 'r', 'w' or 'a' for reading (default),\n"
-"writing or appending.  The file will be created if it doesn't exist\n"
-"when opened for writing or appending; it will be truncated when\n"
-"opened for writing.  Add a 'b' to the mode for binary files.\n"
-"Add a '+' to the mode to allow simultaneous reading and writing.\n"
-"If the buffering argument is given, 0 means unbuffered, 1 means line\n"
-"buffered, and larger numbers specify the buffer size.\n"
-)
-PyDoc_STR(
-"Add a 'U' to mode to open the file for input with universal newline\n"
-"support.  Any line ending in the input file will be seen as a '\\n'\n"
-"in Python.  Also, a file so opened gains the attribute 'newlines';\n"
-"the value for this attribute is one of None (no newline read yet),\n"
-"'\\r', '\\n', '\\r\\n' or a tuple containing all the newline types seen.\n"
-"\n"
-"'U' cannot be combined with 'w' or '+' mode.\n"
-);
+PyDoc_STRVAR(open_doc,
+"open(name[, mode[, buffering]]) -> file object\n\
+\n\
+Open a file using the file() type, returns a file object.");
 
 
 static PyObject *
@@ -2272,7 +2259,7 @@ static PyMethodDef builtin_methods[] = {
  	{"max",		(PyCFunction)builtin_max,        METH_VARARGS | METH_KEYWORDS, max_doc},
  	{"min",		(PyCFunction)builtin_min,        METH_VARARGS | METH_KEYWORDS, min_doc},
  	{"oct",		builtin_oct,        METH_O, oct_doc},
- 	{"open",	(PyCFunction)PyFile_UnsafeOpen,  METH_VARARGS | METH_KEYWORDS, open_doc},
+ 	{"open",	(PyCFunction)builtin_open,       METH_VARARGS | METH_KEYWORDS, open_doc},
  	{"ord",		builtin_ord,        METH_O, ord_doc},
  	{"pow",		builtin_pow,        METH_VARARGS, pow_doc},
  	{"range",	builtin_range,      METH_VARARGS, range_doc},

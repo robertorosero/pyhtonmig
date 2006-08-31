@@ -45,8 +45,6 @@ PyAPI_FUNC(int) PyFile_SoftSpace(PyObject *, int);
 PyAPI_FUNC(int) PyFile_WriteString(const char *, PyObject *);
 PyAPI_FUNC(int) PyObject_AsFileDescriptor(PyObject *);
 
-PyAPI_FUNC(PyObject *) PyFile_UnsafeOpen(PyObject *, PyObject *, PyObject *);
-
 /* The default encoding used by the platform file system APIs
    If non-NULL, this is different than the default encoding for strings
 */

@@ -273,7 +273,6 @@ cleanup:
 	return (PyObject *)f;
 }
 
-
 PyObject *
 PyFile_FromFile(FILE *fp, char *name, char *mode, int (*close)(FILE *))
 {
@@ -1967,28 +1966,25 @@ file_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	return self;
 }
 
-/*
-   Open a file with no regards to whether it should be allowed.
-
-   Used as the implementation of built-in open().
-*/
-PyObject *
-PyFile_UnsafeOpen(PyObject *self, PyObject *args, PyObject *kwds)
+static int
+file_init(PyObject *self, PyObject *args, PyObject *kwds)
 {
-	PyFileObject *foself; 
-	PyObject *ret = NULL;
+	PyFileObject *foself = (PyFileObject *)self;
+	int ret = 0;
 	static char *kwlist[] = {"name", "mode", "buffering", 0};
 	char *name = NULL;
 	char *mode = "r";
 	int bufsize = -1;
 	int wideargument = 0;
 
-	self = file_new(&PyFile_Type, args, kwds);
-	if (!self)
-	    return NULL;
-	foself = (PyFileObject *)self;
-
 	assert(PyFile_Check(self));
+	if (foself->f_fp != NULL) {
+		/* Have to close the existing file first. */
+		PyObject *closeresult = file_close(foself);
+		if (closeresult == NULL)
+			return -1;
+		Py_DECREF(closeresult);
+	}
 
 #ifdef Py_WIN_WIDE_FILENAMES
 	if (GetVersion() < 0x80000000) {    /* On NT, so wide API available */
@@ -2014,13 +2010,13 @@ PyFile_UnsafeOpen(PyObject *self, PyObject *args, PyObject *kwds)
 						 Py_FileSystemDefaultEncoding,
 						 &name,
 						 &mode, &bufsize))
-			return NULL;
+			return -1;
 
                 /* We parse again to get the name as a PyObject */
                 if (!PyArg_ParseTupleAndKeywords(args, kwds, "O|si:file", 
                                                  kwlist, &o_name, &mode, 
                                                  &bufsize))
-                        return NULL;
+                        return -1;
 
 		if (fill_file_fields(foself, NULL, o_name, mode,
 				     fclose) == NULL)
@@ -2030,11 +2026,10 @@ PyFile_UnsafeOpen(PyObject *self, PyObject *args, PyObject *kwds)
 		goto Error;
 	foself->f_setbuf = NULL;
 	PyFile_SetBufSize(self, bufsize);
-	ret = self;
 	goto Done;
 
 Error:
-	ret = NULL;
+	ret = -1;
 	/* fall through */
 Done:
 	PyMem_Free(name); /* free the encoded string */
@@ -2101,7 +2096,7 @@ PyTypeObject PyFile_Type = {
 	0,					/* tp_descr_get */
 	0,					/* tp_descr_set */
 	0,					/* tp_dictoffset */
-	0,					/* tp_init */
+	file_init,				/* tp_init */
 	PyType_GenericAlloc,			/* tp_alloc */
 	file_new,				/* tp_new */
 	PyObject_Del,                           /* tp_free */
