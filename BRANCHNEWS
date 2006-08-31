@@ -5,5 +5,14 @@ Branch News
 Core and builtins
 -----------------
 
+* rev. 51672: Remove the initializer from the 'file' type.  Constructing an
+  isntance now takes no arguments and makes it an empty instance.  To attach a
+  file to a 'file' instance, use objcap.file_init().
+
+  This changes how subclassing 'file' needs to be handled.  First,
+  file.__new__() must be called with no arguments.  Second, in the subclass'
+  __init__(), call objcap.file_init() with 'self' as the first argument and
+  then the usual arguments for opening a file.
+
 * rev. 51392: Introduce objcap module to hold removed functions/methods.  Begin
   with moving object.__subclasses__().
