@@ -5,6 +5,10 @@ Branch News
 Core and builtins
 -----------------
 
+* rev. 51679: Remove the constructor for the 'code' type.  This means instances
+  of the 'code' type cannot be created directly.  You must use the new
+  objcap.code_new() factory function to create instances.
+
 * rev. 51672: Remove the initializer from the 'file' type.  Constructing an
   isntance now takes no arguments and makes it an empty instance.  To attach a
   file to a 'file' instance, use objcap.file_init().
