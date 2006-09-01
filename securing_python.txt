@@ -24,7 +24,8 @@ Status
               makes less of a performance-critical operation.
             + Might need to add some C code for easily accessing
               built-in objects.
-    - code
+    - code [done]
+        * Add objcap.code_new() function [done]
     - ??? <go through Objects/*>
 + Sandboxed versions of built-ins (`Sanitizing Built-In Types`_)
     - open()

@@ -132,11 +132,139 @@ PyDoc_STR(
 );
 
 
+/* Helper for code_new: return a shallow copy of a tuple that is
+   guaranteed to contain exact strings, by converting string subclasses
+   to exact strings and complaining if a non-string is found. */
+static PyObject*
+validate_and_copy_tuple(PyObject *tup)
+{
+	PyObject *newtuple;
+	PyObject *item;
+	Py_ssize_t i, len;
+
+	len = PyTuple_GET_SIZE(tup);
+	newtuple = PyTuple_New(len);
+	if (newtuple == NULL)
+		return NULL;
+
+	for (i = 0; i < len; i++) {
+		item = PyTuple_GET_ITEM(tup, i);
+		if (PyString_CheckExact(item)) {
+			Py_INCREF(item);
+		}
+		else if (!PyString_Check(item)) {
+			PyErr_Format(
+				PyExc_TypeError,
+				"name tuples must contain only "
+				"strings, not '%.500s'",
+				item->ob_type->tp_name);
+			Py_DECREF(newtuple);
+			return NULL;
+		}
+		else {
+			item = PyString_FromStringAndSize(
+				PyString_AS_STRING(item),
+				PyString_GET_SIZE(item));
+			if (item == NULL) {
+				Py_DECREF(newtuple);
+				return NULL;
+			}
+		}
+		PyTuple_SET_ITEM(newtuple, i, item);
+	}
+
+	return newtuple;
+}
+
+PyDoc_STRVAR(code_doc,
+"code(argcount, nlocals, stacksize, flags, codestring, constants, names,\n\
+      varnames, filename, name, firstlineno, lnotab[, freevars[, cellvars]])\n\
+\n\
+Create a code object.  Not for the faint of heart.");
+
+static PyObject *
+code_new(PyTypeObject *type, PyObject *args, PyObject *kw)
+{
+	int argcount;
+	int nlocals;
+	int stacksize;
+	int flags;
+	PyObject *co = NULL;
+	PyObject *code;
+	PyObject *consts;
+	PyObject *names, *ournames = NULL;
+	PyObject *varnames, *ourvarnames = NULL;
+	PyObject *freevars = NULL, *ourfreevars = NULL;
+	PyObject *cellvars = NULL, *ourcellvars = NULL;
+	PyObject *filename;
+	PyObject *name;
+	int firstlineno;
+	PyObject *lnotab;
+
+	if (!PyArg_ParseTuple(args, "iiiiSO!O!O!SSiS|O!O!:code",
+			      &argcount, &nlocals, &stacksize, &flags,
+			      &code,
+			      &PyTuple_Type, &consts,
+			      &PyTuple_Type, &names,
+			      &PyTuple_Type, &varnames,
+			      &filename, &name,
+			      &firstlineno, &lnotab,
+			      &PyTuple_Type, &freevars,
+			      &PyTuple_Type, &cellvars))
+		return NULL;
+
+	if (argcount < 0) {
+		PyErr_SetString(
+			PyExc_ValueError,
+			"code: argcount must not be negative");
+		goto cleanup;
+	}
+
+	if (nlocals < 0) {
+		PyErr_SetString(
+			PyExc_ValueError,
+			"code: nlocals must not be negative");
+		goto cleanup;
+	}
+
+	ournames = validate_and_copy_tuple(names);
+	if (ournames == NULL)
+		goto cleanup;
+	ourvarnames = validate_and_copy_tuple(varnames);
+	if (ourvarnames == NULL)
+		goto cleanup;
+	if (freevars)
+		ourfreevars = validate_and_copy_tuple(freevars);
+	else
+		ourfreevars = PyTuple_New(0);
+	if (ourfreevars == NULL)
+		goto cleanup;
+	if (cellvars)
+		ourcellvars = validate_and_copy_tuple(cellvars);
+	else
+		ourcellvars = PyTuple_New(0);
+	if (ourcellvars == NULL)
+		goto cleanup;
+
+	co = (PyObject *)PyCode_New(argcount, nlocals, stacksize, flags,
+				    code, consts, ournames, ourvarnames,
+				    ourfreevars, ourcellvars, filename,
+				    name, firstlineno, lnotab);
+  cleanup:
+	Py_XDECREF(ournames);
+	Py_XDECREF(ourvarnames);
+	Py_XDECREF(ourfreevars);
+	Py_XDECREF(ourcellvars);
+	return co;
+}
+
+
 
 static PyMethodDef module_methods[] = {
     {"subclasses", (PyCFunction)object_subclasses, METH_O, object_subclass_doc},
     {"file_init", (PyCFunction)file_init, METH_VARARGS | METH_KEYWORDS,
 	file_init_doc},
+    {"code_new", (PyCFunction)code_new, METH_VARARGS, code_doc},
     {NULL, NULL}
 };
 
