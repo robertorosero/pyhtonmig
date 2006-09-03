@@ -1,9 +1,9 @@
-import smtpd
+import gopherlib
 import logging
 from cStringIO import StringIO
 
 # ... run the tests ...
-log=logging.getLogger("py.smtpd")
+log=logging.getLogger("py.gopherlib")
 stringLog = StringIO()
 
 # define the handler and level
@@ -13,7 +13,7 @@ log.setLevel(logging.INFO)
 # add the handler to the logger
 log.addHandler(handler)
 
-smtpd._log.info("message 1") 
+gopherlib._log.info("message 1")
 
 print stringLog.getvalue()  # For testing purposes
 

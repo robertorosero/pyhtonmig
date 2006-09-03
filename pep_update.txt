@@ -5,17 +5,17 @@ Module Checklist
 BaseHTTPServer.py - done but no test case created
 SocketServer.py - done but no test case created
 asyncore.py - done
-gopherlib.py - done but no test case created
-httplib - done with a test case almost completed
-ihooks.py - done but no test case created
-imaplib.py - done but no test case created
-mhlib.py - done but no test case created
-nntplib.py - done but no test case created
-pipes.py - done but no test case created
-pkgutil.py  - done but no test case created
+gopherlib.py - done
+httplib - done
+ihooks.py - done
+imaplib.py - done
+mhlib.py - done
+nntplib.py - done
+pipes.py - done
+pkgutil.py  - done
 robotparser.py - done
 shlex.py - done
 smtpd.py - done
-threading.py - done but no test case created
-timeit.py - done but no test case created
+threading.py - done and test case really close to completion, small problem
+timeit.py - done
 trace.py - done but no test case created
