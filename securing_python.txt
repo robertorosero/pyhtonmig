@@ -4,8 +4,7 @@ Securing Python
 Status
 ///////////////////////////////////////
 
-+ Remove object.__subclasses__ (`Mutable Shared State`_) [done]
-+ Dangerous constructors (`Constructors`_)
++ Dangerous types (`Constructors`_)
     - file
         * Create PyFile_Init() from file_init() [done]
         * Switch current C-level uses of 'file' constructor to
@@ -26,11 +25,24 @@ Status
               built-in objects.
     - code [done]
         * Add objcap.code_new() function [done]
-    - ??? <go through Objects/*>
+    - frame
+        * do not allow importing 'sys' module to get to
+          sys._getframe() or sys._current_frames().
 + Sandboxed versions of built-ins (`Sanitizing Built-In Types`_)
     - open()
     - __import__() / PEP 302 importer (`Imports`_)
-    - ??? <go through built-ins>
+    - compile() (?)
+    - eval() (?)
+    - execfile()
+    - exit() (XXX verify if it kills the interpreter or the process;
+      should also check raising SystemExit)
+    - input() / raw_input()  (XXX make sure it gets its stdin from sys.stdin
+        and not sys.__stdin__)
+    - type() (?)
+    - object()
+        * Remove object.__subclasses__ (`Mutable Shared State`_) [done]
+        * XXX
+    - globals() / vars() (?)
 + Filesystem path hiding (`Filesystem Information`_)
 + Tweaked stdlib modules
     - mini 'sys' module (`Making the ``sys`` Module Safe`_)
@@ -598,7 +610,7 @@ XXX separate modules, ``sys.settings`` and ``sys.info``, or strip
 that will create a faked sys module that has the safe values copied
 into it?
 
-The safe information values are:
+The safe attributes are:
 
 * builtin_module_names
     Information about what might be blocked from importation.
@@ -611,8 +623,8 @@ The safe information values are:
 * __displayhook__ (?)
 * __excepthook__ (?)
 * exc_info() (?)
-* exc_clear()
-* exit()
+* exc_clear() (XXX double-check exceptions unique to each interpreter)
+* exit() (XXX make sure only exits interpreter and not process)
 * exitfunc
 * getcheckinterval()
     Returns an int.
@@ -624,8 +636,9 @@ The safe information values are:
     Returns an int about the interpreter.
 * hexversion
     Set to an int about the interpreter.
-* last_type
-* last_value
+* last_type (XXX make sure doesn't return value from creating
+                interpreter) 
+* last_value (XXX see last_type worry)
 * last_traceback (?)
 * maxint
     Set to an int that exposes ambiguous information about the
