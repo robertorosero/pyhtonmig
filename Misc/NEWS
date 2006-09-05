@@ -4,19 +4,35 @@ Python News
 
 (editors: check NEWS.help for information about editing NEWS using ReST.)
 
-What's New in Python 2.6?
-=========================
+What's New in Python 2.6 alpha 1?
+=================================
 
 *Release date: XX-XXX-200X*
 
 Core and builtins
 -----------------
 
+- Overflow checking code in integer division ran afoul of new gcc
+  optimizations.  Changed to be more standard-conforming.
+
 - Patch #1542451: disallow continue anywhere under a finally.
+
+- Patch #1546288: fix seg fault in dict_equal due to ref counting bug.
+
+- The return tuple from str.rpartition(sep) is (tail, sep, head) where
+  head is the original string if sep was not found.
+
+- Bug #1520864: unpacking singleton tuples in list comprehensions and
+  generator expressions (x for x, in ... ) works again.  Fixing this problem
+  required changing the .pyc magic number.  This means that .pyc files
+  generated before 2.5c2 will be regenerated.
 
 
 Library
 -------
+
+- Patch #1550886: Fix decimal module context management implementation
+  to match the localcontext() example from PEP 343.
 
 - Bug #1541863: uuid.uuid1 failed to generate unique identifiers
   on systems with low clock resolution.
@@ -25,9 +41,22 @@ Library
 Extension Modules
 -----------------
 
+- Bug #1548092: fix curses.tparm seg fault on invalid input.
+
+- Bug #1550714: fix SystemError from itertools.tee on negative value for n.
+
+- Fixed a few bugs on cjkcodecs:
+  - gbk and gb18030 codec now handle U+30FB KATAKANA MIDDLE DOT correctly.
+  - iso2022_jp_2 codec now encodes into G0 for KS X 1001, GB2312
+    codepoints to conform the standard.
+  - iso2022_jp_3 and iso2022_jp_2004 codec can encode JIS X 0213:2
+    codepoints now.
 
 Tests
 -----
+
+- Fix bsddb test_basics.test06_Transactions to check the version
+  number properly.
 
 
 Documentation
@@ -40,6 +69,8 @@ Documentation
 
 Build
 -----
+
+- Patch #1540470, for OpenBSD 4.0.
 
 
 C API
@@ -129,7 +160,7 @@ Library
 - The __repr__ method of a NULL ctypes.py_object() no longer raises
   an exception.
 
-- uuid.UUID now has a bytes_le attribute. This returns the UUID in 
+- uuid.UUID now has a bytes_le attribute. This returns the UUID in
   little-endian byte order for Windows. In addition, uuid.py gained some
   workarounds for clocks with low resolution, to stop the code yielding
   duplicate UUIDs.
@@ -288,7 +319,7 @@ Library
 - Bug #1002398: The documentation for os.path.sameopenfile now correctly
   refers to file descriptors, not file objects.
 
-- The renaming of the xml package to xmlcore, and the import hackery done 
+- The renaming of the xml package to xmlcore, and the import hackery done
   to make it appear at both names, has been removed.  Bug #1511497,
   #1513611, and probably others.
 
