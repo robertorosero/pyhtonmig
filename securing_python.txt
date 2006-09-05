@@ -27,7 +27,10 @@ Status
         * Add objcap.code_new() function [done]
     - frame
         * do not allow importing 'sys' module to get to
-          sys._getframe() or sys._current_frames().
+          sys._getframe(), sys._current_frames(), or setting a trace
+          or profile function.
+    - object() [done]
+        * Remove object.__subclasses__ (`Mutable Shared State`_) [done]
 + Sandboxed versions of built-ins (`Sanitizing Built-In Types`_)
     - open()
     - __import__() / PEP 302 importer (`Imports`_)
@@ -38,16 +41,16 @@ Status
       should also check raising SystemExit)
     - input() / raw_input()  (XXX make sure it gets its stdin from sys.stdin
         and not sys.__stdin__)
-    - type() (?)
-    - object()
-        * Remove object.__subclasses__ (`Mutable Shared State`_) [done]
-        * XXX
     - globals() / vars() (?)
 + Filesystem path hiding (`Filesystem Information`_)
 + Tweaked stdlib modules
     - mini 'sys' module (`Making the ``sys`` Module Safe`_)
+        * XXX mark what attributes are global to the process
     - genericpath module (for os.path when C modules blocked)
     - socket (`Safe Networking`_)
+    - thread (XXX only if worried about thread resource starvation,
+      interrupt_main() not per-interpreter, and stack_size() can be
+      dangerous)
 + Create sandboxed interpreter stdlib module
     - Be able to specify built-ins
     - Set 'sys' module settings
@@ -598,17 +601,24 @@ Making the ``sys`` Module Safe
 The ``sys`` module is an odd mix of both information and settings for
 the interpreter.  Because of this dichotomy, some very useful, but
 innocuous information is stored in the module along with things that
-should not be exposed to sandboxed interpreters.
+should not be exposed to sandboxed interpreters.  This includes
+settings that are global to the Python process along with settings
+that are specific to each interpreter.
 
 This means that the ``sys`` module needs to have its safe information
 separated out from the unsafe settings.  This will allow an import
 proxy to let through safe information but block out the ability to set
 values.
 
+This separation will also require some reworking of the underpinnings
+of how interpreters are created as currently Py_NewInterpreter() sets
+an interpreter's sys module dict to one that is shared by *all*
+interpreters.
+
 XXX separate modules, ``sys.settings`` and ``sys.info``, or strip
-``sys`` to settings and put info somewhere else?  Or provide a method
-that will create a faked sys module that has the safe values copied
-into it?
+``sys`` to settings and put info somewhere else (interpreter?)?  Or
+provide a method that will create a faked sys module that has the safe
+values copied into it?
 
 The safe attributes are:
 
