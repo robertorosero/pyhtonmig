@@ -15,14 +15,6 @@ Status
           subclasses are actually worth something. [done]
         * Create PyFile_Safe*() version of C API that goes through
           open() built-in.
-            + Convert C strings to Python objects and do a direct
-              call.
-            + Since I/O-bound anyway going from C->Python->C should
-              not be a large performance penalty.
-            + Function also not called in a tight loop which also
-              makes less of a performance-critical operation.
-            + Might need to add some C code for easily accessing
-              built-in objects.
     - code [done]
         * Add objcap.code_new() function [done]
     - frame
@@ -34,14 +26,13 @@ Status
 + Sandboxed versions of built-ins (`Sanitizing Built-In Types`_)
     - open()
     - __import__() / PEP 302 importer (`Imports`_)
-    - compile() (?)
-    - eval() (?)
     - execfile()
-    - exit() (XXX verify if it kills the interpreter or the process;
-      should also check raising SystemExit)
-    - input() / raw_input()  (XXX make sure it gets its stdin from sys.stdin
-        and not sys.__stdin__)
-    - globals() / vars() (?)
+        * Force to go through open()
+            + Prevents opening unauthorized files.
+            + Prevents using as a way to probe filesystem.
+    - exit() 
+        * XXX verify that raising SystemExit in a sub-interpreter only
+          exits that sub-interpreter and not the process.
 + Filesystem path hiding (`Filesystem Information`_)
 + Tweaked stdlib modules
     - mini 'sys' module (`Making the ``sys`` Module Safe`_)
@@ -539,8 +530,6 @@ Types whose constructors are considered dangerous are:
     + Will definitely use the ``open()`` built-in.
 * code objects
 * XXX sockets?
-* XXX type?
-* XXX
 
 
 Filesystem Information
@@ -574,7 +563,6 @@ how they share it, and how to fix the problem:
 * ``object``
     + ``__subclasses__()`` function
         - Remove the function; never seen used in real-world code.
-* XXX
 
 
 Perimeter Defences Between a Created Interpreter and Its Creator
