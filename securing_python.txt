@@ -610,58 +610,70 @@ values copied into it?
 
 The safe attributes are:
 
-* builtin_module_names
+* builtin_module_names : Modules/config.c:PyImport_Inittab
     Information about what might be blocked from importation.
-* byteorder
+* byteorder : Python/sysmodule.c:_PySys_Init()
     Needed for networking.
-* copyright 
+* copyright : Python/getcopyright.c:Py_GetCopyright()
     Set to a string about the interpreter.
-* displayhook (?)
-* excepthook (?)
-* __displayhook__ (?)
-* __excepthook__ (?)
-* exc_info() (?)
-* exc_clear() (XXX double-check exceptions unique to each interpreter)
-* exit() (XXX make sure only exits interpreter and not process)
-* exitfunc
-* getcheckinterval()
+* displayhook() : per-interpreter (Python/sysmodule.c:sys_displayhook())
+    (?)
+* excepthook() : per-interpreter (Python/sysmodule.c:sys_excepthook())
+    (?)
+* exc_info() : per-thread (Python/sysmodule.c:sys_exc_info())
+    (?)
+* exc_clear() : per-thread (Python/sysmodule.c:sys_exc_clear())
+    (?)
+* exit() : per-thread (Python/sysmodule.c:sys_exit())
+    Raises SystemExit (XXX make sure only exits interpreter if
+    multiple interpreters running)
+* getcheckinterval() : per-process (Python/ceval.c:_Py_CheckInterval)
     Returns an int.
-* getdefaultencoding()
+* getdefaultencoding() : per-process (Objects/unicodeobject.c:PyUnicode_GetDefaultEncoding())
     Returns a string about interpreter.
-* getrefcount()
+* getrefcount() : per-object
     Returns an int about the passed-in object.
-* getrecursionlimit()
+* getrecursionlimit() : per-process (Python/ceval.c:Py_GetRecursionLimit())
     Returns an int about the interpreter.
-* hexversion
+* hexversion : Python/sysmodule.c:_PySys_Init()
     Set to an int about the interpreter.
-* last_type (XXX make sure doesn't return value from creating
-                interpreter) 
-* last_value (XXX see last_type worry)
-* last_traceback (?)
-* maxint
+* last_type : Python/pythonrun.c:PyErr_PrintEx()
+    (XXX make sure doesn't return value from creating interpreter) 
+* last_value : Python/pythonrun.c:PyErr_PrintEx()
+    (XXX see last_type worry)
+* last_traceback : Python/pythonrun.c:PyErr_PrintEx()
+    (?)
+* maxint : Objects/intobject.c:PyInt_GetMax()
     Set to an int that exposes ambiguous information about the
     computer.
-* maxunicode
+* maxunicode : Objects/unicodeobject.c:PyUnicode_GetMax()
     Returns a string about the interpreter.
-* meta_path (?)
-* path_hooks (?)
-* path_importer_cache (?)
-* ps1
-* ps2
-* stdin
-* stdout
-* stderr
-* traceback (?)
-* version
-* api_version
-* version_info
-* warnoptions (?)
+* meta_path : Python/import.c:_PyImportHooks_Init()
+    (?)
+* path_hooks : Python/import.c:_PyImportHooks_Init()
+    (?)
+* path_importer_cache : Python/import.c:_PyImportHooks_Init()
+    (?)
+* ps1 : Python/pythonrun.c:PyRun_InteractiveLoopFlags()
+* ps2 : Python/pythonrun.c:PyRun_InteractiveLoopFlags()
+* stdin : Python/sysmodule.c:_PySys_Init()
+* stdout : Python/sysmodule.c:_PySys_Init()
+* stderr : Python/sysmodule.c:_PySys_Init()
+* tracebacklimit : (XXX don't know where it is set)
+    (?)
+* version : Python/sysmodule.c:_PySys_Init()
+* api_version : Python/sysmodule.c:_PySys_Init()
+* version_info : Python/sysmodule.c:_PySys_Init()
+* warnoptions : Python/sysmodule.c:_PySys_Init()
+    (?) (XXX per-process value)
 
 The dangerous settings are:
 
 * argv
 * subversion
 * _current_frames()
+* __displayhook__ (?)
+* __excepthook__ (?)
 * dllhandle
 * exc_type
     Deprecated since 1.5 .
@@ -673,6 +685,8 @@ The dangerous settings are:
     Exposes filesystem information.
 * executable
     Exposes filesystem information.
+* exitfunc
+    Deprecated.
 * _getframe()
 * getwindowsversion()
     Exposes OS information.
