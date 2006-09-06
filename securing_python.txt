@@ -36,7 +36,6 @@ Status
 + Filesystem path hiding (`Filesystem Information`_)
 + Tweaked stdlib modules
     - mini 'sys' module (`Making the ``sys`` Module Safe`_)
-        * XXX mark what attributes are global to the process
     - genericpath module (for os.path when C modules blocked)
     - socket (`Safe Networking`_)
     - thread (XXX only if worried about thread resource starvation,
