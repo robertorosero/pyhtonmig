@@ -674,44 +674,47 @@ The safe attributes are:
 
 The dangerous settings are:
 
-* argv
-* subversion
-* _current_frames()
-* __displayhook__ (?)
-* __excepthook__ (?)
-* dllhandle
-* exc_type
+* argv : Modules/main.c:Py_Main()
+* subversion : Python/sysmodule.c:_PySys_Init()
+* _current_frames() : per-thread (Python/sysmodule.c:sys_current_frames())
+* __displayhook__ : Python/sysmodule.c:_PySys_Init()
+    (?)
+* __excepthook__ : Python/sysmodule.c:_PySys_Init()
+    (?)
+* dllhandle : Python/sysmodule.c:_PySys_Init()
+* exc_type : Python/ceval.c:(re)?set_exc_info()
     Deprecated since 1.5 .
-* exc_value
+* exc_value : Python/ceval.c:(re)?set_exc_info()
     Deprecated since 1.5 .
-* exc_traceback
+* exc_traceback : Python/ceval.c:(re)?set_exc_info()
     Deprecated since 1.5 .
-* exc_prefix
+* exec_prefix : Python/sysmodule.c:_PySys_Init()
     Exposes filesystem information.
-* executable
+* executable : Python/sysmodule.c:_PySys_Init()
     Exposes filesystem information.
-* exitfunc
+* exitfunc : set by user
     Deprecated.
-* _getframe()
-* getwindowsversion()
+* _getframe() : per-thread (Python/sysmodule.c:sys_getframe())
+* getwindowsversion() : per-process (Python/sysmodule.c:sys_getwindowsversion())
     Exposes OS information.
-* modules
-* path
-* platform
+* modules : per-interpreter (Python/pythonrun.c:(Py_InitializeEx() | Py_NewInterpreter()))
+* path : per-interpreter (Python/sysmodule.c:PySys_SetPath() called by Py_InitializeEx() and Py_NewInterpreter())
+* platform : Python/sysmodule.c:_PySys_Init()
     Exposes OS information.
-* prefix
+* prefix : Python/sysmodule.c:_PySys_Init()
     Exposes filesystem information.
-* setcheckinterval()
-* setdefaultencoding()
-* setdlopenflags()
-* setprofile()
-* setrecursionlimit()
-* settrace()
-* settcsdump()
-* __stdin__
-* __stdout__
-* __stderr__
-* winver
+* setcheckinterval() : per-process (Python/sysmodule.c:sys_setcheckinterval())
+* setdefaultencoding() : per-process
+* (Python/sysmodule.c:sys_setdefaultencoding() using PyUnicode_SetDefaultEncoding())
+* setdlopenflags() : per-interpreter (Python/sysmodule.c:sys_setdlopenflags())
+* setprofile() : per-thread (Python/sysmodule.c:sys_setprofile() using PyEval_SetProfile())
+* setrecursionlimit() : per-process (Python/sysmodule.c:sys_setrecursionlimit() using Py_SetRecursionLimit())
+* settrace() : per-thread (Python/sysmodule.c:sys_settrace() using PyEval_SetTrace())
+* settcsdump() : per-interpreter (Python/sysmodule.c:set_settscdump())
+* __stdin__ : Python/sysmodule.c:_PySys_Init()
+* __stdout__ : Python/sysmodule.c:_PySys_Init()
+* __stderr__ : Python/sysmodule.c:_PySys_Init()
+* winver : Python/sysmodule.c:_PySys_Init()
     Exposes OS information.
 
 
