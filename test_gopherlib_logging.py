@@ -16,8 +16,8 @@ log.addHandler(handler)
 gopherlib._log.info("message 1")
 
 print stringLog.getvalue()  # For testing purposes
-
-if stringLog.getvalue() != "Error:  It worked":
+	
+if stringLog.getvalue()  == "message 1" + "\n":
     print "it worked"
 else:
     print "it didn't work"

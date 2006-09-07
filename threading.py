@@ -2,8 +2,8 @@
 
 import sys as _sys
 
-import logging
-_log = logging.getLogger('py.threading')
+from logging import getLogger
+_log = getLogger('py.threading')
 
 try:
     import thread
@@ -480,7 +480,7 @@ class Thread(_Verbose):
                     # Lib/traceback.py)
                     exc_type, exc_value, exc_tb = self.__exc_info()
                     try:
-                        _log.info(>>self.__stderr, (
+                        _log.info(self.__stderr, (
                             "Exception in thread " + self.getName() +
                             " (most likely raised during interpreter shutdown):"))
                         _log.info(self.__stderr, (
