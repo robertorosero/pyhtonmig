@@ -231,15 +231,17 @@ public and private attributes on objects.  Those private attributes
 provide a private namespace for the class and instances that are not
 accessible by other objects.
 
-The Python language has no such thing as a private namespace.  The
-language has the philosophy that if exposing something to the
-programmer could provide some use, then it is exposed.  This has led
-to Python having a wonderful amount of introspection abilities.
-Unfortunately this makes the possibility of a private namespace
-non-existent.  This poses an issue for providing proxies for resources
-since there is no way in Python code to hide the reference to a
-resource.  It also makes providing security at the object level using
-object-capabilities non-existent in pure Python code.
+The Python language has no such thing as a persistent, private
+namespace.  The language has the philosophy that if exposing something
+to the programmer could provide some use, then it is exposed.  This
+has led to Python having a wonderful amount of introspection
+abilities.  Unfortunately this makes the possibility of a private
+namespace non-existent.  This poses an issue for providing proxies for
+resources since there is no way in Python code to hide the reference
+to a resource.  It also makes providing security at the object level
+using object-capabilities non-existent in pure Python code without
+changing the language (e.g., protecting nested scoped variables from
+external introspection).
 
 Luckily, the Python virtual machine *does* provide a private namespace,
 albeit not for pure Python source code.  If you use the Python/C
@@ -281,8 +283,8 @@ of itself unless explicitly allowed to.  This means that:
 * An interpreter cannot gain abilties the Python process possesses
   without explicitly being given those abilities.
     + With the Python process being the powerbox, if an interpreter
-    could gain whatever abilities it wanted to then the security
-    domain would be completely breached.
+      could gain whatever abilities it wanted to then the security
+      domain would be completely breached.
 * An interpreter cannot influence another interpreter directly at the
   Python level without explicitly allowing it.
     + This includes preventing communicating with another interpreter.
@@ -312,20 +314,20 @@ In order to accomplish these goals, certain things must be made true.
 * Python bytecode is always distrusted.
     + Malicious bytecode can bring down an interpreter.
 * Pure Python source code is always safe on its own.
-    + Malicious abilities are derived from C extension modules,
-      built-in modules, and unsafe types implemented in C, not from
-      pure Python source.
+    + Python source code is not able to violate the restrictions
+      placed upon the interpreter it is running in.
+    + Possibly malicious abilities are derived from C extension
+      modules, built-in modules, and unsafe types implemented in C,
+      not from pure Python source.
 * A sub-interpreter started by another interpreter does not inherit
   any state.
     + The sub-interpreter starts out with a fresh global namespace and
       whatever built-ins it was initially given.
 
 
-Implementation
-///////////////////////////////////////
 
 Guiding Principles
-========================
+///////////////////////////////////////
 
 To begin, the Python process garners all power as the powerbox.  It is
 up to the process to initially hand out access to resources and
@@ -359,8 +361,8 @@ create instances of proxies for providing protection of key resources.
 Backwards-compatibility will not be a hindrance upon the design or
 implementation of the security model.  Because the security model will
 inherently remove resources and abilities that existing code expects,
-it is not reasonable to expect existing code to work in a sandboxed
-interpreter.
+it is not reasonable to expect all existing code to work in a
+sandboxed interpreter.
 
 Keeping Python "pythonic" is required for all design decisions.  
 In general, being pythonic means that something fits the general
@@ -373,6 +375,10 @@ the spirit of being pythonic will not be compromised in the name of the
 security model.  While this might lead to a weaker security model, this
 is a price that must be paid in order for Python to continue to be the
 language that it is.
+
+
+Implementation
+///////////////////////////////////////
 
 Restricting what is in the built-in namespace and the safe-guarding
 the interpreter (which includes safe-guarding the built-in types) is
@@ -579,7 +585,7 @@ creating interpreter or escalating privileges.  Those ways are:
 * ``__del__`` created in sandboxed interpreter but object is cleaned
   up in unprotected interpreter.
 * Using frames to walk the frame stack back to another interpreter.
-* XXX
+* XXX A generator's execution frame?
 
 
 Making the ``sys`` Module Safe
