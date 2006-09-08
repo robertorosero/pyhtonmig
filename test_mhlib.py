@@ -138,11 +138,7 @@ class MhlibTests(unittest.TestCase):
 		# The default setup permits warnings
         mhlib._log.warn("Testing log of " + self.str)
 
-        # works, but could be coded better. it prints this for each test.
-        if self.str == "mhlib":
-			print "logging worked"
-        else:
-			print "logging didn't work"
+        self.assert_(self.str == "mhlib")
 
         # A deeply nested folder
         def deep(folder, n):
