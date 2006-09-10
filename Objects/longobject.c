@@ -2066,7 +2066,7 @@ long_hash(PyLongObject *v)
 	switch(i) {
 	case -1: return v->ob_digit[0]==1 ? -2 : -v->ob_digit[0];
 	case 0: return 0;
-	case 1: return v->ob_digit[1];
+	case 1: return v->ob_digit[0];
 	}
 	sign = 1;
 	x = 0;
