@@ -25,15 +25,15 @@ Status
         * Remove object.__subclasses__ (`Mutable Shared State`_) [done]
 + Sandboxed versions of built-ins (`Sanitizing Built-In Types`_)
     - open()
-    - __import__() / PEP 302 importer (`Imports`_)
+    - __import__() / PEP 302 importer (`Imports`_) <critical>
     - execfile()
         * Force to go through open()
             + Prevents opening unauthorized files.
             + Prevents using as a way to probe filesystem.
-    - exit() 
+    - exit()
         * XXX verify that raising SystemExit in a sub-interpreter only
-          exits that sub-interpreter and not the process.
-+ Filesystem path hiding (`Filesystem Information`_)
+          exits that sub-interpreter and not the process. <critical>
++ Filesystem path hiding (`Filesystem Information`_) <critical?>
 + Tweaked stdlib modules
     - mini 'sys' module (`Making the ``sys`` Module Safe`_)
     - genericpath module (for os.path when C modules blocked)
@@ -41,7 +41,7 @@ Status
     - thread (XXX only if worried about thread resource starvation,
       interrupt_main() not per-interpreter, and stack_size() can be
       dangerous)
-+ Create sandboxed interpreter stdlib module
++ Create sandboxed interpreter stdlib module <critical>
     - Be able to specify built-ins
     - Set 'sys' module settings
     - API
