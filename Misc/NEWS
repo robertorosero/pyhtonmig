@@ -12,6 +12,16 @@ What's New in Python 2.6 alpha 1?
 Core and builtins
 -----------------
 
+- Make _PyGILState_NoteThreadState() static, it was not used anywhere
+  outside of pystate.c and should not be necessary.
+
+- Bug #1542051: Exceptions now correctly call PyObject_GC_UnTrack.
+  Also make sure that every exception class has __module__ set to
+  'exceptions'.
+
+- Bug #1550983: emit better error messages for erroneous relative
+  imports (if not in package and if beyond toplevel package).
+
 - Overflow checking code in integer division ran afoul of new gcc
   optimizations.  Changed to be more standard-conforming.
 
@@ -27,9 +37,18 @@ Core and builtins
   required changing the .pyc magic number.  This means that .pyc files
   generated before 2.5c2 will be regenerated.
 
+- with and as are now keywords.
+
 
 Library
 -------
+
+- Reverted patch #1504333 to sgmllib because it introduced an infinite loop.
+
+- Patch #1553314: Fix the inspect.py slowdown that was hurting IPython & SAGE
+  by adding smarter caching in inspect.getmodule()
+
+- Fix missing import of the types module in logging.config.
 
 - Patch #1550886: Fix decimal module context management implementation
   to match the localcontext() example from PEP 343.
@@ -37,9 +56,14 @@ Library
 - Bug #1541863: uuid.uuid1 failed to generate unique identifiers
   on systems with low clock resolution.
 
+- Bug #1531862: Do not close standard file descriptors in subprocess.
+
 
 Extension Modules
 -----------------
+
+- Bug #1551427: fix a wrong NULL pointer check in the win32 version
+  of os.urandom().
 
 - Bug #1548092: fix curses.tparm seg fault on invalid input.
 
@@ -65,6 +89,13 @@ Documentation
 - Bug #1541682: Fix example in the "Refcount details" API docs.
   Additionally, remove a faulty example showing PySequence_SetItem applied
   to a newly created list object and add notes that this isn't a good idea.
+
+
+Tools
+-----
+
+- Bug #1546372: Fixed small bugglet in pybench that caused a missing
+  file not to get reported properly.
 
 
 Build
