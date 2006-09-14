@@ -47,6 +47,13 @@ Status
     - API
         * Python
         * C
+    - Securely handle exceptions being raised in sub-interpreter
+        * Raise InterpreterException w/ string for the exception type
+          and a sanitized string for message?
+        * If type is exact of an exception in namespace, recreate,
+          otherwise make an instance of InterpreterException?
+        * Need to watch out for malicious __str__() instances that
+          could do something nasty.
 
 
 Introduction
