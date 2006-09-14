@@ -367,6 +367,8 @@ class PyBuildExt(build_ext):
                                libraries=math_libs) )
         exts.append( Extension('datetime', ['datetimemodule.c', 'timemodule.c'],
                                libraries=math_libs) )
+        # interpreter instantiation
+        exts.append( Extension('interpreter', ['interpretermodule.c']) )
         # random number generator implemented in C
         exts.append( Extension("_random", ["_randommodule.c"]) )
         # fast iterator tools implemented in C

@@ -44,6 +44,7 @@ Status
 + Create sandboxed interpreter stdlib module <critical>
     - Be able to specify built-ins
     - Set 'sys' module settings
+    - Set 'sys.modules'
     - API
         * Python
         * C
