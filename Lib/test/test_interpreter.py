@@ -1,5 +1,3 @@
-"""XXX
-"""
 import interpreter
 
 import unittest
@@ -11,6 +9,14 @@ simple_stmt = """
 while True:
     2 + 3
     break
+"""
+
+test_sys_changed = """
+import sys
+if sys.version == 'test':
+    to_return.append(True)
+else:
+    to_return.append(False)
 """
 
 class BaseInterpTests(unittest.TestCase):
@@ -98,11 +104,50 @@ class ModulesTests(BaseInterpTests):
         self.failUnless(self.interp.modules['token'] is not token)
 
 
+class SysDictTests(BaseInterpTests):
+
+    """Test interpreter.Interpreter().sys_dict ."""
+
+    def test_get(self):
+        # Make sure a dict is returned.
+        sys_dict = self.interp.sys_dict
+        self.failUnless(isinstance(sys_dict, dict))
+        self.failUnless('version' in sys_dict)
+
+    def test_set(self):
+        # Make sure sys_dict can be set to a new dict.
+        sys_dict_copy = self.interp.sys_dict.copy()
+        self.interp.sys_dict = sys_dict_copy
+        self.failUnlessRaises(TypeError, setattr, self.interp, 'sys_dict', [])
+
+    def test_effect(self):
+        # Changes to the dict should be reflected in the interpreter.
+        sys_dict = self.interp.sys_dict
+        sys_dict['version'] = 'test'
+        interp_return = []
+        self.interp.builtins['to_return'] = interp_return
+        self.interp.execute(test_sys_changed)
+        self.failUnless(interp_return[0])
+
+    def test_copied(self):
+        # sys_dict should be unique per interpreter (including mutable data
+        # structures).
+        sys_dict = self.interp.sys_dict
+        sys_dict['version'] = 'test'
+        self.failUnless(sys.version != 'test')
+        # XXX check mutable data structures
+        sys_dict.setdefault('argv', []).append('test')
+        self.failUnless(sys.argv[-1] != 'test')
+        sys_dict['path'].append('test')
+        self.failUnless(sys.path[-1] != 'test')
+
+
 def test_main():
     test_support.run_unittest(
             BasicInterpreterTests,
             BuiltinsTests,
             ModulesTests,
+            SysDictTests,
     )
 
 

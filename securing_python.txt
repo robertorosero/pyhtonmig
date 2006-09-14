@@ -31,8 +31,8 @@ Status
             + Prevents opening unauthorized files.
             + Prevents using as a way to probe filesystem.
     - exit()
-        * XXX verify that raising SystemExit in a sub-interpreter only
-          exits that sub-interpreter and not the process. <critical>
+        * Have SystemExit exit the process only if no other
+          interpreters are running. <critical>
 + Filesystem path hiding (`Filesystem Information`_) <critical?>
 + Tweaked stdlib modules
     - mini 'sys' module (`Making the ``sys`` Module Safe`_)
@@ -42,9 +42,9 @@ Status
       interrupt_main() not per-interpreter, and stack_size() can be
       dangerous)
 + Create sandboxed interpreter stdlib module <critical>
-    - Be able to specify built-ins
-    - Set 'sys' module settings
-    - Set 'sys.modules'
+    - Be able to specify built-ins [done]
+    - Set 'sys' module settings [done]
+    - Set 'sys.modules' [done]
     - API
         * Python
         * C

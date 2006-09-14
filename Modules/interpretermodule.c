@@ -133,7 +133,7 @@ interpreter_set_builtins(PyObject *self, PyObject *arg, void *optional)
 	}
 
 	Py_INCREF(arg);
-	Py_XDECREF(old_builtins);
+	Py_DECREF(old_builtins);
 	PyInterpreter_GET_INTERP(self)->builtins = arg;
 
 	return 0;
@@ -166,8 +166,41 @@ interpreter_set_modules(PyObject *self, PyObject *arg, void *optional)
 	}
 
 	Py_INCREF(arg);
-	Py_XDECREF(old_modules);
+	Py_DECREF(old_modules);
 	PyInterpreter_GET_INTERP(self)->modules = arg;
+
+	return 0;
+}
+
+/*
+   Getter for 'sys_dict'.
+*/
+static PyObject *
+interpreter_get_sys_dict(PyObject *self, void *optional)
+{
+	PyObject *sys_dict = PyInterpreter_GET_INTERP(self)->sysdict;
+
+	Py_INCREF(sys_dict);
+	return sys_dict;
+}
+
+/*
+   Setter for 'sys_dict'.
+*/
+static int
+interpreter_set_sys_dict(PyObject *self, PyObject *arg, void *optional)
+{
+	PyObject *old_sys_dict = PyInterpreter_GET_INTERP(self)->sysdict;
+
+	if (!PyDict_Check(arg)) {
+		PyErr_SetString(PyExc_TypeError,
+				"'sys_dict' must be set to a dict");
+		return -1;
+	}
+
+	Py_INCREF(arg);
+	Py_DECREF(old_sys_dict);
+	PyInterpreter_GET_INTERP(self)->sysdict = arg;
 
 	return 0;
 }
@@ -176,7 +209,8 @@ interpreter_set_modules(PyObject *self, PyObject *arg, void *optional)
 static PyGetSetDef interpreter_getset[] = {
 	{"builtins", interpreter_get_builtins, interpreter_set_builtins,
 		"The built-ins dict for the interpreter.", NULL},
-	/*{"sys_dict", XXX, XXX, "The modules dict for 'sys'.", NULL},*/
+	{"sys_dict", interpreter_get_sys_dict, interpreter_set_sys_dict,
+		"The modules dict for 'sys'.", NULL},
 	{"modules", interpreter_get_modules, interpreter_set_modules,
 		"The dict used for sys.modules.", NULL},
 	{NULL}
