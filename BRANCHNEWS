@@ -20,3 +20,9 @@ Core and builtins
 
 * rev. 51392: Introduce objcap module to hold removed functions/methods.  Begin
   with moving object.__subclasses__().
+
+
+Extension Modules
+-----------------
+
+* rev. 51875: Introduced the interpreter module.
