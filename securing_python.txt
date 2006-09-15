@@ -43,9 +43,13 @@ Status
       interrupt_main() not per-interpreter, and stack_size() can be
       dangerous)
 + Create sandboxed interpreter stdlib module <critical>
-    - Be able to specify built-ins [done]
-    - Set 'sys' module settings [done]
-    - Set 'sys.modules' [done]
+    - Be able to specify built-ins
+        * XXX frames cache built-ins, so setting to a new dict does
+          not get propagated; need to either change ability to assign
+          to built-ins or add functions that allow to set and delete
+          keys individually.
+    - Set 'sys' module settings
+    - Set 'sys.modules'
     - API
         * Python
         * C
@@ -598,6 +602,9 @@ creating interpreter or escalating privileges.  Those ways are:
 
 * ``__del__`` created in sandboxed interpreter but object is cleaned
   up in unprotected interpreter.
+  - XXX Watch out for objects being set in __builtin__.__dict__ and
+    thus not cleaned up until the interpreter object is deleted and
+    thus possibly executed in the creator's environment!
 * Using frames to walk the frame stack back to another interpreter.
 * XXX A generator's execution frame?
 
