@@ -8,6 +8,9 @@ class Evil(object):
     stdout = sys.stdout
     NameError = NameError
     BaseException = BaseException
+    ImportError = ImportError
+    KeyError = KeyError
+    TypeError = TypeError
 
     def __init__(self, num):
         self.num = num
@@ -29,9 +32,23 @@ class Evil(object):
             self.stdout.write("(%s) Second Evil!\n" % self.num)
         finally:
             self.stdout.flush()
+        try:
+            import __builtin__
+            temp = __builtin__.__dict__['open']
+        except self.ImportError:
+            self.stdout.write("(%s) Third Good!\n" % self.num)
+        except self.KeyError:
+            self.stdout.write("(%s) Third Good!\n" % self.num)
+        except self.TypeError:
+            self.stdout.write("(%s) Third Good!\n" % self.num)
+        except self.BaseException, exc:
+            self.stdout.write("Unexpected exception (2): %r\n" % exc)
+        finally:
+            self.stdout.flush()
+
 
 # Deletion in own scope.
-Evil(0)
+temp = Evil(0)
 
 # Cleanup of interpreter.
 __builtin__.__dict__['evil1'] = Evil(1)
@@ -43,12 +60,16 @@ __builtin__.__dict__['evil3'] = Evil(3)
 
 import interpreter
 import __builtin__
+import gc
 
 
 interp = interpreter.Interpreter()
 print 'Same builtins?:', ('no' if id(__builtin__.__dict__) !=
                             id(interp.builtins) else 'yes')
 del interp.builtins['open']
+gc.collect()
+if 'open' not in __builtin__.__dict__:
+    print "'open()' missing!"
 print 'Running interpreter ...'
 interp.execute(evil_str)
 
@@ -57,8 +78,10 @@ evil3 = interp.builtins['evil3']
 
 print 'Deleting interpreter ...'
 del interp
+gc.collect()
 
 print 'Explicitly deleting locally ...'
 del evil2
+gc.collect()
 
 print 'Implicit deletion locally from interpreter teardown ...'
