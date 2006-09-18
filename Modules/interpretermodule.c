@@ -99,45 +99,29 @@ interpreter_exec(PyObject *self, PyObject *arg)
     Py_RETURN_NONE;
 }
 
+/*
+ Getter for 'builtins'.
+ 
+ There is not setter because the creation of a new interpreter automatically
+ creates the initial execution frame which caches the built-in namespace.
+ */
+static PyObject *
+interpreter_builtins(PyObject *self)
+{
+    PyObject *builtins = PyInterpreter_GET_INTERP(self)->builtins;
+    
+    Py_INCREF(builtins);
+    return builtins;
+}
+
 static PyMethodDef interpreter_methods[] = {
+    {"builtins", (PyCFunction)interpreter_builtins, METH_NOARGS,
+        "Return the built-in namespace dict"},
     {"execute", interpreter_exec, METH_O,
 	"Execute the passed-in string in the interpreter"},
     {NULL}
 };
 
-
-/*
-   Getter for 'builtins'.
-*/
-static PyObject *
-interpreter_get_builtins(PyObject *self, void *optional)
-{
-	PyObject *builtins = PyInterpreter_GET_INTERP(self)->builtins;
-
-	Py_INCREF(builtins);
-	return builtins;
-}
-
-/*
-   Setter for 'builtins'.
-*/
-static int
-interpreter_set_builtins(PyObject *self, PyObject *arg, void *optional)
-{
-	PyObject *old_builtins = PyInterpreter_GET_INTERP(self)->builtins;
-
-	if (!PyDict_CheckExact(arg)) {
-		PyErr_SetString(PyExc_TypeError,
-				"'builtins' must be set to a dict");
-		return -1;
-	}
-
-	Py_INCREF(arg);
-	Py_DECREF(old_builtins);
-	PyInterpreter_GET_INTERP(self)->builtins = arg;
-
-	return 0;
-}
 
 /*
    Getter for 'modules'.
@@ -207,8 +191,6 @@ interpreter_set_sys_dict(PyObject *self, PyObject *arg, void *optional)
 
 
 static PyGetSetDef interpreter_getset[] = {
-	{"builtins", interpreter_get_builtins, interpreter_set_builtins,
-		"The built-ins dict for the interpreter.", NULL},
 	{"sys_dict", interpreter_get_sys_dict, interpreter_set_sys_dict,
 		"The modules dict for 'sys'.", NULL},
 	{"modules", interpreter_get_modules, interpreter_set_modules,

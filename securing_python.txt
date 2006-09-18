@@ -43,11 +43,7 @@ Status
       interrupt_main() not per-interpreter, and stack_size() can be
       dangerous)
 + Create sandboxed interpreter stdlib module <critical>
-    - Be able to specify built-ins
-        * XXX frames cache built-ins, so setting to a new dict does
-          not get propagated; need to either change ability to assign
-          to built-ins or add functions that allow to set and delete
-          keys individually.
+    - Be able to specify built-ins [done]
     - Set 'sys' module settings
     - Set 'sys.modules'
     - API

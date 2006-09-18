@@ -1,12 +1,3 @@
-"""XXX Use case tests:
-    * cannot open files
-        - test removal of open() as well as change to bz2.
-    * block imports
-        - built-ins
-        - .pyc/.pyo
-        - extension modules
-
-"""
 import interpreter
 
 import unittest
@@ -27,6 +18,12 @@ if sys.version == 'test':
 else:
     to_return.append(False)
 """
+
+test_builtins_contains = """
+import __builtin__
+_return.append(__builtin__.__dict__.__contains__("%s"))
+"""
+
 
 class BaseInterpTests(unittest.TestCase):
 
@@ -49,52 +46,45 @@ class BasicInterpreterTests(BaseInterpTests):
 
 class BuiltinsTests(BaseInterpTests):
 
-    """Test interpreter.Interpreter().builtins ."""
+    """Test interpreter.Interpreter().builtins() ."""
 
     def test_get(self):
         # Test the getting of 'builtins'.
-        builtins = self.interp.builtins
+        builtins = self.interp.builtins()
         self.failUnless(isinstance(builtins, dict))
         self.failUnless('object' in builtins)
 
-    def test_set(self):
-        # Make sure setting 'builtins' can be done and has proper type
-        # checking.
-        self.interp.builtins = {}
-        self.failUnlessRaises(TypeError, setattr, self.interp, 'builtins', [])
-
     def test_remove(self):
         # Make sure that something can be removed from built-ins.
-        # XXX
-        pass
+        builtins = self.interp.builtins()
+        del builtins['open']
+        _return = []
+        builtins['_return'] = _return
+        self.interp.execute(test_builtins_contains % 'open')
+        self.failUnless(not _return[-1])
 
     def test_add_remove(self):
         # Make sure you can add to the built-ins and then remove the same
         # object.
-        self.interp.builtins['test'] = 'test'
-        self.interp.execute('test')
-        del self.interp.builtins['test']
-        # XXX self.failUnlessRaises(XXX, interp.execute, 'test')
-
-
-    def test_empty_builtins(self):
-        # Make sure that emptying the built-ins truly make them non-existent.
-        self.interp.builtins = {}
-        # XXX self.failUnlessRaises(XXX, interp.execute, 'object')
-
+        self.interp.builtins()['test'] = 'test'
+        _return = []
+        self.interp.builtins()['_return'] = _return
+        self.interp.execute(test_builtins_contains % 'test')
+        self.failUnless(_return[-1])
+        del self.interp.builtins()['test']
+        self.interp.execute(test_builtins_contains % 'test')
+        self.failUnless(not _return[-1])
+        
     def test_copied(self):
         # Make sure built-ins are unique per interpreter.
-        self.failUnless(self.interp.builtins is not __builtin__.__dict__)
-
-        try:
-            __builtin__.__dict__['test1'] = 'test1'
-            self.failUnless('test1' not in self.interp.builtins)
-        finally:
-            del __builtin__.__dict__['test1']
-        self.interp.builtins['test2'] = 'test2'
-        self.failUnless('test2' not in __builtin__.__dict__)
-
-
+        master_id = id(__builtin__.__dict__)
+        _return = []
+        self.interp.builtins()['_return'] = _return
+        self.interp.execute('import __builtin__;'
+                            '_return.append(id(__builtin__.__dict__))')
+        self.failUnless(_return[-1] != master_id)
+        
+                            
 class ModulesTests(BaseInterpTests):
 
     """Test interpreter.Interpreter().modules ."""
@@ -153,7 +143,7 @@ class SysDictTests(BaseInterpTests):
         sys_dict = self.interp.sys_dict
         sys_dict['version'] = 'test'
         interp_return = []
-        self.interp.builtins['to_return'] = interp_return
+        self.interp.builtins()['to_return'] = interp_return
         self.interp.execute(test_sys_changed)
         self.failUnless(interp_return[0])
 
@@ -183,7 +173,7 @@ class PlaceHolder(BaseInterpTests):
 
     def test_file_restrictions(self):
         # You cannot open a file.
-        del self.interp.builtins['open']
+        del self.interp.builtins()['open']
         try:
             self.interp.execute("open(%s, 'w')" % test_support.TESTFN)
         finally:
