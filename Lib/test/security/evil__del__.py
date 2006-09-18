@@ -35,6 +35,7 @@ class Evil(object):
         try:
             import __builtin__
             temp = __builtin__.__dict__['open']
+            self.stdout.write("(%s) Third Evil!\n" % self.num)
         except self.ImportError:
             self.stdout.write("(%s) Third Good!\n" % self.num)
         except self.KeyError:
@@ -48,7 +49,7 @@ class Evil(object):
 
 
 # Deletion in own scope.
-temp = Evil(0)
+Evil(0)
 
 # Cleanup of interpreter.
 __builtin__.__dict__['evil1'] = Evil(1)
@@ -61,7 +62,6 @@ __builtin__.__dict__['evil3'] = Evil(3)
 import interpreter
 import __builtin__
 import gc
-
 
 interp = interpreter.Interpreter()
 print 'Same builtins?:', ('no' if id(__builtin__.__dict__) !=
