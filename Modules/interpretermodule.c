@@ -137,6 +137,16 @@ interpreter_get_modules(PyObject *self, void *optional)
 
 /*
    Setter for 'modules'.
+ 
+ Assumes no one has stored away a reference to sys.modules .  Since sys.modules
+ is set during interpreter creation, its reference is not updated unless done so
+ explicitly.
+ 
+ One option would have been to take the approach of builtins(), which is to have
+ a function that returns the initial dict and thus prevent complete dict
+ replacement.  But since assigning to sys.modules directly has not effect,
+ assuming people would treat sys.modules as something to not store away seemed
+ reasonable.
 */
 static int
 interpreter_set_modules(PyObject *self, PyObject *arg, void *optional)
@@ -152,6 +162,8 @@ interpreter_set_modules(PyObject *self, PyObject *arg, void *optional)
 	Py_INCREF(arg);
 	Py_DECREF(old_modules);
 	PyInterpreter_GET_INTERP(self)->modules = arg;
+        PyDict_SetItemString(PyInterpreter_GET_INTERP(self)->sysdict,
+                             "modules", arg);
 
 	return 0;
 }
