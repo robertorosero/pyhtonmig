@@ -42,7 +42,6 @@ class BaseInterpTests(unittest.TestCase):
 
     def setUp(self):
         """Create a new interpreter."""
-
         self.interp = interpreter.Interpreter()
 
 
@@ -106,6 +105,11 @@ class ModulesTests(BaseInterpTests):
         # Make sure a dict is returned.
         modules = self.interp.modules
         self.failUnless(isinstance(modules, dict))
+        master_id = id(modules)
+        _return = []
+        self.interp.builtins()['_return'] = _return
+        self.interp.execute('import sys; _return.append(id(sys.modules))')
+        self.failUnlessEqual(_return[-1], master_id)
 
     def test_set(self):
         # Make sure setting 'modules' can be done and has proper type checking.
@@ -113,26 +117,33 @@ class ModulesTests(BaseInterpTests):
         self.failUnlessRaises(TypeError, setattr, self.interp.modules, [])
 
     def test_mutation(self):
-        # If a module is swapped for another one, make sure imports actually
-        # use the new module entry.
-        # XXX
-        pass
-
-    def test_adding(self):
         # If a module is added, make sure importing uses that module.
-        # XXX
-        pass
+        self.interp.modules['test1'] = 'test1'
+        _return = []
+        self.interp.builtins()['_return'] = _return
+        self.interp.execute('import test1; _return.append(test1)')
+        self.failUnlessEqual(_return[-1], 'test1')
+        self.interp.modules['test1'] = 'test2'
+        self.interp.execute('import test1; _return.append(test1)')
+        self.failUnlessEqual(_return[-1], 'test2')
 
     def test_deleting(self):
         # Make sure that a module is re-imported if it is removed.
-        # XXX
-        pass
+        self.failUnless('token' not in self.interp.modules)
+        self.interp.execute('import token')
+        del self.interp.modules['token']
+        # XXX should really check that ImportError not raised.
+        self.interp.execute('import token')
 
     def test_fresh(self):
-        # Make sure that import Python modules are new instances.
+        # Make sure that imported Python modules are new instances.
         import token
-        self.interp.execute("import token")
-        self.failUnless(self.interp.modules['token'] is not token)
+        token.test = 'test'
+        _return = []
+        self.interp.builtins()['_return'] = _return
+        self.interp.execute("import token;"
+                            "_return.append(hasattr(token, 'test'))")
+        self.failUnless(not _return[-1])
 
 
 class SysDictTests(BaseInterpTests):
