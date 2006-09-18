@@ -1,3 +1,16 @@
+""" Things to protect (and thus test) against:
+* Importing
+    + built-ins
+    + .pyc/.pyo
+    + extension modules
+* File access
+    + open()
+* Evil methods
+    + __del__
+    + __str__ (for exceptions)
+    + properties
+
+"""
 import interpreter
 
 import unittest
@@ -133,10 +146,12 @@ class SysDictTests(BaseInterpTests):
         self.failUnless('version' in sys_dict)
 
     def test_set(self):
-        # Make sure sys_dict can be set to a new dict.
+        # Make sure sys_dict can be set to a new dict and that  it has desired
+        # effect.
         sys_dict_copy = self.interp.sys_dict.copy()
         self.interp.sys_dict = sys_dict_copy
         self.failUnlessRaises(TypeError, setattr, self.interp, 'sys_dict', [])
+        # XXX requires exceptions.
 
     def test_mutating(self):
         # Changes to the dict should be reflected in the interpreter.
@@ -151,6 +166,7 @@ class SysDictTests(BaseInterpTests):
         # Make sure removing a value raises the proper exception when accessing
         # through the 'sys' module.
         del self.interp.sys_dict['version']
+        # XXX requires exceptions
         # XXX self.failUnlessRaises(XXX, self.interp.execute,
         #                           'import sys; sys.version')
 
@@ -165,35 +181,6 @@ class SysDictTests(BaseInterpTests):
         self.failUnless(sys.argv[-1] != 'test')
         sys_dict['path'].append('test')
         self.failUnless(sys.path[-1] != 'test')
-
-
-class PlaceHolder(BaseInterpTests):
-
-    """Hold some tests that will need to pass at some point."""
-
-    def test_file_restrictions(self):
-        # You cannot open a file.
-        del self.interp.builtins()['open']
-        try:
-            self.interp.execute("open(%s, 'w')" % test_support.TESTFN)
-        finally:
-            try:
-                os.remove(test_support.TESTFN)
-            except OSError:
-                pass
-        # XXX bz2 module protection.
-
-    def test_import_builtin(self):
-        # Block importing built-in modules.
-        pass
-
-    def test_import_pyc(self):
-        # Block importing .pyc files.
-        pass
-
-    def test_import_extensions(self):
-        # Block importing extension modules.
-        pass
 
 
 def test_main():
