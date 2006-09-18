@@ -1,3 +1,12 @@
+"""XXX Use case tests:
+    * cannot open files
+        - test removal of open() as well as change to bz2.
+    * block imports
+        - built-ins
+        - .pyc/.pyo
+        - extension modules
+
+"""
 import interpreter
 
 import unittest
@@ -54,15 +63,24 @@ class BuiltinsTests(BaseInterpTests):
         self.interp.builtins = {}
         self.failUnlessRaises(TypeError, setattr, self.interp, 'builtins', [])
 
-    def test_effect(self):
-        # Make sure that setting 'builtin's actually affects the built-in
-        # namespace.
-        self.interp.builtins['msg'] = "hello"
-        self.interp.execute("msg")
-        self.interp.execute("import __builtin__; __builtin__.__dict__['test1'] = 'test1'")
-        self.failUnless('test1' in self.interp.builtins)
-        del self.interp.builtins['object']
-        #self.failUnlessRaises(XXX, interp.execute, 'object')
+    def test_remove(self):
+        # Make sure that something can be removed from built-ins.
+        # XXX
+        pass
+
+    def test_add_remove(self):
+        # Make sure you can add to the built-ins and then remove the same
+        # object.
+        self.interp.builtins['test'] = 'test'
+        self.interp.execute('test')
+        del self.interp.builtins['test']
+        # XXX self.failUnlessRaises(XXX, interp.execute, 'test')
+
+
+    def test_empty_builtins(self):
+        # Make sure that emptying the built-ins truly make them non-existent.
+        self.interp.builtins = {}
+        # XXX self.failUnlessRaises(XXX, interp.execute, 'object')
 
     def test_copied(self):
         # Make sure built-ins are unique per interpreter.
@@ -91,10 +109,20 @@ class ModulesTests(BaseInterpTests):
         self.interp.modules = {}
         self.failUnlessRaises(TypeError, setattr, self.interp.modules, [])
 
-    def test_effect(self):
-        # Make sure mutating 'modules' has proper result.
-        # XXX Insert value in 'module', have sub-interpreter set into
-        # __builtin__, and check that same object.
+    def test_mutation(self):
+        # If a module is swapped for another one, make sure imports actually
+        # use the new module entry.
+        # XXX
+        pass
+
+    def test_adding(self):
+        # If a module is added, make sure importing uses that module.
+        # XXX
+        pass
+
+    def test_deleting(self):
+        # Make sure that a module is re-imported if it is removed.
+        # XXX
         pass
 
     def test_fresh(self):
@@ -120,7 +148,7 @@ class SysDictTests(BaseInterpTests):
         self.interp.sys_dict = sys_dict_copy
         self.failUnlessRaises(TypeError, setattr, self.interp, 'sys_dict', [])
 
-    def test_effect(self):
+    def test_mutating(self):
         # Changes to the dict should be reflected in the interpreter.
         sys_dict = self.interp.sys_dict
         sys_dict['version'] = 'test'
@@ -128,6 +156,13 @@ class SysDictTests(BaseInterpTests):
         self.interp.builtins['to_return'] = interp_return
         self.interp.execute(test_sys_changed)
         self.failUnless(interp_return[0])
+
+    def test_deletion(self):
+        # Make sure removing a value raises the proper exception when accessing
+        # through the 'sys' module.
+        del self.interp.sys_dict['version']
+        # XXX self.failUnlessRaises(XXX, self.interp.execute,
+        #                           'import sys; sys.version')
 
     def test_copied(self):
         # sys_dict should be unique per interpreter (including mutable data
@@ -140,6 +175,35 @@ class SysDictTests(BaseInterpTests):
         self.failUnless(sys.argv[-1] != 'test')
         sys_dict['path'].append('test')
         self.failUnless(sys.path[-1] != 'test')
+
+
+class PlaceHolder(BaseInterpTests):
+
+    """Hold some tests that will need to pass at some point."""
+
+    def test_file_restrictions(self):
+        # You cannot open a file.
+        del self.interp.builtins['open']
+        try:
+            self.interp.execute("open(%s, 'w')" % test_support.TESTFN)
+        finally:
+            try:
+                os.remove(test_support.TESTFN)
+            except OSError:
+                pass
+        # XXX bz2 module protection.
+
+    def test_import_builtin(self):
+        # Block importing built-in modules.
+        pass
+
+    def test_import_pyc(self):
+        # Block importing .pyc files.
+        pass
+
+    def test_import_extensions(self):
+        # Block importing extension modules.
+        pass
 
 
 def test_main():
