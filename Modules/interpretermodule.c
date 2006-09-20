@@ -163,11 +163,11 @@ redirect_output(PyObject *self, PyObject *args)
 
 static PyMethodDef interpreter_methods[] = {
     {"builtins", (PyCFunction)interpreter_builtins, METH_NOARGS,
-        "Return the built-in namespace dict"},
+        "Return the built-in namespace dict."},
     {"execute", interpreter_exec, METH_O,
-	"Execute the passed-in string in the interpreter"},
+	"Execute the passed-in string in the interpreter."},
     {"redirect_output", (PyCFunction)redirect_output, METH_VARARGS,
-        "Redirect stdout to stderr"},
+        "Redirect stdout to stderr.  Returns tuple of objects used."},
     {NULL}
 };
 
