@@ -1,5 +1,8 @@
 #include "Python.h"
 #include "interpreter.h"
+#include "cStringIO.h"
+
+static struct PycStringIO_CAPI* PycStringIO = NULL;
 
 #define PyInterpreter_GET_INTERP(interp) \
 	(((PyInterpreterObject *)interp)->istate)
@@ -61,6 +64,7 @@ interpreter_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     return (PyObject *)self;
 }
 
+
 /*
    Execute Python source code in the interpreter.
 */
@@ -91,8 +95,8 @@ interpreter_exec(PyObject *self, PyObject *arg)
     PyThreadState_Swap(cur_tstate);
 
     if (result < 0) {
-	PyErr_SetString(PyExc_Exception,
-			"exception during execution in interpreter.");
+	PyErr_SetString(PyExc_RuntimeError,
+			"exception during execution");
 	return NULL;
     }
 
@@ -114,11 +118,56 @@ interpreter_builtins(PyObject *self)
     return builtins;
 }
 
+static PyObject *
+redirect_output(PyObject *self, PyObject *args)
+{
+    PyObject *py_stdout = NULL;
+    PyObject *py_stderr = NULL;
+    PyObject *used_stdout_stderr = NULL;
+    
+    if (!PyArg_ParseTuple(args, "|OO", &py_stdout, &py_stderr))
+        return NULL;
+    
+    if (!py_stdout) {
+        /* Argument for NewOutput() copied from PycStringIO->NewInput(). */
+        py_stdout = (PycStringIO->NewOutput)(128);
+        if (!py_stdout)
+            return NULL;
+    }
+    
+    if (!py_stderr) {
+        /* Argument for NewOutput() copied from PycStringIO->NewInput(). */
+        py_stderr = (PycStringIO->NewOutput)(128);
+        if (!py_stderr)
+            return NULL;
+    }
+    
+    used_stdout_stderr = PyTuple_New(2);
+    if (!used_stdout_stderr)
+        return NULL;
+    
+    if (PyDict_SetItemString(PyInterpreter_GET_INTERP(self)->sysdict, "stdout",
+                         py_stdout) < 0)
+        return NULL;
+    if (PyDict_SetItemString(PyInterpreter_GET_INTERP(self)->sysdict, "stderr",
+                         py_stderr) < 0)
+        return NULL;
+    
+    Py_INCREF(py_stdout);
+    Py_INCREF(py_stderr);
+    PyTuple_SET_ITEM(used_stdout_stderr, 0, py_stdout);
+    PyTuple_SET_ITEM(used_stdout_stderr, 1, py_stderr);
+    
+    return used_stdout_stderr;
+}
+
 static PyMethodDef interpreter_methods[] = {
     {"builtins", (PyCFunction)interpreter_builtins, METH_NOARGS,
         "Return the built-in namespace dict"},
     {"execute", interpreter_exec, METH_O,
 	"Execute the passed-in string in the interpreter"},
+    {"redirect_output", (PyCFunction)redirect_output, METH_VARARGS,
+        "Redirect stdout to stderr"},
     {NULL}
 };
 
@@ -279,4 +328,8 @@ initinterpreter(void)
     if (PyModule_AddObject(module, "Interpreter",
 			    (PyObject *)&PyInterpreter_Type) < 0)
 	return;
+    
+    PycString_IMPORT;
+    if (!PycStringIO)
+        return;
 }

@@ -9,6 +9,7 @@
     + __del__
     + __str__ (for exceptions)
     + properties
+    + something that raises SystemExit
 
 """
 import interpreter
@@ -17,6 +18,7 @@ import unittest
 from test import test_support
 import sys
 import __builtin__
+import StringIO
 
 simple_stmt = """
 while True:
@@ -168,9 +170,9 @@ class SysDictTests(BaseInterpTests):
     def test_set(self):
         # Make sure sys_dict can be set to a new dict and that it has desired
         # effect.
-        sys_dict_copy = self.interp.sys_dict.copy()
-        self.interp.sys_dict = sys_dict_copy
         self.failUnlessRaises(TypeError, setattr, self.interp, 'sys_dict', [])
+        # XXX requires exceptions
+        # set to new dict, make sure exceptions raised when trying to get attribute from sys
 
     def test_mutating(self):
         # Changes to the dict should be reflected in the interpreter.
@@ -200,6 +202,49 @@ class SysDictTests(BaseInterpTests):
         self.failUnless(sys.argv[-1] != 'test')
         sys_dict['path'].append('test')
         self.failUnless(sys.path[-1] != 'test')
+        
+
+class InputOutputTests(BaseInterpTests):
+
+    """Test stdin/stdout/stderr fiddling."""
+    
+    def test_redirect_output_defaults(self):
+        # Make sure it sets stdout and stderr.
+        stdout, stderr = self.interp.redirect_output()
+        self.interp.execute("print 'test'")
+        self.failUnlessEqual("test\n", stdout.getvalue())
+        self.failUnless(not stderr.getvalue())
+        self.failUnlessRaises(RuntimeError, self.interp.execute, "+")
+        self.failUnless(stderr.getvalue())
+        
+    def test_redirect_output_arguments(self):
+        # Test passing in arguments to redirect_output().
+        new_stdout = StringIO.StringIO()
+        new_stderr = StringIO.StringIO()
+        used_stdout, used_stderr = self.interp.redirect_output(new_stdout,
+                                                                new_stderr)
+        self.failUnless(used_stdout is new_stdout)
+        self.failUnless(used_stderr is new_stderr)
+        self.failUnlessRaises(RuntimeError, self.interp.execute, '=')
+        self.failUnlessEqual(new_stderr.getvalue(), used_stderr.getvalue())
+        self.interp.execute("print 'test'")
+        self.failUnlessEqual(new_stdout.getvalue(), used_stdout.getvalue())
+        
+        
+class ExceptionsTests(BaseInterpTests):
+
+    """Test exception usage."""
+    
+    def test_execute_failure(self):
+        # RuntimeError should be raised when something goes bad in execute().
+        stdout, stderr = self.interp.redirect_output()
+        self.failUnlessRaises(RuntimeError, self.interp.execute, "=")
+        
+    def test_exc_matches(self):
+        # Test exc_matches().
+        stdout, stderr = self.interp.redirect_output()
+        self.failUnlessRaises(RuntimeError, self.interp.execute, '=')
+        #self.failUnless(self.interp.exc_matches(SyntaxError))
 
 
 def test_main():
@@ -208,6 +253,8 @@ def test_main():
             BuiltinsTests,
             ModulesTests,
             SysDictTests,
+            InputOutputTests,
+            ExceptionsTests,
     )
 
 

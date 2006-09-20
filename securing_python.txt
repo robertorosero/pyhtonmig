@@ -57,6 +57,7 @@ Status
           (i.e., expose PyErr_ExceptionMatches())?
         * Provide exc_info() for those who know what they are doing?
             + Raise a SecurityWarning when used?
+    - Redirect output [done]
 + Tear out old restricted mode code.
 
 
