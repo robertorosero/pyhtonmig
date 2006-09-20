@@ -31,6 +31,7 @@ Status
         * Force to go through open()
             + Prevents opening unauthorized files.
             + Prevents using as a way to probe filesystem.
+        * Just promote removal
     - exit()
         * Have SystemExit exit the process only if no other
           interpreters are running. <critical>
@@ -52,14 +53,10 @@ Status
     - Securely handle exceptions being raised in sub-interpreter
         * Raise InterpreterException w/ string for the exception type
           and a sanitized string for message?
-        * If type is exact of an exception in namespace, recreate,
-          otherwise make an instance of InterpreterException?
-        * Need to watch out for malicious __str__() instances that
-          could do something nasty.
-    - Be able to clear exceptions in the interpreter to allow reuse
-        * Raise an exception if the interpreter is used while an
-          exception is still set.
-        * Provide a function to clear any set exeception.
+        * Provide way to compare the raised exception in a safe manner
+          (i.e., expose PyErr_ExceptionMatches())?
+        * Provide exc_info() for those who know what they are doing?
+            + Raise a SecurityWarning when used?
 + Tear out old restricted mode code.
 
 
