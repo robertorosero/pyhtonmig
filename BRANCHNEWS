@@ -25,6 +25,10 @@ Core and builtins
 Extension Modules
 -----------------
 
+* rev. 51941: Changed exception raised by interpreter.Interpreter().execute()
+  to RuntimError when something goes bad.  Also added the redirect_output()
+  method.
+
 * rev. 51914: Changed accessing the built-in namespace dict from an attribute
   to a function call.  This is because the dict is cached in the execution
   frame created when the interpreter is first created and thus setting the dict
