@@ -134,7 +134,6 @@ class ModulesTests(BaseInterpTests):
         self.failUnless('token' not in self.interp.modules)
         self.interp.execute('import token')
         del self.interp.modules['token']
-        # XXX should really check that ImportError not raised.
         self.interp.execute('import token')
         
     def test_replacing(self):
@@ -155,7 +154,18 @@ class ModulesTests(BaseInterpTests):
         self.interp.execute("import token;"
                             "_return.append(hasattr(token, 'test'))")
         self.failUnless(not _return[-1])
-
+        
+    def test_not_cached(self):
+        # Make sure that 'modules' dict is not cached.
+        builtin = self.interp.modules['__builtin__']
+        main = self.interp.modules['__main__']
+        self.interp.execute("import token")
+        self.interp.modules = {}
+        self.interp.modules['__builtin__'] = builtin
+        self.interp.modules['__main__'] = main
+        self.interp.execute("import token")
+        self.failUnless('token' in self.interp.modules)
+        
 
 class SysDictTests(BaseInterpTests):
 
@@ -163,20 +173,13 @@ class SysDictTests(BaseInterpTests):
 
     def test_get(self):
         # Make sure a dict is returned.
-        sys_dict = self.interp.sys_dict
+        sys_dict = self.interp.sys_dict()
         self.failUnless(isinstance(sys_dict, dict))
         self.failUnless('version' in sys_dict)
 
-    def test_set(self):
-        # Make sure sys_dict can be set to a new dict and that it has desired
-        # effect.
-        self.failUnlessRaises(TypeError, setattr, self.interp, 'sys_dict', [])
-        # XXX requires exceptions
-        # set to new dict, make sure exceptions raised when trying to get attribute from sys
-
     def test_mutating(self):
         # Changes to the dict should be reflected in the interpreter.
-        sys_dict = self.interp.sys_dict
+        sys_dict = self.interp.sys_dict()
         sys_dict['version'] = 'test'
         interp_return = []
         self.interp.builtins()['to_return'] = interp_return
@@ -186,7 +189,7 @@ class SysDictTests(BaseInterpTests):
     def test_deletion(self):
         # Make sure removing a value raises the proper exception when accessing
         # through the 'sys' module.
-        del self.interp.sys_dict['version']
+        del self.interp.sys_dict()['version']
         # XXX requires exceptions
         # XXX self.failUnlessRaises(XXX, self.interp.execute,
         #                           'import sys; sys.version')
@@ -194,14 +197,14 @@ class SysDictTests(BaseInterpTests):
     def test_copied(self):
         # sys_dict should be unique per interpreter (including mutable data
         # structures).
-        sys_dict = self.interp.sys_dict
-        sys_dict['version'] = 'test'
-        self.failUnless(sys.version != 'test')
-        # XXX check mutable data structures
-        sys_dict.setdefault('argv', []).append('test')
-        self.failUnless(sys.argv[-1] != 'test')
-        sys_dict['path'].append('test')
-        self.failUnless(sys.path[-1] != 'test')
+        sys_version = sys.version
+        self.interp.sys_dict()['version'] = 'test'
+        reload(sys)
+        self.failUnlessEqual(sys.version, sys_version)
+        _return = []
+        self.interp.builtins()['_return'] = _return
+        self.interp.execute("import sys; _return.append(sys.version)")
+        self.failUnlessEqual(_return[-1], 'test')
         
 
 class InputOutputTests(BaseInterpTests):

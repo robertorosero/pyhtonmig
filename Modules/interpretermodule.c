@@ -64,6 +64,34 @@ interpreter_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     return (PyObject *)self;
 }
 
+/*
+ Getter for 'builtins'.
+ 
+ There is not setter because the creation of a new interpreter automatically
+ creates the initial execution frame which caches the built-in namespace.
+ */
+static PyObject *
+interpreter_builtins(PyObject *self)
+{
+    PyObject *builtins = PyInterpreter_GET_INTERP(self)->builtins;
+    
+    Py_INCREF(builtins);
+    return builtins;
+}
+
+/*
+ Getter for 'sys_dict'.
+ 
+ There is no setter because the dict gets cached somewhere.
+ */
+static PyObject *
+interpreter_sys_dict(PyObject *self)
+{
+    PyObject *sys_dict = PyInterpreter_GET_INTERP(self)->sysdict;
+    
+    Py_INCREF(sys_dict);
+    return sys_dict;
+}
 
 /*
    Execute Python source code in the interpreter.
@@ -101,21 +129,6 @@ interpreter_exec(PyObject *self, PyObject *arg)
     }
 
     Py_RETURN_NONE;
-}
-
-/*
- Getter for 'builtins'.
- 
- There is not setter because the creation of a new interpreter automatically
- creates the initial execution frame which caches the built-in namespace.
- */
-static PyObject *
-interpreter_builtins(PyObject *self)
-{
-    PyObject *builtins = PyInterpreter_GET_INTERP(self)->builtins;
-    
-    Py_INCREF(builtins);
-    return builtins;
 }
 
 static PyObject *
@@ -164,6 +177,8 @@ redirect_output(PyObject *self, PyObject *args)
 static PyMethodDef interpreter_methods[] = {
     {"builtins", (PyCFunction)interpreter_builtins, METH_NOARGS,
         "Return the built-in namespace dict."},
+    {"sys_dict", (PyCFunction)interpreter_sys_dict, METH_NOARGS,
+        "Return the 'sys' module's data dictionary."},
     {"execute", interpreter_exec, METH_O,
 	"Execute the passed-in string in the interpreter."},
     {"redirect_output", (PyCFunction)redirect_output, METH_VARARGS,
@@ -217,43 +232,8 @@ interpreter_set_modules(PyObject *self, PyObject *arg, void *optional)
 	return 0;
 }
 
-/*
-   Getter for 'sys_dict'.
-*/
-static PyObject *
-interpreter_get_sys_dict(PyObject *self, void *optional)
-{
-	PyObject *sys_dict = PyInterpreter_GET_INTERP(self)->sysdict;
-
-	Py_INCREF(sys_dict);
-	return sys_dict;
-}
-
-/*
-   Setter for 'sys_dict'.
-*/
-static int
-interpreter_set_sys_dict(PyObject *self, PyObject *arg, void *optional)
-{
-	PyObject *old_sys_dict = PyInterpreter_GET_INTERP(self)->sysdict;
-
-	if (!PyDict_Check(arg)) {
-		PyErr_SetString(PyExc_TypeError,
-				"'sys_dict' must be set to a dict");
-		return -1;
-	}
-
-	Py_INCREF(arg);
-	Py_DECREF(old_sys_dict);
-	PyInterpreter_GET_INTERP(self)->sysdict = arg;
-
-	return 0;
-}
-
 
 static PyGetSetDef interpreter_getset[] = {
-	{"sys_dict", interpreter_get_sys_dict, interpreter_set_sys_dict,
-		"The modules dict for 'sys'.", NULL},
 	{"modules", interpreter_get_modules, interpreter_set_modules,
 		"The dict used for sys.modules.", NULL},
 	{NULL}
