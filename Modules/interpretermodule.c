@@ -97,12 +97,14 @@ interpreter_sys_dict(PyObject *self)
    Execute Python source code in the interpreter.
 */
 static PyObject *
-interpreter_exec(PyObject *self, PyObject *arg)
+interpreter_exec(PyInterpreterObject *self, PyObject *arg)
 {
-    PyInterpreterObject *interp_self = (PyInterpreterObject *)self;
     const char *str_arg = NULL;
     PyThreadState* cur_tstate = NULL;
-    int result = 0;
+    PyObject *main_module = NULL;
+    PyObject *main_dict = NULL;
+    PyObject *result = NULL;
+    const char *exc_name = NULL;
 
     if (!PyString_Check(arg)) {
 	PyErr_SetString(PyExc_TypeError, "argument must be a string");
@@ -113,21 +115,40 @@ interpreter_exec(PyObject *self, PyObject *arg)
     if (!str_arg)
 	return NULL;
 
-    cur_tstate = PyThreadState_Swap(interp_self->tstate);
+    /* Execute in 'self'. */
+    cur_tstate = PyThreadState_Swap(self->tstate);
+    
+    /* If a previous exception was present, clear it out. */
+    if (PyErr_Occurred())
+        PyErr_Clear();
+    
+    /* Code borrowed from PyRun_SimpleStringFlags(). */
+    main_module = PyImport_AddModule("__main__");
+    if (!main_module) {
+        goto back_to_caller;
+    }
+    
+    main_dict = PyModule_GetDict(main_module);
 
-    result = PyRun_SimpleString(str_arg);
-    if (result < 0) {
-	PyErr_Clear();
+    result = PyRun_String(str_arg, Py_file_input, main_dict, main_dict);
+    
+    if (result) {
+        Py_DECREF(result);
+    }
+    else {
+        exc_name = ((PyTypeObject *)PyErr_Occurred())->tp_name;
     }
 
+ back_to_caller:
+    /* Execute in calling interpreter. */
     PyThreadState_Swap(cur_tstate);
 
-    if (result < 0) {
-	PyErr_SetString(PyExc_RuntimeError,
-			"exception during execution");
+    if (!result) {
+	PyErr_Format(PyExc_RuntimeError,
+			"execution raised during execution (%s)", exc_name);
 	return NULL;
     }
-
+    
     Py_RETURN_NONE;
 }
 
@@ -143,14 +164,14 @@ redirect_output(PyObject *self, PyObject *args)
     
     if (!py_stdout) {
         /* Argument for NewOutput() copied from PycStringIO->NewInput(). */
-        py_stdout = (PycStringIO->NewOutput)(128);
+        py_stdout = (PycStringIO->NewOutput)(512);
         if (!py_stdout)
             return NULL;
     }
     
     if (!py_stderr) {
         /* Argument for NewOutput() copied from PycStringIO->NewInput(). */
-        py_stderr = (PycStringIO->NewOutput)(128);
+        py_stderr = (PycStringIO->NewOutput)(512);
         if (!py_stderr)
             return NULL;
     }
@@ -174,15 +195,55 @@ redirect_output(PyObject *self, PyObject *args)
     return used_stdout_stderr;
 }
 
+static PyObject *
+exc_matches(PyInterpreterObject *self, PyObject *arg)
+{
+    PyThreadState *starting_tstate = NULL;
+    PyObject *raised_exc = NULL;
+    int result = 0;
+    
+    /* Can only compare against exception classes or instances. */
+    if (!(PyExceptionClass_Check(arg) || PyExceptionInstance_Check(arg))) {
+        PyErr_SetString(PyExc_TypeError,
+                        "argument must be an exception class or instance");
+        return NULL;
+    }
+    
+    /* Now executing under 'self'. */
+    starting_tstate = PyThreadState_Swap(self->tstate);
+    
+    raised_exc = PyErr_Occurred();
+    
+    if (!raised_exc) {
+        /* Executing under calling interpreter. */
+        PyThreadState_Swap(starting_tstate);
+        PyErr_SetString(PyExc_LookupError, "no exception set");
+        return NULL;
+    }
+    
+    if (PyErr_GivenExceptionMatches(raised_exc, arg))
+        result = 1;
+    
+    /* Execute under calling interpreter. */
+    PyThreadState_Swap(starting_tstate);
+    
+    if (result)
+        Py_RETURN_TRUE;
+    else
+        Py_RETURN_FALSE;
+}
+
 static PyMethodDef interpreter_methods[] = {
     {"builtins", (PyCFunction)interpreter_builtins, METH_NOARGS,
         "Return the built-in namespace dict."},
     {"sys_dict", (PyCFunction)interpreter_sys_dict, METH_NOARGS,
         "Return the 'sys' module's data dictionary."},
-    {"execute", interpreter_exec, METH_O,
+    {"execute", (PyCFunction)interpreter_exec, METH_O,
 	"Execute the passed-in string in the interpreter."},
     {"redirect_output", (PyCFunction)redirect_output, METH_VARARGS,
         "Redirect stdout to stderr.  Returns tuple of objects used."},
+    {"exc_matches", (PyCFunction)exc_matches, METH_O,
+    "Check if the raised exception in the interpreter matches the argument"},
     {NULL}
 };
 
@@ -245,7 +306,7 @@ PyDoc_STRVAR(interpreter_type_doc,
 \n\
 XXX");
 
-PyTypeObject PyInterpreter_Type = {
+static PyTypeObject PyInterpreter_Type = {
 	PyObject_HEAD_INIT(NULL)
 	0,					/* ob_size */
 	"interpreterInterpreter",		/* tp_name */

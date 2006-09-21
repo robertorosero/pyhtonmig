@@ -34,7 +34,8 @@ Status
         * Just promote removal
     - exit()
         * Have SystemExit exit the process only if no other
-          interpreters are running. <critical>
+          interpreters are running. <critical> [done]
+        * XXX Safe?
 + Filesystem path hiding (`Filesystem Information`_) <critical?>
 + Tweaked stdlib modules
     - mini 'sys' module (`Making the ``sys`` Module Safe`_)
@@ -48,15 +49,10 @@ Status
     - Set 'sys' module settings [done]
     - Set 'sys.modules' [done]
     - API
-        * Python
+        * Python [done]
         * C
     - Securely handle exceptions being raised in sub-interpreter
-        * Raise InterpreterException w/ string for the exception type
-          and a sanitized string for message?
-        * Provide way to compare the raised exception in a safe manner
-          (i.e., expose PyErr_ExceptionMatches())?
-        * Provide exc_info() for those who know what they are doing?
-            + Raise a SecurityWarning when used?
+      [done]
     - Redirect output [done]
 + Tear out old restricted mode code.
 

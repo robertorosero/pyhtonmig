@@ -190,9 +190,10 @@ class SysDictTests(BaseInterpTests):
         # Make sure removing a value raises the proper exception when accessing
         # through the 'sys' module.
         del self.interp.sys_dict()['version']
-        # XXX requires exceptions
-        # XXX self.failUnlessRaises(XXX, self.interp.execute,
-        #                           'import sys; sys.version')
+        stdout, stderr = self.interp.redirect_output()
+        self.failUnlessRaises(RuntimeError, self.interp.execute,
+                              'import sys; sys.version')
+        self.failUnless(self.interp.exc_matches(AttributeError))
 
     def test_copied(self):
         # sys_dict should be unique per interpreter (including mutable data
@@ -217,8 +218,8 @@ class InputOutputTests(BaseInterpTests):
         self.interp.execute("print 'test'")
         self.failUnlessEqual("test\n", stdout.getvalue())
         self.failUnless(not stderr.getvalue())
-        self.failUnlessRaises(RuntimeError, self.interp.execute, "+")
-        self.failUnless(stderr.getvalue())
+        self.interp.execute(r"import sys; sys.stderr.write('test\n')")
+        self.failUnlessEqual('test\n', stderr.getvalue())
         
     def test_redirect_output_arguments(self):
         # Test passing in arguments to redirect_output().
@@ -247,8 +248,29 @@ class ExceptionsTests(BaseInterpTests):
         # Test exc_matches().
         stdout, stderr = self.interp.redirect_output()
         self.failUnlessRaises(RuntimeError, self.interp.execute, '=')
-        #self.failUnless(self.interp.exc_matches(SyntaxError))
-
+        self.failUnless(self.interp.exc_matches(SyntaxError))
+        self.failUnless(not self.interp.exc_matches(TypeError))
+        
+    def test_exception_cleared(self):
+        # No exception should be set after a successful execution.
+        stdout, stderr = self.interp.redirect_output()
+        self.failUnlessRaises(RuntimeError, self.interp.execute, '=')
+        self.interp.execute('2 + 3')
+        self.failUnlessRaises(LookupError, self.interp.exc_matches, Exception)
+        
+    def test_multiple_exc_checks(self):
+        # Be able to check the exception multiple times.
+        stdout, stderr = self.interp.redirect_output()
+        self.failUnlessRaises(RuntimeError, self.interp.execute, '=')
+        for x in range(2):
+            self.failUnless(self.interp.exc_matches(SyntaxError))
+            
+    def test_SystemExit_safe(self):
+        # Raising SystemExit should not cause the process to exit.
+        self.failUnlessRaises(RuntimeError, self.interp.execute,
+                                "raise SystemExit")
+        self.failUnless(self.interp.exc_matches(SystemExit))
+        
 
 def test_main():
     test_support.run_unittest(
