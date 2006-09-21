@@ -25,6 +25,8 @@ Core and builtins
 Extension Modules
 -----------------
 
+* rev. 51958: Fix up handling exceptions.  Added exc_matches() exception.
+
 * rev. 51944: Change sys_dict to a module since that dict is cached somewhere.
 
 * rev. 51941: Changed exception raised by interpreter.Interpreter().execute()
