@@ -122,10 +122,7 @@ class ModuleFinder:
 
     def import_hook(self, name, caller=None, fromlist=None, level=-1):
         self.msg(3, "import_hook", name, caller, fromlist, level)
-        if level == 0: # absolute import
-            parent = None
-        else:
-            parent = self.determine_parent(caller)
+        parent = self.determine_parent(caller, level=level)
         q, tail = self.find_head_package(parent, name)
         m = self.load_tail(q, tail)
         if not fromlist:
@@ -134,12 +131,21 @@ class ModuleFinder:
             self.ensure_fromlist(m, fromlist)
         return None
 
-    def determine_parent(self, caller):
-        self.msgin(4, "determine_parent", caller)
-        if not caller:
+    def determine_parent(self, caller, level=-1):
+        self.msgin(4, "determine_parent", caller, level)
+        if not caller or level == 0:
             self.msgout(4, "determine_parent -> None")
             return None
         pname = caller.__name__
+        if level >= 1:
+            if caller.__path__:
+                level -= 1
+            if pname.count(".") < level:
+                raise ImportError, "relative importpath too deep"
+            pname = ".".join(pname.split(".")[:-level])
+            parent = self.modules[pname]
+            self.msgout(4, "determine_parent ->", parent)
+            return parent
         if caller.__path__:
             parent = self.modules[pname]
             assert caller is parent
@@ -325,6 +331,7 @@ class ModuleFinder:
     def scan_opcodes(self, co,
                      unpack = struct.unpack):
         # Scan the code, and yield 'interesting' opcode combinations
+        # Version for Python 2.4 and older
         code = co.co_code
         names = co.co_names
         consts = co.co_consts
@@ -348,6 +355,7 @@ class ModuleFinder:
     def scan_opcodes_25(self, co,
                      unpack = struct.unpack):
         # Scan the code, and yield 'interesting' opcode combinations
+        # Python 2.5 version (has absolute and relative imports)
         code = co.co_code
         names = co.co_names
         consts = co.co_consts
@@ -418,7 +426,9 @@ class ModuleFinder:
                 self._safe_import_hook(name, m, fromlist, level=0)
                 # XXX code missing, see above
             elif what == "relative_import":
-                raise NotImplementedError("relative import not yet implemented")
+                level, fromlist, name = args
+                # XXX code missing, see above
+                self._safe_import_hook(name, m, fromlist, level=level)
             else:
                 # We don't expect anything else from the generator.
                 raise RuntimeError(what)

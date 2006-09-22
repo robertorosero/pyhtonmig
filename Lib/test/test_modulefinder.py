@@ -55,20 +55,20 @@ absolute_import_test = [
     "a.module",
     ["a", "a.module",
      "b", "b.x", "b.y", "b.z",
-     "__future__", "sys", "time"],
+     "__future__", "sys", "exceptions"],
     ["blahblah"],
     """\
 mymodule.py
 a/__init__.py
 a/module.py
                                 from __future__ import absolute_import
-                                import sys # this is a.sys
+                                import sys # sys
                                 import blahblah # fails
-                                import time # this is NOT a.time
-                                import b.x # this is NOT a.b.x
-                                from b import y
-                                from b.z import *
-a/time.py
+                                import exceptions # exceptions
+                                import b.x # b.x
+                                from b import y # b.y
+                                from b.z import * # b.z.*
+a/exceptions.py
 a/sys.py
                                 import mymodule
 a/b/__init__.py
@@ -85,33 +85,41 @@ b/z.py
 
 relative_import_test = [
     "a.module",
-    ["a", "a.module",
-     "b", "b.x", "b.y", "b.z",
-     "__future__", "sys", "time"],
-    ["blahblah"],
+    ["__future__",
+     "a", "a.module",
+     "a.b", "a.b.y", "a.b.z",
+     "a.b.c", "a.b.c.moduleC",
+     "a.b.c.d", "a.b.c.e",
+     "exceptions"],
+    [],
+# The 'from ... import name' constructs stil fail'
     """\
 mymodule.py
 a/__init__.py
+                                ##from . import sys # a.sys
 a/module.py
-                                from __future__ import absolute_import
-                                import sys # this is a.sys
-                                import blahblah # fails
-                                import time # this is NOT a.time
-                                from . import x # this is a.b.x
+                                from __future__ import absolute_import # __future__
+                                import exceptions # exceptions
+                                #from . import x # a.x
                                 from .b import y, z
-a/time.py
+                                #from . import sys # a.sys
+a/exceptions.py
 a/sys.py
-                                import mymodule
 a/b/__init__.py
+                                #from .c import moduleC
+                                from a.b.c import moduleC
 a/b/x.py
 a/b/y.py
 a/b/z.py
-b/__init__.py
-                                import z
-b/unused.py
-b/x.py
-b/y.py
-b/z.py
+a/b/c/__init__.py
+                                from ..c import e # a.b.c.e
+a/b/c/moduleC.py
+                                #
+                                #from .. import c
+                                #from .. import x # a.b.x
+                                from ..c import d # a.b.c.d
+a/b/c/d.py
+a/b/c/e.py
 """]
 
 def open_file(path):
@@ -129,13 +137,23 @@ def create_package(source):
             ofi = open_file(os.path.join(TEST_DIR, line.strip()))
 
 class ModuleFinderTest(unittest.TestCase):
-    def _do_test(self, info):
+    def _do_test(self, info, report=False):
         import_this, modules, missing, source = info
         create_package(source)
         try:
             mf = modulefinder.ModuleFinder(path=TEST_PATH)
             mf.import_hook(import_this)
-##            mf.report()
+            if report:
+                mf.report()
+
+                opath = sys.path[:]
+                sys.path = TEST_PATH
+                try:
+                    __import__(import_this)
+                except:
+                    import traceback; traceback.print_exc()
+                sys.path = opath
+
             modules = set(modules)
             found = set(mf.modules.keys())
             more = list(found - modules)
@@ -158,14 +176,7 @@ class ModuleFinderTest(unittest.TestCase):
             self._do_test(absolute_import_test)
 
         def test_relative_imports(self):
-            import_this, modules, missing, source = relative_import_test
-            create_package(source)
-            try:
-                mf = modulefinder.ModuleFinder(path=TEST_PATH)
-                self.assertRaises(NotImplementedError,
-                                  lambda: mf.import_hook(import_this))
-            finally:
-                distutils.dir_util.remove_tree(TEST_DIR)
+            self._do_test(relative_import_test)
 
 def test_main():
     test_support.run_unittest(ModuleFinderTest)
