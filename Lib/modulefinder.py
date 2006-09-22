@@ -137,9 +137,14 @@ class ModuleFinder:
             self.msgout(4, "determine_parent -> None")
             return None
         pname = caller.__name__
-        if level >= 1:
+        if level >= 1: # relative import
             if caller.__path__:
                 level -= 1
+            if level == 0:
+                parent = self.modules[pname]
+                assert parent is caller
+                self.msgout(4, "determine_parent ->", parent)
+                return parent
             if pname.count(".") < level:
                 raise ImportError, "relative importpath too deep"
             pname = ".".join(pname.split(".")[:-level])

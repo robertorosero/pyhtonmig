@@ -90,36 +90,36 @@ relative_import_test = [
      "a.b", "a.b.y", "a.b.z",
      "a.b.c", "a.b.c.moduleC",
      "a.b.c.d", "a.b.c.e",
+     "a.b.x",
      "exceptions"],
     [],
-# The 'from ... import name' constructs stil fail'
     """\
 mymodule.py
 a/__init__.py
-                                ##from . import sys # a.sys
+                                from .b import y, z # a.b.y, a.b.z
 a/module.py
                                 from __future__ import absolute_import # __future__
                                 import exceptions # exceptions
-                                #from . import x # a.x
-                                from .b import y, z
-                                #from . import sys # a.sys
 a/exceptions.py
 a/sys.py
 a/b/__init__.py
-                                #from .c import moduleC
-                                from a.b.c import moduleC
+                                from ..b import x # a.b.x
+                                #from a.b.c import moduleC
+                                from .c import moduleC # a.b.moduleC
 a/b/x.py
+                                # Shouldn't this work? It doesn't seem to,
+                                # in Python:
+                                #from ..b import x
 a/b/y.py
 a/b/z.py
+a/b/g.py
 a/b/c/__init__.py
                                 from ..c import e # a.b.c.e
 a/b/c/moduleC.py
-                                #
-                                #from .. import c
-                                #from .. import x # a.b.x
                                 from ..c import d # a.b.c.d
 a/b/c/d.py
 a/b/c/e.py
+a/b/c/x.py
 """]
 
 def open_file(path):
