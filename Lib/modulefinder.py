@@ -8,6 +8,7 @@ import marshal
 import os
 import sys
 import new
+import struct
 
 if hasattr(sys.__stdout__, "newlines"):
     READ_MODE = "U"  # universal line endings
@@ -15,11 +16,12 @@ else:
     # remain compatible with Python  < 2.3
     READ_MODE = "r"
 
-LOAD_CONST = dis.opname.index('LOAD_CONST')
-IMPORT_NAME = dis.opname.index('IMPORT_NAME')
-STORE_NAME = dis.opname.index('STORE_NAME')
-STORE_GLOBAL = dis.opname.index('STORE_GLOBAL')
+LOAD_CONST = chr(dis.opname.index('LOAD_CONST'))
+IMPORT_NAME = chr(dis.opname.index('IMPORT_NAME'))
+STORE_NAME = chr(dis.opname.index('STORE_NAME'))
+STORE_GLOBAL = chr(dis.opname.index('STORE_GLOBAL'))
 STORE_OPS = [STORE_NAME, STORE_GLOBAL]
+HAVE_ARGUMENT = chr(dis.HAVE_ARGUMENT)
 
 # Modulefinder does a good job at simulating Python's, but it can not
 # handle __path__ modifications packages make at runtime.  Therefore there
@@ -317,26 +319,38 @@ class ModuleFinder:
                         fullname = name + "." + sub
                         self._add_badmodule(fullname, caller)
 
+    def yield_opcodes(self, co,
+                      unpack = struct.unpack):
+        # Scan the code, and yield 'interesting' opcode combinations
+        code = co.co_code
+        names = co.co_names
+        consts = co.co_consts
+        LOAD_AND_IMPORT = LOAD_CONST + IMPORT_NAME
+        while code:
+            c = code[0]
+            if c in STORE_OPS:
+                oparg, = unpack('<H', code[1:3])
+                yield "store", (names[oparg],)
+                code = code[3:]
+                continue
+            if code[:6:3] == LOAD_AND_IMPORT:
+                oparg_1, oparg_2 = unpack('<xHxH', code[:6])
+                yield "import", (consts[oparg_1], names[oparg_2])
+                code = code[6:]
+                continue
+            if c >= HAVE_ARGUMENT:
+                code = code[3:]
+            else:
+                code = code[1:]
+
     def scan_code(self, co, m):
         code = co.co_code
-        n = len(code)
-        i = 0
-        fromlist = None
-        while i < n:
-            c = code[i]
-            i = i+1
-            op = ord(c)
-            if op >= dis.HAVE_ARGUMENT:
-                oparg = ord(code[i]) + ord(code[i+1])*256
-                i = i+2
-            if op == LOAD_CONST:
-                # An IMPORT_NAME is always preceded by a LOAD_CONST, it's
-                # a tuple of "from" names, or None for a regular import.
-                # The tuple may contain "*" for "from <mod> import *"
-                fromlist = co.co_consts[oparg]
-            elif op == IMPORT_NAME:
-                assert fromlist is None or type(fromlist) is tuple
-                name = co.co_names[oparg]
+        for what, args in self.yield_opcodes(co):
+            if what == "store":
+                name, = args
+                m.globalnames[name] = 1
+            elif what == "import":
+                fromlist, name = args
                 have_star = 0
                 if fromlist is not None:
                     if "*" in fromlist:
@@ -362,10 +376,10 @@ class ModuleFinder:
                             m.starimports[name] = 1
                     else:
                         m.starimports[name] = 1
-            elif op in STORE_OPS:
-                # keep track of all global names that are assigned to
-                name = co.co_names[oparg]
-                m.globalnames[name] = 1
+            else:
+                # We don't expect anything else from the generator.
+                raise RuntimeError(what)
+
         for c in co.co_consts:
             if isinstance(c, type(co)):
                 self.scan_code(c, m)
