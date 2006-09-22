@@ -44,10 +44,11 @@ a/__init__.py
 a/module.py
                                 import sys
                                 from a import b as x
+                                from a.c import sillyname
 a/b.py
 a/c.py
                                 from a.module import x
-                                import mymodule
+                                import mymodule as sillyname
 """]
 
 absolute_import_test = [
@@ -67,6 +68,37 @@ a/module.py
                                 import b.x # this is NOT a.b.x
                                 from b import y
                                 from b.z import *
+a/time.py
+a/sys.py
+                                import mymodule
+a/b/__init__.py
+a/b/x.py
+a/b/y.py
+a/b/z.py
+b/__init__.py
+                                import z
+b/unused.py
+b/x.py
+b/y.py
+b/z.py
+"""]
+
+relative_import_test = [
+    "a.module",
+    ["a", "a.module",
+     "b", "b.x", "b.y", "b.z",
+     "__future__", "sys", "time"],
+    ["blahblah"],
+    """\
+mymodule.py
+a/__init__.py
+a/module.py
+                                from __future__ import absolute_import
+                                import sys # this is a.sys
+                                import blahblah # fails
+                                import time # this is NOT a.time
+                                from . import x # this is a.b.x
+                                from .b import y, z
 a/time.py
 a/sys.py
                                 import mymodule
@@ -123,7 +155,10 @@ class ModuleFinderTest(unittest.TestCase):
     if getattr(__future__, "absolute_import", None):
 
         def test_absolute_imports(self):
-            import_this, modules, missing, source = absolute_import_test
+            self._do_test(absolute_import_test)
+
+        def test_relative_imports(self):
+            import_this, modules, missing, source = relative_import_test
             create_package(source)
             try:
                 mf = modulefinder.ModuleFinder(path=TEST_PATH)

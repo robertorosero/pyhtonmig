@@ -120,9 +120,12 @@ class ModuleFinder:
         stuff = (ext, "r", imp.PY_SOURCE)
         self.load_module(name, fp, pathname, stuff)
 
-    def import_hook(self, name, caller=None, fromlist=None):
-        self.msg(3, "import_hook", name, caller, fromlist)
-        parent = self.determine_parent(caller)
+    def import_hook(self, name, caller=None, fromlist=None, level=-1):
+        self.msg(3, "import_hook", name, caller, fromlist, level)
+        if level == 0: # absolute import
+            parent = None
+        else:
+            parent = self.determine_parent(caller)
         q, tail = self.find_head_package(parent, name)
         m = self.load_tail(q, tail)
         if not fromlist:
@@ -296,13 +299,13 @@ class ModuleFinder:
             self.badmodules[name] = {}
         self.badmodules[name][caller.__name__] = 1
 
-    def _safe_import_hook(self, name, caller, fromlist):
+    def _safe_import_hook(self, name, caller, fromlist, level=-1):
         # wrapper for self.import_hook() that won't raise ImportError
         if name in self.badmodules:
             self._add_badmodule(name, caller)
             return
         try:
-            self.import_hook(name, caller)
+            self.import_hook(name, caller, level=level)
         except ImportError, msg:
             self.msg(2, "ImportError:", str(msg))
             self._add_badmodule(name, caller)
@@ -313,7 +316,7 @@ class ModuleFinder:
                         self._add_badmodule(sub, caller)
                         continue
                     try:
-                        self.import_hook(name, caller, [sub])
+                        self.import_hook(name, caller, [sub], level=level)
                     except ImportError, msg:
                         self.msg(2, "ImportError:", str(msg))
                         fullname = name + "." + sub
@@ -410,7 +413,10 @@ class ModuleFinder:
                     else:
                         m.starimports[name] = 1
             elif what == "absolute_import":
-                raise NotImplementedError("absolute import not yet implemented")
+                fromlist, name = args
+                # XXX code missing, see above
+                self._safe_import_hook(name, m, fromlist, level=0)
+                # XXX code missing, see above
             elif what == "relative_import":
                 raise NotImplementedError("relative import not yet implemented")
             else:
