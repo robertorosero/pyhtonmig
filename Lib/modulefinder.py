@@ -319,8 +319,8 @@ class ModuleFinder:
                         fullname = name + "." + sub
                         self._add_badmodule(fullname, caller)
 
-    def yield_opcodes(self, co,
-                      unpack = struct.unpack):
+    def scan_opcodes(self, co,
+                     unpack = struct.unpack):
         # Scan the code, and yield 'interesting' opcode combinations
         code = co.co_code
         names = co.co_names
@@ -343,9 +343,43 @@ class ModuleFinder:
             else:
                 code = code[1:]
 
+    def scan_opcodes_25(self, co,
+                     unpack = struct.unpack):
+        # Scan the code, and yield 'interesting' opcode combinations
+        code = co.co_code
+        names = co.co_names
+        consts = co.co_consts
+        LOAD_LOAD_AND_IMPORT = LOAD_CONST + LOAD_CONST + IMPORT_NAME
+        while code:
+            c = code[0]
+            if c in STORE_OPS:
+                oparg, = unpack('<H', code[1:3])
+                yield "store", (names[oparg],)
+                code = code[3:]
+                continue
+            if code[:9:3] == LOAD_LOAD_AND_IMPORT:
+                oparg_1, oparg_2, oparg_3 = unpack('<xHxHxH', code[:9])
+                level = consts[oparg_1]
+                if level == -1: # normal import
+                    yield "import", (consts[oparg_2], names[oparg_3])
+                elif level == 0: # absolute import
+                    yield "absolute_import", (consts[oparg_2], names[oparg_3])
+                else: # relative import
+                    yield "relative_import", (level, consts[oparg_2], names[oparg_3])
+                code = code[9:]
+                continue
+            if c >= HAVE_ARGUMENT:
+                code = code[3:]
+            else:
+                code = code[1:]
+
     def scan_code(self, co, m):
         code = co.co_code
-        for what, args in self.yield_opcodes(co):
+        if sys.version_info >= (2, 5):
+            scanner = self.scan_opcodes_25
+        else:
+            scanner = self.scan_opcodes
+        for what, args in scanner(co):
             if what == "store":
                 name, = args
                 m.globalnames[name] = 1
@@ -376,6 +410,10 @@ class ModuleFinder:
                             m.starimports[name] = 1
                     else:
                         m.starimports[name] = 1
+            elif what == "absolute_import":
+                raise RuntimeError("absolute import not yet implemented")
+            elif what == "relative_import":
+                raise RuntimeError("relative import not yet implemented")
             else:
                 # We don't expect anything else from the generator.
                 raise RuntimeError(what)
