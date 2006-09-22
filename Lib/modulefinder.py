@@ -1,7 +1,7 @@
 """Find modules used by a script, using introspection."""
-
 # This module should be kept compatible with Python 2.2, see PEP 291.
 
+from __future__ import generators
 import dis
 import imp
 import marshal
@@ -325,7 +325,6 @@ class ModuleFinder:
         code = co.co_code
         names = co.co_names
         consts = co.co_consts
-        LOAD_AND_IMPORT = LOAD_CONST + IMPORT_NAME
         while code:
             c = code[0]
             if c in STORE_OPS:
@@ -333,7 +332,7 @@ class ModuleFinder:
                 yield "store", (names[oparg],)
                 code = code[3:]
                 continue
-            if code[:6:3] == LOAD_AND_IMPORT:
+            if c == LOAD_CONST and code[3] == IMPORT_NAME:
                 oparg_1, oparg_2 = unpack('<xHxH', code[:6])
                 yield "import", (consts[oparg_1], names[oparg_2])
                 code = code[6:]
@@ -411,9 +410,9 @@ class ModuleFinder:
                     else:
                         m.starimports[name] = 1
             elif what == "absolute_import":
-                raise RuntimeError("absolute import not yet implemented")
+                raise NotImplementedError("absolute import not yet implemented")
             elif what == "relative_import":
-                raise RuntimeError("relative import not yet implemented")
+                raise NotImplementedError("relative import not yet implemented")
             else:
                 # We don't expect anything else from the generator.
                 raise RuntimeError(what)
