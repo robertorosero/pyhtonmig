@@ -427,13 +427,20 @@ class ModuleFinder:
                         m.starimports[name] = 1
             elif what == "absolute_import":
                 fromlist, name = args
-                # XXX code missing, see above
+                # XXX
                 self._safe_import_hook(name, m, fromlist, level=0)
-                # XXX code missing, see above
+                # XXX
             elif what == "relative_import":
                 level, fromlist, name = args
-                # XXX code missing, see above
-                self._safe_import_hook(name, m, fromlist, level=level)
+                # XXX
+                if name:
+                    self._safe_import_hook(name, m, fromlist, level=level)
+                    # XXX
+                else:
+                    # XXX
+                    parent = self.determine_parent(m, level=level)
+                    self._safe_import_hook(parent.__name__, None, fromlist, level=0)
+                    # XXX
             else:
                 # We don't expect anything else from the generator.
                 raise RuntimeError(what)

@@ -107,9 +107,6 @@ a/b/__init__.py
                                 #from a.b.c import moduleC
                                 from .c import moduleC # a.b.moduleC
 a/b/x.py
-                                # Shouldn't this work? It doesn't seem to,
-                                # in Python:
-                                #from ..b import x
 a/b/y.py
 a/b/z.py
 a/b/g.py
@@ -120,6 +117,45 @@ a/b/c/moduleC.py
 a/b/c/d.py
 a/b/c/e.py
 a/b/c/x.py
+"""]
+
+relative_import_test_2 = [
+    "a.module",
+    ["a", "a.module",
+     "a.sys",
+     "a.b", "a.b.y", "a.b.z",
+     "a.b.c", "a.b.c.d",
+     "a.b.c.e",
+     "a.b.c.moduleC",
+     "a.b.c.f",
+     "a.b.x",
+     "a.another"],
+    [],
+    """\
+mymodule.py
+a/__init__.py
+                                from . import sys # a.sys
+a/another.py
+a/module.py
+                                from .b import y, z # a.b.y, a.b.z
+a/exceptions.py
+a/sys.py
+a/b/__init__.py
+                                from .c import moduleC # a.b.c.moduleC
+                                from .c import d # a.b.c.d
+a/b/x.py
+a/b/y.py
+a/b/z.py
+a/b/c/__init__.py
+                                from . import e # a.b.c.e
+a/b/c/moduleC.py
+                                #
+                                from . import f   # a.b.c.f
+                                from .. import x  # a.b.x
+                                from ... import another # a.another
+a/b/c/d.py
+a/b/c/e.py
+a/b/c/f.py
 """]
 
 def open_file(path):
@@ -145,15 +181,15 @@ class ModuleFinderTest(unittest.TestCase):
             mf.import_hook(import_this)
             if report:
                 mf.report()
-
-                opath = sys.path[:]
-                sys.path = TEST_PATH
-                try:
-                    __import__(import_this)
-                except:
-                    import traceback; traceback.print_exc()
-                sys.path = opath
-
+##                # This wouldn't work in general when executed several times:
+##                opath = sys.path[:]
+##                sys.path = TEST_PATH
+##                try:
+##                    __import__(import_this)
+##                except:
+##                    import traceback; traceback.print_exc()
+##                sys.path = opath
+##                return
             modules = set(modules)
             found = set(mf.modules.keys())
             more = list(found - modules)
@@ -177,6 +213,9 @@ class ModuleFinderTest(unittest.TestCase):
 
         def test_relative_imports(self):
             self._do_test(relative_import_test)
+
+        def test_relative_imports_2(self):
+            self._do_test(relative_import_test_2)
 
 def test_main():
     test_support.run_unittest(ModuleFinderTest)
