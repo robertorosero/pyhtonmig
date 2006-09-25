@@ -12,6 +12,19 @@ What's New in Python 2.6 alpha 1?
 Core and builtins
 -----------------
 
+- Fix a bug in the parser's future statement handling that led to "with"
+  not being recognized as a keyword after, e.g., this statement:
+  from __future__ import division, with_statement
+
+- Bug #1557232: fix seg fault with def f((((x)))) and def f(((x),)).
+
+- Fix %zd string formatting on Mac OS X so it prints negative numbers.
+
+- Allow exception instances to be directly sliced again.
+
+- Bug #1551432: Exceptions do not define an explicit __unicode__ method.  This
+  allows calling unicode() on exceptions classes directly to succeed.
+
 - Make _PyGILState_NoteThreadState() static, it was not used anywhere
   outside of pystate.c and should not be necessary.
 
@@ -43,6 +56,13 @@ Core and builtins
 Library
 -------
 
+- Fix a bug in traceback.format_exception_only() that led to an error
+  being raised when print_exc() was called without an exception set.
+  In version 2.4, this printed "None", restored that behavior.
+
+- Make webbrowser.BackgroundBrowser usable in Windows (it wasn't because
+  the close_fds arg to subprocess.Popen is not supported).
+
 - Reverted patch #1504333 to sgmllib because it introduced an infinite loop.
 
 - Patch #1553314: Fix the inspect.py slowdown that was hurting IPython & SAGE
@@ -58,9 +78,13 @@ Library
 
 - Bug #1531862: Do not close standard file descriptors in subprocess.
 
+- fixed a bug with bsddb.DB.stat: its flags and txn keyword arguments
+  were transposed.
 
 Extension Modules
 -----------------
+
+- Fix itertools.count(n) to work with negative numbers again.
 
 - RLIMIT_SBSIZE was added to the resource module where available.
 
@@ -95,6 +119,10 @@ Documentation
 
 Tools
 -----
+
+- Make auto-generated python.vim file list built-ins and exceptions in
+  alphatbetical order.  Makes output more deterministic and easier to tell if
+  the file is stale or not.
 
 - Bug #1546372: Fixed small bugglet in pybench that caused a missing
   file not to get reported properly.
