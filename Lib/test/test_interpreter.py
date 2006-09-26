@@ -1,4 +1,4 @@
-""" Things to protect (and thus test) against:
+﻿""" Things to protect (and thus test) against:
 * Importing
     + built-ins
     + .pyc/.pyo
@@ -269,6 +269,8 @@ class ExceptionsTests(BaseInterpTests):
         # Raising SystemExit should not cause the process to exit.
         self.failUnlessRaises(RuntimeError, self.interp.execute,
                                 "raise SystemExit")
+        self.failUnless(self.interp.exc_matches(SystemExit))
+        self.failUnlessRaises(RuntimeError, self.interp.execute, "exit()")
         self.failUnless(self.interp.exc_matches(SystemExit))
         
 

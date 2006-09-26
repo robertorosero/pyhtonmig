@@ -20,7 +20,7 @@ Status
     - frame
         * do not allow importing 'sys' module to get to
           sys._getframe(), sys._current_frames(), or setting a trace
-          or profile function.
+          or profile function. <critical>
     - object() [done]
         * Remove object.__subclasses__ (`Mutable Shared State`_) [done]
 + Sandboxed versions of built-ins (`Sanitizing Built-In Types`_)
@@ -34,8 +34,7 @@ Status
         * Just promote removal
     - exit()
         * Have SystemExit exit the process only if no other
-          interpreters are running. <critical> [done]
-        * XXX Safe?
+          interpreters are running. [done]
 + Filesystem path hiding (`Filesystem Information`_) <critical?>
 + Tweaked stdlib modules
     - mini 'sys' module (`Making the ``sys`` Module Safe`_)
