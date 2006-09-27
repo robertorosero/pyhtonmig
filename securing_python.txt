@@ -40,9 +40,9 @@ Status
     - mini 'sys' module (`Making the ``sys`` Module Safe`_)
     - genericpath module (for os.path when C modules blocked)
     - socket (`Safe Networking`_)
-    - thread (XXX only if worried about thread resource starvation,
-      interrupt_main() not per-interpreter, and stack_size() can be
-      dangerous)
+    - thread (only if worried about thread resource starvation,
+      interrupt_main() not per-interpreter, and stack_size()
+      considered dangerous)
 + Create sandboxed interpreter stdlib module <critical>
     - Be able to specify built-ins [done]
     - Set 'sys' module settings [done]
@@ -53,6 +53,9 @@ Status
     - Securely handle exceptions being raised in sub-interpreter
       [done]
     - Redirect output [done]
+    - Inherit abilities provided by creating interpreter ONLY
+        * Only get importers as provided by creating interpreter.
+        * Only get built-ins as provided by creating interpreter.
 + Tear out old restricted mode code.
 
 
