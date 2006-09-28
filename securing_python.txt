@@ -444,18 +444,8 @@ Imports
 -------
 
 A proxy for protecting imports will be provided.  This is done by
-setting the ``__import__()`` function in the built-in namespace of the
-sandboxed interpreter to a proxied version of the function.
-
-The planned proxy will take in a passed-in function to use for the
-import and a whitelist of C extension modules and built-in modules to
-allow importation of.  If an import would lead to loading an extension
-or built-in module, it is checked against the whitelist and allowed
-to be imported based on that list.  All .pyc and .pyo file will not
-be imported.  All .py files will be imported.
-
-XXX perhaps augment 'sys' so that you list the extension of files that
-can be used for importing?  It is returned by ``imp.get_suffixes()``.
+setting the proper values in 'sys' that involve imports:
+sys.path, sys.meta_path, sys.path_hooks, and sys.path_importer.cache.
 
 It must be warned that importing any C extension module is dangerous.
 Not only are they able to circumvent security measures by executing C
@@ -468,12 +458,35 @@ accesses that mutated object it is essentially communicating and/or
 acting on behalf of the sandboxed interpreter.  This violates the
 perimeter defence.  No one should import extension modules blindly.
 
+Bytecode files will be flat-out disallowed.  Because malicious
+bytecode can be created that can crash the interpreter all bytecode
+files will be ignored.
+
+
+Implementing Phase 2 of PEP 302
++++++++++++++++++++++++++++++++
+
+Currently Python's built-in importer is monolithic in that __import__
+will automatically import a .py, .pyc, extension modules, or built-in
+modules if a custom importer does handle the import.  This does not
+give one the flexibility needed to control imports at the level of
+file type.
+
+In order to be able to prevent extension module imports and .pyc file
+imports, the current import machinery will be refactored to be PEP
+302 importers.  This will allow for better control over what can and
+cannot be imported.
+
+
 Implementing Import in Python
 +++++++++++++++++++++++++++++
 
-To help facilitate in the exposure of more of what importation
-requires (and thus make implementing a proxy easier), the import
-machinery should be rewritten in Python.  This will require some
+The import machinery should be rewritten in Python.  The C code is
+considered delicate and does not lend itself to being read.  There is
+also not a very strong definition of the import rules.  Rewriting
+import in Python would help clarify the semantics of imports.
+
+This rewrite will require some
 bootstrapping in order for the code to be loaded into the process
 without itself requiring importation, but that should be doable.  Plus
 some care must be taken to not lead to circular dependency on
@@ -482,8 +495,8 @@ having that import call the import call, etc.).
 
 Interaction with another interpreter that might provide an import
 function must also be dealt with.  One cannot expose the importation
-of a needed module for the import machinery as it might not be allowed
-by a proxy.  This can be handled by allowing the powerbox's import
+of a needed module for the import machinery as.
+This can be handled by allowing the powerbox's import
 function to have modules directly injected into its global namespace.
 But there is also the issue of using the proper ``sys.modules`` for
 storing the modules already imported.  You do not want to inject the
@@ -492,9 +505,6 @@ storing the modules already imported.  You do not want to inject the
 dealt with in some fashion (injecting per-call, having a factory
 function create a new import function based on an interpreter passed
 in, etc.).
-
-One can also implement a PEP 302 import object that takes the proper
-precautions of not exposing power needlessly.
 
 
 Sanitizing Built-In Types
