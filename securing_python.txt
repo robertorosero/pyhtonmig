@@ -507,6 +507,55 @@ function create a new import function based on an interpreter passed
 in, etc.).
 
 
+Python/import.c Notes for PEP 302 Phase 2
++++++++++++++++++++++++++++++++++++++++++
+
+__import__ -> PyImport_ImportModuleLevel() -> import_module_level()
+
+import_module_level()
+    -> get_parent()
+        Find out if import is occurring in a package and return the
+        parent module in the package.
+    -> load_next()
+        Find out next module to import in chain in dotted name (e.g.,
+        ``b`` in ``a.b.c`` if ``a`` already imported but not ``b``).
+
+load_next() -> import_submodule()
+
+import_submodule()
+    -> find_module() *
+        Check meta_path, path_hooks/path_importer_cache, else file
+        location for built-in import.
+    -> load_module() *
+        Execute loading of code based on type of import:
+        * PY_SOURCE -> path_hook
+        * PY_COMPILED -> path_hook
+        * C_EXTENSION -> path_hook
+        * PKG_DIRECTORY -> path_hook
+            Could it be worked so that if package found put in an
+            empty module in sys.modules and then import pkg.__init__?
+        * C_BUILTIN -> meta_path
+        * PY_FROZEN -> meta_path
+        * IMP_HOOK = importer -> path_hook
+
+Changes to find_module()
+    * Make only use PEP 302 resolution.
+    * Rip out part that finds file/directory and make it the importer
+      that finds files.  Then have different file types register their
+      file extension and a factory function to call to get the
+      importer to return (if proper file type found).
+      objects for py source, bytecode, packages, and extension
+      modules. (path_hooks factory function comes from part that just
+      verifies that sys.path entry is a directory).
+
+Changes to load_module()
+    * Rip out switch and have only do loaders.
+    * Change py source, bytecode, packages, and extension module
+      loaders be individual loaders.
+    * Change built-ins and frozen module loaders to be meta_path
+      loaders.
+
+
 Sanitizing Built-In Types
 -------------------------
 
