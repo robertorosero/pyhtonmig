@@ -87,6 +87,11 @@ ISSUES
     + As a data handler for the filesystem importer?
     + As part of the filesystem importer itself?
 * Writing out .pyc files optional for .py importer?
+* What about use of None as a value in sys.path_importer_cache?
+    + Shouldn't be needed after this.
+    + Make it a no-op?
+    + Add an entry in 'sys' for a default factory function that gets called for
+      None entries?
 
 
 What's New in this Branch?
