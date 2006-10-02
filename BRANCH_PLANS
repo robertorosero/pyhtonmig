@@ -1,0 +1,93 @@
+WHAT
+=============================
+
+Implement phase 2 of `PEP 302`_.  This entails refactoring the built-in import
+machinery for built-in, frozen, py, pyc, and extension modules and packages to
+use the abilities introduced by PEP 302.
+
+.. _PEP 302: http://www.python.org/dev/peps/pep-0302/
+
+
+WHY
+=============================
+
+As it stands now in Python 2.5, the built-in import machinery is an
+all-or-nothing proposition.  Either you support all six different types of
+imports or you support none.  By factoring these different types of imports
+into individual objects it allows much more control over what imports are to be
+allowed.
+
+This provides several benefits.  One is for security.  One will have the
+ability to remove support for specific types of modules from being imported,
+allowing for fine-grained control over the abilities of an interpreter.
+
+It also allows for more customized imports.  For instance, it should help
+simplify writing more caching support into importers to help in situations
+where reading and writing to the filesystem is expensive.  It should also help
+in situations where a file requires some pre-processing before being imported.
+
+
+HOW
+=============================
+
+PEP 302 introduces two lists to the 'sys' module that have different uses:
+sys.meta_path and sys.path_hooks.  The former is meant for importers that have
+no need for a specific token (e.g., file path, etc.) to work.  The latter is
+for factory functions that do require some context to specify how they should
+work.
+
+For the imports that require the filesystem, they will be factored out into
+data handlers.  These handlers will then be used with a filesystem importer to
+handle importation of files.  This allows for easy ordering of import
+preference in terms of file type.  It also allows a directory listed on
+sys.path to work with multiple types of imports instead of just one.
+
+* .py
+    Data handler to be used by the filesystem importer.
+
+* .pyc/.pyo
+    Data handler to be used by the filesystem importer.
+
+* extension
+    Data handler to be used by the filesystem importer.
+
+* built-in
+    meta_path importer.
+
+* frozen
+    meta_path importer.
+
+* package
+    Data handler to be used by the filesystem importer.
+
+
+ISSUES
+-------------------
+
+* API for data handlers.
+    + Support associating data type with handler.
+        - Use 'imp' constants?
+        - Use reasonable string names (e.g., '.py', '.so', etc.)?
+        - Worry about supporting third-party types (e.g., .ptl)?
+    + Actual importing
+        - handle_path() function.
+            * Pass in module, or have handler deal with module creation itself?
+            * Bother with supporting more than just giving file path to data
+              handler?
+            * Need import name if giving module to populate?
+            * Need package name if giving module to populate?
+        - handle_data() function.
+            * Totally optional/random idea.
+            * Allow for working off of string.
+        - handle_file() function.
+            * Totally optional/random idea.
+            * Allow for working off of file object.
+* How does any of this affect zipimport?
+* Best way to handle packages
+    + As a data handler for the filesystem importer?
+    + As part of the filesystem importer itself?
+* Writing out .pyc files optional for .py importer?
+
+
+What's New in this Branch?
+==========================
