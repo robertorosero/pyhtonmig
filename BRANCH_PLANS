@@ -94,5 +94,27 @@ ISSUES
       None entries?
 
 
+Built-in Meta Path Importer
+---------------------------
+
+Key data structures and functions:
+
+* Modules/config.c
+    + _PyImport_Inttab[]
+        Array of built-in modules.
+
+* Python/import.c
+    + is_builtin()
+        Function that tells you if a module is a built-in.
+    + init_builtin()
+        Initialize a specified built-in.
+
+
+There will be a new class, BuiltinImporter, that will be the importer/loader
+for built-in modules.  Can either have the class return instances or bind a
+single instance to the imp module.  Can also have methods be staticmethods or
+regular instance methods.
+
+
 What's New in this Branch?
 ==========================
