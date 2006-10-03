@@ -92,6 +92,8 @@ ISSUES
     + Make it a no-op?
     + Add an entry in 'sys' for a default factory function that gets called for
       None entries?
+* What to do with Python/import.c:PyWin_FindRegisteredModule()?
+    + Make meta_path importer?
 
 
 Built-in Meta Path Importer
@@ -108,12 +110,24 @@ Key data structures and functions:
         Function that tells you if a module is a built-in.
     + init_builtin()
         Initialize a specified built-in.
+    + find_module()
+        Function that handles finding modules (calls is_builtin()).
+    + load_module()
+        Handles loading of modules (calls init_builtin() along with some sanity
+        checking and a Py_INCREF on the returned module).
 
 
 There will be a new class, BuiltinImporter, that will be the importer/loader
-for built-in modules.  Can either have the class return instances or bind a
-single instance to the imp module.  Can also have methods be staticmethods or
-regular instance methods.
+for built-in modules.  Seems reasonable to have the class have staticmethods so
+as to skip need to create an instance of the class.
+
+Can short-circuit checking whether the meta path importer should handle an
+import by noting that if a value other than None is passed for the second
+argument to find_module() it is definitely not a built-in module.
+
+Need to make sure that this gets registered in sys.meta_path during new
+interpreter initialization when the sys data dict is created.  Is there going
+to be a bootstrap problem of people trying to import before then in C code?
 
 
 What's New in this Branch?
