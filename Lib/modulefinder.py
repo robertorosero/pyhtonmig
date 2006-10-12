@@ -398,14 +398,16 @@ class ModuleFinder:
             if what == "store":
                 name, = args
                 m.globalnames[name] = 1
-            elif what == "import":
+            elif what in ("import", "absolute_import"):
                 fromlist, name = args
                 have_star = 0
                 if fromlist is not None:
                     if "*" in fromlist:
                         have_star = 1
                     fromlist = [f for f in fromlist if f != "*"]
-                self._safe_import_hook(name, m, fromlist)
+                if what == "absolute_import": level = 0
+                else: level = -1
+                self._safe_import_hook(name, m, fromlist, level=level)
                 if have_star:
                     # We've encountered an "import *". If it is a Python module,
                     # the code has already been parsed and we can suck out the
@@ -425,22 +427,13 @@ class ModuleFinder:
                             m.starimports[name] = 1
                     else:
                         m.starimports[name] = 1
-            elif what == "absolute_import":
-                fromlist, name = args
-                # XXX
-                self._safe_import_hook(name, m, fromlist, level=0)
-                # XXX
             elif what == "relative_import":
                 level, fromlist, name = args
-                # XXX
                 if name:
                     self._safe_import_hook(name, m, fromlist, level=level)
-                    # XXX
                 else:
-                    # XXX
                     parent = self.determine_parent(m, level=level)
                     self._safe_import_hook(parent.__name__, None, fromlist, level=0)
-                    # XXX
             else:
                 # We don't expect anything else from the generator.
                 raise RuntimeError(what)
