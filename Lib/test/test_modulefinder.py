@@ -2,6 +2,7 @@ import __future__
 import sys, os
 import unittest
 import distutils.dir_util
+import tempfile
 
 from test import test_support
 
@@ -10,31 +11,61 @@ except NameError: from sets import Set as set
 
 import modulefinder
 
-# XXX To test modulefinder with Python 2.2, sets.py and
+# Note: To test modulefinder with Python 2.2, sets.py and
 # modulefinder.py must be available - they are not in the standard
 # library.
 
-# XXX FIXME: do NOT create files in the current directory
-TEST_DIR = os.path.abspath("testing")
+TEST_DIR = tempfile.mkdtemp()
 TEST_PATH = [TEST_DIR, os.path.dirname(__future__.__file__)]
 
-# Each test description is a list of 4 items:
+# Each test description is a list of 5 items:
 #
 # 1. a module name that will be imported by modulefinder
 # 2. a list of module names that modulefinder is required to find
 # 3. a list of module names that modulefinder should complain
 #    about because they are not found
-# 4. a string specifying a package to create; the format is obvious imo.
+# 4. a list of module names that modulefinder should complain
+#    about because they MAY be not found
+# 5. a string specifying packages to create; the format is obvious imo.
 #
 # Each package will be created in TEST_DIR, and TEST_DIR will be
 # removed after the tests again.
 # Modulefinder searches in a path that contains TEST_DIR, plus
 # the standard Lib directory.
 
+maybe_test = [
+    "a.module",
+    ["a", "a.module", "sys",
+     "b"],
+    ["c"], ["b.something"],
+    """\
+a/__init__.py
+a/module.py
+                                from b import something
+                                from c import something
+b/__init__.py
+                                from sys import *
+"""]
+
+maybe_test_new = [
+    "a.module",
+    ["a", "a.module", "sys",
+     "b", "__future__"],
+    ["c"], ["b.something"],
+    """\
+a/__init__.py
+a/module.py
+                                from b import something
+                                from c import something
+b/__init__.py
+                                from __future__ import absolute_import
+                                from sys import *
+"""]
+
 package_test = [
     "a.module",
     ["a", "a.b", "a.c", "a.module", "mymodule", "sys"],
-    ["blahblah"],
+    ["blahblah"], [],
     """\
 mymodule.py
 a/__init__.py
@@ -49,6 +80,7 @@ a/b.py
 a/c.py
                                 from a.module import x
                                 import mymodule as sillyname
+                                from sys import version_info
 """]
 
 absolute_import_test = [
@@ -56,7 +88,7 @@ absolute_import_test = [
     ["a", "a.module",
      "b", "b.x", "b.y", "b.z",
      "__future__", "sys", "exceptions"],
-    ["blahblah"],
+    ["blahblah"], [],
     """\
 mymodule.py
 a/__init__.py
@@ -92,7 +124,7 @@ relative_import_test = [
      "a.b.c.d", "a.b.c.e",
      "a.b.x",
      "exceptions"],
-    [],
+    [], [],
     """\
 mymodule.py
 a/__init__.py
@@ -130,7 +162,7 @@ relative_import_test_2 = [
      "a.b.c.f",
      "a.b.x",
      "a.another"],
-    [],
+    [], [],
     """\
 mymodule.py
 a/__init__.py
@@ -174,7 +206,7 @@ def create_package(source):
 
 class ModuleFinderTest(unittest.TestCase):
     def _do_test(self, info, report=False):
-        import_this, modules, missing, source = info
+        import_this, modules, missing, maybe_missing, source = info
         create_package(source)
         try:
             mf = modulefinder.ModuleFinder(path=TEST_PATH)
@@ -197,16 +229,23 @@ class ModuleFinderTest(unittest.TestCase):
             # check if we found what we expected, not more, not less
             self.failUnlessEqual((more, less), ([], []))
 
-            # check if missing modules are reported correctly
-            bad = mf.badmodules.keys()
+            # check for missing and maybe missing modules
+            bad, maybe = mf.any_missing_maybe()
             self.failUnlessEqual(bad, missing)
+            self.failUnlessEqual(maybe, maybe_missing)
         finally:
             distutils.dir_util.remove_tree(TEST_DIR)
 
     def test_package(self):
         self._do_test(package_test)
 
+    def test_maybe(self):
+        self._do_test(maybe_test)
+
     if getattr(__future__, "absolute_import", None):
+
+        def test_maybe_new(self):
+            self._do_test(maybe_test_new)
 
         def test_absolute_imports(self):
             self._do_test(absolute_import_test)
