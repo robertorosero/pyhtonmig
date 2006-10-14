@@ -27,6 +27,12 @@ Status
     - open()
     - __import__() / PEP 302 importer (`Imports`_) <critical>
         * Make sure importing built-in modules can be blocked.
+        * Make sure that no abilities are exposed by importers since
+          they will be accessible from inheritance through sys data
+          dict for any created interpreters.
+            + Do not inject full sys module.
+            + Most likely will need to wrap built-in importer so as to
+              be able to effectively block access to sys.
     - execfile()
         * Force to go through open()
             + Prevents opening unauthorized files.
