@@ -33,6 +33,17 @@ Status
             + Do not inject full sys module.
             + Most likely will need to wrap built-in importer so as to
               be able to effectively block access to sys.
+        * Could make __import__ self-contained such that 'sys' is not
+          directly referenced.
+            + Allows hiding sys.path by storing in the self-contained
+              object.
+            + Could expose other objects if desired.
+            + Could make it so that there is only exposure of certain
+              functions that allow removal from a whitelist but no
+              additions.
+            + Other things can be options that can only be turned off.
+            + Importers could be made like this with the one-way
+              narrowing of abilities.
     - execfile()
         * Force to go through open()
             + Prevents opening unauthorized files.
