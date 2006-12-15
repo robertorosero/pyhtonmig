@@ -10,6 +10,20 @@
 #include "Python.h"
 #include "structmember.h"
 
+/* Set a key error with the specified argument, wrapping it in a
+ * tuple automatically so that tuple keys are not unpacked as the
+ * exception arguments. */
+static void
+set_key_error(PyObject *arg)
+{
+	PyObject *tup;
+	tup = PyTuple_Pack(1, arg);
+	if (!tup)
+		return; /* caller will expect error to be set anyway */
+	PyErr_SetObject(PyExc_KeyError, tup);
+	Py_DECREF(tup);
+}
+
 /* This must be >= 1. */
 #define PERTURB_SHIFT 5
 
@@ -179,11 +193,13 @@ set_lookkey_string(PySetObject *so, PyObject *key, register long hash)
 		if (entry->key == dummy && freeslot == NULL)
 			freeslot = entry;
 	}
+	assert(0);	/* NOT REACHED */
+	return 0;
 }
 
 /*
 Internal routine to insert a new key into the table.
-Used both by the internal resize routine and by the public insert routine.
+Used by the public insert routine.
 Eats a reference to key.
 */
 static int
@@ -213,6 +229,35 @@ set_insert_key(register PySetObject *so, PyObject *key, long hash)
 		Py_DECREF(key);
 	}
 	return 0;
+}
+
+/*
+Internal routine used by set_table_resize() to insert an item which is
+known to be absent from the set.  This routine also assumes that
+the set contains no deleted entries.  Besides the performance benefit,
+using set_insert_clean() in set_table_resize() is dangerous (SF bug #1456209).
+Note that no refcounts are changed by this routine; if needed, the caller
+is responsible for incref'ing `key`.
+*/
+static void
+set_insert_clean(register PySetObject *so, PyObject *key, long hash)
+{
+	register size_t i;
+	register size_t perturb;
+	register size_t mask = (size_t)so->mask;
+	setentry *table = so->table;
+	register setentry *entry;
+
+	i = hash & mask;
+	entry = &table[i];
+	for (perturb = hash; entry->key != NULL; perturb >>= PERTURB_SHIFT) {
+		i = (i << 2) + i + perturb + 1;
+		entry = &table[i & mask];
+	}
+	so->fill++;
+	entry->key = key;
+	entry->hash = hash;
+	so->used++;
 }
 
 /*
@@ -296,11 +341,7 @@ set_table_resize(PySetObject *so, Py_ssize_t minused)
 		} else {
 			/* ACTIVE */
 			--i;
-			if(set_insert_key(so, entry->key, entry->hash) == -1) {
-				if (is_oldtable_malloced)
-					PyMem_DEL(oldtable);
-				return -1;
-			}
+			set_insert_clean(so, entry->key, entry->hash);
 		}
 	}
 
@@ -319,8 +360,10 @@ set_add_entry(register PySetObject *so, setentry *entry)
 	assert(so->fill <= so->mask);  /* at least one empty slot */
 	n_used = so->used;
 	Py_INCREF(entry->key);
-	if (set_insert_key(so, entry->key, entry->hash) == -1)
+	if (set_insert_key(so, entry->key, entry->hash) == -1) {
+		Py_DECREF(entry->key);
 		return -1;
+	}
 	if (!(so->used > n_used && so->fill*3 >= (so->mask+1)*2))
 		return 0;
 	return set_table_resize(so, so->used>50000 ? so->used*2 : so->used*4);
@@ -529,15 +572,28 @@ set_tp_print(PySetObject *so, FILE *fp, int flags)
 	Py_ssize_t pos=0;
 	char *emit = "";	/* No separator emitted on first pass */
 	char *separator = ", ";
+	int literalform = 0;
 
-	fprintf(fp, "%s([", so->ob_type->tp_name);
+	if (!so->used) {
+		fprintf(fp, "%s()", so->ob_type->tp_name);
+		return 0;
+	}
+
+	if (so->ob_type == &PySet_Type) {
+		literalform = 1;
+		fprintf(fp, "{");
+	} else
+		fprintf(fp, "%s([", so->ob_type->tp_name);
 	while (set_next(so, &pos, &entry)) {
 		fputs(emit, fp);
 		emit = separator;
 		if (PyObject_Print(entry->key, fp, 0) != 0)
 			return -1;
 	}
-	fputs("])", fp);
+	if (literalform)
+		fputs("}", fp);
+	else
+		fputs("])", fp);
 	return 0;
 }
 
@@ -545,6 +601,10 @@ static PyObject *
 set_repr(PySetObject *so)
 {
 	PyObject *keys, *result, *listrepr;
+
+	/* shortcut for the empty set */
+	if (!so->used)
+		return PyString_FromFormat("%s()", so->ob_type->tp_name);
 
 	keys = PySequence_List((PyObject *)so);
 	if (keys == NULL)
@@ -554,8 +614,15 @@ set_repr(PySetObject *so)
 	if (listrepr == NULL)
 		return NULL;
 
-	result = PyString_FromFormat("%s(%s)", so->ob_type->tp_name,
-		PyString_AS_STRING(listrepr));
+	if (so->ob_type == &PySet_Type) {
+		char *s = PyString_AS_STRING(listrepr);
+		s += 1;
+		s[strlen(s)-1] = 0;
+		result = PyString_FromFormat("{%s}", s);
+	} else {
+		result = PyString_FromFormat("%s(%s)", so->ob_type->tp_name,
+			 	PyString_AS_STRING(listrepr));
+	}
 	Py_DECREF(listrepr);
 	return result;
 }
@@ -1131,7 +1198,12 @@ set_intersection(PySetObject *so, PyObject *other)
 		}
 
 		while (set_next((PySetObject *)other, &pos, &entry)) {
-			if (set_contains_entry(so, entry)) {
+			int rv = set_contains_entry(so, entry);
+			if (rv == -1) {
+				Py_DECREF(result);
+				return NULL;
+			}
+			if (rv) {
 				if (set_add_entry(result, entry) == -1) {
 					Py_DECREF(result);
 					return NULL;
@@ -1148,8 +1220,27 @@ set_intersection(PySetObject *so, PyObject *other)
 	}
 
 	while ((key = PyIter_Next(it)) != NULL) {
-		if (set_contains_key(so, key)) {
-			if (set_add_key(result, key) == -1) {
+		int rv;
+		setentry entry;
+		long hash = PyObject_Hash(key);
+
+		if (hash == -1) {
+			Py_DECREF(it);
+			Py_DECREF(result);
+			Py_DECREF(key);
+			return NULL;
+		}
+		entry.hash = hash;
+		entry.key = key;
+		rv = set_contains_entry(so, &entry);
+		if (rv == -1) {
+			Py_DECREF(it);
+			Py_DECREF(result);
+			Py_DECREF(key);
+			return NULL;
+		}
+		if (rv) {
+			if (set_add_entry(result, &entry) == -1) {
 				Py_DECREF(it);
 				Py_DECREF(result);
 				Py_DECREF(key);
@@ -1225,7 +1316,8 @@ set_difference_update_internal(PySetObject *so, PyObject *other)
 		Py_ssize_t pos = 0;
 
 		while (set_next((PySetObject *)other, &pos, &entry))
-			set_discard_entry(so, entry);
+			if (set_discard_entry(so, entry) == -1)
+				return -1;
 	} else {
 		PyObject *key, *it;
 		it = PyObject_GetIter(other);
@@ -1288,17 +1380,26 @@ set_difference(PySetObject *so, PyObject *other)
 			entrycopy.hash = entry->hash;
 			entrycopy.key = entry->key;
 			if (!PyDict_Contains(other, entry->key)) {
-				if (set_add_entry((PySetObject *)result, &entrycopy) == -1)
+				if (set_add_entry((PySetObject *)result, &entrycopy) == -1) {
+					Py_DECREF(result);
 					return NULL;
+				}
 			}
 		}
 		return result;
 	}
 
 	while (set_next(so, &pos, &entry)) {
-		if (!set_contains_entry((PySetObject *)other, entry)) {
-			if (set_add_entry((PySetObject *)result, entry) == -1)
+		int rv = set_contains_entry((PySetObject *)other, entry);
+		if (rv == -1) {
+			Py_DECREF(result);
+			return NULL;
+		}
+		if (!rv) {
+			if (set_add_entry((PySetObject *)result, entry) == -1) {
+				Py_DECREF(result);
 				return NULL;
+			}
 		}
 	}
 	return result;
@@ -1350,11 +1451,18 @@ set_symmetric_difference_update(PySetObject *so, PyObject *other)
 		PyObject *value;
 		int rv;
 		while (PyDict_Next(other, &pos, &key, &value)) {
-			rv = set_discard_key(so, key);
+			setentry an_entry;
+			long hash = PyObject_Hash(key);
+
+			if (hash == -1)
+				return NULL;
+			an_entry.hash = hash;
+			an_entry.key = key;
+			rv = set_discard_entry(so, &an_entry);
 			if (rv == -1)
 				return NULL;
 			if (rv == DISCARD_NOTFOUND) {
-				if (set_add_key(so, key) == -1)
+				if (set_add_entry(so, &an_entry) == -1)
 					return NULL;
 			}
 		}
@@ -1457,7 +1565,10 @@ set_issubset(PySetObject *so, PyObject *other)
 		Py_RETURN_FALSE;
 
 	while (set_next(so, &pos, &entry)) {
-		if (!set_contains_entry((PySetObject *)other, entry))
+		int rv = set_contains_entry((PySetObject *)other, entry);
+		if (rv == -1)
+			return NULL;
+		if (!rv)
 			Py_RETURN_FALSE;
 	}
 	Py_RETURN_TRUE;
@@ -1604,7 +1715,7 @@ set_remove(PySetObject *so, PyObject *key)
 		Py_DECREF(tmpkey);
 		return result;
 	} else if (rv == DISCARD_NOTFOUND) {
-		PyErr_SetObject(PyExc_KeyError, key);
+		set_key_error(key);
 		return NULL;
 	}
 	Py_RETURN_NONE;
@@ -1760,7 +1871,7 @@ static PyNumberMethods set_as_number = {
 	0,				/*nb_negative*/
 	0,				/*nb_positive*/
 	0,				/*nb_absolute*/
-	0,				/*nb_nonzero*/
+	0,				/*nb_bool*/
 	0,				/*nb_invert*/
 	0,				/*nb_lshift*/
 	0,				/*nb_rshift*/
@@ -1870,7 +1981,7 @@ static PyNumberMethods frozenset_as_number = {
 	0,				/*nb_negative*/
 	0,				/*nb_positive*/
 	0,				/*nb_absolute*/
-	0,				/*nb_nonzero*/
+	0,				/*nb_bool*/
 	0,				/*nb_invert*/
 	0,				/*nb_lshift*/
 	0,				/*nb_rshift*/

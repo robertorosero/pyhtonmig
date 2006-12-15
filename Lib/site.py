@@ -135,7 +135,7 @@ def addpackage(sitedir, name, known_paths):
             if line.startswith("#"):
                 continue
             if line.startswith("import"):
-                exec line
+                exec(line)
                 continue
             line = line.rstrip()
             dir, dircase = makepath(sitedir, line)
@@ -274,7 +274,7 @@ class _Printer(object):
             for filename in self.__files:
                 filename = os.path.join(dir, filename)
                 try:
-                    fp = file(filename, "rU")
+                    fp = open(filename, "rU")
                     data = fp.read()
                     fp.close()
                     break

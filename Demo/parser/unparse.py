@@ -123,16 +123,6 @@ class Unparser:
             self.write(", ")
             self.dispatch(t.msg)
 
-    def _Exec(self, t):
-        self.fill("exec ")
-        self.dispatch(t.body)
-        if t.globals:
-            self.write(" in ")
-            self.dispatch(t.globals)
-        if t.locals:
-            self.write(", ")
-            self.dispatch(t.locals)
-
     def _Print(self, t):
         self.fill("print ")
         do_comma = False
@@ -223,6 +213,9 @@ class Unparser:
 
     def _FunctionDef(self, t):
         self.write("\n")
+        for deco in t.decorators:
+            self.fill("@")
+            self.dispatch(deco)
         self.fill("def "+t.name + "(")
         self.dispatch(t.args)
         self.write(")")

@@ -1893,8 +1893,8 @@ use \method{pop()} with \code{0} as the index.  For example:
 
 \subsection{Functional Programming Tools \label{functional}}
 
-There are three built-in functions that are very useful when used with
-lists: \function{filter()}, \function{map()}, and \function{reduce()}.
+There are two built-in functions that are very useful when used with
+lists: \function{filter()} and \function{map()}.
 
 \samp{filter(\var{function}, \var{sequence})} returns a sequence
 consisting of those items from the
@@ -1934,42 +1934,6 @@ is shorter than another).  For example:
 >>> map(add, seq, seq)
 [0, 2, 4, 6, 8, 10, 12, 14]
 \end{verbatim}
-
-\samp{reduce(\var{function}, \var{sequence})} returns a single value
-constructed by calling the binary function \var{function} on the first two
-items of the sequence, then on the result and the next item, and so
-on.  For example, to compute the sum of the numbers 1 through 10:
-
-\begin{verbatim}
->>> def add(x,y): return x+y
-...
->>> reduce(add, range(1, 11))
-55
-\end{verbatim}
-
-If there's only one item in the sequence, its value is returned; if
-the sequence is empty, an exception is raised.
-
-A third argument can be passed to indicate the starting value.  In this
-case the starting value is returned for an empty sequence, and the
-function is first applied to the starting value and the first sequence
-item, then to the result and the next item, and so on.  For example,
-
-\begin{verbatim}
->>> def sum(seq):
-...     def add(x,y): return x+y
-...     return reduce(add, seq, 0)
-... 
->>> sum(range(1, 11))
-55
->>> sum([])
-0
-\end{verbatim}
-
-Don't use this example's definition of \function{sum()}: since summing
-numbers is such a common need, a built-in function
-\code{sum(\var{sequence})} is already provided, and works exactly like
-this.
 \versionadded{2.3}
 
 \subsection{List Comprehensions}
@@ -2732,14 +2696,14 @@ standard module \module{__builtin__}\refbimodindex{__builtin__}:
  'UserWarning', 'ValueError', 'Warning', 'WindowsError',
  'ZeroDivisionError', '_', '__debug__', '__doc__', '__import__',
  '__name__', 'abs', 'basestring', 'bool', 'buffer',
- 'callable', 'chr', 'classmethod', 'cmp', 'coerce', 'compile',
+ 'callable', 'chr', 'classmethod', 'cmp', 'compile',
  'complex', 'copyright', 'credits', 'delattr', 'dict', 'dir', 'divmod',
- 'enumerate', 'eval', 'execfile', 'exit', 'file', 'filter', 'float',
+ 'enumerate', 'eval', 'exec', 'execfile', 'exit', 'file', 'filter', 'float',
  'frozenset', 'getattr', 'globals', 'hasattr', 'hash', 'help', 'hex',
  'id', 'int', 'intern', 'isinstance', 'issubclass', 'iter',
  'len', 'license', 'list', 'locals', 'long', 'map', 'max', 'min',
  'object', 'oct', 'open', 'ord', 'pow', 'property', 'quit', 'range',
- 'reduce', 'reload', 'repr', 'reversed', 'round', 'set',
+ 'reload', 'repr', 'reversed', 'round', 'set',
  'setattr', 'slice', 'sorted', 'staticmethod', 'str', 'sum', 'super',
  'tuple', 'type', 'unichr', 'unicode', 'vars', 'xrange', 'zip']
 \end{verbatim}
@@ -2867,7 +2831,7 @@ Now what happens when the user writes \code{from Sound.Effects import
 *}?  Ideally, one would hope that this somehow goes out to the
 filesystem, finds which submodules are present in the package, and
 imports them all.  Unfortunately, this operation does not work very
-well on Mac and Windows platforms, where the filesystem does not
+well on Windows platforms, where the filesystem does not
 always have accurate information about the case of a filename!  On
 these platforms, there is no guaranteed way to know whether a file
 \file{ECHO.PY} should be imported as a module \module{echo},
@@ -3072,6 +3036,7 @@ Here are two ways to write a table of squares and cubes:
  8  64  512
  9  81  729
 10 100 1000
+
 >>> for x in range(1,11):
 ...     print '%2d %3d %4d' % (x, x*x, x*x*x)
 ... 
@@ -3087,8 +3052,9 @@ Here are two ways to write a table of squares and cubes:
 10 100 1000
 \end{verbatim}
 
-(Note that one space between each column was added by the way
-\keyword{print} works: it always adds spaces between its arguments.)
+(Note that in the first example, one space between each column was
+added by the way \keyword{print} works: it always adds spaces between
+its arguments.)
 
 This example demonstrates the \method{rjust()} method of string objects,
 which right-justifies a string in a field of a given width by padding
@@ -3557,7 +3523,7 @@ be accessed or printed directly without having to reference \code{.args}.
 
 But use of \code{.args} is discouraged.  Instead, the preferred use is to pass
 a single argument to an exception (which can be a tuple if multiple arguments
-are needed) and have it bound to the \code{message} attribute.  One my also
+are needed) and have it bound to the \code{message} attribute.  One may also
 instantiate an exception first before raising it and add any attributes to it
 as desired.
 
@@ -4398,8 +4364,8 @@ the debugger, and that's one reason why this loophole is not closed.
 (Buglet: derivation of a class with the same name as the base class
 makes use of private variables of the base class possible.)
 
-Notice that code passed to \code{exec}, \code{eval()} or
-\code{evalfile()} does not consider the classname of the invoking 
+Notice that code passed to \code{exec()}, \code{eval()} or
+\code{execfile()} does not consider the classname of the invoking 
 class to be the current class; this is similar to the effect of the 
 \code{global} statement, the effect of which is likewise restricted to 
 code that is byte-compiled together.  The same restriction applies to

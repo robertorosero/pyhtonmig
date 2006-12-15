@@ -148,9 +148,8 @@ fallback, depending on the operator.)  Its truth value is true.
 
 \item[Ellipsis]
 This type has a single value.  There is a single object with this value.
-This object is accessed through the built-in name \code{Ellipsis}.
-It is used to indicate the presence of the \samp{...} syntax in a
-slice.  Its truth value is true.
+This object is accessed through the literal \code{...} or the
+built-in name \code{Ellipsis}.  Its truth value is true.
 \obindex{Ellipsis}
 
 \item[Numbers]
@@ -378,6 +377,41 @@ additional example of a mutable sequence type.
 
 
 \end{description} % Sequences
+
+
+\item[Set types]
+These represent unordered, finite sets of unique, immutable objects.
+As such, they cannot be indexed by any subscript. However, they can be
+iterated over, and the built-in function \function{len()} returns the
+number of items in a set. Common uses for sets are
+fast membership testing, removing duplicates from a sequence, and
+computing mathematical operations such as intersection, union, difference,
+and symmetric difference.
+\bifuncindex{len}
+\obindex{set type}
+
+For set elements, the same immutability rules apply as for dictionary
+keys. Note that numeric types obey the normal rules for numeric
+comparison: if two numbers compare equal (e.g., \code{1} and
+\code{1.0}), only one of them can be contained in a set.
+
+There are currently two intrinsic set types:
+
+\begin{description}
+
+\item[Sets]
+These\obindex{set} represent a mutable set. They are created by the
+built-in \function{set()} constructor and can be modified afterwards
+by several methods, such as \method{add()}.
+
+\item[Frozen sets]
+These\obindex{frozenset} represent an immutable set. They are created by
+the built-in \function{frozenset()} constructor. As a frozenset is
+immutable and hashable, it can be used again as an element of another set,
+or as a dictionary key.
+
+\end{description} % Set types
+
 
 \item[Mappings]
 These represent finite sets of objects indexed by arbitrary index sets.
@@ -762,7 +796,7 @@ user-defined method object whose associated class is the class
 (call it~\class{C}) of the instance for which the attribute reference
 was initiated or one of its bases,
 it is transformed into a bound user-defined method object whose
-\member{im_class} attribute is~\class{C} whose \member{im_self} attribute
+\member{im_class} attribute is~\class{C} and whose \member{im_self} attribute
 is the instance. Static method and class method objects are also
 transformed, as if they had been retrieved from class~\class{C};
 see above under ``Classes''. See section~\ref{descriptors} for
@@ -1243,8 +1277,7 @@ follows:
 \code{\var{x}<\var{y}} calls \code{\var{x}.__lt__(\var{y})},
 \code{\var{x}<=\var{y}} calls \code{\var{x}.__le__(\var{y})},
 \code{\var{x}==\var{y}} calls \code{\var{x}.__eq__(\var{y})},
-\code{\var{x}!=\var{y}} and \code{\var{x}<>\var{y}} call
-\code{\var{x}.__ne__(\var{y})},
+\code{\var{x}!=\var{y}} calls \code{\var{x}.__ne__(\var{y})},
 \code{\var{x}>\var{y}} calls \code{\var{x}.__gt__(\var{y})}, and
 \code{\var{x}>=\var{y}} calls \code{\var{x}.__ge__(\var{y})}.
 These methods can return any value, but if the comparison operator is
@@ -1315,13 +1348,13 @@ of that object]{2.5}
 \withsubitem{(object method)}{\ttindex{__cmp__()}}
 \end{methoddesc}
 
-\begin{methoddesc}[object]{__nonzero__}{self}
+\begin{methoddesc}[object]{__bool__}{self}
 Called to implement truth value testing, and the built-in operation
-\code{bool()}; should return \code{False} or \code{True}, or their
-integer equivalents \code{0} or \code{1}.
+\code{bool()}; should return \code{False} or \code{True}.
 When this method is not defined, \method{__len__()} is
-called, if it is defined (see below).  If a class defines neither
-\method{__len__()} nor \method{__nonzero__()}, all its instances are
+called, if it is defined (see below) and \code{True} is returned when
+the length is not zero.  If a class defines neither
+\method{__len__()} nor \method{__bool__()}, all its instances are
 considered true.
 \withsubitem{(mapping object method)}{\ttindex{__len__()}}
 \end{methoddesc}
@@ -1695,9 +1728,9 @@ through the values.
 Called to implement the built-in function
 \function{len()}\bifuncindex{len}.  Should return the length of the
 object, an integer \code{>=} 0.  Also, an object that doesn't define a
-\method{__nonzero__()} method and whose \method{__len__()} method
+\method{__bool__()} method and whose \method{__len__()} method
 returns zero is considered to be false in a Boolean context.
-\withsubitem{(object method)}{\ttindex{__nonzero__()}}
+\withsubitem{(object method)}{\ttindex{__bool__()}}
 \end{methoddesc}
 
 \begin{methoddesc}[container object]{__getitem__}{self, key}

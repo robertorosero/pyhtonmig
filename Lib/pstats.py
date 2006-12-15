@@ -116,7 +116,7 @@ class Stats:
 
     def load_stats(self, arg):
         if not arg:  self.stats = {}
-        elif type(arg) == type(""):
+        elif isinstance(arg, basestring):
             f = open(arg, 'rb')
             self.stats = marshal.load(f)
             f.close()
@@ -173,7 +173,7 @@ class Stats:
 
     def dump_stats(self, filename):
         """Write the profile data to a file we know how to load back."""
-        f = file(filename, 'wb')
+        f = open(filename, 'wb')
         try:
             marshal.dump(self.stats, f)
         finally:

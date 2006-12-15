@@ -37,7 +37,7 @@ class CommonTest(seq_tests.CommonTest):
 
         self.assertEqual(str(a0), str(l0))
         self.assertEqual(repr(a0), repr(l0))
-        self.assertEqual(`a2`, `l2`)
+        self.assertEqual(repr(a2), repr(l2))
         self.assertEqual(str(a2), "[0, 1, 2]")
         self.assertEqual(repr(a2), "[0, 1, 2]")
 
@@ -269,7 +269,6 @@ class CommonTest(seq_tests.CommonTest):
         self.assertRaises(TypeError, a.insert)
 
     def test_pop(self):
-        from decimal import Decimal
         a = self.type2test([-1, 0, 1])
         a.pop()
         self.assertEqual(a, [-1, 0])
@@ -281,8 +280,6 @@ class CommonTest(seq_tests.CommonTest):
         self.assertRaises(IndexError, a.pop)
         self.assertRaises(TypeError, a.pop, 42, 42)
         a = self.type2test([0, 10, 20, 30, 40])
-        self.assertEqual(a.pop(Decimal(2)), 20)
-        self.assertRaises(IndexError, a.pop, Decimal(25))
 
     def test_remove(self):
         a = self.type2test([0, 0, 1])

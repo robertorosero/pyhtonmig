@@ -469,11 +469,12 @@ class DocTest:
 
 
     # This lets us sort tests by name:
-    def __cmp__(self, other):
+    def __lt__(self, other):
         if not isinstance(other, DocTest):
-            return -1
-        return cmp((self.name, self.filename, self.lineno, id(self)),
-                   (other.name, other.filename, other.lineno, id(other)))
+            return NotImplemented
+        return ((self.name, self.filename, self.lineno, id(self))
+                <
+                (other.name, other.filename, other.lineno, id(other)))
 
 ######################################################################
 ## 3. DocTestParser
@@ -1208,8 +1209,8 @@ class DocTestRunner:
             # keyboard interrupts.)
             try:
                 # Don't blink!  This is where the user's code gets run.
-                exec compile(example.source, filename, "single",
-                             compileflags, 1) in test.globs
+                exec(compile(example.source, filename, "single",
+                             compileflags, 1), test.globs)
                 self.debugger.set_continue() # ==== Example Finished ====
                 exception = None
             except KeyboardInterrupt:
@@ -1561,7 +1562,7 @@ class DocTestFailure(Exception):
 
     - test: the DocTest object being run
 
-    - excample: the Example object that failed
+    - example: the Example object that failed
 
     - got: the actual output
     """
@@ -1580,7 +1581,7 @@ class UnexpectedException(Exception):
 
     - test: the DocTest object being run
 
-    - excample: the Example object that failed
+    - example: the Example object that failed
 
     - exc_info: the exception info
     """
@@ -1663,7 +1664,7 @@ class DebugRunner(DocTestRunner):
          >>> runner.run(test)
          Traceback (most recent call last):
          ...
-         UnexpectedException: <DocTest foo from foo.py:0 (2 examples)>
+         doctest.UnexpectedException: <DocTest foo from foo.py:0 (2 examples)>
 
          >>> del test.globs['__builtins__']
          >>> test.globs

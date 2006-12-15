@@ -6,9 +6,10 @@
  * object:
  *   1. Checks for future statements.  See future.c
  *   2. Builds a symbol table.	See symtable.c.
- *   3. Generate code for basic blocks.	 See compiler_mod() in this file.
+ *   3. Generate code for basic blocks.  See compiler_mod() in this file.
  *   4. Assemble the basic blocks into final code.  See assemble() in
- *   this file.	 
+ *      this file.	 
+ *   5. Optimize the byte code (peephole optimizations).  See peephole.c
  *
  * Note that compiler_mod() suggests module, but the module ast type
  * (mod_ty) has cases for expressions and interactive statements.
@@ -16,7 +17,8 @@
  * CAUTION: The VISIT_* macros abort the current function when they
  * encounter a problem. So don't invoke them when there is memory
  * which needs to be released. Code blocks are OK, as the compiler
- * structure takes care of releasing those.
+ * structure takes care of releasing those.  Use the arena to manage
+ * objects.
  */
 
 #include "Python.h"
@@ -31,16 +33,6 @@
 #include "opcode.h"
 
 int Py_OptimizeFlag = 0;
-
-/*
-  ISSUES:
-
-  opcode_stack_effect() function should be reviewed since stack depth bugs
-  could be really hard to find later.
-
-  Dead code is being generated (i.e. after unconditional jumps).
-    XXX(nnorwitz): not sure this is still true
-*/
 
 #define DEFAULT_BLOCK_SIZE 16
 #define DEFAULT_BLOCKS 8
@@ -115,11 +107,12 @@ struct compiler_unit {
 	PyObject *u_private;	/* for private name mangling */
 
 	int u_argcount;	   /* number of arguments for block */ 
-    /* Pointer to the most recently allocated block.  By following b_list
-       members, you can reach all early allocated blocks. */
+	int u_kwonlyargcount; /* number of keyword only arguments for block */
+	/* Pointer to the most recently allocated block.  By following b_list
+	   members, you can reach all early allocated blocks. */
 	basicblock *u_blocks;
 	basicblock *u_curblock; /* pointer to current block */
-	int u_tmpname;	   /* temporary variables for list comps */
+	int u_tmpname;		/* temporary variables for list comps */
 
 	int u_nfblocks;
 	struct fblockinfo u_fblock[CO_MAXBLOCKS];
@@ -152,17 +145,6 @@ struct compiler {
 	PyArena *c_arena;	 /* pointer to memory allocation arena */
 };
 
-struct assembler {
-	PyObject *a_bytecode;  /* string containing bytecode */
-	int a_offset;	       /* offset into bytecode */
-	int a_nblocks;	       /* number of reachable blocks */
-	basicblock **a_postorder; /* list of blocks in dfs postorder */
-	PyObject *a_lnotab;    /* string containing lnotab */
-	int a_lnotab_off;      /* offset into lnotab */
-	int a_lineno;	       /* last lineno of emitted instruction */
-	int a_lineno_off;      /* bytecode offset of last lineno */
-};
-
 static int compiler_enter_scope(struct compiler *, identifier, void *, int);
 static void compiler_free(struct compiler *);
 static basicblock *compiler_new_block(struct compiler *);
@@ -187,6 +169,8 @@ static int compiler_push_fblock(struct compiler *, enum fblocktype,
 				basicblock *);
 static void compiler_pop_fblock(struct compiler *, enum fblocktype,
 				basicblock *);
+/* Returns true if there is a loop on the fblock stack. */
+static int compiler_in_loop(struct compiler *);
 
 static int inplace_binop(struct compiler *, operator_ty);
 static int expr_constant(expr_ty e);
@@ -394,47 +378,6 @@ dictbytype(PyObject *src, int scope_type, int flag, int offset)
 	return dest;
 }
 
-/*
-
-Leave this debugging code for just a little longer.
-
-static void
-compiler_display_symbols(PyObject *name, PyObject *symbols)
-{
-PyObject *key, *value;
-int flags;
-Py_ssize_t pos = 0;
-
-fprintf(stderr, "block %s\n", PyString_AS_STRING(name));
-while (PyDict_Next(symbols, &pos, &key, &value)) {
-flags = PyInt_AsLong(value);
-fprintf(stderr, "var %s:", PyString_AS_STRING(key));
-if (flags & DEF_GLOBAL)
-fprintf(stderr, " declared_global");
-if (flags & DEF_LOCAL)
-fprintf(stderr, " local");
-if (flags & DEF_PARAM)
-fprintf(stderr, " param");
-if (flags & DEF_STAR)
-fprintf(stderr, " stararg");
-if (flags & DEF_DOUBLESTAR)
-fprintf(stderr, " starstar");
-if (flags & DEF_INTUPLE)
-fprintf(stderr, " tuple");
-if (flags & DEF_FREE)
-fprintf(stderr, " free");
-if (flags & DEF_FREE_GLOBAL)
-fprintf(stderr, " global");
-if (flags & DEF_FREE_CLASS)
-fprintf(stderr, " free/class");
-if (flags & DEF_IMPORT)
-fprintf(stderr, " import");
-fprintf(stderr, "\n");
-}
-	fprintf(stderr, "\n");
-}
-*/
-
 static void
 compiler_unit_check(struct compiler_unit *u)
 {
@@ -494,6 +437,7 @@ compiler_enter_scope(struct compiler *c, identifier name, void *key,
 	}
 	memset(u, 0, sizeof(struct compiler_unit));
 	u->u_argcount = 0;
+	u->u_kwonlyargcount = 0;
 	u->u_ste = PySymtable_Lookup(c->c_st, key);
 	if (!u->u_ste) {
 		compiler_unit_free(u);
@@ -608,7 +552,7 @@ compiler_new_block(struct compiler *c)
 		return NULL;
 	}
 	memset((void *)b, 0, sizeof(basicblock));
-    /* Extend the singly linked list of blocks with new block. */
+	/* Extend the singly linked list of blocks with new block. */
 	b->b_list = u->u_blocks;
 	u->u_blocks = b;
 	return b;
@@ -647,7 +591,7 @@ compiler_use_next_block(struct compiler *c, basicblock *block)
 /* Returns the offset of the next instruction in the current block's
    b_instr array.  Resizes the b_instr as necessary.
    Returns -1 on failure.
- */
+*/
 
 static int
 compiler_next_instr(struct compiler *c, basicblock *b)
@@ -691,7 +635,7 @@ compiler_next_instr(struct compiler *c, basicblock *b)
    already been set.  If it has been set, the call has no effect.
 
    Every time a new node is b
-   */
+*/
 
 static void
 compiler_set_lineno(struct compiler *c, int off)
@@ -721,7 +665,6 @@ opcode_stack_effect(int opcode, int oparg)
 		case UNARY_POSITIVE:
 		case UNARY_NEGATIVE:
 		case UNARY_NOT:
-		case UNARY_CONVERT:
 		case UNARY_INVERT:
 			return 0;
 
@@ -788,8 +731,6 @@ opcode_stack_effect(int opcode, int oparg)
 			return -1;
 		case IMPORT_STAR:
 			return -1;
-		case EXEC_STMT:
-			return -3;
 		case YIELD_VALUE:
 			return 0;
 
@@ -825,6 +766,7 @@ opcode_stack_effect(int opcode, int oparg)
 			return 1;
 		case BUILD_TUPLE:
 		case BUILD_LIST:
+		case BUILD_SET:
 			return 1-oparg;
 		case BUILD_MAP:
 			return 1;
@@ -871,9 +813,9 @@ opcode_stack_effect(int opcode, int oparg)
 			return -NARGS(oparg)-1;
 		case CALL_FUNCTION_VAR_KW:
 			return -NARGS(oparg)-2;
-#undef NARGS
 		case MAKE_FUNCTION:
-			return -oparg;
+			return -NARGS(oparg);
+#undef NARGS
 		case BUILD_SLICE:
 			if (oparg == 3)
 				return -2;
@@ -932,6 +874,8 @@ compiler_add_o(struct compiler *c, PyObject *dict, PyObject *o)
 
 	v = PyDict_GetItem(dict, t);
 	if (!v) {
+                if (PyErr_Occurred())
+                        return -1;
 		arg = PyDict_Size(dict);
 		v = PyInt_FromLong(arg);
 		if (!v) {
@@ -1024,8 +968,8 @@ compiler_addop_j(struct compiler *c, int opcode, basicblock *b, int absolute)
    from the current block to the new block.
 */
 
-/* XXX The returns inside these macros make it impossible to decref
-   objects created in the local function.
+/* The returns inside these macros make it impossible to decref objects
+   created in the local function.  Local objects should use the arena.
 */
 
 
@@ -1320,6 +1264,25 @@ compiler_arguments(struct compiler *c, arguments_ty args)
 }
 
 static int
+compiler_visit_kwonlydefaults(struct compiler *c, asdl_seq *kwonlyargs,
+	                      asdl_seq *kw_defaults)
+{
+	int i, default_count = 0;
+	for (i = 0; i < asdl_seq_LEN(kwonlyargs); i++) {
+		expr_ty arg = asdl_seq_GET(kwonlyargs, i);
+		expr_ty default_ = asdl_seq_GET(kw_defaults, i);
+		if (default_) {
+			ADDOP_O(c, LOAD_CONST, arg->v.Name.id, consts);
+			if (!compiler_visit_expr(c, default_)) {
+			    return -1;
+			}
+			default_count++;
+		}
+	}
+	return default_count;
+}
+
+static int
 compiler_function(struct compiler *c, stmt_ty s)
 {
 	PyCodeObject *co;
@@ -1327,14 +1290,22 @@ compiler_function(struct compiler *c, stmt_ty s)
 	arguments_ty args = s->v.FunctionDef.args;
 	asdl_seq* decos = s->v.FunctionDef.decorators;
 	stmt_ty st;
-	int i, n, docstring;
+	int i, n, docstring, kw_default_count = 0, arglength;
 
 	assert(s->kind == FunctionDef_kind);
 
 	if (!compiler_decorators(c, decos))
 		return 0;
+	if (args->kwonlyargs) {
+		int res = compiler_visit_kwonlydefaults(c, args->kwonlyargs,
+						        args->kw_defaults);
+		if (res < 0)
+			return 0;
+		kw_default_count = res;
+	}
 	if (args->defaults)
 		VISIT_SEQ(c, expr, args->defaults);
+
 	if (!compiler_enter_scope(c, s->v.FunctionDef.name, (void *)s,
 				  s->lineno))
 		return 0;
@@ -1352,6 +1323,7 @@ compiler_function(struct compiler *c, stmt_ty s)
 	compiler_arguments(c, args);
 
 	c->u->u_argcount = asdl_seq_LEN(args->args);
+	c->u->u_kwonlyargcount = asdl_seq_LEN(args->kwonlyargs);
 	n = asdl_seq_LEN(s->v.FunctionDef.body);
 	/* if there was a docstring, we need to skip the first statement */
 	for (i = docstring; i < n; i++) {
@@ -1363,7 +1335,9 @@ compiler_function(struct compiler *c, stmt_ty s)
 	if (co == NULL)
 		return 0;
 
-	compiler_make_closure(c, co, asdl_seq_LEN(args->defaults));
+	arglength = asdl_seq_LEN(args->defaults);
+	arglength |= kw_default_count << 8;
+	compiler_make_closure(c, co, arglength);
 	Py_DECREF(co);
 
 	for (i = 0; i < asdl_seq_LEN(decos); i++) {
@@ -1458,6 +1432,7 @@ compiler_lambda(struct compiler *c, expr_ty e)
 {
 	PyCodeObject *co;
 	static identifier name;
+	int kw_default_count = 0, arglength;
 	arguments_ty args = e->v.Lambda.args;
 	assert(e->kind == Lambda_kind);
 
@@ -1467,6 +1442,12 @@ compiler_lambda(struct compiler *c, expr_ty e)
 			return 0;
 	}
 
+	if (args->kwonlyargs) {
+		int res = compiler_visit_kwonlydefaults(c, args->kwonlyargs,
+						        args->kw_defaults);
+		if (res < 0) return 0;
+		kw_default_count = res;
+	}
 	if (args->defaults)
 		VISIT_SEQ(c, expr, args->defaults);
 	if (!compiler_enter_scope(c, name, (void *)e, e->lineno))
@@ -1476,6 +1457,7 @@ compiler_lambda(struct compiler *c, expr_ty e)
 	compiler_arguments(c, args);
 	
 	c->u->u_argcount = asdl_seq_LEN(args->args);
+	c->u->u_kwonlyargcount = asdl_seq_LEN(args->kwonlyargs);
 	VISIT_IN_SCOPE(c, expr, e->v.Lambda.body);
 	ADDOP_IN_SCOPE(c, RETURN_VALUE);
 	co = assemble(c, 1);
@@ -1483,7 +1465,9 @@ compiler_lambda(struct compiler *c, expr_ty e)
 	if (co == NULL)
 		return 0;
 
-	compiler_make_closure(c, co, asdl_seq_LEN(args->defaults));
+	arglength = asdl_seq_LEN(args->defaults);
+	arglength |= kw_default_count << 8;
+	compiler_make_closure(c, co, arglength);
 	Py_DECREF(co);
 
 	return 1;
@@ -1653,6 +1637,8 @@ static int
 compiler_continue(struct compiler *c)
 {
 	static const char LOOP_ERROR_MSG[] = "'continue' not properly in loop";
+	static const char IN_FINALLY_ERROR_MSG[] = 
+			"'continue' not supported inside 'finally' clause";
 	int i;
 
 	if (!c->u->u_nfblocks)
@@ -1664,15 +1650,18 @@ compiler_continue(struct compiler *c)
 		break;
 	case EXCEPT:
 	case FINALLY_TRY:
-		while (--i >= 0 && c->u->u_fblock[i].fb_type != LOOP)
-			;
+		while (--i >= 0 && c->u->u_fblock[i].fb_type != LOOP) {
+			/* Prevent continue anywhere under a finally
+			      even if hidden in a sub-try or except. */
+			if (c->u->u_fblock[i].fb_type == FINALLY_END)
+				return compiler_error(c, IN_FINALLY_ERROR_MSG);
+		}
 		if (i == -1)
 			return compiler_error(c, LOOP_ERROR_MSG);
 		ADDOP_JABS(c, CONTINUE_LOOP, c->u->u_fblock[i].fb_block);
 		break;
 	case FINALLY_END:
-		return compiler_error(c,
-			"'continue' not supported inside 'finally' clause");
+		return compiler_error(c, IN_FINALLY_ERROR_MSG);
 	}
 
 	return 1;
@@ -2015,7 +2004,7 @@ compiler_visit_stmt(struct compiler *c, stmt_ty s)
 {
 	int i, n;
 
-    /* Always assign a lineno to the next instruction for a stmt. */
+	/* Always assign a lineno to the next instruction for a stmt. */
 	c->u->u_lineno = s->lineno;
 	c->u->u_lineno_set = false;
 
@@ -2083,21 +2072,6 @@ compiler_visit_stmt(struct compiler *c, stmt_ty s)
 		return compiler_import(c, s);
 	case ImportFrom_kind:
 		return compiler_from_import(c, s);
-	case Exec_kind:
-		VISIT(c, expr, s->v.Exec.body);
-		if (s->v.Exec.globals) {
-			VISIT(c, expr, s->v.Exec.globals);
-			if (s->v.Exec.locals) {
-				VISIT(c, expr, s->v.Exec.locals);
-			} else {
-				ADDOP(c, DUP_TOP);
-			}
-		} else {
-			ADDOP_O(c, LOAD_CONST, Py_None, consts);
-			ADDOP(c, DUP_TOP);
-		}
-		ADDOP(c, EXEC_STMT);
-		break;
 	case Global_kind:
 		break;
 	case Expr_kind:
@@ -2114,7 +2088,7 @@ compiler_visit_stmt(struct compiler *c, stmt_ty s)
 	case Pass_kind:
 		break;
 	case Break_kind:
-		if (!c->u->u_nfblocks)
+                if (!compiler_in_loop(c))
 			return compiler_error(c, "'break' outside loop");
 		ADDOP(c, BREAK_LOOP);
 		break;
@@ -2468,7 +2442,6 @@ compiler_compare(struct compiler *c, expr_ty e)
 	}
 	return 1;
 }
-#undef CMPCAST
 
 static int
 compiler_call(struct compiler *c, expr_ty e)
@@ -2568,7 +2541,7 @@ compiler_listcomp_generator(struct compiler *c, PyObject *tmpname,
 	} 
 	ADDOP_JABS(c, JUMP_ABSOLUTE, start);
 	compiler_use_next_block(c, anchor);
-	/* delete the append method added to locals */
+	/* delete the temporary list name added to locals */
 	if (gen_index == 1)
 	    if (!compiler_nameop(c, tmpname, Del))
 		return 0;
@@ -2581,15 +2554,9 @@ compiler_listcomp(struct compiler *c, expr_ty e)
 {
 	identifier tmp;
 	int rc = 0;
-	static identifier append;
 	asdl_seq *generators = e->v.ListComp.generators;
 
 	assert(e->kind == ListComp_kind);
-	if (!append) {
-		append = PyString_InternFromString("append");
-		if (!append)
-			return 0;
-	}
 	tmp = compiler_new_tmpname(c);
 	if (!tmp)
 		return 0;
@@ -2734,6 +2701,8 @@ static int
 expr_constant(expr_ty e)
 {
 	switch (e->kind) {
+	case Ellipsis_kind:
+		return 1;
 	case Num_kind:
 		return PyObject_IsTrue(e->v.Num.n);
 	case Str_kind:
@@ -2888,9 +2857,9 @@ compiler_visit_expr(struct compiler *c, expr_ty e)
 {
 	int i, n;
 
-    /* If expr e has a different line number than the last expr/stmt,
-       set a new line number for the next instruction.
-       */
+	/* If expr e has a different line number than the last expr/stmt,
+           set a new line number for the next instruction.
+        */
 	if (e->lineno > c->u->u_lineno) {
 		c->u->u_lineno = e->lineno;
 		c->u->u_lineno_set = false;
@@ -2927,6 +2896,11 @@ compiler_visit_expr(struct compiler *c, expr_ty e)
 			ADDOP(c, STORE_SUBSCR);
 		}
 		break;
+	case Set_kind:
+		n = asdl_seq_LEN(e->v.Set.elts);
+		VISIT_SEQ(c, expr, e->v.Set.elts);
+		ADDOP_I(c, BUILD_SET, n);
+		break;
 	case ListComp_kind:
 		return compiler_listcomp(c, e);
 	case GeneratorExp_kind:
@@ -2934,14 +2908,6 @@ compiler_visit_expr(struct compiler *c, expr_ty e)
 	case Yield_kind:
 		if (c->u->u_ste->ste_type != FunctionBlock)
 			return compiler_error(c, "'yield' outside function");
-		/*
-		for (i = 0; i < c->u->u_nfblocks; i++) {
-			if (c->u->u_fblock[i].fb_type == FINALLY_TRY)
-				return compiler_error(
-					c, "'yield' not allowed in a 'try' "
-					"block with a 'finally' clause");
-		}
-		*/
 		if (e->v.Yield.value) {
 			VISIT(c, expr, e->v.Yield.value);
 		}
@@ -2954,15 +2920,14 @@ compiler_visit_expr(struct compiler *c, expr_ty e)
 		return compiler_compare(c, e);
 	case Call_kind:
 		return compiler_call(c, e);
-	case Repr_kind:
-		VISIT(c, expr, e->v.Repr.value);
-		ADDOP(c, UNARY_CONVERT);
-		break;
 	case Num_kind:
 		ADDOP_O(c, LOAD_CONST, e->v.Num.n, consts);
 		break;
 	case Str_kind:
 		ADDOP_O(c, LOAD_CONST, e->v.Str.s, consts);
+		break;
+	case Ellipsis_kind:
+		ADDOP_O(c, LOAD_CONST, Py_Ellipsis, consts);
 		break;
 	/* The following exprs can be assignment targets. */
 	case Attribute_kind:
@@ -3080,8 +3045,11 @@ static int
 compiler_push_fblock(struct compiler *c, enum fblocktype t, basicblock *b)
 {
 	struct fblockinfo *f;
-	if (c->u->u_nfblocks >= CO_MAXBLOCKS)
+	if (c->u->u_nfblocks >= CO_MAXBLOCKS) {
+		PyErr_SetString(PyExc_SystemError,
+				"too many statically nested blocks");
 		return 0;
+	}
 	f = &c->u->u_fblock[c->u->u_nfblocks++];
 	f->fb_type = t;
 	f->fb_block = b;
@@ -3098,6 +3066,16 @@ compiler_pop_fblock(struct compiler *c, enum fblocktype t, basicblock *b)
 	assert(u->u_fblock[u->u_nfblocks].fb_block == b);
 }
 
+static int
+compiler_in_loop(struct compiler *c) {
+        int i;
+        struct compiler_unit *u = c->u;
+        for (i = 0; i < u->u_nfblocks; ++i) {
+                if (u->u_fblock[i].fb_type == LOOP)
+                        return 1;
+        }
+        return 0;
+}
 /* Raises a SyntaxError and returns 0.
    If something goes wrong, a different exception may be raised.
 */
@@ -3191,9 +3169,6 @@ compiler_visit_nested_slice(struct compiler *c, slice_ty s,
 			    expr_context_ty ctx)
 {
 	switch (s->kind) {
-	case Ellipsis_kind:
-		ADDOP_O(c, LOAD_CONST, Py_Ellipsis, consts);
-		break;
 	case Slice_kind:
 		return compiler_slice(c, s, ctx);
 	case Index_kind:
@@ -3208,7 +3183,6 @@ compiler_visit_nested_slice(struct compiler *c, slice_ty s,
 	return 1;
 }
 
-
 static int
 compiler_visit_slice(struct compiler *c, slice_ty s, expr_context_ty ctx)
 {
@@ -3218,12 +3192,6 @@ compiler_visit_slice(struct compiler *c, slice_ty s, expr_context_ty ctx)
 		kindname = "index";
 		if (ctx != AugStore) {
 			VISIT(c, expr, s->v.Index.value);
-		}
-		break;
-	case Ellipsis_kind:
-		kindname = "ellipsis";
-		if (ctx != AugStore) {
-			ADDOP_O(c, LOAD_CONST, Py_Ellipsis, consts);
 		}
 		break;
 	case Slice_kind:
@@ -3254,11 +3222,25 @@ compiler_visit_slice(struct compiler *c, slice_ty s, expr_context_ty ctx)
 	return compiler_handle_subscr(c, kindname, ctx);
 }
 
+
+/* End of the compiler section, beginning of the assembler section */
+
 /* do depth-first search of basic block graph, starting with block.
    post records the block indices in post-order.
 
    XXX must handle implicit jumps from one block to next
 */
+
+struct assembler {
+	PyObject *a_bytecode;  /* string containing bytecode */
+	int a_offset;	       /* offset into bytecode */
+	int a_nblocks;	       /* number of reachable blocks */
+	basicblock **a_postorder; /* list of blocks in dfs postorder */
+	PyObject *a_lnotab;    /* string containing lnotab */
+	int a_lnotab_off;      /* offset into lnotab */
+	int a_lineno;	       /* last lineno of emitted instruction */
+	int a_lineno_off;      /* bytecode offset of last lineno */
+};
 
 static void
 dfs(struct compiler *c, basicblock *b, struct assembler *a)
@@ -3729,7 +3711,8 @@ makecode(struct compiler *c, struct assembler *a)
 	Py_DECREF(consts);
 	consts = tmp;
 
-	co = PyCode_New(c->u->u_argcount, nlocals, stackdepth(c), flags,
+	co = PyCode_New(c->u->u_argcount, c->u->u_kwonlyargcount,
+			nlocals, stackdepth(c), flags,
 			bytecode, consts, names, varnames,
 			freevars, cellvars,
 			filename, c->u->u_name,

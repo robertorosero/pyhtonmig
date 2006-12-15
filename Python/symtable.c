@@ -480,25 +480,12 @@ check_unoptimized(const PySTEntryObject* ste) {
 			       "is a nested function");
 
 	switch (ste->ste_unoptimized) {
-	case OPT_TOPLEVEL: /* exec / import * at top-level is fine */
-	case OPT_EXEC: /* qualified exec is fine */
+	case OPT_TOPLEVEL: /* import * at top-level is fine */
 		return 1;
 	case OPT_IMPORT_STAR:
 		PyOS_snprintf(buf, sizeof(buf), 
 			      "import * is not allowed in function '%.100s' "
 			      "because it is %s",
-			      PyString_AS_STRING(ste->ste_name), trailer);
-		break;
-	case OPT_BARE_EXEC:
-		PyOS_snprintf(buf, sizeof(buf),
-			      "unqualified exec is not allowed in function "
-			      "'%.100s' it %s",
-			      PyString_AS_STRING(ste->ste_name), trailer);
-		break;
-	default:
-		PyOS_snprintf(buf, sizeof(buf), 
-			      "function '%.100s' uses import * and bare exec, "
-			      "which are illegal because it %s",
 			      PyString_AS_STRING(ste->ste_name), trailer);
 		break;
 	}
@@ -906,6 +893,17 @@ error:
 	} \
 }
 
+#define VISIT_KWONLYDEFAULTS(ST, KW_DEFAULTS) { \
+	int i = 0; \
+	asdl_seq *seq = (KW_DEFAULTS); /* avoid variable capture */ \
+	for (i = 0; i < asdl_seq_LEN(seq); i++) { \
+		expr_ty elt = (expr_ty)asdl_seq_GET(seq, i); \
+		if (!elt) continue; /* can be NULL */ \
+		if (!symtable_visit_expr((ST), elt)) \
+			return 0; \
+	} \
+}
+
 static int
 symtable_new_tmpname(struct symtable *st)
 {
@@ -923,6 +921,8 @@ symtable_new_tmpname(struct symtable *st)
 	return 1;
 }
 
+
+
 static int
 symtable_visit_stmt(struct symtable *st, stmt_ty s)
 {
@@ -932,6 +932,9 @@ symtable_visit_stmt(struct symtable *st, stmt_ty s)
 			return 0;
 		if (s->v.FunctionDef.args->defaults)
 			VISIT_SEQ(st, expr, s->v.FunctionDef.args->defaults);
+		if (s->v.FunctionDef.args->kw_defaults)
+			VISIT_KWONLYDEFAULTS(st, 
+					   s->v.FunctionDef.args->kw_defaults);
 		if (s->v.FunctionDef.decorators)
 			VISIT_SEQ(st, expr, s->v.FunctionDef.decorators);
 		if (!symtable_enter_block(st, s->v.FunctionDef.name, 
@@ -1045,19 +1048,6 @@ symtable_visit_stmt(struct symtable *st, stmt_ty s)
 		if (st->st_cur->ste_unoptimized && !st->st_cur->ste_opt_lineno)
 			st->st_cur->ste_opt_lineno = s->lineno;
 		break;
-        case Exec_kind:
-		VISIT(st, expr, s->v.Exec.body);
-		if (!st->st_cur->ste_opt_lineno)
-			st->st_cur->ste_opt_lineno = s->lineno;
-		if (s->v.Exec.globals) {
-			st->st_cur->ste_unoptimized |= OPT_EXEC;
-			VISIT(st, expr, s->v.Exec.globals);
-			if (s->v.Exec.locals) 
-				VISIT(st, expr, s->v.Exec.locals);
-		} else {
-			st->st_cur->ste_unoptimized |= OPT_BARE_EXEC;
-		}
-		break;
         case Global_kind: {
 		int i;
 		asdl_seq *seq = s->v.Global.names;
@@ -1147,6 +1137,9 @@ symtable_visit_expr(struct symtable *st, expr_ty e)
 		VISIT_SEQ(st, expr, e->v.Dict.keys);
 		VISIT_SEQ(st, expr, e->v.Dict.values);
 		break;
+	case Set_kind:
+		VISIT_SEQ(st, expr, e->v.Set.elts);
+		break;
         case ListComp_kind:
 		if (!symtable_new_tmpname(st))
 			return 0;
@@ -1182,11 +1175,9 @@ symtable_visit_expr(struct symtable *st, expr_ty e)
 		if (e->v.Call.kwargs)
 			VISIT(st, expr, e->v.Call.kwargs);
 		break;
-        case Repr_kind:
-		VISIT(st, expr, e->v.Repr.value);
-		break;
         case Num_kind:
         case Str_kind:
+	case Ellipsis_kind:
 		/* Nothing to do here. */
 		break;
 	/* The following exprs can be assignment targets. */
@@ -1286,6 +1277,8 @@ symtable_visit_arguments(struct symtable *st, arguments_ty a)
 	   XXX should ast be different?
 	*/
 	if (a->args && !symtable_visit_params(st, a->args, 1))
+		return 0;
+	if (a->kwonlyargs && !symtable_visit_params(st, a->kwonlyargs, 1))
 		return 0;
 	if (a->vararg) {
 		if (!symtable_add_def(st, a->vararg, DEF_PARAM))
@@ -1390,8 +1383,6 @@ symtable_visit_slice(struct symtable *st, slice_ty s)
 		break;
 	case Index_kind:
 		VISIT(st, expr, s->v.Index.value)
-		break;
-	case Ellipsis_kind:
 		break;
 	}
 	return 1;

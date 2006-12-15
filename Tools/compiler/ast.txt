@@ -12,8 +12,8 @@
 Module: doc*, node
 Stmt: nodes!
 Decorators: nodes!
-Function: decorators&, name*, argnames*, defaults!, flags*, doc*, code
-Lambda: argnames*, defaults!, flags*, code
+Function: decorators&, name*, argnames*, defaults!, kwonlyargs*, flags*, doc*, code
+Lambda: argnames*, defaults!, kwonlyargs*, flags*, code
 Class: name*, bases!, doc*, code
 Pass: 
 Break: 
@@ -23,7 +23,6 @@ While: test, body, else_&
 With: expr, vars&, body
 If: tests!, else_&
 IfExp: test, then, else_
-Exec: expr, locals&, globals&
 From: modname*, names*, level*
 Import: names*
 Raise: expr1&, expr2&, expr3&
@@ -50,16 +49,15 @@ GenExprFor: assign, iter, ifs!
 GenExprIf: test
 List: nodes!
 Dict: items!
+Set: items!
 Not: expr
 Compare: expr, ops!
 Name: name*
 Global: names*
-Backquote: expr
 Getattr: expr, attrname*
 CallFunc: node, args!, star_args& = None, dstar_args& = None
 Keyword: name*, expr
 Subscript: expr, flags*, subs!
-Ellipsis: 
 Sliceobj: nodes!
 Slice: expr, flags*, lower&, upper&
 Assert: test, fail&
@@ -97,8 +95,9 @@ init(Lambda):
         self.kwargs = 1
 
 init(GenExpr):
-    self.argnames = ['[outmost-iterable]']
+    self.argnames = ['.0']
     self.varargs = self.kwargs = None
+    self.kwonlyargs = ()
 
 init(GenExprFor):
     self.is_outmost = False

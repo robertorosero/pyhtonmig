@@ -403,7 +403,7 @@ PyDoc_STRVAR(compile_doc,
 "compile(source, filename, mode[, flags[, dont_inherit]]) -> code object\n\
 \n\
 Compile the source string (a Python module, statement or expression)\n\
-into a code object that can be executed by the exec statement or eval().\n\
+into a code object that can be executed by exec() or eval().\n\
 The filename will be used for run-time error messages.\n\
 The mode must be 'exec' to compile a module, 'single' to compile a\n\
 single (interactive) statement, or 'eval' to compile an expression.\n\
@@ -539,9 +539,117 @@ PyDoc_STRVAR(eval_doc,
 Evaluate the source in the context of globals and locals.\n\
 The source may be a string representing a Python expression\n\
 or a code object as returned by compile().\n\
-The globals must be a dictionary and locals can be any mappping,\n\
+The globals must be a dictionary and locals can be any mapping,\n\
 defaulting to the current globals and locals.\n\
 If only globals is given, locals defaults to it.\n");
+
+static PyObject *
+builtin_exec(PyObject *self, PyObject *args)
+{
+	PyObject *v;
+	PyObject *prog, *globals = Py_None, *locals = Py_None;
+	int plain = 0;
+
+	if (!PyArg_ParseTuple(args, "O|OO:exec", &prog, &globals, &locals))
+		return NULL;
+	
+	if (globals == Py_None) {
+		globals = PyEval_GetGlobals();
+		if (locals == Py_None) {
+			locals = PyEval_GetLocals();
+			plain = 1;
+		}
+		if (!globals || !locals) {
+			PyErr_SetString(PyExc_SystemError,
+					"globals and locals cannot be NULL");
+			return NULL;
+		}
+	}
+	else if (locals == Py_None)
+		locals = globals;
+	if (!PyString_Check(prog) &&
+	    !PyUnicode_Check(prog) &&
+	    !PyCode_Check(prog) &&
+	    !PyFile_Check(prog)) {
+		PyErr_Format(PyExc_TypeError,
+			"exec() arg 1 must be a string, file, or code "
+			"object, not %.100s", prog->ob_type->tp_name);
+		return NULL;
+	}
+	if (!PyDict_Check(globals)) {
+		PyErr_Format(PyExc_TypeError, "exec() arg 2 must be a dict, not %.100s",
+			     globals->ob_type->tp_name);
+		return NULL;
+	}
+	if (!PyMapping_Check(locals)) {
+		PyErr_Format(PyExc_TypeError,
+		    "arg 3 must be a mapping or None, not %.100s",
+		    locals->ob_type->tp_name);
+		return NULL;
+	}
+	if (PyDict_GetItemString(globals, "__builtins__") == NULL) {
+		if (PyDict_SetItemString(globals, "__builtins__",
+					 PyEval_GetBuiltins()) != 0)
+			return NULL;
+	}
+
+	if (PyCode_Check(prog)) {
+		if (PyCode_GetNumFree((PyCodeObject *)prog) > 0) {
+			PyErr_SetString(PyExc_TypeError,
+				"code object passed to exec() may not "
+				"contain free variables");
+			return NULL;
+		}
+		v = PyEval_EvalCode((PyCodeObject *) prog, globals, locals);
+	}
+	else if (PyFile_Check(prog)) {
+		FILE *fp = PyFile_AsFile(prog);
+		char *name = PyString_AsString(PyFile_Name(prog));
+		PyCompilerFlags cf;
+		cf.cf_flags = 0;
+		if (PyEval_MergeCompilerFlags(&cf))
+			v = PyRun_FileFlags(fp, name, Py_file_input, globals,
+					    locals, &cf);
+		else
+			v = PyRun_File(fp, name, Py_file_input, globals,
+				       locals);
+	}
+	else {
+		PyObject *tmp = NULL;
+		char *str;
+		PyCompilerFlags cf;
+		cf.cf_flags = 0;
+#ifdef Py_USING_UNICODE
+		if (PyUnicode_Check(prog)) {
+			tmp = PyUnicode_AsUTF8String(prog);
+			if (tmp == NULL)
+				return NULL;
+			prog = tmp;
+			cf.cf_flags |= PyCF_SOURCE_IS_UTF8;
+		}
+#endif
+		if (PyString_AsStringAndSize(prog, &str, NULL))
+			return NULL;
+		if (PyEval_MergeCompilerFlags(&cf))
+			v = PyRun_StringFlags(str, Py_file_input, globals,
+					      locals, &cf);
+		else
+			v = PyRun_String(str, Py_file_input, globals, locals);
+		Py_XDECREF(tmp);
+	}
+	if (v == NULL)
+		return NULL;
+	Py_DECREF(v);
+	Py_RETURN_NONE;
+}
+
+PyDoc_STRVAR(exec_doc,
+"exec(object[, globals[, locals]])\n\
+\n\
+Read and execute code from a object, which can be a string, a code\n\
+object or a file object.\n\
+The globals and locals are dictionaries, defaulting to the current\n\
+globals and locals.  If only globals is given, locals defaults to it.");
 
 
 static PyObject *
@@ -1305,6 +1413,73 @@ equivalent to (x**y) % z, but may be more efficient (e.g. for longs).");
 
 
 
+static PyObject *
+builtin_print(PyObject *self, PyObject *args, PyObject *kwds)
+{
+	static char *kwlist[] = {"sep", "end", "file", 0};
+	PyObject *dummy_args = PyTuple_New(0);
+	PyObject *sep = NULL, *end = NULL, *file = NULL;
+	int i, err;
+
+	if (dummy_args == NULL)
+		return NULL;
+	if (!PyArg_ParseTupleAndKeywords(dummy_args, kwds, "|OOO:Print",
+					 kwlist, &sep, &end, &file))
+                return NULL;
+	if (file == NULL || file == Py_None)
+		file = PySys_GetObject("stdout");
+
+	if (sep && sep != Py_None && !PyString_Check(sep) &&
+	    !PyUnicode_Check(sep)) {
+		PyErr_Format(PyExc_TypeError,
+			     "sep must be None, str or unicode, not %.200s",
+			     sep->ob_type->tp_name);
+		return NULL;
+	}
+	if (end && end != Py_None && !PyString_Check(end) &&
+	    !PyUnicode_Check(end)) {
+		PyErr_Format(PyExc_TypeError,
+			     "end must be None, str or unicode, not %.200s",
+			     end->ob_type->tp_name);
+		return NULL;
+	}
+
+	for (i = 0; i < PyTuple_Size(args); i++) {
+		if (i > 0) {
+			if (sep == NULL || sep == Py_None)
+				err = PyFile_WriteString(" ", file);
+			else
+				err = PyFile_WriteObject(sep, file,
+							 Py_PRINT_RAW);
+			if (err)
+				return NULL;
+		}
+		err = PyFile_WriteObject(PyTuple_GetItem(args, i), file,
+					 Py_PRINT_RAW);
+		if (err)
+			return NULL;
+	}
+
+	if (end == NULL || end == Py_None)
+		err = PyFile_WriteString("\n", file);
+	else
+		err = PyFile_WriteObject(end, file, Py_PRINT_RAW);
+	if (err)
+		return NULL;
+
+	Py_RETURN_NONE;
+}
+
+PyDoc_STRVAR(print_doc,
+"Print(value, ..., file=None, sep=' ', end='\\n')\n\
+\n\
+Prints the values to a stream, or to sys.stdout by default.\n\
+Optional keyword arguments:\n\
+file: a file-like object (stream); defaults to the current sys.stdout.\n\
+sep:  string inserted between values, default a space.\n\
+end:  string appended after the last value, default a newline.");
+
+
 /* Return number of items in range (lo, hi, step), when arguments are
  * PyInt or PyLong objects.  step > 0 required.  Return a value < 0 if
  * & only if the true value is too large to fit in a signed long.
@@ -1324,9 +1499,10 @@ get_len_of_range_longs(PyObject *lo, PyObject *hi, PyObject *step)
 	PyObject *tmp1 = NULL, *tmp2 = NULL, *tmp3 = NULL;
 		/* holds sub-expression evaluations */
 
-	/* if (lo >= hi), return length of 0. */
-	if (PyObject_Compare(lo, hi) >= 0)
-		return 0;
+	/* If (lo >= hi), return length of 0 (or error). */
+	n = PyObject_RichCompareBool(lo, hi, Py_LT);
+	if (n <= 0)
+		return n;
 
 	if ((one = PyLong_FromLong(1L)) == NULL)
 		goto Fail;
@@ -1378,7 +1554,7 @@ handle_range_longs(PyObject *self, PyObject *args)
 	PyObject *v = NULL;
 	long bign;
 	int i, n;
-	int cmp_result;
+	int step_pos;
 
 	PyObject *zero = PyLong_FromLong(0);
 
@@ -1439,18 +1615,22 @@ handle_range_longs(PyObject *self, PyObject *args)
 		goto Fail;
 	}
 
-	if (PyObject_Cmp(istep, zero, &cmp_result) == -1)
+	step_pos = PyObject_RichCompareBool(istep, zero, Py_GT);
+	if (step_pos < 0)
 		goto Fail;
-	if (cmp_result == 0) {
-		PyErr_SetString(PyExc_ValueError,
-				"range() step argument must not be zero");
-		goto Fail;
-	}
-
-	if (cmp_result > 0)
+	if (step_pos)
 		bign = get_len_of_range_longs(ilow, ihigh, istep);
 	else {
-		PyObject *neg_istep = PyNumber_Negative(istep);
+		int step_zero = PyObject_RichCompareBool(istep, zero, Py_EQ);
+		PyObject *neg_istep;
+		if (step_zero < 0)
+			goto Fail;
+		if (step_zero) {
+			PyErr_SetString(PyExc_ValueError,
+				"range() step argument must not be zero");
+			goto Fail;
+		}
+		neg_istep = PyNumber_Negative(istep);
 		if (neg_istep == NULL)
 			goto Fail;
 		bign = get_len_of_range_longs(ihigh, ilow, neg_istep);
@@ -1792,10 +1972,11 @@ builtin_sum(PyObject *self, PyObject *args)
 }
 
 PyDoc_STRVAR(sum_doc,
-"sum(sequence, start=0) -> value\n\
+"sum(sequence[, start]) -> value\n\
 \n\
 Returns the sum of a sequence of numbers (NOT strings) plus the value\n\
-of parameter 'start'.  When the sequence is empty, returns start.");
+of parameter 'start' (which defaults to 0).  When the sequence is\n\
+empty, returns start.");
 
 
 static PyObject *
@@ -1850,116 +2031,20 @@ is a shortcut for issubclass(X, A) or issubclass(X, B) or ... (etc.).");
 static PyObject*
 builtin_zip(PyObject *self, PyObject *args)
 {
-	PyObject *ret;
-	const Py_ssize_t itemsize = PySequence_Length(args);
-	Py_ssize_t i;
-	PyObject *itlist;  /* tuple of iterators */
-	Py_ssize_t len;	   /* guess at result length */
-
-	if (itemsize == 0)
-		return PyList_New(0);
-
 	/* args must be a tuple */
 	assert(PyTuple_Check(args));
 
-	/* Guess at result length:  the shortest of the input lengths.
-	   If some argument refuses to say, we refuse to guess too, lest
-	   an argument like xrange(sys.maxint) lead us astray.*/
-	len = -1;	/* unknown */
-	for (i = 0; i < itemsize; ++i) {
-		PyObject *item = PyTuple_GET_ITEM(args, i);
-		Py_ssize_t thislen = _PyObject_LengthHint(item);
-		if (thislen < 0) {
-			if (!PyErr_ExceptionMatches(PyExc_TypeError)  &&
-			    !PyErr_ExceptionMatches(PyExc_AttributeError)) {
-				return NULL;
-			}
-			PyErr_Clear();
-			len = -1;
-			break;
-		}
-		else if (len < 0 || thislen < len)
-			len = thislen;
-	}
-
-	/* allocate result list */
-	if (len < 0)
-		len = 10;	/* arbitrary */
-	if ((ret = PyList_New(len)) == NULL)
-		return NULL;
-
-	/* obtain iterators */
-	itlist = PyTuple_New(itemsize);
-	if (itlist == NULL)
-		goto Fail_ret;
-	for (i = 0; i < itemsize; ++i) {
-		PyObject *item = PyTuple_GET_ITEM(args, i);
-		PyObject *it = PyObject_GetIter(item);
-		if (it == NULL) {
-			if (PyErr_ExceptionMatches(PyExc_TypeError))
-				PyErr_Format(PyExc_TypeError,
-				    "zip argument #%zd must support iteration",
-				    i+1);
-			goto Fail_ret_itlist;
-		}
-		PyTuple_SET_ITEM(itlist, i, it);
-	}
-
-	/* build result into ret list */
-	for (i = 0; ; ++i) {
-		int j;
-		PyObject *next = PyTuple_New(itemsize);
-		if (!next)
-			goto Fail_ret_itlist;
-
-		for (j = 0; j < itemsize; j++) {
-			PyObject *it = PyTuple_GET_ITEM(itlist, j);
-			PyObject *item = PyIter_Next(it);
-			if (!item) {
-				if (PyErr_Occurred()) {
-					Py_DECREF(ret);
-					ret = NULL;
-				}
-				Py_DECREF(next);
-				Py_DECREF(itlist);
-				goto Done;
-			}
-			PyTuple_SET_ITEM(next, j, item);
-		}
-
-		if (i < len)
-			PyList_SET_ITEM(ret, i, next);
-		else {
-			int status = PyList_Append(ret, next);
-			Py_DECREF(next);
-			++len;
-			if (status < 0)
-				goto Fail_ret_itlist;
-		}
-	}
-
-Done:
-	if (ret != NULL && i < len) {
-		/* The list is too big. */
-		if (PyList_SetSlice(ret, i, len, NULL) < 0)
-			return NULL;
-	}
-	return ret;
-
-Fail_ret_itlist:
-	Py_DECREF(itlist);
-Fail_ret:
-	Py_DECREF(ret);
-	return NULL;
+	return _PyZip_CreateIter(args);
 }
 
 
 PyDoc_STRVAR(zip_doc,
-"zip(seq1 [, seq2 [...]]) -> [(seq1[0], seq2[0] ...), (...)]\n\
+"zip(it1 [, it2 [...]]) -> iter([(it1[0], it2[0] ...), ...])\n\
 \n\
-Return a list of tuples, where each tuple contains the i-th element\n\
-from each of the argument sequences.  The returned list is truncated\n\
-in length to the length of the shortest argument sequence.");
+Return an iterator yielding tuples, where each tuple contains the\n\
+corresponding element from each of the argument iterables.\n\
+The returned iterator ends when the shortest argument iterable is exhausted.\n\
+NOTE: This is implemented using itertools.izip().");
 
 
 static PyMethodDef builtin_methods[] = {
@@ -1975,6 +2060,7 @@ static PyMethodDef builtin_methods[] = {
  	{"dir",		builtin_dir,        METH_VARARGS, dir_doc},
  	{"divmod",	builtin_divmod,     METH_VARARGS, divmod_doc},
  	{"eval",	builtin_eval,       METH_VARARGS, eval_doc},
+	{"exec",        builtin_exec,       METH_VARARGS, exec_doc},
  	{"execfile",	builtin_execfile,   METH_VARARGS, execfile_doc},
  	{"filter",	builtin_filter,     METH_VARARGS, filter_doc},
  	{"getattr",	builtin_getattr,    METH_VARARGS, getattr_doc},
@@ -1996,6 +2082,7 @@ static PyMethodDef builtin_methods[] = {
  	{"open",	(PyCFunction)builtin_open,       METH_VARARGS | METH_KEYWORDS, open_doc},
  	{"ord",		builtin_ord,        METH_O, ord_doc},
  	{"pow",		builtin_pow,        METH_VARARGS, pow_doc},
+ 	{"Print",	(PyCFunction)builtin_print,      METH_VARARGS | METH_KEYWORDS, print_doc},
  	{"range",	builtin_range,      METH_VARARGS, range_doc},
  	{"reload",	builtin_reload,     METH_O, reload_doc},
  	{"repr",	builtin_repr,       METH_O, repr_doc},

@@ -74,7 +74,8 @@ static PyObject*
 node2tuple(node *n,                     /* node to convert               */
            SeqMaker mkseq,              /* create sequence               */
            SeqInserter addelem,         /* func. to add elem. in seq.    */
-           int lineno)                  /* include line numbers?         */
+           int lineno,                  /* include line numbers?         */
+           int col_offset)              /* include column offsets?       */
 {
     if (n == NULL) {
         Py_INCREF(Py_None);
@@ -95,7 +96,7 @@ node2tuple(node *n,                     /* node to convert               */
         }
         (void) addelem(v, 0, w);
         for (i = 0; i < NCH(n); i++) {
-            w = node2tuple(CHILD(n, i), mkseq, addelem, lineno);
+            w = node2tuple(CHILD(n, i), mkseq, addelem, lineno, col_offset);
             if (w == NULL) {
                 Py_DECREF(v);
                 return ((PyObject*) NULL);
@@ -108,12 +109,14 @@ node2tuple(node *n,                     /* node to convert               */
         return (v);
     }
     else if (ISTERMINAL(TYPE(n))) {
-        PyObject *result = mkseq(2 + lineno);
+        PyObject *result = mkseq(2 + lineno + col_offset);
         if (result != NULL) {
             (void) addelem(result, 0, PyInt_FromLong(TYPE(n)));
             (void) addelem(result, 1, PyString_FromString(STR(n)));
             if (lineno == 1)
                 (void) addelem(result, 2, PyInt_FromLong(n->n_lineno));
+            if (col_offset == 1)
+                (void) addelem(result, 3, PyInt_FromLong(n->n_col_offset));
         }
         return (result);
     }
@@ -289,29 +292,35 @@ static PyObject*
 parser_st2tuple(PyST_Object *self, PyObject *args, PyObject *kw)
 {
     PyObject *line_option = 0;
+    PyObject *col_option = 0;
     PyObject *res = 0;
     int ok;
 
-    static char *keywords[] = {"ast", "line_info", NULL};
+    static char *keywords[] = {"ast", "line_info", "col_info", NULL};
 
     if (self == NULL) {
-        ok = PyArg_ParseTupleAndKeywords(args, kw, "O!|O:st2tuple", keywords,
-                                         &PyST_Type, &self, &line_option);
+        ok = PyArg_ParseTupleAndKeywords(args, kw, "O!|OO:st2tuple", keywords,
+                                         &PyST_Type, &self, &line_option,
+                                         &col_option);
     }
     else
-        ok = PyArg_ParseTupleAndKeywords(args, kw, "|O:totuple", &keywords[1],
-                                         &line_option);
+        ok = PyArg_ParseTupleAndKeywords(args, kw, "|OO:totuple", &keywords[1],
+                                         &line_option, &col_option);
     if (ok != 0) {
         int lineno = 0;
+        int col_offset = 0;
         if (line_option != NULL) {
             lineno = (PyObject_IsTrue(line_option) != 0) ? 1 : 0;
+        }
+        if (col_option != NULL) {
+            col_offset = (PyObject_IsTrue(col_option) != 0) ? 1 : 0;
         }
         /*
          *  Convert ST into a tuple representation.  Use Guido's function,
          *  since it's known to work already.
          */
         res = node2tuple(((PyST_Object*)self)->st_node,
-                         PyTuple_New, PyTuple_SetItem, lineno);
+                         PyTuple_New, PyTuple_SetItem, lineno, col_offset);
     }
     return (res);
 }
@@ -327,28 +336,34 @@ static PyObject*
 parser_st2list(PyST_Object *self, PyObject *args, PyObject *kw)
 {
     PyObject *line_option = 0;
+    PyObject *col_option = 0;
     PyObject *res = 0;
     int ok;
 
-    static char *keywords[] = {"ast", "line_info", NULL};
+    static char *keywords[] = {"ast", "line_info", "col_info", NULL};
 
     if (self == NULL)
-        ok = PyArg_ParseTupleAndKeywords(args, kw, "O!|O:st2list", keywords,
-                                         &PyST_Type, &self, &line_option);
+        ok = PyArg_ParseTupleAndKeywords(args, kw, "O!|OO:st2list", keywords,
+                                         &PyST_Type, &self, &line_option,
+                                         &col_option);
     else
-        ok = PyArg_ParseTupleAndKeywords(args, kw, "|O:tolist", &keywords[1],
-                                         &line_option);
+        ok = PyArg_ParseTupleAndKeywords(args, kw, "|OO:tolist", &keywords[1],
+                                         &line_option, &col_option);
     if (ok) {
         int lineno = 0;
+        int col_offset = 0;
         if (line_option != 0) {
             lineno = PyObject_IsTrue(line_option) ? 1 : 0;
+        }
+        if (col_option != NULL) {
+            col_offset = (PyObject_IsTrue(col_option) != 0) ? 1 : 0;
         }
         /*
          *  Convert ST into a tuple representation.  Use Guido's function,
          *  since it's known to work already.
          */
         res = node2tuple(self->st_node,
-                         PyList_New, PyList_SetItem, lineno);
+                         PyList_New, PyList_SetItem, lineno, col_offset);
     }
     return (res);
 }
@@ -848,7 +863,7 @@ VALIDATER(raise_stmt);          VALIDATER(import_stmt);
 VALIDATER(import_name);         VALIDATER(import_from);
 VALIDATER(global_stmt);         VALIDATER(list_if);
 VALIDATER(assert_stmt);         VALIDATER(list_for);
-VALIDATER(exec_stmt);           VALIDATER(compound_stmt);
+VALIDATER(compound_stmt);
 VALIDATER(while);               VALIDATER(for);
 VALIDATER(try);                 VALIDATER(except_clause);
 VALIDATER(test);                VALIDATER(and_test);
@@ -860,7 +875,7 @@ VALIDATER(term);                VALIDATER(factor);
 VALIDATER(atom);                VALIDATER(lambdef);
 VALIDATER(trailer);             VALIDATER(subscript);
 VALIDATER(subscriptlist);       VALIDATER(sliceop);
-VALIDATER(exprlist);            VALIDATER(dictmaker);
+VALIDATER(exprlist);            VALIDATER(dictsetmaker);
 VALIDATER(arglist);             VALIDATER(argument);
 VALIDATER(listmaker);           VALIDATER(yield_stmt);
 VALIDATER(testlist1);           VALIDATER(gen_for);
@@ -1105,13 +1120,13 @@ validate_testlist_safe(node *tree)
 }
 
 
-/* '*' NAME [',' '**' NAME] | '**' NAME
+/* '*' [NAME] (',' NAME ['=' test])* [',' '**' NAME] | '**' NAME
  */
 static int
 validate_varargslist_trailer(node *tree, int start)
 {
     int nch = NCH(tree);
-    int res = 0;
+    int res = 0, i;
     int sym;
 
     if (nch <= start) {
@@ -1121,15 +1136,40 @@ validate_varargslist_trailer(node *tree, int start)
     sym = TYPE(CHILD(tree, start));
     if (sym == STAR) {
         /*
-         *  ('*' NAME [',' '**' NAME]
+         * '*' [NAME] (',' NAME ['=' test])* [',' '**' NAME] | '**' NAME
          */
         if (nch-start == 2)
             res = validate_name(CHILD(tree, start+1), NULL);
-        else if (nch-start == 5)
+        else if (nch-start == 5 && TYPE(CHILD(tree, start+2)) == COMMA)
             res = (validate_name(CHILD(tree, start+1), NULL)
                    && validate_comma(CHILD(tree, start+2))
                    && validate_doublestar(CHILD(tree, start+3))
                    && validate_name(CHILD(tree, start+4), NULL));
+        else {
+            /* skip over [NAME] (',' NAME ['=' test])*  */
+            i = start + 1;
+	    if (TYPE(CHILD(tree, i)) == NAME) { /* skip over [NAME] */
+		i += 1;
+	    }
+            while (res && i+1 < nch) { /* validate  (',' NAME ['=' test])* */
+                res = validate_comma(CHILD(tree, i));
+                if (TYPE(CHILD(tree, i+1)) == DOUBLESTAR) 
+                    break;
+                res = res && validate_name(CHILD(tree, i+1), NULL);
+                if (res && i+2 < nch && TYPE(CHILD(tree, i+2)) == EQUAL) {
+                    res = res && (i+3 < nch) 
+                          && validate_test(CHILD(tree, i+3));
+                    i += 4;
+                }
+                else {
+                    i += 2;
+                }
+            }
+            /* [',' '**' NAME] */
+            if (res && i+1 < nch && TYPE(CHILD(tree, i+1)) == DOUBLESTAR) {
+                res = validate_name(CHILD(tree, i+2), NULL);
+            }
+        }
     }
     else if (sym == DOUBLESTAR) {
         /*
@@ -1148,9 +1188,8 @@ validate_varargslist_trailer(node *tree, int start)
  *
  *  varargslist:
  *      (fpdef ['=' test] ',')*
- *           ('*' NAME [',' '**' NAME]
- *         | '**' NAME)
- *    | fpdef ['=' test] (',' fpdef ['=' test])* [',']
+ *      ('*' [NAME] (',' NAME ['=' test])* [',' '**' NAME] | '**' NAME)
+ *      | fpdef ['=' test] (',' fpdef ['=' test])* [',']
  *
  */
 static int
@@ -1169,7 +1208,7 @@ validate_varargslist(node *tree)
     sym = TYPE(CHILD(tree, 0));
     if (sym == STAR || sym == DOUBLESTAR)
         /* whole thing matches:
-         *      '*' NAME [',' '**' NAME] | '**' NAME
+         *    '*' [NAME] (',' NAME ['=' test])* [',' '**' NAME] | '**' NAME
          */
         res = validate_varargslist_trailer(tree, 0);
     else if (sym == fpdef) {
@@ -1201,7 +1240,7 @@ validate_varargslist(node *tree)
                         break;
                 }
             }
-            /* ... '*' NAME [',' '**' NAME] | '**' NAME
+            /* .. ('*' [NAME] (',' NAME ['=' test])* [',' '**' NAME] | '**' NAME)
              * i --^^^
              */
             if (res)
@@ -1465,8 +1504,7 @@ validate_small_stmt(node *tree)
               || (ntype == flow_stmt)
               || (ntype == import_stmt)
               || (ntype == global_stmt)
-              || (ntype == assert_stmt)
-              || (ntype == exec_stmt))
+              || (ntype == assert_stmt))
             res = validate_node(CHILD(tree, 0));
         else {
             res = 0;
@@ -1883,32 +1921,6 @@ validate_global_stmt(node *tree)
     for (j = 2; res && (j < nch); j += 2)
         res = (validate_comma(CHILD(tree, j))
                && validate_ntype(CHILD(tree, j + 1), NAME));
-
-    return (res);
-}
-
-
-/*  exec_stmt:
- *
- *  'exec' expr ['in' test [',' test]]
- */
-static int
-validate_exec_stmt(node *tree)
-{
-    int nch = NCH(tree);
-    int res = (validate_ntype(tree, exec_stmt)
-               && ((nch == 2) || (nch == 4) || (nch == 6))
-               && validate_name(CHILD(tree, 0), "exec")
-               && validate_expr(CHILD(tree, 1)));
-
-    if (!res && !PyErr_Occurred())
-        err_string("illegal exec statement");
-    if (res && (nch > 2))
-        res = (validate_name(CHILD(tree, 2), "in")
-               && validate_test(CHILD(tree, 3)));
-    if (res && (nch == 6))
-        res = (validate_comma(CHILD(tree, 4))
-               && validate_test(CHILD(tree, 5)));
 
     return (res);
 }
@@ -2402,12 +2414,7 @@ validate_atom(node *tree)
                    && validate_ntype(CHILD(tree, nch - 1), RBRACE));
 
             if (res && (nch == 3))
-                res = validate_dictmaker(CHILD(tree, 1));
-            break;
-          case BACKQUOTE:
-            res = ((nch == 3)
-                   && validate_testlist1(CHILD(tree, 1))
-                   && validate_ntype(CHILD(tree, 2), BACKQUOTE));
+                res = validate_dictsetmaker(CHILD(tree, 1));
             break;
           case NAME:
           case NUMBER:
@@ -2417,6 +2424,11 @@ validate_atom(node *tree)
             for (pos = 1; res && (pos < nch); ++pos)
                 res = validate_ntype(CHILD(tree, pos), STRING);
             break;
+	  case DOT:
+	    res = (nch == 3 &&
+	           validate_ntype(CHILD(tree, 1), DOT) &&
+		   validate_ntype(CHILD(tree, 2), DOT));
+	    break;
           default:
             res = 0;
             break;
@@ -2843,10 +2855,10 @@ validate_exprlist(node *tree)
 
 
 static int
-validate_dictmaker(node *tree)
+validate_dictsetmaker(node *tree)
 {
     int nch = NCH(tree);
-    int res = (validate_ntype(tree, dictmaker)
+    int res = (validate_ntype(tree, dictsetmaker)
                && (nch >= 3)
                && validate_test(CHILD(tree, 0))
                && validate_colon(CHILD(tree, 1))
@@ -2919,7 +2931,7 @@ validate_node(node *tree)
           case small_stmt:
             /*
              *  expr_stmt | print_stmt | del_stmt | pass_stmt | flow_stmt
-             *  | import_stmt | global_stmt | exec_stmt | assert_stmt
+             *  | import_stmt | global_stmt | assert_stmt
              */
             res = validate_small_stmt(tree);
             break;
@@ -2988,9 +3000,6 @@ validate_node(node *tree)
 	    break;
           case global_stmt:
             res = validate_global_stmt(tree);
-            break;
-          case exec_stmt:
-            res = validate_exec_stmt(tree);
             break;
           case assert_stmt:
             res = validate_assert_stmt(tree);

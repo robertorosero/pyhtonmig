@@ -49,6 +49,7 @@ import stat
 import errno
 import time
 import struct
+import copy
 
 if sys.platform == 'mac':
     # This module needs work for MacOS9, especially in the area of pathname
@@ -64,6 +65,8 @@ except ImportError:
 
 # from tarfile import *
 __all__ = ["TarFile", "TarInfo", "is_tarfile", "TarError"]
+
+from __builtin__ import open as _open # Since 'open' is TarFile.open
 
 #---------------------------------------------------------
 # tar constants
@@ -136,7 +139,7 @@ TOEXEC  = 0001           # execute/search by other
 def stn(s, length):
     """Convert a python string to a null-terminated string buffer.
     """
-    return s[:length-1] + (length - len(s) - 1) * NUL + NUL
+    return s[:length] + (length - len(s)) * NUL
 
 def nti(s):
     """Convert a number field to a python number.
@@ -144,7 +147,7 @@ def nti(s):
     # There are two possible encodings for a number field, see
     # itn() below.
     if s[0] != chr(0200):
-        n = int(s.rstrip(NUL) or "0", 8)
+        n = int(s.rstrip(NUL + " ") or "0", 8)
     else:
         n = 0L
         for i in xrange(len(s) - 1):
@@ -793,7 +796,6 @@ class TarInfo(object):
         """Construct a TarInfo object. name is the optional name
            of the member.
         """
-
         self.name = name        # member name (dirnames must end with '/')
         self.mode = 0666        # file permissions
         self.uid = 0            # user id
@@ -807,8 +809,6 @@ class TarInfo(object):
         self.gname = "group"    # group name
         self.devmajor = 0       # device major number
         self.devminor = 0       # device minor number
-        self.prefix = ""        # prefix to filename or information
-                                # about sparse files
 
         self.offset = 0         # the tar header starts here
         self.offset_data = 0    # the file's data starts here
@@ -840,24 +840,74 @@ class TarInfo(object):
         tarinfo.gname = buf[297:329].rstrip(NUL)
         tarinfo.devmajor = nti(buf[329:337])
         tarinfo.devminor = nti(buf[337:345])
-        tarinfo.prefix = buf[345:500]
+        prefix = buf[345:500].rstrip(NUL)
+
+        if prefix and not tarinfo.issparse():
+            tarinfo.name = prefix + "/" + tarinfo.name
 
         if tarinfo.chksum not in calc_chksums(buf):
             raise ValueError("invalid header")
         return tarinfo
 
     def tobuf(self, posix=False):
-        """Return a tar header block as a 512 byte string.
+        """Return a tar header as a string of 512 byte blocks.
         """
+        buf = ""
+        type = self.type
+        prefix = ""
+
+        if self.name.endswith("/"):
+            type = DIRTYPE
+
+        if type in (GNUTYPE_LONGNAME, GNUTYPE_LONGLINK):
+            # Prevent "././@LongLink" from being normalized.
+            name = self.name
+        else:
+            name = normpath(self.name)
+
+        if type == DIRTYPE:
+            # directories should end with '/'
+            name += "/"
+
+        linkname = self.linkname
+        if linkname:
+            # if linkname is empty we end up with a '.'
+            linkname = normpath(linkname)
+
+        if posix:
+            if self.size > MAXSIZE_MEMBER:
+                raise ValueError("file is too large (>= 8 GB)")
+
+            if len(self.linkname) > LENGTH_LINK:
+                raise ValueError("linkname is too long (>%d)" % (LENGTH_LINK))
+
+            if len(name) > LENGTH_NAME:
+                prefix = name[:LENGTH_PREFIX + 1]
+                while prefix and prefix[-1] != "/":
+                    prefix = prefix[:-1]
+
+                name = name[len(prefix):]
+                prefix = prefix[:-1]
+
+                if not prefix or len(name) > LENGTH_NAME:
+                    raise ValueError("name is too long")
+
+        else:
+            if len(self.linkname) > LENGTH_LINK:
+                buf += self._create_gnulong(self.linkname, GNUTYPE_LONGLINK)
+
+            if len(name) > LENGTH_NAME:
+                buf += self._create_gnulong(name, GNUTYPE_LONGNAME)
+
         parts = [
-            stn(self.name, 100),
+            stn(name, 100),
             itn(self.mode & 07777, 8, posix),
             itn(self.uid, 8, posix),
             itn(self.gid, 8, posix),
             itn(self.size, 12, posix),
             itn(self.mtime, 12, posix),
             "        ", # checksum field
-            self.type,
+            type,
             stn(self.linkname, 100),
             stn(MAGIC, 6),
             stn(VERSION, 2),
@@ -865,13 +915,36 @@ class TarInfo(object):
             stn(self.gname, 32),
             itn(self.devmajor, 8, posix),
             itn(self.devminor, 8, posix),
-            stn(self.prefix, 155)
+            stn(prefix, 155)
         ]
 
-        buf = struct.pack("%ds" % BLOCKSIZE, "".join(parts))
-        chksum = calc_chksums(buf)[0]
-        buf = buf[:148] + "%06o\0" % chksum + buf[155:]
+        buf += struct.pack("%ds" % BLOCKSIZE, "".join(parts))
+        chksum = calc_chksums(buf[-BLOCKSIZE:])[0]
+        buf = buf[:-364] + "%06o\0" % chksum + buf[-357:]
         self.buf = buf
+        return buf
+
+    def _create_gnulong(self, name, type):
+        """Create a GNU longname/longlink header from name.
+           It consists of an extended tar header, with the length
+           of the longname as size, followed by data blocks,
+           which contain the longname as a null terminated string.
+        """
+        name += NUL
+
+        tarinfo = self.__class__()
+        tarinfo.name = "././@LongLink"
+        tarinfo.type = type
+        tarinfo.mode = 0
+        tarinfo.size = len(name)
+
+        # create extended header
+        buf = tarinfo.tobuf()
+        # create name blocks
+        buf += name
+        blocks, remainder = divmod(len(name), BLOCKSIZE)
+        if remainder > 0:
+            buf += (BLOCKSIZE - remainder) * NUL
         return buf
 
     def isreg(self):
@@ -934,7 +1007,7 @@ class TarFile(object):
         self.mode = {"r": "rb", "a": "r+b", "w": "wb"}[mode]
 
         if not fileobj:
-            fileobj = file(self.name, self.mode)
+            fileobj = _open(self.name, self.mode)
             self._extfileobj = False
         else:
             if self.name is None and hasattr(fileobj, "name"):
@@ -1083,7 +1156,7 @@ class TarFile(object):
         tarname = pre + ext
 
         if fileobj is None:
-            fileobj = file(name, mode + "b")
+            fileobj = _open(name, mode + "b")
 
         if mode != "r":
             name = tarname
@@ -1355,7 +1428,7 @@ class TarFile(object):
 
         # Append the tar header and data to the archive.
         if tarinfo.isreg():
-            f = file(name, "rb")
+            f = _open(name, "rb")
             self.addfile(tarinfo, f)
             f.close()
 
@@ -1377,50 +1450,11 @@ class TarFile(object):
         """
         self._check("aw")
 
-        tarinfo.name = normpath(tarinfo.name)
-        if tarinfo.isdir():
-            # directories should end with '/'
-            tarinfo.name += "/"
+        tarinfo = copy.copy(tarinfo)
 
-        if tarinfo.linkname:
-            tarinfo.linkname = normpath(tarinfo.linkname)
-
-        if tarinfo.size > MAXSIZE_MEMBER:
-            if self.posix:
-                raise ValueError("file is too large (>= 8 GB)")
-            else:
-                self._dbg(2, "tarfile: Created GNU tar largefile header")
-
-
-        if len(tarinfo.linkname) > LENGTH_LINK:
-            if self.posix:
-                raise ValueError("linkname is too long (>%d)" % (LENGTH_LINK))
-            else:
-                self._create_gnulong(tarinfo.linkname, GNUTYPE_LONGLINK)
-                tarinfo.linkname = tarinfo.linkname[:LENGTH_LINK -1]
-                self._dbg(2, "tarfile: Created GNU tar extension LONGLINK")
-
-        if len(tarinfo.name) > LENGTH_NAME:
-            if self.posix:
-                prefix = tarinfo.name[:LENGTH_PREFIX + 1]
-                while prefix and prefix[-1] != "/":
-                    prefix = prefix[:-1]
-
-                name = tarinfo.name[len(prefix):]
-                prefix = prefix[:-1]
-
-                if not prefix or len(name) > LENGTH_NAME:
-                    raise ValueError("name is too long (>%d)" % (LENGTH_NAME))
-
-                tarinfo.name   = name
-                tarinfo.prefix = prefix
-            else:
-                self._create_gnulong(tarinfo.name, GNUTYPE_LONGNAME)
-                tarinfo.name = tarinfo.name[:LENGTH_NAME - 1]
-                self._dbg(2, "tarfile: Created GNU tar extension LONGNAME")
-
-        self.fileobj.write(tarinfo.tobuf(self.posix))
-        self.offset += BLOCKSIZE
+        buf = tarinfo.tobuf(self.posix)
+        self.fileobj.write(buf)
+        self.offset += len(buf)
 
         # If there's data to follow, append it.
         if fileobj is not None:
@@ -1617,7 +1651,7 @@ class TarFile(object):
         """Make a file called targetpath.
         """
         source = self.extractfile(tarinfo)
-        target = file(targetpath, "wb")
+        target = _open(targetpath, "wb")
         copyfileobj(source, target)
         source.close()
         target.close()
@@ -1779,12 +1813,6 @@ class TarFile(object):
         if tarinfo.isreg() and tarinfo.name.endswith("/"):
             tarinfo.type = DIRTYPE
 
-        # The prefix field is used for filenames > 100 in
-        # the POSIX standard.
-        # name = prefix + '/' + name
-        tarinfo.name = normpath(os.path.join(tarinfo.prefix.rstrip(NUL),
-                                             tarinfo.name))
-
         # Directory names should have a '/' at the end.
         if tarinfo.isdir():
             tarinfo.name += "/"
@@ -1909,10 +1937,6 @@ class TarFile(object):
         self.offset += self._block(tarinfo.size)
         tarinfo.size = origsize
 
-        # Clear the prefix field so that it is not used
-        # as a pathname in next().
-        tarinfo.prefix = ""
-
         return tarinfo
 
     #--------------------------------------------------------------------------
@@ -1969,31 +1993,6 @@ class TarFile(object):
             return iter(self.members)
         else:
             return TarIter(self)
-
-    def _create_gnulong(self, name, type):
-        """Write a GNU longname/longlink member to the TarFile.
-           It consists of an extended tar header, with the length
-           of the longname as size, followed by data blocks,
-           which contain the longname as a null terminated string.
-        """
-        name += NUL
-
-        tarinfo = TarInfo()
-        tarinfo.name = "././@LongLink"
-        tarinfo.type = type
-        tarinfo.mode = 0
-        tarinfo.size = len(name)
-
-        # write extended header
-        self.fileobj.write(tarinfo.tobuf())
-        self.offset += BLOCKSIZE
-        # write name blocks
-        self.fileobj.write(name)
-        blocks, remainder = divmod(tarinfo.size, BLOCKSIZE)
-        if remainder > 0:
-            self.fileobj.write(NUL * (BLOCKSIZE - remainder))
-            blocks += 1
-        self.offset += blocks * BLOCKSIZE
 
     def _dbg(self, level, msg):
         """Write debugging output to sys.stderr.

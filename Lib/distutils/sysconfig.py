@@ -354,7 +354,7 @@ def _init_posix():
     # load the installed pyconfig.h:
     try:
         filename = get_config_h_filename()
-        parse_config_h(file(filename), g)
+        parse_config_h(open(filename), g)
     except IOError, msg:
         my_msg = "invalid Python installation: unable to open %s" % filename
         if hasattr(msg, "strerror"):
@@ -509,7 +509,10 @@ def get_config_vars(*args):
                 # are in CFLAGS or LDFLAGS and remove them if they are.
                 # This is needed when building extensions on a 10.3 system
                 # using a universal build of python.
-                for key in ('LDFLAGS', 'BASECFLAGS'):
+                for key in ('LDFLAGS', 'BASECFLAGS',
+                        # a number of derived variables. These need to be
+                        # patched up as well.
+                        'CFLAGS', 'PY_CFLAGS', 'BLDSHARED'):
                     flags = _config_vars[key]
                     flags = re.sub('-arch\s+\w+\s', ' ', flags)
                     flags = re.sub('-isysroot [^ \t]*', ' ', flags)

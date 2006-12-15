@@ -223,6 +223,23 @@ class StatAttributeTests(unittest.TestCase):
         except TypeError:
             pass
 
+    def test_utime_dir(self):
+        delta = 1000000
+        st = os.stat(test_support.TESTFN)
+        # round to int, because some systems may support sub-second
+        # time stamps in stat, but not in utime.
+        os.utime(test_support.TESTFN, (st.st_atime, int(st.st_mtime-delta)))
+        st2 = os.stat(test_support.TESTFN)
+        self.assertEquals(st2.st_mtime, int(st.st_mtime-delta))
+
+    # Restrict test to Win32, since there is no guarantee other
+    # systems support centiseconds
+    if sys.platform == 'win32':
+        def test_1565150(self):
+            t1 = 1159195039.25
+            os.utime(self.fname, (t1, t1))
+            self.assertEquals(os.stat(self.fname).st_mtime, t1)
+
 from test import mapping_tests
 
 class EnvironTests(mapping_tests.BasicTestMappingProtocol):
@@ -273,7 +290,7 @@ class WalkTests(unittest.TestCase):
         os.makedirs(sub11_path)
         os.makedirs(sub2_path)
         for path in tmp1_path, tmp2_path, tmp3_path:
-            f = file(path, "w")
+            f = open(path, "w")
             f.write("I'm " + path + " and proud of it.  Blame test_os.\n")
             f.close()
 
@@ -361,10 +378,10 @@ class MakedirTests (unittest.TestCase):
 
 class DevNullTests (unittest.TestCase):
     def test_devnull(self):
-        f = file(os.devnull, 'w')
+        f = open(os.devnull, 'w')
         f.write('hello')
         f.close()
-        f = file(os.devnull, 'r')
+        f = open(os.devnull, 'r')
         self.assertEqual(f.read(), '')
         f.close()
 

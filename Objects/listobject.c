@@ -863,17 +863,12 @@ static PyObject *
 listpop(PyListObject *self, PyObject *args)
 {
 	Py_ssize_t i = -1;
-	PyObject *v, *arg = NULL;
+	PyObject *v;
 	int status;
 
-	if (!PyArg_UnpackTuple(args, "pop", 0, 1, &arg))
+	if (!PyArg_ParseTuple(args, "|n:pop", &i))
 		return NULL;
-	if (arg != NULL) {
-		if (PyInt_Check(arg))
-			i = PyInt_AS_LONG((PyIntObject*) arg);
-		else if (!PyArg_ParseTuple(args, "|n:pop", &i))
-   			return NULL;
-	}
+
 	if (self->ob_size == 0) {
 		/* Special-case most common failure cause */
 		PyErr_SetString(PyExc_IndexError, "pop from empty list");
@@ -951,9 +946,10 @@ islt(PyObject *x, PyObject *y, PyObject *compare)
 	if (res == NULL)
 		return -1;
 	if (!PyInt_Check(res)) {
+		PyErr_Format(PyExc_TypeError,
+			     "comparison function must return int, not %.200s",
+			     res->ob_type->tp_name);
 		Py_DECREF(res);
-		PyErr_SetString(PyExc_TypeError,
-				"comparison function must return int");
 		return -1;
 	}
 	i = PyInt_AsLong(res);
@@ -1971,6 +1967,26 @@ build_cmpwrapper(PyObject *cmpfunc)
 	return (PyObject *)co;
 }
 
+static int
+is_default_cmp(PyObject *cmpfunc)
+{
+	PyCFunctionObject *f;
+	if (cmpfunc == NULL || cmpfunc == Py_None)
+		return 1;
+	if (!PyCFunction_Check(cmpfunc))
+		return 0;
+	f = (PyCFunctionObject *)cmpfunc;
+	if (f->m_self != NULL)
+		return 0;
+	if (!PyString_Check(f->m_module))
+		return 0;
+	if (strcmp(PyString_AS_STRING(f->m_module), "__builtin__") != 0)
+		return 0;
+	if (strcmp(f->m_ml->ml_name, "cmp") != 0)
+		return 0;
+	return 1;
+}
+
 /* An adaptive, stable, natural mergesort.  See listsort.txt.
  * Returns Py_None on success, NULL on error.  Even in case of error, the
  * list will be some permutation of its input state (nothing is lost or
@@ -2001,7 +2017,7 @@ listsort(PyListObject *self, PyObject *args, PyObject *kwds)
 			kwlist, &compare, &keyfunc, &reverse))
 			return NULL;
 	}
-	if (compare == Py_None)
+	if (is_default_cmp(compare))
 		compare = NULL;
 	if (keyfunc == Py_None)
 		keyfunc = NULL;
@@ -2490,8 +2506,9 @@ list_subscript(PyListObject* self, PyObject* item)
 		}
 	}
 	else {
-		PyErr_SetString(PyExc_TypeError,
-				"list indices must be integers");
+		PyErr_Format(PyExc_TypeError,
+			     "list indices must be integers, not %.200s",
+			     item->ob_type->tp_name);
 		return NULL;
 	}
 }
@@ -2613,6 +2630,11 @@ list_ass_subscript(PyListObject* self, PyObject* item, PyObject* value)
 
 			garbage = (PyObject**)
 				PyMem_MALLOC(slicelength*sizeof(PyObject*));
+			if (!garbage) {
+				Py_DECREF(seq);
+				PyErr_NoMemory();
+				return -1;
+			}
 
 			selfitems = self->ob_item;
 			seqitems = PySequence_Fast_ITEMS(seq);
@@ -2635,8 +2657,9 @@ list_ass_subscript(PyListObject* self, PyObject* item, PyObject* value)
 		}
 	}
 	else {
-		PyErr_SetString(PyExc_TypeError,
-				"list indices must be integers");
+		PyErr_Format(PyExc_TypeError,
+			     "list indices must be integers, not %.200s",
+			     item->ob_type->tp_name);
 		return -1;
 	}
 }

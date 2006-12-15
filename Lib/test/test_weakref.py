@@ -51,10 +51,10 @@ class ReferencesTestCase(TestBase):
         # Live reference:
         o = C()
         wr = weakref.ref(o)
-        `wr`
+        repr(wr)
         # Dead reference:
         del o
-        `wr`
+        repr(wr)
 
     def test_basic_callback(self):
         self.check_basic_callback(C)
@@ -701,6 +701,12 @@ class Object:
         self.arg = arg
     def __repr__(self):
         return "<Object %r>" % self.arg
+    def __lt__(self, other):
+        if isinstance(other, Object):
+            return self.arg < other.arg
+        return NotImplemented
+    def __hash__(self):
+        return hash(self.arg)
 
 
 class MappingTestCase(TestBase):

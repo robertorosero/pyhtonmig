@@ -111,9 +111,9 @@ class Transformer:
         self._atom_dispatch = {token.LPAR: self.atom_lpar,
                                token.LSQB: self.atom_lsqb,
                                token.LBRACE: self.atom_lbrace,
-                               token.BACKQUOTE: self.atom_backquote,
                                token.NUMBER: self.atom_number,
                                token.STRING: self.atom_string,
+                               token.DOT: self.atom_ellipsis,
                                token.NAME: self.atom_name,
                                }
         self.encoding = None
@@ -250,9 +250,9 @@ class Transformer:
         args = nodelist[-3][2]
 
         if args[0] == symbol.varargslist:
-            names, defaults, flags = self.com_arglist(args[1:])
+            names, defaults, kwonlyargs, flags = self.com_arglist(args[1:])
         else:
-            names = defaults = ()
+            names = defaults = kwonlyargs = ()
             flags = 0
         doc = self.get_docstring(nodelist[-1])
 
@@ -263,21 +263,23 @@ class Transformer:
             assert isinstance(code, Stmt)
             assert isinstance(code.nodes[0], Discard)
             del code.nodes[0]
-        return Function(decorators, name, names, defaults, flags, doc, code,
-                     lineno=lineno)
+        return Function(decorators, name, names, defaults,
+                        kwonlyargs, flags, doc, code, lineno=lineno)
 
     def lambdef(self, nodelist):
         # lambdef: 'lambda' [varargslist] ':' test
         if nodelist[2][0] == symbol.varargslist:
-            names, defaults, flags = self.com_arglist(nodelist[2][1:])
+            names, defaults, kwonlyargs, flags = \
+                                self.com_arglist(nodelist[2][1:])
         else:
-            names = defaults = ()
+            names = defaults = kwonlyargs = ()
             flags = 0
 
         # code for lambda
         code = self.com_node(nodelist[-1])
 
-        return Lambda(names, defaults, flags, code, lineno=nodelist[1][2])
+        return Lambda(names, defaults, kwonlyargs,
+                      flags, code, lineno=nodelist[1][2])
     old_lambdef = lambdef
 
     def classdef(self, nodelist):
@@ -469,20 +471,6 @@ class Transformer:
             names.append(nodelist[i][1])
         return Global(names, lineno=nodelist[0][2])
 
-    def exec_stmt(self, nodelist):
-        # exec_stmt: 'exec' expr ['in' expr [',' expr]]
-        expr1 = self.com_node(nodelist[1])
-        if len(nodelist) >= 4:
-            expr2 = self.com_node(nodelist[3])
-            if len(nodelist) >= 6:
-                expr3 = self.com_node(nodelist[5])
-            else:
-                expr3 = None
-        else:
-            expr2 = expr3 = None
-
-        return Exec(expr1, expr2, expr3, lineno=nodelist[0][2])
-
     def assert_stmt(self, nodelist):
         # 'assert': test, [',' test]
         expr1 = self.com_node(nodelist[1])
@@ -618,7 +606,7 @@ class Transformer:
         for i in range(2, len(nodelist), 2):
             nl = nodelist[i-1]
 
-            # comp_op: '<' | '>' | '=' | '>=' | '<=' | '<>' | '!=' | '=='
+            # comp_op: '<' | '>' | '=' | '>=' | '<=' | '!=' | '=='
             #          | 'in' | 'not' 'in' | 'is' | 'is' 'not'
             n = nl[1]
             if n[0] == token.NAME:
@@ -738,10 +726,7 @@ class Transformer:
     def atom_lbrace(self, nodelist):
         if nodelist[1][0] == token.RBRACE:
             return Dict((), lineno=nodelist[0][2])
-        return self.com_dictmaker(nodelist[1])
-
-    def atom_backquote(self, nodelist):
-        return Backquote(self.com_node(nodelist[1]))
+        return self.com_dictsetmaker(nodelist[1])
 
     def atom_number(self, nodelist):
         ### need to verify this matches compile.c
@@ -764,6 +749,9 @@ class Transformer:
         for node in nodelist:
             k += self.decode_literal(node[1])
         return Const(k, lineno=nodelist[0][2])
+
+    def atom_ellipsis(self, nodelist):
+        return Const(Ellipsis, lineno=nodelist[0][2])
 
     def atom_name(self, nodelist):
         return Name(nodelist[0][1], lineno=nodelist[0][2])
@@ -797,13 +785,37 @@ class Transformer:
         # ('const', xxxx)) Nodes)
         return Discard(Const(None))
 
+    def keywordonlyargs(self, nodelist):
+        # (',' NAME ['=' test])*
+        #      ^^^
+        # ------+
+        kwonlyargs = []
+        i = 0
+        while i < len(nodelist):
+            default = EmptyNode()
+            node = nodelist[i]
+            #assert node[0] == token.COMMA
+            #node = nodelist[i+1]
+            if i+1 < len(nodelist) and nodelist[i+1][0] == token.EQUAL:
+                assert i+2 < len(nodelist)
+                default = self.com_node(nodelist[i+2])
+                i += 2
+            if node[0] == token.DOUBLESTAR:
+                return kwonlyargs, i
+            elif node[0] == token.NAME:
+                kwonlyargs.append(Keyword(node[1], default, lineno=node[2]))
+                i += 2
+        return kwonlyargs, i
+        
     def com_arglist(self, nodelist):
         # varargslist:
-        #     (fpdef ['=' test] ',')* ('*' NAME [',' '**' NAME] | '**' NAME)
-        #   | fpdef ['=' test] (',' fpdef ['=' test])* [',']
+        #     (fpdef ['=' test] ',')*
+        #      ('*' [NAME] (',' NAME '=' test)* [',' '**' NAME] | '**' NAME)
+        #      | fpdef ['=' test] (',' fpdef ['=' test])* [',']
         # fpdef: NAME | '(' fplist ')'
         # fplist: fpdef (',' fpdef)* [',']
         names = []
+        kwonlyargs = []
         defaults = []
         flags = 0
 
@@ -813,10 +825,16 @@ class Transformer:
             if node[0] == token.STAR or node[0] == token.DOUBLESTAR:
                 if node[0] == token.STAR:
                     node = nodelist[i+1]
-                    if node[0] == token.NAME:
+                    if node[0] == token.NAME: # vararg
                         names.append(node[1])
                         flags = flags | CO_VARARGS
                         i = i + 3
+                    else: # no vararg
+                        assert node[0] == token.COMMA
+                        i += 2
+                    if i < len(nodelist) and nodelist[i][0] == token.NAME:
+                        kwonlyargs, skip = self.keywordonlyargs(nodelist[i:])
+                        i += skip
 
                 if i < len(nodelist):
                     # should be DOUBLESTAR
@@ -845,7 +863,7 @@ class Transformer:
             # skip the comma
             i = i + 1
 
-        return names, defaults, flags
+        return names, defaults, kwonlyargs, flags
 
     def com_fpdef(self, node):
         # fpdef: NAME | '(' fplist ')'
@@ -1182,13 +1200,20 @@ class Transformer:
             assert node[0] == symbol.gen_iter
             return node[1]
 
-    def com_dictmaker(self, nodelist):
-        # dictmaker: test ':' test (',' test ':' value)* [',']
+    def com_dictsetmaker(self, nodelist):
+        # dictsetmaker: (test ':' test (',' test ':' value)* [',']) | (test (',' test)* [','])
         items = []
-        for i in range(1, len(nodelist), 4):
-            items.append((self.com_node(nodelist[i]),
-                          self.com_node(nodelist[i+2])))
-        return Dict(items, lineno=items[0][0].lineno)
+        if len(nodelist) == 1 or nodelist[1] != ':':
+            # it's a set
+            for i in range(1, len(nodelist), 2):
+                items.append(self.com_node(nodelist[i]))
+            return Set(items, lineno=items[0].lineno)
+        else:
+            # it's a dict
+            for i in range(1, len(nodelist), 4):
+                items.append((self.com_node(nodelist[i]),
+                              self.com_node(nodelist[i+2])))
+            return Dict(items, lineno=items[0][0].lineno)
 
     def com_apply_trailer(self, primaryNode, nodelist):
         t = nodelist[1][0]
@@ -1279,11 +1304,9 @@ class Transformer:
                          lineno=extractLineNo(nodelist))
 
     def com_subscript(self, node):
-        # slice_item: expression | proper_slice | ellipsis
+        # slice_item: expression | proper_slice
         ch = node[1]
         t = ch[0]
-        if t == token.DOT and node[2][0] == token.DOT:
-            return Ellipsis()
         if t == token.COLON or len(node) > 2:
             return self.com_sliceobj(node)
         return self.com_node(ch)
@@ -1374,7 +1397,7 @@ _doc_nodes = [
     symbol.power,
     ]
 
-# comp_op: '<' | '>' | '=' | '>=' | '<=' | '<>' | '!=' | '=='
+# comp_op: '<' | '>' | '=' | '>=' | '<=' | '!=' | '=='
 #             | 'in' | 'not' 'in' | 'is' | 'is' 'not'
 _cmp_types = {
     token.LESS : '<',
@@ -1404,7 +1427,6 @@ _legal_node_types = [
     symbol.raise_stmt,
     symbol.import_stmt,
     symbol.global_stmt,
-    symbol.exec_stmt,
     symbol.assert_stmt,
     symbol.if_stmt,
     symbol.while_stmt,

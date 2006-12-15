@@ -130,7 +130,7 @@ class GetSourceBase(unittest.TestCase):
     def __init__(self, *args, **kwargs):
         unittest.TestCase.__init__(self, *args, **kwargs)
 
-        self.source = file(inspect.getsourcefile(self.fodderFile)).read()
+        self.source = open(inspect.getsourcefile(self.fodderFile)).read()
 
     def sourcerange(self, top, bottom):
         lines = self.source.split("\n")
@@ -180,7 +180,18 @@ class TestRetrievingSourceCode(GetSourceBase):
         self.assertEqual(inspect.getcomments(mod.StupidGit), '# line 20\n')
 
     def test_getmodule(self):
+        # Check actual module
+        self.assertEqual(inspect.getmodule(mod), mod)
+        # Check class (uses __module__ attribute)
         self.assertEqual(inspect.getmodule(mod.StupidGit), mod)
+        # Check a method (no __module__ attribute, falls back to filename)
+        self.assertEqual(inspect.getmodule(mod.StupidGit.abuse), mod)
+        # Do it again (check the caching isn't broken)
+        self.assertEqual(inspect.getmodule(mod.StupidGit.abuse), mod)
+        # Check a builtin
+        self.assertEqual(inspect.getmodule(str), sys.modules["__builtin__"])
+        # Check filename override
+        self.assertEqual(inspect.getmodule(None, modfile), mod)
 
     def test_getsource(self):
         self.assertSourceEqual(git.abuse, 29, 39)
@@ -199,7 +210,7 @@ class TestRetrievingSourceCode(GetSourceBase):
         m = sys.modules[name] = module(name)
         m.__file__ = "<string>" # hopefully not a real filename...
         m.__loader__ = "dummy"  # pretend the filename is understood by a loader
-        exec "def x(): pass" in m.__dict__
+        exec("def x(): pass", m.__dict__)
         self.assertEqual(inspect.getsourcefile(m.x.func_code), '<string>')
         del sys.modules[name]
         inspect.getmodule(compile('a=10','','single'))

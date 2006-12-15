@@ -282,56 +282,9 @@ class Fault(Error):
 # @param value A boolean value.  Any true value is interpreted as True,
 #              all other values are interpreted as False.
 
-if _bool_is_builtin:
-    boolean = Boolean = bool
-    # to avoid breaking code which references xmlrpclib.{True,False}
-    True, False = True, False
-else:
-    class Boolean:
-        """Boolean-value wrapper.
-
-        Use True or False to generate a "boolean" XML-RPC value.
-        """
-
-        def __init__(self, value = 0):
-            self.value = operator.truth(value)
-
-        def encode(self, out):
-            out.write("<value><boolean>%d</boolean></value>\n" % self.value)
-
-        def __cmp__(self, other):
-            if isinstance(other, Boolean):
-                other = other.value
-            return cmp(self.value, other)
-
-        def __repr__(self):
-            if self.value:
-                return "<Boolean True at %x>" % id(self)
-            else:
-                return "<Boolean False at %x>" % id(self)
-
-        def __int__(self):
-            return self.value
-
-        def __nonzero__(self):
-            return self.value
-
-    True, False = Boolean(1), Boolean(0)
-
-    ##
-    # Map true or false value to XML-RPC boolean values.
-    #
-    # @def boolean(value)
-    # @param value A boolean value.  Any true value is mapped to True,
-    #              all other values are mapped to False.
-    # @return xmlrpclib.True or xmlrpclib.False.
-    # @see Boolean
-    # @see True
-    # @see False
-
-    def boolean(value, _truefalse=(False, True)):
-        """Convert any Python value to XML-RPC 'boolean'."""
-        return _truefalse[operator.truth(value)]
+boolean = Boolean = bool
+# to avoid breaking code which references xmlrpclib.{True,False}
+True, False = True, False
 
 ##
 # Wrapper for XML-RPC DateTime values.  This converts a time value to
@@ -371,10 +324,15 @@ class DateTime:
             value = time.strftime("%Y%m%dT%H:%M:%S", value)
         self.value = value
 
-    def __cmp__(self, other):
+    def __eq__(self, other):
         if isinstance(other, DateTime):
             other = other.value
-        return cmp(self.value, other)
+        return self.value == other
+
+    def __ne__(self, other):
+        if isinstance(other, DateTime):
+            other = other.value
+        return self.value != other
 
     ##
     # Get date/time value.
@@ -432,10 +390,15 @@ class Binary:
     def __str__(self):
         return self.data or ""
 
-    def __cmp__(self, other):
+    def __eq__(self, other):
         if isinstance(other, Binary):
             other = other.data
-        return cmp(self.data, other)
+        return self.data == other
+
+    def __ne__(self, other):
+        if isinstance(other, Binary):
+            other = other.data
+        return self.data != other
 
     def decode(self, data):
         self.data = base64.decodestring(data)
@@ -630,9 +593,21 @@ class Marshaller:
         try:
             f = self.dispatch[type(value)]
         except KeyError:
-            raise TypeError, "cannot marshal %s objects" % type(value)
-        else:
-            f(self, value, write)
+            # check if this object can be marshalled as a structure
+            try:
+                value.__dict__
+            except:
+                raise TypeError, "cannot marshal %s objects" % type(value)
+            # check if this class is a sub-class of a basic type,
+            # because we don't know how to marshal these types
+            # (e.g. a string sub-class)
+            for type_ in type(value).__mro__:
+                if type_ in self.dispatch.keys():
+                    raise TypeError, "cannot marshal %s objects" % type(value)
+            # XXX(twouters): using "_arbitrary_instance" as key as a quick-fix
+            # for the p3yk merge, this should probably be fixed more neatly.
+            f = self.dispatch["_arbitrary_instance"]
+        f(self, value, write)
 
     def dump_nil (self, value, write):
         if not self.allow_none:
@@ -750,6 +725,9 @@ class Marshaller:
             self.dump_struct(value.__dict__, write)
     dispatch[DateTime] = dump_instance
     dispatch[Binary] = dump_instance
+    # XXX(twouters): using "_arbitrary_instance" as key as a quick-fix
+    # for the p3yk merge, this should probably be fixed more neatly.
+    dispatch["_arbitrary_instance"] = dump_instance
 
 ##
 # XML-RPC unmarshaller.

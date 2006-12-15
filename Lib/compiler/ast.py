@@ -203,20 +203,6 @@ class AugAssign(Node):
     def __repr__(self):
         return "AugAssign(%s, %s, %s)" % (repr(self.node), repr(self.op), repr(self.expr))
 
-class Backquote(Node):
-    def __init__(self, expr, lineno=None):
-        self.expr = expr
-        self.lineno = lineno
-
-    def getChildren(self):
-        return self.expr,
-
-    def getChildNodes(self):
-        return self.expr,
-
-    def __repr__(self):
-        return "Backquote(%s)" % (repr(self.expr),)
-
 class Bitand(Node):
     def __init__(self, nodes, lineno=None):
         self.nodes = nodes
@@ -441,45 +427,6 @@ class Div(Node):
     def __repr__(self):
         return "Div((%s, %s))" % (repr(self.left), repr(self.right))
 
-class Ellipsis(Node):
-    def __init__(self, lineno=None):
-        self.lineno = lineno
-
-    def getChildren(self):
-        return ()
-
-    def getChildNodes(self):
-        return ()
-
-    def __repr__(self):
-        return "Ellipsis()"
-
-class Exec(Node):
-    def __init__(self, expr, locals, globals, lineno=None):
-        self.expr = expr
-        self.locals = locals
-        self.globals = globals
-        self.lineno = lineno
-
-    def getChildren(self):
-        children = []
-        children.append(self.expr)
-        children.append(self.locals)
-        children.append(self.globals)
-        return tuple(children)
-
-    def getChildNodes(self):
-        nodelist = []
-        nodelist.append(self.expr)
-        if self.locals is not None:
-            nodelist.append(self.locals)
-        if self.globals is not None:
-            nodelist.append(self.globals)
-        return tuple(nodelist)
-
-    def __repr__(self):
-        return "Exec(%s, %s, %s)" % (repr(self.expr), repr(self.locals), repr(self.globals))
-
 class FloorDiv(Node):
     def __init__(self, (left, right), lineno=None):
         self.left = left
@@ -540,11 +487,12 @@ class From(Node):
         return "From(%s, %s, %s)" % (repr(self.modname), repr(self.names), repr(self.level))
 
 class Function(Node):
-    def __init__(self, decorators, name, argnames, defaults, flags, doc, code, lineno=None):
+    def __init__(self, decorators, name, argnames, defaults, kwonlyargs, flags, doc, code, lineno=None):
         self.decorators = decorators
         self.name = name
         self.argnames = argnames
         self.defaults = defaults
+        self.kwonlyargs = kwonlyargs
         self.flags = flags
         self.doc = doc
         self.code = code
@@ -556,13 +504,13 @@ class Function(Node):
             self.kwargs = 1
 
 
-
     def getChildren(self):
         children = []
         children.append(self.decorators)
         children.append(self.name)
         children.append(self.argnames)
         children.extend(flatten(self.defaults))
+        children.append(self.kwonlyargs)
         children.append(self.flags)
         children.append(self.doc)
         children.append(self.code)
@@ -577,7 +525,7 @@ class Function(Node):
         return tuple(nodelist)
 
     def __repr__(self):
-        return "Function(%s, %s, %s, %s, %s, %s, %s)" % (repr(self.decorators), repr(self.name), repr(self.argnames), repr(self.defaults), repr(self.flags), repr(self.doc), repr(self.code))
+        return "Function(%s, %s, %s, %s, %s, %s, %s, %s)" % (repr(self.decorators), repr(self.name), repr(self.argnames), repr(self.defaults), repr(self.kwonlyargs), repr(self.flags), repr(self.doc), repr(self.code))
 
 class GenExpr(Node):
     def __init__(self, code, lineno=None):
@@ -585,6 +533,8 @@ class GenExpr(Node):
         self.lineno = lineno
         self.argnames = ['.0']
         self.varargs = self.kwargs = None
+        self.kwonlyargs = ()
+
 
     def getChildren(self):
         return self.code,
@@ -602,7 +552,6 @@ class GenExprFor(Node):
         self.ifs = ifs
         self.lineno = lineno
         self.is_outmost = False
-
 
     def getChildren(self):
         children = []
@@ -767,9 +716,10 @@ class Keyword(Node):
         return "Keyword(%s, %s)" % (repr(self.name), repr(self.expr))
 
 class Lambda(Node):
-    def __init__(self, argnames, defaults, flags, code, lineno=None):
+    def __init__(self, argnames, defaults, kwonlyargs, flags, code, lineno=None):
         self.argnames = argnames
         self.defaults = defaults
+        self.kwonlyargs = kwonlyargs
         self.flags = flags
         self.code = code
         self.lineno = lineno
@@ -780,11 +730,11 @@ class Lambda(Node):
             self.kwargs = 1
 
 
-
     def getChildren(self):
         children = []
         children.append(self.argnames)
         children.extend(flatten(self.defaults))
+        children.append(self.kwonlyargs)
         children.append(self.flags)
         children.append(self.code)
         return tuple(children)
@@ -796,7 +746,7 @@ class Lambda(Node):
         return tuple(nodelist)
 
     def __repr__(self):
-        return "Lambda(%s, %s, %s, %s)" % (repr(self.argnames), repr(self.defaults), repr(self.flags), repr(self.code))
+        return "Lambda(%s, %s, %s, %s, %s)" % (repr(self.argnames), repr(self.defaults), repr(self.kwonlyargs), repr(self.flags), repr(self.code))
 
 class LeftShift(Node):
     def __init__(self, (left, right), lineno=None):
@@ -1104,6 +1054,22 @@ class RightShift(Node):
 
     def __repr__(self):
         return "RightShift((%s, %s))" % (repr(self.left), repr(self.right))
+
+class Set(Node):
+    def __init__(self, items, lineno=None):
+        self.items = items
+        self.lineno = lineno
+
+    def getChildren(self):
+        return tuple(flatten(self.items))
+
+    def getChildNodes(self):
+        nodelist = []
+        nodelist.extend(flatten_nodes(self.items))
+        return tuple(nodelist)
+
+    def __repr__(self):
+        return "Set(%s)" % (repr(self.items),)
 
 class Slice(Node):
     def __init__(self, expr, flags, lower, upper, lineno=None):

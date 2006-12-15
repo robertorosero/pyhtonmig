@@ -128,7 +128,7 @@ class Keyword:
         self.keyword = "%-4.4s" % str(keyword)
 
     def __repr__(self):
-        return "Keyword(%r)" % `self.keyword`
+        return "Keyword(%r)" % self.keyword
 
     def __str__(self):
         return string.strip(self.keyword)
@@ -557,12 +557,12 @@ template = """
 class %s(ComponentItem): want = '%s'
 """
 
-exec template % ("Text", 'text')
-exec template % ("Character", 'cha ')
-exec template % ("Word", 'cwor')
-exec template % ("Line", 'clin')
-exec template % ("paragraph", 'cpar')
-exec template % ("Window", 'cwin')
-exec template % ("Document", 'docu')
-exec template % ("File", 'file')
-exec template % ("InsertionPoint", 'cins')
+exec(template % ("Text", 'text'))
+exec(template % ("Character", 'cha '))
+exec(template % ("Word", 'cwor'))
+exec(template % ("Line", 'clin'))
+exec(template % ("paragraph", 'cpar'))
+exec(template % ("Window", 'cwin'))
+exec(template % ("Document", 'docu'))
+exec(template % ("File", 'file'))
+exec(template % ("InsertionPoint", 'cins'))

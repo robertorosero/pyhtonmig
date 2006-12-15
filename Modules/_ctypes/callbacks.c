@@ -51,6 +51,7 @@ void _AddTraceback(char *funcname, char *filename, int lineno)
 	if (!empty_string) goto bad;
 	py_code = PyCode_New(
 		0,            /*int argcount,*/
+		0,            /*int kwonlyargcount,*/
 		0,            /*int nlocals,*/
 		0,            /*int stacksize,*/
 		0,            /*int flags,*/
@@ -293,14 +294,17 @@ ffi_info *AllocFunctionCallback(PyObject *callable,
 		p->restype = &ffi_type_void;
 	} else {
 		StgDictObject *dict = PyType_stgdict(restype);
-		if (dict == NULL)
-			goto error;
+		if (dict == NULL || dict->setfunc == NULL) {
+		  PyErr_SetString(PyExc_TypeError,
+				  "invalid result type for callback function");
+		  goto error;
+		}
 		p->setfunc = dict->setfunc;
 		p->restype = &dict->ffi_type_pointer;
 	}
 
 	cc = FFI_DEFAULT_ABI;
-#if defined(MS_WIN32) && !defined(_WIN32_WCE)
+#if defined(MS_WIN32) && !defined(_WIN32_WCE) && !defined(MS_WIN64)
 	if (is_cdecl == 0)
 		cc = FFI_STDCALL;
 #endif

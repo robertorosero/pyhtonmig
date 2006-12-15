@@ -605,7 +605,7 @@ text:
     ...     if isinstance(piece, doctest.Example):
     ...         print 'Example:', (piece.source, piece.want, piece.lineno)
     ...     else:
-    ...         print '   Text:', `piece`
+    ...         print '   Text:', repr(piece)
        Text: '\n'
     Example: ('x, y = 2, 3  # no output expected\n', '', 1)
        Text: ''
@@ -2234,7 +2234,7 @@ debugging):
     >>> doctest.testfile('test_doctest.txt', raise_on_error=True)
     ... # doctest: +ELLIPSIS
     Traceback (most recent call last):
-    UnexpectedException: ...
+    doctest.UnexpectedException: ...
     >>> doctest.master = None  # Reset master.
 
 If the tests contain non-ASCII characters, the tests might fail, since
@@ -2366,8 +2366,8 @@ def old_test4(): """
         ...        '''>>> assert 1 < 2
         ...        '''
         ... \"""
-        >>> exec test_data in m1.__dict__
-        >>> exec test_data in m2.__dict__
+        >>> exec(test_data, m1.__dict__)
+        >>> exec(test_data, m2.__dict__)
         >>> m1.__dict__.update({"f2": m2._f, "g2": m2.g, "h2": m2.H})
 
         Tests that objects outside m1 are excluded:

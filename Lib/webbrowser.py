@@ -165,7 +165,10 @@ class GenericBrowser(BaseBrowser):
         cmdline = [self.name] + [arg.replace("%s", url)
                                  for arg in self.args]
         try:
-            p = subprocess.Popen(cmdline, close_fds=True)
+            if sys.platform[:3] == 'win':
+                p = subprocess.Popen(cmdline)
+            else:
+                p = subprocess.Popen(cmdline, close_fds=True)
             return not p.wait()
         except OSError:
             return False
@@ -178,11 +181,14 @@ class BackgroundBrowser(GenericBrowser):
     def open(self, url, new=0, autoraise=1):
         cmdline = [self.name] + [arg.replace("%s", url)
                                  for arg in self.args]
-        setsid = getattr(os, 'setsid', None)
-        if not setsid:
-            setsid = getattr(os, 'setpgrp', None)
         try:
-            p = subprocess.Popen(cmdline, close_fds=True, preexec_fn=setsid)
+            if sys.platform[:3] == 'win':
+                p = subprocess.Popen(cmdline)
+            else:
+                setsid = getattr(os, 'setsid', None)
+                if not setsid:
+                    setsid = getattr(os, 'setpgrp', None)
+                p = subprocess.Popen(cmdline, close_fds=True, preexec_fn=setsid)
             return (p.poll() is None)
         except OSError:
             return False
@@ -210,7 +216,7 @@ class UnixBrowser(BaseBrowser):
         cmdline = [self.name] + raise_opt + args
 
         if remote or self.background:
-            inout = file(os.devnull, "r+")
+            inout = open(os.devnull, "r+")
         else:
             # for TTY browsers, we need stdin/out
             inout = None
@@ -334,7 +340,7 @@ class Konqueror(BaseBrowser):
         else:
             action = "openURL"
 
-        devnull = file(os.devnull, "r+")
+        devnull = open(os.devnull, "r+")
         # if possible, put browser in separate process group, so
         # keyboard interrupts don't affect browser as well as Python
         setsid = getattr(os, 'setsid', None)
@@ -441,7 +447,7 @@ def register_X_browsers():
 
         # if successful, register it
         if retncode is None and commd:
-            register("gnome", None, BackgroundBrowser(commd))
+            register("gnome", None, BackgroundBrowser(commd.split()))
 
     # First, the Mozilla/Netscape browsers
     for browser in ("mozilla-firefox", "firefox",
@@ -627,7 +633,7 @@ def main():
     for o, a in opts:
         if o == '-n': new_win = 1
         elif o == '-t': new_win = 2
-    if len(args) <> 1:
+    if len(args) != 1:
         print >>sys.stderr, usage
         sys.exit(1)
 

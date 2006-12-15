@@ -100,6 +100,30 @@ class AllTests:
         print "__cmp__:", args
         return 0
 
+    def __eq__(self, *args):
+        print "__eq__:", args
+        return True
+
+    def __ne__(self, *args):
+        print "__ne__:", args
+        return False
+
+    def __lt__(self, *args):
+        print "__lt__:", args
+        return False
+
+    def __le__(self, *args):
+        print "__le__:", args
+        return True
+
+    def __gt__(self, *args):
+        print "__gt__:", args
+        return False
+
+    def __ge__(self, *args):
+        print "__ge__:", args
+        return True
+
     def __del__(self, *args):
         print "__del__:", args
 
@@ -112,7 +136,7 @@ def __%(method)s__(self, *args):
 
 d = {}
 for method in testmeths:
-    exec method_template % locals() in d
+    exec(method_template % locals(), d)
 for k in d:
     setattr(AllTests, k, d[k])
 del d, k
@@ -161,6 +185,14 @@ testme ^ 1
 
 
 # List/dict operations
+
+class Empty: pass
+
+try:
+    1 in Empty()
+    print 'failed, should have raised TypeError'
+except TypeError:
+    pass
 
 1 in testme
 
@@ -220,12 +252,10 @@ str(testme)
 testme == 1
 testme < 1
 testme > 1
-testme <> 1
 testme != 1
 1 == testme
 1 < testme
 1 > testme
-1 <> testme
 1 != testme
 
 # This test has to be last (duh.)
@@ -269,7 +299,7 @@ def check_exc(stmt, exception):
     """Raise TestFailed if executing 'stmt' does not raise 'exception'
     """
     try:
-        exec stmt
+        exec(stmt)
     except exception:
         pass
     else:

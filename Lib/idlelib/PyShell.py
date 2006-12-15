@@ -351,6 +351,8 @@ class ModifiedInterpreter(InteractiveInterpreter):
 
     def build_subprocess_arglist(self):
         w = ['-W' + s for s in sys.warnoptions]
+        if 1/2 > 0: # account for new division
+            w.append('-Qnew')
         # Maybe IDLE is installed and is being accessed via sys.path,
         # or maybe it's not installed and the idle.py script is being
         # run from the IDLE source directory.
@@ -690,7 +692,7 @@ class ModifiedInterpreter(InteractiveInterpreter):
         if self.rpcclt:
             self.rpcclt.remotequeue("exec", "runcode", (code,), {})
         else:
-            exec code in self.locals
+            exec(code, self.locals)
         return 1
 
     def runcode(self, code):
@@ -711,7 +713,7 @@ class ModifiedInterpreter(InteractiveInterpreter):
                 elif debugger:
                     debugger.run(code, self.locals)
                 else:
-                    exec code in self.locals
+                    exec(code, self.locals)
             except SystemExit:
                 if not self.tkconsole.closing:
                     if tkMessageBox.askyesno(
@@ -726,6 +728,8 @@ class ModifiedInterpreter(InteractiveInterpreter):
                     raise
             except:
                 if use_subprocess:
+                    # When run w/o subprocess, both user and IDLE errors
+                    # are printed here; skip message in that case.
                     print >> self.tkconsole.stderr, \
                              "IDLE internal error in runcode()"
                 self.showtraceback()

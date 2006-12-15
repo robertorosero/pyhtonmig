@@ -446,6 +446,17 @@ int_compare(PyIntObject *v, PyIntObject *w)
 	return (i < j) ? -1 : (i > j) ? 1 : 0;
 }
 
+static PyObject *
+int_richcompare(PyObject *self, PyObject *other, int op)
+{
+	if (!PyInt_Check(self) || !PyInt_Check(other)) {
+		Py_INCREF(Py_NotImplemented);
+		return Py_NotImplemented;
+	}
+	return Py_CmpToRich(op, int_compare((PyIntObject *)self, 
+					    (PyIntObject *)other));
+}
+
 static long
 int_hash(PyIntObject *v)
 {
@@ -546,6 +557,17 @@ int_mul(PyObject *v, PyObject *w)
 	}
 }
 
+/* Integer overflow checking for unary negation: on a 2's-complement
+ * box, -x overflows iff x is the most negative long.  In this case we
+ * get -x == x.  However, -x is undefined (by C) if x /is/ the most
+ * negative long (it's a signed overflow case), and some compilers care.
+ * So we cast x to unsigned long first.  However, then other compilers
+ * warn about applying unary minus to an unsigned operand.  Hence the
+ * weird "0-".
+ */
+#define UNARY_NEG_WOULD_OVERFLOW(x)	\
+	((x) < 0 && (unsigned long)(x) == 0-(unsigned long)(x))
+
 /* Return type of i_divmod */
 enum divmod_result {
 	DIVMOD_OK,		/* Correct result */
@@ -565,7 +587,7 @@ i_divmod(register long x, register long y,
 		return DIVMOD_ERROR;
 	}
 	/* (-sys.maxint-1)/-1 is the only overflow case. */
-	if (y == -1 && x < 0 && x == -x)
+	if (y == -1 && UNARY_NEG_WOULD_OVERFLOW(x))
 		return DIVMOD_OVERFLOW;
 	xdivy = x / y;
 	xmody = x - xdivy * y;
@@ -733,10 +755,10 @@ int_pow(PyIntObject *v, PyIntObject *w, PyIntObject *z)
 static PyObject *
 int_neg(PyIntObject *v)
 {
-	register long a, x;
+	register long a;
 	a = v->ob_ival;
-	x = -a;
-	if (a < 0 && x < 0) {
+        /* check for overflow */
+	if (UNARY_NEG_WOULD_OVERFLOW(a)) {
 		PyObject *o = PyLong_FromLong(a);
 		if (o != NULL) {
 			PyObject *result = PyNumber_Negative(o);
@@ -745,7 +767,7 @@ int_neg(PyIntObject *v)
 		}
 		return NULL;
 	}
-	return PyInt_FromLong(x);
+	return PyInt_FromLong(-a);
 }
 
 static PyObject *
@@ -769,7 +791,7 @@ int_abs(PyIntObject *v)
 }
 
 static int
-int_nonzero(PyIntObject *v)
+int_bool(PyIntObject *v)
 {
 	return v->ob_ival != 0;
 }
@@ -944,8 +966,25 @@ int_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 		return PyInt_FromLong(0L);
 	if (base == -909)
 		return PyNumber_Int(x);
-	if (PyString_Check(x))
-		return PyInt_FromString(PyString_AS_STRING(x), NULL, base);
+	if (PyString_Check(x)) {
+		/* Since PyInt_FromString doesn't have a length parameter,
+		 * check here for possible NULs in the string. */
+		char *string = PyString_AS_STRING(x);
+		if (strlen(string) != PyString_Size(x)) {
+			/* create a repr() of the input string,
+			 * just like PyInt_FromString does */
+			PyObject *srepr;
+			srepr = PyObject_Repr(x);
+			if (srepr == NULL)
+				return NULL;
+			PyErr_Format(PyExc_ValueError,
+			     "invalid literal for int() with base %d: %s",
+			     base, PyString_AS_STRING(srepr));
+			Py_DECREF(srepr);
+			return NULL;
+		}
+		return PyInt_FromString(string, NULL, base);
+	}
 #ifdef Py_USING_UNICODE
 	if (PyUnicode_Check(x))
 		return PyInt_FromUnicode(PyUnicode_AS_UNICODE(x),
@@ -1023,14 +1062,14 @@ static PyNumberMethods int_as_number = {
 	(unaryfunc)int_neg,	/*nb_negative*/
 	(unaryfunc)int_pos,	/*nb_positive*/
 	(unaryfunc)int_abs,	/*nb_absolute*/
-	(inquiry)int_nonzero,	/*nb_nonzero*/
+	(inquiry)int_bool,	/*nb_bool*/
 	(unaryfunc)int_invert,	/*nb_invert*/
 	(binaryfunc)int_lshift,	/*nb_lshift*/
 	(binaryfunc)int_rshift,	/*nb_rshift*/
 	(binaryfunc)int_and,	/*nb_and*/
 	(binaryfunc)int_xor,	/*nb_xor*/
 	(binaryfunc)int_or,	/*nb_or*/
-	0,		/*nb_coerce*/
+	0,			/*nb_coerce*/
 	(unaryfunc)int_int,	/*nb_int*/
 	(unaryfunc)int_long,	/*nb_long*/
 	(unaryfunc)int_float,	/*nb_float*/
@@ -1063,7 +1102,7 @@ PyTypeObject PyInt_Type = {
 	(printfunc)int_print,			/* tp_print */
 	0,					/* tp_getattr */
 	0,					/* tp_setattr */
-	(cmpfunc)int_compare,			/* tp_compare */
+	0,					/* tp_compare */
 	(reprfunc)int_repr,			/* tp_repr */
 	&int_as_number,				/* tp_as_number */
 	0,					/* tp_as_sequence */
@@ -1078,7 +1117,7 @@ PyTypeObject PyInt_Type = {
 	int_doc,				/* tp_doc */
 	0,					/* tp_traverse */
 	0,					/* tp_clear */
-	0,					/* tp_richcompare */
+	int_richcompare,			/* tp_richcompare */
 	0,					/* tp_weaklistoffset */
 	0,					/* tp_iter */
 	0,					/* tp_iternext */

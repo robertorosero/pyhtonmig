@@ -268,49 +268,6 @@ stored for a given key value prevails.
 \indexii{immutable}{object}
 
 
-\subsection{String conversions\label{string-conversions}}
-\indexii{string}{conversion}
-\indexii{reverse}{quotes}
-\indexii{backward}{quotes}
-\index{back-quotes}
-
-A string conversion is an expression list enclosed in reverse (a.k.a.
-backward) quotes:
-
-\begin{productionlist}
-  \production{string_conversion}
-             {"`" \token{expression_list} "`"}
-\end{productionlist}
-
-A string conversion evaluates the contained expression list and
-converts the resulting object into a string according to rules
-specific to its type.
-
-If the object is a string, a number, \code{None}, or a tuple, list or
-dictionary containing only objects whose type is one of these, the
-resulting string is a valid Python expression which can be passed to
-the built-in function \function{eval()} to yield an expression with the
-same value (or an approximation, if floating point numbers are
-involved).
-
-(In particular, converting a string adds quotes around it and converts
-``funny'' characters to escape sequences that are safe to print.)
-
-Recursive objects (for example, lists or dictionaries that contain a
-reference to themselves, directly or indirectly) use \samp{...} to
-indicate a recursive reference, and the result cannot be passed to
-\function{eval()} to get an equal value (\exception{SyntaxError} will
-be raised instead).
-\obindex{recursive}
-
-The built-in function \function{repr()} performs exactly the same
-conversion in its argument as enclosing it in parentheses and reverse
-quotes does.  The built-in function \function{str()} performs a
-similar but more user-friendly conversion.
-\bifuncindex{repr}
-\bifuncindex{str}
-
-
 \section{Primaries\label{primaries}}
 \index{primary}
 
@@ -454,8 +411,7 @@ is constructed from the slice list, as follows.  If the slice list
 contains at least one comma, the key is a tuple containing the
 conversion of the slice items; otherwise, the conversion of the lone
 slice item is the key.  The conversion of a slice item that is an
-expression is that expression.  The conversion of an ellipsis slice
-item is the built-in \code{Ellipsis} object.  The conversion of a
+expression is that expression.  The conversion of a
 proper slice is a slice object (see section \ref{types}) whose
 \member{start}, \member{stop} and \member{step} attributes are the
 values of the expressions given as lower bound, upper bound and
@@ -875,7 +831,7 @@ interpretation that is conventional in mathematics:
   \production{comparison}
              {\token{or_expr} ( \token{comp_operator} \token{or_expr} )*}
   \production{comp_operator}
-             {"<" | ">" | "==" | ">=" | "<=" | "<>" | "!="}
+             {"<" | ">" | "==" | ">=" | "<=" | "!="}
   \productioncont{| "is" ["not"] | ["not"] "in"}
 \end{productionlist}
 
@@ -896,11 +852,6 @@ to \var{a opa b} \keyword{and} \var{b opb c} \keyword{and} \ldots
 Note that \var{a opa b opb c} doesn't imply any kind of comparison
 between \var{a} and \var{c}, so that, e.g., \code{x < y > z} is
 perfectly legal (though perhaps not pretty).
-
-The forms \code{<>} and \code{!=} are equivalent; for consistency with
-C, \code{!=} is preferred; where \code{!=} is mentioned below
-\code{<>} is also accepted.  The \code{<>} spelling is considered
-obsolescent.
 
 The operators \code{<}, \code{>}, \code{==}, \code{>=}, \code{<=}, and
 \code{!=} compare
@@ -1154,7 +1105,7 @@ have the same precedence and chain from left to right --- see section
     \lineii{\keyword{in}, \keyword{not} \keyword{in}}{Membership tests}
     \lineii{\keyword{is}, \keyword{is not}}{Identity tests}
     \lineii{\code{<}, \code{<=}, \code{>}, \code{>=},
-            \code{<>}, \code{!=}, \code{==}}
+            \code{!=}, \code{==}}
 	   {Comparisons}
   \hline
     \lineii{\code{|}}				{Bitwise OR}

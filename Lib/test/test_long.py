@@ -247,17 +247,23 @@ class LongTest(unittest.TestCase):
             "long(-sys.maxint-1) != -sys.maxint-1")
 
         # long -> int should not fail for hugepos_aslong or hugeneg_aslong
+        x = int(hugepos_aslong)
         try:
-            self.assertEqual(int(hugepos_aslong), hugepos,
+            self.assertEqual(x, hugepos,
                   "converting sys.maxint to long and back to int fails")
         except OverflowError:
             self.fail("int(long(sys.maxint)) overflowed!")
+        if not isinstance(x, int):
+            raise TestFailed("int(long(sys.maxint)) should have returned int")
+        x = int(hugeneg_aslong)
         try:
-            self.assertEqual(int(hugeneg_aslong), hugeneg,
+            self.assertEqual(x, hugeneg,
                   "converting -sys.maxint-1 to long and back to int fails")
         except OverflowError:
             self.fail("int(long(-sys.maxint-1)) overflowed!")
-
+        if not isinstance(x, int):
+            raise TestFailed("int(long(-sys.maxint-1)) should have "
+                             "returned int")
         # but long -> int should overflow for hugepos+1 and hugeneg-1
         x = hugepos_aslong + 1
         try:
@@ -281,6 +287,7 @@ class LongTest(unittest.TestCase):
         y = int(x)
         self.assert_(type(y) is long,
             "overflowing int conversion must return long not long subtype")
+
 
 # ----------------------------------- tests of auto int->long conversion
 

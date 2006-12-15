@@ -13,7 +13,7 @@ class _Environ:
         return len(riscos.getenvdict())
     def __getitem__(self, key):
         ret = riscos.getenv(key)
-        if ret<>None:
+        if ret != None:
             return ret
         else:
             raise KeyError
@@ -31,7 +31,7 @@ class _Environ:
     def values(self): return riscos.getenvdict().values()
     def has_key(self, key):
         value = riscos.getenv(key)
-        return value<>None
+        return value != None
     def __contains__(self, key):
         return riscos.getenv(key) is not None
     def update(self, dict):
@@ -39,7 +39,7 @@ class _Environ:
             riscos.putenv(k, v)
     def get(self, key, failobj=None):
         value = riscos.getenv(key)
-        if value<>None:
+        if value != None:
             return value
         else:
             return failobj

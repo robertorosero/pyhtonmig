@@ -5,6 +5,7 @@ import sys, UserDict, cStringIO
 
 
 class DictTest(unittest.TestCase):
+
     def test_constructor(self):
         # calling built-in types without argument must return empty
         self.assertEqual(dict(), {})
@@ -368,9 +369,9 @@ class DictTest(unittest.TestCase):
         d = {1: BadRepr()}
         self.assertRaises(Exc, repr, d)
 
-    def test_le(self):
-        self.assert_(not ({} < {}))
-        self.assert_(not ({1: 2} < {1L: 2L}))
+    def test_eq(self):
+        self.assertEqual({}, {})
+        self.assertEqual({1: 2}, {1L: 2L})
 
         class Exc(Exception): pass
 
@@ -378,12 +379,12 @@ class DictTest(unittest.TestCase):
             def __eq__(self, other):
                 raise Exc()
             def __hash__(self):
-                return 42
+                return 1
 
         d1 = {BadCmp(): 1}
         d2 = {1: 1}
         try:
-            d1 < d2
+            d1 == d2
         except Exc:
             pass
         else:
@@ -437,6 +438,16 @@ class DictTest(unittest.TestCase):
             self.assertEqual(err.args, (42,))
         else:
             self.fail_("g[42] didn't raise KeyError")
+
+    def test_tuple_keyerror(self):
+        # SF #1576657
+        d = {}
+        try:
+            d[(1,)]
+        except KeyError, e:
+            self.assertEqual(e.args, ((1,),))
+        else:
+            self.fail("missing KeyError")
 
 
 from test import mapping_tests

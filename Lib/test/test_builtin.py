@@ -94,7 +94,7 @@ if have_unicode:
 ]
 
 class TestFailingBool:
-    def __nonzero__(self):
+    def __bool__(self):
         raise RuntimeError
 
 class TestFailingIter:
@@ -116,6 +116,7 @@ class BuiltinTest(unittest.TestCase):
         self.assertEqual(abs(0), 0)
         self.assertEqual(abs(1234), 1234)
         self.assertEqual(abs(-1234), 1234)
+        self.assertTrue(abs(-sys.maxint-1) > 0)
         # float
         self.assertEqual(abs(0.0), 0.0)
         self.assertEqual(abs(3.14), 3.14)
@@ -155,6 +156,11 @@ class BuiltinTest(unittest.TestCase):
         S = [10, 20, 30]
         self.assertEqual(any(x > 42 for x in S), False)
 
+    def test_neg(self):
+        x = -sys.maxint-1
+        self.assert_(isinstance(x, int))
+        self.assertEqual(-x, sys.maxint+1)
+
     def test_callable(self):
         self.assert_(callable(len))
         def f(): pass
@@ -179,7 +185,8 @@ class BuiltinTest(unittest.TestCase):
         self.assertRaises(ValueError, chr, 256)
         self.assertRaises(TypeError, chr)
 
-    def test_cmp(self):
+    def XXX_test_cmp(self):
+        # cmp() is no longer supported
         self.assertEqual(cmp(-1, 1), -1)
         self.assertEqual(cmp(1, -1), 1)
         self.assertEqual(cmp(1, 1), 0)
@@ -396,6 +403,29 @@ class BuiltinTest(unittest.TestCase):
         import os
         self.assertRaises(IOError, execfile, os.curdir)
         self.assertRaises(IOError, execfile, "I_dont_exist")
+
+    def test_exec(self):
+        g = {}
+        exec('z = 1', g)
+        if '__builtins__' in g:
+            del g['__builtins__']
+        self.assertEqual(g, {'z': 1})
+
+        exec(u'z = 1+1', g)
+        if '__builtins__' in g:
+            del g['__builtins__']
+        self.assertEqual(g, {'z': 2})
+        g = {}
+        l = {}
+
+        import warnings
+        warnings.filterwarnings("ignore", "global statement", module="<string>")
+        exec('global a; a = 1; b = 2', g, l)
+        if '__builtins__' in g:
+            del g['__builtins__']
+        if '__builtins__' in l:
+            del l['__builtins__']
+        self.assertEqual((g, l), ({'a': 1}, {'b': 2}))
 
     def test_filter(self):
         self.assertEqual(filter(lambda c: 'a' <= c <= 'z', 'Hello World'), 'elloorld')
@@ -665,9 +695,11 @@ class BuiltinTest(unittest.TestCase):
                         pass
 
         s = repr(-1-sys.maxint)
-        self.assertEqual(int(s)+1, -sys.maxint)
+        x = int(s)
+        self.assertEqual(x+1, -sys.maxint)
+        self.assert_(isinstance(x, int))
         # should return long
-        int(s[1:])
+        self.assertEqual(int(s[1:]), sys.maxint+1)
 
         # should return long
         x = int(1e100)
@@ -684,6 +716,11 @@ class BuiltinTest(unittest.TestCase):
 
         self.assertRaises(ValueError, int, '123\0')
         self.assertRaises(ValueError, int, '53', 40)
+
+        # SF bug 1545497: embedded NULs were not detected with
+        # explicit base
+        self.assertRaises(ValueError, int, '123\0', 10)
+        self.assertRaises(ValueError, int, '123\x00 245', 20)
 
         x = int('1' * 600)
         self.assert_(isinstance(x, long))
@@ -1135,8 +1172,14 @@ class BuiltinTest(unittest.TestCase):
             map(None, Squares(3), Squares(2)),
             [(0,0), (1,1), (4,None)]
         )
+        def Max(a, b):
+            if a is None:
+                return b
+            if b is None:
+                return a
+            return max(a, b)
         self.assertEqual(
-            map(max, Squares(3), Squares(2)),
+            map(Max, Squares(3), Squares(2)),
             [0, 1, 4]
         )
         self.assertRaises(TypeError, map)
@@ -1168,7 +1211,7 @@ class BuiltinTest(unittest.TestCase):
             "max(1, 2, key=1)",             # keyfunc is not callable
             ):
             try:
-                exec(stmt) in globals()
+                exec(stmt, globals())
             except TypeError:
                 pass
             else:
@@ -1204,7 +1247,7 @@ class BuiltinTest(unittest.TestCase):
         class BadNumber:
             def __cmp__(self, other):
                 raise ValueError
-        self.assertRaises(ValueError, min, (42, BadNumber()))
+        self.assertRaises(TypeError, min, (42, BadNumber()))
 
         for stmt in (
             "min(key=int)",                 # no args
@@ -1214,7 +1257,7 @@ class BuiltinTest(unittest.TestCase):
             "min(1, 2, key=1)",             # keyfunc is not callable
             ):
             try:
-                exec(stmt) in globals()
+                exec(stmt, globals())
             except TypeError:
                 pass
             else:
@@ -1382,8 +1425,11 @@ class BuiltinTest(unittest.TestCase):
         self.assertRaises(ValueError, range, a, a + 1, long(0))
 
         class badzero(int):
-            def __cmp__(self, other):
+            def __eq__(self, other):
                 raise RuntimeError
+            __ne__ = __lt__ = __gt__ = __le__ = __ge__ = __eq__
+
+        # XXX This won't (but should!) raise RuntimeError if a is an int...
         self.assertRaises(RuntimeError, range, a, a + 1, badzero(1))
 
         # Reject floats when it would require PyLongs to represent.
@@ -1547,18 +1593,18 @@ class BuiltinTest(unittest.TestCase):
         a = (1, 2, 3)
         b = (4, 5, 6)
         t = [(1, 4), (2, 5), (3, 6)]
-        self.assertEqual(zip(a, b), t)
+        self.assertEqual(list(zip(a, b)), t)
         b = [4, 5, 6]
-        self.assertEqual(zip(a, b), t)
+        self.assertEqual(list(zip(a, b)), t)
         b = (4, 5, 6, 7)
-        self.assertEqual(zip(a, b), t)
+        self.assertEqual(list(zip(a, b)), t)
         class I:
             def __getitem__(self, i):
                 if i < 0 or i > 2: raise IndexError
                 return i + 4
-        self.assertEqual(zip(a, I()), t)
-        self.assertEqual(zip(), [])
-        self.assertEqual(zip(*[]), [])
+        self.assertEqual(list(zip(a, I())), t)
+        self.assertEqual(list(zip()), [])
+        self.assertEqual(list(zip(*[])), [])
         self.assertRaises(TypeError, zip, None)
         class G:
             pass
@@ -1574,7 +1620,7 @@ class BuiltinTest(unittest.TestCase):
                 else:
                     return i
         self.assertEqual(
-            zip(SequenceWithoutALength(), xrange(2**30)),
+            list(zip(SequenceWithoutALength(), xrange(2**30))),
             list(enumerate(range(5)))
         )
 
@@ -1584,7 +1630,7 @@ class BuiltinTest(unittest.TestCase):
                     raise ValueError
                 else:
                     return i
-        self.assertRaises(ValueError, zip, BadSeq(), BadSeq())
+        self.assertRaises(ValueError, list, zip(BadSeq(), BadSeq()))
 
 class TestSorted(unittest.TestCase):
 
@@ -1597,7 +1643,7 @@ class TestSorted(unittest.TestCase):
 
         data.reverse()
         random.shuffle(copy)
-        self.assertEqual(data, sorted(copy, cmp=lambda x, y: cmp(y,x)))
+        self.assertEqual(data, sorted(copy, cmp=lambda x, y: (x < y) - (x > y)))
         self.assertNotEqual(data, copy)
         random.shuffle(copy)
         self.assertEqual(data, sorted(copy, key=lambda x: -x))

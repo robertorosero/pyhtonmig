@@ -160,7 +160,7 @@ typedef struct {
 	unaryfunc nb_negative;
 	unaryfunc nb_positive;
 	unaryfunc nb_absolute;
-	inquiry nb_nonzero;
+	inquiry nb_bool;
 	unaryfunc nb_invert;
 	binaryfunc nb_lshift;
 	binaryfunc nb_rshift;
@@ -379,6 +379,7 @@ PyAPI_FUNC(PyObject *) PyObject_Unicode(PyObject *);
 PyAPI_FUNC(int) PyObject_Compare(PyObject *, PyObject *);
 PyAPI_FUNC(PyObject *) PyObject_RichCompare(PyObject *, PyObject *, int);
 PyAPI_FUNC(int) PyObject_RichCompareBool(PyObject *, PyObject *, int);
+PyAPI_FUNC(PyObject *) Py_CmpToRich(int op, int cmp);
 PyAPI_FUNC(PyObject *) PyObject_GetAttrString(PyObject *, const char *);
 PyAPI_FUNC(int) PyObject_SetAttrString(PyObject *, const char *, PyObject *);
 PyAPI_FUNC(int) PyObject_HasAttrString(PyObject *, const char *);
@@ -394,7 +395,6 @@ PyAPI_FUNC(long) PyObject_Hash(PyObject *);
 PyAPI_FUNC(int) PyObject_IsTrue(PyObject *);
 PyAPI_FUNC(int) PyObject_Not(PyObject *);
 PyAPI_FUNC(int) PyCallable_Check(PyObject *);
-PyAPI_FUNC(int) PyNumber_CoerceEx(PyObject **, PyObject **);
 
 PyAPI_FUNC(void) PyObject_ClearWeakRefs(PyObject *);
 

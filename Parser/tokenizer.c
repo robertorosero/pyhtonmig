@@ -67,7 +67,6 @@ char *_PyParser_TokenNames[] = {
 	"EQUAL",
 	"DOT",
 	"PERCENT",
-	"BACKQUOTE",
 	"LBRACE",
 	"RBRACE",
 	"EQEQUAL",
@@ -897,7 +896,7 @@ tok_nextc(register struct tok_state *tok)
 				tok->cur = tok->buf + cur;
 				tok->line_start = tok->cur;
 				/* replace "\r\n" with "\n" */
-				/* For Mac leave the \r, giving syntax error */
+				/* For Mac leave the \r, giving a syntax error */
 				pt = tok->inp - 2;
 				if (pt >= tok->buf && *pt == '\r') {
 					*pt++ = '\n';
@@ -955,7 +954,6 @@ PyToken_OneChar(int c)
 	case '=':	return EQUAL;
 	case '.':	return DOT;
 	case '%':	return PERCENT;
-	case '`':	return BACKQUOTE;
 	case '{':	return LBRACE;
 	case '}':	return RBRACE;
 	case '^':	return CIRCUMFLEX;
@@ -982,7 +980,6 @@ PyToken_TwoChars(int c1, int c2)
 		break;
 	case '<':
 		switch (c2) {
-		case '>':	return NOTEQUAL;
 		case '=':	return LESSEQUAL;
 		case '<':	return LEFTSHIFT;
 		}

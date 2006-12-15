@@ -88,14 +88,21 @@ class Horrid:
         # have any systematic relationship between comparison outcomes
         # (based on self.i and other.i) and relative position within the
         # hash vector (based on hashcode).
-        self.hashcode = random.randrange(1000000000)
+        # XXX This is no longer effective.
+        ##self.hashcode = random.randrange(1000000000)
 
     def __hash__(self):
+        return 42
         return self.hashcode
 
-    def __cmp__(self, other):
+    def __eq__(self, other):
         maybe_mutate()   # The point of the test.
-        return cmp(self.i, other.i)
+        return self.i == other.i
+
+    def __ne__(self, other):
+        raise RuntimeError("I didn't expect some kind of Spanish inquisition!")
+
+    __lt__ = __le__ = __gt__ = __ge__ = __ne__
 
     def __repr__(self):
         return "Horrid(%d)" % self.i
@@ -132,7 +139,7 @@ def test_one(n):
     while dict1 and len(dict1) == len(dict2):
         if verbose:
             print ".",
-        c = cmp(dict1, dict2)
+        c = dict1 == dict2
     if verbose:
         print
 
@@ -202,7 +209,7 @@ class Machiavelli:
         # Tim sez:  "luck of the draw; crashes with or without for me."
         print >> f
 
-        return `"machiavelli"`
+        return repr("machiavelli")
 
     def __hash__(self):
         return 0

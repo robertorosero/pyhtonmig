@@ -98,7 +98,7 @@ type_module(PyTypeObject *type, void *context)
 		s = strrchr(type->tp_name, '.');
 		if (s != NULL)
 			return PyString_FromStringAndSize(
-				type->tp_name, (int)(s - type->tp_name));
+			    type->tp_name, (Py_ssize_t)(s - type->tp_name));
 		return PyString_FromString("__builtin__");
 	}
 }
@@ -360,16 +360,6 @@ static PyGetSetDef type_getsets[] = {
 	{"__doc__", (getter)type_get_doc, NULL, NULL},
 	{0}
 };
-
-static int
-type_compare(PyObject *v, PyObject *w)
-{
-	/* This is called with type objects only. So we
-	   can just compare the addresses. */
-	Py_uintptr_t vv = (Py_uintptr_t)v;
-	Py_uintptr_t ww = (Py_uintptr_t)w;
-	return (vv < ww) ? -1 : (vv > ww) ? 1 : 0;
-}
 
 static PyObject *
 type_repr(PyTypeObject *type)
@@ -2191,12 +2181,12 @@ PyTypeObject PyType_Type = {
 	0,					/* tp_print */
 	0,			 		/* tp_getattr */
 	0,					/* tp_setattr */
-	type_compare,				/* tp_compare */
+	0,					/* tp_compare */
 	(reprfunc)type_repr,			/* tp_repr */
 	0,					/* tp_as_number */
 	0,					/* tp_as_sequence */
 	0,					/* tp_as_mapping */
-	(hashfunc)_Py_HashPointer,		/* tp_hash */
+	0,					/* tp_hash */
 	(ternaryfunc)type_call,			/* tp_call */
 	0,					/* tp_str */
 	(getattrofunc)type_getattro,		/* tp_getattro */
@@ -2298,6 +2288,30 @@ object_str(PyObject *self)
 	if (f == NULL)
 		f = object_repr;
 	return f(self);
+}
+
+static PyObject *
+object_richcompare(PyObject *self, PyObject *other, int op)
+{
+	PyObject *res;
+
+	switch (op) {
+
+	case Py_EQ:
+		res = (self == other) ? Py_True : Py_False;
+		break;
+
+	case Py_NE:
+		res = (self != other) ? Py_True : Py_False;
+		break;
+
+	default:
+		res = Py_NotImplemented;
+		break;
+	}
+
+	Py_INCREF(res);
+	return res;
 }
 
 static PyObject *
@@ -2702,7 +2716,7 @@ PyTypeObject PyBaseObject_Type = {
 	PyDoc_STR("The most base type"),	/* tp_doc */
 	0,					/* tp_traverse */
 	0,					/* tp_clear */
-	0,					/* tp_richcompare */
+	object_richcompare,			/* tp_richcompare */
 	0,					/* tp_weaklistoffset */
 	0,					/* tp_iter */
 	0,					/* tp_iternext */
@@ -2913,14 +2927,13 @@ inherit_slots(PyTypeObject *type, PyTypeObject *base)
 		COPYNUM(nb_negative);
 		COPYNUM(nb_positive);
 		COPYNUM(nb_absolute);
-		COPYNUM(nb_nonzero);
+		COPYNUM(nb_bool);
 		COPYNUM(nb_invert);
 		COPYNUM(nb_lshift);
 		COPYNUM(nb_rshift);
 		COPYNUM(nb_and);
 		COPYNUM(nb_xor);
 		COPYNUM(nb_or);
-		COPYNUM(nb_coerce);
 		COPYNUM(nb_int);
 		COPYNUM(nb_long);
 		COPYNUM(nb_float);
@@ -3612,7 +3625,7 @@ hackcheck(PyObject *self, setattrofunc func, char *what)
 	while (type && type->tp_flags & Py_TPFLAGS_HEAPTYPE)
 		type = type->tp_base;
         /* If type is NULL now, this is a really weird type.
-           In the same of backwards compatibility (?), just shut up. */
+           In the spirit of backwards compatibility (?), just shut up. */
 	if (type && type->tp_setattro != func) {
 		PyErr_Format(PyExc_TypeError,
 			     "can't apply this %s to %s object",
@@ -3829,7 +3842,7 @@ tp_new_wrapper(PyObject *self, PyObject *args, PyObject *kwds)
 	while (staticbase && (staticbase->tp_flags & Py_TPFLAGS_HEAPTYPE))
 		staticbase = staticbase->tp_base;
         /* If staticbase is NULL now, it is a really weird type.
-           In the same of backwards compatibility (?), just shut up. */
+           In the spirit of backwards compatibility (?), just shut up. */
 	if (staticbase && staticbase->tp_new != type->tp_new) {
 		PyErr_Format(PyExc_TypeError,
 			     "%s.__new__(%s) is not safe, use %s.__new__()",
@@ -3985,19 +3998,10 @@ slot_sq_length(PyObject *self)
 		return -1;
 	len = PyInt_AsSsize_t(res);
 	Py_DECREF(res);
-	if (len == -1 && PyErr_Occurred())
-		return -1;
-#if SIZEOF_SIZE_T < SIZEOF_INT
-	/* Overflow check -- range of PyInt is more than C ssize_t */
-	if (len != (int)len) {
-		PyErr_SetString(PyExc_OverflowError,
-			"__len__() should return 0 <= outcome < 2**31");
-		return -1;
-	}
-#endif
 	if (len < 0) {
-		PyErr_SetString(PyExc_ValueError,
-				"__len__() should return >= 0");
+		if (!PyErr_Occurred())
+			PyErr_SetString(PyExc_ValueError,
+					"__len__() should return >= 0");
 		return -1;
 	}
 	return len;
@@ -4154,32 +4158,39 @@ SLOT0(slot_nb_positive, "__pos__")
 SLOT0(slot_nb_absolute, "__abs__")
 
 static int
-slot_nb_nonzero(PyObject *self)
+slot_nb_bool(PyObject *self)
 {
 	PyObject *func, *args;
-	static PyObject *nonzero_str, *len_str;
+	static PyObject *bool_str, *len_str;
 	int result = -1;
+	int from_len = 0;
 
-	func = lookup_maybe(self, "__nonzero__", &nonzero_str);
+	func = lookup_maybe(self, "__bool__", &bool_str);
 	if (func == NULL) {
 		if (PyErr_Occurred())
 			return -1;
 		func = lookup_maybe(self, "__len__", &len_str);
 		if (func == NULL)
 			return PyErr_Occurred() ? -1 : 1;
+		from_len = 1;
  	}
 	args = PyTuple_New(0);
 	if (args != NULL) {
 		PyObject *temp = PyObject_Call(func, args, NULL);
 		Py_DECREF(args);
 		if (temp != NULL) {
-			if (PyInt_CheckExact(temp) || PyBool_Check(temp))
+			if (from_len) {
+				/* enforced by slot_nb_len */
 				result = PyObject_IsTrue(temp);
+			}
+			else if (PyBool_Check(temp)) {
+				result = PyObject_IsTrue(temp);
+			}
 			else {
 				PyErr_Format(PyExc_TypeError,
-					     "__nonzero__ should return "
-					     "bool or int, returned %s",
-					     temp->ob_type->tp_name);
+					 "__bool__ should return "
+					 "bool, returned %s",
+					 temp->ob_type->tp_name);
 				result = -1;
 			}
 			Py_DECREF(temp);
@@ -4822,7 +4833,7 @@ static slotdef slotdefs[] = {
 	UNSLOT("__pos__", nb_positive, slot_nb_positive, wrap_unaryfunc, "+x"),
 	UNSLOT("__abs__", nb_absolute, slot_nb_absolute, wrap_unaryfunc,
 	       "abs(x)"),
-	UNSLOT("__nonzero__", nb_nonzero, slot_nb_nonzero, wrap_inquirypred,
+	UNSLOT("__bool__", nb_bool, slot_nb_bool, wrap_inquirypred,
 	       "x != 0"),
 	UNSLOT("__invert__", nb_invert, slot_nb_invert, wrap_unaryfunc, "~x"),
 	BINSLOT("__lshift__", nb_lshift, slot_nb_lshift, "<<"),
@@ -5511,6 +5522,8 @@ super_init(PyObject *self, PyObject *args, PyObject *kwds)
 	PyObject *obj = NULL;
 	PyTypeObject *obj_type = NULL;
 
+	if (!_PyArg_NoKeywords("super", kwds))
+		return -1;
 	if (!PyArg_ParseTuple(args, "O!|O:super", &PyType_Type, &type, &obj))
 		return -1;
 	if (obj == Py_None)

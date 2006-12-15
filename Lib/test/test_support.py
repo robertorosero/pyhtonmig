@@ -122,8 +122,8 @@ def fcmp(x, y): # fuzzy comparison function
             outcome = fcmp(x[i], y[i])
             if outcome != 0:
                 return outcome
-        return cmp(len(x), len(y))
-    return cmp(x, y)
+        return (len(x) > len(y)) - (len(x) < len(y))
+    return (x > y) - (x < y)
 
 try:
     unicode
@@ -244,13 +244,13 @@ def sortdict(dict):
     withcommas = ", ".join(reprpairs)
     return "{%s}" % withcommas
 
-def check_syntax(statement):
+def check_syntax_error(testcase, statement):
     try:
-        compile(statement, '<string>', 'exec')
+        compile(statement, '<test string>', 'exec')
     except SyntaxError:
         pass
     else:
-        print 'Missing SyntaxError: "%s"' % statement
+        testcase.fail('Missing SyntaxError: "%s"' % statement)
 
 def open_urlresource(url):
     import urllib, urlparse

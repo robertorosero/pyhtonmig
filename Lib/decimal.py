@@ -85,7 +85,7 @@ Traceback (most recent call last):
   ...
   ...
   ...
-DivisionByZero: x / 0
+decimal.DivisionByZero: x / 0
 >>> c = Context()
 >>> c.traps[InvalidOperation] = 0
 >>> print c.flags[InvalidOperation]
@@ -103,7 +103,7 @@ Traceback (most recent call last):
   ...
   ...
   ...
-InvalidOperation: 0 / 0
+decimal.InvalidOperation: 0 / 0
 >>> print c.flags[InvalidOperation]
 1
 >>> c.flags[InvalidOperation] = 0
@@ -131,7 +131,7 @@ __all__ = [
     'ROUND_FLOOR', 'ROUND_UP', 'ROUND_HALF_DOWN',
 
     # Functions for manipulating contexts
-    'setcontext', 'getcontext'
+    'setcontext', 'getcontext', 'localcontext'
 ]
 
 import copy as _copy
@@ -458,6 +458,49 @@ else:
 
     del threading, local        # Don't contaminate the namespace
 
+def localcontext(ctx=None):
+    """Return a context manager for a copy of the supplied context
+
+    Uses a copy of the current context if no context is specified
+    The returned context manager creates a local decimal context
+    in a with statement:
+        def sin(x):
+             with localcontext() as ctx:
+                 ctx.prec += 2
+                 # Rest of sin calculation algorithm
+                 # uses a precision 2 greater than normal
+             return +s # Convert result to normal precision
+
+         def sin(x):
+             with localcontext(ExtendedContext):
+                 # Rest of sin calculation algorithm
+                 # uses the Extended Context from the
+                 # General Decimal Arithmetic Specification
+             return +s # Convert result to normal context
+
+    """
+    # The string below can't be included in the docstring until Python 2.6
+    # as the doctest module doesn't understand __future__ statements
+    """
+    >>> from __future__ import with_statement
+    >>> print getcontext().prec
+    28
+    >>> with localcontext():
+    ...     ctx = getcontext()
+    ...     ctx.prec() += 2
+    ...     print ctx.prec
+    ...
+    30
+    >>> with localcontext(ExtendedContext):
+    ...     print getcontext().prec
+    ...
+    9
+    >>> print getcontext().prec
+    28
+    """
+    if ctx is None: ctx = getcontext()
+    return _ContextManager(ctx)
+
 
 ##### Decimal class ###########################################
 
@@ -633,14 +676,14 @@ class Decimal(object):
             return other
         return 0
 
-    def __nonzero__(self):
-        """Is the number non-zero?
+    def __bool__(self):
+        """return True if the number is non-zero.
 
-        0 if self == 0
-        1 if self != 0
+        False if self == 0
+        True if self != 0
         """
         if self._is_special:
-            return 1
+            return True
         return sum(self._int) != 0
 
     def __cmp__(self, other, context=None):
@@ -706,6 +749,26 @@ class Decimal(object):
             return NotImplemented
         return self.__cmp__(other) != 0
 
+    def __lt__(self, other):
+        if not isinstance(other, (Decimal, int, long)):
+            return NotImplemented
+        return self.__cmp__(other) < 0
+
+    def __le__(self, other):
+        if not isinstance(other, (Decimal, int, long)):
+            return NotImplemented
+        return self.__cmp__(other) <= 0
+
+    def __gt__(self, other):
+        if not isinstance(other, (Decimal, int, long)):
+            return NotImplemented
+        return self.__cmp__(other) > 0
+
+    def __ge__(self, other):
+        if not isinstance(other, (Decimal, int, long)):
+            return NotImplemented
+        return self.__cmp__(other) >= 0
+
     def compare(self, other, context=None):
         """Compares one to another.
 
@@ -739,7 +802,7 @@ class Decimal(object):
         i = int(self)
         if self == Decimal(i):
             return hash(i)
-        assert self.__nonzero__()   # '-0' handled by integer case
+        assert self.__bool__()   # '-0' handled by integer case
         return hash(str(self.normalize()))
 
     def as_tuple(self):
@@ -1894,6 +1957,7 @@ class Decimal(object):
             ans = self._check_nans(context=context)
             if ans:
                 return ans
+            return self
         if self._exp >= 0:
             return self
         if context is None:
@@ -2171,23 +2235,14 @@ for name in rounding_functions:
 
 del name, val, globalname, rounding_functions
 
-class ContextManager(object):
-    """Helper class to simplify Context management.
+class _ContextManager(object):
+    """Context manager class to support localcontext().
 
-    Sample usage:
-
-    with decimal.ExtendedContext:
-        s = ...
-    return +s # Convert result to normal precision
-
-    with decimal.getcontext() as ctx:
-        ctx.prec += 2
-        s = ...
-    return +s
-
+      Sets a copy of the supplied context in __enter__() and restores
+      the previous decimal context in __exit__()
     """
     def __init__(self, new_context):
-        self.new_context = new_context
+        self.new_context = new_context.copy()
     def __enter__(self):
         self.saved_context = getcontext()
         setcontext(self.new_context)
@@ -2245,9 +2300,6 @@ class Context(object):
         s.append('flags=[' + ', '.join([f.__name__ for f, v in self.flags.items() if v]) + ']')
         s.append('traps=[' + ', '.join([t.__name__ for t, v in self.traps.items() if v]) + ']')
         return ', '.join(s) + ')'
-
-    def get_manager(self):
-        return ContextManager(self.copy())
 
     def clear_flags(self):
         """Reset all flags to zero"""

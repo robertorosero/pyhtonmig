@@ -280,6 +280,32 @@ class WriteTest(BaseTest):
             else:
                 self.dst.addfile(tarinfo, f)
 
+
+class Write100Test(BaseTest):
+    # The name field in a tar header stores strings of at most 100 chars.
+    # If a string is shorter than 100 chars it has to be padded with '\0',
+    # which implies that a string of exactly 100 chars is stored without
+    # a trailing '\0'.
+
+    def setUp(self):
+        self.name = "01234567890123456789012345678901234567890123456789"
+        self.name += "01234567890123456789012345678901234567890123456789"
+
+        self.tar = tarfile.open(tmpname(), "w")
+        t = tarfile.TarInfo(self.name)
+        self.tar.addfile(t)
+        self.tar.close()
+
+        self.tar = tarfile.open(tmpname())
+
+    def tearDown(self):
+        self.tar.close()
+
+    def test(self):
+        self.assertEqual(self.tar.getnames()[0], self.name,
+                "failed to store 100 char filename")
+
+
 class WriteSize0Test(BaseTest):
     mode = 'w'
 
@@ -333,11 +359,11 @@ class WriteStreamTest(WriteTest):
             f.close()
         elif self.comp == "bz2":
             f = bz2.BZ2Decompressor()
-            s = file(self.dstname).read()
+            s = open(self.dstname).read()
             s = f.decompress(s)
             self.assertEqual(len(f.unused_data), 0, "trailing data")
         else:
-            f = file(self.dstname)
+            f = open(self.dstname)
             s = f.read()
             f.close()
 
@@ -361,13 +387,6 @@ class WriteGNULongTest(unittest.TestCase):
        bad tarfiles when their length was a multiple of 512. This
        is tested as well.
     """
-
-    def setUp(self):
-        self.tar = tarfile.open(tmpname(), "w")
-        self.tar.posix = False
-
-    def tearDown(self):
-        self.tar.close()
 
     def _length(self, s):
         blocks, remainder = divmod(len(s) + 1, 512)
@@ -397,11 +416,22 @@ class WriteGNULongTest(unittest.TestCase):
             tarinfo.linkname = link
             tarinfo.type = tarfile.LNKTYPE
 
-        self.tar.addfile(tarinfo)
+        tar = tarfile.open(tmpname(), "w")
+        tar.posix = False
+        tar.addfile(tarinfo)
 
         v1 = self._calc_size(name, link)
-        v2 = self.tar.offset
+        v2 = tar.offset
         self.assertEqual(v1, v2, "GNU longname/longlink creation failed")
+
+        tar.close()
+
+        tar = tarfile.open(tmpname())
+        member = tar.next()
+        self.failIf(member is None, "unable to read longname member")
+        self.assert_(tarinfo.name == member.name and \
+                     tarinfo.linkname == member.linkname, \
+                     "unable to read longname member")
 
     def test_longname_1023(self):
         self._test(("longnam/" * 127) + "longnam")
@@ -623,6 +653,7 @@ def test_main():
         ReadAsteriskTest,
         ReadStreamAsteriskTest,
         WriteTest,
+        Write100Test,
         WriteSize0Test,
         WriteStreamTest,
         WriteGNULongTest,

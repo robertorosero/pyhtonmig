@@ -18,7 +18,6 @@ extern "C" {
 #define UNARY_POSITIVE	10
 #define UNARY_NEGATIVE	11
 #define UNARY_NOT	12
-#define UNARY_CONVERT	13
 
 #define UNARY_INVERT	15
 
@@ -67,7 +66,7 @@ extern "C" {
 #define LOAD_LOCALS	82
 #define RETURN_VALUE	83
 #define IMPORT_STAR	84
-#define EXEC_STMT	85
+
 #define YIELD_VALUE	86
 #define POP_BLOCK	87
 #define END_FINALLY	88
@@ -89,11 +88,12 @@ extern "C" {
 #define LOAD_NAME	101	/* Index in name list */
 #define BUILD_TUPLE	102	/* Number of tuple items */
 #define BUILD_LIST	103	/* Number of list items */
-#define BUILD_MAP	104	/* Always zero for now */
-#define LOAD_ATTR	105	/* Index in name list */
-#define COMPARE_OP	106	/* Comparison operator */
-#define IMPORT_NAME	107	/* Index in name list */
-#define IMPORT_FROM	108	/* Index in name list */
+#define BUILD_SET	104     /* Number of set items */
+#define BUILD_MAP	105	/* Always zero for now */
+#define LOAD_ATTR	106	/* Index in name list */
+#define COMPARE_OP	107	/* Comparison operator */
+#define IMPORT_NAME	108	/* Index in name list */
+#define IMPORT_FROM	109	/* Index in name list */
 
 #define JUMP_FORWARD	110	/* Number of bytes to skip */
 #define JUMP_IF_FALSE	111	/* "" */

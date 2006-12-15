@@ -1699,7 +1699,7 @@ class Tk(Misc, Wm):
         base_tcl = os.path.join(home, '.%s.tcl' % baseName)
         base_py = os.path.join(home, '.%s.py' % baseName)
         dir = {'self': self}
-        exec 'from Tkinter import *' in dir
+        exec('from Tkinter import *', dir)
         if os.path.isfile(class_tcl):
             self.tk.call('source', class_tcl)
         if os.path.isfile(class_py):
@@ -3017,7 +3017,7 @@ class Text(Widget):
         self.tk.call(self._w, 'scan', 'dragto', x, y)
     def search(self, pattern, index, stopindex=None,
            forwards=None, backwards=None, exact=None,
-           regexp=None, nocase=None, count=None):
+           regexp=None, nocase=None, count=None, elide=None):
         """Search PATTERN beginning from INDEX until STOPINDEX.
         Return the index of the first character of a match or an empty string."""
         args = [self._w, 'search']
@@ -3026,6 +3026,7 @@ class Text(Widget):
         if exact: args.append('-exact')
         if regexp: args.append('-regexp')
         if nocase: args.append('-nocase')
+        if elide: args.append('-elide')
         if count: args.append('-count'); args.append(count)
         if pattern[0] == '-': args.append('--')
         args.append(pattern)

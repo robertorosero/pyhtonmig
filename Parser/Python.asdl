@@ -36,11 +36,6 @@ module Python version "$Revision$"
 	      | Import(alias* names)
 	      | ImportFrom(identifier module, alias* names, int? level)
 
-	      -- Doesn't capture requirement that locals must be
-	      -- defined if globals is
-	      -- still supports use as a function!
-	      | Exec(expr body, expr? globals, expr? locals)
-
 	      | Global(identifier* names)
 	      | Expr(expr value)
 	      | Pass | Break | Continue
@@ -56,6 +51,7 @@ module Python version "$Revision$"
 	     | Lambda(arguments args, expr body)
 	     | IfExp(expr test, expr body, expr orelse)
 	     | Dict(expr* keys, expr* values)
+	     | Set(expr* elts)
 	     | ListComp(expr elt, comprehension* generators)
 	     | GeneratorExp(expr elt, comprehension* generators)
 	     -- the grammar constrains where yield expressions can occur
@@ -65,9 +61,9 @@ module Python version "$Revision$"
 	     | Compare(expr left, cmpop* ops, expr* comparators)
 	     | Call(expr func, expr* args, keyword* keywords,
 			 expr? starargs, expr? kwargs)
-	     | Repr(expr value)
 	     | Num(object n) -- a number as a PyObject.
 	     | Str(string s) -- need to specify raw, unicode, etc?
+	     | Ellipsis
 	     -- other literals? bools?
 
 	     -- the following expression can appear in assignment context
@@ -82,7 +78,7 @@ module Python version "$Revision$"
 
 	expr_context = Load | Store | Del | AugLoad | AugStore | Param
 
-	slice = Ellipsis | Slice(expr? lower, expr? upper, expr? step) 
+	slice = Slice(expr? lower, expr? upper, expr? step) 
 	      | ExtSlice(slice* dims) 
 	      | Index(expr value) 
 
@@ -104,8 +100,8 @@ module Python version "$Revision$"
 	excepthandler = (expr? type, expr? name, stmt* body, int lineno,
 	                 int col_offset)
 
-	arguments = (expr* args, identifier? vararg, 
-		     identifier? kwarg, expr* defaults)
+	arguments = (expr* args, identifier? vararg, expr* kwonlyargs,
+		         identifier? kwarg, expr* defaults, expr* kw_defaults)
 
         -- keyword arguments supplied to call
         keyword = (identifier arg, expr value)

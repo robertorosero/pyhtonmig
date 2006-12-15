@@ -378,6 +378,12 @@ class CodeGenerator:
         walk(node.code, gen)
         gen.finish()
         self.set_lineno(node)
+        for keyword in node.kwonlyargs:
+            default = keyword.expr
+            if isinstance(default, ast.EmptyNode):
+                continue
+            self.emit('LOAD_CONST', keyword.name)
+            self.visit(default)
         for default in node.defaults:
             self.visit(default)
         self._makeClosure(gen, len(node.defaults))
@@ -571,12 +577,11 @@ class CodeGenerator:
     def visitListComp(self, node):
         self.set_lineno(node)
         # setup list
-        append = "$append%d" % self.__list_count
+        tmpname = "$list%d" % self.__list_count
         self.__list_count = self.__list_count + 1
         self.emit('BUILD_LIST', 0)
         self.emit('DUP_TOP')
-        self.emit('LOAD_ATTR', 'append')
-        self._implicitNameOp('STORE', append)
+        self._implicitNameOp('STORE', tmpname)
 
         stack = []
         for i, for_ in zip(range(len(node.quals)), node.quals):
@@ -588,10 +593,9 @@ class CodeGenerator:
                 self.visit(if_, cont)
             stack.insert(0, (start, cont, anchor))
 
-        self._implicitNameOp('LOAD', append)
+        self._implicitNameOp('LOAD', tmpname)
         self.visit(node.expr)
-        self.emit('CALL_FUNCTION', 1)
-        self.emit('POP_TOP')
+        self.emit('LIST_APPEND')
 
         for start, cont, anchor in stack:
             if cont:
@@ -602,7 +606,7 @@ class CodeGenerator:
                 self.nextBlock(skip_one)
             self.emit('JUMP_ABSOLUTE', start)
             self.startBlock(anchor)
-        self._implicitNameOp('DELETE', append)
+        self._implicitNameOp('DELETE', tmpname)
 
         self.__list_count = self.__list_count - 1
 
@@ -1026,18 +1030,6 @@ class CodeGenerator:
             self.emit('ROT_THREE')
             self.emit('STORE_SUBSCR')
 
-    def visitExec(self, node):
-        self.visit(node.expr)
-        if node.locals is None:
-            self.emit('LOAD_CONST', None)
-        else:
-            self.visit(node.locals)
-        if node.globals is None:
-            self.emit('DUP_TOP')
-        else:
-            self.visit(node.globals)
-        self.emit('EXEC_STMT')
-
     def visitCallFunc(self, node):
         pos = 0
         kw = 0
@@ -1163,9 +1155,6 @@ class CodeGenerator:
     def visitNot(self, node):
         return self.unaryOp(node, 'UNARY_NOT')
 
-    def visitBackquote(self, node):
-        return self.unaryOp(node, 'UNARY_CONVERT')
-
     # bit ops
 
     def bitOp(self, nodes, op):
@@ -1185,9 +1174,6 @@ class CodeGenerator:
 
     # object constructors
 
-    def visitEllipsis(self, node):
-        self.emit('LOAD_CONST', Ellipsis)
-
     def visitTuple(self, node):
         self.set_lineno(node)
         for elt in node.nodes:
@@ -1199,6 +1185,12 @@ class CodeGenerator:
         for elt in node.nodes:
             self.visit(elt)
         self.emit('BUILD_LIST', len(node.nodes))
+
+    def visitSet(self, node):
+        self.set_lineno(node)
+        for elt in node.items:
+            self.visit(elt)
+        self.emit('BUILD_SET', len(node.items))
 
     def visitSliceobj(self, node):
         for child in node.nodes:
@@ -1288,7 +1280,9 @@ class AbstractFunctionCode:
             name = func.name
 
         args, hasTupleArg = generateArgList(func.argnames)
+        kwonlyargs = generateKwonlyArgList(func.kwonlyargs)
         self.graph = pyassem.PyFlowGraph(name, func.filename, args,
+                                         kwonlyargs=kwonlyargs,
                                          optimized=1)
         self.isLambda = isLambda
         self.super_init()
@@ -1424,6 +1418,13 @@ def generateArgList(arglist):
             raise ValueError, "unexpect argument type:", elt
     return args + extra, count
 
+def generateKwonlyArgList(keywordOnlyArgs):
+    kwonlyargs = {}
+    for elt in keywordOnlyArgs:
+        assert isinstance(elt, ast.Keyword)
+        kwonlyargs[elt.name] = elt.expr
+    return kwonlyargs
+    
 def findOp(node):
     """Find the op (DELETE, LOAD, STORE) in an AssTuple tree"""
     v = OpFinder()
