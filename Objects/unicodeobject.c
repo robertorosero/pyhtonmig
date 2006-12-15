@@ -6574,28 +6574,6 @@ unicode_rjust(PyUnicodeObject *self, PyObject *args)
     return (PyObject*) pad(self, width - self->length, 0, fillchar);
 }
 
-static PyObject*
-unicode_slice(PyUnicodeObject *self, Py_ssize_t start, Py_ssize_t end)
-{
-    /* standard clamping */
-    if (start < 0)
-        start = 0;
-    if (end < 0)
-        end = 0;
-    if (end > self->length)
-        end = self->length;
-    if (start == 0 && end == self->length && PyUnicode_CheckExact(self)) {
-        /* full slice, return original string */
-        Py_INCREF(self);
-        return (PyObject*) self;
-    }
-    if (start > end)
-        start = end;
-    /* copy slice */
-    return (PyObject*) PyUnicode_FromUnicode(self->str + start,
-					     end - start);
-}
-
 PyObject *PyUnicode_Split(PyObject *s,
 			  PyObject *sep,
 			  Py_ssize_t maxsplit)

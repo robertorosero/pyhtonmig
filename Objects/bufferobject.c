@@ -490,25 +490,6 @@ buffer_item(PyBufferObject *self, Py_ssize_t idx)
 }
 
 static PyObject *
-buffer_slice(PyBufferObject *self, Py_ssize_t left, Py_ssize_t right)
-{
-	void *ptr;
-	Py_ssize_t size;
-	if (!get_buf(self, &ptr, &size, ANY_BUFFER))
-		return NULL;
-	if ( left < 0 )
-		left = 0;
-	if ( right < 0 )
-		right = 0;
-	if ( right > size )
-		right = size;
-	if ( right < left )
-		right = left;
-	return PyString_FromStringAndSize((char *)ptr + left,
-					  right - left);
-}
-
-static PyObject *
 buffer_subscript(PyBufferObject *self, PyObject *item)
 {
 	void *p;
@@ -612,64 +593,6 @@ buffer_ass_item(PyBufferObject *self, Py_ssize_t idx, PyObject *other)
 	}
 
 	((char *)ptr1)[idx] = *(char *)ptr2;
-	return 0;
-}
-
-static int
-buffer_ass_slice(PyBufferObject *self, Py_ssize_t left, Py_ssize_t right, PyObject *other)
-{
-	PyBufferProcs *pb;
-	void *ptr1, *ptr2;
-	Py_ssize_t size;
-	Py_ssize_t slice_len;
-	Py_ssize_t count;
-
-	if ( self->b_readonly ) {
-		PyErr_SetString(PyExc_TypeError,
-				"buffer is read-only");
-		return -1;
-	}
-
-	pb = other ? other->ob_type->tp_as_buffer : NULL;
-	if ( pb == NULL ||
-	     pb->bf_getreadbuffer == NULL ||
-	     pb->bf_getsegcount == NULL )
-	{
-		PyErr_BadArgument();
-		return -1;
-	}
-	if ( (*pb->bf_getsegcount)(other, NULL) != 1 )
-	{
-		/* ### use a different exception type/message? */
-		PyErr_SetString(PyExc_TypeError,
-				"single-segment buffer object expected");
-		return -1;
-	}
-	if (!get_buf(self, &ptr1, &size, ANY_BUFFER))
-		return -1;
-	if ( (count = (*pb->bf_getreadbuffer)(other, 0, &ptr2)) < 0 )
-		return -1;
-
-	if ( left < 0 )
-		left = 0;
-	else if ( left > size )
-		left = size;
-	if ( right < left )
-		right = left;
-	else if ( right > size )
-		right = size;
-	slice_len = right - left;
-
-	if ( count != slice_len ) {
-		PyErr_SetString(
-			PyExc_TypeError,
-			"right operand length must match slice length");
-		return -1;
-	}
-
-	if ( slice_len )
-	    memcpy((char *)ptr1 + left, ptr2, slice_len);
-
 	return 0;
 }
 

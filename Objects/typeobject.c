@@ -3471,17 +3471,6 @@ wrap_sq_item(PyObject *self, PyObject *args, void *wrapped)
 }
 
 static PyObject *
-wrap_ssizessizeargfunc(PyObject *self, PyObject *args, void *wrapped)
-{
-	ssizessizeargfunc func = (ssizessizeargfunc)wrapped;
-	Py_ssize_t i, j;
-
-	if (!PyArg_ParseTuple(args, "nn", &i, &j))
-		return NULL;
-	return (*func)(self, i, j);
-}
-
-static PyObject *
 wrap_sq_setitem(PyObject *self, PyObject *args, void *wrapped)
 {
 	ssizeobjargproc func = (ssizeobjargproc)wrapped;
@@ -3516,23 +3505,6 @@ wrap_sq_delitem(PyObject *self, PyObject *args, void *wrapped)
 	if (i == -1 && PyErr_Occurred())
 		return NULL;
 	res = (*func)(self, i, NULL);
-	if (res == -1 && PyErr_Occurred())
-		return NULL;
-	Py_INCREF(Py_None);
-	return Py_None;
-}
-
-static PyObject *
-wrap_ssizessizeobjargproc(PyObject *self, PyObject *args, void *wrapped)
-{
-	ssizessizeobjargproc func = (ssizessizeobjargproc)wrapped;
-	Py_ssize_t i, j;
-	int res;
-	PyObject *value;
-
-	if (!PyArg_ParseTuple(args, "nnO", &i, &j, &value))
-		return NULL;
-	res = (*func)(self, i, j, value);
 	if (res == -1 && PyErr_Occurred())
 		return NULL;
 	Py_INCREF(Py_None);

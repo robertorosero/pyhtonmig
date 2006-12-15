@@ -663,24 +663,6 @@ mmap_item(mmap_object *self, Py_ssize_t i)
 }
 
 static PyObject *
-mmap_slice(mmap_object *self, Py_ssize_t ilow, Py_ssize_t ihigh)
-{
-	CHECK_VALID(NULL);
-	if (ilow < 0)
-		ilow = 0;
-	else if ((size_t)ilow > self->size)
-		ilow = self->size;
-	if (ihigh < 0)
-		ihigh = 0;
-	if (ihigh < ilow)
-		ihigh = ilow;
-	else if ((size_t)ihigh > self->size)
-		ihigh = self->size;
-
-	return PyString_FromStringAndSize(self->data + ilow, ihigh-ilow);
-}
-
-static PyObject *
 mmap_subscript(mmap_object *self, PyObject *item)
 {
 	CHECK_VALID(NULL);
@@ -750,45 +732,6 @@ mmap_repeat(mmap_object *self, Py_ssize_t n)
 	PyErr_SetString(PyExc_SystemError,
 			"mmaps don't support repeat operation");
 	return NULL;
-}
-
-static int
-mmap_ass_slice(mmap_object *self, Py_ssize_t ilow, Py_ssize_t ihigh, PyObject *v)
-{
-	const char *buf;
-
-	CHECK_VALID(-1);
-	if (ilow < 0)
-		ilow = 0;
-	else if ((size_t)ilow > self->size)
-		ilow = self->size;
-	if (ihigh < 0)
-		ihigh = 0;
-	if (ihigh < ilow)
-		ihigh = ilow;
-	else if ((size_t)ihigh > self->size)
-		ihigh = self->size;
-
-	if (v == NULL) {
-		PyErr_SetString(PyExc_TypeError,
-				"mmap object doesn't support slice deletion");
-		return -1;
-	}
-	if (! (PyString_Check(v)) ) {
-		PyErr_SetString(PyExc_IndexError,
-				"mmap slice assignment must be a string");
-		return -1;
-	}
-	if (PyString_Size(v) != (ihigh - ilow)) {
-		PyErr_SetString(PyExc_IndexError,
-				"mmap slice assignment is wrong size");
-		return -1;
-	}
-	if (!is_writeable(self))
-		return -1;
-	buf = PyString_AsString(v);
-	memcpy(self->data + ilow, buf, ihigh-ilow);
-	return 0;
 }
 
 static int

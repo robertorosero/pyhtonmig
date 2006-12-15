@@ -269,18 +269,6 @@ bytes_getitem(PyBytesObject *self, Py_ssize_t i)
 }
 
 static PyObject *
-bytes_getslice(PyBytesObject *self, Py_ssize_t lo, Py_ssize_t hi)
-{
-    if (lo < 0)
-        lo = 0;
-    if (hi > self->ob_size)
-        hi = self->ob_size;
-    if (lo >= hi)
-        lo = hi = 0;
-    return PyBytes_FromStringAndSize(self->ob_bytes + lo, hi - lo);
-}
-
-static PyObject *
 bytes_subscript(PyBytesObject *self, PyObject *item)
 {
     if (PyIndex_Check(item)) {

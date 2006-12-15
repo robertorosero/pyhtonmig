@@ -518,14 +518,6 @@ proxy_dealloc(PyWeakReference *self)
 
 /* sequence slots */
 
-static PyObject *
-proxy_slice(PyWeakReference *proxy, Py_ssize_t i, Py_ssize_t j)
-{
-    if (!proxy_checkref(proxy))
-        return NULL;
-    return PySequence_GetSlice(PyWeakref_GET_OBJECT(proxy), i, j);
-}
-
 static int
 proxy_contains(PyWeakReference *proxy, PyObject *value)
 {
