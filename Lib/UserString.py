@@ -178,8 +178,14 @@ class MutableString(UserString):
             elif not isinstance(sub, basestring):
                sub = str(sub)
             start, stop, step = index.indices(len(self.data))
-            if step != 1:
+            if step == -1:
+                start, stop = stop+1, start+1
+                sub = sub[::-1]
+            elif step != 1:
+                # XXX(twouters): I guess we should be reimplementing
+                # the extended slice assignment/deletion algorithm here...
                 raise TypeError, "invalid step in slicing assignment"
+            start = min(start, stop)
             self.data = self.data[:start] + sub + self.data[stop:]
         else:
             if index < 0:
@@ -189,8 +195,12 @@ class MutableString(UserString):
     def __delitem__(self, index):
         if isinstance(index, slice):
             start, stop, step = index.indices(len(self.data))
-            if step != 1:
-                raise TypeError, "invalid step in slicing assignment"
+            if step == -1:
+                start, stop = stop+1, start+1
+            elif step != 1:
+                # XXX(twouters): see same block in __setitem__
+                raise TypeError, "invalid step in slicing deletion"
+            start = min(start, stop)
             self.data = self.data[:start] + self.data[stop:]
         else:
             if index < 0:

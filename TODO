@@ -2,15 +2,14 @@
 TODO in slice removal:
 
  - Clean up compilerpackage's code now that SLICE opcodes are gone
- - Add tests for the extended slicing abilities of:
-    buffer
-    mmap.mmap
-    structseq
- - Add actual *extended* slicing to ctypes objects
+ - Add non-step-1 slicing to ctypes objects
+ - Add non-step-1 slice assignment to UserString.MutableString
  - Make list's mp_[ass_]subscr not depend on list_[ass]slice
  - Remove slice API (or emulate it ontop of sliceobject API)
  - Further remove slice/ass_slice PySequenceMethod hooks
  - Figure out what to do with PyMapping_Check (it uses the presence of the
    classic slicing hook to tell sequences-with-extended-slicing from
    mappings.)
-
+ - Refactor slice handling logic from all the sequency types into a single
+   location? Might need some funky macros to make work...
+ - Submit type enhancements to trunk, rest to p3yk
