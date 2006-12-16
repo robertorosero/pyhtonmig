@@ -308,7 +308,7 @@ class MmapTests(unittest.TestCase):
 
     def test_extended_getslice(self):
         # Test extended slicing by comparing with list slicing.
-        s = "".join(chr(c) for c in list(range(255, -1, -1)))
+        s = "".join(chr(c) for c in reversed(range(256)))
         m = mmap.mmap(-1, len(s))
         m[:] = s
         self.assertEqual(m[:], s)
@@ -322,7 +322,7 @@ class MmapTests(unittest.TestCase):
 
     def test_extended_set_del_slice(self):
         # Test extended slicing by comparing with list slicing.
-        s = "".join(chr(c) for c in list(range(255, -1, -1)))
+        s = "".join(chr(c) for c in reversed(range(256)))
         m = mmap.mmap(-1, len(s))
         indices = (0, None, 1, 3, 19, 300, -1, -2, -31, -300)
         for start in indices:
