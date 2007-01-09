@@ -1,7 +1,8 @@
-This is Python version 2.5 rc 1
-===============================
+This is Python version 2.6 alpha 0
+==================================
 
-Copyright (c) 2001, 2002, 2003, 2004, 2005, 2006 Python Software Foundation.
+Copyright (c) 2001, 2002, 2003, 2004, 2005, 2006, 2007 
+Python Software Foundation.
 All rights reserved.
 
 Copyright (c) 2000 BeOpen.com.
@@ -222,6 +223,11 @@ From Python 2.0 onward, all Python C code is ANSI C.  Compiling using
 old K&R-C-only compilers is no longer possible.  ANSI C compilers are
 available for all modern systems, either in the form of updated
 compilers from the vendor, or one of the free compilers (gcc).
+
+If "make install" fails mysteriously during the "compiling the library"
+step, make sure that you don't have any of the PYTHONPATH or PYTHONHOME
+environment variables set, as they may interfere with the newly built
+executable which is compiling the library.
 
 Unsupported systems
 -------------------

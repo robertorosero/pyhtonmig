@@ -150,7 +150,7 @@ For the \var{isolation_level} parameter, please see the \member{isolation_level}
 property of \class{Connection} objects in section~\ref{sqlite3-Connection-IsolationLevel}.
 
 SQLite natively supports only the types TEXT, INTEGER, FLOAT, BLOB and NULL. If
-you want to use other types, like you have to add support for them yourself.
+you want to use other types you must add support for them yourself.
 The \var{detect_types} parameter and the using custom \strong{converters} registered with
 the module-level \function{register_converter} function allow you to easily do that.
 
@@ -187,12 +187,12 @@ int, long, float, str (UTF-8 encoded), unicode or buffer.
 \end{funcdesc}
 
 \begin{funcdesc}{complete_statement}{sql}
-Returns \constant{True} if the string \var{sql} one or more complete SQL
-statements terminated by semicolons. It does not verify if the SQL is
-syntactically correct, only if there are no unclosed string literals and if the
+Returns \constant{True} if the string \var{sql} contains one or more complete SQL
+statements terminated by semicolons. It does not verify that the SQL is
+syntactically correct, only that there are no unclosed string literals and the
 statement is terminated by a semicolon.
 
-This can be used to build a shell for SQLite, like in the following example:
+This can be used to build a shell for SQLite, as in the following example:
 
     \verbatiminput{sqlite3/complete_statement.py}
 \end{funcdesc}

@@ -322,6 +322,51 @@ This is essentially a continue in a finally which should not be allowed.
       ...
     SyntaxError: 'continue' not supported inside 'finally' clause (<doctest test.test_syntax[41]>, line 8)
 
+There is one test for a break that is not in a loop.  The compiler
+uses a single data structure to keep track of try-finally and loops,
+so we need to be sure that a break is actually inside a loop.  If it
+isn't, there should be a syntax error.
+
+   >>> try:
+   ...     print 1
+   ...     break
+   ...     print 2
+   ... finally:
+   ...     print 3
+   Traceback (most recent call last):
+     ...
+   SyntaxError: 'break' outside loop (<doctest test.test_syntax[42]>, line 3)
+
+This should probably raise a better error than a SystemError (or none at all).
+In 2.5 there was a missing exception and an assert was triggered in a debug
+build.  The number of blocks must be greater than CO_MAXBLOCKS.  SF #1565514
+
+   >>> while 1:
+   ...  while 2:
+   ...   while 3:
+   ...    while 4:
+   ...     while 5:
+   ...      while 6:
+   ...       while 8:
+   ...        while 9:
+   ...         while 10:
+   ...          while 11:
+   ...           while 12:
+   ...            while 13:
+   ...             while 14:
+   ...              while 15:
+   ...               while 16:
+   ...                while 17:
+   ...                 while 18:
+   ...                  while 19:
+   ...                   while 20:
+   ...                    while 21:
+   ...                     while 22:
+   ...                      break
+   Traceback (most recent call last):
+     ...
+   SystemError: too many statically nested blocks
+
 """
 
 import re

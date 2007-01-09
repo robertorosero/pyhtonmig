@@ -3,6 +3,10 @@
 
 #include "pyconfig.h" /* include for defines */
 
+#ifdef HAVE_STDINT_H
+#include <stdint.h>
+#endif
+
 /**************************************************************************
 Symbols and macros to supply platform-independent interfaces to basic
 C language & library operations whose spellings vary across platforms.
@@ -743,6 +747,15 @@ typedef	struct fd_set {
 #define Py_GCC_ATTRIBUTE(x)
 #else
 #define Py_GCC_ATTRIBUTE(x) __attribute__(x)
+#endif
+
+/*
+ * Add PyArg_ParseTuple format where available.
+ */
+#ifdef HAVE_ATTRIBUTE_FORMAT_PARSETUPLE
+#define Py_FORMAT_PARSETUPLE(func,p1,p2) __attribute__((format(func,p1,p2)))
+#else
+#define Py_FORMAT_PARSETUPLE(func,p1,p2)
 #endif
 
 /* Eliminate end-of-loop code not reached warnings from SunPro C

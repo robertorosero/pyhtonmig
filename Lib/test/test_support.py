@@ -3,7 +3,9 @@
 if __name__ != 'test.test_support':
     raise ImportError, 'test_support must be imported from the test package'
 
+from contextlib import contextmanager
 import sys
+import warnings
 
 class Error(Exception):
     """Base class for regression test exceptions."""
@@ -245,13 +247,13 @@ def sortdict(dict):
     withcommas = ", ".join(reprpairs)
     return "{%s}" % withcommas
 
-def check_syntax(statement):
+def check_syntax_error(testcase, statement):
     try:
-        compile(statement, '<string>', 'exec')
+        compile(statement, '<test string>', 'exec')
     except SyntaxError:
         pass
     else:
-        print 'Missing SyntaxError: "%s"' % statement
+        testcase.fail('Missing SyntaxError: "%s"' % statement)
 
 def open_urlresource(url):
     import urllib, urlparse
@@ -268,6 +270,48 @@ def open_urlresource(url):
     print >> get_original_stdout(), '\tfetching %s ...' % url
     fn, _ = urllib.urlretrieve(url, filename)
     return open(fn)
+    
+@contextmanager
+def guard_warnings_filter():
+    """Guard the warnings filter from being permanently changed."""
+    original_filters = warnings.filters[:]
+    try:
+        yield
+    finally:
+        warnings.filters = original_filters
+
+class EnvironmentVarGuard(object):
+
+    """Class to help protect the environment variable properly.  Can be used as
+    a context manager."""
+
+    def __init__(self):
+        from os import environ
+        self._environ = environ
+        self._unset = set()
+        self._reset = dict()
+
+    def set(self, envvar, value):
+        if envvar not in self._environ:
+            self._unset.add(envvar)
+        else:
+            self._reset[envvar] = self._environ[envvar]
+        self._environ[envvar] = value
+
+    def unset(self, envvar):
+        if envvar in self._environ:
+            self._reset[envvar] = self._environ[envvar]
+            del self._environ[envvar]
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *ignore_exc):
+        for envvar, value in self._reset.iteritems():
+            self._environ[envvar] = value
+        for unset in self._unset:
+            del self._environ[unset]
+
 
 #=======================================================================
 # Decorator for running a function in a different locale, correctly resetting

@@ -12,6 +12,59 @@ What's New in Python 2.6 alpha 1?
 Core and builtins
 -----------------
 
+- Prevent seg fault on shutdown which could occur if an object
+  raised a warning.
+
+- Bug #1566280: Explicitly invoke threading._shutdown from Py_Main,
+  to avoid relying on atexit.
+
+- Bug #1590891: random.randrange don't return correct value for big number
+
+- Patch #1586791: Better exception messages for some operations on strings,
+  tuples and lists.
+
+- Bug #1067760: Deprecate passing floats to file.seek.
+
+- Bug #1591996: Correctly forward exception in instance_contains().
+
+- Bug #1588287: fix invalid assertion for `1,2` in debug builds.
+
+- Bug #1576657: when setting a KeyError for a tuple key, make sure that
+  the tuple isn't used as the "exception arguments tuple".
+
+- Bug #1565514, SystemError not raised on too many nested blocks.
+
+- Bug #1576174: WindowsError now displays the windows error code
+  again, no longer the posix error code.
+
+- Patch #1549049: Support long values in structmember, issue warnings
+  if the assigned value for structmember fields gets truncated.
+
+- Update the peephole optimizer to remove more dead code (jumps after returns)
+  and inline unconditional jumps to returns.
+
+- Bug #1545497: when given an explicit base, int() did ignore NULs
+  embedded in the string to convert.
+
+- Bug #1569998: break inside a try statement (outside a loop) is now
+  recognized and rejected.
+
+- list.pop(x) accepts any object x following the __index__ protocol.
+
+- Fix some leftovers from the conversion from int to Py_ssize_t
+  (relevant to strings and sequences of more than 2**31 items).
+
+- A number of places, including integer negation and absolute value,
+  were fixed to not rely on undefined behaviour of the C compiler
+  anymore.
+
+- Bug #1566800: make sure that EnvironmentError can be called with any
+  number of arguments, as was the case in Python 2.4.
+
+- Patch #1567691: super() and new.instancemethod() now don't accept
+  keyword arguments any more (previously they accepted them, but didn't
+  use them).
+
 - Fix a bug in the parser's future statement handling that led to "with"
   not being recognized as a keyword after, e.g., this statement:
   from __future__ import division, with_statement
@@ -56,6 +109,153 @@ Core and builtins
 Library
 -------
 
+- Bug #1627575: logging: Added _open() method to FileHandler which can
+  be used to reopen files. The FileHandler instance now saves the
+  encoding (which can be None) in an attribute called "encoding".
+
+- Bug #411881: logging.handlers: bare except clause removed from
+  SMTPHandler.emit. Now, only ImportError is trapped.
+
+- Bug #411881: logging.handlers: bare except clause removed from
+  SocketHandler.createSocket. Now, only socket.error is trapped.
+
+- Bug #411881: logging: bare except clause removed from LogRecord.__init__.
+  Now, only ValueError, TypeError and AttributeError are trapped.
+
+- Patch #1504073: Fix tarfile.open() for mode "r" with a fileobj argument.
+
+- Patch #1182394 from Shane Holloway: speed up HMAC.hexdigest.
+
+- Patch #1262036: Prevent TarFiles from being added to themselves under
+  certain conditions.
+
+- Patch #1230446: tarfile.py: fix ExFileObject so that read() and tell()
+  work correctly together with readline().
+
+- Patch #1484695: The tarfile module now raises a HeaderError exception
+  if a buffer given to frombuf() is invalid.
+
+- Bug #1503765: Fix a problem in logging.config with spaces in comma-
+  separated lists read from logging config files.
+
+- Patch #1604907: Fix problems in logging.handlers caused at logging shutdown
+  when syslog handlers fail to initialize because of syslogd problems.
+
+- Patch #1608267: fix a race condition in os.makedirs() is the directory
+  to be created is already there.
+
+- Patch #1610437: fix a tarfile bug with long filename headers.
+
+- Patch #1371075: Make ConfigParser accept optional dict type
+  for ordering, sorting, etc.
+
+- Bug #1563807: _ctypes built on AIX fails with ld ffi error.
+
+- Bug #1598620: A ctypes Structure cannot contain itself.
+
+- Patch #1070046: Marshal new-style objects like InstanceType
+  in xmlrpclib.
+
+- cStringIO.truncate(-1) now raises an IOError, like StringIO and
+  regular files.
+
+- Patch #1472877: Fix Tix subwidget name resolution.
+
+- Patch #1594554: Always close a tkSimpleDialog on ok(), even
+  if an exception occurs.
+
+- Patch #1538878: Don't make tkSimpleDialog dialogs transient if
+  the parent window is withdrawn.
+
+- Bug #1597824: return the registered function from atexit.register()
+  to facilitate usage as a decorator.
+
+- Patch #1360200: Use unmangled_version RPM spec field to deal with
+  file name mangling.
+
+- Patch #1359217: Process 2xx response in an ftplib transfer
+  that precedes an 1xx response.
+
+- Patch #1355023: support whence argument for GzipFile.seek.
+
+- Patch #1065257: Support passing open files as body in
+  HTTPConnection.request().
+
+- Bug #1569790: mailbox.py: Maildir.get_folder() and MH.get_folder()
+  weren't passing the message factory on to newly created Maildir/MH
+  objects.
+
+- Patch #1514543: mailbox.py: In the Maildir class, report errors if there's
+  a filename clash instead of possibly losing a message.  (Patch by David
+  Watson.)
+
+- Patch #1514544: Try to ensure that messages/indexes have been physically
+  written to disk after calling .flush() or .close(). (Patch by David
+  Watson.)
+
+- Patch #1592250: Add elidge argument to Tkinter.Text.search.
+
+- Patch #838546: Make terminal become controlling in pty.fork()
+
+- Patch #1351744: Add askyesnocancel helper for tkMessageBox.
+
+- Patch #1060577: Extract list of RPM files from spec file in
+  bdist_rpm
+
+- Bug #1586613: fix zlib and bz2 codecs' incremental en/decoders.
+
+- Patch #1583880: fix tarfile's problems with long names and posix/
+  GNU modes.
+
+- Bug #1586448: the compiler module now emits the same bytecode for
+  list comprehensions as the builtin compiler, using the LIST_APPEND
+  opcode.
+
+- Fix codecs.EncodedFile which did not use file_encoding in 2.5.0, and
+  fix all codecs file wrappers to work correctly with the "with"
+  statement (bug #1586513).
+
+- Lib/modulefinder.py now handles absolute and relative imports
+  correctly.
+
+- Patch #1567274: Support SMTP over TLS.
+
+- Patch #1560695: Add .note.GNU-stack to ctypes' sysv.S so that
+  ctypes isn't considered as requiring executable stacks.
+
+- ctypes callback functions only support 'fundamental' data types as
+  result type.  Raise an error when something else is used.  This is a
+  partial fix for Bug #1574584.
+
+- Fix turtle so that time.sleep is imported for the entire library.  Allows
+  the demo2 function to be executed on its own instead of only when the
+  module is run as a script.
+
+- Bug #813342: Start the IDLE subprocess with -Qnew if the parent
+  is started with that option.
+
+- Bug #1565150: Fix subsecond processing for os.utime on Windows.
+
+- Support for MSVC 8 was added to bdist_wininst.
+
+- Bug #1446043: correctly raise a LookupError if an encoding name given
+  to encodings.search_function() contains a dot.
+
+- Bug #1560617: in pyclbr, return full module name not only for classes,
+  but also for functions.
+
+- Bug #1457823: cgi.(Sv)FormContentDict's constructor now takes
+  keep_blank_values and strict_parsing keyword arguments.
+
+- Bug #1566602: correct failure of posixpath unittest when $HOME ends
+  with a slash.
+
+- Bug #1565661: in webbrowser, split() the command for the default
+  GNOME browser in case it is a command with args.
+
+- Made the error message for time.strptime when the data data and format do
+  match be more clear.
+
 - Fix a bug in traceback.format_exception_only() that led to an error
   being raised when print_exc() was called without an exception set.
   In version 2.4, this printed "None", restored that behavior.
@@ -73,16 +273,47 @@ Library
 - Patch #1550886: Fix decimal module context management implementation
   to match the localcontext() example from PEP 343.
 
+- Bug #1545341: The 'classifier' keyword argument to the Distutils setup()
+  function now accepts tuples as well as lists.
+
 - Bug #1541863: uuid.uuid1 failed to generate unique identifiers
   on systems with low clock resolution.
 
 - Bug #1531862: Do not close standard file descriptors in subprocess.
 
-- fixed a bug with bsddb.DB.stat: its flags and txn keyword arguments
+- fixed a bug with bsddb.DB.stat: the flags and txn keyword arguments
   were transposed.
+
 
 Extension Modules
 -----------------
+
+- Patch #1544279: Improve thread-safety of the socket module by moving
+  the sock_addr_t storage out of the socket object.
+
+- Speed up function calls into the math module.
+
+- Bug #1588217: don't parse "= " as a soft line break in binascii's
+  a2b_qp() function, instead leave it in the string as quopri.decode()
+  does.
+
+- Bug #1599782: Fix segfault on bsddb.db.DB().type().
+
+- Bug #1567666: Emulate GetFileAttributesExA for Win95.
+
+- Patch #1576166: Support os.utime for directories on Windows NT+.
+
+- Bug #1548891: The cStringIO.StringIO() constructor now encodes unicode
+  arguments with the system default encoding just like the write()
+  method does, instead of converting it to a raw buffer.
+
+- Patch #1572724: fix typo ('=' instead of '==') in _msi.c.
+
+- Bug #1572832: fix a bug in ISO-2022 codecs which may cause segfault
+  when encoding non-BMP unicode characters.
+
+- Bug #1556784: allow format strings longer than 127 characters in
+  datetime's strftime function.
 
 - Fix itertools.count(n) to work with negative numbers again.
 
@@ -102,8 +333,28 @@ Extension Modules
   - iso2022_jp_3 and iso2022_jp_2004 codec can encode JIS X 0213:2
     codepoints now.
 
+- Bug #1552726: in readline.c, avoid repeatedly polling in interactive
+  mode by only placing a timeout on the select() if an input hook has
+  been defined.  This prevents an interactive Python from waking up 10
+  times per second.  Patch by Richard Boulton.
+
+- Added support for linking the bsddb module against BerkeleyDB 4.5.x.
+
+
 Tests
 -----
+
+- Added test.test_support.EnvironmentVarGuard.  It's a class that provides a
+  context manager so that one can temporarily set or unset environment
+  variables.
+
+- Added guard_warnings_filter to test.test_support.  It returns a context
+  manager that protects the 'warnings' module's filter from being mutated
+  once the context has been exited.
+
+- Added some tests for modulefinder.
+
+- Converted test_imp to use unittest.
 
 - Fix bsddb test_basics.test06_Transactions to check the version
   number properly.
@@ -112,13 +363,22 @@ Tests
 Documentation
 -------------
 
+- Bug #1565919: document set types in the Language Reference.
+
+- Bug #1546052: clarify that PyString_FromString(AndSize) copies the
+  string pointed to by its parameter.
+
+- Bug #1566663: remove obsolete example from datetime docs.
+
 - Bug #1541682: Fix example in the "Refcount details" API docs.
   Additionally, remove a faulty example showing PySequence_SetItem applied
   to a newly created list object and add notes that this isn't a good idea.
 
 
-Tools
------
+Tools/Demos
+-----------
+
+- Patch #1552024: add decorator support to unparse.py demo script.
 
 - Make auto-generated python.vim file list built-ins and exceptions in
   alphatbetical order.  Makes output more deterministic and easier to tell if
@@ -131,7 +391,24 @@ Tools
 Build
 -----
 
+- Disable _XOPEN_SOURCE on NetBSD 1.x.
+
+- configure now checks whether gcc supports the PyArg_ParseTuple format
+  attribute.
+
+- Bug #1578513: Cross compilation was broken by a change to configure.
+  Repair so that it's back to how it was in 2.4.3.
+
+- Patch #1576954: Update VC6 build directory; remove redundant
+  files in VC7.
+
+- Bug #1568842: Fix test for uintptr_t.
+
 - Patch #1540470, for OpenBSD 4.0.
+
+- Fix build failure on kfreebsd and on the hurd.
+
+- Fix the build of the library reference in info format.
 
 
 C API
@@ -139,6 +416,13 @@ C API
 
 - Bug #1542693: remove semi-colon at end of PyImport_ImportModuleEx macro
   so it can be used as an expression.
+
+
+Windows
+-------
+
+- Conditionalize definition of _CRT_SECURE_NO_DEPRECATE
+  and _CRT_NONSTDC_NO_DEPRECATE.
 
 
 Mac

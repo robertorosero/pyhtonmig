@@ -551,7 +551,8 @@ PyErr_NewException(char *name, PyObject *base, PyObject *dict)
 			goto failure;
 	}
 	if (PyDict_GetItemString(dict, "__module__") == NULL) {
-		modulename = PyString_FromStringAndSize(name, (int)(dot-name));
+		modulename = PyString_FromStringAndSize(name,
+						     (Py_ssize_t)(dot-name));
 		if (modulename == NULL)
 			goto failure;
 		if (PyDict_SetItemString(dict, "__module__", modulename) != 0)
@@ -639,7 +640,8 @@ PyErr_WarnEx(PyObject *category, const char *message, Py_ssize_t stack_level)
 
 	if (warnings_module != NULL) {
 		dict = PyModule_GetDict(warnings_module);
-		func = PyDict_GetItemString(dict, "warn");
+		if (dict != NULL)
+			func = PyDict_GetItemString(dict, "warn");
 	}
 	if (func == NULL) {
 		PySys_WriteStderr("warning: %s\n", message);

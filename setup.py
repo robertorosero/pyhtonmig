@@ -610,7 +610,7 @@ class PyBuildExt(build_ext):
         # a release.  Most open source OSes come with one or more
         # versions of BerkeleyDB already installed.
 
-        max_db_ver = (4, 4)
+        max_db_ver = (4, 5)
         min_db_ver = (3, 3)
         db_setup_debug = False   # verbose debug prints from this script?
 
@@ -627,7 +627,7 @@ class PyBuildExt(build_ext):
             '/sw/include/db3',
         ]
         # 4.x minor number specific paths
-        for x in (0,1,2,3,4):
+        for x in (0,1,2,3,4,5):
             db_inc_paths.append('/usr/include/db4%d' % x)
             db_inc_paths.append('/usr/include/db4.%d' % x)
             db_inc_paths.append('/usr/local/BerkeleyDB.4.%d/include' % x)
@@ -635,7 +635,7 @@ class PyBuildExt(build_ext):
             db_inc_paths.append('/pkg/db-4.%d/include' % x)
             db_inc_paths.append('/opt/db-4.%d/include' % x)
         # 3.x minor number specific paths
-        for x in (2,3):
+        for x in (3,):
             db_inc_paths.append('/usr/include/db3%d' % x)
             db_inc_paths.append('/usr/local/BerkeleyDB.3.%d/include' % x)
             db_inc_paths.append('/usr/local/include/db3%d' % x)
@@ -683,7 +683,8 @@ class PyBuildExt(build_ext):
                             # save the include directory with the db.h version
                             # (first occurrance only)
                             db_ver_inc_map[db_ver] = d
-                            print "db.h: found", db_ver, "in", d
+                            if db_setup_debug:
+                                print "db.h: found", db_ver, "in", d
                         else:
                             # we already found a header for this library version
                             if db_setup_debug: print "db.h: ignoring", d
@@ -723,8 +724,9 @@ class PyBuildExt(build_ext):
                         if db_setup_debug: print "db lib: ", dblib, "not found"
 
         except db_found:
-            print "db lib: using", db_ver, dblib
-            if db_setup_debug: print "db: lib dir", dblib_dir, "inc dir", db_incdir
+            if db_setup_debug:
+                print "db lib: using", db_ver, dblib
+                print "db: lib dir", dblib_dir, "inc dir", db_incdir
             db_incs = [db_incdir]
             dblibs = [dblib]
             # We add the runtime_library_dirs argument because the
@@ -745,7 +747,7 @@ class PyBuildExt(build_ext):
             dblib_dir = None
 
         # The sqlite interface
-        sqlite_setup_debug = True   # verbose debug prints from this script?
+        sqlite_setup_debug = False   # verbose debug prints from this script?
 
         # We hunt for #define SQLITE_VERSION "n.n.n"
         # We need to find >= sqlite version 3.0.8
@@ -777,7 +779,8 @@ class PyBuildExt(build_ext):
                                         for x in sqlite_version.split(".")])
                     if sqlite_version_tuple >= MIN_SQLITE_VERSION_NUMBER:
                         # we win!
-                        print "%s/sqlite3.h: version %s"%(d, sqlite_version)
+                        if sqlite_setup_debug:
+                            print "%s/sqlite3.h: version %s"%(d, sqlite_version)
                         sqlite_incdir = d
                         break
                     else:

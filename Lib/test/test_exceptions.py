@@ -3,7 +3,6 @@
 import os
 import sys
 import unittest
-import warnings
 import pickle, cPickle
 
 from test.test_support import TESTFN, unlink, run_unittest
@@ -183,6 +182,19 @@ class ExceptionTests(unittest.TestCase):
             test_capi1()
             test_capi2()
 
+    def test_WindowsError(self):
+        try:
+            WindowsError
+        except NameError:
+            pass
+        else:
+            self.failUnlessEqual(str(WindowsError(1001)),
+                                 "1001")
+            self.failUnlessEqual(str(WindowsError(1001, "message")),
+                                 "[Error 1001] message")
+            self.failUnlessEqual(WindowsError(1001, "message").errno, 22)
+            self.failUnlessEqual(WindowsError(1001, "message").winerror, 1001)
+
     def testAttributes(self):
         # test that exception attributes are happy
 
@@ -196,11 +208,16 @@ class ExceptionTests(unittest.TestCase):
             (SystemExit, ('foo',),
                 {'message' : 'foo', 'args' : ('foo',), 'code' : 'foo'}),
             (IOError, ('foo',),
-                {'message' : 'foo', 'args' : ('foo',)}),
+                {'message' : 'foo', 'args' : ('foo',), 'filename' : None,
+                 'errno' : None, 'strerror' : None}),
             (IOError, ('foo', 'bar'),
-                {'message' : '', 'args' : ('foo', 'bar')}),
+                {'message' : '', 'args' : ('foo', 'bar'), 'filename' : None,
+                 'errno' : 'foo', 'strerror' : 'bar'}),
             (IOError, ('foo', 'bar', 'baz'),
-                {'message' : '', 'args' : ('foo', 'bar')}),
+                {'message' : '', 'args' : ('foo', 'bar'), 'filename' : 'baz',
+                 'errno' : 'foo', 'strerror' : 'bar'}),
+            (IOError, ('foo', 'bar', 'baz', 'quux'),
+                {'message' : '', 'args' : ('foo', 'bar', 'baz', 'quux')}),
             (EnvironmentError, ('errnoStr', 'strErrorStr', 'filenameStr'),
                 {'message' : '', 'args' : ('errnoStr', 'strErrorStr'),
                  'strerror' : 'strErrorStr', 'errno' : 'errnoStr',

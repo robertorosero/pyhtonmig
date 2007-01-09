@@ -186,10 +186,10 @@ static int pcall[PCALL_NUM];
 PyObject *
 PyEval_GetCallStats(PyObject *self)
 {
-	return Py_BuildValue("iiiiiiiiii",
+	return Py_BuildValue("iiiiiiiiiii",
 			     pcall[0], pcall[1], pcall[2], pcall[3],
 			     pcall[4], pcall[5], pcall[6], pcall[7],
-			     pcall[8], pcall[9]);
+			     pcall[8], pcall[9], pcall[10]);
 }
 #else
 #define PCALL(O)
@@ -741,7 +741,16 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 	   this wasn't always true before 2.3!  PyFrame_New now sets
 	   f->f_lasti to -1 (i.e. the index *before* the first instruction)
 	   and YIELD_VALUE doesn't fiddle with f_lasti any more.  So this
-	   does work.  Promise. */
+	   does work.  Promise. 
+
+	   When the PREDICT() macros are enabled, some opcode pairs follow in
+           direct succession without updating f->f_lasti.  A successful 
+           prediction effectively links the two codes together as if they
+           were a single new opcode; accordingly,f->f_lasti will point to
+           the first code in the pair (for instance, GET_ITER followed by
+           FOR_ITER is effectively a single opcode and f->f_lasti will point
+           at to the beginning of the combined pair.)
+	*/
 	next_instr = first_instr + f->f_lasti + 1;
 	stack_pointer = f->f_stacktop;
 	assert(stack_pointer != NULL);
@@ -4046,8 +4055,10 @@ import_all_from(PyObject *locals, PyObject *v)
 		value = PyObject_GetAttr(v, name);
 		if (value == NULL)
 			err = -1;
-		else
+		else if (PyDict_CheckExact(locals))
 			err = PyDict_SetItem(locals, name, value);
+		else
+			err = PyObject_SetItem(locals, name, value);
 		Py_DECREF(name);
 		Py_XDECREF(value);
 		if (err != 0)

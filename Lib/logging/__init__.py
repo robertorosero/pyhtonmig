@@ -41,8 +41,8 @@ except ImportError:
 
 __author__  = "Vinay Sajip <vinay_sajip@red-dove.com>"
 __status__  = "production"
-__version__ = "0.4.9.9"
-__date__    = "06 February 2006"
+__version__ = "0.5.0.1"
+__date__    = "09 January 2007"
 
 #---------------------------------------------------------------------------
 #   Miscellaneous module data
@@ -214,7 +214,7 @@ class LogRecord:
     information to be logged.
     """
     def __init__(self, name, level, pathname, lineno,
-                 msg, args, exc_info, func):
+                 msg, args, exc_info, func=None):
         """
         Initialize a logging record with interesting information.
         """
@@ -243,7 +243,7 @@ class LogRecord:
         try:
             self.filename = os.path.basename(pathname)
             self.module = os.path.splitext(self.filename)[0]
-        except:
+        except (TypeError, ValueError, AttributeError):
             self.filename = pathname
             self.module = "Unknown module"
         self.exc_info = exc_info
@@ -764,17 +764,15 @@ class FileHandler(StreamHandler):
         """
         Open the specified file and use it as the stream for logging.
         """
-        if codecs is None:
-            encoding = None
-        if encoding is None:
-            stream = open(filename, mode)
-        else:
-            stream = codecs.open(filename, mode, encoding)
-        StreamHandler.__init__(self, stream)
         #keep the absolute path, otherwise derived classes which use this
         #may come a cropper when the current directory changes
+        if codecs is None:
+            encoding = None
         self.baseFilename = os.path.abspath(filename)
         self.mode = mode
+        self.encoding = encoding
+        stream = self._open()
+        StreamHandler.__init__(self, stream)
 
     def close(self):
         """
@@ -783,6 +781,17 @@ class FileHandler(StreamHandler):
         self.flush()
         self.stream.close()
         StreamHandler.close(self)
+
+    def _open(self):
+        """
+        Open the current base file with the (original) mode and encoding.
+        Return the resulting stream.
+        """
+        if self.encoding is None:
+            stream = open(self.baseFilename, self.mode)
+        else:
+            stream = codecs.open(self.baseFilename, self.mode, self.encoding)
+        return stream
 
 #---------------------------------------------------------------------------
 #   Manager classes and functions
@@ -910,9 +919,12 @@ class Manager:
         Ensure that children of the placeholder ph are connected to the
         specified logger.
         """
-        #for c in ph.loggers:
+        name = alogger.name
+        namelen = len(name)
         for c in ph.loggerMap.keys():
-            if string.find(c.parent.name, alogger.name) <> 0:
+            #The if means ... if not c.parent.name.startswith(nm)
+            #if string.find(c.parent.name, nm) <> 0:
+            if c.parent.name[:namelen] != name:
                 alogger.parent = c.parent
                 c.parent = alogger
 

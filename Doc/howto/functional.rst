@@ -1,7 +1,7 @@
 Functional Programming HOWTO
 ================================
 
-**Version 0.21**
+**Version 0.30**
 
 (This is a first draft.  Please send comments/error
 reports/suggestions to amk@amk.ca.  This URL is probably not going to
@@ -14,6 +14,8 @@ the concepts of functional programming, we'll look at language
 features such as iterators and generators and relevant library modules
 such as ``itertools`` and ``functools``.
 
+
+.. contents::
 
 Introduction
 ----------------------
@@ -339,11 +341,11 @@ the set's elements::
 Generator expressions and list comprehensions
 ----------------------------------------------------
 
-Two common operations on a stream are 1) performing some operation for
-every element, 2) selecting a subset of elements that meet some
-condition.  For example, given a list of strings, you might want to
-strip off trailing whitespace from each line or extract all the
-strings containing a given substring.
+Two common operations on an iterator's output are 1) performing some
+operation for every element, 2) selecting a subset of elements that
+meet some condition.  For example, given a list of strings, you might
+want to strip off trailing whitespace from each line or extract all
+the strings containing a given substring.
 
 List comprehensions and generator expressions (short form: "listcomps"
 and "genexps") are a concise notation for such operations, borrowed
@@ -658,7 +660,7 @@ Let's look in more detail at built-in functions often used with iterators.
 
 Two Python's built-in functions, ``map()`` and ``filter()``, are
 somewhat obsolete; they duplicate the features of list comprehensions
-and return actual lists instead of iterators.  
+but return actual lists instead of iterators.  
 
 ``map(f, iterA, iterB, ...)`` returns a list containing ``f(iterA[0],
 iterB[0]), f(iterA[1], iterB[1]), f(iterA[2], iterB[2]), ...``.  
@@ -675,7 +677,7 @@ iterB[0]), f(iterA[1], iterB[1]), f(iterA[2], iterB[2]), ...``.
 
 As shown above, you can achieve the same effect with a list
 comprehension.  The ``itertools.imap()`` function does the same thing
-but can handle infinite iterators; it'll be discussed in the section on 
+but can handle infinite iterators; it'll be discussed later, in the section on 
 the ``itertools`` module.
 
 ``filter(predicate, iter)`` returns a list 
@@ -705,7 +707,7 @@ can therefore handle infinite sequences just as ``itertools.imap()`` can.
 ``reduce(func, iter, [initial_value])`` doesn't have a counterpart in
 the ``itertools`` module because it cumulatively performs an operation
 on all the iterable's elements and therefore can't be applied to
-infinite ones.  ``func`` must be a function that takes two elements
+infinite iterables.  ``func`` must be a function that takes two elements
 and returns a single value.  ``reduce()`` takes the first two elements
 A and B returned by the iterator and calculates ``func(A, B)``.  It
 then requests the third element, C, calculates ``func(func(A, B),
@@ -821,7 +823,7 @@ don't need to define a new function at all::
 If the function you need doesn't exist, you need to write it.  One way
 to write small functions is to use the ``lambda`` statement.  ``lambda``
 takes a number of parameters and an expression combining these parameters,
-and creates a small function that returns the value of the expression:
+and creates a small function that returns the value of the expression::
 
         lowercase = lambda x: x.lower()
 
@@ -842,14 +844,15 @@ function in the usual way::
             return x + y
 
 Which alternative is preferable?  That's a style question; my usual
-view is to avoid using ``lambda``.
+course is to avoid using ``lambda``.
 
-``lambda`` is quite limited in the functions it can define.  The
-result has to be computable as a single expression, which means you
-can't have multiway ``if... elif... else`` comparisons or
-``try... except`` statements.  If you try to do too much in a
-``lambda`` statement, you'll end up with an overly complicated
-expression that's hard to read.  Quick, what's the following code doing?
+One reason for my preference is that ``lambda`` is quite limited in
+the functions it can define.  The result has to be computable as a
+single expression, which means you can't have multiway
+``if... elif... else`` comparisons or ``try... except`` statements.
+If you try to do too much in a ``lambda`` statement, you'll end up
+with an overly complicated expression that's hard to read.  Quick,
+what's the following code doing?
 
 ::
 
@@ -886,8 +889,8 @@ uses of ``lambda``:
 4) Convert the lambda to a def statement, using that name.
 5) Remove the comment.
 
-I really like these rules, but you're free to disagree that this style
-is better.
+I really like these rules, but you're free to disagree that this 
+lambda-free style is better.
 
 
 The itertools module
@@ -896,6 +899,16 @@ The itertools module
 The ``itertools`` module contains a number of commonly-used iterators
 as well as functions for combining several iterators.  This section
 will introduce the module's contents by showing small examples.
+
+The module's functions fall into a few broad classes:
+
+* Functions that create a new iterator based on an existing iterator.
+* Functions for treating an iterator's elements as function arguments.
+* Functions for selecting portions of an iterator's output.
+* A function for grouping an iterator's output.
+
+Creating new iterators
+''''''''''''''''''''''
 
 ``itertools.count(n)`` returns an infinite stream of
 integers, increasing by 1 each time.  You can optionally supply the
@@ -941,6 +954,12 @@ and returns them in a tuple::
     itertools.izip(['a', 'b', 'c'], (1, 2, 3)) =>
       ('a', 1), ('b', 2), ('c', 3)
 
+It's similiar to the built-in ``zip()`` function, but doesn't
+construct an in-memory list and exhaust all the input iterators before
+returning; instead tuples are constructed and returned only if they're
+requested.  (The technical term for this behaviour is 
+`lazy evaluation <http://en.wikipedia.org/wiki/Lazy_evaluation>`__.)
+
 This iterator is intended to be used with iterables that are all of
 the same length.  If the iterables are of different lengths, the
 resulting stream will be the same length as the shortest iterable.
@@ -956,9 +975,10 @@ to use the iterators further because you risk skipping a discarded
 element.
 
 ``itertools.islice(iter, [start], stop, [step])`` returns a stream
-that's a slice of the iterator.  It can return the first ``stop``
+that's a slice of the iterator.  With a single ``stop`` argument, 
+it will return the first ``stop``
 elements.  If you supply a starting index, you'll get ``stop-start``
-elements, and if you supply a value for ``step` elements will be
+elements, and if you supply a value for ``step`, elements will be
 skipped accordingly.  Unlike Python's string and list slicing, you
 can't use negative values for ``start``, ``stop``, or ``step``.
 
@@ -990,6 +1010,9 @@ and one of the new iterators is consumed more than the others.
            0, 1, 2, 3, 4, 5, 6, 7, 8, 9, ...
 
 
+Calling functions on elements
+'''''''''''''''''''''''''''''
+
 Two functions are used for calling other functions on the contents of an
 iterable.
 
@@ -1017,6 +1040,10 @@ arguments::
                        ('/usr', 'bin', 'perl'),('/usr', 'bin', 'ruby')])
     =>
       /usr/bin/java, /bin/python, /usr/bin/perl, /usr/bin/ruby
+
+
+Selecting elements
+''''''''''''''''''
 
 Another group of functions chooses a subset of an iterator's elements
 based on a predicate.
@@ -1064,6 +1091,9 @@ results.
       1, 2, 3, 4, 5, 6, 7, 8, 9, 10, ...
 
 
+Grouping elements
+'''''''''''''''''
+
 The last function I'll discuss, ``itertools.groupby(iter,
 key_func=None)``, is the most complicated.  ``key_func(elem)`` is a
 function that can compute a key value for each element returned by the
@@ -1109,15 +1139,16 @@ The functools module
 ----------------------------------------------
 
 The ``functools`` module in Python 2.5 contains some higher-order
-functions.  A **higher-order function** takes functions as input and
-returns new functions.  The most useful tool in this module is the
-``partial()`` function.
+functions.  A **higher-order function** takes one or more functions as
+input and returns a new function.  The most useful tool in this module
+is the ``partial()`` function.
 
 For programs written in a functional style, you'll sometimes want to
 construct variants of existing functions that have some of the
 parameters filled in.  Consider a Python function ``f(a, b, c)``; you
-may wish to create a new function ``g(b, c)`` that was equivalent to
-``f(1, b, c)``.  This is called "partial function application".
+may wish to create a new function ``g(b, c)`` that's equivalent to
+``f(1, b, c)``; you're filling in a value for one of ``f()``'s parameters.  
+This is called "partial function application".
 
 The constructor for ``partial`` takes the arguments ``(function, arg1,
 arg2, ... kwarg1=value1, kwarg2=value2)``.  The resulting object is
@@ -1136,9 +1167,165 @@ Here's a small but realistic example::
     server_log = functools.partial(log, subsystem='server')
     server_log('Unable to open socket')
 
-There are also third-party modules, such as Collin Winter's
-`functional package <http://cheeseshop.python.org/pypi/functional>`__,
-that are intended for use in functional-style programs.
+
+The operator module
+-------------------
+
+The ``operator`` module was mentioned earlier.  It contains a set of
+functions corresponding to Python's operators.  These functions 
+are often useful in functional-style code because they save you 
+from writing trivial functions that perform a single operation.
+
+Some of the functions in this module are:
+
+* Math operations: ``add()``, ``sub()``, ``mul()``, ``div()``, ``floordiv()``,
+  ``abs()``, ...
+* Logical operations: ``not_()``, ``truth()``.
+* Bitwise operations: ``and_()``, ``or_()``, ``invert()``.
+* Comparisons: ``eq()``, ``ne()``, ``lt()``, ``le()``, ``gt()``, and ``ge()``.
+* Object identity: ``is_()``, ``is_not()``.
+
+Consult `the operator module's documentation <http://docs.python.org/lib/module-operator.html>`__ for a complete
+list.
+
+
+
+The functional module
+---------------------
+
+Collin Winter's `functional module <http://oakwinter.com/code/functional/>`__ 
+provides a number of more
+advanced tools for functional programming. It also reimplements
+several Python built-ins, trying to make them more intuitive to those
+used to functional programming in other languages.
+
+This section contains an introduction to some of the most important
+functions in ``functional``; full documentation can be found at `the
+project's website <http://oakwinter.com/code/functional/documentation/>`__.
+
+``compose(outer, inner, unpack=False)``
+
+The ``compose()`` function implements function composition.
+In other words, it returns a wrapper around the ``outer`` and ``inner`` callables, such
+that the return value from ``inner`` is fed directly to ``outer``.  That is,
+
+::
+
+        >>> def add(a, b):
+        ...     return a + b
+        ...
+        >>> def double(a):
+        ...     return 2 * a
+        ...
+        >>> compose(double, add)(5, 6)
+        22
+
+is equivalent to
+
+::
+
+        >>> double(add(5, 6))
+        22
+                    
+The ``unpack`` keyword is provided to work around the fact that Python functions are not always
+`fully curried <http://en.wikipedia.org/wiki/Currying>`__.
+By default, it is expected that the ``inner`` function will return a single object and that the ``outer``
+function will take a single argument. Setting the ``unpack`` argument causes ``compose`` to expect a
+tuple from ``inner`` which will be expanded before being passed to ``outer``. Put simply,
+
+::
+
+        compose(f, g)(5, 6)
+                    
+is equivalent to::
+
+        f(g(5, 6))
+                    
+while
+
+::
+
+        compose(f, g, unpack=True)(5, 6)
+                    
+is equivalent to::
+
+        f(*g(5, 6))
+
+Even though ``compose()`` only accepts two functions, it's trivial to
+build up a version that will compose any number of functions. We'll
+use ``reduce()``, ``compose()`` and ``partial()`` (the last of which
+is provided by both ``functional`` and ``functools``).
+
+::
+
+        from functional import compose, partial
+        
+        multi_compose = partial(reduce, compose)
+        
+    
+We can also use ``map()``, ``compose()`` and ``partial()`` to craft a
+version of ``"".join(...)`` that converts its arguments to string::
+
+        from functional import compose, partial
+        
+        join = compose("".join, partial(map, str))
+
+
+``flip(func)``
+                    
+``flip()`` wraps the callable in ``func`` and  
+causes it to receive its non-keyword arguments in reverse order.
+
+::
+
+        >>> def triple(a, b, c):
+        ...     return (a, b, c)
+        ...
+        >>> triple(5, 6, 7)
+        (5, 6, 7)
+        >>>
+        >>> flipped_triple = flip(triple)
+        >>> flipped_triple(5, 6, 7)
+        (7, 6, 5)
+
+``foldl(func, start, iterable)``
+                    
+``foldl()`` takes a binary function, a starting value (usually some kind of 'zero'), and an iterable.
+The function is applied to the starting value and the first element of the list, then the result of
+that and the second element of the list, then the result of that and the third element of the list,
+and so on.
+
+This means that a call such as::
+
+        foldl(f, 0, [1, 2, 3])
+
+is equivalent to::
+
+        f(f(f(0, 1), 2), 3)
+
+    
+``foldl()`` is roughly equivalent to the following recursive function::
+
+        def foldl(func, start, seq):
+            if len(seq) == 0:
+                return start
+
+            return foldl(func, func(start, seq[0]), seq[1:])
+
+Speaking of equivalence, the above ``foldl`` call can be expressed in terms of the built-in ``reduce`` like
+so::
+
+        reduce(f, [1, 2, 3], 0)
+
+
+We can use ``foldl()``, ``operator.concat()`` and ``partial()`` to
+write a cleaner, more aesthetically-pleasing version of Python's
+``"".join(...)`` idiom::
+
+        from functional import foldl, partial
+        from operator import concat
+        
+        join = partial(foldl, concat, "")
 
 
 Revision History and Acknowledgements
@@ -1158,6 +1345,10 @@ Version 0.2: posted July 10 2006.  Merged genexp and listcomp
 sections into one.  Typo fixes.
 
 Version 0.21: Added more references suggested on the tutor mailing list.
+
+Version 0.30: Adds a section on the ``functional`` module written by
+Collin Winter; adds short section on the operator module; a few other
+edits.
 
 
 References
@@ -1185,6 +1376,8 @@ General Wikipedia entry describing functional programming.
 http://en.wikipedia.org/wiki/Coroutine:
 Entry for coroutines.
 
+http://en.wikipedia.org/wiki/Currying:
+Entry for the concept of currying.
 
 Python-specific
 '''''''''''''''''''''''''''
@@ -1205,10 +1398,10 @@ Python documentation
 '''''''''''''''''''''''''''
 
 http://docs.python.org/lib/module-itertools.html:
-Documentation ``for the itertools`` module.
+Documentation for the ``itertools`` module.
 
 http://docs.python.org/lib/module-operator.html:
-Documentation ``for the operator`` module.
+Documentation for the ``operator`` module.
 
 http://www.python.org/dev/peps/pep-0289/:
 PEP 289: "Generator Expressions"

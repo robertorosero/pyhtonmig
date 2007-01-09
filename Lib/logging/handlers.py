@@ -343,7 +343,7 @@ class SocketHandler(logging.Handler):
             try:
                 self.sock = self.makeSocket()
                 self.retryTime = None # next time, no delay before trying
-            except:
+            except socket.error:
                 #Creation failed, so set the retry time and return.
                 if self.retryTime is None:
                     self.retryPeriod = self.retryStart
@@ -586,11 +586,11 @@ class SysLogHandler(logging.Handler):
         self.address = address
         self.facility = facility
         if type(address) == types.StringType:
-            self._connect_unixsocket(address)
             self.unixsocket = 1
+            self._connect_unixsocket(address)
         else:
-            self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             self.unixsocket = 0
+            self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
         self.formatter = None
 
@@ -734,7 +734,7 @@ class SMTPHandler(logging.Handler):
             import smtplib
             try:
                 from email.Utils import formatdate
-            except:
+            except ImportError:
                 formatdate = self.date_time
             port = self.mailport
             if not port:
