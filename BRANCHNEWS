@@ -2,6 +2,9 @@
 Branch News
 +++++++++++
 
+If a comment lacks an explicit revision number then use ``svn blame`` on this
+file to find out what revision number introduced the feature.
+
 Core and builtins
 -----------------
 
@@ -41,3 +44,9 @@ Extension Modules
 * rev. 51880: Add access to the 'sys' modules data dict to Interpreter objects.
 
 * rev. 51875: Introduced the interpreter module.
+
+
+Library
+-------
+
+* rev. 53333: External definition of importlib (from the sandbox) added.
