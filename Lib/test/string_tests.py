@@ -967,7 +967,7 @@ class MixinStrUnicodeUserStringTest:
             def f():
                 yield 4 + ""
             self.fixtype(' ').join(f())
-        except TypeError, e:
+        except TypeError as e:
             if '+' not in str(e):
                 self.fail('join() ate exception message')
         else:

@@ -332,7 +332,7 @@ class TestSet(TestJointOps):
         for v1 in ['Q', (1,)]:
             try:
                 self.s.remove(v1)
-            except KeyError, e:
+            except KeyError as e:
                 v2 = e.args[0]
                 self.assertEqual(v1, v2)
             else:
@@ -1451,7 +1451,6 @@ class TestVariousIteratorArgs(unittest.TestCase):
 #==============================================================================
 
 def test_main(verbose=None):
-    from test import test_sets
     test_classes = (
         TestSet,
         TestSetSubclass,
