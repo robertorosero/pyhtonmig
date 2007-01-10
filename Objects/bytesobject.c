@@ -324,7 +324,7 @@ bytes_subscript(PyBytesObject *self, PyObject *item)
 }
  
 static int
-bytes_setslice(PyBytesObject *self, Py_ssize_t lo, Py_ssize_t hi, 
+bytes_setslice(PyBytesObject *self, Py_ssize_t lo, Py_ssize_t hi,
                PyObject *values)
 {
     int avail;
@@ -373,7 +373,7 @@ bytes_setslice(PyBytesObject *self, Py_ssize_t lo, Py_ssize_t hi,
             memmove(self->ob_bytes + lo + needed, self->ob_bytes + hi,
                     self->ob_size - hi);
         }
-        if (PyBytes_Resize((PyObject *)self, 
+        if (PyBytes_Resize((PyObject *)self,
                            self->ob_size + needed - avail) < 0)
             return -1;
         if (avail < needed) {
@@ -510,7 +510,7 @@ bytes_ass_subscript(PyBytesObject *self, PyObject *item, PyObject *values)
                 memmove(self->ob_bytes + start + needed, self->ob_bytes + stop,
                         self->ob_size - stop);
             }
-            if (PyBytes_Resize((PyObject *)self, 
+            if (PyBytes_Resize((PyObject *)self,
                                self->ob_size + needed - slicelen) < 0)
                 return -1;
             if (slicelen < needed) {
@@ -557,7 +557,7 @@ bytes_ass_subscript(PyBytesObject *self, PyObject *item, PyObject *values)
                         self->ob_bytes + cur,
                         PyBytes_GET_SIZE(self) - cur);
             }
-            if (PyBytes_Resize((PyObject *)self, 
+            if (PyBytes_Resize((PyObject *)self,
                                PyBytes_GET_SIZE(self) - slicelen) < 0)
                 return -1;
 
@@ -1034,7 +1034,7 @@ PyTypeObject PyBytes_Type = {
     PyObject_GenericGetAttr,            /* tp_getattro */
     0,                                  /* tp_setattro */
     &bytes_as_buffer,                   /* tp_as_buffer */
-    Py_TPFLAGS_DEFAULT,			/* tp_flags */ 
+    Py_TPFLAGS_DEFAULT,			/* tp_flags */
                                         /* bytes is 'final' or 'sealed' */
     bytes_doc,                          /* tp_doc */
     0,                                  /* tp_traverse */

@@ -734,7 +734,16 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 	   this wasn't always true before 2.3!  PyFrame_New now sets
 	   f->f_lasti to -1 (i.e. the index *before* the first instruction)
 	   and YIELD_VALUE doesn't fiddle with f_lasti any more.  So this
-	   does work.  Promise. */
+	   does work.  Promise. 
+
+	   When the PREDICT() macros are enabled, some opcode pairs follow in
+           direct succession without updating f->f_lasti.  A successful 
+           prediction effectively links the two codes together as if they
+           were a single new opcode; accordingly,f->f_lasti will point to
+           the first code in the pair (for instance, GET_ITER followed by
+           FOR_ITER is effectively a single opcode and f->f_lasti will point
+           at to the beginning of the combined pair.)
+	*/
 	next_instr = first_instr + f->f_lasti + 1;
 	stack_pointer = f->f_stacktop;
 	assert(stack_pointer != NULL);
@@ -2225,10 +2234,38 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 		{
 		    int posdefaults = oparg & 0xff;
 		    int kwdefaults = (oparg>>8) & 0xff;
+		    int num_annotations = (oparg >> 16) & 0x7fff;
+		    PyObject *t;
 
 			v = POP(); /* code object */
 			x = PyFunction_New(v, f->f_globals);
 			Py_DECREF(v);
+
+			if (x != NULL && num_annotations > 0) {
+				Py_ssize_t name_ix;
+				u = POP(); /* names of args with annotations */
+				v = PyDict_New();
+				if (v == NULL) {
+					Py_DECREF(x);
+					x = NULL;
+					break;
+				}
+				name_ix = PyTuple_Size(u);
+				assert(num_annotations == name_ix+1);
+				while (name_ix > 0) {
+					--name_ix;
+					t = PyTuple_GET_ITEM(u, name_ix);
+					w = POP();
+					/* XXX(nnorwitz): check for errors */
+					PyDict_SetItem(v, t, w);
+					Py_DECREF(w);
+				}
+
+				err = PyFunction_SetAnnotations(x, v);
+				Py_DECREF(v);
+				Py_DECREF(u);
+			}
+
 			/* XXX Maybe this should be a separate opcode? */
 			if (x != NULL && posdefaults > 0) {
 				v = PyTuple_New(posdefaults);
@@ -2254,6 +2291,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 				while (--kwdefaults >= 0) {
 					w = POP(); /* default value */
 					u = POP(); /* kw only arg name */
+					/* XXX(nnorwitz): check for errors */
 					PyDict_SetItem(v, u, w);
 				}
 				err = PyFunction_SetKwDefaults(x, v);

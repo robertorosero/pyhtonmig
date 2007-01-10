@@ -98,7 +98,7 @@
 #error "eek! DBVER can't handle minor versions > 9"
 #endif
 
-#define PY_BSDDB_VERSION "4.4.6"
+#define PY_BSDDB_VERSION "4.5.0"
 static char *rcs_id = "$Id$";
 
 
@@ -4127,6 +4127,7 @@ DBEnv_set_lk_detect(DBEnvObject* self, PyObject* args)
 }
 
 
+#if (DBVER < 45)
 static PyObject*
 DBEnv_set_lk_max(DBEnvObject* self, PyObject* args)
 {
@@ -4142,6 +4143,7 @@ DBEnv_set_lk_max(DBEnvObject* self, PyObject* args)
     RETURN_IF_ERR();
     RETURN_NONE();
 }
+#endif
 
 
 #if (DBVER >= 32)
@@ -5231,7 +5233,9 @@ static PyMethodDef DBEnv_methods[] = {
     {"set_lg_regionmax",(PyCFunction)DBEnv_set_lg_regionmax, METH_VARARGS},
 #endif
     {"set_lk_detect",   (PyCFunction)DBEnv_set_lk_detect,    METH_VARARGS},
+#if (DBVER < 45)
     {"set_lk_max",      (PyCFunction)DBEnv_set_lk_max,       METH_VARARGS},
+#endif
 #if (DBVER >= 32)
     {"set_lk_max_locks", (PyCFunction)DBEnv_set_lk_max_locks, METH_VARARGS},
     {"set_lk_max_lockers", (PyCFunction)DBEnv_set_lk_max_lockers, METH_VARARGS},
@@ -5627,7 +5631,7 @@ static PyMethodDef bsddb_methods[] = {
 #define MODULE_NAME_MAX_LEN     11
 static char _bsddbModuleName[MODULE_NAME_MAX_LEN+1] = "_bsddb";
 
-DL_EXPORT(void) init_bsddb(void)
+PyMODINIT_FUNC init_bsddb(void)
 {
     PyObject* m;
     PyObject* d;
@@ -5833,7 +5837,9 @@ DL_EXPORT(void) init_bsddb(void)
     ADD_INT(d, DB_AFTER);
     ADD_INT(d, DB_APPEND);
     ADD_INT(d, DB_BEFORE);
+#if (DBVER < 45)
     ADD_INT(d, DB_CACHED_COUNTS);
+#endif
 #if (DBVER >= 41)
     _addIntToDict(d, "DB_CHECKPOINT", 0);
 #else
@@ -5868,7 +5874,9 @@ DL_EXPORT(void) init_bsddb(void)
     ADD_INT(d, DB_POSITION);
     ADD_INT(d, DB_PREV);
     ADD_INT(d, DB_PREV_NODUP);
+#if (DBVER < 45)
     ADD_INT(d, DB_RECORDCOUNT);
+#endif
     ADD_INT(d, DB_SET);
     ADD_INT(d, DB_SET_RANGE);
     ADD_INT(d, DB_SET_RECNO);
@@ -6032,7 +6040,7 @@ DL_EXPORT(void) init_bsddb(void)
 /* allow this module to be named _pybsddb so that it can be installed
  * and imported on top of python >= 2.3 that includes its own older
  * copy of the library named _bsddb without importing the old version. */
-DL_EXPORT(void) init_pybsddb(void)
+PyMODINIT_FUNC init_pybsddb(void)
 {
     strncpy(_bsddbModuleName, "_pybsddb", MODULE_NAME_MAX_LEN);
     init_bsddb();
