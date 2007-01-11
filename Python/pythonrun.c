@@ -250,6 +250,9 @@ Py_InitializeEx(int install_sigs)
 	   needed. */
 	PyDict_SetItemString(interp->sysdict, "import_",
 			PyDict_GetItemString(interp->builtins, "__import__"));
+	PyDict_SetItemString(interp->builtins, "__import__",
+			PyDict_GetItemString(interp->sysdict,
+				"import_delegate"));
 
 #if defined(Py_USING_UNICODE) && defined(HAVE_LANGINFO_H) && defined(CODESET)
 	/* On Unix, set the file system encoding according to the

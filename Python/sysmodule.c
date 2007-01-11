@@ -733,6 +733,19 @@ extern PyObject *_Py_GetDXProfile(PyObject *,  PyObject *);
 }
 #endif
 
+static PyObject *
+sys_import_delegate(PyObject *self, PyObject *args, PyObject *kwargs)
+{
+	PyObject *import_object = PySys_GetObject("import_");
+
+	if (import_object == NULL) {
+		PyErr_SetString(PyExc_RuntimeError, "sys.import_ not set");
+		return NULL;
+	}
+
+	return PyObject_Call(import_object, args, kwargs);
+}
+
 static PyMethodDef sys_methods[] = {
 	/* Might as well keep this in alphabetic order */
 	{"callstats", (PyCFunction)PyEval_GetCallStats, METH_NOARGS,
@@ -776,6 +789,8 @@ static PyMethodDef sys_methods[] = {
 	{"getwindowsversion", (PyCFunction)sys_getwindowsversion, METH_NOARGS,
 	 getwindowsversion_doc},
 #endif /* MS_WINDOWS */
+	{"import_delegate", (PyCFunction)sys_import_delegate,
+		METH_VARARGS | METH_KEYWORDS, "XXX"},
 #ifdef USE_MALLOPT
 	{"mdebug",	sys_mdebug, METH_VARARGS},
 #endif
