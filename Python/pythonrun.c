@@ -246,6 +246,11 @@ Py_InitializeEx(int install_sigs)
 	if (!warnings_module)
 		PyErr_Clear();
 
+	/* Store import machinery somewhere so that a reference is held as
+	   needed. */
+	PyDict_SetItemString(interp->sysdict, "import_",
+			PyDict_GetItemString(interp->builtins, "__import__"));
+
 #if defined(Py_USING_UNICODE) && defined(HAVE_LANGINFO_H) && defined(CODESET)
 	/* On Unix, set the file system encoding according to the
 	   user's preference, if the CODESET names a well-known
