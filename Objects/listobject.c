@@ -950,7 +950,7 @@ islt(PyObject *x, PyObject *y, PyObject *compare)
 	Py_DECREF(args);
 	if (res == NULL)
 		return -1;
-	if (!PyInt_Check(res)) {
+	if (!PyInt_CheckExact(res)) {
 		Py_DECREF(res);
 		PyErr_SetString(PyExc_TypeError,
 				"comparison function must return int");

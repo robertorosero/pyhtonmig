@@ -48,7 +48,7 @@ get_small_int(int ival)
 #define CHECK_SMALL_INT(ival)
 #endif
 
-#define MEDIUM_VALUE(x) ((x)->ob_size < 0 ? -(x)->ob_digit[0] : (x)->ob_digit[0])
+#define MEDIUM_VALUE(x) ((x)->ob_size < 0 ? -(x)->ob_digit[0] : ((x)->ob_size == 0 ? 0 : (x)->ob_digit[0]))
 /* If a freshly-allocated long is already shared, it must
    be a small integer, so negating it must go to PyLong_FromLong */
 #define NEGATE(x) \
@@ -496,8 +496,8 @@ PyLong_AsSize_t(PyObject *vv)
 /* Get a C unsigned long int from a long int object, ignoring the high bits.
    Returns -1 and sets an error condition if an error occurs. */
 
-unsigned long
-PyLong_AsUnsignedLongMask(PyObject *vv)
+static unsigned long
+_PyLong_AsUnsignedLongMask(PyObject *vv)
 {
 	register PyLongObject *v;
 	unsigned long x;
@@ -524,6 +524,41 @@ PyLong_AsUnsignedLongMask(PyObject *vv)
 		x = (x << SHIFT) + v->ob_digit[i];
 	}
 	return x * sign;
+}
+
+unsigned long
+PyLong_AsUnsignedLongMask(register PyObject *op)
+{
+	PyNumberMethods *nb;
+	PyLongObject *lo;
+	unsigned long val;
+
+	if (op && PyLong_Check(op))
+		return _PyLong_AsUnsignedLongMask(op);
+
+	if (op == NULL || (nb = op->ob_type->tp_as_number) == NULL ||
+	    nb->nb_int == NULL) {
+		PyErr_SetString(PyExc_TypeError, "an integer is required");
+		return (unsigned long)-1;
+	}
+
+	lo = (PyLongObject*) (*nb->nb_int) (op);
+	if (lo == NULL)
+		return (unsigned long)-1;
+	if (PyLong_Check(lo)) {
+		val = _PyLong_AsUnsignedLongMask((PyObject *)lo);
+		Py_DECREF(lo);
+		if (PyErr_Occurred())
+			return (unsigned long)-1;
+		return val;
+	}
+	else
+	{
+		Py_DECREF(lo);
+		PyErr_SetString(PyExc_TypeError,
+				"nb_int should return int object");
+		return (unsigned long)-1;
+	}
 }
 
 int
@@ -912,7 +947,7 @@ PyLong_FromVoidPtr(void *p)
 	/* special-case null pointer */
 	if (!p)
 		return PyInt_FromLong(0);
-	return PyLong_FromUnsignedLongLong((unsigned PY_LONG_LONG)p);
+	return PyLong_FromUnsignedLongLong((unsigned PY_LONG_LONG)(Py_uintptr_t)p);
 
 }
 
@@ -1146,8 +1181,8 @@ PyLong_AsUnsignedLongLong(PyObject *vv)
 /* Get a C unsigned long int from a long int object, ignoring the high bits.
    Returns -1 and sets an error condition if an error occurs. */
 
-unsigned PY_LONG_LONG
-PyLong_AsUnsignedLongLongMask(PyObject *vv)
+static unsigned PY_LONG_LONG
+_PyLong_AsUnsignedLongLongMask(PyObject *vv)
 {
 	register PyLongObject *v;
 	unsigned PY_LONG_LONG x;
@@ -1174,6 +1209,41 @@ PyLong_AsUnsignedLongLongMask(PyObject *vv)
 		x = (x << SHIFT) + v->ob_digit[i];
 	}
 	return x * sign;
+}
+
+unsigned PY_LONG_LONG
+PyLong_AsUnsignedLongLongMask(register PyObject *op)
+{
+	PyNumberMethods *nb;
+	PyLongObject *lo;
+	unsigned PY_LONG_LONG val;
+
+	if (op && PyLong_Check(op))
+		return _PyLong_AsUnsignedLongLongMask(op);
+
+	if (op == NULL || (nb = op->ob_type->tp_as_number) == NULL ||
+	    nb->nb_int == NULL) {
+		PyErr_SetString(PyExc_TypeError, "an integer is required");
+		return (unsigned PY_LONG_LONG)-1;
+	}
+
+	lo = (PyLongObject*) (*nb->nb_int) (op);
+	if (lo == NULL)
+		return (unsigned PY_LONG_LONG)-1;
+	if (PyLong_Check(lo)) {
+		val = _PyLong_AsUnsignedLongLongMask((PyObject *)lo);
+		Py_DECREF(lo);
+		if (PyErr_Occurred())
+			return (unsigned PY_LONG_LONG)-1;
+		return val;
+	}
+	else
+	{
+		Py_DECREF(lo);
+		PyErr_SetString(PyExc_TypeError,
+				"nb_int should return int object");
+		return (unsigned PY_LONG_LONG)-1;
+	}
 }
 #undef IS_LITTLE_ENDIAN
 

@@ -1094,7 +1094,7 @@ SyntaxError_str(PySyntaxErrorObject *self)
 
     have_filename = (self->filename != NULL) &&
         PyString_Check(self->filename);
-    have_lineno = (self->lineno != NULL) && PyInt_Check(self->lineno);
+    have_lineno = (self->lineno != NULL) && PyInt_CheckExact(self->lineno);
 
     if (!have_filename && !have_lineno)
         return str;
@@ -1230,9 +1230,7 @@ get_int(PyObject *attr, Py_ssize_t *value, const char *name)
         return -1;
     }
 
-    if (PyInt_Check(attr)) {
-        *value = PyInt_AS_LONG(attr);
-    } else if (PyLong_Check(attr)) {
+    if (PyLong_Check(attr)) {
         *value = PyLong_AsSsize_t(attr);
         if (*value == -1 && PyErr_Occurred())
             return -1;
