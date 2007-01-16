@@ -158,6 +158,7 @@ Py_InitializeEx(int install_sigs)
 	char *saved_locale;
 	PyObject *sys_stream, *sys_isatty;
 #endif
+	/* Forward declaration. */
 	extern void _Py_ReadyTypes(void);
 
 	if (initialized)
@@ -171,15 +172,19 @@ Py_InitializeEx(int install_sigs)
 	if ((p = Py_GETENV("PYTHONOPTIMIZE")) && *p != '\0')
 		Py_OptimizeFlag = add_flag(Py_OptimizeFlag, p);
 
+	/* Create new interpreter. */
 	interp = PyInterpreterState_New();
 	if (interp == NULL)
 		Py_FatalError("Py_Initialize: can't make first interpreter");
 
+	/* Spawn a new thread to run the interpreter in. */
 	tstate = PyThreadState_New(interp);
 	if (tstate == NULL)
 		Py_FatalError("Py_Initialize: can't make first thread");
+	/* Make the new interpreter the current interpreter. */
 	(void) PyThreadState_Swap(tstate);
 
+	/* Get Python types ready for use. */
 	_Py_ReadyTypes();
 
 	if (!_PyFrame_Init())
@@ -190,6 +195,7 @@ Py_InitializeEx(int install_sigs)
 
 	_PyFloat_Init();
 
+	/* Create modules cache. */
 	interp->modules = PyDict_New();
 	if (interp->modules == NULL)
 		Py_FatalError("Py_Initialize: can't make modules dictionary");
@@ -199,6 +205,7 @@ Py_InitializeEx(int install_sigs)
 	_PyUnicode_Init();
 #endif
 
+	/* Create and initialize the builtins dict. */
 	bimod = _PyBuiltin_Init();
 	if (bimod == NULL)
 		Py_FatalError("Py_Initialize: can't initialize __builtin__");
@@ -207,18 +214,25 @@ Py_InitializeEx(int install_sigs)
 		Py_FatalError("Py_Initialize: can't initialize builtins dict");
 	Py_INCREF(interp->builtins);
 
+	/* Create and initialize the sys module. */
 	sysmod = _PySys_Init();
 	if (sysmod == NULL)
 		Py_FatalError("Py_Initialize: can't initialize sys");
+	/* Store the sys module's dict in the interpreter. */
 	interp->sysdict = PyModule_GetDict(sysmod);
 	if (interp->sysdict == NULL)
 		Py_FatalError("Py_Initialize: can't initialize sys dict");
 	Py_INCREF(interp->sysdict);
+	/* Store a copy of the sys module's dict for use in future imports.
+	   All modification of the sys module after this call will not be
+	   picked up in future imports! */
 	_PyImport_FixupExtension("sys", "sys");
+	/* Set sys.path. */
 	PySys_SetPath(Py_GetPath());
 	PyDict_SetItemString(interp->sysdict, "modules",
 			     interp->modules);
 
+	/* Prep import. */
 	_PyImport_Init();
 
 	/* initialize builtin exceptions */
@@ -228,6 +242,7 @@ Py_InitializeEx(int install_sigs)
 	/* phase 2 of builtins */
 	_PyImport_FixupExtension("__builtin__", "__builtin__");
 
+	/* Set various import-related values in sys. */
 	_PyImportHooks_Init();
 
 	if (install_sigs)
@@ -245,14 +260,6 @@ Py_InitializeEx(int install_sigs)
 	warnings_module = PyImport_ImportModule("warnings");
 	if (!warnings_module)
 		PyErr_Clear();
-
-	/* Store import machinery somewhere so that a reference is held as
-	   needed. */
-	PyDict_SetItemString(interp->sysdict, "import_",
-			PyDict_GetItemString(interp->builtins, "__import__"));
-	PyDict_SetItemString(interp->builtins, "__import__",
-			PyDict_GetItemString(interp->sysdict,
-				"import_delegate"));
 
 #if defined(Py_USING_UNICODE) && defined(HAVE_LANGINFO_H) && defined(CODESET)
 	/* On Unix, set the file system encoding according to the
@@ -315,12 +322,45 @@ Py_InitializeEx(int install_sigs)
 			free(codeset);
 	}
 #endif
+
 }
 
 void
 Py_Initialize(void)
 {
+	PyInterpreterState *interp;
+	Py_ssize_t module_count, x;
+	PyObject* module_names_list;
+
 	Py_InitializeEx(1);
+
+	interp = PyThreadState_GET()->interp;
+
+	/* Store import machinery somewhere so that a reference is held as
+	   needed. */
+	PyDict_SetItemString(interp->sysdict, "import_",
+			PyDict_GetItemString(interp->builtins, "__import__"));
+	PyDict_SetItemString(interp->builtins, "__import__",
+			PyDict_GetItemString(interp->sysdict,
+				"import_delegate"));
+
+	/* Clear out sys.modules (sans some key modules). */
+	module_names_list = PyDict_Keys(interp->modules);
+	module_count = PyList_GET_SIZE(module_names_list);
+	for (x=0; x < module_count; x+=1) {
+		char *module_name =
+			PyString_AS_STRING(
+					PyList_GET_ITEM(module_names_list, x));
+		if ((strcmp(module_name, "__builtin__") != 0) &&
+			(strcmp(module_name, "exceptions") != 0) &&
+			(strcmp(module_name, "__main__") != 0) &&
+			(strcmp(module_name, "sys") != 0) &&
+			(strcmp(module_name, "encodings") != 0)) {
+			PyDict_DelItemString(interp->modules, module_name);
+		}
+	}
+	PyDict_SetItemString(interp->sysdict, "modules", interp->modules);
+
 }
 
 
