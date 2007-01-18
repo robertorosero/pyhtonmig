@@ -8,6 +8,8 @@ file to find out what revision number introduced the feature.
 Core and builtins
 -----------------
 
+* rev. ????: Added a delegate for import that calls sys.import_.
+
 * rev. 51679: Remove the constructor for the 'code' type.  This means instances
   of the 'code' type cannot be created directly.  You must use the new
   objcap.code_new() factory function to create instances.
