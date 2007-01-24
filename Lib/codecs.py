@@ -7,7 +7,8 @@ Written by Marc-Andre Lemburg (mal@lemburg.com).
 
 """#"
 
-import __builtin__, sys
+import __builtin__
+from sys import byteorder
 
 ### Registry and builtin stateless codec functions
 
@@ -47,7 +48,7 @@ BOM_UTF32_LE = '\xff\xfe\x00\x00'
 # UTF-32, big endian
 BOM_UTF32_BE = '\x00\x00\xfe\xff'
 
-if sys.byteorder == 'little':
+if byteorder == 'little':
 
     # UTF-16, native endianness
     BOM = BOM_UTF16 = BOM_UTF16_LE
@@ -1022,13 +1023,3 @@ except LookupError:
 _false = 0
 if _false:
     import encodings
-
-### Tests
-
-if __name__ == '__main__':
-
-    # Make stdout translate Latin-1 output into UTF-8 output
-    sys.stdout = EncodedFile(sys.stdout, 'latin-1', 'utf-8')
-
-    # Have stdin translate Latin-1 input into UTF-8 input
-    sys.stdin = EncodedFile(sys.stdin, 'utf-8', 'latin-1')

@@ -344,7 +344,29 @@ Py_Initialize(void)
 			PyDict_GetItemString(interp->sysdict,
 				"import_delegate"));
 
-	/* Clear out sys.modules (sans some key modules). */
+	/* Clear out sys.modules.
+	   Some modules must be kept around (at least for now; **XXX need to do
+	   a security audit of each one!):
+
+	   * __builtin__
+	       Lose this and Python will not run.
+	   * __main__
+	       Current scope of execution.
+	   * exceptions
+	       Safe to keep around.
+	   * sys
+	       Certain values set during Python initialization that are lost
+	       when the module is deleted and then re-imported.
+	   * encodings
+	       Does dynamic import of encodings which requires globals() to
+	       work; globals() fails when the module has been deleted.
+	   * encodings.utf_8
+	       Many encodings use this.
+	   * codecs
+	       Incremental codecs fail.
+	   * warnings
+	       Warnings reset otherwise.
+	 */
 	module_names_list = PyDict_Keys(interp->modules);
 	module_count = PyList_GET_SIZE(module_names_list);
 	for (x=0; x < module_count; x+=1) {
@@ -355,7 +377,10 @@ Py_Initialize(void)
 			(strcmp(module_name, "exceptions") != 0) &&
 			(strcmp(module_name, "__main__") != 0) &&
 			(strcmp(module_name, "sys") != 0) &&
-			(strcmp(module_name, "encodings") != 0)) {
+			(strcmp(module_name, "encodings") != 0) &&
+			(strcmp(module_name, "encodings.utf_8") != 0) &&
+			(strcmp(module_name, "codecs") != 0) &&
+			(strcmp(module_name, "warnings") != 0)) {
 			PyDict_DelItemString(interp->modules, module_name);
 		}
 	}

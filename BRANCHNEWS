@@ -51,4 +51,7 @@ Extension Modules
 Library
 -------
 
+* Change the codecs module so that it does not import the entire sys module and
+  thus hold a reference to it.
+
 * rev. 53333: External definition of importlib (from the sandbox) added.
