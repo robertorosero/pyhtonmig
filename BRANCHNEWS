@@ -8,6 +8,11 @@ file to find out what revision number introduced the feature.
 Core and builtins
 -----------------
 
+* Make importing the sys module after it has been completely deleted use the
+  interpreter's sysdict instead of the cached dict used by the import
+  machinery.  This lets the sys module be deleted for security reasons during
+  startup.
+
 * rev. ????: Added a delegate for import that calls sys.import_.
 
 * rev. 51679: Remove the constructor for the 'code' type.  This means instances

@@ -357,9 +357,6 @@ Py_Initialize(void)
 	       Current scope of execution.
 	   * exceptions
 	       Safe to keep around.
-	   * sys
-	       Certain values set during Python initialization that are lost
-	       when the module is deleted and then re-imported.
 	   * encodings
 	       Does dynamic import of encodings which requires globals() to
 	       work; globals() fails when the module has been deleted.
@@ -379,7 +376,6 @@ Py_Initialize(void)
 		if ((strcmp(module_name, "__builtin__") != 0) &&
 			(strcmp(module_name, "exceptions") != 0) &&
 			(strcmp(module_name, "__main__") != 0) &&
-			(strcmp(module_name, "sys") != 0) &&
 			(strcmp(module_name, "encodings") != 0) &&
 			(strcmp(module_name, "encodings.utf_8") != 0) &&
 			(strcmp(module_name, "codecs") != 0) &&

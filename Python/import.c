@@ -563,8 +563,17 @@ _PyImport_FindExtension(char *name, char *filename)
 	mdict = PyModule_GetDict(mod);
 	if (mdict == NULL)
 		return NULL;
-	if (PyDict_Update(mdict, dict))
-		return NULL;
+	if ((!strcmp("sys", name)) && (!strcmp("sys", filename))) {
+		PyThreadState *tstate = PyThreadState_GET();
+		PyObject *sysdict = tstate->interp->sysdict;
+
+		Py_INCREF(sysdict);
+		PyModule_SetDict(mod, sysdict);
+	}
+	else {
+		if (PyDict_Update(mdict, dict))
+			return NULL;
+	}
 	if (Py_VerboseFlag)
 		PySys_WriteStderr("import %s # previously loaded (%s)\n",
 			name, filename);

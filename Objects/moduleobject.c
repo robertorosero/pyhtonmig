@@ -54,6 +54,16 @@ PyModule_GetDict(PyObject *m)
 	return d;
 }
 
+void
+PyModule_SetDict(PyObject *m, PyObject *new_dict)
+{
+	PyModuleObject *module = (PyModuleObject *)m;
+	PyObject *old_dict = module->md_dict;
+
+	Py_XDECREF(old_dict);
+	module->md_dict = new_dict;
+}
+
 char *
 PyModule_GetName(PyObject *m)
 {
