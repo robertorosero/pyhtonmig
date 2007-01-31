@@ -16,8 +16,8 @@ import socket
 import errno
 import copy
 import email
-import email.Message
-import email.Generator
+import email.message
+import email.generator
 import rfc822
 import StringIO
 try:
@@ -196,9 +196,9 @@ class Mailbox:
         # To get native line endings on disk, the user-friendly \n line endings
         # used in strings and by email.Message are translated here.
         """Dump message contents to target file."""
-        if isinstance(message, email.Message.Message):
+        if isinstance(message, email.message.Message):
             buffer = StringIO.StringIO()
-            gen = email.Generator.Generator(buffer, mangle_from_, 0)
+            gen = email.generator.Generator(buffer, mangle_from_, 0)
             gen.flatten(message)
             buffer.seek(0)
             target.write(buffer.read().replace('\n', os.linesep))
@@ -572,7 +572,7 @@ class _singlefileMailbox(Mailbox):
         # already have been generated (and presumably has been modified
         # by adding or deleting an item).
         assert self._toc is not None
-        
+
         # Check length of self._file; if it's changed, some other process
         # has modified the mailbox since we scanned it.
         self._file.seek(0, 2)
@@ -581,7 +581,7 @@ class _singlefileMailbox(Mailbox):
             raise ExternalClashError('Size of mailbox file changed '
                                      '(expected %i, found %i)' %
                                      (self._file_length, cur_len))
-        
+
         new_file = _create_temporary(self._path)
         try:
             new_toc = {}
@@ -707,7 +707,7 @@ class _mboxMMDF(_singlefileMailbox):
                 message = ''
         elif isinstance(message, _mboxMMDFMessage):
             from_line = 'From ' + message.get_from()
-        elif isinstance(message, email.Message.Message):
+        elif isinstance(message, email.message.Message):
             from_line = message.get_unixfrom()  # May be None.
         if from_line is None:
             from_line = 'From MAILER-DAEMON %s' % time.asctime(time.gmtime())
@@ -1222,7 +1222,7 @@ class Babyl(_singlefileMailbox):
         self._next_key = len(self._toc)
         self._file.seek(0, 2)
         self._file_length = self._file.tell()
-        
+
     def _pre_mailbox_hook(self, f):
         """Called before writing the mailbox to file f."""
         f.write('BABYL OPTIONS:%sVersion: 5%sLabels:%s%s\037' %
@@ -1257,9 +1257,9 @@ class Babyl(_singlefileMailbox):
             self._file.write(os.linesep)
         else:
             self._file.write('1,,' + os.linesep)
-        if isinstance(message, email.Message.Message):
+        if isinstance(message, email.message.Message):
             orig_buffer = StringIO.StringIO()
-            orig_generator = email.Generator.Generator(orig_buffer, False, 0)
+            orig_generator = email.generator.Generator(orig_buffer, False, 0)
             orig_generator.flatten(message)
             orig_buffer.seek(0)
             while True:
@@ -1270,7 +1270,7 @@ class Babyl(_singlefileMailbox):
             self._file.write('*** EOOH ***' + os.linesep)
             if isinstance(message, BabylMessage):
                 vis_buffer = StringIO.StringIO()
-                vis_generator = email.Generator.Generator(vis_buffer, False, 0)
+                vis_generator = email.generator.Generator(vis_buffer, False, 0)
                 vis_generator.flatten(message.get_visible())
                 while True:
                     line = vis_buffer.readline()
@@ -1326,12 +1326,12 @@ class Babyl(_singlefileMailbox):
         return (start, stop)
 
 
-class Message(email.Message.Message):
+class Message(email.message.Message):
     """Message with mailbox-format-specific properties."""
 
     def __init__(self, message=None):
         """Initialize a Message instance."""
-        if isinstance(message, email.Message.Message):
+        if isinstance(message, email.message.Message):
             self._become_message(copy.deepcopy(message))
             if isinstance(message, Message):
                 message._explain_to(self)
@@ -1340,7 +1340,7 @@ class Message(email.Message.Message):
         elif hasattr(message, "read"):
             self._become_message(email.message_from_file(message))
         elif message is None:
-            email.Message.Message.__init__(self)
+            email.message.Message.__init__(self)
         else:
             raise TypeError('Invalid message type: %s' % type(message))
 
@@ -1471,7 +1471,7 @@ class _mboxMMDFMessage(Message):
     def __init__(self, message=None):
         """Initialize an mboxMMDFMessage instance."""
         self.set_from('MAILER-DAEMON', True)
-        if isinstance(message, email.Message.Message):
+        if isinstance(message, email.message.Message):
             unixfrom = message.get_unixfrom()
             if unixfrom is not None and unixfrom.startswith('From '):
                 self.set_from(unixfrom[5:])
@@ -1993,10 +1993,12 @@ class UnixMailbox(_Mailbox):
     # that the two characters preceding "From " are \n\n or the beginning of
     # the file.  Fixing this would require a more extensive rewrite than is
     # necessary.  For convenience, we've added a PortableUnixMailbox class
-    # which uses the more lenient _fromlinepattern regular expression.
+    # which does no checking of the format of the 'From' line.
 
-    _fromlinepattern = r"From \s*[^\s]+\s+\w\w\w\s+\w\w\w\s+\d?\d\s+" \
-                       r"\d?\d:\d\d(:\d\d)?(\s+[^\s]+)?\s+\d\d\d\d\s*$"
+    _fromlinepattern = (r"From \s*[^\s]+\s+\w\w\w\s+\w\w\w\s+\d?\d\s+"
+                        r"\d?\d:\d\d(:\d\d)?(\s+[^\s]+)?\s+\d\d\d\d\s*"
+                        r"[^\s]*\s*"
+                        "$")
     _regexp = None
 
     def _strict_isrealfromline(self, line):
