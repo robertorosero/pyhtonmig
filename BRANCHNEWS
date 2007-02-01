@@ -8,6 +8,8 @@ file to find out what revision number introduced the feature.
 Core and builtins
 -----------------
 
+* Force 'warnings' to be cached by the C code.
+
 * Make importing the sys module after it has been completely deleted use the
   interpreter's sysdict instead of the cached dict used by the import
   machinery.  This lets the sys module be deleted for security reasons during

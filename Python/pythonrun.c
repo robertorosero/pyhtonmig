@@ -334,6 +334,7 @@ Py_Initialize(void)
 	PyInterpreterState *interp;
 	Py_ssize_t module_count, x;
 	PyObject* module_names_list;
+	PyObject* hidden_modules;
 
 	Py_InitializeEx(1);
 
@@ -359,32 +360,53 @@ Py_Initialize(void)
 	       Safe to keep around.
 	   * encodings
 	       Does dynamic import of encodings which requires globals() to
-	       work; globals() fails when the module has been deleted.
-	   * encodings.utf_8
-	       Many encodings use this.
+	       work; globals() fails when the module has been deleted.  Also
+	       fails if you hide module because importing of submodules for
+	       encodings no longer has the parent package.
 	   * codecs
 	       Incremental codecs fail.
-	   * warnings
+	   * _codecs
+	       Exposed by codecs.
+	   * warnings (hide: needs sys._getframe())
 	       Warnings reset otherwise.
 	 */
+	/* Get the 'warnings' module cached away at the C level. */
+	PyModule_GetWarningsModule();
 	module_names_list = PyDict_Keys(interp->modules);
 	module_count = PyList_GET_SIZE(module_names_list);
+	hidden_modules = PyDict_New();
 	for (x=0; x < module_count; x+=1) {
 		char *module_name =
 			PyString_AS_STRING(
 					PyList_GET_ITEM(module_names_list, x));
-		if ((strcmp(module_name, "__builtin__") != 0) &&
-			(strcmp(module_name, "exceptions") != 0) &&
-			(strcmp(module_name, "__main__") != 0) &&
-			(strcmp(module_name, "encodings") != 0) &&
-			(strcmp(module_name, "encodings.utf_8") != 0) &&
-			(strcmp(module_name, "codecs") != 0) &&
-			(strcmp(module_name, "warnings") != 0)) {
+		/* Modules that *must* stay visible. */
+		if ((strcmp(module_name, "__builtin__") == 0) ||
+				(strcmp(module_name, "__main__") == 0) ||
+				(strcmp(module_name, "exceptions") == 0) ||
+				(strcmp(module_name, "encodings") == 0) ||
+				(strcmp(module_name, "codecs") == 0) ||
+				(strcmp(module_name, "_codecs") == 0)) {
+			continue;
+		}
+		/* Modules that *must* stay but can be invisible. */
+		/*else if ((strcmp(module_name, "warnings") == 0)) {
+			PyObject *module =
+				PyDict_GetItemString(interp->modules,
+						module_name);
+			PyDict_SetItemString(hidden_modules, module_name,
+					module);
+			PyDict_DelItemString(interp->modules, module_name);
+		}*/
+		/* Everything else can go. */
+		else {
 			PyDict_DelItemString(interp->modules, module_name);
 		}
 	}
-	PyDict_SetItemString(interp->sysdict, "modules", interp->modules);
+	/* Store away modules that must stick around but should not be exposed.
+	   */
+	PyDict_SetItemString(interp->modules, ".hidden", hidden_modules);
 
+	PyDict_SetItemString(interp->sysdict, "modules", interp->modules);
 }
 
 
