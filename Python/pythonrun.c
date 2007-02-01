@@ -333,24 +333,32 @@ Py_Initialize(void)
 {
 	PyInterpreterState *interp;
 	Py_ssize_t module_count, x;
-	PyObject* module_names_list;
-	PyObject* hidden_modules;
+	PyObject *module_names_list;
+	PyObject *hidden_modules;
+	PyObject *import_module;
+	PyObject *import_callable;
 
 	Py_InitializeEx(1);
 
 	interp = PyThreadState_GET()->interp;
 
+	import_module = PyImport_ImportModule("importlib");
+
+	import_callable = PyObject_CallMethod(import_module, "Import", "");
+
 	/* Store import machinery somewhere so that a reference is held as
 	   needed. */
-	PyDict_SetItemString(interp->sysdict, "import_",
-			PyDict_GetItemString(interp->builtins, "__import__"));
+	PyDict_SetItemString(interp->sysdict, "import_", import_callable);
 	PyDict_SetItemString(interp->builtins, "__import__",
 			PyDict_GetItemString(interp->sysdict,
 				"import_delegate"));
 
+	Py_DECREF(import_module);
+	Py_DECREF(import_callable);
+
 	/* Clear out sys.modules.
-	   Some modules must be kept around (at least for now; **XXX need to do
-	   a security audit of each one!):
+	   Some modules must be kept around in order for Python to function
+	   properly.
 
 	   * __builtin__
 	       Lose this and Python will not run.
@@ -369,6 +377,9 @@ Py_Initialize(void)
 	       Exposed by codecs.
 	   * warnings (cache in C code)
 	       Warnings reset otherwise.  Requires 'sys' module to work.
+
+	   All other modules are kept in the '.hidden' dict in sys.modules for
+	   use by importlib.
 	 */
 	/* Get the 'warnings' module cached away at the C level. */
 	PyModule_GetWarningsModule();
@@ -388,21 +399,18 @@ Py_Initialize(void)
 				(strcmp(module_name, "_codecs") == 0)) {
 			continue;
 		}
-		/* Modules that *must* stay but can be invisible. */
-		/*else if ((strcmp(module_name, "warnings") == 0)) {
+		/* All other modules must be stored away for importlib. */
+		else {
 			PyObject *module =
 				PyDict_GetItemString(interp->modules,
 						module_name);
 			PyDict_SetItemString(hidden_modules, module_name,
 					module);
 			PyDict_DelItemString(interp->modules, module_name);
-		}*/
-		/* Everything else can go. */
-		else {
-			PyDict_DelItemString(interp->modules, module_name);
 		}
 	}
-	/* Store away modules that must stick around but should not be exposed.
+	/* Store away modules that must stick around but should not be exposed;
+	   this is done for importlib's benefit.
 	   */
 	PyDict_SetItemString(interp->modules, ".hidden", hidden_modules);
 

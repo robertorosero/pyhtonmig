@@ -8,6 +8,10 @@ file to find out what revision number introduced the feature.
 Core and builtins
 -----------------
 
+* Use an instance of importlib.Import as what __import__ delegates to.  This
+  necessitates storing a large chunk of modules into sys.modules['.hidden'] so
+  that importlib can keep working.
+
 * Clear out sys.path_importer_cache.
 
 * Force 'warnings' to be cached by the C code.
