@@ -8,6 +8,8 @@ file to find out what revision number introduced the feature.
 Core and builtins
 -----------------
 
+* Clear out sys.path_importer_cache.
+
 * Force 'warnings' to be cached by the C code.
 
 * Make importing the sys module after it has been completely deleted use the

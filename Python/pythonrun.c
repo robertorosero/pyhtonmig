@@ -367,8 +367,8 @@ Py_Initialize(void)
 	       Incremental codecs fail.
 	   * _codecs
 	       Exposed by codecs.
-	   * warnings (hide: needs sys._getframe())
-	       Warnings reset otherwise.
+	   * warnings (cache in C code)
+	       Warnings reset otherwise.  Requires 'sys' module to work.
 	 */
 	/* Get the 'warnings' module cached away at the C level. */
 	PyModule_GetWarningsModule();
@@ -407,6 +407,10 @@ Py_Initialize(void)
 	PyDict_SetItemString(interp->modules, ".hidden", hidden_modules);
 
 	PyDict_SetItemString(interp->sysdict, "modules", interp->modules);
+
+	/* Clear out sys.path_importer_cache. */
+	PyDict_Clear(PyDict_GetItemString(interp->sysdict,
+				"path_importer_cache"));
 }
 
 
