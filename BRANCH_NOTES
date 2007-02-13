@@ -1,0 +1,17 @@
+=======
+Purpose
+=======
+Attempt to develop some form of security model for Python.
+
+======
+Status
+======
+Working on an interpreter-wide security model for Python.  This is not a
+replacement for rexec but should allow someone who embeds Python to be able to
+execute Python code safely.
+
+==========
+References
+==========
+* securing_python.txt
+* http://docs.google.com/Doc?id=dg7fctr4_4d8tdbq
