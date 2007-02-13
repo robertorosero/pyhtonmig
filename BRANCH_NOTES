@@ -1,0 +1,24 @@
+=======
+Purpose
+=======
+This branch is to try to track how memory is used throughout the interpreter.
+The goal was to be able to ask questions like, "how many bytes are being used
+by integers?" and the like.
+
+The hope was that people would be able to tell where all of their memory usage
+was going.  This could also help with finding reference leaks if a certain type
+of object was taking up more memory than it was supposed to.
+
+======
+Status
+======
+Tracking "leaks" a few bytes after every pressing of Enter at an interpreter
+prompt.
+
+This branch was meant as a proof-of-concept of the idea.  It was to work out
+how one could track pymalloc and malloc usage.
+
+==========
+References
+==========
+* PEP.txt in this branch.
