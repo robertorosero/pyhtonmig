@@ -1,0 +1,15 @@
+=======
+Purpose
+=======
+Replace the C implementation of import with Python implementation.
+
+======
+Status
+======
+Rewrite of import in Pure Python contained is in Python's sandbox under
+import_in_py.
+
+
+==========
+References
+==========
