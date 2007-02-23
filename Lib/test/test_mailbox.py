@@ -4,7 +4,7 @@ import time
 import stat
 import socket
 import email
-import email.Message
+import email.message
 import rfc822
 import re
 import StringIO
@@ -22,15 +22,15 @@ class TestBase(unittest.TestCase):
 
     def _check_sample(self, msg):
         # Inspect a mailbox.Message representation of the sample message
-        self.assert_(isinstance(msg, email.Message.Message))
+        self.assert_(isinstance(msg, email.message.Message))
         self.assert_(isinstance(msg, mailbox.Message))
-        for key, value in _sample_headers.iteritems():
+        for key, value in _sample_headers.items():
             self.assert_(value in msg.get_all(key))
         self.assert_(msg.is_multipart())
         self.assert_(len(msg.get_payload()) == len(_sample_payloads))
         for i, payload in enumerate(_sample_payloads):
             part = msg.get_payload(i)
-            self.assert_(isinstance(part, email.Message.Message))
+            self.assert_(isinstance(part, email.message.Message))
             self.assert_(not isinstance(part, mailbox.Message))
             self.assert_(part.get_payload() == payload)
 
@@ -174,7 +174,7 @@ class TestMailbox(TestBase):
 
     def test_iterkeys(self):
         # Get keys using iterkeys()
-        self._check_iteration(self._box.iterkeys, do_keys=True, do_values=False)
+        self._check_iteration(self._box.keys, do_keys=True, do_values=False)
 
     def test_keys(self):
         # Get keys using keys()
@@ -182,7 +182,7 @@ class TestMailbox(TestBase):
 
     def test_itervalues(self):
         # Get values using itervalues()
-        self._check_iteration(self._box.itervalues, do_keys=False,
+        self._check_iteration(self._box.values, do_keys=False,
                               do_values=True)
 
     def test_iter(self):
@@ -196,7 +196,7 @@ class TestMailbox(TestBase):
 
     def test_iteritems(self):
         # Get keys and values using iteritems()
-        self._check_iteration(self._box.iteritems, do_keys=True,
+        self._check_iteration(self._box.items, do_keys=True,
                               do_values=True)
 
     def test_items(self):
@@ -424,12 +424,12 @@ class TestMailboxSuperclass(TestBase):
         self.assertRaises(NotImplementedError, lambda: box.__delitem__(''))
         self.assertRaises(NotImplementedError, lambda: box.discard(''))
         self.assertRaises(NotImplementedError, lambda: box.__setitem__('', ''))
-        self.assertRaises(NotImplementedError, lambda: box.iterkeys())
         self.assertRaises(NotImplementedError, lambda: box.keys())
-        self.assertRaises(NotImplementedError, lambda: box.itervalues().next())
+        self.assertRaises(NotImplementedError, lambda: box.keys())
+        self.assertRaises(NotImplementedError, lambda: box.values().next())
         self.assertRaises(NotImplementedError, lambda: box.__iter__().next())
         self.assertRaises(NotImplementedError, lambda: box.values())
-        self.assertRaises(NotImplementedError, lambda: box.iteritems().next())
+        self.assertRaises(NotImplementedError, lambda: box.items().next())
         self.assertRaises(NotImplementedError, lambda: box.items())
         self.assertRaises(NotImplementedError, lambda: box.get(''))
         self.assertRaises(NotImplementedError, lambda: box.__getitem__(''))
@@ -674,11 +674,11 @@ class TestMaildir(TestMailbox):
         box = self._factory(self._path, factory=dummy_factory)
         folder = box.add_folder('folder1')
         self.assert_(folder._factory is dummy_factory)
-        
+
         folder1_alias = box.get_folder('folder1')
         self.assert_(folder1_alias._factory is dummy_factory)
 
-        
+
 
 class _TestMboxMMDF(TestMailbox):
 
@@ -709,7 +709,7 @@ class _TestMboxMMDF(TestMailbox):
         mtime = os.path.getmtime(self._path)
         self._box = self._factory(self._path)
         self.assert_(len(self._box) == 3)
-        for key in self._box.iterkeys():
+        for key in self._box.keys():
             self.assert_(self._box.get_string(key) in values)
         self._box.close()
         self.assert_(mtime == os.path.getmtime(self._path))
@@ -798,7 +798,7 @@ class TestMH(TestMailbox):
         def dummy_factory (s):
             return None
         self._box = self._factory(self._path, dummy_factory)
-        
+
         new_folder = self._box.add_folder('foo.bar')
         folder0 = self._box.get_folder('foo.bar')
         folder0.add(self._template % 'bar')
@@ -894,7 +894,7 @@ class TestMH(TestMailbox):
         self.assert_(self._box.get_sequences() ==
                      {'foo':[1, 2, 3, 4, 5],
                       'unseen':[1], 'bar':[3], 'replied':[3]})
-        
+
     def _get_lock_path(self):
         return os.path.join(self._path, '.mh_sequences.lock')
 
@@ -939,7 +939,7 @@ class TestMessage(TestBase):
         self._delete_recursively(self._path)
 
     def test_initialize_with_eMM(self):
-        # Initialize based on email.Message.Message instance
+        # Initialize based on email.message.Message instance
         eMM = email.message_from_string(_sample_message)
         msg = self._factory(eMM)
         self._post_initialize_hook(msg)
@@ -965,7 +965,7 @@ class TestMessage(TestBase):
         # Initialize without arguments
         msg = self._factory()
         self._post_initialize_hook(msg)
-        self.assert_(isinstance(msg, email.Message.Message))
+        self.assert_(isinstance(msg, email.message.Message))
         self.assert_(isinstance(msg, mailbox.Message))
         self.assert_(isinstance(msg, self._factory))
         self.assert_(msg.keys() == [])
@@ -992,7 +992,7 @@ class TestMessage(TestBase):
                        mailbox.BabylMessage, mailbox.MMDFMessage):
             other_msg = class_()
             msg._explain_to(other_msg)
-        other_msg = email.Message.Message()
+        other_msg = email.message.Message()
         self.assertRaises(TypeError, lambda: msg._explain_to(other_msg))
 
     def _post_initialize_hook(self, msg):
@@ -1732,11 +1732,11 @@ class MaildirTestCase(unittest.TestCase):
 
     def test_unix_mbox(self):
         ### should be better!
-        import email.Parser
+        import email.parser
         fname = self.createMessage("cur", True)
         n = 0
         for msg in mailbox.PortableUnixMailbox(open(fname),
-                                               email.Parser.Parser().parse):
+                                               email.parser.Parser().parse):
             n += 1
             self.assertEqual(msg["subject"], "Simple Test")
             self.assertEqual(len(str(msg)), len(FROM_)+len(DUMMY_MESSAGE))

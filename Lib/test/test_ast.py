@@ -2,7 +2,7 @@ import sys, itertools
 import _ast
 
 def to_tuple(t):
-    if t is None or isinstance(t, (basestring, int, long, complex)):
+    if t is None or isinstance(t, (basestring, int, int, complex)):
         return t
     elif isinstance(t, list):
         return [to_tuple(e) for e in t]
@@ -30,8 +30,6 @@ exec_tests = [
     "v = 1",
     # AugAssign
     "v += 1",
-    # Print
-    "print >>f, 1, ",
     # For
     "for v in v:pass",
     # While
@@ -93,7 +91,7 @@ eval_tests = [
   # Call
   "f(1,2,c=3,*d,**e)",
   # Num
-  "10L",
+  "10",
   # Str
   "'string'",
   # Attribute
@@ -117,11 +115,11 @@ eval_tests = [
 if __name__=='__main__' and sys.argv[1:] == ['-g']:
     for statements, kind in ((exec_tests, "exec"), (single_tests, "single"),
                              (eval_tests, "eval")):
-        print kind+"_results = ["
+        print(kind+"_results = [")
         for s in statements:
-            print repr(to_tuple(compile(s, "?", kind, 0x400)))+","
-        print "]"
-    print "run_tests()"
+            print(repr(to_tuple(compile(s, "?", kind, 0x400)))+",")
+        print("]")
+    print("run_tests()")
     raise SystemExit
 
 def test_order(ast_node, parent_pos):
@@ -157,7 +155,6 @@ exec_results = [
 ('Module', [('Delete', (1, 0), [('Name', (1, 4), 'v', ('Del',))])]),
 ('Module', [('Assign', (1, 0), [('Name', (1, 0), 'v', ('Store',))], ('Num', (1, 4), 1))]),
 ('Module', [('AugAssign', (1, 0), ('Name', (1, 0), 'v', ('Store',)), ('Add',), ('Num', (1, 5), 1))]),
-('Module', [('Print', (1, 0), ('Name', (1, 8), 'f', ('Load',)), [('Num', (1, 11), 1)], False)]),
 ('Module', [('For', (1, 0), ('Name', (1, 4), 'v', ('Store',)), ('Name', (1, 9), 'v', ('Load',)), [('Pass', (1, 11))], [])]),
 ('Module', [('While', (1, 0), ('Name', (1, 6), 'v', ('Load',)), [('Pass', (1, 8))], [])]),
 ('Module', [('If', (1, 0), ('Name', (1, 3), 'v', ('Load',)), [('Pass', (1, 5))], [])]),

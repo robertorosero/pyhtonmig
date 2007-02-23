@@ -84,8 +84,8 @@ sz = struct.calcsize('i')
 if sz * 3 != struct.calcsize('iii'):
     raise TestFailed, 'inconsistent sizes'
 
-fmt = 'cbxxxxxxhhhhiillffd'
-fmt3 = '3c3b18x12h6i6l6f3d'
+fmt = 'cbxxxxxxhhhhiillffdt'
+fmt3 = '3c3b18x12h6i6l6f3d3t'
 sz = struct.calcsize(fmt)
 sz3 = struct.calcsize(fmt3)
 if sz * 3 != sz3:
@@ -108,19 +108,21 @@ i = 65535
 l = 65536
 f = 3.1415
 d = 3.1415
+t = True
 
 for prefix in ('', '@', '<', '>', '=', '!'):
-    for format in ('xcbhilfd', 'xcBHILfd'):
+    for format in ('xcbhilfdt', 'xcBHILfdt'):
         format = prefix + format
         if verbose:
-            print "trying:", format
-        s = struct.pack(format, c, b, h, i, l, f, d)
-        cp, bp, hp, ip, lp, fp, dp = struct.unpack(format, s)
+            print("trying:", format)
+        s = struct.pack(format, c, b, h, i, l, f, d, t)
+        cp, bp, hp, ip, lp, fp, dp, tp = struct.unpack(format, s)
         if (cp != c or bp != b or hp != h or ip != i or lp != l or
-            int(100 * fp) != int(100 * f) or int(100 * dp) != int(100 * d)):
+            int(100 * fp) != int(100 * f) or int(100 * dp) != int(100 * d) or
+                        tp != t):
             # ^^^ calculate only to two decimal places
             raise TestFailed, "unpack/pack not transitive (%s, %s)" % (
-                str(format), str((cp, bp, hp, ip, lp, fp, dp)))
+                str(format), str((cp, bp, hp, ip, lp, fp, dp, tp)))
 
 # Test some of the new features in detail
 
@@ -146,23 +148,28 @@ tests = [
     ('H', 0x10000-700, '\375D', 'D\375', 0),
     ('i', 70000000, '\004,\035\200', '\200\035,\004', 0),
     ('i', -70000000, '\373\323\342\200', '\200\342\323\373', 0),
-    ('I', 70000000L, '\004,\035\200', '\200\035,\004', 0),
-    ('I', 0x100000000L-70000000, '\373\323\342\200', '\200\342\323\373', 0),
+    ('I', 70000000, '\004,\035\200', '\200\035,\004', 0),
+    ('I', 0x100000000-70000000, '\373\323\342\200', '\200\342\323\373', 0),
     ('l', 70000000, '\004,\035\200', '\200\035,\004', 0),
     ('l', -70000000, '\373\323\342\200', '\200\342\323\373', 0),
-    ('L', 70000000L, '\004,\035\200', '\200\035,\004', 0),
-    ('L', 0x100000000L-70000000, '\373\323\342\200', '\200\342\323\373', 0),
+    ('L', 70000000, '\004,\035\200', '\200\035,\004', 0),
+    ('L', 0x100000000-70000000, '\373\323\342\200', '\200\342\323\373', 0),
     ('f', 2.0, '@\000\000\000', '\000\000\000@', 0),
     ('d', 2.0, '@\000\000\000\000\000\000\000',
                '\000\000\000\000\000\000\000@', 0),
     ('f', -2.0, '\300\000\000\000', '\000\000\000\300', 0),
     ('d', -2.0, '\300\000\000\000\000\000\000\000',
                '\000\000\000\000\000\000\000\300', 0),
+        ('t', 0, '\0', '\0', 0),
+        ('t', 3, '\1', '\1', 1),
+        ('t', True, '\1', '\1', 0),
+        ('t', [], '\0', '\0', 1),
+        ('t', (1,), '\1', '\1', 1),
 ]
 
 for fmt, arg, big, lil, asy in tests:
     if verbose:
-        print "%r %r %r %r" % (fmt, arg, big, lil)
+        print("%r %r %r %r" % (fmt, arg, big, lil))
     for (xfmt, exp) in [('>'+fmt, big), ('!'+fmt, big), ('<'+fmt, lil),
                         ('='+fmt, ISBIGENDIAN and big or lil)]:
         res = struct.pack(xfmt, arg)
@@ -188,7 +195,7 @@ except struct.error:
     has_native_qQ = 0
 
 if verbose:
-    print "Platform has native q/Q?", has_native_qQ and "Yes." or "No."
+    print("Platform has native q/Q?", has_native_qQ and "Yes." or "No.")
 
 any_err(struct.pack, "Q", -1)   # can't pack -1 as unsigned regardless
 simple_err(struct.pack, "q", "a")  # can't pack string as 'q' regardless
@@ -203,9 +210,9 @@ def test_native_qQ():
             ('q', -1, '\xff' * bytes),
             ('q', 0, '\x00' * bytes),
             ('Q', 0, '\x00' * bytes),
-            ('q', 1L, '\x00' * (bytes-1) + '\x01'),
-            ('Q', (1L << (8*bytes))-1, '\xff' * bytes),
-            ('q', (1L << (8*bytes-1))-1, '\x7f' + '\xff' * (bytes - 1))):
+            ('q', 1, '\x00' * (bytes-1) + '\x01'),
+            ('Q', (1 << (8*bytes))-1, '\xff' * bytes),
+            ('q', (1 << (8*bytes-1))-1, '\x7f' + '\xff' * (bytes - 1))):
         got = struct.pack(format, input)
         native_expected = bigendian_to_native(expected)
         verify(got == native_expected,
@@ -243,23 +250,23 @@ class IntTester:
         self.bitsize = bytesize * 8
         self.signed_code, self.unsigned_code = formatpair
         self.unsigned_min = 0
-        self.unsigned_max = 2L**self.bitsize - 1
-        self.signed_min = -(2L**(self.bitsize-1))
-        self.signed_max = 2L**(self.bitsize-1) - 1
+        self.unsigned_max = 2**self.bitsize - 1
+        self.signed_min = -(2**(self.bitsize-1))
+        self.signed_max = 2**(self.bitsize-1) - 1
 
     def test_one(self, x, pack=struct.pack,
                           unpack=struct.unpack,
                           unhexlify=binascii.unhexlify):
         if verbose:
-            print "trying std", self.formatpair, "on", x, "==", hex(x)
+            print("trying std", self.formatpair, "on", x, "==", hex(x))
 
         # Try signed.
         code = self.signed_code
         if self.signed_min <= x <= self.signed_max:
             # Try big-endian.
-            expected = long(x)
+            expected = int(x)
             if x < 0:
-                expected += 1L << self.bitsize
+                expected += 1 << self.bitsize
                 assert expected > 0
             expected = hex(expected)[2:] # chop "0x"
             if len(expected) & 1:
@@ -306,7 +313,7 @@ class IntTester:
             # x is out of range -- verify pack realizes that.
             if not PY_STRUCT_RANGE_CHECKING and code in self.BUGGY_RANGE_CHECK:
                 if verbose:
-                    print "Skipping buggy range check for code", code
+                    print("Skipping buggy range check for code", code)
             else:
                 deprecated_err(pack, ">" + code, x)
                 deprecated_err(pack, "<" + code, x)
@@ -316,7 +323,7 @@ class IntTester:
         if self.unsigned_min <= x <= self.unsigned_max:
             # Try big-endian.
             format = ">" + code
-            expected = long(x)
+            expected = int(x)
             expected = hex(expected)[2:] # chop "0x"
             if len(expected) & 1:
                 expected = "0" + expected
@@ -361,7 +368,7 @@ class IntTester:
             # x is out of range -- verify pack realizes that.
             if not PY_STRUCT_RANGE_CHECKING and code in self.BUGGY_RANGE_CHECK:
                 if verbose:
-                    print "Skipping buggy range check for code", code
+                    print("Skipping buggy range check for code", code)
             else:
                 deprecated_err(pack, ">" + code, x)
                 deprecated_err(pack, "<" + code, x)
@@ -372,11 +379,11 @@ class IntTester:
         # Create all interesting powers of 2.
         values = []
         for exp in range(self.bitsize + 3):
-            values.append(1L << exp)
+            values.append(1 << exp)
 
         # Add some random values.
         for i in range(self.bitsize):
-            val = 0L
+            val = 0
             for j in range(self.bytesize):
                 val = (val << 8) | randrange(256)
             values.append(val)
@@ -485,15 +492,15 @@ test_705836()
 def test_1229380():
     import sys
     for endian in ('', '>', '<'):
-        for cls in (int, long):
+        for cls in (int, int):
             for fmt in ('B', 'H', 'I', 'L'):
                 deprecated_err(struct.pack, endian + fmt, cls(-1))
 
             deprecated_err(struct.pack, endian + 'B', cls(300))
             deprecated_err(struct.pack, endian + 'H', cls(70000))
 
-        deprecated_err(struct.pack, endian + 'I', sys.maxint * 4L)
-        deprecated_err(struct.pack, endian + 'L', sys.maxint * 4L)
+        deprecated_err(struct.pack, endian + 'I', sys.maxint * 4)
+        deprecated_err(struct.pack, endian + 'L', sys.maxint * 4)
 
 if PY_STRUCT_RANGE_CHECKING:
     test_1229380()
@@ -612,3 +619,50 @@ def test_pack_into_fn():
 test_unpack_from()
 test_pack_into()
 test_pack_into_fn()
+
+def test_bool():
+    for prefix in tuple("<>!=")+('',):
+        false = (), [], [], '', 0
+        true = [1], 'test', 5, -1, 0xffffffff+1, 0xffffffff/2
+        
+        falseFormat = prefix + 't' * len(false)
+        if verbose:
+            print('trying bool pack/unpack on', false, 'using format', falseFormat)
+        packedFalse = struct.pack(falseFormat, *false)
+        unpackedFalse = struct.unpack(falseFormat, packedFalse)
+        
+        trueFormat = prefix + 't' * len(true)
+        if verbose:
+            print('trying bool pack/unpack on', true, 'using format', trueFormat)
+        packedTrue = struct.pack(trueFormat, *true)
+        unpackedTrue = struct.unpack(trueFormat, packedTrue)
+        
+        if len(true) != len(unpackedTrue):
+            raise TestFailed('unpacked true array is not of same size as input')
+        if len(false) != len(unpackedFalse):
+            raise TestFailed('unpacked false array is not of same size as input')
+        
+        for t in unpackedFalse:
+            if t is not False:
+                raise TestFailed('%r did not unpack as False' % t)
+        for t in unpackedTrue:
+            if t is not True:
+                raise TestFailed('%r did not unpack as false' % t)
+    
+        if prefix and verbose:
+            print('trying size of bool with format %r' % (prefix+'t'))
+        packed = struct.pack(prefix+'t', 1)
+        
+        if len(packed) != struct.calcsize(prefix+'t'):
+            raise TestFailed('packed length is not equal to calculated size')
+        
+        if len(packed) != 1 and prefix:
+            raise TestFailed('encoded bool is not one byte: %r' % packed)
+        elif not prefix and verbose:
+            print('size of bool in native format is %i' % (len(packed)))
+        
+        for c in '\x01\x7f\xff\x0f\xf0':
+            if struct.unpack('>t', c)[0] is not True:
+                raise TestFailed('%c did not unpack as True' % c)
+
+test_bool()

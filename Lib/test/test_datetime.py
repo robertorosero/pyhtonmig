@@ -32,7 +32,7 @@ else:
 
 # An arbitrary collection of objects of non-datetime types, for testing
 # mixed-type comparisons.
-OTHERSTUFF = (10, 10L, 34.5, "abc", {}, [], ())
+OTHERSTUFF = (10, 10, 34.5, "abc", {}, [], ())
 
 
 #############################################################################
@@ -149,11 +149,11 @@ class HarmlessMixedComparison(unittest.TestCase):
         self.failIf(() == me)
         self.failUnless(() != me)
 
-        self.failUnless(me in [1, 20L, [], me])
-        self.failIf(me not in [1, 20L, [], me])
+        self.failUnless(me in [1, 20, [], me])
+        self.failIf(me not in [1, 20, [], me])
 
-        self.failUnless([] in [me, 1, 20L, []])
-        self.failIf([] not in [me, 1, 20L, []])
+        self.failUnless([] in [me, 1, 20, []])
+        self.failIf([] not in [me, 1, 20, []])
 
     def test_harmful_mixed_comparison(self):
         me = self.theclass(1, 1, 1)
@@ -222,13 +222,13 @@ class TestTimeDelta(HarmlessMixedComparison):
         eq(td(0, 0, 60*1000000), b)
         eq(a*10, td(70))
         eq(a*10, 10*a)
-        eq(a*10L, 10*a)
+        eq(a*10, 10*a)
         eq(b*10, td(0, 600))
         eq(10*b, td(0, 600))
-        eq(b*10L, td(0, 600))
+        eq(b*10, td(0, 600))
         eq(c*10, td(0, 0, 10000))
         eq(10*c, td(0, 0, 10000))
-        eq(c*10L, td(0, 0, 10000))
+        eq(c*10, td(0, 0, 10000))
         eq(a*-1, -a)
         eq(b*-2, -b-b)
         eq(c*-2, -c+-c)
@@ -246,7 +246,7 @@ class TestTimeDelta(HarmlessMixedComparison):
         a = timedelta(42)
 
         # Add/sub ints, longs, floats should be illegal
-        for i in 1, 1L, 1.0:
+        for i in 1, 1, 1.0:
             self.assertRaises(TypeError, lambda: a+i)
             self.assertRaises(TypeError, lambda: a-i)
             self.assertRaises(TypeError, lambda: i+a)
@@ -263,7 +263,7 @@ class TestTimeDelta(HarmlessMixedComparison):
 
         # Divison of int by timedelta doesn't make sense.
         # Division by zero doesn't make sense.
-        for zero in 0, 0L:
+        for zero in 0, 0:
             self.assertRaises(TypeError, lambda: zero // a)
             self.assertRaises(ZeroDivisionError, lambda: a // zero)
 
@@ -696,7 +696,7 @@ class TestDate(HarmlessMixedComparison):
         self.assertEqual(a - (a - day), day)
 
         # Add/sub ints, longs, floats should be illegal
-        for i in 1, 1L, 1.0:
+        for i in 1, 1, 1.0:
             self.assertRaises(TypeError, lambda: a+i)
             self.assertRaises(TypeError, lambda: a-i)
             self.assertRaises(TypeError, lambda: i+a)
@@ -1325,7 +1325,7 @@ class TestDateTime(TestDate):
         self.assertEqual(a - (week + day + hour + millisec),
                          (((a - week) - day) - hour) - millisec)
         # Add/sub ints, longs, floats should be illegal
-        for i in 1, 1L, 1.0:
+        for i in 1, 1, 1.0:
             self.assertRaises(TypeError, lambda: a+i)
             self.assertRaises(TypeError, lambda: a-i)
             self.assertRaises(TypeError, lambda: i+a)
@@ -1766,6 +1766,11 @@ class TestTime(HarmlessMixedComparison):
         t = self.theclass(microsecond=100000)
         self.assertEqual(t.isoformat(), "00:00:00.100000")
         self.assertEqual(t.isoformat(), str(t))
+
+    def test_1653736(self):
+        # verify it doesn't accept extra keyword arguments
+        t = self.theclass(second=1)
+        self.assertRaises(TypeError, t.isoformat, foo=3)
 
     def test_strftime(self):
         t = self.theclass(1, 2, 3, 4)
@@ -3287,11 +3292,11 @@ def test_main():
                               gc.garbage)
         if hasattr(sys, 'gettotalrefcount'):
             thisrc = sys.gettotalrefcount()
-            print >> sys.stderr, '*' * 10, 'total refs:', thisrc,
+            print('*' * 10, 'total refs:', thisrc, end=' ', file=sys.stderr)
             if lastrc:
-                print >> sys.stderr, 'delta:', thisrc - lastrc
+                print('delta:', thisrc - lastrc, file=sys.stderr)
             else:
-                print >> sys.stderr
+                print(file=sys.stderr)
             lastrc = thisrc
 
 if __name__ == "__main__":

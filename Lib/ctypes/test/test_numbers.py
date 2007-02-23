@@ -93,7 +93,7 @@ class NumberTestCase(unittest.TestCase):
         for t in float_types:
             self.failUnlessEqual(t(2.0).value, 2.0)
             self.failUnlessEqual(t(2).value, 2.0)
-            self.failUnlessEqual(t(2L).value, 2.0)
+            self.failUnlessEqual(t(2).value, 2.0)
 
     def test_integers(self):
         # integers cannot be constructed from floats
@@ -192,7 +192,7 @@ def run_test(rep, msg, func, arg=None):
         for i in items:
             func(); func(); func(); func(); func()
         stop = clock()
-    print "%15s: %.2f us" % (msg, ((stop-start)*1e6/5/rep))
+    print("%15s: %.2f us" % (msg, ((stop-start)*1e6/5/rep)))
 
 def check_perf():
     # Construct 5 objects

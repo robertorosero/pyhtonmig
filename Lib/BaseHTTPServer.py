@@ -331,12 +331,12 @@ class BaseHTTPRequestHandler(SocketServer.StreamRequestHandler):
         """
 
         try:
-            short, long = self.responses[code]
+            shortmsg, longmsg = self.responses[code]
         except KeyError:
-            short, long = '???', '???'
+            shortmsg, longmsg = '???', '???'
         if message is None:
-            message = short
-        explain = long
+            message = shortmsg
+        explain = longmsg
         self.log_error("code %d, message %s", code, message)
         # using _quote_html to prevent Cross Site Scripting attacks (see bug #1100201)
         content = (self.error_message_format %
@@ -396,7 +396,7 @@ class BaseHTTPRequestHandler(SocketServer.StreamRequestHandler):
         self.log_message('"%s" %s %s',
                          self.requestline, str(code), str(size))
 
-    def log_error(self, *args):
+    def log_error(self, format, *args):
         """Log an error.
 
         This is called when a request cannot be fulfilled.  By
@@ -408,7 +408,7 @@ class BaseHTTPRequestHandler(SocketServer.StreamRequestHandler):
 
         """
 
-        self.log_message(*args)
+        self.log_message(format, *args)
 
     def log_message(self, format, *args):
         """Log an arbitrary message.
@@ -570,7 +570,7 @@ def test(HandlerClass = BaseHTTPRequestHandler,
     httpd = ServerClass(server_address, HandlerClass)
 
     sa = httpd.socket.getsockname()
-    print "Serving HTTP on", sa[0], "port", sa[1], "..."
+    print("Serving HTTP on", sa[0], "port", sa[1], "...")
     httpd.serve_forever()
 
 

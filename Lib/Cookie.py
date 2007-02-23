@@ -80,9 +80,9 @@ attributes by using the .output() function
    >>> C = Cookie.SmartCookie()
    >>> C["rocky"] = "road"
    >>> C["rocky"]["path"] = "/cookie"
-   >>> print C.output(header="Cookie:")
+   >>> print(C.output(header="Cookie:"))
    Cookie: rocky=road; Path=/cookie
-   >>> print C.output(attrs=[], header="Cookie:")
+   >>> print(C.output(attrs=[], header="Cookie:"))
    Cookie: rocky=road
 
 The load() method of a Cookie extracts cookies from a string.  In a
@@ -100,7 +100,7 @@ such trickeries do not confuse it.
 
    >>> C = Cookie.SmartCookie()
    >>> C.load('keebler="E=everybody; L=\\"Loves\\"; fudge=\\012;";')
-   >>> print C
+   >>> print(C)
    Set-Cookie: keebler="E=everybody; L=\"Loves\"; fudge=\012;"
 
 Each element of the Cookie also supports all of the RFC 2109
@@ -110,7 +110,7 @@ attribute.
    >>> C = Cookie.SmartCookie()
    >>> C["oreo"] = "doublestuff"
    >>> C["oreo"]["path"] = "/"
-   >>> print C
+   >>> print(C)
    Set-Cookie: oreo=doublestuff; Path=/
 
 Each dictionary element has a 'value' attribute, which gives you
@@ -198,7 +198,7 @@ it is still possible to use Cookie.Cookie() to create a Cookie.  In
 fact, this simply returns a SmartCookie.
 
    >>> C = Cookie.Cookie()
-   >>> print C.__class__.__name__
+   >>> print(C.__class__.__name__)
    SmartCookie
 
 
@@ -488,8 +488,7 @@ class Morsel(dict):
         # Now add any defined attributes
         if attrs is None:
             attrs = self._reserved
-        items = self.items()
-        items.sort()
+        items = sorted(self.items())
         for K,V in items:
             if V == "": continue
             if K not in attrs: continue
@@ -582,8 +581,7 @@ class BaseCookie(dict):
     def output(self, attrs=None, header="Set-Cookie:", sep="\015\012"):
         """Return a string suitable for HTTP."""
         result = []
-        items = self.items()
-        items.sort()
+        items = sorted(self.items())
         for K,V in items:
             result.append( V.output(attrs, header) )
         return sep.join(result)
@@ -593,8 +591,7 @@ class BaseCookie(dict):
 
     def __repr__(self):
         L = []
-        items = self.items()
-        items.sort()
+        items = sorted(self.items())
         for K,V in items:
             L.append( '%s=%s' % (K,repr(V.value) ) )
         return '<%s: %s>' % (self.__class__.__name__, _spacejoin(L))
@@ -602,8 +599,7 @@ class BaseCookie(dict):
     def js_output(self, attrs=None):
         """Return a string suitable for JavaScript."""
         result = []
-        items = self.items()
-        items.sort()
+        items = sorted(self.items())
         for K,V in items:
             result.append( V.js_output(attrs) )
         return _nulljoin(result)

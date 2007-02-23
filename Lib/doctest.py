@@ -240,16 +240,10 @@ class _SpoofOut(StringIO):
         # that a trailing newline is missing.
         if result and not result.endswith("\n"):
             result += "\n"
-        # Prevent softspace from screwing up the next test case, in
-        # case they used print with a trailing comma in an example.
-        if hasattr(self, "softspace"):
-            del self.softspace
         return result
 
-    def truncate(self,   size=None):
+    def truncate(self, size=None):
         StringIO.truncate(self, size)
-        if hasattr(self, "softspace"):
-            del self.softspace
 
 # Worst-case linear-time ellipsis matching.
 def _ellipsis_match(want, got):
@@ -855,7 +849,7 @@ class DocTestFinder:
         add them to `tests`.
         """
         if self._verbose:
-            print 'Finding tests in %s' % name
+            print('Finding tests in %s' % name)
 
         # If we've already processed this object, then ignore it.
         if id(obj) in seen:
@@ -1012,7 +1006,7 @@ class DocTestRunner:
         >>> runner = DocTestRunner(verbose=False)
         >>> tests.sort(key = lambda test: test.name)
         >>> for test in tests:
-        ...     print test.name, '->', runner.run(test)
+        ...     print(test.name, '->', runner.run(test))
         _TestClass -> (0, 2)
         _TestClass.__init__ -> (0, 2)
         _TestClass.get -> (0, 2)
@@ -1384,28 +1378,28 @@ class DocTestRunner:
                 failed.append(x)
         if verbose:
             if notests:
-                print len(notests), "items had no tests:"
+                print(len(notests), "items had no tests:")
                 notests.sort()
                 for thing in notests:
-                    print "   ", thing
+                    print("   ", thing)
             if passed:
-                print len(passed), "items passed all tests:"
+                print(len(passed), "items passed all tests:")
                 passed.sort()
                 for thing, count in passed:
-                    print " %3d tests in %s" % (count, thing)
+                    print(" %3d tests in %s" % (count, thing))
         if failed:
-            print self.DIVIDER
-            print len(failed), "items had failures:"
+            print(self.DIVIDER)
+            print(len(failed), "items had failures:")
             failed.sort()
             for thing, (f, t) in failed:
-                print " %3d of %3d in %s" % (f, t, thing)
+                print(" %3d of %3d in %s" % (f, t, thing))
         if verbose:
-            print totalt, "tests in", len(self._name2ft), "items."
-            print totalt - totalf, "passed and", totalf, "failed."
+            print(totalt, "tests in", len(self._name2ft), "items.")
+            print(totalt - totalf, "passed and", totalf, "failed.")
         if totalf:
-            print "***Test Failed***", totalf, "failures."
+            print("***Test Failed***", totalf, "failures.")
         elif verbose:
-            print "Test passed."
+            print("Test passed.")
         return totalf, totalt
 
     #/////////////////////////////////////////////////////////////////
@@ -1415,8 +1409,8 @@ class DocTestRunner:
         d = self._name2ft
         for name, (f, t) in other._name2ft.items():
             if name in d:
-                print "*** DocTestRunner.merge: '" + name + "' in both" \
-                    " testers; summing outcomes."
+                print("*** DocTestRunner.merge: '" + name + "' in both" \
+                    " testers; summing outcomes.")
                 f2, t2 = d[name]
                 f = f + f2
                 t = t + t2
@@ -1985,10 +1979,10 @@ class Tester:
     def runstring(self, s, name):
         test = DocTestParser().get_doctest(s, self.globs, name, None, None)
         if self.verbose:
-            print "Running string", name
+            print("Running string", name)
         (f,t) = self.testrunner.run(test)
         if self.verbose:
-            print f, "of", t, "examples failed in string", name
+            print(f, "of", t, "examples failed in string", name)
         return (f,t)
 
     def rundoc(self, object, name=None, module=None):
@@ -2419,7 +2413,7 @@ def script_from_examples(s):
        ...           Ho hum
        ...           '''
 
-       >>> print script_from_examples(text)
+       >>> print(script_from_examples(text))
        # Here are examples of simple math.
        #
        #     Python has super accurate integer addition
@@ -2512,7 +2506,7 @@ def debug_script(src, pm=False, globs=None):
             try:
                 execfile(srcfilename, globs, globs)
             except:
-                print sys.exc_info()[1]
+                print(sys.exc_info()[1])
                 pdb.post_mortem(sys.exc_info()[2])
         else:
             # Note that %r is vital here.  '%s' instead can, e.g., cause
@@ -2554,7 +2548,7 @@ class _TestClass:
         """val -> _TestClass object with associated value val.
 
         >>> t = _TestClass(123)
-        >>> print t.get()
+        >>> print(t.get())
         123
         """
 
@@ -2574,7 +2568,7 @@ class _TestClass:
         """get() -> return TestClass's associated value.
 
         >>> x = _TestClass(-42)
-        >>> print x.get()
+        >>> print(x.get())
         -42
         """
 
@@ -2606,7 +2600,7 @@ __test__ = {"_TestClass": _TestClass,
 
             "blank lines": r"""
                 Blank lines can be marked with <BLANKLINE>:
-                    >>> print 'foo\n\nbar\n'
+                    >>> print('foo\n\nbar\n')
                     foo
                     <BLANKLINE>
                     bar
@@ -2616,14 +2610,14 @@ __test__ = {"_TestClass": _TestClass,
             "ellipsis": r"""
                 If the ellipsis flag is used, then '...' can be used to
                 elide substrings in the desired output:
-                    >>> print range(1000) #doctest: +ELLIPSIS
+                    >>> print(range(1000)) #doctest: +ELLIPSIS
                     [0, 1, 2, ..., 999]
             """,
 
             "whitespace normalization": r"""
                 If the whitespace normalization flag is used, then
                 differences in whitespace are ignored.
-                    >>> print range(30) #doctest: +NORMALIZE_WHITESPACE
+                    >>> print(range(30)) #doctest: +NORMALIZE_WHITESPACE
                     [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14,
                      15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26,
                      27, 28, 29]

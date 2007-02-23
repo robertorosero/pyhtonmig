@@ -65,73 +65,69 @@ testmeths = [
 
 class AllTests:
     def __hash__(self, *args):
-        print "__hash__:", args
+        print("__hash__:", args)
         return hash(id(self))
 
     def __str__(self, *args):
-        print "__str__:", args
+        print("__str__:", args)
         return "AllTests"
 
     def __repr__(self, *args):
-        print "__repr__:", args
+        print("__repr__:", args)
         return "AllTests"
 
     def __int__(self, *args):
-        print "__int__:", args
+        print("__int__:", args)
         return 1
 
     def __float__(self, *args):
-        print "__float__:", args
+        print("__float__:", args)
         return 1.0
 
-    def __long__(self, *args):
-        print "__long__:", args
-        return 1L
-
     def __oct__(self, *args):
-        print "__oct__:", args
+        print("__oct__:", args)
         return '01'
 
     def __hex__(self, *args):
-        print "__hex__:", args
+        print("__hex__:", args)
         return '0x1'
 
     def __cmp__(self, *args):
-        print "__cmp__:", args
+        print("__cmp__:", args)
         return 0
 
     def __eq__(self, *args):
-        print "__eq__:", args
+        print("__eq__:", args)
         return True
 
     def __ne__(self, *args):
-        print "__ne__:", args
+        print("__ne__:", args)
         return False
 
     def __lt__(self, *args):
-        print "__lt__:", args
+        print("__lt__:", args)
         return False
 
     def __le__(self, *args):
-        print "__le__:", args
+        print("__le__:", args)
         return True
 
     def __gt__(self, *args):
-        print "__gt__:", args
+        print("__gt__:", args)
         return False
 
     def __ge__(self, *args):
-        print "__ge__:", args
+        print("__ge__:", args)
         return True
 
     def __del__(self, *args):
-        print "__del__:", args
+        print("__del__:", args)
 
 # Synthesize AllTests methods from the names in testmeths.
 
 method_template = """\
 def __%(method)s__(self, *args):
-    print "__%(method)s__:", args
+    print("__%(method)s__:", args)
 """
 
 d = {}
@@ -190,7 +186,7 @@ class Empty: pass
 
 try:
     1 in Empty()
-    print 'failed, should have raised TypeError'
+    print('failed, should have raised TypeError')
 except TypeError:
     pass
 
@@ -228,9 +224,9 @@ if sys.platform[:4] != 'java':
 else:
     # This works under Jython, but the actual slice values are
     # different.
-    print "__getitem__: (slice(0, 42, None),)"
-    print "__setitem__: (slice(0, 42, None), 'The Answer')"
-    print "__delitem__: (slice(0, 42, None),)"
+    print("__getitem__: (slice(0, 42, None),)")
+    print("__setitem__: (slice(0, 42, None), 'The Answer')")
+    print("__delitem__: (slice(0, 42, None),)")
 
 # Unary operations
 
@@ -238,7 +234,7 @@ else:
 +testme
 abs(testme)
 int(testme)
-long(testme)
+int(testme)
 float(testme)
 oct(testme)
 hex(testme)
@@ -269,14 +265,14 @@ if sys.platform[:4] == 'java':
 
 class ExtraTests:
     def __getattr__(self, *args):
-        print "__getattr__:", args
+        print("__getattr__:", args)
         return "SomeVal"
 
     def __setattr__(self, *args):
-        print "__setattr__:", args
+        print("__setattr__:", args)
 
     def __delattr__(self, *args):
-        print "__delattr__:", args
+        print("__delattr__:", args)
 
 testme = ExtraTests()
 testme.spam
@@ -289,7 +285,6 @@ class BadTypeClass:
     def __int__(self):
         return None
     __float__ = __int__
-    __long__ = __int__
     __str__ = __int__
     __repr__ = __int__
     __oct__ = __int__
@@ -307,30 +302,10 @@ def check_exc(stmt, exception):
 
 check_exc("int(BadTypeClass())", TypeError)
 check_exc("float(BadTypeClass())", TypeError)
-check_exc("long(BadTypeClass())", TypeError)
 check_exc("str(BadTypeClass())", TypeError)
 check_exc("repr(BadTypeClass())", TypeError)
 check_exc("oct(BadTypeClass())", TypeError)
 check_exc("hex(BadTypeClass())", TypeError)
-
-# mixing up ints and longs is okay
-class IntLongMixClass:
-    def __int__(self):
-        return 0L
-
-    def __long__(self):
-        return 0
-
-try:
-    int(IntLongMixClass())
-except TypeError:
-    raise TestFailed, "TypeError should not be raised"
-
-try:
-    long(IntLongMixClass())
-except TypeError:
-    raise TestFailed, "TypeError should not be raised"
-
 
 # Test correct errors from hash() on objects with comparisons but no __hash__
 
@@ -374,7 +349,7 @@ try:
     A().a # Raised AttributeError: A instance has no attribute 'a'
 except AttributeError as x:
     if str(x) != "booh":
-        print "attribute error for A().a got masked:", str(x)
+        print("attribute error for A().a got masked:", str(x))
 
 class E:
     __eq__ = property(booh)
@@ -387,7 +362,7 @@ try:
 except AttributeError as x:
     pass
 else:
-    print "attribute error for I.__init__ got masked"
+    print("attribute error for I.__init__ got masked")
 
 
 # Test comparison and hash of methods

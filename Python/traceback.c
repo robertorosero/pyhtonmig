@@ -113,7 +113,7 @@ newtracebackobject(PyTracebackObject *next, PyFrameObject *frame)
 int
 PyTraceBack_Here(PyFrameObject *frame)
 {
-	PyThreadState *tstate = frame->f_tstate;
+	PyThreadState *tstate = PyThreadState_GET();
 	PyTracebackObject *oldtb = (PyTracebackObject *) tstate->curexc_traceback;
 	PyTracebackObject *tb = newtracebackobject(oldtb, frame);
 	if (tb == NULL)
@@ -250,7 +250,7 @@ PyTraceBack_Print(PyObject *v, PyObject *f)
 		return -1;
 	}
 	limitv = PySys_GetObject("tracebacklimit");
-	if (limitv && PyInt_Check(limitv)) {
+	if (limitv && PyInt_CheckExact(limitv)) {
 		limit = PyInt_AsLong(limitv);
 		if (limit <= 0)
 			return 0;

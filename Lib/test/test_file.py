@@ -30,13 +30,9 @@ class AutoFileTests(unittest.TestCase):
     def testAttributes(self):
         # verify expected attributes exist
         f = self.f
-        softspace = f.softspace
         f.name     # merely shouldn't blow up
         f.mode     # ditto
         f.closed   # ditto
-
-        # verify softspace is writable
-        f.softspace = softspace    # merely shouldn't blow up
 
         # verify the others aren't
         for attr in 'name', 'mode', 'closed':
@@ -142,9 +138,9 @@ class OtherFileTests(unittest.TestCase):
         if sys.platform != 'osf1V5':
             self.assertRaises(IOError, sys.stdin.seek, -1)
         else:
-            print >>sys.__stdout__, (
+            print((
                 '  Skipping sys.stdin.seek(-1), it may crash the interpreter.'
-                ' Test manually.')
+                ' Test manually.'), file=sys.__stdout__)
         self.assertRaises(IOError, sys.stdin.truncate)
 
     def testUnicodeOpen(self):

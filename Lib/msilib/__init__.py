@@ -40,7 +40,7 @@ class Table:
             index -= 1
             unk = type & ~knownbits
             if unk:
-                print "%s.%s unknown bits %x" % (self.name, name, unk)
+                print("%s.%s unknown bits %x" % (self.name, name, unk))
             size = type & datasizemask
             dtype = type & typemask
             if dtype == type_string:
@@ -59,7 +59,7 @@ class Table:
                 tname="OBJECT"
             else:
                 tname="unknown"
-                print "%s.%sunknown integer type %d" % (self.name, name, size)
+                print("%s.%sunknown integer type %d" % (self.name, name, size))
             if type & type_nullable:
                 flags = ""
             else:
@@ -99,7 +99,7 @@ def add_data(db, table, values):
         assert len(value) == count, value
         for i in range(count):
             field = value[i]
-            if isinstance(field, (int, long)):
+            if isinstance(field, (int, int)):
                 r.SetInteger(i+1,field)
             elif isinstance(field, basestring):
                 r.SetString(i+1,field)

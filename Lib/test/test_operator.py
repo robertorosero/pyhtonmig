@@ -199,7 +199,7 @@ class OperatorTestCase(unittest.TestCase):
         self.failUnlessRaises(TypeError, operator.isNumberType)
         self.failUnless(operator.isNumberType(8))
         self.failUnless(operator.isNumberType(8j))
-        self.failUnless(operator.isNumberType(8L))
+        self.failUnless(operator.isNumberType(8))
         self.failUnless(operator.isNumberType(8.3))
         self.failIf(operator.isNumberType(dir()))
 
@@ -210,6 +210,8 @@ class OperatorTestCase(unittest.TestCase):
         self.failUnless(operator.isSequenceType(xrange(10)))
         self.failUnless(operator.isSequenceType('yeahbuddy'))
         self.failIf(operator.isSequenceType(3))
+        class Dict(dict): pass
+        self.failIf(operator.isSequenceType(Dict()))
 
     def test_lshift(self):
         self.failUnlessRaises(TypeError, operator.lshift)
@@ -468,7 +470,7 @@ def test_main(verbose=None):
             test_support.run_unittest(*test_classes)
             gc.collect()
             counts[i] = sys.gettotalrefcount()
-        print counts
+        print(counts)
 
 if __name__ == "__main__":
     test_main(verbose=True)

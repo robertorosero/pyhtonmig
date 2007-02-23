@@ -1462,7 +1462,7 @@ posix_do_stat(PyObject *self, PyObject *args,
 /* POSIX methods */
 
 PyDoc_STRVAR(posix_access__doc__,
-"access(path, mode) -> 1 if granted, 0 otherwise\n\n\
+"access(path, mode) -> True if granted, False otherwise\n\n\
 Use the real uid/gid to test for access to a path.  Note that most\n\
 operations will use the effective uid/gid, therefore this routine can\n\
 be used in a suid/sgid environment to test if the invoking user has the\n\
@@ -1691,6 +1691,57 @@ posix_chmod(PyObject *self, PyObject *args)
 #endif
 }
 
+
+#ifdef HAVE_CHFLAGS
+PyDoc_STRVAR(posix_chflags__doc__,
+"chflags(path, flags)\n\n\
+Set file flags.");
+
+static PyObject *
+posix_chflags(PyObject *self, PyObject *args)
+{
+	char *path;
+	unsigned long flags;
+	int res;
+	if (!PyArg_ParseTuple(args, "etk:chflags",
+			      Py_FileSystemDefaultEncoding, &path, &flags))
+		return NULL;
+	Py_BEGIN_ALLOW_THREADS
+	res = chflags(path, flags);
+	Py_END_ALLOW_THREADS
+	if (res < 0)
+		return posix_error_with_allocated_filename(path);
+	PyMem_Free(path);
+	Py_INCREF(Py_None);
+	return Py_None;
+}
+#endif /* HAVE_CHFLAGS */
+
+#ifdef HAVE_LCHFLAGS
+PyDoc_STRVAR(posix_lchflags__doc__,
+"lchflags(path, flags)\n\n\
+Set file flags.\n\
+This function will not follow symbolic links.");
+
+static PyObject *
+posix_lchflags(PyObject *self, PyObject *args)
+{
+	char *path;
+	unsigned long flags;
+	int res;
+	if (!PyArg_ParseTuple(args, "etk:lchflags",
+			      Py_FileSystemDefaultEncoding, &path, &flags))
+		return NULL;
+	Py_BEGIN_ALLOW_THREADS
+	res = lchflags(path, flags);
+	Py_END_ALLOW_THREADS
+	if (res < 0)
+		return posix_error_with_allocated_filename(path);
+	PyMem_Free(path);
+	Py_INCREF(Py_None);
+	return Py_None;
+}
+#endif /* HAVE_LCHFLAGS */
 
 #ifdef HAVE_CHROOT
 PyDoc_STRVAR(posix_chroot__doc__,
@@ -5437,32 +5488,21 @@ posix_setgroups(PyObject *self, PyObject *groups)
 		elem = PySequence_GetItem(groups, i);
 		if (!elem)
 			return NULL;
-		if (!PyInt_Check(elem)) {
-			if (!PyLong_Check(elem)) {
-				PyErr_SetString(PyExc_TypeError,
-						"groups must be integers");
+		if (!PyLong_Check(elem)) {
+			PyErr_SetString(PyExc_TypeError,
+					"groups must be integers");
+			Py_DECREF(elem);
+			return NULL;
+		} else {
+			unsigned long x = PyLong_AsUnsignedLong(elem);
+			if (PyErr_Occurred()) {
+				PyErr_SetString(PyExc_TypeError, 
+						"group id too big");
 				Py_DECREF(elem);
 				return NULL;
-			} else {
-				unsigned long x = PyLong_AsUnsignedLong(elem);
-				if (PyErr_Occurred()) {
-					PyErr_SetString(PyExc_TypeError, 
-							"group id too big");
-					Py_DECREF(elem);
-					return NULL;
-				}
-				grouplist[i] = x;
-				/* read back the value to see if it fitted in gid_t */
-				if (grouplist[i] != x) {
-					PyErr_SetString(PyExc_TypeError,
-							"group id too big");
-					Py_DECREF(elem);
-					return NULL;
-				}
 			}
-		} else {
-			long x  = PyInt_AsLong(elem);
 			grouplist[i] = x;
+			/* read back the value to see if it fitted in gid_t */
 			if (grouplist[i] != x) {
 				PyErr_SetString(PyExc_TypeError,
 						"group id too big");
@@ -8081,10 +8121,16 @@ static PyMethodDef posix_methods[] = {
 	{"ttyname",	posix_ttyname, METH_VARARGS, posix_ttyname__doc__},
 #endif
 	{"chdir",	posix_chdir, METH_VARARGS, posix_chdir__doc__},
+#ifdef HAVE_CHFLAGS
+	{"chflags",	posix_chflags, METH_VARARGS, posix_chflags__doc__},
+#endif /* HAVE_CHFLAGS */
 	{"chmod",	posix_chmod, METH_VARARGS, posix_chmod__doc__},
 #ifdef HAVE_CHOWN
 	{"chown",	posix_chown, METH_VARARGS, posix_chown__doc__},
 #endif /* HAVE_CHOWN */
+#ifdef HAVE_LCHFLAGS
+	{"lchflags",	posix_lchflags, METH_VARARGS, posix_lchflags__doc__},
+#endif /* HAVE_LCHFLAGS */
 #ifdef HAVE_LCHOWN
 	{"lchown",	posix_lchown, METH_VARARGS, posix_lchown__doc__},
 #endif /* HAVE_LCHOWN */

@@ -79,7 +79,7 @@ class UserDictTest(mapping_tests.TestHashMappingProtocol):
         self.assertEqual(u2b, u2c)
 
         class MyUserDict(UserDict.UserDict):
-            def display(self): print self
+            def display(self): print(self)
 
         m2 = MyUserDict(u2)
         m2a = m2.copy()
@@ -92,7 +92,7 @@ class UserDictTest(mapping_tests.TestHashMappingProtocol):
         # Test keys, items, values
         self.assertEqual(u2.keys(), d2.keys())
         self.assertEqual(u2.items(), d2.items())
-        self.assertEqual(u2.values(), d2.values())
+        self.assertEqual(list(u2.values()), list(d2.values()))
 
         # Test "in".
         for i in u2.keys():
@@ -208,7 +208,7 @@ class SeqDict(UserDict.DictMixin):
         if other is not None:
             for (key, value) in other:
                 self[key] = value
-        for (key, value) in kwargs.iteritems():
+        for (key, value) in kwargs.items():
             self[key] = value
     def __getitem__(self, key):
         try:
@@ -234,7 +234,7 @@ class SeqDict(UserDict.DictMixin):
         return list(self.keylist)
     def copy(self):
         d = self.__class__()
-        for key, value in self.iteritems():
+        for key, value in self.items():
             d[key] = value
         return d
     @classmethod
@@ -278,13 +278,13 @@ class UserDictMixinTest(mapping_tests.TestMappingProtocol):
         self.assertEqual(len(s), 2)
 
         # iteritems
-        self.assertEqual(list(s.iteritems()), [(10,'ten'), (30, 'thirty')])
+        self.assertEqual(list(s.items()), [(10,'ten'), (30, 'thirty')])
 
         # iterkeys
-        self.assertEqual(list(s.iterkeys()), [10, 30])
+        self.assertEqual(list(s.keys()), [10, 30])
 
         # itervalues
-        self.assertEqual(list(s.itervalues()), ['ten', 'thirty'])
+        self.assertEqual(list(s.values()), ['ten', 'thirty'])
 
         # values
         self.assertEqual(s.values(), ['ten', 'thirty'])

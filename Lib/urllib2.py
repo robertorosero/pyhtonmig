@@ -281,7 +281,7 @@ class Request:
     def header_items(self):
         hdrs = self.unredirected_hdrs.copy()
         hdrs.update(self.headers)
-        return hdrs.items()
+        return list(hdrs.items())
 
 class OpenerDirector:
     def __init__(self):
@@ -710,7 +710,7 @@ class HTTPPasswordMgr:
         domains = self.passwd.get(realm, {})
         for default_port in True, False:
             reduced_authuri = self.reduce_uri(authuri, default_port)
-            for uris, authinfo in domains.iteritems():
+            for uris, authinfo in domains.items():
                 for uri in uris:
                     if self.is_suburi(uri, reduced_authuri):
                         return authinfo
@@ -1087,7 +1087,7 @@ class AbstractHTTPHandler(BaseHandler):
         # out of socket._fileobject() and into a base class.
 
         r.recv = r.read
-        fp = socket._fileobject(r)
+        fp = socket._fileobject(r, close=True)
 
         resp = addinfourl(fp, r.msg, req.get_full_url())
         resp.code = r.status
@@ -1209,14 +1209,14 @@ class FileHandler(BaseHandler):
 
     # not entirely sure what the rules are here
     def open_local_file(self, req):
-        import email.Utils
+        import email.utils
         import mimetypes
         host = req.get_host()
         file = req.get_selector()
         localfile = url2pathname(file)
         stats = os.stat(localfile)
         size = stats.st_size
-        modified = email.Utils.formatdate(stats.st_mtime, usegmt=True)
+        modified = email.utils.formatdate(stats.st_mtime, usegmt=True)
         mtype = mimetypes.guess_type(file)[0]
         headers = mimetools.Message(StringIO(
             'Content-type: %s\nContent-length: %d\nLast-modified: %s\n' %
@@ -1318,21 +1318,21 @@ class CacheFTPHandler(FTPHandler):
         # first check for old ones
         t = time.time()
         if self.soonest <= t:
-            for k, v in self.timeout.items():
+            for k, v in list(self.timeout.items()):
                 if v < t:
                     self.cache[k].close()
                     del self.cache[k]
                     del self.timeout[k]
-        self.soonest = min(self.timeout.values())
+        self.soonest = min(list(self.timeout.values()))
 
         # then check the size
         if len(self.cache) == self.max_conns:
-            for k, v in self.timeout.items():
+            for k, v in list(self.timeout.items()):
                 if v == self.soonest:
                     del self.cache[k]
                     del self.timeout[k]
                     break
-            self.soonest = min(self.timeout.values())
+            self.soonest = min(list(self.timeout.values()))
 
 class GopherHandler(BaseHandler):
     def gopher_open(self, req):

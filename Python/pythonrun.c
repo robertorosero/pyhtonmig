@@ -60,6 +60,8 @@ static void call_sys_exitfunc(void);
 static void call_ll_exitfuncs(void);
 extern void _PyUnicode_Init(void);
 extern void _PyUnicode_Fini(void);
+extern int _PyLong_Init(void);
+extern void PyLong_Fini(void);
 
 #ifdef WITH_THREAD
 extern void _PyGILState_Init(PyInterpreterState *, PyThreadState *);
@@ -181,8 +183,8 @@ Py_InitializeEx(int install_sigs)
 	if (!_PyFrame_Init())
 		Py_FatalError("Py_Initialize: can't init frames");
 
-	if (!_PyInt_Init())
-		Py_FatalError("Py_Initialize: can't init ints");
+	if (!_PyLong_Init())
+		Py_FatalError("Py_Initialize: can't init longs");
 
 	_PyFloat_Init();
 
@@ -271,7 +273,8 @@ Py_InitializeEx(int install_sigs)
 		sys_isatty = PyObject_CallMethod(sys_stream, "isatty", "");
 		if (!sys_isatty)
 			PyErr_Clear();
-		if(sys_isatty && PyObject_IsTrue(sys_isatty)) {
+		if(sys_isatty && PyObject_IsTrue(sys_isatty) &&
+		   PyFile_Check(sys_stream)) {
 			if (!PyFile_SetEncoding(sys_stream, codeset))
 				Py_FatalError("Cannot set codeset of stdin");
 		}
@@ -281,7 +284,8 @@ Py_InitializeEx(int install_sigs)
 		sys_isatty = PyObject_CallMethod(sys_stream, "isatty", "");
 		if (!sys_isatty)
 			PyErr_Clear();
-		if(sys_isatty && PyObject_IsTrue(sys_isatty)) {
+		if(sys_isatty && PyObject_IsTrue(sys_isatty) &&
+		   PyFile_Check(sys_stream)) {
 			if (!PyFile_SetEncoding(sys_stream, codeset))
 				Py_FatalError("Cannot set codeset of stdout");
 		}
@@ -291,7 +295,8 @@ Py_InitializeEx(int install_sigs)
 		sys_isatty = PyObject_CallMethod(sys_stream, "isatty", "");
 		if (!sys_isatty)
 			PyErr_Clear();
-		if(sys_isatty && PyObject_IsTrue(sys_isatty)) {
+		if(sys_isatty && PyObject_IsTrue(sys_isatty) &&
+		   PyFile_Check(sys_stream)) {
 			if (!PyFile_SetEncoding(sys_stream, codeset))
 				Py_FatalError("Cannot set codeset of stderr");
 		}
@@ -453,7 +458,7 @@ Py_Finalize(void)
 	PyList_Fini();
 	PySet_Fini();
 	PyString_Fini();
-	PyInt_Fini();
+	PyLong_Fini();
 	PyFloat_Fini();
 
 #ifdef Py_USING_UNICODE
@@ -790,8 +795,6 @@ PyRun_InteractiveOneFlags(FILE *fp, const char *filename, PyCompilerFlags *flags
 		return -1;
 	}
 	Py_DECREF(v);
-	if (Py_FlushLine())
-		PyErr_Clear();
 	return 0;
 }
 
@@ -878,8 +881,6 @@ PyRun_SimpleFileExFlags(FILE *fp, const char *filename, int closeit,
 		return -1;
 	}
 	Py_DECREF(v);
-	if (Py_FlushLine())
-		PyErr_Clear();
 	return 0;
 }
 
@@ -897,8 +898,6 @@ PyRun_SimpleStringFlags(const char *command, PyCompilerFlags *flags)
 		return -1;
 	}
 	Py_DECREF(v);
-	if (Py_FlushLine())
-		PyErr_Clear();
 	return 0;
 }
 
@@ -1013,8 +1012,6 @@ handle_system_exit(void)
 	int exitcode = 0;
 
 	PyErr_Fetch(&exception, &value, &tb);
-	if (Py_FlushLine())
-		PyErr_Clear();
 	fflush(stdout);
 	if (value == NULL || value == Py_None)
 		goto done;
@@ -1092,8 +1089,6 @@ PyErr_PrintEx(int set_sys_last_vars)
 				v2 = Py_None;
 				Py_INCREF(v2);
 			}
-			if (Py_FlushLine())
-				PyErr_Clear();
 			fflush(stdout);
 			PySys_WriteStderr("Error in sys.excepthook:\n");
 			PyErr_Display(exception2, v2, tb2);
@@ -1123,8 +1118,6 @@ PyErr_Display(PyObject *exception, PyObject *value, PyObject *tb)
 	if (f == NULL)
 		fprintf(stderr, "lost sys.stderr\n");
 	else {
-		if (Py_FlushLine())
-			PyErr_Clear();
 		fflush(stdout);
 		if (tb && tb != Py_None)
 			err = PyTraceBack_Print(tb, f);
@@ -1592,8 +1585,6 @@ call_sys_exitfunc(void)
 		Py_DECREF(exitfunc);
 	}
 
-	if (Py_FlushLine())
-		PyErr_Clear();
 }
 
 static void
@@ -1850,4 +1841,3 @@ PyRun_InteractiveLoop(FILE *f, const char *p)
 #ifdef __cplusplus
 }
 #endif
-

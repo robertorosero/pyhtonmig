@@ -511,7 +511,7 @@ def read_decimalnl_short(f):
     try:
         return int(s)
     except OverflowError:
-        return long(s)
+        return int(s)
 
 def read_decimalnl_long(f):
     r"""
@@ -525,7 +525,7 @@ def read_decimalnl_long(f):
     """
 
     s = read_stringnl(f, decode=False, stripquotes=False)
-    return long(s)
+    return int(s)
 
 
 decimalnl_short = ArgumentDescriptor(
@@ -676,7 +676,7 @@ long4 = ArgumentDescriptor(
     This first reads four bytes as a signed size (but requires the
     size to be >= 0), then reads that many bytes and interprets them
     as a little-endian 2's-complement long.  If the size is 0, that's taken
-    as a shortcut for the long 0L, although LONG1 should really be used
+    as a shortcut for the int 0, although LONG1 should really be used
     then instead (and in any case where # of bytes < 256).
     """)
 
@@ -724,12 +724,12 @@ pyint = StackObject(
 
 pylong = StackObject(
              name='long',
-             obtype=long,
+             obtype=int,
              doc="A long (as opposed to short) Python integer object.")
 
 pyinteger_or_bool = StackObject(
                         name='int_or_bool',
-                        obtype=(int, long, bool),
+                        obtype=(int, int, bool),
                         doc="A Python integer object (short or long), or "
                             "a Python bool.")
 
@@ -1757,18 +1757,18 @@ def assure_pickle_consistency(verbose=False):
     for name in pickle.__all__:
         if not re.match("[A-Z][A-Z0-9_]+$", name):
             if verbose:
-                print "skipping %r: it doesn't look like an opcode name" % name
+                print("skipping %r: it doesn't look like an opcode name" % name)
             continue
         picklecode = getattr(pickle, name)
         if not isinstance(picklecode, str) or len(picklecode) != 1:
             if verbose:
-                print ("skipping %r: value %r doesn't look like a pickle "
-                       "code" % (name, picklecode))
+                print(("skipping %r: value %r doesn't look like a pickle "
+                       "code" % (name, picklecode)))
             continue
         if picklecode in copy:
             if verbose:
-                print "checking name %r w/ code %r for consistency" % (
-                      name, picklecode)
+                print("checking name %r w/ code %r for consistency" % (
+                      name, picklecode))
             d = copy[picklecode]
             if d.name != name:
                 raise ValueError("for pickle code %r, pickle.py uses name %r "
@@ -1899,7 +1899,7 @@ def dis(pickle, out=None, memo=None, indentlevel=4):
     errormsg = None
     for opcode, arg, pos in genops(pickle):
         if pos is not None:
-            print >> out, "%5d:" % pos,
+            print("%5d:" % pos, end=' ', file=out)
 
         line = "%-4s %s%s" % (repr(opcode.code)[1:-1],
                               indentchunk * len(markstack),
@@ -1964,7 +1964,7 @@ def dis(pickle, out=None, memo=None, indentlevel=4):
                 line += ' ' + repr(arg)
             if markmsg:
                 line += ' ' + markmsg
-        print >> out, line
+        print(line, file=out)
 
         if errormsg:
             # Note that we delayed complaining until the offending opcode
@@ -1983,7 +1983,7 @@ def dis(pickle, out=None, memo=None, indentlevel=4):
 
         stack.extend(after)
 
-    print >> out, "highest protocol among opcodes =", maxproto
+    print("highest protocol among opcodes =", maxproto, file=out)
     if stack:
         raise ValueError("stack not empty after STOP: %r" % stack)
 
@@ -2000,13 +2000,13 @@ _dis_test = r"""
     0: (    MARK
     1: l        LIST       (MARK at 0)
     2: p    PUT        0
-    5: I    INT        1
+    5: L    LONG       1
     8: a    APPEND
-    9: I    INT        2
+    9: L    LONG       2
    12: a    APPEND
    13: (    MARK
-   14: I        INT        3
-   17: I        INT        4
+   14: L        LONG       3
+   17: L        LONG       4
    20: t        TUPLE      (MARK at 13)
    21: p    PUT        1
    24: a    APPEND
@@ -2079,7 +2079,7 @@ highest protocol among opcodes = 0
    93: p    PUT        6
    96: S    STRING     'value'
   105: p    PUT        7
-  108: I    INT        42
+  108: L    LONG       42
   112: s    SETITEM
   113: b    BUILD
   114: a    APPEND

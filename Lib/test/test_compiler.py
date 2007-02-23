@@ -7,6 +7,12 @@ from random import random
 # How much time in seconds can pass before we print a 'Still working' message.
 _PRINT_WORKING_MSG_INTERVAL = 5 * 60
 
+class TrivialContext(object):
+    def __enter__(self):
+        return self
+    def __exit__(self, *exc_info):
+        pass
+
 class CompilerTest(unittest.TestCase):
 
     def testCompileLibrary(self):
@@ -24,8 +30,7 @@ class CompilerTest(unittest.TestCase):
                 # Print still working message since this test can be really slow
                 if next_time <= time.time():
                     next_time = time.time() + _PRINT_WORKING_MSG_INTERVAL
-                    print >>sys.__stdout__, \
-                       '  testCompileLibrary still working, be patient...'
+                    print('  testCompileLibrary still working, be patient...', file=sys.__stdout__)
                     sys.__stdout__.flush()
 
                 if not basename.endswith(".py"):
@@ -34,7 +39,7 @@ class CompilerTest(unittest.TestCase):
                     continue
                 path = os.path.join(dir, basename)
                 if test.test_support.verbose:
-                    print "compiling", path
+                    print("compiling", path)
                 f = open(path, "U")
                 buf = f.read()
                 f.close()
@@ -88,7 +93,7 @@ class CompilerTest(unittest.TestCase):
         try:
             self._check_lineno(node)
         except AssertionError:
-            print node.__class__, node.lineno
+            print(node.__class__, node.lineno)
             raise
 
     def _check_lineno(self, node):
@@ -157,6 +162,31 @@ class CompilerTest(unittest.TestCase):
             exec(c, dct)
             self.assertEquals(dct['f'].func_annotations, expected)
 
+    def testWith(self):
+        # SF bug 1638243
+        c = compiler.compile('from __future__ import with_statement\n'
+                             'def f():\n'
+                             '    with TrivialContext():\n'
+                             '        return 1\n'
+                             'result = f()',
+                             '<string>',
+                             'exec' )
+        dct = {'TrivialContext': TrivialContext}
+        exec(c, dct)
+        self.assertEquals(dct.get('result'), 1)
+
+    def testWithAss(self):
+        c = compiler.compile('from __future__ import with_statement\n'
+                             'def f():\n'
+                             '    with TrivialContext() as tc:\n'
+                             '        return 1\n'
+                             'result = f()',
+                             '<string>',
+                             'exec' )
+        dct = {'TrivialContext': TrivialContext}
+        exec(c, dct)
+        self.assertEquals(dct.get('result'), 1)
+
 
 NOLINENO = (compiler.ast.Module, compiler.ast.Stmt, compiler.ast.Discard,
             compiler.ast.Const)
@@ -187,7 +217,7 @@ else:
     a, b = b, a
 
 try:
-    print yo
+    print(yo)
 except:
     yo = 3
 else:

@@ -86,7 +86,7 @@ def Node(*args):
         try:
             return nodes[kind](*args[1:])
         except TypeError:
-            print nodes[kind], len(args), args
+            print(nodes[kind], len(args), args)
             raise
     else:
         raise WalkerError, "Can't find appropriate Node type: %s" % str(args)
@@ -386,26 +386,6 @@ class Transformer:
             op = self.com_augassign_op(nodelist[1])
             return AugAssign(lval, op[1], exprNode, lineno=op[2])
         raise WalkerError, "can't get here"
-
-    def print_stmt(self, nodelist):
-        # print ([ test (',' test)* [','] ] | '>>' test [ (',' test)+ [','] ])
-        items = []
-        if len(nodelist) == 1:
-            start = 1
-            dest = None
-        elif nodelist[1][0] == token.RIGHTSHIFT:
-            assert len(nodelist) == 3 \
-                   or nodelist[3][0] == token.COMMA
-            dest = self.com_node(nodelist[2])
-            start = 4
-        else:
-            dest = None
-            start = 1
-        for i in range(start, len(nodelist), 2):
-            items.append(self.com_node(nodelist[i]))
-        if nodelist[-1][0] == token.COMMA:
-            return Print(items, dest, lineno=nodelist[0][2])
-        return Printnl(items, dest, lineno=nodelist[0][2])
 
     def del_stmt(self, nodelist):
         return self.com_assign(nodelist[1], OP_DELETE)
@@ -1018,7 +998,7 @@ class Transformer:
         if nodelist[2][0] == token.COLON:
             var = None
         else:
-            var = self.com_node(nodelist[2])
+            var = self.com_assign(nodelist[2][2], OP_ASSIGN)
         return With(expr, var, body, lineno=nodelist[0][2])
 
     def com_with_var(self, nodelist):
@@ -1458,7 +1438,6 @@ _legal_node_types = [
     symbol.simple_stmt,
     symbol.compound_stmt,
     symbol.expr_stmt,
-    symbol.print_stmt,
     symbol.del_stmt,
     symbol.pass_stmt,
     symbol.break_stmt,

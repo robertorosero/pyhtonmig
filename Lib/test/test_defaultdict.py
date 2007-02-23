@@ -47,6 +47,7 @@ class TestDefaultDict(unittest.TestCase):
             self.assertEqual(err.args, (15,))
         else:
             self.fail("d2[15] didn't raise KeyError")
+        self.assertRaises(TypeError, defaultdict, 1)
 
     def test_missing(self):
         d1 = defaultdict()
@@ -60,10 +61,10 @@ class TestDefaultDict(unittest.TestCase):
         self.assertEqual(repr(d1), "defaultdict(None, {})")
         d1[11] = 41
         self.assertEqual(repr(d1), "defaultdict(None, {11: 41})")
-        d2 = defaultdict(0)
-        self.assertEqual(d2.default_factory, 0)
+        d2 = defaultdict(int)
+        self.assertEqual(d2.default_factory, int)
         d2[12] = 42
-        self.assertEqual(repr(d2), "defaultdict(0, {12: 42})")
+        self.assertEqual(repr(d2), "defaultdict(<type 'int'>, {12: 42})")
         def foo(): return 43
         d3 = defaultdict(foo)
         self.assert_(d3.default_factory is foo)
@@ -81,8 +82,8 @@ class TestDefaultDict(unittest.TestCase):
         try:
             f = open(tfn, "w+")
             try:
-                print >>f, d1
-                print >>f, d2
+                print(d1, file=f)
+                print(d2, file=f)
                 f.seek(0)
                 self.assertEqual(f.readline(), repr(d1) + "\n")
                 self.assertEqual(f.readline(), repr(d2) + "\n")

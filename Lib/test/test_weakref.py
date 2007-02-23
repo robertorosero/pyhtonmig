@@ -6,6 +6,8 @@ import weakref
 
 from test import test_support
 
+# Used in ReferencesTestCase.test_ref_created_during_del() .
+ref_from_del = None
 
 class C:
     def method(self):
@@ -630,6 +632,18 @@ class ReferencesTestCase(TestBase):
         finally:
             gc.set_threshold(*thresholds)
 
+    def test_ref_created_during_del(self):
+        # Bug #1377858
+        # A weakref created in an object's __del__() would crash the
+        # interpreter when the weakref was cleaned up since it would refer to
+        # non-existent memory.  This test should not segfault the interpreter.
+        class Target(object):
+            def __del__(self):
+                global ref_from_del
+                ref_from_del = weakref.ref(self)
+
+        w = Target()
+
 
 class SubclassableWeakrefTestCase(unittest.TestCase):
 
@@ -825,25 +839,25 @@ class MappingTestCase(TestBase):
     def check_iters(self, dict):
         # item iterator:
         items = dict.items()
-        for item in dict.iteritems():
+        for item in dict.items():
             items.remove(item)
         self.assert_(len(items) == 0, "iteritems() did not touch all items")
 
         # key iterator, via __iter__():
-        keys = dict.keys()
+        keys = list(dict.keys())
         for k in dict:
             keys.remove(k)
         self.assert_(len(keys) == 0, "__iter__() did not touch all keys")
 
         # key iterator, via iterkeys():
-        keys = dict.keys()
-        for k in dict.iterkeys():
+        keys = list(dict.keys())
+        for k in dict.keys():
             keys.remove(k)
         self.assert_(len(keys) == 0, "iterkeys() did not touch all keys")
 
         # value iterator:
-        values = dict.values()
-        for v in dict.itervalues():
+        values = list(dict.values())
+        for v in dict.values():
             values.remove(v)
         self.assert_(len(values) == 0,
                      "itervalues() did not touch all values")
@@ -1058,7 +1072,7 @@ libreftest = """ Doctest for examples in the library reference: libweakref.tex
 ...
 >>> obj = Dict(red=1, green=2, blue=3)   # this object is weak referencable
 >>> r = weakref.ref(obj)
->>> print r() is obj
+>>> print(r() is obj)
 True
 
 >>> import weakref
@@ -1071,7 +1085,7 @@ True
 >>> o is o2
 True
 >>> del o, o2
->>> print r()
+>>> print(r())
 None
 
 >>> import weakref
@@ -1079,7 +1093,7 @@ None
 ...     def __init__(self, ob, callback=None, **annotations):
 ...         super(ExtendedRef, self).__init__(ob, callback)
 ...         self.__counter = 0
-...         for k, v in annotations.iteritems():
+...         for k, v in annotations.items():
 ...             setattr(self, k, v)
 ...     def __call__(self):
 ...         '''Return a pair containing the referent and the number of
@@ -1090,7 +1104,7 @@ None
 ...             self.__counter += 1
 ...             ob = (ob, self.__counter)
 ...         return ob
-...
+... 
 >>> class A:   # not in docs from here, just testing the ExtendedRef
 ...     pass
 ...
@@ -1126,9 +1140,9 @@ True
 >>> try:
 ...     id2obj(a_id)
 ... except KeyError:
-...     print 'OK'
+...     print('OK')
 ... else:
-...     print 'WeakValueDictionary error'
+...     print('WeakValueDictionary error')
 OK
 
 """

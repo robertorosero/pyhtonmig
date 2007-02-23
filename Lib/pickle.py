@@ -456,9 +456,29 @@ class Pickler:
                 return
         # Text pickle, or int too big to fit in signed 4-byte format.
         self.write(INT + repr(obj) + '\n')
-    dispatch[IntType] = save_int
+    # XXX save_int is merged into save_long
+    # dispatch[IntType] = save_int
 
     def save_long(self, obj, pack=struct.pack):
+        if self.bin:
+            # If the int is small enough to fit in a signed 4-byte 2's-comp
+            # format, we can store it more efficiently than the general
+            # case.
+            # First one- and two-byte unsigned ints:
+            if obj >= 0:
+                if obj <= 0xff:
+                    self.write(BININT1 + chr(obj))
+                    return
+                if obj <= 0xffff:
+                    self.write("%c%c%c" % (BININT2, obj&0xff, obj>>8))
+                    return
+            # Next check for 4-byte signed ints:
+            high_bits = obj >> 31  # note that Python shift sign-extends
+            if high_bits == 0 or high_bits == -1:
+                # All high bits are copies of bit 2**31, so the value
+                # fits in a 4-byte signed int.
+                self.write(BININT + pack("<i", obj))
+                return
         if self.proto >= 2:
             bytes = encode_long(obj)
             n = len(bytes)
@@ -646,7 +666,7 @@ class Pickler:
             write(MARK + DICT)
 
         self.memoize(obj)
-        self._batch_setitems(obj.iteritems())
+        self._batch_setitems(iter(obj.items()))
 
     dispatch[DictionaryType] = save_dict
     if not PyStringMap is None:
@@ -878,7 +898,7 @@ class Unpickler:
             try:
                 val = int(data)
             except ValueError:
-                val = long(data)
+                val = int(data)
         self.append(val)
     dispatch[INT] = load_int
 
@@ -895,7 +915,7 @@ class Unpickler:
     dispatch[BININT2] = load_binint2
 
     def load_long(self):
-        self.append(long(self.readline()[:-1], 0))
+        self.append(int(self.readline()[:-1], 0))
     dispatch[LONG] = load_long
 
     def load_long1(self):
@@ -1219,22 +1239,22 @@ import binascii as _binascii
 
 def encode_long(x):
     r"""Encode a long to a two's complement little-endian binary string.
-    Note that 0L is a special case, returning an empty string, to save a
+    Note that 0 is a special case, returning an empty string, to save a
     byte in the LONG1 pickling context.
 
-    >>> encode_long(0L)
+    >>> encode_long(0)
     ''
-    >>> encode_long(255L)
+    >>> encode_long(255)
     '\xff\x00'
-    >>> encode_long(32767L)
+    >>> encode_long(32767)
     '\xff\x7f'
-    >>> encode_long(-256L)
+    >>> encode_long(-256)
     '\x00\xff'
-    >>> encode_long(-32768L)
+    >>> encode_long(-32768)
     '\x00\x80'
-    >>> encode_long(-128L)
+    >>> encode_long(-128)
     '\x80'
-    >>> encode_long(127L)
+    >>> encode_long(127)
     '\x7f'
     >>>
     """
@@ -1264,7 +1284,7 @@ def encode_long(x):
             # Extend to a full byte.
             nibbles += 1
         nbits = nibbles * 4
-        x += 1L << nbits
+        x += 1 << nbits
         assert x > 0
         ashex = hex(x)
         njunkchars = 2 + ashex.endswith('L')
@@ -1304,11 +1324,11 @@ def decode_long(data):
 
     nbytes = len(data)
     if nbytes == 0:
-        return 0L
+        return 0
     ashex = _binascii.hexlify(data[::-1])
-    n = long(ashex, 16) # quadratic time before Python 2.3; linear now
+    n = int(ashex, 16) # quadratic time before Python 2.3; linear now
     if data[-1] >= '\x80':
-        n -= 1L << (nbytes * 8)
+        n -= 1 << (nbytes * 8)
     return n
 
 # Shorthands

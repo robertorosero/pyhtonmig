@@ -26,6 +26,14 @@ class ReprWrapper:
     def __repr__(self):
         return repr(self.value)
 
+class HashCountingInt(int):
+    'int-like object that counts the number of times __hash__ is called'
+    def __init__(self, *args):
+        self.hash_count = 0
+    def __hash__(self):
+        self.hash_count += 1
+        return int.__hash__(self)
+
 class TestJointOps(unittest.TestCase):
     # Tests common to both set and frozenset
 
@@ -265,13 +273,25 @@ class TestJointOps(unittest.TestCase):
         w.value = s
         try:
             fo = open(test_support.TESTFN, "wb")
-            print >> fo, s,
+            fo.write(str(s))
             fo.close()
             fo = open(test_support.TESTFN, "rb")
             self.assertEqual(fo.read(), repr(s))
         finally:
             fo.close()
             os.remove(test_support.TESTFN)
+
+    def test_do_not_rehash_dict_keys(self):
+        n = 10
+        d = dict.fromkeys(map(HashCountingInt, xrange(n)))
+        self.assertEqual(sum(elem.hash_count for elem in d), n)
+        s = self.thetype(d)
+        self.assertEqual(sum(elem.hash_count for elem in d), n)
+        s.difference(d)
+        self.assertEqual(sum(elem.hash_count for elem in d), n)    
+        if hasattr(s, 'symmetric_difference_update'):
+            s.symmetric_difference_update(d)
+        self.assertEqual(sum(elem.hash_count for elem in d), n)      
 
 class TestSet(TestJointOps):
     thetype = set
@@ -476,6 +496,16 @@ class SetSubclass(set):
 class TestSetSubclass(TestSet):
     thetype = SetSubclass
 
+class SetSubclassWithKeywordArgs(set):
+    def __init__(self, iterable=[], newarg=None):
+        set.__init__(self, iterable)
+
+class TestSetSubclassWithKeywordArgs(TestSet):
+
+    def test_keywords_in_subclass(self):
+        'SF bug #1486663 -- this used to erroneously raise a TypeError'
+        SetSubclassWithKeywordArgs(newarg=1)
+
 class TestFrozenSet(TestJointOps):
     thetype = frozenset
 
@@ -584,7 +614,7 @@ class TestBasicOps(unittest.TestCase):
     def test_print(self):
         try:
             fo = open(test_support.TESTFN, "wb")
-            print >> fo, self.set,
+            fo.write(str(self.set))
             fo.close()
             fo = open(test_support.TESTFN, "rb")
             self.assertEqual(fo.read(), repr(self.set))
@@ -1454,6 +1484,7 @@ def test_main(verbose=None):
     test_classes = (
         TestSet,
         TestSetSubclass,
+        TestSetSubclassWithKeywordArgs,
         TestFrozenSet,
         TestFrozenSetSubclass,
         TestSetOfSets,
@@ -1495,7 +1526,7 @@ def test_main(verbose=None):
             test_support.run_unittest(*test_classes)
             gc.collect()
             counts[i] = sys.gettotalrefcount()
-        print counts
+        print(counts)
 
 if __name__ == "__main__":
     test_main(verbose=True)

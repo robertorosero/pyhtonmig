@@ -109,7 +109,7 @@ class _Database(UserDict.DictMixin):
 
         f = self._open(self._dirfile, 'w')
         self._chmod(self._dirfile)
-        for key, pos_and_siz_pair in self._index.iteritems():
+        for key, pos_and_siz_pair in self._index.items():
             f.write("%r, %r\n" % (key, pos_and_siz_pair))
         f.close()
 
@@ -202,7 +202,7 @@ class _Database(UserDict.DictMixin):
         return key in self._index
 
     def iterkeys(self):
-        return self._index.iterkeys()
+        return iter(self._index.keys())
     __iter__ = iterkeys
 
     def __len__(self):
@@ -243,5 +243,5 @@ def open(file, flag=None, mode=0666):
     else:
         # Turn off any bits that are set in the umask
         mode = mode & (~um)
-        
+
     return _Database(file, mode)

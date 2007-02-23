@@ -104,6 +104,15 @@ typedef struct { char c; PY_LONG_LONG x; } s_long_long;
 #define LONG_LONG_ALIGN (sizeof(s_long_long) - sizeof(PY_LONG_LONG))
 #endif
 
+#ifdef HAVE_C99_BOOL
+#define BOOL_TYPE _Bool
+typedef struct { char c; _Bool x; } s_bool;
+#define BOOL_ALIGN (sizeof(s_bool) - sizeof(BOOL_TYPE))
+#else
+#define BOOL_TYPE char
+#define BOOL_ALIGN 0
+#endif
+
 #define STRINGIFY(x)    #x
 
 #ifdef __powerc
@@ -118,8 +127,6 @@ get_pylong(PyObject *v)
 	PyNumberMethods *m;
 
 	assert(v != NULL);
-	if (PyInt_Check(v))
-		return PyLong_FromLong(PyInt_AS_LONG(v));
 	if (PyLong_Check(v)) {
 		Py_INCREF(v);
 		return v;
@@ -536,6 +543,15 @@ nu_ulonglong(const char *p, const formatdef *f)
 #endif
 
 static PyObject *
+nu_bool(const char *p, const formatdef *f)
+{
+	BOOL_TYPE x;
+	memcpy((char *)&x, p, sizeof x);
+	return PyBool_FromLong(x != 0);
+}
+
+
+static PyObject *
 nu_float(const char *p, const formatdef *f)
 {
 	float x;
@@ -711,6 +727,16 @@ np_ulonglong(char *p, PyObject *v, const formatdef *f)
 }
 #endif
 
+
+static int
+np_bool(char *p, PyObject *v, const formatdef *f)
+{
+	BOOL_TYPE y; 
+	y = PyObject_IsTrue(v);
+	memcpy(p, (char *)&y, sizeof y);
+	return 0;
+}
+
 static int
 np_float(char *p, PyObject *v, const formatdef *f)
 {
@@ -771,6 +797,7 @@ static formatdef native_table[] = {
 	{'q',	sizeof(PY_LONG_LONG), LONG_LONG_ALIGN, nu_longlong, np_longlong},
 	{'Q',	sizeof(PY_LONG_LONG), LONG_LONG_ALIGN, nu_ulonglong,np_ulonglong},
 #endif
+	{'t',	sizeof(BOOL_TYPE),	BOOL_ALIGN,	nu_bool,	np_bool},
 	{'f',	sizeof(float),	FLOAT_ALIGN,	nu_float,	np_float},
 	{'d',	sizeof(double),	DOUBLE_ALIGN,	nu_double,	np_double},
 	{'P',	sizeof(void *),	VOID_P_ALIGN,	nu_void_p,	np_void_p},
@@ -863,6 +890,14 @@ static PyObject *
 bu_double(const char *p, const formatdef *f)
 {
 	return unpack_double(p, 0);
+}
+
+static PyObject *
+bu_bool(const char *p, const formatdef *f)
+{
+	char x;
+	memcpy((char *)&x, p, sizeof x);
+	return PyBool_FromLong(x != 0);
 }
 
 static int
@@ -969,6 +1004,15 @@ bp_double(char *p, PyObject *v, const formatdef *f)
 	return _PyFloat_Pack8(x, (unsigned char *)p, 0);
 }
 
+static int
+bp_bool(char *p, PyObject *v, const formatdef *f)
+{
+	char y; 
+	y = PyObject_IsTrue(v);
+	memcpy(p, (char *)&y, sizeof y);
+	return 0;
+}
+
 static formatdef bigendian_table[] = {
 	{'x',	1,		0,		NULL},
 #ifdef PY_STRUCT_OVERFLOW_MASKING
@@ -990,6 +1034,7 @@ static formatdef bigendian_table[] = {
 	{'L',	4,		0,		bu_uint,	bp_uint},
 	{'q',	8,		0,		bu_longlong,	bp_longlong},
 	{'Q',	8,		0,		bu_ulonglong,	bp_ulonglong},
+	{'t',	1,		0,		bu_bool,	bp_bool},
 	{'f',	4,		0,		bu_float,	bp_float},
 	{'d',	8,		0,		bu_double,	bp_double},
 	{0}
@@ -1208,6 +1253,8 @@ static formatdef lilendian_table[] = {
 	{'L',	4,		0,		lu_uint,	lp_uint},
 	{'q',	8,		0,		lu_longlong,	lp_longlong},
 	{'Q',	8,		0,		lu_ulonglong,	lp_ulonglong},
+	{'t',	1,		0,		bu_bool,	bp_bool}, /* Std rep not endian dep,
+		but potentially different from native rep -- reuse bx_bool funcs. */
 	{'f',	4,		0,		lu_float,	lp_float},
 	{'d',	8,		0,		lu_double,	lp_double},
 	{0}

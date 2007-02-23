@@ -103,30 +103,30 @@ class SubPattern:
         nl = 1
         seqtypes = type(()), type([])
         for op, av in self.data:
-            print level*"  " + op,; nl = 0
+            print(level*"  " + op, end=' '); nl = 0
             if op == "in":
                 # member sublanguage
-                print; nl = 1
+                print(); nl = 1
                 for op, a in av:
-                    print (level+1)*"  " + op, a
+                    print((level+1)*"  " + op, a)
             elif op == "branch":
-                print; nl = 1
+                print(); nl = 1
                 i = 0
                 for a in av[1]:
                     if i > 0:
-                        print level*"  " + "or"
+                        print(level*"  " + "or")
                     a.dump(level+1); nl = 1
                     i = i + 1
             elif type(av) in seqtypes:
                 for a in av:
                     if isinstance(a, SubPattern):
-                        if not nl: print
+                        if not nl: print()
                         a.dump(level+1); nl = 1
                     else:
-                        print a, ; nl = 0
+                        print(a, end=' ') ; nl = 0
             else:
-                print av, ; nl = 0
-            if not nl: print
+                print(av, end=' ') ; nl = 0
+            if not nl: print()
     def __repr__(self):
         return repr(self.data)
     def __len__(self):
@@ -147,7 +147,7 @@ class SubPattern:
         # determine the width (min, max) for this subpattern
         if self.width:
             return self.width
-        lo = hi = 0L
+        lo = hi = 0
         UNITCODES = (ANY, RANGE, IN, LITERAL, NOT_LITERAL, CATEGORY)
         REPEATCODES = (MIN_REPEAT, MAX_REPEAT)
         for op, av in self.data:
@@ -170,8 +170,8 @@ class SubPattern:
                 hi = hi + j
             elif op in REPEATCODES:
                 i, j = av[2].getwidth()
-                lo = lo + long(i) * av[0]
-                hi = hi + long(j) * av[1]
+                lo = lo + int(i) * av[0]
+                hi = hi + int(j) * av[1]
             elif op in UNITCODES:
                 lo = lo + 1
                 hi = hi + 1

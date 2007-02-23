@@ -21,12 +21,12 @@ def U32(i):
     If it's >= 2GB when viewed as a 32-bit unsigned int, return a long.
     """
     if i < 0:
-        i += 1L << 32
+        i += 1 << 32
     return i
 
 def LOWU32(i):
     """Return the low-order 32 bits of an int, as a non-negative int."""
-    return i & 0xFFFFFFFFL
+    return i & 0xFFFFFFFF
 
 def write32(output, value):
     output.write(struct.pack("<l", value))
@@ -106,7 +106,7 @@ class GzipFile:
             self._new_member = True
             self.extrabuf = ""
             self.extrasize = 0
-            self.filename = filename
+            self.name = filename
             # Starts small, scales exponentially
             self.min_readsize = 100
 
@@ -127,14 +127,20 @@ class GzipFile:
         if self.mode == WRITE:
             self._write_gzip_header()
 
+    @property
+    def filename(self):
+        import warnings
+        warnings.warn("use the name attribute", DeprecationWarning)
+        if self.mode == WRITE and self.name[-3:] != ".gz":
+            return self.name + ".gz"
+        return self.name
+
     def __repr__(self):
         s = repr(self.fileobj)
         return '<gzip ' + s[1:-1] + ' ' + hex(id(self)) + '>'
 
     def _init_write(self, filename):
-        if filename[-3:] != '.gz':
-            filename = filename + '.gz'
-        self.filename = filename
+        self.name = filename
         self.crc = zlib.crc32("")
         self.size = 0
         self.writebuf = []
@@ -143,12 +149,14 @@ class GzipFile:
     def _write_gzip_header(self):
         self.fileobj.write('\037\213')             # magic header
         self.fileobj.write('\010')                 # compression method
-        fname = self.filename[:-3]
+        fname = self.name
+        if fname.endswith(".gz"):
+            fname = fname[:-3]
         flags = 0
         if fname:
             flags = FNAME
         self.fileobj.write(chr(flags))
-        write32u(self.fileobj, long(time.time()))
+        write32u(self.fileobj, int(time.time()))
         self.fileobj.write('\002')
         self.fileobj.write('\377')
         if fname:
@@ -470,7 +478,7 @@ def _test():
                 g = sys.stdout
             else:
                 if arg[-3:] != ".gz":
-                    print "filename doesn't end in .gz:", repr(arg)
+                    print("filename doesn't end in .gz:", repr(arg))
                     continue
                 f = open(arg, "rb")
                 g = __builtin__.open(arg[:-3], "wb")

@@ -56,31 +56,31 @@ Decimal("2.60")
 >>> Decimal("12.34") + Decimal("3.87") - Decimal("18.41")
 Decimal("-2.20")
 >>> dig = Decimal(1)
->>> print dig / Decimal(3)
+>>> print(dig / Decimal(3))
 0.333333333
 >>> getcontext().prec = 18
->>> print dig / Decimal(3)
+>>> print(dig / Decimal(3))
 0.333333333333333333
->>> print dig.sqrt()
+>>> print(dig.sqrt())
 1
->>> print Decimal(3).sqrt()
+>>> print(Decimal(3).sqrt())
 1.73205080756887729
->>> print Decimal(3) ** 123
+>>> print(Decimal(3) ** 123)
 4.85192780976896427E+58
 >>> inf = Decimal(1) / Decimal(0)
->>> print inf
+>>> print(inf)
 Infinity
 >>> neginf = Decimal(-1) / Decimal(0)
->>> print neginf
+>>> print(neginf)
 -Infinity
->>> print neginf + inf
+>>> print(neginf + inf)
 NaN
->>> print neginf * inf
+>>> print(neginf * inf)
 -Infinity
->>> print dig / 0
+>>> print(dig / 0)
 Infinity
 >>> getcontext().traps[DivisionByZero] = 1
->>> print dig / 0
+>>> print(dig / 0)
 Traceback (most recent call last):
   ...
   ...
@@ -88,29 +88,29 @@ Traceback (most recent call last):
 decimal.DivisionByZero: x / 0
 >>> c = Context()
 >>> c.traps[InvalidOperation] = 0
->>> print c.flags[InvalidOperation]
+>>> print(c.flags[InvalidOperation])
 0
 >>> c.divide(Decimal(0), Decimal(0))
 Decimal("NaN")
 >>> c.traps[InvalidOperation] = 1
->>> print c.flags[InvalidOperation]
+>>> print(c.flags[InvalidOperation])
 1
 >>> c.flags[InvalidOperation] = 0
->>> print c.flags[InvalidOperation]
+>>> print(c.flags[InvalidOperation])
 0
->>> print c.divide(Decimal(0), Decimal(0))
+>>> print(c.divide(Decimal(0), Decimal(0)))
 Traceback (most recent call last):
   ...
   ...
   ...
 decimal.InvalidOperation: 0 / 0
->>> print c.flags[InvalidOperation]
+>>> print(c.flags[InvalidOperation])
 1
 >>> c.flags[InvalidOperation] = 0
 >>> c.traps[InvalidOperation] = 0
->>> print c.divide(Decimal(0), Decimal(0))
+>>> print(c.divide(Decimal(0), Decimal(0)))
 NaN
->>> print c.flags[InvalidOperation]
+>>> print(c.flags[InvalidOperation])
 1
 >>>
 """
@@ -483,19 +483,19 @@ def localcontext(ctx=None):
     # as the doctest module doesn't understand __future__ statements
     """
     >>> from __future__ import with_statement
-    >>> print getcontext().prec
+    >>> print(getcontext().prec)
     28
     >>> with localcontext():
     ...     ctx = getcontext()
-    ...     ctx.prec() += 2
-    ...     print ctx.prec
-    ...
+    ...     ctx.prec += 2
+    ...     print(ctx.prec)
+    ... 
     30
     >>> with localcontext(ExtendedContext):
-    ...     print getcontext().prec
-    ...
+    ...     print(getcontext().prec)
+    ... 
     9
-    >>> print getcontext().prec
+    >>> print(getcontext().prec)
     28
     """
     if ctx is None: ctx = getcontext()
@@ -545,7 +545,7 @@ class Decimal(object):
             return self
 
         # From an integer
-        if isinstance(value, (int,long)):
+        if isinstance(value, (int,int)):
             if value >= 0:
                 self._sign = 0
             else:
@@ -561,7 +561,7 @@ class Decimal(object):
             if value[0] not in (0,1):
                 raise ValueError, 'Invalid sign'
             for digit in value[1]:
-                if not isinstance(digit, (int,long)) or digit < 0:
+                if not isinstance(digit, (int,int)) or digit < 0:
                     raise ValueError, "The second value in the tuple must be composed of non negative integer elements."
 
             self._sign = value[0]
@@ -740,32 +740,32 @@ class Decimal(object):
         return 1
 
     def __eq__(self, other):
-        if not isinstance(other, (Decimal, int, long)):
+        if not isinstance(other, (Decimal, int, int)):
             return NotImplemented
         return self.__cmp__(other) == 0
 
     def __ne__(self, other):
-        if not isinstance(other, (Decimal, int, long)):
+        if not isinstance(other, (Decimal, int, int)):
             return NotImplemented
         return self.__cmp__(other) != 0
 
     def __lt__(self, other):
-        if not isinstance(other, (Decimal, int, long)):
+        if not isinstance(other, (Decimal, int, int)):
             return NotImplemented
         return self.__cmp__(other) < 0
 
     def __le__(self, other):
-        if not isinstance(other, (Decimal, int, long)):
+        if not isinstance(other, (Decimal, int, int)):
             return NotImplemented
         return self.__cmp__(other) <= 0
 
     def __gt__(self, other):
-        if not isinstance(other, (Decimal, int, long)):
+        if not isinstance(other, (Decimal, int, int)):
             return NotImplemented
         return self.__cmp__(other) > 0
 
     def __ge__(self, other):
-        if not isinstance(other, (Decimal, int, long)):
+        if not isinstance(other, (Decimal, int, int)):
             return NotImplemented
         return self.__cmp__(other) >= 0
 
@@ -1529,7 +1529,7 @@ class Decimal(object):
 
         Equivalent to long(int(self))
         """
-        return long(self.__int__())
+        return int(self.__int__())
 
     def _fix(self, context):
         """Round if it is necessary to keep self within prec precision.
@@ -2986,7 +2986,7 @@ def _convert_other(other):
     """
     if isinstance(other, Decimal):
         return other
-    if isinstance(other, (int, long)):
+    if isinstance(other, (int, int)):
         return Decimal(other)
     return NotImplemented
 

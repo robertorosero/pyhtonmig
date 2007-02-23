@@ -437,18 +437,18 @@ class Message:
 
     def keys(self):
         """Get all of a message's header field names."""
-        return self.dict.keys()
+        return list(self.dict.keys())
 
     def values(self):
         """Get all of a message's header field values."""
-        return self.dict.values()
+        return list(self.dict.values())
 
     def items(self):
         """Get all of a message's headers.
 
         Returns a list of name, value tuples.
         """
-        return self.dict.items()
+        return list(self.dict.items())
 
     def __str__(self):
         return ''.join(self.headers)
@@ -850,6 +850,11 @@ def parsedate_tz(data):
     if data[0][-1] in (',', '.') or data[0].lower() in _daynames:
         # There's a dayname here. Skip it
         del data[0]
+    else:
+        # no space after the "weekday,"?
+        i = data[0].rfind(',')
+        if i >= 0:
+            data[0] = data[0][i+1:]
     if len(data) == 3: # RFC 850 date, deprecated
         stuff = data[0].split('-')
         if len(stuff) == 3:
@@ -967,32 +972,32 @@ if __name__ == '__main__':
     if sys.argv[1:]: file = sys.argv[1]
     f = open(file, 'r')
     m = Message(f)
-    print 'From:', m.getaddr('from')
-    print 'To:', m.getaddrlist('to')
-    print 'Subject:', m.getheader('subject')
-    print 'Date:', m.getheader('date')
+    print('From:', m.getaddr('from'))
+    print('To:', m.getaddrlist('to'))
+    print('Subject:', m.getheader('subject'))
+    print('Date:', m.getheader('date'))
     date = m.getdate_tz('date')
     tz = date[-1]
     date = time.localtime(mktime_tz(date))
     if date:
-        print 'ParsedDate:', time.asctime(date),
+        print('ParsedDate:', time.asctime(date), end=' ')
         hhmmss = tz
         hhmm, ss = divmod(hhmmss, 60)
         hh, mm = divmod(hhmm, 60)
-        print "%+03d%02d" % (hh, mm),
-        if ss: print ".%02d" % ss,
-        print
+        print("%+03d%02d" % (hh, mm), end=' ')
+        if ss: print(".%02d" % ss, end=' ')
+        print()
     else:
-        print 'ParsedDate:', None
+        print('ParsedDate:', None)
     m.rewindbody()
     n = 0
     while f.readline():
         n += 1
-    print 'Lines:', n
-    print '-'*70
-    print 'len =', len(m)
-    if 'Date' in m: print 'Date =', m['Date']
+    print('Lines:', n)
+    print('-'*70)
+    print('len =', len(m))
+    if 'Date' in m: print('Date =', m['Date'])
     if 'X-Nonsense' in m: pass
-    print 'keys =', m.keys()
-    print 'values =', m.values()
-    print 'items =', m.items()
+    print('keys =', m.keys())
+    print('values =', m.values())
+    print('items =', m.items())

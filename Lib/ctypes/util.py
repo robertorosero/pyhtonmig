@@ -46,23 +46,16 @@ elif os.name == "posix":
     import re, tempfile, errno
 
     def _findLib_gcc(name):
-        expr = '[^\(\)\s]*lib%s\.[^\(\)\s]*' % name
+        expr = r'[^\(\)\s]*lib%s\.[^\(\)\s]*' % re.escape(name)
         fdout, ccout = tempfile.mkstemp()
         os.close(fdout)
-        cmd = 'if type gcc &>/dev/null; then CC=gcc; else CC=cc; fi;' \
+        cmd = 'if type gcc >/dev/null 2>&1; then CC=gcc; else CC=cc; fi;' \
               '$CC -Wl,-t -o ' + ccout + ' 2>&1 -l' + name
         try:
-            fdout, outfile =  tempfile.mkstemp()
-            os.close(fdout)
-            fd = os.popen(cmd)
-            trace = fd.read()
-            err = fd.close()
+            f = os.popen(cmd)
+            trace = f.read()
+            f.close()
         finally:
-            try:
-                os.unlink(outfile)
-            except OSError as e:
-                if e.errno != errno.ENOENT:
-                    raise
             try:
                 os.unlink(ccout)
             except OSError as e:
@@ -73,29 +66,58 @@ elif os.name == "posix":
             return None
         return res.group(0)
 
-    def _findLib_ld(name):
-        expr = '/[^\(\)\s]*lib%s\.[^\(\)\s]*' % name
-        res = re.search(expr, os.popen('/sbin/ldconfig -p 2>/dev/null').read())
-        if not res:
-            # Hm, this works only for libs needed by the python executable.
-            cmd = 'ldd %s 2>/dev/null' % sys.executable
-            res = re.search(expr, os.popen(cmd).read())
-            if not res:
-                return None
-        return res.group(0)
-
     def _get_soname(f):
+        # assuming GNU binutils / ELF
+        if not f:
+            return None
         cmd = "objdump -p -j .dynamic 2>/dev/null " + f
         res = re.search(r'\sSONAME\s+([^\s]+)', os.popen(cmd).read())
         if not res:
             return None
         return res.group(1)
 
-    def find_library(name):
-        lib = _findLib_ld(name) or _findLib_gcc(name)
-        if not lib:
-            return None
-        return _get_soname(lib)
+    if (sys.platform.startswith("freebsd")
+        or sys.platform.startswith("openbsd")
+        or sys.platform.startswith("dragonfly")):
+
+        def _num_version(libname):
+            # "libxyz.so.MAJOR.MINOR" => [ MAJOR, MINOR ]
+            parts = libname.split(".")
+            nums = []
+            try:
+                while parts:
+                    nums.insert(0, int(parts.pop()))
+            except ValueError:
+                pass
+            return nums or [ sys.maxint ]
+
+        def find_library(name):
+            ename = re.escape(name)
+            expr = r':-l%s\.\S+ => \S*/(lib%s\.\S+)' % (ename, ename)
+            res = re.findall(expr,
+                             os.popen('/sbin/ldconfig -r 2>/dev/null').read())
+            if not res:
+                return _get_soname(_findLib_gcc(name))
+            res.sort(cmp= lambda x,y: cmp(_num_version(x), _num_version(y)))
+            return res[-1]
+
+    else:
+
+        def _findLib_ldconfig(name):
+            # XXX assuming GLIBC's ldconfig (with option -p)
+            expr = r'/[^\(\)\s]*lib%s\.[^\(\)\s]*' % re.escape(name)
+            res = re.search(expr,
+                            os.popen('/sbin/ldconfig -p 2>/dev/null').read())
+            if not res:
+                # Hm, this works only for libs needed by the python executable.
+                cmd = 'ldd %s 2>/dev/null' % sys.executable
+                res = re.search(expr, os.popen(cmd).read())
+                if not res:
+                    return None
+            return res.group(0)
+
+        def find_library(name):
+            return _get_soname(_findLib_ldconfig(name) or _findLib_gcc(name))
 
 ################################################################
 # test code
@@ -103,15 +125,15 @@ elif os.name == "posix":
 def test():
     from ctypes import cdll
     if os.name == "nt":
-        print cdll.msvcrt
-        print cdll.load("msvcrt")
-        print find_library("msvcrt")
+        print(cdll.msvcrt)
+        print(cdll.load("msvcrt"))
+        print(find_library("msvcrt"))
 
     if os.name == "posix":
         # find and load_version
-        print find_library("m")
-        print find_library("c")
-        print find_library("bz2")
+        print(find_library("m"))
+        print(find_library("c"))
+        print(find_library("bz2"))
 
         # getattr
 ##        print cdll.m
@@ -119,14 +141,14 @@ def test():
 
         # load
         if sys.platform == "darwin":
-            print cdll.LoadLibrary("libm.dylib")
-            print cdll.LoadLibrary("libcrypto.dylib")
-            print cdll.LoadLibrary("libSystem.dylib")
-            print cdll.LoadLibrary("System.framework/System")
+            print(cdll.LoadLibrary("libm.dylib"))
+            print(cdll.LoadLibrary("libcrypto.dylib"))
+            print(cdll.LoadLibrary("libSystem.dylib"))
+            print(cdll.LoadLibrary("System.framework/System"))
         else:
-            print cdll.LoadLibrary("libm.so")
-            print cdll.LoadLibrary("libcrypt.so")
-            print find_library("crypt")
+            print(cdll.LoadLibrary("libm.so"))
+            print(cdll.LoadLibrary("libcrypt.so"))
+            print(find_library("crypt"))
 
 if __name__ == "__main__":
     test()

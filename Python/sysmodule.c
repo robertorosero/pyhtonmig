@@ -104,8 +104,6 @@ sys_displayhook(PyObject *self, PyObject *o)
 	}
 	if (PyObject_SetAttrString(builtins, "_", Py_None) != 0)
 		return NULL;
-	if (Py_FlushLine() != 0)
-		return NULL;
 	outf = PySys_GetObject("stdout");
 	if (outf == NULL) {
 		PyErr_SetString(PyExc_RuntimeError, "lost sys.stdout");
@@ -113,8 +111,7 @@ sys_displayhook(PyObject *self, PyObject *o)
 	}
 	if (PyFile_WriteObject(o, outf, 0) != 0)
 		return NULL;
-	PyFile_SoftSpace(outf, 1);
-	if (Py_FlushLine() != 0)
+	if (PyFile_WriteString("\n", outf) != 0)
 		return NULL;
 	if (PyObject_SetAttrString(builtins, "_", o) != 0)
 		return NULL;
@@ -904,7 +901,7 @@ exitfunc -- if sys.exitfunc exists, this routine is called when Python exits\n\
   Assigning to sys.exitfunc is deprecated; use the atexit module instead.\n\
 \n\
 stdin -- standard input file object; used by raw_input() and input()\n\
-stdout -- standard output file object; used by the print statement\n\
+stdout -- standard output file object; used by print()\n\
 stderr -- standard error object; used for error messages\n\
   By assigning other file objects (or objects that behave like files)\n\
   to these, it is possible to redirect all of the interpreter's I/O.\n\
@@ -1110,17 +1107,17 @@ _PySys_Init(void)
 	if (PyErr_Occurred())
 		return NULL;
 #ifdef MS_WINDOWS
-	if(isatty(_fileno(stdin))){
+	if(isatty(_fileno(stdin)) && PyFile_Check(sysin)) {
 		sprintf(buf, "cp%d", GetConsoleCP());
 		if (!PyFile_SetEncoding(sysin, buf))
 			return NULL;
 	}
-	if(isatty(_fileno(stdout))) {
+	if(isatty(_fileno(stdout)) && PyFile_Check(sysout)) {
 		sprintf(buf, "cp%d", GetConsoleOutputCP());
 		if (!PyFile_SetEncoding(sysout, buf))
 			return NULL;
 	}
-	if(isatty(_fileno(stderr))) {
+	if(isatty(_fileno(stderr)) && PyFile_Check(syserr)) {
 		sprintf(buf, "cp%d", GetConsoleOutputCP());
 		if (!PyFile_SetEncoding(syserr, buf))
 			return NULL;

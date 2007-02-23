@@ -50,15 +50,15 @@ flags: 67
 consts: ('None',)
 
 >>> def attrs(obj):
-...     print obj.attr1
-...     print obj.attr2
-...     print obj.attr3
+...     print(obj.attr1)
+...     print(obj.attr2)
+...     print(obj.attr3)
 
 >>> dump(attrs.func_code)
 name: attrs
 argcount: 1
 kwonlyargcount: 0
-names: ('attr1', 'attr2', 'attr3')
+names: ('print', 'attr1', 'attr2', 'attr3')
 varnames: ('obj',)
 cellvars: ()
 freevars: ()
@@ -70,7 +70,7 @@ consts: ('None',)
 ...     'doc string'
 ...     'not a docstring'
 ...     53
-...     53L
+...     0x53
 
 >>> dump(optimize_away.func_code)
 name: optimize_away
@@ -115,8 +115,8 @@ def dump(co):
     """Print out a text representation of a code object."""
     for attr in ["name", "argcount", "kwonlyargcount", "names", "varnames",
                  "cellvars", "freevars", "nlocals", "flags"]:
-        print "%s: %s" % (attr, getattr(co, "co_" + attr))
-    print "consts:", tuple(consts(co.co_consts))
+        print("%s: %s" % (attr, getattr(co, "co_" + attr)))
+    print("consts:", tuple(consts(co.co_consts)))
 
 def test_main(verbose=None):
     from test.test_support import run_doctest

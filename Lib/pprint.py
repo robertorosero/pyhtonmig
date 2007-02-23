@@ -141,8 +141,7 @@ class PrettyPrinter:
                 if length:
                     context[objid] = 1
                     indent = indent + self._indent_per_level
-                    items  = object.items()
-                    items.sort()
+                    items  = sorted(object.items())
                     key, ent = items[0]
                     rep = self._repr(key, context, level)
                     write(rep)
@@ -313,8 +312,8 @@ def _perfcheck(object=None):
     t2 = time.time()
     p.pformat(object)
     t3 = time.time()
-    print "_safe_repr:", t2 - t1
-    print "pformat:", t3 - t2
+    print("_safe_repr:", t2 - t1)
+    print("pformat:", t3 - t2)
 
 if __name__ == "__main__":
     _perfcheck()

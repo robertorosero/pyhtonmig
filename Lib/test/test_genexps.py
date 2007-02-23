@@ -157,12 +157,12 @@ Generators always return to the most recent caller:
 
     >>> def creator():
     ...     r = yrange(5)
-    ...     print "creator", r.next()
+    ...     print("creator", r.next())
     ...     return r
     >>> def caller():
     ...     r = creator()
     ...     for i in r:
-    ...             print "caller", i
+    ...             print("caller", i)
     >>> caller()
     creator 0
     caller 1
@@ -221,7 +221,7 @@ Check that generator attributes are present
     >>> set(attr for attr in dir(g) if not attr.startswith('__')) >= expected
     True
 
-    >>> print g.next.__doc__
+    >>> print(g.next.__doc__)
     x.next() -> the next value, or raise StopIteration
     >>> import types
     >>> isinstance(g, types.GeneratorType)
@@ -274,7 +274,7 @@ def test_main(verbose=None):
             test_support.run_doctest(test_genexps, verbose)
             gc.collect()
             counts[i] = sys.gettotalrefcount()
-        print counts
+        print(counts)
 
 if __name__ == "__main__":
     test_main(verbose=True)

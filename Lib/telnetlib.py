@@ -8,7 +8,7 @@ Example:
 >>> from telnetlib import Telnet
 >>> tn = Telnet('www.python.org', 79)   # connect to finger port
 >>> tn.write('guido\r\n')
->>> print tn.read_all()
+>>> print(tn.read_all())
 Login       Name               TTY         Idle    When    Where
 guido    Guido van Rossum      pts/2        <Dec  2 11:10> snag.cnri.reston..
 
@@ -248,11 +248,11 @@ class Telnet:
 
         """
         if self.debuglevel > 0:
-            print 'Telnet(%s,%d):' % (self.host, self.port),
+            print('Telnet(%s,%d):' % (self.host, self.port), end=' ')
             if args:
-                print msg % args
+                print(msg % args)
             else:
-                print msg
+                print(msg)
 
     def set_debuglevel(self, debuglevel):
         """Set the debug level.
@@ -545,7 +545,7 @@ class Telnet:
                 try:
                     text = self.read_eager()
                 except EOFError:
-                    print '*** Connection closed by remote host ***'
+                    print('*** Connection closed by remote host ***')
                     break
                 if text:
                     sys.stdout.write(text)
@@ -572,7 +572,7 @@ class Telnet:
             try:
                 data = self.read_eager()
             except EOFError:
-                print '*** Connection closed by remote host ***'
+                print('*** Connection closed by remote host ***')
                 return
             if data:
                 sys.stdout.write(data)

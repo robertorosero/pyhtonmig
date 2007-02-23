@@ -202,17 +202,17 @@ class _fileobject(object):
     default_bufsize = 8192
     name = "<socket>"
 
-    __slots__ = ["mode", "bufsize", "softspace",
+    __slots__ = ["mode", "bufsize",
                  # "closed" is a property, see below
-                 "_sock", "_rbufsize", "_wbufsize", "_rbuf", "_wbuf"]
+                 "_sock", "_rbufsize", "_wbufsize", "_rbuf", "_wbuf",
+                 "_close"]
 
-    def __init__(self, sock, mode='rb', bufsize=-1):
+    def __init__(self, sock, mode='rb', bufsize=-1, close=False):
         self._sock = sock
         self.mode = mode # Not actually used in this version
         if bufsize < 0:
             bufsize = self.default_bufsize
         self.bufsize = bufsize
-        self.softspace = False
         if bufsize == 0:
             self._rbufsize = 1
         elif bufsize == 1:
@@ -222,6 +222,7 @@ class _fileobject(object):
         self._wbufsize = bufsize
         self._rbuf = "" # A string
         self._wbuf = [] # A list of strings
+        self._close = close
 
     def _getclosed(self):
         return self._sock is None
@@ -232,6 +233,8 @@ class _fileobject(object):
             if self._sock:
                 self.flush()
         finally:
+            if self._close:
+                self._sock.close()
             self._sock = None
 
     def __del__(self):

@@ -12,6 +12,10 @@ from pickle import loads, dumps
 class ArraySubclass(array.array):
     pass
 
+class ArraySubclassWithKwargs(array.array):
+    def __init__(self, typecode, newarg=None):
+        array.array.__init__(typecode)
+
 tests = [] # list to accumulate all tests
 typecodes = "cubBhHiIlLfd"
 
@@ -61,7 +65,7 @@ class BaseTest(unittest.TestCase):
         bi = a.buffer_info()
         self.assert_(isinstance(bi, tuple))
         self.assertEqual(len(bi), 2)
-        self.assert_(isinstance(bi[0], (int, long)))
+        self.assert_(isinstance(bi[0], (int, int)))
         self.assert_(isinstance(bi[1], int))
         self.assertEqual(bi[1], len(a))
 
@@ -323,9 +327,9 @@ class BaseTest(unittest.TestCase):
     def test_getitem(self):
         a = array.array(self.typecode, self.example)
         self.assertEntryEqual(a[0], self.example[0])
-        self.assertEntryEqual(a[0L], self.example[0])
+        self.assertEntryEqual(a[0], self.example[0])
         self.assertEntryEqual(a[-1], self.example[-1])
-        self.assertEntryEqual(a[-1L], self.example[-1])
+        self.assertEntryEqual(a[-1], self.example[-1])
         self.assertEntryEqual(a[len(self.example)-1], self.example[-1])
         self.assertEntryEqual(a[-len(self.example)], self.example[0])
         self.assertRaises(TypeError, a.__getitem__)
@@ -338,7 +342,7 @@ class BaseTest(unittest.TestCase):
         self.assertEntryEqual(a[0], a[-1])
 
         a = array.array(self.typecode, self.example)
-        a[0L] = a[-1]
+        a[0] = a[-1]
         self.assertEntryEqual(a[0], a[-1])
 
         a = array.array(self.typecode, self.example)
@@ -346,7 +350,7 @@ class BaseTest(unittest.TestCase):
         self.assertEntryEqual(a[0], a[-1])
 
         a = array.array(self.typecode, self.example)
-        a[-1L] = a[0]
+        a[-1] = a[0]
         self.assertEntryEqual(a[0], a[-1])
 
         a = array.array(self.typecode, self.example)
@@ -715,6 +719,9 @@ class BaseTest(unittest.TestCase):
                 b = array.array('B', range(64))
             self.assertEqual(rc, sys.getrefcount(10))
 
+    def test_subclass_with_kwargs(self):
+        # SF bug #1486663 -- this used to erroneously raise a TypeError
+        ArraySubclassWithKwargs('b', newarg=1)
 
 
 class StringTest(BaseTest):
@@ -754,7 +761,7 @@ class CharacterTest(StringTest):
         self.assertEqual(s.color, "blue")
         s.color = "red"
         self.assertEqual(s.color, "red")
-        self.assertEqual(s.__dict__.keys(), ["color"])
+        self.assertEqual(list(s.__dict__.keys()), ["color"])
 
     def test_nounicode(self):
         a = array.array(self.typecode, self.example)
@@ -809,7 +816,7 @@ class NumberTest(BaseTest):
         self.assertEqual(a[3::-2], array.array(self.typecode, [3,1]))
         self.assertEqual(a[-100:100:], a)
         self.assertEqual(a[100:-100:-1], a[::-1])
-        self.assertEqual(a[-100L:100L:2L], array.array(self.typecode, [0,2,4]))
+        self.assertEqual(a[-100:100:2], array.array(self.typecode, [0,2,4]))
         self.assertEqual(a[1000:2000:2], array.array(self.typecode, []))
         self.assertEqual(a[-1000:-2000:-2], array.array(self.typecode, []))
 
@@ -895,8 +902,8 @@ class SignedNumberTest(NumberTest):
 
     def test_overflow(self):
         a = array.array(self.typecode)
-        lower = -1 * long(pow(2, a.itemsize * 8 - 1))
-        upper = long(pow(2, a.itemsize * 8 - 1)) - 1L
+        lower = -1 * int(pow(2, a.itemsize * 8 - 1))
+        upper = int(pow(2, a.itemsize * 8 - 1)) - 1
         self.check_overflow(lower, upper)
 
 class UnsignedNumberTest(NumberTest):
@@ -908,7 +915,7 @@ class UnsignedNumberTest(NumberTest):
     def test_overflow(self):
         a = array.array(self.typecode)
         lower = 0
-        upper = long(pow(2, a.itemsize * 8)) - 1L
+        upper = int(pow(2, a.itemsize * 8)) - 1
         self.check_overflow(lower, upper)
 
 
@@ -1000,7 +1007,7 @@ def test_main(verbose=None):
             test_support.run_unittest(*tests)
             gc.collect()
             counts[i] = sys.gettotalrefcount()
-        print counts
+        print(counts)
 
 if __name__ == "__main__":
     test_main(verbose=True)

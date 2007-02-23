@@ -14,27 +14,41 @@ TO DO
 
 - See PEP 3000, 3100.
 
-- Test merging certain changes from the 2.5 HEAD code.
-
 - Weed really old/weird stuff from the library.
 
 - Unify range() and xrange().
 
-- Revamp the dict API: keys(), values(), items() return iterators, etc.
-
-- Add the bytes type.
-
 - Rework the standard I/O library to use bytes for binary files.
 
 - Make strings all Unicode.
-
-- Get rid of classic class implementation.
 
 - Get rid of various compatibility-related flags (e.g. division flags).
 
 
 Core and Builtins
 -----------------
+
+- PEP 3106: dict.iterkeys(), .iteritems(), .itervalues() are now gone;
+  and .keys(), .items(), .values() return dict views.
+
+- PEP 3105: print is now a function.  Also (not in the PEP) the
+  'softspace' attribute of files is now gone (since print() doesn't use
+  it).  A side effect of this change is that you can get incomplete
+  output lines in interactive sessions:
+
+  >>> print(42, end="")
+  42>>> 
+
+  We may be able to fix this after the I/O library rewrite.
+
+- PEP 3102: keyword-only arguments.
+
+- Int/Long unification is complete.  The 'long' built-in type
+  and literals with trailing 'L' or 'l' have been removed.
+  Performance may be sub-optimal (haven't really benchmarked).
+
+- 'except E, V' must now be spelled as 'except E as V' and deletes V
+  at the end of the except clause; V must be a simple name.
 
 - Added function annotations per PEP 3107.
 

@@ -500,7 +500,7 @@ def list2cmdline(seq):
         if result:
             result.append(' ')
 
-        needquote = (" " in arg) or ("\t" in arg)
+        needquote = (" " in arg) or ("\t" in arg) or arg == ""
         if needquote:
             result.append('"')
 
@@ -541,7 +541,7 @@ class Popen(object):
         _cleanup()
 
         self._child_created = False
-        if not isinstance(bufsize, (int, long)):
+        if not isinstance(bufsize, (int, int)):
             raise TypeError("bufsize must be an integer")
 
         if mswindows:
@@ -593,14 +593,30 @@ class Popen(object):
                             c2pread, c2pwrite,
                             errread, errwrite)
 
-        if p2cwrite:
+        # On Windows, you cannot just redirect one or two handles: You
+        # either have to redirect all three or none. If the subprocess
+        # user has only redirected one or two handles, we are
+        # automatically creating PIPEs for the rest. We should close
+        # these after the process is started. See bug #1124861. 
+        if mswindows:
+            if stdin is None and p2cwrite is not None:
+                os.close(p2cwrite)
+                p2cwrite = None
+            if stdout is None and c2pread is not None:
+                os.close(c2pread)
+                c2pread = None
+            if stderr is None and errread is not None:
+                os.close(errread)
+                errread = None
+
+        if p2cwrite is not None:
             self.stdin = os.fdopen(p2cwrite, 'wb', bufsize)
-        if c2pread:
+        if c2pread is not None:
             if universal_newlines:
                 self.stdout = os.fdopen(c2pread, 'rU', bufsize)
             else:
                 self.stdout = os.fdopen(c2pread, 'rb', bufsize)
-        if errread:
+        if errread is not None:
             if universal_newlines:
                 self.stderr = os.fdopen(errread, 'rU', bufsize)
             else:
@@ -669,7 +685,9 @@ class Popen(object):
 
             if stdin is None:
                 p2cread = GetStdHandle(STD_INPUT_HANDLE)
-            elif stdin == PIPE:
+            if p2cread is not None:
+                pass
+            elif stdin is None or stdin == PIPE:
                 p2cread, p2cwrite = CreatePipe(None, 0)
                 # Detach and turn into fd
                 p2cwrite = p2cwrite.Detach()
@@ -683,7 +701,9 @@ class Popen(object):
 
             if stdout is None:
                 c2pwrite = GetStdHandle(STD_OUTPUT_HANDLE)
-            elif stdout == PIPE:
+            if c2pwrite is not None:
+                pass
+            elif stdout is None or stdout == PIPE:
                 c2pread, c2pwrite = CreatePipe(None, 0)
                 # Detach and turn into fd
                 c2pread = c2pread.Detach()
@@ -697,7 +717,9 @@ class Popen(object):
 
             if stderr is None:
                 errwrite = GetStdHandle(STD_ERROR_HANDLE)
-            elif stderr == PIPE:
+            if errwrite is not None:
+                pass
+            elif stderr is None or stderr == PIPE:
                 errread, errwrite = CreatePipe(None, 0)
                 # Detach and turn into fd
                 errread = errread.Detach()
@@ -764,7 +786,7 @@ class Popen(object):
                 startupinfo.wShowWindow = SW_HIDE
                 comspec = os.environ.get("COMSPEC", "cmd.exe")
                 args = comspec + " /c " + args
-                if (GetVersion() >= 0x80000000L or
+                if (GetVersion() >= 0x80000000 or
                         os.path.basename(comspec).lower() == "command.com"):
                     # Win9x, or using command.com on NT. We need to
                     # use the w9xpopen intermediate program. For more
@@ -987,29 +1009,29 @@ class Popen(object):
                 # Child
                 try:
                     # Close parent's pipe ends
-                    if p2cwrite:
+                    if p2cwrite is not None:
                         os.close(p2cwrite)
-                    if c2pread:
+                    if c2pread is not None:
                         os.close(c2pread)
-                    if errread:
+                    if errread is not None:
                         os.close(errread)
                     os.close(errpipe_read)
 
                     # Dup fds for child
-                    if p2cread:
+                    if p2cread is not None:
                         os.dup2(p2cread, 0)
-                    if c2pwrite:
+                    if c2pwrite is not None:
                         os.dup2(c2pwrite, 1)
-                    if errwrite:
+                    if errwrite is not None:
                         os.dup2(errwrite, 2)
 
                     # Close pipe fds.  Make sure we don't close the same
                     # fd more than once, or standard fds.
-                    if p2cread and p2cread not in (0,):
+                    if p2cread is not None and p2cread not in (0,):
                         os.close(p2cread)
-                    if c2pwrite and c2pwrite not in (p2cread, 1):
+                    if c2pwrite is not None and c2pwrite not in (p2cread, 1):
                         os.close(c2pwrite)
-                    if errwrite and errwrite not in (p2cread, c2pwrite, 2):
+                    if errwrite is not None and errwrite not in (p2cread, c2pwrite, 2):
                         os.close(errwrite)
 
                     # Close all other fds, if asked for
@@ -1042,11 +1064,11 @@ class Popen(object):
 
             # Parent
             os.close(errpipe_write)
-            if p2cread and p2cwrite:
+            if p2cread is not None and p2cwrite is not None:
                 os.close(p2cread)
-            if c2pwrite and c2pread:
+            if c2pwrite is not None and c2pread is not None:
                 os.close(c2pwrite)
-            if errwrite and errread:
+            if errwrite is not None and errread is not None:
                 os.close(errwrite)
 
             # Wait for exec to fail or succeed; possibly raising exception
@@ -1121,7 +1143,7 @@ class Popen(object):
                     # we can write up to PIPE_BUF bytes without risk
                     # blocking.  POSIX defines PIPE_BUF >= 512
                     bytes_written = os.write(self.stdin.fileno(), buffer(input, input_offset, 512))
-                    input_offset += bytes_written 
+                    input_offset += bytes_written
                     if input_offset >= len(input):
                         self.stdin.close()
                         write_set.remove(self.stdin)
@@ -1165,8 +1187,8 @@ def _demo_posix():
     # Example 1: Simple redirection: Get process list
     #
     plist = Popen(["ps"], stdout=PIPE).communicate()[0]
-    print "Process list:"
-    print plist
+    print("Process list:")
+    print(plist)
 
     #
     # Example 2: Change uid before executing child
@@ -1178,42 +1200,42 @@ def _demo_posix():
     #
     # Example 3: Connecting several subprocesses
     #
-    print "Looking for 'hda'..."
+    print("Looking for 'hda'...")
     p1 = Popen(["dmesg"], stdout=PIPE)
     p2 = Popen(["grep", "hda"], stdin=p1.stdout, stdout=PIPE)
-    print repr(p2.communicate()[0])
+    print(repr(p2.communicate()[0]))
 
     #
     # Example 4: Catch execution error
     #
-    print
-    print "Trying a weird file..."
+    print()
+    print("Trying a weird file...")
     try:
-        print Popen(["/this/path/does/not/exist"]).communicate()
+        print(Popen(["/this/path/does/not/exist"]).communicate())
     except OSError as e:
         if e.errno == errno.ENOENT:
-            print "The file didn't exist.  I thought so..."
-            print "Child traceback:"
-            print e.child_traceback
+            print("The file didn't exist.  I thought so...")
+            print("Child traceback:")
+            print(e.child_traceback)
         else:
-            print "Error", e.errno
+            print("Error", e.errno)
     else:
-        print >>sys.stderr, "Gosh.  No error."
+        print("Gosh.  No error.", file=sys.stderr)
 
 
 def _demo_windows():
     #
     # Example 1: Connecting several subprocesses
     #
-    print "Looking for 'PROMPT' in set output..."
+    print("Looking for 'PROMPT' in set output...")
     p1 = Popen("set", stdout=PIPE, shell=True)
     p2 = Popen('find "PROMPT"', stdin=p1.stdout, stdout=PIPE)
-    print repr(p2.communicate()[0])
+    print(repr(p2.communicate()[0]))
 
     #
     # Example 2: Simple execution of program
     #
-    print "Executing calc..."
+    print("Executing calc...")
     p = Popen("calc")
     p.wait()
 

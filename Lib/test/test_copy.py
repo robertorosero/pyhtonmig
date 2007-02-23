@@ -82,7 +82,7 @@ class TestCopy(unittest.TestCase):
             pass
         def f():
             pass
-        tests = [None, 42, 2L**100, 3.14, True, False, 1j,
+        tests = [None, 42, 2**100, 3.14, True, False, 1j,
                  "hello", u"hello\u1234", f.func_code,
                  NewStyle, xrange(10), Classic, max]
         for x in tests:
@@ -255,7 +255,7 @@ class TestCopy(unittest.TestCase):
             pass
         def f():
             pass
-        tests = [None, 42, 2L**100, 3.14, True, False, 1j,
+        tests = [None, 42, 2**100, 3.14, True, False, 1j,
                  "hello", u"hello\u1234", f.func_code,
                  NewStyle, xrange(10), Classic, max]
         for x in tests:
@@ -491,7 +491,7 @@ class TestCopy(unittest.TestCase):
     def test_reduce_5tuple(self):
         class C(dict):
             def __reduce__(self):
-                return (C, (), self.__dict__, None, self.iteritems())
+                return (C, (), self.__dict__, None, self.items())
             def __eq__(self, other):
                 return (dict(self) == dict(other) and
                         self.__dict__ == other.__dict__)

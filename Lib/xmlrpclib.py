@@ -183,8 +183,8 @@ else:
 __version__ = "1.0.1"
 
 # xmlrpc integer limits
-MAXINT =  2L**31-1
-MININT = -2L**31
+MAXINT =  2**31-1
+MININT = -2**31
 
 # --------------------------------------------------------------------
 # Error constants (from Dan Libby's specification at
@@ -1310,7 +1310,7 @@ class Transport:
             if not response:
                 break
             if self.verbose:
-                print "body:", repr(response)
+                print("body:", repr(response))
             p.feed(response)
 
         file.close()
@@ -1450,18 +1450,18 @@ if __name__ == "__main__":
     # server = ServerProxy("http://localhost:8000") # local server
     server = ServerProxy("http://time.xmlrpc.com/RPC2")
 
-    print server
+    print(server)
 
     try:
-        print server.currentTime.getCurrentTime()
+        print(server.currentTime.getCurrentTime())
     except Error as v:
-        print "ERROR", v
+        print("ERROR", v)
 
     multi = MultiCall(server)
     multi.currentTime.getCurrentTime()
     multi.currentTime.getCurrentTime()
     try:
         for response in multi():
-            print response
+            print(response)
     except Error as v:
-        print "ERROR", v
+        print("ERROR", v)

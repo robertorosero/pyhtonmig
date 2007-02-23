@@ -520,7 +520,6 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 	register PyObject *v;	/* Temporary objects popped off stack */
 	register PyObject *w;
 	register PyObject *u;
-	register PyObject *stream = NULL;    /* for PRINT opcodes */
 	register PyObject **fastlocals, **freevars;
 	PyObject *retval = NULL;	/* Return value */
 	PyThreadState *tstate = PyThreadState_GET();
@@ -1440,81 +1439,6 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 			Py_XDECREF(x);
 			break;
 
-		case PRINT_ITEM_TO:
-			w = stream = POP();
-			/* fall through to PRINT_ITEM */
-
-		case PRINT_ITEM:
-			v = POP();
-			if (stream == NULL || stream == Py_None) {
-				w = PySys_GetObject("stdout");
-				if (w == NULL) {
-					PyErr_SetString(PyExc_RuntimeError,
-							"lost sys.stdout");
-					err = -1;
-				}
-			}
-			/* PyFile_SoftSpace() can exececute arbitrary code
-			   if sys.stdout is an instance with a __getattr__.
-			   If __getattr__ raises an exception, w will
-			   be freed, so we need to prevent that temporarily. */
-			Py_XINCREF(w);
-			if (w != NULL && PyFile_SoftSpace(w, 0))
-				err = PyFile_WriteString(" ", w);
-			if (err == 0)
-				err = PyFile_WriteObject(v, w, Py_PRINT_RAW);
-			if (err == 0) {
-			    /* XXX move into writeobject() ? */
-			    if (PyString_Check(v)) {
-				char *s = PyString_AS_STRING(v);
-				Py_ssize_t len = PyString_GET_SIZE(v);
-				if (len == 0 ||
-				    !isspace(Py_CHARMASK(s[len-1])) ||
-				    s[len-1] == ' ')
-					PyFile_SoftSpace(w, 1);
-			    }
-#ifdef Py_USING_UNICODE
-			    else if (PyUnicode_Check(v)) {
-				Py_UNICODE *s = PyUnicode_AS_UNICODE(v);
-				Py_ssize_t len = PyUnicode_GET_SIZE(v);
-				if (len == 0 ||
-				    !Py_UNICODE_ISSPACE(s[len-1]) ||
-				    s[len-1] == ' ')
-				    PyFile_SoftSpace(w, 1);
-			    }
-#endif
-			    else
-			    	PyFile_SoftSpace(w, 1);
-			}
-			Py_XDECREF(w);
-			Py_DECREF(v);
-			Py_XDECREF(stream);
-			stream = NULL;
-			if (err == 0)
-				continue;
-			break;
-
-		case PRINT_NEWLINE_TO:
-			w = stream = POP();
-			/* fall through to PRINT_NEWLINE */
-
-		case PRINT_NEWLINE:
-			if (stream == NULL || stream == Py_None) {
-				w = PySys_GetObject("stdout");
-				if (w == NULL)
-					PyErr_SetString(PyExc_RuntimeError,
-							"lost sys.stdout");
-			}
-			if (w != NULL) {
-				err = PyFile_WriteString("\n", w);
-				if (err == 0)
-					PyFile_SoftSpace(w, 0);
-			}
-			Py_XDECREF(stream);
-			stream = NULL;
-			break;
-
-
 #ifdef CASE_TOO_BIG
 		default: switch (opcode) {
 #endif
@@ -2106,8 +2030,9 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 		case SETUP_LOOP:
 		case SETUP_EXCEPT:
 		case SETUP_FINALLY:
-			/* NOTE: If you add any new block-setup opcodes that are not try/except/finally
-			   handlers, you may need to update the PyGen_NeedsFinalizing() function. */
+			/* NOTE: If you add any new block-setup opcodes that are
+		           not try/except/finally handlers, you may need to
+			   update the PyGen_NeedsFinalizing() function. */
 
 			PyFrame_BlockSetup(f, opcode, INSTR_OFFSET() + oparg,
 					   STACK_LEVEL());
@@ -2705,7 +2630,7 @@ PyEval_EvalCodeEx(PyCodeObject *co, PyObject *globals, PyObject *locals,
 				}
 				PyErr_Format(PyExc_TypeError,
 					"%.200s() needs "
-					"keyword only argument %s",
+					"keyword-only argument %s",
 					PyString_AsString(co->co_name),
 					PyString_AsString(name));
 				goto fail;
@@ -3357,17 +3282,6 @@ PyEval_MergeCompilerFlags(PyCompilerFlags *cf)
 	return result;
 }
 
-int
-Py_FlushLine(void)
-{
-	PyObject *f = PySys_GetObject("stdout");
-	if (f == NULL)
-		return 0;
-	if (!PyFile_SoftSpace(f, 0))
-		return 0;
-	return PyFile_WriteString("\n", f);
-}
-
 
 /* External interface to call any callable object.
    The arg must be a tuple or NULL. */
@@ -3833,7 +3747,7 @@ _PyEval_SliceIndex(PyObject *v, Py_ssize_t *pi)
 {
 	if (v != NULL) {
 		Py_ssize_t x;
-		if (PyInt_Check(v)) {
+		if (PyInt_CheckExact(v)) {
 			/* XXX(nnorwitz): I think PyInt_AS_LONG is correct,
 			   however, it looks like it should be AsSsize_t.
 			   There should be a comment here explaining why.
@@ -3879,6 +3793,35 @@ cmp_outcome(int op, register PyObject *v, register PyObject *w)
 		res = !res;
 		break;
 	case PyCmp_EXC_MATCH:
+		if (PyTuple_Check(w)) {
+			Py_ssize_t i, length;
+			length = PyTuple_Size(w);
+			for (i = 0; i < length; i += 1) {
+				PyObject *exc = PyTuple_GET_ITEM(w, i);
+				if (PyString_Check(exc)) {
+					int ret_val;
+					ret_val = PyErr_WarnEx(
+							PyExc_DeprecationWarning,
+							"catching of string "
+							"exceptions is "
+							"deprecated", 1);
+					if (ret_val == -1)
+						return NULL;
+				}
+			}
+		}
+		else {
+			if (PyString_Check(w)) {
+				int ret_val;
+				ret_val = PyErr_WarnEx(
+						PyExc_DeprecationWarning,
+						"catching of string "
+						"exceptions is deprecated",
+						1);
+				if (ret_val == -1)
+					return NULL;
+			}
+		}
 		res = PyErr_GivenExceptionMatches(v, w);
 		break;
 	default:

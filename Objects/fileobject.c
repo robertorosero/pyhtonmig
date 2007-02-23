@@ -118,7 +118,6 @@ fill_file_fields(PyFileObject *f, FILE *fp, PyObject *name, char *mode,
 	f->f_mode = PyString_FromString(mode);
 
 	f->f_close = close;
-	f->f_softspace = 0;
 	f->f_binary = strchr(mode,'b') != NULL;
 	f->f_buf = NULL;
 	f->f_univ_newline = (strchr(mode, 'U') != NULL);
@@ -354,6 +353,8 @@ PyFile_SetEncoding(PyObject *f, const char *enc)
 {
 	PyFileObject *file = (PyFileObject*)f;
 	PyObject *str = PyString_FromString(enc);
+
+	assert(PyFile_Check(f));
 	if (!str)
 		return 0;
 	Py_DECREF(file->f_encoding);
@@ -1521,7 +1522,6 @@ file_write(PyFileObject *f, PyObject *args)
 		return err_closed();
 	if (!PyArg_ParseTuple(args, f->f_binary ? "s#" : "t#", &s, &n))
 		return NULL;
-	f->f_softspace = 0;
 	Py_BEGIN_ALLOW_THREADS
 	errno = 0;
 	n2 = fwrite(s, 1, n, f->f_fp);
@@ -1624,7 +1624,6 @@ file_writelines(PyFileObject *f, PyObject *seq)
 		/* Since we are releasing the global lock, the
 		   following code may *not* execute Python code. */
 		Py_BEGIN_ALLOW_THREADS
-		f->f_softspace = 0;
 		errno = 0;
 		for (i = 0; i < j; i++) {
 		    	line = PyList_GET_ITEM(list, i);
@@ -1784,8 +1783,6 @@ static PyMethodDef file_methods[] = {
 #define OFF(x) offsetof(PyFileObject, x)
 
 static PyMemberDef file_memberlist[] = {
-	{"softspace",	T_INT,		OFF(f_softspace), 0,
-	 "flag indicating that a space needs to be printed; used by print"},
 	{"mode",	T_OBJECT,	OFF(f_mode),	RO,
 	 "file mode ('r', 'U', 'w', 'a', possibly with 'b' or '+' added)"},
 	{"name",	T_OBJECT,	OFF(f_name),	RO,
@@ -2092,8 +2089,7 @@ PyTypeObject PyFile_Type = {
 	0,					/* tp_call */
 	0,					/* tp_str */
 	PyObject_GenericGetAttr,		/* tp_getattro */
-	/* softspace is writable:  we must supply tp_setattro */
-	PyObject_GenericSetAttr,		/* tp_setattro */
+	0,					/* tp_setattro */
 	0,					/* tp_as_buffer */
 	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE, /* tp_flags */
 	file_doc,				/* tp_doc */
@@ -2116,42 +2112,6 @@ PyTypeObject PyFile_Type = {
 	file_new,				/* tp_new */
 	PyObject_Del,                           /* tp_free */
 };
-
-/* Interface for the 'soft space' between print items. */
-
-int
-PyFile_SoftSpace(PyObject *f, int newflag)
-{
-	long oldflag = 0;
-	if (f == NULL) {
-		/* Do nothing */
-	}
-	else if (PyFile_Check(f)) {
-		oldflag = ((PyFileObject *)f)->f_softspace;
-		((PyFileObject *)f)->f_softspace = newflag;
-	}
-	else {
-		PyObject *v;
-		v = PyObject_GetAttrString(f, "softspace");
-		if (v == NULL)
-			PyErr_Clear();
-		else {
-			if (PyInt_Check(v))
-				oldflag = PyInt_AsLong(v);
-			assert(oldflag < INT_MAX);
-			Py_DECREF(v);
-		}
-		v = PyInt_FromLong((long)newflag);
-		if (v == NULL)
-			PyErr_Clear();
-		else {
-			if (PyObject_SetAttrString(f, "softspace", v) != 0)
-				PyErr_Clear();
-			Py_DECREF(v);
-		}
-	}
-	return (int)oldflag;
-}
 
 /* Interfaces to write objects/strings to file-like objects */
 
@@ -2301,6 +2261,8 @@ int PyObject_AsFileDescriptor(PyObject *o)
 		return -1;
 	}
 
+	if (fd == -1 && PyErr_Occurred())
+		return -1;
 	if (fd < 0) {
 		PyErr_Format(PyExc_ValueError,
 			     "file descriptor cannot be a negative integer (%i)",

@@ -10,6 +10,7 @@ PyInt_GetMax(void)
 	return LONG_MAX;	/* To initialize sys.maxint */
 }
 
+#if 0
 /* Integers are quite normal objects, to make object handling uniform.
    (Using odd pointers to represent integers would save much space
    but require extra checks for this special case throughout the code.)
@@ -1049,8 +1050,9 @@ Convert a string or number to an integer, if possible.  A floating point\n\
 argument will be truncated towards zero (this does not include a string\n\
 representation of a floating point number!)  When converting a string, use\n\
 the optional base.  It is an error to supply a base when converting a\n\
-non-string. If the argument is outside the integer range a long object\n\
-will be returned instead.");
+non-string.  If base is zero, the proper base is guessed based on the\n\
+string content.  If the argument is outside the integer range a\n\
+long object will be returned instead.");
 
 static PyNumberMethods int_as_number = {
 	(binaryfunc)int_add,	/*nb_add*/
@@ -1254,3 +1256,4 @@ PyInt_Fini(void)
 		}
 	}
 }
+#endif /* if 0 */

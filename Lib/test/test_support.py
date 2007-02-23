@@ -106,8 +106,7 @@ def bind_port(sock, host='', preferred_port=54321):
             (err, msg) = e
             if err != errno.EADDRINUSE:
                 raise
-            print >>sys.__stderr__, \
-                '  WARNING: failed to listen on port %d, trying another' % port
+            print('  WARNING: failed to listen on port %d, trying another' % port, file=sys.__stderr__)
     raise TestFailed, 'unable to find port to listen on'
 
 FUZZ = 1e-6
@@ -178,10 +177,9 @@ else:
             except UnicodeEncodeError:
                 pass
             else:
-                print \
-                'WARNING: The filename %r CAN be encoded by the filesystem.  ' \
+                print('WARNING: The filename %r CAN be encoded by the filesystem.  ' \
                 'Unicode filename tests may not be effective' \
-                % TESTFN_UNICODE_UNENCODEABLE
+                % TESTFN_UNICODE_UNENCODEABLE)
 
 # Make sure we can write to TESTFN, try in /tmp if we can't
 fp = None
@@ -194,8 +192,8 @@ except IOError:
         TESTFN = TMP_TESTFN
         del TMP_TESTFN
     except IOError:
-        print ('WARNING: tests will fail, unable to write to: %s or %s' %
-                (TESTFN, TMP_TESTFN))
+        print(('WARNING: tests will fail, unable to write to: %s or %s' %
+                (TESTFN, TMP_TESTFN)))
 if fp is not None:
     fp.close()
     unlink(TESTFN)
@@ -241,8 +239,7 @@ def vereq(a, b):
 
 def sortdict(dict):
     "Like repr(dict), but in sorted order."
-    items = dict.items()
-    items.sort()
+    items = sorted(dict.items())
     reprpairs = ["%r: %r" % pair for pair in items]
     withcommas = ", ".join(reprpairs)
     return "{%s}" % withcommas
@@ -267,10 +264,10 @@ def open_urlresource(url):
             return open(fn)
 
     requires('urlfetch')
-    print >> get_original_stdout(), '\tfetching %s ...' % url
+    print('\tfetching %s ...' % url, file=get_original_stdout())
     fn, _ = urllib.urlretrieve(url, filename)
     return open(fn)
-    
+
 @contextmanager
 def guard_warnings_filter():
     """Guard the warnings filter from being permanently changed."""
@@ -307,7 +304,7 @@ class EnvironmentVarGuard(object):
         return self
 
     def __exit__(self, *ignore_exc):
-        for envvar, value in self._reset.iteritems():
+        for envvar, value in self._reset.items():
             self._environ[envvar] = value
         for unset in self._unset:
             del self._environ[unset]
@@ -511,7 +508,7 @@ def run_doctest(module, verbosity=None):
     finally:
         sys.stdout = save_stdout
     if verbose:
-        print 'doctest (%s) ... %d tests with zero failures' % (module.__name__, t)
+        print('doctest (%s) ... %d tests with zero failures' % (module.__name__, t))
     return f, t
 
 #=======================================================================

@@ -84,7 +84,7 @@ class ProcessTestCase(unittest.TestCase):
 
     def test_stdin_none(self):
         # .stdin is None when not redirected
-        p = subprocess.Popen([sys.executable, "-c", 'print "banana"'],
+        p = subprocess.Popen([sys.executable, "-c", 'print("banana")'],
                          stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         p.wait()
         self.assertEqual(p.stdin, None)
@@ -92,16 +92,16 @@ class ProcessTestCase(unittest.TestCase):
     def test_stdout_none(self):
         # .stdout is None when not redirected
         p = subprocess.Popen([sys.executable, "-c",
-                             'print "    this bit of output is from a '
+                             'print("    this bit of output is from a '
                              'test of stdout in a different '
-                             'process ..."'],
+                             'process ...")'],
                              stdin=subprocess.PIPE, stderr=subprocess.PIPE)
         p.wait()
         self.assertEqual(p.stdout, None)
 
     def test_stderr_none(self):
         # .stderr is None when not redirected
-        p = subprocess.Popen([sys.executable, "-c", 'print "banana"'],
+        p = subprocess.Popen([sys.executable, "-c", 'print("banana")'],
                          stdin=subprocess.PIPE, stdout=subprocess.PIPE)
         p.wait()
         self.assertEqual(p.stderr, None)
@@ -430,6 +430,8 @@ class ProcessTestCase(unittest.TestCase):
                          '"a\\\\b c" d e')
         self.assertEqual(subprocess.list2cmdline(['a\\\\b\\ c', 'd', 'e']),
                          '"a\\\\b\\ c" d e')
+        self.assertEqual(subprocess.list2cmdline(['ab', '']),
+                         'ab ""')
 
 
     def test_poll(self):

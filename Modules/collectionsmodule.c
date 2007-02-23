@@ -95,7 +95,7 @@ deque_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	dequeobject *deque;
 	block *b;
 
-	if (!_PyArg_NoKeywords("deque()", kwds))
+	if (type == &deque_type && !_PyArg_NoKeywords("deque()", kwds))
 		return NULL;
 
 	/* create dequeobject structure */
@@ -1140,6 +1140,7 @@ defdict_reduce(defdictobject *dd)
 	*/
 	PyObject *args;
 	PyObject *items;
+	PyObject *iteritems;
 	PyObject *result;
 	if (dd->default_factory == NULL || dd->default_factory == Py_None)
 		args = PyTuple_New(0);
@@ -1147,14 +1148,20 @@ defdict_reduce(defdictobject *dd)
 		args = PyTuple_Pack(1, dd->default_factory);
 	if (args == NULL)
 		return NULL;
-	items = PyObject_CallMethod((PyObject *)dd, "iteritems", "()");
+	items = PyObject_CallMethod((PyObject *)dd, "items", "()");
 	if (items == NULL) {
 		Py_DECREF(args);
 		return NULL;
 	}
-	result = PyTuple_Pack(5, dd->dict.ob_type, args,
-			      Py_None, Py_None, items);
+	iteritems = PyObject_GetIter(items);
 	Py_DECREF(items);
+	if (iteritems == NULL) {
+		Py_DECREF(args);
+		return NULL;
+	}
+	result = PyTuple_Pack(5, dd->dict.ob_type, args,
+			      Py_None, Py_None, iteritems);
+	Py_DECREF(iteritems);
 	Py_DECREF(args);
 	return result;
 }
@@ -1252,8 +1259,14 @@ defdict_init(PyObject *self, PyObject *args, PyObject *kwds)
 		newargs = PyTuple_New(0);
 	else {
 		Py_ssize_t n = PyTuple_GET_SIZE(args);
-		if (n > 0)
+		if (n > 0) {
 			newdefault = PyTuple_GET_ITEM(args, 0);
+			if (!PyCallable_Check(newdefault)) {
+				PyErr_SetString(PyExc_TypeError,
+					"first argument must be callable");                           
+				return -1;
+			}
+		}
 		newargs = PySequence_GetSlice(args, 1, n);
 	}
 	if (newargs == NULL)

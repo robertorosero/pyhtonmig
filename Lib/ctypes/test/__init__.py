@@ -41,7 +41,7 @@ def find_package_modules(package, mask):
             hasattr(package.__loader__, '_files')):
         path = package.__name__.replace(".", os.path.sep)
         mask = os.path.join(path, mask)
-        for fnm in package.__loader__._files.iterkeys():
+        for fnm in package.__loader__._files.keys():
             if fnmatch.fnmatchcase(fnm, mask):
                 yield os.path.splitext(fnm)[0].replace(os.path.sep, ".")
     else:
@@ -60,10 +60,10 @@ def get_tests(package, mask, verbosity):
         except ResourceDenied as detail:
             skipped.append(modname)
             if verbosity > 1:
-                print >> sys.stderr, "Skipped %s: %s" % (modname, detail)
+                print("Skipped %s: %s" % (modname, detail), file=sys.stderr)
             continue
         except Exception as detail:
-            print >> sys.stderr, "Warning: could not import %s: %s" % (modname, detail)
+            print("Warning: could not import %s: %s" % (modname, detail), file=sys.stderr)
             continue
         for name in dir(mod):
             if name.startswith("_"):
@@ -74,7 +74,7 @@ def get_tests(package, mask, verbosity):
     return skipped, tests
 
 def usage():
-    print __doc__
+    print(__doc__)
     return 1
 
 def test_with_refcounts(runner, verbosity, testcase):
@@ -106,9 +106,9 @@ def test_with_refcounts(runner, verbosity, testcase):
         cleanup()
         refcounts[i] = sys.gettotalrefcount() - rc
     if filter(None, refcounts):
-        print "%s leaks:\n\t" % testcase, refcounts
+        print("%s leaks:\n\t" % testcase, refcounts)
     elif verbosity:
-        print "%s: ok." % testcase
+        print("%s: ok." % testcase)
 
 class TestRunner(unittest.TextTestRunner):
     def run(self, test, skipped):
@@ -166,7 +166,7 @@ def main(*packages):
             try:
                 sys.gettotalrefcount
             except AttributeError:
-                print >> sys.stderr, "-r flag requires Python debug build"
+                print("-r flag requires Python debug build", file=sys.stderr)
                 return -1
             search_leaks = True
         elif flag == "-u":

@@ -18,9 +18,6 @@ module Python version "$Revision$"
 	      | Assign(expr* targets, expr value)
 	      | AugAssign(expr target, operator op, expr value)
 
-	      -- not sure if bool is allowed, can always use int
- 	      | Print(expr? dest, expr* values, bool nl)
-
 	      -- use 'orelse' because else is a keyword in target languages
 	      | For(expr target, expr iter, stmt* body, stmt* orelse)
 	      | While(expr test, stmt* body, stmt* orelse)
@@ -71,7 +68,7 @@ module Python version "$Revision$"
 	     | Subscript(expr value, slice slice, expr_context ctx)
 	     | Name(identifier id, expr_context ctx)
 	     | List(expr* elts, expr_context ctx) 
-	     | Tuple(expr *elts, expr_context ctx)
+	     | Tuple(expr* elts, expr_context ctx)
 
 	      -- col_offset is the byte offset in the utf8 string the parser uses
 	      attributes (int lineno, int col_offset)

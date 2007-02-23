@@ -500,7 +500,7 @@ def _timestamp(pathname):
         s = _os_stat(pathname)
     except OSError:
         return None
-    return long(s.st_mtime)
+    return int(s.st_mtime)
 
 
 ######################################################################
@@ -552,6 +552,10 @@ class _FilesystemImporter(Importer):
         # This method is only used when we look for a module within a package.
         assert parent
 
+        for submodule_path in parent.__path__:
+            code = self._import_pathname(_os_path_join(submodule_path, modname), fqname)
+            if code is not None:
+                return code
         return self._import_pathname(_os_path_join(parent.__pkgdir__, modname),
                                      fqname)
 
@@ -583,7 +587,7 @@ class _FilesystemImporter(Importer):
 
 def py_suffix_importer(filename, finfo, fqname):
     file = filename[:-3] + _suffix
-    t_py = long(finfo[8])
+    t_py = int(finfo[8])
     t_pyc = _timestamp(file)
 
     code = None
@@ -618,9 +622,9 @@ def _print_importers():
     items.sort()
     for name, module in items:
         if module:
-            print name, module.__dict__.get('__importer__', '-- no importer')
+            print(name, module.__dict__.get('__importer__', '-- no importer'))
         else:
-            print name, '-- non-existent module'
+            print(name, '-- non-existent module')
 
 def _test_revamp():
     ImportManager().install()

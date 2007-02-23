@@ -29,12 +29,31 @@ The module defines the following exception and functions:
   exactly.
 \end{funcdesc}
 
+\begin{funcdesc}{pack_into}{fmt, buffer, offset, v1, v2, \moreargs}
+  Pack the values \code{\var{v1}, \var{v2}, \textrm{\ldots}} according to the given
+  format, write the packed bytes into the writable \var{buffer} starting at
+  \var{offset}.
+  Note that the offset is not an optional argument.
+
+  \versionadded{2.5}
+\end{funcdesc}
+
 \begin{funcdesc}{unpack}{fmt, string}
   Unpack the string (presumably packed by \code{pack(\var{fmt},
   \textrm{\ldots})}) according to the given format.  The result is a
   tuple even if it contains exactly one item.  The string must contain
   exactly the amount of data required by the format
   (\code{len(\var{string})} must equal \code{calcsize(\var{fmt})}).
+\end{funcdesc}
+
+\begin{funcdesc}{unpack_from}{fmt, buffer\optional{,offset \code{= 0}}}
+  Unpack the \var{buffer} according to tthe given format.
+  The result is a tuple even if it contains exactly one item. The
+  \var{buffer} must contain at least the amount of data required by the
+  format (\code{len(buffer[offset:])} must be at least
+  \code{calcsize(\var{fmt})}).
+
+  \versionadded{2.5}
 \end{funcdesc}
 
 \begin{funcdesc}{calcsize}{fmt}
@@ -50,14 +69,15 @@ C and Python values should be obvious given their types:
   \lineiv{c}{\ctype{char}}{string of length 1}{}
   \lineiv{b}{\ctype{signed char}}{integer}{}
   \lineiv{B}{\ctype{unsigned char}}{integer}{}
+  \lineiv{t}{\ctype{_Bool}}{bool}{(1)}
   \lineiv{h}{\ctype{short}}{integer}{}
   \lineiv{H}{\ctype{unsigned short}}{integer}{}
   \lineiv{i}{\ctype{int}}{integer}{}
   \lineiv{I}{\ctype{unsigned int}}{long}{}
   \lineiv{l}{\ctype{long}}{integer}{}
   \lineiv{L}{\ctype{unsigned long}}{long}{}
-  \lineiv{q}{\ctype{long long}}{long}{(1)}
-  \lineiv{Q}{\ctype{unsigned long long}}{long}{(1)}
+  \lineiv{q}{\ctype{long long}}{long}{(2)}
+  \lineiv{Q}{\ctype{unsigned long long}}{long}{(2)}
   \lineiv{f}{\ctype{float}}{float}{}
   \lineiv{d}{\ctype{double}}{float}{}
   \lineiv{s}{\ctype{char[]}}{string}{}
@@ -70,6 +90,11 @@ Notes:
 
 \begin{description}
 \item[(1)]
+  The \character{t} conversion code corresponds to the \ctype{_Bool} type
+  defined by C99. If this type is not available, it is simulated using a
+  \ctype{char}. In standard mode, it is always represented by one byte.
+  \versionadded{2.6}
+\item[(2)]
   The \character{q} and \character{Q} conversion codes are available in
   native mode only if the platform C compiler supports C \ctype{long long},
   or, on Windows, \ctype{__int64}.  They are always available in standard
@@ -118,6 +143,12 @@ example, the Alpha and Merced processors use 64-bit pointer values,
 meaning a Python long integer will be used to hold the pointer; other
 platforms use 32-bit pointers and will use a Python integer.
 
+For the \character{t} format character, the return value is either
+\constant{True} or \constant{False}. When packing, the truth value
+of the argument object is used. Either 0 or 1 in the native or standard
+bool representation will be packed, and any non-zero value will be True
+when unpacking.
+
 By default, C numbers are represented in the machine's native format
 and byte order, and properly aligned by skipping pad bytes if
 necessary (according to the rules used by the C compiler).
@@ -151,6 +182,7 @@ for any type (so you have to use pad bytes);
 \ctype{long long} (\ctype{__int64} on Windows) is 8 bytes;
 \ctype{float} and \ctype{double} are 32-bit and 64-bit
 IEEE floating point numbers, respectively.
+\ctype{_Bool} is 1 byte.
 
 Note the difference between \character{@} and \character{=}: both use
 native byte order, but the size and alignment of the latter is
@@ -195,3 +227,43 @@ in effect; standard size and alignment does not enforce any alignment.
   \seemodule{array}{Packed binary storage of homogeneous data.}
   \seemodule{xdrlib}{Packing and unpacking of XDR data.}
 \end{seealso}
+
+\subsection{Struct Objects \label{struct-objects}}
+
+The \module{struct} module also defines the following type:
+
+\begin{classdesc}{Struct}{format}
+  Return a new Struct object which writes and reads binary data according to
+  the format string \var{format}.  Creating a Struct object once and calling
+  its methods is more efficient than calling the \module{struct} functions
+  with the same format since the format string only needs to be compiled once.
+
+ \versionadded{2.5}
+\end{classdesc}
+
+Compiled Struct objects support the following methods and attributes:
+
+\begin{methoddesc}[Struct]{pack}{v1, v2, \moreargs}
+  Identical to the \function{pack()} function, using the compiled format.
+  (\code{len(result)} will equal \member{self.size}.)
+\end{methoddesc}
+
+\begin{methoddesc}[Struct]{pack_into}{buffer, offset, v1, v2, \moreargs}
+  Identical to the \function{pack_into()} function, using the compiled format.
+\end{methoddesc}
+
+\begin{methoddesc}[Struct]{unpack}{string}
+  Identical to the \function{unpack()} function, using the compiled format.
+  (\code{len(string)} must equal \member{self.size}).
+\end{methoddesc}
+
+\begin{methoddesc}[Struct]{unpack_from}{buffer\optional{,offset
+                                              \code{= 0}}}
+  Identical to the \function{unpack_from()} function, using the compiled format.
+  (\code{len(buffer[offset:])} must be at least \member{self.size}).
+\end{methoddesc}
+
+\begin{memberdesc}[Struct]{format}
+  The format string used to construct this Struct object.
+\end{memberdesc}
+

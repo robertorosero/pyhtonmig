@@ -80,7 +80,7 @@ VERSION    = "00"               # version number
 LENGTH_NAME    = 100            # maximum length of a filename
 LENGTH_LINK    = 100            # maximum length of a linkname
 LENGTH_PREFIX  = 155            # maximum length of the prefix field
-MAXSIZE_MEMBER = 077777777777L  # maximum size of a file (11 octal digits)
+MAXSIZE_MEMBER = 077777777777  # maximum size of a file (11 octal digits)
 
 REGTYPE  = "0"                  # regular file
 AREGTYPE = "\0"                 # regular file
@@ -152,7 +152,7 @@ def nti(s):
         except ValueError:
             raise HeaderError("invalid header")
     else:
-        n = 0L
+        n = 0
         for i in xrange(len(s) - 1):
             n <<= 8
             n += ord(s[i + 1])
@@ -347,7 +347,7 @@ class _Stream:
         self.fileobj  = fileobj
         self.bufsize  = bufsize
         self.buf      = ""
-        self.pos      = 0L
+        self.pos      = 0
         self.closed   = False
 
         if comptype == "gz":
@@ -384,7 +384,7 @@ class _Stream:
                                             -self.zlib.MAX_WBITS,
                                             self.zlib.DEF_MEM_LEVEL,
                                             0)
-        timestamp = struct.pack("<L", long(time.time()))
+        timestamp = struct.pack("<L", int(time.time()))
         self.__write("\037\213\010\010%s\002\377" % timestamp)
         if self.name.endswith(".gz"):
             self.name = self.name[:-3]
@@ -429,8 +429,8 @@ class _Stream:
                 # while the same crc on a 64-bit box may "look positive".
                 # To avoid irksome warnings from the `struct` module, force
                 # it to look positive on all boxes.
-                self.fileobj.write(struct.pack("<L", self.crc & 0xffffffffL))
-                self.fileobj.write(struct.pack("<L", self.pos & 0xffffFFFFL))
+                self.fileobj.write(struct.pack("<L", self.crc & 0xffffffff))
+                self.fileobj.write(struct.pack("<L", self.pos & 0xffffFFFF))
 
         if not self._extfileobj:
             self.fileobj.close()
@@ -1062,6 +1062,10 @@ class TarFile(object):
         self.mode = {"r": "rb", "a": "r+b", "w": "wb"}[mode]
 
         if not fileobj:
+            if self._mode == "a" and not os.path.exists(self.name):
+                # Create nonexistent files in append mode.
+                self._mode = "w"
+                self.mode = "wb"
             fileobj = _open(self.name, self.mode)
             self._extfileobj = False
         else:
@@ -1076,7 +1080,7 @@ class TarFile(object):
         self.closed = False
         self.members = []       # list of members as TarInfo objects
         self._loaded = False    # flag if all members have been read
-        self.offset = 0L        # current position in the archive file
+        self.offset = 0        # current position in the archive file
         self.inodes = {}        # dictionary caching the inodes of
                                 # archive members already added
 
@@ -1095,7 +1099,8 @@ class TarFile(object):
                     self.fileobj.seek(0)
                     break
                 if tarinfo is None:
-                    self.fileobj.seek(- BLOCKSIZE, 1)
+                    if self.offset > 0:
+                        self.fileobj.seek(- BLOCKSIZE, 1)
                     break
 
         if self._mode in "aw":
@@ -1122,7 +1127,7 @@ class TarFile(object):
            'r:'         open for reading exclusively uncompressed
            'r:gz'       open for reading with gzip compression
            'r:bz2'      open for reading with bzip2 compression
-           'a' or 'a:'  open for appending
+           'a' or 'a:'  open for appending, creating the file if necessary
            'w' or 'w:'  open for writing without compression
            'w:gz'       open for writing with gzip compression
            'w:bz2'      open for writing with bzip2 compression
@@ -1378,7 +1383,7 @@ class TarFile(object):
         if stat.S_ISREG(stmd):
             tarinfo.size = statres.st_size
         else:
-            tarinfo.size = 0L
+            tarinfo.size = 0
         tarinfo.mtime = statres.st_mtime
         tarinfo.type = type
         tarinfo.linkname = linkname
@@ -1408,25 +1413,25 @@ class TarFile(object):
 
         for tarinfo in self:
             if verbose:
-                print filemode(tarinfo.mode),
-                print "%s/%s" % (tarinfo.uname or tarinfo.uid,
-                                 tarinfo.gname or tarinfo.gid),
+                print(filemode(tarinfo.mode), end=' ')
+                print("%s/%s" % (tarinfo.uname or tarinfo.uid,
+                                 tarinfo.gname or tarinfo.gid), end=' ')
                 if tarinfo.ischr() or tarinfo.isblk():
-                    print "%10s" % ("%d,%d" \
-                                    % (tarinfo.devmajor, tarinfo.devminor)),
+                    print("%10s" % ("%d,%d" \
+                                    % (tarinfo.devmajor, tarinfo.devminor)), end=' ')
                 else:
-                    print "%10d" % tarinfo.size,
-                print "%d-%02d-%02d %02d:%02d:%02d" \
-                      % time.localtime(tarinfo.mtime)[:6],
+                    print("%10d" % tarinfo.size, end=' ')
+                print("%d-%02d-%02d %02d:%02d:%02d" \
+                      % time.localtime(tarinfo.mtime)[:6], end=' ')
 
-            print tarinfo.name,
+            print(tarinfo.name, end=' ')
 
             if verbose:
                 if tarinfo.issym():
-                    print "->", tarinfo.linkname,
+                    print("->", tarinfo.linkname, end=' ')
                 if tarinfo.islnk():
-                    print "link to", tarinfo.linkname,
-            print
+                    print("link to", tarinfo.linkname, end=' ')
+            print()
 
     def add(self, name, arcname=None, recursive=True):
         """Add the file `name' to the archive. `name' may be any type of file
@@ -1632,19 +1637,7 @@ class TarFile(object):
         # Create all upper directories.
         upperdirs = os.path.dirname(targetpath)
         if upperdirs and not os.path.exists(upperdirs):
-            ti = TarInfo()
-            ti.name  = upperdirs
-            ti.type  = DIRTYPE
-            ti.mode  = 0777
-            ti.mtime = tarinfo.mtime
-            ti.uid   = tarinfo.uid
-            ti.gid   = tarinfo.gid
-            ti.uname = tarinfo.uname
-            ti.gname = tarinfo.gname
-            try:
-                self._extract_member(ti, ti.name)
-            except:
-                pass
+            os.makedirs(upperdirs)
 
         if tarinfo.islnk() or tarinfo.issym():
             self._dbg(1, "%s -> %s" % (tarinfo.name, tarinfo.linkname))
@@ -1924,8 +1917,8 @@ class TarFile(object):
         buf = tarinfo.buf
         sp = _ringbuffer()
         pos = 386
-        lastpos = 0L
-        realpos = 0L
+        lastpos = 0
+        realpos = 0
         # There are 4 possible sparse structs in the
         # first header.
         for i in xrange(4):
@@ -2034,7 +2027,7 @@ class TarFile(object):
         """Write debugging output to sys.stderr.
         """
         if level <= self.debug:
-            print >> sys.stderr, msg
+            print(msg, file=sys.stderr)
 # class TarFile
 
 class TarIter:

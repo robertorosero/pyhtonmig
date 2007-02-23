@@ -1844,10 +1844,7 @@ accum(const char* tag, PyObject *sofar, PyObject *num, PyObject *factor,
 		 * lose a little info.
 		 */
 		assert(PyInt_Check(factor) || PyLong_Check(factor));
-		if (PyInt_Check(factor))
-			dnum = (double)PyInt_AsLong(factor);
-		else
-			dnum = PyLong_AsDouble(factor);
+		dnum = PyLong_AsDouble(factor);
 
 		dnum *= fracpart;
 		fracpart = modf(dnum, &intpart);
@@ -3141,7 +3138,7 @@ time_str(PyDateTime_Time *self)
 }
 
 static PyObject *
-time_isoformat(PyDateTime_Time *self)
+time_isoformat(PyDateTime_Time *self, PyObject *unused)
 {
 	char buf[100];
 	PyObject *result;
@@ -3377,7 +3374,7 @@ time_reduce(PyDateTime_Time *self, PyObject *arg)
 
 static PyMethodDef time_methods[] = {
 
-	{"isoformat",   (PyCFunction)time_isoformat,	METH_KEYWORDS,
+	{"isoformat",   (PyCFunction)time_isoformat,	METH_NOARGS,
 	 PyDoc_STR("Return string in ISO 8601 format, HH:MM:SS[.mmmmmm]"
 	 	   "[+HH:MM].")},
 
@@ -3800,7 +3797,7 @@ datetime_strptime(PyObject *cls, PyObject *args)
 					Py_DECREF(obj);
 					return NULL;
 				}
-				if (PyInt_Check(p))
+				if (PyInt_CheckExact(p))
 					ia[i] = PyInt_AsLong(p);
 				else
 					good_timetuple = 0;

@@ -483,7 +483,7 @@ class UnicodeTest(
                          UnicodeCompat(u"u'%s' % obj falls back to obj.__str__()"),
                          u"u'%s' % obj falls back to obj.__str__()")
 
-        for obj in (123, 123.45, 123L):
+        for obj in (123, 123.45, 123):
             self.assertEqual(unicode(obj), unicode(str(obj)))
 
         # unicode(obj, encoding, error) tests (this maps to
@@ -732,15 +732,15 @@ class UnicodeTest(
                 pass
 
         out = BitBucket()
-        print >>out, u'abc'
-        print >>out, u'abc', u'def'
-        print >>out, u'abc', 'def'
-        print >>out, 'abc', u'def'
-        print >>out, u'abc\n'
-        print >>out, u'abc\n',
-        print >>out, u'abc\n',
-        print >>out, u'def\n'
-        print >>out, u'def\n'
+        print(u'abc', file=out)
+        print(u'abc', u'def', file=out)
+        print(u'abc', 'def', file=out)
+        print('abc', u'def', file=out)
+        print(u'abc\n', file=out)
+        print(u'abc\n', end=' ', file=out)
+        print(u'abc\n', end=' ', file=out)
+        print(u'def\n', file=out)
+        print(u'def\n', file=out)
 
     def test_ucs4(self):
         if sys.maxunicode == 0xFFFF:

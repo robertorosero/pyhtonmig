@@ -13,7 +13,7 @@ __all__ = ["symtable", "SymbolTable", "newSymbolTable", "Class",
 
 def symtable(code, filename, compile_type):
     raw = _symtable.symtable(code, filename, compile_type)
-    for top in raw.itervalues():
+    for top in raw.values():
         if top.name == 'top':
             break
     return newSymbolTable(top, filename)
@@ -249,4 +249,4 @@ if __name__ == "__main__":
     mod = symtable(src, os.path.split(sys.argv[0])[1], "exec")
     for ident in mod.get_identifiers():
         info = mod.lookup(ident)
-        print info, info.is_local(), info.is_namespace()
+        print(info, info.is_local(), info.is_namespace())

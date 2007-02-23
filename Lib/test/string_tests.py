@@ -12,7 +12,7 @@ class Sequence:
     def __getitem__(self, i): return self.seq[i]
 
 class BadSeq1(Sequence):
-    def __init__(self): self.seq = [7, 'hello', 123L]
+    def __init__(self): self.seq = [7, 'hello', 123]
 
 class BadSeq2(Sequence):
     def __init__(self): self.seq = ['a', 'b', 'c']
@@ -40,7 +40,7 @@ class CommonTest(unittest.TestCase):
         elif isinstance(obj, dict):
             return dict([
                (self.fixtype(key), self.fixtype(value))
-               for (key, value) in obj.iteritems()
+               for (key, value) in obj.items()
             ])
         else:
             return obj
@@ -902,7 +902,7 @@ class MixinStrUnicodeUserStringTest:
     def test_subscript(self):
         self.checkequal(u'a', 'abc', '__getitem__', 0)
         self.checkequal(u'c', 'abc', '__getitem__', -1)
-        self.checkequal(u'a', 'abc', '__getitem__', 0L)
+        self.checkequal(u'a', 'abc', '__getitem__', 0)
         self.checkequal(u'abc', 'abc', '__getitem__', slice(0, 3))
         self.checkequal(u'abc', 'abc', '__getitem__', slice(0, 1000))
         self.checkequal(u'a', 'abc', '__getitem__', slice(0, 1))
@@ -962,7 +962,7 @@ class MixinStrUnicodeUserStringTest:
 
         self.checkraises(TypeError, ' ', 'join')
         self.checkraises(TypeError, ' ', 'join', 7)
-        self.checkraises(TypeError, ' ', 'join', Sequence([7, 'hello', 123L]))
+        self.checkraises(TypeError, ' ', 'join', Sequence([7, 'hello', 123]))
         try:
             def f():
                 yield 4 + ""

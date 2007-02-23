@@ -245,7 +245,7 @@ class TestBasic(unittest.TestCase):
         d.append(d)
         try:
             fo = open(test_support.TESTFN, "wb")
-            print >> fo, d,
+            fo.write(str(d))
             fo.close()
             fo = open(test_support.TESTFN, "rb")
             self.assertEqual(fo.read(), repr(d))
@@ -486,6 +486,16 @@ class TestSubclass(unittest.TestCase):
         d1 == d2   # not clear if this is supposed to be True or False,
                    # but it used to give a SystemError
 
+
+class SubclassWithKwargs(deque):
+    def __init__(self, newarg=1):
+        deque.__init__(self)
+
+class TestSubclassWithKwargs(unittest.TestCase):
+    def test_subclass_with_kwargs(self):
+        # SF bug #1486663 -- this used to erroneously raise a TypeError
+        SubclassWithKwargs(newarg=1)
+
 #==============================================================================
 
 libreftest = """
@@ -494,7 +504,7 @@ Example from the Library Reference:  Doc/lib/libcollections.tex
 >>> from collections import deque
 >>> d = deque('ghi')                 # make a new deque with three items
 >>> for elem in d:                   # iterate over the deque's elements
-...     print elem.upper()
+...     print(elem.upper())
 G
 H
 I
@@ -564,8 +574,8 @@ deque(['a', 'b', 'd', 'e', 'f'])
 ...
 
 >>> for value in roundrobin('abc', 'd', 'efgh'):
-...     print value
-...
+...     print(value)
+... 
 a
 d
 e
@@ -583,7 +593,7 @@ h
 ...         d.append(pair)
 ...     return list(d)
 ...
->>> print maketree('abcdefgh')
+>>> print(maketree('abcdefgh'))
 [[[['a', 'b'], ['c', 'd']], [['e', 'f'], ['g', 'h']]]]
 
 """
@@ -599,6 +609,7 @@ def test_main(verbose=None):
         TestBasic,
         TestVariousIteratorArgs,
         TestSubclass,
+        TestSubclassWithKwargs,
     )
 
     test_support.run_unittest(*test_classes)
@@ -611,7 +622,7 @@ def test_main(verbose=None):
             test_support.run_unittest(*test_classes)
             gc.collect()
             counts[i] = sys.gettotalrefcount()
-        print counts
+        print(counts)
 
     # doctests
     from test import test_deque

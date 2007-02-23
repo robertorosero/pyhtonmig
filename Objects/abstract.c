@@ -790,25 +790,6 @@ PyNumber_Absolute(PyObject *o)
 	return type_error("bad operand type for abs(): '%.200s'", o);
 }
 
-/* Add a check for embedded NULL-bytes in the argument. */
-static PyObject *
-int_from_string(const char *s, Py_ssize_t len)
-{
-	char *end;
-	PyObject *x;
-
-	x = PyInt_FromString((char*)s, &end, 10);
-	if (x == NULL)
-		return NULL;
-	if (end != s + len) {
-		PyErr_SetString(PyExc_ValueError,
-				"null byte in argument for int()");
-		Py_DECREF(x);
-		return NULL;
-	}
-	return x;
-}
-
 /* Return a Python Int or Long from the object item 
    Raise TypeError if the result is not an int-or-long
    or if the object cannot be interpreted as an index. 
@@ -828,7 +809,7 @@ PyNumber_Index(PyObject *item)
 		if (result &&
 		    !PyInt_Check(result) && !PyLong_Check(result)) {
 			PyErr_Format(PyExc_TypeError,
-				     "__index__ returned non-(int,long) " \
+				     "__index__ returned non-int " \
 				     "(type %.200s)",
 				     result->ob_type->tp_name);
 			Py_DECREF(result);
@@ -890,51 +871,6 @@ PyNumber_AsSsize_t(PyObject *item, PyObject *err)
 }
 
 
-PyObject *
-PyNumber_Int(PyObject *o)
-{
-	PyNumberMethods *m;
-	const char *buffer;
-	Py_ssize_t buffer_len;
-
-	if (o == NULL)
-		return null_error();
-	if (PyInt_CheckExact(o)) {
-		Py_INCREF(o);
-		return o;
-	}
-	m = o->ob_type->tp_as_number;
-	if (m && m->nb_int) { /* This should include subclasses of int */
-		PyObject *res = m->nb_int(o);
-		if (res && (!PyInt_Check(res) && !PyLong_Check(res))) {
-			PyErr_Format(PyExc_TypeError,
-				     "__int__ returned non-int (type %.200s)",
-				     res->ob_type->tp_name);
-			Py_DECREF(res);
-			return NULL;
-		}
-		return res;
-	}
-	if (PyInt_Check(o)) { /* A int subclass without nb_int */
-		PyIntObject *io = (PyIntObject*)o;
-		return PyInt_FromLong(io->ob_ival);
-	}
-	if (PyString_Check(o))
-		return int_from_string(PyString_AS_STRING(o),
-				       PyString_GET_SIZE(o));
-#ifdef Py_USING_UNICODE
-	if (PyUnicode_Check(o))
-		return PyInt_FromUnicode(PyUnicode_AS_UNICODE(o),
-					 PyUnicode_GET_SIZE(o),
-					 10);
-#endif
-	if (!PyObject_AsCharBuffer(o, &buffer, &buffer_len))
-		return int_from_string((char*)buffer, buffer_len);
-
-	return type_error("int() argument must be a string or a "
-			  "number, not '%.200s'", o);
-}
-
 /* Add a check for embedded NULL-bytes in the argument. */
 static PyObject *
 long_from_string(const char *s, Py_ssize_t len)
@@ -947,7 +883,7 @@ long_from_string(const char *s, Py_ssize_t len)
 		return NULL;
 	if (end != s + len) {
 		PyErr_SetString(PyExc_ValueError,
-				"null byte in argument for long()");
+				"null byte in argument for int()");
 		Py_DECREF(x);
 		return NULL;
 	}
@@ -963,7 +899,22 @@ PyNumber_Long(PyObject *o)
 
 	if (o == NULL)
 		return null_error();
+	if (PyLong_CheckExact(o)) {
+		Py_INCREF(o);
+		return o;
+	}
 	m = o->ob_type->tp_as_number;
+	if (m && m->nb_int) { /* This should include subclasses of int */
+		PyObject *res = m->nb_int(o);
+		if (res && !PyLong_Check(res)) {
+			PyErr_Format(PyExc_TypeError,
+				     "__int__ returned non-int (type %.200s)",
+				     res->ob_type->tp_name);
+			Py_DECREF(res);
+			return NULL;
+		}
+		return res;
+	}
 	if (m && m->nb_long) { /* This should include subclasses of long */
 		PyObject *res = m->nb_long(o);
 		if (res && (!PyInt_Check(res) && !PyLong_Check(res))) {
@@ -994,7 +945,7 @@ PyNumber_Long(PyObject *o)
 	if (!PyObject_AsCharBuffer(o, &buffer, &buffer_len))
 		return long_from_string(buffer, buffer_len);
 
-	return type_error("long() argument must be a string or a "
+	return type_error("int() argument must be a string or a "
 			  "number, not '%.200s'", o);
 }
 
@@ -1029,6 +980,8 @@ PyNumber_Float(PyObject *o)
 int
 PySequence_Check(PyObject *s)
 {
+	if (PyObject_IsInstance(s, (PyObject *)&PyDict_Type))
+		return 0;
 	return s != NULL && s->ob_type->tp_as_sequence &&
 		s->ob_type->tp_as_sequence->sq_item != NULL;
 }
@@ -1669,6 +1622,54 @@ PyMapping_HasKey(PyObject *o, PyObject *key)
 	}
 	PyErr_Clear();
 	return 0;
+}
+
+PyObject *
+PyMapping_Keys(PyObject *o)
+{
+	PyObject *keys;
+	PyObject *fast;
+
+	if (PyDict_CheckExact(o))
+		return PyDict_Keys(o);
+	keys = PyObject_CallMethod(o, "keys", NULL);
+	if (keys == NULL)
+		return NULL;
+	fast = PySequence_Fast(keys, "o.keys() are not iterable");
+	Py_DECREF(keys);
+	return fast;
+}
+
+PyObject *
+PyMapping_Items(PyObject *o)
+{
+	PyObject *items;
+	PyObject *fast;
+
+	if (PyDict_CheckExact(o))
+		return PyDict_Items(o);
+	items = PyObject_CallMethod(o, "items", NULL);
+	if (items == NULL)
+		return NULL;
+	fast = PySequence_Fast(items, "o.items() are not iterable");
+	Py_DECREF(items);
+	return fast;
+}
+
+PyObject *
+PyMapping_Values(PyObject *o)
+{
+	PyObject *values;
+	PyObject *fast;
+
+	if (PyDict_CheckExact(o))
+		return PyDict_Values(o);
+	values = PyObject_CallMethod(o, "values", NULL);
+	if (values == NULL)
+		return NULL;
+	fast = PySequence_Fast(values, "o.values() are not iterable");
+	Py_DECREF(values);
+	return fast;
 }
 
 /* Operations on callable objects */

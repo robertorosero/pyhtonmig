@@ -27,7 +27,7 @@ def confirm(outcome, name):
     tests = tests + 1
     if outcome:
         if verbose:
-            print "Passed", name
+            print("Passed", name)
     else:
         failures.append(name)
 
@@ -216,7 +216,44 @@ def test_xmlgen_ns():
            ('<ns1:doc xmlns:ns1="%s"><udoc></udoc></ns1:doc>' %
                                          ns_uri)
 
-# ===== XMLFilterBase
+def test_1463026_1():
+    result = StringIO()
+    gen = XMLGenerator(result)
+
+    gen.startDocument()
+    gen.startElementNS((None, 'a'), 'a', {(None, 'b'):'c'})
+    gen.endElementNS((None, 'a'), 'a')
+    gen.endDocument()
+
+    return result.getvalue() == start+'<a b="c"></a>'
+
+def test_1463026_2():
+    result = StringIO()
+    gen = XMLGenerator(result)
+
+    gen.startDocument()
+    gen.startPrefixMapping(None, 'qux')
+    gen.startElementNS(('qux', 'a'), 'a', {})
+    gen.endElementNS(('qux', 'a'), 'a')
+    gen.endPrefixMapping(None)
+    gen.endDocument()
+
+    return result.getvalue() == start+'<a xmlns="qux"></a>'
+
+def test_1463026_3():
+    result = StringIO()
+    gen = XMLGenerator(result)
+
+    gen.startDocument()
+    gen.startPrefixMapping('my', 'qux')
+    gen.startElementNS(('qux', 'a'), 'a', {(None, 'b'):'c'})
+    gen.endElementNS(('qux', 'a'), 'a')
+    gen.endPrefixMapping('my')
+    gen.endDocument()
+
+    return result.getvalue() == start+'<my:a xmlns:my="qux" b="c"></my:a>'
+    
+# ===== Xmlfilterbase
 
 def test_filter_basic():
     result = StringIO()
@@ -358,11 +395,11 @@ def test_expat_nsattrs_wattr():
            (attrs.getQNames() == [] or attrs.getQNames() == ["ns:attr"]) and \
            len(attrs) == 1 and \
            (ns_uri, "attr") in attrs and \
-           attrs.keys() == [(ns_uri, "attr")] and \
+           list(attrs.keys()) == [(ns_uri, "attr")] and \
            attrs.get((ns_uri, "attr")) == "val" and \
            attrs.get((ns_uri, "attr"), 25) == "val" and \
-           attrs.items() == [((ns_uri, "attr"), "val")] and \
-           attrs.values() == ["val"] and \
+           list(attrs.items()) == [((ns_uri, "attr"), "val")] and \
+           list(attrs.values()) == ["val"] and \
            attrs.getValue((ns_uri, "attr")) == "val" and \
            attrs[(ns_uri, "attr")] == "val"
 
@@ -698,7 +735,7 @@ def test_sf_1511497():
     # Bug report: http://www.python.org/sf/1511497
     import sys
     old_modules = sys.modules.copy()
-    for modname in sys.modules.keys():
+    for modname in list(sys.modules.keys()):
         if modname.startswith("xml."):
             del sys.modules[modname]
     try:
@@ -734,8 +771,7 @@ def make_test_output():
     outf.write(result.getvalue())
     outf.close()
 
-items = locals().items()
-items.sort()
+items = sorted(locals().items())
 for (name, value) in items:
     if name[ : 5] == "test_":
         confirm(value(), name)
@@ -745,7 +781,7 @@ for (name, value) in items:
 del items
 
 if verbose:
-    print "%d tests, %d failures" % (tests, len(failures))
+    print("%d tests, %d failures" % (tests, len(failures)))
 if failures:
     raise TestFailed("%d of %d tests failed: %s"
                      % (len(failures), tests, ", ".join(failures)))

@@ -208,12 +208,12 @@ class bsdTableDB :
 
     def _db_print(self) :
         """Print the database to stdout for debugging"""
-        print "******** Printing raw database for debugging ********"
+        print("******** Printing raw database for debugging ********")
         cur = self.db.cursor()
         try:
             key, data = cur.first()
             while 1:
-                print repr({key: data})
+                print(repr({key: data}))
                 next = cur.next()
                 if next:
                     key, data = next
@@ -546,7 +546,7 @@ class bsdTableDB :
             self.__load_column_info(table)
         if columns is None:
             columns = self.tablecolumns[table]
-        for column in (columns + conditions.keys()):
+        for column in (columns + list(conditions.keys())):
             if not self.__tablecolumns[table].count(column):
                 raise TableDBError, "unknown column: %r" % (column,)
 
@@ -580,7 +580,7 @@ class bsdTableDB :
             # leave all unknown condition callables alone as equals
             return 0
 
-        conditionlist = conditions.items()
+        conditionlist = list(conditions.items())
         conditionlist.sort(cmp_conditions)
 
         # Apply conditions to column data to find what we want

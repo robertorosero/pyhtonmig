@@ -32,7 +32,7 @@ class DumbDBMTestCase(unittest.TestCase):
 
     def test_dumbdbm_creation(self):
         f = dumbdbm.open(_fname, 'c')
-        self.assertEqual(f.keys(), [])
+        self.assertEqual(list(f.keys()), [])
         for key in self._dict:
             f[key] = self._dict[key]
         self.read_helper(f)
@@ -49,13 +49,19 @@ class DumbDBMTestCase(unittest.TestCase):
             f.close()
         finally:
             os.umask(old_umask)
-            
+
+        expected_mode = 0635
+        if os.name != 'posix':
+            # Windows only supports setting the read-only attribute.
+            # This shouldn't fail, but doesn't work like Unix either.
+            expected_mode = 0666
+
         import stat
         st = os.stat(_fname + '.dat')
-        self.assertEqual(stat.S_IMODE(st.st_mode), 0635)
+        self.assertEqual(stat.S_IMODE(st.st_mode), expected_mode)
         st = os.stat(_fname + '.dir')
-        self.assertEqual(stat.S_IMODE(st.st_mode), 0635)
-        
+        self.assertEqual(stat.S_IMODE(st.st_mode), expected_mode)
+
     def test_close_twice(self):
         f = dumbdbm.open(_fname)
         f['a'] = 'b'
@@ -122,10 +128,8 @@ class DumbDBMTestCase(unittest.TestCase):
         f.close()
 
     def keys_helper(self, f):
-        keys = f.keys()
-        keys.sort()
-        dkeys = self._dict.keys()
-        dkeys.sort()
+        keys = sorted(f.keys())
+        dkeys = sorted(self._dict.keys())
         self.assertEqual(keys, dkeys)
         return keys
 
@@ -150,10 +154,8 @@ class DumbDBMTestCase(unittest.TestCase):
             f.close()
 
             f = dumbdbm.open(_fname)
-            expected = d.items()
-            expected.sort()
-            got = f.items()
-            got.sort()
+            expected = sorted(d.items())
+            got = sorted(f.items())
             self.assertEqual(expected, got)
             f.close()
 

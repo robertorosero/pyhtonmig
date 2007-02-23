@@ -55,14 +55,14 @@ class TokenTests(unittest.TestCase):
             self.fail('Weird maxint value %r' % maxint)
 
     def testLongIntegers(self):
-        x = 0L
-        x = 0l
-        x = 0xffffffffffffffffL
-        x = 0xffffffffffffffffl
-        x = 077777777777777777L
-        x = 077777777777777777l
-        x = 123456789012345678901234567890L
-        x = 123456789012345678901234567890l
+        x = 0
+        x = 0
+        x = 0xffffffffffffffff
+        x = 0xffffffffffffffff
+        x = 077777777777777777
+        x = 077777777777777777
+        x = 123456789012345678901234567890
+        x = 123456789012345678901234567890
 
     def testFloats(self):
         x = 3.14
@@ -327,7 +327,7 @@ class GrammarTests(unittest.TestCase):
         l1 = lambda : 0
         self.assertEquals(l1(), 0)
         l2 = lambda : a[d] # XXX just testing the expression
-        l3 = lambda : [2 < x for x in [-1, 3, 0L]]
+        l3 = lambda : [2 < x for x in [-1, 3, 0]]
         self.assertEquals(l3(), [0, 1, 0])
         l4 = lambda x = lambda y = lambda z=1 : z : y() : x()
         self.assertEquals(l4(), 1)
@@ -351,7 +351,7 @@ class GrammarTests(unittest.TestCase):
             x = 1; pass; del x;
         foo()
 
-    ### small_stmt: expr_stmt | print_stmt  | pass_stmt | del_stmt | flow_stmt | import_stmt | global_stmt | access_stmt 
+    ### small_stmt: expr_stmt | pass_stmt | del_stmt | flow_stmt | import_stmt | global_stmt | access_stmt 
     # Tested below
 
     def testExprStmt(self):
@@ -366,76 +366,6 @@ class GrammarTests(unittest.TestCase):
 
         check_syntax_error(self, "x + 1 = 1")
         check_syntax_error(self, "a + 1 = b + 2")
-
-    def testPrintStmt(self):
-        # 'print' (test ',')* [test]
-        import StringIO
-
-        # Can't test printing to real stdout without comparing output
-        # which is not available in unittest.
-        save_stdout = sys.stdout
-        sys.stdout = StringIO.StringIO()
-
-        print 1, 2, 3
-        print 1, 2, 3,
-        print
-        print 0 or 1, 0 or 1,
-        print 0 or 1
-
-        # 'print' '>>' test ','
-        print >> sys.stdout, 1, 2, 3
-        print >> sys.stdout, 1, 2, 3,
-        print >> sys.stdout
-        print >> sys.stdout, 0 or 1, 0 or 1,
-        print >> sys.stdout, 0 or 1
-
-        # test printing to an instance
-        class Gulp:
-            def write(self, msg): pass
-
-        gulp = Gulp()
-        print >> gulp, 1, 2, 3
-        print >> gulp, 1, 2, 3,
-        print >> gulp
-        print >> gulp, 0 or 1, 0 or 1,
-        print >> gulp, 0 or 1
-
-        # test print >> None
-        def driver():
-            oldstdout = sys.stdout
-            sys.stdout = Gulp()
-            try:
-                tellme(Gulp())
-                tellme()
-            finally:
-                sys.stdout = oldstdout
-
-        # we should see this once
-        def tellme(file=sys.stdout):
-            print >> file, 'hello world'
-
-        driver()
-
-        # we should not see this at all
-        def tellme(file=None):
-            print >> file, 'goodbye universe'
-
-        driver()
-
-        self.assertEqual(sys.stdout.getvalue(), '''\
-1 2 3
-1 2 3
-1 1 1
-1 2 3
-1 2 3
-1 1 1
-hello world
-''')
-        sys.stdout = save_stdout
-
-        # syntax errors
-        check_syntax_error(self, 'print ,')
-        check_syntax_error(self, 'print >> x,')
 
     def testDelStmt(self):
         # 'del' exprlist
@@ -902,7 +832,7 @@ hello world
         # Test ifelse expressions in various cases
         def _checkeval(msg, ret):
             "helper to check that evaluation of expressions is done correctly"
-            print x
+            print(x)
             return ret
 
         self.assertEqual([ x() for x in lambda: True, lambda: False if x() ], [True])

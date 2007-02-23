@@ -407,7 +407,7 @@ def _parse_int(val):
     return _parse_num(val, int)
 
 def _parse_long(val):
-    return _parse_num(val, long)
+    return _parse_num(val, int)
 
 _builtin_cvt = { "int" : (_parse_int, _("integer")),
                  "long" : (_parse_long, _("long integer")),
@@ -611,8 +611,7 @@ class Option:
                 else:
                     setattr(self, attr, None)
         if attrs:
-            attrs = attrs.keys()
-            attrs.sort()
+            attrs = sorted(attrs.keys())
             raise OptionError(
                 "invalid keyword arguments: %s" % ", ".join(attrs),
                 self)
@@ -1578,7 +1577,7 @@ class OptionParser (OptionContainer):
         or not defined.
         """
         if self.usage:
-            print >>file, self.get_usage()
+            print(self.get_usage(), file=file)
 
     def get_version(self):
         if self.version:
@@ -1595,7 +1594,7 @@ class OptionParser (OptionContainer):
         name.  Does nothing if self.version is empty or undefined.
         """
         if self.version:
-            print >>file, self.get_version()
+            print(self.get_version(), file=file)
 
     def format_option_help(self, formatter=None):
         if formatter is None:

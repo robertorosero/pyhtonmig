@@ -112,7 +112,7 @@ class Module(AbstractCompileMode):
         gen = ModuleCodeGenerator(tree)
         if display:
             import pprint
-            print pprint.pprint(tree)
+            print(pprint.pprint(tree))
         self.code = gen.getCode()
 
     def dump(self, f):
@@ -914,6 +914,8 @@ class CodeGenerator:
         self.emit('LOAD_CONST', None)
         self.nextBlock(final)
         self.setups.push((END_FINALLY, final))
+        self._implicitNameOp('LOAD', exitvar)
+        self._implicitNameOp('DELETE', exitvar)
         self.emit('WITH_CLEANUP')
         self.emit('END_FINALLY')
         self.setups.pop()
@@ -1016,7 +1018,7 @@ class CodeGenerator:
             self.set_lineno(node)
             self.delName(node.name)
         else:
-            print "oops", node.flags
+            print("oops", node.flags)
 
     def visitAssAttr(self, node):
         self.visit(node.expr)
@@ -1025,8 +1027,8 @@ class CodeGenerator:
         elif node.flags == 'OP_DELETE':
             self.emit('DELETE_ATTR', self.mangle(node.attrname))
         else:
-            print "warning: unexpected flags:", node.flags
-            print node
+            print("warning: unexpected flags:", node.flags)
+            print(node)
 
     def _visitAssSequence(self, node, op='UNPACK_SEQUENCE'):
         if findOp(node) != 'OP_DELETE':
@@ -1110,29 +1112,6 @@ class CodeGenerator:
         have_dstar = node.dstar_args is not None
         opcode = callfunc_opcode_info[have_star, have_dstar]
         self.emit(opcode, kw << 8 | pos)
-
-    def visitPrint(self, node, newline=0):
-        self.set_lineno(node)
-        if node.dest:
-            self.visit(node.dest)
-        for child in node.nodes:
-            if node.dest:
-                self.emit('DUP_TOP')
-            self.visit(child)
-            if node.dest:
-                self.emit('ROT_TWO')
-                self.emit('PRINT_ITEM_TO')
-            else:
-                self.emit('PRINT_ITEM')
-        if node.dest and not newline:
-            self.emit('POP_TOP')
-
-    def visitPrintnl(self, node):
-        self.visitPrint(node, newline=1)
-        if node.dest:
-            self.emit('PRINT_NEWLINE_TO')
-        else:
-            self.emit('PRINT_NEWLINE')
 
     def visitReturn(self, node):
         self.set_lineno(node)

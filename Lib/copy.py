@@ -99,7 +99,7 @@ _copy_dispatch = d = {}
 
 def _copy_immutable(x):
     return x
-for t in (type(None), int, long, float, bool, str, tuple,
+for t in (type(None), int, int, float, bool, str, tuple,
           frozenset, type, xrange, types.ClassType,
           types.BuiltinFunctionType,
           types.FunctionType):
@@ -178,7 +178,7 @@ def _deepcopy_atomic(x, memo):
     return x
 d[type(None)] = _deepcopy_atomic
 d[int] = _deepcopy_atomic
-d[long] = _deepcopy_atomic
+d[int] = _deepcopy_atomic
 d[float] = _deepcopy_atomic
 d[bool] = _deepcopy_atomic
 try:
@@ -230,7 +230,7 @@ d[tuple] = _deepcopy_tuple
 def _deepcopy_dict(x, memo):
     y = {}
     memo[id(x)] = y
-    for key, value in x.iteritems():
+    for key, value in x.items():
         y[deepcopy(key, memo)] = deepcopy(value, memo)
     return y
 d[dict] = _deepcopy_dict
@@ -302,7 +302,7 @@ def _reconstruct(x, info, deep, memo=None):
             if state is not None:
                 y.__dict__.update(state)
             if slotstate is not None:
-                for key, value in slotstate.iteritems():
+                for key, value in slotstate.items():
                     setattr(y, key, value)
     return y
 
@@ -315,14 +315,14 @@ class _EmptyClass:
     pass
 
 def _test():
-    l = [None, 1, 2L, 3.14, 'xyzzy', (1, 2L), [3.14, 'abc'],
+    l = [None, 1, 2, 3.14, 'xyzzy', (1, 2), [3.14, 'abc'],
          {'abc': 'ABC'}, (), [], {}]
     l1 = copy(l)
-    print l1==l
+    print(l1==l)
     l1 = map(copy, l)
-    print l1==l
+    print(l1==l)
     l1 = deepcopy(l)
-    print l1==l
+    print(l1==l)
     class C:
         def __init__(self, arg=None):
             self.a = 1
@@ -337,7 +337,7 @@ def _test():
         def __getstate__(self):
             return {'a': self.a, 'arg': self.arg}
         def __setstate__(self, state):
-            for key, value in state.iteritems():
+            for key, value in state.items():
                 setattr(self, key, value)
         def __deepcopy__(self, memo=None):
             new = self.__class__(deepcopy(self.arg, memo))
@@ -346,26 +346,26 @@ def _test():
     c = C('argument sketch')
     l.append(c)
     l2 = copy(l)
-    print l == l2
-    print l
-    print l2
+    print(l == l2)
+    print(l)
+    print(l2)
     l2 = deepcopy(l)
-    print l == l2
-    print l
-    print l2
+    print(l == l2)
+    print(l)
+    print(l2)
     l.append({l[1]: l, 'xyz': l[2]})
     l3 = copy(l)
     import repr
-    print map(repr.repr, l)
-    print map(repr.repr, l1)
-    print map(repr.repr, l2)
-    print map(repr.repr, l3)
+    print(map(repr.repr, l))
+    print(map(repr.repr, l1))
+    print(map(repr.repr, l2))
+    print(map(repr.repr, l3))
     l3 = deepcopy(l)
     import repr
-    print map(repr.repr, l)
-    print map(repr.repr, l1)
-    print map(repr.repr, l2)
-    print map(repr.repr, l3)
+    print(map(repr.repr, l))
+    print(map(repr.repr, l1))
+    print(map(repr.repr, l2))
+    print(map(repr.repr, l3))
 
 if __name__ == '__main__':
     _test()

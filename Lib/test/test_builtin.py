@@ -122,9 +122,9 @@ class BuiltinTest(unittest.TestCase):
         self.assertEqual(abs(3.14), 3.14)
         self.assertEqual(abs(-3.14), 3.14)
         # long
-        self.assertEqual(abs(0L), 0L)
-        self.assertEqual(abs(1234L), 1234L)
-        self.assertEqual(abs(-1234L), 1234L)
+        self.assertEqual(abs(0), 0)
+        self.assertEqual(abs(1234), 1234)
+        self.assertEqual(abs(-1234), 1234)
         # str
         self.assertRaises(TypeError, abs, 'a')
 
@@ -204,15 +204,15 @@ class BuiltinTest(unittest.TestCase):
         self.assertRaises(TypeError, cmp)
 
     def test_compile(self):
-        compile('print 1\n', '', 'exec')
+        compile('print(1)\n', '', 'exec')
         bom = '\xef\xbb\xbf'
-        compile(bom + 'print 1\n', '', 'exec')
+        compile(bom + 'print(1)\n', '', 'exec')
         self.assertRaises(TypeError, compile)
-        self.assertRaises(ValueError, compile, 'print 42\n', '<string>', 'badmode')
-        self.assertRaises(ValueError, compile, 'print 42\n', '<string>', 'single', 0xff)
+        self.assertRaises(ValueError, compile, 'print(42)\n', '<string>', 'badmode')
+        self.assertRaises(ValueError, compile, 'print(42)\n', '<string>', 'single', 0xff)
         self.assertRaises(TypeError, compile, chr(0), 'f', 'exec')
         if have_unicode:
-            compile(unicode('print u"\xc3\xa5"\n', 'utf8'), '', 'exec')
+            compile(unicode('print(u"\xc3\xa5")\n', 'utf8'), '', 'exec')
             self.assertRaises(TypeError, compile, unichr(0), 'f', 'exec')
             self.assertRaises(ValueError, compile, unicode('a = 1'), 'f', 'bad')
 
@@ -235,15 +235,15 @@ class BuiltinTest(unittest.TestCase):
         self.assertEqual(divmod(12, -7), (-2, -2))
         self.assertEqual(divmod(-12, -7), (1, -5))
 
-        self.assertEqual(divmod(12L, 7L), (1L, 5L))
-        self.assertEqual(divmod(-12L, 7L), (-2L, 2L))
-        self.assertEqual(divmod(12L, -7L), (-2L, -2L))
-        self.assertEqual(divmod(-12L, -7L), (1L, -5L))
+        self.assertEqual(divmod(12, 7), (1, 5))
+        self.assertEqual(divmod(-12, 7), (-2, 2))
+        self.assertEqual(divmod(12, -7), (-2, -2))
+        self.assertEqual(divmod(-12, -7), (1, -5))
 
-        self.assertEqual(divmod(12, 7L), (1, 5L))
-        self.assertEqual(divmod(-12, 7L), (-2, 2L))
-        self.assertEqual(divmod(12L, -7), (-2L, -2))
-        self.assertEqual(divmod(-12L, -7), (1L, -5))
+        self.assertEqual(divmod(12, 7), (1, 5))
+        self.assertEqual(divmod(-12, 7), (-2, 2))
+        self.assertEqual(divmod(12, -7), (-2, -2))
+        self.assertEqual(divmod(-12, -7), (1, -5))
 
         self.assertEqual(divmod(-sys.maxint-1, -1),
                          (sys.maxint+1, 0))
@@ -347,7 +347,7 @@ class BuiltinTest(unittest.TestCase):
             def __getitem__(self, item):
                 raise KeyError(item)
             def keys(self):
-                return 'a'
+                return 1 # used to be 'a' but that's no longer an error
         self.assertRaises(TypeError, eval, 'dir()', globals(), C())
 
     # Done outside of the method test_z to get the correct scope
@@ -525,8 +525,8 @@ class BuiltinTest(unittest.TestCase):
                 unicode("123"): unicode("112233")
             }
 
-        for (cls, inps) in inputs.iteritems():
-            for (inp, exp) in inps.iteritems():
+        for (cls, inps) in inputs.items():
+            for (inp, exp) in inps.items():
                 # make sure the output goes through __getitem__
                 # even if func is None
                 self.assertEqual(
@@ -541,7 +541,7 @@ class BuiltinTest(unittest.TestCase):
     def test_float(self):
         self.assertEqual(float(3.14), 3.14)
         self.assertEqual(float(314), 314.0)
-        self.assertEqual(float(314L), 314.0)
+        self.assertEqual(float(314), 314.0)
         self.assertEqual(float("  3.14  "), 3.14)
         self.assertRaises(ValueError, float, "  0x3.1  ")
         self.assertRaises(ValueError, float, "  -0x3.p-1  ")
@@ -627,7 +627,7 @@ class BuiltinTest(unittest.TestCase):
 
     def test_hash(self):
         hash(None)
-        self.assertEqual(hash(1), hash(1L))
+        self.assertEqual(hash(1), hash(1))
         self.assertEqual(hash(1), hash(1.0))
         hash('spam')
         if have_unicode:
@@ -645,22 +645,22 @@ class BuiltinTest(unittest.TestCase):
             def __hash__(self):
                 return 2**100
         self.assertEquals(type(hash(Y())), int)
-        class Z(long):
+        class Z(int):
             def __hash__(self):
                 return self
-        self.assertEquals(hash(Z(42)), hash(42L))
+        self.assertEquals(hash(Z(42)), hash(42))
 
     def test_hex(self):
         self.assertEqual(hex(16), '0x10')
-        self.assertEqual(hex(16L), '0x10')
+        self.assertEqual(hex(16), '0x10')
         self.assertEqual(hex(-16), '-0x10')
-        self.assertEqual(hex(-16L), '-0x10')
+        self.assertEqual(hex(-16), '-0x10')
         self.assertRaises(TypeError, hex, {})
 
     def test_id(self):
         id(None)
         id(1)
-        id(1L)
+        id(1)
         id(1.0)
         id('spam')
         id((0,1,2,3))
@@ -670,7 +670,7 @@ class BuiltinTest(unittest.TestCase):
     def test_int(self):
         self.assertEqual(int(314), 314)
         self.assertEqual(int(3.14), 3)
-        self.assertEqual(int(314L), 314)
+        self.assertEqual(int(314), 314)
         # Check that conversion from float truncates towards zero
         self.assertEqual(int(-3.14), -3)
         self.assertEqual(int(3.9), 3)
@@ -678,9 +678,9 @@ class BuiltinTest(unittest.TestCase):
         self.assertEqual(int(3.5), 3)
         self.assertEqual(int(-3.5), -3)
         # Different base:
-        self.assertEqual(int("10",16), 16L)
+        self.assertEqual(int("10",16), 16)
         if have_unicode:
-            self.assertEqual(int(unicode("10"),16), 16L)
+            self.assertEqual(int(unicode("10"),16), 16)
         # Test conversion from strings and various anomalies
         for s, v in L:
             for sign in "", "+", "-":
@@ -703,9 +703,9 @@ class BuiltinTest(unittest.TestCase):
 
         # should return long
         x = int(1e100)
-        self.assert_(isinstance(x, long))
+        self.assert_(isinstance(x, int))
         x = int(-1e100)
-        self.assert_(isinstance(x, long))
+        self.assert_(isinstance(x, int))
 
 
         # SF bug 434186:  0x80000000/2 != 0x80000000>>1.
@@ -723,11 +723,11 @@ class BuiltinTest(unittest.TestCase):
         self.assertRaises(ValueError, int, '123\x00 245', 20)
 
         x = int('1' * 600)
-        self.assert_(isinstance(x, long))
+        self.assert_(isinstance(x, int))
 
         if have_unicode:
             x = int(unichr(0x661) * 600)
-            self.assert_(isinstance(x, long))
+            self.assert_(isinstance(x, int))
 
         self.assertRaises(TypeError, int, 1, 12)
 
@@ -738,79 +738,79 @@ class BuiltinTest(unittest.TestCase):
         # Various representations of 2**32 evaluated to 0
         # rather than 2**32 in previous versions
 
-        self.assertEqual(int('100000000000000000000000000000000', 2), 4294967296L)
-        self.assertEqual(int('102002022201221111211', 3), 4294967296L)
-        self.assertEqual(int('10000000000000000', 4), 4294967296L)
-        self.assertEqual(int('32244002423141', 5), 4294967296L)
-        self.assertEqual(int('1550104015504', 6), 4294967296L)
-        self.assertEqual(int('211301422354', 7), 4294967296L)
-        self.assertEqual(int('40000000000', 8), 4294967296L)
-        self.assertEqual(int('12068657454', 9), 4294967296L)
-        self.assertEqual(int('4294967296', 10), 4294967296L)
-        self.assertEqual(int('1904440554', 11), 4294967296L)
-        self.assertEqual(int('9ba461594', 12), 4294967296L)
-        self.assertEqual(int('535a79889', 13), 4294967296L)
-        self.assertEqual(int('2ca5b7464', 14), 4294967296L)
-        self.assertEqual(int('1a20dcd81', 15), 4294967296L)
-        self.assertEqual(int('100000000', 16), 4294967296L)
-        self.assertEqual(int('a7ffda91', 17), 4294967296L)
-        self.assertEqual(int('704he7g4', 18), 4294967296L)
-        self.assertEqual(int('4f5aff66', 19), 4294967296L)
-        self.assertEqual(int('3723ai4g', 20), 4294967296L)
-        self.assertEqual(int('281d55i4', 21), 4294967296L)
-        self.assertEqual(int('1fj8b184', 22), 4294967296L)
-        self.assertEqual(int('1606k7ic', 23), 4294967296L)
-        self.assertEqual(int('mb994ag', 24), 4294967296L)
-        self.assertEqual(int('hek2mgl', 25), 4294967296L)
-        self.assertEqual(int('dnchbnm', 26), 4294967296L)
-        self.assertEqual(int('b28jpdm', 27), 4294967296L)
-        self.assertEqual(int('8pfgih4', 28), 4294967296L)
-        self.assertEqual(int('76beigg', 29), 4294967296L)
-        self.assertEqual(int('5qmcpqg', 30), 4294967296L)
-        self.assertEqual(int('4q0jto4', 31), 4294967296L)
-        self.assertEqual(int('4000000', 32), 4294967296L)
-        self.assertEqual(int('3aokq94', 33), 4294967296L)
-        self.assertEqual(int('2qhxjli', 34), 4294967296L)
-        self.assertEqual(int('2br45qb', 35), 4294967296L)
-        self.assertEqual(int('1z141z4', 36), 4294967296L)
+        self.assertEqual(int('100000000000000000000000000000000', 2), 4294967296)
+        self.assertEqual(int('102002022201221111211', 3), 4294967296)
+        self.assertEqual(int('10000000000000000', 4), 4294967296)
+        self.assertEqual(int('32244002423141', 5), 4294967296)
+        self.assertEqual(int('1550104015504', 6), 4294967296)
+        self.assertEqual(int('211301422354', 7), 4294967296)
+        self.assertEqual(int('40000000000', 8), 4294967296)
+        self.assertEqual(int('12068657454', 9), 4294967296)
+        self.assertEqual(int('4294967296', 10), 4294967296)
+        self.assertEqual(int('1904440554', 11), 4294967296)
+        self.assertEqual(int('9ba461594', 12), 4294967296)
+        self.assertEqual(int('535a79889', 13), 4294967296)
+        self.assertEqual(int('2ca5b7464', 14), 4294967296)
+        self.assertEqual(int('1a20dcd81', 15), 4294967296)
+        self.assertEqual(int('100000000', 16), 4294967296)
+        self.assertEqual(int('a7ffda91', 17), 4294967296)
+        self.assertEqual(int('704he7g4', 18), 4294967296)
+        self.assertEqual(int('4f5aff66', 19), 4294967296)
+        self.assertEqual(int('3723ai4g', 20), 4294967296)
+        self.assertEqual(int('281d55i4', 21), 4294967296)
+        self.assertEqual(int('1fj8b184', 22), 4294967296)
+        self.assertEqual(int('1606k7ic', 23), 4294967296)
+        self.assertEqual(int('mb994ag', 24), 4294967296)
+        self.assertEqual(int('hek2mgl', 25), 4294967296)
+        self.assertEqual(int('dnchbnm', 26), 4294967296)
+        self.assertEqual(int('b28jpdm', 27), 4294967296)
+        self.assertEqual(int('8pfgih4', 28), 4294967296)
+        self.assertEqual(int('76beigg', 29), 4294967296)
+        self.assertEqual(int('5qmcpqg', 30), 4294967296)
+        self.assertEqual(int('4q0jto4', 31), 4294967296)
+        self.assertEqual(int('4000000', 32), 4294967296)
+        self.assertEqual(int('3aokq94', 33), 4294967296)
+        self.assertEqual(int('2qhxjli', 34), 4294967296)
+        self.assertEqual(int('2br45qb', 35), 4294967296)
+        self.assertEqual(int('1z141z4', 36), 4294967296)
 
         # SF bug 1334662: int(string, base) wrong answers
         # Checks for proper evaluation of 2**32 + 1
-        self.assertEqual(int('100000000000000000000000000000001', 2), 4294967297L)
-        self.assertEqual(int('102002022201221111212', 3), 4294967297L)
-        self.assertEqual(int('10000000000000001', 4), 4294967297L)
-        self.assertEqual(int('32244002423142', 5), 4294967297L)
-        self.assertEqual(int('1550104015505', 6), 4294967297L)
-        self.assertEqual(int('211301422355', 7), 4294967297L)
-        self.assertEqual(int('40000000001', 8), 4294967297L)
-        self.assertEqual(int('12068657455', 9), 4294967297L)
-        self.assertEqual(int('4294967297', 10), 4294967297L)
-        self.assertEqual(int('1904440555', 11), 4294967297L)
-        self.assertEqual(int('9ba461595', 12), 4294967297L)
-        self.assertEqual(int('535a7988a', 13), 4294967297L)
-        self.assertEqual(int('2ca5b7465', 14), 4294967297L)
-        self.assertEqual(int('1a20dcd82', 15), 4294967297L)
-        self.assertEqual(int('100000001', 16), 4294967297L)
-        self.assertEqual(int('a7ffda92', 17), 4294967297L)
-        self.assertEqual(int('704he7g5', 18), 4294967297L)
-        self.assertEqual(int('4f5aff67', 19), 4294967297L)
-        self.assertEqual(int('3723ai4h', 20), 4294967297L)
-        self.assertEqual(int('281d55i5', 21), 4294967297L)
-        self.assertEqual(int('1fj8b185', 22), 4294967297L)
-        self.assertEqual(int('1606k7id', 23), 4294967297L)
-        self.assertEqual(int('mb994ah', 24), 4294967297L)
-        self.assertEqual(int('hek2mgm', 25), 4294967297L)
-        self.assertEqual(int('dnchbnn', 26), 4294967297L)
-        self.assertEqual(int('b28jpdn', 27), 4294967297L)
-        self.assertEqual(int('8pfgih5', 28), 4294967297L)
-        self.assertEqual(int('76beigh', 29), 4294967297L)
-        self.assertEqual(int('5qmcpqh', 30), 4294967297L)
-        self.assertEqual(int('4q0jto5', 31), 4294967297L)
-        self.assertEqual(int('4000001', 32), 4294967297L)
-        self.assertEqual(int('3aokq95', 33), 4294967297L)
-        self.assertEqual(int('2qhxjlj', 34), 4294967297L)
-        self.assertEqual(int('2br45qc', 35), 4294967297L)
-        self.assertEqual(int('1z141z5', 36), 4294967297L)
+        self.assertEqual(int('100000000000000000000000000000001', 2), 4294967297)
+        self.assertEqual(int('102002022201221111212', 3), 4294967297)
+        self.assertEqual(int('10000000000000001', 4), 4294967297)
+        self.assertEqual(int('32244002423142', 5), 4294967297)
+        self.assertEqual(int('1550104015505', 6), 4294967297)
+        self.assertEqual(int('211301422355', 7), 4294967297)
+        self.assertEqual(int('40000000001', 8), 4294967297)
+        self.assertEqual(int('12068657455', 9), 4294967297)
+        self.assertEqual(int('4294967297', 10), 4294967297)
+        self.assertEqual(int('1904440555', 11), 4294967297)
+        self.assertEqual(int('9ba461595', 12), 4294967297)
+        self.assertEqual(int('535a7988a', 13), 4294967297)
+        self.assertEqual(int('2ca5b7465', 14), 4294967297)
+        self.assertEqual(int('1a20dcd82', 15), 4294967297)
+        self.assertEqual(int('100000001', 16), 4294967297)
+        self.assertEqual(int('a7ffda92', 17), 4294967297)
+        self.assertEqual(int('704he7g5', 18), 4294967297)
+        self.assertEqual(int('4f5aff67', 19), 4294967297)
+        self.assertEqual(int('3723ai4h', 20), 4294967297)
+        self.assertEqual(int('281d55i5', 21), 4294967297)
+        self.assertEqual(int('1fj8b185', 22), 4294967297)
+        self.assertEqual(int('1606k7id', 23), 4294967297)
+        self.assertEqual(int('mb994ah', 24), 4294967297)
+        self.assertEqual(int('hek2mgm', 25), 4294967297)
+        self.assertEqual(int('dnchbnn', 26), 4294967297)
+        self.assertEqual(int('b28jpdn', 27), 4294967297)
+        self.assertEqual(int('8pfgih5', 28), 4294967297)
+        self.assertEqual(int('76beigh', 29), 4294967297)
+        self.assertEqual(int('5qmcpqh', 30), 4294967297)
+        self.assertEqual(int('4q0jto5', 31), 4294967297)
+        self.assertEqual(int('4000001', 32), 4294967297)
+        self.assertEqual(int('3aokq95', 33), 4294967297)
+        self.assertEqual(int('2qhxjlj', 34), 4294967297)
+        self.assertEqual(int('2br45qc', 35), 4294967297)
+        self.assertEqual(int('1z141z5', 36), 4294967297)
 
     def test_intconversion(self):
         # Test __int__()
@@ -832,7 +832,7 @@ class BuiltinTest(unittest.TestCase):
 
         class Foo4(int):
             def __int__(self):
-                return 42L
+                return 42
 
         class Foo5(int):
             def __int__(self):
@@ -842,7 +842,7 @@ class BuiltinTest(unittest.TestCase):
         self.assertEqual(int(Foo1()), 42)
         self.assertEqual(int(Foo2()), 42)
         self.assertEqual(int(Foo3()), 0)
-        self.assertEqual(int(Foo4()), 42L)
+        self.assertEqual(int(Foo4()), 42)
         self.assertRaises(TypeError, int, Foo5())
 
     def test_iter(self):
@@ -938,32 +938,32 @@ class BuiltinTest(unittest.TestCase):
         self.assertEqual(x, [])
 
     def test_long(self):
-        self.assertEqual(long(314), 314L)
-        self.assertEqual(long(3.14), 3L)
-        self.assertEqual(long(314L), 314L)
+        self.assertEqual(int(314), 314)
+        self.assertEqual(int(3.14), 3)
+        self.assertEqual(int(314), 314)
         # Check that conversion from float truncates towards zero
-        self.assertEqual(long(-3.14), -3L)
-        self.assertEqual(long(3.9), 3L)
-        self.assertEqual(long(-3.9), -3L)
-        self.assertEqual(long(3.5), 3L)
-        self.assertEqual(long(-3.5), -3L)
-        self.assertEqual(long("-3"), -3L)
+        self.assertEqual(int(-3.14), -3)
+        self.assertEqual(int(3.9), 3)
+        self.assertEqual(int(-3.9), -3)
+        self.assertEqual(int(3.5), 3)
+        self.assertEqual(int(-3.5), -3)
+        self.assertEqual(int("-3"), -3)
         if have_unicode:
-            self.assertEqual(long(unicode("-3")), -3L)
+            self.assertEqual(int(unicode("-3")), -3)
         # Different base:
-        self.assertEqual(long("10",16), 16L)
+        self.assertEqual(int("10",16), 16)
         if have_unicode:
-            self.assertEqual(long(unicode("10"),16), 16L)
+            self.assertEqual(int(unicode("10"),16), 16)
         # Check conversions from string (same test set as for int(), and then some)
         LL = [
-                ('1' + '0'*20, 10L**20),
-                ('1' + '0'*100, 10L**100)
+                ('1' + '0'*20, 10**20),
+                ('1' + '0'*100, 10**100)
         ]
         L2 = L[:]
         if have_unicode:
             L2 += [
-                (unicode('1') + unicode('0')*20, 10L**20),
-                (unicode('1') + unicode('0')*100, 10L**100),
+                (unicode('1') + unicode('0')*20, 10**20),
+                (unicode('1') + unicode('0')*100, 10**100),
         ]
         for s, v in L2 + LL:
             for sign in "", "+", "-":
@@ -973,121 +973,123 @@ class BuiltinTest(unittest.TestCase):
                     if sign == "-" and v is not ValueError:
                         vv = -v
                     try:
-                        self.assertEqual(long(ss), long(vv))
+                        self.assertEqual(int(ss), int(vv))
                     except v:
                         pass
 
-        self.assertRaises(ValueError, long, '123\0')
-        self.assertRaises(ValueError, long, '53', 40)
-        self.assertRaises(TypeError, long, 1, 12)
+        self.assertRaises(ValueError, int, '123\0')
+        self.assertRaises(ValueError, int, '53', 40)
+        self.assertRaises(TypeError, int, 1, 12)
 
-        self.assertEqual(long('100000000000000000000000000000000', 2),
+        self.assertEqual(int('100000000000000000000000000000000', 2),
                          4294967296)
-        self.assertEqual(long('102002022201221111211', 3), 4294967296)
-        self.assertEqual(long('10000000000000000', 4), 4294967296)
-        self.assertEqual(long('32244002423141', 5), 4294967296)
-        self.assertEqual(long('1550104015504', 6), 4294967296)
-        self.assertEqual(long('211301422354', 7), 4294967296)
-        self.assertEqual(long('40000000000', 8), 4294967296)
-        self.assertEqual(long('12068657454', 9), 4294967296)
-        self.assertEqual(long('4294967296', 10), 4294967296)
-        self.assertEqual(long('1904440554', 11), 4294967296)
-        self.assertEqual(long('9ba461594', 12), 4294967296)
-        self.assertEqual(long('535a79889', 13), 4294967296)
-        self.assertEqual(long('2ca5b7464', 14), 4294967296)
-        self.assertEqual(long('1a20dcd81', 15), 4294967296)
-        self.assertEqual(long('100000000', 16), 4294967296)
-        self.assertEqual(long('a7ffda91', 17), 4294967296)
-        self.assertEqual(long('704he7g4', 18), 4294967296)
-        self.assertEqual(long('4f5aff66', 19), 4294967296)
-        self.assertEqual(long('3723ai4g', 20), 4294967296)
-        self.assertEqual(long('281d55i4', 21), 4294967296)
-        self.assertEqual(long('1fj8b184', 22), 4294967296)
-        self.assertEqual(long('1606k7ic', 23), 4294967296)
-        self.assertEqual(long('mb994ag', 24), 4294967296)
-        self.assertEqual(long('hek2mgl', 25), 4294967296)
-        self.assertEqual(long('dnchbnm', 26), 4294967296)
-        self.assertEqual(long('b28jpdm', 27), 4294967296)
-        self.assertEqual(long('8pfgih4', 28), 4294967296)
-        self.assertEqual(long('76beigg', 29), 4294967296)
-        self.assertEqual(long('5qmcpqg', 30), 4294967296)
-        self.assertEqual(long('4q0jto4', 31), 4294967296)
-        self.assertEqual(long('4000000', 32), 4294967296)
-        self.assertEqual(long('3aokq94', 33), 4294967296)
-        self.assertEqual(long('2qhxjli', 34), 4294967296)
-        self.assertEqual(long('2br45qb', 35), 4294967296)
-        self.assertEqual(long('1z141z4', 36), 4294967296)
+        self.assertEqual(int('102002022201221111211', 3), 4294967296)
+        self.assertEqual(int('10000000000000000', 4), 4294967296)
+        self.assertEqual(int('32244002423141', 5), 4294967296)
+        self.assertEqual(int('1550104015504', 6), 4294967296)
+        self.assertEqual(int('211301422354', 7), 4294967296)
+        self.assertEqual(int('40000000000', 8), 4294967296)
+        self.assertEqual(int('12068657454', 9), 4294967296)
+        self.assertEqual(int('4294967296', 10), 4294967296)
+        self.assertEqual(int('1904440554', 11), 4294967296)
+        self.assertEqual(int('9ba461594', 12), 4294967296)
+        self.assertEqual(int('535a79889', 13), 4294967296)
+        self.assertEqual(int('2ca5b7464', 14), 4294967296)
+        self.assertEqual(int('1a20dcd81', 15), 4294967296)
+        self.assertEqual(int('100000000', 16), 4294967296)
+        self.assertEqual(int('a7ffda91', 17), 4294967296)
+        self.assertEqual(int('704he7g4', 18), 4294967296)
+        self.assertEqual(int('4f5aff66', 19), 4294967296)
+        self.assertEqual(int('3723ai4g', 20), 4294967296)
+        self.assertEqual(int('281d55i4', 21), 4294967296)
+        self.assertEqual(int('1fj8b184', 22), 4294967296)
+        self.assertEqual(int('1606k7ic', 23), 4294967296)
+        self.assertEqual(int('mb994ag', 24), 4294967296)
+        self.assertEqual(int('hek2mgl', 25), 4294967296)
+        self.assertEqual(int('dnchbnm', 26), 4294967296)
+        self.assertEqual(int('b28jpdm', 27), 4294967296)
+        self.assertEqual(int('8pfgih4', 28), 4294967296)
+        self.assertEqual(int('76beigg', 29), 4294967296)
+        self.assertEqual(int('5qmcpqg', 30), 4294967296)
+        self.assertEqual(int('4q0jto4', 31), 4294967296)
+        self.assertEqual(int('4000000', 32), 4294967296)
+        self.assertEqual(int('3aokq94', 33), 4294967296)
+        self.assertEqual(int('2qhxjli', 34), 4294967296)
+        self.assertEqual(int('2br45qb', 35), 4294967296)
+        self.assertEqual(int('1z141z4', 36), 4294967296)
 
-        self.assertEqual(long('100000000000000000000000000000001', 2),
+        self.assertEqual(int('100000000000000000000000000000001', 2),
                          4294967297)
-        self.assertEqual(long('102002022201221111212', 3), 4294967297)
-        self.assertEqual(long('10000000000000001', 4), 4294967297)
-        self.assertEqual(long('32244002423142', 5), 4294967297)
-        self.assertEqual(long('1550104015505', 6), 4294967297)
-        self.assertEqual(long('211301422355', 7), 4294967297)
-        self.assertEqual(long('40000000001', 8), 4294967297)
-        self.assertEqual(long('12068657455', 9), 4294967297)
-        self.assertEqual(long('4294967297', 10), 4294967297)
-        self.assertEqual(long('1904440555', 11), 4294967297)
-        self.assertEqual(long('9ba461595', 12), 4294967297)
-        self.assertEqual(long('535a7988a', 13), 4294967297)
-        self.assertEqual(long('2ca5b7465', 14), 4294967297)
-        self.assertEqual(long('1a20dcd82', 15), 4294967297)
-        self.assertEqual(long('100000001', 16), 4294967297)
-        self.assertEqual(long('a7ffda92', 17), 4294967297)
-        self.assertEqual(long('704he7g5', 18), 4294967297)
-        self.assertEqual(long('4f5aff67', 19), 4294967297)
-        self.assertEqual(long('3723ai4h', 20), 4294967297)
-        self.assertEqual(long('281d55i5', 21), 4294967297)
-        self.assertEqual(long('1fj8b185', 22), 4294967297)
-        self.assertEqual(long('1606k7id', 23), 4294967297)
-        self.assertEqual(long('mb994ah', 24), 4294967297)
-        self.assertEqual(long('hek2mgm', 25), 4294967297)
-        self.assertEqual(long('dnchbnn', 26), 4294967297)
-        self.assertEqual(long('b28jpdn', 27), 4294967297)
-        self.assertEqual(long('8pfgih5', 28), 4294967297)
-        self.assertEqual(long('76beigh', 29), 4294967297)
-        self.assertEqual(long('5qmcpqh', 30), 4294967297)
-        self.assertEqual(long('4q0jto5', 31), 4294967297)
-        self.assertEqual(long('4000001', 32), 4294967297)
-        self.assertEqual(long('3aokq95', 33), 4294967297)
-        self.assertEqual(long('2qhxjlj', 34), 4294967297)
-        self.assertEqual(long('2br45qc', 35), 4294967297)
-        self.assertEqual(long('1z141z5', 36), 4294967297)
+        self.assertEqual(int('102002022201221111212', 3), 4294967297)
+        self.assertEqual(int('10000000000000001', 4), 4294967297)
+        self.assertEqual(int('32244002423142', 5), 4294967297)
+        self.assertEqual(int('1550104015505', 6), 4294967297)
+        self.assertEqual(int('211301422355', 7), 4294967297)
+        self.assertEqual(int('40000000001', 8), 4294967297)
+        self.assertEqual(int('12068657455', 9), 4294967297)
+        self.assertEqual(int('4294967297', 10), 4294967297)
+        self.assertEqual(int('1904440555', 11), 4294967297)
+        self.assertEqual(int('9ba461595', 12), 4294967297)
+        self.assertEqual(int('535a7988a', 13), 4294967297)
+        self.assertEqual(int('2ca5b7465', 14), 4294967297)
+        self.assertEqual(int('1a20dcd82', 15), 4294967297)
+        self.assertEqual(int('100000001', 16), 4294967297)
+        self.assertEqual(int('a7ffda92', 17), 4294967297)
+        self.assertEqual(int('704he7g5', 18), 4294967297)
+        self.assertEqual(int('4f5aff67', 19), 4294967297)
+        self.assertEqual(int('3723ai4h', 20), 4294967297)
+        self.assertEqual(int('281d55i5', 21), 4294967297)
+        self.assertEqual(int('1fj8b185', 22), 4294967297)
+        self.assertEqual(int('1606k7id', 23), 4294967297)
+        self.assertEqual(int('mb994ah', 24), 4294967297)
+        self.assertEqual(int('hek2mgm', 25), 4294967297)
+        self.assertEqual(int('dnchbnn', 26), 4294967297)
+        self.assertEqual(int('b28jpdn', 27), 4294967297)
+        self.assertEqual(int('8pfgih5', 28), 4294967297)
+        self.assertEqual(int('76beigh', 29), 4294967297)
+        self.assertEqual(int('5qmcpqh', 30), 4294967297)
+        self.assertEqual(int('4q0jto5', 31), 4294967297)
+        self.assertEqual(int('4000001', 32), 4294967297)
+        self.assertEqual(int('3aokq95', 33), 4294967297)
+        self.assertEqual(int('2qhxjlj', 34), 4294967297)
+        self.assertEqual(int('2br45qc', 35), 4294967297)
+        self.assertEqual(int('1z141z5', 36), 4294967297)
 
 
     def test_longconversion(self):
         # Test __long__()
         class Foo0:
             def __long__(self):
-                return 42L
+                return 42
 
         class Foo1(object):
             def __long__(self):
-                return 42L
+                return 42
 
-        class Foo2(long):
-            def __long__(self):
-                return 42L
-
-        class Foo3(long):
-            def __long__(self):
-                return self
-
-        class Foo4(long):
+        class Foo2(int):
             def __long__(self):
                 return 42
 
-        class Foo5(long):
+        class Foo3(int):
+            def __long__(self):
+                return self
+
+        class Foo4(int):
+            def __long__(self):
+                return 42
+
+        class Foo5(int):
             def __long__(self):
                 return 42.
 
-        self.assertEqual(long(Foo0()), 42L)
-        self.assertEqual(long(Foo1()), 42L)
-        self.assertEqual(long(Foo2()), 42L)
-        self.assertEqual(long(Foo3()), 0)
-        self.assertEqual(long(Foo4()), 42)
-        self.assertRaises(TypeError, long, Foo5())
+        self.assertEqual(int(Foo0()), 42)
+        self.assertEqual(int(Foo1()), 42)
+	# XXX invokes __int__ now
+        # self.assertEqual(long(Foo2()), 42L)
+        self.assertEqual(int(Foo3()), 0)
+	# XXX likewise
+        # self.assertEqual(long(Foo4()), 42)
+        # self.assertRaises(TypeError, long, Foo5())
 
     def test_map(self):
         self.assertEqual(
@@ -1175,9 +1177,9 @@ class BuiltinTest(unittest.TestCase):
         self.assertEqual(max((1, 2, 3, 1, 2, 3)), 3)
         self.assertEqual(max([1, 2, 3, 1, 2, 3]), 3)
 
-        self.assertEqual(max(1, 2L, 3.0), 3.0)
-        self.assertEqual(max(1L, 2.0, 3), 3)
-        self.assertEqual(max(1.0, 2, 3L), 3L)
+        self.assertEqual(max(1, 2, 3.0), 3.0)
+        self.assertEqual(max(1, 2.0, 3), 3)
+        self.assertEqual(max(1.0, 2, 3), 3)
 
         for stmt in (
             "max(key=int)",                 # no args
@@ -1209,9 +1211,9 @@ class BuiltinTest(unittest.TestCase):
         self.assertEqual(min((1, 2, 3, 1, 2, 3)), 1)
         self.assertEqual(min([1, 2, 3, 1, 2, 3]), 1)
 
-        self.assertEqual(min(1, 2L, 3.0), 1)
-        self.assertEqual(min(1L, 2.0, 3), 1L)
-        self.assertEqual(min(1.0, 2, 3L), 1.0)
+        self.assertEqual(min(1, 2, 3.0), 1)
+        self.assertEqual(min(1, 2.0, 3), 1)
+        self.assertEqual(min(1.0, 2, 3), 1.0)
 
         self.assertRaises(TypeError, min)
         self.assertRaises(TypeError, min, 42)
@@ -1251,9 +1253,9 @@ class BuiltinTest(unittest.TestCase):
 
     def test_oct(self):
         self.assertEqual(oct(100), '0144')
-        self.assertEqual(oct(100L), '0144')
+        self.assertEqual(oct(100), '0144')
         self.assertEqual(oct(-100), '-0144')
-        self.assertEqual(oct(-100L), '-0144')
+        self.assertEqual(oct(-100), '-0144')
         self.assertRaises(TypeError, oct, ())
 
     def write_testfile(self):
@@ -1310,20 +1312,20 @@ class BuiltinTest(unittest.TestCase):
         self.assertEqual(pow(-2,2), 4)
         self.assertEqual(pow(-2,3), -8)
 
-        self.assertEqual(pow(0L,0), 1)
-        self.assertEqual(pow(0L,1), 0)
-        self.assertEqual(pow(1L,0), 1)
-        self.assertEqual(pow(1L,1), 1)
+        self.assertEqual(pow(0,0), 1)
+        self.assertEqual(pow(0,1), 0)
+        self.assertEqual(pow(1,0), 1)
+        self.assertEqual(pow(1,1), 1)
 
-        self.assertEqual(pow(2L,0), 1)
-        self.assertEqual(pow(2L,10), 1024)
-        self.assertEqual(pow(2L,20), 1024*1024)
-        self.assertEqual(pow(2L,30), 1024*1024*1024)
+        self.assertEqual(pow(2,0), 1)
+        self.assertEqual(pow(2,10), 1024)
+        self.assertEqual(pow(2,20), 1024*1024)
+        self.assertEqual(pow(2,30), 1024*1024*1024)
 
-        self.assertEqual(pow(-2L,0), 1)
-        self.assertEqual(pow(-2L,1), -2)
-        self.assertEqual(pow(-2L,2), 4)
-        self.assertEqual(pow(-2L,3), -8)
+        self.assertEqual(pow(-2,0), 1)
+        self.assertEqual(pow(-2,1), -2)
+        self.assertEqual(pow(-2,2), 4)
+        self.assertEqual(pow(-2,3), -8)
 
         self.assertAlmostEqual(pow(0.,0), 1.)
         self.assertAlmostEqual(pow(0.,1), 0.)
@@ -1340,9 +1342,9 @@ class BuiltinTest(unittest.TestCase):
         self.assertAlmostEqual(pow(-2.,2), 4.)
         self.assertAlmostEqual(pow(-2.,3), -8.)
 
-        for x in 2, 2L, 2.0:
-            for y in 10, 10L, 10.0:
-                for z in 1000, 1000L, 1000.0:
+        for x in 2, 2, 2.0:
+            for y in 10, 10, 10.0:
+                for z in 1000, 1000, 1000.0:
                     if isinstance(x, float) or \
                        isinstance(y, float) or \
                        isinstance(z, float):
@@ -1352,8 +1354,8 @@ class BuiltinTest(unittest.TestCase):
 
         self.assertRaises(TypeError, pow, -1, -2, 3)
         self.assertRaises(ValueError, pow, 1, 2, 0)
-        self.assertRaises(TypeError, pow, -1L, -2L, 3L)
-        self.assertRaises(ValueError, pow, 1L, 2L, 0L)
+        self.assertRaises(TypeError, pow, -1, -2, 3)
+        self.assertRaises(ValueError, pow, 1, 2, 0)
         self.assertRaises(ValueError, pow, -342.43, 0.234)
 
         self.assertRaises(TypeError, pow)
@@ -1372,12 +1374,12 @@ class BuiltinTest(unittest.TestCase):
         self.assertEqual(range(0, 2**100, -1), [])
         self.assertEqual(range(0, 2**100, -1), [])
 
-        a = long(10 * sys.maxint)
-        b = long(100 * sys.maxint)
-        c = long(50 * sys.maxint)
+        a = int(10 * sys.maxint)
+        b = int(100 * sys.maxint)
+        c = int(50 * sys.maxint)
 
         self.assertEqual(range(a, a+2), [a, a+1])
-        self.assertEqual(range(a+2, a, -1L), [a+2, a+1])
+        self.assertEqual(range(a+2, a, -1), [a+2, a+1])
         self.assertEqual(range(a+4, a, -2), [a+4, a+2])
 
         seq = range(a, b, c)
@@ -1398,7 +1400,7 @@ class BuiltinTest(unittest.TestCase):
         self.assertRaises(TypeError, range)
         self.assertRaises(TypeError, range, 1, 2, 3, 4)
         self.assertRaises(ValueError, range, 1, 2, 0)
-        self.assertRaises(ValueError, range, a, a + 1, long(0))
+        self.assertRaises(ValueError, range, a, a + 1, int(0))
 
         class badzero(int):
             def __eq__(self, other):
@@ -1429,7 +1431,7 @@ class BuiltinTest(unittest.TestCase):
     def test_repr(self):
         self.assertEqual(repr(''), '\'\'')
         self.assertEqual(repr(0), '0')
-        self.assertEqual(repr(0L), '0')
+        self.assertEqual(repr(0), '0')
         self.assertEqual(repr(()), '()')
         self.assertEqual(repr([]), '[]')
         self.assertEqual(repr({}), '{}')
@@ -1485,7 +1487,7 @@ class BuiltinTest(unittest.TestCase):
     def test_str(self):
         self.assertEqual(str(''), '')
         self.assertEqual(str(0), '0')
-        self.assertEqual(str(0L), '0')
+        self.assertEqual(str(0), '0')
         self.assertEqual(str(()), '()')
         self.assertEqual(str([]), '[]')
         self.assertEqual(str({}), '{}')
@@ -1660,7 +1662,7 @@ def test_main(verbose=None):
             run_unittest(*test_classes)
             gc.collect()
             counts[i] = sys.gettotalrefcount()
-        print counts
+        print(counts)
 
 
 if __name__ == "__main__":

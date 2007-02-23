@@ -19,7 +19,7 @@ class DictTest(unittest.TestCase):
 
     def test_keys(self):
         d = {}
-        self.assertEqual(d.keys(), [])
+        self.assertEqual(set(d.keys()), set())
         d = {'a': 1, 'b': 2}
         k = d.keys()
         self.assert_('a' in d)
@@ -29,18 +29,18 @@ class DictTest(unittest.TestCase):
 
     def test_values(self):
         d = {}
-        self.assertEqual(d.values(), [])
+        self.assertEqual(set(d.values()), set())
         d = {1:2}
-        self.assertEqual(d.values(), [2])
+        self.assertEqual(set(d.values()), {2})
 
         self.assertRaises(TypeError, d.values, None)
 
     def test_items(self):
         d = {}
-        self.assertEqual(d.items(), [])
+        self.assertEqual(set(d.items()), set())
 
         d = {1:2}
-        self.assertEqual(d.items(), [(1, 2)])
+        self.assertEqual(set(d.items()), {(1, 2)})
 
         self.assertRaises(TypeError, d.items, None)
 
@@ -182,6 +182,14 @@ class DictTest(unittest.TestCase):
 
         self.assertRaises(ValueError, {}.update, [(1, 2, 3)])
 
+        # SF #1615701:  make d.update(m) honor __getitem__() and keys() in dict subclasses
+        class KeyUpperDict(dict):
+            def __getitem__(self, key):
+                return key.upper()
+        d.clear()
+        d.update(KeyUpperDict.fromkeys('abc'))
+        self.assertEqual(d, {'a':'A', 'b':'B', 'c':'C'})
+
     def test_fromkeys(self):
         self.assertEqual(dict.fromkeys('abc'), {'a':None, 'b':None, 'c':None})
         d = {}
@@ -314,7 +322,7 @@ class DictTest(unittest.TestCase):
 
         # verify longs/ints get same value when key > 32 bits (for 64-bit archs)
         # see SF bug #689659
-        x = 4503599627370496L
+        x = 4503599627370496
         y = 4503599627370496
         h = {x: 'anything', y: 'something else'}
         self.assertEqual(h[x], h[y])
@@ -371,7 +379,7 @@ class DictTest(unittest.TestCase):
 
     def test_eq(self):
         self.assertEqual({}, {})
-        self.assertEqual({1: 2}, {1L: 2L})
+        self.assertEqual({1: 2}, {1: 2})
 
         class Exc(Exception): pass
 

@@ -1,4 +1,4 @@
-# Copyright 2001-2005 by Vinay Sajip. All Rights Reserved.
+# Copyright 2001-2007 by Vinay Sajip. All Rights Reserved.
 #
 # Permission to use, copy, modify, and distribute this software and its
 # documentation for any purpose and without fee is hereby granted,
@@ -21,7 +21,7 @@ comp.lang.python, and influenced by Apache's log4j system.
 Should work under Python versions >= 1.5.2, except that source line
 information is not available unless 'sys._getframe()' is.
 
-Copyright (C) 2001-2004 Vinay Sajip. All Rights Reserved.
+Copyright (C) 2001-2007 Vinay Sajip. All Rights Reserved.
 
 To use, simply 'import logging' and log away!
 """
@@ -41,8 +41,8 @@ except ImportError:
 
 __author__  = "Vinay Sajip <vinay_sajip@red-dove.com>"
 __status__  = "production"
-__version__ = "0.5.0.0"
-__date__    = "08 January 2007"
+__version__ = "0.5.0.2"
+__date__    = "16 February 2007"
 
 #---------------------------------------------------------------------------
 #   Miscellaneous module data
@@ -68,7 +68,7 @@ def currentframe():
     except:
         return sys.exc_traceback.tb_frame.f_back
 
-if hasattr(sys, '_getframe'): currentframe = sys._getframe
+if hasattr(sys, '_getframe'): currentframe = lambda: sys._getframe(3)
 # done filching
 
 # _srcfile is only used in conjunction with sys._getframe().
@@ -251,7 +251,7 @@ class LogRecord:
         self.lineno = lineno
         self.funcName = func
         self.created = ct
-        self.msecs = (ct - long(ct)) * 1000
+        self.msecs = (ct - int(ct)) * 1000
         self.relativeCreated = (self.created - _startTime) * 1000
         if logThreads and thread:
             self.thread = thread.get_ident()
@@ -764,17 +764,15 @@ class FileHandler(StreamHandler):
         """
         Open the specified file and use it as the stream for logging.
         """
-        if codecs is None:
-            encoding = None
-        if encoding is None:
-            stream = open(filename, mode)
-        else:
-            stream = codecs.open(filename, mode, encoding)
-        StreamHandler.__init__(self, stream)
         #keep the absolute path, otherwise derived classes which use this
         #may come a cropper when the current directory changes
+        if codecs is None:
+            encoding = None
         self.baseFilename = os.path.abspath(filename)
         self.mode = mode
+        self.encoding = encoding
+        stream = self._open()
+        StreamHandler.__init__(self, stream)
 
     def close(self):
         """
@@ -783,6 +781,17 @@ class FileHandler(StreamHandler):
         self.flush()
         self.stream.close()
         StreamHandler.close(self)
+
+    def _open(self):
+        """
+        Open the current base file with the (original) mode and encoding.
+        Return the resulting stream.
+        """
+        if self.encoding is None:
+            stream = open(self.baseFilename, self.mode)
+        else:
+            stream = codecs.open(self.baseFilename, self.mode, self.encoding)
+        return stream
 
 #---------------------------------------------------------------------------
 #   Manager classes and functions

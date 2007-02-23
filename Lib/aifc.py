@@ -142,7 +142,7 @@ __all__ = ["Error","open","openfp"]
 class Error(Exception):
     pass
 
-_AIFC_version = 0xA2805140L     # Version 1 of AIFF-C
+_AIFC_version = 0xA2805140     # Version 1 of AIFF-C
 
 _skiplist = 'COMT', 'INST', 'MIDI', 'AESD', \
       'APPL', 'NAME', 'AUTH', '(c) ', 'ANNO'
@@ -191,7 +191,7 @@ def _read_float(f): # 10 bytes
         f = _HUGE_VAL
     else:
         expon = expon - 16383
-        f = (himant * 0x100000000L + lomant) * pow(2.0, expon - 63)
+        f = (himant * 0x100000000 + lomant) * pow(2.0, expon - 63)
     return sign * f
 
 def _write_short(f, x):
@@ -233,10 +233,10 @@ def _write_float(f, x):
             expon = expon | sign
             fmant = math.ldexp(fmant, 32)
             fsmant = math.floor(fmant)
-            himant = long(fsmant)
+            himant = int(fsmant)
             fmant = math.ldexp(fmant - fsmant, 32)
             fsmant = math.floor(fmant)
-            lomant = long(fsmant)
+            lomant = int(fsmant)
     _write_short(f, expon)
     _write_long(f, himant)
     _write_long(f, lomant)
@@ -453,7 +453,7 @@ class Aifc_read:
             kludge = 0
             if chunk.chunksize == 18:
                 kludge = 1
-                print 'Warning: bad COMM chunk size'
+                print('Warning: bad COMM chunk size')
                 chunk.chunksize = 23
             #DEBUG end
             self._comptype = chunk.read(4)
@@ -518,11 +518,11 @@ class Aifc_read:
                     # a position 0 and name ''
                     self._markers.append((id, pos, name))
         except EOFError:
-            print 'Warning: MARK chunk contains only',
-            print len(self._markers),
-            if len(self._markers) == 1: print 'marker',
-            else: print 'markers',
-            print 'instead of', nmarkers
+            print('Warning: MARK chunk contains only', end=' ')
+            print(len(self._markers), end=' ')
+            if len(self._markers) == 1: print('marker', end=' ')
+            else: print('markers', end=' ')
+            print('instead of', nmarkers)
 
 class Aifc_write:
     # Variables used in this class:
@@ -939,16 +939,16 @@ if __name__ == '__main__':
         sys.argv.append('/usr/demos/data/audio/bach.aiff')
     fn = sys.argv[1]
     f = open(fn, 'r')
-    print "Reading", fn
-    print "nchannels =", f.getnchannels()
-    print "nframes   =", f.getnframes()
-    print "sampwidth =", f.getsampwidth()
-    print "framerate =", f.getframerate()
-    print "comptype  =", f.getcomptype()
-    print "compname  =", f.getcompname()
+    print("Reading", fn)
+    print("nchannels =", f.getnchannels())
+    print("nframes   =", f.getnframes())
+    print("sampwidth =", f.getsampwidth())
+    print("framerate =", f.getframerate())
+    print("comptype  =", f.getcomptype())
+    print("compname  =", f.getcompname())
     if sys.argv[2:]:
         gn = sys.argv[2]
-        print "Writing", gn
+        print("Writing", gn)
         g = open(gn, 'w')
         g.setparams(f.getparams())
         while 1:
@@ -958,4 +958,4 @@ if __name__ == '__main__':
             g.writeframes(data)
         g.close()
         f.close()
-        print "Done."
+        print("Done.")
