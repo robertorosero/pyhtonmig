@@ -154,6 +154,40 @@ class CompilerTest(unittest.TestCase):
         exec c in dct
         self.assertEquals(dct.get('result'), 1)
 
+    def testDictViews(self):
+        class Dict(dict): pass
+        class NonDict:
+            def keys(self): pass
+            def items(self): pass
+            def values(self): pass
+            def viewkeys(self): pass
+            def viewitems(self): pass
+            def viewvalues(self): pass
+        c = compiler.compile('from __future__ import dictviews\n'
+                             'keys, items, values = d.keys, d.items, d.values\n',
+                             '<string>',
+                             'exec')
+        obj = {}
+        dct = {'d': obj}
+        exec c in dct
+        self.assertEquals(dct['keys'].__name__, obj.viewkeys.__name__)
+        self.assertEquals(dct['items'].__name__, obj.viewitems.__name__)
+        self.assertEquals(dct['values'].__name__, obj.viewvalues.__name__)
+
+        obj = Dict()
+        dct = {'d': obj}
+        exec c in dct
+        self.assertEquals(dct['keys'].__name__, obj.viewkeys.__name__)
+        self.assertEquals(dct['items'].__name__, obj.viewitems.__name__)
+        self.assertEquals(dct['values'].__name__, obj.viewvalues.__name__)
+
+        obj = NonDict()
+        dct = {'d': obj}
+        exec c in dct
+        self.assertEquals(dct['keys'].__name__, obj.keys.__name__)
+        self.assertEquals(dct['items'].__name__, obj.items.__name__)
+        self.assertEquals(dct['values'].__name__, obj.values.__name__)
+        
 
 NOLINENO = (compiler.ast.Module, compiler.ast.Stmt, compiler.ast.Discard)
 

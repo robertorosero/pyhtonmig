@@ -56,7 +56,7 @@ class DictTest(unittest.TestCase):
 
     def test_items(self):
         d = {}
-        self.assertEqual(list(d.items(), [])
+        self.assertEqual(list(d.items()), [])
 
         d = {1:2}
         self.assertEqual(d.items(), [(1, 2)])
@@ -490,6 +490,89 @@ class DictTest(unittest.TestCase):
             self.assertEqual(e.args, ((1,),))
         else:
             self.fail("missing KeyError")
+
+    def test_dictviews_future(self):
+        import __future__
+
+        d = {'a': 1, 'b': 2, 'c': 3}
+        c = compile("d.keys", "d.keys", "eval", 0)
+        k = eval(c, locals())
+        self.assertEquals(k.__name__, d.keys.__name__)
+        c = compile("d.items", "d.items", "eval", 0)
+        k = eval(c, locals())
+        self.assertEquals(k.__name__, d.items.__name__)
+        c = compile("d.values", "d.values", "eval", 0)
+        k = eval(c, locals())
+        self.assertEquals(k.__name__, d.values.__name__)
+        c = compile("d.keys", "d.keys", "eval",
+                    __future__.CO_FUTURE_DICTVIEWS)
+        k = eval(c, locals())
+        self.assertEquals(k.__name__, d.viewkeys.__name__)
+        c = compile("d.items", "d.items", "eval",
+                    __future__.CO_FUTURE_DICTVIEWS)
+        k = eval(c, locals())
+        self.assertEquals(k.__name__, d.viewitems.__name__)
+        c = compile("d.values", "d.values", "eval",
+                    __future__.CO_FUTURE_DICTVIEWS)
+        k = eval(c, locals())
+        self.assertEquals(k.__name__, d.viewvalues.__name__)
+
+        d = Dict(a=1, b=2, c=3)
+        c = compile("d.keys", "d.keys", "eval", 0)
+        k = eval(c, locals())
+        self.assertEquals(k.__name__, d.keys.__name__)
+        c = compile("d.items", "d.items", "eval", 0)
+        k = eval(c, locals())
+        self.assertEquals(k.__name__, d.items.__name__)
+        c = compile("d.values", "d.values", "eval", 0)
+        k = eval(c, locals())
+        self.assertEquals(k.__name__, d.values.__name__)
+        c = compile("d.keys", "d.keys", "eval",
+                    __future__.CO_FUTURE_DICTVIEWS)
+        k = eval(c, locals())
+        self.assertEquals(k.__name__, d.viewkeys.__name__)
+        c = compile("d.items", "d.items", "eval",
+                    __future__.CO_FUTURE_DICTVIEWS)
+        k = eval(c, locals())
+        self.assertEquals(k.__name__, d.viewitems.__name__)
+        c = compile("d.values", "d.values", "eval",
+                    __future__.CO_FUTURE_DICTVIEWS)
+        k = eval(c, locals())
+        self.assertEquals(k.__name__, d.viewvalues.__name__)
+
+        class NonDict:
+            def __init__(self, *args, **kwargs):
+                self.d = dict(*args, **kwargs)
+            def keys(self): return self.d.keys()
+            def items(self): return self.d.items()
+            def values(self): return self.d.values()
+            # these should *not* end up being used   
+            def viewkeys(self): pass
+            def viewitems(self): pass
+            def viewvalues(self): pass
+
+        d = NonDict(a=1, b=2, c=3)
+        c = compile("d.keys", "d.keys", "eval", 0)
+        k = eval(c, locals())
+        self.assertEquals(k.__name__, d.keys.__name__)
+        c = compile("d.items", "d.items", "eval", 0)
+        k = eval(c, locals())
+        self.assertEquals(k.__name__, d.items.__name__)
+        c = compile("d.values", "d.values", "eval", 0)
+        k = eval(c, locals())
+        self.assertEquals(k.__name__, d.values.__name__)
+        c = compile("d.keys", "d.keys", "eval",
+                    __future__.CO_FUTURE_DICTVIEWS)
+        k = eval(c, locals())
+        self.assertEquals(k.__name__, d.keys.__name__)
+        c = compile("d.items", "d.items", "eval",
+                    __future__.CO_FUTURE_DICTVIEWS)
+        k = eval(c, locals())
+        self.assertEquals(k.__name__, d.items.__name__)
+        c = compile("d.values", "d.values", "eval",
+                    __future__.CO_FUTURE_DICTVIEWS)
+        k = eval(c, locals())
+        self.assertEquals(k.__name__, d.values.__name__)
 
 
 from test import mapping_tests

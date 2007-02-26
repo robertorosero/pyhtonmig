@@ -10,7 +10,7 @@ from compiler import pyassem, misc, future, symbols
 from compiler.consts import SC_LOCAL, SC_GLOBAL, SC_FREE, SC_CELL
 from compiler.consts import (CO_VARARGS, CO_VARKEYWORDS, CO_NEWLOCALS,
      CO_NESTED, CO_GENERATOR, CO_FUTURE_DIVISION,
-     CO_FUTURE_ABSIMPORT, CO_FUTURE_WITH_STATEMENT)
+     CO_FUTURE_ABSIMPORT, CO_FUTURE_WITH_STATEMENT, CO_FUTURE_DICTVIEWS)
 from compiler.pyassem import TupleArg
 
 # XXX The version-specific code can go, since this code only works with 2.x.
@@ -218,6 +218,8 @@ class CodeGenerator:
                 self.graph.setFlag(CO_FUTURE_ABSIMPORT)
             elif feature == "with_statement":
                 self.graph.setFlag(CO_FUTURE_WITH_STATEMENT)
+            elif feature == "dictviews":
+                self.graph.setFlag(CO_FUTURE_DICTVIEWS)
 
     def initClass(self):
         """This method is called once for each class"""
@@ -929,9 +931,18 @@ class CodeGenerator:
         for elt in elts[1:]:
             self.emit('LOAD_ATTR', elt)
 
+    def _checkViewAttr(self, regop, viewop, attrname):
+        if (self.graph.checkFlag(CO_FUTURE_DICTVIEWS) and
+            attrname in ('keys', 'items', 'values')):
+            return viewop
+        else:
+            return regop
+    
     def visitGetattr(self, node):
         self.visit(node.expr)
-        self.emit('LOAD_ATTR', self.mangle(node.attrname))
+        load_op = self._checkViewAttr('LOAD_ATTR', 'LOAD_VIEWATTR',
+                                      node.attrname)
+        self.emit(load_op, self.mangle(node.attrname))
 
     # next five implement assignments
 
@@ -958,9 +969,13 @@ class CodeGenerator:
     def visitAssAttr(self, node):
         self.visit(node.expr)
         if node.flags == 'OP_ASSIGN':
-            self.emit('STORE_ATTR', self.mangle(node.attrname))
+            op = self._checkViewAttr('STORE_ATTR', 'STORE_VIEWATTR',
+                                     node.attrname)
+            self.emit(op, self.mangle(node.attrname))
         elif node.flags == 'OP_DELETE':
-            self.emit('DELETE_ATTR', self.mangle(node.attrname))
+            op = self._checkViewAttr('DELETE_ATTR', 'DELETE_VIEWATTR',
+                                     node.attrname)
+            self.emit(op, self.mangle(node.attrname))
         else:
             print "warning: unexpected flags:", node.flags
             print node
@@ -1016,10 +1031,14 @@ class CodeGenerator:
         if mode == "load":
             self.visit(node.expr)
             self.emit('DUP_TOP')
-            self.emit('LOAD_ATTR', self.mangle(node.attrname))
+            op = self._checkViewAttr('LOAD_ATTR', 'LOAD_VIEWATTR',
+                                     node.attrname)
+            self.emit(op, self.mangle(node.attrname))
         elif mode == "store":
             self.emit('ROT_TWO')
-            self.emit('STORE_ATTR', self.mangle(node.attrname))
+            op = self._checkViewAttr('STORE_ATTR', 'STORE_VIEWATTR',
+                                     node.attrname)
+            self.emit(op, self.mangle(node.attrname))
 
     def visitAugSlice(self, node, mode):
         if mode == "load":

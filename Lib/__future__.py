@@ -53,6 +53,7 @@ all_feature_names = [
     "division",
     "absolute_import",
     "with_statement",
+    "dictviews",
 ]
 
 __all__ = ["all_feature_names"] + all_feature_names

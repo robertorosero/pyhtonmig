@@ -1079,6 +1079,8 @@ builtin_delattr(PyObject *self, PyObject *args)
 	    	result = _PyObject_SetViewAttr(v, name, (PyObject *)NULL);
 	} else
 		result = PyObject_SetAttr(v, name, (PyObject *)NULL);
+	if (result != 0)
+		return NULL;
 	Py_INCREF(Py_None);
 	return Py_None;
 }

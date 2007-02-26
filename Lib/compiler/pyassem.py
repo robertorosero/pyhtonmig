@@ -533,6 +533,9 @@ class PyFlowGraph(FlowGraph):
     _convert_STORE_ATTR = _convert_NAME
     _convert_LOAD_ATTR = _convert_NAME
     _convert_DELETE_ATTR = _convert_NAME
+    _convert_STORE_VIEWATTR = _convert_NAME
+    _convert_LOAD_VIEWATTR = _convert_NAME
+    _convert_DELETE_VIEWATTR = _convert_NAME
     _convert_LOAD_GLOBAL = _convert_NAME
     _convert_STORE_GLOBAL = _convert_NAME
     _convert_DELETE_GLOBAL = _convert_NAME
@@ -766,7 +769,9 @@ class StackDepthTracker:
         'BUILD_CLASS': -2,
         'STORE_NAME': -1,
         'STORE_ATTR': -2,
+        'STORE_VIEWATTR': -2,
         'DELETE_ATTR': -1,
+        'DELETE_VIEWATTR': -1,
         'STORE_GLOBAL': -1,
         'BUILD_MAP': 1,
         'COMPARE_OP': -1,
@@ -775,6 +780,7 @@ class StackDepthTracker:
         'IMPORT_NAME': -1,
         'IMPORT_FROM': 1,
         'LOAD_ATTR': 0, # unlike other loads
+        'LOAD_VIEWATTR': 0,
         # close enough...
         'SETUP_EXCEPT': 3,
         'SETUP_FINALLY': 3,
