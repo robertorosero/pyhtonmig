@@ -26,6 +26,18 @@ class DictTest(unittest.TestCase):
 
         self.assertRaises(TypeError, d.keys, None)
 
+    def test_viewkeys(self):
+        d = {}
+        self.assertEqual(d.viewkeys(), set())
+        d = {'a': 1, 'b': 2}
+        k = d.viewkeys()
+        self.assert_('a' in k)
+        self.assert_('b' in k)
+        self.assertFalse('c' in k)
+        self.assertEquals(k, set(['a', 'b']))
+
+        self.assertRaises(TypeError, d.viewkeys, None)
+
     def test_values(self):
         d = {}
         self.assertEqual(d.values(), [])
@@ -34,14 +46,31 @@ class DictTest(unittest.TestCase):
 
         self.assertRaises(TypeError, d.values, None)
 
+    def test_viewvalues(self):
+        d = {}
+        self.assertEqual(list(d.viewvalues()), [])
+        d = {1:2}
+        self.assertEqual(list(d.viewvalues()), [2])
+
+        self.assertRaises(TypeError, d.viewvalues, None)
+
     def test_items(self):
         d = {}
-        self.assertEqual(d.items(), [])
+        self.assertEqual(list(d.items(), [])
 
         d = {1:2}
         self.assertEqual(d.items(), [(1, 2)])
 
         self.assertRaises(TypeError, d.items, None)
+
+    def test_viewitems(self):
+        d = {}
+        self.assertEqual(list(d.viewitems()), [])
+
+        d = {1:2}
+        self.assertEqual(list(d.viewitems()), [(1, 2)])
+
+        self.assertRaises(TypeError, d.viewitems, None)
 
     def test_has_key(self):
         d = {}
