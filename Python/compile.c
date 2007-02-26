@@ -155,6 +155,7 @@ static int compiler_addop_j(struct compiler *, int, basicblock *, int);
 static basicblock *compiler_use_new_block(struct compiler *);
 static int compiler_error(struct compiler *, const char *);
 static int compiler_nameop(struct compiler *, identifier, expr_context_ty);
+static int compiler_attrop(struct compiler *, expr_ty);
 
 static PyCodeObject *compiler_mod(struct compiler *, mod_ty);
 static int compiler_visit_stmt(struct compiler *, stmt_ty);
@@ -781,8 +782,10 @@ opcode_stack_effect(int opcode, int oparg)
 			return 1;
 
 		case STORE_ATTR:
+		case STORE_VIEWATTR:
 			return -2;
 		case DELETE_ATTR:
+		case DELETE_VIEWATTR:
 			return -1;
 		case STORE_GLOBAL:
 			return -1;
@@ -800,6 +803,7 @@ opcode_stack_effect(int opcode, int oparg)
 		case BUILD_MAP:
 			return 1;
 		case LOAD_ATTR:
+		case LOAD_VIEWATTR:
 			return 0;
 		case COMPARE_OP:
 			return -1;
@@ -2942,31 +2946,7 @@ compiler_visit_expr(struct compiler *c, expr_ty e)
 		break;
 	/* The following exprs can be assignment targets. */
 	case Attribute_kind:
-		if (e->v.Attribute.ctx != AugStore)
-			VISIT(c, expr, e->v.Attribute.value);
-		switch (e->v.Attribute.ctx) {
-		case AugLoad:
-			ADDOP(c, DUP_TOP);
-			/* Fall through to load */
-		case Load:
-			ADDOP_NAME(c, LOAD_ATTR, e->v.Attribute.attr, names);
-			break;
-		case AugStore:
-			ADDOP(c, ROT_TWO);
-			/* Fall through to save */
-		case Store:
-			ADDOP_NAME(c, STORE_ATTR, e->v.Attribute.attr, names);
-			break;
-		case Del:
-			ADDOP_NAME(c, DELETE_ATTR, e->v.Attribute.attr, names);
-			break;
-		case Param:
-		default:
-			PyErr_SetString(PyExc_SystemError,
-					"param invalid in attribute expression");
-			return 0;
-		}
-		break;
+		return compiler_attrop(c, e);
 	case Subscript_kind:
 		switch (e->v.Subscript.ctx) {
 		case AugLoad:
@@ -3047,6 +3027,50 @@ compiler_augassign(struct compiler *c, stmt_ty s)
 		PyErr_Format(PyExc_SystemError, 
 			"invalid node type (%d) for augmented assignment",
 			e->kind);
+		return 0;
+	}
+	return 1;
+}
+
+	/* Helper to handle dictviews future-import magic */
+static int
+compiler_attrop(struct compiler *c, expr_ty e)
+{
+	int needviews = 0;
+	
+	if (c->c_flags && (c->c_flags->cf_flags & CO_FUTURE_DICTVIEWS)) {
+		const char *attrstr = PyString_AS_STRING(e->v.Attribute.attr);
+		if (strcmp(attrstr, "keys") == 0 ||
+		    strcmp(attrstr, "items") == 0 ||
+		    strcmp(attrstr, "values") == 0)
+			needviews = 1;
+	}
+
+	if (e->v.Attribute.ctx != AugStore)
+		VISIT(c, expr, e->v.Attribute.value);
+	switch (e->v.Attribute.ctx) {
+	case AugLoad:
+		ADDOP(c, DUP_TOP);
+		/* Fall through to load */
+	case Load:
+		ADDOP_NAME(c, needviews ? LOAD_VIEWATTR : LOAD_ATTR,
+			   e->v.Attribute.attr, names);
+		break;
+	case AugStore:
+		ADDOP(c, ROT_TWO);
+		/* Fall through to save */
+	case Store:
+		ADDOP_NAME(c, needviews ? STORE_VIEWATTR : STORE_ATTR,
+			   e->v.Attribute.attr, names);
+		break;
+	case Del:
+		ADDOP_NAME(c, needviews ? DELETE_VIEWATTR : DELETE_ATTR,
+		           e->v.Attribute.attr, names);
+		break;
+	case Param:
+	default:
+		PyErr_SetString(PyExc_SystemError,
+				"param invalid in attribute expression");
 		return 0;
 	}
 	return 1;

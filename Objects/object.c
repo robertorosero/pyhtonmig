@@ -1100,6 +1100,33 @@ PyObject_SetAttrString(PyObject *v, const char *name, PyObject *w)
 }
 
 PyObject *
+_PyObject_GetViewAttr(PyObject *v, PyObject *name)
+{
+	/* Wrapper around PyObject_GetAttr that translates
+	   dict.keys/items/values into dict.viewkeys/viewitems/viewvalues
+	   for all subclasses of dict. It doesn't care about dict-like
+	   objects even if they have view* attrs, and doesn't check
+	   whether the attribute is actually one of keys/items/values */
+	if (PyDict_Check(v)) {
+		static PyObject *viewstr;
+		PyObject *result;
+
+		if (viewstr == NULL) {
+			viewstr = PyString_InternFromString("view");
+			if (viewstr == NULL)
+				return NULL;
+		}
+		name = PyNumber_Add(viewstr, name);
+		if (name == NULL)
+			return NULL;
+		result = PyObject_GetAttr(v, name);
+		Py_DECREF(name);
+		return result;
+	}
+	return PyObject_GetAttr(v, name);
+}
+
+PyObject *
 PyObject_GetAttr(PyObject *v, PyObject *name)
 {
 	PyTypeObject *tp = v->ob_type;
@@ -1143,6 +1170,29 @@ PyObject_HasAttr(PyObject *v, PyObject *name)
 	}
 	PyErr_Clear();
 	return 0;
+}
+
+int
+_PyObject_SetViewAttr(PyObject *v, PyObject *name, PyObject *value)
+{
+	/* Like _PyObject_GetViewAttr(), but for setting/deleting */
+	if (PyDict_Check(v)) {
+		static PyObject *viewstr;
+		int result;
+
+		if (viewstr == NULL) {
+			viewstr = PyString_InternFromString("view");
+			if (viewstr == NULL)
+				return -1;
+		}
+		name = PyNumber_Add(viewstr, name);
+		if (name == NULL)
+			return -1;
+		result = PyObject_SetAttr(v, name, value);
+		Py_DECREF(name);
+		return result;
+	}
+	return PyObject_SetAttr(v, name, value);
 }
 
 int

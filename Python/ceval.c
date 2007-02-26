@@ -1796,11 +1796,29 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 			if (err == 0) continue;
 			break;
 
+		case STORE_VIEWATTR:
+			w = GETITEM(names, oparg);
+			v = TOP();
+			u = SECOND();
+			STACKADJ(-2);
+			err = _PyObject_SetViewAttr(v, w, u); /* v.w = u */
+			Py_DECREF(v);
+			Py_DECREF(u);
+			if (err == 0) continue;
+			break;
+
 		case DELETE_ATTR:
 			w = GETITEM(names, oparg);
 			v = POP();
 			err = PyObject_SetAttr(v, w, (PyObject *)NULL);
 							/* del v.w */
+			Py_DECREF(v);
+			break;
+
+		case DELETE_VIEWATTR:
+			w = GETITEM(names, oparg);
+			v = POP();
+			err = _PyObject_SetViewAttr(v, w, (PyObject *)NULL);
 			Py_DECREF(v);
 			break;
 
@@ -2001,6 +2019,16 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 			Py_DECREF(v);
 			SET_TOP(x);
 			if (x != NULL) continue;
+			break;
+
+		case LOAD_VIEWATTR:
+			w = GETITEM(names, oparg);
+			v = TOP();
+			x = _PyObject_GetViewAttr(v, w);
+			Py_DECREF(v);
+			SET_TOP(x);
+			if (x != NULL)
+				continue;
 			break;
 
 		case COMPARE_OP:

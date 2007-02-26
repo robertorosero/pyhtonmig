@@ -103,12 +103,13 @@ extern "C" {
 #define COMPARE_OP	106	/* Comparison operator */
 #define IMPORT_NAME	107	/* Index in name list */
 #define IMPORT_FROM	108	/* Index in name list */
-
+#define LOAD_VIEWATTR   109	/* Index in name list */
 #define JUMP_FORWARD	110	/* Number of bytes to skip */
 #define JUMP_IF_FALSE	111	/* "" */
 #define JUMP_IF_TRUE	112	/* "" */
 #define JUMP_ABSOLUTE	113	/* Target byte offset from beginning of code */
-
+#define STORE_VIEWATTR  114	/* Index in name list */
+#define DELETE_VIEWATTR 115	/* Index in name list */
 #define LOAD_GLOBAL	116	/* Index in name list */
 
 #define CONTINUE_LOOP	119	/* Start of loop (absolute) */

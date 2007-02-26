@@ -66,6 +66,7 @@ CO_GENERATOR_ALLOWED = 0        # generators (obsolete, was 0x1000)
 CO_FUTURE_DIVISION   = 0x2000   # division
 CO_FUTURE_ABSOLUTE_IMPORT = 0x4000 # perform absolute imports by default
 CO_FUTURE_WITH_STATEMENT  = 0x8000   # with statement
+CO_FUTURE_DICTVIEWS  = 0x10000
 
 class _Feature:
     def __init__(self, optionalRelease, mandatoryRelease, compiler_flag):
@@ -114,3 +115,7 @@ absolute_import = _Feature((2, 5, 0, "alpha", 1),
 with_statement = _Feature((2, 5, 0, "alpha", 1),
                           (2, 6, 0, "alpha", 0),
                           CO_FUTURE_WITH_STATEMENT)
+
+dictviews = _Feature((2, 6, 0, "alpha", 1),
+                     (3, 0, 0, "alpha", 0),
+                     CO_FUTURE_DICTVIEWS)
