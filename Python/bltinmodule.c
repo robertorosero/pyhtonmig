@@ -5,6 +5,7 @@
 #include "node.h"
 #include "code.h"
 #include "eval.h"
+#include "frameobject.h"
 
 #include <ctype.h>
 
@@ -718,6 +719,7 @@ builtin_getattr(PyObject *self, PyObject *args)
 {
 	PyObject *v, *result, *dflt = NULL;
 	PyObject *name;
+	const char *sname;
 
 	if (!PyArg_UnpackTuple(args, "getattr", 2, 3, &v, &name, &dflt))
 		return NULL;
@@ -734,7 +736,16 @@ builtin_getattr(PyObject *self, PyObject *args)
 				"getattr(): attribute name must be string");
 		return NULL;
 	}
-	result = PyObject_GetAttr(v, name);
+	sname = PyString_AS_STRING(name);
+	/* Do some magic to see if the caller wanted dictviews or not */
+	if ((strcmp(sname, "keys") == 0 ||
+	     strcmp(sname, "items") == 0 ||
+	     strcmp(sname, "values") == 0) &&
+	    (PyThreadState_GET()->frame->f_code->co_flags & 
+	    					CO_FUTURE_DICTVIEWS)) {
+	    	result = _PyObject_GetViewAttr(v, name);
+	} else
+		result = PyObject_GetAttr(v, name);
 	if (result == NULL && dflt != NULL &&
 	    PyErr_ExceptionMatches(PyExc_AttributeError))
 	{
@@ -994,10 +1005,35 @@ builtin_setattr(PyObject *self, PyObject *args)
 	PyObject *v;
 	PyObject *name;
 	PyObject *value;
+	const char *sname;
+	int result;
 
 	if (!PyArg_UnpackTuple(args, "setattr", 3, 3, &v, &name, &value))
 		return NULL;
-	if (PyObject_SetAttr(v, name, value) != 0)
+#ifdef Py_USING_UNICODE
+	if (PyUnicode_Check(name)) {
+		name = _PyUnicode_AsDefaultEncodedString(name, NULL);
+		if (name == NULL)
+			return NULL;
+	}
+#endif
+
+	if (!PyString_Check(name)) {
+		PyErr_SetString(PyExc_TypeError,
+				"setattr(): attribute name must be string");
+		return NULL;
+	}
+	sname = PyString_AS_STRING(name);
+	/* Do some magic to see if the caller wanted dictviews or not */
+	if ((strcmp(sname, "keys") == 0 ||
+	     strcmp(sname, "items") == 0 ||
+	     strcmp(sname, "values") == 0) &&
+	    (PyThreadState_GET()->frame->f_code->co_flags & 
+	    					CO_FUTURE_DICTVIEWS)) {
+	    	result = _PyObject_SetViewAttr(v, name, value);
+	} else
+		result = PyObject_SetAttr(v, name, value);
+	if (result != 0)
 		return NULL;
 	Py_INCREF(Py_None);
 	return Py_None;
@@ -1015,11 +1051,34 @@ builtin_delattr(PyObject *self, PyObject *args)
 {
 	PyObject *v;
 	PyObject *name;
+	const char *sname;
+	int result;
 
 	if (!PyArg_UnpackTuple(args, "delattr", 2, 2, &v, &name))
 		return NULL;
-	if (PyObject_SetAttr(v, name, (PyObject *)NULL) != 0)
+#ifdef Py_USING_UNICODE
+	if (PyUnicode_Check(name)) {
+		name = _PyUnicode_AsDefaultEncodedString(name, NULL);
+		if (name == NULL)
+			return NULL;
+	}
+#endif
+
+	if (!PyString_Check(name)) {
+		PyErr_SetString(PyExc_TypeError,
+				"delattr(): attribute name must be string");
 		return NULL;
+	}
+	sname = PyString_AS_STRING(name);
+	/* Do some magic to see if the caller wanted dictviews or not */
+	if ((strcmp(sname, "keys") == 0 ||
+	     strcmp(sname, "items") == 0 ||
+	     strcmp(sname, "values") == 0) &&
+	    (PyThreadState_GET()->frame->f_code->co_flags & 
+	    					CO_FUTURE_DICTVIEWS)) {
+	    	result = _PyObject_SetViewAttr(v, name, (PyObject *)NULL);
+	} else
+		result = PyObject_SetAttr(v, name, (PyObject *)NULL);
 	Py_INCREF(Py_None);
 	return Py_None;
 }
