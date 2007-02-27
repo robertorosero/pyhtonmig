@@ -742,7 +742,7 @@ builtin_getattr(PyObject *self, PyObject *args)
 	     strcmp(sname, "items") == 0 ||
 	     strcmp(sname, "values") == 0) &&
 	    (PyThreadState_GET()->frame->f_code->co_flags & 
-	    					CO_FUTURE_DICTVIEWS)) {
+	    					CO_FUTURE_DICT_VIEWS)) {
 	    	result = _PyObject_GetViewAttr(v, name);
 	} else
 		result = PyObject_GetAttr(v, name);
@@ -1029,7 +1029,7 @@ builtin_setattr(PyObject *self, PyObject *args)
 	     strcmp(sname, "items") == 0 ||
 	     strcmp(sname, "values") == 0) &&
 	    (PyThreadState_GET()->frame->f_code->co_flags & 
-	    					CO_FUTURE_DICTVIEWS)) {
+	    					CO_FUTURE_DICT_VIEWS)) {
 	    	result = _PyObject_SetViewAttr(v, name, value);
 	} else
 		result = PyObject_SetAttr(v, name, value);
@@ -1075,7 +1075,7 @@ builtin_delattr(PyObject *self, PyObject *args)
 	     strcmp(sname, "items") == 0 ||
 	     strcmp(sname, "values") == 0) &&
 	    (PyThreadState_GET()->frame->f_code->co_flags & 
-	    					CO_FUTURE_DICTVIEWS)) {
+	    					CO_FUTURE_DICT_VIEWS)) {
 	    	result = _PyObject_SetViewAttr(v, name, (PyObject *)NULL);
 	} else
 		result = PyObject_SetAttr(v, name, (PyObject *)NULL);

@@ -163,7 +163,7 @@ class CompilerTest(unittest.TestCase):
             def viewkeys(self): pass
             def viewitems(self): pass
             def viewvalues(self): pass
-        c = compiler.compile('from __future__ import dictviews\n'
+        c = compiler.compile('from __future__ import dict_views\n'
                              'keys, items, values = d.keys, d.items, d.values\n',
                              '<string>',
                              'exec')

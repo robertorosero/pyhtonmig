@@ -3032,13 +3032,13 @@ compiler_augassign(struct compiler *c, stmt_ty s)
 	return 1;
 }
 
-	/* Helper to handle dictviews future-import magic */
+	/* Helper to handle dict views future-import magic */
 static int
 compiler_attrop(struct compiler *c, expr_ty e)
 {
 	int needviews = 0;
 	
-	if (c->c_flags && (c->c_flags->cf_flags & CO_FUTURE_DICTVIEWS)) {
+	if (c->c_flags && (c->c_flags->cf_flags & CO_FUTURE_DICT_VIEWS)) {
 		const char *attrstr = PyString_AS_STRING(e->v.Attribute.attr);
 		if (strcmp(attrstr, "keys") == 0 ||
 		    strcmp(attrstr, "items") == 0 ||

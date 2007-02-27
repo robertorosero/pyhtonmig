@@ -491,7 +491,7 @@ class DictTest(unittest.TestCase):
         else:
             self.fail("missing KeyError")
 
-    def test_dictviews_future(self):
+    def test_dict_views_future(self):
         import __future__
 
         d = {'a': 1, 'b': 2, 'c': 3}
@@ -505,15 +505,15 @@ class DictTest(unittest.TestCase):
         k = eval(c, locals())
         self.assertEquals(k.__name__, d.values.__name__)
         c = compile("d.keys", "d.keys", "eval",
-                    __future__.CO_FUTURE_DICTVIEWS)
+                    __future__.CO_FUTURE_DICT_VIEWS)
         k = eval(c, locals())
         self.assertEquals(k.__name__, d.viewkeys.__name__)
         c = compile("d.items", "d.items", "eval",
-                    __future__.CO_FUTURE_DICTVIEWS)
+                    __future__.CO_FUTURE_DICT_VIEWS)
         k = eval(c, locals())
         self.assertEquals(k.__name__, d.viewitems.__name__)
         c = compile("d.values", "d.values", "eval",
-                    __future__.CO_FUTURE_DICTVIEWS)
+                    __future__.CO_FUTURE_DICT_VIEWS)
         k = eval(c, locals())
         self.assertEquals(k.__name__, d.viewvalues.__name__)
 
@@ -528,15 +528,15 @@ class DictTest(unittest.TestCase):
         k = eval(c, locals())
         self.assertEquals(k.__name__, d.values.__name__)
         c = compile("d.keys", "d.keys", "eval",
-                    __future__.CO_FUTURE_DICTVIEWS)
+                    __future__.CO_FUTURE_DICT_VIEWS)
         k = eval(c, locals())
         self.assertEquals(k.__name__, d.viewkeys.__name__)
         c = compile("d.items", "d.items", "eval",
-                    __future__.CO_FUTURE_DICTVIEWS)
+                    __future__.CO_FUTURE_DICT_VIEWS)
         k = eval(c, locals())
         self.assertEquals(k.__name__, d.viewitems.__name__)
         c = compile("d.values", "d.values", "eval",
-                    __future__.CO_FUTURE_DICTVIEWS)
+                    __future__.CO_FUTURE_DICT_VIEWS)
         k = eval(c, locals())
         self.assertEquals(k.__name__, d.viewvalues.__name__)
 
@@ -562,15 +562,15 @@ class DictTest(unittest.TestCase):
         k = eval(c, locals())
         self.assertEquals(k.__name__, d.values.__name__)
         c = compile("d.keys", "d.keys", "eval",
-                    __future__.CO_FUTURE_DICTVIEWS)
+                    __future__.CO_FUTURE_DICT_VIEWS)
         k = eval(c, locals())
         self.assertEquals(k.__name__, d.keys.__name__)
         c = compile("d.items", "d.items", "eval",
-                    __future__.CO_FUTURE_DICTVIEWS)
+                    __future__.CO_FUTURE_DICT_VIEWS)
         k = eval(c, locals())
         self.assertEquals(k.__name__, d.items.__name__)
         c = compile("d.values", "d.values", "eval",
-                    __future__.CO_FUTURE_DICTVIEWS)
+                    __future__.CO_FUTURE_DICT_VIEWS)
         k = eval(c, locals())
         self.assertEquals(k.__name__, d.values.__name__)
 
