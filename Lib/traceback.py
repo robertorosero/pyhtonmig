@@ -178,7 +178,12 @@ def format_exception_only(etype, value):
     # It was a syntax error; show exactly where the problem was found.
     lines = []
     try:
-        msg, (filename, lineno, offset, badline) = value.args
+        message = value.message
+        filename = value.filename
+        lineno = value.lineno
+        offset = value.offset
+        badline = value.text
+        msg = value.message
     except Exception:
         pass
     else:
