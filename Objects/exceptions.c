@@ -919,7 +919,7 @@ SyntaxError_init(PySyntaxErrorObject *self, PyObject *args, PyObject *kwds)
     self->msg = self->message;
     Py_INCREF(self->msg);
 
-    if (lenargs == 1) {
+    if (lenargs == 0 || lenargs == 1) {
         Py_INCREF(Py_None);
         self->filename = Py_None;
         Py_INCREF(Py_None);
@@ -960,7 +960,7 @@ SyntaxError_init(PySyntaxErrorObject *self, PyObject *args, PyObject *kwds)
         Py_DECREF(info);
     }
     else {
-        PyErr_SetString(PyExc_TypeError, "expect either 0, 1, or 2 arguments");
+        PyErr_SetString(PyExc_TypeError, "0, 1, or 2 arguments required");
         return -1;
     }
     return 0;
