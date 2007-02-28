@@ -531,7 +531,7 @@ set_error(void)
 			}
 		}
 
-		v = Py_BuildValue("(is)", err_no, msg);
+		v = Py_BuildValue("((is))", err_no, msg);
 		if (v != NULL) {
 			PyErr_SetObject(socket_error, v);
 			Py_DECREF(v);
@@ -567,7 +567,7 @@ set_error(void)
 					*lastc-- = '\0';
 				}
 			}
-			v = Py_BuildValue("(is)", myerrorcode, outbuf);
+			v = Py_BuildValue("((is))", myerrorcode, outbuf);
 			if (v != NULL) {
 				PyErr_SetObject(socket_error, v);
 				Py_DECREF(v);
@@ -580,7 +580,7 @@ set_error(void)
 #if defined(RISCOS)
 	if (_inet_error.errnum != NULL) {
 		PyObject *v;
-		v = Py_BuildValue("(is)", errno, _inet_err());
+		v = Py_BuildValue("((is))", errno, _inet_err());
 		if (v != NULL) {
 			PyErr_SetObject(socket_error, v);
 			Py_DECREF(v);
@@ -599,9 +599,9 @@ set_herror(int h_error)
 	PyObject *v;
 
 #ifdef HAVE_HSTRERROR
-	v = Py_BuildValue("(is)", h_error, (char *)hstrerror(h_error));
+	v = Py_BuildValue("((is))", h_error, (char *)hstrerror(h_error));
 #else
-	v = Py_BuildValue("(is)", h_error, "host not found");
+	v = Py_BuildValue("((is))", h_error, "host not found");
 #endif
 	if (v != NULL) {
 		PyErr_SetObject(socket_herror, v);
@@ -624,9 +624,9 @@ set_gaierror(int error)
 #endif
 
 #ifdef HAVE_GAI_STRERROR
-	v = Py_BuildValue("(is)", error, gai_strerror(error));
+	v = Py_BuildValue("((is))", error, gai_strerror(error));
 #else
-	v = Py_BuildValue("(is)", error, "getaddrinfo failed");
+	v = Py_BuildValue("((is))", error, "getaddrinfo failed");
 #endif
 	if (v != NULL) {
 		PyErr_SetObject(socket_gaierror, v);

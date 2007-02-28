@@ -28,6 +28,9 @@ TO DO
 Core and Builtins
 -----------------
 
+- PyErr_SetFromErrno() now wraps its value argument in another tuple before
+  passing it to the exception type's init function.
+
 - SyntaxError now enforces the requirement of having two arguments, second of
   which is a four-item tuple.
 

@@ -138,7 +138,7 @@ _delegate_methods = ("recv", "recvfrom", "recv_into", "recvfrom_into",
 class _closedsocket(object):
     __slots__ = []
     def _dummy(*args):
-        raise error(EBADF, 'Bad file descriptor')
+        raise error((EBADF, 'Bad file descriptor'))
     def close(self):
         pass
     # All _delegate_methods must also be initialized here.

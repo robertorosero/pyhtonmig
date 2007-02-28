@@ -161,19 +161,18 @@ PySSL_SetError(PySSLObject *obj, int ret)
 	n = PyInt_FromLong((long) p);
 	if (n == NULL)
 		return NULL;
-	v = PyTuple_New(2);
-	if (v == NULL) {
-		Py_DECREF(n);
-		return NULL;
-	}
 
 	s = PyString_FromString(errstr);
 	if (s == NULL) {
-		Py_DECREF(v);
 		Py_DECREF(n);
 	}
-	PyTuple_SET_ITEM(v, 0, n);
-	PyTuple_SET_ITEM(v, 1, s);
+	v = Py_BuildValue("((O, O))", n, s);
+	if (v == NULL) {
+		Py_DECREF(n);
+		Py_DECREF(s);
+		return NULL;
+	}
+
 	PyErr_SetObject(PySSLErrorObject, v);
 	Py_DECREF(v);
 	return NULL;
