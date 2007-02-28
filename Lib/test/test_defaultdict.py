@@ -44,7 +44,7 @@ class TestDefaultDict(unittest.TestCase):
         try:
             d2[15]
         except KeyError as err:
-            self.assertEqual(err.args, (15,))
+            self.assertEqual(err.message, 15)
         else:
             self.fail("d2[15] didn't raise KeyError")
         self.assertRaises(TypeError, defaultdict, 1)
