@@ -9,14 +9,12 @@ extern "C" {
 typedef struct {
     PyObject_HEAD
     PyObject *dict;
-    PyObject *args;
     PyObject *message;
 } PyBaseExceptionObject;
 
 typedef struct {
     PyObject_HEAD
     PyObject *dict;
-    PyObject *args;
     PyObject *message;
     PyObject *msg;
     PyObject *filename;
@@ -30,7 +28,6 @@ typedef struct {
 typedef struct {
     PyObject_HEAD
     PyObject *dict;
-    PyObject *args;
     PyObject *message;
     PyObject *encoding;
     PyObject *object;
@@ -43,7 +40,6 @@ typedef struct {
 typedef struct {
     PyObject_HEAD
     PyObject *dict;
-    PyObject *args;
     PyObject *message;
     PyObject *code;
 } PySystemExitObject;
@@ -51,7 +47,6 @@ typedef struct {
 typedef struct {
     PyObject_HEAD
     PyObject *dict;
-    PyObject *args;
     PyObject *message;
     PyObject *myerrno;
     PyObject *strerror;
@@ -62,7 +57,6 @@ typedef struct {
 typedef struct {
     PyObject_HEAD
     PyObject *dict;
-    PyObject *args;
     PyObject *message;
     PyObject *myerrno;
     PyObject *strerror;

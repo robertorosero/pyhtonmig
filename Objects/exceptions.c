@@ -9,8 +9,6 @@
 #include "structmember.h"
 #include "osdefs.h"
 
-#define MAKE_IT_NONE(x) (x) = Py_None; Py_INCREF(Py_None);
-
 /* NOTE: If the exception class hierarchy changes, don't forget to update
  * Lib/test/exception_hierarchy.txt
  */
@@ -27,12 +25,6 @@ BaseException_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     /* the dict is created on the fly in PyObject_GenericSetAttr */
     self->message = self->dict = NULL;
 
-    self->args = PyTuple_New(0);
-    if (!self->args) {
-        Py_DECREF(self);
-        return NULL;
-    }
-
     self->message = PyString_FromString("");
     if (!self->message) {
         Py_DECREF(self);
@@ -45,26 +37,50 @@ BaseException_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 static int
 BaseException_init(PyBaseExceptionObject *self, PyObject *args, PyObject *kwds)
 {
+    PyObject *message = NULL;
+
     if (!_PyArg_NoKeywords(self->ob_type->tp_name, kwds))
         return -1;
 
-    Py_DECREF(self->args);
-    self->args = args;
-    Py_INCREF(self->args);
+    if (!PyArg_ParseTuple(args, "|O", &message))
+	    return -1;
 
-    if (PyTuple_GET_SIZE(self->args) == 1) {
-        Py_CLEAR(self->message);
-        self->message = PyTuple_GET_ITEM(self->args, 0);
-        Py_INCREF(self->message);
+    if (message) {
+	Py_CLEAR(self->message);
+        self->message = message;
+	Py_INCREF(self->message);
     }
+
     return 0;
+}
+
+static int
+BaseException_super_init(PyBaseExceptionObject *self, PyObject *args,
+				PyObject *kwds)
+{
+    PyObject *short_tuple = NULL;
+    PyObject *tuple_item = NULL;
+    int ret;
+
+    /* BaseException.__init__ can handle an argument tuple of length 0 or 1. */
+    if (PyTuple_GET_SIZE(args) <= 1)
+        return BaseException_init(self, args, kwds);
+ 
+    short_tuple = PyTuple_New(1);
+    if (!short_tuple)
+	    return -1;
+    tuple_item = PyTuple_GET_ITEM(args, 0);
+    PyTuple_SET_ITEM(short_tuple, 0, tuple_item);
+    Py_INCREF(tuple_item);
+    ret = BaseException_init(self, short_tuple, kwds);
+    Py_DECREF(short_tuple);
+    return ret;
 }
 
 static int
 BaseException_clear(PyBaseExceptionObject *self)
 {
     Py_CLEAR(self->dict);
-    Py_CLEAR(self->args);
     Py_CLEAR(self->message);
     return 0;
 }
@@ -81,7 +97,6 @@ static int
 BaseException_traverse(PyBaseExceptionObject *self, visitproc visit, void *arg)
 {
     Py_VISIT(self->dict);
-    Py_VISIT(self->args);
     Py_VISIT(self->message);
     return 0;
 }
@@ -89,34 +104,34 @@ BaseException_traverse(PyBaseExceptionObject *self, visitproc visit, void *arg)
 static PyObject *
 BaseException_str(PyBaseExceptionObject *self)
 {
-    PyObject *out;
-
-    switch (PyTuple_GET_SIZE(self->args)) {
-    case 0:
-        out = PyString_FromString("");
-        break;
-    case 1:
-        out = PyObject_Str(PyTuple_GET_ITEM(self->args, 0));
-        break;
-    default:
-        out = PyObject_Str(self->args);
-        break;
-    }
-
-    return out;
+    return PyObject_Str(self->message);
 }
 
 static PyObject *
 BaseException_repr(PyBaseExceptionObject *self)
 {
     PyObject *repr_suffix;
+    PyObject *message_repr;
     PyObject *repr;
     char *name;
     char *dot;
 
-    repr_suffix = PyObject_Repr(self->args);
-    if (!repr_suffix)
-        return NULL;
+    if (PyString_Check(self->message) && PyString_Size(self->message) == 0) {
+        repr_suffix = PyString_FromString("()");
+    }
+    else {
+        message_repr = PyObject_Repr(self->message);
+        if (!message_repr)
+            return NULL;
+
+        repr_suffix = PyString_FromFormat("(%s)",
+                                            PyString_AS_STRING(message_repr));
+        if (!repr_suffix) {
+            Py_DECREF(message_repr);
+            return NULL;
+        }
+        Py_DECREF(message_repr);
+    }
 
     name = (char *)self->ob_type->tp_name;
     dot = strrchr(name, '.');
@@ -136,10 +151,11 @@ BaseException_repr(PyBaseExceptionObject *self)
 static PyObject *
 BaseException_reduce(PyBaseExceptionObject *self)
 {
-    if (self->args && self->dict)
-        return PyTuple_Pack(3, self->ob_type, self->args, self->dict);
+    if (self->dict)
+        return Py_BuildValue("(O, (O), O)", self->ob_type, self->message,
+				self->dict);
     else
-        return PyTuple_Pack(2, self->ob_type, self->args);
+        return Py_BuildValue("(O, (O))", self->ob_type, self->message);
 }
 
 /*
@@ -210,35 +226,9 @@ BaseException_set_dict(PyBaseExceptionObject *self, PyObject *val)
     return 0;
 }
 
-static PyObject *
-BaseException_get_args(PyBaseExceptionObject *self)
-{
-    if (self->args == NULL) {
-        Py_INCREF(Py_None);
-        return Py_None;
-    }
-    Py_INCREF(self->args);
-    return self->args;
-}
-
-static int
-BaseException_set_args(PyBaseExceptionObject *self, PyObject *val)
-{
-    PyObject *seq;
-    if (val == NULL) {
-        PyErr_SetString(PyExc_TypeError, "args may not be deleted");
-        return -1;
-    }
-    seq = PySequence_Tuple(val);
-    if (!seq) return -1;
-    Py_CLEAR(self->args);
-    self->args = seq;
-    return 0;
-}
 
 static PyGetSetDef BaseException_getset[] = {
     {"__dict__", (getter)BaseException_get_dict, (setter)BaseException_set_dict},
-    {"args", (getter)BaseException_get_args, (setter)BaseException_set_args},
     {NULL},
 };
 
@@ -388,7 +378,8 @@ SystemExit_init(PySystemExitObject *self, PyObject *args, PyObject *kwds)
 {
     Py_ssize_t size = PyTuple_GET_SIZE(args);
 
-    if (BaseException_init((PyBaseExceptionObject *)self, args, kwds) == -1)
+    if (BaseException_super_init((PyBaseExceptionObject *)self, args, kwds) ==
+       	-1)
         return -1;
 
     if (size == 0)
@@ -453,29 +444,26 @@ SimpleExtendsException(PyExc_StandardError, ImportError,
 /*
  *    EnvironmentError extends StandardError
  */
-
-/* Where a function has a single filename, such as open() or some
- * of the os module functions, PyErr_SetFromErrnoWithFilename() is
- * called, giving a third argument which is the filename.  But, so
- * that old code using in-place unpacking doesn't break, e.g.:
- *
- * except IOError, (errno, strerror):
- *
- * we hack args so that it only contains two items.  This also
- * means we need our own __str__() which prints out the filename
- * when it was supplied.
- */
 static int
 EnvironmentError_init(PyEnvironmentErrorObject *self, PyObject *args,
     PyObject *kwds)
 {
     PyObject *myerrno = NULL, *strerror = NULL, *filename = NULL;
-    PyObject *subslice = NULL;
+    Py_ssize_t args_len = 0;
 
-    if (BaseException_init((PyBaseExceptionObject *)self, args, kwds) == -1)
+    if (BaseException_super_init((PyBaseExceptionObject *)self, args, kwds) ==
+		    -1)
         return -1;
 
-    if (PyTuple_GET_SIZE(args) <= 1 || PyTuple_GET_SIZE(args) > 3) {
+    args_len = PyTuple_GET_SIZE(args);
+
+    if (args_len == 0 || args_len == 1) {
+        Py_INCREF(self->message);
+        self->myerrno = self->message;
+        Py_INCREF(Py_None);
+        self->strerror = Py_None;
+        Py_INCREF(Py_None);
+        self->filename = Py_None;
         return 0;
     }
 
@@ -496,13 +484,10 @@ EnvironmentError_init(PyEnvironmentErrorObject *self, PyObject *args,
         Py_CLEAR(self->filename);      /* replacing */
         self->filename = filename;
         Py_INCREF(self->filename);
-
-        subslice = PyTuple_GetSlice(args, 0, 2);
-        if (!subslice)
-            return -1;
-
-        Py_DECREF(self->args);  /* replacing args */
-        self->args = subslice;
+    }
+    else {
+        Py_INCREF(Py_None);
+        self->filename = Py_None;
     }
     return 0;
 }
@@ -560,22 +545,11 @@ EnvironmentError_str(PyEnvironmentErrorObject *self)
             return NULL;
         }
 
-        if (self->myerrno) {
-            Py_INCREF(self->myerrno);
-            PyTuple_SET_ITEM(tuple, 0, self->myerrno);
-        }
-        else {
-            Py_INCREF(Py_None);
-            PyTuple_SET_ITEM(tuple, 0, Py_None);
-        }
-        if (self->strerror) {
-            Py_INCREF(self->strerror);
-            PyTuple_SET_ITEM(tuple, 1, self->strerror);
-        }
-        else {
-            Py_INCREF(Py_None);
-            PyTuple_SET_ITEM(tuple, 1, Py_None);
-        }
+        Py_INCREF(self->myerrno);
+        PyTuple_SET_ITEM(tuple, 0, self->myerrno);
+        
+        Py_INCREF(self->strerror);
+        PyTuple_SET_ITEM(tuple, 1, self->strerror);
 
         PyTuple_SET_ITEM(tuple, 2, repr);
 
@@ -642,27 +616,26 @@ static PyMemberDef EnvironmentError_members[] = {
 static PyObject *
 EnvironmentError_reduce(PyEnvironmentErrorObject *self)
 {
-    PyObject *args = self->args;
-    PyObject *res = NULL, *tmp;
+    PyObject *args = PyTuple_New(3);
+    PyObject *res = NULL;
 
-    /* self->args is only the first two real arguments if there was a
-     * file name given to EnvironmentError. */
-    if (PyTuple_GET_SIZE(args) == 2 && self->filename) {
-        args = PyTuple_New(3);
-        if (!args) return NULL;
+    if (!args)
+        return NULL;
 
-        tmp = PyTuple_GET_ITEM(self->args, 0);
-        Py_INCREF(tmp);
-        PyTuple_SET_ITEM(args, 0, tmp);
+        if (self->myerrno == Py_None) {
+            Py_INCREF(self->message);
+            PyTuple_SET_ITEM(args, 0, self->message);
+        }
+        else {
+            Py_INCREF(self->myerrno);
+            PyTuple_SET_ITEM(args, 0, self->myerrno);
+        }
 
-        tmp = PyTuple_GET_ITEM(self->args, 1);
-        Py_INCREF(tmp);
-        PyTuple_SET_ITEM(args, 1, tmp);
+        Py_INCREF(self->strerror);
+        PyTuple_SET_ITEM(args, 1, self->strerror);
 
         Py_INCREF(self->filename);
         PyTuple_SET_ITEM(args, 2, self->filename);
-    } else
-        Py_INCREF(args);
 
     if (self->dict)
         res = PyTuple_Pack(3, self->ob_type, args, self->dict);
@@ -938,15 +911,25 @@ SyntaxError_init(PySyntaxErrorObject *self, PyObject *args, PyObject *kwds)
     PyObject *info = NULL;
     Py_ssize_t lenargs = PyTuple_GET_SIZE(args);
 
-    if (BaseException_init((PyBaseExceptionObject *)self, args, kwds) == -1)
+    if (BaseException_super_init((PyBaseExceptionObject *)self, args, kwds) ==
+		    -1)
         return -1;
 
-    if (lenargs >= 1) {
-        Py_CLEAR(self->msg);
-        self->msg = PyTuple_GET_ITEM(args, 0);
-        Py_INCREF(self->msg);
+    Py_CLEAR(self->msg);
+    self->msg = self->message;
+    Py_INCREF(self->msg);
+
+    if (lenargs == 1) {
+        Py_INCREF(Py_None);
+        self->filename = Py_None;
+        Py_INCREF(Py_None);
+        self->lineno = Py_None;
+        Py_INCREF(Py_None);
+        self->offset = Py_None;
+        Py_INCREF(Py_None);
+        self->text = Py_None;
     }
-    if (lenargs == 2) {
+    else if (lenargs == 2) {
         info = PyTuple_GET_ITEM(args, 1);
         info = PySequence_Tuple(info);
         if (!info) return -1;
@@ -975,6 +958,10 @@ SyntaxError_init(PySyntaxErrorObject *self, PyObject *args, PyObject *kwds)
         Py_INCREF(self->text);
 
         Py_DECREF(info);
+    }
+    else {
+        PyErr_SetString(PyExc_TypeError, "expect either 0, 1, or 2 arguments");
+        return -1;
     }
     return 0;
 }
@@ -1091,6 +1078,26 @@ SyntaxError_str(PySyntaxErrorObject *self)
     return result;
 }
 
+
+static PyObject *
+SyntaxError_reduce(PySyntaxErrorObject *self)
+{
+    if (self->dict)
+        return Py_BuildValue("(O, (O, (O, O, O, O)), O)", self->ob_type,
+                self->message, self->filename, self->lineno,
+                self->offset, self->text, self->dict);
+    else
+        return Py_BuildValue("(O, (O, (O, O, O, O)))", self->ob_type,
+                self->message, self->filename, self->lineno,
+                self->offset, self->text);
+}
+
+
+static PyMethodDef SyntaxError_methods[] = {
+    {"__reduce__", (PyCFunction)SyntaxError_reduce, METH_NOARGS},
+    {NULL}
+};
+
 static PyMemberDef SyntaxError_members[] = {
     {"message", T_OBJECT, offsetof(PySyntaxErrorObject, message), 0,
         PyDoc_STR("exception message")},
@@ -1110,9 +1117,11 @@ static PyMemberDef SyntaxError_members[] = {
     {NULL}  /* Sentinel */
 };
 
+
 ComplexExtendsException(PyExc_StandardError, SyntaxError, SyntaxError,
-                        SyntaxError_dealloc, 0, SyntaxError_members,
-                        SyntaxError_str, "Invalid syntax.");
+                        SyntaxError_dealloc, SyntaxError_methods,
+                        SyntaxError_members, SyntaxError_str,
+                        "Invalid syntax.");
 
 
 /*
@@ -1158,9 +1167,9 @@ KeyError_str(PyBaseExceptionObject *self)
        string, that string will be displayed in quotes.  Too bad.
        If args is anything else, use the default BaseException__str__().
     */
-    if (PyTuple_GET_SIZE(self->args) == 1) {
-        return PyObject_Repr(PyTuple_GET_ITEM(self->args, 0));
-    }
+    if (PyString_Check(self->message) && PyString_Size(self->message) == 0)
+        return PyObject_Repr(self->message);
+ 
     return BaseException_str(self);
 }
 
@@ -1549,7 +1558,8 @@ static PyMemberDef UnicodeError_members[] = {
 static int
 UnicodeEncodeError_init(PyObject *self, PyObject *args, PyObject *kwds)
 {
-    if (BaseException_init((PyBaseExceptionObject *)self, args, kwds) == -1)
+    if (BaseException_super_init((PyBaseExceptionObject *)self, args, kwds) ==
+		    -1)
         return -1;
     return UnicodeError_init((PyUnicodeErrorObject *)self, args,
                              kwds, &PyUnicode_Type);
@@ -1625,7 +1635,8 @@ PyUnicodeEncodeError_Create(
 static int
 UnicodeDecodeError_init(PyObject *self, PyObject *args, PyObject *kwds)
 {
-    if (BaseException_init((PyBaseExceptionObject *)self, args, kwds) == -1)
+    if (BaseException_super_init((PyBaseExceptionObject *)self, args, kwds) ==
+		    -1)
         return -1;
     return UnicodeError_init((PyUnicodeErrorObject *)self, args,
                              kwds, &PyString_Type);
@@ -1701,7 +1712,8 @@ static int
 UnicodeTranslateError_init(PyUnicodeErrorObject *self, PyObject *args,
                            PyObject *kwds)
 {
-    if (BaseException_init((PyBaseExceptionObject *)self, args, kwds) == -1)
+    if (BaseException_super_init((PyBaseExceptionObject *)self, args, kwds) ==
+		    -1)
         return -1;
 
     Py_CLEAR(self->object);

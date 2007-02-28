@@ -203,71 +203,51 @@ class ExceptionTests(unittest.TestCase):
         # test that exception attributes are happy
 
         exceptionList = [
-            (BaseException, (), {'message' : '', 'args' : ()}),
-            (BaseException, (1, ), {'message' : 1, 'args' : (1,)}),
+            (BaseException, (), {'message' : ''}),
+            (BaseException, (1, ), {'message' : 1}),
             (BaseException, ('foo',),
-                {'message' : 'foo', 'args' : ('foo',)}),
-            (BaseException, ('foo', 1),
-                {'message' : '', 'args' : ('foo', 1)}),
+                {'message' : 'foo'}),
             (SystemExit, ('foo',),
-                {'message' : 'foo', 'args' : ('foo',), 'code' : 'foo'}),
+                {'message' : 'foo', 'code' : 'foo'}),
             (IOError, ('foo',),
-                {'message' : 'foo', 'args' : ('foo',), 'filename' : None,
-                 'errno' : None, 'strerror' : None}),
+                {'message' : 'foo', 'filename' : None, 'errno' : 'foo',
+                    'strerror' : None}),
             (IOError, ('foo', 'bar'),
-                {'message' : '', 'args' : ('foo', 'bar'), 'filename' : None,
-                 'errno' : 'foo', 'strerror' : 'bar'}),
+                {'message' : 'foo', 'filename' : None, 'errno' : 'foo',
+                    'strerror' : 'bar'}),
             (IOError, ('foo', 'bar', 'baz'),
-                {'message' : '', 'args' : ('foo', 'bar'), 'filename' : 'baz',
-                 'errno' : 'foo', 'strerror' : 'bar'}),
-            (IOError, ('foo', 'bar', 'baz', 'quux'),
-                {'message' : '', 'args' : ('foo', 'bar', 'baz', 'quux')}),
+                {'message' : 'foo', 'filename' : 'baz', 'errno' : 'foo',
+                    'strerror' : 'bar'}),
             (EnvironmentError, ('errnoStr', 'strErrorStr', 'filenameStr'),
-                {'message' : '', 'args' : ('errnoStr', 'strErrorStr'),
-                 'strerror' : 'strErrorStr', 'errno' : 'errnoStr',
-                 'filename' : 'filenameStr'}),
+                {'message' : 'errnoStr', 'strerror' : 'strErrorStr',
+                    'errno' : 'errnoStr', 'filename' : 'filenameStr'}),
             (EnvironmentError, (1, 'strErrorStr', 'filenameStr'),
-                {'message' : '', 'args' : (1, 'strErrorStr'), 'errno' : 1,
-                 'strerror' : 'strErrorStr', 'filename' : 'filenameStr'}),
+                {'message' : 1, 'errno' : 1, 'strerror' : 'strErrorStr',
+                    'filename' : 'filenameStr'}),
             (SyntaxError, ('msgStr',),
-                {'message' : 'msgStr', 'args' : ('msgStr',), 'text' : None,
-                 'print_file_and_line' : None, 'msg' : 'msgStr',
+                {'message' : 'msgStr', 'text' : None,
+                    'print_file_and_line' : None, 'msg' : 'msgStr',
                  'filename' : None, 'lineno' : None, 'offset' : None}),
             (SyntaxError, ('msgStr', ('filenameStr', 'linenoStr', 'offsetStr',
                            'textStr')),
-                {'message' : '', 'offset' : 'offsetStr', 'text' : 'textStr',
-                 'args' : ('msgStr', ('filenameStr', 'linenoStr',
-                                      'offsetStr', 'textStr')),
+                {'message' : 'msgStr', 'offset' : 'offsetStr', 'text' : 'textStr',
                  'print_file_and_line' : None, 'msg' : 'msgStr',
                  'filename' : 'filenameStr', 'lineno' : 'linenoStr'}),
-            (SyntaxError, ('msgStr', 'filenameStr', 'linenoStr', 'offsetStr',
-                           'textStr', 'print_file_and_lineStr'),
-                {'message' : '', 'text' : None,
-                 'args' : ('msgStr', 'filenameStr', 'linenoStr', 'offsetStr',
-                           'textStr', 'print_file_and_lineStr'),
-                 'print_file_and_line' : None, 'msg' : 'msgStr',
-                 'filename' : None, 'lineno' : None, 'offset' : None}),
-            (UnicodeError, (), {'message' : '', 'args' : (),}),
+            (UnicodeError, (), {'message' : ''}),
             (UnicodeEncodeError, ('ascii', u'a', 0, 1, 'ordinal not in range'),
-                {'message' : '', 'args' : ('ascii', u'a', 0, 1,
-                                           'ordinal not in range'),
-                 'encoding' : 'ascii', 'object' : u'a',
+                {'message' : 'ascii', 'encoding' : 'ascii', 'object' : u'a',
                  'start' : 0, 'reason' : 'ordinal not in range'}),
             (UnicodeDecodeError, ('ascii', '\xff', 0, 1, 'ordinal not in range'),
-                {'message' : '', 'args' : ('ascii', '\xff', 0, 1,
-                                           'ordinal not in range'),
-                 'encoding' : 'ascii', 'object' : '\xff',
+                {'message' : 'ascii', 'encoding' : 'ascii', 'object' : '\xff',
                  'start' : 0, 'reason' : 'ordinal not in range'}),
             (UnicodeTranslateError, (u"\u3042", 0, 1, "ouch"),
-                {'message' : '', 'args' : (u'\u3042', 0, 1, 'ouch'),
-                 'object' : u'\u3042', 'reason' : 'ouch',
+                {'message' : u"\u3042", 'object' : u'\u3042', 'reason' : 'ouch',
                  'start' : 0, 'end' : 1}),
         ]
         try:
             exceptionList.append(
                 (WindowsError, (1, 'strErrorStr', 'filenameStr'),
-                    {'message' : '', 'args' : (1, 'strErrorStr'),
-                     'strerror' : 'strErrorStr', 'winerror' : 1,
+                    {'message' : 1, 'strerror' : 'strErrorStr', 'winerror' : 1,
                      'errno' : 22, 'filename' : 'filenameStr'})
             )
         except NameError:
@@ -279,15 +259,17 @@ class ExceptionTests(unittest.TestCase):
             except BaseException as e:
                 if type(e) is not exc:
                     raise
+                print(repr(e), ':', args)
                 # Verify module name
                 self.assertEquals(type(e).__module__, '__builtin__')
                 # Verify no ref leaks in Exc_str()
                 s = str(e)
                 for checkArgName in expected:
-                    self.assertEquals(repr(getattr(e, checkArgName)),
-                                      repr(expected[checkArgName]),
-                                      'exception "%s", attribute "%s"' %
-                                       (repr(e), checkArgName))
+                    got = repr(getattr(e, checkArgName))
+                    want = repr(expected[checkArgName])
+                    self.assertEquals(got, want,
+                                      'exception "%s", attribute %s: %r != %r' %
+                                       (repr(e), checkArgName, got, want))
 
                 # test for pickling support
                 for p in pickle, cPickle:
@@ -299,8 +281,9 @@ class ExceptionTests(unittest.TestCase):
                             got = repr(getattr(new, checkArgName))
                             want = repr(expected[checkArgName])
                             self.assertEquals(got, want,
-                                              'pickled "%r", attribute "%s' %
-                                              (e, checkArgName))
+                                                'pickled "%r", attribute %s: '
+                                                '%r != %r' %
+                                              (e, checkArgName, got, want))
 
     def testKeywordArgs(self):
         # test that builtin exception don't take keyword args,

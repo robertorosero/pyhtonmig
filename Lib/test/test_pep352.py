@@ -14,7 +14,7 @@ class ExceptionClassTests(unittest.TestCase):
         self.failUnless(issubclass(Exception, object))
 
     def verify_instance_interface(self, ins):
-        for attr in ("args", "message", "__str__", "__repr__"):
+        for attr in ("message", "__str__", "__repr__"):
             self.failUnless(hasattr(ins, attr), "%s missing %s attribute" %
                     (ins.__class__.__name__, attr))
 
@@ -27,7 +27,6 @@ class ExceptionClassTests(unittest.TestCase):
                     exc_set.add(object_.__name__)
             except TypeError:
                 pass
-
         inheritance_tree = open(os.path.join(os.path.split(__file__)[0],
                                                 'exception_hierarchy.txt'))
         try:
@@ -78,39 +77,37 @@ class ExceptionClassTests(unittest.TestCase):
             inheritance_tree.close()
         self.failUnlessEqual(len(exc_set), 0, "%s not accounted for" % exc_set)
 
-    interface_tests = ("length", "args", "message", "str", "unicode", "repr")
+    interface_tests = ("message", "str", "unicode", "repr")
 
     def interface_test_driver(self, results):
         for test_name, (given, expected) in zip(self.interface_tests, results):
             self.failUnlessEqual(given, expected, "%s: %s != %s" % (test_name,
                 given, expected))
 
+    def make_repr(self, exc, message=None):
+        """Generate the expected str/repr of an exception based on the message
+        and a converter function."""
+        name = exc.__class__.__name__
+        if message:
+            args = '(%r)' % message
+        else:
+            args = '()'
+        return name + args
+
     def test_interface_single_arg(self):
         # Make sure interface works properly when given a single argument
         arg = "spam"
         exc = Exception(arg)
-        results = ([len(exc.args), 1], [exc.args[0], arg], [exc.message, arg],
-                [str(exc), str(arg)], [unicode(exc), unicode(arg)],
-            [repr(exc), exc.__class__.__name__ + repr(exc.args)])
-        self.interface_test_driver(results)
-
-    def test_interface_multi_arg(self):
-        # Make sure interface correct when multiple arguments given
-        arg_count = 3
-        args = tuple(range(arg_count))
-        exc = Exception(*args)
-        results = ([len(exc.args), arg_count], [exc.args, args],
-                [exc.message, ''], [str(exc), str(args)],
-                [unicode(exc), unicode(args)],
-                [repr(exc), exc.__class__.__name__ + repr(exc.args)])
+        results = ([exc.message, arg], [str(exc), str(arg)],
+                    [unicode(exc), unicode(arg)],
+                    [repr(exc), self.make_repr(exc, arg)])
         self.interface_test_driver(results)
 
     def test_interface_no_arg(self):
         # Make sure that with no args that interface is correct
         exc = Exception()
-        results = ([len(exc.args), 0], [exc.args, tuple()], [exc.message, ''],
-                [str(exc), ''], [unicode(exc), u''],
-                [repr(exc), exc.__class__.__name__ + '()'])
+        results = ([exc.message, ''], [str(exc), ''], [unicode(exc), u''],
+                [repr(exc), self.make_repr(exc)])
         self.interface_test_driver(results)
 
 class UsageTests(unittest.TestCase):

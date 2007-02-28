@@ -28,7 +28,13 @@ TO DO
 Core and Builtins
 -----------------
 
-- Removing indexing/slicing on BaseException.
+- SyntaxError now enforces the requirement of having two arguments, second of
+  which is a four-item tuple.
+
+- EnvironmentError always binds its first argument to 'message' and 'errno'.
+  Also don't call with no more than 3 arguments.
+
+- Remove indexing/slicing on BaseException.
 
 - Remove the exceptions module, all the exceptions are already builtin.
 
