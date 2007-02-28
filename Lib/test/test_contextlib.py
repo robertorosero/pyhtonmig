@@ -77,7 +77,7 @@ class ContextManagerTestCase(unittest.TestCase):
             try:
                 yield 42
             except ZeroDivisionError as e:
-                state.append(e.args[0])
+                state.append(e.message)
                 self.assertEqual(state, [1, 42, 999])
         with woohoo() as x:
             self.assertEqual(state, [1])
