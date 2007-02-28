@@ -2,7 +2,6 @@
   thus constructor gets passed two arguments (thanks to
   PyErr_NormalizeException() passing any tuple given to it as a value as the
   args tuple, but not when it is any other type of value).
-    + test_bsddb
     + test_bsddb3 (?)
 
 * doctest oddness (need to change how SyntaxError is handled?)

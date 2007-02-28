@@ -323,7 +323,7 @@ static PyTypeObject DB_Type, DBCursor_Type, DBEnv_Type, DBTxn_Type, DBLock_Type;
 #define _CHECK_OBJECT_NOT_CLOSED(nonNull, pyErrObj, name) \
     if ((nonNull) == NULL) {          \
         PyObject *errTuple = NULL;    \
-        errTuple = Py_BuildValue("(is)", 0, #name " object has been closed"); \
+        errTuple = Py_BuildValue("((is))", 0, #name " object has been closed"); \
         PyErr_SetObject((pyErrObj), errTuple);  \
 	Py_DECREF(errTuple);          \
         return NULL;                  \
@@ -602,7 +602,7 @@ static int makeDBError(int err)
         }
         _db_errmsg[0] = 0;
 
-	errTuple = Py_BuildValue("(is)", err, errTxt);
+	errTuple = Py_BuildValue("((is))", err, errTxt);
         PyErr_SetObject(errObj, errTuple);
 	Py_DECREF(errTuple);
     }
@@ -1931,7 +1931,7 @@ DB_open(DBObject* self, PyObject* args, PyObject* kwargs)
 #endif
 
     if (NULL == self->db) {
-        PyObject *t = Py_BuildValue("(is)", 0,
+        PyObject *t = Py_BuildValue("((is))", 0,
                                 "Cannot call open() twice for DB object");
         PyErr_SetObject(DBError, t);
         Py_DECREF(t);
@@ -2703,7 +2703,7 @@ Py_ssize_t DB_length(PyObject* _self)
     DBObject* self = (DBObject*)_self;
 
     if (self->db == NULL) {
-        PyObject *t = Py_BuildValue("(is)", 0, "DB object has been closed");
+        PyObject *t = Py_BuildValue("((is))", 0, "DB object has been closed");
         PyErr_SetObject(DBError, t);
         Py_DECREF(t);
         return -1;
@@ -2795,7 +2795,7 @@ DB_ass_sub(DBObject* self, PyObject* keyobj, PyObject* dataobj)
     int flags = 0;
 
     if (self->db == NULL) {
-        PyObject *t = Py_BuildValue("(is)", 0, "DB object has been closed");
+        PyObject *t = Py_BuildValue("((is))", 0, "DB object has been closed");
         PyErr_SetObject(DBError, t);
         Py_DECREF(t);
         return -1;
@@ -4686,7 +4686,7 @@ DBTxn_commit(DBTxnObject* self, PyObject* args)
         return NULL;
 
     if (!self->txn) {
-        PyObject *t =  Py_BuildValue("(is)", 0, "DBTxn must not be used "
+        PyObject *t =  Py_BuildValue("((is))", 0, "DBTxn must not be used "
                                      "after txn_commit or txn_abort");
         PyErr_SetObject(DBError, t);
         Py_DECREF(t);
@@ -4723,7 +4723,7 @@ DBTxn_prepare(DBTxnObject* self, PyObject* args)
     }
 
     if (!self->txn) {
-        PyObject *t = Py_BuildValue("(is)", 0,"DBTxn must not be used "
+        PyObject *t = Py_BuildValue("((is))", 0,"DBTxn must not be used "
                                     "after txn_commit or txn_abort");
         PyErr_SetObject(DBError, t);
         Py_DECREF(t);
@@ -4745,7 +4745,7 @@ DBTxn_prepare(DBTxnObject* self, PyObject* args)
         return NULL;
 
     if (!self->txn) {
-        PyObject *t = Py_BuildValue("(is)", 0, "DBTxn must not be used "
+        PyObject *t = Py_BuildValue("((is))", 0, "DBTxn must not be used "
                                     "after txn_commit or txn_abort");
         PyErr_SetObject(DBError, t);
         Py_DECREF(t);
@@ -4770,7 +4770,7 @@ DBTxn_abort(DBTxnObject* self, PyObject* args)
         return NULL;
 
     if (!self->txn) {
-        PyObject *t = Py_BuildValue("(is)", 0, "DBTxn must not be used "
+        PyObject *t = Py_BuildValue("((is))", 0, "DBTxn must not be used "
                                     "after txn_commit or txn_abort");
         PyErr_SetObject(DBError, t);
         Py_DECREF(t);
@@ -4799,7 +4799,7 @@ DBTxn_id(DBTxnObject* self, PyObject* args)
         return NULL;
 
     if (!self->txn) {
-        PyObject *t = Py_BuildValue("(is)", 0, "DBTxn must not be used "
+        PyObject *t = Py_BuildValue("((is))", 0, "DBTxn must not be used "
                                     "after txn_commit or txn_abort");
         PyErr_SetObject(DBError, t);
         Py_DECREF(t);
