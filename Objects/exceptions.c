@@ -1534,6 +1534,27 @@ UnicodeError_traverse(PyUnicodeErrorObject *self, visitproc visit, void *arg)
     return BaseException_traverse((PyBaseExceptionObject *)self, visit, arg);
 }
 
+
+static PyObject *
+UnicodeError_reduce(PyUnicodeErrorObject *self)
+{
+    if (self->dict)
+	    return Py_BuildValue("(O, (O, O, O, O, O), O)", self->ob_type,
+			    self->encoding, self->object, self->start,
+			    self->end, self->reason, self->dict);
+    else
+	    return Py_BuildValue("(O, (O, O, O, O, O))", self->ob_type,
+			    self->encoding, self->object, self->start,
+			    self->end, self->reason);
+
+}
+
+
+static PyMethodDef UnicodeError_methods[] = {
+    {"__reduce__", (PyCFunction)UnicodeError_reduce, METH_NOARGS},
+    {NULL}
+};
+
 static PyMemberDef UnicodeError_members[] = {
     {"message", T_OBJECT, offsetof(PyUnicodeErrorObject, message), 0,
         PyDoc_STR("exception message")},
@@ -1612,8 +1633,9 @@ static PyTypeObject _PyExc_UnicodeEncodeError = {
     (reprfunc)UnicodeEncodeError_str, 0, 0, 0,
     Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC,
     PyDoc_STR("Unicode encoding error."), (traverseproc)UnicodeError_traverse,
-    (inquiry)UnicodeError_clear, 0, 0, 0, 0, 0, UnicodeError_members,
-    0, &_PyExc_UnicodeError, 0, 0, 0, offsetof(PyUnicodeErrorObject, dict),
+    (inquiry)UnicodeError_clear, 0, 0, 0, 0, UnicodeError_methods,
+    UnicodeError_members, 0, &_PyExc_UnicodeError, 0, 0, 0,
+    offsetof(PyUnicodeErrorObject, dict),
     (initproc)UnicodeEncodeError_init, 0, BaseException_new,
 };
 PyObject *PyExc_UnicodeEncodeError = (PyObject *)&_PyExc_UnicodeEncodeError;
@@ -1685,9 +1707,10 @@ static PyTypeObject _PyExc_UnicodeDecodeError = {
     (reprfunc)UnicodeDecodeError_str, 0, 0, 0,
     Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC,
     PyDoc_STR("Unicode decoding error."), (traverseproc)UnicodeError_traverse,
-    (inquiry)UnicodeError_clear, 0, 0, 0, 0, 0, UnicodeError_members,
-    0, &_PyExc_UnicodeError, 0, 0, 0, offsetof(PyUnicodeErrorObject, dict),
-    (initproc)UnicodeDecodeError_init, 0, BaseException_new,
+    (inquiry)UnicodeError_clear, 0, 0, 0, 0, UnicodeError_methods,
+    UnicodeError_members, 0, &_PyExc_UnicodeError, 0, 0, 0,
+    offsetof(PyUnicodeErrorObject, dict), (initproc)UnicodeDecodeError_init, 0,
+    BaseException_new,
 };
 PyObject *PyExc_UnicodeDecodeError = (PyObject *)&_PyExc_UnicodeDecodeError;
 
@@ -1775,6 +1798,27 @@ UnicodeTranslateError_str(PyObject *self)
     );
 }
 
+
+static PyObject *
+UnicodeTranslateError_reduce(PyUnicodeErrorObject *self)
+{
+	if (self->dict)
+		return Py_BuildValue("(O, (O, O, O, O), O)", self->ob_type,
+				self->object, self->start, self->end,
+				self->reason, self->dict);
+	else
+		return Py_BuildValue("(O, (O, O, O, O))", self->ob_type,
+				self->object, self->start, self->end,
+				self->reason);
+}
+
+
+static PyMethodDef UnicodeTranslateError_methods[] = {
+    {"__reduce__", (PyCFunction)UnicodeTranslateError_reduce, METH_NOARGS},
+    {NULL}
+};
+
+
 static PyTypeObject _PyExc_UnicodeTranslateError = {
     PyObject_HEAD_INIT(NULL)
     0,
@@ -1784,8 +1828,9 @@ static PyTypeObject _PyExc_UnicodeTranslateError = {
     (reprfunc)UnicodeTranslateError_str, 0, 0, 0,
     Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC,
     PyDoc_STR("Unicode translation error."), (traverseproc)UnicodeError_traverse,
-    (inquiry)UnicodeError_clear, 0, 0, 0, 0, 0, UnicodeError_members,
-    0, &_PyExc_UnicodeError, 0, 0, 0, offsetof(PyUnicodeErrorObject, dict),
+    (inquiry)UnicodeError_clear, 0, 0, 0, 0, UnicodeTranslateError_methods,
+    UnicodeError_members, 0, &_PyExc_UnicodeError, 0, 0, 0,
+    offsetof(PyUnicodeErrorObject, dict),
     (initproc)UnicodeTranslateError_init, 0, BaseException_new,
 };
 PyObject *PyExc_UnicodeTranslateError = (PyObject *)&_PyExc_UnicodeTranslateError;

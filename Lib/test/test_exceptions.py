@@ -259,7 +259,6 @@ class ExceptionTests(unittest.TestCase):
             except BaseException as e:
                 if type(e) is not exc:
                     raise
-                print(repr(e), ':', args)
                 # Verify module name
                 self.assertEquals(type(e).__module__, '__builtin__')
                 # Verify no ref leaks in Exc_str()
