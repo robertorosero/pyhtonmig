@@ -309,7 +309,7 @@ def strptime(data_string, format="%a %b %d %H:%M:%S %Y"):
             # KeyError raised when a bad format is found; can be specified as
             # \\, in which case it was a stray % but with a space after it
             except KeyError as err:
-                bad_directive = err.args[0]
+                bad_directive = err.message
                 if bad_directive == "\\":
                     bad_directive = "%"
                 del err
