@@ -353,7 +353,7 @@ class TestSet(TestJointOps):
             try:
                 self.s.remove(v1)
             except KeyError as e:
-                v2 = e.args[0]
+                v2 = e.message
                 self.assertEqual(v1, v2)
             else:
                 self.fail()
