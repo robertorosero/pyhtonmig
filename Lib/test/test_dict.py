@@ -423,7 +423,7 @@ class DictTest(unittest.TestCase):
         try:
             e[42]
         except RuntimeError as err:
-            self.assertEqual(err.args, (42,))
+            self.assertEqual(err.message, 42)
         else:
             self.fail_("e[42] didn't raise RuntimeError")
         class F(dict):
@@ -434,7 +434,7 @@ class DictTest(unittest.TestCase):
         try:
             f[42]
         except KeyError as err:
-            self.assertEqual(err.args, (42,))
+            self.assertEqual(err.message, 42)
         else:
             self.fail_("f[42] didn't raise KeyError")
         class G(dict):
@@ -443,7 +443,7 @@ class DictTest(unittest.TestCase):
         try:
             g[42]
         except KeyError as err:
-            self.assertEqual(err.args, (42,))
+            self.assertEqual(err.message, 42)
         else:
             self.fail_("g[42] didn't raise KeyError")
 
@@ -453,7 +453,7 @@ class DictTest(unittest.TestCase):
         try:
             d[(1,)]
         except KeyError as e:
-            self.assertEqual(e.args, ((1,),))
+            self.assertEqual(e.message, (1,))
         else:
             self.fail("missing KeyError")
 
