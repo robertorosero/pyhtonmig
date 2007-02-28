@@ -492,7 +492,7 @@ class GrammarTests(unittest.TestCase):
         try:
             assert 0, "msg"
         except AssertionError as e:
-            self.assertEquals(e.args[0], "msg")
+            self.assertEquals(e.message, "msg")
         else:
             if __debug__:
                 self.fail("AssertionError not raised by assert 0")
