@@ -524,7 +524,7 @@ EnvironmentError_str(PyEnvironmentErrorObject *self)
 {
     PyObject *rtnval = NULL;
 
-    if (self->filename) {
+    if (self->filename != Py_None) {
         PyObject *fmt;
         PyObject *repr;
         PyObject *tuple;
@@ -558,7 +558,7 @@ EnvironmentError_str(PyEnvironmentErrorObject *self)
         Py_DECREF(fmt);
         Py_DECREF(tuple);
     }
-    else if (self->myerrno && self->strerror) {
+    else if (self->myerrno != Py_None && self->strerror != Py_None) {
         PyObject *fmt;
         PyObject *tuple;
 
