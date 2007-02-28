@@ -46,7 +46,7 @@ def handlerB(*args):
     b_called = True
     if verbose:
         print("handlerB invoked", args)
-    raise HandlerBCalled, args
+    raise HandlerBCalled(args)
 
 # Set up a child to send signals to us (the parent) after waiting long
 # enough to receive the alarm.  It seems we miss the alarm for some
