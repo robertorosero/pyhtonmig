@@ -30,7 +30,7 @@ class ComparableException:
         if not isinstance(anExc, Exception):
             return NotImplemented
         return (self.err.__class__ == anExc.__class__ and
-                self.err.args == anExc.args)
+                self.err.message == anExc.message)
 
     def __getattr__(self, attr):
         return getattr(self.err, attr)
