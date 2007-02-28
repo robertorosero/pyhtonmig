@@ -37,7 +37,7 @@ class CollationTests(unittest.TestCase):
             con.create_collation("X", 42)
             self.fail("should have raised a TypeError")
         except TypeError as e:
-            self.failUnlessEqual(e.args[0], "parameter must be callable")
+            self.failUnlessEqual(e.message, "parameter must be callable")
 
     def CheckCreateCollationNotAscii(self):
         con = sqlite.connect(":memory:")
@@ -102,7 +102,7 @@ class CollationTests(unittest.TestCase):
             con.execute("select 'a' as x union select 'b' as x order by x collate mycoll")
             self.fail("should have raised an OperationalError")
         except sqlite.OperationalError as e:
-            if not e.args[0].startswith("no such collation sequence"):
+            if not e.message.startswith("no such collation sequence"):
                 self.fail("wrong OperationalError raised")
 
 def suite():
