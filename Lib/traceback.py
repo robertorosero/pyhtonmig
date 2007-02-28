@@ -180,7 +180,7 @@ def format_exception_only(etype, value):
     try:
         message = value.message
         filename = value.filename
-        lineno = value.lineno
+        lineno = value.lineno if value.lineno is not None else 0
         offset = value.offset
         badline = value.text
         msg = value.message
