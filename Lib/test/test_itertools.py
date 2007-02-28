@@ -809,7 +809,7 @@ class SubclassWithKwargsTest(unittest.TestCase):
                 Subclass(newarg=1)
             except TypeError as err:
                 # we expect type errors because of wrong argument count
-                self.failIf("does not take keyword arguments" in err.args[0])
+                self.failIf("does not take keyword arguments" in err.message)
 
 
 libreftest = """ Doctest for examples in the library reference: libitertools.tex
