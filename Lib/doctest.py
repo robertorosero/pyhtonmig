@@ -1611,7 +1611,7 @@ class DebugRunner(DocTestRunner):
          >>> raise exc_info[0], exc_info[1], exc_info[2]
          Traceback (most recent call last):
          ...
-         KeyError
+         KeyError: ''
 
        We wrap the original exception to give the calling application
        access to the test and example information.
@@ -2050,7 +2050,7 @@ def set_unittest_reportflags(flags):
     global _unittest_reportflags
 
     if (flags & REPORTING_FLAGS) != flags:
-        raise ValueError("Only reporting flags allowed", flags)
+        raise ValueError(("Only reporting flags allowed", flags))
     old = _unittest_reportflags
     _unittest_reportflags = flags
     return old
@@ -2151,7 +2151,7 @@ class DocTestCase(unittest.TestCase):
              >>> raise exc_info[0], exc_info[1], exc_info[2]
              Traceback (most recent call last):
              ...
-             KeyError
+             KeyError: ''
 
            If the output doesn't match, then a DocTestFailure is raised:
 
