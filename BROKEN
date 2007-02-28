@@ -1,0 +1,10 @@
+* Construction of exception at C level passing too many arguments?
+    + test_bsddb
+    + test_socket
+    + test_socket_ssl
+    + test_timeout
+    + test_urllib2net 
+    + test_urllibnet
+
+* doctest oddness (need to change how SyntaxError is handled?)
+    + test_xml_etree
