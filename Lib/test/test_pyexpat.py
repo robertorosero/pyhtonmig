@@ -322,7 +322,7 @@ parser.StartElementHandler = StartElementHandler
 try:
     parser.Parse("<a><b><c/></b></a>", 1)
 except RuntimeError as e:
-    if e.args[0] != "a":
+    if e.message != "a":
         print("Expected RuntimeError for element 'a'; found %r" % e.args[0])
 else:
     print("Expected RuntimeError for 'a'")
