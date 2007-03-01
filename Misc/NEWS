@@ -150,6 +150,10 @@ Core and Builtins
 Extension Modules
 -----------------
 
+- socket.error binds its second argument to 'errno'.
+
+- bsddb.DBError binds all arguments as a tuple to 'message'.
+
 Library
 -------
 
