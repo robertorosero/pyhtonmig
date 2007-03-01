@@ -42,7 +42,7 @@ BaseException_init(PyBaseExceptionObject *self, PyObject *args, PyObject *kwds)
     if (!_PyArg_NoKeywords(self->ob_type->tp_name, kwds))
         return -1;
 
-    if (!PyArg_ParseTuple(args, "|O:BaseException", &message))
+    if (!PyArg_UnpackTuple(args, "BaseException", 0, 1, &message))
 	    return -1;
 
     if (message) {
