@@ -4240,6 +4240,7 @@ PyMODINIT_FUNC
 init_socket(void)
 {
 	PyObject *m, *has_ipv6;
+	PyObject *module_dict;
 
 	if (!os_init())
 		return;
@@ -4251,30 +4252,23 @@ init_socket(void)
 	if (m == NULL)
 		return;
 
-	socket_error = PyErr_NewException("socket.error", NULL, NULL);
-	if (socket_error == NULL)
-		return;
-        PySocketModuleAPI.error = socket_error;
-	Py_INCREF(socket_error);
-	PyModule_AddObject(m, "error", socket_error);
-	socket_herror = PyErr_NewException("socket.herror",
-					   socket_error, NULL);
-	if (socket_herror == NULL)
-		return;
-	Py_INCREF(socket_herror);
-	PyModule_AddObject(m, "herror", socket_herror);
-	socket_gaierror = PyErr_NewException("socket.gaierror", socket_error,
-	    NULL);
-	if (socket_gaierror == NULL)
-		return;
-	Py_INCREF(socket_gaierror);
-	PyModule_AddObject(m, "gaierror", socket_gaierror);
-	socket_timeout = PyErr_NewException("socket.timeout",
-					    socket_error, NULL);
-	if (socket_timeout == NULL)
-		return;
-	Py_INCREF(socket_timeout);
-	PyModule_AddObject(m, "timeout", socket_timeout);
+	module_dict = PyModule_GetDict(m);
+        PyDict_SetItemString(module_dict, "Exception", PyExc_Exception);
+
+	PyRun_String("class error(Exception):\n"
+                     "  def __init__(self, message='', errno=None):\n"
+                     "    Exception.__init__(self, message)\n"
+                     "    if errno:\n"
+                     "      self.errno = errno\n"
+                     "class herror(error): pass\n"
+                     "class gaierror(error): pass\n"
+                     "class timeout(error): pass\n",
+                     Py_file_input, module_dict, module_dict);
+	socket_error = PyDict_GetItemString(module_dict, "error");
+        socket_herror = PyDict_GetItemString(module_dict, "herror");
+        socket_gaierror = PyDict_GetItemString(module_dict, "gaierror");
+        socket_timeout = PyDict_GetItemString(module_dict, "timeout");
+
 	Py_INCREF((PyObject *)&sock_type);
 	if (PyModule_AddObject(m, "SocketType",
 			       (PyObject *)&sock_type) != 0)
