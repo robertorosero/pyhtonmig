@@ -64,7 +64,7 @@ class SimpleRecnoTestCase(unittest.TestCase):
         try:
             data = d[0]  # This should raise a KeyError!?!?!
         except db.DBInvalidArgError as val:
-            assert val[0] == db.EINVAL
+            assert val.message[0] == db.EINVAL
             if verbose: print(val)
         else:
             self.fail("expected exception")
@@ -268,7 +268,7 @@ class SimpleRecnoTestCase(unittest.TestCase):
         try:                    # this one will fail
             d.append('bad' * 20)
         except db.DBInvalidArgError as val:
-            assert val[0] == db.EINVAL
+            assert val.message[0] == db.EINVAL
             if verbose: print(val)
         else:
             self.fail("expected exception")

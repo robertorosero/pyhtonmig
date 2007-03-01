@@ -244,7 +244,7 @@ class bsdTableDB :
 
             columnlist_key = _columns_key(table)
             if self.db.has_key(columnlist_key):
-                raise TableAlreadyExists, "table already exists"
+                raise TableAlreadyExists("table already exists")
 
             txn = self.env.txn_begin()
             # store the table's column info
@@ -263,7 +263,7 @@ class bsdTableDB :
         except DBError as dberror:
             if txn:
                 txn.abort()
-            raise TableDBError, dberror[1]
+            raise TableDBError(dberror.message[1])
 
 
     def ListTableColumns(self, table):
@@ -272,7 +272,7 @@ class bsdTableDB :
         """
         assert isinstance(table, StringType)
         if contains_metastrings(table):
-            raise ValueError, "bad table name: contains reserved metastrings"
+            raise ValueError("bad table name: contains reserved metastrings")
 
         columnlist_key = _columns_key(table)
         if not self.db.has_key(columnlist_key):
@@ -341,7 +341,7 @@ class bsdTableDB :
             except DBError as dberror:
                 if txn:
                     txn.abort()
-                raise TableDBError, dberror[1]
+                raise TableDBError(dberror.message[1])
 
 
     def __load_column_info(self, table) :
@@ -350,9 +350,9 @@ class bsdTableDB :
         try:
             tcolpickles = self.db.get(_columns_key(table))
         except DBNotFoundError:
-            raise TableDBError, "unknown table: %r" % (table,)
+            raise TableDBError("unknown table: %r" % (table,))
         if not tcolpickles:
-            raise TableDBError, "unknown table: %r" % (table,)
+            raise TableDBError("unknown table: %r" % (table,))
         self.__tablecolumns[table] = pickle.loads(tcolpickles)
 
     def __new_rowid(self, table, txn) :
@@ -416,7 +416,7 @@ class bsdTableDB :
             if txn:
                 txn.abort()
                 self.db.delete(_rowid_key(table, rowid))
-            raise TableDBError, dberror[1], info[2]
+            raise TableDBError((dberror.message[1], info[2]))
 
 
     def Modify(self, table, conditions={}, mappings={}):
@@ -467,7 +467,7 @@ class bsdTableDB :
                     raise
 
         except DBError as dberror:
-            raise TableDBError, dberror[1]
+            raise TableDBError(dberror.message[1])
 
     def Delete(self, table, conditions={}):
         """Delete(table, conditions) - Delete items matching the given
@@ -507,7 +507,7 @@ class bsdTableDB :
                         txn.abort()
                     raise
         except DBError as dberror:
-            raise TableDBError, dberror[1]
+            raise TableDBError(dberror.message[1])
 
 
     def Select(self, table, columns, conditions={}):
@@ -527,7 +527,7 @@ class bsdTableDB :
                 columns = self.__tablecolumns[table]
             matching_rowids = self.__Select(table, columns, conditions)
         except DBError as dberror:
-            raise TableDBError, dberror[1]
+            raise TableDBError(dberror.message[1])
         # return the matches as a list of dictionaries
         return matching_rowids.values()
 
@@ -617,7 +617,7 @@ class bsdTableDB :
                     key, data = cur.next()
 
             except DBError as dberror:
-                if dberror[0] != DB_NOTFOUND:
+                if dberror.message != DB_NOTFOUND:
                     raise
                 continue
 
@@ -703,4 +703,4 @@ class bsdTableDB :
         except DBError as dberror:
             if txn:
                 txn.abort()
-            raise TableDBError, dberror[1]
+            raise TableDBError(dberror.message[1])
