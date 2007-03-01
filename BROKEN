@@ -1,9 +1,1 @@
-* socket.error is passed two arguments but just subclasses PyExc_Exception, and
-  thus constructor gets passed two arguments (thanks to
-  PyErr_NormalizeException() passing any tuple given to it as a value as the
-  args tuple, but not when it is any other type of value).
-    + test_socket
-    + test_socket_ssl
-    + test_timeout
-    + test_urllib2net 
-    + test_urllibnet
+test_bsddb3 test_compiler (with -uall)
