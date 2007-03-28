@@ -417,6 +417,67 @@ class TestMailbox(TestBase):
         self.assertRaises(TypeError,
                           lambda: self._box._dump_message(None, output))
 
+    def test_concurrent_add(self):
+        # Simple test of concurrent addition to a mailbox.
+        # This exercises the add() and flush() methods, based on bug #1599254.
+        # This bug affected only the classes based on _singlefileMailbox
+        # (mbox, MMDF, Babyl), but this test can apply to any mailbox type.
+        # If fork isn't available, skip this test.
+        # XXX Could someone please port this to Windows?
+        if not hasattr(os, 'fork'):
+            return
+
+        def random_message ():
+            # Generate a random message body
+            import random
+            body = ""
+            for i in range(random.randint(1, 10)):
+                line = "a" * random.randint(0, 75) + '\n'
+                body += line
+
+            return body
+
+        def add_25_messages ():
+            "Helper function to add 25 messages to a mailbox."
+            mbox = self._box
+
+            for i in range(25):
+                msg = """Subject: %i, pid %i
+ +From: sender@example.com
+ +
+ +Content goes here.
+ +%s""" % (i, os.getpid(), random_message())
+                while True:
+                    try:
+                        mbox.lock()
+                    except mailbox.ExternalClashError:
+                        # In case of conflict, wait a bit and try again.
+                        time.sleep(0.01)
+                    else:
+                        break
+                mbox.add(msg)
+                mbox.flush()
+                mbox.unlock()
+
+        # Fire off a subprocess that will add 25 messages to a mailbox
+        # file, locking and unlocking it each time.  The parent process
+        # will do the same.  The resulting mailbox should contain 50 messages.
+        pid = os.fork()
+        if pid == 0:
+            try:
+                add_25_messages()
+            finally:
+                os._exit(0)
+
+        # Add our 25 messages, and wait for the child to exit.
+        add_25_messages()
+        os.wait()
+
+        # We expect the mailbox to contain 50 messages.
+        self._box.lock()
+        self.assert_(len(self._box) == 50)
+        self._box.unlock()
+
     def _get_lock_path(self):
         # Return the path of the dot lock file. May be overridden.
         return self._path + '.lock'
