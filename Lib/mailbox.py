@@ -20,6 +20,7 @@ import email.message
 import email.generator
 import rfc822
 import StringIO
+import warnings
 try:
     if sys.platform == 'os2emx':
         # OS/2 EMX fcntl() not adequate
@@ -556,6 +557,10 @@ class _singlefileMailbox(Mailbox):
         if not self._locked:
             _lock_file(self._file)
             self._locked = True
+            if self._pending:
+                warnings.warn("lock() method called with pending changes; "
+                              "should have been locked before making changes",
+                              stacklevel=2)
 
     def unlock(self):
         """Unlock the mailbox if it is locked."""
