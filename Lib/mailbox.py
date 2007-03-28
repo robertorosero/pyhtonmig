@@ -20,6 +20,7 @@ import email.message
 import email.generator
 import rfc822
 import StringIO
+import shutil
 import warnings
 try:
     if sys.platform == 'os2emx':
@@ -587,6 +588,15 @@ class _singlefileMailbox(Mailbox):
                                      '(expected %i, found %i)' %
                                      (self._file_length, cur_len))
 
+        if fcntl and self._locked and not hasattr(self._file, 'truncate'):
+            warnings.warn('file.truncate() unavailable, flush() may '
+                          'momentarily release the fcntl lock; if you depend '
+                          'on fcntl locking, you should regard flush() as '
+                          'invalidating the message keys', RuntimeWarning,
+                          stacklevel=2)
+            
+        orig_file = self._file
+        remove_temp_file = True
         new_file = _create_temporary(self._path)
         try:
             new_toc = {}
@@ -604,27 +614,45 @@ class _singlefileMailbox(Mailbox):
                     new_file.write(buffer)
                 new_toc[key] = (new_start, new_file.tell())
                 self._post_message_hook(new_file)
-        except:
-            new_file.close()
-            os.remove(new_file.name)
-            raise
-        _sync_close(new_file)
-        # self._file is about to get replaced, so no need to sync.
-        self._file.close()
-        try:
-            os.rename(new_file.name, self._path)
-        except OSError, e:
-            if e.errno == errno.EEXIST or \
-              (os.name == 'os2' and e.errno == errno.EACCES):
-                os.remove(self._path)
-                os.rename(new_file.name, self._path)
-            else:
-                raise
-        self._file = open(self._path, 'rb+')
-        self._toc = new_toc
-        self._pending = False
-        if self._locked:
-            _lock_file(self._file, dotlock=False)
+            new_len = new_file.tell()
+            _sync_flush(new_file)
+            new_file.seek(0)
+            self._file.seek(0)
+            if new_len < cur_len and not hasattr(self._file, 'truncate'):
+                try:
+                    if not os.path.samestat(os.fstat(self._file.fileno()),
+                                            os.stat(self._path)):
+                        raise ExternalClashError("Mailbox has been replaced: "
+                                                 "%s" % self._path)
+                except OSError, e:
+                    if e.errno == errno.ENOENT:
+                        raise NoSuchMailboxError(self._path)
+                    raise
+                except AttributeError:
+                    # No stat(), etc.
+                    pass
+                # *** race condition ***
+                remove_temp_file = False
+                self._file = open(self._path, 'wb+')
+            remove_temp_file = False
+            shutil.copyfileobj(new_file, self._file)
+            if hasattr(self._file, 'truncate'):
+                self._file.truncate(new_len)
+            self._file_length = new_len
+            self._toc = new_toc
+            _sync_flush(self._file)
+            remove_temp_file = True
+            self._pending = False
+        finally:
+            try:
+                new_file.close()
+                if remove_temp_file:
+                    os.remove(new_file.name)
+            finally:
+                if self._file is not orig_file:
+                    orig_file.close()
+                    if self._locked:
+                        _lock_file(self._file, dotlock=False)
 
     def _pre_mailbox_hook(self, f):
         """Called before writing the mailbox to file f."""
