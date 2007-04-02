@@ -122,6 +122,38 @@ class TestMailbox(TestBase):
         self.assert_(len(self._box) == 1)
         self.assertRaises(KeyError, lambda: self._box[key0])
 
+    def test_double_shorten(self):
+        # Check that flush() can shorten the mailbox twice
+        self._test_remove_two_of_three(broken_locking=False)
+
+    def test_remove_with_broken_locking(self):
+        # Check that a (broken) application releasing the lock and
+        # then removing messages using the existing keys does not
+        # delete the wrong messages.
+        self._test_remove_two_of_three(broken_locking=True)
+
+    def _test_remove_two_of_three(self, broken_locking=False):
+        self._box.lock()
+        key0 = self._box.add(self._template % 0)
+        key1 = self._box.add(self._template % 1)
+        key2 = self._box.add(self._template % 2)
+        self._box.flush()
+        self._box.remove(key0)
+        self._box.flush()
+        if broken_locking:
+            # As the name suggests, code that does this is broken
+            # (releasing the lock invalidates the keys, in general),
+            # but ideally mailbox.py should not break it further.
+            self._box.unlock()
+            self._box.lock()
+        self._box.remove(key1)
+        self._box.flush()
+        self._box.unlock()
+        self._box.close()
+        self._box = self._factory(self._path)
+        self.assert_(len(self._box) == 1)
+        self.assert_(self._box.itervalues().next().get_payload() == '2')
+
     def test_get(self):
         # Retrieve messages using get()
         key0 = self._box.add(self._template % 0)
