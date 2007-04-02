@@ -871,24 +871,9 @@ class MH(Mailbox):
     def remove(self, key):
         """Remove the keyed message; raise KeyError if it doesn't exist."""
         path = os.path.join(self._path, str(key))
-        try:
-            f = open(path, 'rb+')
-        except IOError, e:
-            if e.errno == errno.ENOENT:
-                raise KeyError('No message with key: %s' % key)
-            else:
-                raise
-        try:
-            if self._locked:
-                _lock_file(f)
-            try:
-                f.close()
-                os.remove(os.path.join(self._path, str(key)))
-            finally:
-                if self._locked:
-                    _unlock_file(f)
-        finally:
-            f.close()
+        if not os.path.exists(path):
+            raise KeyError('No message with key: %s' % key)
+        os.remove(path)
 
     def __setitem__(self, key, message):
         """Replace the keyed message; raise KeyError if it doesn't exist."""
