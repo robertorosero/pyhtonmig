@@ -1,6 +1,6 @@
 ------------------------------------------------------------------------
 -- normalize.decTest -- remove trailing zeros                         --
--- Copyright (c) IBM Corporation, 2003.  All rights reserved.         --
+-- Copyright (c) IBM Corporation, 2003, 2007.  All rights reserved.   --
 ------------------------------------------------------------------------
 -- Please see the document "General Decimal Arithmetic Testcases"     --
 -- at http://www2.hursley.ibm.com/decimal for the description of      --
@@ -17,7 +17,7 @@
 --   IBM UK, PO Box 31, Birmingham Road, Warwick CV34 5JL, UK         --
 --   mfc@uk.ibm.com                                                   --
 ------------------------------------------------------------------------
-version: 2.39
+version: 2.53
 
 extended:    1
 precision:   9
@@ -164,9 +164,9 @@ nrmx214 normalize  0.01E-999        ->   1E-1001   Subnormal
 nrmx215 normalize  0.999E-999       ->   1E-999    Inexact Rounded Subnormal Underflow
 nrmx216 normalize  0.099E-999       ->   1E-1000   Inexact Rounded Subnormal Underflow
 nrmx217 normalize  0.009E-999       ->   1E-1001   Inexact Rounded Subnormal Underflow
-nrmx218 normalize  0.001E-999       ->   0         Inexact Rounded Subnormal Underflow
-nrmx219 normalize  0.0009E-999      ->   0         Inexact Rounded Subnormal Underflow
-nrmx220 normalize  0.0001E-999      ->   0         Inexact Rounded Subnormal Underflow
+nrmx218 normalize  0.001E-999       ->   0         Inexact Rounded Subnormal Underflow Clamped
+nrmx219 normalize  0.0009E-999      ->   0         Inexact Rounded Subnormal Underflow Clamped
+nrmx220 normalize  0.0001E-999      ->   0         Inexact Rounded Subnormal Underflow Clamped
 
 nrmx230 normalize -1.00E-999        ->  -1E-999
 nrmx231 normalize -0.1E-999         ->  -1E-1000   Subnormal
@@ -177,9 +177,9 @@ nrmx234 normalize -0.01E-999        ->  -1E-1001   Subnormal
 nrmx235 normalize -0.999E-999       ->  -1E-999    Inexact Rounded Subnormal Underflow
 nrmx236 normalize -0.099E-999       ->  -1E-1000   Inexact Rounded Subnormal Underflow
 nrmx237 normalize -0.009E-999       ->  -1E-1001   Inexact Rounded Subnormal Underflow
-nrmx238 normalize -0.001E-999       ->  -0         Inexact Rounded Subnormal Underflow
-nrmx239 normalize -0.0009E-999      ->  -0         Inexact Rounded Subnormal Underflow
-nrmx240 normalize -0.0001E-999      ->  -0         Inexact Rounded Subnormal Underflow
+nrmx238 normalize -0.001E-999       ->  -0         Inexact Rounded Subnormal Underflow Clamped
+nrmx239 normalize -0.0009E-999      ->  -0         Inexact Rounded Subnormal Underflow Clamped
+nrmx240 normalize -0.0001E-999      ->  -0         Inexact Rounded Subnormal Underflow Clamped
 
 -- more reshaping
 precision: 9
@@ -208,6 +208,9 @@ nrmx290 normalize '-56260E+4'   -> '-5.626E+8'
 nrmx291 normalize '-56260E+5'   -> '-5.626E+9'
 nrmx292 normalize '-56260E+6'   -> '-5.626E+10'
 
+-- FL test
+precision: 40
+nrmx295 normalize 9892345673.0123456780000000000 -> 9892345673.012345678
 
 -- specials
 nrmx820 normalize 'Inf'    -> 'Infinity'
@@ -220,6 +223,10 @@ nrmx827 normalize  -NaN    -> -NaN
 nrmx828 normalize -sNaN    -> -NaN    Invalid_operation
 nrmx829 normalize  -NaN101 -> -NaN101
 nrmx830 normalize -sNaN010 -> -NaN10  Invalid_operation
+
+-- payload decapitate
+precision: 5
+nrmx62100 normalize  sNaN1234567890 -> NaN67890  Invalid_operation
 
 -- Null test
 nrmx900 normalize  # -> NaN Invalid_operation
