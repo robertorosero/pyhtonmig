@@ -142,10 +142,6 @@ class DecimalTest(unittest.TestCase):
             #print line
             try:
                 t = self.eval_line(line)
-            except InvalidOperation:
-                print 'Error in test cases:'
-                print line
-                continue
             except DecimalException, exception:
                 #Exception raised where there shoudn't have been one.
                 self.fail('Exception "'+exception.__class__.__name__ + '" raised on line '+line)
@@ -194,7 +190,8 @@ class DecimalTest(unittest.TestCase):
             Sides = s.split('->')
             L = Sides[0].strip().split()
             id = L[0]
-#            print id,
+            if DEBUG:
+                print "Test ", id,
             funct = L[1].lower()
             valstemp = L[2:]
             L = Sides[1].strip().split()
@@ -246,7 +243,7 @@ class DecimalTest(unittest.TestCase):
                         self.context.traps[error] = 0
                 v = self.context.create_decimal(v)
             else:
-                v = Decimal(v)
+                v = Decimal(v, self.context)
             vals.append(v)
 
         ans = FixQuotes(ans)
@@ -264,6 +261,8 @@ class DecimalTest(unittest.TestCase):
                 else:
                     self.fail("Did not raise %s in %s" % (error, s))
                 self.context.traps[error] = 0
+        if DEBUG:
+            print "--", self.context
         try:
             result = str(funct(*vals))
             if fname == 'same_quantum':
@@ -300,17 +299,6 @@ class DecimalTest(unittest.TestCase):
         self.context.Emax = exp
     def change_clamp(self, clamp):
         self.context._clamp = clamp
-
-# Dynamically build custom test definition for each file in the test
-# directory and add the definitions to the DecimalTest class.  This
-# procedure insures that new files do not get skipped.
-for filename in os.listdir(directory):
-    if '.decTest' not in filename:
-        continue
-    head, tail = filename.split('.')
-    tester = lambda self, f=filename: self.eval_file(directory + f)
-    setattr(DecimalTest, 'test_' + head, tester)
-    del filename, head, tail, tester
 
 
 
@@ -1091,7 +1079,7 @@ class WithStatementTest(unittest.TestCase):
         self.assert_(new_ctx is not set_ctx, 'did not copy the context')
         self.assert_(set_ctx is enter_ctx, '__enter__ returned wrong context')
 
-def test_main(arith=False, verbose=None):
+def test_main(arith=False, verbose=None, todo_tests=None, debug=None):
     """ Execute the tests.
 
     Runs all arithmetic tests if arith is True or if the "decimal" resource
@@ -1099,35 +1087,57 @@ def test_main(arith=False, verbose=None):
     """
 
     init()
-    global TEST_ALL
+    global TEST_ALL, DEBUG
     TEST_ALL = arith or is_resource_enabled('decimal')
+    DEBUG = debug
 
-    test_classes = [
-        DecimalExplicitConstructionTest,
-        DecimalImplicitConstructionTest,
-        DecimalArithmeticOperatorsTest,
-        DecimalUseOfContextTest,
-        DecimalUsabilityTest,
-        DecimalPythonAPItests,
-        ContextAPItests,
-        DecimalTest,
-        WithStatementTest,
-    ]
+    if todo_tests is None:
+        test_classes = [
+            DecimalExplicitConstructionTest,
+            DecimalImplicitConstructionTest,
+            DecimalArithmeticOperatorsTest,
+            DecimalUseOfContextTest,
+            DecimalUsabilityTest,
+            DecimalPythonAPItests,
+            ContextAPItests,
+            DecimalTest,
+            WithStatementTest,
+        ]
+    else:
+        test_classes = [DecimalTest]
+
+    # Dynamically build custom test definition for each file in the test
+    # directory and add the definitions to the DecimalTest class.  This
+    # procedure insures that new files do not get skipped.
+    for filename in os.listdir(directory):
+        if '.decTest' not in filename or filename.startswith("."):
+            continue
+        head, tail = filename.split('.')
+        if todo_tests is not None and head not in todo_tests:
+            continue
+        tester = lambda self, f=filename: self.eval_file(directory + f)
+        setattr(DecimalTest, 'test_' + head, tester)
+        del filename, head, tail, tester
+
 
     try:
         run_unittest(*test_classes)
-        import decimal as DecimalModule
-        run_doctest(DecimalModule, verbose)
+        if todo_tests is None:
+            import decimal as DecimalModule
+            run_doctest(DecimalModule, verbose)
     finally:
         setcontext(ORIGINAL_CONTEXT)
 
 if __name__ == '__main__':
-    # Calling with no arguments runs all tests.
-    # Calling with "Skip" will skip over 90% of the arithmetic tests.
-    if len(sys.argv) == 1:
-        test_main(arith=True, verbose=True)
-    elif len(sys.argv) == 2:
-        arith = sys.argv[1].lower() != 'skip'
-        test_main(arith=arith, verbose=True)
+    import optparse
+    p = optparse.OptionParser("test_decimal.py [--debug] [{--skip | test1 [test2 [...]]}]")
+    p.add_option('--debug', '-d', action='store_true', help='shows the test number and context before each test')
+    p.add_option('--skip',  '-s', action='store_true', help='skip over 90% of the arithmetic tests')
+    (opt, args) = p.parse_args()
+
+    if opt.skip:
+        test_main(arith=False, verbose=True)
+    elif args:
+        test_main(arith=True, verbose=True, todo_tests=args, debug=opt.debug)
     else:
-        raise ValueError("test called with wrong arguments, use test_Decimal [Skip]")
+        test_main(arith=True, verbose=True)
