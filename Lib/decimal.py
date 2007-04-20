@@ -204,12 +204,20 @@ class InvalidOperation(DecimalException):
     x ** (non-integer)
     x ** (+-)INF
     An operand is invalid
+
+    The result of the operation after these is a quiet positive NaN,
+    except when the cause is a signaling NaN, in which case the result is
+    also a quiet NaN, but with the original sign, and an optional
+    diagnostic information.
     """
     def handle(self, context, *args):
         if args:
             if args[0] == 1:  # sNaN, must drop 's' but keep diagnostics
                 return Decimal( (args[1]._sign, args[1]._int, 'n') )
+            elif args[0] == 2:
+                return Decimal( (args[1], args[2], 'P') )
         return NaN
+
 
 class ConversionSyntax(InvalidOperation):
     """Trying to convert badly formed string.
@@ -218,9 +226,8 @@ class ConversionSyntax(InvalidOperation):
     converted to a number and it does not conform to the numeric string
     syntax.  The result is [0,qNaN].
     """
-
     def handle(self, context, *args):
-        return (0, (0,), 'n')  # Passed to something which uses a tuple.
+        return NaN
 
 class DivisionByZero(DecimalException, ZeroDivisionError):
     """Division by 0.
@@ -562,11 +569,11 @@ class Decimal(object):
                 raise ValueError('Invalid sign')
             for digit in value[1]:
                 if not isinstance(digit, (int,long)) or digit < 0:
-                    raise ValueError("The second value in the tuple must be"
+                    raise ValueError("The second value in the tuple must be "
                                 "composed of non negative integer elements.")
             self._sign = value[0]
             self._int  = tuple(value[1])
-            if value[2] in ('F','n','N'):
+            if value[2] in ('F','n','N', 'P'):
                 self._exp = value[2]
                 self._is_special = True
             else:
@@ -597,9 +604,18 @@ class Decimal(object):
                 sig, sign, diag = _isnan(value)
                 self._is_special = True
                 if len(diag) > context.prec:  # Diagnostic info too long
-                    self._sign, self._int, self._exp = \
-                                context._raise_error(ConversionSyntax)
-                    return self
+                    # sig=1, qNaN -> ConversionSyntax
+                    # sig=2, sNaN -> InvalidOperation
+                    digits = tuple(int(x) for x in diag[-context.prec:])
+                    if sig == 1:
+                        self._exp = 'P'  # qNaN
+                        self._sign = sign
+                        self._int = digits
+                        return self
+
+                    return context._raise_error(InvalidOperation,
+                                                'diagnostic info too long',
+                                                2, sign, digits)
                 if sig == 1:
                     self._exp = 'n'  # qNaN
                 else:  # sig == 2
@@ -611,8 +627,8 @@ class Decimal(object):
                 self._sign, self._int, self._exp = _string2exact(value)
             except ValueError:
                 self._is_special = True
-                self._sign, self._int, self._exp = \
-                                        context._raise_error(ConversionSyntax)
+                return context._raise_error(ConversionSyntax, 
+                                                "non parseable string")
             return self
 
         raise TypeError("Cannot convert %r to Decimal" % value)
@@ -621,12 +637,12 @@ class Decimal(object):
         """Returns whether the number is not actually one.
 
         0 if a number
-        1 if NaN
+        1 if NaN  (it could be a normal quiet NaN or a phantom one)
         2 if sNaN
         """
         if self._is_special:
             exp = self._exp
-            if exp == 'n':
+            if exp == 'n' or exp == 'P':
                 return 1
             elif exp == 'N':
                 return 2
@@ -645,7 +661,7 @@ class Decimal(object):
             return 1
         return 0
 
-    def _check_nans(self, other = None, context=None):
+    def _check_nans(self, other=None, context=None):
         """Returns whether the number is not actually one.
 
         if self, other are sNaN, signal
@@ -999,6 +1015,9 @@ class Decimal(object):
             sign = min(self._sign, other._sign)
             if negativezero:
                 sign = 1
+            if exp < context.Etiny():
+                exp = context.Etiny()
+                context._raise_error(Clamped)
             return Decimal( (sign, (0,), exp))
         if not self:
             exp = max(exp, other._exp - context.prec-1)
@@ -1217,10 +1236,11 @@ class Decimal(object):
 
             if self._isinfinity() and other._isinfinity():
                 if divmod:
-                    return (context._raise_error(InvalidOperation,
+                    reloco = (context._raise_error(InvalidOperation,
                                             '(+-)INF // (+-)INF'),
                             context._raise_error(InvalidOperation,
                                             '(+-)INF % (+-)INF'))
+                    return reloco
                 return context._raise_error(InvalidOperation, '(+-)INF/(+-)INF')
 
             if self._isinfinity():
@@ -1554,6 +1574,8 @@ class Decimal(object):
                 ans = ans._rescale(Etiny, context=context)
                 # It isn't zero, and exp < Emin => subnormal
                 context._raise_error(Subnormal)
+                if not ans:
+                    context._raise_error(Clamped)
                 if context.flags[Inexact]:
                     context._raise_error(Underflow)
             else:
@@ -1579,7 +1601,7 @@ class Decimal(object):
                     return c
         return ans
 
-    def _round(self, prec=None, rounding=None, context=None):
+    def _round(self, prec=None, rounding=None, context=None, forceExp=None, fromQuantize=False):
         """Returns a rounded version of self.
 
         You can specify the precision or rounding method.  Otherwise, the
@@ -1625,12 +1647,19 @@ class Decimal(object):
             temp = Decimal(self)
 
         numdigits = len(temp._int)
-        if prec == numdigits:
-            return temp
 
-        # See if we need to extend precision
+#        # See if we need to extend precision
         expdiff = prec - numdigits
-        if expdiff > 0:
+        
+        # not allowing subnormal for quantize
+        if fromQuantize and (forceExp - context.Emax) > context.prec:
+            context._raise_error(InvalidOperation, "Quantize doesn't allow subnormal")
+            return NaN
+
+        if expdiff >= 0:
+            if fromQuantize and len(temp._int)+expdiff > context.prec:
+                context._raise_error(InvalidOperation, 'Beyond guarded precision')
+                return NaN
             tmp = list(temp._int)
             tmp.extend([0] * expdiff)
             ans =  Decimal( (temp._sign, tmp, temp._exp - expdiff))
@@ -1644,18 +1673,49 @@ class Decimal(object):
             context._raise_error(Rounded)
             return ans
 
-        # Okay, let's round and lose data
-
+        # Okay, let's round and lose data, let's get the correct rounding function
         this_function = getattr(temp, self._pick_rounding_function[rounding])
-        # Now we've got the rounding function
 
+        # Now we've got the rounding function
+        origprec = context.prec
         if prec != context.prec:
             context = context._shallow_copy()
             context.prec = prec
         ans = this_function(prec, expdiff, context)
+
+        if forceExp is not None:
+            exp = forceExp
+            if fromQuantize and not (context.Emin <= exp <= context.Emax):
+                if (context.Emin <= ans._exp) and ans._int == (0,):
+                    context._raise_error(InvalidOperation)
+                    return NaN
+
+            if context.Emin < exp < context.Emax:
+                newdiff = ans._exp - exp
+                if newdiff >= 0:
+                    ans._int = ans._int + tuple([0]*newdiff)
+                else:
+                    ans._int = (0,)
+                ans._exp = exp
+            else:
+                if not context.flags[Underflow]:
+                    newdiff = ans._exp - exp
+                    if newdiff >= 0:
+                        ans._int = ans._int + tuple([0]*newdiff)
+                    else:
+                        ans._int = (0,)
+
+                ans._exp = exp
+                context._raise_error(Rounded)
+                context._raise_error(Inexact, 'Changed in rounding')
+                return ans
+                
+            if len(ans._int) > origprec:
+                context._raise_error(InvalidOperation, 'Beyond guarded precision')
+                return NaN
+
         context._raise_error(Rounded)
         context._raise_error(Inexact, 'Changed in rounding')
-
         return ans
 
     _pick_rounding_function = {}
@@ -1868,7 +1928,7 @@ class Decimal(object):
                     context = getcontext()
                 return context._raise_error(InvalidOperation,
                                         'quantize with one INF')
-        return self._rescale(exp._exp, rounding, context, watchexp)
+        return self._rescale(exp._exp, rounding, context, watchexp=0, fromQuantize=True)
 
     def same_quantum(self, other):
         """Test whether self and other have the same exponent.
@@ -1882,7 +1942,7 @@ class Decimal(object):
                 return self._isinfinity() and other._isinfinity() and True
         return self._exp == other._exp
 
-    def _rescale(self, exp, rounding=None, context=None, watchexp=1):
+    def _rescale(self, exp, rounding=None, context=None, watchexp=1, fromQuantize=False):
         """Rescales so that the exponent is exp.
 
         exp = exp to scale to (an integer)
@@ -1901,8 +1961,10 @@ class Decimal(object):
             if ans:
                 return ans
 
-        if watchexp and (context.Emax  < exp or context.Etiny() > exp):
+        if fromQuantize and (context.Emax  < exp or context.Etiny() > exp):
             return context._raise_error(InvalidOperation, 'rescale(a, INF)')
+        if fromQuantize and exp < context.Etiny():
+            return context._raise_error(InvalidOperation, '"rhs" must be no less than Etiny')
 
         if not self:
             ans = Decimal(self)
@@ -1917,18 +1979,12 @@ class Decimal(object):
             return context._raise_error(InvalidOperation, 'Rescale > prec')
 
         tmp = Decimal(self)
-        tmp._int = (0,) + tmp._int
-        digits += 1
 
         if digits < 0:
             tmp._exp = -digits + tmp._exp
             tmp._int = (0,1)
             digits = 1
-        tmp = tmp._round(digits, rounding, context=context)
-
-        if tmp._int[0] == 0 and len(tmp._int) > 1:
-            tmp._int = tmp._int[1:]
-        tmp._exp = exp
+        tmp = tmp._round(digits, rounding, context=context, forceExp=exp, fromQuantize=fromQuantize)
 
         tmp_adjusted = tmp.adjusted()
         if tmp and tmp_adjusted < context.Emin:
@@ -2076,7 +2132,7 @@ class Decimal(object):
     def max(self, other, context=None):
         """Returns the larger value.
 
-        like max(self, other) except if one is not a number, returns
+        Like max(self, other) except if one is not a number, returns
         NaN (and signals if one is sNaN).  Also rounds.
         """
         other = _convert_other(other)
@@ -2086,6 +2142,8 @@ class Decimal(object):
         if self._is_special or other._is_special:
             # If one operand is a quiet NaN and the other is number, then the
             # number is always returned
+            if other._exp == 'P':
+                return other
             sn = self._isnan()
             on = other._isnan()
             if sn or on:
@@ -2844,6 +2902,8 @@ class Context(object):
 
         The operation is not affected by the context.
         """
+        if a._exp == 'P':
+            a = self._raise_error(ConversionSyntax)
         return a.__str__(context=self)
 
     def to_integral(self, a):
@@ -3070,7 +3130,6 @@ negInf = Decimal('-Inf')
 Infsign = (Inf, negInf)
 
 NaN = Decimal('NaN')
-
 
 ##### crud for parsing strings #############################################
 import re
