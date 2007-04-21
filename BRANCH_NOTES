@@ -6,8 +6,6 @@ Attempt to develop some form of security model for Python.
 ======
 Status
 ======
-* Create app that embeds Python
-    + Move changes in Py_Initialize() to app.
 * Remove dangerous built-ins.
 * Turn on whitelisting.
 * Write tests.
