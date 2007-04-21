@@ -3,6 +3,12 @@ Purpose
 =======
 Attempt to develop some form of security model for Python.
 
+=====
+Usage
+=====
+1. Build Python as normal.
+2. Run ``build_secure_py.sh`` to build ``secure_python.exe``.
+
 ======
 Status
 ======
