@@ -1790,7 +1790,7 @@ class Decimal(object):
         else:
             return self._round_up(prec, expdiff, context)
 
-    def __pow__(self, n, modulo = None, context=None):
+    def __pow__(self, n, modulo=None, context=None):
         """Return self ** n (mod modulo)
 
         If modulo is None (default), don't take it mod modulo.
@@ -1802,37 +1802,96 @@ class Decimal(object):
         if context is None:
             context = getcontext()
 
-        if self._is_special or n._is_special or n.adjusted() > 8:
-            # Because the spot << doesn't work with really big exponents
-            if n._isinfinity() or n.adjusted() > 8:
-                return context._raise_error(InvalidOperation, 'x ** INF')
+#        # FIXME: study if this finally disappears...
+#        if self._is_special or n._is_special:# or n.adjusted() > 8:
+#            # Because the spot << doesn't work with really big exponents
+#            if n._isinfinity() or n.adjusted() > 8:
+#                return context._raise_error(InvalidOperation, 'x ** INF')
 
-            ans = self._check_nans(n, context)
-            if ans:
-                return ans
+        ans = self._check_nans(n, context)
+        if ans:
+            return ans
 
-        if not n._isinteger():
-            return context._raise_error(InvalidOperation, 'x ** (non-integer)')
-
-        if not self and not n:
-            return context._raise_error(InvalidOperation, '0 ** 0')
+        if not self:
+            if not n:
+                return context._raise_error(InvalidOperation, '0 ** 0')
+            if n._sign == 0:
+                zero = Decimal(0)
+                if n._iseven():
+                    return zero
+                zero._sign = self._sign
+                return zero
+            # n is negative
+            if self._sign == 0:
+                return Inf
+            # also self is negative
+            if n._iseven():
+                return Inf
+            else:
+                return negInf
 
         if not n:
             return Decimal(1)
 
+        # FIXME: Reduce the following to something more readable
         if self == Decimal(1):
+            if n._isinfinity():
+                context._raise_error(Inexact)
+                context._raise_error(Rounded)
+                digits = (1,)+(0,)*(context.prec-1)
+                return Decimal((0, digits, -context.prec+1))
             return Decimal(1)
+
+        if self._isinfinity() == -1 and n._isinfinity():
+            return context._raise_error(InvalidOperation, '-Inf ** +-Inf')
+        if self._isinfinity() == 1:
+            if n._isinfinity() == 1:
+                return Inf
+            if n._isinfinity() == -1:
+                return Decimal(0)
+            
+        if self._isinfinity() == 1:
+            if modulo:
+                return context._raise_error(InvalidOperation, 'INF % x')
+            if not n:
+                return Decimal(1)
+            if n._sign == 1:
+                return Decimal(0)
+            return Inf
+        if self._isinfinity() == -1:
+            if modulo:
+                return context._raise_error(InvalidOperation, '-INF % x')
+            if not n:
+                return Decimal(1)
+            if abs(n) < 1:
+                return context._raise_error(InvalidOperation, '-INF ** -1<n<1')
+            if n._sign == 0:
+                if n._iseven():
+                    return Inf
+                else:
+                    return negInf
+            if n._iseven():
+                return Decimal(0)
+            else:
+                return Decimal((1, (0,), 0))
+
+        if n._isinfinity() == 1:
+            if self._sign == 1:
+                return context._raise_error(InvalidOperation, '-num ** Inf')
+            if self < 1:
+                return Decimal(0)
+            else:
+                return Inf
+        if n._isinfinity() == -1:
+            if self._sign == 1:
+                return context._raise_error(InvalidOperation, '-num ** -Inf')
+            if self > 1:
+                return Decimal(0)
+            else:
+                return Inf
 
         sign = self._sign and not n._iseven()
         n = int(n)
-
-        if self._isinfinity():
-            if modulo:
-                return context._raise_error(InvalidOperation, 'INF % x')
-            if n > 0:
-                return Infsign[sign]
-            return Decimal( (sign, (0,), 0) )
-
         # With ludicrously large exponent, just raise an overflow
         # and return inf.
         if not modulo and n > 0 and \
