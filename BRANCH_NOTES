@@ -12,7 +12,7 @@ Usage
 ======
 Status
 ======
-* Remove dangerous built-ins.
+* Decide how to squirrel away and access 'open'.
 * Turn on whitelisting.
 * Write tests.
 

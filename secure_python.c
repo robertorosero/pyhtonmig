@@ -102,6 +102,10 @@ main(int argc, char *argv[])
     PyDict_Clear(PyDict_GetItemString(interp->sysdict,
 			    "path_importer_cache"));
 
+    /* Remove dangerous built-ins. */
+    PyDict_DelItemString(interp->builtins, "execfile");
+    PyDict_DelItemString(interp->builtins, "open");
+
   /* Use interpreter. */
     return_val = Py_Main(argc, argv);
   /* Tear down interpreter. */
