@@ -99,11 +99,28 @@ RoundingDict = {'ceiling' : ROUND_CEILING, #Maps test-case names to roundings.
 nameAdapter = {'toeng':'to_eng_string',
                'tosci':'to_sci_string',
                'samequantum':'same_quantum',
-               'tointegral':'to_integral',
+               'tointegral':'to_integral_value',
+               'tointegralx':'to_integral_exact',
                'remaindernear':'remainder_near',
                'divideint':'divide_int',
                'squareroot':'sqrt',
                'apply':'_apply',
+               'class':'number_class',
+               'comparetotal':'compare_total',
+               'comparetotmag':'compare_total_mag',
+               'copyabs':'copy_abs',
+               'copy':'copy_decimal',
+               'copynegate':'copy_negate',
+               'copysign':'copy_sign',
+               'and':'logical_and',
+               'or':'logical_or',
+               'xor':'logical_xor',
+               'invert':'logical_invert',
+               'maxmag':'max_mag',
+               'minmag':'min_mag',
+               'nextminus':'next_minus',
+               'nextplus':'next_plus',
+               'nexttoward':'next_toward',
               }
 
 class DecimalTest(unittest.TestCase):
@@ -948,7 +965,7 @@ class DecimalUsabilityTest(unittest.TestCase):
 
         d1 = Decimal('-25e55')
         b1 = Decimal('-25e55')
-        d2 = Decimal('33e-33')
+        d2 = Decimal('33e+33')
         b2 = Decimal('33e-33')
 
         def checkSameDec(operation, useOther=False):
