@@ -2712,7 +2712,7 @@ class Context(object):
         received object already is in it's canonical form.
 
         >>> ExtendedContext.canonical(Decimal('2.50'))
-        Decimal('2.50')
+        Decimal("2.50")
         """
         return a.canonical(context=self)
 
@@ -2761,17 +2761,17 @@ class Context(object):
         representations.
 
         >>> ExtendedContext.compare_total(Decimal('12.73'), Decimal('127.9'))
-        Decimal('-1')
+        Decimal("-1")
         >>> ExtendedContext.compare_total(Decimal('-127'),  Decimal('12'))
-        Decimal('-1')
+        Decimal("-1")
         >>> ExtendedContext.compare_total(Decimal('12.30'), Decimal('12.3'))
-        Decimal('-1')
+        Decimal("-1")
         >>> ExtendedContext.compare_total(Decimal('12.30'), Decimal('12.30'))
-        Decimal('0')
+        Decimal("0")
         >>> ExtendedContext.compare_total(Decimal('12.3'),  Decimal('12.300'))
-        Decimal('1')
+        Decimal("1")
         >>> ExtendedContext.compare_total(Decimal('12.3'),  Decimal('NaN'))
-        Decimal('-1')
+        Decimal("-1")
         """
         return a.compare_total(b, context=self)
 
@@ -2786,9 +2786,9 @@ class Context(object):
         """Returns a copy of the operand with the sign set to 0.
 
         >>> ExtendedContext.copy_abs(Decimal('2.1'))
-        Decimal('2.1')
+        Decimal("2.1")
         >>> ExtendedContext.copy_abs(Decimal('-100'))
-        Decimal('100')
+        Decimal("100")
         """
         return a.copy_abs(context=self)
 
@@ -2796,9 +2796,9 @@ class Context(object):
         """Returns a copy of the decimal objet.
 
         >>> ExtendedContext.copy_decimal(Decimal('2.1'))
-        Decimal('2.1')
+        Decimal("2.1")
         >>> ExtendedContext.copy_decimal(Decimal('-1.00'))
-        Decimal('-1.00')
+        Decimal("-1.00")
         """
         return a
 
@@ -2806,9 +2806,9 @@ class Context(object):
         """Returns a copy of the operand with the sign inverted.
 
         >>> ExtendedContext.copy_negate(Decimal('101.5'))
-        Decimal('-101.5')
+        Decimal("-101.5")
         >>> ExtendedContext.copy_negate(Decimal('-101.5'))
-        Decimal('101.5')
+        Decimal("101.5")
         """
         return a.copy_negate(context=self)
 
@@ -2819,13 +2819,13 @@ class Context(object):
         equal to the sign of the second operand.
 
         >>> ExtendedContext.copy_sign(Decimal( '1.50'), Decimal('7.33'))
-        Decimal('1.50')
+        Decimal("1.50")
         >>> ExtendedContext.copy_sign(Decimal('-1.50'), Decimal('7.33'))
-        Decimal('1.50')
+        Decimal("1.50")
         >>> ExtendedContext.copy_sign(Decimal( '1.50'), Decimal('-7.33'))
-        Decimal('-1.50')
+        Decimal("-1.50")
         >>> ExtendedContext.copy_sign(Decimal('-1.50'), Decimal('-7.33'))
-        Decimal('-1.50')
+        Decimal("-1.50")
         """
         return a.copy_sign(b, context=self)
 
@@ -2874,17 +2874,17 @@ class Context(object):
         """Returns e ** a.
 
         >>> ExtendedContext.exp(Decimal('-Infinity'))
-        Decimal('0')
+        Decimal("0")
         >>> ExtendedContext.exp(Decimal('-1'))
-        Decimal('0.367879441')
+        Decimal("0.367879441")
         >>> ExtendedContext.exp(Decimal('0'))
-        Decimal('1')
+        Decimal("1")
         >>> ExtendedContext.exp(Decimal('1'))
-        Decimal('2.71828183')
+        Decimal("2.71828183")
         >>> ExtendedContext.exp(Decimal('0.693147181'))
-        Decimal('2.00000000')
+        Decimal("2.00000000")
         >>> ExtendedContext.exp(Decimal('+Infinity'))
-        Decimal('Inf')
+        Decimal("Inf")
         """
         return a.exp(context=self)
 
@@ -2896,18 +2896,18 @@ class Context(object):
         multiplication, using add, all with only one final rounding.
 
         >>> ExtendedContext.fma(Decimal('3'), Decimal('5'), Decimal('7'))
-        Decimal('22')
+        Decimal("22")
         >>> ExtendedContext.fma(Decimal('3'), Decimal('-5'), Decimal('7'))
-        Decimal('-8')
+        Decimal("-8")
         >>> ExtendedContext.fma(Decimal('888565290'), Decimal('1557.96930'), Decimal('-86087.7578'))
-        Decimal('1.38435736E+12')
+        Decimal("1.38435736E+12")
         """
 
     def is_canonical(self, a):
         """Returns 1 if the operand is canonical; otherwise returns 0.
 
         >>> ExtendedContext.is_canonical(Decimal('2.50'))
-        Decimal('1')
+        Decimal("1")
         """
         return a.is_canonical(context=self)
 
@@ -2917,15 +2917,15 @@ class Context(object):
         For it to be finite, it must be neither infinite nor a NaN.
 
         >>> ExtendedContext.is_finite(Decimal('2.50'))
-        Decimal('1')
+        Decimal("1")
         >>> ExtendedContext.is_finite(Decimal('-0.3'))
-        Decimal('1')
+        Decimal("1")
         >>> ExtendedContext.is_finite(Decimal('0'))
-        Decimal('1')
+        Decimal("1")
         >>> ExtendedContext.is_finite(Decimal('Inf'))
-        Decimal('0')
+        Decimal("0")
         >>> ExtendedContext.is_finite(Decimal('NaN'))
-        Decimal('0')
+        Decimal("0")
         """
         return a.is_finite(context=self)
 
@@ -2933,11 +2933,11 @@ class Context(object):
         """Returns 1 if the operand is an Infinite, otherwise returns 0.
 
         >>> ExtendedContext.is_infinite(Decimal('2.50'))
-        Decimal('0')
+        Decimal("0")
         >>> ExtendedContext.is_infinite(Decimal('-Inf'))
-        Decimal('1')
+        Decimal("1")
         >>> ExtendedContext.is_infinite(Decimal('NaN'))
-        Decimal('0')
+        Decimal("0")
         """
         return a.is_infinite(context=self)
 
@@ -2945,11 +2945,11 @@ class Context(object):
         """Returns 1 if the operand is qNaN or sNaN, otherwise returns 0.
 
         >>> ExtendedContext.is_nan(Decimal('2.50'))
-        Decimal('0')
+        Decimal("0")
         >>> ExtendedContext.is_nan(Decimal('NaN'))
-        Decimal('1')
+        Decimal("1")
         >>> ExtendedContext.is_nan(Decimal('-sNaN'))
-        Decimal('1')
+        Decimal("1")
         """
         return a.is_nan(context=self)
 
@@ -2957,15 +2957,15 @@ class Context(object):
         """Returns 1 if the operand is a normal number, otherwise returns 0.
 
         >>> ExtendedContext.is_normal(Decimal('2.50'))
-        Decimal('1')
+        Decimal("1")
         >>> ExtendedContext.is_normal(Decimal('0.1E-999'))
-        Decimal('0')
+        Decimal("0")
         >>> ExtendedContext.is_normal(Decimal('0.00'))
-        Decimal('0')
+        Decimal("0")
         >>> ExtendedContext.is_normal(Decimal('-Inf'))
-        Decimal('0')
+        Decimal("0")
         >>> ExtendedContext.is_normal(Decimal('NaN'))
-        Decimal('0')
+        Decimal("0")
         """
         return a.is_normal(context=self)
 
@@ -2973,11 +2973,11 @@ class Context(object):
         """Returns 1 if the operand is a quiet NaN, otherwise returns 0.
 
         >>> ExtendedContext.is_qnan(Decimal('2.50'))
-        Decimal('0')
+        Decimal("0")
         >>> ExtendedContext.is_qnan(Decimal('NaN'))
-        Decimal('1')
+        Decimal("1")
         >>> ExtendedContext.is_qnan(Decimal('sNaN'))
-        Decimal('0')
+        Decimal("0")
         """
         return a.is_qnan(context=self)
 
@@ -2985,11 +2985,11 @@ class Context(object):
         """Returns 1 if the operand is negative, otherwise returns 0.
 
         >>> ExtendedContext.is_signed(Decimal('2.50'))
-        Decimal('0')
+        Decimal("0")
         >>> ExtendedContext.is_signed(Decimal('-12'))
-        Decimal('1')
+        Decimal("1")
         >>> ExtendedContext.is_signed(Decimal('-0'))
-        Decimal('1')
+        Decimal("1")
         """
         return a.is_signed(context=self)
 
@@ -2997,11 +2997,11 @@ class Context(object):
         """Returns 1 if the operand is a signaling NaN, otherwise returns 0.
 
         >>> ExtendedContext.is_snan(Decimal('2.50'))
-        Decimal('0')
+        Decimal("0")
         >>> ExtendedContext.is_snan(Decimal('NaN'))
-        Decimal('0')
+        Decimal("0")
         >>> ExtendedContext.is_snan(Decimal('sNaN'))
-        Decimal('1')
+        Decimal("1")
         """
         return a.is_snan(context=self)
 
@@ -3009,15 +3009,15 @@ class Context(object):
         """Returns 1 if the operand is subnormal, otherwise returns 0.
 
         >>> ExtendedContext.is_subnormal(Decimal('2.50'))
-        Decimal('0')
+        Decimal("0")
         >>> ExtendedContext.is_subnormal(Decimal('0.1E-999'))
-        Decimal('1')
+        Decimal("1")
         >>> ExtendedContext.is_subnormal(Decimal('0.00'))
-        Decimal('0')
+        Decimal("0")
         >>> ExtendedContext.is_subnormal(Decimal('-Inf'))
-        Decimal('0')
+        Decimal("0")
         >>> ExtendedContext.is_subnormal(Decimal('NaN'))
-        Decimal('0')
+        Decimal("0")
         """
         return a.is_subnormal(context=self)
 
@@ -3025,11 +3025,11 @@ class Context(object):
         """Returns 1 if the operand is a zero, otherwise returns 0.
 
         >>> ExtendedContext.is_zero(Decimal('0'))
-        Decimal('1')
+        Decimal("1")
         >>> ExtendedContext.is_zero(Decimal('2.50'))
-        Decimal('0')
+        Decimal("0")
         >>> ExtendedContext.is_zero(Decimal('-0E+2'))
-        Decimal('1')
+        Decimal("1")
         """
         return a.is_zero(context=self)
 
@@ -3037,15 +3037,15 @@ class Context(object):
         """Returns the natural (base e) logarithm of the operand.
 
         >>> ExtendedContext.ln(Decimal('0'))
-        Decimal('-Inf')
+        Decimal("-Inf")
         >>> ExtendedContext.ln(Decimal('1.000'))
-        Decimal('0')
+        Decimal("0")
         >>> ExtendedContext.ln(Decimal('2.71828183'))
-        Decimal('1.00000000')
+        Decimal("1.00000000")
         >>> ExtendedContext.ln(Decimal('10'))
-        Decimal('2.30258509')
+        Decimal("2.30258509")
         >>> ExtendedContext.ln(Decimal('+Infinity'))
-        Decimal('Inf')
+        Decimal("Inf")
         """
         return a.ln(context=self)
 
@@ -3053,19 +3053,19 @@ class Context(object):
         """Returns the base 10 logarithm of the operand.
 
         >>> ExtendedContext.log10(Decimal('0'))
-        Decimal('-In')
+        Decimal("-In")
         >>> ExtendedContext.log10(Decimal('0.001'))
-        Decimal('-3')
+        Decimal("-3")
         >>> ExtendedContext.log10(Decimal('1.000'))
-        Decimal('0')
+        Decimal("0")
         >>> ExtendedContext.log10(Decimal('2'))
-        Decimal('0.301029996')
+        Decimal("0.301029996")
         >>> ExtendedContext.log10(Decimal('10'))
-        Decimal('1')
+        Decimal("1")
         >>> ExtendedContext.log10(Decimal('70'))
-        Decimal('1.84509804')
+        Decimal("1.84509804")
         >>> ExtendedContext.log10(Decimal('+Infinity'))
-        Decimal('Inf')
+        Decimal("Inf")
         """
         return a.log10(context=self)
 
@@ -3078,13 +3078,13 @@ class Context(object):
         value of that digit and without limiting the resulting exponent).
 
         >>> ExtendedContext.logb(Decimal('250'))
-        Decimal('2')
+        Decimal("2")
         >>> ExtendedContext.logb(Decimal('2.50'))
-        Decimal('0')
+        Decimal("0")
         >>> ExtendedContext.logb(Decimal('0.03'))
-        Decimal('-2')
+        Decimal("-2")
         >>> ExtendedContext.logb(Decimal('0'))
-        Decimal('-Inf')
+        Decimal("-Inf")
         """
         return a.logb(context=self)
 
@@ -3094,17 +3094,17 @@ class Context(object):
         The operands must be both logical numbers.
 
         >>> ExtendedContext.logical_and(Decimal('0'), Decimal('0'))
-        Decimal('0')
+        Decimal("0")
         >>> ExtendedContext.logical_and(Decimal('0'), Decimal('1'))
-        Decimal('0')
+        Decimal("0")
         >>> ExtendedContext.logical_and(Decimal('1'), Decimal('0'))
-        Decimal('0')
+        Decimal("0")
         >>> ExtendedContext.logical_and(Decimal('1'), Decimal('1'))
-        Decimal('1')
+        Decimal("1")
         >>> ExtendedContext.logical_and(Decimal('1100'), Decimal('1010'))
-        Decimal('1000')
+        Decimal("1000")
         >>> ExtendedContext.logical_and(Decimal('1111'), Decimal('10'))
-        Decimal('10')
+        Decimal("10")
         """
         return a.logical_and(b, context=self)
 
@@ -3114,13 +3114,13 @@ class Context(object):
         The operand must be a logical number.
 
         >>> ExtendedContext.logical_invert(Decimal('0'))
-        Decimal('111111111')
+        Decimal("111111111")
         >>> ExtendedContext.logical_invert(Decimal('1'))
-        Decimal('111111110')
+        Decimal("111111110")
         >>> ExtendedContext.logical_invert(Decimal('111111111'))
-        Decimal('0')
+        Decimal("0")
         >>> ExtendedContext.logical_invert(Decimal('101010101'))
-        Decimal('10101010')
+        Decimal("10101010")
         """
         return a.logical_invert(context=self)
 
@@ -3130,17 +3130,17 @@ class Context(object):
         The operands must be both logical numbers.
 
         >>> ExtendedContext.logical_or(Decimal('0'), Decimal('0'))
-        Decimal('0')
+        Decimal("0")
         >>> ExtendedContext.logical_or(Decimal('0'), Decimal('1'))
-        Decimal('1')
+        Decimal("1")
         >>> ExtendedContext.logical_or(Decimal('1'), Decimal('0'))
-        Decimal('1')
+        Decimal("1")
         >>> ExtendedContext.logical_or(Decimal('1'), Decimal('1'))
-        Decimal('1')
+        Decimal("1")
         >>> ExtendedContext.logical_or(Decimal('1100'), Decimal('1010'))
-        Decimal('1110')
+        Decimal("1110")
         >>> ExtendedContext.logical_or(Decimal('1110'), Decimal('10'))
-        Decimal('1110')
+        Decimal("1110")
         """
         return a.logical_or(b, context=self)
 
@@ -3150,17 +3150,17 @@ class Context(object):
         The operands must be both logical numbers.
 
         >>> ExtendedContext.logical_xor(Decimal('0'), Decimal('0'))
-        Decimal('0')
+        Decimal("0")
         >>> ExtendedContext.logical_xor(Decimal('0'), Decimal('1'))
-        Decimal('1')
+        Decimal("1")
         >>> ExtendedContext.logical_xor(Decimal('1'), Decimal('0'))
-        Decimal('1')
+        Decimal("1")
         >>> ExtendedContext.logical_xor(Decimal('1'), Decimal('1'))
-        Decimal('0')
+        Decimal("0")
         >>> ExtendedContext.logical_xor(Decimal('1100'), Decimal('1010'))
-        Decimal('110')
+        Decimal("110")
         >>> ExtendedContext.logical_xor(Decimal('1111'), Decimal('10'))
-        Decimal('1101')
+        Decimal("1101")
         """
         return a.logical_xor(b, context=self)
 
@@ -3251,13 +3251,13 @@ class Context(object):
         """Returns the largest representable number smaller than a.
 
         >>> ExtendedContext.next_minus(Decimal('1'))
-        Decimal('0.999999999')
+        Decimal("0.999999999")
         >>> ExtendedContext.next_minus(Decimal('1E-1007'))
-        Decimal('0E-1007')
+        Decimal("0E-1007")
         >>> ExtendedContext.next_minus(Decimal('-1.00000003'))
-        Decimal('-1.00000004')
+        Decimal("-1.00000004")
         >>> ExtendedContext.next_minus(Decimal('Infinity'))
-        Decimal('9.99999999E+999')
+        Decimal("9.99999999E+999")
         """
         return a.next_minus(context=self)
 
@@ -3265,13 +3265,13 @@ class Context(object):
         """Returns the smallest representable number larger than a.
 
         >>> ExtendedContext.next_plus(Decimal('1'))
-        Decimal('1.00000001')
+        Decimal("1.00000001")
         >>> ExtendedContext.next_plus(Decimal('-1E-1007'))
-        Decimal('-0E-1007')
+        Decimal("-0E-1007")
         >>> ExtendedContext.next_plus(Decimal('-1.00000003'))
-        Decimal('-1.00000002')
+        Decimal("-1.00000002")
         >>> ExtendedContext.next_plus(Decimal('-Infinity'))
-        Decimal('-9.99999999E+999')
+        Decimal("-9.99999999E+999")
         """
         return a.next_plus(context=self)
 
@@ -3284,19 +3284,19 @@ class Context(object):
         value.
 
         >>> ExtendedContext.next_toward(Decimal('1'), Decimal('2'))
-        Decimal('1.00000001')
+        Decimal("1.00000001")
         >>> ExtendedContext.next_toward(Decimal('-1E-1007'), Decimal('1'))
-        Decimal('-0E-1007')
+        Decimal("-0E-1007")
         >>> ExtendedContext.next_toward(Decimal('-1.00000003'), Decimal('0'))
-        Decimal('-1.00000002')
+        Decimal("-1.00000002")
         >>> ExtendedContext.next_toward(Decimal('1'), Decimal('0'))
-        Decimal('0.999999999')
+        Decimal("0.999999999")
         >>> ExtendedContext.next_toward(Decimal('1E-1007'), Decimal('-100'))
-        Decimal('0E-1007')
+        Decimal("0E-1007")
         >>> ExtendedContext.next_toward(Decimal('-1.00000003'), Decimal('-10'))
-        Decimal('-1.00000004')
+        Decimal("-1.00000004")
         >>> ExtendedContext.next_toward(Decimal('0.00'), Decimal('-0.0000'))
-        Decimal('-0.00')
+        Decimal("-0.00")
         """
         return a.next_toward(b, context=self)
 
@@ -3483,7 +3483,7 @@ class Context(object):
         """Just returns 10, as this is Decimal, :)
 
         >>> ExtendedContext.radix()
-        Decimal('10')
+        Decimal("10")
         """
         return Decimal(10)
 
@@ -3551,15 +3551,15 @@ class Context(object):
         positive or to the right otherwise.
 
         >>> ExtendedContext.rotate(Decimal('34'), Decimal('8'))
-        Decimal('400000003')
+        Decimal("400000003")
         >>> ExtendedContext.rotate(Decimal('12'), Decimal('9'))
-        Decimal('12')
+        Decimal("12")
         >>> ExtendedContext.rotate(Decimal('123456789'), Decimal('-2'))
-        Decimal('891234567')
+        Decimal("891234567")
         >>> ExtendedContext.rotate(Decimal('123456789'), Decimal('0'))
-        Decimal('123456789')
+        Decimal("123456789")
         >>> ExtendedContext.rotate(Decimal('123456789'), Decimal('+2'))
-        Decimal('345678912')
+        Decimal("345678912")
         """
         return a.rotate(b, context=self)
 
@@ -3584,11 +3584,11 @@ class Context(object):
         """Returns the first operand after adding the second value its exp.
 
         >>> ExtendedContext.scaleb(Decimal('7.50'), Decimal('-2'))
-        Decimal('0.0750')
+        Decimal("0.0750")
         >>> ExtendedContext.scaleb(Decimal('7.50'), Decimal('0'))
-        Decimal('7.50')
+        Decimal("7.50")
         >>> ExtendedContext.scaleb(Decimal('7.50'), Decimal('3'))
-        Decimal('7.50E+3')
+        Decimal("7.50E+3")
         """
         return a.scaleb (b, context=self)
 
@@ -3603,15 +3603,15 @@ class Context(object):
         coefficient are zeros.
 
         >>> ExtendedContext.shift(Decimal('34'), Decimal('8'))
-        Decimal('400000000')
+        Decimal("400000000")
         >>> ExtendedContext.shift(Decimal('12'), Decimal('9'))
-        Decimal('0')
+        Decimal("0")
         >>> ExtendedContext.shift(Decimal('123456789'), Decimal('-2'))
-        Decimal('1234567')
+        Decimal("1234567")
         >>> ExtendedContext.shift(Decimal('123456789'), Decimal('0'))
-        Decimal('123456789')
+        Decimal("123456789")
         >>> ExtendedContext.shift(Decimal('123456789'), Decimal('+2'))
-        Decimal('345678900')
+        Decimal("345678900")
         """
         return a.shift(b, context=self)
 
@@ -3683,21 +3683,21 @@ class Context(object):
         context.
 
         >>> ExtendedContext.to_integral_exact(Decimal('2.1'))
-        Decimal('2')
+        Decimal("2")
         >>> ExtendedContext.to_integral_exact(Decimal('100'))
-        Decimal('100')
+        Decimal("100")
         >>> ExtendedContext.to_integral_exact(Decimal('100.0'))
-        Decimal('100')
+        Decimal("100")
         >>> ExtendedContext.to_integral_exact(Decimal('101.5'))
-        Decimal('102')
+        Decimal("102")
         >>> ExtendedContext.to_integral_exact(Decimal('-101.5'))
-        Decimal('-102')
+        Decimal("-102")
         >>> ExtendedContext.to_integral_exact(Decimal('10E+5'))
-        Decimal('1.0E+6')
+        Decimal("1.0E+6")
         >>> ExtendedContext.to_integral_exact(Decimal('7.89E+77'))
-        Decimal('7.89E+77')
+        Decimal("7.89E+77")
         >>> ExtendedContext.to_integral_exact(Decimal('-Inf'))
-        Decimal('-Infinity')
+        Decimal("-Infinity")
         """
 
     def to_integral_value(self, a):
