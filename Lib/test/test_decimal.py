@@ -966,7 +966,7 @@ class DecimalUsabilityTest(unittest.TestCase):
         d1 = Decimal('-25e55')
         b1 = Decimal('-25e55')
         d2 = Decimal('33e+33')
-        b2 = Decimal('33e-33')
+        b2 = Decimal('33e+33')
 
         def checkSameDec(operation, useOther=False):
             if useOther:
