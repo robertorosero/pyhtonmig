@@ -2339,48 +2339,80 @@ class Decimal(object):
 
     def copy_abs(self, context=None):
         """Returns a copy with the sign set to 0. """
+        return Decimal((0, self._int, self._exp))
 
     def copy_negate(self, context=None):
         """Returns a copy with the sign inverted."""
+        if self._sign:
+            return Decimal((0, self._int, self._exp))
+        else:
+            return Decimal((1, self._int, self._exp))
 
     def copy_sign(self, other, context=None):
         """Returns self with the sign of other."""
+        return Decimal((other._sign, self._int, self._exp))
 
     def exp(self, context=None):
         """Returns e ** self."""
 
     def is_canonical(self, context=None):
         """Returns 1 if self is canonical; otherwise returns 0."""
+        return Decimal(1)
 
     def is_finite(self, context=None):
         """Returns 1 if self is finite, otherwise returns 0.
 
         For it to be finite, it must be neither infinite nor a NaN.
         """
+        if self._is_special:
+            return Decimal(0)
+        else:
+            return Decimal(1)
 
     def is_infinite(self, context=None):
         """Returns 1 if self is an Infinite, otherwise returns 0."""
+        if self._isinfinity():
+            return Decimal(1)
+        else:
+            return Decimal(0)
 
     def is_nan(self, context=None):
         """Returns 1 if self is qNaN or sNaN, otherwise returns 0."""
+        if self._isnan():
+            return Decimal(1)
+        else:
+            return Decimal(0)
 
     def is_normal(self, context=None):
         """Returns 1 if self is a normal number, otherwise returns 0."""
 
     def is_qnan(self, context=None):
         """Returns 1 if self is a quiet NaN, otherwise returns 0."""
+        if self._isnan() == 1:
+            return Decimal(1)
+        else:
+            return Decimal(0)
 
     def is_signed(self, context=None):
         """Returns 1 if self is negative, otherwise returns 0."""
+        return Decimal(self._sign)
 
     def is_snan(self, context=None):
         """Returns 1 if self is a signaling NaN, otherwise returns 0."""
+        if self._isnan() == 2:
+            return Decimal(1)
+        else:
+            return Decimal(0)
 
     def is_subnormal(self, context=None):
         """Returns 1 if self is subnormal, otherwise returns 0."""
 
     def is_zero(self, context=None):
         """Returns 1 if self is a zero, otherwise returns 0."""
+        if self:
+            return Decimal(0)
+        else:
+            return Decimal(1)
 
     def ln(self, context=None):
         """Returns the natural (base e) logarithm of self."""
@@ -2457,6 +2489,8 @@ class Decimal(object):
 
     def shift(self, other, context=None):
         """Returns a shifted copy of self, value-of-other times."""
+
+
     # Support for pickling, copy, and deepcopy
     def __reduce__(self):
         return (self.__class__, (str(self),))
@@ -2909,7 +2943,7 @@ class Context(object):
         >>> ExtendedContext.is_canonical(Decimal('2.50'))
         Decimal("1")
         """
-        return a.is_canonical(context=self)
+        return Decimal(1)
 
     def is_finite(self, a):
         """Returns 1 if the operand is finite, otherwise returns 0.
