@@ -2429,11 +2429,53 @@ class Decimal(object):
         without limiting the resulting exponent).
         """
 
+    def _islogical(self):
+        """Return 1 is self is a logical operand.
+
+        For being logical, it must be a finite numbers with a sign of 0,
+        an exponent of 0, and a coefficient whose digits must all be
+        either 0 or 1.
+        """
+        if self._sign != 0 or self._exp != 0:
+            return 0
+        for dig in self._int:
+            if dig not in (0, 1):
+                return 0
+        return 1
+
     def logical_and(self, other, context=None):
         """Applies an 'and' operation between self and other's digits."""
 
     def logical_invert(self, context=None):
         """Invert all its digits."""
+        if context is None:
+            context = getcontext()
+
+        if not self._islogical():
+            return context._raise_error(InvalidOperation)
+
+        # fill to context.prec
+        dif = context.prec - len(self._int)
+        if dif:
+            self._int = (0,)*dif + self._int
+
+        # invert, only starting after the first resulting 1
+        result = []
+        started = False
+        for dig in self._int:
+            if dig == 1 and not started:
+                continue
+            if dig == 1:
+                result.append(0)
+            else:
+                result.append(1)
+                started = True
+        result = tuple(result)
+
+        # if empty, we must have at least a zero
+        if not result:
+            result = (0,)
+        return Decimal((0, result, 0))
 
     def logical_or(self, other, context=None):
         """Applies an 'or' operation between self and other's digits."""
