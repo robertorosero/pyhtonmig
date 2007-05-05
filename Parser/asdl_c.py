@@ -741,25 +741,25 @@ def main(srcfile):
     if INC_DIR:
         p = "%s/%s-ast.h" % (INC_DIR, mod.name)
         f = open(p, "wb")
-        print >> f, auto_gen_msg
-        print >> f, '#include "asdl.h"\n'
+        print(auto_gen_msg, file=f)
+        print('#include "asdl.h"\n', file=f)
         c = ChainOfVisitors(TypeDefVisitor(f),
                             StructVisitor(f),
                             PrototypeVisitor(f),
                             )
         c.visit(mod)
-        print >>f, "PyObject* PyAST_mod2obj(mod_ty t);"
+        print("PyObject* PyAST_mod2obj(mod_ty t);", file=f)
         f.close()
 
     if SRC_DIR:
         p = os.path.join(SRC_DIR, str(mod.name) + "-ast.c")
         f = open(p, "wb")
-        print >> f, auto_gen_msg
-        print >> f, c_file_msg % parse_version(mod)
-        print >> f, '#include "Python.h"'
-        print >> f, '#include "%s-ast.h"' % mod.name
-        print >> f
-        print >>f, "static PyTypeObject* AST_type;"
+        print(auto_gen_msg, file=f)
+        print(c_file_msg % parse_version(mod), file=f)
+        print('#include "Python.h"', file=f)
+        print('#include "%s-ast.h"' % mod.name, file=f)
+        print(file=f)
+        print("static PyTypeObject* AST_type;", file=f)
         v = ChainOfVisitors(
             PyTypesDeclareVisitor(f),
             PyTypesVisitor(f),
@@ -779,7 +779,7 @@ if __name__ == "__main__":
     SRC_DIR = ''
     opts, args = getopt.getopt(sys.argv[1:], "h:c:")
     if len(opts) != 1:
-        print "Must specify exactly one output file"
+        print("Must specify exactly one output file")
         sys.exit(1)
     for o, v in opts:
         if o == '-h':
@@ -787,6 +787,6 @@ if __name__ == "__main__":
         if o == '-c':
             SRC_DIR = v
     if len(args) != 1:
-        print "Must specify single input file"
+        print("Must specify single input file")
         sys.exit(1)
     main(args[0])
