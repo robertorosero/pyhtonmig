@@ -324,7 +324,7 @@ class GenericParser:
             self.states = { 0: self.makeState0() }
             self.makeState(0, self._BOF)
 
-        for i in xrange(len(tokens)):
+        for i in range(len(tokens)):
             sets.append([])
 
             if sets[i] == []:

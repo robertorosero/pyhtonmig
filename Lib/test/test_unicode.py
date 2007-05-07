@@ -90,7 +90,7 @@ class UnicodeTest(
                 "\\xe2\\xe3\\xe4\\xe5\\xe6\\xe7\\xe8\\xe9\\xea\\xeb\\xec\\xed\\xee\\xef"
                 "\\xf0\\xf1\\xf2\\xf3\\xf4\\xf5\\xf6\\xf7\\xf8\\xf9\\xfa\\xfb\\xfc\\xfd"
                 "\\xfe\\xff'")
-            testrepr = repr(u''.join(map(unichr, xrange(256))))
+            testrepr = repr(u''.join(map(unichr, range(256))))
             self.assertEqual(testrepr, latin1repr)
             # Test repr works on wide unicode escapes without overflow.
             self.assertEqual(repr(u"\U00010000" * 39 + u"\uffff" * 4096),
@@ -631,7 +631,7 @@ class UnicodeTest(
         self.assertEqual(u'hello'.encode('latin-1'), 'hello')
 
         # Roundtrip safety for BMP (just the first 1024 chars)
-        for c in xrange(1024):
+        for c in range(1024):
             u = unichr(c)
             for encoding in ('utf-7', 'utf-8', 'utf-16', 'utf-16-le',
                              'utf-16-be', 'raw_unicode_escape',
@@ -639,13 +639,13 @@ class UnicodeTest(
                 self.assertEqual(unicode(u.encode(encoding),encoding), u)
 
         # Roundtrip safety for BMP (just the first 256 chars)
-        for c in xrange(256):
+        for c in range(256):
             u = unichr(c)
             for encoding in ('latin-1',):
                 self.assertEqual(unicode(u.encode(encoding),encoding), u)
 
         # Roundtrip safety for BMP (just the first 128 chars)
-        for c in xrange(128):
+        for c in range(128):
             u = unichr(c)
             for encoding in ('ascii',):
                 self.assertEqual(unicode(u.encode(encoding),encoding), u)
@@ -661,13 +661,14 @@ class UnicodeTest(
         # This excludes surrogates: in the full range, there would be
         # a surrogate pair (\udbff\udc00), which gets converted back
         # to a non-BMP character (\U0010fc00)
-        u = u''.join(map(unichr, range(0,0xd800)+range(0xe000,0x10000)))
+        u = u''.join(map(unichr, list(range(0,0xd800)) +
+                                 list(range(0xe000,0x10000))))
         for encoding in ('utf-8',):
             self.assertEqual(unicode(u.encode(encoding),encoding), u)
 
     def test_codecs_charmap(self):
         # 0-127
-        s = ''.join(map(chr, xrange(128)))
+        s = ''.join(map(chr, range(128)))
         for encoding in (
             'cp037', 'cp1026',
             'cp437', 'cp500', 'cp737', 'cp775', 'cp850',
@@ -695,7 +696,7 @@ class UnicodeTest(
             self.assertEqual(unicode(s, encoding).encode(encoding), s)
 
         # 128-255
-        s = ''.join(map(chr, xrange(128, 256)))
+        s = ''.join(map(chr, range(128, 256)))
         for encoding in (
             'cp037', 'cp1026',
             'cp437', 'cp500', 'cp737', 'cp775', 'cp850',
