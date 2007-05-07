@@ -34,8 +34,8 @@ class SampleClass:
     >>> sc = SampleClass(3)
     >>> for i in range(10):
     ...     sc = sc.double()
-    ...     print(sc.get(), end=' ')
-    6 12 24 48 96 192 384 768 1536 3072
+    ...     print(' ', sc.get(), sep='', end='')
+     6 12 24 48 96 192 384 768 1536 3072
     """
     def __init__(self, val):
         """
@@ -1460,12 +1460,12 @@ at the end of any line:
 
     >>> def f(x): r'''
     ...     >>> for x in range(10): # doctest: +ELLIPSIS
-    ...     ...     print(x, end=' ')
-    ...     0 1 2 ... 9
+    ...     ...     print(' ', x, end='', sep='')
+    ...      0 1 2 ... 9
     ...
     ...     >>> for x in range(10):
-    ...     ...     print(x, end=' ') # doctest: +ELLIPSIS
-    ...     0 1 2 ... 9
+    ...     ...     print(' ', x, end='', sep='') # doctest: +ELLIPSIS
+    ...      0 1 2 ... 9
     ...     '''
     >>> test = doctest.DocTestFinder().find(f)[0]
     >>> doctest.DocTestRunner(verbose=False).run(test)
