@@ -172,6 +172,8 @@ Extension Modules
 Library
 -------
 
+- Remove bsddb185 module it was obsolete.
+
 - Remove commands.getstatus() it was obsolete.
 
 - Remove functions in string and strop modules that are also string methods.

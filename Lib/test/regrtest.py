@@ -819,7 +819,6 @@ _expectations = {
         test__locale
         test_applesingle
         test_al
-        test_bsddb185
         test_bsddb3
         test_cd
         test_cl
@@ -857,7 +856,6 @@ _expectations = {
         """
         test_al
         test_applesingle
-        test_bsddb185
         test_cd
         test_cl
         test_curses
@@ -878,7 +876,6 @@ _expectations = {
         test_al
         test_atexit
         test_bsddb
-        test_bsddb185
         test_bsddb3
         test_bz2
         test_cd
@@ -922,7 +919,6 @@ _expectations = {
         test_al
         test_applesingle
         test_bsddb
-        test_bsddb185
         test_cd
         test_cl
         test_dl
@@ -946,7 +942,6 @@ _expectations = {
         test_al
         test_applesingle
         test_bsddb
-        test_bsddb185
         test_cd
         test_cl
         test_dl
@@ -971,7 +966,6 @@ _expectations = {
         test_applesingle
         test_asynchat
         test_bsddb
-        test_bsddb185
         test_cd
         test_cl
         test_dl
@@ -1005,7 +999,6 @@ _expectations = {
         test_asynchat
         test_atexit
         test_bsddb
-        test_bsddb185
         test_bsddb3
         test_cd
         test_cl
@@ -1062,7 +1055,6 @@ _expectations = {
         test_al
         test_applesingle
         test_bsddb
-        test_bsddb185
         test_cd
         test_cl
         test_curses
@@ -1083,7 +1075,6 @@ _expectations = {
         test_al
         test_applesingle
         test_bsddb
-        test_bsddb185
         test_cd
         test_cl
         test_curses
@@ -1111,7 +1102,6 @@ _expectations = {
         """
         test_al
         test_applesingle
-        test_bsddb185
         test_cd
         test_cl
         test_curses
@@ -1136,7 +1126,6 @@ _expectations = {
         """
         test_al
         test_applesingle
-        test_bsddb185
         test_bsddb3
         test_cd
         test_cl
@@ -1159,7 +1148,6 @@ _expectations = {
         test_al
         test_applesingle
         test_audioop
-        test_bsddb185
         test_bsddb3
         test_cd
         test_cl
@@ -1222,7 +1210,6 @@ _expectations = {
         test_al
         test_applesingle
         test_bsddb
-        test_bsddb185
         test_bsddb3
         test_bz2
         test_cd
@@ -1284,7 +1271,6 @@ _expectations = {
         test_al
         test_applesingle
         test_bsddb
-        test_bsddb185
         test_bsddb3
         test_cd
         test_cl
