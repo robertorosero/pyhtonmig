@@ -818,10 +818,7 @@ _expectations = {
         """
         test__locale
         test_applesingle
-        test_al
         test_bsddb3
-        test_cd
-        test_cl
         test_commands
         test_crypt
         test_curses
@@ -830,9 +827,7 @@ _expectations = {
         test_fcntl
         test_fork1
         test_gdbm
-        test_gl
         test_grp
-        test_imgfile
         test_ioctl
         test_largefile
         test_linuxaudiodev
@@ -854,14 +849,9 @@ _expectations = {
         """,
     'linux2':
         """
-        test_al
         test_applesingle
-        test_cd
-        test_cl
         test_curses
         test_dl
-        test_gl
-        test_imgfile
         test_largefile
         test_linuxaudiodev
         test_nis
@@ -873,13 +863,10 @@ _expectations = {
         """,
    'mac':
         """
-        test_al
         test_atexit
         test_bsddb
         test_bsddb3
         test_bz2
-        test_cd
-        test_cl
         test_commands
         test_crypt
         test_curses
@@ -887,10 +874,8 @@ _expectations = {
         test_dl
         test_fcntl
         test_fork1
-        test_gl
         test_grp
         test_ioctl
-        test_imgfile
         test_largefile
         test_linuxaudiodev
         test_locale
@@ -916,14 +901,9 @@ _expectations = {
         """,
     'unixware7':
         """
-        test_al
         test_applesingle
         test_bsddb
-        test_cd
-        test_cl
         test_dl
-        test_gl
-        test_imgfile
         test_largefile
         test_linuxaudiodev
         test_minidom
@@ -939,14 +919,9 @@ _expectations = {
         """,
     'openunix8':
         """
-        test_al
         test_applesingle
         test_bsddb
-        test_cd
-        test_cl
         test_dl
-        test_gl
-        test_imgfile
         test_largefile
         test_linuxaudiodev
         test_minidom
@@ -962,17 +937,12 @@ _expectations = {
         """,
     'sco_sv3':
         """
-        test_al
         test_applesingle
         test_asynchat
         test_bsddb
-        test_cd
-        test_cl
         test_dl
         test_fork1
         test_gettext
-        test_gl
-        test_imgfile
         test_largefile
         test_linuxaudiodev
         test_locale
@@ -994,14 +964,11 @@ _expectations = {
         """,
     'riscos':
         """
-        test_al
         test_applesingle
         test_asynchat
         test_atexit
         test_bsddb
         test_bsddb3
-        test_cd
-        test_cl
         test_commands
         test_crypt
         test_dbm
@@ -1009,9 +976,7 @@ _expectations = {
         test_fcntl
         test_fork1
         test_gdbm
-        test_gl
         test_grp
-        test_imgfile
         test_largefile
         test_linuxaudiodev
         test_locale
@@ -1036,12 +1001,7 @@ _expectations = {
         """,
     'darwin':
         """
-        test_al
-        test_cd
-        test_cl
         test_gdbm
-        test_gl
-        test_imgfile
         test_largefile
         test_linuxaudiodev
         test_locale
@@ -1052,17 +1012,12 @@ _expectations = {
         """,
     'sunos5':
         """
-        test_al
         test_applesingle
         test_bsddb
-        test_cd
-        test_cl
         test_curses
         test_dbm
         test_gdbm
-        test_gl
         test_gzip
-        test_imgfile
         test_linuxaudiodev
         test_openpty
         test_sqlite
@@ -1072,17 +1027,12 @@ _expectations = {
         """,
     'hp-ux11':
         """
-        test_al
         test_applesingle
         test_bsddb
-        test_cd
-        test_cl
         test_curses
         test_dl
         test_gdbm
-        test_gl
         test_gzip
-        test_imgfile
         test_largefile
         test_linuxaudiodev
         test_locale
@@ -1100,15 +1050,10 @@ _expectations = {
         """,
     'atheos':
         """
-        test_al
         test_applesingle
-        test_cd
-        test_cl
         test_curses
         test_dl
         test_gdbm
-        test_gl
-        test_imgfile
         test_largefile
         test_linuxaudiodev
         test_locale
@@ -1124,15 +1069,10 @@ _expectations = {
         """,
     'cygwin':
         """
-        test_al
         test_applesingle
         test_bsddb3
-        test_cd
-        test_cl
         test_curses
         test_dbm
-        test_gl
-        test_imgfile
         test_ioctl
         test_largefile
         test_linuxaudiodev
@@ -1145,17 +1085,12 @@ _expectations = {
         """,
     'os2emx':
         """
-        test_al
         test_applesingle
         test_audioop
         test_bsddb3
-        test_cd
-        test_cl
         test_commands
         test_curses
         test_dl
-        test_gl
-        test_imgfile
         test_largefile
         test_linuxaudiodev
         test_mhlib
@@ -1173,15 +1108,10 @@ _expectations = {
     'freebsd4':
         """
         test_aepack
-        test_al
         test_applesingle
         test_bsddb
         test_bsddb3
-        test_cd
-        test_cl
         test_gdbm
-        test_gl
-        test_imgfile
         test_linuxaudiodev
         test_locale
         test_macfs
@@ -1207,18 +1137,13 @@ _expectations = {
     'aix5':
         """
         test_aepack
-        test_al
         test_applesingle
         test_bsddb
         test_bsddb3
         test_bz2
-        test_cd
-        test_cl
         test_dl
         test_gdbm
-        test_gl
         test_gzip
-        test_imgfile
         test_linuxaudiodev
         test_macfs
         test_macostools
@@ -1236,17 +1161,12 @@ _expectations = {
     'openbsd3':
         """
         test_aepack
-        test_al
         test_applesingle
         test_bsddb
         test_bsddb3
-        test_cd
-        test_cl
         test_ctypes
         test_dl
         test_gdbm
-        test_gl
-        test_imgfile
         test_linuxaudiodev
         test_locale
         test_macfs
@@ -1268,18 +1188,13 @@ _expectations = {
     'netbsd3':
         """
         test_aepack
-        test_al
         test_applesingle
         test_bsddb
         test_bsddb3
-        test_cd
-        test_cl
         test_ctypes
         test_curses
         test_dl
         test_gdbm
-        test_gl
-        test_imgfile
         test_linuxaudiodev
         test_locale
         test_macfs

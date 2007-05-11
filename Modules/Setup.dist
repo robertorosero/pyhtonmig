@@ -250,42 +250,6 @@ GLHACK=-Dclear=__GLclear
 #_sha shamodule.c
 
 
-# SGI IRIX specific modules -- off by default.
-
-# These module work on any SGI machine:
-
-# *** gl must be enabled higher up in this file ***
-#fm fmmodule.c $(GLHACK) -lfm -lgl		# Font Manager
-#sgi sgimodule.c			# sgi.nap() and a few more
-
-# This module requires the header file
-# /usr/people/4Dgifts/iristools/include/izoom.h:
-#imgfile imgfile.c -limage -lgutil -lgl -lm	# Image Processing Utilities
-
-
-# These modules require the Multimedia Development Option (I think):
-
-#al almodule.c -laudio			# Audio Library
-#cd cdmodule.c -lcdaudio -lds -lmediad	# CD Audio Library
-#cl clmodule.c -lcl -lawareaudio	# Compression Library
-#sv svmodule.c yuvconvert.c -lsvideo -lXext -lX11	# Starter Video
-
-
-# The FORMS library, by Mark Overmars, implements user interface
-# components such as dialogs and buttons using SGI's GL and FM
-# libraries.  You must ftp the FORMS library separately from
-# ftp://ftp.cs.ruu.nl/pub/SGI/FORMS.  It was tested with FORMS 2.2a.
-# NOTE: if you want to be able to use FORMS and curses simultaneously
-# (or both link them statically into the same binary), you must
-# compile all of FORMS with the cc option "-Dclear=__GLclear".
-
-# The FORMS variable must point to the FORMS subdirectory of the forms
-# toplevel directory:
-
-#FORMS=/ufs/guido/src/forms/FORMS
-#fl flmodule.c -I$(FORMS) $(GLHACK) $(FORMS)/libforms.a -lfm -lgl
-
-
 # SunOS specific modules -- off by default:
 
 #sunaudiodev sunaudiodev.c

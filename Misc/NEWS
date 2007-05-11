@@ -172,6 +172,8 @@ Extension Modules
 Library
 -------
 
+- Remove obsolete IRIX modules: al, cd, cl, fl, fm, gl, imgfile, sgi, sv.
+
 - Remove bsddb185 module it was obsolete.
 
 - Remove commands.getstatus() it was obsolete.
