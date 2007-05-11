@@ -409,17 +409,6 @@ GLHACK=-Dclear=__GLclear
 #DBLIB=$(DB)/lib
 #_bsddb _bsddb.c -I$(DBINC) -L$(DBLIB) -ldb-$(DBLIBVER)
 
-# Historical Berkeley DB 1.85
-#
-# This module is deprecated; the 1.85 version of the Berkeley DB library has
-# bugs that can cause data corruption. If you can, use later versions of the
-# library instead, available from <http://www.sleepycat.com/>.
-
-#DB=/depot/sundry/src/berkeley-db/db.1.85
-#DBPORT=$(DB)/PORT/irix.5.3
-#bsddb185 bsddbmodule.c -I$(DBPORT)/include -I$(DBPORT) $(DBPORT)/libdb.a
-
-
 
 # Helper module for various ascii-encoders
 #binascii binascii.c
