@@ -3149,7 +3149,7 @@ unpack_iterable(PyObject *v, int argcnt, int argcntafter, PyObject **sp)
 
 	ll = PyList_GET_SIZE(l);
 	if (ll < argcntafter) {
-		PyErr_Format(PyExc_ValueError, "need more than %d values to unpack",
+		PyErr_Format(PyExc_ValueError, "need more than %zd values to unpack",
 			     argcnt + ll);
 		goto Error;
 	}
