@@ -392,6 +392,9 @@ set_context(expr_ty e, expr_context_ty ctx, const node *n)
         case ListComp_kind:
             expr_name = "list comprehension";
             break;
+        case SetComp_kind:
+            expr_name = "set comprehension";
+            break;
         case Dict_kind:
         case Set_kind:
         case Num_kind:
