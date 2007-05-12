@@ -200,7 +200,6 @@ LIBFILES= $(MANSTYLES) $(INDEXSTYLES) $(COMMONTEX) \
 	lib/libaudioop.tex \
 	lib/libimageop.tex \
 	lib/libaifc.tex \
-	lib/libjpeg.tex \
 	lib/librgbimg.tex \
 	lib/libossaudiodev.tex \
 	lib/libcrypto.tex \
