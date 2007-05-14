@@ -178,6 +178,8 @@ Extension Modules
 Library
 -------
 
+- Remove md5 and sha.  Both have been deprecated since Python 2.5.
+
 - Remove Bastion and rexec as they have been disabled since Python 2.3 (this
   also leads to the C API support for restricted execution).
 
