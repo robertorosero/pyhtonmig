@@ -26,6 +26,8 @@ TO DO
 Core and Builtins
 -----------------
 
+- Remove tuple parameter unpacking (PEP 3113).
+
 - Remove the f_restricted attribute from frames.  This naturally leads to teh
   removal of PyEval_GetRestricted() and PyFrame_IsRestricted().
 
