@@ -802,13 +802,7 @@ r_object(RFILE *p)
 		return v3;
 
 	case TYPE_CODE:
-		if (PyEval_GetRestricted()) {
-			PyErr_SetString(PyExc_RuntimeError,
-				"cannot unmarshal code objects in "
-				"restricted execution mode");
-			return NULL;
-		}
-		else {
+		{
 			int argcount;
 			int kwonlyargcount;
 			int nlocals;
@@ -827,7 +821,7 @@ r_object(RFILE *p)
 			
 			v = NULL;
 
-                        /* XXX ignore long->int overflows for now */
+			/* XXX ignore long->int overflows for now */
 			argcount = (int)r_long(p);
 			kwonlyargcount = (int)r_long(p);
 			nlocals = (int)r_long(p);
@@ -880,8 +874,8 @@ r_object(RFILE *p)
 			Py_XDECREF(name);
 			Py_XDECREF(lnotab);
 
+			return v;
 		}
-		return v;
 
 	default:
 		/* Bogus data got written, which isn't ideal.
