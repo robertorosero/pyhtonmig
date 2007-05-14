@@ -88,7 +88,6 @@ LIBFILES= $(MANSTYLES) $(INDEXSTYLES) $(COMMONTEX) \
 	commontex/reportingbugs.tex \
 	lib/lib.tex \
 	lib/asttable.tex \
-	lib/compiler.tex \
 	lib/distutils.tex \
 	lib/email.tex \
 	lib/emailencoders.tex \
