@@ -180,8 +180,10 @@ Extension Modules
 Library
 -------
 
-- Remove the compiler package.  Use of the _ast module and (an eventual) AST ->
-  bytecode mechanism.
+- Remove popen2 module and os.popen* functions.
+
+- Remove the compiler package.  Use of the _ast module and (an eventual)
+  AST -> bytecode mechanism.
 
 - Remove md5 and sha.  Both have been deprecated since Python 2.5.
 
