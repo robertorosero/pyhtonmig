@@ -987,7 +987,6 @@ _expectations = {
         test_poll
         test_pty
         test_pwd
-        test_strop
         test_sqlite
         test_startfile
         test_sunaudiodev
