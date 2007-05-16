@@ -12,9 +12,20 @@ Usage
 ======
 Status
 ======
-* Decide how to squirrel away and access 'open'.
 * Turn on whitelisting.
+    - Verify injecting 'open' into importlib works.
 * Write tests.
+    - Import
+        + Delegate protects importlib.
+        + Whitelisting works.
+            * Name fall-through to alternate implementation.
+        + '.hidden' cannot be imported.
+        + Removed modules cannot be imported (unless whitelisted).
+    - Built-in namespace properly cleansed.
+        + Nothing exposed through __builtin__ or __builtins__.
+    - Types crippled.
+        + file
+        + code
 
 ==========
 References

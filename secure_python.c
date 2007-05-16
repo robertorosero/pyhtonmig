@@ -26,6 +26,11 @@ main(int argc, char *argv[])
 
     import_module = PyImport_ImportModule("importlib");
 
+    /* XXX Hack to make importlib work w/o 'open' in the built-in namespace.
+       Fixed in controlled_importlib.  */
+    PyDict_SetItemString(PyModule_GetDict(import_module), "open",
+		    PyDict_GetItemString(interp->builtins, "open"));
+
     import_callable = PyObject_CallMethod(import_module, "Import", "");
 
     /* Store import machinery somewhere so that a reference is held as
