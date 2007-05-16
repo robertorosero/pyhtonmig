@@ -163,7 +163,6 @@ _symtable symtablemodule.c
 #_random _randommodule.c	# Random number generator
 #collections collectionsmodule.c # Container types
 #itertools itertoolsmodule.c	# Functions creating iterators for efficient looping 
-#strop stropmodule.c		# String manipulations
 #atexit atexitmodule.c      # Register functions to be run at interpreter-shutdown
 
 #unicodedata unicodedata.c    # static Unicode character database
