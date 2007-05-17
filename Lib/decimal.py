@@ -2443,45 +2443,90 @@ class Decimal(object):
                 return 0
         return 1
 
+    def _fill_logical(self, context, opa, opb):
+        dif = context.prec - len(opa)
+        if dif > 0:
+            opa = (0,)*dif + opa
+        elif dif < 0:
+            opa = opa[-context.prec:]
+        dif = context.prec - len(opb)
+        if dif > 0:
+            opb = (0,)*dif + opb
+        elif dif < 0:
+            opb = opb[-context.prec:]
+        return opa, opb
+
     def logical_and(self, other, context=None):
         """Applies an 'and' operation between self and other's digits."""
-
-    def logical_invert(self, context=None):
-        """Invert all its digits."""
         if context is None:
             context = getcontext()
-
-        if not self._islogical():
+        if not self._islogical() or not other._islogical():
             return context._raise_error(InvalidOperation)
 
         # fill to context.prec
-        dif = context.prec - len(self._int)
-        if dif:
-            self._int = (0,)*dif + self._int
+        (opa, opb) = self._fill_logical(context, self._int, other._int)
 
-        # invert, only starting after the first resulting 1
-        result = []
-        started = False
-        for dig in self._int:
-            if dig == 1 and not started:
-                continue
-            if dig == 1:
-                result.append(0)
-            else:
-                result.append(1)
-                started = True
-        result = tuple(result)
+        # make the operation, and clean starting zeroes
+        result = [a&b for a,b in zip(opa,opb)]
+        for i,d in enumerate(result):
+            if d == 1:
+                break
+        result = tuple(result[i:])
 
         # if empty, we must have at least a zero
         if not result:
             result = (0,)
         return Decimal((0, result, 0))
 
+    def logical_invert(self, context=None):
+        """Invert all its digits."""
+        if context is None:
+            context = getcontext()
+        return self.logical_xor(Decimal((0,(1,)*context.prec,0)), context)
+
     def logical_or(self, other, context=None):
         """Applies an 'or' operation between self and other's digits."""
+        if context is None:
+            context = getcontext()
+        if not self._islogical() or not other._islogical():
+            return context._raise_error(InvalidOperation)
+
+        # fill to context.prec
+        (opa, opb) = self._fill_logical(context, self._int, other._int)
+
+        # make the operation, and clean starting zeroes
+        result = [a|b for a,b in zip(opa,opb)]
+        for i,d in enumerate(result):
+            if d == 1:
+                break
+        result = tuple(result[i:])
+
+        # if empty, we must have at least a zero
+        if not result:
+            result = (0,)
+        return Decimal((0, result, 0))
 
     def logical_xor(self, other, context=None):
         """Applies an 'xor' operation between self and other's digits."""
+        if context is None:
+            context = getcontext()
+        if not self._islogical() or not other._islogical():
+            return context._raise_error(InvalidOperation)
+
+        # fill to context.prec
+        (opa, opb) = self._fill_logical(context, self._int, other._int)
+
+        # make the operation, and clean starting zeroes
+        result = [a^b for a,b in zip(opa,opb)]
+        for i,d in enumerate(result):
+            if d == 1:
+                break
+        result = tuple(result[i:])
+
+        # if empty, we must have at least a zero
+        if not result:
+            result = (0,)
+        return Decimal((0, result, 0))
 
     def max_mag(self, other, context=None):
         """Compares the values numerically with their sign ignored."""
