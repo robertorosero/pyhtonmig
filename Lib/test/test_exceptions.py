@@ -11,7 +11,6 @@ except ImportError:
 
 from test.test_support import (TESTFN, unlink, run_unittest,
                                 guard_warnings_filter)
-from test.test_pep352 import ignore_message_warning
 
 # XXX This is not really enough, each *operation* should be tested!
 
@@ -205,109 +204,107 @@ class ExceptionTests(unittest.TestCase):
         # test that exception attributes are happy
 
         exceptionList = [
-            (BaseException, (), {'message' : '', 'args' : ()}),
-            (BaseException, (1, ), {'message' : 1, 'args' : (1,)}),
+            (BaseException, (), {'args' : ()}),
+            (BaseException, (1, ), {'args' : (1,)}),
             (BaseException, ('foo',),
-                {'message' : 'foo', 'args' : ('foo',)}),
+                {'args' : ('foo',)}),
             (BaseException, ('foo', 1),
-                {'message' : '', 'args' : ('foo', 1)}),
+                {'args' : ('foo', 1)}),
             (SystemExit, ('foo',),
-                {'message' : 'foo', 'args' : ('foo',), 'code' : 'foo'}),
+                {'args' : ('foo',), 'code' : 'foo'}),
             (IOError, ('foo',),
-                {'message' : 'foo', 'args' : ('foo',), 'filename' : None,
+                {'args' : ('foo',), 'filename' : None,
                  'errno' : None, 'strerror' : None}),
             (IOError, ('foo', 'bar'),
-                {'message' : '', 'args' : ('foo', 'bar'), 'filename' : None,
+                {'args' : ('foo', 'bar'), 'filename' : None,
                  'errno' : 'foo', 'strerror' : 'bar'}),
             (IOError, ('foo', 'bar', 'baz'),
-                {'message' : '', 'args' : ('foo', 'bar'), 'filename' : 'baz',
+                {'args' : ('foo', 'bar'), 'filename' : 'baz',
                  'errno' : 'foo', 'strerror' : 'bar'}),
             (IOError, ('foo', 'bar', 'baz', 'quux'),
-                {'message' : '', 'args' : ('foo', 'bar', 'baz', 'quux')}),
+                {'args' : ('foo', 'bar', 'baz', 'quux')}),
             (EnvironmentError, ('errnoStr', 'strErrorStr', 'filenameStr'),
-                {'message' : '', 'args' : ('errnoStr', 'strErrorStr'),
+                {'args' : ('errnoStr', 'strErrorStr'),
                  'strerror' : 'strErrorStr', 'errno' : 'errnoStr',
                  'filename' : 'filenameStr'}),
             (EnvironmentError, (1, 'strErrorStr', 'filenameStr'),
-                {'message' : '', 'args' : (1, 'strErrorStr'), 'errno' : 1,
+                {'args' : (1, 'strErrorStr'), 'errno' : 1,
                  'strerror' : 'strErrorStr', 'filename' : 'filenameStr'}),
-            (SyntaxError, (), {'message' : '', 'msg' : None, 'text' : None,
+            (SyntaxError, (), {'msg' : None, 'text' : None,
                 'filename' : None, 'lineno' : None, 'offset' : None,
                 'print_file_and_line' : None}),
             (SyntaxError, ('msgStr',),
-                {'message' : 'msgStr', 'args' : ('msgStr',), 'text' : None,
+                {'args' : ('msgStr',), 'text' : None,
                  'print_file_and_line' : None, 'msg' : 'msgStr',
                  'filename' : None, 'lineno' : None, 'offset' : None}),
             (SyntaxError, ('msgStr', ('filenameStr', 'linenoStr', 'offsetStr',
                            'textStr')),
-                {'message' : '', 'offset' : 'offsetStr', 'text' : 'textStr',
+                {'offset' : 'offsetStr', 'text' : 'textStr',
                  'args' : ('msgStr', ('filenameStr', 'linenoStr',
                                       'offsetStr', 'textStr')),
                  'print_file_and_line' : None, 'msg' : 'msgStr',
                  'filename' : 'filenameStr', 'lineno' : 'linenoStr'}),
             (SyntaxError, ('msgStr', 'filenameStr', 'linenoStr', 'offsetStr',
                            'textStr', 'print_file_and_lineStr'),
-                {'message' : '', 'text' : None,
+                {'text' : None,
                  'args' : ('msgStr', 'filenameStr', 'linenoStr', 'offsetStr',
                            'textStr', 'print_file_and_lineStr'),
                  'print_file_and_line' : None, 'msg' : 'msgStr',
                  'filename' : None, 'lineno' : None, 'offset' : None}),
-            (UnicodeError, (), {'message' : '', 'args' : (),}),
+            (UnicodeError, (), {'args' : (),}),
             (UnicodeEncodeError, ('ascii', u'a', 0, 1, 'ordinal not in range'),
-                {'message' : '', 'args' : ('ascii', u'a', 0, 1,
+                {'args' : ('ascii', u'a', 0, 1,
                                            'ordinal not in range'),
                  'encoding' : 'ascii', 'object' : u'a',
                  'start' : 0, 'reason' : 'ordinal not in range'}),
             (UnicodeDecodeError, ('ascii', '\xff', 0, 1, 'ordinal not in range'),
-                {'message' : '', 'args' : ('ascii', '\xff', 0, 1,
+                {'args' : ('ascii', '\xff', 0, 1,
                                            'ordinal not in range'),
                  'encoding' : 'ascii', 'object' : '\xff',
                  'start' : 0, 'reason' : 'ordinal not in range'}),
             (UnicodeTranslateError, (u"\u3042", 0, 1, "ouch"),
-                {'message' : '', 'args' : (u'\u3042', 0, 1, 'ouch'),
+                {'args' : (u'\u3042', 0, 1, 'ouch'),
                  'object' : u'\u3042', 'reason' : 'ouch',
                  'start' : 0, 'end' : 1}),
         ]
         try:
             exceptionList.append(
                 (WindowsError, (1, 'strErrorStr', 'filenameStr'),
-                    {'message' : '', 'args' : (1, 'strErrorStr'),
+                    {'args' : (1, 'strErrorStr'),
                      'strerror' : 'strErrorStr', 'winerror' : 1,
                      'errno' : 22, 'filename' : 'filenameStr'})
             )
         except NameError:
             pass
 
-        with guard_warnings_filter():
-            ignore_message_warning()
-            for exc, args, expected in exceptionList:
-                try:
-                    raise exc(*args)
-                except BaseException as e:
-                    if type(e) is not exc:
-                        raise
-                    # Verify module name
-                    self.assertEquals(type(e).__module__, '__builtin__')
-                    # Verify no ref leaks in Exc_str()
-                    s = str(e)
-                    for checkArgName in expected:
-                        self.assertEquals(repr(getattr(e, checkArgName)),
-                                          repr(expected[checkArgName]),
-                                          'exception "%s", attribute "%s"' %
-                                           (repr(e), checkArgName))
+        for exc, args, expected in exceptionList:
+            try:
+                raise exc(*args)
+            except BaseException as e:
+                if type(e) is not exc:
+                    raise
+                # Verify module name
+                self.assertEquals(type(e).__module__, '__builtin__')
+                # Verify no ref leaks in Exc_str()
+                s = str(e)
+                for checkArgName in expected:
+                    self.assertEquals(repr(getattr(e, checkArgName)),
+                                      repr(expected[checkArgName]),
+                                      'exception "%s", attribute "%s"' %
+                                       (repr(e), checkArgName))
 
-                    # test for pickling support
-                    for p in pickle, cPickle:
-                        if p is None:
-                            continue # cPickle not found -- skip it
-                        for protocol in range(p.HIGHEST_PROTOCOL + 1):
-                            new = p.loads(p.dumps(e, protocol))
-                            for checkArgName in expected:
-                                got = repr(getattr(new, checkArgName))
-                                want = repr(expected[checkArgName])
-                                self.assertEquals(got, want,
-                                                  'pickled "%r", attribute "%s' %
-                                                  (e, checkArgName))
+                # test for pickling support
+                for p in pickle, cPickle:
+                    if p is None:
+                        continue # cPickle not found -- skip it
+                    for protocol in range(p.HIGHEST_PROTOCOL + 1):
+                        new = p.loads(p.dumps(e, protocol))
+                        for checkArgName in expected:
+                            got = repr(getattr(new, checkArgName))
+                            want = repr(expected[checkArgName])
+                            self.assertEquals(got, want,
+                                              'pickled "%r", attribute "%s' %
+                                              (e, checkArgName))
 
     def testKeywordArgs(self):
         # test that builtin exception don't take keyword args,

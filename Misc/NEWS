@@ -26,6 +26,8 @@ TO DO
 Core and Builtins
 -----------------
 
+- Remove BaseException.message.
+
 - Remove strop module.
 
 - Remove tuple parameter unpacking (PEP 3113).
