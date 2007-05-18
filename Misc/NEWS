@@ -173,6 +173,7 @@ Core and Builtins
 - Additions:
   set literals, ellipsis literal
 
+- Added class decorators per PEP 3129.
 
 Extension Modules
 -----------------
