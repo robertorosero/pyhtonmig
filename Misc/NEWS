@@ -178,6 +178,9 @@ Core and Builtins
 Extension Modules
 -----------------
 
+- Remove the imageop module.  Obsolete long with its unit tests becoming
+  useless from the removal of rgbimg and imgfile.
+
 - isCallable() and sequenceIncludes() have been removed from the operator
   module.
 

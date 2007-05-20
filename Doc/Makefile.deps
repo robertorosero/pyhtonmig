@@ -197,7 +197,6 @@ LIBFILES= $(MANSTYLES) $(INDEXSTYLES) $(COMMONTEX) \
 	lib/libbinascii.tex \
 	lib/libmm.tex \
 	lib/libaudioop.tex \
-	lib/libimageop.tex \
 	lib/libaifc.tex \
 	lib/librgbimg.tex \
 	lib/libossaudiodev.tex \
