@@ -1241,6 +1241,11 @@ class _ExpectedSkips:
                 for skip in WIN_ONLY:
                     self.expected.add(skip)
 
+            if sys.platform != 'irix':
+                IRIX_ONLY =["test_imageop"]
+                for skip in IRIX_ONLY:
+                    self.expected.add(skip)
+
             self.valid = True
 
     def isvalid(self):

@@ -185,7 +185,6 @@ LIBFILES= $(MANSTYLES) $(INDEXSTYLES) $(COMMONTEX) \
 	lib/liburllib2.tex \
 	lib/libhttplib.tex \
 	lib/libftplib.tex \
-	lib/libgopherlib.tex \
 	lib/libnntplib.tex \
 	lib/liburlparse.tex \
 	lib/libhtmlparser.tex \
@@ -198,7 +197,6 @@ LIBFILES= $(MANSTYLES) $(INDEXSTYLES) $(COMMONTEX) \
 	lib/libmm.tex \
 	lib/libaudioop.tex \
 	lib/libaifc.tex \
-	lib/librgbimg.tex \
 	lib/libossaudiodev.tex \
 	lib/libcrypto.tex \
 	lib/libhashlib.tex \
