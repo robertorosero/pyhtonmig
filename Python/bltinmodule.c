@@ -247,19 +247,6 @@ Return True if bool(x) is True for any x in the iterable.");
 
 
 static PyObject *
-builtin_callable(PyObject *self, PyObject *v)
-{
-	return PyBool_FromLong((long)PyCallable_Check(v));
-}
-
-PyDoc_STRVAR(callable_doc,
-"callable(object) -> bool\n\
-\n\
-Return whether the object is callable (i.e., some kind of function).\n\
-Note that classes are callable, as are instances with a __call__() method.");
-
-
-static PyObject *
 builtin_filter(PyObject *self, PyObject *args)
 {
 	PyObject *func, *seq, *result, *it, *arg;
@@ -1973,7 +1960,6 @@ static PyMethodDef builtin_methods[] = {
  	{"abs",		builtin_abs,        METH_O, abs_doc},
  	{"all",		builtin_all,        METH_O, all_doc},
  	{"any",		builtin_any,        METH_O, any_doc},
- 	{"callable",	builtin_callable,   METH_O, callable_doc},
  	{"chr",		builtin_chr,        METH_VARARGS, chr_doc},
  	{"cmp",		builtin_cmp,        METH_VARARGS, cmp_doc},
  	{"compile",	(PyCFunction)builtin_compile,    METH_VARARGS | METH_KEYWORDS, compile_doc},
