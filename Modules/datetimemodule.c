@@ -2605,7 +2605,7 @@ static PyMethodDef date_methods[] = {
 	{"ctime",       (PyCFunction)date_ctime,        METH_NOARGS,
 	 PyDoc_STR("Return ctime() style string.")},
 
-	{"strftime",   	(PyCFunction)date_strftime,	METH_KEYWORDS,
+	{"strftime",   	(PyCFunction)date_strftime,	METH_VARARGS | METH_KEYWORDS,
 	 PyDoc_STR("format -> strftime() style string.")},
 
 	{"timetuple",   (PyCFunction)date_timetuple,    METH_NOARGS,
@@ -2630,7 +2630,7 @@ static PyMethodDef date_methods[] = {
 	 PyDoc_STR("Return the day of the week represented by the date.\n"
 		   "Monday == 0 ... Sunday == 6")},
 
-	{"replace",     (PyCFunction)date_replace,      METH_KEYWORDS,
+	{"replace",     (PyCFunction)date_replace,      METH_VARARGS | METH_KEYWORDS,
 	 PyDoc_STR("Return date with new specified fields.")},
 
 	{"__reduce__", (PyCFunction)date_reduce,        METH_NOARGS,
@@ -3380,7 +3380,7 @@ static PyMethodDef time_methods[] = {
 	 PyDoc_STR("Return string in ISO 8601 format, HH:MM:SS[.mmmmmm]"
 	 	   "[+HH:MM].")},
 
-	{"strftime",   	(PyCFunction)time_strftime,	METH_KEYWORDS,
+	{"strftime",   	(PyCFunction)time_strftime,	METH_VARARGS | METH_KEYWORDS,
 	 PyDoc_STR("format -> strftime() style string.")},
 
 	{"utcoffset",	(PyCFunction)time_utcoffset,	METH_NOARGS,
@@ -3392,7 +3392,7 @@ static PyMethodDef time_methods[] = {
 	{"dst",		(PyCFunction)time_dst,		METH_NOARGS,
 	 PyDoc_STR("Return self.tzinfo.dst(self).")},
 
-	{"replace",     (PyCFunction)time_replace,	METH_KEYWORDS,
+	{"replace",     (PyCFunction)time_replace,	METH_VARARGS | METH_KEYWORDS,
 	 PyDoc_STR("Return time with new specified fields.")},
 
 	{"__reduce__", (PyCFunction)time_reduce,        METH_NOARGS,
@@ -4418,7 +4418,7 @@ static PyMethodDef datetime_methods[] = {
 	/* Class methods: */
 
 	{"now",         (PyCFunction)datetime_now,
-	 METH_KEYWORDS | METH_CLASS,
+	 METH_VARARGS | METH_KEYWORDS | METH_CLASS,
 	 PyDoc_STR("[tz] -> new datetime with tz's local day and time.")},
 
 	{"utcnow",         (PyCFunction)datetime_utcnow,
@@ -4426,7 +4426,7 @@ static PyMethodDef datetime_methods[] = {
 	 PyDoc_STR("Return a new datetime representing UTC day and time.")},
 
 	{"fromtimestamp", (PyCFunction)datetime_fromtimestamp,
-	 METH_KEYWORDS | METH_CLASS,
+	 METH_VARARGS | METH_KEYWORDS | METH_CLASS,
 	 PyDoc_STR("timestamp[, tz] -> tz's local time from POSIX timestamp.")},
 
 	{"utcfromtimestamp", (PyCFunction)datetime_utcfromtimestamp,
@@ -4463,7 +4463,7 @@ static PyMethodDef datetime_methods[] = {
 	{"utctimetuple",   (PyCFunction)datetime_utctimetuple, METH_NOARGS,
          PyDoc_STR("Return UTC time tuple, compatible with time.localtime().")},
 
-	{"isoformat",   (PyCFunction)datetime_isoformat, METH_KEYWORDS,
+	{"isoformat",   (PyCFunction)datetime_isoformat, METH_VARARGS | METH_KEYWORDS,
 	 PyDoc_STR("[sep] -> string in ISO 8601 format, "
 	 	   "YYYY-MM-DDTHH:MM:SS[.mmmmmm][+HH:MM].\n\n"
 	 	   "sep is used to separate the year from the time, and "
@@ -4478,10 +4478,10 @@ static PyMethodDef datetime_methods[] = {
 	{"dst",		(PyCFunction)datetime_dst, METH_NOARGS,
 	 PyDoc_STR("Return self.tzinfo.dst(self).")},
 
-	{"replace",     (PyCFunction)datetime_replace,	METH_KEYWORDS,
+	{"replace",     (PyCFunction)datetime_replace,	METH_VARARGS | METH_KEYWORDS,
 	 PyDoc_STR("Return datetime with new specified fields.")},
 
-	{"astimezone",  (PyCFunction)datetime_astimezone, METH_KEYWORDS,
+	{"astimezone",  (PyCFunction)datetime_astimezone, METH_VARARGS | METH_KEYWORDS,
 	 PyDoc_STR("tz -> convert to local time in new timezone tz\n")},
 
 	{"__reduce__", (PyCFunction)datetime_reduce,     METH_NOARGS,

@@ -1108,7 +1108,6 @@ _expectations = {
         test_gdbm
         test_linuxaudiodev
         test_locale
-        test_macfs
         test_macostools
         test_nis
         test_ossaudiodev
@@ -1139,7 +1138,6 @@ _expectations = {
         test_gdbm
         test_gzip
         test_linuxaudiodev
-        test_macfs
         test_macostools
         test_nis
         test_ossaudiodev
@@ -1163,7 +1161,6 @@ _expectations = {
         test_gdbm
         test_linuxaudiodev
         test_locale
-        test_macfs
         test_macostools
         test_nis
         test_normalization
@@ -1191,7 +1188,6 @@ _expectations = {
         test_gdbm
         test_linuxaudiodev
         test_locale
-        test_macfs
         test_macostools
         test_nis
         test_ossaudiodev
@@ -1230,7 +1226,7 @@ class _ExpectedSkips:
                 self.expected.add('test_timeout')
 
             if not sys.platform in ("mac", "darwin"):
-                MAC_ONLY = ["test_macostools", "test_macfs", "test_aepack",
+                MAC_ONLY = ["test_macostools", "test_aepack",
                             "test_plistlib", "test_scriptpackages"]
                 for skip in MAC_ONLY:
                     self.expected.add(skip)
