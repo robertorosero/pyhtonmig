@@ -1,0 +1,5 @@
+The 'succeed' directory contains files that when run should always run to
+conclusion without failure.
+
+The 'fail' directory has files that should always raise the exception specified
+in the file's name.
