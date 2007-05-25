@@ -5,7 +5,9 @@ import sys
 import unittest
 import pickle, cPickle
 
-from test.test_support import TESTFN, unlink, run_unittest
+from test.test_support import (TESTFN, unlink, run_unittest,
+                                guard_warnings_filter)
+from test.test_pep352 import ignore_message_warning
 
 # XXX This is not really enough, each *operation* should be tested!
 
@@ -225,6 +227,9 @@ class ExceptionTests(unittest.TestCase):
             (EnvironmentError, (1, 'strErrorStr', 'filenameStr'),
                 {'message' : '', 'args' : (1, 'strErrorStr'), 'errno' : 1,
                  'strerror' : 'strErrorStr', 'filename' : 'filenameStr'}),
+            (SyntaxError, (), {'message' : '', 'msg' : None, 'text' : None,
+                'filename' : None, 'lineno' : None, 'offset' : None,
+                'print_file_and_line' : None}),
             (SyntaxError, ('msgStr',),
                 {'message' : 'msgStr', 'args' : ('msgStr',), 'text' : None,
                  'print_file_and_line' : None, 'msg' : 'msgStr',
@@ -269,32 +274,34 @@ class ExceptionTests(unittest.TestCase):
         except NameError:
             pass
 
-        for exc, args, expected in exceptionList:
-            try:
-                raise exc(*args)
-            except BaseException, e:
-                if type(e) is not exc:
-                    raise
-                # Verify module name
-                self.assertEquals(type(e).__module__, 'exceptions')
-                # Verify no ref leaks in Exc_str()
-                s = str(e)
-                for checkArgName in expected:
-                    self.assertEquals(repr(getattr(e, checkArgName)),
-                                      repr(expected[checkArgName]),
-                                      'exception "%s", attribute "%s"' %
-                                       (repr(e), checkArgName))
+        with guard_warnings_filter():
+            ignore_message_warning()
+            for exc, args, expected in exceptionList:
+                try:
+                    raise exc(*args)
+                except BaseException, e:
+                    if type(e) is not exc:
+                        raise
+                    # Verify module name
+                    self.assertEquals(type(e).__module__, 'exceptions')
+                    # Verify no ref leaks in Exc_str()
+                    s = str(e)
+                    for checkArgName in expected:
+                        self.assertEquals(repr(getattr(e, checkArgName)),
+                                          repr(expected[checkArgName]),
+                                          'exception "%s", attribute "%s"' %
+                                           (repr(e), checkArgName))
 
-                # test for pickling support
-                for p in pickle, cPickle:
-                    for protocol in range(p.HIGHEST_PROTOCOL + 1):
-                        new = p.loads(p.dumps(e, protocol))
-                        for checkArgName in expected:
-                            got = repr(getattr(new, checkArgName))
-                            want = repr(expected[checkArgName])
-                            self.assertEquals(got, want,
-                                              'pickled "%r", attribute "%s' %
-                                              (e, checkArgName))
+                    # test for pickling support
+                    for p in pickle, cPickle:
+                        for protocol in range(p.HIGHEST_PROTOCOL + 1):
+                            new = p.loads(p.dumps(e, protocol))
+                            for checkArgName in expected:
+                                got = repr(getattr(new, checkArgName))
+                                want = repr(expected[checkArgName])
+                                self.assertEquals(got, want,
+                                                  'pickled "%r", attribute "%s' %
+                                                  (e, checkArgName))
 
     def testSlicing(self):
         # Test that you can slice an exception directly instead of requiring

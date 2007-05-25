@@ -470,10 +470,13 @@ def main(tests=None, testdir=None, verbose=0, quiet=False, generate=False,
 STDTESTS = [
     'test_grammar',
     'test_opcodes',
-    'test_operations',
+    'test_dict',
     'test_builtin',
     'test_exceptions',
     'test_types',
+    'test_unittest',
+    'test_doctest',
+    'test_doctest2',
    ]
 
 NOTTESTS = [
@@ -679,9 +682,10 @@ def dash_R(the_module, test, indirect_test, huntrleaks):
             deltas.append(sys.gettotalrefcount() - rc - 2)
     print >> sys.stderr
     if any(deltas):
-        print >> sys.stderr, test, 'leaked', deltas, 'references'
+        msg = '%s leaked %s references, sum=%s' % (test, deltas, sum(deltas))
+        print >> sys.stderr, msg
         refrep = open(fname, "a")
-        print >> refrep, test, 'leaked', deltas, 'references'
+        print >> refrep, msg
         refrep.close()
 
 def dash_R_cleanup(fs, ps, pic):
@@ -1194,7 +1198,6 @@ _expectations = {
         test_imgfile
         test_linuxaudiodev
         test_locale
-        test_macfs
         test_macostools
         test_nis
         test_ossaudiodev
@@ -1231,7 +1234,6 @@ _expectations = {
         test_gzip
         test_imgfile
         test_linuxaudiodev
-        test_macfs
         test_macostools
         test_nis
         test_ossaudiodev
@@ -1260,7 +1262,6 @@ _expectations = {
         test_imgfile
         test_linuxaudiodev
         test_locale
-        test_macfs
         test_macostools
         test_nis
         test_normalization
@@ -1294,7 +1295,6 @@ _expectations = {
         test_imgfile
         test_linuxaudiodev
         test_locale
-        test_macfs
         test_macostools
         test_nis
         test_ossaudiodev
@@ -1333,11 +1333,10 @@ class _ExpectedSkips:
                 self.expected.add('test_timeout')
 
             if sys.maxint == 9223372036854775807L:
-                self.expected.add('test_rgbimg')
                 self.expected.add('test_imageop')
 
             if not sys.platform in ("mac", "darwin"):
-                MAC_ONLY = ["test_macostools", "test_macfs", "test_aepack",
+                MAC_ONLY = ["test_macostools", "test_aepack",
                             "test_plistlib", "test_scriptpackages"]
                 for skip in MAC_ONLY:
                     self.expected.add(skip)
@@ -1346,6 +1345,11 @@ class _ExpectedSkips:
                 WIN_ONLY = ["test_unicode_file", "test_winreg",
                             "test_winsound"]
                 for skip in WIN_ONLY:
+                    self.expected.add(skip)
+
+            if sys.platform != 'irix':
+                IRIX_ONLY =["test_imageop"]
+                for skip in IRIX_ONLY:
                     self.expected.add(skip)
 
             self.valid = True

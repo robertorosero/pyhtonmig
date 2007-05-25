@@ -184,12 +184,12 @@ your local Python guru or system administrator.  (E.g.,
 \file{/usr/local/python} is a popular alternative location.)
 
 On Windows machines, the Python installation is usually placed in
-\file{C:\e Python24}, though you can change this when you're running
+\file{C:\e Python26}, though you can change this when you're running
 the installer.  To add this directory to your path, 
 you can type the following command into the command prompt in a DOS box:
 
 \begin{verbatim}
-set path=%path%;C:\python24
+set path=%path%;C:\python26
 \end{verbatim}
 
 
@@ -813,7 +813,7 @@ Traceback (most recent call last):
 IndexError: string index out of range
 \end{verbatim}
 
-The best way to remember how slices work is to think of the indices as
+One way to remember how slices work is to think of the indices as
 pointing \emph{between} characters, with the left edge of the first
 character numbered 0.  Then the right edge of the last character of a
 string of \var{n} characters has index \var{n}, for example:
@@ -2629,8 +2629,8 @@ the core of the language but are nevertheless built in, either for
 efficiency or to provide access to operating system primitives such as
 system calls.  The set of such modules is a configuration option which
 also depends on the underlying platform  For example,
-the \module{amoeba} module is only provided on systems that somehow
-support Amoeba primitives.  One particular module deserves some
+the \module{winreg} module is only provided on Windows systems.
+One particular module deserves some
 attention: \ulink{\module{sys}}{../lib/module-sys.html}%
 \refstmodindex{sys}, which is built into every 
 Python interpreter.  The variables \code{sys.ps1} and
@@ -3556,7 +3556,7 @@ as desired.
 ...    print 'x =', x
 ...    print 'y =', y
 ...
-<type 'instance'>
+<type 'exceptions.Exception'>
 ('spam', 'eggs')
 ('spam', 'eggs')
 x = spam
@@ -4329,8 +4329,7 @@ class DerivedClassName(Base1, Base2, Base3):
     <statement-N>
 \end{verbatim}
 
-The only rule necessary to explain the semantics is the resolution
-rule used for class attribute references.  This is depth-first,
+For old-style classes, the only rule is depth-first,
 left-to-right.  Thus, if an attribute is not found in
 \class{DerivedClassName}, it is searched in \class{Base1}, then
 (recursively) in the base classes of \class{Base1}, and only if it is
@@ -4345,16 +4344,26 @@ a name conflict with an attribute of \class{Base2}.  The depth-first
 rule makes no differences between direct and inherited attributes of
 \class{Base1}.)
 
-It is clear that indiscriminate use of multiple inheritance is a
-maintenance nightmare, given the reliance in Python on conventions to
-avoid accidental name conflicts.  A well-known problem with multiple
-inheritance is a class derived from two classes that happen to have a
-common base class.  While it is easy enough to figure out what happens
-in this case (the instance will have a single copy of ``instance
-variables'' or data attributes used by the common base class), it is
-not clear that these semantics are in any way useful.
+For new-style classes, the method resolution order changes dynamically
+to support cooperative calls to \function{super()}.  This approach
+is known in some other multiple-inheritance languages as call-next-method
+and is more powerful than the super call found in single-inheritance languages.
 
-%% XXX Add rules for new-style MRO?
+With new-style classes, dynamic ordering is necessary because all 
+cases of multiple inheritance exhibit one or more diamond relationships
+(where one at least one of the parent classes can be accessed through
+multiple paths from the bottommost class).  For example, all new-style
+classes inherit from \class{object}, so any case of multiple inheritance
+provides more than one path to reach \class{object}.  To keep the
+base classes from being accessed more than once, the dynamic algorithm
+linearizes the search order in a way that preserves the left-to-right
+ordering specified in each class, that calls each parent only once, and
+that is monotonic (meaning that a class can be subclassed without affecting
+the precedence order of its parents).  Taken together, these properties
+make it possible to design reliable and extensible classes with
+multiple inheritance.  For more detail, see 
+\url{http://www.python.org/download/releases/2.3/mro/}.
+
 
 \section{Private Variables \label{private}}
 
@@ -4645,7 +4654,7 @@ operating system:
 >>> os.system('time 0:02')
 0
 >>> os.getcwd()      # Return the current working directory
-'C:\\Python24'
+'C:\\Python26'
 >>> os.chdir('/server/accesslogs')
 \end{verbatim}
 
@@ -5245,7 +5254,7 @@ applications include caching objects that are expensive to create:
     Traceback (most recent call last):
       File "<pyshell#108>", line 1, in -toplevel-
         d['primary']                # entry was automatically removed
-      File "C:/PY24/lib/weakref.py", line 46, in __getitem__
+      File "C:/python26/lib/weakref.py", line 46, in __getitem__
         o = self.data[key]()
     KeyError: 'primary'
 \end{verbatim}

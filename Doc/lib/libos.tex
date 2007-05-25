@@ -361,9 +361,8 @@ object, except that when the exit status is zero (termination without
 errors), \code{None} is returned.
 Availability: Macintosh, \UNIX, Windows.
 
-The \module{subprocess} module provides more powerful facilities for
-spawning new processes and retrieving their results; using that module
-is preferable to using this function.
+\deprecated{2.6}{This function is obsolete.  Use the
+                 \module{subprocess} module.}
 
 \versionchanged[This function worked unreliably under Windows in
   earlier versions of Python.  This was due to the use of the
@@ -380,10 +379,9 @@ Availability: Macintosh, \UNIX, Windows.
 \end{funcdesc}
 
 There are a number of different \function{popen*()} functions that
-provide slightly different ways to create subprocesses.  Note that the
-\module{subprocess} module is easier to use and more powerful;
-consider using that module before writing code using the
-lower-level \function{popen*()} functions.
+provide slightly different ways to create subprocesses.
+\deprecated{2.6}{All of the \function{popen*()} functions are obsolete.
+                 Use the \module{subprocess} module.}
 
 For each of the \function{popen*()} variants, if \var{bufsize} is
 specified, it specifies the buffer size for the I/O pipes.
@@ -400,8 +398,7 @@ be passed to the shell (as with \function{os.system()}).
 These methods do not make it possible to retrieve the exit status from
 the child processes.  The only way to control the input and output
 streams and also retrieve the return codes is to use the
-\class{Popen3} and \class{Popen4} classes from the \refmodule{popen2}
-module; these are only available on \UNIX.
+\refmodule{subprocess} module; these are only available on \UNIX.
 
 For a discussion of possible deadlock conditions related to the use
 of these functions, see ``\ulink{Flow Control
@@ -411,6 +408,8 @@ Issues}{popen2-flow-control.html}''
 \begin{funcdesc}{popen2}{cmd\optional{, mode\optional{, bufsize}}}
 Executes \var{cmd} as a sub-process.  Returns the file objects
 \code{(\var{child_stdin}, \var{child_stdout})}.
+\deprecated{2.6}{All of the \function{popen*()} functions are obsolete.
+                 Use the \module{subprocess} module.}
 Availability: Macintosh, \UNIX, Windows.
 \versionadded{2.0}
 \end{funcdesc}
@@ -418,6 +417,8 @@ Availability: Macintosh, \UNIX, Windows.
 \begin{funcdesc}{popen3}{cmd\optional{, mode\optional{, bufsize}}}
 Executes \var{cmd} as a sub-process.  Returns the file objects
 \code{(\var{child_stdin}, \var{child_stdout}, \var{child_stderr})}.
+\deprecated{2.6}{All of the \function{popen*()} functions are obsolete.
+                 Use the \module{subprocess} module.}
 Availability: Macintosh, \UNIX, Windows.
 \versionadded{2.0}
 \end{funcdesc}
@@ -425,6 +426,8 @@ Availability: Macintosh, \UNIX, Windows.
 \begin{funcdesc}{popen4}{cmd\optional{, mode\optional{, bufsize}}}
 Executes \var{cmd} as a sub-process.  Returns the file objects
 \code{(\var{child_stdin}, \var{child_stdout_and_stderr})}.
+\deprecated{2.6}{All of the \function{popen*()} functions are obsolete.
+                 Use the \module{subprocess} module.}
 Availability: Macintosh, \UNIX, Windows.
 \versionadded{2.0}
 \end{funcdesc}
@@ -758,6 +761,26 @@ Availability: Macintosh, \UNIX, Windows.
 \versionadded{2.3}
 \end{funcdesc}
 
+\begin{funcdesc}{chflags}{path, flags}
+Set the flags of \var{path} to the numeric \var{flags}.
+\var{flags} may take a combination (bitwise OR) of the following values
+(as defined in the \module{stat} module):
+\begin{itemize}
+  \item \code{UF_NODUMP}
+  \item \code{UF_IMMUTABLE}
+  \item \code{UF_APPEND}
+  \item \code{UF_OPAQUE}
+  \item \code{UF_NOUNLINK}
+  \item \code{SF_ARCHIVED}
+  \item \code{SF_IMMUTABLE}
+  \item \code{SF_APPEND}
+  \item \code{SF_NOUNLINK}
+  \item \code{SF_SNAPSHOT}
+\end{itemize}
+Availability: Macintosh, \UNIX.
+\versionadded{2.6}
+\end{funcdesc}
+
 \begin{funcdesc}{chroot}{path}
 Change the root directory of the current process to \var{path}.
 Availability: Macintosh, \UNIX.
@@ -802,6 +825,13 @@ All other bits are ignored.}
 Change the owner and group id of \var{path} to the numeric \var{uid}
 and \var{gid}. To leave one of the ids unchanged, set it to -1.
 Availability: Macintosh, \UNIX.
+\end{funcdesc}
+
+\begin{funcdesc}{lchflags}{path, flags}
+Set the flags of \var{path} to the numeric \var{flags}, like
+\function{chflags()}, but do not follow symbolic links.
+Availability: \UNIX.
+\versionadded{2.6}
 \end{funcdesc}
 
 \begin{funcdesc}{lchown}{path, uid, gid}
@@ -1206,7 +1236,8 @@ Availability: Macintosh, \UNIX, Windows.
 \end{funcdesc}
 
 \begin{funcdesc}{walk}{top\optional{, topdown\code{=True}
-                       \optional{, onerror\code{=None}}}}
+                       \optional{, onerror\code{=None}\optional{,
+		       followlinks\code{=False}}}}}
 \index{directory!walking}
 \index{directory!traversal}
 \function{walk()} generates the file names in a directory tree, by
@@ -1246,20 +1277,23 @@ report the error to continue with the walk, or raise the exception
 to abort the walk.  Note that the filename is available as the
 \code{filename} attribute of the exception object.
 
+By default, \function{walk()} will not walk down into symbolic links that
+resolve to directories. Set \var{followlinks} to True to visit directories
+pointed to by symlinks, on systems that support them.
+
+\versionadded[The \var{followlinks} parameter]{2.6}
+
+\begin{notice}
+Be aware that setting \var{followlinks} to true can lead to infinite recursion
+if a link points to a parent directory of itself. \function{walk()} does not
+keep track of the directories it visited already.
+\end{notice}
+
 \begin{notice}
 If you pass a relative pathname, don't change the current working
 directory between resumptions of \function{walk()}.  \function{walk()}
 never changes the current directory, and assumes that its caller
 doesn't either.
-\end{notice}
-
-\begin{notice}
-On systems that support symbolic links, links to subdirectories appear
-in \var{dirnames} lists, but \function{walk()} will not visit them
-(infinite loops are hard to avoid when following symbolic links).
-To visit linked directories, you can identify them with
-\code{os.path.islink(\var{path})}, and invoke \code{walk(\var{path})}
-on each directly.
 \end{notice}
 
 This example displays the number of bytes taken by non-directory files
@@ -1975,9 +2009,12 @@ Also available via \module{os.path}.
 
 \begin{datadesc}{linesep}
 The string used to separate (or, rather, terminate) lines on the
-current platform.  This may be a single character, such as \code{'\e
-n'} for \POSIX{} or \code{'\e r'} for Mac OS, or multiple characters,
-for example, \code{'\e r\e n'} for Windows.
+current platform.  This may be a single character, such as 
+\code{'\e n'} for \POSIX{} or \code{'\e r'} for Mac OS, or multiple 
+characters, for example, \code{'\e r\e n'} for Windows.
+Do not use \var{os.linesep} as a line terminator when writing files 
+opened in text mode (the default); use a single \code{'\e n'} instead, 
+on all platforms. 
 \end{datadesc}
 
 \begin{datadesc}{devnull}

@@ -40,7 +40,7 @@ static char **orig_argv;
 static int  orig_argc;
 
 /* command line options */
-#define BASE_OPTS "c:dEhim:OQ:StuUvVW:xX?"
+#define BASE_OPTS "3c:dEhim:OQ:StuUvVW:xX?"
 
 #ifndef RISCOS
 #define PROGRAM_OPTS BASE_OPTS
@@ -82,6 +82,7 @@ static char *usage_3 = "\
 -V     : print the Python version number and exit (also --version)\n\
 -W arg : warning control; arg is action:message:category:module:lineno\n\
 -x     : skip first line of source, allowing use of non-Unix forms of #!cmd\n\
+-3     : warn about Python 3.x incompatibilities\n\
 file   : program read from script file\n\
 -      : program read from stdin (default; interactive mode if a tty)\n\
 ";
@@ -216,13 +217,11 @@ Py_Main(int argc, char **argv)
 	char *module = NULL;
 	FILE *fp = stdin;
 	char *p;
-	int inspect = 0;
 	int unbuffered = 0;
 	int skipfirstline = 0;
 	int stdin_is_interactive = 0;
 	int help = 0;
 	int version = 0;
-	int saw_inspect_flag = 0;
 	int saw_unbuffered_flag = 0;
 	PyCompilerFlags cf;
 
@@ -269,6 +268,10 @@ Py_Main(int argc, char **argv)
 			Py_DebugFlag++;
 			break;
 
+		case '3':
+			Py_Py3kWarningFlag++;
+			break;
+
 		case 'Q':
 			if (strcmp(_PyOS_optarg, "old") == 0) {
 				Py_DivisionWarningFlag = 0;
@@ -297,8 +300,7 @@ Py_Main(int argc, char **argv)
 			/* NOTREACHED */
 
 		case 'i':
-			inspect++;
-			saw_inspect_flag = 1;
+			Py_InspectFlag++;
 			Py_InteractiveFlag++;
 			break;
 
@@ -369,9 +371,9 @@ Py_Main(int argc, char **argv)
 		return 0;
 	}
 
-	if (!saw_inspect_flag &&
+	if (!Py_InspectFlag &&
 	    (p = Py_GETENV("PYTHONINSPECT")) && *p != '\0')
-		inspect = 1;
+		Py_InspectFlag = 1;
 	if (!saw_unbuffered_flag &&
 	    (p = Py_GETENV("PYTHONUNBUFFERED")) && *p != '\0')
 		unbuffered = 1;
@@ -499,7 +501,7 @@ Py_Main(int argc, char **argv)
 
 	PySys_SetArgv(argc-_PyOS_optind, argv+_PyOS_optind);
 
-	if ((inspect || (command == NULL && filename == NULL && module == NULL)) &&
+	if ((Py_InspectFlag || (command == NULL && filename == NULL && module == NULL)) &&
 	    isatty(fileno(stdin))) {
 		PyObject *v;
 		v = PyImport_ImportModule("readline");
@@ -518,6 +520,7 @@ Py_Main(int argc, char **argv)
 	}
 	else {
 		if (filename == NULL && stdin_is_interactive) {
+			Py_InspectFlag = 0; /* do exit on SystemExit */
 			RunStartupFile(&cf);
 		}
 		/* XXX */
@@ -530,16 +533,18 @@ Py_Main(int argc, char **argv)
 	/* Check this environment variable at the end, to give programs the
 	 * opportunity to set it from Python.
 	 */
-	if (!saw_inspect_flag &&
+	if (!Py_InspectFlag &&
 	    (p = Py_GETENV("PYTHONINSPECT")) && *p != '\0')
 	{
-		inspect = 1;
+		Py_InspectFlag = 1;
 	}
 
-	if (inspect && stdin_is_interactive &&
-	    (filename != NULL || command != NULL || module != NULL))
+	if (Py_InspectFlag && stdin_is_interactive &&
+	    (filename != NULL || command != NULL || module != NULL)) {
+		Py_InspectFlag = 0;
 		/* XXX */
 		sts = PyRun_AnyFileFlags(stdin, "<stdin>", &cf) != 0;
+	}
 
 	WaitForThreadShutdown();
 

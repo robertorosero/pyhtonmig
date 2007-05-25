@@ -4,6 +4,7 @@
 #include "Python.h"
 
 #include "Python-ast.h"
+#undef Yield /* undefine macro conflicting with winbase.h */
 #include "pyarena.h"
 #include "pythonrun.h"
 #include "errcode.h"
@@ -340,6 +341,14 @@ imp_release_lock(PyObject *self, PyObject *noargs)
 	return Py_None;
 }
 
+static void
+imp_modules_reloading_clear(void)
+{
+	PyInterpreterState *interp = PyThreadState_Get()->interp;
+	if (interp->modules_reloading != NULL)
+		PyDict_Clear(interp->modules_reloading);
+}
+
 /* Helper for sys */
 
 PyObject *
@@ -499,6 +508,7 @@ PyImport_Cleanup(void)
 	PyDict_Clear(modules);
 	interp->modules = NULL;
 	Py_DECREF(modules);
+	Py_CLEAR(interp->modules_reloading);
 }
 
 
@@ -2410,13 +2420,21 @@ import_submodule(PyObject *mod, char *subname, char *fullname)
 PyObject *
 PyImport_ReloadModule(PyObject *m)
 {
+	PyInterpreterState *interp = PyThreadState_Get()->interp;
+	PyObject *modules_reloading = interp->modules_reloading;
 	PyObject *modules = PyImport_GetModuleDict();
-	PyObject *path = NULL, *loader = NULL;
+	PyObject *path = NULL, *loader = NULL, *existing_m = NULL;
 	char *name, *subname;
 	char buf[MAXPATHLEN+1];
 	struct filedescr *fdp;
 	FILE *fp = NULL;
 	PyObject *newm;
+    
+	if (modules_reloading == NULL) {
+		Py_FatalError("PyImport_ReloadModule: "
+							"no modules_reloading dictionary!");
+		return NULL;
+	}
 
 	if (m == NULL || !PyModule_Check(m)) {
 		PyErr_SetString(PyExc_TypeError,
@@ -2432,20 +2450,33 @@ PyImport_ReloadModule(PyObject *m)
 			     name);
 		return NULL;
 	}
+	existing_m = PyDict_GetItemString(modules_reloading, name);
+	if (existing_m != NULL) {
+		/* Due to a recursive reload, this module is already
+		   being reloaded. */
+		Py_INCREF(existing_m);
+		return existing_m;
+ 	}
+ 	if (PyDict_SetItemString(modules_reloading, name, m) < 0)
+		return NULL;
+
 	subname = strrchr(name, '.');
 	if (subname == NULL)
 		subname = name;
 	else {
 		PyObject *parentname, *parent;
 		parentname = PyString_FromStringAndSize(name, (subname-name));
-		if (parentname == NULL)
+		if (parentname == NULL) {
+			imp_modules_reloading_clear();
 			return NULL;
+        	}
 		parent = PyDict_GetItem(modules, parentname);
 		if (parent == NULL) {
 			PyErr_Format(PyExc_ImportError,
 			    "reload(): parent %.200s not in sys.modules",
 			    PyString_AS_STRING(parentname));
 			Py_DECREF(parentname);
+            imp_modules_reloading_clear();
 			return NULL;
 		}
 		Py_DECREF(parentname);
@@ -2460,6 +2491,7 @@ PyImport_ReloadModule(PyObject *m)
 
 	if (fdp == NULL) {
 		Py_XDECREF(loader);
+		imp_modules_reloading_clear();
 		return NULL;
 	}
 
@@ -2476,6 +2508,7 @@ PyImport_ReloadModule(PyObject *m)
 		 */
 		PyDict_SetItemString(modules, name, m);
 	}
+	imp_modules_reloading_clear();
 	return newm;
 }
 
@@ -2545,7 +2578,7 @@ PyImport_Import(PyObject *module_name)
 	if (import == NULL)
 		goto err;
 
-	/* Call the _import__ function with the proper argument list */
+	/* Call the __import__ function with the proper argument list */
 	r = PyObject_CallFunctionObjArgs(import, module_name, globals,
 					 globals, silly_list, NULL);
 

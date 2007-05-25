@@ -213,11 +213,10 @@ PyInt_AsSsize_t(register PyObject *op)
 		return -1;
 	}
 
-	if (nb->nb_long != 0) {
+	if (nb->nb_long != 0)
 		io = (PyIntObject*) (*nb->nb_long) (op);
-	} else {
+	else
 		io = (PyIntObject*) (*nb->nb_int) (op);
-	}
 	if (io == NULL)
 		return -1;
 	if (!PyInt_Check(io)) {
@@ -394,7 +393,7 @@ PyInt_FromUnicode(Py_UNICODE *s, Py_ssize_t length, int base)
 	char *buffer = (char *)PyMem_MALLOC(length+1);
 
 	if (buffer == NULL)
-		return NULL;
+		return PyErr_NoMemory();
 
 	if (PyUnicode_EncodeDecimal(s, length, buffer, NULL)) {
 		PyMem_FREE(buffer);
@@ -1138,7 +1137,7 @@ PyTypeObject PyInt_Type = {
 	0,					/* tp_setattro */
 	0,					/* tp_as_buffer */
 	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_CHECKTYPES |
-		Py_TPFLAGS_BASETYPE,		/* tp_flags */
+		Py_TPFLAGS_BASETYPE | Py_TPFLAGS_INT_SUBCLASS,	/* tp_flags */
 	int_doc,				/* tp_doc */
 	0,					/* tp_traverse */
 	0,					/* tp_clear */

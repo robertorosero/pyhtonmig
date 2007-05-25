@@ -1592,6 +1592,8 @@ BZ2Comp_compress(BZ2CompObject *self, PyObject *args)
 			Util_CatchBZ2Error(bzerror);
 			goto error;
 		}
+		if (bzs->avail_in == 0)
+			break; /* no more input data */
 		if (bzs->avail_out == 0) {
 			bufsize = Util_NewBufferSize(bufsize);
 			if (_PyString_Resize(&ret, bufsize) < 0) {
@@ -1601,8 +1603,6 @@ BZ2Comp_compress(BZ2CompObject *self, PyObject *args)
 			bzs->next_out = BUF(ret) + (BZS_TOTAL_OUT(bzs)
 						    - totalout);
 			bzs->avail_out = bufsize - (bzs->next_out - BUF(ret));
-		} else if (bzs->avail_in == 0) {
-			break;
 		}
 	}
 
@@ -1884,6 +1884,8 @@ BZ2Decomp_decompress(BZ2DecompObject *self, PyObject *args)
 			Util_CatchBZ2Error(bzerror);
 			goto error;
 		}
+		if (bzs->avail_in == 0)
+			break; /* no more input data */
 		if (bzs->avail_out == 0) {
 			bufsize = Util_NewBufferSize(bufsize);
 			if (_PyString_Resize(&ret, bufsize) < 0) {
@@ -1894,8 +1896,6 @@ BZ2Decomp_decompress(BZ2DecompObject *self, PyObject *args)
 			bzs->next_out = BUF(ret) + (BZS_TOTAL_OUT(bzs)
 						    - totalout);
 			bzs->avail_out = bufsize - (bzs->next_out - BUF(ret));
-		} else if (bzs->avail_in == 0) {
-			break;
 		}
 	}
 
@@ -2173,6 +2173,13 @@ bz2_decompress(PyObject *self, PyObject *args)
 			Py_DECREF(ret);
 			return NULL;
 		}
+		if (bzs->avail_in == 0) {
+			BZ2_bzDecompressEnd(bzs);
+			PyErr_SetString(PyExc_ValueError,
+					"couldn't find end of stream");
+			Py_DECREF(ret);
+			return NULL;
+		}
 		if (bzs->avail_out == 0) {
 			bufsize = Util_NewBufferSize(bufsize);
 			if (_PyString_Resize(&ret, bufsize) < 0) {
@@ -2182,12 +2189,6 @@ bz2_decompress(PyObject *self, PyObject *args)
 			}
 			bzs->next_out = BUF(ret) + BZS_TOTAL_OUT(bzs);
 			bzs->avail_out = bufsize - (bzs->next_out - BUF(ret));
-		} else if (bzs->avail_in == 0) {
-			BZ2_bzDecompressEnd(bzs);
-			PyErr_SetString(PyExc_ValueError,
-					"couldn't find end of stream");
-			Py_DECREF(ret);
-			return NULL;
 		}
 	}
 

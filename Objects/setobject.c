@@ -912,14 +912,31 @@ set_update_internal(PySetObject *so, PyObject *other)
 {
 	PyObject *key, *it;
 
-	if (PyAnySet_Check(other))
+	if (PyAnySet_CheckExact(other))
 		return set_merge(so, other);
 
-	if (PyDict_Check(other)) {
+	if (PyDict_CheckExact(other)) {
 		PyObject *value;
 		Py_ssize_t pos = 0;
-		while (PyDict_Next(other, &pos, &key, &value)) {
-			if (set_add_key(so, key) == -1)
+		long hash;
+		Py_ssize_t dictsize = PyDict_Size(other);
+
+		/* Do one big resize at the start, rather than
+		* incrementally resizing as we insert new keys.  Expect
+		* that there will be no (or few) overlapping keys.
+		*/
+		if (dictsize == -1)
+			return -1;
+		if ((so->fill + dictsize)*3 >= (so->mask+1)*2) {
+			if (set_table_resize(so, (so->used + dictsize)*2) != 0)
+				return -1;
+		}
+		while (_PyDict_Next(other, &pos, &key, &value, &hash)) {
+			setentry an_entry;
+
+			an_entry.hash = hash;
+			an_entry.key = key;
+			if (set_add_entry(so, &an_entry) == -1)
 				return -1;
 		}
 		return 0;
@@ -1190,7 +1207,7 @@ set_intersection(PySetObject *so, PyObject *other)
 	if (result == NULL)
 		return NULL;
 
-	if (PyAnySet_Check(other)) {		
+	if (PyAnySet_CheckExact(other)) {		
 		Py_ssize_t pos = 0;
 		setentry *entry;
 
@@ -1314,7 +1331,7 @@ set_difference_update_internal(PySetObject *so, PyObject *other)
 	if ((PyObject *)so == other)
 		return set_clear_internal(so);
 	
-	if (PyAnySet_Check(other)) {
+	if (PyAnySet_CheckExact(other)) {
 		setentry *entry;
 		Py_ssize_t pos = 0;
 
@@ -1363,7 +1380,7 @@ set_difference(PySetObject *so, PyObject *other)
 	setentry *entry;
 	Py_ssize_t pos = 0;
 
-	if (!PyAnySet_Check(other)  && !PyDict_Check(other)) {
+	if (!PyAnySet_CheckExact(other)  && !PyDict_CheckExact(other)) {
 		result = set_copy(so);
 		if (result == NULL)
 			return NULL;
@@ -1377,12 +1394,12 @@ set_difference(PySetObject *so, PyObject *other)
 	if (result == NULL)
 		return NULL;
 
-	if (PyDict_Check(other)) {
+	if (PyDict_CheckExact(other)) {
 		while (set_next(so, &pos, &entry)) {
 			setentry entrycopy;
 			entrycopy.hash = entry->hash;
 			entrycopy.key = entry->key;
-			if (!PyDict_Contains(other, entry->key)) {
+			if (!_PyDict_Contains(other, entry->key, entry->hash)) {
 				if (set_add_entry((PySetObject *)result, &entrycopy) == -1) {
 					Py_DECREF(result);
 					return NULL;
@@ -1450,15 +1467,13 @@ set_symmetric_difference_update(PySetObject *so, PyObject *other)
 	if ((PyObject *)so == other)
 		return set_clear(so);
 
-	if (PyDict_Check(other)) {
+	if (PyDict_CheckExact(other)) {
 		PyObject *value;
 		int rv;
-		while (PyDict_Next(other, &pos, &key, &value)) {
+		long hash;
+		while (_PyDict_Next(other, &pos, &key, &value, &hash)) {
 			setentry an_entry;
-			long hash = PyObject_Hash(key);
 
-			if (hash == -1)
-				return NULL;
 			an_entry.hash = hash;
 			an_entry.key = key;
 			rv = set_discard_entry(so, &an_entry);
@@ -1472,7 +1487,7 @@ set_symmetric_difference_update(PySetObject *so, PyObject *other)
 		Py_RETURN_NONE;
 	}
 
-	if (PyAnySet_Check(other)) {
+	if (PyAnySet_CheckExact(other)) {
 		Py_INCREF(other);
 		otherset = (PySetObject *)other;
 	} else {
@@ -1555,7 +1570,7 @@ set_issubset(PySetObject *so, PyObject *other)
 	setentry *entry;
 	Py_ssize_t pos = 0;
 
-	if (!PyAnySet_Check(other)) {
+	if (!PyAnySet_CheckExact(other)) {
 		PyObject *tmp, *result;
 		tmp = make_new_set(&PySet_Type, other);
 		if (tmp == NULL)
@@ -1584,7 +1599,7 @@ set_issuperset(PySetObject *so, PyObject *other)
 {
 	PyObject *tmp, *result;
 
-	if (!PyAnySet_Check(other)) {
+	if (!PyAnySet_CheckExact(other)) {
 		tmp = make_new_set(&PySet_Type, other);
 		if (tmp == NULL)
 			return NULL;
@@ -2122,7 +2137,7 @@ PySet_Add(PyObject *set, PyObject *key)
 }
 
 int
-_PySet_Next(PyObject *set, Py_ssize_t *pos, PyObject **entry)
+_PySet_Next(PyObject *set, Py_ssize_t *pos, PyObject **key)
 {
 	setentry *entry_ptr;
 
@@ -2132,7 +2147,23 @@ _PySet_Next(PyObject *set, Py_ssize_t *pos, PyObject **entry)
 	}
 	if (set_next((PySetObject *)set, pos, &entry_ptr) == 0)
 		return 0;
-	*entry = entry_ptr->key;
+	*key = entry_ptr->key;
+	return 1;
+}
+
+int
+_PySet_NextEntry(PyObject *set, Py_ssize_t *pos, PyObject **key, long *hash)
+{
+	setentry *entry;
+
+	if (!PyAnySet_Check(set)) {
+		PyErr_BadInternalCall();
+		return -1;
+	}
+	if (set_next((PySetObject *)set, pos, &entry) == 0)
+		return 0;
+	*key = entry->key;
+	*hash = entry->hash;
 	return 1;
 }
 
@@ -2174,7 +2205,7 @@ test_c_api(PySetObject *so)
 	Py_ssize_t count;
 	char *s;
 	Py_ssize_t i;
-	PyObject *elem, *dup, *t, *f, *dup2;
+	PyObject *elem=NULL, *dup=NULL, *t, *f, *dup2, *x;
 	PyObject *ob = (PyObject *)so;
 
 	/* Verify preconditions and exercise type/size checks */
@@ -2220,8 +2251,8 @@ test_c_api(PySetObject *so)
 
 	/* Exercise direct iteration */
 	i = 0, count = 0;
-	while (_PySet_Next((PyObject *)dup, &i, &elem)) {
-		s = PyString_AsString(elem);
+	while (_PySet_Next((PyObject *)dup, &i, &x)) {
+		s = PyString_AsString(x);
 		assert(s && (s[0] == 'a' || s[0] == 'b' || s[0] == 'c'));
 		count++;
 	}

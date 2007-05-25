@@ -362,20 +362,25 @@ const char *inet_ntop(int af, const void *src, char *dst, socklen_t size);
 #if defined(__FreeBSD__)
 #define BTPROTO_L2CAP BLUETOOTH_PROTO_L2CAP
 #define BTPROTO_RFCOMM BLUETOOTH_PROTO_RFCOMM
+#define BTPROTO_HCI BLUETOOTH_PROTO_HCI
 #define sockaddr_l2 sockaddr_l2cap
 #define sockaddr_rc sockaddr_rfcomm
 #define _BT_L2_MEMB(sa, memb) ((sa)->l2cap_##memb)
 #define _BT_RC_MEMB(sa, memb) ((sa)->rfcomm_##memb)
+#define _BT_HCI_MEMB(sa, memb) ((sa)->hci_##memb)
 #elif defined(__NetBSD__)
 #define sockaddr_l2 sockaddr_bt
 #define sockaddr_rc sockaddr_bt
+#define sockaddr_hci sockaddr_bt
 #define sockaddr_sco sockaddr_bt
 #define _BT_L2_MEMB(sa, memb) ((sa)->bt_##memb)
 #define _BT_RC_MEMB(sa, memb) ((sa)->bt_##memb)
+#define _BT_HCI_MEMB(sa, memb) ((sa)->bt_##memb)
 #define _BT_SCO_MEMB(sa, memb) ((sa)->bt_##memb)
 #else
 #define _BT_L2_MEMB(sa, memb) ((sa)->l2_##memb)
 #define _BT_RC_MEMB(sa, memb) ((sa)->rc_##memb)
+#define _BT_HCI_MEMB(sa, memb) ((sa)->hci_##memb)
 #define _BT_SCO_MEMB(sa, memb) ((sa)->sco_##memb)
 #endif
 #endif
@@ -1119,6 +1124,14 @@ makesockaddr(int sockfd, struct sockaddr *addr, int addrlen, int proto)
 			return ret;
 		}
 
+		case BTPROTO_HCI:
+		{
+			struct sockaddr_hci *a = (struct sockaddr_hci *) addr;
+			PyObject *ret = NULL;
+			ret = Py_BuildValue("i", _BT_HCI_MEMB(a, dev));
+			return ret;
+		}
+
 #if !defined(__FreeBSD__)
 		case BTPROTO_SCO:
 		{
@@ -1347,6 +1360,18 @@ getsockaddrarg(PySocketSockObject *s, PyObject *args,
 			*len_ret = sizeof *addr;
 			return 1;
 		}
+		case BTPROTO_HCI:
+		{
+			struct sockaddr_hci *addr = (struct sockaddr_hci *)addr_ret;
+			_BT_HCI_MEMB(addr, family) = AF_BLUETOOTH;
+			if (!PyArg_ParseTuple(args, "i", &_BT_HCI_MEMB(addr, dev))) {
+				PyErr_SetString(socket_error, "getsockaddrarg: "
+						"wrong format");
+				return 0;
+			}
+			*len_ret = sizeof *addr;
+			return 1;
+		}
 #if !defined(__FreeBSD__)
 		case BTPROTO_SCO:
 		{
@@ -1484,6 +1509,9 @@ getsockaddrlen(PySocketSockObject *s, socklen_t *len_ret)
 			return 1;
 		case BTPROTO_RFCOMM:
 			*len_ret = sizeof (struct sockaddr_rc);
+			return 1;
+		case BTPROTO_HCI:
+			*len_ret = sizeof (struct sockaddr_hci);
 			return 1;
 #if !defined(__FreeBSD__)
 		case BTPROTO_SCO:
@@ -2356,14 +2384,14 @@ sock_recv_into(PySocketSockObject *s, PyObject *args, PyObject *kwds)
 	int buflen;
 
 	/* Get the buffer's memory */
-	if (!PyArg_ParseTupleAndKeywords(args, kwds, "w#|ii:recv", kwlist,
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "w#|ii:recv_into", kwlist,
 					 &buf, &buflen, &recvlen, &flags))
 		return NULL;
 	assert(buf != 0 && buflen > 0);
 
 	if (recvlen < 0) {
 		PyErr_SetString(PyExc_ValueError,
-				"negative buffersize in recv");
+				"negative buffersize in recv_into");
 		return NULL;
 	}
 	if (recvlen == 0) {
@@ -2479,6 +2507,12 @@ sock_recvfrom(PySocketSockObject *s, PyObject *args)
 	if (!PyArg_ParseTuple(args, "i|i:recvfrom", &recvlen, &flags))
 		return NULL;
 
+	if (recvlen < 0) {
+		PyErr_SetString(PyExc_ValueError,
+				"negative buffersize in recvfrom");
+		return NULL;
+	}
+
 	buf = PyString_FromStringAndSize((char *) 0, recvlen);
 	if (buf == NULL)
 		return NULL;
@@ -2525,14 +2559,15 @@ sock_recvfrom_into(PySocketSockObject *s, PyObject *args, PyObject* kwds)
 
 	PyObject *addr = NULL;
 
-	if (!PyArg_ParseTupleAndKeywords(args, kwds, "w#|ii:recvfrom", kwlist,
-					 &buf, &buflen, &recvlen, &flags))
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "w#|ii:recvfrom_into",
+					 kwlist, &buf, &buflen,
+					 &recvlen, &flags))
 		return NULL;
 	assert(buf != 0 && buflen > 0);
 
 	if (recvlen < 0) {
 		PyErr_SetString(PyExc_ValueError,
-				"negative buffersize in recv");
+				"negative buffersize in recvfrom_into");
 		return NULL;
 	}
 	if (recvlen == 0) {
@@ -4383,7 +4418,9 @@ init_socket(void)
 	PyModule_AddIntConstant(m, "NETLINK_ROUTE6", NETLINK_ROUTE6);
 #endif
 	PyModule_AddIntConstant(m, "NETLINK_IP6_FW", NETLINK_IP6_FW);
+#ifdef NETLINK_DNRTMSG
 	PyModule_AddIntConstant(m, "NETLINK_DNRTMSG", NETLINK_DNRTMSG);
+#endif 
 #ifdef NETLINK_TAPBASE
 	PyModule_AddIntConstant(m, "NETLINK_TAPBASE", NETLINK_TAPBASE);
 #endif
@@ -4428,6 +4465,11 @@ init_socket(void)
 #ifdef USE_BLUETOOTH
 	PyModule_AddIntConstant(m, "AF_BLUETOOTH", AF_BLUETOOTH);
 	PyModule_AddIntConstant(m, "BTPROTO_L2CAP", BTPROTO_L2CAP);
+	PyModule_AddIntConstant(m, "BTPROTO_HCI", BTPROTO_HCI);
+	PyModule_AddIntConstant(m, "SOL_HCI", SOL_HCI);
+	PyModule_AddIntConstant(m, "HCI_TIME_STAMP", HCI_TIME_STAMP);
+	PyModule_AddIntConstant(m, "HCI_DATA_DIR", HCI_DATA_DIR);
+	PyModule_AddIntConstant(m, "HCI_FILTER", HCI_FILTER);
 #if !defined(__FreeBSD__)
 	PyModule_AddIntConstant(m, "BTPROTO_SCO", BTPROTO_SCO);
 #endif

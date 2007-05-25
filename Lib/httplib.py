@@ -625,7 +625,8 @@ class HTTPConnection:
     debuglevel = 0
     strict = 0
 
-    def __init__(self, host, port=None, strict=None):
+    def __init__(self, host, port=None, strict=None, timeout=None):
+        self.timeout = timeout
         self.sock = None
         self._buffer = []
         self.__response = None
@@ -658,25 +659,8 @@ class HTTPConnection:
 
     def connect(self):
         """Connect to the host and port specified in __init__."""
-        msg = "getaddrinfo returns an empty list"
-        for res in socket.getaddrinfo(self.host, self.port, 0,
-                                      socket.SOCK_STREAM):
-            af, socktype, proto, canonname, sa = res
-            try:
-                self.sock = socket.socket(af, socktype, proto)
-                if self.debuglevel > 0:
-                    print "connect: (%s, %s)" % (self.host, self.port)
-                self.sock.connect(sa)
-            except socket.error, msg:
-                if self.debuglevel > 0:
-                    print 'connect fail:', (self.host, self.port)
-                if self.sock:
-                    self.sock.close()
-                self.sock = None
-                continue
-            break
-        if not self.sock:
-            raise socket.error, msg
+        self.sock = socket.create_connection((self.host,self.port),
+                                             self.timeout)
 
     def close(self):
         """Close the connection to the HTTP server."""
@@ -948,8 +932,8 @@ class HTTPConnection:
         self.__state = _CS_IDLE
 
         if response.will_close:
-            # Pass the socket to the response
-            self.sock = None
+            # this effectively passes the connection to the response
+            self.close()
         else:
             # remember this, so we can tell when it is complete
             self.__response = response
@@ -1140,16 +1124,15 @@ class HTTPSConnection(HTTPConnection):
     default_port = HTTPS_PORT
 
     def __init__(self, host, port=None, key_file=None, cert_file=None,
-                 strict=None):
-        HTTPConnection.__init__(self, host, port, strict)
+                 strict=None, timeout=None):
+        HTTPConnection.__init__(self, host, port, strict, timeout)
         self.key_file = key_file
         self.cert_file = cert_file
 
     def connect(self):
         "Connect to a host on a given (SSL) port."
 
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.connect((self.host, self.port))
+        sock = socket.create_connection((self.host, self.port), self.timeout)
         ssl = socket.ssl(sock, self.key_file, self.cert_file)
         self.sock = FakeSocket(sock, ssl)
 

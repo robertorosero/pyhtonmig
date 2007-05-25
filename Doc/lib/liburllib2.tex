@@ -86,11 +86,6 @@ non-exceptional file-like return value (the same thing that
 HTTP errors, such as requests for authentication.
 \end{excdesc}
 
-\begin{excdesc}{GopherError}
-A subclass of \exception{URLError}, this is the error raised by the
-Gopher handler.
-\end{excdesc}
-
 
 The following classes are provided:
 
@@ -239,10 +234,6 @@ Open FTP URLs.
 \begin{classdesc}{CacheFTPHandler}{}
 Open FTP URLs, keeping a cache of open FTP connections to minimize
 delays.
-\end{classdesc}
-
-\begin{classdesc}{GopherHandler}{}
-Open gopher URLs.
 \end{classdesc}
 
 \begin{classdesc}{UnknownHandler}{}
@@ -588,7 +579,7 @@ The same as \method{http_error_301()}, but called for the
 
 \class{HTTPCookieProcessor} instances have one attribute:
 
-\begin{memberdesc}{cookiejar}
+\begin{memberdesc}[HTTPCookieProcessor]{cookiejar}
 The \class{cookielib.CookieJar} in which cookies are stored.
 \end{memberdesc}
 
@@ -744,13 +735,6 @@ Set maximum number of cached connections to \var{m}.
 \end{methoddesc}
 
 
-\subsection{GopherHandler Objects \label{gopher-handler}}
-
-\begin{methoddesc}[GopherHandler]{gopher_open}{req}
-Open the gopher resource indicated by \var{req}.
-\end{methoddesc}
-
-
 \subsection{UnknownHandler Objects \label{unknown-handler-objects}}
 
 \begin{methoddesc}[UnknownHandler]{unknown_open}{}
@@ -817,7 +801,10 @@ Use of Basic HTTP Authentication:
 import urllib2
 # Create an OpenerDirector with support for Basic HTTP Authentication...
 auth_handler = urllib2.HTTPBasicAuthHandler()
-auth_handler.add_password('realm', 'host', 'username', 'password')
+auth_handler.add_password(realm='PDQ Application',
+                          uri='https://mahler:8092/site-updates.py',
+                          user='klem',
+                          passwd='kadidd!ehopper')
 opener = urllib2.build_opener(auth_handler)
 # ...and install it globally so it can be used with urlopen.
 urllib2.install_opener(opener)

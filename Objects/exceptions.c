@@ -33,6 +33,8 @@ BaseException_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     PyBaseExceptionObject *self;
 
     self = (PyBaseExceptionObject *)type->tp_alloc(type, 0);
+    if (!self)
+        return NULL;
     /* the dict is created on the fly in PyObject_GenericSetAttr */
     self->message = self->dict = NULL;
 
@@ -210,13 +212,6 @@ static PySequenceMethods BaseException_as_sequence = {
     0                       /* sq_inplace_repeat; */
 };
 
-static PyMemberDef BaseException_members[] = {
-    {"message", T_OBJECT, offsetof(PyBaseExceptionObject, message), 0,
-        PyDoc_STR("exception message")},
-    {NULL}  /* Sentinel */
-};
-
-
 static PyObject *
 BaseException_get_dict(PyBaseExceptionObject *self)
 {
@@ -272,9 +267,42 @@ BaseException_set_args(PyBaseExceptionObject *self, PyObject *val)
     return 0;
 }
 
+static PyObject *
+BaseException_get_message(PyBaseExceptionObject *self)
+{
+	int ret;
+	ret = PyErr_WarnEx(PyExc_DeprecationWarning,
+				"BaseException.message has been deprecated as "
+					"of Python 2.6",
+				1);
+	if (ret == -1)
+		return NULL;
+
+	Py_INCREF(self->message);
+	return self->message;
+}
+
+static int
+BaseException_set_message(PyBaseExceptionObject *self, PyObject *val)
+{
+	int ret;
+	ret = PyErr_WarnEx(PyExc_DeprecationWarning,
+				"BaseException.message has been deprecated as "
+					"of Python 2.6",
+				1);
+	if (ret == -1)
+		return -1;
+	Py_INCREF(val);
+	Py_DECREF(self->message);
+	self->message = val;
+	return 0;
+}
+
 static PyGetSetDef BaseException_getset[] = {
     {"__dict__", (getter)BaseException_get_dict, (setter)BaseException_set_dict},
     {"args", (getter)BaseException_get_args, (setter)BaseException_set_args},
+    {"message", (getter)BaseException_get_message,
+	    (setter)BaseException_set_message},
     {NULL},
 };
 
@@ -300,7 +328,8 @@ static PyTypeObject _PyExc_BaseException = {
     PyObject_GenericGetAttr,    /*tp_getattro*/
     PyObject_GenericSetAttr,    /*tp_setattro*/
     0,                          /*tp_as_buffer*/
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC,  /*tp_flags*/
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC |
+    	Py_TPFLAGS_BASE_EXC_SUBCLASS,  /*tp_flags*/
     PyDoc_STR("Common base class for all exceptions"), /* tp_doc */
     (traverseproc)BaseException_traverse, /* tp_traverse */
     (inquiry)BaseException_clear, /* tp_clear */
@@ -309,7 +338,7 @@ static PyTypeObject _PyExc_BaseException = {
     0,                          /* tp_iter */
     0,                          /* tp_iternext */
     BaseException_methods,      /* tp_methods */
-    BaseException_members,      /* tp_members */
+    0,                          /* tp_members */
     BaseException_getset,       /* tp_getset */
     0,                          /* tp_base */
     0,                          /* tp_dict */
@@ -460,8 +489,6 @@ SystemExit_traverse(PySystemExitObject *self, visitproc visit, void *arg)
 }
 
 static PyMemberDef SystemExit_members[] = {
-    {"message", T_OBJECT, offsetof(PySystemExitObject, message), 0,
-        PyDoc_STR("exception message")},
     {"code", T_OBJECT, offsetof(PySystemExitObject, code), 0,
         PyDoc_STR("exception code")},
     {NULL}  /* Sentinel */
@@ -662,8 +689,6 @@ EnvironmentError_str(PyEnvironmentErrorObject *self)
 }
 
 static PyMemberDef EnvironmentError_members[] = {
-    {"message", T_OBJECT, offsetof(PyEnvironmentErrorObject, message), 0,
-        PyDoc_STR("exception message")},
     {"errno", T_OBJECT, offsetof(PyEnvironmentErrorObject, myerrno), 0,
         PyDoc_STR("exception errno")},
     {"strerror", T_OBJECT, offsetof(PyEnvironmentErrorObject, strerror), 0,
@@ -895,8 +920,6 @@ WindowsError_str(PyWindowsErrorObject *self)
 }
 
 static PyMemberDef WindowsError_members[] = {
-    {"message", T_OBJECT, offsetof(PyWindowsErrorObject, message), 0,
-        PyDoc_STR("exception message")},
     {"errno", T_OBJECT, offsetof(PyWindowsErrorObject, myerrno), 0,
         PyDoc_STR("POSIX exception code")},
     {"strerror", T_OBJECT, offsetof(PyWindowsErrorObject, strerror), 0,
@@ -1127,8 +1150,6 @@ SyntaxError_str(PySyntaxErrorObject *self)
 }
 
 static PyMemberDef SyntaxError_members[] = {
-    {"message", T_OBJECT, offsetof(PySyntaxErrorObject, message), 0,
-        PyDoc_STR("exception message")},
     {"msg", T_OBJECT, offsetof(PySyntaxErrorObject, msg), 0,
         PyDoc_STR("exception msg")},
     {"filename", T_OBJECT, offsetof(PySyntaxErrorObject, filename), 0,
@@ -1563,8 +1584,6 @@ UnicodeError_traverse(PyUnicodeErrorObject *self, visitproc visit, void *arg)
 }
 
 static PyMemberDef UnicodeError_members[] = {
-    {"message", T_OBJECT, offsetof(PyUnicodeErrorObject, message), 0,
-        PyDoc_STR("exception message")},
     {"encoding", T_OBJECT, offsetof(PyUnicodeErrorObject, encoding), 0,
         PyDoc_STR("exception encoding")},
     {"object", T_OBJECT, offsetof(PyUnicodeErrorObject, object), 0,

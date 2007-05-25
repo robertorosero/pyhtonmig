@@ -803,6 +803,34 @@ PyDict_Next(PyObject *op, Py_ssize_t *ppos, PyObject **pkey, PyObject **pvalue)
 	return 1;
 }
 
+/* Internal version of PyDict_Next that returns a hash value in addition to the key and value.*/
+int
+_PyDict_Next(PyObject *op, Py_ssize_t *ppos, PyObject **pkey, PyObject **pvalue, long *phash)
+{
+	register Py_ssize_t i;
+	register Py_ssize_t mask;
+	register dictentry *ep;
+
+	if (!PyDict_Check(op))
+		return 0;
+	i = *ppos;
+	if (i < 0)
+		return 0;
+	ep = ((dictobject *)op)->ma_table;
+	mask = ((dictobject *)op)->ma_mask;
+	while (i <= mask && ep[i].me_value == NULL)
+		i++;
+	*ppos = i+1;
+	if (i > mask)
+		return 0;
+        *phash = (long)(ep[i].me_hash);
+	if (pkey)
+		*pkey = ep[i].me_key;
+	if (pvalue)
+		*pvalue = ep[i].me_value;
+	return 1;
+}
+
 /* Methods */
 
 static void
@@ -1147,6 +1175,24 @@ dict_fromkeys(PyObject *cls, PyObject *args)
 	if (d == NULL)
 		return NULL;
 
+	if (PyDict_CheckExact(d) && PyAnySet_CheckExact(seq)) {
+		dictobject *mp = (dictobject *)d;
+		Py_ssize_t pos = 0;
+		PyObject *key;
+		long hash;
+
+		if (dictresize(mp, PySet_GET_SIZE(seq)))
+			return NULL;
+
+		while (_PySet_NextEntry(seq, &pos, &key, &hash)) {
+			Py_INCREF(key);
+			Py_INCREF(value);
+			if (insertdict(mp, key, hash, value))
+				return NULL;
+		}
+		return d;
+	}
+
 	it = PyObject_GetIter(seq);
 	if (it == NULL){
 		Py_DECREF(d);
@@ -1306,7 +1352,7 @@ PyDict_Merge(PyObject *a, PyObject *b, int override)
 		return -1;
 	}
 	mp = (dictobject*)a;
-	if (PyDict_Check(b)) {
+	if (PyDict_CheckExact(b)) {
 		other = (dictobject*)b;
 		if (other == mp || other->ma_used == 0)
 			/* a.update(a) or a.update({}); nothing to do */
@@ -1642,7 +1688,7 @@ dict_richcompare(PyObject *v, PyObject *w, int op)
  }
 
 static PyObject *
-dict_has_key(register dictobject *mp, PyObject *key)
+dict_contains(register dictobject *mp, PyObject *key)
 {
 	long hash;
 	dictentry *ep;
@@ -1657,6 +1703,16 @@ dict_has_key(register dictobject *mp, PyObject *key)
 	if (ep == NULL)
 		return NULL;
 	return PyBool_FromLong(ep->me_value != NULL);
+}
+
+static PyObject *
+dict_has_key(register dictobject *mp, PyObject *key)
+{
+	if (Py_Py3kWarningFlag &&
+	    PyErr_Warn(PyExc_DeprecationWarning, 
+		       "dict.has_key() not supported in 3.x") < 0)
+		return NULL;
+	return dict_contains(mp, key);
 }
 
 static PyObject *
@@ -1932,7 +1988,7 @@ PyDoc_STRVAR(iteritems__doc__,
 "D.iteritems() -> an iterator over the (key, value) items of D");
 
 static PyMethodDef mapp_methods[] = {
-	{"__contains__",(PyCFunction)dict_has_key,      METH_O | METH_COEXIST,
+	{"__contains__",(PyCFunction)dict_contains,	METH_O | METH_COEXIST,
 	 contains__doc__},
 	{"__getitem__", (PyCFunction)dict_subscript,	METH_O | METH_COEXIST,
 	 getitem__doc__},
@@ -1983,6 +2039,17 @@ PyDict_Contains(PyObject *op, PyObject *key)
 		if (hash == -1)
 			return -1;
 	}
+	ep = (mp->ma_lookup)(mp, key, hash);
+	return ep == NULL ? -1 : (ep->me_value != NULL);
+}
+
+/* Internal version of PyDict_Contains used when the hash value is already known */
+int
+_PyDict_Contains(PyObject *op, PyObject *key, long hash)
+{
+	dictobject *mp = (dictobject *)op;
+	dictentry *ep;
+
 	ep = (mp->ma_lookup)(mp, key, hash);
 	return ep == NULL ? -1 : (ep->me_value != NULL);
 }
@@ -2073,7 +2140,7 @@ PyTypeObject PyDict_Type = {
 	0,					/* tp_setattro */
 	0,					/* tp_as_buffer */
 	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC |
-		Py_TPFLAGS_BASETYPE,		/* tp_flags */
+		Py_TPFLAGS_BASETYPE | Py_TPFLAGS_DICT_SUBCLASS,	/* tp_flags */
 	dictionary_doc,				/* tp_doc */
 	dict_traverse,				/* tp_traverse */
 	dict_tp_clear,				/* tp_clear */

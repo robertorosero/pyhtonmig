@@ -490,7 +490,6 @@ volatile int _Py_Ticker = 100;
 PyObject *
 PyEval_EvalCode(PyCodeObject *co, PyObject *globals, PyObject *locals)
 {
-	/* XXX raise SystemError if globals is NULL */
 	return PyEval_EvalCodeEx(co,
 			  globals, locals,
 			  (PyObject **)NULL, 0,
@@ -662,7 +661,7 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 #define STACKADJ(n)	{ (void)(BASIC_STACKADJ(n), \
                                lltrace && prtrace(TOP(), "stackadj")); \
                                assert(STACK_LEVEL() <= co->co_stacksize); }
-#define EXT_POP(STACK_POINTER) (lltrace && prtrace(*(STACK_POINTER), "ext_pop"), *--(STACK_POINTER))
+#define EXT_POP(STACK_POINTER) (lltrace && prtrace((STACK_POINTER)[-1], "ext_pop"), *--(STACK_POINTER))
 #else
 #define PUSH(v)		BASIC_PUSH(v)
 #define POP()		BASIC_POP()
@@ -1774,12 +1773,10 @@ PyEval_EvalFrameEx(PyFrameObject *f, int throwflag)
 					PUSH(w);
 				}
 			} else if (unpack_iterable(v, oparg,
-						 stack_pointer + oparg))
+						 stack_pointer + oparg)) {
 				stack_pointer += oparg;
-			else {
-				if (PyErr_ExceptionMatches(PyExc_TypeError))
-					PyErr_SetString(PyExc_TypeError,
-						"unpack non-sequence");
+			} else {
+				/* unpack_iterable() raised an exception */
 				why = WHY_EXCEPTION;
 			}
 			Py_DECREF(v);
@@ -3793,13 +3790,31 @@ ext_do_call(PyObject *func, PyObject ***pp_stack, int flags, int na, int nk)
 
 	if (flags & CALL_FLAG_KW) {
 		kwdict = EXT_POP(*pp_stack);
-		if (!(kwdict && PyDict_Check(kwdict))) {
-			PyErr_Format(PyExc_TypeError,
-				     "%s%s argument after ** "
-				     "must be a dictionary",
-				     PyEval_GetFuncName(func),
-				     PyEval_GetFuncDesc(func));
-			goto ext_call_fail;
+		if (!PyDict_Check(kwdict)) {
+			PyObject *d;
+			d = PyDict_New();
+			if (d == NULL)
+				goto ext_call_fail;
+			if (PyDict_Update(d, kwdict) != 0) {
+				Py_DECREF(d);
+				/* PyDict_Update raises attribute
+				 * error (percolated from an attempt
+				 * to get 'keys' attribute) instead of
+				 * a type error if its second argument
+				 * is not a mapping.
+				 */
+				if (PyErr_ExceptionMatches(PyExc_AttributeError)) {
+					PyErr_Format(PyExc_TypeError,
+						     "%.200s%.200s argument after ** "
+						     "must be a mapping, not %.200s",
+						     PyEval_GetFuncName(func),
+						     PyEval_GetFuncDesc(func),
+						     kwdict->ob_type->tp_name);
+				}
+				goto ext_call_fail;
+			}
+			Py_DECREF(kwdict);
+			kwdict = d;
 		}
 	}
 	if (flags & CALL_FLAG_VAR) {
@@ -3810,10 +3825,11 @@ ext_do_call(PyObject *func, PyObject ***pp_stack, int flags, int na, int nk)
 			if (t == NULL) {
 				if (PyErr_ExceptionMatches(PyExc_TypeError)) {
 					PyErr_Format(PyExc_TypeError,
-						     "%s%s argument after * "
-						     "must be a sequence",
+						     "%.200s%.200s argument after * "
+						     "must be a sequence, not %200s",
 						     PyEval_GetFuncName(func),
-						     PyEval_GetFuncDesc(func));
+						     PyEval_GetFuncDesc(func),
+						     stararg->ob_type->tp_name);
 				}
 				goto ext_call_fail;
 			}
@@ -3927,7 +3943,7 @@ assign_slice(PyObject *u, PyObject *v, PyObject *w, PyObject *x)
 	PyTypeObject *tp = u->ob_type;
 	PySequenceMethods *sq = tp->tp_as_sequence;
 
-	if (sq && sq->sq_slice && ISINDEX(v) && ISINDEX(w)) {
+	if (sq && sq->sq_ass_slice && ISINDEX(v) && ISINDEX(w)) {
 		Py_ssize_t ilow = 0, ihigh = PY_SSIZE_T_MAX;
 		if (!_PyEval_SliceIndex(v, &ilow))
 			return -1;
@@ -4115,7 +4131,8 @@ build_class(PyObject *methods, PyObject *bases, PyObject *name)
 			metaclass = (PyObject *) &PyClass_Type;
 		Py_INCREF(metaclass);
 	}
-	result = PyObject_CallFunctionObjArgs(metaclass, name, bases, methods, NULL);
+	result = PyObject_CallFunctionObjArgs(metaclass, name, bases, methods,
+                                              NULL);
 	Py_DECREF(metaclass);
 	if (result == NULL && PyErr_ExceptionMatches(PyExc_TypeError)) {
 		/* A type error here likely means that the user passed
@@ -4129,7 +4146,8 @@ build_class(PyObject *methods, PyObject *bases, PyObject *name)
 		if (PyString_Check(pvalue)) {
 			PyObject *newmsg;
 			newmsg = PyString_FromFormat(
-				"Error when calling the metaclass bases\n    %s",
+				"Error when calling the metaclass bases\n"
+                                "    %s",
 				PyString_AS_STRING(pvalue));
 			if (newmsg != NULL) {
 				Py_DECREF(pvalue);
@@ -4203,6 +4221,8 @@ exec_statement(PyFrameObject *f, PyObject *prog, PyObject *globals,
 		FILE *fp = PyFile_AsFile(prog);
 		char *name = PyString_AsString(PyFile_Name(prog));
 		PyCompilerFlags cf;
+                if (name == NULL)
+                        return -1;
 		cf.cf_flags = 0;
 		if (PyEval_MergeCompilerFlags(&cf))
 			v = PyRun_FileFlags(fp, name, Py_file_input, globals,

@@ -893,7 +893,7 @@ _PyLong_FromSsize_t(Py_ssize_t ival)
 	int one = 1;
 	return _PyLong_FromByteArray(
 			(unsigned char *)&bytes,
-			SIZEOF_SIZE_T, IS_LITTLE_ENDIAN, 0);
+			SIZEOF_SIZE_T, IS_LITTLE_ENDIAN, 1);
 }
 
 /* Create a new long int object from a C size_t. */
@@ -1739,6 +1739,8 @@ long_divrem(PyLongObject *a, PyLongObject *b,
 	     a->ob_digit[size_a-1] < b->ob_digit[size_b-1])) {
 		/* |a| < |b|. */
 		*pdiv = _PyLong_New(0);
+		if (*pdiv == NULL)
+			return -1;
 		Py_INCREF(a);
 		*prem = (PyLongObject *) a;
 		return 0;
@@ -1749,6 +1751,10 @@ long_divrem(PyLongObject *a, PyLongObject *b,
 		if (z == NULL)
 			return -1;
 		*prem = (PyLongObject *) PyLong_FromLong((long)rem);
+		if (*prem == NULL) {
+			Py_DECREF(z);
+			return -1;
+		}
 	}
 	else {
 		z = x_divrem(a, b, prem);
@@ -3204,6 +3210,8 @@ long_coerce(PyObject **pv, PyObject **pw)
 {
 	if (PyInt_Check(*pw)) {
 		*pw = PyLong_FromLong(PyInt_AS_LONG(*pw));
+		if (*pw == NULL)
+			return -1;
 		Py_INCREF(*pv);
 		return 0;
 	}
@@ -3287,8 +3295,25 @@ long_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 		return PyLong_FromLong(0L);
 	if (base == -909)
 		return PyNumber_Long(x);
-	else if (PyString_Check(x))
+	else if (PyString_Check(x)) {
+		/* Since PyLong_FromString doesn't have a length parameter,
+		 * check here for possible NULs in the string. */
+		char *string = PyString_AS_STRING(x);
+		if (strlen(string) != PyString_Size(x)) {
+			/* create a repr() of the input string,
+			 * just like PyLong_FromString does. */
+			PyObject *srepr;
+			srepr = PyObject_Repr(x);
+			if (srepr == NULL)
+				return NULL;
+			PyErr_Format(PyExc_ValueError,
+			     "invalid literal for long() with base %d: %s",
+			     base, PyString_AS_STRING(srepr));
+			Py_DECREF(srepr);
+			return NULL;
+		}
 		return PyLong_FromString(PyString_AS_STRING(x), NULL, base);
+	}
 #ifdef Py_USING_UNICODE
 	else if (PyUnicode_Check(x))
 		return PyLong_FromUnicode(PyUnicode_AS_UNICODE(x),
@@ -3418,7 +3443,7 @@ PyTypeObject PyLong_Type = {
 	0,					/* tp_setattro */
 	0,					/* tp_as_buffer */
 	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_CHECKTYPES |
-		Py_TPFLAGS_BASETYPE,		/* tp_flags */
+		Py_TPFLAGS_BASETYPE | Py_TPFLAGS_LONG_SUBCLASS,	/* tp_flags */
 	long_doc,				/* tp_doc */
 	0,					/* tp_traverse */
 	0,					/* tp_clear */

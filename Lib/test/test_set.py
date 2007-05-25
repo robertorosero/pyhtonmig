@@ -26,6 +26,14 @@ class ReprWrapper:
     def __repr__(self):
         return repr(self.value)
 
+class HashCountingInt(int):
+    'int-like object that counts the number of times __hash__ is called'
+    def __init__(self, *args):
+        self.hash_count = 0
+    def __hash__(self):
+        self.hash_count += 1
+        return int.__hash__(self)
+
 class TestJointOps(unittest.TestCase):
     # Tests common to both set and frozenset
 
@@ -269,6 +277,25 @@ class TestJointOps(unittest.TestCase):
         finally:
             fo.close()
             os.remove(test_support.TESTFN)
+
+    def test_do_not_rehash_dict_keys(self):
+        n = 10
+        d = dict.fromkeys(map(HashCountingInt, xrange(n)))
+        self.assertEqual(sum(elem.hash_count for elem in d), n)
+        s = self.thetype(d)
+        self.assertEqual(sum(elem.hash_count for elem in d), n)
+        s.difference(d)
+        self.assertEqual(sum(elem.hash_count for elem in d), n)
+        if hasattr(s, 'symmetric_difference_update'):
+            s.symmetric_difference_update(d)
+        self.assertEqual(sum(elem.hash_count for elem in d), n)
+        d2 = dict.fromkeys(set(d))
+        self.assertEqual(sum(elem.hash_count for elem in d), n)
+        d3 = dict.fromkeys(frozenset(d))
+        self.assertEqual(sum(elem.hash_count for elem in d), n)
+        d3 = dict.fromkeys(frozenset(d), 123)
+        self.assertEqual(sum(elem.hash_count for elem in d), n)
+        self.assertEqual(d3, dict.fromkeys(d, 123))
 
 class TestSet(TestJointOps):
     thetype = set
