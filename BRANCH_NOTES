@@ -12,8 +12,6 @@ Usage
 ======
 Status
 ======
-* Fix failing tests.
-    - test_xmlrpc
 * Turn on whitelisting.
     - Verify injecting 'open' into importlib works.
 * Write tests.
@@ -28,7 +26,7 @@ Status
     - Types crippled.
         + file
         + code
-* Fix 'sys' module.
+* Fix 'sys' module reloading.
     - test_xmlrpc relies on reloading sys to get setdefaultencoding, but hack
       to allow re-import of sys doesn't let this work.
 
