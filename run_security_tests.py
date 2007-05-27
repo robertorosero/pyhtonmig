@@ -1,5 +1,6 @@
 import subprocess
 import os
+import re
 
 def run_tests(type_, test_verifier):
     failures = []
@@ -22,18 +23,23 @@ def run_tests(type_, test_verifier):
     return failures
 
 
+debug_refs_regex = re.compile(r"^\[\d+ refs\]$")
+
 def verify_succeed_test(test_name, stderr):
-    if stderr.count('\n') > 1:
+    """Should only have debug build output.
+
+    Does not work for non-debug builds!
+
+    """
+    if not debug_refs_regex.match(stderr):
         return False
-    else:
-        return True
+    return True
 
 
 def verify_fail_test(test_name, stderr):
-    if stderr.count('\n') <= 1:
-        return False
+    """Should have an exception line with the proper exception raised."""
     exc_name = test_name.split('--')[1]
-    if exc_name not in stderr:
+    if not re.search('^'+exc_name, stderr, re.MULTILINE):
         return False
     return True
 
