@@ -6,6 +6,16 @@
 */
 #include "Python.h"
 
+#define CREATE_SAFE_LIST(kind)  \
+	safe_##kind##_seq = PyTuple_New(safe_##kind##_count); \
+        for (x = 0; x < safe_##kind##_count; x += 1) { \
+		PyObject *module_name = \
+			PyString_FromString(safe_##kind##_names[x]); \
+		PyTuple_SetItem(safe_##kind##_seq, x, module_name); \
+	}
+
+extern PyObject *PyModule_GetWarningsModule(void);
+
 int
 main(int argc, char *argv[])
 {
@@ -16,26 +26,43 @@ main(int argc, char *argv[])
     PyObject *hidden_modules;
     PyObject *import_module;
     PyObject *import_callable;
+    Py_ssize_t safe_builtins_count = 7;
+    const char *safe_builtins_names[] = {"_ast", "_codecs", "_sre",
+					  "_symtable", "_types", "errno",
+					  "exceptions"};
+    Py_ssize_t safe_frozen_count = 0;
+    const char *safe_frozen_names[] = {};
+    PyObject *safe_builtins_seq;
+    PyObject *safe_frozen_seq;
+    Py_ssize_t safe_extensions_count = 5;
+    const char *safe_extensions_names[] = {"binascii", "cmath", "math",
+					    "operator", "time"};
+    PyObject *safe_extensions_seq;
 
-  /* Initialize interpreter.  */
+    /* Initialize interpreter.  */
     Py_Initialize();
 
+    /* Create lists of modules safe to import. */
+    CREATE_SAFE_LIST(builtins);
+    CREATE_SAFE_LIST(frozen);
+    CREATE_SAFE_LIST(extensions);
 
-  /* Secure it. */
     interp = PyThreadState_GET()->interp;
 
-    import_module = PyImport_ImportModule("importlib");
+    /* Get importer from importlib. */
+    import_module = PyImport_ImportModule("controlled_importlib");
+    if (!import_module)
+	    return 1;
 
-    /* XXX Hack to make importlib work w/o 'open' in the built-in namespace.
-       Fixed in controlled_importlib.  */
-    PyDict_SetItemString(PyModule_GetDict(import_module), "open",
-		    PyDict_GetItemString(interp->builtins, "open"));
+    import_callable = PyObject_CallMethod(import_module,
+		    "ControlledImport", "(O, O, O)",
+		    safe_builtins_seq, safe_frozen_seq, safe_extensions_seq);
+    if (!import_callable)
+	    return 1;
 
-    import_callable = PyObject_CallMethod(import_module, "Import", "");
-
-    /* Store import machinery somewhere so that a reference is held as
-       needed. */
+    /* Store importlib importer somewhere. */
     PyDict_SetItemString(interp->sysdict, "import_", import_callable);
+    /* Set __import__ to the import delegate defined in 'sys'. */
     PyDict_SetItemString(interp->builtins, "__import__",
 		    PyDict_GetItemString(interp->sysdict,
 			    "import_delegate"));
