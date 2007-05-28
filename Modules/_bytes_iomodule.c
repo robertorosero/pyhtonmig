@@ -63,8 +63,6 @@ bytes_io_read(BytesIOObject *self, PyObject *args)
 	Py_ssize_t l, n = -1;
 	char *output = NULL;
 
-	if (self->buf == NULL)
-		return err_closed();
 	if (!PyArg_ParseTuple(args, "|n:read", &n))
 		return NULL;
 
@@ -82,65 +80,83 @@ bytes_io_read(BytesIOObject *self, PyObject *args)
 	return PyString_FromStringAndSize(output, n);
 }
 
+/* Internal routine to get a line. Return the number of bytes read. */
+static Py_ssize_t
+get_line(BytesIOObject *self, char **output)
+{
+	char *n, *s;
+	Py_ssize_t l;
+
+	/* XXX: Should we ckeck here if the object is closed,
+	   for thread-safety? */
+	assert(self->buf != NULL);
+
+	/* Move to the end of the line, upto the end of the string, s */
+	for (n = self->buf + self->pos,
+	     s = self->buf + self->string_size;
+	     n < s && *n != '\n'; n++);
+
+	/* Skip the newline character */
+	if (n < s)
+		n++;
+
+	/* Get the length from the current position to the end of the line */
+	l = n - (self->buf + self->pos);
+	*output = self->buf + self->pos;
+
+	/* XXX: Is this really needed? */
+	assert(self->pos + l < PY_SSIZE_T_MAX);
+	self->pos += l;
+
+	return l;
+}
+
 static PyObject *
 bytes_io_readline(BytesIOobject *self, PyObject *args)
 {
-	char *n, *s;
-	int m = -1;
-	Py_ssize_t l;
+	Py_ssize_t n, m = -1;
 	char *output;
 
 	if (self->buf == NULL)
 		return err_closed();
 
-	if (args) {
+	if (args)  /* XXX: Why this is required? */
 		if (!PyArg_ParseTuple(args, "|i:readline", &m))
 			return NULL;
-	}
 
-	/* move to the end of the line, upto the end of the string, s */
-	for (n = self->buf + self->pos,
-	     s = self->buf + self->string_size;
-	     n < s && *n != '\n'; n++);
+	n = get_line(self, &output);
 
-	/* skip the newline character */
-	if (n < s)
-		n++;
-
-	/* get the length from the current position to the end of the line */
-	l = n - (self->buf + self->pos);
-	output = self->buf + self->pos;
-
-	assert(self->pos + l < INT_MAX);  /* XXX: Is this really needed? */
-	self->pos += l;
-
-	if (m >= 0 && m < l) {
-		m = l - m;
-		l -= m;
+	if (m >= 0 && m < n) {
+		m = n - m;
+		n -= m;
 		self->pos -= m;
 	}
 
-	return PyString_FromStringAndSize(output, l);
+	return PyString_FromStringAndSize(output, n);
 }
 
 static PyObject *
-IO_readlines(IOobject *self, PyObject *args)
+bytes_io_readlines(BytesIOObject *self, PyObject *args)
 {
 	int n;
 	char *output;
 	PyObject *result, *line;
 	int hint = 0, length = 0;
 
-	if (!PyArg_ParseTuple(args, "|i:readlines", &hint))
-		return NULL;
+	if (self->buf == NULL)
+		return err_closed();
+
+	if (args)
+		if (!PyArg_ParseTuple(args, "|i:readlines", &hint))
+			return NULL;
 
 	result = PyList_New(0);
 	if (!result)
 		return NULL;
 
 	while (1) {
-		if ((n = IO_creadline((PyObject *) self, &output)) < 0)
-			goto err;
+		n = get_line(self, &output);
+
 		if (n == 0)
 			break;
 		line = PyString_FromStringAndSize(output, n);
@@ -161,7 +177,7 @@ IO_readlines(IOobject *self, PyObject *args)
 	return NULL;
 }
 
-PyDoc_STRVAR(IO_readlines__doc__, "readlines() -- Read all lines");
+
 
 static PyObject *
 IO_reset(IOobject *self, PyObject *unused)
@@ -673,6 +689,13 @@ PyDoc_STRVAR(BytesIO_readline_doc,
 "Retain newline.  A non-negative size argument limits the maximum\n"
 "number of bytes to return (an incomplete line may be returned then).\n"
 "Return an empty string at EOF.\n");
+
+PyDoc_STRVAR(BytesIO_readlines_doc,
+"readlines([size]) -> list of strings, each a line from the object.\n"
+"\n"
+"Call readline() repeatedly and return a list of the lines so read.\n"
+"The optional size argument, if given, is an approximate bound on the\n"
+"total number of bytes in the lines returned.\n");
 
 /* List of methods defined in the module */
 static struct PyMethodDef IO_methods[] = {
