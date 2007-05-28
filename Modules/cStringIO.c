@@ -262,22 +262,6 @@ IO_readlines(IOobject *self, PyObject *args)
 PyDoc_STRVAR(IO_readlines__doc__, "readlines() -- Read all lines");
 
 static PyObject *
-IO_reset(IOobject *self, PyObject *unused)
-{
-
-	if (!IO__opencheck(self))
-		return NULL;
-
-	self->pos = 0;
-
-	Py_INCREF(Py_None);
-	return Py_None;
-}
-
-PyDoc_STRVAR(IO_reset__doc__,
-"reset() -- Reset the file position to the beginning");
-
-static PyObject *
 IO_tell(IOobject *self, PyObject *unused)
 {
 
@@ -513,7 +497,6 @@ static struct PyMethodDef O_methods[] = {
 	 IO_readline__doc__},
 	{"readlines", (PyCFunction) IO_readlines, METH_VARARGS,
 	 IO_readlines__doc__},
-	{"reset", (PyCFunction) IO_reset, METH_NOARGS, IO_reset__doc__},
 	{"tell", (PyCFunction) IO_tell, METH_NOARGS, IO_tell__doc__},
 	{"truncate", (PyCFunction) IO_truncate, METH_VARARGS,
 	 IO_truncate__doc__},
@@ -647,7 +630,6 @@ static struct PyMethodDef I_methods[] = {
 	 IO_readline__doc__},
 	{"readlines", (PyCFunction) IO_readlines, METH_VARARGS,
 	 IO_readlines__doc__},
-	{"reset", (PyCFunction) IO_reset, METH_NOARGS, IO_reset__doc__},
 	{"tell", (PyCFunction) IO_tell, METH_NOARGS, IO_tell__doc__},
 	{"truncate", (PyCFunction) IO_truncate, METH_VARARGS,
 	 IO_truncate__doc__},
