@@ -106,6 +106,7 @@ get_line(BytesIOObject *self, char **output)
 
 	/* XXX: Is this really needed? */
 	assert(self->pos + l < PY_SSIZE_T_MAX);
+	fprintf(stderr, "line length: %i\n", l);
 	self->pos += l;
 
 	return l;
@@ -177,52 +178,29 @@ bytes_io_readlines(BytesIOObject *self, PyObject *args)
 	return NULL;
 }
 
-
-
 static PyObject *
-IO_reset(IOobject *self, PyObject *unused)
+bytes_io_tell(BytesIOObject *self)
 {
-
-	if (!IO__opencheck(self))
-		return NULL;
-
-	self->pos = 0;
-
-	Py_INCREF(Py_None);
-	return Py_None;
-}
-
-PyDoc_STRVAR(IO_reset__doc__,
-"reset() -- Reset the file position to the beginning");
-
-static PyObject *
-IO_tell(IOobject *self, PyObject *unused)
-{
-
-	if (!IO__opencheck(self))
-		return NULL;
+	if (self->buf == NULL)
+		return err_closed();
 
 	return PyInt_FromSsize_t(self->pos);
 }
 
-PyDoc_STRVAR(IO_tell__doc__, "tell() -- get the current position.");
-
 static PyObject *
-IO_truncate(IOobject *self, PyObject *args)
+bytes_io_truncate(IOobject *self, PyObject *args)
 {
-	Py_ssize_t pos = -1;
+	Py_ssize_t size;
 
-	if (!IO__opencheck(self))
+	/* No argument passed, truncate to current position */
+	size = self->pos;
+
+	if (self->buf == NULL)
+		return err_closed();
+	if (!PyArg_ParseTuple(args, "|n:truncate", &size))
 		return NULL;
-	if (!PyArg_ParseTuple(args, "|n:truncate", &pos))
-		return NULL;
 
-	if (PyTuple_Size(args) == 0) {
-		/* No argument passed, truncate to current position */
-		pos = self->pos;
-	}
-
-	if (pos < 0) {
+	if (size < 0) {
 		errno = EINVAL;
 		PyErr_SetFromErrno(PyExc_IOError);
 		return NULL;
@@ -236,22 +214,23 @@ IO_truncate(IOobject *self, PyObject *args)
 	return Py_None;
 }
 
-PyDoc_STRVAR(IO_truncate__doc__,
-"truncate(): truncate the file at the current position.");
-
 static PyObject *
-IO_iternext(Iobject *self)
+bytes_io_iternext(IOobject *self)
 {
-	PyObject *next;
-	next = IO_readline((IOobject *) self, NULL);
+	char *next;
+	Py_ssize_t n;
+
+	if (self->buf == NULL)
+		return err_closed();
+
+	n = get_line(self, &next);
+
 	if (!next)
 		return NULL;
-	if (!PyString_GET_SIZE(next)) {
-		Py_DECREF(next);
-		PyErr_SetNone(PyExc_StopIteration);
+	if (n == 0)
 		return NULL;
-	}
-	return next;
+
+	return PyString_FromStringAndSize(next, n);
 }
 
 
@@ -431,7 +410,6 @@ static struct PyMethodDef O_methods[] = {
 	 IO_readline__doc__},
 	{"readlines", (PyCFunction) IO_readlines, METH_VARARGS,
 	 IO_readlines__doc__},
-	{"reset", (PyCFunction) IO_reset, METH_NOARGS, IO_reset__doc__},
 	{"tell", (PyCFunction) IO_tell, METH_NOARGS, IO_tell__doc__},
 	{"truncate", (PyCFunction) IO_truncate, METH_VARARGS,
 	 IO_truncate__doc__},
@@ -565,7 +543,6 @@ static struct PyMethodDef I_methods[] = {
 	 IO_readline__doc__},
 	{"readlines", (PyCFunction) IO_readlines, METH_VARARGS,
 	 IO_readlines__doc__},
-	{"reset", (PyCFunction) IO_reset, METH_NOARGS, IO_reset__doc__},
 	{"tell", (PyCFunction) IO_tell, METH_NOARGS, IO_tell__doc__},
 	{"truncate", (PyCFunction) IO_truncate, METH_VARARGS,
 	 IO_truncate__doc__},
@@ -691,11 +668,21 @@ PyDoc_STRVAR(BytesIO_readline_doc,
 "Return an empty string at EOF.\n");
 
 PyDoc_STRVAR(BytesIO_readlines_doc,
-"readlines([size]) -> list of strings, each a line from the object.\n"
+"readlines([size]) -> list of strings, each a line from the file.\n"
 "\n"
 "Call readline() repeatedly and return a list of the lines so read.\n"
 "The optional size argument, if given, is an approximate bound on the\n"
 "total number of bytes in the lines returned.\n");
+
+PyDoc_STRVAR(BytesIO_tell_doc,
+"tell() -> current file position, an integer\n");
+
+PyDoc_STRVAR(IO_truncate__doc__,
+"truncate([size]) -> None.  Truncate the file to at most size bytes.\n"
+"\n"
+"Size defaults to the current file position, as returned by tell().\n"
+"If the specified size exceeds the file's current size, the file\n"
+"remains unchanged.");
 
 /* List of methods defined in the module */
 static struct PyMethodDef IO_methods[] = {
