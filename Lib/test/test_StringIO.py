@@ -98,6 +98,11 @@ class TestGenericStringIO(unittest.TestCase):
         self._fp.close()
         self.assertRaises(ValueError, next, self._fp)
 
+    def test_getvalue(self):
+        f = self.MODULE.StringIO()
+        f.close()
+        self.assertRaises(ValueError, f.getvalue)
+
 class TestStringIO(TestGenericStringIO):
     MODULE = StringIO
 
