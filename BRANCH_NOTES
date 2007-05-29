@@ -32,6 +32,7 @@ Failing Tests
 =====
 To Do
 =====
+* Deal with exit()/SystemExit.
 * Write tests.
     - Import
         + Whitelisting works.
