@@ -908,12 +908,6 @@ last_value -- value of last uncaught exception\n\
 last_traceback -- traceback of last uncaught exception\n\
   These three are only available in an interactive session after a\n\
   traceback has been printed.\n\
-\n\
-exc_type -- type of exception currently being handled\n\
-exc_value -- value of exception currently being handled\n\
-exc_traceback -- traceback of exception currently being handled\n\
-  The function exc_info() should be used instead of these three,\n\
-  because it is thread-safe.\n\
 "
 )
 /* concatenating string here */
