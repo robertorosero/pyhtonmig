@@ -1,5 +1,23 @@
-The 'succeed' directory contains files that when run should always run to
-conclusion without failure.
+==========
+How to Use
+==========
 
-The 'fail' directory has files that should always raise the exception specified
-in the file's name.
+Run the test driver ``../run_security_tests.py`` with a standard Python
+interpreter.  The driver will execute the scripts using 'subprocess' and the
+``../secure_python.exe`` interpreter.
+
+
+==============
+Types of Tests
+==============
+
+* succeed
+    All tests in this directory represent code that should always work in a
+    secured interpreter.
+
+* fail
+    Tests that contain code that should not work in a secured interpreter.  All
+    insecure code should be contained with in proper try/except statements.
+    The smallest amount of code required to test a security feature should be
+    within each try/except statement (of which there may be several within a
+    single file).

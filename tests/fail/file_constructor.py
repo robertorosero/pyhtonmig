@@ -1,2 +1,5 @@
 """The constructor for 'file' should not work to open a file."""
-_ = file('README', 'r')
+try:
+    _ = file('README', 'r')
+except TypeError:
+    pass

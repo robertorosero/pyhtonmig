@@ -25,7 +25,7 @@ def run_tests(type_, test_verifier):
 
 debug_refs_regex = re.compile(r"^\[\d+ refs\]$")
 
-def verify_succeed_test(test_name, stderr):
+def verify_no_output(test_name, stderr):
     """Should only have debug build output.
 
     Does not work for non-debug builds!
@@ -36,15 +36,15 @@ def verify_succeed_test(test_name, stderr):
     return True
 
 
-def verify_fail_test(test_name, stderr):
+def verify_exception(test_name, stderr):
     """Should have an exception line with the proper exception raised."""
     exc_name = test_name.split('--')[1]
     if not re.search('^'+exc_name, stderr, re.MULTILINE):
         return False
     return True
 
-for type_, verifier in (('succeed', verify_succeed_test),
-        ('fail', verify_fail_test)):
+for type_, verifier in (('succeed', verify_no_output),
+        ('fail', verify_no_output)):
     failures = run_tests(type_, verifier)
     if failures:
         print '%s failures: %s' % (len(failures), ', '.join(failures))
