@@ -20,12 +20,12 @@ Status
     - frame
         * do not allow importing 'sys' module to get to
           sys._getframe(), sys._current_frames(), or setting a trace
-          or profile function. <critical>
+          or profile function. [done]
     - object() [done]
         * Remove object.__subclasses__ (`Mutable Shared State`_) [done]
 + Sandboxed versions of built-ins (`Sanitizing Built-In Types`_)
     - open()
-    - __import__() / PEP 302 importer (`Imports`_) <critical>
+    - __import__() / PEP 302 importer (`Imports`_) [done]
         * Make sure importing built-in modules can be blocked.
         * Make sure that no abilities are exposed by importers since
           they will be accessible from inheritance through sys data
@@ -51,8 +51,8 @@ Status
         * Just promote removal
     - exit()
         * Have SystemExit exit the process only if no other
-          interpreters are running. [done]
-+ Filesystem path hiding (`Filesystem Information`_) <critical?>
+          interpreters are running.
++ Filesystem path hiding (`Filesystem Information`_)
 + Tweaked stdlib modules
     - mini 'sys' module (`Making the ``sys`` Module Safe`_)
     - genericpath module (for os.path when C modules blocked)
