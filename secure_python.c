@@ -27,6 +27,7 @@ main(int argc, char *argv[])
     PyObject *import_module;
     PyObject *import_callable;
     Py_ssize_t safe_builtins_count = 7;
+    /* All whitelisted modules should be imported in the proper test file. */
     const char *safe_builtins_names[] = {"_ast", "_codecs", "_sre",
 					  "_symtable", "_types", "errno",
 					  "exceptions"};
@@ -34,9 +35,18 @@ main(int argc, char *argv[])
     const char *safe_frozen_names[] = {};
     PyObject *safe_builtins_seq;
     PyObject *safe_frozen_seq;
-    Py_ssize_t safe_extensions_count = 5;
-    const char *safe_extensions_names[] = {"binascii", "cmath", "math",
-					    "operator", "time"};
+    Py_ssize_t safe_extensions_count = 18;
+    /* All whitelisted modules should be imported in the proper test file. */
+    const char *safe_extensions_names[] = {"_bisect", "_collections", "_csv",
+					   "_functools", "_hashlib",
+					   "_heapq", "_random",
+					   "_struct", "_weakref",
+					   "array",
+					   "binascii", "cmath",
+					   "itertools",
+					   "math",
+					   "operator",
+					   "time", "unicodedata", "zlib"};
     PyObject *safe_extensions_seq;
 
     /* Initialize interpreter.  */

@@ -1,1 +1,19 @@
+"""All whitelisted extension modules should be able to be imported."""
+import _bisect
+import _collections
+import _csv
+import _functools
+import _hashlib
+import _heapq
+import _random
+import _struct
+import _weakref
+import array
+import binascii
+import cmath
+import itertools
+import math
+import operator
 import time
+import unicodedata
+import zlib

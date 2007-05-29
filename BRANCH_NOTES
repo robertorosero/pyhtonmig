@@ -3,17 +3,35 @@ Purpose
 =======
 Attempt to develop some form of security model for Python.
 
-=====
-Usage
-=====
+
+==================
+Build instructions
+==================
 1. Build Python as normal.
 2. Run ``build_secure_py.sh`` to build ``secure_python.exe``.
 
-======
-Status
-======
-* Turn on whitelisting.
-    - Verify injecting 'open' into importlib works.
+
+=======
+Testing
+=======
+Execute ``run_security_tests.py`` with ``secure_python.exe`` to run security
+tests.  Do not expect normal tests to pass as critical modules might be blocked
+from being imported.
+
+
+=============
+Failing Tests
+=============
+* Lib/tests/test_xmlrpc.py
+    + Fails with insecure Python.
+    + Requires sys.setdefaultencoding() which is deleted by site.py .
+    + reload(sys) normally adds it, but hack to do a fresh import on sys is
+      preventing that from happening somehow.
+
+
+=====
+To Do
+=====
 * Write tests.
     - Import
         + Delegate protects importlib.
@@ -21,14 +39,10 @@ Status
             * Name fall-through to alternate implementation.
         + '.hidden' cannot be imported.
         + Removed modules cannot be imported (unless whitelisted).
-    - Built-in namespace properly cleansed.
-        + Nothing exposed through __builtin__ or __builtins__.
+        + 'sys' not exposed on any modules needed for interpreter.
     - Types crippled.
-        + file
         + code
-* Fix 'sys' module reloading.
-    - test_xmlrpc relies on reloading sys to get setdefaultencoding, but hack
-      to allow re-import of sys doesn't let this work.
+
 
 ==========
 References
