@@ -168,17 +168,6 @@ It is always available.
 \versionadded{2.3}
 \end{funcdesc}
 
-\begin{datadesc}{exc_type}
-\dataline{exc_value}
-\dataline{exc_traceback}
-\deprecated {1.5}
-            {Use \function{exc_info()} instead.}
-  Since they are global variables, they are not specific to the
-  current thread, so their use is not safe in a multi-threaded
-  program.  When no exception is being handled, \code{exc_type} is set
-  to \code{None} and the other two are undefined.
-\end{datadesc}
-
 \begin{datadesc}{exec_prefix}
   A string giving the site-specific directory prefix where the
   platform-dependent Python files are installed; by default, this is

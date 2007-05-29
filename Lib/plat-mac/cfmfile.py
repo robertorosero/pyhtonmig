@@ -68,7 +68,7 @@ class CfrgResource:
                 try:
                     data = Res.Get1Resource('cfrg', 0).data
                 except Res.Error:
-                    raise Res.Error, "no 'cfrg' resource found", sys.exc_traceback
+                    raise Res.Error, "no 'cfrg' resource found", sys.exc_info()[2]
             finally:
                 Res.CloseResFile(resref)
                 Res.UseResFile(currentresref)

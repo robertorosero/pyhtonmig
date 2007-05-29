@@ -72,7 +72,7 @@ def test():
                 test_bug737473.test()
             except ValueError:
                 # this loads source code to linecache
-                traceback.extract_tb(sys.exc_traceback)
+                traceback.extract_tb(sys.exc_info()[2])
 
             # If this test runs too quickly, test_bug737473.py's mtime
             # attribute will remain unchanged even if the file is rewritten.
@@ -89,7 +89,7 @@ def test():
             try:
                 test_bug737473.test()
             except NotImplementedError:
-                src = traceback.extract_tb(sys.exc_traceback)[-1][-1]
+                src = traceback.extract_tb(sys.exc_info()[2])[-1][-1]
                 self.failUnlessEqual(src, 'raise NotImplementedError')
         finally:
             sys.path[:] = savedpath
@@ -103,7 +103,7 @@ def test():
             1/0
         except:
             import sys
-            sys.exc_traceback.__members__
+            sys.exc_info()[2].__members__
 
     def test_base_exception(self):
         # Test that exceptions derived from BaseException are formatted right
