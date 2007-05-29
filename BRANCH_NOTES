@@ -37,11 +37,8 @@ To Do
         + Delegate protects importlib.
         + Whitelisting works.
             * Name fall-through to alternate implementation.
-        + '.hidden' cannot be imported.
         + Removed modules cannot be imported (unless whitelisted).
-        + 'sys' not exposed on any modules needed for interpreter.
-    - Types crippled.
-        + code
+    - Thoroughly look for open and execfile.
 
 
 ==========
