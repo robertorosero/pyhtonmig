@@ -35,7 +35,7 @@ main(int argc, char *argv[])
     const char *safe_frozen_names[] = {};
     PyObject *safe_builtins_seq;
     PyObject *safe_frozen_seq;
-    Py_ssize_t safe_extensions_count = 18;
+    Py_ssize_t safe_extensions_count = 19;
     /* All whitelisted modules should be imported in the proper test file. */
     const char *safe_extensions_names[] = {"_bisect", "_collections", "_csv",
 					   "_functools", "_hashlib",
@@ -43,6 +43,7 @@ main(int argc, char *argv[])
 					   "_struct", "_weakref",
 					   "array",
 					   "binascii", "cmath",
+					   "datetime",
 					   "itertools",
 					   "math",
 					   "operator",
