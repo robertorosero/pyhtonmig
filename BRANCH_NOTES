@@ -37,8 +37,6 @@ To Do
         + Delegate protects importlib.
         + Whitelisting works.
             * Name fall-through to alternate implementation.
-        + Removed modules cannot be imported (unless whitelisted).
-    - Thoroughly look for open and execfile.
 
 
 ==========
