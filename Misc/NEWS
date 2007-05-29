@@ -12,6 +12,9 @@ What's New in Python 2.6 alpha 1?
 Core and builtins
 -----------------
 
+- Add new attribute names for function objects.  All the func_* become
+  __*__ attributes.  (Some already existed, e.g., __doc__ and __name__.)
+
 - Add -3 option to the interpreter to warn about features that are
   deprecated and will be changed/removed in Python 3.0.
 
@@ -216,6 +219,9 @@ Core and builtins
 
 Library
 -------
+
+- tarfile.py: Improved unicode support. Unicode input names are now
+  officially supported. Added "errors" argument to the TarFile class.
 
 - urllib.ftpwrapper class now accepts an optional timeout.
 
