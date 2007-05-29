@@ -104,9 +104,8 @@ get_line(BytesIOObject *self, char **output)
 	l = n - (self->buf + self->pos);
 	*output = self->buf + self->pos;
 
-	/* XXX: Is this really needed? */
 	assert(self->pos + l < PY_SSIZE_T_MAX);
-	fprintf(stderr, "line length: %i\n", l);
+	assert(l >= 0);
 	self->pos += l;
 
 	return l;
