@@ -3,3 +3,5 @@ try:
     import sys
 except ImportError:
     pass
+else:
+    raise Exception

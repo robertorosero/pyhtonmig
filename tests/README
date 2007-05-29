@@ -17,7 +17,8 @@ Types of Tests
 
 * fail
     Tests that contain code that should not work in a secured interpreter.  All
-    insecure code should be contained with in proper try/except statements.
+    insecure code should be contained within proper try/except/else statements.
     The smallest amount of code required to test a security feature should be
-    within each try/except statement (of which there may be several within a
-    single file).
+    within each try/except/else statement (of which there may be several within
+    a single file).  Within the 'else' statement make sure to raise an
+    exception to flag that the expected exception was not raised.

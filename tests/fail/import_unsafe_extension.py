@@ -3,3 +3,5 @@ try:
     import thread
 except ImportError:
     pass
+else:
+    raise Exception

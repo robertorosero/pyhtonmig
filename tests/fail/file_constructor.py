@@ -3,3 +3,5 @@ try:
     _ = file('README', 'r')
 except TypeError:
     pass
+else:
+    raise Exception
