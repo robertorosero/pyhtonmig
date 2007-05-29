@@ -163,33 +163,6 @@ clause in the current stack frame or in an older stack frame."
 );
 
 static PyObject *
-sys_exc_clear(PyObject *self, PyObject *noargs)
-{
-	PyThreadState *tstate = PyThreadState_GET();
-	PyObject *tmp_type, *tmp_value, *tmp_tb;
-	tmp_type = tstate->exc_type;
-	tmp_value = tstate->exc_value;
-	tmp_tb = tstate->exc_traceback;
-	tstate->exc_type = NULL;
-	tstate->exc_value = NULL;
-	tstate->exc_traceback = NULL;
-	Py_XDECREF(tmp_type);
-	Py_XDECREF(tmp_value);
-	Py_XDECREF(tmp_tb);
-	Py_INCREF(Py_None);
-	return Py_None;
-}
-
-PyDoc_STRVAR(exc_clear_doc,
-"exc_clear() -> None\n\
-\n\
-Clear global information on the current exception.  Subsequent calls to\n\
-exc_info() will return (None,None,None) until another exception is raised\n\
-in the current thread or the execution stack returns to a frame where\n\
-another exception is being handled."
-);
-
-static PyObject *
 sys_exit(PyObject *self, PyObject *args)
 {
 	PyObject *exit_code = 0;
@@ -760,7 +733,6 @@ static PyMethodDef sys_methods[] = {
 	 current_frames_doc},
 	{"displayhook",	sys_displayhook, METH_O, displayhook_doc},
 	{"exc_info",	sys_exc_info, METH_NOARGS, exc_info_doc},
-	{"exc_clear",	sys_exc_clear, METH_NOARGS, exc_clear_doc},
 	{"excepthook",	sys_excepthook, METH_VARARGS, excepthook_doc},
 	{"exit",	sys_exit, METH_VARARGS, exit_doc},
 #ifdef Py_USING_UNICODE
@@ -948,7 +920,6 @@ Functions:\n\
 displayhook() -- print an object to the screen, and save it in __builtin__._\n\
 excepthook() -- print an exception and its traceback to sys.stderr\n\
 exc_info() -- return thread-safe information about the current exception\n\
-exc_clear() -- clear the exception state for the current thread\n\
 exit() -- exit the interpreter by raising SystemExit\n\
 getdlopenflags() -- returns flags to be used for dlopen() calls\n\
 getrefcount() -- return the reference count for an object (plus one :-)\n\
