@@ -27,12 +27,13 @@ Failing Tests
     + Requires sys.setdefaultencoding() which is deleted by site.py .
     + reload(sys) normally adds it, but hack to do a fresh import on sys is
       preventing that from happening somehow.
+    + reload() going away in Python 3.0.
 
 
 =====
 To Do
 =====
-* Deal with exit()/SystemExit.
+Nothing.
 
 
 ==========

@@ -8,6 +8,9 @@ examined = set()
 # Needed to look for 'open' and 'execfile'.
 builtin_fxn_type = type(any)
 dangerous_builtins = ('open', 'execfile')
+# Needed for SystemExit.
+exc_type = type(Exception)
+dangerous_exceptions = ('SystemExit',)
 
 def check_imported_modules(module):
     """Recursively check that the module (and the modules it imports) do not
@@ -27,6 +30,9 @@ def check_imported_modules(module):
         elif isinstance(attr, builtin_fxn_type):
             if attr_name in dangerous_builtins:
                 raise Exception
+        elif isinstance(attr, exc_type):
+            if attr_name in dangerous_exceptions:
+                raise Exception
 
 
 import __builtin__
@@ -34,9 +40,6 @@ check_imported_modules(__builtin__)
 
 import __main__
 check_imported_modules(__main__)
-
-import exceptions
-check_imported_modules(exceptions)
 
 import encodings
 check_imported_modules(encodings)

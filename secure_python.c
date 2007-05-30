@@ -26,11 +26,10 @@ main(int argc, char *argv[])
     PyObject *hidden_modules;
     PyObject *import_module;
     PyObject *import_callable;
-    Py_ssize_t safe_builtins_count = 7;
+    Py_ssize_t safe_builtins_count = 6;
     /* All whitelisted modules should be imported in the proper test file. */
     const char *safe_builtins_names[] = {"_ast", "_codecs", "_sre",
-					  "_symtable", "_types", "errno",
-					  "exceptions"};
+					  "_symtable", "_types", "errno"};
     Py_ssize_t safe_frozen_count = 0;
     const char *safe_frozen_names[] = {};
     PyObject *safe_builtins_seq;
@@ -89,8 +88,6 @@ main(int argc, char *argv[])
 	   Lose this and Python will not run.
        * __main__
 	   Current scope of execution.
-       * exceptions
-	   Safe to keep around.
        * encodings
 	   Does dynamic import of encodings which requires globals() to
 	   work; globals() fails when the module has been deleted.  Also
@@ -118,7 +115,6 @@ main(int argc, char *argv[])
 	    /* Modules that *must* stay visible. */
 	    if ((strcmp(module_name, "__builtin__") == 0) ||
 			    (strcmp(module_name, "__main__") == 0) ||
-			    (strcmp(module_name, "exceptions") == 0) ||
 			    (strcmp(module_name, "encodings") == 0) ||
 			    (strcmp(module_name, "codecs") == 0) ||
 			    (strcmp(module_name, "_codecs") == 0)) {
@@ -148,6 +144,7 @@ main(int argc, char *argv[])
     /* Remove dangerous built-ins. */
     PyDict_DelItemString(interp->builtins, "execfile");
     PyDict_DelItemString(interp->builtins, "open");
+    PyDict_DelItemString(interp->builtins, "SystemExit");
 
   /* Use interpreter. */
     return_val = Py_Main(argc, argv);

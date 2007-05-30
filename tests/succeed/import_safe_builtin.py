@@ -5,4 +5,3 @@ import _sre
 # Also tests that modules moved to .hidden can be imported again.
 import _types
 import errno
-import exceptions
