@@ -56,7 +56,7 @@ get_line(BytesIOObject *self, char **output)
 /* Internal routine for writing a string of bytes to the buffer of a BytesIO
    object. Returns the number of bytes wrote. */
 static Py_ssize_t
-write_bytes(BytesIOObject *self, const char *c, Py_ssize_t l)
+write_bytes(BytesIOObject *self, const char *bytes, Py_ssize_t l)
 {
 	Py_ssize_t newl;
 
@@ -79,7 +79,7 @@ write_bytes(BytesIOObject *self, const char *c, Py_ssize_t l)
 		}
 	}
 
-	memcpy(self->buf + self->pos, c, l);
+	memcpy(self->buf + self->pos, bytes, l);
 
 	assert(self->pos + l < PY_SSIZE_T_MAX);
 	self->pos += l;
@@ -320,16 +320,16 @@ bytes_io_seek(BytesIOObject *self, PyObject *args)
 static PyObject *
 bytes_io_write(BytesIOObject *self, PyObject *args)
 {
-	const char *c;
-	Py_ssize_t l;
+	const char *bytes;
+	Py_ssize_t n;
 
 	if (self->buf == NULL)
 		return err_closed();
 
-	if (!PyArg_ParseTuple(args, "t#:write", &c, &l))
+	if (!PyArg_ParseTuple(args, "t#:write", &bytes, &n))
 		return NULL;
 
-	if (write_bytes(self, c, l) == -1)
+	if (write_bytes(self, bytes, n) == -1)
 		return NULL;
 
 	Py_RETURN_NONE;
