@@ -2,24 +2,48 @@ import subprocess
 import os
 import re
 
+def exec_test(file_path):
+    exec_ = './secure_python.exe ' + file_path
+    proc = subprocess.Popen(exec_, stderr=subprocess.PIPE, shell=True,
+                            universal_newlines=True)
+    proc.wait()
+    stderr_output = proc.stderr.read()
+    return stderr_output
+
+
 def run_tests(type_, test_verifier):
     failures = []
     print "Running '%s' tests ..." % type_
-    for file_name in (x for x in os.listdir(os.path.join('tests', type_))
-            if x.endswith('.py') and not x.startswith('_')):
-        test_name = file_name[:-3]
-        print '\t%s ...' % test_name,
+    for path_name in (x for x in os.listdir(os.path.join('tests', type_))
+            if not x.startswith('_') and not x.startswith('.')):
+        path = os.path.join('tests', type_, path_name)
+        if os.path.isfile(path):
+            if not path_name.endswith('.py'):
+                continue
+            test_name = path_name[:-3]
+            print '\t%s ...' % test_name,
+            stderr_output = exec_test(path)
+            if not test_verifier(test_name, stderr_output):
+                print 'failed'
+                failures.append(test_name)
+            else:
+                print 'passed'
+        elif os.path.isdir(path):
+            print '\t%s ...' % path_name,
+            module_name = 'tests.%s.%s.prep' % (type_, path_name)
+            module = __import__(module_name, fromlist=['set_up', 'tear_down'],
+                                level=0)
+            module.set_up()
+            try:
+                stderr_output = exec_test(os.path.join(path, 'test.py'))
+                if not test_verifier(test_name, stderr_output):
+                    print 'failed'
+                else:
+                    print 'passed'
+            finally:
+                module.tear_down()
 
-        exec_ = './secure_python.exe ' + os.path.join('tests', type_, file_name)
-        proc = subprocess.Popen(exec_, stderr=subprocess.PIPE, shell=True,
-                                universal_newlines=True)
-        proc.wait()
-        stderr_output = proc.stderr.read()
-        if not test_verifier(test_name, stderr_output):
-            print 'failed'
-            failures.append(test_name)
-        else:
-            print 'passed'
+
     return failures
 
 
