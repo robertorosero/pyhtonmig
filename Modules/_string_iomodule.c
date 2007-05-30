@@ -5,7 +5,7 @@ PyDoc_STRVAR(module_doc,
 
 typedef struct {
 	PyObject_HEAD
-	char *buf;
+	Py_UNICODE *buf;
 	Py_ssize_t pos, string_size;
 	Py_ssize_t buf_size;
 } StringIOObject;
@@ -24,10 +24,10 @@ err_closed(void)
 
 /* Internal routine to get a line. Returns the number of bytes read. */
 static Py_ssize_t
-get_line(StringIOObject *self, char **output)
+get_line(StringIOObject *self, Py_UNICODE **output)
 {
-	char *n;
-	const char *str_end;
+	Py_UNICODE *n;
+	const Py_UNICODE *str_end;
 	Py_ssize_t l;
 
 	/* XXX: Should we ckeck here if the object is closed,
@@ -56,7 +56,7 @@ get_line(StringIOObject *self, char **output)
 /* Internal routine for writing a string of bytes to the buffer of a StringIO
    object. Returns the number of bytes wrote. */
 static Py_ssize_t
-write_bytes(StringIOObject *self, const char *c, Py_ssize_t l)
+write_bytes(StringIOObject *self, const Py_UNICODE *c, Py_ssize_t l)
 {
 	Py_ssize_t newl;
 
@@ -70,7 +70,7 @@ write_bytes(StringIOObject *self, const char *c, Py_ssize_t l)
 			self->buf_size = newl + 1;
 		}
 
-		PyMem_Resize(self->buf, char, self->buf_size);
+		PyMem_Resize(self->buf, Py_UNICODE, self->buf_size);
 		if (self->buf == NULL) {
 			PyErr_SetString(PyExc_MemoryError, "Out of memory");
 			PyMem_Del(self->buf);
@@ -119,7 +119,7 @@ string_io_getvalue(StringIOObject *self)
 	if (self->buf == NULL)
 		return err_closed();
 
-	return PyString_FromStringAndSize(self->buf, self->string_size);
+	return PyUnicode_FromUnicode(self->buf, self->string_size);
 }
 
 static PyObject *
@@ -144,7 +144,7 @@ static PyObject *
 string_io_read(StringIOObject *self, PyObject *args)
 {
 	Py_ssize_t l, n = -1;
-	char *output;
+	Py_UNICODE *output;
 
 	if (self->buf == NULL)
 		return err_closed();
@@ -163,14 +163,14 @@ string_io_read(StringIOObject *self, PyObject *args)
 	output = self->buf + self->pos;
 	self->pos += n;
 
-	return PyString_FromStringAndSize(output, n);
+	return PyUnicode_FromUnicode(output, n);
 }
 
 static PyObject *
 string_io_readline(StringIOObject *self, PyObject *args)
 {
 	Py_ssize_t n, m = -1;
-	char *output;
+	Py_UNICODE *output;
 
 	if (self->buf == NULL)
 		return err_closed();
@@ -186,7 +186,7 @@ string_io_readline(StringIOObject *self, PyObject *args)
 		self->pos -= m;
 	}
 
-	return PyString_FromStringAndSize(output, n);
+	return PyUnicode_FromUnicode(output, n);
 }
 
 static PyObject *
@@ -194,7 +194,7 @@ string_io_readlines(StringIOObject *self, PyObject *args)
 {
 	Py_ssize_t n, hint = 0, length = 0;
 	PyObject *result, *line;
-	char *output;
+	Py_UNICODE *output;
 
 	if (self->buf == NULL)
 		return err_closed();
@@ -211,7 +211,7 @@ string_io_readlines(StringIOObject *self, PyObject *args)
 
 		if (n == 0)
 			break;
-		line = PyString_FromStringAndSize(output, n);
+		line = PyUnicode_FromUnicode(output, n);
 		if (!line)
 			goto err;
 		if (PyList_Append(result, line) == -1) {
@@ -259,7 +259,7 @@ string_io_truncate(StringIOObject *self, PyObject *args)
 static PyObject *
 string_io_iternext(StringIOObject *self)
 {
-	char *next;
+	Py_UNICODE *next;
 	Py_ssize_t n;
 
 	if (self->buf == NULL)
@@ -272,7 +272,7 @@ string_io_iternext(StringIOObject *self)
 	if (n == 0)
 		return NULL;
 
-	return PyString_FromStringAndSize(next, n);
+	return PyUnicode_FromUnicode(next, n);
 }
 
 static PyObject *
@@ -299,7 +299,7 @@ string_io_seek(StringIOObject *self, PyObject *args)
 		if (self->buf_size <= position)
 			self->buf_size = position + 1;
 
-		PyMem_Resize(self->buf, char, self->buf_size);
+		PyMem_Resize(self->buf, Py_UNICODE, self->buf_size);
 		if (self->buf == NULL) {
 			PyMem_Del(self->buf);
 			self->buf_size = self->pos = 0;
@@ -320,13 +320,13 @@ string_io_seek(StringIOObject *self, PyObject *args)
 static PyObject *
 string_io_write(StringIOObject *self, PyObject *args)
 {
-	const char *c;
+	const Py_UNICODE *c;
 	Py_ssize_t l;
 
 	if (self->buf == NULL)
 		return err_closed();
 
-	if (!PyArg_ParseTuple(args, "t#:write", &c, &l))
+	if (!PyArg_ParseTuple(args, "u#:write", &c, &l))
 		return NULL;
 
 	if (write_bytes(self, c, l) == -1)
@@ -349,7 +349,7 @@ string_io_writelines(StringIOObject *self, PyObject *v)
 
 	while ((item = PyIter_Next(it)) != NULL) {
 		Py_ssize_t n;
-		char *c;
+		Py_UNICODE *c;
 		if (PyString_AsStringAndSize(item, &c, &n) == -1) {
 			Py_DECREF(it);
 			Py_DECREF(item);
@@ -396,12 +396,12 @@ static PyObject *
 StringIO_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
 	StringIOObject *self;
-	const char *buf;
+	const Py_UNICODE *buf;
 	Py_ssize_t n = -1, size = BUFSIZE;
 
 	assert(type != NULL && type->tp_alloc != NULL);
 
-	if (!PyArg_ParseTuple(args, "|t#:StringIO", &buf, &n))
+	if (!PyArg_ParseTuple(args, "|u#:StringIO", &buf, &n))
 		return NULL;
 
 	self = (StringIOObject *)type->tp_alloc(type, 0);
@@ -409,7 +409,7 @@ StringIO_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	if (self == NULL)
 		return NULL;
 
-	self->buf = PyMem_New(char, size);
+	self->buf = PyMem_New(Py_UNICODE, size);
 
 	/* These variables need to be initialized before attempting to write
 	   anything to the object. */
