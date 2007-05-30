@@ -79,7 +79,7 @@ write_bytes(StringIOObject *self, const Py_UNICODE *c, Py_ssize_t l)
 		}
 	}
 
-	memcpy(self->buf + self->pos, c, l);
+	memcpy(self->buf + self->pos, c, l * sizeof(Py_UNICODE));
 
 	assert(self->pos + l < PY_SSIZE_T_MAX);
 	self->pos += l;
