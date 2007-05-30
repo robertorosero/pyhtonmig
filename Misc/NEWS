@@ -26,6 +26,8 @@ TO DO
 Core and Builtins
 -----------------
 
+- None, True, False are now keywords.
+
 - PEP 3119: isinstance() and issubclass() can be overridden.
 
 - Remove BaseException.message.
