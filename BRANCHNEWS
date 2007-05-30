@@ -8,20 +8,13 @@ file to find out what revision number introduced the feature.
 Core and builtins
 -----------------
 
-* Use an instance of importlib.Import as what __import__ delegates to.  This
-  necessitates storing a large chunk of modules into sys.modules['.hidden'] so
-  that importlib can keep working.
-
-* Clear out sys.path_importer_cache.
-
-* Force 'warnings' to be cached by the C code.
-
 * Make importing the sys module after it has been completely deleted use the
   interpreter's sysdict instead of the cached dict used by the import
   machinery.  This lets the sys module be deleted for security reasons during
   startup.
 
-* rev. ????: Added a delegate for import that calls sys.import_.
+* rev. ????: Added a delegate for import that calls sys.import_ in
+  sys.import_delegate.
 
 * rev. 51679: Remove the constructor for the 'code' type.  This means instances
   of the 'code' type cannot be created directly.  You must use the new
@@ -40,31 +33,8 @@ Core and builtins
   with moving object.__subclasses__().
 
 
-Extension Modules
------------------
-
-* rev. 51958: Fix up handling exceptions.  Added exc_matches() exception.
-
-* rev. 51944: Change sys_dict to a module since that dict is cached somewhere.
-
-* rev. 51941: Changed exception raised by interpreter.Interpreter().execute()
-  to RuntimError when something goes bad.  Also added the redirect_output()
-  method.
-
-* rev. 51914: Changed accessing the built-in namespace dict from an attribute
-  to a function call.  This is because the dict is cached in the execution
-  frame created when the interpreter is first created and thus setting the dict
-  to another dict has no affect.
-
-* rev. 51880: Add access to the 'sys' modules data dict to Interpreter objects.
-
-* rev. 51875: Introduced the interpreter module.
-
-
 Library
 -------
 
 * Change the codecs module so that it does not import the entire sys module and
   thus hold a reference to it.
-
-* rev. 53333: External definition of importlib (from the sandbox) added.
