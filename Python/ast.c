@@ -2005,11 +2005,8 @@ ast_for_expr_stmt(struct compiling *c, const node *n)
                           "expression not possible");
                 return NULL;
             case Name_kind: {
-                const char *var_name = PyString_AS_STRING(expr1->v.Name.id);
-                if (var_name[0] == 'N' && !strcmp(var_name, "None")) {
-                    ast_error(ch, "assignment to None");
+                if (forbidden_name(expr1, ch))
                     return NULL;
-                }
                 break;
             }
             case Attribute_kind:
