@@ -33,7 +33,6 @@ with guard_warnings_filter():
     import linecache
     import macurl2path
     import mailcap
-    import mimify
     import mutex
     import nntplib
     import nturl2path

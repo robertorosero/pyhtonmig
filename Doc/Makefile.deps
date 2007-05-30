@@ -234,7 +234,6 @@ LIBFILES= $(MANSTYLES) $(INDEXSTYLES) $(COMMONTEX) \
 	lib/libzipfile.tex \
 	lib/libpprint.tex \
 	lib/libcode.tex \
-	lib/libmimify.tex \
 	lib/libre.tex \
 	lib/libuserdict.tex \
 	lib/libdis.tex \

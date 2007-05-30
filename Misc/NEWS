@@ -175,7 +175,7 @@ Library
   AST -> bytecode mechanism.
 
 - Removed these modules:
-  * Bastion, bsddb185, exceptions, md5, MimeWriter, popen2, rexec,
+  * Bastion, bsddb185, exceptions, md5, MimeWriter, mimify, popen2, rexec,
     sets, sha, stringold, strop, xmllib.
 
 - Remove obsolete IRIX modules: al/AL, cd/CD, cddb, cdplayer, cl/CL, DEVICE,

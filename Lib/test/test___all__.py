@@ -90,7 +90,6 @@ class AllTest(unittest.TestCase):
         self.check_all("mhlib")
         self.check_all("mimetools")
         self.check_all("mimetypes")
-        self.check_all("mimify")
         self.check_all("multifile")
         self.check_all("netrc")
         self.check_all("nntplib")
