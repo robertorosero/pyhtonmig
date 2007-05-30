@@ -472,6 +472,9 @@ class PyBuildExt(build_ext):
         exts.append( Extension('cStringIO', ['cStringIO.c']) )
         exts.append( Extension('cPickle', ['cPickle.c']) )
 
+        # Fast implementation of BytesIO
+        exts.append( Extension('_bytes_io', ['_bytes_iomodule.c']) )
+
         # Memory-mapped files (also works on Win32).
         if platform not in ['atheos', 'mac']:
             exts.append( Extension('mmap', ['mmapmodule.c']) )
