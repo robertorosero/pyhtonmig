@@ -72,7 +72,7 @@ write_bytes(BytesIOObject *self, const char *c, Py_ssize_t l)
 
 		PyMem_Resize(self->buf, char, self->buf_size);
 		if (self->buf == NULL) {
-			PyErr_SetString(PyExc_MemoryError, "out of memory");
+			PyErr_SetString(PyExc_MemoryError, "Out of memory");
 			PyMem_Del(self->buf);
 			self->buf_size = self->pos = 0;
 			return -1;
@@ -99,6 +99,7 @@ bytes_io_get_closed(BytesIOObject *self)
 
 	if (self->buf == NULL)
 		result = Py_True;
+
 	Py_INCREF(result);
 	return result;
 }
@@ -131,10 +132,19 @@ bytes_io_isatty(BytesIOObject *self)
 }
 
 static PyObject *
+bytes_io_tell(BytesIOObject *self)
+{
+	if (self->buf == NULL)
+		return err_closed();
+
+	return PyInt_FromSsize_t(self->pos);
+}
+
+static PyObject *
 bytes_io_read(BytesIOObject *self, PyObject *args)
 {
 	Py_ssize_t l, n = -1;
-	char *output = NULL;
+	char *output;
 
 	if (self->buf == NULL)
 		return err_closed();
@@ -182,10 +192,9 @@ bytes_io_readline(BytesIOObject *self, PyObject *args)
 static PyObject *
 bytes_io_readlines(BytesIOObject *self, PyObject *args)
 {
-	int n;
-	char *output;
+	Py_ssize_t n, hint = 0, length = 0;
 	PyObject *result, *line;
-	int hint = 0, length = 0;
+	char *output;
 
 	if (self->buf == NULL)
 		return err_closed();
@@ -218,15 +227,6 @@ bytes_io_readlines(BytesIOObject *self, PyObject *args)
       err:
 	Py_DECREF(result);
 	return NULL;
-}
-
-static PyObject *
-bytes_io_tell(BytesIOObject *self)
-{
-	if (self->buf == NULL)
-		return err_closed();
-
-	return PyInt_FromSsize_t(self->pos);
 }
 
 static PyObject *
@@ -321,7 +321,7 @@ static PyObject *
 bytes_io_write(BytesIOObject *self, PyObject *args)
 {
 	const char *c;
-	int l;
+	Py_ssize_t l;
 
 	if (self->buf == NULL)
 		return err_closed();
@@ -432,7 +432,7 @@ BytesIO_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 
 
 PyDoc_STRVAR(BytesIO_doc,
-"BytesIO([s]) -> Return a BytesIO stream for reading and writing.");
+"BytesIO([buffer]) -> Return a BytesIO stream for reading and writing.");
 
 PyDoc_STRVAR(BytesIO_flush_doc,
 "flush() -> None.  Does nothing.");
