@@ -56,7 +56,7 @@ get_line(StringIOObject *self, Py_UNICODE **output)
 /* Internal routine for writing a string of bytes to the buffer of a StringIO
    object. Returns the number of bytes wrote. */
 static Py_ssize_t
-write_bytes(StringIOObject *self, const Py_UNICODE *c, Py_ssize_t l)
+write_str(StringIOObject *self, const Py_UNICODE *ustr, Py_ssize_t l)
 {
 	Py_ssize_t newl;
 
@@ -79,7 +79,7 @@ write_bytes(StringIOObject *self, const Py_UNICODE *c, Py_ssize_t l)
 		}
 	}
 
-	memcpy(self->buf + self->pos, c, l * sizeof(Py_UNICODE));
+	memcpy(self->buf + self->pos, ustr, l * sizeof(Py_UNICODE));
 
 	assert(self->pos + l < PY_SSIZE_T_MAX);
 	self->pos += l;
@@ -320,16 +320,18 @@ string_io_seek(StringIOObject *self, PyObject *args)
 static PyObject *
 string_io_write(StringIOObject *self, PyObject *args)
 {
-	const Py_UNICODE *c;
-	Py_ssize_t l;
+	const Py_UNICODE *ustr;
+	Py_ssize_t n;
 
 	if (self->buf == NULL)
 		return err_closed();
 
-	if (!PyArg_ParseTuple(args, "u#:write", &c, &l))
+	if (!PyArg_ParseTuple(args,
+			      "u#;write() may only be called on"
+			      "unicode strings", &ustr, &n))
 		return NULL;
 
-	if (write_bytes(self, c, l) == -1)
+	if (write_str(self, ustr, n) == -1)
 		return NULL;
 
 	Py_RETURN_NONE;
@@ -349,15 +351,18 @@ string_io_writelines(StringIOObject *self, PyObject *v)
 
 	while ((item = PyIter_Next(it)) != NULL) {
 		Py_ssize_t n;
-		Py_UNICODE *c;
-		if (PyString_AsStringAndSize(item, &c, &n) == -1) {
+		Py_UNICODE *ustr;
+		if ((ustr = PyUnicode_AsUnicode(item)) == NULL) {
+			PyErr_SetString(PyExc_TypeError,
+					"Need a list of unicode objects");
 			Py_DECREF(it);
 			Py_DECREF(item);
 			return NULL;
 		}
+		n = PyUnicode_GetSize(item);
 		Py_DECREF(item);
 
-		if (write_bytes(self, c, n) == -1) {
+		if (write_str(self, ustr, n) == -1) {
 			Py_DECREF(it);
 			return NULL;
 		}
@@ -417,7 +422,7 @@ StringIO_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	self->string_size = 0;
 
 	if (n > 0) {
-		if (write_bytes(self, buf, n) == -1)
+		if (write_str(self, buf, n) == -1)
 			return NULL;
 		self->pos = 0;
 	}
