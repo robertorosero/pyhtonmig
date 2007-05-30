@@ -1,7 +1,6 @@
 import unittest
 from test.test_support import verbose, run_unittest
 import sys
-import warnings
 
 
 class AllTest(unittest.TestCase):
@@ -34,7 +33,6 @@ class AllTest(unittest.TestCase):
         self.check_all("CGIHTTPServer")
         self.check_all("ConfigParser")
         self.check_all("Cookie")
-        self.check_all("MimeWriter")
         self.check_all("Queue")
         self.check_all("SimpleHTTPServer")
         self.check_all("SocketServer")
