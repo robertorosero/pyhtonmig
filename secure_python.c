@@ -22,6 +22,7 @@ main(int argc, char *argv[])
     int return_val;
     PyInterpreterState *interp;
     Py_ssize_t module_count, x;
+    PyObject *obj;
     PyObject *module_names_list;
     PyObject *hidden_modules;
     PyObject *import_module;
@@ -52,12 +53,24 @@ main(int argc, char *argv[])
     /* Initialize interpreter.  */
     Py_Initialize();
 
+    interp = PyThreadState_GET()->interp;
+
+    /* Clear sys.meta_path and sys.path_hooks.
+       This needs to be done before importlib is called as it sets values in
+       both attributes. */
+    obj = PyDict_GetItemString(interp->sysdict, "meta_path");
+    x = PyList_Size(obj);
+    PyList_SetSlice(obj, 0, x, NULL);
+
+    obj = PyDict_GetItemString(interp->sysdict, "path_hooks");
+    x = PyList_Size(obj);
+    PyList_SetSlice(obj, 0, x, NULL);
+
     /* Create lists of modules safe to import. */
     CREATE_SAFE_LIST(builtins);
     CREATE_SAFE_LIST(frozen);
     CREATE_SAFE_LIST(extensions);
 
-    interp = PyThreadState_GET()->interp;
 
     /* Get importer from importlib. */
     import_module = PyImport_ImportModule("controlled_importlib");
