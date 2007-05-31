@@ -1918,7 +1918,9 @@ ast_for_call(struct compiling *c, const node *n, expr_ty func)
                 } else if (e->kind != Name_kind) {
                   ast_error(CHILD(ch, 0), "keyword can't be an expression");
                   return NULL;
-                }
+                } else if (forbidden_name(e, ch)) {
+		  return NULL;
+		}
                 key = e->v.Name.id;
                 e = ast_for_expr(c, CHILD(ch, 2));
                 if (!e)
