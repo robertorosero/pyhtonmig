@@ -328,7 +328,7 @@ string_io_write(StringIOObject *self, PyObject *args)
 
 	if (!PyArg_ParseTuple(args,
 			      "u#;write() may only be called on"
-			      "unicode strings", &ustr, &n))
+			      " unicode strings", &ustr, &n))
 		return NULL;
 
 	if (write_str(self, ustr, n) == -1)
@@ -406,7 +406,9 @@ StringIO_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 
 	assert(type != NULL && type->tp_alloc != NULL);
 
-	if (!PyArg_ParseTuple(args, "|u#:StringIO", &buf, &n))
+	if (!PyArg_ParseTuple(args,
+			      "|u#;StringIO() may only given a"
+			      " unicode string", &buf, &n))
 		return NULL;
 
 	self = (StringIOObject *)type->tp_alloc(type, 0);
