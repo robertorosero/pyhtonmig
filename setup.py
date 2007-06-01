@@ -620,16 +620,7 @@ class PyBuildExt(build_ext):
                                    include_dirs = ssl_incs,
                                    library_dirs = ssl_libs,
                                    libraries = ['ssl', 'crypto']) )
-            missing.extend(['_sha', '_md5'])
         else:
-            # The _sha module implements the SHA1 hash algorithm.
-            exts.append( Extension('_sha', ['shamodule.c']) )
-            # The _md5 module implements the RSA Data Security, Inc. MD5
-            # Message-Digest Algorithm, described in RFC 1321.  The
-            # necessary files md5.c and md5.h are included here.
-            exts.append( Extension('_md5',
-                            sources = ['md5module.c', 'md5.c'],
-                            depends = ['md5.h']) )
             missing.append('_hashlib')
 
         if (openssl_ver < 0x00908000):
