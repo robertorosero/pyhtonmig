@@ -669,7 +669,8 @@ def dash_R(the_module, test, indirect_test, huntrleaks):
             indirect_test()
     else:
         def run_the_test():
-            reload(the_module)
+            del sys.modules[the_module.__name__]
+            exec('import ' + the_module.__name__)
 
     deltas = []
     nwarmup, ntracked, fname = huntrleaks
