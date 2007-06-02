@@ -485,11 +485,6 @@ class PyBuildExt(build_ext):
         else:
             missing.append('syslog')
 
-        # George Neville-Neil's timing module:
-        # Deprecated in PEP 4 http://www.python.org/peps/pep-0004.html
-        # http://mail.python.org/pipermail/python-dev/2006-January/060023.html
-        #exts.append( Extension('timing', ['timingmodule.c']) )
-
         #
         # Here ends the simple stuff.  From here on, modules need certain
         # libraries, are platform-specific, or present other surprises.
