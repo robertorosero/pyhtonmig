@@ -1845,7 +1845,6 @@ dospath          Common operations on DOS pathnames.
 dumbdbm          A dumb and slow but simple dbm clone.
 [DEL:dump:DEL]   [DEL:Print python code that reconstructs a variable.:DEL]
 email            Comprehensive support for internet email.
-exceptions       Class based built-in exception hierarchy.
 filecmp          File comparison.
 fileinput        Helper class to quickly write a loop over all standard input
                  files.
@@ -1860,7 +1859,6 @@ getopt           Standard command line processing. See also ftp://
                  www.pauahtun.org/pub/getargspy.zip
 getpass          Utilities to get a password and/or the current user name.
 glob             filename globbing.
-gopherlib        Gopher protocol client interface.
 [DEL:grep:DEL]   [DEL:'grep' utilities.:DEL]
 gzip             Read & write gzipped files.
 heapq            Priority queue implemented using lists organized as heaps.
@@ -1875,7 +1873,6 @@ imghdr           Recognizing image files based on their first few bytes.
 imputil          Privides a way of writing customised import hooks.
 inspect          Tool for probing live Python objects.
 keyword          List of Python keywords.
-knee             A Python re-implementation of hierarchical module import.
 linecache        Cache lines from files.
 linuxaudiodev    Lunix /dev/audio support.
 locale           Support for number formatting using the current locale
@@ -1888,8 +1885,6 @@ mailcap          Mailcap file handling (RFC 1524).
 mhlib            MH (mailbox) interface.
 mimetools        Various tools used by MIME-reading or MIME-writing programs.
 mimetypes        Guess the MIME type of a file.
-MimeWriter       Generic MIME writer.
-mimify           Mimification and unmimification of mail messages.
 mmap             Interface to memory-mapped files - they behave like mutable
                  strings./font>
 multifile        Class to make multi-file messages easier to handle.
@@ -1908,7 +1903,6 @@ pickle           Pickling (save and restore) of Python objects (a faster
 pipes            Conversion pipeline templates.
 pkgunil          Utilities for working with Python packages.
 poplib           A POP3 client class. Based on the J. Myers POP3 draft.
-posixfile        Extended (posix) file operations.
 posixpath        Common operations on POSIX pathnames.
 pprint           Support to pretty-print lists, tuples, & dictionaries
                  recursively.
@@ -1921,7 +1915,6 @@ py_compile       Routine to "compile" a .py file to a .pyc file.
 pyclbr           Parse a Python file and retrieve classes and methods.
 Queue            A multi-producer, multi-consumer queue.
 quopri           Conversions to/from quoted-printable transport encoding.
-rand             Don't use unless you want compatibility with C's rand().
 random           Random variable generators
 re               Regular Expressions.
 repr             Redo repr() but with limits on most sizes.
@@ -1930,7 +1923,6 @@ rfc822           RFC-822 message manipulation class.
 rlcompleter      Word completion for GNU readline 2.0.
 robotparser      Parse robots.txt files, useful for web spiders.
 sched            A generally useful event scheduler class.
-sets             Module for a set datatype.
 sgmllib          A parser for SGML.
 shelve           Manage shelves of pickled objects.
 shlex            Lexical analyzer class for simple shell-like syntaxes.
@@ -1942,7 +1934,6 @@ smtplib          SMTP Client class (RFC 821)
 sndhdr           Several routines that help recognizing sound.
 SocketServer     Generic socket server classes.
 stat             Constants and functions for interpreting stat/lstat struct.
-statcache        Maintain a cache of file stats.
 statvfs          Constants for interpreting statvfs struct as returned by
                  os.statvfs()and os.fstatvfs() (if they exist).
 string           A collection of string operations.
