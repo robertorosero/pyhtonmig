@@ -28,7 +28,7 @@ get_line(BytesIOObject *self, char **output)
 {
 	char *n;
 	const char *str_end;
-	Py_ssize_t l;
+	Py_ssize_t len;
 
 	/* XXX: Should we ckeck here if the object is closed,
 	   for thread-safety? */
@@ -43,31 +43,31 @@ get_line(BytesIOObject *self, char **output)
 		n++;
 
 	/* Get the length from the current position to the end of the line. */
-	l = n - (self->buf + self->pos);
+	len = n - (self->buf + self->pos);
 	*output = self->buf + self->pos;
 
-	assert(self->pos + l < PY_SSIZE_T_MAX);
-	assert(l >= 0);
-	self->pos += l;
+	assert(self->pos + len < PY_SSIZE_T_MAX);
+	assert(len >= 0);
+	self->pos += len;
 
-	return l;
+	return len;
 }
 
 /* Internal routine for writing a string of bytes to the buffer of a BytesIO
    object. Returns the number of bytes wrote. */
 static Py_ssize_t
-write_bytes(BytesIOObject *self, const char *bytes, Py_ssize_t l)
+write_bytes(BytesIOObject *self, const char *bytes, Py_ssize_t len)
 {
-	Py_ssize_t newl;
+	Py_ssize_t new_len;
 
 	assert(self->buf != NULL);
 
-	newl = self->pos + l;
-	if (newl >= self->buf_size) {
+	new_len = self->pos + len;
+	if (new_len >= self->buf_size) {
 		self->buf_size *= 2;
-		if (self->buf_size <= newl) {
-			assert(newl + 1 < PY_SSIZE_T_MAX);
-			self->buf_size = newl + 1;
+		if (self->buf_size <= new_len) {
+			assert(new_len + 1 < PY_SSIZE_T_MAX);
+			self->buf_size = new_len + 1;
 		}
 
 		PyMem_Resize(self->buf, char, self->buf_size);
@@ -79,16 +79,16 @@ write_bytes(BytesIOObject *self, const char *bytes, Py_ssize_t l)
 		}
 	}
 
-	memcpy(self->buf + self->pos, bytes, l);
+	memcpy(self->buf + self->pos, bytes, len);
 
-	assert(self->pos + l < PY_SSIZE_T_MAX);
-	self->pos += l;
+	assert(self->pos + len < PY_SSIZE_T_MAX);
+	self->pos += len;
 
 	if (self->string_size < self->pos) {
 		self->string_size = self->pos;
 	}
 
-	return l;
+	return len;
 }
 
 
@@ -143,7 +143,7 @@ bytes_io_tell(BytesIOObject *self)
 static PyObject *
 bytes_io_read(BytesIOObject *self, PyObject *args)
 {
-	Py_ssize_t l, n = -1;
+	Py_ssize_t len, n = -1;
 	char *output;
 
 	if (self->buf == NULL)
@@ -154,8 +154,8 @@ bytes_io_read(BytesIOObject *self, PyObject *args)
 
 	/* adjust invalid sizes */
 	l = self->string_size - self->pos;
-	if (n < 0 || n > l) {
-		n = l;
+	if (n < 0 || n > len) {
+		n = len;
 		if (n < 0)
 			n = 0;
 	}
@@ -169,21 +169,21 @@ bytes_io_read(BytesIOObject *self, PyObject *args)
 static PyObject *
 bytes_io_readline(BytesIOObject *self, PyObject *args)
 {
-	Py_ssize_t n, m = -1;
+	Py_ssize_t n, size = -1;
 	char *output;
 
 	if (self->buf == NULL)
 		return err_closed();
 
-	if (!PyArg_ParseTuple(args, "|i:readline", &m))
+	if (!PyArg_ParseTuple(args, "|i:readline", &size))
 		return NULL;
 
 	n = get_line(self, &output);
 
-	if (m >= 0 && m < n) {
-		m = n - m;
-		n -= m;
-		self->pos -= m;
+	if (size >= 0 && size < n) {
+		size = n - size;
+		n -= size;
+		self->pos -= size;
 	}
 
 	return PyString_FromStringAndSize(output, n);
@@ -192,14 +192,14 @@ bytes_io_readline(BytesIOObject *self, PyObject *args)
 static PyObject *
 bytes_io_readlines(BytesIOObject *self, PyObject *args)
 {
-	Py_ssize_t n, hint = 0, length = 0;
+	Py_ssize_t n, size = 0, len = 0;
 	PyObject *result, *line;
 	char *output;
 
 	if (self->buf == NULL)
 		return err_closed();
 
-	if (!PyArg_ParseTuple(args, "|i:readlines", &hint))
+	if (!PyArg_ParseTuple(args, "|i:readlines", &size))
 		return NULL;
 
 	result = PyList_New(0);
@@ -219,8 +219,8 @@ bytes_io_readlines(BytesIOObject *self, PyObject *args)
 			goto err;
 		}
 		Py_DECREF(line);
-		length += n;
-		if (hint > 0 && length >= hint)
+		len += n;
+		if (size > 0 && len >= size)
 			break;
 	}
 	return result;
