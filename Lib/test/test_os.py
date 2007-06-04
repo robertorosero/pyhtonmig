@@ -433,6 +433,10 @@ class URandomTests (unittest.TestCase):
         except NotImplementedError:
             pass
 
+class ExecTests(unittest.TestCase):
+    def test_execvpe_with_bad_program(self):
+        self.assertRaises(OSError, os.execvpe, 'no such app-', [], None)
+
 class Win32ErrorTests(unittest.TestCase):
     def test_rename(self):
         self.assertRaises(WindowsError, os.rename, test_support.TESTFN, test_support.TESTFN+".bak")
@@ -469,6 +473,7 @@ def test_main():
         MakedirTests,
         DevNullTests,
         URandomTests,
+        ExecTests,
         Win32ErrorTests
     )
 
