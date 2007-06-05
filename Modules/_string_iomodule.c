@@ -434,6 +434,7 @@ StringIO_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
        anything to the object. */
     self->pos = 0;
     self->string_size = 0;
+    self->buf_size = size;
 
     if (n > 0) {
         if (write_str(self, buf, n) == -1)
@@ -444,7 +445,6 @@ StringIO_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
         Py_DECREF(self);
         return PyErr_NoMemory();
     }
-    self->buf_size = size;
 
     return (PyObject *)self;
 }
