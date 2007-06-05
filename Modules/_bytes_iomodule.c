@@ -64,8 +64,13 @@ write_bytes(BytesIOObject *self, const char *bytes, Py_ssize_t len)
 
     new_len = self->pos + len;
     if (new_len >= self->buf_size) {
+        /* The size of the internal buffer double, every time we need more
+           memory. That reduces the need of resizing the buffer when working
+           with a large amount of data. */
         self->buf_size *= 2;
         if (self->buf_size <= new_len) {
+            /* Doubling wasn't enough to hold the new internal string
+               size, then just use the new length. */
             assert(new_len + 1 < PY_SSIZE_T_MAX);
             self->buf_size = new_len + 1;
         }
@@ -79,11 +84,15 @@ write_bytes(BytesIOObject *self, const char *bytes, Py_ssize_t len)
         }
     }
 
+    /* Copy the data to the internal buffer, overwriting some of the existing
+       data if self->pos < self->string_size. */
     memcpy(self->buf + self->pos, bytes, len);
 
     assert(self->pos + len < PY_SSIZE_T_MAX);
     self->pos += len;
 
+    /* Unless we only overwritten some data, set the new length of the
+       internal string. */
     if (self->string_size < self->pos) {
         self->string_size = self->pos;
     }

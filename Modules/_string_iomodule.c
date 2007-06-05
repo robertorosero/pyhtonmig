@@ -58,16 +58,24 @@ get_line(StringIOObject *self, Py_UNICODE **output)
 static Py_ssize_t
 write_str(StringIOObject *self, const Py_UNICODE *ustr, Py_ssize_t len)
 {
-    Py_ssize_t newl;
+    Py_ssize_t new_len;
 
     assert(self->buf != NULL);
 
-    newl = self->pos + len;
-    if (newl >= self->buf_size) {
+    /* Here we doing some direct memory manipulation for speed and to keep the
+       implementation of this module relatively close to the implementation of
+       _bytes_io. */
+    new_len = self->pos + len;
+    if (new_len >= self->buf_size) {
+        /* The size of the internal buffer double, every time we need more
+           memory. That reduces the need of resizing the buffer when working
+           with a large amount of data. */
         self->buf_size *= 2;
-        if (self->buf_size <= newl) {
-            assert(newl + 1 < PY_SSIZE_T_MAX);
-            self->buf_size = newl + 1;
+        if (self->buf_size <= new_len) {
+            /* Doubling wasn't enough to hold the new internal string
+               size, then just use the new length. */
+            assert(new_len + 1 < PY_SSIZE_T_MAX);
+            self->buf_size = new_len + 1;
         }
 
         PyMem_Resize(self->buf, Py_UNICODE, self->buf_size);
@@ -79,11 +87,15 @@ write_str(StringIOObject *self, const Py_UNICODE *ustr, Py_ssize_t len)
         }
     }
 
+    /* Copy the data to the internal buffer, overwriting some of the existing
+       data if self->pos < self->string_size. */
     memcpy(self->buf + self->pos, ustr, len * sizeof(Py_UNICODE));
 
     assert(self->pos + len < PY_SSIZE_T_MAX);
     self->pos += len;
 
+    /* Unless we only overwritten some data, set the new length of the
+       internal string. */
     if (self->string_size < self->pos) {
         self->string_size = self->pos;
     }
