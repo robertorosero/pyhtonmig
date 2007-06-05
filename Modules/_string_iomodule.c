@@ -28,7 +28,7 @@ get_line(StringIOObject *self, Py_UNICODE **output)
 {
 	Py_UNICODE *n;
 	const Py_UNICODE *str_end;
-	Py_ssize_t l;
+	Py_ssize_t len;
 
 	/* XXX: Should we ckeck here if the object is closed,
 	   for thread-safety? */
@@ -43,26 +43,26 @@ get_line(StringIOObject *self, Py_UNICODE **output)
 		n++;
 
 	/* Get the length from the current position to the end of the line. */
-	l = n - (self->buf + self->pos);
+	len = n - (self->buf + self->pos);
 	*output = self->buf + self->pos;
 
-	assert(self->pos + l < PY_SSIZE_T_MAX);
+	assert(self->pos + len < PY_SSIZE_T_MAX);
 	assert(l >= 0);
-	self->pos += l;
+	self->pos += len;
 
-	return l;
+	return len;
 }
 
 /* Internal routine for writing a string of bytes to the buffer of a StringIO
    object. Returns the number of bytes wrote. */
 static Py_ssize_t
-write_str(StringIOObject *self, const Py_UNICODE *ustr, Py_ssize_t l)
+write_str(StringIOObject *self, const Py_UNICODE *ustr, Py_ssize_t len)
 {
 	Py_ssize_t newl;
 
 	assert(self->buf != NULL);
 
-	newl = self->pos + l;
+	newl = self->pos + len;
 	if (newl >= self->buf_size) {
 		self->buf_size *= 2;
 		if (self->buf_size <= newl) {
@@ -79,16 +79,16 @@ write_str(StringIOObject *self, const Py_UNICODE *ustr, Py_ssize_t l)
 		}
 	}
 
-	memcpy(self->buf + self->pos, ustr, l * sizeof(Py_UNICODE));
+	memcpy(self->buf + self->pos, ustr, len * sizeof(Py_UNICODE));
 
-	assert(self->pos + l < PY_SSIZE_T_MAX);
-	self->pos += l;
+	assert(self->pos + len < PY_SSIZE_T_MAX);
+	self->pos += len;
 
 	if (self->string_size < self->pos) {
 		self->string_size = self->pos;
 	}
 
-	return l;
+	return len;
 }
 
 
@@ -143,7 +143,7 @@ string_io_tell(StringIOObject *self)
 static PyObject *
 string_io_read(StringIOObject *self, PyObject *args)
 {
-	Py_ssize_t l, n = -1;
+	Py_ssize_t len, n = -1;
 	Py_UNICODE *output;
 
 	if (self->buf == NULL)
@@ -153,9 +153,9 @@ string_io_read(StringIOObject *self, PyObject *args)
 		return NULL;
 
 	/* adjust invalid sizes */
-	l = self->string_size - self->pos;
-	if (n < 0 || n > l) {
-		n = l;
+	len = self->string_size - self->pos;
+	if (n < 0 || n > len) {
+		n = len;
 		if (n < 0)
 			n = 0;
 	}
@@ -169,21 +169,21 @@ string_io_read(StringIOObject *self, PyObject *args)
 static PyObject *
 string_io_readline(StringIOObject *self, PyObject *args)
 {
-	Py_ssize_t n, m = -1;
+	Py_ssize_t n, size = -1;
 	Py_UNICODE *output;
 
 	if (self->buf == NULL)
 		return err_closed();
 
-	if (!PyArg_ParseTuple(args, "|i:readline", &m))
+	if (!PyArg_ParseTuple(args, "|i:readline", &size))
 		return NULL;
 
 	n = get_line(self, &output);
 
-	if (m >= 0 && m < n) {
-		m = n - m;
-		n -= m;
-		self->pos -= m;
+	if (size >= 0 && size < n) {
+		size = n - size;
+		n -= size;
+		self->pos -= size;
 	}
 
 	return PyUnicode_FromUnicode(output, n);
@@ -192,14 +192,14 @@ string_io_readline(StringIOObject *self, PyObject *args)
 static PyObject *
 string_io_readlines(StringIOObject *self, PyObject *args)
 {
-	Py_ssize_t n, hint = 0, length = 0;
+	Py_ssize_t n, size = 0, len = 0;
 	PyObject *result, *line;
 	Py_UNICODE *output;
 
 	if (self->buf == NULL)
 		return err_closed();
 
-	if (!PyArg_ParseTuple(args, "|i:readlines", &hint))
+	if (!PyArg_ParseTuple(args, "|i:readlines", &size))
 		return NULL;
 
 	result = PyList_New(0);
@@ -219,8 +219,8 @@ string_io_readlines(StringIOObject *self, PyObject *args)
 			goto err;
 		}
 		Py_DECREF(line);
-		length += n;
-		if (hint > 0 && length >= hint)
+		len += n;
+		if (size > 0 && len >= size)
 			break;
 	}
 	return result;

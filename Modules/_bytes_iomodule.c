@@ -153,7 +153,7 @@ bytes_io_read(BytesIOObject *self, PyObject *args)
 		return NULL;
 
 	/* adjust invalid sizes */
-	l = self->string_size - self->pos;
+	len = self->string_size - self->pos;
 	if (n < 0 || n > len) {
 		n = len;
 		if (n < 0)
