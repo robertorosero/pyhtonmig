@@ -9,7 +9,6 @@ in the distutils.command package.
 __revision__ = "$Id$"
 
 import sys, os, re
-from types import *
 from distutils.errors import *
 from distutils import util, dir_util, file_util, archive_util, dep_util
 from distutils import log
@@ -222,7 +221,7 @@ class Command:
         if val is None:
             setattr(self, option, default)
             return default
-        elif type(val) is not StringType:
+        elif not isinstance(val, str):
             raise DistutilsOptionError, \
                   "'%s' must be a %s (got `%s`)" % (option, what, val)
         return val
@@ -242,12 +241,12 @@ class Command:
         val = getattr(self, option)
         if val is None:
             return
-        elif type(val) is StringType:
+        elif isinstance(val, str):
             setattr(self, option, re.split(r',\s*|\s+', val))
         else:
-            if type(val) is ListType:
+            if isinstance(val, list):
                 types = map(type, val)
-                ok = (types == [StringType] * len(val))
+                ok = (types == [str] * len(val))
             else:
                 ok = 0
 
@@ -421,9 +420,9 @@ class Command:
 
 
         # Allow 'infiles' to be a single string
-        if type(infiles) is StringType:
+        if isinstance(infiles, str):
             infiles = (infiles,)
-        elif type(infiles) not in (ListType, TupleType):
+        elif not isinstance(infiles, (list, tuple)):
             raise TypeError, \
                   "'infiles' must be a string, or a list or tuple of strings"
 

@@ -235,7 +235,7 @@ class ErrorDuringImport(Exception):
 
     def __str__(self):
         exc = self.exc
-        if type(exc) is types.ClassType:
+        if isinstance(exc, type):
             exc = exc.__name__
         return 'problem in %s - %s: %s' % (self.filename, exc, self.value)
 
