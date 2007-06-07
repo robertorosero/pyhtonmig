@@ -333,7 +333,7 @@ string_io_seek(StringIOObject *self, PyObject *args)
     while (--position >= self->string_size)
         self->buf[position] = 0;
 
-    return Py_BuildValue("n", self->pos);
+    return PyInt_FromSsize_t(self->pos);
 }
 
 static PyObject *
