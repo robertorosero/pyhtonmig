@@ -113,6 +113,13 @@ bytes_io_get_closed(BytesIOObject *self)
     return result;
 }
 
+/* Generic getter for the writable, readable and seekable properties */
+static PyObject *
+bytes_io_get_true(BytesIOObject *self)
+{
+    Py_RETURN_TRUE;
+}
+
 static PyObject *
 bytes_io_flush(BytesIOObject *self)
 {
@@ -323,7 +330,7 @@ bytes_io_seek(BytesIOObject *self, PyObject *args)
     while (--position >= self->string_size)
         self->buf[position] = 0;
 
-    Py_RETURN_NONE;
+    return Py_BuildValue("n", self->pos);
 }
 
 static PyObject *
@@ -492,12 +499,13 @@ PyDoc_STRVAR(BytesIO_close_doc,
 "close() -> None.  Close the file and release the resources held.");
 
 PyDoc_STRVAR(BytesIO_seek_doc,
-"seek(offset[, whence]) -> None.  Set the file's current position.\n"
+"seek(pos, whence=0) -> int.  Change stream position.\n"
 "\n"
-"Argument offset is a byte count.  Optional argument whence defaults to\n"
-"0 (offset from start of file, offset should be >= 0); other values are 1\n"
-"(move relative to current position, positive or negative), and 2 (move\n"
-"relative to end of file, usually negative).\n");
+"Seek to byte offset pos relative to position indicated by whence:\n"
+"     0  Start of stream (the default).  pos should be >= 0;\n"
+"     1  Current position - whence may be negative;\n"
+"     2  End of stream - whence usually negative.\n"
+"Returns the new absolute position.");
 
 PyDoc_STRVAR(BytesIO_write_doc,
 "write(str) -> None.  Write string str to file.");
@@ -510,8 +518,14 @@ PyDoc_STRVAR(BytesIO_writelines_doc,
 
 
 static PyGetSetDef BytesIO_getsetlist[] = {
-    {"closed", (getter) bytes_io_get_closed, NULL,
-     "True if the file is closed"},
+    {"closed",    (getter) bytes_io_get_closed, NULL,
+     "True if the file is closed."},
+    {"writeable", (getter) bytes_io_get_true, NULL,
+     "Always True."},
+    {"readable",  (getter) bytes_io_get_true, NULL,
+     "Always True."},
+    {"seekable",  (getter) bytes_io_get_true, NULL,
+     "Always True."},
     {0},            /* sentinel */
 };
 
