@@ -46,6 +46,17 @@ class _Abstract(object):
                             (cls.__name__, ", ".join(sorted(am))))
         return super(_Abstract, cls).__new__(cls, *args, **kwds)
 
+    @classmethod
+    def __subclasshook__(cls, subclass):
+        """Abstract classes can override this to customize issubclass().
+
+        This is invoked early on by __subclasscheck__() below.  It
+        should return True, False or NotImplemented.  If it returns
+        NotImplemented, the normal algorithm is used.  Otherwise, it
+        overrides the normal algorithm (and the outcome is cached).
+        """
+        return NotImplemented
+
 
 def _fix_bases(bases):
     """Helper method that inserts _Abstract in the bases if needed."""
@@ -144,6 +155,15 @@ class ABCMeta(type):
             cls.__negative_cache = set()
         elif subclass in cls.__negative_cache:
             return False
+        # Check the subclass hook
+        ok = cls.__subclasshook__(subclass)
+        if ok is not NotImplemented:
+            assert isinstance(ok, bool)
+            if ok:
+                cls.__cache.add(subclass)
+            else:
+                cls.__negative_cache.add(subclass)
+            return ok
         # Check if it's a direct subclass
         if cls in subclass.__mro__:
             cls.__cache.add(subclass)

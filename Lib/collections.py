@@ -51,15 +51,11 @@ def NamedTuple(typename, s):
 
 class _OneTrickPony(metaclass=_ABCMeta):
 
-    @classmethod
-    def __instancecheck__(cls, x):
-        return issubclass(x.__class__, cls)
+    """Helper class for Hashable and friends."""
 
-    @classmethod
-    def register(cls, C):
-        raise TypeError("class %s doesn't allow registration of subclasses" %
-                        cls.__name__)
-
+    @_abstractmethod
+    def __subclasshook__(self, subclass):
+        return NotImplemented
 
 class Hashable(_OneTrickPony):
 
@@ -68,11 +64,13 @@ class Hashable(_OneTrickPony):
         return 0
 
     @classmethod
-    def __subclasscheck__(cls, C):
+    def __subclasshook__(cls, C):
         for B in C.__mro__:
             if "__hash__" in B.__dict__:
-                return B.__dict__["__hash__"] is not None
-        return False
+                if B.__dict__["__hash__"]:
+                    return True
+                break
+        return NotImplemented
 
 
 class Iterable(_OneTrickPony):
@@ -83,9 +81,11 @@ class Iterable(_OneTrickPony):
             yield None
 
     @classmethod
-    def __subclasscheck__(cls, C):
-        return any("__iter__" in B.__dict__ or "__getitem__" in B.__dict__
-                   for B in C.__mro__)
+    def __subclasshook__(cls, C):
+        if any("__iter__" in B.__dict__ or "__getitem__" in B.__dict__
+               for B in C.__mro__):
+            return True
+        return NotImplemented
 
 
 class Iterator(_OneTrickPony):
@@ -98,8 +98,10 @@ class Iterator(_OneTrickPony):
         return self
 
     @classmethod
-    def __subclasscheck__(cls, C):
-        return any("__next__" in B.__dict__ for B in C.__mro__)
+    def __subclasshook__(cls, C):
+        if any("__next__" in B.__dict__ for B in C.__mro__):
+            return True
+        return NotImplemented
 
 
 class Sized(_OneTrickPony):
@@ -109,8 +111,10 @@ class Sized(_OneTrickPony):
         return 0
 
     @classmethod
-    def __subclasscheck__(cls, C):
-        return any("__len__" in B.__dict__ for B in C.__mro__)
+    def __subclasshook__(cls, C):
+        if any("__len__" in B.__dict__ for B in C.__mro__):
+            return True
+        return NotImplemented
 
 
 class Container(_OneTrickPony):
@@ -120,7 +124,7 @@ class Container(_OneTrickPony):
         return False
 
     @classmethod
-    def __subclasscheck__(cls, C):
+    def __subclasshook__(cls, C):
         return any("__contains__" in B.__dict__ for B in C.__mro__)
 
 

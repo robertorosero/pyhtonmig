@@ -79,11 +79,12 @@ class TestABCs(unittest.TestCase):
             def __hash__(self):
                 return super(H, self).__hash__()
         self.assertEqual(hash(H()), 0)
-        # Check registration is disabled
+        # Check registration
         class C:
-            def __hash__(self):
-                return 0
-        self.assertRaises(TypeError, Hashable.register, C)
+            __hash__ = None
+        self.failIf(issubclass(C, Hashable))
+        Hashable.register(C)
+        self.failUnless(issubclass(C, Hashable))
 
     def test_Iterable(self):
         non_samples = [None, 42, 3.14, 1j]
