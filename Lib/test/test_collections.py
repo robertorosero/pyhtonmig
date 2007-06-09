@@ -1,6 +1,10 @@
+"""Unit tests for collections.py."""
+
 import unittest
 from test import test_support
 from collections import NamedTuple
+from collections import Hashable, Iterable, Iterator, Sized, Container
+
 
 class TestNamedTuple(unittest.TestCase):
 
@@ -51,9 +55,89 @@ class TestNamedTuple(unittest.TestCase):
         self.assertRaises(AttributeError, eval, 'p.z', locals())
 
 
+class TestABCs(unittest.TestCase):
+
+    def test_Hashable(self):
+        # Check some non-hashables
+        non_samples = [bytes(), list(), set(), dict()]
+        for x in non_samples:
+            self.failIf(isinstance(x, Hashable), repr(x))
+            self.failIf(issubclass(type(x), Hashable), repr(type(x)))
+        # Check some hashables
+        samples = [None,
+                   int(), float(), complex(),
+                   str(), unicode(),
+                   tuple(), frozenset(),
+                   int, list, object, type,
+                   ]
+        for x in samples:
+            self.failUnless(isinstance(x, Hashable), repr(x))
+            self.failUnless(issubclass(type(x), Hashable), repr(type(x)))
+        self.assertRaises(TypeError, Hashable)
+        # Check direct subclassing
+        class H(Hashable):
+            def __hash__(self):
+                return super(H, self).__hash__()
+        self.assertEqual(hash(H()), 0)
+        # Check registration is disabled
+        class C:
+            def __hash__(self):
+                return 0
+        self.assertRaises(TypeError, Hashable.register, C)
+
+    def test_Iterable(self):
+        non_samples = [None, 42, 3.14, 1j]
+        for x in non_samples:
+            self.failIf(isinstance(x, Iterable), repr(x))
+            self.failIf(issubclass(type(x), Iterable), repr(type(x)))
+        samples = [bytes(), str(), unicode(),
+                   tuple(), list(), set(), frozenset(), dict(),
+                   ]
+        for x in samples:
+            self.failUnless(isinstance(x, Iterable), repr(x))
+            self.failUnless(issubclass(type(x), Iterable), repr(type(x)))
+
+    def test_Iterator(self):
+        non_samples = [None, 42, 3.14, 1j, b"", "", u"", (), [], {}, set()]
+        for x in non_samples:
+            self.failIf(isinstance(x, Iterator), repr(x))
+            self.failIf(issubclass(type(x), Iterator), repr(type(x)))
+        samples = [iter(bytes()), iter(str()), iter(unicode()),
+                   iter(tuple()), iter(list()), iter(dict()),
+                   iter(set()), iter(frozenset()),
+                   ]
+        for x in samples:
+            self.failUnless(isinstance(x, Iterator), repr(x))
+            self.failUnless(issubclass(type(x), Iterator), repr(type(x)))
+
+    def test_Sized(self):
+        non_samples = [None, 42, 3.14, 1j]
+        for x in non_samples:
+            self.failIf(isinstance(x, Sized), repr(x))
+            self.failIf(issubclass(type(x), Sized), repr(type(x)))
+        samples = [bytes(), str(), unicode(),
+                   tuple(), list(), set(), frozenset(), dict(),
+                   ]
+        for x in samples:
+            self.failUnless(isinstance(x, Sized), repr(x))
+            self.failUnless(issubclass(type(x), Sized), repr(type(x)))
+
+    def test_Container(self):
+        non_samples = [None, 42, 3.14, 1j]
+        for x in non_samples:
+            self.failIf(isinstance(x, Container), repr(x))
+            self.failIf(issubclass(type(x), Container), repr(type(x)))
+        samples = [bytes(), str(), unicode(),
+                   tuple(), list(), set(), frozenset(), dict(),
+                   ]
+        for x in samples:
+            self.failUnless(isinstance(x, Container), repr(x))
+            self.failUnless(issubclass(type(x), Container), repr(type(x)))
+
+
 def test_main(verbose=None):
     import collections as CollectionsModule
-    test_classes = [TestNamedTuple]
+    test_classes = [TestNamedTuple, TestABCs]
     test_support.run_unittest(*test_classes)
     test_support.run_doctest(CollectionsModule, verbose)
 

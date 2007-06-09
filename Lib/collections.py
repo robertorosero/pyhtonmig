@@ -1,8 +1,11 @@
-__all__ = ['deque', 'defaultdict', 'NamedTuple']
+__all__ = ['deque', 'defaultdict', 'NamedTuple',
+           'Hashable', 'Iterable', 'Iterator', 'Sized', 'Container',
+           ]
 
 from _collections import deque, defaultdict
 from operator import itemgetter as _itemgetter
 import sys as _sys
+from abc import abstractmethod as _abstractmethod, ABCMeta as _ABCMeta
 
 def NamedTuple(typename, s):
     """Returns a new subclass of tuple with named fields.
@@ -46,7 +49,79 @@ def NamedTuple(typename, s):
     return result
 
 
+class _OneTrickPony(metaclass=_ABCMeta):
 
+    @classmethod
+    def __instancecheck__(cls, x):
+        return issubclass(x.__class__, cls)
+
+    @classmethod
+    def register(cls, C):
+        raise TypeError("class %s doesn't allow registration of subclasses" %
+                        cls.__name__)
+
+
+class Hashable(_OneTrickPony):
+
+    @_abstractmethod
+    def __hash__(self):
+        return 0
+
+    @classmethod
+    def __subclasscheck__(cls, C):
+        for B in C.__mro__:
+            if "__hash__" in B.__dict__:
+                return B.__dict__["__hash__"] is not None
+        return False
+
+
+class Iterable(_OneTrickPony):
+
+    @_abstractmethod
+    def __iter__(self):
+        while False:
+            yield None
+
+    @classmethod
+    def __subclasscheck__(cls, C):
+        return any("__iter__" in B.__dict__ or "__getitem__" in B.__dict__
+                   for B in C.__mro__)
+
+
+class Iterator(_OneTrickPony):
+
+    @_abstractmethod
+    def __next__(self):
+        raise StopIteration
+
+    def __iter__(self):
+        return self
+
+    @classmethod
+    def __subclasscheck__(cls, C):
+        return any("__next__" in B.__dict__ for B in C.__mro__)
+
+
+class Sized(_OneTrickPony):
+
+    @_abstractmethod
+    def __len__(self):
+        return 0
+
+    @classmethod
+    def __subclasscheck__(cls, C):
+        return any("__len__" in B.__dict__ for B in C.__mro__)
+
+
+class Container(_OneTrickPony):
+
+    @_abstractmethod
+    def __contains__(self, x):
+        return False
+
+    @classmethod
+    def __subclasscheck__(cls, C):
+        return any("__contains__" in B.__dict__ for B in C.__mro__)
 
 
 if __name__ == '__main__':
