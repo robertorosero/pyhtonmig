@@ -159,7 +159,7 @@ class TestABCs(unittest.TestCase):
             self.failIf(issubclass(type(x), Container), repr(type(x)))
         samples = [bytes(), str(), unicode(),
                    tuple(), list(), set(), frozenset(), dict(),
-##                   dict().keys(), dict().items(), dict().values(),
+                   dict().keys(), dict().items(),
                    ]
         for x in samples:
             self.failUnless(isinstance(x, Container), repr(x))
