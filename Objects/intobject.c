@@ -927,11 +927,9 @@ int_oct(PyIntObject *v)
 	char buf[100];
 	long x = v -> ob_ival;
 	if (x < 0)
-		PyOS_snprintf(buf, sizeof(buf), "-0%lo", -x);
-	else if (x == 0)
-		strcpy(buf, "0");
+		PyOS_snprintf(buf, sizeof(buf), "-0o%lo", -x);
 	else
-		PyOS_snprintf(buf, sizeof(buf), "0%lo", x);
+		PyOS_snprintf(buf, sizeof(buf), "0o%lo", x);
 	return PyString_FromString(buf);
 }
 
