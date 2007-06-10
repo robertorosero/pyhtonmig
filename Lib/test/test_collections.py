@@ -96,6 +96,9 @@ class TestABCs(unittest.TestCase):
         # Check some iterables
         samples = [bytes(), str(), unicode(),
                    tuple(), list(), set(), frozenset(), dict(),
+                   dict().keys(), dict().items(), dict().values(),
+                   (lambda: (yield))(),
+                   (x for x in []),
                    ]
         for x in samples:
             self.failUnless(isinstance(x, Iterable), repr(x))
@@ -121,30 +124,42 @@ class TestABCs(unittest.TestCase):
         samples = [iter(bytes()), iter(str()), iter(unicode()),
                    iter(tuple()), iter(list()), iter(dict()),
                    iter(set()), iter(frozenset()),
+                   iter(dict().keys()), iter(dict().items()),
+                   iter(dict().values()),
+                   (lambda: (yield))(),
+                   (x for x in []),
                    ]
         for x in samples:
             self.failUnless(isinstance(x, Iterator), repr(x))
             self.failUnless(issubclass(type(x), Iterator), repr(type(x)))
 
     def test_Sized(self):
-        non_samples = [None, 42, 3.14, 1j]
+        non_samples = [None, 42, 3.14, 1j,
+                       (lambda: (yield))(),
+                       (x for x in []),
+                       ]
         for x in non_samples:
             self.failIf(isinstance(x, Sized), repr(x))
             self.failIf(issubclass(type(x), Sized), repr(type(x)))
         samples = [bytes(), str(), unicode(),
                    tuple(), list(), set(), frozenset(), dict(),
+                   dict().keys(), dict().items(), dict().values(),
                    ]
         for x in samples:
             self.failUnless(isinstance(x, Sized), repr(x))
             self.failUnless(issubclass(type(x), Sized), repr(type(x)))
 
     def test_Container(self):
-        non_samples = [None, 42, 3.14, 1j]
+        non_samples = [None, 42, 3.14, 1j,
+                       (lambda: (yield))(),
+                       (x for x in []),
+                       ]
         for x in non_samples:
             self.failIf(isinstance(x, Container), repr(x))
             self.failIf(issubclass(type(x), Container), repr(type(x)))
         samples = [bytes(), str(), unicode(),
                    tuple(), list(), set(), frozenset(), dict(),
+##                   dict().keys(), dict().items(), dict().values(),
                    ]
         for x in samples:
             self.failUnless(isinstance(x, Container), repr(x))
