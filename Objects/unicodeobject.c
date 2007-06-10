@@ -7354,9 +7354,10 @@ formatint(Py_UNICODE *buf,
     }
 
     if ((flags & F_ALT) &&
-        (type == 'x' || type == 'X')) {
-        /* When converting under %#x or %#X, there are a number
+        (type == 'x' || type == 'X' || type == 'o')) {
+        /* When converting under %#o, %#x or %#X, there are a number
          * of issues that cause pain:
+	 * - for %#o, we want a different base marker than C
          * - when 0 is being converted, the C standard leaves off
          *   the '0x' or '0X', which is inconsistent with other
          *   %#x/%#X conversions and inconsistent with Python's
@@ -7814,7 +7815,7 @@ PyObject *PyUnicode_Format(PyObject *format,
 		if (width > len)
 		    width--;
 	    }
-	    if ((flags & F_ALT) && (c == 'x' || c == 'X')) {
+	    if ((flags & F_ALT) && (c == 'x' || c == 'X' || c == 'o')) {
 		assert(pbuf[0] == '0');
 		assert(pbuf[1] == c);
 		if (fill != ' ') {
@@ -7836,7 +7837,7 @@ PyObject *PyUnicode_Format(PyObject *format,
 	    if (fill == ' ') {
 		if (sign)
 		    *res++ = sign;
-		if ((flags & F_ALT) && (c == 'x' || c == 'X')) {
+		if ((flags & F_ALT) && (c == 'x' || c == 'X' || c == 'o')) {
 		    assert(pbuf[0] == '0');
 		    assert(pbuf[1] == c);
 		    *res++ = *pbuf++;

@@ -1424,7 +1424,7 @@ divrem1(PyLongObject *a, digit n, digit *prem)
 
 /* Convert a long int object to a string, using a given conversion base.
    Return a string object.
-   If base is 8 or 16, add the proper prefix '0' or '0x'. */
+   If base is 2, 8 or 16, add the proper prefix '0b', '0o' or '0x'. */
 
 static PyObject *
 long_format(PyObject *aa, int base)
@@ -1551,12 +1551,16 @@ long_format(PyObject *aa, int base)
 		Py_DECREF(scratch);
 	}
 
-	if (base == 8) {
-		if (size_a != 0)
-			*--p = '0';
-	}
-	else if (base == 16) {
+	if (base == 16) {
 		*--p = 'x';
+		*--p = '0';
+	}
+	else if (base == 8) {
+		*--p = 'o';
+		*--p = '0';
+	}
+	else if (base == 2) {
+		*--p = 'b';
 		*--p = '0';
 	}
 	else if (base != 10) {
@@ -1675,9 +1679,9 @@ long_from_binary_base(char **str, int base)
 PyObject *
 PyLong_FromString(char *str, char **pend, int base)
 {
-	int sign = 1;
+	int sign = 1, error_if_nonzero = 0;
 	char *start, *orig_str = str;
-	PyLongObject *z;
+	PyLongObject *z = NULL;
 	PyObject *strobj, *strrepr;
 	Py_ssize_t slen;
 
@@ -1701,10 +1705,21 @@ PyLong_FromString(char *str, char **pend, int base)
 			base = 10;
 		else if (str[1] == 'x' || str[1] == 'X')
 			base = 16;
-		else
+		else if (str[1] == 'o' || str[1] == 'O')
 			base = 8;
+		else if (str[1] == 'b' || str[1] == 'B')
+			base = 2;
+		else {
+			/* "old" (C-style) octal literal, now invalid.
+			   it might still be zero though */
+			error_if_nonzero = 1;
+			base = 10;
+		}
 	}
-	if (base == 16 && str[0] == '0' && (str[1] == 'x' || str[1] == 'X'))
+	if (str[0] == '0' &&
+	    ((base == 16 && (str[1] == 'x' || str[1] == 'X')) ||
+	     (base == 8  && (str[1] == 'o' || str[1] == 'O')) ||
+	     (base == 2  && (str[1] == 'b' || str[1] == 'B'))))
 		str += 2;
 
 	start = str;
@@ -1908,6 +1923,15 @@ digit beyond the first.
 	}
 	if (z == NULL)
 		return NULL;
+	if (error_if_nonzero) {
+		/* reset the base to 0, else the exception message
+		   doesn't make too much sense */
+		base = 0;
+		if (z->ob_size != 0)
+			goto onError;
+		/* there might still be other problems, therefore base
+		   remains zero here for the same reason */
+	}
 	if (str == start)
 		goto onError;
 	if (sign < 0)

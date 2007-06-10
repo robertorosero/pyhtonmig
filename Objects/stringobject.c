@@ -4243,6 +4243,7 @@ _PyString_FormatLong(PyObject *val, int flags, int prec, int type,
 		result = val->ob_type->tp_str(val);
 		break;
 	case 'o':
+		numnondigits = 2;
 		result = val->ob_type->tp_as_number->nb_oct(val);
 		break;
 	case 'x':
@@ -4283,32 +4284,16 @@ _PyString_FormatLong(PyObject *val, int flags, int prec, int type,
 	assert(numdigits > 0);
 
 	/* Get rid of base marker unless F_ALT */
-	if ((flags & F_ALT) == 0) {
-		/* Need to skip 0x, 0X or 0. */
-		int skipped = 0;
-		switch (type) {
-		case 'o':
-			assert(buf[sign] == '0');
-			/* If 0 is only digit, leave it alone. */
-			if (numdigits > 1) {
-				skipped = 1;
-				--numdigits;
-			}
-			break;
-		case 'x':
-		case 'X':
-			assert(buf[sign] == '0');
-			assert(buf[sign + 1] == 'x');
-			skipped = 2;
-			numnondigits -= 2;
-			break;
-		}
-		if (skipped) {
-			buf += skipped;
-			len -= skipped;
-			if (sign)
-				buf[0] = '-';
-		}
+	if (((flags & F_ALT) == 0 &&
+	    (type == 'o' || type == 'x' || type == 'X'))) {
+		assert(buf[sign] == '0');
+		assert(buf[sign+1] == 'x' || buf[sign+1] == 'X' ||
+                       buf[sign+1] == 'o');
+		numnondigits -= 2;
+		buf += 2;
+		len -= 2;
+		if (sign)
+			buf[0] = '-';
 		assert(len == numnondigits + numdigits);
 		assert(numdigits > 0);
 	}
@@ -4377,9 +4362,10 @@ formatint(char *buf, size_t buflen, int flags,
 		prec = 1;
 
 	if ((flags & F_ALT) &&
-	    (type == 'x' || type == 'X')) {
-		/* When converting under %#x or %#X, there are a number
+	    (type == 'x' || type == 'X' || type == 'o')) {
+		/* When converting under %#o, %#x or %#X, there are a number
 		 * of issues that cause pain:
+		 * - for %#o, we want a different base marker than C
 		 * - when 0 is being converted, the C standard leaves off
 		 *   the '0x' or '0X', which is inconsistent with other
 		 *   %#x/%#X conversions and inconsistent with Python's
@@ -4407,7 +4393,7 @@ formatint(char *buf, size_t buflen, int flags,
 			      prec, type);
 	}
 
-	/* buf = '+'/'-'/'' + '0'/'0x'/'' + '[0-9]'*max(prec, len(x in octal))
+	/* buf = '+'/'-'/'' + '0o'/'0x'/'' + '[0-9]'*max(prec, len(x in octal))
 	 * worst case buf = '-0x' + [0-9]*prec, where prec >= 11
 	 */
 	if (buflen <= 14 || buflen <= (size_t)3 + (size_t)prec) {
@@ -4805,7 +4791,8 @@ PyString_Format(PyObject *format, PyObject *args)
 				if (width > len)
 					width--;
 			}
-			if ((flags & F_ALT) && (c == 'x' || c == 'X')) {
+			if ((flags & F_ALT) &&
+			    (c == 'x' || c == 'X' || c == 'o')) {
 				assert(pbuf[0] == '0');
 				assert(pbuf[1] == c);
 				if (fill != ' ') {
@@ -4828,7 +4815,7 @@ PyString_Format(PyObject *format, PyObject *args)
 				if (sign)
 					*res++ = sign;
 				if ((flags & F_ALT) &&
-				    (c == 'x' || c == 'X')) {
+				    (c == 'x' || c == 'X' || c == 'o')) {
 					assert(pbuf[0] == '0');
 					assert(pbuf[1] == c);
 					*res++ = *pbuf++;

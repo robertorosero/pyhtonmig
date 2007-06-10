@@ -3029,8 +3029,6 @@ parsenumber(const char *s)
 #ifndef WITHOUT_COMPLEX
     imflag = *end == 'j' || *end == 'J';
 #endif
-    if (*end == 'l' || *end == 'L')
-        return PyLong_FromString((char *)s, (char **)0, 0);
     if (s[0] == '0') {
         x = (long) PyOS_strtoul((char *)s, (char **)&end, 0);
         if (x < 0 && errno == 0) {
