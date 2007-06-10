@@ -1,11 +1,14 @@
 __all__ = ['deque', 'defaultdict', 'NamedTuple',
            'Hashable', 'Iterable', 'Iterator', 'Sized', 'Container',
+           'Sequence', 'Set', 'Mapping',
+           'MutableSequence', 'MutableSet', 'MutableMapping',
            ]
 
 from _collections import deque, defaultdict
 from operator import itemgetter as _itemgetter
 import sys as _sys
 from abc import abstractmethod as _abstractmethod, ABCMeta as _ABCMeta
+
 
 def NamedTuple(typename, s):
     """Returns a new subclass of tuple with named fields.
@@ -57,6 +60,7 @@ class _OneTrickPony(metaclass=_ABCMeta):
     def __subclasshook__(self, subclass):
         return NotImplemented
 
+
 class Hashable(_OneTrickPony):
 
     @_abstractmethod
@@ -65,11 +69,12 @@ class Hashable(_OneTrickPony):
 
     @classmethod
     def __subclasshook__(cls, C):
-        for B in C.__mro__:
-            if "__hash__" in B.__dict__:
-                if B.__dict__["__hash__"]:
-                    return True
-                break
+        if cls is Hashable:
+            for B in C.__mro__:
+                if "__hash__" in B.__dict__:
+                    if B.__dict__["__hash__"]:
+                        return True
+                    break
         return NotImplemented
 
 
@@ -82,9 +87,10 @@ class Iterable(_OneTrickPony):
 
     @classmethod
     def __subclasshook__(cls, C):
-        if any("__iter__" in B.__dict__ or "__getitem__" in B.__dict__
-               for B in C.__mro__):
-            return True
+        if cls is Iterable:
+            if any("__iter__" in B.__dict__ or "__getitem__" in B.__dict__
+                   for B in C.__mro__):
+                return True
         return NotImplemented
 
 
@@ -99,8 +105,9 @@ class Iterator(_OneTrickPony):
 
     @classmethod
     def __subclasshook__(cls, C):
-        if any("__next__" in B.__dict__ for B in C.__mro__):
-            return True
+        if cls is Iterator:
+            if any("__next__" in B.__dict__ for B in C.__mro__):
+                return True
         return NotImplemented
 
 
@@ -112,8 +119,9 @@ class Sized(_OneTrickPony):
 
     @classmethod
     def __subclasshook__(cls, C):
-        if any("__len__" in B.__dict__ for B in C.__mro__):
-            return True
+        if cls is Sized:
+            if any("__len__" in B.__dict__ for B in C.__mro__):
+                return True
         return NotImplemented
 
 
@@ -125,7 +133,10 @@ class Container(_OneTrickPony):
 
     @classmethod
     def __subclasshook__(cls, C):
-        return any("__contains__" in B.__dict__ for B in C.__mro__)
+        if cls is Container:
+            if any("__contains__" in B.__dict__ for B in C.__mro__):
+                return True
+        return NotImplemented
 
 
 if __name__ == '__main__':

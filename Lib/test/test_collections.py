@@ -79,6 +79,7 @@ class TestABCs(unittest.TestCase):
             def __hash__(self):
                 return super(H, self).__hash__()
         self.assertEqual(hash(H()), 0)
+        self.failIf(issubclass(int, H))
         # Check registration
         class C:
             __hash__ = None
@@ -87,16 +88,30 @@ class TestABCs(unittest.TestCase):
         self.failUnless(issubclass(C, Hashable))
 
     def test_Iterable(self):
+        # Check some non-iterables
         non_samples = [None, 42, 3.14, 1j]
         for x in non_samples:
             self.failIf(isinstance(x, Iterable), repr(x))
             self.failIf(issubclass(type(x), Iterable), repr(type(x)))
+        # Check some iterables
         samples = [bytes(), str(), unicode(),
                    tuple(), list(), set(), frozenset(), dict(),
                    ]
         for x in samples:
             self.failUnless(isinstance(x, Iterable), repr(x))
             self.failUnless(issubclass(type(x), Iterable), repr(type(x)))
+        # Check direct subclassing
+        class I(Iterable):
+            def __iter__(self):
+                return super(I, self).__iter__()
+        self.assertEqual(list(I()), [])
+        self.failIf(issubclass(str, I))
+        # Check registration
+        class C:
+            pass
+        self.failIf(issubclass(C, Iterable))
+        Iterable.register(C)
+        self.failUnless(issubclass(C, Iterable))
 
     def test_Iterator(self):
         non_samples = [None, 42, 3.14, 1j, b"", "", u"", (), [], {}, set()]
@@ -141,6 +156,7 @@ def test_main(verbose=None):
     test_classes = [TestNamedTuple, TestABCs]
     test_support.run_unittest(*test_classes)
     test_support.run_doctest(CollectionsModule, verbose)
+
 
 if __name__ == "__main__":
     test_main(verbose=True)
