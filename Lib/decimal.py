@@ -2570,12 +2570,106 @@ class Decimal(object):
 
     def rotate(self, other, context=None):
         """Returns a rotated copy of self, value-of-other times."""
+        if context is None:
+            context = getcontext()
+
+        ans = self._check_nans(other, context)
+        if ans:
+            return ans
+
+        if other._exp != 0:
+            return context._raise_error(InvalidOperation)
+        if not (-context.prec <= int(other) <= context.prec):
+            return context._raise_error(InvalidOperation)
+
+        if self._isinfinity():
+            return self
+
+        # get values, pad if necessary
+        torot = int(other)
+        rotdig = self._int
+        topad = context.prec - len(rotdig)
+        if topad:
+            rotdig = ((0,)*topad) + rotdig
+
+        # let's rotate!
+        rotated = rotdig[torot:] + rotdig[:torot]
+
+        # clean starting zeroes
+        for i,d in enumerate(rotated):
+            if d != 0:
+                break
+        rotated = rotated[i:]
+
+        return Decimal((self._sign, rotated, self._exp))
+
 
     def scaleb (self, other, context=None):
         """Returns self operand after adding the second value to its exp."""
+        if context is None:
+            context = getcontext()
+
+        ans = self._check_nans(other, context)
+        if ans:
+            return ans
+
+        if other._exp != 0:
+            return context._raise_error(InvalidOperation)
+        liminf = -2 * (context.Emax + context.prec)
+        limsup =  2 * (context.Emax + context.prec)
+        if not (liminf <= int(other) <= limsup):
+            return context._raise_error(InvalidOperation)
+
+        if self._isinfinity():
+            return self
+
+        d = Decimal((self._sign, self._int, self._exp + int(other)))
+        d = d._fixexponents(context)
+        return d
 
     def shift(self, other, context=None):
         """Returns a shifted copy of self, value-of-other times."""
+        if context is None:
+            context = getcontext()
+
+        ans = self._check_nans(other, context)
+        if ans:
+            return ans
+
+        if other._exp != 0:
+            return context._raise_error(InvalidOperation)
+        if not (-context.prec <= int(other) <= context.prec):
+            return context._raise_error(InvalidOperation)
+
+        if self._isinfinity():
+            return self
+
+        # get values, pad if necessary
+        torot = int(other)
+        if not torot:
+            return self
+        rotdig = self._int
+        topad = context.prec - len(rotdig)
+        if topad:
+            rotdig = ((0,)*topad) + rotdig
+
+        # let's shift!
+        if torot < 0:
+            rotated = rotdig[:torot]
+        else:
+            rotated = (rotdig + ((0,) * torot))
+            rotated = rotated[-context.prec:]
+
+        # clean starting zeroes
+        if rotated:
+            for i,d in enumerate(rotated):
+                if d != 0:
+                    break
+            rotated = rotated[i:]
+        else:
+            rotated = (0,)
+
+        return Decimal((self._sign, rotated, self._exp))
 
 
     # Support for pickling, copy, and deepcopy
