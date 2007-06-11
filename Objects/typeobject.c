@@ -3236,8 +3236,6 @@ inherit_slots(PyTypeObject *type, PyTypeObject *base)
 		COPYNUM(nb_int);
 		COPYNUM(nb_long);
 		COPYNUM(nb_float);
-		COPYNUM(nb_oct);
-		COPYNUM(nb_hex);
 		COPYNUM(nb_inplace_add);
 		COPYNUM(nb_inplace_subtract);
 		COPYNUM(nb_inplace_multiply);
@@ -4556,8 +4554,6 @@ SLOT1BIN(slot_nb_or, nb_or, "__or__", "__ror__")
 SLOT0(slot_nb_int, "__int__")
 SLOT0(slot_nb_long, "__long__")
 SLOT0(slot_nb_float, "__float__")
-SLOT0(slot_nb_oct, "__oct__")
-SLOT0(slot_nb_hex, "__hex__")
 SLOT1(slot_nb_inplace_add, "__iadd__", PyObject *, "O")
 SLOT1(slot_nb_inplace_subtract, "__isub__", PyObject *, "O")
 SLOT1(slot_nb_inplace_multiply, "__imul__", PyObject *, "O")
@@ -5208,10 +5204,6 @@ static slotdef slotdefs[] = {
 	       "long(x)"),
 	UNSLOT("__float__", nb_float, slot_nb_float, wrap_unaryfunc,
 	       "float(x)"),
-	UNSLOT("__oct__", nb_oct, slot_nb_oct, wrap_unaryfunc,
-	       "oct(x)"),
-	UNSLOT("__hex__", nb_hex, slot_nb_hex, wrap_unaryfunc,
-	       "hex(x)"),
 	NBSLOT("__index__", nb_index, slot_nb_index, wrap_unaryfunc, 
 	       "x[y:z] <==> x[y.__index__():z.__index__()]"),
 	IBSLOT("__iadd__", nb_inplace_add, slot_nb_inplace_add,

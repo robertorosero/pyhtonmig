@@ -80,7 +80,6 @@ static PyLongObject *long_normalize(PyLongObject *);
 static PyLongObject *mul1(PyLongObject *, wdigit);
 static PyLongObject *muladd1(PyLongObject *, wdigit, wdigit);
 static PyLongObject *divrem1(PyLongObject *, digit, digit *);
-static PyObject *long_format(PyObject *aa, int base);
 
 #define SIGCHECK(PyTryBlock) \
 	if (--_Py_Ticker < 0) { \
@@ -1384,7 +1383,7 @@ muladd1(PyLongObject *a, wdigit n, wdigit extra)
 /* Divide long pin, w/ size digits, by non-zero digit n, storing quotient
    in pout, and returning the remainder.  pin and pout point at the LSD.
    It's OK for pin == pout on entry, which saves oodles of mallocs/frees in
-   long_format, but that should be done with great care since longs are
+   _PyLong_Format, but that should be done with great care since longs are
    immutable. */
 
 static digit
@@ -1426,8 +1425,8 @@ divrem1(PyLongObject *a, digit n, digit *prem)
    Return a string object.
    If base is 2, 8 or 16, add the proper prefix '0b', '0o' or '0x'. */
 
-static PyObject *
-long_format(PyObject *aa, int base)
+PyObject *
+_PyLong_Format(PyObject *aa, int base)
 {
 	register PyLongObject *a = (PyLongObject *)aa;
 	PyStringObject *str;
@@ -2154,7 +2153,7 @@ long_dealloc(PyObject *v)
 static PyObject *
 long_repr(PyObject *v)
 {
-	return long_format(v, 10);
+	return _PyLong_Format(v, 10);
 }
 
 static int
@@ -3513,18 +3512,6 @@ long_float(PyObject *v)
 }
 
 static PyObject *
-long_oct(PyObject *v)
-{
-	return long_format(v, 8);
-}
-
-static PyObject *
-long_hex(PyObject *v)
-{
-	return long_format(v, 16);
-}
-
-static PyObject *
 long_subtype_new(PyTypeObject *type, PyObject *args, PyObject *kwds);
 
 static PyObject *
@@ -3648,8 +3635,8 @@ static PyNumberMethods long_as_number = {
 			long_int,	/*nb_int*/
 			long_long,	/*nb_long*/
 			long_float,	/*nb_float*/
-			long_oct,	/*nb_oct*/
-			long_hex,	/*nb_hex*/
+			0,		/*nb_oct*/ /* not used */
+			0,		/*nb_hex*/ /* not used */
 	0,				/* nb_inplace_add */
 	0,				/* nb_inplace_subtract */
 	0,				/* nb_inplace_multiply */

@@ -4255,12 +4255,12 @@ _PyString_FormatLong(PyObject *val, int flags, int prec, int type,
 		break;
 	case 'o':
 		numnondigits = 2;
-		result = val->ob_type->tp_as_number->nb_oct(val);
+		result = PyNumber_ToBase(val, 8);
 		break;
 	case 'x':
 	case 'X':
 		numnondigits = 2;
-		result = val->ob_type->tp_as_number->nb_hex(val);
+		result = PyNumber_ToBase(val, 16);
 		break;
 	default:
 		assert(!"'type' not in [duoxX]");
