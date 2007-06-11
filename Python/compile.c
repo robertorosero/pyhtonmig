@@ -373,10 +373,12 @@ dictbytype(PyObject *src, int scope_type, int flag, int offset)
 
 	while (PyDict_Next(src, &pos, &k, &v)) {
 		/* XXX this should probably be a macro in symtable.h */
+		long vi;
 		assert(PyInt_Check(v));
-		scope = (PyInt_AS_LONG(v) >> SCOPE_OFFSET) & SCOPE_MASK;
+		vi = PyInt_AS_LONG(v);
+		scope = (vi >> SCOPE_OFFSET) & SCOPE_MASK;
 
-		if (scope == scope_type || PyInt_AS_LONG(v) & flag) {
+		if (scope == scope_type || vi & flag) {
 			PyObject *tuple, *item = PyInt_FromLong(i);
 			if (item == NULL) {
 				Py_DECREF(dest);
@@ -1252,7 +1254,8 @@ compiler_make_closure(struct compiler *c, PyCodeObject *co, int args)
 		else /* (reftype == FREE) */
 			arg = compiler_lookup_arg(c->u->u_freevars, name);
 		if (arg == -1) {
-			printf("lookup %s in %s %d %d\n"
+			fprintf(stderr,
+				"lookup %s in %s %d %d\n"
 				"freevars of %s: %s\n",
 				PyObject_REPR(name), 
 				PyString_AS_STRING(c->u->u_name), 
@@ -1475,7 +1478,6 @@ compiler_function(struct compiler *c, stmt_ty s)
 static int
 compiler_class(struct compiler *c, stmt_ty s)
 {
-	static PyObject *build_class = NULL;
 	static PyObject *locals = NULL;
 	PyCodeObject *co;
 	PyObject *str;
@@ -1486,13 +1488,7 @@ compiler_class(struct compiler *c, stmt_ty s)
         if (!compiler_decorators(c, decos))
                 return 0;
 
-
 	/* initialize statics */
-	if (build_class == NULL) {
-		build_class = PyString_FromString("__build_class__");
-		if (build_class == NULL)
-			return 0;
-	}
 	if (locals == NULL) {
 		locals = PyString_FromString("__locals__");
 		if (locals == NULL)
@@ -1502,14 +1498,16 @@ compiler_class(struct compiler *c, stmt_ty s)
 	/* ultimately generate code for:
 	     <name> = __build_class__(<func>, <name>, *<bases>, **<keywords>)
 	   where:
-	     <func> is a function/closure created from the class body
+	     <func> is a function/closure created from the class body;
+                    it has a single argument (__locals__) where the dict
+		    (or MutableSequence) representing the locals is passed
 	     <name> is the class name
              <bases> is the positional arguments and *varargs argument
 	     <keywords> is the keyword arguments and **kwds argument
 	   This borrows from compiler_call.
 	*/
 
-	/* 0. Create a fake variable named __locals__ */
+	/* 0. Create a fake argument named __locals__ */
 	ste = PySymtable_Lookup(c->c_st, s);
 	if (ste == NULL)
 		return 0;
@@ -1529,11 +1527,11 @@ compiler_class(struct compiler *c, stmt_ty s)
 		c->u->u_private = s->v.ClassDef.name;
 		/* force it to have one mandatory argument */
 		c->u->u_argcount = 1;
-		/* load the first argument ... */
+		/* load the first argument (__locals__) ... */
 		ADDOP_I(c, LOAD_FAST, 0);
 		/* ... and store it into f_locals */
 		ADDOP_IN_SCOPE(c, STORE_LOCALS);
-		/* load __name__ ... */
+		/* load (global) __name__ ... */
 		str = PyString_InternFromString("__name__");
 		if (!str || !compiler_nameop(c, str, Load)) {
 			Py_XDECREF(str);
@@ -1554,8 +1552,24 @@ compiler_class(struct compiler *c, stmt_ty s)
 			compiler_exit_scope(c);
 			return 0;
 		}
-		/* return None */
-		ADDOP_O(c, LOAD_CONST, Py_None, consts);
+		/* return the (empty) __class__ cell */
+		str = PyString_InternFromString("__class__");
+		if (str == NULL) {
+			compiler_exit_scope(c);
+			return 0;
+		}
+		i = compiler_lookup_arg(c->u->u_cellvars, str);
+		Py_DECREF(str);
+		if (i == -1) {
+			/* This happens when nobody references the cell */
+			PyErr_Clear();
+			/* Return None */
+			ADDOP_O(c, LOAD_CONST, Py_None, consts);
+                }
+		else {
+			/* Return the cell where to store __class__ */
+			ADDOP_I(c, LOAD_CLOSURE, i);
+		}
 		ADDOP_IN_SCOPE(c, RETURN_VALUE);
 		/* create the code object */
 		co = assemble(c, 1);
@@ -2422,7 +2436,7 @@ compiler_nameop(struct compiler *c, identifier name, expr_context_ty ctx)
 		return compiler_error(c, "can not assign to __debug__");
 	}
 
-mangled = _Py_Mangle(c->u->u_private, name);
+	mangled = _Py_Mangle(c->u->u_private, name);
 	if (!mangled)
 		return 0;
 

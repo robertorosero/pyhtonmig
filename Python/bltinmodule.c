@@ -33,7 +33,8 @@ static PyObject *filtertuple (PyObject *, PyObject *);
 static PyObject *
 builtin___build_class__(PyObject *self, PyObject *args, PyObject *kwds)
 {
-	PyObject *func, *name, *bases, *mkw, *meta, *prep, *ns, *res;
+	PyObject *func, *name, *bases, *mkw, *meta, *prep, *ns, *cell;
+	PyObject *cls = NULL;
 	Py_ssize_t nargs, nbases;
 
 	assert(args != NULL);
@@ -114,22 +115,25 @@ builtin___build_class__(PyObject *self, PyObject *args, PyObject *kwds)
 			return NULL;
 		}
 	}
-	res = PyObject_CallFunctionObjArgs(func, ns, NULL);
-	if (res != NULL) {
+	cell = PyObject_CallFunctionObjArgs(func, ns, NULL);
+	if (cell != NULL) {
 		PyObject *margs;
-		Py_DECREF(res);
-		res = NULL;
 		margs = Py_BuildValue("OOO", name, bases, ns);
 		if (margs != NULL) {
-			res = PyEval_CallObjectWithKeywords(meta, margs, mkw);
+			cls = PyEval_CallObjectWithKeywords(meta, margs, mkw);
 			Py_DECREF(margs);
 		}
+		if (cls != NULL && PyCell_Check(cell)) {
+			Py_INCREF(cls);
+			PyCell_SET(cell, cls);
+		}
+		Py_DECREF(cell);
 	}
 	Py_DECREF(ns);
 	Py_DECREF(meta);
 	Py_XDECREF(mkw);
 	Py_DECREF(bases);
-	return res;
+	return cls;
 }
 
 PyDoc_STRVAR(build_class_doc,
