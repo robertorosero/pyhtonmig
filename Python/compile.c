@@ -2948,6 +2948,7 @@ compiler_visit_keyword(struct compiler *c, keyword_ty k)
 static int
 expr_constant(expr_ty e)
 {
+	char *id;
 	switch (e->kind) {
 	case Ellipsis_kind:
 		return 1;
@@ -2956,11 +2957,13 @@ expr_constant(expr_ty e)
 	case Str_kind:
 		return PyObject_IsTrue(e->v.Str.s);
 	case Name_kind:
-		/* __debug__ is not assignable, so we can optimize
-		 * it away in if and while statements */
-		if (strcmp(PyString_AS_STRING(e->v.Name.id),
-			   "__debug__") == 0)
-			   return ! Py_OptimizeFlag;
+		/* optimize away names that can't be reassigned */
+		id = PyString_AS_STRING(e->v.Name.id);
+		if (strcmp(id, "True") == 0) return 1;
+		if (strcmp(id, "False") == 0) return 0;
+		if (strcmp(id, "None") == 0) return 0;
+		if (strcmp(id, "__debug__") == 0)
+			return ! Py_OptimizeFlag;
 		/* fall through */
 	default:
 		return -1;
