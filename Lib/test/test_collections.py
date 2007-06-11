@@ -3,7 +3,11 @@
 import unittest
 from test import test_support
 from collections import NamedTuple
-from collections import Hashable, Iterable, Iterator, Sized, Container
+from collections import Hashable, Iterable, Iterator
+from collections import Sized, Container, Callable
+from collections import Set, MutableSet
+from collections import Mapping, MutableMapping
+from collections import Sequence, MutableSequence
 
 
 class TestNamedTuple(unittest.TestCase):
@@ -55,7 +59,7 @@ class TestNamedTuple(unittest.TestCase):
         self.assertRaises(AttributeError, eval, 'p.z', locals())
 
 
-class TestABCs(unittest.TestCase):
+class TestOneTrickPonyABCs(unittest.TestCase):
 
     def test_Hashable(self):
         # Check some non-hashables
@@ -80,12 +84,6 @@ class TestABCs(unittest.TestCase):
                 return super(H, self).__hash__()
         self.assertEqual(hash(H()), 0)
         self.failIf(issubclass(int, H))
-        # Check registration
-        class C:
-            __hash__ = None
-        self.failIf(issubclass(C, Hashable))
-        Hashable.register(C)
-        self.failUnless(issubclass(C, Hashable))
 
     def test_Iterable(self):
         # Check some non-iterables
@@ -109,12 +107,6 @@ class TestABCs(unittest.TestCase):
                 return super(I, self).__iter__()
         self.assertEqual(list(I()), [])
         self.failIf(issubclass(str, I))
-        # Check registration
-        class C:
-            pass
-        self.failIf(issubclass(C, Iterable))
-        Iterable.register(C)
-        self.failUnless(issubclass(C, Iterable))
 
     def test_Iterator(self):
         non_samples = [None, 42, 3.14, 1j, b"", "", u"", (), [], {}, set()]
@@ -165,10 +157,86 @@ class TestABCs(unittest.TestCase):
             self.failUnless(isinstance(x, Container), repr(x))
             self.failUnless(issubclass(type(x), Container), repr(type(x)))
 
+    def test_Callable(self):
+        non_samples = [None, 42, 3.14, 1j,
+                       "", b"", (), [], {}, set(),
+                       (lambda: (yield))(),
+                       (x for x in []),
+                       ]
+        for x in non_samples:
+            self.failIf(isinstance(x, Callable), repr(x))
+            self.failIf(issubclass(type(x), Callable), repr(type(x)))
+        samples = [lambda: None,
+                   type, int, object,
+                   len,
+                   list.append, [].append,
+                   ]
+        for x in samples:
+            self.failUnless(isinstance(x, Callable), repr(x))
+            self.failUnless(issubclass(type(x), Callable), repr(type(x)))
+
+    def test_direct_subclassing(self):
+        for B in Hashable, Iterable, Iterator, Sized, Container, Callable:
+            class C(B):
+                pass
+            self.failUnless(issubclass(C, B))
+            self.failIf(issubclass(int, C))
+
+    def test_registration(self):
+        for B in Hashable, Iterable, Iterator, Sized, Container, Callable:
+            class C:
+                __hash__ = None  # Make sure it isn't hashable by default
+            self.failIf(issubclass(C, B), B.__name__)
+            B.register(C)
+            self.failUnless(issubclass(C, B))
+
+
+class TestCollectionABCs(unittest.TestCase):
+
+    # XXX For now, we only test some virtual inheritance properties.
+    # We should also test the proper behavior of the collection ABCs
+    # as real base classes or mix-in classes.
+
+    def test_Set(self):
+        for sample in [set, frozenset]:
+            self.failUnless(isinstance(sample(), Set))
+            self.failUnless(issubclass(sample, Set))
+
+    def test_MutableSet(self):
+        self.failUnless(isinstance(set(), MutableSet))
+        self.failUnless(issubclass(set, MutableSet))
+        self.failIf(isinstance(frozenset(), MutableSet))
+        self.failIf(issubclass(frozenset, MutableSet))
+
+    def test_Mapping(self):
+        for sample in [dict]:
+            self.failUnless(isinstance(sample(), Mapping))
+            self.failUnless(issubclass(sample, Mapping))
+
+    def test_MutableMapping(self):
+        for sample in [dict]:
+            self.failUnless(isinstance(sample(), MutableMapping))
+            self.failUnless(issubclass(sample, MutableMapping))
+
+    def test_Sequence(self):
+        for sample in [tuple, list, bytes, str]:
+            self.failUnless(isinstance(sample(), Sequence))
+            self.failUnless(issubclass(sample, Sequence))
+        self.failUnless(issubclass(basestring, Sequence))
+
+    def test_MutableSequence(self):
+        for sample in [tuple, str]:
+            self.failIf(isinstance(sample(), MutableSequence))
+            self.failIf(issubclass(sample, MutableSequence))
+        for sample in [list, bytes]:
+            self.failUnless(isinstance(sample(), MutableSequence))
+            self.failUnless(issubclass(sample, MutableSequence))
+        self.failIf(issubclass(basestring, MutableSequence))
+
 
 def test_main(verbose=None):
     import collections as CollectionsModule
-    test_classes = [TestNamedTuple, TestABCs]
+    test_classes = [TestNamedTuple, TestOneTrickPonyABCs, TestCollectionABCs]
     test_support.run_unittest(*test_classes)
     test_support.run_doctest(CollectionsModule, verbose)
 

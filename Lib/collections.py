@@ -1,13 +1,14 @@
-__all__ = ['deque', 'defaultdict', 'NamedTuple',
-           'Hashable', 'Iterable', 'Iterator', 'Sized', 'Container',
-           'Sequence', 'Set', 'Mapping',
-           'MutableSequence', 'MutableSet', 'MutableMapping',
-           ]
+__all__ = ['deque', 'defaultdict', 'NamedTuple']
 
 from _collections import deque, defaultdict
 from operator import itemgetter as _itemgetter
 import sys as _sys
-from abc import abstractmethod as _abstractmethod, ABCMeta as _ABCMeta
+
+# For bootstrapping reasons, the collection ABCs are defined in _abcoll.py.
+# They should however be considered an integral part of collections.py.
+from _abcoll import *
+import _abcoll
+__all__ += _abcoll.__all__
 
 
 def NamedTuple(typename, s):
@@ -52,91 +53,7 @@ def NamedTuple(typename, s):
     return result
 
 
-class _OneTrickPony(metaclass=_ABCMeta):
 
-    """Helper class for Hashable and friends."""
-
-    @_abstractmethod
-    def __subclasshook__(self, subclass):
-        return NotImplemented
-
-
-class Hashable(_OneTrickPony):
-
-    @_abstractmethod
-    def __hash__(self):
-        return 0
-
-    @classmethod
-    def __subclasshook__(cls, C):
-        if cls is Hashable:
-            for B in C.__mro__:
-                if "__hash__" in B.__dict__:
-                    if B.__dict__["__hash__"]:
-                        return True
-                    break
-        return NotImplemented
-
-
-class Iterable(_OneTrickPony):
-
-    @_abstractmethod
-    def __iter__(self):
-        while False:
-            yield None
-
-    @classmethod
-    def __subclasshook__(cls, C):
-        if cls is Iterable:
-            if any("__iter__" in B.__dict__ or "__getitem__" in B.__dict__
-                   for B in C.__mro__):
-                return True
-        return NotImplemented
-
-
-class Iterator(_OneTrickPony):
-
-    @_abstractmethod
-    def __next__(self):
-        raise StopIteration
-
-    def __iter__(self):
-        return self
-
-    @classmethod
-    def __subclasshook__(cls, C):
-        if cls is Iterator:
-            if any("__next__" in B.__dict__ for B in C.__mro__):
-                return True
-        return NotImplemented
-
-
-class Sized(_OneTrickPony):
-
-    @_abstractmethod
-    def __len__(self):
-        return 0
-
-    @classmethod
-    def __subclasshook__(cls, C):
-        if cls is Sized:
-            if any("__len__" in B.__dict__ for B in C.__mro__):
-                return True
-        return NotImplemented
-
-
-class Container(_OneTrickPony):
-
-    @_abstractmethod
-    def __contains__(self, x):
-        return False
-
-    @classmethod
-    def __subclasshook__(cls, C):
-        if cls is Container:
-            if any("__contains__" in B.__dict__ for B in C.__mro__):
-                return True
-        return NotImplemented
 
 
 if __name__ == '__main__':
