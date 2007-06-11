@@ -3,13 +3,6 @@
 
 """Abstract Base Classes (ABCs) according to PEP 3119."""
 
-import sys
-import inspect
-import itertools
-
-
-### ABC SUPPORT FRAMEWORK ###
-
 
 def abstractmethod(funcobj):
     """A decorator indicating abstract methods.
@@ -129,8 +122,6 @@ class ABCMeta(type):
 
     def _dump_registry(cls, file=None):
         """Debug helper to print the ABC registry."""
-        if file is None:
-            file = sys.stdout
         print("Class: %s.%s" % (cls.__module__, cls.__name__), file=file)
         print("Inv.counter: %s" % ABCMeta.__invalidation_counter, file=file)
         for name in sorted(cls.__dict__.keys()):
