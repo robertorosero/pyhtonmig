@@ -29,15 +29,20 @@ class _Abstract(object):
     """Helper class inserted into the bases by ABCMeta (using _fix_bases()).
 
     You should never need to explicitly subclass this class.
+
+    There should never be a base class between _Abstract and object.
     """
 
     def __new__(cls, *args, **kwds):
         am = cls.__dict__.get("__abstractmethods__")
         if am:
-            raise TypeError("can't instantiate abstract class %s "
+            raise TypeError("Can't instantiate abstract class %s "
                             "with abstract methods %s" %
                             (cls.__name__, ", ".join(sorted(am))))
-        return super(_Abstract, cls).__new__(cls, *args, **kwds)
+        if (args or kwds) and cls.__init__ is object.__init__:
+            raise TypeError("Can't pass arguments to __new__ "
+                            "without overriding __init__")
+        return object.__new__(cls)
 
     @classmethod
     def __subclasshook__(cls, subclass):
