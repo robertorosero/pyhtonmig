@@ -3324,7 +3324,8 @@ string_expandtabs(PyStringObject *self, PyObject *args)
 	    if (tabsize > 0) {
 		j += tabsize - (j % tabsize);
 		if (old_j > j) {
-		    PyErr_SetString(PyExc_OverflowError, "new string is too long");
+		    PyErr_SetString(PyExc_OverflowError,
+				    "new string is too long");
 		    return NULL;
 		}
 		old_j = j;
@@ -3334,7 +3335,12 @@ string_expandtabs(PyStringObject *self, PyObject *args)
             j++;
             if (*p == '\n' || *p == '\r') {
                 i += j;
-                j = 0;
+                old_j = j = 0;
+                if (i < 0) {
+                    PyErr_SetString(PyExc_OverflowError,
+                                    "new string is too long");
+                    return NULL;
+                }
             }
         }
 
