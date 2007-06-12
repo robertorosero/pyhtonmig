@@ -81,7 +81,7 @@ class TestOneTrickPonyABCs(unittest.TestCase):
         # Check direct subclassing
         class H(Hashable):
             def __hash__(self):
-                return super(H, self).__hash__()
+                return super().__hash__()
         self.assertEqual(hash(H()), 0)
         self.failIf(issubclass(int, H))
 
@@ -104,7 +104,7 @@ class TestOneTrickPonyABCs(unittest.TestCase):
         # Check direct subclassing
         class I(Iterable):
             def __iter__(self):
-                return super(I, self).__iter__()
+                return super().__iter__()
         self.assertEqual(list(I()), [])
         self.failIf(issubclass(str, I))
 

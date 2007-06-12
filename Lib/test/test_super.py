@@ -1,8 +1,5 @@
 """Unit tests for new super() implementation."""
 
-# XXX Temporarily, we use super() instead of super.  Or maybe we should
-# use this, period?
-
 import sys
 import unittest
 from test import test_support
