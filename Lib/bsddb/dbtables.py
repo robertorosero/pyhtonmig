@@ -38,7 +38,7 @@ except NameError:
     class DBIncompleteError(Exception):
         pass
 
-class TableDBError(StandardError):
+class TableDBError(Exception):
     pass
 class TableAlreadyExists(TableDBError):
     pass
