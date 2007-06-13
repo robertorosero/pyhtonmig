@@ -728,7 +728,7 @@ void print_delta(int test, struct timeval *s, struct timeval *e)
 		e->tv_sec -=1;
 		e->tv_usec += 1000000;
 	}
-	printf("Test %d: %d.%06ds\n", test, (int)e->tv_sec, e->tv_usec);
+	printf("Test %d: %d.%06ds\n", test, (int)e->tv_sec, (int)e->tv_usec);
 }
 
 static PyObject *
