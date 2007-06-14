@@ -340,7 +340,7 @@ static PyObject *
 string_io_write(StringIOObject *self, PyObject *args)
 {
     const Py_UNICODE *ustr;
-    Py_ssize_t n;
+    Py_ssize_t len, n;
 
     if (self->buf == NULL)
         return err_closed();
@@ -350,10 +350,11 @@ string_io_write(StringIOObject *self, PyObject *args)
                   " unicode strings", &ustr, &n))
         return NULL;
 
-    if (write_str(self, ustr, n) == -1)
+    len = write_str(self, ustr, n);
+    if (len == -1)
         return NULL;
 
-    Py_RETURN_NONE;
+    return PyInt_FromSsize_t(len);
 }
 
 static PyObject *
@@ -518,7 +519,9 @@ PyDoc_STRVAR(StringIO_seek_doc,
 "Returns the new absolute position.");
 
 PyDoc_STRVAR(StringIO_write_doc,
-"write(str) -> None.  Write string str to file.");
+"write(str) -> int.  Write string str to file.\n"
+"\n"
+"Return the number of characters written.");
 
 PyDoc_STRVAR(StringIO_writelines_doc,
 "writelines(sequence_of_strings) -> None.  Write the strings to the file.\n"

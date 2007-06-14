@@ -337,7 +337,7 @@ static PyObject *
 bytes_io_write(BytesIOObject *self, PyObject *args)
 {
     const char *bytes;
-    Py_ssize_t n;
+    Py_ssize_t len, n;
 
     if (self->buf == NULL)
         return err_closed();
@@ -345,10 +345,11 @@ bytes_io_write(BytesIOObject *self, PyObject *args)
     if (!PyArg_ParseTuple(args, "t#:write", &bytes, &n))
         return NULL;
 
-    if (write_bytes(self, bytes, n) == -1)
+    len = write_bytes(self, bytes, n);
+    if (len == -1)
         return NULL;
 
-    Py_RETURN_NONE;
+    return PyInt_FromSsize_t(len);
 }
 
 static PyObject *
@@ -508,7 +509,9 @@ PyDoc_STRVAR(BytesIO_seek_doc,
 "Returns the new absolute position.");
 
 PyDoc_STRVAR(BytesIO_write_doc,
-"write(str) -> None.  Write string str to file.");
+"write(str) -> int.  Write string str to file.\n"
+"\n"
+"Return the number of bytes written.");
 
 PyDoc_STRVAR(BytesIO_writelines_doc,
 "writelines(sequence_of_strings) -> None.  Write the strings to the file.\n"
