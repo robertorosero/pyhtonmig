@@ -138,8 +138,6 @@ Exported functions:
 
 import re, time, operator
 
-from types import *
-
 # --------------------------------------------------------------------
 # Internal stuff
 
@@ -304,7 +302,7 @@ class DateTime:
     """
 
     def __init__(self, value=0):
-        if not isinstance(value, StringType):
+        if not isinstance(value, str):
             if datetime and isinstance(value, datetime.datetime):
                 self.value = value.strftime("%Y%m%dT%H:%M:%S")
                 return
@@ -315,7 +313,7 @@ class DateTime:
                 today = datetime.datetime.now().strftime("%Y%m%d")
                 self.value = value.strftime(today+"T%H:%M:%S")
                 return
-            if not isinstance(value, (TupleType, time.struct_time)):
+            if not isinstance(value, (tuple, time.struct_time)):
                 if value == 0:
                     value = time.time()
                 value = time.localtime(value)
@@ -592,7 +590,7 @@ class Marshaller:
         if not self.allow_none:
             raise TypeError, "cannot marshal None unless allow_none is enabled"
         write("<value><nil/></value>")
-    dispatch[NoneType] = dump_nil
+    dispatch[type(None)] = dump_nil
 
     def dump_int(self, value, write):
         # in case ints are > 32 bits
@@ -601,7 +599,7 @@ class Marshaller:
         write("<value><int>")
         write(str(value))
         write("</int></value>\n")
-    dispatch[IntType] = dump_int
+    #dispatch[int] = dump_int
 
     if _bool_is_builtin:
         def dump_bool(self, value, write):
@@ -616,19 +614,19 @@ class Marshaller:
         write("<value><int>")
         write(str(int(value)))
         write("</int></value>\n")
-    dispatch[LongType] = dump_long
+    dispatch[int] = dump_long
 
     def dump_double(self, value, write):
         write("<value><double>")
         write(repr(value))
         write("</double></value>\n")
-    dispatch[FloatType] = dump_double
+    dispatch[float] = dump_double
 
     def dump_string(self, value, write, escape=escape):
         write("<value><string>")
         write(escape(value))
         write("</string></value>\n")
-    dispatch[StringType] = dump_string
+    dispatch[str] = dump_string
 
     if unicode:
         def dump_unicode(self, value, write, escape=escape):
@@ -636,7 +634,7 @@ class Marshaller:
             write("<value><string>")
             write(escape(value))
             write("</string></value>\n")
-        dispatch[UnicodeType] = dump_unicode
+        dispatch[unicode] = dump_unicode
 
     def dump_array(self, value, write):
         i = id(value)
@@ -649,8 +647,8 @@ class Marshaller:
             dump(v, write)
         write("</data></array></value>\n")
         del self.memo[i]
-    dispatch[TupleType] = dump_array
-    dispatch[ListType] = dump_array
+    dispatch[tuple] = dump_array
+    dispatch[list] = dump_array
 
     def dump_struct(self, value, write, escape=escape):
         i = id(value)
@@ -661,8 +659,8 @@ class Marshaller:
         write("<value><struct>\n")
         for k, v in value.items():
             write("<member>\n")
-            if type(k) is not StringType:
-                if unicode and type(k) is UnicodeType:
+            if not isinstance(k, str):
+                if unicode and isinstance(k, unicode):
                     k = k.encode(self.encoding)
                 else:
                     raise TypeError, "dictionary key must be string"
@@ -671,7 +669,7 @@ class Marshaller:
             write("</member>\n")
         write("</struct></value>\n")
         del self.memo[i]
-    dispatch[DictType] = dump_struct
+    dispatch[dict] = dump_struct
 
     if datetime:
         def dump_datetime(self, value, write):
@@ -1019,12 +1017,10 @@ def dumps(params, methodname=None, methodresponse=None, encoding=None,
     where necessary.
     """
 
-    assert isinstance(params, TupleType) or isinstance(params, Fault),\
-           "argument must be tuple or Fault instance"
-
+    assert isinstance(params, (tuple, Fault)), "argument must be tuple or Fault instance"
     if isinstance(params, Fault):
         methodresponse = 1
-    elif methodresponse and isinstance(params, TupleType):
+    elif methodresponse and isinstance(params, tuple):
         assert len(params) == 1, "response tuple must be a singleton"
 
     if not encoding:
@@ -1045,7 +1041,7 @@ def dumps(params, methodname=None, methodresponse=None, encoding=None,
     # standard XML-RPC wrappings
     if methodname:
         # a method call
-        if not isinstance(methodname, StringType):
+        if not isinstance(methodname, str):
             methodname = methodname.encode(encoding)
         data = (
             xmlheader,
@@ -1180,7 +1176,7 @@ class Transport:
     def get_host_info(self, host):
 
         x509 = {}
-        if isinstance(host, TupleType):
+        if isinstance(host, tuple):
             host, x509 = host
 
         import urllib
@@ -1230,7 +1226,7 @@ class Transport:
         host, extra_headers, x509 = self.get_host_info(host)
         connection.putheader("Host", host)
         if extra_headers:
-            if isinstance(extra_headers, DictType):
+            if isinstance(extra_headers, dict):
                 extra_headers = extra_headers.items()
             for key, value in extra_headers:
                 connection.putheader(key, value)

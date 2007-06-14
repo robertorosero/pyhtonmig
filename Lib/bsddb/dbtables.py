@@ -22,7 +22,6 @@ import sys
 import copy
 import xdrlib
 import random
-from types import ListType, StringType
 import cPickle as pickle
 
 try:
@@ -39,7 +38,7 @@ except NameError:
     class DBIncompleteError(Exception):
         pass
 
-class TableDBError(StandardError):
+class TableDBError(Exception):
     pass
 class TableAlreadyExists(TableDBError):
     pass
@@ -135,9 +134,9 @@ def contains_metastrings(s) :
 
 
 class bsdTableDB :
-    def __init__(self, filename, dbhome, create=0, truncate=0, mode=0600,
+    def __init__(self, filename, dbhome, create=0, truncate=0, mode=0o600,
                  recover=0, dbflags=0):
-        """bsdTableDB(filename, dbhome, create=0, truncate=0, mode=0600)
+        """bsdTableDB(filename, dbhome, create=0, truncate=0, mode=0o600)
 
         Open database name in the dbhome BerkeleyDB directory.
         Use keyword arguments when calling this constructor.
@@ -229,7 +228,7 @@ class bsdTableDB :
 
         raises TableDBError if it already exists or for other DB errors.
         """
-        assert isinstance(columns, ListType)
+        assert isinstance(columns, list)
         txn = None
         try:
             # checking sanity of the table and column names here on
@@ -270,7 +269,7 @@ class bsdTableDB :
         """Return a list of columns in the given table.
         [] if the table doesn't exist.
         """
-        assert isinstance(table, StringType)
+        assert isinstance(table, str)
         if contains_metastrings(table):
             raise ValueError, "bad table name: contains reserved metastrings"
 
@@ -300,7 +299,7 @@ class bsdTableDB :
         additional columns present in the given list as well as
         all of its current columns.
         """
-        assert isinstance(columns, ListType)
+        assert isinstance(columns, list)
         try:
             self.CreateTable(table, columns)
         except TableAlreadyExists:

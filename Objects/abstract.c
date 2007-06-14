@@ -971,6 +971,22 @@ PyNumber_Float(PyObject *o)
 	return PyFloat_FromString(o);
 }
 
+
+PyObject *
+PyNumber_ToBase(PyObject *n, int base)
+{
+	PyObject *res;
+	PyObject *index = PyNumber_Index(n);
+
+	if (!index)
+		return NULL;
+	assert(PyLong_Check(index));
+	res = _PyLong_Format(index, base);
+	Py_DECREF(index);
+	return res;
+}
+
+
 /* Operations on sequences */
 
 int
@@ -2133,8 +2149,9 @@ int
 PyObject_IsInstance(PyObject *inst, PyObject *cls)
 {
 	PyObject *t, *v, *tb;
+	PyObject *checker;
 	PyErr_Fetch(&t, &v, &tb);
-	PyObject *checker = PyObject_GetAttrString(cls, "__instancecheck__");
+	checker = PyObject_GetAttrString(cls, "__instancecheck__");
 	PyErr_Restore(t, v, tb);
 	if (checker != NULL) {
 		PyObject *res;
@@ -2203,8 +2220,9 @@ int
 PyObject_IsSubclass(PyObject *derived, PyObject *cls)
 {
 	PyObject *t, *v, *tb;
+	PyObject *checker;
 	PyErr_Fetch(&t, &v, &tb);
-	PyObject *checker = PyObject_GetAttrString(cls, "__subclasscheck__");
+	checker = PyObject_GetAttrString(cls, "__subclasscheck__");
 	PyErr_Restore(t, v, tb);
 	if (checker != NULL) {
 		PyObject *res;

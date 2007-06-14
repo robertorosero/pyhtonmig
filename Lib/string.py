@@ -103,7 +103,7 @@ class _TemplateMetaclass(type):
     """
 
     def __init__(cls, name, bases, dct):
-        super(_TemplateMetaclass, cls).__init__(name, bases, dct)
+        super().__init__(name, bases, dct)
         if 'pattern' in dct:
             pattern = cls.pattern
         else:

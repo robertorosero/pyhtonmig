@@ -709,6 +709,12 @@ class BytesAsStringTest(test.string_tests.BaseTest):
         pass
     def test_find(self):
         pass
+    def test_expandtabs(self):
+        pass
+    def test_upper(self):
+        pass
+    def test_lower(self):
+        pass
 
 
 def test_main():

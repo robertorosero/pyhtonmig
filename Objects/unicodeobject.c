@@ -5693,7 +5693,7 @@ unicode_expandtabs(PyUnicodeObject *self, PyObject *args)
     Py_UNICODE *e;
     Py_UNICODE *p;
     Py_UNICODE *q;
-    Py_ssize_t i, j;
+    Py_ssize_t i, j, old_j;
     PyUnicodeObject *u;
     int tabsize = 8;
 
@@ -5701,20 +5701,37 @@ unicode_expandtabs(PyUnicodeObject *self, PyObject *args)
 	return NULL;
 
     /* First pass: determine size of output string */
-    i = j = 0;
+    i = j = old_j = 0;
     e = self->str + self->length;
     for (p = self->str; p < e; p++)
         if (*p == '\t') {
-	    if (tabsize > 0)
+	    if (tabsize > 0) {
 		j += tabsize - (j % tabsize);
+		if (old_j > j) {
+		    PyErr_SetString(PyExc_OverflowError,
+				    "new string is too long");
+		    return NULL;
+		}
+		old_j = j;
+	    }
 	}
         else {
             j++;
             if (*p == '\n' || *p == '\r') {
                 i += j;
-                j = 0;
+                old_j = j = 0;
+                if (i < 0) {
+                    PyErr_SetString(PyExc_OverflowError,
+                                    "new string is too long");
+                    return NULL;
+                }
             }
         }
+
+    if ((i + j) < 0) {
+        PyErr_SetString(PyExc_OverflowError, "new string is too long");
+        return NULL;
+    }
 
     /* Second pass: create output string and fill it */
     u = _PyUnicode_New(i + j);
@@ -7354,9 +7371,10 @@ formatint(Py_UNICODE *buf,
     }
 
     if ((flags & F_ALT) &&
-        (type == 'x' || type == 'X')) {
-        /* When converting under %#x or %#X, there are a number
+        (type == 'x' || type == 'X' || type == 'o')) {
+        /* When converting under %#o, %#x or %#X, there are a number
          * of issues that cause pain:
+	 * - for %#o, we want a different base marker than C
          * - when 0 is being converted, the C standard leaves off
          *   the '0x' or '0X', which is inconsistent with other
          *   %#x/%#X conversions and inconsistent with Python's
@@ -7814,7 +7832,7 @@ PyObject *PyUnicode_Format(PyObject *format,
 		if (width > len)
 		    width--;
 	    }
-	    if ((flags & F_ALT) && (c == 'x' || c == 'X')) {
+	    if ((flags & F_ALT) && (c == 'x' || c == 'X' || c == 'o')) {
 		assert(pbuf[0] == '0');
 		assert(pbuf[1] == c);
 		if (fill != ' ') {
@@ -7836,7 +7854,7 @@ PyObject *PyUnicode_Format(PyObject *format,
 	    if (fill == ' ') {
 		if (sign)
 		    *res++ = sign;
-		if ((flags & F_ALT) && (c == 'x' || c == 'X')) {
+		if ((flags & F_ALT) && (c == 'x' || c == 'X' || c == 'o')) {
 		    assert(pbuf[0] == '0');
 		    assert(pbuf[1] == c);
 		    *res++ = *pbuf++;

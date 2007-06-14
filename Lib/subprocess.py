@@ -287,7 +287,6 @@ import sys
 mswindows = (sys.platform == "win32")
 
 import os
-import types
 import traceback
 
 # Exception classes used by this module.
@@ -694,7 +693,7 @@ class Popen(object):
                            errread, errwrite):
             """Execute program (MS Windows version)"""
 
-            if not isinstance(args, types.StringTypes):
+            if not isinstance(args, basestring):
                 args = list2cmdline(args)
 
             # Process startup details
@@ -909,7 +908,7 @@ class Popen(object):
                            errread, errwrite):
             """Execute program (POSIX version)"""
 
-            if isinstance(args, types.StringTypes):
+            if isinstance(args, basestring):
                 args = [args]
             else:
                 args = list(args)

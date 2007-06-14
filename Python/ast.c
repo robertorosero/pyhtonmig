@@ -1922,6 +1922,10 @@ ast_for_call(struct compiling *c, const node *n, expr_ty func)
 		  return NULL;
 		}
                 key = e->v.Name.id;
+                if (!strcmp(PyString_AS_STRING(key), "None")) {
+                    ast_error(CHILD(ch, 0), "assignment to None");
+                    return NULL;
+                }
                 e = ast_for_expr(c, CHILD(ch, 2));
                 if (!e)
                     return NULL;
@@ -3029,8 +3033,6 @@ parsenumber(const char *s)
 #ifndef WITHOUT_COMPLEX
     imflag = *end == 'j' || *end == 'J';
 #endif
-    if (*end == 'l' || *end == 'L')
-        return PyLong_FromString((char *)s, (char **)0, 0);
     if (s[0] == '0') {
         x = (long) PyOS_strtoul((char *)s, (char **)&end, 0);
         if (x < 0 && errno == 0) {

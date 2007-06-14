@@ -117,11 +117,11 @@ from urllib import localhost, url2pathname, getproxies
 __version__ = sys.version[:3]
 
 _opener = None
-def urlopen(url, data=None):
+def urlopen(url, data=None, timeout=None):
     global _opener
     if _opener is None:
         _opener = build_opener()
-    return _opener.open(url, data)
+    return _opener.open(url, data, timeout)
 
 def install_opener(opener):
     global _opener
@@ -355,7 +355,7 @@ class OpenerDirector:
             if result is not None:
                 return result
 
-    def open(self, fullurl, data=None):
+    def open(self, fullurl, data=None, timeout=None):
         # accept a URL or a Request object
         if isinstance(fullurl, basestring):
             req = Request(fullurl, data)
@@ -364,6 +364,7 @@ class OpenerDirector:
             if data is not None:
                 req.add_data(data)
 
+        req.timeout = timeout
         protocol = req.get_type()
 
         # pre-process request
@@ -431,9 +432,8 @@ def build_opener(*handlers):
     If any of the handlers passed as arguments are subclasses of the
     default handlers, the default handlers will not be used.
     """
-    import types
     def isclass(obj):
-        return isinstance(obj, types.ClassType) or hasattr(obj, "__bases__")
+        return isinstance(obj, type) or hasattr(obj, "__bases__")
 
     opener = OpenerDirector()
     default_classes = [ProxyHandler, UnknownHandler, HTTPHandler,
@@ -948,7 +948,7 @@ class AbstractDigestAuthHandler:
             respdig = KD(H(A1), "%s:%s" % (nonce, H(A2)))
         else:
             # XXX handle auth-int.
-            pass
+            raise URLError("qop '%s' is not supported." % qop)
 
         # XXX should the partial digests be encoded too?
 
@@ -1057,7 +1057,7 @@ class AbstractHTTPHandler(BaseHandler):
         if not host:
             raise URLError('no host given')
 
-        h = http_class(host) # will parse host:port
+        h = http_class(host, timeout=req.timeout) # will parse host:port
         h.set_debuglevel(self._debuglevel)
 
         headers = dict(req.headers)
@@ -1269,7 +1269,7 @@ class FTPHandler(BaseHandler):
         if dirs and not dirs[0]:
             dirs = dirs[1:]
         try:
-            fw = self.connect_ftp(user, passwd, host, port, dirs)
+            fw = self.connect_ftp(user, passwd, host, port, dirs, req.timeout)
             type = file and 'I' or 'D'
             for attr in attrs:
                 attr, value = splitvalue(attr)
@@ -1289,8 +1289,8 @@ class FTPHandler(BaseHandler):
         except ftplib.all_errors as msg:
             raise IOError, ('ftp error', msg), sys.exc_info()[2]
 
-    def connect_ftp(self, user, passwd, host, port, dirs):
-        fw = ftpwrapper(user, passwd, host, port, dirs)
+    def connect_ftp(self, user, passwd, host, port, dirs, timeout):
+        fw = ftpwrapper(user, passwd, host, port, dirs, timeout)
 ##        fw.ftp.set_debuglevel(1)
         return fw
 
@@ -1310,12 +1310,12 @@ class CacheFTPHandler(FTPHandler):
     def setMaxConns(self, m):
         self.max_conns = m
 
-    def connect_ftp(self, user, passwd, host, port, dirs):
-        key = user, host, port, '/'.join(dirs)
+    def connect_ftp(self, user, passwd, host, port, dirs, timeout):
+        key = user, host, port, '/'.join(dirs), timeout
         if key in self.cache:
             self.timeout[key] = time.time() + self.delay
         else:
-            self.cache[key] = ftpwrapper(user, passwd, host, port, dirs)
+            self.cache[key] = ftpwrapper(user, passwd, host, port, dirs, timeout)
             self.timeout[key] = time.time() + self.delay
         self.check_cache()
         return self.cache[key]

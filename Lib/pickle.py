@@ -26,7 +26,7 @@ Misc variables:
 
 __version__ = "$Revision$"       # Code version
 
-from types import *
+from types import FunctionType, BuiltinFunctionType
 from copy_reg import dispatch_table
 from copy_reg import _extension_registry, _inverted_registry, _extension_cache
 import marshal
@@ -89,11 +89,11 @@ try:
 except ImportError:
     PyStringMap = None
 
-# UnicodeType may or may not be exported (normally imported from types)
+# unicode may or may not be exported (normally imported from types)
 try:
-    UnicodeType
+    unicode
 except NameError:
-    UnicodeType = None
+    unicode = None
 
 # Pickle opcodes.  See pickletools.py for extensive docs.  The listing
 # here is in kind-of alphabetical order of 1-character pickle code.
@@ -287,7 +287,7 @@ class Pickler:
 
         # Check for a class with a custom metaclass; treat as regular class
         try:
-            issc = issubclass(t, TypeType)
+            issc = issubclass(t, type)
         except TypeError: # t is not a class (old Boost; see SF #502085)
             issc = 0
         if issc:
@@ -312,12 +312,12 @@ class Pickler:
                                         (t.__name__, obj))
 
         # Check for string returned by reduce(), meaning "save as global"
-        if type(rv) is StringType:
+        if isinstance(rv, str):
             self.save_global(obj, rv)
             return
 
         # Assert that reduce() returned a tuple
-        if type(rv) is not TupleType:
+        if not isinstance(rv, tuple):
             raise PicklingError("%s must return string or tuple" % reduce)
 
         # Assert that it returned an appropriately sized tuple
@@ -346,7 +346,7 @@ class Pickler:
         # This API is called by some subclasses
 
         # Assert that args is a tuple or None
-        if not isinstance(args, TupleType):
+        if not isinstance(args, tuple):
             raise PicklingError("args from reduce() should be a tuple")
 
         # Assert that func is callable
@@ -424,7 +424,7 @@ class Pickler:
 
     def save_none(self, obj):
         self.write(NONE)
-    dispatch[NoneType] = save_none
+    dispatch[type(None)] = save_none
 
     def save_bool(self, obj):
         if self.proto >= 2:
@@ -456,7 +456,7 @@ class Pickler:
         # Text pickle, or int too big to fit in signed 4-byte format.
         self.write(INT + repr(obj) + '\n')
     # XXX save_int is merged into save_long
-    # dispatch[IntType] = save_int
+    # dispatch[int] = save_int
 
     def save_long(self, obj, pack=struct.pack):
         if self.bin:
@@ -487,14 +487,14 @@ class Pickler:
                 self.write(LONG4 + pack("<i", n) + bytes)
             return
         self.write(LONG + repr(obj) + '\n')
-    dispatch[LongType] = save_long
+    dispatch[int] = save_long
 
     def save_float(self, obj, pack=struct.pack):
         if self.bin:
             self.write(BINFLOAT + pack('>d', obj))
         else:
             self.write(FLOAT + repr(obj) + '\n')
-    dispatch[FloatType] = save_float
+    dispatch[float] = save_float
 
     def save_string(self, obj, pack=struct.pack):
         if self.bin:
@@ -506,7 +506,7 @@ class Pickler:
         else:
             self.write(STRING + repr(obj) + '\n')
         self.memoize(obj)
-    dispatch[StringType] = save_string
+    dispatch[str] = save_string
 
     def save_unicode(self, obj, pack=struct.pack):
         if self.bin:
@@ -518,9 +518,9 @@ class Pickler:
             obj = obj.replace("\n", "\\u000a")
             self.write(UNICODE + obj.encode('raw-unicode-escape') + '\n')
         self.memoize(obj)
-    dispatch[UnicodeType] = save_unicode
+    dispatch[unicode] = save_unicode
 
-    if StringType == UnicodeType:
+    if str == unicode:
         # This is true for Jython
         def save_string(self, obj, pack=struct.pack):
             unicode = obj.isunicode()
@@ -546,7 +546,7 @@ class Pickler:
                 else:
                     self.write(STRING + repr(obj) + '\n')
             self.memoize(obj)
-        dispatch[StringType] = save_string
+        dispatch[str] = save_string
 
     def save_tuple(self, obj):
         write = self.write
@@ -599,7 +599,7 @@ class Pickler:
         self.write(TUPLE)
         self.memoize(obj)
 
-    dispatch[TupleType] = save_tuple
+    dispatch[tuple] = save_tuple
 
     # save_empty_tuple() isn't used by anything in Python 2.3.  However, I
     # found a Pickler subclass in Zope3 that calls it, so it's not harmless
@@ -618,7 +618,7 @@ class Pickler:
         self.memoize(obj)
         self._batch_appends(iter(obj))
 
-    dispatch[ListType] = save_list
+    dispatch[list] = save_list
 
     # Keep in synch with cPickle's BATCHSIZE.  Nothing will break if it gets
     # out of synch, though.
@@ -667,8 +667,8 @@ class Pickler:
         self.memoize(obj)
         self._batch_setitems(iter(obj.items()))
 
-    dispatch[DictionaryType] = save_dict
-    if not PyStringMap is None:
+    dispatch[dict] = save_dict
+    if PyStringMap is not None:
         dispatch[PyStringMap] = save_dict
 
     def _batch_setitems(self, items):
@@ -746,10 +746,9 @@ class Pickler:
         write(GLOBAL + module + '\n' + name + '\n')
         self.memoize(obj)
 
-    dispatch[ClassType] = save_global
     dispatch[FunctionType] = save_global
     dispatch[BuiltinFunctionType] = save_global
-    dispatch[TypeType] = save_global
+    dispatch[type] = save_global
 
 # Pickling helpers
 
@@ -1024,7 +1023,7 @@ class Unpickler:
         del self.stack[k:]
         instantiated = 0
         if (not args and
-                type(klass) is ClassType and
+                isinstance(klass, type) and
                 not hasattr(klass, "__getinitargs__")):
             value = _EmptyClass()
             value.__class__ = klass

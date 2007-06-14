@@ -2124,17 +2124,14 @@ def inherits():
     class octlong(int):
         __slots__ = []
         def __str__(self):
-            s = oct(self)
-            if s[-1] == 'L':
-                s = s[:-1]
-            return s
+            return oct(self)
         def __add__(self, other):
             return self.__class__(super(octlong, self).__add__(other))
         __radd__ = __add__
-    vereq(str(octlong(3) + 5), "010")
+    vereq(str(octlong(3) + 5), "0o10")
     # (Note that overriding __radd__ here only seems to work
     # because the example uses a short int left argument.)
-    vereq(str(5 + octlong(3000)), "05675")
+    vereq(str(5 + octlong(3000)), "0o5675")
     a = octlong(12345)
     vereq(a, 12345)
     vereq(int(a), 12345)
@@ -4103,7 +4100,8 @@ def notimplemented():
     N1 = sys.maxint + 1    # might trigger OverflowErrors instead of TypeErrors
     N2 = sys.maxint         # if sizeof(int) < sizeof(long), might trigger
                             #   ValueErrors instead of TypeErrors
-    for metaclass in [type, types.ClassType]:
+    if 1:
+        metaclass = type
         for name, expr, iexpr in [
                 ('__add__',      'x + y',                   'x += y'),
                 ('__sub__',      'x - y',                   'x -= y'),
