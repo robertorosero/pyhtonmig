@@ -575,7 +575,7 @@ class _MemoryIOMixin(BufferedIOBase):
         return True
 
 
-class BytesIO(_MemoryIOMixin):
+class _BytesIO(_MemoryIOMixin):
 
     """Buffered I/O implementation using a bytes buffer, like StringIO."""
 
@@ -586,6 +586,12 @@ class BytesIO(_MemoryIOMixin):
         if inital_bytes is not None:
             buffer += inital_bytes
         _MemoryIOMixin.__init__(self, buffer)
+
+# Use the faster implementation if available
+try:
+    from _bytes_io import BytesIO
+except ImportError:
+    BytesIO = _BytesIO
 
 
 # XXX This should inherit from TextIOBase
@@ -611,6 +617,12 @@ class StringIO(_MemoryIOMixin):
 
     def readinto(self, b: bytes) -> int:
         self._unsupported("readinto")
+
+# Use the faster implementation if available
+try:
+    from _string_io import StringIO
+except ImportError:
+    StringIO = _StringIO
 
 
 class BufferedReader(_BufferedIOMixin):
