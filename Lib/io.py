@@ -595,7 +595,7 @@ except ImportError:
 
 
 # XXX This should inherit from TextIOBase
-class StringIO(_MemoryIOMixin):
+class _StringIO(_MemoryIOMixin):
 
     """Buffered I/O implementation using a string buffer, like StringIO."""
 
