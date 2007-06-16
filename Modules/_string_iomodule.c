@@ -118,7 +118,7 @@ string_io_get_closed(StringIOObject *self)
 
 /* Generic getter for the writable, readable and seekable properties */
 static PyObject *
-string_io_get_true(StringIOObject *self)
+generic_true(StringIOObject *self)
 {
     Py_RETURN_TRUE;
 }
@@ -272,7 +272,7 @@ string_io_truncate(StringIOObject *self, PyObject *args)
         self->string_size = size;
     self->pos = self->string_size;
 
-    Py_RETURN_NONE;
+    return PyInt_FromSsize_t(self->string_size);
 }
 
 static PyObject *
@@ -500,11 +500,10 @@ PyDoc_STRVAR(StringIO_tell_doc,
 "tell() -> current file position, an integer\n");
 
 PyDoc_STRVAR(StringIO_truncate_doc,
-"truncate([size]) -> None.  Truncate the file to at most size bytes.\n"
+"truncate([size]) -> int.  Truncate the file to at most size bytes.\n"
 "\n"
 "Size defaults to the current file position, as returned by tell().\n"
-"If the specified size exceeds the file's current size, the file\n"
-"remains unchanged.");
+"Returns the new size.");
 
 PyDoc_STRVAR(StringIO_close_doc,
 "close() -> None.  Close the file and release the resources held.");
@@ -529,20 +528,22 @@ PyDoc_STRVAR(StringIO_writelines_doc,
 "Note that newlines are not added.  The sequence can be any iterable object\n"
 "producing strings. This is equivalent to calling write() for each string.");
 
+PyDoc_STRVAR(generic_true_doc, "Always True.");
+
 
 static PyGetSetDef StringIO_getsetlist[] = {
     {"closed", (getter) string_io_get_closed, NULL,
      "True if the file is closed"},
-    {"writeable", (getter) string_io_get_true, NULL,
-     "Always True."},
-    {"readable",  (getter) string_io_get_true, NULL,
-     "Always True."},
-    {"seekable",  (getter) string_io_get_true, NULL,
-     "Always True."},
     {0},            /* sentinel */
 };
 
 static struct PyMethodDef StringIO_methods[] = {
+    {"readable",   (PyCFunction) generic_true, METH_NOARGS,
+     generic_true_doc},
+    {"seekable",   (PyCFunction) generic_true, METH_NOARGS,
+     generic_true_doc},
+    {"writable",   (PyCFunction) generic_true, METH_NOARGS, 
+     generic_true_doc},
     {"flush",      (PyCFunction) string_io_flush, METH_NOARGS,
      StringIO_flush_doc},
     {"getvalue",   (PyCFunction) string_io_getvalue, METH_VARARGS,

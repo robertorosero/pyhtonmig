@@ -115,7 +115,7 @@ bytes_io_get_closed(BytesIOObject *self)
 
 /* Generic getter for the writable, readable and seekable properties */
 static PyObject *
-bytes_io_get_true(BytesIOObject *self)
+generic_true(BytesIOObject *self)
 {
     Py_RETURN_TRUE;
 }
@@ -269,7 +269,7 @@ bytes_io_truncate(BytesIOObject *self, PyObject *args)
         self->string_size = size;
     self->pos = self->string_size;
 
-    Py_RETURN_NONE;
+    return PyInt_FromSsize_t(self->string_size);
 }
 
 static PyObject *
@@ -490,11 +490,10 @@ PyDoc_STRVAR(BytesIO_tell_doc,
 "tell() -> current file position, an integer\n");
 
 PyDoc_STRVAR(BytesIO_truncate_doc,
-"truncate([size]) -> None.  Truncate the file to at most size bytes.\n"
+"truncate([size]) -> int.  Truncate the file to at most size bytes.\n"
 "\n"
 "Size defaults to the current file position, as returned by tell().\n"
-"If the specified size exceeds the file's current size, the file\n"
-"remains unchanged.");
+"Returns the new size.");
 
 PyDoc_STRVAR(BytesIO_close_doc,
 "close() -> None.  Close the file and release the resources held.");
@@ -519,20 +518,22 @@ PyDoc_STRVAR(BytesIO_writelines_doc,
 "Note that newlines are not added.  The sequence can be any iterable object\n"
 "producing strings. This is equivalent to calling write() for each string.");
 
+PyDoc_STRVAR(generic_true_doc, "Always True.");
+
 
 static PyGetSetDef BytesIO_getsetlist[] = {
     {"closed",    (getter) bytes_io_get_closed, NULL,
      "True if the file is closed."},
-    {"writeable", (getter) bytes_io_get_true, NULL,
-     "Always True."},
-    {"readable",  (getter) bytes_io_get_true, NULL,
-     "Always True."},
-    {"seekable",  (getter) bytes_io_get_true, NULL,
-     "Always True."},
     {0},            /* sentinel */
 };
 
 static struct PyMethodDef BytesIO_methods[] = {
+    {"readable",   (PyCFunction) generic_true, METH_NOARGS,
+     generic_true_doc},
+    {"seekable",   (PyCFunction) generic_true, METH_NOARGS,
+     generic_true_doc},
+    {"writable",   (PyCFunction) generic_true, METH_NOARGS, 
+     generic_true_doc},
     {"flush",      (PyCFunction) bytes_io_flush, METH_NOARGS,
      BytesIO_flush_doc},
     {"getvalue",   (PyCFunction) bytes_io_getvalue, METH_VARARGS,
