@@ -708,10 +708,11 @@ def dash_R_cleanup(fs, ps, pic):
     sys.path_importer_cache.update(pic)
 
     # Clear ABC registries.
-    for obj in [getattr(_abcoll, a) for a in _abcoll.__all__] + [os.environ]:
-        obj._ABCMeta__registry.clear()
-        obj._ABCMeta__cache.clear()
-        obj._ABCMeta__negative_cache.clear()
+    for abc in [getattr(_abcoll, a) for a in _abcoll.__all__]:
+        for obj in abc.__subclasses__() + [abc]:
+            obj._ABCMeta__registry.clear()
+            obj._ABCMeta__cache.clear()
+            obj._ABCMeta__negative_cache.clear()
 
     # Clear assorted module caches.
     _path_created.clear()
