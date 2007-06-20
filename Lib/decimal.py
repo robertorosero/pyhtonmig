@@ -2315,6 +2315,7 @@ class Decimal(object):
         As we do not have different encodings for the same number, the
         received object already is in it's canonical form.
         """
+        return self
 
     def compare_signal(self, other, context=None):
         """Compares self to the other operand numerically.
@@ -2530,9 +2531,69 @@ class Decimal(object):
 
     def max_mag(self, other, context=None):
         """Compares the values numerically with their sign ignored."""
+        if context is None:
+            context = getcontext()
+        if self._isnan() == 2:
+            return context._raise_error(InvalidOperation, 'Magnitude max with sNaN', 1, self)
+        if other._isnan() == 2:
+            return context._raise_error(InvalidOperation, 'Magnitude max with sNaN', 1, other)
+        abs_self = abs(self)
+        abs_other = abs(other)
+        if abs_self == abs_other:
+            if self._sign == other._sign:
+                if self._sign == 0:
+                    if self._exp >= other._exp:
+                        return self
+                    else:
+                        return other
+                else:
+                    if self._exp < other._exp:
+                        return self
+                    else:
+                        return other
+            elif self._sign == 0:
+                return self
+            else:
+                return other
+        ans = abs_self.max(abs_other)
+        if abs_self is ans:
+            d = self._fix(context)
+        else:
+            d = other._fix(context)
+        return d
 
     def min_mag(self, other, context=None):
         """Compares the values numerically with their sign ignored."""
+        if context is None:
+            context = getcontext()
+        if self._isnan() == 2:
+            return context._raise_error(InvalidOperation, 'Magnitude max with sNaN', 1, self)
+        if other._isnan() == 2:
+            return context._raise_error(InvalidOperation, 'Magnitude max with sNaN', 1, other)
+        abs_self = abs(self)
+        abs_other = abs(other)
+        if abs_self == abs_other:
+            if self._sign == other._sign:
+                if self._sign == 0:
+                    if self._exp >= other._exp:
+                        return other
+                    else:
+                        return self
+                else:
+                    if self._exp < other._exp:
+                        return other
+                    else:
+                        return self
+            elif self._sign == 0:
+                return other
+            else:
+                return self
+        ans = abs_self.min(abs_other)
+        if abs_self is ans:
+            d = self._fix(context)
+        else:
+            d = other._fix(context)
+        return d
 
     def next_minus(self, context=None):
         """Returns the largest representable number smaller than itself."""
