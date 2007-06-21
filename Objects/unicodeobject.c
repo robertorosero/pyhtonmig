@@ -5690,7 +5690,7 @@ unicode_expandtabs(PyUnicodeObject *self, PyObject *args)
     Py_UNICODE *e;
     Py_UNICODE *p;
     Py_UNICODE *q;
-    Py_ssize_t i, j;
+    Py_ssize_t i, j, old_j;
     PyUnicodeObject *u;
     int tabsize = 8;
 
@@ -5698,20 +5698,37 @@ unicode_expandtabs(PyUnicodeObject *self, PyObject *args)
 	return NULL;
 
     /* First pass: determine size of output string */
-    i = j = 0;
+    i = j = old_j = 0;
     e = self->str + self->length;
     for (p = self->str; p < e; p++)
         if (*p == '\t') {
-	    if (tabsize > 0)
+	    if (tabsize > 0) {
 		j += tabsize - (j % tabsize);
+		if (old_j > j) {
+		    PyErr_SetString(PyExc_OverflowError,
+				    "new string is too long");
+		    return NULL;
+		}
+		old_j = j;
+	    }
 	}
         else {
             j++;
             if (*p == '\n' || *p == '\r') {
                 i += j;
-                j = 0;
+                old_j = j = 0;
+                if (i < 0) {
+                    PyErr_SetString(PyExc_OverflowError,
+                                    "new string is too long");
+                    return NULL;
+                }
             }
         }
+
+    if ((i + j) < 0) {
+        PyErr_SetString(PyExc_OverflowError, "new string is too long");
+        return NULL;
+    }
 
     /* Second pass: create output string and fill it */
     u = _PyUnicode_New(i + j);

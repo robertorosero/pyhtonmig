@@ -7,6 +7,10 @@ warnings.filterwarnings("ignore", "the sets module is deprecated",
                         DeprecationWarning, "<string>")
 warnings.filterwarnings("ignore", ".*popen2 module is deprecated.*",
                         DeprecationWarning)
+warnings.filterwarnings("ignore", "the MimeWriter module is deprecated.*",
+                        DeprecationWarning)
+warnings.filterwarnings("ignore", "the mimify module is deprecated.*",
+                        DeprecationWarning)
 
 class AllTest(unittest.TestCase):
 
