@@ -279,7 +279,6 @@ bytes_io_truncate(BytesIOObject *self, PyObject *args)
 
     if (self->string_size > size)
         self->string_size = size;
-    self->pos = self->string_size;
 
     return PyInt_FromSsize_t(self->string_size);
 }
