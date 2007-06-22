@@ -3950,7 +3950,7 @@ assign_slice(PyObject *u, PyObject *v, PyObject *w, PyObject *x)
 	}
 }
 
-#define CANNOT_CATCH_MSG "catching classes that do not inherit from"\
+#define CANNOT_CATCH_MSG "catching classes that do not inherit from "\
 			 "BaseException is not allowed"
 
 static PyObject *
