@@ -12,7 +12,8 @@ typedef struct {
 
 static PyTypeObject BytesIO_Type;
 
-/* The initial size of the buffer of BytesIO objects */
+/* The initial size of the buffer of BytesIO objects
+   XXX Is this optimal? */
 #define BUFSIZE 128
 
 static PyObject *
@@ -22,7 +23,8 @@ err_closed(void)
     return NULL;
 }
 
-/* Internal routine to get a line. Returns the number of bytes read. */
+/* Internal routine to get a line from the buffer of a StringIO
+   object. Returns the number of bytes read. */
 static Py_ssize_t
 get_line(BytesIOObject *self, char **output)
 {
@@ -53,26 +55,24 @@ get_line(BytesIOObject *self, char **output)
     return len;
 }
 
-/* Internal routine for writing a string of bytes to the buffer of a BytesIO
-   object. Returns the number of bytes wrote. */
+/* Internal routine for changing the size of the buffer of BytesIO
+   objects. Returns the new buffer size, or -1 on error. */
 static Py_ssize_t
-write_bytes(BytesIOObject *self, const char *bytes, Py_ssize_t len)
+resize_buffer(BytesIOObject *self, Py_ssize_t new_size)
 {
-    Py_ssize_t new_len;
+    /* Here we doing some direct memory manipulation for speed and to keep the
+       implementation of this module relatively simple. */
 
-    assert(self->buf != NULL);
-
-    new_len = self->pos + len;
-    if (new_len >= self->buf_size) {
+    if (new_size >= self->buf_size) {
         /* The size of the internal buffer double, every time we need more
            memory. That reduces the need of resizing the buffer when working
            with a large amount of data. */
         self->buf_size *= 2;
-        if (self->buf_size <= new_len) {
+        if (self->buf_size <= new_size) {
             /* Doubling wasn't enough to hold the new internal string
                size, then just use the new length. */
-            assert(new_len + 1 < PY_SSIZE_T_MAX);
-            self->buf_size = new_len + 1;
+            assert(new_size + 1 < PY_SSIZE_T_MAX);
+            self->buf_size = new_size + 1;
         }
 
         PyMem_Resize(self->buf, char, self->buf_size);
@@ -83,6 +83,18 @@ write_bytes(BytesIOObject *self, const char *bytes, Py_ssize_t len)
             return -1;
         }
     }
+    return self->buf_size;
+}
+
+/* Internal routine for writing a string of bytes to the buffer of a StringIO
+   object. Returns the number of bytes wrote, or -1 on error. */
+static Py_ssize_t
+write_bytes(BytesIOObject *self, const char *bytes, Py_ssize_t len)
+{
+    assert(self->buf != NULL);
+
+    if (resize_buffer(self, self->pos + len) < 0)
+        return -1;  /* out of memory */
 
     /* Copy the data to the internal buffer, overwriting some of the existing
        data if self->pos < self->string_size. */
@@ -91,7 +103,7 @@ write_bytes(BytesIOObject *self, const char *bytes, Py_ssize_t len)
     assert(self->pos + len < PY_SSIZE_T_MAX);
     self->pos += len;
 
-    /* Unless we only overwritten some data, set the new length of the
+    /* Unless we *only* overwritten some data, set the new length of the
        internal string. */
     if (self->string_size < self->pos) {
         self->string_size = self->pos;
@@ -294,41 +306,40 @@ bytes_io_iternext(BytesIOObject *self)
 static PyObject *
 bytes_io_seek(BytesIOObject *self, PyObject *args)
 {
-    Py_ssize_t position;
+    Py_ssize_t newpos;
     int mode = 0;
 
     if (self->buf == NULL)
         return err_closed();
 
-    if (!PyArg_ParseTuple(args, "n|i:seek", &position, &mode))
+    if (!PyArg_ParseTuple(args, "n|i:seek", &newpos, &mode))
         return NULL;
 
-    if (mode == 2) {
-        position += self->string_size;
+    /* mode 0: offset relative to beginning of the string.
+       mode 1: offset relative to current position.
+       mode 2: offset relative the end of the string. */
+    if (mode == 1) {
+        newpos += self->pos;
     }
-    else if (mode == 1) {
-        position += self->pos;
+    else if (mode == 2) {
+        newpos += self->string_size;
+    }
+    else if (mode != 0) {
+        PyErr_SetString(PyExc_IOError, "invalid whence value");
+        return NULL;
     }
 
-    if (position > self->buf_size) {
-        self->buf_size *= 2;
-        if (self->buf_size <= position)
-            self->buf_size = position + 1;
+    if (newpos < 0)
+        newpos = 0;
 
-        PyMem_Resize(self->buf, char, self->buf_size);
-        if (self->buf == NULL) {
-            PyMem_Del(self->buf);
-            self->buf_size = self->pos = 0;
-            return PyErr_NoMemory();
-        }
-    }
-    else if (position < 0)
-        position = 0;
+    if (resize_buffer(self, newpos) < 0)
+        return NULL;  /* out of memory */
 
-    self->pos = position;
+    self->pos = newpos;
 
-    while (--position >= self->string_size)
-        self->buf[position] = 0;
+    /* Pad with zeros the buffer region larger than the string size. */
+    while (--newpos >= self->string_size)
+        self->buf[newpos] = 0;
 
     return PyInt_FromSsize_t(self->pos);
 }
