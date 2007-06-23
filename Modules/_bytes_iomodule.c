@@ -23,7 +23,7 @@ err_closed(void)
     return NULL;
 }
 
-/* Internal routine to get a line from the buffer of a StringIO
+/* Internal routine to get a line from the buffer of a BytesIO
    object. Returns the number of bytes read. */
 static Py_ssize_t
 get_line(BytesIOObject *self, char **output)
@@ -86,7 +86,7 @@ resize_buffer(BytesIOObject *self, Py_ssize_t new_size)
     return self->buf_size;
 }
 
-/* Internal routine for writing a string of bytes to the buffer of a StringIO
+/* Internal routine for writing a string of bytes to the buffer of a BytesIO
    object. Returns the number of bytes wrote, or -1 on error. */
 static Py_ssize_t
 write_bytes(BytesIOObject *self, const char *bytes, Py_ssize_t len)
@@ -241,10 +241,10 @@ bytes_io_readlines(BytesIOObject *self, PyObject *args)
             break;
         line = PyString_FromStringAndSize(output, n);
         if (!line)
-            goto err;
+            goto onError;
         if (PyList_Append(result, line) == -1) {
             Py_DECREF(line);
-            goto err;
+            goto onError;
         }
         Py_DECREF(line);
         len += n;
@@ -252,7 +252,8 @@ bytes_io_readlines(BytesIOObject *self, PyObject *args)
             break;
     }
     return result;
-      err:
+
+  onError:
     Py_DECREF(result);
     return NULL;
 }

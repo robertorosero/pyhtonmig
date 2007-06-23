@@ -241,10 +241,10 @@ string_io_readlines(StringIOObject *self, PyObject *args)
             break;
         line = PyUnicode_FromUnicode(output, n);
         if (!line)
-            goto err;
+            goto onError;
         if (PyList_Append(result, line) == -1) {
             Py_DECREF(line);
-            goto err;
+            goto onError;
         }
         Py_DECREF(line);
         len += n;
@@ -252,7 +252,8 @@ string_io_readlines(StringIOObject *self, PyObject *args)
             break;
     }
     return result;
-      err:
+
+  onError:
     Py_DECREF(result);
     return NULL;
 }
