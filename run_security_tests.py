@@ -38,6 +38,7 @@ def run_tests(type_, test_verifier):
                 stderr_output = exec_test(os.path.join(path, 'test.py'))
                 if not test_verifier(test_name, stderr_output):
                     print 'failed'
+                    failures.append(test_name)
                 else:
                     print 'passed'
             finally:
