@@ -12,9 +12,6 @@ typedef struct {
 
 static PyTypeObject BytesIO_Type;
 
-/* The initial size of the buffer of BytesIO objects
-   XXX Is this optimal? */
-#define BUFSIZE 128
 
 static PyObject *
 err_closed(void)
@@ -38,7 +35,9 @@ get_line(BytesIOObject *self, char **output)
     str_end = self->buf + self->string_size;
 
     /* Move to the end of the line, up to the end of the string, s. */
-    for (n = self->buf + self->pos; n < str_end && *n != '\n'; n++);
+    for (n = self->buf + self->pos;
+         n < str_end && *n != '\n';
+         n++);
 
     /* Skip the newline character */
     if (n < str_end)
@@ -64,16 +63,9 @@ resize_buffer(BytesIOObject *self, Py_ssize_t new_size)
        implementation of this module relatively simple. */
 
     if (new_size >= self->buf_size) {
-        /* The size of the internal buffer double, every time we need more
-           memory. That reduces the need of resizing the buffer when working
-           with a large amount of data. */
-        self->buf_size *= 2;
-        if (self->buf_size <= new_size) {
-            /* Doubling wasn't enough to hold the new internal string
-               size, then just use the new length. */
-            assert(new_size + 1 < PY_SSIZE_T_MAX);
-            self->buf_size = new_size + 1;
-        }
+        /* Allocate memory to the nearest 16K chunk. You shouldn't see any
+           significant performance gain (or lost) by changing this value. */
+        self->buf_size = (new_size + 16383) & ~16383;
 
         PyMem_Resize(self->buf, char, self->buf_size);
         if (self->buf == NULL) {
@@ -234,17 +226,13 @@ bytes_io_readlines(BytesIOObject *self, PyObject *args)
     if (!result)
         return NULL;
 
-    while (1) {
-        n = get_line(self, &output);
-
-        if (n == 0)
-            break;
+    while ((n = get_line(self, &output)) != 0) {
         line = PyString_FromStringAndSize(output, n);
         if (!line)
-            goto onError;
+            goto on_error;
         if (PyList_Append(result, line) == -1) {
             Py_DECREF(line);
-            goto onError;
+            goto on_error;
         }
         Py_DECREF(line);
         len += n;
@@ -253,7 +241,7 @@ bytes_io_readlines(BytesIOObject *self, PyObject *args)
     }
     return result;
 
-  onError:
+  on_error:
     Py_DECREF(result);
     return NULL;
 }
@@ -280,6 +268,7 @@ bytes_io_truncate(BytesIOObject *self, PyObject *args)
 
     if (self->string_size > size)
         self->string_size = size;
+    self->pos = self->string_size;
 
     return PyInt_FromSsize_t(self->string_size);
 }
@@ -295,9 +284,7 @@ bytes_io_iternext(BytesIOObject *self)
 
     n = get_line(self, &next);
 
-    if (!next)
-        return NULL;
-    if (n == 0)
+    if (!next || n == 0)
         return NULL;
 
     return PyString_FromStringAndSize(next, n);
@@ -337,7 +324,8 @@ bytes_io_seek(BytesIOObject *self, PyObject *args)
 
     self->pos = newpos;
 
-    /* Pad with zeros the buffer region larger than the string size. */
+    /* Pad with zeros the buffer region larger than the string size.
+       XXX This is inefficient for multiple seeks. */
     while (--newpos >= self->string_size)
         self->buf[newpos] = 0;
 
@@ -402,9 +390,10 @@ bytes_io_writelines(BytesIOObject *self, PyObject *v)
 static PyObject *
 bytes_io_close(BytesIOObject *self)
 {
-    if (self->buf != NULL)
+    if (self->buf != NULL) {
         PyMem_Del(self->buf);
-    self->buf = NULL;
+        self->buf = NULL;
+    }
 
     self->pos = self->string_size = self->buf_size = 0;
 
@@ -425,11 +414,11 @@ BytesIO_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
     BytesIOObject *self;
     const char *buf;
-    Py_ssize_t n = -1, size = BUFSIZE;
+    Py_ssize_t size = 0;
 
     assert(type != NULL && type->tp_alloc != NULL);
 
-    if (!PyArg_ParseTuple(args, "|t#:BytesIO", &buf, &n))
+    if (!PyArg_ParseTuple(args, "|t#:BytesIO", &buf, &size))
         return NULL;
 
     self = (BytesIOObject *)type->tp_alloc(type, 0);
@@ -437,16 +426,16 @@ BytesIO_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     if (self == NULL)
         return NULL;
 
-    self->buf = PyMem_New(char, size);
+    self->buf = PyMem_New(char, size + 1);
 
     /* These variables need to be initialized before attempting to write
        anything to the object. */
     self->pos = 0;
     self->string_size = 0;
-    self->buf_size = size;
+    self->buf_size = size + 1;
 
-    if (n > 0) {
-        if (write_bytes(self, buf, n) == -1)
+    if (size > 0) {
+        if (write_bytes(self, buf, size) == -1)
             return NULL;
         self->pos = 0;
     }
