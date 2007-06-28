@@ -142,6 +142,36 @@ bytes_io_getvalue(BytesIOObject *self)
     return PyString_FromStringAndSize(self->buf, self->string_size);
 }
 
+/* Not exposed as a method of BytesIO. */
+static int
+bytes_io_setvalue(BytesIOObject *self, PyObject *value)
+{
+    if (self->buf == NULL) {
+        err_closed();
+        return -1;
+    }
+
+    self->pos = 0;
+    self->string_size = 0;
+
+    if (value == NULL)
+        return 0;
+
+    if (!PyString_Check(value)) {
+        PyErr_SetString(PyExc_TypeError, "need a string");
+        return -1;
+    }
+    if ((write_bytes(self, PyString_AsString(value),
+                     PyString_Size(value))) < 0) {
+        return -1;  /* out of memory */
+    }
+    /* Reset the position back to beginning-of-file, since 
+       write_bytes changed it. */
+    self->pos = 0;
+
+    return 0;
+}
+
 static PyObject *
 bytes_io_isatty(BytesIOObject *self)
 {
@@ -524,6 +554,8 @@ PyDoc_STRVAR(generic_true_doc, "Always True.");
 static PyGetSetDef BytesIO_getsetlist[] = {
     {"closed",    (getter) bytes_io_get_closed, NULL,
      "True if the file is closed."},
+    {"_buffer", (getter) bytes_io_getvalue, (setter) bytes_io_setvalue,
+     NULL},
     {0},            /* sentinel */
 };
 
