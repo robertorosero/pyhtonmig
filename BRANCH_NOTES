@@ -7,7 +7,9 @@ Attempt to develop some form of security model for Python.
 ==================
 Build instructions
 ==================
-1. Build Python as normal.
+1. Build Python as normal (``./configure``, ``make -s``; DO NOT run
+``make install`` as I don't know if the symlinks for importlib will install the
+files properly).
 2. Run ``build_secure_py.sh`` to build ``secure_python.exe``.
 
 
