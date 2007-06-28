@@ -50,6 +50,7 @@ main(int argc, char *argv[])
     PyObject *safe_extensions_seq;
 
     /* Initialize interpreter.  */
+    Py_SetProgramName("secure_python.exe");
     Py_Initialize();
 
     interp = PyThreadState_GET()->interp;
