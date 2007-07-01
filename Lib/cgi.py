@@ -575,7 +575,7 @@ class FieldStorage:
         if key in self:
             value = self[key]
             if type(value) is type([]):
-                return map(attrgetter('value'), value)
+                return [x.value for x in value]
             else:
                 return value.value
         else:
@@ -597,7 +597,7 @@ class FieldStorage:
         if key in self:
             value = self[key]
             if type(value) is type([]):
-                return map(attrgetter('value'), value)
+                return [x.value for x in value]
             else:
                 return [value.value]
         else:
