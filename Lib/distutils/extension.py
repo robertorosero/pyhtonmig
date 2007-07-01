@@ -104,7 +104,7 @@ class Extension:
                  ):
         assert isinstance(name, str), "'name' must be a string"
         assert (isinstance(sources, list) and
-                map(type, sources) == [str]*len(sources)), \
+                all(isinstance(s, str) for s in sources)), \
                 "'sources' must be a list of strings"
 
         self.name = name
