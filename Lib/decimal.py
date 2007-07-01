@@ -841,7 +841,7 @@ class Decimal(object):
         if context is None:
             context = getcontext()
 
-        tmp = map(str, self._int)
+        tmp = list(map(str, self._int))
         numdigits = len(self._int)
         leftdigits = self._exp + numdigits
         if eng and not self:  # self = 0eX wants 0[.0[0]]eY, not [[0]0]0eY
@@ -3145,7 +3145,7 @@ def _string2exact(s):
     exp -= len(fracpart)
 
     mantissa = intpart + fracpart
-    tmp = map(int, mantissa)
+    tmp = list(map(int, mantissa))
     backup = tmp
     while tmp and tmp[0] == 0:
         del tmp[0]
