@@ -1193,7 +1193,9 @@ class Decimal(object):
         op1 = _WorkRep(self)
         op2 = _WorkRep(other)
 
-        ans = Decimal((resultsign, map(int, str(op1.int * op2.int)), resultexp))
+        ans = Decimal((resultsign,
+                       tuple(map(int, str(op1.int * op2.int))),
+                       resultexp))
         if shouldround:
             ans = ans._fix(context)
 
