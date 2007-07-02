@@ -322,7 +322,7 @@ string_io_iternext(StringIOObject *self)
 static PyObject *
 string_io_seek(StringIOObject *self, PyObject *args)
 {
-    Py_ssize_t newpos;
+    Py_ssize_t newpos, prevpos;
     int mode = 0;
 
     if (self->buf == NULL)
@@ -351,12 +351,15 @@ string_io_seek(StringIOObject *self, PyObject *args)
     if (resize_buffer(self, newpos) < 0)
         return NULL;  /* out of memory */
 
+    prevpos = self->pos;
     self->pos = newpos;
 
-    /* Pad with zeros the buffer region larger than the string size.
-       XXX This is inefficient for multiple seeks. */
-    while (--newpos >= self->string_size)
+    /* Pad with zeros the buffer region larger than the string size and
+       not previously padded with zeros. */
+    while (newpos >= self->string_size && newpos >= prevpos) {
         self->buf[newpos] = 0;
+        newpos--;
+    }
 
     return PyInt_FromSsize_t(self->pos);
 }
