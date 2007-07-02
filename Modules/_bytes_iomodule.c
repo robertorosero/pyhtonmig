@@ -146,6 +146,9 @@ bytes_io_getvalue(BytesIOObject *self)
 static int
 bytes_io_setvalue(BytesIOObject *self, PyObject *value)
 {
+    const char *bytes;
+    Py_ssize_t len;
+
     if (self->buf == NULL) {
         err_closed();
         return -1;
@@ -156,13 +159,11 @@ bytes_io_setvalue(BytesIOObject *self, PyObject *value)
 
     if (value == NULL)
         return 0;
-
-    if (!PyString_Check(value)) {
-        PyErr_SetString(PyExc_TypeError, "need a string");
+    
+    if (PyObject_AsCharBuffer(value, &bytes, &len) == -1)
         return -1;
-    }
-    if ((write_bytes(self, PyString_AsString(value),
-                     PyString_Size(value))) < 0) {
+
+    if (write_bytes(self, bytes, len) < 0) {
         return -1;  /* out of memory */
     }
     /* Reset the position back to beginning-of-file, since 
@@ -385,6 +386,8 @@ static PyObject *
 bytes_io_writelines(BytesIOObject *self, PyObject *v)
 {
     PyObject *it, *item;
+    const char *bytes;
+    Py_ssize_t len;
 
     if (self->buf == NULL)
         return err_closed();
@@ -394,16 +397,14 @@ bytes_io_writelines(BytesIOObject *self, PyObject *v)
         return NULL;
 
     while ((item = PyIter_Next(it)) != NULL) {
-        Py_ssize_t n;
-        char *c;
-        if (PyString_AsStringAndSize(item, &c, &n) == -1) {
+        if (PyObject_AsCharBuffer(item, &bytes, &len) == -1) {
             Py_DECREF(it);
             Py_DECREF(item);
             return NULL;
         }
         Py_DECREF(item);
 
-        if (write_bytes(self, c, n) == -1) {
+        if (write_bytes(self, bytes, len) == -1) {
             Py_DECREF(it);
             return NULL;
         }
