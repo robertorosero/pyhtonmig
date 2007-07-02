@@ -286,8 +286,8 @@ bytes_io_readinto(BytesIOObject *self, PyObject *buffer)
     if (PyObject_AsWriteBuffer(buffer, &raw_buffer, &len) == -1)
         return NULL;
 
-    if (len > self->string_size)
-        len = self->string_size;
+    if (self->pos + len > self->string_size)
+        len = self->string_size - self->pos;
 
     memcpy(raw_buffer, self->buf + self->pos, len);
     self->pos += len;
@@ -539,7 +539,7 @@ PyDoc_STRVAR(BytesIO_readinto_doc,
 "readinto(bytes) -> int.  Read up to len(b) bytes into b.\n"
 "\n"
 "Returns number of bytes read (0 for EOF), or None if the object\n"
-"is set not to block as has no data to read."
+"is set not to block as has no data to read.");
 
 PyDoc_STRVAR(BytesIO_tell_doc,
 "tell() -> current file position, an integer\n");
