@@ -278,6 +278,24 @@ bytes_io_readlines(BytesIOObject *self, PyObject *args)
 }
 
 static PyObject *
+bytes_io_readinto(BytesIOObject *self, PyObject *buffer)
+{
+    void *raw_buffer;
+    Py_ssize_t len;
+
+    if (PyObject_AsWriteBuffer(buffer, &raw_buffer, &len) == -1)
+        return NULL;
+
+    if (len > self->string_size)
+        len = self->string_size;
+
+    memcpy(raw_buffer, self->buf + self->pos, len);
+    self->pos += len;
+
+    return PyInt_FromSsize_t(len);
+}
+
+static PyObject *
 bytes_io_truncate(BytesIOObject *self, PyObject *args)
 {
     Py_ssize_t size;
@@ -517,6 +535,12 @@ PyDoc_STRVAR(BytesIO_readlines_doc,
 "The optional size argument, if given, is an approximate bound on the\n"
 "total number of bytes in the lines returned.\n");
 
+PyDoc_STRVAR(BytesIO_readinto_doc,
+"readinto(bytes) -> int.  Read up to len(b) bytes into b.\n"
+"\n"
+"Returns number of bytes read (0 for EOF), or None if the object\n"
+"is set not to block as has no data to read."
+
 PyDoc_STRVAR(BytesIO_tell_doc,
 "tell() -> current file position, an integer\n");
 
@@ -579,6 +603,8 @@ static struct PyMethodDef BytesIO_methods[] = {
      BytesIO_readline_doc},
     {"readlines",  (PyCFunction) bytes_io_readlines, METH_VARARGS,
      BytesIO_readlines_doc},
+    {"readinto",   (PyCFunction) bytes_io_readinto, METH_O,
+     BytesIO_readinto_doc},
     {"tell",       (PyCFunction) bytes_io_tell, METH_NOARGS,
      BytesIO_tell_doc},
     {"truncate",   (PyCFunction) bytes_io_truncate, METH_VARARGS,
