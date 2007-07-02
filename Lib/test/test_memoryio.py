@@ -31,7 +31,7 @@ class MemoryTestMixin:
         self.assertEqual(f.seek(-1, 2), 13)
         self.assertEqual(f.tell(), 13)
         self.assertEqual(f.truncate(12), 12)
-        self.assertEqual(f.tell(), 13)
+        self.assertEqual(f.tell(), 12)
 
     def test_write(self):
         buf = self.buftype("hello world\n")
@@ -92,27 +92,6 @@ class MemoryTestMixin:
         buf = self.buftype("1234567890")
         memio = self.ioclass(buf)
 
-    def read_ops(self, f, data):
-        t = self.buftype
-        data = f.read(5)
-        self.assertEqual(data, t("hello"))
-        self.assertEqual(f.readinto(data), 5)
-        self.assertEqual(data, t(" worl"))
-        self.assertEqual(f.readinto(data), 2)
-        self.assertEqual(len(data), 5)
-        self.assertEqual(data[:2], t("d\n"))
-        self.assertEqual(f.seek(0), 0)
-        self.assertEqual(f.read(20), t("hello world\n"))
-        self.assertEqual(f.read(1), t(""))
-        self.assertEqual(f.readinto(t("x")), 0)
-        self.assertEqual(f.seek(-6, 2), 6)
-        self.assertEqual(f.read(5), t("world"))
-        self.assertEqual(f.read(0), t(""))
-        self.assertEqual(f.readinto(t("")), 0)
-        self.assertEqual(f.seek(-6, 1), 5)
-        self.assertEqual(f.read(5), t(" worl"))
-        self.assertEqual(f.tell(), 10)
-
     def test_read(self):
         buf = self.buftype("1234567890")
         memio = self.ioclass(buf)
@@ -121,11 +100,9 @@ class MemoryTestMixin:
         self.assertEqual(memio.read(4), buf[1:5])
         self.assertEqual(memio.read(900), buf[5:])
         self.assertEqual(memio.read(), self.EOF)
-
-        buf = self.buftype("hello world\n")
-        memio = self.ioclass(buf)
-
-        self.read_ops(memio, buf)
+        self.assertEqual(memio.seek(0), 0)
+        self.assertEqual(memio.read(), buf)
+        self.assertEqual(memio.tell(), 10)
 
     def test_read_noargs(self):
         buf = self.buftype("1234567890")
@@ -202,7 +179,7 @@ class MemoryTestMixin:
         self.assertEqual(memio.seekable(), True)
 
 
-class PythonBytesIOTest(MemoryTestMixin, unittest.TestCase):
+class PyBytesIOTest(MemoryTestMixin, unittest.TestCase):
     """
     Test the Python implementation of BytesIO.
     """
@@ -210,36 +187,50 @@ class PythonBytesIOTest(MemoryTestMixin, unittest.TestCase):
     ioclass = io._BytesIO
     EOF = b""
 
+    def test_readinto(self):
+        buf = self.buftype("1234567890")
+        memio = self.ioclass(buf)
 
-class PythonStringIOTest(MemoryTestMixin, unittest.TestCase):
+        b = bytes("hello")
+        self.assertEqual(memio.readinto(b), 5)
+        self.assertEqual(b, b"12345")
+        self.assertEqual(memio.readinto(b), 5)
+        self.assertEqual(b, b"67890")
+        self.assertEqual(memio.readinto(b), 0)
+        self.assertEqual(b, b"67890")
+
+        b = bytes("hello world")
+        self.assertEqual(memio.seek(0), 0)
+        self.assertEqual(memio.readinto(b), 10)
+        self.assertEqual(b, "1234567890d")
+
+
+class PyStringIOTest(MemoryTestMixin, unittest.TestCase):
     """
     Test the Python implementation of StringIO.
     """
-    buftype = str
+    buftype = unicode
     ioclass = io._StringIO
     EOF = ""
 
 if has_c_implementation:
-    class CBytesIOTest(MemoryTestMixin, unittest.TestCase):
+    class CBytesIOTest(PyBytesIOTest):
         """
         Test the C implementation of BytesIO if available.
         """
-        buftype = bytes
         ioclass = _bytes_io.BytesIO
-        EOF = b""
 
 
-    class CStringIOTest(MemoryTestMixin, unittest.TestCase):
+    class CStringIOTest(PyStringIOTest):
         """
         Test the C implementation of StringIO if available.
         """
-        buftype = unicode
         ioclass = _string_io.StringIO
-        EOF = u""
+
 
 def test_main():
     if has_c_implementation:
-        test_support.run_unittest(PythonBytesIOTest, PythonStringIOTest,
+        test_support.run_unittest(PyBytesIOTest, PyStringIOTest,
                                   CBytesIOTest, CStringIOTest)
     else:
         test_support.run_unittest(PythonBytesIOTest, PythonStringIOTest)
