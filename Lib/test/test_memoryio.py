@@ -100,7 +100,7 @@ class MemoryTestMixin:
         self.assertEqual(memio.read(4), buf[1:5])
         self.assertEqual(memio.read(900), buf[5:])
         self.assertEqual(memio.read(), self.EOF)
-        self.assertEqual(memio.seek(0), 0)
+        memio.seek(0)
         self.assertEqual(memio.read(), buf)
         self.assertEqual(memio.tell(), 10)
 
@@ -112,10 +112,26 @@ class MemoryTestMixin:
         self.assertEqual(self.EOF, memio.read())
 
     def test_readline(self):
-        pass
+        buf = self.buftype("1234567890\n")
+        memio = self.ioclass(buf * 2)
+
+        self.assertEqual(memio.readline(), buf)
+        self.assertEqual(memio.readline(), buf)
+        self.assertEqual(memio.readline(), self.EOF)
+        memio.seek(0)
+        self.assertEqual(memio.readline(5), "12345")
+        self.assertEqual(memio.readline(5), "67890")
+        self.assertEqual(memio.readline(5), '\n')
 
     def test_readlines(self):
-        pass
+        buf = self.buftype("1234567890\n")
+        memio = self.ioclass(buf * 10)
+
+        self.assertEqual(memio.readlines(), [buf] * 10)
+        memio.seek(5)
+        self.assertEqual(memio.readlines(), ['67890\n'] + [buf] * 9)
+        memio.seek(0)
+        self.assertEqual(memio.readlines(15), [buf] * 2)
 
     def test_iterator(self):
         buf = self.buftype("1234567890\n")
@@ -200,7 +216,7 @@ class PyBytesIOTest(MemoryTestMixin, unittest.TestCase):
         self.assertEqual(b, b"67890")
 
         b = bytes("hello world")
-        self.assertEqual(memio.seek(0), 0)
+        memio.seek(0)
         self.assertEqual(memio.readinto(b), 10)
         self.assertEqual(b, "1234567890d")
 
@@ -233,7 +249,7 @@ def test_main():
         test_support.run_unittest(PyBytesIOTest, PyStringIOTest,
                                   CBytesIOTest, CStringIOTest)
     else:
-        test_support.run_unittest(PythonBytesIOTest, PythonStringIOTest)
+        test_support.run_unittest(PyBytesIOTest, PyStringIOTest)
 
 if __name__ == '__main__':
     test_main()
