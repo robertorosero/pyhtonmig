@@ -283,6 +283,9 @@ bytes_io_readinto(BytesIOObject *self, PyObject *buffer)
     void *raw_buffer;
     Py_ssize_t len;
 
+    if (self->buf == NULL)
+        return err_closed();
+
     if (PyObject_AsWriteBuffer(buffer, &raw_buffer, &len) == -1)
         return NULL;
 
