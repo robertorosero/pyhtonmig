@@ -38,11 +38,10 @@ class MemoryTestMixin:
         memio = self.ioclass(buf)
 
         self.write_ops(memio)
-
-    def test_write_noinit(self):
         memio = self.ioclass()
-
         self.write_ops(memio)
+        memio.close()
+        self.assertRaises(ValueError, memio.write, buf)
 
     def test_writelines(self):
         buf = self.buftype("1234567890")
@@ -50,6 +49,8 @@ class MemoryTestMixin:
 
         memio.writelines([buf] * 100)
         self.assertEqual(memio.getvalue(), buf * 100)
+        memio.close()
+        self.assertRaises(ValueError, memio.writelines, buf)
 
     def test_writelines_error(self):
         memio = self.ioclass()
@@ -72,21 +73,8 @@ class MemoryTestMixin:
         memio.write(buf)
         self.assertEqual(memio.getvalue(), buf[:4] + buf)
         self.assertRaises(IOError, memio.truncate, -1)
-
-    def test_close(self):
-        buf = self.buftype("1234567890")
-        memio = self.ioclass(buf)
-
-        self.assertEqual(memio.closed, False)
         memio.close()
-        self.assertRaises(ValueError, memio.read)
-        self.assertRaises(ValueError, memio.write, buf)
-        self.assertRaises(ValueError, memio.writelines, buf)
-        self.assertRaises(ValueError, memio.seek, 3)
         self.assertRaises(ValueError, memio.truncate)
-        self.assertRaises(ValueError, memio.getvalue)
-        self.assertRaises(ValueError, memio.tell)
-        self.assertEqual(memio.closed, True)
 
     def test_init(self):
         buf = self.buftype("1234567890")
@@ -102,14 +90,10 @@ class MemoryTestMixin:
         self.assertEqual(memio.read(), self.EOF)
         memio.seek(0)
         self.assertEqual(memio.read(), buf)
+        self.assertEqual(memio.read(), self.EOF)
         self.assertEqual(memio.tell(), 10)
-
-    def test_read_noargs(self):
-        buf = self.buftype("1234567890")
-        memio = self.ioclass(buf)
-
-        self.assertEqual(buf, memio.read())
-        self.assertEqual(self.EOF, memio.read())
+        memio.close()
+        self.assertRaises(ValueError, memio.read)
 
     def test_readline(self):
         buf = self.buftype("1234567890\n")
@@ -122,6 +106,8 @@ class MemoryTestMixin:
         self.assertEqual(memio.readline(5), "12345")
         self.assertEqual(memio.readline(5), "67890")
         self.assertEqual(memio.readline(5), '\n')
+        memio.close()
+        self.assertRaises(ValueError, memio.readline)
 
     def test_readlines(self):
         buf = self.buftype("1234567890\n")
@@ -132,6 +118,8 @@ class MemoryTestMixin:
         self.assertEqual(memio.readlines(), ['67890\n'] + [buf] * 9)
         memio.seek(0)
         self.assertEqual(memio.readlines(15), [buf] * 2)
+        memio.close()
+        self.assertRaises(ValueError, memio.readlines)
 
     def test_iterator(self):
         buf = self.buftype("1234567890\n")
@@ -145,13 +133,14 @@ class MemoryTestMixin:
             self.assertEqual(line, buf)
             i += 1
         self.assertEqual(i, 10)
-
         memio.seek(0)
         i = 0
         for line in memio:
             self.assertEqual(line, buf)
             i += 1
         self.assertEqual(i, 10)
+        memio.close()
+        self.assertRaises(ValueError, memio.__next__)
 
     def test_getvalue(self):
         buf = self.buftype("1234567890")
@@ -160,6 +149,8 @@ class MemoryTestMixin:
         self.assertEqual(memio.getvalue(), buf)
         memio = self.ioclass(buf * 1000)
         self.assertEqual(memio.getvalue()[-3:], "890")
+        memio.close()
+        self.assertRaises(ValueError, memio.getvalue)
 
     def test_seek(self):
         buf = self.buftype("1234567890")
@@ -171,6 +162,8 @@ class MemoryTestMixin:
 
         memio.seek(3)
         self.assertEqual(buf[3:], memio.read())
+        memio.close()
+        self.assertRaises(ValueError, memio.seek, 3)
 
     def test_tell(self):
         buf = self.buftype("1234567890")
@@ -181,6 +174,8 @@ class MemoryTestMixin:
         self.assertEqual(5, memio.tell())
         memio.seek(10000)
         self.assertEqual(10000, memio.tell())
+        memio.close()
+        self.assertRaises(ValueError, memio.tell)
 
     def test_flags(self):
         memio = self.ioclass()
@@ -189,16 +184,16 @@ class MemoryTestMixin:
         self.assertEqual(memio.readable(), True)
         self.assertEqual(memio.seekable(), True)
         self.assertEqual(memio.isatty(), False)
+        self.assertEqual(memio.closed, False)
         memio.close()
         self.assertEqual(memio.writable(), True)
         self.assertEqual(memio.readable(), True)
         self.assertEqual(memio.seekable(), True)
+        self.assertRaises(ValueError, memio.isatty)
+        self.assertEqual(memio.closed, True)
 
 
 class PyBytesIOTest(MemoryTestMixin, unittest.TestCase):
-    """
-    Test the Python implementation of BytesIO.
-    """
     buftype = bytes
     ioclass = io._BytesIO
     EOF = b""
@@ -214,42 +209,36 @@ class PyBytesIOTest(MemoryTestMixin, unittest.TestCase):
         self.assertEqual(b, b"67890")
         self.assertEqual(memio.readinto(b), 0)
         self.assertEqual(b, b"67890")
-
         b = bytes("hello world")
         memio.seek(0)
         self.assertEqual(memio.readinto(b), 10)
         self.assertEqual(b, "1234567890d")
+        b = bytes()
+        memio.seek(0)
+        self.assertEqual(memio.readinto(b), 0)
+        self.assertEqual(b, b"")
+        memio.close()
+        self.assertRaises(ValueError, memio.readinto, b)
 
 
 class PyStringIOTest(MemoryTestMixin, unittest.TestCase):
-    """
-    Test the Python implementation of StringIO.
-    """
     buftype = unicode
     ioclass = io._StringIO
     EOF = ""
 
 if has_c_implementation:
     class CBytesIOTest(PyBytesIOTest):
-        """
-        Test the C implementation of BytesIO if available.
-        """
         ioclass = _bytes_io.BytesIO
 
-
     class CStringIOTest(PyStringIOTest):
-        """
-        Test the C implementation of StringIO if available.
-        """
         ioclass = _string_io.StringIO
 
 
 def test_main():
+    tests = [PyBytesIOTest, PyStringIOTest]
     if has_c_implementation:
-        test_support.run_unittest(PyBytesIOTest, PyStringIOTest,
-                                  CBytesIOTest, CStringIOTest)
-    else:
-        test_support.run_unittest(PyBytesIOTest, PyStringIOTest)
+        tests.extend([CBytesIOTest, CStringIOTest])
+    test_support.run_unittest(*tests)
 
 if __name__ == '__main__':
     test_main()
