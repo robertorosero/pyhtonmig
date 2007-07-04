@@ -6,11 +6,11 @@ PyDoc_STRVAR(module_doc,
 typedef struct {
     PyObject_HEAD
     Py_UNICODE *buf;
-    Py_ssize_t pos, string_size;
+    Py_ssize_t pos;
+    Py_ssize_t string_size;
     Py_ssize_t buf_size;
 } StringIOObject;
 
-static PyTypeObject StringIO_Type;
 
 static PyObject *
 err_closed(void)
@@ -609,7 +609,6 @@ static PyTypeObject StringIO_Type = {
     "_string_io.StringIO",                     /*tp_name*/
     sizeof(StringIOObject),                    /*tp_basicsize*/
     0,                                         /*tp_itemsize*/
-    /* methods */
     (destructor)StringIO_dealloc,              /*tp_dealloc*/
     0,                                         /*tp_print*/
     0,                                         /*tp_getattr*/

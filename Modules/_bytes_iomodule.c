@@ -6,11 +6,10 @@ PyDoc_STRVAR(module_doc,
 typedef struct {
     PyObject_HEAD
     char *buf;
-    Py_ssize_t pos, string_size;
+    Py_ssize_t pos;
+    Py_ssize_t string_size;
     Py_ssize_t buf_size;
 } BytesIOObject;
-
-static PyTypeObject BytesIO_Type;
 
 
 static PyObject *
@@ -293,6 +292,8 @@ bytes_io_readinto(BytesIOObject *self, PyObject *buffer)
         len = self->string_size - self->pos;
 
     memcpy(raw_buffer, self->buf + self->pos, len);
+    assert(self->pos + len < PY_SSIZE_T_MAX);
+    assert(len >= 0);
     self->pos += len;
 
     return PyInt_FromSsize_t(len);
@@ -633,7 +634,6 @@ static PyTypeObject BytesIO_Type = {
     "_bytes_io.BytesIO",                       /*tp_name*/
     sizeof(BytesIOObject),                     /*tp_basicsize*/
     0,                                         /*tp_itemsize*/
-    /* methods */
     (destructor)BytesIO_dealloc,               /*tp_dealloc*/
     0,                                         /*tp_print*/
     0,                                         /*tp_getattr*/
