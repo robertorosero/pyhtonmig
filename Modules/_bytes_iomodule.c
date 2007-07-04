@@ -47,7 +47,6 @@ get_line(BytesIOObject *self, char **output)
     *output = self->buf + self->pos;
 
     assert(self->pos + len < PY_SSIZE_T_MAX);
-    assert(len >= 0);
     self->pos += len;
 
     return len;
@@ -293,7 +292,6 @@ bytes_io_readinto(BytesIOObject *self, PyObject *buffer)
 
     memcpy(raw_buffer, self->buf + self->pos, len);
     assert(self->pos + len < PY_SSIZE_T_MAX);
-    assert(len >= 0);
     self->pos += len;
 
     return PyInt_FromSsize_t(len);

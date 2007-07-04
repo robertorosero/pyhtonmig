@@ -47,7 +47,6 @@ get_line(StringIOObject *self, Py_UNICODE **output)
     *output = self->buf + self->pos;
 
     assert(self->pos + len < PY_SSIZE_T_MAX);
-    assert(len >= 0);
     self->pos += len;
 
     return len;
