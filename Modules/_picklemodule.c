@@ -1,5 +1,4 @@
 #include "Python.h"
-#include "cStringIO.h"
 #include "structmember.h"
 
 PyDoc_STRVAR(pickle_module_documentation,
@@ -443,20 +442,6 @@ write_file(Picklerobject * self, const char *s, Py_ssize_t n)
 }
 
 static int
-write_cStringIO(Picklerobject * self, const char *s, Py_ssize_t n)
-{
-    if (s == NULL) {
-        return 0;
-    }
-
-    if (PycStringIO->cwrite((PyObject *) self->file, s, n) != n) {
-        return -1;
-    }
-
-    return (int) n;
-}
-
-static int
 write_none(Picklerobject * self, const char *s, Py_ssize_t n)
 {
     if (s == NULL)
@@ -601,39 +586,6 @@ readline_file(Unpicklerobject * self, char **s)
         self->buf_size = bigger;
     }
 }
-
-
-static Py_ssize_t
-read_cStringIO(Unpicklerobject * self, char **s, Py_ssize_t n)
-{
-    char *ptr;
-
-    if (PycStringIO->cread((PyObject *) self->file, &ptr, n) != n) {
-        PyErr_SetNone(PyExc_EOFError);
-        return -1;
-    }
-
-    *s = ptr;
-
-    return n;
-}
-
-
-static Py_ssize_t
-readline_cStringIO(Unpicklerobject * self, char **s)
-{
-    Py_ssize_t n;
-    char *ptr;
-
-    if ((n = PycStringIO->creadline((PyObject *) self->file, &ptr)) < 0) {
-        return -1;
-    }
-
-    *s = ptr;
-
-    return n;
-}
-
 
 static Py_ssize_t
 read_other(Unpicklerobject * self, char **s, Py_ssize_t n)
@@ -2677,9 +2629,6 @@ newPicklerobject(PyObject * file, int proto)
             goto err;
         }
         self->write_func = write_file;
-    }
-    else if (PycStringIO_OutputCheck(file)) {
-        self->write_func = write_cStringIO;
     }
     else if (file == Py_None) {
         self->write_func = write_none;
@@ -5091,11 +5040,6 @@ newUnpicklerobject(PyObject * f)
         self->read_func = read_file;
         self->readline_func = readline_file;
     }
-    else if (PycStringIO_InputCheck(f)) {
-        self->fp = NULL;
-        self->read_func = read_cStringIO;
-        self->readline_func = readline_cStringIO;
-    }
     else {
 
         self->fp = NULL;
@@ -5296,39 +5240,6 @@ cpm_dump(PyObject * self, PyObject * args, PyObject * kwds)
     return res;
 }
 
-
-/* dumps(obj, protocol=0). */
-static PyObject *
-cpm_dumps(PyObject * self, PyObject * args, PyObject * kwds)
-{
-    static char *kwlist[] = { "obj", "protocol", NULL };
-    PyObject *ob, *file = 0, *res = NULL;
-    Picklerobject *pickler = 0;
-    int proto = 0;
-
-    if (!(PyArg_ParseTupleAndKeywords(args, kwds, "O|i:dumps", kwlist,
-                                      &ob, &proto)))
-        goto finally;
-
-    if (!(file = PycStringIO->NewOutput(128)))
-        goto finally;
-
-    if (!(pickler = newPicklerobject(file, proto)))
-        goto finally;
-
-    if (dump(pickler, ob) < 0)
-        goto finally;
-
-    res = PycStringIO->cgetvalue(file);
-
-  finally:
-    Py_XDECREF(pickler);
-    Py_XDECREF(file);
-
-    return res;
-}
-
-
 /* load(fileobj). */
 static PyObject *
 cpm_load(PyObject * self, PyObject * ob)
@@ -5346,33 +5257,6 @@ cpm_load(PyObject * self, PyObject * ob)
 
     return res;
 }
-
-
-/* loads(string) */
-static PyObject *
-cpm_loads(PyObject * self, PyObject * args)
-{
-    PyObject *ob, *file = 0, *res = NULL;
-    Unpicklerobject *unpickler = 0;
-
-    if (!(PyArg_ParseTuple(args, "S:loads", &ob)))
-        goto finally;
-
-    if (!(file = PycStringIO->NewInput(ob)))
-        goto finally;
-
-    if (!(unpickler = newUnpicklerobject(file)))
-        goto finally;
-
-    res = load(unpickler);
-
-  finally:
-    Py_XDECREF(file);
-    Py_XDECREF(unpickler);
-
-    return res;
-}
-
 
 PyDoc_STRVAR(Unpicklertype__doc__, "Objects that know how to unpickle");
 
@@ -5411,18 +5295,8 @@ static struct PyMethodDef pickle_methods[] = {
                "See the Pickler docstring for the meaning of optional argument proto.")
      },
 
-    {"dumps", (PyCFunction) cpm_dumps, METH_VARARGS | METH_KEYWORDS,
-     PyDoc_STR("dumps(obj, protocol=0) -- "
-               "Return a string containing an object in pickle format.\n"
-               "\n"
-               "See the Pickler docstring for the meaning of optional argument proto.")
-     },
-
     {"load", (PyCFunction) cpm_load, METH_O,
      PyDoc_STR("load(file) -- Load a pickle from the given file")},
-
-    {"loads", (PyCFunction) cpm_loads, METH_VARARGS,
-     PyDoc_STR("loads(string) -- Load a pickle from the given string")},
 
     {"Pickler", (PyCFunction) get_Pickler, METH_VARARGS | METH_KEYWORDS,
      PyDoc_STR("Pickler(file, protocol=0) -- Create a pickler.\n"
@@ -5585,8 +5459,6 @@ init_stuff(PyObject * module_dict)
 
     if (PyDict_SetItemString(module_dict, "BadPickleGet", BadPickleGet) < 0)
         return -1;
-
-    PycString_IMPORT;
 
     return 0;
 }
