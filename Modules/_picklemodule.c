@@ -2,7 +2,7 @@
 #include "cStringIO.h"
 #include "structmember.h"
 
-PyDoc_STRVAR(cPickle_module_documentation,
+PyDoc_STRVAR(pickle_module_documentation,
 "C implementation and optimization of the Python pickle module.");
 
 #ifndef Py_eval_input
@@ -150,7 +150,7 @@ Pdata_dealloc(Pdata * self)
 }
 
 static PyTypeObject PdataType = {
-    PyObject_HEAD_INIT(NULL) 0, "cPickle.Pdata", sizeof(Pdata), 0,
+    PyObject_HEAD_INIT(NULL) 0, "pickle.Pdata", sizeof(Pdata), 0,
     (destructor) Pdata_dealloc,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0L, 0L, 0L, 0L, ""
 };
@@ -382,7 +382,7 @@ static int put2(Picklerobject *, PyObject *);
 
 static
 PyObject *
-cPickle_ErrFormat(PyObject * ErrType, char *stringformat, char *format, ...)
+pickle_ErrFormat(PyObject * ErrType, char *stringformat, char *format, ...)
 {
     va_list va;
     PyObject *args = 0, *retval = 0;
@@ -1847,21 +1847,21 @@ save_global(Picklerobject * self, PyObject * args, PyObject * name)
      * but I don't know how to stop it. :-( */
     mod = PyImport_ImportModule(module_str);
     if (mod == NULL) {
-        cPickle_ErrFormat(PicklingError,
+        pickle_ErrFormat(PicklingError,
                           "Can't pickle %s: import of module %s "
                           "failed", "OS", args, module);
         goto finally;
     }
     klass = PyObject_GetAttrString(mod, name_str);
     if (klass == NULL) {
-        cPickle_ErrFormat(PicklingError,
+        pickle_ErrFormat(PicklingError,
                           "Can't pickle %s: attribute lookup %s.%s "
                           "failed", "OSS", args, module, global_name);
         goto finally;
     }
     if (klass != args) {
         Py_DECREF(klass);
-        cPickle_ErrFormat(PicklingError,
+        pickle_ErrFormat(PicklingError,
                           "Can't pickle %s: it's not the same object "
                           "as %s.%s", "OSS", args, module, global_name);
         goto finally;
@@ -1885,14 +1885,14 @@ save_global(Picklerobject * self, PyObject * args, PyObject * name)
 
         /* Verify py_code has the right type and value. */
         if (!PyInt_Check(py_code)) {
-            cPickle_ErrFormat(PicklingError, "Can't pickle %s: "
+            pickle_ErrFormat(PicklingError, "Can't pickle %s: "
                               "extension code %s isn't an integer",
                               "OO", args, py_code);
             goto finally;
         }
         code = PyInt_AS_LONG(py_code);
         if (code <= 0 || code > 0x7fffffffL) {
-            cPickle_ErrFormat(PicklingError, "Can't pickle %s: "
+            pickle_ErrFormat(PicklingError, "Can't pickle %s: "
                               "extension code %ld is out of range",
                               "Ol", args, code);
             goto finally;
@@ -2377,14 +2377,14 @@ save(Picklerobject * self, PyObject * args, int pers_save)
     }
 
     if (!PyTuple_Check(t)) {
-        cPickle_ErrFormat(PicklingError, "Value returned by "
+        pickle_ErrFormat(PicklingError, "Value returned by "
                           "%s must be string or tuple", "O", __reduce__);
         goto finally;
     }
 
     size = PyTuple_Size(t);
     if (size < 2 || size > 5) {
-        cPickle_ErrFormat(PicklingError, "tuple returned by "
+        pickle_ErrFormat(PicklingError, "tuple returned by "
                           "%s must contain 2 through 5 elements",
                           "O", __reduce__);
         goto finally;
@@ -2392,7 +2392,7 @@ save(Picklerobject * self, PyObject * args, int pers_save)
 
     arg_tup = PyTuple_GET_ITEM(t, 1);
     if (!(PyTuple_Check(arg_tup) || arg_tup == Py_None)) {
-        cPickle_ErrFormat(PicklingError, "Second element of "
+        pickle_ErrFormat(PicklingError, "Second element of "
                           "tuple returned by %s must be a tuple",
                           "O", __reduce__);
         goto finally;
@@ -2879,7 +2879,7 @@ PyDoc_STRVAR(Picklertype__doc__, "Objects that know how to pickle objects\n");
 static PyTypeObject Picklertype = {
     PyObject_HEAD_INIT(NULL)
         0,                      /*ob_size */
-    "cPickle.Pickler",          /*tp_name */
+    "pickle.Pickler",          /*tp_name */
     sizeof(Picklerobject),      /*tp_basicsize */
     0,
     (destructor) Pickler_dealloc,       /* tp_dealloc */
@@ -4605,7 +4605,7 @@ load(Unpicklerobject * self)
             break;
 
         default:
-            cPickle_ErrFormat(UnpicklingError,
+            pickle_ErrFormat(UnpicklingError,
                               "invalid load key, '%s'.", "c", s[0]);
             return NULL;
         }
@@ -5001,7 +5001,7 @@ noload(Unpicklerobject * self)
                 break;
             continue;
         default:
-            cPickle_ErrFormat(UnpicklingError,
+            pickle_ErrFormat(UnpicklingError,
                               "invalid load key, '%s'.", "c", s[0]);
             return NULL;
         }
@@ -5379,7 +5379,7 @@ PyDoc_STRVAR(Unpicklertype__doc__, "Objects that know how to unpickle");
 static PyTypeObject Unpicklertype = {
     PyObject_HEAD_INIT(NULL)
         0,                      /*ob_size */
-    "cPickle.Unpickler",        /*tp_name */
+    "pickle.Unpickler",        /*tp_name */
     sizeof(Unpicklerobject),    /*tp_basicsize */
     0,
     (destructor) Unpickler_dealloc,     /* tp_dealloc */
@@ -5403,7 +5403,7 @@ static PyTypeObject Unpicklertype = {
     (inquiry) Unpickler_clear,  /* tp_clear */
 };
 
-static struct PyMethodDef cPickle_methods[] = {
+static struct PyMethodDef pickle_methods[] = {
     {"dump", (PyCFunction) cpm_dump, METH_VARARGS | METH_KEYWORDS,
      PyDoc_STR("dump(obj, file, protocol=0) -- "
                "Write an object in pickle format to the given file.\n"
@@ -5533,13 +5533,13 @@ init_stuff(PyObject * module_dict)
         return -1;
     Py_DECREF(r);
 
-    PickleError = PyErr_NewException("cPickle.PickleError", NULL, t);
+    PickleError = PyErr_NewException("pickle.PickleError", NULL, t);
     if (!PickleError)
         return -1;
 
     Py_DECREF(t);
 
-    PicklingError = PyErr_NewException("cPickle.PicklingError",
+    PicklingError = PyErr_NewException("pickle.PicklingError",
                                        PickleError, NULL);
     if (!PicklingError)
         return -1;
@@ -5556,16 +5556,16 @@ init_stuff(PyObject * module_dict)
 
     if (!
         (UnpickleableError =
-         PyErr_NewException("cPickle.UnpickleableError", PicklingError, t)))
+         PyErr_NewException("pickle.UnpickleableError", PicklingError, t)))
         return -1;
 
     Py_DECREF(t);
 
-    if (!(UnpicklingError = PyErr_NewException("cPickle.UnpicklingError",
+    if (!(UnpicklingError = PyErr_NewException("pickle.UnpicklingError",
                                                PickleError, NULL)))
         return -1;
 
-    if (!(BadPickleGet = PyErr_NewException("cPickle.BadPickleGet",
+    if (!(BadPickleGet = PyErr_NewException("pickle.BadPickleGet",
                                             UnpicklingError, NULL)))
         return -1;
 
@@ -5595,7 +5595,7 @@ init_stuff(PyObject * module_dict)
 #define PyMODINIT_FUNC void
 #endif
 PyMODINIT_FUNC
-initcPickle(void)
+init_pickle(void)
 {
     PyObject *m, *d, *di, *v, *k;
     Py_ssize_t i;
@@ -5617,8 +5617,8 @@ initcPickle(void)
         return;
 
     /* Create the module and add the functions */
-    m = Py_InitModule4("cPickle", cPickle_methods,
-                       cPickle_module_documentation,
+    m = Py_InitModule4("_pickle", pickle_methods,
+                       pickle_module_documentation,
                        (PyObject *) NULL, PYTHON_API_VERSION);
     if (m == NULL)
         return;

@@ -472,6 +472,9 @@ class PyBuildExt(build_ext):
         exts.append( Extension('cStringIO', ['cStringIO.c']) )
         exts.append( Extension('cPickle', ['cPickle.c']) )
 
+        # Optimization for pickle
+        exts.append( Extension('_pickle', ['_picklemodule.c']) )
+
         # Fast implementation of BytesIO and StringIO
         exts.append( Extension('_bytes_io', ['_bytes_iomodule.c']) )
         exts.append( Extension('_string_io', ['_string_iomodule.c']) )
