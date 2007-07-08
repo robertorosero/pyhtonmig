@@ -118,12 +118,26 @@ static PyObject *extension_cache;
 /* For looking up name pairs in copy_reg._extension_registry. */
 static PyObject *two_tuple;
 
-static PyObject *__class___str, *__getinitargs___str, *__dict___str,
-    *__getstate___str, *__setstate___str, *__name___str, *__reduce___str,
+#define INIT_STR(S)                                 \
+    if (!(S##_str = PyString_InternFromString(#S))) \
+        return -1;
+
+static PyObject \
+    *__class___str,
+    *__getinitargs___str,
+    *__dict___str,
+    *__getstate___str,
+    *__setstate___str,
+    *__name___str,
+    *__reduce___str,
     *__reduce_ex___str,
-    *write_str, *append_str,
-    *read_str, *readline_str, *__main___str,
-    *copy_reg_str, *dispatch_table_str;
+    *write_str,
+    *append_str,
+    *read_str,
+    *readline_str,
+    *__main___str,
+    *copy_reg_str,
+    *dispatch_table_str;
 
 /*************************************************************************
  Internal Data type for pickle data.                                     */
@@ -131,7 +145,7 @@ static PyObject *__class___str, *__getinitargs___str, *__dict___str,
 typedef struct {
     PyObject_HEAD
     int length;   /* number of initial slots in data currently used */
-    int size;                   /* number of slots in data allocated */
+    int size;     /* number of slots in data allocated */
     PyObject **data;
 } Pdata;
 
@@ -150,9 +164,12 @@ Pdata_dealloc(Pdata *self)
 }
 
 static PyTypeObject PdataType = {
-    PyObject_HEAD_INIT(NULL) 0, "pickle.Pdata", sizeof(Pdata), 0,
-    (destructor) Pdata_dealloc,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0L, 0L, 0L, 0L, ""
+    PyObject_HEAD_INIT(NULL)
+    0,                            /*ob_size*/
+    "_pickle.Pdata",              /*tp_name*/
+    sizeof(Pdata),                /*tp_basicsize*/
+    0,                            /*tp_itemsize*/
+    (destructor) Pdata_dealloc,   /*tp_dealloc*/
 };
 
 #define Pdata_Check(O) ((O)->ob_type == &PdataType)
@@ -233,14 +250,14 @@ Pdata_grow(Pdata *self)
  * must be an lvalue holding PyObject*.  On stack underflow, UnpicklingError
  * is raised and V is set to NULL.  D and V may be evaluated several times.
  */
-#define PDATA_POP(D, V) {                                       \
-        if ((D)->length)                                        \
-                (V) = (D)->data[--((D)->length)];               \
-        else {                                                  \
-                PyErr_SetString(UnpicklingError, "bad pickle data");    \
-                (V) = NULL;                                     \
-        }                                                       \
-}
+#define PDATA_POP(D, V) {                                           \
+        if ((D)->length)                                            \
+            (V) = (D)->data[--((D)->length)];                       \
+        else {                                                      \
+            PyErr_SetString(UnpicklingError, "bad pickle data");    \
+            (V) = NULL;                                             \
+        }                                                           \
+    }
 
 /* PDATA_PUSH and PDATA_APPEND both push rvalue PyObject* O on to Pdata*
  * D.  If the Pdata stack can't be grown to hold the new value, both
@@ -254,17 +271,17 @@ Pdata_grow(Pdata *self)
 #define PDATA_PUSH(D, O, ER) {                                  \
         if (((Pdata*)(D))->length == ((Pdata*)(D))->size &&     \
             Pdata_grow((Pdata*)(D)) < 0) {                      \
-                Py_DECREF(O);                                   \
-                return ER;                                      \
+            Py_DECREF(O);                                       \
+            return ER;                                          \
         }                                                       \
         ((Pdata*)(D))->data[((Pdata*)(D))->length++] = (O);     \
-}
+    }
 
 /* Push O on stack D, pushing a new reference. */
 #define PDATA_APPEND(D, O, ER) {                                \
         if (((Pdata*)(D))->length == ((Pdata*)(D))->size &&     \
             Pdata_grow((Pdata*)(D)) < 0)                        \
-                return ER;                                      \
+            return ER;                                          \
         Py_INCREF(O);                                           \
         ((Pdata*)(D))->data[((Pdata*)(D))->length++] = (O);     \
 }
@@ -305,22 +322,22 @@ Pdata_popList(Pdata *self, int start)
 
 /*************************************************************************/
 
-#define ARG_TUP(self, o) {                          \
-  if (self->arg || (self->arg=PyTuple_New(1))) {    \
-      Py_XDECREF(PyTuple_GET_ITEM(self->arg,0));    \
-      PyTuple_SET_ITEM(self->arg,0,o);              \
-  }                                                 \
-  else {                                            \
-      Py_DECREF(o);                                 \
-  }                                                 \
-}
+#define ARG_TUP(self, o) {                              \
+        if (self->arg || (self->arg=PyTuple_New(1))) {  \
+            Py_XDECREF(PyTuple_GET_ITEM(self->arg,0));  \
+            PyTuple_SET_ITEM(self->arg,0,o);            \
+        }                                               \
+        else {                                          \
+            Py_DECREF(o);                               \
+        }                                               \
+    }
 
 #define FREE_ARG_TUP(self) {                        \
-    if (self->arg->ob_refcnt > 1) {                 \
-      Py_DECREF(self->arg);                         \
-      self->arg=NULL;                               \
-    }                                               \
-  }
+        if (self->arg->ob_refcnt > 1) {             \
+            Py_DECREF(self->arg);                   \
+            self->arg=NULL;                         \
+        }                                           \
+    }
 
 typedef struct Picklerobject {
     PyObject_HEAD
@@ -338,7 +355,7 @@ typedef struct Picklerobject {
     /* bool, true if proto > 0 */
     int bin;
 
-    int fast;                   /* Fast mode doesn't save in memo, don't use if circ ref */
+    int fast;   /* Fast mode doesn't save in memo, don't use if circ ref */
     int nesting;
     int (*write_func) (struct Picklerobject *, const char *, Py_ssize_t);
     char *write_buf;
@@ -434,9 +451,9 @@ write_file(Picklerobject *self, const char *s, Py_ssize_t n)
         return -1;
     }
 
-    Py_BEGIN_ALLOW_THREADS
-        nbyteswritten = fwrite(s, sizeof(char), n, self->fp);
-    Py_END_ALLOW_THREADS
+    Py_BEGIN_ALLOW_THREADS;
+    nbyteswritten = fwrite(s, sizeof(char), n, self->fp);
+    Py_END_ALLOW_THREADS;
 
     if (nbyteswritten != (size_t) n) {
         PyErr_SetFromErrno(PyExc_IOError);
@@ -5269,7 +5286,7 @@ PyDoc_STRVAR(Unpicklertype__doc__, "Objects that know how to unpickle");
 static PyTypeObject Unpicklertype = {
     PyObject_HEAD_INIT(NULL)
     0,                                  /*ob_size */
-    "pickle.Unpickler",                 /*tp_name */
+    "_pickle.Unpickler",                /*tp_name */
     sizeof(Unpicklerobject),            /*tp_basicsize */
     0,
     (destructor) Unpickler_dealloc,     /* tp_dealloc */
@@ -5338,8 +5355,6 @@ static int
 init_stuff(PyObject *module_dict)
 {
     PyObject *copy_reg, *t, *r;
-
-#define INIT_STR(S) if (!( S ## _str=PyString_InternFromString(#S)))  return -1;
 
     if (PyType_Ready(&Unpicklertype) < 0)
         return -1;
@@ -5433,9 +5448,8 @@ init_stuff(PyObject *module_dict)
         return -1;
     Py_DECREF(r);
 
-    if (!
-        (UnpickleableError =
-         PyErr_NewException("pickle.UnpickleableError", PicklingError, t)))
+    if (!(UnpickleableError = PyErr_NewException("pickle.UnpickleableError",
+                                                 PicklingError, t)))
         return -1;
 
     Py_DECREF(t);
