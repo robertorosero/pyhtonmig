@@ -462,16 +462,6 @@ write_file(Picklerobject *self, const char *s, Py_ssize_t n)
 }
 
 static int
-write_none(Picklerobject *self, const char *s, Py_ssize_t n)
-{
-    if (s == NULL)
-        return 0;
-    if (n > INT_MAX)
-        return -1;
-    return (int) n;
-}
-
-static int
 write_other(Picklerobject *self, const char *s, Py_ssize_t _n)
 {
     PyObject *py_str = 0, *junk = 0;
@@ -2650,9 +2640,6 @@ newPicklerobject(PyObject *file, int proto)
             goto err;
         }
         self->write_func = write_file;
-    }
-    else if (file == Py_None) {
-        self->write_func = write_none;
     }
     else {
         self->write_func = write_other;
