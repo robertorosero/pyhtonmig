@@ -9,8 +9,6 @@ PyDoc_STRVAR(pickle_module_documentation,
 #define Py_eval_input eval_input
 #endif /* Py_eval_input */
 
-#define DEL_LIST_SLICE(list, from, to) (PyList_SetSlice(list, from, to, NULL))
-
 #define WRITE_BUF_SIZE 256
 
 /* Bump this when new opcodes are added to the pickle protocol. */
