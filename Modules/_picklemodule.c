@@ -913,7 +913,7 @@ fast_save_enter(Picklerobject *self, PyObject *obj)
     return 1;
 }
 
-int
+static int
 fast_save_leave(Picklerobject *self, PyObject *obj)
 {
     if (self->fast_container-- >= PY_CPICKLE_FAST_LIMIT) {
