@@ -1137,17 +1137,17 @@ save_string(PicklerObject *self, PyObject *args, int doput)
             return -1;
 
         if ((len = PyString_Size(repr)) < 0)
-            goto err;
+            goto error;
         repr_str = PyString_AS_STRING((PyStringObject *) repr);
 
         if (self->write_func(self, &string, 1) < 0)
-            goto err;
+            goto error;
 
         if (self->write_func(self, repr_str, len) < 0)
-            goto err;
+            goto error;
 
         if (self->write_func(self, "\n", 1) < 0)
-            goto err;
+            goto error;
 
         Py_XDECREF(repr);
     }
@@ -1187,7 +1187,7 @@ save_string(PicklerObject *self, PyObject *args, int doput)
 
     return 0;
 
-  err:
+  error:
     Py_XDECREF(repr);
     return -1;
 }
@@ -1253,17 +1253,17 @@ save_unicode(PicklerObject *self, PyObject *args, int doput)
             return -1;
 
         if ((len = PyString_Size(repr)) < 0)
-            goto err;
+            goto error;
         repr_str = PyString_AS_STRING((PyStringObject *) repr);
 
         if (self->write_func(self, &string, 1) < 0)
-            goto err;
+            goto error;
 
         if (self->write_func(self, repr_str, len) < 0)
-            goto err;
+            goto error;
 
         if (self->write_func(self, "\n", 1) < 0)
-            goto err;
+            goto error;
 
         Py_XDECREF(repr);
     }
@@ -1275,7 +1275,7 @@ save_unicode(PicklerObject *self, PyObject *args, int doput)
             return -1;
 
         if ((size = PyString_Size(repr)) < 0)
-            goto err;
+            goto error;
         if (size > INT_MAX)
             return -1;          /* string too large */
 
@@ -1285,10 +1285,10 @@ save_unicode(PicklerObject *self, PyObject *args, int doput)
         len = 5;
 
         if (self->write_func(self, c_str, len) < 0)
-            goto err;
+            goto error;
 
         if (self->write_func(self, PyString_AS_STRING(repr), size) < 0)
-            goto err;
+            goto error;
 
         Py_DECREF(repr);
     }
@@ -1299,7 +1299,7 @@ save_unicode(PicklerObject *self, PyObject *args, int doput)
 
     return 0;
 
-  err:
+  error:
     Py_XDECREF(repr);
     return -1;
 }
@@ -4834,10 +4834,10 @@ newUnpicklerobject(PyObject *f)
     self->find_class = NULL;
 
     if (!(self->memo = PyDict_New()))
-        goto err;
+        goto error;
 
     if (!self->stack)
-        goto err;
+        goto error;
 
     Py_INCREF(f);
     self->file = f;
@@ -4847,7 +4847,7 @@ newUnpicklerobject(PyObject *f)
         self->fp = PyFile_AsFile(f);
         if (self->fp == NULL) {
             PyErr_SetString(PyExc_ValueError, "I/O operation on closed file");
-            goto err;
+            goto error;
         }
         self->read_func = read_file;
         self->readline_func = readline_file;
@@ -4864,14 +4864,14 @@ newUnpicklerobject(PyObject *f)
             PyErr_SetString(PyExc_TypeError,
                             "argument must have 'read' and "
                             "'readline' attributes");
-            goto err;
+            goto error;
         }
     }
     PyObject_GC_Track(self);
 
     return self;
 
-  err:
+  error:
     Py_DECREF((PyObject *) self);
     return NULL;
 }
