@@ -461,7 +461,7 @@ write_file(Picklerobject *self, const char *s, Py_ssize_t n)
 static int
 write_other(Picklerobject *self, const char *s, Py_ssize_t _n)
 {
-    PyObject *py_str = 0, *junk = 0;
+    PyObject *py_str, *result;
     int n;
 
     if (_n > INT_MAX)
@@ -491,21 +491,16 @@ write_other(Picklerobject *self, const char *s, Py_ssize_t _n)
         }
     }
 
-    if (self->write) {
-        /* object with write method */
-        ARG_TUP(self, py_str);
-        if (self->arg) {
-            junk = PyObject_Call(self->write, self->arg, NULL);
-            FREE_ARG_TUP(self);
-        }
-        if (junk)
-            Py_DECREF(junk);
-        else
-            return -1;
+    /* object with write method */
+    ARG_TUP(self, py_str);
+    if (self->arg) {
+        result = PyObject_Call(self->write, self->arg, NULL);
+        FREE_ARG_TUP(self);
     }
-    else
-        PDATA_PUSH(self->file, py_str, -1);
+    if (result == NULL)
+        return -1;
 
+    Py_DECREF(result);
     self->buf_size = 0;
     return n;
 }
@@ -2394,10 +2389,17 @@ static struct PyMethodDef Pickler_methods[] = {
     {NULL, NULL}                /* sentinel */
 };
 
-static Picklerobject *
-newPicklerobject(PyObject *file, int proto)
+static PyObject *
+Pickler_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
+    static char *kwlist[] = { "file", "protocol", NULL };
     Picklerobject *self;
+    PyObject *file;
+    int proto = 0;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "O|i:Pickler",
+                                     kwlist, &file, &proto))
+        return NULL;
 
     if (proto < 0)
         proto = HIGHEST_PROTOCOL;
@@ -2411,85 +2413,65 @@ newPicklerobject(PyObject *file, int proto)
     self = PyObject_GC_New(Picklerobject, &Picklertype);
     if (self == NULL)
         return NULL;
-    self->proto = proto;
-    self->bin = proto > 0;
-    self->fp = NULL;
-    self->write = NULL;
-    self->memo = NULL;
-    self->arg = NULL;
-    self->pers_func = NULL;
-    self->inst_pers_func = NULL;
-    self->write_buf = NULL;
-    self->fast = 0;
+
+	self->proto = proto;
+	self->bin = proto > 0;
+	self->fp = NULL;
+	self->write = NULL;
+	self->memo = NULL;
+	self->arg = NULL;
+	self->pers_func = NULL;
+	self->inst_pers_func = NULL;
+	self->write_buf = NULL;
+	self->fast = 0;
     self->nesting = 0;
-    self->fast_container = 0;
-    self->fast_memo = NULL;
-    self->buf_size = 0;
-    self->dispatch_table = NULL;
+	self->fast_container = 0;
+	self->fast_memo = NULL;
+	self->buf_size = 0;
+	self->dispatch_table = NULL;
 
-    self->file = NULL;
-    if (file)
-        Py_INCREF(file);
-    else
-        goto err;
+    self->memo = PyDict_New();
+    if (self->memo == NULL)
+        goto error;
 
-    self->file = file;
+    Py_INCREF(dispatch_table);
+    self->dispatch_table = dispatch_table;
 
-    if (!(self->memo = PyDict_New()))
-        goto err;
-
+    Py_INCREF(file);
     if (PyFile_Check(file)) {
         self->fp = PyFile_AsFile(file);
         if (self->fp == NULL) {
             PyErr_SetString(PyExc_ValueError, "I/O operation on closed file");
-            goto err;
+            goto io_error;
         }
         self->write_func = write_file;
     }
     else {
-        self->write_func = write_other;
-
         self->write = PyObject_GetAttr(file, write_str);
-        if (!self->write) {
+        if (self->write == NULL) {
             PyErr_Clear();
             PyErr_SetString(PyExc_TypeError,
                             "argument must have 'write' " "attribute");
-            goto err;
+            goto io_error;
         }
 
         self->write_buf = (char *) PyMem_Malloc(WRITE_BUF_SIZE);
         if (self->write_buf == NULL) {
             PyErr_NoMemory();
-            goto err;
+            goto io_error;
         }
+        self->write_func = write_other;
     }
 
-    self->dispatch_table = dispatch_table;
-    Py_INCREF(dispatch_table);
     PyObject_GC_Track(self);
+    return (PyObject *) self;
 
-    return self;
-
-  err:
+  io_error:
+    Py_DECREF(file);
+  error:
     Py_DECREF(self);
     return NULL;
 }
-
-
-static PyObject *
-get_Pickler(PyObject *self, PyObject *args, PyObject *kwds)
-{
-    static char *kwlist[] = { "file", "protocol", NULL };
-    PyObject *file = NULL;
-    int proto = 0;
-
-    if (!PyArg_ParseTupleAndKeywords(args, kwds, "O|i:Pickler",
-                                     kwlist, &file, &proto))
-        return NULL;
-
-    return (PyObject *) newPicklerobject(file, proto);
-}
-
 
 static void
 Pickler_dealloc(Picklerobject *self)
@@ -2499,7 +2481,6 @@ Pickler_dealloc(Picklerobject *self)
     Py_XDECREF(self->memo);
     Py_XDECREF(self->fast_memo);
     Py_XDECREF(self->arg);
-    Py_XDECREF(self->file);
     Py_XDECREF(self->pers_func);
     Py_XDECREF(self->inst_pers_func);
     Py_XDECREF(self->dispatch_table);
@@ -2514,7 +2495,6 @@ Pickler_traverse(Picklerobject *self, visitproc visit, void *arg)
     Py_VISIT(self->memo);
     Py_VISIT(self->fast_memo);
     Py_VISIT(self->arg);
-    Py_VISIT(self->file);
     Py_VISIT(self->pers_func);
     Py_VISIT(self->inst_pers_func);
     Py_VISIT(self->dispatch_table);
@@ -2528,7 +2508,6 @@ Pickler_clear(Picklerobject *self)
     Py_CLEAR(self->memo);
     Py_CLEAR(self->fast_memo);
     Py_CLEAR(self->arg);
-    Py_CLEAR(self->file);
     Py_CLEAR(self->pers_func);
     Py_CLEAR(self->inst_pers_func);
     Py_CLEAR(self->dispatch_table);
@@ -2624,40 +2603,73 @@ static PyGetSetDef Pickler_getsets[] = {
     {NULL}
 };
 
-PyDoc_STRVAR(Picklertype__doc__, "Objects that know how to pickle objects\n");
+PyDoc_STRVAR(Pickler_doc,
+"Pickler(file, protocol=0) -- Create a pickler.\n"
+"\n"
+"This takes a file-like object for writing a pickle data stream.\n"
+"The optional proto argument tells the pickler to use the given\n"
+"protocol; supported protocols are 0, 1, 2.  The default\n"
+"protocol is 0, to be backwards compatible.  (Protocol 0 is the\n"
+"only protocol that can be written to a file opened in text\n"
+"mode and read back successfully.  When using a protocol higher\n"
+"than 0, make sure the file is opened in binary mode, both when\n"
+"pickling and unpickling.)\n"
+"\n"
+"Protocol 1 is more efficient than protocol 0; protocol 2 is\n"
+"more efficient than protocol 1.\n"
+"\n"
+"Specifying a negative protocol version selects the highest\n"
+"protocol version supported.  The higher the protocol used, the\n"
+"more recent the version of Python needed to read the pickle\n"
+"produced.\n"
+"\n"
+"The file parameter must have a write() method that accepts a single\n"
+"string argument.  It can thus be an open file object, a StringIO\n"
+"object, or any other custom object that meets this interface.\n");
+
 
 static PyTypeObject Picklertype = {
     PyObject_HEAD_INIT(NULL)
-        0,                      /*ob_size */
-    "pickle.Pickler",          /*tp_name */
-    sizeof(Picklerobject),      /*tp_basicsize */
-    0,
-    (destructor) Pickler_dealloc,       /* tp_dealloc */
-    0,                          /* tp_print */
-    0,                          /* tp_getattr */
-    0,                          /* tp_setattr */
-    0,                          /* tp_compare */
-    0,                          /* tp_repr */
-    0,                          /* tp_as_number */
-    0,                          /* tp_as_sequence */
-    0,                          /* tp_as_mapping */
-    0,                          /* tp_hash */
-    0,                          /* tp_call */
-    0,                          /* tp_str */
-    PyObject_GenericGetAttr,    /* tp_getattro */
-    PyObject_GenericSetAttr,    /* tp_setattro */
-    0,                          /* tp_as_buffer */
+    0,                                  /*ob_size*/
+    "_pickle.Pickler"  ,                /*tp_name*/
+    sizeof(Picklerobject),              /*tp_basicsize*/
+    0,                                  /*tp_itemsize*/
+    (destructor)Pickler_dealloc,        /*tp_dealloc*/
+    0,                                  /*tp_print*/
+    0,                                  /*tp_getattr*/
+    0,                                  /*tp_setattr*/
+    0,                                  /*tp_compare*/
+    0,                                  /*tp_repr*/
+    0,                                  /*tp_as_number*/
+    0,                                  /*tp_as_sequence*/
+    0,                                  /*tp_as_mapping*/
+    0,                                  /*tp_hash*/
+    0,                                  /*tp_call*/
+    0,                                  /*tp_str*/
+    PyObject_GenericGetAttr,            /*tp_getattro*/
+    PyObject_GenericSetAttr,            /*tp_setattro*/
+    0,                                  /*tp_as_buffer*/
     Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC,
-    Picklertype__doc__,         /* tp_doc */
-    (traverseproc) Pickler_traverse,    /* tp_traverse */
-    (inquiry) Pickler_clear,    /* tp_clear */
-    0,                          /* tp_richcompare */
-    0,                          /* tp_weaklistoffset */
-    0,                          /* tp_iter */
-    0,                          /* tp_iternext */
-    Pickler_methods,            /* tp_methods */
-    Pickler_members,            /* tp_members */
-    Pickler_getsets,            /* tp_getset */
+    Pickler_doc,                        /*tp_doc*/
+    (traverseproc)Pickler_traverse,     /*tp_traverse*/
+    (inquiry)Pickler_clear,             /*tp_clear*/
+    0,                                  /*tp_richcompare*/
+    0,                                  /*tp_weaklistoffset*/
+    0,                                  /*tp_iter*/
+    0,                                  /*tp_iternext*/
+    Pickler_methods,                    /*tp_methods*/
+    Pickler_members,                    /*tp_members*/
+    Pickler_getsets,                    /*tp_getset*/
+    0,                                  /*tp_base*/
+    0,                                  /*tp_dict*/
+    0,                                  /*tp_descr_get*/
+    0,                                  /*tp_descr_set*/
+    0,                                  /*tp_dictoffset*/
+    0,                                  /*tp_init*/
+    0,                                  /*tp_alloc*/
+    Pickler_new,                        /*tp_new*/
+    0,                                  /*tp_free*/
+    0,                                  /*tp_is_gc*/
 };
 
 static PyObject *
@@ -5008,56 +5020,6 @@ Unpickler_setattr(Unpicklerobject *self, char *name, PyObject *value)
     return -1;
 }
 
-/* ---------------------------------------------------------------------------
- * Module-level functions.
- */
-
-/* dump(obj, file, protocol=0). */
-static PyObject *
-cpm_dump(PyObject *self, PyObject *args, PyObject *kwds)
-{
-    static char *kwlist[] = { "obj", "file", "protocol", NULL };
-    PyObject *ob, *file, *res = NULL;
-    Picklerobject *pickler = 0;
-    int proto = 0;
-
-    if (!(PyArg_ParseTupleAndKeywords(args, kwds, "OO|i", kwlist,
-                                      &ob, &file, &proto)))
-        goto finally;
-
-    if (!(pickler = newPicklerobject(file, proto)))
-        goto finally;
-
-    if (dump(pickler, ob) < 0)
-        goto finally;
-
-    Py_INCREF(Py_None);
-    res = Py_None;
-
-  finally:
-    Py_XDECREF(pickler);
-
-    return res;
-}
-
-/* load(fileobj). */
-static PyObject *
-cpm_load(PyObject *self, PyObject *ob)
-{
-    Unpicklerobject *unpickler = 0;
-    PyObject *res = NULL;
-
-    if (!(unpickler = newUnpicklerobject(ob)))
-        goto finally;
-
-    res = load(unpickler);
-
-  finally:
-    Py_XDECREF(unpickler);
-
-    return res;
-}
-
 PyDoc_STRVAR(Unpicklertype__doc__, "Objects that know how to unpickle");
 
 static PyTypeObject Unpicklertype = {
@@ -5085,47 +5047,6 @@ static PyTypeObject Unpicklertype = {
     Unpicklertype__doc__,               /* tp_doc */
     (traverseproc) Unpickler_traverse,  /* tp_traverse */
     (inquiry) Unpickler_clear,          /* tp_clear */
-};
-
-static struct PyMethodDef pickle_methods[] = {
-    {"dump", (PyCFunction) cpm_dump, METH_VARARGS | METH_KEYWORDS,
-     PyDoc_STR("dump(obj, file, protocol=0) -- "
-               "Write an object in pickle format to the given file.\n"
-               "\n"
-               "See the Pickler docstring for the meaning of optional argument proto.")
-     },
-
-    {"load", (PyCFunction) cpm_load, METH_O,
-     PyDoc_STR("load(file) -- Load a pickle from the given file")},
-
-    {"Pickler", (PyCFunction) get_Pickler, METH_VARARGS | METH_KEYWORDS,
-     PyDoc_STR("Pickler(file, protocol=0) -- Create a pickler.\n"
-               "\n"
-               "This takes a file-like object for writing a pickle data stream.\n"
-               "The optional proto argument tells the pickler to use the given\n"
-               "protocol; supported protocols are 0, 1, 2.  The default\n"
-               "protocol is 0, to be backwards compatible.  (Protocol 0 is the\n"
-               "only protocol that can be written to a file opened in text\n"
-               "mode and read back successfully.  When using a protocol higher\n"
-               "than 0, make sure the file is opened in binary mode, both when\n"
-               "pickling and unpickling.)\n"
-               "\n"
-               "Protocol 1 is more efficient than protocol 0; protocol 2 is\n"
-               "more efficient than protocol 1.\n"
-               "\n"
-               "Specifying a negative protocol version selects the highest\n"
-               "protocol version supported.  The higher the protocol used, the\n"
-               "more recent the version of Python needed to read the pickle\n"
-               "produced.\n"
-               "\n"
-               "The file parameter must have a write() method that accepts a single\n"
-               "string argument.  It can thus be an open file object, a StringIO\n"
-               "object, or any other custom object that meets this interface.\n")
-     },
-
-    {"Unpickler", (PyCFunction) get_Unpickler, METH_O,
-     PyDoc_STR("Unpickler(file) -- Create an unpickler.")},
-    {NULL, NULL}
 };
 
 static int
@@ -5282,11 +5203,11 @@ init_pickle(void)
         return;
 
     /* Create the module and add the functions */
-    m = Py_InitModule4("_pickle", pickle_methods,
-                       pickle_module_documentation,
-                       (PyObject *) NULL, PYTHON_API_VERSION);
+    m = Py_InitModule3("_pickle", NULL, pickle_module_documentation);
     if (m == NULL)
         return;
+
+    PyModule_AddObject(m, "Pickler", (PyObject *)&Picklertype);
 
     /* Add some symbolic constants to the module */
     d = PyModule_GetDict(m);
