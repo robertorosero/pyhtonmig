@@ -367,7 +367,7 @@ typedef struct PicklerObject {
 
 static PyTypeObject Pickler_Type;
 
-typedef struct Unpicklerobject {
+typedef struct UnpicklerObject {
     PyObject_HEAD
     FILE *fp;
     PyObject *file;
@@ -382,14 +382,14 @@ typedef struct Unpicklerobject {
     int *marks;
     int num_marks;
     int marks_size;
-    Py_ssize_t(*read_func) (struct Unpicklerobject *, char **, Py_ssize_t);
-    Py_ssize_t(*readline_func) (struct Unpicklerobject *, char **);
+    Py_ssize_t(*read_func) (struct UnpicklerObject *, char **, Py_ssize_t);
+    Py_ssize_t(*readline_func) (struct UnpicklerObject *, char **);
     int buf_size;
     char *buf;
     PyObject *find_class;
-} Unpicklerobject;
+} UnpicklerObject;
 
-static PyTypeObject Unpicklertype;
+static PyTypeObject Unpickler_Type;
 
 /* Forward decls that need the above structs */
 static int save(PicklerObject *, PyObject *, int);
@@ -507,7 +507,7 @@ write_other(PicklerObject *self, const char *s, Py_ssize_t _n)
 
 
 static Py_ssize_t
-read_file(Unpicklerobject *self, char **s, Py_ssize_t n)
+read_file(UnpicklerObject *self, char **s, Py_ssize_t n)
 {
     size_t nbytesread;
 
@@ -552,7 +552,7 @@ read_file(Unpicklerobject *self, char **s, Py_ssize_t n)
 
 
 static Py_ssize_t
-readline_file(Unpicklerobject *self, char **s)
+readline_file(UnpicklerObject *self, char **s)
 {
     int i;
 
@@ -591,7 +591,7 @@ readline_file(Unpicklerobject *self, char **s)
 }
 
 static Py_ssize_t
-read_other(Unpicklerobject *self, char **s, Py_ssize_t n)
+read_other(UnpicklerObject *self, char **s, Py_ssize_t n)
 {
     PyObject *bytes, *str = 0;
 
@@ -616,7 +616,7 @@ read_other(Unpicklerobject *self, char **s, Py_ssize_t n)
 
 
 static Py_ssize_t
-readline_other(Unpicklerobject *self, char **s)
+readline_other(UnpicklerObject *self, char **s)
 {
     PyObject *str;
     Py_ssize_t str_size;
@@ -2705,7 +2705,7 @@ find_class(PyObject *py_module_name, PyObject *py_global_name, PyObject *fc)
 }
 
 static int
-marker(Unpicklerobject *self)
+marker(UnpicklerObject *self)
 {
     if (self->num_marks < 1) {
         PyErr_SetString(UnpicklingError, "could not find MARK");
@@ -2717,7 +2717,7 @@ marker(Unpicklerobject *self)
 
 
 static int
-load_none(Unpicklerobject *self)
+load_none(UnpicklerObject *self)
 {
     PDATA_APPEND(self->stack, Py_None, -1);
     return 0;
@@ -2731,7 +2731,7 @@ bad_readline(void)
 }
 
 static int
-load_int(Unpicklerobject *self)
+load_int(UnpicklerObject *self)
 {
     PyObject *py_int = 0;
     char *endptr, *s;
@@ -2781,7 +2781,7 @@ load_int(Unpicklerobject *self)
 }
 
 static int
-load_bool(Unpicklerobject *self, PyObject *boolean)
+load_bool(UnpicklerObject *self, PyObject *boolean)
 {
     assert(boolean == Py_True || boolean == Py_False);
     PDATA_APPEND(self->stack, boolean, -1);
@@ -2817,7 +2817,7 @@ calc_binint(char *s, int x)
 
 
 static int
-load_binintx(Unpicklerobject *self, char *s, int x)
+load_binintx(UnpicklerObject *self, char *s, int x)
 {
     PyObject *py_int = 0;
     long l;
@@ -2833,7 +2833,7 @@ load_binintx(Unpicklerobject *self, char *s, int x)
 
 
 static int
-load_binint(Unpicklerobject *self)
+load_binint(UnpicklerObject *self)
 {
     char *s;
 
@@ -2845,7 +2845,7 @@ load_binint(Unpicklerobject *self)
 
 
 static int
-load_binint1(Unpicklerobject *self)
+load_binint1(UnpicklerObject *self)
 {
     char *s;
 
@@ -2857,7 +2857,7 @@ load_binint1(Unpicklerobject *self)
 
 
 static int
-load_binint2(Unpicklerobject *self)
+load_binint2(UnpicklerObject *self)
 {
     char *s;
 
@@ -2868,7 +2868,7 @@ load_binint2(Unpicklerobject *self)
 }
 
 static int
-load_long(Unpicklerobject *self)
+load_long(UnpicklerObject *self)
 {
     PyObject *l = 0;
     char *end, *s;
@@ -2898,7 +2898,7 @@ load_long(Unpicklerobject *self)
  * data following.
  */
 static int
-load_counted_long(Unpicklerobject *self, int size)
+load_counted_long(UnpicklerObject *self, int size)
 {
     Py_ssize_t i;
     char *nbytes;
@@ -2937,7 +2937,7 @@ load_counted_long(Unpicklerobject *self, int size)
 }
 
 static int
-load_float(Unpicklerobject *self)
+load_float(UnpicklerObject *self)
 {
     PyObject *py_float = 0;
     char *endptr, *s;
@@ -2973,7 +2973,7 @@ load_float(Unpicklerobject *self)
 }
 
 static int
-load_binfloat(Unpicklerobject *self)
+load_binfloat(UnpicklerObject *self)
 {
     PyObject *py_float;
     double x;
@@ -2995,7 +2995,7 @@ load_binfloat(Unpicklerobject *self)
 }
 
 static int
-load_string(Unpicklerobject *self)
+load_string(UnpicklerObject *self)
 {
     PyObject *str = 0;
     int len, res = -1;
@@ -3041,7 +3041,7 @@ load_string(Unpicklerobject *self)
 
 
 static int
-load_binstring(Unpicklerobject *self)
+load_binstring(UnpicklerObject *self)
 {
     PyObject *py_string = 0;
     long l;
@@ -3064,7 +3064,7 @@ load_binstring(Unpicklerobject *self)
 
 
 static int
-load_short_binstring(Unpicklerobject *self)
+load_short_binstring(UnpicklerObject *self)
 {
     PyObject *py_string = 0;
     unsigned char l;
@@ -3088,7 +3088,7 @@ load_short_binstring(Unpicklerobject *self)
 
 #ifdef Py_USING_UNICODE
 static int
-load_unicode(Unpicklerobject *self)
+load_unicode(UnpicklerObject *self)
 {
     PyObject *str = 0;
     int len, res = -1;
@@ -3113,7 +3113,7 @@ load_unicode(Unpicklerobject *self)
 
 #ifdef Py_USING_UNICODE
 static int
-load_binunicode(Unpicklerobject *self)
+load_binunicode(UnpicklerObject *self)
 {
     PyObject *unicode;
     long l;
@@ -3137,7 +3137,7 @@ load_binunicode(Unpicklerobject *self)
 
 
 static int
-load_tuple(Unpicklerobject *self)
+load_tuple(UnpicklerObject *self)
 {
     PyObject *tup;
     int i;
@@ -3151,7 +3151,7 @@ load_tuple(Unpicklerobject *self)
 }
 
 static int
-load_counted_tuple(Unpicklerobject *self, int len)
+load_counted_tuple(UnpicklerObject *self, int len)
 {
     PyObject *tup = PyTuple_New(len);
 
@@ -3171,7 +3171,7 @@ load_counted_tuple(Unpicklerobject *self, int len)
 }
 
 static int
-load_empty_list(Unpicklerobject *self)
+load_empty_list(UnpicklerObject *self)
 {
     PyObject *list;
 
@@ -3182,7 +3182,7 @@ load_empty_list(Unpicklerobject *self)
 }
 
 static int
-load_empty_dict(Unpicklerobject *self)
+load_empty_dict(UnpicklerObject *self)
 {
     PyObject *dict;
 
@@ -3194,7 +3194,7 @@ load_empty_dict(Unpicklerobject *self)
 
 
 static int
-load_list(Unpicklerobject *self)
+load_list(UnpicklerObject *self)
 {
     PyObject *list = 0;
     int i;
@@ -3208,7 +3208,7 @@ load_list(Unpicklerobject *self)
 }
 
 static int
-load_dict(Unpicklerobject *self)
+load_dict(UnpicklerObject *self)
 {
     PyObject *dict, *key, *value;
     int i, j, k;
@@ -3260,7 +3260,7 @@ Instance_New(PyObject *cls, PyObject *args)
 
 
 static int
-load_obj(Unpicklerobject *self)
+load_obj(UnpicklerObject *self)
 {
     PyObject *class, *tup, *obj = 0;
     int i;
@@ -3284,7 +3284,7 @@ load_obj(Unpicklerobject *self)
 
 
 static int
-load_inst(Unpicklerobject *self)
+load_inst(UnpicklerObject *self)
 {
     PyObject *tup, *class = 0, *obj = 0, *module_name, *class_name;
     int i, len;
@@ -3328,7 +3328,7 @@ load_inst(Unpicklerobject *self)
 }
 
 static int
-load_newobj(Unpicklerobject *self)
+load_newobj(UnpicklerObject *self)
 {
     PyObject *args = NULL;
     PyObject *clsraw = NULL;
@@ -3378,7 +3378,7 @@ load_newobj(Unpicklerobject *self)
 }
 
 static int
-load_global(Unpicklerobject *self)
+load_global(UnpicklerObject *self)
 {
     PyObject *class = 0, *module_name = 0, *class_name = 0;
     int len;
@@ -3412,7 +3412,7 @@ load_global(Unpicklerobject *self)
 
 
 static int
-load_persid(Unpicklerobject *self)
+load_persid(UnpicklerObject *self)
 {
     PyObject *pid = 0;
     int len;
@@ -3457,7 +3457,7 @@ load_persid(Unpicklerobject *self)
 }
 
 static int
-load_binpersid(Unpicklerobject *self)
+load_binpersid(UnpicklerObject *self)
 {
     PyObject *pid = 0;
 
@@ -3495,7 +3495,7 @@ load_binpersid(Unpicklerobject *self)
 
 
 static int
-load_pop(Unpicklerobject *self)
+load_pop(UnpicklerObject *self)
 {
     int len;
 
@@ -3521,7 +3521,7 @@ load_pop(Unpicklerobject *self)
 
 
 static int
-load_pop_mark(Unpicklerobject *self)
+load_pop_mark(UnpicklerObject *self)
 {
     int i;
 
@@ -3535,7 +3535,7 @@ load_pop_mark(Unpicklerobject *self)
 
 
 static int
-load_dup(Unpicklerobject *self)
+load_dup(UnpicklerObject *self)
 {
     PyObject *last;
     int len;
@@ -3550,7 +3550,7 @@ load_dup(Unpicklerobject *self)
 
 
 static int
-load_get(Unpicklerobject *self)
+load_get(UnpicklerObject *self)
 {
     PyObject *py_str = 0, *value = 0;
     int len;
@@ -3581,7 +3581,7 @@ load_get(Unpicklerobject *self)
 
 
 static int
-load_binget(Unpicklerobject *self)
+load_binget(UnpicklerObject *self)
 {
     PyObject *py_key = 0, *value = 0;
     unsigned char key;
@@ -3611,7 +3611,7 @@ load_binget(Unpicklerobject *self)
 
 
 static int
-load_long_binget(Unpicklerobject *self)
+load_long_binget(UnpicklerObject *self)
 {
     PyObject *py_key = 0, *value = 0;
     unsigned char c;
@@ -3652,7 +3652,7 @@ load_long_binget(Unpicklerobject *self)
  * the number of bytes following the opcode, holding the index (code) value.
  */
 static int
-load_extension(Unpicklerobject *self, int nbytes)
+load_extension(UnpicklerObject *self, int nbytes)
 {
     char *codebytes;            /* the nbytes bytes after the opcode */
     long code;                  /* calc_binint returns long */
@@ -3720,7 +3720,7 @@ load_extension(Unpicklerobject *self, int nbytes)
 }
 
 static int
-load_put(Unpicklerobject *self)
+load_put(UnpicklerObject *self)
 {
     PyObject *py_str = 0, *value = 0;
     int len, l;
@@ -3742,7 +3742,7 @@ load_put(Unpicklerobject *self)
 
 
 static int
-load_binput(Unpicklerobject *self)
+load_binput(UnpicklerObject *self)
 {
     PyObject *py_key = 0, *value = 0;
     unsigned char key;
@@ -3766,7 +3766,7 @@ load_binput(Unpicklerobject *self)
 
 
 static int
-load_long_binput(Unpicklerobject *self)
+load_long_binput(UnpicklerObject *self)
 {
     PyObject *py_key = 0, *value = 0;
     long key;
@@ -3798,7 +3798,7 @@ load_long_binput(Unpicklerobject *self)
 
 
 static int
-do_append(Unpicklerobject *self, int x)
+do_append(UnpicklerObject *self, int x)
 {
     PyObject *value = 0, *list = 0, *append_method = 0;
     int len, i;
@@ -3856,21 +3856,21 @@ do_append(Unpicklerobject *self, int x)
 
 
 static int
-load_append(Unpicklerobject *self)
+load_append(UnpicklerObject *self)
 {
     return do_append(self, self->stack->length - 1);
 }
 
 
 static int
-load_appends(Unpicklerobject *self)
+load_appends(UnpicklerObject *self)
 {
     return do_append(self, marker(self));
 }
 
 
 static int
-do_setitems(Unpicklerobject *self, int x)
+do_setitems(UnpicklerObject *self, int x)
 {
     PyObject *value = 0, *key = 0, *dict = 0;
     int len, i, r = 0;
@@ -3896,20 +3896,20 @@ do_setitems(Unpicklerobject *self, int x)
 
 
 static int
-load_setitem(Unpicklerobject *self)
+load_setitem(UnpicklerObject *self)
 {
     return do_setitems(self, self->stack->length - 2);
 }
 
 static int
-load_setitems(Unpicklerobject *self)
+load_setitems(UnpicklerObject *self)
 {
     return do_setitems(self, marker(self));
 }
 
 
 static int
-load_build(Unpicklerobject *self)
+load_build(UnpicklerObject *self)
 {
     PyObject *state, *inst, *slotstate;
     PyObject *__setstate__;
@@ -4003,7 +4003,7 @@ load_build(Unpicklerobject *self)
 
 
 static int
-load_mark(Unpicklerobject *self)
+load_mark(UnpicklerObject *self)
 {
     int s;
 
@@ -4035,7 +4035,7 @@ load_mark(Unpicklerobject *self)
 }
 
 static int
-load_reduce(Unpicklerobject *self)
+load_reduce(UnpicklerObject *self)
 {
     PyObject *callable = 0, *arg_tup = 0, *ob = 0;
 
@@ -4060,7 +4060,7 @@ load_reduce(Unpicklerobject *self)
  * is the first opcode for protocols >= 2.
  */
 static int
-load_proto(Unpicklerobject *self)
+load_proto(UnpicklerObject *self)
 {
     int i;
     char *protobyte;
@@ -4082,7 +4082,7 @@ load_proto(Unpicklerobject *self)
 }
 
 static PyObject *
-load(Unpicklerobject *self)
+load(UnpicklerObject *self)
 {
     PyObject *err = 0, *val = 0;
     char *s;
@@ -4390,7 +4390,7 @@ load(Unpicklerobject *self)
    find persistent references. */
 
 static int
-noload_obj(Unpicklerobject * self)
+noload_obj(UnpicklerObject * self)
 {
     int i;
 
@@ -4401,7 +4401,7 @@ noload_obj(Unpicklerobject * self)
 
 
 static int
-noload_inst(Unpicklerobject * self)
+noload_inst(UnpicklerObject * self)
 {
     int i;
     char *s;
@@ -4418,7 +4418,7 @@ noload_inst(Unpicklerobject * self)
 }
 
 static int
-noload_newobj(Unpicklerobject * self)
+noload_newobj(UnpicklerObject * self)
 {
     PyObject *obj;
 
@@ -4437,7 +4437,7 @@ noload_newobj(Unpicklerobject * self)
 }
 
 static int
-noload_global(Unpicklerobject *self)
+noload_global(UnpicklerObject *self)
 {
     char *s;
 
@@ -4450,7 +4450,7 @@ noload_global(Unpicklerobject *self)
 }
 
 static int
-noload_reduce(Unpicklerobject *self)
+noload_reduce(UnpicklerObject *self)
 {
 
     if (self->stack->length < 2)
@@ -4461,7 +4461,7 @@ noload_reduce(Unpicklerobject *self)
 }
 
 static int
-noload_build(Unpicklerobject *self)
+noload_build(UnpicklerObject *self)
 {
 
     if (self->stack->length < 1)
@@ -4471,7 +4471,7 @@ noload_build(Unpicklerobject *self)
 }
 
 static int
-noload_extension(Unpicklerobject *self, int nbytes)
+noload_extension(UnpicklerObject *self, int nbytes)
 {
     char *codebytes;
 
@@ -4484,7 +4484,7 @@ noload_extension(Unpicklerobject *self, int nbytes)
 
 
 static PyObject *
-noload(Unpicklerobject *self)
+noload(UnpicklerObject *self)
 {
     PyObject *err = 0, *val = 0;
     char *s;
@@ -4783,13 +4783,13 @@ noload(Unpicklerobject *self)
 
 
 static PyObject *
-Unpickler_load(Unpicklerobject * self, PyObject * unused)
+Unpickler_load(UnpicklerObject * self, PyObject * unused)
 {
     return load(self);
 }
 
 static PyObject *
-Unpickler_noload(Unpicklerobject *self, PyObject *unused)
+Unpickler_noload(UnpicklerObject *self, PyObject *unused)
 {
     return noload(self);
 }
@@ -4812,12 +4812,12 @@ static struct PyMethodDef Unpickler_methods[] = {
 };
 
 
-static Unpicklerobject *
-newUnpicklerobject(PyObject *f)
+static UnpicklerObject *
+newUnpicklerObject(PyObject *f)
 {
-    Unpicklerobject *self;
+    UnpicklerObject *self;
 
-    if (!(self = PyObject_GC_New(Unpicklerobject, &Unpicklertype)))
+    if (!(self = PyObject_GC_New(UnpicklerObject, &Unpickler_Type)))
         return NULL;
 
     self->file = NULL;
@@ -4880,12 +4880,12 @@ newUnpicklerobject(PyObject *f)
 static PyObject *
 get_Unpickler(PyObject *self, PyObject *file)
 {
-    return (PyObject *) newUnpicklerobject(file);
+    return (PyObject *) newUnpicklerObject(file);
 }
 
 
 static void
-Unpickler_dealloc(Unpicklerobject *self)
+Unpickler_dealloc(UnpicklerObject *self)
 {
     PyObject_GC_UnTrack((PyObject *) self);
     Py_XDECREF(self->readline);
@@ -4910,7 +4910,7 @@ Unpickler_dealloc(Unpicklerobject *self)
 }
 
 static int
-Unpickler_traverse(Unpicklerobject *self, visitproc visit, void *arg)
+Unpickler_traverse(UnpicklerObject *self, visitproc visit, void *arg)
 {
     Py_VISIT(self->readline);
     Py_VISIT(self->read);
@@ -4925,7 +4925,7 @@ Unpickler_traverse(Unpicklerobject *self, visitproc visit, void *arg)
 }
 
 static int
-Unpickler_clear(Unpicklerobject *self)
+Unpickler_clear(UnpicklerObject *self)
 {
     Py_CLEAR(self->readline);
     Py_CLEAR(self->read);
@@ -4940,7 +4940,7 @@ Unpickler_clear(Unpicklerobject *self)
 }
 
 static PyObject *
-Unpickler_getattr(Unpicklerobject *self, char *name)
+Unpickler_getattr(UnpicklerObject *self, char *name)
 {
     if (!strcmp(name, "persistent_load")) {
         if (!self->pers_func) {
@@ -4982,7 +4982,7 @@ Unpickler_getattr(Unpicklerobject *self, char *name)
 
 
 static int
-Unpickler_setattr(Unpicklerobject *self, char *name, PyObject *value)
+Unpickler_setattr(UnpicklerObject *self, char *name, PyObject *value)
 {
 
     if (!strcmp(name, "persistent_load")) {
@@ -5020,13 +5020,13 @@ Unpickler_setattr(Unpicklerobject *self, char *name, PyObject *value)
     return -1;
 }
 
-PyDoc_STRVAR(Unpicklertype__doc__, "Objects that know how to unpickle");
+PyDoc_STRVAR(Unpickler_Type__doc__, "Objects that know how to unpickle");
 
-static PyTypeObject Unpicklertype = {
+static PyTypeObject Unpickler_Type = {
     PyObject_HEAD_INIT(NULL)
     0,                                  /*ob_size */
     "_pickle.Unpickler",                /*tp_name */
-    sizeof(Unpicklerobject),            /*tp_basicsize */
+    sizeof(UnpicklerObject),            /*tp_basicsize */
     0,
     (destructor) Unpickler_dealloc,     /* tp_dealloc */
     0,                                  /* tp_print */
@@ -5044,7 +5044,7 @@ static PyTypeObject Unpicklertype = {
     0,                                  /* tp_setattro */
     0,                                  /* tp_as_buffer */
     Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC,
-    Unpicklertype__doc__,               /* tp_doc */
+    Unpickler_Type__doc__,               /* tp_doc */
     (traverseproc) Unpickler_traverse,  /* tp_traverse */
     (inquiry) Unpickler_clear,          /* tp_clear */
 };
@@ -5054,7 +5054,7 @@ init_stuff(PyObject *module_dict)
 {
     PyObject *copy_reg, *t, *r;
 
-    if (PyType_Ready(&Unpicklertype) < 0)
+    if (PyType_Ready(&Unpickler_Type) < 0)
         return -1;
     if (PyType_Ready(&Pickler_Type) < 0)
         return -1;
@@ -5190,7 +5190,7 @@ init_pickle(void)
     PyObject *compatible_formats;
 
     Pickler_Type.ob_type = &PyType_Type;
-    Unpicklertype.ob_type = &PyType_Type;
+    Unpickler_Type.ob_type = &PyType_Type;
     PdataType.ob_type = &PyType_Type;
 
     /* Initialize some pieces. We need to do this before module creation,
