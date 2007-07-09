@@ -170,8 +170,6 @@ static PyTypeObject PdataType = {
     (destructor) Pdata_dealloc,   /*tp_dealloc*/
 };
 
-#define Pdata_Check(O) ((O)->ob_type == &PdataType)
-
 static PyObject *
 Pdata_New(void)
 {
@@ -397,8 +395,7 @@ static PyTypeObject Unpicklertype;
 static int save(Picklerobject *, PyObject *, int);
 static int put2(Picklerobject *, PyObject *);
 
-static
-PyObject *
+static PyObject *
 pickle_ErrFormat(PyObject *ErrType, char *stringformat, char *format, ...)
 {
     va_list va;
@@ -540,9 +537,9 @@ read_file(Unpicklerobject *self, char **s, Py_ssize_t n)
         self->buf_size = n;
     }
 
-    Py_BEGIN_ALLOW_THREADS
-        nbytesread = fread(self->buf, sizeof(char), n, self->fp);
-    Py_END_ALLOW_THREADS
+    Py_BEGIN_ALLOW_THREADS;
+    nbytesread = fread(self->buf, sizeof(char), n, self->fp);
+    Py_END_ALLOW_THREADS;
     if (nbytesread != (size_t) n) {
         if (feof(self->fp)) {
             PyErr_SetNone(PyExc_EOFError);
@@ -690,12 +687,6 @@ get(Picklerobject *self, PyObject * id)
         PyOS_snprintf(s + 1, sizeof(s) - 1, "%ld\n", c_value);
         len = strlen(s);
     }
-    else if (Pdata_Check(self->file)) {
-        if (write_other(self, NULL, 0) < 0)
-            return -1;
-        PDATA_APPEND(self->file, mv, -1);
-        return 0;
-    }
     else {
         if (c_value < 256) {
             s[0] = BINGET;
@@ -744,14 +735,6 @@ put2(Picklerobject *self, PyObject *ob)
     if ((p = PyDict_Size(self->memo)) < 0)
         goto finally;
 
-    /* Make sure memo keys are positive! */
-    /* XXX Why?
-     * XXX And does "positive" really mean non-negative?
-     * XXX pickle.py starts with PUT index 0, not 1.  This makes for
-     * XXX gratuitous differences between the pickling modules.
-     */
-    p++;
-
     if (!(py_ob_id = PyLong_FromVoidPtr(ob)))
         goto finally;
 
@@ -773,13 +756,6 @@ put2(Picklerobject *self, PyObject *ob)
         c_str[0] = PUT;
         PyOS_snprintf(c_str + 1, sizeof(c_str) - 1, "%d\n", p);
         len = strlen(c_str);
-    }
-    else if (Pdata_Check(self->file)) {
-        if (write_other(self, NULL, 0) < 0)
-            return -1;
-        PDATA_APPEND(self->file, memo_len, -1);
-        res = 0;                /* Job well done ;) */
-        goto finally;
     }
     else {
         if (p >= 256) {
@@ -1204,17 +1180,10 @@ save_string(Picklerobject *self, PyObject *args, int doput)
         if (self->write_func(self, c_str, len) < 0)
             return -1;
 
-        if (size > 128 && Pdata_Check(self->file)) {
-            if (write_other(self, NULL, 0) < 0)
-                return -1;
-            PDATA_APPEND(self->file, args, -1);
-        }
-        else {
-            if (self->write_func(self,
-                                 PyString_AS_STRING((PyStringObject *) args),
-                                 size) < 0)
-                return -1;
-        }
+        if (self->write_func(self,
+                             PyString_AS_STRING((PyStringObject *) args),
+                             size) < 0)
+            return -1;
     }
 
     if (doput)
@@ -1323,15 +1292,8 @@ save_unicode(Picklerobject *self, PyObject *args, int doput)
         if (self->write_func(self, c_str, len) < 0)
             goto err;
 
-        if (size > 128 && Pdata_Check(self->file)) {
-            if (write_other(self, NULL, 0) < 0)
-                goto err;
-            PDATA_APPEND(self->file, repr, -1);
-        }
-        else {
-            if (self->write_func(self, PyString_AS_STRING(repr), size) < 0)
-                goto err;
-        }
+        if (self->write_func(self, PyString_AS_STRING(repr), size) < 0)
+            goto err;
 
         Py_DECREF(repr);
     }
@@ -2405,175 +2367,23 @@ Pickle_clear_memo(Picklerobject *self, PyObject *args)
 {
     if (self->memo)
         PyDict_Clear(self->memo);
-    Py_INCREF(Py_None);
-    return Py_None;
-}
 
-static PyObject *
-Pickle_getvalue(Picklerobject *self, PyObject *args)
-{
-    int l, i, rsize, ssize, clear = 1, lm;
-    long ik;
-    PyObject *k, *r;
-    char *s, *p, *have_get;
-    Pdata *data;
-
-    /* Can be called by Python code or C code */
-    if (args && !PyArg_ParseTuple(args, "|i:getvalue", &clear))
-        return NULL;
-
-    /* Check to make sure we are based on a list */
-    if (!Pdata_Check(self->file)) {
-        PyErr_SetString(PicklingError,
-                        "Attempt to getvalue() a non-list-based pickler");
-        return NULL;
-    }
-
-    /* flush write buffer */
-    if (write_other(self, NULL, 0) < 0)
-        return NULL;
-
-    data = (Pdata *) self->file;
-    l = data->length;
-
-    /* set up an array to hold get/put status */
-    lm = PyDict_Size(self->memo);
-    if (lm < 0)
-        return NULL;
-    lm++;
-    have_get = malloc(lm);
-    if (have_get == NULL)
-        return PyErr_NoMemory();
-    memset(have_get, 0, lm);
-
-    /* Scan for gets. */
-    for (rsize = 0, i = l; --i >= 0;) {
-        k = data->data[i];
-
-        if (PyString_Check(k))
-            rsize += PyString_GET_SIZE(k);
-
-        else if (PyInt_Check(k)) {      /* put */
-            ik = PyInt_AsLong(k);
-            if (ik == -1 && PyErr_Occurred())
-                goto err;
-            if (ik >= lm || ik == 0) {
-                PyErr_SetString(PicklingError, "Invalid get data");
-                goto err;
-            }
-            if (have_get[ik])   /* with matching get */
-                rsize += ik < 256 ? 2 : 5;
-        }
-
-        else if (!(PyTuple_Check(k) &&
-                   PyTuple_GET_SIZE(k) == 2 &&
-                   PyInt_Check((k = PyTuple_GET_ITEM(k, 0))))
-            ) {
-            PyErr_SetString(PicklingError, "Unexpected data in internal list");
-            goto err;
-        }
-
-        else {                  /* put */
-            ik = PyInt_AsLong(k);
-            if (ik == -1 && PyErr_Occurred())
-                goto err;
-            if (ik >= lm || ik == 0) {
-                PyErr_SetString(PicklingError, "Invalid get data");
-                return NULL;
-            }
-            have_get[ik] = 1;
-            rsize += ik < 256 ? 2 : 5;
-        }
-    }
-
-    /* Now generate the result */
-    r = PyString_FromStringAndSize(NULL, rsize);
-    if (r == NULL)
-        goto err;
-    s = PyString_AS_STRING((PyStringObject *) r);
-
-    for (i = 0; i < l; i++) {
-        k = data->data[i];
-
-        if (PyString_Check(k)) {
-            ssize = PyString_GET_SIZE(k);
-            if (ssize) {
-                p = PyString_AS_STRING((PyStringObject *) k);
-                while (--ssize >= 0)
-                    *s++ = *p++;
-            }
-        }
-
-        else if (PyTuple_Check(k)) {    /* get */
-            ik = PyLong_AsLong(PyTuple_GET_ITEM(k, 0));
-            if (ik == -1 && PyErr_Occurred())
-                goto err;
-            if (ik < 256) {
-                *s++ = BINGET;
-                *s++ = (int) (ik & 0xff);
-            }
-            else {
-                *s++ = LONG_BINGET;
-                *s++ = (int) (ik & 0xff);
-                *s++ = (int) ((ik >> 8) & 0xff);
-                *s++ = (int) ((ik >> 16) & 0xff);
-                *s++ = (int) ((ik >> 24) & 0xff);
-            }
-        }
-
-        else {                  /* put */
-            ik = PyLong_AsLong(k);
-            if (ik == -1 && PyErr_Occurred())
-                goto err;
-
-            if (have_get[ik]) { /* with matching get */
-                if (ik < 256) {
-                    *s++ = BINPUT;
-                    *s++ = (int) (ik & 0xff);
-                }
-                else {
-                    *s++ = LONG_BINPUT;
-                    *s++ = (int) (ik & 0xff);
-                    *s++ = (int) ((ik >> 8) & 0xff);
-                    *s++ = (int) ((ik >> 16) & 0xff);
-                    *s++ = (int) ((ik >> 24) & 0xff);
-                }
-            }
-        }
-    }
-
-    if (clear) {
-        PyDict_Clear(self->memo);
-        Pdata_clear(data, 0);
-    }
-
-    free(have_get);
-    return r;
-  err:
-    free(have_get);
-    return NULL;
+    Py_RETURN_NONE;
 }
 
 static PyObject *
 Pickler_dump(Picklerobject *self, PyObject *args)
 {
     PyObject *ob;
-    int get = 0;
 
-    if (!(PyArg_ParseTuple(args, "O|i:dump", &ob, &get)))
+    if (!(PyArg_ParseTuple(args, "O:dump", &ob)))
         return NULL;
 
     if (dump(self, ob) < 0)
         return NULL;
 
-    if (get)
-        return Pickle_getvalue(self, NULL);
-
-    /* XXX Why does dump() return self? */
-    Py_INCREF(self);
-    return (PyObject *) self;
+    Py_RETURN_NONE;
 }
-
 
 static struct PyMethodDef Pickler_methods[] = {
     {"dump", (PyCFunction) Pickler_dump, METH_VARARGS,
@@ -2581,11 +2391,8 @@ static struct PyMethodDef Pickler_methods[] = {
                "Write an object in pickle format to the object's pickle stream")},
     {"clear_memo", (PyCFunction) Pickle_clear_memo, METH_NOARGS,
      PyDoc_STR("clear_memo() -- Clear the picklers memo")},
-    {"getvalue", (PyCFunction) Pickle_getvalue, METH_VARARGS,
-     PyDoc_STR("getvalue() -- Finish picking a list-based pickle")},
     {NULL, NULL}                /* sentinel */
 };
-
 
 static Picklerobject *
 newPicklerobject(PyObject *file, int proto)
@@ -2623,11 +2430,9 @@ newPicklerobject(PyObject *file, int proto)
     self->file = NULL;
     if (file)
         Py_INCREF(file);
-    else {
-        file = Pdata_New();
-        if (file == NULL)
-            goto err;
-    }
+    else
+        goto err;
+
     self->file = file;
 
     if (!(self->memo = PyDict_New()))
@@ -2644,14 +2449,12 @@ newPicklerobject(PyObject *file, int proto)
     else {
         self->write_func = write_other;
 
-        if (!Pdata_Check(file)) {
-            self->write = PyObject_GetAttr(file, write_str);
-            if (!self->write) {
-                PyErr_Clear();
-                PyErr_SetString(PyExc_TypeError,
-                                "argument must have 'write' " "attribute");
-                goto err;
-            }
+        self->write = PyObject_GetAttr(file, write_str);
+        if (!self->write) {
+            PyErr_Clear();
+            PyErr_SetString(PyExc_TypeError,
+                            "argument must have 'write' " "attribute");
+            goto err;
         }
 
         self->write_buf = (char *) PyMem_Malloc(WRITE_BUF_SIZE);
@@ -2680,20 +2483,10 @@ get_Pickler(PyObject *self, PyObject *args, PyObject *kwds)
     PyObject *file = NULL;
     int proto = 0;
 
-    /* XXX
-     * The documented signature is Pickler(file, protocol=0), but this
-     * accepts Pickler() and Pickler(integer) too.  The meaning then
-     * is clear as mud, undocumented, and not supported by pickle.py.
-     * I'm told Zope uses this, but I haven't traced into this code
-     * far enough to figure out what it means.
-     */
-    if (!PyArg_ParseTuple(args, "|i:Pickler", &proto)) {
-        PyErr_Clear();
-        proto = 0;
-        if (!PyArg_ParseTupleAndKeywords(args, kwds, "O|i:Pickler",
-                                         kwlist, &file, &proto))
-            return NULL;
-    }
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "O|i:Pickler",
+                                     kwlist, &file, &proto))
+        return NULL;
+
     return (PyObject *) newPicklerobject(file, proto);
 }
 
@@ -3219,7 +3012,6 @@ load_string(Unpicklerobject *self)
     }
     else
         goto insecure;
-        /********************************************/
 
     str = PyString_DecodeEscape(p, len, NULL, 0, NULL);
     free(s);
