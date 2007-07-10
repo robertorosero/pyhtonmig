@@ -2438,11 +2438,12 @@ Pickler_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     self->dispatch_table = dispatch_table;
 
     Py_INCREF(file);
+    self->file = file;
     if (PyFile_Check(file)) {
         self->fp = PyFile_AsFile(file);
         if (self->fp == NULL) {
             PyErr_SetString(PyExc_ValueError, "I/O operation on closed file");
-            goto io_error;
+            goto error;
         }
         self->write_func = write_file;
     }
@@ -2452,13 +2453,13 @@ Pickler_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
             PyErr_Clear();
             PyErr_SetString(PyExc_TypeError,
                             "argument must have 'write' " "attribute");
-            goto io_error;
+            goto error;
         }
 
         self->write_buf = (char *) PyMem_Malloc(WRITE_BUF_SIZE);
         if (self->write_buf == NULL) {
             PyErr_NoMemory();
-            goto io_error;
+            goto error;
         }
         self->write_func = write_other;
     }
@@ -2466,8 +2467,6 @@ Pickler_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     PyObject_GC_Track(self);
     return (PyObject *) self;
 
-  io_error:
-    Py_DECREF(file);
   error:
     Py_DECREF(self);
     return NULL;
@@ -2477,6 +2476,7 @@ static void
 Pickler_dealloc(PicklerObject *self)
 {
     PyObject_GC_UnTrack(self);
+    Py_XDECREF(self->file);
     Py_XDECREF(self->write);
     Py_XDECREF(self->memo);
     Py_XDECREF(self->fast_memo);
@@ -2604,11 +2604,12 @@ static PyGetSetDef Pickler_getsets[] = {
 };
 
 PyDoc_STRVAR(Pickler_doc,
-"Pickler(file, protocol=0) -- Create a pickler.\n"
+"Pickler(file, protocol=0) -> new pickler object"
 "\n"
 "This takes a file-like object for writing a pickle data stream.\n"
-"The optional proto argument tells the pickler to use the given\n"
-"protocol; supported protocols are 0, 1, 2.  The default\n"
+"\n"
+"The optional protocol argument tells the pickler to use the\n"
+"given protocol; supported protocols are 0, 1, 2.  The default\n"
 "protocol is 0, to be backwards compatible.  (Protocol 0 is the\n"
 "only protocol that can be written to a file opened in text\n"
 "mode and read back successfully.  When using a protocol higher\n"
@@ -4812,17 +4813,23 @@ static struct PyMethodDef Unpickler_methods[] = {
 };
 
 
-static UnpicklerObject *
-newUnpicklerObject(PyObject *f)
+static PyObject *
+Unpickler_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
+    static char *kwlist[] = { "file", NULL };
     UnpicklerObject *self;
+    PyObject *file;
 
-    if (!(self = PyObject_GC_New(UnpicklerObject, &Unpickler_Type)))
+    if (!PyArg_ParseTupleAndKeywords(args, kwds, "O:Unpickler",
+                                     kwlist, &file))
         return NULL;
 
-    self->file = NULL;
+    self = PyObject_GC_New(UnpicklerObject, &Unpickler_Type);
+    if (self == NULL)
+        return NULL;
+
+    self->fp = NULL;
     self->arg = NULL;
-    self->stack = (Pdata *) Pdata_New();
     self->pers_func = NULL;
     self->last_string = NULL;
     self->marks = NULL;
@@ -4833,18 +4840,19 @@ newUnpicklerObject(PyObject *f)
     self->readline = NULL;
     self->find_class = NULL;
 
-    if (!(self->memo = PyDict_New()))
+    self->memo = PyDict_New();
+    if (self->memo == NULL)
         goto error;
 
-    if (!self->stack)
+    self->stack = (Pdata *) Pdata_New();
+    if (self->stack == NULL)
         goto error;
 
-    Py_INCREF(f);
-    self->file = f;
-
-    /* Set read, readline based on type of f */
-    if (PyFile_Check(f)) {
-        self->fp = PyFile_AsFile(f);
+    Py_INCREF(file);
+    self->file = file;
+    /* Set read, readline based on type of file */
+    if (PyFile_Check(file)) {
+        self->fp = PyFile_AsFile(file);
         if (self->fp == NULL) {
             PyErr_SetString(PyExc_ValueError, "I/O operation on closed file");
             goto error;
@@ -4853,36 +4861,26 @@ newUnpicklerObject(PyObject *f)
         self->readline_func = readline_file;
     }
     else {
-
-        self->fp = NULL;
-        self->read_func = read_other;
-        self->readline_func = readline_other;
-
-        if (!((self->readline = PyObject_GetAttr(f, readline_str)) &&
-              (self->read = PyObject_GetAttr(f, read_str)))) {
+        self->readline = PyObject_GetAttr(file, readline_str);
+        self->read = PyObject_GetAttr(file, read_str);
+        if (self->readline == NULL || self->read == NULL) {
             PyErr_Clear();
             PyErr_SetString(PyExc_TypeError,
                             "argument must have 'read' and "
                             "'readline' attributes");
             goto error;
         }
+        self->read_func = read_other;
+        self->readline_func = readline_other;
     }
-    PyObject_GC_Track(self);
 
-    return self;
+    PyObject_GC_Track(self);
+    return (PyObject *)self;
 
   error:
-    Py_DECREF((PyObject *) self);
+    Py_DECREF(self);
     return NULL;
 }
-
-
-static PyObject *
-get_Unpickler(PyObject *self, PyObject *file)
-{
-    return (PyObject *) newUnpicklerObject(file);
-}
-
 
 static void
 Unpickler_dealloc(UnpicklerObject *self)
@@ -5020,33 +5018,62 @@ Unpickler_setattr(UnpicklerObject *self, char *name, PyObject *value)
     return -1;
 }
 
-PyDoc_STRVAR(Unpickler_Type__doc__, "Objects that know how to unpickle");
+PyDoc_STRVAR(Unpickler_doc,
+"Unpickler(file) -> new unpickler object"
+"\n"
+"This takes a file-like object for reading a pickle data stream.\n"
+"\n"
+"The protocol version of the pickle is detected automatically, so no\n"
+"proto argument is needed.\n"
+"\n"
+"The file-like object must have two methods, a read() method that\n"
+"takes an integer argument, and a readline() method that requires no\n"
+"arguments.  Both methods should return a string.  Thus file-like\n"
+"object can be a file object opened for reading, a StringIO object,\n"
+"or any other custom object that meets this interface.\n");
 
 static PyTypeObject Unpickler_Type = {
     PyObject_HEAD_INIT(NULL)
-    0,                                  /*ob_size */
-    "_pickle.Unpickler",                /*tp_name */
-    sizeof(UnpicklerObject),            /*tp_basicsize */
-    0,
-    (destructor) Unpickler_dealloc,     /* tp_dealloc */
-    0,                                  /* tp_print */
-    (getattrfunc) Unpickler_getattr,    /* tp_getattr */
-    (setattrfunc) Unpickler_setattr,    /* tp_setattr */
-    0,                                  /* tp_compare */
-    0,                                  /* tp_repr */
-    0,                                  /* tp_as_number */
-    0,                                  /* tp_as_sequence */
-    0,                                  /* tp_as_mapping */
-    0,                                  /* tp_hash */
-    0,                                  /* tp_call */
-    0,                                  /* tp_str */
-    0,                                  /* tp_getattro */
-    0,                                  /* tp_setattro */
-    0,                                  /* tp_as_buffer */
+    0,                                  /*ob_size*/
+    "_pickle.Unpickler",                /*tp_name*/
+    sizeof(UnpicklerObject),            /*tp_basicsize*/
+    0,                                  /*tp_itemsize*/
+    (destructor)Unpickler_dealloc,      /*tp_dealloc*/
+    0,                                  /*tp_print*/
+    (getattrfunc)Unpickler_getattr,     /*tp_getattr*/
+    (setattrfunc)Unpickler_setattr,	    /*tp_setattr*/
+    0,                                  /*tp_compare*/
+    0,                                  /*tp_repr*/
+    0,                                  /*tp_as_number*/
+    0,                                  /*tp_as_sequence*/
+    0,                                  /*tp_as_mapping*/
+    0,                                  /*tp_hash*/
+    0,                                  /*tp_call*/
+    0,                                  /*tp_str*/
+    0,                                  /*tp_getattro*/
+    0,                                  /*tp_setattro*/
+    0,                                  /*tp_as_buffer*/
     Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE | Py_TPFLAGS_HAVE_GC,
-    Unpickler_Type__doc__,               /* tp_doc */
-    (traverseproc) Unpickler_traverse,  /* tp_traverse */
-    (inquiry) Unpickler_clear,          /* tp_clear */
+    Unpickler_doc,                      /*tp_doc*/
+    (traverseproc)Unpickler_traverse,   /*tp_traverse*/
+    (inquiry)Unpickler_clear,           /*tp_clear*/
+    0,                                  /*tp_richcompare*/
+    0,                                  /*tp_weaklistoffset*/
+    0,                                  /*tp_iter*/
+    0,                                  /*tp_iternext*/
+    0,                                  /*tp_methods*/
+    0,                                  /*tp_members*/
+    0,                                  /*tp_getset*/
+    0,                                  /*tp_base*/
+    0,                                  /*tp_dict*/
+    0,                                  /*tp_descr_get*/
+    0,                                  /*tp_descr_set*/
+    0,                                  /*tp_dictoffset*/
+    0,                                  /*tp_init*/
+    0,                                  /*tp_alloc*/
+    Unpickler_new,                      /*tp_new*/
+    0,                                  /*tp_free*/
+    0,                                  /*tp_is_gc*/
 };
 
 static int
@@ -5208,6 +5235,7 @@ init_pickle(void)
         return;
 
     PyModule_AddObject(m, "Pickler", (PyObject *)&Pickler_Type);
+    PyModule_AddObject(m, "Unpickler", (PyObject *)&Unpickler_Type);
 
     /* Add some symbolic constants to the module */
     d = PyModule_GetDict(m);
