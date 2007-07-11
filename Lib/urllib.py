@@ -22,7 +22,6 @@ used to query various info about the object, if available.
 (mimetools.Message objects are queried with the getheader() method.)
 """
 
-import string
 import socket
 import os
 import time
@@ -35,7 +34,7 @@ __all__ = ["urlopen", "URLopener", "FancyURLopener", "urlretrieve",
            "localhost", "thishost", "ftperrors", "basejoin", "unwrap",
            "splittype", "splithost", "splituser", "splitpasswd", "splitport",
            "splitnport", "splitquery", "splitattr", "splitvalue",
-           "splitgophertype", "getproxies"]
+           "getproxies"]
 
 __version__ = '1.17'    # XXX This version is not always updated :-(
 
@@ -327,6 +326,11 @@ class URLopener:
             h.send(data)
         errcode, errmsg, headers = h.getreply()
         fp = h.getfile()
+        if errcode == -1:
+            if fp: fp.close()
+            # something went wrong with the HTTP status line
+            raise IOError, ('http protocol error', 0,
+                            'got a bad status line', None)
         if errcode == 200:
             return addinfourl(fp, headers, "http:" + url)
         else:
@@ -414,6 +418,11 @@ class URLopener:
                 h.send(data)
             errcode, errmsg, headers = h.getreply()
             fp = h.getfile()
+            if errcode == -1:
+                if fp: fp.close()
+                # something went wrong with the HTTP status line
+                raise IOError, ('http protocol error', 0,
+                                'got a bad status line', None)
             if errcode == 200:
                 return addinfourl(fp, headers, "https:" + url)
             else:
@@ -422,24 +431,6 @@ class URLopener:
                 else:
                     return self.http_error(url, fp, errcode, errmsg, headers,
                                            data)
-
-    def open_gopher(self, url):
-        """Use Gopher protocol."""
-        if not isinstance(url, str):
-            raise IOError, ('gopher error', 'proxy support for gopher protocol currently not implemented')
-        import gopherlib
-        host, selector = splithost(url)
-        if not host: raise IOError, ('gopher error', 'no host given')
-        host = unquote(host)
-        type, selector = splitgophertype(selector)
-        selector, query = splitquery(selector)
-        selector = unquote(selector)
-        if query:
-            query = unquote(query)
-            fp = gopherlib.send_query(selector, query, host)
-        else:
-            fp = gopherlib.send_selector(selector, host)
-        return addinfourl(fp, noheaders(), "gopher:" + url)
 
     def open_file(self, url):
         """Use local file or FTP depending on form of URL."""
@@ -768,11 +759,9 @@ class FancyURLopener(URLopener):
 
     def prompt_user_passwd(self, host, realm):
         """Override this in a GUI environment!"""
-        import getpass, sys
+        import getpass
         try:
-            sys.stdout.write("Enter username for %s at %s: " % (realm, host))
-            sys.stdout.flush()
-            user = sys.stdin.readline()
+            user = input("Enter username for %s at %s: " % (realm, host))
             passwd = getpass.getpass("Enter password for %s in %s at %s: " %
                 (user, realm, host))
             return user, passwd
@@ -828,19 +817,20 @@ def noheaders():
 class ftpwrapper:
     """Class used by open_ftp() for cache of open FTP connections."""
 
-    def __init__(self, user, passwd, host, port, dirs):
+    def __init__(self, user, passwd, host, port, dirs, timeout=None):
         self.user = user
         self.passwd = passwd
         self.host = host
         self.port = port
         self.dirs = dirs
+        self.timeout = timeout
         self.init()
 
     def init(self):
         import ftplib
         self.busy = 0
         self.ftp = ftplib.FTP()
-        self.ftp.connect(self.host, self.port)
+        self.ftp.connect(self.host, self.port, self.timeout)
         self.ftp.login(self.user, self.passwd)
         for dir in self.dirs:
             self.ftp.cwd(dir)
@@ -905,8 +895,8 @@ class addbase:
             self.fileno = lambda: None
         if hasattr(self.fp, "__iter__"):
             self.__iter__ = self.fp.__iter__
-            if hasattr(self.fp, "next"):
-                self.next = self.fp.next
+            if hasattr(self.fp, "__next__"):
+                self.__next__ = self.fp.__next__
 
     def __repr__(self):
         return '<%s at %r whose fp = %r>' % (self.__class__.__name__,
@@ -972,7 +962,6 @@ class addinfourl(addbase):
 # splitattr('/path;attr1=value1;attr2=value2;...') ->
 #   '/path', ['attr1=value1', 'attr2=value2', ...]
 # splitvalue('attr=value') --> 'attr', 'value'
-# splitgophertype('/Xselector') --> 'X', 'selector'
 # unquote('abc%20def') -> 'abc def'
 # quote('abc def') -> 'abc%20def')
 
@@ -1132,19 +1121,13 @@ def splitvalue(attr):
     if match: return match.group(1, 2)
     return attr, None
 
-def splitgophertype(selector):
-    """splitgophertype('/Xselector') --> 'X', 'selector'."""
-    if selector[:1] == '/' and selector[1:2]:
-        return selector[1], selector[2:]
-    return None, selector
-
 _hextochr = dict(('%02x' % i, chr(i)) for i in range(256))
 _hextochr.update(('%02X' % i, chr(i)) for i in range(256))
 
 def unquote(s):
     """unquote('abc%20def') -> 'abc def'."""
     res = s.split('%')
-    for i in xrange(1, len(res)):
+    for i in range(1, len(res)):
         item = res[i]
         try:
             res[i] = _hextochr[item[:2]] + item[2:]
@@ -1467,13 +1450,13 @@ def reporthook(blocknum, blocksize, totalsize):
 
 # Test program
 def test(args=[]):
+    import string
     if not args:
         args = [
             '/etc/passwd',
             'file:/etc/passwd',
             'file://localhost/etc/passwd',
-            'ftp://ftp.python.org/pub/python/README',
-##          'gopher://gopher.micro.umn.edu/1/',
+            'ftp://ftp.gnu.org/pub/README',
             'http://www.python.org/index.html',
             ]
         if hasattr(URLopener, "open_https"):

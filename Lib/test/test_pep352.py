@@ -1,10 +1,10 @@
 import unittest
 import __builtin__
-import exceptions
 import warnings
 from test.test_support import run_unittest, guard_warnings_filter
 import os
 from platform import system as platform_system
+
 
 class ExceptionClassTests(unittest.TestCase):
 
@@ -15,13 +15,21 @@ class ExceptionClassTests(unittest.TestCase):
         self.failUnless(issubclass(Exception, object))
 
     def verify_instance_interface(self, ins):
-        for attr in ("args", "message", "__str__", "__repr__", "__getitem__"):
-            self.failUnless(hasattr(ins, attr), "%s missing %s attribute" %
-                    (ins.__class__.__name__, attr))
+        for attr in ("args", "__str__", "__repr__"):
+            self.failUnless(hasattr(ins, attr),
+                    "%s missing %s attribute" %
+                        (ins.__class__.__name__, attr))
 
     def test_inheritance(self):
         # Make sure the inheritance hierarchy matches the documentation
-        exc_set = set(x for x in dir(exceptions) if not x.startswith('_'))
+        exc_set = set()
+        for object_ in __builtin__.__dict__.values():
+            try:
+                if issubclass(object_, BaseException):
+                    exc_set.add(object_.__name__)
+            except TypeError:
+                pass
+
         inheritance_tree = open(os.path.join(os.path.split(__file__)[0],
                                                 'exception_hierarchy.txt'))
         try:
@@ -30,7 +38,8 @@ class ExceptionClassTests(unittest.TestCase):
                 last_exc = getattr(__builtin__, superclass_name)
             except AttributeError:
                 self.fail("base class %s not a built-in" % superclass_name)
-            self.failUnless(superclass_name in exc_set)
+            self.failUnless(superclass_name in exc_set,
+                            '%s not found' % superclass_name)
             exc_set.discard(superclass_name)
             superclasses = []  # Loop will insert base exception
             last_depth = 0
@@ -72,8 +81,7 @@ class ExceptionClassTests(unittest.TestCase):
             inheritance_tree.close()
         self.failUnlessEqual(len(exc_set), 0, "%s not accounted for" % exc_set)
 
-    interface_tests = ("length", "args", "message", "str", "unicode", "repr",
-            "indexing")
+    interface_tests = ("length", "args", "str", "unicode", "repr")
 
     def interface_test_driver(self, results):
         for test_name, (given, expected) in zip(self.interface_tests, results):
@@ -84,9 +92,9 @@ class ExceptionClassTests(unittest.TestCase):
         # Make sure interface works properly when given a single argument
         arg = "spam"
         exc = Exception(arg)
-        results = ([len(exc.args), 1], [exc.args[0], arg], [exc.message, arg],
-                [str(exc), str(arg)], [unicode(exc), unicode(arg)],
-            [repr(exc), exc.__class__.__name__ + repr(exc.args)], [exc[0], arg])
+        results = ([len(exc.args), 1], [exc.args[0], arg],
+                   [str(exc), str(arg)], [unicode(exc), unicode(arg)],
+            [repr(exc), exc.__class__.__name__ + repr(exc.args)])
         self.interface_test_driver(results)
 
     def test_interface_multi_arg(self):
@@ -95,23 +103,54 @@ class ExceptionClassTests(unittest.TestCase):
         args = tuple(range(arg_count))
         exc = Exception(*args)
         results = ([len(exc.args), arg_count], [exc.args, args],
-                [exc.message, ''], [str(exc), str(args)],
+                [str(exc), str(args)],
                 [unicode(exc), unicode(args)],
-                [repr(exc), exc.__class__.__name__ + repr(exc.args)],
-                [exc[-1], args[-1]])
+                [repr(exc), exc.__class__.__name__ + repr(exc.args)])
         self.interface_test_driver(results)
 
     def test_interface_no_arg(self):
         # Make sure that with no args that interface is correct
         exc = Exception()
-        results = ([len(exc.args), 0], [exc.args, tuple()], [exc.message, ''],
+        results = ([len(exc.args), 0], [exc.args, tuple()],
                 [str(exc), ''], [unicode(exc), u''],
-                [repr(exc), exc.__class__.__name__ + '()'], [True, True])
+                [repr(exc), exc.__class__.__name__ + '()'])
         self.interface_test_driver(results)
+
 
 class UsageTests(unittest.TestCase):
 
     """Test usage of exceptions"""
+
+    def raise_fails(self, object_):
+        """Make sure that raising 'object_' triggers a TypeError."""
+        try:
+            raise object_
+        except TypeError:
+            return  # What is expected.
+        self.fail("TypeError expected for raising %s" % type(object_))
+
+    def catch_fails(self, object_):
+        """Catching 'object_' should raise a TypeError."""
+        try:
+            try:
+                raise Exception
+            except object_:
+                pass
+        except TypeError:
+            pass
+        except Exception:
+            self.fail("TypeError expected when catching %s" % type(object_))
+
+        try:
+            try:
+                raise Exception
+            except (object_,):
+                pass
+        except TypeError:
+            return
+        except Exception:
+            self.fail("TypeError expected when catching %s as specified in a "
+                        "tuple" % type(object_))
 
     def test_raise_new_style_non_exception(self):
         # You cannot raise a new-style class that does not inherit from
@@ -120,56 +159,28 @@ class UsageTests(unittest.TestCase):
         # inherit from it.
         class NewStyleClass(object):
             pass
-        try:
-            raise NewStyleClass
-        except TypeError:
-            pass
-        except:
-            self.fail("able to raise new-style class")
-        try:
-            raise NewStyleClass()
-        except TypeError:
-            pass
-        except:
-            self.fail("able to raise new-style class instance")
+        self.raise_fails(NewStyleClass)
+        self.raise_fails(NewStyleClass())
 
     def test_raise_string(self):
         # Raising a string raises TypeError.
-        try:
-            raise "spam"
-        except TypeError:
+        self.raise_fails("spam")
+
+    def test_catch_non_BaseException(self):
+        # Tryinng to catch an object that does not inherit from BaseException
+        # is not allowed.
+        class NonBaseException(object):
             pass
-        except:
-            self.fail("was able to raise a string exception")
+        self.catch_fails(NonBaseException)
+        self.catch_fails(NonBaseException())
+
+    def test_catch_BaseException_instance(self):
+        # Catching an instance of a BaseException subclass won't work.
+        self.catch_fails(BaseException())
 
     def test_catch_string(self):
-        # Catching a string should trigger a DeprecationWarning.
-        with guard_warnings_filter():
-            warnings.resetwarnings()
-            warnings.filterwarnings("error")
-            str_exc = "spam"
-            try:
-                try:
-                    raise StandardError
-                except str_exc:
-                    pass
-            except DeprecationWarning:
-                pass
-            except StandardError:
-                self.fail("catching a string exception did not raise "
-                            "DeprecationWarning")
-            # Make sure that even if the string exception is listed in a tuple
-            # that a warning is raised.
-            try:
-                try:
-                    raise StandardError
-                except (AssertionError, str_exc):
-                    pass
-            except DeprecationWarning:
-                pass
-            except StandardError:
-                self.fail("catching a string exception specified in a tuple did "
-                            "not raise DeprecationWarning")
+        # Catching a string is bad.
+        self.catch_fails("spam")
 
 def test_main():
     run_unittest(ExceptionClassTests, UsageTests)

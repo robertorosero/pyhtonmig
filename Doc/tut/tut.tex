@@ -184,12 +184,12 @@ your local Python guru or system administrator.  (E.g.,
 \file{/usr/local/python} is a popular alternative location.)
 
 On Windows machines, the Python installation is usually placed in
-\file{C:\e Python24}, though you can change this when you're running
+\file{C:\e Python30}, though you can change this when you're running
 the installer.  To add this directory to your path, 
 you can type the following command into the command prompt in a DOS box:
 
 \begin{verbatim}
-set path=%path%;C:\python24
+set path=%path%;C:\python30
 \end{verbatim}
 
 
@@ -813,7 +813,7 @@ Traceback (most recent call last):
 IndexError: string index out of range
 \end{verbatim}
 
-The best way to remember how slices work is to think of the indices as
+One way to remember how slices work is to think of the indices as
 pointing \emph{between} characters, with the left edge of the first
 character numbered 0.  Then the right edge of the last character of a
 string of \var{n} characters has index \var{n}, for example:
@@ -2260,7 +2260,7 @@ in a forward direction and then call the \function{reversed()}
 function.
 
 \begin{verbatim}
->>> for i in reversed(xrange(1,10,2)):
+>>> for i in reversed(range(1,10,2)):
 ...     print i
 ...
 9
@@ -2605,8 +2605,8 @@ the core of the language but are nevertheless built in, either for
 efficiency or to provide access to operating system primitives such as
 system calls.  The set of such modules is a configuration option which
 also depends on the underlying platform  For example,
-the \module{amoeba} module is only provided on systems that somehow
-support Amoeba primitives.  One particular module deserves some
+the \module{winreg} module is only provided on Windows systems.
+One particular module deserves some
 attention: \ulink{\module{sys}}{../lib/module-sys.html}%
 \refstmodindex{sys}, which is built into every 
 Python interpreter.  The variables \code{sys.ps1} and
@@ -2653,7 +2653,7 @@ a module defines.  It returns a sorted list of strings:
 ['__displayhook__', '__doc__', '__excepthook__', '__name__', '__stderr__',
  '__stdin__', '__stdout__', '_getframe', 'api_version', 'argv', 
  'builtin_module_names', 'byteorder', 'callstats', 'copyright',
- 'displayhook', 'exc_clear', 'exc_info', 'exc_type', 'excepthook',
+ 'displayhook', 'exc_info', 'excepthook',
  'exec_prefix', 'executable', 'exit', 'getdefaultencoding', 'getdlopenflags',
  'getrecursionlimit', 'getrefcount', 'hexversion', 'maxint', 'maxunicode',
  'meta_path', 'modules', 'path', 'path_hooks', 'path_importer_cache',
@@ -2689,23 +2689,23 @@ standard module \module{__builtin__}\refbimodindex{__builtin__}:
  'LookupError', 'MemoryError', 'NameError', 'None', 'NotImplemented',
  'NotImplementedError', 'OSError', 'OverflowError', 
  'PendingDeprecationWarning', 'ReferenceError', 'RuntimeError',
- 'RuntimeWarning', 'StandardError', 'StopIteration', 'SyntaxError',
+ 'RuntimeWarning', 'StopIteration', 'SyntaxError',
  'SyntaxWarning', 'SystemError', 'SystemExit', 'TabError', 'True',
  'TypeError', 'UnboundLocalError', 'UnicodeDecodeError',
  'UnicodeEncodeError', 'UnicodeError', 'UnicodeTranslateError',
  'UserWarning', 'ValueError', 'Warning', 'WindowsError',
  'ZeroDivisionError', '_', '__debug__', '__doc__', '__import__',
  '__name__', 'abs', 'basestring', 'bool', 'buffer',
- 'callable', 'chr', 'classmethod', 'cmp', 'compile',
+ 'chr', 'classmethod', 'cmp', 'compile',
  'complex', 'copyright', 'credits', 'delattr', 'dict', 'dir', 'divmod',
- 'enumerate', 'eval', 'exec', 'execfile', 'exit', 'file', 'filter', 'float',
+ 'enumerate', 'eval', 'execfile', 'exit', 'file', 'filter', 'float',
  'frozenset', 'getattr', 'globals', 'hasattr', 'hash', 'help', 'hex',
- 'id', 'int', 'isinstance', 'issubclass', 'iter',
+ 'id', 'input', 'int', 'isinstance', 'issubclass', 'iter',
  'len', 'license', 'list', 'locals', 'long', 'map', 'max', 'min',
  'object', 'oct', 'open', 'ord', 'pow', 'property', 'quit', 'range',
- 'reload', 'repr', 'reversed', 'round', 'set',
+ 'repr', 'reversed', 'round', 'set',
  'setattr', 'slice', 'sorted', 'staticmethod', 'str', 'sum', 'super',
- 'tuple', 'type', 'unichr', 'unicode', 'vars', 'xrange', 'zip']
+ 'tuple', 'type', 'unichr', 'unicode', 'vars', 'zip']
 \end{verbatim}
 
 
@@ -2734,9 +2734,9 @@ possible structure for your package (expressed in terms of a
 hierarchical filesystem):
 
 \begin{verbatim}
-Sound/                          Top-level package
+sound/                          Top-level package
       __init__.py               Initialize the sound package
-      Formats/                  Subpackage for file format conversions
+      formats/                  Subpackage for file format conversions
               __init__.py
               wavread.py
               wavwrite.py
@@ -2745,13 +2745,13 @@ Sound/                          Top-level package
               auread.py
               auwrite.py
               ...
-      Effects/                  Subpackage for sound effects
+      effects/                  Subpackage for sound effects
               __init__.py
               echo.py
               surround.py
               reverse.py
               ...
-      Filters/                  Subpackage for filters
+      filters/                  Subpackage for filters
               __init__.py
               equalizer.py
               vocoder.py
@@ -2774,20 +2774,20 @@ Users of the package can import individual modules from the
 package, for example:
 
 \begin{verbatim}
-import Sound.Effects.echo
+import sound.effects.echo
 \end{verbatim}
 
-This loads the submodule \module{Sound.Effects.echo}.  It must be referenced
+This loads the submodule \module{sound.effects.echo}.  It must be referenced
 with its full name.
 
 \begin{verbatim}
-Sound.Effects.echo.echofilter(input, output, delay=0.7, atten=4)
+sound.effects.echo.echofilter(input, output, delay=0.7, atten=4)
 \end{verbatim}
 
 An alternative way of importing the submodule is:
 
 \begin{verbatim}
-from Sound.Effects import echo
+from sound.effects import echo
 \end{verbatim}
 
 This also loads the submodule \module{echo}, and makes it available without
@@ -2800,7 +2800,7 @@ echo.echofilter(input, output, delay=0.7, atten=4)
 Yet another variation is to import the desired function or variable directly:
 
 \begin{verbatim}
-from Sound.Effects.echo import echofilter
+from sound.effects.echo import echofilter
 \end{verbatim}
 
 Again, this loads the submodule \module{echo}, but this makes its function
@@ -2827,7 +2827,7 @@ class or function or variable defined in the previous item.
 %The \code{__all__} Attribute
 
 \ttindex{__all__}
-Now what happens when the user writes \code{from Sound.Effects import
+Now what happens when the user writes \code{from sound.effects import
 *}?  Ideally, one would hope that this somehow goes out to the
 filesystem, finds which submodules are present in the package, and
 imports them all.  Unfortunately, this operation does not work very
@@ -2849,19 +2849,19 @@ encountered.  It is up to the package author to keep this list
 up-to-date when a new version of the package is released.  Package
 authors may also decide not to support it, if they don't see a use for
 importing * from their package.  For example, the file
-\file{Sounds/Effects/__init__.py} could contain the following code:
+\file{sounds/effects/__init__.py} could contain the following code:
 
 \begin{verbatim}
 __all__ = ["echo", "surround", "reverse"]
 \end{verbatim}
 
-This would mean that \code{from Sound.Effects import *} would
-import the three named submodules of the \module{Sound} package.
+This would mean that \code{from sound.effects import *} would
+import the three named submodules of the \module{sound} package.
 
-If \code{__all__} is not defined, the statement \code{from Sound.Effects
+If \code{__all__} is not defined, the statement \code{from sound.effects
 import *} does \emph{not} import all submodules from the package
-\module{Sound.Effects} into the current namespace; it only ensures that the
-package \module{Sound.Effects} has been imported (possibly running any
+\module{sound.effects} into the current namespace; it only ensures that the
+package \module{sound.effects} has been imported (possibly running any
 initialization code in \file{__init__.py}) and then imports whatever names are
 defined in the package.  This includes any names defined (and
 submodules explicitly loaded) by \file{__init__.py}.  It also includes any
@@ -2869,14 +2869,14 @@ submodules of the package that were explicitly loaded by previous
 import statements.  Consider this code:
 
 \begin{verbatim}
-import Sound.Effects.echo
-import Sound.Effects.surround
-from Sound.Effects import *
+import sound.effects.echo
+import sound.effects.surround
+from sound.effects import *
 \end{verbatim}
 
 In this example, the echo and surround modules are imported in the
 current namespace because they are defined in the
-\module{Sound.Effects} package when the \code{from...import} statement
+\module{sound.effects} package when the \code{from...import} statement
 is executed.  (This also works when \code{__all__} is defined.)
 
 Note that in general the practice of importing \code{*} from a module or
@@ -2904,12 +2904,12 @@ which the current module is a submodule), the \keyword{import}
 statement looks for a top-level module with the given name.
 
 When packages are structured into subpackages (as with the
-\module{Sound} package in the example), there's no shortcut to refer
+\module{sound} package in the example), there's no shortcut to refer
 to submodules of sibling packages - the full name of the subpackage
 must be used.  For example, if the module
-\module{Sound.Filters.vocoder} needs to use the \module{echo} module
-in the \module{Sound.Effects} package, it can use \code{from
-Sound.Effects import echo}.
+\module{sound.filters.vocoder} needs to use the \module{echo} module
+in the \module{sound.effects} package, it can use \code{from
+sound.effects import echo}.
 
 Starting with Python 2.5, in addition to the implicit relative imports
 described above, you can write explicit relative imports with the
@@ -2920,8 +2920,8 @@ module for example, you might use:
 
 \begin{verbatim}
 from . import echo
-from .. import Formats
-from ..Filters import equalizer
+from .. import formats
+from ..filters import equalizer
 \end{verbatim}
 
 Note that both explicit and implicit relative imports are based on the
@@ -3539,7 +3539,7 @@ as desired.
 ...    print 'x =', x
 ...    print 'y =', y
 ...
-<type 'instance'>
+<type 'Exception'>
 ('spam', 'eggs')
 ('spam', 'eggs')
 x = spam
@@ -4312,8 +4312,7 @@ class DerivedClassName(Base1, Base2, Base3):
     <statement-N>
 \end{verbatim}
 
-The only rule necessary to explain the semantics is the resolution
-rule used for class attribute references.  This is depth-first,
+For old-style classes, the only rule is depth-first,
 left-to-right.  Thus, if an attribute is not found in
 \class{DerivedClassName}, it is searched in \class{Base1}, then
 (recursively) in the base classes of \class{Base1}, and only if it is
@@ -4328,16 +4327,26 @@ a name conflict with an attribute of \class{Base2}.  The depth-first
 rule makes no differences between direct and inherited attributes of
 \class{Base1}.)
 
-It is clear that indiscriminate use of multiple inheritance is a
-maintenance nightmare, given the reliance in Python on conventions to
-avoid accidental name conflicts.  A well-known problem with multiple
-inheritance is a class derived from two classes that happen to have a
-common base class.  While it is easy enough to figure out what happens
-in this case (the instance will have a single copy of ``instance
-variables'' or data attributes used by the common base class), it is
-not clear that these semantics are in any way useful.
+For new-style classes, the method resolution order changes dynamically
+to support cooperative calls to \function{super()}.  This approach
+is known in some other multiple-inheritance languages as call-next-method
+and is more powerful than the super call found in single-inheritance languages.
 
-%% XXX Add rules for new-style MRO?
+With new-style classes, dynamic ordering is necessary because all 
+cases of multiple inheritance exhibit one or more diamond relationships
+(where one at least one of the parent classes can be accessed through
+multiple paths from the bottommost class).  For example, all new-style
+classes inherit from \class{object}, so any case of multiple inheritance
+provides more than one path to reach \class{object}.  To keep the
+base classes from being accessed more than once, the dynamic algorithm
+linearizes the search order in a way that preserves the left-to-right
+ordering specified in each class, that calls each parent only once, and
+that is monotonic (meaning that a class can be subclassed without affecting
+the precedence order of its parents).  Taken together, these properties
+make it possible to design reliable and extensible classes with
+multiple inheritance.  For more detail, see 
+\url{http://www.python.org/download/releases/2.3/mro/}.
+
 
 \section{Private Variables \label{private}}
 
@@ -4488,34 +4497,35 @@ This style of access is clear, concise, and convenient.  The use of iterators
 pervades and unifies Python.  Behind the scenes, the \keyword{for}
 statement calls \function{iter()} on the container object.  The
 function returns an iterator object that defines the method
-\method{next()} which accesses elements in the container one at a
-time.  When there are no more elements, \method{next()} raises a
+\method{__next__()} which accesses elements in the container one at a
+time.  When there are no more elements, \method{__next__()} raises a
 \exception{StopIteration} exception which tells the \keyword{for} loop
-to terminate.  This example shows how it all works:
+to terminate.  You can call the \method{__next__()} method using the
+\function{next()} builtin; this example shows how it all works:
 
 \begin{verbatim}
 >>> s = 'abc'
 >>> it = iter(s)
 >>> it
 <iterator object at 0x00A1DB50>
->>> it.next()
+>>> next(it)
 'a'
->>> it.next()
+>>> next(it)
 'b'
->>> it.next()
+>>> next(it)
 'c'
->>> it.next()
+>>> next(it)
 
 Traceback (most recent call last):
   File "<stdin>", line 1, in ?
-    it.next()
+    next(it)
 StopIteration
 \end{verbatim}
 
 Having seen the mechanics behind the iterator protocol, it is easy to add
 iterator behavior to your classes.  Define a \method{__iter__()} method
-which returns an object with a \method{next()} method.  If the class defines
-\method{next()}, then \method{__iter__()} can just return \code{self}:
+which returns an object with a \method{__next__()} method.  If the class defines
+\method{__next__()}, then \method{__iter__()} can just return \code{self}:
 
 \begin{verbatim}
 class Reverse:
@@ -4525,7 +4535,7 @@ class Reverse:
         self.index = len(data)
     def __iter__(self):
         return self
-    def next(self):
+    def __next__(self):
         if self.index == 0:
             raise StopIteration
         self.index = self.index - 1
@@ -4545,7 +4555,7 @@ s
 
 Generators are a simple and powerful tool for creating iterators.  They are
 written like regular functions but use the \keyword{yield} statement whenever
-they want to return data.  Each time \method{next()} is called, the
+they want to return data.  Each time \function{next()} is called on it, the
 generator resumes where it left-off (it remembers all the data values and
 which statement was last executed).  An example shows that generators can
 be trivially easy to create:
@@ -4566,7 +4576,7 @@ g
 
 Anything that can be done with generators can also be done with class based
 iterators as described in the previous section.  What makes generators so
-compact is that the \method{__iter__()} and \method{next()} methods are
+compact is that the \method{__iter__()} and \method{__next__()} methods are
 created automatically.
 
 Another key feature is that the local variables and execution state
@@ -4628,7 +4638,7 @@ operating system:
 >>> os.system('time 0:02')
 0
 >>> os.getcwd()      # Return the current working directory
-'C:\\Python24'
+'C:\\Python30'
 >>> os.chdir('/server/accesslogs')
 \end{verbatim}
 
@@ -4752,7 +4762,7 @@ module provides tools for making random selections:
 >>> import random
 >>> random.choice(['apple', 'pear', 'banana'])
 'apple'
->>> random.sample(xrange(100), 10)   # sampling without replacement
+>>> random.sample(range(100), 10)   # sampling without replacement
 [30, 83, 16, 4, 8, 81, 41, 50, 18, 33]
 >>> random.random()    # random float
 0.17970987693706186
@@ -5233,7 +5243,7 @@ applications include caching objects that are expensive to create:
     Traceback (most recent call last):
       File "<pyshell#108>", line 1, in -toplevel-
         d['primary']                # entry was automatically removed
-      File "C:/PY24/lib/weakref.py", line 46, in __getitem__
+      File "C:/python30/lib/weakref.py", line 46, in __getitem__
         o = self.data[key]()
     KeyError: 'primary'
 \end{verbatim}

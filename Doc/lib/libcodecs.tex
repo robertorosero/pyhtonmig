@@ -237,7 +237,7 @@ any other keyword argument) is passed through to the incremental encoder.
 \begin{funcdesc}{iterdecode}{iterable, encoding\optional{, errors}}
 Uses an incremental decoder to iteratively decode the input provided by
 \var{iterable}. This function is a generator. \var{errors} (as well as
-any other keyword argument) is passed through to the incremental encoder.
+any other keyword argument) is passed through to the incremental decoder.
 \versionadded{2.5}
 \end{funcdesc}
 
@@ -307,7 +307,7 @@ The set of allowed values can be extended via \method{register_error}.
 The \class{Codec} class defines these methods which also define the
 function interfaces of the stateless encoder and decoder:
 
-\begin{methoddesc}{encode}{input\optional{, errors}}
+\begin{methoddesc}[Codec]{encode}{input\optional{, errors}}
   Encodes the object \var{input} and returns a tuple (output object,
   length consumed).  While codecs are not restricted to use with Unicode, in
   a Unicode context, encoding converts a Unicode object to a plain string
@@ -325,7 +325,7 @@ function interfaces of the stateless encoder and decoder:
   empty object of the output object type in this situation.
 \end{methoddesc}
 
-\begin{methoddesc}{decode}{input\optional{, errors}}
+\begin{methoddesc}[Codec]{decode}{input\optional{, errors}}
   Decodes the object \var{input} and returns a tuple (output object,
   length consumed).  In a Unicode context, decoding converts a plain string
   encoded using a particular character set encoding to a Unicode object.
@@ -405,6 +405,21 @@ define in order to be compatible with the Python codec registry.
   Reset the encoder to the initial state.
 \end{methoddesc}
 
+\begin{methoddesc}{getstate}{}
+  Return the current state of the encoder which must be an integer.
+  The implementation should make sure that \code{0} is the most common state.
+  (States that are more complicated than integers can be converted into an
+  integer by marshaling/pickling the state and encoding the bytes of the
+  resulting string into an integer).
+  \versionadded{3.0}
+\end{methoddesc}
+
+\begin{methoddesc}{setstate}{state}
+  Set the state of the encoder to \var{state}. \var{state} must be an
+  encoder state returned by \method{getstate}.
+  \versionadded{3.0}
+\end{methoddesc}
+
 
 \subsubsection{IncrementalDecoder Objects \label{incremental-decoder-objects}}
 
@@ -451,6 +466,27 @@ define in order to be compatible with the Python codec registry.
 
 \begin{methoddesc}{reset}{}
   Reset the decoder to the initial state.
+\end{methoddesc}
+
+\begin{methoddesc}{getstate}{}
+  Return the current state of the decoder. This must be a tuple with two
+  items, the first must be the buffer containing the still undecoded input.
+  The second must be an integer and can be additional state info.
+  (The implementation should make sure that \code{0} is the most common
+  additional state info.) If this additional state info is \code{0} it must
+  be possible to set the decoder to the state which has no input buffered
+  and \code{0} as the additional state info, so that feeding the previously
+  buffered input to the decoder returns it to the previous state without
+  producing any output. (Additional state info that is more complicated
+  than integers can be converted into an integer by marshaling/pickling
+  the info and encoding the bytes of the resulting string into an integer.)
+  \versionadded{3.0}
+\end{methoddesc}
+
+\begin{methoddesc}{setstate}{state}
+  Set the state of the encoder to \var{state}. \var{state} must be a
+  decoder state returned by \method{getstate}.
+  \versionadded{3.0}
 \end{methoddesc}
 
 
@@ -1197,9 +1233,8 @@ listed as operand type in the table.
 \lineiv{idna}
          {}
          {Unicode string}
-         {Implements \rfc{3490}.
-          \versionadded{2.3}
-          See also \refmodule{encodings.idna}}
+         {Implements \rfc{3490},
+          see also \refmodule{encodings.idna}}
 
 \lineiv{mbcs}
          {dbcs}
@@ -1214,8 +1249,7 @@ listed as operand type in the table.
 \lineiv{punycode}
          {}
          {Unicode string}
-         {Implements \rfc{3492}.
-          \versionadded{2.3}}
+         {Implements \rfc{3492}}
 
 \lineiv{quopri_codec}
          {quopri, quoted-printable, quotedprintable}
@@ -1268,6 +1302,8 @@ listed as operand type in the table.
          {Compress the operand using gzip}
 
 \end{tableiv}
+
+\versionadded[The \code{idna} and \code{punycode} encodings]{2.3}
 
 \subsection{\module{encodings.idna} ---
             Internationalized Domain Names in Applications}

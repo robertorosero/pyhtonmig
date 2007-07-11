@@ -54,6 +54,7 @@ class TestMailbox(TestBase):
 
     def setUp(self):
         self._path = test_support.TESTFN
+        self._delete_recursively(self._path)
         self._box = self._factory(self._path)
 
     def tearDown(self):
@@ -207,7 +208,7 @@ class TestMailbox(TestBase):
         for value in method():
             self.fail("Not empty")
         keys, values = [], []
-        for i in xrange(repetitions):
+        for i in range(repetitions):
             keys.append(self._box.add(self._template % i))
             values.append(self._template % i)
         if do_keys and not do_values:
@@ -253,11 +254,11 @@ class TestMailbox(TestBase):
     def test_len(self, repetitions=10):
         # Get message count
         keys = []
-        for i in xrange(repetitions):
+        for i in range(repetitions):
             self.assert_(len(self._box) == i)
             keys.append(self._box.add(self._template % i))
             self.assert_(len(self._box) == i + 1)
-        for i in xrange(repetitions):
+        for i in range(repetitions):
             self.assert_(len(self._box) == repetitions - i)
             self._box.remove(keys[i])
             self.assert_(len(self._box) == repetitions - i - 1)
@@ -292,7 +293,7 @@ class TestMailbox(TestBase):
     def test_clear(self, iterations=10):
         # Remove all messages using clear()
         keys = []
-        for i in xrange(iterations):
+        for i in range(iterations):
             self._box.add(self._template % i)
         for i, key in enumerate(keys):
             self.assert_(self._box.get_string(key) == self._template % i)
@@ -322,10 +323,10 @@ class TestMailbox(TestBase):
     def test_popitem(self, iterations=10):
         # Get and remove an arbitrary (key, message) using popitem()
         keys = []
-        for i in xrange(10):
+        for i in range(10):
             keys.append(self._box.add(self._template % i))
         seen = []
-        for i in xrange(10):
+        for i in range(10):
             key, msg = self._box.popitem()
             self.assert_(key in keys)
             self.assert_(key not in seen)
@@ -386,7 +387,7 @@ class TestMailbox(TestBase):
         self._test_flush_or_close(self._box.close)
 
     def _test_flush_or_close(self, method):
-        contents = [self._template % i for i in xrange(3)]
+        contents = [self._template % i for i in range(3)]
         self._box.add(contents[0])
         self._box.add(contents[1])
         self._box.add(contents[2])
@@ -598,7 +599,7 @@ class TestMaildir(TestMailbox):
         pattern = re.compile(r"(?P<time>\d+)\.M(?P<M>\d{1,6})P(?P<P>\d+)"
                              r"Q(?P<Q>\d+)\.(?P<host>[^:/]+)")
         previous_groups = None
-        for x in xrange(repetitions):
+        for x in range(repetitions):
             tmp_file = self._box._create_tmp()
             head, tail = os.path.split(tmp_file.name)
             self.assertEqual(head, os.path.abspath(os.path.join(self._path,
@@ -686,7 +687,7 @@ class _TestMboxMMDF(TestMailbox):
         self._box.close()
         self._delete_recursively(self._path)
         for lock_remnant in glob.glob(self._path + '.*'):
-            os.remove(lock_remnant)
+            test_support.unlink(lock_remnant)
 
     def test_add_from_string(self):
         # Add a string starting with 'From ' to the mailbox
@@ -702,7 +703,7 @@ class _TestMboxMMDF(TestMailbox):
 
     def test_open_close_open(self):
         # Open and inspect previously-created mailbox
-        values = [self._template % i for i in xrange(3)]
+        values = [self._template % i for i in range(3)]
         for value in values:
             self._box.add(value)
         self._box.close()
@@ -717,7 +718,7 @@ class _TestMboxMMDF(TestMailbox):
     def test_add_and_close(self):
         # Verifying that closing a mailbox doesn't change added items
         self._box.add(_sample_message)
-        for i in xrange(3):
+        for i in range(3):
             self._box.add(self._template % i)
         self._box.add(_sample_message)
         self._box._file.flush()
@@ -735,10 +736,12 @@ class _TestMboxMMDF(TestMailbox):
         pid = os.fork()
         if pid == 0:
             # In the child, lock the mailbox.
-            self._box.lock()
-            time.sleep(2)
-            self._box.unlock()
-            os._exit(0)
+            try:
+                self._box.lock()
+                time.sleep(2)
+                self._box.unlock()
+            finally:
+                os._exit(0)
 
         # In the parent, sleep a bit to give the child time to acquire
         # the lock.
@@ -907,7 +910,7 @@ class TestBabyl(TestMailbox):
         self._box.close()
         self._delete_recursively(self._path)
         for lock_remnant in glob.glob(self._path + '.*'):
-            os.remove(lock_remnant)
+            test_support.unlink(lock_remnant)
 
     def test_labels(self):
         # Get labels from the mailbox
@@ -1516,11 +1519,11 @@ class TestProxyFileBase(TestBase):
         # Iterate by line
         proxy.seek(0)
         iterator = iter(proxy)
-        self.assert_(iterator.next() == 'foo' + os.linesep)
-        self.assert_(iterator.next() == 'bar' + os.linesep)
-        self.assert_(iterator.next() == 'fred' + os.linesep)
-        self.assert_(iterator.next() == 'bob')
-        self.assertRaises(StopIteration, lambda: iterator.next())
+        self.assert_(next(iterator) == 'foo' + os.linesep)
+        self.assert_(next(iterator) == 'bar' + os.linesep)
+        self.assert_(next(iterator) == 'fred' + os.linesep)
+        self.assert_(next(iterator) == 'bob')
+        self.assertRaises(StopIteration, next, iterator)
 
     def _test_seek_and_tell(self, proxy):
         # Seek and use tell to check position
@@ -1666,7 +1669,7 @@ class MaildirTestCase(unittest.TestCase):
         self._msgfiles = []
 
     def tearDown(self):
-        map(os.unlink, self._msgfiles)
+        list(map(os.unlink, self._msgfiles))
         os.rmdir(os.path.join(self._dir, "cur"))
         os.rmdir(os.path.join(self._dir, "tmp"))
         os.rmdir(os.path.join(self._dir, "new"))

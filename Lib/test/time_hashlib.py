@@ -14,7 +14,7 @@ def test_scaled_msg(scale, name):
 
     localCF = creatorFunc
     start = time.time()
-    for f in xrange(iterations):
+    for f in range(iterations):
         x = localCF(longStr).digest()
     end = time.time()
 
@@ -22,7 +22,7 @@ def test_scaled_msg(scale, name):
 
 def test_create():
     start = time.time()
-    for f in xrange(20000):
+    for f in range(20000):
         d = creatorFunc()
     end = time.time()
 
@@ -30,7 +30,7 @@ def test_create():
 
 def test_zero():
     start = time.time()
-    for f in xrange(20000):
+    for f in range(20000):
         x = creatorFunc().digest()
     end = time.time()
 
@@ -55,7 +55,7 @@ elif hName == '_hashlib' and len(sys.argv) == 3:
     import _hashlib
     exec('creatorFunc = lambda x=_hashlib.new : x(%r)' % sys.argv[2])
     print("testing speed of _hashlib.new(%r)" % sys.argv[2])
-elif hasattr(hashlib, hName) and callable(getattr(hashlib, hName)):
+elif hasattr(hashlib, hName) and hasattr(getattr(hashlib, hName), '__call__'):
     creatorFunc = getattr(hashlib, hName)
     print("testing speed of hashlib."+hName, getattr(hashlib, hName))
 else:

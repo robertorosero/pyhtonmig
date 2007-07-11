@@ -54,7 +54,6 @@ Richard Chamberlain, for the first implementation of textdoc.
 
 import sys, imp, os, re, types, inspect, __builtin__, pkgutil
 from repr import Repr
-from string import expandtabs, find, join, lower, split, strip, rfind, rstrip
 try:
     from collections import deque
 except ImportError:
@@ -80,16 +79,16 @@ def pathdirs():
 def getdoc(object):
     """Get the doc string or comments for an object."""
     result = inspect.getdoc(object) or inspect.getcomments(object)
-    return result and re.sub('^ *\n', '', rstrip(result)) or ''
+    return result and re.sub('^ *\n', '', result.rstrip()) or ''
 
 def splitdoc(doc):
     """Split a doc string into a synopsis line (if any) and the rest."""
-    lines = split(strip(doc), '\n')
+    lines = doc.strip().split('\n')
     if len(lines) == 1:
         return lines[0], ''
-    elif len(lines) >= 2 and not rstrip(lines[1]):
-        return lines[0], join(lines[2:], '\n')
-    return '', join(lines, '\n')
+    elif len(lines) >= 2 and not lines[1].rstrip():
+        return lines[0], '\n'.join(lines[2:])
+    return '', '\n'.join(lines)
 
 def classname(object, modname):
     """Get a class name and qualify it with a module name if necessary."""
@@ -107,7 +106,7 @@ def isdata(object):
 def replace(text, *pairs):
     """Do a series of global replacements on a string."""
     while pairs:
-        text = join(split(text, pairs[0]), pairs[1])
+        text = pairs[1].join(text.split(pairs[0]))
         pairs = pairs[2:]
     return text
 
@@ -172,11 +171,12 @@ def visiblename(name, all=None):
 
 def classify_class_attrs(object):
     """Wrap inspect.classify_class_attrs, with fixup for data descriptors."""
-    def fixup((name, kind, cls, value)):
+    results = []
+    for (name, kind, cls, value) in inspect.classify_class_attrs(object):
         if inspect.isdatadescriptor(value):
             kind = 'data descriptor'
-        return name, kind, cls, value
-    return map(fixup, inspect.classify_class_attrs(object))
+        results.append((name, kind, cls, value))
+    return results
 
 # ----------------------------------------------------- module manipulation
 
@@ -190,18 +190,18 @@ def ispackage(path):
 
 def source_synopsis(file):
     line = file.readline()
-    while line[:1] == '#' or not strip(line):
+    while line[:1] == '#' or not line.strip():
         line = file.readline()
         if not line: break
-    line = strip(line)
+    line = line.strip()
     if line[:4] == 'r"""': line = line[1:]
     if line[:3] == '"""':
         line = line[3:]
         if line[-1:] == '\\': line = line[:-1]
-        while not strip(line):
+        while not line.strip():
             line = file.readline()
             if not line: break
-        result = strip(split(line, '"""')[0])
+        result = line.split('"""')[0].strip()
     else: result = None
     return result
 
@@ -229,15 +229,13 @@ def synopsis(filename, cache={}):
 
 class ErrorDuringImport(Exception):
     """Errors that occurred while trying to import something to document it."""
-    def __init__(self, filename, (exc, value, tb)):
+    def __init__(self, filename, exc_info):
         self.filename = filename
-        self.exc = exc
-        self.value = value
-        self.tb = tb
+        self.exc, self.value, self.tb = exc_info
 
     def __str__(self):
         exc = self.exc
-        if type(exc) is types.ClassType:
+        if isinstance(exc, type):
             exc = exc.__name__
         return 'problem in %s - %s: %s' % (self.filename, exc, self.value)
 
@@ -275,12 +273,11 @@ def safeimport(path, forceload=0, cache={}):
         # that inherits from another module that has changed).
         if forceload and path in sys.modules:
             if path not in sys.builtin_module_names:
-                # Avoid simply calling reload() because it leaves names in
-                # the currently loaded module lying around if they're not
-                # defined in the new source file.  Instead, remove the
-                # module from sys.modules and re-import.  Also remove any
-                # submodules because they won't appear in the newly loaded
-                # module's namespace if they're already in sys.modules.
+                # Remove the module from sys.modules and re-import to try
+                # and avoid problems with partially loaded modules.
+                # Also remove any submodules because they won't appear
+                # in the newly loaded module's namespace if they're already
+                # in sys.modules.
                 subs = [m for m in sys.modules if m.startswith(path + '.')]
                 for key in [path] + subs:
                     # Prevent garbage collection.
@@ -297,13 +294,13 @@ def safeimport(path, forceload=0, cache={}):
             # A SyntaxError occurred before we could execute the module.
             raise ErrorDuringImport(value.filename, info)
         elif exc is ImportError and \
-             split(lower(str(value)))[:2] == ['no', 'module']:
+             str(value).lower().split()[:2] == ['no', 'module']:
             # The module was not found.
             return None
         else:
             # Some other error occurred during the importing process.
             raise ErrorDuringImport(path, sys.exc_info())
-    for part in split(path, '.')[1:]:
+    for part in path.split('.')[1:]:
         try: module = getattr(module, part)
         except AttributeError: return None
     return module
@@ -382,7 +379,7 @@ class HTMLRepr(Repr):
 
     def repr1(self, x, level):
         if hasattr(type(x), '__name__'):
-            methodname = 'repr_' + join(split(type(x).__name__), '_')
+            methodname = 'repr_' + '_'.join(type(x).__name__.split())
             if hasattr(self, methodname):
                 return getattr(self, methodname)(x, level)
         return self.escape(cram(stripid(repr(x)), self.maxother))
@@ -466,16 +463,16 @@ class HTMLDoc(Doc):
 
     def preformat(self, text):
         """Format literal preformatted text."""
-        text = self.escape(expandtabs(text))
+        text = self.escape(text.expandtabs())
         return replace(text, '\n\n', '\n \n', '\n\n', '\n \n',
                              ' ', '&nbsp;', '\n', '<br>\n')
 
     def multicolumn(self, list, format, cols=4):
         """Format a list of items into a multi-column list."""
         result = ''
-        rows = (len(list)+cols-1)/cols
+        rows = (len(list)+cols-1)//cols
         for col in range(cols):
-            result = result + '<td width="%d%%" valign=top>' % (100/cols)
+            result = result + '<td width="%d%%" valign=top>' % (100//cols)
             for i in range(rows*col, rows*col+rows):
                 if i < len(list):
                     result = result + format(list[i]) + '<br>\n'
@@ -503,8 +500,9 @@ class HTMLDoc(Doc):
         """Make a link for a module."""
         return '<a href="%s.html">%s</a>' % (object.__name__, object.__name__)
 
-    def modpkglink(self, (name, path, ispackage, shadowed)):
+    def modpkglink(self, modpkginfo):
         """Make a link for a module or package to display in an index."""
+        name, path, ispackage, shadowed = modpkginfo
         if shadowed:
             return self.grey(name)
         if path:
@@ -551,7 +549,7 @@ class HTMLDoc(Doc):
                 results.append(self.namelink(name, classes))
             here = end
         results.append(escape(text[here:]))
-        return join(results, '')
+        return ''.join(results)
 
     # ---------------------------------------------- type-specific routines
 
@@ -567,7 +565,7 @@ class HTMLDoc(Doc):
                     parents = []
                     for base in bases:
                         parents.append(self.classlink(base, modname))
-                    result = result + '(' + join(parents, ', ') + ')'
+                    result = result + '(' + ', '.join(parents) + ')'
                 result = result + '\n</font></dt>'
             elif type(entry) is type([]):
                 result = result + '<dd>\n%s</dd>\n' % self.formattree(
@@ -581,13 +579,13 @@ class HTMLDoc(Doc):
             all = object.__all__
         except AttributeError:
             all = None
-        parts = split(name, '.')
+        parts = name.split('.')
         links = []
         for i in range(len(parts)-1):
             links.append(
                 '<a href="%s.html"><font color="#ffffff">%s</font></a>' %
-                (join(parts[:i+1], '.'), parts[i]))
-        linkedname = join(links + parts[-1:], '.')
+                ('.'.join(parts[:i+1]), parts[i]))
+        linkedname = '.'.join(links + parts[-1:])
         head = '<big><big><strong>%s</strong></big></big>' % linkedname
         try:
             path = inspect.getabsfile(object)
@@ -602,12 +600,12 @@ class HTMLDoc(Doc):
         if hasattr(object, '__version__'):
             version = str(object.__version__)
             if version[:11] == '$' + 'Revision: ' and version[-1:] == '$':
-                version = strip(version[11:-1])
+                version = version[11:-1].strip()
             info.append('version %s' % self.escape(version))
         if hasattr(object, '__date__'):
             info.append(self.escape(str(object.__date__)))
         if info:
-            head = head + ' (%s)' % join(info, ', ')
+            head = head + ' (%s)' % ', '.join(info)
         docloc = self.getdocloc(object)
         if docloc is not None:
             docloc = '<br><a href="%(docloc)s">Module Docs</a>' % locals()
@@ -663,30 +661,30 @@ class HTMLDoc(Doc):
                 'Package Contents', '#ffffff', '#aa55cc', contents)
         elif modules:
             contents = self.multicolumn(
-                modules, lambda (key, value), s=self: s.modulelink(value))
+                modules, lambda t: self.modulelink(t[1]))
             result = result + self.bigsection(
                 'Modules', '#fffff', '#aa55cc', contents)
 
         if classes:
-            classlist = map(lambda (key, value): value, classes)
+            classlist = [value for (key, value) in classes]
             contents = [
                 self.formattree(inspect.getclasstree(classlist, 1), name)]
             for key, value in classes:
                 contents.append(self.document(value, key, name, fdict, cdict))
             result = result + self.bigsection(
-                'Classes', '#ffffff', '#ee77aa', join(contents))
+                'Classes', '#ffffff', '#ee77aa', ' '.join(contents))
         if funcs:
             contents = []
             for key, value in funcs:
                 contents.append(self.document(value, key, name, fdict, cdict))
             result = result + self.bigsection(
-                'Functions', '#ffffff', '#eeaa77', join(contents))
+                'Functions', '#ffffff', '#eeaa77', ' '.join(contents))
         if data:
             contents = []
             for key, value in data:
                 contents.append(self.document(value, key))
             result = result + self.bigsection(
-                'Data', '#ffffff', '#55aa55', join(contents, '<br>\n'))
+                'Data', '#ffffff', '#55aa55', '<br>\n'.join(contents))
         if hasattr(object, '__author__'):
             contents = self.markup(str(object.__author__), self.preformat)
             result = result + self.bigsection(
@@ -755,7 +753,7 @@ class HTMLDoc(Doc):
                 push(msg)
                 for name, kind, homecls, value in ok:
                     base = self.docother(getattr(object, name), name, mod)
-                    if callable(value) or inspect.isdatadescriptor(value):
+                    if hasattr(value, '__call__') or inspect.isdatadescriptor(value):
                         doc = getattr(value, "__doc__", None)
                     else:
                         doc = None
@@ -769,8 +767,10 @@ class HTMLDoc(Doc):
                     push('\n')
             return attrs
 
-        attrs = filter(lambda (name, kind, cls, value): visiblename(name),
-                       classify_class_attrs(object))
+        attrs = [(name, kind, cls, value)
+                 for name, kind, cls, value in classify_class_attrs(object)
+                 if visiblename(name)]
+
         mdict = {}
         for key, kind, homecls, value in attrs:
             mdict[key] = anchor = '#' + name + '-' + key
@@ -831,7 +831,7 @@ class HTMLDoc(Doc):
             parents = []
             for base in bases:
                 parents.append(self.classlink(base, object.__module__))
-            title = title + '(%s)' % join(parents, ', ')
+            title = title + '(%s)' % ', '.join(parents)
         doc = self.markup(getdoc(object), self.preformat, funcs, classes, mdict)
         doc = doc and '<tt>%s<br>&nbsp;</tt>' % doc
 
@@ -855,7 +855,7 @@ class HTMLDoc(Doc):
                 if imclass is not cl:
                     note = ' from ' + self.classlink(imclass, mod)
             else:
-                if object.im_self:
+                if object.im_self is not None:
                     note = ' method of %s instance' % self.classlink(
                         object.im_self.__class__, mod)
                 else:
@@ -875,11 +875,17 @@ class HTMLDoc(Doc):
             title = '<a name="%s"><strong>%s</strong></a> = %s' % (
                 anchor, name, reallink)
         if inspect.isfunction(object):
-            args, varargs, varkw, defaults = inspect.getargspec(object)
+            args, varargs, kwonlyargs, kwdefaults, varkw, defaults, ann = \
+                inspect.getfullargspec(object)
             argspec = inspect.formatargspec(
-                args, varargs, varkw, defaults, formatvalue=self.formatvalue)
+                args, varargs, kwonlyargs, kwdefaults, varkw, defaults, ann,
+                formatvalue=self.formatvalue,
+                formatannotation=inspect.formatannotationrelativeto(object))
             if realname == '<lambda>':
                 title = '<strong>%s</strong> <em>lambda</em> ' % name
+                # XXX lambda's won't usually have func_annotations['return']
+                # since the syntax doesn't support but it is possible.
+                # So removing parentheses isn't truly safe.
                 argspec = argspec[1:-1] # remove parentheses
         else:
             argspec = '(...)'
@@ -945,7 +951,7 @@ class TextRepr(Repr):
 
     def repr1(self, x, level):
         if hasattr(type(x), '__name__'):
-            methodname = 'repr_' + join(split(type(x).__name__), '_')
+            methodname = 'repr_' + '_'.join(type(x).__name__.split())
             if hasattr(self, methodname):
                 return getattr(self, methodname)(x, level)
         return cram(stripid(repr(x)), self.maxother)
@@ -977,19 +983,20 @@ class TextDoc(Doc):
 
     def bold(self, text):
         """Format a string in bold by overstriking."""
-        return join(map(lambda ch: ch + '\b' + ch, text), '')
+        return ''.join(map(lambda ch: ch + '\b' + ch, text))
 
     def indent(self, text, prefix='    '):
         """Indent text by prepending a given prefix to each line."""
         if not text: return ''
-        lines = split(text, '\n')
+        lines = text.split('\n')
         lines = map(lambda line, prefix=prefix: prefix + line, lines)
-        if lines: lines[-1] = rstrip(lines[-1])
-        return join(lines, '\n')
+        if lines: lines[-1] = lines[-1].rstrip()
+        return '\n'.join(lines)
 
     def section(self, title, contents):
         """Format a section with a given heading."""
-        return self.bold(title) + '\n' + rstrip(self.indent(contents)) + '\n\n'
+        clean_contents = self.indent(contents).rstrip()
+        return self.bold(title) + '\n' + clean_contents + '\n\n'
 
     # ---------------------------------------------- type-specific routines
 
@@ -1002,7 +1009,7 @@ class TextDoc(Doc):
                 result = result + prefix + classname(c, modname)
                 if bases and bases != (parent,):
                     parents = map(lambda c, m=modname: classname(c, m), bases)
-                    result = result + '(%s)' % join(parents, ', ')
+                    result = result + '(%s)' % ', '.join(parents)
                 result = result + '\n'
             elif type(entry) is type([]):
                 result = result + self.formattree(
@@ -1062,32 +1069,32 @@ class TextDoc(Doc):
 
             modpkgs.sort()
             result = result + self.section(
-                'PACKAGE CONTENTS', join(modpkgs, '\n'))
+                'PACKAGE CONTENTS', '\n'.join(modpkgs))
 
         if classes:
-            classlist = map(lambda (key, value): value, classes)
+            classlist = [value for key, value in classes]
             contents = [self.formattree(
                 inspect.getclasstree(classlist, 1), name)]
             for key, value in classes:
                 contents.append(self.document(value, key, name))
-            result = result + self.section('CLASSES', join(contents, '\n'))
+            result = result + self.section('CLASSES', '\n'.join(contents))
 
         if funcs:
             contents = []
             for key, value in funcs:
                 contents.append(self.document(value, key, name))
-            result = result + self.section('FUNCTIONS', join(contents, '\n'))
+            result = result + self.section('FUNCTIONS', '\n'.join(contents))
 
         if data:
             contents = []
             for key, value in data:
                 contents.append(self.docother(value, key, name, maxlen=70))
-            result = result + self.section('DATA', join(contents, '\n'))
+            result = result + self.section('DATA', '\n'.join(contents))
 
         if hasattr(object, '__version__'):
             version = str(object.__version__)
             if version[:11] == '$' + 'Revision: ' and version[-1:] == '$':
-                version = strip(version[11:-1])
+                version = version[11:-1].strip()
             result = result + self.section('VERSION', version)
         if hasattr(object, '__date__'):
             result = result + self.section('DATE', str(object.__date__))
@@ -1112,7 +1119,7 @@ class TextDoc(Doc):
             title = self.bold(name) + ' = class ' + realname
         if bases:
             parents = map(makename, bases)
-            title = title + '(%s)' % join(parents, ', ')
+            title = title + '(%s)' % ', '.join(parents)
 
         doc = getdoc(object)
         contents = doc and [doc + '\n'] or []
@@ -1161,7 +1168,7 @@ class TextDoc(Doc):
                 hr.maybe()
                 push(msg)
                 for name, kind, homecls, value in ok:
-                    if callable(value) or inspect.isdatadescriptor(value):
+                    if hasattr(value, '__call__') or inspect.isdatadescriptor(value):
                         doc = getdoc(value)
                     else:
                         doc = None
@@ -1169,8 +1176,10 @@ class TextDoc(Doc):
                                        name, mod, maxlen=70, doc=doc) + '\n')
             return attrs
 
-        attrs = filter(lambda (name, kind, cls, value): visiblename(name),
-                       classify_class_attrs(object))
+        attrs = [(name, kind, cls, value)
+                 for name, kind, cls, value in classify_class_attrs(object)
+                 if visiblename(name)]
+
         while attrs:
             if mro:
                 thisclass = mro.popleft()
@@ -1208,7 +1217,7 @@ class TextDoc(Doc):
         contents = '\n'.join(contents)
         if not contents:
             return title + '\n'
-        return title + '\n' + self.indent(rstrip(contents), ' |  ') + '\n'
+        return title + '\n' + self.indent(contents.rstrip(), ' |  ') + '\n'
 
     def formatvalue(self, object):
         """Format an argument default value as text."""
@@ -1226,7 +1235,7 @@ class TextDoc(Doc):
                 if imclass is not cl:
                     note = ' from ' + classname(imclass, mod)
             else:
-                if object.im_self:
+                if object.im_self is not None:
                     note = ' method of %s instance' % classname(
                         object.im_self.__class__, mod)
                 else:
@@ -1241,11 +1250,17 @@ class TextDoc(Doc):
                 skipdocs = 1
             title = self.bold(name) + ' = ' + realname
         if inspect.isfunction(object):
-            args, varargs, varkw, defaults = inspect.getargspec(object)
+            args, varargs, varkw, defaults, kwonlyargs, kwdefaults, ann = \
+              inspect.getfullargspec(object)
             argspec = inspect.formatargspec(
-                args, varargs, varkw, defaults, formatvalue=self.formatvalue)
+                args, varargs, varkw, defaults, kwonlyargs, kwdefaults, ann,
+                formatvalue=self.formatvalue,
+                formatannotation=inspect.formatannotationrelativeto(object))
             if realname == '<lambda>':
                 title = self.bold(name) + ' lambda '
+                # XXX lambda's won't usually have func_annotations['return']
+                # since the syntax doesn't support but it is possible.
+                # So removing parentheses isn't truly safe.
                 argspec = argspec[1:-1] # remove parentheses
         else:
             argspec = '(...)'
@@ -1255,7 +1270,7 @@ class TextDoc(Doc):
             return decl + '\n'
         else:
             doc = getdoc(object) or ''
-            return decl + '\n' + (doc and rstrip(self.indent(doc)) + '\n')
+            return decl + '\n' + (doc and self.indent(doc).rstrip() + '\n')
 
     def _docdescriptor(self, name, value, mod):
         results = []
@@ -1356,7 +1371,7 @@ def tempfilepager(text, cmd):
 
 def ttypager(text):
     """Page through text on a text terminal."""
-    lines = split(plain(text), '\n')
+    lines = plain(text).split('\n')
     try:
         import tty
         fd = sys.stdin.fileno()
@@ -1369,7 +1384,7 @@ def ttypager(text):
 
     try:
         r = inc = os.environ.get('LINES', 25) - 1
-        sys.stdout.write(join(lines[:inc], '\n') + '\n')
+        sys.stdout.write('\n'.join(lines[:inc]) + '\n')
         while lines[r:]:
             sys.stdout.write('-- more --')
             sys.stdout.flush()
@@ -1385,7 +1400,7 @@ def ttypager(text):
             if c in ('b', 'B', '\x1b'):
                 r = r - inc - inc
                 if r < 0: r = 0
-            sys.stdout.write('\n' + join(lines[r:r+inc], '\n') + '\n')
+            sys.stdout.write('\n' + '\n'.join(lines[r:r+inc]) + '\n')
             r = r + inc
 
     finally:
@@ -1421,16 +1436,14 @@ def describe(thing):
         return 'function ' + thing.__name__
     if inspect.ismethod(thing):
         return 'method ' + thing.__name__
-    if type(thing) is types.InstanceType:
-        return 'instance of ' + thing.__class__.__name__
     return type(thing).__name__
 
 def locate(path, forceload=0):
     """Locate an object by name or dotted path, importing as necessary."""
-    parts = [part for part in split(path, '.') if part]
+    parts = [part for part in path.split('.') if part]
     module, n = None, 0
     while n < len(parts):
-        nextmodule = safeimport(join(parts[:n+1], '.'), forceload)
+        nextmodule = safeimport('.'.join(parts[:n+1]), forceload)
         if nextmodule: module, n = nextmodule, n + 1
         else: break
     if module:
@@ -1458,6 +1471,27 @@ def resolve(thing, forceload=0):
     else:
         return thing, getattr(thing, '__name__', None)
 
+def render_doc(thing, title='Python Library Documentation: %s', forceload=0):
+    """Render text documentation, given an object or a path to an object."""
+    object, name = resolve(thing, forceload)
+    desc = describe(object)
+    module = inspect.getmodule(object)
+    if name and '.' in name:
+        desc += ' in ' + name[:name.rfind('.')]
+    elif module and module is not object:
+        desc += ' in module ' + module.__name__
+    elif not (inspect.ismodule(object) or
+              inspect.isclass(object) or
+              inspect.isroutine(object) or
+              inspect.isgetsetdescriptor(object) or
+              inspect.ismemberdescriptor(object) or
+              isinstance(object, property)):
+        # If the passed object is a piece of data or an instance,
+        # document its available methods instead of its value.
+        object = type(object)
+        desc += ' object'
+    return title % desc + '\n\n' + text.document(object, name)
+
 def doc(thing, title='Python Library Documentation: %s', forceload=0):
     """Display text documentation, given an object or a path to an object."""
     try:
@@ -1478,7 +1512,7 @@ def doc(thing, title='Python Library Documentation: %s', forceload=0):
             # document its available methods instead of its value.
             object = type(object)
             desc += ' object'
-        pager(title % desc + '\n\n' + text.document(object, name))
+        pager(render_doc(thing, title, forceload))
     except (ImportError, ErrorDuringImport) as value:
         print(value)
 
@@ -1509,6 +1543,7 @@ def raw_input(prompt):
 class Helper:
     keywords = {
         'and': 'BOOLEAN',
+        'as': 'with',
         'assert': ('ref/assert', ''),
         'break': ('ref/break', 'while for'),
         'class': ('ref/class', 'CLASSES SPECIALMETHODS'),
@@ -1536,6 +1571,7 @@ class Helper:
         'return': ('ref/return', 'FUNCTIONS'),
         'try': ('ref/try', 'EXCEPTIONS'),
         'while': ('ref/while', 'break continue if TRUTHVALUE'),
+        'with': ('ref/with', 'CONTEXTMANAGERS EXCEPTIONS yield'),
         'yield': ('ref/yield', ''),
     }
 
@@ -1549,7 +1585,7 @@ class Helper:
         'INTEGER': ('ref/integers', 'int range'),
         'FLOAT': ('ref/floating', 'float math'),
         'COMPLEX': ('ref/imaginary', 'complex cmath'),
-        'SEQUENCES': ('lib/typesseq', 'STRINGMETHODS FORMATTING xrange LISTS'),
+        'SEQUENCES': ('lib/typesseq', 'STRINGMETHODS FORMATTING range LISTS'),
         'MAPPINGS': 'DICTIONARIES',
         'FUNCTIONS': ('lib/typesfunctions', 'def TYPES'),
         'METHODS': ('lib/typesmethods', 'class def CLASSES TYPES'),
@@ -1616,6 +1652,7 @@ class Helper:
         'LOOPING': ('ref/compound', 'for while break continue'),
         'TRUTHVALUE': ('lib/truth', 'if while and or not BASICMETHODS'),
         'DEBUGGING': ('lib/module-pdb', 'pdb'),
+        'CONTEXTMANAGERS': ('ref/context-managers', 'with'),
     }
 
     def __init__(self, input, output):
@@ -1624,16 +1661,21 @@ class Helper:
         self.docdir = None
         execdir = os.path.dirname(sys.executable)
         homedir = os.environ.get('PYTHONHOME')
+        join = os.path.join
         for dir in [os.environ.get('PYTHONDOCS'),
                     homedir and os.path.join(homedir, 'doc'),
-                    os.path.join(execdir, 'doc'),
-                    '/usr/doc/python-docs-' + split(sys.version)[0],
-                    '/usr/doc/python-' + split(sys.version)[0],
-                    '/usr/doc/python-docs-' + sys.version[:3],
-                    '/usr/doc/python-' + sys.version[:3],
-                    os.path.join(sys.prefix, 'Resources/English.lproj/Documentation')]:
-            if dir and os.path.isdir(os.path.join(dir, 'lib')):
+                    join(execdir, 'doc'), # for Windows
+                    join(sys.prefix, 'doc/python-docs-' + sys.version.split()[0]),
+                    join(sys.prefix, 'doc/python-' + sys.version.split()[0]),
+                    join(sys.prefix, 'doc/python-docs-' + sys.version[:3]),
+                    join(sys.prefix, 'doc/python-' + sys.version[:3]),
+                    join(sys.prefix, 'Resources/English.lproj/Documentation')]:
+            if dir and os.path.isdir(join(dir, 'lib')):
                 self.docdir = dir
+                break
+            if dir and os.path.isdir(join(dir, 'html', 'lib')):
+                self.docdir = join(dir, 'html')
+                break
 
     def __repr__(self):
         if inspect.stack()[1][3] == '?':
@@ -1662,8 +1704,8 @@ has the same effect as typing a particular string at the help> prompt.
                 if not request: break
             except (KeyboardInterrupt, EOFError):
                 break
-            request = strip(replace(request, '"', '', "'", ''))
-            if lower(request) in ('q', 'quit'): break
+            request = replace(request, '"', '', "'", '').strip()
+            if request.lower() in ('q', 'quit'): break
             self.help(request)
 
     def getline(self, prompt):
@@ -1682,7 +1724,7 @@ has the same effect as typing a particular string at the help> prompt.
             elif request == 'topics': self.listtopics()
             elif request == 'modules': self.listmodules()
             elif request[:8] == 'modules ':
-                self.listmodules(split(request)[1])
+                self.listmodules(request.split()[1])
             elif request in self.keywords: self.showtopic(request)
             elif request in self.topics: self.showtopic(request)
             elif request: doc(request, 'Help on %s:')
@@ -1708,17 +1750,16 @@ such as "spam", type "modules spam".
 ''' % sys.version[:3])
 
     def list(self, items, columns=4, width=80):
-        items = items[:]
-        items.sort()
-        colw = width / columns
-        rows = (len(items) + columns - 1) / columns
+        items = list(sorted(items))
+        colw = width // columns
+        rows = (len(items) + columns - 1) // columns
         for row in range(rows):
             for col in range(columns):
                 i = col * rows + row
                 if i < len(items):
                     self.output.write(items[i])
                     if col < columns - 1:
-                        self.output.write(' ' + ' ' * (colw-1 - len(items[i])))
+                        self.output.write(' ' + ' ' * (colw - 1 - len(items[i])))
             self.output.write('\n')
 
     def listkeywords(self):
@@ -1776,11 +1817,11 @@ running "hh -decompile . PythonNN.chm" in the C:\PythonNN\Doc> directory.
         parser.start_td = parser.start_th = lambda a, b=buffer: b.write('\t')
         parser.feed(document)
         buffer = replace(buffer.getvalue(), '\xa0', ' ', '\n', '\n  ')
-        pager('  ' + strip(buffer) + '\n')
+        pager('  ' + buffer.strip() + '\n')
         if xrefs:
             buffer = StringIO.StringIO()
             formatter.DumbWriter(buffer).send_flowing_data(
-                'Related help topics: ' + join(split(xrefs), ', ') + '\n')
+                'Related help topics: ' + ', '.join(xrefs.split()) + '\n')
             self.output.write('\n%s\n' % buffer.getvalue())
 
     def listmodules(self, key=''):
@@ -1799,7 +1840,7 @@ Please wait a moment while I gather a list of all available modules...
             def callback(path, modname, desc, modules=modules):
                 if modname and modname[-9:] == '.__init__':
                     modname = modname[:-9] + ' (package)'
-                if find(modname, '.') < 0:
+                if modname.find('.') < 0:
                     modules[modname] = 1
             ModuleScanner().run(callback)
             self.list(modules.keys())
@@ -1838,7 +1879,7 @@ class ModuleScanner:
     """An interruptible scanner that searches module synopses."""
 
     def run(self, callback, key=None, completer=None):
-        if key: key = lower(key)
+        if key: key = key.lower()
         self.quit = False
         seen = {}
 
@@ -1848,8 +1889,10 @@ class ModuleScanner:
                 if key is None:
                     callback(None, modname, '')
                 else:
-                    desc = split(__import__(modname).__doc__ or '', '\n')[0]
-                    if find(lower(modname + ' - ' + desc), key) >= 0:
+                    name = __import__(modname).__doc__ or ''
+                    desc = name.split('\n')[0]
+                    name = modname + ' - ' + desc
+                    if name.lower().find(key) >= 0:
                         callback(None, modname, desc)
 
         for importer, modname, ispkg in pkgutil.walk_packages():
@@ -1872,7 +1915,8 @@ class ModuleScanner:
                     module = loader.load_module(modname)
                     desc = (module.__doc__ or '').splitlines()[0]
                     path = getattr(module,'__file__',None)
-                if find(lower(modname + ' - ' + desc), key) >= 0:
+                name = modname + ' - ' + desc
+                if name.lower().find(key) >= 0:
                     callback(path, modname, desc)
 
         if completer:
@@ -1943,7 +1987,7 @@ def serve(port, callback=None, completer=None):
                 seen = {}
                 for dir in sys.path:
                     indices.append(html.index(dir, seen))
-                contents = heading + join(indices) + '''<p align=right>
+                contents = heading + ' '.join(indices) + '''<p align=right>
 <font color="#909090" face="helvetica, arial"><strong>
 pydoc</strong> by Ka-Ping Yee &lt;ping@lfw.org&gt;</font>'''
                 self.send_document('Index of Modules', contents)
@@ -2125,7 +2169,7 @@ def gui():
         def goto(self, event=None):
             selection = self.result_lst.curselection()
             if selection:
-                modname = split(self.result_lst.get(selection[0]))[0]
+                modname = self.result_lst.get(selection[0]).split()[0]
                 self.open(url=self.server.url + modname + '.html')
 
         def collapse(self):
@@ -2170,12 +2214,12 @@ def gui():
 # -------------------------------------------------- command-line interface
 
 def ispath(x):
-    return isinstance(x, str) and find(x, os.sep) >= 0
+    return isinstance(x, str) and x.find(os.sep) >= 0
 
 def cli():
     """Command-line interface (looks at sys.argv to decide what to do)."""
     import getopt
-    class BadUsage: pass
+    class BadUsage(Exception): pass
 
     # Scripts don't get the current directory in their path by default.
     scriptdir = os.path.dirname(sys.argv[0])

@@ -66,7 +66,8 @@ enum _stmt_kind {FunctionDef_kind=1, ClassDef_kind=2, Return_kind=3,
                   While_kind=8, If_kind=9, With_kind=10, Raise_kind=11,
                   TryExcept_kind=12, TryFinally_kind=13, Assert_kind=14,
                   Import_kind=15, ImportFrom_kind=16, Global_kind=17,
-                  Expr_kind=18, Pass_kind=19, Break_kind=20, Continue_kind=21};
+                  Nonlocal_kind=18, Expr_kind=19, Pass_kind=20, Break_kind=21,
+                  Continue_kind=22};
 struct _stmt {
         enum _stmt_kind kind;
         union {
@@ -74,14 +75,18 @@ struct _stmt {
                         identifier name;
                         arguments_ty args;
                         asdl_seq *body;
-                        asdl_seq *decorators;
+                        asdl_seq *decorator_list;
                         expr_ty returns;
                 } FunctionDef;
                 
                 struct {
                         identifier name;
                         asdl_seq *bases;
+                        asdl_seq *keywords;
+                        expr_ty starargs;
+                        expr_ty kwargs;
                         asdl_seq *body;
+                        asdl_seq *decorator_list;
                 } ClassDef;
                 
                 struct {
@@ -165,6 +170,10 @@ struct _stmt {
                 } Global;
                 
                 struct {
+                        asdl_seq *names;
+                } Nonlocal;
+                
+                struct {
                         expr_ty value;
                 } Expr;
                 
@@ -175,10 +184,11 @@ struct _stmt {
 
 enum _expr_kind {BoolOp_kind=1, BinOp_kind=2, UnaryOp_kind=3, Lambda_kind=4,
                   IfExp_kind=5, Dict_kind=6, Set_kind=7, ListComp_kind=8,
-                  GeneratorExp_kind=9, Yield_kind=10, Compare_kind=11,
-                  Call_kind=12, Num_kind=13, Str_kind=14, Ellipsis_kind=15,
-                  Attribute_kind=16, Subscript_kind=17, Name_kind=18,
-                  List_kind=19, Tuple_kind=20};
+                  SetComp_kind=9, GeneratorExp_kind=10, Yield_kind=11,
+                  Compare_kind=12, Call_kind=13, Num_kind=14, Str_kind=15,
+                  Bytes_kind=16, Ellipsis_kind=17, Attribute_kind=18,
+                  Subscript_kind=19, Starred_kind=20, Name_kind=21,
+                  List_kind=22, Tuple_kind=23};
 struct _expr {
         enum _expr_kind kind;
         union {
@@ -226,6 +236,11 @@ struct _expr {
                 struct {
                         expr_ty elt;
                         asdl_seq *generators;
+                } SetComp;
+                
+                struct {
+                        expr_ty elt;
+                        asdl_seq *generators;
                 } GeneratorExp;
                 
                 struct {
@@ -255,6 +270,10 @@ struct _expr {
                 } Str;
                 
                 struct {
+                        string s;
+                } Bytes;
+                
+                struct {
                         expr_ty value;
                         identifier attr;
                         expr_context_ty ctx;
@@ -265,6 +284,11 @@ struct _expr {
                         slice_ty slice;
                         expr_context_ty ctx;
                 } Subscript;
+                
+                struct {
+                        expr_ty value;
+                        expr_context_ty ctx;
+                } Starred;
                 
                 struct {
                         identifier id;
@@ -332,20 +356,9 @@ struct _arguments {
         asdl_seq *kw_defaults;
 };
 
-enum _arg_kind {SimpleArg_kind=1, NestedArgs_kind=2};
 struct _arg {
-        enum _arg_kind kind;
-        union {
-                struct {
-                        identifier arg;
-                        expr_ty annotation;
-                } SimpleArg;
-                
-                struct {
-                        asdl_seq *args;
-                } NestedArgs;
-                
-        } v;
+        identifier arg;
+        expr_ty annotation;
 };
 
 struct _keyword {
@@ -369,11 +382,13 @@ mod_ty _Py_Expression(expr_ty body, PyArena *arena);
 mod_ty _Py_Suite(asdl_seq * body, PyArena *arena);
 #define FunctionDef(a0, a1, a2, a3, a4, a5, a6, a7) _Py_FunctionDef(a0, a1, a2, a3, a4, a5, a6, a7)
 stmt_ty _Py_FunctionDef(identifier name, arguments_ty args, asdl_seq * body,
-                        asdl_seq * decorators, expr_ty returns, int lineno, int
-                        col_offset, PyArena *arena);
-#define ClassDef(a0, a1, a2, a3, a4, a5) _Py_ClassDef(a0, a1, a2, a3, a4, a5)
-stmt_ty _Py_ClassDef(identifier name, asdl_seq * bases, asdl_seq * body, int
-                     lineno, int col_offset, PyArena *arena);
+                        asdl_seq * decorator_list, expr_ty returns, int lineno,
+                        int col_offset, PyArena *arena);
+#define ClassDef(a0, a1, a2, a3, a4, a5, a6, a7, a8, a9) _Py_ClassDef(a0, a1, a2, a3, a4, a5, a6, a7, a8, a9)
+stmt_ty _Py_ClassDef(identifier name, asdl_seq * bases, asdl_seq * keywords,
+                     expr_ty starargs, expr_ty kwargs, asdl_seq * body,
+                     asdl_seq * decorator_list, int lineno, int col_offset,
+                     PyArena *arena);
 #define Return(a0, a1, a2, a3) _Py_Return(a0, a1, a2, a3)
 stmt_ty _Py_Return(expr_ty value, int lineno, int col_offset, PyArena *arena);
 #define Delete(a0, a1, a2, a3) _Py_Delete(a0, a1, a2, a3)
@@ -418,6 +433,9 @@ stmt_ty _Py_ImportFrom(identifier module, asdl_seq * names, int level, int
 #define Global(a0, a1, a2, a3) _Py_Global(a0, a1, a2, a3)
 stmt_ty _Py_Global(asdl_seq * names, int lineno, int col_offset, PyArena
                    *arena);
+#define Nonlocal(a0, a1, a2, a3) _Py_Nonlocal(a0, a1, a2, a3)
+stmt_ty _Py_Nonlocal(asdl_seq * names, int lineno, int col_offset, PyArena
+                     *arena);
 #define Expr(a0, a1, a2, a3) _Py_Expr(a0, a1, a2, a3)
 stmt_ty _Py_Expr(expr_ty value, int lineno, int col_offset, PyArena *arena);
 #define Pass(a0, a1, a2) _Py_Pass(a0, a1, a2)
@@ -449,6 +467,9 @@ expr_ty _Py_Set(asdl_seq * elts, int lineno, int col_offset, PyArena *arena);
 #define ListComp(a0, a1, a2, a3, a4) _Py_ListComp(a0, a1, a2, a3, a4)
 expr_ty _Py_ListComp(expr_ty elt, asdl_seq * generators, int lineno, int
                      col_offset, PyArena *arena);
+#define SetComp(a0, a1, a2, a3, a4) _Py_SetComp(a0, a1, a2, a3, a4)
+expr_ty _Py_SetComp(expr_ty elt, asdl_seq * generators, int lineno, int
+                    col_offset, PyArena *arena);
 #define GeneratorExp(a0, a1, a2, a3, a4) _Py_GeneratorExp(a0, a1, a2, a3, a4)
 expr_ty _Py_GeneratorExp(expr_ty elt, asdl_seq * generators, int lineno, int
                          col_offset, PyArena *arena);
@@ -465,6 +486,8 @@ expr_ty _Py_Call(expr_ty func, asdl_seq * args, asdl_seq * keywords, expr_ty
 expr_ty _Py_Num(object n, int lineno, int col_offset, PyArena *arena);
 #define Str(a0, a1, a2, a3) _Py_Str(a0, a1, a2, a3)
 expr_ty _Py_Str(string s, int lineno, int col_offset, PyArena *arena);
+#define Bytes(a0, a1, a2, a3) _Py_Bytes(a0, a1, a2, a3)
+expr_ty _Py_Bytes(string s, int lineno, int col_offset, PyArena *arena);
 #define Ellipsis(a0, a1, a2) _Py_Ellipsis(a0, a1, a2)
 expr_ty _Py_Ellipsis(int lineno, int col_offset, PyArena *arena);
 #define Attribute(a0, a1, a2, a3, a4, a5) _Py_Attribute(a0, a1, a2, a3, a4, a5)
@@ -473,6 +496,9 @@ expr_ty _Py_Attribute(expr_ty value, identifier attr, expr_context_ty ctx, int
 #define Subscript(a0, a1, a2, a3, a4, a5) _Py_Subscript(a0, a1, a2, a3, a4, a5)
 expr_ty _Py_Subscript(expr_ty value, slice_ty slice, expr_context_ty ctx, int
                       lineno, int col_offset, PyArena *arena);
+#define Starred(a0, a1, a2, a3, a4) _Py_Starred(a0, a1, a2, a3, a4)
+expr_ty _Py_Starred(expr_ty value, expr_context_ty ctx, int lineno, int
+                    col_offset, PyArena *arena);
 #define Name(a0, a1, a2, a3, a4) _Py_Name(a0, a1, a2, a3, a4)
 expr_ty _Py_Name(identifier id, expr_context_ty ctx, int lineno, int
                  col_offset, PyArena *arena);
@@ -500,10 +526,8 @@ arguments_ty _Py_arguments(asdl_seq * args, identifier vararg, expr_ty
                            varargannotation, asdl_seq * kwonlyargs, identifier
                            kwarg, expr_ty kwargannotation, asdl_seq * defaults,
                            asdl_seq * kw_defaults, PyArena *arena);
-#define SimpleArg(a0, a1, a2) _Py_SimpleArg(a0, a1, a2)
-arg_ty _Py_SimpleArg(identifier arg, expr_ty annotation, PyArena *arena);
-#define NestedArgs(a0, a1) _Py_NestedArgs(a0, a1)
-arg_ty _Py_NestedArgs(asdl_seq * args, PyArena *arena);
+#define arg(a0, a1, a2) _Py_arg(a0, a1, a2)
+arg_ty _Py_arg(identifier arg, expr_ty annotation, PyArena *arena);
 #define keyword(a0, a1, a2) _Py_keyword(a0, a1, a2)
 keyword_ty _Py_keyword(identifier arg, expr_ty value, PyArena *arena);
 #define alias(a0, a1, a2) _Py_alias(a0, a1, a2)

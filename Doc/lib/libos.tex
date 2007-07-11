@@ -361,9 +361,8 @@ object, except that when the exit status is zero (termination without
 errors), \code{None} is returned.
 Availability: Macintosh, \UNIX, Windows.
 
-The \module{subprocess} module provides more powerful facilities for
-spawning new processes and retrieving their results; using that module
-is preferable to using this function.
+\deprecated{2.6}{This function is obsolete.  Use the
+                 \module{subprocess} module.}
 
 \versionchanged[This function worked unreliably under Windows in
   earlier versions of Python.  This was due to the use of the
@@ -378,64 +377,6 @@ has no directory entries associated with it and will be automatically
 deleted once there are no file descriptors for the file.
 Availability: Macintosh, \UNIX, Windows.
 \end{funcdesc}
-
-There are a number of different \function{popen*()} functions that
-provide slightly different ways to create subprocesses.  Note that the
-\module{subprocess} module is easier to use and more powerful;
-consider using that module before writing code using the
-lower-level \function{popen*()} functions.
-
-For each of the \function{popen*()} variants, if \var{bufsize} is
-specified, it specifies the buffer size for the I/O pipes.
-\var{mode}, if provided, should be the string \code{'b'} or
-\code{'t'}; on Windows this is needed to determine whether the file
-objects should be opened in binary or text mode.  The default value
-for \var{mode} is \code{'t'}.
-
-Also, for each of these variants, on \UNIX, \var{cmd} may be a sequence, in
-which case arguments will be passed directly to the program without shell
-intervention (as with \function{os.spawnv()}). If \var{cmd} is a string it will
-be passed to the shell (as with \function{os.system()}).
-
-These methods do not make it possible to retrieve the exit status from
-the child processes.  The only way to control the input and output
-streams and also retrieve the return codes is to use the
-\class{Popen3} and \class{Popen4} classes from the \refmodule{popen2}
-module; these are only available on \UNIX.
-
-For a discussion of possible deadlock conditions related to the use
-of these functions, see ``\ulink{Flow Control
-Issues}{popen2-flow-control.html}''
-(section~\ref{popen2-flow-control}).
-
-\begin{funcdesc}{popen2}{cmd\optional{, mode\optional{, bufsize}}}
-Executes \var{cmd} as a sub-process.  Returns the file objects
-\code{(\var{child_stdin}, \var{child_stdout})}.
-Availability: Macintosh, \UNIX, Windows.
-\versionadded{2.0}
-\end{funcdesc}
-
-\begin{funcdesc}{popen3}{cmd\optional{, mode\optional{, bufsize}}}
-Executes \var{cmd} as a sub-process.  Returns the file objects
-\code{(\var{child_stdin}, \var{child_stdout}, \var{child_stderr})}.
-Availability: Macintosh, \UNIX, Windows.
-\versionadded{2.0}
-\end{funcdesc}
-
-\begin{funcdesc}{popen4}{cmd\optional{, mode\optional{, bufsize}}}
-Executes \var{cmd} as a sub-process.  Returns the file objects
-\code{(\var{child_stdin}, \var{child_stdout_and_stderr})}.
-Availability: Macintosh, \UNIX, Windows.
-\versionadded{2.0}
-\end{funcdesc}
-
-(Note that \code{\var{child_stdin}, \var{child_stdout}, and
-\var{child_stderr}} are named from the point of view of the child
-process, so \var{child_stdin} is the child's standard input.)
-
-This functionality is also available in the \refmodule{popen2} module
-using functions of the same names, but the return values of those
-functions have a different order.
 
 
 \subsection{File Descriptor Operations \label{os-fd-ops}}
@@ -1233,7 +1174,8 @@ Availability: Macintosh, \UNIX, Windows.
 \end{funcdesc}
 
 \begin{funcdesc}{walk}{top\optional{, topdown\code{=True}
-                       \optional{, onerror\code{=None}}}}
+                       \optional{, onerror\code{=None}\optional{,
+		       followlinks\code{=False}}}}}
 \index{directory!walking}
 \index{directory!traversal}
 \function{walk()} generates the file names in a directory tree, by
@@ -1273,20 +1215,23 @@ report the error to continue with the walk, or raise the exception
 to abort the walk.  Note that the filename is available as the
 \code{filename} attribute of the exception object.
 
+By default, \function{walk()} will not walk down into symbolic links that
+resolve to directories. Set \var{followlinks} to True to visit directories
+pointed to by symlinks, on systems that support them.
+
+\versionadded[The \var{followlinks} parameter]{2.6}
+
+\begin{notice}
+Be aware that setting \var{followlinks} to true can lead to infinite recursion
+if a link points to a parent directory of itself. \function{walk()} does not
+keep track of the directories it visited already.
+\end{notice}
+
 \begin{notice}
 If you pass a relative pathname, don't change the current working
 directory between resumptions of \function{walk()}.  \function{walk()}
 never changes the current directory, and assumes that its caller
 doesn't either.
-\end{notice}
-
-\begin{notice}
-On systems that support symbolic links, links to subdirectories appear
-in \var{dirnames} lists, but \function{walk()} will not visit them
-(infinite loops are hard to avoid when following symbolic links).
-To visit linked directories, you can identify them with
-\code{os.path.islink(\var{path})}, and invoke \code{walk(\var{path})}
-on each directly.
 \end{notice}
 
 This example displays the number of bytes taken by non-directory files
@@ -1568,9 +1513,6 @@ Availability: Macintosh, \UNIX.
 \end{funcdesc}
 
 \begin{funcdescni}{popen}{\unspecified}
-\funclineni{popen2}{\unspecified}
-\funclineni{popen3}{\unspecified}
-\funclineni{popen4}{\unspecified}
 Run child processes, returning opened pipes for communications.  These
 functions are described in section \ref{os-newstreams}.
 \end{funcdescni}
@@ -2002,9 +1944,12 @@ Also available via \module{os.path}.
 
 \begin{datadesc}{linesep}
 The string used to separate (or, rather, terminate) lines on the
-current platform.  This may be a single character, such as \code{'\e
-n'} for \POSIX{} or \code{'\e r'} for Mac OS, or multiple characters,
-for example, \code{'\e r\e n'} for Windows.
+current platform.  This may be a single character, such as 
+\code{'\e n'} for \POSIX{} or \code{'\e r'} for Mac OS, or multiple 
+characters, for example, \code{'\e r\e n'} for Windows.
+Do not use \var{os.linesep} as a line terminator when writing files 
+opened in text mode (the default); use a single \code{'\e n'} instead, 
+on all platforms. 
 \end{datadesc}
 
 \begin{datadesc}{devnull}

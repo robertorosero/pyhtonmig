@@ -190,10 +190,6 @@ class ImportHooksTestCase(ImportHooksBaseTestCase):
         import reloadmodule
         self.failIf(hasattr(reloadmodule,'reloaded'))
 
-        TestImporter.modules['reloadmodule'] = (False, reload_co)
-        reload(reloadmodule)
-        self.failUnless(hasattr(reloadmodule,'reloaded'))
-
         import hooktestpackage.newrel
         self.assertEqual(hooktestpackage.newrel.get_name(),
                          "hooktestpackage.newrel")
@@ -251,7 +247,7 @@ class ImportHooksTestCase(ImportHooksBaseTestCase):
         i = ImpWrapper()
         sys.meta_path.append(i)
         sys.path_hooks.append(ImpWrapper)
-        mnames = ("colorsys", "urlparse", "distutils.core", "compiler.misc")
+        mnames = ("colorsys", "urlparse", "distutils.core")
         for mname in mnames:
             parent = mname.split(".")[0]
             for n in list(sys.modules.keys()):

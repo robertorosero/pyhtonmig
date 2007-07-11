@@ -7,7 +7,7 @@ import sys
 # Iterators in Python aren't a matter of type but of protocol.  A large
 # and changing number of builtin types implement *some* flavor of
 # iterator.  Don't check the type!  Use hasattr to check for both
-# "__iter__" and "next" attributes instead.
+# "__iter__" and "__next__" attributes instead.
 
 NoneType = type(None)
 TypeType = type
@@ -42,11 +42,7 @@ DictType = DictionaryType = dict
 def _f(): pass
 FunctionType = type(_f)
 LambdaType = type(lambda: None)         # Same as FunctionType
-try:
-    CodeType = type(_f.func_code)
-except RuntimeError:
-    # Execution in restricted environment
-    pass
+CodeType = type(_f.__code__)
 
 def _g():
     yield 1
@@ -54,7 +50,7 @@ GeneratorType = type(_g())
 
 class _C:
     def _m(self): pass
-ClassType = type(_C)
+ClassType = type
 UnboundMethodType = type(_C._m)         # Same as MethodType
 MethodType = type(_C()._m)
 
@@ -63,19 +59,13 @@ BuiltinMethodType = type([].append)     # Same as BuiltinFunctionType
 
 ModuleType = type(sys)
 FileType = file
-XRangeType = xrange
 
 try:
     raise TypeError
 except TypeError:
-    try:
-        tb = sys.exc_info()[2]
-        TracebackType = type(tb)
-        FrameType = type(tb.tb_frame)
-    except AttributeError:
-        # In the restricted environment, exc_info returns (None, None,
-        # None) Then, tb.tb_frame gives an attribute error
-        pass
+    tb = sys.exc_info()[2]
+    TracebackType = type(tb)
+    FrameType = type(tb.tb_frame)
     tb = None; del tb
 
 SliceType = slice

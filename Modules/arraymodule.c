@@ -1147,12 +1147,19 @@ array_reduce(arrayobject *array)
 		dict = Py_None;
 		Py_INCREF(dict);
 	}
-	result = Py_BuildValue("O(cs#)O", 
-		array->ob_type, 
-		array->ob_descr->typecode,
-		array->ob_item,
-		array->ob_size * array->ob_descr->itemsize,
-		dict);
+	if (array->ob_size > 0) {
+		result = Py_BuildValue("O(cs#)O", 
+			array->ob_type, 
+			array->ob_descr->typecode,
+			array->ob_item,
+			array->ob_size * array->ob_descr->itemsize,
+			dict);
+	} else {
+		result = Py_BuildValue("O(c)O", 
+			array->ob_type, 
+			array->ob_descr->typecode,
+			dict);
+	}
 	Py_DECREF(dict);
 	return result;
 }
@@ -1252,12 +1259,11 @@ array_tofile(arrayobject *self, PyObject *f)
 {
 	FILE *fp;
 
+        if (self->ob_size == 0)
+		goto done;
+
 	fp = PyFile_AsFile(f);
-	if (fp == NULL) {
-		PyErr_SetString(PyExc_TypeError, "arg must be open file");
-		return NULL;
-	}
-	if (self->ob_size > 0) {
+	if (fp != NULL) {
 		if (fwrite(self->ob_item, self->ob_descr->itemsize,
 			   self->ob_size, fp) != (size_t)self->ob_size) {
 			PyErr_SetFromErrno(PyExc_IOError);
@@ -1265,6 +1271,31 @@ array_tofile(arrayobject *self, PyObject *f)
 			return NULL;
 		}
 	}
+	else {
+		Py_ssize_t nbytes = self->ob_size * self->ob_descr->itemsize;
+		/* Write 64K blocks at a time */
+		/* XXX Make the block size settable */
+		int BLOCKSIZE = 64*1024;
+		Py_ssize_t nblocks = (nbytes + BLOCKSIZE - 1) / BLOCKSIZE;
+		Py_ssize_t i;
+		for (i = 0; i < nblocks; i++) {
+			char* ptr = self->ob_item + i*BLOCKSIZE;
+			Py_ssize_t size = BLOCKSIZE;
+			PyObject *bytes, *res;
+			if (i*BLOCKSIZE + size > nbytes)
+				size = nbytes - i*BLOCKSIZE;
+			bytes = PyBytes_FromStringAndSize(ptr, size);
+			if (bytes == NULL)
+				return NULL;
+			res = PyObject_CallMethod(f, "write", "O",
+						  bytes);
+			Py_DECREF(bytes);
+			if (res == NULL)
+				return NULL;
+		}
+	}
+
+  done:
 	Py_INCREF(Py_None);
 	return Py_None;
 }
@@ -1787,6 +1818,8 @@ static PyMappingMethods array_as_mapping = {
 	(objobjargproc)array_ass_subscr
 };
 
+static const void *emptybuf = "";
+
 static Py_ssize_t
 array_buffer_getreadbuf(arrayobject *self, Py_ssize_t index, const void **ptr)
 {
@@ -1796,6 +1829,8 @@ array_buffer_getreadbuf(arrayobject *self, Py_ssize_t index, const void **ptr)
 		return -1;
 	}
 	*ptr = (void *)self->ob_item;
+	if (*ptr == NULL)
+		*ptr = emptybuf;
 	return self->ob_size*self->ob_descr->itemsize;
 }
 
@@ -1808,6 +1843,8 @@ array_buffer_getwritebuf(arrayobject *self, Py_ssize_t index, const void **ptr)
 		return -1;
 	}
 	*ptr = (void *)self->ob_item;
+	if (*ptr == NULL)
+		*ptr = emptybuf;
 	return self->ob_size*self->ob_descr->itemsize;
 }
 

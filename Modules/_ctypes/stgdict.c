@@ -50,7 +50,7 @@ int
 StgDict_clone(StgDictObject *dst, StgDictObject *src)
 {
 	char *d, *s;
-	int size;
+	Py_ssize_t size;
 
 	StgDict_clear(dst);
 	PyMem_Free(dst->ffi_type_pointer.elements);
@@ -72,8 +72,10 @@ StgDict_clone(StgDictObject *dst, StgDictObject *src)
 		return 0;
 	size = sizeof(ffi_type *) * (src->length + 1);
 	dst->ffi_type_pointer.elements = PyMem_Malloc(size);
-	if (dst->ffi_type_pointer.elements == NULL)
+	if (dst->ffi_type_pointer.elements == NULL) {
+		PyErr_NoMemory();
 		return -1;
+	}
 	memcpy(dst->ffi_type_pointer.elements,
 	       src->ffi_type_pointer.elements,
 	       size);
@@ -283,13 +285,13 @@ int
 StructUnionType_update_stgdict(PyObject *type, PyObject *fields, int isStruct)
 {
 	StgDictObject *stgdict, *basedict;
-	int len, offset, size, align, i;
-	int union_size, total_align;
-	int field_size = 0;
+	Py_ssize_t len, offset, size, align, i;
+	Py_ssize_t union_size, total_align;
+	Py_ssize_t field_size = 0;
 	int bitofs;
 	PyObject *isPacked;
 	int pack = 0;
-	int ffi_ofs;
+	Py_ssize_t ffi_ofs;
 	int big_endian;
 
 	/* HACK Alert: I cannot be bothered to fix ctypes.com, so there has to
@@ -355,6 +357,10 @@ StructUnionType_update_stgdict(PyObject *type, PyObject *fields, int isStruct)
 		total_align = align ? align : 1;
 		stgdict->ffi_type_pointer.type = FFI_TYPE_STRUCT;
 		stgdict->ffi_type_pointer.elements = PyMem_Malloc(sizeof(ffi_type *) * (basedict->length + len + 1));
+		if (stgdict->ffi_type_pointer.elements == NULL) {
+			PyErr_NoMemory();
+			return -1;
+		}
 		memset(stgdict->ffi_type_pointer.elements, 0,
 		       sizeof(ffi_type *) * (basedict->length + len + 1));
 		memcpy(stgdict->ffi_type_pointer.elements,
@@ -369,6 +375,10 @@ StructUnionType_update_stgdict(PyObject *type, PyObject *fields, int isStruct)
 		total_align = 1;
 		stgdict->ffi_type_pointer.type = FFI_TYPE_STRUCT;
 		stgdict->ffi_type_pointer.elements = PyMem_Malloc(sizeof(ffi_type *) * (len + 1));
+		if (stgdict->ffi_type_pointer.elements == NULL) {
+			PyErr_NoMemory();
+			return -1;
+		}
 		memset(stgdict->ffi_type_pointer.elements, 0,
 		       sizeof(ffi_type *) * (len + 1));
 		ffi_ofs = 0;
@@ -392,7 +402,11 @@ StructUnionType_update_stgdict(PyObject *type, PyObject *fields, int isStruct)
 		if (dict == NULL) {
 			Py_DECREF(pair);
 			PyErr_Format(PyExc_TypeError,
+#if (PY_VERSION_HEX < 0x02050000)
 				     "second item in _fields_ tuple (index %d) must be a C type",
+#else
+				     "second item in _fields_ tuple (index %zd) must be a C type",
+#endif
 				     i);
 			return -1;
 		}
@@ -470,7 +484,9 @@ StructUnionType_update_stgdict(PyObject *type, PyObject *fields, int isStruct)
 	/* Adjust the size according to the alignment requirements */
 	size = ((size + total_align - 1) / total_align) * total_align;
 
-	stgdict->ffi_type_pointer.alignment = total_align;
+	stgdict->ffi_type_pointer.alignment = Py_SAFE_DOWNCAST(total_align,
+							       Py_ssize_t,
+							       unsigned short);
 	stgdict->ffi_type_pointer.size = size;
 
 	stgdict->size = size;

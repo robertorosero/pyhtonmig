@@ -1,5 +1,5 @@
 from __future__ import nested_scopes    # Backward compat for 2.1
-from unittest import TestSuite, TestCase, makeSuite
+from unittest import TestCase
 from wsgiref.util import setup_testing_defaults
 from wsgiref.headers import Headers
 from wsgiref.handlers import BaseHandler, BaseCGIHandler
@@ -11,6 +11,7 @@ from StringIO import StringIO
 from SocketServer import BaseServer
 import re, sys
 
+from test import test_support
 
 class MockServer(WSGIServer):
     """Non-socket HTTP server"""
@@ -108,13 +109,13 @@ def compare_generic_iter(make_it,match):
         it = make_it()
         if not iter(it) is it: raise AssertionError
         for item in match:
-            if not it.next()==item: raise AssertionError
+            if not next(it) == item: raise AssertionError
         try:
-            it.next()
+            next(it)
         except StopIteration:
             pass
         else:
-            raise AssertionError("Too many items from .next()",it)
+            raise AssertionError("Too many items from .__next__()", it)
 
 
 
@@ -575,11 +576,7 @@ class HandlerTests(TestCase):
 # This epilogue is needed for compatibility with the Python 2.5 regrtest module
 
 def test_main():
-    import unittest
-    from test.test_support import run_suite
-    run_suite(
-        unittest.defaultTestLoader.loadTestsFromModule(sys.modules[__name__])
-    )
+    test_support.run_unittest(__name__)
 
 if __name__ == "__main__":
     test_main()

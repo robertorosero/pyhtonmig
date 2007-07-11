@@ -62,24 +62,8 @@ PyFloat_FromDouble(double fval)
 	return (PyObject *) op;
 }
 
-/**************************************************************************
-RED_FLAG 22-Sep-2000 tim
-PyFloat_FromString's pend argument is braindead.  Prior to this RED_FLAG,
-
-1.  If v was a regular string, *pend was set to point to its terminating
-    null byte.  That's useless (the caller can find that without any
-    help from this function!).
-
-2.  If v was a Unicode string, or an object convertible to a character
-    buffer, *pend was set to point into stack trash (the auto temp
-    vector holding the character buffer).  That was downright dangerous.
-
-Since we can't change the interface of a public API function, pend is
-still supported but now *officially* useless:  if pend is not NULL,
-*pend is set to NULL.
-**************************************************************************/
 PyObject *
-PyFloat_FromString(PyObject *v, char **pend)
+PyFloat_FromString(PyObject *v)
 {
 	const char *s, *last, *end;
 	double x;
@@ -89,8 +73,6 @@ PyFloat_FromString(PyObject *v, char **pend)
 #endif
 	Py_ssize_t len;
 
-	if (pend)
-		*pend = NULL;
 	if (PyString_Check(v)) {
 		s = PyString_AS_STRING(v);
 		len = PyString_GET_SIZE(v);
@@ -697,18 +679,7 @@ float_pow(PyObject *v, PyObject *w, PyObject *z)
 
 	/* Sort out special cases here instead of relying on pow() */
 	if (iw == 0) { 		/* v**0 is 1, even 0**0 */
-		PyFPE_START_PROTECT("pow", return NULL)
-		if ((PyObject *)z != Py_None) {
-			double iz;
-			CONVERT_TO_DOUBLE(z, iz);
-			ix = fmod(1.0, iz);
-			if (ix != 0 && iz < 0)
-				ix += iz;
-		}
-		else
-			ix = 1.0;
-		PyFPE_END_PROTECT(ix)
-		return PyFloat_FromDouble(ix);
+		return PyFloat_FromDouble(1.0);
 	}
 	if (iv == 0.0) {  /* 0**w is error if w<0, else 1 */
 		if (iw < 0.0) {
@@ -852,7 +823,7 @@ float_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	if (!PyArg_ParseTupleAndKeywords(args, kwds, "|O:float", kwlist, &x))
 		return NULL;
 	if (PyString_Check(x))
-		return PyFloat_FromString(x, NULL);
+		return PyFloat_FromString(x);
 	return PyNumber_Float(x);
 }
 

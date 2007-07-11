@@ -12,10 +12,10 @@
 
 */
 
-#include "windows.h"
 #include "Python.h"
 #include "structmember.h"
 #include "malloc.h" /* for alloca */
+#include "windows.h"
 
 static BOOL PyHKEY_AsHKEY(PyObject *ob, HKEY *pRes, BOOL bNoneOK);
 static PyObject *PyHKEY_FromHKEY(HKEY h);
@@ -693,11 +693,12 @@ static BOOL
 Py2Reg(PyObject *value, DWORD typ, BYTE **retDataBuf, DWORD *retDataSize)
 {
 	int i,j;
+	DWORD d;
 	switch (typ) {
 		case REG_DWORD:
-			if (value != Py_None && !PyInt_Check(value))
+			if (value != Py_None && !PyLong_Check(value))
 				return FALSE;
-			*retDataBuf = (BYTE *)PyMem_NEW(DWORD, sizeof(DWORD));
+			*retDataBuf = (BYTE *)PyMem_NEW(DWORD, 1);
 			if (*retDataBuf==NULL){
 				PyErr_NoMemory();
 				return FALSE;
@@ -707,10 +708,10 @@ Py2Reg(PyObject *value, DWORD typ, BYTE **retDataBuf, DWORD *retDataSize)
 				DWORD zero = 0;
 				memcpy(*retDataBuf, &zero, sizeof(DWORD));
 			}
-			else
-				memcpy(*retDataBuf,
-				       &PyInt_AS_LONG((PyIntObject *)value),
-				       sizeof(DWORD));
+			else {
+				d = PyLong_AsLong(value);
+				memcpy(*retDataBuf, &d, sizeof(DWORD));
+			}
 			break;
 		case REG_SZ:
 		case REG_EXPAND_SZ:

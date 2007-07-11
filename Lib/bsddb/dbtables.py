@@ -22,7 +22,6 @@ import sys
 import copy
 import xdrlib
 import random
-from types import ListType, StringType
 import cPickle as pickle
 
 try:
@@ -39,7 +38,7 @@ except NameError:
     class DBIncompleteError(Exception):
         pass
 
-class TableDBError(StandardError):
+class TableDBError(Exception):
     pass
 class TableAlreadyExists(TableDBError):
     pass
@@ -135,9 +134,9 @@ def contains_metastrings(s) :
 
 
 class bsdTableDB :
-    def __init__(self, filename, dbhome, create=0, truncate=0, mode=0600,
+    def __init__(self, filename, dbhome, create=0, truncate=0, mode=0o600,
                  recover=0, dbflags=0):
-        """bsdTableDB(filename, dbhome, create=0, truncate=0, mode=0600)
+        """bsdTableDB(filename, dbhome, create=0, truncate=0, mode=0o600)
 
         Open database name in the dbhome BerkeleyDB directory.
         Use keyword arguments when calling this constructor.
@@ -229,7 +228,7 @@ class bsdTableDB :
 
         raises TableDBError if it already exists or for other DB errors.
         """
-        assert isinstance(columns, ListType)
+        assert isinstance(columns, list)
         txn = None
         try:
             # checking sanity of the table and column names here on
@@ -263,14 +262,14 @@ class bsdTableDB :
         except DBError as dberror:
             if txn:
                 txn.abort()
-            raise TableDBError, dberror[1]
+            raise TableDBError, dberror.args[1]
 
 
     def ListTableColumns(self, table):
         """Return a list of columns in the given table.
         [] if the table doesn't exist.
         """
-        assert isinstance(table, StringType)
+        assert isinstance(table, str)
         if contains_metastrings(table):
             raise ValueError, "bad table name: contains reserved metastrings"
 
@@ -300,7 +299,7 @@ class bsdTableDB :
         additional columns present in the given list as well as
         all of its current columns.
         """
-        assert isinstance(columns, ListType)
+        assert isinstance(columns, list)
         try:
             self.CreateTable(table, columns)
         except TableAlreadyExists:
@@ -341,7 +340,7 @@ class bsdTableDB :
             except DBError as dberror:
                 if txn:
                     txn.abort()
-                raise TableDBError, dberror[1]
+                raise TableDBError, dberror.args[1]
 
 
     def __load_column_info(self, table) :
@@ -416,7 +415,7 @@ class bsdTableDB :
             if txn:
                 txn.abort()
                 self.db.delete(_rowid_key(table, rowid))
-            raise TableDBError, dberror[1], info[2]
+            raise TableDBError, dberror.args[1], info[2]
 
 
     def Modify(self, table, conditions={}, mappings={}):
@@ -467,7 +466,7 @@ class bsdTableDB :
                     raise
 
         except DBError as dberror:
-            raise TableDBError, dberror[1]
+            raise TableDBError, dberror.args[1]
 
     def Delete(self, table, conditions={}):
         """Delete(table, conditions) - Delete items matching the given
@@ -507,7 +506,7 @@ class bsdTableDB :
                         txn.abort()
                     raise
         except DBError as dberror:
-            raise TableDBError, dberror[1]
+            raise TableDBError, dberror.args[1]
 
 
     def Select(self, table, columns, conditions={}):
@@ -527,7 +526,7 @@ class bsdTableDB :
                 columns = self.__tablecolumns[table]
             matching_rowids = self.__Select(table, columns, conditions)
         except DBError as dberror:
-            raise TableDBError, dberror[1]
+            raise TableDBError, dberror.args[1]
         # return the matches as a list of dictionaries
         return matching_rowids.values()
 
@@ -617,7 +616,7 @@ class bsdTableDB :
                     key, data = cur.next()
 
             except DBError as dberror:
-                if dberror[0] != DB_NOTFOUND:
+                if dberror.args[0] != DB_NOTFOUND:
                     raise
                 continue
 
@@ -637,7 +636,7 @@ class bsdTableDB :
                         rowdata[column] = self.db.get(
                             _data_key(table, column, rowid))
                     except DBError as dberror:
-                        if dberror[0] != DB_NOTFOUND:
+                        if dberror.args[0] != DB_NOTFOUND:
                             raise
                         rowdata[column] = None
 
@@ -703,4 +702,4 @@ class bsdTableDB :
         except DBError as dberror:
             if txn:
                 txn.abort()
-            raise TableDBError, dberror[1]
+            raise TableDBError, dberror.args[1]

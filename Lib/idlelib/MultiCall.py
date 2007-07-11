@@ -31,7 +31,6 @@ Each function will be called at most once for each event.
 
 import sys
 import os
-import string
 import re
 import Tkinter
 
@@ -244,7 +243,7 @@ def _parse_sequence(sequence):
     """
     if not sequence or sequence[0] != '<' or sequence[-1] != '>':
         return None
-    words = string.split(sequence[1:-1], '-')
+    words = '-'.split(sequence[1:-1])
 
     modifiers = 0
     while words and words[0] in _modifier_names:
@@ -351,6 +350,8 @@ def MultiCallCreator(widget):
                     triplets.append(triplet)
 
         def event_delete(self, virtual, *sequences):
+            if virtual not in self.__eventinfo:
+                return
             func, triplets = self.__eventinfo[virtual]
             for seq in sequences:
                 triplet = _parse_sequence(seq)

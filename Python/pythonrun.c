@@ -4,6 +4,7 @@
 #include "Python.h"
 
 #include "Python-ast.h"
+#undef Yield /* undefine macro conflicting with winbase.h */
 #include "grammar.h"
 #include "node.h"
 #include "token.h"
@@ -56,7 +57,7 @@ static PyObject *run_pyc_file(FILE *, const char *, PyObject *, PyObject *,
 			      PyCompilerFlags *);
 static void err_input(perrdetail *);
 static void initsigs(void);
-static void call_sys_exitfunc(void);
+static void call_py_exitfuncs(void);
 static void call_ll_exitfuncs(void);
 extern void _PyUnicode_Init(void);
 extern void _PyUnicode_Fini(void);
@@ -71,6 +72,7 @@ extern void _PyGILState_Fini(void);
 int Py_DebugFlag; /* Needed by parser.c */
 int Py_VerboseFlag; /* Needed by import.c */
 int Py_InteractiveFlag; /* Needed by Py_FdIsInteractive() below */
+int Py_InspectFlag; /* Needed to determine whether to exit at SystemError */
 int Py_NoSiteFlag; /* Suppress 'import site' */
 int Py_UseClassExceptionsFlag = 1; /* Needed by bltinmodule.c: deprecated */
 int Py_FrozenFlag; /* Needed by getpath.c */
@@ -186,11 +188,17 @@ Py_InitializeEx(int install_sigs)
 	if (!_PyLong_Init())
 		Py_FatalError("Py_Initialize: can't init longs");
 
+	if (!PyBytes_Init())
+		Py_FatalError("Py_Initialize: can't init bytes");
+
 	_PyFloat_Init();
 
 	interp->modules = PyDict_New();
 	if (interp->modules == NULL)
 		Py_FatalError("Py_Initialize: can't make modules dictionary");
+	interp->modules_reloading = PyDict_New();
+	if (interp->modules_reloading == NULL)
+		Py_FatalError("Py_Initialize: can't make modules_reloading dictionary");
 
 #ifdef Py_USING_UNICODE
 	/* Init Unicode implementation; relies on the codec registry */
@@ -221,7 +229,6 @@ Py_InitializeEx(int install_sigs)
 
 	/* initialize builtin exceptions */
 	_PyExc_Init();
-	_PyImport_FixupExtension("exceptions", "exceptions");
 
 	/* phase 2 of builtins */
 	_PyImport_FixupExtension("__builtin__", "__builtin__");
@@ -353,7 +360,7 @@ Py_Finalize(void)
 	 * threads created thru it, so this also protects pending imports in
 	 * the threads created via Threading.
 	 */
-	call_sys_exitfunc();
+	call_py_exitfuncs();
 	initialized = 0;
 
 	/* Get current thread state and interpreter pointer */
@@ -458,6 +465,7 @@ Py_Finalize(void)
 	PyList_Fini();
 	PySet_Fini();
 	PyString_Fini();
+	PyBytes_Fini();
 	PyLong_Fini();
 	PyFloat_Fini();
 
@@ -528,6 +536,7 @@ Py_NewInterpreter(void)
 	/* XXX The following is lax in error checking */
 
 	interp->modules = PyDict_New();
+	interp->modules_reloading = PyDict_New();
 
 	bimod = _PyImport_FindExtension("__builtin__", "__builtin__");
 	if (bimod != NULL) {
@@ -844,6 +853,7 @@ PyRun_SimpleFileExFlags(FILE *fp, const char *filename, int closeit,
 {
 	PyObject *m, *d, *v;
 	const char *ext;
+	int set_file_name = 0, ret;
 
 	m = PyImport_AddModule("__main__");
 	if (m == NULL)
@@ -857,6 +867,7 @@ PyRun_SimpleFileExFlags(FILE *fp, const char *filename, int closeit,
 			Py_DECREF(f);
 			return -1;
 		}
+		set_file_name = 1;
 		Py_DECREF(f);
 	}
 	ext = filename + strlen(filename) - 4;
@@ -866,7 +877,8 @@ PyRun_SimpleFileExFlags(FILE *fp, const char *filename, int closeit,
 			fclose(fp);
 		if ((fp = fopen(filename, "rb")) == NULL) {
 			fprintf(stderr, "python: Can't reopen .pyc file\n");
-			return -1;
+			ret = -1;
+			goto done;
 		}
 		/* Turn on optimization if a .pyo file is given */
 		if (strcmp(ext, ".pyo") == 0)
@@ -878,10 +890,15 @@ PyRun_SimpleFileExFlags(FILE *fp, const char *filename, int closeit,
 	}
 	if (v == NULL) {
 		PyErr_Print();
-		return -1;
+		ret = -1;
+		goto done;
 	}
 	Py_DECREF(v);
-	return 0;
+	ret = 0;
+  done:
+	if (set_file_name && PyDict_DelItemString(d, "__file__"))
+		PyErr_Clear();
+	return ret;
 }
 
 int
@@ -1010,6 +1027,11 @@ handle_system_exit(void)
 {
 	PyObject *exception, *value, *tb;
 	int exitcode = 0;
+
+	if (Py_InspectFlag)
+		/* Don't exit if -i flag was given. This flag is set to 0
+		 * when entering interactive mode for inspecting. */
+		return;
 
 	PyErr_Fetch(&exception, &value, &tb);
 	fflush(stdout);
@@ -1168,7 +1190,7 @@ PyErr_Display(PyObject *exception, PyObject *value, PyObject *tb)
 				err = PyFile_WriteString("<unknown>", f);
 			else {
 				char* modstr = PyString_AsString(moduleName);
-				if (modstr && strcmp(modstr, "exceptions"))
+				if (modstr && strcmp(modstr, "__builtin__"))
 				{
 					err = PyFile_WriteString(modstr, f);
 					err += PyFile_WriteString(".", f);
@@ -1198,8 +1220,8 @@ PyErr_Display(PyObject *exception, PyObject *value, PyObject *tb)
 			  err = PyFile_WriteObject(s, f, Py_PRINT_RAW);
 			Py_XDECREF(s);
 		}
-		if (err == 0)
-			err = PyFile_WriteString("\n", f);
+		/* try to write a newline in any case */
+		err += PyFile_WriteString("\n", f);
 	}
 	Py_DECREF(value);
 	/* If an error happened here, don't show it.
@@ -1237,12 +1259,12 @@ PyRun_FileExFlags(FILE *fp, const char *filename, int start, PyObject *globals,
 	
 	mod = PyParser_ASTFromFile(fp, filename, start, 0, 0,
 				   flags, NULL, arena);
+	if (closeit)
+		fclose(fp);
 	if (mod == NULL) {
 		PyArena_Free(arena);
 		return NULL;
 	}
-	if (closeit)
-		fclose(fp);
 	ret = run_mod(mod, filename, globals, locals, flags, arena);
 	PyArena_Free(arena);
 	return ret;
@@ -1554,6 +1576,23 @@ Py_FatalError(const char *msg)
 #include "pythread.h"
 #endif
 
+static void (*pyexitfunc)(void) = NULL;
+/* For the atexit module. */
+void _Py_PyAtExit(void (*func)(void))
+{
+	pyexitfunc = func;
+}
+
+static void
+call_py_exitfuncs(void)
+{
+	if (pyexitfunc == NULL) 
+		return;
+
+	(*pyexitfunc)();
+	PyErr_Clear();
+}
+
 #define NEXITFUNCS 32
 static void (*exitfuncs[NEXITFUNCS])(void);
 static int nexitfuncs = 0;
@@ -1564,27 +1603,6 @@ int Py_AtExit(void (*func)(void))
 		return -1;
 	exitfuncs[nexitfuncs++] = func;
 	return 0;
-}
-
-static void
-call_sys_exitfunc(void)
-{
-	PyObject *exitfunc = PySys_GetObject("exitfunc");
-
-	if (exitfunc) {
-		PyObject *res;
-		Py_INCREF(exitfunc);
-		PySys_SetObject("exitfunc", (PyObject *)NULL);
-		res = PyEval_CallObject(exitfunc, (PyObject *)NULL);
-		if (res == NULL) {
-			if (!PyErr_ExceptionMatches(PyExc_SystemExit)) {
-				PySys_WriteStderr("Error in sys.exitfunc:\n");
-			}
-			PyErr_Print();
-		}
-		Py_DECREF(exitfunc);
-	}
-
 }
 
 static void

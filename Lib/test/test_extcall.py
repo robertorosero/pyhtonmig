@@ -1,5 +1,6 @@
 from test.test_support import verify, verbose, TestFailed, sortdict
 from UserList import UserList
+from UserDict import UserDict
 
 def e(a, b):
     print(a, b)
@@ -24,6 +25,12 @@ f(1, 2, 3, *UserList([4, 5]))
 f(1, 2, 3, **{'a':4, 'b':5})
 f(1, 2, 3, *(4, 5), **{'a':6, 'b':7})
 f(1, 2, 3, x=4, y=5, *(6, 7), **{'a':8, 'b':9})
+
+
+f(1, 2, 3, **UserDict(a=4, b=5))
+f(1, 2, 3, *(4, 5), **UserDict(a=6, b=7))
+f(1, 2, 3, x=4, y=5, *(6, 7), **UserDict(a=8, b=9))
+
 
 # Verify clearing of SF bug #733667
 try:
@@ -103,7 +110,7 @@ class Nothing:
         self.c = 0
     def __iter__(self):
         return self
-    def next(self):
+    def __next__(self):
         if self.c == 4:
             raise StopIteration
         c = self.c
@@ -256,8 +263,7 @@ for args in ['', 'a', 'ab']:
         for vararg in ['', 'v']:
             for kwarg in ['', 'k']:
                 name = 'z' + args + defargs + vararg + kwarg
-                arglist = list(args) + map(
-                    lambda x: '%s="%s"' % (x, x), defargs)
+                arglist = list(args) + ['%s="%s"' % (x, x) for x in defargs]
                 if vararg: arglist.append('*' + vararg)
                 if kwarg: arglist.append('**' + kwarg)
                 decl = (('def %s(%s): print("ok %s", a, b, d, e, v, ' +
@@ -274,6 +280,6 @@ for name in ['za', 'zade', 'zabk', 'zabdv', 'zabdevk']:
         for kwargs in ['', 'a', 'd', 'ad', 'abde']:
             kwdict = {}
             for k in kwargs: kwdict[k] = k + k
-            print(func.func_name, args, sortdict(kwdict), '->', end=' ')
+            print(func.__name__, args, sortdict(kwdict), '->', end=' ')
             try: func(*args, **kwdict)
             except TypeError as err: print(err)

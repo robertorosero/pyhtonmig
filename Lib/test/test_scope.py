@@ -187,25 +187,25 @@ class ScopeTests(unittest.TestCase):
         check_syntax_error(self, """\
 def unoptimized_clash1(strip):
     def f(s):
-        from string import *
-        return strip(s) # ambiguity: free or local
+        from sys import *
+        return getrefcount(s) # ambiguity: free or local
     return f
 """)
 
         check_syntax_error(self, """\
 def unoptimized_clash2():
-    from string import *
+    from sys import *
     def f(s):
-        return strip(s) # ambiguity: global or local
+        return getrefcount(s) # ambiguity: global or local
     return f
 """)
 
         check_syntax_error(self, """\
 def unoptimized_clash2():
-    from string import *
+    from sys import *
     def g():
         def f(s):
-            return strip(s) # ambiguity: global or local
+            return getrefcount(s) # ambiguity: global or local
         return f
 """)
 
@@ -219,24 +219,24 @@ def f(x):
         check_syntax_error(self, """\
 def f():
     def g():
-        from string import *
-        return strip # global or local?
+        from sys import *
+        return getrefcount # global or local?
 """)
 
         # and verify a few cases that should work
 
         exec("""
 def noproblem1():
-    from string import *
+    from sys import *
     f = lambda x:x
 
 def noproblem2():
-    from string import *
+    from sys import *
     def f(x):
         return x + 1
 
 def noproblem3():
-    from string import *
+    from sys import *
     def f(x):
         global y
         y = x
@@ -322,13 +322,6 @@ else:
             return returner
 
         self.assertEqual(makeReturner2(a=11)()['a'], 11)
-
-        def makeAddPair((a, b)):
-            def addPair((c, d)):
-                return (a + c, b + d)
-            return addPair
-
-        self.assertEqual(makeAddPair((1, 2))((100, 200)), (101,202))
 
     def testScopeOfGlobalStmt(self):
 # Examples posted by Samuele Pedroni to python-dev on 3/1/2001
@@ -477,6 +470,39 @@ self.assert_(X.passed)
         del d['h']
         self.assertEqual(d, {'x': 2, 'y': 7, 'w': 6})
 
+    def testLocalsClass(self):
+        # This test verifies that calling locals() does not pollute
+        # the local namespace of the class with free variables.  Old
+        # versions of Python had a bug, where a free variable being
+        # passed through a class namespace would be inserted into
+        # locals() by locals() or exec or a trace function.
+        #
+        # The real bug lies in frame code that copies variables
+        # between fast locals and the locals dict, e.g. when executing
+        # a trace function.
+
+        def f(x):
+            class C:
+                x = 12
+                def m(self):
+                    return x
+                locals()
+            return C
+
+        self.assertEqual(f(1).x, 12)
+
+        def f(x):
+            class C:
+                y = x
+                def m(self):
+                    return x
+                z = list(locals())
+            return C
+
+        varnames = f(1).z
+        self.assert_("x" not in varnames)
+        self.assert_("y" in varnames)
+
     def testBoundAndFree(self):
         # var is bound and free in class
 
@@ -518,10 +544,10 @@ self.assert_(X.passed)
             return lambda: x + 1
 
         g = f(3)
-        self.assertRaises(TypeError, eval, g.func_code)
+        self.assertRaises(TypeError, eval, g.__code__)
 
         try:
-            exec(g.func_code, {})
+            exec(g.__code__, {})
         except TypeError:
             pass
         else:
@@ -554,6 +580,90 @@ self.assert_(X.passed)
             return g
 
         f(4)()
+
+    def testNonLocalFunction(self):
+
+        def f(x):
+            def inc():
+                nonlocal x
+                x += 1
+                return x
+            def dec():
+                nonlocal x
+                x -= 1
+                return x
+            return inc, dec
+
+        inc, dec = f(0)
+        self.assertEqual(inc(), 1)
+        self.assertEqual(inc(), 2)
+        self.assertEqual(dec(), 1)
+        self.assertEqual(dec(), 0)
+
+    def testNonLocalMethod(self):
+
+        def f(x):
+            class c:
+                def inc(self):
+                    nonlocal x
+                    x += 1
+                    return x
+                def dec(self):
+                    nonlocal x
+                    x -= 1
+                    return x
+            return c()
+
+        c = f(0)
+        self.assertEqual(c.inc(), 1)
+        self.assertEqual(c.inc(), 2)
+        self.assertEqual(c.dec(), 1)
+        self.assertEqual(c.dec(), 0)
+
+    def testNonLocalClass(self):
+
+        def f(x):
+            class c:
+                nonlocal x
+                x += 1
+                def get(self):
+                    return x
+            return c()
+
+        c = f(0)
+        self.assertEqual(c.get(), 1)
+        self.assert_("x" not in c.__class__.__dict__)
+
+
+    def testNonLocalGenerator(self):
+
+        def f(x):
+            def g(y):
+                nonlocal x
+                for i in range(y):
+                    x += 1
+                    yield x
+            return g
+
+        g = f(0)
+        self.assertEqual(list(g(5)), [1, 2, 3, 4, 5])
+
+    def testNestedNonLocal(self):
+
+        def f(x):
+            def g():
+                nonlocal x
+                x -= 2
+                def h():
+                    nonlocal x
+                    x += 4
+                    return x
+                return h
+            return g
+
+        g = f(1)
+        h = g()
+        self.assertEqual(h(), 3)
 
 
 def test_main():

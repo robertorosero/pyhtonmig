@@ -1517,7 +1517,7 @@ opcodes = [
       opcode is followed by code to create setstate's argument, and then a
       BUILD opcode to apply  __setstate__ to that argument.
 
-      If type(callable) is not ClassType, REDUCE complains unless the
+      If not isinstance(callable, type), REDUCE complains unless the
       callable has been registered with the copy_reg module's
       safe_constructors dict, or the callable has a magic
       '__safe_for_unpickling__' attribute with a true value.  I'm not sure
@@ -1548,13 +1548,6 @@ opcodes = [
       the object is updated via
 
           anyobject.__dict__.update(argument)
-
-      This may raise RuntimeError in restricted execution mode (which
-      disallows access to __dict__ directly); in that case, the object
-      is updated instead via
-
-          for k, v in argument.items():
-              anyobject[k] = v
       """),
 
     I(name='INST',
@@ -1580,9 +1573,6 @@ opcodes = [
         + The argtuple is empty (markobject was at the top of the stack
           at the start).
 
-        + It's an old-style class object (the type of the class object is
-          ClassType).
-
         + The class object does not have a __getinitargs__ attribute.
 
       then we want to create an old-style class instance without invoking
@@ -1590,11 +1580,7 @@ opcodes = [
       calling __init__() is current wisdom).  In this case, an instance of
       an old-style dummy class is created, and then we try to rebind its
       __class__ attribute to the desired class object.  If this succeeds,
-      the new instance object is pushed on the stack, and we're done.  In
-      restricted execution mode it can fail (assignment to __class__ is
-      disallowed), and I'm not really sure what happens then -- it looks
-      like the code ends up calling the class object's __init__ anyway,
-      via falling into the next case.
+      the new instance object is pushed on the stack, and we're done.
 
       Else (the argtuple is not empty, it's not an old-style class object,
       or the class object does have a __getinitargs__ attribute), the code
@@ -2050,10 +2036,10 @@ highest protocol among opcodes = 1
 Exercise the INST/OBJ/BUILD family.
 
 >>> import random
->>> dis(pickle.dumps(random.random, 0))
-    0: c    GLOBAL     'random random'
-   15: p    PUT        0
-   18: .    STOP
+>>> dis(pickle.dumps(random.getrandbits, 0))
+    0: c    GLOBAL     'random getrandbits'
+   20: p    PUT        0
+   23: .    STOP
 highest protocol among opcodes = 0
 
 >>> from pickletools import _Example

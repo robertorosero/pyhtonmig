@@ -1,6 +1,7 @@
 import unittest
 from test import test_support
 import operator
+import sys
 from sys import maxint
 
 class oldstyle:
@@ -49,7 +50,7 @@ class BaseTestCase(unittest.TestCase):
         self.assertEqual(self.n.__index__(), 5)
 
     def test_subclasses(self):
-        r = range(10)
+        r = list(range(10))
         self.assertEqual(r[TrapInt(5):TrapInt(10)], r[5:10])
         self.assertEqual(r[TrapLong(5):TrapLong(10)], r[5:10])
         self.assertEqual(slice(TrapInt()).indices(0), (0,0,1))
@@ -164,14 +165,6 @@ class UnicodeTestCase(SeqTestCase):
     seq = u"this is a test"
 
 
-class XRangeTestCase(unittest.TestCase):
-
-    def test_xrange(self):
-        n = newstyle()
-        n.ind = 5
-        self.assertEqual(xrange(1, 20)[n], 6)
-        self.assertEqual(xrange(1, 20).__getitem__(n), 6)
-
 class OverflowTestCase(unittest.TestCase):
 
     def setUp(self):
@@ -185,7 +178,7 @@ class OverflowTestCase(unittest.TestCase):
     def _getitem_helper(self, base):
         class GetItem(base):
             def __len__(self):
-                return maxint
+                return maxint #cannot return long here
             def __getitem__(self, key):
                 return key
         x = GetItem()
@@ -213,7 +206,6 @@ def test_main():
         TupleTestCase,
         StringTestCase,
         UnicodeTestCase,
-        XRangeTestCase,
         OverflowTestCase,
     )
 

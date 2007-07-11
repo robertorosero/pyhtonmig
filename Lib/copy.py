@@ -99,13 +99,16 @@ _copy_dispatch = d = {}
 
 def _copy_immutable(x):
     return x
-for t in (type(None), int, int, float, bool, str, tuple,
-          frozenset, type, xrange, types.ClassType,
+for t in (type(None), int, float, bool, str, tuple,
+          frozenset, type, range,
           types.BuiltinFunctionType,
           types.FunctionType):
     d[t] = _copy_immutable
-for name in ("ComplexType", "UnicodeType", "CodeType"):
-    t = getattr(types, name, None)
+t = getattr(types, "CodeType", None)
+if t is not None:
+    d[t] = _copy_immutable
+for name in ("complex", "unicode"):
+    t = globals()['__builtins__'].get(name)
     if t is not None:
         d[t] = _copy_immutable
 
@@ -178,7 +181,6 @@ def _deepcopy_atomic(x, memo):
     return x
 d[type(None)] = _deepcopy_atomic
 d[int] = _deepcopy_atomic
-d[int] = _deepcopy_atomic
 d[float] = _deepcopy_atomic
 d[bool] = _deepcopy_atomic
 try:
@@ -195,8 +197,7 @@ try:
 except AttributeError:
     pass
 d[type] = _deepcopy_atomic
-d[xrange] = _deepcopy_atomic
-d[types.ClassType] = _deepcopy_atomic
+d[range] = _deepcopy_atomic
 d[types.BuiltinFunctionType] = _deepcopy_atomic
 d[types.FunctionType] = _deepcopy_atomic
 

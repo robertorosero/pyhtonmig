@@ -159,7 +159,12 @@ class Wave_read:
             f = __builtin__.open(f, 'rb')
             self._i_opened_the_file = f
         # else, assume it is an open file object already
-        self.initfp(f)
+        try:
+            self.initfp(f)
+        except:
+            if self._i_opened_the_file:
+                f.close()
+            raise
 
     def __del__(self):
         self.close()
@@ -256,9 +261,9 @@ class Wave_read:
     #
 
     def _read_fmt_chunk(self, chunk):
-        wFormatTag, self._nchannels, self._framerate, dwAvgBytesPerSec, wBlockAlign = struct.unpack('<hhllh', chunk.read(14))
+        wFormatTag, self._nchannels, self._framerate, dwAvgBytesPerSec, wBlockAlign = struct.unpack_from('<hhllh', chunk.read(14))
         if wFormatTag == WAVE_FORMAT_PCM:
-            sampwidth = struct.unpack('<h', chunk.read(2))[0]
+            sampwidth = struct.unpack_from('<h', chunk.read(2))[0]
             self._sampwidth = (sampwidth + 7) // 8
         else:
             raise Error, 'unknown format: %r' % (wFormatTag,)
@@ -297,7 +302,12 @@ class Wave_write:
         if isinstance(f, basestring):
             f = __builtin__.open(f, 'wb')
             self._i_opened_the_file = f
-        self.initfp(f)
+        try:
+            self.initfp(f)
+        except:
+            if self._i_opened_the_file:
+                f.close()
+            raise
 
     def initfp(self, file):
         self._file = file
@@ -374,7 +384,8 @@ class Wave_write:
     def getcompname(self):
         return self._compname
 
-    def setparams(self, (nchannels, sampwidth, framerate, nframes, comptype, compname)):
+    def setparams(self, params):
+        nchannels, sampwidth, framerate, nframes, comptype, compname = params
         if self._datawritten:
             raise Error, 'cannot change parameters after starting to write'
         self.setnchannels(nchannels)

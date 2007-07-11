@@ -8,7 +8,7 @@ Windows."""
 
 __revision__ = "$Id$"
 
-import sys, os, string
+import sys, os
 from types import *
 from distutils.errors import \
      DistutilsExecError, DistutilsPlatformError, \
@@ -18,7 +18,6 @@ from distutils.ccompiler import \
 import distutils.util
 import distutils.dir_util
 from distutils import log
-import mkcwproject
 
 class MWerksCompiler (CCompiler) :
     """Concrete class that implements an interface to MetroWerks CodeWarrior,
@@ -188,6 +187,7 @@ class MWerksCompiler (CCompiler) :
         # doesn't have a clue about our working directory.
         xmlfilename = os.path.join(os.getcwd(), os.path.join(build_temp, xmlname))
         log.debug("\tCreate XML file %s", xmlfilename)
+        import mkcwproject
         xmlbuilder = mkcwproject.cwxmlgen.ProjectBuilder(settings)
         xmlbuilder.generate()
         xmldata = settings['tmp_projectxmldata']
@@ -213,11 +213,11 @@ class MWerksCompiler (CCompiler) :
             curdir = os.getcwd()
             filename = os.path.join(curdir, filename)
         # Finally remove .. components
-        components = string.split(filename, ':')
+        components = filename.split(':')
         for i in range(1, len(components)):
             if components[i] == '..':
                 components[i] = ''
-        return string.join(components, ':')
+        return ':'.join(components)
 
     def library_dir_option (self, dir):
         """Return the compiler option to add 'dir' to the list of

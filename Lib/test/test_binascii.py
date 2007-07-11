@@ -9,7 +9,7 @@ class BinASCIITest(unittest.TestCase):
     # Create binary test data
     data = "The quick brown fox jumps over the lazy dog.\r\n"
     # Be slow so we don't depend on other modules
-    data += "".join(map(chr, xrange(256)))
+    data += "".join(map(chr, range(256)))
     data += "\r\nHello world.\n"
 
     def test_exceptions(self):
@@ -26,10 +26,10 @@ class BinASCIITest(unittest.TestCase):
                 prefixes.extend(["crc_", "rlecode_", "rledecode_"])
             for prefix in prefixes:
                 name = prefix + suffix
-                self.assert_(callable(getattr(binascii, name)))
+                self.assert_(hasattr(getattr(binascii, name), '__call__'))
                 self.assertRaises(TypeError, getattr(binascii, name))
         for name in ("hexlify", "unhexlify"):
-            self.assert_(callable(getattr(binascii, name)))
+            self.assert_(hasattr(getattr(binascii, name), '__call__'))
             self.assertRaises(TypeError, getattr(binascii, name))
 
     def test_base64valid(self):
@@ -58,7 +58,7 @@ class BinASCIITest(unittest.TestCase):
 
         fillers = ""
         valid = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789+/"
-        for i in xrange(256):
+        for i in range(256):
             c = chr(i)
             if c not in valid:
                 fillers += c
@@ -147,6 +147,15 @@ class BinASCIITest(unittest.TestCase):
             binascii.b2a_qp("0"*75+"\xff\r\n\xff\r\n\xff"),
             "0"*75+"=\r\n=FF\r\n=FF\r\n=FF"
         )
+
+        self.assertEqual(binascii.b2a_qp('\0\n'), '=00\n')
+        self.assertEqual(binascii.b2a_qp('\0\n', quotetabs=True), '=00\n')
+        self.assertEqual(binascii.b2a_qp('foo\tbar\t\n'), 'foo\tbar=09\n')
+        self.assertEqual(binascii.b2a_qp('foo\tbar\t\n', quotetabs=True), 'foo=09bar=09\n')
+
+        self.assertEqual(binascii.b2a_qp('.'), '=2E')
+        self.assertEqual(binascii.b2a_qp('.\n'), '=2E\n')
+        self.assertEqual(binascii.b2a_qp('a.\n'), 'a.\n')
 
     def test_empty_string(self):
         # A test for SF bug #1022953.  Make sure SystemError is not raised.

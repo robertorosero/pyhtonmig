@@ -1,5 +1,4 @@
 from pybench import Test
-from string import join
 import sys
 
 class ConcatStrings(Test):
@@ -11,10 +10,10 @@ class ConcatStrings(Test):
     def test(self):
 
         # Make sure the strings are *not* interned
-        s = join(map(str,range(100)))
-        t = join(map(str,range(1,101)))
+        s = ''.join(map(str,range(100)))
+        t = ''.join(map(str,range(1,101)))
 
-        for i in xrange(self.rounds):
+        for i in range(self.rounds):
             t + s
             t + s
             t + s
@@ -77,10 +76,10 @@ class ConcatStrings(Test):
 
     def calibrate(self):
 
-        s = join(map(str,range(100)))
-        t = join(map(str,range(1,101)))
+        s = ''.join(map(str,range(100)))
+        t = ''.join(map(str,range(1,101)))
 
-        for i in xrange(self.rounds):
+        for i in range(self.rounds):
             pass
 
 
@@ -93,10 +92,10 @@ class CompareStrings(Test):
     def test(self):
 
         # Make sure the strings are *not* interned
-        s = join(map(str,range(10)))
-        t = join(map(str,range(10))) + "abc"
+        s = ''.join(map(str,range(10)))
+        t = ''.join(map(str,range(10))) + "abc"
 
-        for i in xrange(self.rounds):
+        for i in range(self.rounds):
             t < s
             t > s
             t == s
@@ -159,10 +158,10 @@ class CompareStrings(Test):
 
     def calibrate(self):
 
-        s = join(map(str,range(10)))
-        t = join(map(str,range(10))) + "abc"
+        s = ''.join(map(str,range(10)))
+        t = ''.join(map(str,range(10))) + "abc"
 
-        for i in xrange(self.rounds):
+        for i in range(self.rounds):
             pass
 
 
@@ -175,10 +174,10 @@ class CompareInternedStrings(Test):
     def test(self):
 
         # Make sure the strings *are* interned
-        s = sys.intern(join(map(str,range(10))))
+        s = sys.intern(''.join(map(str,range(10))))
         t = s
 
-        for i in xrange(self.rounds):
+        for i in range(self.rounds):
             t == s
             t == s
             t >= s
@@ -241,10 +240,10 @@ class CompareInternedStrings(Test):
 
     def calibrate(self):
 
-        s = sys.intern(join(map(str,range(10))))
+        s = sys.intern(''.join(map(str,range(10))))
         t = s
 
-        for i in xrange(self.rounds):
+        for i in range(self.rounds):
             pass
 
 
@@ -256,7 +255,7 @@ class CreateStringsWithConcat(Test):
 
     def test(self):
 
-        for i in xrange(self.rounds):
+        for i in range(self.rounds):
             s = 'om'
             s = s + 'xbx'
             s = s + 'xcx'
@@ -319,7 +318,7 @@ class CreateStringsWithConcat(Test):
 
     def calibrate(self):
 
-        for i in xrange(self.rounds):
+        for i in range(self.rounds):
             pass
 
 
@@ -331,9 +330,9 @@ class StringSlicing(Test):
 
     def test(self):
 
-        s = join(map(str,range(100)))
+        s = ''.join(map(str,range(100)))
 
-        for i in xrange(self.rounds):
+        for i in range(self.rounds):
 
             s[50:]
             s[:25]
@@ -377,9 +376,9 @@ class StringSlicing(Test):
 
     def calibrate(self):
 
-        s = join(map(str,range(100)))
+        s = ''.join(map(str,range(100)))
 
-        for i in xrange(self.rounds):
+        for i in range(self.rounds):
             pass
 
 ### String methods
@@ -394,12 +393,12 @@ if hasattr('', 'lower'):
 
         def test(self):
 
-            s = join(map(chr,range(20)),'')
-            t = join(map(chr,range(50)),'')
-            u = join(map(chr,range(100)),'')
-            v = join(map(chr,range(256)),'')
+            s = ''.join(map(chr,range(20)))
+            t = ''.join(map(chr,range(50)))
+            u = ''.join(map(chr,range(100)))
+            v = ''.join(map(chr,range(256)))
 
-            for i in xrange(self.rounds):
+            for i in range(self.rounds):
 
                 s.lower()
                 s.lower()
@@ -451,12 +450,12 @@ if hasattr('', 'lower'):
 
         def calibrate(self):
 
-            s = join(map(chr,range(20)),'')
-            t = join(map(chr,range(50)),'')
-            u = join(map(chr,range(100)),'')
-            v = join(map(chr,range(256)),'')
+            s = ''.join(map(chr,range(20)))
+            t = ''.join(map(chr,range(50)))
+            u = ''.join(map(chr,range(100)))
+            v = ''.join(map(chr,range(256)))
 
-            for i in xrange(self.rounds):
+            for i in range(self.rounds):
                 pass
 
     class StringPredicates(Test):
@@ -470,7 +469,7 @@ if hasattr('', 'lower'):
             data = ('abc', '123', '   ', '\xe4\xf6\xfc', '\xdf'*10)
             len_data = len(data)
 
-            for i in xrange(self.rounds):
+            for i in range(self.rounds):
                 s = data[i % len_data]
 
                 s.isalnum()
@@ -559,5 +558,5 @@ if hasattr('', 'lower'):
             data = ('abc', '123', '   ', '\xe4\xf6\xfc', '\xdf'*10)
             len_data = len(data)
 
-            for i in xrange(self.rounds):
+            for i in range(self.rounds):
                 s = data[i % len_data]

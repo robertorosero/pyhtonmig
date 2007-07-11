@@ -3,6 +3,7 @@
 from test.test_support import verify, vereq, verbose, TestFailed, TESTFN, get_original_stdout
 from copy import deepcopy
 import warnings
+import types
 
 warnings.filterwarnings("ignore",
          r'complex divmod\(\), // and % are deprecated$',
@@ -616,9 +617,8 @@ def pylists():
     vereq(a[100:200], (100,200))
 
 def metaclass():
-    if verbose: print("Testing __metaclass__...")
-    class C:
-        __metaclass__ = type
+    if verbose: print("Testing metaclass...")
+    class C(metaclass=type):
         def __init__(self):
             self.__state = 0
         def getstate(self):
@@ -629,9 +629,10 @@ def metaclass():
     vereq(a.getstate(), 0)
     a.setstate(10)
     vereq(a.getstate(), 10)
-    class D:
-        class __metaclass__(type):
-            def myself(cls): return cls
+    class _metaclass(type):
+        def myself(cls): return cls
+    class D(metaclass=_metaclass):
+        pass
     vereq(D.myself(), D)
     d = D()
     verify(d.__class__ is D)
@@ -639,8 +640,8 @@ def metaclass():
         def __new__(cls, name, bases, dict):
             dict['__spam__'] = 1
             return type.__new__(cls, name, bases, dict)
-    class C:
-        __metaclass__ = M1
+    class C(metaclass=M1):
+        pass
     vereq(C.__spam__, 1)
     c = C()
     vereq(c.__spam__, 1)
@@ -663,8 +664,7 @@ def metaclass():
                     continue
                 setattr(it, key, self.dict[key].__get__(it, self))
             return it
-    class C:
-        __metaclass__ = M2
+    class C(metaclass=M2):
         def spam(self):
             return 42
     vereq(C.name, 'C')
@@ -690,8 +690,7 @@ def metaclass():
                 name = "__super"
             setattr(cls, name, super(cls))
             return cls
-    class A:
-        __metaclass__ = autosuper
+    class A(metaclass=autosuper):
         def meth(self):
             return "A"
     class B(A):
@@ -729,8 +728,7 @@ def metaclass():
                 dict[key] = property(get, set)
             return super(autoproperty, metaclass).__new__(metaclass,
                                                         name, bases, dict)
-    class A:
-        __metaclass__ = autoproperty
+    class A(metaclass=autoproperty):
         def _get_x(self):
             return -self.__x
         def _set_x(self, x):
@@ -744,8 +742,7 @@ def metaclass():
     class multimetaclass(autoproperty, autosuper):
         # Merge of multiple cooperating metaclasses
         pass
-    class A:
-        __metaclass__ = multimetaclass
+    class A(metaclass=multimetaclass):
         def _get_x(self):
             return "A"
     class B(A):
@@ -764,8 +761,8 @@ def metaclass():
         counter = 0
         def __init__(self, *args):
             T.counter += 1
-    class C:
-        __metaclass__ = T
+    class C(metaclass=T):
+        pass
     vereq(T.counter, 1)
     a = C()
     vereq(type(a), C)
@@ -776,6 +773,22 @@ def metaclass():
     try: c()
     except TypeError: pass
     else: raise TestFailed, "calling object w/o call method should raise TypeError"
+
+    # Testing code to find most derived baseclass
+    class A(type):
+        def __new__(*args, **kwargs):
+            return type.__new__(*args, **kwargs)
+
+    class B(object):
+        pass
+
+    class C(object, metaclass=A):
+        pass
+
+    # The most derived metaclass of D is A rather than type.
+    class D(B, C):
+        pass
+
 
 def pymods():
     if verbose: print("Testing Python subclass of module...")
@@ -801,6 +814,16 @@ def pymods():
     vereq(log, [("setattr", "foo", 12),
                 ("getattr", "foo"),
                 ("delattr", "foo")])
+
+    # http://python.org/sf/1174712
+    try:
+        class Module(types.ModuleType, str):
+            pass
+    except TypeError:
+        pass
+    else:
+        raise TestFailed("inheriting from ModuleType and str at the "
+                          "same time should fail")
 
 def multi():
     if verbose: print("Testing multiple inheritance...")
@@ -1076,6 +1099,45 @@ def slots():
         raise TestFailed, "[''] slots not caught"
     class C(object):
         __slots__ = ["a", "a_b", "_a", "A0123456789Z"]
+    # XXX(nnorwitz): was there supposed to be something tested
+    # from the class above?
+
+    # Test a single string is not expanded as a sequence.
+    class C(object):
+        __slots__ = "abc"
+    c = C()
+    c.abc = 5
+    vereq(c.abc, 5)
+
+    # Test unicode slot names
+    try:
+        unicode
+    except NameError:
+        pass
+    else:
+        # Test a single unicode string is not expanded as a sequence.
+        class C(object):
+            __slots__ = unicode("abc")
+        c = C()
+        c.abc = 5
+        vereq(c.abc, 5)
+
+        # _unicode_to_string used to modify slots in certain circumstances
+        slots = (unicode("foo"), unicode("bar"))
+        class C(object):
+            __slots__ = slots
+        x = C()
+        x.foo = 5
+        vereq(x.foo, 5)
+        veris(type(slots[0]), unicode)
+        # this used to leak references
+        try:
+            class C(object):
+                __slots__ = [unichr(128)]
+        except (TypeError, UnicodeEncodeError):
+            pass
+        else:
+            raise TestFailed, "[unichr(128)] slots not caught"
 
     # Test leaks
     class Counted(object):
@@ -1130,7 +1192,7 @@ def slots():
             return 0
     g = G()
     orig_objects = len(gc.get_objects())
-    for i in xrange(10):
+    for i in range(10):
         g==g
     new_objects = len(gc.get_objects())
     vereq(orig_objects, new_objects)
@@ -1273,8 +1335,8 @@ def dynamics():
     # Test comparison of classes with dynamic metaclasses
     class dynamicmetaclass(type):
         pass
-    class someclass:
-        __metaclass__ = dynamicmetaclass
+    class someclass(metaclass=dynamicmetaclass):
+        pass
     verify(someclass != object)
 
 def errors():
@@ -1321,6 +1383,22 @@ def errors():
         pass
     else:
         verify(0, "__slots__ = [1] should be illegal")
+
+    class M1(type):
+        pass
+    class M2(type):
+        pass
+    class A1(object, metaclass=M1):
+        pass
+    class A2(object, metaclass=M2):
+        pass
+    try:
+        class B(A1, A2):
+            pass
+    except TypeError:
+        pass
+    else:
+        verify(0, "finding the most derived metaclass should have failed")
 
 def classmethods():
     if verbose: print("Testing class methods...")
@@ -1505,36 +1583,39 @@ def altmro():
             L = type.mro(cls)
             L.reverse()
             return L
-    class X(D,B,C,A):
-        __metaclass__ = PerverseMetaType
+    class X(D,B,C,A, metaclass=PerverseMetaType):
+        pass
     vereq(X.__mro__, (object, A, C, B, D, X))
     vereq(X().f(), "A")
 
     try:
-        class X(object):
-            class __metaclass__(type):
-                def mro(self):
-                    return [self, dict, object]
+        class _metaclass(type):
+            def mro(self):
+                return [self, dict, object]
+        class X(object, metaclass=_metaclass):
+            pass
     except TypeError:
         pass
     else:
         raise TestFailed, "devious mro() return not caught"
 
     try:
-        class X(object):
-            class __metaclass__(type):
-                def mro(self):
-                    return [1]
+        class _metaclass(type):
+            def mro(self):
+                return [1]
+        class X(object, metaclass=_metaclass):
+            pass
     except TypeError:
         pass
     else:
         raise TestFailed, "non-class mro() return not caught"
 
     try:
-        class X(object):
-            class __metaclass__(type):
-                def mro(self):
-                    return 1
+        class _metaclass(type):
+            def mro(self):
+                return 1
+        class X(object, metaclass=_metaclass):
+            pass
     except TypeError:
         pass
     else:
@@ -1851,13 +1932,13 @@ def properties():
     for attr in "__doc__", "fget", "fset", "fdel":
         try:
             setattr(raw, attr, 42)
-        except TypeError as msg:
+        except AttributeError as msg:
             if str(msg).find('readonly') < 0:
                 raise TestFailed("when setting readonly attr %r on a "
-                                 "property, got unexpected TypeError "
+                                 "property, got unexpected AttributeError "
                                  "msg %r" % (attr, str(msg)))
         else:
-            raise TestFailed("expected TypeError from trying to set "
+            raise TestFailed("expected AttributeError from trying to set "
                              "readonly %r attr on a property" % attr)
 
     class D(object):
@@ -2036,17 +2117,14 @@ def inherits():
     class octlong(int):
         __slots__ = []
         def __str__(self):
-            s = oct(self)
-            if s[-1] == 'L':
-                s = s[:-1]
-            return s
+            return oct(self)
         def __add__(self, other):
             return self.__class__(super(octlong, self).__add__(other))
         __radd__ = __add__
-    vereq(str(octlong(3) + 5), "010")
+    vereq(str(octlong(3) + 5), "0o10")
     # (Note that overriding __radd__ here only seems to work
     # because the example uses a short int left argument.)
-    vereq(str(5 + octlong(3000)), "05675")
+    vereq(str(5 + octlong(3000)), "0o5675")
     a = octlong(12345)
     vereq(a, 12345)
     vereq(int(a), 12345)
@@ -2086,7 +2164,6 @@ def inherits():
         __slots__ = ['prec']
         def __init__(self, value=0.0, prec=12):
             self.prec = int(prec)
-            float.__init__(self, value)
         def __repr__(self):
             return "%.*g" % (self.prec, self)
     vereq(repr(precfloat(1.1)), "1.1")
@@ -2287,24 +2364,24 @@ def inherits():
     class sublist(list):
         pass
     a = sublist(range(5))
-    vereq(a, range(5))
+    vereq(a, list(range(5)))
     a.append("hello")
-    vereq(a, range(5) + ["hello"])
+    vereq(a, list(range(5)) + ["hello"])
     a[5] = 5
-    vereq(a, range(6))
+    vereq(a, list(range(6)))
     a.extend(range(6, 20))
-    vereq(a, range(20))
+    vereq(a, list(range(20)))
     a[-5:] = []
-    vereq(a, range(15))
+    vereq(a, list(range(15)))
     del a[10:15]
     vereq(len(a), 10)
-    vereq(a, range(10))
-    vereq(list(a), range(10))
+    vereq(a, list(range(10)))
+    vereq(list(a), list(range(10)))
     vereq(a[0], 0)
     vereq(a[9], 9)
     vereq(a[-10], 0)
     vereq(a[-1], 9)
-    vereq(a[:5], range(5))
+    vereq(a[:5], list(range(5)))
 
     class CountedInput(file):
         """Counts lines read by self.readline().
@@ -2336,7 +2413,7 @@ def inherits():
         f.writelines(lines)
         f.close()
         f = CountedInput(TESTFN)
-        for (i, expected) in zip(range(1, 5) + [4], lines + 2 * [""]):
+        for (i, expected) in zip(list(range(1, 5)) + [4], lines + 2 * [""]):
             got = f.readline()
             vereq(expected, got)
             vereq(f.lineno, i)
@@ -2363,7 +2440,7 @@ def keywords():
     vereq(str(object=500), '500')
     vereq(unicode(string='abc', errors='strict'), u'abc')
     vereq(tuple(sequence=range(3)), (0, 1, 2))
-    vereq(list(sequence=(0, 1, 2)), range(3))
+    vereq(list(sequence=(0, 1, 2)), list(range(3)))
     # note: as of Python 2.3, dict() no longer has an "items" keyword arg
 
     for constructor in (int, float, int, complex, str, unicode,
@@ -2375,49 +2452,6 @@ def keywords():
         else:
             raise TestFailed("expected TypeError from bogus keyword "
                              "argument to %r" % constructor)
-
-def restricted():
-    # XXX This test is disabled because rexec is not deemed safe
-    return
-    import rexec
-    if verbose:
-        print("Testing interaction with restricted execution ...")
-
-    sandbox = rexec.RExec()
-
-    code1 = """f = open(%r, 'w')""" % TESTFN
-    code2 = """f = open(%r, 'w')""" % TESTFN
-    code3 = """\
-f = open(%r)
-t = type(f)  # a sneaky way to get the file() constructor
-f.close()
-f = t(%r, 'w')  # rexec can't catch this by itself
-""" % (TESTFN, TESTFN)
-
-    f = open(TESTFN, 'w')  # Create the file so code3 can find it.
-    f.close()
-
-    try:
-        for code in code1, code2, code3:
-            try:
-                sandbox.r_exec(code)
-            except IOError as msg:
-                if str(msg).find("restricted") >= 0:
-                    outcome = "OK"
-                else:
-                    outcome = "got an exception, but not an expected one"
-            else:
-                outcome = "expected a restricted-execution exception"
-
-            if outcome != "OK":
-                raise TestFailed("%s, in %r" % (outcome, code))
-
-    finally:
-        try:
-            import os
-            os.unlink(TESTFN)
-        except:
-            pass
 
 def str_subclass_as_dict_key():
     if verbose:
@@ -2638,6 +2672,51 @@ def setclass():
     cant(o, type(1))
     cant(o, type(None))
     del o
+    class G(object):
+        __slots__ = ["a", "b"]
+    class H(object):
+        __slots__ = ["b", "a"]
+    try:
+        unicode
+    except NameError:
+        class I(object):
+            __slots__ = ["a", "b"]
+    else:
+        class I(object):
+            __slots__ = [unicode("a"), unicode("b")]
+    class J(object):
+        __slots__ = ["c", "b"]
+    class K(object):
+        __slots__ = ["a", "b", "d"]
+    class L(H):
+        __slots__ = ["e"]
+    class M(I):
+        __slots__ = ["e"]
+    class N(J):
+        __slots__ = ["__weakref__"]
+    class P(J):
+        __slots__ = ["__dict__"]
+    class Q(J):
+        pass
+    class R(J):
+        __slots__ = ["__dict__", "__weakref__"]
+
+    for cls, cls2 in ((G, H), (G, I), (I, H), (Q, R), (R, Q)):
+        x = cls()
+        x.a = 1
+        x.__class__ = cls2
+        verify(x.__class__ is cls2,
+               "assigning %r as __class__ for %r silently failed" % (cls2, x))
+        vereq(x.a, 1)
+        x.__class__ = cls
+        verify(x.__class__ is cls,
+               "assigning %r as __class__ for %r silently failed" % (cls, x))
+        vereq(x.a, 1)
+    for cls in G, J, K, L, M, N, P, R, list, Int:
+        for cls2 in G, J, K, L, M, N, P, R, list, Int:
+            if cls is cls2:
+                continue
+            cant(cls(), cls2)
 
 def setdict():
     if verbose: print("Testing __dict__ assignment...")
@@ -2656,8 +2735,73 @@ def setdict():
     cant(a, [])
     cant(a, 1)
     del a.__dict__ # Deleting __dict__ is allowed
-    # Classes don't allow __dict__ assignment
-    cant(C, {})
+
+    class Base(object):
+        pass
+    def verify_dict_readonly(x):
+        """
+        x has to be an instance of a class inheriting from Base.
+        """
+        cant(x, {})
+        try:
+            del x.__dict__
+        except (AttributeError, TypeError):
+            pass
+        else:
+            raise TestFailed, "shouldn't allow del %r.__dict__" % x
+        dict_descr = Base.__dict__["__dict__"]
+        try:
+            dict_descr.__set__(x, {})
+        except (AttributeError, TypeError):
+            pass
+        else:
+            raise TestFailed, "dict_descr allowed access to %r's dict" % x
+
+    # Classes don't allow __dict__ assignment and have readonly dicts
+    class Meta1(type, Base):
+        pass
+    class Meta2(Base, type):
+        pass
+    class D(object):
+        __metaclass__ = Meta1
+    class E(object):
+        __metaclass__ = Meta2
+    for cls in C, D, E:
+        verify_dict_readonly(cls)
+        class_dict = cls.__dict__
+        try:
+            class_dict["spam"] = "eggs"
+        except TypeError:
+            pass
+        else:
+            raise TestFailed, "%r's __dict__ can be modified" % cls
+
+    # Modules also disallow __dict__ assignment
+    class Module1(types.ModuleType, Base):
+        pass
+    class Module2(Base, types.ModuleType):
+        pass
+    for ModuleType in Module1, Module2:
+        mod = ModuleType("spam")
+        verify_dict_readonly(mod)
+        mod.__dict__["spam"] = "eggs"
+
+    # Exception's __dict__ can be replaced, but not deleted
+    class Exception1(Exception, Base):
+        pass
+    class Exception2(Base, Exception):
+        pass
+    for ExceptionType in Exception, Exception1, Exception2:
+        e = ExceptionType()
+        e.__dict__ = {"a": 1}
+        vereq(e.a, 1)
+        try:
+            del e.__dict__
+        except (TypeError, AttributeError):
+            pass
+        else:
+            raise TestFaied, "%r's __dict__ can be deleted" % e
+
 
 def pickles():
     if verbose:
@@ -3381,7 +3525,7 @@ def slottrash():
         def __init__(self, x):
             self.x = x
     o = None
-    for i in xrange(50000):
+    for i in range(50000):
         o = trash(o)
     del o
 
@@ -3568,11 +3712,11 @@ def test_mutable_bases_with_failing_mro():
     class E(D):
         pass
 
-    class F(D):
-        __metaclass__ = WorkOnce
+    class F(D, metaclass=WorkOnce):
+        pass
 
-    class G(D):
-        __metaclass__ = WorkAlways
+    class G(D, metaclass=WorkAlways):
+        pass
 
     # Immediate subclasses have their mro's adjusted in alphabetical
     # order, so E's will get adjusted before adjusting F's fails.  We
@@ -3683,15 +3827,15 @@ def subclass_right_op():
 
 def dict_type_with_metaclass():
     if verbose:
-        print("Testing type of __dict__ when __metaclass__ set...")
+        print("Testing type of __dict__ when metaclass set...")
 
     class B(object):
         pass
     class M(type):
         pass
-    class C:
+    class C(metaclass=M):
         # In 2.3a1, C.__dict__ was a real dict rather than a dict proxy
-        __metaclass__ = M
+        pass
     veris(type(C.__dict__), type(B.__dict__))
 
 def meth_class_get():
@@ -3838,7 +3982,7 @@ def weakref_segfault():
 def wrapper_segfault():
     # SF 927248: deeply nested wrappers could cause stack overflow
     f = lambda:None
-    for i in xrange(1000000):
+    for i in range(1000000):
         f = f.__call__
     f = None
 
@@ -3949,7 +4093,8 @@ def notimplemented():
     N1 = sys.maxint + 1    # might trigger OverflowErrors instead of TypeErrors
     N2 = sys.maxint         # if sizeof(int) < sizeof(long), might trigger
                             #   ValueErrors instead of TypeErrors
-    for metaclass in [type, types.ClassType]:
+    if 1:
+        metaclass = type
         for name, expr, iexpr in [
                 ('__add__',      'x + y',                   'x += y'),
                 ('__sub__',      'x - y',                   'x -= y'),
@@ -4039,7 +4184,6 @@ def test_main():
     supers()
     inherits()
     keywords()
-    restricted()
     str_subclass_as_dict_key()
     classic_comparisons()
     rich_comparisons()

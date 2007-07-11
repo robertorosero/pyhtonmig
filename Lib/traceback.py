@@ -169,7 +169,7 @@ def format_exception_only(etype, value):
 
     stype = etype.__name__
     smod = etype.__module__
-    if smod not in ("exceptions", "__main__", "__builtin__"):
+    if smod not in ("__main__", "__builtin__"):
         stype = smod + '.' + stype
 
     if not issubclass(etype, SyntaxError):
@@ -178,7 +178,7 @@ def format_exception_only(etype, value):
     # It was a syntax error; show exactly where the problem was found.
     lines = []
     try:
-        msg, (filename, lineno, offset, badline) = value
+        msg, (filename, lineno, offset, badline) = value.args
     except Exception:
         pass
     else:

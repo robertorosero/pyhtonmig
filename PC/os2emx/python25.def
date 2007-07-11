@@ -767,7 +767,6 @@ EXPORTS
   "_PyExc_Fini"
   "PyExc_BaseException"
   "PyExc_Exception"
-  "PyExc_StandardError"
   "PyExc_TypeError"
   "PyExc_StopIteration"
   "PyExc_GeneratorExit"
@@ -1255,25 +1254,11 @@ EXPORTS
 ; From python25_s.lib(mathmodule)
 ;  "initmath"
 
-; From python25_s.lib(md5)
-  "md5_finish"
-  "md5_init"
-  "md5_append"
-
-; From python25_s.lib(md5module)
-;  "init_md5"
-
 ; From python25_s.lib(operator)
 ;  "initoperator"
 
 ; From python25_s.lib(_randommodule)
 ;  "init_random"
-
-; From python25_s.lib(rgbimgmodule)
-;  "initrgbimg"
-
-; From python25_s.lib(shamodule)
-;  "init_sha"
 
 ; From python25_s.lib(sha256module)
 ;  "init_sha256"
@@ -1283,9 +1268,6 @@ EXPORTS
 
 ; From python25_s.lib(_sre)
 ;  "init_sre"
-
-; From python25_s.lib(stropmodule)
-;  "initstrop"
 
 ; From python25_s.lib(_struct)
 ;  "init_struct"
@@ -1300,9 +1282,6 @@ EXPORTS
 ;  "inittime"
   "_PyTime_DoubleToTimet"
 ;  "inittimezone"
-
-; From python25_s.lib(timingmodule)
-;  "inittiming"
 
 ; From python25_s.lib(_weakref)
 ;  "init_weakref"

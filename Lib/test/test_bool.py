@@ -168,8 +168,8 @@ class BoolTest(unittest.TestCase):
         self.assertIs(hasattr([], "wobble"), False)
 
     def test_callable(self):
-        self.assertIs(callable(len), True)
-        self.assertIs(callable(1), False)
+        self.assertIs(hasattr(len, '__call__'), True)
+        self.assertIs(hasattr(1, '__call__'), False)
 
     def test_isinstance(self):
         self.assertIs(isinstance(True, bool), True)
@@ -257,8 +257,6 @@ class BoolTest(unittest.TestCase):
         import operator
         self.assertIs(operator.truth(0), False)
         self.assertIs(operator.truth(1), True)
-        self.assertIs(operator.isCallable(0), False)
-        self.assertIs(operator.isCallable(len), True)
         self.assertIs(operator.isNumberType(None), False)
         self.assertIs(operator.isNumberType(0), True)
         self.assertIs(operator.not_(1), False)
@@ -323,7 +321,7 @@ class BoolTest(unittest.TestCase):
         self.assertEqual(pickle.dumps(False), "I00\n.")
         self.assertEqual(pickle.dumps(True, True), "I01\n.")
         self.assertEqual(pickle.dumps(False, True), "I00\n.")
- 
+
         try:
             import cPickle
         except ImportError:

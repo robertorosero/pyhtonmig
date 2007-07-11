@@ -151,7 +151,7 @@ This module offers the following functions:
  An application should only call \function{FlushKey()} if it requires absolute 
  certainty that registry changes are on disk.
  
- \emph{If you don't know whether a \function{FlushKey()} call is required, it 
+ \note{If you don't know whether a \function{FlushKey()} call is required, it 
  probably isn't.}
  
 \end{funcdesc}
@@ -321,7 +321,7 @@ This module offers the following functions:
  \var{key} is an already open key, or one of the predefined 
  \constant{HKEY_*} constants.
 
- \var{sub_key} is a string that names the subkey with which the 
+ \var{value_name} is a string that names the subkey with which the 
  value is associated.
 
  \var{type} is an integer that specifies the type of the data.  
@@ -393,14 +393,14 @@ This module offers the following functions:
  \method{Detach()} method to return the integer handle, and
  also disconnect the Windows handle from the handle object.
 
-\begin{methoddesc}{Close}{}
+\begin{methoddesc}[PyHKEY]{Close}{}
   Closes the underlying Windows handle.
 
   If the handle is already closed, no error is raised.
 \end{methoddesc}
 
 
-\begin{methoddesc}{Detach}{}
+\begin{methoddesc}[PyHKEY]{Detach}{}
   Detaches the Windows handle from the handle object.
 
  The result is an integer (or long on 64 bit Windows) that holds

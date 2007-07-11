@@ -73,7 +73,7 @@ TOOLSDIR=	tools
 # commontex/patchlevel.tex in their dependencies.
 RELEASE=$(shell $(PYTHON) tools/getversioninfo)
 
-PYTHON=	   python
+PYTHON=	   $(PWD)/../python
 DVIPS=	   dvips -N0 -t $(PAPER)
 
 # This is ugly!  The issue here is that there are two different levels
@@ -122,7 +122,7 @@ EMACS=     emacs
 
 # The end of this should reflect the major/minor version numbers of
 # the release:
-WHATSNEW=whatsnew26
+WHATSNEW=whatsnew30
 
 # what's what
 MANDVIFILES=	paper-$(PAPER)/api.dvi paper-$(PAPER)/ext.dvi \

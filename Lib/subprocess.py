@@ -17,8 +17,6 @@ intends to replace several other, older modules and functions, like:
 
 os.system
 os.spawn*
-os.popen*
-popen2.*
 commands.*
 
 Information about how the subprocess module can be used to replace these
@@ -283,80 +281,12 @@ Environment example:
 os.spawnlpe(os.P_NOWAIT, "/bin/mycmd", "mycmd", "myarg", env)
 ==>
 Popen(["/bin/mycmd", "myarg"], env={"PATH": "/usr/bin"})
-
-
-Replacing os.popen*
--------------------
-pipe = os.popen(cmd, mode='r', bufsize)
-==>
-pipe = Popen(cmd, shell=True, bufsize=bufsize, stdout=PIPE).stdout
-
-pipe = os.popen(cmd, mode='w', bufsize)
-==>
-pipe = Popen(cmd, shell=True, bufsize=bufsize, stdin=PIPE).stdin
-
-
-(child_stdin, child_stdout) = os.popen2(cmd, mode, bufsize)
-==>
-p = Popen(cmd, shell=True, bufsize=bufsize,
-          stdin=PIPE, stdout=PIPE, close_fds=True)
-(child_stdin, child_stdout) = (p.stdin, p.stdout)
-
-
-(child_stdin,
- child_stdout,
- child_stderr) = os.popen3(cmd, mode, bufsize)
-==>
-p = Popen(cmd, shell=True, bufsize=bufsize,
-          stdin=PIPE, stdout=PIPE, stderr=PIPE, close_fds=True)
-(child_stdin,
- child_stdout,
- child_stderr) = (p.stdin, p.stdout, p.stderr)
-
-
-(child_stdin, child_stdout_and_stderr) = os.popen4(cmd, mode, bufsize)
-==>
-p = Popen(cmd, shell=True, bufsize=bufsize,
-          stdin=PIPE, stdout=PIPE, stderr=STDOUT, close_fds=True)
-(child_stdin, child_stdout_and_stderr) = (p.stdin, p.stdout)
-
-
-Replacing popen2.*
-------------------
-Note: If the cmd argument to popen2 functions is a string, the command
-is executed through /bin/sh.  If it is a list, the command is directly
-executed.
-
-(child_stdout, child_stdin) = popen2.popen2("somestring", bufsize, mode)
-==>
-p = Popen(["somestring"], shell=True, bufsize=bufsize
-          stdin=PIPE, stdout=PIPE, close_fds=True)
-(child_stdout, child_stdin) = (p.stdout, p.stdin)
-
-
-(child_stdout, child_stdin) = popen2.popen2(["mycmd", "myarg"], bufsize, mode)
-==>
-p = Popen(["mycmd", "myarg"], bufsize=bufsize,
-          stdin=PIPE, stdout=PIPE, close_fds=True)
-(child_stdout, child_stdin) = (p.stdout, p.stdin)
-
-The popen2.Popen3 and popen3.Popen4 basically works as subprocess.Popen,
-except that:
-
-* subprocess.Popen raises an exception if the execution fails
-* the capturestderr argument is replaced with the stderr argument.
-* stdin=PIPE and stdout=PIPE must be specified.
-* popen2 closes all filedescriptors by default, but you have to specify
-  close_fds=True with subprocess.Popen.
-
-
 """
 
 import sys
 mswindows = (sys.platform == "win32")
 
 import os
-import types
 import traceback
 
 # Exception classes used by this module.
@@ -408,13 +338,6 @@ try:
     MAXFD = os.sysconf("SC_OPEN_MAX")
 except:
     MAXFD = 256
-
-# True/False does not exist on 2.2.0
-try:
-    False
-except NameError:
-    False = 0
-    True = 1
 
 _active = []
 
@@ -548,9 +471,10 @@ class Popen(object):
             if preexec_fn is not None:
                 raise ValueError("preexec_fn is not supported on Windows "
                                  "platforms")
-            if close_fds:
+            if close_fds and (stdin is not None or stdout is not None or
+                              stderr is not None):
                 raise ValueError("close_fds is not supported on Windows "
-                                 "platforms")
+                                 "platforms if you redirect stdin/stdout/stderr")
         else:
             # POSIX
             if startupinfo is not None:
@@ -597,7 +521,7 @@ class Popen(object):
         # either have to redirect all three or none. If the subprocess
         # user has only redirected one or two handles, we are
         # automatically creating PIPEs for the rest. We should close
-        # these after the process is started. See bug #1124861. 
+        # these after the process is started. See bug #1124861.
         if mswindows:
             if stdin is None and p2cwrite is not None:
                 os.close(p2cwrite)
@@ -629,7 +553,7 @@ class Popen(object):
         return data
 
 
-    def __del__(self):
+    def __del__(self, sys=sys):
         if not self._child_created:
             # We didn't get to successfully create a child process.
             return
@@ -769,7 +693,7 @@ class Popen(object):
                            errread, errwrite):
             """Execute program (MS Windows version)"""
 
-            if not isinstance(args, types.StringTypes):
+            if not isinstance(args, basestring):
                 args = list2cmdline(args)
 
             # Process startup details
@@ -807,9 +731,7 @@ class Popen(object):
                 hp, ht, pid, tid = CreateProcess(executable, args,
                                          # no special security
                                          None, None,
-                                         # must inherit handles to pass std
-                                         # handles
-                                         1,
+                                         int(not close_fds),
                                          creationflags,
                                          env,
                                          cwd,
@@ -969,7 +891,7 @@ class Popen(object):
 
 
         def _close_fds(self, but):
-            for i in xrange(3, MAXFD):
+            for i in range(3, MAXFD):
                 if i == but:
                     continue
                 try:
@@ -986,7 +908,7 @@ class Popen(object):
                            errread, errwrite):
             """Execute program (POSIX version)"""
 
-            if isinstance(args, types.StringTypes):
+            if isinstance(args, basestring):
                 args = [args]
             else:
                 args = list(args)

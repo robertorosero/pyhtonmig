@@ -749,6 +749,24 @@ static void _addIntToDict(PyObject* dict, char *name, int value)
 
     Py_XDECREF(v);
 }
+
+/* The same, when the value is a time_t */
+static void _addTimeTToDict(PyObject* dict, char *name, time_t value)
+{
+    PyObject* v;
+	/* if the value fits in regular int, use that. */
+#ifdef HAVE_LONG_LONG
+	if (sizeof(time_t) > sizeof(long))
+		v = PyLong_FromLongLong((PY_LONG_LONG) value);
+	else
+#endif
+		v = PyInt_FromLong((long) value);
+    if (!v || PyDict_SetItemString(dict, name, v))
+        PyErr_Clear();
+
+    Py_XDECREF(v);
+}
+
 #if (DBVER >= 43)
 /* add an db_seq_t to a dictionary using the given name as a key */
 static void _addDb_seq_tToDict(PyObject* dict, char *name, db_seq_t value)
@@ -1695,6 +1713,7 @@ DB_get_both(DBObject* self, PyObject* args, PyObject* kwargs)
     PyObject* dataobj;
     PyObject* retval = NULL;
     DBT key, data;
+    void *orig_data;
     DB_TXN *txn = NULL;
     static char* kwnames[] = { "key", "data", "txn", "flags", NULL };
 
@@ -1714,13 +1733,12 @@ DB_get_both(DBObject* self, PyObject* args, PyObject* kwargs)
     }
 
     flags |= DB_GET_BOTH;
+    orig_data = data.data;
 
     if (CHECK_DBFLAG(self, DB_THREAD)) {
         /* Tell BerkeleyDB to malloc the return value (thread safe) */
+        /* XXX(nnorwitz): At least 4.4.20 and 4.5.20 require this flag. */
         data.flags = DB_DBT_MALLOC;
-        /* TODO: Is this flag needed?  We're passing a data object that should
-                 match what's in the DB, so there should be no need to malloc.
-                 We run the risk of freeing something twice!  Check this. */
     }
 
     MYDB_BEGIN_ALLOW_THREADS;
@@ -1734,8 +1752,13 @@ DB_get_both(DBObject* self, PyObject* args, PyObject* kwargs)
         retval = Py_None;
     }
     else if (!err) {
+        /* XXX(nnorwitz): can we do: retval = dataobj; Py_INCREF(retval); */
         retval = PyString_FromStringAndSize((char*)data.data, data.size);
-        FREE_DBT(data); /* Only if retrieval was successful */
+
+        /* Even though the flags require DB_DBT_MALLOC, data is not always
+           allocated.  4.4: allocated, 4.5: *not* allocated. :-( */
+        if (data.data != orig_data)
+            FREE_DBT(data);
     }
 
     FREE_DBT(key);
@@ -4633,8 +4656,9 @@ DBEnv_txn_stat(DBEnvObject* self, PyObject* args)
     }
 
 #define MAKE_ENTRY(name)  _addIntToDict(d, #name, sp->st_##name)
+#define MAKE_TIME_T_ENTRY(name)_addTimeTToDict(d, #name, sp->st_##name)
 
-    MAKE_ENTRY(time_ckp);
+    MAKE_TIME_T_ENTRY(time_ckp);
     MAKE_ENTRY(last_txnid);
     MAKE_ENTRY(maxtxns);
     MAKE_ENTRY(nactive);
@@ -4647,6 +4671,7 @@ DBEnv_txn_stat(DBEnvObject* self, PyObject* args)
     MAKE_ENTRY(region_nowait);
 
 #undef MAKE_ENTRY
+#undef MAKE_TIME_T_ENTRY
     free(sp);
     return d;
 }
@@ -5991,6 +6016,10 @@ PyMODINIT_FUNC init_bsddb(void)
      * from both DBError and KeyError, since the API only supports
      * using one base class. */
     PyDict_SetItemString(d, "KeyError", PyExc_KeyError);
+    { 
+	    PyObject *builtin_mod = PyImport_ImportModule("__builtin__");
+	    PyDict_SetItemString(d, "__builtins__", builtin_mod);
+    }
     PyRun_String("class DBNotFoundError(DBError, KeyError): pass\n"
 	         "class DBKeyEmptyError(DBError, KeyError): pass",
                  Py_file_input, d, d);

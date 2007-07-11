@@ -1,4 +1,4 @@
--- ASDL's five builtin types are identifier, int, string, object, bool
+-- ASDL's five builtin types are identifier, int, string, object
 
 module Python version "$Revision$"
 {
@@ -10,8 +10,14 @@ module Python version "$Revision$"
 	    | Suite(stmt* body)
 
 	stmt = FunctionDef(identifier name, arguments args, 
-                           stmt* body, expr* decorators, expr? returns)
-	      | ClassDef(identifier name, expr* bases, stmt* body)
+                           stmt* body, expr* decorator_list, expr? returns)
+	      | ClassDef(identifier name, 
+			 expr* bases,
+			 keyword* keywords,
+			 expr? starargs,
+			 expr? kwargs,
+			 stmt* body,
+			 expr *decorator_list)
 	      | Return(expr? value)
 
 	      | Delete(expr* targets)
@@ -34,6 +40,7 @@ module Python version "$Revision$"
 	      | ImportFrom(identifier module, alias* names, int? level)
 
 	      | Global(identifier* names)
+	      | Nonlocal(identifier* names)
 	      | Expr(expr value)
 	      | Pass | Break | Continue
 
@@ -50,6 +57,8 @@ module Python version "$Revision$"
 	     | Dict(expr* keys, expr* values)
 	     | Set(expr* elts)
 	     | ListComp(expr elt, comprehension* generators)
+	     | SetComp(expr elt, comprehension* generators)
+	     | DictComp(expr key, expr value, comprehension* generators)
 	     | GeneratorExp(expr elt, comprehension* generators)
 	     -- the grammar constrains where yield expressions can occur
 	     | Yield(expr? value)
@@ -60,12 +69,14 @@ module Python version "$Revision$"
 			 expr? starargs, expr? kwargs)
 	     | Num(object n) -- a number as a PyObject.
 	     | Str(string s) -- need to specify raw, unicode, etc?
+	     | Bytes(string s)
 	     | Ellipsis
 	     -- other literals? bools?
 
 	     -- the following expression can appear in assignment context
 	     | Attribute(expr value, identifier attr, expr_context ctx)
 	     | Subscript(expr value, slice slice, expr_context ctx)
+	     | Starred(expr value, expr_context ctx)
 	     | Name(identifier id, expr_context ctx)
 	     | List(expr* elts, expr_context ctx) 
 	     | Tuple(expr* elts, expr_context ctx)
@@ -101,8 +112,7 @@ module Python version "$Revision$"
                      arg* kwonlyargs, identifier? kwarg,
                      expr? kwargannotation, expr* defaults,
                      expr* kw_defaults)
-	arg = SimpleArg(identifier arg, expr? annotation)
-            | NestedArgs(arg* args)
+	arg = (identifier arg, expr? annotation)
 
         -- keyword arguments supplied to call
         keyword = (identifier arg, expr value)
@@ -110,3 +120,4 @@ module Python version "$Revision$"
         -- import name with optional 'as' alias.
         alias = (identifier name, identifier? asname)
 }
+

@@ -136,11 +136,21 @@ class Test_IncrementalDecoder(unittest.TestCase):
         self.assertRaises(UnicodeDecodeError, decoder.decode, '', True)
         self.assertEqual(decoder.decode('B@$'), u'\u4e16')
 
+class Test_StreamReader(unittest.TestCase):
+    def test_bug1728403(self):
+        try:
+            open(TESTFN, 'w').write('\xa1')
+            f = codecs.open(TESTFN, encoding='cp949')
+            self.assertRaises(UnicodeDecodeError, f.read, 2)
+        finally:
+            try: f.close()
+            except: pass
+            os.unlink(TESTFN)
 
 class Test_StreamWriter(unittest.TestCase):
     if len(u'\U00012345') == 2: # UCS2
         def test_gb18030(self):
-            s= StringIO.StringIO()
+            s = StringIO.StringIO()
             c = codecs.getwriter('gb18030')(s)
             c.write(u'123')
             self.assertEqual(s.getvalue(), '123')
@@ -206,7 +216,7 @@ class Test_ISO2022(unittest.TestCase):
         self.failIf('\x0e' in u'\N{SOFT HYPHEN}'.encode('iso-2022-jp-2'))
         for encoding in ('iso-2022-jp-2004', 'iso-2022-jp-3'):
             e = u'\u3406'.encode(encoding)
-            self.failIf(filter(lambda x: x >= '\x80', e))
+            self.failIf(list(filter(lambda x: x >= '\x80', e)))
 
     def test_bug1572832(self):
         if sys.maxunicode >= 0x10000:
@@ -214,18 +224,12 @@ class Test_ISO2022(unittest.TestCase):
         else:
             myunichr = lambda x: unichr(0xD7C0+(x>>10)) + unichr(0xDC00+(x&0x3FF))
 
-        for x in xrange(0x10000, 0x110000):
+        for x in range(0x10000, 0x110000):
             # Any ISO 2022 codec will cause the segfault
             myunichr(x).encode('iso_2022_jp', 'ignore')
 
 def test_main():
-    suite = unittest.TestSuite()
-    suite.addTest(unittest.makeSuite(Test_MultibyteCodec))
-    suite.addTest(unittest.makeSuite(Test_IncrementalEncoder))
-    suite.addTest(unittest.makeSuite(Test_IncrementalDecoder))
-    suite.addTest(unittest.makeSuite(Test_StreamWriter))
-    suite.addTest(unittest.makeSuite(Test_ISO2022))
-    test_support.run_suite(suite)
+    test_support.run_unittest(__name__)
 
 if __name__ == "__main__":
     test_main()

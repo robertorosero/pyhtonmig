@@ -15,8 +15,7 @@ class TestIsInstanceExceptions(unittest.TestCase):
     # (leading to an "undetected error" in the debug build).  Set up is,
     # isinstance(inst, cls) where:
     #
-    # - inst isn't an InstanceType
-    # - cls isn't a ClassType, a TypeType, or a TupleType
+    # - cls isn't a a type, or a tuple
     # - cls has a __bases__ attribute
     # - inst has a __class__ attribute
     # - inst.__class__ as no __bases__ attribute
@@ -260,7 +259,7 @@ def blowstack(fxn, arg, compare_to):
     # Make sure that calling isinstance with a deeply nested tuple for its
     # argument will raise RuntimeError eventually.
     tuple_arg = (compare_to,)
-    for cnt in xrange(sys.getrecursionlimit()+5):
+    for cnt in range(sys.getrecursionlimit()+5):
         tuple_arg = (tuple_arg,)
         fxn(arg, tuple_arg)
 

@@ -10,6 +10,7 @@ import unittest
 
 from test.test_support import run_unittest
 from repr import repr as r # Don't shadow builtin repr
+from repr import Repr
 
 
 def nestedTuple(nesting):
@@ -33,6 +34,18 @@ class ReprTests(unittest.TestCase):
         s = "\""*30+"'"*100
         expected = repr(s)[:13] + "..." + repr(s)[-14:]
         eq(r(s), expected)
+
+    def test_tuple(self):
+        eq = self.assertEquals
+        eq(r((1,)), "(1,)")
+
+        t3 = (1, 2, 3)
+        eq(r(t3), "(1, 2, 3)")
+
+        r2 = Repr()
+        r2.maxtuple = 2
+        expected = repr(t3)[:-2] + "...)"
+        eq(r2.repr(t3), expected)
 
     def test_container(self):
         from array import array
@@ -135,11 +148,11 @@ class ReprTests(unittest.TestCase):
         self.failUnless(repr(''.split).startswith(
             '<built-in method split of str object at 0x'))
 
-    def test_xrange(self):
+    def test_range(self):
         eq = self.assertEquals
-        eq(repr(xrange(1)), 'xrange(1)')
-        eq(repr(xrange(1, 2)), 'xrange(1, 2)')
-        eq(repr(xrange(1, 2, 3)), 'xrange(1, 4, 3)')
+        eq(repr(range(1)), 'range(1)')
+        eq(repr(range(1, 2)), 'range(1, 2)')
+        eq(repr(range(1, 4, 3)), 'range(1, 4, 3)')
 
     def test_nesting(self):
         eq = self.assertEquals

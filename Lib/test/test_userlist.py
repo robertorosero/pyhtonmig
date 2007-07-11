@@ -20,7 +20,7 @@ class UserListTest(list_tests.CommonTest):
         self.assertEqual(u2, list("spameggs"))
 
     def test_iadd(self):
-        super(UserListTest, self).test_iadd()
+        super().test_iadd()
         u = [0, 1]
         u += UserList([0, 1])
         self.assertEqual(u, [0, 1, 0, 1])
@@ -41,7 +41,7 @@ class UserListTest(list_tests.CommonTest):
         class T(self.type2test):
             def __getitem__(self, key):
                 return str(key) + '!!!'
-        self.assertEqual(iter(T((1,2))).next(), "0!!!")
+        self.assertEqual(next(iter(T((1,2)))), "0!!!")
 
 def test_main():
     test_support.run_unittest(UserListTest)

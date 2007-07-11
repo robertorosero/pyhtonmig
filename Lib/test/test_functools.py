@@ -19,6 +19,7 @@ def capture(*args, **kw):
     """capture all positional and keyword arguments"""
     return args, kw
 
+
 class TestPartial(unittest.TestCase):
 
     thetype = functools.partial
@@ -28,7 +29,7 @@ class TestPartial(unittest.TestCase):
         self.assertEqual(p(3, 4, b=30, c=40),
                          ((1, 2, 3, 4), dict(a=10, b=30, c=40)))
         p = self.thetype(map, lambda x: x*10)
-        self.assertEqual(p([1,2,3,4]), [10, 20, 30, 40])
+        self.assertEqual(list(p([1,2,3,4])), [10, 20, 30, 40])
 
     def test_attributes(self):
         p = self.thetype(capture, 1, 2, a=10, b=20)
@@ -134,7 +135,7 @@ class TestPartial(unittest.TestCase):
         self.assertRaises(ReferenceError, getattr, p, 'func')
 
     def test_with_bound_and_unbound_methods(self):
-        data = map(str, range(10))
+        data = list(map(str, range(10)))
         join = self.thetype(str.join, '')
         self.assertEqual(join(data), '0123456789')
         join = self.thetype(''.join)
@@ -285,7 +286,7 @@ class TestReduce(unittest.TestCase):
                     self.sofar.append(n*n)
                     n += 1
                 return self.sofar[i]
-    
+
         self.assertEqual(self.func(lambda x, y: x+y, ['a', 'b', 'c'], ''), 'abc')
         self.assertEqual(
             self.func(lambda x, y: x+y, [['a', 'c'], [], ['d', 'w']], []),
@@ -321,7 +322,7 @@ class TestReduce(unittest.TestCase):
                     return i
                 else:
                     raise IndexError
-    
+
         from operator import add
         self.assertEqual(self.func(add, SequenceClass(5)), 10)
         self.assertEqual(self.func(add, SequenceClass(5), 42), 52)
@@ -333,7 +334,7 @@ class TestReduce(unittest.TestCase):
         d = {"one": 1, "two": 2, "three": 3}
         self.assertEqual(self.func(add, d), "".join(d.keys()))
 
-    
+
 
 
 def test_main(verbose=None):
@@ -352,7 +353,7 @@ def test_main(verbose=None):
     if verbose and hasattr(sys, "gettotalrefcount"):
         import gc
         counts = [None] * 5
-        for i in xrange(len(counts)):
+        for i in range(len(counts)):
             test_support.run_unittest(*test_classes)
             gc.collect()
             counts[i] = sys.gettotalrefcount()

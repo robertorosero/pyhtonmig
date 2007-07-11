@@ -15,8 +15,6 @@ and functions, such as:
 \begin{verbatim}
 os.system
 os.spawn*
-os.popen*
-popen2.*
 commands.*
 \end{verbatim}
 
@@ -89,7 +87,10 @@ called in the child process just before the child is executed.
 
 If \var{close_fds} is true, all file descriptors except \constant{0},
 \constant{1} and \constant{2} will be closed before the child process is
-executed. (\UNIX{} only)
+executed. (\UNIX{} only).  Or, on Windows, if \var{close_fds} is true
+then no handles will be inherited by the child process.  Note that on
+Windows, you cannot set \var{close_fds} to true and also redirect the
+standard handles by setting \var{stdin}, \var{stdout} or \var{stderr}.
 
 If \var{shell} is \constant{True}, the specified command will be
 executed through the shell.
@@ -176,16 +177,16 @@ metacharacters, can safely be passed to child processes.
 
 Instances of the \class{Popen} class have the following methods:
 
-\begin{methoddesc}{poll}{}
+\begin{methoddesc}[Popen]{poll}{}
 Check if child process has terminated.  Returns returncode
 attribute.
 \end{methoddesc}
 
-\begin{methoddesc}{wait}{}
+\begin{methoddesc}[Popen]{wait}{}
 Wait for child process to terminate.  Returns returncode attribute.
 \end{methoddesc}
 
-\begin{methoddesc}{communicate}{input=None}
+\begin{methoddesc}[Popen]{communicate}{input=None}
 Interact with process: Send data to stdin.  Read data from stdout and
 stderr, until end-of-file is reached.  Wait for process to terminate.
 The optional \var{input} argument should be a string to be sent to the
@@ -199,29 +200,29 @@ if the data size is large or unlimited.}
 
 The following attributes are also available:
 
-\begin{memberdesc}{stdin}
+\begin{memberdesc}[Popen]{stdin}
 If the \var{stdin} argument is \code{PIPE}, this attribute is a file
 object that provides input to the child process.  Otherwise, it is
 \code{None}.
 \end{memberdesc}
 
-\begin{memberdesc}{stdout}
+\begin{memberdesc}[Popen]{stdout}
 If the \var{stdout} argument is \code{PIPE}, this attribute is a file
 object that provides output from the child process.  Otherwise, it is
 \code{None}.
 \end{memberdesc}
 
-\begin{memberdesc}{stderr}
+\begin{memberdesc}[Popen]{stderr}
 If the \var{stderr} argument is \code{PIPE}, this attribute is file
 object that provides error output from the child process.  Otherwise,
 it is \code{None}.
 \end{memberdesc}
 
-\begin{memberdesc}{pid}
+\begin{memberdesc}[Popen]{pid}
 The process ID of the child process.
 \end{memberdesc}
 
-\begin{memberdesc}{returncode}
+\begin{memberdesc}[Popen]{returncode}
 The child return code.  A \code{None} value indicates that the process
 hasn't terminated yet.  A negative value -N indicates that the child
 was terminated by signal N (\UNIX{} only).
@@ -335,68 +336,3 @@ pipe = os.popen(cmd, mode='w', bufsize)
 ==>
 pipe = Popen(cmd, shell=True, bufsize=bufsize, stdin=PIPE).stdin
 \end{verbatim}
-
-\begin{verbatim}
-(child_stdin, child_stdout) = os.popen2(cmd, mode, bufsize)
-==>
-p = Popen(cmd, shell=True, bufsize=bufsize,
-          stdin=PIPE, stdout=PIPE, close_fds=True)
-(child_stdin, child_stdout) = (p.stdin, p.stdout)
-\end{verbatim}
-
-\begin{verbatim}
-(child_stdin,
- child_stdout,
- child_stderr) = os.popen3(cmd, mode, bufsize)
-==>
-p = Popen(cmd, shell=True, bufsize=bufsize,
-          stdin=PIPE, stdout=PIPE, stderr=PIPE, close_fds=True)
-(child_stdin,
- child_stdout,
- child_stderr) = (p.stdin, p.stdout, p.stderr)
-\end{verbatim}
-
-\begin{verbatim}
-(child_stdin, child_stdout_and_stderr) = os.popen4(cmd, mode, bufsize)
-==>
-p = Popen(cmd, shell=True, bufsize=bufsize,
-          stdin=PIPE, stdout=PIPE, stderr=STDOUT, close_fds=True)
-(child_stdin, child_stdout_and_stderr) = (p.stdin, p.stdout)
-\end{verbatim}
-
-\subsubsection{Replacing popen2.*}
-
-\note{If the cmd argument to popen2 functions is a string, the command
-is executed through /bin/sh.  If it is a list, the command is directly
-executed.}
-
-\begin{verbatim}
-(child_stdout, child_stdin) = popen2.popen2("somestring", bufsize, mode)
-==>
-p = Popen(["somestring"], shell=True, bufsize=bufsize,
-          stdin=PIPE, stdout=PIPE, close_fds=True)
-(child_stdout, child_stdin) = (p.stdout, p.stdin)
-\end{verbatim}
-
-\begin{verbatim}
-(child_stdout, child_stdin) = popen2.popen2(["mycmd", "myarg"], bufsize, mode)
-==>
-p = Popen(["mycmd", "myarg"], bufsize=bufsize,
-          stdin=PIPE, stdout=PIPE, close_fds=True)
-(child_stdout, child_stdin) = (p.stdout, p.stdin)
-\end{verbatim}
-
-The popen2.Popen3 and popen2.Popen4 basically works as subprocess.Popen,
-except that:
-
-\begin{itemize}
-\item subprocess.Popen raises an exception if the execution fails
-
-\item the \var{capturestderr} argument is replaced with the \var{stderr}
-      argument.
-
-\item stdin=PIPE and stdout=PIPE must be specified.
-
-\item popen2 closes all file descriptors by default, but you have to
-      specify close_fds=True with subprocess.Popen.
-\end{itemize}

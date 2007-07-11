@@ -8,8 +8,7 @@ in the distutils.command package.
 
 __revision__ = "$Id$"
 
-import sys, os, string, re
-from types import *
+import sys, os, re
 from distutils.errors import *
 from distutils import util, dir_util, file_util, archive_util, dep_util
 from distutils import log
@@ -166,7 +165,7 @@ class Command:
         print(indent + header)
         indent = indent + "  "
         for (option, _, _) in self.user_options:
-            option = string.translate(option, longopt_xlate)
+            option = option.translate(longopt_xlate)
             if option[-1] == "=":
                 option = option[:-1]
             value = getattr(self, option)
@@ -222,7 +221,7 @@ class Command:
         if val is None:
             setattr(self, option, default)
             return default
-        elif type(val) is not StringType:
+        elif not isinstance(val, str):
             raise DistutilsOptionError, \
                   "'%s' must be a %s (got `%s`)" % (option, what, val)
         return val
@@ -242,12 +241,12 @@ class Command:
         val = getattr(self, option)
         if val is None:
             return
-        elif type(val) is StringType:
+        elif isinstance(val, str):
             setattr(self, option, re.split(r',\s*|\s+', val))
         else:
-            if type(val) is ListType:
+            if isinstance(val, list):
                 types = map(type, val)
-                ok = (types == [StringType] * len(val))
+                ok = (types == [str] * len(val))
             else:
                 ok = 0
 
@@ -358,7 +357,7 @@ class Command:
         util.execute(func, args, msg, dry_run=self.dry_run)
 
 
-    def mkpath (self, name, mode=0777):
+    def mkpath (self, name, mode=0o777):
         dir_util.mkpath(name, mode, dry_run=self.dry_run)
 
 
@@ -415,15 +414,15 @@ class Command:
         """
         if exec_msg is None:
             exec_msg = "generating %s from %s" % \
-                       (outfile, string.join(infiles, ', '))
+                       (outfile, ', '.join(infiles))
         if skip_msg is None:
             skip_msg = "skipping %s (inputs unchanged)" % outfile
 
 
         # Allow 'infiles' to be a single string
-        if type(infiles) is StringType:
+        if isinstance(infiles, str):
             infiles = (infiles,)
-        elif type(infiles) not in (ListType, TupleType):
+        elif not isinstance(infiles, (list, tuple)):
             raise TypeError, \
                   "'infiles' must be a string, or a list or tuple of strings"
 

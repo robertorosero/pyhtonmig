@@ -26,7 +26,7 @@ class IterFunc:
         self.i = 0
     def __iter__(self):
         return self
-    def next(self):
+    def __next__(self):
         if self.i >= len(self.seqn): raise StopIteration
         v = self.seqn[self.i]
         self.i += 1
@@ -46,14 +46,14 @@ class IterNextOnly:
     def __init__(self, seqn):
         self.seqn = seqn
         self.i = 0
-    def next(self):
+    def __next__(self):
         if self.i >= len(self.seqn): raise StopIteration
         v = self.seqn[self.i]
         self.i += 1
         return v
 
 class IterNoNext:
-    'Iterator missing next()'
+    'Iterator missing __next__()'
     def __init__(self, seqn):
         self.seqn = seqn
         self.i = 0
@@ -67,7 +67,7 @@ class IterGenExc:
         self.i = 0
     def __iter__(self):
         return self
-    def next(self):
+    def __next__(self):
         3 // 0
 
 class IterFuncStop:
@@ -76,7 +76,7 @@ class IterFuncStop:
         pass
     def __iter__(self):
         return self
-    def next(self):
+    def __next__(self):
         raise StopIteration
 
 from itertools import chain, imap
@@ -120,7 +120,7 @@ class CommonTest(unittest.TestCase):
         self.assertEqual(len(vv), len(s))
 
         # Create from various iteratables
-        for s in ("123", "", range(1000), ('do', 1.2), xrange(2000,2200,5)):
+        for s in ("123", "", range(1000), ('do', 1.2), range(2000,2200,5)):
             for g in (Sequence, IterFunc, IterGen,
                       itermulti, iterfunc):
                 self.assertEqual(self.type2test(g(s)), self.type2test(s))
@@ -136,10 +136,10 @@ class CommonTest(unittest.TestCase):
 
     def test_getitem(self):
         u = self.type2test([0, 1, 2, 3, 4])
-        for i in xrange(len(u)):
+        for i in range(len(u)):
             self.assertEqual(u[i], i)
             self.assertEqual(u[int(i)], i)
-        for i in xrange(-len(u), -1):
+        for i in range(-len(u), -1):
             self.assertEqual(u[i], len(u)+i)
             self.assertEqual(u[int(i)], len(u)+i)
         self.assertRaises(IndexError, u.__getitem__, -len(u)-1)
@@ -294,12 +294,12 @@ class CommonTest(unittest.TestCase):
         class T(self.type2test):
             def __getitem__(self, key):
                 return str(key) + '!!!'
-        self.assertEqual(iter(T((1,2))).next(), 1)
+        self.assertEqual(next(iter(T((1,2)))), 1)
 
     def test_repeat(self):
-        for m in xrange(4):
+        for m in range(4):
             s = tuple(range(m))
-            for n in xrange(-3, 5):
+            for n in range(-3, 5):
                 self.assertEqual(self.type2test(s*n), self.type2test(s)*n)
             self.assertEqual(self.type2test(s)*(-4), self.type2test([]))
             self.assertEqual(id(s), id(s*1))

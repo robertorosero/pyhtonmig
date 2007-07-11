@@ -287,7 +287,7 @@ class SocketIO(object):
     def _proxify(self, obj):
         if isinstance(obj, RemoteProxy):
             return RPCProxy(self, obj.oid)
-        if isinstance(obj, types.ListType):
+        if isinstance(obj, list):
             return map(self._proxify, obj)
         # XXX Check for other types -- not currently needed
         return obj
@@ -572,18 +572,16 @@ def _getmethods(obj, methods):
     # Adds names to dictionary argument 'methods'
     for name in dir(obj):
         attr = getattr(obj, name)
-        if callable(attr):
+        if hasattr(attr, '__call__'):
             methods[name] = 1
-    if type(obj) == types.InstanceType:
-        _getmethods(obj.__class__, methods)
-    if type(obj) == types.ClassType:
+    if isinstance(obj, type):
         for super in obj.__bases__:
             _getmethods(super, methods)
 
 def _getattributes(obj, attributes):
     for name in dir(obj):
         attr = getattr(obj, name)
-        if not callable(attr):
+        if not hasattr(attr, '__call__'):
             attributes[name] = 1
 
 class MethodProxy(object):

@@ -5,8 +5,7 @@ modules in setup scripts."""
 
 __revision__ = "$Id$"
 
-import os, string, sys
-from types import *
+import os, sys
 
 try:
     import warnings
@@ -103,9 +102,9 @@ class Extension:
                   language=None,
                   **kw                      # To catch unknown keywords
                  ):
-        assert type(name) is StringType, "'name' must be a string"
-        assert (type(sources) is ListType and
-                map(type, sources) == [StringType]*len(sources)), \
+        assert isinstance(name, str), "'name' must be a string"
+        assert (isinstance(sources, list) and
+                all(isinstance(s, str) for s in sources)), \
                 "'sources' must be a list of strings"
 
         self.name = name
@@ -128,7 +127,7 @@ class Extension:
         if len(kw):
             L = kw.keys() ; L.sort()
             L = map(repr, L)
-            msg = "Unknown Extension options: " + string.join(L, ', ')
+            msg = "Unknown Extension options: " + ', '.join(L)
             if warnings is not None:
                 warnings.warn(msg)
             else:
@@ -195,7 +194,7 @@ def read_setup_file (filename):
             elif switch == "-I":
                 ext.include_dirs.append(value)
             elif switch == "-D":
-                equals = string.find(value, "=")
+                equals = value.find("=")
                 if equals == -1:        # bare "-DFOO" -- no value
                     ext.define_macros.append((value, None))
                 else:                   # "-DFOO=blah"

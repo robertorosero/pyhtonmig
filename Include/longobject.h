@@ -11,7 +11,8 @@ typedef struct _longobject PyLongObject; /* Revealed in longintrepr.h */
 
 PyAPI_DATA(PyTypeObject) PyLong_Type;
 
-#define PyLong_Check(op) PyObject_TypeCheck(op, &PyLong_Type)
+#define PyLong_Check(op) \
+		PyType_FastSubclass((op)->ob_type, Py_TPFLAGS_LONG_SUBCLASS)
 #define PyLong_CheckExact(op) ((op)->ob_type == &PyLong_Type)
 
 PyAPI_FUNC(PyObject *) PyLong_FromLong(long);
@@ -20,7 +21,7 @@ PyAPI_FUNC(PyObject *) PyLong_FromSize_t(size_t);
 PyAPI_FUNC(PyObject *) PyLong_FromSsize_t(Py_ssize_t);
 PyAPI_FUNC(PyObject *) PyLong_FromDouble(double);
 PyAPI_FUNC(long) PyLong_AsLong(PyObject *);
-PyAPI_FUNC(ssize_t) PyLong_AsSsize_t(PyObject *);
+PyAPI_FUNC(Py_ssize_t) PyLong_AsSsize_t(PyObject *);
 PyAPI_FUNC(size_t) PyLong_AsSize_t(PyObject *);
 PyAPI_FUNC(unsigned long) PyLong_AsUnsignedLong(PyObject *);
 PyAPI_FUNC(unsigned long) PyLong_AsUnsignedLongMask(PyObject *);
@@ -109,6 +110,11 @@ PyAPI_FUNC(PyObject *) _PyLong_FromByteArray(
 PyAPI_FUNC(int) _PyLong_AsByteArray(PyLongObject* v,
 	unsigned char* bytes, size_t n,
 	int little_endian, int is_signed);
+
+
+/* _PyLong_Format: Convert the long to a string object with given base,
+   appending a base prefix of 0[box] if base is 2, 8 or 16. */
+PyAPI_FUNC(PyObject *) _PyLong_Format(PyObject *aa, int base);
 
 #ifdef __cplusplus
 }

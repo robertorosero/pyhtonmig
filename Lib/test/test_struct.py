@@ -54,7 +54,7 @@ def with_warning_restore(func):
             # Grrr, we need this function to warn every time.  Without removing
             # the warningregistry, running test_tarfile then test_struct would fail
             # on 64-bit platforms.
-            globals = func.func_globals
+            globals = func.__globals__
             if '__warningregistry__' in globals:
                 del globals['__warningregistry__']
             warnings.filterwarnings("error", r"""^struct.*""", DeprecationWarning)
@@ -558,18 +558,18 @@ def test_unpack_from():
         vereq(s.unpack_from(data), ('abcd',))
         vereq(s.unpack_from(data, 2), ('cd01',))
         vereq(s.unpack_from(data, 4), ('0123',))
-        for i in xrange(6):
+        for i in range(6):
             vereq(s.unpack_from(data, i), (data[i:i+4],))
-        for i in xrange(6, len(test_string) + 1):
+        for i in range(6, len(test_string) + 1):
             simple_err(s.unpack_from, data, i)
     for cls in (str, buffer):
         data = cls(test_string)
         vereq(struct.unpack_from(fmt, data), ('abcd',))
         vereq(struct.unpack_from(fmt, data, 2), ('cd01',))
         vereq(struct.unpack_from(fmt, data, 4), ('0123',))
-        for i in xrange(6):
+        for i in range(6):
             vereq(struct.unpack_from(fmt, data, i), (data[i:i+4],))
-        for i in xrange(6, len(test_string) + 1):
+        for i in range(6, len(test_string) + 1):
             simple_err(struct.unpack_from, fmt, data, i)
 
 def test_pack_into():
@@ -614,53 +614,61 @@ def test_pack_into_fn():
     assertRaises(struct.error, pack_into, small_buf, 0, test_string)
     assertRaises(struct.error, pack_into, small_buf, 2, test_string)
 
+def test_unpack_with_buffer():
+    # SF bug 1563759: struct.unpack doens't support buffer protocol objects
+    data1 = array.array('B', '\x12\x34\x56\x78')
+    data2 = buffer('......\x12\x34\x56\x78......', 6, 4)
+    for data in [data1, data2]:
+        value, = struct.unpack('>I', data)
+        vereq(value, 0x12345678)
 
 # Test methods to pack and unpack from buffers rather than strings.
 test_unpack_from()
 test_pack_into()
 test_pack_into_fn()
+test_unpack_with_buffer()
 
 def test_bool():
     for prefix in tuple("<>!=")+('',):
         false = (), [], [], '', 0
         true = [1], 'test', 5, -1, 0xffffffff+1, 0xffffffff/2
-        
+
         falseFormat = prefix + 't' * len(false)
         if verbose:
             print('trying bool pack/unpack on', false, 'using format', falseFormat)
         packedFalse = struct.pack(falseFormat, *false)
         unpackedFalse = struct.unpack(falseFormat, packedFalse)
-        
+
         trueFormat = prefix + 't' * len(true)
         if verbose:
             print('trying bool pack/unpack on', true, 'using format', trueFormat)
         packedTrue = struct.pack(trueFormat, *true)
         unpackedTrue = struct.unpack(trueFormat, packedTrue)
-        
+
         if len(true) != len(unpackedTrue):
             raise TestFailed('unpacked true array is not of same size as input')
         if len(false) != len(unpackedFalse):
             raise TestFailed('unpacked false array is not of same size as input')
-        
+
         for t in unpackedFalse:
             if t is not False:
                 raise TestFailed('%r did not unpack as False' % t)
         for t in unpackedTrue:
             if t is not True:
                 raise TestFailed('%r did not unpack as false' % t)
-    
+
         if prefix and verbose:
             print('trying size of bool with format %r' % (prefix+'t'))
         packed = struct.pack(prefix+'t', 1)
-        
+
         if len(packed) != struct.calcsize(prefix+'t'):
             raise TestFailed('packed length is not equal to calculated size')
-        
+
         if len(packed) != 1 and prefix:
             raise TestFailed('encoded bool is not one byte: %r' % packed)
         elif not prefix and verbose:
             print('size of bool in native format is %i' % (len(packed)))
-        
+
         for c in '\x01\x7f\xff\x0f\xf0':
             if struct.unpack('>t', c)[0] is not True:
                 raise TestFailed('%c did not unpack as True' % c)

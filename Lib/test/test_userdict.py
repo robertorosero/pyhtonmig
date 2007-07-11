@@ -118,7 +118,7 @@ class UserDictTest(mapping_tests.TestHashMappingProtocol):
             self.assertEqual(u0.get(i), d0.get(i))
 
         # Test "in" iteration.
-        for i in xrange(20):
+        for i in range(20):
             u2[i] = str(i)
         ikeys = []
         for k in u2:
@@ -171,7 +171,7 @@ class UserDictTest(mapping_tests.TestHashMappingProtocol):
         except RuntimeError as err:
             self.assertEqual(err.args, (42,))
         else:
-            self.fail_("e[42] didn't raise RuntimeError")
+            self.fail("e[42] didn't raise RuntimeError")
         class F(UserDict.UserDict):
             def __init__(self):
                 # An instance variable __missing__ should have no effect
@@ -183,7 +183,7 @@ class UserDictTest(mapping_tests.TestHashMappingProtocol):
         except KeyError as err:
             self.assertEqual(err.args, (42,))
         else:
-            self.fail_("f[42] didn't raise KeyError")
+            self.fail("f[42] didn't raise KeyError")
         class G(UserDict.UserDict):
             pass
         g = G()
@@ -192,7 +192,7 @@ class UserDictTest(mapping_tests.TestHashMappingProtocol):
         except KeyError as err:
             self.assertEqual(err.args, (42,))
         else:
-            self.fail_("g[42] didn't raise KeyError")
+            self.fail("g[42] didn't raise KeyError")
 
 ##########################
 # Test Dict Mixin

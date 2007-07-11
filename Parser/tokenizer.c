@@ -93,6 +93,7 @@ char *_PyParser_TokenNames[] = {
 	"DOUBLESLASHEQUAL",
 	"AT",
 	"RARROW",
+	"ELLIPSIS",
 	/* This table must match the #defines in token.h! */
 	"OP",
 	"<ERRORTOKEN>",
@@ -1082,6 +1083,16 @@ PyToken_ThreeChars(int c1, int c2, int c3)
 			break;
 		}
 		break;
+        case '.':
+	        switch (c2) {
+		case '.':
+			switch (c3) {
+			case '.':
+				return ELLIPSIS;
+			}
+			break;
+		}
+		break;
 	}
 	return OP;
 }
@@ -1244,6 +1255,14 @@ tok_get(register struct tok_state *tok, char **p_start, char **p_end)
 			if (c == '"' || c == '\'')
 				goto letter_quote;
 			break;
+		case 'b':
+		case 'B':
+			c = tok_nextc(tok);
+			if (c == 'r' || c == 'R')
+				c = tok_nextc(tok);
+			if (c == '"' || c == '\'')
+				goto letter_quote;
+			break;
 		}
 		while (isalnum(c) || c == '_') {
 			c = tok_nextc(tok);
@@ -1270,19 +1289,28 @@ tok_get(register struct tok_state *tok, char **p_start, char **p_end)
 		c = tok_nextc(tok);
 		if (isdigit(c)) {
 			goto fraction;
-		}
-		else {
+		} else if (c == '.') {
+			c = tok_nextc(tok);
+			if (c == '.') {
+				*p_start = tok->start;
+				*p_end = tok->cur; 
+				return ELLIPSIS;
+			} else {
+				tok_backup(tok, c);
+			}
+			tok_backup(tok, '.');
+		} else {
 			tok_backup(tok, c);
-			*p_start = tok->start;
-			*p_end = tok->cur;
-			return DOT;
 		}
+		*p_start = tok->start;
+		*p_end = tok->cur;
+		return DOT;
 	}
 
 	/* Number */
 	if (isdigit(c)) {
 		if (c == '0') {
-			/* Hex or octal -- maybe. */
+			/* Hex, octal or binary -- maybe. */
 			c = tok_nextc(tok);
 			if (c == '.')
 				goto fraction;
@@ -1296,18 +1324,27 @@ tok_get(register struct tok_state *tok, char **p_start, char **p_end)
 					c = tok_nextc(tok);
 				} while (isxdigit(c));
 			}
-			else {
-				int found_decimal = 0;
-				/* Octal; c is first char of it */
-				/* There's no 'isoctdigit' macro, sigh */
-				while ('0' <= c && c < '8') {
+                        else if (c == 'o' || c == 'O') {
+				/* Octal */
+				do {
 					c = tok_nextc(tok);
-				}
-				if (isdigit(c)) {
-					found_decimal = 1;
-					do {
-						c = tok_nextc(tok);
-					} while (isdigit(c));
+				} while ('0' <= c && c < '8');
+			}
+			else if (c == 'b' || c == 'B') {
+				/* Binary */
+				do {
+					c = tok_nextc(tok);
+				} while (c == '0' || c == '1');
+			}
+			else {
+				int nonzero = 0;
+				/* maybe old-style octal; c is first char of it */
+				/* in any case, allow '0' as a literal */
+				while (c == '0')
+					c = tok_nextc(tok);
+				while (isdigit(c)) {
+					nonzero = 1;
+					c = tok_nextc(tok);
 				}
 				if (c == '.')
 					goto fraction;
@@ -1317,7 +1354,7 @@ tok_get(register struct tok_state *tok, char **p_start, char **p_end)
 				else if (c == 'j' || c == 'J')
 					goto imaginary;
 #endif
-				else if (found_decimal) {
+				else if (nonzero) {
 					tok->done = E_TOKEN;
 					tok_backup(tok, c);
 					return ERRORTOKEN;

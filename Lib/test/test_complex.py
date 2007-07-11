@@ -64,7 +64,7 @@ class ComplexTest(unittest.TestCase):
             self.assertClose(q, x)
 
     def test_truediv(self):
-        simple_real = [float(i) for i in xrange(-5, 6)]
+        simple_real = [float(i) for i in range(-5, 6)]
         simple_complex = [complex(x, y) for x in simple_real for y in simple_real]
         for x in simple_complex:
             for y in simple_complex:
@@ -76,7 +76,7 @@ class ComplexTest(unittest.TestCase):
         self.check_div(complex(1e-200, 1e-200), 1+0j)
 
         # Just for fun.
-        for i in xrange(100):
+        for i in range(100):
             self.check_div(complex(random(), random()),
                            complex(random(), random()))
 
@@ -158,7 +158,7 @@ class ComplexTest(unittest.TestCase):
         self.assertRaises(ValueError, pow, a, b, 0)
 
     def test_boolcontext(self):
-        for i in xrange(100):
+        for i in range(100):
             self.assert_(complex(random() + 1e-6, random() + 1e-6))
         self.assert_(not complex(0.0, 0.0))
 
@@ -208,6 +208,8 @@ class ComplexTest(unittest.TestCase):
         self.assertAlmostEqual(complex(),  0)
         self.assertAlmostEqual(complex("-1"), -1)
         self.assertAlmostEqual(complex("+1"), +1)
+        self.assertAlmostEqual(complex("(1+2j)"), 1+2j)
+        self.assertAlmostEqual(complex("(1.3+2.2j)"), 1.3+2.2j)
 
         class complex2(complex): pass
         self.assertAlmostEqual(complex(complex2(1+1j)), 1+1j)
@@ -237,12 +239,17 @@ class ComplexTest(unittest.TestCase):
         self.assertRaises(ValueError, complex, "")
         self.assertRaises(TypeError, complex, None)
         self.assertRaises(ValueError, complex, "\0")
+        self.assertRaises(ValueError, complex, "3\09")
         self.assertRaises(TypeError, complex, "1", "2")
         self.assertRaises(TypeError, complex, "1", 42)
         self.assertRaises(TypeError, complex, 1, "2")
         self.assertRaises(ValueError, complex, "1+")
         self.assertRaises(ValueError, complex, "1+1j+1j")
         self.assertRaises(ValueError, complex, "--")
+        self.assertRaises(ValueError, complex, "(1+2j")
+        self.assertRaises(ValueError, complex, "1+2j)")
+        self.assertRaises(ValueError, complex, "1+(2j)")
+        self.assertRaises(ValueError, complex, "(1+2j)123")
         if test_support.have_unicode:
             self.assertRaises(ValueError, complex, unicode("1"*500))
             self.assertRaises(ValueError, complex, unicode("x"))
@@ -289,13 +296,13 @@ class ComplexTest(unittest.TestCase):
         self.assertRaises(TypeError, complex, complex2(1j))
 
     def test_hash(self):
-        for x in xrange(-30, 30):
+        for x in range(-30, 30):
             self.assertEqual(hash(x), hash(complex(x, 0)))
             x /= 3.0    # now check against floating point
             self.assertEqual(hash(x), hash(complex(x, 0.)))
 
     def test_abs(self):
-        nums = [complex(x/3., y/7.) for x in xrange(-9,9) for y in xrange(-9,9)]
+        nums = [complex(x/3., y/7.) for x in range(-9,9) for y in range(-9,9)]
         for num in nums:
             self.assertAlmostEqual((num.real**2 + num.imag**2)  ** 0.5, abs(num))
 
@@ -304,6 +311,11 @@ class ComplexTest(unittest.TestCase):
         self.assertEqual(repr(1-6j), '(1-6j)')
 
         self.assertNotEqual(repr(-(1+0j)), '(-1+-0j)')
+
+        self.assertEqual(1-6j,complex(repr(1-6j)))
+        self.assertEqual(1+6j,complex(repr(1+6j)))
+        self.assertEqual(-6j,complex(repr(-6j)))
+        self.assertEqual(6j,complex(repr(6j)))
 
     def test_neg(self):
         self.assertEqual(-(1+6j), -1-6j)

@@ -12,7 +12,6 @@ import sys
 import os
 import re
 import copy
-import types
 import unittest
 
 from StringIO import StringIO
@@ -26,12 +25,6 @@ from optparse import make_option, Option, IndentedHelpFormatter, \
      BadOptionError, OptionValueError, Values
 from optparse import _match_abbrev
 from optparse import _parse_num
-
-# Do the right thing with boolean values for all known Python versions.
-try:
-    True, False
-except NameError:
-    (True, False) = (1, 0)
 
 retype = type(re.compile(''))
 
@@ -177,7 +170,7 @@ and kwargs %(kwargs)r
 
         except InterceptedError as err:
             self.assert_(
-                type(output) is types.StringType,
+                isinstance(output, str),
                 "expected output to be an ordinary string, not %r"
                 % type(output))
 
@@ -438,16 +431,10 @@ class TestTypeAliases(BaseTest):
         self.parser.add_option("-s", type="str")
         self.assertEquals(self.parser.get_option("-s").type, "string")
 
-    def test_new_type_object(self):
+    def test_type_object(self):
         self.parser.add_option("-s", type=str)
         self.assertEquals(self.parser.get_option("-s").type, "string")
         self.parser.add_option("-x", type=int)
-        self.assertEquals(self.parser.get_option("-x").type, "int")
-
-    def test_old_type_object(self):
-        self.parser.add_option("-s", type=types.StringType)
-        self.assertEquals(self.parser.get_option("-s").type, "string")
-        self.parser.add_option("-x", type=types.IntType)
         self.assertEquals(self.parser.get_option("-x").type, "int")
 
 
@@ -1476,7 +1463,7 @@ class TestHelp(BaseTest):
                 os.environ['COLUMNS'] = orig_columns
 
     def assertHelpEquals(self, expected_output):
-        if type(expected_output) is types.UnicodeType:
+        if isinstance(expected_output, unicode):
             encoding = self.parser._get_encoding(sys.stdout)
             expected_output = expected_output.encode(encoding, "replace")
 
@@ -1631,18 +1618,8 @@ class TestParseNumber(BaseTest):
                              "option -l: invalid integer value: '0x12x'")
 
 
-def _testclasses():
-    mod = sys.modules[__name__]
-    return [getattr(mod, name) for name in dir(mod) if name.startswith('Test')]
-
-def suite():
-    suite = unittest.TestSuite()
-    for testclass in _testclasses():
-        suite.addTest(unittest.makeSuite(testclass))
-    return suite
-
 def test_main():
-    test_support.run_suite(suite())
+    test_support.run_unittest(__name__)
 
 if __name__ == '__main__':
-    unittest.main()
+    test_main()

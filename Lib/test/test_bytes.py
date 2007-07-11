@@ -3,9 +3,12 @@
 import os
 import re
 import sys
+import pickle
+import cPickle
 import tempfile
 import unittest
 import test.test_support
+import test.string_tests
 
 
 class BytesTest(unittest.TestCase):
@@ -69,9 +72,11 @@ class BytesTest(unittest.TestCase):
         self.assertRaises(ValueError, bytes, [10**100])
 
     def test_repr(self):
-        self.assertEqual(repr(bytes()), "bytes()")
-        self.assertEqual(repr(bytes([0])), "bytes([0x00])")
-        self.assertEqual(repr(bytes([0, 1, 254, 255])), "bytes([0x00, 0x01, 0xfe, 0xff])")
+        self.assertEqual(repr(bytes()), "b''")
+        self.assertEqual(repr(bytes([0])), "b'\\0'")
+        self.assertEqual(repr(bytes([0, 1, 254, 255])), "b'\\0\\x01\\xfe\\xff'")
+        self.assertEqual(repr(bytes('abc')), "b'abc'")
+        self.assertEqual(repr(bytes("'")), "b'\\''")
 
     def test_compare(self):
         b1 = bytes([1, 2, 3])
@@ -96,6 +101,42 @@ class BytesTest(unittest.TestCase):
         self.failIf(b3 <  b2)
         self.failIf(b3 <= b2)
 
+    def test_compare_to_str(self):
+        self.assertEqual(b"abc" == "abc", True)
+        self.assertEqual(b"ab" != "abc", True)
+        self.assertEqual(b"ab" <= "abc", True)
+        self.assertEqual(b"ab" < "abc", True)
+        self.assertEqual(b"abc" >= "ab", True)
+        self.assertEqual(b"abc" > "ab", True)
+
+        self.assertEqual(b"abc" != "abc", False)
+        self.assertEqual(b"ab" == "abc", False)
+        self.assertEqual(b"ab" > "abc", False)
+        self.assertEqual(b"ab" >= "abc", False)
+        self.assertEqual(b"abc" < "ab", False)
+        self.assertEqual(b"abc" <= "ab", False)
+
+        self.assertEqual("abc" == b"abc", True)
+        self.assertEqual("ab" != b"abc", True)
+        self.assertEqual("ab" <= b"abc", True)
+        self.assertEqual("ab" < b"abc", True)
+        self.assertEqual("abc" >= b"ab", True)
+        self.assertEqual("abc" > b"ab", True)
+
+        self.assertEqual("abc" != b"abc", False)
+        self.assertEqual("ab" == b"abc", False)
+        self.assertEqual("ab" > b"abc", False)
+        self.assertEqual("ab" >= b"abc", False)
+        self.assertEqual("abc" < b"ab", False)
+        self.assertEqual("abc" <= b"ab", False)
+
+        # But they should never compare equal to Unicode!
+        # Test this for all expected byte orders and Unicode character sizes
+        self.assertEqual(b"\0a\0b\0c" == u"abc", False)
+        self.assertEqual(b"\0\0\0a\0\0\0b\0\0\0c" == u"abc", False)
+        self.assertEqual(b"a\0b\0c\0" == u"abc", False)
+        self.assertEqual(b"a\0\0\0b\0\0\0c\0\0\0" == u"abc", False)
+
     def test_nohash(self):
         self.assertRaises(TypeError, hash, bytes())
 
@@ -116,20 +157,13 @@ class BytesTest(unittest.TestCase):
                 b = bytes([ord('x')]*20)
                 n = f.readinto(b)
             self.assertEqual(n, len(short_sample))
-            self.assertEqual(list(b), map(ord, sample))
+            self.assertEqual(list(b), list(map(ord, sample)))
             # Test writing in binary mode
             with open(tfn, "wb") as f:
                 f.write(b)
             with open(tfn, "rb") as f:
                 self.assertEqual(f.read(), sample)
-            # Test writing in text mode
-            with open(tfn, "w") as f:
-                f.write(b)
-            with open(tfn, "r") as f:
-                self.assertEqual(f.read(), sample)
-            # Can't use readinto in text mode
-            with open(tfn, "r") as f:
-                self.assertRaises(TypeError, f.readinto, b)
+            # Text mode is ambiguous; don't test
         finally:
             try:
                 os.remove(tfn)
@@ -137,11 +171,22 @@ class BytesTest(unittest.TestCase):
                 pass
 
     def test_reversed(self):
-        input = map(ord, "Hello")
+        input = list(map(ord, "Hello"))
         b = bytes(input)
         output = list(reversed(b))
         input.reverse()
         self.assertEqual(output, input)
+
+    def test_reverse(self):
+        b = b'hello'
+        self.assertEqual(b.reverse(), None)
+        self.assertEqual(b, b'olleh')
+        b = b'hello1' # test even number of items
+        b.reverse()
+        self.assertEqual(b, b'1olleh')
+        b = bytes()
+        b.reverse()
+        self.assertFalse(b)
 
     def test_getslice(self):
         def by(s):
@@ -173,7 +218,7 @@ class BytesTest(unittest.TestCase):
                 # Skip step 0 (invalid)
                 for step in indices[1:]:
                     self.assertEqual(b[start:stop:step], bytes(L[start:stop:step]))
-        
+
     def test_regexps(self):
         def by(s):
             return bytes(map(ord, s))
@@ -246,7 +291,7 @@ class BytesTest(unittest.TestCase):
 
         b[3:5] = [3, 4, 5, 6]
         self.assertEqual(b, bytes(range(10)))
-        
+
         b[3:0] = [42, 42, 42]
         self.assertEqual(b, bytes([0, 1, 2, 42, 42, 42, 3, 4, 5, 6, 7, 8, 9]))
 
@@ -265,7 +310,7 @@ class BytesTest(unittest.TestCase):
                     L[start:stop:step] = data
                     b[start:stop:step] = data
                     self.assertEquals(b, bytes(L))
-                    
+
                     del L[start:stop:step]
                     del b[start:stop:step]
                     self.assertEquals(b, bytes(L))
@@ -319,8 +364,10 @@ class BytesTest(unittest.TestCase):
         b1 = bytes("abc")
         b2 = bytes("def")
         self.assertEqual(b1 + b2, bytes("abcdef"))
-        self.assertRaises(TypeError, lambda: b1 + "def")
-        self.assertRaises(TypeError, lambda: "abc" + b2)
+        self.assertEqual(b1 + "def", bytes("abcdef"))
+        self.assertEqual("def" + b1, bytes("defabc"))
+        self.assertRaises(TypeError, lambda: b1 + u"def")
+        self.assertRaises(TypeError, lambda: u"abc" + b2)
 
     def test_repeat(self):
         b = bytes("abc")
@@ -341,6 +388,14 @@ class BytesTest(unittest.TestCase):
         self.assertEqual(b, bytes("abcdef"))
         self.assertEqual(b, b1)
         self.failUnless(b is b1)
+        b += "xyz"
+        self.assertEqual(b, b"abcdefxyz")
+        try:
+            b += u""
+        except TypeError:
+            pass
+        else:
+            self.fail("bytes += unicode didn't raise TypeError")
 
     def test_irepeat(self):
         b = bytes("abc")
@@ -394,51 +449,277 @@ class BytesTest(unittest.TestCase):
                 seq.append(alloc)
         #print seq
 
+    def test_fromhex(self):
+        self.assertRaises(TypeError, bytes.fromhex)
+        self.assertRaises(TypeError, bytes.fromhex, 1)
+        self.assertEquals(bytes.fromhex(''), bytes())
+        b = bytes([0x1a, 0x2b, 0x30])
+        self.assertEquals(bytes.fromhex('1a2B30'), b)
+        self.assertEquals(bytes.fromhex('  1A 2B  30   '), b)
+        self.assertEquals(bytes.fromhex(buffer('')), bytes())
+        self.assertEquals(bytes.fromhex(buffer('0000')), bytes([0, 0]))
+        self.assertRaises(ValueError, bytes.fromhex, 'a')
+        self.assertRaises(ValueError, bytes.fromhex, 'rt')
+        self.assertRaises(ValueError, bytes.fromhex, '1a b cd')
+        self.assertRaises(ValueError, bytes.fromhex, '\x00')
+        self.assertRaises(ValueError, bytes.fromhex, '12   \x00   34')
+
     def test_join(self):
         self.assertEqual(bytes.join([]), bytes())
         self.assertEqual(bytes.join([bytes()]), bytes())
         for part in [("abc",), ("a", "bc"), ("ab", "c"), ("a", "b", "c")]:
-            lst = map(bytes, part)
+            lst = list(map(bytes, part))
             self.assertEqual(bytes.join(lst), bytes("abc"))
             self.assertEqual(bytes.join(tuple(lst)), bytes("abc"))
             self.assertEqual(bytes.join(iter(lst)), bytes("abc"))
         # XXX more...
-            
+
+    def test_literal(self):
+        tests =  [
+            (b"Wonderful spam", u"Wonderful spam"),
+            (br"Wonderful spam too", u"Wonderful spam too"),
+            (b"\xaa\x00\000\200", u"\xaa\x00\000\200"),
+            (br"\xaa\x00\000\200", ur"\xaa\x00\000\200"),
+        ]
+        for b, s in tests:
+            self.assertEqual(b, bytes(s, 'latin-1'))
+        for c in range(128, 256):
+            self.assertRaises(SyntaxError, eval,
+                              'b"%s"' % chr(c))
+
+    def test_extend(self):
+        orig = b'hello'
+        a = bytes(orig)
+        a.extend(a)
+        self.assertEqual(a, orig + orig)
+        self.assertEqual(a[5:], orig)
+
+    def test_remove(self):
+        b = b'hello'
+        b.remove(ord('l'))
+        self.assertEqual(b, b'helo')
+        b.remove(ord('l'))
+        self.assertEqual(b, b'heo')
+        self.assertRaises(ValueError, lambda: b.remove(ord('l')))
+        self.assertRaises(ValueError, lambda: b.remove(400))
+        self.assertRaises(ValueError, lambda: b.remove('e'))
+        # remove first and last
+        b.remove(ord('o'))
+        b.remove(ord('h'))
+        self.assertEqual(b, b'e')
+
+    def test_pop(self):
+        b = b'world'
+        self.assertEqual(b.pop(), ord('d'))
+        self.assertEqual(b.pop(0), ord('w'))
+        self.assertEqual(b.pop(-2), ord('r'))
+        self.assertRaises(IndexError, lambda: b.pop(10))
+        self.assertRaises(OverflowError, lambda: bytes().pop())
+
+    def test_nosort(self):
+        self.assertRaises(AttributeError, lambda: bytes().sort())
+
+    def test_index(self):
+        b = b'parrot'
+        self.assertEqual(b.index('p'), 0)
+        self.assertEqual(b.index('rr'), 2)
+        self.assertEqual(b.index('t'), 5)
+        self.assertRaises(ValueError, lambda: b.index('w'))
+
+    def test_count(self):
+        b = b'mississippi'
+        self.assertEqual(b.count('i'), 4)
+        self.assertEqual(b.count('ss'), 2)
+        self.assertEqual(b.count('w'), 0)
+
+    def test_append(self):
+        b = b'hell'
+        b.append(ord('o'))
+        self.assertEqual(b, b'hello')
+        self.assertEqual(b.append(100), None)
+        b = bytes()
+        b.append(ord('A'))
+        self.assertEqual(len(b), 1)
+
+    def test_insert(self):
+        b = b'msssspp'
+        b.insert(1, ord('i'))
+        b.insert(4, ord('i'))
+        b.insert(-2, ord('i'))
+        b.insert(1000, ord('i'))
+        self.assertEqual(b, b'mississippi')
+
+    def test_startswith(self):
+        b = b'hello'
+        self.assertFalse(bytes().startswith("anything"))
+        self.assertTrue(b.startswith("hello"))
+        self.assertTrue(b.startswith("hel"))
+        self.assertTrue(b.startswith("h"))
+        self.assertFalse(b.startswith("hellow"))
+        self.assertFalse(b.startswith("ha"))
+
+    def test_endswith(self):
+        b = b'hello'
+        self.assertFalse(bytes().endswith("anything"))
+        self.assertTrue(b.endswith("hello"))
+        self.assertTrue(b.endswith("llo"))
+        self.assertTrue(b.endswith("o"))
+        self.assertFalse(b.endswith("whello"))
+        self.assertFalse(b.endswith("no"))
+
+    def test_find(self):
+        b = b'mississippi'
+        self.assertEqual(b.find('ss'), 2)
+        self.assertEqual(b.find('ss', 3), 5)
+        self.assertEqual(b.find('ss', 1, 7), 2)
+        self.assertEqual(b.find('ss', 1, 3), -1)
+        self.assertEqual(b.find('w'), -1)
+        self.assertEqual(b.find('mississippian'), -1)
+
+    def test_rfind(self):
+        b = b'mississippi'
+        self.assertEqual(b.rfind('ss'), 5)
+        self.assertEqual(b.rfind('ss', 3), 5)
+        self.assertEqual(b.rfind('ss', 0, 6), 2)
+        self.assertEqual(b.rfind('w'), -1)
+        self.assertEqual(b.rfind('mississippian'), -1)
+
+    def test_index(self):
+        b = b'world'
+        self.assertEqual(b.index('w'), 0)
+        self.assertEqual(b.index('orl'), 1)
+        self.assertRaises(ValueError, lambda: b.index('worm'))
+        self.assertRaises(ValueError, lambda: b.index('ldo'))
+
+    def test_rindex(self):
+        # XXX could be more rigorous
+        b = b'world'
+        self.assertEqual(b.rindex('w'), 0)
+        self.assertEqual(b.rindex('orl'), 1)
+        self.assertRaises(ValueError, lambda: b.rindex('worm'))
+        self.assertRaises(ValueError, lambda: b.rindex('ldo'))
+
+    def test_replace(self):
+        b = b'mississippi'
+        self.assertEqual(b.replace('i', 'a'), b'massassappa')
+        self.assertEqual(b.replace('ss', 'x'), b'mixixippi')
+
+    def test_translate(self):
+        b = b'hello'
+        rosetta = bytes(range(0, 256))
+        rosetta[ord('o')] = ord('e')
+        c = b.translate(rosetta, b'l')
+        self.assertEqual(b, b'hello')
+        self.assertEqual(c, b'hee')
+
+    def test_split(self):
+        b = b'mississippi'
+        self.assertEqual(b.split('i'), [b'm', b'ss', b'ss', b'pp', b''])
+        self.assertEqual(b.split('ss'), [b'mi', b'i', b'ippi'])
+        self.assertEqual(b.split('w'), [b])
+        # require an arg (no magic whitespace split)
+        self.assertRaises(TypeError, lambda: b.split())
+
+    def test_rsplit(self):
+        b = b'mississippi'
+        self.assertEqual(b.rsplit('i'), [b'm', b'ss', b'ss', b'pp', b''])
+        self.assertEqual(b.rsplit('ss'), [b'mi', b'i', b'ippi'])
+        self.assertEqual(b.rsplit('w'), [b])
+        # require an arg (no magic whitespace split)
+        self.assertRaises(TypeError, lambda: b.rsplit())
+
+    def test_partition(self):
+        b = b'mississippi'
+        self.assertEqual(b.partition(b'ss'), (b'mi', b'ss', b'issippi'))
+        self.assertEqual(b.rpartition(b'w'), (b'', b'', b'mississippi'))
+
+    def test_rpartition(self):
+        b = b'mississippi'
+        self.assertEqual(b.rpartition(b'ss'), (b'missi', b'ss', b'ippi'))
+        self.assertEqual(b.rpartition(b'i'), (b'mississipp', b'i', b''))
+
+    def test_pickling(self):
+        for pm in pickle, cPickle:
+            for proto in range(pm.HIGHEST_PROTOCOL):
+                for b in b"", b"a", b"abc", b"\xffab\x80", b"\0\0\377\0\0":
+                    ps = pm.dumps(b, proto)
+                    q = pm.loads(ps)
+                    self.assertEqual(b, q)
+
+    def test_strip(self):
+        b = b'mississippi'
+        self.assertEqual(b.strip(b'i'), b'mississipp')
+        self.assertEqual(b.strip(b'm'), b'ississippi')
+        self.assertEqual(b.strip(b'pi'), b'mississ')
+        self.assertEqual(b.strip(b'im'), b'ssissipp')
+        self.assertEqual(b.strip(b'pim'), b'ssiss')
+
+    def test_lstrip(self):
+        b = b'mississippi'
+        self.assertEqual(b.lstrip(b'i'), b'mississippi')
+        self.assertEqual(b.lstrip(b'm'), b'ississippi')
+        self.assertEqual(b.lstrip(b'pi'), b'mississippi')
+        self.assertEqual(b.lstrip(b'im'), b'ssissippi')
+        self.assertEqual(b.lstrip(b'pim'), b'ssissippi')
+
+    def test_rstrip(self):
+        b = b'mississippi'
+        self.assertEqual(b.rstrip(b'i'), b'mississipp')
+        self.assertEqual(b.rstrip(b'm'), b'mississippi')
+        self.assertEqual(b.rstrip(b'pi'), b'mississ')
+        self.assertEqual(b.rstrip(b'im'), b'mississipp')
+        self.assertEqual(b.rstrip(b'pim'), b'mississ')
 
     # Optimizations:
     # __iter__? (optimization)
     # __reversed__? (optimization)
 
-    # XXX Some list methods?
-    # extended slicing
-    # extended slice assignment
-    # extend (same as b[len(b):] = src)
-    # reverse (in-place)
-    # remove
-    # pop
-    # NOT sort!
-    # With int arg:
-    # index
-    # count
-    # append
-    # insert
+    # XXX More string methods?  (Those that don't use character properties)
 
-    # XXX Some string methods?  (Those that don't use character properties)
-    # startswith
-    # endswidth
-    # find, rfind
-    # index, rindex (bytes arg)
-    # join
-    # replace
-    # translate
-    # split, rsplit
-    # lstrip, rstrip, strip??
+    # There are tests in string_tests.py that are more
+    # comprehensive for things like split, partition, etc.
+    # Unfortunately they are all bundled with tests that
+    # are not appropriate for bytes
 
-    # XXX pickle and marshal support?
+
+class BytesAsStringTest(test.string_tests.BaseTest):
+    type2test = bytes
+
+    def checkequal(self, result, object, methodname, *args):
+        object = bytes(object)
+        realresult = getattr(bytes, methodname)(object, *args)
+        self.assertEqual(
+            self.fixtype(result),
+            realresult
+        )
+
+    def checkraises(self, exc, object, methodname, *args):
+        object = bytes(object)
+        self.assertRaises(
+            exc,
+            getattr(bytes, methodname),
+            object,
+            *args
+        )
+
+    # Currently the bytes containment testing uses a single integer
+    # value. This may not be the final design, but until then the
+    # bytes section with in a bytes containment not valid
+    def test_contains(self):
+        pass
+    def test_find(self):
+        pass
+    def test_expandtabs(self):
+        pass
+    def test_upper(self):
+        pass
+    def test_lower(self):
+        pass
 
 
 def test_main():
     test.test_support.run_unittest(BytesTest)
+    test.test_support.run_unittest(BytesAsStringTest)
 
 
 if __name__ == "__main__":

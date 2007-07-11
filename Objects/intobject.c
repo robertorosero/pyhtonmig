@@ -214,11 +214,10 @@ PyInt_AsSsize_t(register PyObject *op)
 		return -1;
 	}
 
-	if (nb->nb_long != 0) {
+	if (nb->nb_long != 0)
 		io = (PyIntObject*) (*nb->nb_long) (op);
-	} else {
+	else
 		io = (PyIntObject*) (*nb->nb_int) (op);
-	}
 	if (io == NULL)
 		return -1;
 	if (!PyInt_Check(io)) {
@@ -395,7 +394,7 @@ PyInt_FromUnicode(Py_UNICODE *s, Py_ssize_t length, int base)
 	char *buffer = (char *)PyMem_MALLOC(length+1);
 
 	if (buffer == NULL)
-		return NULL;
+		return PyErr_NoMemory();
 
 	if (PyUnicode_EncodeDecimal(s, length, buffer, NULL)) {
 		PyMem_FREE(buffer);
@@ -923,32 +922,6 @@ int_float(PyIntObject *v)
 }
 
 static PyObject *
-int_oct(PyIntObject *v)
-{
-	char buf[100];
-	long x = v -> ob_ival;
-	if (x < 0)
-		PyOS_snprintf(buf, sizeof(buf), "-0%lo", -x);
-	else if (x == 0)
-		strcpy(buf, "0");
-	else
-		PyOS_snprintf(buf, sizeof(buf), "0%lo", x);
-	return PyString_FromString(buf);
-}
-
-static PyObject *
-int_hex(PyIntObject *v)
-{
-	char buf[100];
-	long x = v -> ob_ival;
-	if (x < 0)
-		PyOS_snprintf(buf, sizeof(buf), "-0x%lx", -x);
-	else
-		PyOS_snprintf(buf, sizeof(buf), "0x%lx", x);
-	return PyString_FromString(buf);
-}
-
-static PyObject *
 int_subtype_new(PyTypeObject *type, PyObject *args, PyObject *kwds);
 
 static PyObject *
@@ -1075,8 +1048,8 @@ static PyNumberMethods int_as_number = {
 	(unaryfunc)int_int,	/*nb_int*/
 	(unaryfunc)int_long,	/*nb_long*/
 	(unaryfunc)int_float,	/*nb_float*/
-	(unaryfunc)int_oct,	/*nb_oct*/
-	(unaryfunc)int_hex, 	/*nb_hex*/
+	0,			/*nb_oct*/ /* not in use */
+	0, 			/*nb_hex*/ /* not in use */
 	0,			/*nb_inplace_add*/
 	0,			/*nb_inplace_subtract*/
 	0,			/*nb_inplace_multiply*/
@@ -1115,7 +1088,8 @@ PyTypeObject PyInt_Type = {
 	PyObject_GenericGetAttr,		/* tp_getattro */
 	0,					/* tp_setattro */
 	0,					/* tp_as_buffer */
-	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE, /* tp_flags */
+	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE |
+		Py_TPFLAGS_INT_SUBCLASS,	/* tp_flags */
 	int_doc,				/* tp_doc */
 	0,					/* tp_traverse */
 	0,					/* tp_clear */

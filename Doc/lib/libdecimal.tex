@@ -425,7 +425,7 @@ also have a number of specialized methods:
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%            
-\subsection{Context objects \label{decimal-decimal}}
+\subsection{Context objects \label{decimal-context}}
 
 Contexts are environments for arithmetic operations.  They govern precision,
 set rules for rounding, determine which signals are treated as exceptions, and
@@ -845,7 +845,7 @@ exception is raised upon encountering the condition.
 The following table summarizes the hierarchy of signals:
 
 \begin{verbatim}    
-    exceptions.ArithmeticError(exceptions.StandardError)
+    exceptions.ArithmeticError(exceptions.Exception)
         DecimalException
             Clamped
             DivisionByZero(DecimalException, exceptions.ZeroDivisionError)

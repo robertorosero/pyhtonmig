@@ -40,15 +40,12 @@ class ImportManager:
         self.namespace = namespace
         namespace['__import__'] = self._import_hook
 
-        ### fix this
-        #namespace['reload'] = self._reload_hook
-
     def uninstall(self):
         "Restore the previous import mechanism."
         self.namespace['__import__'] = self.previous_importer
 
     def add_suffix(self, suffix, importFunc):
-        assert callable(importFunc)
+        assert hasattr(importFunc, '__call__')
         self.fs_imp.add_suffix(suffix, importFunc)
 
     ######################################################################
@@ -194,22 +191,6 @@ class ImportManager:
                 return module
         return None
 
-    def _reload_hook(self, module):
-        "Python calls this hook to reload a module."
-
-        # reloading of a module may or may not be possible (depending on the
-        # importer), but at least we can validate that it's ours to reload
-        importer = module.__dict__.get('__importer__')
-        if not importer:
-            ### oops. now what...
-            pass
-
-        # okay. it is using the imputil system, and we must delegate it, but
-        # we don't know what to do (yet)
-        ### we should blast the module dict and do another get_code(). need to
-        ### flesh this out and add proper docco...
-        raise SystemError, "reload not yet implemented"
-
 
 class Importer:
     "Base class for replacing standard import functions."
@@ -278,7 +259,10 @@ class Importer:
             setattr(parent, modname, module)
         return module
 
-    def _process_result(self, (ispkg, code, values), fqname):
+    def _process_result(self, result, fqname):
+        # unpack result
+        ispkg, code, values = result
+
         # did get_code() return an actual module? (rather than a code object)
         is_module = isinstance(code, _ModuleType)
 
@@ -492,7 +476,7 @@ def _os_path_isdir(pathname):
         s = _os_stat(pathname)
     except OSError:
         return None
-    return (s.st_mode & 0170000) == 0040000
+    return (s.st_mode & 0o170000) == 0o040000
 
 def _timestamp(pathname):
     "Return the file modification time as a Long."
@@ -536,7 +520,7 @@ class _FilesystemImporter(Importer):
         self.suffixes = [ ]
 
     def add_suffix(self, suffix, importFunc):
-        assert callable(importFunc)
+        assert hasattr(importFunc, '__call__')
         self.suffixes.append((suffix, importFunc))
 
     def import_from_dir(self, dir, fqname):
@@ -674,13 +658,11 @@ def _test_revamp():
 #   push MAL's mapper into sys.path[0] as a cache (hard-coded for apps)
 #
 # from Guido:
-#   need to change sys.* references for rexec environs
 #   need hook for MAL's walk-me-up import strategy, or Tim's absolute strategy
 #   watch out for sys.modules[...] is None
 #   flag to force absolute imports? (speeds _determine_import_context and
 #       checking for a relative module)
 #   insert names of archives into sys.path  (see quote below)
-#   note: reload does NOT blast module dict
 #   shift import mechanisms and policies around; provide for hooks, overrides
 #       (see quote below)
 #   add get_source stuff
@@ -714,7 +696,7 @@ def _test_revamp():
 # > However, we still have a tension occurring here:
 # >
 # > 1) implementing policy in ImportManager assists in single-point policy
-# >    changes for app/rexec situations
+# >    changes for app situations
 # > 2) implementing policy in Importer assists in package-private policy
 # >    changes for normal, operating conditions
 # >

@@ -24,7 +24,7 @@ static PyLongObject small_ints[NSMALLNEGINTS + NSMALLPOSINTS];
 int quick_int_allocs, quick_neg_int_allocs;
 #endif
 
-static inline PyObject *
+static PyObject *
 get_small_int(int ival)
 {
 	PyObject *v = (PyObject*)(small_ints + ival + NSMALLNEGINTS);
@@ -80,7 +80,6 @@ static PyLongObject *long_normalize(PyLongObject *);
 static PyLongObject *mul1(PyLongObject *, wdigit);
 static PyLongObject *muladd1(PyLongObject *, wdigit, wdigit);
 static PyLongObject *divrem1(PyLongObject *, digit, digit *);
-static PyObject *long_format(PyObject *aa, int base);
 
 #define SIGCHECK(PyTryBlock) \
 	if (--_Py_Ticker < 0) { \
@@ -298,6 +297,7 @@ PyLong_AsLong(PyObject *vv)
 	/* This version by Tim Peters */
 	register PyLongObject *v;
 	unsigned long x, prev;
+	long res;
 	Py_ssize_t i;
 	int sign;
 	int do_decref = 0; /* if nb_int was called */
@@ -326,46 +326,55 @@ PyLong_AsLong(PyObject *vv)
 		}
 	}
 
+	res = -1;
 	v = (PyLongObject *)vv;
 	i = v->ob_size;
-	switch (i) {
-	case -1: return -v->ob_digit[0];
-	case 0: return 0;
-	case 1: return v->ob_digit[0];
-	}
-	sign = 1;
-	x = 0;
-	if (i < 0) {
-		sign = -1;
-		i = -(i);
-	}
-	while (--i >= 0) {
-		prev = x;
-		x = (x << SHIFT) + v->ob_digit[i];
-		if ((x >> SHIFT) != prev)
-			goto overflow;
-	}
-	if (do_decref) {
-		Py_DECREF(vv);
-	}
-	/* Haven't lost any bits, but casting to long requires extra care
-	 * (see comment above).
-         */
-	if (x <= (unsigned long)LONG_MAX) {
-		return (long)x * sign;
-	}
-	else if (sign < 0 && x == PY_ABS_LONG_MIN) {
-		return LONG_MIN;
-	}
-	/* else overflow */
 
- overflow:
+	switch (i) {
+	case -1:
+		res = -v->ob_digit[0];
+		break;
+	case 0:
+		res = 0;
+		break;
+	case 1:
+		res = v->ob_digit[0];
+		break;
+	default:
+		sign = 1;
+		x = 0;
+		if (i < 0) {
+			sign = -1;
+			i = -(i);
+		}
+		while (--i >= 0) {
+			prev = x;
+			x = (x << SHIFT) + v->ob_digit[i];
+			if ((x >> SHIFT) != prev) {
+				PyErr_SetString(PyExc_OverflowError,
+					"Python int too large to convert to C long");
+				goto exit;
+			}
+		}
+		/* Haven't lost any bits, but casting to long requires extra care
+		 * (see comment above).
+	         */
+		if (x <= (unsigned long)LONG_MAX) {
+			res = (long)x * sign;
+		}
+		else if (sign < 0 && x == PY_ABS_LONG_MIN) {
+			res = LONG_MIN;
+		}
+		else {
+			PyErr_SetString(PyExc_OverflowError,
+				"Python int too large to convert to C long");
+		}	
+	}
+ exit:
 	if (do_decref) {
 		Py_DECREF(vv);
 	}
-	PyErr_SetString(PyExc_OverflowError,
-			"Python int too large to convert to C long");
-	return -1;
+	return res;
 }
 
 int
@@ -1374,7 +1383,7 @@ muladd1(PyLongObject *a, wdigit n, wdigit extra)
 /* Divide long pin, w/ size digits, by non-zero digit n, storing quotient
    in pout, and returning the remainder.  pin and pout point at the LSD.
    It's OK for pin == pout on entry, which saves oodles of mallocs/frees in
-   long_format, but that should be done with great care since longs are
+   _PyLong_Format, but that should be done with great care since longs are
    immutable. */
 
 static digit
@@ -1414,10 +1423,10 @@ divrem1(PyLongObject *a, digit n, digit *prem)
 
 /* Convert a long int object to a string, using a given conversion base.
    Return a string object.
-   If base is 8 or 16, add the proper prefix '0' or '0x'. */
+   If base is 2, 8 or 16, add the proper prefix '0b', '0o' or '0x'. */
 
-static PyObject *
-long_format(PyObject *aa, int base)
+PyObject *
+_PyLong_Format(PyObject *aa, int base)
 {
 	register PyLongObject *a = (PyLongObject *)aa;
 	PyStringObject *str;
@@ -1541,12 +1550,16 @@ long_format(PyObject *aa, int base)
 		Py_DECREF(scratch);
 	}
 
-	if (base == 8) {
-		if (size_a != 0)
-			*--p = '0';
-	}
-	else if (base == 16) {
+	if (base == 16) {
 		*--p = 'x';
+		*--p = '0';
+	}
+	else if (base == 8) {
+		*--p = 'o';
+		*--p = '0';
+	}
+	else if (base == 2) {
+		*--p = 'b';
 		*--p = '0';
 	}
 	else if (base != 10) {
@@ -1665,9 +1678,9 @@ long_from_binary_base(char **str, int base)
 PyObject *
 PyLong_FromString(char *str, char **pend, int base)
 {
-	int sign = 1;
+	int sign = 1, error_if_nonzero = 0;
 	char *start, *orig_str = str;
-	PyLongObject *z;
+	PyLongObject *z = NULL;
 	PyObject *strobj, *strrepr;
 	Py_ssize_t slen;
 
@@ -1691,10 +1704,21 @@ PyLong_FromString(char *str, char **pend, int base)
 			base = 10;
 		else if (str[1] == 'x' || str[1] == 'X')
 			base = 16;
-		else
+		else if (str[1] == 'o' || str[1] == 'O')
 			base = 8;
+		else if (str[1] == 'b' || str[1] == 'B')
+			base = 2;
+		else {
+			/* "old" (C-style) octal literal, now invalid.
+			   it might still be zero though */
+			error_if_nonzero = 1;
+			base = 10;
+		}
 	}
-	if (base == 16 && str[0] == '0' && (str[1] == 'x' || str[1] == 'X'))
+	if (str[0] == '0' &&
+	    ((base == 16 && (str[1] == 'x' || str[1] == 'X')) ||
+	     (base == 8  && (str[1] == 'o' || str[1] == 'O')) ||
+	     (base == 2  && (str[1] == 'b' || str[1] == 'B'))))
 		str += 2;
 
 	start = str;
@@ -1898,6 +1922,15 @@ digit beyond the first.
 	}
 	if (z == NULL)
 		return NULL;
+	if (error_if_nonzero) {
+		/* reset the base to 0, else the exception message
+		   doesn't make too much sense */
+		base = 0;
+		if (z->ob_size != 0)
+			goto onError;
+		/* there might still be other problems, therefore base
+		   remains zero here for the same reason */
+	}
 	if (str == start)
 		goto onError;
 	if (sign < 0)
@@ -1975,6 +2008,8 @@ long_divrem(PyLongObject *a, PyLongObject *b,
 	     a->ob_digit[size_a-1] < b->ob_digit[size_b-1])) {
 		/* |a| < |b|. */
 		*pdiv = (PyLongObject*)PyLong_FromLong(0);
+		if (*pdiv == NULL)
+			return -1;
 		Py_INCREF(a);
 		*prem = (PyLongObject *) a;
 		return 0;
@@ -1985,6 +2020,10 @@ long_divrem(PyLongObject *a, PyLongObject *b,
 		if (z == NULL)
 			return -1;
 		*prem = (PyLongObject *) PyLong_FromLong((long)rem);
+		if (*prem == NULL) {
+			Py_DECREF(z);
+			return -1;
+		}
 	}
 	else {
 		z = x_divrem(a, b, prem);
@@ -2114,7 +2153,7 @@ long_dealloc(PyObject *v)
 static PyObject *
 long_repr(PyObject *v)
 {
-	return long_format(v, 10);
+	return _PyLong_Format(v, 10);
 }
 
 static int
@@ -3473,18 +3512,6 @@ long_float(PyObject *v)
 }
 
 static PyObject *
-long_oct(PyObject *v)
-{
-	return long_format(v, 8);
-}
-
-static PyObject *
-long_hex(PyObject *v)
-{
-	return long_format(v, 16);
-}
-
-static PyObject *
 long_subtype_new(PyTypeObject *type, PyObject *args, PyObject *kwds);
 
 static PyObject *
@@ -3504,16 +3531,23 @@ long_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 	if (base == -909)
 		return PyNumber_Long(x);
 	else if (PyString_Check(x)) {
-		char *s = PyString_AS_STRING(x);
-		char *end;
-		PyObject *r = PyLong_FromString(s, &end, base);
-		if (r != NULL && end != s + PyString_GET_SIZE(x)) {
-			PyErr_SetString(PyExc_ValueError,
-				"null byte in argument for int()");
-			Py_DECREF(r);
-			r = NULL;
+		/* Since PyLong_FromString doesn't have a length parameter,
+		 * check here for possible NULs in the string. */
+		char *string = PyString_AS_STRING(x);
+		if (strlen(string) != PyString_Size(x)) {
+			/* create a repr() of the input string,
+			 * just like PyLong_FromString does. */
+			PyObject *srepr;
+			srepr = PyObject_Repr(x);
+			if (srepr == NULL)
+				return NULL;
+			PyErr_Format(PyExc_ValueError,
+			     "invalid literal for int() with base %d: %s",
+			     base, PyString_AS_STRING(srepr));
+			Py_DECREF(srepr);
+			return NULL;
 		}
-		return r;
+		return PyLong_FromString(PyString_AS_STRING(x), NULL, base);
 	}
 #ifdef Py_USING_UNICODE
 	else if (PyUnicode_Check(x))
@@ -3601,8 +3635,8 @@ static PyNumberMethods long_as_number = {
 			long_int,	/*nb_int*/
 			long_long,	/*nb_long*/
 			long_float,	/*nb_float*/
-			long_oct,	/*nb_oct*/
-			long_hex,	/*nb_hex*/
+			0,		/*nb_oct*/ /* not used */
+			0,		/*nb_hex*/ /* not used */
 	0,				/* nb_inplace_add */
 	0,				/* nb_inplace_subtract */
 	0,				/* nb_inplace_multiply */
@@ -3643,7 +3677,8 @@ PyTypeObject PyLong_Type = {
 	PyObject_GenericGetAttr,		/* tp_getattro */
 	0,					/* tp_setattro */
 	0,					/* tp_as_buffer */
-	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE, /* tp_flags */
+	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE |
+		Py_TPFLAGS_LONG_SUBCLASS,	/* tp_flags */
 	long_doc,				/* tp_doc */
 	0,					/* tp_traverse */
 	0,					/* tp_clear */

@@ -13,7 +13,9 @@
 /* Differentiate between building the core module and building extension
  * modules.
  */
+#ifndef Py_BUILD_CORE
 #define Py_BUILD_CORE
+#endif
 #include "datetime.h"
 #undef Py_BUILD_CORE
 
@@ -2603,7 +2605,7 @@ static PyMethodDef date_methods[] = {
 	{"ctime",       (PyCFunction)date_ctime,        METH_NOARGS,
 	 PyDoc_STR("Return ctime() style string.")},
 
-	{"strftime",   	(PyCFunction)date_strftime,	METH_KEYWORDS,
+	{"strftime",   	(PyCFunction)date_strftime,	METH_VARARGS | METH_KEYWORDS,
 	 PyDoc_STR("format -> strftime() style string.")},
 
 	{"timetuple",   (PyCFunction)date_timetuple,    METH_NOARGS,
@@ -2628,7 +2630,7 @@ static PyMethodDef date_methods[] = {
 	 PyDoc_STR("Return the day of the week represented by the date.\n"
 		   "Monday == 0 ... Sunday == 6")},
 
-	{"replace",     (PyCFunction)date_replace,      METH_KEYWORDS,
+	{"replace",     (PyCFunction)date_replace,      METH_VARARGS | METH_KEYWORDS,
 	 PyDoc_STR("Return date with new specified fields.")},
 
 	{"__reduce__", (PyCFunction)date_reduce,        METH_NOARGS,
@@ -3378,7 +3380,7 @@ static PyMethodDef time_methods[] = {
 	 PyDoc_STR("Return string in ISO 8601 format, HH:MM:SS[.mmmmmm]"
 	 	   "[+HH:MM].")},
 
-	{"strftime",   	(PyCFunction)time_strftime,	METH_KEYWORDS,
+	{"strftime",   	(PyCFunction)time_strftime,	METH_VARARGS | METH_KEYWORDS,
 	 PyDoc_STR("format -> strftime() style string.")},
 
 	{"utcoffset",	(PyCFunction)time_utcoffset,	METH_NOARGS,
@@ -3390,7 +3392,7 @@ static PyMethodDef time_methods[] = {
 	{"dst",		(PyCFunction)time_dst,		METH_NOARGS,
 	 PyDoc_STR("Return self.tzinfo.dst(self).")},
 
-	{"replace",     (PyCFunction)time_replace,	METH_KEYWORDS,
+	{"replace",     (PyCFunction)time_replace,	METH_VARARGS | METH_KEYWORDS,
 	 PyDoc_STR("Return time with new specified fields.")},
 
 	{"__reduce__", (PyCFunction)time_reduce,        METH_NOARGS,
@@ -3644,6 +3646,12 @@ datetime_from_timestamp(PyObject *cls, TM_FUNC f, double timestamp,
 		return NULL;
 	fraction = timestamp - (double)timet;
 	us = (int)round_to_long(fraction * 1e6);
+	if (us < 0) {
+		/* Truncation towards zero is not what we wanted
+		   for negative numbers (Python's mod semantics) */
+		timet -= 1;
+		us += 1000000;
+	}
 	/* If timestamp is less than one microsecond smaller than a
 	 * full second, round up. Otherwise, ValueErrors are raised
 	 * for some floats. */
@@ -4410,7 +4418,7 @@ static PyMethodDef datetime_methods[] = {
 	/* Class methods: */
 
 	{"now",         (PyCFunction)datetime_now,
-	 METH_KEYWORDS | METH_CLASS,
+	 METH_VARARGS | METH_KEYWORDS | METH_CLASS,
 	 PyDoc_STR("[tz] -> new datetime with tz's local day and time.")},
 
 	{"utcnow",         (PyCFunction)datetime_utcnow,
@@ -4418,7 +4426,7 @@ static PyMethodDef datetime_methods[] = {
 	 PyDoc_STR("Return a new datetime representing UTC day and time.")},
 
 	{"fromtimestamp", (PyCFunction)datetime_fromtimestamp,
-	 METH_KEYWORDS | METH_CLASS,
+	 METH_VARARGS | METH_KEYWORDS | METH_CLASS,
 	 PyDoc_STR("timestamp[, tz] -> tz's local time from POSIX timestamp.")},
 
 	{"utcfromtimestamp", (PyCFunction)datetime_utcfromtimestamp,
@@ -4455,7 +4463,7 @@ static PyMethodDef datetime_methods[] = {
 	{"utctimetuple",   (PyCFunction)datetime_utctimetuple, METH_NOARGS,
          PyDoc_STR("Return UTC time tuple, compatible with time.localtime().")},
 
-	{"isoformat",   (PyCFunction)datetime_isoformat, METH_KEYWORDS,
+	{"isoformat",   (PyCFunction)datetime_isoformat, METH_VARARGS | METH_KEYWORDS,
 	 PyDoc_STR("[sep] -> string in ISO 8601 format, "
 	 	   "YYYY-MM-DDTHH:MM:SS[.mmmmmm][+HH:MM].\n\n"
 	 	   "sep is used to separate the year from the time, and "
@@ -4470,10 +4478,10 @@ static PyMethodDef datetime_methods[] = {
 	{"dst",		(PyCFunction)datetime_dst, METH_NOARGS,
 	 PyDoc_STR("Return self.tzinfo.dst(self).")},
 
-	{"replace",     (PyCFunction)datetime_replace,	METH_KEYWORDS,
+	{"replace",     (PyCFunction)datetime_replace,	METH_VARARGS | METH_KEYWORDS,
 	 PyDoc_STR("Return datetime with new specified fields.")},
 
-	{"astimezone",  (PyCFunction)datetime_astimezone, METH_KEYWORDS,
+	{"astimezone",  (PyCFunction)datetime_astimezone, METH_VARARGS | METH_KEYWORDS,
 	 PyDoc_STR("tz -> convert to local time in new timezone tz\n")},
 
 	{"__reduce__", (PyCFunction)datetime_reduce,     METH_NOARGS,

@@ -64,6 +64,7 @@
 
 #ifdef MS_WIN32
 #include <windows.h>
+#include <tchar.h>
 #else
 #include "ctypes_dlfcn.h"
 #endif
@@ -97,9 +98,9 @@ static TCHAR *FormatError(DWORD code)
 			  0,
 			  NULL);
 	if (n) {
-		while (isspace(lpMsgBuf[n-1]))
+		while (_istspace(lpMsgBuf[n-1]))
 			--n;
-		lpMsgBuf[n] = '\0'; /* rstrip() */
+		lpMsgBuf[n] = _T('\0'); /* rstrip() */
 	}
 	return lpMsgBuf;
 }
@@ -360,13 +361,13 @@ PyCArg_repr(PyCArgObject *self)
 	case 'z':
 	case 'Z':
 	case 'P':
-		sprintf(buffer, "<cparam '%c' (%08lx)>",
-			self->tag, (long)self->value.p);
+		sprintf(buffer, "<cparam '%c' (%p)>",
+			self->tag, self->value.p);
 		break;
 
 	default:
-		sprintf(buffer, "<cparam '%c' at %08lx>",
-			self->tag, (long)self);
+		sprintf(buffer, "<cparam '%c' at %p>",
+			self->tag, self);
 		break;
 	}
 	return PyString_FromString(buffer);
@@ -463,7 +464,7 @@ struct argument {
 /*
  * Convert a single Python object into a PyCArgObject and return it.
  */
-static int ConvParam(PyObject *obj, int index, struct argument *pa)
+static int ConvParam(PyObject *obj, Py_ssize_t index, struct argument *pa)
 {
 	StgDictObject *dict;
 	pa->keep = NULL; /* so we cannot forget it later */
@@ -532,8 +533,10 @@ static int ConvParam(PyObject *obj, int index, struct argument *pa)
 		size += 1; /* terminating NUL */
 		size *= sizeof(wchar_t);
 		pa->value.p = PyMem_Malloc(size);
-		if (!pa->value.p)
+		if (!pa->value.p) {
+			PyErr_NoMemory();
 			return -1;
+		}
 		memset(pa->value.p, 0, size);
 		pa->keep = PyCObject_FromVoidPtr(pa->value.p, PyMem_Free);
 		if (!pa->keep) {
@@ -563,7 +566,8 @@ static int ConvParam(PyObject *obj, int index, struct argument *pa)
 			return result;
 		}
 		PyErr_Format(PyExc_TypeError,
-			     "Don't know how to convert parameter %d", index);
+			     "Don't know how to convert parameter %d", 
+			     Py_SAFE_DOWNCAST(index, Py_ssize_t, int));
 		return -1;
 	}
 }
@@ -903,7 +907,7 @@ PyObject *_CallProc(PPROC pProc,
 		    PyObject *restype,
 		    PyObject *checker)
 {
-	int i, n, argcount, argtype_count;
+	Py_ssize_t i, n, argcount, argtype_count;
 	void *resbuf;
 	struct argument *args, *pa;
 	ffi_type **atypes;
@@ -993,7 +997,10 @@ PyObject *_CallProc(PPROC pProc,
 	}
 
 	if (-1 == _call_function_pointer(flags, pProc, avalues, atypes,
-					 rtype, resbuf, argcount))
+					 rtype, resbuf,
+					 Py_SAFE_DOWNCAST(argcount,
+							  Py_ssize_t,
+							  int)))
 		goto cleanup;
 
 #ifdef WORDS_BIGENDIAN
@@ -1031,6 +1038,15 @@ PyObject *_CallProc(PPROC pProc,
 	for (i = 0; i < argcount; ++i)
 		Py_XDECREF(args[i].keep);
 	return retval;
+}
+
+static int
+_parse_voidp(PyObject *obj, void **address)
+{
+	*address = PyLong_AsVoidPtr(obj);
+	if (*address == NULL)
+		return 0;
+	return 1;
 }
 
 #ifdef MS_WIN32
@@ -1119,10 +1135,10 @@ static char free_library_doc[] =
 Free the handle of an executable previously loaded by LoadLibrary.\n";
 static PyObject *free_library(PyObject *self, PyObject *args)
 {
-	HMODULE hMod;
-	if (!PyArg_ParseTuple(args, "i:FreeLibrary", &hMod))
+	void *hMod;
+	if (!PyArg_ParseTuple(args, "O&:FreeLibrary", &_parse_voidp, &hMod))
 		return NULL;
-	if (!FreeLibrary(hMod))
+	if (!FreeLibrary((HMODULE)hMod))
 		return PyErr_SetFromWindowsErr(GetLastError());
 	Py_INCREF(Py_None);
 	return Py_None;
@@ -1241,11 +1257,11 @@ static PyObject *py_dl_open(PyObject *self, PyObject *args)
 
 static PyObject *py_dl_close(PyObject *self, PyObject *args)
 {
-	int handle;
+	void *handle;
 
-	if (!PyArg_ParseTuple(args, "i:dlclose", &handle))
+	if (!PyArg_ParseTuple(args, "O&:dlclose", &_parse_voidp, &handle))
 		return NULL;
-	if (dlclose((void*)handle)) {
+	if (dlclose(handle)) {
 		PyErr_SetString(PyExc_OSError,
 				       ctypes_dlerror());
 		return NULL;
@@ -1257,10 +1273,11 @@ static PyObject *py_dl_close(PyObject *self, PyObject *args)
 static PyObject *py_dl_sym(PyObject *self, PyObject *args)
 {
 	char *name;
-	int handle;
+	void *handle;
 	void *ptr;
 
-	if (!PyArg_ParseTuple(args, "is:dlsym", &handle, &name))
+	if (!PyArg_ParseTuple(args, "O&s:dlsym",
+			      &_parse_voidp, &handle, &name))
 		return NULL;
 	ptr = ctypes_dlsym((void*)handle, name);
 	if (!ptr) {
@@ -1268,7 +1285,7 @@ static PyObject *py_dl_sym(PyObject *self, PyObject *args)
 				       ctypes_dlerror());
 		return NULL;
 	}
-	return Py_BuildValue("i", ptr);
+	return PyLong_FromVoidPtr(ptr);
 }
 #endif
 
@@ -1280,13 +1297,13 @@ static PyObject *py_dl_sym(PyObject *self, PyObject *args)
 static PyObject *
 call_function(PyObject *self, PyObject *args)
 {
-	int func;
+	void *func;
 	PyObject *arguments;
 	PyObject *result;
 
 	if (!PyArg_ParseTuple(args,
-			      "iO!",
-			      &func,
+			      "O&O!",
+			      &_parse_voidp, &func,
 			      &PyTuple_Type, &arguments))
 		return NULL;
 
@@ -1311,13 +1328,13 @@ call_function(PyObject *self, PyObject *args)
 static PyObject *
 call_cdeclfunction(PyObject *self, PyObject *args)
 {
-	int func;
+	void *func;
 	PyObject *arguments;
 	PyObject *result;
 
 	if (!PyArg_ParseTuple(args,
-			      "iO!",
-			      &func,
+			      "O&O!",
+			      &_parse_voidp, &func,
 			      &PyTuple_Type, &arguments))
 		return NULL;
 
@@ -1349,10 +1366,10 @@ sizeof_func(PyObject *self, PyObject *obj)
 
 	dict = PyType_stgdict(obj);
 	if (dict)
-		return PyInt_FromLong(dict->size);
+		return PyInt_FromSsize_t(dict->size);
 
 	if (CDataObject_Check(obj))
-		return PyInt_FromLong(((CDataObject *)obj)->b_size);
+		return PyInt_FromSsize_t(((CDataObject *)obj)->b_size);
 	PyErr_SetString(PyExc_TypeError,
 			"this type has no size");
 	return NULL;
@@ -1370,11 +1387,11 @@ align_func(PyObject *self, PyObject *obj)
 
 	dict = PyType_stgdict(obj);
 	if (dict)
-		return PyInt_FromLong(dict->align);
+		return PyInt_FromSsize_t(dict->align);
 
 	dict = PyObject_stgdict(obj);
 	if (dict)
-		return PyInt_FromLong(dict->align);
+		return PyInt_FromSsize_t(dict->align);
 
 	PyErr_SetString(PyExc_TypeError,
 			"no alignment info");

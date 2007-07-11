@@ -10,14 +10,12 @@ typedef struct {
     PyObject_HEAD
     PyObject *dict;
     PyObject *args;
-    PyObject *message;
 } PyBaseExceptionObject;
 
 typedef struct {
     PyObject_HEAD
     PyObject *dict;
     PyObject *args;
-    PyObject *message;
     PyObject *msg;
     PyObject *filename;
     PyObject *lineno;
@@ -31,11 +29,10 @@ typedef struct {
     PyObject_HEAD
     PyObject *dict;
     PyObject *args;
-    PyObject *message;
     PyObject *encoding;
     PyObject *object;
-    PyObject *start;
-    PyObject *end;
+    Py_ssize_t start;
+    Py_ssize_t end;
     PyObject *reason;
 } PyUnicodeErrorObject;
 #endif
@@ -44,7 +41,6 @@ typedef struct {
     PyObject_HEAD
     PyObject *dict;
     PyObject *args;
-    PyObject *message;
     PyObject *code;
 } PySystemExitObject;
 
@@ -52,7 +48,6 @@ typedef struct {
     PyObject_HEAD
     PyObject *dict;
     PyObject *args;
-    PyObject *message;
     PyObject *myerrno;
     PyObject *strerror;
     PyObject *filename;
@@ -63,7 +58,6 @@ typedef struct {
     PyObject_HEAD
     PyObject *dict;
     PyObject *args;
-    PyObject *message;
     PyObject *myerrno;
     PyObject *strerror;
     PyObject *filename;
@@ -94,13 +88,12 @@ PyAPI_FUNC(void) PyErr_NormalizeException(PyObject**, PyObject**, PyObject**);
 
 /* */
 
-#define PyExceptionClass_Check(x) \
-	    (PyType_Check((x)) && PyType_IsSubtype(			\
-		     (PyTypeObject*)(x), (PyTypeObject*)PyExc_BaseException))
+#define PyExceptionClass_Check(x)					\
+	(PyType_Check((x)) &&						\
+	 PyType_FastSubclass((PyTypeObject*)(x), Py_TPFLAGS_BASE_EXC_SUBCLASS))
 
-
-#define PyExceptionInstance_Check(x) \
-	 (PyType_IsSubtype((x)->ob_type, (PyTypeObject*)PyExc_BaseException))
+#define PyExceptionInstance_Check(x)			\
+	PyType_FastSubclass((x)->ob_type, Py_TPFLAGS_BASE_EXC_SUBCLASS)
 
 #define PyExceptionClass_Name(x) \
 	 ((char *)(((PyTypeObject*)(x))->tp_name))
@@ -114,7 +107,6 @@ PyAPI_DATA(PyObject *) PyExc_BaseException;
 PyAPI_DATA(PyObject *) PyExc_Exception;
 PyAPI_DATA(PyObject *) PyExc_StopIteration;
 PyAPI_DATA(PyObject *) PyExc_GeneratorExit;
-PyAPI_DATA(PyObject *) PyExc_StandardError;
 PyAPI_DATA(PyObject *) PyExc_ArithmeticError;
 PyAPI_DATA(PyObject *) PyExc_LookupError;
 

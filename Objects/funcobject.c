@@ -225,31 +225,18 @@ PyFunction_SetAnnotations(PyObject *op, PyObject *annotations)
 #define OFF(x) offsetof(PyFunctionObject, x)
 
 static PyMemberDef func_memberlist[] = {
-        {"func_closure",  T_OBJECT,     OFF(func_closure),
+        {"__closure__",   T_OBJECT,     OFF(func_closure),
 	 RESTRICTED|READONLY},
-        {"func_doc",      T_OBJECT,     OFF(func_doc), WRITE_RESTRICTED},
         {"__doc__",       T_OBJECT,     OFF(func_doc), WRITE_RESTRICTED},
-        {"func_globals",  T_OBJECT,     OFF(func_globals),
+        {"__globals__",   T_OBJECT,     OFF(func_globals),
 	 RESTRICTED|READONLY},
         {"__module__",    T_OBJECT,     OFF(func_module), WRITE_RESTRICTED},
         {NULL}  /* Sentinel */
 };
 
-static int
-restricted(void)
-{
-	if (!PyEval_GetRestricted())
-		return 0;
-	PyErr_SetString(PyExc_RuntimeError,
-		"function attributes not accessible in restricted mode");
-	return 1;
-}
-
 static PyObject *
 func_get_dict(PyFunctionObject *op)
 {
-	if (restricted())
-		return NULL;
 	if (op->func_dict == NULL) {
 		op->func_dict = PyDict_New();
 		if (op->func_dict == NULL)
@@ -264,8 +251,6 @@ func_set_dict(PyFunctionObject *op, PyObject *value)
 {
 	PyObject *tmp;
 
-	if (restricted())
-		return -1;
 	/* It is illegal to del f.func_dict */
 	if (value == NULL) {
 		PyErr_SetString(PyExc_TypeError,
@@ -288,8 +273,6 @@ func_set_dict(PyFunctionObject *op, PyObject *value)
 static PyObject *
 func_get_code(PyFunctionObject *op)
 {
-	if (restricted())
-		return NULL;
 	Py_INCREF(op->func_code);
 	return op->func_code;
 }
@@ -300,13 +283,11 @@ func_set_code(PyFunctionObject *op, PyObject *value)
 	PyObject *tmp;
 	Py_ssize_t nfree, nclosure;
 
-	if (restricted())
-		return -1;
 	/* Not legal to del f.func_code or to set it to anything
 	 * other than a code object. */
 	if (value == NULL || !PyCode_Check(value)) {
 		PyErr_SetString(PyExc_TypeError,
-				"func_code must be set to a code object");
+				"__code__ must be set to a code object");
 		return -1;
 	}
 	nfree = PyCode_GetNumFree((PyCodeObject *)value);
@@ -339,13 +320,11 @@ func_set_name(PyFunctionObject *op, PyObject *value)
 {
 	PyObject *tmp;
 
-	if (restricted())
-		return -1;
 	/* Not legal to del f.func_name or to set it to anything
 	 * other than a string object. */
 	if (value == NULL || !PyString_Check(value)) {
 		PyErr_SetString(PyExc_TypeError,
-				"func_name must be set to a string object");
+				"__name__ must be set to a string object");
 		return -1;
 	}
 	tmp = op->func_name;
@@ -358,8 +337,6 @@ func_set_name(PyFunctionObject *op, PyObject *value)
 static PyObject *
 func_get_defaults(PyFunctionObject *op)
 {
-	if (restricted())
-		return NULL;
 	if (op->func_defaults == NULL) {
 		Py_INCREF(Py_None);
 		return Py_None;
@@ -373,15 +350,13 @@ func_set_defaults(PyFunctionObject *op, PyObject *value)
 {
 	PyObject *tmp;
 
-	if (restricted())
-		return -1;
 	/* Legal to del f.func_defaults.
 	 * Can only set func_defaults to NULL or a tuple. */
 	if (value == Py_None)
 		value = NULL;
 	if (value != NULL && !PyTuple_Check(value)) {
 		PyErr_SetString(PyExc_TypeError,
-				"func_defaults must be set to a tuple object");
+				"__defaults__ must be set to a tuple object");
 		return -1;
 	}
 	tmp = op->func_defaults;
@@ -394,8 +369,6 @@ func_set_defaults(PyFunctionObject *op, PyObject *value)
 static PyObject *
 func_get_kwdefaults(PyFunctionObject *op)
 {
-	if (restricted())
-		return NULL;
 	if (op->func_kwdefaults == NULL) {
 		Py_INCREF(Py_None);
 		return Py_None;
@@ -408,17 +381,14 @@ static int
 func_set_kwdefaults(PyFunctionObject *op, PyObject *value)
 {
 	PyObject *tmp;
-    
-	if (restricted())
-		return -1;
 
 	if (value == Py_None)
 		value = NULL;
-	/* Legal to del f.func_defaults.
+	/* Legal to del f.func_kwdefaults.
 	 * Can only set func_kwdefaults to NULL or a dict. */
 	if (value != NULL && !PyDict_Check(value)) {
 		PyErr_SetString(PyExc_TypeError,
-			"func_kwdefaults must be set to a dict object");
+			"__kwdefaults__ must be set to a dict object");
 		return -1;
 	}
 	tmp = op->func_kwdefaults;
@@ -452,7 +422,7 @@ func_set_annotations(PyFunctionObject *op, PyObject *value)
 	 * or a dict. */
 	if (value != NULL && !PyDict_Check(value)) {
 		PyErr_SetString(PyExc_TypeError,
-			"func_annotations must be set to a dict object");
+			"__annotations__ must be set to a dict object");
 		return -1;
 	}
 	tmp = op->func_annotations;
@@ -463,16 +433,14 @@ func_set_annotations(PyFunctionObject *op, PyObject *value)
 }
 
 static PyGetSetDef func_getsetlist[] = {
-        {"func_code", (getter)func_get_code, (setter)func_set_code},
-        {"func_defaults", (getter)func_get_defaults,
+        {"__code__", (getter)func_get_code, (setter)func_set_code},
+        {"__defaults__", (getter)func_get_defaults,
 	 (setter)func_set_defaults},
-	{"func_kwdefaults", (getter)func_get_kwdefaults,
+	{"__kwdefaults__", (getter)func_get_kwdefaults,
 	 (setter)func_set_kwdefaults},
-	{"func_annotations", (getter)func_get_annotations,
+	{"__annotations__", (getter)func_get_annotations,
 	 (setter)func_set_annotations},
-	{"func_dict", (getter)func_get_dict, (setter)func_set_dict},
 	{"__dict__", (getter)func_get_dict, (setter)func_set_dict},
-	{"func_name", (getter)func_get_name, (setter)func_set_name},
 	{"__name__", (getter)func_get_name, (setter)func_set_name},
 	{NULL} /* Sentinel */
 };
@@ -590,6 +558,7 @@ func_dealloc(PyFunctionObject *op)
 	Py_XDECREF(op->func_module);
 	Py_DECREF(op->func_name);
 	Py_XDECREF(op->func_defaults);
+	Py_XDECREF(op->func_kwdefaults);
 	Py_XDECREF(op->func_doc);
 	Py_XDECREF(op->func_dict);
 	Py_XDECREF(op->func_closure);
@@ -612,6 +581,7 @@ func_traverse(PyFunctionObject *f, visitproc visit, void *arg)
 	Py_VISIT(f->func_globals);
 	Py_VISIT(f->func_module);
 	Py_VISIT(f->func_defaults);
+	Py_VISIT(f->func_kwdefaults);
 	Py_VISIT(f->func_doc);
 	Py_VISIT(f->func_name);
 	Py_VISIT(f->func_dict);

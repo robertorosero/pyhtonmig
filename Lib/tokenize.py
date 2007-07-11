@@ -32,7 +32,6 @@ from token import *
 import token
 __all__ = [x for x in dir(token) if x[0] != '_'] + ["COMMENT", "tokenize",
            "generate_tokens", "NL", "untokenize"]
-del x
 del token
 
 COMMENT = N_TOKENS
@@ -50,10 +49,11 @@ Comment = r'#[^\r\n]*'
 Ignore = Whitespace + any(r'\\\r?\n' + Whitespace) + maybe(Comment)
 Name = r'[a-zA-Z_]\w*'
 
-Hexnumber = r'0[xX][\da-fA-F]*[lL]?'
-Octnumber = r'0[0-7]*[lL]?'
-Decnumber = r'[1-9]\d*[lL]?'
-Intnumber = group(Hexnumber, Octnumber, Decnumber)
+Hexnumber = r'0[xX][\da-fA-F]*'
+Binnumber = r'0[bB][01]*'
+Octnumber = r'0[oO][0-7]*'
+Decnumber = r'(?:0+|[1-9]\d*)'
+Intnumber = group(Hexnumber, Binnumber, Octnumber, Decnumber)
 Exponent = r'[eE][-+]?\d+'
 Pointfloat = group(r'\d+\.\d*', r'\.\d+') + maybe(Exponent)
 Expfloat = r'\d+' + Exponent
@@ -83,7 +83,7 @@ Operator = group(r"\*\*=?", r">>=?", r"<<=?", r"!=",
                  r"~")
 
 Bracket = '[][(){}]'
-Special = group(r'\r?\n', r'[:;.,@]')
+Special = group(r'\r?\n', r'\.\.\.', r'[:;.,@]')
 Funny = group(Operator, Bracket, Special)
 
 PlainToken = group(Number, Funny, String, Name)
@@ -132,7 +132,8 @@ class TokenError(Exception): pass
 
 class StopTokenizing(Exception): pass
 
-def printtoken(type, token, (srow, scol), (erow, ecol), line): # for testing
+def printtoken(type, token, startrowcol, endrowcol, line): # for testing
+    (srow, scol), (erow, ecol) = startrowcol, endrowcol
     print("%d,%d-%d,%d:\t%s\t%s" % \
         (srow, scol, erow, ecol, tok_name[type], repr(token)))
 
@@ -229,7 +230,7 @@ def untokenize(iterable):
         # Output text will tokenize the back to the input
         t1 = [tok[:2] for tok in generate_tokens(f.readline)]
         newcode = untokenize(t1)
-        readline = iter(newcode.splitlines(1)).next
+        readline = iter(newcode.splitlines(1)).__next__
         t2 = [tok[:2] for tokin generate_tokens(readline)]
         assert t1 == t2
     """
@@ -243,7 +244,7 @@ def generate_tokens(readline):
     readline() method of built-in file objects. Each call to the function
     should return one line of input as a string.  Alternately, readline
     can be a callable function terminating with StopIteration:
-        readline = open(myfile).next    # Example of alternate readline
+        readline = open(myfile).__next__    # Example of alternate readline
 
     The generator produces 5-tuples with these members: the token type; the
     token string; a 2-tuple (srow, scol) of ints specifying the row and
@@ -334,8 +335,8 @@ def generate_tokens(readline):
                 spos, epos, pos = (lnum, start), (lnum, end), end
                 token, initial = line[start:end], line[start]
 
-                if initial in numchars or \
-                   (initial == '.' and token != '.'):      # ordinary number
+                if (initial in numchars or                  # ordinary number
+                    (initial == '.' and token != '.' and token != '...')):
                     yield (NUMBER, token, spos, epos, line)
                 elif initial in '\r\n':
                     yield (NL if parenlev > 0 else NEWLINE,

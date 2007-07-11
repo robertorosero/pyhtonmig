@@ -25,7 +25,7 @@ import __builtin__
 try:
     1/0
 except:
-    tb = sys.exc_traceback
+    tb = sys.exc_info()[2]
 
 git = mod.StupidGit()
 
@@ -43,7 +43,7 @@ class IsTestBase(unittest.TestCase):
 
 class TestPredicates(IsTestBase):
     def test_thirteen(self):
-        count = len(filter(lambda x:x.startswith('is'), dir(inspect)))
+        count = len([x for x in dir(inspect) if x.startswith('is')])
         # Doc/lib/libinspect.tex claims there are 13 such functions
         expected = 13
         err_msg = "There are %d (not %d) is* functions" % (count, expected)
@@ -53,7 +53,7 @@ class TestPredicates(IsTestBase):
         self.istest(inspect.isbuiltin, 'sys.exit')
         self.istest(inspect.isbuiltin, '[].append')
         self.istest(inspect.isclass, 'mod.StupidGit')
-        self.istest(inspect.iscode, 'mod.spam.func_code')
+        self.istest(inspect.iscode, 'mod.spam.__code__')
         self.istest(inspect.isframe, 'tb.tb_frame')
         self.istest(inspect.isfunction, 'mod.spam')
         self.istest(inspect.ismethod, 'mod.StupidGit.abuse')
@@ -116,11 +116,11 @@ class TestInterpreterStack(IsTestBase):
 
     def test_previous_frame(self):
         args, varargs, varkw, locals = inspect.getargvalues(mod.fr.f_back)
-        self.assertEqual(args, ['a', 'b', 'c', 'd', ['e', ['f']]])
+        self.assertEqual(args, ['a', 'b', 'c', 'd', 'e', 'f'])
         self.assertEqual(varargs, 'g')
         self.assertEqual(varkw, 'h')
         self.assertEqual(inspect.formatargvalues(args, varargs, varkw, locals),
-             '(a=7, b=8, c=9, d=3, (e=4, (f=5,)), *g=(), **h={})')
+             '(a=7, b=8, c=9, d=3, e=4, f=5, *g=(), **h={})')
 
 class GetSourceBase(unittest.TestCase):
     # Subclasses must override.
@@ -210,7 +210,7 @@ class TestRetrievingSourceCode(GetSourceBase):
         m.__file__ = "<string>" # hopefully not a real filename...
         m.__loader__ = "dummy"  # pretend the filename is understood by a loader
         exec("def x(): pass", m.__dict__)
-        self.assertEqual(inspect.getsourcefile(m.x.func_code), '<string>')
+        self.assertEqual(inspect.getsourcefile(m.x.__code__), '<string>')
         del sys.modules[name]
         inspect.getmodule(compile('a=10','','single'))
 
@@ -218,7 +218,7 @@ class TestDecorators(GetSourceBase):
     fodderFile = mod2
 
     def test_wrapped_decorator(self):
-        self.assertSourceEqual(mod2.wrapped, 14, 17)
+        self.assertSourceEqual(mod2.wrapped, 16, 17)
 
     def test_replacing_decorator(self):
         self.assertSourceEqual(mod2.gone, 9, 10)
@@ -321,22 +321,15 @@ class TestClassesAndFunctions(unittest.TestCase):
         self.assertArgSpecEquals(mod.eggs, ['x', 'y'], formatted = '(x, y)')
 
         self.assertArgSpecEquals(mod.spam,
-                                 ['a', 'b', 'c', 'd', ['e', ['f']]],
-                                 'g', 'h', (3, (4, (5,))),
-                                 '(a, b, c, d=3, (e, (f,))=(4, (5,)), *g, **h)')
+                                 ['a', 'b', 'c', 'd', 'e', 'f'],
+                                 'g', 'h', (3, 4, 5),
+                                 '(a, b, c, d=3, e=4, f=5, *g, **h)')
 
     def test_getargspec_method(self):
         class A(object):
             def m(self):
                 pass
         self.assertArgSpecEquals(A.m, ['self'])
-
-    def test_getargspec_sublistofone(self):
-        def sublistOfOne((foo,)): return 1
-        self.assertArgSpecEquals(sublistOfOne, [['foo']])
-
-        def fakeSublistOfOne((foo)): return 1
-        self.assertArgSpecEquals(fakeSublistOfOne, ['foo'])
 
     def test_classify_newstyle(self):
         class A(object):

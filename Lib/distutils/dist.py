@@ -8,8 +8,7 @@ being built/installed/distributed.
 
 __revision__ = "$Id$"
 
-import sys, os, string, re
-from types import *
+import sys, os, re
 from copy import copy
 
 try:
@@ -113,8 +112,7 @@ Common commands: (see '--help-commands' for more)
         ('obsoletes', None,
          "print the list of packages/modules made obsolete")
         ]
-    display_option_names = map(lambda x: translate_longopt(x[0]),
-                               display_options)
+    display_option_names = [translate_longopt(x[0]) for x in display_options]
 
     # negative options are options that exclude other options
     negative_opt = {'quiet': 'verbose'}
@@ -304,7 +302,7 @@ Common commands: (see '--help-commands' for more)
             else:
                 print(indent + "option dict for '%s' command:" % cmd_name)
                 out = pformat(opt_dict)
-                for line in string.split(out, "\n"):
+                for line in out.split("\n"):
                     print(indent + "  " + line)
 
     # dump_option_dicts ()
@@ -378,7 +376,7 @@ Common commands: (see '--help-commands' for more)
                 for opt in options:
                     if opt != '__name__':
                         val = parser.get(section,opt)
-                        opt = string.replace(opt, '-', '_')
+                        opt = opt.replace('-', '_')
                         opt_dict[opt] = (filename, val)
 
             # Make the ConfigParser forget everything (so we retain
@@ -527,7 +525,7 @@ Common commands: (see '--help-commands' for more)
         # Also make sure that the command object provides a list of its
         # known options.
         if not (hasattr(cmd_class, 'user_options') and
-                type(cmd_class.user_options) is ListType):
+                isinstance(cmd_class.user_options, list)):
             raise DistutilsClassError, \
                   ("command class %s must provide " +
                    "'user_options' attribute (a list of tuples)") % \
@@ -543,7 +541,7 @@ Common commands: (see '--help-commands' for more)
         # Check for help_options in command class.  They have a different
         # format (tuple of four) so we need to preprocess them here.
         if (hasattr(cmd_class, 'help_options') and
-            type(cmd_class.help_options) is ListType):
+            isinstance(cmd_class.help_options, list)):
             help_options = fix_help_options(cmd_class.help_options)
         else:
             help_options = []
@@ -561,7 +559,7 @@ Common commands: (see '--help-commands' for more)
             return
 
         if (hasattr(cmd_class, 'help_options') and
-            type(cmd_class.help_options) is ListType):
+            isinstance(cmd_class.help_options, list)):
             help_option_found=0
             for (help_option, short, desc, func) in cmd_class.help_options:
                 if hasattr(opts, parser.get_attr_name(help_option)):
@@ -569,7 +567,7 @@ Common commands: (see '--help-commands' for more)
                     #print "showing help for option %s of command %s" % \
                     #      (help_option[0],cmd_class)
 
-                    if callable(func):
+                    if hasattr(func, '__call__'):
                         func()
                     else:
                         raise DistutilsClassError(
@@ -598,15 +596,15 @@ Common commands: (see '--help-commands' for more)
 
         keywords = self.metadata.keywords
         if keywords is not None:
-            if type(keywords) is StringType:
-                keywordlist = string.split(keywords, ',')
-                self.metadata.keywords = map(string.strip, keywordlist)
+            if isinstance(keywords, str):
+                keywordlist = keywords.split(',')
+                self.metadata.keywords = [x.strip() for x in keywordlist]
 
         platforms = self.metadata.platforms
         if platforms is not None:
-            if type(platforms) is StringType:
-                platformlist = string.split(platforms, ',')
-                self.metadata.platforms = map(string.strip, platformlist)
+            if isinstance(platforms, str):
+                platformlist = platforms.split(',')
+                self.metadata.platforms = [x.strip() for x in platformlist]
 
     def _show_help (self,
                     parser,
@@ -646,12 +644,12 @@ Common commands: (see '--help-commands' for more)
             print()
 
         for command in self.commands:
-            if type(command) is ClassType and issubclass(command, Command):
+            if isinstance(command, type) and issubclass(command, Command):
                 klass = command
             else:
                 klass = self.get_command_class(command)
             if (hasattr(klass, 'help_options') and
-                type(klass.help_options) is ListType):
+                isinstance(klass.help_options, list)):
                 parser.set_option_table(klass.user_options +
                                         fix_help_options(klass.help_options))
             else:
@@ -695,10 +693,10 @@ Common commands: (see '--help-commands' for more)
                 opt = translate_longopt(opt)
                 value = getattr(self.metadata, "get_"+opt)()
                 if opt in ['keywords', 'platforms']:
-                    print(string.join(value, ','))
+                    print(','.join(value))
                 elif opt in ('classifiers', 'provides', 'requires',
                              'obsoletes'):
-                    print(string.join(value, '\n'))
+                    print('\n'.join(value))
                 else:
                     print(value)
                 any_display_options = 1
@@ -803,10 +801,10 @@ Common commands: (see '--help-commands' for more)
         """Return a list of packages from which commands are loaded."""
         pkgs = self.command_packages
         if not isinstance(pkgs, type([])):
-            pkgs = string.split(pkgs or "", ",")
+            pkgs = (pkgs or "").split(",")
             for i in range(len(pkgs)):
-                pkgs[i] = string.strip(pkgs[i])
-            pkgs = filter(None, pkgs)
+                pkgs[i] = pkgs[i].strip()
+            pkgs = [p for p in pkgs if p]
             if "distutils.command" not in pkgs:
                 pkgs.insert(0, "distutils.command")
             self.command_packages = pkgs
@@ -906,7 +904,7 @@ Common commands: (see '--help-commands' for more)
                 neg_opt = {}
 
             try:
-                is_string = type(value) is StringType
+                is_string = isinstance(value, str)
                 if option in neg_opt and is_string:
                     setattr(command_obj, neg_opt[option], not strtobool(value))
                 elif option in bool_opts and is_string:
@@ -1100,7 +1098,7 @@ class DistributionMetadata:
         long_desc = rfc822_escape( self.get_long_description() )
         file.write('Description: %s\n' % long_desc)
 
-        keywords = string.join( self.get_keywords(), ',')
+        keywords = ','.join(self.get_keywords())
         if keywords:
             file.write('Keywords: %s\n' % keywords )
 

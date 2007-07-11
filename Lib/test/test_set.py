@@ -227,7 +227,7 @@ class TestJointOps(unittest.TestCase):
         # Create a nest of cycles to exercise overall ref count check
         class A:
             pass
-        s = set(A() for i in xrange(1000))
+        s = set(A() for i in range(1000))
         for elem in s:
             elem.cycle = s
             elem.sub = elem
@@ -283,15 +283,22 @@ class TestJointOps(unittest.TestCase):
 
     def test_do_not_rehash_dict_keys(self):
         n = 10
-        d = dict.fromkeys(map(HashCountingInt, xrange(n)))
+        d = dict.fromkeys(map(HashCountingInt, range(n)))
         self.assertEqual(sum(elem.hash_count for elem in d), n)
         s = self.thetype(d)
         self.assertEqual(sum(elem.hash_count for elem in d), n)
         s.difference(d)
-        self.assertEqual(sum(elem.hash_count for elem in d), n)    
+        self.assertEqual(sum(elem.hash_count for elem in d), n)
         if hasattr(s, 'symmetric_difference_update'):
             s.symmetric_difference_update(d)
-        self.assertEqual(sum(elem.hash_count for elem in d), n)      
+        self.assertEqual(sum(elem.hash_count for elem in d), n)
+        d2 = dict.fromkeys(set(d))
+        self.assertEqual(sum(elem.hash_count for elem in d), n)
+        d3 = dict.fromkeys(frozenset(d))
+        self.assertEqual(sum(elem.hash_count for elem in d), n)
+        d3 = dict.fromkeys(frozenset(d), 123)
+        self.assertEqual(sum(elem.hash_count for elem in d), n)
+        self.assertEqual(d3, dict.fromkeys(d, 123))
 
 class TestSet(TestJointOps):
     thetype = set
@@ -370,7 +377,7 @@ class TestSet(TestJointOps):
         s.discard(self.thetype(self.word))
 
     def test_pop(self):
-        for i in xrange(len(self.s)):
+        for i in range(len(self.s)):
             elem = self.s.pop()
             self.assert_(elem not in self.s)
         self.assertRaises(KeyError, self.s.pop)
@@ -518,7 +525,7 @@ class TestFrozenSet(TestJointOps):
         f = frozenset()
         efs = [frozenset(), frozenset([]), frozenset(()), frozenset(''),
                frozenset(), frozenset([]), frozenset(()), frozenset(''),
-               frozenset(xrange(0)), frozenset(frozenset()),
+               frozenset(range(0)), frozenset(frozenset()),
                frozenset(f), f]
         # All of the empty frozensets should have just one id()
         self.assertEqual(len(set(map(id, efs))), 1)
@@ -534,9 +541,9 @@ class TestFrozenSet(TestJointOps):
 
         # make sure that all permutations give the same hash value
         n = 100
-        seq = [randrange(n) for i in xrange(n)]
+        seq = [randrange(n) for i in range(n)]
         results = set()
-        for i in xrange(200):
+        for i in range(200):
             shuffle(seq)
             results.add(hash(self.thetype(seq)))
         self.assertEqual(len(results), 1)
@@ -546,7 +553,7 @@ class TestFrozenSet(TestJointOps):
         self.assertEqual(id(self.s), id(dup))
 
     def test_frozen_as_dictkey(self):
-        seq = range(10) + list('abcdefg') + ['apple']
+        seq = list(range(10)) + list('abcdefg') + ['apple']
         key1 = self.thetype(seq)
         key2 = self.thetype(reversed(seq))
         self.assertEqual(key1, key2)
@@ -564,7 +571,7 @@ class TestFrozenSet(TestJointOps):
         hashvalues = set()
         addhashvalue = hashvalues.add
         elemmasks = [(i+1, 1<<i) for i in range(n)]
-        for i in xrange(2**n):
+        for i in range(2**n):
             addhashvalue(hash(frozenset([e for e, m in elemmasks if m&i])))
         self.assertEqual(len(hashvalues), 2**n)
 
@@ -594,7 +601,7 @@ class TestFrozenSetSubclass(TestFrozenSet):
         F = Frozenset()
         efs = [Frozenset(), Frozenset([]), Frozenset(()), Frozenset(''),
                Frozenset(), Frozenset([]), Frozenset(()), Frozenset(''),
-               Frozenset(xrange(0)), Frozenset(Frozenset()),
+               Frozenset(range(0)), Frozenset(Frozenset()),
                Frozenset(frozenset()), f, F, Frozenset(f), Frozenset(F)]
         # All empty frozenset subclass instances should have different ids
         self.assertEqual(len(set(map(id, efs))), len(efs))
@@ -768,7 +775,7 @@ class TestExceptionPropagation(unittest.TestCase):
         set([1,2,3])
         set((1,2,3))
         set({'one':1, 'two':2, 'three':3})
-        set(xrange(3))
+        set(range(3))
         set('abc')
         set(gooditer())
 
@@ -1261,7 +1268,7 @@ class TestOnlySetsString(TestOnlySetsInBinaryOps):
 class TestOnlySetsGenerator(TestOnlySetsInBinaryOps):
     def setUp(self):
         def gen():
-            for i in xrange(0, 10, 2):
+            for i in range(0, 10, 2):
                 yield i
         self.set   = set((1, 2, 3))
         self.other = gen()
@@ -1382,7 +1389,7 @@ class I:
         self.i = 0
     def __iter__(self):
         return self
-    def next(self):
+    def __next__(self):
         if self.i >= len(self.seqn): raise StopIteration
         v = self.seqn[self.i]
         self.i += 1
@@ -1402,14 +1409,14 @@ class X:
     def __init__(self, seqn):
         self.seqn = seqn
         self.i = 0
-    def next(self):
+    def __next__(self):
         if self.i >= len(self.seqn): raise StopIteration
         v = self.seqn[self.i]
         self.i += 1
         return v
 
 class N:
-    'Iterator missing next()'
+    'Iterator missing __next__()'
     def __init__(self, seqn):
         self.seqn = seqn
         self.i = 0
@@ -1423,7 +1430,7 @@ class E:
         self.i = 0
     def __iter__(self):
         return self
-    def next(self):
+    def __next__(self):
         3 // 0
 
 class S:
@@ -1432,7 +1439,7 @@ class S:
         pass
     def __iter__(self):
         return self
-    def next(self):
+    def __next__(self):
         raise StopIteration
 
 from itertools import chain, imap
@@ -1444,7 +1451,7 @@ class TestVariousIteratorArgs(unittest.TestCase):
 
     def test_constructor(self):
         for cons in (set, frozenset):
-            for s in ("123", "", range(1000), ('do', 1.2), xrange(2000,2200,5)):
+            for s in ("123", "", range(1000), ('do', 1.2), range(2000,2200,5)):
                 for g in (G, I, Ig, S, L, R):
                     self.assertEqual(sorted(cons(g(s)), key=repr), sorted(g(s), key=repr))
                 self.assertRaises(TypeError, cons , X(s))
@@ -1453,7 +1460,7 @@ class TestVariousIteratorArgs(unittest.TestCase):
 
     def test_inline_methods(self):
         s = set('november')
-        for data in ("123", "", range(1000), ('do', 1.2), xrange(2000,2200,5), 'december'):
+        for data in ("123", "", range(1000), ('do', 1.2), range(2000,2200,5), 'december'):
             for meth in (s.union, s.intersection, s.difference, s.symmetric_difference):
                 for g in (G, I, Ig, L, R):
                     expected = meth(data)
@@ -1464,7 +1471,7 @@ class TestVariousIteratorArgs(unittest.TestCase):
                 self.assertRaises(ZeroDivisionError, meth, E(s))
 
     def test_inplace_methods(self):
-        for data in ("123", "", range(1000), ('do', 1.2), xrange(2000,2200,5), 'december'):
+        for data in ("123", "", range(1000), ('do', 1.2), range(2000,2200,5), 'december'):
             for methname in ('update', 'intersection_update',
                              'difference_update', 'symmetric_difference_update'):
                 for g in (G, I, Ig, S, L, R):
@@ -1522,7 +1529,7 @@ def test_main(verbose=None):
     if verbose and hasattr(sys, "gettotalrefcount"):
         import gc
         counts = [None] * 5
-        for i in xrange(len(counts)):
+        for i in range(len(counts)):
             test_support.run_unittest(*test_classes)
             gc.collect()
             counts[i] = sys.gettotalrefcount()

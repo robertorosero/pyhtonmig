@@ -831,7 +831,7 @@ class DocTestFinder:
         if module is None:
             return True
         elif inspect.isfunction(object):
-            return module.__dict__ is object.func_globals
+            return module.__dict__ is object.__globals__
         elif inspect.isclass(object):
             return module.__name__ == object.__module__
         elif inspect.getmodule(object) is not None:
@@ -969,7 +969,7 @@ class DocTestFinder:
 
         # Find the line number for functions & methods.
         if inspect.ismethod(obj): obj = obj.im_func
-        if inspect.isfunction(obj): obj = obj.func_code
+        if inspect.isfunction(obj): obj = obj.__code__
         if inspect.istraceback(obj): obj = obj.tb_frame
         if inspect.isframe(obj): obj = obj.f_code
         if inspect.iscode(obj):
@@ -2610,14 +2610,14 @@ __test__ = {"_TestClass": _TestClass,
             "ellipsis": r"""
                 If the ellipsis flag is used, then '...' can be used to
                 elide substrings in the desired output:
-                    >>> print(range(1000)) #doctest: +ELLIPSIS
+                    >>> print(list(range(1000))) #doctest: +ELLIPSIS
                     [0, 1, 2, ..., 999]
             """,
 
             "whitespace normalization": r"""
                 If the whitespace normalization flag is used, then
                 differences in whitespace are ignored.
-                    >>> print(range(30)) #doctest: +NORMALIZE_WHITESPACE
+                    >>> print(list(range(30))) #doctest: +NORMALIZE_WHITESPACE
                     [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14,
                      15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26,
                      27, 28, 29]
@@ -2625,8 +2625,23 @@ __test__ = {"_TestClass": _TestClass,
            }
 
 def _test():
-    r = unittest.TextTestRunner()
-    r.run(DocTestSuite())
+    testfiles = [arg for arg in sys.argv[1:] if arg and arg[0] != '-']
+    if testfiles:
+        for filename in testfiles:
+            if filename.endswith(".py"):
+                # It is a module -- insert its dir into sys.path and try to
+                # import it. If it is part of a package, that possibly won't work
+                # because of package imports.
+                dirname, filename = os.path.split(filename)
+                sys.path.insert(0, dirname)
+                m = __import__(filename[:-3])
+                del sys.path[0]
+                testmod(m)
+            else:
+                testfile(filename, module_relative=False)
+    else:
+        r = unittest.TextTestRunner()
+        r.run(DocTestSuite())
 
 if __name__ == "__main__":
     _test()

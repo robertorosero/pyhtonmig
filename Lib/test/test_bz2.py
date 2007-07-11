@@ -5,7 +5,7 @@ from test.test_support import TESTFN
 import unittest
 from cStringIO import StringIO
 import os
-import popen2
+import subprocess
 import sys
 
 import bz2
@@ -21,18 +21,20 @@ class BaseTest(unittest.TestCase):
 
     if has_cmdline_bunzip2:
         def decompress(self, data):
-            pop = popen2.Popen3("bunzip2", capturestderr=1)
-            pop.tochild.write(data)
-            pop.tochild.close()
-            ret = pop.fromchild.read()
-            pop.fromchild.close()
+            pop = subprocess.Popen("bunzip2", shell=True,
+                                   stdin=subprocess.PIPE,
+                                   stdout=subprocess.PIPE,
+                                   stderr=subprocess.STDOUT)
+            pop.stdin.write(data)
+            pop.stdin.close()
+            ret = pop.stdout.read()
+            pop.stdout.close()
             if pop.wait() != 0:
                 ret = bz2.decompress(data)
             return ret
 
     else:
-        # popen2.Popen3 doesn't exist on Windows, and even if it did, bunzip2
-        # isn't available to run.
+        # bunzip2 isn't available to run on Windows.
         def decompress(self, data):
             return bz2.decompress(data)
 
@@ -230,7 +232,7 @@ class BZ2FileTest(BaseTest):
     def testOpenDel(self):
         # "Test opening and deleting a file many times"
         self.createTempFile()
-        for i in xrange(10000):
+        for i in range(10000):
             o = BZ2File(self.filename)
             del o
 
@@ -243,7 +245,7 @@ class BZ2FileTest(BaseTest):
         self.createTempFile()
         bz2f = BZ2File(self.filename, "U")
         bz2f.close()
-        f = open(self.filename)
+        f = open(self.filename, "rb")
         f.seek(0, 2)
         self.assertEqual(f.tell(), len(self.DATA))
         f.close()

@@ -61,9 +61,10 @@ DOUBLESLASH = 48
 DOUBLESLASHEQUAL = 49
 AT = 50
 RARROW = 51
-OP = 52
-ERRORTOKEN = 53
-N_TOKENS = 54
+ELLIPSIS = 52
+OP = 53
+ERRORTOKEN = 54
+N_TOKENS = 55
 NT_OFFSET = 256
 #--end constants--
 
@@ -108,8 +109,7 @@ def main():
             name, val = match.group(1, 2)
             val = int(val)
             tokens[val] = name          # reverse so we can sort them...
-    keys = tokens.keys()
-    keys.sort()
+    keys = sorted(tokens.keys())
     # load the output skeleton from the target:
     try:
         fp = open(outFileName)

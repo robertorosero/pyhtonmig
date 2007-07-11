@@ -12,7 +12,7 @@ import codecs, binascii
 
 ### Codec APIs
 
-def uu_encode(input,errors='strict',filename='<data>',mode=0666):
+def uu_encode(input,errors='strict',filename='<data>',mode=0o666):
 
     """ Encodes the object input and returns a tuple (output
         object, length consumed).
@@ -31,7 +31,7 @@ def uu_encode(input,errors='strict',filename='<data>',mode=0666):
     write = outfile.write
 
     # Encode
-    write('begin %o %s\n' % (mode & 0777, filename))
+    write('begin %o %s\n' % (mode & 0o777, filename))
     chunk = read(45)
     while chunk:
         write(b2a_uu(chunk))

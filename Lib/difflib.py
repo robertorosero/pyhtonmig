@@ -407,7 +407,7 @@ class SequenceMatcher:
         # junk-free match ending with a[i-1] and b[j]
         j2len = {}
         nothing = []
-        for i in xrange(alo, ahi):
+        for i in range(alo, ahi):
             # look at all instances of a[i] in b; note that because
             # b2j has no junk keys, the loop is skipped if a[i] is junk
             j2lenget = j2len.get
@@ -587,7 +587,7 @@ class SequenceMatcher:
         Each group is in the same format as returned by get_opcodes().
 
         >>> from pprint import pprint
-        >>> a = map(str, range(1,40))
+        >>> a = list(map(str, range(1,40)))
         >>> b = a[:]
         >>> b[8:8] = ['i']     # Make an insertion
         >>> b[20] += 'x'       # Make a replacement
@@ -719,7 +719,7 @@ def get_close_matches(word, possibilities, n=3, cutoff=0.6):
     >>> import keyword as _keyword
     >>> get_close_matches("wheel", _keyword.kwlist)
     ['while']
-    >>> get_close_matches("apple", _keyword.kwlist)
+    >>> get_close_matches("Apple", _keyword.kwlist)
     []
     >>> get_close_matches("accept", _keyword.kwlist)
     ['except']
@@ -921,7 +921,7 @@ class Differ:
 
     def _dump(self, tag, x, lo, hi):
         """Generate comparison results for a same-tagged range."""
-        for i in xrange(lo, hi):
+        for i in range(lo, hi):
             yield '%s %s' % (tag, x[i])
 
     def _plain_replace(self, a, alo, ahi, b, blo, bhi):
@@ -967,10 +967,10 @@ class Differ:
         # search for the pair that matches best without being identical
         # (identical lines must be junk lines, & we don't want to synch up
         # on junk -- unless we have to)
-        for j in xrange(blo, bhi):
+        for j in range(blo, bhi):
             bj = b[j]
             cruncher.set_seq2(bj)
-            for i in xrange(alo, ahi):
+            for i in range(alo, ahi):
                 ai = a[i]
                 if ai == bj:
                     if eqi is None:
@@ -1430,7 +1430,7 @@ def _mdiff(fromlines, tolines, context=None, linejunk=None,
             # so we can do some very readable comparisons.
             while len(lines) < 4:
                 try:
-                    lines.append(diff_lines_iterator.next())
+                    lines.append(next(diff_lines_iterator))
                 except StopIteration:
                     lines.append('X')
             s = ''.join([line[0] for line in lines])
@@ -1517,7 +1517,7 @@ def _mdiff(fromlines, tolines, context=None, linejunk=None,
         while True:
             # Collecting lines of text until we have a from/to pair
             while (len(fromlines)==0 or len(tolines)==0):
-                from_line, to_line, found_diff =line_iterator.next()
+                from_line, to_line, found_diff = next(line_iterator)
                 if from_line is not None:
                     fromlines.append((from_line,found_diff))
                 if to_line is not None:
@@ -1532,7 +1532,7 @@ def _mdiff(fromlines, tolines, context=None, linejunk=None,
     line_pair_iterator = _line_pair_iterator()
     if context is None:
         while True:
-            yield line_pair_iterator.next()
+            yield next(line_pair_iterator)
     # Handle case where user wants context differencing.  We must do some
     # storage of lines until we know for sure that they are to be yielded.
     else:
@@ -1545,7 +1545,7 @@ def _mdiff(fromlines, tolines, context=None, linejunk=None,
             index, contextLines = 0, [None]*(context)
             found_diff = False
             while(found_diff is False):
-                from_line, to_line, found_diff = line_pair_iterator.next()
+                from_line, to_line, found_diff = next(line_pair_iterator)
                 i = index % context
                 contextLines[i] = (from_line, to_line, found_diff)
                 index += 1
@@ -1565,7 +1565,7 @@ def _mdiff(fromlines, tolines, context=None, linejunk=None,
             # Now yield the context lines after the change
             lines_to_write = context-1
             while(lines_to_write):
-                from_line, to_line, found_diff = line_pair_iterator.next()
+                from_line, to_line, found_diff = next(line_pair_iterator)
                 # If another change within the context, extend the context
                 if found_diff:
                     lines_to_write = context-1
@@ -1946,8 +1946,7 @@ class HtmlDiff(object):
         fromlist,tolist,flaglist,next_href,next_id = self._convert_flags(
             fromlist,tolist,flaglist,context,numlines)
 
-        import cStringIO
-        s = cStringIO.StringIO()
+        s = []
         fmt = '            <tr><td class="diff_next"%s>%s</td>%s' + \
               '<td class="diff_next">%s</td>%s</tr>\n'
         for i in range(len(flaglist)):
@@ -1955,9 +1954,9 @@ class HtmlDiff(object):
                 # mdiff yields None on separator lines skip the bogus ones
                 # generated for the first line
                 if i > 0:
-                    s.write('        </tbody>        \n        <tbody>\n')
+                    s.append('        </tbody>        \n        <tbody>\n')
             else:
-                s.write( fmt % (next_id[i],next_href[i],fromlist[i],
+                s.append( fmt % (next_id[i],next_href[i],fromlist[i],
                                            next_href[i],tolist[i]))
         if fromdesc or todesc:
             header_row = '<thead><tr>%s%s%s%s</tr></thead>' % (
@@ -1969,7 +1968,7 @@ class HtmlDiff(object):
             header_row = ''
 
         table = self._table_template % dict(
-            data_rows=s.getvalue(),
+            data_rows=''.join(s),
             header_row=header_row,
             prefix=self._prefix[1])
 

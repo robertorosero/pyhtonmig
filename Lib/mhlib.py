@@ -67,7 +67,7 @@ s = m.getbodytext(0)    # text of message's body, not decoded
 MH_PROFILE = '~/.mh_profile'
 PATH = '~/Mail'
 MH_SEQUENCES = '.mh_sequences'
-FOLDER_PROTECT = 0700
+FOLDER_PROTECT = 0o700
 
 
 # Imported modules
@@ -282,8 +282,7 @@ class Folder:
         for name in os.listdir(self.getfullname()):
             if match(name):
                 append(name)
-        messages = map(int, messages)
-        messages.sort()
+        messages = sorted(map(int, messages))
         if messages:
             self.last = messages[-1]
         else:
@@ -828,7 +827,7 @@ class IntSet:
     def tolist(self):
         l = []
         for lo, hi in self.pairs:
-            m = range(lo, hi+1)
+            m = list(range(lo, hi+1))
             l = l + m
         return l
 

@@ -847,7 +847,7 @@ bu_longlong(const char *p, const formatdef *f)
 	} while (--i > 0);
 	/* Extend the sign bit. */
 	if (SIZEOF_LONG_LONG > f->size)
-		x |= -(x & (1L << ((8 * f->size) - 1)));
+		x |= -(x & ((PY_LONG_LONG)1 << ((8 * f->size) - 1)));
 	if (x >= LONG_MIN && x <= LONG_MAX)
 		return PyInt_FromLong(Py_SAFE_DOWNCAST(x, PY_LONG_LONG, long));
 	return PyLong_FromLongLong(x);
@@ -1083,7 +1083,7 @@ lu_longlong(const char *p, const formatdef *f)
 	} while (i > 0);
 	/* Extend the sign bit. */
 	if (SIZEOF_LONG_LONG > f->size)
-		x |= -(x & (1L << ((8 * f->size) - 1)));
+		x |= -(x & ((PY_LONG_LONG)1 << ((8 * f->size) - 1)));
 	if (x >= LONG_MIN && x <= LONG_MAX)
 		return PyInt_FromLong(Py_SAFE_DOWNCAST(x, PY_LONG_LONG, long));
 	return PyLong_FromLongLong(x);
@@ -1523,26 +1523,44 @@ fail:
 
 
 PyDoc_STRVAR(s_unpack__doc__,
-"S.unpack(str) -> (v1, v2, ...)\n\
+"S.unpack(buffer) -> (v1, v2, ...)\n\
 \n\
 Return tuple containing values unpacked according to this Struct's format.\n\
-Requires len(str) == self.size. See struct.__doc__ for more on format\n\
+Requires len(buffer) == self.size. See struct.__doc__ for more on format\n\
 strings.");
 
 static PyObject *
 s_unpack(PyObject *self, PyObject *inputstr)
 {
+	char *start;
+	Py_ssize_t len;
+	PyObject *args=NULL, *result;
 	PyStructObject *soself = (PyStructObject *)self;
 	assert(PyStruct_Check(self));
 	assert(soself->s_codes != NULL);
-	if (inputstr == NULL || !PyString_Check(inputstr) ||
-		PyString_GET_SIZE(inputstr) != soself->s_size) {
-		PyErr_Format(StructError,
-			"unpack requires a string argument of length %zd",
-			soself->s_size);
-		return NULL;
+	if (inputstr == NULL)
+		goto fail;
+	if (PyString_Check(inputstr) &&
+		PyString_GET_SIZE(inputstr) == soself->s_size) {
+			return s_unpack_internal(soself, PyString_AS_STRING(inputstr));
 	}
-	return s_unpack_internal(soself, PyString_AS_STRING(inputstr));
+	args = PyTuple_Pack(1, inputstr);
+	if (args == NULL)
+		return NULL;
+	if (!PyArg_ParseTuple(args, "s#:unpack", &start, &len))
+		goto fail;
+	if (soself->s_size != len)
+		goto fail;
+	result = s_unpack_internal(soself, start);
+	Py_DECREF(args);
+	return result;
+
+fail:
+	Py_XDECREF(args);
+	PyErr_Format(StructError,
+		"unpack requires a string argument of length %zd",
+		soself->s_size);
+	return NULL;
 }
 
 PyDoc_STRVAR(s_unpack_from__doc__,
@@ -1769,7 +1787,7 @@ static struct PyMethodDef s_methods[] = {
 	{"pack",	s_pack,		METH_VARARGS, s_pack__doc__},
 	{"pack_into",	s_pack_into,	METH_VARARGS, s_pack_into__doc__},
 	{"unpack",	s_unpack,       METH_O, s_unpack__doc__},
-	{"unpack_from",	(PyCFunction)s_unpack_from, METH_KEYWORDS,
+	{"unpack_from",	(PyCFunction)s_unpack_from, METH_VARARGS|METH_KEYWORDS,
 			s_unpack_from__doc__},
 	{NULL,	 NULL}		/* sentinel */
 };

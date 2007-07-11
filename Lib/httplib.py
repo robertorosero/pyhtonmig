@@ -625,7 +625,8 @@ class HTTPConnection:
     debuglevel = 0
     strict = 0
 
-    def __init__(self, host, port=None, strict=None):
+    def __init__(self, host, port=None, strict=None, timeout=None):
+        self.timeout = timeout
         self.sock = None
         self._buffer = []
         self.__response = None
@@ -658,25 +659,8 @@ class HTTPConnection:
 
     def connect(self):
         """Connect to the host and port specified in __init__."""
-        msg = "getaddrinfo returns an empty list"
-        for res in socket.getaddrinfo(self.host, self.port, 0,
-                                      socket.SOCK_STREAM):
-            af, socktype, proto, canonname, sa = res
-            try:
-                self.sock = socket.socket(af, socktype, proto)
-                if self.debuglevel > 0:
-                    print("connect: (%s, %s)" % (self.host, self.port))
-                self.sock.connect(sa)
-            except socket.error as msg:
-                if self.debuglevel > 0:
-                    print('connect fail:', (self.host, self.port))
-                if self.sock:
-                    self.sock.close()
-                self.sock = None
-                continue
-            break
-        if not self.sock:
-            raise socket.error, msg
+        self.sock = socket.create_connection((self.host,self.port),
+                                             self.timeout)
 
     def close(self):
         """Close the connection to the HTTP server."""
@@ -714,7 +698,7 @@ class HTTPConnection:
             else:
                 self.sock.sendall(str)
         except socket.error as v:
-            if v[0] == 32:      # Broken pipe
+            if v.args[0] == 32:      # Broken pipe
                 self.close()
             raise
 
@@ -870,7 +854,7 @@ class HTTPConnection:
             self._send_request(method, url, body, headers)
         except socket.error as v:
             # trap 'Broken pipe' if we're allowed to automatically reconnect
-            if v[0] != 32 or not self.auto_open:
+            if v.args[0] != 32 or not self.auto_open:
                 raise
             # try one more time
             self._send_request(method, url, body, headers)
@@ -948,8 +932,8 @@ class HTTPConnection:
         self.__state = _CS_IDLE
 
         if response.will_close:
-            # Pass the socket to the response
-            self.sock = None
+            # this effectively passes the connection to the response
+            self.close()
         else:
             # remember this, so we can tell when it is complete
             self.__response = response
@@ -1020,17 +1004,19 @@ class SSLFile(SharedSocketClient):
             try:
                 buf = self._ssl.read(self._bufsize)
             except socket.sslerror as err:
-                if (err[0] == socket.SSL_ERROR_WANT_READ
-                    or err[0] == socket.SSL_ERROR_WANT_WRITE):
+                err_type = err.args[0]
+                if (err_type == socket.SSL_ERROR_WANT_READ
+                    or err_type == socket.SSL_ERROR_WANT_WRITE):
                     continue
-                if (err[0] == socket.SSL_ERROR_ZERO_RETURN
-                    or err[0] == socket.SSL_ERROR_EOF):
+                if (err_type == socket.SSL_ERROR_ZERO_RETURN
+                    or err_type == socket.SSL_ERROR_EOF):
                     break
                 raise
             except socket.error as err:
-                if err[0] == errno.EINTR:
+                err_type = err.args[0]
+                if err_type == errno.EINTR:
                     continue
-                if err[0] == errno.EBADF:
+                if err_type == errno.EBADF:
                     # XXX socket was closed?
                     break
                 raise
@@ -1096,7 +1082,7 @@ class SSLFile(SharedSocketClient):
     def __iter__(self):
         return self
 
-    def next(self):
+    def __next__(self):
         line = self.readline()
         if not line:
             raise StopIteration
@@ -1140,16 +1126,15 @@ class HTTPSConnection(HTTPConnection):
     default_port = HTTPS_PORT
 
     def __init__(self, host, port=None, key_file=None, cert_file=None,
-                 strict=None):
-        HTTPConnection.__init__(self, host, port, strict)
+                 strict=None, timeout=None):
+        HTTPConnection.__init__(self, host, port, strict, timeout)
         self.key_file = key_file
         self.cert_file = cert_file
 
     def connect(self):
         "Connect to a host on a given (SSL) port."
 
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.connect((self.host, self.port))
+        sock = socket.create_connection((self.host, self.port), self.timeout)
         ssl = socket.ssl(sock, self.key_file, self.cert_file)
         self.sock = FakeSocket(sock, ssl)
 

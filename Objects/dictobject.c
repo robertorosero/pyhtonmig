@@ -1205,6 +1205,24 @@ dict_fromkeys(PyObject *cls, PyObject *args)
 	if (d == NULL)
 		return NULL;
 
+	if (PyDict_CheckExact(d) && PyAnySet_CheckExact(seq)) {
+		dictobject *mp = (dictobject *)d;
+		Py_ssize_t pos = 0;
+		PyObject *key;
+		long hash;
+
+		if (dictresize(mp, PySet_GET_SIZE(seq)))
+			return NULL;
+
+		while (_PySet_NextEntry(seq, &pos, &key, &hash)) {
+			Py_INCREF(key);
+			Py_INCREF(value);
+			if (insertdict(mp, key, hash, value))
+				return NULL;
+		}
+		return d;
+	}
+
 	it = PyObject_GetIter(seq);
 	if (it == NULL){
 		Py_DECREF(d);
@@ -1869,9 +1887,9 @@ static PyObject *dictkeys_new(PyObject *);
 static PyObject *dictitems_new(PyObject *);
 static PyObject *dictvalues_new(PyObject *);
 
-PyDoc_STRVAR(KEYS__doc__, "D.KEYS() -> a set-like object for D's keys");
-PyDoc_STRVAR(ITEMS__doc__, "D.ITEMS() -> a set-like object for D's items");
-PyDoc_STRVAR(VALUES__doc__, "D.VALUES() -> a set-like object for D's values");
+PyDoc_STRVAR(keys__doc__, "D.keys() -> a set-like object for D's keys");
+PyDoc_STRVAR(items__doc__, "D.items() -> a set-like object for D's items");
+PyDoc_STRVAR(values__doc__, "D.values() -> a set-like object for D's values");
 
 static PyMethodDef mapp_methods[] = {
 	{"__contains__",(PyCFunction)dict_contains,     METH_O | METH_COEXIST,
@@ -1895,11 +1913,11 @@ static PyMethodDef mapp_methods[] = {
 	 values__doc__},
 #endif
 	{"keys",	(PyCFunction)dictkeys_new,	METH_NOARGS,
-	KEYS__doc__},
+	keys__doc__},
 	{"items",	(PyCFunction)dictitems_new,	METH_NOARGS,
-	ITEMS__doc__},
+	items__doc__},
 	{"values",	(PyCFunction)dictvalues_new,	METH_NOARGS,
-	VALUES__doc__},
+	values__doc__},
 	{"update",	(PyCFunction)dict_update,	METH_VARARGS | METH_KEYWORDS,
 	 update__doc__},
 	{"fromkeys",	(PyCFunction)dict_fromkeys,	METH_VARARGS | METH_CLASS,
@@ -2027,7 +2045,7 @@ PyTypeObject PyDict_Type = {
 	0,					/* tp_setattro */
 	0,					/* tp_as_buffer */
 	Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_GC |
-		Py_TPFLAGS_BASETYPE,		/* tp_flags */
+		Py_TPFLAGS_BASETYPE | Py_TPFLAGS_DICT_SUBCLASS,	/* tp_flags */
 	dictionary_doc,				/* tp_doc */
 	dict_traverse,				/* tp_traverse */
 	dict_tp_clear,				/* tp_clear */
@@ -2389,8 +2407,6 @@ PyTypeObject PyDictIterItem_Type = {
 /* View objects for keys(), items(), values(). */
 /***********************************************/
 
-/* While this is incomplete, we use KEYS(), ITEMS(), VALUES(). */
-
 /* The instance lay-out is the same for all three; but the type differs. */
 
 typedef struct {
@@ -2437,6 +2453,14 @@ dictview_new(PyObject *dict, PyTypeObject *type)
 	dv->dv_dict = (dictobject *)dict;
 	return (PyObject *)dv;
 }
+
+/* TODO(guido): The views objects are not complete:
+
+ * support more set operations
+ * support arbitrary mappings?
+   - either these should be static or exported in dictobject.h
+   - if public then they should probably be in builtins
+*/
 
 /* Forward */
 PyTypeObject PyDictKeys_Type;

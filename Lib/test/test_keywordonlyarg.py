@@ -71,7 +71,7 @@ class KeywordOnlyArgTestCase(unittest.TestCase):
             fundef3 += "i%d, "%i
         fundef3 += "lastarg):\n  pass\n"
         compile(fundef3, "<test>", "single")
- 
+
     def testSyntaxErrorForFunctionCall(self):
         self.assertRaisesSyntaxError("f(p, k=1, p2)")
         self.assertRaisesSyntaxError("f(p, *(1,2), k1=100)")
@@ -135,12 +135,12 @@ class KeywordOnlyArgTestCase(unittest.TestCase):
         def foo(p1,p2=0, *, k1, k2=0):
             return p1 + p2 + k1 + k2
 
-        self.assertEquals(2, foo.func_code.co_kwonlyargcount)
-        self.assertEquals({"k2":0}, foo.func_kwdefaults)
-        foo.func_kwdefaults = {"k1":0}
+        self.assertEquals(2, foo.__code__.co_kwonlyargcount)
+        self.assertEquals({"k2":0}, foo.__kwdefaults__)
+        foo.__kwdefaults__ = {"k1":0}
         try:
             foo(1,k1=10)
-            self.fail("func_kwdefaults is not properly changed")
+            self.fail("__kwdefaults__ is not properly changed")
         except TypeError:
             pass
 

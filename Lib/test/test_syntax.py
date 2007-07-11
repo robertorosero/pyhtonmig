@@ -5,7 +5,7 @@ Here's an example of the sort of thing that is tested.
 >>> def f(x):
 ...     global x
 Traceback (most recent call last):
-SyntaxError: name 'x' is local and global
+SyntaxError: name 'x' is parameter and global
 
 The tests are all raise SyntaxErrors.  They were created by checking
 each C call that raises SyntaxError.  There are several modules that
@@ -27,15 +27,13 @@ In ast.c, syntax errors are raised by calling ast_error().
 
 Errors from set_context():
 
-TODO(jhylton): "assignment to None" is inconsistent with other messages
-
 >>> obj.None = 1
 Traceback (most recent call last):
-SyntaxError: assignment to None (<doctest test.test_syntax[1]>, line 1)
+SyntaxError: invalid syntax
 
 >>> None = 1
 Traceback (most recent call last):
-SyntaxError: assignment to None (<doctest test.test_syntax[2]>, line 1)
+SyntaxError: assignment to keyword (<doctest test.test_syntax[2]>, line 1)
 
 It's a syntax error to assign to the empty tuple.  Why isn't it an
 error to assign to the empty list?  It will always raise some error at
@@ -95,7 +93,7 @@ From compiler_complex_args():
 >>> def f(None=1):
 ...     pass
 Traceback (most recent call last):
-SyntaxError: assignment to None (<doctest test.test_syntax[14]>, line 1)
+SyntaxError: invalid syntax
 
 
 From ast_for_arguments():
@@ -108,17 +106,17 @@ SyntaxError: non-default argument follows default argument (<doctest test.test_s
 >>> def f(x, None):
 ...     pass
 Traceback (most recent call last):
-SyntaxError: assignment to None (<doctest test.test_syntax[16]>, line 1)
+SyntaxError: invalid syntax
 
 >>> def f(*None):
 ...     pass
 Traceback (most recent call last):
-SyntaxError: assignment to None (<doctest test.test_syntax[17]>, line 1)
+SyntaxError: invalid syntax
 
 >>> def f(**None):
 ...     pass
 Traceback (most recent call last):
-SyntaxError: assignment to None (<doctest test.test_syntax[18]>, line 1)
+SyntaxError: invalid syntax
 
 
 From ast_for_funcdef():
@@ -126,7 +124,7 @@ From ast_for_funcdef():
 >>> def None(x):
 ...     pass
 Traceback (most recent call last):
-SyntaxError: assignment to None (<doctest test.test_syntax[19]>, line 1)
+SyntaxError: invalid syntax
 
 
 From ast_for_call():
@@ -231,7 +229,7 @@ Traceback (most recent call last):
 SyntaxError: augmented assignment to generator expression not possible (<doctest test.test_syntax[31]>, line 1)
 >>> None += 1
 Traceback (most recent call last):
-SyntaxError: assignment to None (<doctest test.test_syntax[32]>, line 1)
+SyntaxError: assignment to keyword (<doctest test.test_syntax[32]>, line 1)
 >>> f() += 1
 Traceback (most recent call last):
 SyntaxError: illegal expression for augmented assignment (<doctest test.test_syntax[33]>, line 1)
@@ -366,6 +364,101 @@ build.  The number of blocks must be greater than CO_MAXBLOCKS.  SF #1565514
    Traceback (most recent call last):
      ...
    SystemError: too many statically nested blocks
+
+Misuse of the nonlocal statement can lead to a few unique syntax errors.
+
+   >>> def f(x):
+   ...     nonlocal x
+   Traceback (most recent call last):
+     ...
+   SyntaxError: name 'x' is parameter and nonlocal
+
+   >>> def f():
+   ...     global x
+   ...     nonlocal x
+   Traceback (most recent call last):
+     ...
+   SyntaxError: name 'x' is nonlocal and global
+
+   >>> def f():
+   ...     nonlocal x
+   Traceback (most recent call last):
+     ...
+   SyntaxError: no binding for nonlocal 'x' found
+
+From SF bug #1705365
+   >>> nonlocal x
+   Traceback (most recent call last):
+     ...
+   SyntaxError: nonlocal declaration not allowed at module level
+
+TODO(jhylton): Figure out how to test SyntaxWarning with doctest.
+
+##   >>> def f(x):
+##   ...     def f():
+##   ...         print(x)
+##   ...         nonlocal x
+##   Traceback (most recent call last):
+##     ...
+##   SyntaxWarning: name 'x' is assigned to before nonlocal declaration
+
+##   >>> def f():
+##   ...     x = 1
+##   ...     nonlocal x
+##   Traceback (most recent call last):
+##     ...
+##   SyntaxWarning: name 'x' is assigned to before nonlocal declaration
+
+
+This tests assignment-context; there was a bug in Python 2.5 where compiling
+a complex 'if' (one with 'elif') would fail to notice an invalid suite,
+leading to spurious errors.
+
+   >>> if 1:
+   ...   x() = 1
+   ... elif 1:
+   ...   pass
+   Traceback (most recent call last):
+     ...
+   SyntaxError: can't assign to function call (<doctest test.test_syntax[48]>, line 2)
+
+   >>> if 1:
+   ...   pass
+   ... elif 1:
+   ...   x() = 1
+   Traceback (most recent call last):
+     ...
+   SyntaxError: can't assign to function call (<doctest test.test_syntax[49]>, line 4)
+
+   >>> if 1:
+   ...   x() = 1
+   ... elif 1:
+   ...   pass
+   ... else:
+   ...   pass
+   Traceback (most recent call last):
+     ...
+   SyntaxError: can't assign to function call (<doctest test.test_syntax[50]>, line 2)
+
+   >>> if 1:
+   ...   pass
+   ... elif 1:
+   ...   x() = 1
+   ... else:
+   ...   pass
+   Traceback (most recent call last):
+     ...
+   SyntaxError: can't assign to function call (<doctest test.test_syntax[51]>, line 4)
+
+   >>> if 1:
+   ...   pass
+   ... elif 1:
+   ...   pass
+   ... else:
+   ...   x() = 1
+   Traceback (most recent call last):
+     ...
+   SyntaxError: can't assign to function call (<doctest test.test_syntax[52]>, line 6)
 
 """
 

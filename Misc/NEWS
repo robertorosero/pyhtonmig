@@ -16,17 +16,68 @@ TO DO
 
 - Weed really old/weird stuff from the library.
 
-- Unify range() and xrange().
+- Use io.py instead of C stdio everywhere.
 
-- Rework the standard I/O library to use bytes for binary files.
-
-- Make strings all Unicode.
+- Make strings all Unicode (see branches/py3k-struni).
 
 - Get rid of various compatibility-related flags (e.g. division flags).
 
 
 Core and Builtins
 -----------------
+
+- Removed the __oct__ and __hex__ special methods and added a bin()
+  builtin function.
+
+- PEP 3127: octal literals now start with "0o". Old-style octal literals
+  are invalid. There are binary literals with a prefix of "0b".
+  This also affects int(x, 0).
+
+- None, True, False are now keywords.
+
+- PEP 3119: isinstance() and issubclass() can be overridden.
+
+- Remove BaseException.message.
+
+- Remove tuple parameter unpacking (PEP 3113).
+
+- Remove the f_restricted attribute from frames.  This naturally leads to teh
+  removal of PyEval_GetRestricted() and PyFrame_IsRestricted().
+
+- PEP 3132 was accepted. That means that you can do ``a, *b = range(5)``
+  to assign 0 to a and [1, 2, 3, 4] to b.
+
+- range() now returns an iterator rather than a list.  Floats are not allowed.
+  xrange() is no longer defined.
+
+- Patch #1660500: hide iteration variable in list comps, add set comps
+  and use common code to handle compilation of iterative expressions
+
+- By default, != returns the opposite of ==, unless the latter returns
+  NotImplemented.
+
+- Patch #1680961: sys.exitfunc has been removed and replaced with a private
+  C-level API.
+
+- PEP 3115: new metaclasses: the metaclass is now specified as a
+  keyword arg in the class statement, which can now use the full syntax of
+  a parameter list. Also, the metaclass can implement a __prepare__ function
+  which will be called to create the dictionary for the new class namespace.
+
+- The long-deprecated argument "pend" of PyFloat_FromString() has been
+  removed.
+
+- The dir() function has been extended to call the __dir__() method on
+  its argument, if it exists. If not, it will work like before. This allows
+  customizing the output of dir() in the presence of a __getattr__().
+
+- Removed indexing/slicing on BaseException.
+
+- input() became raw_input(): the name input() now implements the
+  functionality formerly known as raw_input(); the name raw_input()
+  is no longer defined.
+
+- Classes listed in an 'except' clause must inherit from BaseException.
 
 - PEP 3106: dict.iterkeys(), .iteritems(), .itervalues() are now gone;
   and .keys(), .items(), .values() return dict views.
@@ -51,6 +102,21 @@ Core and Builtins
   at the end of the except clause; V must be a simple name.
 
 - Added function annotations per PEP 3107.
+
+- Added nonlocal declaration from PEP 3104
+
+  >>> def f(x):
+  ...     def inc():
+  ...         nonlocal x
+  ...         x += 1
+  ...         return x
+  ...     return inc
+  ...
+  >>> inc = f(0)
+  >>> inc()
+  1
+  >>> inc()
+  2
 
 - Moved intern() to sys.intern().
 
@@ -77,19 +143,72 @@ Core and Builtins
 - Absolute import is the default behavior for 'import foo' etc.
 
 - Removed support for syntax:
-  backticks (`x`), <>
+  backticks (ie, `x`), <>
 
 - Removed these Python builtins:
-  apply(), coerce(), input(), raw_input()
+  apply(), callable(), coerce(), file(), reduce(), reload()
 
 - Removed these Python methods:
   {}.has_key
 
-- Removed these Python slots:
-  __coerce__, __div__, __idiv__, __rdiv__
+- Removed these opcodes:
+  BINARY_DIVIDE, INPLACE_DIVIDE, UNARY_CONVERT
+
+- Remove C API support for restricted execution.
+
+- zip returns an iterator
+
+- Additions:
+  set literals, ellipsis literal
+
+- Added class decorators per PEP 3129.
+
+
+Extension Modules
+-----------------
+
+- Remove the imageop module.  Obsolete long with its unit tests becoming
+  useless from the removal of rgbimg and imgfile.
 
 - Removed these attributes from Python modules:
-  * operator module: div, idiv, __div__, __idiv__
+  * operator module: div, idiv, __div__, __idiv__, isCallable, sequenceIncludes
+  * sys module: exc_clear(), exc_type, exc_value, exc_traceback
+
+
+Library
+-------
+
+- Remove the compiler package.  Use of the _ast module and (an eventual)
+  AST -> bytecode mechanism.
+
+- Removed these modules:
+  * Bastion, bsddb185, exceptions, md5, MimeWriter, mimify, popen2, rexec,
+    sets, sha, stringold, strop, timing, xmllib.
+
+- Remove obsolete IRIX modules: al/AL, cd/CD, cddb, cdplayer, cl/CL, DEVICE,
+  ERRNO, FILE, fl/FL, flp, fm, GET, gl/GL, GLWS, IN, imgfile, IOCTL, jpeg,
+  panel, panelparser, readcd, sgi, sv/SV, torgb, WAIT.
+
+- Remove obsolete functions:
+  * commands.getstatus(), os.popen*,
+
+- Remove functions in the string module that are also string methods.
+
+- Remove support for long obsolete platforms: plat-aix3, plat-irix5.
+
+- Remove xmlrpclib.SlowParser.  It was based on xmllib.
+
+- Patch #1680961: atexit has been reimplemented in C.
+
+
+Build
+-----
+
+C API
+-----
+
+- Removed these Python slots:
+  __coerce__, __div__, __idiv__, __rdiv__
 
 - Removed these C APIs:
   PyNumber_Coerce(), PyNumber_CoerceEx() 
@@ -104,28 +223,6 @@ Core and Builtins
   intargfunc, intintargfunc, intobjargproc, intintobjargproc,
   getreadbufferproc, getwritebufferproc, getsegcountproc, getcharbufferproc
 
-- Removed these opcodes:
-  BINARY_DIVIDE, INPLACE_DIVIDE, UNARY_CONVERT
-
-- zip returns an iterator
-
-- Additions:
-  set literals, ellipsis literal
-
-
-Extension Modules
------------------
-
-Library
--------
-
-- Removed all traces of the sets module.
-
-Build
------
-
-C API
------
 
 Tests
 -----
@@ -136,6 +233,9 @@ Documentation
 Mac
 ---
 
+- The cfmfile was removed.
+
+
 New platforms
 -------------
 
@@ -143,3 +243,4 @@ Tools/Demos
 -----------
 
 **(For information about older versions, consult the HISTORY file.)**
+

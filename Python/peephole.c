@@ -1,4 +1,4 @@
-/* Peehole optimizations for bytecode compiler. */
+/* Peephole optimizations for bytecode compiler. */
 
 #include "Python.h"
 
@@ -257,14 +257,47 @@ markblocks(unsigned char *code, int len)
 	return blocks;
 }
 
+/* Helper to replace LOAD_NAME None/True/False with LOAD_CONST
+   Returns: 0 if no change, 1 if change, -1 if error */
+static int
+load_global(unsigned char *codestr, Py_ssize_t i, char *name, PyObject *consts)
+{
+	Py_ssize_t j;
+	PyObject *obj;
+	if (name == NULL)
+		return 0;
+	if (strcmp(name, "None") == 0)
+		obj = Py_None;
+	else if (strcmp(name, "True") == 0)
+		obj = Py_True;
+	else if (strcmp(name, "False") == 0)
+		obj = Py_False;
+	else
+		return 0;
+	for (j = 0; j < PyList_GET_SIZE(consts); j++) {
+		if (PyList_GET_ITEM(consts, j) == obj)
+			break;
+	}
+	if (j == PyList_GET_SIZE(consts)) {
+		if (PyList_Append(consts, obj) < 0)
+			return -1;
+	}
+	assert(PyList_GET_ITEM(consts, j) == obj);
+	codestr[i] = LOAD_CONST;
+	SETARG(codestr, i, j);
+	return 1;
+}
+
 /* Perform basic peephole optimizations to components of a code object.
    The consts object should still be in list form to allow new constants 
    to be appended.
 
-   To keep the optimizer simple, it bails out (does nothing) for code
-   containing extended arguments or that has a length over 32,700.  That 
-   allows us to avoid overflow and sign issues.	 Likewise, it bails when
-   the lineno table has complex encoding for gaps >= 255.
+   To keep the optimizer simple, it bails out (does nothing) for code that
+   has a length over 32,700, and does not calculate extended arguments. 
+   That allows us to avoid overflow and sign issues. Likewise, it bails when
+   the lineno table has complex encoding for gaps >= 255. EXTENDED_ARG can
+   appear before MAKE_FUNCTION; in this case both opcodes are skipped.
+   EXTENDED_ARG preceding any other opcode causes the optimizer to bail.
 
    Optimizations are restricted to simple transformations occuring within a
    single basic block.	All transformations keep the code size the same or 
@@ -300,7 +333,7 @@ PyCode_Optimize(PyObject *code, PyObject* consts, PyObject *names,
 
 	/* Avoid situations where jump retargeting could overflow */
 	assert(PyString_Check(code));
-	codelen = PyString_Size(code);
+	codelen = PyString_GET_SIZE(code);
 	if (codelen > 32700)
 		goto exitUnchanged;
 
@@ -369,22 +402,18 @@ PyCode_Optimize(PyObject *code, PyObject* consts, PyObject *names,
 				codestr[i+3] = NOP;
 				break;
 
-				/* Replace LOAD_GLOBAL/LOAD_NAME None
-                                   with LOAD_CONST None */
+				/* Replace LOAD_GLOBAL/LOAD_NAME None/True/False
+                                   with LOAD_CONST None/True/False */
 			case LOAD_NAME:
 			case LOAD_GLOBAL:
 				j = GETARG(codestr, i);
 				name = PyString_AsString(PyTuple_GET_ITEM(names, j));
-				if (name == NULL  ||  strcmp(name, "None") != 0)
+				h = load_global(codestr, i, name, consts);
+				if (h < 0)
+					goto exitUnchanged;
+				else if (h == 0)
 					continue;
-				for (j=0 ; j < PyList_GET_SIZE(consts) ; j++) {
-					if (PyList_GET_ITEM(consts, j) == Py_None) {
-						codestr[i] = LOAD_CONST;
-						SETARG(codestr, i, j);
-						cumlc = lastlc + 1;
-						break;
-					}
-				}
+				cumlc = lastlc + 1;
 				break;
 
 				/* Skip over LOAD_CONST trueconst
@@ -535,7 +564,11 @@ PyCode_Optimize(PyObject *code, PyObject* consts, PyObject *names,
 				break;
 
 			case EXTENDED_ARG:
-				goto exitUnchanged;
+				if (codestr[i+3] != MAKE_FUNCTION)
+					goto exitUnchanged;
+				/* don't visit MAKE_FUNCTION as GETARG will be wrong */
+				i += 3;
+				break;
 
 				/* Replace RETURN LOAD_CONST None RETURN with just RETURN */
 				/* Remove unreachable JUMPs after RETURN */

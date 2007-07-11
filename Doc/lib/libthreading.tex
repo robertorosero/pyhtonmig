@@ -15,17 +15,16 @@ situations where \module{threading} cannot be used because
 This module defines the following functions and objects:
 
 \begin{funcdesc}{activeCount}{}
-Return the number of currently active \class{Thread} objects.
-The returned count is equal to the length of the list returned by
+Return the number of \class{Thread} objects currently alive.  The
+returned count is equal to the length of the list returned by
 \function{enumerate()}.
-A function that returns the number of currently active threads.
 \end{funcdesc}
 
-\begin{funcdesc}{Condition}{}
+\begin{funcdescni}{Condition}{}
 A factory function that returns a new condition variable object.
 A condition variable allows one or more threads to wait until they
 are notified by another thread.
-\end{funcdesc}
+\end{funcdescni}
 
 \begin{funcdesc}{currentThread}{}
 Return the current \class{Thread} object, corresponding to the
@@ -36,18 +35,18 @@ is returned.
 \end{funcdesc}
 
 \begin{funcdesc}{enumerate}{}
-Return a list of all currently active \class{Thread} objects.
-The list includes daemonic threads, dummy thread objects created
-by \function{currentThread()}, and the main thread.  It excludes terminated
-threads and threads that have not yet been started.
+Return a list of all \class{Thread} objects currently alive.  The list
+includes daemonic threads, dummy thread objects created by
+\function{currentThread()}, and the main thread.  It excludes
+terminated threads and threads that have not yet been started.
 \end{funcdesc}
 
-\begin{funcdesc}{Event}{}
+\begin{funcdescni}{Event}{}
 A factory function that returns a new event object.  An event manages
 a flag that can be set to true with the \method{set()} method and
 reset to false with the \method{clear()} method.  The \method{wait()}
 method blocks until the flag is true.
-\end{funcdesc}
+\end{funcdescni}
 
 \begin{classdesc*}{local}{}
 A class that represents thread-local data.  Thread-local data are data
@@ -82,14 +81,14 @@ acquire it again without blocking; the thread must release it once
 for each time it has acquired it.
 \end{funcdesc}
 
-\begin{funcdesc}{Semaphore}{\optional{value}}
+\begin{funcdescni}{Semaphore}{\optional{value}}
 A factory function that returns a new semaphore object.  A
 semaphore manages a counter representing the number of \method{release()}
 calls minus the number of \method{acquire()} calls, plus an initial value.
 The \method{acquire()} method blocks if necessary until it can return
 without making the counter negative.  If not given, \var{value} defaults to
 1. 
-\end{funcdesc}
+\end{funcdescni}
 
 \begin{funcdesc}{BoundedSemaphore}{\optional{value}}
 A factory function that returns a new bounded semaphore object.  A bounded
@@ -100,12 +99,12 @@ semaphore is released too many times it's a sign of a bug.  If not given,
 \var{value} defaults to 1. 
 \end{funcdesc}
 
-\begin{classdesc*}{Thread}{}
+\begin{classdesc*}{Thread}
 A class that represents a thread of control.  This class can be safely
 subclassed in a limited fashion.
 \end{classdesc*}
 
-\begin{classdesc*}{Timer}{}
+\begin{classdesc*}{Timer}
 A thread that executes a function after a specified interval has passed.
 \end{classdesc*}
 
@@ -175,15 +174,18 @@ until a call to \method{release()} in another thread changes it to
 unlocked, then the \method{acquire()} call resets it to locked and
 returns.  The \method{release()} method should only be called in the
 locked state; it changes the state to unlocked and returns
-immediately.  When more than one thread is blocked in
-\method{acquire()} waiting for the state to turn to unlocked, only one
-thread proceeds when a \method{release()} call resets the state to
-unlocked; which one of the waiting threads proceeds is not defined,
-and may vary across implementations.
+immediately. If an attempt is made to release an unlocked lock, a
+\exception{RuntimeError} will be raised.
+
+When more than one thread is blocked in \method{acquire()} waiting for
+the state to turn to unlocked, only one thread proceeds when a
+\method{release()} call resets the state to unlocked; which one of the
+waiting threads proceeds is not defined, and may vary across
+implementations.
 
 All methods are executed atomically.
 
-\begin{methoddesc}{acquire}{\optional{blocking\code{ = 1}}}
+\begin{methoddesc}[Lock]{acquire}{\optional{blocking\code{ = 1}}}
 Acquire a lock, blocking or non-blocking.
 
 When invoked without arguments, block until the lock is
@@ -198,7 +200,7 @@ immediately; otherwise, do the same thing as when called
 without arguments, and return true.
 \end{methoddesc}
 
-\begin{methoddesc}{release}{}
+\begin{methoddesc}[Lock]{release}{}
 Release a lock.
 
 When the lock is locked, reset it to unlocked, and return.  If
@@ -228,7 +230,7 @@ the final \method{release()} (the \method{release()} of the outermost
 pair) resets the lock to unlocked and allows another thread blocked in
 \method{acquire()} to proceed.
 
-\begin{methoddesc}{acquire}{\optional{blocking\code{ = 1}}}
+\begin{methoddesc}[RLock]{acquire}{\optional{blocking\code{ = 1}}}
 Acquire a lock, blocking or non-blocking.
 
 When invoked without arguments: if this thread already owns
@@ -250,7 +252,7 @@ immediately; otherwise, do the same thing as when called
 without arguments, and return true.
 \end{methoddesc}
 
-\begin{methoddesc}{release}{}
+\begin{methoddesc}[RLock]{release}{}
 Release a lock, decrementing the recursion level.  If after the
 decrement it is zero, reset the lock to unlocked (not owned by any
 thread), and if any other threads are blocked waiting for the lock to
@@ -258,8 +260,9 @@ become unlocked, allow exactly one of them to proceed.  If after the
 decrement the recursion level is still nonzero, the lock remains
 locked and owned by the calling thread.
 
-Only call this method when the calling thread owns the lock.
-Do not call this method when the lock is unlocked.
+Only call this method when the calling thread owns the lock. A
+\exception{RuntimeError} is raised if this method is called when the
+lock is unlocked.
 
 There is no return value.
 \end{methoddesc}
@@ -276,7 +279,8 @@ A condition variable has \method{acquire()} and \method{release()}
 methods that call the corresponding methods of the associated lock.
 It also has a \method{wait()} method, and \method{notify()} and
 \method{notifyAll()} methods.  These three must only be called when
-the calling thread has acquired the lock.
+the calling thread has acquired the lock, otherwise a
+\exception{RuntimeError} is raised.
 
 The \method{wait()} method releases the lock, and then blocks until it
 is awakened by a \method{notify()} or \method{notifyAll()} call for
@@ -344,9 +348,9 @@ lock; there is no return value.
 \end{methoddesc}
 
 \begin{methoddesc}{wait}{\optional{timeout}}
-Wait until notified or until a timeout occurs.
-This must only be called when the calling thread has acquired the
-lock.
+Wait until notified or until a timeout occurs. If the calling thread
+has not acquired the lock when this method is called, a
+\exception{RuntimeError} is raised.
 
 This method releases the underlying lock, and then blocks until it is
 awakened by a \method{notify()} or \method{notifyAll()} call for the
@@ -368,9 +372,10 @@ when the lock is reacquired.
 \end{methoddesc}
 
 \begin{methoddesc}{notify}{}
-Wake up a thread waiting on this condition, if any.
-This must only be called when the calling thread has acquired the
-lock.
+Wake up a thread waiting on this condition, if any. Wait until
+notified or until a timeout occurs. If the calling thread has not
+acquired the lock when this method is called, a
+\exception{RuntimeError} is raised.
 
 This method wakes up one of the threads waiting for the condition
 variable, if any are waiting; it is a no-op if no threads are waiting.
@@ -387,7 +392,9 @@ Note: the awakened thread does not actually return from its
 
 \begin{methoddesc}{notifyAll}{}
 Wake up all threads waiting on this condition.  This method acts like
-\method{notify()}, but wakes up all waiting threads instead of one.
+\method{notify()}, but wakes up all waiting threads instead of one. If
+the calling thread has not acquired the lock when this method is
+called, a \exception{RuntimeError} is raised.
 \end{methoddesc}
 
 
@@ -405,8 +412,9 @@ finds that it is zero, it blocks, waiting until some other thread
 calls \method{release()}.
 
 \begin{classdesc}{Semaphore}{\optional{value}}
-The optional argument gives the initial value for the internal
-counter; it defaults to \code{1}.
+The optional argument gives the initial \var{value} for the internal
+counter; it defaults to \code{1}. If the \var{value} given is less
+than 0, \exception{ValueError} is raised.
 \end{classdesc}
 
 \begin{methoddesc}{acquire}{\optional{blocking}}
@@ -526,12 +534,9 @@ calling the thread's \method{start()} method.  This invokes the
 \method{run()} method in a separate thread of control.
 
 Once the thread's activity is started, the thread is considered
-'alive' and 'active' (these concepts are almost, but not quite
-exactly, the same; their definition is intentionally somewhat
-vague).  It stops being alive and active when its \method{run()}
-method terminates -- either normally, or by raising an unhandled
-exception.  The \method{isAlive()} method tests whether the thread is
-alive.
+'alive'. It stops being alive when its \method{run()} method terminates
+-- either normally, or by raising an unhandled exception.  The
+\method{isAlive()} method tests whether the thread is alive.
 
 Other threads can call a thread's \method{join()} method.  This blocks
 the calling thread until the thread whose \method{join()} method is
@@ -551,14 +556,13 @@ There is a ``main thread'' object; this corresponds to the
 initial thread of control in the Python program.  It is not a
 daemon thread.
 
-There is the possibility that ``dummy thread objects'' are
-created.  These are thread objects corresponding to ``alien
-threads''.  These are threads of control started outside the
-threading module, such as directly from C code.  Dummy thread objects
-have limited functionality; they are always considered alive,
-active, and daemonic, and cannot be \method{join()}ed.  They are never 
-deleted, since it is impossible to detect the termination of alien
-threads.
+There is the possibility that ``dummy thread objects'' are created.
+These are thread objects corresponding to ``alien threads'', which
+are threads of control started outside the threading module, such as
+directly from C code.  Dummy thread objects have limited
+functionality; they are always considered alive and daemonic, and
+cannot be \method{join()}ed.  They are never deleted, since it is
+impossible to detect the termination of alien threads.
 
 
 \begin{classdesc}{Thread}{group=None, target=None, name=None,
@@ -591,9 +595,12 @@ before doing anything else to the thread.
 \begin{methoddesc}{start}{}
 Start the thread's activity.
 
-This must be called at most once per thread object.  It
-arranges for the object's \method{run()} method to be invoked in a
-separate thread of control.
+It must be called at most once per thread object.  It arranges for the
+object's \method{run()} method to be invoked in a separate thread of
+control.
+
+This method will raise a \exception{RuntimeException} if called more
+than once on the same thread object.
 \end{methoddesc}
 
 \begin{methoddesc}{run}{}
@@ -623,11 +630,10 @@ operation will block until the thread terminates.
 
 A thread can be \method{join()}ed many times.
 
-A thread cannot join itself because this would cause a
-deadlock.
-
-It is an error to attempt to \method{join()} a thread before it has
-been started.
+\method{join()} may throw a \exception{RuntimeError}, if an attempt is
+made to join the current thread as that would cause a deadlock. It is
+also an error to \method{join()} a thread before it has been started
+and attempts to do so raises same exception.
 \end{methoddesc}
 
 \begin{methoddesc}{getName}{}
@@ -646,7 +652,8 @@ name.  The initial name is set by the constructor.
 Return whether the thread is alive.
 
 Roughly, a thread is alive from the moment the \method{start()} method
-returns until its \method{run()} method terminates.
+returns until its \method{run()} method terminates. The module
+function \function{enumerate()} returns a list of all alive threads.
 \end{methoddesc}
 
 \begin{methoddesc}{isDaemon}{}
@@ -655,12 +662,13 @@ Return the thread's daemon flag.
 
 \begin{methoddesc}{setDaemon}{daemonic}
 Set the thread's daemon flag to the Boolean value \var{daemonic}.
-This must be called before \method{start()} is called.
+This must be called before \method{start()} is called, otherwise
+\exception{RuntimeError} is raised.
 
 The initial value is inherited from the creating thread.
 
-The entire Python program exits when no active non-daemon
-threads are left.
+The entire Python program exits when no alive non-daemon threads are
+left.
 \end{methoddesc}
 
 

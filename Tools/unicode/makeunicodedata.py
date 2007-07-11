@@ -757,7 +757,7 @@ def myhash(s, magic):
     h = 0
     for c in map(ord, s.upper()):
         h = (h * magic) + c
-        ix = h & 0xff000000L
+        ix = h & 0xff000000
         if ix:
             h = (h ^ ((ix>>24) & 0xff)) & 0x00ffffff
     return h
@@ -935,7 +935,7 @@ def splitbins(t, trace=0):
     if __debug__:
         # exhaustively verify that the decomposition is correct
         mask = ~((~0) << shift) # i.e., low-bit mask of shift bits
-        for i in xrange(len(t)):
+        for i in range(len(t)):
             assert t[i] == t2[(t1[i >> shift] << shift) + (i & mask)]
     return best
 

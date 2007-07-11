@@ -1,14 +1,7 @@
 import unittest
-from test import test_support
-
-from test.test_support import verify, verbose
+from test.test_support import verbose, run_unittest
 import sys
-import warnings
 
-warnings.filterwarnings("ignore",
-                        "the gopherlib module is deprecated",
-                        DeprecationWarning,
-                        "<string>")
 
 class AllTest(unittest.TestCase):
 
@@ -20,15 +13,15 @@ class AllTest(unittest.TestCase):
             # Silent fail here seems the best route since some modules
             # may not be available in all environments.
             return
-        verify(hasattr(sys.modules[modname], "__all__"),
-               "%s has no __all__ attribute" % modname)
+        self.failUnless(hasattr(sys.modules[modname], "__all__"),
+                        "%s has no __all__ attribute" % modname)
         names = {}
         exec("from %s import *" % modname, names)
         if "__builtins__" in names:
             del names["__builtins__"]
         keys = set(names)
         all = set(sys.modules[modname].__all__)
-        verify(keys==all, "%s != %s" % (keys, all))
+        self.assertEqual(keys, all)
 
     def test_all(self):
         if not sys.platform.startswith('java'):
@@ -37,18 +30,15 @@ class AllTest(unittest.TestCase):
             import _socket
 
         self.check_all("BaseHTTPServer")
-        self.check_all("Bastion")
         self.check_all("CGIHTTPServer")
         self.check_all("ConfigParser")
         self.check_all("Cookie")
-        self.check_all("MimeWriter")
         self.check_all("Queue")
         self.check_all("SimpleHTTPServer")
         self.check_all("SocketServer")
         self.check_all("StringIO")
         self.check_all("UserString")
         self.check_all("aifc")
-        self.check_all("atexit")
         self.check_all("audiodev")
         self.check_all("base64")
         self.check_all("bdb")
@@ -82,7 +72,6 @@ class AllTest(unittest.TestCase):
         self.check_all("getpass")
         self.check_all("gettext")
         self.check_all("glob")
-        self.check_all("gopherlib")
         self.check_all("gzip")
         self.check_all("heapq")
         self.check_all("htmllib")
@@ -101,7 +90,6 @@ class AllTest(unittest.TestCase):
         self.check_all("mhlib")
         self.check_all("mimetools")
         self.check_all("mimetypes")
-        self.check_all("mimify")
         self.check_all("multifile")
         self.check_all("netrc")
         self.check_all("nntplib")
@@ -114,7 +102,6 @@ class AllTest(unittest.TestCase):
         self.check_all("pickle")
         self.check_all("pickletools")
         self.check_all("pipes")
-        self.check_all("popen2")
         self.check_all("poplib")
         self.check_all("posixpath")
         self.check_all("pprint")
@@ -127,7 +114,6 @@ class AllTest(unittest.TestCase):
         self.check_all("random")
         self.check_all("re")
         self.check_all("repr")
-        self.check_all("rexec")
         self.check_all("rfc822")
         self.check_all("rlcompleter")
         self.check_all("robotparser")
@@ -178,7 +164,7 @@ class AllTest(unittest.TestCase):
 
 
 def test_main():
-    test_support.run_unittest(AllTest)
+    run_unittest(AllTest)
 
 if __name__ == "__main__":
     test_main()

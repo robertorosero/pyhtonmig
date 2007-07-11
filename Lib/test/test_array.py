@@ -111,6 +111,21 @@ class BaseTest(unittest.TestCase):
             self.assertEqual(a.x, b.x)
             self.assertEqual(type(a), type(b))
 
+    def test_pickle_for_empty_array(self):
+        for protocol in (0, 1, 2):
+            a = array.array(self.typecode)
+            b = loads(dumps(a, protocol))
+            self.assertNotEqual(id(a), id(b))
+            self.assertEqual(a, b)
+
+            a = ArraySubclass(self.typecode)
+            a.x = 10
+            b = loads(dumps(a, protocol))
+            self.assertNotEqual(id(a), id(b))
+            self.assertEqual(a, b)
+            self.assertEqual(a.x, b.x)
+            self.assertEqual(type(a), type(b))
+
     def test_insert(self):
         a = array.array(self.typecode, self.example)
         a.insert(0, self.example[0])
@@ -147,7 +162,7 @@ class BaseTest(unittest.TestCase):
     def test_tofromfile(self):
         a = array.array(self.typecode, 2*self.example)
         self.assertRaises(TypeError, a.tofile)
-        self.assertRaises(TypeError, a.tofile, cStringIO.StringIO())
+        ##self.assertRaises(TypeError, a.tofile, cStringIO.StringIO())
         f = open(test_support.TESTFN, 'wb')
         try:
             a.tofile(f)
@@ -470,7 +485,7 @@ class BaseTest(unittest.TestCase):
                 for step in indices[1:]:
                     self.assertEqual(list(a[start:stop:step]),
                                      list(a)[start:stop:step])
-        
+
     def test_setslice(self):
         a = array.array(self.typecode, self.example)
         a[:1] = a
@@ -575,7 +590,7 @@ class BaseTest(unittest.TestCase):
                     L[start:stop:step] = data
                     a[start:stop:step] = array.array(self.typecode, data)
                     self.assertEquals(a, array.array(self.typecode, L))
-                    
+
                     del L[start:stop:step]
                     del a[start:stop:step]
                     self.assertEquals(a, array.array(self.typecode, L))
@@ -727,7 +742,7 @@ class BaseTest(unittest.TestCase):
 class StringTest(BaseTest):
 
     def test_setitem(self):
-        super(StringTest, self).test_setitem()
+        super().test_setitem()
         a = array.array(self.typecode, self.example)
         self.assertRaises(TypeError, a.__setitem__, 0, self.example[:2])
 
@@ -745,7 +760,6 @@ class CharacterTest(StringTest):
                 return array.array.__new__(cls, 'c', s)
 
             def __init__(self, s, color='blue'):
-                array.array.__init__(self, 'c', s)
                 self.color = color
 
             def strip(self):
@@ -854,7 +868,7 @@ class NumberTest(BaseTest):
 
     def test_iterationcontains(self):
         a = array.array(self.typecode, range(10))
-        self.assertEqual(list(a), range(10))
+        self.assertEqual(list(a), list(range(10)))
         b = array.array(self.typecode, [20])
         self.assertEqual(a[-1] in a, True)
         self.assertEqual(b[0] not in a, True)
@@ -1003,7 +1017,7 @@ def test_main(verbose=None):
     if verbose and hasattr(sys, "gettotalrefcount"):
         import gc
         counts = [None] * 5
-        for i in xrange(len(counts)):
+        for i in range(len(counts)):
             test_support.run_unittest(*tests)
             gc.collect()
             counts[i] = sys.gettotalrefcount()

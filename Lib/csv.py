@@ -79,17 +79,17 @@ class DictReader:
     def __iter__(self):
         return self
 
-    def next(self):
-        row = self.reader.next()
+    def __next__(self):
+        row = next(self.reader)
         if self.fieldnames is None:
             self.fieldnames = row
-            row = self.reader.next()
+            row = next(self.reader)
 
         # unlike the basic reader, we prefer not to return blanks,
         # because we will typically wind up with a dict full of None
         # values
         while row == []:
-            row = self.reader.next()
+            row = next(self.reader)
         d = dict(zip(self.fieldnames, row))
         lf = len(self.fieldnames)
         lr = len(row)
@@ -115,9 +115,10 @@ class DictWriter:
 
     def _dict_to_list(self, rowdict):
         if self.extrasaction == "raise":
-            for k in rowdict.keys():
-                if k not in self.fieldnames:
-                    raise ValueError, "dict contains fields not in fieldnames"
+            wrong_fields = [k for k in rowdict if k not in self.fieldnames]
+            if wrong_fields:
+                raise ValueError("dict contains fields not in fieldnames: " +
+                                 ", ".join(wrong_fields))
         return [rowdict.get(key, self.restval) for key in self.fieldnames]
 
     def writerow(self, rowdict):
@@ -255,7 +256,7 @@ class Sniffer:
         additional chunks as necessary.
         """
 
-        data = filter(None, data.split('\n'))
+        data = list(filter(None, data.split('\n')))
 
         ascii = [chr(c) for c in range(127)] # 7-bit ASCII
 
@@ -351,7 +352,7 @@ class Sniffer:
 
         rdr = reader(StringIO(sample), self.sniff(sample))
 
-        header = rdr.next() # assume first row is header
+        header = next(rdr) # assume first row is header
 
         columns = len(header)
         columnTypes = {}

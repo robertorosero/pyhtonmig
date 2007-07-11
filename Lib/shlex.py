@@ -265,14 +265,14 @@ class shlex:
     def __iter__(self):
         return self
 
-    def next(self):
+    def __next__(self):
         token = self.get_token()
         if token == self.eof:
             raise StopIteration
         return token
 
-def split(s, comments=False):
-    lex = shlex(s, posix=True)
+def split(s, comments=False, posix=True):
+    lex = shlex(s, posix=posix)
     lex.whitespace_split = True
     if not comments:
         lex.commenters = ''

@@ -9,14 +9,6 @@ __revision__ = "$Id$"
 
 import string, re
 
-# Do the right thing with boolean values for all known Python versions
-# (so this module can be copied to projects that don't depend on Python
-# 2.3, e.g. Optik and Docutils).
-try:
-    True, False
-except NameError:
-    (True, False) = (1, 0)
-
 __all__ = ['TextWrapper', 'wrap', 'fill']
 
 # Hardcode the recognized whitespace characters to the US-ASCII
@@ -63,14 +55,16 @@ class TextWrapper:
       break_long_words (default: true)
         Break words longer than 'width'.  If false, those words will not
         be broken, and some lines might be longer than 'width'.
+      drop_whitespace (default: true)
+        Drop leading and trailing whitespace from lines.
     """
 
     whitespace_trans = string.maketrans(_whitespace, ' ' * len(_whitespace))
 
     unicode_whitespace_trans = {}
     uspace = ord(u' ')
-    for x in map(ord, _whitespace):
-        unicode_whitespace_trans[x] = uspace
+    for x in _whitespace:
+        unicode_whitespace_trans[ord(x)] = uspace
 
     # This funky little regex is just the trick for splitting
     # text up into word-wrappable chunks.  E.g.
@@ -98,7 +92,8 @@ class TextWrapper:
                  expand_tabs=True,
                  replace_whitespace=True,
                  fix_sentence_endings=False,
-                 break_long_words=True):
+                 break_long_words=True,
+                 drop_whitespace=True):
         self.width = width
         self.initial_indent = initial_indent
         self.subsequent_indent = subsequent_indent
@@ -106,6 +101,7 @@ class TextWrapper:
         self.replace_whitespace = replace_whitespace
         self.fix_sentence_endings = fix_sentence_endings
         self.break_long_words = break_long_words
+        self.drop_whitespace = drop_whitespace
 
 
     # -- Private methods -----------------------------------------------
@@ -140,7 +136,7 @@ class TextWrapper:
           'use', ' ', 'the', ' ', '-b', ' ', 'option!'
         """
         chunks = self.wordsep_re.split(text)
-        chunks = filter(None, chunks)
+        chunks = [c for c in chunks if c]
         return chunks
 
     def _fix_sentence_endings(self, chunks):
@@ -228,7 +224,7 @@ class TextWrapper:
 
             # First chunk on line is whitespace -- drop it, unless this
             # is the very beginning of the text (ie. no lines started yet).
-            if chunks[-1].strip() == '' and lines:
+            if self.drop_whitespace and chunks[-1].strip() == '' and lines:
                 del chunks[-1]
 
             while chunks:
@@ -249,7 +245,7 @@ class TextWrapper:
                 self._handle_long_word(chunks, cur_line, cur_len, width)
 
             # If the last chunk on this line is all whitespace, drop it.
-            if cur_line and cur_line[-1].strip() == '':
+            if self.drop_whitespace and cur_line and cur_line[-1].strip() == '':
                 del cur_line[-1]
 
             # Convert current line back to a string and store it in list

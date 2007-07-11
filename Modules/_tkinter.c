@@ -1285,6 +1285,12 @@ Tkapp_Call(PyObject *selfptr, PyObject *args)
 	/* Could add TCL_EVAL_GLOBAL if wrapped by GlobalCall... */
 	int flags = TCL_EVAL_DIRECT;
 
+	/* If args is a single tuple, replace with contents of tuple */
+	if (1 == PyTuple_Size(args)){
+		PyObject* item = PyTuple_GetItem(args, 0);
+		if (PyTuple_Check(item))
+			args = item;
+	}
 #ifdef WITH_THREAD
 	if (self->threaded && self->thread_id != Tcl_GetCurrentThread()) {
 		/* We cannot call the command directly. Instead, we must
@@ -2698,8 +2704,8 @@ static PyMethodDef Tkapp_methods[] =
 {
 	{"willdispatch",       Tkapp_WillDispatch, METH_NOARGS},
 	{"wantobjects",	       Tkapp_WantObjects, METH_VARARGS},
-	{"call", 	       Tkapp_Call, METH_OLDARGS},
-	{"globalcall", 	       Tkapp_GlobalCall, METH_OLDARGS},
+	{"call", 	       Tkapp_Call, METH_VARARGS},
+	{"globalcall", 	       Tkapp_GlobalCall, METH_VARARGS},
 	{"eval", 	       Tkapp_Eval, METH_VARARGS},
 	{"globaleval", 	       Tkapp_GlobalEval, METH_VARARGS},
 	{"evalfile", 	       Tkapp_EvalFile, METH_VARARGS},
@@ -2720,7 +2726,7 @@ static PyMethodDef Tkapp_methods[] =
 	{"exprboolean",        Tkapp_ExprBoolean, METH_VARARGS},
 	{"splitlist", 	       Tkapp_SplitList, METH_VARARGS},
 	{"split", 	       Tkapp_Split, METH_VARARGS},
-	{"merge", 	       Tkapp_Merge, METH_OLDARGS},
+	{"merge", 	       Tkapp_Merge, METH_VARARGS},
 	{"createcommand",      Tkapp_CreateCommand, METH_VARARGS},
 	{"deletecommand",      Tkapp_DeleteCommand, METH_VARARGS},
 #ifdef HAVE_CREATEFILEHANDLER

@@ -112,7 +112,7 @@ __copyright__ = """
 
 __version__ = '1.0.6'
 
-import sys,string,os,re
+import sys, os, re
 
 ### Platform specific APIs
 
@@ -189,15 +189,15 @@ def _dist_try_harder(distname,version,id):
         info = open('/var/adm/inst-log/info').readlines()
         distname = 'SuSE'
         for line in info:
-            tv = string.split(line)
+            tv = line.split()
             if len(tv) == 2:
                 tag,value = tv
             else:
                 continue
             if tag == 'MIN_DIST_VERSION':
-                version = string.strip(value)
+                version = value.strip()
             elif tag == 'DIST_IDENT':
-                values = string.split(value,'-')
+                values = value.split('-')
                 id = values[2]
         return distname,version,id
 
@@ -205,7 +205,7 @@ def _dist_try_harder(distname,version,id):
         # Caldera OpenLinux has some infos in that file (thanks to Colin Kong)
         info = open('/etc/.installed').readlines()
         for line in info:
-            pkg = string.split(line,'-')
+            pkg = line.split('-')
             if len(pkg) >= 2 and pkg[0] == 'OpenLinux':
                 # XXX does Caldera support non Intel platforms ? If yes,
                 #     where can we find the needed id ?
@@ -242,7 +242,7 @@ _release_version = re.compile(r'([^0-9]+)'
 
 _supported_dists = ('SuSE', 'debian', 'fedora', 'redhat', 'centos',
                     'mandrake', 'rocks', 'slackware', 'yellowdog',
-                    'gentoo', 'UnitedLinux')
+                    'gentoo', 'UnitedLinux', 'turbolinux')
 
 def _parse_release_file(firstline):
 
@@ -258,7 +258,7 @@ def _parse_release_file(firstline):
         return tuple(m.groups())
 
     # Unkown format... take the first two words
-    l = string.split(string.strip(firstline))
+    l = firstline.strip().split()
     if l:
         version = l[0]
         if len(l) > 1:
@@ -451,7 +451,7 @@ def _norm_version(version, build=''):
     """ Normalize the version and build strings and return a single
         version string using the format major.minor.build (or patchlevel).
     """
-    l = string.split(version,'.')
+    l = version.split('.')
     if build:
         l.append(build)
     try:
@@ -460,7 +460,7 @@ def _norm_version(version, build=''):
         strings = l
     else:
         strings = map(str,ints)
-    version = string.join(strings[:3],'.')
+    version = '.'.join(strings[:3])
     return version
 
 _ver_output = re.compile(r'(?:([\w ]+) ([\w.]+) '
@@ -505,7 +505,7 @@ def _syscmd_ver(system='', release='', version='',
         return system,release,version
 
     # Parse the output
-    info = string.strip(info)
+    info = info.strip()
     m = _ver_output.match(info)
     if m is not None:
         system,release,version = m.groups()
@@ -600,6 +600,16 @@ def win32_ver(release='',version='',csd='',ptype=''):
                 release = '2003Server'
             else:
                 release = 'post2003'
+        elif maj == 6:
+            if min == 0:
+                # Per http://msdn2.microsoft.com/en-us/library/ms724429.aspx
+                productType = GetVersionEx(1)[8]
+                if productType == 1: # VER_NT_WORKSTATION
+                    release = 'Vista'
+                else:
+                    release = '2008Server'
+            else:
+                release = 'post2008Server'
     else:
         if not release:
             # E.g. Win3.1 with win32s
@@ -766,7 +776,7 @@ def system_alias(system,release,version):
             # These releases use the old name SunOS
             return system,release,version
         # Modify release (marketing release = SunOS release - 3)
-        l = string.split(release,'.')
+        l = release.split('.')
         if l:
             try:
                 major = int(l[0])
@@ -775,7 +785,7 @@ def system_alias(system,release,version):
             else:
                 major = major - 3
                 l[0] = str(major)
-                release = string.join(l,'.')
+                release = '.'.join(l)
         if release < '6':
             system = 'Solaris'
         else:
@@ -806,28 +816,24 @@ def _platform(*args):
         compatible format e.g. "system-version-machine".
     """
     # Format the platform string
-    platform = string.join(
-        map(string.strip,
-            filter(len, args)),
-        '-')
+    platform = '-'.join(x.strip() for x in filter(len, args))
 
     # Cleanup some possible filename obstacles...
-    replace = string.replace
-    platform = replace(platform,' ','_')
-    platform = replace(platform,'/','-')
-    platform = replace(platform,'\\','-')
-    platform = replace(platform,':','-')
-    platform = replace(platform,';','-')
-    platform = replace(platform,'"','-')
-    platform = replace(platform,'(','-')
-    platform = replace(platform,')','-')
+    platform = platform.replace(' ','_')
+    platform = platform.replace('/','-')
+    platform = platform.replace('\\','-')
+    platform = platform.replace(':','-')
+    platform = platform.replace(';','-')
+    platform = platform.replace('"','-')
+    platform = platform.replace('(','-')
+    platform = platform.replace(')','-')
 
     # No need to report 'unknown' information...
-    platform = replace(platform,'unknown','')
+    platform = platform.replace('unknown','')
 
     # Fold '--'s and remove trailing '-'
     while 1:
-        cleaned = replace(platform,'--','-')
+        cleaned = platform.replace('--','-')
         if cleaned == platform:
             break
         platform = cleaned
@@ -889,7 +895,7 @@ def _syscmd_uname(option,default=''):
         f = os.popen('uname %s 2> /dev/null' % option)
     except (AttributeError,os.error):
         return default
-    output = string.strip(f.read())
+    output = f.read().strip()
     rc = f.close()
     if not output or rc:
         return default
@@ -911,7 +917,7 @@ def _syscmd_file(target,default=''):
         f = os.popen('file %s 2> /dev/null' % target)
     except (AttributeError,os.error):
         return default
-    output = string.strip(f.read())
+    output = f.read().strip()
     rc = f.close()
     if not output or rc:
         return default
@@ -1068,6 +1074,16 @@ def uname():
             # (_syscmd_ver() tends to return the vendor name as well)
             if system == 'Microsoft Windows':
                 system = 'Windows'
+            elif system == 'Microsoft' and release == 'Windows':
+                # Under Windows Vista and Windows Server 2008,
+                # Microsoft changed the output of the ver command. The
+                # release is no longer printed.  This causes the
+                # system and release to be misidentified.
+                system = 'Windows'
+                if '6.0' == version[:3]:
+                    release = 'Vista'
+                else:
+                    release = ''
 
         # In case we still don't know anything useful, we'll try to
         # help ourselves
@@ -1082,7 +1098,7 @@ def uname():
         elif system[:4] == 'java':
             release,vendor,vminfo,osinfo = java_ver()
             system = 'Java'
-            version = string.join(vminfo,', ')
+            version = ', '.join(vminfo)
             if not version:
                 version = vendor
 
@@ -1285,10 +1301,10 @@ def _sys_version(sys_version=None):
         builddate = builddate + ' ' + buildtime
 
     # Add the patchlevel version if missing
-    l = string.split(version, '.')
+    l = version.split('.')
     if len(l) == 2:
         l.append('0')
-        version = string.join(l, '.')
+        version = '.'.join(l)
 
     # Build and cache the result
     result = (name, version, branch, revision, buildno, builddate, compiler)
@@ -1345,7 +1361,7 @@ def python_version_tuple():
     """
     if hasattr(sys, 'version_info'):
         return sys.version_info[:3]
-    return tuple(string.split(_sys_version()[1], '.'))
+    return tuple(_sys_version()[1].split('.'))
 
 def python_branch():
 

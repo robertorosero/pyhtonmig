@@ -218,7 +218,7 @@ when using mixed operands.
 \indexii{integer}{representation}
 
 \item[Floating point numbers]
-These represent machine-level double precision floating point numbers.  
+These represent machine-level double precision floating point numbers.
 You are at the mercy of the underlying machine architecture (and
 C or Java implementation) for the accepted range and handling of overflow.
 Python does not support single-precision floating point numbers; the
@@ -470,45 +470,46 @@ parameter list.
 \obindex{function}
 \obindex{user-defined function}
 
-Special attributes: 
+Special attributes:
 
 \begin{tableiii}{lll}{member}{Attribute}{Meaning}{}
-  \lineiii{func_doc}{The function's documentation string, or
+  \lineiii{__doc__}{The function's documentation string, or
     \code{None} if unavailable}{Writable}
 
-  \lineiii{__doc__}{Another way of spelling
-    \member{func_doc}}{Writable}
-
-  \lineiii{func_name}{The function's name}{Writable}
-
-  \lineiii{__name__}{Another way of spelling
-    \member{func_name}}{Writable}
+  \lineiii{__name__}{The function's name}{Writable}
 
   \lineiii{__module__}{The name of the module the function was defined
     in, or \code{None} if unavailable.}{Writable}
 
-  \lineiii{func_defaults}{A tuple containing default argument values
+  \lineiii{__defaults__}{A tuple containing default argument values
     for those arguments that have defaults, or \code{None} if no
     arguments have a default value}{Writable}
 
-  \lineiii{func_code}{The code object representing the compiled
+  \lineiii{__code__}{The code object representing the compiled
     function body.}{Writable}
 
-  \lineiii{func_globals}{A reference to the dictionary that holds the
+  \lineiii{__globals__}{A reference to the dictionary that holds the
     function's global variables --- the global namespace of the module
     in which the function was defined.}{Read-only}
 
-  \lineiii{func_dict}{The namespace supporting arbitrary function
+  \lineiii{__dict__}{The namespace supporting arbitrary function
     attributes.}{Writable}
 
-  \lineiii{func_closure}{\code{None} or a tuple of cells that contain
+  \lineiii{__closure__}{\code{None} or a tuple of cells that contain
     bindings for the function's free variables.}{Read-only}
+
+  \lineiii{__annotations__}{A dict containing annotations of parameters. 
+    The keys of the dict are the parameter names, or \code{'return'}
+    for the return annotation, if provided.}{Writable}
+
+  \lineiii{__kwdefaults__}{A dict containing defaults for keyword-only
+    parameters.}{Writable}
 \end{tableiii}
 
 Most of the attributes labelled ``Writable'' check the type of the
 assigned value.
 
-\versionchanged[\code{func_name} is now writable]{2.4}
+\versionchanged[\code{__name__} is now writable]{2.4}
 
 Function objects also support getting and setting arbitrary
 attributes, which can be used, for example, to attach metadata to
@@ -521,16 +522,16 @@ Additional information about a function's definition can be retrieved
 from its code object; see the description of internal types below.
 
 \withsubitem{(function attribute)}{
-  \ttindex{func_doc}
   \ttindex{__doc__}
   \ttindex{__name__}
   \ttindex{__module__}
   \ttindex{__dict__}
-  \ttindex{func_defaults}
-  \ttindex{func_closure}
-  \ttindex{func_code}
-  \ttindex{func_globals}
-  \ttindex{func_dict}}
+  \ttindex{__defaults__}
+  \ttindex{__closure__}
+  \ttindex{__code__}
+  \ttindex{__globals__}
+  \ttindex{__annotations__}
+  \ttindex{__kwdefaults__}}
 \indexii{global}{namespace}
 
 \item[User-defined methods]
@@ -633,7 +634,7 @@ A function or method which uses the \keyword{yield} statement (see
 section~\ref{yield}, ``The \keyword{yield} statement'') is called a
 \dfn{generator function}.  Such a function, when called, always
 returns an iterator object which can be used to execute the body of
-the function:  calling the iterator's \method{next()} method will
+the function:  calling the iterator's \method{__next__()} method will
 cause the function to execute until it provides a value using the
 \keyword{yield} statement.  When the function executes a
 \keyword{return} statement or falls off the end, a
@@ -700,7 +701,7 @@ Modules are imported by the \keyword{import} statement (see
 section~\ref{import}, ``The \keyword{import} statement'').%
 \stindex{import}\obindex{module}
 A module object has a namespace implemented by a dictionary object
-(this is the dictionary referenced by the func_globals attribute of
+(this is the dictionary referenced by the __globals__ attribute of
 functions defined in the module).  Attribute references are translated
 to lookups in this dictionary, e.g., \code{m.x} is equivalent to
 \code{m.__dict__["x"]}.
@@ -860,12 +861,12 @@ but they are mentioned here for completeness.
 \begin{description}
 
 \item[Code objects]
-Code objects represent \emph{byte-compiled} executable Python code, or 
+Code objects represent \emph{byte-compiled} executable Python code, or
 \emph{bytecode}.
 The difference between a code
 object and a function object is that the function object contains an
 explicit reference to the function's globals (the module in which it
-was defined), while a code object contains no context; 
+was defined), while a code object contains no context;
 also the default argument values are stored in the function object,
 not in the code object (because they represent values calculated at
 run-time).  Unlike function objects, code objects are immutable and
@@ -941,18 +942,15 @@ stack frame; \member{f_code} is the code object being executed in this
 frame; \member{f_locals} is the dictionary used to look up local
 variables; \member{f_globals} is used for global variables;
 \member{f_builtins} is used for built-in (intrinsic) names;
-\member{f_restricted} is a flag indicating whether the function is
-executing in restricted execution mode; \member{f_lasti} gives the
-precise instruction (this is an index into the bytecode string of
-the code object).
+ \member{f_lasti} gives the precise instruction (this is an index into
+ the bytecode string of the code object).
 \withsubitem{(frame attribute)}{
   \ttindex{f_back}
   \ttindex{f_code}
   \ttindex{f_globals}
   \ttindex{f_locals}
   \ttindex{f_lasti}
-  \ttindex{f_builtins}
-  \ttindex{f_restricted}}
+  \ttindex{f_builtins}}
 
 Special writable attributes: \member{f_trace}, if not \code{None}, is
 a function called at the start of each source code line (this is used
@@ -979,10 +977,8 @@ level a traceback object is inserted in front of the current
 traceback.  When an exception handler is entered, the stack trace is
 made available to the program.
 (See section~\ref{try}, ``The \code{try} statement.'')
-It is accessible as \code{sys.exc_traceback}, and also as the third
-item of the tuple returned by \code{sys.exc_info()}.  The latter is
-the preferred interface, since it works correctly when the program is
-using multiple threads.
+It is accessible as the third
+item of the tuple returned by \code{sys.exc_info()}.
 When the program contains no suitable handler, the stack trace is written
 (nicely formatted) to the standard error stream; if the interpreter is
 interactive, it is also made available to the user as
@@ -996,7 +992,6 @@ interactive, it is also made available to the user as
   \ttindex{exc_traceback}
   \ttindex{last_traceback}}
 \ttindex{sys.exc_info}
-\ttindex{sys.exc_traceback}
 \ttindex{sys.last_traceback}
 
 Special read-only attributes: \member{tb_next} is the next level in the
@@ -1069,7 +1064,7 @@ by the built-in \function{classmethod()} constructor.
 %=========================================================================
 \section{New-style and classic classes}
 
-Classes and instances come in two flavors: old-style or classic, and new-style.  
+Classes and instances come in two flavors: old-style or classic, and new-style.
 
 Up to Python 2.1, old-style classes were the only flavour available to the
 user.  The concept of (old-style) class is unrelated to the concept of type: if
@@ -1200,13 +1195,13 @@ reference count of an object from going to zero include: circular
 references between objects (e.g., a doubly-linked list or a tree data
 structure with parent and child pointers); a reference to the object
 on the stack frame of a function that caught an exception (the
-traceback stored in \code{sys.exc_traceback} keeps the stack frame
+traceback stored in \code{sys.exc_info()[2]} keeps the stack frame
 alive); or a reference to the object on the stack frame that raised an
 unhandled exception in interactive mode (the traceback stored in
 \code{sys.last_traceback} keeps the stack frame alive).  The first
 situation can only be remedied by explicitly breaking the cycles; the
 latter two situations can be resolved by storing \code{None} in
-\code{sys.exc_traceback} or \code{sys.last_traceback}.  Circular
+\code{sys.last_traceback}.  Circular
 references which are garbage are detected when the option cycle
 detector is enabled (it's on by default), but can only be cleaned up
 if there are no Python-level \method{__del__()} methods involved.
@@ -1244,7 +1239,7 @@ description...}>} should be returned.  The return value must be a
 string object.
 If a class defines \method{__repr__()} but not \method{__str__()},
 then \method{__repr__()} is also used when an ``informal'' string
-representation of instances of that class is required.		     
+representation of instances of that class is required.
 
 This is typically used for debugging, so it is important that the
 representation is information-rich and unambiguous.
@@ -1280,10 +1275,14 @@ follows:
 \code{\var{x}!=\var{y}} calls \code{\var{x}.__ne__(\var{y})},
 \code{\var{x}>\var{y}} calls \code{\var{x}.__gt__(\var{y})}, and
 \code{\var{x}>=\var{y}} calls \code{\var{x}.__ge__(\var{y})}.
-These methods can return any value, but if the comparison operator is
-used in a Boolean context, the return value should be interpretable as
-a Boolean value, else a \exception{TypeError} will be raised.
-By convention, \code{False} is used for false and \code{True} for true.
+
+A rich comparison method may return the singleton \code{NotImplemented} if it
+does not implement the operation for a given pair of arguments.
+By convention, \code{False} and \code{True} are returned for a successful
+comparison. However, these methods can return any value, so if the
+comparison operator is used in a Boolean context (e.g., in the condition
+of an \code{if} statement), Python will call \function{bool()} on the
+value to determine if the result is true or false.
 
 There are no implied relationships among the comparison operators.
 The truth of \code{\var{x}==\var{y}} does not imply that \code{\var{x}!=\var{y}}
@@ -1297,9 +1296,7 @@ the right argument does); rather, \method{__lt__()} and
 \method{__ge__()} are each other's reflection, and \method{__eq__()}
 and \method{__ne__()} are their own reflection.
 
-Arguments to rich comparison methods are never coerced.  A rich
-comparison method may return \code{NotImplemented} if it does not
-implement the operation for a given pair of arguments.
+Arguments to rich comparison methods are never coerced.
 \end{methoddesc}
 
 \begin{methoddesc}[object]{__cmp__}{self, other}
@@ -1399,7 +1396,7 @@ instead of the normal mechanism (i.e.\ store the value in the instance
 dictionary).  \var{name} is the attribute name, \var{value} is the
 value to be assigned to it.
 
-If \method{__setattr__()} wants to assign to an instance attribute, it 
+If \method{__setattr__()} wants to assign to an instance attribute, it
 should not simply execute \samp{self.\var{name} = value} --- this
 would cause a recursive call to itself.  Instead, it should insert the
 value in the dictionary of instance attributes, e.g.,
@@ -1422,8 +1419,8 @@ The following methods only apply to new-style classes.
 
 \begin{methoddesc}[object]{__getattribute__}{self, name}
 Called unconditionally to implement attribute accesses for instances
-of the class. If the class also defines \method{__getattr__()}, the latter 
-will not be called unless \method{__getattribute__()} either calls it 
+of the class. If the class also defines \method{__getattr__()}, the latter
+will not be called unless \method{__getattribute__()} either calls it
 explicitly or raises an \exception{AttributeError}.
 This method should return the (computed) attribute
 value or raise an \exception{AttributeError} exception.
@@ -1475,7 +1472,7 @@ descriptor.
 The default behavior for attribute access is to get, set, or delete the
 attribute from an object's dictionary. For instance, \code{a.x} has a
 lookup chain starting with \code{a.__dict__['x']}, then
-\code{type(a).__dict__['x']}, and continuing 
+\code{type(a).__dict__['x']}, and continuing
 through the base classes of \code{type(a)} excluding metaclasses.
 
 However, if the looked-up value is an object defining one of the descriptor
@@ -1489,14 +1486,14 @@ The starting point for descriptor invocation is a binding, \code{a.x}.
 How the arguments are assembled depends on \code{a}:
 
 \begin{itemize}
-                      
+
   \item[Direct Call] The simplest and least common call is when user code
     directly invokes a descriptor method:    \code{x.__get__(a)}.
 
   \item[Instance Binding]  If binding to a new-style object instance,
     \code{a.x} is transformed into the call:
     \code{type(a).__dict__['x'].__get__(a, type(a))}.
-                     
+
   \item[Class Binding]  If binding to a new-style class, \code{A.x}
     is transformed into the call: \code{A.__dict__['x'].__get__(None, A)}.
 
@@ -1505,7 +1502,7 @@ How the arguments are assembled depends on \code{a}:
     \code{obj.__class__.__mro__} for the base class \code{A} immediately
     preceding \code{B} and then invokes the descriptor with the call:
     \code{A.__dict__['m'].__get__(obj, A)}.
-                     
+
 \end{itemize}
 
 For instance bindings, the precedence of descriptor invocation depends
@@ -1518,7 +1515,7 @@ descriptors can be overridden by instances.
 Python methods (including \function{staticmethod()} and \function{classmethod()})
 are implemented as non-data descriptors.  Accordingly, instances can
 redefine and override methods.  This allows individual instances to acquire
-behaviors that differ from other instances of the same class.                     
+behaviors that differ from other instances of the same class.
 
 The \function{property()} function is implemented as a data descriptor.
 Accordingly, instances cannot override the behavior of a property.
@@ -1536,14 +1533,14 @@ definition.  The \var{__slots__} declaration takes a sequence of instance
 variables and reserves just enough space in each instance to hold a value
 for each variable.  Space is saved because \var{__dict__} is not created for
 each instance.
-    
+
 \begin{datadesc}{__slots__}
 This class variable can be assigned a string, iterable, or sequence of strings
 with variable names used by instances.  If defined in a new-style class,
 \var{__slots__} reserves space for the declared variables
 and prevents the automatic creation of \var{__dict__} and \var{__weakref__}
 for each instance.
-\versionadded{2.2}                     
+\versionadded{2.2}
 \end{datadesc}
 
 \noindent
@@ -1555,23 +1552,23 @@ Notes on using \var{__slots__}
 variables not listed in the \var{__slots__} definition.  Attempts to assign
 to an unlisted variable name raises \exception{AttributeError}. If dynamic
 assignment of new variables is desired, then add \code{'__dict__'} to the
-sequence of strings in the \var{__slots__} declaration.                                     
+sequence of strings in the \var{__slots__} declaration.
 \versionchanged[Previously, adding \code{'__dict__'} to the \var{__slots__}
 declaration would not enable the assignment of new attributes not
-specifically listed in the sequence of instance variable names]{2.3}                     
+specifically listed in the sequence of instance variable names]{2.3}
 
 \item Without a \var{__weakref__} variable for each instance, classes
 defining \var{__slots__} do not support weak references to its instances.
 If weak reference support is needed, then add \code{'__weakref__'} to the
-sequence of strings in the \var{__slots__} declaration.                    
+sequence of strings in the \var{__slots__} declaration.
 \versionchanged[Previously, adding \code{'__weakref__'} to the \var{__slots__}
-declaration would not enable support for weak references]{2.3}                                            
+declaration would not enable support for weak references]{2.3}
 
 \item \var{__slots__} are implemented at the class level by creating
 descriptors (\ref{descriptors}) for each variable name.  As a result,
 class attributes cannot be used to set default values for instance
 variables defined by \var{__slots__}; otherwise, the class attribute would
-overwrite the descriptor assignment. 
+overwrite the descriptor assignment.
 
 \item If a class defines a slot also defined in a base class, the instance
 variable defined by the base class slot is inaccessible (except by retrieving
@@ -1580,14 +1577,19 @@ program undefined.  In the future, a check may be added to prevent this.
 
 \item The action of a \var{__slots__} declaration is limited to the class
 where it is defined.  As a result, subclasses will have a \var{__dict__}
-unless they also define  \var{__slots__}.                     
+unless they also define  \var{__slots__}.
 
 \item \var{__slots__} do not work for classes derived from ``variable-length''
-built-in types such as \class{long}, \class{str} and \class{tuple}. 
+built-in types such as \class{long}, \class{str} and \class{tuple}.
 
 \item Any non-string iterable may be assigned to \var{__slots__}.
 Mappings may also be used; however, in the future, special meaning may
-be assigned to the values corresponding to each key.                      
+be assigned to the values corresponding to each key.
+
+\item \var{__class__} assignment works only if both classes have the
+same \var{__slots__}.
+\versionchanged[Previously, \var{__class__} assignment raised an error
+if either new or old class had \var{__slots__}]{2.6}
 
 \end{itemize}
 
@@ -1613,7 +1615,7 @@ the role of a factory function.
 This variable can be any callable accepting arguments for \code{name},
 \code{bases}, and \code{dict}.  Upon class creation, the callable is
 used instead of the built-in \function{type()}.
-\versionadded{2.2}                     
+\versionadded{2.2}
 \end{datadesc}
 
 The appropriate metaclass is determined by the following precedence rules:
@@ -1630,7 +1632,7 @@ type).
 
 \item Otherwise, the old-style, classic metaclass (types.ClassType) is used.
 
-\end{itemize}      
+\end{itemize}
 
 The potential uses for metaclasses are boundless. Some ideas that have
 been explored including logging, interface checking, automatic delegation,
@@ -1663,15 +1665,15 @@ defined to handle simple, but not extended slices.) It is also recommended
 that mappings provide the methods \method{keys()}, \method{values()},
 \method{items()}, \method{has_key()}, \method{get()}, \method{clear()},
 \method{setdefault()}, \method{iterkeys()}, \method{itervalues()},
-\method{iteritems()}, \method{pop()}, \method{popitem()},		     
+\method{iteritems()}, \method{pop()}, \method{popitem()},
 \method{copy()}, and \method{update()} behaving similar to those for
 Python's standard dictionary objects.  The \module{UserDict} module
 provides a \class{DictMixin} class to help create those methods
 from a base set of \method{__getitem__()}, \method{__setitem__()},
-\method{__delitem__()}, and \method{keys()}.		     
+\method{__delitem__()}, and \method{keys()}.
 Mutable sequences should provide
 methods \method{append()}, \method{count()}, \method{index()},
-\method{extend()},		     
+\method{extend()},
 \method{insert()}, \method{pop()}, \method{remove()}, \method{reverse()}
 and \method{sort()}, like Python standard list objects.  Finally,
 sequence types should implement addition (meaning concatenation) and
@@ -1694,12 +1696,12 @@ through the values.
   \ttindex{items()}
   \ttindex{iterkeys()}
   \ttindex{itervalues()}
-  \ttindex{iteritems()}    
+  \ttindex{iteritems()}
   \ttindex{has_key()}
   \ttindex{get()}
   \ttindex{setdefault()}
-  \ttindex{pop()}      
-  \ttindex{popitem()}    
+  \ttindex{pop()}
+  \ttindex{popitem()}
   \ttindex{clear()}
   \ttindex{copy()}
   \ttindex{update()}
@@ -1707,7 +1709,7 @@ through the values.
 \withsubitem{(sequence object method)}{
   \ttindex{append()}
   \ttindex{count()}
-  \ttindex{extend()}    
+  \ttindex{extend()}
   \ttindex{index()}
   \ttindex{insert()}
   \ttindex{pop()}
@@ -1721,7 +1723,7 @@ through the values.
   \ttindex{__rmul__()}
   \ttindex{__imul__()}
   \ttindex{__contains__()}
-  \ttindex{__iter__()}}		     
+  \ttindex{__iter__()}}
 \withsubitem{(numeric object method)}
 
 \begin{methoddesc}[container object]{__len__}{self}
@@ -1744,7 +1746,7 @@ raised; if of a value outside the set of indexes for the sequence
 (after any special interpretation of negative values),
 \exception{IndexError} should be raised.
 For mapping types, if \var{key} is missing (not in the container),
-\exception{KeyError} should be raised.                     
+\exception{KeyError} should be raised.
 \note{\keyword{for} loops expect that an
 \exception{IndexError} will be raised for illegal indexes to allow
 proper detection of the end of the sequence.}
@@ -1943,7 +1945,7 @@ the alternate context; \exception{TypeError} will be raised instead.
 \methodline[numeric object]{__rmul__}{self, other}
 \methodline[numeric object]{__rdiv__}{self, other}
 \methodline[numeric object]{__rtruediv__}{self, other}
-\methodline[numeric object]{__rfloordiv__}{self, other}	     
+\methodline[numeric object]{__rfloordiv__}{self, other}
 \methodline[numeric object]{__rmod__}{self, other}
 \methodline[numeric object]{__rdivmod__}{self, other}
 \methodline[numeric object]{__rpow__}{self, other}
@@ -1964,7 +1966,7 @@ operands are of different types.\footnote{
     For operands of the same type, it is assumed that if the
     non-reflected method (such as \method{__add__()}) fails the
     operation is not supported, which is why the reflected method
-    is not called.} 
+    is not called.}
 For instance, to evaluate the expression \var{x}\code{-}\var{y},
 where \var{y} is an instance of a class that has an
 \method{__rsub__()} method, \code{\var{y}.__rsub__(\var{x})}
@@ -1989,7 +1991,7 @@ complicated).
 \methodline[numeric object]{__idiv__}{self, other}
 \methodline[numeric object]{__itruediv__}{self, other}
 \methodline[numeric object]{__ifloordiv__}{self, other}
-\methodline[numeric object]{__imod__}{self, other}		     
+\methodline[numeric object]{__imod__}{self, other}
 \methodline[numeric object]{__ipow__}{self, other\optional{, modulo}}
 \methodline[numeric object]{__ilshift__}{self, other}
 \methodline[numeric object]{__irshift__}{self, other}
@@ -2031,17 +2033,11 @@ and \function{float()}\bifuncindex{float}.  Should return a value of
 the appropriate type.
 \end{methoddesc}
 
-\begin{methoddesc}[numeric object]{__oct__}{self}
-\methodline[numeric object]{__hex__}{self}
-Called to implement the built-in functions
-\function{oct()}\bifuncindex{oct} and
-\function{hex()}\bifuncindex{hex}.  Should return a string value.
-\end{methoddesc}
-
 \begin{methoddesc}[numeric object]{__index__}{self}
 Called to implement \function{operator.index()}.  Also called whenever
-Python needs an integer object (such as in slicing).  Must return an
-integer (int or long).
+Python needs an integer object (such as in slicing, or in the built-in
+\function{bin()}, \function{hex()} and \function{oct()} functions).
+Must return an integer (int or long).
 \versionadded{2.5}
 \end{methoddesc}
 

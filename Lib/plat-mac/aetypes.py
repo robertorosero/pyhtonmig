@@ -2,8 +2,6 @@
 
 from Carbon.AppleEvents import *
 import struct
-from types import *
-import string
 
 #
 # convoluted, since there are cyclic dependencies between this file and
@@ -15,7 +13,7 @@ def pack(*args, **kwargs):
 
 def nice(s):
     """'nice' representation of an object"""
-    if type(s) is StringType: return repr(s)
+    if isinstance(s, str): return repr(s)
     else: return str(s)
 
 class Unknown:
@@ -41,7 +39,7 @@ class Enum:
         return "Enum(%r)" % (self.enum,)
 
     def __str__(self):
-        return string.strip(self.enum)
+        return self.enum.strip()
 
     def __aepack__(self):
         return pack(self.enum, typeEnumeration)
@@ -108,7 +106,7 @@ class Type:
         return "Type(%r)" % (self.type,)
 
     def __str__(self):
-        return string.strip(self.type)
+        return self.type.strip()
 
     def __aepack__(self):
         return pack(self.type, typeType)
@@ -131,7 +129,7 @@ class Keyword:
         return "Keyword(%r)" % self.keyword
 
     def __str__(self):
-        return string.strip(self.keyword)
+        return self.keyword.strip()
 
     def __aepack__(self):
         return pack(self.keyword, typeKeyword)
@@ -170,7 +168,7 @@ class Comparison:
         return "Comparison(%r, %r, %r)" % (self.obj1, self.relo, self.obj2)
 
     def __str__(self):
-        return "%s %s %s" % (nice(self.obj1), string.strip(self.relo), nice(self.obj2))
+        return "%s %s %s" % (nice(self.obj1), self.relo.strip(), nice(self.obj2))
 
     def __aepack__(self):
         return pack({'obj1': self.obj1,
@@ -198,7 +196,7 @@ class Ordinal:
         return "Ordinal(%r)" % (self.abso,)
 
     def __str__(self):
-        return "%s" % (string.strip(self.abso))
+        return "%s" % (self.abso.strip())
 
     def __aepack__(self):
         return pack(self.abso, 'abso')
@@ -223,12 +221,12 @@ class Logical:
         return "Logical(%r, %r)" % (self.logc, self.term)
 
     def __str__(self):
-        if type(self.term) == ListType and len(self.term) == 2:
+        if isinstance(self.term, list) and len(self.term) == 2:
             return "%s %s %s" % (nice(self.term[0]),
-                                 string.strip(self.logc),
+                                 self.logc.strip(),
                                  nice(self.term[1]))
         else:
-            return "%s(%s)" % (string.strip(self.logc), nice(self.term))
+            return "%s(%s)" % (self.logc.strip(), nice(self.term))
 
     def __aepack__(self):
         return pack({'logc': mkenum(self.logc), 'term': self.term}, 'logi')
@@ -482,13 +480,13 @@ class SelectableItem(ObjectSpecifier):
 
     def __init__(self, want, seld, fr = None):
         t = type(seld)
-        if t == StringType:
+        if isinstance(t, str):
             form = 'name'
         elif IsRange(seld):
             form = 'rang'
         elif IsComparison(seld) or IsLogical(seld):
             form = 'test'
-        elif t == TupleType:
+        elif isinstance(t, tuple):
             # Breakout: specify both form and seld in a tuple
             # (if you want ID or rele or somesuch)
             form, seld = seld
@@ -514,12 +512,11 @@ class ComponentItem(SelectableItem):
 
     def __str__(self):
         seld = self.seld
-        if type(seld) == StringType:
+        if isinstance(seld, str):
             ss = repr(seld)
         elif IsRange(seld):
             start, stop = seld.start, seld.stop
-            if type(start) == InstanceType == type(stop) and \
-               start.__class__ == self.__class__ == stop.__class__:
+            if type(start) == type(stop) == type(self):
                 ss = str(start.seld) + " thru " + str(stop.seld)
             else:
                 ss = str(seld)

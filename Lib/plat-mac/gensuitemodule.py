@@ -279,9 +279,9 @@ def decode(data, verbose=None):
 
 def simplify(item):
     """Recursively replace singleton tuples by their constituent item"""
-    if type(item) is types.ListType:
+    if isinstance(item, list):
         return map(simplify, item)
-    elif type(item) == types.TupleType and len(item) == 2:
+    elif isinstance(item, tuple) and len(item) == 2:
         return simplify(item[1])
     else:
         return item
@@ -352,7 +352,7 @@ def alt_generic(what, f, *args):
 def generic(what, f, *args):
     if type(what) == types.FunctionType:
         return what(f, *args)
-    if type(what) == types.ListType:
+    if isinstance(what, list):
         record = []
         for thing in what:
             item = generic(thing[:1], f, *thing[1:])
@@ -698,7 +698,7 @@ class SuiteCompiler:
         """Generate class boilerplate"""
         classname = '%s_Events'%self.modname
         if self.basemodule:
-            modshortname = string.split(self.basemodule.__name__, '.')[-1]
+            modshortname = self.basemodule.__name__.split('.')[-1]
             baseclassname = '%s_Events'%modshortname
             self.fp.write("class %s(%s):\n\n"%(classname, baseclassname))
         else:
@@ -1169,7 +1169,7 @@ def compiledataflags(flags):
                 bits.append(dataflagdict[i])
             else:
                 bits.append(repr(i))
-    return '[%s]' % string.join(bits)
+    return '[%s]' % ' '.join(bits)
 
 def ascii(str):
     """Return a string with all non-ascii characters hex-encoded"""

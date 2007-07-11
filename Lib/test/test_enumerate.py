@@ -17,7 +17,7 @@ class I:
         self.i = 0
     def __iter__(self):
         return self
-    def next(self):
+    def __next__(self):
         if self.i >= len(self.seqn): raise StopIteration
         v = self.seqn[self.i]
         self.i += 1
@@ -37,7 +37,7 @@ class X:
     def __init__(self, seqn):
         self.seqn = seqn
         self.i = 0
-    def next(self):
+    def __next__(self):
         if self.i >= len(self.seqn): raise StopIteration
         v = self.seqn[self.i]
         self.i += 1
@@ -50,11 +50,11 @@ class E:
         self.i = 0
     def __iter__(self):
         return self
-    def next(self):
+    def __next__(self):
         3 // 0
 
 class N:
-    'Iterator missing next()'
+    'Iterator missing __next__()'
     def __init__(self, seqn):
         self.seqn = seqn
         self.i = 0
@@ -76,17 +76,17 @@ class EnumerateTestCase(unittest.TestCase):
     def test_getitemseqn(self):
         self.assertEqual(list(self.enum(G(self.seq))), self.res)
         e = self.enum(G(''))
-        self.assertRaises(StopIteration, e.next)
+        self.assertRaises(StopIteration, next, e)
 
     def test_iteratorseqn(self):
         self.assertEqual(list(self.enum(I(self.seq))), self.res)
         e = self.enum(I(''))
-        self.assertRaises(StopIteration, e.next)
+        self.assertRaises(StopIteration, next, e)
 
     def test_iteratorgenerator(self):
         self.assertEqual(list(self.enum(Ig(self.seq))), self.res)
         e = self.enum(Ig(''))
-        self.assertRaises(StopIteration, e.next)
+        self.assertRaises(StopIteration, next, e)
 
     def test_noniterable(self):
         self.assertRaises(TypeError, self.enum, X(self.seq))
@@ -134,18 +134,18 @@ class TestReversed(unittest.TestCase):
                 raise StopIteration
             def __len__(self):
                 return 5
-        for data in 'abc', range(5), tuple(enumerate('abc')), A(), xrange(1,17,5):
+        for data in 'abc', range(5), tuple(enumerate('abc')), A(), range(1,17,5):
             self.assertEqual(list(data)[::-1], list(reversed(data)))
         self.assertRaises(TypeError, reversed, {})
 
-    def test_xrange_optimization(self):
-        x = xrange(1)
+    def test_range_optimization(self):
+        x = range(1)
         self.assertEqual(type(reversed(x)), type(iter(x)))
 
     def test_len(self):
         # This is an implementation detail, not an interface requirement
         from test.test_iterlen import len
-        for s in ('hello', tuple('hello'), list('hello'), xrange(5)):
+        for s in ('hello', tuple('hello'), list('hello'), range(5)):
             self.assertEqual(len(reversed(s)), len(s))
             r = reversed(s)
             list(r)
@@ -205,7 +205,7 @@ def test_main(verbose=None):
     import sys
     if verbose and hasattr(sys, "gettotalrefcount"):
         counts = [None] * 5
-        for i in xrange(len(counts)):
+        for i in range(len(counts)):
             test_support.run_unittest(*testclasses)
             counts[i] = sys.gettotalrefcount()
         print(counts)

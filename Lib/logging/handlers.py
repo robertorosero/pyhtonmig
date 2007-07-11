@@ -27,7 +27,7 @@ Copyright (C) 2001-2007 Vinay Sajip. All Rights Reserved.
 To use, simply 'import logging' and log away!
 """
 
-import sys, logging, socket, types, os, string, struct, time, glob
+import sys, logging, socket, os, struct, time, glob
 try:
     import cPickle as pickle
 except ImportError:
@@ -162,7 +162,7 @@ class TimedRotatingFileHandler(BaseRotatingHandler):
     """
     def __init__(self, filename, when='h', interval=1, backupCount=0, encoding=None):
         BaseRotatingHandler.__init__(self, filename, 'a', encoding)
-        self.when = string.upper(when)
+        self.when = when.upper()
         self.backupCount = backupCount
         # Calculate the real rollover interval, which is just the number of
         # seconds between rollovers.  Also set the filename suffix used when
@@ -365,12 +365,14 @@ class SocketHandler(logging.Handler):
         self.retryMax = 30.0
         self.retryFactor = 2.0
 
-    def makeSocket(self):
+    def makeSocket(self, timeout=1):
         """
         A factory method which allows subclasses to define the precise
         type of socket they want.
         """
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        if hasattr(s, 'settimeout'):
+            s.settimeout(timeout)
         s.connect((self.host, self.port))
         return s
 
@@ -627,14 +629,15 @@ class SysLogHandler(logging.Handler):
         """
         Initialize a handler.
 
-        If address is specified as a string, UNIX socket is used.
+        If address is specified as a string, a UNIX socket is used. To log to a
+        local syslogd, "SysLogHandler(address="/dev/log")" can be used.
         If facility is not specified, LOG_USER is used.
         """
         logging.Handler.__init__(self)
 
         self.address = address
         self.facility = facility
-        if type(address) == types.StringType:
+        if isinstance(address, str):
             self.unixsocket = 1
             self._connect_unixsocket(address)
         else:
@@ -666,9 +669,9 @@ class SysLogHandler(logging.Handler):
         priority_names mapping dictionaries are used to convert them to
         integers.
         """
-        if type(facility) == types.StringType:
+        if isinstance(facility, str):
             facility = self.facility_names[facility]
-        if type(priority) == types.StringType:
+        if isinstance(priority, str):
             priority = self.priority_names[priority]
         return (facility << 3) | priority
 
@@ -724,24 +727,27 @@ class SMTPHandler(logging.Handler):
     """
     A handler class which sends an SMTP email for each logging event.
     """
-    def __init__(self, mailhost, fromaddr, toaddrs, subject):
+    def __init__(self, mailhost, fromaddr, toaddrs, subject, credentials=None):
         """
         Initialize the handler.
 
         Initialize the instance with the from and to addresses and subject
         line of the email. To specify a non-standard SMTP port, use the
-        (host, port) tuple format for the mailhost argument.
+        (host, port) tuple format for the mailhost argument. To specify
+        authentication credentials, supply a (username, password) tuple
+        for the credentials argument.
         """
         logging.Handler.__init__(self)
-        if type(mailhost) == types.TupleType:
-            host, port = mailhost
-            self.mailhost = host
-            self.mailport = port
+        if isinstance(mailhost, tuple):
+            self.mailhost, self.mailport = mailhost
         else:
-            self.mailhost = mailhost
-            self.mailport = None
+            self.mailhost, self.mailport = mailhost, None
+        if isinstance(credentials, tuple):
+            self.username, self.password = credentials
+        else:
+            self.username = None
         self.fromaddr = fromaddr
-        if type(toaddrs) == types.StringType:
+        if isinstance(toaddrs, str):
             toaddrs = [toaddrs]
         self.toaddrs = toaddrs
         self.subject = subject
@@ -792,9 +798,11 @@ class SMTPHandler(logging.Handler):
             msg = self.format(record)
             msg = "From: %s\r\nTo: %s\r\nSubject: %s\r\nDate: %s\r\n\r\n%s" % (
                             self.fromaddr,
-                            string.join(self.toaddrs, ","),
+                            ",".join(self.toaddrs),
                             self.getSubject(record),
                             formatdate(), msg)
+            if self.username:
+                smtp.login(self.username, self.password)
             smtp.sendmail(self.fromaddr, self.toaddrs, msg)
             smtp.quit()
         except (KeyboardInterrupt, SystemExit):
@@ -913,7 +921,7 @@ class HTTPHandler(logging.Handler):
         ("GET" or "POST")
         """
         logging.Handler.__init__(self)
-        method = string.upper(method)
+        method = method.upper()
         if method not in ["GET", "POST"]:
             raise ValueError, "method must be GET or POST"
         self.host = host
@@ -941,7 +949,7 @@ class HTTPHandler(logging.Handler):
             url = self.url
             data = urllib.urlencode(self.mapLogRecord(record))
             if self.method == "GET":
-                if (string.find(url, '?') >= 0):
+                if (url.find('?') >= 0):
                     sep = '&'
                 else:
                     sep = '?'
@@ -949,7 +957,7 @@ class HTTPHandler(logging.Handler):
             h.putrequest(self.method, url)
             # support multiple hosts on one IP address...
             # need to strip optional :port from host, if present
-            i = string.find(host, ":")
+            i = host.find(":")
             if i >= 0:
                 host = host[:i]
             h.putheader("Host", host)

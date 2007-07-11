@@ -19,7 +19,7 @@ whether the line contains the completion of a statement.
 
 >>> dump_tokens("if False:\\n"
 ...             "    # NL\\n"
-...             "    True = False # NEWLINE\\n")
+...             "    a    = False # NEWLINE\\n")
 NAME        'if'          (1, 0) (1, 2)
 NAME        'False'       (1, 3) (1, 8)
 OP          ':'           (1, 8) (1, 9)
@@ -27,7 +27,7 @@ NEWLINE     '\\n'          (1, 9) (1, 10)
 COMMENT     '# NL'        (2, 4) (2, 8)
 NL          '\\n'          (2, 8) (2, 9)
 INDENT      '    '        (3, 0) (3, 4)
-NAME        'True'        (3, 4) (3, 8)
+NAME        'a'           (3, 4) (3, 5)
 OP          '='           (3, 9) (3, 10)
 NAME        'False'       (3, 11) (3, 16)
 COMMENT     '# NEWLINE'   (3, 17) (3, 26)
@@ -103,7 +103,7 @@ def test_roundtrip(f):
 
     t1 = [tok[:2] for tok in fulltok]
     newtext = untokenize(t1)
-    readline = iter(newtext.splitlines(1)).next
+    readline = iter(newtext.splitlines(1)).__next__
     t2 = [tok[:2] for tok in generate_tokens(readline)]
     if t1 != t2:
         raise TestFailed("untokenize() roundtrip failed for %r" % f)
@@ -224,7 +224,7 @@ def test_rarrow():
     This function exists solely to test the tokenization of the RARROW
     operator.
 
-    >>> tokenize(iter(['->']).next)   #doctest: +NORMALIZE_WHITESPACE
+    >>> tokenize(iter(['->']).__next__)   #doctest: +NORMALIZE_WHITESPACE
     1,0-1,2:\tOP\t'->'
     2,0-2,0:\tENDMARKER\t''
     """

@@ -7,7 +7,7 @@ Implements the Distutils 'register' command (register with the repository).
 
 __revision__ = "$Id$"
 
-import sys, os, string, urllib2, getpass, urlparse
+import sys, os, urllib2, getpass, urlparse
 import StringIO, ConfigParser
 
 from distutils.core import Command
@@ -67,7 +67,7 @@ class register(Command):
 
         if missing:
             self.warn("missing required meta-data: " +
-                      string.join(missing, ", "))
+                      ", ".join(missing))
 
         if metadata.author:
             if not metadata.author_email:
@@ -183,7 +183,7 @@ Your selection [default 1]: ''', end=' ')
                         username, password))
                     f.close()
                     try:
-                        os.chmod(rc, 0600)
+                        os.chmod(rc, 0o600)
                     except:
                         pass
         elif choice == '2':

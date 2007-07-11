@@ -565,14 +565,12 @@ PyNumber_Multiply(PyObject *v, PyObject *w)
 PyObject *
 PyNumber_FloorDivide(PyObject *v, PyObject *w)
 {
-	/* XXX tp_flags test */
 	return binary_op(v, w, NB_SLOT(nb_floor_divide), "//");
 }
 
 PyObject *
 PyNumber_TrueDivide(PyObject *v, PyObject *w)
 {
-	/* XXX tp_flags test */
 	return binary_op(v, w, NB_SLOT(nb_true_divide), "/");
 }
 
@@ -649,7 +647,6 @@ INPLACE_BINOP(PyNumber_InPlaceSubtract, nb_inplace_subtract, nb_subtract, "-=")
 PyObject *
 PyNumber_InPlaceFloorDivide(PyObject *v, PyObject *w)
 {
-	/* XXX tp_flags test */
 	return binary_iop(v, w, NB_SLOT(nb_inplace_floor_divide),
 			  NB_SLOT(nb_floor_divide), "//=");
 }
@@ -657,7 +654,6 @@ PyNumber_InPlaceFloorDivide(PyObject *v, PyObject *w)
 PyObject *
 PyNumber_InPlaceTrueDivide(PyObject *v, PyObject *w)
 {
-	/* XXX tp_flags test */
 	return binary_iop(v, w, NB_SLOT(nb_inplace_true_divide),
 			  NB_SLOT(nb_true_divide), "/=");
 }
@@ -809,7 +805,7 @@ PyNumber_Index(PyObject *item)
 		if (result &&
 		    !PyInt_Check(result) && !PyLong_Check(result)) {
 			PyErr_Format(PyExc_TypeError,
-				     "__index__ returned non-int " \
+				     "__index__ returned non-int "
 				     "(type %.200s)",
 				     result->ob_type->tp_name);
 			Py_DECREF(result);
@@ -819,7 +815,7 @@ PyNumber_Index(PyObject *item)
 	else {
 		PyErr_Format(PyExc_TypeError,
 			     "'%.200s' object cannot be interpreted "
-			     "as an index", item->ob_type->tp_name);
+			     "as an integer", item->ob_type->tp_name);
 	}
 	return result;
 }
@@ -972,8 +968,24 @@ PyNumber_Float(PyObject *o)
 		PyFloatObject *po = (PyFloatObject *)o;
 		return PyFloat_FromDouble(po->ob_fval);
 	}
-	return PyFloat_FromString(o, NULL);
+	return PyFloat_FromString(o);
 }
+
+
+PyObject *
+PyNumber_ToBase(PyObject *n, int base)
+{
+	PyObject *res;
+	PyObject *index = PyNumber_Index(n);
+
+	if (!index)
+		return NULL;
+	assert(PyLong_Check(index));
+	res = _PyLong_Format(index, base);
+	Py_DECREF(index);
+	return res;
+}
+
 
 /* Operations on sequences */
 
@@ -2101,7 +2113,28 @@ recursive_isinstance(PyObject *inst, PyObject *cls, int recursion_depth)
 int
 PyObject_IsInstance(PyObject *inst, PyObject *cls)
 {
-    return recursive_isinstance(inst, cls, Py_GetRecursionLimit());
+	PyObject *t, *v, *tb;
+	PyObject *checker;
+	PyErr_Fetch(&t, &v, &tb);
+	checker = PyObject_GetAttrString(cls, "__instancecheck__");
+	PyErr_Restore(t, v, tb);
+	if (checker != NULL) {
+		PyObject *res;
+		int ok = -1;
+		if (Py_EnterRecursiveCall(" in __instancecheck__")) {
+			Py_DECREF(checker);
+			return ok;
+		}
+		res = PyObject_CallFunctionObjArgs(checker, inst, NULL);
+		Py_LeaveRecursiveCall();
+		Py_DECREF(checker);
+		if (res != NULL) {
+			ok = PyObject_IsTrue(res);
+			Py_DECREF(res);
+		}
+		return ok;
+	}
+	return recursive_isinstance(inst, cls, Py_GetRecursionLimit());
 }
 
 static  int
@@ -2151,7 +2184,26 @@ recursive_issubclass(PyObject *derived, PyObject *cls, int recursion_depth)
 int
 PyObject_IsSubclass(PyObject *derived, PyObject *cls)
 {
-    return recursive_issubclass(derived, cls, Py_GetRecursionLimit());
+	PyObject *t, *v, *tb;
+	PyObject *checker;
+	PyErr_Fetch(&t, &v, &tb);
+	checker = PyObject_GetAttrString(cls, "__subclasscheck__");
+	PyErr_Restore(t, v, tb);
+	if (checker != NULL) {
+		PyObject *res;
+		int ok = -1;
+		if (Py_EnterRecursiveCall(" in __subclasscheck__"))
+			return ok;
+		res = PyObject_CallFunctionObjArgs(checker, derived, NULL);
+		Py_LeaveRecursiveCall();
+		Py_DECREF(checker);
+		if (res != NULL) {
+			ok = PyObject_IsTrue(res);
+			Py_DECREF(res);
+		}
+		return ok;
+	}
+	return recursive_issubclass(derived, cls, Py_GetRecursionLimit());
 }
 
 

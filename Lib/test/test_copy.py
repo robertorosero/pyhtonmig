@@ -83,8 +83,8 @@ class TestCopy(unittest.TestCase):
         def f():
             pass
         tests = [None, 42, 2**100, 3.14, True, False, 1j,
-                 "hello", u"hello\u1234", f.func_code,
-                 NewStyle, xrange(10), Classic, max]
+                 "hello", u"hello\u1234", f.__code__,
+                 NewStyle, range(10), Classic, max]
         for x in tests:
             self.assert_(copy.copy(x) is x, repr(x))
 
@@ -191,8 +191,8 @@ class TestCopy(unittest.TestCase):
         # type.
         class Meta(type):
             pass
-        class C:
-            __metaclass__ = Meta
+        class C(metaclass=Meta):
+            pass
         self.assertEqual(copy.deepcopy(C), C)
 
     def test_deepcopy_deepcopy(self):
@@ -256,8 +256,8 @@ class TestCopy(unittest.TestCase):
         def f():
             pass
         tests = [None, 42, 2**100, 3.14, True, False, 1j,
-                 "hello", u"hello\u1234", f.func_code,
-                 NewStyle, xrange(10), Classic, max]
+                 "hello", u"hello\u1234", f.__code__,
+                 NewStyle, range(10), Classic, max]
         for x in tests:
             self.assert_(copy.deepcopy(x) is x, repr(x))
 

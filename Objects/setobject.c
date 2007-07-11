@@ -2154,7 +2154,7 @@ PySet_Add(PyObject *set, PyObject *key)
 }
 
 int
-_PySet_Next(PyObject *set, Py_ssize_t *pos, PyObject **entry)
+_PySet_Next(PyObject *set, Py_ssize_t *pos, PyObject **key)
 {
 	setentry *entry_ptr;
 
@@ -2164,7 +2164,23 @@ _PySet_Next(PyObject *set, Py_ssize_t *pos, PyObject **entry)
 	}
 	if (set_next((PySetObject *)set, pos, &entry_ptr) == 0)
 		return 0;
-	*entry = entry_ptr->key;
+	*key = entry_ptr->key;
+	return 1;
+}
+
+int
+_PySet_NextEntry(PyObject *set, Py_ssize_t *pos, PyObject **key, long *hash)
+{
+	setentry *entry;
+
+	if (!PyAnySet_Check(set)) {
+		PyErr_BadInternalCall();
+		return -1;
+	}
+	if (set_next((PySetObject *)set, pos, &entry) == 0)
+		return 0;
+	*key = entry->key;
+	*hash = entry->hash;
 	return 1;
 }
 
@@ -2206,7 +2222,7 @@ test_c_api(PySetObject *so)
 	Py_ssize_t count;
 	char *s;
 	Py_ssize_t i;
-	PyObject *elem, *dup, *t, *f, *dup2;
+	PyObject *elem=NULL, *dup=NULL, *t, *f, *dup2, *x;
 	PyObject *ob = (PyObject *)so;
 
 	/* Verify preconditions and exercise type/size checks */
@@ -2252,8 +2268,8 @@ test_c_api(PySetObject *so)
 
 	/* Exercise direct iteration */
 	i = 0, count = 0;
-	while (_PySet_Next((PyObject *)dup, &i, &elem)) {
-		s = PyString_AsString(elem);
+	while (_PySet_Next((PyObject *)dup, &i, &x)) {
+		s = PyString_AsString(x);
 		assert(s && (s[0] == 'a' || s[0] == 'b' || s[0] == 'c'));
 		count++;
 	}

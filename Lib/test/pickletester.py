@@ -88,8 +88,8 @@ class initarg(C):
 class metaclass(type):
     pass
 
-class use_metaclass(object):
-    __metaclass__ = metaclass
+class use_metaclass(object, metaclass=metaclass):
+    pass
 
 # DATA0 .. DATA2 are the pickles we expect under the various protocols, for
 # the object returned by create_data().
@@ -745,7 +745,7 @@ class AbstractPickleTests(unittest.TestCase):
 
     def test_list_chunking(self):
         n = 10  # too small to chunk
-        x = range(n)
+        x = list(range(n))
         for proto in protocols:
             s = self.dumps(x, proto)
             y = self.loads(s)
@@ -754,7 +754,7 @@ class AbstractPickleTests(unittest.TestCase):
             self.assertEqual(num_appends, proto > 0)
 
         n = 2500  # expect at least two chunks when proto > 0
-        x = range(n)
+        x = list(range(n))
         for proto in protocols:
             s = self.dumps(x, proto)
             y = self.loads(s)
@@ -835,6 +835,24 @@ class AbstractPickleTests(unittest.TestCase):
             y = self.loads(s)
             self.assertEqual(y._proto, None)
 
+    def test_reduce_ex_calls_base(self):
+        for proto in 0, 1, 2:
+            x = REX_four()
+            self.assertEqual(x._proto, None)
+            s = self.dumps(x, proto)
+            self.assertEqual(x._proto, proto)
+            y = self.loads(s)
+            self.assertEqual(y._proto, proto)
+
+    def test_reduce_calls_base(self):
+        for proto in 0, 1, 2:
+            x = REX_five()
+            self.assertEqual(x._reduce_called, 0)
+            s = self.dumps(x, proto)
+            self.assertEqual(x._reduce_called, 1)
+            y = self.loads(s)
+            self.assertEqual(y._reduce_called, 1)
+
 # Test classes for reduce_ex
 
 class REX_one(object):
@@ -858,6 +876,20 @@ class REX_three(object):
         return REX_two, ()
     def __reduce__(self):
         raise TestFailed, "This __reduce__ shouldn't be called"
+
+class REX_four(object):
+    _proto = None
+    def __reduce_ex__(self, proto):
+        self._proto = proto
+        return object.__reduce_ex__(self, proto)
+    # Calling base class method should succeed
+
+class REX_five(object):
+    _reduce_called = 0
+    def __reduce__(self):
+        self._reduce_called = 1
+        return object.__reduce__(self)
+    # This one used to fail with infinite recursion
 
 # Test classes for newobj
 
@@ -959,7 +991,7 @@ class AbstractPersistentPicklerTests(unittest.TestCase):
     def test_persistence(self):
         self.id_count = 0
         self.load_count = 0
-        L = range(10)
+        L = list(range(10))
         self.assertEqual(self.loads(self.dumps(L)), L)
         self.assertEqual(self.id_count, 5)
         self.assertEqual(self.load_count, 5)
@@ -967,7 +999,7 @@ class AbstractPersistentPicklerTests(unittest.TestCase):
     def test_bin_persistence(self):
         self.id_count = 0
         self.load_count = 0
-        L = range(10)
+        L = list(range(10))
         self.assertEqual(self.loads(self.dumps(L, 1)), L)
         self.assertEqual(self.id_count, 5)
         self.assertEqual(self.load_count, 5)

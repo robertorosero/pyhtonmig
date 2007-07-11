@@ -104,9 +104,9 @@ class ReferencesTestCase(TestBase):
         def check(proxy):
             proxy.bar
 
-        self.assertRaises(weakref.ReferenceError, check, ref1)
-        self.assertRaises(weakref.ReferenceError, check, ref2)
-        self.assertRaises(weakref.ReferenceError, bool, weakref.proxy(C()))
+        self.assertRaises(ReferenceError, check, ref1)
+        self.assertRaises(ReferenceError, check, ref2)
+        self.assertRaises(ReferenceError, bool, weakref.proxy(C()))
         self.assert_(self.cbcalled == 2)
 
     def check_basic_ref(self, factory):
@@ -651,10 +651,10 @@ class SubclassableWeakrefTestCase(unittest.TestCase):
         class MyRef(weakref.ref):
             def __init__(self, ob, callback=None, value=42):
                 self.value = value
-                super(MyRef, self).__init__(ob, callback)
+                super().__init__(ob, callback)
             def __call__(self):
                 self.called = True
-                return super(MyRef, self).__call__()
+                return super().__call__()
         o = Object("foo")
         mr = MyRef(o, value=24)
         self.assert_(mr() is o)
@@ -740,15 +740,15 @@ class MappingTestCase(TestBase):
         items2 = dict.copy().items()
         items1.sort()
         items2.sort()
-        self.assert_(items1 == items2,
+        self.assertEqual(items1, items2,
                      "cloning of weak-valued dictionary did not work!")
         del items1, items2
-        self.assert_(len(dict) == self.COUNT)
+        self.assertEqual(len(dict), self.COUNT)
         del objects[0]
-        self.assert_(len(dict) == (self.COUNT - 1),
+        self.assertEqual(len(dict), self.COUNT - 1,
                      "deleting object did not cause dictionary update")
         del objects, o
-        self.assert_(len(dict) == 0,
+        self.assertEqual(len(dict), 0,
                      "deleting the values did not clear the dictionary")
         # regression on SF bug #447152:
         dict = weakref.WeakValueDictionary()
@@ -841,7 +841,7 @@ class MappingTestCase(TestBase):
         items = dict.items()
         for item in dict.items():
             items.remove(item)
-        self.assert_(len(items) == 0, "iteritems() did not touch all items")
+        self.assert_(len(items) == 0, "items() did not touch all items")
 
         # key iterator, via __iter__():
         keys = list(dict.keys())
@@ -875,14 +875,14 @@ class MappingTestCase(TestBase):
 
     def make_weak_keyed_dict(self):
         dict = weakref.WeakKeyDictionary()
-        objects = map(Object, range(self.COUNT))
+        objects = list(map(Object, range(self.COUNT)))
         for o in objects:
             dict[o] = o.arg
         return dict, objects
 
     def make_weak_valued_dict(self):
         dict = weakref.WeakValueDictionary()
-        objects = map(Object, range(self.COUNT))
+        objects = list(map(Object, range(self.COUNT)))
         for o in objects:
             dict[o.arg] = o
         return dict, objects
@@ -1091,7 +1091,7 @@ None
 >>> import weakref
 >>> class ExtendedRef(weakref.ref):
 ...     def __init__(self, ob, callback=None, **annotations):
-...         super(ExtendedRef, self).__init__(ob, callback)
+...         super().__init__(ob, callback)
 ...         self.__counter = 0
 ...         for k, v in annotations.items():
 ...             setattr(self, k, v)
@@ -1099,12 +1099,12 @@ None
 ...         '''Return a pair containing the referent and the number of
 ...         times the reference has been called.
 ...         '''
-...         ob = super(ExtendedRef, self).__call__()
+...         ob = super().__call__()
 ...         if ob is not None:
 ...             self.__counter += 1
 ...             ob = (ob, self.__counter)
 ...         return ob
-... 
+...
 >>> class A:   # not in docs from here, just testing the ExtendedRef
 ...     pass
 ...

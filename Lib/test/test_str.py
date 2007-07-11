@@ -1,4 +1,7 @@
+
 import unittest
+import struct
+import sys
 from test import test_support, string_tests
 
 
@@ -22,10 +25,10 @@ class StrTest(
     def test_iterators(self):
         # Make sure str objects have an __iter__ method
         it = "abc".__iter__()
-        self.assertEqual(it.next(), "a")
-        self.assertEqual(it.next(), "b")
-        self.assertEqual(it.next(), "c")
-        self.assertRaises(StopIteration, it.next)
+        self.assertEqual(next(it), "a")
+        self.assertEqual(next(it), "b")
+        self.assertEqual(next(it), "c")
+        self.assertRaises(StopIteration, next, it)
 
     def test_conversion(self):
         # Make sure __str__() behaves properly
@@ -89,6 +92,15 @@ class StrTest(
         self.assertEqual(str(Foo8("foo")), "foofoo")
         self.assertEqual(str(Foo9("foo")), "string")
         self.assertEqual(unicode(Foo9("foo")), u"not unicode")
+
+    def test_expandtabs_overflows_gracefully(self):
+        # This test only affects 32-bit platforms because expandtabs can only take
+        # an int as the max value, not a 64-bit C long.  If expandtabs is changed
+        # to take a 64-bit long, this test should apply to all platforms.
+        if sys.maxint > (1 << 32) or struct.calcsize('P') != 4:
+            return
+        self.assertRaises(OverflowError, 't\tt\t'.expandtabs, sys.maxint)
+
 
 def test_main():
     test_support.run_unittest(StrTest)

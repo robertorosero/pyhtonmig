@@ -129,7 +129,7 @@ From all times, sorting has always been a Great Art! :-)
 __all__ = ['heappush', 'heappop', 'heapify', 'heapreplace', 'merge',
            'nlargest', 'nsmallest']
 
-from itertools import islice, repeat, count, imap, izip, tee
+from itertools import islice, repeat, count, izip, tee
 from operator import itemgetter, neg
 import bisect
 
@@ -173,7 +173,7 @@ def heapify(x):
     # or i < (n-1)/2.  If n is even = 2*j, this is (2*j-1)/2 = j-1/2 so
     # j-1 is the largest, which is n//2 - 1.  If n is odd = 2*j+1, this is
     # (2*j+1-1)/2 = j so j-1 is the largest, and that's again n//2-1.
-    for i in reversed(xrange(n//2)):
+    for i in reversed(range(n//2)):
         _siftup(x, i)
 
 def nlargest(n, iterable):
@@ -225,7 +225,7 @@ def nsmallest(n, iterable):
     #    O(m) + O(n log m) comparisons.
     h = list(iterable)
     heapify(h)
-    return map(heappop, repeat(h, min(n, len(h))))
+    return list(map(heappop, repeat(h, min(n, len(h)))))
 
 # 'heap' is a heap at all indices >= startpos, except possibly for pos.  pos
 # is the index of a leaf with a possibly out-of-order value.  Restore the
@@ -311,7 +311,7 @@ except ImportError:
 def merge(*iterables):
     '''Merge multiple sorted inputs into a single sorted output.
 
-    Similar to sorted(itertools.chain(*iterables)) but returns an iterable,
+    Similar to sorted(itertools.chain(*iterables)) but returns a generator,
     does not pull the data into memory all at once, and assumes that each of
     the input streams is already sorted (smallest to largest).
 
@@ -325,7 +325,7 @@ def merge(*iterables):
     h_append = h.append
     for itnum, it in enumerate(map(iter, iterables)):
         try:
-            next = it.next
+            next = it.__next__
             h_append([next(), itnum, next])
         except _StopIteration:
             pass
@@ -351,9 +351,9 @@ def nsmallest(n, iterable, key=None):
     Equivalent to:  sorted(iterable, key=key)[:n]
     """
     in1, in2 = tee(iterable)
-    it = izip(imap(key, in1), count(), in2)                 # decorate
+    it = izip(map(key, in1), count(), in2)                  # decorate
     result = _nsmallest(n, it)
-    return map(itemgetter(2), result)                       # undecorate
+    return list(map(itemgetter(2), result))                 # undecorate
 
 _nlargest = nlargest
 def nlargest(n, iterable, key=None):
@@ -362,9 +362,9 @@ def nlargest(n, iterable, key=None):
     Equivalent to:  sorted(iterable, key=key, reverse=True)[:n]
     """
     in1, in2 = tee(iterable)
-    it = izip(imap(key, in1), imap(neg, count()), in2)      # decorate
+    it = izip(map(key, in1), map(neg, count()), in2)        # decorate
     result = _nlargest(n, it)
-    return map(itemgetter(2), result)                       # undecorate
+    return list(map(itemgetter(2), result))                 # undecorate
 
 if __name__ == "__main__":
     # Simple sanity test

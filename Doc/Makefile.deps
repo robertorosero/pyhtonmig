@@ -88,7 +88,6 @@ LIBFILES= $(MANSTYLES) $(INDEXSTYLES) $(COMMONTEX) \
 	commontex/reportingbugs.tex \
 	lib/lib.tex \
 	lib/asttable.tex \
-	lib/compiler.tex \
 	lib/distutils.tex \
 	lib/email.tex \
 	lib/emailencoders.tex \
@@ -172,7 +171,6 @@ LIBFILES= $(MANSTYLES) $(INDEXSTYLES) $(COMMONTEX) \
 	lib/libgdbm.tex \
 	lib/libtermios.tex \
 	lib/libfcntl.tex \
-	lib/libposixfile.tex \
 	lib/libsyslog.tex \
 	lib/liblogging.tex \
 	lib/libpdb.tex \
@@ -186,7 +184,6 @@ LIBFILES= $(MANSTYLES) $(INDEXSTYLES) $(COMMONTEX) \
 	lib/liburllib2.tex \
 	lib/libhttplib.tex \
 	lib/libftplib.tex \
-	lib/libgopherlib.tex \
 	lib/libnntplib.tex \
 	lib/liburlparse.tex \
 	lib/libhtmlparser.tex \
@@ -194,34 +191,17 @@ LIBFILES= $(MANSTYLES) $(INDEXSTYLES) $(COMMONTEX) \
 	lib/libsgmllib.tex \
 	lib/librfc822.tex \
 	lib/libmimetools.tex \
-	lib/libmimewriter.tex \
 	lib/libbinascii.tex \
 	lib/libmm.tex \
 	lib/libaudioop.tex \
-	lib/libimageop.tex \
 	lib/libaifc.tex \
-	lib/libjpeg.tex \
-	lib/librgbimg.tex \
 	lib/libossaudiodev.tex \
 	lib/libcrypto.tex \
 	lib/libhashlib.tex \
-	lib/libmd5.tex \
-	lib/libsha.tex \
 	lib/libhmac.tex \
-	lib/libstdwin.tex \
-	lib/libsgi.tex \
-	lib/libal.tex \
-	lib/libcd.tex \
-	lib/libfl.tex \
-	lib/libfm.tex \
-	lib/libgl.tex \
-	lib/libimgfile.tex \
 	lib/libsun.tex \
 	lib/libxdrlib.tex \
 	lib/libimghdr.tex \
-	lib/librestricted.tex \
-	lib/librexec.tex \
-	lib/libbastion.tex \
 	lib/libformatter.tex \
 	lib/liboperator.tex \
 	lib/libresource.tex \
@@ -253,7 +233,6 @@ LIBFILES= $(MANSTYLES) $(INDEXSTYLES) $(COMMONTEX) \
 	lib/libzipfile.tex \
 	lib/libpprint.tex \
 	lib/libcode.tex \
-	lib/libmimify.tex \
 	lib/libre.tex \
 	lib/libuserdict.tex \
 	lib/libdis.tex \
@@ -285,7 +264,6 @@ LIBFILES= $(MANSTYLES) $(INDEXSTYLES) $(COMMONTEX) \
 	lib/libimaplib.tex \
 	lib/libpoplib.tex \
 	lib/libcalendar.tex \
-	lib/libpopen2.tex \
 	lib/libbisect.tex \
 	lib/libcollections.tex \
 	lib/libheapq.tex \
@@ -368,7 +346,6 @@ MACFILES= $(HOWTOSTYLES) $(INDEXSTYLES) $(COMMONTEX) \
 	mac/libaetools.tex \
 	mac/libaepack.tex \
 	mac/libaetypes.tex \
-	mac/libmacfs.tex \
 	mac/libmacos.tex \
 	mac/libmacostools.tex \
 	mac/libmacui.tex \

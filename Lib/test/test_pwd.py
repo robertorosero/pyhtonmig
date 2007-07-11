@@ -59,8 +59,8 @@ class PwdTest(unittest.TestCase):
         namei = 0
         fakename = allnames[namei]
         while fakename in bynames:
-            chars = map(None, fakename)
-            for i in xrange(len(chars)):
+            chars = list(fakename)
+            for i in range(len(chars)):
                 if chars[i] == 'z':
                     chars[i] = 'A'
                     break
@@ -76,7 +76,7 @@ class PwdTest(unittest.TestCase):
                 except IndexError:
                     # should never happen... if so, just forget it
                     break
-            fakename = ''.join(map(None, chars))
+            fakename = ''.join(chars)
 
         self.assertRaises(KeyError, pwd.getpwnam, fakename)
 

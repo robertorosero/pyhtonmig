@@ -118,8 +118,10 @@ def _init_pathinfo():
     return d
 
 def addpackage(sitedir, name, known_paths):
-    """Add a new path to known_paths by combining sitedir and 'name' or execute
-    sitedir if it starts with 'import'"""
+    """Process a .pth file within the site-packages directory:
+       For each line in the file, either combine it with sitedir to a path
+       and add that to known_paths, or execute it if it starts with 'import '.
+    """
     if known_paths is None:
         _init_pathinfo()
         reset = 1
@@ -134,7 +136,7 @@ def addpackage(sitedir, name, known_paths):
         for line in f:
             if line.startswith("#"):
                 continue
-            if line.startswith("import"):
+            if line.startswith("import ") or line.startswith("import\t"):
                 exec(line)
                 continue
             line = line.rstrip()
@@ -400,6 +402,28 @@ def execsitecustomize():
             (err.__class__.__name__, err))
 
 
+def installnewio():
+    """Install new I/O library as default.
+
+    This is only done if $PYTHONNEWIO is set and non-empty.
+    """
+    if not os.getenv("PYTHONNEWIO"):
+        return
+    import io
+    # Trick so that open won't become a bound method when stored
+    # as a class variable (as dumbdbm does)
+    class open:
+        def __new__(cls, *args, **kwds):
+            return io.open(*args, **kwds)
+    __builtin__.classic_open = __builtin__.open
+    __builtin__.classic_file = __builtin__.file
+    __builtin__.open = open
+    __builtin__.file = open
+    sys.stdin = io.open(0, "r")
+    sys.stdout = io.open(1, "w")
+    sys.stderr = io.open(2, "w")
+
+
 def main():
     abs__file__()
     paths_in_sys = removeduppaths()
@@ -414,6 +438,7 @@ def main():
     sethelper()
     aliasmbcs()
     setencoding()
+    installnewio()
     execsitecustomize()
     # Remove sys.setdefaultencoding() so that users cannot change the
     # encoding after initialization.  The test for presence is needed when

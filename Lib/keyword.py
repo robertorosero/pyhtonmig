@@ -14,6 +14,9 @@ __all__ = ["iskeyword", "kwlist"]
 
 kwlist = [
 #--start keywords--
+        'False',
+        'None',
+        'True',
         'and',
         'as',
         'assert',
@@ -34,10 +37,10 @@ kwlist = [
         'in',
         'is',
         'lambda',
+        'nonlocal',
         'not',
         'or',
         'pass',
-        'print',
         'raise',
         'return',
         'try',

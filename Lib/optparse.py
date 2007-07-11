@@ -67,7 +67,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 
 import sys, os
-import types
 import textwrap
 
 def _repr(self):
@@ -574,7 +573,7 @@ class Option:
         # Filter out None because early versions of Optik had exactly
         # one short option and one long option, either of which
         # could be None.
-        opts = filter(None, opts)
+        opts = [opt for opt in opts if opt]
         if not opts:
             raise TypeError("at least one option string must be supplied")
         return opts
@@ -641,7 +640,7 @@ class Option:
             # Python 2.1 and earlier, and is short-circuited by the
             # first check on modern Pythons.)
             import __builtin__
-            if ( type(self.type) is types.TypeType or
+            if ( isinstance(self.type, type) or
                  (hasattr(self.type, "__name__") and
                   getattr(__builtin__, self.type.__name__, None) is self.type) ):
                 self.type = self.type.__name__
@@ -660,7 +659,7 @@ class Option:
             if self.choices is None:
                 raise OptionError(
                     "must supply a list of choices for type 'choice'", self)
-            elif type(self.choices) not in (types.TupleType, types.ListType):
+            elif not isinstance(self.choices, (tuple, list)):
                 raise OptionError(
                     "choices must be a list of strings ('%s' supplied)"
                     % str(type(self.choices)).split("'")[1], self)
@@ -700,16 +699,16 @@ class Option:
 
     def _check_callback(self):
         if self.action == "callback":
-            if not callable(self.callback):
+            if not hasattr(self.callback, '__call__'):
                 raise OptionError(
                     "callback not callable: %r" % self.callback, self)
             if (self.callback_args is not None and
-                type(self.callback_args) is not types.TupleType):
+                not isinstance(self.callback_args, tuple)):
                 raise OptionError(
                     "callback_args, if supplied, must be a tuple: not %r"
                     % self.callback_args, self)
             if (self.callback_kwargs is not None and
-                type(self.callback_kwargs) is not types.DictType):
+                not isinstance(self.callback_kwargs, dict)):
                 raise OptionError(
                     "callback_kwargs, if supplied, must be a dict: not %r"
                     % self.callback_kwargs, self)
@@ -816,14 +815,8 @@ class Option:
 SUPPRESS_HELP = "SUPPRESS"+"HELP"
 SUPPRESS_USAGE = "SUPPRESS"+"USAGE"
 
-# For compatibility with Python 2.2
-try:
-    True, False
-except NameError:
-    (True, False) = (1, 0)
-
 def isbasestring(x):
-    return isinstance(x, types.StringType) or isinstance(x, types.UnicodeType)
+    return isinstance(x, basestring)
 
 class Values:
 
@@ -840,7 +833,7 @@ class Values:
     def __eq__(self, other):
         if isinstance(other, Values):
             return self.__dict__ == other.__dict__
-        elif isinstance(other, types.DictType):
+        elif isinstance(other, dict):
             return self.__dict__ == other
         else:
             return NotImplemented
@@ -1001,7 +994,7 @@ class OptionContainer:
         """add_option(Option)
            add_option(opt_str, ..., kwarg=val, ...)
         """
-        if type(args[0]) is types.StringType:
+        if isinstance(args[0], str):
             option = self.option_class(*args, **kwargs)
         elif len(args) == 1 and not kwargs:
             option = args[0]
@@ -1312,7 +1305,7 @@ class OptionParser (OptionContainer):
 
     def add_option_group(self, *args, **kwargs):
         # XXX lots of overlap with OptionContainer.add_option()
-        if type(args[0]) is types.StringType:
+        if isinstance(args[0], str):
             group = OptionGroup(self, *args, **kwargs)
         elif len(args) == 1 and not kwargs:
             group = args[0]

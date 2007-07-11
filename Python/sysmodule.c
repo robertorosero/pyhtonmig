@@ -163,33 +163,6 @@ clause in the current stack frame or in an older stack frame."
 );
 
 static PyObject *
-sys_exc_clear(PyObject *self, PyObject *noargs)
-{
-	PyThreadState *tstate = PyThreadState_GET();
-	PyObject *tmp_type, *tmp_value, *tmp_tb;
-	tmp_type = tstate->exc_type;
-	tmp_value = tstate->exc_value;
-	tmp_tb = tstate->exc_traceback;
-	tstate->exc_type = NULL;
-	tstate->exc_value = NULL;
-	tstate->exc_traceback = NULL;
-	Py_XDECREF(tmp_type);
-	Py_XDECREF(tmp_value);
-	Py_XDECREF(tmp_tb);
-	Py_INCREF(Py_None);
-	return Py_None;
-}
-
-PyDoc_STRVAR(exc_clear_doc,
-"exc_clear() -> None\n\
-\n\
-Clear global information on the current exception.  Subsequent calls to\n\
-exc_info() will return (None,None,None) until another exception is raised\n\
-in the current thread or the execution stack returns to a frame where\n\
-another exception is being handled."
-);
-
-static PyObject *
 sys_exit(PyObject *self, PyObject *args)
 {
 	PyObject *exit_code = 0;
@@ -760,7 +733,6 @@ static PyMethodDef sys_methods[] = {
 	 current_frames_doc},
 	{"displayhook",	sys_displayhook, METH_O, displayhook_doc},
 	{"exc_info",	sys_exc_info, METH_NOARGS, exc_info_doc},
-	{"exc_clear",	sys_exc_clear, METH_NOARGS, exc_clear_doc},
 	{"excepthook",	sys_excepthook, METH_VARARGS, excepthook_doc},
 	{"exit",	sys_exit, METH_VARARGS, exit_doc},
 #ifdef Py_USING_UNICODE
@@ -897,9 +869,6 @@ excepthook -- called to handle any uncaught exception other than SystemExit\n\
   To customize printing in an interactive session or to install a custom\n\
   top-level exception handler, assign other functions to replace these.\n\
 \n\
-exitfunc -- if sys.exitfunc exists, this routine is called when Python exits\n\
-  Assigning to sys.exitfunc is deprecated; use the atexit module instead.\n\
-\n\
 stdin -- standard input file object; used by raw_input() and input()\n\
 stdout -- standard output file object; used by print()\n\
 stderr -- standard error object; used for error messages\n\
@@ -911,12 +880,6 @@ last_value -- value of last uncaught exception\n\
 last_traceback -- traceback of last uncaught exception\n\
   These three are only available in an interactive session after a\n\
   traceback has been printed.\n\
-\n\
-exc_type -- type of exception currently being handled\n\
-exc_value -- value of exception currently being handled\n\
-exc_traceback -- traceback of exception currently being handled\n\
-  The function exc_info() should be used instead of these three,\n\
-  because it is thread-safe.\n\
 "
 )
 /* concatenating string here */
@@ -957,7 +920,6 @@ Functions:\n\
 displayhook() -- print an object to the screen, and save it in __builtin__._\n\
 excepthook() -- print an exception and its traceback to sys.stderr\n\
 exc_info() -- return thread-safe information about the current exception\n\
-exc_clear() -- clear the exception state for the current thread\n\
 exit() -- exit the interpreter by raising SystemExit\n\
 getdlopenflags() -- returns flags to be used for dlopen() calls\n\
 getrefcount() -- return the reference count for an object (plus one :-)\n\
@@ -1017,8 +979,6 @@ svnversion_init(void)
 	}
 	else if (istag || strncmp(br_start, "branches", 8) == 0) {
 		len = br_end2 - br_start;
-		assert(len >= 13);
-		assert(len < (sizeof(patchlevel_revision) - 13));
 		strncpy(branch, br_start, len);
 		branch[len] = '\0';
 
@@ -1037,6 +997,8 @@ svnversion_init(void)
 		svn_revision = svnversion;
 	else if (istag) {
 		len = strlen(_patchlevel_revision);
+		assert(len >= 13);
+		assert(len < (sizeof(patchlevel_revision) + 13));
 		strncpy(patchlevel_revision, _patchlevel_revision + 11,
 			len - 13);
 		patchlevel_revision[len - 13] = '\0';

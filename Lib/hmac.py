@@ -3,8 +3,8 @@
 Implements the HMAC algorithm as described by RFC 2104.
 """
 
-trans_5C = "".join ([chr (x ^ 0x5C) for x in xrange(256)])
-trans_36 = "".join ([chr (x ^ 0x36) for x in xrange(256)])
+trans_5C = "".join ([chr (x ^ 0x5C) for x in range(256)])
+trans_36 = "".join ([chr (x ^ 0x36) for x in range(256)])
 
 # The size of the digests returned by HMAC depends on the underlying
 # hashing module used.  Use digest_size from the instance of HMAC instead.
@@ -39,7 +39,7 @@ class HMAC:
             import hashlib
             digestmod = hashlib.md5
 
-        if callable(digestmod):
+        if hasattr(digestmod, '__call__'):
             self.digest_cons = digestmod
         else:
             self.digest_cons = lambda d='': digestmod.new(d)

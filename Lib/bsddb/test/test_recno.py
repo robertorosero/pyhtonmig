@@ -64,7 +64,7 @@ class SimpleRecnoTestCase(unittest.TestCase):
         try:
             data = d[0]  # This should raise a KeyError!?!?!
         except db.DBInvalidArgError as val:
-            assert val[0] == db.EINVAL
+            assert val.args[0] == db.EINVAL
             if verbose: print(val)
         else:
             self.fail("expected exception")
@@ -118,7 +118,7 @@ class SimpleRecnoTestCase(unittest.TestCase):
         assert not d.has_key(13)
 
         data = d.get_both(26, "z" * 60)
-        assert data == "z" * 60
+        assert data == "z" * 60, 'was %r' % data
         if verbose:
             print(data)
 
@@ -181,7 +181,7 @@ class SimpleRecnoTestCase(unittest.TestCase):
             if get_returns_none:
                 self.fail("unexpected DBKeyEmptyError exception")
             else:
-                assert val[0] == db.DB_KEYEMPTY
+                assert val.args[0] == db.DB_KEYEMPTY
                 if verbose: print(val)
         else:
             if not get_returns_none:
@@ -268,7 +268,7 @@ class SimpleRecnoTestCase(unittest.TestCase):
         try:                    # this one will fail
             d.append('bad' * 20)
         except db.DBInvalidArgError as val:
-            assert val[0] == db.EINVAL
+            assert val.args[0] == db.EINVAL
             if verbose: print(val)
         else:
             self.fail("expected exception")

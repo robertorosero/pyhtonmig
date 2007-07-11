@@ -10,6 +10,7 @@ Command line options:
 
 -v: verbose    -- run tests in verbose mode with output to stdout
 -w: verbose2   -- re-run failed tests in verbose mode
+-d: debug      -- print traceback for failed tests
 -q: quiet      -- don't print anything except if a test fails
 -g: generate   -- write the output file for a test instead of comparing it
 -x: exclude    -- arguments are tests to *exclude*
@@ -106,11 +107,8 @@ resources to test.  Currently only the following are defined:
     decimal -   Test the decimal module against a large suite that
                 verifies compliance with standards.
 
-    compiler -  Test the compiler package by compiling all the source
-                in the standard library and test suite.  This takes
-                a long time.  Enabling this resource also allows
-                test_tokenize to verify round-trip lexing on every
-                file in the test library.
+    compiler -  Allow test_tokenize to verify round-trip lexing on
+                every file in the test library.
 
     subprocess  Run all tests for the subprocess module.
 
@@ -179,7 +177,7 @@ def usage(code, msg=''):
 def main(tests=None, testdir=None, verbose=0, quiet=False, generate=False,
          exclude=False, single=False, randomize=False, fromfile=None,
          findleaks=False, use_resources=None, trace=False, coverdir='coverage',
-         runleaks=False, huntrleaks=False, verbose2=False):
+         runleaks=False, huntrleaks=False, verbose2=False, debug=False):
     """Execute a test suite.
 
     This also parses command-line options and modifies its behavior
@@ -204,12 +202,13 @@ def main(tests=None, testdir=None, verbose=0, quiet=False, generate=False,
 
     test_support.record_original_stdout(sys.stdout)
     try:
-        opts, args = getopt.getopt(sys.argv[1:], 'hvgqxsrf:lu:t:TD:NLR:wM:',
+        opts, args = getopt.getopt(sys.argv[1:], 'dhvgqxsrf:lu:t:TD:NLR:wM:',
                                    ['help', 'verbose', 'quiet', 'generate',
                                     'exclude', 'single', 'random', 'fromfile',
                                     'findleaks', 'use=', 'threshold=', 'trace',
                                     'coverdir=', 'nocoverdir', 'runleaks',
                                     'huntrleaks=', 'verbose2', 'memlimit=',
+                                    'debug',
                                     ])
     except getopt.error as msg:
         usage(2, msg)
@@ -224,6 +223,8 @@ def main(tests=None, testdir=None, verbose=0, quiet=False, generate=False,
             verbose += 1
         elif o in ('-w', '--verbose2'):
             verbose2 = True
+        elif o in ('-d', '--debug'):
+            debug = True
         elif o in ('-q', '--quiet'):
             quiet = True;
             verbose = 0
@@ -435,7 +436,7 @@ def main(tests=None, testdir=None, verbose=0, quiet=False, generate=False,
             try:
                 test_support.verbose = 1
                 ok = runtest(test, generate, 1, quiet, testdir,
-                             huntrleaks)
+                             huntrleaks, debug)
             except KeyboardInterrupt:
                 # print a newline separate from the ^C
                 print()
@@ -470,10 +471,13 @@ def main(tests=None, testdir=None, verbose=0, quiet=False, generate=False,
 STDTESTS = [
     'test_grammar',
     'test_opcodes',
-    'test_operations',
+    'test_dict',
     'test_builtin',
     'test_exceptions',
     'test_types',
+    'test_unittest',
+    'test_doctest',
+    'test_doctest2',
    ]
 
 NOTTESTS = [
@@ -496,7 +500,8 @@ def findtests(testdir=None, stdtests=STDTESTS, nottests=NOTTESTS):
     tests.sort()
     return stdtests + tests
 
-def runtest(test, generate, verbose, quiet, testdir=None, huntrleaks=False):
+def runtest(test, generate, verbose, quiet, testdir=None,
+            huntrleaks=False, debug=False):
     """Run a single test.
 
     test -- the name of the test
@@ -507,6 +512,8 @@ def runtest(test, generate, verbose, quiet, testdir=None, huntrleaks=False):
     testdir -- test directory
     huntrleaks -- run multiple times to test for leaks; requires a debug
                   build; a triple corresponding to -R's three arguments
+    debug -- if true, print tracebacks for failed tests regardless of
+             verbose setting
     Return:
         -2  test skipped because resource denied
         -1  test skipped for some other reason
@@ -516,12 +523,12 @@ def runtest(test, generate, verbose, quiet, testdir=None, huntrleaks=False):
 
     try:
         return runtest_inner(test, generate, verbose, quiet, testdir,
-                             huntrleaks)
+                             huntrleaks, debug)
     finally:
         cleanup_test_droppings(test, verbose)
 
 def runtest_inner(test, generate, verbose, quiet,
-                     testdir=None, huntrleaks=False):
+                     testdir=None, huntrleaks=False, debug=False):
     test_support.unload(test)
     if not testdir:
         testdir = findtestdir()
@@ -576,7 +583,7 @@ def runtest_inner(test, generate, verbose, quiet,
         type, value = sys.exc_info()[:2]
         print("test", test, "crashed --", str(type) + ":", value)
         sys.stdout.flush()
-        if verbose:
+        if verbose or debug:
             traceback.print_exc(file=sys.stdout)
             sys.stdout.flush()
         return 0
@@ -662,7 +669,8 @@ def dash_R(the_module, test, indirect_test, huntrleaks):
             indirect_test()
     else:
         def run_the_test():
-            reload(the_module)
+            del sys.modules[the_module.__name__]
+            exec('import ' + the_module.__name__)
 
     deltas = []
     nwarmup, ntracked, fname = huntrleaks
@@ -679,16 +687,17 @@ def dash_R(the_module, test, indirect_test, huntrleaks):
             deltas.append(sys.gettotalrefcount() - rc - 2)
     print(file=sys.stderr)
     if any(deltas):
-        print(test, 'leaked', deltas, 'references', file=sys.stderr)
+        msg = '%s leaked %s references, sum=%s' % (test, deltas, sum(deltas))
+        print(msg, file=sys.stderr)
         refrep = open(fname, "a")
-        print(test, 'leaked', deltas, 'references', file=refrep)
+        print(msg, file=refrep)
         refrep.close()
 
 def dash_R_cleanup(fs, ps, pic):
     import gc, copy_reg
     import _strptime, linecache, dircache
     import urlparse, urllib, urllib2, mimetypes, doctest
-    import struct, filecmp
+    import struct, filecmp, _abcoll
     from distutils.dir_util import _path_created
 
     # Restore some original values.
@@ -697,6 +706,13 @@ def dash_R_cleanup(fs, ps, pic):
     copy_reg.dispatch_table.update(ps)
     sys.path_importer_cache.clear()
     sys.path_importer_cache.update(pic)
+
+    # Clear ABC registries.
+    for abc in [getattr(_abcoll, a) for a in _abcoll.__all__]:
+        for obj in abc.__subclasses__() + [abc]:
+            obj._ABCMeta__registry.clear()
+            obj._ABCMeta__cache.clear()
+            obj._ABCMeta__negative_cache.clear()
 
     # Clear assorted module caches.
     _path_created.clear()
@@ -808,11 +824,7 @@ _expectations = {
         """
         test__locale
         test_applesingle
-        test_al
-        test_bsddb185
         test_bsddb3
-        test_cd
-        test_cl
         test_commands
         test_crypt
         test_curses
@@ -821,9 +833,7 @@ _expectations = {
         test_fcntl
         test_fork1
         test_gdbm
-        test_gl
         test_grp
-        test_imgfile
         test_ioctl
         test_largefile
         test_linuxaudiodev
@@ -839,21 +849,14 @@ _expectations = {
         test_signal
         test_sunaudiodev
         test_threadsignals
-        test_timing
         test_wait3
         test_wait4
         """,
     'linux2':
         """
-        test_al
         test_applesingle
-        test_bsddb185
-        test_cd
-        test_cl
         test_curses
         test_dl
-        test_gl
-        test_imgfile
         test_largefile
         test_linuxaudiodev
         test_nis
@@ -865,14 +868,10 @@ _expectations = {
         """,
    'mac':
         """
-        test_al
         test_atexit
         test_bsddb
-        test_bsddb185
         test_bsddb3
         test_bz2
-        test_cd
-        test_cl
         test_commands
         test_crypt
         test_curses
@@ -880,10 +879,8 @@ _expectations = {
         test_dl
         test_fcntl
         test_fork1
-        test_gl
         test_grp
         test_ioctl
-        test_imgfile
         test_largefile
         test_linuxaudiodev
         test_locale
@@ -894,7 +891,6 @@ _expectations = {
         test_ossaudiodev
         test_poll
         test_popen
-        test_popen2
         test_posix
         test_pty
         test_pwd
@@ -905,19 +901,12 @@ _expectations = {
         test_sunaudiodev
         test_sundry
         test_tarfile
-        test_timing
         """,
     'unixware7':
         """
-        test_al
         test_applesingle
         test_bsddb
-        test_bsddb185
-        test_cd
-        test_cl
         test_dl
-        test_gl
-        test_imgfile
         test_largefile
         test_linuxaudiodev
         test_minidom
@@ -933,15 +922,9 @@ _expectations = {
         """,
     'openunix8':
         """
-        test_al
         test_applesingle
         test_bsddb
-        test_bsddb185
-        test_cd
-        test_cl
         test_dl
-        test_gl
-        test_imgfile
         test_largefile
         test_linuxaudiodev
         test_minidom
@@ -957,18 +940,12 @@ _expectations = {
         """,
     'sco_sv3':
         """
-        test_al
         test_applesingle
         test_asynchat
         test_bsddb
-        test_bsddb185
-        test_cd
-        test_cl
         test_dl
         test_fork1
         test_gettext
-        test_gl
-        test_imgfile
         test_largefile
         test_linuxaudiodev
         test_locale
@@ -990,15 +967,11 @@ _expectations = {
         """,
     'riscos':
         """
-        test_al
         test_applesingle
         test_asynchat
         test_atexit
         test_bsddb
-        test_bsddb185
         test_bsddb3
-        test_cd
-        test_cl
         test_commands
         test_crypt
         test_dbm
@@ -1006,9 +979,7 @@ _expectations = {
         test_fcntl
         test_fork1
         test_gdbm
-        test_gl
         test_grp
-        test_imgfile
         test_largefile
         test_linuxaudiodev
         test_locale
@@ -1017,10 +988,8 @@ _expectations = {
         test_ntpath
         test_openpty
         test_poll
-        test_popen2
         test_pty
         test_pwd
-        test_strop
         test_sqlite
         test_startfile
         test_sunaudiodev
@@ -1029,16 +998,10 @@ _expectations = {
         test_threaded_import
         test_threadedtempfile
         test_threading
-        test_timing
         """,
     'darwin':
         """
-        test_al
-        test_cd
-        test_cl
         test_gdbm
-        test_gl
-        test_imgfile
         test_largefile
         test_linuxaudiodev
         test_locale
@@ -1049,18 +1012,12 @@ _expectations = {
         """,
     'sunos5':
         """
-        test_al
         test_applesingle
         test_bsddb
-        test_bsddb185
-        test_cd
-        test_cl
         test_curses
         test_dbm
         test_gdbm
-        test_gl
         test_gzip
-        test_imgfile
         test_linuxaudiodev
         test_openpty
         test_sqlite
@@ -1070,18 +1027,12 @@ _expectations = {
         """,
     'hp-ux11':
         """
-        test_al
         test_applesingle
         test_bsddb
-        test_bsddb185
-        test_cd
-        test_cl
         test_curses
         test_dl
         test_gdbm
-        test_gl
         test_gzip
-        test_imgfile
         test_largefile
         test_linuxaudiodev
         test_locale
@@ -1099,16 +1050,10 @@ _expectations = {
         """,
     'atheos':
         """
-        test_al
         test_applesingle
-        test_bsddb185
-        test_cd
-        test_cl
         test_curses
         test_dl
         test_gdbm
-        test_gl
-        test_imgfile
         test_largefile
         test_linuxaudiodev
         test_locale
@@ -1116,7 +1061,6 @@ _expectations = {
         test_mmap
         test_nis
         test_poll
-        test_popen2
         test_resource
         test_sqlite
         test_startfile
@@ -1124,16 +1068,10 @@ _expectations = {
         """,
     'cygwin':
         """
-        test_al
         test_applesingle
-        test_bsddb185
         test_bsddb3
-        test_cd
-        test_cl
         test_curses
         test_dbm
-        test_gl
-        test_imgfile
         test_ioctl
         test_largefile
         test_linuxaudiodev
@@ -1146,18 +1084,12 @@ _expectations = {
         """,
     'os2emx':
         """
-        test_al
         test_applesingle
         test_audioop
-        test_bsddb185
         test_bsddb3
-        test_cd
-        test_cl
         test_commands
         test_curses
         test_dl
-        test_gl
-        test_imgfile
         test_largefile
         test_linuxaudiodev
         test_mhlib
@@ -1175,18 +1107,12 @@ _expectations = {
     'freebsd4':
         """
         test_aepack
-        test_al
         test_applesingle
         test_bsddb
         test_bsddb3
-        test_cd
-        test_cl
         test_gdbm
-        test_gl
-        test_imgfile
         test_linuxaudiodev
         test_locale
-        test_macfs
         test_macostools
         test_nis
         test_ossaudiodev
@@ -1209,21 +1135,14 @@ _expectations = {
     'aix5':
         """
         test_aepack
-        test_al
         test_applesingle
         test_bsddb
-        test_bsddb185
         test_bsddb3
         test_bz2
-        test_cd
-        test_cl
         test_dl
         test_gdbm
-        test_gl
         test_gzip
-        test_imgfile
         test_linuxaudiodev
-        test_macfs
         test_macostools
         test_nis
         test_ossaudiodev
@@ -1239,20 +1158,14 @@ _expectations = {
     'openbsd3':
         """
         test_aepack
-        test_al
         test_applesingle
         test_bsddb
         test_bsddb3
-        test_cd
-        test_cl
         test_ctypes
         test_dl
         test_gdbm
-        test_gl
-        test_imgfile
         test_linuxaudiodev
         test_locale
-        test_macfs
         test_macostools
         test_nis
         test_normalization
@@ -1271,22 +1184,15 @@ _expectations = {
     'netbsd3':
         """
         test_aepack
-        test_al
         test_applesingle
         test_bsddb
-        test_bsddb185
         test_bsddb3
-        test_cd
-        test_cl
         test_ctypes
         test_curses
         test_dl
         test_gdbm
-        test_gl
-        test_imgfile
         test_linuxaudiodev
         test_locale
-        test_macfs
         test_macostools
         test_nis
         test_ossaudiodev
@@ -1324,12 +1230,8 @@ class _ExpectedSkips:
             if test_timeout.skip_expected:
                 self.expected.add('test_timeout')
 
-            if sys.maxint == 9223372036854775807:
-                self.expected.add('test_rgbimg')
-                self.expected.add('test_imageop')
-
             if not sys.platform in ("mac", "darwin"):
-                MAC_ONLY = ["test_macostools", "test_macfs", "test_aepack",
+                MAC_ONLY = ["test_macostools", "test_aepack",
                             "test_plistlib", "test_scriptpackages"]
                 for skip in MAC_ONLY:
                     self.expected.add(skip)
@@ -1338,6 +1240,11 @@ class _ExpectedSkips:
                 WIN_ONLY = ["test_unicode_file", "test_winreg",
                             "test_winsound"]
                 for skip in WIN_ONLY:
+                    self.expected.add(skip)
+
+            if sys.platform != 'irix':
+                IRIX_ONLY =["test_imageop"]
+                for skip in IRIX_ONLY:
                     self.expected.add(skip)
 
             self.valid = True

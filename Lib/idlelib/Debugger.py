@@ -253,7 +253,8 @@ class Debugger:
         if self.vsource.get():
             self.sync_source_line()
 
-    def show_frame(self, (frame, lineno)):
+    def show_frame(self, stackitem):
+        frame, lineno = stackitem
         self.frame = frame
         self.show_variables()
 
@@ -348,8 +349,7 @@ class StackViewer(ScrolledList):
             funcname = code.co_name
             import linecache
             sourceline = linecache.getline(filename, lineno)
-            import string
-            sourceline = string.strip(sourceline)
+            sourceline = sourceline.strip()
             if funcname in ("?", "", None):
                 item = "%s, line %d: %s" % (modname, lineno, sourceline)
             else:

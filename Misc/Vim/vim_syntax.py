@@ -1,4 +1,6 @@
 from __future__ import with_statement
+# XXX(nnorwitz): what versions of python is this file supposed to work with?
+# It uses the old print statement not in py3k.
 
 import keyword
 import exceptions
@@ -139,7 +141,7 @@ def fill_stmt(iterable, fill_len):
             overflow = None
         while total_len < fill_len:
             try:
-                new_item = it.next()
+                new_item = next(it)
                 buffer_.append(new_item)
                 total_len += len(new_item) + 1
             except StopIteration:
@@ -188,7 +190,7 @@ def main(file_path):
                                             FILL - len(prefix) - len(indent))
                         try:
                             while True:
-                                print>>FILE, indent + prefix + stmt_iter.next()
+                                print>>FILE, indent + prefix + next(stmt_iter)
                         except StopIteration:
                             print>>FILE, ''
                     else:

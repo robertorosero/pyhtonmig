@@ -26,7 +26,7 @@ Copyright (C) 2001-2007 Vinay Sajip. All Rights Reserved.
 To use, simply 'import logging' and log away!
 """
 
-import sys, os, types, time, string, cStringIO, traceback
+import sys, os, time, cStringIO, traceback
 
 try:
     import codecs
@@ -48,13 +48,15 @@ __date__    = "16 February 2007"
 #   Miscellaneous module data
 #---------------------------------------------------------------------------
 
+_unicode = 'unicode' in dir(__builtins__)
+
 #
 # _srcfile is used when walking the stack to check when we've got the first
 # caller stack frame.
 #
 if hasattr(sys, 'frozen'): #support for py2exe
     _srcfile = "logging%s__init__%s" % (os.sep, __file__[-4:])
-elif string.lower(__file__[-4:]) in ['.pyc', '.pyo']:
+elif __file__[-4:].lower() in ['.pyc', '.pyo']:
     _srcfile = __file__[:-4] + '.py'
 else:
     _srcfile = __file__
@@ -66,7 +68,7 @@ def currentframe():
     try:
         raise Exception
     except:
-        return sys.exc_traceback.tb_frame.f_back
+        return sys.exc_info()[2].tb_frame.f_back
 
 if hasattr(sys, '_getframe'): currentframe = lambda: sys._getframe(3)
 # done filching
@@ -234,7 +236,7 @@ class LogRecord:
         # 'Value is %d' instead of 'Value is 0'.
         # For the use case of passing a dictionary, this should not be a
         # problem.
-        if args and (len(args) == 1) and args[0] and (type(args[0]) == types.DictType):
+        if args and (len(args) == 1) and args[0] and isinstance(args[0], dict):
             args = args[0]
         self.args = args
         self.levelname = getLevelName(level)
@@ -275,11 +277,11 @@ class LogRecord:
         Return the message for this LogRecord after merging any user-supplied
         arguments with the message.
         """
-        if not hasattr(types, "UnicodeType"): #if no unicode support...
+        if not _unicode: #if no unicode support...
             msg = str(self.msg)
         else:
             msg = self.msg
-            if type(msg) not in (types.UnicodeType, types.StringType):
+            if not isinstance(msg, basestring):
                 try:
                     msg = str(self.msg)
                 except UnicodeError:
@@ -398,7 +400,7 @@ class Formatter:
         traceback.print_exception(ei[0], ei[1], ei[2], None, sio)
         s = sio.getvalue()
         sio.close()
-        if s[-1] == "\n":
+        if s[-1:] == "\n":
             s = s[:-1]
         return s
 
@@ -416,7 +418,7 @@ class Formatter:
         formatException() and appended to the message.
         """
         record.message = record.getMessage()
-        if string.find(self._fmt,"%(asctime)") >= 0:
+        if self._fmt.find("%(asctime)") >= 0:
             record.asctime = self.formatTime(record, self.datefmt)
         s = self._fmt % record.__dict__
         if record.exc_info:
@@ -425,7 +427,7 @@ class Formatter:
             if not record.exc_text:
                 record.exc_text = self.formatException(record.exc_info)
         if record.exc_text:
-            if s[-1] != "\n":
+            if s[-1:] != "\n":
                 s = s + "\n"
             s = s + record.exc_text
         return s
@@ -510,7 +512,7 @@ class Filter:
             return 1
         elif self.name == record.name:
             return 1
-        elif string.find(record.name, self.name, 0, self.nlen) != 0:
+        elif record.name.find(self.name, 0, self.nlen) != 0:
             return 0
         return (record.name[self.nlen] == ".")
 
@@ -743,7 +745,7 @@ class StreamHandler(Handler):
         try:
             msg = self.format(record)
             fs = "%s\n"
-            if not hasattr(types, "UnicodeType"): #if no unicode support...
+            if not _unicode: #if no unicode support...
                 self.stream.write(fs % msg)
             else:
                 try:
@@ -896,7 +898,7 @@ class Manager:
         from the specified logger to the root of the logger hierarchy.
         """
         name = alogger.name
-        i = string.rfind(name, ".")
+        i = name.rfind(".")
         rv = None
         while (i > 0) and not rv:
             substr = name[:i]
@@ -909,7 +911,7 @@ class Manager:
                 else:
                     assert isinstance(obj, PlaceHolder)
                     obj.append(alogger)
-            i = string.rfind(name, ".", 0, i - 1)
+            i = name.rfind(".", 0, i - 1)
         if not rv:
             rv = self.root
         alogger.parent = rv
@@ -1053,7 +1055,7 @@ class Logger(Filterer):
 
         logger.log(level, "We have a %s", "mysterious problem", exc_info=1)
         """
-        if type(level) != types.IntType:
+        if not isinstance(level, int):
             if raiseExceptions:
                 raise TypeError, "level must be an integer"
             else:
@@ -1103,7 +1105,7 @@ class Logger(Filterer):
         else:
             fn, lno, func = "(unknown file)", 0, "(unknown function)"
         if exc_info:
-            if type(exc_info) != types.TupleType:
+            if not isinstance(exc_info, tuple):
                 exc_info = sys.exc_info()
         record = self.makeRecord(self.name, level, fn, lno, msg, args, exc_info, func, extra)
         self.handle(record)

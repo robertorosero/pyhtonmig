@@ -168,8 +168,6 @@ class PyBuildExt(build_ext):
         if platform in ['Darwin1.2', 'beos']:
             math_libs = []
 
-        # XXX Omitted modules: gl, pure, dl, SGI-specific modules
-
         #
         # The following modules are all pretty straightforward, and compile
         # on pretty much any POSIXish platform.
@@ -188,8 +186,6 @@ class PyBuildExt(build_ext):
         # math library functions, e.g. sin()
         exts.append( Extension('math',  ['mathmodule.c'],
                                libraries=math_libs) )
-        # fast string operations implemented in C
-        exts.append( Extension('strop', ['stropmodule.c']) )
         # time operations and variables
         exts.append( Extension('time', ['timemodule.c'],
                                libraries=math_libs) )
@@ -243,9 +239,6 @@ class PyBuildExt(build_ext):
 
         # Lance Ellinghaus's syslog daemon interface
         exts.append( Extension('syslog', ['syslogmodule.c']) )
-
-        # George Neville-Neil's timing module:
-        exts.append( Extension('timing', ['timingmodule.c']) )
 
         #
         # Here ends the simple stuff.  From here on, modules need certain
@@ -342,15 +335,8 @@ class PyBuildExt(build_ext):
         if self.compiler.find_library_file(lib_dirs, 'db'):
             dblib = ['db']
 
-        db185_incs = find_file('db_185.h', inc_dirs,
-                               ['/usr/include/db3', '/usr/include/db2'])
         db_inc = find_file('db.h', inc_dirs, ['/usr/include/db1'])
-        if db185_incs is not None:
-            exts.append( Extension('bsddb', ['bsddbmodule.c'],
-                                   include_dirs = db185_incs,
-                                   define_macros=[('HAVE_DB_185_H',1)],
-                                   libraries = dblib ) )
-        elif db_inc is not None:
+        db_inc is not None:
             exts.append( Extension('bsddb', ['bsddbmodule.c'],
                                    include_dirs = db_inc,
                                    libraries = dblib) )
