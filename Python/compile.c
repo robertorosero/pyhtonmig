@@ -42,6 +42,7 @@ int Py_OptimizeFlag = 0;
 #define COMP_GENEXP   0
 #define COMP_LISTCOMP 1
 #define COMP_SETCOMP  2
+#define COMP_DICTCOMP 3
 
 struct instr {
 	unsigned i_jabs : 1;
@@ -2726,7 +2727,7 @@ compiler_call_helper(struct compiler *c,
 static int
 compiler_comprehension_generator(struct compiler *c, PyObject *tmpname,
 				 asdl_seq *generators, int gen_index, 
-				 expr_ty elt, int type)
+				 expr_ty elt, expr_ty val, int type)
 {
 	/* generate code for the iterator, then each of the ifs,
 	   and then write to the element */
@@ -2774,7 +2775,7 @@ compiler_comprehension_generator(struct compiler *c, PyObject *tmpname,
 	if (++gen_index < asdl_seq_LEN(generators))
 		if (!compiler_comprehension_generator(c, tmpname, 
 						      generators, gen_index,
-						      elt, type))
+						      elt, val, type))
 		return 0;
 
 	/* only append after the last for generator */
@@ -2798,6 +2799,17 @@ compiler_comprehension_generator(struct compiler *c, PyObject *tmpname,
 			VISIT(c, expr, elt);
 			ADDOP(c, SET_ADD);
 			break;
+		case COMP_DICTCOMP:
+			if (!compiler_nameop(c, tmpname, Load))
+				return 0;
+			/* With 'd[k] = v', v is evaluated before k, so we do
+			   the same. STORE_SUBSCR requires (item, map, key),
+			   so we still end up ROTing once. */
+			VISIT(c, expr, val);
+			ADDOP(c, ROT_TWO);
+			VISIT(c, expr, elt);
+			ADDOP(c, STORE_SUBSCR);
+			break;
 		default:
 			return 0;
 		}
@@ -2819,7 +2831,7 @@ compiler_comprehension_generator(struct compiler *c, PyObject *tmpname,
 
 static int
 compiler_comprehension(struct compiler *c, expr_ty e, int type, identifier name,
-		       asdl_seq *generators, expr_ty elt)
+		       asdl_seq *generators, expr_ty elt, expr_ty val)
 {
 	PyCodeObject *co = NULL;
 	identifier tmp = NULL;
@@ -2832,18 +2844,34 @@ compiler_comprehension(struct compiler *c, expr_ty e, int type, identifier name,
 		goto error;
 	
 	if (type != COMP_GENEXP) {
+		int op;
 		tmp = compiler_new_tmpname(c);
 		if (!tmp)
 			goto error_in_scope;
+		switch (type) {
+		case COMP_LISTCOMP:
+			op = BUILD_LIST;
+			break;
+		case COMP_SETCOMP:
+			op = BUILD_SET;
+			break;
+		case COMP_DICTCOMP:
+			op = BUILD_MAP;
+			break;
+		default:
+			PyErr_Format(PyExc_SystemError,
+				     "unknown comprehension type %d", type);
+			goto error_in_scope;
+		}
 
-		ADDOP_I(c, (type == COMP_LISTCOMP ?
-			    BUILD_LIST : BUILD_SET), 0);
+		ADDOP_I(c, op, 0);
 		ADDOP(c, DUP_TOP);
 		if (!compiler_nameop(c, tmp, Store))
 			goto error_in_scope;
 	}
 	
-	if (!compiler_comprehension_generator(c, tmp, generators, 0, elt, type))
+	if (!compiler_comprehension_generator(c, tmp, generators, 0, elt,
+					      val, type))
 		goto error_in_scope;
 	
 	if (type != COMP_GENEXP) {
@@ -2884,7 +2912,7 @@ compiler_genexp(struct compiler *c, expr_ty e)
 	assert(e->kind == GeneratorExp_kind);
 	return compiler_comprehension(c, e, COMP_GENEXP, name,
 				      e->v.GeneratorExp.generators,
-				      e->v.GeneratorExp.elt);
+				      e->v.GeneratorExp.elt, NULL);
 }
 
 static int
@@ -2899,7 +2927,7 @@ compiler_listcomp(struct compiler *c, expr_ty e)
 	assert(e->kind == ListComp_kind);
 	return compiler_comprehension(c, e, COMP_LISTCOMP, name,
 				      e->v.ListComp.generators,
-				      e->v.ListComp.elt);
+				      e->v.ListComp.elt, NULL);
 }
 
 static int
@@ -2914,7 +2942,23 @@ compiler_setcomp(struct compiler *c, expr_ty e)
 	assert(e->kind == SetComp_kind);
 	return compiler_comprehension(c, e, COMP_SETCOMP, name,
 				      e->v.SetComp.generators,
-				      e->v.SetComp.elt);
+				      e->v.SetComp.elt, NULL);
+}
+
+
+static int
+compiler_dictcomp(struct compiler *c, expr_ty e)
+{
+	static identifier name;
+	if (!name) {
+		name = PyString_FromString("<dictcomp>");
+		if (!name)
+			return 0;
+	}
+	assert(e->kind == DictComp_kind);
+	return compiler_comprehension(c, e, COMP_DICTCOMP, name,
+				      e->v.DictComp.generators,
+				      e->v.DictComp.key, e->v.DictComp.value);
 }
 
 
@@ -3145,6 +3189,8 @@ compiler_visit_expr(struct compiler *c, expr_ty e)
 		return compiler_listcomp(c, e);
 	case SetComp_kind:
 		return compiler_setcomp(c, e);
+	case DictComp_kind:
+		return compiler_dictcomp(c, e);
 	case Yield_kind:
 		if (c->u->u_ste->ste_type != FunctionBlock)
 			return compiler_error(c, "'yield' outside function");
