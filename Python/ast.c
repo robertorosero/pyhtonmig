@@ -1133,7 +1133,7 @@ ast_for_comprehension(struct compiling *c, const node *n)
     int i, n_fors;
     asdl_seq *comps;
 
-    n_fors = count_comp_fors(CHILD(n, 1));
+    n_fors = count_comp_fors(n);
     if (n_fors == -1)
         return NULL;
 
@@ -1152,10 +1152,10 @@ ast_for_comprehension(struct compiling *c, const node *n)
         for_ch = CHILD(n, 1);
         t = ast_for_exprlist(c, for_ch, Store);
         if (!t)
-            return -1;
+            return NULL;
         expression = ast_for_expr(c, CHILD(n, 3));
         if (!expression)
-            return -1;
+            return NULL;
 
         /* Check the # of children rather than the length of t, since
            (x for x, in ...) has 1 element in t, but still requires a Tuple. */
@@ -1168,7 +1168,7 @@ ast_for_comprehension(struct compiling *c, const node *n)
                                  expression, NULL, c->c_arena);
 
         if (!comp)
-            return -1;
+            return NULL;
 
         if (NCH(n) == 5) {
             int j, n_ifs;
@@ -1177,11 +1177,11 @@ ast_for_comprehension(struct compiling *c, const node *n)
             n = CHILD(n, 4);
             n_ifs = count_comp_ifs(n);
             if (n_ifs == -1)
-                return -1;
+                return NULL;
 
             ifs = asdl_seq_new(n_ifs, c->c_arena);
             if (!ifs)
-                return -1;
+                return NULL;
 
             for (j = 0; j < n_ifs; j++) {
                 REQ(n, comp_iter);
@@ -1190,7 +1190,7 @@ ast_for_comprehension(struct compiling *c, const node *n)
                 
                 expression = ast_for_expr(c, CHILD(n, 1));
                 if (!expression)
-                    return -1;
+                    return NULL;
                 asdl_seq_SET(ifs, j, expression);
                 if (NCH(n) == 3)
                     n = CHILD(n, 2);
@@ -1279,42 +1279,6 @@ ast_for_setcomp(struct compiling *c, const node *n)
     return ast_for_itercomp(c, n, COMP_SETCOMP);
 }
 
-static expr_ty
-ast_for_dictcomp(struct compiling *c, const node *n)
-{
-    /* dict(orset)maker: test ':' test ( comp_for | (',' test ':' test)* [','] )
-       comp_iter: comp_for | comp_if
-       comp_for: 'for' exprlist 'in' or_test [comp_iter]
-       comp_if: 'if' test_nocond [comp_iter]
-     */
-    expr_ty key, value;
-    asdl_seq *comps;
-    int i, n_fors;
-    node *ch;
-    
-    assert(NCH(n) > 3);
-    REQ(CHILD(n, 1), COLON);
-    
-    key = ast_for_expr(c, CHILD(n, 0));
-    if (!key)
-        return NULL;
-    value = ast_for_expr(c, CHILD(n, 2));
-    if (!value)
-        return NULL;
-    
-    n_fors = count_comp_fors(CHILD(n, 3));
-    if (n_fors == -1)
-        return NULL;
-
-    comps = asdl_seq_new(n_fors, c->c_arena);
-    if (!comps)
-        return NULL;
-
-    if (ast_for_comprehension(c, CHILD(n, 3), n_fors, comps) < 0)
-        return NULL;
-
-    return DictComp(key, value, comps, LINENO(n), n->n_col_offset, c->c_arena);
-}
 
 static expr_ty
 ast_for_atom(struct compiling *c, const node *n)
@@ -1410,15 +1374,8 @@ ast_for_atom(struct compiling *c, const node *n)
         } else if (TYPE(CHILD(ch, 1)) == comp_for) {
             /* it's a set comprehension */
             return ast_for_setcomp(c, ch);
-<<<<<<< .working
-        } else if (NCH(ch) > 3 && TYPE(CHILD(ch, 3)) == comp_for) {
-            /* it's a dict comprehension */
-            return ast_for_dictcomp(c, ch);
-        }
-=======
         } else if (NCH(ch) > 3 && TYPE(CHILD(ch, 3)) == comp_for) {
             return ast_for_dictcomp(c, ch);
->>>>>>> .merge-right.r56274
         } else {
             /* it's a dict */
             size = (NCH(ch) + 1) / 4; /* +1 in case no trailing comma */
