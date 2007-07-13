@@ -335,12 +335,12 @@ def main(tests=None, testdir=None, verbose=0, quiet=False, generate=False,
         tests = map(removepy, tests)
 
     stdtests = STDTESTS[:]
-    nottests = NOTTESTS[:]
+    nottests = NOTTESTS.copy()
     if exclude:
         for arg in args:
             if arg in stdtests:
                 stdtests.remove(arg)
-        nottests[:0] = args
+            nottests.add(arg)
         args = []
     tests = tests or args or findtests(testdir, stdtests, nottests)
     if single:
@@ -478,14 +478,14 @@ STDTESTS = [
     'test_unittest',
     'test_doctest',
     'test_doctest2',
-   ]
+]
 
-NOTTESTS = [
+NOTTESTS = {
     'test_support',
     'test_future1',
     'test_future2',
     'test_future3',
-    ]
+}
 
 def findtests(testdir=None, stdtests=STDTESTS, nottests=NOTTESTS):
     """Return a list of all applicable test modules."""
