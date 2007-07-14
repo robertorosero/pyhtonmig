@@ -491,8 +491,10 @@ BytesIO_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     self->buf_size = size + 1;
 
     if (size > 0) {
-        if (write_bytes(self, buf, size) == -1)
+        if (write_bytes(self, buf, size) == -1) {
+            Py_DECREF(self);            
             return NULL;
+        }
         self->pos = 0;
     }
     if (self->buf == NULL) {
