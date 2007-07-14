@@ -989,7 +989,7 @@ class TextDoc(Doc):
         """Indent text by prepending a given prefix to each line."""
         if not text: return ''
         lines = text.split('\n')
-        lines = map(lambda line, prefix=prefix: prefix + line, lines)
+        lines = list(map(lambda line, prefix=prefix: prefix + line, lines))
         if lines: lines[-1] = lines[-1].rstrip()
         return '\n'.join(lines)
 
